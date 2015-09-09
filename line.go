@@ -684,6 +684,17 @@ mainLoop:
 			// Catch unhandled control codes (anything <= 31)
 			case 0, 28, 29, 30, 31:
 				fmt.Print(beep)
+			case '?':
+				if s.helper != nil {
+					t := s.helper(string(line))
+					if len(t) > 0 {
+						fmt.Println("?")
+						fmt.Println(t)
+						s.refresh(p, line, pos)
+						continue mainLoop
+					}
+				}
+				fallthrough
 			default:
 				if pos == len(line) && len(p)+len(line) < s.columns-1 {
 					line = append(line, v)

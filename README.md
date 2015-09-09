@@ -38,6 +38,7 @@ Ctrl-R       | Reverse Search history (Ctrl-S forward, Ctrl-G cancel)
 Ctrl-Y       | Paste from Yank buffer (Alt-Y to paste next yank instead)
 Tab          | Next completion
 Shift-Tab    | (after Tab) Previous completion
+?            | Print available help text
 
 Getting started
 -----------------
@@ -72,6 +73,11 @@ func main() {
 		}
 		return
 	})
+	if len(os.Args) > 1 && os.Args[1] == "-with-help" {
+		line.SetHelper(func(line string) string {
+			return "Enter your name."
+		})
+	}
 
 	if f, err := os.Open(history_fn); err == nil {
 		line.ReadHistory(f)

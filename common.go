@@ -24,6 +24,7 @@ type commonState struct {
 	history           []string
 	historyMutex      sync.RWMutex
 	completer         WordCompleter
+	helper            Helper
 	columns           int
 	killRing          *ring.Ring
 	ctrlCAborts       bool
@@ -182,6 +183,16 @@ func (s *State) SetCompleter(f Completer) {
 // fetch completion candidates when the user presses tab.
 func (s *State) SetWordCompleter(f WordCompleter) {
 	s.completer = f
+}
+
+// Helper takes the currently edited line content at the left of the cursor
+// and returns the best available help text.
+type Helper func(line string) string
+
+// SetHelper sets the function that Liner will call to
+// fetch the best available help text for the given line.
+func (s *State) SetHelper(f Helper) {
+	s.helper = f
 }
 
 // SetTabCompletionStyle sets the behvavior when the Tab key is pressed
