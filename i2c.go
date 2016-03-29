@@ -22,7 +22,7 @@ func (p *I2c) Usage() string {
 	return "i2c BUS.ADDR[.REG] [VALUE] [WRITE-DELAY-IN-SEC]"
 }
 
-func (p *I2c) Run(ctx *goes.Context, args ...string) {
+func (p *I2c) Main(ctx *goes.Context, args ...string) {
 	var (
 		bus     i2c.Bus
 		sd      i2c.SMBusData
