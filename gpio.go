@@ -117,7 +117,7 @@ func (p pinValues) Len() int           { return len(p) }
 func (p pinValues) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p pinValues) Less(i, j int) bool { return p[i].name < p[j].name }
 
-func (p *Gpio) Run(ctx *goes.Context, args ...string) {
+func (p *Gpio) Main(ctx *goes.Context, args ...string) {
 	if len(args) > 2 {
 		p.Panic(args[2:], ": unexpected")
 	}
