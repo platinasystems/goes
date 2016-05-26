@@ -8,6 +8,7 @@ package gpio
 import (
 	"github.com/platinasystems/fdt"
 	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/log"
 	. "github.com/platinasystems/gpio"
 	"github.com/platinasystems/oops"
 
@@ -31,19 +32,19 @@ var gpios PinMap
 func init() {
 	goes.Command.Map(&Gpio{oops.Id("gpio")})
 
-	// Parse linux.dtb to generate gpio map for this machine
-	b, err := ioutil.ReadFile(dtbFile)
-	if err != nil {
-		panic(err)
-	}
-	t := &fdt.Tree{Debug: false, IsLittleEndian: false}
-	t.Parse(b)
-
 	gpioAlias = make(GpioAliasMap)
 	gpios = make(PinMap)
 
-	t.MatchNode("aliases", gatherGpioAliases)
-	t.EachProperty("gpio-controller", "", gatherGpioPins)
+	// Parse linux.dtb to generate gpio map for this machine
+	if b, err := ioutil.ReadFile(dtbFile); err == nil {
+		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+		t.Parse(b)
+
+		t.MatchNode("aliases", gatherGpioAliases)
+		t.EachProperty("gpio-controller", "", gatherGpioPins)
+	} else {
+		log.Print("daemon", "err", "gpio: ", dtbFile, ": ", err)
+	}
 }
 
 func (p *Gpio) Usage() string {
