@@ -16,9 +16,11 @@ import (
 
 type I2c struct{ oops.Id }
 
-func init() { goes.Command.Map(&I2c{oops.Id("i2c")}) }
+var Commands = goes.Commands{
+	&I2c{"i2c"},
+}
 
-func (p *I2c) Usage() string {
+func (*I2c) Usage() string {
 	return "i2c BUS.ADDR[.REG] [VALUE] [WRITE-DELAY-IN-SEC]"
 }
 
