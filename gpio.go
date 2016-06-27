@@ -26,12 +26,14 @@ const (
 
 type Gpio struct{ oops.Id }
 
+var Commands = goes.Commands{
+	&Gpio{"gpio"},
+}
+
 var gpioAlias GpioAliasMap
 var gpios PinMap
 
 func init() {
-	goes.Command.Map(&Gpio{oops.Id("gpio")})
-
 	gpioAlias = make(GpioAliasMap)
 	gpios = make(PinMap)
 
@@ -47,7 +49,7 @@ func init() {
 	}
 }
 
-func (p *Gpio) Usage() string {
+func (*Gpio) Usage() string {
 	return "gpio PIN_NAME [VALUE]"
 }
 
