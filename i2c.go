@@ -8,23 +8,24 @@ package i2c
 import (
 	"fmt"
 
+	"time"
+
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/oops"
-	"time"
 )
 
-type I2c struct{ oops.Id }
+type i2c_ struct{ oops.Id }
 
 var Commands = goes.Commands{
-	&I2c{"i2c"},
+	&i2c_{"i2c"},
 }
 
-func (*I2c) Usage() string {
+func (*i2c_) Usage() string {
 	return "i2c BUS.ADDR[.REG] [VALUE] [WRITE-DELAY-IN-SEC]"
 }
 
-func (p *I2c) Main(ctx *goes.Context, args ...string) {
+func (p *i2c_) Main(args ...string) {
 	var (
 		bus     i2c.Bus
 		sd      i2c.SMBusData
@@ -97,7 +98,7 @@ func (p *I2c) Main(ctx *goes.Context, args ...string) {
 		if err != nil {
 			p.Panic(err)
 		}
-		ctx.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
+		fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
 		if c == cs[1] {
 			break
 		}

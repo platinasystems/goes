@@ -6,11 +6,11 @@
 
 package i2c
 
-func (p *I2c) Apropos() string {
+func (*i2c_) Apropos() string {
 	return "read/write I2C bus devices"
 }
 
-func (p *I2c) Man() string {
+func (*i2c_) Man() string {
 	return `NAME
 	i2c - Read/write I2C bus devices
 
