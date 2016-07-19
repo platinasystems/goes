@@ -24,10 +24,10 @@ const (
 	dtbFile = "/boot/linux.dtb"
 )
 
-type Gpio struct{ oops.Id }
+type gpio struct{ oops.Id }
 
 var Commands = goes.Commands{
-	&Gpio{"gpio"},
+	&gpio{"gpio"},
 }
 
 var gpioAlias GpioAliasMap
@@ -49,7 +49,7 @@ func init() {
 	}
 }
 
-func (*Gpio) Usage() string {
+func (*gpio) Usage() string {
 	return "gpio PIN_NAME [VALUE]"
 }
 
@@ -120,7 +120,7 @@ func (p pinValues) Len() int           { return len(p) }
 func (p pinValues) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p pinValues) Less(i, j int) bool { return p[i].name < p[j].name }
 
-func (p *Gpio) Main(ctx *goes.Context, args ...string) {
+func (p *gpio) Main(args ...string) {
 	if len(args) > 2 {
 		p.Panic(args[2:], ": unexpected")
 	}
@@ -131,7 +131,7 @@ func (p *Gpio) Main(ctx *goes.Context, args ...string) {
 			err := p.SetDirection()
 			if err != nil {
 				// Don't panic just report error and continue.
-				ctx.Println(err)
+				fmt.Println(err)
 			}
 		}
 		return
@@ -145,13 +145,13 @@ func (p *Gpio) Main(ctx *goes.Context, args ...string) {
 			v, err := p.Value()
 			if err != nil {
 				// Don't panic just report error and continue.
-				ctx.Println(err)
+				fmt.Println(err)
 			}
 			pvs = append(pvs, pinValue{name: n, value: v, pin: p})
 		}
 		sort.Sort(pvs)
 		for i := range pvs {
-			ctx.Println(&pvs[i])
+			fmt.Println(&pvs[i])
 		}
 		return
 	}
@@ -178,10 +178,10 @@ func (p *Gpio) Main(ctx *goes.Context, args ...string) {
 
 		// Single arg? Read specified pin value.
 		if v, err := pv.pin.Value(); err != nil {
-			ctx.Println(err)
+			fmt.Println(err)
 		} else {
 			pv.value = v
 		}
-		ctx.Println(&pv)
+		fmt.Println(&pv)
 	}
 }

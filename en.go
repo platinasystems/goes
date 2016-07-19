@@ -6,11 +6,11 @@
 
 package gpio
 
-func (p *Gpio) Apropos() string {
+func (*gpio) Apropos() string {
 	return "manipulate GPIO pins"
 }
 
-func (p *Gpio) Man() string {
+func (*gpio) Man() string {
 	return `NAME
 	gpio - Manipulate GPIO pins
 
