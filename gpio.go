@@ -8,7 +8,6 @@ package gpio
 import (
 	"github.com/platinasystems/fdt"
 	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/log"
 	. "github.com/platinasystems/gpio"
 	"github.com/platinasystems/oops"
 
@@ -20,34 +19,15 @@ import (
 	"sync"
 )
 
-const (
-	dtbFile = "/boot/linux.dtb"
-)
-
 type gpio struct{ oops.Id }
 
 var Commands = goes.Commands{
 	&gpio{"gpio"},
 }
 
+var File = "/boot/linux.dtb"
 var gpioAlias GpioAliasMap
 var gpios PinMap
-
-func init() {
-	gpioAlias = make(GpioAliasMap)
-	gpios = make(PinMap)
-
-	// Parse linux.dtb to generate gpio map for this machine
-	if b, err := ioutil.ReadFile(dtbFile); err == nil {
-		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
-		t.Parse(b)
-
-		t.MatchNode("aliases", gatherGpioAliases)
-		t.EachProperty("gpio-controller", "", gatherGpioPins)
-	} else {
-		log.Print("daemon", "err", "gpio: ", dtbFile, ": ", err)
-	}
-}
 
 func (*gpio) Usage() string {
 	return "gpio PIN_NAME [VALUE]"
@@ -123,6 +103,20 @@ func (p pinValues) Less(i, j int) bool { return p[i].name < p[j].name }
 func (p *gpio) Main(args ...string) {
 	if len(args) > 2 {
 		p.Panic(args[2:], ": unexpected")
+	}
+
+	gpioAlias = make(GpioAliasMap)
+	gpios = make(PinMap)
+
+	// Parse linux.dtb to generate gpio map for this machine
+	if b, err := ioutil.ReadFile(File); err == nil {
+		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+		t.Parse(b)
+
+		t.MatchNode("aliases", gatherGpioAliases)
+		t.EachProperty("gpio-controller", "", gatherGpioPins)
+	} else {
+		p.Panic(File, ": ", err)
 	}
 
 	if len(args) == 1 && args[0] == "default" {
