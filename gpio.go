@@ -7,7 +7,6 @@ package gpio
 
 import (
 	"github.com/platinasystems/fdt"
-	"github.com/platinasystems/goes"
 	. "github.com/platinasystems/gpio"
 	"github.com/platinasystems/oops"
 
@@ -21,9 +20,7 @@ import (
 
 type gpio struct{ oops.Id }
 
-var Commands = goes.Commands{
-	&gpio{"gpio"},
-}
+var Gpio = &gpio{"gpio"}
 
 var File = "/boot/linux.dtb"
 var gpioAlias GpioAliasMap
