@@ -10,16 +10,13 @@ import (
 
 	"time"
 
-	"github.com/platinasystems/goes"
 	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/oops"
 )
 
 type i2c_ struct{ oops.Id }
 
-var Commands = goes.Commands{
-	&i2c_{"i2c"},
-}
+var I2c = &i2c_{"i2c"}
 
 func (*i2c_) Usage() string {
 	return "i2c BUS.ADDR[.REG] [VALUE] [WRITE-DELAY-IN-SEC]"
