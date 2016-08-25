@@ -18,12 +18,5 @@ SYNOPSIS
 	i2c
 
 DESCRIPTION
-	Read/write I2C bus devices.
-
-	To set the address for a RANDOM READ from an I2C EEPROM device,
-	use OP=2 and specify a VALUE for the address.
-	Example:  i2c 0.55.0 2 40
-
-	To read from an I2C EEPROM I2C device, use OP=1 without VALUE.
-	Example:  i2c 0.55.0 1    The address will auto-increment.`
+	Read/write I2C bus devices.`
 }

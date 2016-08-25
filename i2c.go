@@ -19,25 +19,30 @@ type i2c_ struct{ oops.Id }
 var I2c = &i2c_{"i2c"}
 
 func (*i2c_) Usage() string {
-	return "i2c BUS.ADDR[.REG_BEGIN][-REG_END] [OP] [VALUE] [WRITE-DELAY-IN-SEC]"
+	return "i2c ['EEPROM'] BUS.ADDR[.BEGIN][-END] [VALUE] [WRITE-DELAY-IN-SEC]"
 }
 
 func (p *i2c_) Main(args ...string) {
 	var (
-		bus           i2c.Bus
-		sd            i2c.SMBusData
-		b, a, d, o, t uint8
-		cs            [2]uint8
+		bus     i2c.Bus
+		sd      i2c.SMBusData
+		b, a, d uint8
+		cs      [2]uint8
 	)
 
 	if n := len(args); n == 0 {
 		p.Panic("BUS.ADDR.REG: missing")
-	} else if n > 4 {
-		p.Panic(args[4:], ": unexpected")
+	} else if n > 3 {
+		p.Panic(args[3:], ": unexpected")
 	}
 
-	oValid := len(args) > 1
-	dValid := len(args) > 2
+	eeprom := 0
+	if args[0] == "EEPROM" {
+		fmt.Println("EEPROM")
+		eeprom, args = 1, args[1:]
+	}
+
+	dValid := len(args) > 1
 
 	nc := 2
 	_, err := fmt.Sscanf(args[0], "%x.%x.%x-%x", &b, &a, &cs[0], &cs[1])
@@ -53,23 +58,17 @@ func (p *i2c_) Main(args ...string) {
 		p.Panic(args[0], ": invalid BUS.ADDR[.REG]: ", err)
 	}
 
-	if oValid {
-		_, err = fmt.Sscanf(args[1], "%x", &o)
+	if dValid {
+		_, err = fmt.Sscanf(args[1], "%x", &d)
 		if err != nil {
 			p.Panic(args[1], ": invalid value: ", err)
 		}
 	}
 
-	if dValid {
-		_, err = fmt.Sscanf(args[2], "%x", &d)
-		if err != nil {
-			p.Panic(args[2], ": invalid value: ", err)
-		}
-	}
-
-	if len(args) > 3 {
-		s := args[3]
-		_, err := fmt.Sscanf(s, "%x", &t)
+	writeDelay := float64(0)
+	if len(args) > 2 {
+		s := args[2]
+		_, err := fmt.Sscanf(s, "%f", &writeDelay)
 		if err != nil {
 			p.Panic(s, ": invalid delay: ", err)
 		}
@@ -86,12 +85,17 @@ func (p *i2c_) Main(args ...string) {
 		p.Panic(err)
 	}
 
-	op := i2c.ByteData
-	if nc == 0 {
-		op = i2c.Byte
+	if eeprom == 1 {
+		sd[0] = cs[0]
+		err = bus.Do(i2c.Write, 0, i2c.ByteData, &sd)
+		if err != nil {
+			p.Panic(err)
+		}
 	}
-	if oValid {
-		op = (i2c.SMBusSize)(o)
+
+	op := i2c.ByteData
+	if nc == 0 || eeprom == 1 {
+		op = i2c.Byte
 	}
 
 	rw := i2c.Read
@@ -114,8 +118,8 @@ func (p *i2c_) Main(args ...string) {
 			break
 		}
 		c++
-		if rw == i2c.Write && t > 0 {
-			time.Sleep(time.Second * time.Duration(t))
+		if rw == i2c.Write && writeDelay > 0 {
+			time.Sleep(time.Second * time.Duration(writeDelay))
 		}
 	}
 }
