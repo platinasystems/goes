@@ -18,5 +18,12 @@ SYNOPSIS
 	i2c
 
 DESCRIPTION
-	Read/write I2C bus devices.`
+	Read/write I2C bus devices.
+
+	Examples:
+	    i2c 0.76.0 80          writes a 0x80
+	    i2c 0.2f.1f            reads device 0x2f, register 0x1f
+	    i2c 0.2f.1f-20         reads two bytes
+	    i2c EEPROM 0.55.0-30   reads 0x0-0x30 from EEPROM`
+
 }

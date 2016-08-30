@@ -38,7 +38,6 @@ func (p *i2c_) Main(args ...string) {
 
 	eeprom := 0
 	if args[0] == "EEPROM" {
-		fmt.Println("EEPROM")
 		eeprom, args = 1, args[1:]
 	}
 
@@ -104,22 +103,48 @@ func (p *i2c_) Main(args ...string) {
 		sd[0] = d
 	}
 
-	if nc < 2 {
-		cs[1] = cs[0]
-	}
 	c := cs[0]
-	for {
+	if nc < 2 {
 		err = bus.Do(rw, c, op, &sd)
 		if err != nil {
 			p.Panic(err)
 		}
 		fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
+		return
+	}
+
+	s := ""
+	count := 0
+	ascii := ""
+	for {
+		err = bus.Do(rw, c, op, &sd)
+		if err != nil {
+			p.Panic(err)
+		}
+		if count == 0 {
+			s += fmt.Sprintf("%02x: ", c)
+		}
+		s += fmt.Sprintf("%02x ", sd[0])
+		if sd[0] < 0x7e && sd[0] > 0x1f {
+			ascii += fmt.Sprintf("%c", sd[0])
+		} else {
+			ascii += "."
+		}
 		if c == cs[1] {
 			break
 		}
 		c++
+		count++
+		if count == 16 {
+			count = 0
+			s += "   "
+			s += ascii
+			s += "\n"
+			ascii = ""
+		}
 		if rw == i2c.Write && writeDelay > 0 {
 			time.Sleep(time.Second * time.Duration(writeDelay))
 		}
 	}
+	fmt.Println(s)
 }
