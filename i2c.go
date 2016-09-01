@@ -19,15 +19,15 @@ type i2c_ struct{ oops.Id }
 var I2c = &i2c_{"i2c"}
 
 func (*i2c_) Usage() string {
-	return "i2c ['EEPROM'] BUS.ADDR[.BEGIN][-END] [VALUE] [WRITE-DELAY-IN-SEC]"
+	return "i2c ['EEPROM'] BUS.ADDR[.BEGIN][-END][/8][/16] [VALUE] [WRITE-DELAY-IN-SEC]"
 }
 
 func (p *i2c_) Main(args ...string) {
 	var (
-		bus     i2c.Bus
-		sd      i2c.SMBusData
-		b, a, d uint8
-		cs      [2]uint8
+		bus        i2c.Bus
+		sd         i2c.SMBusData
+		b, a, d, w uint8
+		cs         [2]uint8
 	)
 
 	if n := len(args); n == 0 {
@@ -44,17 +44,30 @@ func (p *i2c_) Main(args ...string) {
 	dValid := len(args) > 1
 
 	nc := 2
-	_, err := fmt.Sscanf(args[0], "%x.%x.%x-%x", &b, &a, &cs[0], &cs[1])
+	w = 0
+	_, err := fmt.Sscanf(args[0], "%x.%x.%x-%x/%d", &b, &a, &cs[0], &cs[1], &w)
 	if err != nil {
-		nc = 1
-		_, err = fmt.Sscanf(args[0], "%x.%x.%x", &b, &a, &cs[0])
+		_, err = fmt.Sscanf(args[0], "%x.%x.%x-%x", &b, &a, &cs[0], &cs[1])
 		if err != nil {
-			nc = 0
-			_, err = fmt.Sscanf(args[0], "%x.%x", &b, &a)
+			nc = 1
+			_, err = fmt.Sscanf(args[0], "%x.%x.%x/%d", &b, &a, &cs[0], &w)
+			if err != nil {
+				_, err = fmt.Sscanf(args[0], "%x.%x.%x", &b, &a, &cs[0])
+				if err != nil {
+					nc = 0
+					_, err = fmt.Sscanf(args[0], "%x.%x/%d", &b, &a, &w)
+					if err != nil {
+						_, err = fmt.Sscanf(args[0], "%x.%x", &b, &a)
+					}
+				}
+			}
 		}
 	}
 	if err != nil {
 		p.Panic(args[0], ": invalid BUS.ADDR[.REG]: ", err)
+	}
+	if w != 0 && w != 8 && w != 16 {
+		p.Panic(w, ": invalid R/W width: ", w)
 	}
 
 	if dValid {
@@ -84,17 +97,22 @@ func (p *i2c_) Main(args ...string) {
 		p.Panic(err)
 	}
 
+	c := uint8(0)
+	op := i2c.ByteData
 	if eeprom == 1 {
 		sd[0] = cs[0]
-		err = bus.Do(i2c.Write, 0, i2c.ByteData, &sd)
+		err = bus.Do(i2c.Write, c, op, &sd)
 		if err != nil {
 			p.Panic(err)
 		}
 	}
 
-	op := i2c.ByteData
-	if nc == 0 || eeprom == 1 {
+	op = i2c.ByteData
+	if nc == 0 || eeprom == 1 || w == 8 {
 		op = i2c.Byte
+	}
+	if w == 16 {
+		op = i2c.ByteData
 	}
 
 	rw := i2c.Read
@@ -103,7 +121,7 @@ func (p *i2c_) Main(args ...string) {
 		sd[0] = d
 	}
 
-	c := cs[0]
+	c = cs[0]
 	if nc < 2 {
 		err = bus.Do(rw, c, op, &sd)
 		if err != nil {
