@@ -10,7 +10,7 @@ import (
 
 	"time"
 
-	"github.com/platinasystems/i2c"
+	"github.com/platinasystems/goes/i2c"
 	"github.com/platinasystems/oops"
 )
 
