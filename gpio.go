@@ -6,8 +6,8 @@
 package gpio
 
 import (
-	"github.com/platinasystems/fdt"
-	. "github.com/platinasystems/gpio"
+	"github.com/platinasystems/goes/fdt"
+	. "github.com/platinasystems/goes/gpio"
 	"github.com/platinasystems/oops"
 
 	"fmt"
