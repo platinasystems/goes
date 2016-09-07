@@ -6,8 +6,8 @@
 package gpio
 
 import (
-	"github.com/platinasystems/goes/fdt"
-	. "github.com/platinasystems/goes/gpio"
+	"github.com/platinasystems/fdt"
+	. "github.com/platinasystems/gpio"
 	"github.com/platinasystems/oops"
 
 	"fmt"
@@ -23,36 +23,36 @@ type gpio struct{ oops.Id }
 var Gpio = &gpio{"gpio"}
 
 var File = "/boot/linux.dtb"
-var gpioAlias GpioAliasMap
-var gpios PinMap
+var GpioAlias GpioAliasMap
+var Gpios PinMap
 
 func (*gpio) Usage() string {
 	return "gpio PIN_NAME [VALUE]"
 }
 
 // Build map of gpio pins for this gpio controller
-func gatherGpioAliases(n *fdt.Node) {
+func GatherGpioAliases(n *fdt.Node) {
 	for p, pn := range n.Properties {
 		if strings.Contains(p, "gpio") {
 			val := strings.Split(string(pn), "\x00")
 			v := strings.Split(val[0], "/")
-			gpioAlias[p] = v[len(v)-1]
+			GpioAlias[p] = v[len(v)-1]
 		}
 	}
 }
 
 func buildPinMap(name string, mode string, bank string, index string) {
 	i, _ := strconv.Atoi(index)
-	gpios[name] = GpioPinMode[mode] | GpioBankToBase[bank] |
+	Gpios[name] = GpioPinMode[mode] | GpioBankToBase[bank] |
 		Pin(i)
 }
 
 // Build map of gpio pins for this gpio controller
-func gatherGpioPins(n *fdt.Node, name string, value string) {
+func GatherGpioPins(n *fdt.Node, name string, value string) {
 	var pn []string
 	var mode string
 
-	for na, al := range gpioAlias {
+	for na, al := range GpioAlias {
 		if al == n.Name {
 			for _, c := range n.Children {
 				for p, _ := range c.Properties {
@@ -74,51 +74,80 @@ func gatherGpioPins(n *fdt.Node, name string, value string) {
 
 var once sync.Once
 
-type pinValue struct {
-	name  string
-	pin   Pin
-	value bool
+type PinValue struct {
+	Name  string
+	PinNum  Pin
+	Value bool
 }
-type pinValues []pinValue
+type pinValues []PinValue
 
-func (p *pinValue) String() string {
+func (p *PinValue) String() string {
 	kind := "IN"
-	if p.pin&IsOutputHi != 0 {
+	if p.PinNum&IsOutputHi != 0 {
 		kind = "OUT HI"
 	}
-	if p.pin&IsOutputLo != 0 {
+	if p.PinNum&IsOutputLo != 0 {
 		kind = "OUT LO"
 	}
-	return fmt.Sprintf("%8s%32s: %v", kind, p.name, p.value)
+	return fmt.Sprintf("%8s%32s: %v", kind, p.Name, p.Value)
 }
+
+func GpioInit () {
+
+	GpioAlias = make(GpioAliasMap)
+        Gpios = make(PinMap)
+
+        // Parse linux.dtb to generate gpio map for this machine
+        if b, err := ioutil.ReadFile(File); err == nil {
+                t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+                t.Parse(b)
+
+                t.MatchNode("aliases", GatherGpioAliases)
+                t.EachProperty("gpio-controller", "", GatherGpioPins)
+        } else {
+                fmt.Println(err)
+        }
+
+	// Set pin directions.
+	for _, p := range Gpios {
+		err := p.SetDirection()
+		if err != nil {
+		// Don't panic just report error and continue.
+			fmt.Println(err)
+		}
+	}
+	return
+}
+
 
 // Implement sort.Interface
 func (p pinValues) Len() int           { return len(p) }
 func (p pinValues) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p pinValues) Less(i, j int) bool { return p[i].name < p[j].name }
+func (p pinValues) Less(i, j int) bool { return p[i].Name < p[j].Name }
 
 func (p *gpio) Main(args ...string) {
 	if len(args) > 2 {
 		p.Panic(args[2:], ": unexpected")
 	}
 
-	gpioAlias = make(GpioAliasMap)
-	gpios = make(PinMap)
+	GpioAlias = make(GpioAliasMap)
+	Gpios = make(PinMap)
 
 	// Parse linux.dtb to generate gpio map for this machine
 	if b, err := ioutil.ReadFile(File); err == nil {
 		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
 		t.Parse(b)
 
-		t.MatchNode("aliases", gatherGpioAliases)
-		t.EachProperty("gpio-controller", "", gatherGpioPins)
+		t.MatchNode("aliases", GatherGpioAliases)
+		t.EachProperty("gpio-controller", "", GatherGpioPins)
 	} else {
 		p.Panic(File, ": ", err)
 	}
 
+
 	if len(args) == 1 && args[0] == "default" {
 		// Set pin directions.
-		for _, p := range gpios {
+		for _, p := range Gpios {
 			err := p.SetDirection()
 			if err != nil {
 				// Don't panic just report error and continue.
@@ -132,13 +161,13 @@ func (p *gpio) Main(args ...string) {
 	if len(args) == 0 {
 
 		pvs := pinValues{}
-		for n, p := range gpios {
+		for n, p := range Gpios {
 			v, err := p.Value()
 			if err != nil {
 				// Don't panic just report error and continue.
 				fmt.Println(err)
 			}
-			pvs = append(pvs, pinValue{name: n, value: v, pin: p})
+			pvs = append(pvs, PinValue{Name: n, Value: v, PinNum: p})
 		}
 		sort.Sort(pvs)
 		for i := range pvs {
@@ -148,10 +177,10 @@ func (p *gpio) Main(args ...string) {
 	}
 
 	if len(args) > 0 {
-		pv := pinValue{name: args[0]}
+		pv := PinValue{Name: args[0]}
 		ok := false
-		if pv.pin, ok = gpios[pv.name]; !ok {
-			p.Panic("no such pin: " + pv.name)
+		if pv.PinNum, ok = Gpios[pv.Name]; !ok {
+			p.Panic("no such pin: " + pv.Name)
 		}
 
 		if len(args) == 2 {
@@ -164,14 +193,14 @@ func (p *gpio) Main(args ...string) {
 				p.Panic("expected true|false or 0|1, got ",
 					args[1])
 			}
-			pv.pin.SetValue(ok)
+			pv.PinNum.SetValue(ok)
 		}
 
 		// Single arg? Read specified pin value.
-		if v, err := pv.pin.Value(); err != nil {
+		if v, err := pv.PinNum.Value(); err != nil {
 			fmt.Println(err)
 		} else {
-			pv.value = v
+			pv.Value = v
 		}
 		fmt.Println(&pv)
 	}
