@@ -112,7 +112,7 @@ func (p *i2c_) Main(args ...string) {
 		op = i2c.Byte
 	}
 	if w == 16 {
-		op = i2c.ByteData
+		op = i2c.WordData
 	}
 
 	rw := i2c.Read
