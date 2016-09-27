@@ -127,8 +127,14 @@ func (p *i2c_) Main(args ...string) {
 		if err != nil {
 			p.Panic(err)
 		}
-		fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
-		return
+		if w == 16 {
+			j := (uint16(sd[1]<<8) | uint16(sd[0]))
+			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, j)
+			return
+		} else {
+			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
+			return
+		}
 	}
 
 	s := ""
@@ -142,7 +148,11 @@ func (p *i2c_) Main(args ...string) {
 		if count == 0 {
 			s += fmt.Sprintf("%02x: ", c)
 		}
-		s += fmt.Sprintf("%02x ", sd[0])
+		if w == 16 {
+			s += fmt.Sprintf("%02x ", (uint16(sd[1])<<8 | uint16(sd[0])))
+		} else {
+			s += fmt.Sprintf("%02x ", sd[0])
+		}
 		if sd[0] < 0x7e && sd[0] > 0x1f {
 			ascii += fmt.Sprintf("%c", sd[0])
 		} else {
