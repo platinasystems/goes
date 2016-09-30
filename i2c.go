@@ -128,8 +128,7 @@ func (p *i2c_) Main(args ...string) {
 			p.Panic(err)
 		}
 		if w == 16 {
-			j := (uint16(sd[1]<<8) | uint16(sd[0]))
-			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, j)
+			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, uint16(sd[1])<<8|uint16(sd[0]))
 			return
 		} else {
 			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
