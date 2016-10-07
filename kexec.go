@@ -7,8 +7,10 @@ package kexec
 import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/fit"
+	"github.com/platinasystems/goes/coreutils/reboot"
 	"github.com/platinasystems/oops"
 	"io/ioutil"
+	"syscall"
 )
 
 type kexec struct {
@@ -54,10 +56,13 @@ func (p *kexec) Main(args ...string) {
 		}
 	}
 
-	if p.flags["-e"] {
-		err = fit.KexecRebootSyscall()
+	if p.flags["-e"] || p.flags["-f"] {
+		if !p.flags["-f"] {
+			reboot.Prepare()
+		}
+		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
 		if err != nil {
-			panic(err)
+			p.Panic(err)
 		}
 	}
 }
