@@ -7,10 +7,12 @@ package kexec
 import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/fit"
+	kexecSyscall "github.com/platinasystems/goes/kexec"
 	"github.com/platinasystems/goes/coreutils/reboot"
 	"github.com/platinasystems/oops"
 	"io/ioutil"
 	"syscall"
+	"os"
 )
 
 type kexec struct {
@@ -34,7 +36,9 @@ func (*kexec) Flags() goes.Flags {
 
 func (*kexec) Parms() goes.Parms {
 	return goes.Parms{
-		"-c": goes.Parm{"CONFIGURATION", nil, ""},
+	        "-c": goes.Parm{"CONFIGURATION", nil, ""},
+		"-i": goes.Parm{"INITRAMFS", goes.Complete.File, ""},
+		"-k": goes.Parm{"KERNEL", goes.Complete.File, ""},
 		"-l": goes.Parm{"IMAGE", goes.Complete.File, ""},
 	}
 }
@@ -47,13 +51,16 @@ func (p *kexec) Main(args ...string) {
 		p.Panic(err)
 	}
 
+	if len(args) > 0 {
+		p.Panic(args[0:], ": unexpected")
+	}
+
 	if image := p.parms["-l"]; len(image) > 0 {
-		switch len(args) {
-		case 0:
-			p.load(image)
-		default:
-			p.Panic(args[0:], ": unexpected")
-		}
+		p.loadFit(image)
+	}
+
+	if kernel := p.parms["-k"]; len(kernel) > 0 {
+		p.loadKernel(kernel)
 	}
 
 	if p.flags["-e"] || p.flags["-f"] {
@@ -67,7 +74,7 @@ func (p *kexec) Main(args ...string) {
 	}
 }
 
-func (p *kexec) load(image string) {
+func (p *kexec) loadFit(image string) {
 	b, err := ioutil.ReadFile(image)
 	if err != nil {
 		p.Panic(err)
@@ -85,6 +92,30 @@ func (p *kexec) load(image string) {
 
 	err = fit.KexecLoadConfig(config, 0x0)
 
+	if err != nil {
+		p.Panic(err)
+	}
+}
+
+func (p *kexec) loadKernel(kernel string) {
+	k, err := os.Open(kernel)
+	if err != nil {
+		p.Panic(err)
+	}
+	defer k.Close()
+
+	initramfs := p.parms["-i"]
+	if len(initramfs) == 0 {
+		p.Panic("Initramfs (-i) must be specified")
+	}
+
+	i, err := os.Open(initramfs)
+	if err != nil {
+		p.Panic(err)
+	}
+	defer i.Close()
+
+	err = kexecSyscall.FileLoad(k, i, "", 0)
 	if err != nil {
 		p.Panic(err)
 	}
