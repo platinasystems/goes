@@ -34,7 +34,7 @@ func (*kexec) Flags() goes.Flags {
 
 func (*kexec) Parms() goes.Parms {
 	return goes.Parms{
-		"-c": goes.Parm{"IMAGE", nil, ""},
+		"-c": goes.Parm{"CONFIGURATION", nil, ""},
 		"-l": goes.Parm{"IMAGE", goes.Complete.File, ""},
 	}
 }
