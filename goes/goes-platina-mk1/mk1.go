@@ -245,7 +245,7 @@ func main() {
 	machined.Hook = func() {
 		machined.NetLink.Prefixes("lo.", "eth0.")
 		machined.InfoProviders = append(machined.InfoProviders, &Info{
-			Id:       "mk1",
+			name:     "mk1",
 			prefixes: []string{"eth-", "dp-"},
 			attrs:    make(machined.Attrs),
 		})
