@@ -36,10 +36,11 @@ func (*kexec) Flags() goes.Flags {
 
 func (*kexec) Parms() goes.Parms {
 	return goes.Parms{
-	        "-c": goes.Parm{"CONFIGURATION", nil, ""},
+		"-c": goes.Parm{"COMMANDLINE", nil, ""},
 		"-i": goes.Parm{"INITRAMFS", goes.Complete.File, ""},
 		"-k": goes.Parm{"KERNEL", goes.Complete.File, ""},
 		"-l": goes.Parm{"IMAGE", goes.Complete.File, ""},
+	        "-x": goes.Parm{"CONFIGURATION", nil, ""},
 	}
 }
 
@@ -82,7 +83,7 @@ func (p *kexec) loadFit(image string) {
 
 	fit := fit.Parse(b)
 
-	configName := p.parms["-c"]
+	configName := p.parms["-x"]
 	if len(configName) == 0 {
 		configName = fit.DefaultConfig
 	}
@@ -115,7 +116,7 @@ func (p *kexec) loadKernel(kernel string) {
 	}
 	defer i.Close()
 
-	err = kexecSyscall.FileLoad(k, i, "", 0)
+	err = kexecSyscall.FileLoad(k, i, p.parms["-c"], 0)
 	if err != nil {
 		p.Panic(err)
 	}
