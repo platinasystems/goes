@@ -200,7 +200,8 @@ func Main(args ...string) error {
 		return nil
 	}
 	name := args[0]
-	flag, args := flags.New(args[1:],
+	args = args[1:]
+	flag, args := flags.New(args,
 		"-h", "-help", "--help", "help",
 		"-apropos", "--apropos",
 		"-man", "--man",
@@ -270,7 +271,7 @@ func Main(args ...string) error {
 		if IsDaemon(name) {
 			switch os.Getenv(daemonFlag) {
 			case "":
-				c := exec.Command(Prog, args...)
+				c := exec.Command(Prog, args[1:]...)
 				c.Args[0] = name
 				c.Stdin = nil
 				c.Stdout = nil
@@ -293,7 +294,7 @@ func Main(args ...string) error {
 				return c.Wait()
 			case "child":
 				syscall.Umask(002)
-				c := exec.Command(Prog, args...)
+				c := exec.Command(Prog, args[1:]...)
 				c.Args[0] = name
 				c.Stdin = nil
 				c.Stdout = nil
@@ -312,7 +313,6 @@ func Main(args ...string) error {
 				return recovered.New(ms).Main(args...)
 			}
 		} else {
-			// fmt.Printf("Main(%s, %v)...\n", name, args)
 			return recovered.New(ms).Main(args...)
 		}
 	}
@@ -417,10 +417,11 @@ func Plot(cmds ...interface{}) {
 //	dmesg | grep goes >>> goes.log
 func Shell(getline GetLiner) error {
 	var (
-		in   io.Reader
-		out  io.Writer
-		trim bool
-		err  error
+		rc  io.ReadCloser
+		wc  io.WriteCloser
+		in  io.Reader
+		out io.Writer
+		err error
 
 		closers []io.Closer
 
@@ -508,22 +509,20 @@ commandLoop:
 		pl.Slices[end] = args
 
 		in = nil
-		lbl, found := iparm["<<"]
-		if !found {
-			lbl, found = iparm["<<-"]
-			if found {
-				trim = true
-			}
-		}
-		if fn, found := iparm["<"]; found {
-			var r io.ReadCloser
-			r, err = url.Open(fn)
+		if fn := iparm["<"]; len(fn) > 0 {
+			rc, err = url.Open(fn)
 			if err != nil {
 				continue commandLoop
 			}
-			in = r
-			closers = append(closers, r)
-		} else if len(lbl) > 0 {
+			in = rc
+			closers = append(closers, rc)
+		} else if len(iparm["<<"]) > 0 || len(iparm["<<-"]) > 0 {
+			var trim bool
+			lbl := iparm["<<"]
+			if len(lbl) == 0 {
+				lbl = iparm["<<-"]
+				trim = true
+			}
 			var r, w *os.File
 			r, w, err = os.Pipe()
 			if err != nil {
@@ -546,40 +545,41 @@ commandLoop:
 				}
 			}(w, lbl)
 		}
-		out = nil
-		if fn, found := oparm[">"]; found {
-			f, err := url.Create(fn)
+		out = os.Stdout
+		if fn := oparm[">"]; len(fn) > 0 {
+			wc, err = url.Create(fn)
 			if err != nil {
 				continue commandLoop
 			}
-			out = f
-			closers = append(closers, f)
-		} else if fn, found := oparm[">>"]; found {
-			f, err := url.Append(fn)
+			out = wc
+			closers = append(closers, wc)
+		} else if fn = oparm[">>"]; len(fn) > 0 {
+			wc, err = url.Append(fn)
 			if err != nil {
 				continue commandLoop
 			}
-			out = f
-			closers = append(closers, f)
-		} else if fn, found := oparm[">>>"]; found {
-			f, err := url.Create(fn)
+			out = wc
+			closers = append(closers, wc)
+		} else if fn := oparm[">>>"]; len(fn) > 0 {
+			wc, err = url.Create(fn)
 			if err != nil {
 				continue commandLoop
 			}
-			out = io.MultiWriter(os.Stdout, f)
-			closers = append(closers, f)
-		} else if fn, found := oparm[">>"]; found {
-			f, err := url.Append(fn)
+			out = io.MultiWriter(os.Stdout, wc)
+			closers = append(closers, wc)
+		} else if fn := oparm[">>"]; len(fn) > 0 {
+			wc, err = url.Append(fn)
 			if err != nil {
 				continue commandLoop
 			}
-			out = io.MultiWriter(os.Stdout, f)
-			closers = append(closers, f)
+			out = io.MultiWriter(os.Stdout, wc)
+			closers = append(closers, wc)
 		}
 
 		for i := 0; i < len(pl.Slices); i++ {
-			c := exec.Command(Prog, pl.Slices[0]...)
-			c.Args[0] = pl.Slices[i][0]
+			c := exec.Command(Prog, pl.Slices[i][1:]...)
+			c.Args[i] = pl.Slices[i][0]
+			c.Stderr = os.Stderr
 			if i == 0 {
 				c.Stdin = in
 			} else {
