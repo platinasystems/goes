@@ -27,7 +27,7 @@ const Version = "{{.Version}}"
 		panic(err)
 	}
 
-	buf, err := exec.Command("git", "describe").Output()
+	buf, err := exec.Command("git", "rev-parse", "HEAD").Output()
 	if err != nil {
 		panic(err)
 	}

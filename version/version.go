@@ -7,4 +7,4 @@ package version
 
 //go:generate go run ./go-version/main.go
 
-const Version = "TBD"
+const Version = "a1308edbb009b578798cb1885909f6b943ce5752"
