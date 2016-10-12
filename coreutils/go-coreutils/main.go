@@ -5,7 +5,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"os"
 
@@ -21,7 +20,6 @@ func main() {
 	command.Sort()
 	err := goes.Main(os.Args...)
 	if err != nil && err != io.EOF {
-		fmt.Fprintf(os.Stderr, "%s: %v\n", command.Prog, err)
 		os.Exit(1)
 	}
 }

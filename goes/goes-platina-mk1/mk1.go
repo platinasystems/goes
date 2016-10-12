@@ -10,11 +10,16 @@ import (
 	"github.com/platinasystems/go/builtinutils"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/coreutils"
+	"github.com/platinasystems/go/diagutils"
 	"github.com/platinasystems/go/diagutils/dlv"
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/initutils/goesd"
+	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/machined"
 	"github.com/platinasystems/go/netutils"
+	"github.com/platinasystems/go/redisutils"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	//"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -230,7 +235,13 @@ func main() {
 	command.Plot(builtinutils.New()...)
 	command.Plot(coreutils.New()...)
 	command.Plot(dlv.New()...)
-	command.Plot(netutils.New())
+	command.Plot(diagutils.New()...)
+	command.Plot(fsutils.New()...)
+	command.Plot(goesd.New())
+	command.Plot(kutils.New()...)
+	command.Plot(netutils.New()...)
+	command.Plot(redisutils.New()...)
+	command.Sort()
 	machined.Hook = func() {
 		machined.NetLink.Prefixes("lo.", "eth0.")
 		machined.InfoProviders = append(machined.InfoProviders, &Info{
@@ -242,7 +253,6 @@ func main() {
 	os.Setenv("REDISD_DEVS", "lo eth0")
 	err := goes.Main(os.Args...)
 	if err != nil && err != io.EOF {
-		fmt.Fprintf(os.Stderr, "%s: %v\n", command.Prog, err)
 		os.Exit(1)
 	}
 }

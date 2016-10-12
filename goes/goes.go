@@ -9,31 +9,42 @@
 package goes
 
 import (
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/unprompted"
 )
 
-func Main(args ...string) error {
+func Main(args ...string) (err error) {
+	defer func() {
+		if err != nil && err != io.EOF {
+			fmt.Fprintf(os.Stderr, "%s: %v\n",
+				filepath.Base(command.Prog), err)
+		}
+	}()
 	if command.Find(args[0]) != nil {
-		return command.Main(args...)
+		err = command.Main(args...)
 	} else if len(args) > 1 {
 		if args[0] == command.Prog {
-			script, err := os.Open(args[1])
-			if err == nil {
+			if script, ierr := os.Open(args[1]); ierr == nil {
 				defer script.Close()
 				buf := make([]byte, 4096)
-				n, err := script.Read(buf[:])
-				if err == nil && utf8.Valid(buf[:n]) {
+				n, ierr := script.Read(buf[:])
+				if ierr == nil && utf8.Valid(buf[:n]) {
 					script.Seek(0, 0)
 					gl := unprompted.New(script).GetLine
-					return command.Shell(gl)
+					err = command.Shell(gl)
+					return
 				}
 			}
 		}
-		return command.Main(args[1:]...)
+		err = command.Main(args[1:]...)
+	} else {
+		err = command.Main("cli")
 	}
-	return command.Main("cli")
+	return
 }

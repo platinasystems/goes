@@ -25,10 +25,15 @@ import (
 	"github.com/platinasystems/go/environ/ti"
 	"github.com/platinasystems/go/fdt"
 	"github.com/platinasystems/go/fdtgpio"
+	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/initutils/sbininit"
+	"github.com/platinasystems/go/initutils/slashinit"
+	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/machined"
 	"github.com/platinasystems/go/netutils"
+	"github.com/platinasystems/go/redisutils"
 )
 
 type parser interface {
@@ -64,8 +69,13 @@ func main() {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
 	command.Plot(builtinutils.New()...)
 	command.Plot(coreutils.New()...)
-	command.Plot(diagutils.New())
-	command.Plot(netutils.New())
+	command.Plot(diagutils.New()...)
+	command.Plot(fsutils.New()...)
+	command.Plot(sbininit.New(), slashinit.New())
+	command.Plot(kutils.New()...)
+	command.Plot(netutils.New()...)
+	command.Plot(redisutils.New()...)
+	command.Sort()
 	machined.Hook = func() {
 		gpioInit()
 		machined.NetLink.Prefixes("lo.", "eth0.")
@@ -131,7 +141,6 @@ func main() {
 	os.Setenv("REDISD_DEVS", "lo eth0")
 	err := goes.Main(os.Args...)
 	if err != nil && err != io.EOF {
-		fmt.Fprintf(os.Stderr, "%s: %v\n", command.Prog, err)
 		os.Exit(1)
 	}
 }

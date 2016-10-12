@@ -17,10 +17,14 @@ import (
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/coreutils"
 	"github.com/platinasystems/go/diagutils/dlv"
+	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/initutils"
+	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/machined"
 	"github.com/platinasystems/go/netutils"
 	"github.com/platinasystems/go/netutils/telnetd"
+	"github.com/platinasystems/go/redisutils"
 )
 
 type parser interface {
@@ -37,8 +41,13 @@ func main() {
 	command.Plot(builtinutils.New()...)
 	command.Plot(coreutils.New()...)
 	command.Plot(dlv.New()...)
-	command.Plot(netutils.New())
+	command.Plot(fsutils.New()...)
+	command.Plot(initutils.New()...)
+	command.Plot(kutils.New()...)
+	command.Plot(netutils.New()...)
+	command.Plot(redisutils.New()...)
 	command.Plot(telnetd.New())
+	command.Sort()
 	machined.Hook = func() {
 		machined.NetLink.Prefixes("lo.", "eth0.")
 		machined.InfoProviders = append(machined.InfoProviders,
@@ -96,7 +105,6 @@ func main() {
 	os.Setenv("REDISD_DEVS", "lo eth0")
 	err := goes.Main(os.Args...)
 	if err != nil && err != io.EOF {
-		fmt.Fprintf(os.Stderr, "%s: %v\n", command.Prog, err)
 		os.Exit(1)
 	}
 }
