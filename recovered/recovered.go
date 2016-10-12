@@ -27,6 +27,14 @@ func New(v V) Recovered { return Recovered{v} }
 
 func (recovered Recovered) Main(args ...string) (err error) {
 	defer func() {
+		if err != nil && err != io.EOF {
+			preface := fmt.Sprint(recovered.V.String(), ": ")
+			if !strings.HasPrefix(err.Error(), preface) {
+				err = fmt.Errorf("%s%v", preface, err)
+			}
+		}
+	}()
+	defer func() {
 		r := recover()
 		switch t := r.(type) {
 		case nil:
@@ -64,14 +72,6 @@ func (recovered Recovered) Main(args ...string) (err error) {
 			err = errors.New(t)
 		default:
 			err = fmt.Errorf("%v", t)
-		}
-		preface := fmt.Sprint(recovered.V.String(), ": ")
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			} else if !strings.HasPrefix(err.Error(), preface) {
-				err = fmt.Errorf("%s%v", preface, err)
-			}
 		}
 	}()
 	err = recovered.V.Main(args...)
