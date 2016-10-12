@@ -4,7 +4,7 @@
 
 // +build amd64 arm
 
-// This is an example goes machine.
+// This is an example goes daemon for a debian system.
 package main
 
 import (
@@ -18,8 +18,7 @@ import (
 	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/example"
-	"github.com/platinasystems/go/initutils/sbininit"
-	"github.com/platinasystems/go/initutils/slashinit"
+	"github.com/platinasystems/go/initutils/goesd"
 	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/machined"
 	"github.com/platinasystems/go/netutils"
@@ -32,7 +31,7 @@ func main() {
 	command.Plot(coreutils.New()...)
 	command.Plot(dlv.New()...)
 	command.Plot(fsutils.New()...)
-	command.Plot(sbininit.New(), slashinit.New())
+	command.Plot(goesd.New())
 	command.Plot(kutils.New()...)
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
