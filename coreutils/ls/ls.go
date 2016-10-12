@@ -48,13 +48,27 @@ func (ls) Main(args ...string) error {
 		files = files[:0]
 		dirs = dirs[:0]
 	}()
-	for _, name := range args {
-		fi, err := os.Stat(name)
-		if err == nil {
-			if fi.IsDir() {
-				dirs = append(dirs, name)
-			} else {
-				files = append(files, name)
+	if len(args) == 0 {
+		dirs = append(dirs, ".")
+	} else {
+		for _, pat := range args {
+			globs, err := filepath.Glob(pat)
+			if err != nil {
+				return err
+			}
+			if len(globs) == 0 {
+				return fmt.Errorf("%s: %v", pat,
+					syscall.ENOENT)
+			}
+			for _, name := range globs {
+				fi, err := os.Stat(name)
+				if err == nil {
+					if fi.IsDir() {
+						dirs = append(dirs, name)
+					} else {
+						files = append(files, name)
+					}
+				}
 			}
 		}
 	}
