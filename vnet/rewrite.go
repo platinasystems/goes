@@ -3,6 +3,7 @@ package vnet
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/hw"
+	"github.com/platinasystems/go/elib/parse"
 
 	"unsafe"
 )
@@ -31,7 +32,18 @@ type Rewrite struct {
 func (r *Rewrite) String(v *Vnet) string {
 	hi := v.SupHi(r.Si)
 	h := v.HwIfer(hi)
-	return h.FormatRewrite(r)
+	return r.Si.Name(v) + " " + h.FormatRewrite(r)
+}
+
+func (r *Rewrite) ParseWithArgs(in *parse.Input, args *parse.Args) {
+	v := args.Get().(*Vnet)
+	if !in.Parse("%v", &r.Si, v) {
+		panic(parse.ErrInput)
+	}
+	sw := v.SwIf(r.Si)
+	hw := v.SupHwIf(sw)
+	h := v.HwIfer(hw.hi)
+	h.ParseRewrite(r, in)
 }
 
 func (r *Rewrite) SetData(d []byte) { r.dataLen = uint16(copy(r.data[:], d)) }

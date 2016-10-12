@@ -1,7 +1,6 @@
 package ip4
 
 import (
-	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 )
@@ -41,17 +40,6 @@ func (m *Main) Init() (err error) {
 	m.Main.Init(v, cf)
 	m.nodeInit(v)
 	m.pgInit(v)
-
-	cmds := [...]cli.Command{
-		cli.Command{
-			Name:      "show ip fib",
-			ShortHelp: "show ip4 forwarding table",
-			Action:    m.showIpFib,
-		},
-	}
-	for i := range cmds {
-		v.CliAdd(&cmds[i])
-	}
-
+	m.cliInit(v)
 	return
 }

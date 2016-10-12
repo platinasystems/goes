@@ -3,6 +3,7 @@ package pg
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
+	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
 	"fmt"
@@ -128,7 +129,10 @@ func (n *node) del_stream(r Streamer) {
 	s.clean()
 }
 
-func (n *node) GetHwInterfaceCounters(nm *vnet.InterfaceCounterNames, t *vnet.InterfaceThread)   {}
+func (n *node) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
+func (n *node) GetSwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
+func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)                              {}
 func (n *node) FormatAddress() (s string)                                                        { return }
 func (n *node) FormatRewrite(rw *vnet.Rewrite) (s string)                                        { return }
 func (n *node) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.PacketType, da []byte) {}
+func (n *node) ParseRewrite(rw *vnet.Rewrite, in *parse.Input)                                   {}

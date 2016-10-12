@@ -1,6 +1,7 @@
 package ip4
 
 import (
+	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 
@@ -25,6 +26,15 @@ func (p *Prefix) LessThan(q *Prefix) bool {
 		return cmp < 0
 	}
 	return p.Len < q.Len
+}
+
+// Add adds offset to prefix.  For example, 1.2.3.0/24 + 1 = 1.2.4.0/24.
+func (p *Prefix) Add(offset uint) (q Prefix) {
+	a := p.Address.AsUint32().ToHost()
+	a += uint32(offset << (32 - p.Len))
+	q = *p
+	q.Address.FromUint32(vnet.Uint32(a).FromHost())
+	return
 }
 
 // True if given destination matches prefix.
@@ -320,10 +330,15 @@ func (m *Main) getRoute(p *ip.Prefix, si vnet.Si) (ai ip.Adj, ok bool) {
 	return
 }
 
-func (m *Main) addDelRoute(p *ip.Prefix, si vnet.Si, newAdj ip.Adj, isDel bool) (oldAdj ip.Adj, ok bool) {
-	f := m.fibBySi(si)
+func (m *Main) addDelRoute(p *ip.Prefix, fi ip.FibIndex, newAdj ip.Adj, isDel bool) (oldAdj ip.Adj, err error) {
+	createFib := !isDel
+	f := m.fibByIndex(fi, createFib)
 	q := FromIp4Prefix(p)
+	var ok bool
 	oldAdj, ok = f.addDel(m, &q, newAdj, isDel)
+	if !ok {
+		err = fmt.Errorf("prefix %s not found", &q)
+	}
 	return
 }
 
@@ -331,6 +346,15 @@ type NextHop struct {
 	Address Address
 	Si      vnet.Si
 	Weight  ip.NextHopWeight
+}
+
+func (x *NextHop) ParseWithArgs(in *parse.Input, args *parse.Args) {
+	v := args.Get().(*vnet.Vnet)
+	if !in.Parse("%v %v", &x.Si, v, &x.Address) {
+		panic(parse.ErrInput)
+	}
+	x.Weight = 1
+	in.Parse("weight %d", &x.Weight)
 }
 
 func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error) {

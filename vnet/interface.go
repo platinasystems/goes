@@ -34,6 +34,7 @@ type HwIf struct {
 	// Max size of packet in bytes (MTU)
 	maxPacketSize uint
 
+	defaultId IfIndex
 	subSiById map[IfIndex]Si
 }
 
@@ -191,7 +192,14 @@ func (s *swIf) IfName(vn *Vnet) (v string) {
 func (i Si) Name(v *Vnet) string { return v.SwIf(i).IfName(v) }
 func (i Hi) Name(v *Vnet) string { return v.HwIf(i).name }
 
-func (i *swIf) Id() IfIndex { return i.id }
+func (i *swIf) Id(v *Vnet) (id IfIndex) {
+	id = i.id
+	if i.typ == swIfTypeHardware {
+		h := v.HwIf(Hi(id))
+		id = h.defaultId
+	}
+	return
+}
 
 func (i *swIf) IsAdminUp() bool      { return i.flags&swIfAdminUp != 0 }
 func (si Si) IsAdminUp(v *Vnet) bool { return v.SwIf(si).IsAdminUp() }
@@ -251,6 +259,8 @@ func (h *HwIf) SetProvisioned(v bool) (err error) {
 	}
 	return
 }
+
+func (h *HwIf) SetDefaultId(id uint) { h.defaultId = IfIndex(id) }
 
 func (h *HwIf) IsLinkUp() bool      { return h.linkUp }
 func (hi Hi) IsLinkUp(v *Vnet) bool { return v.HwIf(hi).IsLinkUp() }
@@ -320,6 +330,7 @@ func (h *HwIf) SetLoopback(v IfLoopbackType) (err error) {
 	}
 	return
 }
+func (h *HwIf) GetSwInterfaceCounterNames() (nm InterfaceCounterNames) { return }
 
 type interfaceMain struct {
 	hwIferPool      hwIferPool
@@ -468,6 +479,7 @@ type HwIfClasser interface {
 	FormatAddress() string
 	SetRewrite(v *Vnet, r *Rewrite, t PacketType, dstAddr []byte)
 	FormatRewrite(r *Rewrite) string
+	ParseRewrite(r *Rewrite, in *parse.Input)
 }
 
 type Devicer interface {
@@ -476,7 +488,9 @@ type Devicer interface {
 	IsUnix() bool
 	ValidateSpeed(speed Bandwidth) error
 	SetLoopback(v IfLoopbackType) error
-	GetHwInterfaceCounters(n *InterfaceCounterNames, t *InterfaceThread)
+	GetHwInterfaceCounterNames() InterfaceCounterNames
+	GetSwInterfaceCounterNames() InterfaceCounterNames
+	GetHwInterfaceCounterValues(t *InterfaceThread)
 }
 
 type SwIfAddDelHook func(v *Vnet, si Si, isDel bool) error

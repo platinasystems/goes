@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip"
+	ipcli "github.com/platinasystems/go/vnet/ip/cli"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
 	"github.com/platinasystems/go/vnet/pg"
@@ -135,7 +136,7 @@ const (
 	c2_counter
 )
 
-func (n *myNode) GetHwInterfaceCounters(nm *vnet.InterfaceCounterNames, t *vnet.InterfaceThread) {
+func (n *myNode) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames) {
 	nm.Single = []string{
 		s1_counter: "s1",
 		s2_counter: "s2",
@@ -144,7 +145,10 @@ func (n *myNode) GetHwInterfaceCounters(nm *vnet.InterfaceCounterNames, t *vnet.
 		c1_counter: "c1",
 		c2_counter: "c2",
 	}
+	return
 }
+
+func (n *myNode) GetHwInterfaceCounterValues(t *vnet.InterfaceThread) { return }
 
 func ip4Template(t *hw.BufferTemplate) {
 	t.Data = vnet.MakePacket(
@@ -296,6 +300,7 @@ func main() {
 	ip6.Init(v)
 	ixge.Init(v)
 	pg.Init(v)
+	ipcli.Init(v)
 	myNodePackage = v.AddPackage("my-node", MyNode)
 
 	var in parse.Input

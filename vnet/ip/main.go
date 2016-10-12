@@ -12,7 +12,7 @@ type FamilyConfig struct {
 	RewriteNode     vnet.Noder
 	PacketType      vnet.PacketType
 	GetRoute        func(p *Prefix, si vnet.Si) (ai Adj, ok bool)
-	AddDelRoute     func(p *Prefix, si vnet.Si, newAdj Adj, isDel bool) (oldAdj Adj, ok bool)
+	AddDelRoute     func(p *Prefix, fi FibIndex, newAdj Adj, isDel bool) (oldAdj Adj, err error)
 }
 
 type Main struct {

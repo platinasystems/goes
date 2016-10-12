@@ -6,11 +6,19 @@ import (
 	"fmt"
 )
 
-func (a *Address) String() string        { return fmt.Sprintf("%d.%d.%d.%d", a[0], a[1], a[2], a[3]) }
-func (a *Address) Parse(in *parse.Input) { in.Parse("%d.%d.%d.%d", &a[0], &a[1], &a[2], &a[3]) }
+func (a *Address) String() string { return fmt.Sprintf("%d.%d.%d.%d", a[0], a[1], a[2], a[3]) }
+func (a *Address) Parse(in *parse.Input) {
+	if !in.Parse("%d.%d.%d.%d", &a[0], &a[1], &a[2], &a[3]) {
+		panic(parse.ErrInput)
+	}
+}
 
-func (p *Prefix) String() string        { return fmt.Sprintf("%s/%d", &p.Address, p.Len) }
-func (p *Prefix) Parse(in *parse.Input) { in.Parse("%v/%d", &p.Address, &p.Len) }
+func (p *Prefix) String() string { return fmt.Sprintf("%s/%d", &p.Address, p.Len) }
+func (p *Prefix) Parse(in *parse.Input) {
+	if !in.Parse("%v/%d", &p.Address, &p.Len) {
+		panic(parse.ErrInput)
+	}
+}
 
 func (h *Header) String() (s string) {
 	s = fmt.Sprintf("%s: %s -> %s", h.Protocol.String(), h.Src.String(), h.Dst.String())

@@ -158,7 +158,7 @@ func (d *dev) counter_init() {
 	d.AddTimedEvent(&counter_update_event{dev: d}, counter_update_interval)
 }
 
-func (d *dev) GetHwInterfaceCounters(n *vnet.InterfaceCounterNames, th *vnet.InterfaceThread) {
+func (d *dev) GetHwInterfaceCounterNames() (n vnet.InterfaceCounterNames) {
 	// Initialize counters names on first call.
 	cn := &d.m.InterfaceCounterNames
 	if len(cn.Single) == 0 {
@@ -166,13 +166,11 @@ func (d *dev) GetHwInterfaceCounters(n *vnet.InterfaceCounterNames, th *vnet.Int
 			cn.Single = append(cn.Single, counters[i].name)
 		}
 	}
-	*n = *cn
+	n = *cn
+	return
+}
 
-	// Just get names?  As opposed to also getting counter values.
-	if th == nil {
-		return
-	}
-
+func (d *dev) GetHwInterfaceCounterValues(th *vnet.InterfaceThread) {
 	hi := d.Hi()
 	d.foreach_counter(false, func(i uint, v uint64) {
 		vnet.HwIfCounterKind(i).Add64(th, hi, v)

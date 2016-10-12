@@ -113,7 +113,7 @@ func (c HwIfCombinedCounterKind) Add64(t *InterfaceThread, hi Hi, packets, bytes
 
 type foreachFn func(name string, value uint64)
 
-func (m *interfaceMain) doSwCombined(f foreachFn, nm *InterfaceCounterNames, zero bool, k, i uint) {
+func (m *interfaceMain) doSwCombined(f foreachFn, nm *InterfaceCounterNames, zero bool, nk, k, i uint) {
 	var v, w CombinedCounter
 	for _, t := range m.ifThreads {
 		if t != nil {
@@ -122,13 +122,13 @@ func (m *interfaceMain) doSwCombined(f foreachFn, nm *InterfaceCounterNames, zer
 		}
 	}
 	if v.Packets != 0 || zero {
-		f(nm.Combined[k]+" packets", v.Packets)
-		f(nm.Combined[k]+" bytes", v.Bytes)
+		f(nm.Combined[nk]+" packets", v.Packets)
+		f(nm.Combined[nk]+" bytes", v.Bytes)
 	}
 	return
 }
 
-func (m *interfaceMain) doSwSingle(f foreachFn, nm *InterfaceCounterNames, zero bool, k, i uint) {
+func (m *interfaceMain) doSwSingle(f foreachFn, nm *InterfaceCounterNames, zero bool, nk, k, i uint) {
 	var v, w uint64
 	for _, t := range m.ifThreads {
 		if t != nil {
@@ -137,9 +137,17 @@ func (m *interfaceMain) doSwSingle(f foreachFn, nm *InterfaceCounterNames, zero 
 		}
 	}
 	if v != 0 || zero {
-		f(nm.Single[k], v)
+		f(nm.Single[nk], v)
 	}
 	return
+}
+
+func (m *interfaceMain) HwSwSingleIfCounter(i uint) swIfCounterKind {
+	return swIfCounterKind(uint(len(m.swIfCounterNames.Single)) + i)
+}
+
+func (m *interfaceMain) HwSwCombinedIfCounter(i uint) swIfCombinedCounterKind {
+	return swIfCombinedCounterKind(uint(len(m.swIfCounterNames.Combined)) + i)
 }
 
 func (m *interfaceMain) foreachSwIfCounter(zero bool, si Si, f func(name string, value uint64)) {
@@ -148,20 +156,32 @@ func (m *interfaceMain) foreachSwIfCounter(zero bool, si Si, f func(name string,
 	// Make sure at least one interface thread exists.
 	m.GetIfThread(0)
 
+	var k0, k1 uint
+
 	// First builtin counters.
-	for k := 0; k < len(builtinCombinedIfCounterNames); k++ {
-		m.doSwCombined(f, &m.swIfCounterNames, zero, uint(k), i)
+	for k0 = 0; k0 < uint(len(builtinCombinedIfCounterNames)); k0++ {
+		m.doSwCombined(f, &m.swIfCounterNames, zero, k0, k0, i)
 	}
-	for k := 0; k < len(builtinSingleIfCounterNames); k++ {
-		m.doSwSingle(f, &m.swIfCounterNames, zero, uint(k), i)
+	for k1 = 0; k1 < uint(len(builtinSingleIfCounterNames)); k1++ {
+		m.doSwSingle(f, &m.swIfCounterNames, zero, k1, k1, i)
 	}
 
 	// Next user-defined counters.
-	for k := len(builtinCombinedIfCounterNames); k < len(m.swIfCounterNames.Combined); k++ {
-		m.doSwCombined(f, &m.swIfCounterNames, zero, uint(k), i)
+	for ; k0 < uint(len(m.swIfCounterNames.Combined)); k0++ {
+		m.doSwCombined(f, &m.swIfCounterNames, zero, k0, k0, i)
 	}
-	for k := len(builtinSingleIfCounterNames); k < len(m.swIfCounterNames.Single); k++ {
-		m.doSwSingle(f, &m.swIfCounterNames, zero, uint(k), i)
+	for ; k1 < uint(len(m.swIfCounterNames.Single)); k1++ {
+		m.doSwSingle(f, &m.swIfCounterNames, zero, k1, k1, i)
+	}
+
+	// Next hardware software interface counters.
+	h := m.HwIfer(m.SupHi(si))
+	nm := h.GetSwInterfaceCounterNames()
+	for k := uint(0); k < uint(len(nm.Combined)); k++ {
+		m.doSwCombined(f, &nm, zero, k, k0+k, i)
+	}
+	for k := uint(0); k < uint(len(nm.Single)); k++ {
+		m.doSwSingle(f, &nm, zero, k, k1+k, i)
 	}
 }
 
@@ -195,10 +215,10 @@ func (m *interfaceMain) doHwSingle(f foreachFn, nm *InterfaceCounterNames, zero 
 }
 
 func (m *interfaceMain) foreachHwIfCounter(zero bool, hi Hi, f func(name string, value uint64)) {
-	var nm InterfaceCounterNames
 	h := m.HwIfer(hi)
 	t := m.GetIfThread(0)
-	h.GetHwInterfaceCounters(&nm, t)
+	nm := h.GetHwInterfaceCounterNames()
+	h.GetHwInterfaceCounterValues(t)
 	i := uint(hi)
 	for k := range t.hw.combined {
 		m.doHwCombined(f, &nm, zero, uint(k), i)
@@ -215,10 +235,9 @@ func (v *Vnet) syncSwIfCounters() {
 }
 
 func (m *interfaceMain) syncHwIfCounters() {
-	var nm InterfaceCounterNames
 	t := m.GetIfThread(0)
 	m.hwIferPool.Foreach(func(h HwInterfacer) {
-		h.GetHwInterfaceCounters(&nm, t)
+		h.GetHwInterfaceCounterValues(t)
 	})
 }
 
@@ -273,6 +292,17 @@ func (m *interfaceMain) counterInit(t *InterfaceThread) {
 		}
 	}
 
+	m.swInterfaces.Foreach(func(x swIf) {
+		h := m.HwIfer(m.SupHi(x.si))
+		nm := h.GetSwInterfaceCounterNames()
+		if len(nm.Single) > 0 {
+			t.sw.single.Validate(uint(len(m.swIfCounterNames.Single)) + uint(len(nm.Single)) - 1)
+		}
+		if len(nm.Combined) > 0 {
+			t.sw.combined.Validate(uint(len(m.swIfCounterNames.Combined)) + uint(len(nm.Combined)) - 1)
+		}
+	})
+
 	if nSwIfs := m.swInterfaces.Len(); nSwIfs > 0 {
 		for i := range t.sw.single {
 			t.sw.single[i].Validate(nSwIfs - 1)
@@ -284,8 +314,7 @@ func (m *interfaceMain) counterInit(t *InterfaceThread) {
 
 	// Allocate hardware counters based on largest number of names.
 	m.hwIferPool.Foreach(func(h HwInterfacer) {
-		var nm InterfaceCounterNames
-		h.GetHwInterfaceCounters(&nm, nil)
+		nm := h.GetHwInterfaceCounterNames()
 		if len(nm.Single) > 0 {
 			t.hw.single.Validate(uint(len(nm.Single)) - 1)
 		}

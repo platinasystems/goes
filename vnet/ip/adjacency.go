@@ -95,6 +95,22 @@ func (a *Adjacency) String(m *Main) (ss []string) {
 	return
 }
 
+func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
+	v := args.Get().(*vnet.Vnet)
+	if !in.Parse("%v", &a.LookupNextIndex) {
+		panic(parse.ErrInput)
+	}
+	a.NAdj = 1
+	a.IfAddr = IfAddrNil
+	switch a.LookupNextIndex {
+	case LookupNextRewrite:
+		if !in.Parse("%v", &a.Rewrite, v) {
+			panic(parse.ErrInput)
+		}
+	case LookupNextGlean:
+	}
+}
+
 // Index into adjacency table.
 type Adj uint32
 

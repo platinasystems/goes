@@ -87,9 +87,8 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 		m.v.SetRewrite(&as[0].Rewrite, n.Si, im.RewriteNode, im.PacketType, n.Ethernet[:])
 		as[0].LookupNextIndex = ip.LookupNextRewrite
 
-		_, ok = im.AddDelRoute(&prefix, n.Si, ai, isDel)
-		if !ok {
-			panic("add del route")
+		if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
+			return
 		}
 
 		// Update neighbor fields (ethernet address may change).
