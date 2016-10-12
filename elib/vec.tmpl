@@ -1,0 +1,86 @@
+{{/* -*- mode: Go -*- */}}
+
+{{if ne .TAGS ""}}
+//+build {{.TAGS}}
+{{end}}
+
+{{define "elib"}}{{if ne . "elib"}}elib.{{end}}{{end}}
+
+package {{.Package}}
+
+{{if ne .Package "elib"}}
+import (
+	"github.com/platinasystems/go/elib"
+)
+{{end}}
+
+type {{.VecType}} []{{.Type}}
+
+func (p * {{.VecType}}) Resize(n uint) {
+	c := {{template "elib" .Package}}Index(cap(*p))
+	l := {{template "elib" .Package}}Index(len(*p)) + {{template "elib" .Package}}Index(n)
+	if l > c {
+		c = {{template "elib" .Package}}NextResizeCap(l)
+		q := make([]{{.Type}}, l, c)
+		copy(q, *p)
+		*p = q
+	}
+	*p = (*p)[:l]
+}
+
+func (p * {{.VecType}}) validate(new_len uint, zero *{{.Type}}) *{{.Type}} {
+	c := {{template "elib" .Package}}Index(cap(*p))
+	lʹ := {{template "elib" .Package}}Index(len(*p))
+	l := {{template "elib" .Package}}Index(new_len)
+	if l <= c {
+		// Need to reslice to larger length?
+		if l >= lʹ {
+			*p = (*p)[:l]
+		}
+		return &(*p)[l-1]
+	}
+	return p.validateSlowPath(zero, c, l, lʹ)
+}
+
+func (p * {{.VecType}}) validateSlowPath(zero *{{.Type}},
+	c, l, lʹ {{template "elib" .Package}}Index) *{{.Type}} {
+	if l > c {
+		cNext := {{template "elib" .Package}}NextResizeCap(l)
+		q := make([]{{.Type}}, cNext, cNext)
+		copy(q, *p)
+		if zero != nil {
+			for i := c; i < cNext; i++ {
+				q[i] = *zero
+			}
+		}
+		*p = q[:l]
+	}
+	if l > lʹ {
+		*p = (*p)[:l]
+	}
+	return &(*p)[l-1]
+}
+
+func (p * {{.VecType}}) Validate(i uint) *{{.Type}} {
+	return p.validate(i+1, (*{{.Type}})(nil))
+}
+
+func (p * {{.VecType}}) ValidateInit(i uint, zero {{.Type}}) *{{.Type}} {
+	return p.validate(i+1, &zero)
+}
+
+func (p * {{.VecType}}) ValidateLen(l uint) (v *{{.Type}}) {
+	if l > 0 {
+		v = p.validate(l, (*{{.Type}})(nil))
+	}
+	return
+}
+
+func (p * {{.VecType}}) ValidateLenInit(l uint, zero {{.Type}}) (v *{{.Type}}) {
+	if l > 0 {
+		v = p.validate(l, &zero)
+	}
+	return
+}
+
+func (p {{.VecType}}) Len() uint { return uint(len(p)) }

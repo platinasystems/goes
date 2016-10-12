@@ -1,0 +1,34 @@
+// clear event log
+cl ev
+
+// pa short-hand for packet-generator
+pa {
+	// Packet data: start with ethernet header.
+	ethernet {
+   	    IP4: 00:a0:c9:00:00:00 -> 02:46:8a:00:01:8d
+		UDP: 1.2.3.4 -> 5.6.7.8
+	}
+
+	// single size: all packets are the same size.
+	// payload is incrementing pattern of bytes.
+	// size 100
+
+	// range of packet sizes.  sizes increment and cycle when max is reached.
+	size 100-10000
+
+	// rate in packets per second
+	rate 1e6pps
+
+	// rate in bits per second
+	// rate 1e4bps
+
+	// number of packets to send
+	count 1e3
+
+	// specify next hop on vnet graph
+	next packet-generator
+}
+
+// sends a million packets with current stream
+// pa 1e6
+

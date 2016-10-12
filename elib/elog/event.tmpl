@@ -1,0 +1,48 @@
+{{/* -*- mode: Go -*- */}}
+
+{{define "elog"}}{{if ne . "elog"}}elog.{{end}}{{end}}
+
+package {{.Package}}
+
+import (
+{{if ne .Package "elog"}}
+	"github.com/platinasystems/go/elib/elog"
+{{end}}
+)
+
+var {{.Type}}Type = &{{template "elog" .Package}}EventType{
+	Name: "{{.Package}}.{{.Type}}",
+}
+
+func init() {
+	t := {{.Type}}Type
+	t.Stringer = stringer_{{.Type}}
+	t.Encode = encode_{{.Type}}
+	t.Decode = decode_{{.Type}}
+	{{template "elog" .Package}}RegisterType({{.Type}}Type)
+}
+
+func stringer_{{.Type}}(e *{{template "elog" .Package}}Event) string {
+	var x {{.Type}}
+	x.Decode(e.Data[:])
+	return x.String()
+}
+
+func encode_{{.Type}}(b []byte, e *{{template "elog" .Package}}Event) int {
+	var x {{.Type}}
+	x.Decode(e.Data[:])
+	return x.Encode(b)
+}
+
+func decode_{{.Type}}(b []byte, e *{{template "elog" .Package}}Event) int {
+	var x {{.Type}}
+	x.Decode(b)
+	return x.Encode(e.Data[:])
+}
+
+func (x {{.Type}}) Log() { x.Logb({{template "elog" .Package}}DefaultBuffer) }
+
+func (x {{.Type}}) Logb(b *{{template "elog" .Package}}Buffer) {
+	e := b.Add({{.Type}}Type)
+	x.Encode(e.Data[:])
+}

@@ -1,0 +1,66 @@
+{{/* -*- mode: Go -*- */}}
+
+{{if ne .TAGS ""}}
+//+build {{.TAGS}}
+{{end}}
+
+{{define "elib"}}{{if ne . "elib"}}elib.{{end}}{{end}}
+
+package {{.Package}}
+
+{{if ne .Package "elib"}}
+import (
+	"github.com/platinasystems/go/elib"
+)
+{{end}}
+
+type {{.HeapType}} struct {
+	{{template "elib" .Package}}Heap
+	{{.Data}} []{{.Type}}
+	ids []{{template "elib" .Package}}Index
+}
+
+func (p * {{.HeapType}}) GetAligned(size, log2Alignment uint) (offset uint) {
+	l := uint(len(p.{{.Data}}))
+	id, offset := p.Heap.GetAligned(size, log2Alignment)
+	if offset >= l {
+		p.Validate(offset + size - 1)
+	}
+	for i := uint(0); i < size; i++ {
+		p.ids[offset + i] = id
+	}
+	return
+}
+
+func (p * {{.HeapType}}) Get(size uint) uint { return p.GetAligned(size, 0) }
+
+func (p * {{.HeapType}}) Put(offset uint) {
+	p.Heap.Put(p.Id(offset))
+}
+
+func (p * {{.HeapType}}) Validate(i uint) {
+	c := {{template "elib" .Package}}Index(cap(p.{{.Data}}))
+	l := {{template "elib" .Package}}Index(i) + 1
+	if l > c {
+		c = {{template "elib" .Package}}NextResizeCap(l)
+		q := make([]{{.Type}}, l, c)
+		r := make([]{{template "elib" .Package}}Index, l, c)
+		copy(q, p.{{.Data}})
+		copy(r, p.ids)
+		p.{{.Data}} = q
+		p.ids = r
+	}
+	if l > {{template "elib" .Package}}Index(len(p.{{.Data}})) {
+		p.{{.Data}} = p.{{.Data}}[:l]
+		p.ids = p.ids[:l]
+	}
+}
+
+func (p *{{.HeapType}}) Id(offset uint) {{template "elib" .Package}}Index {
+	return p.ids[offset]
+}
+
+func (p *{{.HeapType}}) Slice(offset uint) []{{.Type}} {
+	l := p.Len(p.Id(offset))
+	return p.{{.Data}}[offset:offset+l]
+}
