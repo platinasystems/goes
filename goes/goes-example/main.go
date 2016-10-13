@@ -14,7 +14,6 @@ import (
 	"github.com/platinasystems/go/builtinutils"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/coreutils"
-	"github.com/platinasystems/go/diagutils/dlv"
 	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/example"
@@ -30,7 +29,6 @@ import (
 func main() {
 	command.Plot(builtinutils.New()...)
 	command.Plot(coreutils.New()...)
-	command.Plot(dlv.New()...)
 	command.Plot(fsutils.New()...)
 	command.Plot(sbininit.New(), slashinit.New())
 	command.Plot(kutils.New()...)
