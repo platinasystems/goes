@@ -3,11 +3,11 @@ package main
 import (
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/loop"
-	"github.com/platinasystems/vnet"
-	"github.com/platinasystems/vnet/arp"
-	"github.com/platinasystems/vnet/ethernet"
-	"github.com/platinasystems/vnet/ip"
-	"github.com/platinasystems/vnet/ip4"
+	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/arp"
+	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/ip"
+	"github.com/platinasystems/go/vnet/ip4"
 
 	"fmt"
 )
