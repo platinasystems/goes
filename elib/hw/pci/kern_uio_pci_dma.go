@@ -1,4 +1,4 @@
-//+build uio_pci_dma
+// +build uio_pci_dma
 
 package pci
 

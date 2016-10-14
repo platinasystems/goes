@@ -1,4 +1,4 @@
-//+build ppc ppc64
+// +build ppc ppc64
 
 package vnet
 
