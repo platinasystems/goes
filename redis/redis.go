@@ -2,132 +2,24 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-// This package contains the *Args and *Reply types for redis RPC along with
-// standard commands for the local server.
+// Package redis commands to query and modify the local redis server.
 package redis
 
 import (
-	"bytes"
 	"fmt"
-	"reflect"
 	"regexp"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/platinasystems/go/redis/rpc/args"
 	"github.com/platinasystems/go/sch"
 	"github.com/platinasystems/go/sockfile"
 )
 
 const Timeout = 500 * time.Millisecond
 
-type AssignArgs struct {
-	Key  string
-	File string
-	Name string
-}
-
-type UnassignArgs struct {
-	Key string
-}
-
-type BB [][]byte
-
-type DelArgs struct {
-	Key  string
-	Keys []string
-}
-
-type DelReply int
-type GetArgs struct{ Key string }
-type GetReply []byte
-
-type SetArgs struct {
-	Key   string
-	Value []byte
-}
-
-type HdelArgs struct {
-	Key    string
-	Field  string
-	Fields []string
-}
-
-type HdelReply int
-type HexistsArgs struct{ Key, Field string }
-type HexistsReply int
-type HgetArgs struct{ Key, Field string }
-type HgetReply []byte
-type HgetallArgs struct{ Key string }
-type HgetallReply struct{ BB }
-type HkeysArgs struct{ Key string }
-type HkeysReply struct{ BB }
-
-type HsetArgs struct {
-	Key, Field string
-	Value      []byte
-}
-
-type HsetReply int
-
-type LrangeArgs struct {
-	Key   string
-	Start int
-	Stop  int
-}
-
-type LrangeReply struct{ BB }
-
-type LindexArgs struct {
-	Key   string
-	Index int
-}
-
-type LindexReply []byte
-
-type BlpopArgs struct {
-	Key  string
-	Keys []string
-}
-
-type BlpopReply struct{ BB }
-
-type BrpopArgs struct {
-	Key  string
-	Keys []string
-}
-
-type BrpopReply struct{ BB }
-
-type LpushArgs struct {
-	Key    string
-	Value  []byte
-	Values [][]byte
-}
-
-type LpushReply int
-
-type RpushArgs struct {
-	Key    string
-	Value  []byte
-	Values [][]byte
-}
-
-type RpushReply int
-
-type Values []reflect.Value
-
 var keyRe *regexp.Regexp
 var empty = struct{}{}
-
-func Key(v interface{}) string {
-	s := fmt.Sprint(v)
-	if strings.Contains(s, ".") {
-		s = fmt.Sprint("[", s, "]")
-	}
-	return s
-}
 
 // Split a structured redis key.
 //
@@ -155,209 +47,6 @@ func Split(key string) []string {
 	return fields
 }
 
-func vfilter(v reflect.Value) string {
-	switch v.Kind() {
-	case reflect.Bool:
-		if v.Bool() {
-			return fmt.Sprint(v.Interface())
-		}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
-		reflect.Int64:
-		if v.Int() != 0 {
-			return fmt.Sprint(v.Interface())
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
-		reflect.Uint64:
-		if v.Uint() != 0 {
-			return fmt.Sprint(v.Interface())
-		}
-	case reflect.Float32, reflect.Float64:
-		if v.Float() != 0.0 {
-			return fmt.Sprint(v.Interface())
-		}
-	case reflect.String:
-		if s := v.String(); len(s) > 0 {
-			return s
-		}
-	default:
-		return fmt.Sprint(v.Interface())
-	}
-	return ""
-}
-
-func reflection(pbb *BB, withValues bool, prefix string, v interface{}) {
-	val := reflect.Indirect(reflect.ValueOf(v))
-	if val.Kind() == reflect.Map {
-		keys := Values(val.MapKeys())
-		sort.Sort(keys)
-		for _, mk := range keys {
-			mv := reflect.Indirect(val.MapIndex(mk))
-			mvkind := mv.Kind()
-			if mvkind == reflect.Struct || mvkind == reflect.Map {
-				reflection(pbb, withValues,
-					fmt.Sprint(prefix, Key(mk.Interface()),
-						"."),
-					mv.Interface())
-			} else if mv.Interface() != nil {
-				if withValues {
-					if s := vfilter(mv); len(s) > 0 {
-						pbb.Sprint(prefix,
-							Key(mk.Interface()))
-						pbb.Sappend(s)
-					}
-				} else {
-					pbb.Sprint(prefix, Key(mk.Interface()))
-				}
-			}
-		}
-		return
-	}
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		tfield := val.Type().Field(i)
-		name := strings.ToLower(tfield.Name)
-		fkind := field.Kind()
-		if fkind == reflect.Struct || fkind == reflect.Map {
-			reflection(pbb, withValues,
-				fmt.Sprint(prefix, name, "."),
-				field.Interface())
-		} else if field.Interface() != nil {
-			if withValues {
-				if s := vfilter(field); len(s) > 0 {
-					pbb.Sprint(prefix, name)
-					pbb.Sappend(s)
-				}
-			} else {
-				pbb.Sprint(prefix, name)
-			}
-		}
-	}
-}
-
-func (p *BB) Sappend(s string) {
-	*p = append(*p, []byte(s))
-}
-
-func (p *BB) Sprint(args ...interface{}) {
-	*p = append(*p, []byte(fmt.Sprint(args...)))
-}
-
-func (bb BB) Redis() [][]byte { return [][]byte(bb) }
-func (bb BB) Len() int        { return len(bb.Redis()) }
-
-func (bb BB) Less(i, j int) bool {
-	return bytes.Compare(bb.Redis()[i], bb.Redis()[j]) < 0
-}
-
-func (bb BB) Swap(i, j int) {
-	bb.Redis()[i], bb.Redis()[j] = bb.Redis()[j], bb.Redis()[i]
-}
-
-func (bb BB) String() string {
-	buf := &bytes.Buffer{}
-	for i, b := range bb {
-		if i > 0 {
-			buf.Write([]byte{' '})
-		}
-		buf.Write(b)
-	}
-	return buf.String()
-}
-
-func (r DelReply) Redis() int { return int(r) }
-
-func (r GetReply) Redis() []byte { return []byte(r) }
-
-func (r HdelReply) Redis() int { return int(r) }
-
-func (r HexistsReply) Redis() int { return int(r) }
-
-func (r HgetReply) Redis() []byte { return []byte(r) }
-
-// Reflection recursively descends the given struct to retrieve the value of
-// the named member.
-func (p *HgetReply) Reflection(fields []string, v interface{}) error {
-	val := reflect.Indirect(reflect.ValueOf(v))
-	if val.Kind() == reflect.Map {
-		mv := val.MapIndex(reflect.ValueOf(fields[0]))
-		if !mv.IsValid() {
-			return fmt.Errorf("%s not found", fields[0])
-		}
-		mv = reflect.Indirect(mv)
-		mvkind := mv.Kind()
-		if mvkind == reflect.Struct || mvkind == reflect.Map {
-			return p.Reflection(fields[1:], mv.Interface())
-		}
-		*p = append(*p, []byte(fmt.Sprint(mv.Interface()))...)
-		return nil
-	}
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		tfield := val.Type().Field(i)
-		name := strings.ToLower(tfield.Name)
-		if name != fields[0] {
-			continue
-		}
-		if len(fields) > 1 {
-			fkind := field.Kind()
-			if fkind == reflect.Struct || fkind == reflect.Map {
-				return p.Reflection(fields[1:],
-					field.Interface())
-			} else {
-				break
-			}
-		}
-		*p = append(*p, []byte(fmt.Sprint(field.Interface()))...)
-		return nil
-	}
-	return fmt.Errorf("%s not found", fields[0])
-}
-
-func (r HgetallReply) Redis() [][]byte { return r.BB.Redis() }
-
-// Reflection recursively descends the given struct to retrieve the name, value
-// of each member.
-func (p *HgetallReply) Reflection(prefix string, v interface{}) {
-	reflection(&p.BB, true, prefix, v)
-}
-
-func (r HkeysReply) Redis() [][]byte { return r.BB.Redis() }
-
-// Reflection recursively loads the receiver with the lowercased name of each
-// member from the given struct.
-func (p *HkeysReply) Reflection(prefix string, v interface{}) {
-	reflection(&p.BB, false, prefix, v)
-}
-
-func (r HsetReply) Redis() int { return int(r) }
-
-func (r LrangeReply) Redis() [][]byte { return r.BB.Redis() }
-
-func (r LindexReply) Redis() []byte { return []byte(r) }
-
-func (r BlpopReply) Redis() [][]byte { return r.BB.Redis() }
-
-func (r BrpopReply) Redis() [][]byte { return r.BB.Redis() }
-
-func (r LpushReply) Redis() int { return int(r) }
-
-func (r RpushReply) Redis() int { return int(r) }
-
-func MakeBB(size int) BB { return BB(make([][]byte, 0, size)) }
-
-func MakeHgetReply(size int) HgetReply {
-	return HgetReply(make([]byte, 0, size))
-}
-
-func MakeHgetallReply(size int) HgetallReply {
-	return HgetallReply{MakeBB(size)}
-}
-
-func MakeHkeysReply(size int) HkeysReply   { return HkeysReply{MakeBB(size)} }
-func MakeLrangeReply(size int) LrangeReply { return LrangeReply{MakeBB(size)} }
-func MakeBlpopReply(size int) BlpopReply   { return BlpopReply{MakeBB(size)} }
-func MakeBrpopReply(size int) BrpopReply   { return BrpopReply{MakeBB(size)} }
-
 // Assign an RPC handler for the given key.
 func Assign(key, file, name string) error {
 	cl, err := sockfile.NewRpcClient("redis-reg")
@@ -365,7 +54,7 @@ func Assign(key, file, name string) error {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("RedisReg.Assign", AssignArgs{key, file, name}, &empty)
+	return cl.Call("RedisReg.Assign", args.Assign{key, file, name}, &empty)
 }
 
 // Unassign an RPC handler for the given key.
@@ -375,7 +64,7 @@ func Unassign(key string) error {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("RedisReg.Unassign", UnassignArgs{key}, &empty)
+	return cl.Call("RedisReg.Unassign", args.Unassign{key}, &empty)
 }
 
 // Connect to the redis file socket.
@@ -614,28 +303,4 @@ func vstring(v interface{}) (s string) {
 		}
 	}
 	return
-}
-
-func (values Values) Len() int { return len(values) }
-
-func (values Values) Less(i, j int) bool {
-	switch values[i].Kind() {
-	case reflect.String:
-		return values[i].String() < values[j].String()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32,
-		reflect.Int64:
-		return values[i].Int() < values[j].Int()
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32,
-		reflect.Uint64:
-		return values[i].Uint() < values[j].Uint()
-	case reflect.Float32, reflect.Float64:
-		return values[i].Float() < values[j].Float()
-	default:
-		return fmt.Sprint(values[i].Interface()) <
-			fmt.Sprint(values[j].Interface())
-	}
-}
-
-func (values Values) Swap(i, j int) {
-	values[i], values[j] = values[j], values[i]
 }

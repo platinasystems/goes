@@ -13,6 +13,8 @@ import (
 
 	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/redis/rpc/args"
+	"github.com/platinasystems/go/redis/rpc/reply"
 	"github.com/platinasystems/go/sch"
 	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/goes"
@@ -169,7 +171,7 @@ func (p *machined) Swap(i, j int) {
 	p.registry[i], p.registry[j] = p.registry[j], p.registry[i]
 }
 
-func (r Registry) Hdel(args redis.HdelArgs, reply *redis.HdelReply) error {
+func (r Registry) Hdel(args args.Hdel, reply *reply.Hdel) error {
 	for _, entry := range r {
 		if strings.HasPrefix(args.Field, entry.prefix) {
 			if entry.info.Del == nil {
@@ -185,7 +187,7 @@ func (r Registry) Hdel(args redis.HdelArgs, reply *redis.HdelReply) error {
 	return fmt.Errorf("can't delete %s", args.Field)
 }
 
-func (r Registry) Hset(args redis.HsetArgs, reply *redis.HsetReply) error {
+func (r Registry) Hset(args args.Hset, reply *reply.Hset) error {
 	value := string(args.Value)
 	for _, entry := range r {
 		if strings.HasPrefix(args.Field, entry.prefix) {
