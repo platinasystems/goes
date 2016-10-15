@@ -5,9 +5,13 @@
 package recovered
 
 import (
+	"bytes"
 	"io"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/platinasystems/go/log"
 )
 
 type x struct {
@@ -22,7 +26,7 @@ func (x *x) String() string { return x.name }
 func TestNoErr(t *testing.T) {
 	err := New(&x{
 		"test",
-		func(_ ...string) error {
+		func(...string) error {
 			return nil
 		},
 	}).Main()
@@ -34,11 +38,11 @@ func TestNoErr(t *testing.T) {
 func TestIoEOF(t *testing.T) {
 	err := New(&x{
 		"test",
-		func(_ ...string) error {
+		func(...string) error {
 			return io.EOF
 		},
 	}).Main()
-	if err != nil {
+	if err != io.EOF {
 		t.Error("unexpected err:", err)
 	}
 }
@@ -47,7 +51,7 @@ func TestUnexpectedEOF(t *testing.T) {
 	expect := "test: " + io.ErrUnexpectedEOF.Error()
 	err := New(&x{
 		"test",
-		func(_ ...string) error {
+		func(...string) error {
 			return io.ErrUnexpectedEOF
 		},
 	}).Main()
@@ -59,7 +63,7 @@ func TestUnexpectedEOF(t *testing.T) {
 func TestPanic(t *testing.T) {
 	err := New(&x{
 		"test",
-		func(_ ...string) error {
+		func(...string) error {
 			panic(42)
 			return nil
 		},
@@ -72,7 +76,7 @@ func TestPanic(t *testing.T) {
 func TestDivby0(t *testing.T) {
 	err := New(&x{
 		"test",
-		func(_ ...string) error {
+		func(...string) error {
 			var i, j int
 			_ = i / j
 			return nil
@@ -84,4 +88,37 @@ func TestDivby0(t *testing.T) {
 	} else {
 		t.Log(err)
 	}
+}
+
+func TestGo(t *testing.T) {
+	buf := new(bytes.Buffer)
+	log.Writer = buf
+	go Go(func(...interface{}) {
+		panic("oops")
+	})
+	for i := 0; i < 3; i++ {
+		if buf.Len() > 0 {
+			t.Log("\n" + buf.String())
+			return
+		}
+		time.Sleep(time.Second)
+	}
+	t.Error("didn't receive expected panic message")
+}
+
+func TestGoDiv0(t *testing.T) {
+	buf := new(bytes.Buffer)
+	log.Writer = buf
+	go Go(func(...interface{}) {
+		var i, j int
+		_ = i / j
+	})
+	for i := 0; i < 3; i++ {
+		if buf.Len() > 0 {
+			t.Log("\n" + buf.String())
+			return
+		}
+		time.Sleep(time.Second)
+	}
+	t.Error("didn't receive expected panic message")
 }
