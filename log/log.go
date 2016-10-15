@@ -14,6 +14,7 @@ import (
 	"log/syslog"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,11 +56,11 @@ type RateLimited struct {
 }
 
 var pid int64
-var writer io.Writer
+var Writer io.Writer
 var mutex sync.Mutex
 var earlyBufs []*bytes.Buffer
 
-var Tag = "goes"
+var prog string
 
 var PriorityByName = map[string]syslog.Priority{
 	"emerg": syslog.LOG_EMERG,
@@ -252,11 +253,20 @@ func log(pri syslog.Priority, args ...interface{}) {
 		pid = int64(os.Getpid())
 	}
 
+	if len(prog) == 0 {
+		s, err := os.Readlink("/proc/self/exe")
+		if err == nil {
+			prog = filepath.Base(s)
+		} else {
+			prog = filepath.Base(os.Args[0])
+		}
+	}
+
 	msg := strings.Split(fmt.Sprint(args...), "\n")
 
-	if writer != nil {
+	if Writer != nil {
 		for _, s := range msg {
-			fmt.Fprintf(writer, "<%d>%s[%d]: %s\n", pri, Tag,
+			fmt.Fprintf(Writer, "<%d>%s[%d]: %s\n", pri, prog,
 				pid, s)
 		}
 	} else if _, err := os.Stat(DevLog); err == nil {
@@ -269,7 +279,7 @@ func log(pri syslog.Priority, args ...interface{}) {
 		for _, s := range msg {
 			fmt.Fprintf(conn, "<%d>%s %s[%d]: %s\n",
 				pri, time.Now().Format(time.Stamp),
-				Tag, pid, s)
+				prog, pid, s)
 		}
 	} else if kmsg, err := os.OpenFile(DevKmsg, os.O_RDWR, 0644); err == nil {
 		defer kmsg.Close()
@@ -281,13 +291,13 @@ func log(pri syslog.Priority, args ...interface{}) {
 			earlyBufs = earlyBufs[:0]
 		}
 		for _, s := range msg {
-			fmt.Fprintf(kmsg, "<%d>%s[%d]: %s\n", pri, Tag,
+			fmt.Fprintf(kmsg, "<%d>%s[%d]: %s\n", pri, prog,
 				pid, s)
 		}
 	} else if os.IsNotExist(err) {
 		buf := new(bytes.Buffer)
 		for _, s := range msg {
-			fmt.Fprintf(buf, "<%d>%s[%d]: %s\n", pri, Tag,
+			fmt.Fprintf(buf, "<%d>%s[%d]: %s\n", pri, prog,
 				pid, s)
 		}
 		earlyBufs = append(earlyBufs, buf)

@@ -6,8 +6,6 @@ package log
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 
 	"github.com/platinasystems/go/log"
 )
@@ -20,7 +18,6 @@ func (cmd) String() string { return "log" }
 func (cmd) Usage() string  { return "log [PRIORITY [FACILITY]] TEXT..." }
 
 func (cmd) Main(args ...string) error {
-	log.Tag = filepath.Base(os.Args[0])
 	if len(args) == 0 {
 		return errors.New("TEXT: missing")
 	}

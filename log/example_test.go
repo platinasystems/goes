@@ -11,7 +11,7 @@ import (
 
 func setup() {
 	pid = 6789
-	writer = os.Stdout
+	Writer = os.Stdout
 }
 
 func ExamplePrint() {
@@ -23,11 +23,11 @@ func ExamplePrint() {
 a multi-
 line message with default fac/pri`[1:])
 	// Output:
-	// <15>goes[6789]: a message with default facility/priority [fac/pri]
-	// <31>goes[6789]: a message with daemon fac and default pri
-	// <30>goes[6789]: a message with daemon fac and info pri
-	// <15>goes[6789]: a multi-
-	// <15>goes[6789]: line message with default fac/pri
+	// <15>log.test[6789]: a message with default facility/priority [fac/pri]
+	// <31>log.test[6789]: a message with daemon fac and default pri
+	// <30>log.test[6789]: a message with daemon fac and info pri
+	// <15>log.test[6789]: a multi-
+	// <15>log.test[6789]: line message with default fac/pri
 }
 
 func ExamplePrintf() {
@@ -41,11 +41,11 @@ func ExamplePrintf() {
 multi-
 line message with default fac/pri`[1:])
 	// Output:
-	// <15>goes[6789]: a formatted message with default fac/pri
-	// <31>goes[6789]: a formatted message with daemon fac and default pri
-	// <30>goes[6789]: a formatted message with daemon fac and info pri
-	// <15>goes[6789]: a formatted multi-
-	// <15>goes[6789]: line message with default fac/pri
+	// <15>log.test[6789]: a formatted message with default fac/pri
+	// <31>log.test[6789]: a formatted message with daemon fac and default pri
+	// <30>log.test[6789]: a formatted message with daemon fac and info pri
+	// <15>log.test[6789]: a formatted multi-
+	// <15>log.test[6789]: line message with default fac/pri
 }
 
 func ExampleLimitedPrint() {
@@ -56,9 +56,9 @@ func ExampleLimitedPrint() {
 	l.Print("third message")
 	l.Print("fourth message should be dropped")
 	// Output:
-	// <15>goes[6789]: first message
-	// <15>goes[6789]: second message
-	// <15>goes[6789]: third message
+	// <15>log.test[6789]: first message
+	// <15>log.test[6789]: second message
+	// <15>log.test[6789]: third message
 }
 
 func ExampleRateLimitedPrint() {
@@ -72,8 +72,8 @@ func ExampleRateLimitedPrint() {
 	time.Sleep(750 * time.Millisecond)
 	rl.Print("fifth message after fourth is rate limited")
 	// Output:
-	// <15>goes[6789]: first message
-	// <15>goes[6789]: second message
-	// <15>goes[6789]: third message
-	// <15>goes[6789]: fifth message after fourth is rate limited
+	// <15>log.test[6789]: first message
+	// <15>log.test[6789]: second message
+	// <15>log.test[6789]: third message
+	// <15>log.test[6789]: fifth message after fourth is rate limited
 }
