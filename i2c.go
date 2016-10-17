@@ -23,6 +23,9 @@ func (*i2c_) Usage() string {
 }
 
 func (p *i2c_) Main(args ...string) {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
 	var (
 		bus        i2c.Bus
 		sd         i2c.SMBusData
