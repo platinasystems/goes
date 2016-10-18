@@ -119,6 +119,24 @@ func GpioInit () {
 	return
 }
 
+// returns value of BMC gpio name
+func GpioGet(name string) bool {
+        pv := PinValue{Name: name}
+        pv.PinNum = Gpios[pv.Name]
+        v, err := pv.PinNum.Value()
+        if err != nil {
+                fmt.Println(err)
+        }
+        return v
+}
+
+// sets BMC gpio name to value
+func GpioSet(name string, value bool) {
+        pv := PinValue{Name: name}
+        pv.PinNum = Gpios[pv.Name]
+        pv.PinNum.SetValue(value)
+        return
+}
 
 // Implement sort.Interface
 func (p pinValues) Len() int           { return len(p) }
