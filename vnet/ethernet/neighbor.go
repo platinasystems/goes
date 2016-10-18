@@ -81,11 +81,16 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 	if isDel {
 		*in = ipNeighbor{}
 	} else {
-		if len(as) == 0 {
+		is_new_adj := len(as) == 0
+		if is_new_adj {
 			ai, as = im.NewAdj(1)
 		}
 		m.v.SetRewrite(&as[0].Rewrite, n.Si, im.RewriteNode, im.PacketType, n.Ethernet[:])
 		as[0].LookupNextIndex = ip.LookupNextRewrite
+
+		if is_new_adj {
+			im.CallAdjAddHooks(ai)
+		}
 
 		if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
 			return

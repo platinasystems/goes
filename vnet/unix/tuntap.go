@@ -70,8 +70,9 @@ type tuntapMain struct {
 	bufferPool *vnet.BufferPool
 }
 
-func (m *tuntapMain) Init() {
+func (m *tuntapMain) Init(v *vnet.Vnet) {
 	m.bufferPool = vnet.DefaultBufferPool
+	v.AddBufferPool(m.bufferPool)
 }
 
 const (

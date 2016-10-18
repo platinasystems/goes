@@ -1,6 +1,7 @@
 package ip4
 
 import (
+	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
@@ -70,8 +71,9 @@ func init() {
 	}
 }
 
-func (p *Prefix) Mask() vnet.Uint32      { return mapFibMasks[p.Len] }
-func (p *Prefix) mapFibKey() vnet.Uint32 { return p.Address.AsUint32() & p.Mask() }
+func (p *Prefix) Mask() vnet.Uint32          { return mapFibMasks[p.Len] }
+func (p *Prefix) MaskAsAddress() (a Address) { a.FromUint32(p.Mask()); return }
+func (p *Prefix) mapFibKey() vnet.Uint32     { return p.Address.AsUint32() & p.Mask() }
 
 func (m *mapFib) set(p *Prefix, r ip.Adj) (oldAdj ip.Adj, ok bool) {
 	l := p.Len
@@ -295,6 +297,10 @@ type fibMain struct {
 }
 
 //go:generate gentemplate -d Package=ip4 -id Fib -d VecType=FibVec -d Type=*Fib github.com/platinasystems/go/elib/vec.tmpl
+
+func (m *fibMain) RegisterFibAddDelHook(f FibAddDelHook, dep ...*dep.Dep) {
+	m.fibAddDelHooks.Add(f, dep...)
+}
 
 func (m *Main) fibByIndex(i ip.FibIndex, create bool) (f *Fib) {
 	m.fibs.Validate(uint(i))

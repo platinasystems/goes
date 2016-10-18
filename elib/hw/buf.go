@@ -339,6 +339,8 @@ var DefaultBufferTemplate = &BufferTemplate{
 	Ref:  Ref{RefHeader: RefHeader{dataOffset: BufferRewriteBytes}},
 }
 
+func (p *BufferPool) isInitialized() bool { return p.sizeIncludingOverhead != 0 }
+
 func (p *BufferPool) Init() {
 	t := &p.BufferTemplate
 	if len(t.Data) > 0 {
@@ -413,6 +415,9 @@ func (p *BufferPool) FreeLen() uint { return uint(len(p.refs)) }
 
 func (p *BufferPool) AllocRefs(r *RefHeader, n uint) { p.AllocRefsStride(r, n, 1) }
 func (p *BufferPool) AllocRefsStride(r *RefHeader, want, stride uint) {
+	if !p.isInitialized() {
+		p.Init()
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	got := p.FreeLen()

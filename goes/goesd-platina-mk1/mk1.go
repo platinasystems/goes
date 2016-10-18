@@ -28,7 +28,7 @@ import (
 	"github.com/platinasystems/go/vnet/ip6"
 	"github.com/platinasystems/go/vnet/pg"
 	"github.com/platinasystems/go/vnet/unix"
-	"github.com/platinasystems/proprietary/ethernet/switch/bcm"
+	"github.com/platinasystems/vnetdevices/ethernet/switch/bcm"
 
 	"fmt"
 	"os"

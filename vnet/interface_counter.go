@@ -228,6 +228,21 @@ func (m *interfaceMain) foreachHwIfCounter(zero bool, hi Hi, f func(name string,
 	}
 }
 
+func (v *Vnet) ForeachHwIfCounter(zero bool, f func(hi Hi, name string, value uint64)) {
+	for i := range v.hwIferPool.elts {
+		if v.hwIferPool.IsFree(uint(i)) {
+			continue
+		}
+		h := v.hwIferPool.elts[i].GetHwIf()
+		if h.unprovisioned {
+			continue
+		}
+		v.foreachHwIfCounter(zero, h.hi, func(name string, value uint64) {
+			f(h.hi, name, value)
+		})
+	}
+}
+
 func (v *Vnet) syncSwIfCounters() {
 	for i := range v.swIfCounterSyncHooks.hooks {
 		v.swIfCounterSyncHooks.Get(i)(v)

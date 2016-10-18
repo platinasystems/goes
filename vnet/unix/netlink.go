@@ -198,6 +198,7 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	intf := m.getInterface(v.Index)
 	dst := ip4Address(v.Attrs[netlink.NDA_DST])
 	nbr := ethernet.IpNeighbor{
+		Si:       intf.si,
 		Ethernet: ethernetAddress(v.Attrs[netlink.NDA_LLADDR]),
 		Ip:       dst.ToIp(),
 	}

@@ -88,6 +88,7 @@ loop:
 			for i := range x.adjs {
 				ai, a := m4.NewAdj(1)
 				a[0] = x.adjs[i]
+				m4.CallAdjAddHooks(ai)
 				if _, err = m4.AddDelRoute(&pi, x.fib_index, ai, x.is_del); err != nil {
 					return
 				}

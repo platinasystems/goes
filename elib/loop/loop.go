@@ -251,6 +251,10 @@ func (l *Loop) Resume(in *In) {
 	if p := a.pollerNode; p != nil {
 		for {
 			old := p.flags
+			if old&node_active == 0 {
+				p.pollerElog(poller_resume, old)
+				return
+			}
 			new := old
 			new |= node_active
 			new |= node_resumed

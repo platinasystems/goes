@@ -41,7 +41,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	}
 
 	// Sync adjacency stats with hardware.
-	m.CallAdjSyncHooks()
+	m.CallAdjSyncCounterHooks()
 
 	rs := []showIpFibRoute{}
 	for fi := range m.fibs {
@@ -65,12 +65,12 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			}
 			ss := adjs[ai].String(&m.Main)
 
-			// Fetch adjacency counters.
-			v := m.Main.GetCounter(r.adj + ip.Adj(ai))
-			if v.Packets != 0 || detail {
-				ss = append(ss, fmt.Sprintf("%spackets %16d", initialSpace, v.Packets))
-				ss = append(ss, fmt.Sprintf("%sbytes   %16d", initialSpace, v.Bytes))
-			}
+			m.Main.ForeachAdjCounter(r.adj+ip.Adj(ai), func(tag string, v vnet.CombinedCounter) {
+				if v.Packets != 0 || detail {
+					ss = append(ss, fmt.Sprintf("%s%spackets %16d", initialSpace, tag, v.Packets))
+					ss = append(ss, fmt.Sprintf("%s%sbytes   %16d", initialSpace, tag, v.Bytes))
+				}
+			})
 
 			for _, s := range ss {
 				lines = append(lines, line+s)

@@ -9,8 +9,8 @@ func GetHeader(r *vnet.Ref) *Header { return (*Header)(r.Data()) }
 type nodeMain struct {
 	inputNode              inputNode
 	inputValidChecksumNode inputValidChecksumNode
-	rewriteNode            vnet.Node
-	arpNode                vnet.Node
+	rewriteNode            inputNode
+	arpNode                inputNode
 }
 
 func (m *Main) nodeInit(v *vnet.Vnet) {
@@ -21,6 +21,8 @@ func (m *Main) nodeInit(v *vnet.Vnet) {
 	v.RegisterInOutNode(&m.inputNode, "ip4-input")
 	m.inputValidChecksumNode.Next = m.inputNode.Next
 	v.RegisterInOutNode(&m.inputValidChecksumNode, "ip4-input-valid-checksum")
+	v.RegisterInOutNode(&m.arpNode, "ip4-arp")
+	v.RegisterInOutNode(&m.rewriteNode, "ip4-rewrite")
 }
 
 const (
