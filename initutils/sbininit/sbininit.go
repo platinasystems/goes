@@ -2,26 +2,31 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-// Package sbininit provides both '/sbin/init' and '/usr/sbin/goesd' goes
-// commands that run a redis server prior to running all of the registered goes
-// daemons. After starting the daemons, '/sbin/init' returns to 'goes.Goes'
-// that then runs the console shell; where as, '/usr/sbin/goesd' instead waits
-// for a kill signal then stops all daemons.
+// Package sbininit provides `/sbin/init` that is run from `/init`.  This
+// starts a redis server followed by all configured daemons before repatedly
+// running the cli on the console.
 //
-// A machine main may reassign the Hook closure to perform target specific
-// tasks prior to running the daemons. Similarly, the 'GOESRC' environment
-// variable may name a script to run before the daemons.
+// If present, this sources `/etc/goes` which set these variables.
 //
-// The 'REDISD_DEVS' environment variable may be a space separated list of
-// redis listening net devices. The default is "lo".
+//	REDISD		list of net devices that the server listens to
+//			default: lo
+//	MACHINED	machined arguments
 package sbininit
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
-	"github.com/platinasystems/go/initutils/internal"
-	"github.com/platinasystems/go/log"
+	"github.com/platinasystems/go/command"
 )
+
+// If present, /etc/goes is sourced before running redisd, machined, and
+// the remaining damons.
+const EtcGoes = "/etc/goes"
+
+// Machines may use this Hook to run something before redisd, machined, etc.
+var Hook = func() error { return nil }
 
 type sbinInit struct{}
 
@@ -30,19 +35,57 @@ func New() sbinInit { return sbinInit{} }
 func (sbinInit) String() string { return "/sbin/init" }
 func (sbinInit) Usage() string  { return "/sbin/init" }
 
-func (sbinInit) Main(_ ...string) error {
-	defer func(stdin, stdout, stderr *os.File) {
-		os.Stdin, os.Stdout, os.Stderr = stdin, stdout, stderr
-	}(os.Stdin, os.Stdout, os.Stderr)
-	var err error
-	if os.Stdin, err = os.Open(os.DevNull); err != nil {
+func (sbinInit) Main(...string) error {
+	if pid := os.Getpid(); pid != 1 {
+		return fmt.Errorf("%d: pid not 1", pid)
+	}
+	err := Hook()
+	if err != nil {
 		return err
 	}
-	if os.Stdout, _ = log.Pipe("info"); err != nil {
+	if _, err = os.Stat(EtcGoes); err == nil {
+		err = command.Main("source", EtcGoes)
+		if err != nil {
+			return err
+		}
+	}
+	args := strings.Fields(os.Getenv("REDISD"))
+	if len(args) > 0 {
+		err = command.Main(append([]string{"redisd"}, args...)...)
+	} else {
+		err = command.Main("redisd")
+	}
+	if err != nil {
 		return err
 	}
-	if os.Stderr, _ = log.Pipe("err"); err != nil {
+	args = strings.Fields(os.Getenv("MACHINED"))
+	if len(args) > 0 {
+		err = command.Main(append([]string{"machined"}, args...)...)
+	} else {
+		err = command.Main("machined")
+	}
+	if err != nil {
 		return err
 	}
-	return internal.Init.Start()
+	for daemon, lvl := range command.Daemon {
+		if lvl < 0 {
+			continue
+		}
+		err = command.Main(daemon)
+		if err != nil {
+			return err
+		}
+	}
+	login := command.Find("login") != nil
+	for {
+		if login {
+			err = command.Main("login")
+			if err != nil {
+				fmt.Println("login:", err)
+				continue
+			}
+		}
+		command.Main("cli")
+	}
+	return nil
 }

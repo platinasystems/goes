@@ -16,8 +16,10 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/nocomment"
 	"github.com/platinasystems/go/parms"
+	"github.com/platinasystems/go/pidfile"
 	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/slice_args"
 	"github.com/platinasystems/go/slice_string"
@@ -297,8 +299,16 @@ func Main(args ...string) error {
 				c := exec.Command(Prog, args[1:]...)
 				c.Args[0] = name
 				c.Stdin = nil
-				c.Stdout = nil
-				c.Stderr = nil
+				if p, err := log.Pipe("info"); err == nil {
+					c.Stdout = p
+				} else {
+					c.Stdout = nil
+				}
+				if p, err := log.Pipe("err"); err == nil {
+					c.Stderr = p
+				} else {
+					c.Stderr = nil
+				}
 				c.Env = []string{
 					"PATH=" + Path,
 					"TERM=linux",
@@ -310,7 +320,12 @@ func Main(args ...string) error {
 				}
 				return c.Start()
 			case "grandchild":
-				return recovered.New(ms).Main(args...)
+				pidfn, err := pidfile.New()
+				if err == nil {
+					err = recovered.New(ms).Main(args...)
+					os.Remove(pidfn)
+				}
+				return err
 			}
 		} else {
 			return recovered.New(ms).Main(args...)

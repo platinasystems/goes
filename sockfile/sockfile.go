@@ -17,6 +17,7 @@ import (
 
 	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/group"
+	"github.com/platinasystems/go/rundir"
 )
 
 const Dir = "/run/goes/socks"
@@ -24,13 +25,6 @@ const Dir = "/run/goes/socks"
 type RpcServer struct {
 	sig chan os.Signal
 	emptych.Out
-}
-
-func Path(name string) string {
-	if strings.HasPrefix(name, Dir) {
-		return name
-	}
-	return filepath.Join(Dir, name)
 }
 
 func Dial(name string) (net.Conn, error) {
@@ -49,25 +43,20 @@ func Dial(name string) (net.Conn, error) {
 
 func Listen(name string) (net.Listener, error) {
 	path := Path(name)
-	dir := filepath.Dir(path)
-	adm := group.Parse()["adm"].Gid()
-	if _, err := os.Stat(dir); err != nil {
-		if os.IsNotExist(err) {
-			err = os.MkdirAll(dir, os.FileMode(0755))
-			if adm > 0 {
-				os.Chown(dir, os.Geteuid(), adm)
-			}
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-	if _, err := os.Stat(path); err == nil || os.IsExist(err) {
+	_, err := os.Stat(path)
+	if err == nil || os.IsExist(err) {
 		return nil, fmt.Errorf("%s: %v", name, os.ErrExist)
 	}
+	err = rundir.New(Dir)
+	if err != nil {
+		return nil, err
+	}
 	ln, err := net.Listen("unix", path)
-	if err == nil && adm > 0 {
-		os.Chown(path, os.Geteuid(), adm)
+	if err != nil {
+		return nil, err
+	}
+	if adm := group.Parse()["adm"].Gid(); adm > 0 {
+		err = os.Chown(path, os.Geteuid(), adm)
 	}
 	return ln, err
 }
@@ -116,6 +105,24 @@ func NewRpcServer(name string) (*RpcServer, error) {
 		close(srvr.sig)
 	}()
 	return srvr, err
+}
+
+// Path returns Dir + "/" + name if name isn't already prefaced by Dir
+func Path(name string) string {
+	if strings.HasPrefix(name, Dir) {
+		return name
+	}
+	return filepath.Join(Dir, name)
+}
+
+func RemoveAll() {
+	socks, err := filepath.Glob(filepath.Join(Dir, "*"))
+	if err == nil {
+		for _, fn := range socks {
+			os.Remove(fn)
+		}
+		os.Remove(Dir)
+	}
 }
 
 func (p *RpcServer) Terminate() {
