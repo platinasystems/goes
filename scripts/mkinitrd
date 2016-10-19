@@ -1,0 +1,30 @@
+#!/bin/sh
+
+prog=${0##*/}
+usage="${prog} PKG"
+
+if [ $# -ne 1 ] ; then
+	echo usage: ${usage} > /dev/stderr
+	exit 1
+fi
+
+GOARCH=`go env GOARCH`
+pkg=$1
+goes=${pkg##*/}
+cpio=${goes}-${GOARCH}.cpio
+tmpdir=`mktemp -d`
+
+if [ "$GOTAGS" = "" ] ; then
+	GOTAGS=netgo
+else
+	GOTAGS="$GOTAGS netgo"
+fi
+
+mkdir -m 0755 -p $tmpdir/usr/bin
+go build -o $tmpdir/usr/bin/$goes -tags "$GOTAGS" -ldflags "-d" $pkg
+ln -s usr/bin/$goes $tmpdir/init
+mkdir -m 0755 $tmpdir/etc
+echo "nameserver 8.8.8.8" > $tmpdir/etc/resolv.conf
+(cd $tmpdir && find . | cpio --quiet -H newc -o --owner 0:0) > $cpio
+xz -f --check=crc32 -9 $cpio
+rm -rf $tmpdir

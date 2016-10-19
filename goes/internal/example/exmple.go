@@ -6,12 +6,20 @@ package example
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/platinasystems/go/machined"
 )
 
-func Machine() {
+var GoesdHook = SbinInitHook
+
+func SbinInitHook() error {
+	os.Setenv("REDISD", "lo eth0")
+	return nil
+}
+
+func MachineHook() {
 	machined.NetLink.Prefixes("lo.", "eth0.")
 	machined.InfoProviders = append(machined.InfoProviders,
 		&ExampleInfo{

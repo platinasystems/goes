@@ -10,7 +10,6 @@
 package slashinit
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"syscall"
@@ -20,31 +19,26 @@ import (
 )
 
 const (
-	sbinInit   = "/sbin/init"
-	usrBinGoes = "/usr/bin/goes"
+	Name = "/init"
+	zero = uintptr(0)
 )
 
-type slashInit struct{}
-
-var env struct {
-	goes, root string
-}
+type cmd struct{}
 
 var Hook = func() error { return nil }
 
-func New() slashInit { return slashInit{} }
+func New() cmd { return cmd{} }
 
-func (slashInit) String() string { return "/init" }
-func (slashInit) Usage() string  { return "/init" }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
 func init() {
-	env.goes = os.Getenv("goes")
-	env.root = os.Getenv("root")
-
 	if os.Getpid() != 1 {
 		return
 	}
-
+	if os.Args[0] != Name {
+		return
+	}
 	for _, mnt := range []struct {
 		dir    string
 		dev    string
@@ -60,14 +54,13 @@ func init() {
 		if _, err := os.Stat(mnt.dir); os.IsNotExist(err) {
 			err = os.Mkdir(mnt.dir, os.FileMode(mnt.mode))
 			if err != nil {
-				log.Print("err", "mkdir", mnt.dir, ":", err)
+				log.Print("err", mnt.dir, ": ", err)
 				continue
 			}
 		}
-		err := syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, uintptr(0),
-			"")
+		err := syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
 		if err != nil {
-			log.Print("err", "mount", mnt.dir, ":", err)
+			log.Print("err", mnt.dir, ": ", err)
 		}
 	}
 	for _, ln := range []struct {
@@ -87,12 +80,13 @@ func init() {
 	}
 }
 
-func (slashInit) Main(_ ...string) error {
+func (cmd) Main(_ ...string) error {
+	root := os.Getenv("root")
 	err := Hook()
 	if err != nil {
 		return err
 	}
-	if len(env.root) > 0 {
+	if len(root) > 0 {
 		_, err = os.Stat("/newroot")
 		if os.IsNotExist(err) {
 			err = os.Mkdir("/newroot", os.FileMode(0755))
@@ -100,7 +94,7 @@ func (slashInit) Main(_ ...string) error {
 				return err
 			}
 		}
-		err = command.Main("mount", env.root, "/newroot")
+		err = command.Main("mount", root, "/newroot")
 		if err != nil {
 			return err
 		}
@@ -123,11 +117,12 @@ func (slashInit) Main(_ ...string) error {
 		for _, cp := range []struct {
 			src, dst string
 		}{
-			{"/bin/goes", "/newroot/bin/goes"},
+			{"/usr/bin/goes", "/newroot/usr/bin/goes"},
 			{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
 		} {
 			_, err = os.Stat(cp.dst)
-			if os.IsNotExist(err) || env.goes == "overwrite" {
+			if os.IsNotExist(err) ||
+				os.Getenv("goes") == "overwrite" {
 				r, err := os.Open(cp.src)
 				if err != nil {
 					return err
@@ -245,8 +240,7 @@ func (slashInit) Main(_ ...string) error {
 	}{
 		{"/tmp", "tmpfs", "tmpfs"},
 	} {
-		err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, uintptr(0),
-			"")
+		err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
 		if err != nil {
 			log.Print("err", "mount", mnt.dir, ":", err)
 		}
@@ -268,15 +262,17 @@ func (slashInit) Main(_ ...string) error {
 			return err
 		}
 	}
-	syscall.Exec(sbinInit, []string{sbinInit}, []string{
-		"PATH=" + os.Getenv("PATH"),
-		"SHELL=" + os.Getenv("SHELL"),
-		"HOME=" + os.Getenv("HOME"),
-		"TERM=" + os.Getenv("TERM"),
-	})
-	// fallback if above fails
-	if err = command.Main(sbinInit); err != nil {
-		return err
+	const sbininit = "/sbin/init"
+	_, err = os.Stat(sbininit)
+	if err == nil {
+		err = syscall.Exec(sbininit, []string{sbininit}, []string{
+			"PATH=" + os.Getenv("PATH"),
+			"SHELL=" + os.Getenv("SHELL"),
+			"HOME=" + os.Getenv("HOME"),
+			"TERM=" + os.Getenv("TERM"),
+		})
+	} else {
+		err = command.Main(sbininit)
 	}
-	return fmt.Errorf("Help me Mr. Wizard!")
+	return err
 }

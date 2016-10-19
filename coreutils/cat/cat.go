@@ -12,14 +12,16 @@ import (
 	"github.com/platinasystems/go/url"
 )
 
-type cat struct{}
+const Name = "cat"
 
-func New() cat { return cat{} }
+type cmd struct{}
 
-func (cat) String() string { return "cat" }
-func (cat) Usage() string  { return "cat [FILE]..." }
+func New() cmd { return cmd{} }
 
-func (p *cat) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return "cat [FILE]..." }
+
+func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		args = []string{"-"}
 	}
@@ -42,13 +44,13 @@ func (p *cat) Main(args ...string) error {
 	return nil
 }
 
-func (cat) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print concatenated files",
 	}
 }
 
-func (cat) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	cat - print concatenates files

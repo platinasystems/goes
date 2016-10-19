@@ -12,15 +12,17 @@ import (
 	"unsafe"
 )
 
-type resize struct{}
+const Name = "resize"
 
-func New() resize { return resize{} }
+type cmd struct{}
 
-func (resize) String() string { return "resize" }
-func (resize) Tag() string    { return "builtin" }
-func (resize) Usage() string  { return "resize" }
+func New() cmd { return cmd{} }
 
-func (resize) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return Name }
+
+func (cmd) Main(args ...string) error {
 	var (
 		rcxy    struct{ Row, Col, X, Y uint16 }
 		mustset bool
@@ -55,7 +57,7 @@ func (resize) Main(args ...string) error {
 		}
 		if *(dimension.rcxy) == 0 {
 			if u == 0 {
-				if dimension.init == 0 {
+				if dimension.init != 0 {
 					mustset = true
 					*(dimension.rcxy) = dimension.init
 					env = fmt.Sprint(dimension.init)

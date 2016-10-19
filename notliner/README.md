@@ -1,5 +1,5 @@
-
-Package unprompted provied a command.GetLiner for scripts.
+Package notliner provides an alternative command.Prompter for shell scripts and
+tty's unsupported by liner.
 
 ---
 

@@ -9,7 +9,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -76,6 +75,10 @@ func main() {
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Sort()
+	sbininit.Hook = func() error {
+		os.Setenv("REDISD", "lo eth0")
+		return nil
+	}
 	machined.Hook = func() {
 		gpioInit()
 		machined.NetLink.Prefixes("lo.", "eth0.")
@@ -138,11 +141,7 @@ func main() {
 				},
 			})
 	}
-	os.Setenv("REDISD_DEVS", "lo eth0")
-	err := goes.Main(os.Args...)
-	if err != nil && err != io.EOF {
-		os.Exit(1)
-	}
+	goes.Main()
 }
 
 func updateUint16(v uint16, k string) {

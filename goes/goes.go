@@ -11,40 +11,49 @@ package goes
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/command"
-	"github.com/platinasystems/go/unprompted"
+	"github.com/platinasystems/go/log"
 )
 
-func Main(args ...string) (err error) {
-	defer func() {
-		if err != nil && err != io.EOF {
-			fmt.Fprintf(os.Stderr, "%s: %v\n",
-				filepath.Base(command.Prog), err)
-		}
-	}()
-	if command.Find(args[0]) != nil {
-		err = command.Main(args...)
-	} else if len(args) > 1 {
-		if args[0] == command.Prog {
-			if script, ierr := os.Open(args[1]); ierr == nil {
-				defer script.Close()
-				buf := make([]byte, 4096)
-				n, ierr := script.Read(buf[:])
-				if ierr == nil && utf8.Valid(buf[:n]) {
-					script.Seek(0, 0)
-					gl := unprompted.New(script).GetLine
-					err = command.Shell(gl)
-					return
-				}
-			}
-		}
-		err = command.Main(args[1:]...)
-	} else {
-		err = command.Main("cli")
+var Exit = os.Exit
+
+func Main() {
+	args := os.Args
+	if len(args) == 0 {
+		return
 	}
-	return
+	if command.Find(args[0]) == nil {
+		if args[0] == "/usr/bin/goes" && len(args) > 2 {
+			buf, err := ioutil.ReadFile(args[1])
+			if err == nil && utf8.Valid(buf) {
+				args = []string{"source", args[1]}
+			} else {
+				args = args[1:]
+			}
+		} else {
+			args = args[1:]
+		}
+	}
+	if len(args) == 0 {
+		args = []string{"cli"}
+	}
+	isdaemon := command.IsDaemon(args[0])
+	err := command.Main(args...)
+	if err == io.EOF {
+		err = nil
+	}
+	if err != nil {
+		if isdaemon {
+			log.Print("daemon", "err", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s: %v\n",
+				filepath.Base(command.Prog()), err)
+		}
+		Exit(1)
+	}
 }

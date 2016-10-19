@@ -10,18 +10,20 @@ import (
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/flags"
-	"github.com/platinasystems/go/unprompted"
+	"github.com/platinasystems/go/notliner"
 	"github.com/platinasystems/go/url"
 )
 
-type source struct{}
+const Name = "source"
 
-func New() source { return source{} }
+type cmd struct{}
 
-func (source) String() string { return "source" }
-func (source) Usage() string  { return "source [-x] FILE" }
+func New() cmd { return cmd{} }
 
-func (source) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return "source [-x] FILE" }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-x")
 	if len(args) == 0 {
 		return fmt.Errorf("FILE: missing")
@@ -41,7 +43,7 @@ func (source) Main(args ...string) error {
 		os.Setenv("TRACE", "true")
 	}
 
-	err = command.Shell(unprompted.New(f).GetLine)
+	err = command.Shell(notliner.New(f, nil))
 
 	if flag["-x"] && t != "true" {
 		os.Unsetenv("TRACE")
@@ -49,13 +51,13 @@ func (source) Main(args ...string) error {
 	return err
 }
 
-func (source) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "import command script",
 	}
 }
 
-func (source) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	source - import command script

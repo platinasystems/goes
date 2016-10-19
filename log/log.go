@@ -257,6 +257,9 @@ func log(pri syslog.Priority, args ...interface{}) {
 		s, err := os.Readlink("/proc/self/exe")
 		if err == nil {
 			prog = filepath.Base(s)
+			if s != os.Args[0] {
+				prog += "." + os.Args[0]
+			}
 		} else {
 			prog = filepath.Base(os.Args[0])
 		}

@@ -9,13 +9,9 @@ import (
 	"net"
 	"net/rpc"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"strings"
-	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/group"
 	"github.com/platinasystems/go/rundir"
 )
@@ -23,8 +19,8 @@ import (
 const Dir = "/run/goes/socks"
 
 type RpcServer struct {
-	sig chan os.Signal
-	emptych.Out
+	ln    net.Listener
+	conns []net.Conn
 }
 
 func Dial(name string) (net.Conn, error) {
@@ -70,49 +66,21 @@ func NewRpcClient(name string) (*rpc.Client, error) {
 }
 
 func NewRpcServer(name string) (*RpcServer, error) {
-	done := emptych.Make()
 	ln, err := Listen(name)
 	if err != nil {
 		return nil, err
 	}
-	srvr := &RpcServer{
-		make(chan os.Signal),
-		emptych.Out(done),
-	}
-	signal.Notify(srvr.sig, syscall.SIGTERM)
-	go func(done emptych.In) {
-		fmt.Println("listen to ", ln.Addr().String())
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				fn := ln.Addr().String()
-				fmt.Println("remove ", fn)
-				os.Remove(fn)
-				break
-			}
-			go rpc.ServeConn(conn)
-		}
-		done.Close()
-	}(emptych.In(done))
-	go func() {
-		for sig := range srvr.sig {
-			if sig == syscall.SIGTERM {
-				fmt.Println("close ", ln.Addr().String())
-				ln.Close()
-				break
-			}
-		}
-		close(srvr.sig)
-	}()
+	srvr := &RpcServer{ln: ln}
+	go srvr.listen()
 	return srvr, err
 }
 
-// Path returns Dir + "/" + name if name isn't already prefaced by Dir
+// Path returns Dir + "/" + Dir(name) if name isn't already prefaced by Dir
 func Path(name string) string {
-	if strings.HasPrefix(name, Dir) {
-		return name
+	if filepath.Dir(name) != Dir {
+		name = filepath.Join(Dir, filepath.Base(name))
 	}
-	return filepath.Join(Dir, name)
+	return name
 }
 
 func RemoveAll() {
@@ -125,6 +93,26 @@ func RemoveAll() {
 	}
 }
 
-func (p *RpcServer) Terminate() {
-	p.sig <- syscall.SIGTERM
+func (srvr *RpcServer) Close() error {
+	err := srvr.ln.Close()
+	for _, conn := range srvr.conns {
+		xerr := conn.Close()
+		if err == nil {
+			err = xerr
+		}
+	}
+	return err
+}
+
+func (srvr *RpcServer) listen() {
+	fn := srvr.ln.Addr().String()
+	for {
+		conn, err := srvr.ln.Accept()
+		if err != nil {
+			break
+		}
+		srvr.conns = append(srvr.conns, conn)
+		go rpc.ServeConn(conn)
+	}
+	os.Remove(fn)
 }

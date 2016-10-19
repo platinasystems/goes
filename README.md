@@ -1,9 +1,9 @@
 This repos contains Platina System's open source GO projects.
 
-Run this to build all debian daemons and stand-alone systems:
+Run this to build all debian daemons and initrd's.
 
 ```console
-go generate ./generate
+./scripts/mkall
 ```
 
 ---

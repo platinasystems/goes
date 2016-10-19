@@ -11,16 +11,16 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/args"
 	"github.com/platinasystems/go/redis/rpc/reply"
 	"github.com/platinasystems/go/sch"
 	"github.com/platinasystems/go/sockfile"
-	"github.com/platinasystems/goes"
 )
 
-const debugRegistry = false
+const Name = "machined"
 
 // Machines may modify this info provider list or overwrite any of its
 // references with a target specific implementation.
@@ -82,34 +82,40 @@ type entry struct {
 	info   InfoProvider
 }
 
-type machined struct {
+type cmd struct {
 	registry Registry
+	sock     *sockfile.RpcServer
+	done     emptych.In
 }
 
-func New() *machined { return &machined{} }
+func New() *cmd { return &cmd{} }
 
-func (*machined) String() string { return "machined" }
-func (*machined) Usage() string  { return "machined" }
-func (*machined) Daemon() int    { return 1 }
+func (*cmd) Daemon() int    { return -1 }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Name }
 
-func (p *machined) Main(args ...string) error {
+func (cmd *cmd) Main(args ...string) error {
 	var i, n int
+	var err error
+	var done emptych.Out
 
-	goes.Standby("machined")
+	cmd.done, done = emptych.New()
+
+	// FIXME goes.Standby(Name)
 	Hook()
 	for _, info := range InfoProviders {
 		n += len(info.Prefixes())
 	}
-	p.registry = make(Registry, n)
+	cmd.registry = make(Registry, n)
 	for _, info := range InfoProviders {
 		for _, prefix := range info.Prefixes() {
-			p.registry[i] = &entry{prefix, info}
+			cmd.registry[i] = &entry{prefix, info}
 			i++
 		}
 	}
-	sort.Sort(p)
-	rpc.Register(p.registry)
-	sock, err := sockfile.NewRpcServer("machined")
+	sort.Sort(cmd)
+	rpc.Register(cmd.registry)
+	cmd.sock, err = sockfile.NewRpcServer(Name)
 	if err != nil {
 		return err
 	}
@@ -118,13 +124,9 @@ func (p *machined) Main(args ...string) error {
 		return err
 	}
 	defer close(pub)
-	for i, entry := range p.registry {
+	for _, entry := range cmd.registry {
 		key := fmt.Sprint("platina:", entry.prefix)
-		redis.Assign(key, "machined", "Registry")
-		if debugRegistry {
-			Publish(fmt.Sprintf("machined.%03d", i),
-				entry.prefix)
-		}
+		redis.Assign(key, Name, "Registry")
 	}
 	for _, info := range InfoProviders {
 		if info.Main != nil {
@@ -138,37 +140,46 @@ func (p *machined) Main(args ...string) error {
 			}(info)
 		}
 	}
-	sock.Wait()
-	for _, info := range InfoProviders {
-		if info.Close != nil {
-			info.Close()
-		}
-	}
+	<-done
 	return nil
 }
 
-// Interface to sort machine info registry
-func (p *machined) Len() int {
-	return len(p.registry)
+func (cmd *cmd) Close() error {
+	err := cmd.sock.Close()
+	for _, info := range InfoProviders {
+		if info.Close != nil {
+			xerr := info.Close()
+			if err == nil {
+				err = xerr
+			}
+		}
+	}
+	close(cmd.done)
+	return err
 }
 
-func (p *machined) Less(i, j int) (t bool) {
-	ni, nj := len(p.registry[i].prefix), len(p.registry[j].prefix)
+// Interface to sort machine info registry
+func (cmd *cmd) Len() int {
+	return len(cmd.registry)
+}
+
+func (cmd *cmd) Less(i, j int) (t bool) {
+	ni, nj := len(cmd.registry[i].prefix), len(cmd.registry[j].prefix)
 	switch {
 	case ni < nj:
 		t = true
 	case ni > nj:
 		t = false
 	case ni == nj:
-		t = p.registry[i].prefix < p.registry[j].prefix
+		t = cmd.registry[i].prefix < cmd.registry[j].prefix
 	default:
 		panic("oops")
 	}
 	return t
 }
 
-func (p *machined) Swap(i, j int) {
-	p.registry[i], p.registry[j] = p.registry[j], p.registry[i]
+func (cmd *cmd) Swap(i, j int) {
+	cmd.registry[i], cmd.registry[j] = cmd.registry[j], cmd.registry[i]
 }
 
 func (r Registry) Hdel(args args.Hdel, reply *reply.Hdel) error {

@@ -9,19 +9,21 @@ import (
 	"github.com/platinasystems/go/liner"
 )
 
-type cli struct{}
+const Name = "cli"
 
-func New() cli { return cli{} }
+type cmd struct{}
 
-func (cli) String() string { return "cli" }
-func (cli) Tag() string    { return "builtin" }
-func (cli) Usage() string  { return "man cli" }
+func New() cmd { return cmd{} }
 
-func (cli) Main(args ...string) error {
-	return command.Shell(liner.New().GetLine)
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return "man cli" }
+
+func (cmd) Main(args ...string) error {
+	return command.Shell(liner.New())
 }
 
-func (cli) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	cli - command line interpreter

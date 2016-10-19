@@ -15,11 +15,15 @@ package sbininit
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/platinasystems/go/command"
 )
+
+const Name = "/sbin/init"
 
 // If present, /etc/goes is sourced before running redisd, machined, and
 // the remaining damons.
@@ -28,14 +32,14 @@ const EtcGoes = "/etc/goes"
 // Machines may use this Hook to run something before redisd, machined, etc.
 var Hook = func() error { return nil }
 
-type sbinInit struct{}
+type cmd struct{}
 
-func New() sbinInit { return sbinInit{} }
+func New() cmd { return cmd{} }
 
-func (sbinInit) String() string { return "/sbin/init" }
-func (sbinInit) Usage() string  { return "/sbin/init" }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
-func (sbinInit) Main(...string) error {
+func (cmd) Main(...string) error {
 	if pid := os.Getpid(); pid != 1 {
 		return fmt.Errorf("%d: pid not 1", pid)
 	}
@@ -82,10 +86,15 @@ func (sbinInit) Main(...string) error {
 			err = command.Main("login")
 			if err != nil {
 				fmt.Println("login:", err)
+				time.Sleep(3 * time.Second)
 				continue
 			}
 		}
-		command.Main("cli")
+		err = command.Main("cli")
+		if err != nil && err != io.EOF {
+			fmt.Println(err)
+			<-make(chan struct{})
+		}
 	}
 	return nil
 }

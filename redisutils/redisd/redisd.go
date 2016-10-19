@@ -10,22 +10,22 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/group"
 	"github.com/platinasystems/go/redis/rpc/reg"
+	"github.com/platinasystems/go/rundir"
 	"github.com/platinasystems/go/sockfile"
 )
 
-const VarLogRedisd = "/var/log/redisd"
+const Name = "redisd"
+const Log = rundir.Dir + "/log/redisd"
 
 var PublishedKeys = []string{"platina"}
 
@@ -60,29 +60,46 @@ func New() *cmd { return &cmd{} }
 // The redis server is started by /sbin/init or /usr/sbin/goesd *before* all
 // other daemons.
 func (*cmd) Daemon() int    { return -1 }
-func (*cmd) String() string { return "redisd" }
-func (*cmd) Usage() string  { return "redisd [DEVICE]..." }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Name + " [DEVICE]..." }
 
 func (cmd *cmd) Main(args ...string) error {
+	var devs []string
 	if len(args) == 0 {
 		args = []string{"lo"}
 	}
-	varlog := filepath.Dir(VarLogRedisd)
-	if _, err := os.Stat(varlog); err != nil {
-		if os.IsNotExist(err) {
-			err = os.MkdirAll(varlog, os.FileMode(0755))
-		}
+
+	for _, name := range args {
+		dev, err := net.InterfaceByName(name)
 		if err != nil {
 			return err
 		}
+		if (dev.Flags & net.FlagUp) == net.FlagUp {
+			devs = append(devs, name)
+		}
 	}
+
+	err := rundir.New(sockfile.Dir)
+	if err != nil {
+		return err
+	}
+
+	err = rundir.New(filepath.Dir(Log))
+	if err != nil {
+		return err
+	}
+
+	logf, err := rundir.Create(Log)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(Log)
+	defer logf.Close()
 
 	if false {
 		grs.Debugf = grs.ActualDebugf
-	} else if w, err := os.Create(VarLogRedisd); err != nil {
-		return err
 	} else {
-		grs.Stderr = w
+		grs.Stderr = logf
 	}
 
 	cmd.redisd.devs = make(map[string][]*grs.Server)
@@ -92,7 +109,7 @@ func (cmd *cmd) Main(args ...string) error {
 		cmd.redisd.published[k] = make(grs.HashValue)
 	}
 
-	sfn := sockfile.Path("redisd")
+	sfn := sockfile.Path(Name)
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
 	cfg = cfg.Host(sfn)
@@ -102,63 +119,60 @@ func (cmd *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	go srv.Start()
-	cmd.redisd.devs[sfn] = []*grs.Server{srv}
-	if adm := group.Parse()["adm"].Gid(); adm > 0 {
-		go func(sfn string, adm int) {
-			for i := 0; i < 30; i++ {
-				_, err := os.Stat(sfn)
-				if err == nil {
-					os.Chown(sfn, os.Geteuid(), adm)
-					break
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}(sfn, adm)
-	}
-
-	defer func() {
-		cmd.redisd.mutex.Lock()
-		for k, srvs := range cmd.redisd.devs {
-			for i, srv := range srvs {
-				srv.Close()
-				srvs[i] = nil
-			}
-			cmd.redisd.devs[k] = cmd.redisd.devs[k][:0]
-			delete(cmd.redisd.devs, k)
-		}
-		cmd.redisd.mutex.Unlock()
-	}()
-
-	for _, name := range args {
-		dev, err := net.InterfaceByName(name)
-		if err != nil {
-			return err
-		}
-		if (dev.Flags & net.FlagUp) == net.FlagUp {
-			if err = cmd.redisd.listen(name, "6379"); err != nil {
-				return err
-			}
-		}
-	}
 
 	cmd.redisd.reg, err =
 		reg.New("redis-reg", cmd.redisd.assign, cmd.redisd.unassign)
 	if err != nil {
 		return err
 	}
-	defer cmd.redisd.reg.Srvr.Terminate()
 
-	sigch := make(chan os.Signal)
-	signal.Notify(sigch, syscall.SIGTERM)
+	cmd.redisd.devs[sfn] = []*grs.Server{srv}
 
-	for sig := range sigch {
-		if sig == syscall.SIGTERM {
-			break
+	go func(redisd *Redisd, fn string, devs ...string) {
+		adm := group.Parse()["adm"].Gid()
+		for i := 0; i < 30; i++ {
+			if _, err := os.Stat(fn); err == nil {
+				if adm > 0 {
+					err = os.Chown(fn, os.Geteuid(), adm)
+				}
+				if err != nil {
+					fmt.Fprint(os.Stderr, fn, ": chown: ",
+						err, "\n")
+				} else {
+					fmt.Println(fn)
+				}
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		redisd.listen(devs...)
+	}(&cmd.redisd, sfn, devs...)
+
+	return srv.Start()
+}
+
+func (cmd *cmd) Close() error {
+	var err error
+	cmd.redisd.mutex.Lock()
+	defer cmd.redisd.mutex.Unlock()
+	for k, srvs := range cmd.redisd.devs {
+		for i, srv := range srvs {
+			xerr := srv.Close()
+			if err == nil {
+				err = xerr
+			}
+			srvs[i] = nil
+		}
+		cmd.redisd.devs[k] = cmd.redisd.devs[k][:0]
+		delete(cmd.redisd.devs, k)
+	}
+	if cmd.redisd.reg != nil {
+		xerr := cmd.redisd.reg.Srvr.Close()
+		if err == nil {
+			err = xerr
 		}
 	}
-
-	return nil
+	return err
 }
 
 func (redisd *Redisd) assign(key string, v interface{}) error {
@@ -180,75 +194,60 @@ func (redisd *Redisd) unassign(key string) error {
 	return nil
 }
 
-func (redisd *Redisd) listen(dev, port string) error {
-	if len(port) == 0 {
-		port = "6379"
-	}
-	var iport int
-	_, err := fmt.Sscan(port, &iport)
-	if err != nil {
-		return err
-	}
-
-	redisd.mutex.Lock()
-	_, found := redisd.devs[dev]
-	if !found {
-		// place holder
-		redisd.devs[dev] = []*grs.Server{}
-	}
-	redisd.mutex.Unlock()
-	if found {
-		return fmt.Errorf("%s: already running redisd", dev)
-	}
-
-	netdev, err := net.InterfaceByName(dev)
-	if err != nil {
-		return err
-	}
-	addrs, err := netdev.Addrs()
-	if err != nil {
-		return err
-	}
-	if len(addrs) == 0 {
-		return fmt.Errorf("%s: no address or isn't up", dev)
-	}
-
-	srvs := make([]*grs.Server, 0, 2)
-	for _, addr := range addrs {
-		ip, _, err := net.ParseCIDR(addr.String())
+func (redisd *Redisd) listen(devs ...string) {
+	port := 6379
+	// redisd.mutex.Lock()
+	// defer redisd.mutex.Unlock()
+	for _, dev := range devs {
+		srvs := make([]*grs.Server, 0, 2)
+		netdev, err := net.InterfaceByName(dev)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "redisd: ", addr.String(),
-				": CIDR: ", err)
+			fmt.Fprint(os.Stderr, dev, ": ", err, "\n")
 			continue
 		}
-		if ip.IsMulticast() {
+		addrs, err := netdev.Addrs()
+		if err != nil {
+			fmt.Fprint(os.Stderr, dev, ": ", err, "\n")
 			continue
 		}
-		id := fmt.Sprint("[", ip, "%", dev, "]:", port)
-		cfg := grs.DefaultConfig()
-		cfg = cfg.Handler(redisd)
-		cfg = cfg.Port(iport)
-		if ip.To4() == nil {
-			cfg = cfg.Proto("tcp6")
-			cfg = cfg.Host(fmt.Sprint("[", ip, "%", dev, "]"))
-		} else {
-			cfg = cfg.Host(ip.String())
+		if len(addrs) == 0 {
+			fmt.Fprint(os.Stderr, dev,
+				": no address or isn't up\n")
+			continue
 		}
-		srv, err := grs.NewServer(cfg)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "redisd: ", id, ": ", err)
-		} else {
-			fmt.Println("redisd serve: ", id)
-			srvs = append(srvs, srv)
-			go srv.Start()
+
+		for _, addr := range addrs {
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				fmt.Fprint(os.Stderr, addr, ": CIDR: ",
+					err, "\n")
+				continue
+			}
+			if ip.IsMulticast() {
+				continue
+			}
+			id := fmt.Sprint("[", ip, "%", dev, "]:", port)
+			cfg := grs.DefaultConfig()
+			cfg = cfg.Handler(redisd)
+			cfg = cfg.Port(port)
+			if ip.To4() == nil {
+				cfg = cfg.Proto("tcp6")
+				host := fmt.Sprint("[", ip, "%", dev, "]")
+				cfg = cfg.Host(host)
+			} else {
+				cfg = cfg.Host(ip.String())
+			}
+			srv, err := grs.NewServer(cfg)
+			if err != nil {
+				fmt.Fprint(os.Stderr, id, ": ", err, "\n")
+			} else {
+				srvs = append(srvs, srv)
+				go srv.Start()
+				fmt.Println(id)
+			}
 		}
+		redisd.devs[dev] = srvs
 	}
-
-	redisd.mutex.Lock()
-	redisd.devs[dev] = srvs
-	redisd.mutex.Unlock()
-
-	return nil
 }
 
 func (redisd *Redisd) flushKeyCache() {
@@ -265,7 +264,7 @@ func (redisd *Redisd) flushSubkeyCache(key string) {
 	}
 }
 
-func (redisd *Redisd) Handler(key string) interface{} {
+func (redisd *Redisd) handler(key string) interface{} {
 	redisd.mutex.Lock()
 	defer redisd.mutex.Unlock()
 	return redisd.assignments.Find(key)
@@ -275,7 +274,7 @@ func (redisd *Redisd) Del(key string, keys ...string) (int, error) {
 	type t interface {
 		Del(string, ...string) (int, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		i, err := method.Del(key)
 		if err == nil {
 			redisd.mutex.Lock()
@@ -291,7 +290,7 @@ func (redisd *Redisd) Get(key string) ([]byte, error) {
 	type t interface {
 		Get(string) ([]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Get(key)
 	}
 	return nil, fmt.Errorf("can't get %s", key)
@@ -302,33 +301,13 @@ func (redisd *Redisd) Hdel(key, subkey string, subkeys ...string) (int, error) {
 		Hdel(string, string, ...string) (int, error)
 	}
 	hashkey := fmt.Sprint(key, ":", subkey)
-	if method, found := redisd.Handler(hashkey).(t); found {
+	if method, found := redisd.handler(hashkey).(t); found {
 		return method.Hdel(key, subkey, subkeys...)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Hdel(key, subkey, subkeys...)
 	}
-	if key != "redisd" {
-		return 0, fmt.Errorf("can't hdel %s", key)
-	}
-	closed := 0
-	if redisd.devs == nil {
-		return closed, nil
-	}
-	redisd.mutex.Lock()
-	defer redisd.mutex.Unlock()
-	for _, dev := range append([]string{subkey}, subkeys...) {
-		if lns, found := redisd.devs[dev]; found {
-			for _, ln := range lns {
-				ln.Close()
-			}
-			closed += 1
-			lns = lns[:0]
-			delete(redisd.devs, dev)
-			fmt.Println("redisd: ", dev, ": closed")
-		}
-	}
-	return closed, nil
+	return 0, fmt.Errorf("can't hdel %s", key)
 }
 
 func (redisd *Redisd) Hexists(key, field string) (int, error) {
@@ -336,25 +315,13 @@ func (redisd *Redisd) Hexists(key, field string) (int, error) {
 		Hexists(string, string) (int, error)
 	}
 	hashkey := fmt.Sprint(key, ":", field)
-	if method, found := redisd.Handler(hashkey).(t); found {
+	if method, found := redisd.handler(hashkey).(t); found {
 		return method.Hexists(key, field)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Hexists(key, field)
 	}
-	if key != "redisd" {
-		return 0, fmt.Errorf("can't hexists %s", key)
-	}
-	if redisd.devs == nil {
-		return 0, nil
-	}
-	redisd.mutex.Lock()
-	defer redisd.mutex.Unlock()
-	i := 0
-	if _, found := redisd.devs[field]; found {
-		i = 1
-	}
-	return i, nil
+	return 0, fmt.Errorf("can't hexists %s", key)
 }
 
 func (redisd *Redisd) Hget(key, subkey string) ([]byte, error) {
@@ -368,10 +335,10 @@ func (redisd *Redisd) Hget(key, subkey string) ([]byte, error) {
 		Hget(string, string) ([]byte, error)
 	}
 	hashkey := fmt.Sprint(key, ":", subkey)
-	if method, found := redisd.Handler(hashkey).(t); found {
+	if method, found := redisd.handler(hashkey).(t); found {
 		return method.Hget(key, subkey)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Hget(key, subkey)
 	}
 	return nil, fmt.Errorf("can't hget %s %s", key, subkey)
@@ -392,7 +359,7 @@ func (redisd *Redisd) Hgetall(key string) ([][]byte, error) {
 	type t interface {
 		Hgetall(string) ([][]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Hgetall(key)
 	}
 	return nil, fmt.Errorf("can't hgetall %s", key)
@@ -411,22 +378,10 @@ func (redisd *Redisd) Hkeys(key string) ([][]byte, error) {
 	type t interface {
 		Hkeys(string) ([][]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Hkeys(key)
 	}
-	if key != "redisd" {
-		return nil, fmt.Errorf("can't hkeys %s", key)
-	}
-	if redisd.devs == nil {
-		return nil, nil
-	}
-	redisd.mutex.Lock()
-	defer redisd.mutex.Unlock()
-	keys := make([][]byte, 0, len(redisd.devs))
-	for k := range redisd.devs {
-		keys = append(keys, []byte(k))
-	}
-	return keys, nil
+	return nil, fmt.Errorf("can't hkeys %s", key)
 }
 
 func (redisd *Redisd) Hset(key, field string, value []byte) (int, error) {
@@ -438,17 +393,12 @@ func (redisd *Redisd) Hset(key, field string, value []byte) (int, error) {
 		Hset(string, string, []byte) (int, error)
 	}
 	hashkey := fmt.Sprint(key, ":", field)
-	if method, found := redisd.Handler(hashkey).(t); found {
+	if method, found := redisd.handler(hashkey).(t); found {
 		i, err = method.Hset(key, field, value)
-	} else if method, found := redisd.Handler(key).(t); found {
+	} else if method, found := redisd.handler(key).(t); found {
 		i, err = method.Hset(key, field, value)
-	} else if key != "redisd" {
-		err = fmt.Errorf("can't hset %s %s", key, field)
 	} else {
-		err = redisd.listen(field, string(value))
-		if err == nil {
-			i = 1
-		}
+		err = fmt.Errorf("can't hset %s %s", key, field)
 	}
 	return i, err
 }
@@ -522,7 +472,7 @@ func (redisd *Redisd) Set(key string, value []byte) error {
 	type t interface {
 		Set(string, []byte) error
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Set(key, value)
 	}
 	return fmt.Errorf("can't set %s", key)
@@ -532,7 +482,7 @@ func (redisd *Redisd) Lrange(key string, start, stop int) ([][]byte, error) {
 	type t interface {
 		Lrange(string, int, int) ([][]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Lrange(key, start, stop)
 	}
 	return nil, fmt.Errorf("can't lrange %s", key)
@@ -542,7 +492,7 @@ func (redisd *Redisd) Lindex(key string, index int) ([]byte, error) {
 	type t interface {
 		Lindex(string, int) ([]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Lindex(key, index)
 	}
 	return nil, fmt.Errorf("can't lindex %s", key)
@@ -552,7 +502,7 @@ func (redisd *Redisd) Blpop(key string, keys ...string) ([][]byte, error) {
 	type t interface {
 		Blpop(string, ...string) ([][]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Blpop(key, keys...)
 	}
 	return nil, fmt.Errorf("can't blpop %s", key)
@@ -562,7 +512,7 @@ func (redisd *Redisd) Brpop(key string, keys ...string) ([][]byte, error) {
 	type t interface {
 		Brpop(string, ...string) ([][]byte, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Brpop(key, keys...)
 	}
 	return nil, fmt.Errorf("can't brpop %s", key)
@@ -573,7 +523,7 @@ func (redisd *Redisd) Lpush(key string, value []byte, values ...[]byte) (int,
 	type t interface {
 		Lpush(string, []byte, ...[]byte) (int, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Lpush(key, value, values...)
 	}
 	return 0, fmt.Errorf("can't lpush %s", key)
@@ -584,7 +534,7 @@ func (redisd *Redisd) Rpush(key string, value []byte, values ...[]byte) (int,
 	type t interface {
 		Rpush(string, []byte, ...[]byte) (int, error)
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Rpush(key, value, values...)
 	}
 	return 0, fmt.Errorf("can't rpush %s", key)
@@ -635,7 +585,7 @@ func (redisd *Redisd) Select(key string) error {
 	type t interface {
 		Select(string) error
 	}
-	if method, found := redisd.Handler(key).(t); found {
+	if method, found := redisd.handler(key).(t); found {
 		return method.Select(key)
 	}
 	return fmt.Errorf("can't select %s", key)

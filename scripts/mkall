@@ -1,0 +1,41 @@
+#!/bin/sh
+
+set -e
+
+prog=${0##*/}
+usage="${prog} [-v]"
+
+goes=`go list -f '{{.Dir}}' github.com/platinasystems/go/goes`
+bin=${goes%/*}/bin
+scripts=${goes%/*}/scripts
+dir=${0%/*}
+verbose=:
+for arg; do
+	case $arg in
+	-v | -verbose | --verbose)
+		verbose=echo
+		;;
+	-h | -help | --help)
+		echo usage: $usage
+		exit 0
+		;;
+	*)	echo $arg: unknown >/dev/stderr
+		echo usage: $usage > /dev/stderr
+		exit 1
+	esac
+done
+
+mkdir -p $bin
+eval $verbose version...
+go generate github.com/platinasystems/go/version
+eval $verbose goesd-example...
+go build -o $bin/goesd-example \
+	github.com/platinasystems/go/goes/goesd-example
+eval $verbose goes-example.cpio.xz...
+$scripts/mkinitrd github.com/platinasystems/go/goes/goes-example
+eval $verbose goesd-platina-mk1...
+go build -o $bin/goesd-platina-mk1 \
+	github.com/platinasystems/go/goes/goesd-platina-mk1
+eval $verbose goes-platina-mk1-bmc.cpio.xz...
+env GOARCH=arm $scripts/mkinitrd \
+	github.com/platinasystems/go/goes/goes-platina-mk1-bmc

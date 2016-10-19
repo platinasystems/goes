@@ -26,6 +26,8 @@ import (
 	"github.com/platinasystems/go/sockfile"
 )
 
+const Name = "/usr/sbin/goesd"
+
 // If present, /etc/goesd is sourced before running redisd, machined, and
 // the remaining damons.
 const EtcGoesd = "/etc/goesd"
@@ -35,25 +37,43 @@ var ErrNotRoot = errors.New("you aren't root")
 // Machines may use this Hook to run something before redisd, machined, etc.
 var Hook = func() error { return nil }
 
-type goesd struct{}
+type cmd struct{}
 
-func New() goesd { return goesd{} }
+func New() cmd { return cmd{} }
 
-func (goesd) String() string { return "/usr/sbin/goesd" }
-func (goesd) Usage() string  { return "/usr/sbin/goesd" }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [start | stop | restart]" }
 
-func (goesd) Daemon() int { return -1 }
-
-func (goesd goesd) Main(args ...string) error {
+func (cmd cmd) Main(args ...string) error {
+	var err error
 	if os.Geteuid() != 0 {
 		return ErrNotRoot
 	}
+	x := "start"
 	if len(args) > 0 {
-		if args[0] == "stop" {
-			return goesd.stop()
+		x = args[0]
+		args = args[1:]
+		if len(args) > 0 {
+			return fmt.Errorf("%v: unexpected", args)
 		}
-		return fmt.Errorf("%v: unexpected", args)
 	}
+	switch x {
+	case "start":
+		err = cmd.start()
+	case "stop":
+		err = cmd.stop()
+	case "restart":
+		err := cmd.stop()
+		if err == nil {
+			err = cmd.start()
+		}
+	default:
+		err = fmt.Errorf("%s: unknown", x)
+	}
+	return err
+}
+
+func (cmd) start() error {
 	err := Hook()
 	if err != nil {
 		return err
@@ -64,7 +84,7 @@ func (goesd goesd) Main(args ...string) error {
 			return err
 		}
 	}
-	args = strings.Fields(os.Getenv("REDISD"))
+	args := strings.Fields(os.Getenv("REDISD"))
 	if len(args) > 0 {
 		err = command.Main(append([]string{"redisd"}, args...)...)
 	} else {
@@ -94,7 +114,7 @@ func (goesd goesd) Main(args ...string) error {
 	return nil
 }
 
-func (goesd) stop() error {
+func (cmd) stop() error {
 	thisprog, err := os.Readlink("/proc/self/exe")
 	if err != nil {
 		return err

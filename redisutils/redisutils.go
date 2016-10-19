@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/go/redisutils/hset"
 	"github.com/platinasystems/go/redisutils/keys"
 	"github.com/platinasystems/go/redisutils/lrange"
+	"github.com/platinasystems/go/redisutils/redisd"
 	"github.com/platinasystems/go/redisutils/set"
 	"github.com/platinasystems/go/redisutils/subscribe"
 )
@@ -30,6 +31,7 @@ func New() []interface{} {
 		hset.New(),
 		keys.New(),
 		lrange.New(),
+		redisd.New(),
 		set.New(),
 		subscribe.New(),
 	}

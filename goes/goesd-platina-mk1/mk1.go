@@ -5,8 +5,6 @@
 package main
 
 import (
-	"io"
-
 	"github.com/platinasystems/go/builtinutils"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/coreutils"
@@ -242,6 +240,10 @@ func main() {
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Sort()
+	goesd.Hook = func() error {
+		os.Setenv("REDISD", "lo eth0")
+		return nil
+	}
 	machined.Hook = func() {
 		machined.NetLink.Prefixes("lo.", "eth0.")
 		machined.InfoProviders = append(machined.InfoProviders, &Info{
@@ -250,11 +252,7 @@ func main() {
 			attrs:    make(machined.Attrs),
 		})
 	}
-	os.Setenv("REDISD_DEVS", "lo eth0")
-	err := goes.Main(os.Args...)
-	if err != nil && err != io.EOF {
-		os.Exit(1)
-	}
+	goes.Main()
 }
 
 func (p *Info) Main(...string) error {

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -46,21 +47,30 @@ var (
 	Tag      map[string]string
 	Usage    map[string]string
 
-	Prog string
-	Path string
+	prog string
+	path string
 )
 
-func init() {
-	s, err := os.Readlink("/proc/self/exe")
-	if err == nil {
-		Prog = s
-	} else {
-		Prog = "/usr/bin/goes"
+func Prog() string {
+	if len(prog) == 0 {
+		var err error
+		prog, err = os.Readlink("/proc/self/exe")
+		if err != nil {
+			prog = "/usr/bin/goes"
+		}
 	}
-	Path = "/bin:/usr/bin"
-	if s = filepath.Dir(Prog); s != "/bin" && s != "/usr/bin" {
-		Path += ":" + s
+	return prog
+}
+
+func Path() string {
+	if len(path) == 0 {
+		path = "/bin:/usr/bin"
+		dir := filepath.Dir(Prog())
+		if dir != "/bin" && dir != "/usr/bin" {
+			path += ":" + dir
+		}
 	}
+	return path
 }
 
 type aproposer interface {
@@ -80,9 +90,6 @@ type daemoner interface {
 	mainer
 }
 
-// A GetLiner will return the prompted input upto but not including `\n`.
-type GetLiner func(prompt string) (string, error)
-
 type helper interface {
 	Help(...string) string
 }
@@ -98,6 +105,11 @@ type mainstringer interface {
 
 type manner interface {
 	Man() map[string]string
+}
+
+// A Prompter returns the prompted input upto but not including `\n`.
+type Prompter interface {
+	Prompt(string) (string, error)
 }
 
 type stringer interface {
@@ -273,13 +285,13 @@ func Main(args ...string) error {
 		if IsDaemon(name) {
 			switch os.Getenv(daemonFlag) {
 			case "":
-				c := exec.Command(Prog, args[1:]...)
+				c := exec.Command(Prog(), args...)
 				c.Args[0] = name
 				c.Stdin = nil
 				c.Stdout = nil
 				c.Stderr = nil
 				c.Env = []string{
-					"PATH=" + Path,
+					"PATH=" + Path(),
 					"TERM=linux",
 					daemonFlag + "=child",
 				}
@@ -296,21 +308,13 @@ func Main(args ...string) error {
 				return c.Wait()
 			case "child":
 				syscall.Umask(002)
-				c := exec.Command(Prog, args[1:]...)
+				c := exec.Command(Prog(), args...)
 				c.Args[0] = name
 				c.Stdin = nil
-				if p, err := log.Pipe("info"); err == nil {
-					c.Stdout = p
-				} else {
-					c.Stdout = nil
-				}
-				if p, err := log.Pipe("err"); err == nil {
-					c.Stderr = p
-				} else {
-					c.Stderr = nil
-				}
+				c.Stdout = nil
+				c.Stderr = nil
 				c.Env = []string{
-					"PATH=" + Path,
+					"PATH=" + Path(),
 					"TERM=linux",
 					daemonFlag + "=grandchild",
 				}
@@ -321,10 +325,16 @@ func Main(args ...string) error {
 				return c.Start()
 			case "grandchild":
 				pidfn, err := pidfile.New()
-				if err == nil {
-					err = recovered.New(ms).Main(args...)
-					os.Remove(pidfn)
+				if err != nil {
+					return err
 				}
+				os.Stdout, _ = log.Pipe("info")
+				os.Stderr, _ = log.Pipe("err")
+				sigch := make(chan os.Signal)
+				signal.Notify(sigch, syscall.SIGTERM)
+				go terminate(cmd, pidfn, sigch)
+				err = recovered.New(ms).Main(args...)
+				sigch <- syscall.SIGABRT
 				return err
 			}
 		} else {
@@ -332,6 +342,21 @@ func Main(args ...string) error {
 		}
 	}
 	return nil
+}
+
+func terminate(cmd interface{}, pidfn string, ch chan os.Signal) {
+	for sig := range ch {
+		if sig == syscall.SIGTERM {
+			method, found := cmd.(io.Closer)
+			if found {
+				method.Close()
+			}
+			os.Remove(pidfn)
+			os.Exit(0)
+		}
+		os.Remove(pidfn)
+		break
+	}
 }
 
 // Plot commands on respective maps and key lists.
@@ -430,7 +455,7 @@ func Plot(cmds ...interface{}) {
 // and `>>>>` respectively, e.g.:
 //
 //	dmesg | grep goes >>> goes.log
-func Shell(getline GetLiner) error {
+func Shell(p Prompter) error {
 	var (
 		rc  io.ReadCloser
 		wc  io.WriteCloser
@@ -446,7 +471,7 @@ func Shell(getline GetLiner) error {
 	catline := func(prompt string) (line string, err error) {
 		for {
 			var s string
-			s, err = getline(prompt)
+			s, err = p.Prompt(prompt)
 			if err != nil {
 				return
 			}
@@ -473,23 +498,32 @@ commandLoop:
 			err = nil
 		}
 		pl.Reset()
-		prompt := filepath.Base(Prog) + "> "
+		prompt := filepath.Base(Prog()) + "> "
 		if hn, err := os.Hostname(); err == nil {
 			prompt = hn + "> "
 		}
 	pipelineLoop:
-		s, err := catline(prompt)
-		if err != nil {
-			return err
+		for {
+			s, err := catline(prompt)
+			if err != nil {
+				return err
+			}
+			s = strings.TrimLeft(s, " \t")
+			if len(s) == 0 {
+				continue pipelineLoop
+			}
+			s = nocomment.New(s)
+			if len(s) == 0 {
+				continue pipelineLoop
+			}
+			pl.Slice(slice_string.New(s)...)
+			if pl.More {
+				prompt = "| "
+			} else {
+				break pipelineLoop
+			}
 		}
-		s = strings.TrimLeft(s, " \t")
-		s = nocomment.New(s)
-		pl.Slice(slice_string.New(s)...)
-		if pl.More {
-			prompt = "| "
-			goto pipelineLoop
-		}
-		if len(pl.Slices) < 1 {
+		if len(pl.Slices) == 0 {
 			continue commandLoop
 		}
 		end := len(pl.Slices) - 1
@@ -592,7 +626,7 @@ commandLoop:
 		}
 
 		for i := 0; i < len(pl.Slices); i++ {
-			c := exec.Command(Prog, pl.Slices[i][1:]...)
+			c := exec.Command(Prog(), pl.Slices[i][1:]...)
 			c.Args[i] = pl.Slices[i][0]
 			c.Stderr = os.Stderr
 			if i == 0 {

@@ -17,10 +17,13 @@ import (
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/nocomment"
+	"github.com/platinasystems/go/notliner"
 	"github.com/platinasystems/go/slice_args"
 	"github.com/platinasystems/go/slice_string"
 	"github.com/platinasystems/liner"
 )
+
+const woliner = false
 
 type Liner struct {
 	history struct {
@@ -28,13 +31,16 @@ type Liner struct {
 		lines []string
 		i     int
 	}
-	state *liner.State
+	fallback *notliner.Prompter
 }
 
 func New() *Liner {
 	l := new(Liner)
 	l.history.buf = new(bytes.Buffer)
 	l.history.lines = make([]string, 0, 1<<6)
+	if woliner {
+		l.fallback = notliner.New(os.Stdin, os.Stdout)
+	}
 	return l
 }
 
@@ -105,7 +111,10 @@ func help(line string) string {
 	return string(buf[:n])
 }
 
-func (l *Liner) GetLine(prompt string) (string, error) {
+func (l *Liner) Prompt(prompt string) (string, error) {
+	if l.fallback != nil {
+		return l.fallback.Prompt(prompt)
+	}
 	t := &syscall.Termios{}
 
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
@@ -131,11 +140,10 @@ func (l *Liner) GetLine(prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	l.state = liner.NewLiner()
-	defer l.state.Close()
-	l.state = liner.NewLiner()
-	l.state.SetCompleter(complete)
-	l.state.SetHelper(help)
+
+	state := liner.NewLiner()
+	state.SetCompleter(complete)
+	state.SetHelper(help)
 	if len(l.history.lines) > 0 {
 		l.history.buf.Reset()
 		if len(l.history.lines) < cap(l.history.lines) {
@@ -151,9 +159,10 @@ func (l *Liner) GetLine(prompt string) (string, error) {
 				fmt.Fprintln(l.history.buf, l.history.lines[i])
 			}
 		}
-		l.state.ReadHistory(l.history.buf)
+		state.ReadHistory(l.history.buf)
 	}
-	line, err := l.state.Prompt(prompt)
+	line, err := state.Prompt(prompt)
+	state.Close()
 	if err == nil {
 		if len(l.history.lines) < cap(l.history.lines) {
 			l.history.lines = append(l.history.lines, line)
@@ -162,7 +171,9 @@ func (l *Liner) GetLine(prompt string) (string, error) {
 		}
 		l.history.i++
 		l.history.i &= cap(l.history.lines) - 1
-
+	} else if err == liner.ErrNotTerminalOutput {
+		l.fallback = notliner.New(os.Stdin, os.Stdout)
+		line, err = l.fallback.Prompt(prompt)
 	}
 	return line, err
 }

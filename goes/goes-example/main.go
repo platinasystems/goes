@@ -8,9 +8,6 @@
 package main
 
 import (
-	"io"
-	"os"
-
 	"github.com/platinasystems/go/builtinutils"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/coreutils"
@@ -30,16 +27,13 @@ func main() {
 	command.Plot(builtinutils.New()...)
 	command.Plot(coreutils.New()...)
 	command.Plot(fsutils.New()...)
-	command.Plot(sbininit.New(), slashinit.New())
+	command.Plot(sbininit.New(), slashinit.New(), machined.New())
 	command.Plot(kutils.New()...)
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Plot(telnetd.New())
 	command.Sort()
-	machined.Hook = example.Machine
-	os.Setenv("REDISD_DEVS", "lo eth0")
-	err := goes.Main(os.Args...)
-	if err != nil && err != io.EOF {
-		os.Exit(1)
-	}
+	sbininit.Hook = example.SbinInitHook
+	machined.Hook = example.MachineHook
+	goes.Main()
 }
