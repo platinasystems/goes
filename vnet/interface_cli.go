@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package vnet
 
 import (
@@ -34,6 +38,106 @@ func (si *Si) ParseWithArgs(in *parse.Input, args *parse.Args) {
 		if *si, ok = hw.subSiById[id]; !ok {
 			panic(fmt.Errorf("unkown sub interface id: %d", id))
 		}
+	}
+}
+
+type ifChooser struct {
+	v         *Vnet
+	isHw      bool
+	finalized bool
+	re        parse.Regexp
+	siMap     map[Si]struct{}
+	hiMap     map[Hi]struct{}
+	sw        swIfIndices
+	hw        hwIfIndices
+}
+
+func (c *ifChooser) parse(in *parse.Input) {
+	var empty struct{}
+	var (
+		si Si
+		hi Hi
+	)
+	switch {
+	case !c.isHw && in.Parse("%v", &si, c.v):
+		c.siMap[si] = empty
+	case c.isHw && in.Parse("%v", &hi, c.v):
+		c.hiMap[hi] = empty
+	case in.Parse("m%*atching %v", &c.re):
+	default:
+		panic(parse.ErrInput)
+	}
+}
+
+func (c *ifChooser) finalize() {
+	if c.finalized {
+		return
+	}
+	c.finalized = true
+	var empty struct{}
+	if c.isHw {
+		if len(c.hiMap) == 0 || c.re.Valid() {
+			c.v.hwIferPool.Foreach(func(r HwInterfacer) {
+				h := r.GetHwIf()
+				if h.unprovisioned {
+					return
+				}
+				if c.re.Valid() && !c.re.MatchString(h.name) {
+					return
+				}
+				c.hiMap[h.hi] = empty
+			})
+		}
+		c.hw.Vnet = c.v
+		for hi := range c.hiMap {
+			c.hw.ifs = append(c.hw.ifs, hi)
+		}
+		sort.Sort(&c.hw)
+	} else {
+		if len(c.siMap) == 0 || c.re.Valid() {
+			c.v.swInterfaces.ForeachIndex(func(i uint) {
+				si := Si(i)
+				if c.re.Valid() && !c.re.MatchString(si.Name(c.v)) {
+					return
+				}
+				c.siMap[si] = empty
+			})
+		}
+		c.sw.Vnet = c.v
+		for si := range c.siMap {
+			c.sw.ifs = append(c.sw.ifs, si)
+		}
+		sort.Sort(&c.sw)
+	}
+}
+
+type HwIfChooser ifChooser
+type SwIfChooser ifChooser
+
+func (c *HwIfChooser) Init(v *Vnet) {
+	c.v = v
+	c.isHw = true
+	c.hiMap = make(map[Hi]struct{})
+}
+func (c *SwIfChooser) Init(v *Vnet) {
+	c.v = v
+	c.isHw = false
+	c.siMap = make(map[Si]struct{})
+}
+
+func (c *HwIfChooser) Parse(in *parse.Input) { (*ifChooser)(c).parse(in) }
+func (c *SwIfChooser) Parse(in *parse.Input) { (*ifChooser)(c).parse(in) }
+
+func (c *HwIfChooser) Foreach(f func(v *Vnet, h HwInterfacer)) {
+	(*ifChooser)(c).finalize()
+	for _, hi := range c.hw.ifs {
+		f(c.v, c.v.HwIfer(hi))
+	}
+}
+func (c *SwIfChooser) Foreach(f func(v *Vnet, si Si)) {
+	(*ifChooser)(c).finalize()
+	for _, si := range c.sw.ifs {
+		f(c.v, si)
 	}
 }
 
@@ -101,16 +205,13 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 
 	swIfs := &swIfIndices{Vnet: v}
 	if len(cf.siMap) == 0 {
-		for i := range v.swInterfaces.elts {
+		v.swInterfaces.ForeachIndex(func(i uint) {
 			si := Si(i)
-			if v.swInterfaces.IsFree(uint(si)) {
-				continue
-			}
 			if cf.re.Valid() && !cf.re.MatchString(si.Name(v)) {
-				continue
+				return
 			}
 			swIfs.ifs = append(swIfs.ifs, si)
-		}
+		})
 	} else {
 		for si, _ := range cf.siMap {
 			swIfs.ifs = append(swIfs.ifs, si)
@@ -197,19 +298,16 @@ func (v *Vnet) showHwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	hwIfs := &hwIfIndices{Vnet: v}
 
 	if len(cf.hiMap) == 0 {
-		for i := range v.hwIferPool.elts {
-			if v.hwIferPool.IsFree(uint(i)) {
-				continue
-			}
-			h := v.hwIferPool.elts[i].GetHwIf()
+		v.hwIferPool.Foreach(func(r HwInterfacer) {
+			h := r.GetHwIf()
 			if h.unprovisioned {
-				continue
+				return
 			}
 			if cf.re.Valid() && !cf.re.MatchString(h.name) {
-				continue
+				return
 			}
-			hwIfs.ifs = append(hwIfs.ifs, Hi(i))
-		}
+			hwIfs.ifs = append(hwIfs.ifs, h.hi)
+		})
 	} else {
 		for hi, _ := range cf.hiMap {
 			hwIfs.ifs = append(hwIfs.ifs, hi)

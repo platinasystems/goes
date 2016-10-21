@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package srpc gives symmetric bi-directional RPC on top of GO rpc.
 // Two hosts connected via are Client and server both expose RPC calls to each other.
 // Either host may make RPC calls to the other: so each host is both client and server at the same time.

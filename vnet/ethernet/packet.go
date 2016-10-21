@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package ethernet
 
 import (
@@ -80,15 +84,15 @@ func (a *Address) Add(x uint64) {
 	}
 }
 
-func (a *Address) FromUint64(x uint64) {
+func (a *Address) FromUint64(x vnet.Uint64) {
 	for i := 0; i < AddressBytes; i++ {
 		a[i] = byte((x >> uint(40-8*i)) & 0xff)
 	}
 }
 
-func (a *Address) ToUint64() (x uint64) {
+func (a *Address) ToUint64() (x vnet.Uint64) {
 	for i := 0; i < AddressBytes; i++ {
-		x |= uint64(a[i]) << uint(40-8*i)
+		x |= vnet.Uint64(a[i]) << uint(40-8*i)
 	}
 	return
 }

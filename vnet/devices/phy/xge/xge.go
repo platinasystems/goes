@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // 10 GIG E (XGE) PHY IEEE 802.3 clause 45 definitions.
 package xge
 

@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package ip4
 
 import (
@@ -35,6 +39,14 @@ func (h *Header) Parse(in *parse.Input) {
 	h.Ip_version_and_header_length = 0x45
 	if !in.ParseLoose("%v: %v -> %v", &h.Protocol, &h.Src, &h.Dst) {
 		panic(parse.ErrInput)
+	}
+loop:
+	for {
+		switch {
+		case in.Parse("ttl %d", &h.Ttl):
+		default:
+			break loop
+		}
 	}
 	return
 }

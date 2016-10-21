@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package vnet
 
 import (
@@ -460,6 +464,13 @@ func (b Bandwidth) String() string {
 
 func (b *Bandwidth) Parse(in *parse.Input) {
 	var f float64
+
+	// Special speed code "autoneg" means auto-negotiate speed.
+	if in.Parse("au%*toneg") {
+		*b = 0
+		return
+	}
+
 	in.Parse("%f", &f)
 	unit := Bps
 	switch {

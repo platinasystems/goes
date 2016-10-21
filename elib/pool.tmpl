@@ -1,4 +1,7 @@
 {{/* -*- mode: Go -*- */}}
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 {{if ne .TAGS ""}}
 // +build {{.TAGS}}
@@ -78,6 +81,14 @@ func (p * {{.PoolType}}) Foreach(f func(x {{.Type}})) {
 	for i := range p.{{.Data}} {
 		if !p.Pool.IsFree(uint(i)) {
 			f(p.{{.Data}}[i])
+		}
+	}
+}
+
+func (p * {{.PoolType}}) ForeachIndex(f func(i uint)) {
+	for i := range p.{{.Data}} {
+		if !p.Pool.IsFree(uint(i)) {
+			f(uint(i))
 		}
 	}
 }
