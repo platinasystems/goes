@@ -3,25 +3,23 @@ package wget
 import (
 	"fmt"
 	"github.com/cavaliercoder/grab"
-	"github.com/platinasystems/oops"
 	"os"
 	"time"
 )
 
-type wget struct {
-	oops.Id
-}
+const Name = "wget"
 
-var Wget = &wget{Id: "wget"}
+type cmd struct{}
 
-func (*wget) Usage() string {
-	return `wget URL...`
-}
+func New() cmd { return cmd{} }
 
-func (p *wget) Main(args ...string) {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + ` URL...` }
+
+func (cmd) Main(args ...string) error {
 	// validate command args
 	if len(args) < 1 {
-		p.Panic("url missing\n")
+		return fmt.Errorf("URL: missing")
 	}
 
 	// create a custom client
@@ -33,7 +31,7 @@ func (p *wget) Main(args ...string) {
 	for _, url := range args {
 		req, err := grab.NewRequest(url)
 		if err != nil {
-			p.Panic(err)
+			return err
 		}
 
 		reqs = append(reqs, req)
@@ -95,4 +93,5 @@ func (p *wget) Main(args ...string) {
 	t.Stop()
 
 	fmt.Printf("%d files successfully downloaded.\n", len(reqs))
+	return nil
 }

@@ -6,10 +6,12 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/platinasystems/go/i2c"
 )
 
 func main() {
+	var d i2c.SMBusData
 	b := &i2c.Bus{}
 	err := b.Open(2)
 	if err != nil {
@@ -19,21 +21,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	if false {
-		var x [64]byte
-		_, err = b.Read(x[:])
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(x)
+	err = b.Read(10, i2c.ByteData, &d)
+	if err != nil {
+		panic(err)
 	}
-	if true {
-		var d i2c.SMBusData
-		err = b.ReadSMBusData(10, i2c.Byte_Data, &d)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(d[:])
-	}
+	fmt.Println(d[:])
 }

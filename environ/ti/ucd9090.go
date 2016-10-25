@@ -11,13 +11,8 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/platinasystems/goes/i2c"
-	"github.com/platinasystems/oops"
+	"github.com/platinasystems/go/i2c"
 )
-
-type i2c_ struct{ oops.Id }
-
-var I2c = &i2c_{"i2c"}
 
 var (
 	dummy       byte

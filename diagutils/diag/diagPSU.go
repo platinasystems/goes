@@ -7,14 +7,10 @@ package diag
 import (
 	"fmt"
 	"time"
-
-	//	"github.com/platinasystems/goes/environ/fsp"
-	"github.com/platinasystems/goes/optional/gpio"
 )
 
-func diagPSU() {
+func diagPSU() error {
 
-	var pinstate bool
 	var r string
 	/*
 	   const (
@@ -45,7 +41,10 @@ func diagPSU() {
 	/* diagTest: PSU[1:0]_PRSNT_L
 	validate PSU is detected present (TBD: not present case)
 	*/
-	pinstate = gpio.GpioGet("PSU0_PRSNT_L")
+	pinstate, err := gpioGet("PSU0_PRSNT_L")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -53,7 +52,10 @@ func diagPSU() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "psu", "psu0_present_l_on", "-", pinstate, active_low_on_min, active_low_on_max, r, "check psu present is low")
 
-	pinstate = gpio.GpioGet("PSU1_PRSNT_L")
+	pinstate, err = gpioGet("PSU1_PRSNT_L")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -64,9 +66,12 @@ func diagPSU() {
 	/* diagTest: PSU[1:0]_PWROK and PSU[1:0]_PWRON_L
 	toggle psu on and validate pwrok behaves appropriately
 	*/
-	gpio.GpioSet("PSU0_PWRON_L", true)
+	gpioSet("PSU0_PWRON_L", true)
 	time.Sleep(50 * time.Millisecond)
-	pinstate = gpio.GpioGet("PSU0_PWROK")
+	pinstate, err = gpioGet("PSU0_PWROK")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -74,9 +79,12 @@ func diagPSU() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "psu", "psu0_pwron_l/pwrok_off", "-", pinstate, active_high_off_min, active_high_off_max, r, "turn psu off, check psu ok is low")
 
-	gpio.GpioSet("PSU0_PWRON_L", false)
+	gpioSet("PSU0_PWRON_L", false)
 	time.Sleep(50 * time.Millisecond)
-	pinstate = gpio.GpioGet("PSU0_PWROK")
+	pinstate, err = gpioGet("PSU0_PWROK")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -85,9 +93,12 @@ func diagPSU() {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "psu", "psu0_pwron_l/pwrok_on", "-", pinstate, active_high_on_min, active_high_on_max, r, "turn psu on, check psu ok is high")
 	time.Sleep(2 * time.Second)
 
-	gpio.GpioSet("PSU1_PWRON_L", true)
+	gpioSet("PSU1_PWRON_L", true)
 	time.Sleep(50 * time.Millisecond)
-	pinstate = gpio.GpioGet("PSU1_PWROK")
+	pinstate, err = gpioGet("PSU1_PWROK")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -95,9 +106,12 @@ func diagPSU() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "psu", "psu1_pwron_l/pwrok_off", "-", pinstate, active_high_off_min, active_high_off_max, r, "turn psu off, check psu ok is low")
 
-	gpio.GpioSet("PSU1_PWRON_L", false)
+	gpioSet("PSU1_PWRON_L", false)
 	time.Sleep(50 * time.Millisecond)
-	pinstate = gpio.GpioGet("PSU1_PWROK")
+	pinstate, err = gpioGet("PSU1_PWROK")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -110,23 +124,36 @@ func diagPSU() {
 	*/
 	/*
 			//tbd: generate psu interrupt
-			pinstate = gpio.GpioGet("PSU0_INT_L")
+			pinstate, err = gpioGet("PSU0_INT_L")
+			if err != nil {
+				return err
+			}
 		        if !pinstate {r = "pass"} else {r = "fail"}
 		        fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n","psu","psu0_int_l_on","-",pinstate,active_low_on_min,active_low_on_max,r,"check interrupt is low")
 
 			//tbd: clear psu interrupt
-			pinstate = gpio.GpioGet("PSU0_INT_L")
+			pinstate , err= gpioGet("PSU0_INT_L")
+			if err != nil {
+				return err
+			}
 		        if pinstate {r = "pass"} else {r = "fail"}
 		        fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n","psu","psu0_int_l_off","-",pinstate,active_low_off_min,active_low_off_max,r,"check interrupt is high")
 
 			//tbd: generate psu interrupt
-		        pinstate = gpio.GpioGet("PSU1_INT_L")
+		        pinstate, err = gpioGet("PSU1_INT_L")
+			if err != nil {
+				return err
+			}
 		        if !pinstate {r = "pass"} else {r = "fail"}
 		        fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n","psu","psu1_int_l_on","-",pinstate,active_low_on_min,active_low_on_max,r,"check interrupt is low")
 
 		        //tbd: clear psu interrupt
-		        pinstate = gpio.GpioGet("PSU1_INT_L")
+		        pinstate, err = gpioGet("PSU1_INT_L")
+			if err != nil {
+				return err
+			}
 		        if pinstate {r = "pass"} else {r = "fail"}
 		        fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n","psu","psu1_int_l_off","-",pinstate,active_low_off_min,active_low_off_max,r,"check interrupt is high")
 	*/
+	return nil
 }

@@ -2,8 +2,8 @@
 package fit
 
 import (
-        "github.com/platinasystems/goes/kexec"
 	"fmt"
+	"github.com/platinasystems/go/kexec"
 )
 
 func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {
@@ -20,7 +20,7 @@ func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {
 		segments[i].Mem = uintptr(image.LoadAddr) + offset
 		segments[i].Memsz = memsz
 	}
-	if (f.Debug) {
+	if f.Debug {
 		fmt.Printf("Segments: %+v\n", segments)
 	}
 	err = kexec.SegmentLoad(conf.BaseAddr, &segments, uintptr(0))

@@ -6,7 +6,7 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"fmt"
-	"github.com/platinasystems/goes/fdt"
+	"github.com/platinasystems/go/fdt"
 	"hash/crc32"
 	"strings"
 	"time"

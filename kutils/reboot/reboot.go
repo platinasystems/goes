@@ -5,35 +5,43 @@
 package reboot
 
 import (
-	"os"
 	"syscall"
 
-	"github.com/platinasystems/oops"
+	"github.com/platinasystems/go/kexec"
 )
 
-type reboot struct{ oops.Id }
+const Name = "reboot"
 
-var Reboot = &reboot{"reboot"}
+type cmd struct{}
 
-func (*reboot) Usage() string { return "reboot" }
+func New() cmd { return cmd{} }
 
-func Prepare() {
-	for _, f := range []*os.File{
-		os.Stdout,
-		os.Stderr,
-	} {
-		syscall.Fsync(int(f.Fd()))
-	}
-	syscall.Sync()
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
-func (p *reboot) Main(args ...string) {
-	Prepare()
+func (cmd) Main(args ...string) error {
+	kexec.Prepare()
 
 	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
 
-	err := syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-	if err != nil {
-		p.Panic(err)
+	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+}
+
+func (cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "reboot system",
+	}
+}
+
+func (cmd) Man() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": `NAME
+	reboot - reboots system
+
+SYNOPSIS
+	reboot
+
+DESCRIPTION
+	Reboots system.`,
 	}
 }

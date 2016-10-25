@@ -7,14 +7,12 @@ package diag
 import (
 	"fmt"
 	"time"
-
-	"github.com/platinasystems/goes/optional/gpio"
 )
 
-func diagI2c() {
+func diagI2c() error {
 
 	var r string
-	var pinstate, result bool
+	var result bool
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
 	fmt.Printf("---------------|-------------------------|----------|----------|----------|----------|------|-----------------------------------\n")
@@ -22,7 +20,10 @@ func diagI2c() {
 	/* diagTest: i2c mon
 	check that all i2c monitoring pins read high, stuck high pins will be discovered during i2c ping tests
 	*/
-	pinstate = gpio.GpioGet("I2C1_SCL_MON")
+	pinstate, err := gpioGet("I2C1_SCL_MON")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -30,7 +31,10 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "i2c1_scl_mon", "-", pinstate, i2cmon_min, i2cmon_max, r, "check mon pin is high")
 
-	pinstate = gpio.GpioGet("I2C1_SDA_MON")
+	pinstate, err = gpioGet("I2C1_SDA_MON")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -38,7 +42,10 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "i2c1_sda_mon", "-", pinstate, i2cmon_min, i2cmon_max, r, "check mon pin is high")
 
-	pinstate = gpio.GpioGet("I2C2_SCL_MON")
+	pinstate, err = gpioGet("I2C2_SCL_MON")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -46,7 +53,10 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "i2c2_scl_mon", "-", pinstate, i2cmon_min, i2cmon_max, r, "check mon pin is high")
 
-	pinstate = gpio.GpioGet("I2C2_SDA_MON")
+	pinstate, err = gpioGet("I2C2_SDA_MON")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -54,7 +64,10 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "i2c2_sda_mon", "-", pinstate, i2cmon_min, i2cmon_max, r, "check mon pin is high")
 
-	pinstate = gpio.GpioGet("I2C3_SCL_MON")
+	pinstate, err = gpioGet("I2C3_SCL_MON")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -62,7 +75,10 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "i2c3_scl_mon", "-", pinstate, i2cmon_min, i2cmon_max, r, "check mon pin is high")
 
-	pinstate = gpio.GpioGet("I2C3_SDA_MON")
+	pinstate, err = gpioGet("I2C3_SDA_MON")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -74,7 +90,7 @@ func diagI2c() {
 	enable host access to main_i2c bus and check that bmc can access mfg eeprom on cpu card
 	repeat with fru_i2c bus
 	*/
-	gpio.GpioSet("CPU_TO_MAIN_I2C_EN", true)
+	gpioSet("CPU_TO_MAIN_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x51, 0x00, 1)
 	if result {
@@ -84,7 +100,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_main_i2c_en_on", "-", result, i2cping_response_min, i2cping_response_max, r, "enable host bus, ping host eeprom")
 
-	gpio.GpioSet("CPU_TO_MAIN_I2C_EN", false)
+	gpioSet("CPU_TO_MAIN_I2C_EN", false)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x51, 0x00, 1)
 	if !result {
@@ -94,7 +110,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_main_i2c_en_off", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "disable host bus, ping host eeprom")
 
-	gpio.GpioSet("CPU_TO_FRU_I2C_EN", true)
+	gpioSet("CPU_TO_FRU_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x51, 0x00, 1)
 	if result {
@@ -104,7 +120,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_fru_i2c_en_on", "-", result, i2cping_response_min, i2cping_response_max, r, "enable host bus, ping host eeprom")
 
-	gpio.GpioSet("CPU_TO_FRU_I2C_EN", false)
+	gpioSet("CPU_TO_FRU_I2C_EN", false)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x51, 0x00, 1)
 	if !result {
@@ -119,14 +135,14 @@ func diagI2c() {
 	enable i2c power and check that i2c devices can be accessed
 	*/
 	/*
-			gpio.GpioSet("P3V3_I2C_EN",false)
+			gpioSet("P3V3_I2C_EN",false)
 		        time.Sleep(50 * time.Millisecond)
 		        result := diagI2cPing(0x00,0x76,1)
 		        if !result {r = "pass"} else {r = "fail"}
 		        fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n","i2c","p3v3_i2c_en_off","-",result,i2cping_noresponse_min,i2cping_noresponse_max,r,"disable i2c power, ping main_mux0")
 	*/
 
-	gpio.GpioSet("P3V3_I2C_EN", true)
+	gpioSet("P3V3_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x76, 0x00, 1)
 	if result {
@@ -139,7 +155,7 @@ func diagI2c() {
 	/* diagTest: i2c resets
 	activate i2c reset and validate associated devices cannot be accessed
 	*/
-	gpio.GpioSet("MAIN_I2C_MUX_RST_L", false)
+	gpioSet("MAIN_I2C_MUX_RST_L", false)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x76, 0x00, 1)
 	if !result {
@@ -149,7 +165,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "main_i2c_mux_rst_l_on", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "enable reset, ping main_mux0")
 
-	gpio.GpioSet("MAIN_I2C_MUX_RST_L", true)
+	gpioSet("MAIN_I2C_MUX_RST_L", true)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x76, 0x00, 1)
 	if result {
@@ -159,7 +175,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "main_i2c_mux_rst_l_off", "-", result, i2cping_response_min, i2cping_response_max, r, "disable reset, ping main_mux0")
 
-	gpio.GpioSet("FRU_I2C_MUX_RST_L", false)
+	gpioSet("FRU_I2C_MUX_RST_L", false)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x01, 0x72, 0x00, 1)
 	if !result {
@@ -169,7 +185,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "fru_i2c_mux_rst_l_on", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "enable reset, ping fru_mux0")
 
-	gpio.GpioSet("FRU_I2C_MUX_RST_L", true)
+	gpioSet("FRU_I2C_MUX_RST_L", true)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x01, 0x72, 0x00, 1)
 	if result {
@@ -183,7 +199,7 @@ func diagI2c() {
 		disable fan board 3.3V power and check that i2c devices cannot be accessed
 	        enable fan board 3.3Vpower and check that i2c devices can be accessed
 	*/
-	gpio.GpioSet("P3V3_FAN_EN", false)
+	gpioSet("P3V3_FAN_EN", false)
 	time.Sleep(50 * time.Millisecond)
 	diagI2cWrite1Byte(0x01, 0x72, 0x04)
 	time.Sleep(10 * time.Millisecond)
@@ -196,7 +212,7 @@ func diagI2c() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "p3v3_fan_en_off", "-", result, i2cping_response_min, i2cping_response_max, r, "disable fan3.3V, ping fan brd gpio")
 
-	gpio.GpioSet("P3V3_FAN_EN", true)
+	gpioSet("P3V3_FAN_EN", true)
 	time.Sleep(50 * time.Millisecond)
 	diagI2cWrite1Byte(0x01, 0x20, 0x00)
 	result, _ = diagI2cPing(0x01, 0x20, 0x00, 1)
@@ -334,4 +350,5 @@ func diagI2c() {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_fan_board", "-", result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")
 
 	diagI2cWrite1Byte(0x01, 0x72, 0x00)
+	return nil
 }

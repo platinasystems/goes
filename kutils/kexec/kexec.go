@@ -5,119 +5,94 @@
 package kexec
 
 import (
-	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/fit"
-	kexecSyscall "github.com/platinasystems/goes/kexec"
-	"github.com/platinasystems/goes/coreutils/reboot"
-	"github.com/platinasystems/oops"
+	"errors"
+	"fmt"
 	"io/ioutil"
-	"syscall"
 	"os"
+	"syscall"
+
+	"github.com/platinasystems/go/fit"
+	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/kexec"
+	"github.com/platinasystems/go/parms"
 )
 
-type kexec struct {
-	oops.Id
-	flags map[string]bool
-	parms map[string]string
-}
+const Name = "kexec"
 
-var Kexec = &kexec{Id: "kexec"}
+type cmd struct{}
 
-func (*kexec) Usage() string {
-	return "kexec -l IMAGE"
-}
+func New() cmd { return cmd{} }
 
-func (*kexec) Flags() goes.Flags {
-	return goes.Flags{
-		"-e": goes.Flag{},
-		"-f": goes.Flag{},
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTIONS]..." }
 
-func (*kexec) Parms() goes.Parms {
-	return goes.Parms{
-		"-c": goes.Parm{"COMMANDLINE", nil, ""},
-		"-i": goes.Parm{"INITRAMFS", goes.Complete.File, ""},
-		"-k": goes.Parm{"KERNEL", goes.Complete.File, ""},
-		"-l": goes.Parm{"IMAGE", goes.Complete.File, ""},
-	        "-x": goes.Parm{"CONFIGURATION", nil, ""},
-	}
-}
-
-func (p *kexec) Main(args ...string) {
+func (cmd) Main(args ...string) error {
 	var err error
-	p.flags, args = p.Flags().Parse(args)
-	p.parms, args, err = p.Parms().Parse(args)
-	if err != nil {
-		p.Panic(err)
-	}
+	flag, args := flags.New(args, "-e", "-f")
+	parm, args := parms.New(args, "-c", "-i", "-k", "-l", "-x")
 
 	if len(args) > 0 {
-		p.Panic(args[0:], ": unexpected")
+		return fmt.Errorf("%v: unexpected", args)
 	}
 
-	if image := p.parms["-l"]; len(image) > 0 {
-		p.loadFit(image)
+	if image := parm["-l"]; len(image) > 0 {
+		err = loadFit(image, parm["-x"])
+		if err != nil {
+			return err
+		}
 	}
 
-	if kernel := p.parms["-k"]; len(kernel) > 0 {
-		p.loadKernel(kernel)
+	if kernel := parm["-k"]; len(kernel) > 0 {
+		err = loadKernel(kernel, parm["-i"], parm["-c"])
+		if err != nil {
+			return err
+		}
 	}
 
-	if p.flags["-e"] || p.flags["-f"] {
-		if !p.flags["-f"] {
-			reboot.Prepare()
+	if flag["-e"] || flag["-f"] {
+		if !flag["-f"] {
+			kexec.Prepare()
 		}
 		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
-		if err != nil {
-			p.Panic(err)
-		}
 	}
+	return err
 }
 
-func (p *kexec) loadFit(image string) {
+func loadFit(image, x string) error {
 	b, err := ioutil.ReadFile(image)
 	if err != nil {
-		p.Panic(err)
+		return err
 	}
 
 	fit := fit.Parse(b)
 
-	configName := p.parms["-x"]
-	if len(configName) == 0 {
-		configName = fit.DefaultConfig
+	if len(x) == 0 {
+		x = fit.DefaultConfig
 	}
+	config := fit.Configs[x]
+	config.BaseAddr = 0x60008000
 
-	config := fit.Configs[configName]
-	config.BaseAddr = 0x60008000;
-
-	err = fit.KexecLoadConfig(config, 0x0)
-
-	if err != nil {
-		p.Panic(err)
-	}
+	return fit.KexecLoadConfig(config, 0x0)
 }
 
-func (p *kexec) loadKernel(kernel string) {
+func loadKernel(kernel, initramfs, cmdline string) error {
 	k, err := os.Open(kernel)
 	if err != nil {
-		p.Panic(err)
+		return err
 	}
 	defer k.Close()
 
-	initramfs := p.parms["-i"]
 	if len(initramfs) == 0 {
-		p.Panic("Initramfs (-i) must be specified")
+		return errors.New("Initramfs (-i) must be specified")
 	}
 
 	i, err := os.Open(initramfs)
 	if err != nil {
-		p.Panic(err)
+		return err
 	}
 	defer i.Close()
 
-	err = kexecSyscall.FileLoad(k, i, p.parms["-c"], 0)
-	if err != nil {
-		p.Panic(err)
-	}
+	return kexec.FileLoad(k, i, cmdline, 0)
 }
+
+// FIXME add Apropos() and Man()

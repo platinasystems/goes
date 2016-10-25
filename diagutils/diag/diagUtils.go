@@ -6,7 +6,8 @@ package diag
 
 import (
 	"fmt"
-	"github.com/platinasystems/goes/i2c"
+	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/i2c"
 	"github.com/tatsushid/go-fastping"
 	"net"
 	"time"
@@ -143,6 +144,24 @@ func diagI2cWriteOffsetByte(b uint8, a uint8, c uint8, d uint8) {
 		}
 	}
 	//if debug {fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])}
+}
+
+// returns value of BMC gpio name
+func gpioGet(name string) (bool, error) {
+	pin, found := gpio.Pins[name]
+	if !found {
+		return false, fmt.Errorf("%s: not found")
+	}
+	return pin.Value()
+}
+
+// sets BMC gpio name to value
+func gpioSet(name string, value bool) error {
+	pin, found := gpio.Pins[name]
+	if !found {
+		return fmt.Errorf("%s: not found")
+	}
+	return pin.SetValue(value)
 }
 
 // return true if test result r is within min and max limits

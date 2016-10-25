@@ -20,7 +20,6 @@ import (
 	"github.com/platinasystems/go/coreutils/mkdir"
 	"github.com/platinasystems/go/coreutils/ps"
 	"github.com/platinasystems/go/coreutils/pwd"
-	"github.com/platinasystems/go/coreutils/reboot"
 	"github.com/platinasystems/go/coreutils/rm"
 	"github.com/platinasystems/go/coreutils/sleep"
 	"github.com/platinasystems/go/coreutils/stty"
@@ -42,7 +41,6 @@ func New() []interface{} {
 		mkdir.New(),
 		ps.New(),
 		pwd.New(),
-		reboot.New(),
 		rm.New(),
 		sleep.New(),
 		stty.New(),

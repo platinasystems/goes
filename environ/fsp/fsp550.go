@@ -8,14 +8,9 @@ package fsp550
 import (
 	"unsafe"
 
-	"github.com/platinasystems/goes/i2c"
-	"github.com/platinasystems/goes/optional/gpio"
-	"github.com/platinasystems/oops"
+	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/i2c"
 )
-
-type i2c_ struct{ oops.Id }
-
-var I2c = &i2c_{"i2c"}
 
 var (
 	dummy       byte
@@ -359,40 +354,55 @@ func (h *Psu) MfgId() uint16 {
 }
 
 func (h *Psu) PsuStatus() string {
-	var r string
-
-	if !gpio.GpioGet(h.GpioPrsntL) {
-		r = "installed."
+	pin, found := gpio.Pins[h.GpioPrsntL]
+	if !found {
+		return "not_found"
 	} else {
-		r = "not_installed."
+		t, err := pin.Value()
+		if err != nil {
+			return err.Error()
+		} else if !t {
+			return "not_installed."
+		}
 	}
 
-	if gpio.GpioGet(h.GpioPwrok) {
-		r += "powered_on"
-	} else {
-		r += "powered_off"
+	pin, found = gpio.Pins[h.GpioPwrok]
+	if !found {
+		return "undetermined"
 	}
-
-	return r
+	t, err := pin.Value()
+	if err != nil {
+		return err.Error()
+	}
+	if !t {
+		return "powered_off"
+	}
+	return "powered_on"
 }
 
 func (h *Psu) SetAdminState(s string) {
-
-	if s == "disable" {
-		gpio.GpioSet(h.GpioPwronL, true)
-	} else if s == "enable" {
-		gpio.GpioSet(h.GpioPwronL, false)
+	pin, found := gpio.Pins[h.GpioPwronL]
+	if found {
+		switch s {
+		case "disable":
+			pin.SetValue(false)
+		case "enable":
+			pin.SetValue(true)
+		}
 	}
 }
 
 func (h *Psu) GetAdminState() string {
-
-	var r string
-	if !gpio.GpioGet(h.GpioPwronL) {
-		r = "enabled"
-	} else {
-		r = "disabled"
+	pin, found := gpio.Pins[h.GpioPwronL]
+	if !found {
+		return "not found"
 	}
-
-	return r
+	t, err := pin.Value()
+	if err != nil {
+		return err.Error()
+	}
+	if !t {
+		return "disabled"
+	}
+	return "enabled"
 }

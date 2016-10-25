@@ -6,17 +6,16 @@ package diag
 
 import (
 	"fmt"
-
-	"github.com/platinasystems/goes/environ/nuvoton"
-	"github.com/platinasystems/goes/optional/gpio"
-	"github.com/platinasystems/goes/redis"
 	"strconv"
 	"time"
+
+	"github.com/platinasystems/go/environ/nuvoton"
+	"github.com/platinasystems/go/redis"
 )
 
-func diagFans() {
+func diagFans() error {
 
-	var result, pinstate bool
+	var result bool
 	var r string
 	var d0, d1 uint8
 
@@ -39,7 +38,7 @@ func diagFans() {
 	time.Sleep(10 * time.Millisecond)
 	diagI2cWriteOffsetByte(0x00, 0x2f, 0x00, 0x00)
 	diagI2cWriteOffsetByte(0x00, 0x2f, 0x01, 0x55)
-	gpio.GpioSet("HWM_RST_L", false)
+	gpioSet("HWM_RST_L", false)
 	time.Sleep(50 * time.Millisecond)
 	result, d0 = diagI2cPing(0x00, 0x2f, 0x01, 1)
 	if result && d0 == 0x80 {
@@ -49,7 +48,7 @@ func diagFans() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "fans", "hwm_rst_l_on", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "enable reset, ping device")
 
-	gpio.GpioSet("HWM_RST_L", true)
+	gpioSet("HWM_RST_L", true)
 	time.Sleep(50 * time.Millisecond)
 	result, d0 = diagI2cPing(0x00, 0x2f, 0x01, 1)
 	if result && d0 == 0x55 {
@@ -70,7 +69,10 @@ func diagFans() {
 	diagI2cWriteOffsetByte(0x00, 0x2f, 0x00, 0x00)
 	diagI2cWriteOffsetByte(0x00, 0x2f, 0x40, 0x00)
 	diagI2cWrite1Byte(0x00, 0x76, 0x00)
-	pinstate = gpio.GpioGet("HWM_INT_L")
+	pinstate, err := gpioGet("HWM_INT_L")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -78,10 +80,13 @@ func diagFans() {
 	}
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "fans", "hwm_int_l_on", "-", pinstate, active_low_on_min, active_low_on_max, r, "check interrupt is low")
 
-	gpio.GpioSet("HWM_RST_L", false)
+	gpioSet("HWM_RST_L", false)
 	time.Sleep(10 * time.Millisecond)
-	gpio.GpioSet("HWM_RST_L", true)
-	pinstate = gpio.GpioGet("HWM_INT_L")
+	gpioSet("HWM_RST_L", true)
+	pinstate, err = gpioGet("HWM_INT_L")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -92,10 +97,13 @@ func diagFans() {
 	/* diagTest: fan board interrupt
 	   Toggle interrupt and check interrupt signal state
 	*/
-	gpio.GpioSet("P3V3_FAN_EN", false)
+	gpioSet("P3V3_FAN_EN", false)
 	time.Sleep(50 * time.Millisecond)
-	gpio.GpioSet("P3V3_FAN_EN", true)
-	pinstate = gpio.GpioGet("FAN_STATUS_INT_L")
+	gpioSet("P3V3_FAN_EN", true)
+	pinstate, err = gpioGet("FAN_STATUS_INT_L")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -109,7 +117,10 @@ func diagFans() {
 	result, _ = diagI2cPing(0x01, 0x20, 0x01, 1)
 	diagI2cWrite1Byte(0x01, 0x72, 0x00)
 	time.Sleep(10 * time.Millisecond)
-	pinstate = gpio.GpioGet("FAN_STATUS_INT_L")
+	pinstate, err = gpioGet("FAN_STATUS_INT_L")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -228,4 +239,5 @@ func diagFans() {
 		r = "pass"
 	}
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_fan_front", "°C", f, tmon_fan_front_min, tmon_fan_front_max, r, "check hwm intake temp sense")
+	return nil
 }

@@ -3,14 +3,11 @@ package diag
 import (
 	"fmt"
 	"time"
-
-	"github.com/platinasystems/goes/optional/gpio"
 )
 
-func diagNetwork() {
+func diagNetwork() error {
 
 	var r string
-	var pinstate bool
 	var result bool
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
@@ -19,7 +16,10 @@ func diagNetwork() {
 	/* diagTest: ETHX_INT_L interrupt: toggle ethx interrupt and validate bmc can detect the proper signal states */
 	//tbd: generate ethx interrupt
 	//tbd: use cat /proc/interrupts instead?
-	pinstate = gpio.GpioGet("ETHX_INT_L")
+	pinstate, err := gpioGet("ETHX_INT_L")
+	if err != nil {
+		return err
+	}
 	if !pinstate {
 		r = "pass"
 	} else {
@@ -28,7 +28,10 @@ func diagNetwork() {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "mgmt_network", "ethx_int_l_on", "-", pinstate, active_low_on_min, active_low_on_max, r, "check interrupt is low")
 
 	//tbd: clear ethx interrupt
-	pinstate = gpio.GpioGet("ETHX_INT_L")
+	pinstate, err = gpioGet("ETHX_INT_L")
+	if err != nil {
+		return err
+	}
 	if pinstate {
 		r = "pass"
 	} else {
@@ -38,13 +41,13 @@ func diagNetwork() {
 
 	/* diagTest: ETHX_RST_L: toggle BMC to ethx RST_L and validate ethx behaves accordingly */
 	/*
-	   gpio.GpioSet("ETHX_RST_L",false)
+	   gpioSet("ETHX_RST_L",false)
 	   time.Sleep(50 * time.Millisecond)
 	   result = diagPing("192.168.101.1", 1)
 	   if !result {r = "pass"} else {r = "fail"}
 	   fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n","network","ethx_rst_l_on","-",result,ping_noresponse,ping_noresponse_max,r,"enable reset, ping external host")
 	*/
-	gpio.GpioSet("ETHX_RST_L", true)
+	gpioSet("ETHX_RST_L", true)
 	time.Sleep(50 * time.Millisecond)
 	result = diagPing("192.168.101.1", 10)
 	if result {
@@ -56,4 +59,5 @@ func diagNetwork() {
 
 	/* diagTest: ethx MDIO, tbd: validate reads/writes across MDIO interface */
 
+	return nil
 }
