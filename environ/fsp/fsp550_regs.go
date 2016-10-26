@@ -1,4 +1,4 @@
-package fsp550
+package fsp
 
 type reg8 byte
 type reg16 [2]byte

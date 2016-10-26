@@ -5,22 +5,26 @@
 package main
 
 import (
-	"github.com/platinasystems/elib/parse"
-	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/coreutils"
-	"github.com/platinasystems/goes/coreutils/machined"
-	"github.com/platinasystems/goes/dlv"
-	"github.com/platinasystems/goes/optional/i2c"
-	"github.com/platinasystems/goes/test"
-	"github.com/platinasystems/oops"
-	"github.com/platinasystems/vnet"
-	"github.com/platinasystems/vnet/devices/bus/pci"
-	//"github.com/platinasystems/vnet/devices/ethernet/ixge"
-	"github.com/platinasystems/vnet/ethernet"
-	"github.com/platinasystems/vnet/ip4"
-	"github.com/platinasystems/vnet/ip6"
-	"github.com/platinasystems/vnet/pg"
-	"github.com/platinasystems/vnet/unix"
+	"github.com/platinasystems/go/builtinutils"
+	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/coreutils"
+	"github.com/platinasystems/go/diagutils"
+	"github.com/platinasystems/go/diagutils/dlv"
+	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/fsutils"
+	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/initutils/goesd"
+	"github.com/platinasystems/go/kutils"
+	"github.com/platinasystems/go/machined"
+	"github.com/platinasystems/go/netutils"
+	"github.com/platinasystems/go/redisutils"
+	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/devices/bus/pci"
+	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/ip4"
+	"github.com/platinasystems/go/vnet/ip6"
+	"github.com/platinasystems/go/vnet/pg"
+	"github.com/platinasystems/go/vnet/unix"
 	"github.com/platinasystems/vnetdevices/ethernet/switch/bcm"
 
 	"fmt"
@@ -47,8 +51,8 @@ type parser interface {
 }
 
 type Info struct {
-	oops.Id
 	mutex    sync.Mutex
+	name     string
 	prefixes []string
 	attrs    machined.Attrs
 }
@@ -66,22 +70,32 @@ var portConfigs = []AttrInfo{
 }
 
 func main() {
-	goes.Command.Plot(dlv.Commands[:]...)
-	goes.Command.Plot(coreutils.Commands[:]...)
-	goes.Command.Plot(test.Commands[:]...)
-	goes.Command.Plot(i2c.I2c)
+	command.Plot(builtinutils.New()...)
+	command.Plot(coreutils.New()...)
+	command.Plot(dlv.New()...)
+	command.Plot(diagutils.New()...)
+	command.Plot(fsutils.New()...)
+	command.Plot(goesd.New(), machined.New())
+	command.Plot(kutils.New()...)
+	command.Plot(netutils.New()...)
+	command.Plot(redisutils.New()...)
+	command.Sort()
+	goesd.Hook = func() error {
+		os.Setenv("REDISD", "lo eth0")
+		return nil
+	}
 	machined.Hook = func() {
 		machined.NetLink.Prefixes("lo.", "eth0.")
 		machined.InfoProviders = append(machined.InfoProviders, &Info{
-			Id:       "mk1",
+			name:     "mk1",
 			prefixes: []string{"eth-", "dp-"},
 			attrs:    make(machined.Attrs),
 		})
 	}
-	goes.Goes()
+	goes.Main()
 }
 
-func (p *Info) Main() {
+func (p *Info) Main(...string) error {
 	machined.Publish("machine", "platina-mk1")
 	for _, entry := range []struct{ name, unit string }{
 		{"current", "milliamperes"},
@@ -139,7 +153,7 @@ func (p *Info) Main() {
 	}()
 
 	initStatsTimer(v)
-
+	return nil
 }
 
 func (p *Info) Close() error {
@@ -268,3 +282,5 @@ func initStatsTimer(v *vnet.Vnet) {
 	}()
 	return
 }
+
+func (p *Info) String() string { return p.name }

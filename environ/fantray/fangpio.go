@@ -3,7 +3,7 @@
 // LICENSE file.
 
 // Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package fangpio
+package fantray
 
 import (
 	"strconv"

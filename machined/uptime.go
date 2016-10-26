@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/goes/emptych"
+	"github.com/platinasystems/go/emptych"
 )
 
 type uptime struct {

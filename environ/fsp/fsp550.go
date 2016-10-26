@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-// Package fsp550 provides access to the power supply unit
-package fsp550
+// Package fsp provides access to the power supply unit
+package fsp
 
 import (
 	"unsafe"

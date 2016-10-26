@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/netutils/femtocom"
 	"github.com/platinasystems/go/netutils/nsid"
 	"github.com/platinasystems/go/netutils/ping"
+	"github.com/platinasystems/go/netutils/wget"
 )
 
 func New() []interface{} {
@@ -16,5 +17,6 @@ func New() []interface{} {
 		femtocom.New(),
 		nsid.New(),
 		ping.New(),
+		wget.New(),
 	}
 }

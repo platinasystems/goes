@@ -8,31 +8,33 @@
 package main
 
 import (
-	//"bytes"
 	"fmt"
 	"os"
-	//"runtime"
 	"strconv"
 	"time"
 
-	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/coreutils"
-	"github.com/platinasystems/goes/coreutils/machined"
-	"github.com/platinasystems/goes/eeprom"
-	"github.com/platinasystems/goes/emptych"
-	"github.com/platinasystems/goes/environ/fantray"
-	"github.com/platinasystems/goes/environ/fsp"
-	"github.com/platinasystems/goes/environ/nuvoton"
-	"github.com/platinasystems/goes/environ/nxp"
-	"github.com/platinasystems/goes/environ/ti"
-	"github.com/platinasystems/goes/led"
-	goes_log "github.com/platinasystems/goes/log"
-	"github.com/platinasystems/goes/optional/gpio"
-	"github.com/platinasystems/goes/optional/i2c"
-	//"github.com/platinasystems/goes/optional/mdio"
-	"github.com/platinasystems/goes/test"
-	"github.com/platinasystems/oops"
-	"github.com/platinasystems/vnet/ethernet"
+	"github.com/platinasystems/go/builtinutils"
+	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/coreutils"
+	"github.com/platinasystems/go/diagutils"
+	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/emptych"
+	"github.com/platinasystems/go/environ/fantray"
+	"github.com/platinasystems/go/environ/fsp"
+	"github.com/platinasystems/go/environ/nuvoton"
+	"github.com/platinasystems/go/environ/nxp"
+	"github.com/platinasystems/go/environ/ti"
+	"github.com/platinasystems/go/fsutils"
+	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/initutils/sbininit"
+	"github.com/platinasystems/go/initutils/slashinit"
+	"github.com/platinasystems/go/kutils"
+	"github.com/platinasystems/go/led"
+	"github.com/platinasystems/go/log"
+	"github.com/platinasystems/go/machined"
+	"github.com/platinasystems/go/netutils"
+	"github.com/platinasystems/go/redisutils"
 )
 
 type parser interface {
@@ -41,7 +43,7 @@ type parser interface {
 
 type Info struct {
 	emptych.In
-	oops.Id
+	name     string
 	prefixes []string
 	attrs    machined.Attrs
 }
@@ -88,10 +90,10 @@ const (
 
 var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxAdr, w83795MuxVal}
 var pm = ucd9090.PowerMon{ucd9090Bus, ucd9090Adr, ucd9090MuxAdr, ucd9090MuxVal}
-var ledfp = ledgpio.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxAdr, ledgpioMuxVal}
-var fanTray = fangpio.FanStat{fangpioBus, fangpioAdr, fangpioMuxAdr, fangpioMuxVal}
-var ps2 = fsp550.Psu{ps1Bus, ps1Adr, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
-var ps1 = fsp550.Psu{ps2Bus, ps2Adr, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
+var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxAdr, ledgpioMuxVal}
+var fanTray = fantray.FanStat{fangpioBus, fangpioAdr, fangpioMuxAdr, fangpioMuxVal}
+var ps2 = fsp.Psu{ps1Bus, ps1Adr, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
+var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
 var cpu = imx6.Cpu{}
 
 var RedisEnvShadow = map[string]interface{}{}
@@ -114,18 +116,23 @@ var stageKeyFloat64 string
 var stageFlagFloat64 int = 0
 
 func main() {
-	var dd ethernet.Address
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
-	goes.Command.Plot(coreutils.Commands[:]...)
-	goes.Command.Plot(test.Commands[:]...)
-	goes.Command.Plot(gpio.Gpio, i2c.I2c)
+	command.Plot(builtinutils.New()...)
+	command.Plot(coreutils.New()...)
+	command.Plot(diagutils.New()...)
+	command.Plot(fsutils.New()...)
+	command.Plot(sbininit.New(), slashinit.New(), machined.New())
+	command.Plot(kutils.New()...)
+	command.Plot(netutils.New()...)
+	command.Plot(redisutils.New()...)
+	command.Sort()
 	regWriteString = map[string]func(string){}
 	regWriteInt = map[string]func(int){}
 	regWriteUint16 = map[string]func(uint16){}
 	regWriteFloat64 = map[string]func(float64){}
 	//	goes.Command.Plot(gpio.Gpio, i2c.I2c, mdio.Mdio)
 	machined.Hook = func() {
-		gpio.GpioInit()
+		//  gpio.GpioInit() FIXME this should be like diag and gpio commands
 		ledfp.LedFpInit()
 		fanTray.FanTrayLedInit()
 		hw.FanInit()
@@ -141,18 +148,20 @@ func main() {
 			//	Count: 256,
 			//}
 		} else {
-			dd = d.Fields.BaseEthernetAddress
-			g := (uint32(dd[3])<<16 | uint32(dd[4])<<8 | uint32(dd[5])) + uint32(d.Fields.NEthernetAddress)
-			dd[3] = uint8((g & 0xff0000) >> 16)
-			dd[4] = uint8((g & 0xff00) >> 8)
-			dd[5] = uint8(g & 0xff)
+			// FIXME can't import vnet b/c elib/hw doesn't compile on ARM
+			// var dd ethernet.Address
+			// dd = d.Fields.BaseEthernetAddress
+			// g := (uint32(dd[3])<<16 | uint32(dd[4])<<8 | uint32(dd[5])) + uint32(d.Fields.NEthernetAddress)
+			// dd[3] = uint8((g & 0xff0000) >> 16)
+			// dd[4] = uint8((g & 0xff00) >> 8)
+			// dd[5] = uint8(g & 0xff)
 		}
 
 		machined.NetLink.Prefixes("lo.", "eth0.")
 		machined.InfoProviders = append(machined.InfoProviders,
-			&Info{Id: "platina-mk1-bmc"},
+			&Info{name: "platina-mk1-bmc"},
 			&Info{
-				Id:       "fan",
+				name:     "fan",
 				prefixes: []string{"fan."},
 				attrs: machined.Attrs{
 					"fan.front": 100,
@@ -160,7 +169,7 @@ func main() {
 				},
 			},
 			&Info{
-				Id:       "mfg",
+				name:     "mfg",
 				prefixes: []string{"mfg."},
 				attrs: machined.Attrs{
 					"mfg.product.name":     d.Fields.ProductName,
@@ -180,7 +189,7 @@ func main() {
 				},
 			},
 			&Info{
-				Id:       "vmon",
+				name:     "vmon",
 				prefixes: []string{"vmon."},
 				attrs: machined.Attrs{
 					"vmon.5v.sb":    pm.Vout(1),
@@ -196,7 +205,7 @@ func main() {
 				},
 			},
 			&Info{
-				Id:       "chassis",
+				name:     "chassis",
 				prefixes: []string{"fan_tray."},
 				attrs: machined.Attrs{
 					"fan_tray.1.1.rpm":  hw.FanCount(1),
@@ -215,7 +224,7 @@ func main() {
 				},
 			},
 			&Info{
-				Id:       "psu1",
+				name:     "psu1",
 				prefixes: []string{"psu1."},
 				attrs: machined.Attrs{
 					"psu1.status":       ps1.PsuStatus(),
@@ -241,7 +250,7 @@ func main() {
 				},
 			},
 			&Info{
-				Id:       "psu2",
+				name:     "psu2",
 				prefixes: []string{"psu2."},
 				attrs: machined.Attrs{
 					"psu2.status":       ps2.PsuStatus(),
@@ -267,7 +276,7 @@ func main() {
 				},
 			},
 			&Info{
-				Id:       "temperature",
+				name:     "temperature",
 				prefixes: []string{"temperature."},
 				attrs: machined.Attrs{
 					"temperature.bmc_cpu":   cpu.ReadTemp(),
@@ -287,7 +296,7 @@ func main() {
 	os.Setenv("REDISD_DEVS", "lo eth0")
 
 	go timerLoop()
-	goes.Goes()
+	goes.Main()
 }
 
 func timerLoop() {
@@ -334,7 +343,7 @@ func getGID() uint64 {
 */
 
 func timerIsr() {
-	goes_log.Print("timerISR")
+	log.Print("daemon", "info", "timerISR")
 
 	if stageFlagString == 1 {
 		if _, ok := regWriteUint16[stageKeyString]; ok {
@@ -440,7 +449,7 @@ func timerIsr() {
 	ledfp.LedStatus()
 }
 
-func (p *Info) Main() {
+func (p *Info) Main(...string) error {
 	machined.Publish("machine", "platina-mk1-bmc")
 	for _, entry := range []struct{ name, unit string }{
 		{"fan", "% max speed"},
@@ -453,6 +462,7 @@ func (p *Info) Main() {
 		machined.Publish(k, a)
 		RedisEnvShadow[k] = a
 	}
+	return nil
 }
 
 func (*Info) Close() error {
@@ -531,4 +541,4 @@ func (p *Info) Set(key, value string) error {
 	return nil
 }
 
-func (*Info) String() string { return "platina-mk1-bmc" }
+func (p *Info) String() string { return p.name }

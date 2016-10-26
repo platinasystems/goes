@@ -5,9 +5,9 @@
 package main
 
 import (
-	"github.com/platinasystems/goes/eeprom"
-	"github.com/platinasystems/goes/i2c"
-	"github.com/platinasystems/vnet/ethernet"
+	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/vnetdevices/ethernet/switch/bcm"
 )
 

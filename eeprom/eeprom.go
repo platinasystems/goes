@@ -15,7 +15,6 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/i2c"
-	"github.com/platinasystems/go/vnet/ethernet"
 )
 
 // EEPROM TLVs offsets
@@ -41,24 +40,25 @@ const (
 
 // EEPROM TLV field types
 type fields struct {
-	ONIEData            [8]byte
-	ONIEDataVersion     byte
-	ProductName         string
-	PlatformName        string
-	VendorName          string
-	Manufacturer        string
-	Vendor              string
-	LabelRevision       string
-	PartNumber          string
-	SerialNumber        string
-	DeviceVersion       string
-	ManufactureDate     string
-	CountryCode         string
-	DiagVersion         string
-	ServiceTag          string
-	VendorExtension     string
-	ONIEVersion         string
-	BaseEthernetAddress ethernet.Address
+	ONIEData        [8]byte
+	ONIEDataVersion byte
+	ProductName     string
+	PlatformName    string
+	VendorName      string
+	Manufacturer    string
+	Vendor          string
+	LabelRevision   string
+	PartNumber      string
+	SerialNumber    string
+	DeviceVersion   string
+	ManufactureDate string
+	CountryCode     string
+	DiagVersion     string
+	ServiceTag      string
+	VendorExtension string
+	ONIEVersion     string
+	// FIXME BaseEthernetAddress ethernet.Address
+	BaseEthernetAddress [6]byte
 	NEthernetAddress    uint
 	CRC32               uint
 }

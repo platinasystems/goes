@@ -7,22 +7,23 @@ package i2c
 
 import (
 	"fmt"
-
 	"time"
 
-	"github.com/platinasystems/goes/i2c"
-	"github.com/platinasystems/oops"
+	"github.com/platinasystems/go/i2c"
 )
 
-type i2c_ struct{ oops.Id }
+const Name = "i2c"
 
-var I2c = &i2c_{"i2c"}
+type cmd struct{}
 
-func (*i2c_) Usage() string {
-	return "i2c ['EEPROM'] BUS.ADDR[.BEGIN][-END][/8][/16] [VALUE] [WRITE-DELAY-IN-SEC]"
+func New() cmd { return cmd{} }
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string {
+	return Name + " ['EEPROM'] BUS.ADDR[.BEGIN][-END][/8][/16] [VALUE] [WRITE-DELAY-IN-SEC]"
 }
 
-func (p *i2c_) Main(args ...string) {
+func (cmd) Main(args ...string) error {
 	i2c.Lock.Lock()
 	defer i2c.Lock.Unlock()
 
@@ -34,9 +35,9 @@ func (p *i2c_) Main(args ...string) {
 	)
 
 	if n := len(args); n == 0 {
-		p.Panic("BUS.ADDR.REG: missing")
+		return fmt.Errorf("BUS.ADDR.REG: missing")
 	} else if n > 3 {
-		p.Panic(args[3:], ": unexpected")
+		return fmt.Errorf("%v: unexpected", args[3:])
 	}
 
 	eeprom := 0
@@ -67,16 +68,16 @@ func (p *i2c_) Main(args ...string) {
 		}
 	}
 	if err != nil {
-		p.Panic(args[0], ": invalid BUS.ADDR[.REG]: ", err)
+		return fmt.Errorf("%s: invalid BUS.ADDR[.REG]: %v", args[0], err)
 	}
 	if w != 0 && w != 8 && w != 16 {
-		p.Panic(w, ": invalid R/W width: ", w)
+		return fmt.Errorf("%v: invalid R/W width")
 	}
 
 	if dValid {
 		_, err = fmt.Sscanf(args[1], "%x", &d)
 		if err != nil {
-			p.Panic(args[1], ": invalid value: ", err)
+			return fmt.Errorf("%s: invalid: %v", args[1], err)
 		}
 	}
 
@@ -85,19 +86,19 @@ func (p *i2c_) Main(args ...string) {
 		s := args[2]
 		_, err := fmt.Sscanf(s, "%f", &writeDelay)
 		if err != nil {
-			p.Panic(s, ": invalid delay: ", err)
+			return fmt.Errorf("%s: invalid: %v", s, err)
 		}
 	}
 
 	err = bus.Open(int(b))
 	if err != nil {
-		p.Panic(err)
+		return err
 	}
 	defer bus.Close()
 
 	err = bus.ForceSlaveAddress(int(a))
 	if err != nil {
-		p.Panic(err)
+		return err
 	}
 
 	c := uint8(0)
@@ -106,7 +107,7 @@ func (p *i2c_) Main(args ...string) {
 		sd[0] = cs[0]
 		err = bus.Do(i2c.Write, c, op, &sd)
 		if err != nil {
-			p.Panic(err)
+			return err
 		}
 	}
 
@@ -128,14 +129,14 @@ func (p *i2c_) Main(args ...string) {
 	if nc < 2 {
 		err = bus.Do(rw, c, op, &sd)
 		if err != nil {
-			p.Panic(err)
+			return err
 		}
 		if w == 16 {
 			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, uint16(sd[1])<<8|uint16(sd[0]))
-			return
+			return nil
 		} else {
 			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
-			return
+			return nil
 		}
 	}
 
@@ -145,7 +146,7 @@ func (p *i2c_) Main(args ...string) {
 	for {
 		err = bus.Do(rw, c, op, &sd)
 		if err != nil {
-			p.Panic(err)
+			return err
 		}
 		if count == 0 {
 			s += fmt.Sprintf("%02x: ", c)
@@ -177,4 +178,34 @@ func (p *i2c_) Main(args ...string) {
 		}
 	}
 	fmt.Println(s)
+	return nil
+}
+
+func (cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "read/write I2C bus devices",
+	}
+}
+
+func (cmd) Man() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": `NAME
+	i2c - Read/write I2C bus devices
+
+SYNOPSIS
+	i2c
+
+DESCRIPTION
+	Read/write I2C bus devices.
+
+	Examples:
+	    i2c 0.76.0 80          writes a 0x80
+	    i2c 0.2f.1f            reads device 0x2f, register 0x1f
+	    i2c 0.2f.1f-20         reads two bytes
+	    i2c EEPROM 0.55.0-30   reads 0x0-0x30 from EEPROM
+            i2c 0.76/8             force reads at 8-bits
+            i2c 0.76.0/8           force reads at 8-bits
+	    i2c 0.55.0-30/8        reads 0x0-0x30 8-bits at a time
+	    i2c 0.55.0-30/16       reads 0x0-0x30 16-bits at a time`,
+	}
 }

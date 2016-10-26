@@ -3,21 +3,16 @@
 // LICENSE file.
 
 // Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package ledgpio
+package led
 
 import (
 	"strconv"
 	"strings"
 	"unsafe"
 
-	"github.com/platinasystems/goes/i2c"
-	"github.com/platinasystems/goes/redis"
-	"github.com/platinasystems/oops"
+	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/redis"
 )
-
-type i2c_ struct{ oops.Id }
-
-var I2c = &i2c_{"i2c"}
 
 var (
 	dummy         byte

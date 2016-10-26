@@ -6,8 +6,6 @@ import (
 	"sync"
 	"syscall"
 	"unsafe"
-
-	"github.com/platinasystems/go/elib"
 )
 
 // /dev/i2c-X ioctl commands.  The ioctl's parameter is always an unsigned long, except for:
@@ -133,29 +131,29 @@ const (
 	SMBUS_Write_I2C_Block  FeatureFlag = 0x08000000
 )
 
-var featureFlagNames = []string{
-	0:  "I2C",
-	1:  "10 Bit Addresses",
-	2:  "Protocol Mangling",
-	3:  "SMBUS PEC",
-	4:  "No Start",
-	5:  "Slave",
-	15: "SMBUS Block Proc Call",
-	16: "SMBUS Quick",
-	17: "SMBUS Read Byte",
-	18: "SMBUS Write Byte",
-	19: "SMBUS Read Byte Data",
-	20: "SMBUS Write Byte Data",
-	21: "SMBUS Read Word Data",
-	22: "SMBUS Write Word Data",
-	23: "SMBUS Proc Call",
-	24: "SMBUS Read Block Data",
-	25: "SMBUS Write Block Data",
-	26: "SMBUS Read I2C Block",
-	27: "SMBUS Write I2C Block",
+func (x FeatureFlag) String() string {
+	return map[FeatureFlag]string{
+		0:  "I2C",
+		1:  "10 Bit Addresses",
+		2:  "Protocol Mangling",
+		3:  "SMBUS PEC",
+		4:  "No Start",
+		5:  "Slave",
+		15: "SMBUS Block Proc Call",
+		16: "SMBUS Quick",
+		17: "SMBUS Read Byte",
+		18: "SMBUS Write Byte",
+		19: "SMBUS Read Byte Data",
+		20: "SMBUS Write Byte Data",
+		21: "SMBUS Read Word Data",
+		22: "SMBUS Write Word Data",
+		23: "SMBUS Proc Call",
+		24: "SMBUS Read Block Data",
+		25: "SMBUS Write Block Data",
+		26: "SMBUS Read I2C Block",
+		27: "SMBUS Write I2C Block",
+	}[x]
 }
-
-func (x FeatureFlag) String() string { return elib.FlagStringer(featureFlagNames, elib.Word(x)) }
 
 /* SMBus transaction types (size parameter in the above functions)
    Note: these no longer correspond to the (arbitrary) PIIX4 internal codes! */
