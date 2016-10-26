@@ -6,6 +6,7 @@
 package kutils
 
 import (
+	"github.com/platinasystems/go/kutils/cmdline"
 	"github.com/platinasystems/go/kutils/dmesg"
 	"github.com/platinasystems/go/kutils/iminfo"
 	"github.com/platinasystems/go/kutils/insmod"
@@ -18,6 +19,7 @@ import (
 
 func New() []interface{} {
 	return []interface{}{
+		cmdline.New(),
 		dmesg.New(),
 		iminfo.New(),
 		insmod.New(),
