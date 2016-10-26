@@ -13,13 +13,16 @@ import (
 	"github.com/platinasystems/go/vnet/ip6"
 
 	"fmt"
+	"sync"
 )
 
 type netlinkMain struct {
 	loop.Node
-	m *Main
-	s *netlink.Socket
-	c chan netlink.Message
+	m         *Main
+	s         *netlink.Socket
+	c         chan netlink.Message
+	e         *netlinkEvent
+	eventPool sync.Pool
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -48,93 +51,181 @@ func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
 	return
 }
 
+func (m *Main) addMsg(msg netlink.Message) {
+	e := m.getEvent()
+	if m.msgGeneratesEvent(msg) {
+		e.msgs = append(e.msgs, msg)
+	} else {
+		if m.verboseNetlink {
+			m.v.Logf("netlink ignore %s\n", msg)
+		}
+		// Done with message.
+		msg.Close()
+	}
+}
+
 func (m *Main) listener(l *loop.Loop) {
 	nm := &m.netlinkMain
-	for msg := range nm.c {
-		if m.msgGeneratesEvent(msg) {
-			nm.AddEvent(&netlinkEvent{m: m, msg: msg}, nm)
-		} else {
-			if m.verboseNetlink {
-				m.v.Logf("netlink ignore %s\n", msg)
+	for {
+		// Block until next message.
+		msg := <-nm.c
+		m.addMsg(msg)
+
+		// Read any remaining messages without blocking.
+	loop:
+		for {
+			select {
+			case msg := <-nm.c:
+				m.addMsg(msg)
+			default:
+				break loop
 			}
-			// Done with message.
-			msg.Close()
 		}
+
+		// Add event to be handled next time through main loop.
+		nm.e.add()
 	}
 }
 
 func (nm *netlinkMain) LoopInit(l *loop.Loop) {
+	var err error
+	nm.c = make(chan netlink.Message, 64)
+	nm.s, err = netlink.New(nm.c)
+	if err != nil {
+		panic(err)
+	}
 	go nm.s.Listen()
 	go nm.m.listener(l)
 }
 
 func (nm *netlinkMain) Init(m *Main) (err error) {
 	nm.m = m
+	nm.eventPool.New = nm.newEvent
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
-	nm.c = make(chan netlink.Message, 64)
-	nm.s, err = netlink.New(nm.c)
 	return
 }
 
 type netlinkEvent struct {
-	m   *Main
-	msg netlink.Message
+	m    *Main
+	msgs []netlink.Message
+}
+
+func (m *netlinkMain) newEvent() interface{} {
+	return &netlinkEvent{m: m.m}
+}
+
+func (m *netlinkMain) getEvent() *netlinkEvent {
+	if m.e == nil {
+		m.e = m.eventPool.Get().(*netlinkEvent)
+	}
+	return m.e
+}
+func (e *netlinkEvent) add() {
+	if len(e.msgs) > 0 {
+		e.m.AddEvent(e, e.m)
+		e.m.e = nil
+	}
+}
+func (e *netlinkEvent) put() {
+	if len(e.msgs) > 0 {
+		e.msgs = e.msgs[:0]
+	}
+	e.m.eventPool.Put(e)
 }
 
 func (m *netlinkMain) EventHandler() {}
 
-func (e *netlinkEvent) String() string { return fmt.Sprintf("netlink-message %s", e.msg) }
+type eventSumState struct {
+	lastType  netlink.MsgType
+	lastCount uint
+}
+
+func (a *eventSumState) update(msg netlink.Message, sʹ string) (s string) {
+	var t netlink.MsgType
+	s = sʹ
+	if msg != nil {
+		t = msg.MsgType()
+		if a.lastCount > 0 && t == a.lastType {
+			a.lastCount++
+			return
+		}
+	}
+	if a.lastCount > 0 {
+		s += " "
+		if a.lastCount > 1 {
+			s += fmt.Sprintf("%d ", a.lastCount)
+		}
+		s += a.lastType.String()
+	}
+	a.lastType = t
+	a.lastCount = 1
+	return
+}
+
+func (e *netlinkEvent) String() (s string) {
+	l := len(e.msgs)
+	s = fmt.Sprintf("netlink %d:", l)
+	var st eventSumState
+	for _, msg := range e.msgs {
+		s = st.update(msg, s)
+	}
+	s = st.update(nil, s)
+	return
+}
 
 func (e *netlinkEvent) EventAction() {
 	var err error
 	vn := e.m.v
 	known := false
-	if e.m.verboseNetlink {
-		e.m.v.Logf("netlink %s\n", e.msg.String())
-	}
-	switch v := e.msg.(type) {
-	case *netlink.IfInfoMessage:
-		known = true
-		intf := e.m.getInterface(v.Index)
-		// Respect flag admin state changes from unix shell via ifconfig or "ip link" commands.
-		err = intf.si.SetAdminUp(vn, v.IfInfomsg.Flags&netlink.IFF_UP != 0)
-	case *netlink.IfAddrMessage:
-		switch v.Family {
-		case netlink.AF_INET:
-			known = true
-			err = e.m.ip4IfaddrMsg(v)
-		case netlink.AF_INET6:
-			known = true
-			err = e.m.ip6IfaddrMsg(v)
+	for _, msg := range e.msgs {
+		if e.m.verboseNetlink {
+			e.m.v.Logf("netlink %s\n", msg)
 		}
-	case *netlink.RouteMessage:
-		switch v.Family {
-		case netlink.AF_INET:
+		switch v := msg.(type) {
+		case *netlink.IfInfoMessage:
 			known = true
-			err = e.m.ip4RouteMsg(v)
-		case netlink.AF_INET6:
-			known = true
-			err = e.m.ip6RouteMsg(v)
+			intf := e.m.getInterface(v.Index)
+			// Respect flag admin state changes from unix shell via ifconfig or "ip link" commands.
+			err = intf.si.SetAdminUp(vn, v.IfInfomsg.Flags&netlink.IFF_UP != 0)
+		case *netlink.IfAddrMessage:
+			switch v.Family {
+			case netlink.AF_INET:
+				known = true
+				err = e.m.ip4IfaddrMsg(v)
+			case netlink.AF_INET6:
+				known = true
+				err = e.m.ip6IfaddrMsg(v)
+			}
+		case *netlink.RouteMessage:
+			switch v.Family {
+			case netlink.AF_INET:
+				known = true
+				err = e.m.ip4RouteMsg(v)
+			case netlink.AF_INET6:
+				known = true
+				err = e.m.ip6RouteMsg(v)
+			}
+		case *netlink.NeighborMessage:
+			switch v.Family {
+			case netlink.AF_INET:
+				known = true
+				err = e.m.ip4NeighborMsg(v)
+			case netlink.AF_INET6:
+				known = true
+				err = e.m.ip6NeighborMsg(v)
+			}
 		}
-	case *netlink.NeighborMessage:
-		switch v.Family {
-		case netlink.AF_INET:
-			known = true
-			err = e.m.ip4NeighborMsg(v)
-		case netlink.AF_INET6:
-			known = true
-			err = e.m.ip6NeighborMsg(v)
+		if !known {
+			err = fmt.Errorf("unkown")
 		}
+		if err != nil {
+			e.m.v.Logf("netlink %s: %s\n", err, msg.String())
+		}
+		// Return message to pools.
+		msg.Close()
 	}
-	if !known {
-		err = fmt.Errorf("unkown")
-	}
-	if err != nil {
-		e.m.v.Logf("netlink %s: %s\n", err, e.msg.String())
-	}
-	// Return message to pools.
-	e.msg.Close()
+	e.put()
 }
 
 func ip4Prefix(t netlink.Attr, l uint8) (p ip4.Prefix) {

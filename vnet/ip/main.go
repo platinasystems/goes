@@ -11,12 +11,13 @@ import (
 type AddressStringer func(a *Address) string
 
 type FamilyConfig struct {
-	AddressStringer AddressStringer
-	Family          Family
-	RewriteNode     vnet.Noder
-	PacketType      vnet.PacketType
-	GetRoute        func(p *Prefix, si vnet.Si) (ai Adj, ok bool)
-	AddDelRoute     func(p *Prefix, fi FibIndex, newAdj Adj, isDel bool) (oldAdj Adj, err error)
+	AddressStringer  AddressStringer
+	Family           Family
+	RewriteNode      vnet.Noder
+	PacketType       vnet.PacketType
+	GetRoute         func(p *Prefix, si vnet.Si) (ai Adj, ok bool)
+	GetRouteFibIndex func(p *Prefix, fi FibIndex) (ai Adj, ok bool)
+	AddDelRoute      func(p *Prefix, fi FibIndex, newAdj Adj, isDel bool) (oldAdj Adj, err error)
 }
 
 type Main struct {

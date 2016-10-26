@@ -34,14 +34,26 @@ func (x showIpFibRoutes) Len() int      { return len(x) }
 func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 
 	detail := false
+	summary := false
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
 			detail = true
+		case in.Parse("s%*ummary"):
+			summary = true
 		default:
 			err = cli.ParseError
 			return
 		}
+	}
+
+	if summary {
+		fmt.Fprintf(w, "%6s%12s\n", "Table", "Routes")
+		for fi := range m.fibs {
+			fib := m.fibs[fi]
+			fmt.Fprintf(w, "%6d%12d\n", fi, fib.Len())
+		}
+		return
 	}
 
 	// Sync adjacency stats with hardware.
@@ -63,10 +75,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		adjs := m.GetAdj(r.adj)
 		for ai := range adjs {
 			initialSpace := "  "
-			line := initialSpace
-			if len(adjs) > 1 {
-				line += fmt.Sprintf("%d: ", ai)
-			}
+			line := fmt.Sprintf("%s%d: ", initialSpace, int(r.adj)+ai)
 			ss := adjs[ai].String(&m.Main)
 
 			m.Main.ForeachAdjCounter(r.adj+ip.Adj(ai), func(tag string, v vnet.CombinedCounter) {

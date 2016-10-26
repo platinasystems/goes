@@ -189,12 +189,17 @@ type nextHop struct {
 //go:generate gentemplate -d Package=ip -id nextHopVec -d VecType=nextHopVec -d Type=nextHop github.com/platinasystems/go/elib/vec.tmpl
 //go:generate gentemplate -d Package=ip -id multipathAdjacencyVec -d VecType=multipathAdjacencyVec -d Type=multipathAdjacency github.com/platinasystems/go/elib/vec.tmpl
 
+type nextHopHashValue struct {
+	heapOffset uint32
+	adj        Adj
+}
+
 type multipathMain struct {
 	cachedNextHopVec [2]nextHopVec
 
 	multipathErrorTolerance float64
 	nextHopHash             elib.Hash
-	nextHopHeapOffsets      []uint32
+	nextHopHashValues       []nextHopHashValue
 
 	nextHopHeap
 
@@ -203,17 +208,17 @@ type multipathMain struct {
 }
 
 func (m *multipathMain) GetNextHops(i uint) []nextHop {
-	return m.nextHopHeap.Slice(uint(m.nextHopHeapOffsets[i]))
+	return m.nextHopHeap.Slice(uint(m.nextHopHashValues[i].heapOffset))
 }
 func (m *multipathMain) HashIndex(s *elib.HashState, i uint) {
 	nextHopVec(m.GetNextHops(i)).HashKey(s)
 }
 func (m *multipathMain) HashResize(newCap uint, rs []elib.HashResizeCopy) {
-	src, dst := m.nextHopHeapOffsets, make([]uint32, newCap)
+	src, dst := m.nextHopHashValues, make([]nextHopHashValue, newCap)
 	for i := range rs {
 		dst[rs[i].Dst] = src[rs[i].Src]
 	}
-	m.nextHopHeapOffsets = dst
+	m.nextHopHashValues = dst
 }
 
 func (a nextHopVec) HashKey(s *elib.HashState) {
@@ -396,13 +401,15 @@ func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacenc
 	nAdj, norm := unnorm.normalizePow2(mp, &mp.cachedNextHopVec[1])
 
 	// Use unnormalized next hops to see if we've seen a block equivalent to this one before.
-	if _, ok = mp.nextHopHash.Get(norm); ok || !create {
+	var i uint
+	if i, ok = mp.nextHopHash.Get(norm); ok || !create {
+		ai := mp.nextHopHashValues[i].adj
+		madj, madjIndex = m.mpAdjForAdj(ai, false)
 		return
 	}
 
 	// Copy next hops into power of 2 adjacency block one for each weight.
 	ai, as := m.NewAdj(nAdj)
-	i := uint(0)
 	for nhi := range norm {
 		nh := &norm[nhi]
 		nextHopAdjacency := &m.adjacencyHeap.elts[nh.adj]
@@ -423,7 +430,10 @@ func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacenc
 	mp.allocNextHopBlock(&madj.unnormalizedNextHops, unnorm)
 
 	i, _ = mp.nextHopHash.Set(norm)
-	mp.nextHopHeapOffsets[i] = madj.normalizedNextHops.offset
+	mp.nextHopHashValues[i] = nextHopHashValue{
+		heapOffset: madj.normalizedNextHops.offset,
+		adj:        ai,
+	}
 
 	m.CallAdjAddHooks(ai)
 
@@ -647,7 +657,10 @@ func (ma *multipathAdjacency) free(m *Main) {
 	if !ok {
 		panic("unknown multipath adjacency")
 	}
-	mm.nextHopHeapOffsets[i] = ^uint32(0)
+	mm.nextHopHashValues[i] = nextHopHashValue{
+		heapOffset: ^uint32(0),
+		adj:        AdjNil,
+	}
 
 	m.PoisonAdj(ma.adj)
 	m.FreeAdj(ma.adj, ma.referenceCount == 0)

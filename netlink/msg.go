@@ -23,6 +23,7 @@ type Byter interface {
 
 type Message interface {
 	netlinkMessage()
+	MsgType() MsgType
 	io.Closer
 	Parse([]byte)
 	fmt.Stringer
@@ -69,6 +70,7 @@ func (h *Header) WriteTo(w io.Writer) (int64, error) {
 	}
 	return acc.N, acc.Err
 }
+func (h *Header) MsgType() MsgType { return h.Type }
 
 // AFMessage is a generic message depending only on address family.
 type GenMessage struct {

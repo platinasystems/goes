@@ -25,6 +25,14 @@ var DefaultGroups = []MulticastGroup{
 	RTNLGRP_IPV6_MROUTE,
 }
 
+type SocketConfig struct {
+	// Buffer sizes for setsockopt.  Zero means use default value.
+	RcvbufBytes int
+	SndbufBytes int
+	Rx          chan Message
+	Groups      []MulticastGroup
+}
+
 type Socket struct {
 	socket             int
 	pid                uint32
@@ -35,13 +43,19 @@ type Socket struct {
 	quit_chan          chan struct{}
 	sync.Mutex
 	rsvp map[uint32]chan *ErrorMessage
+	SocketConfig
 }
 
 func New(rx chan Message, groups ...MulticastGroup) (s *Socket, err error) {
+	return NewWithConfig(SocketConfig{Rx: rx, Groups: groups})
+}
+
+func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
 	s = &Socket{
-		rx_chan:   rx,
+		rx_chan:   cf.Rx,
 		quit_chan: make(chan struct{}),
 	}
+	s.SocketConfig = cf
 	s.socket, err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
 	if err != nil {
 		err = os.NewSyscallError("socket", err)
@@ -54,10 +68,10 @@ func New(rx chan Message, groups ...MulticastGroup) (s *Socket, err error) {
 	}()
 
 	var groupbits uint32
-	if len(groups) == 0 {
-		groups = DefaultGroups
+	if len(cf.Groups) == 0 {
+		cf.Groups = DefaultGroups
 	}
-	for _, group := range groups {
+	for _, group := range cf.Groups {
 		if group != NOOP_RTNLGRP {
 			groupbits |= 1 << group
 		}
@@ -75,12 +89,17 @@ func New(rx chan Message, groups ...MulticastGroup) (s *Socket, err error) {
 	}
 
 	// Increase socket buffering.
-	bytes := 1024 << 10
-	if err = os.NewSyscallError("setsockopt SO_RCVBUF", syscall.SetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_RCVBUF, bytes)); err != nil {
-		return
+	if s.RcvbufBytes != 0 {
+		if err = os.NewSyscallError("setsockopt SO_RCVBUF", syscall.SetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_RCVBUF,
+			s.RcvbufBytes)); err != nil {
+			return
+		}
 	}
-	if err = os.NewSyscallError("setsockopt SO_SNDBUF", syscall.SetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_SNDBUF, bytes)); err != nil {
-		return
+	if s.SndbufBytes != 0 {
+		if err = os.NewSyscallError("setsockopt SO_SNDBUF", syscall.SetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_SNDBUF,
+			s.RcvbufBytes)); err != nil {
+			return
+		}
 	}
 	return
 }
@@ -98,9 +117,24 @@ func (s *Socket) Close() error {
 }
 
 func (s *Socket) Listen(reqs ...ListenReq) {
+	// Loop forever restarting listen every time we get ENOBUFS (meaning kernel has lost a message).
+	for {
+		if err := s.listen(reqs...); err != nil && err != syscall.ENOBUFS {
+			panic(err)
+		}
+	}
+}
+
+func (s *Socket) listen(reqs ...ListenReq) (err error) {
 	if len(reqs) == 0 {
 		reqs = DefaultListenReqs
 	}
+	// Preserve error so caller can check for syscall.ENOBUFS
+	defer func() {
+		if e, ok := recover().(error); ok {
+			err = e
+		}
+	}()
 	for _, r := range reqs {
 		if r.MsgType == NLMSG_NOOP {
 			continue
@@ -213,14 +247,21 @@ func (s *Socket) fillRxBuffer() {
 	s.rx_buffer.Resize(4096)
 	m, err := syscall.Read(s.socket, s.rx_buffer[i:])
 	if err != nil {
+		s.reset_rx_buffer()
 		panic(err)
 	}
 	s.rx_buffer = s.rx_buffer[:i+m]
 }
 
-func (n *Socket) reset_tx_buffer() {
-	if len(n.tx_buffer) != 0 {
-		n.tx_buffer = n.tx_buffer[:0]
+func (s *Socket) reset_rx_buffer() {
+	if len(s.rx_buffer) != 0 {
+		s.rx_buffer = s.rx_buffer[:0]
+	}
+}
+
+func (s *Socket) reset_tx_buffer() {
+	if len(s.tx_buffer) != 0 {
+		s.tx_buffer = s.tx_buffer[:0]
 	}
 }
 

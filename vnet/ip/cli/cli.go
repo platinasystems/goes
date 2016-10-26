@@ -90,11 +90,28 @@ loop:
 		if len(x.adjs) > 0 {
 			pi := p.ToIpPrefix()
 			for i := range x.adjs {
-				ai, a := m4.NewAdj(1)
-				a[0] = x.adjs[i]
-				m4.CallAdjAddHooks(ai)
+				var (
+					ai ip.Adj
+					as []ip.Adjacency
+					ok bool
+				)
+				if x.is_del {
+					ai, ok = m4.GetRouteFibIndex(&pi, x.fib_index)
+					if !ok {
+						err = fmt.Errorf("%s not found", &pi)
+						return
+					}
+				} else {
+					ai, as = m4.NewAdj(1)
+					as[0] = x.adjs[i]
+					m4.CallAdjAddHooks(ai)
+				}
 				if _, err = m4.AddDelRoute(&pi, x.fib_index, ai, x.is_del); err != nil {
 					return
+				}
+				if x.is_del {
+					m4.CallAdjDelHooks(ai)
+					m4.DelAdj(ai)
 				}
 			}
 		}

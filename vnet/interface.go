@@ -63,6 +63,10 @@ func (h *HwIf) SetName(v *Vnet, name string) {
 	h.name = name
 	v.hwIfIndexByName.Set(name, uint(h.hi))
 }
+func (v *Vnet) HwIfByName(name string) (Hi, bool) {
+	hi, ok := v.hwIfIndexByName[name]
+	return Hi(hi), ok
+}
 
 func (h *HwIf) SetSubInterface(id IfIndex, si Si) {
 	if h.subSiById == nil {
@@ -320,6 +324,7 @@ func (hw *HwIf) SetSpeed(v Bandwidth) (err error) {
 	}
 	return
 }
+func (hi Hi) SetSpeed(v *Vnet, s Bandwidth) error { return v.HwIf(hi).SetSpeed(s) }
 
 var ErrNotSupported = errors.New("not supported")
 

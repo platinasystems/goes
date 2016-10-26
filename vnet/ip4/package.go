@@ -34,12 +34,13 @@ func (m *Main) Init() (err error) {
 	v := m.Vnet
 	v.RegisterSwIfAdminUpDownHook(m.swIfAdminUpDown)
 	cf := ip.FamilyConfig{
-		Family:          ip.Ip4,
-		AddressStringer: ipAddressStringer,
-		RewriteNode:     &m.rewriteNode,
-		PacketType:      vnet.IP4,
-		GetRoute:        m.getRoute,
-		AddDelRoute:     m.addDelRoute,
+		Family:           ip.Ip4,
+		AddressStringer:  ipAddressStringer,
+		RewriteNode:      &m.rewriteNode,
+		PacketType:       vnet.IP4,
+		GetRoute:         m.getRoute,
+		GetRouteFibIndex: m.getRouteFibIndex,
+		AddDelRoute:      m.addDelRoute,
 	}
 	m.Main.Init(v, cf)
 	m.nodeInit(v)
