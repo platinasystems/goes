@@ -26,62 +26,64 @@ func SbinInitHook() error {
 }
 
 func MachineHook() error {
-	machined.Plot(cmdline.New())
-	machined.Plot(hostname.New())
-	machined.Plot(netlink.New())
+	machined.Plot(
+		cmdline.New(),
+		hostname.New(),
+		netlink.New(),
+		uptime.New(),
+		version.New(),
+		&Example{
+			name:     "current",
+			prefixes: []string{"current."},
+			attrs: machined.Attrs{
+				"current.somewhere": 3.33,
+			},
+		},
+		&Example{
+			name:     "fan",
+			prefixes: []string{"fan."},
+			attrs: machined.Attrs{
+				"fan.front": 100,
+				"fan.back":  100,
+			},
+		},
+		&Example{
+			name:     "psu",
+			prefixes: []string{"psu."},
+			attrs: machined.Attrs{
+				"psu.0": 5.01,
+				"psu.1": 4.98,
+			},
+		},
+		&Example{
+			name:     "potential",
+			prefixes: []string{"potential."},
+			attrs: machined.Attrs{
+				"potential.1.8": 1.82,
+				"potential.2.5": 2.53,
+				"potential.5":   5.05,
+				"potential.12":  11.98,
+			},
+		},
+		&Example{
+			name:     "chassis",
+			prefixes: []string{"slot."},
+			attrs: machined.Attrs{
+				"slot.0": "empty",
+				"slot.1": "empty",
+				"slot.2": "empty",
+				"slot.3": "empty",
+			},
+		},
+		&Example{
+			name:     "temperature",
+			prefixes: []string{"temperature."},
+			attrs: machined.Attrs{
+				"temperature.cpu": 28.6,
+			},
+		},
+	)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
-	machined.Plot(uptime.New())
-	machined.Plot(version.New())
-	machined.Plot(&Example{
-		name:     "current",
-		prefixes: []string{"current."},
-		attrs: machined.Attrs{
-			"current.somewhere": 3.33,
-		},
-	})
-	machined.Plot(&Example{
-		name:     "fan",
-		prefixes: []string{"fan."},
-		attrs: machined.Attrs{
-			"fan.front": 100,
-			"fan.back":  100,
-		},
-	})
-	machined.Plot(&Example{
-		name:     "psu",
-		prefixes: []string{"psu."},
-		attrs: machined.Attrs{
-			"psu.0": 5.01,
-			"psu.1": 4.98,
-		},
-	})
-	machined.Plot(&Example{
-		name:     "potential",
-		prefixes: []string{"potential."},
-		attrs: machined.Attrs{
-			"potential.1.8": 1.82,
-			"potential.2.5": 2.53,
-			"potential.5":   5.05,
-			"potential.12":  11.98,
-		},
-	})
-	machined.Plot(&Example{
-		name:     "chassis",
-		prefixes: []string{"slot."},
-		attrs: machined.Attrs{
-			"slot.0": "empty",
-			"slot.1": "empty",
-			"slot.2": "empty",
-			"slot.3": "empty",
-		},
-	})
-	machined.Plot(&Example{
-		name:     "temperature",
-		prefixes: []string{"temperature."},
-		attrs: machined.Attrs{
-			"temperature.cpu": 28.6,
-		},
-	})
 	return nil
 }
 

@@ -179,140 +179,142 @@ func hook() error {
 		// dd[5] = uint8(g & 0xff)
 	}
 
-	machined.Plot(cmdline.New())
-	machined.Plot(hostname.New())
-	machined.Plot(netlink.New())
+	machined.Plot(
+		cmdline.New(),
+		hostname.New(),
+		netlink.New(),
+		uptime.New(),
+		version.New(),
+		&Info{name: "platina-mk1-bmc"},
+		&Info{
+			name:     "fan",
+			prefixes: []string{"fan."},
+			attrs: machined.Attrs{
+				"fan.front": 100,
+				"fan.rear":  100,
+			},
+		},
+		&Info{
+			name:     "mfg",
+			prefixes: []string{"mfg."},
+			attrs: machined.Attrs{
+				"mfg.product.name":     d.Fields.ProductName,
+				"mfg.platform.name":    d.Fields.PlatformName,
+				"mfg.vendor.name":      d.Fields.VendorName,
+				"mfg.manufacturer":     d.Fields.Manufacturer,
+				"mfg.vendor":           d.Fields.Vendor,
+				"mfg.label.revision":   d.Fields.LabelRevision,
+				"mfg.part.number":      d.Fields.PartNumber,
+				"mfg.serial.number":    d.Fields.SerialNumber,
+				"mfg.device.version":   d.Fields.DeviceVersion,
+				"mfg.manufacture.date": d.Fields.ManufactureDate,
+				"mfg.country.code":     d.Fields.CountryCode,
+				"mfg.diag.version":     d.Fields.DiagVersion,
+				"mfg.service.tag":      d.Fields.ServiceTag,
+				"mfg.vendor.extension": d.Fields.VendorExtension,
+			},
+		},
+		&Info{
+			name:     "vmon",
+			prefixes: []string{"vmon."},
+			attrs: machined.Attrs{
+				"vmon.5v.sb":    pm.Vout(1),
+				"vmon.3v8.bmc":  pm.Vout(2),
+				"vmon.3v3.sys":  pm.Vout(3),
+				"vmon.3v3.bmc":  pm.Vout(4),
+				"vmon.3v3.sb":   pm.Vout(5),
+				"vmon.1v0.thc":  pm.Vout(6),
+				"vmon.1v8.sys":  pm.Vout(7),
+				"vmon.1v25.sys": pm.Vout(8),
+				"vmon.1v2.ethx": pm.Vout(9),
+				"vmon.1v0.tha":  pm.Vout(10),
+			},
+		},
+		&Info{
+			name:     "chassis",
+			prefixes: []string{"fan_tray."},
+			attrs: machined.Attrs{
+				"fan_tray.1.1.rpm":  hw.FanCount(1),
+				"fan_tray.1.2.rpm":  hw.FanCount(2),
+				"fan_tray.2.1.rpm":  hw.FanCount(3),
+				"fan_tray.2.2.rpm":  hw.FanCount(4),
+				"fan_tray.3.1.rpm":  hw.FanCount(5),
+				"fan_tray.3.2.rpm":  hw.FanCount(6),
+				"fan_tray.4.1.rpm":  hw.FanCount(7),
+				"fan_tray.4.2.rpm":  hw.FanCount(8),
+				"fan_tray.1.status": fanTray.FanTrayStatus(1),
+				"fan_tray.2.status": fanTray.FanTrayStatus(2),
+				"fan_tray.3.status": fanTray.FanTrayStatus(3),
+				"fan_tray.4.status": fanTray.FanTrayStatus(4),
+				"fan_tray.speed":    hw.GetFanSpeed(),
+			},
+		},
+		&Info{
+			name:     "psu1",
+			prefixes: []string{"psu1."},
+			attrs: machined.Attrs{
+				"psu1.status":      ps1.PsuStatus(),
+				"psu1.admin.state": ps1.GetAdminState(),
+				// set type to uint16 since we have a set
+				"psu1.page":         uint16(ps1.Page()),
+				"psu1.status_word":  ps1.StatusWord(),
+				"psu1.status_vout":  ps1.StatusVout(),
+				"psu1.status_iout":  ps1.StatusIout(),
+				"psu1.status_input": ps1.StatusInput(),
+				"psu1.v_in":         ps1.Vin(),
+				"psu1.i_in":         ps1.Iin(),
+				"psu1.v_out":        ps1.Vout(),
+				"psu1.i_out":        ps1.Iout(),
+				"psu1.status_temp":  ps1.StatusTemp(),
+				"psu1.p_out":        ps1.Pout(),
+				"psu1.p_in":         ps1.Pin(),
+				"psu1.pmbus_rev":    ps1.PMBusRev(),
+				"psu1.mfg_id":       ps1.MfgId(),
+				"psu1.status_fans":  ps1.StatusFans(),
+				"psu1.temperature1": ps1.Temp1(),
+				"psu1.temperature2": ps1.Temp2(),
+				"psu1.fan_speed":    ps1.FanSpeed(),
+			},
+		},
+		&Info{
+			name:     "psu2",
+			prefixes: []string{"psu2."},
+			attrs: machined.Attrs{
+				"psu2.status":      ps2.PsuStatus(),
+				"psu2.admin.state": ps2.GetAdminState(),
+				// set type to uint16 since we have a set
+				"psu2.page":         uint16(ps2.Page()),
+				"psu2.status_word":  ps2.StatusWord(),
+				"psu2.status_vout":  ps2.StatusVout(),
+				"psu2.status_iout":  ps2.StatusIout(),
+				"psu2.status_input": ps2.StatusInput(),
+				"psu2.v_in":         ps2.Vin(),
+				"psu2.i_in":         ps2.Iin(),
+				"psu2.v_out":        ps2.Vout(),
+				"psu2.i_out":        ps2.Iout(),
+				"psu2.status_temp":  ps2.StatusTemp(),
+				"psu2.p_out":        ps2.Pout(),
+				"psu2.p_in":         ps2.Pin(),
+				"psu2.pmbus_rev":    ps2.PMBusRev(),
+				"psu2.mfg_id":       ps2.MfgId(),
+				"psu2.status_fans":  ps2.StatusFans(),
+				"psu2.temperature1": ps2.Temp1(),
+				"psu2.temperature2": ps2.Temp2(),
+				"psu2.fan_speed":    ps2.FanSpeed(),
+			},
+		},
+		&Info{
+			name:     "temperature",
+			prefixes: []string{"temperature."},
+			attrs: machined.Attrs{
+				"temperature.bmc_cpu":   cpu.ReadTemp(),
+				"temperature.fan_front": hw.FrontTemp(),
+				"temperature.fan_rear":  hw.RearTemp(),
+				"temperature.pcb_board": 28.6,
+			},
+		},
+	)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
-	machined.Plot(uptime.New())
-	machined.Plot(version.New())
-	machined.Plot(&Info{name: "platina-mk1-bmc"})
-	machined.Plot(&Info{
-		name:     "fan",
-		prefixes: []string{"fan."},
-		attrs: machined.Attrs{
-			"fan.front": 100,
-			"fan.rear":  100,
-		},
-	})
-	machined.Plot(&Info{
-		name:     "mfg",
-		prefixes: []string{"mfg."},
-		attrs: machined.Attrs{
-			"mfg.product.name":     d.Fields.ProductName,
-			"mfg.platform.name":    d.Fields.PlatformName,
-			"mfg.vendor.name":      d.Fields.VendorName,
-			"mfg.manufacturer":     d.Fields.Manufacturer,
-			"mfg.vendor":           d.Fields.Vendor,
-			"mfg.label.revision":   d.Fields.LabelRevision,
-			"mfg.part.number":      d.Fields.PartNumber,
-			"mfg.serial.number":    d.Fields.SerialNumber,
-			"mfg.device.version":   d.Fields.DeviceVersion,
-			"mfg.manufacture.date": d.Fields.ManufactureDate,
-			"mfg.country.code":     d.Fields.CountryCode,
-			"mfg.diag.version":     d.Fields.DiagVersion,
-			"mfg.service.tag":      d.Fields.ServiceTag,
-			"mfg.vendor.extension": d.Fields.VendorExtension,
-		},
-	})
-	machined.Plot(&Info{
-		name:     "vmon",
-		prefixes: []string{"vmon."},
-		attrs: machined.Attrs{
-			"vmon.5v.sb":    pm.Vout(1),
-			"vmon.3v8.bmc":  pm.Vout(2),
-			"vmon.3v3.sys":  pm.Vout(3),
-			"vmon.3v3.bmc":  pm.Vout(4),
-			"vmon.3v3.sb":   pm.Vout(5),
-			"vmon.1v0.thc":  pm.Vout(6),
-			"vmon.1v8.sys":  pm.Vout(7),
-			"vmon.1v25.sys": pm.Vout(8),
-			"vmon.1v2.ethx": pm.Vout(9),
-			"vmon.1v0.tha":  pm.Vout(10),
-		},
-	})
-	machined.Plot(&Info{
-		name:     "chassis",
-		prefixes: []string{"fan_tray."},
-		attrs: machined.Attrs{
-			"fan_tray.1.1.rpm":  hw.FanCount(1),
-			"fan_tray.1.2.rpm":  hw.FanCount(2),
-			"fan_tray.2.1.rpm":  hw.FanCount(3),
-			"fan_tray.2.2.rpm":  hw.FanCount(4),
-			"fan_tray.3.1.rpm":  hw.FanCount(5),
-			"fan_tray.3.2.rpm":  hw.FanCount(6),
-			"fan_tray.4.1.rpm":  hw.FanCount(7),
-			"fan_tray.4.2.rpm":  hw.FanCount(8),
-			"fan_tray.1.status": fanTray.FanTrayStatus(1),
-			"fan_tray.2.status": fanTray.FanTrayStatus(2),
-			"fan_tray.3.status": fanTray.FanTrayStatus(3),
-			"fan_tray.4.status": fanTray.FanTrayStatus(4),
-			"fan_tray.speed":    hw.GetFanSpeed(),
-		},
-	})
-	machined.Plot(&Info{
-		name:     "psu1",
-		prefixes: []string{"psu1."},
-		attrs: machined.Attrs{
-			"psu1.status":      ps1.PsuStatus(),
-			"psu1.admin.state": ps1.GetAdminState(),
-			// set type to uint16 since we have a set
-			"psu1.page":         uint16(ps1.Page()),
-			"psu1.status_word":  ps1.StatusWord(),
-			"psu1.status_vout":  ps1.StatusVout(),
-			"psu1.status_iout":  ps1.StatusIout(),
-			"psu1.status_input": ps1.StatusInput(),
-			"psu1.v_in":         ps1.Vin(),
-			"psu1.i_in":         ps1.Iin(),
-			"psu1.v_out":        ps1.Vout(),
-			"psu1.i_out":        ps1.Iout(),
-			"psu1.status_temp":  ps1.StatusTemp(),
-			"psu1.p_out":        ps1.Pout(),
-			"psu1.p_in":         ps1.Pin(),
-			"psu1.pmbus_rev":    ps1.PMBusRev(),
-			"psu1.mfg_id":       ps1.MfgId(),
-			"psu1.status_fans":  ps1.StatusFans(),
-			"psu1.temperature1": ps1.Temp1(),
-			"psu1.temperature2": ps1.Temp2(),
-			"psu1.fan_speed":    ps1.FanSpeed(),
-		},
-	})
-	machined.Plot(&Info{
-		name:     "psu2",
-		prefixes: []string{"psu2."},
-		attrs: machined.Attrs{
-			"psu2.status":      ps2.PsuStatus(),
-			"psu2.admin.state": ps2.GetAdminState(),
-			// set type to uint16 since we have a set
-			"psu2.page":         uint16(ps2.Page()),
-			"psu2.status_word":  ps2.StatusWord(),
-			"psu2.status_vout":  ps2.StatusVout(),
-			"psu2.status_iout":  ps2.StatusIout(),
-			"psu2.status_input": ps2.StatusInput(),
-			"psu2.v_in":         ps2.Vin(),
-			"psu2.i_in":         ps2.Iin(),
-			"psu2.v_out":        ps2.Vout(),
-			"psu2.i_out":        ps2.Iout(),
-			"psu2.status_temp":  ps2.StatusTemp(),
-			"psu2.p_out":        ps2.Pout(),
-			"psu2.p_in":         ps2.Pin(),
-			"psu2.pmbus_rev":    ps2.PMBusRev(),
-			"psu2.mfg_id":       ps2.MfgId(),
-			"psu2.status_fans":  ps2.StatusFans(),
-			"psu2.temperature1": ps2.Temp1(),
-			"psu2.temperature2": ps2.Temp2(),
-			"psu2.fan_speed":    ps2.FanSpeed(),
-		},
-	})
-	machined.Plot(&Info{
-		name:     "temperature",
-		prefixes: []string{"temperature."},
-		attrs: machined.Attrs{
-			"temperature.bmc_cpu":   cpu.ReadTemp(),
-			"temperature.fan_front": hw.FrontTemp(),
-			"temperature.fan_rear":  hw.RearTemp(),
-			"temperature.pcb_board": 28.6,
-		},
-	})
 	go timerLoop()
 	return nil
 }

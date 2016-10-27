@@ -95,17 +95,19 @@ func main() {
 }
 
 func hook() error {
-	machined.Plot(cmdline.New())
-	machined.Plot(hostname.New())
-	machined.Plot(netlink.New())
+	machined.Plot(
+		cmdline.New(),
+		hostname.New(),
+		netlink.New(),
+		uptime.New(),
+		version.New(),
+		&Info{
+			name:     "mk1",
+			prefixes: []string{"eth-", "dp-"},
+			attrs:    make(machined.Attrs),
+		},
+	)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
-	machined.Plot(uptime.New())
-	machined.Plot(version.New())
-	machined.Plot(&Info{
-		name:     "mk1",
-		prefixes: []string{"eth-", "dp-"},
-		attrs:    make(machined.Attrs),
-	})
 	return nil
 }
 
