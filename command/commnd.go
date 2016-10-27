@@ -239,7 +239,7 @@ func Main(args ...string) error {
 	}
 	switch {
 	case flag["-h"]:
-		s := Man[args[0]]
+		s := Man[name]
 		if method, found := cmd.(helper); found {
 			s = method.Help(args...)
 		}
@@ -248,19 +248,19 @@ func Main(args ...string) error {
 		}
 		fmt.Println(s)
 	case flag["-apropos"]:
-		s := Apropos[args[0]]
+		s := Apropos[name]
 		if len(s) == 0 {
 			return fmt.Errorf("%s: has no apropos", name)
 		}
 		fmt.Println(s)
 	case flag["-man"]:
-		s := Man[args[0]]
+		s := Man[name]
 		if len(s) == 0 {
 			return fmt.Errorf("%s: has no man", name)
 		}
 		fmt.Println(s)
 	case flag["-usage"]:
-		if s := Usage[args[0]]; len(s) == 0 {
+		if s := Usage[name]; len(s) == 0 {
 			return fmt.Errorf("%s: has no usage", name)
 		} else if strings.IndexRune(s, '\n') >= 0 {
 			fmt.Print("usage:\t", s, "\n")
