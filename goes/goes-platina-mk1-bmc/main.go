@@ -9,6 +9,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
@@ -24,6 +25,8 @@ import (
 	"github.com/platinasystems/go/environ/nuvoton"
 	"github.com/platinasystems/go/environ/nxp"
 	"github.com/platinasystems/go/environ/ti"
+	"github.com/platinasystems/go/fdt"
+	"github.com/platinasystems/go/fdtgpio"
 	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/gpio"
@@ -154,7 +157,20 @@ func hook() error {
 	regWriteString["psu1.admin.state"] = funcS(ps1.SetAdminState)
 	regWriteString["psu2.admin.state"] = funcS(ps2.SetAdminState)
 
-	//  gpio.GpioInit() FIXME this should be like diag and gpio commands
+	gpio.Aliases = make(gpio.GpioAliasMap)
+	gpio.Pins = make(gpio.PinMap)
+
+	// Parse linux.dtb to generate gpio map for this machine
+	if b, err := ioutil.ReadFile(gpio.File); err == nil {
+		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+		t.Parse(b)
+
+		t.MatchNode("aliases", fdtgpio.GatherAliases)
+		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
+	} else {
+		return fmt.Errorf("%s: %v", gpio.File, err)
+	}
+
 	ledfp.LedFpInit()
 	fanTray.FanTrayLedInit()
 	hw.FanInit()
