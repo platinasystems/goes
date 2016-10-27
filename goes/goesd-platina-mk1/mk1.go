@@ -16,6 +16,12 @@ import (
 	"github.com/platinasystems/go/initutils/goesd"
 	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/machined"
+	"github.com/platinasystems/go/machined/info"
+	"github.com/platinasystems/go/machined/info/cmdline"
+	"github.com/platinasystems/go/machined/info/hostname"
+	"github.com/platinasystems/go/machined/info/netlink"
+	"github.com/platinasystems/go/machined/info/uptime"
+	"github.com/platinasystems/go/machined/info/version"
 	"github.com/platinasystems/go/netutils"
 	"github.com/platinasystems/go/redisutils"
 	"github.com/platinasystems/go/vnet"
@@ -84,26 +90,34 @@ func main() {
 		os.Setenv("REDISD", "lo eth0")
 		return nil
 	}
-	machined.Hook = func() {
-		machined.NetLink.Prefixes("lo.", "eth0.")
-		machined.InfoProviders = append(machined.InfoProviders, &Info{
-			name:     "mk1",
-			prefixes: []string{"eth-", "dp-"},
-			attrs:    make(machined.Attrs),
-		})
-	}
+	machined.Hook = hook
 	goes.Main()
 }
 
+func hook() error {
+	machined.Plot(cmdline.New())
+	machined.Plot(hostname.New())
+	machined.Plot(netlink.New())
+	machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	machined.Plot(uptime.New())
+	machined.Plot(version.New())
+	machined.Plot(&Info{
+		name:     "mk1",
+		prefixes: []string{"eth-", "dp-"},
+		attrs:    make(machined.Attrs),
+	})
+	return nil
+}
+
 func (p *Info) Main(...string) error {
-	machined.Publish("machine", "platina-mk1")
+	info.Publish("machine", "platina-mk1")
 	for _, entry := range []struct{ name, unit string }{
 		{"current", "milliamperes"},
 		{"fan", "% max speed"},
 		{"potential", "volts"},
 		{"temperature", "°C"},
 	} {
-		machined.Publish("unit."+entry.name, entry.unit)
+		info.Publish("unit."+entry.name, entry.unit)
 	}
 
 	for port := 0; port < 32; port++ {
@@ -115,7 +129,7 @@ func (p *Info) Main(...string) error {
 						portConfigs[i].attr_name)
 					p.attrs[k] = portConfigs[i].attr
 					// Publish configuration redis nodes
-					machined.Publish(k, fmt.Sprint(p.attrs[k]))
+					info.Publish(k, fmt.Sprint(p.attrs[k]))
 				}
 			}
 		}
@@ -142,7 +156,7 @@ func (p *Info) Main(...string) error {
 	plat.DependsOn("pci-discovery") // after pci discovery
 
 	// Set redis publish pointer so vnet can push updates
-	//vnet.Publish = machined.Publish
+	//vnet.Publish = info.Publish
 
 	go func() {
 		err := v.Run(&in)
@@ -165,10 +179,10 @@ func (p *Info) Del(key string) error {
 	defer p.mutex.Unlock()
 
 	if _, found := p.attrs[key]; !found {
-		return machined.CantDel(key)
+		return info.CantDel(key)
 	}
 	delete(p.attrs, key)
-	machined.Publish("delete", key)
+	info.Publish("delete", key)
 	return nil
 }
 
@@ -201,7 +215,7 @@ func (p *Info) settableKey(key string) error {
 		}
 	}
 	if !found {
-		return machined.CantSet(key)
+		return info.CantSet(key)
 	}
 	return nil
 }
@@ -212,7 +226,7 @@ func (p *Info) Set(key, value string) error {
 
 	a, found := p.attrs[key]
 	if !found {
-		return machined.CantSet(key)
+		return info.CantSet(key)
 	}
 
 	// Test if this attribute is settable.
@@ -256,10 +270,10 @@ func (p *Info) Set(key, value string) error {
 				return err
 			}
 		} else {
-			return machined.CantSet(key)
+			return info.CantSet(key)
 		}
 	}
-	machined.Publish(key, fmt.Sprint(p.attrs[key]))
+	info.Publish(key, fmt.Sprint(p.attrs[key]))
 	return nil
 }
 
@@ -276,7 +290,7 @@ func initStatsTimer(v *vnet.Vnet) {
 				hiName := hi.Name(v)
 				// Limit display to front-panel ports i.e.  "eth-*" ?
 				countVal := fmt.Sprintf("%d", count)
-				machined.Publish(strings.Replace(hiName+"."+counter, " ", "_", -1), countVal)
+				info.Publish(strings.Replace(hiName+"."+counter, " ", "_", -1), countVal)
 			})
 		}
 	}()

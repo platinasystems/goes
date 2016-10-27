@@ -33,6 +33,12 @@ import (
 	"github.com/platinasystems/go/led"
 	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/machined"
+	"github.com/platinasystems/go/machined/info"
+	"github.com/platinasystems/go/machined/info/cmdline"
+	"github.com/platinasystems/go/machined/info/hostname"
+	"github.com/platinasystems/go/machined/info/netlink"
+	"github.com/platinasystems/go/machined/info/uptime"
+	"github.com/platinasystems/go/machined/info/version"
 	"github.com/platinasystems/go/netutils"
 	"github.com/platinasystems/go/redisutils"
 )
@@ -126,166 +132,20 @@ func main() {
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Sort()
-	regWriteString = map[string]func(string){}
-	regWriteInt = map[string]func(int){}
-	regWriteUint16 = map[string]func(uint16){}
-	regWriteFloat64 = map[string]func(float64){}
-	//	goes.Command.Plot(gpio.Gpio, i2c.I2c, mdio.Mdio)
-	machined.Hook = func() {
-		//  gpio.GpioInit() FIXME this should be like diag and gpio commands
-		ledfp.LedFpInit()
-		fanTray.FanTrayLedInit()
-		hw.FanInit()
 
-		d := eeprom.Device{
-			BusIndex:   0,
-			BusAddress: 0x55,
-		}
-		if e := d.GetInfo(); e != nil {
-			//TODO: p.Vnet.Logf("eeprom read failed: %s; using random addresses", err)
-			//AddressBlock = ethernet.AddressBlock{
-			//	Base:  ethernet.RandomAddress(),
-			//	Count: 256,
-			//}
-		} else {
-			// FIXME can't import vnet b/c elib/hw doesn't compile on ARM
-			// var dd ethernet.Address
-			// dd = d.Fields.BaseEthernetAddress
-			// g := (uint32(dd[3])<<16 | uint32(dd[4])<<8 | uint32(dd[5])) + uint32(d.Fields.NEthernetAddress)
-			// dd[3] = uint8((g & 0xff0000) >> 16)
-			// dd[4] = uint8((g & 0xff00) >> 8)
-			// dd[5] = uint8(g & 0xff)
-		}
-
-		machined.NetLink.Prefixes("lo.", "eth0.")
-		machined.InfoProviders = append(machined.InfoProviders,
-			&Info{name: "platina-mk1-bmc"},
-			&Info{
-				name:     "fan",
-				prefixes: []string{"fan."},
-				attrs: machined.Attrs{
-					"fan.front": 100,
-					"fan.rear":  100,
-				},
-			},
-			&Info{
-				name:     "mfg",
-				prefixes: []string{"mfg."},
-				attrs: machined.Attrs{
-					"mfg.product.name":     d.Fields.ProductName,
-					"mfg.platform.name":    d.Fields.PlatformName,
-					"mfg.vendor.name":      d.Fields.VendorName,
-					"mfg.manufacturer":     d.Fields.Manufacturer,
-					"mfg.vendor":           d.Fields.Vendor,
-					"mfg.label.revision":   d.Fields.LabelRevision,
-					"mfg.part.number":      d.Fields.PartNumber,
-					"mfg.serial.number":    d.Fields.SerialNumber,
-					"mfg.device.version":   d.Fields.DeviceVersion,
-					"mfg.manufacture.date": d.Fields.ManufactureDate,
-					"mfg.country.code":     d.Fields.CountryCode,
-					"mfg.diag.version":     d.Fields.DiagVersion,
-					"mfg.service.tag":      d.Fields.ServiceTag,
-					"mfg.vendor.extension": d.Fields.VendorExtension,
-				},
-			},
-			&Info{
-				name:     "vmon",
-				prefixes: []string{"vmon."},
-				attrs: machined.Attrs{
-					"vmon.5v.sb":    pm.Vout(1),
-					"vmon.3v8.bmc":  pm.Vout(2),
-					"vmon.3v3.sys":  pm.Vout(3),
-					"vmon.3v3.bmc":  pm.Vout(4),
-					"vmon.3v3.sb":   pm.Vout(5),
-					"vmon.1v0.thc":  pm.Vout(6),
-					"vmon.1v8.sys":  pm.Vout(7),
-					"vmon.1v25.sys": pm.Vout(8),
-					"vmon.1v2.ethx": pm.Vout(9),
-					"vmon.1v0.tha":  pm.Vout(10),
-				},
-			},
-			&Info{
-				name:     "chassis",
-				prefixes: []string{"fan_tray."},
-				attrs: machined.Attrs{
-					"fan_tray.1.1.rpm":  hw.FanCount(1),
-					"fan_tray.1.2.rpm":  hw.FanCount(2),
-					"fan_tray.2.1.rpm":  hw.FanCount(3),
-					"fan_tray.2.2.rpm":  hw.FanCount(4),
-					"fan_tray.3.1.rpm":  hw.FanCount(5),
-					"fan_tray.3.2.rpm":  hw.FanCount(6),
-					"fan_tray.4.1.rpm":  hw.FanCount(7),
-					"fan_tray.4.2.rpm":  hw.FanCount(8),
-					"fan_tray.1.status": fanTray.FanTrayStatus(1),
-					"fan_tray.2.status": fanTray.FanTrayStatus(2),
-					"fan_tray.3.status": fanTray.FanTrayStatus(3),
-					"fan_tray.4.status": fanTray.FanTrayStatus(4),
-					"fan_tray.speed":    hw.GetFanSpeed(),
-				},
-			},
-			&Info{
-				name:     "psu1",
-				prefixes: []string{"psu1."},
-				attrs: machined.Attrs{
-					"psu1.status":       ps1.PsuStatus(),
-					"psu1.admin.state":  ps1.GetAdminState(),
-					"psu1.page":         uint16(ps1.Page()), // set type to uint16 since we have a set
-					"psu1.status_word":  ps1.StatusWord(),
-					"psu1.status_vout":  ps1.StatusVout(),
-					"psu1.status_iout":  ps1.StatusIout(),
-					"psu1.status_input": ps1.StatusInput(),
-					"psu1.v_in":         ps1.Vin(),
-					"psu1.i_in":         ps1.Iin(),
-					"psu1.v_out":        ps1.Vout(),
-					"psu1.i_out":        ps1.Iout(),
-					"psu1.status_temp":  ps1.StatusTemp(),
-					"psu1.p_out":        ps1.Pout(),
-					"psu1.p_in":         ps1.Pin(),
-					"psu1.pmbus_rev":    ps1.PMBusRev(),
-					"psu1.mfg_id":       ps1.MfgId(),
-					"psu1.status_fans":  ps1.StatusFans(),
-					"psu1.temperature1": ps1.Temp1(),
-					"psu1.temperature2": ps1.Temp2(),
-					"psu1.fan_speed":    ps1.FanSpeed(),
-				},
-			},
-			&Info{
-				name:     "psu2",
-				prefixes: []string{"psu2."},
-				attrs: machined.Attrs{
-					"psu2.status":       ps2.PsuStatus(),
-					"psu2.admin.state":  ps2.GetAdminState(),
-					"psu2.page":         uint16(ps2.Page()), // set type to uint16 since we have a set
-					"psu2.status_word":  ps2.StatusWord(),
-					"psu2.status_vout":  ps2.StatusVout(),
-					"psu2.status_iout":  ps2.StatusIout(),
-					"psu2.status_input": ps2.StatusInput(),
-					"psu2.v_in":         ps2.Vin(),
-					"psu2.i_in":         ps2.Iin(),
-					"psu2.v_out":        ps2.Vout(),
-					"psu2.i_out":        ps2.Iout(),
-					"psu2.status_temp":  ps2.StatusTemp(),
-					"psu2.p_out":        ps2.Pout(),
-					"psu2.p_in":         ps2.Pin(),
-					"psu2.pmbus_rev":    ps2.PMBusRev(),
-					"psu2.mfg_id":       ps2.MfgId(),
-					"psu2.status_fans":  ps2.StatusFans(),
-					"psu2.temperature1": ps2.Temp1(),
-					"psu2.temperature2": ps2.Temp2(),
-					"psu2.fan_speed":    ps2.FanSpeed(),
-				},
-			},
-			&Info{
-				name:     "temperature",
-				prefixes: []string{"temperature."},
-				attrs: machined.Attrs{
-					"temperature.bmc_cpu":   cpu.ReadTemp(),
-					"temperature.fan_front": hw.FrontTemp(),
-					"temperature.fan_rear":  hw.RearTemp(),
-					"temperature.pcb_board": 28.6,
-				},
-			})
+	sbininit.Hook = func() error {
+		os.Setenv("REDISD", "lo eth0")
+		return nil
 	}
+	machined.Hook = hook
+	goes.Main()
+}
+
+func hook() error {
+	regWriteString = make(map[string]func(string))
+	regWriteInt = make(map[string]func(int))
+	regWriteUint16 = make(map[string]func(uint16))
+	regWriteFloat64 = make(map[string]func(float64))
 
 	// Set HW register write regWrite function
 	regWriteUint16["psu1.page"] = funcU16(ps1.PageWr)
@@ -293,10 +153,168 @@ func main() {
 	regWriteString["fan_tray.speed"] = funcS(hw.SetFanSpeed)
 	regWriteString["psu1.admin.state"] = funcS(ps1.SetAdminState)
 	regWriteString["psu2.admin.state"] = funcS(ps2.SetAdminState)
-	os.Setenv("REDISD_DEVS", "lo eth0")
 
+	//  gpio.GpioInit() FIXME this should be like diag and gpio commands
+	ledfp.LedFpInit()
+	fanTray.FanTrayLedInit()
+	hw.FanInit()
+
+	d := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
+	if e := d.GetInfo(); e != nil {
+		//TODO: p.Vnet.Logf("eeprom read failed: %s; using random addresses", err)
+		//AddressBlock = ethernet.AddressBlock{
+		//	Base:  ethernet.RandomAddress(),
+		//	Count: 256,
+		//}
+	} else {
+		// FIXME can't import vnet b/c elib/hw doesn't compile on ARM
+		// var dd ethernet.Address
+		// dd = d.Fields.BaseEthernetAddress
+		// g := (uint32(dd[3])<<16 | uint32(dd[4])<<8 | uint32(dd[5])) + uint32(d.Fields.NEthernetAddress)
+		// dd[3] = uint8((g & 0xff0000) >> 16)
+		// dd[4] = uint8((g & 0xff00) >> 8)
+		// dd[5] = uint8(g & 0xff)
+	}
+
+	machined.Plot(cmdline.New())
+	machined.Plot(hostname.New())
+	machined.Plot(netlink.New())
+	machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	machined.Plot(uptime.New())
+	machined.Plot(version.New())
+	machined.Plot(&Info{name: "platina-mk1-bmc"})
+	machined.Plot(&Info{
+		name:     "fan",
+		prefixes: []string{"fan."},
+		attrs: machined.Attrs{
+			"fan.front": 100,
+			"fan.rear":  100,
+		},
+	})
+	machined.Plot(&Info{
+		name:     "mfg",
+		prefixes: []string{"mfg."},
+		attrs: machined.Attrs{
+			"mfg.product.name":     d.Fields.ProductName,
+			"mfg.platform.name":    d.Fields.PlatformName,
+			"mfg.vendor.name":      d.Fields.VendorName,
+			"mfg.manufacturer":     d.Fields.Manufacturer,
+			"mfg.vendor":           d.Fields.Vendor,
+			"mfg.label.revision":   d.Fields.LabelRevision,
+			"mfg.part.number":      d.Fields.PartNumber,
+			"mfg.serial.number":    d.Fields.SerialNumber,
+			"mfg.device.version":   d.Fields.DeviceVersion,
+			"mfg.manufacture.date": d.Fields.ManufactureDate,
+			"mfg.country.code":     d.Fields.CountryCode,
+			"mfg.diag.version":     d.Fields.DiagVersion,
+			"mfg.service.tag":      d.Fields.ServiceTag,
+			"mfg.vendor.extension": d.Fields.VendorExtension,
+		},
+	})
+	machined.Plot(&Info{
+		name:     "vmon",
+		prefixes: []string{"vmon."},
+		attrs: machined.Attrs{
+			"vmon.5v.sb":    pm.Vout(1),
+			"vmon.3v8.bmc":  pm.Vout(2),
+			"vmon.3v3.sys":  pm.Vout(3),
+			"vmon.3v3.bmc":  pm.Vout(4),
+			"vmon.3v3.sb":   pm.Vout(5),
+			"vmon.1v0.thc":  pm.Vout(6),
+			"vmon.1v8.sys":  pm.Vout(7),
+			"vmon.1v25.sys": pm.Vout(8),
+			"vmon.1v2.ethx": pm.Vout(9),
+			"vmon.1v0.tha":  pm.Vout(10),
+		},
+	})
+	machined.Plot(&Info{
+		name:     "chassis",
+		prefixes: []string{"fan_tray."},
+		attrs: machined.Attrs{
+			"fan_tray.1.1.rpm":  hw.FanCount(1),
+			"fan_tray.1.2.rpm":  hw.FanCount(2),
+			"fan_tray.2.1.rpm":  hw.FanCount(3),
+			"fan_tray.2.2.rpm":  hw.FanCount(4),
+			"fan_tray.3.1.rpm":  hw.FanCount(5),
+			"fan_tray.3.2.rpm":  hw.FanCount(6),
+			"fan_tray.4.1.rpm":  hw.FanCount(7),
+			"fan_tray.4.2.rpm":  hw.FanCount(8),
+			"fan_tray.1.status": fanTray.FanTrayStatus(1),
+			"fan_tray.2.status": fanTray.FanTrayStatus(2),
+			"fan_tray.3.status": fanTray.FanTrayStatus(3),
+			"fan_tray.4.status": fanTray.FanTrayStatus(4),
+			"fan_tray.speed":    hw.GetFanSpeed(),
+		},
+	})
+	machined.Plot(&Info{
+		name:     "psu1",
+		prefixes: []string{"psu1."},
+		attrs: machined.Attrs{
+			"psu1.status":      ps1.PsuStatus(),
+			"psu1.admin.state": ps1.GetAdminState(),
+			// set type to uint16 since we have a set
+			"psu1.page":         uint16(ps1.Page()),
+			"psu1.status_word":  ps1.StatusWord(),
+			"psu1.status_vout":  ps1.StatusVout(),
+			"psu1.status_iout":  ps1.StatusIout(),
+			"psu1.status_input": ps1.StatusInput(),
+			"psu1.v_in":         ps1.Vin(),
+			"psu1.i_in":         ps1.Iin(),
+			"psu1.v_out":        ps1.Vout(),
+			"psu1.i_out":        ps1.Iout(),
+			"psu1.status_temp":  ps1.StatusTemp(),
+			"psu1.p_out":        ps1.Pout(),
+			"psu1.p_in":         ps1.Pin(),
+			"psu1.pmbus_rev":    ps1.PMBusRev(),
+			"psu1.mfg_id":       ps1.MfgId(),
+			"psu1.status_fans":  ps1.StatusFans(),
+			"psu1.temperature1": ps1.Temp1(),
+			"psu1.temperature2": ps1.Temp2(),
+			"psu1.fan_speed":    ps1.FanSpeed(),
+		},
+	})
+	machined.Plot(&Info{
+		name:     "psu2",
+		prefixes: []string{"psu2."},
+		attrs: machined.Attrs{
+			"psu2.status":      ps2.PsuStatus(),
+			"psu2.admin.state": ps2.GetAdminState(),
+			// set type to uint16 since we have a set
+			"psu2.page":         uint16(ps2.Page()),
+			"psu2.status_word":  ps2.StatusWord(),
+			"psu2.status_vout":  ps2.StatusVout(),
+			"psu2.status_iout":  ps2.StatusIout(),
+			"psu2.status_input": ps2.StatusInput(),
+			"psu2.v_in":         ps2.Vin(),
+			"psu2.i_in":         ps2.Iin(),
+			"psu2.v_out":        ps2.Vout(),
+			"psu2.i_out":        ps2.Iout(),
+			"psu2.status_temp":  ps2.StatusTemp(),
+			"psu2.p_out":        ps2.Pout(),
+			"psu2.p_in":         ps2.Pin(),
+			"psu2.pmbus_rev":    ps2.PMBusRev(),
+			"psu2.mfg_id":       ps2.MfgId(),
+			"psu2.status_fans":  ps2.StatusFans(),
+			"psu2.temperature1": ps2.Temp1(),
+			"psu2.temperature2": ps2.Temp2(),
+			"psu2.fan_speed":    ps2.FanSpeed(),
+		},
+	})
+	machined.Plot(&Info{
+		name:     "temperature",
+		prefixes: []string{"temperature."},
+		attrs: machined.Attrs{
+			"temperature.bmc_cpu":   cpu.ReadTemp(),
+			"temperature.fan_front": hw.FrontTemp(),
+			"temperature.fan_rear":  hw.RearTemp(),
+			"temperature.pcb_board": 28.6,
+		},
+	})
 	go timerLoop()
-	goes.Main()
+	return nil
 }
 
 func timerLoop() {
@@ -312,21 +330,21 @@ func timerLoop() {
 
 func updateUint16(v uint16, k string) {
 	if v != RedisEnvShadow[k] {
-		machined.Publish(k, v)
+		info.Publish(k, v)
 		RedisEnvShadow[k] = v
 	}
 }
 
 func updateFloat64(v float64, k string) {
 	if v != RedisEnvShadow[k] {
-		machined.Publish(k, v)
+		info.Publish(k, v)
 		RedisEnvShadow[k] = v
 	}
 }
 
 func updateString(v string, k string) {
 	if v != RedisEnvShadow[k] {
-		machined.Publish(k, v)
+		info.Publish(k, v)
 		RedisEnvShadow[k] = v
 	}
 }
@@ -450,16 +468,16 @@ func timerIsr() {
 }
 
 func (p *Info) Main(...string) error {
-	machined.Publish("machine", "platina-mk1-bmc")
+	info.Publish("machine", "platina-mk1-bmc")
 	for _, entry := range []struct{ name, unit string }{
 		{"fan", "% max speed"},
 		{"vmon", "volts"},
 		{"temperature", "°C"},
 	} {
-		machined.Publish("unit."+entry.name, entry.unit)
+		info.Publish("unit."+entry.name, entry.unit)
 	}
 	for k, a := range p.attrs {
-		machined.Publish(k, a)
+		info.Publish(k, a)
 		RedisEnvShadow[k] = a
 	}
 	return nil
@@ -471,10 +489,10 @@ func (*Info) Close() error {
 
 func (p *Info) Del(key string) error {
 	if _, found := p.attrs[key]; !found {
-		return machined.CantDel(key)
+		return info.CantDel(key)
 	}
 	delete(p.attrs, key)
-	machined.Publish("delete", key)
+	info.Publish("delete", key)
 	return nil
 }
 
@@ -489,7 +507,7 @@ func (p *Info) Prefixes(prefixes ...string) []string {
 func (p *Info) Set(key, value string) error {
 	a, found := p.attrs[key]
 	if !found {
-		return machined.CantSet(key)
+		return info.CantSet(key)
 	}
 	switch t := a.(type) {
 	case string:
@@ -534,10 +552,10 @@ func (p *Info) Set(key, value string) error {
 				return err
 			}
 		} else {
-			return machined.CantSet(key)
+			return info.CantSet(key)
 		}
 	}
-	machined.Publish(key, fmt.Sprint(p.attrs[key]))
+	info.Publish(key, fmt.Sprint(p.attrs[key]))
 	return nil
 }
 

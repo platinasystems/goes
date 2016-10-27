@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-package machined
+package uptime
 
 import (
 	"bytes"
@@ -10,51 +10,64 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/emptych"
+	"github.com/platinasystems/go/machined/info"
+	"github.com/platinasystems/go/recovered"
 )
 
-type uptime struct {
-	emptych.In
+const Name = "uptime"
+
+type Info struct {
 	prefixes []string
+	stop     chan struct{}
 }
 
-var Uptime InfoProvider = &uptime{
-	prefixes: []string{"uptime"},
+func New() *Info { return &Info{prefixes: []string{Name}} }
+
+func (*Info) String() string { return Name }
+
+func (p *Info) Main(...string) error {
+	var si syscall.Sysinfo_t
+	err := syscall.Sysinfo(&si)
+	if err != nil {
+		return err
+	}
+	p.stop = make(chan struct{})
+	info.Publish("uptime", p.update())
+	go recovered.Go(p.ticker)
+	return nil
 }
 
-func (p *uptime) Main(...string) error {
-	stop := emptych.Make()
-	p.In = emptych.In(stop)
-	Publish("uptime", p.String())
+func (p *Info) Close() error {
+	close(p.stop)
+	return nil
+}
+
+func (*Info) Del(key string) error {
+	return info.CantDel(key)
+}
+
+func (p *Info) Prefixes(...string) []string {
+	return p.prefixes
+}
+
+func (*Info) Set(key, value string) error {
+	return info.CantSet(key)
+}
+
+func (p *Info) ticker(...interface{}) {
 	t := time.NewTicker(60 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-stop:
-			return nil
+		case <-p.stop:
+			return
 		case <-t.C:
-			Publish("uptime", p.String())
+			info.Publish("uptime", p.update())
 		}
 	}
-	return nil
 }
 
-func (p *uptime) Del(key string) error {
-	return CantDel(key)
-}
-
-func (p *uptime) Prefixes(prefixes ...string) []string {
-	if len(prefixes) > 0 {
-		p.prefixes = prefixes
-	}
-	return p.prefixes
-}
-
-func (p *uptime) Set(key, value string) error {
-	return CantSet(key)
-}
-
-func (p *uptime) String() string {
+func (*Info) update() string {
 	var si syscall.Sysinfo_t
 	if err := syscall.Sysinfo(&si); err != nil {
 		return err.Error()

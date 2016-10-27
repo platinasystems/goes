@@ -10,6 +10,12 @@ import (
 	"strconv"
 
 	"github.com/platinasystems/go/machined"
+	"github.com/platinasystems/go/machined/info"
+	"github.com/platinasystems/go/machined/info/cmdline"
+	"github.com/platinasystems/go/machined/info/hostname"
+	"github.com/platinasystems/go/machined/info/netlink"
+	"github.com/platinasystems/go/machined/info/uptime"
+	"github.com/platinasystems/go/machined/info/version"
 )
 
 var GoesdHook = SbinInitHook
@@ -19,111 +25,118 @@ func SbinInitHook() error {
 	return nil
 }
 
-func MachineHook() {
-	machined.NetLink.Prefixes("lo.", "eth0.")
-	machined.InfoProviders = append(machined.InfoProviders,
-		&ExampleInfo{
-			name:     "current",
-			prefixes: []string{"current."},
-			attrs: machined.Attrs{
-				"current.somewhere": 3.33,
-			},
+func MachineHook() error {
+	machined.Plot(cmdline.New())
+	machined.Plot(hostname.New())
+	machined.Plot(netlink.New())
+	machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	machined.Plot(uptime.New())
+	machined.Plot(version.New())
+	machined.Plot(&Example{
+		name:     "current",
+		prefixes: []string{"current."},
+		attrs: machined.Attrs{
+			"current.somewhere": 3.33,
 		},
-		&ExampleInfo{
-			name:     "fan",
-			prefixes: []string{"fan."},
-			attrs: machined.Attrs{
-				"fan.front": 100,
-				"fan.back":  100,
-			},
+	})
+	machined.Plot(&Example{
+		name:     "fan",
+		prefixes: []string{"fan."},
+		attrs: machined.Attrs{
+			"fan.front": 100,
+			"fan.back":  100,
 		},
-		&ExampleInfo{
-			name:     "psu",
-			prefixes: []string{"psu."},
-			attrs: machined.Attrs{
-				"psu.0": 5.01,
-				"psu.1": 4.98,
-			},
+	})
+	machined.Plot(&Example{
+		name:     "psu",
+		prefixes: []string{"psu."},
+		attrs: machined.Attrs{
+			"psu.0": 5.01,
+			"psu.1": 4.98,
 		},
-		&ExampleInfo{
-			name:     "potential",
-			prefixes: []string{"potential."},
-			attrs: machined.Attrs{
-				"potential.1.8": 1.82,
-				"potential.2.5": 2.53,
-				"potential.5":   5.05,
-				"potential.12":  11.98,
-			},
+	})
+	machined.Plot(&Example{
+		name:     "potential",
+		prefixes: []string{"potential."},
+		attrs: machined.Attrs{
+			"potential.1.8": 1.82,
+			"potential.2.5": 2.53,
+			"potential.5":   5.05,
+			"potential.12":  11.98,
 		},
-		&ExampleInfo{
-			name:     "chassis",
-			prefixes: []string{"slot."},
-			attrs: machined.Attrs{
-				"slot.0": "empty",
-				"slot.1": "empty",
-				"slot.2": "empty",
-				"slot.3": "empty",
-			},
+	})
+	machined.Plot(&Example{
+		name:     "chassis",
+		prefixes: []string{"slot."},
+		attrs: machined.Attrs{
+			"slot.0": "empty",
+			"slot.1": "empty",
+			"slot.2": "empty",
+			"slot.3": "empty",
 		},
-		&ExampleInfo{
-			name:     "temperature",
-			prefixes: []string{"temperature."},
-			attrs: machined.Attrs{
-				"temperature.cpu": 28.6,
-			},
-		})
+	})
+	machined.Plot(&Example{
+		name:     "temperature",
+		prefixes: []string{"temperature."},
+		attrs: machined.Attrs{
+			"temperature.cpu": 28.6,
+		},
+	})
+	return nil
 }
 
 type parser interface {
 	Parse(string) error
 }
 
-type ExampleInfo struct {
+type Example struct {
 	name     string
 	prefixes []string
 	attrs    machined.Attrs
 }
 
-func (p *ExampleInfo) Main(...string) error {
-	machined.Publish("machine", "example")
+func (p *Example) String() string { return p.name }
+
+func (p *Example) Main(...string) error {
+	info.Publish("machine", "example")
 	for _, entry := range []struct{ name, unit string }{
 		{"current", "milliamperes"},
 		{"fan", "% max speed"},
 		{"potential", "volts"},
 		{"temperature", "°C"},
 	} {
-		machined.Publish("unit."+entry.name, entry.unit)
+		info.Publish("unit."+entry.name, entry.unit)
 	}
 	for k, a := range p.attrs {
-		machined.Publish(k, a)
+		info.Publish(k, a)
 	}
 	return nil
 }
 
-func (*ExampleInfo) Close() error {
+func (*Example) Close() error {
 	return nil
 }
 
-func (p *ExampleInfo) Del(key string) error {
+func (p *Example) Del(key string) error {
 	if _, found := p.attrs[key]; !found {
-		return machined.CantDel(key)
+		return info.CantDel(key)
 	}
 	delete(p.attrs, key)
-	machined.Publish("delete", key)
+	info.Publish("delete", key)
 	return nil
 }
 
-func (p *ExampleInfo) Prefixes(prefixes ...string) []string {
+func (p *Example) Prefixes(prefixes ...string) []string {
 	if len(prefixes) > 0 {
 		p.prefixes = prefixes
 	}
 	return p.prefixes
 }
 
-func (p *ExampleInfo) Set(key, value string) error {
+func (p *Example) Set(key, value string) error {
 	a, found := p.attrs[key]
 	if !found {
-		return machined.CantSet(key)
+		return info.CantSet(key)
 	}
 	switch t := a.(type) {
 	case string:
@@ -146,13 +159,9 @@ func (p *ExampleInfo) Set(key, value string) error {
 				return err
 			}
 		} else {
-			return machined.CantSet(key)
+			return info.CantSet(key)
 		}
 	}
-	machined.Publish(key, fmt.Sprint(p.attrs[key]))
+	info.Publish(key, fmt.Sprint(p.attrs[key]))
 	return nil
-}
-
-func (p *ExampleInfo) String() string {
-	return p.name
 }

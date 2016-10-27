@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-package machined
+package netlink
 
 import (
 	"fmt"
@@ -13,16 +13,19 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/emptych"
+	"github.com/platinasystems/go/machined/info"
 	"github.com/platinasystems/go/netlink"
 	"github.com/platinasystems/go/redis"
 )
 
 const (
+	Name = "netlink"
+
 	withCounters    = true
 	withoutCounters = false
 )
 
-type nl struct {
+type Info struct {
 	mutex     sync.Mutex
 	prefixes  []string
 	reqch     chan<- netlink.Message
@@ -52,11 +55,10 @@ type getAddrReqParm struct {
 	af  netlink.AddressFamily
 }
 
-var NetLink InfoProvider = &nl{
-	prefixes: []string{"lo."},
-}
+func New() *Info { return &Info{prefixes: []string{"lo"}} }
 
-func (p *nl) Main(...string) error {
+func (p *Info) String() string { return Name }
+func (p *Info) Main(...string) error {
 	p.idx = make(map[string]uint32)
 	p.dev = make(map[uint32]*dev)
 	p.efilter = make(map[uint32]struct{})
@@ -101,7 +103,7 @@ func (p *nl) Main(...string) error {
 	return nil
 }
 
-func (p *nl) Close() error {
+func (p *Info) Close() error {
 	var err error
 	for _, in := range []emptych.In{
 		p.getCountersStop,
@@ -115,18 +117,18 @@ func (p *nl) Close() error {
 	return err
 }
 
-func (p *nl) Prefixes(prefixes ...string) []string {
+func (p *Info) Prefixes(prefixes ...string) []string {
 	if len(prefixes) > 0 {
 		p.prefixes = prefixes
 	}
 	return p.prefixes
 }
 
-func (p *nl) Del(key string) error {
+func (p *Info) Del(key string) error {
 	return p.delLinkAddr(redis.Split(key))
 }
 
-func (p *nl) Set(key, value string) (err error) {
+func (p *Info) Set(key, value string) (err error) {
 	a := redis.Split(key)
 	switch {
 	case len(a) == 1:
@@ -145,7 +147,7 @@ func (p *nl) Set(key, value string) (err error) {
 
 // getLinkAddr listens to Netlink multicast groups for link info (besides
 // counters) and address changes.
-func (p *nl) getLinkAddr() {
+func (p *Info) getLinkAddr() {
 	stop := emptych.Make()
 	p.getLinkAddrStop = emptych.In(stop)
 	rxch := make(chan netlink.Message, 64)
@@ -193,7 +195,7 @@ func (p *nl) getLinkAddr() {
 	}(rxch)
 }
 
-func (p *nl) ifDelAddr(msg *netlink.IfAddrMessage) {
+func (p *Info) ifDelAddr(msg *netlink.IfAddrMessage) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -218,13 +220,13 @@ func (p *nl) ifDelAddr(msg *netlink.IfAddrMessage) {
 		_, found := dev.addrs[k]
 		if found {
 			fullname := fmt.Sprint(dev.name, ".", k)
-			Publish("delete", fullname)
+			info.Publish("delete", fullname)
 			delete(dev.addrs, k)
 		}
 	}
 }
 
-func (p *nl) ifNewAddr(msg *netlink.IfAddrMessage) {
+func (p *Info) ifNewAddr(msg *netlink.IfAddrMessage) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -250,7 +252,7 @@ func (p *nl) ifNewAddr(msg *netlink.IfAddrMessage) {
 		as, found := dev.addrs[k]
 		if !found || s != as {
 			fullname := fmt.Sprint(dev.name, ".", k)
-			Publish(fullname, s)
+			info.Publish(fullname, s)
 			dev.addrs[k] = s
 		}
 	}
@@ -258,7 +260,7 @@ func (p *nl) ifNewAddr(msg *netlink.IfAddrMessage) {
 
 // getCounters uses a periodic ticker to request link counters.
 // The same request socket is used for SETLINK, NEWADDR and DELADDR.
-func (p *nl) getCounters() {
+func (p *Info) getCounters() {
 	stop := emptych.Make()
 	p.getCountersStop = emptych.In(stop)
 	rxch := make(chan netlink.Message, 64)
@@ -273,7 +275,7 @@ func (p *nl) getCounters() {
 	return
 }
 
-func (p *nl) getCounterTicker(sock *netlink.Socket, stop emptych.Out) {
+func (p *Info) getCounterTicker(sock *netlink.Socket, stop emptych.Out) {
 	defer sock.Close()
 	seq := uint32(1000000)
 	reqch := make(chan netlink.Message, 4)
@@ -307,7 +309,7 @@ func (p *nl) getCounterTicker(sock *netlink.Socket, stop emptych.Out) {
 	}
 }
 
-func (p *nl) getCounterRx(rxch <-chan netlink.Message) {
+func (p *Info) getCounterRx(rxch <-chan netlink.Message) {
 	for msg := range rxch {
 		switch t := msg.(type) {
 		case *netlink.DoneMessage:
@@ -324,7 +326,7 @@ func (p *nl) getCounterRx(rxch <-chan netlink.Message) {
 	}
 }
 
-func (p *nl) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
+func (p *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -410,11 +412,11 @@ func (p *nl) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 		} else if dev.flags&flag.bit == flag.bit {
 			if !found {
 				dev.attrs[flag.name] = flag.show
-				Publish(fullname, flag.show)
+				info.Publish(fullname, flag.show)
 			}
 		} else if found {
 			delete(dev.attrs, flag.name)
-			Publish("delete", fullname)
+			info.Publish("delete", fullname)
 		}
 	}
 	for i, attr := range msg.Attrs {
@@ -435,7 +437,7 @@ func (p *nl) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 					dev.stats[i] = count
 					fullname := fmt.Sprint(dev.name, ".",
 						p.statNames[i])
-					Publish(fullname, count)
+					info.Publish(fullname, count)
 				}
 			}
 		default:
@@ -446,7 +448,7 @@ func (p *nl) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 			as, found := dev.attrs[aname]
 			if !found || s != as {
 				fullname := fmt.Sprint(dev.name, ".", aname)
-				Publish(fullname, s)
+				info.Publish(fullname, s)
 				dev.attrs[aname] = s
 				break
 			}
@@ -454,7 +456,7 @@ func (p *nl) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 	}
 }
 
-func (p *nl) logerr(msg *netlink.ErrorMessage) {
+func (p *Info) logerr(msg *netlink.ErrorMessage) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -467,7 +469,7 @@ func (p *nl) logerr(msg *netlink.ErrorMessage) {
 }
 
 // args: LINK, CIDR
-func (p *nl) delLinkAddr(args []string) error {
+func (p *Info) delLinkAddr(args []string) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -506,7 +508,7 @@ func (p *nl) delLinkAddr(args []string) error {
 	return nil
 }
 
-func (p *nl) newLinkAddr(link, cidr, attr, value string) error {
+func (p *Info) newLinkAddr(link, cidr, attr, value string) error {
 	var addrAttr netlink.Attr
 
 	p.mutex.Lock()
@@ -585,7 +587,7 @@ func (p *nl) newLinkAddr(link, cidr, attr, value string) error {
 	return nil
 }
 
-func (p *nl) setLinkAttr(link, attr, value string) error {
+func (p *Info) setLinkAttr(link, attr, value string) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -647,5 +649,3 @@ func (p *nl) setLinkAttr(link, attr, value string) error {
 	p.reqch <- req
 	return nil
 }
-
-func (p *nl) String() string { return "nl" }

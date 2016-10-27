@@ -12,74 +12,36 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/emptych"
+	"github.com/platinasystems/go/machined/info"
 	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/args"
 	"github.com/platinasystems/go/redis/rpc/reply"
-	"github.com/platinasystems/go/sch"
 	"github.com/platinasystems/go/sockfile"
 )
 
 const Name = "machined"
 
-// Machines may modify this info provider list or overwrite any of its
-// references with a target specific implementation.
-var InfoProviders = []InfoProvider{
-	Hostname,
-	NetLink,
-	Uptime,
-	Version,
-	Test,
+// Machines should Plot their info providers into this map.
+var Info map[string]info.Interface
+
+func Plot(providers ...info.Interface) {
+	if Info == nil {
+		Info = make(map[string]info.Interface)
+	}
+	for _, v := range providers {
+		Info[v.String()] = v
+	}
 }
 
-var pub sch.In
-
-var Hook = func() {}
-
-func Publish(key, value interface{}) {
-	pub <- fmt.Sprint(key, ": ", value)
-}
-
-type InfoProvider interface {
-	// Provider should return a list of longest match keys supported by
-	// info provider
-	Prefixes(...string) []string
-
-	// Main should detect and report machine changes like this until Close.
-	//
-	//	Publish(KEY, VALUE)
-	//
-	// or, if device or attribute is removed,
-	//
-	//	Publish("delete", KEY)
-	//
-	Main(...string) error
-
-	// Close should stop all info go-routines and release all resources.
-	Close() error
-
-	// Del should remove the attribute then publish with,
-	//
-	//	Publish("delete", KEY)
-	Del(string) error
-
-	// Set should assign the given machine attribute then publish the new
-	// value with,
-	//
-	//	Publish(KEY, VALUE)
-	//
-	Set(string, string) error
-
-	// String should return the provider name
-	String() string
-}
+var Hook = func() error { return nil }
 
 type Attrs map[string]interface{}
 type Registry []*entry
 
 type entry struct {
 	prefix string
-	info   InfoProvider
+	info   info.Interface
 }
 
 type cmd struct {
@@ -96,20 +58,22 @@ func (*cmd) Usage() string  { return Name }
 
 func (cmd *cmd) Main(args ...string) error {
 	var i, n int
-	var err error
 	var done emptych.Out
 
 	cmd.done, done = emptych.New()
 
-	// FIXME goes.Standby(Name)
-	Hook()
-	for _, info := range InfoProviders {
-		n += len(info.Prefixes())
+	err := Hook()
+	if err != nil {
+		return err
+	}
+
+	for _, v := range Info {
+		n += len(v.Prefixes())
 	}
 	cmd.registry = make(Registry, n)
-	for _, info := range InfoProviders {
-		for _, prefix := range info.Prefixes() {
-			cmd.registry[i] = &entry{prefix, info}
+	for _, v := range Info {
+		for _, prefix := range v.Prefixes() {
+			cmd.registry[i] = &entry{prefix, v}
 			i++
 		}
 	}
@@ -119,26 +83,22 @@ func (cmd *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	pub, err = redis.Publish("platina")
+	info.PubCh, err = redis.Publish("platina")
 	if err != nil {
 		return err
 	}
-	defer close(pub)
+	defer close(info.PubCh)
 	for _, entry := range cmd.registry {
 		key := fmt.Sprint("platina:", entry.prefix)
 		redis.Assign(key, Name, "Registry")
 	}
-	for _, info := range InfoProviders {
-		if info.Main != nil {
-			go func(info InfoProvider) {
-				func() {
-					err := recovered.New(info).Main()
-					if err != nil {
-						log.Print("daemon", "err", err)
-					}
-				}()
-			}(info)
-		}
+	for _, v := range Info {
+		go func(v info.Interface) {
+			err := recovered.New(v).Main()
+			if err != nil {
+				log.Print("daemon", "err", err)
+			}
+		}(v)
 	}
 	<-done
 	return nil
@@ -146,9 +106,9 @@ func (cmd *cmd) Main(args ...string) error {
 
 func (cmd *cmd) Close() error {
 	err := cmd.sock.Close()
-	for _, info := range InfoProviders {
-		if info.Close != nil {
-			xerr := info.Close()
+	for _, v := range Info {
+		if v.Close != nil {
+			xerr := v.Close()
 			if err == nil {
 				err = xerr
 			}
@@ -213,12 +173,4 @@ func (r Registry) Hset(args args.Hset, reply *reply.Hset) error {
 		}
 	}
 	return fmt.Errorf("can't set %s", args.Field)
-}
-
-func CantDel(key string) error {
-	return fmt.Errorf("can't delete %s", key)
-}
-
-func CantSet(key string) error {
-	return fmt.Errorf("can't set %s", key)
 }
