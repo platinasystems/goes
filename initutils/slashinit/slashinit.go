@@ -7,15 +7,25 @@
 // may reassign the Hook closure to perform target specific tasks prior to the
 // 'goesroot' pivot. The kernel command may include 'goes=overwrite' to force
 // copy of '/bin/goes' from the initrd to the named 'goesroot'.
+//
+// If the target root is not mountable, the 'goesinstaller' parameter specifies
+// an installer/recovery system to use to repair the system. The parameter to
+// this is three comma-seperated URLs. The first is mandatory, and is the
+// kernel to load. The second is the optional initramfs to load. The third is
+// the optional FDT to load. The kernel is loaded via the kexec command.
 package slashinit
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"strings"
 	"syscall"
 
+	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/log"
+	"github.com/platinasystems/go/url"
 )
 
 const (
@@ -83,6 +93,7 @@ func init() {
 
 func (cmd) Main(_ ...string) error {
 	goesroot := os.Getenv("goesroot")
+	goesinstaller := os.Getenv("goesinstaller")
 	err := Hook()
 	if err != nil {
 		return err
@@ -97,7 +108,13 @@ func (cmd) Main(_ ...string) error {
 		}
 		err = command.Main("mount", goesroot, "/newroot")
 		if err != nil {
-			return err
+			if len(goesinstaller) > 0 {
+				params := strings.Split(goesinstaller, ",")
+				err = installer(params)
+			}
+			if err != nil {
+				return err
+			}
 		}
 		for _, dir := range []struct {
 			name string
@@ -276,4 +293,49 @@ func (cmd) Main(_ ...string) error {
 		err = command.Main(sbininit)
 	}
 	return err
+}
+
+func installer(params []string) error {
+	if len(params) < 1 || len(params[0]) == 0 {
+		return fmt.Errorf("KERNEL: missing")
+	}
+
+	reqs := make([]*grab.Request, 0)
+
+	req, err := grab.NewRequest(params[0])
+	if err != nil {
+		return err
+	}
+	req.Filename = "kernel"
+	reqs = append(reqs, req)
+
+	if len(params) >= 2 && len(params[1]) > 0 {
+		req, err := grab.NewRequest(params[1])
+		if err != nil {
+			return err
+		}
+		req.Filename = "initramfs"
+		reqs = append(reqs, req)
+	}
+
+	if len(params) >= 3 && len(params[2]) > 0 {
+		req, err := grab.NewRequest(params[2])
+		if err != nil {
+			return err
+		}
+		req.Filename = "fdt"
+		reqs = append(reqs, req)
+	}
+
+	successes, err := url.FetchReqs(0, reqs)
+	if err != nil {
+		return err
+	}
+
+	if successes == len(reqs) {
+		fmt.Printf("All files loaded successfully!")
+	}
+
+	return command.Main("kexec", "-e", "-k", "kernel", "-i", "initramfs",
+		"-c", "console=ttyS0,115200")
 }
