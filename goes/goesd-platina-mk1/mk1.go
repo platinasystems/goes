@@ -23,7 +23,10 @@ import (
 	"github.com/platinasystems/go/machined/info/uptime"
 	"github.com/platinasystems/go/machined/info/version"
 	"github.com/platinasystems/go/netutils"
+	"github.com/platinasystems/go/netutils/npu"
+	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redisutils"
+	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/ethernet"
@@ -43,7 +46,6 @@ import (
 
 const (
 	Machine        = "platina-mk1"
-	VnetCmdSock    = "/run/goes/socks/npu"
 	statsTimerTick = 5
 )
 
@@ -61,6 +63,8 @@ type Info struct {
 	name     string
 	prefixes []string
 	attrs    machined.Attrs
+	stop     chan struct{}
+	v        *vnet.Vnet
 }
 
 type AttrInfo struct {
@@ -81,7 +85,7 @@ func main() {
 	command.Plot(dlv.New()...)
 	command.Plot(diagutils.New()...)
 	command.Plot(fsutils.New()...)
-	command.Plot(goesd.New(), machined.New())
+	command.Plot(goesd.New(), machined.New(), npu.New())
 	command.Plot(kutils.New()...)
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
@@ -102,7 +106,7 @@ func hook() error {
 		uptime.New(),
 		version.New(),
 		&Info{
-			name:     "mk1",
+			name:     "vnet",
 			prefixes: []string{"eth-", "dp-"},
 			attrs:    make(machined.Attrs),
 		},
@@ -110,6 +114,8 @@ func hook() error {
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
 	return nil
 }
+
+func (p *Info) String() string { return p.name }
 
 func (p *Info) Main(...string) error {
 	info.Publish("machine", "platina-mk1")
@@ -138,41 +144,38 @@ func (p *Info) Main(...string) error {
 	}
 
 	var in parse.Input
-	vnetArgsLine := fmt.Sprint("cli { listen { socket ", VnetCmdSock, " no-prompt } }")
-	vnetArgs := strings.Split(vnetArgsLine, " ")
-	in.Add(vnetArgs[0:]...)
-	v := &vnet.Vnet{}
+	//vnetArgsLine := fmt.Sprint("cli { listen { socket ", VnetCmdSock, " no-prompt } }")
+	//vnetArgs := strings.Split(vnetArgsLine, " ")
+	in.Add("cli", "{",
+		"listen",
+		"{", "socket", sockfile.Path("npu"), "no-prompt", "}",
+		"}")
+	p.v = &vnet.Vnet{}
 
-	bcm.Init(v)
-	ethernet.Init(v)
-	ip4.Init(v)
-	ip6.Init(v)
+	bcm.Init(p.v)
+	ethernet.Init(p.v)
+	ip4.Init(p.v)
+	ip6.Init(p.v)
 	// Temporarily remove to get goesdeb running vnet
-	//ixge.Init(v)
-	pci.Init(v)
-	pg.Init(v)
-	unix.Init(v)
+	//ixge.Init(p.v)
+	pci.Init(p.v)
+	pg.Init(p.v)
+	unix.Init(p.v)
 
 	plat := &platform{}
-	v.AddPackage("platform", plat)
+	p.v.AddPackage("platform", plat)
 	plat.DependsOn("pci-discovery") // after pci discovery
 
-	// Set redis publish pointer so vnet can push updates
-	//vnet.Publish = info.Publish
+	p.stop = make(chan struct{})
+	defer p.Close()
+	go recovered.Go(p.ticker)
 
-	go func() {
-		err := v.Run(&in)
-		if err != nil {
-			fmt.Printf("%s\n", err)
-			os.Exit(1)
-		}
-	}()
-
-	initStatsTimer(v)
-	return nil
+	return p.v.Run(&in)
 }
 
 func (p *Info) Close() error {
+	// FIXME: Find a way to stop vnet
+	close(p.stop)
 	return nil
 }
 
@@ -279,24 +282,24 @@ func (p *Info) Set(key, value string) error {
 	return nil
 }
 
-func initStatsTimer(v *vnet.Vnet) {
-	// Wait for vnet to setup server
-	time.Sleep(2 * time.Second)
-
-	go func() {
-		// Start timer to poll npu counters (every 5 seconds)
-		ticker := time.NewTicker(time.Second * statsTimerTick)
-
-		for _ = range ticker.C {
-			v.ForeachHwIfCounter(false, func(hi vnet.Hi, counter string, count uint64) {
-				hiName := hi.Name(v)
-				// Limit display to front-panel ports i.e.  "eth-*" ?
-				countVal := fmt.Sprintf("%d", count)
-				info.Publish(strings.Replace(hiName+"."+counter, " ", "_", -1), countVal)
-			})
+func (p *Info) ticker(...interface{}) {
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-p.stop:
+			return
+		case <-t.C:
+			p.stats()
 		}
-	}()
-	return
+	}
 }
 
-func (p *Info) String() string { return p.name }
+func (p *Info) stats() {
+	p.v.ForeachHwIfCounter(false, func(hi vnet.Hi, counter string, count uint64) {
+		hiName := hi.Name(p.v)
+		// Limit display to front-panel ports i.e.  "eth-*" ?
+		countVal := fmt.Sprintf("%d", count)
+		info.Publish(strings.Replace(hiName+"."+counter, " ", "_", -1), countVal)
+	})
+}

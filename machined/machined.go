@@ -6,8 +6,8 @@ package machined
 
 import (
 	"fmt"
-	"log"
 	"net/rpc"
+	"os"
 	"sort"
 	"strings"
 
@@ -96,7 +96,7 @@ func (cmd *cmd) Main(args ...string) error {
 		go func(v info.Interface) {
 			err := recovered.New(v).Main()
 			if err != nil {
-				log.Print("daemon", "err", err)
+				fmt.Fprintln(os.Stderr, err)
 			}
 		}(v)
 	}
