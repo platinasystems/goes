@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unsafe"
 )
 
 const (
@@ -17,6 +18,10 @@ const (
 	prop       = 0x3 // Property
 	nop        = 0x4 // nop
 	end        = 0x9 // End of fdt
+
+	headerVer      = 17
+	headerLastComp = 16
+	headerLen      = 40
 )
 
 type header struct {
@@ -307,4 +312,105 @@ func (t *Tree) PropString(b []byte) (s string) {
 // Property value as go string slice.
 func (t *Tree) PropStringSlice(b []byte) (s []string) {
 	return strings.Split(string(b), "\x00")
+}
+
+// Write support
+func (t *Tree) alignTo(b []byte, align int) []byte {
+	for len(b)&(align-1) != 0 {
+		b = append(b, 0)
+	}
+	return b
+}
+
+func (t *Tree) propUint32ToSlice(v uint32) (r []byte) {
+	r = make([]byte, 4)
+	if t.IsLittleEndian {
+		binary.LittleEndian.PutUint32(r, v)
+	} else {
+		binary.BigEndian.PutUint32(r, v)
+	}
+	return r
+}
+
+func (t *Tree) propUint64ToSlice(v uint64) (r []byte) {
+	r = make([]byte, 8)
+	if t.IsLittleEndian {
+		binary.LittleEndian.PutUint64(r, v)
+	} else {
+		binary.BigEndian.PutUint64(r, v)
+	}
+	return r
+}
+
+func (t *Tree) putCell(b []byte, v uint32) []byte {
+	return append(b, t.propUint32ToSlice(v)...)
+}
+
+func (t *Tree) putCellUint64(b []byte, v uint64) []byte {
+	return append(b, t.propUint64ToSlice(v)...)
+}
+
+func (t *Tree) putNode(b []byte, s []byte, n *Node) (bOut []byte, sOut []byte) {
+	b = t.putCell(b, begin_node)
+
+	if n.Name != "/" {
+		b = append(b, []byte(n.Name)...)
+	}
+	b = append(b, 0)
+	b = t.alignTo(b, 4)
+
+	for name, value := range n.Properties {
+		b = t.putCell(b, prop)
+		b = t.putCell(b, uint32(len(value)))
+		b = t.putCell(b, uint32(len(s)))
+		b = append(b, []byte(value)...)
+		s = append(s, []byte(name)...)
+		s = append(s, 0)
+		b = t.alignTo(b, 4)
+	}
+
+	for _, c := range n.Children {
+		b, s = t.putNode(b, s, c)
+	}
+
+	b = t.putCell(b, end_node)
+
+	return b, s
+}
+
+func (t *Tree) putUint32(w *uint32, v uint32) {
+	r := t.propUint32ToSlice(v)
+	*w = *(*uint32)(unsafe.Pointer(&r[0]))
+}
+
+func (t *Tree) FlattenTreeToSlice() []byte {
+	h := make([]byte, headerLen) // Header block
+	m := make([]byte, 8*2)       // Dummy memory reservation block
+	b := make([]byte, 0)         // Structure block
+	s := make([]byte, 0)         // String block
+
+	b, s = t.putNode(b, s, t.RootNode) // Build structure and string block
+	b = t.putCell(b, end)              // End the tree
+	s = t.alignTo(s, 4)                // Align string block
+
+	hdr := (*header)(unsafe.Pointer(&h[0])) // Get header pointer
+
+	t.putUint32(&hdr.Magic, magic)
+	t.putUint32(&hdr.TotalSize, uint32(headerLen+len(m)+len(b)+len(s)))
+	t.putUint32(&hdr.OffDtStruct, uint32(headerLen+len(m)))
+	t.putUint32(&hdr.OffDtStrings, uint32(headerLen+len(m)+len(b))) // offset to strings
+	t.putUint32(&hdr.OffMemRsvmap, headerLen)                       // offset to memory reserve map
+
+	t.putUint32(&hdr.Version, headerVer)
+	t.putUint32(&hdr.LastCompatibleVersion, headerLastComp)
+
+	t.putUint32(&hdr.BootCpuidPhys, 0)              // Which physical CPU id we're
+	t.putUint32(&hdr.SizeDtStrings, uint32(len(s))) // size of the strings block
+	t.putUint32(&hdr.SizeDtStruct, uint32(len(b)))  // size of the structure block
+
+	h = append(h, m...)
+	h = append(h, b...)
+	h = append(h, s...)
+
+	return h
 }
