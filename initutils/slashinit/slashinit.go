@@ -3,10 +3,10 @@
 // LICENSE file.
 
 // Package slashinit provides the '/init' command that mounts and pivots to the
-// 'root' kernel parameter before executing its '/sbin/init'.  The machine may
-// reassign the Hook closure to perform target specific tasks prior to the
-// 'root' pivot. The kernel command may include 'goes=overwrite' to force copy
-// of '/bin/goes' from the initrd to the named 'root'.
+// 'goesroot' kernel parameter before executing its '/sbin/init'.  The machine
+// may reassign the Hook closure to perform target specific tasks prior to the
+// 'goesroot' pivot. The kernel command may include 'goes=overwrite' to force
+// copy of '/bin/goes' from the initrd to the named 'goesroot'.
 package slashinit
 
 import (
@@ -39,6 +39,7 @@ func init() {
 	if os.Args[0] != Name {
 		return
 	}
+
 	for _, mnt := range []struct {
 		dir    string
 		dev    string
@@ -81,12 +82,12 @@ func init() {
 }
 
 func (cmd) Main(_ ...string) error {
-	root := os.Getenv("root")
+	goesroot := os.Getenv("goesroot")
 	err := Hook()
 	if err != nil {
 		return err
 	}
-	if len(root) > 0 {
+	if len(goesroot) > 0 {
 		_, err = os.Stat("/newroot")
 		if os.IsNotExist(err) {
 			err = os.Mkdir("/newroot", os.FileMode(0755))
@@ -94,7 +95,7 @@ func (cmd) Main(_ ...string) error {
 				return err
 			}
 		}
-		err = command.Main("mount", root, "/newroot")
+		err = command.Main("mount", goesroot, "/newroot")
 		if err != nil {
 			return err
 		}
