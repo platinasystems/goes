@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/go/netutils"
 	"github.com/platinasystems/go/netutils/telnetd"
 	"github.com/platinasystems/go/redisutils"
+	"github.com/platinasystems/go/testutils"
 )
 
 func main() {
@@ -33,6 +34,7 @@ func main() {
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Plot(telnetd.New())
+	command.Plot(testutils.New()...)
 	command.Sort()
 	goesd.Hook = example.GoesdHook
 	machined.Hook = example.MachineHook
