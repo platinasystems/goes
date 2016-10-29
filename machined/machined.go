@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/machined/info"
 	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redis"
@@ -47,7 +46,7 @@ type entry struct {
 type cmd struct {
 	registry Registry
 	sock     *sockfile.RpcServer
-	done     emptych.In
+	stop     chan<- struct{}
 }
 
 func New() *cmd { return &cmd{} }
@@ -58,9 +57,10 @@ func (*cmd) Usage() string  { return Name }
 
 func (cmd *cmd) Main(args ...string) error {
 	var i, n int
-	var done emptych.Out
 
-	cmd.done, done = emptych.New()
+	stop := make(chan struct{})
+	cmd.stop = stop
+	var wait <-chan struct{} = stop
 
 	err := Hook()
 	if err != nil {
@@ -100,7 +100,7 @@ func (cmd *cmd) Main(args ...string) error {
 			}
 		}(v)
 	}
-	<-done
+	<-wait
 	return nil
 }
 
@@ -114,7 +114,7 @@ func (cmd *cmd) Close() error {
 			}
 		}
 	}
-	close(cmd.done)
+	close(cmd.stop)
 	return err
 }
 

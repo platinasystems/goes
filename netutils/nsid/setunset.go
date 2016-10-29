@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/netlink"
 )
 
@@ -30,16 +29,16 @@ func (nsid *nsid) setunset(name string, id int32, mt netlink.MsgType) error {
 	}
 	defer f.Close()
 	pid := uint32(os.Getpid())
-	stop := emptych.Make()
+	stop := make(chan struct{})
 	nlch := make(chan netlink.Message, 64)
 	nlsock, err := netlink.New(nlch, netlink.NOOP_RTNLGRP)
 	if err != nil {
 		return err
 	}
-	go func(sock *netlink.Socket, stop emptych.Out) {
+	go func(sock *netlink.Socket, wait <-chan struct{}) {
 		defer sock.Close()
-		stop.Wait()
-	}(nlsock, emptych.Out(stop))
+		<-wait
+	}(nlsock, stop)
 	go nlsock.Listen(netlink.NoopListenReq)
 	defer close(stop)
 	req := netlink.NewNetnsMessage()

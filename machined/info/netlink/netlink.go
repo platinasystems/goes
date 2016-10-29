@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/machined/info"
 	"github.com/platinasystems/go/netlink"
 	"github.com/platinasystems/go/redis"
@@ -37,8 +36,8 @@ type Info struct {
 	attrNames [netlink.IFLA_MAX]string
 	statNames [netlink.N_link_stat]string
 
-	getCountersStop emptych.In
-	getLinkAddrStop emptych.In
+	getCountersStop chan<- struct{}
+	getLinkAddrStop chan<- struct{}
 }
 
 type dev struct {
@@ -104,17 +103,9 @@ func (p *Info) Main(...string) error {
 }
 
 func (p *Info) Close() error {
-	var err error
-	for _, in := range []emptych.In{
-		p.getCountersStop,
-		p.getLinkAddrStop,
-	} {
-		nexterr := in.Close()
-		if err == nil {
-			err = nexterr
-		}
-	}
-	return err
+	close(p.getCountersStop)
+	close(p.getLinkAddrStop)
+	return nil
 }
 
 func (p *Info) Prefixes(prefixes ...string) []string {
@@ -148,8 +139,8 @@ func (p *Info) Set(key, value string) (err error) {
 // getLinkAddr listens to Netlink multicast groups for link info (besides
 // counters) and address changes.
 func (p *Info) getLinkAddr() {
-	stop := emptych.Make()
-	p.getLinkAddrStop = emptych.In(stop)
+	stop := make(chan struct{})
+	p.getLinkAddrStop = stop
 	rxch := make(chan netlink.Message, 64)
 	sock, err := netlink.New(rxch,
 		netlink.RTNLGRP_LINK,
@@ -159,10 +150,10 @@ func (p *Info) getLinkAddr() {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	go func(sock *netlink.Socket, stop emptych.Out) {
+	go func(sock *netlink.Socket, wait <-chan struct{}) {
 		defer sock.Close()
-		stop.Wait()
-	}(sock, emptych.Out(stop))
+		<-wait
+	}(sock, stop)
 	go sock.Listen(
 		netlink.ListenReq{netlink.RTM_GETLINK, netlink.AF_UNSPEC},
 		netlink.ListenReq{netlink.RTM_GETADDR, netlink.AF_INET},
@@ -261,8 +252,8 @@ func (p *Info) ifNewAddr(msg *netlink.IfAddrMessage) {
 // getCounters uses a periodic ticker to request link counters.
 // The same request socket is used for SETLINK, NEWADDR and DELADDR.
 func (p *Info) getCounters() {
-	stop := emptych.Make()
-	p.getCountersStop = emptych.In(stop)
+	stop := make(chan struct{})
+	p.getCountersStop = stop
 	rxch := make(chan netlink.Message, 64)
 	sock, err := netlink.New(rxch, netlink.NOOP_RTNLGRP)
 	if err != nil {
@@ -270,12 +261,12 @@ func (p *Info) getCounters() {
 		return
 	}
 	go sock.Listen(netlink.NoopListenReq)
-	go p.getCounterTicker(sock, emptych.Out(stop))
+	go p.getCounterTicker(sock, stop)
 	go p.getCounterRx(rxch)
 	return
 }
 
-func (p *Info) getCounterTicker(sock *netlink.Socket, stop emptych.Out) {
+func (p *Info) getCounterTicker(sock *netlink.Socket, wait <-chan struct{}) {
 	defer sock.Close()
 	seq := uint32(1000000)
 	reqch := make(chan netlink.Message, 4)
@@ -303,7 +294,7 @@ func (p *Info) getCounterTicker(sock *netlink.Socket, stop emptych.Out) {
 			seq++
 			req.TxAdd(sock)
 			sock.TxFlush()
-		case <-stop:
+		case <-wait:
 			return
 		}
 	}

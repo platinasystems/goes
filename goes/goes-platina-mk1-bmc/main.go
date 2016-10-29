@@ -19,7 +19,6 @@ import (
 	"github.com/platinasystems/go/coreutils"
 	"github.com/platinasystems/go/diagutils"
 	"github.com/platinasystems/go/eeprom"
-	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/environ/fantray"
 	"github.com/platinasystems/go/environ/fsp"
 	"github.com/platinasystems/go/environ/nuvoton"
@@ -51,7 +50,7 @@ type parser interface {
 }
 
 type Info struct {
-	emptych.In
+	done     chan<- struct{}
 	name     string
 	prefixes []string
 	attrs    machined.Attrs

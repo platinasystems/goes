@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/platinasystems/go/emptych"
 	"github.com/platinasystems/go/netlink"
 )
 
@@ -22,16 +21,16 @@ func (nsid *nsid) List() ([]Entry, error) {
 		return nil, err
 	}
 	entries := make([]Entry, len(dir))
-	stop := emptych.Make()
+	stop := make(chan struct{})
 	nlch := make(chan netlink.Message, 64)
 	nlsock, err := netlink.New(nlch, netlink.NOOP_RTNLGRP)
 	if err != nil {
 		return nil, err
 	}
-	go func(sock *netlink.Socket, stop emptych.Out) {
+	go func(sock *netlink.Socket, wait <-chan struct{}) {
 		defer sock.Close()
-		stop.Wait()
-	}(nlsock, emptych.Out(stop))
+		<-wait
+	}(nlsock, stop)
 	go nlsock.Listen(netlink.NoopListenReq)
 	defer close(stop)
 	for i, info := range dir {

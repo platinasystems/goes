@@ -238,7 +238,7 @@ func Main(args ...string) (err error) {
 			if err != nil {
 				log.Print("daemon", "err", err)
 			} else if daemonFlagValue == "grandchild" {
-				log.Print("daemon", "info", "finish")
+				fmt.Println("finish")
 			}
 		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n",
@@ -328,12 +328,12 @@ func Main(args ...string) (err error) {
 				err = c.Start()
 			case "child":
 				syscall.Umask(002)
-				pipeOut, doneOut, terr := log.Pipe("info")
+				pipeOut, waitOut, terr := log.Pipe("info")
 				if terr != nil {
 					err = terr
 					return
 				}
-				pipeErr, doneErr, terr := log.Pipe("err")
+				pipeErr, waitErr, terr := log.Pipe("err")
 				if terr != nil {
 					err = terr
 					return
@@ -353,8 +353,8 @@ func Main(args ...string) (err error) {
 					Pgid:   0,
 				}
 				err = c.Start()
-				<-doneOut
-				<-doneErr
+				<-waitOut
+				<-waitErr
 			case "grandchild":
 				pidfn, terr := pidfile.New()
 				if terr != nil {
@@ -364,7 +364,7 @@ func Main(args ...string) (err error) {
 				sigch := make(chan os.Signal)
 				signal.Notify(sigch, syscall.SIGTERM)
 				go terminate(cmd, pidfn, sigch)
-				log.Print("daemon", "info", "start")
+				fmt.Println("start")
 				err = ms.Main(args...)
 				sigch <- syscall.SIGABRT
 			}

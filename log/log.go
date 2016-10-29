@@ -20,8 +20,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/platinasystems/go/emptych"
 )
 
 const DevKmsg = "/dev/kmsg"
@@ -52,7 +50,12 @@ type Limited struct {
 // destroyed with (*RateLimited).Close().
 type RateLimited struct {
 	*Limited
-	emptych.In
+	stop chan<- struct{}
+}
+
+func (p *RateLimited) Close() error {
+	close(p.stop)
+	return nil
 }
 
 var pid int64
@@ -144,46 +147,46 @@ func NewLimited(n uint32) *Limited { return &Limited{N: n} }
 // NewRateLimited returns a logger restricted to the given iterations per
 // unit time that should be destroyed with `defer (*RateLimited).Close()`
 func NewRateLimited(n uint32, d time.Duration) *RateLimited {
-	done := emptych.Make()
-	rl := &RateLimited{NewLimited(n), emptych.In(done)}
-	go func(done emptych.Out) {
+	stop := make(chan struct{})
+	rl := &RateLimited{NewLimited(n), stop}
+	go func(wait <-chan struct{}) {
 		t := time.NewTicker(d)
 		defer t.Stop()
 		for {
 			select {
 			case <-t.C:
 				rl.reset()
-			case <-done:
+			case <-wait:
 				return
 			}
 		}
-	}(emptych.Out(done))
+	}(stop)
 	return rl
 }
 
 // Pipe returns a *File after starting a go routine that loops logging the
 // other end of the pipe until EOF; then signals complete by closing the
 // returned channel..
-func Pipe(priority string) (w *os.File, done <-chan struct{}, err error) {
+func Pipe(priority string) (w *os.File, wait <-chan struct{}, err error) {
 	pri, found := PriorityByName[priority]
 	if !found {
 		pri = syslog.LOG_ERR
 	}
 	r, w, err := os.Pipe()
 	if err == nil {
-		ch := make(chan struct{})
-		done = ch
+		stop := make(chan struct{})
+		wait = stop
 		go func(pri syslog.Priority, r io.Reader,
-			done chan<- struct{}) {
+			stop chan<- struct{}) {
 			scan := bufio.NewScanner(r)
 			for scan.Scan() {
 				s := scan.Text()
 				s = strings.Replace(s, "\t", "        ", -1)
 				log(pri|syslog.LOG_DAEMON, s)
 			}
-			close(done)
+			close(stop)
 			log(pri|syslog.LOG_DAEMON, "closed pipe")
-		}(pri, r, ch)
+		}(pri, r, stop)
 	}
 	return
 }
