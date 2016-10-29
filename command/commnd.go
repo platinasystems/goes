@@ -21,7 +21,6 @@ import (
 	"github.com/platinasystems/go/nocomment"
 	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/pidfile"
-	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/slice_args"
 	"github.com/platinasystems/go/slice_string"
 	"github.com/platinasystems/go/url"
@@ -142,6 +141,9 @@ func (d Daemons) Swap(i, j int) {
 }
 
 func IsDaemon(name string) bool {
+	if commands == nil {
+		return false
+	}
 	cmd, found := commands[name]
 	if found {
 		_, found = cmd.(daemoner)
@@ -209,7 +211,7 @@ func Globs(pattern string) (c []string) {
 //
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
-func Main(args ...string) error {
+func Main(args ...string) (err error) {
 	if len(args) < 1 {
 		return nil
 	}
@@ -226,16 +228,36 @@ func Main(args ...string) error {
 	flag.Aka("-complete", "--complete")
 	flag.Aka("-man", "--man")
 	flag.Aka("-usage", "--usage")
+	isDaemon := IsDaemon(name)
+	daemonFlagValue := os.Getenv(daemonFlag)
+	defer func() {
+		if err == io.EOF {
+			err = nil
+		}
+		if isDaemon {
+			if err != nil {
+				log.Print("daemon", "err", err)
+			} else if daemonFlagValue == "grandchild" {
+				log.Print("daemon", "info", "done")
+			}
+		} else if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n",
+				filepath.Base(Prog()), err)
+		}
+	}()
 	if commands == nil {
-		return fmt.Errorf("no commands")
+		err = fmt.Errorf("no commands")
+		return
 	}
 	cmd, found := commands[name]
 	if !found {
-		return fmt.Errorf("%s: command not found", name)
+		err = fmt.Errorf("%s: command not found", name)
+		return
 	}
 	ms, found := cmd.(mainstringer)
 	if !found {
-		return fmt.Errorf("%s: can't execute", name)
+		err = fmt.Errorf("%s: can't execute", name)
+		return
 	}
 	switch {
 	case flag["-h"]:
@@ -244,24 +266,27 @@ func Main(args ...string) error {
 			s = method.Help(args...)
 		}
 		if len(s) == 0 {
-			return fmt.Errorf("%s: has no help", name)
+			err = fmt.Errorf("%s: has no help", name)
+		} else {
+			fmt.Println(s)
 		}
-		fmt.Println(s)
 	case flag["-apropos"]:
 		s := Apropos[name]
 		if len(s) == 0 {
-			return fmt.Errorf("%s: has no apropos", name)
+			err = fmt.Errorf("%s: has no apropos", name)
+		} else {
+			fmt.Println(s)
 		}
-		fmt.Println(s)
 	case flag["-man"]:
 		s := Man[name]
 		if len(s) == 0 {
-			return fmt.Errorf("%s: has no man", name)
+			err = fmt.Errorf("%s: has no man", name)
+		} else {
+			fmt.Println(s)
 		}
-		fmt.Println(s)
 	case flag["-usage"]:
 		if s := Usage[name]; len(s) == 0 {
-			return fmt.Errorf("%s: has no usage", name)
+			err = fmt.Errorf("%s: has no usage", name)
 		} else if strings.IndexRune(s, '\n') >= 0 {
 			fmt.Print("usage:\t", s, "\n")
 		} else {
@@ -282,8 +307,8 @@ func Main(args ...string) error {
 			}
 		}
 	default:
-		if IsDaemon(name) {
-			switch os.Getenv(daemonFlag) {
+		if isDaemon {
+			switch daemonFlagValue {
 			case "":
 				c := exec.Command(Prog(), args...)
 				c.Args[0] = name
@@ -300,19 +325,24 @@ func Main(args ...string) error {
 					Setsid: true,
 					Pgid:   0,
 				}
-				err := c.Start()
-				if err != nil {
-					return fmt.Errorf("child: %v: %v",
-						c.Args, err)
-				}
-				return c.Wait()
+				err = c.Start()
 			case "child":
 				syscall.Umask(002)
+				pipeOut, doneOut, terr := log.Pipe("info")
+				if terr != nil {
+					err = terr
+					return
+				}
+				pipeErr, doneErr, terr := log.Pipe("err")
+				if terr != nil {
+					err = terr
+					return
+				}
 				c := exec.Command(Prog(), args...)
 				c.Args[0] = name
 				c.Stdin = nil
-				c.Stdout = nil
-				c.Stderr = nil
+				c.Stdout = pipeOut
+				c.Stderr = pipeErr
 				c.Env = []string{
 					"PATH=" + Path(),
 					"TERM=linux",
@@ -322,26 +352,26 @@ func Main(args ...string) error {
 					Setsid: true,
 					Pgid:   0,
 				}
-				return c.Start()
+				err = c.Start()
+				<-doneOut
+				<-doneErr
 			case "grandchild":
-				pidfn, err := pidfile.New()
-				if err != nil {
-					return err
+				pidfn, terr := pidfile.New()
+				if terr != nil {
+					err = terr
+					return
 				}
-				os.Stdout, _ = log.Pipe("info")
-				os.Stderr, _ = log.Pipe("err")
 				sigch := make(chan os.Signal)
 				signal.Notify(sigch, syscall.SIGTERM)
 				go terminate(cmd, pidfn, sigch)
-				err = recovered.New(ms).Main(args...)
+				err = ms.Main(args...)
 				sigch <- syscall.SIGABRT
-				return err
 			}
 		} else {
-			return recovered.New(ms).Main(args...)
+			err = ms.Main(args...)
 		}
 	}
-	return nil
+	return
 }
 
 func terminate(cmd interface{}, pidfn string, ch chan os.Signal) {

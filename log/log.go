@@ -161,34 +161,31 @@ func NewRateLimited(n uint32, d time.Duration) *RateLimited {
 	return rl
 }
 
-// Pipe returns a *File after starting a go routine that loops logging
-// the other end of the pipe until EOF.
-func Pipe(priority string) (*os.File, error) {
+// Pipe returns a *File after starting a go routine that loops logging the
+// other end of the pipe until EOF; then signals complete by closing the
+// returned channel..
+func Pipe(priority string) (w *os.File, done <-chan struct{}, err error) {
 	pri, found := PriorityByName[priority]
 	if !found {
 		pri = syslog.LOG_ERR
 	}
-	ew := os.Stdout
-	if pri == syslog.LOG_ERR {
-		ew = os.Stderr
-	}
-	pr, pw, err := os.Pipe()
-	if err != nil {
-		return ew, err
-	}
-	go func(pri syslog.Priority, r io.Reader) {
-		br := bufio.NewReader(r)
-		for {
-			line, err := br.ReadString('\n')
-			if err != nil {
-				return
+	r, w, err := os.Pipe()
+	if err == nil {
+		ch := make(chan struct{})
+		done = ch
+		go func(pri syslog.Priority, r io.Reader,
+			done chan<- struct{}) {
+			scan := bufio.NewScanner(r)
+			for scan.Scan() {
+				s := scan.Text()
+				s = strings.Replace(s, "\t", "        ", -1)
+				log(pri|syslog.LOG_DAEMON, s)
 			}
-			if n := len(line); n > 0 {
-				log(pri|syslog.LOG_DAEMON, line[:n-1])
-			}
-		}
-	}(pri, pr)
-	return pw, nil
+			close(done)
+			log(pri|syslog.LOG_DAEMON, "closed pipe")
+		}(pri, r, ch)
+	}
+	return
 }
 
 // The default level is: Debug, User. Upto the first two arguments may change
