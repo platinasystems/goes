@@ -8,16 +8,19 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type hdel struct{}
+const Name = "hdel"
 
-func New() hdel { return hdel{} }
+type cmd struct{}
 
-func (hdel) String() string { return "hdel" }
-func (hdel) Usage() string  { return "hdel KEY FIELD" }
+func New() cmd { return cmd{} }
 
-func (hdel) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " KEY FIELD" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY FIELD: missing")
@@ -40,8 +43,12 @@ func (hdel) Main(args ...string) error {
 	return nil
 }
 
-func (hdel) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "delete one or more redis hash fields",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

@@ -10,15 +10,17 @@ import (
 	"github.com/platinasystems/go/redis"
 )
 
-type subscribe struct{}
+const Name = "subscribe"
 
-func New() subscribe { return subscribe{} }
+type cmd struct{}
 
-func (subscribe) String() string { return "subscribe" }
+func New() cmd { return cmd{} }
 
-func (subscribe) Usage() string { return "subscribe CHANNEL" }
+func (cmd) String() string { return Name }
 
-func (subscribe) Main(args ...string) error {
+func (cmd) Usage() string { return Name + " CHANNEL" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("CHANNEL: missing")
@@ -32,7 +34,7 @@ func (subscribe) Main(args ...string) error {
 	return nil
 }
 
-func (subscribe) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print messages published to the given redis channel",
 	}

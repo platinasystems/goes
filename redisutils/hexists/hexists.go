@@ -8,16 +8,19 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type hexists struct{}
+const Name = "hexists"
 
-func New() hexists { return hexists{} }
+type cmd struct{}
 
-func (hexists) String() string { return "hexists" }
-func (hexists) Usage() string  { return "hexists KEY FIELD" }
+func New() cmd { return cmd{} }
 
-func (hexists) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " KEY FIELD" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY FIELD: missing")
@@ -40,8 +43,12 @@ func (hexists) Main(args ...string) error {
 	return nil
 }
 
-func (hexists) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "determine if the redis hash field exists",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

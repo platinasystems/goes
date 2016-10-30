@@ -13,14 +13,16 @@ import (
 	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type set struct{}
+const Name = "set"
 
-func New() set { return set{} }
+type cmd struct{}
 
-func (set) String() string { return "set" }
-func (set) Usage() string  { return "set [-q] KEY VALUE" }
+func New() cmd { return cmd{} }
 
-func (set) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [-q] KEY VALUE" }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-q")
 	switch len(args) {
 	case 0:
@@ -41,8 +43,12 @@ func (set) Main(args ...string) error {
 	return nil
 }
 
-func (set) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "set the string value of a redis key",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

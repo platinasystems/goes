@@ -9,16 +9,19 @@ import (
 
 	"github.com/platinasystems/go/flags"
 	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type hset struct{}
+const Name = "hset"
 
-func New() hset { return hset{} }
+type cmd struct{}
 
-func (hset) String() string { return "hset" }
-func (hset) Usage() string  { return "hset [-q] KEY FIELD VALUE" }
+func New() cmd { return cmd{} }
 
-func (hset) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [-q] KEY FIELD VALUE" }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-q")
 	switch len(args) {
 	case 0:
@@ -41,8 +44,12 @@ func (hset) Main(args ...string) error {
 	return nil
 }
 
-func (hset) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "set the string value of a redis hash field",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

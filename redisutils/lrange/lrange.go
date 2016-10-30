@@ -12,14 +12,16 @@ import (
 	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type lrange struct{}
+const Name = "lrange"
 
-func New() lrange { return lrange{} }
+type cmd struct{}
 
-func (lrange) String() string { return "lgrange" }
-func (lrange) Usage() string  { return "lgrange START STOP" }
+func New() cmd { return cmd{} }
 
-func (lrange) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " KEY START STOP" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY START STOP: missing")
@@ -48,8 +50,12 @@ func (lrange) Main(args ...string) error {
 	return nil
 }
 
-func (lrange) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "get a range of elements from a redis list",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

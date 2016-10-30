@@ -12,14 +12,16 @@ import (
 	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type keys struct{}
+const Name = "keys"
 
-func New() keys { return keys{} }
+type cmd struct{}
 
-func (keys) String() string { return "keys" }
-func (keys) Usage() string  { return "keys [PATTERN]" }
+func New() cmd { return cmd{} }
 
-func (keys) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [PATTERN]" }
+
+func (cmd) Main(args ...string) error {
 	var pattern string
 	switch len(args) {
 	case 0:
@@ -39,8 +41,12 @@ func (keys) Main(args ...string) error {
 	return nil
 }
 
-func (keys) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "find all redis keys matching the given pattern",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

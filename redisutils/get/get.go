@@ -12,14 +12,16 @@ import (
 	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type get struct{}
+const Name = "get"
 
-func New() get { return get{} }
+type cmd struct{}
 
-func (get) String() string { return "get" }
-func (get) Usage() string  { return "get KEY" }
+func New() cmd { return cmd{} }
 
-func (get) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " KEY" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY: missing")
@@ -35,8 +37,12 @@ func (get) Main(args ...string) error {
 	return nil
 }
 
-func (get) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "get the value of a redis key",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

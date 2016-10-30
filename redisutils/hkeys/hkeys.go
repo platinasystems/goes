@@ -12,14 +12,16 @@ import (
 	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type hkeys struct{}
+const Name = "hkeys"
 
-func New() hkeys { return hkeys{} }
+type cmd struct{}
 
-func (hkeys) String() string { return "hkeys" }
-func (hkeys) Usage() string  { return "hkeys KEY" }
+func New() cmd { return cmd{} }
 
-func (hkeys) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " KEY" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY: missing")
@@ -37,8 +39,12 @@ func (hkeys) Main(args ...string) error {
 	return nil
 }
 
-func (hkeys) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "get all the fields in a redis hash",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }

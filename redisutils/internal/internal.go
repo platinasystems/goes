@@ -7,7 +7,10 @@ package internal
 import (
 	"fmt"
 	"io"
+	"strings"
 	"unicode"
+
+	"github.com/platinasystems/go/redis"
 )
 
 var these struct {
@@ -35,40 +38,23 @@ func Quotes(s string) string {
 	return s
 }
 
-/* FIXME
-func Complete(line string) []string {
-	args := strings.Fields(line)
+// Complete redis Key and Subkey. This skips over leading '-' prefaced flags.
+func Complete(args ...string) (c []string) {
+	if len(args) != 0 && strings.HasPrefix(args[0], "-") {
+		args = args[1:]
+	}
 	switch len(args) {
+	case 0:
+		c, _ = redis.Keys(".*")
 	case 1:
-		return completeKeys(line)
+		c, _ = redis.Keys(args[0] + ".*")
 	case 2:
-		if line[len(line)-1] == ' ' {
-			return completeHkeys(args[1], line)
-		} else {
-			return completeKeys(line)
+		subkeys, _ := redis.Hkeys(args[0])
+		for _, subkey := range subkeys {
+			if strings.HasPrefix(subkey, args[1]) {
+				c = append(c, subkey)
+			}
 		}
-	case 3:
-		return completeHkeys(args[1], line)
 	}
-	return []string{}
+	return
 }
-
-func CompleteKeys(line string) []string {
-	if len(these.keys) == 0 {
-		these.keys, _ = redis.Keys(".*")
-	}
-	return goes.Complete.List(line, these.keys)
-}
-
-func CompleteHkeys(key, line string) []string {
-	if these.hkeys == nil {
-		these.hkeys = make(map[string][]string)
-	}
-	l, found := these.hkeys[key]
-	if !found {
-		l, _ = redis.Hkeys(key)
-		these.hkeys[key] = l
-	}
-	return goes.Complete.List(line, l)
-}
-*/

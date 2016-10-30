@@ -12,14 +12,16 @@ import (
 	"github.com/platinasystems/go/redisutils/internal"
 )
 
-type hget struct{}
+const Name = "hget"
 
-func New() hget { return hget{} }
+type cmd struct{}
 
-func (hget) String() string { return "hget" }
-func (hget) Usage() string  { return "hget KEY FIELD" }
+func New() cmd { return cmd{} }
 
-func (hget) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " KEY FIELD" }
+
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY FIELD: missing")
@@ -37,8 +39,12 @@ func (hget) Main(args ...string) error {
 	return nil
 }
 
-func (hget) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "get the value of a redis hash field",
 	}
+}
+
+func (cmd) Complete(args ...string) []string {
+	return internal.Complete(args...)
 }
