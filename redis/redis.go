@@ -54,7 +54,7 @@ func Assign(key, file, name string) error {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("RedisReg.Assign", args.Assign{key, file, name}, &empty)
+	return cl.Call("Reg.Assign", args.Assign{key, file, name}, &empty)
 }
 
 // Unassign an RPC handler for the given key.
@@ -64,7 +64,7 @@ func Unassign(key string) error {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("RedisReg.Unassign", args.Unassign{key}, &empty)
+	return cl.Call("Reg.Unassign", args.Unassign{key}, &empty)
 }
 
 // Connect to the redis file socket.
