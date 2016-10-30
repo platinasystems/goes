@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/go/machined/info/cmdline"
 	"github.com/platinasystems/go/machined/info/hostname"
 	"github.com/platinasystems/go/machined/info/netlink"
+	"github.com/platinasystems/go/machined/info/tests"
 	"github.com/platinasystems/go/machined/info/uptime"
 	"github.com/platinasystems/go/machined/info/version"
 )
@@ -83,6 +84,7 @@ func MachineHook() error {
 			},
 		},
 	)
+	machined.Plot(tests.New()...)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
 	return nil
 }
