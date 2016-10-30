@@ -491,15 +491,15 @@ type RouteMessage struct {
 const SizeofRouteMessage = SizeofHeader + SizeofRtmsg
 
 type Rtmsg struct {
-	Family   AddressFamily
-	DstLen   uint8
-	SrcLen   uint8
-	Tos      uint8
-	Table    uint8
-	Protocol RouteProtocol
-	Scope    RtScope
-	Type     RouteType
-	Flags    RouteFlags
+	Family     AddressFamily
+	DstLen     uint8
+	SrcLen     uint8
+	Tos        uint8
+	Table      RouteTableKind
+	Protocol   RouteProtocol
+	Scope      RtScope
+	RouteType  RouteType
+	RouteFlags RouteFlags
 }
 
 const SizeofRtmsg = 12
@@ -582,9 +582,9 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprintln(acc, "table:", m.Table)
 	fmt.Fprintln(acc, "protocol:", m.Protocol)
 	fmt.Fprintln(acc, "scope:", m.Scope)
-	fmt.Fprintln(acc, "type:", m.Rtmsg.Type)
-	if m.Rtmsg.Flags != 0 {
-		fmt.Fprintln(acc, "route flags:", m.Rtmsg.Flags)
+	fmt.Fprintln(acc, "type:", m.RouteType)
+	if m.RouteFlags != 0 {
+		fmt.Fprintln(acc, "route flags:", m.RouteFlags)
 	}
 	fprintAttrs(acc, routeAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)

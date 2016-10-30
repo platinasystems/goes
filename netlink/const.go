@@ -417,6 +417,28 @@ func (x RouteAttrKind) String() string {
 	return elib.Stringer(routeAttrKindNames, int(x))
 }
 
+type RouteTableKind uint8
+
+const (
+	RT_TABLE_UNSPEC  RouteTableKind = 0
+	RT_TABLE_COMPAT  RouteTableKind = 252
+	RT_TABLE_DEFAULT RouteTableKind = 253
+	RT_TABLE_MAIN    RouteTableKind = 254
+	RT_TABLE_LOCAL   RouteTableKind = 255
+)
+
+var routeTableKindNames = []string{
+	RT_TABLE_UNSPEC:  "UNSPEC",
+	RT_TABLE_COMPAT:  "COMPAT",
+	RT_TABLE_DEFAULT: "DEFAULT",
+	RT_TABLE_MAIN:    "MAIN",
+	RT_TABLE_LOCAL:   "LOCAL",
+}
+
+func (x RouteTableKind) String() string {
+	return elib.Stringer(routeTableKindNames, int(x))
+}
+
 type NeighborAttrKind int
 
 const (
