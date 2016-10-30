@@ -24,7 +24,6 @@ import (
 	"github.com/platinasystems/go/machined/info/version"
 	"github.com/platinasystems/go/netutils"
 	"github.com/platinasystems/go/netutils/npu"
-	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redisutils"
 	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet"
@@ -167,8 +166,7 @@ func (p *Info) Main(...string) error {
 	plat.DependsOn("pci-discovery") // after pci discovery
 
 	p.stop = make(chan struct{})
-	defer p.Close()
-	go recovered.Go(p.ticker)
+	go p.ticker()
 
 	return p.v.Run(&in)
 }
@@ -282,7 +280,7 @@ func (p *Info) Set(key, value string) error {
 	return nil
 }
 
-func (p *Info) ticker(...interface{}) {
+func (p *Info) ticker() {
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
