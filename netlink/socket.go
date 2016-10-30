@@ -209,6 +209,8 @@ func (s *Socket) TxAdd(m Message) { m.TxAdd(s) }
 // txAdd adds a both a nlmsghdr and a request header (e.g. ifinfomsg, ifaddrmsg, rtmsg, ...)
 //   to the end of the tx buffer.
 func (s *Socket) TxAddReq(header *Header, nBytes int) []byte {
+	s.Lock()
+	defer s.Unlock()
 	i := len(s.tx_buffer)
 	s.tx_buffer.Resize(uint(messageAlignLen(nBytes) + SizeofHeader))
 	h := (*Header)(unsafe.Pointer(&s.tx_buffer[i]))
@@ -260,6 +262,8 @@ func (s *Socket) reset_rx_buffer() {
 }
 
 func (s *Socket) reset_tx_buffer() {
+	s.Lock()
+	defer s.Unlock()
 	if len(s.tx_buffer) != 0 {
 		s.tx_buffer = s.tx_buffer[:0]
 	}
