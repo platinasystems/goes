@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/machined/info"
-	"github.com/platinasystems/go/recovered"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/args"
 	"github.com/platinasystems/go/redis/rpc/reply"
@@ -90,12 +89,14 @@ func (cmd *cmd) Main(args ...string) error {
 	defer close(info.PubCh)
 	for _, entry := range cmd.registry {
 		key := fmt.Sprint("platina:", entry.prefix)
-		redis.Assign(key, Name, "Registry")
+		err = redis.Assign(key, Name, "Registry")
+		if err != nil {
+			return err
+		}
 	}
 	for _, v := range Info {
 		go func(v info.Interface) {
-			err := recovered.New(v).Main()
-			if err != nil {
+			if err := v.Main(); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
 		}(v)
