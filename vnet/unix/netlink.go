@@ -18,11 +18,12 @@ import (
 
 type netlinkMain struct {
 	loop.Node
-	m         *Main
-	s         *netlink.Socket
-	c         chan netlink.Message
-	e         *netlinkEvent
-	eventPool sync.Pool
+	m            *Main
+	s            *netlink.Socket
+	c            chan netlink.Message
+	e            *netlinkEvent
+	eventPool    sync.Pool
+	add_del_chan chan netlink_add_del
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -43,8 +44,8 @@ func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
 		ok = m.knownInterface(uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr)))
 	case *netlink.NeighborMessage:
 		ok = m.knownInterface(v.Index)
-	case *netlink.DoneMessage:
-		ok = false // ignore done messages
+	case *netlink.DoneMessage, *netlink.ErrorMessage:
+		ok = false // ignore done/error messages
 	default:
 		panic("unknown netlink message")
 	}
@@ -103,6 +104,7 @@ func (nm *netlinkMain) Init(m *Main) (err error) {
 	nm.eventPool.New = nm.newEvent
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
+	nm.cliInit()
 	return
 }
 
@@ -317,7 +319,7 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage) (err error) {
 		// Ignore all except routes that are static (RTPROT_BOOT) or originating from routing-protocols.
 		return
 	}
-	if v.Rtmsg.Type != netlink.RTN_UNICAST {
+	if v.RouteType != netlink.RTN_UNICAST {
 		return
 	}
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)

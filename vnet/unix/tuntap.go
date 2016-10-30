@@ -70,6 +70,7 @@ type tuntapMain struct {
 
 	ifVec     interfaceVec
 	ifByIndex map[int]*Interface
+	ifBySi    map[vnet.Si]*Interface
 
 	bufferPool *vnet.BufferPool
 }
@@ -170,6 +171,7 @@ const (
 	ifreq_GETIFINDEX    ifreq_type = syscall.SIOCGIFINDEX
 	ifreq_GETIFFLAGS    ifreq_type = syscall.SIOCGIFFLAGS
 	ifreq_SETIFFLAGS    ifreq_type = syscall.SIOCSIFFLAGS
+	ifreq_GETIFHWADDR   ifreq_type = syscall.SIOCGIFHWADDR
 	ifreq_SETIFHWADDR   ifreq_type = syscall.SIOCSIFHWADDR
 	ifreq_SETIFMTU      ifreq_type = syscall.SIOCSIFMTU
 )
@@ -180,6 +182,7 @@ var ifreq_type_names = map[ifreq_type]string{
 	ifreq_GETIFINDEX:    "GETIFINDEX",
 	ifreq_GETIFFLAGS:    "GETIFFLAGS",
 	ifreq_SETIFFLAGS:    "SETIFFLAGS",
+	ifreq_GETIFHWADDR:   "GETIFHWADDR",
 	ifreq_SETIFHWADDR:   "SETIFHWADDR",
 	ifreq_SETIFMTU:      "SETIFMTU",
 }
@@ -224,6 +227,10 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 
 	copy(intf.name[:], si.Name(v))
 
+	if err = intf.open(); err != nil {
+		return
+	}
+
 	// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
 	{
 		r := ifreq_flags{name: intf.name}
@@ -232,9 +239,6 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 			r.flags |= iff_tun
 		} else {
 			r.flags |= iff_tap
-		}
-		if err = intf.open(); err != nil {
-			return
 		}
 		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 			return
@@ -307,12 +311,27 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		if !m.isTun {
 			r := ifreq_sockaddr_any{name: intf.name}
 			r.sockaddr.Addr.Family = syscall.ARPHRD_ETHER
-			for i := range ei.Address {
-				r.sockaddr.Addr.Data[i] = int8(ei.Address[i])
-			}
-			if err = intf.ioctl(intf.provision_fd, ifreq_SETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
+
+			// Only set address if it changes.  If address is reset to same value, kernel will remove arps for some reason.
+			if err = intf.ioctl(intf.provision_fd, ifreq_GETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
 				err = fmt.Errorf("%s: %s", err, &ei.Address)
 				return
+			}
+			same_address := true
+			for i := range ei.Address {
+				same_address = r.sockaddr.Addr.Data[i] == int8(ei.Address[i])
+				if !same_address {
+					break
+				}
+			}
+			if !same_address {
+				for i := range ei.Address {
+					r.sockaddr.Addr.Data[i] = int8(ei.Address[i])
+				}
+				if err = intf.ioctl(intf.provision_fd, ifreq_SETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
+					err = fmt.Errorf("%s: %s", err, &ei.Address)
+					return
+				}
 			}
 		}
 	}
@@ -321,7 +340,9 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	m.ifVec[si] = intf
 	if m.ifByIndex == nil {
 		m.ifByIndex = make(map[int]*Interface)
+		m.ifBySi = make(map[vnet.Si]*Interface)
 	}
+	m.ifBySi[intf.si] = intf
 	m.ifByIndex[intf.ifindex] = intf
 
 	// Create Vnet interface.
