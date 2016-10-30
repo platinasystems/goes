@@ -525,7 +525,9 @@ commandLoop:
 			if err == io.EOF {
 				return nil
 			}
-			fmt.Fprintln(os.Stderr, err)
+			if err.Error() != "exit status 1" {
+				fmt.Fprintln(os.Stderr, err)
+			}
 			err = nil
 		}
 		pl.Reset()
