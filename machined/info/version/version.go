@@ -11,31 +11,21 @@ import (
 
 const Name = "version"
 
-type Info struct {
-	prefixes []string
-}
+type Info struct{}
 
-func New() *Info { return &Info{[]string{Name}} }
+func New() Info { return Info{} }
 
-func (*Info) String() string { return Name }
+func (Info) String() string { return Name }
 
-func (*Info) Main(...string) error {
+func (Info) Main(...string) error {
 	info.Publish(Name, version.Version)
 	return nil
 }
 
-func (*Info) Close() error {
-	return nil
-}
+func (Info) Close() error { return nil }
 
-func (*Info) Del(key string) error {
-	return info.CantDel(key)
-}
+func (Info) Del(key string) error { return info.CantDel(key) }
 
-func (p *Info) Prefixes(...string) []string {
-	return p.prefixes
-}
+func (Info) Prefixes(...string) []string { return []string{Name} }
 
-func (*Info) Set(key, value string) error {
-	return info.CantSet(key)
-}
+func (Info) Set(key, value string) error { return info.CantSet(key) }

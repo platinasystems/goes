@@ -11,63 +11,52 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/machined/info"
-	"github.com/platinasystems/go/recovered"
 )
 
 const Name = "uptime"
 
-type Info struct {
-	prefixes []string
-	stop     chan struct{}
-}
+type Info chan struct{}
 
-func New() *Info { return &Info{prefixes: []string{Name}} }
+func New() Info { return Info(make(chan struct{})) }
 
-func (*Info) String() string { return Name }
+func (Info) String() string { return Name }
 
-func (p *Info) Main(...string) error {
+func (uptime Info) Main(...string) error {
 	var si syscall.Sysinfo_t
 	err := syscall.Sysinfo(&si)
 	if err != nil {
 		return err
 	}
-	p.stop = make(chan struct{})
-	info.Publish("uptime", p.update())
-	go recovered.Go(p.ticker)
+	info.Publish(Name, update())
+	go uptime.ticker()
 	return nil
 }
 
-func (p *Info) Close() error {
-	close(p.stop)
+func (uptime Info) Close() error {
+	close(uptime)
 	return nil
 }
 
-func (*Info) Del(key string) error {
-	return info.CantDel(key)
-}
+func (Info) Del(key string) error { return info.CantDel(key) }
 
-func (p *Info) Prefixes(...string) []string {
-	return p.prefixes
-}
+func (Info) Prefixes(...string) []string { return []string{Name} }
 
-func (*Info) Set(key, value string) error {
-	return info.CantSet(key)
-}
+func (Info) Set(key, value string) error { return info.CantSet(key) }
 
-func (p *Info) ticker(...interface{}) {
+func (uptime Info) ticker() {
 	t := time.NewTicker(60 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-p.stop:
+		case <-uptime:
 			return
 		case <-t.C:
-			info.Publish("uptime", p.update())
+			info.Publish(Name, update())
 		}
 	}
 }
 
-func (*Info) update() string {
+func update() string {
 	var si syscall.Sysinfo_t
 	if err := syscall.Sysinfo(&si); err != nil {
 		return err.Error()

@@ -13,15 +13,13 @@ import (
 
 const Name = "hostname"
 
-type Info struct {
-	prefixes []string
-}
+type Info struct{}
 
-func New() *Info { return &Info{[]string{Name}} }
+func New() Info { return Info{} }
 
-func (*Info) String() string { return Name }
+func (Info) String() string { return Name }
 
-func (*Info) Main(...string) error {
+func (Info) Main(...string) error {
 	value, err := os.Hostname()
 	if err != nil {
 		value = err.Error()
@@ -30,17 +28,11 @@ func (*Info) Main(...string) error {
 	return err
 }
 
-func (*Info) Close() error {
-	return nil
-}
+func (Info) Close() error { return nil }
 
-func (*Info) Del(key string) error {
-	return info.CantDel(key)
-}
+func (Info) Del(key string) error { return info.CantDel(key) }
 
-func (p *Info) Prefixes(prefixes ...string) []string {
-	return p.prefixes
-}
+func (Info) Prefixes(...string) []string { return []string{Name} }
 
 func (Info) Set(key, value string) error {
 	err := syscall.Sethostname([]byte(value))
