@@ -10,6 +10,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strconv"
 	"time"
@@ -62,6 +63,7 @@ type funcU16 func(uint16)
 type funcF64 func(float64)
 
 const (
+	AddressBytes  = 6
 	w83795Bus     = 0
 	w83795Adr     = 0x2f
 	w83795MuxAdr  = 0x76
@@ -95,6 +97,8 @@ const (
 	ps2GpioPwronL = "PSU1_PWRON_L"
 	ps2GpioIntL   = "PSU1_INT_L"
 )
+
+type Address [AddressBytes]byte
 
 var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxAdr, w83795MuxVal}
 var pm = ucd9090.PowerMon{ucd9090Bus, ucd9090Adr, ucd9090MuxAdr, ucd9090MuxVal}
@@ -178,20 +182,23 @@ func hook() error {
 		BusIndex:   0,
 		BusAddress: 0x55,
 	}
+	var dd Address
 	if e := d.GetInfo(); e != nil {
-		//TODO: p.Vnet.Logf("eeprom read failed: %s; using random addresses", err)
-		//AddressBlock = ethernet.AddressBlock{
-		//	Base:  ethernet.RandomAddress(),
-		//	Count: 256,
-		//}
+		t := time.Now()
+		n := t.Nanosecond()
+		r := rand.New(rand.NewSource(int64(n)))
+		dd[0] = uint8(0x02)
+		dd[1] = uint8(0x46)
+		dd[2] = uint8(0x8a)
+		dd[3] = uint8(r.Uint32() & 0xff)
+		dd[4] = uint8(r.Uint32() & 0xff)
+		dd[5] = uint8(r.Uint32() & 0xff)
 	} else {
-		// FIXME can't import vnet b/c elib/hw doesn't compile on ARM
-		// var dd ethernet.Address
-		// dd = d.Fields.BaseEthernetAddress
-		// g := (uint32(dd[3])<<16 | uint32(dd[4])<<8 | uint32(dd[5])) + uint32(d.Fields.NEthernetAddress)
-		// dd[3] = uint8((g & 0xff0000) >> 16)
-		// dd[4] = uint8((g & 0xff00) >> 8)
-		// dd[5] = uint8(g & 0xff)
+		dd = d.Fields.BaseEthernetAddress
+		g := (uint32(dd[3])<<16 | uint32(dd[4])<<8 | uint32(dd[5])) + uint32(d.Fields.NEthernetAddress)
+		dd[3] = uint8((g & 0xff0000) >> 16)
+		dd[4] = uint8((g & 0xff00) >> 8)
+		dd[5] = uint8(g & 0xff)
 	}
 
 	machined.Plot(
@@ -267,10 +274,10 @@ func hook() error {
 		&Info{
 			name:     "psu1",
 			prefixes: []string{"psu1."},
-			attrs: machined.Attrs{
-				"psu1.status":      ps1.PsuStatus(),
-				"psu1.admin.state": ps1.GetAdminState(),
-				// set type to uint16 since we have a set
+			attrs:    machined.Attrs{
+			/*
+				"psu1.status":       ps1.PsuStatus(),
+				"psu1.admin.state":  ps1.GetAdminState(),
 				"psu1.page":         uint16(ps1.Page()),
 				"psu1.status_word":  ps1.StatusWord(),
 				"psu1.status_vout":  ps1.StatusVout(),
@@ -289,15 +296,16 @@ func hook() error {
 				"psu1.temperature1": ps1.Temp1(),
 				"psu1.temperature2": ps1.Temp2(),
 				"psu1.fan_speed":    ps1.FanSpeed(),
+			*/
 			},
 		},
 		&Info{
 			name:     "psu2",
 			prefixes: []string{"psu2."},
-			attrs: machined.Attrs{
-				"psu2.status":      ps2.PsuStatus(),
-				"psu2.admin.state": ps2.GetAdminState(),
-				// set type to uint16 since we have a set
+			attrs:    machined.Attrs{
+			/*
+				"psu2.status":       ps2.PsuStatus(),
+				"psu2.admin.state":  ps2.GetAdminState(),
 				"psu2.page":         uint16(ps2.Page()),
 				"psu2.status_word":  ps2.StatusWord(),
 				"psu2.status_vout":  ps2.StatusVout(),
@@ -316,6 +324,7 @@ func hook() error {
 				"psu2.temperature1": ps2.Temp1(),
 				"psu2.temperature2": ps2.Temp2(),
 				"psu2.fan_speed":    ps2.FanSpeed(),
+			*/
 			},
 		},
 		&Info{
@@ -365,17 +374,6 @@ func updateString(v string, k string) {
 		RedisEnvShadow[k] = v
 	}
 }
-
-/*
-func getGID() uint64 {
-	b := make([]byte, 64)
-	b = b[:runtime.Stack(b, false)]
-	b = bytes.TrimPrefix(b, []byte("goroutine "))
-	b = b[:bytes.IndexByte(b, ' ')]
-	n, _ := strconv.ParseUint(string(b), 10, 64)
-	return n
-}
-*/
 
 func timerIsr() {
 	log.Print("daemon", "info", "timerISR")
@@ -429,45 +427,44 @@ func timerIsr() {
 	updateString(ps1.GetAdminState(), "psu1.admin.state")
 	updateString(ps2.PsuStatus(), "psu2.status")
 	updateString(ps2.GetAdminState(), "psu2.admin.state")
+	/*
+		updateUint16(ps1.Page(), "psu1.page")
+		updateUint16(ps1.StatusWord(), "psu1.status_word")
+		updateUint16(ps1.StatusVout(), "psu1.status_vout")
+		updateUint16(ps1.StatusIout(), "psu1.status_iout")
+		updateUint16(ps1.StatusInput(), "psu1.status_input")
+		updateUint16(ps1.Vin(), "psu1.v_in")
+		updateUint16(ps1.Iin(), "psu1.i_in")
+		updateUint16(ps1.Vout(), "psu1.v_out")
+		updateUint16(ps1.Iout(), "psu1.i_out")
+		updateUint16(ps1.StatusTemp(), "psu1.status_temp")
+		updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
+		updateUint16(ps1.Pout(), "psu1.p_out")
+		updateUint16(ps1.Pin(), "psu1.p_in")
+		updateUint16(ps1.MfgId(), "psu1.mfg_id")
+		updateUint16(ps1.StatusFans(), "psu1.status_fans")
+		updateUint16(ps1.Temp1(), "psu1.temperature1")
+		updateUint16(ps1.Temp2(), "psu1.temperature2")
+		updateUint16(ps1.FanSpeed(), "psu1.fan_speed")
 
-	updateUint16(ps1.Page(), "psu1.page")
-	/* commenting out for now, causing problem with redis field update when PSU is not present
-	updateUint16(ps1.StatusWord(), "psu1.status_word")
-	updateUint16(ps1.StatusVout(), "psu1.status_vout")
-	updateUint16(ps1.StatusIout(), "psu1.status_iout")
-	updateUint16(ps1.StatusInput(), "psu1.status_input")
-	updateUint16(ps1.Vin(), "psu1.v_in")
-	updateUint16(ps1.Iin(), "psu1.i_in")
-	updateUint16(ps1.Vout(), "psu1.v_out")
-	updateUint16(ps1.Iout(), "psu1.i_out")
-	updateUint16(ps1.StatusTemp(), "psu1.status_temp")
-	updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
-	updateUint16(ps1.Pout(), "psu1.p_out")
-	updateUint16(ps1.Pin(), "psu1.p_in")
-	updateUint16(ps1.MfgId(), "psu1.mfg_id")
-	updateUint16(ps1.StatusFans(), "psu1.status_fans")
-	updateUint16(ps1.Temp1(), "psu1.temperature1")
-	updateUint16(ps1.Temp2(), "psu1.temperature2")
-	updateUint16(ps1.FanSpeed(), "psu1.fan_speed")
-
-	updateUint16(ps2.Page(), "psu2.page")
-	updateUint16(ps2.StatusWord(), "psu2.status_word")
-	updateUint16(ps2.StatusVout(), "psu2.status_vout")
-	updateUint16(ps2.StatusIout(), "psu2.status_iout")
-	updateUint16(ps2.StatusInput(), "psu2.status_input")
-	updateUint16(ps2.Vin(), "psu2.v_in")
-	updateUint16(ps2.Iin(), "psu2.i_in")
-	updateUint16(ps2.Vout(), "psu2.v_out")
-	updateUint16(ps2.Iout(), "psu2.i_out")
-	updateUint16(ps2.StatusTemp(), "psu2.status_temp")
-	updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
-	updateUint16(ps2.Pout(), "psu2.p_out")
-	updateUint16(ps2.Pin(), "psu2.p_in")
-	updateUint16(ps2.MfgId(), "psu2.mfg_id")
-	updateUint16(ps2.StatusFans(), "psu2.status_fans")
-	updateUint16(ps2.Temp1(), "psu2.temperature1")
-	updateUint16(ps2.Temp2(), "psu2.temperature2")
-	updateUint16(ps2.FanSpeed(), "psu2.fan_speed")
+		updateUint16(ps2.Page(), "psu2.page")
+		updateUint16(ps2.StatusWord(), "psu2.status_word")
+		updateUint16(ps2.StatusVout(), "psu2.status_vout")
+		updateUint16(ps2.StatusIout(), "psu2.status_iout")
+		updateUint16(ps2.StatusInput(), "psu2.status_input")
+		updateUint16(ps2.Vin(), "psu2.v_in")
+		updateUint16(ps2.Iin(), "psu2.i_in")
+		updateUint16(ps2.Vout(), "psu2.v_out")
+		updateUint16(ps2.Iout(), "psu2.i_out")
+		updateUint16(ps2.StatusTemp(), "psu2.status_temp")
+		updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
+		updateUint16(ps2.Pout(), "psu2.p_out")
+		updateUint16(ps2.Pin(), "psu2.p_in")
+		updateUint16(ps2.MfgId(), "psu2.mfg_id")
+		updateUint16(ps2.StatusFans(), "psu2.status_fans")
+		updateUint16(ps2.Temp1(), "psu2.temperature1")
+		updateUint16(ps2.Temp2(), "psu2.temperature2")
+		updateUint16(ps2.FanSpeed(), "psu2.fan_speed")
 	*/
 
 	updateFloat64(cpu.ReadTemp(), "temperature.bmc_cpu")
