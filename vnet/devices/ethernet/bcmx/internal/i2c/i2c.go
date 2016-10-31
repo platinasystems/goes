@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // This code implements an SMBus driver interface for a BCM i2c
 // controller, operating in master mode, utilizing the CMIC.
 // << NOTE: the SMBus does not implement all i2c commands >>

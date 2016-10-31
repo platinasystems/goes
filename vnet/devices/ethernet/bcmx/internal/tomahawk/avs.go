@@ -1,3 +1,7 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // This file is used for the Tomahawk Adaptive Voltage Scaling (AVS)interface.
 //
 // The Tomahawk AVS is a power-saving technique of the digital 1.0V supply.
