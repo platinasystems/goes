@@ -94,8 +94,7 @@ func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 	cf := netlink.SocketConfig{
 		Rx: nm.c,
 		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
-		// Found that 2<<20 is too small.
-		RcvbufBytes: 4 << 20,
+		RcvbufBytes: 8 << 20,
 	}
 	nm.s, err = netlink.NewWithConfig(cf)
 	if err != nil {
