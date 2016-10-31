@@ -91,7 +91,13 @@ func (m *Main) listener(l *loop.Loop) {
 func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 	var err error
 	nm.c = make(chan netlink.Message, 64)
-	nm.s, err = netlink.New(nm.c)
+	cf := netlink.SocketConfig{
+		Rx: nm.c,
+		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
+		// Found that 2<<20 is too small.
+		RcvbufBytes: 4 << 20,
+	}
+	nm.s, err = netlink.NewWithConfig(cf)
 	if err != nil {
 		panic(err)
 	}
