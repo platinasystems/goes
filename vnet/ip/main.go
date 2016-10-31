@@ -18,6 +18,7 @@ type FamilyConfig struct {
 	GetRoute         func(p *Prefix, si vnet.Si) (ai Adj, ok bool)
 	GetRouteFibIndex func(p *Prefix, fi FibIndex) (ai Adj, ok bool)
 	AddDelRoute      func(p *Prefix, fi FibIndex, newAdj Adj, isDel bool) (oldAdj Adj, err error)
+	RemapAdjacency   func(oldAdj, newAdj Adj)
 }
 
 type Main struct {
