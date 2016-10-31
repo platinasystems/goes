@@ -171,8 +171,6 @@ func (p *PortBlock) SetPortEnable(port m.Porter, enable bool) {
 	p.Phy.SetSpeed(port, sp, false)
 
 	pc.Enabled = enable
-	pc.Autoneg = true
-	p.Phy.SetAutoneg(port, pc.Autoneg)
 
 	const (
 		mac_sw_reset uint64 = 1 << 6

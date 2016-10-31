@@ -28,12 +28,12 @@ import (
 	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
 	"github.com/platinasystems/go/vnet/pg"
 	"github.com/platinasystems/go/vnet/unix"
-	"github.com/platinasystems/vnetdevices/ethernet/switch/bcm"
 
 	"fmt"
 	"os"
@@ -71,9 +71,16 @@ type AttrInfo struct {
 	attr      interface{}
 }
 
+var speedMap = map[string]float64{
+	"100g": 100e9,
+	"40g":  40e9,
+	"10g":  10e9,
+	"1g":   1e9,
+}
+
 // Would like to do "eth-0-0.speedsetting = 100e9,4" where 4 is number of lanes based off subport 0 here.
 var portConfigs = []AttrInfo{
-	{"speedsetting", "100e9,4"},
+	{"speed", "100g"},
 	{"autoneg", "false"},
 	{"loopback", "false"},
 }
@@ -197,13 +204,28 @@ func (p *Info) Prefixes(prefixes ...string) []string {
 }
 
 // Send message to hw channel
-func (p *Info) setHw(key, value string) error {
+func (p *Info) setHw(key, value string) (err error) {
 	// If previous configuration existed on this
 	// port, delete and start again.
-
-	// Send new setting to vnetdevices layer via channel
-
-	return nil
+	// Give new setting to vnet
+	keyStr := strings.SplitN(key, ".", 2)
+	switch keyStr[1] {
+	case "speed":
+		sp, ok := speedMap[value]
+		if ok {
+			err = p.SetSpeedHwIf(keyStr[0], sp)
+		} else {
+			fmt.Printf("Invalid speed setting for %s: %s\n", key, value)
+		}
+	case "autoneg":
+		if value == "false" {
+			sp, _ := speedMap[p.attrs[keyStr[0]+".speed"].(string)]
+			err = p.SetSpeedHwIf(keyStr[0], sp)
+		} else { // "true"
+			err = p.SetSpeedHwIf(keyStr[0], 0)
+		}
+	}
+	return
 }
 
 func (p *Info) settableKey(key string) error {
@@ -221,6 +243,16 @@ func (p *Info) settableKey(key string) error {
 		return info.CantSet(key)
 	}
 	return nil
+}
+
+func (p *Info) SetSpeedHwIf(hwif_name string, bandwidth float64) (err error) {
+	hi, ok := p.v.HwIfByName(hwif_name)
+	if !ok {
+		err = fmt.Errorf("%s: hwif not found", hwif_name)
+		return
+	}
+	err = hi.SetSpeed(p.v, vnet.Bandwidth(bandwidth))
+	return
 }
 
 func (p *Info) Set(key, value string) error {

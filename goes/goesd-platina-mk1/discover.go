@@ -7,8 +7,8 @@ package main
 import (
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
 	"github.com/platinasystems/go/vnet/ethernet"
-	"github.com/platinasystems/vnetdevices/ethernet/switch/bcm"
 )
 
 func (p *platform) Init() (err error) {
