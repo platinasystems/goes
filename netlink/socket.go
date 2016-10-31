@@ -134,25 +134,10 @@ func (s *Socket) Close() error {
 	return nil
 }
 
-func (s *Socket) Listen(reqs ...ListenReq) {
-	// Loop forever restarting listen every time we get ENOBUFS (meaning kernel has lost a message).
-	for {
-		if err := s.listen(reqs...); err != nil && err != syscall.ENOBUFS {
-			panic(err)
-		}
-	}
-}
-
-func (s *Socket) listen(reqs ...ListenReq) (err error) {
+func (s *Socket) Listen(reqs ...ListenReq) (err error) {
 	if len(reqs) == 0 {
 		reqs = DefaultListenReqs
 	}
-	// Preserve error so caller can check for syscall.ENOBUFS
-	defer func() {
-		if e, ok := recover().(error); ok {
-			err = e
-		}
-	}()
 	for _, r := range reqs {
 		if r.MsgType == NLMSG_NOOP {
 			continue
