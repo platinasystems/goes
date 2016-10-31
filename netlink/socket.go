@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"fmt"
 	"github.com/platinasystems/go/elib"
 )
 
@@ -94,13 +95,30 @@ func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
 			s.RcvbufBytes)); err != nil {
 			return
 		}
+		// Verify buffer size is at least as large as requested.
+		{
+			if v, e := syscall.GetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_RCVBUF); e != nil {
+				panic(e)
+			} else if v < s.RcvbufBytes {
+				panic(fmt.Errorf("SO_RCVBUF truncated by kernel to %d bytes; need to increase rmem_max via sysctl -w net.core.rmem_max=%d", v, s.RcvbufBytes))
+			}
+		}
 	}
 	if s.SndbufBytes != 0 {
 		if err = os.NewSyscallError("setsockopt SO_SNDBUF", syscall.SetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_SNDBUF,
-			s.RcvbufBytes)); err != nil {
+			s.SndbufBytes)); err != nil {
 			return
 		}
+		// Verify buffer size is at least as large as requested.
+		{
+			if v, e := syscall.GetsockoptInt(s.socket, syscall.SOL_SOCKET, syscall.SO_SNDBUF); e != nil {
+				panic(e)
+			} else if v < s.SndbufBytes {
+				panic(fmt.Errorf("SO_SNDBUF truncated by kernel to %d bytes; need to increase wmem_max via sysctl -w net.core.wmem_max=%d", v, s.SndbufBytes))
+			}
+		}
 	}
+
 	return
 }
 
