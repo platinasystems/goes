@@ -126,35 +126,16 @@ const (
 )
 
 //go:generate gentemplate -d Package=ip -id adjacencyHeap -d HeapType=adjacencyHeap -d Data=elts -d Type=Adjacency github.com/platinasystems/go/elib/heap.tmpl
-//go:generate gentemplate -d Package=ip -id AdjRemapVec -d VecType=AdjRemapVec -d Type=AdjRemap github.com/platinasystems/go/elib/vec.tmpl
 
 type adjacencyThread struct {
 	// Packet/byte counters for each adjacency.
 	counters vnet.CombinedCounters
 }
 
-type AdjRemap Adj
-
-const AdjRemapNil AdjRemap = 0
-
-func (r AdjRemap) IsValid() bool { return r != 0 }
-func (r AdjRemap) GetAdj() Adj   { return Adj(r - 1) }
-func (r *AdjRemap) SetAdj(a Adj) { *r = AdjRemap(a + 1) }
-func (r *AdjRemap) GetAndInvalidate() (a Adj, valid bool) {
-	if valid = r.IsValid(); valid {
-		a = r.GetAdj()
-		*r = AdjRemapNil
-	}
-	return
-}
-
 type adjacencyMain struct {
 	adjacencyHeap
 
 	multipathMain multipathMain
-
-	Remaps  AdjRemapVec
-	NRemaps uint
 
 	threads []*adjacencyThread
 
@@ -579,8 +560,6 @@ func (m *multipathMain) delNextHop(nhs nextHopVec, result nextHopVec, nhi uint) 
 func (m *Main) delMultipathAdj(toDel Adj) {
 	mm := &m.multipathMain
 
-	m.Remaps.Validate(uint(len(m.adjacencyHeap.elts)))
-	m.NRemaps = uint(0)
 	for maIndex := uint(0); maIndex < uint(len(mm.mpAdjVec)); maIndex++ { // no range since len may change due to create below.
 		ma := &mm.mpAdjVec[maIndex]
 		if !ma.isValid() {
@@ -596,19 +575,18 @@ func (m *Main) delMultipathAdj(toDel Adj) {
 		}
 
 		var newMa *multipathAdjacency
-		newMaIndex := maIndex
 		if len(nhs) > 1 {
 			t := mm.cachedNextHopVec[0]
 			t = mm.delNextHop(nhs, t, nhi)
 			mm.cachedNextHopVec[0] = t
-			newMa, newMaIndex, _ = m.createMpAdj(t)
+			newMa, _, _ = m.createMpAdj(t)
 		}
 
-		m.Remaps[ma.adj] = AdjRemapNil
-		if newMaIndex != maIndex && newMa != nil {
-			m.Remaps[ma.adj].SetAdj(newMa.adj)
-			m.NRemaps++
+		newAdj := AdjNil
+		if newMa != nil {
+			newAdj = newMa.adj
 		}
+		m.RemapAdjacency(ma.adj, newAdj)
 		ma.free(m)
 	}
 }
