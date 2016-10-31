@@ -242,29 +242,32 @@ func (f *Fib) setLessSpecific(a *Address) {
 	}
 }
 
-func (f *Fib) maybeRemapAdjacencies(m *Main) {
-	if m.NRemaps == 0 {
-		return
-	}
+func (f *Fib) mapFibRemapAdjacency(m *Main, from, to ip.Adj) {
 	for l := 0; l <= 32; l++ {
 		for dst, adj := range f.maps[l] {
-			if newAdj, ok := m.Remaps[adj].GetAndInvalidate(); ok {
-				if newAdj == ip.AdjNil {
+			if adj == from {
+				isDel := to == ip.AdjNil
+				if isDel {
 					delete(f.maps[l], dst)
 				} else {
-					f.maps[l][dst] = newAdj
+					f.maps[l][dst] = to
 				}
 				p := &Prefix{Len: uint32(l)}
 				p.Address.FromUint32(dst)
 				for i := range m.fibAddDelHooks.hooks {
-					m.fibAddDelHooks.Get(i)(f.index, p, newAdj, newAdj == ip.AdjNil /* isDel */)
+					m.fibAddDelHooks.Get(i)(f.index, p, to, isDel)
 				}
 			}
 		}
 	}
+}
 
-	f.mtrie.maybeRemapAdjacencies(m)
-	m.NRemaps = 0
+func (m *Main) remapAdjacency(from, to ip.Adj) {
+	for i := range m.fibs {
+		f := m.fibs[i]
+		f.mapFibRemapAdjacency(m, from, to)
+		f.mtrie.remapAdjacency(from, to)
+	}
 }
 
 func (f *Fib) Get(p *Prefix) (a ip.Adj, ok bool) {
@@ -441,7 +444,16 @@ func (f *Fib) deleteMatchingRoutes(m *Main, key *Prefix) {
 	f.foreachMatchingPrefix(key, func(p *Prefix, a ip.Adj) {
 		f.Del(m, p)
 	})
-	f.maybeRemapAdjacencies(m)
+}
+
+func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
+	oldAdj, ok := f.addDel(m, p, r, isDel)
+	if !ok {
+		panic("addDelReplace") // should never fail
+	}
+	if oldAdj != ip.AdjNil {
+		m.DelAdj(oldAdj)
+	}
 }
 
 func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
@@ -462,7 +474,7 @@ func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
 			m.CallAdjAddHooks(ai)
 			addDelAdj = ai
 		}
-		fib.addDel(m, &p, addDelAdj, isDel)
+		fib.addDelReplace(m, &p, addDelAdj, isDel)
 		ifa.NeighborProbeAdj = addDelAdj
 	}
 
@@ -479,7 +491,7 @@ func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
 			addDelAdj = ai
 		}
 		p.Len = 32
-		fib.addDel(m, &p, addDelAdj, isDel)
+		fib.addDelReplace(m, &p, addDelAdj, isDel)
 	}
 
 	if isDel {
@@ -524,8 +536,8 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 		return
 	}
 
-	// If interface is up remove interface routes.
-	if isUp && !isDel {
+	// If interface is up add interface routes.
+	if isUp && !isDel && !exists {
 		m.addDelInterfaceRoutes(ia, isDel)
 	}
 
