@@ -41,6 +41,7 @@ func (m *Main) Init() (err error) {
 		GetRoute:         m.getRoute,
 		GetRouteFibIndex: m.getRouteFibIndex,
 		AddDelRoute:      m.addDelRoute,
+		RemapAdjacency:   m.remapAdjacency,
 	}
 	m.Main.Init(v, cf)
 	m.nodeInit(v)
