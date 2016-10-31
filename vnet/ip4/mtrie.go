@@ -231,34 +231,32 @@ func (s *addDelLeaf) unsetLeafHelper(m *mtrie, oldPlyIndex, keyByteIndex uint) (
 func (s *addDelLeaf) set(m *mtrie)        { s.setLeafHelper(m, rootPlyIndex, 0) }
 func (s *addDelLeaf) unset(m *mtrie) bool { return s.unsetLeafHelper(m, rootPlyIndex, 0) }
 
-func (l *leaf) remap(m *Main) (remapEmpty int) {
+func (l *leaf) remap(from, to ip.Adj) (remapEmpty int) {
 	if l.isTerminal() {
-		adj := l.ResultIndex()
-		if r := m.Remaps[adj]; r.IsValid() {
-			newAdj := r.GetAdj()
-			if newAdj == ip.AdjNil {
+		if adj := l.ResultIndex(); adj == from {
+			if to == ip.AdjNil {
 				remapEmpty = 1
 				*l = emptyLeaf
 			} else {
-				l.setResult(newAdj)
+				l.setResult(to)
 			}
 		}
 	}
 	return
 }
 
-func (p *ply) remap(m *Main) {
+func (p *ply) remap(from, to ip.Adj) {
 	nRemapEmpty := 0
 	for i := range p.leaves {
-		nRemapEmpty += p.leaves[i].remap(m)
+		nRemapEmpty += p.leaves[i].remap(from, to)
 	}
 	p.nNonEmpty -= nRemapEmpty
 }
 
-func (t *mtrie) maybeRemapAdjacencies(m *Main) {
+func (t *mtrie) remapAdjacency(from, to ip.Adj) {
 	for i := uint(0); i < t.plyPool.Len(); i++ {
 		if !t.plyPool.IsFree(i) {
-			t.plyPool.plys[i].remap(m)
+			t.plyPool.plys[i].remap(from, to)
 		}
 	}
 }
