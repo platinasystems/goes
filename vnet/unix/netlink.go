@@ -185,7 +185,8 @@ func (e *netlinkEvent) EventAction() {
 	var err error
 	vn := e.m.v
 	known := false
-	for _, msg := range e.msgs {
+	for imsg, msg := range e.msgs {
+		isLastInEvent := imsg+1 == len(e.msgs)
 		if e.m.verboseNetlink {
 			e.m.v.Logf("netlink %s\n", msg)
 		}
@@ -208,10 +209,10 @@ func (e *netlinkEvent) EventAction() {
 			switch v.Family {
 			case netlink.AF_INET:
 				known = true
-				err = e.m.ip4RouteMsg(v)
+				err = e.m.ip4RouteMsg(v, isLastInEvent)
 			case netlink.AF_INET6:
 				known = true
-				err = e.m.ip6RouteMsg(v)
+				err = e.m.ip6RouteMsg(v, isLastInEvent)
 			}
 		case *netlink.NeighborMessage:
 			switch v.Family {
@@ -318,7 +319,7 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	return
 }
 
-func (m *Main) ip4RouteMsg(v *netlink.RouteMessage) (err error) {
+func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) {
 	switch v.Protocol {
 	case netlink.RTPROT_KERNEL, netlink.RTPROT_REDIRECT:
 		// Ignore all except routes that are static (RTPROT_BOOT) or originating from routing-protocols.
@@ -359,6 +360,6 @@ func ip6Prefix(t netlink.Attr, l uint8) (p ip6.Prefix) {
 }
 
 // not yet
-func (m *Main) ip6IfaddrMsg(v *netlink.IfAddrMessage) (err error)     { return }
-func (m *Main) ip6NeighborMsg(v *netlink.NeighborMessage) (err error) { return }
-func (m *Main) ip6RouteMsg(v *netlink.RouteMessage) (err error)       { return }
+func (m *Main) ip6IfaddrMsg(v *netlink.IfAddrMessage) (err error)                   { return }
+func (m *Main) ip6NeighborMsg(v *netlink.NeighborMessage) (err error)               { return }
+func (m *Main) ip6RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) { return }
