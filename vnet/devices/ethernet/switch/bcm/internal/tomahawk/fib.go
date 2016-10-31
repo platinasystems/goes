@@ -209,6 +209,9 @@ func (pl *ip4_fib_prefix_len) alloc(t *tomahawk) (ei uint32) {
 		pl.n_half_entries += delta
 		for j := uint(len(fm.prefix_lens)) - 1; j > pl.index; j-- {
 			plʹ := &fm.prefix_lens[j]
+			if plʹ.base_index+delta >= 2*n_l3_defip_entries {
+				panic("fib tcam overflow; more than 16k entries")
+			}
 			if plʹ.n_half_entries > 0 {
 				plʹ.shift_up(t, q, delta)
 			}
