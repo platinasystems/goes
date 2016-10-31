@@ -20,6 +20,7 @@ type netlink_add_del struct {
 	ip4_prefix ip4.Prefix
 	count      uint
 	ip4_nhs    []ip4.NextHop
+	wait       time.Duration
 	fib_index  ip.FibIndex
 }
 
@@ -64,14 +65,18 @@ func (m *netlinkMain) add_del() {
 				n_tx++
 				if n_tx > 256 {
 					m.s.TxFlush()
-					time.Sleep(10 * time.Millisecond)
+					if x.wait != 0 {
+						time.Sleep(x.wait)
+					}
 					n_tx = 0
 				}
 			}
 		}
 		if n_tx > 0 {
 			m.s.TxFlush()
-			time.Sleep(10 * time.Millisecond)
+			if x.wait != 0 {
+				time.Sleep(x.wait)
+			}
 		}
 		m.m.v.Logf("done %s\n", &x)
 	}
@@ -95,9 +100,12 @@ func (m *netlinkMain) ip_route(c cli.Commander, w cli.Writer, in *cli.Input) (er
 	x.count = 1
 loop:
 	for !in.End() {
+		var wait float64
 		switch {
 		case in.Parse("c%*ount %d", &x.count):
 		case in.Parse("t%*able %d", &x.fib_index):
+		case in.Parse("w%*ait %f", &wait):
+			x.wait = time.Duration(wait * float64(time.Second))
 		default:
 			break loop
 		}
