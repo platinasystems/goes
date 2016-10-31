@@ -83,6 +83,12 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 		delete(nf.indexByAddress, k)
 	}
 	if isDel {
+		if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
+			return
+		}
+
+		im.DelAdj(ai)
+
 		*in = ipNeighbor{}
 	} else {
 		is_new_adj := len(as) == 0
