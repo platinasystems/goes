@@ -242,7 +242,7 @@ func (m *ip4_fib_main) free(t *tomahawk, i uint32) {
 	q.Do()
 }
 
-func (t *tomahawk) ip4_fib_add_del(fib_index ip.FibIndex, p *ip4.Prefix, adj ip.Adj, isDel bool) {
+func (t *tomahawk) ip4_fib_add_del(fib_index ip.FibIndex, p *ip4.Prefix, adj ip.Adj, isDel bool, isRemap bool) {
 	am := &t.adjacency_main
 	fm := &t.ip4_fib_main
 	fl := &fm.prefix_lens[32-p.Len]

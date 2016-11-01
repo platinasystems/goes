@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 
+	"errors"
 	"fmt"
 )
 
@@ -162,7 +163,7 @@ func (f *Fib) Len() (n uint) {
 	return
 }
 
-type FibAddDelHook func(i ip.FibIndex, p *Prefix, r ip.Adj, isDel bool)
+type FibAddDelHook func(i ip.FibIndex, p *Prefix, r ip.Adj, isDel bool, isRemap bool)
 type IfAddrAddDelHook func(ia ip.IfAddr, isDel bool)
 
 //go:generate gentemplate -id FibAddDelHook -d Package=ip4 -d DepsType=FibAddDelHookVec -d Type=FibAddDelHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
@@ -172,7 +173,7 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 	// Call hooks before unset.
 	if isDel {
 		for i := range main.fibAddDelHooks.hooks {
-			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel)
+			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel, false)
 		}
 	}
 
@@ -213,7 +214,7 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 	// Call hooks after add.
 	if !isDel {
 		for i := range main.fibAddDelHooks.hooks {
-			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel)
+			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel, false)
 		}
 	}
 
@@ -255,7 +256,7 @@ func (f *Fib) mapFibRemapAdjacency(m *Main, from, to ip.Adj) {
 				p := &Prefix{Len: uint32(l)}
 				p.Address.FromUint32(dst)
 				for i := range m.fibAddDelHooks.hooks {
-					m.fibAddDelHooks.Get(i)(f.index, p, to, isDel)
+					m.fibAddDelHooks.Get(i)(f.index, p, to, isDel, true)
 				}
 			}
 		}
@@ -385,6 +386,8 @@ func (x *NextHop) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	in.Parse("weight %d", &x.Weight)
 }
 
+var ErrNextHopNotFound = errors.New("next hop not found")
+
 func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error) {
 	f := m.fibBySi(nh.Si)
 
@@ -412,7 +415,7 @@ func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error
 		}
 	} else {
 		if nhAdj, ok = f.Get(&Prefix{Address: nh.Address, Len: 32}); !ok {
-			err = fmt.Errorf("next-hop %s/32 not found in fib", &nh.Address)
+			err = ErrNextHopNotFound
 			return
 		}
 	}
