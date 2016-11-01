@@ -26,7 +26,7 @@ func KillAll(sig syscall.Signal) (err error) {
 		return
 	}
 	thispid := os.Getpid()
-	exes, err := filepath.Glob("/proc/*/exe")
+	exes, err := filepath.Glob("/proc/[0-9]*/exe")
 	if err != nil {
 		return
 	}
@@ -38,13 +38,13 @@ func KillAll(sig syscall.Signal) (err error) {
 		}
 		spid := strings.TrimPrefix(strings.TrimSuffix(exe, "/exe"),
 			"/proc/")
-		fmt.Sscan(spid, &pid)
-		if pid == thispid {
+		n, e := fmt.Sscan(spid, &pid)
+		if n != 1 || e != nil || pid == thispid || pid == 0 {
 			continue
 		}
 		_, e = os.Stat(fmt.Sprint("/proc/", spid, "/stat"))
 		if e == nil {
-			e = syscall.Kill(pid, syscall.SIGTERM)
+			e = syscall.Kill(pid, sig)
 			if err == nil {
 				err = e
 			}

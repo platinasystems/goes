@@ -7,10 +7,13 @@
 package stop
 
 import (
+	"os"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/initutils/internal"
+	"github.com/platinasystems/go/sockfile"
+	"github.com/platinasystems/go/pidfile"
 )
 
 const Name = "stop"
@@ -28,10 +31,12 @@ func (cmd) Main(...string) error {
 		return err
 	}
 	err = internal.KillAll(syscall.SIGTERM)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	if e := internal.KillAll(syscall.SIGKILL); err == nil {
 		err = e
 	}
+	os.RemoveAll(sockfile.Dir)
+	os.RemoveAll(pidfile.Dir)
 	return err
 }
 
