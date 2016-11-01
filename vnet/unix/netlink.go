@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
 
@@ -16,14 +17,18 @@ import (
 	"sync"
 )
 
+type unreachable_ip4_next_hop map[ip4.Prefix]struct{}
+
 type netlinkMain struct {
 	loop.Node
-	m            *Main
-	s            *netlink.Socket
-	c            chan netlink.Message
-	e            *netlinkEvent
-	eventPool    sync.Pool
-	add_del_chan chan netlink_add_del
+	m                         *Main
+	s                         *netlink.Socket
+	c                         chan netlink.Message
+	e                         *netlinkEvent
+	eventPool                 sync.Pool
+	add_del_chan              chan netlink_add_del
+	unreachable_ip4_next_hops map[ip4.NextHop]unreachable_ip4_next_hop
+	current_del_next_hop      ip4.NextHop
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -57,7 +62,7 @@ func (m *Main) addMsg(msg netlink.Message) {
 	if m.msgGeneratesEvent(msg) {
 		e.msgs = append(e.msgs, msg)
 	} else {
-		if m.verboseNetlink {
+		if m.verboseNetlink > 1 {
 			m.v.Logf("netlink ignore %s\n", msg)
 		}
 		// Done with message.
@@ -100,6 +105,8 @@ func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 	if err != nil {
 		panic(err)
 	}
+	m4 := ip4.GetMain(nm.m.v)
+	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
 	go nm.s.Listen()
 	go nm.m.listener(l)
 }
@@ -107,6 +114,7 @@ func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 func (nm *netlinkMain) Init(m *Main) (err error) {
 	nm.m = m
 	nm.eventPool.New = nm.newEvent
+	nm.unreachable_ip4_next_hops = make(map[ip4.NextHop]unreachable_ip4_next_hop)
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
 	nm.cliInit()
@@ -187,7 +195,7 @@ func (e *netlinkEvent) EventAction() {
 	known := false
 	for imsg, msg := range e.msgs {
 		isLastInEvent := imsg+1 == len(e.msgs)
-		if e.m.verboseNetlink {
+		if e.m.verboseNetlink > 0 {
 			e.m.v.Logf("netlink %s\n", msg)
 		}
 		switch v := msg.(type) {
@@ -257,6 +265,21 @@ func ip4Address(t netlink.Attr) (a ip4.Address) {
 	return
 }
 
+func ip4NextHop(t netlink.Attr, w ip.NextHopWeight, intf *Interface) (n ip4.NextHop) {
+	if t != nil {
+		b := t.(*netlink.Ip4Address)
+		for i := range b {
+			n.Address[i] = b[i]
+		}
+		n.Si = vnet.SiNil
+		if intf != nil {
+			n.Si = intf.si
+		}
+		n.Weight = w
+	}
+	return
+}
+
 func ethernetAddress(t netlink.Attr) (a ethernet.Address) {
 	if t != nil {
 		b := t.(*netlink.EthernetAddress)
@@ -299,25 +322,56 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		isStatic = true
 	}
 	intf := m.getInterface(v.Index)
-	dst := ip4Address(v.Attrs[netlink.NDA_DST])
+	nh := ip4NextHop(v.Attrs[netlink.NDA_DST], next_hop_weight, intf)
 	nbr := ethernet.IpNeighbor{
 		Si:       intf.si,
 		Ethernet: ethernetAddress(v.Attrs[netlink.NDA_LLADDR]),
-		Ip:       dst.ToIp(),
+		Ip:       nh.Address.ToIp(),
 	}
 	m4 := ip4.GetMain(m.v)
-	err = ethernet.GetMain(m.v).AddDelIpNeighbor(&m4.Main, &nbr, isDel)
+	em := ethernet.GetMain(m.v)
+	// Save away currently deleted next hop for use in ip4_fib_add_del callback.
+	if isDel {
+		m.current_del_next_hop = nh
+	}
+	err = em.AddDelIpNeighbor(&m4.Main, &nbr, isDel)
 
 	// Ignore delete of unknown static Arp entry.
 	if err == ethernet.ErrDelUnknownNeighbor && isStatic {
 		err = nil
 	}
-	// not yet
-	if false {
-		fmt.Printf("nbr if %s, isDel %v, %s -> %s\n", intf, isDel, m4.Main.AddressStringer(&nbr.Ip), &nbr.Ethernet)
+	// Add previously unreachable prefixes when next-hop becomes reachable.
+	if err == nil && !isDel {
+		if u, ok := m.unreachable_ip4_next_hops[nh]; ok {
+			delete(m.unreachable_ip4_next_hops, nh)
+			for p := range u {
+				err = m4.AddDelRouteNextHop(&p, &nh, isDel)
+				if err != nil {
+					return
+				}
+			}
+		}
 	}
 	return
 }
+
+func (m *Main) add_ip4_unreachable_next_hop(p ip4.Prefix, nh ip4.NextHop) {
+	u := m.unreachable_ip4_next_hops[nh]
+	if u == nil {
+		u = unreachable_ip4_next_hop(make(map[ip4.Prefix]struct{}))
+	}
+	u[p] = struct{}{}
+	m.unreachable_ip4_next_hops[nh] = u
+}
+
+func (m *Main) ip4_fib_add_del(fib_index ip.FibIndex, p *ip4.Prefix, adj ip.Adj, isDel bool, isRemap bool) {
+	if isDel && isRemap && adj == ip.AdjNil {
+		m.add_ip4_unreachable_next_hop(*p, m.current_del_next_hop)
+	}
+}
+
+// FIXME: Not sure how netlink specifies nexthop weight, so we just set all weights to equal.
+const next_hop_weight = 1
 
 func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) {
 	switch v.Protocol {
@@ -330,21 +384,23 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 	}
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
 	intf := m.ifAttr(v.Attrs[netlink.RTA_OIF])
-	nh := ip4.NextHop{
-		Si:      vnet.SiNil,
-		Address: ip4Address(v.Attrs[netlink.RTA_GATEWAY]),
-		// FIXME: Not sure how netlink specifies nexthop weight.
-		Weight: 1,
-	}
-	if intf != nil {
-		nh.Si = intf.si
-	}
+
+	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, intf)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
-	if false {
-		fmt.Printf("route if %s, isDel %v, %s -> %+v %s\n", intf, isDel, &p, &nh, err)
-	}
 	m4 := ip4.GetMain(m.v)
 	err = m4.AddDelRouteNextHop(&p, &nh, isDel)
+	if err == ip4.ErrNextHopNotFound {
+		err = nil
+		if u, ok := m.unreachable_ip4_next_hops[nh]; !ok {
+			if !isDel {
+				m.add_ip4_unreachable_next_hop(p, nh)
+			} else {
+				err = ip4.ErrNextHopNotFound
+			}
+		} else if isDel {
+			delete(u, p)
+		}
+	}
 	return
 }
 
