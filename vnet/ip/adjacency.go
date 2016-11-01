@@ -88,13 +88,11 @@ type Adjacency struct {
 func (a *Adjacency) String(m *Main) (ss []string) {
 	s := a.LookupNextIndex.String()
 	ni := a.LookupNextIndex
-
-	if a.IfAddr != IfAddrNil {
-		s += " " + a.IfAddr.String(m)
-	}
-
-	if ni == LookupNextRewrite {
+	switch {
+	case ni == LookupNextRewrite:
 		s += " " + a.Rewrite.String(m.v)
+	case a.IfAddr != IfAddrNil:
+		s += " " + a.IfAddr.String(m)
 	}
 	ss = append(ss, s)
 	return
