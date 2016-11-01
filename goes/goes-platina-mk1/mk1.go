@@ -44,14 +44,12 @@ import (
 	"time"
 )
 
-const (
-	Machine        = "platina-mk1"
-	statsTimerTick = 5
-)
+const Machine = "platina-mk1"
 
 type platform struct {
 	vnet.Package
 	*bcm.Platform
+	p *Info
 }
 
 type parser interface {
@@ -63,8 +61,8 @@ type Info struct {
 	name     string
 	prefixes []string
 	attrs    machined.Attrs
-	stop     chan struct{}
 	v        *vnet.Vnet
+	statsPoller
 }
 
 type AttrInfo struct {
@@ -151,38 +149,23 @@ func (p *Info) Main(...string) error {
 		}
 	}
 
-	var in parse.Input
-	//vnetArgsLine := fmt.Sprint("cli { listen { socket ", VnetCmdSock, " no-prompt } }")
-	//vnetArgs := strings.Split(vnetArgsLine, " ")
-	in.Add("cli", "{",
-		"listen",
-		"{", "socket", sockfile.Path("npu"), "no-prompt", "}",
-		"}")
-	p.v = &vnet.Vnet{}
+	gdbWait()
 
-	bcm.Init(p.v)
-	ethernet.Init(p.v)
-	ip4.Init(p.v)
-	ip6.Init(p.v)
-	// Temporarily remove to get goesdeb running vnet
-	//ixge.Init(p.v)
-	pci.Init(p.v)
-	pg.Init(p.v)
-	unix.Init(p.v)
+	return p.startVnet()
+}
 
-	plat := &platform{}
-	p.v.AddPackage("platform", plat)
-	plat.DependsOn("pci-discovery") // after pci discovery
+var oingoes int
 
-	p.stop = make(chan struct{})
-	go p.ticker()
-
-	return p.v.Run(&in)
+func gdbWait() {
+	// Change false to true to enable.
+	// In gdb say "p 'main.oingoes'=1" to break out of loop.
+	for false && oingoes == 0 {
+		time.Sleep(1 * time.Second)
+	}
 }
 
 func (p *Info) Close() error {
-	// FIXME: Find a way to stop vnet
-	close(p.stop)
+	// Stop vnet.
 	return nil
 }
 
@@ -314,24 +297,48 @@ func (p *Info) Set(key, value string) error {
 	return nil
 }
 
-func (p *Info) ticker() {
-	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-p.stop:
-			return
-		case <-t.C:
-			p.stats()
-		}
-	}
+func (p *Info) startVnet() error {
+	var in parse.Input
+	in.Add("cli { listen { no-prompt socket " + sockfile.Path("npu") + "} }")
+	v := &vnet.Vnet{}
+	p.v = v
+
+	bcm.Init(v)
+	ethernet.Init(v)
+	ip4.Init(v)
+	ip6.Init(v)
+	// Temporarily remove to get goesdeb running vnet
+	//ixge.Init(v)
+	pci.Init(v)
+	pg.Init(v)
+	unix.Init(v)
+
+	plat := &platform{p: p}
+	v.AddPackage("platform", plat)
+	plat.DependsOn("pci-discovery") // after pci discovery
+
+	p.statsPoller.p = p // initialize back pointer
+
+	return v.Run(&in)
 }
 
-func (p *Info) stats() {
-	p.v.ForeachHwIfCounter(false, func(hi vnet.Hi, counter string, count uint64) {
-		hiName := hi.Name(p.v)
-		// Limit display to front-panel ports i.e.  "eth-*" ?
-		countVal := fmt.Sprintf("%d", count)
-		info.Publish(strings.Replace(hiName+"."+counter, " ", "_", -1), countVal)
-	})
+const statsPollerInterval = 5
+
+type statsPoller struct {
+	vnet.Event
+	p *Info
+}
+
+func (p *statsPoller) startStatsPoller() { p.p.v.AddTimedEvent(p, statsPollerInterval) }
+func (p *statsPoller) String() string    { return "redis stats poller" }
+func (p *statsPoller) EventAction() {
+	const (
+		includeZeroCounters = false
+		unixInterfacesOnly  = true // only front panel ports (e.g. no bcm-cpu or loopback ports)
+	)
+	p.p.v.ForeachHwIfCounter(includeZeroCounters, unixInterfacesOnly,
+		func(hi vnet.Hi, counter string, count uint64) {
+			info.Publish(hi.Name(p.p.v)+"."+strings.Replace(counter, " ", "_", -1), count)
+		})
+	p.startStatsPoller() // schedule next event
 }

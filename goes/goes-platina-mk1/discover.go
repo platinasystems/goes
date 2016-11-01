@@ -29,6 +29,7 @@ func (p *platform) Init() (err error) {
 		v.Logf("boardPortLedEnable failure: %s", err)
 	}
 
+	p.p.startStatsPoller()
 	return
 }
 
