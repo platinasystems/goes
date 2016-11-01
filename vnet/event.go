@@ -49,3 +49,5 @@ func (n *Node) AddTimedEvent(r Eventer, dt float64) {
 
 func (e *Event) Signal(r Eventer)                    { e.n.SignalEvent(r) }
 func (e *Event) AddTimedEvent(r Eventer, dt float64) { e.n.AddTimedEvent(r, dt) }
+func (v *Vnet) SignalEvent(r Eventer)                { v.eventNode.SignalEvent(r) }
+func (v *Vnet) AddTimedEvent(r Eventer, dt float64)  { v.eventNode.AddTimedEvent(r, dt) }
