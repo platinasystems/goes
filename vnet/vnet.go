@@ -63,3 +63,5 @@ func (v *Vnet) Run(in *parse.Input) (err error) {
 	err = v.ExitPackages()
 	return
 }
+
+func (v *Vnet) Quit() { v.loop.Quit() }
