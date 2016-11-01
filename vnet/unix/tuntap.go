@@ -55,7 +55,7 @@ type Main struct {
 	vnet.Package
 
 	verbosePackets bool
-	verboseNetlink bool
+	verboseNetlink int
 
 	netlinkMain
 	nodeMain
@@ -435,7 +435,7 @@ func (m *Main) Configure(in *parse.Input) {
 		case in.Parse("dump-packets"):
 			m.verbosePackets = true
 		case in.Parse("dump-netlink"):
-			m.verboseNetlink = true
+			m.verboseNetlink++
 		default:
 			panic(parse.ErrInput)
 		}
