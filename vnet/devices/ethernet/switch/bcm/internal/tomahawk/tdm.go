@@ -217,7 +217,7 @@ func (p *tdm_pipe) initEntries(nTokens int) {
 	c.entries[tx] = c.entryBuf[tx][:nTokens]
 }
 
-func (p *tdm_pipe) initSdk(pipe uint) {
+func (p *tdm_pipe) initTdmCalendar(pipe uint) {
 	nTokens := 215
 	p.initEntries(nTokens)
 	c := &p.calendar
@@ -295,7 +295,7 @@ func (t *tomahawk) compute_tdm_calendar(pipe uint) {
 	c := &p.calendar
 
 	if false {
-		p.initSdk(pipe)
+		p.initTdmCalendar(pipe)
 		return
 	}
 

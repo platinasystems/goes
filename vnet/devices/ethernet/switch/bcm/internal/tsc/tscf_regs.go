@@ -340,8 +340,8 @@ type tscf_regs struct {
 		// [9] bypass cl49 tx state machine
 		// [6:5] 1 => force encoder output to local faults
 		//       2 => force output to idles
-		// [1:0] encode mode (undocumented).
-		//   0 => normal, 1 => xfi, 2 => mld (? guessing from sdk)
+		// [1:0] encode mode (undoc).
+		//       0 => normal, 1 => xfi, 2 => mld
 		encode_control pcs_lane_reg
 
 		_ [0xc113 - 0xc112]pad_reg

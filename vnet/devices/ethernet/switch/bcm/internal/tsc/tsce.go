@@ -387,7 +387,7 @@ func (phy *Tsce) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
 	}
 
 	// Set the speed-id and enable the port; then wait for valid status before continuing
-	// NB: SDK does firstLaneMask for speed change enable but we don't and it works.
+	// NB: does firstLaneMask for speed change enable but we don't and it works.
 	firstLaneMask.ForeachMask(func(lm m.LaneMask) {
 		r.speed_change_x4.control.Set(q, lm, uint16(ts.speed)|0<<8)
 	})
@@ -608,7 +608,7 @@ func (phy *Tsce) SetAutoneg(port m.Porter, enable bool) {
 	})
 	q.Do()
 
-	if true { //sdk does this
+	if true { // NB. does this..
 		// test
 		r.speed_change_x4.control.Modify(q, firstLaneMask, 0<<8, 1<<8)
 		q.Do()

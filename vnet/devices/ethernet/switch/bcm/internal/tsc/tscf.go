@@ -661,7 +661,7 @@ func (phy *Tscf) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
 
 	// Set the speed-id and enable the port; then wait for valid status before continuing
 	// ts.speed should be 0x42 for 100e9
-	// NB: SDK does firstLaneMask for speed change enable but we don't and it works.
+	// NB: firstLaneMask for speed change enable but we don't and it works.
 	firstLaneMask.ForeachMask(func(lm m.LaneMask) {
 		r.speed_change_x4.control.Set(q, lm, uint16(ts.speed)|0<<8)
 	})

@@ -194,8 +194,9 @@ type tx_l3_interface_entry struct {
 
 	efp_class_id uint16
 
-	// Indicates if the packet needs to be only L2 Switched and only L2 modifications needs to be done.
-	// What does this mean?  Corresponds to SDK BCM_L3_L2ONLY interface flag.
+	// Indicates if the packet needs to be:
+	// only L2 Switched and only L2 modifications needs to be done
+	// (corresponds to the l3_l2_only interface flag).
 	l2_switch bool
 
 	inner_vlan, outer_vlan struct {

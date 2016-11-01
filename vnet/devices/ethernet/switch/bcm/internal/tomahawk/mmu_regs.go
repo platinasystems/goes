@@ -23,8 +23,8 @@ const (
 	mmu_per_packet_metadata_overhead = 64
 	// MMU chops packets into fixed-sized cells of 208 bytes.
 	mmu_cell_bytes = 208
-	// Reserve 720 CFAP Cells per XPE
-	mmu_reserved_cfap_cells = 0 // 720 sdk value
+	// Reserve CFAP Cells per XPE NB.720
+	mmu_reserved_cfap_cells = 0
 	// maximum packet bytes
 	mmu_max_packet_bytes = 9416
 	// Number of tx queues: 8 cos + SC system control + QM queue management (?)

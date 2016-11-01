@@ -72,7 +72,7 @@ func (t *tomahawk) resetTemp() {
 
 //Initialize temperature sensors
 func (t *tomahawk) tmon_init() {
-	//read once to clear garbage data per BCMSDK
+	// read once to clear garbage data
 	q := t.getDmaReq()
 	var tmon tMon
 	for i := range tmon.Temp {
@@ -100,7 +100,7 @@ func (t *tomahawk) tmon_init() {
 		}
 	}
 
-	//enable max temp interrupt for sensor 6 per BCMSDK
+	// enable max temp interrupt for sensor 6
 	t.top_regs.temperature_sensor_interrupt.enable.set(q, 0x00002000)
 	q.Do()
 
