@@ -232,12 +232,16 @@ func (m *interfaceMain) foreachHwIfCounter(zero bool, hi Hi, f func(name string,
 	}
 }
 
-func (v *Vnet) ForeachHwIfCounter(zero bool, f func(hi Hi, name string, value uint64)) {
+func (v *Vnet) ForeachHwIfCounter(zero bool, unixOnly bool, f func(hi Hi, name string, value uint64)) {
 	for i := range v.hwIferPool.elts {
 		if v.hwIferPool.IsFree(uint(i)) {
 			continue
 		}
-		h := v.hwIferPool.elts[i].GetHwIf()
+		hwifer := v.hwIferPool.elts[i]
+		if unixOnly && !hwifer.IsUnix() {
+			continue
+		}
+		h := hwifer.GetHwIf()
 		if h.unprovisioned {
 			continue
 		}
