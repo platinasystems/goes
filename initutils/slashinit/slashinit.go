@@ -135,7 +135,7 @@ func (cmd) Main(_ ...string) error {
 		for _, cp := range []struct {
 			src, dst string
 		}{
-			{"/usr/bin/goes", "/newroot/usr/bin/goes"},
+			{"/init", "/newroot/usr/bin/goes"},
 			{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
 		} {
 			_, err = os.Stat(cp.dst)
@@ -163,7 +163,7 @@ func (cmd) Main(_ ...string) error {
 		for _, ln := range []struct {
 			src, dst string
 		}{
-			{"../bin/goes", "/newroot/sbin/init"},
+			{"../usr/bin/goes", "/newroot/sbin/init"},
 		} {
 			if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
 				err = os.Symlink(ln.src, ln.dst)
@@ -290,7 +290,7 @@ func (cmd) Main(_ ...string) error {
 			"TERM=" + os.Getenv("TERM"),
 		})
 	} else {
-		err = command.Main(sbininit)
+		err = command.Main("start")
 	}
 	return err
 }

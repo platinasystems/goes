@@ -13,7 +13,8 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/initutils/goesd"
+	"github.com/platinasystems/go/initutils"
+	"github.com/platinasystems/go/initutils/start"
 	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/machined"
 	"github.com/platinasystems/go/machined/info"
@@ -91,12 +92,13 @@ func main() {
 	command.Plot(dlv.New()...)
 	command.Plot(diagutils.New()...)
 	command.Plot(fsutils.New()...)
-	command.Plot(goesd.New(), machined.New(), npu.New())
+	command.Plot(initutils.New()...)
 	command.Plot(kutils.New()...)
+	command.Plot(machined.New(), npu.New())
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Sort()
-	goesd.Hook = func() error {
+	start.Hook = func() error {
 		os.Setenv("REDISD", "lo eth0")
 		return nil
 	}

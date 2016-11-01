@@ -30,8 +30,8 @@ import (
 	"github.com/platinasystems/go/fsutils"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/gpio"
-	"github.com/platinasystems/go/initutils/sbininit"
-	"github.com/platinasystems/go/initutils/slashinit"
+	"github.com/platinasystems/go/initutils"
+	"github.com/platinasystems/go/initutils/start"
 	"github.com/platinasystems/go/kutils"
 	"github.com/platinasystems/go/led"
 	"github.com/platinasystems/go/log"
@@ -133,13 +133,13 @@ func main() {
 	command.Plot(coreutils.New()...)
 	command.Plot(diagutils.New()...)
 	command.Plot(fsutils.New()...)
-	command.Plot(sbininit.New(), slashinit.New(), machined.New())
+	command.Plot(initutils.New()...)
 	command.Plot(kutils.New()...)
+	command.Plot(machined.New())
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Sort()
-
-	sbininit.Hook = func() error {
+	start.Hook = func() error {
 		os.Setenv("REDISD", "lo eth0")
 		return nil
 	}

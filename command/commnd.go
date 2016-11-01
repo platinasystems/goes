@@ -383,6 +383,7 @@ func terminate(cmd interface{}, pidfn string, ch chan os.Signal) {
 				method.Close()
 			}
 			os.Remove(pidfn)
+			fmt.Println("killed")
 			os.Exit(0)
 		}
 		os.Remove(pidfn)
