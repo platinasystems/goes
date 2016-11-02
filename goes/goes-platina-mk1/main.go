@@ -80,7 +80,7 @@ func hook() error {
 	i.v = v
 	i.vi = vnetinfo.New(v, vnetinfo.Config{
 		UnixInterfacesOnly: false,
-		PublishAllCounters: true,
+		PublishAllCounters: false,
 		GdbWait:            false,
 	})
 	machined.Plot(
