@@ -1,10 +1,45 @@
 This repos contains Platina System's open source GO projects.
 
-Run this to build all debian daemons and initrd's.
+To install a select MACHINE,
 
 ```console
-./scripts/mkall
+$ go generate github.com/platinasystems/go/version
+$ go build github.com/platinasystems/go/goes/goes-MACHINE
+$ sudo ./goes-MACHINE install
 ```
+
+These are the available MACHINEs,
+
+- [example] (GOARCH: amd64 or arm)
+- [platina-mk1] (GOARCH: amd64)
+
+To stop and remove,
+
+```console
+$ sudo goes uninstall
+```
+
+After install, to enable BASH completion,
+
+```console
+. /usr/share/bash-completion/completions/goes
+```
+
+To see the commands available on the installed MACHINE,
+
+```console
+$ goes help
+```
+
+Or,
+
+```console
+$ goes
+goes> help
+```
+
+Then `man` any of the listed commands or `man cli` to see how to use the
+command line interface.
 
 ---
 
@@ -12,3 +47,5 @@ Run this to build all debian daemons and initrd's.
 Use of this source code is governed by this BSD-style [LICENSE].*
 
 [LICENSE]: LICENSE
+[example]: goes/goes-example/README.md
+[platina-mk1]: goes/goes-platina-mk1/README.md
