@@ -14,11 +14,13 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/initutils/internal"
 )
 
 const Name = "install"
+const UsrBinGoes = "/usr/bin/goes"
+const EtcInitdGoes = "/etc/init.d/goes"
+const EtcDefaultGoes = "/etc/default/goes"
 
 // Machines may use this Hook to complete its installation.
 var Hook = func() error { return nil }
@@ -35,11 +37,10 @@ func (cmd) Main(...string) error {
 	if err != nil {
 		return err
 	}
-	prog, err := os.Readlink("/proc/self/exe")
-	if err != nil {
+	if err = stop(); err != nil {
 		return err
 	}
-	if err = install_prog(prog); err != nil {
+	if err = install_self(); err != nil {
 		return err
 	}
 	if err = install_default(); err != nil {
@@ -57,7 +58,7 @@ func (cmd) Main(...string) error {
 	if err = Hook(); err != nil {
 		return err
 	}
-	return command.Main("restart")
+	return start()
 
 }
 
@@ -67,14 +68,38 @@ func (cmd) Apropos() map[string]string {
 	}
 }
 
-func install_prog(prog string) error {
-	src, err := os.Open(prog)
+func stop() error {
+	_, err := os.Stat(UsrBinGoes)
+	if err != nil {
+		return nil
+	}
+	err = exec.Command(UsrBinGoes, "stop").Run()
+	if err != nil {
+		err = fmt.Errorf("goes stop: %v", err)
+	}
+	return err
+}
+
+func start() error {
+	err := exec.Command(UsrBinGoes, "start").Run()
+	if err != nil {
+		err = fmt.Errorf("goes start: %v", err)
+	}
+	return err
+}
+
+func install_self() error {
+	self, err := os.Readlink("/proc/self/exe")
+	if err != nil {
+		return err
+	}
+	src, err := os.Open(self)
 	if err != nil {
 		return err
 	}
 	defer src.Close()
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	dst, err := os.OpenFile("/usr/bin/goes", flags, os.FileMode(0755))
+	dst, err := os.OpenFile(UsrBinGoes, flags, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
@@ -84,9 +109,8 @@ func install_prog(prog string) error {
 }
 
 func install_init() error {
-	fn := "/etc/init.d/goes"
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(fn, flags, os.FileMode(0755))
+	f, err := os.OpenFile(EtcInitdGoes, flags, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
@@ -173,14 +197,14 @@ ecode="$?"
 	return err
 }
 
+// Install /etc/default/goes if and only if not already present.
 func install_default() error {
-	const fn = "/etc/default/goes"
-	_, err := os.Stat(fn)
+	_, err := os.Stat(EtcDefaultGoes)
 	if err == nil {
 		return nil
 	}
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(fn, flags, os.FileMode(0755))
+	f, err := os.OpenFile(EtcDefaultGoes, flags, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
@@ -203,11 +227,7 @@ func update_rc() error {
 		// no update-rc.d, may not be debian
 		return nil
 	}
-	err = exec.Command(
-		"/usr/sbin/update-rc.d",
-		"goes",
-		"defaults",
-	).Run()
+	err = exec.Command("/usr/sbin/update-rc.d", "goes", "defaults").Run()
 	if err != nil {
 		err = fmt.Errorf("update-rc.d: %v", err)
 	}
