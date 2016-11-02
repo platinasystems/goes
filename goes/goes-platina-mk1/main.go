@@ -77,7 +77,7 @@ func hook() error {
 	}
 	i.v = v
 	i.vi = vnetinfo.New(v, vnetinfo.Config{
-		UnixInterfacesOnly: false,
+		UnixInterfacesOnly: true,
 		PublishAllCounters: false,
 		GdbWait:            false,
 	})
