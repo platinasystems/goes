@@ -228,6 +228,13 @@ func Main(args ...string) (err error) {
 	flag.Aka("-complete", "--complete")
 	flag.Aka("-man", "--man")
 	flag.Aka("-usage", "--usage")
+	if name == "help" {
+		if len(args) == 0 {
+			name = "apropos"
+		} else {
+			name = "usage"
+		}
+	}
 	isDaemon := IsDaemon(name)
 	daemonFlagValue := os.Getenv(daemonFlag)
 	defer func() {
