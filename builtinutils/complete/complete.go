@@ -19,15 +19,20 @@ import (
 	"github.com/platinasystems/go/command"
 )
 
-type complete struct{}
+const Name = "-complete"
 
-func New() complete { return complete{} }
+type cmd struct{}
 
-func (complete) String() string { return "-complete" }
-func (complete) Tag() string    { return "builtin" }
-func (complete) Usage() string  { return "-complete COMMAND [ARGS]..." }
+func New() cmd { return cmd{} }
 
-func (complete complete) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return Name + " COMMAND [ARGS]..." }
+
+func (cmd) Main(args ...string) error {
+	if len(args) > 0 && args[0] == "goes" {
+		args = args[1:]
+	}
 	switch len(args) {
 	case 0:
 		for _, name := range command.Keys.Main {
@@ -40,8 +45,7 @@ func (complete complete) Main(args ...string) error {
 			}
 		}
 	default:
-		args = append(args[:1], append([]string{"-complete"},
-			args[1:]...)...)
+		args = append(args[:1], append([]string{Name}, args[1:]...)...)
 		return command.Main(args...)
 	}
 	return nil
