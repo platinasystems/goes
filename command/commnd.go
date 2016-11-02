@@ -427,6 +427,7 @@ func Plot(cmds ...interface{}) {
 				s = m[DefaultLang]
 			}
 			Apropos[k] = s
+			Keys.Apropos = append(Keys.Apropos, k)
 		}
 		if method, found := cmd.(manner); found {
 			m := method.Man()
