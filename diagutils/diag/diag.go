@@ -177,10 +177,10 @@ SYNOPSIS
 
 DESCRIPTION
 	Runs diagnostic tests to validate BMC functionality and interfaces
-	
+
 	EEPROM writing utility with diag prom
 	diag prom [-w | -d | -x86] [TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]
-	
+
 	[-x86]			executes command on host EEPROM
 
 	[-w] 			write flag with the following arguments
@@ -189,7 +189,7 @@ DESCRIPTION
 	"length" 		debug tool to write VALUE into length field
 	"copy"			copies host eeprom contents, updates PPN field, recalculates crc (vice versa with -x86)
 	TYPE VALUE 		debug tool to write ONIE field of TYPE with VALUE
-	
+
 	[-d]			delete flag with the following arguments
 	TYPE			delete the first ONIE field found with TYPE
 
