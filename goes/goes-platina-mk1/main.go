@@ -95,8 +95,6 @@ func hook() error {
 	return nil
 }
 
-func (p *Info) String() string { return p.name }
-
 func (i *Info) Main(...string) error {
 	// Public machine name.
 	info.Publish("machine", "platina-mk1")
@@ -134,6 +132,7 @@ func (i *Info) configureVnet() {
 	plat.DependsOn("pci-discovery")
 }
 
+func (p *Info) String() string                     { return p.name }
 func (*Info) Close() error                         { return nil }
 func (*Info) Set(key, value string) error          { return info.CantSet(key) }
 func (*Info) Del(key string) error                 { return info.CantDel(key) }

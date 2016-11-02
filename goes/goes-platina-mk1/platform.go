@@ -91,13 +91,9 @@ func (p *platform) boardInit() (err error) {
 }
 
 func (p *platform) boardPortInit(s bcm.Switch) (err error) {
-	cf := bcm.SwitchConfig{}
-
-	const (
-		numPortsDefault = 32
-	)
-
-	cf.Ports = make([]bcm.PortConfig, numPortsDefault)
+	cf := bcm.SwitchConfig{
+		Ports: make([]bcm.PortConfig, 32),
+	}
 
 	// Data ports
 	for i := range cf.Ports {

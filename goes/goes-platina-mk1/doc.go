@@ -18,7 +18,7 @@ SUBPORT - represents the subordinate port and is based upon speeds and provision
 
 Port provisioning:
 
-"hset eth-PORT.provision <valid descriptor>
+"hset vnet.eth-PORT.provision <valid descriptor>
 
           where valid descriptor is a comma-separated string representing the subports and their speeds.
           Valid desciptor examples:
