@@ -52,13 +52,14 @@ func (in *Input) Add(args ...string) {
 	in.buf = []byte(s)
 }
 
-func (in *Input) AddBuffer(b []byte) {
+func (in *Input) Set(b []byte) {
 	if len(in.buf) == 0 {
 		in.buf = b
 	} else {
 		in.buf = append(in.buf, b...)
 	}
 }
+func (in *Input) SetString(s string) { in.Set([]byte(s)) }
 
 func (in *Input) Save() uint {
 	i := in.saves.Len()
