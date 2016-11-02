@@ -84,25 +84,22 @@ func (i *Info) newEvent() interface{} {
 func (e *event) String() string { return fmt.Sprintf("redis set %s = %s", e.key, e.value) }
 func (e *event) EventAction() {
 	var (
-		hi vnet.Hi
-		bw vnet.Bandwidth
+		hi     vnet.Hi
+		si     vnet.Si
+		bw     vnet.Bandwidth
+		enable parse.Enable
 	)
 	e.in.Init(nil)
 	e.in.Add(e.key, e.value)
 	switch {
 	case e.in.Parse(e.i.prefix+"%v.speed %v", &hi, e.i.v, &bw):
 		e.err <- hi.SetSpeed(e.i.v, bw)
+	case e.in.Parse(e.i.prefix+"%v.admin %v", &si, e.i.v, &enable):
+		e.err <- si.SetAdminUp(e.i.v, bool(enable))
 	default:
 		e.err <- info.CantSet(e.key)
 	}
 	e.i.eventPool.Put(e)
-}
-
-func (i *Info) initialPublish() {
-	i.v.ForeachHwIf(i.UnixInterfacesOnly, func(hi vnet.Hi) {
-		h := i.v.HwIf(hi)
-		i.publish(hi.Name(i.v)+".speed", h.Speed().String())
-	})
 }
 
 func (i *Info) Set(key, value string) (err error) {
@@ -132,7 +129,12 @@ func (i *Info) Start() error {
 	return i.v.Run(&in)
 }
 
-const unixInterfacesOnly = true // only front panel ports (e.g. no bcm-cpu or loopback ports)
+func (i *Info) initialPublish() {
+	i.v.ForeachHwIf(i.UnixInterfacesOnly, func(hi vnet.Hi) {
+		h := i.v.HwIf(hi)
+		i.publish(hi.Name(i.v)+".speed", h.Speed().String())
+	})
+}
 
 func (i *Info) Init() {
 	p := &i.ifStatsPoller
@@ -158,7 +160,7 @@ func (p *ifStatsPoller) String() string      { return "redis stats poller" }
 func (p *ifStatsPoller) EventAction() {
 	// Enable to represent all possible counters in redis (most with 0 values)
 	includeZeroCounters := p.sequence == 0 && p.i.PublishAllCounters
-	p.i.v.ForeachHwIfCounter(includeZeroCounters, unixInterfacesOnly,
+	p.i.v.ForeachHwIfCounter(includeZeroCounters, p.i.UnixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
 			p.publish(hi.Name(p.i.v), counter, value)
 		})
