@@ -1,10 +1,6 @@
 *~
 *.swp
 /*.patch
-/bin
-/git
 /go-*
 /goes-*
-/goesd-*
-/src
 /*.cpio.xz
