@@ -1,3 +1,5 @@
+// Copyright 2015-2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
 // Package eeprom provides the ability to read data from an EEPROM device,
@@ -16,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/i2c"
+	"github.com/platinasystems/go/i2c"
 	"hash/crc32"
 )
 
