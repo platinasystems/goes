@@ -367,7 +367,7 @@ func (m *interfaceMain) init() {
 
 //go:generate gentemplate -d Package=vnet -id ifThread -d VecType=ifThreadVec -d Type=*InterfaceThread github.com/platinasystems/go/elib/vec.tmpl
 
-func (v *Vnet) RegisterHwInterface(h HwInterfacer, format string, args ...interface{}) (err error) {
+func (v *Vnet) RegisterAndProvisionHwInterface(h HwInterfacer, provision bool, format string, args ...interface{}) (err error) {
 	hi := Hi(v.hwIferPool.GetIndex())
 	v.hwIferPool.elts[hi] = h
 	hw := h.GetHwIf()
@@ -375,8 +375,22 @@ func (v *Vnet) RegisterHwInterface(h HwInterfacer, format string, args ...interf
 	hw.SetName(v, fmt.Sprintf(format, args...))
 	hw.vnet = v
 	hw.defaultId = h.DefaultId()
+	hw.unprovisioned = !provision
 	hw.si = v.NewSwIf(swIfTypeHardware, IfIndex(hw.hi))
+
+	isDel := false
+	m := &v.interfaceMain
+	for i := range m.hwIfAddDelHooks.hooks {
+		err := m.hwIfAddDelHooks.Get(i)(v, hi, isDel)
+		if err != nil {
+			panic(err) // how to recover?
+		}
+	}
 	return
+}
+
+func (v *Vnet) RegisterHwInterface(h HwInterfacer, format string, args ...interface{}) (err error) {
+	return v.RegisterAndProvisionHwInterface(h, true, format, args...)
 }
 
 func (m *interfaceMain) newInterfaceThread() (t *InterfaceThread) {

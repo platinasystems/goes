@@ -123,9 +123,10 @@ var phyInterfaceNames = [...]string{
 func (x PhyInterface) String() string { return elib.StringerHex(phyInterfaceNames[:], int(x)) }
 
 type InterfaceConfig struct {
-	Address      Address
-	PhyInterface PhyInterface
-	NativeVlan   Vlan
+	Address       Address
+	PhyInterface  PhyInterface
+	NativeVlan    Vlan
+	Unprovisioned bool
 }
 
 type Interface struct {
@@ -155,7 +156,7 @@ func (i *Interface) SupportsArp() {}
 func RegisterInterface(v *vnet.Vnet, hi HwInterfacer, config *InterfaceConfig, format string, args ...interface{}) {
 	i := hi.GetInterface()
 	i.InterfaceConfig = *config
-	v.RegisterHwInterface(hi, format, args...)
+	v.RegisterAndProvisionHwInterface(hi, !config.Unprovisioned, format, args...)
 }
 
 func (hi *Interface) FormatAddress() string    { return hi.Address.String() }
