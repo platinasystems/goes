@@ -6,10 +6,14 @@ package diag
 
 import (
 	"fmt"
+	"github.com/platinasystems/go/i2c"
 	"time"
 )
 
 func diagHost() error {
+
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
 
 	var r string
 	var d uint8

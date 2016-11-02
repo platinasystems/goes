@@ -8,6 +8,7 @@ package w83795
 import (
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/platinasystems/go/i2c"
@@ -167,7 +168,6 @@ func (h *HwMonitor) FrontTemp() float64 {
 	q.Reg.setMux(h)
 	r := getHwmRegsBank0()
 	r.BankSelect.set(h, 0x80)
-	r.TempCntl2.set(h, tempCtrl2)
 	t := r.FrontTemp.get(h)
 	u := r.FractionLSB.get(h)
 	return (float64(t) + ((float64(u >> 7)) * 0.25))
@@ -181,7 +181,6 @@ func (h *HwMonitor) RearTemp() float64 {
 	q.Reg.setMux(h)
 	r := getHwmRegsBank0()
 	r.BankSelect.set(h, 0x80)
-	r.TempCntl2.set(h, tempCtrl2)
 	t := r.RearTemp.get(h)
 	u := r.FractionLSB.get(h)
 	return (float64(t) + ((float64(u >> 7)) * 0.25))
@@ -273,9 +272,15 @@ func (h *HwMonitor) FanInit() {
 	r2.FanOutValue2.set(h, med)
 	lastSpeed = "med"
 
-	//enable hwm monitoring
+	//enable temperature monitoring
 	r2.BankSelect.set(h, 0x80)
+	r0.TempCntl2.set(h, tempCtrl2)
+
+	//temperature monitoring requires a delay before readings are valid
+	time.Sleep(500 * time.Millisecond)
 	r0.Configuration.set(h, 0x1d)
+
+	//	time.Sleep(1 * time.Second)
 }
 
 func (h *HwMonitor) SetFanSpeed(s string) {

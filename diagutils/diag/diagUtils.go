@@ -42,6 +42,7 @@ func diagPing(address string, count int) bool {
 
 // performs a read to i2c device address a on bus number b, returns true if read is successful
 func diagI2cPing(b uint8, a uint8, c uint8, count int) (bool, uint8) {
+
 	var (
 		bus i2c.Bus
 		sd  i2c.SMBusData
@@ -82,6 +83,7 @@ func diagI2cPing(b uint8, a uint8, c uint8, count int) (bool, uint8) {
 
 // write 1byte to bus b device address a (i.e. set mux channel)
 func diagI2cWrite1Byte(b uint8, a uint8, c uint8) {
+
 	var (
 		bus i2c.Bus
 		sd  i2c.SMBusData
@@ -114,6 +116,7 @@ func diagI2cWrite1Byte(b uint8, a uint8, c uint8) {
 }
 
 func diagI2cWriteOffsetByte(b uint8, a uint8, c uint8, d uint8) {
+
 	var (
 		bus i2c.Bus
 		sd  i2c.SMBusData
@@ -165,10 +168,24 @@ func gpioSet(name string, value bool) error {
 }
 
 // return true if test result r is within min and max limits
-func CheckPass(r float32, min float32, max float32) bool {
+func CheckPassF(r float64, min float64, max float64) string {
 	if r >= min && r <= max {
-		return true
+		return "pass"
 	} else {
-		return false
+		return "fail"
+	}
+}
+func CheckPassU(r uint16, min uint16, max uint16) string {
+	if r >= min && r <= max {
+		return "pass"
+	} else {
+		return "fail"
+	}
+}
+func CheckPassB(r bool, state bool) string {
+	if r == state {
+		return "pass"
+	} else {
+		return "fail"
 	}
 }

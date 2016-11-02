@@ -16,7 +16,9 @@ import (
 
 const Name = "diag"
 
-var debug bool
+var debug, x86, writeField, delField, writeSN bool
+var argF []string
+var flagF flags.Flag
 
 type cmd struct{}
 type Diag func() error
@@ -24,15 +26,24 @@ type Diag func() error
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [-debug]" }
+func (cmd) Usage() string {
+	return Name + " [-debug] | prom [-w | -d | -x86] [TYPE | \"crc\" | \"length\" | \"onie\" | \"copy\" ] [VALUE]"
+}
 
 func (cmd) Main(args ...string) error {
 	var diag string
-	flag, args := flags.New(args, "-debug")
+	flag, args := flags.New(args, "-debug", "-x86", "-w", "-d")
 	debug = flag["-debug"]
-	if n := len(args); n > 1 {
-		return fmt.Errorf("%v: unexpected", args[1:])
-	} else if n == 1 {
+	x86 = flag["-x86"]
+	writeField = flag["-w"]
+	delField = flag["-d"]
+	writeSN = flag["-wsn"]
+	argF = args
+	flagF = flag
+	//if n := len(args); n > 1 {
+	//	return fmt.Errorf("%v: unexpected", args[1:])
+	//}
+	if n := len(args); n != 0 {
 		diag = args[0]
 	}
 
@@ -47,6 +58,13 @@ func (cmd) Main(args ...string) error {
 		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
 	} else {
 		return fmt.Errorf("%s: %v", gpio.File, err)
+	}
+
+	for name, pin := range gpio.Pins {
+		err := pin.SetDirection()
+		if err != nil {
+			fmt.Printf("%s: %v\n", name, err)
+		}
 	}
 
 	diags, found := map[string][]Diag{
@@ -81,6 +99,7 @@ func (cmd) Main(args ...string) error {
 		"fans":    []Diag{diagFans},
 		"eeprom":  []Diag{diagMFGProm},
 		"led":     []Diag{diagLED},
+		"prom":    []Diag{diagProm},
 	}[diag]
 	if !found {
 		return fmt.Errorf("%s: unknown", diag)
@@ -158,8 +177,26 @@ SYNOPSIS
 
 DESCRIPTION
 	Runs diagnostic tests to validate BMC functionality and interfaces
+	
+	EEPROM writing utility with diag prom
+	diag prom [-w | -d | -x86] [TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]
+	
+	[-x86]			executes command on host EEPROM
+
+	[-w] 			write flag with the following arguments
+	"crc" 			recalculates and updates crc field
+	"onie" 			erases contents and adds an ONIE header with crc field
+	"length" 		debug tool to write VALUE into length field
+	"copy"			copies host eeprom contents, updates PPN field, recalculates crc (vice versa with -x86)
+	TYPE VALUE 		debug tool to write ONIE field of TYPE with VALUE
+	
+	[-d]			delete flag with the following arguments
+	TYPE			delete the first ONIE field found with TYPE
 
 EXAMPLES
-	diag`,
+	diag prom		dumps bmc eeprom
+	diag prom -x86		dumps host eeprom
+	diag prom -w copy	copies host to bmc eeprom
+	diag prom -x86 -w crc	updates host eeprom crc field`,
 	}
 }

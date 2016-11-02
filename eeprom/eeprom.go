@@ -1,5 +1,3 @@
-// Copyright 2016 Platina Systems, Inc. All rights reserved.
-// Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
 // Package eeprom provides the ability to read data from an EEPROM device,
@@ -9,12 +7,17 @@
 // GetInfo() at initialization time to collect data and store it into the
 // Fields structure. Once collected and stored, the fields can be referenced
 // by the goes code.
+
 package eeprom
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
-	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/goes/i2c"
+	"hash/crc32"
 )
 
 // EEPROM TLVs offsets
@@ -37,6 +40,10 @@ const (
 	vendor_extension      = 0xfd
 	crc                   = 0xfe
 )
+
+var ONIEId = "TlvInfo" + string(0x00)
+var ONIEVer uint8 = 0x01
+var lengthOffset uint = 9
 
 // EEPROM TLV field types
 type fields struct {
@@ -85,12 +92,6 @@ func (d *Device) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c
 		return
 	}
 
-	// always write the 'address' to location 0
-	err = bus.Do(i2c.Write, 0, i2c.ByteData, data)
-	if err != nil {
-		return
-	}
-
 	// read the data from the eeprom..
 	err = bus.Do(rw, regOffset, size, data)
 	return
@@ -98,11 +99,36 @@ func (d *Device) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c
 
 func (d *Device) getByte(i uint) byte {
 	var data i2c.SMBusData
-	data[0] = uint8(i)
-	if err := d.i2cDo(i2c.Read, uint8(0), i2c.Byte, &data); err != nil {
+	data[0] = uint8(i & 0x00ff)
+	var err error
+
+	//write two byte address
+	if err = d.i2cDo(i2c.Write, uint8(i>>8), i2c.ByteData, &data); err != nil {
+		panic(err)
+	}
+	//EEPROM has a 5ms minimum write delay, wait 10ms
+	time.Sleep(10 * time.Millisecond)
+
+	//read byte
+	if err = d.i2cDo(i2c.Read, uint8(0), i2c.Byte, &data); err != nil {
 		panic(err)
 	}
 	return byte(data[0])
+
+}
+
+func (d *Device) setByte(a uint16, v uint8) error {
+
+	var data i2c.SMBusData
+	data[0] = uint8(a & 0x00ff)
+	data[1] = uint8(v)
+
+	//write two byte address followed by 1 byte data
+	err := d.i2cDo(i2c.Write, uint8(a>>8), i2c.WordData, &data)
+
+	//EEPROM has a 5ms minimum write delay, wait 10ms
+	time.Sleep(10 * time.Millisecond)
+	return err
 }
 
 func (d *Device) getUint16(i uint) uint {
@@ -122,6 +148,9 @@ func (d *Device) GetInfo() (err error) {
 }
 
 func (d *Device) getInfo() {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
 	f := &d.Fields
 	var i uint
 
@@ -184,4 +213,197 @@ func (d *Device) getInfo() {
 		}
 	}
 	return
+}
+
+func (d *Device) DumpProm() (bool, []byte) {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
+	f := &d.Fields
+	var i uint8
+	var rawData []byte
+
+	//if onie ID is not valid, return
+	for i = 0; i < uint8(len(f.ONIEData)); i++ {
+		f.ONIEData[i] = d.getByte(uint(i))
+		if f.ONIEData[i] != ONIEId[i] {
+			return false, d.rawData
+		}
+	}
+
+	//read and return entire ONIE prom including ID, ver, length fields
+	dataLen := d.getUint16(lengthOffset)
+	for j := uint(0); j < dataLen+11; j++ {
+		rawData = append(rawData, d.getByte(j))
+	}
+	return true, rawData
+
+}
+
+func (d *Device) CalcCrc() string {
+	i2c.Lock.Lock()
+
+	f := &d.Fields
+	var i uint8
+
+	//if onie ID is not valid, return
+	for i = 0; i < uint8(len(f.ONIEData)); i++ {
+		f.ONIEData[i] = d.getByte(uint(i))
+		if f.ONIEData[i] != ONIEId[i] {
+			return "Invalid: EEPROM not in ONIE format"
+		}
+	}
+	i2c.Lock.Unlock()
+
+	//read ONIE prom
+	_, rawData := d.DumpProm()
+
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
+	//calculate crc32 up old crc value, write new crc value
+	l := uint16(len(rawData))
+	checksum := crc32.ChecksumIEEE(rawData[0 : l-4])
+	//checksum := crc32.ChecksumIEEE(rawData)
+	d.setByte(l-4, uint8(checksum>>24))
+	d.setByte(l-3, uint8(checksum>>16))
+	d.setByte(l-2, uint8(checksum>>8))
+	d.setByte(l-1, uint8(checksum&0xff))
+
+	return "crc update complete"
+}
+
+func (d *Device) DeleteField(n string) string {
+	//do not allow deleting of crc field
+	if n == "fe" {
+		return "Invalid: crc delete not allowed"
+	}
+
+	var found bool = false
+
+	r, rawData := d.DumpProm()
+	if !r {
+		return "Invalid: EEPROM not in ONIE format"
+	}
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
+	//delete field + 2 byte header if found, shift remaining fields
+	t, _ := strconv.ParseUint(n, 16, 64)
+	dataLen := d.getUint16(lengthOffset)
+
+	for i := uint(0 + 11); i < uint(len(rawData)); {
+		tlv, tlen := rawData[i], uint(rawData[i+1])
+		if tlv == byte(t) {
+			//return "found"
+			for j := i; j < (uint(len(rawData)) - 2 - tlen); j++ {
+				d.setByte(uint16(j), rawData[j+2+tlen])
+			}
+			dataLen -= uint(tlen + 2)
+			found = true
+			break
+		}
+		i += 2 + tlen
+	}
+	if !found {
+		return "field not found"
+	}
+	//update length field
+	d.setByte(9, uint8(dataLen>>8))
+	d.setByte(10, uint8(dataLen&0xFF))
+	return "first matching field deleted"
+
+}
+func (d *Device) AddCrc() string {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
+	dataLen := d.getUint16(lengthOffset)
+	d.setByte(uint16(lengthOffset), uint8((dataLen+6)>>8))
+	d.setByte(uint16(lengthOffset+1), uint8((dataLen+6)&0xFF))
+	d.setByte(uint16(dataLen+11), 0xfe)
+	d.setByte(uint16(dataLen+12), 0x4)
+	d.setByte(uint16(dataLen+13), 0x0)
+	d.setByte(uint16(dataLen+14), 0x0)
+	d.setByte(uint16(dataLen+15), 0x0)
+	d.setByte(uint16(dataLen+16), 0x0)
+
+	return "crc field added"
+}
+
+func (d *Device) CopyAll(rawData []byte) string {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
+	for j := uint(0); j < uint(len(rawData)); j++ {
+		d.setByte(uint16(j), rawData[j])
+	}
+	return "copy complete"
+}
+
+func (d *Device) WriteField(n string, v []byte) string {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+
+	f := &d.Fields
+	var i uint8
+
+	// write onie ID, onie version, length = 6, and placeholder crc32
+	if strings.Contains(n, "onie") {
+		for i = 0; i < uint8(len(ONIEId)); i++ {
+			d.setByte(uint16(i), uint8(ONIEId[i]))
+		}
+		d.setByte(uint16(i), ONIEVer)
+		d.setByte(uint16(i+1), 0)
+		d.setByte(uint16(i+2), 6)
+		d.setByte(uint16(i+3), crc)
+		d.setByte(uint16(i+4), 4)
+		d.setByte(uint16(i+5), 0)
+		d.setByte(uint16(i+6), 0)
+		d.setByte(uint16(i+7), 0)
+		d.setByte(uint16(i+8), 0)
+		return "onie header written"
+	} else if strings.Contains(n, "length") {
+		d.setByte(uint16(9), v[0])
+		d.setByte(uint16(10), v[1])
+		return "length written"
+	} else {
+
+		//if onie ID is not valid, return
+		for i = 0; i < uint8(len(f.ONIEData)); i++ {
+			f.ONIEData[i] = d.getByte(uint(i))
+			if f.ONIEData[i] != ONIEId[i] {
+				return "Invalid: EEPROM not in ONIE format"
+			}
+		}
+
+		t, err := strconv.ParseUint(n, 16, 64)
+		if err == nil {
+			switch uint8(t) {
+			case 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0xfd:
+				dataLen := d.getUint16(lengthOffset)
+				o := uint16(dataLen + 11 - 6)
+				d.setByte(o, uint8(t))
+				d.setByte(o+1, uint8(len(v)))
+				for i = 0; i < uint8(len(v)); i++ {
+					d.setByte(uint16(i+uint8(o+2)), uint8(v[i]))
+				}
+				newLength := uint16(dataLen + uint(len(v)) + 2)
+				d.setByte(uint16(lengthOffset), uint8(newLength>>8))
+				d.setByte(uint16(lengthOffset+1), uint8(newLength&0xFF))
+				d.setByte(newLength+11-6, crc)
+				d.setByte(newLength+11-5, 0x4)
+				d.setByte(newLength+11-4, 0)
+				d.setByte(newLength+11-3, 0)
+				d.setByte(newLength+11-2, 0)
+				d.setByte(newLength+11-1, 0)
+				return "write complete. run diag prom crc"
+			default:
+				return "Invalid: field not recognized"
+			}
+		}
+
+	}
+
+	return "Invalid or incomplete arguments"
 }

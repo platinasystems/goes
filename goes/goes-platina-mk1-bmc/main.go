@@ -174,6 +174,13 @@ func hook() error {
 		return fmt.Errorf("%s: %v", gpio.File, err)
 	}
 
+	// Set gpio input/output as defined in dtb
+	for name, pin := range gpio.Pins {
+		err := pin.SetDirection()
+		if err != nil {
+			fmt.Printf("%s: %v\n", name, err)
+		}
+	}
 	ledfp.LedFpInit()
 	fanTray.FanTrayLedInit()
 	hw.FanInit()
