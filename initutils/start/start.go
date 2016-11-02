@@ -21,16 +21,12 @@ import (
 
 const Name = "start"
 
-// If present, /etc/default/goes is sourced before running redisd, machined,
-// and the remaining damons.
-const EtcDefaultGoes = "/etc/default/goes"
-
 // Machines may use this Hook to run something before redisd, machined, etc.
 // This is typically used to set these environment variables.
 //
 //	REDISD		list of net devices that the server listens to
 //			default: lo
-//	MACHINED	machined arguments
+//	MACHINED	machine specific arguments
 var Hook = func() error { return nil }
 
 type cmd struct{}

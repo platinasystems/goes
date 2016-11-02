@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-// Package initutils provides /init, start, stop, restart, and
-// reload commands.
+// Package initutils provides /init, install, start, stop, restart, and reload
+// commands.
 package initutils
 
 import (
+	"github.com/platinasystems/go/initutils/install"
 	"github.com/platinasystems/go/initutils/reload"
 	"github.com/platinasystems/go/initutils/restart"
 	"github.com/platinasystems/go/initutils/slashinit"
@@ -16,6 +17,7 @@ import (
 
 func New() []interface{} {
 	return []interface{}{
+		install.New(),
 		reload.New(),
 		restart.New(),
 		start.New(),
