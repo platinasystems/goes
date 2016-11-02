@@ -74,14 +74,14 @@ func (p *platform) boardInit() (err error) {
 	}
 	e := d.GetInfo()
 	if e == nil && d.Fields.NEthernetAddress == 134 {
-		p.Vnet.Logf("using eeprom MAC addresses")
+		p.Vnet.Logf("using eeprom MAC addresses\n")
 		p.Platform.AddressBlock = ethernet.AddressBlock{
 			Base:  d.Fields.BaseEthernetAddress,
 			Count: uint32(d.Fields.NEthernetAddress),
 		}
 	} else {
 		// in case the eeprom read fails or not programmed
-		p.Vnet.Logf("eeprom data invalid: %s; using random addresses", err)
+		p.Vnet.Logf("eeprom data invalid: %s; using random addresses\n", err)
 		p.Platform.AddressBlock = ethernet.AddressBlock{
 			Base:  ethernet.RandomAddress(),
 			Count: 256,
