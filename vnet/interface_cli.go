@@ -355,7 +355,7 @@ func (v *Vnet) showHwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	if len(ifs) > 0 {
 		elib.Tabulate(ifs).WriteCols(w, cf.colMap)
 	} else {
-		fmt.Println("All counters are zero")
+		fmt.Println(w, "All counters are zero")
 	}
 	return
 }
