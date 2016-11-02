@@ -7,6 +7,7 @@ package tomahawk
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm/internal/m"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm/internal/sbus"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
@@ -46,6 +47,21 @@ func (t *tomahawk) adjacency_main_init() {
 	im4.RegisterFibAddDelHook(t.ip4_fib_add_del)
 	im4.RegisterAdjSyncCounterHook(t.adj_sync_counters)
 	im4.RegisterAdjGetCounterHook(t.adj_get_counter)
+
+	// Configure ECMP hash control.  We'll hash on src,dst ip plus L4 ports.
+	{
+		q := t.getDmaReq()
+
+		const (
+			enable_ip_tcp_udp_ports = 1 << 22
+			enable_ip_dst_address   = 1 << 12
+		)
+
+		v := t.rx_pipe_regs.hash_control.getDo(q, sbus.Duplicate)
+		v |= enable_ip_dst_address | enable_ip_tcp_udp_ports
+		t.rx_pipe_regs.hash_control.set(q, v)
+		q.Do()
+	}
 }
 
 func (am *adjacency_main) get_adj(ai uint) *adjacency { return &am.adjacency_pool.entries[ai] }
@@ -70,7 +86,8 @@ func (t *tomahawk) adj_add_del(im *ip.Main, adj ip.Adj, isDel bool) {
 	}
 
 	as := im.GetAdj(adj)
-	if len(as) > 1 {
+	if n_adj := len(as); n_adj > 1 {
+		// nhs := im.NextHopsForAdj(adj)
 		panic("ecmp") // not yet
 	}
 
