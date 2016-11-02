@@ -395,6 +395,23 @@ func (m *interfaceMain) GetIfThread(id uint) (t *InterfaceThread) {
 }
 func (n *Node) GetIfThread() *InterfaceThread { return n.Vnet.GetIfThread(n.ThreadId()) }
 
+func (v *Vnet) ForeachHwIf(unixOnly bool, f func(hi Hi)) {
+	for i := range v.hwIferPool.elts {
+		if v.hwIferPool.IsFree(uint(i)) {
+			continue
+		}
+		hwifer := v.hwIferPool.elts[i]
+		if unixOnly && !hwifer.IsUnix() {
+			continue
+		}
+		h := hwifer.GetHwIf()
+		if h.unprovisioned {
+			continue
+		}
+		f(h.hi)
+	}
+}
+
 // Interface ordering for output.
 func (m *interfaceMain) HwLessThan(a, b *HwIf) bool { return a.name < b.name }
 
@@ -445,6 +462,9 @@ const (
 type Bandwidth float64
 
 func (b Bandwidth) String() string {
+	if b == 0 {
+		return "autoneg"
+	}
 	unit := Bandwidth(1)
 	prefix := ""
 	switch {
@@ -452,19 +472,19 @@ func (b Bandwidth) String() string {
 		break
 	case b <= Mbps:
 		unit = Kbps
-		prefix = "K"
+		prefix = "k"
 	case b <= Gbps:
 		unit = Mbps
-		prefix = "M"
+		prefix = "m"
 	case b <= Tbps:
 		unit = Gbps
-		prefix = "G"
+		prefix = "g"
 	default:
 		unit = Tbps
-		prefix = "T"
+		prefix = "t"
 	}
 	b /= unit
-	return fmt.Sprintf("%g%sbps", b, prefix)
+	return fmt.Sprintf("%g%s", b, prefix)
 }
 
 func (b *Bandwidth) Parse(in *parse.Input) {
