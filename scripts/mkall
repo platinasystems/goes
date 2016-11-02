@@ -5,9 +5,9 @@ set -e
 prog=${0##*/}
 usage="${prog} [-v]"
 
-goes=`go list -f '{{.Dir}}' github.com/platinasystems/go/goes`
-bin=${goes%/*}/bin
-scripts=${goes%/*}/scripts
+goes_dir=`go list -f '{{.Dir}}' github.com/platinasystems/go/goes`
+go_dir=${goes_dir%/*}
+scripts_dir=${go_dir}/scripts
 dir=${0%/*}
 verbose=:
 for arg; do
@@ -25,24 +25,23 @@ for arg; do
 	esac
 done
 
-mkdir -p $bin
 eval $verbose version...
 go generate github.com/platinasystems/go/version
-eval $verbose bin/goes-example...
-go build -o $bin/goes-example \
+eval $verbose goes-example...
+go build -o ${go_dir}/goes-example \
 	github.com/platinasystems/go/goes/goes-example
 eval $verbose goes-example-amd64.cpio.xz...
-$scripts/mkinitrd github.com/platinasystems/go/goes/goes-example
+${scripts_dir}/mkinitrd github.com/platinasystems/go/goes/goes-example
 eval $verbose goes-example-arm.cpio.xz...
-env GOARCH=arm $scripts/mkinitrd github.com/platinasystems/go/goes/goes-example
-eval $verbose bin/goes-platina-mk1...
-go build -o $bin/goes-platina-mk1 \
+env GOARCH=arm ${scripts_dir}/mkinitrd github.com/platinasystems/go/goes/goes-example
+eval $verbose goes-platina-mk1...
+go build -o ${go_dir}/goes-platina-mk1 \
 	-tags "uio_pci_dma debug foxy" -gcflags "-N -l" \
 	github.com/platinasystems/go/goes/goes-platina-mk1
-eval $verbose wip...
-go build -o $bin/wip \
+eval $verbose go-wip...
+go build -o ${go_dir}/go-wip \
 	-tags "uio_pci_dma debug foxy" -gcflags "-N -l" \
 	github.com/platinasystems/go/wip/y
 eval $verbose goes-platina-mk1-bmc-arm.cpio.xz...
-env GOARCH=arm $scripts/mkinitrd \
+env GOARCH=arm ${scripts_dir}/mkinitrd \
 	github.com/platinasystems/go/goes/goes-platina-mk1-bmc
