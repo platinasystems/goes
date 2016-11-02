@@ -16,6 +16,7 @@ import (
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/initutils/internal"
+	"github.com/platinasystems/go/sockfile"
 )
 
 const Name = "start"
@@ -43,6 +44,10 @@ func (cmd cmd) Main(...string) error {
 	err := internal.AssertRoot()
 	if err != nil {
 		return err
+	}
+	_, err = os.Stat(sockfile.Path("redisd"))
+	if err == nil {
+		return fmt.Errorf("already started")
 	}
 	if err = Hook(); err != nil {
 		return err

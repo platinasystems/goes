@@ -237,8 +237,6 @@ func Main(args ...string) (err error) {
 		if isDaemon {
 			if err != nil {
 				log.Print("daemon", "err", err)
-			} else if daemonFlagValue == "grandchild" {
-				fmt.Println("finish")
 			}
 		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n",
@@ -364,7 +362,6 @@ func Main(args ...string) (err error) {
 				sigch := make(chan os.Signal)
 				signal.Notify(sigch, syscall.SIGTERM)
 				go terminate(cmd, pidfn, sigch)
-				fmt.Println("start")
 				err = ms.Main(args...)
 				sigch <- syscall.SIGABRT
 			}
