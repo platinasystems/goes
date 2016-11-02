@@ -17,17 +17,31 @@ import (
 
 const Name = "vnet"
 
-type Info struct {
-	v         *vnet.Vnet
-	prefixes  []string
-	eventPool sync.Pool
-	statsPoller
+type Config struct {
+	// Enable publish of Non-unix (e.g. non-tuntap) interfaces.  This will include all vnet interfaces.
+	UnixInterfacesOnly bool
+	// Publish all counters including those with zero values.
+	PublishAllCounters bool
+	// Wait for gdb before starting vnet.
+	GdbWait bool
 }
 
-func NewInfo(v *vnet.Vnet) (i *Info) {
+type Info struct {
+	v         *vnet.Vnet
+	prefix    string
+	prefixes  []string
+	eventPool sync.Pool
+	Config
+	ifStatsPoller
+}
+
+func New(v *vnet.Vnet, cf Config) (i *Info) {
+	const prefix = "vnet."
 	i = &Info{
 		v:        v,
-		prefixes: []string{"eth-"},
+		prefix:   prefix,
+		prefixes: []string{prefix},
+		Config:   cf,
 	}
 	i.eventPool.New = i.newEvent
 	return
@@ -76,7 +90,7 @@ func (e *event) EventAction() {
 	e.in.Init(nil)
 	e.in.Add(e.key, e.value)
 	switch {
-	case e.in.Parse("%v.speed %v", &hi, e.i.v, &bw):
+	case e.in.Parse(e.i.prefix+"%v.speed %v", &hi, e.i.v, &bw):
 		e.err <- hi.SetSpeed(e.i.v, bw)
 	default:
 		e.err <- info.CantSet(e.key)
@@ -85,9 +99,9 @@ func (e *event) EventAction() {
 }
 
 func (i *Info) initialPublish() {
-	i.v.ForeachHwIf(unixInterfacesOnly, func(hi vnet.Hi) {
+	i.v.ForeachHwIf(i.UnixInterfacesOnly, func(hi vnet.Hi) {
 		h := i.v.HwIf(hi)
-		info.Publish(hi.Name(i.v)+".speed", h.Speed().String())
+		i.publish(hi.Name(i.v)+".speed", h.Speed().String())
 	})
 }
 
@@ -104,52 +118,53 @@ func (i *Info) Set(key, value string) (err error) {
 
 var gdb_wait int
 
-func gdbWait() {
-	// Change false to true to enable.
+func (i *Info) gdbWait() {
 	// In gdb issue command "p 'vnetinfo.gdb_wait'=1" to break out of loop and start vnet.
-	const enable = false
-	for enable && gdb_wait == 0 {
+	for i.GdbWait && gdb_wait == 0 {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
 func (i *Info) Start() error {
-	gdbWait()
-	i.statsPoller.i = i
+	i.gdbWait()
 	var in parse.Input
-	in.Add("cli { listen { no-prompt socket " + vnetCmdSock + "} }")
+	in.SetString("cli { listen { no-prompt socket " + vnetCmdSock + "} }")
 	return i.v.Run(&in)
 }
 
 const unixInterfacesOnly = true // only front panel ports (e.g. no bcm-cpu or loopback ports)
 
 func (i *Info) Init() {
+	p := &i.ifStatsPoller
+	p.i = i
+	p.addEvent(0)
 	i.initialPublish()
-	i.statsPoller.addEvent(0)
 }
 
-type statsPoller struct {
+type ifStatsPoller struct {
 	vnet.Event
 	i        *Info
 	sequence uint
 }
 
-func publishIfCounter(name, counter string, value uint64) {
+func (i *Info) publish(key string, value interface{}) { info.Publish(i.prefix+key, value) }
+
+func (p *ifStatsPoller) publish(name, counter string, value uint64) {
 	n := strings.Replace(counter, " ", "_", -1)
-	info.Publish(name+"."+n, value)
+	p.i.publish(name+"."+n, value)
 }
-func (p *statsPoller) addEvent(dt float64) { p.i.v.AddTimedEvent(p, dt) }
-func (p *statsPoller) String() string      { return "redis stats poller" }
-func (p *statsPoller) EventAction() {
+func (p *ifStatsPoller) addEvent(dt float64) { p.i.v.AddTimedEvent(p, dt) }
+func (p *ifStatsPoller) String() string      { return "redis stats poller" }
+func (p *ifStatsPoller) EventAction() {
 	// Enable to represent all possible counters in redis (most with 0 values)
-	includeZeroCounters := p.sequence == 0 && false
+	includeZeroCounters := p.sequence == 0 && p.i.PublishAllCounters
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, unixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
-			publishIfCounter(hi.Name(p.i.v), counter, value)
+			p.publish(hi.Name(p.i.v), counter, value)
 		})
 	p.i.v.ForeachSwIfCounter(includeZeroCounters,
 		func(si vnet.Si, counter string, value uint64) {
-			publishIfCounter(si.Name(p.i.v), "vnet "+counter, value)
+			p.publish(si.Name(p.i.v), counter, value)
 		})
 	p.addEvent(5) // schedule next event in 5 seconds
 	p.sequence++

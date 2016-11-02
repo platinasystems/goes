@@ -78,7 +78,11 @@ func hook() error {
 		name: "mk1",
 	}
 	i.v = v
-	i.vi = vnetinfo.NewInfo(v)
+	i.vi = vnetinfo.New(v, vnetinfo.Config{
+		UnixInterfacesOnly: false,
+		PublishAllCounters: true,
+		GdbWait:            false,
+	})
 	machined.Plot(
 		cmdline.New(),
 		hostname.New(),
