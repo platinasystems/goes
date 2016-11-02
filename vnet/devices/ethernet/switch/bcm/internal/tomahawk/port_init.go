@@ -141,7 +141,7 @@ func (p *Port) GetHwInterfaceCounterValues(th *vnet.InterfaceThread) {
 	p.Switch.(*tomahawk).get_port_counters(p, th)
 }
 
-func (p *Port) registerEthernet(v *vnet.Vnet, name string, isUnixInterface bool) {
+func (p *Port) registerEthernet(v *vnet.Vnet, name string, provision bool, isUnixInterface bool) {
 	var ok bool
 	config := &ethernet.InterfaceConfig{}
 	if isUnixInterface {
@@ -149,6 +149,7 @@ func (p *Port) registerEthernet(v *vnet.Vnet, name string, isUnixInterface bool)
 			panic("ran out of platform ethernet addresses")
 		}
 	}
+	config.Unprovisioned = !provision
 	ethernet.RegisterInterface(v, p, config, name)
 }
 
@@ -169,9 +170,8 @@ func (t *tomahawk) addPort(p *Port, pb *port.PortBlock) {
 		name = fmt.Sprintf("eth-%02d-%d", p.FrontPanelIndex, p.SubPortIndex)
 	}
 
-	p.registerEthernet(v, name, true)
+	p.registerEthernet(v, name, m.IsProvisioned(p), true)
 	p.HwIf.SetSpeed(vnet.Bandwidth(p.SpeedBitsPerSec))
-	p.HwIf.SetProvisioned(m.IsProvisioned(p))
 	hi := p.HwIf.Hi()
 	cf := packet.InterfaceNodeConfig{
 		Use_module_header: true,
@@ -192,9 +192,8 @@ func (t *tomahawk) addCpuLoopbackPort(p *Port, name string, pn physical_port_num
 	v := t.Vnet
 	p.Switch = t
 	p.physical_port_number = pn
-	p.registerEthernet(v, name, false)
+	p.registerEthernet(v, name, true, false)
 	p.HwIf.SetSpeed(speed)
-	p.HwIf.SetProvisioned(true)
 	hi := p.HwIf.Hi()
 	in := &p.InterfaceNode
 	cf := packet.InterfaceNodeConfig{
