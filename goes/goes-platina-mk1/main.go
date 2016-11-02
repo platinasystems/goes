@@ -127,8 +127,7 @@ func (i *Info) configureVnet() {
 
 	plat := &platform{i: i}
 	v.AddPackage("platform", plat)
-	// After switch init, so platform.Init() can refer to ports etc.
-	plat.DependsOn("bcm")
+	plat.DependsOn("pci-discovery")
 }
 
 func (*Info) Close() error                         { return nil }
