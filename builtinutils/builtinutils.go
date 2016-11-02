@@ -19,6 +19,7 @@ import (
 	"github.com/platinasystems/go/builtinutils/man"
 	"github.com/platinasystems/go/builtinutils/resize"
 	"github.com/platinasystems/go/builtinutils/show_commands"
+	"github.com/platinasystems/go/builtinutils/show_version"
 	"github.com/platinasystems/go/builtinutils/source"
 	"github.com/platinasystems/go/builtinutils/usage"
 )
@@ -37,6 +38,7 @@ func New() []interface{} {
 		man.New(),
 		resize.New(),
 		show_commands.New(),
+		show_version.New(),
 		source.New(),
 		usage.New(),
 	}
