@@ -121,7 +121,7 @@ func (i *Info) Start() error {
 	return i.v.Run(&in)
 }
 
-const unixInterfacesOnly = false // only front panel ports (e.g. no bcm-cpu or loopback ports)
+const unixInterfacesOnly = true // only front panel ports (e.g. no bcm-cpu or loopback ports)
 
 func (i *Info) Init() {
 	i.initialPublish()
@@ -141,14 +141,15 @@ func publishIfCounter(name, counter string, value uint64) {
 func (p *statsPoller) addEvent(dt float64) { p.i.v.AddTimedEvent(p, dt) }
 func (p *statsPoller) String() string      { return "redis stats poller" }
 func (p *statsPoller) EventAction() {
-	includeZeroCounters := p.sequence == 0
+	// Enable to represent all possible counters in redis (most with 0 values)
+	includeZeroCounters := p.sequence == 0 && false
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, unixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
 			publishIfCounter(hi.Name(p.i.v), counter, value)
 		})
 	p.i.v.ForeachSwIfCounter(includeZeroCounters,
 		func(si vnet.Si, counter string, value uint64) {
-			publishIfCounter(si.Name(p.i.v), counter, value)
+			publishIfCounter(si.Name(p.i.v), "vnet "+counter, value)
 		})
 	p.addEvent(5) // schedule next event in 5 seconds
 	p.sequence++
