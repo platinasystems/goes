@@ -379,13 +379,13 @@ func timerIsr() {
 	log.Print("daemon", "info", "timerISR")
 
 	if stageFlagString == 1 {
-		if _, ok := regWriteUint16[stageKeyString]; ok {
+		if _, ok := regWriteString[stageKeyString]; ok {
 			regWriteString[stageKeyString](string(stageString))
 		}
 		stageFlagString = 0
 	}
 	if stageFlagInt == 1 {
-		if _, ok := regWriteUint16[stageKeyInt]; ok {
+		if _, ok := regWriteInt[stageKeyInt]; ok {
 			regWriteInt[stageKeyInt](int(stageInt))
 		}
 		stageFlagInt = 0
@@ -397,7 +397,7 @@ func timerIsr() {
 		stageFlagUint16 = 0
 	}
 	if stageFlagFloat64 == 1 {
-		if _, ok := regWriteUint16[stageKeyFloat64]; ok {
+		if _, ok := regWriteFloat64[stageKeyFloat64]; ok {
 			regWriteFloat64[stageKeyFloat64](float64(stageFloat64))
 		}
 		stageFlagFloat64 = 0
