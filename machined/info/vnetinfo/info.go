@@ -63,7 +63,7 @@ type event struct {
 func (i *Info) newEvent() interface{} {
 	return &event{
 		i:   i,
-		err: make(chan error),
+		err: make(chan error, 1),
 	}
 }
 
