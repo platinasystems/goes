@@ -24,7 +24,7 @@ import (
 	"github.com/platinasystems/go/machined/info/uptime"
 	"github.com/platinasystems/go/machined/info/version"
 	"github.com/platinasystems/go/netutils"
-	"github.com/platinasystems/go/netutils/npu"
+	nuvnet "github.com/platinasystems/go/netutils/vnet"
 	"github.com/platinasystems/go/redisutils"
 	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet"
@@ -92,7 +92,7 @@ func main() {
 	command.Plot(fsutils.New()...)
 	command.Plot(initutils.New()...)
 	command.Plot(kutils.New()...)
-	command.Plot(machined.New(), npu.New())
+	command.Plot(machined.New(), nuvnet.New())
 	command.Plot(netutils.New()...)
 	command.Plot(redisutils.New()...)
 	command.Sort()
@@ -299,7 +299,7 @@ func (p *Info) Set(key, value string) error {
 
 func (p *Info) startVnet() error {
 	var in parse.Input
-	in.Add("cli { listen { no-prompt socket " + sockfile.Path("npu") + "} }")
+	in.Add("cli { listen { no-prompt socket " + sockfile.Path("vnet") + "} }")
 	v := &vnet.Vnet{}
 	p.v = v
 
