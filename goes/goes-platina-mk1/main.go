@@ -35,7 +35,6 @@ import (
 	"github.com/platinasystems/go/vnet/unix"
 
 	"os"
-	"sync"
 )
 
 type platform struct {
@@ -45,10 +44,9 @@ type platform struct {
 }
 
 type Info struct {
-	mutex sync.Mutex
-	name  string
-	v     *vnet.Vnet
-	vi    *vnetinfo.Info
+	name string
+	v    *vnet.Vnet
+	vi   *vnetinfo.Info
 }
 
 func main() {
@@ -95,7 +93,7 @@ func hook() error {
 	return nil
 }
 
-func (p *Info) String() string { return p.name }
+func (i *Info) String() string { return i.name }
 
 func (i *Info) Main(...string) error {
 	// Public machine name.
