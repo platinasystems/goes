@@ -158,10 +158,10 @@ type NextHopWeight uint32
 // A next hop in a multipath.
 type nextHop struct {
 	// Adjacency index for next hop's rewrite.
-	adj Adj
+	Adj Adj
 
 	// Relative weight for this next hop.
-	weight NextHopWeight
+	Weight NextHopWeight
 }
 
 //go:generate gentemplate -d Package=ip -id nextHopHeap -d HeapType=nextHopHeap -d Data=elts -d Type=nextHop github.com/platinasystems/go/elib/heap.tmpl
@@ -228,9 +228,9 @@ func (a nextHopSort) Less(i, j int) bool { return a[i].Compare(&a[j]) < 0 }
 
 // Order by decreasing weight and increasing adj index for equal weights.
 func (a *nextHop) Compare(b *nextHop) (cmp int) {
-	cmp = int(b.weight) - int(a.weight)
+	cmp = int(b.Weight) - int(a.Weight)
 	if cmp == 0 {
-		cmp = int(a.adj) - int(b.adj)
+		cmp = int(a.Adj) - int(b.Adj)
 	}
 	return
 }
@@ -254,7 +254,7 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 	switch n {
 	case 1:
 		t[0] = raw[0]
-		t[0].weight = 1
+		t[0].Weight = 1
 		norm = t[:1]
 		return
 	case 2:
@@ -263,9 +263,9 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 			cmp = 1
 		}
 		t[0], t[1] = raw[cmp], raw[cmp^1]
-		if t[0].weight == t[1].weight {
-			t[0].weight = 1
-			t[1].weight = 1
+		if t[0].Weight == t[1].Weight {
+			t[0].Weight = 1
+			t[1].Weight = 1
 			norm = t[:2]
 			return
 		}
@@ -278,13 +278,13 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 	// Find total weight to normalize weights.
 	sumWeight := float64(0)
 	for i := uint(0); i < n; i++ {
-		sumWeight += float64(t[i].weight)
+		sumWeight += float64(t[i].Weight)
 	}
 
 	// In the unlikely case that all weights are given as 0, set them all to 1.
 	if sumWeight == 0 {
 		for i := uint(0); i < n; i++ {
-			t[i].weight = 1
+			t[i].Weight = 1
 		}
 		sumWeight = float64(n)
 	}
@@ -306,17 +306,17 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 
 		i := uint(0)
 		for ; i < n; i++ {
-			nf := w * float64(t[i].weight)
+			nf := w * float64(t[i].Weight)
 			n := uint(nf + .5) // round to nearest integer
 			if n > nLeft {
 				n = nLeft
 			}
 			nLeft -= n
 			error += math.Abs(nf - float64(n))
-			t[i].weight = NextHopWeight(n)
+			t[i].Weight = NextHopWeight(n)
 		}
 		// Add left over weight to largest weight next hop.
-		t[0].weight += NextHopWeight(nLeft)
+		t[0].Weight += NextHopWeight(nLeft)
 
 		if error < m.multipathErrorTolerance*float64(nAdj) {
 			// Truncate any next hops with zero weight.
@@ -391,8 +391,8 @@ func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacenc
 	ai, as := m.NewAdj(nAdj)
 	for nhi := range norm {
 		nh := &norm[nhi]
-		nextHopAdjacency := &m.adjacencyHeap.elts[nh.adj]
-		for w := NextHopWeight(0); w < nh.weight; w++ {
+		nextHopAdjacency := &m.adjacencyHeap.elts[nh.Adj]
+		for w := NextHopWeight(0); w < nh.Weight; w++ {
 			as[i] = *nextHopAdjacency
 			as[i].NAdj = uint16(nAdj)
 			i++
@@ -435,6 +435,13 @@ func (m *adjacencyMain) mpAdjForAdj(a Adj, validate bool) (ma *multipathAdjacenc
 	return
 }
 
+func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
+	mm := &m.multipathMain
+	ma, _ := m.mpAdjForAdj(a, false)
+	nhs = nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
+	return
+}
+
 func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeight NextHopWeight) (newAdj Adj, ok bool) {
 	mm := &m.multipathMain
 	var (
@@ -470,7 +477,7 @@ func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeig
 		t = mm.delNextHop(nhs, t, nhi)
 	} else {
 		// If next hop is already there with the same weight, we have nothing to do.
-		if nhi < nnh && nhs[nhi].weight == nextHopWeight {
+		if nhi < nnh && nhs[nhi].Weight == nextHopWeight {
 			newAdj = oldAdj
 			ok = true
 			return
@@ -486,10 +493,10 @@ func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeig
 		} else {
 			// Add a new next hop.
 			nh = &t[nnh]
-			nh.adj = nextHopAdj
+			nh.Adj = nextHopAdj
 		}
 		// In either case set next hop weight.
-		nh.weight = nextHopWeight
+		nh.Weight = nextHopWeight
 	}
 
 	if len(t) > 0 {
@@ -534,7 +541,7 @@ func (m *Main) DelAdj(a Adj) { m.FreeAdj(a, true) }
 
 func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
 	for i = 0; i < uint(len(nhs)); i++ {
-		if ok = nhs[i].adj == target; ok {
+		if ok = nhs[i].Adj == target; ok {
 			break
 		}
 	}
