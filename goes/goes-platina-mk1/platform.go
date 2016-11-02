@@ -25,11 +25,13 @@ func (p *platform) Init() (err error) {
 		}
 	}
 
-	if err = p.boardPortLedEnable(); err != nil {
-		v.Logf("boardPortLedEnable failure: %s", err)
+	if len(p.Switches) > 0 { // don't need led enable if we're not running on hardware.
+		if err = p.boardPortLedEnable(); err != nil {
+			v.Logf("boardPortLedEnable failure: %s", err)
+		}
 	}
 
-	p.p.startStatsPoller()
+	p.i.vi.Init()
 	return
 }
 
@@ -124,11 +126,7 @@ func (p *platform) boardPortInit(s bcm.Switch) (err error) {
 	for i := range phys {
 		p := &phys[i]
 		p.Index = uint8(i & 0x1f)
-		if p.Index%2 == 0 {
-			p.FrontPanelIndex = p.Index + 1
-		} else {
-			p.FrontPanelIndex = p.Index - 1
-		}
+		p.FrontPanelIndex = p.Index ^ 1
 		p.IsManagement = i == 32
 	}
 	cf.Phys = phys[:]

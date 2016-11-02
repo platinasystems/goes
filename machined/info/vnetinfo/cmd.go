@@ -1,26 +1,24 @@
-// Copyright 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-package vnet
+package vnetinfo
 
 import (
+	"github.com/platinasystems/go/sockfile"
+
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strings"
-
-	"github.com/platinasystems/go/sockfile"
 )
-
-const Name = "vnet"
-
-var vnetCmdSock = sockfile.Path("vnet")
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+var vnetCmdSock = sockfile.Path("vnet")
+
+func NewCmd() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [COMMAND-STRING]..." }
