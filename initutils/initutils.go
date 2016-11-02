@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/initutils/slashinit"
 	"github.com/platinasystems/go/initutils/start"
 	"github.com/platinasystems/go/initutils/stop"
+	"github.com/platinasystems/go/initutils/uninstall"
 )
 
 func New() []interface{} {
@@ -23,5 +24,6 @@ func New() []interface{} {
 		start.New(),
 		stop.New(),
 		slashinit.New(),
+		uninstall.New(),
 	}
 }
