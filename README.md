@@ -10,8 +10,8 @@ $ sudo ./goes-MACHINE install
 
 These are the available MACHINEs,
 
-- [example] (GOARCH: amd64 or arm)
-- [platina-mk1] (GOARCH: amd64)
+- [example] \(GOARCH: amd64 or arm)
+- [platina-mk1] \(GOARCH: amd64)
 
 To stop and remove,
 
