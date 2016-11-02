@@ -450,7 +450,7 @@ func (i revision_id_reg) String() string {
 	return fmt.Sprintf("0x%x", i.getId())
 }
 
-func Init(v *vnet.Vnet) {
+func RegisterDeviceIDs(v *vnet.Vnet) {
 	th := &tomahawk{}
 	th.SwitchConfig = m.SwitchConfig{
 		PciFunction:           0,

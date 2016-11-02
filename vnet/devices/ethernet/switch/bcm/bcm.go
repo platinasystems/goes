@@ -32,8 +32,9 @@ type SwitchConfig struct {
 type Platform m.Platform
 
 func Init(v *vnet.Vnet) {
-	m.InitPlatform(v)
-	tomahawk.Init(v)
+	p := &m.Platform{}
+	p.InitPlatform(v)
+	tomahawk.RegisterDeviceIDs(v)
 }
 func GetPlatform(v *vnet.Vnet) *Platform { return (*Platform)(m.GetPlatform(v)) }
 

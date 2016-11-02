@@ -80,8 +80,7 @@ type Platform struct {
 
 var packageIndex uint
 
-func InitPlatform(v *vnet.Vnet) {
-	p := &Platform{}
+func (p *Platform) InitPlatform(v *vnet.Vnet) {
 	packageIndex = v.AddPackage("bcm", p)
 	p.DependsOn("tuntap")
 	p.DependedOnBy("pci-discovery")
