@@ -44,6 +44,10 @@ func New(v *vnet.Vnet, cf Config) (i *Info) {
 		Config:   cf,
 	}
 	i.eventPool.New = i.newEvent
+	v.RegisterHwIfAddDelHook(i.hw_if_add_del)
+	v.RegisterHwIfLinkUpDownHook(i.hw_if_link_up_down)
+	v.RegisterSwIfAddDelHook(i.sw_if_add_del)
+	v.RegisterSwIfAdminUpDownHook(i.sw_if_admin_up_down)
 	return
 }
 
@@ -64,6 +68,45 @@ func (i *Info) Prefixes(p ...string) []string {
 		i.prefixes = p
 	}
 	return i.prefixes
+}
+
+func (i *Info) hw_is_ok(hi vnet.Hi) bool {
+	h := i.v.HwIfer(hi)
+	hw := i.v.HwIf(hi)
+	if !hw.IsProvisioned() {
+		return false
+	}
+	return !i.UnixInterfacesOnly || h.IsUnix()
+}
+
+func (i *Info) sw_is_ok(si vnet.Si) bool { return i.hw_is_ok(i.v.SupHi(si)) }
+
+func (i *Info) sw_if_add_del(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
+	i.sw_if_admin_up_down(v, si, false)
+	return
+}
+
+func (i *Info) sw_if_admin_up_down(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) {
+	if i.sw_is_ok(si) {
+		i.publish(si.Name(v)+".admin", parse.Enable(isUp))
+	}
+	return
+}
+
+func (i *Info) publish_link(hi vnet.Hi, isUp bool) {
+	i.publish(hi.Name(i.v)+".link", parse.Enable(isUp))
+}
+
+func (i *Info) hw_if_add_del(v *vnet.Vnet, hi vnet.Hi, isDel bool) (err error) {
+	i.hw_if_link_up_down(v, hi, false)
+	return
+}
+
+func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
+	if i.hw_is_ok(hi) {
+		i.publish_link(hi, isUp)
+	}
+	return
 }
 
 type event struct {
