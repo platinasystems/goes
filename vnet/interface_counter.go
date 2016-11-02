@@ -189,6 +189,14 @@ func (m *interfaceMain) foreachSwIfCounter(zero bool, si Si, f func(name string,
 	}
 }
 
+func (v *Vnet) ForeachSwIfCounter(zero bool, f func(si Si, name string, value uint64)) {
+	v.swInterfaces.Foreach(func(x swIf) {
+		v.foreachSwIfCounter(zero, x.si, func(name string, value uint64) {
+			f(x.si, name, value)
+		})
+	})
+}
+
 func (m *interfaceMain) doHwCombined(f foreachFn, nm *InterfaceCounterNames, zero bool, k, i uint) {
 	var v, w CombinedCounter
 	for _, t := range m.ifThreads {
