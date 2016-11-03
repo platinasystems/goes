@@ -8,6 +8,8 @@
 package main
 
 import (
+	"bytes"
+	"net"
 	"os"
 
 	"github.com/platinasystems/go/builtinutils"
@@ -50,7 +52,18 @@ func main() {
 		if len(os.Getenv("REDISD")) == 0 {
 			return nil
 		}
-		return os.Setenv("REDISD", "lo eth0")
+		itfs, err := net.Interfaces()
+		if err != nil {
+			return nil
+		}
+		buf := new(bytes.Buffer)
+		for i, itf := range itfs {
+			if i > 0 {
+				buf.WriteString(" ")
+			}
+			buf.WriteString(itf.Name)
+		}
+		return os.Setenv("REDISD", buf.String())
 	}
 	machined.Hook = func() error {
 		machined.Plot(
@@ -62,7 +75,15 @@ func main() {
 			version.New(),
 		)
 		machined.Plot(tests.New()...)
-		machined.Info["netlink"].Prefixes("lo.", "eth0.")
+		itfs, err := net.Interfaces()
+		if err != nil {
+			return nil
+		}
+		prefixes := make([]string, 0, len(itfs))
+		for _, itf := range itfs {
+			prefixes = append(prefixes, itf.Name+".")
+		}
+		machined.Info["netlink"].Prefixes(prefixes...)
 		return nil
 	}
 	goes.Main()
