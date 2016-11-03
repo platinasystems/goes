@@ -140,11 +140,14 @@ func (l *Loop) eventHandler(p EventHandler) {
 	}
 }
 
+// If too small, events may block when there are timing mismataches between sender and receiver.
+const eventHandlerChanDepth = 16 << 10
+
 func (l *Loop) startHandler(n EventHandler) {
 	c := n.GetNode()
 	c.toLoop = make(chan struct{}, 1)
 	c.fromLoop = make(chan struct{}, 1)
-	c.rxEvents = make(chan *loopEvent, 256)
+	c.rxEvents = make(chan *loopEvent, eventHandlerChanDepth)
 	go l.eventHandler(n)
 }
 
@@ -247,7 +250,7 @@ func (l *eventLoop) Wait() {
 func (p *Loop) eventInit() {
 	l := &p.eventLoop
 	l.l = p
-	l.events = make(chan *loopEvent, 256)
+	l.events = make(chan *loopEvent, eventHandlerChanDepth)
 
 	for _, n := range l.pollers {
 		l.startPoller(n)

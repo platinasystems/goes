@@ -261,27 +261,26 @@ func (cm *Cmic) interruptEnable(i, mask uint32, enable bool) {
 }
 
 type interruptSummary struct {
-	name  string
-	count uint64
+	Interrupt string `format:"%-30s"`
+	Count     uint64 `format:"%16d"`
 }
 type byName []interruptSummary
 
 func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byName) Less(i, j int) bool { return a[i].name < a[j].name }
+func (a byName) Less(i, j int) bool { return a[i].Interrupt < a[j].Interrupt }
 
 func (c *Cmic) WriteInterruptSummary(w io.Writer) {
-	f := "%-40s%d\n"
-
 	data := byName{}
 	for i, h := range c.interruptHandlers {
 		if h.count != 0 {
-			data = append(data, interruptSummary{interrupt(i).String(), h.count})
+			data = append(data, interruptSummary{
+				Interrupt: interrupt(i).String(),
+				Count:     h.count,
+			})
 		}
 	}
 	sort.Sort(data)
-	for i := range data {
-		fmt.Fprintf(w, f, data[i].name, data[i].count)
-	}
-	fmt.Fprintf(w, f, "total", c.interruptCount)
+	data = append(data, interruptSummary{Interrupt: "Total", Count: c.interruptCount})
+	elib.TabulateWrite(w, data)
 }
