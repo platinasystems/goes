@@ -123,7 +123,7 @@ loop:
 	}
 
 	if m.add_del_chan == nil {
-		m.add_del_chan = make(chan netlink_add_del, 64)
+		m.add_del_chan = make(chan netlink_add_del)
 		go m.add_del()
 	}
 	m.add_del_chan <- x
