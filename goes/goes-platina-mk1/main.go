@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/machined"
 	"github.com/platinasystems/go/machined/info/cmdline"
 	"github.com/platinasystems/go/machined/info/hostname"
+	"github.com/platinasystems/go/machined/info/machine"
 	"github.com/platinasystems/go/machined/info/netlink"
 	"github.com/platinasystems/go/machined/info/uptime"
 	"github.com/platinasystems/go/machined/info/version"
@@ -57,6 +58,7 @@ func main() {
 		machined.Plot(
 			cmdline.New(),
 			hostname.New(),
+			machine.New("platina-mk1"),
 			netlink.New(),
 			uptime.New(),
 			version.New(),

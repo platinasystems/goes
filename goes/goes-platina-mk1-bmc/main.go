@@ -39,6 +39,7 @@ import (
 	"github.com/platinasystems/go/machined/info"
 	"github.com/platinasystems/go/machined/info/cmdline"
 	"github.com/platinasystems/go/machined/info/hostname"
+	"github.com/platinasystems/go/machined/info/machine"
 	"github.com/platinasystems/go/machined/info/netlink"
 	"github.com/platinasystems/go/machined/info/uptime"
 	"github.com/platinasystems/go/machined/info/version"
@@ -211,10 +212,10 @@ func hook() error {
 	machined.Plot(
 		cmdline.New(),
 		hostname.New(),
+		machine.New("platina-mk1-bmc"),
 		netlink.New(),
 		uptime.New(),
 		version.New(),
-		&Info{name: "platina-mk1-bmc"},
 		&Info{
 			name:     "fan",
 			prefixes: []string{"fan."},
@@ -489,7 +490,6 @@ func timerIsr() {
 }
 
 func (p *Info) Main(...string) error {
-	info.Publish("machine", "platina-mk1-bmc")
 	for _, entry := range []struct{ name, unit string }{
 		{"fan", "% max speed"},
 		{"vmon", "volts"},
