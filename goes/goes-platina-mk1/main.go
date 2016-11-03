@@ -67,7 +67,7 @@ func main() {
 			vnetinfo.New(vnetinfo.Config{
 				UnixInterfacesOnly: true,
 				PublishAllCounters: false,
-				GdbWait:            false,
+				GdbWait:            gdbwait,
 				Hook:               vnetHook,
 			}),
 		)
