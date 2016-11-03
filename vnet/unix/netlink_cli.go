@@ -5,12 +5,14 @@
 package unix
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/netlink"
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
 
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -129,6 +131,57 @@ loop:
 	return
 }
 
+type showMsg struct {
+	Type    string `format:"%-30s"`
+	Ignored uint64 `format:"%16d"`
+	Handled uint64 `format:"%16d"`
+}
+type showMsgs []showMsg
+
+func (ns showMsgs) Less(i, j int) bool { return ns[i].Type < ns[j].Type }
+func (ns showMsgs) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
+func (ns showMsgs) Len() int           { return len(ns) }
+
+func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	sm := make(map[netlink.MsgType]showMsg)
+	var (
+		x  showMsg
+		ok bool
+	)
+	for t, c := range m.msg_stats.handled.by_type {
+		if x, ok = sm[t]; ok {
+			x.Handled += c
+		} else {
+			x.Type = t.String()
+			x.Handled = c
+		}
+		sm[t] = x
+	}
+	for t, c := range m.msg_stats.ignored.by_type {
+		if x, ok = sm[t]; ok {
+			x.Ignored += c
+		} else {
+			x.Type = t.String()
+			x.Ignored = c
+		}
+		sm[t] = x
+	}
+
+	msgs := showMsgs{}
+	for _, v := range sm {
+		msgs = append(msgs, v)
+	}
+	sort.Sort(msgs)
+	msgs = append(msgs, showMsg{
+		Type:    "Total",
+		Ignored: m.msg_stats.ignored.total,
+		Handled: m.msg_stats.handled.total,
+	})
+
+	elib.TabulateWrite(w, msgs)
+	return
+}
+
 func (m *netlinkMain) cliInit() (err error) {
 	v := m.m.v
 	cmds := []cli.Command{
@@ -136,6 +189,11 @@ func (m *netlinkMain) cliInit() (err error) {
 			Name:      "netlink route",
 			ShortHelp: "add/delete ip4/ip6 routes via netlink",
 			Action:    m.ip_route,
+		},
+		cli.Command{
+			Name:      "show netlink summary",
+			ShortHelp: "summary netlink messages received",
+			Action:    m.show_summary,
 		},
 	}
 	for i := range cmds {

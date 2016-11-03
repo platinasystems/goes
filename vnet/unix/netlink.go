@@ -19,6 +19,19 @@ import (
 
 type unreachable_ip4_next_hop map[ip4.Prefix]struct{}
 
+type msg_counts struct {
+	total   uint64
+	by_type map[netlink.MsgType]uint64
+}
+
+func (c *msg_counts) count(m netlink.Message) {
+	if c.by_type == nil {
+		c.by_type = make(map[netlink.MsgType]uint64)
+	}
+	c.by_type[m.MsgType()]++
+	c.total++
+}
+
 type netlinkMain struct {
 	loop.Node
 	m                         *Main
@@ -29,6 +42,9 @@ type netlinkMain struct {
 	add_del_chan              chan netlink_add_del
 	unreachable_ip4_next_hops map[ip4.NextHop]unreachable_ip4_next_hop
 	current_del_next_hop      ip4.NextHop
+	msg_stats                 struct {
+		ignored, handled msg_counts
+	}
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -62,6 +78,7 @@ func (m *Main) addMsg(msg netlink.Message) {
 	if m.msgGeneratesEvent(msg) {
 		e.msgs = append(e.msgs, msg)
 	} else {
+		m.msg_stats.ignored.count(msg)
 		if m.verboseNetlink > 1 {
 			m.v.Logf("netlink ignore %s\n", msg)
 		}
@@ -94,6 +111,9 @@ func (m *Main) listener(l *loop.Loop) {
 }
 
 func (nm *netlinkMain) LoopInit(l *loop.Loop) {
+	m4 := ip4.GetMain(nm.m.v)
+	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
+
 	var err error
 	nm.c = make(chan netlink.Message, 64)
 	cf := netlink.SocketConfig{
@@ -105,8 +125,6 @@ func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 	if err != nil {
 		panic(err)
 	}
-	m4 := ip4.GetMain(nm.m.v)
-	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
 	go nm.s.Listen()
 	go nm.m.listener(l)
 }
@@ -238,6 +256,7 @@ func (e *netlinkEvent) EventAction() {
 		if err != nil {
 			e.m.v.Logf("netlink %s: %s\n", err, msg.String())
 		}
+		e.m.msg_stats.handled.count(msg)
 		// Return message to pools.
 		msg.Close()
 	}
