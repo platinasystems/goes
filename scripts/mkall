@@ -35,10 +35,12 @@ ${scripts_dir}/mkinitrd github.com/platinasystems/go/goes/goes-example
 eval $verbose goes-example-arm.cpio.xz...
 env GOARCH=arm ${scripts_dir}/mkinitrd github.com/platinasystems/go/goes/goes-example
 eval $verbose goes-platina-mk1...
-go build -o ${go_dir}/goes-platina-mk1 -tags "debug" -gcflags "-N -l" \
+go build -o ${go_dir}/goes-platina-mk1 \
+	-tags "uio_pci_dma debug foxy" -gcflags "-N -l" \
 	github.com/platinasystems/go/goes/goes-platina-mk1
 eval $verbose go-wip...
-go build -o ${go_dir}/go-wip -tags "debug foxy" -gcflags "-N -l" \
+go build -o ${go_dir}/go-wip \
+	-tags "uio_pci_dma debug foxy" -gcflags "-N -l" \
 	github.com/platinasystems/go/wip/y
 eval $verbose goes-platina-mk1-bmc-arm.cpio.xz...
 env GOARCH=arm ${scripts_dir}/mkinitrd \
