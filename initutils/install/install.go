@@ -204,7 +204,7 @@ func install_default() error {
 		return nil
 	}
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(EtcDefaultGoes, flags, os.FileMode(0755))
+	f, err := os.OpenFile(EtcDefaultGoes, flags, os.FileMode(0644))
 	if err != nil {
 		return err
 	}
