@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-package vnetinfo
+package vnet
 
 import (
-	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/machined/info"
-	"github.com/platinasystems/go/vnet"
-
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/machined/info"
+	"github.com/platinasystems/go/sockfile"
+	"github.com/platinasystems/go/vnet"
 )
 
 const Name = "vnet"
@@ -24,6 +25,7 @@ type Config struct {
 	PublishAllCounters bool
 	// Wait for gdb before starting vnet.
 	GdbWait bool
+	Hook    func(*Info) error
 }
 
 type Info struct {
@@ -35,25 +37,33 @@ type Info struct {
 	ifStatsPoller
 }
 
-func New(v *vnet.Vnet, cf Config) (i *Info) {
+func New(cf Config) (i *Info) {
 	const prefix = "vnet."
 	i = &Info{
-		v:        v,
+		v:        new(vnet.Vnet),
 		prefix:   prefix,
 		prefixes: []string{prefix},
 		Config:   cf,
 	}
 	i.eventPool.New = i.newEvent
-	v.RegisterHwIfAddDelHook(i.hw_if_add_del)
-	v.RegisterHwIfLinkUpDownHook(i.hw_if_link_up_down)
-	v.RegisterSwIfAddDelHook(i.sw_if_add_del)
-	v.RegisterSwIfAdminUpDownHook(i.sw_if_admin_up_down)
+	i.v.RegisterHwIfAddDelHook(i.hw_if_add_del)
+	i.v.RegisterHwIfLinkUpDownHook(i.hw_if_link_up_down)
+	i.v.RegisterSwIfAddDelHook(i.sw_if_add_del)
+	i.v.RegisterSwIfAdminUpDownHook(i.sw_if_admin_up_down)
 	return
 }
 
+func (info *Info) V() *vnet.Vnet { return info.v }
+
 func (*Info) String() string { return Name }
 
-func (*Info) Main(...string) error { return nil }
+func (info *Info) Main(...string) error {
+	err := info.Config.Hook(info)
+	if err != nil {
+		return err
+	}
+	return info.Start()
+}
 
 func (i *Info) Close() (err error) {
 	// Exit vnet main loop.
@@ -166,9 +176,10 @@ func (i *Info) gdbWait() {
 }
 
 func (i *Info) Start() error {
+	fn := sockfile.Path(Name)
 	i.gdbWait()
 	var in parse.Input
-	in.SetString("cli { listen { no-prompt socket " + vnetCmdSock + "} }")
+	in.SetString("cli { listen { no-prompt socket " + fn + "} }")
 	return i.v.Run(&in)
 }
 

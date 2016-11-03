@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-package vnetinfo
+package vnet
 
 import (
 	"github.com/platinasystems/go/sockfile"
@@ -14,17 +14,17 @@ import (
 	"strings"
 )
 
+const Name = "vnet"
+
 type cmd struct{}
 
-var vnetCmdSock = sockfile.Path("vnet")
-
-func NewCmd() cmd { return cmd{} }
+func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [COMMAND-STRING]..." }
 
 func (cmd) Main(args ...string) error {
-	conn, err := net.Dial("unix", vnetCmdSock)
+	conn, err := net.Dial("unix", sockfile.Path(Name))
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (cmd) Main(args ...string) error {
 
 func (cmd) Help(...string) string {
 	buf := make([]byte, 4*4096)
-	conn, err := net.Dial("unix", vnetCmdSock)
+	conn, err := net.Dial("unix", sockfile.Path(Name))
 	if err != nil {
 		return err.Error()
 	}

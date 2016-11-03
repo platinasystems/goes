@@ -7,9 +7,17 @@ package main
 import (
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/i2c"
+	vnetinfo "github.com/platinasystems/go/machined/info/vnet"
+	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
+
+type platform struct {
+	vnet.Package
+	*bcm.Platform
+	i *vnetinfo.Info
+}
 
 func (p *platform) Init() (err error) {
 	v := p.Vnet
@@ -31,7 +39,7 @@ func (p *platform) Init() (err error) {
 		}
 	}
 
-	p.i.vi.Init()
+	p.i.Init()
 	return
 }
 
