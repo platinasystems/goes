@@ -51,8 +51,10 @@ func main() {
 	command.Plot(redisutils.New()...)
 	command.Sort()
 	start.Hook = func() error {
-		os.Setenv("REDISD", "lo eth0")
-		return nil
+		if len(os.Getenv("REDISD")) == 0 {
+			return nil
+		}
+		return os.Setenv("REDISD", "lo eth0")
 	}
 	machined.Hook = func() error {
 		machined.Plot(
