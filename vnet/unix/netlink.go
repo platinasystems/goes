@@ -140,6 +140,7 @@ func (nm *netlinkMain) Init(m *Main) (err error) {
 }
 
 type netlinkEvent struct {
+	vnet.Event
 	m    *Main
 	msgs []netlink.Message
 }
@@ -156,7 +157,7 @@ func (m *netlinkMain) getEvent() *netlinkEvent {
 }
 func (e *netlinkEvent) add() {
 	if len(e.msgs) > 0 {
-		e.m.AddEvent(e, e.m)
+		e.m.v.SignalEvent(e)
 		e.m.e = nil
 	}
 }
