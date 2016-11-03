@@ -210,7 +210,9 @@ func (p *ifStatsPoller) publish(name, counter string, value uint64) {
 	p.i.publish(name+"."+n, value)
 }
 func (p *ifStatsPoller) addEvent(dt float64) { p.i.v.AddTimedEvent(p, dt) }
-func (p *ifStatsPoller) String() string      { return "redis stats poller" }
+func (p *ifStatsPoller) String() string {
+	return fmt.Sprintf("redis stats poller sequence %d", p.sequence)
+}
 func (p *ifStatsPoller) EventAction() {
 	// Enable to represent all possible counters in redis (most with 0 values)
 	includeZeroCounters := p.sequence == 0 && p.i.PublishAllCounters
