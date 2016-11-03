@@ -7,7 +7,7 @@ package main
 import (
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/i2c"
-	vnetinfo "github.com/platinasystems/go/machined/info/vnet"
+	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
 	"github.com/platinasystems/go/vnet/ethernet"
