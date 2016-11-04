@@ -3,6 +3,7 @@ This repos contains Platina System's open source GO projects.
 To install a select MACHINE,
 
 ```console
+$ cp -av pkg $(go env GOPATH)
 $ go generate github.com/platinasystems/go/version
 $ go build github.com/platinasystems/go/goes/goes-MACHINE
 $ sudo ./goes-MACHINE install
