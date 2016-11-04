@@ -168,8 +168,6 @@ func (e *netlinkEvent) put() {
 	e.m.eventPool.Put(e)
 }
 
-func (m *netlinkMain) EventHandler() {}
-
 type eventSumState struct {
 	lastType  netlink.MsgType
 	lastCount uint
