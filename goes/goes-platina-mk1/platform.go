@@ -9,19 +9,19 @@ import (
 	"github.com/platinasystems/go/i2c"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
 type platform struct {
 	vnet.Package
-	*bcm.Platform
+	*fe1.Platform
 	i *vnetinfo.Info
 }
 
 func (p *platform) Init() (err error) {
 	v := p.Vnet
-	p.Platform = bcm.GetPlatform(v)
+	p.Platform = fe1.GetPlatform(v)
 	if err = p.boardInit(); err != nil {
 		v.Logf("boardInit failure: %s", err)
 		return
@@ -98,34 +98,34 @@ func (p *platform) boardInit() (err error) {
 	return
 }
 
-func (p *platform) boardPortInit(s bcm.Switch) (err error) {
-	cf := bcm.SwitchConfig{
-		Ports: make([]bcm.PortConfig, 32),
+func (p *platform) boardPortInit(s fe1.Switch) (err error) {
+	cf := fe1.SwitchConfig{
+		Ports: make([]fe1.PortConfig, 32),
 	}
 
 	// Data ports
 	for i := range cf.Ports {
-		cf.Ports[i] = bcm.PortConfig{
+		cf.Ports[i] = fe1.PortConfig{
 			PortBlockIndex:  uint(i),
 			SpeedBitsPerSec: 100e9,
 			LaneMask:        0xf,
-			PhyInterface:    bcm.PhyInterfaceOptics,
+			PhyInterface:    fe1.PhyInterfaceOptics,
 		}
 	}
 
 	// Management ports.
 	for i := uint(0); i < 2; i++ {
-		cf.Ports = append(cf.Ports, bcm.PortConfig{
+		cf.Ports = append(cf.Ports, fe1.PortConfig{
 			PortBlockIndex:  0,
 			SubPortIndex:    i,
 			IsManagement:    true,
 			SpeedBitsPerSec: 10e9,
 			LaneMask:        1 << (2 * uint(i)),
-			PhyInterface:    bcm.PhyInterfaceKR,
+			PhyInterface:    fe1.PhyInterfaceKR,
 		})
 	}
 
-	phys := [32 + 1]bcm.PhyConfig{}
+	phys := [32 + 1]fe1.PhyConfig{}
 	// No lane remapping, but the MK1 front panel ports are flipped..
 	for i := range phys {
 		p := &phys[i]

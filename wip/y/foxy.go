@@ -3,7 +3,7 @@
 package main
 
 import (
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/wip/y/internal/eeprom"
 
@@ -30,8 +30,8 @@ func (p *platform) boardInit() (err error) {
 	return
 }
 
-func (p *platform) boardPortInit(s bcm.Switch) (err error) {
-	cf := bcm.SwitchConfig{}
+func (p *platform) boardPortInit(s fe1.Switch) (err error) {
+	cf := fe1.SwitchConfig{}
 
 	var (
 		nPorts uint
@@ -51,25 +51,25 @@ func (p *platform) boardPortInit(s bcm.Switch) (err error) {
 		panic("nports")
 	}
 
-	cf.Ports = make([]bcm.PortConfig, nPorts)
+	cf.Ports = make([]fe1.PortConfig, nPorts)
 
 	switch nPorts {
 	case 32:
 		for i := range cf.Ports {
-			cf.Ports[i] = bcm.PortConfig{
+			cf.Ports[i] = fe1.PortConfig{
 				PortBlockIndex:  uint(i),
 				SpeedBitsPerSec: speed,
 				LaneMask:        0xf,
-				PhyInterface:    bcm.PhyInterfaceOptics,
+				PhyInterface:    fe1.PhyInterfaceOptics,
 			}
 		}
 	case 64:
 		for i := range cf.Ports {
-			cf.Ports[i] = bcm.PortConfig{
+			cf.Ports[i] = fe1.PortConfig{
 				PortBlockIndex:  uint(i) / 2,
 				SpeedBitsPerSec: speed,
 				LaneMask:        0x3 << (2 * (uint(i) % 2)),
-				PhyInterface:    bcm.PhyInterfaceOptics,
+				PhyInterface:    fe1.PhyInterfaceOptics,
 			}
 		}
 	case 96:
@@ -77,25 +77,25 @@ func (p *platform) boardPortInit(s bcm.Switch) (err error) {
 			// 2x1_1x2
 			for i := range cf.Ports {
 				if i%3 == 0 {
-					cf.Ports[i] = bcm.PortConfig{
+					cf.Ports[i] = fe1.PortConfig{
 						PortBlockIndex:  uint(i) / 3,
 						SpeedBitsPerSec: speed,
 						LaneMask:        0x3 << 2,
-						PhyInterface:    bcm.PhyInterfaceOptics,
+						PhyInterface:    fe1.PhyInterfaceOptics,
 					}
 				} else if (i+2)%3 == 0 {
-					cf.Ports[i] = bcm.PortConfig{
+					cf.Ports[i] = fe1.PortConfig{
 						PortBlockIndex:  (uint(i) - 1) / 3,
 						SpeedBitsPerSec: speed / 2,
 						LaneMask:        0x1 << 1,
-						PhyInterface:    bcm.PhyInterfaceOptics,
+						PhyInterface:    fe1.PhyInterfaceOptics,
 					}
 				} else if (i+1)%3 == 0 {
-					cf.Ports[i] = bcm.PortConfig{
+					cf.Ports[i] = fe1.PortConfig{
 						PortBlockIndex:  (uint(i) - 2) / 3,
 						SpeedBitsPerSec: speed / 2,
 						LaneMask:        0x1 << 0,
-						PhyInterface:    bcm.PhyInterfaceOptics,
+						PhyInterface:    fe1.PhyInterfaceOptics,
 					}
 				}
 			}
@@ -103,25 +103,25 @@ func (p *platform) boardPortInit(s bcm.Switch) (err error) {
 			// 1x2_2x1
 			for i := range cf.Ports {
 				if i%3 == 0 {
-					cf.Ports[i] = bcm.PortConfig{
+					cf.Ports[i] = fe1.PortConfig{
 						PortBlockIndex:  uint(i) / 3,
 						SpeedBitsPerSec: speed / 2,
 						LaneMask:        0x1 << 3,
-						PhyInterface:    bcm.PhyInterfaceOptics,
+						PhyInterface:    fe1.PhyInterfaceOptics,
 					}
 				} else if (i+2)%3 == 0 {
-					cf.Ports[i] = bcm.PortConfig{
+					cf.Ports[i] = fe1.PortConfig{
 						PortBlockIndex:  (uint(i) - 1) / 3,
 						SpeedBitsPerSec: speed / 2,
 						LaneMask:        0x1 << 2,
-						PhyInterface:    bcm.PhyInterfaceOptics,
+						PhyInterface:    fe1.PhyInterfaceOptics,
 					}
 				} else if (i+1)%3 == 0 {
-					cf.Ports[i] = bcm.PortConfig{
+					cf.Ports[i] = fe1.PortConfig{
 						PortBlockIndex:  (uint(i) - 2) / 3,
 						SpeedBitsPerSec: speed,
 						LaneMask:        0x3 << 0,
-						PhyInterface:    bcm.PhyInterfaceOptics,
+						PhyInterface:    fe1.PhyInterfaceOptics,
 					}
 				}
 			}
@@ -130,29 +130,29 @@ func (p *platform) boardPortInit(s bcm.Switch) (err error) {
 		}
 	case 128:
 		for i := range cf.Ports {
-			cf.Ports[i] = bcm.PortConfig{
+			cf.Ports[i] = fe1.PortConfig{
 				PortBlockIndex:  uint(i) / 4,
 				SpeedBitsPerSec: speed,
 				LaneMask:        0x1 << (uint(i) % 4),
-				PhyInterface:    bcm.PhyInterfaceOptics,
+				PhyInterface:    fe1.PhyInterfaceOptics,
 			}
 		}
 	}
 
 	// Management ports.
 	for i := uint(0); i < 2; i++ {
-		cf.Ports = append(cf.Ports, bcm.PortConfig{
+		cf.Ports = append(cf.Ports, fe1.PortConfig{
 			PortBlockIndex:  0,
 			SubPortIndex:    i,
 			IsManagement:    true,
 			SpeedBitsPerSec: 10e9,
 			LaneMask:        1 << (2 * i),
-			PhyInterface:    bcm.PhyInterfaceKR,
+			PhyInterface:    fe1.PhyInterfaceKR,
 		})
 	}
 
 	{
-		phys := [32 + 1]bcm.PhyConfig{}
+		phys := [32 + 1]fe1.PhyConfig{}
 		// No front panel remapping; no lane remapping on Foxy.
 		for i := range phys {
 			p := &phys[i]

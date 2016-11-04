@@ -28,7 +28,7 @@ import (
 	"github.com/platinasystems/go/info/version"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/bcm"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -84,9 +84,9 @@ func vnetHook(i *vnetinfo.Info) error {
 	pg.Init(v)   // vnet packet generator
 	unix.Init(v) // tuntap/netlink
 
-	// Device drivers: Broadcom switch + Intel 10G ethernet for punt path.
+	// Device drivers: FE1 switch + Intel 10G ethernet for punt path.
 	ixge.Init(v)
-	bcm.Init(v)
+	fe1.Init(v)
 
 	plat := &platform{i: i}
 	v.AddPackage("platform", plat)
