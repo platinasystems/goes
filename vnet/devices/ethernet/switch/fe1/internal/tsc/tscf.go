@@ -5,6 +5,7 @@
 package tsc
 
 import (
+	"github.com/platinasystems/go/firmware/fe1a"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/port"
 
@@ -161,7 +162,7 @@ func (phy *Tscf) Init() {
 	r.uc.program_ram_interface_enable.Modify(q, laneMask, 1<<0, 1<<0)
 	q.Do()
 
-	phy.PortBlock.LoadFirmware(&q.DmaRequest, tscf_uc_ucode.data)
+	phy.PortBlock.LoadFirmware(&q.DmaRequest, fe1a.TscfUcode.Data)
 	q.Do()
 	if q.Err != nil {
 		panic(q.Err)
@@ -200,14 +201,14 @@ func (phy *Tscf) Init() {
 	// Have microcode verify crc. Works but is slow so disabled.
 	if false {
 		crc := uint16(0)
-		len := uint16(len(tscf_uc_ucode.data))
+		len := uint16(len(fe1a.TscfUcode.Data))
 		c := uc_cmd{command: uc_cmd_compute_ucode_crc, in: &len, out: &crc}
 		err := c.do(q, laneMask, &r.uc_cmd)
 		if err != nil {
 			panic(err)
 		}
-		if crc != tscf_uc_ucode.crc {
-			panic(fmt.Errorf("uc ucode crc does not match got %x != want %x", crc, tscf_uc_ucode.crc))
+		if crc != fe1a.TscfUcode.Crc {
+			panic(fmt.Errorf("uc ucode crc does not match got %x != want %x", crc, fe1a.TscfUcode.Crc))
 		}
 	}
 

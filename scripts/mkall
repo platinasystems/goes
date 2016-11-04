@@ -10,10 +10,12 @@ go_dir=${goes_dir%/*}
 scripts_dir=${go_dir}/scripts
 dir=${0%/*}
 verbose=:
+v=
 for arg; do
 	case $arg in
 	-v | -verbose | --verbose)
 		verbose=echo
+		v=-v
 		;;
 	-h | -help | --help)
 		echo usage: $usage
@@ -25,6 +27,8 @@ for arg; do
 	esac
 done
 
+eval $verbose install binary packages...
+cp -a ${v} ${go_dir}/pkg $(go env GOPATH)
 eval $verbose version...
 go generate github.com/platinasystems/go/version
 eval $verbose goes-example...
