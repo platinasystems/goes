@@ -47,7 +47,7 @@ func (sws *SwitchSelect) showSwitches(c cli.Commander, w cli.Writer, in *cli.Inp
 	return
 }
 
-func (sws *SwitchSelect) showBcmInterrupt(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (sws *SwitchSelect) showInterrupt(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	sws.SelectFromInput(in)
 	for _, s := range sws.Switches {
 		s.GetSwitchCommon().Cmic.WriteInterruptSummary(w)
@@ -91,7 +91,7 @@ func cliInit(v *vnet.Vnet) {
 		},
 		cli.Command{
 			Name:   "show fe1 interrupt",
-			Action: s.showBcmInterrupt,
+			Action: s.showInterrupt,
 		},
 	}
 	for i := range cmds {

@@ -29,7 +29,6 @@ func getSetTscf(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data
 	// Set read/write data size.
 	m, v := uint16(3), uint16(log2NBytes)
 	if write_data == nil {
-		// [5:4] bits for read; [1:0] for write.
 		m, v = m<<4, v<<4
 	}
 
@@ -117,8 +116,6 @@ func (r *fuc_uint8) Set(q *DmaRequest, laneMask m.LaneMask, v uint8) {
 type tsce_uc_mem struct {
 	_ [0x50]byte
 
-	// [0] core config from pcs
-	// [5:1] vco rate X => vco rate is (22 + X)*250 Mhz
 	config_word tsce_uc_core_config_word_reg
 
 	temp_frc_val               euc_uint16
@@ -133,19 +130,10 @@ type tsce_uc_mem struct {
 	status_byte                euc_uint8
 	diag_max_time_control      euc_uint8
 	diag_max_err_control       euc_uint8
-	_                          [0x400 - 0x63]byte
+
+	_ [0x400 - 0x63]byte
 
 	lanes [4]struct {
-		// uc lane config word
-		// [9] cl72 restart timeout enable
-		// [8] cl72 auto polarity enable
-		// [7] scrambling disable
-		// [6] unreliable los
-		// [5:4] media type (0 => back plane, 1 => copper cable, 2 => optics)
-		// [3] force brdfe on
-		// [2] dfe on
-		// [1] an enabled
-		// [0] lane cfg from PCS
 		config_word tsce_uc_lane_config_word_reg
 
 		retune_after_restart               euc_uint8
@@ -166,10 +154,6 @@ type tsce_uc_mem struct {
 		uc_stopped                         euc_uint8
 		link_time                          euc_uint16
 
-		// [15] complete
-		// [14] uc slower than read access
-		// [13] uc faster than read access
-		// [7:0] amount of data in the uc buffer
 		diag_status euc_uint16
 
 		diag_read_pointer euc_uint8
@@ -183,9 +167,6 @@ type tsce_uc_mem struct {
 type tscf_uc_mem struct {
 	_ [0x400]byte
 
-	/* [7:0] vco_rate X => vco rate is (224 + X)*62.5 Mhz
-	   [8] core config from pcs
-	   [9] disable write pll charge pump current. */
 	config_word tscf_uc_core_config_word_reg
 
 	temp_frc_val               fuc_uint16
@@ -202,21 +183,10 @@ type tscf_uc_mem struct {
 	diag_max_err_control       fuc_uint8
 	misc_ctrl_byte             fuc_uint8
 	config_pll1_word           fuc_uint16
-	_                          [0x420 - 0x416]byte
+
+	_ [0x420 - 0x416]byte
 
 	lanes [4]struct {
-		/* uc lane config word
-		   [15:11] reserved
-		   [10] cl72 restart timeout enable
-		   [9] cl72 auto polarity enable
-		   [8] scrambling disable
-		   [7] unreliable los
-		   [6:5] media type (0 => back plane, 1 => copper cable, 2 => optics)
-		   [4] force brdfe on
-		   [3] dfe low power mode
-		   [2] dfe on
-		   [1] an enabled
-		   [0] lane cfg from PCS */
 		config_word tscf_uc_lane_config_word_reg
 
 		retune_after_restart               fuc_uint8
@@ -239,10 +209,6 @@ type tscf_uc_mem struct {
 		uc_stopped                         fuc_uint8
 		link_time                          fuc_uint16
 
-		// [15] complete
-		// [14] uc slower than read access
-		// [13] uc faster than read access
-		// [7:0] amount of data in the uc buffer
 		diag_status fuc_uint16
 
 		diag_read_pointer       fuc_uint8

@@ -11,25 +11,14 @@ import (
 )
 
 type Regs struct {
-	/* [31:29] cycle
-	   [25] 1 => internal, 0 => external
-	   [24:22] bus id
-	   [21] 1 => clause45, 0 => clause 22
-	   [20:16] phy id
-	   [15:0] phy write data */
 	param hw.Reg32
 
-	// [15:0] phy read data
 	read_data hw.Reg32
 
-	// clause 22 [4:0] register address
-	// clause 45 [20:16] DTYPE, [15:0] register address
 	address hw.Reg32
 
-	// [1] read start, [0] write start
 	control hw.Reg32
 
-	// [0] operation done; cleared by clearing control register read/write start bits.
 	status hw.Reg32
 }
 
@@ -39,14 +28,10 @@ type request struct {
 	PhyID       uint8
 	Address     uint16
 
-	// Pointer to read data if operation is a read.
-	// Operation is a write if ReadData is nil.
 	ReadData *uint16
 
-	// Data to write if operation is a write.
 	WriteData uint16
 
-	// Pointer sent when reply is ready.
 	Done chan *request
 }
 

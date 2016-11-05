@@ -21,59 +21,63 @@ import (
 type cmc_regs struct {
 	schan      sbus.SchanRegs
 	fast_schan sbus.FastSchanRegs
-	_          [0x110 - 0x80]byte
+
+	_ [0x110 - 0x80]byte
+
 	packet_dma packet.DmaRegs
-	_          [0x2c0 - 0x1c0]byte
-	fifo_dma   sbus.FifoDmaRegs
-	_          [0x400 - 0x3a0]byte
-	// 0-1 standard interrupts
-	// 2 parity errors
-	// 3-6 sbus device interrupts
+
+	_ [0x2c0 - 0x1c0]byte
+
+	fifo_dma sbus.FifoDmaRegs
+
+	_ [0x400 - 0x3a0]byte
+
 	irq_status0       [5]hw.Reg32
 	irq_enable0       [3][5]hw.Reg32
 	irq_enable_rcpu   hw.Reg32
 	ecc_errors_status [2]hw.Reg32
-	_                 [0x470 - 0x45c]byte
-	pcie_msi_config   hw.Reg32
 
-	// Top 6 bits of cpu address for each of 16 values of [31:28].  5 per register.
-	// See hostmem_addr_remap1 also.
+	_ [0x470 - 0x45c]byte
+
+	pcie_msi_config hw.Reg32
+
 	hostmem_addr_remap0 [3]hw.Reg32
 
-	// channels 0-3 plus total
 	packet_counts [5]struct{ rx, tx hw.Reg32 }
 
-	// [2] value to set to interrupt status
-	// [1:0] sw interrupt numnber
 	sw_irq_config hw.Reg32
 
-	hostmem_addr_remap1      [1]hw.Reg32
-	irq_status1              [2]hw.Reg32
-	irq_enable1              [3][2]hw.Reg32
-	_                        [0x600 - 0x4d0]byte
+	hostmem_addr_remap1 [1]hw.Reg32
+	irq_status1         [2]hw.Reg32
+	irq_enable1         [3][2]hw.Reg32
+
+	_ [0x600 - 0x4d0]byte
+
 	sbus_dma                 [3]sbus.DmaRegs
 	sbus_dma_timers          [3]hw.Reg32
 	subs_dma_iteration_count [3]hw.Reg32
-	_                        [0x1000 - 0x708]byte
+
+	_ [0x1000 - 0x708]byte
 }
 
 type regs struct {
 	i2c iproc.I2cRegs
-	_   [0x10c - 0x50]byte
+
+	_ [0x10c - 0x50]byte
 
 	cmic_config hw.Reg32
 
-	_     [0x10000 - 0x110]byte
+	_ [0x10000 - 0x110]byte
+
 	schan sbus.SchanRegs
-	_     [0x10080 - 0x10064]byte
+
+	_ [0x10080 - 0x10064]byte
 
 	mdio mdio.Regs
 
 	sbus struct {
 		timeout hw.Reg32
 
-		// 4 bit ring number for up to 128 SBUS block numbers.
-		// SBUS block i at bit 4*i.
 		ring_map [16]hw.Reg32
 	}
 	_             [0x101ec - 0x100d8]byte
@@ -86,9 +90,6 @@ type regs struct {
 	}
 	pio_mcs_access_page hw.Reg32
 
-	// [0] active low interrupt
-	// [2:1] write req pld size
-	// [4:3] read req pld size
 	pcie_config hw.Reg32
 
 	uc_config               [2]hw.Reg32
@@ -96,65 +97,52 @@ type regs struct {
 	pcie_error_status_clear hw.Reg32
 	sw_reset                hw.Reg32
 
-	// [1] soft reset; put reset fsm into reset state
-	// [0] cps reset
 	cps_reset hw.Reg32
 
-	// [23:16] revision id
-	// [15:0] device id
 	revision_id hw.Reg32
 
 	cmicm_revision_id  hw.Reg32
 	_                  hw.Reg32
 	pcie_reset_control hw.Reg32
 
-	// [5] Enable override to allow SW to control SPI Master/Slave mode
-	// [4] Enable override to allow SW to control I2C Master/Slave mode
-	// [3] Enable override for strap_cmicm_i2c_debug_mode
-	// [2] SW override SPI master slave 1=master mode 0=slave mode
-	// [1] sw override i2c master slave mode 1=master mode 0=slave mode
-	// [0] sw override value for strap_cmicm_i2c_debug_mode valid only when enabled via bit 3
 	override_strap hw.Reg32
 
-	bspi_bigendian            hw.Reg32
-	_                         hw.Reg32
-	strap_status              [2]hw.Reg32
-	fsrf_standby_control      hw.Reg32
-	_                         hw.Reg32
+	bspi_bigendian hw.Reg32
+
+	_ hw.Reg32
+
+	strap_status         [2]hw.Reg32
+	fsrf_standby_control hw.Reg32
+
+	_ hw.Reg32
+
 	pcie_user_if_timeout      hw.Reg32
 	pcie_user_if_status       hw.Reg32
 	pcie_user_if_status_clear hw.Reg32
 	pcie_user_if_status_mask  hw.Reg32
 
-	// [0] enable purge interface timeout
-	// [1] enable purge interface reset
-	// [2] enable purge sw programmable
-	// [3] pio purge sw programmable
-	// [4] pio purge if reset
 	pcie_user_if_purge_control hw.Reg32
 
 	pcie_user_if_purge_status hw.Reg32
 	pcie_dma_buf_mem_control  hw.Reg32
 	mcs_dma_buf_mem_control   hw.Reg32
 	pcie_address_upper_32bits hw.Reg32
-	_                         [0x11000 - 0x10274]byte
-	miim                      miim_regs
-	_                         [0x1a000 - 0x1123c]byte
+
+	_ [0x11000 - 0x10274]byte
+
+	miim miim_regs
+
+	_ [0x1a000 - 0x1123c]byte
 
 	rx_buf struct {
-		// [0] relase all credits
 		epipe_interface_release_all_credits hw.Reg32
 
-		// [5:0] max credits; default: 0x20
 		epipe_interface_max_interface_credits hw.Reg32
 
-		// [2:0] default 7
 		status_buffer_max_free_list_entries hw.Reg32
 
-		// [3:0] default 8
 		data_buffer_max_free_list_entries hw.Reg32
 
-		// Number of status/data free list entries available.
 		status_buffer_n_free_entries hw.Reg32
 		data_buffer_n_free_entries   hw.Reg32
 
@@ -163,56 +151,35 @@ type regs struct {
 
 		epipe_interface_buffer_depth hw.Reg32
 
-		// [2:0] cmcX ecc enable (default: 1)
-		// [3] rpe ecc check enable (default: 1)
-		// [4] data buf ecc enable (default: 1)
-		// [5] status buf ecc enable (default: 1)
-		// [15:6] status buf mem tm
-		// [16] status buf mem dcm
-		// [26:17] data buf mem tm
-		// [27] data buf mem dcm
-		// [28] flush epipe interface buffer
 		config            hw.Reg32
 		ecc_error_control hw.Reg32
 		data_buffer_tm    [3]hw.Reg32
 		status_buffer_tm  [2]hw.Reg32
-		_                 [0x1b000 - 0x1a040]byte
+
+		_ [0x1b000 - 0x1a040]byte
 	}
 
 	tx_buf struct {
-		// min/max buffer limits
-		// 6 bits each starting at 6*i rpe/cmc0-2 max buffer limit
-		// max defaults: all 4 set to 0x14 = 20
-		// min defaults: all 4 set to 0x04 =  4
 		max_buffer_limits hw.Reg32
 		min_buffer_limits hw.Reg32
 
-		_             hw.Reg32
+		_ hw.Reg32
+
 		packet_counts [4]hw.Reg32 // rpe, cmc0-2
 		debug         hw.Reg32
-		_             hw.Reg32
 
-		// [5:0] buffer depth
+		_ hw.Reg32
+
 		ipipe_interface_buffer_depth hw.Reg32
 
-		// [5:0]
 		data_buffer_n_free_entries hw.Reg32
 
-		// [5:0] credits
-		// [6] write ipipe interface credits
-		// [7] flush ipipe interface buffer
 		ipipe_interface_credits hw.Reg32
 
-		// [2:0]
 		data_buffer_max_free_list_entries hw.Reg32
 
-		// [0] packet buffer ecc enable (default 1)
-		// [1] status buffer ecc enable (default 1)
-		// [2] first service buffers with eop cells (default 1)
 		config hw.Reg32
 
-		// [0] tx packet buffer ecc error
-		// [1] status buffer ecc error
 		status       hw.Reg32
 		status_clear hw.Reg32
 

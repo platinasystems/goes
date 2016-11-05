@@ -13,76 +13,30 @@ import (
 )
 
 type miim_regs struct {
-	// The clock divider configuration register for External MDIO.
-	// Various parts of the chip involved in rate control require a constant, known frequency. This reference
-	// frequency is based off of the chip 's core clock.  However, the core clock can be different in different
-	// designs, thus the need for this register.  The core clock frequency is multiplied by the rational quantity (DIVIDEND/DIVISOR),
-	// and the further divided down by 2 to produce the actual MDIO operation frequency.
-	// To avoid skew, it is recommended that the DIVIDEND value usually be set to 1.
-	// The default values are for 133MHz operation:
-	//   DIVIDEND=1, DIVISOR=6,
-	//   MDIO operation freq = 133MHz/(6*2) =~ 11MHz
-	// For 157MHz core clock chips, set:
-	//   DIVIDEND=1, DIVISOR=7,
-	//   MDIO operation freq = 133MHz/(7*2) =~ 11MHz
-	// [31:16] dividend 0x1
-	// [15:0] divisor 0x6
 	rate_adjust_external_mdio hw.Reg32
 	rate_adjust_internal_mdio hw.Reg32
 
-	// 29:29 MIIM_ADDR_MAP_ENABLE 0x1
-	//   When set, use the MDIO Address Map Table to get the Phy ID from the port number for both Wr/Rd and link scan. Else, use the Phy ID as-is.
-	// 28:28 OVER_RIDE_EXT_MDIO_MSTR_CNTRL When set, external MDIO master access is disabled, and CMIC becomes the MDIO master, allowing hardware link scan.
-	//   Must be 1 for normal operation.
-	//   Set to 0x0 to allow ATE tests to access XAUI/SERDES cores.
-	// 25:25 STOP_PAUSE_SCAN_ON_FIRST_CHANGE This is the fast interrupt mode for Auto (hardware) MIIM Pause Scan.
-	//   When set, on the first link change detection, stop Pause scanning; this will not scan all the ports set up for scanning.
-	// 24:24 STOP_PAUSE_SCAN_ON_CHANGE When set, on link change detection, stop Pause scanning
-	// 21:21 STOP_LS_ON_FIRST_CHANGE This is the fast interrupt mode for Auto (hardware) MIIM Link can.
-	//   When set, on the first link change detection, stop link scanning; this will not scan all the ports set up for scanning.
-	// 20:20 STOP_LS_ON_CHANGE When set, on link change detection, stop link scanning
-	// 16:12 RX_PAUSE_BIT_POS 0x1
-	// 8:4 TX_PAUSE_BIT_POS 0x0
-	// 1:1 MIIM_PAUSE_SCAN_EN
-	// 0:0 MIIM_LINK_SCAN_EN Set by CPU to start automatic Link Status scanning
 	control hw.Reg32
 
-	// 12:12 RX_PAUSE_STATUS_CHANGE Set by CMIC to indicate pause status changed
-	// 8:8 TX_PAUSE_STATUS_CHANGE Set by CMIC to indicate pause status changed
-	// 4:4 LINK_STATUS_CHANGE Set by CMIC to indicate Link status changed
-	// 0:0 MIIM_SCAN_BUSY Set by CMIC indicating that MIIM scan cycle is in progress
 	status hw.Reg32
 
-	// 31:31 MIIM_FLIP_STATUS_BIT If set, will invert the data read to derive link status information.
-	// 30:26 MIIM_LINK_STATUS_BIT_POSITION 0x2 Position of link status bit in the MDIO device register.
-	// 25:21 CLAUSE_22_REGADR 0x19 Register address for associated read or write
-	// 20:16 CLAUSE_45_DTYPE
-	// 15:0 CLAUSE_45_REGADR 0x19 Register address for associated read or write
 	auto_scan_address hw.Reg32
 
 	pause_address hw.Reg32
 
-	// Ports 0 - 95
-	// Per port; 0 => link up 1 => link down default 0xffffffff
-	// Read only.
 	port_link_is_down_0 [3]hw.Reg32
 	rx_pause_status_0   [3]hw.Reg32
 	tx_pause_status_0   [3]hw.Reg32
 
-	// Bitmap of ports to enable link/pause scan.
 	port_enable_link_scan_0  [3]hw.Reg32
 	port_enable_pause_scan_0 [3]hw.Reg32
 
-	// Port is IEEE clause 45 else clause 22
 	port_scan_is_clause45_0 [3]hw.Reg32
 
-	// 1 => internal phy; 0 => external phy
 	port_phy_is_internal_0 [3]hw.Reg32
 
-	// 3 bit external bus number x 96 ports; 10 per 32 bit register
 	port_bus_index_0 [10]hw.Reg32
 
-	// 5 bit phy mdio address x 96 ports; 4 per 32 bit register
 	port_phy_address_0 [24]hw.Reg32
 
 	rx_pause_capability_0       [3]hw.Reg32
@@ -90,12 +44,8 @@ type miim_regs struct {
 	tx_pause_capability_0       [3]hw.Reg32
 	tx_pause_override_control_0 [3]hw.Reg32
 
-	// 12:12 CLR_RX_PAUSE_STATUS_CHANGE Set by SW to clear RX_PAUSE_STATUS_CHANGE bit in MIIM_SCAN_STATUS register
-	// 8:8 CLR_TX_PAUSE_STATUS_CHANGE Set by SW to clear TX_PAUSE_STATUS_CHANGE bit in MIIM_SCAN_STATUS register
-	// 4:4 CLR_LINK_STATUS_CHANGE Set by SW to clear LINK_STATUS_CHANGE bit in MIIM_SCAN_STATUS register
 	clear_scan_status hw.Reg32
 
-	// Ports 96 - 127 bits as above for _0 registers.
 	port_link_is_down_1         [1]hw.Reg32
 	rx_pause_status_1           [1]hw.Reg32
 	tx_pause_status_1           [1]hw.Reg32
@@ -110,10 +60,8 @@ type miim_regs struct {
 	tx_pause_capability_1       [1]hw.Reg32
 	tx_pause_override_control_1 [1]hw.Reg32
 
-	// 3:0 MDIO_OUT_DELAY 0x3 MDIO Output Delay. This field determines the delay (in number of swclk) between the posedge of MDC and MDIO being driven.
 	config hw.Reg32
 
-	// Ports 128 - 191 bits as above for _0 registers.
 	port_link_is_down_2         [2]hw.Reg32
 	rx_pause_status_2           [2]hw.Reg32
 	tx_pause_status_2           [2]hw.Reg32
