@@ -79,6 +79,8 @@ func (n *node) init(v *vnet.Vnet) {
 	v.AddBufferPool(p)
 }
 
+func (n *node) DriverName() string { return "packet-generator" }
+
 func (n *node) free_buffer_type(t *buffer_type) {
 	if l := t.free_refs.Len(); l > 0 {
 		// Mark buffers as no longer being of this type.

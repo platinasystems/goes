@@ -241,7 +241,8 @@ func (n *myNode) Configure(in *parse.Input) {
 	}
 }
 
-func (n *myNode) IsUnix() bool { return n.isUnix }
+func (n *myNode) IsUnix() bool       { return n.isUnix }
+func (n *myNode) DriverName() string { return "my-node" }
 
 func (n *myNode) InterfaceInput(o *vnet.RefOut) {
 	out := &o.Outs[n.next]

@@ -37,6 +37,8 @@ func (d *dev) vnetInit() {
 	v.RegisterInterfaceNode(d, d.Hi(), d.Name())
 }
 
+func (d *dev) DriverName() string { return "ixge" }
+
 func (d *dev) SetLoopback(x vnet.IfLoopbackType) (err error) {
 	const (
 		force_link_up = 1 << 0
