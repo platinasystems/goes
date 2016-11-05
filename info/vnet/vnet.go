@@ -35,6 +35,7 @@ type Info struct {
 	eventPool sync.Pool
 	Config
 	ifStatsPoller
+	pub_chan chan key_value
 }
 
 func New(cf Config) (i *Info) {
@@ -68,6 +69,7 @@ func (info *Info) Main(...string) error {
 func (i *Info) Close() (err error) {
 	// Exit vnet main loop.
 	i.v.Quit()
+	close(i.pub_chan)
 	return
 }
 
@@ -178,6 +180,8 @@ func (i *Info) gdbWait() {
 func (i *Info) Start() error {
 	fn := sockfile.Path(Name)
 	i.gdbWait()
+	i.pub_chan = make(chan key_value, 16<<10) // never want to block vnet
+	go i.publisher()
 	var in parse.Input
 	in.SetString("cli { listen { no-prompt socket " + fn + "} }")
 	return i.v.Run(&in)
@@ -197,13 +201,24 @@ func (i *Info) Init() {
 	i.initialPublish()
 }
 
+type key_value struct {
+	key   string
+	value interface{}
+}
+
+func (i *Info) publisher() {
+	for c := range i.pub_chan {
+		info.Publish(c.key, c.value)
+	}
+}
+
+func (i *Info) publish(key string, value interface{}) { i.pub_chan <- key_value{key: key, value: value} }
+
 type ifStatsPoller struct {
 	vnet.Event
 	i        *Info
 	sequence uint
 }
-
-func (i *Info) publish(key string, value interface{}) { info.Publish(i.prefix+key, value) }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
 	n := strings.Replace(counter, " ", "_", -1)
