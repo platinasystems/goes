@@ -152,7 +152,8 @@ type showIfConfig struct {
 func (c *showIfConfig) parse(v *Vnet, in *cli.Input, isHw bool) {
 	c.detail = false
 	c.colMap = map[string]bool{
-		"Rate": false,
+		"Rate":   false,
+		"Driver": false,
 	}
 	if isHw {
 		c.hiMap = make(map[Hi]bool)
@@ -172,6 +173,7 @@ func (c *showIfConfig) parse(v *Vnet, in *cli.Input, isHw bool) {
 		case in.Parse("m%*atching %v", &c.re):
 		case in.Parse("d%*etail"):
 			c.detail = true
+			c.colMap["Driver"] = true
 		case in.Parse("r%*ate"):
 			c.colMap["Rate"] = true
 		default:
@@ -279,6 +281,7 @@ func (h *hwIfIndices) Len() int           { return len(h.ifs) }
 
 type showHwIf struct {
 	Name    string `format:"%-30s"`
+	Driver  string `format:"%-12s" align:"center"`
 	Address string `format:"%-12s" align:"center"`
 	Link    string `width:12`
 	Counter string `format:"%-30s" align:"left"`
@@ -330,6 +333,7 @@ func (v *Vnet) showHwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		first := true
 		firstIf := showHwIf{
 			Name:    h.name,
+			Driver:  hi.DriverName(),
 			Address: hi.FormatAddress(),
 			Link:    h.LinkString(),
 		}
@@ -342,6 +346,7 @@ func (v *Vnet) showHwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			if first {
 				first = false
 				s.Name = firstIf.Name
+				s.Driver = firstIf.Driver
 				s.Address = firstIf.Address
 				s.Link = firstIf.Link
 			}

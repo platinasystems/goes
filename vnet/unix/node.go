@@ -73,6 +73,7 @@ func (intf *Interface) interfaceNodeInit(m *Main) {
 	iomux.Add(intf)
 }
 
+func (n *node) DriverName() string                                          { return "tuntap" }
 func (n *node) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames) { return }
 func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)         {}
 func (n *node) ValidateSpeed(speed vnet.Bandwidth) (err error)              { return }

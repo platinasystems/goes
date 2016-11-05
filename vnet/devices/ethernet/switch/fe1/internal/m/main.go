@@ -160,6 +160,23 @@ func (c *PortCommon) GetPortBlock() PortBlocker     { return c.PortBlock }
 func (c *PortCommon) GetSubPortIndex() uint         { return uint(c.SubPortIndex) }
 func (c *PortCommon) GetPhy() Phyer                 { return c.Phy }
 
+// DriverName/LessThan from vnet.Devicer interface.
+func (c *PortCommon) DriverName() string { return "fe1" }
+
+// Sort ports for cli display: first data ports, then management ports,
+// else sort by front panel index.
+func (a *PortCommon) LessThan(b *PortCommon) bool {
+	ia, ib := a.FrontPanelIndex, b.FrontPanelIndex
+	const mgt_offset = 1 << 30
+	if a.IsManagement {
+		ia += mgt_offset
+	}
+	if b.IsManagement {
+		ib += mgt_offset
+	}
+	return ia < ib
+}
+
 func GetSubPortIndex(p Porter) uint { return p.GetPortCommon().GetSubPortIndex() }
 func IsProvisioned(p Porter) bool   { return p.GetPortCommon().LaneMask != 0 }
 

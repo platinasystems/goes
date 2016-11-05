@@ -340,6 +340,7 @@ func (h *HwIf) SetLoopback(v IfLoopbackType) (err error) {
 }
 func (h *HwIf) GetSwInterfaceCounterNames() (nm InterfaceCounterNames) { return }
 func (h *HwIf) DefaultId() IfIndex                                     { return 0 }
+func (a *HwIf) LessThan(b HwInterfacer) bool                           { return a.hi < b.GetHwIf().hi }
 
 type interfaceMain struct {
 	hwIferPool      hwIferPool
@@ -427,12 +428,19 @@ func (v *Vnet) ForeachHwIf(unixOnly bool, f func(hi Hi)) {
 }
 
 // Interface ordering for output.
-func (m *interfaceMain) HwLessThan(a, b *HwIf) bool { return a.name < b.name }
+func (v *Vnet) HwLessThan(a, b *HwIf) bool {
+	ha, hb := v.HwIfer(a.hi), v.HwIfer(b.hi)
+	da, db := ha.DriverName(), hb.DriverName()
+	if da != db {
+		return da < db
+	}
+	return ha.LessThan(hb)
+}
 
-func (m *interfaceMain) SwLessThan(a, b *swIf) bool {
-	ha, hb := m.SupHwIf(a), m.SupHwIf(b)
+func (v *Vnet) SwLessThan(a, b *swIf) bool {
+	ha, hb := v.SupHwIf(a), v.SupHwIf(b)
 	if ha != hb {
-		return m.HwLessThan(ha, hb)
+		return v.HwLessThan(ha, hb)
 	}
 	return a.id < b.id
 }
@@ -537,6 +545,8 @@ type HwIfClasser interface {
 type Devicer interface {
 	Noder
 	loop.OutputLooper
+	DriverName() string // name of device driver
+	LessThan(b HwInterfacer) bool
 	IsUnix() bool
 	ValidateSpeed(speed Bandwidth) error
 	SetLoopback(v IfLoopbackType) error

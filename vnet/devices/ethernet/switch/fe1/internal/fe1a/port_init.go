@@ -561,6 +561,10 @@ func (t *fe1a) enablePorts(enable bool) {
 // Set default VLAN to 1.
 func (p *Port) DefaultId() vnet.IfIndex { return 1 }
 
+func (a *Port) LessThan(b vnet.HwInterfacer) bool {
+	return a.PortCommon.LessThan(&b.(*Port).PortCommon)
+}
+
 func (p *Port) SetLoopback(v vnet.IfLoopbackType) (err error) {
 	var enable bool
 	switch v {
