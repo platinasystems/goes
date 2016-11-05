@@ -28,34 +28,20 @@ const (
 	dma_mode_descriptors dma_control = 1 << 2
 	dma_mode_registers   dma_control = 0 << 2
 	dma_append_cpu       dma_control = 1 << 28
-	dma_jump             dma_control = 1 << 29 // jump to descriptor at given cpu address; rest of descriptor is ignored
-	dma_skip             dma_control = 1 << 30 // skip to next descriptor; ignore this descriptor.
+	dma_jump             dma_control = 1 << 29
+	dma_skip             dma_control = 1 << 30
 	dma_last_in_chain    dma_control = 1 << 31
 )
 
 type dma_descriptor struct {
-	// As above.
 	control dma_control
 
-	/* [31] decrement sbus address instead of increment
-	   [30] disable increment of cpu address (same data for all sbus entries)
-	   [29] disable increment of sbus address
-	   [28:24] shift for sbus address increment
-	   [23:16] core clocks between pending sbus commands
-	   [13] disable write to cpu memory
-	   [12] word swap 64 data
-	   [11] cpu mem write big endian
-	   [10] cpu mem read big endian
-	   [9:5] number of 32 bit data words in request
-	   [4:0] number of 32 bit data words in response */
 	options hw.Reg32
 
-	/* Number of operations to execute. */
 	count hw.Reg32
 
 	command command_reg
 
-	/* Starting SBUS and cpu memory address for dma. */
 	sbus_address Address
 	cpu_address  hw.Reg32
 }
@@ -213,7 +199,6 @@ type DmaRequest struct {
 
 	Commands []DmaCmdInterface
 
-	// Value of dma status register when request finished.
 	status dma_status
 
 	// If status indicates error index into req.Commands where error occurred.

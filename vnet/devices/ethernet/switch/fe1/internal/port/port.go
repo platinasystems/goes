@@ -250,7 +250,7 @@ func (p *PortBlock) getStatus(port m.Porter) (s portStatus) {
 
 type switchSelect struct{ m.SwitchSelect }
 
-func (ss *switchSelect) showBcmPortStatus(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (ss *switchSelect) showPortStatus(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	var ifs vnet.HwIfChooser
 	ifs.Init(ss.Vnet)
 	for !in.End() {
@@ -284,6 +284,6 @@ func Init(v *vnet.Vnet) {
 	ss.Vnet = v
 	v.CliAdd(&cli.Command{
 		Name:   "show fe1 port-status mac",
-		Action: ss.showBcmPortStatus,
+		Action: ss.showPortStatus,
 	})
 }

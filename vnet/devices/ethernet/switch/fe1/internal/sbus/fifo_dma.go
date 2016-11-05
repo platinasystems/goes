@@ -15,53 +15,30 @@ import (
 const n_fifo_dma_channels = 4
 
 type FifoDmaRegs struct {
-	// [31] abort
-	// [30:26] multiple command spacing
-	// [25:12] timer ticks for dma timeout
-	// [11] big endian
-	// [10:7] log2 max number of entries in host memory - 6: so X => 2^(6+X) entries
-	// [6:2] sbus beat count to read one entry
-	// [1] nack is fatal and aborts current fifo dma iteration
-	// [0] enable.
 	control [n_fifo_dma_channels]hw.Reg32
 
 	sbus_start_address     [n_fifo_dma_channels]hw.Reg32
 	host_mem_start_address [n_fifo_dma_channels]hw.Reg32
 
-	// Number of entries read by software (read/write); number of entries available (read only)
 	host_mem [n_fifo_dma_channels]struct{ n_entries_read, n_entries_valid hw.Reg32 }
 
 	ecc_error_address       [n_fifo_dma_channels]hw.Reg32
 	ecc_error_control       [n_fifo_dma_channels]hw.Reg32
 	host_mem_write_pointers [n_fifo_dma_channels]hw.Reg32
-	_                       [0x354 - 0x340]byte
-	// Number of entries in fifo before interrupt occurs.
+
+	_ [0x354 - 0x340]byte
+
 	host_mem_interrupt_threshold [n_fifo_dma_channels]hw.Reg32
 
-	// [11] multibit ecc error
-	// [10] sbus ack timeout
-	// [9] sbus ack error
-	// [8] sbus ack nack
-	// [7] sbus ack wrong opcode
-	// [6] sbus ack wrong beat count
-	// [5] host mem write error
-	// [4] done (zero control enable bit to clear)
-	// [3] host mem timeout
-	// [2] host mem threshold reached
-	// [1] active
-	// [0] error
 	status [n_fifo_dma_channels]fifo_dma_status
 
-	// [2] multibit ecc error clear
-	// [1] host mem timeout clear
-	// [0] host mem overflow clear
 	status_clear [n_fifo_dma_channels]hw.Reg32
 
-	// Typically fifo pop.
 	sbus_opcode [n_fifo_dma_channels]command_reg
 
 	debug hw.Reg32
-	_     [0x3a0 - 0x398]byte
+
+	_ [0x3a0 - 0x398]byte
 }
 
 type fifo_dma_channel struct {

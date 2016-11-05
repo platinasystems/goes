@@ -54,48 +54,25 @@ const (
 	flex_counter_control_clear_on_read = 1 << 2
 )
 
-// Controls for 4 counter pools.  Only one counter per pool can be incremented per packet.
 type flex_counter_4pool_control struct {
-	// 2:2 CLR_ON_READ Enables clear-on-read for SBus reads to the attached pool
-	// 1:1 COUNTER_POOL_ENABLE 0x1 Control to enable/disable counting per pool.
-	// 0:0 MIRROR_COPY_INCR_ENABLE Control to enable/disable counting for mirror copy packets.
 	control [4]rx_tx_pipe_reg32
 
-	// Description: 41-to-8 packet attribute masking register for generating packet keys
-	// 59:59 USE_COMPRESSED_PKT_KEY If set, compressed packet key is used. To use this, USE_UDF_KEY needs to be set to zero
-	// 58:58 USE_UDF_KEY
-	// 57:56 USER_SPECIFIED_UDF_VALID User specified UDF valids, these valids along with actual packet udf_valid's are used to increment the counters
-	// 55:48 SELECTOR_i_EN Enable for SELECTOR_FOR_BIT_i
-	// 47:0 8 6-bit selector for bit i
 	packet_attribute_selector_key [4]rx_tx_pipe_reg64
 
-	// 9:8 MODE	R/W Counter eviction mode for the attached pool Encodings are:
-	//   0 = Counter eviction is disabled.
-	//   1 = Random counter eviction.
-	//   2 = Threshold based counter eviction.
-	//   3 = Reserved.
-	// 7:6 PIPE_ID Identifies the Pipe in which the attached counter pool resides
-	// 5:0 MEMORY_ID Unique identifier of a counter memory within a PIPE.
-	//   Any pool enabled for counter eviction must be assigned a unique value from [1:CENTRAL_CTR_EVICTION_CONTROL__NUM_CE_PER_PIPE].
 	eviction_control [4]rx_tx_pipe_reg32
 
-	// 34:0 SEED Initial seed for LFSR
 	eviction_lfsr_seed [4]rx_tx_pipe_reg64
 
-	// 59:26 THRESHOLD_BYTES byte threshold for eviction
-	// 25:0 THRESHOLD_PKTS packet threshold for eviction
 	eviction_threshold [4]rx_tx_pipe_reg64
 
 	_ [0x80 - 0x14]rx_tx_pipe_reg32
 
-	// undocumented
 	offset_table_control [4]rx_tx_pipe_reg32
 
 	_ [0x100 - 0x84]rx_tx_pipe_reg32
 }
 
 type flex_counter_1pool_control struct {
-	// as above
 	control            rx_tx_pipe_reg32
 	eviction_control   rx_tx_pipe_reg32
 	eviction_threshold rx_tx_pipe_reg64
@@ -107,25 +84,11 @@ const (
 )
 
 type flex_counter_4pool_mems struct {
-	// Table Min: 0 Table Max: 1023
-	// Address: 0x56800000 + j*0x20000 + i*0x1000 i = 0..3 j = 0..2 Block ID: RX_PIPE Access Type: DUPLICATE (9)
-	// Description: The actual offset used to index the counter table in the first counter pool is stored in this table
-	// 9:9 EVEN_PARITY
-	// 8:1 OFFSET This offset will be added to the base index to compute final index
-	// 0:0 COUNT_ENABLE Enable/Disable counting for this offset.
 	pool_offset_tables [4]struct {
 		entries [n_flex_counter_mode][256]m.Mem32
 		_       [0x1000 - n_flex_counter_mode*256]m.MemElt
 	}
 
-	// Table Min: 0 Table Max: 4095
-	// Address: 0x56804000 + j*0x20000 + i*0x4000 i = 0..3 j = 0..2 Block ID: RX_PIPE Access Type: UNIQUE_PIPE0123
-	// Description: Counter Table for flexible counter updates. All sources in the Ingress Pipeline including the IFP can update these counters.
-	// Index Description: Flex Counter table is derived from offset table and the flex ctr base from each table
-	// 67:67 PARITY
-	// 66:60 ECC
-	// 59:26 BYTE_COUNTER
-	// 25:0 PACKET_COUNTER
 	pool_counters [4][0x4000]flex_counter_mem
 
 	_ [0x20000 - 0x14000]byte

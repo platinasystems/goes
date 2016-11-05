@@ -59,7 +59,7 @@ func (x cl72_status) String() (s string) {
 	return
 }
 
-func (ss *switchSelect) showBcmPortStatus(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (ss *switchSelect) showPortStatus(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	var ifs vnet.HwIfChooser
 	ifs.Init(ss.Vnet)
 	for !in.End() {

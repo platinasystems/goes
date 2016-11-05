@@ -309,7 +309,7 @@ func (phy *Tscf) dump_event_log() {
 	return
 }
 
-func (ss *switchSelect) showBcmPhyEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (ss *switchSelect) showPhyEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	portMap := make(map[int]bool)
 	ss.SelectAll()
 	for !in.End() {
@@ -351,7 +351,7 @@ func Init(v *vnet.Vnet) {
 	cmds := []cli.Command{
 		cli.Command{
 			Name:   "show fe1 phy event-log",
-			Action: ss.showBcmPhyEventLog,
+			Action: ss.showPhyEventLog,
 		},
 		cli.Command{
 			Name:   "show fe1 eyescan",
@@ -359,7 +359,7 @@ func Init(v *vnet.Vnet) {
 		},
 		cli.Command{
 			Name:   "show fe1 port-status phy",
-			Action: ss.showBcmPortStatus,
+			Action: ss.showPortStatus,
 		},
 	}
 	for i := range cmds {

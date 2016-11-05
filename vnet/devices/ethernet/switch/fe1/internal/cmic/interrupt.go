@@ -18,19 +18,16 @@ const (
 	mdio_done_interrupt                     interrupt = 7
 	cross_coupled_memory_dma_done_interrupt interrupt = 21
 
-	// SBUS dma channels 0-2
 	sbus_dma0_interrupt          interrupt = 1
 	sbus_dma1_interrupt          interrupt = 0
 	sbus_dma2_interrupt          interrupt = 6
 	sbus_dma_ecc_error_interrupt interrupt = 26
 
-	// FIFO dma channels 0-3
 	fifo_dma0_interrupt interrupt = 5
 	fifo_dma1_interrupt interrupt = 4
 	fifo_dma2_interrupt interrupt = 3
 	fifo_dma3_interrupt interrupt = 2
 
-	// Packet DMA
 	packet_dma3_desc_done_interrupt interrupt = 8
 	packet_dma2_desc_done_interrupt interrupt = 10
 	packet_dma1_desc_done_interrupt interrupt = 12
@@ -46,13 +43,11 @@ const (
 	packet_dma1_coalesce_interrupt interrupt = 18
 	packet_dma0_coalesce_interrupt interrupt = 19
 
-	// descriptor has flags [8] controlled interrupt mode set
 	packet_dma0_desc_controlled_interrupt interrupt = 27
 	packet_dma1_desc_controlled_interrupt interrupt = 28
 	packet_dma2_desc_controlled_interrupt interrupt = 29
 	packet_dma3_desc_controlled_interrupt interrupt = 30
 
-	// Software interrupts.
 	sw0_interrupt interrupt = 22
 	sw1_interrupt interrupt = 23
 	sw2_interrupt interrupt = 24
@@ -181,7 +176,6 @@ func (c *Cmic) setInterruptHandler(which interrupt, h func()) {
 	c.interruptHandlers[which].handler = h
 }
 
-// Dispatch interrupts.
 func (c *Cmic) Interrupt() (nInt uint) {
 	r := &c.regs.cmc[0]
 	c.interruptCount++

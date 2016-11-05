@@ -94,7 +94,7 @@ func (t *fe1a) tmon_init() {
 	for i := range t.top_regs.temperature_sensor_interrupt.thresholds {
 		t.top_regs.temperature_sensor_interrupt.thresholds[i].set(q, (maxTempThresh<<10)|0x3ff)
 		q.Do()
-		//per BRCM sensor 8 is not used
+		// sensor 8 is unused
 		if i == 7 {
 			break
 		}

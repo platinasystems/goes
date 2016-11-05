@@ -7,8 +7,8 @@ package m
 // Configurable port settings.
 //
 // Some assumptions made here:
-// interface doesn't seem to alter phy settings (e.g. KR4 vs CR4
-// encap for us is BCM_PORT_ENCAP_IEEE
+// interface doesn't seem to alter phy settings (e.g. KR4 vs CR4)
+// encap for us is PORT_ENCAP_IEEE
 type portFlags uint32
 
 const (
