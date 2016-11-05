@@ -165,9 +165,9 @@ func (t *fe1a) addPort(p *Port, pb *port.PortBlock) {
 		if p.LaneMask != 1<<0 {
 			u = 1
 		}
-		name = fmt.Sprintf("meth-%02d", u)
+		name = fmt.Sprintf("meth-%d", u)
 	} else {
-		name = fmt.Sprintf("eth-%02d-%d", p.FrontPanelIndex, p.SubPortIndex)
+		name = fmt.Sprintf("eth-%d-%d", p.FrontPanelIndex, p.SubPortIndex)
 	}
 
 	p.registerEthernet(v, name, m.IsProvisioned(p), true)
