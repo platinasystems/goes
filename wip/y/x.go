@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/firmware/fe1a"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -37,6 +38,18 @@ func (p *platform) Init() (err error) {
 }
 
 func main() {
+	var err error
+	defer func() {
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	}()
+
+	if err = fe1a.Load(); err != nil {
+		return
+	}
+
 	var in parse.Input
 	in.Add(os.Args[1:]...)
 
@@ -57,9 +70,5 @@ func main() {
 	v.AddPackage("platform", p)
 	p.DependsOn("pci-discovery") // after pci discovery
 
-	err := v.Run(&in)
-	if err != nil {
-		fmt.Printf("%s\n", err)
-		os.Exit(1)
-	}
+	err = v.Run(&in)
 }

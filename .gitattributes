@@ -1,2 +1,3 @@
 /bin/* binary
 *.a binary
+*.ucode binary

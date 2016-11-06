@@ -5,7 +5,10 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/commands/builtin"
@@ -14,11 +17,13 @@ import (
 	"github.com/platinasystems/go/commands/fs"
 	"github.com/platinasystems/go/commands/kernel"
 	"github.com/platinasystems/go/commands/machine"
+	"github.com/platinasystems/go/commands/machine/install"
 	"github.com/platinasystems/go/commands/machine/machined"
 	"github.com/platinasystems/go/commands/machine/start"
 	netcmds "github.com/platinasystems/go/commands/net"
 	vnetcmd "github.com/platinasystems/go/commands/net/vnet"
 	"github.com/platinasystems/go/commands/redis"
+	"github.com/platinasystems/go/firmware/fe1a"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/hostname"
@@ -36,6 +41,8 @@ import (
 	"github.com/platinasystems/go/vnet/unix"
 )
 
+const UsrShareGoes = "/usr/share/goes"
+
 func main() {
 	command.Plot(builtin.New()...)
 	command.Plot(core.New()...)
@@ -47,31 +54,78 @@ func main() {
 	command.Plot(redis.New()...)
 	command.Plot(vnetcmd.New())
 	command.Sort()
-	start.Hook = func() error {
-		if len(os.Getenv("REDISD")) == 0 {
-			return nil
-		}
-		return os.Setenv("REDISD", "lo eth0")
-	}
-	machined.Hook = func() error {
-		machined.Plot(
-			cmdline.New(),
-			hostname.New(),
-			name.New("platina-mk1"),
-			netlink.New(),
-			uptime.New(),
-			version.New(),
-			vnetinfo.New(vnetinfo.Config{
-				UnixInterfacesOnly: true,
-				PublishAllCounters: false,
-				GdbWait:            gdbwait,
-				Hook:               vnetHook,
-			}),
-		)
-		machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	start.Hook = startHook
+	machined.Hook = machinedHook
+	install.Hook = installHook
+	goes.Main()
+}
+
+func startHook() error {
+	if len(os.Getenv("REDISD")) == 0 {
 		return nil
 	}
-	goes.Main()
+	return os.Setenv("REDISD", "lo eth0")
+}
+
+func machinedHook() error {
+	err := fe1a.Load()
+	if err != nil {
+		return err
+	}
+	machined.Plot(
+		cmdline.New(),
+		hostname.New(),
+		name.New("platina-mk1"),
+		netlink.New(),
+		uptime.New(),
+		version.New(),
+		vnetinfo.New(vnetinfo.Config{
+			UnixInterfacesOnly: true,
+			PublishAllCounters: false,
+			GdbWait:            gdbwait,
+			Hook:               vnetHook,
+		}),
+	)
+	machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	return nil
+}
+
+func installHook() error {
+	_, err := os.Stat(UsrShareGoes)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(UsrShareGoes, os.FileMode(0755))
+		if err != nil {
+			return err
+		}
+	}
+	for _, fn := range []string{"tsce.ucode", "tscf.ucode"} {
+		var src, dst *os.File
+		for _, dir := range []string{
+			".",
+			"firmware/fe1a",
+			"src/github.com/platinasystems/go/firmware/fe1a",
+		} {
+			src, err = os.Open(filepath.Join(dir, fn))
+			if err == nil {
+				break
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("%s: not found")
+		}
+		dst, err = os.Create(filepath.Join(UsrShareGoes, fn))
+		if err != nil {
+			src.Close()
+			return err
+		}
+		_, err = io.Copy(dst, src)
+		src.Close()
+		dst.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func vnetHook(i *vnetinfo.Info) error {
