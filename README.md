@@ -3,8 +3,7 @@ This repos contains Platina System's open source GO projects.
 To install a select MACHINE,
 
 ```console
-$ go generate github.com/platinasystems/go/version
-$ go build github.com/platinasystems/go/goes/goes-MACHINE
+$ make
 $ sudo ./goes-MACHINE install
 ```
 
@@ -19,7 +18,7 @@ To stop and remove,
 $ sudo goes uninstall
 ```
 
-After install, to enable BASH completion,
+To enable BASH completion after install,
 
 ```console
 . /usr/share/bash-completion/completions/goes

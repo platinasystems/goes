@@ -6,7 +6,7 @@ ALL  = goes-example
 ALL += goes-example-arm.cpio.xz
 ALL += goes-platina-mk1-bmc-arm.cpio.xz
 ALL += goes-platina-mk1
-All += go-wip
+ALL += go-wip
 
 .PHONY: all
 all: $(ALL)
