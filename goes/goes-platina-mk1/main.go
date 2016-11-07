@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/commands/machine/install"
 	"github.com/platinasystems/go/commands/machine/machined"
 	"github.com/platinasystems/go/commands/machine/start"
+	"github.com/platinasystems/go/commands/machine/uninstall"
 	netcmds "github.com/platinasystems/go/commands/net"
 	vnetcmd "github.com/platinasystems/go/commands/net/vnet"
 	"github.com/platinasystems/go/commands/redis"
@@ -57,6 +58,7 @@ func main() {
 	start.Hook = startHook
 	machined.Hook = machinedHook
 	install.Hook = installHook
+	uninstall.Hook = uninstallHook
 	goes.Main()
 }
 
@@ -126,6 +128,16 @@ func installHook() error {
 		}
 	}
 	return nil
+}
+
+func uninstallHook() (err error) {
+	for _, fn := range []string{"fe1a-e.ucode", "fe1a-f.ucode"} {
+		terr := os.Remove(filepath.Join("/usr/share/goes", fn))
+		if err == nil && !os.IsNotExist(terr) {
+			err = terr
+		}
+	}
+	return
 }
 
 func vnetHook(i *vnetinfo.Info) error {
