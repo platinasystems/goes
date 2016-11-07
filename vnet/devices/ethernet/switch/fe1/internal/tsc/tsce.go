@@ -129,7 +129,7 @@ func (phy *Tsce) Init() {
 		r.uc.command3.Modify(q, laneMask, cmd3, 0x7)
 		q.Do()
 
-		phy.PortBlock.LoadFirmware(&q.DmaRequest, fe1a.TsceUcode.Data)
+		phy.PortBlock.LoadFirmware(&q.DmaRequest, fe1a.Eucode.Data)
 		q.Do()
 		if q.Err != nil {
 			panic(q.Err)
@@ -166,14 +166,14 @@ func (phy *Tsce) Init() {
 	// Have microcode verify crc.  CRC check does not reliably work (microcode problem?) so skip it.
 	if false {
 		crc := uint16(0)
-		len := uint16(len(fe1a.TsceUcode.Data))
+		len := uint16(len(fe1a.Eucode.Data))
 		c := uc_cmd{command: uc_cmd_compute_ucode_crc, in: &len, out: &crc}
 		err := c.do(q, laneMask, &r.uc_cmd)
 		if err != nil {
 			panic(err)
 		}
-		if crc != fe1a.TsceUcode.Crc {
-			panic(fmt.Errorf("uc ucode crc does not match got %x != want %x", crc, fe1a.TsceUcode.Crc))
+		if crc != fe1a.Eucode.Crc {
+			panic(fmt.Errorf("uc ucode crc does not match got %x != want %x", crc, fe1a.Eucode.Crc))
 		}
 	}
 

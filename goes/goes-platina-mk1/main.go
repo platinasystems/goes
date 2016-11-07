@@ -98,7 +98,7 @@ func installHook() error {
 			return err
 		}
 	}
-	for _, fn := range []string{"tsce.ucode", "tscf.ucode"} {
+	for _, fn := range []string{"fe1a-e.ucode", "fe1a-f.ucode"} {
 		var src, dst *os.File
 		for _, dir := range []string{
 			".",

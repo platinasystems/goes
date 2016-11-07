@@ -11,15 +11,15 @@ import (
 	"path/filepath"
 )
 
-var TsceUcode, TscfUcode struct {
+var Eucode, Fucode struct {
 	Version, Crc uint16
 	Data         []byte
 }
 
 func Load() error {
-	err := load("tsce.ucode", &TsceUcode)
+	err := load("fe1a-e.ucode", &Eucode)
 	if err == nil {
-		err = load("tscf.ucode", &TscfUcode)
+		err = load("fe1a-f.ucode", &Fucode)
 	}
 	return err
 }
