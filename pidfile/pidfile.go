@@ -16,7 +16,7 @@ import (
 
 const Dir = "/run/goes/pids"
 
-func New() (string, error) {
+func New(name string) (string, error) {
 	pid := os.Getpid()
 	fn := filepath.Join(Dir, fmt.Sprint(pid))
 	f, err := rundir.Create(fn)
@@ -24,7 +24,7 @@ func New() (string, error) {
 		return "", err
 	}
 	defer f.Close()
-	fmt.Fprintln(f, pid)
+	fmt.Fprintln(f, name)
 	return fn, err
 }
 

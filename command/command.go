@@ -343,7 +343,7 @@ func Main(args ...string) (err error) {
 		<-waitOut
 		<-waitErr
 	case "grandchild":
-		pidfn, terr := pidfile.New()
+		pidfn, terr := pidfile.New(name)
 		if terr != nil {
 			err = terr
 			return
