@@ -7,9 +7,9 @@
 package fe1a
 
 import (
-	"github.com/platinasystems/vnetdevices/ethernet/switch/fe1/internal/m"
-	"github.com/platinasystems/vnetdevices/ethernet/switch/fe1/internal/packet"
-	"github.com/platinasystems/vnetdevices/ethernet/switch/fe1/internal/sbus"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/packet"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
 var SnakeLoopMode loopbackType = loopbackPhy // change to loopbackExtCable for ext cables
@@ -22,13 +22,13 @@ func (t *fe1a) vlan_init() {
 
 	// Group 0 gets all ports in forwarding state.
 	{
-		var e vlan_stg_entry
+		var e vlan_spanning_tree_group_entry
 		for i := range e {
 			e[i] = m.SpanningTreeForwarding
 		}
 
-		t.rx_pipe_mems.vlan_stg[stg].set(q, &e)
-		t.tx_pipe_mems.egr_vlan_stg[stg].set(q, &e)
+		t.rx_pipe_mems.vlan_spanning_tree_group[stg].set(q, &e)
+		t.tx_pipe_mems.vlan_spanning_tree_group[stg].set(q, &e)
 	}
 	q.Do()
 
@@ -41,26 +41,26 @@ func (t *fe1a) vlan_init() {
 	if false {
 		var e rx_vlan_tag_action_entry
 		e[ut_otag_action] = vlan_tag_action_add
-		t.rx_pipe_mems.ing_vlan_tag_action_profile[0].set(q, &e)
+		t.rx_pipe_mems.vlan_tag_action_profile[0].set(q, &e)
 		q.Do()
 	}
 
 	for vlan := 1; vlan < 2; vlan++ {
-		var e vlan_entry
+		var e rx_vlan_entry
 		e.valid = true
 		e.spanning_tree_group = stg
 		e.members[rx] = t.all_ports
 		e.members[tx] = e.members[rx]
 		// e.flex_counter_ref.alloc(t, 1, 0xf, BlockIpipe, "vlan %d", vlan)
 
-		var f egr_vlan_entry
+		var f tx_vlan_entry
 		f.valid = true
 		f.spanning_tree_group = stg
 		f.members = e.members[rx]
 		f.untagged_members = e.members[rx]
 		// f.flex_counter_ref.alloc(t, 1, 0xf, BlockEpipe, "vlan %d", vlan)
 
-		t.tx_pipe_mems.egr_vlan[vlan].set(q, &f)
+		t.tx_pipe_mems.vlan[vlan].set(q, &f)
 		t.rx_pipe_mems.vlan[vlan].set(q, &e)
 	}
 	q.Do()
@@ -69,7 +69,7 @@ func (t *fe1a) vlan_init() {
 		var e vlan_range_entry
 		e[0].min = 0
 		e[0].max = 4095
-		t.rx_pipe_mems.ing_vlan_range[0].set(q, &e)
+		t.rx_pipe_mems.vlan_range[0].set(q, &e)
 		q.Do()
 	}
 
@@ -104,16 +104,6 @@ func (t *fe1a) l2_init() {
 			t.rx_pipe_mems.source_trunk_map[cpu.toPipe()].set(q, &e)
 		}
 		q.Do()
-	}
-
-	if false {
-		for i := 0; i < 16<<10; i++ {
-			e := &l2_mc_entry{}
-			e.ports.or(&t.all_ports)
-			e.valid = true
-			t.rx_pipe_mems.l2_mc[i].set(q, e)
-			q.Do()
-		}
 	}
 }
 
@@ -207,9 +197,9 @@ func (t *fe1a) l3_init() {
 				e.LogicalPort.Set(uint(i.to_pipe()))
 			}
 			nh := i.next_hop_for_port()
-			t.rx_pipe_mems.ing_l3_next_hop[nh].set(q, &e)
+			t.rx_pipe_mems.l3_next_hop[nh].set(q, &e)
 			// large mtu => no drops
-			t.rx_pipe_mems.l3_mtu_values[m.Unicast][l3_oif].Set(&q.DmaRequest, BlockRxPipe, sbus.Duplicate, 0x3fff)
+			t.rx_pipe_mems.l3_interface_mtu[m.Unicast][l3_oif].Set(&q.DmaRequest, BlockRxPipe, sbus.Duplicate, 0x3fff)
 		}
 		q.Do()
 	}
@@ -225,7 +215,7 @@ func (t *fe1a) l3_init() {
 			l3_oif := i.l3_iif_for_port()
 			e.l3_intf_index = uint16(l3_oif)
 			// e.flex_counter_ref.alloc(t, 0, 0xf, BlockEpipe, "l3 next_hop port %d", i)
-			t.tx_pipe_mems.egr_l3_next_hop[nh].set(q, &e)
+			t.tx_pipe_mems.l3_next_hop[nh].set(q, &e)
 		}
 		q.Do()
 	}
@@ -264,28 +254,28 @@ func (t *fe1a) l3_init() {
 
 	// rx l3 iif profile
 	{
-		e := l3_iif_profile_entry{
+		e := rx_l3_interface_profile_entry{
 			ip4_enable:           true,
 			ip6_enable:           true,
 			ip4_multicast_enable: true,
 			ip6_multicast_enable: true,
 		}
-		t.rx_pipe_mems.l3_iif_profile[0].set(q, &e)
+		t.rx_pipe_mems.l3_interface_profile[0].set(q, &e)
 		q.Do()
 	}
 
 	// rx l3 iif
 	{
 		for i := snake_port(0); i < n_snake_port; i++ {
-			iif := l3_iif_entry{}
-			oif := egr_l3_intf_entry{}
+			iif := rx_l3_interface_entry{}
+			oif := tx_l3_interface_entry{}
 			vrf := vrf_entry{}
 			oif.outer_vlan.id = 1
 			l3_iif := i.l3_iif_for_port()
 			iif.vrf = uint16(i.vrf_for_port())
 			// iif.flex_counter_ref.alloc(t, 2, 0xf, BlockIpipe, "l3 iif port %d", i)
-			t.rx_pipe_mems.l3_iif[l3_iif].set(q, &iif)
-			t.tx_pipe_mems.egr_l3_intf[l3_iif].set(q, &oif)
+			t.rx_pipe_mems.l3_interface[l3_iif].set(q, &iif)
+			t.tx_pipe_mems.l3_interface[l3_iif].set(q, &oif)
 			// vrf.flex_counter_ref.alloc(t, 3, 0xf, BlockIpipe, "l3 vrf port %d", i)
 			t.rx_pipe_mems.vrf[i.vrf_for_port()].set(q, &vrf)
 		}
