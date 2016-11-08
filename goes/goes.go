@@ -23,7 +23,7 @@ func Main() {
 	if len(args) == 0 {
 		return
 	}
-	if command.Find(args[0]) == nil {
+	if _, err := command.Find(args[0]); err != nil {
 		if args[0] == "/usr/bin/goes" && len(args) > 2 {
 			buf, err := ioutil.ReadFile(args[1])
 			if err == nil && utf8.Valid(buf) {

@@ -76,7 +76,8 @@ func (cmd cmd) Main(...string) error {
 		}
 	}
 	if os.Getpid() == 1 {
-		login := command.Find("login") != nil
+		_, err = command.Find("login")
+		login := err == nil
 		for {
 			if login {
 				err = command.Main("login")

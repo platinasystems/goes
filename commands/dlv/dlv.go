@@ -52,7 +52,7 @@ func delve(l string, args ...string) error {
 	os.Args = []string{"dlv"}
 	if len(args) == 0 {
 		// fall through to just show delve help
-	} else if c := command.Find(args[0]); c == nil {
+	} else if _, err := command.Find(args[0]); err != nil {
 		os.Args = append(os.Args, args...)
 	} else if command.IsDaemon(args[0]) {
 		pidf, err := os.Open("/run/goes/pids/" + args[0])

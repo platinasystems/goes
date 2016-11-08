@@ -152,7 +152,14 @@ func IsDaemon(name string) bool {
 }
 
 //Find returns the command with the given name or nil.
-func Find(name string) interface{} { return commands[name] }
+func Find(name string) (interface{}, error) {
+	var err error
+	v, found := commands[name]
+	if !found {
+		err = fmt.Errorf("%s: command not found", name)
+	}
+	return v, err
+}
 
 // globs returns a list of directories or files with the given pattern.
 // A pattern w/o `*` or `?` is changed to pattern+* to glob matching prefaces.
@@ -254,9 +261,8 @@ func Main(args ...string) (err error) {
 		err = fmt.Errorf("no commands")
 		return
 	}
-	cmd, found := commands[name]
-	if !found {
-		err = fmt.Errorf("%s: command not found", name)
+	cmd, err := Find(name)
+	if err != nil {
 		return
 	}
 	ms, found := cmd.(mainstringer)
@@ -545,7 +551,8 @@ commandLoop:
 		}
 	pipelineLoop:
 		for {
-			s, err := catline(prompt)
+			var s string
+			s, err = catline(prompt)
 			if err != nil {
 				return err
 			}
@@ -569,6 +576,10 @@ commandLoop:
 		}
 		end := len(pl.Slices) - 1
 		name := pl.Slices[end][0]
+		if _, err = Find(name); err != nil {
+			continue commandLoop
+		}
+
 		if end == 0 &&
 			(IsDaemon(name) || Tag[name] == "builtin" ||
 				name == os.Args[0]) {
