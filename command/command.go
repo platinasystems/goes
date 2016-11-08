@@ -303,8 +303,6 @@ func Main(args ...string) (err error) {
 		c.Env = []string{
 			"PATH=" + Path(),
 			"TERM=linux",
-			"REDISD=" + os.Getenv("REDISD"),
-			"MACHINED=" + os.Getenv("MACHINED"),
 			daemonFlag + "=child",
 		}
 		c.Dir = "/"

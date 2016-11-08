@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"os"
 	"strconv"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/platinasystems/go/commands/machine/start"
 	"github.com/platinasystems/go/commands/net"
 	"github.com/platinasystems/go/commands/redis"
+	"github.com/platinasystems/go/commands/redis/redisd"
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/environ/fantray"
 	"github.com/platinasystems/go/environ/fsp"
@@ -140,10 +140,8 @@ func main() {
 	command.Plot(redis.New()...)
 	command.Sort()
 	start.Hook = func() error {
-		if len(os.Getenv("REDISD")) == 0 {
-			return nil
-		}
-		return os.Setenv("REDISD", "lo eth0")
+		redisd.Devs = []string{"lo", "eth0"}
+		return nil
 	}
 	machined.Hook = hook
 	goes.Main()

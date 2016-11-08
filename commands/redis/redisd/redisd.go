@@ -19,6 +19,7 @@ import (
 
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/group"
+	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/redis/rpc/reg"
 	"github.com/platinasystems/go/rundir"
 	"github.com/platinasystems/go/sockfile"
@@ -27,6 +28,8 @@ import (
 const Name = "redisd"
 const Log = rundir.Dir + "/log/redisd"
 
+var Devs []string
+var Port = 6379
 var PublishedKeys = []string{"platina"}
 
 type cmd struct {
@@ -61,14 +64,25 @@ func New() *cmd { return &cmd{} }
 // other daemons.
 func (*cmd) Daemon() int    { return -1 }
 func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Name + " [DEVICE]..." }
+func (*cmd) Usage() string  { return Name + " [-port PORT] [DEVICE]..." }
 
 func (cmd *cmd) Main(args ...string) error {
 	var devs []string
-	if len(args) == 0 {
-		args = []string{"lo"}
+	parm, args := parms.New(args, "-port")
+	if s := parm["-port"]; len(s) > 0 {
+		_, err := fmt.Sscan(s, &Port)
+		if err != nil {
+			return err
+		}
 	}
 
+	if len(args) == 0 {
+		if len(Devs) > 0 {
+			args = Devs
+		} else {
+			args = []string{"lo"}
+		}
+	}
 	for _, name := range args {
 		dev, err := net.InterfaceByName(name)
 		if err != nil {
@@ -175,6 +189,27 @@ func (cmd *cmd) Close() error {
 	return err
 }
 
+func (cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "a redis server",
+	}
+}
+
+func (cmd) Man() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": `NAME
+	redisd - a redis server
+
+SYNOPSIS
+	redisd [-port PORT] [DEV]...
+
+DESCRIPTION
+	Run a redis server on the /run/goes/socks/redisd unix files socket and
+	on all of the given network devices and the given or default port of
+	6379.`,
+	}
+}
+
 func (redisd *Redisd) assign(key string, v interface{}) error {
 	redisd.mutex.Lock()
 	defer redisd.mutex.Unlock()
@@ -195,9 +230,6 @@ func (redisd *Redisd) unassign(key string) error {
 }
 
 func (redisd *Redisd) listen(devs ...string) {
-	port := 6379
-	// redisd.mutex.Lock()
-	// defer redisd.mutex.Unlock()
 	for _, dev := range devs {
 		srvs := make([]*grs.Server, 0, 2)
 		netdev, err := net.InterfaceByName(dev)
@@ -226,10 +258,10 @@ func (redisd *Redisd) listen(devs ...string) {
 			if ip.IsMulticast() {
 				continue
 			}
-			id := fmt.Sprint("[", ip, "%", dev, "]:", port)
+			id := fmt.Sprint("[", ip, "%", dev, "]:", Port)
 			cfg := grs.DefaultConfig()
 			cfg = cfg.Handler(redisd)
-			cfg = cfg.Port(port)
+			cfg = cfg.Port(Port)
 			if ip.To4() == nil {
 				cfg = cfg.Proto("tcp6")
 				host := fmt.Sprint("[", ip, "%", dev, "]")

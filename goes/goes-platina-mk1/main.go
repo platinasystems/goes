@@ -5,8 +5,6 @@
 package main
 
 import (
-	"os"
-
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/commands/builtin"
 	"github.com/platinasystems/go/commands/core"
@@ -18,6 +16,7 @@ import (
 	netcmds "github.com/platinasystems/go/commands/net"
 	vnetcmd "github.com/platinasystems/go/commands/net/vnet"
 	"github.com/platinasystems/go/commands/redis"
+	"github.com/platinasystems/go/commands/redis/redisd"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/hostname"
@@ -53,10 +52,8 @@ func main() {
 }
 
 func startHook() error {
-	if len(os.Getenv("REDISD")) == 0 {
-		return nil
-	}
-	return os.Setenv("REDISD", "lo eth0")
+	redisd.Devs = []string{"lo", "eth0"}
+	return nil
 }
 
 func machinedHook() error {

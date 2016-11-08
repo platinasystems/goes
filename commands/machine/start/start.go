@@ -11,22 +11,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/commands/machine/internal"
+	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/sockfile"
 )
 
 const Name = "start"
 
 // Machines may use this Hook to run something before redisd, machined, etc.
-// This is typically used to set these environment variables.
-//
-//	REDISD		list of net devices that the server listens to
-//			default: lo
-//	MACHINED	machine specific arguments
 var Hook = func() error { return nil }
 
 type cmd struct{}
@@ -34,9 +29,15 @@ type cmd struct{}
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
 
-func (cmd cmd) Main(...string) error {
+func (cmd) Usage() string { return Name + " [OPTION]..." }
+
+func (cmd cmd) Main(args ...string) error {
+	parm, args := parms.New(args, "-conf")
+	redisd := []string{"redisd"}
+	if len(args) > 0 {
+		redisd = append(redisd, args...)
+	}
 	err := internal.AssertRoot()
 	if err != nil {
 		return err
@@ -48,30 +49,22 @@ func (cmd cmd) Main(...string) error {
 	if err = Hook(); err != nil {
 		return err
 	}
-	args := strings.Fields(os.Getenv("REDISD"))
-	if len(args) > 0 {
-		err = command.Main(append([]string{"redisd"}, args...)...)
-	} else {
-		err = command.Main("redisd")
-	}
-	if err != nil {
+	if err = command.Main(redisd...); err != nil {
 		return err
 	}
-	args = strings.Fields(os.Getenv("MACHINED"))
-	if len(args) > 0 {
-		err = command.Main(append([]string{"machined"}, args...)...)
-	} else {
-		err = command.Main("machined")
-	}
-	if err != nil {
+	if err = command.Main("machined"); err != nil {
 		return err
 	}
 	for daemon, lvl := range command.Daemon {
 		if lvl < 0 {
 			continue
 		}
-		err = command.Main(daemon)
-		if err != nil {
+		if err = command.Main(daemon); err != nil {
+			return err
+		}
+	}
+	if s := parm["-conf"]; len(s) > 0 {
+		if err = command.Main("source", s); err != nil {
 			return err
 		}
 	}
@@ -100,5 +93,26 @@ func (cmd cmd) Main(...string) error {
 func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "start this goes machine",
+	}
+}
+
+func (cmd) Man() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": `NAME
+	start - start this goes machine
+
+SYNOPSIS
+	start [-conf=URL] [REDIS OPTIONS]...
+
+DESCRIPTION
+	Start a redis server followed by the machine and its embedded daemons.
+
+OPTIONS
+	-conf URL
+		Specifies the URL of the machine's configuration script that's
+		sourced immediately after start of all daemons.
+
+SEE ALSO
+	redisd`,
 	}
 }

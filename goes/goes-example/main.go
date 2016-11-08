@@ -8,9 +8,7 @@
 package main
 
 import (
-	"bytes"
 	"net"
-	"os"
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/commands/builtin"
@@ -23,6 +21,7 @@ import (
 	netcmds "github.com/platinasystems/go/commands/net"
 	"github.com/platinasystems/go/commands/net/telnetd"
 	"github.com/platinasystems/go/commands/redis"
+	"github.com/platinasystems/go/commands/redis/redisd"
 	"github.com/platinasystems/go/commands/test"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/info/cmdline"
@@ -46,21 +45,14 @@ func main() {
 	command.Plot(test.New()...)
 	command.Sort()
 	start.Hook = func() error {
-		if len(os.Getenv("REDISD")) == 0 {
-			return nil
-		}
 		itfs, err := net.Interfaces()
 		if err != nil {
 			return nil
 		}
-		buf := new(bytes.Buffer)
-		for i, itf := range itfs {
-			if i > 0 {
-				buf.WriteString(" ")
-			}
-			buf.WriteString(itf.Name)
+		for _, itf := range itfs {
+			redisd.Devs = append(redisd.Devs, itf.Name)
 		}
-		return os.Setenv("REDISD", buf.String())
+		return nil
 	}
 	machined.Hook = func() error {
 		machined.Plot(

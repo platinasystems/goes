@@ -136,17 +136,12 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="GO-Embedded-System"
 NAME=goes
 DAEMON=/usr/bin/${NAME}
-DAEMON_ARGS=""
 SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
 
-REDISD=
-MACHINED=
 [ -r /etc/default/goes ] && . /etc/default/goes
-export REDISD
-export MACHINED
 
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
@@ -156,9 +151,11 @@ export MACHINED
 # and status_of_proc is working.
 . /lib/lsb/init-functions
 
+args=""
 case "$1" in
   start)
 	cmd="start"
+	args="$ARGS"
 	msg="Starting"
 	;;
   stop)
@@ -188,7 +185,7 @@ case "$1" in
 esac
 
 [ "$VERBOSE" != no ] && log_daemon_msg "${msg} $DESC" "$NAME"
-$DAEMON $cmd
+$DAEMON $cmd $args
 ecode="$?"
 [ "$VERBOSE" != no ] && log_end_msg $ecode
 
@@ -210,13 +207,14 @@ func install_default() error {
 	}
 	defer f.Close()
 	_, err = f.WriteString(`
-# goes configuration options
+# goes start arguments
 
-# REDISD lists the netdevices that the daemon should listen to.
-#REDISD="lo eth0"
+# ARGS: [-conf URL] [-port PORT] [DEV]...
+# URL: goes command script that is sourced after starting embedded daemons
+# PORT: redis listening port; default, 6379
+# DEV: network device(s) that the redis server should listen to; default, lo
 
-# MACHINED lists command script URLs that are sourced after daemon start.
-#MACHINED=""
+#ARGS=""
 `[1:])
 	return err
 }
