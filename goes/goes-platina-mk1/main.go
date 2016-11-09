@@ -10,7 +10,6 @@ import (
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/commands/builtin"
 	"github.com/platinasystems/go/commands/core"
-	"github.com/platinasystems/go/commands/dlv"
 	"github.com/platinasystems/go/commands/fs"
 	"github.com/platinasystems/go/commands/kernel"
 	"github.com/platinasystems/go/commands/machine"
@@ -41,7 +40,6 @@ const UsrShareGoes = "/usr/share/goes"
 func main() {
 	command.Plot(builtin.New()...)
 	command.Plot(core.New()...)
-	command.Plot(dlv.New()...)
 	command.Plot(fs.New()...)
 	command.Plot(kernel.New()...)
 	command.Plot(machine.New()...)
