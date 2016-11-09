@@ -81,34 +81,21 @@ func complete(line string) (lines []string) {
 	return
 }
 
-// Returns best available help text for the last arg of line
-func help(line string) string {
+// Prints the best available help text for the last arg of line
+func help(line string) {
 	pl := slice_args.New("|")
 	defer pl.Reset()
 	pl.Slice(slice_string.New(nocomment.New(strings.TrimLeft(line,
 		" \t")))...)
 	if len(pl.Slices) == 0 {
-		return ""
+		return
 	}
 	args := pl.Slices[len(pl.Slices)-1]
 	if len(args) == 0 || pl.More {
-		return "Enter command."
+		fmt.Println("Enter command.")
+	} else {
+		command.Main(append([]string{"help"}, args...)...)
 	}
-	pr, pw, err := os.Pipe()
-	if err != nil {
-		return ""
-	}
-	go func() {
-		t := os.Stdout
-		defer func() { os.Stdout = t }()
-		os.Stdout = pw
-		command.Main(append([]string{args[0], "-help"},
-			args[1:]...)...)
-		pw.Close()
-	}()
-	buf := make([]byte, 4096)
-	n, err := pr.Read(buf)
-	return string(buf[:n])
 }
 
 func (l *Liner) Prompt(prompt string) (string, error) {
