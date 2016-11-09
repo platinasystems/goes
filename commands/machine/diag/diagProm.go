@@ -45,8 +45,8 @@ func diagProm() error {
 
 	//ONIE vendor exention fields
 	tor1Ved := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-	bde2cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeNone, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-	bde4cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeNone, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	bde2cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	bde4cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
 
 	var vByte []byte
 
@@ -77,7 +77,7 @@ func diagProm() error {
 	//dump prom
 	if len(argF) == 1 {
 		_, rawData := d.DumpProm()
-
+		fmt.Printf("raw data: %v\n\n", rawData)
 		fmt.Printf("id: %s, rev: 0x%x, length: %d\n", string(rawData[0:7]), rawData[8], (uint(rawData[9])<<8)|uint(rawData[10]))
 		fmt.Printf("Type | Length | Value \n")
 		fmt.Printf("-----------------------------------------\n")
@@ -228,6 +228,15 @@ func diagProm() error {
 							for k := uint(0); k < uint(len(ppnNew)); k++ {
 								rawData[i+2+j+2+k] = ppnNew[k]
 							}
+							break
+						} else if tlv == 0x51 {
+							var boardTypeNew uint8
+							if !x86 {
+								boardTypeNew = boardTypeTor1
+							} else {
+								boardTypeNew = boardTypeBde4c
+							}
+							rawData[i+2+j+2] = boardTypeNew
 							break
 						}
 						j += 2 + tlen
