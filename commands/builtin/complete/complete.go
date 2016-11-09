@@ -14,6 +14,7 @@ package complete
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/platinasystems/go/command"
@@ -30,23 +31,31 @@ func (cmd) Tag() string    { return "builtin" }
 func (cmd) Usage() string  { return Name + " COMMAND [ARGS]..." }
 
 func (cmd) Main(args ...string) error {
-	if len(args) > 0 && args[0] == "goes" {
+	var ss []string
+	if len(args) > 0 && strings.HasPrefix(filepath.Base(args[0]), "goes") {
 		args = args[1:]
 	}
-	switch len(args) {
-	case 0:
-		for _, name := range command.Keys.Main {
-			fmt.Println(name)
+	if len(args) == 0 {
+		ss = command.Keys.Main
+	} else if cmd, err := command.Find(args[0]); err == nil {
+		if method, found := cmd.(command.Completer); found {
+			ss = method.Complete(args[1:]...)
+		} else if len(args[1:]) > 0 {
+			ss, _ = filepath.Glob(args[len(args)-1] + "*")
+		} else {
+			ss, _ = filepath.Glob("*")
 		}
-	case 1:
+	} else if len(args) == 1 {
 		for _, name := range command.Keys.Main {
 			if strings.HasPrefix(name, args[0]) {
-				fmt.Println(name)
+				ss = append(ss, name)
 			}
 		}
-	default:
-		args = append(args[:1], append([]string{Name}, args[1:]...)...)
-		return command.Main(args...)
+	} else {
+		return err
+	}
+	for _, s := range ss {
+		fmt.Println(s)
 	}
 	return nil
 }

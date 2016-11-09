@@ -80,7 +80,7 @@ type closer interface {
 	Close() error
 }
 
-type completer interface {
+type Completer interface {
 	Complete(...string) []string
 }
 
@@ -159,53 +159,6 @@ func Find(name string) (interface{}, error) {
 		err = fmt.Errorf("%s: command not found", name)
 	}
 	return v, err
-}
-
-// globs returns a list of directories or files with the given pattern.
-// A pattern w/o `*` or `?` is changed to pattern+* to glob matching prefaces.
-// For example,
-//
-//	"some/where/*"
-//		returns all of the "some/where" files
-//	"some/where*"
-//		returns "some/where/" plus all of the contained files
-//	"some/where/*.txt"
-//		returns all of the ".txt" suffixed files in "some/where"
-//	"some/where/file.txt"
-//		returns nothing for fully qualified file name
-func Globs(pattern string) (c []string) {
-	if strings.ContainsAny(pattern, "*?[]") {
-		if globs, err := filepath.Glob(pattern); err == nil {
-			c = globs
-		}
-		return
-	}
-	fi, err := os.Stat(pattern)
-	if err == nil && !fi.IsDir() {
-		return
-	}
-	pattern += "*"
-	globs, err := filepath.Glob(pattern)
-	if err != nil {
-		globs = globs[:0]
-	}
-	for _, name := range globs {
-		fi, err := os.Stat(name)
-		if err != nil {
-			continue
-		} else if fi.IsDir() {
-			c = append(c, name+string(os.PathSeparator))
-		} else {
-			t, err := filepath.Match(pattern, name)
-			if err == nil && t {
-				c = append(c, name)
-			}
-		}
-	}
-	if len(c) == 1 && c[0][len(c[0])-1] == os.PathSeparator {
-		c = append(c, Globs(c[0])...)
-	}
-	return
 }
 
 // Main runs the arg[0] command in the current context.
