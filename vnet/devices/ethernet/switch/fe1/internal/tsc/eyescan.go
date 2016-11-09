@@ -6,19 +6,25 @@ package tsc
 
 import (
 	"github.com/platinasystems/go/elib/cli"
+	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 
 	"fmt"
+	"strconv"
 	"time"
 )
 
 func (ss *switchSelect) showEyeScan(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
-	portIndex, laneIndex := uint(0), uint(0)
+	var ifs vnet.HwIfChooser
+	var port string
+	ifs.Init(ss.Vnet)
+
 	ss.SelectAll()
+	inc := *in
+	inp := &inc
 	for !in.End() {
 		switch {
-		case in.Parse("p%*ort %d", &portIndex):
-		case in.Parse("l%*ane %d", &laneIndex):
+		case in.Parse("%v", &ifs):
 		case in.Parse("d%*ev %v", ss):
 		default:
 			err = cli.ParseError
@@ -26,11 +32,22 @@ func (ss *switchSelect) showEyeScan(c cli.Commander, w cli.Writer, in *cli.Input
 		}
 	}
 
+	inp.Parse("%s", &port)
+	laneIndex, _ := strconv.Atoi(string(port[len(port)-1]))
+
 	for _, s := range ss.Switches {
-		ps := s.GetPorts()
-		p := ps[portIndex]
-		phy := p.GetPhy().(*Tscf)
-		go phy.printEyeScan(p, laneIndex, w)
+		ifs.Foreach(func(v *vnet.Vnet, r vnet.HwInterfacer) {
+			var (
+				p  m.Porter
+				ok bool
+			)
+			if p, ok = r.(m.Porter); !ok {
+				fmt.Fprintln(w, s.String())
+				return
+			}
+			phy := p.GetPhy().(*Tscf)
+			phy.printEyeScan(p, uint(laneIndex), w)
+		})
 	}
 	return
 }
@@ -47,7 +64,7 @@ type eyeScan struct {
 }
 
 func (phy *Tscf) printEyeScan(port m.Porter, lane uint, w cli.Writer) {
-	fmt.Fprintf(w, "Starting eye scan for port %s lane %d\n", port.GetPortName(), lane)
+	fmt.Fprintf(w, "Starting eye for port %s\n", port.GetPortName())
 
 	result := &eyeScan{}
 

@@ -372,6 +372,8 @@ func (phy *Tscf) SetAutoneg(port m.Porter, enable bool) {
 		la.lane_config_from_pcs = true
 		la.autoneg_enable = true
 		la.cl72_restart_timeout_enable = false
+		//FIXME media_type needs to be set to match media type read from QSFP EEPROM, hard code to cable for now
+		la.media_type = 0x1
 	} else {
 		co.core_config_from_pcs = false
 		la.lane_config_from_pcs = false
