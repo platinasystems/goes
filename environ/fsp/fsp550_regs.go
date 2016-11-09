@@ -28,7 +28,7 @@ type psuRegs struct {
 	StatusTemp  reg8 // 0x7d
 	_           byte
 	_           [0x03 * 2]byte
-	StatusFans  reg8 // 0x81
+	StatusFans  reg16r // 0x81
 	_           byte
 	_           [0x04 * 2]byte
 	Ein         reg8 // 0x86
@@ -51,8 +51,4 @@ type psuRegs struct {
 	_           byte
 	MfgId       reg8 // 0x99
 	_           byte
-}
-
-type genRegs struct {
-	Reg reg8
 }

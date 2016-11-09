@@ -82,6 +82,7 @@ const (
 	fangpioMuxVal = 0x04
 	ps1Bus        = 1
 	ps1Adr        = 0x58
+	ps1MuxBus     = 1
 	ps1MuxAdr     = 0x72
 	ps1MuxVal     = 0x01
 	ps1GpioPwrok  = "PSU0_PWROK"
@@ -90,6 +91,7 @@ const (
 	ps1GpioIntL   = "PSU0_INT_L"
 	ps2Bus        = 1
 	ps2Adr        = 0x58
+	ps2MuxBus     = 1
 	ps2MuxAdr     = 0x72
 	ps2MuxVal     = 0x02
 	ps2GpioPwrok  = "PSU1_PWROK"
@@ -104,8 +106,8 @@ var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxAdr, w83795MuxVal}
 var pm = ucd9090.PowerMon{ucd9090Bus, ucd9090Adr, ucd9090MuxAdr, ucd9090MuxVal}
 var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxAdr, ledgpioMuxVal}
 var fanTray = fantray.FanStat{fangpioBus, fangpioAdr, fangpioMuxAdr, fangpioMuxVal}
-var ps2 = fsp.Psu{ps1Bus, ps1Adr, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
-var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
+var ps2 = fsp.Psu{ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
+var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps1MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
 var cpu = imx6.Cpu{}
 
 var RedisEnvShadow = map[string]interface{}{}
@@ -281,8 +283,7 @@ func hook() error {
 		&Info{
 			name:     "psu1",
 			prefixes: []string{"psu1."},
-			attrs:    machined.Attrs{
-			/*
+			attrs: machined.Attrs{
 				"psu1.status":       ps1.PsuStatus(),
 				"psu1.admin.state":  ps1.GetAdminState(),
 				"psu1.page":         uint16(ps1.Page()),
@@ -303,14 +304,12 @@ func hook() error {
 				"psu1.temperature1": ps1.Temp1(),
 				"psu1.temperature2": ps1.Temp2(),
 				"psu1.fan_speed":    ps1.FanSpeed(),
-			*/
 			},
 		},
 		&Info{
 			name:     "psu2",
 			prefixes: []string{"psu2."},
-			attrs:    machined.Attrs{
-			/*
+			attrs: machined.Attrs{
 				"psu2.status":       ps2.PsuStatus(),
 				"psu2.admin.state":  ps2.GetAdminState(),
 				"psu2.page":         uint16(ps2.Page()),
@@ -331,7 +330,6 @@ func hook() error {
 				"psu2.temperature1": ps2.Temp1(),
 				"psu2.temperature2": ps2.Temp2(),
 				"psu2.fan_speed":    ps2.FanSpeed(),
-			*/
 			},
 		},
 		&Info{
@@ -434,45 +432,44 @@ func timerIsr() {
 	updateString(ps1.GetAdminState(), "psu1.admin.state")
 	updateString(ps2.PsuStatus(), "psu2.status")
 	updateString(ps2.GetAdminState(), "psu2.admin.state")
-	/*
-		updateUint16(ps1.Page(), "psu1.page")
-		updateUint16(ps1.StatusWord(), "psu1.status_word")
-		updateUint16(ps1.StatusVout(), "psu1.status_vout")
-		updateUint16(ps1.StatusIout(), "psu1.status_iout")
-		updateUint16(ps1.StatusInput(), "psu1.status_input")
-		updateUint16(ps1.Vin(), "psu1.v_in")
-		updateUint16(ps1.Iin(), "psu1.i_in")
-		updateUint16(ps1.Vout(), "psu1.v_out")
-		updateUint16(ps1.Iout(), "psu1.i_out")
-		updateUint16(ps1.StatusTemp(), "psu1.status_temp")
-		updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
-		updateUint16(ps1.Pout(), "psu1.p_out")
-		updateUint16(ps1.Pin(), "psu1.p_in")
-		updateUint16(ps1.MfgId(), "psu1.mfg_id")
-		updateUint16(ps1.StatusFans(), "psu1.status_fans")
-		updateUint16(ps1.Temp1(), "psu1.temperature1")
-		updateUint16(ps1.Temp2(), "psu1.temperature2")
-		updateUint16(ps1.FanSpeed(), "psu1.fan_speed")
 
-		updateUint16(ps2.Page(), "psu2.page")
-		updateUint16(ps2.StatusWord(), "psu2.status_word")
-		updateUint16(ps2.StatusVout(), "psu2.status_vout")
-		updateUint16(ps2.StatusIout(), "psu2.status_iout")
-		updateUint16(ps2.StatusInput(), "psu2.status_input")
-		updateUint16(ps2.Vin(), "psu2.v_in")
-		updateUint16(ps2.Iin(), "psu2.i_in")
-		updateUint16(ps2.Vout(), "psu2.v_out")
-		updateUint16(ps2.Iout(), "psu2.i_out")
-		updateUint16(ps2.StatusTemp(), "psu2.status_temp")
-		updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
-		updateUint16(ps2.Pout(), "psu2.p_out")
-		updateUint16(ps2.Pin(), "psu2.p_in")
-		updateUint16(ps2.MfgId(), "psu2.mfg_id")
-		updateUint16(ps2.StatusFans(), "psu2.status_fans")
-		updateUint16(ps2.Temp1(), "psu2.temperature1")
-		updateUint16(ps2.Temp2(), "psu2.temperature2")
-		updateUint16(ps2.FanSpeed(), "psu2.fan_speed")
-	*/
+	updateUint16(ps1.Page(), "psu1.page")
+	updateUint16(ps1.StatusWord(), "psu1.status_word")
+	updateUint16(ps1.StatusVout(), "psu1.status_vout")
+	updateUint16(ps1.StatusIout(), "psu1.status_iout")
+	updateUint16(ps1.StatusInput(), "psu1.status_input")
+	updateUint16(ps1.Vin(), "psu1.v_in")
+	updateUint16(ps1.Iin(), "psu1.i_in")
+	updateUint16(ps1.Vout(), "psu1.v_out")
+	updateUint16(ps1.Iout(), "psu1.i_out")
+	updateUint16(ps1.StatusTemp(), "psu1.status_temp")
+	updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
+	updateUint16(ps1.Pout(), "psu1.p_out")
+	updateUint16(ps1.Pin(), "psu1.p_in")
+	updateUint16(ps1.MfgId(), "psu1.mfg_id")
+	updateUint16(ps1.StatusFans(), "psu1.status_fans")
+	updateUint16(ps1.Temp1(), "psu1.temperature1")
+	updateUint16(ps1.Temp2(), "psu1.temperature2")
+	updateUint16(ps1.FanSpeed(), "psu1.fan_speed")
+
+	updateUint16(ps2.Page(), "psu2.page")
+	updateUint16(ps2.StatusWord(), "psu2.status_word")
+	updateUint16(ps2.StatusVout(), "psu2.status_vout")
+	updateUint16(ps2.StatusIout(), "psu2.status_iout")
+	updateUint16(ps2.StatusInput(), "psu2.status_input")
+	updateUint16(ps2.Vin(), "psu2.v_in")
+	updateUint16(ps2.Iin(), "psu2.i_in")
+	updateUint16(ps2.Vout(), "psu2.v_out")
+	updateUint16(ps2.Iout(), "psu2.i_out")
+	updateUint16(ps2.StatusTemp(), "psu2.status_temp")
+	updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
+	updateUint16(ps2.Pout(), "psu2.p_out")
+	updateUint16(ps2.Pin(), "psu2.p_in")
+	updateUint16(ps2.MfgId(), "psu2.mfg_id")
+	updateUint16(ps2.StatusFans(), "psu2.status_fans")
+	updateUint16(ps2.Temp1(), "psu2.temperature1")
+	updateUint16(ps2.Temp2(), "psu2.temperature2")
+	updateUint16(ps2.FanSpeed(), "psu2.fan_speed")
 
 	updateFloat64(cpu.ReadTemp(), "temperature.bmc_cpu")
 	updateFloat64(hw.FrontTemp(), "temperature.fan_front")
