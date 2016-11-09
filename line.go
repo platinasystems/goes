@@ -686,13 +686,10 @@ mainLoop:
 				fmt.Print(beep)
 			case '?':
 				if s.helper != nil {
-					t := s.helper(string(line))
-					if len(t) > 0 {
-						fmt.Println("?")
-						fmt.Println(t)
-						s.refresh(p, line, pos)
-						continue mainLoop
-					}
+					fmt.Println("?")
+					s.helper(string(line))
+					s.refresh(p, line, pos)
+					continue mainLoop
 				}
 				fallthrough
 			default:
