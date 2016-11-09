@@ -186,11 +186,11 @@ func (s *State) SetWordCompleter(f WordCompleter) {
 }
 
 // Helper takes the currently edited line content at the left of the cursor
-// and returns the best available help text.
-type Helper func(line string) string
+// and prints the best available help text.
+type Helper func(line string)
 
 // SetHelper sets the function that Liner will call to
-// fetch the best available help text for the given line.
+// print the best available help text for the given line.
 func (s *State) SetHelper(f Helper) {
 	s.helper = f
 }
