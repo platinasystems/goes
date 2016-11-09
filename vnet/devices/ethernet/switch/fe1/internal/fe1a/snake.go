@@ -126,8 +126,6 @@ func (t *fe1a) l3_init() {
 
 	{
 		d := my_station_tcam_entry{}
-		d.key.EthernetAddress = m.EthernetAddress{0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0x82}
-		d.mask.EthernetAddress = m.EthernetAddress{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 		d.data = my_station_tcam_data{
 			ip4_unicast_enable:   true,
 			ip6_unicast_enable:   true,
