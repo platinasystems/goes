@@ -104,7 +104,7 @@ func init() {
 	check("pipe_counter_maps.packet_resolution", unsafe.Pointer(&m.pipe_counter_maps.packet_resolution), 0x24080000)
 	check("efp_counter_table", unsafe.Pointer(&m.efp_counter_table), 0x28000000)
 	check("port_enable", unsafe.Pointer(&m.port_enable), 0x28200000)
-	check("pipe_counter_maps", unsafe.Pointer(&m.pipe_counter_maps), 0x2a800000)
+	check("pipe_counter", unsafe.Pointer(&m.pipe_counter), 0x2a800000)
 }
 
 // Verify mmu global memory maps.
