@@ -14,14 +14,16 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
-type watchdog struct{}
+const Name = "watchdog"
 
-func New() watchdog { return watchdog{} }
+type cmd struct{}
 
-func (watchdog) String() string { return "watchdog" }
-func (watchdog) Usage() string  { return "watchdog [OPTION]... [DEVICE]" }
+func New() cmd { return cmd{} }
 
-func (watchdog) Daemon() int {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... [DEVICE]" }
+
+func (cmd) Daemon() int {
 	lvl := -1 // don't run from /usr/sbin/goesd
 	if os.Getpid() == 1 {
 		lvl = 0
@@ -29,7 +31,7 @@ func (watchdog) Daemon() int {
 	return lvl
 }
 
-func (watchdog) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	parm, args := parms.New(args, "-T", "-t")
 	for k, v := range map[string]string{
 		"-T": "60",
@@ -79,13 +81,13 @@ func (watchdog) Main(args ...string) error {
 	return nil
 }
 
-func (watchdog) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "periodic write to device",
 	}
 }
 
-func (watchdog) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	watchdog - periodic write to device

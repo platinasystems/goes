@@ -18,14 +18,16 @@ import (
 	"github.com/platinasystems/go/telnet/option"
 )
 
-type telnetd struct{}
+const Name = "telnetd"
 
-func New() telnetd { return telnetd{} }
+type cmd struct{}
 
-func (telnetd) String() string { return "telnetd" }
-func (telnetd) Usage() string  { return "telnetd" }
+func New() cmd { return cmd{} }
 
-func (telnetd) Daemon() int {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
+
+func (cmd) Daemon() int {
 	lvl := -1 // don't run from /usr/sbin/goesd
 	if os.Getpid() == 1 {
 		lvl = 2
@@ -33,7 +35,7 @@ func (telnetd) Daemon() int {
 	return lvl
 }
 
-func (telnetd telnetd) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	ln, err := net.Listen("tcp", ":23")
 	if err != nil {
 		return err
@@ -49,7 +51,7 @@ func (telnetd telnetd) Main(args ...string) error {
 		if err != nil {
 			return err
 		}
-		telnetd.optionNegotiation(conn)
+		optionNegotiation(conn)
 
 		pts, tty, err := pty.Open()
 		if err != nil {
@@ -92,7 +94,7 @@ func (telnetd telnetd) Main(args ...string) error {
 	return nil
 }
 
-func (p *telnetd) optionNegotiation(conn net.Conn) error {
+func optionNegotiation(conn net.Conn) error {
 	ack := make([]byte, 1024)
 	conn.Write([]byte{command.IAC, command.WILL, option.ECHO})
 	n, err := conn.Read(ack)

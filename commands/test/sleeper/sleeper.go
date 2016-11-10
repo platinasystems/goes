@@ -16,13 +16,15 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
+const Name = "sleeper"
+
 type cmd struct{}
 
 func New() cmd { return cmd{} }
 
 func (cmd) Daemon() int    { return -1 }
-func (cmd) String() string { return "sleeper" }
-func (cmd) Usage() string  { return "sleeper [-s SECONDS] [MESSAGE]..." }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [-s SECONDS] [MESSAGE]..." }
 
 func (cmd) Main(args ...string) error {
 	var sec uint

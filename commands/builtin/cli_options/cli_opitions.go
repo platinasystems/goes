@@ -4,15 +4,17 @@
 
 package cli_options
 
-type cliOptions struct{}
+const Name = "cli-options"
 
-func New() cliOptions { return cliOptions{} }
+type cmd struct{}
 
-func (cliOptions) String() string { return "cli-options" }
-func (cliOptions) Tag() string    { return "builtin" }
-func (cliOptions) Usage() string  { return "man cli-options" }
+func New() cmd { return cmd{} }
 
-func (cliOptions) Man() map[string]string {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return "man " + Name }
+
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `OPTIONS
 	These common options manipluate the CLI command context.

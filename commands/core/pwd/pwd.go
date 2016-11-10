@@ -11,14 +11,16 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type pwd struct{}
+const Name = "pwd"
 
-func New() pwd { return pwd{} }
+type cmd struct{}
 
-func (pwd) String() string { return "pwd" }
-func (pwd) Usage() string  { return "pwd [-L]" }
+func New() cmd { return cmd{} }
 
-func (pwd) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [-L]" }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-L")
 	if len(args) != 0 {
 		return fmt.Errorf("%v: unexpected", args)
@@ -35,13 +37,13 @@ func (pwd) Main(args ...string) error {
 	return nil
 }
 
-func (pwd) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print working directory",
 	}
 }
 
-func (pwd) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	pwd - print working directory

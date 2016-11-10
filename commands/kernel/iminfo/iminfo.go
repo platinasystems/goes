@@ -11,12 +11,14 @@ import (
 	"github.com/platinasystems/go/fit"
 )
 
-type iminfo struct{}
+const Name = "iminfo"
 
-func New() iminfo { return iminfo{} }
+type cmd struct{}
 
-func (iminfo) String() string { return "iminfo" }
-func (iminfo) Usage() string  { return "iminfo" }
+func New() cmd { return cmd{} }
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
 func listImages(imageList []*fit.Image) {
 	for _, image := range imageList {
@@ -34,7 +36,7 @@ func listImages(imageList []*fit.Image) {
 	}
 }
 
-func (iminfo) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	if n := len(args); n == 0 {
 		return fmt.Errorf("DESTINATION: missing")
 	} else if n > 1 {

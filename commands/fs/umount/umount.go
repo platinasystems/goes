@@ -14,33 +14,35 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type umount struct{}
+const Name = "umount"
 
-func New() umount { return umount{} }
+type cmd struct{}
 
-func (umount) String() string { return "umount" }
-func (umount) Usage() string  { return "umount [OPTION]... FILESYSTEM|DIR" }
+func New() cmd { return cmd{} }
 
-func (umount umount) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... FILESYSTEM|DIR" }
+
+func (cmd) Main(args ...string) error {
 	var err error
 	flag, args := flags.New(args, "--fake", "-v", "-a", "-r", "-l", "-f",
 		"-donot-free-loop-device")
 	if flag["-a"] {
-		err = umount.all(flag)
+		err = umountall(flag)
 	} else {
 		if n := len(args); n == 0 {
 			err = fmt.Errorf("FILESYSTEM or DEVICE: missing")
 		} else if n > 1 {
 			err = fmt.Errorf("%v: unexpected", args[1:])
 		} else {
-			err = umount.one(args[0], flag)
+			err = umountone(args[0], flag)
 		}
 	}
 	return err
 }
 
 // Unmount all filesystems in reverse order of /proc/mounts
-func (umount umount) all(flag flags.Flag) error {
+func umountall(flag flags.Flag) error {
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
 		return err
@@ -59,7 +61,7 @@ func (umount umount) all(flag flags.Flag) error {
 		if targets[i] == "/" && i != 0 {
 			continue
 		}
-		terr := umount.one(targets[i], flag)
+		terr := umountone(targets[i], flag)
 		if terr != nil && err == nil {
 			err = terr
 		}
@@ -67,7 +69,7 @@ func (umount umount) all(flag flags.Flag) error {
 	return err
 }
 
-func (umount) one(target string, flag flags.Flag) error {
+func umountone(target string, flag flags.Flag) error {
 	var flags int
 	if flag["-l"] {
 		flags |= syscall.MNT_DETACH
@@ -88,13 +90,13 @@ func (umount) one(target string, flag flags.Flag) error {
 	return nil
 }
 
-func (umount) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "deactivate filesystems",
 	}
 }
 
-func (umount) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	umount [OPTION]... FILESYSTEM|DIRECTORY

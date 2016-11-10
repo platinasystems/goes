@@ -10,15 +10,17 @@ import (
 	"github.com/platinasystems/go/command"
 )
 
-type apropos struct{}
+const Name = "apropos"
 
-func New() apropos { return apropos{} }
+type cmd struct{}
 
-func (apropos) String() string { return "apropos" }
-func (apropos) Tag() string    { return "builtin" }
-func (apropos) Usage() string  { return "apropos COMMAND..." }
+func New() cmd { return cmd{} }
 
-func (a apropos) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return Name + " COMMAND..." }
+
+func (cmd) Main(args ...string) error {
 	printApropos := func(k, v string) {
 		format := "%-15s %s\n"
 		if len(k) >= 16 {
@@ -42,13 +44,13 @@ func (a apropos) Main(args ...string) error {
 	return nil
 }
 
-func (apropos) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print a short command description",
 	}
 }
 
-func (apropos) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	apropos - print a short command description

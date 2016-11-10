@@ -14,9 +14,7 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type kill struct{}
-
-func New() kill { return kill{} }
+const Name = "kill"
 
 var sigByOptName = map[string]syscall.Signal{
 	"-abrt":   syscall.SIGABRT,
@@ -56,10 +54,14 @@ var sigByOptName = map[string]syscall.Signal{
 	"-xfsz":   syscall.SIGXFSZ,
 }
 
-func (kill) String() string { return "kill" }
-func (kill) Usage() string  { return "kill [OPTION] [PID]..." }
+type cmd struct{}
 
-func (kill) Main(args ...string) error {
+func New() cmd { return cmd{} }
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION] [PID]..." }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-l")
 
 	sigByOptNumb := make(map[string]syscall.Signal)
@@ -151,13 +153,13 @@ func (kill) Main(args ...string) error {
 	return nil
 }
 
-func (kill) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "signal a process",
 	}
 }
 
-func (kill) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	kill - signal a process

@@ -13,13 +13,15 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
-type ln struct{}
+const Name = "ln"
 
-func New() ln { return ln{} }
+type cmd struct{}
 
-func (ln) String() string { return "ln" }
+func New() cmd { return cmd{} }
 
-func (ln) Usage() string {
+func (cmd) String() string { return Name }
+
+func (cmd) Usage() string {
 	return `ln [OPTION]... -t DIRECTORY TARGET...
 	ln [OPTION]... -T TARGET LINK
 	ln [OPTION]... TARGET LINK
@@ -27,7 +29,7 @@ func (ln) Usage() string {
 	ln [OPTION]... TARGET`
 }
 
-func (ln ln) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	var err error
 	flag, args := flags.New(args, "-f", "-s", "-b", "-T", "-v")
 	parm, args := parms.New(args, "-S", "-t")
@@ -42,16 +44,16 @@ func (ln ln) Main(args ...string) error {
 		default:
 			return fmt.Errorf("%v:unexpected", args[2:])
 		}
-		err = ln.ln(args[0], args[1], flag, parm)
+		err = ln(args[0], args[1], flag, parm)
 	} else if dir := parm["-t"]; len(dir) > 0 {
 		if len(args) == 0 {
 			return fmt.Errorf("TARGET...: missing")
 		}
-		err = ln.valid(dir)
+		err = valid(dir)
 		if err == nil {
 			for _, t := range args {
 				l := filepath.Join(dir, filepath.Base(t))
-				err = ln.ln(t, l, flag, parm)
+				err = ln(t, l, flag, parm)
 				if err != nil {
 					break
 				}
@@ -67,17 +69,17 @@ func (ln ln) Main(args ...string) error {
 				return err
 			}
 			l := filepath.Join(wd, filepath.Base(args[0]))
-			err = ln.ln(args[0], l, flag, parm)
+			err = ln(args[0], l, flag, parm)
 		case 2:
-			err = ln.ln(args[0], args[1], flag, parm)
+			err = ln(args[0], args[1], flag, parm)
 		default:
 			dir := args[len(args)-1]
-			err = ln.valid(dir)
+			err = valid(dir)
 			if err == nil {
 				for _, t := range args[:len(args)-1] {
 					b := filepath.Base(t)
 					l := filepath.Join(dir, b)
-					err = ln.ln(t, l, flag, parm)
+					err = ln(t, l, flag, parm)
 					if err != nil {
 						break
 					}
@@ -88,7 +90,7 @@ func (ln ln) Main(args ...string) error {
 	return err
 }
 
-func (ln) ln(target, link string, flag flags.Flag, parm parms.Parm) error {
+func ln(target, link string, flag flags.Flag, parm parms.Parm) error {
 	var err error
 	if _, err = os.Stat(link); err == nil {
 		if !flag["-f"] {
@@ -125,7 +127,7 @@ func (ln) ln(target, link string, flag flags.Flag, parm parms.Parm) error {
 	return nil
 }
 
-func (ln) valid(dir string) error {
+func valid(dir string) error {
 	fi, err := os.Stat(dir)
 	if err != nil {
 		return err
@@ -136,13 +138,13 @@ func (ln) valid(dir string) error {
 	return nil
 }
 
-func (ln) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "make links between files",
 	}
 }
 
-func (ln) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	ln - make links between files

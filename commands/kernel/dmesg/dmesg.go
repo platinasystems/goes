@@ -15,6 +15,8 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
+const Name = "dmesg"
+
 const (
 	SYSLOG_ACTION_CLOSE = iota
 	SYSLOG_ACTION_OPEN
@@ -29,15 +31,16 @@ const (
 	SYSLOG_ACTION_SIZE_BUFFER
 )
 
-type dmesg struct{}
 type timeT time.Time
 
-func New() dmesg { return dmesg{} }
+type cmd struct{}
 
-func (dmesg) String() string { return "dmesg" }
-func (dmesg) Usage() string  { return "dmesg [OPTION]..." }
+func New() cmd { return cmd{} }
 
-func (dmesg) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]..." }
+
+func (cmd) Main(args ...string) error {
 	const (
 		nl = "\n"
 		sp = " "
@@ -208,13 +211,13 @@ func (t timeT) T() string {
 	return time.Time(t).Format("Mon " + time.Stamp + " 2006")
 }
 
-func (dmesg) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print or control the kernel ring buffer",
 	}
 }
 
-func (dmesg) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	dmesg - print or control the kernel ring buffer

@@ -12,14 +12,16 @@ import (
 	"syscall"
 )
 
-type bang struct{}
+const Name = "!"
 
-func New() bang { return bang{} }
+type cmd struct{}
 
-func (bang) String() string { return "!" }
-func (bang) Usage() string  { return "! COMMAND [ARGS]..." }
+func New() cmd { return cmd{} }
 
-func (bang) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " COMMAND [ARGS]..." }
+
+func (cmd) Main(args ...string) error {
 	var background bool
 
 	if len(args) == 0 {
@@ -48,13 +50,13 @@ func (bang) Main(args ...string) error {
 	}
 }
 
-func (bang) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "run an external command",
 	}
 }
 
-func (*bang) Man() map[string]string {
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	! - run an external command"

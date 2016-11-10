@@ -13,14 +13,16 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type rm struct{}
+const Name = "rm"
 
-func New() rm { return rm{} }
+type cmd struct{}
 
-func (rm) String() string { return "rm" }
-func (rm) Usage() string  { return "rm [OPTION]... FILE..." }
+func New() cmd { return cmd{} }
 
-func (rm rm) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... FILE..." }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-d", "-f", "-r", "-v")
 	for _, fn := range args {
 		fi, err := os.Stat(fn)
@@ -35,7 +37,7 @@ func (rm rm) Main(args ...string) error {
 			}
 		}
 		if fi.IsDir() {
-			err = rm.dir(fn, flag)
+			err = rmdir(fn, flag)
 			if err != nil {
 				return err
 			}
@@ -51,7 +53,7 @@ func (rm rm) Main(args ...string) error {
 	return nil
 }
 
-func (rm rm) dir(dn string, flag flags.Flag) error {
+func rmdir(dn string, flag flags.Flag) error {
 	fis, err := ioutil.ReadDir(dn)
 	if err != nil {
 		return err
@@ -63,7 +65,7 @@ func (rm rm) dir(dn string, flag flags.Flag) error {
 		for _, fi := range fis {
 			fn := filepath.Join(dn, fi.Name())
 			if fi.IsDir() {
-				rm.dir(fn, flag)
+				rmdir(fn, flag)
 			} else {
 				err = os.Remove(fn)
 				if err != nil {
@@ -88,13 +90,13 @@ func (rm rm) dir(dn string, flag flags.Flag) error {
 	return nil
 }
 
-func (rm) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "remove files or directories",
 	}
 }
 
-func (rm) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	rm - remove files or directories

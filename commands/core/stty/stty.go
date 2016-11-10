@@ -11,14 +11,16 @@ import (
 	"unsafe"
 )
 
-type stty struct{}
+const Name = "stty"
 
-func New() stty { return stty{} }
+type cmd struct{}
 
-func (stty) String() string { return "stty" }
-func (stty) Usage() string  { return "stty [DEVICE]" }
+func New() cmd { return cmd{} }
 
-func (p *stty) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [DEVICE]" }
+
+func (cmd) Main(args ...string) error {
 	dev := os.Stdin
 	if len(args) > 0 {
 		var err error
@@ -252,7 +254,7 @@ func (p *stty) Main(args ...string) error {
 	return nil
 }
 
-func (stty) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print info for given or current TTY",
 	}

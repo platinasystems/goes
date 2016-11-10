@@ -10,15 +10,17 @@ import (
 	"strings"
 )
 
-type export struct{}
+const Name = "export"
 
-func New() export { return export{} }
+type cmd struct{}
 
-func (export) String() string { return "export" }
-func (export) Tag() string    { return "builtin" }
-func (export) Usage() string  { return "export [NAME[=VALUE]]..." }
+func New() cmd { return cmd{} }
 
-func (export) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return Name + " [NAME[=VALUE]]..." }
+
+func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		for _, nv := range os.Environ() {
 			fmt.Println(nv)
@@ -38,13 +40,13 @@ func (export) Main(args ...string) error {
 	return nil
 }
 
-func (export) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "set process configuration",
 	}
 }
 
-func (export) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	export - process configuration

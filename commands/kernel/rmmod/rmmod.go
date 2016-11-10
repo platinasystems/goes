@@ -15,14 +15,16 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type rmmod struct{}
+const Name = "rmmod"
 
-func New() rmmod { return rmmod{} }
+type cmd struct{}
 
-func (rmmod) String() string { return "rmmod" }
-func (rmmod) Usage() string  { return "rmmod [OPTION]... MODULE..." }
+func New() cmd { return cmd{} }
 
-func (rmmod) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... MODULE..." }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-q", "-v")
 	if len(args) == 0 {
 		return fmt.Errorf("MODULE: missing")
@@ -49,17 +51,7 @@ func (rmmod) Main(args ...string) error {
 	return nil
 }
 
-func (rmmod) Complete(args ...string) (c []string) {
-	if len(args) == 0 {
-		return
-	}
-	if args[0] == "rmmod" {
-		args = args[1:]
-	}
-	if len(args) == 0 {
-		return
-	}
-
+func (cmd) Complete(args ...string) (c []string) {
 	f, err := os.Open("/proc/modules")
 	if err != nil {
 		return
@@ -69,20 +61,21 @@ func (rmmod) Complete(args ...string) (c []string) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		x := strings.Fields(line)
-		if strings.HasPrefix(x[0], args[len(args)-1]) {
+		if len(args) == 0 ||
+			strings.HasPrefix(x[0], args[len(args)-1]) {
 			c = append(c, x[0])
 		}
 	}
 	return
 }
 
-func (rmmod) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "remove a module from the Linux Kernel",
 	}
 }
 
-func (rmmod) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	rmmod - remove a module from the Linux Kernel

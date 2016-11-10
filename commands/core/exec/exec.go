@@ -7,23 +7,25 @@ package exec
 import (
 	"fmt"
 	"os"
-	os_exec "os/exec"
+	"os/exec"
 	"syscall"
 )
 
-type exec struct{}
+const Name = "exec"
 
-func New() exec { return exec{} }
+type cmd struct{}
 
-func (exec) String() string { return "exec" }
-func (exec) Usage() string  { return "exec COMMAND..." }
+func New() cmd { return cmd{} }
 
-func (exec) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " COMMAND..." }
+
+func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("COMMAND: missing")
 	}
 
-	path, err := os_exec.LookPath(args[0])
+	path, err := exec.LookPath(args[0])
 	if err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
@@ -35,13 +37,13 @@ func (exec) Main(args ...string) error {
 	return nil
 }
 
-func (exec) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "execute a file",
 	}
 }
 
-func (exec) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	exec - execute a file"

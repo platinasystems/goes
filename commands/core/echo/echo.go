@@ -11,14 +11,16 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type echo struct{}
+const Name = "echo"
 
-func New() echo { return echo{} }
+type cmd struct{}
 
-func (echo) String() string { return "echo" }
-func (echo) Usage() string  { return "echo [-n] [STRING]..." }
+func New() cmd { return cmd{} }
 
-func (echo) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [-n] [STRING]..." }
+
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-n")
 	s := strings.Join(args, " ")
 	if flag["-n"] {
@@ -29,13 +31,13 @@ func (echo) Main(args ...string) error {
 	return nil
 }
 
-func (echo) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print a line of text",
 	}
 }
 
-func (echo) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	echo - print a line of text

@@ -10,14 +10,16 @@ import (
 	"time"
 )
 
-type sleep struct{}
+const Name = "sleep"
 
-func New() sleep { return sleep{} }
+type cmd struct{}
 
-func (sleep) String() string { return "sleep" }
-func (sleep) Usage() string  { return "sleep SECONDS" }
+func New() cmd { return cmd{} }
 
-func (sleep) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " SECONDS" }
+
+func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("SECONDS: missing")
 	}
@@ -31,13 +33,13 @@ func (sleep) Main(args ...string) error {
 	return nil
 }
 
-func (sleep) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "suspend execution for an interval of time",
 	}
 }
 
-func (sleep) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	sleep - suspend execution for an interval of time

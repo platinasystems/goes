@@ -9,15 +9,17 @@ import (
 	"strconv"
 )
 
-type exit struct{}
+const Name = "exit"
 
-func New() exit { return exit{} }
+type cmd struct{}
 
-func (exit) String() string { return "exit" }
-func (exit) Tag() string    { return "builtin" }
-func (exit) Usage() string  { return "exit [N]" }
+func New() cmd { return cmd{} }
 
-func (exit) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return Name + " [N]" }
+
+func (cmd) Main(args ...string) error {
 	var ecode int
 	if len(args) != 0 {
 		i64, err := strconv.ParseInt(args[0], 0, 0)
@@ -30,13 +32,13 @@ func (exit) Main(args ...string) error {
 	return nil
 }
 
-func (exit) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "exit the shell",
 	}
 }
 
-func (exit) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	exit - exit the shell

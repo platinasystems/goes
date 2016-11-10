@@ -16,16 +16,18 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
+const Name = "ls"
+
 var PathSeparatorString = string([]byte{os.PathSeparator})
 
-type ls struct{}
+type cmd struct{}
 
-func New() ls { return ls{} }
+func New() cmd { return cmd{} }
 
-func (ls) String() string { return "ls" }
-func (ls) Usage() string  { return "ls [OPTION]... [FILE]..." }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... [FILE]..." }
 
-func (ls) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	var err error
 	var ls func(string, []string) error
 
@@ -204,13 +206,13 @@ func tabulate(prefix string, names []string) error {
 	return nil
 }
 
-func (ls) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "list directory contents",
 	}
 }
 
-func (ls) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	ls - list directory contents

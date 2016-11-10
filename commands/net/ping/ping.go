@@ -12,14 +12,16 @@ import (
 	"github.com/tatsushid/go-fastping"
 )
 
-type ping struct{}
+const Name = "ping"
 
-func New() ping { return ping{} }
+type cmd struct{}
 
-func (ping) String() string { return "ping" }
-func (ping) Usage() string  { return "ping DESTINATION" }
+func New() cmd { return cmd{} }
 
-func (ping) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " DESTINATION" }
+
+func (cmd) Main(args ...string) error {
 	if n := len(args); n == 0 {
 		return fmt.Errorf("DESTINATION: missing")
 	} else if n > 1 {
@@ -42,13 +44,13 @@ func (ping) Main(args ...string) error {
 	return pinger.Run()
 }
 
-func (ping) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "send ICMP ECHO_REQUEST to network host",
 	}
 }
 
-func (ping) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	ping - send ICMP ECHO_REQUEST to network hosts

@@ -12,18 +12,20 @@ import (
 	"github.com/platinasystems/go/command"
 )
 
-type env struct{}
+const Name = "env"
 
-func New() env { return env{} }
+type cmd struct{}
 
-func (env) String() string { return "env" }
-func (env) Tag() string    { return "builtin" }
+func New() cmd { return cmd{} }
 
-func (env) Usage() string {
-	return "env [NAME[=VALUE... COMMAND [ARGS...]]]"
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+
+func (cmd) Usage() string {
+	return Name + " [NAME[=VALUE... COMMAND [ARGS...]]]"
 }
 
-func (env) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		for _, env := range os.Environ() {
@@ -45,13 +47,13 @@ func (env) Main(args ...string) error {
 	return nil
 }
 
-func (env) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "run a program in a modified environment",
 	}
 }
 
-func (env) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	env - run a program in a modified environment

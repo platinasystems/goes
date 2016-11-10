@@ -4,29 +4,29 @@
 
 package sync
 
-import (
-	"syscall"
-)
+import "syscall"
 
-type sync struct{}
+const Name = "sync"
 
-func New() sync { return sync{} }
+type cmd struct{}
 
-func (sync) String() string { return "sync" }
-func (sync) Usage() string  { return "sync" }
+func New() cmd { return cmd{} }
 
-func (sync) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
+
+func (cmd) Main(args ...string) error {
 	syscall.Sync()
 	return nil
 }
 
-func (sync) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "flush file system buffers",
 	}
 }
 
-func (sync) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	sync - flush file system buffers

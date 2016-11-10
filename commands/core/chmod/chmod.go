@@ -10,14 +10,16 @@ import (
 	"strconv"
 )
 
-type chmod struct{}
+const Name = "chmod"
 
-func New() chmod { return chmod{} }
+type cmd struct{}
 
-func (chmod) String() string { return "chmod" }
-func (chmod) Usage() string  { return "chmod MODE FILE..." }
+func New() cmd { return cmd{} }
 
-func (chmod) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " MODE FILE..." }
+
+func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("MODE: missing")
 	}
@@ -40,13 +42,13 @@ func (chmod) Main(args ...string) error {
 	return nil
 }
 
-func (chmod) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "change file mode",
 	}
 }
 
-func (chmod) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	chmod - change file mode"

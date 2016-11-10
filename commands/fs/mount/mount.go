@@ -15,11 +15,11 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
+const Name = "mount"
+
 // hack around syscall incorrect definition
 const MS_NOUSER uintptr = (1 << 31)
 const procFilesystems = "/proc/filesystems"
-
-type mount struct{}
 
 type fstabEntry struct {
 	fsSpec  string
@@ -33,7 +33,9 @@ type Filesystems struct {
 	list []string
 }
 
-func New() mount { return mount{} }
+type cmd struct{}
+
+func New() cmd { return cmd{} }
 
 var translations = []struct {
 	name string
@@ -82,10 +84,10 @@ var filesystems struct {
 	all, auto Filesystems
 }
 
-func (mount) String() string { return "mount" }
-func (mount) Usage() string  { return "mount [OPTION]... DEVICE [DIRECTORY]" }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... DEVICE [DIRECTORY]" }
 
-func (mount mount) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args,
 		"--fake",
 		"-v",
@@ -136,15 +138,15 @@ func (mount mount) Main(args ...string) error {
 	filesystems.auto.name = "auto"
 	var err error
 	if flag["-a"] {
-		err = mount.all(flag, parm)
+		err = mountall(flag, parm)
 	} else {
 		switch len(args) {
 		case 0:
-			err = mount.show()
+			err = show()
 		case 1:
-			err = mount.fstab(args[0], flag, parm)
+			err = fstab(args[0], flag, parm)
 		case 2:
-			err = mount.one(parm["-t"], args[0], args[1], flag,
+			err = mountone(parm["-t"], args[0], args[1], flag,
 				parm)
 		default:
 			err = fmt.Errorf("%v: unexpected", args[2:])
@@ -153,13 +155,13 @@ func (mount mount) Main(args ...string) error {
 	return err
 }
 
-func (mount mount) all(flag flags.Flag, parm parms.Parm) error {
-	fstab, err := mount.loadFstab()
+func mountall(flag flags.Flag, parm parms.Parm) error {
+	fstab, err := loadFstab()
 	if err != nil {
 		return err
 	}
 	for _, x := range fstab {
-		err = mount.one(x.fsType, x.fsSpec, x.fsFile, flag, parm)
+		err = mountone(x.fsType, x.fsSpec, x.fsFile, flag, parm)
 		if err != nil {
 			break
 		}
@@ -167,21 +169,21 @@ func (mount mount) all(flag flags.Flag, parm parms.Parm) error {
 	return err
 }
 
-func (mount mount) fstab(name string, flag flags.Flag, parm parms.Parm) error {
-	fstab, err := mount.loadFstab()
+func fstab(name string, flag flags.Flag, parm parms.Parm) error {
+	fstab, err := loadFstab()
 	if err != nil {
 		return err
 	}
 	for _, x := range fstab {
 		if name == x.fsSpec || name == x.fsFile {
-			return mount.one(x.fsType, x.fsSpec, x.fsFile,
+			return mountone(x.fsType, x.fsSpec, x.fsFile,
 				flag, parm)
 		}
 	}
 	return nil
 }
 
-func (mount) loadFstab() ([]fstabEntry, error) {
+func loadFstab() ([]fstabEntry, error) {
 	f, err := os.Open("/etc/fstab")
 	if err != nil {
 		return nil, err
@@ -204,7 +206,7 @@ func (mount) loadFstab() ([]fstabEntry, error) {
 	return fstab, scanner.Err()
 }
 
-func (mount) one(t, dev, dir string, flag flags.Flag, parm parms.Parm) error {
+func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) error {
 	var flags uintptr
 	if flag["-defaults"] {
 		//  rw, suid, dev, exec, auto, nouser, async
@@ -253,7 +255,7 @@ func (mount) one(t, dev, dir string, flag flags.Flag, parm parms.Parm) error {
 	return nil
 }
 
-func (mount) show() error {
+func show() error {
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
 		return err
@@ -298,13 +300,13 @@ func (fs *Filesystems) List() []string {
 	return fs.list
 }
 
-func (mount) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "activated a filesystem",
 	}
 }
 
-func (mount) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	mount - activate a filesystem

@@ -14,16 +14,17 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
+const Name = "mkdir"
 const DefaultMode = 0755
 
-type mkdir struct{}
+type cmd struct{}
 
-func New() mkdir { return mkdir{} }
+func New() cmd { return cmd{} }
 
-func (mkdir) String() string { return "mkdir" }
-func (mkdir) Usage() string  { return "mkdir [OPTION]... DIRECTORY..." }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... DIRECTORY..." }
 
-func (mkdir) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	var perm os.FileMode = DefaultMode
 
 	flag, args := flags.New(args, "-p", "-v")
@@ -60,13 +61,13 @@ func (mkdir) Main(args ...string) error {
 	return nil
 }
 
-func (mkdir) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "make directories",
 	}
 }
 
-func (mkdir) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	mkdir - make directories

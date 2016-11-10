@@ -10,12 +10,14 @@ import (
 	"github.com/platinasystems/go/netlink"
 )
 
+const Name = "nldump"
+
 type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return "nldump" }
-func (cmd) Usage() string  { return "nldump [TYPE...]" }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [TYPE...]" }
 
 func (cmd) Main(args ...string) error {
 	return netlink.Dump(os.Stdout, args...)

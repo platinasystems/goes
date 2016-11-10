@@ -14,12 +14,14 @@ import (
 	"github.com/platinasystems/go/redis"
 )
 
+const Name = "ipmigod"
+
 type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return "ipmigod" }
-func (cmd) Usage() string  { return "ipmigod [OPTIONS]..." }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTIONS]..." }
 
 func (cmd) Apropos() map[string]string {
 	return map[string]string{

@@ -15,17 +15,19 @@ import (
 	"github.com/platinasystems/go/url"
 )
 
-type insmod struct{}
+const Name = "insmod"
 
-func New() insmod { return insmod{} }
+type cmd struct{}
 
-func (insmod) String() string { return "insmod" }
+func New() cmd { return cmd{} }
 
-func (insmod) Usage() string {
-	return "insmod [OPTION]... FILE [NAME[=VAL[,VAL]]]..."
+func (cmd) String() string { return Name }
+
+func (cmd) Usage() string {
+	return Name + " [OPTION]... FILE [NAME[=VAL[,VAL]]]..."
 }
 
-func (insmod) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-v")
 	if len(args) == 0 {
 		return fmt.Errorf("FILE: missing")
@@ -56,13 +58,13 @@ func (insmod) Main(args ...string) error {
 	return nil
 }
 
-func (insmod) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "insert a module into the Linux Kernel",
 	}
 }
 
-func (insmod) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	insmod - insert a module into the Linux Kernel

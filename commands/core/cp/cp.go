@@ -15,19 +15,21 @@ import (
 	"github.com/platinasystems/go/url"
 )
 
-type cp struct{}
+const Name = "cp"
 
-func New() cp { return cp{} }
+type cmd struct{}
 
-func (cp) String() string { return "cp" }
+func New() cmd { return cmd{} }
 
-func (cp) Usage() string {
+func (cmd) String() string { return Name }
+
+func (cmd) Usage() string {
 	return `cp [-v] -T SOURCE DESTINATION
 	cp [-v] -t DIRECTORY SOURCE...
 	cp [-v] SOURCE... DIRECTORY`
 }
 
-func (cp) Main(args ...string) error {
+func (cmd) Main(args ...string) error {
 	cp := func(source, dest string, verbose bool) error {
 		r, err := url.Open(source)
 		if err != nil {
@@ -112,13 +114,13 @@ func (cp) Main(args ...string) error {
 	return nil
 }
 
-func (cp) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "copy files and directories",
 	}
 }
 
-func (cp) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	cp - copy files and directories

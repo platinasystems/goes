@@ -9,17 +9,19 @@ import (
 	"os"
 )
 
-type cd struct {
+const Name = "cd"
+
+type cmd struct {
 	last string
 }
 
-func New() *cd { return &cd{} }
+func New() *cmd { return &cmd{} }
 
-func (*cd) String() string { return "cd" }
-func (*cd) Tag() string    { return "builtin" }
-func (*cd) Usage() string  { return "cd [- | DIRECTORY]" }
+func (*cmd) String() string { return Name }
+func (*cmd) Tag() string    { return "builtin" }
+func (*cmd) Usage() string  { return Name + " [- | DIRECTORY]" }
 
-func (cd *cd) Main(args ...string) error {
+func (cd *cmd) Main(args ...string) error {
 	var dir string
 
 	if len(args) > 1 {
@@ -53,13 +55,13 @@ func (cd *cd) Main(args ...string) error {
 	return nil
 }
 
-func (*cd) Apropos() map[string]string {
+func (*cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "change the current directory",
 	}
 }
 
-func (*cd) Man() map[string]string {
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	cd - change the current directory

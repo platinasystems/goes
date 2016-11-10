@@ -10,12 +10,14 @@ import (
 	"github.com/platinasystems/go/log"
 )
 
+const Name = "log"
+
 type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return "log" }
-func (cmd) Usage() string  { return "log [PRIORITY [FACILITY]] TEXT..." }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [PRIORITY [FACILITY]] TEXT..." }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {

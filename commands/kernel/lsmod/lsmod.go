@@ -11,14 +11,16 @@ import (
 	"strings"
 )
 
-type lsmod struct{}
+const Name = "lsmod"
 
-func New() lsmod { return lsmod{} }
+type cmd struct{}
 
-func (lsmod) String() string { return "lsmod" }
-func (lsmod) Usage() string  { return "lsmod" }
+func New() cmd { return cmd{} }
 
-func (lsmod) Main(_ ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
+
+func (cmd) Main(_ ...string) error {
 	f, err := os.Open("/proc/modules")
 	if err != nil {
 		return err
@@ -48,13 +50,13 @@ func (lsmod) Main(_ ...string) error {
 	return nil
 }
 
-func (lsmod) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print status of Linux Kernel modules",
 	}
 }
 
-func (lsmod) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	lsmod - print Linux Kernel module status

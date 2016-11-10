@@ -18,7 +18,9 @@ import (
 	"github.com/platinasystems/go/flags"
 )
 
-type ps struct{}
+const Name = "ps"
+
+type cmd struct{}
 type psStats []*psStat
 type psStat struct {
 	uid     uint32
@@ -86,12 +88,12 @@ type psStat struct {
 var epoch time.Time
 var hz uint64
 
-func New() ps { return ps{} }
+func New() cmd { return cmd{} }
 
-func (ps) String() string { return "ps" }
-func (ps) Usage() string  { return "ps [OPTION]..." }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]..." }
 
-func (ps ps) Main(args ...string) error {
+func (ps cmd) Main(args ...string) error {
 	hz = Hz()
 	flag, args := flags.New(args, "-e", "-f")
 	if len(args) > 0 {
@@ -367,7 +369,7 @@ func (ps ps) Main(args ...string) error {
 	thisTtyName := "?"
 	for _, t := range stats {
 		if t.tty_nr != lastTty {
-			thisTtyName, err = ps.ttyName(t.tty_nr)
+			thisTtyName, err = ttyName(t.tty_nr)
 			if err != nil {
 				return err
 			}
@@ -408,7 +410,7 @@ func (ps ps) Main(args ...string) error {
 	return nil
 }
 
-func (ps) ttyName(tty_nr uint) (string, error) {
+func ttyName(tty_nr uint) (string, error) {
 	const devname = "DEVNAME="
 	name := "?"
 	maj := major(tty_nr)
@@ -519,13 +521,13 @@ func startTimeString(start, boy, bod time.Time) (s string) {
 	return s
 }
 
-func (ps) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "process state",
 	}
 }
 
-func (ps) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	ps - process state

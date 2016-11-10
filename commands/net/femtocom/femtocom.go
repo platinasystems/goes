@@ -15,14 +15,16 @@ import (
 	"github.com/platinasystems/go/parms"
 )
 
-type femtocom struct{}
+const Name = "femtocom"
 
-func New() femtocom { return femtocom{} }
+type cmd struct{}
 
-func (femtocom) String() string { return "femtocom" }
-func (femtocom) Usage() string  { return "femtocom [OPTION]... DEVICE" }
+func New() cmd { return cmd{} }
 
-func (femtocom) Main(args ...string) error {
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name + " [OPTION]... DEVICE" }
+
+func (cmd) Main(args ...string) error {
 	const (
 		ctrlA rune = 1
 		ctrlX rune = 'x' - 'a' + 1
@@ -267,13 +269,13 @@ func (femtocom) Main(args ...string) error {
 	return nil
 }
 
-func (femtocom) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "tiny serial-terminal emulation",
 	}
 }
 
-func (femtocom) Man() map[string]string {
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	femtocom - tiny serial-terminal emulation

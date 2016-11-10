@@ -19,7 +19,7 @@ type cmd struct{}
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return "cat [FILE]..." }
+func (cmd) Usage() string  { return Name + " [FILE]..." }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {

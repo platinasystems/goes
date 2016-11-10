@@ -4,15 +4,17 @@
 
 package cli_escapes
 
-type cliEscapes struct{}
+const Name = "cli-escapes"
 
-func New() cliEscapes { return cliEscapes{} }
+type cmd struct{}
 
-func (cliEscapes) String() string { return "cli-escapes" }
-func (cliEscapes) Tag() string    { return "builtin" }
-func (cliEscapes) Usage() string  { return "man cli-escapes" }
+func New() cmd { return cmd{} }
 
-func (cliEscapes) Man() map[string]string {
+func (cmd) String() string { return Name }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return "man " + Name }
+
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `ESCAPES
 	A COMMAND may extend to multiple lines by escaping the end of
