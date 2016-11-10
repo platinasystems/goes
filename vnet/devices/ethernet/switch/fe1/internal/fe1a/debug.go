@@ -69,8 +69,8 @@ func init() {
 	check("iss_memory_control_0", unsafe.Pointer(&r.iss_memory_control_0), 0x3d000000)
 	check("rep_id_remap_control", unsafe.Pointer(&r.rep_id_remap_control), 0x40000000)
 	check("storm_control_meter_mapping", unsafe.Pointer(&r.storm_control_meter_mapping), 0x44000000)
-	check("ifp_slice_meter_map_enable", unsafe.Pointer(&r.ifp_slice_meter_map_enable), 0x48000300)
-	check("ifp_ecmp_hash_control", unsafe.Pointer(&r.ifp_ecmp_hash_control), 0x4c000000)
+	check("rxf_slice_meter_map_enable", unsafe.Pointer(&r.rxf_slice_meter_map_enable), 0x48000300)
+	check("rxf_ecmp_hash_control", unsafe.Pointer(&r.rxf_ecmp_hash_control), 0x4c000000)
 	check("mirror_select", unsafe.Pointer(&r.mirror_select), 0x50000000)
 	check("sflow_tx_threshold", unsafe.Pointer(&r.sflow_tx_threshold), 0x54000000)
 	check("pipe_counter_eviction_control", unsafe.Pointer(&r.pipe_counter_eviction_control), 0x5c000000)
@@ -171,9 +171,9 @@ func init() {
 	check("cbp_data_slices_23", unsafe.Pointer(&m.cbp_data_slices[1]), 0x54000000)
 }
 
-// Verify ifp bit extractor offsets.
+// Verify rxf bit extractor offsets.
 func init() {
-	x := get_ifp_field_extractor_l0_bus()
+	x := get_rxf_field_extractor_l0_bus()
 	if got, want := x.u32.aux_ab.b.offset(), uint(0*32); got != want {
 		panic(fmt.Errorf("u32 %d %d", got, want))
 	}

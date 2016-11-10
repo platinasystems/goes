@@ -21,7 +21,7 @@ type rx_l3_interface_entry struct {
 
 	rx_l3_interface_profile_index uint8
 
-	ifp_class_id uint16
+	rxf_class_id uint16
 
 	ip_multicast_interface_for_lookup_keys uint16
 
@@ -51,7 +51,7 @@ func (e *rx_l3_interface_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 
 	i = m.MemGetSetUint8(&e.ip_option_profile_index, b, i+1, i, isSet)
-	i = m.MemGetSetUint16(&e.ifp_class_id, b, i+11, i, isSet)
+	i = m.MemGetSetUint16(&e.rxf_class_id, b, i+11, i, isSet)
 	i = m.MemGetSetUint16(&e.active_rx_l3_interface_profile_index, b, i+9, i, isSet)
 	i = m.MemGetSetUint8(&e.src_realm_id, b, i+1, i, isSet)
 	i = m.MemGetSetUint8(&e.tunnel_termination_ecn_decap_mapping_pointer, b, i+2, i, isSet)

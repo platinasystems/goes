@@ -81,7 +81,7 @@ type l2_user_entry_data struct {
 	priority_valid bool
 	priority       uint8
 
-	ifpClass uint16
+	rxfClass uint16
 	m.LogicalPort
 }
 
@@ -119,7 +119,7 @@ func (r *l2_user_entry_data) getSet(b []uint32, lo int, isSet bool) int {
 	i = m.MemGetSet1(&r.drop, b, i, isSet)
 	i = r.LogicalPort.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&r.disable_src_ethernet_address_learning, b, i, isSet)
-	i = m.MemGetSetUint16(&r.ifpClass, b, i+9, i, isSet)
+	i = m.MemGetSetUint16(&r.rxfClass, b, i+9, i, isSet)
 	i = m.MemGetSet1(&r.is_bpdu, b, i, isSet)
 	i = m.MemGetSet1(&r.is_l2_protocol_packet, b, i, isSet)
 	return i

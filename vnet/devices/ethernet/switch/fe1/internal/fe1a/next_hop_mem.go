@@ -80,7 +80,7 @@ const (
 	tx_next_hop_type_mac_in_mac
 	tx_next_hop_type_l2_actions
 	tx_next_hop_type_normal_proxy
-	tx_next_hop_type_ifp_actions
+	tx_next_hop_type_rxf_actions
 	tx_next_hop_type_l3_multicast
 )
 

@@ -240,11 +240,11 @@ type rx_pipe_regs struct {
 	_                                       [0x4f - 0x43]rx_pipe_reg32
 	gtp_control                             rx_pipe_reg32
 	_                                       [0x100 - 0x50]rx_pipe_reg32
-	ifp_ethernet_type_map                   [16]rx_pipe_reg32
+	rxf_ethernet_type_map                   [16]rx_pipe_reg32
 	_                                       [0x120 - 0x110]rx_pipe_reg32
-	ifp_l4_src_port_map                     [16]rx_pipe_reg32
+	rxf_l4_src_port_map                     [16]rx_pipe_reg32
 	_                                       [0x140 - 0x130]rx_pipe_reg32
-	ifp_l4_dst_port_map                     [16]rx_pipe_reg32
+	rxf_l4_dst_port_map                     [16]rx_pipe_reg32
 	_                                       [0x160 - 0x150]rx_pipe_reg32
 	exact_match_logical_table_select_config rx_pipe_reg32
 	_                                       [0x398b0000 - 0x38016100]byte
@@ -293,25 +293,25 @@ type rx_pipe_regs struct {
 	_                                      [0x80 - 0x68]rx_pipe_reg32
 	protocol_pkt_control                   [64]rx_pipe_reg32
 	igmp_mld_pkt_control                   [64]rx_pipe_reg32
-	ifp_logical_table_select_config        rx_pipe_reg32
+	rxf_logical_table_select_config        rx_pipe_reg32
 	_                                      [0x44000000 - 0x40010100]byte
 
 	storm_control_meter_mapping           rx_pipe_reg32
 	storm_control_meter_config            rx_pipe_portreg32
 	_                                     [0x7 - 0x2]rx_pipe_reg32
-	ifp_meter_control                     rx_pipe_portreg32
+	rxf_meter_control                     rx_pipe_portreg32
 	_                                     [0xb - 0x8]rx_pipe_reg32
 	iss_alpm_logical_to_physical_bank_map rx_pipe_reg32
 	_                                     [0x48000000 - 0x44000c00]byte
 
 	_                                 [0x3 - 0x0]rx_pipe_reg32
-	ifp_slice_meter_map_enable        rx_pipe_reg32
+	rxf_slice_meter_map_enable        rx_pipe_reg32
 	_                                 [0x100 - 0x4]rx_pipe_reg32
-	ifp_config                        [12]rx_pipe_reg32
+	rxf_config                        [12]rx_pipe_reg32
 	_                                 [0x120 - 0x10c]rx_pipe_reg32
-	ifp_logical_table_config          [n_ifp_logical_tables]rx_pipe_reg64
+	rxf_logical_table_config          [n_rxf_logical_tables]rx_pipe_reg64
 	_                                 [0x4c000000 - 0x48014000]byte
-	ifp_ecmp_hash_control             rx_pipe_reg32
+	rxf_ecmp_hash_control             rx_pipe_reg32
 	ecmp_random_load_balancing_config rx_pipe_reg32
 	_                                 [0x50000000 - 0x4c000200]byte
 
@@ -323,7 +323,7 @@ type rx_pipe_regs struct {
 	sflow_pipe_rand_seed              rx_pipe_reg32
 	sflow_mirror_config               rx_pipe_reg32
 	misc_config                       rx_pipe_reg32
-	sw2_ifp_dst_action_control        rx_pipe_reg32
+	sw2_rxf_dst_action_control        rx_pipe_reg32
 	trunk_rand_load_balancing_seed    rx_pipe_reg32
 	hg_trunk_rand_load_balancing_seed rx_pipe_reg32
 	cpu_visibility_packet_profile_2   rx_pipe_reg32
@@ -610,7 +610,7 @@ type rx_pipe_mems struct {
 	ttl_fn m.Mem
 	tos_fn m.Mem
 
-	ifp_range_check [32]m.Mem64
+	rxf_range_check [32]m.Mem64
 	_               [m.MemMax - 32]m.MemElt
 
 	src_compression_tcam_only m.Mem
@@ -687,18 +687,18 @@ type rx_pipe_mems struct {
 
 	_ [0x41d00000 - 0x40280000]byte
 
-	ifp_logical_table_select           [n_ifp_slice][n_ifp_logical_tables]ifp_logical_table_select_mem
-	_                                  [m.MemMax - n_ifp_slice*n_ifp_logical_tables]m.MemElt
-	ifp_logical_table_select_data_only [n_ifp_slice][n_ifp_logical_tables]ifp_logical_table_select_data_only_mem
-	_                                  [m.MemMax - n_ifp_slice*n_ifp_logical_tables]m.MemElt
+	rxf_logical_table_select           [n_rxf_slice][n_rxf_logical_tables]rxf_logical_table_select_mem
+	_                                  [m.MemMax - n_rxf_slice*n_rxf_logical_tables]m.MemElt
+	rxf_logical_table_select_data_only [n_rxf_slice][n_rxf_logical_tables]rxf_logical_table_select_data_only_mem
+	_                                  [m.MemMax - n_rxf_slice*n_rxf_logical_tables]m.MemElt
 	_                                  [0x42040000 - 0x41d80000]byte
-	ifp_key_gen_program_profile        [n_ifp_key_generation_profiles]ifp_key_generation_profile_mem
-	_                                  [m.MemMax - n_ifp_key_generation_profiles]m.MemElt
+	rxf_key_gen_program_profile        [n_rxf_key_generation_profiles]rxf_key_generation_profile_mem
+	_                                  [m.MemMax - n_rxf_key_generation_profiles]m.MemElt
 	_                                  [0x42140000 - 0x42080000]byte
-	ifp_key_gen_program_profile2       [n_ifp_key_generation_profiles]m.Mem32
-	_                                  [m.MemMax - n_ifp_key_generation_profiles]m.MemElt
-	ifp_logical_table_select_tcam_only [n_ifp_slice][n_ifp_logical_tables]ifp_logical_table_select_tcam_only_mem
-	_                                  [m.MemMax - n_ifp_slice*n_ifp_logical_tables]m.MemElt
+	rxf_key_gen_program_profile2       [n_rxf_key_generation_profiles]m.Mem32
+	_                                  [m.MemMax - n_rxf_key_generation_profiles]m.MemElt
+	rxf_logical_table_select_tcam_only [n_rxf_slice][n_rxf_logical_tables]rxf_logical_table_select_tcam_only_mem
+	_                                  [m.MemMax - n_rxf_slice*n_rxf_logical_tables]m.MemElt
 
 	exact_match_default_policy m.Mem
 
@@ -723,30 +723,30 @@ type rx_pipe_mems struct {
 
 	dvp_2_table m.Mem
 
-	ifp_i2e_classid_select m.Mem
-	ifp_hg_classid_select  m.Mem
+	rxf_i2e_classid_select m.Mem
+	rxf_hg_classid_select  m.Mem
 
-	ifp_tcam [n_ifp_slice][n_ifp_tcam_elts_per_slice]ifp_tcam_80bit_mem
-	_        [m.MemMax - n_ifp_slice*n_ifp_tcam_elts_per_slice]m.MemElt
+	rxf_tcam [n_rxf_slice][n_rxf_tcam_elts_per_slice]rxf_tcam_80bit_mem
+	_        [m.MemMax - n_rxf_slice*n_rxf_tcam_elts_per_slice]m.MemElt
 
-	ifp_tcam_wide [n_ifp_slice][n_ifp_tcam_elts_per_slice / 2]ifp_tcam_160bit_mem
-	_             [m.MemMax - n_ifp_slice*n_ifp_tcam_elts_per_slice/2]m.MemElt
+	rxf_tcam_wide [n_rxf_slice][n_rxf_tcam_elts_per_slice / 2]rxf_tcam_160bit_mem
+	_             [m.MemMax - n_rxf_slice*n_rxf_tcam_elts_per_slice/2]m.MemElt
 
 	_ [1]m.Mem
 
-	ifp_meter_table          m.Mem
-	ifp_storm_control_meters m.Mem
-	ifp_port_meter_map       m.Mem
+	rxf_meter_table          m.Mem
+	rxf_storm_control_meters m.Mem
+	rxf_port_meter_map       m.Mem
 
 	exact_match_qos_actions_profile m.Mem
 	_                               [1]m.Mem
 	exact_match_action_profile      m.Mem
 	_                               [1]m.Mem
 
-	ifp_logical_table_action_priority m.Mem
+	rxf_logical_table_action_priority m.Mem
 	_                                 [0x4b200000 - 0x48640000]byte
-	ifp_policy_table                  [n_ifp_slice][n_ifp_tcam_elts_per_slice]ifp_policy_mem
-	_                                 [m.MemMax - n_ifp_slice*n_ifp_tcam_elts_per_slice]m.MemElt
+	rxf_policy_table                  [n_rxf_slice][n_rxf_tcam_elts_per_slice]rxf_policy_mem
+	_                                 [m.MemMax - n_rxf_slice*n_rxf_tcam_elts_per_slice]m.MemElt
 
 	eh_mask_profile m.Mem
 
@@ -762,7 +762,7 @@ type rx_pipe_mems struct {
 	l3_next_hop [n_next_hop]rx_next_hop_mem
 	_           [m.MemMax - n_next_hop]m.MemElt
 
-	ifp_redirection_profile [m.MemMax]port_bitmap_mem
+	rxf_redirection_profile [m.MemMax]port_bitmap_mem
 
 	l2_multicast [n_l2_multicast_entry]l2_multicast_mem
 	_            [m.MemMax - n_l2_multicast_entry]m.MemElt
@@ -913,7 +913,7 @@ type rx_pipe_mems struct {
 		priority_cng      m.Mem
 	}
 
-	ifp_cos_map m.Mem
+	rxf_cos_map m.Mem
 
 	int_cn_to_mmuif_mapping m.Mem
 

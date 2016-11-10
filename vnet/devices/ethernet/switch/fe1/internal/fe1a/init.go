@@ -551,15 +551,15 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 		const (
 			apply_mask_on_l2_packets          = 1 << 12
 			apply_mask_on_l3_packets          = 1 << 13
-			arp_included_in_ifp_keys          = 1 << 39
-			rarp_included_in_ifp_keys         = 1 << 40
+			arp_included_in_rxf_keys          = 1 << 39
+			rarp_included_in_rxf_keys         = 1 << 40
 			arp_validation_enable             = 1 << 29
 			ignore_hi_gig_header_lag_failover = 1 << 23
 		)
 
 		v |= apply_mask_on_l3_packets | apply_mask_on_l2_packets
 
-		v |= arp_included_in_ifp_keys | rarp_included_in_ifp_keys | arp_validation_enable
+		v |= arp_included_in_rxf_keys | rarp_included_in_rxf_keys | arp_validation_enable
 
 		if false {
 			v |= ignore_hi_gig_header_lag_failover

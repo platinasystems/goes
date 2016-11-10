@@ -57,7 +57,7 @@ type rx_vlan_entry struct {
 	// Forwarding ID for l2 lookup.
 	forwarding_id uint16
 
-	ifp_class_id uint16
+	rxf_class_id uint16
 
 	vlan_profile_index uint8
 
@@ -101,7 +101,7 @@ func (e *rx_vlan_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSetUint8(&e.trill_rbridge_nickname_index, b, i+1, i, isSet)
 	i = m.MemGetSet1(&e.virtual_port_enable, b, i, isSet)
 	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
-	i = m.MemGetSetUint16(&e.ifp_class_id, b, i+11, i, isSet)
+	i = m.MemGetSetUint16(&e.rxf_class_id, b, i+11, i, isSet)
 	if i != 477 {
 		panic("vlan")
 	}

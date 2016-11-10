@@ -29,7 +29,7 @@ type source_trunk_map_entry struct {
 
 	trunk_id uint16
 
-	ifp_class_id uint16
+	rxf_class_id uint16
 
 	// 8 bit index into ing_vlan_range compression table.
 	outer_vlan_range_compression_index uint8
@@ -59,7 +59,7 @@ func (e *source_trunk_map_entry) MemGetSet(b []uint32, isSet bool) {
 	i := e.source_port_type.MemGetSet(b, 0, isSet)
 	i = m.MemGetSetUint16(&e.trunk_id, b, i+10, i, isSet)
 	i = 17 // skip reserved bits [16:13]
-	i = m.MemGetSetUint16(&e.ifp_class_id, b, i+11, i, isSet)
+	i = m.MemGetSetUint16(&e.rxf_class_id, b, i+11, i, isSet)
 	i = m.MemGetSetUint8(&e.outer_vlan_range_compression_index, b, i+7, i, isSet)
 	i = m.MemGetSetUint16(&e.index, b, i+13, i, isSet)
 	i = m.MemGetSetUint8(&e.vfp_port_group_id, b, i+7, i, isSet)

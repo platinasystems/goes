@@ -28,7 +28,7 @@ type l3_entry_data struct {
 	bfd_enable      bool
 	is_ecmp         bool
 	drop            bool
-	ifp_class_id    uint8
+	rxf_class_id    uint8
 	priority_change m.PriorityChange
 	// Next hop or ecmp index depending on is_ecmp.
 	index uint32
@@ -50,7 +50,7 @@ func (e *l3_ipv4_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSetUint8((*uint8)(&e.key_type), b, i+4, i, isSet)
 	i = e.Ip4Address.MemGetSet(b, i, isSet)
 	i = e.Vrf.MemGetSet(b, i, isSet)
-	i = m.MemGetSetUint8(&e.ifp_class_id, b, i+5, i, isSet)
+	i = m.MemGetSetUint8(&e.rxf_class_id, b, i+5, i, isSet)
 	i = m.MemGetSet1(&e.is_local, b, i, isSet)
 	i = m.MemGetSet1(&e.bfd_enable, b, i, isSet)
 	i = e.priority_change.MemGetSet(b, i, isSet)

@@ -225,11 +225,11 @@ type rx_port_table_entry struct {
 	// IFP section
 	// IPBM valid values: 0-33
 	port_ipbm_index uint8
-	ifp_class_id    uint8
+	rxf_class_id    uint8
 
 	vfp_port_group_id uint8
 
-	enable_ifp bool
+	enable_rxf bool
 	enable_vfp bool
 	enable_efp bool
 
@@ -288,7 +288,7 @@ type rx_port_table_entry struct {
 func (e *rx_port_table_entry) MemBits() int { return 424 }
 
 func (e *rx_port_table_entry) MemGetSet(b []uint32, isSet bool) {
-	i := m.MemGetSet1(&e.enable_ifp, b, 0, isSet)
+	i := m.MemGetSet1(&e.enable_rxf, b, 0, isSet)
 	i = m.MemGetSet1(&e.vlan_translation_miss_drop_enable, b, i, isSet)
 	i = m.MemGetSet1(&e.vlan_translation_enable, b, i, isSet)
 	i = m.MemGetSet1(&e.trust_packet_ip4_dscp, b, i, isSet)
@@ -390,7 +390,7 @@ func (e *rx_port_table_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSet1(&e.ieee_802_1as_trap_to_cpu, b, i, isSet)
 	i = m.MemGetSet1(&e.vfp_use_lport_table_group_id, b, i, isSet)
 
-	i = m.MemGetSetUint8(&e.ifp_class_id, b, i+7, i, isSet)
+	i = m.MemGetSetUint8(&e.rxf_class_id, b, i+7, i, isSet)
 	i = m.MemGetSetUint8(&e.vlan_protocol_data_index, b, i+6, i, isSet)
 
 	i = m.MemGetSet1(&e.default_vlan_cfi, b, i, isSet)
@@ -590,7 +590,7 @@ func (t *fe1a) init_port_table() {
 		port_type:      port_type_ethernet,
 		port_operation: port_operation_l3_iif_valid,
 
-		enable_ifp:           true,
+		enable_rxf:           true,
 		enable_l3_ip4:        true,
 		enable_l3_ip6:        true,
 		enable_ip4_multicast: true,

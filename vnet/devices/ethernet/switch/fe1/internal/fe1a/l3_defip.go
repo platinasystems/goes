@@ -59,7 +59,7 @@ type l3_defip_tcam_data struct {
 
 	parallel_search_use_global_search_on_miss bool
 
-	ifp_class_id m.FpClassId
+	rxf_class_id m.FpClassId
 
 	// Counter for tcam entry.
 	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
@@ -84,7 +84,7 @@ func (e *l3_defip_tcam_data) getSetData(b []uint32, lo int, isSet bool) int {
 	i := e.next_hop.MemGetSet(b, lo, isSet, hasReservedBit)
 	i = e.priority_change.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.drop_on_hit, b, i, isSet)
-	i = e.ifp_class_id.MemGetSet(b, i, isSet)
+	i = e.rxf_class_id.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.is_global, b, i, isSet)
 	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.parallel_search_use_global_search_on_miss, b, i, isSet)
@@ -356,7 +356,7 @@ type l3_defip_alpm_common struct {
 	is_valid    bool
 	drop_on_hit bool
 
-	ifp_class_id m.FpClassId
+	rxf_class_id m.FpClassId
 
 	// 2 bit sub-bucket index
 	sub_bucket_index uint8
@@ -380,7 +380,7 @@ func (e *l3_defip_alpm_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Addr
 	i = e.next_hop.MemGetSet(b, i, isSet /* hasReservedBit */, false)
 	i = e.priority_change.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.drop_on_hit, b, i, isSet)
-	i = e.ifp_class_id.MemGetSet(b, i, isSet)
+	i = e.rxf_class_id.MemGetSet(b, i, isSet)
 	if pipeCounter != nil {
 		i = pipeCounter.MemGetSet(b, i, isSet)
 		if i != 88 {
