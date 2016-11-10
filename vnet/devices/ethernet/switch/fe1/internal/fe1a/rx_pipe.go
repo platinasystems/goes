@@ -387,10 +387,10 @@ func (x *rx_pipe_mem32) geta(q *DmaRequest, a sbus.AccessType, v *uint32) {
 func (x *rx_pipe_mem32) set(q *DmaRequest, v uint32) { x.seta(q, sbus.Duplicate, v) }
 
 type rx_pipe_mems struct {
-	_                                     [0x00080000 - 0x0]byte
-	idb_to_pipe_port_number_mapping_table [n_idb_port]rx_pipe_mem32
-	_                                     [m.MemMax - n_idb_port]m.MemElt
-	_                                     [0x04000000 - 0xc0000]byte
+	_                                         [0x00080000 - 0x0]byte
+	rx_pipe_to_pipe_port_number_mapping_table [n_rx_pipe_port]rx_pipe_mem32
+	_                                         [m.MemMax - n_rx_pipe_port]m.MemElt
+	_                                         [0x04000000 - 0xc0000]byte
 
 	tdm_calendar [2]struct {
 		entries [128]tdm_calendar_mem

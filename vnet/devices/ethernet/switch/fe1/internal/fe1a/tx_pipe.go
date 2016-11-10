@@ -373,12 +373,12 @@ type tx_pipe_mems struct {
 
 	per_tx_queue_counters struct {
 		cpu   [mmu_n_cpu_queues]tx_pipe_pipe_counter_mem
-		ports [n_idb_mmu_port]struct {
+		ports [n_rx_pipe_mmu_port]struct {
 			unicast   [mmu_n_tx_queues]tx_pipe_pipe_counter_mem
 			multicast [mmu_n_tx_queues]tx_pipe_pipe_counter_mem
 		}
 	}
-	_ [m.MemMax - (48 + n_idb_mmu_port*2*mmu_n_tx_queues)]m.MemElt
+	_ [m.MemMax - (48 + n_rx_pipe_mmu_port*2*mmu_n_tx_queues)]m.MemElt
 
 	_ [0x28200000 - 0x280c0000]byte
 

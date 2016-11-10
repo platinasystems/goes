@@ -587,12 +587,12 @@ func (t *fe1a) port_mapping_init() {
 	q := t.getDmaReq()
 
 	// IDB to pipe port number mapping.
-	for i := idb_mmu_port_number(0); i < n_idb_port; i++ {
+	for i := rx_pipe_mmu_port_number(0); i < n_rx_pipe_port; i++ {
 		for pipe := uint(0); pipe < n_pipe; pipe++ {
 			phys := i.toPhys(pipe)
 			if phys != phys_port_invalid {
 				pipePort := phys.toPipe()
-				t.rx_pipe_mems.idb_to_pipe_port_number_mapping_table[i].seta(q, sbus.Unique(pipe), uint32(pipePort))
+				t.rx_pipe_mems.rx_pipe_to_pipe_port_number_mapping_table[i].seta(q, sbus.Unique(pipe), uint32(pipePort))
 			}
 		}
 	}

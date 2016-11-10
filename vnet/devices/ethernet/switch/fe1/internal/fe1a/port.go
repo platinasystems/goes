@@ -56,15 +56,15 @@ func init() {
 	t[phys_port_management_0] = 66
 	t[phys_port_management_1] = 100
 
-	for i := 0; i < n_idb_data_port; i++ {
+	for i := 0; i < n_rx_pipe_data_port; i++ {
 		// Phys 1-31 clport0-7 => pipe ports 1-31
-		t[1+n_idb_data_port*0+i] = pipe_port_number(i) + first_data_port_for_pipe[0]
+		t[1+n_rx_pipe_data_port*0+i] = pipe_port_number(i) + first_data_port_for_pipe[0]
 		// Phys 33-64 clport8-15 => pipe ports 34-65
-		t[1+n_idb_data_port*1+i] = pipe_port_number(i) + first_data_port_for_pipe[1]
+		t[1+n_rx_pipe_data_port*1+i] = pipe_port_number(i) + first_data_port_for_pipe[1]
 		// Phys 65-96 clport16-23 => pipe ports 68-99
-		t[1+n_idb_data_port*2+i] = pipe_port_number(i) + first_data_port_for_pipe[2]
+		t[1+n_rx_pipe_data_port*2+i] = pipe_port_number(i) + first_data_port_for_pipe[2]
 		// Phys 97-128 clport24-31 => pipe ports 102-133
-		t[1+n_idb_data_port*3+i] = pipe_port_number(i) + first_data_port_for_pipe[3]
+		t[1+n_rx_pipe_data_port*3+i] = pipe_port_number(i) + first_data_port_for_pipe[3]
 	}
 
 	for i := range phys_by_pipe_port_number {
@@ -151,37 +151,38 @@ func (p physical_port_number) speedBitsPerSec(t *fe1a) float64 {
 	}
 }
 
-type idb_mmu_port_number uint16
+// Each rx pipe or mmu pipe has 32 data ports plus cpu/management and loopback ports.
+type rx_pipe_mmu_port_number uint16
 
 const (
-	// 32 data ports per idb/mmu
-	idb_mmu_port_data_0 idb_mmu_port_number = iota
+	// 32 data ports per rx-pipe/mmu
+	rx_pipe_mmu_port_data_0 rx_pipe_mmu_port_number = iota
 	// idb port 32 is cpu/management ports depending on pipe number
-	idb_mmu_port_pipe_0_cpu                 idb_mmu_port_number = 32
-	idb_mmu_port_pipe_1_management_0        idb_mmu_port_number = 32
-	idb_mmu_port_pipe_2_management_1        idb_mmu_port_number = 32
-	idb_mmu_port_any_pipe_cpu_or_management idb_mmu_port_number = 32
+	rx_pipe_mmu_port_pipe_0_cpu                 rx_pipe_mmu_port_number = 32
+	rx_pipe_mmu_port_pipe_1_management_0        rx_pipe_mmu_port_number = 32
+	rx_pipe_mmu_port_pipe_2_management_1        rx_pipe_mmu_port_number = 32
+	rx_pipe_mmu_port_any_pipe_cpu_or_management rx_pipe_mmu_port_number = 32
 	// loopback port is number 33 in all 4 pipes.
-	idb_mmu_port_loopback idb_mmu_port_number = 33
-	n_idb_mmu_port                            = 34
+	rx_pipe_mmu_port_loopback rx_pipe_mmu_port_number = 33
+	n_rx_pipe_mmu_port                                = 34
 
 	// Aliases
-	n_idb_data_port = 32
-	n_mmu_data_port = 32
-	n_idb_port      = n_idb_mmu_port
-	n_mmu_port      = n_idb_mmu_port
+	n_rx_pipe_data_port = 32
+	n_mmu_data_port     = 32
+	n_rx_pipe_port      = n_rx_pipe_mmu_port
+	n_mmu_port          = n_rx_pipe_mmu_port
 
 	// Pseudo-ports appearing in tdm calendars.
 	// Over subscription round robin.
-	idb_mmu_port_over_subscription = n_idb_mmu_port + 0
+	rx_pipe_mmu_port_over_subscription = n_rx_pipe_mmu_port + 0
 	// Null psuedo-port: no port pick, no opportunistic.
-	idb_mmu_port_null = n_idb_mmu_port + 1
+	rx_pipe_mmu_port_null = n_rx_pipe_mmu_port + 1
 	// Pseudo-port for mem reset, l2 management, etc.
-	idb_mmu_port_idle1 = n_idb_mmu_port + 2
+	rx_pipe_mmu_port_idle1 = n_rx_pipe_mmu_port + 2
 	// Port for guaranteed for refresh
-	idb_mmu_port_idle2 = n_idb_mmu_port + 3
+	rx_pipe_mmu_port_idle2 = n_rx_pipe_mmu_port + 3
 	// Port number used to tell hardware that table entries are not valid.
-	idb_mmu_port_invalid = 0x3f
+	rx_pipe_mmu_port_invalid = 0x3f
 )
 
 // 8 bit global mmu port number: 2 bit pipe + 6 bit mmu port number
@@ -191,56 +192,56 @@ type mmu_pipe uint8   // mmu pipe (xpe) index [0,3]
 
 const mmu_global_port_number_invalid = 0xffff
 
-var phys_by_idb_and_pipe [n_idb_port][n_pipe]physical_port_number
+var phys_by_rx_pipe_and_pipe [n_rx_pipe_port][n_pipe]physical_port_number
 
 func init() {
-	for i := 0; i < n_idb_data_port; i++ {
+	for i := 0; i < n_rx_pipe_data_port; i++ {
 		for p := 0; p < n_pipe; p++ {
-			phys_by_idb_and_pipe[i][p] = phys_port_data_lo + physical_port_number(n_idb_data_port*p+i)
+			phys_by_rx_pipe_and_pipe[i][p] = phys_port_data_lo + physical_port_number(n_rx_pipe_data_port*p+i)
 		}
 	}
 	// Loopback ports for each pipe.
 	for p := 0; p < n_pipe; p++ {
-		phys_by_idb_and_pipe[idb_mmu_port_loopback][p] = phys_port_loopback_pipe_0 + physical_port_number(p)
+		phys_by_rx_pipe_and_pipe[rx_pipe_mmu_port_loopback][p] = phys_port_loopback_pipe_0 + physical_port_number(p)
 	}
 	// Cpu and management ports.
-	phys_by_idb_and_pipe[idb_mmu_port_pipe_0_cpu][0] = phys_port_cpu
-	phys_by_idb_and_pipe[idb_mmu_port_pipe_1_management_0][1] = phys_port_management_0
-	phys_by_idb_and_pipe[idb_mmu_port_pipe_2_management_1][2] = phys_port_management_1
+	phys_by_rx_pipe_and_pipe[rx_pipe_mmu_port_pipe_0_cpu][0] = phys_port_cpu
+	phys_by_rx_pipe_and_pipe[rx_pipe_mmu_port_pipe_1_management_0][1] = phys_port_management_0
+	phys_by_rx_pipe_and_pipe[rx_pipe_mmu_port_pipe_2_management_1][2] = phys_port_management_1
 	// Invalidate unused slots
-	phys_by_idb_and_pipe[idb_mmu_port_pipe_0_cpu][3] = phys_port_invalid
+	phys_by_rx_pipe_and_pipe[rx_pipe_mmu_port_pipe_0_cpu][3] = phys_port_invalid
 }
 
-func (i idb_mmu_port_number) toPhys(pipe uint) physical_port_number {
-	return phys_by_idb_and_pipe[i][pipe]
+func (i rx_pipe_mmu_port_number) toPhys(pipe uint) physical_port_number {
+	return phys_by_rx_pipe_and_pipe[i][pipe]
 }
 
 var (
-	idb_by_phys     [n_phys_ports]idb_mmu_port_number
+	rx_pipe_by_phys [n_phys_ports]rx_pipe_mmu_port_number
 	ie_pipe_by_phys [n_phys_ports]rx_tx_pipe
 )
 
 func init() {
 	for p := physical_port_number(0); p < n_phys_ports; p++ {
 		if i := p - phys_port_data_lo; i < n_data_ports {
-			idb_by_phys[p] = idb_mmu_port_number(i % 32)
+			rx_pipe_by_phys[p] = rx_pipe_mmu_port_number(i % 32)
 			ie_pipe_by_phys[p] = rx_tx_pipe(i / 32)
 		} else if i := p - phys_port_loopback_pipe_0; i < n_pipe {
-			idb_by_phys[p] = idb_mmu_port_loopback
+			rx_pipe_by_phys[p] = rx_pipe_mmu_port_loopback
 			ie_pipe_by_phys[p] = rx_tx_pipe(i)
 		} else {
 			switch p {
 			case phys_port_cpu:
-				idb_by_phys[p] = idb_mmu_port_pipe_0_cpu
+				rx_pipe_by_phys[p] = rx_pipe_mmu_port_pipe_0_cpu
 				ie_pipe_by_phys[p] = 0
 			case phys_port_management_0:
-				idb_by_phys[p] = idb_mmu_port_pipe_1_management_0
+				rx_pipe_by_phys[p] = rx_pipe_mmu_port_pipe_1_management_0
 				ie_pipe_by_phys[p] = 1
 			case phys_port_management_1:
-				idb_by_phys[p] = idb_mmu_port_pipe_2_management_1
+				rx_pipe_by_phys[p] = rx_pipe_mmu_port_pipe_2_management_1
 				ie_pipe_by_phys[p] = 2
 			default:
-				idb_by_phys[p] = idb_mmu_port_invalid
+				rx_pipe_by_phys[p] = rx_pipe_mmu_port_invalid
 				ie_pipe_by_phys[p] = ^rx_tx_pipe(0)
 			}
 		}
@@ -266,22 +267,22 @@ func (t *fe1a) set_mmu_pipe_map() {
 	}
 }
 
-func (i idb_mmu_port_number) gratuitous_mmu_port_scrambling() idb_mmu_port_number {
-	if i < n_idb_data_port {
+func (i rx_pipe_mmu_port_number) gratuitous_mmu_port_scrambling() rx_pipe_mmu_port_number {
+	if i < n_rx_pipe_data_port {
 		i = i>>1 | (i&1)<<4
 	}
 	return i
 }
 
-func (p physical_port_number) toIdb() (i idb_mmu_port_number, pipe rx_tx_pipe) {
-	i, pipe = idb_by_phys[p], ie_pipe_by_phys[p]
+func (p physical_port_number) to_rx_pipe_mmu() (i rx_pipe_mmu_port_number, pipe rx_tx_pipe) {
+	i, pipe = rx_pipe_by_phys[p], ie_pipe_by_phys[p]
 	return
 }
 
 func (p physical_port_number) pipe() rx_tx_pipe { return ie_pipe_by_phys[p] }
 
-func (p physical_port_number) toMmu(t *fe1a) (i idb_mmu_port_number, m mmu_pipe) {
-	i, m = idb_by_phys[p], t.mmu_pipe_by_phys_port[p]
+func (p physical_port_number) toMmu(t *fe1a) (i rx_pipe_mmu_port_number, m mmu_pipe) {
+	i, m = rx_pipe_by_phys[p], t.mmu_pipe_by_phys_port[p]
 	i = i.gratuitous_mmu_port_scrambling()
 	return
 }

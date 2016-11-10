@@ -119,7 +119,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 
 	// Tx_pipe per q counters.
 	{
-		_, tx_pipe := phys_port.toIdb()
+		_, tx_pipe := phys_port.to_rx_pipe_mmu()
 		// No need to simulate clear on read; since we've initialized all pipe counters to clear on read.
 		if phys_port == phys_port_cpu {
 			var v [mmu_n_cpu_queues]pipe_counter_entry
@@ -204,10 +204,10 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 						case mmu_port < n_mmu_data_port:
 							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].ports[mmu_port][txq].get(q, xpe, &v[cast][txq][x])
 							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].ports[mmu_port][txq].set(q, xpe, &zero)
-						case mmu_port == idb_mmu_port_loopback:
+						case mmu_port == rx_pipe_mmu_port_loopback:
 							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].loopback[txq].get(q, xpe, &v[cast][txq][x])
 							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].loopback[txq].set(q, xpe, &zero)
-						case mmu_port == idb_mmu_port_any_pipe_cpu_or_management:
+						case mmu_port == rx_pipe_mmu_port_any_pipe_cpu_or_management:
 							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].cpu[txq].get(q, xpe, &v[cast][txq][x])
 							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].cpu[txq].set(q, xpe, &zero)
 						}

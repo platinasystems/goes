@@ -395,7 +395,7 @@ const (
 )
 
 func (t *fe1a) set_cell_assembly_cut_through_threshold(q *DmaRequest, p physical_port_number, thresh uint) {
-	idb, rx_tx_pipe := p.toIdb()
+	idb, rx_tx_pipe := p.to_rx_pipe_mmu()
 	pipe := uint(rx_tx_pipe)
 	i0, i1 := uint(idb/4), uint(idb%4)
 	port_block_index := 8*pipe + i0

@@ -201,7 +201,7 @@ func obm_for_port_block_index(i uint) (obm uint) {
 	return
 }
 
-func (t *fe1a) idb_init() {
+func (t *fe1a) rx_pipe_buffer_init() {
 	type portBlock struct {
 		speeds  [4]float64
 		n_lanes [4]uint8
@@ -662,7 +662,7 @@ func (t *fe1a) tx_pipe_mmu_credits_set() {
 func (t *fe1a) misc_init() {
 	t.port_mapping_init()
 	t.tdm_scheduler_init()
-	t.idb_init()
+	t.rx_pipe_buffer_init()
 	t.port_bitmap_garbage_dump_init()
 	t.mmu_init()
 	t.tmon_init()

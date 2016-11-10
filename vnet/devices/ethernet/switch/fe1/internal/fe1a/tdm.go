@@ -49,93 +49,28 @@ func (r *tdm_reg32) set(q *DmaRequest, b sbus.Block, pipe_index uint, v uint32) 
 type tdm_regs struct {
 	_ [0x1]tdm_reg32
 
-	// Address: 0x04040100 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: TDM calendar config register
-	// 17:17 ENABLE R/W Enables the TDM port pick function
-	// 16:16 CURR_CAL R/W Indicates which calendar is to be used currently
-	// 15:8 CAL1_END R/W TDM Calendar1 end entry
-	// 7:0 CAL0_END R/W TDM Calendar0 end entry
 	config tdm_reg32
 
-	// Address: 0x04040200 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: TDM_HSP HIGH SPEED PORT indication (high speed = speed >= 40e9 bits/sec)
-	// 31:0 PORT_BMP R/W Setting this bit indicates that this port is a high speed port requiring minimum spacing of less than 8
-	//   (minimum spacing is fixed for Loopback at 4 and CPU at 8)
 	high_speed_port_bitmap tdm_reg32
 
-	// Address: 0x04040300 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: Post Calendar opportunistic scheduler config
-	// 19:14 DISABLE_PORT_NUM R/W 0x25 If this port number is present in the Calendar then it cannot be substituted by opportunistic scheduler
-	// 13:11 OPP_STRICT_PRI R/W Control strict priority scheduling between 3 opportunistic sources (high to low)
-	//   0: Opp1, Opp2, Oversub
-	//   1: Opp2, Opp1, Oversub
-	//   2: Opp1, Oversub, Opp2
-	//   3: Opp2, Oversub, Opp1
-	//   4: Oversub, Opp1, Opp2
-	//   5: Oversub, Opp2, Opp1
-	// 10:10 OPP_OVR_SUB_EN R/W Enable for oversub port in opportunistic scheduling
-	// 9:6 OPP2_SPACING R/W Same spacing value for OPP2_PORT_NUM
-	// 5:5 OPP2_PORT_EN R/W Enable for opportunistic2 port in opportunistic scheduling
-	// 4:1 OPP1_SPACING R/W Same spacing value for OPP1_PORT_NUM
-	// 0:0 OPP1_PORT_EN R/W Enable for opportunistic1 port in opportunistic scheduling
 	opportunistic_scheduler_config tdm_reg32
 
-	// Address: 0x04040400 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: CPU Loopback opportunistic scheduler config
-	// 13:10 LB_SPACING R/W 0x4 Minimum spacing for Loopback picks
-	// 9:6 CPU_SPACING R/W 0x8 Minimum spacing for CPU picks
-	// 5:2 LB_CPU_RATIO R/W 0xa Ratio of number of opportunistic slots to be given to Loopback to CPU
-	// 1:1 LB_OPP_EN R/W Enable for Loopback port in opportunistic scheduling
-	// 0:0 CPU_OPP_EN R/W Enable for CPU port in opportunistic scheduling
 	cpu_loopback_opportunistic_scheduler_config tdm_reg32
 
 	_ [0x8 - 0x5]tdm_reg32
 
-	// Number of Register Instances: 8 groups
-	// Address: 0x04040800 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: TDM Oversub group configuration registers
-	// 9:7 SPEED R/W Speed of this group. The only values allowed are 2,4,5,8,10 and 20
-	//   0x0 = 0
-	//   0x1 = 2 < 20G
-	//   0x2 = 4 >= 20G
-	//   0x3 = 5 >= 25G
-	//   0x4 = 8 >= 40G
-	//   0x5 = 10 >= 50G
-	//   0x6 = 20 >= 100G
-	// 6:4 SISTER_SPACING R/W 0x4 spacing between ports within same PHY_PORT_ID
-	// 3:0 SAME_SPACING R/W 0x8 spacing between same ports (for mmu: set to >= 40G = 4; else 8; for idb: 4)
 	over_subscription_group_config [8]tdm_reg32
 
 	_ [0x14 - 0x10]tdm_reg32
 
-	// Number of Register Instances: 8 groups x 12 max members/group
-	// Address: 0x04041400 + 0xc00*i i=0..7 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: TDM Oversub group0 Member Table
-	// Index Description: oversub group table entry #
-	// 8:6 PHY_PORT_ID Physical Port ID. All ports which belong to the same serdes are configured to the same PHY_PORT_ID. 0x7
-	// 5:0 PORT_NUM R/W MMU Port number residing in the current entry. Unused entries are configured with reserved MMU port number 0x3f
-	// All group member ports have the same speed.
 	over_subscription_group_members [8][12]tdm_reg32
 
-	// Number of Register Instances: 8 port-blocks-per-pipe x 7 calendar entry time-slots
-	// Address: 0x04047400 + i*0x700 i = 0..7 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: Port block Calendar
-	// Index Description: PBLK0_CALENDAR entry #
-	// 10:7 SPACING R/W The same spacing value for this port.  IDB => always 4; MMU 4 for >= 40G else 8
-	// 6:1 PORT_NUM R/W 0x3f IDB port number residing in the current entry. Unused entries are configured with reserved port number 0x3f
-	// 0:0 VALID R/W Indicates this entry is valid
 	port_block_calendar [8][7]tdm_reg32
 
-	// Address: 0x0404ac00 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: MMU TDM 1bit correctable memory ECC error reporting enable
-	// 0:0 TDM_CAL R/W Enable TDM0_CAL 1bit ECC reporting
 	calendar_ecc_enable tdm_reg32
 
 	_ [0x4b2 - 0x4ad]tdm_reg32
 
-	// Address: 0x0404b200 Block ID: IPIPE Access Type: UNIQUE_PIPE0123
-	// Description: DFT input
-	// 11:0 CAL_TM R/W TM bits
 	dft_input tdm_reg32
 
 	_ [0x08000000 - 0x0404b300]byte
@@ -151,7 +86,7 @@ func (x *tdm_calendar_mem) seta(q *DmaRequest, e *tdm_calendar_dual_entry, b sbu
 }
 
 type tdm_calendar_entry struct {
-	port   idb_mmu_port_number
+	port   rx_pipe_mmu_port_number
 	phy_id uint8
 }
 
@@ -160,7 +95,7 @@ func (e *tdm_calendar_entry) getSet(b []uint32, lo int, isSet bool) int {
 	i := m.MemGetSetUint8((*uint8)(&v), b, lo+5, lo, isSet)
 	i = m.MemGetSetUint8(&e.phy_id, b, i+3, i, isSet)
 	if !isSet {
-		e.port = idb_mmu_port_number(v)
+		e.port = rx_pipe_mmu_port_number(v)
 	}
 	return i
 }
@@ -179,7 +114,7 @@ func (r *tdm_calendar_dual_entry) MemGetSet(b []uint32, isSet bool) {
 }
 
 type tdm_over_subscription_group struct {
-	members []idb_mmu_port_number
+	members []rx_pipe_mmu_port_number
 }
 
 func (g *tdm_over_subscription_group) reset() {
@@ -188,7 +123,7 @@ func (g *tdm_over_subscription_group) reset() {
 	}
 }
 
-func (g *tdm_over_subscription_group) add_member(p idb_mmu_port_number) {
+func (g *tdm_over_subscription_group) add_member(p rx_pipe_mmu_port_number) {
 	g.members = append(g.members, p)
 }
 func (g *tdm_over_subscription_group) n_members() uint { return uint(len(g.members)) }
@@ -206,81 +141,15 @@ type tdm_pipe struct {
 func (p *tdm_pipe) initEntries(nTokens int) {
 	c := &p.calendar
 	for i := range c.entryBuf[rx] {
-		e := tdm_calendar_entry{port: idb_mmu_port_invalid, phy_id: 0xf}
+		e := tdm_calendar_entry{port: rx_pipe_mmu_port_invalid, phy_id: 0xf}
 		if i < nTokens {
-			e.port = idb_mmu_port_over_subscription
+			e.port = rx_pipe_mmu_port_over_subscription
 		}
 		c.entryBuf[rx][i] = e
 		c.entryBuf[tx][i] = e
 	}
 	c.entries[rx] = c.entryBuf[rx][:nTokens]
 	c.entries[tx] = c.entryBuf[tx][:nTokens]
-}
-
-func (p *tdm_pipe) initTdmCalendar(pipe uint) {
-	nTokens := 215
-	p.initEntries(nTokens)
-	c := &p.calendar
-
-	if pipe == 3 {
-		i := 41
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		i += 1 + 41
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_idle2, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		i += 1 + 20
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		i += 1 + 21
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		i += 1 + 43
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_idle1, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		i += 1 + 43
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_idle2, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_idle2, phy_id: 0xf}
-		i += 1
-		if i != nTokens {
-			panic("nTokens")
-		}
-	} else {
-		i := 20
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		i += 1 + 20
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		i += 1 + 20
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		i += 1 + 20
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_idle2, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		i += 1 + 20
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		i += 1 + 21
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_loopback, phy_id: 0xf}
-		i += 1 + 21
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		i += 1 + 21
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_idle1, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_null, phy_id: 0xf}
-		i += 1 + 21
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_any_pipe_cpu_or_management, phy_id: 0xf}
-		i += 1 + 21
-		c.entries[rx][i] = tdm_calendar_entry{port: idb_mmu_port_idle2, phy_id: 0xf}
-		c.entries[tx][i] = tdm_calendar_entry{port: idb_mmu_port_idle2, phy_id: 0xf}
-		i += 1
-		if i != nTokens {
-			panic("nTokens")
-		}
-	}
 }
 
 func (t *fe1a) compute_tdm_calendar(pipe uint) {
@@ -294,11 +163,6 @@ func (t *fe1a) compute_tdm_calendar(pipe uint) {
 	p := &t.pipes[pipe].tdm_pipe
 	c := &p.calendar
 
-	if false {
-		p.initTdmCalendar(pipe)
-		return
-	}
-
 	coreFreq := t.GetSwitchCommon().CoreFrequencyInHz
 	minSizedPacketsPerSec := bandwidthPerToken / (8 * (minPacketBytes + preambleBytes + interFrameGapBytes))
 	nTokens := int(math.Floor(coreFreq / minSizedPacketsPerSec))
@@ -308,51 +172,51 @@ func (t *fe1a) compute_tdm_calendar(pipe uint) {
 
 	p.initEntries(nTokens)
 
-	var fixedSlots [n_rx_tx][]idb_mmu_port_number
+	var fixedSlots [n_rx_tx][]rx_pipe_mmu_port_number
 	// 10G of bandwidth for cpu/management ports on pipes 0-2
 	// 5G of bandwidth for loopback port.
 	// Misc slots: 5G internal idle1 (refresh), 2.5G idle2, 2.5G null
 	if pipe == 3 {
-		fixedSlots[rx] = []idb_mmu_port_number{
-			idb_mmu_port_loopback,
-			idb_mmu_port_idle2,
-			idb_mmu_port_null,
-			idb_mmu_port_loopback,
-			idb_mmu_port_idle1,
-			idb_mmu_port_idle2,
+		fixedSlots[rx] = []rx_pipe_mmu_port_number{
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_idle2,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_idle1,
+			rx_pipe_mmu_port_idle2,
 		}
-		fixedSlots[tx] = []idb_mmu_port_number{
-			idb_mmu_port_loopback,
-			idb_mmu_port_null,
-			idb_mmu_port_null,
-			idb_mmu_port_loopback,
-			idb_mmu_port_null,
-			idb_mmu_port_idle2,
+		fixedSlots[tx] = []rx_pipe_mmu_port_number{
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_idle2,
 		}
 	} else {
-		fixedSlots[rx] = []idb_mmu_port_number{
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_loopback,
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_idle2,
-			idb_mmu_port_null,
-			idb_mmu_port_loopback,
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_idle1,
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_idle2,
+		fixedSlots[rx] = []rx_pipe_mmu_port_number{
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_idle2,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_idle1,
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_idle2,
 		}
-		fixedSlots[tx] = []idb_mmu_port_number{
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_loopback,
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_null,
-			idb_mmu_port_null,
-			idb_mmu_port_loopback,
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_null,
-			idb_mmu_port_any_pipe_cpu_or_management,
-			idb_mmu_port_idle2,
+		fixedSlots[tx] = []rx_pipe_mmu_port_number{
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_loopback,
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_null,
+			rx_pipe_mmu_port_any_pipe_cpu_or_management,
+			rx_pipe_mmu_port_idle2,
 		}
 	}
 
@@ -431,7 +295,7 @@ func (t *fe1a) install_over_subscription_groups() {
 		pb := pc.PortBlock
 		pipe := pb.GetPipe()
 		sp := port_speed_code(pc.SpeedBitsPerSec)
-		pi := idb_mmu_port_data_0 + idb_mmu_port_number(pb.GetPortIndex(p)&0x1f)
+		pi := rx_pipe_mmu_port_data_0 + rx_pipe_mmu_port_number(pb.GetPortIndex(p)&0x1f)
 		t.pipes[pipe].over_subscription_groups[sp].add_member(pi)
 		if pc.SpeedBitsPerSec >= 40e9 {
 			mpi := pi.gratuitous_mmu_port_scrambling()
@@ -469,7 +333,7 @@ func (t *fe1a) install_over_subscription_groups() {
 			// Set group members.
 			for i := uint(0); i < l; i++ {
 				var (
-					pi     [2]idb_mmu_port_number
+					pi     [2]rx_pipe_mmu_port_number
 					phy_id [2]uint32
 					w      [2]uint32
 				)
@@ -575,8 +439,8 @@ func (t *fe1a) install_port_block_calendar() {
 				v       [2]uint32
 				spacing [2]uint32
 			)
-			idb_port_num := idb_mmu_port_number(0x3f)
-			mmu_port_num := idb_port_num
+			rx_pipe_port_num := rx_pipe_mmu_port_number(0x3f)
+			mmu_port_num := rx_pipe_port_num
 			sub_pbi := port_block_index % 8 // block index within pipe
 			if sub_port_index := int(pb.tdm_calendar[ci]); sub_port_index != -1 {
 				// Correct spacing for lower speed mmu port calendar.
@@ -585,11 +449,11 @@ func (t *fe1a) install_port_block_calendar() {
 					spacing[1] = 8
 				}
 				v[0], v[1] = valid, valid
-				idb_port_num = idb_mmu_port_number(sub_port_index + sub_pbi*4)
-				mmu_port_num = idb_port_num.gratuitous_mmu_port_scrambling()
+				rx_pipe_port_num = rx_pipe_mmu_port_number(sub_port_index + sub_pbi*4)
+				mmu_port_num = rx_pipe_port_num.gratuitous_mmu_port_scrambling()
 				v[0] |= spacing[0] << 7
 				v[1] |= spacing[1] << 7
-				v[0] |= uint32(idb_port_num) << 1
+				v[0] |= uint32(rx_pipe_port_num) << 1
 				v[1] |= uint32(mmu_port_num) << 1
 			} else {
 				v[0], v[1] = 0, 0
@@ -622,7 +486,7 @@ func (t *fe1a) opportunistic_scheduler_init(pipe uint) {
 	for i := range v {
 		v[i] |= enable_opportunistic_port1 | enable_opportunistic_port2 | enable_over_subscription_port
 		// Opportunistic disable port number: reset value is internal idle1; set to null port.
-		v[i] = (v[i] &^ (0x3f << 14)) | idb_mmu_port_null<<14
+		v[i] = (v[i] &^ (0x3f << 14)) | rx_pipe_mmu_port_null<<14
 		u[i] |= enable_cpu_port | enable_loopback_port
 	}
 	t.rx_pipe_regs.rx_buffer_tdm_scheduler.opportunistic_scheduler_config.set(q, BlockRxPipe, pipe, v[0])
