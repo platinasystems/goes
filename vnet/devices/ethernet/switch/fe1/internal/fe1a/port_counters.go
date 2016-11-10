@@ -69,7 +69,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 	pipe_port := phys_port.toPipe()
 	pipe := uint(phys_port.pipe())
 
-	// Read Rx_pipe counters.
+	// Read rx pipe counters.
 	{
 		var v [n_rx_counters]uint64
 		for i := range rx_counter_names {
@@ -86,14 +86,14 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 		}
 	}
 
-	// Read Rx_pipe per port pipe counter.
+	// Read rx pipe per port pipe counter.
 	{
 		v := t.rx_pipe_port_table[pipe_port].pipe_counter.update_value(t, pipe, BlockRxPipe)
 		(cm.kindForPortPipeCounter[vnet.Rx] + 0).Add64(th, hi, v.Packets)
 		(cm.kindForPortPipeCounter[vnet.Rx] + 1).Add64(th, hi, v.Bytes)
 	}
 
-	// Read Tx_pipe counters.
+	// Read tx pipe counters.
 	{
 		var v [n_tx_counters]uint64
 		for i := range tx_counter_names {
@@ -110,14 +110,14 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 		}
 	}
 
-	// Read Tx_pipe per port pipe counter.
+	// Read tx per port table counter.
 	{
 		v := t.tx_pipe_port_table[pipe_port].pipe_counter.update_value(t, pipe, BlockTxPipe)
 		(cm.kindForPortPipeCounter[vnet.Tx] + 0).Add64(th, hi, v.Packets)
 		(cm.kindForPortPipeCounter[vnet.Tx] + 1).Add64(th, hi, v.Bytes)
 	}
 
-	// Tx_pipe per q counters.
+	// Tx pipe per queue counters.
 	{
 		_, tx_pipe := phys_port.to_rx_pipe_mmu()
 		// No need to simulate clear on read; since we've initialized all pipe counters to clear on read.
@@ -149,7 +149,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 			}
 		}
 
-		// Tx perq counters may be in eviction fifo; so sync it here.
+		// Tx counters may be in eviction fifo; so sync it here.
 		t.pipe_counter_eviction_fifo_sync()
 	}
 
