@@ -144,7 +144,7 @@ type l3_unicast_tx_next_hop struct {
 
 	l3_intf_index uint16
 
-	flex_counter_ref tx_pipe_flex_counter_ref
+	pipe_counter_ref tx_pipe_pipe_counter_ref
 
 	vntag_p_bit       bool
 	vntag_force_l_bit bool
@@ -177,7 +177,7 @@ func (e *l3_unicast_tx_next_hop) MemGetSet(b []uint32, i int, isSet bool) {
 		panic("104")
 	}
 
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 	i = e.vntag_action.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.vntag_p_bit, b, i, isSet)
 	i = m.MemGetSet1(&e.vntag_force_l_bit, b, i, isSet)

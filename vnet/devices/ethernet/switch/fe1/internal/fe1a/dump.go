@@ -50,14 +50,14 @@ func (t *fe1a) vlan_init() {
 		e.spanning_tree_group = stg
 		e.members[rx] = t.all_ports
 		e.members[tx] = e.members[rx]
-		// e.flex_counter_ref.alloc(t, 1, 0xf, BlockRxPipe)
+		// e.pipe_counter_ref.alloc(t, 1, 0xf, BlockRxPipe)
 
 		var f tx_vlan_entry
 		f.valid = true
 		f.spanning_tree_group = stg
 		f.members = e.members[rx]
 		f.untagged_members = e.members[rx]
-		// f.flex_counter_ref.alloc(t, 1, 0xf, BlockEpipe)
+		// f.pipe_counter_ref.alloc(t, 1, 0xf, BlockEpipe)
 
 		t.tx_pipe_mems.vlan[vlan].set(q, &f)
 		t.rx_pipe_mems.vlan[vlan].set(q, &e)
@@ -166,11 +166,11 @@ func (t *fe1a) l3_init() {
 			e[0].disable_src_ethernet_address_rewrite = true
 			e[0].disable_ip_ttl_decrement = true
 			e[0].l3_intf_index = l3_intf_index
-			// e[0].flex_counter_ref.alloc(t, 0, 0xf, BlockEpipe)
+			// e[0].pipe_counter_ref.alloc(t, 0, 0xf, BlockEpipe)
 			t.tx_pipe_mems.l3_next_hop[next_hop_index].set(q, &e[0])
 
 			e[1] = e[0]
-			// e[1].flex_counter_ref.alloc(t, 0, 0xf, BlockEpipe)
+			// e[1].pipe_counter_ref.alloc(t, 0, 0xf, BlockEpipe)
 			t.tx_pipe_mems.l3_next_hop[next_hop_index_alpm].set(q, &e[1])
 
 			q.Do()

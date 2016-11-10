@@ -20,7 +20,7 @@ type l3_main struct {
 
 func (t *fe1a) register_hooks(v *vnet.Vnet) {
 	t.l3_interface_init()
-	t.flex_counter_init()
+	t.pipe_counter_init()
 	t.adjacency_main_init()
 	t.ip4_fib_init()
 	v.RegisterSwIfAdminUpDownHook(t.l3_main.swIfAdminUpDown)

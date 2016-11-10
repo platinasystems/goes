@@ -387,7 +387,7 @@ func (x *ifp_policy_redirect_set) MemGetSet(b []uint32, i int, isSet bool) int {
 }
 
 type ifp_policy_counter_set struct {
-	flex_counter_ref          rx_pipe_4p11i_flex_counter_ref
+	pipe_counter_ref          rx_pipe_4p11i_pipe_counter_ref
 	per_color_offset_less_one [n_packet_color]uint8
 }
 
@@ -396,7 +396,7 @@ func (x *ifp_policy_counter_set) MemGetSet(b []uint32, i int, isSet bool) int {
 	for c = packet_color_green; c <= packet_color_red; c++ {
 		i = m.MemGetSetUint8(&x.per_color_offset_less_one[c], b, i+1, i, isSet)
 	}
-	i = x.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = x.pipe_counter_ref.MemGetSet(b, i, isSet)
 	return i
 }
 

@@ -251,7 +251,7 @@ type fe1a struct {
 	pipes [n_pipe]pipe
 
 	adjacency_main
-	flex_counter_main
+	pipe_counter_main
 	ip4_fib_main
 	l3_main
 	l3_interface_main

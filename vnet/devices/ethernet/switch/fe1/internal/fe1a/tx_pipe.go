@@ -174,12 +174,12 @@ type tx_pipe_regs struct {
 	device_to_physical_port_number_mapping tx_pipe_portreg32
 	_                                      [0x50 - 0x42]tx_pipe_reg32
 	mmu_max_cell_credit                    tx_pipe_portreg32
-	perq_counter, efp_counter              flex_counter_1pool_control
+	perq_counter, efp_counter              pipe_counter_1pool_control
 	_                                      [0x113 - 0x59]tx_pipe_reg32
 	edb_misc_control                       tx_pipe_reg32
 	_                                      [0x400 - 0x114]tx_pipe_reg32
 
-	flex_counter flex_counter_4pool_control
+	pipe_counter pipe_counter_4pool_control
 	_            [0x29040000 - 0x28050000]byte
 
 	edb_control_parity_enable tx_pipe_reg32
@@ -348,15 +348,13 @@ type tx_pipe_mems struct {
 
 	_ [0x24080000 - 0x20140000]byte
 
-	flex_counter_pkt_res_map m.Mem
-
-	flex_counter_tos_map m.Mem
-
-	flex_counter_port_map m.Mem
-
-	flex_counter_pkt_pri_map m.Mem
-
-	flex_counter_pri_cng_map m.Mem
+	pipe_counter_maps struct {
+		packet_resolution m.Mem
+		ip_tos            m.Mem
+		port              m.Mem
+		priority          m.Mem
+		priority_cng      m.Mem
+	}
 
 	ip_cut_thru_class [n_phys_ports]m.Mem32
 	_                 [m.MemMax - n_phys_ports]m.MemElt
@@ -364,20 +362,20 @@ type tx_pipe_mems struct {
 	tx_start_count [34][16]m.Mem32
 	_              [m.MemMax - 34*16]m.MemElt
 
-	flex_counter_cos_map m.Mem
+	pipe_counter_cos_map m.Mem
 
 	_ [0x28000000 - 0x24280000]byte
 
-	efp_counter_table [1024]tx_pipe_flex_counter_mem
+	efp_counter_table [1024]tx_pipe_pipe_counter_mem
 	_                 [m.MemMax - 1024]m.MemElt
 
 	_ [1]m.Mem
 
 	per_tx_queue_counters struct {
-		cpu   [mmu_n_cpu_queues]tx_pipe_flex_counter_mem
+		cpu   [mmu_n_cpu_queues]tx_pipe_pipe_counter_mem
 		ports [n_idb_mmu_port]struct {
-			unicast   [mmu_n_tx_queues]tx_pipe_flex_counter_mem
-			multicast [mmu_n_tx_queues]tx_pipe_flex_counter_mem
+			unicast   [mmu_n_tx_queues]tx_pipe_pipe_counter_mem
+			multicast [mmu_n_tx_queues]tx_pipe_pipe_counter_mem
 		}
 	}
 	_ [m.MemMax - (48 + n_idb_mmu_port*2*mmu_n_tx_queues)]m.MemElt
@@ -407,5 +405,5 @@ type tx_pipe_mems struct {
 
 	// pools 0-1: 4k counters per pool per pipe
 	// pools 2-3: 1k counters per pool per pipe
-	flex_counter flex_counter_4pool_mems
+	pipe_counter pipe_counter_4pool_mems
 }

@@ -320,7 +320,7 @@ type rx_pipe_regs struct {
 	local_sw_disable_control          rx_pipe_portreg32
 	src_module_id_egress_select       rx_pipe_portreg32
 	sflow_rx_rand_seed                rx_pipe_reg32
-	sflow_flex_rand_seed              rx_pipe_reg32
+	sflow_pipe_rand_seed              rx_pipe_reg32
 	sflow_mirror_config               rx_pipe_reg32
 	misc_config                       rx_pipe_reg32
 	sw2_ifp_dst_action_control        rx_pipe_reg32
@@ -348,10 +348,10 @@ type rx_pipe_regs struct {
 	nat_counters              [5][16]rx_pipe_reg32
 	_                         [0x54040000 - 0x54010800]byte
 
-	flex_counter                       [5]flex_counter_4pool_control
+	pipe_counter                       [5]pipe_counter_4pool_control
 	_                                  [0x5c000000 - 0x54090000]byte
-	flex_counter_eviction_control      rx_pipe_reg32
-	flex_counter_eviction_counter_flag rx_pipe_reg32
+	pipe_counter_eviction_control      rx_pipe_reg32
+	pipe_counter_eviction_counter_flag rx_pipe_reg32
 	_                                  [0x60000000 - 0x5c000200]byte
 
 	l2_management_control          rx_pipe_reg32
@@ -646,13 +646,13 @@ type rx_pipe_mems struct {
 	l3_defip_alpm_ipv4 [n_iss_bits_per_bucket / 70][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip4_mem
 	_                  [m.MemMax - (n_iss_bits_per_bucket/70)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_ipv4_with_flex_counters [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip4_with_flex_counter_mem
+	l3_defip_alpm_ipv4_with_pipe_counters [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip4_with_pipe_counter_mem
 	_                                     [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
 	l3_defip_alpm_ipv6_64 [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_64_mem
 	_                     [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_ipv6_64_with_flex_counters [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_64_with_flex_counter_mem
+	l3_defip_alpm_ipv6_64_with_pipe_counters [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_64_with_pipe_counter_mem
 	_                                        [m.MemMax - (n_iss_bits_per_bucket/140)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
 	l3_defip_alpm_ipv6_128 [n_iss_bits_per_bucket / 210][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_128_mem
@@ -876,7 +876,7 @@ type rx_pipe_mems struct {
 
 	sflow_ing_data_source m.Mem
 
-	sflow_ing_flex_data_source m.Mem
+	sflow_ing_pipe_data_source m.Mem
 
 	_ [0x54000000 - 0x50d40000]byte
 
@@ -905,15 +905,13 @@ type rx_pipe_mems struct {
 
 	cpu_port_bitmap_1 [m.MemMax]port_bitmap_mem
 
-	ing_flex_counter_pkt_res_map m.Mem
-
-	ing_flex_counter_tos_map m.Mem
-
-	ing_flex_counter_port_map m.Mem
-
-	ing_flex_counter_pkt_pri_map m.Mem
-
-	ing_flex_counter_pri_cng_map m.Mem
+	pipe_counter_maps struct {
+		packet_resolution m.Mem
+		ip_tos            m.Mem
+		port              m.Mem
+		priority          m.Mem
+		priority_cng      m.Mem
+	}
 
 	ifp_cos_map m.Mem
 
@@ -929,13 +927,13 @@ type rx_pipe_mems struct {
 
 	// pools 0-7:  4k counters per pipe => 8*4k = 32k counters per pipe
 	// pools 8-19: 512 counters per pipe => 12*512 = 6k counters per pipe
-	flex_counter0 [3]flex_counter_4pool_mems // first 12 pools
-	_             [1]flex_counter_4pool_mems
-	flex_counter1 [2]flex_counter_4pool_mems // last 8 pools
+	pipe_counter0 [3]pipe_counter_4pool_mems // first 12 pools
+	_             [1]pipe_counter_4pool_mems
+	pipe_counter1 [2]pipe_counter_4pool_mems // last 8 pools
 
 	_ [0x5c000000 - 0x568c0000]byte
 
-	flex_counter_eviction_fifo m.Mem
+	pipe_counter_eviction_fifo m.Mem
 
 	_ [0x60000000 - 0x5c040000]byte
 

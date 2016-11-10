@@ -53,7 +53,7 @@ func init() {
 	check("l3_ecmp_group", unsafe.Pointer(&m.l3_ecmp_group), 0x4c000000)
 	check("trunk_group", unsafe.Pointer(&m.trunk_group), 0x50000000)
 	check("cos_map", unsafe.Pointer(&m.cos_map), 0x54000000)
-	check("flex_counter_eviction_fifo", unsafe.Pointer(&m.flex_counter_eviction_fifo), 0x5c000000)
+	check("pipe_counter_eviction_fifo", unsafe.Pointer(&m.pipe_counter_eviction_fifo), 0x5c000000)
 	check("l2_bulk", unsafe.Pointer(&m.l2_bulk), 0x60040000)
 
 	check("rx_buffer_tdm_scheduler", unsafe.Pointer(&r.rx_buffer_tdm_scheduler), 0x04040000)
@@ -73,7 +73,7 @@ func init() {
 	check("ifp_ecmp_hash_control", unsafe.Pointer(&r.ifp_ecmp_hash_control), 0x4c000000)
 	check("mirror_select", unsafe.Pointer(&r.mirror_select), 0x50000000)
 	check("sflow_tx_threshold", unsafe.Pointer(&r.sflow_tx_threshold), 0x54000000)
-	check("flex_counter_eviction_control", unsafe.Pointer(&r.flex_counter_eviction_control), 0x5c000000)
+	check("pipe_counter_eviction_control", unsafe.Pointer(&r.pipe_counter_eviction_control), 0x5c000000)
 	check("l2_management_control", unsafe.Pointer(&r.l2_management_control), 0x60000000)
 }
 
@@ -93,7 +93,7 @@ func init() {
 	check("efp_slice_control", unsafe.Pointer(&r.efp_slice_control), 0x20000000)
 	check("event_debug", unsafe.Pointer(&r.event_debug), 0x24000000)
 	check("counters", unsafe.Pointer(&r.counters), 0x28000000)
-	check("flex_counters", unsafe.Pointer(&r.flex_counter), 0x28040000)
+	check("pipe_counters", unsafe.Pointer(&r.pipe_counter), 0x28040000)
 
 	check("l3_next_hop", unsafe.Pointer(&m.l3_next_hop), 0x04000000)
 	check("int_cn_update", unsafe.Pointer(&m.int_cn_update), 0x05900000)
@@ -101,10 +101,10 @@ func init() {
 	check("vxlt_action_table", unsafe.Pointer(&m.vxlt_action_table), 0x08780000)
 	check("mpls_exp_pri_mapping", unsafe.Pointer(&m.mpls_exp_pri_mapping), 0x10000000)
 	check("trill_parse_control_2", unsafe.Pointer(&m.trill_parse_control_2), 0x1c000000)
-	check("flex_counter_pkt_res_map", unsafe.Pointer(&m.flex_counter_pkt_res_map), 0x24080000)
+	check("pipe_counter_maps.packet_resolution", unsafe.Pointer(&m.pipe_counter_maps.packet_resolution), 0x24080000)
 	check("efp_counter_table", unsafe.Pointer(&m.efp_counter_table), 0x28000000)
 	check("port_enable", unsafe.Pointer(&m.port_enable), 0x28200000)
-	check("flex_counter", unsafe.Pointer(&m.flex_counter), 0x2a800000)
+	check("pipe_counter_maps", unsafe.Pointer(&m.pipe_counter_maps), 0x2a800000)
 }
 
 // Verify mmu global memory maps.

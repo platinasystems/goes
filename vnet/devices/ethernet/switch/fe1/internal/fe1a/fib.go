@@ -16,7 +16,7 @@ import (
 type adjacency struct {
 	rx      rx_next_hop_entry
 	tx      tx_next_hop_entry
-	counter tx_pipe_flex_counter_ref
+	counter tx_pipe_pipe_counter_ref
 }
 
 //go:generate gentemplate -d Package=fe1a -id adjacency -d PoolType=adjacency_pool -d Type=adjacency -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
@@ -139,8 +139,8 @@ func (t *fe1a) adj_add_del(im *ip.Main, adj ip.Adj, isDel bool) {
 
 	ai := am.adjacency_pool.GetIndex()
 	if !disable_counter {
-		a.counter.alloc(t, flex_counter_pool_tx_adjacency, pipe_mask, BlockTxPipe)
-		tx.flex_counter_ref = a.counter
+		a.counter.alloc(t, pipe_counter_pool_tx_adjacency, pipe_mask, BlockTxPipe)
+		tx.pipe_counter_ref = a.counter
 	}
 	a.tx = tx
 	*am.get_adj(ai) = *a
@@ -155,7 +155,7 @@ func (t *fe1a) adj_add_del(im *ip.Main, adj ip.Adj, isDel bool) {
 }
 
 func (t *fe1a) adj_sync_counters(m *ip.Main) {
-	t.update_pool_counter_values(flex_counter_pool_tx_adjacency, BlockTxPipe)
+	t.update_pool_counter_values(pipe_counter_pool_tx_adjacency, BlockTxPipe)
 }
 
 func (t *fe1a) adj_get_counter(im *ip.Main, adj ip.Adj, f ip.AdjGetCounterHandler) {

@@ -47,7 +47,7 @@ type mpls_tx_next_hop struct {
 	dst_virtual_port_is_network_port               bool
 	delete_vntag_if_present                        bool
 
-	flex_counter_ref tx_pipe_flex_counter_ref
+	pipe_counter_ref tx_pipe_pipe_counter_ref
 
 	hi_gig_2_mode                                   bool
 	hi_gig_packet_modify_enable                     bool // set for non-vpls and vplx proxy entries
@@ -77,7 +77,7 @@ func (e *mpls_tx_next_hop) MemGetSet(b []uint32, i int, isSet bool) {
 	i = m.MemGetSet1(&e.dst_virtual_port_unknown_multicast_drop_enable, b, i, isSet)
 	i = m.MemGetSet1(&e.dst_virtual_port_unknown_unicast_drop_enable, b, i, isSet)
 	i = m.MemGetSet1(&e.delete_vntag_if_present, b, i, isSet)
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.hi_gig_change_destination, b, i, isSet)
 	i = m.MemGetSet1(&e.dst_virtual_port_is_network_port, b, i, isSet)
 	if i != 122 {
@@ -203,7 +203,7 @@ type mpls_entry_mpls struct {
 	m.LogicalPort
 	mpls_label
 
-	flex_counter_ref rx_pipe_3p11i_flex_counter_ref
+	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
 
 	mpls_action_bos
 	mpls_action_not_bos
@@ -256,7 +256,7 @@ func (e *mpls_entry_mpls) MemGetSet(b []uint32, i int, isSet bool) {
 	i = m.MemGetSet1(&e.php_push_exp_into_next_inner_label, b, i, isSet)
 	i = m.MemGetSet1(&e.bfd_enable, b, i, isSet)
 	i = 97
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 	i = m.MemGetSetUint8(&e.pseudo_wire_cc_type, b, i+1, i, isSet)
 	i = m.MemGetSet1(&e.decap_copy_outer_ttl_to_inner_label, b, i, isSet)
 	i = m.MemGetSet1(&e.disable_ip_dscp_from_ing_mpls_exp_mapping, b, i, isSet)

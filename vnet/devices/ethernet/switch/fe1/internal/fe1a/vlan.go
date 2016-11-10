@@ -65,7 +65,7 @@ type rx_vlan_entry struct {
 
 	private_vlan_src_port_type uint8
 
-	flex_counter_ref rx_pipe_4p12i_flex_counter_ref
+	pipe_counter_ref rx_pipe_4p12i_pipe_counter_ref
 
 	// Bitmap of virtual port groups that are members of this vlan.
 	virtual_port_group_bitmap uint64
@@ -100,7 +100,7 @@ func (e *rx_vlan_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSet1(&e.trill_access_receivers_present, b, i, isSet)
 	i = m.MemGetSetUint8(&e.trill_rbridge_nickname_index, b, i+1, i, isSet)
 	i = m.MemGetSet1(&e.virtual_port_enable, b, i, isSet)
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 	i = m.MemGetSetUint16(&e.ifp_class_id, b, i+11, i, isSet)
 	if i != 477 {
 		panic("vlan")
@@ -130,7 +130,7 @@ type tx_vlan_entry struct {
 	dot1p_mapping_pointer         uint8
 	spanning_tree_group           uint16
 	virtual_port_group_membership uint64
-	flex_counter_ref              tx_pipe_flex_counter_ref
+	pipe_counter_ref              tx_pipe_pipe_counter_ref
 	members                       port_bitmap
 	untagged_members              port_bitmap
 }
@@ -145,7 +145,7 @@ func (e *tx_vlan_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSet1(&e.modifiy_cfi_bit, b, i, isSet)
 	i = m.MemGetSetUint64(&e.virtual_port_group_membership, b, i+63, i, isSet)
 	i = m.MemGetSet1(&e.modifiy_dot1p, b, i, isSet)
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 
 	i = 103
 	i = e.untagged_members.MemGetSet(b, i, isSet)

@@ -51,14 +51,14 @@ func (t *fe1a) vlan_init() {
 		e.spanning_tree_group = stg
 		e.members[rx] = t.all_ports
 		e.members[tx] = e.members[rx]
-		// e.flex_counter_ref.alloc(t, 1, 0xf, BlockIpipe, "vlan %d", vlan)
+		// e.pipe_counter_ref.alloc(t, 1, 0xf, BlockIpipe, "vlan %d", vlan)
 
 		var f tx_vlan_entry
 		f.valid = true
 		f.spanning_tree_group = stg
 		f.members = e.members[rx]
 		f.untagged_members = e.members[rx]
-		// f.flex_counter_ref.alloc(t, 1, 0xf, BlockEpipe, "vlan %d", vlan)
+		// f.pipe_counter_ref.alloc(t, 1, 0xf, BlockEpipe, "vlan %d", vlan)
 
 		t.tx_pipe_mems.vlan[vlan].set(q, &f)
 		t.rx_pipe_mems.vlan[vlan].set(q, &e)
@@ -212,7 +212,7 @@ func (t *fe1a) l3_init() {
 			nh := i.next_hop_for_port()
 			l3_oif := i.l3_iif_for_port()
 			e.l3_intf_index = uint16(l3_oif)
-			// e.flex_counter_ref.alloc(t, 0, 0xf, BlockEpipe, "l3 next_hop port %d", i)
+			// e.pipe_counter_ref.alloc(t, 0, 0xf, BlockEpipe, "l3 next_hop port %d", i)
 			t.tx_pipe_mems.l3_next_hop[nh].set(q, &e)
 		}
 		q.Do()
@@ -271,10 +271,10 @@ func (t *fe1a) l3_init() {
 			oif.outer_vlan.id = 1
 			l3_iif := i.l3_iif_for_port()
 			iif.vrf = uint16(i.vrf_for_port())
-			// iif.flex_counter_ref.alloc(t, 2, 0xf, BlockIpipe, "l3 iif port %d", i)
+			// iif.pipe_counter_ref.alloc(t, 2, 0xf, BlockIpipe, "l3 iif port %d", i)
 			t.rx_pipe_mems.l3_interface[l3_iif].set(q, &iif)
 			t.tx_pipe_mems.l3_interface[l3_iif].set(q, &oif)
-			// vrf.flex_counter_ref.alloc(t, 3, 0xf, BlockIpipe, "l3 vrf port %d", i)
+			// vrf.pipe_counter_ref.alloc(t, 3, 0xf, BlockIpipe, "l3 vrf port %d", i)
 			t.rx_pipe_mems.vrf[i.vrf_for_port()].set(q, &vrf)
 		}
 		q.Do()

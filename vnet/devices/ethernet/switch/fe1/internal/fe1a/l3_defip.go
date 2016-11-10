@@ -47,7 +47,7 @@ func (x *l3_defip_tcam_key) getSet(b []uint32, lo int, isSet bool) int {
 }
 
 type l3_defip_tcam_data struct {
-	bucket_has_flex_counter bool
+	bucket_has_pipe_counter bool
 
 	drop_on_hit bool
 
@@ -62,7 +62,7 @@ type l3_defip_tcam_data struct {
 	ifp_class_id m.FpClassId
 
 	// Counter for tcam entry.
-	flex_counter_ref rx_pipe_3p11i_flex_counter_ref
+	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
 
 	// Hit bit index to use when ALPM bucket search misses.
 	hit_bit_index uint32
@@ -86,11 +86,11 @@ func (e *l3_defip_tcam_data) getSetData(b []uint32, lo int, isSet bool) int {
 	i = m.MemGetSet1(&e.drop_on_hit, b, i, isSet)
 	i = e.ifp_class_id.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.is_global, b, i, isSet)
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.parallel_search_use_global_search_on_miss, b, i, isSet)
 	i = m.MemGetSetUint32(&e.hit_bit_index, b, i+17, i, isSet)
 	i = m.MemGetSet1(&e.is_global_high_priority, b, i, isSet)
-	i = m.MemGetSet1(&e.bucket_has_flex_counter, b, i, isSet)
+	i = m.MemGetSet1(&e.bucket_has_pipe_counter, b, i, isSet)
 	i = m.MemGetSetUint16(&e.bucket_index, b, i+12, i, isSet)
 	i = m.MemGetSetUint8(&e.sub_bucket_index, b, i+1, i, isSet)
 	if i != lo+84 {
@@ -369,7 +369,7 @@ type l3_defip_alpm_common struct {
 	dst_length uint8
 }
 
-func (e *l3_defip_alpm_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Address, flexCounter *rx_pipe_3p11i_flex_counter_ref) {
+func (e *l3_defip_alpm_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Address, pipeCounter *rx_pipe_3p11i_pipe_counter_ref) {
 	i := m.MemGetSet1(&e.is_valid, b, 1, isSet)
 	for j := range dst {
 		i = dst[j].MemGetSet(b, i, isSet)
@@ -381,8 +381,8 @@ func (e *l3_defip_alpm_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Addr
 	i = e.priority_change.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.drop_on_hit, b, i, isSet)
 	i = e.ifp_class_id.MemGetSet(b, i, isSet)
-	if flexCounter != nil {
-		i = flexCounter.MemGetSet(b, i, isSet)
+	if pipeCounter != nil {
+		i = pipeCounter.MemGetSet(b, i, isSet)
 		if i != 88 {
 			panic("88")
 		}
@@ -408,7 +408,7 @@ func (e *l3_defip_alpm_ip4_entry) MemGetSet(b []uint32, isSet bool) {
 	if isSet {
 		tmp[0] = e.dst
 	}
-	e.l3_defip_alpm_common.memGetSet(b, isSet, tmp[:] /* no flex counter */, nil)
+	e.l3_defip_alpm_common.memGetSet(b, isSet, tmp[:] /* no pipe counter */, nil)
 	if !isSet {
 		e.dst = tmp[0]
 	}
@@ -430,42 +430,42 @@ func (r *l3_defip_alpm_ip4_mem) set(q *DmaRequest, v *l3_defip_alpm_ip4_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_ip4_with_flex_counter_entry struct {
+type l3_defip_alpm_ip4_with_pipe_counter_entry struct {
 	l3_defip_alpm_common
 
 	was_hit bool
 
-	flex_counter_ref rx_pipe_3p11i_flex_counter_ref
+	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
 
 	// Ip4 destination
 	dst m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip4_with_flex_counter_entry) MemBits() int { return 106 }
-func (e *l3_defip_alpm_ip4_with_flex_counter_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *l3_defip_alpm_ip4_with_pipe_counter_entry) MemBits() int { return 106 }
+func (e *l3_defip_alpm_ip4_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
 	var tmp [1]m.Ip4Address
 	if isSet {
 		tmp[0] = e.dst
 	}
-	e.l3_defip_alpm_common.memGetSet(b, isSet, tmp[:], &e.flex_counter_ref)
+	e.l3_defip_alpm_common.memGetSet(b, isSet, tmp[:], &e.pipe_counter_ref)
 	if !isSet {
 		e.dst = tmp[0]
 	}
 	m.MemGetSet1(&e.was_hit, b, 105, isSet)
 }
 
-type l3_defip_alpm_ip4_with_flex_counter_mem m.MemElt
+type l3_defip_alpm_ip4_with_pipe_counter_mem m.MemElt
 
-func (r *l3_defip_alpm_ip4_with_flex_counter_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip4_with_flex_counter_entry, t sbus.AccessType) {
+func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip4_with_flex_counter_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip4_with_flex_counter_entry, t sbus.AccessType) {
+func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip4_with_flex_counter_mem) get(q *DmaRequest, v *l3_defip_alpm_ip4_with_flex_counter_entry) {
+func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) get(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip4_with_flex_counter_mem) set(q *DmaRequest, v *l3_defip_alpm_ip4_with_flex_counter_entry) {
+func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) set(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
@@ -499,35 +499,35 @@ func (r *l3_defip_alpm_ip6_64_mem) set(q *DmaRequest, v *l3_defip_alpm_ip6_64_en
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_ip6_64_with_flex_counter_entry struct {
+type l3_defip_alpm_ip6_64_with_pipe_counter_entry struct {
 	l3_defip_alpm_common
 
 	was_hit bool
 
-	flex_counter_ref rx_pipe_3p11i_flex_counter_ref
+	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
 
 	// Ip6/64 destination
 	dst [2]m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip6_64_with_flex_counter_entry) MemBits() int { return 141 }
-func (e *l3_defip_alpm_ip6_64_with_flex_counter_entry) MemGetSet(b []uint32, isSet bool) {
-	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], &e.flex_counter_ref)
+func (e *l3_defip_alpm_ip6_64_with_pipe_counter_entry) MemBits() int { return 141 }
+func (e *l3_defip_alpm_ip6_64_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
+	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], &e.pipe_counter_ref)
 	m.MemGetSet1(&e.was_hit, b, 140, isSet)
 }
 
-type l3_defip_alpm_ip6_64_with_flex_counter_mem m.MemElt
+type l3_defip_alpm_ip6_64_with_pipe_counter_mem m.MemElt
 
-func (r *l3_defip_alpm_ip6_64_with_flex_counter_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_flex_counter_entry, t sbus.AccessType) {
+func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_64_with_flex_counter_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_flex_counter_entry, t sbus.AccessType) {
+func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_64_with_flex_counter_mem) get(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_flex_counter_entry) {
+func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) get(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip6_64_with_flex_counter_mem) set(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_flex_counter_entry) {
+func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) set(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
@@ -536,7 +536,7 @@ type l3_defip_alpm_ip6_128_entry struct {
 
 	was_hit bool
 
-	flex_counter_ref rx_pipe_3p11i_flex_counter_ref
+	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
 
 	// Ip6/128 destination
 	dst [4]m.Ip4Address
@@ -544,7 +544,7 @@ type l3_defip_alpm_ip6_128_entry struct {
 
 func (e *l3_defip_alpm_ip6_128_entry) MemBits() int { return 211 }
 func (e *l3_defip_alpm_ip6_128_entry) MemGetSet(b []uint32, isSet bool) {
-	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], &e.flex_counter_ref)
+	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], &e.pipe_counter_ref)
 	m.MemGetSet1(&e.was_hit, b, 210, isSet)
 }
 

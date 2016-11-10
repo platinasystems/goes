@@ -34,7 +34,7 @@ type rx_l3_interface_entry struct {
 
 	tunnel_termination_ecn_decap_mapping_pointer uint8
 
-	flex_counter_ref rx_pipe_4p12i_flex_counter_ref
+	pipe_counter_ref rx_pipe_4p12i_pipe_counter_ref
 }
 
 func (e *rx_l3_interface_entry) MemBits() int { return 82 }
@@ -44,7 +44,7 @@ func (e *rx_l3_interface_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSetUint16(&e.vrf, b, i+10, i, isSet)
 	i = m.MemGetSetUint8(&e.rx_l3_interface_profile_index, b, i+7, i, isSet)
 	i = m.MemGetSetUint16(&e.ip_multicast_interface_for_lookup_keys, b, i+12, i, isSet)
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 
 	if i != 52 {
 		panic("rx_l3_interface_entry: ip_opt")
@@ -248,14 +248,14 @@ func (r *tx_l3_interface_mem) set(q *DmaRequest, v *tx_l3_interface_entry) {
 const n_vrf = 2 << 10
 
 type vrf_entry struct {
-	flex_counter_ref rx_pipe_4p12i_flex_counter_ref
+	pipe_counter_ref rx_pipe_4p12i_pipe_counter_ref
 }
 
 func (e *vrf_entry) MemBits() int { return 25 }
 
 func (e *vrf_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 0
-	i = e.flex_counter_ref.MemGetSet(b, i, isSet)
+	i = e.pipe_counter_ref.MemGetSet(b, i, isSet)
 }
 
 type vrf_mem m.MemElt
@@ -329,7 +329,7 @@ const (
 )
 
 func (p *Port) GetSwInterfaceCounterNames() (nm vnet.InterfaceCounterNames) {
-	// Unfortunately there is no way to hook up a flex counter to an egress l3 interface.
+	// Unfortunately there is no way to hook up a pipe counter to an egress l3 interface.
 	// So, we only count rx packet/bytes for l3 interfaces.
 	nm.Combined = []string{
 		rx_if_counter: rx_counter_prefix + "l3 interface",
@@ -338,8 +338,8 @@ func (p *Port) GetSwInterfaceCounterNames() (nm vnet.InterfaceCounterNames) {
 }
 
 func (t *fe1a) swIfCounterSync(v *vnet.Vnet) {
-	t.update_pool_counter_values(flex_counter_pool_rx_l3_interface, BlockRxPipe)
-	p := &t.flex_counter_main.rx_pipe.pools[flex_counter_pool_rx_l3_interface]
+	t.update_pool_counter_values(pipe_counter_pool_rx_l3_interface, BlockRxPipe)
+	p := &t.pipe_counter_main.rx_pipe.pools[pipe_counter_pool_rx_l3_interface]
 	im := &t.l3_interface_main
 	th := v.GetIfThread(0)
 	p.mu.Lock()
@@ -370,8 +370,8 @@ func (t *fe1a) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	i := &im.if_by_si[si]
 
 	if isDel {
-		if i.rx.flex_counter_ref.is_valid() {
-			i.rx.flex_counter_ref.free(t, BlockRxPipe)
+		if i.rx.pipe_counter_ref.is_valid() {
+			i.rx.pipe_counter_ref.free(t, BlockRxPipe)
 		}
 		im.pool.Put(i.ref)
 		*i = l3_interface{}
@@ -386,9 +386,9 @@ func (t *fe1a) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		err = errors.New("l3 interface overflow")
 		return
 	}
-	_, flex_ok := i.rx.flex_counter_ref.alloc(t, flex_counter_pool_rx_l3_interface, pipe_mask, BlockRxPipe)
-	if flex_ok {
-		index := uint(i.rx.flex_counter_ref.index)
+	_, pipe_ok := i.rx.pipe_counter_ref.alloc(t, pipe_counter_pool_rx_l3_interface, pipe_mask, BlockRxPipe)
+	if pipe_ok {
+		index := uint(i.rx.pipe_counter_ref.index)
 		im.si_by_counter[pipe].Validate(index)
 		im.si_by_counter[pipe][index] = uint32(si)
 	}

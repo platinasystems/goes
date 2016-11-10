@@ -108,7 +108,7 @@ type rx_port_table_entry struct {
 	global_physical_port uint8
 
 	// Rx packet/byte counters for this port.
-	flex_counter rx_pipe_4p12i_flex_counter_ref
+	pipe_counter rx_pipe_4p12i_pipe_counter_ref
 
 	// Index into protocol_pkt_control register array.
 	protocol_packet_index uint8
@@ -446,7 +446,7 @@ func (e *rx_port_table_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 	i = m.MemGetSetUint8(&e.dscp_table_pointer, b, i+6, i, isSet)
 
-	i = e.flex_counter.MemGetSet(b, i, isSet)
+	i = e.pipe_counter.MemGetSet(b, i, isSet)
 	i = m.MemGetSet1(&e.enable_hi_gig_2_mode, b, i, isSet)
 	i = m.MemGetSetUint8(&e.etag_pcp_de_source, b, i+1, i, isSet)
 
@@ -496,7 +496,7 @@ type tx_port_table_entry struct {
 	port_type
 
 	// Tx packet/byte counters for this port.
-	flex_counter tx_pipe_flex_counter_ref
+	pipe_counter tx_pipe_pipe_counter_ref
 
 	vlan_xlate_port_group_id uint8
 	cntag_delete_pri_bitmap  uint8
@@ -561,7 +561,7 @@ func (e *tx_port_table_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSet1(&e.mirror_encap_enable, b, i, isSet)
 	i = m.MemGetSetUint8((*uint8)(&e.mirror_encap_index), b, i+3, i, isSet)
 	i = m.MemGetSet1(&e.l2_gre_vfi_lookup_key_type, b, i, isSet)
-	i = e.flex_counter.MemGetSet(b, i, isSet)
+	i = e.pipe_counter.MemGetSet(b, i, isSet)
 
 	if i != 106 {
 		panic("106")
@@ -628,7 +628,7 @@ func (t *fe1a) init_port_table() {
 		{
 			e := rx_pipe_defaults
 			e.global_physical_port = uint8(pipe_port.toGpp())
-			e.flex_counter.alloc(t, flex_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
+			e.pipe_counter.alloc(t, pipe_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
 			t.rx_pipe_port_table[pipe_port] = e
 			t.rx_pipe_mems.port_table[pipe_port].set(q, &e)
 			t.rx_pipe_mems.lport_profile_table[pipe_port].set(q, &e)
@@ -637,7 +637,7 @@ func (t *fe1a) init_port_table() {
 		// Tx_pipe
 		{
 			e := tx_pipe_defaults
-			e.flex_counter.alloc(t, flex_counter_pool_tx_port_table, pipe_mask, BlockTxPipe)
+			e.pipe_counter.alloc(t, pipe_counter_pool_tx_port_table, pipe_mask, BlockTxPipe)
 			t.tx_pipe_port_table[pipe_port] = e
 			t.tx_pipe_mems.port_table[pipe_port].set(q, &e)
 		}
@@ -655,7 +655,7 @@ func (t *fe1a) init_port_table() {
 			e := rx_pipe_defaults
 			e.port_type = port_type_loopback
 			e.global_physical_port = uint8(pipe_port.toGpp())
-			e.flex_counter.alloc(t, flex_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
+			e.pipe_counter.alloc(t, pipe_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
 			t.rx_pipe_port_table[pipe_port] = e
 			t.rx_pipe_mems.port_table[pipe_port].set(q, &e)
 			t.rx_pipe_mems.lport_profile_table[pipe_port].set(q, &e)
@@ -665,7 +665,7 @@ func (t *fe1a) init_port_table() {
 		{
 			e := tx_pipe_defaults
 			e.port_type = port_type_loopback
-			e.flex_counter.alloc(t, flex_counter_pool_tx_port_table, pipe_mask, BlockTxPipe)
+			e.pipe_counter.alloc(t, pipe_counter_pool_tx_port_table, pipe_mask, BlockTxPipe)
 			t.tx_pipe_port_table[pipe_port] = e
 			t.tx_pipe_mems.port_table[pipe_port].set(q, &e)
 		}
@@ -681,7 +681,7 @@ func (t *fe1a) init_port_table() {
 		{
 			e := rx_pipe_defaults
 			e.global_physical_port = uint8(pipe_port.toGpp())
-			e.flex_counter.alloc(t, flex_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
+			e.pipe_counter.alloc(t, pipe_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
 			f := e
 
 			t.rx_pipe_port_table[pipe_port] = e
@@ -689,7 +689,7 @@ func (t *fe1a) init_port_table() {
 			t.rx_pipe_mems.lport_profile_table[pipe_port].set(q, &e)
 
 			f.port_type = port_type_higig
-			f.flex_counter.alloc(t, flex_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
+			f.pipe_counter.alloc(t, pipe_counter_pool_rx_port_table, pipe_mask, BlockRxPipe)
 			t.rx_pipe_mems.port_table[pipe_port_cpu_hi_gig_index].set(q, &f)
 			t.rx_pipe_mems.lport_profile_table[pipe_port_cpu_hi_gig_index].set(q, &f)
 		}
@@ -697,7 +697,7 @@ func (t *fe1a) init_port_table() {
 		// Tx pipe
 		{
 			e := tx_pipe_defaults
-			e.flex_counter.alloc(t, flex_counter_pool_tx_port_table, pipe_mask, BlockTxPipe)
+			e.pipe_counter.alloc(t, pipe_counter_pool_tx_port_table, pipe_mask, BlockTxPipe)
 			t.tx_pipe_port_table[pipe_port] = e
 			t.tx_pipe_mems.port_table[pipe_port].set(q, &e)
 		}
@@ -705,6 +705,6 @@ func (t *fe1a) init_port_table() {
 		q.Do()
 	}
 
-	// Port counters depend on port table due to rx/tx flex counters.
+	// Port counters depend on port table due to rx/tx pipe counters.
 	t.port_counter_init()
 }

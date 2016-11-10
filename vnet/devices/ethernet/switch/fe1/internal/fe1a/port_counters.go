@@ -28,7 +28,7 @@ type port_counter_main struct {
 	kindByTxCounterType map[tx_counter_type]vnet.HwIfCounterKind
 	txCounterTypeByKind map[vnet.HwIfCounterKind]tx_counter_type
 
-	kindForPortFlexCounter [vnet.NRxTx]vnet.HwIfCounterKind
+	kindForPortPipeCounter [vnet.NRxTx]vnet.HwIfCounterKind
 
 	// 2 * 2 * 10 counters: unicast/multicast packets/bytes 10 queues
 	txPerqCounterKind    [m.N_cast]vnet.HwIfCounterKind
@@ -86,11 +86,11 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 		}
 	}
 
-	// Read Rx_pipe per port flex counter.
+	// Read Rx_pipe per port pipe counter.
 	{
-		v := t.rx_pipe_port_table[pipe_port].flex_counter.update_value(t, pipe, BlockRxPipe)
-		(cm.kindForPortFlexCounter[vnet.Rx] + 0).Add64(th, hi, v.Packets)
-		(cm.kindForPortFlexCounter[vnet.Rx] + 1).Add64(th, hi, v.Bytes)
+		v := t.rx_pipe_port_table[pipe_port].pipe_counter.update_value(t, pipe, BlockRxPipe)
+		(cm.kindForPortPipeCounter[vnet.Rx] + 0).Add64(th, hi, v.Packets)
+		(cm.kindForPortPipeCounter[vnet.Rx] + 1).Add64(th, hi, v.Bytes)
 	}
 
 	// Read Tx_pipe counters.
@@ -110,19 +110,19 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 		}
 	}
 
-	// Read Tx_pipe per port flex counter.
+	// Read Tx_pipe per port pipe counter.
 	{
-		v := t.tx_pipe_port_table[pipe_port].flex_counter.update_value(t, pipe, BlockTxPipe)
-		(cm.kindForPortFlexCounter[vnet.Tx] + 0).Add64(th, hi, v.Packets)
-		(cm.kindForPortFlexCounter[vnet.Tx] + 1).Add64(th, hi, v.Bytes)
+		v := t.tx_pipe_port_table[pipe_port].pipe_counter.update_value(t, pipe, BlockTxPipe)
+		(cm.kindForPortPipeCounter[vnet.Tx] + 0).Add64(th, hi, v.Packets)
+		(cm.kindForPortPipeCounter[vnet.Tx] + 1).Add64(th, hi, v.Bytes)
 	}
 
 	// Tx_pipe per q counters.
 	{
 		_, tx_pipe := phys_port.toIdb()
-		// No need to simulate clear on read; since we've initialized all flex counters to clear on read.
+		// No need to simulate clear on read; since we've initialized all pipe counters to clear on read.
 		if phys_port == phys_port_cpu {
-			var v [mmu_n_cpu_queues]flex_counter_entry
+			var v [mmu_n_cpu_queues]pipe_counter_entry
 			for txq := 0; txq < mmu_n_cpu_queues; txq++ {
 				t.tx_pipe_mems.per_tx_queue_counters.cpu[txq].geta(q, uint(tx_pipe), &v[txq])
 			}
@@ -133,7 +133,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 				(cm.txPerqCpuCounterKind + 2*k + 1).Add64(th, hi, v[txq].Bytes)
 			}
 		} else {
-			var v [m.N_cast][mmu_n_tx_queues]flex_counter_entry
+			var v [m.N_cast][mmu_n_tx_queues]pipe_counter_entry
 			pi := pipe_port % 34
 			for txq := 0; txq < mmu_n_tx_queues; txq++ {
 				t.tx_pipe_mems.per_tx_queue_counters.ports[pi].unicast[txq].geta(q, uint(tx_pipe), &v[m.Unicast][txq])
@@ -150,7 +150,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 		}
 
 		// Tx perq counters may be in eviction fifo; so sync it here.
-		t.flex_counter_eviction_fifo_sync()
+		t.pipe_counter_eviction_fifo_sync()
 	}
 
 	// MMU rx port counters
@@ -311,7 +311,7 @@ func (t *fe1a) rx_pipe_port_counter_init(kind vnet.HwIfCounterKind) vnet.HwIfCou
 	}
 	q.Do()
 
-	m.kindForPortFlexCounter[vnet.Rx] = kind
+	m.kindForPortPipeCounter[vnet.Rx] = kind
 	nm.Single = append(nm.Single, rx_counter_prefix+"port table packets")
 	nm.Single = append(nm.Single, rx_counter_prefix+"port table bytes")
 	kind += 2
@@ -400,7 +400,7 @@ func (t *fe1a) tx_pipe_port_counter_init(kind vnet.HwIfCounterKind) vnet.HwIfCou
 	}
 	kind += 2 * mmu_n_cpu_queues
 
-	cm.kindForPortFlexCounter[vnet.Tx] = kind
+	cm.kindForPortPipeCounter[vnet.Tx] = kind
 	nm.Single = append(nm.Single, tx_counter_prefix+"port table packets")
 	nm.Single = append(nm.Single, tx_counter_prefix+"port table bytes")
 	kind += 2
