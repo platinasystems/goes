@@ -42,7 +42,7 @@ func init() {
 	check("source_trunk_map", unsafe.Pointer(&m.source_trunk_map[0]), 0x2c000000)
 	check("vlan_protocol", unsafe.Pointer(&m.vlan_protocol[0]), 0x30000000)
 	check("vlan_mpls", unsafe.Pointer(&m.vlan_mpls[0]), 0x34000000)
-	check("ing_vp_vlan_membership", unsafe.Pointer(&m.ing_vp_vlan_membership[0]), 0x38000000)
+	check("vp_vlan_membership", unsafe.Pointer(&m.vp_vlan_membership[0]), 0x38000000)
 	check("dvp_table", unsafe.Pointer(&m.dvp_table), 0x38500000)
 	check("ip46_dst_compression", unsafe.Pointer(&m.ip46_dst_compression[0]), 0x39980000)
 	check("exact_match_2", unsafe.Pointer(&m.exact_match_2), 0x39c80000)

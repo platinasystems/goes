@@ -283,7 +283,7 @@ type rx_pipe_regs struct {
 	iss_exact_match_logical_to_phyysical_bank_map rx_pipe_reg32
 	cpu_control_1                                 rx_pipe_reg32
 	cpu_control_m                                 rx_pipe_reg32
-	ing_misc_config2                              rx_pipe_reg32
+	misc_config2                                  rx_pipe_reg32
 	mc_control_4                                  rx_pipe_reg32
 	mc_control_5                                  rx_pipe_reg32
 	_                                             [0x8 - 0x7]rx_pipe_reg32
@@ -505,14 +505,14 @@ type rx_pipe_mems struct {
 	l3_interface [n_l3_interface]rx_l3_interface_mem
 	_            [m.MemMax - n_l3_interface]m.MemElt
 
-	ing_trill_payload_parse_control m.Mem
+	trill_payload_parse_control m.Mem
 
 	visibility_packet_capture_buffer_ivp [2]m.Mem64
 	_                                    [m.MemMax - 2]m.MemElt
 
 	_ [0x38000000 - 0x34280000]byte
 
-	ing_vp_vlan_membership m.Mem
+	vp_vlan_membership m.Mem
 
 	_ m.Mem
 
@@ -528,7 +528,7 @@ type rx_pipe_mems struct {
 	vlan_profile [128]m.Mem64
 	_            [m.MemMax - 128]m.MemElt
 
-	ing_outer_dot1p_mapping_table m.Mem
+	outer_dot1p_mapping_table m.Mem
 
 	rxv_hash_field_bitmap_table [2]m.Mem
 
@@ -864,9 +864,9 @@ type rx_pipe_mems struct {
 
 	mirror_control m.Mem
 
-	ing_routed_int_pri_mapping m.Mem
+	routed_int_pri_mapping m.Mem
 
-	ing_higig_trunk_override_profile m.Mem
+	higig_trunk_override_profile m.Mem
 
 	trunk_member m.Mem
 
@@ -878,9 +878,9 @@ type rx_pipe_mems struct {
 	device_port_by_global_physical [n_global_physical_port]rx_pipe_mem32
 	_                              [m.MemMax - n_global_physical_port]m.MemElt
 
-	sflow_ing_data_source m.Mem
+	sflow_data_source m.Mem
 
-	sflow_ing_pipe_data_source m.Mem
+	sflow_pipe_data_source m.Mem
 
 	_ [0x54000000 - 0x50d40000]byte
 
