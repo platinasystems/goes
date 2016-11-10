@@ -17,11 +17,9 @@ import (
 	"github.com/platinasystems/go/commands/kernel"
 	"github.com/platinasystems/go/commands/machine"
 	"github.com/platinasystems/go/commands/machine/machined"
-	"github.com/platinasystems/go/commands/machine/start"
 	netcmds "github.com/platinasystems/go/commands/net"
 	"github.com/platinasystems/go/commands/net/telnetd"
 	"github.com/platinasystems/go/commands/redis"
-	"github.com/platinasystems/go/commands/redis/redisd"
 	"github.com/platinasystems/go/commands/test"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/info/cmdline"
@@ -44,16 +42,6 @@ func main() {
 	command.Plot(telnetd.New())
 	command.Plot(test.New()...)
 	command.Sort()
-	start.Hook = func() error {
-		itfs, err := net.Interfaces()
-		if err != nil {
-			return nil
-		}
-		for _, itf := range itfs {
-			redisd.Devs = append(redisd.Devs, itf.Name)
-		}
-		return nil
-	}
 	machined.Hook = func() error {
 		machined.Plot(
 			cmdline.New(),

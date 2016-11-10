@@ -16,7 +16,6 @@ import (
 	netcmds "github.com/platinasystems/go/commands/net"
 	vnetcmd "github.com/platinasystems/go/commands/net/vnet"
 	"github.com/platinasystems/go/commands/redis"
-	"github.com/platinasystems/go/commands/redis/redisd"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/hostname"
@@ -46,14 +45,9 @@ func main() {
 	command.Plot(redis.New()...)
 	command.Plot(vnetcmd.New())
 	command.Sort()
-	start.Hook = startHook
+	start.RedisDevs = []string{"lo", "eth0"}
 	machined.Hook = machinedHook
 	goes.Main()
-}
-
-func startHook() error {
-	redisd.Devs = []string{"lo", "eth0"}
-	return nil
 }
 
 func machinedHook() error {

@@ -24,7 +24,6 @@ import (
 	"github.com/platinasystems/go/commands/machine/start"
 	"github.com/platinasystems/go/commands/net"
 	"github.com/platinasystems/go/commands/redis"
-	"github.com/platinasystems/go/commands/redis/redisd"
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/environ/fantray"
 	"github.com/platinasystems/go/environ/fsp"
@@ -139,10 +138,7 @@ func main() {
 	command.Plot(net.New()...)
 	command.Plot(redis.New()...)
 	command.Sort()
-	start.Hook = func() error {
-		redisd.Devs = []string{"lo", "eth0"}
-		return nil
-	}
+	start.RedisDevs = []string{"lo", "eth0"}
 	machined.Hook = hook
 	goes.Main()
 }

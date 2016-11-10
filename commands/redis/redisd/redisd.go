@@ -28,7 +28,6 @@ import (
 const Name = "redisd"
 const Log = rundir.Dir + "/log/redisd"
 
-var Devs []string
 var Port = 6379
 var PublishedKeys = []string{"platina"}
 
@@ -76,13 +75,6 @@ func (cmd *cmd) Main(args ...string) error {
 		}
 	}
 
-	if len(args) == 0 {
-		if len(Devs) > 0 {
-			args = Devs
-		} else {
-			args = []string{"lo"}
-		}
-	}
 	for _, name := range args {
 		dev, err := net.InterfaceByName(name)
 		if err != nil {

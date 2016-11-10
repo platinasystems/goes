@@ -10,6 +10,7 @@ package start
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"time"
 
@@ -24,6 +25,8 @@ const Name = "start"
 // Machines may use this Hook to run something before redisd, machined, etc.
 var Hook = func() error { return nil }
 
+var RedisDevs []string
+
 type cmd struct{}
 
 func New() cmd { return cmd{} }
@@ -37,6 +40,12 @@ func (cmd cmd) Main(args ...string) error {
 	redisd := []string{"redisd"}
 	if len(args) > 0 {
 		redisd = append(redisd, args...)
+	} else if len(RedisDevs) > 0 {
+		redisd = append(redisd, RedisDevs...)
+	} else if itfs, err := net.Interfaces(); err == nil {
+		for _, itf := range itfs {
+			redisd = append(redisd, itf.Name)
+		}
 	}
 	err := internal.AssertRoot()
 	if err != nil {
