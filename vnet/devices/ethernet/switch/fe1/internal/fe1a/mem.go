@@ -9,7 +9,7 @@ import (
 )
 
 // ISS = Internel Shared SRAM ?
-// This is the shared SRAM used for l3_defip_alpm table and others.
+// This is the shared SRAM used for fib tcam buckets and others.
 // ISS is physically 4 banks x 8k buckets per bank x 420 bits per bucket.
 const (
 	n_iss_buckets_per_bank = 8 << 10

@@ -46,7 +46,7 @@ func init() {
 	check("dvp_table", unsafe.Pointer(&m.dvp_table), 0x38500000)
 	check("ip46_dst_compression", unsafe.Pointer(&m.ip46_dst_compression[0]), 0x39980000)
 	check("exact_match_2", unsafe.Pointer(&m.exact_match_2), 0x39c80000)
-	check("l3_defip_alpm_raw", unsafe.Pointer(&m.l3_defip_alpm_raw), 0x3a6c0000)
+	check("fib_tcam_bucket_raw", unsafe.Pointer(&m.fib_tcam_bucket_raw), 0x3a6c0000)
 	check("initial_l3_ecmp_group", unsafe.Pointer(&m.initial_l3_ecmp_group), 0x40000000)
 	check("initial_l3_next_hop", unsafe.Pointer(&m.initial_l3_next_hop), 0x44000000)
 	check("dvp_2_table", unsafe.Pointer(&m.dvp_2_table), 0x482c0000)

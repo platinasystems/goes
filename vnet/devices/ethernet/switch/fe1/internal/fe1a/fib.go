@@ -181,7 +181,7 @@ type ip4_fib_prefix_len struct {
 type ip4_fib_main struct {
 	// /32 /31 ... /0
 	prefix_lens      [33]ip4_fib_prefix_len
-	l3_defip_entries [n_l3_defip_entries]l3_defip_entry
+	fib_tcam_entries [n_fib_tcam_entries]fib_tcam_entry
 }
 
 func (t *fe1a) ip4_fib_init() {
@@ -192,19 +192,19 @@ func (t *fe1a) ip4_fib_init() {
 	}
 }
 
-const log2_l3_defip_alloc_unit = 5 // 32 double entries
+const log2_fib_tcam_alloc_unit = 5 // 32 double entries
 
 func (pl *ip4_fib_prefix_len) shift_up(t *fe1a, q *DmaRequest, n_half_entries uint32) {
 	fm := &t.ip4_fib_main
 	for a, i := range pl.index_by_key {
 		iʹ := i + n_half_entries
 		i0, i0ʹ := i/2, iʹ/2
-		e0, e0ʹ := &fm.l3_defip_entries[i0], &fm.l3_defip_entries[i0ʹ]
+		e0, e0ʹ := &fm.fib_tcam_entries[i0], &fm.fib_tcam_entries[i0ʹ]
 		*e0ʹ = *e0
-		t.rx_pipe_mems.l3_defip[i0ʹ].set(q, e0ʹ)
+		t.rx_pipe_mems.fib_tcam[i0ʹ].set(q, e0ʹ)
 		e0[0].is_valid = false
 		e0[1].is_valid = false
-		t.rx_pipe_mems.l3_defip[i0].set(q, e0)
+		t.rx_pipe_mems.fib_tcam[i0].set(q, e0)
 		pl.index_by_key[a] = iʹ
 	}
 	if len(q.Commands) > 256 {
@@ -218,15 +218,15 @@ func (pl *ip4_fib_prefix_len) alloc(t *fe1a) (ei uint32) {
 	var i uint
 	q := t.getDmaReq()
 	if i = pl.Pool.GetIndex(l); i == l {
-		u := uint(log2_l3_defip_alloc_unit)
-		if pl.len < log2_l3_defip_alloc_unit {
+		u := uint(log2_fib_tcam_alloc_unit)
+		if pl.len < log2_fib_tcam_alloc_unit {
 			u = pl.len
 		}
 		delta := uint32(2) << u // 2 since each entry is 2 half entries
 		pl.n_half_entries += delta
 		for j := uint(len(fm.prefix_lens)) - 1; j > pl.index; j-- {
 			plʹ := &fm.prefix_lens[j]
-			if plʹ.base_index+delta >= 2*n_l3_defip_entries {
+			if plʹ.base_index+delta >= 2*n_fib_tcam_entries {
 				panic("fib tcam overflow; more than 16k entries")
 			}
 			if plʹ.n_half_entries > 0 {
@@ -249,13 +249,13 @@ func (pl *ip4_fib_prefix_len) alloc(t *fe1a) (ei uint32) {
 
 func (m *ip4_fib_main) free(t *fe1a, i uint32) {
 	i0, i1 := i/2, i%2
-	e := &m.l3_defip_entries[i0]
+	e := &m.fib_tcam_entries[i0]
 	e[i1].is_valid = false
-	var f l3_defip_tcam_only_entry
-	f[0] = e[0].l3_defip_tcam_search
-	f[1] = e[1].l3_defip_tcam_search
+	var f fib_tcam_tcam_only_entry
+	f[0] = e[0].fib_tcam_tcam_search
+	f[1] = e[1].fib_tcam_tcam_search
 	q := t.getDmaReq()
-	t.rx_pipe_mems.l3_defip_only[i0].set(q, &f)
+	t.rx_pipe_mems.fib_tcam_only[i0].set(q, &f)
 	q.Do()
 }
 
@@ -278,43 +278,43 @@ func (t *fe1a) ip4_fib_add_del(fib_index ip.FibIndex, p *ip4.Prefix, adj ip.Adj,
 		ai := uint16(am.family_adj_index_by_ai[ip.Ip4][adj])
 		if i, ok := fl.index_by_key[key]; ok {
 			i0, i1 := i/2, i%2
-			e := &fm.l3_defip_entries[i0]
+			e := &fm.fib_tcam_entries[i0]
 			if e[i1].next_hop.IsECMP {
 				panic("ecmp")
 			}
 			if e[i1].next_hop.Index != ai {
 				e[i1].next_hop.Index = ai
-				var f l3_defip_tcam_data_only_entry
-				f[0] = e[0].l3_defip_tcam_data
-				f[1] = e[1].l3_defip_tcam_data
+				var f fib_tcam_tcam_data_only_entry
+				f[0] = e[0].fib_tcam_tcam_data
+				f[1] = e[1].fib_tcam_tcam_data
 				q := t.getDmaReq()
-				t.rx_pipe_mems.l3_defip_data_only[i0].set(q, &f)
+				t.rx_pipe_mems.fib_tcam_data_only[i0].set(q, &f)
 				q.Do()
 			}
 		} else {
 			i := fl.alloc(t)
 			i0, i1 := i/2, i%2
-			e := &fm.l3_defip_entries[i0]
-			e[i1] = l3_defip_half_entry{
-				l3_defip_tcam_search: l3_defip_tcam_search{
-					key: l3_defip_tcam_key{
-						key_type:   l3_defip_ip4,
+			e := &fm.fib_tcam_entries[i0]
+			e[i1] = fib_tcam_half_entry{
+				fib_tcam_tcam_search: fib_tcam_tcam_search{
+					key: fib_tcam_tcam_key{
+						key_type:   fib_tcam_ip4,
 						Vrf:        m.Vrf(fib_index),
 						Ip4Address: m.Ip4Address(p.Address),
 					},
-					mask: l3_defip_tcam_key{
+					mask: fib_tcam_tcam_key{
 						key_type:   0xff,
 						Vrf:        ^m.Vrf(0),
 						Ip4Address: m.Ip4Address(p.MaskAsAddress()),
 					},
 					is_valid: true,
 				},
-				l3_defip_tcam_data: l3_defip_tcam_data{
+				fib_tcam_tcam_data: fib_tcam_tcam_data{
 					next_hop: m.NextHop{Index: ai},
 				},
 			}
 			q := t.getDmaReq()
-			t.rx_pipe_mems.l3_defip[i0].set(q, e)
+			t.rx_pipe_mems.fib_tcam[i0].set(q, e)
 			q.Do()
 			if fl.index_by_key == nil {
 				fl.index_by_key = make(map[ip4_fib_key]uint32)

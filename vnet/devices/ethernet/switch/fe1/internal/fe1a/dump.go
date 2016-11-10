@@ -104,9 +104,9 @@ func (t *fe1a) l3_init() {
 	if false {
 
 		const (
-			next_hop_index      = 1 // must be non-zero; zero => invalid
-			next_hop_index_alpm = 2
-			l3_intf_index       = 1 // must be non-zero; zero => invalid
+			next_hop_index        = 1 // must be non-zero; zero => invalid
+			next_hop_index_bucket = 2
+			l3_intf_index         = 1 // must be non-zero; zero => invalid
 		)
 
 		// l3 defip: 0/0 points to next hop 1
@@ -128,15 +128,15 @@ func (t *fe1a) l3_init() {
 			q.Do()
 		}
 
-		// l3 defip alpm
+		// l3 defip bucket
 		if false {
-			e := l3_defip_alpm_ip4_entry{}
+			e := l3_defip_bucket_ip4_entry{}
 			e.is_valid = true
-			e.next_hop = m.NextHop{Index: next_hop_index_alpm}
+			e.next_hop = m.NextHop{Index: next_hop_index_bucket}
 			e.dst_length = 32
 			e.dst = m.Ip4Address{0x5, 0x6, 0x7, 0x8}
 			e.sub_bucket_index = 1
-			t.rx_pipe_mems.l3_defip_alpm_ipv4[0][0][0].set(q, &e)
+			t.rx_pipe_mems.l3_defip_bucket_ipv4[0][0][0].set(q, &e)
 			q.Do()
 		}
 
@@ -152,7 +152,7 @@ func (t *fe1a) l3_init() {
 				e.LogicalPort.Set(uint(phys_port_cpu.toPipe()))
 			}
 			t.rx_pipe_mems.l3_next_hop[next_hop_index].set(q, &e)
-			t.rx_pipe_mems.l3_next_hop[next_hop_index_alpm].set(q, &e)
+			t.rx_pipe_mems.l3_next_hop[next_hop_index_bucket].set(q, &e)
 			// large mtu => no drops
 			t.rx_pipe_mems.l3_interface_mtu[m.Unicast][l3_intf_index].Set(&q.DmaRequest, BlockRxPipe, sbus.Duplicate, 0x3fff)
 			q.Do()
@@ -171,7 +171,7 @@ func (t *fe1a) l3_init() {
 
 			e[1] = e[0]
 			// e[1].pipe_counter_ref.alloc(t, 0, 0xf, BlockEpipe)
-			t.tx_pipe_mems.l3_next_hop[next_hop_index_alpm].set(q, &e[1])
+			t.tx_pipe_mems.l3_next_hop[next_hop_index_bucket].set(q, &e[1])
 
 			q.Do()
 		}

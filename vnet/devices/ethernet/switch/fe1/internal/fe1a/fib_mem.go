@@ -151,43 +151,43 @@ func (tm *my_station_tcam_main) addDel(t *fe1a, e *my_station_tcam_entry, isDel 
 	return
 }
 
-type l3_defip_key_type uint8
+type fib_tcam_key_type uint8
 
 const (
-	l3_defip_ip4 l3_defip_key_type = iota
-	l3_defip_ip6_64bit
+	fib_tcam_ip4 fib_tcam_key_type = iota
+	fib_tcam_ip6_64bit
 	_
-	l3_defip_ip6_128bit
+	fib_tcam_ip6_128bit
 	fcoe
 )
 
-func (a l3_defip_key_type) tcamEncode(b l3_defip_key_type, isSet bool) (c, d l3_defip_key_type) {
+func (a fib_tcam_key_type) tcamEncode(b fib_tcam_key_type, isSet bool) (c, d fib_tcam_key_type) {
 	x, y := m.TcamUint8(a).TcamEncode(m.TcamUint8(b), isSet)
-	c, d = l3_defip_key_type(x), l3_defip_key_type(y)
+	c, d = fib_tcam_key_type(x), fib_tcam_key_type(y)
 	return
 }
 
-type l3_defip_tcam_key struct {
-	key_type l3_defip_key_type
+type fib_tcam_tcam_key struct {
+	key_type fib_tcam_key_type
 	m.Vrf
 	m.Ip4Address
 }
 
-func (key *l3_defip_tcam_key) tcamEncode(mask *l3_defip_tcam_key, isSet bool) (x, y l3_defip_tcam_key) {
+func (key *fib_tcam_tcam_key) tcamEncode(mask *fib_tcam_tcam_key, isSet bool) (x, y fib_tcam_tcam_key) {
 	x.key_type, y.key_type = key.key_type.tcamEncode(mask.key_type, isSet)
 	x.Vrf, y.Vrf = key.Vrf.TcamEncode(mask.Vrf, isSet)
 	x.Ip4Address, y.Ip4Address = key.Ip4Address.TcamEncode(mask.Ip4Address, isSet)
 	return
 }
 
-func (x *l3_defip_tcam_key) getSet(b []uint32, lo int, isSet bool) int {
+func (x *fib_tcam_tcam_key) getSet(b []uint32, lo int, isSet bool) int {
 	i := m.MemGetSetUint8((*uint8)(&x.key_type), b, lo+2, lo, isSet)
 	i = x.Ip4Address.MemGetSet(b, i, isSet)
 	i = x.Vrf.MemGetSet(b, i, isSet)
 	return lo + 48
 }
 
-type l3_defip_tcam_data struct {
+type fib_tcam_tcam_data struct {
 	bucket_has_pipe_counter bool
 
 	drop_on_hit bool
@@ -205,22 +205,22 @@ type l3_defip_tcam_data struct {
 	// Counter for tcam entry.
 	pipe_counter_ref rx_pipe_3p11i_pipe_counter_ref
 
-	// Hit bit index to use when ALPM bucket search misses.
+	// Hit bit index to use when bucket search misses.
 	hit_bit_index uint32
 
-	// ALPM bucket index to use for when this key/mask matches packet.
+	// BUCKET bucket index to use for when this key/mask matches packet.
 	bucket_index uint16
 
-	// 2 bit ALPM sub-bucket index.  Used to further refine bucket prefix matching.
+	// 2 bit BUCKET sub-bucket index.  Used to further refine bucket prefix matching.
 	sub_bucket_index uint8
 
 	priority_change m.PriorityChange
 
-	// Next hop to use for this tcam entry when ALPM bucket search misses.
+	// Next hop to use for this tcam entry when BUCKET bucket search misses.
 	next_hop m.NextHop
 }
 
-func (e *l3_defip_tcam_data) getSetData(b []uint32, lo int, isSet bool) int {
+func (e *fib_tcam_tcam_data) getSetData(b []uint32, lo int, isSet bool) int {
 	const hasReservedBit = true
 	i := e.next_hop.MemGetSet(b, lo, isSet, hasReservedBit)
 	i = e.priority_change.MemGetSet(b, i, isSet)
@@ -240,35 +240,35 @@ func (e *l3_defip_tcam_data) getSetData(b []uint32, lo int, isSet bool) int {
 	return lo + 84
 }
 
-type l3_defip_tcam_search struct {
-	// Key and mask to match for this prefix or in ALPM mode to trigger bucket search.
-	key, mask l3_defip_tcam_key
+type fib_tcam_tcam_search struct {
+	// Key and mask to match for this prefix or in BUCKET mode to trigger bucket search.
+	key, mask fib_tcam_tcam_key
 
 	is_valid bool
 }
 
-type l3_defip_half_entry struct {
-	l3_defip_tcam_search
+type fib_tcam_half_entry struct {
+	fib_tcam_tcam_search
 
-	// Data to use to forward packet in case ALPM buckets miss or not in ALPM mode.
-	l3_defip_tcam_data
+	// Data to use to forward packet in case BUCKET buckets miss or not in BUCKET mode.
+	fib_tcam_tcam_data
 
 	was_hit bool
 }
 
 // TCAM size in double entries.
-const n_l3_defip_entries = 8 << 10
+const n_fib_tcam_entries = 8 << 10
 
-type l3_defip_entry [2]l3_defip_half_entry
+type fib_tcam_entry [2]fib_tcam_half_entry
 
-func (e *l3_defip_entry) MemBits() int { return 365 }
+func (e *fib_tcam_entry) MemBits() int { return 365 }
 
-func (e *l3_defip_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 0
 	for j := range e {
 		i = m.MemGetSet1(&e[j].is_valid, b, i, isSet)
 	}
-	var keys, masks [2]l3_defip_tcam_key
+	var keys, masks [2]fib_tcam_tcam_key
 	if isSet {
 		for j := range e {
 			keys[j], masks[j] = e[j].key.tcamEncode(&e[j].mask, isSet)
@@ -287,7 +287,7 @@ func (e *l3_defip_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 
 	if i != 194 {
-		panic("l3_defip 194")
+		panic("fib_tcam 194")
 	}
 
 	for j := range e {
@@ -295,7 +295,7 @@ func (e *l3_defip_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 
 	if i != 362 {
-		panic("l3_defip 362")
+		panic("fib_tcam 362")
 	}
 
 	i = 363 // skip parity bit
@@ -304,27 +304,27 @@ func (e *l3_defip_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 }
 
-type l3_defip_mem m.MemElt
+type fib_tcam_mem m.MemElt
 
-func (r *l3_defip_mem) geta(q *DmaRequest, v *l3_defip_entry, t sbus.AccessType) {
+func (r *fib_tcam_mem) geta(q *DmaRequest, v *fib_tcam_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_mem) seta(q *DmaRequest, v *l3_defip_entry, t sbus.AccessType) {
+func (r *fib_tcam_mem) seta(q *DmaRequest, v *fib_tcam_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_mem) get(q *DmaRequest, v *l3_defip_entry) { r.geta(q, v, sbus.Duplicate) }
-func (r *l3_defip_mem) set(q *DmaRequest, v *l3_defip_entry) { r.seta(q, v, sbus.Duplicate) }
+func (r *fib_tcam_mem) get(q *DmaRequest, v *fib_tcam_entry) { r.geta(q, v, sbus.Duplicate) }
+func (r *fib_tcam_mem) set(q *DmaRequest, v *fib_tcam_entry) { r.seta(q, v, sbus.Duplicate) }
 
-type l3_defip_tcam_only_entry [2]l3_defip_tcam_search
+type fib_tcam_tcam_only_entry [2]fib_tcam_tcam_search
 
-func (e *l3_defip_tcam_only_entry) MemBits() int { return 194 }
+func (e *fib_tcam_tcam_only_entry) MemBits() int { return 194 }
 
-func (e *l3_defip_tcam_only_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_tcam_only_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 0
 	for j := range e {
 		i = m.MemGetSet1(&e[j].is_valid, b, i, isSet)
 	}
-	var keys, masks [2]l3_defip_tcam_key
+	var keys, masks [2]fib_tcam_tcam_key
 	if isSet {
 		for j := range e {
 			keys[j], masks[j] = e[j].key.tcamEncode(&e[j].mask, isSet)
@@ -343,58 +343,58 @@ func (e *l3_defip_tcam_only_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 }
 
-type l3_defip_tcam_only_mem m.MemElt
+type fib_tcam_tcam_only_mem m.MemElt
 
-func (r *l3_defip_tcam_only_mem) geta(q *DmaRequest, v *l3_defip_tcam_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_tcam_only_mem) geta(q *DmaRequest, v *fib_tcam_tcam_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_tcam_only_mem) seta(q *DmaRequest, v *l3_defip_tcam_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_tcam_only_mem) seta(q *DmaRequest, v *fib_tcam_tcam_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_tcam_only_mem) get(q *DmaRequest, v *l3_defip_tcam_only_entry) {
+func (r *fib_tcam_tcam_only_mem) get(q *DmaRequest, v *fib_tcam_tcam_only_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_tcam_only_mem) set(q *DmaRequest, v *l3_defip_tcam_only_entry) {
+func (r *fib_tcam_tcam_only_mem) set(q *DmaRequest, v *fib_tcam_tcam_only_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_tcam_data_only_entry [2]l3_defip_tcam_data
+type fib_tcam_tcam_data_only_entry [2]fib_tcam_tcam_data
 
-func (e *l3_defip_tcam_data_only_entry) MemBits() int { return 169 }
+func (e *fib_tcam_tcam_data_only_entry) MemBits() int { return 169 }
 
-func (e *l3_defip_tcam_data_only_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_tcam_data_only_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 0
 	for j := range e {
 		i = e[j].getSetData(b, i, isSet)
 	}
 }
 
-type l3_defip_tcam_data_only_mem m.MemElt
+type fib_tcam_tcam_data_only_mem m.MemElt
 
-func (r *l3_defip_tcam_data_only_mem) geta(q *DmaRequest, v *l3_defip_tcam_data_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_tcam_data_only_mem) geta(q *DmaRequest, v *fib_tcam_tcam_data_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_tcam_data_only_mem) seta(q *DmaRequest, v *l3_defip_tcam_data_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_tcam_data_only_mem) seta(q *DmaRequest, v *fib_tcam_tcam_data_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_tcam_data_only_mem) get(q *DmaRequest, v *l3_defip_tcam_data_only_entry) {
+func (r *fib_tcam_tcam_data_only_mem) get(q *DmaRequest, v *fib_tcam_tcam_data_only_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_tcam_data_only_mem) set(q *DmaRequest, v *l3_defip_tcam_data_only_entry) {
+func (r *fib_tcam_tcam_data_only_mem) set(q *DmaRequest, v *fib_tcam_tcam_data_only_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_pair_entry [4]l3_defip_half_entry
+type fib_tcam_pair_entry [4]fib_tcam_half_entry
 
-func (e *l3_defip_pair_entry) MemBits() int { return 474 }
+func (e *fib_tcam_pair_entry) MemBits() int { return 474 }
 
-func (e *l3_defip_pair_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_pair_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 0
 	for j := range e {
 		i = m.MemGetSet1(&e[j].is_valid, b, i, isSet)
 	}
 
-	var keys, masks [4]l3_defip_tcam_key
+	var keys, masks [4]fib_tcam_tcam_key
 	if isSet {
 		for j := range e {
 			keys[j], masks[j] = e[j].key.tcamEncode(&e[j].mask, isSet)
@@ -416,27 +416,27 @@ func (e *l3_defip_pair_entry) MemGetSet(b []uint32, isSet bool) {
 	m.MemGetSet1(&e[0].was_hit, b, i, isSet)
 }
 
-type l3_defip_pair_mem m.MemElt
+type fib_tcam_pair_mem m.MemElt
 
-func (r *l3_defip_pair_mem) geta(q *DmaRequest, v *l3_defip_pair_entry, t sbus.AccessType) {
+func (r *fib_tcam_pair_mem) geta(q *DmaRequest, v *fib_tcam_pair_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_pair_mem) seta(q *DmaRequest, v *l3_defip_pair_entry, t sbus.AccessType) {
+func (r *fib_tcam_pair_mem) seta(q *DmaRequest, v *fib_tcam_pair_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_pair_mem) get(q *DmaRequest, v *l3_defip_pair_entry) { r.geta(q, v, sbus.Duplicate) }
-func (r *l3_defip_pair_mem) set(q *DmaRequest, v *l3_defip_pair_entry) { r.seta(q, v, sbus.Duplicate) }
+func (r *fib_tcam_pair_mem) get(q *DmaRequest, v *fib_tcam_pair_entry) { r.geta(q, v, sbus.Duplicate) }
+func (r *fib_tcam_pair_mem) set(q *DmaRequest, v *fib_tcam_pair_entry) { r.seta(q, v, sbus.Duplicate) }
 
-type l3_defip_pair_tcam_only_entry [4]l3_defip_tcam_search
+type fib_tcam_pair_tcam_only_entry [4]fib_tcam_tcam_search
 
-func (e *l3_defip_pair_tcam_only_entry) MemBits() int { return 388 }
+func (e *fib_tcam_pair_tcam_only_entry) MemBits() int { return 388 }
 
-func (e *l3_defip_pair_tcam_only_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_pair_tcam_only_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 0
 	for j := range e {
 		i = m.MemGetSet1(&e[j].is_valid, b, i, isSet)
 	}
-	var keys, masks [4]l3_defip_tcam_key
+	var keys, masks [4]fib_tcam_tcam_key
 	if isSet {
 		for j := range e {
 			keys[j], masks[j] = e[j].key.tcamEncode(&e[j].mask, isSet)
@@ -455,45 +455,45 @@ func (e *l3_defip_pair_tcam_only_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 }
 
-type l3_defip_pair_tcam_only_mem m.MemElt
+type fib_tcam_pair_tcam_only_mem m.MemElt
 
-func (r *l3_defip_pair_tcam_only_mem) geta(q *DmaRequest, v *l3_defip_pair_tcam_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_pair_tcam_only_mem) geta(q *DmaRequest, v *fib_tcam_pair_tcam_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_pair_tcam_only_mem) seta(q *DmaRequest, v *l3_defip_pair_tcam_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_pair_tcam_only_mem) seta(q *DmaRequest, v *fib_tcam_pair_tcam_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_pair_tcam_only_mem) get(q *DmaRequest, v *l3_defip_pair_tcam_only_entry) {
+func (r *fib_tcam_pair_tcam_only_mem) get(q *DmaRequest, v *fib_tcam_pair_tcam_only_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_pair_tcam_only_mem) set(q *DmaRequest, v *l3_defip_pair_tcam_only_entry) {
+func (r *fib_tcam_pair_tcam_only_mem) set(q *DmaRequest, v *fib_tcam_pair_tcam_only_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_pair_tcam_data_only_entry l3_defip_tcam_data
+type fib_tcam_pair_tcam_data_only_entry fib_tcam_tcam_data
 
-func (e *l3_defip_pair_tcam_data_only_entry) MemBits() int { return 85 }
+func (e *fib_tcam_pair_tcam_data_only_entry) MemBits() int { return 85 }
 
-func (e *l3_defip_pair_tcam_data_only_entry) MemGetSet(b []uint32, isSet bool) {
-	(*l3_defip_tcam_data)(e).getSetData(b, 0, isSet)
+func (e *fib_tcam_pair_tcam_data_only_entry) MemGetSet(b []uint32, isSet bool) {
+	(*fib_tcam_tcam_data)(e).getSetData(b, 0, isSet)
 }
 
-type l3_defip_pair_tcam_data_only_mem m.MemElt
+type fib_tcam_pair_tcam_data_only_mem m.MemElt
 
-func (r *l3_defip_pair_tcam_data_only_mem) geta(q *DmaRequest, v *l3_defip_pair_tcam_data_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_pair_tcam_data_only_mem) geta(q *DmaRequest, v *fib_tcam_pair_tcam_data_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_pair_tcam_data_only_mem) seta(q *DmaRequest, v *l3_defip_pair_tcam_data_only_entry, t sbus.AccessType) {
+func (r *fib_tcam_pair_tcam_data_only_mem) seta(q *DmaRequest, v *fib_tcam_pair_tcam_data_only_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_pair_tcam_data_only_mem) get(q *DmaRequest, v *l3_defip_pair_tcam_data_only_entry) {
+func (r *fib_tcam_pair_tcam_data_only_mem) get(q *DmaRequest, v *fib_tcam_pair_tcam_data_only_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_pair_tcam_data_only_mem) set(q *DmaRequest, v *l3_defip_pair_tcam_data_only_entry) {
+func (r *fib_tcam_pair_tcam_data_only_mem) set(q *DmaRequest, v *fib_tcam_pair_tcam_data_only_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_common struct {
+type fib_tcam_bucket_common struct {
 	is_valid    bool
 	drop_on_hit bool
 
@@ -510,7 +510,7 @@ type l3_defip_alpm_common struct {
 	dst_length uint8
 }
 
-func (e *l3_defip_alpm_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Address, pipeCounter *rx_pipe_3p11i_pipe_counter_ref) {
+func (e *fib_tcam_bucket_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Address, pipeCounter *rx_pipe_3p11i_pipe_counter_ref) {
 	i := m.MemGetSet1(&e.is_valid, b, 1, isSet)
 	for j := range dst {
 		i = dst[j].MemGetSet(b, i, isSet)
@@ -534,8 +534,8 @@ func (e *l3_defip_alpm_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Addr
 	}
 }
 
-type l3_defip_alpm_ip4_entry struct {
-	l3_defip_alpm_common
+type fib_tcam_bucket_ip4_entry struct {
+	fib_tcam_bucket_common
 
 	was_hit bool
 
@@ -543,36 +543,36 @@ type l3_defip_alpm_ip4_entry struct {
 	dst m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip4_entry) MemBits() int { return 71 }
-func (e *l3_defip_alpm_ip4_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_bucket_ip4_entry) MemBits() int { return 71 }
+func (e *fib_tcam_bucket_ip4_entry) MemGetSet(b []uint32, isSet bool) {
 	var tmp [1]m.Ip4Address
 	if isSet {
 		tmp[0] = e.dst
 	}
-	e.l3_defip_alpm_common.memGetSet(b, isSet, tmp[:] /* no pipe counter */, nil)
+	e.fib_tcam_bucket_common.memGetSet(b, isSet, tmp[:] /* no pipe counter */, nil)
 	if !isSet {
 		e.dst = tmp[0]
 	}
 	m.MemGetSet1(&e.was_hit, b, 70, isSet)
 }
 
-type l3_defip_alpm_ip4_mem m.MemElt
+type fib_tcam_bucket_ip4_mem m.MemElt
 
-func (r *l3_defip_alpm_ip4_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip4_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip4_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip4_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip4_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip4_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip4_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip4_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip4_mem) get(q *DmaRequest, v *l3_defip_alpm_ip4_entry) {
+func (r *fib_tcam_bucket_ip4_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip4_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip4_mem) set(q *DmaRequest, v *l3_defip_alpm_ip4_entry) {
+func (r *fib_tcam_bucket_ip4_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip4_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_ip4_with_pipe_counter_entry struct {
-	l3_defip_alpm_common
+type fib_tcam_bucket_ip4_with_pipe_counter_entry struct {
+	fib_tcam_bucket_common
 
 	was_hit bool
 
@@ -582,36 +582,36 @@ type l3_defip_alpm_ip4_with_pipe_counter_entry struct {
 	dst m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip4_with_pipe_counter_entry) MemBits() int { return 106 }
-func (e *l3_defip_alpm_ip4_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_bucket_ip4_with_pipe_counter_entry) MemBits() int { return 106 }
+func (e *fib_tcam_bucket_ip4_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
 	var tmp [1]m.Ip4Address
 	if isSet {
 		tmp[0] = e.dst
 	}
-	e.l3_defip_alpm_common.memGetSet(b, isSet, tmp[:], &e.pipe_counter_ref)
+	e.fib_tcam_bucket_common.memGetSet(b, isSet, tmp[:], &e.pipe_counter_ref)
 	if !isSet {
 		e.dst = tmp[0]
 	}
 	m.MemGetSet1(&e.was_hit, b, 105, isSet)
 }
 
-type l3_defip_alpm_ip4_with_pipe_counter_mem m.MemElt
+type fib_tcam_bucket_ip4_with_pipe_counter_mem m.MemElt
 
-func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) get(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry) {
+func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip4_with_pipe_counter_mem) set(q *DmaRequest, v *l3_defip_alpm_ip4_with_pipe_counter_entry) {
+func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_ip6_64_entry struct {
-	l3_defip_alpm_common
+type fib_tcam_bucket_ip6_64_entry struct {
+	fib_tcam_bucket_common
 
 	was_hit bool
 
@@ -619,29 +619,29 @@ type l3_defip_alpm_ip6_64_entry struct {
 	dst [2]m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip6_64_entry) MemBits() int { return 106 }
-func (e *l3_defip_alpm_ip6_64_entry) MemGetSet(b []uint32, isSet bool) {
-	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], nil)
+func (e *fib_tcam_bucket_ip6_64_entry) MemBits() int { return 106 }
+func (e *fib_tcam_bucket_ip6_64_entry) MemGetSet(b []uint32, isSet bool) {
+	e.fib_tcam_bucket_common.memGetSet(b, isSet, e.dst[:], nil)
 	m.MemGetSet1(&e.was_hit, b, 105, isSet)
 }
 
-type l3_defip_alpm_ip6_64_mem m.MemElt
+type fib_tcam_bucket_ip6_64_mem m.MemElt
 
-func (r *l3_defip_alpm_ip6_64_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip6_64_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip6_64_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip6_64_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_64_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip6_64_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip6_64_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip6_64_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_64_mem) get(q *DmaRequest, v *l3_defip_alpm_ip6_64_entry) {
+func (r *fib_tcam_bucket_ip6_64_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip6_64_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip6_64_mem) set(q *DmaRequest, v *l3_defip_alpm_ip6_64_entry) {
+func (r *fib_tcam_bucket_ip6_64_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip6_64_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_ip6_64_with_pipe_counter_entry struct {
-	l3_defip_alpm_common
+type fib_tcam_bucket_ip6_64_with_pipe_counter_entry struct {
+	fib_tcam_bucket_common
 
 	was_hit bool
 
@@ -651,29 +651,29 @@ type l3_defip_alpm_ip6_64_with_pipe_counter_entry struct {
 	dst [2]m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip6_64_with_pipe_counter_entry) MemBits() int { return 141 }
-func (e *l3_defip_alpm_ip6_64_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
-	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], &e.pipe_counter_ref)
+func (e *fib_tcam_bucket_ip6_64_with_pipe_counter_entry) MemBits() int { return 141 }
+func (e *fib_tcam_bucket_ip6_64_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
+	e.fib_tcam_bucket_common.memGetSet(b, isSet, e.dst[:], &e.pipe_counter_ref)
 	m.MemGetSet1(&e.was_hit, b, 140, isSet)
 }
 
-type l3_defip_alpm_ip6_64_with_pipe_counter_mem m.MemElt
+type fib_tcam_bucket_ip6_64_with_pipe_counter_mem m.MemElt
 
-func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip6_64_with_pipe_counter_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip6_64_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip6_64_with_pipe_counter_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip6_64_with_pipe_counter_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) get(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry) {
+func (r *fib_tcam_bucket_ip6_64_with_pipe_counter_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip6_64_with_pipe_counter_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip6_64_with_pipe_counter_mem) set(q *DmaRequest, v *l3_defip_alpm_ip6_64_with_pipe_counter_entry) {
+func (r *fib_tcam_bucket_ip6_64_with_pipe_counter_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip6_64_with_pipe_counter_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type l3_defip_alpm_ip6_128_entry struct {
-	l3_defip_alpm_common
+type fib_tcam_bucket_ip6_128_entry struct {
+	fib_tcam_bucket_common
 
 	was_hit bool
 
@@ -683,24 +683,24 @@ type l3_defip_alpm_ip6_128_entry struct {
 	dst [4]m.Ip4Address
 }
 
-func (e *l3_defip_alpm_ip6_128_entry) MemBits() int { return 211 }
-func (e *l3_defip_alpm_ip6_128_entry) MemGetSet(b []uint32, isSet bool) {
-	e.l3_defip_alpm_common.memGetSet(b, isSet, e.dst[:], &e.pipe_counter_ref)
+func (e *fib_tcam_bucket_ip6_128_entry) MemBits() int { return 211 }
+func (e *fib_tcam_bucket_ip6_128_entry) MemGetSet(b []uint32, isSet bool) {
+	e.fib_tcam_bucket_common.memGetSet(b, isSet, e.dst[:], &e.pipe_counter_ref)
 	m.MemGetSet1(&e.was_hit, b, 210, isSet)
 }
 
-type l3_defip_alpm_ip6_128_mem m.MemElt
+type fib_tcam_bucket_ip6_128_mem m.MemElt
 
-func (r *l3_defip_alpm_ip6_128_mem) geta(q *DmaRequest, v *l3_defip_alpm_ip6_128_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip6_128_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip6_128_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_128_mem) seta(q *DmaRequest, v *l3_defip_alpm_ip6_128_entry, t sbus.AccessType) {
+func (r *fib_tcam_bucket_ip6_128_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip6_128_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_defip_alpm_ip6_128_mem) get(q *DmaRequest, v *l3_defip_alpm_ip6_128_entry) {
+func (r *fib_tcam_bucket_ip6_128_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip6_128_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *l3_defip_alpm_ip6_128_mem) set(q *DmaRequest, v *l3_defip_alpm_ip6_128_entry) {
+func (r *fib_tcam_bucket_ip6_128_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip6_128_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
@@ -775,15 +775,15 @@ func (t *fe1a) iss_init() {
 	// Bypass iss memory lp.
 	r.iss_memory_control_84.set(q, r.iss_memory_control_84.getDo(q, sbus.Duplicate)|(0xf<<0))
 
-	// All banks ALPM
+	// All banks BUCKET
 	r.iss_bank_config.set(q, 0xf<<8)
 
-	// ALPM uses 4 banks (and not 2)
+	// BUCKET uses 4 banks (and not 2)
 	r.iss_logical_to_physical_bank_map.set(q, 0<<24)
-	r.iss_alpm_logical_to_physical_bank_map.set(q, 0)
+	r.iss_bucket_logical_to_physical_bank_map.set(q, 0)
 
 	// Enable algorithmic LPM mode and combined search mode.
-	r.l3_defip_control.set(q, 1<<1|(0<<2))
+	r.fib_tcam.control.set(q, 1<<1|(0<<2))
 
 	q.Do()
 }

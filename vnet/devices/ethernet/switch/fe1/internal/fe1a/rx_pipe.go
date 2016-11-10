@@ -248,34 +248,36 @@ type rx_pipe_regs struct {
 	_                                       [0x160 - 0x150]rx_pipe_reg32
 	exact_match_logical_table_select_config rx_pipe_reg32
 	_                                       [0x398b0000 - 0x38016100]byte
-	ilpm_ser_control                        rx_pipe_reg32
+	ilpm_ecc_control                        rx_pipe_reg32
 	_                                       [0x398d0000 - 0x398b0100]byte
-	l3_defip_control                        rx_pipe_reg32
-	_                                       [0x398e0000 - 0x398d0100]byte
-	l3_defip_key_select                     rx_pipe_reg32
-	_                                       [0x398f0000 - 0x398e0100]byte
-	l3_defip_aux_control_0                  rx_pipe_reg32
-	_                                       [0x39900000 - 0x398f0100]byte
-	l3_defip_aux_control_1                  rx_pipe_reg32
-	_                                       [0x39910000 - 0x39900100]byte
-	l3_defip_alpm_config                    rx_pipe_reg32
-	_                                       [0x3c000000 - 0x39910100]byte
-	shared_table_hash_control               rx_pipe_reg32
-	_                                       [0x3d000000 - 0x3c000100]byte
-	iss_memory_control_0                    rx_pipe_reg32
-	_                                       [0x100 - 0x001]rx_pipe_reg32
-	iss_memory_control_1                    rx_pipe_reg32
-	_                                       [0x200 - 0x101]rx_pipe_reg32
-	iss_memory_control_2                    rx_pipe_reg32
-	_                                       [0x300 - 0x201]rx_pipe_reg32
-	iss_memory_control_3                    rx_pipe_reg32
-	_                                       [0x400 - 0x301]rx_pipe_reg32
-	iss_memory_control_4                    rx_pipe_reg32
-	_                                       [0x500 - 0x401]rx_pipe_reg32
-	iss_memory_control_5                    rx_pipe_reg32
-	_                                       [0x600 - 0x501]rx_pipe_reg32
-	iss_memory_control_84                   rx_pipe_reg32
-	_                                       [0x40000000 - 0x3d060100]byte
+	fib_tcam                                struct {
+		control       rx_pipe_reg32
+		_             [0x398e0000 - 0x398d0100]byte
+		key_select    rx_pipe_reg32
+		_             [0x398f0000 - 0x398e0100]byte
+		aux_control_0 rx_pipe_reg32
+		_             [0x39900000 - 0x398f0100]byte
+		aux_control_1 rx_pipe_reg32
+		_             [0x39910000 - 0x39900100]byte
+		bucket_config rx_pipe_reg32
+		_             [0x3c000000 - 0x39910100]byte
+	}
+	shared_table_hash_control rx_pipe_reg32
+	_                         [0x3d000000 - 0x3c000100]byte
+	iss_memory_control_0      rx_pipe_reg32
+	_                         [0x100 - 0x001]rx_pipe_reg32
+	iss_memory_control_1      rx_pipe_reg32
+	_                         [0x200 - 0x101]rx_pipe_reg32
+	iss_memory_control_2      rx_pipe_reg32
+	_                         [0x300 - 0x201]rx_pipe_reg32
+	iss_memory_control_3      rx_pipe_reg32
+	_                         [0x400 - 0x301]rx_pipe_reg32
+	iss_memory_control_4      rx_pipe_reg32
+	_                         [0x500 - 0x401]rx_pipe_reg32
+	iss_memory_control_5      rx_pipe_reg32
+	_                         [0x600 - 0x501]rx_pipe_reg32
+	iss_memory_control_84     rx_pipe_reg32
+	_                         [0x40000000 - 0x3d060100]byte
 
 	rep_id_remap_control                   rx_pipe_reg32
 	iss_fpem_logical_to_phyysical_bank_map rx_pipe_reg32
@@ -296,13 +298,13 @@ type rx_pipe_regs struct {
 	rxf_logical_table_select_config        rx_pipe_reg32
 	_                                      [0x44000000 - 0x40010100]byte
 
-	storm_control_meter_mapping           rx_pipe_reg32
-	storm_control_meter_config            rx_pipe_portreg32
-	_                                     [0x7 - 0x2]rx_pipe_reg32
-	rxf_meter_control                     rx_pipe_portreg32
-	_                                     [0xb - 0x8]rx_pipe_reg32
-	iss_alpm_logical_to_physical_bank_map rx_pipe_reg32
-	_                                     [0x48000000 - 0x44000c00]byte
+	storm_control_meter_mapping             rx_pipe_reg32
+	storm_control_meter_config              rx_pipe_portreg32
+	_                                       [0x7 - 0x2]rx_pipe_reg32
+	rxf_meter_control                       rx_pipe_portreg32
+	_                                       [0xb - 0x8]rx_pipe_reg32
+	iss_bucket_logical_to_physical_bank_map rx_pipe_reg32
+	_                                       [0x48000000 - 0x44000c00]byte
 
 	_                                 [0x3 - 0x0]rx_pipe_reg32
 	rxf_slice_meter_map_enable        rx_pipe_reg32
@@ -625,44 +627,44 @@ type rx_pipe_mems struct {
 	fpem_lp         m.Mem
 	_               [0x3a400000 - 0x3a140000]byte
 
-	l3_defip [n_l3_defip_entries]l3_defip_mem
-	_        [m.MemMax - n_l3_defip_entries]m.MemElt
+	fib_tcam [n_fib_tcam_entries]fib_tcam_mem
+	_        [m.MemMax - n_fib_tcam_entries]m.MemElt
 
-	l3_defip_only [n_l3_defip_entries]l3_defip_tcam_only_mem
-	_             [m.MemMax - n_l3_defip_entries]m.MemElt
+	fib_tcam_only [n_fib_tcam_entries]fib_tcam_tcam_only_mem
+	_             [m.MemMax - n_fib_tcam_entries]m.MemElt
 
-	l3_defip_data_only [n_l3_defip_entries]l3_defip_tcam_data_only_mem
-	_                  [m.MemMax - n_l3_defip_entries]m.MemElt
+	fib_tcam_data_only [n_fib_tcam_entries]fib_tcam_tcam_data_only_mem
+	_                  [m.MemMax - n_fib_tcam_entries]m.MemElt
 
-	l3_defip_pair_128 [n_l3_defip_entries / 2]l3_defip_pair_mem
-	_                 [m.MemMax - n_l3_defip_entries/2]m.MemElt
+	fib_tcam_pair_128 [n_fib_tcam_entries / 2]fib_tcam_pair_mem
+	_                 [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	l3_defip_pair_128_only [n_l3_defip_entries / 2]l3_defip_pair_tcam_only_mem
-	_                      [m.MemMax - n_l3_defip_entries/2]m.MemElt
+	fib_tcam_pair_128_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_only_mem
+	_                      [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	l3_defip_pair_128_data_only [n_l3_defip_entries / 2]l3_defip_pair_tcam_data_only_mem
-	_                           [m.MemMax - n_l3_defip_entries/2]m.MemElt
+	fib_tcam_pair_128_data_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_data_only_mem
+	_                           [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	l3_defip_alpm_ipv4 [n_iss_bits_per_bucket / 70][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip4_mem
-	_                  [m.MemMax - (n_iss_bits_per_bucket/70)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_ipv4 [n_iss_bits_per_bucket / 70][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip4_mem
+	_                    [m.MemMax - (n_iss_bits_per_bucket/70)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_ipv4_with_pipe_counters [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip4_with_pipe_counter_mem
-	_                                     [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_ipv4_with_pipe_counters [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip4_with_pipe_counter_mem
+	_                                       [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_ipv6_64 [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_64_mem
-	_                     [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_ipv6_64 [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_mem
+	_                       [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_ipv6_64_with_pipe_counters [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_64_with_pipe_counter_mem
-	_                                        [m.MemMax - (n_iss_bits_per_bucket/140)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_ipv6_64_with_pipe_counters [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_with_pipe_counter_mem
+	_                                          [m.MemMax - (n_iss_bits_per_bucket/140)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_ipv6_128 [n_iss_bits_per_bucket / 210][n_iss_buckets_per_bank][n_iss_banks]l3_defip_alpm_ip6_128_mem
-	_                      [m.MemMax - (n_iss_bits_per_bucket/210)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_ipv6_128 [n_iss_bits_per_bucket / 210][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_128_mem
+	_                        [m.MemMax - (n_iss_bits_per_bucket/210)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	l3_defip_alpm_raw          m.Mem
-	l3_defip_aux_table         m.Mem
-	l3_defip_aux_scratch       m.Mem
-	l3_defip_aux_hitbit_update m.Mem
-	l3_defip_alpm_ecc          m.Mem
+	fib_tcam_bucket_raw        m.Mem
+	fib_tcam_aux_table         m.Mem
+	fib_tcam_aux_scratch       m.Mem
+	fib_tcam_aux_hitbit_update m.Mem
+	fib_tcam_bucket_ecc        m.Mem
 	_                          [0x40000000 - 0x3a800000]byte
 
 	initial_l3_ecmp_group [2][1 << 10]ecmp_group_mem
@@ -707,9 +709,9 @@ type rx_pipe_mems struct {
 	initial_l3_next_hop m.Mem
 
 	l3_entry_hit_only          m.Mem
-	l3_defip_hit_only          m.Mem
-	l3_defip_pair_128_hit_only m.Mem
-	l3_defip_alpm_hit_only     m.Mem
+	fib_tcam_hit_only          m.Mem
+	fib_tcam_pair_128_hit_only m.Mem
+	fib_tcam_bucket_hit_only   m.Mem
 
 	visibility_packet_capture_buffer_isw1 [4]m.Mem64
 	_                                     [m.MemMax - 4]m.MemElt

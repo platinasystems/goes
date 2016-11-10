@@ -153,14 +153,14 @@ func (t *fe1a) l3_init() {
 
 	{
 		for i := snake_port(0); i < n_snake_port; i++ {
-			e := l3_defip_entry{}
-			e[0].key = l3_defip_tcam_key{
-				key_type:   l3_defip_ip4,
+			e := fib_tcam_entry{}
+			e[0].key = fib_tcam_tcam_key{
+				key_type:   fib_tcam_ip4,
 				Vrf:        m.Vrf(i.vrf_for_port()),
 				Ip4Address: m.Ip4Address{0, 0, 0, 0},
 			}
-			e[0].mask = l3_defip_tcam_key{
-				key_type:   l3_defip_key_type(0xff),
+			e[0].mask = fib_tcam_tcam_key{
+				key_type:   fib_tcam_key_type(0xff),
 				Vrf:        m.Vrf(^uint16(0)),
 				Ip4Address: m.Ip4Address{0, 0, 0, 0},
 			}
@@ -175,7 +175,7 @@ func (t *fe1a) l3_init() {
 			}
 			e[0].next_hop = m.NextHop{Index: uint16(next_port.next_hop_for_port())}
 			e[0].is_valid = true
-			t.rx_pipe_mems.l3_defip[i].set(q, &e)
+			t.rx_pipe_mems.fib_tcam[i].set(q, &e)
 		}
 		q.Do()
 	}

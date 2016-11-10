@@ -43,7 +43,7 @@ func (t *fe1a) clear_memories() {
 			tx_pipe_reset_all uint32 = 1 << 16
 		)
 
-		// Initialize for largest memory size in rx pipe: defip ip4 alpm
+		// Initialize for largest memory size in rx pipe: ip4 fib tcam buckets
 		count := uint32((n_iss_bits_per_bucket / 70) * n_iss_buckets_per_bank * n_iss_banks)
 		t.rx_pipe_regs.rx_buffer.hw_reset_control_1.set(q, rx_pipe_valid|rx_pipe_reset_all|count)
 
