@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package tsc
+package phy
 
 import (
 	"github.com/platinasystems/go/firmware/fe1a"
@@ -14,7 +14,7 @@ import (
 )
 
 type Tscf struct {
-	Tsc
+	Common
 	core_config  uc_core_config_word
 	lane_configs [4]uc_lane_config_word
 }

@@ -10,9 +10,9 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/cpu"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/packet"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/phy"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/port"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/tsc"
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
@@ -45,8 +45,8 @@ func (p *Port) GetPortName() string { return p.HwIf.Name() }
 type portMain struct {
 	port_blocks_100g [n_port_block_100g]port.PortBlock
 	port_blocks_10g  [n_port_block_10g]port.PortBlock
-	phys_100g        [n_port_block_100g]tsc.Tscf
-	phys_10g         [n_port_block_10g]tsc.Tsce
+	phys_100g        [n_port_block_100g]phy.Tscf
+	phys_10g         [n_port_block_10g]phy.Tsce
 	loopbackPorts    [n_pipe]Port
 	cpuPort          Port
 
@@ -227,7 +227,7 @@ func (t *fe1a) addCpuLoopbackPorts() {
 
 func (t *fe1a) PortInit(vn *vnet.Vnet) {
 	port.Init(vn)
-	tsc.Init(vn)
+	phy.Init(vn)
 	t.cliInit()
 
 	c := t.GetSwitchCommon()
@@ -249,8 +249,8 @@ func (t *fe1a) PortInit(vn *vnet.Vnet) {
 			AllLanesMask:    m.LaneMask(0xf),
 		}
 		c.PortBlocks = append(c.PortBlocks, &t.port_blocks_100g[p])
-		t.phys_100g[p] = tsc.Tscf{
-			Tsc: tsc.Tsc{
+		t.phys_100g[p] = phy.Tscf{
+			Common: phy.Common{
 				Switch:    t,
 				PortBlock: &t.port_blocks_100g[p],
 			},
@@ -269,8 +269,8 @@ func (t *fe1a) PortInit(vn *vnet.Vnet) {
 			AllLanesMask:    m.LaneMask(1 << uint(2*p)),
 		}
 		c.PortBlocks = append(c.PortBlocks, &t.port_blocks_10g[p])
-		t.phys_10g[p] = tsc.Tsce{
-			Tsc: tsc.Tsc{
+		t.phys_10g[p] = phy.Tsce{
+			Common: phy.Common{
 				Switch:    t,
 				PortBlock: &t.port_blocks_10g[p],
 			},

@@ -6,8 +6,8 @@ package fe1a
 
 import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/phy"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/tsc"
 
 	"fmt"
 )
@@ -100,7 +100,7 @@ func (mod34 pipe_port_number) mod34_to_pipe(pipe uint) (p pipe_port_number) {
 type physical_port_number uint16
 
 const (
-	n_phys_data_ports       = 32 * tsc.N_lane // each serdes lane can be a physical port.
+	n_phys_data_ports       = 32 * phy.N_lane // each serdes lane can be a physical port.
 	n_phys_management_ports = 2
 )
 

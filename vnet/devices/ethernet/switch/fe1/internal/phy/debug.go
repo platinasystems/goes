@@ -4,7 +4,7 @@
 
 // +build debug
 
-package tsc
+package phy
 
 import (
 	. "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/debug"

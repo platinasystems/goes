@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package tsc
+package phy
 
 import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
@@ -12,7 +12,7 @@ import (
 	"unsafe"
 )
 
-type Tsc struct {
+type Common struct {
 	m.Switch
 	m.PhyCommon
 	m.PhyConfig
@@ -20,26 +20,21 @@ type Tsc struct {
 	req       DmaRequest
 }
 
-func (phy *Tsc) GetPhyCommon() *m.PhyCommon { return &phy.PhyCommon }
-
-func (phy *Tsc) dmaReq() *DmaRequest  { phy.req.Tsc = phy; return &phy.req }
-func (phy *Tscf) dmaReq() *DmaRequest { return phy.Tsc.dmaReq() }
-func (phy *Tsce) dmaReq() *DmaRequest { return phy.Tsc.dmaReq() }
+func (p *Common) GetPhyCommon() *m.PhyCommon { return &p.PhyCommon }
+func (p *Common) dmaReq() *DmaRequest        { p.req.Common = p; return &p.req }
 
 type DmaRequest struct {
 	sbus.DmaRequest
-	*Tsc
+	*Common
 }
 
 func (q *DmaRequest) Do() {
-	s := q.Tsc.Switch.GetSwitchCommon()
+	s := q.Switch.GetSwitchCommon()
 	s.CpuMain.Dma.Do(&q.DmaRequest)
 }
 
-const (
-	// Number of serdes lanes 4 x 25G = 100G
-	N_lane = 4
-)
+// Number of serdes lanes 4 x 25G = 100G
+const N_lane = 4
 
 type reg byte
 type reg32 [2]reg
