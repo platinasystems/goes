@@ -89,7 +89,7 @@ type daemoner interface {
 	mainer
 }
 
-type helper interface {
+type Helper interface {
 	Help(...string) string
 }
 
@@ -119,7 +119,7 @@ type tagger interface {
 	Tag() string
 }
 
-type usager interface {
+type Usager interface {
 	Usage() string
 }
 
@@ -230,18 +230,11 @@ func Main(args ...string) (err error) {
 		"-man", "--man",
 		"-usage", "--usage",
 		"-complete", "--complete")
-	flag.Aka("-h", "-help", "--help", "help")
+	flag.Aka("-h", "-help", "--help")
 	flag.Aka("-apropos", "--apropos")
 	flag.Aka("-complete", "--complete")
 	flag.Aka("-man", "--man")
 	flag.Aka("-usage", "--usage")
-	if name == "help" {
-		if len(args) == 0 {
-			name = "apropos"
-		} else {
-			name = "usage"
-		}
-	}
 	isDaemon := IsDaemon(name)
 	daemonFlagValue := os.Getenv(daemonFlag)
 	defer func() {
@@ -261,6 +254,32 @@ func Main(args ...string) (err error) {
 		err = fmt.Errorf("no commands")
 		return
 	}
+	targs := []string{name}
+	switch {
+	case flag["-h"]:
+		name = "help"
+		if len(args) == 0 {
+			args = append(targs, args...)
+		} else {
+			args = targs
+		}
+	case flag["-apropos"]:
+		args = targs
+		name = "apropos"
+	case flag["-man"]:
+		args = targs
+		name = "man"
+	case flag["-usage"]:
+		args = targs
+		name = "usage"
+	case flag["-complete"]:
+		name = "-complete"
+		if len(args) == 0 {
+			args = append(targs, args...)
+		} else {
+			args = targs
+		}
+	}
 	cmd, err := Find(name)
 	if err != nil {
 		return
@@ -270,119 +289,70 @@ func Main(args ...string) (err error) {
 		err = fmt.Errorf("%s: can't execute", name)
 		return
 	}
-	switch {
-	case flag["-h"]:
-		s := Man[name]
-		if method, found := cmd.(helper); found {
-			s = method.Help(args...)
+	if !isDaemon {
+		err = ms.Main(args...)
+		return
+	}
+	switch daemonFlagValue {
+	case "":
+		c := exec.Command(Prog(), args...)
+		c.Args[0] = name
+		c.Stdin = nil
+		c.Stdout = nil
+		c.Stderr = nil
+		c.Env = []string{
+			"PATH=" + Path(),
+			"TERM=linux",
+			"REDISD=" + os.Getenv("REDISD"),
+			"MACHINED=" + os.Getenv("MACHINED"),
+			daemonFlag + "=child",
 		}
-		if len(s) == 0 {
-			err = fmt.Errorf("%s: has no help", name)
-		} else {
-			fmt.Println(s)
+		c.Dir = "/"
+		c.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+			Pgid:   0,
 		}
-	case flag["-apropos"]:
-		s := Apropos[name]
-		if len(s) == 0 {
-			err = fmt.Errorf("%s: has no apropos", name)
-		} else {
-			fmt.Println(s)
+		err = c.Start()
+	case "child":
+		syscall.Umask(002)
+		pipeOut, waitOut, terr := log.Pipe("info")
+		if terr != nil {
+			err = terr
+			return
 		}
-	case flag["-man"]:
-		s := Man[name]
-		if len(s) == 0 {
-			err = fmt.Errorf("%s: has no man", name)
-		} else {
-			fmt.Println(s)
+		pipeErr, waitErr, terr := log.Pipe("err")
+		if terr != nil {
+			err = terr
+			return
 		}
-	case flag["-usage"]:
-		if s := Usage[name]; len(s) == 0 {
-			err = fmt.Errorf("%s: has no usage", name)
-		} else if strings.IndexRune(s, '\n') >= 0 {
-			fmt.Print("usage:\t", s, "\n")
-		} else {
-			fmt.Println("usage:", s)
+		c := exec.Command(Prog(), args...)
+		c.Args[0] = name
+		c.Stdin = nil
+		c.Stdout = pipeOut
+		c.Stderr = pipeErr
+		c.Env = []string{
+			"PATH=" + Path(),
+			"TERM=linux",
+			daemonFlag + "=grandchild",
 		}
-	case flag["-complete"]:
-		if m, found := cmd.(completer); found {
-			for _, c := range m.Complete(args...) {
-				fmt.Println(c)
-			}
-		} else {
-			pattern := "*"
-			if len(args) > 0 {
-				pattern = args[len(args)-1]
-			}
-			for _, c := range Globs(pattern) {
-				fmt.Println(c)
-			}
+		c.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
+			Pgid:   0,
 		}
-	default:
-		if isDaemon {
-			switch daemonFlagValue {
-			case "":
-				c := exec.Command(Prog(), args...)
-				c.Args[0] = name
-				c.Stdin = nil
-				c.Stdout = nil
-				c.Stderr = nil
-				c.Env = []string{
-					"PATH=" + Path(),
-					"TERM=linux",
-					"REDISD=" + os.Getenv("REDISD"),
-					"MACHINED=" + os.Getenv("MACHINED"),
-					daemonFlag + "=child",
-				}
-				c.Dir = "/"
-				c.SysProcAttr = &syscall.SysProcAttr{
-					Setsid: true,
-					Pgid:   0,
-				}
-				err = c.Start()
-			case "child":
-				syscall.Umask(002)
-				pipeOut, waitOut, terr := log.Pipe("info")
-				if terr != nil {
-					err = terr
-					return
-				}
-				pipeErr, waitErr, terr := log.Pipe("err")
-				if terr != nil {
-					err = terr
-					return
-				}
-				c := exec.Command(Prog(), args...)
-				c.Args[0] = name
-				c.Stdin = nil
-				c.Stdout = pipeOut
-				c.Stderr = pipeErr
-				c.Env = []string{
-					"PATH=" + Path(),
-					"TERM=linux",
-					daemonFlag + "=grandchild",
-				}
-				c.SysProcAttr = &syscall.SysProcAttr{
-					Setsid: true,
-					Pgid:   0,
-				}
-				err = c.Start()
-				<-waitOut
-				<-waitErr
-			case "grandchild":
-				pidfn, terr := pidfile.New()
-				if terr != nil {
-					err = terr
-					return
-				}
-				sigch := make(chan os.Signal)
-				signal.Notify(sigch, syscall.SIGTERM)
-				go terminate(cmd, pidfn, sigch)
-				err = ms.Main(args...)
-				sigch <- syscall.SIGABRT
-			}
-		} else {
-			err = ms.Main(args...)
+		err = c.Start()
+		<-waitOut
+		<-waitErr
+	case "grandchild":
+		pidfn, terr := pidfile.New()
+		if terr != nil {
+			err = terr
+			return
 		}
+		sigch := make(chan os.Signal)
+		signal.Notify(sigch, syscall.SIGTERM)
+		go terminate(cmd, pidfn, sigch)
+		err = ms.Main(args...)
+		sigch <- syscall.SIGABRT
 	}
 	return
 }
@@ -455,7 +425,7 @@ func Plot(cmds ...interface{}) {
 		if method, found := cmd.(tagger); found {
 			Tag[k] = method.Tag()
 		}
-		if method, found := cmd.(usager); found {
+		if method, found := cmd.(Usager); found {
 			Usage[k] = method.Usage()
 		}
 	}

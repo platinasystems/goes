@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/go/commands/builtin/env"
 	"github.com/platinasystems/go/commands/builtin/exit"
 	"github.com/platinasystems/go/commands/builtin/export"
+	"github.com/platinasystems/go/commands/builtin/help"
 	"github.com/platinasystems/go/commands/builtin/man"
 	"github.com/platinasystems/go/commands/builtin/resize"
 	"github.com/platinasystems/go/commands/builtin/show_commands"
@@ -35,6 +36,7 @@ func New() []interface{} {
 		env.New(),
 		exit.New(),
 		export.New(),
+		help.New(),
 		man.New(),
 		resize.New(),
 		show_commands.New(),
