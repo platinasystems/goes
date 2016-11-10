@@ -394,6 +394,7 @@ func (t *fe1a) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	}
 
 	i.rx.rx_l3_interface_profile_index = 0
+	// i.rx.vrf = 0 // fill in with fib index
 	i.tx.outer_vlan.id = m.Vlan(v.SwIf(si).Id(v))
 	i.tx.src_ethernet_address = m.EthernetAddress(port.EthernetAddress())
 
