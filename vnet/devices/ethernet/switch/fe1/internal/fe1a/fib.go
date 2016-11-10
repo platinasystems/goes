@@ -255,7 +255,7 @@ func (m *ip4_fib_main) free(t *fe1a, i uint32) {
 	f[0] = e[0].fib_tcam_tcam_search
 	f[1] = e[1].fib_tcam_tcam_search
 	q := t.getDmaReq()
-	t.rx_pipe_mems.fib_tcam_only[i0].set(q, &f)
+	t.rx_pipe_mems.fib_tcam_tcam_only[i0].set(q, &f)
 	q.Do()
 }
 

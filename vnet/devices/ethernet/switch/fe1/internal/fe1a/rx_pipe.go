@@ -141,14 +141,14 @@ type rx_pipe_regs struct {
 		_                                 [0x4000000 - 0x6800]byte
 	}
 
-	rx_config                      rx_pipe_reg64
-	dos_control_3                  rx_pipe_reg64
-	vlan_control                   rx_pipe_reg32
-	flexible_ipv6_extension_header rx_pipe_reg32
-	multicast_control_1            rx_pipe_reg32
-	ecmp_config                    rx_pipe_reg32
-	latency_control                rx_pipe_reg32
-	module_remapping_control       rx_pipe_portreg32
+	rx_config                     rx_pipe_reg64
+	dos_control_3                 rx_pipe_reg64
+	vlan_control                  rx_pipe_reg32
+	flexible_ip6_extension_header rx_pipe_reg32
+	multicast_control_1           rx_pipe_reg32
+	ecmp_config                   rx_pipe_reg32
+	latency_control               rx_pipe_reg32
+	module_remapping_control      rx_pipe_portreg32
 
 	_ [0x2c000000 - 0x28000800]byte
 
@@ -227,7 +227,7 @@ type rx_pipe_regs struct {
 	rtag7_vxlan_payload_l2_hash_field_bmap  rx_pipe_reg32
 	rtag7_vxlan_payload_l3_hash_field_bmap  rx_pipe_reg32
 	icmp_error_type                         rx_pipe_reg32
-	ipv6_min_fragment_size                  rx_pipe_reg32
+	ip6_min_fragment_size                   rx_pipe_reg32
 	dos_control                             rx_pipe_reg32
 	dos_control_2                           rx_pipe_reg32
 	l2_table_hash_control                   rx_pipe_reg32
@@ -429,7 +429,7 @@ type rx_pipe_mems struct {
 	lport_profile_table [n_pipe_ports + 1]rx_port_table_mem
 	_                   [m.MemMax - (n_pipe_ports + 1)]m.MemElt
 
-	ipv4_in_ipv6_prefix_match m.Mem
+	ip4_in_ip6_prefix_match m.Mem
 
 	vlan_range [256]vlan_range_mem
 	_          [m.MemMax - 256]m.MemElt
@@ -541,7 +541,7 @@ type rx_pipe_mems struct {
 
 	dnat_address_type m.Mem
 
-	ipv6_multicast_reserved_address m.Mem
+	ip6_multicast_reserved_address m.Mem
 
 	l2_hit_da_only m.Mem
 	l2_hit_sa_only m.Mem
@@ -556,15 +556,15 @@ type rx_pipe_mems struct {
 	l2_entry_tile      m.Mem
 	l2_entry_only_tile m.Mem
 
-	l3_entry_only         m.Mem
-	l3_entry_ipv4_unicast struct {
-		dedicated [n_iss_banks][512][n_iss_bits_per_bucket / 105]l3_ipv4_entry_mem
-		shared    [n_iss_banks][n_iss_buckets_per_bank][n_iss_bits_per_bucket / 105]l3_ipv4_entry_mem
+	l3_entry_only        m.Mem
+	l3_entry_ip4_unicast struct {
+		dedicated [n_iss_banks][512][n_iss_bits_per_bucket / 105]l3_ip4_entry_mem
+		shared    [n_iss_banks][n_iss_buckets_per_bank][n_iss_bits_per_bucket / 105]l3_ip4_entry_mem
 		_         [m.MemMax - n_iss_banks*(512+n_iss_buckets_per_bank)*(n_iss_bits_per_bucket/105)]m.MemElt
 	}
-	l3_entry_ipv4_multicast m.Mem
-	l3_entry_ipv6_unicast   m.Mem
-	l3_entry_ipv6_multicast m.Mem
+	l3_entry_ip4_multicast m.Mem
+	l3_entry_ip6_unicast   m.Mem
+	l3_entry_ip6_multicast m.Mem
 
 	active_l3_interface_profile m.Mem
 
@@ -630,35 +630,35 @@ type rx_pipe_mems struct {
 	fib_tcam [n_fib_tcam_entries]fib_tcam_mem
 	_        [m.MemMax - n_fib_tcam_entries]m.MemElt
 
-	fib_tcam_only [n_fib_tcam_entries]fib_tcam_tcam_only_mem
-	_             [m.MemMax - n_fib_tcam_entries]m.MemElt
+	fib_tcam_tcam_only [n_fib_tcam_entries]fib_tcam_tcam_only_mem
+	_                  [m.MemMax - n_fib_tcam_entries]m.MemElt
 
 	fib_tcam_data_only [n_fib_tcam_entries]fib_tcam_tcam_data_only_mem
 	_                  [m.MemMax - n_fib_tcam_entries]m.MemElt
 
-	fib_tcam_pair_128 [n_fib_tcam_entries / 2]fib_tcam_pair_mem
-	_                 [m.MemMax - n_fib_tcam_entries/2]m.MemElt
+	fib_tcam_dual [n_fib_tcam_entries / 2]fib_tcam_pair_mem
+	_             [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	fib_tcam_pair_128_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_only_mem
-	_                      [m.MemMax - n_fib_tcam_entries/2]m.MemElt
+	fib_tcam_dual_tcam_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_only_mem
+	_                       [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	fib_tcam_pair_128_data_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_data_only_mem
-	_                           [m.MemMax - n_fib_tcam_entries/2]m.MemElt
+	fib_tcam_dual_data_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_data_only_mem
+	_                       [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	fib_tcam_bucket_ipv4 [n_iss_bits_per_bucket / 70][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip4_mem
-	_                    [m.MemMax - (n_iss_bits_per_bucket/70)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_6_entry_buckets [n_iss_bits_per_bucket / 70][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_6_entry_bucket_mem
+	_                        [m.MemMax - (n_iss_bits_per_bucket/70)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	fib_tcam_bucket_ipv4_with_pipe_counters [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip4_with_pipe_counter_mem
-	_                                       [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_4_ip4_entry_buckets [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_4_ip4_entry_bucket_mem
+	_                            [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	fib_tcam_bucket_ipv6_64 [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_mem
-	_                       [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_4_ip6_entry_buckets [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_mem
+	_                            [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	fib_tcam_bucket_ipv6_64_with_pipe_counters [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_with_pipe_counter_mem
-	_                                          [m.MemMax - (n_iss_bits_per_bucket/140)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_3_ip6_entry_buckets [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_with_pipe_counter_mem
+	_                                   [m.MemMax - (n_iss_bits_per_bucket/140)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
-	fib_tcam_bucket_ipv6_128 [n_iss_bits_per_bucket / 210][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_128_mem
-	_                        [m.MemMax - (n_iss_bits_per_bucket/210)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_2_ip6_entry_buckets [n_iss_bits_per_bucket / 210][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_128_mem
+	_                                   [m.MemMax - (n_iss_bits_per_bucket/210)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
 
 	fib_tcam_bucket_raw        m.Mem
 	fib_tcam_aux_table         m.Mem

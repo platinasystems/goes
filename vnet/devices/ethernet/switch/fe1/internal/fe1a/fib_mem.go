@@ -534,7 +534,7 @@ func (e *fib_tcam_bucket_common) memGetSet(b []uint32, isSet bool, dst []m.Ip4Ad
 	}
 }
 
-type fib_tcam_bucket_ip4_entry struct {
+type fib_tcam_6_entry_bucket_entry struct {
 	fib_tcam_bucket_common
 
 	was_hit bool
@@ -543,8 +543,8 @@ type fib_tcam_bucket_ip4_entry struct {
 	dst m.Ip4Address
 }
 
-func (e *fib_tcam_bucket_ip4_entry) MemBits() int { return 71 }
-func (e *fib_tcam_bucket_ip4_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_6_entry_bucket_entry) MemBits() int { return 71 }
+func (e *fib_tcam_6_entry_bucket_entry) MemGetSet(b []uint32, isSet bool) {
 	var tmp [1]m.Ip4Address
 	if isSet {
 		tmp[0] = e.dst
@@ -556,22 +556,22 @@ func (e *fib_tcam_bucket_ip4_entry) MemGetSet(b []uint32, isSet bool) {
 	m.MemGetSet1(&e.was_hit, b, 70, isSet)
 }
 
-type fib_tcam_bucket_ip4_mem m.MemElt
+type fib_tcam_6_entry_bucket_mem m.MemElt
 
-func (r *fib_tcam_bucket_ip4_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip4_entry, t sbus.AccessType) {
+func (r *fib_tcam_6_entry_bucket_mem) geta(q *DmaRequest, v *fib_tcam_6_entry_bucket_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *fib_tcam_bucket_ip4_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip4_entry, t sbus.AccessType) {
+func (r *fib_tcam_6_entry_bucket_mem) seta(q *DmaRequest, v *fib_tcam_6_entry_bucket_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *fib_tcam_bucket_ip4_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip4_entry) {
+func (r *fib_tcam_6_entry_bucket_mem) get(q *DmaRequest, v *fib_tcam_6_entry_bucket_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *fib_tcam_bucket_ip4_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip4_entry) {
+func (r *fib_tcam_6_entry_bucket_mem) set(q *DmaRequest, v *fib_tcam_6_entry_bucket_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type fib_tcam_bucket_ip4_with_pipe_counter_entry struct {
+type fib_tcam_4_ip4_entry_bucket_entry struct {
 	fib_tcam_bucket_common
 
 	was_hit bool
@@ -582,8 +582,8 @@ type fib_tcam_bucket_ip4_with_pipe_counter_entry struct {
 	dst m.Ip4Address
 }
 
-func (e *fib_tcam_bucket_ip4_with_pipe_counter_entry) MemBits() int { return 106 }
-func (e *fib_tcam_bucket_ip4_with_pipe_counter_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *fib_tcam_4_ip4_entry_bucket_entry) MemBits() int { return 106 }
+func (e *fib_tcam_4_ip4_entry_bucket_entry) MemGetSet(b []uint32, isSet bool) {
 	var tmp [1]m.Ip4Address
 	if isSet {
 		tmp[0] = e.dst
@@ -595,18 +595,18 @@ func (e *fib_tcam_bucket_ip4_with_pipe_counter_entry) MemGetSet(b []uint32, isSe
 	m.MemGetSet1(&e.was_hit, b, 105, isSet)
 }
 
-type fib_tcam_bucket_ip4_with_pipe_counter_mem m.MemElt
+type fib_tcam_4_ip4_entry_bucket_mem m.MemElt
 
-func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) geta(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry, t sbus.AccessType) {
+func (r *fib_tcam_4_ip4_entry_bucket_mem) geta(q *DmaRequest, v *fib_tcam_4_ip4_entry_bucket_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) seta(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry, t sbus.AccessType) {
+func (r *fib_tcam_4_ip4_entry_bucket_mem) seta(q *DmaRequest, v *fib_tcam_4_ip4_entry_bucket_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) get(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry) {
+func (r *fib_tcam_4_ip4_entry_bucket_mem) get(q *DmaRequest, v *fib_tcam_4_ip4_entry_bucket_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *fib_tcam_bucket_ip4_with_pipe_counter_mem) set(q *DmaRequest, v *fib_tcam_bucket_ip4_with_pipe_counter_entry) {
+func (r *fib_tcam_4_ip4_entry_bucket_mem) set(q *DmaRequest, v *fib_tcam_4_ip4_entry_bucket_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
@@ -729,7 +729,7 @@ type l3_entry_data struct {
 	index uint32
 }
 
-type l3_ipv4_entry struct {
+type l3_ip4_entry struct {
 	key_type l3_entry_key_type
 	valid    bool
 	l3_entry_data
@@ -737,9 +737,9 @@ type l3_ipv4_entry struct {
 	m.Ip4Address
 }
 
-func (e *l3_ipv4_entry) MemBits() int { return 106 }
+func (e *l3_ip4_entry) MemBits() int { return 106 }
 
-func (e *l3_ipv4_entry) MemGetSet(b []uint32, isSet bool) {
+func (e *l3_ip4_entry) MemGetSet(b []uint32, isSet bool) {
 	i := 1 // skip parity bit
 	i = m.MemGetSet1(&e.valid, b, i, isSet)
 	i = m.MemGetSetUint8((*uint8)(&e.key_type), b, i+4, i, isSet)
@@ -757,16 +757,16 @@ func (e *l3_ipv4_entry) MemGetSet(b []uint32, isSet bool) {
 	}
 }
 
-type l3_ipv4_entry_mem m.MemElt
+type l3_ip4_entry_mem m.MemElt
 
-func (r *l3_ipv4_entry_mem) geta(q *DmaRequest, v *l3_ipv4_entry, t sbus.AccessType) {
+func (r *l3_ip4_entry_mem) geta(q *DmaRequest, v *l3_ip4_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_ipv4_entry_mem) seta(q *DmaRequest, v *l3_ipv4_entry, t sbus.AccessType) {
+func (r *l3_ip4_entry_mem) seta(q *DmaRequest, v *l3_ip4_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *l3_ipv4_entry_mem) get(q *DmaRequest, v *l3_ipv4_entry) { r.geta(q, v, sbus.Duplicate) }
-func (r *l3_ipv4_entry_mem) set(q *DmaRequest, v *l3_ipv4_entry) { r.seta(q, v, sbus.Duplicate) }
+func (r *l3_ip4_entry_mem) get(q *DmaRequest, v *l3_ip4_entry) { r.geta(q, v, sbus.Duplicate) }
+func (r *l3_ip4_entry_mem) set(q *DmaRequest, v *l3_ip4_entry) { r.seta(q, v, sbus.Duplicate) }
 
 func (t *fe1a) iss_init() {
 	r := t.rx_pipe_regs
