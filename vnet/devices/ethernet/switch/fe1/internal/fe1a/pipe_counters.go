@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/pipemem"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 
+	"math/rand"
 	"sync"
 )
 
@@ -59,11 +60,9 @@ type pipe_counter_4pool_control struct {
 
 	packet_attribute_selector_key [4]rx_tx_pipe_reg64
 
-	eviction_control [4]rx_tx_pipe_reg32
-
-	eviction_lfsr_seed [4]rx_tx_pipe_reg64
-
-	eviction_threshold [4]rx_tx_pipe_reg64
+	eviction_control   [4]eviction_control_reg
+	eviction_lfsr_seed [4]eviction_seed_reg
+	eviction_threshold [4]eviction_threshold_reg
 
 	_ [0x80 - 0x14]rx_tx_pipe_reg32
 
@@ -74,14 +73,60 @@ type pipe_counter_4pool_control struct {
 
 type pipe_counter_1pool_control struct {
 	control            rx_tx_pipe_reg32
-	eviction_control   rx_tx_pipe_reg32
-	eviction_threshold rx_tx_pipe_reg64
-	eviction_seed      rx_tx_pipe_reg64
+	eviction_control   eviction_control_reg
+	eviction_threshold eviction_threshold_reg
+	eviction_seed      eviction_seed_reg
 }
 
-const (
-	n_pipe_counter_mode = 4 // 2 bits of mode
-)
+type pipe_counter_config struct {
+	q                      *DmaRequest
+	is_clear_on_read       bool
+	eviction_threshold     vnet.CombinedCounter
+	random_eviction_enable bool
+}
+
+func (r *pipe_counter_1pool_control) enable(t *fe1a, c pipe_counter_config) {
+}
+
+type eviction_control_reg rx_tx_pipe_reg32
+
+func (r *eviction_control_reg) set(c pipe_counter_config, b sbus.Block, pipe uint, memory_id int) {
+	mode := 2
+	if c.random_eviction_enable {
+		mode = 1
+	}
+	v := uint32(mode << 8)
+	v |= uint32(memory_id) | uint32(pipe)<<6
+	(*rx_tx_pipe_reg32)(r).seta(c.q, b, sbus.Unique(pipe), v)
+}
+
+type eviction_threshold_reg rx_tx_pipe_reg64
+
+func (r *eviction_threshold_reg) set(c pipe_counter_config, b sbus.Block, pipe uint) {
+	v := c.eviction_threshold.Packets | c.eviction_threshold.Bytes<<26
+	(*rx_tx_pipe_reg64)(r).seta(c.q, b, sbus.Unique(pipe), v)
+}
+
+type eviction_seed_reg rx_tx_pipe_reg64
+
+func (r *eviction_seed_reg) set(c pipe_counter_config, b sbus.Block, pipe uint) {
+	v := uint64(rand.Int())
+	(*rx_tx_pipe_reg64)(r).seta(c.q, b, sbus.Unique(pipe), v)
+}
+
+func (r *pipe_counter_1pool_control) set(c pipe_counter_config, b sbus.Block, pipe uint, memory_id int) {
+	r.eviction_control.set(c, b, pipe, memory_id)
+	r.eviction_threshold.set(c, b, pipe)
+	r.eviction_seed.set(c, b, pipe)
+}
+
+func (r *pipe_counter_4pool_control) set(c pipe_counter_config, b sbus.Block, pipe uint, memory_id, i int) {
+	r.eviction_control[i].set(c, b, pipe, memory_id)
+	r.eviction_threshold[i].set(c, b, pipe)
+	r.eviction_lfsr_seed[i].set(c, b, pipe)
+}
+
+const n_pipe_counter_mode = 4 // 2 bits of mode
 
 type pipe_counter_4pool_mems struct {
 	pool_offset_tables [4]struct {
@@ -159,59 +204,42 @@ func (t *fe1a) pipe_counter_init() {
 		fm.tx_pipe.pools[i].Init(n_tx_pipe, max_len)
 	}
 
-	// Enable threshold based eviction.
-	{
-		const (
-			counter_mode uint32 = 2 << 8 // threshold based eviction
-		)
-
-		maxPackets := uint64(1) << 26
-		maxBytes := uint64(1) << 34
-		nPackets := maxPackets * 3 / 4
-		nBytes := maxBytes * 3 / 4
-		eviction_threshold := nPackets<<0 | nBytes<<26
-
-		for pipe := uint(0); pipe < n_pipe; pipe++ {
-			v := counter_mode | (uint32(pipe) << 6)
-
-			// RxPipe counters.
-			mem_id := pipe_counter_memory_id_pool_rx_pipe
-			for i := range t.rx_pipe_regs.pipe_counter {
-				for j := range t.rx_pipe_regs.pipe_counter[i].eviction_control {
-					t.rx_pipe_regs.pipe_counter[i].eviction_control[j].seta(q, BlockRxPipe, sbus.Unique(pipe),
-						v|uint32(mem_id))
-					t.rx_pipe_regs.pipe_counter[i].eviction_threshold[j].seta(q, BlockRxPipe, sbus.Unique(pipe),
-						eviction_threshold)
-					mem_id++
-				}
-			}
-
-			// Tx_pipe counters.
-			t.tx_pipe_regs.perq_counter.eviction_control.seta(q, BlockTxPipe, sbus.Unique(pipe),
-				v|pipe_counter_memory_id_tx_pipe_perq_pool)
-			t.tx_pipe_regs.perq_counter.eviction_threshold.seta(q, BlockTxPipe, sbus.Unique(pipe),
-				eviction_threshold)
-			t.tx_pipe_regs.txf_counter.eviction_control.seta(q, BlockTxPipe, sbus.Unique(pipe),
-				v|pipe_counter_memory_id_tx_pipe_txf_pool)
-			t.tx_pipe_regs.txf_counter.eviction_threshold.seta(q, BlockTxPipe, sbus.Unique(pipe),
-				eviction_threshold)
-			for i := range t.tx_pipe_regs.pipe_counter.eviction_control {
-				t.tx_pipe_regs.pipe_counter.eviction_control[i].seta(q, BlockTxPipe, sbus.Unique(pipe),
-					v|(pipe_counter_memory_id_pool_tx_pipe+uint32(i)))
-				t.tx_pipe_regs.pipe_counter.eviction_threshold[i].seta(q, BlockTxPipe, sbus.Unique(pipe),
-					eviction_threshold)
-			}
-		}
-		q.Do()
-	}
-
-	t.pipe_counter_fifo_dma_start()
-
 	// Enable central eviction fifo.
 	{
 		v := uint32(1 << 0) // enable bit
 		v |= uint32(n_pipe_counter_memory_id << 1)
 		t.rx_pipe_regs.pipe_counter_eviction_control.set(q, v)
+		q.Do()
+	}
+
+	// Enable threshold based eviction.
+	{
+		c := pipe_counter_config{
+			q: q,
+			random_eviction_enable: false,
+			eviction_threshold: vnet.CombinedCounter{
+				Packets: (1 << 26) / 2, // 26 bits
+				Bytes:   (1 << 34) / 2, // 34 bits
+			},
+		}
+
+		for pipe := uint(0); pipe < n_pipe; pipe++ {
+			// Rx pipe counters.
+			mem_id := pipe_counter_memory_id_pool_rx_pipe
+			for i := range t.rx_pipe_regs.pipe_counter {
+				for j := range t.rx_pipe_regs.pipe_counter[i].eviction_control {
+					t.rx_pipe_regs.pipe_counter[i].set(c, BlockRxPipe, pipe, mem_id, j)
+					mem_id++
+				}
+			}
+
+			// Tx pipe counters.
+			t.tx_pipe_regs.perq_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_tx_pipe_perq_pool)
+			t.tx_pipe_regs.txf_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_tx_pipe_txf_pool)
+			for i := range t.tx_pipe_regs.pipe_counter.eviction_control {
+				t.tx_pipe_regs.pipe_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_pool_tx_pipe+i, i)
+			}
+		}
 		q.Do()
 	}
 
@@ -230,6 +258,8 @@ func (t *fe1a) pipe_counter_init() {
 		}
 		q.Do()
 	}
+
+	t.pipe_counter_fifo_dma_start()
 }
 
 func (t *fe1a) pipe_counter_init_offset_table(b sbus.Block, pool uint) {
