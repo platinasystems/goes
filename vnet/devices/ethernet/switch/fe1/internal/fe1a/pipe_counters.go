@@ -133,7 +133,7 @@ const (
 	pipe_counter_memory_id_pool_rx_pipe      = 1
 	pipe_counter_memory_id_pool_tx_pipe      = pipe_counter_memory_id_pool_rx_pipe + n_pipe_counter_pool_rx_pipe
 	pipe_counter_memory_id_tx_pipe_perq_pool = pipe_counter_memory_id_pool_tx_pipe + n_pipe_counter_pool_tx_pipe
-	pipe_counter_memory_id_tx_pipe_efp_pool  = pipe_counter_memory_id_tx_pipe_perq_pool + 1
+	pipe_counter_memory_id_tx_pipe_txf_pool  = pipe_counter_memory_id_tx_pipe_perq_pool + 1
 	n_pipe_counter_memory_id                 = 26
 )
 
@@ -142,7 +142,7 @@ func (t *fe1a) pipe_counter_init() {
 	fm := &t.pipe_counter_main
 
 	fm.rx_pipe.pools = make([]pipe_counter_pool, n_pipe_counter_pool_rx_pipe)
-	fm.tx_pipe.pools = make([]pipe_counter_pool, n_pipe_counter_pool_tx_pipe+1) // 1 extra for efp
+	fm.tx_pipe.pools = make([]pipe_counter_pool, n_pipe_counter_pool_tx_pipe+1) // 1 extra for txf
 
 	for i := range fm.rx_pipe.pools {
 		max_len := uint(4096)
@@ -191,9 +191,9 @@ func (t *fe1a) pipe_counter_init() {
 				v|pipe_counter_memory_id_tx_pipe_perq_pool)
 			t.tx_pipe_regs.perq_counter.eviction_threshold.seta(q, BlockTxPipe, sbus.Unique(pipe),
 				eviction_threshold)
-			t.tx_pipe_regs.efp_counter.eviction_control.seta(q, BlockTxPipe, sbus.Unique(pipe),
-				v|pipe_counter_memory_id_tx_pipe_efp_pool)
-			t.tx_pipe_regs.efp_counter.eviction_threshold.seta(q, BlockTxPipe, sbus.Unique(pipe),
+			t.tx_pipe_regs.txf_counter.eviction_control.seta(q, BlockTxPipe, sbus.Unique(pipe),
+				v|pipe_counter_memory_id_tx_pipe_txf_pool)
+			t.tx_pipe_regs.txf_counter.eviction_threshold.seta(q, BlockTxPipe, sbus.Unique(pipe),
 				eviction_threshold)
 			for i := range t.tx_pipe_regs.pipe_counter.eviction_control {
 				t.tx_pipe_regs.pipe_counter.eviction_control[i].seta(q, BlockTxPipe, sbus.Unique(pipe),
@@ -219,7 +219,7 @@ func (t *fe1a) pipe_counter_init() {
 	{
 		const v uint32 = pipe_counter_control_enable | pipe_counter_control_clear_on_read
 		t.tx_pipe_regs.perq_counter.control.set(q, BlockTxPipe, v)
-		t.tx_pipe_regs.efp_counter.control.set(q, BlockTxPipe, v)
+		t.tx_pipe_regs.txf_counter.control.set(q, BlockTxPipe, v)
 		for i := range t.tx_pipe_regs.pipe_counter.control {
 			t.tx_pipe_regs.pipe_counter.control[i].set(q, BlockTxPipe, v)
 		}
@@ -414,7 +414,7 @@ func (x *pipe_counter_ref_entry) update_value(t *fe1a, pipe uint, b sbus.Block) 
 		if x.pool < n_pipe_counter_pool_tx_pipe {
 			t.tx_pipe_mems.pipe_counter.pool_counters[x.pool][x.index].geta(q, BlockTxPipe, pipe, &c.dma_value)
 		} else {
-			t.tx_pipe_mems.efp_counter_table[x.index].geta(q, pipe, &c.dma_value)
+			t.tx_pipe_mems.txf_counter_table[x.index].geta(q, pipe, &c.dma_value)
 		}
 	} else {
 		p0, p1 := x.pool/4, x.pool%4
@@ -458,7 +458,7 @@ func (t *fe1a) update_pool_counter_values(poolIndex uint, b sbus.Block) {
 			if poolIndex < n_pipe_counter_pool_tx_pipe {
 				t.tx_pipe_mems.pipe_counter.pool_counters[poolIndex][index].geta(q, BlockTxPipe, pipe, &c.dma_value)
 			} else {
-				t.tx_pipe_mems.efp_counter_table[index].geta(q, pipe, &c.dma_value)
+				t.tx_pipe_mems.txf_counter_table[index].geta(q, pipe, &c.dma_value)
 			}
 		} else {
 			if p0 < 3 {
@@ -624,7 +624,7 @@ func (t *fe1a) decode_eviction_fifo(b []uint32) {
 		switch mi {
 		case pipe_counter_memory_id_tx_pipe_perq_pool:
 			e.tx_pipe_perq(t)
-		case pipe_counter_memory_id_tx_pipe_efp_pool:
+		case pipe_counter_memory_id_tx_pipe_txf_pool:
 			pm := &t.pipe_counter_main.tx_pipe
 			e.pool(pm, n_pipe_counter_pool_tx_pipe)
 		default:

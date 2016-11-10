@@ -151,16 +151,16 @@ type tx_pipe_regs struct {
 	ieee_1588_parsing_control     tx_pipe_reg32
 	_                             [0x20000000 - 0x1c000600]byte
 
-	efp_slice_control        tx_pipe_reg32
-	efp_meter_control        tx_pipe_reg32
-	efp_slice_map            tx_pipe_reg32
-	efp_class_id_selector    tx_pipe_reg32
-	efp_key4_dvp_selector    tx_pipe_reg32
-	efp_key4_mdl_selector    tx_pipe_reg32
+	txf_slice_control        tx_pipe_reg32
+	txf_meter_control        tx_pipe_reg32
+	txf_slice_map            tx_pipe_reg32
+	txf_class_id_selector    tx_pipe_reg32
+	txf_key4_dvp_selector    tx_pipe_reg32
+	txf_key4_mdl_selector    tx_pipe_reg32
 	ieee_1588_egress_control tx_pipe_portreg32
 	ieee_1588_link_delay_64  tx_pipe_portreg64
 	_                        [0x13 - 0x08]tx_pipe_reg32
-	efp_key8_dvp_selector    tx_pipe_reg32
+	txf_key8_dvp_selector    tx_pipe_reg32
 	_                        [0x24000000 - 0x20001400]byte
 
 	event_debug                            tx_pipe_reg32
@@ -174,7 +174,7 @@ type tx_pipe_regs struct {
 	device_to_physical_port_number_mapping tx_pipe_portreg32
 	_                                      [0x50 - 0x42]tx_pipe_reg32
 	mmu_max_cell_credit                    tx_pipe_portreg32
-	perq_counter, efp_counter              pipe_counter_1pool_control
+	perq_counter, txf_counter              pipe_counter_1pool_control
 	_                                      [0x113 - 0x59]tx_pipe_reg32
 	edb_misc_control                       tx_pipe_reg32
 	_                                      [0x400 - 0x114]tx_pipe_reg32
@@ -336,11 +336,11 @@ type tx_pipe_mems struct {
 
 	_ [0x20000000 - 0x1c040000]byte
 
-	efp_tcam m.Mem
+	txf_tcam m.Mem
 
-	efp_policy_table m.Mem
+	txf_policy_table m.Mem
 
-	efp_meter_table m.Mem
+	txf_meter_table m.Mem
 
 	l2_mpls_pseudo_wire_sequence_numbers m.Mem
 
@@ -366,7 +366,7 @@ type tx_pipe_mems struct {
 
 	_ [0x28000000 - 0x24280000]byte
 
-	efp_counter_table [1024]tx_pipe_pipe_counter_mem
+	txf_counter_table [1024]tx_pipe_pipe_counter_mem
 	_                 [m.MemMax - 1024]m.MemElt
 
 	_ [1]m.Mem

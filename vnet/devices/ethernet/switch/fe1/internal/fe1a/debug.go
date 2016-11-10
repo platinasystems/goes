@@ -90,7 +90,7 @@ func init() {
 	check("tunnel_pimdr", unsafe.Pointer(&r.tunnel_pimdr), 0x14000000)
 	check("multicast_control_1", unsafe.Pointer(&r.multicast_control_1), 0x18000000)
 	check("wesp_proto_control", unsafe.Pointer(&r.wesp_proto_control), 0x1c000000)
-	check("efp_slice_control", unsafe.Pointer(&r.efp_slice_control), 0x20000000)
+	check("txf_slice_control", unsafe.Pointer(&r.txf_slice_control), 0x20000000)
 	check("event_debug", unsafe.Pointer(&r.event_debug), 0x24000000)
 	check("counters", unsafe.Pointer(&r.counters), 0x28000000)
 	check("pipe_counters", unsafe.Pointer(&r.pipe_counter), 0x28040000)
@@ -102,7 +102,7 @@ func init() {
 	check("mpls_exp_pri_mapping", unsafe.Pointer(&m.mpls_exp_pri_mapping), 0x10000000)
 	check("trill_parse_control_2", unsafe.Pointer(&m.trill_parse_control_2), 0x1c000000)
 	check("pipe_counter_maps.packet_resolution", unsafe.Pointer(&m.pipe_counter_maps.packet_resolution), 0x24080000)
-	check("efp_counter_table", unsafe.Pointer(&m.efp_counter_table), 0x28000000)
+	check("txf_counter_table", unsafe.Pointer(&m.txf_counter_table), 0x28000000)
 	check("port_enable", unsafe.Pointer(&m.port_enable), 0x28200000)
 	check("pipe_counter", unsafe.Pointer(&m.pipe_counter), 0x2a800000)
 }

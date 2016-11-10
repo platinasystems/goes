@@ -13,7 +13,7 @@ import (
 )
 
 // Global physical port (GPP) number (used in multiple module stack).
-// Used to match in VFP/IFP/EFP.
+// Used to match in feature lookup.
 type global_physical_port_number uint16
 
 const (

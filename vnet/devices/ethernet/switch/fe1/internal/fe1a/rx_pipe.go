@@ -186,10 +186,10 @@ type rx_pipe_regs struct {
 
 	niv_config                      rx_pipe_reg32
 	vlan_translate_hash_control     rx_pipe_reg32
-	vfp_slice_control               rx_pipe_reg32
-	vfp_key_control_1               rx_pipe_reg32
-	vfp_key_control_2               rx_pipe_reg32
-	vfp_slice_map                   rx_pipe_reg32
+	rxv_slice_control               rx_pipe_reg32
+	rxv_key_control_1               rx_pipe_reg32
+	rxv_key_control_2               rx_pipe_reg32
+	rxv_slice_map                   rx_pipe_reg32
 	mpls_entry_hash_control         rx_pipe_reg32
 	etag_multicast_range            rx_pipe_reg32
 	hash_config_0                   rx_pipe_reg32
@@ -459,8 +459,8 @@ type rx_pipe_mems struct {
 
 	vlan_translate m.Mem
 
-	vfp_tcam         m.Mem
-	vfp_policy_table m.Mem
+	rxv_tcam         m.Mem
+	rxv_policy_table m.Mem
 
 	vlan_tag_action_profile [n_vlan_tag_action_profile_entries]rx_vlan_tag_action_mem
 	_                       [m.MemMax - n_vlan_tag_action_profile_entries]m.MemElt
@@ -528,7 +528,7 @@ type rx_pipe_mems struct {
 
 	ing_outer_dot1p_mapping_table m.Mem
 
-	vfp_hash_field_bmap_table [2]m.Mem
+	rxv_hash_field_bitmap_table [2]m.Mem
 
 	gtp_port_table m.Mem
 

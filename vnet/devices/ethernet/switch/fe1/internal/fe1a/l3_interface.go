@@ -192,7 +192,7 @@ type tx_l3_interface_entry struct {
 	// 0 => nop, 1 => set from ip_dscp field, 2 => use mapping_pointer
 	ip_dscp_select uint8
 
-	efp_class_id uint16
+	txf_class_id uint16
 
 	// Indicates if the packet needs to be:
 	// only L2 Switched and only L2 modifications needs to be done
@@ -227,7 +227,7 @@ func (e *tx_l3_interface_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSetUint8(&e.ip_dscp_select, b, i+1, i, isSet)
 	i = m.MemGetSetUint8(&e.inner_vlan_present_action, b, i+1, i, isSet)
 	i = m.MemGetSet1(&e.inner_vlan_absent_add, b, i, isSet)
-	i = m.MemGetSetUint16(&e.efp_class_id, b, i+11, i, isSet)
+	i = m.MemGetSetUint16(&e.txf_class_id, b, i+11, i, isSet)
 }
 
 type tx_l3_interface_mem m.MemElt

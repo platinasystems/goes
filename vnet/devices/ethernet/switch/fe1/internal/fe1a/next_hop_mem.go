@@ -138,7 +138,7 @@ type l3_unicast_tx_next_hop struct {
 	etag_de  bool
 	etag_pcp uint8
 
-	efp_class_id uint8
+	txf_class_id uint8
 
 	dst_ethernet_address m.EthernetAddress
 
@@ -182,7 +182,7 @@ func (e *l3_unicast_tx_next_hop) MemGetSet(b []uint32, i int, isSet bool) {
 	i = m.MemGetSet1(&e.vntag_p_bit, b, i, isSet)
 	i = m.MemGetSet1(&e.vntag_force_l_bit, b, i, isSet)
 	i = m.MemGetSet1(&e.disable_src_ethernet_address_rewrite, b, i, isSet)
-	i = m.MemGetSetUint8(&e.efp_class_id, b, i+6, i, isSet)
+	i = m.MemGetSetUint8(&e.txf_class_id, b, i+6, i, isSet)
 
 	if i != 135 {
 		panic("135")

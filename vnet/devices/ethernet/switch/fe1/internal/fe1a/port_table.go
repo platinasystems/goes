@@ -222,7 +222,7 @@ type rx_port_table_entry struct {
 	ecmp_random_bit_offset           [2]uint8
 	trunk_random_bit_offset          uint8
 
-	// IFP section
+	// RXF section
 	// IPBM valid values: 0-33
 	port_ipbm_index uint8
 	rxf_class_id    uint8
@@ -231,7 +231,7 @@ type rx_port_table_entry struct {
 
 	enable_rxf bool
 	enable_vfp bool
-	enable_efp bool
+	enable_txf bool
 
 	//   0 == Use port_group_id from SOURCE_TRUNK_MAP table for VFP key.
 	//   1 == Use port_group_id from LPORT table for VFP key.
@@ -501,8 +501,8 @@ type tx_port_table_entry struct {
 	vlan_xlate_port_group_id uint8
 	cntag_delete_pri_bitmap  uint8
 
-	efp_port_group_id uint8
-	efp_enable        bool
+	txf_port_group_id uint8
+	txf_enable        bool
 
 	preserve_cpu_tag bool
 
@@ -541,10 +541,10 @@ func (e *tx_port_table_entry) MemGetSet(b []uint32, isSet bool) {
 	i = m.MemGetSet1(&e.preserve_cpu_tag, b, i, isSet)
 	i = m.MemGetSet1(&e.hi_gig_change_src_modid, b, i, isSet)
 	i = m.MemGetSetUint8((*uint8)(&e.hi_gig_src_modid), b, i+7, i, isSet)
-	i = m.MemGetSetUint8((*uint8)(&e.efp_port_group_id), b, i+7, i, isSet)
+	i = m.MemGetSetUint8((*uint8)(&e.txf_port_group_id), b, i+7, i, isSet)
 	i = m.MemGetSetUint8((*uint8)(&e.vlan_xlate_port_group_id), b, i+7, i, isSet)
 	i = m.MemGetSet1(&e.hi_gig_dual_modid_enable, b, i, isSet)
-	i = m.MemGetSet1(&e.efp_enable, b, i, isSet)
+	i = m.MemGetSet1(&e.txf_enable, b, i, isSet)
 	i = 49 // skip reserved bits
 	i = m.MemGetSetUint8((*uint8)(&e.cntag_delete_pri_bitmap), b, i+7, i, isSet)
 	i = 59

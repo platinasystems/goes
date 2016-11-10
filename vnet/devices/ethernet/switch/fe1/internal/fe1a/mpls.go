@@ -39,7 +39,7 @@ type mpls_tx_next_hop struct {
 	// VC_AND_SWAP_INDEX or PW_INIT_NUM table index
 	index uint16
 
-	efp_class_id uint16
+	txf_class_id uint16
 
 	dst_virtual_port_broadcast_drop_enable         bool
 	dst_virtual_port_unknown_unicast_drop_enable   bool
@@ -72,7 +72,7 @@ func (e *mpls_tx_next_hop) MemGetSet(b []uint32, i int, isSet bool) {
 	i = m.MemGetSetUint16(&e.index, b, i+13, i, isSet)
 	i = m.MemGetSetUint16(&e.mac_da_profile_index, b, i+8, i, isSet)
 	i = m.MemGetSet1(&e.dst_virtual_port_broadcast_drop_enable, b, i, isSet)
-	i = m.MemGetSetUint16(&e.efp_class_id, b, i+11, i, isSet)
+	i = m.MemGetSetUint16(&e.txf_class_id, b, i+11, i, isSet)
 	i = 98
 	i = m.MemGetSet1(&e.dst_virtual_port_unknown_multicast_drop_enable, b, i, isSet)
 	i = m.MemGetSet1(&e.dst_virtual_port_unknown_unicast_drop_enable, b, i, isSet)
