@@ -403,6 +403,7 @@ func (x *pipe_counter_ref_entry) get_value(t *fe1a, b sbus.Block) (v vnet.Combin
 	return
 }
 
+// NB: does not sync eviction fifo.
 func (x *pipe_counter_ref_entry) update_value(t *fe1a, pipe uint, b sbus.Block) (v pipe_counter_entry) {
 	fm := &t.pipe_counter_main
 	pm := fm.get_pipe(b)
@@ -425,9 +426,6 @@ func (x *pipe_counter_ref_entry) update_value(t *fe1a, pipe uint, b sbus.Block) 
 		}
 	}
 	q.Do()
-
-	// There might be entries for this pool in eviction fifo.
-	t.pipe_counter_eviction_fifo_sync()
 
 	// Mutually exclude update by fifo dma interrupt.
 	pool.mu.Lock()
