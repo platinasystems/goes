@@ -12,9 +12,9 @@ import (
 // This is the shared SRAM used for fib tcam buckets and others.
 // ISS is physically 4 banks x 8k buckets per bank x 420 bits per bucket.
 const (
-	n_iss_buckets_per_bank = 8 << 10
-	n_iss_banks            = 4
-	n_iss_bits_per_bucket  = 420
+	n_shared_lookup_sram_buckets_per_bank = 8 << 10
+	n_shared_lookup_sram_banks            = 4
+	n_shared_lookup_sram_bits_per_bucket  = 420
 )
 
 // 4 bit chip internal priority

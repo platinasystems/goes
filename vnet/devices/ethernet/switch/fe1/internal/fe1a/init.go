@@ -44,7 +44,7 @@ func (t *fe1a) clear_memories() {
 		)
 
 		// Initialize for largest memory size in rx pipe: ip4 fib tcam buckets
-		count := uint32((n_iss_bits_per_bucket / 70) * n_iss_buckets_per_bank * n_iss_banks)
+		count := uint32((n_shared_lookup_sram_bits_per_bucket / 70) * n_shared_lookup_sram_buckets_per_bank * n_shared_lookup_sram_banks)
 		t.rx_pipe_regs.rx_buffer.hw_reset_control_1.set(q, rx_pipe_valid|rx_pipe_reset_all|count)
 
 		count = uint32(len(t.tx_pipe_mems.l3_next_hop)) // next hops
@@ -466,7 +466,7 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			if t.all_ports.isSet(pipePort) {
 				speed := phys.speedBitsPerSec(t)
 				b := uint32(11875 * speed / 100e9)
-				t.tx_pipe_mems.edb_1dbg_b[phys].Set(&q.DmaRequest, BlockTxPipe, sbus.AddressSplitDist, b)
+				t.tx_pipe_mems.data_buffer_1dbg_b[phys].Set(&q.DmaRequest, BlockTxPipe, sbus.AddressSplitDist, b)
 			}
 		}
 
@@ -490,13 +490,12 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			c := uint32(8)
 			v := uint32(a<<0 | b<<10 | c<<24)
 			for tx_pipe := uint(0); tx_pipe < n_tx_pipe; tx_pipe++ {
-				t.tx_pipe_regs.edb_1dbg_a.seta(q, sbus.Unique(tx_pipe), v)
+				t.tx_pipe_regs.data_buffer_1dbg_a.seta(q, sbus.Unique(tx_pipe), v)
 			}
 		}
 		q.Do()
 	}
 
-	// fixme
 	{
 		for phys := physical_port_number(0); phys < n_phys_ports; phys++ {
 			pipePort := phys.toPipe()
@@ -505,8 +504,6 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			}
 			mmuPort := phys.toGlobalMmu(t)
 			t.tx_pipe_mems.per_port_buffer_soft_reset[pipePort].Set(&q.DmaRequest, BlockTxPipe, sbus.AddressSplit, 1)
-			// t.mmu_sc_regs.asf_eport_cfg[i].set(q, mmuBaseTypeEport, sbus.Single, 0x10200000)
-			// t.mmu_sc_regs.asf_eport_cfg[i].set(q, mmuBaseTypeEport, sbus.Single, 0x10200001)
 			if mmuPort&0x3f < 32 {
 				asf_class := uint32(asf_100g)
 				t.tx_pipe_mems.ip_cut_thru_class[pipePort].Set(&q.DmaRequest, BlockTxPipe, sbus.Duplicate, asf_class)

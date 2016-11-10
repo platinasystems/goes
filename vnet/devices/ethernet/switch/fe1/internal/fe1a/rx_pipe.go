@@ -210,47 +210,47 @@ type rx_pipe_regs struct {
 	bfd_rx_ach_type_mplstp1   rx_pipe_reg32
 	_                         [0x38000000 - 0x34000f00]byte
 
-	rtag7_hash_field_selection_bitmaps      [10]rx_pipe_reg32
-	rtag7_hash_seed                         [2]rx_pipe_reg32
-	drop_control_0                          rx_pipe_reg32
-	rtag7_hash_control_2                    rx_pipe_reg32
-	rtag7_hash_control_3                    rx_pipe_reg32
-	rtag7_hash_field_selection_bitmaps_1    [0x17 - 0x0f]rx_pipe_reg32
-	hash_control                            rx_pipe_reg32
-	trill_rbridge_nickname_select           rx_pipe_reg32
-	rtag7_hash_control_l2gre_mask           [2]rx_pipe_reg32
-	rtag7_hash_field_selection_bitmaps_2    [0x1e - 0x1b]rx_pipe_reg32
-	bfd_rx_udp_control_1                    rx_pipe_reg32
-	vlan_membership_hash_control            rx_pipe_reg32
-	dnat_address_type_hash_control          rx_pipe_reg32
-	rtag7_hash_control_4                    rx_pipe_reg32
-	rtag7_vxlan_payload_l2_hash_field_bmap  rx_pipe_reg32
-	rtag7_vxlan_payload_l3_hash_field_bmap  rx_pipe_reg32
-	icmp_error_type                         rx_pipe_reg32
-	ip6_min_fragment_size                   rx_pipe_reg32
-	dos_control                             rx_pipe_reg32
-	dos_control_2                           rx_pipe_reg32
-	l2_table_hash_control                   rx_pipe_reg32
-	l3_table_hash_control                   rx_pipe_reg32
-	rtag7_hash_select                       rx_pipe_reg32
-	ecn_control                             rx_pipe_reg32
-	_                                       [0x41 - 0x2c]rx_pipe_reg32
-	iss_bank_config                         rx_pipe_reg32
-	iss_logical_to_physical_bank_map        rx_pipe_reg32
-	_                                       [0x4f - 0x43]rx_pipe_reg32
-	gtp_control                             rx_pipe_reg32
-	_                                       [0x100 - 0x50]rx_pipe_reg32
-	rxf_ethernet_type_map                   [16]rx_pipe_reg32
-	_                                       [0x120 - 0x110]rx_pipe_reg32
-	rxf_l4_src_port_map                     [16]rx_pipe_reg32
-	_                                       [0x140 - 0x130]rx_pipe_reg32
-	rxf_l4_dst_port_map                     [16]rx_pipe_reg32
-	_                                       [0x160 - 0x150]rx_pipe_reg32
-	exact_match_logical_table_select_config rx_pipe_reg32
-	_                                       [0x398b0000 - 0x38016100]byte
-	ilpm_ecc_control                        rx_pipe_reg32
-	_                                       [0x398d0000 - 0x398b0100]byte
-	fib_tcam                                struct {
+	rtag7_hash_field_selection_bitmaps              [10]rx_pipe_reg32
+	rtag7_hash_seed                                 [2]rx_pipe_reg32
+	drop_control_0                                  rx_pipe_reg32
+	rtag7_hash_control_2                            rx_pipe_reg32
+	rtag7_hash_control_3                            rx_pipe_reg32
+	rtag7_hash_field_selection_bitmaps_1            [0x17 - 0x0f]rx_pipe_reg32
+	hash_control                                    rx_pipe_reg32
+	trill_rbridge_nickname_select                   rx_pipe_reg32
+	rtag7_hash_control_l2gre_mask                   [2]rx_pipe_reg32
+	rtag7_hash_field_selection_bitmaps_2            [0x1e - 0x1b]rx_pipe_reg32
+	bfd_rx_udp_control_1                            rx_pipe_reg32
+	vlan_membership_hash_control                    rx_pipe_reg32
+	dnat_address_type_hash_control                  rx_pipe_reg32
+	rtag7_hash_control_4                            rx_pipe_reg32
+	rtag7_vxlan_payload_l2_hash_field_bmap          rx_pipe_reg32
+	rtag7_vxlan_payload_l3_hash_field_bmap          rx_pipe_reg32
+	icmp_error_type                                 rx_pipe_reg32
+	ip6_min_fragment_size                           rx_pipe_reg32
+	dos_control                                     rx_pipe_reg32
+	dos_control_2                                   rx_pipe_reg32
+	l2_table_hash_control                           rx_pipe_reg32
+	l3_table_hash_control                           rx_pipe_reg32
+	rtag7_hash_select                               rx_pipe_reg32
+	ecn_control                                     rx_pipe_reg32
+	_                                               [0x41 - 0x2c]rx_pipe_reg32
+	shared_lookup_sram_bank_config                  rx_pipe_reg32
+	shared_lookup_sram_logical_to_physical_bank_map rx_pipe_reg32
+	_                                               [0x4f - 0x43]rx_pipe_reg32
+	gtp_control                                     rx_pipe_reg32
+	_                                               [0x100 - 0x50]rx_pipe_reg32
+	rxf_ethernet_type_map                           [16]rx_pipe_reg32
+	_                                               [0x120 - 0x110]rx_pipe_reg32
+	rxf_l4_src_port_map                             [16]rx_pipe_reg32
+	_                                               [0x140 - 0x130]rx_pipe_reg32
+	rxf_l4_dst_port_map                             [16]rx_pipe_reg32
+	_                                               [0x160 - 0x150]rx_pipe_reg32
+	exact_match_logical_table_select_config         rx_pipe_reg32
+	_                                               [0x398b0000 - 0x38016100]byte
+	ilpm_ecc_control                                rx_pipe_reg32
+	_                                               [0x398d0000 - 0x398b0100]byte
+	fib_tcam                                        struct {
 		control       rx_pipe_reg32
 		_             [0x398e0000 - 0x398d0100]byte
 		key_select    rx_pipe_reg32
@@ -262,49 +262,49 @@ type rx_pipe_regs struct {
 		bucket_config rx_pipe_reg32
 		_             [0x3c000000 - 0x39910100]byte
 	}
-	shared_table_hash_control rx_pipe_reg32
-	_                         [0x3d000000 - 0x3c000100]byte
-	iss_memory_control_0      rx_pipe_reg32
-	_                         [0x100 - 0x001]rx_pipe_reg32
-	iss_memory_control_1      rx_pipe_reg32
-	_                         [0x200 - 0x101]rx_pipe_reg32
-	iss_memory_control_2      rx_pipe_reg32
-	_                         [0x300 - 0x201]rx_pipe_reg32
-	iss_memory_control_3      rx_pipe_reg32
-	_                         [0x400 - 0x301]rx_pipe_reg32
-	iss_memory_control_4      rx_pipe_reg32
-	_                         [0x500 - 0x401]rx_pipe_reg32
-	iss_memory_control_5      rx_pipe_reg32
-	_                         [0x600 - 0x501]rx_pipe_reg32
-	iss_memory_control_84     rx_pipe_reg32
-	_                         [0x40000000 - 0x3d060100]byte
+	shared_table_hash_control            rx_pipe_reg32
+	_                                    [0x3d000000 - 0x3c000100]byte
+	shared_lookup_sram_memory_control_0  rx_pipe_reg32
+	_                                    [0x100 - 0x001]rx_pipe_reg32
+	shared_lookup_sram_memory_control_1  rx_pipe_reg32
+	_                                    [0x200 - 0x101]rx_pipe_reg32
+	shared_lookup_sram_memory_control_2  rx_pipe_reg32
+	_                                    [0x300 - 0x201]rx_pipe_reg32
+	shared_lookup_sram_memory_control_3  rx_pipe_reg32
+	_                                    [0x400 - 0x301]rx_pipe_reg32
+	shared_lookup_sram_memory_control_4  rx_pipe_reg32
+	_                                    [0x500 - 0x401]rx_pipe_reg32
+	shared_lookup_sram_memory_control_5  rx_pipe_reg32
+	_                                    [0x600 - 0x501]rx_pipe_reg32
+	shared_lookup_sram_memory_control_84 rx_pipe_reg32
+	_                                    [0x40000000 - 0x3d060100]byte
 
-	rep_id_remap_control                          rx_pipe_reg32
-	iss_exact_match_logical_to_phyysical_bank_map rx_pipe_reg32
-	cpu_control_1                                 rx_pipe_reg32
-	cpu_control_m                                 rx_pipe_reg32
-	misc_config2                                  rx_pipe_reg32
-	mc_control_4                                  rx_pipe_reg32
-	mc_control_5                                  rx_pipe_reg32
-	_                                             [0x8 - 0x7]rx_pipe_reg32
-	cpu_control_0                                 rx_pipe_reg32
-	priority_control                              rx_pipe_reg32
-	trill_drop_control                            rx_pipe_reg32
-	_                                             [0x64 - 0xb]rx_pipe_reg32
-	cbl_attribute                                 [4]rx_pipe_reg32
-	_                                             [0x80 - 0x68]rx_pipe_reg32
-	protocol_pkt_control                          [64]rx_pipe_reg32
-	igmp_mld_pkt_control                          [64]rx_pipe_reg32
-	rxf_logical_table_select_config               rx_pipe_reg32
-	_                                             [0x44000000 - 0x40010100]byte
+	rep_id_remap_control                                         rx_pipe_reg32
+	shared_lookup_sram_exact_match_logical_to_phyysical_bank_map rx_pipe_reg32
+	cpu_control_1                                                rx_pipe_reg32
+	cpu_control_m                                                rx_pipe_reg32
+	misc_config2                                                 rx_pipe_reg32
+	mc_control_4                                                 rx_pipe_reg32
+	mc_control_5                                                 rx_pipe_reg32
+	_                                                            [0x8 - 0x7]rx_pipe_reg32
+	cpu_control_0                                                rx_pipe_reg32
+	priority_control                                             rx_pipe_reg32
+	trill_drop_control                                           rx_pipe_reg32
+	_                                                            [0x64 - 0xb]rx_pipe_reg32
+	cbl_attribute                                                [4]rx_pipe_reg32
+	_                                                            [0x80 - 0x68]rx_pipe_reg32
+	protocol_pkt_control                                         [64]rx_pipe_reg32
+	igmp_mld_pkt_control                                         [64]rx_pipe_reg32
+	rxf_logical_table_select_config                              rx_pipe_reg32
+	_                                                            [0x44000000 - 0x40010100]byte
 
-	storm_control_meter_mapping             rx_pipe_reg32
-	storm_control_meter_config              rx_pipe_portreg32
-	_                                       [0x7 - 0x2]rx_pipe_reg32
-	rxf_meter_control                       rx_pipe_portreg32
-	_                                       [0xb - 0x8]rx_pipe_reg32
-	iss_bucket_logical_to_physical_bank_map rx_pipe_reg32
-	_                                       [0x48000000 - 0x44000c00]byte
+	storm_control_meter_mapping                            rx_pipe_reg32
+	storm_control_meter_config                             rx_pipe_portreg32
+	_                                                      [0x7 - 0x2]rx_pipe_reg32
+	rxf_meter_control                                      rx_pipe_portreg32
+	_                                                      [0xb - 0x8]rx_pipe_reg32
+	shared_lookup_sram_bucket_logical_to_physical_bank_map rx_pipe_reg32
+	_                                                      [0x48000000 - 0x44000c00]byte
 
 	_                                 [0x3 - 0x0]rx_pipe_reg32
 	rxf_slice_meter_map_enable        rx_pipe_reg32
@@ -560,9 +560,9 @@ type rx_pipe_mems struct {
 
 	l3_entry_only        m.Mem
 	l3_entry_ip4_unicast struct {
-		dedicated [n_iss_banks][512][n_iss_bits_per_bucket / 105]l3_ip4_entry_mem
-		shared    [n_iss_banks][n_iss_buckets_per_bank][n_iss_bits_per_bucket / 105]l3_ip4_entry_mem
-		_         [m.MemMax - n_iss_banks*(512+n_iss_buckets_per_bank)*(n_iss_bits_per_bucket/105)]m.MemElt
+		dedicated [n_shared_lookup_sram_banks][512][n_shared_lookup_sram_bits_per_bucket / 105]l3_ip4_entry_mem
+		shared    [n_shared_lookup_sram_banks][n_shared_lookup_sram_buckets_per_bank][n_shared_lookup_sram_bits_per_bucket / 105]l3_ip4_entry_mem
+		_         [m.MemMax - n_shared_lookup_sram_banks*(512+n_shared_lookup_sram_buckets_per_bank)*(n_shared_lookup_sram_bits_per_bucket/105)]m.MemElt
 	}
 	l3_entry_ip4_multicast m.Mem
 	l3_entry_ip6_unicast   m.Mem
@@ -624,10 +624,10 @@ type rx_pipe_mems struct {
 
 	_ [0x3a080000 - 0x39f40000]byte
 
-	l3_entry_lp     m.Mem
-	l3_entry_iss_lp m.Mem
-	exact_match_lp  m.Mem
-	_               [0x3a400000 - 0x3a140000]byte
+	l3_entry_lp                    m.Mem
+	l3_entry_shared_lookup_sram_lp m.Mem
+	exact_match_lp                 m.Mem
+	_                              [0x3a400000 - 0x3a140000]byte
 
 	fib_tcam [n_fib_tcam_entries]fib_tcam_mem
 	_        [m.MemMax - n_fib_tcam_entries]m.MemElt
@@ -647,20 +647,20 @@ type rx_pipe_mems struct {
 	fib_tcam_dual_data_only [n_fib_tcam_entries / 2]fib_tcam_pair_tcam_data_only_mem
 	_                       [m.MemMax - n_fib_tcam_entries/2]m.MemElt
 
-	fib_tcam_6_entry_buckets [n_iss_bits_per_bucket / 70][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_6_entry_bucket_mem
-	_                        [m.MemMax - (n_iss_bits_per_bucket/70)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_6_entry_buckets [n_shared_lookup_sram_bits_per_bucket / 70][n_shared_lookup_sram_buckets_per_bank][n_shared_lookup_sram_banks]fib_tcam_6_entry_bucket_mem
+	_                        [m.MemMax - (n_shared_lookup_sram_bits_per_bucket/70)*n_shared_lookup_sram_buckets_per_bank*n_shared_lookup_sram_banks]m.MemElt
 
-	fib_tcam_4_ip4_entry_buckets [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_4_ip4_entry_bucket_mem
-	_                            [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_4_ip4_entry_buckets [n_shared_lookup_sram_bits_per_bucket / 105][n_shared_lookup_sram_buckets_per_bank][n_shared_lookup_sram_banks]fib_tcam_4_ip4_entry_bucket_mem
+	_                            [m.MemMax - (n_shared_lookup_sram_bits_per_bucket/105)*n_shared_lookup_sram_buckets_per_bank*n_shared_lookup_sram_banks]m.MemElt
 
-	fib_tcam_4_ip6_entry_buckets [n_iss_bits_per_bucket / 105][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_mem
-	_                            [m.MemMax - (n_iss_bits_per_bucket/105)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_4_ip6_entry_buckets [n_shared_lookup_sram_bits_per_bucket / 105][n_shared_lookup_sram_buckets_per_bank][n_shared_lookup_sram_banks]fib_tcam_bucket_ip6_64_mem
+	_                            [m.MemMax - (n_shared_lookup_sram_bits_per_bucket/105)*n_shared_lookup_sram_buckets_per_bank*n_shared_lookup_sram_banks]m.MemElt
 
-	fib_tcam_bucket_3_ip6_entry_buckets [n_iss_bits_per_bucket / 140][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_64_with_pipe_counter_mem
-	_                                   [m.MemMax - (n_iss_bits_per_bucket/140)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_3_ip6_entry_buckets [n_shared_lookup_sram_bits_per_bucket / 140][n_shared_lookup_sram_buckets_per_bank][n_shared_lookup_sram_banks]fib_tcam_bucket_ip6_64_with_pipe_counter_mem
+	_                                   [m.MemMax - (n_shared_lookup_sram_bits_per_bucket/140)*n_shared_lookup_sram_buckets_per_bank*n_shared_lookup_sram_banks]m.MemElt
 
-	fib_tcam_bucket_2_ip6_entry_buckets [n_iss_bits_per_bucket / 210][n_iss_buckets_per_bank][n_iss_banks]fib_tcam_bucket_ip6_128_mem
-	_                                   [m.MemMax - (n_iss_bits_per_bucket/210)*n_iss_buckets_per_bank*n_iss_banks]m.MemElt
+	fib_tcam_bucket_2_ip6_entry_buckets [n_shared_lookup_sram_bits_per_bucket / 210][n_shared_lookup_sram_buckets_per_bank][n_shared_lookup_sram_banks]fib_tcam_bucket_ip6_128_mem
+	_                                   [m.MemMax - (n_shared_lookup_sram_bits_per_bucket/210)*n_shared_lookup_sram_buckets_per_bank*n_shared_lookup_sram_banks]m.MemElt
 
 	fib_tcam_bucket_raw        m.Mem
 	fib_tcam_aux_table         m.Mem
@@ -814,7 +814,7 @@ type rx_pipe_mems struct {
 
 	mac_block_table [m.MemMax]port_bitmap_mem
 
-	nonucast_trunk_block_mask [m.MemMax]port_bitmap_mem
+	non_unicast_trunk_block_mask [m.MemMax]port_bitmap_mem
 
 	im_mtp_index m.Mem
 
@@ -957,7 +957,7 @@ type rx_pipe_mems struct {
 
 	l2_entry struct {
 		dedicated [n_l2_dedicated_banks][n_l2_dedicated_buckets_per_bank][n_l2_entry_per_bucket]l2_entry_mem
-		shared    [n_iss_banks][n_iss_buckets_per_bank][n_l2_entry_per_bucket]l2_entry_mem
-		_         [m.MemMax - n_l2_entry_per_bucket*(n_l2_dedicated_banks*n_l2_dedicated_buckets_per_bank+n_iss_banks*n_iss_buckets_per_bank)]m.MemElt
+		shared    [n_shared_lookup_sram_banks][n_shared_lookup_sram_buckets_per_bank][n_l2_entry_per_bucket]l2_entry_mem
+		_         [m.MemMax - n_l2_entry_per_bucket*(n_l2_dedicated_banks*n_l2_dedicated_buckets_per_bank+n_shared_lookup_sram_banks*n_shared_lookup_sram_buckets_per_bank)]m.MemElt
 	}
 }

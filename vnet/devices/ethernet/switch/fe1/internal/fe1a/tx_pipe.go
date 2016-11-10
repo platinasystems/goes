@@ -176,15 +176,15 @@ type tx_pipe_regs struct {
 	mmu_max_cell_credit                    tx_pipe_portreg32
 	perq_counter, txf_counter              pipe_counter_1pool_control
 	_                                      [0x113 - 0x59]tx_pipe_reg32
-	edb_misc_control                       tx_pipe_reg32
+	data_buffer_misc_control               tx_pipe_reg32
 	_                                      [0x400 - 0x114]tx_pipe_reg32
 
 	pipe_counter pipe_counter_4pool_control
 	_            [0x29040000 - 0x28050000]byte
 
-	edb_control_parity_enable tx_pipe_reg32
-	_                         [0x29500000 - 0x29040100]byte
-	edb_1dbg_a                tx_pipe_reg32
+	data_buffer_control_parity_enable tx_pipe_reg32
+	_                                 [0x29500000 - 0x29040100]byte
+	data_buffer_1dbg_a                tx_pipe_reg32
 }
 
 type tx_pipe_mems struct {
@@ -263,9 +263,7 @@ type tx_pipe_mems struct {
 	ip_tunnel_mpls [2 << 10]tx_mpls_tunnel_mem
 	_              [m.MemMax - 2<<10]m.MemElt
 
-	mpls_exp_mapping_1 m.Mem
-
-	mpls_exp_mapping_2 m.Mem
+	mpls_exp_mapping [2]m.Mem
 
 	mpls_pri_mapping m.Mem
 
@@ -298,13 +296,13 @@ type tx_pipe_mems struct {
 
 	etag_pcp_mapping m.Mem
 
-	vxlt_remap_table [2]m.Mem
+	vlan_translate_remap_table [2]m.Mem
 
 	vlan_translate_ecc m.Mem
 
 	_ [0x08780000 - 0x086c0000]byte
 
-	vxlt_action_table [2]m.Mem
+	vlan_translate_action_table [2]m.Mem
 
 	_ [0x10000000 - 0x08800000]byte
 
@@ -314,21 +312,17 @@ type tx_pipe_mems struct {
 
 	int_cn_to_ip_mapping m.Mem
 
-	tunnel_ecn_encap m.Mem
-
-	tunnel_ecn_encap_2 m.Mem
+	tunnel_ecn_encap [2]m.Mem
 
 	ip_to_int_cn_mapping m.Mem
 
 	_ [0x14000000 - 0x10180000]byte
 
-	mod_map m.Mem
+	module_map m.Mem
 
 	_ [0x18000000 - 0x14040000]byte
 
-	mirror_encap_data_1 m.Mem
-
-	mirror_encap_data_2 m.Mem
+	mirror_encap_data [2]m.Mem
 
 	_ [0x1c000000 - 0x18080000]byte
 
@@ -398,8 +392,8 @@ type tx_pipe_mems struct {
 
 	_ [0x287c0000 - 0x28340000]byte
 
-	edb_1dbg_b [n_pipe_ports]m.Mem32
-	_          [m.MemMax - n_pipe_ports]m.MemElt
+	data_buffer_1dbg_b [n_pipe_ports]m.Mem32
+	_                  [m.MemMax - n_pipe_ports]m.MemElt
 
 	_ [0x2a800000 - 0x28800000]byte
 

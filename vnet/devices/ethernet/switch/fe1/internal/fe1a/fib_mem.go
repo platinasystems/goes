@@ -768,19 +768,19 @@ func (r *l3_ip4_entry_mem) seta(q *DmaRequest, v *l3_ip4_entry, t sbus.AccessTyp
 func (r *l3_ip4_entry_mem) get(q *DmaRequest, v *l3_ip4_entry) { r.geta(q, v, sbus.Duplicate) }
 func (r *l3_ip4_entry_mem) set(q *DmaRequest, v *l3_ip4_entry) { r.seta(q, v, sbus.Duplicate) }
 
-func (t *fe1a) iss_init() {
+func (t *fe1a) shared_lookup_sram_init() {
 	r := t.rx_pipe_regs
 	q := t.getDmaReq()
 
 	// Bypass iss memory lp.
-	r.iss_memory_control_84.set(q, r.iss_memory_control_84.getDo(q, sbus.Duplicate)|(0xf<<0))
+	r.shared_lookup_sram_memory_control_84.set(q, r.shared_lookup_sram_memory_control_84.getDo(q, sbus.Duplicate)|(0xf<<0))
 
 	// All banks BUCKET
-	r.iss_bank_config.set(q, 0xf<<8)
+	r.shared_lookup_sram_bank_config.set(q, 0xf<<8)
 
 	// BUCKET uses 4 banks (and not 2)
-	r.iss_logical_to_physical_bank_map.set(q, 0<<24)
-	r.iss_bucket_logical_to_physical_bank_map.set(q, 0)
+	r.shared_lookup_sram_logical_to_physical_bank_map.set(q, 0<<24)
+	r.shared_lookup_sram_bucket_logical_to_physical_bank_map.set(q, 0)
 
 	// Enable algorithmic LPM mode and combined search mode.
 	r.fib_tcam.control.set(q, 1<<1|(0<<2))

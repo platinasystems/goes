@@ -377,7 +377,7 @@ func (t *fe1a) PortInit(vn *vnet.Vnet) {
 
 	// Initialize misc/mmu stuff
 	t.misc_init()
-	t.iss_init()
+	t.shared_lookup_sram_init()
 	t.enablePorts(true)
 	t.init_port_table()
 	t.garbage_dump_init()
