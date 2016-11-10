@@ -125,8 +125,8 @@ func (t *fe1a) l3_init() {
 	q := t.getDmaReq()
 
 	{
-		d := my_station_tcam_entry{}
-		d.data = my_station_tcam_data{
+		d := l3_terminate_tcam_entry{}
+		d.data = l3_terminate_tcam_data{
 			ip4_unicast_enable:   true,
 			ip6_unicast_enable:   true,
 			ip4_multicast_enable: true,
@@ -137,11 +137,11 @@ func (t *fe1a) l3_init() {
 		for i := snake_port(0); i < n_snake_port; i++ {
 			e := d
 			e.key.LogicalPort.Set(uint(i.to_pipe()))
-			t.rx_pipe_mems.my_station_tcam[i].set(q, &e)
+			t.rx_pipe_mems.l3_terminate_tcam[i].set(q, &e)
 		}
 		e := d
 		e.key.LogicalPort.Set(uint(phys_port_cpu.toPipe()))
-		t.rx_pipe_mems.my_station_tcam[n_snake_port].set(q, &e)
+		t.rx_pipe_mems.l3_terminate_tcam[n_snake_port].set(q, &e)
 		q.Do()
 	}
 

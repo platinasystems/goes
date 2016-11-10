@@ -10,24 +10,24 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-const n_my_station_tcam_entry = 1 << 10
+const n_l3_terminate_tcam_entry = 1 << 10
 
 // Key and mask for station TCAM.  Match when search & mask == key */
-type my_station_tcam_key struct {
+type l3_terminate_tcam_key struct {
 	m.LogicalPort
 	m.Vlan
 	m.EthernetAddress
 }
 
-func (key *my_station_tcam_key) tcamEncode(mask *my_station_tcam_key, isSet bool) (x, y my_station_tcam_key) {
+func (key *l3_terminate_tcam_key) tcamEncode(mask *l3_terminate_tcam_key, isSet bool) (x, y l3_terminate_tcam_key) {
 	x.LogicalPort, y.LogicalPort = key.LogicalPort.TcamEncode(&mask.LogicalPort, isSet)
 	x.Vlan, y.Vlan = key.Vlan.TcamEncode(mask.Vlan, isSet)
 	x.EthernetAddress, y.EthernetAddress = key.EthernetAddress.TcamEncode(&mask.EthernetAddress, isSet)
 	return
 }
 
-// What to do station entry matches.
-type my_station_tcam_data struct {
+// What to do when packet dst ethernet address/port/vlan entry matches.
+type l3_terminate_tcam_data struct {
 	copy_to_cpu bool
 	drop        bool
 	// Enable termination of various types of packets.
@@ -42,20 +42,20 @@ type my_station_tcam_data struct {
 	mac_in_mac_enable    bool
 }
 
-type my_station_tcam_entry struct {
-	data      my_station_tcam_data
+type l3_terminate_tcam_entry struct {
+	data      l3_terminate_tcam_data
 	valid     bool
-	key, mask my_station_tcam_key
+	key, mask l3_terminate_tcam_key
 }
 
-func (r *my_station_tcam_key) getSet(b []uint32, lo int, isSet bool) int {
+func (r *l3_terminate_tcam_key) getSet(b []uint32, lo int, isSet bool) int {
 	i := r.EthernetAddress.MemGetSet(b, lo, isSet)
 	i = r.Vlan.MemGetSet(b, i, isSet)
 	i = r.LogicalPort.MemGetSet(b, i, isSet)
 	return lo + 80
 }
 
-func (r *my_station_tcam_data) getSet(b []uint32, i int, isSet bool) int {
+func (r *l3_terminate_tcam_data) getSet(b []uint32, i int, isSet bool) int {
 	i = m.MemGetSet1(&r.mac_in_mac_enable, b, i, isSet)
 	i = m.MemGetSet1(&r.mpls_enable, b, i, isSet)
 	i = m.MemGetSet1(&r.trill_enable, b, i, isSet)
@@ -72,10 +72,10 @@ func (r *my_station_tcam_data) getSet(b []uint32, i int, isSet bool) int {
 	return i
 }
 
-func (r *my_station_tcam_entry) MemBits() int { return 174 }
-func (r *my_station_tcam_entry) MemGetSet(b []uint32, isSet bool) {
+func (r *l3_terminate_tcam_entry) MemBits() int { return 174 }
+func (r *l3_terminate_tcam_entry) MemGetSet(b []uint32, isSet bool) {
 	i := m.MemGetSet1(&r.valid, b, 0, isSet)
-	var key, mask my_station_tcam_key
+	var key, mask l3_terminate_tcam_key
 	if isSet {
 		key, mask = r.key.tcamEncode(&r.mask, isSet)
 	}
@@ -93,39 +93,39 @@ func (r *my_station_tcam_entry) MemGetSet(b []uint32, isSet bool) {
 	i = r.data.getSet(b, i, isSet)
 }
 
-type my_station_tcam_mem m.MemElt
+type l3_terminate_tcam_mem m.MemElt
 
-func (r *my_station_tcam_mem) geta(q *DmaRequest, v *my_station_tcam_entry, t sbus.AccessType) {
+func (r *l3_terminate_tcam_mem) geta(q *DmaRequest, v *l3_terminate_tcam_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaGet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *my_station_tcam_mem) seta(q *DmaRequest, v *my_station_tcam_entry, t sbus.AccessType) {
+func (r *l3_terminate_tcam_mem) seta(q *DmaRequest, v *l3_terminate_tcam_entry, t sbus.AccessType) {
 	(*m.MemElt)(r).MemDmaSet(&q.DmaRequest, v, BlockRxPipe, t)
 }
-func (r *my_station_tcam_mem) get(q *DmaRequest, v *my_station_tcam_entry) {
+func (r *l3_terminate_tcam_mem) get(q *DmaRequest, v *l3_terminate_tcam_entry) {
 	r.geta(q, v, sbus.Duplicate)
 }
-func (r *my_station_tcam_mem) set(q *DmaRequest, v *my_station_tcam_entry) {
+func (r *l3_terminate_tcam_mem) set(q *DmaRequest, v *l3_terminate_tcam_entry) {
 	r.seta(q, v, sbus.Duplicate)
 }
 
-type my_station_tcam_entry_only_mem m.MemElt
-type my_station_tcam_data_only_mem m.MemElt
+type l3_terminate_tcam_entry_only_mem m.MemElt
+type l3_terminate_tcam_data_only_mem m.MemElt
 
-//go:generate gentemplate -d Package=fe1a -id my_station_tcam -d PoolType=my_station_tcam_pool -d Type=my_station_tcam_entry -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
+//go:generate gentemplate -d Package=fe1a -id l3_terminate_tcam -d PoolType=l3_terminate_tcam_pool -d Type=l3_terminate_tcam_entry -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
 
-type my_station_tcam_main struct {
-	pool             my_station_tcam_pool
-	poolIndexByEntry map[my_station_tcam_entry]uint
+type l3_terminate_tcam_main struct {
+	pool             l3_terminate_tcam_pool
+	poolIndexByEntry map[l3_terminate_tcam_entry]uint
 }
 
-func (tm *my_station_tcam_main) addDel(t *fe1a, e *my_station_tcam_entry, isDel bool) (i uint, ok bool) {
+func (tm *l3_terminate_tcam_main) addDel(t *fe1a, e *l3_terminate_tcam_entry, isDel bool) (i uint, ok bool) {
 	if tm.poolIndexByEntry == nil {
-		tm.poolIndexByEntry = make(map[my_station_tcam_entry]uint)
-		tm.pool.SetMaxLen(n_my_station_tcam_entry)
+		tm.poolIndexByEntry = make(map[l3_terminate_tcam_entry]uint)
+		tm.pool.SetMaxLen(n_l3_terminate_tcam_entry)
 	}
 
 	q := t.getDmaReq()
-	f := my_station_tcam_entry{}
+	f := l3_terminate_tcam_entry{}
 	f.key = e.key
 	f.mask = e.mask
 	if i, ok = tm.poolIndexByEntry[f]; !ok && isDel {
@@ -134,7 +134,7 @@ func (tm *my_station_tcam_main) addDel(t *fe1a, e *my_station_tcam_entry, isDel 
 	if isDel {
 		pe := &tm.pool.entries[i]
 		pe.valid = false
-		t.rx_pipe_mems.my_station_tcam[i].set(q, pe)
+		t.rx_pipe_mems.l3_terminate_tcam[i].set(q, pe)
 		tm.pool.PutIndex(i)
 		delete(tm.poolIndexByEntry, f)
 	} else {
@@ -145,7 +145,7 @@ func (tm *my_station_tcam_main) addDel(t *fe1a, e *my_station_tcam_entry, isDel 
 		pe := &tm.pool.entries[i]
 		*pe = *e
 		pe.valid = true
-		t.rx_pipe_mems.my_station_tcam[i].set(q, pe)
+		t.rx_pipe_mems.l3_terminate_tcam[i].set(q, pe)
 	}
 	q.Do()
 	return

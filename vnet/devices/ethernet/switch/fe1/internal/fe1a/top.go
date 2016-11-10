@@ -255,7 +255,7 @@ type fe1a struct {
 	ip4_fib_main
 	l3_main
 	l3_interface_main
-	my_station_tcam_main
+	l3_terminate_tcam_main
 	portMain
 	port_counter_main
 	port_bitmap_main

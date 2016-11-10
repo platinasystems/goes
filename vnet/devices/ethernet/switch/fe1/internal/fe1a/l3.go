@@ -15,7 +15,7 @@ import (
 
 type l3_main struct {
 	*fe1a
-	my_station_tcam my_station_tcam_main
+	l3_terminate_tcam l3_terminate_tcam_main
 }
 
 func (t *fe1a) register_hooks(v *vnet.Vnet) {
@@ -42,12 +42,12 @@ func (lm *l3_main) swIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err err
 		return
 	}
 
-	e := my_station_tcam_entry{}
+	e := l3_terminate_tcam_entry{}
 	e.key.LogicalPort.Set(uint(p.physical_port_number.toGpp()))
 	e.mask.LogicalPort = m.LogicalPortMaskAll
 	e.key.EthernetAddress = m.EthernetAddress(p.Address)
 	e.mask.EthernetAddress = m.EthernetAddressMaskAll
-	e.data = my_station_tcam_data{
+	e.data = l3_terminate_tcam_data{
 		ip4_unicast_enable:   true,
 		ip6_unicast_enable:   true,
 		ip4_multicast_enable: true,
@@ -56,7 +56,7 @@ func (lm *l3_main) swIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err err
 		arp_rarp_enable:      true,
 	}
 	isDel := !isUp
-	lm.my_station_tcam.addDel(lm.fe1a, &e, isDel)
+	lm.l3_terminate_tcam.addDel(lm.fe1a, &e, isDel)
 	return
 }
 

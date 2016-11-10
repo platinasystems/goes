@@ -486,14 +486,14 @@ type rx_pipe_mems struct {
 
 	vlan_mpls m.Mem
 
-	my_station_tcam [n_my_station_tcam_entry]my_station_tcam_mem
-	_               [m.MemMax - n_my_station_tcam_entry]m.MemElt
+	l3_terminate_tcam [n_l3_terminate_tcam_entry]l3_terminate_tcam_mem
+	_                 [m.MemMax - n_l3_terminate_tcam_entry]m.MemElt
 
-	my_station_tcam_entry_only [n_my_station_tcam_entry]my_station_tcam_entry_only_mem
-	_                          [m.MemMax - n_my_station_tcam_entry]m.MemElt
+	l3_terminate_tcam_entry_only [n_l3_terminate_tcam_entry]l3_terminate_tcam_entry_only_mem
+	_                            [m.MemMax - n_l3_terminate_tcam_entry]m.MemElt
 
-	my_station_tcam_data_only [n_my_station_tcam_entry]my_station_tcam_data_only_mem
-	_                         [m.MemMax - n_my_station_tcam_entry]m.MemElt
+	l3_terminate_tcam_data_only [n_l3_terminate_tcam_entry]l3_terminate_tcam_data_only_mem
+	_                           [m.MemMax - n_l3_terminate_tcam_entry]m.MemElt
 
 	source_vp m.Mem
 
