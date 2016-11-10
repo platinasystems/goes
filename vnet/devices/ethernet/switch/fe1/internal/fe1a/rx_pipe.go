@@ -279,24 +279,24 @@ type rx_pipe_regs struct {
 	iss_memory_control_84     rx_pipe_reg32
 	_                         [0x40000000 - 0x3d060100]byte
 
-	rep_id_remap_control                   rx_pipe_reg32
-	iss_fpem_logical_to_phyysical_bank_map rx_pipe_reg32
-	cpu_control_1                          rx_pipe_reg32
-	cpu_control_m                          rx_pipe_reg32
-	ing_misc_config2                       rx_pipe_reg32
-	mc_control_4                           rx_pipe_reg32
-	mc_control_5                           rx_pipe_reg32
-	_                                      [0x8 - 0x7]rx_pipe_reg32
-	cpu_control_0                          rx_pipe_reg32
-	priority_control                       rx_pipe_reg32
-	trill_drop_control                     rx_pipe_reg32
-	_                                      [0x64 - 0xb]rx_pipe_reg32
-	cbl_attribute                          [4]rx_pipe_reg32
-	_                                      [0x80 - 0x68]rx_pipe_reg32
-	protocol_pkt_control                   [64]rx_pipe_reg32
-	igmp_mld_pkt_control                   [64]rx_pipe_reg32
-	rxf_logical_table_select_config        rx_pipe_reg32
-	_                                      [0x44000000 - 0x40010100]byte
+	rep_id_remap_control                          rx_pipe_reg32
+	iss_exact_match_logical_to_phyysical_bank_map rx_pipe_reg32
+	cpu_control_1                                 rx_pipe_reg32
+	cpu_control_m                                 rx_pipe_reg32
+	ing_misc_config2                              rx_pipe_reg32
+	mc_control_4                                  rx_pipe_reg32
+	mc_control_5                                  rx_pipe_reg32
+	_                                             [0x8 - 0x7]rx_pipe_reg32
+	cpu_control_0                                 rx_pipe_reg32
+	priority_control                              rx_pipe_reg32
+	trill_drop_control                            rx_pipe_reg32
+	_                                             [0x64 - 0xb]rx_pipe_reg32
+	cbl_attribute                                 [4]rx_pipe_reg32
+	_                                             [0x80 - 0x68]rx_pipe_reg32
+	protocol_pkt_control                          [64]rx_pipe_reg32
+	igmp_mld_pkt_control                          [64]rx_pipe_reg32
+	rxf_logical_table_select_config               rx_pipe_reg32
+	_                                             [0x44000000 - 0x40010100]byte
 
 	storm_control_meter_mapping             rx_pipe_reg32
 	storm_control_meter_config              rx_pipe_portreg32
@@ -420,8 +420,8 @@ type rx_pipe_mems struct {
 
 	l3_tunnel m.Mem
 
-	udf_tcam   m.Mem
-	udf_offset m.Mem
+	user_defined_field_tcam   m.Mem
+	user_defined_field_offset m.Mem
 
 	mod_map          m.Mem
 	source_mod_proxy m.Mem
@@ -468,13 +468,15 @@ type rx_pipe_mems struct {
 	mpls_entry [n_mpls_entry]mpls_entry_mem
 	_          [m.MemMax - n_mpls_entry]m.MemElt
 
-	udf_conditional_check_table_cam m.Mem
-	udf_conditional_check_table_ram m.Mem
+	user_defined_field_conditional_check struct {
+		tcam m.Mem
+		data m.Mem
+	}
 
 	etag_pcp_mapping m.Mem
 
-	vxlt_remap_table  [2]m.Mem
-	vxlt_action_table [2]m.Mem
+	vlan_translate_remap_table  [2]m.Mem
+	vlan_translate_action_table [2]m.Mem
 
 	mpls_entry_remap_table  [2]m.Mem
 	mpls_entry_action_table [2]m.Mem
@@ -568,7 +570,7 @@ type rx_pipe_mems struct {
 
 	active_l3_interface_profile m.Mem
 
-	fpem_ecc m.Mem
+	exact_match_ecc m.Mem
 
 	rtag7_flow_based_hash m.Mem
 	rtag7_port_based_hash m.Mem
@@ -624,7 +626,7 @@ type rx_pipe_mems struct {
 
 	l3_entry_lp     m.Mem
 	l3_entry_iss_lp m.Mem
-	fpem_lp         m.Mem
+	exact_match_lp  m.Mem
 	_               [0x3a400000 - 0x3a140000]byte
 
 	fib_tcam [n_fib_tcam_entries]fib_tcam_mem
