@@ -444,8 +444,8 @@ func (h *Psu) PsuStatus() string {
 		t, err := pin.Value()
 		if err != nil {
 			return err.Error()
-		} else if !t {
-			return "not_installed."
+		} else if t {
+			return "not_installed"
 		}
 	}
 
