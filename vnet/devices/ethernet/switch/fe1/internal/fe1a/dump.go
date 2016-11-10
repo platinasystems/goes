@@ -111,12 +111,12 @@ func (t *fe1a) l3_init() {
 
 		// l3 defip: 0/0 points to next hop 1
 		{
-			e := l3_defip_entry{}
-			e[0].key = l3_defip_tcam_key{
-				key_type:   l3_defip_ip4,
+			e := fib_tcam_entry{}
+			e[0].key = fib_tcam_tcam_key{
+				key_type:   fib_tcam_ip4,
 				Ip4Address: m.Ip4Address{0, 0, 0, 0},
 			}
-			e[0].mask = l3_defip_tcam_key{
+			e[0].mask = fib_tcam_tcam_key{
 				key_type:   0xff,
 				Ip4Address: m.Ip4Address{0, 0, 0, 0},
 			}
@@ -124,19 +124,19 @@ func (t *fe1a) l3_init() {
 			e[0].is_valid = true
 			e[0].bucket_index = 0
 			e[0].sub_bucket_index = 1
-			t.rx_pipe_mems.l3_defip[0].set(q, &e)
+			t.rx_pipe_mems.fib_tcam[0].set(q, &e)
 			q.Do()
 		}
 
 		// l3 defip bucket
 		if false {
-			e := l3_defip_bucket_ip4_entry{}
+			e := fib_tcam_6_entry_bucket_entry{}
 			e.is_valid = true
 			e.next_hop = m.NextHop{Index: next_hop_index_bucket}
 			e.dst_length = 32
 			e.dst = m.Ip4Address{0x5, 0x6, 0x7, 0x8}
 			e.sub_bucket_index = 1
-			t.rx_pipe_mems.l3_defip_bucket_ipv4[0][0][0].set(q, &e)
+			t.rx_pipe_mems.fib_tcam_6_entry_buckets[0][0][0].set(q, &e)
 			q.Do()
 		}
 
