@@ -50,6 +50,9 @@ type port_counter_main struct {
 }
 
 func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
+	// Pipe counters may be in eviction fifo; so sync it here so we are guaranteed accuracy.
+	t.pipe_counter_eviction_fifo_sync()
+
 	cm := &t.port_counter_main
 	hi := p.Hi()
 
@@ -148,9 +151,6 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 				}
 			}
 		}
-
-		// Tx counters may be in eviction fifo; so sync it here.
-		t.pipe_counter_eviction_fifo_sync()
 	}
 
 	// MMU rx port counters
