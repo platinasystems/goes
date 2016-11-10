@@ -263,8 +263,8 @@ type fe1a struct {
 }
 
 func (t *fe1a) getDmaReq() *DmaRequest { return &t.dmaReq }
-func (t *fe1a) Interrupt()             { t.Cmic.Interrupt() }
-func (t *fe1a) GetLedDataRam()         { t.Cmic.LedDataRamDump() }
+func (t *fe1a) Interrupt()             { t.CpuMain.Interrupt() }
+func (t *fe1a) GetLedDataRam()         { t.CpuMain.LedDataRamDump() }
 
 func (t *fe1a) pll_wait(r *top_reg, tag string) {
 	q := t.getDmaReq()
@@ -282,7 +282,7 @@ func (t *fe1a) pll_wait(r *top_reg, tag string) {
 }
 
 func (t *fe1a) Init() {
-	t.Cmic.HardwareInit()
+	t.CpuMain.HardwareInit()
 
 	// Set SBUS ring map.
 	{
@@ -303,7 +303,7 @@ func (t *fe1a) Init() {
 			}
 			ringByBlock[int(BlockClport0)+i] = b
 		}
-		t.Cmic.SetSbusRingMap(ringByBlock[:])
+		t.CpuMain.SetSbusRingMap(ringByBlock[:])
 	}
 
 	// Initialize fictitious memory-map pointers to all memories and registers.

@@ -50,13 +50,13 @@ func (sws *SwitchSelect) showSwitches(c cli.Commander, w cli.Writer, in *cli.Inp
 func (sws *SwitchSelect) showInterrupt(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	sws.SelectFromInput(in)
 	for _, s := range sws.Switches {
-		s.GetSwitchCommon().Cmic.WriteInterruptSummary(w)
+		s.GetSwitchCommon().CpuMain.WriteInterruptSummary(w)
 	}
 	return
 }
 
 func i2cScan(sw Switch) {
-	i2cBus := sw.GetSwitchCommon().Cmic.I2c
+	i2cBus := &sw.GetSwitchCommon().CpuMain.I2c
 	for a := 0; a < 128; a++ {
 		var d i2c.Data
 		n, err := i2cBus.Do(i2c.Write, byte(a), i2c.Quick, 0, &d, 0)

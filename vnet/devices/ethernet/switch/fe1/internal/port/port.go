@@ -105,7 +105,7 @@ type dmaRequest struct {
 
 func (q *dmaRequest) Do() {
 	s := q.portBlock.Switch.GetSwitchCommon()
-	s.Dma.Do(&q.DmaRequest)
+	s.CpuMain.Dma.Do(&q.DmaRequest)
 }
 
 func (p *PortBlock) dmaReq() *dmaRequest {

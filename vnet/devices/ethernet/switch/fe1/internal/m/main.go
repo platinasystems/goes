@@ -8,7 +8,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/hw/pci"
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/cmic"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/cpu"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
@@ -22,7 +22,7 @@ type SwitchCommon struct {
 
 	PciDev *pci.Device
 
-	cmic.Cmic
+	CpuMain cpu.Main
 
 	SwitchConfig
 

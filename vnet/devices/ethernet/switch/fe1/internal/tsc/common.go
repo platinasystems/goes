@@ -33,7 +33,7 @@ type DmaRequest struct {
 
 func (q *DmaRequest) Do() {
 	s := q.Tsc.Switch.GetSwitchCommon()
-	s.Dma.Do(&q.DmaRequest)
+	s.CpuMain.Dma.Do(&q.DmaRequest)
 }
 
 const (

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package cmic
+package cpu
 
 import (
 	"github.com/platinasystems/go/elib/hw"
@@ -65,7 +65,7 @@ type regs struct {
 
 	_ [0x10c - 0x50]byte
 
-	cmic_config hw.Reg32
+	config hw.Reg32
 
 	_ [0x10000 - 0x110]byte
 
@@ -101,9 +101,9 @@ type regs struct {
 
 	revision_id hw.Reg32
 
-	cmicm_revision_id  hw.Reg32
-	_                  hw.Reg32
-	pcie_reset_control hw.Reg32
+	cpu_interface_revision_id hw.Reg32
+	_                         hw.Reg32
+	pcie_reset_control        hw.Reg32
 
 	override_strap hw.Reg32
 
@@ -203,7 +203,7 @@ type Config struct {
 	SbusRingByBlock map[int]int
 }
 
-type Cmic struct {
+type Main struct {
 	regs      *regs
 	iprocRegs *iproc.Regs
 	Config    Config
@@ -223,7 +223,7 @@ type Cmic struct {
 	linkScanMain
 }
 
-func (cm *Cmic) SetSbusRingMap(data []uint8) {
+func (cm *Main) SetSbusRingMap(data []uint8) {
 	var d [128 / 8]uint32
 	for i := range data {
 		d[i/8] |= (uint32(data[i]) & 0xf) << (4 * (uint(i) % 8))
@@ -233,7 +233,7 @@ func (cm *Cmic) SetSbusRingMap(data []uint8) {
 	}
 }
 
-func (cm *Cmic) Reset() {
+func (cm *Main) Reset() {
 	r := cm.regs
 
 	// Hard reset of chip.
@@ -269,7 +269,7 @@ func (cm *Cmic) Reset() {
 	cm.interrupt_init()
 }
 
-func (cm *Cmic) Init(pRegs, pIproc unsafe.Pointer) {
+func (cm *Main) Init(pRegs, pIproc unsafe.Pointer) {
 	cm.regs = (*regs)(pRegs)
 	cm.iprocRegs = (*iproc.Regs)(pIproc)
 
@@ -307,7 +307,7 @@ func (cm *Cmic) Init(pRegs, pIproc unsafe.Pointer) {
 	cm.setInterruptHandler(i2c_interrupt, cm.I2c.Interrupt)
 }
 
-func (cm *Cmic) HardwareInit() {
+func (cm *Main) HardwareInit() {
 	cm.Reset()
 
 	// Override master mode on i2c.
@@ -315,7 +315,7 @@ func (cm *Cmic) HardwareInit() {
 	cm.I2c.Init()
 }
 
-func (cm *Cmic) packetDmaInterruptEnable(enable bool) {
+func (cm *Main) packetDmaInterruptEnable(enable bool) {
 	const mask = 1<<packet_dma0_desc_controlled_interrupt |
 		1<<packet_dma1_desc_controlled_interrupt |
 		1<<packet_dma2_desc_controlled_interrupt |
@@ -323,11 +323,11 @@ func (cm *Cmic) packetDmaInterruptEnable(enable bool) {
 	cm.interruptEnable(0, mask, enable)
 }
 
-func (cm *Cmic) StartPacketDma() {
+func (cm *Main) StartPacketDma() {
 	cm.regs.rx_buf.epipe_interface_release_all_credits.Set(1)
 }
 
-func (cm *Cmic) LedInit(data_ram_port_offset uint) {
+func (cm *Main) LedInit(data_ram_port_offset uint) {
 	// FIXME skip this when there are no leds.
 	cm.Leds[0].Regs = &cm.regs.led0
 	cm.Leds[1].Regs = &cm.regs.led1
@@ -337,7 +337,7 @@ func (cm *Cmic) LedInit(data_ram_port_offset uint) {
 	}
 }
 
-func (cm *Cmic) LedDataRamDump() {
+func (cm *Main) LedDataRamDump() {
 	cm.Leds[0].Regs = &cm.regs.led0
 	cm.Leds[1].Regs = &cm.regs.led1
 	for i := uint32(0); i < 2; i++ {

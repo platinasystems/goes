@@ -16,7 +16,7 @@ type DmaRequest struct {
 }
 
 func (r *DmaRequest) Start() {
-	r.Dma.Start(&r.DmaRequest)
+	r.CpuMain.Dma.Start(&r.DmaRequest)
 }
 
 func (r *DmaRequest) Do() {

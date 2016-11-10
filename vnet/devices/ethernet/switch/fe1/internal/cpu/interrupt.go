@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package cmic
+package cpu
 
 import (
 	"github.com/platinasystems/go/elib"
@@ -169,14 +169,14 @@ func (i interrupt) String() string {
 	return fmt.Sprintf("%d %d", i/32, i%32)
 }
 
-//go:generate gentemplate -d Package=cmic -id interruptHandler -d VecType=interruptHandlerVec -d Type=interruptHandler github.com/platinasystems/go/elib/vec.tmpl
+//go:generate gentemplate -d Package=cpu.-id interruptHandler -d VecType=interruptHandlerVec -d Type=interruptHandler github.com/platinasystems/go/elib/vec.tmpl
 
-func (c *Cmic) setInterruptHandler(which interrupt, h func()) {
+func (c *Main) setInterruptHandler(which interrupt, h func()) {
 	c.interruptHandlers.Validate(uint(which))
 	c.interruptHandlers[which].handler = h
 }
 
-func (c *Cmic) Interrupt() (nInt uint) {
+func (c *Main) Interrupt() (nInt uint) {
 	r := &c.regs.cmc[0]
 	c.interruptCount++
 	for i := range r.irq_status0 {
@@ -194,7 +194,7 @@ func (c *Cmic) Interrupt() (nInt uint) {
 	return
 }
 
-func (c *Cmic) intr(i uint, status uint32) (nInt uint) {
+func (c *Main) intr(i uint, status uint32) (nInt uint) {
 	s := elib.Word(status)
 	for s != 0 {
 		b := s.FirstSet()
@@ -224,9 +224,9 @@ func (e *irqEvent) String() string          { return fmt.Sprintf("fe1 irq %s", i
 func (e *irqEvent) Encode(b []byte) int     { return elog.EncodeUint32(b, e.i) }
 func (e *irqEvent) Decode(b []byte) (i int) { e.i, i = elog.DecodeUint32(b, i); return }
 
-//go:generate gentemplate -d Package=cmic -id irqEvent -d Type=irqEvent github.com/platinasystems/go/elib/elog/event.tmpl
+//go:generate gentemplate -d Package=cpu.-id irqEvent -d Type=irqEvent github.com/platinasystems/go/elib/elog/event.tmpl
 
-func (c *Cmic) interrupt_init() {
+func (c *Main) interrupt_init() {
 	r := &c.regs.cmc[0]
 
 	c.interruptHandlers.Validate(uint(32*(len(r.irq_status0)+len(r.irq_status1)) - 1))
@@ -244,7 +244,7 @@ func (c *Cmic) interrupt_init() {
 	}
 }
 
-func (cm *Cmic) interruptEnable(i, mask uint32, enable bool) {
+func (cm *Main) interruptEnable(i, mask uint32, enable bool) {
 	v := cm.regs.cmc[0].irq_enable0[0][i].Get()
 	if enable {
 		v |= mask
@@ -264,7 +264,7 @@ func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].Interrupt < a[j].Interrupt }
 
-func (c *Cmic) WriteInterruptSummary(w io.Writer) {
+func (c *Main) WriteInterruptSummary(w io.Writer) {
 	data := byName{}
 	for i, h := range c.interruptHandlers {
 		if h.count != 0 {

@@ -265,7 +265,7 @@ func (t *fe1a) flex_counter_fifo_dma_start() {
 		}
 	}(t)
 
-	t.Cmic.FifoDmaInit(fm.resultFifo,
+	t.CpuMain.FifoDmaInit(fm.resultFifo,
 		flex_counter_fifo_dma_channel, // channel
 		t.rx_pipe_mems.flex_counter_eviction_fifo[0].Address(),
 		sbus.Command{
@@ -297,7 +297,7 @@ func (t *fe1a) handle_fifo_data(d sbus.FifoDmaData) {
 // Poll eviction fifo for entries.
 func (t *fe1a) flex_counter_eviction_fifo_sync() {
 	for {
-		d := t.Cmic.FifoDmaSync(flex_counter_fifo_dma_channel)
+		d := t.CpuMain.FifoDmaSync(flex_counter_fifo_dma_channel)
 		if len(d.Data) == 0 {
 			break
 		}

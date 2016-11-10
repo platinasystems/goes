@@ -4,7 +4,7 @@
 
 // +build debug
 
-package cmic
+package cpu
 
 import (
 	. "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/debug"

@@ -189,9 +189,9 @@ func (p *PortBlock) sync_rw(is_write bool, isPMD bool, lane_mask m.LaneMask, add
 	}
 	mem := get_xclport_mems()
 	sw := p.Switch.GetSwitchCommon()
-	err = sw.Schan.Write128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
+	err = sw.CpuMain.Schan.Write128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
 	if err == nil && !is_write {
-		err = sw.Schan.Read128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
+		err = sw.CpuMain.Schan.Read128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
 		read_data = uint16(d[1])
 	}
 	return

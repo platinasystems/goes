@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package cmic
+package cpu
 
 import (
 	"github.com/platinasystems/go/elib/elog"
@@ -179,12 +179,12 @@ func (r *miim_regs) set_phy_bus_id(i uint16, id uint8) {
 	reg.Set(v)
 }
 
-func (c *Cmic) MdioInit(coreFreqInHz float64, ch linkStatusChanger) {
+func (c *Main) MdioInit(coreFreqInHz float64, ch linkStatusChanger) {
 	c.changer = ch
 	c.setMdioFreq(coreFreqInHz)
 }
 
-func (c *Cmic) LinkScanEnable(vn *vnet.Vnet, enable bool) {
+func (c *Main) LinkScanEnable(vn *vnet.Vnet, enable bool) {
 	if defaultLinkStatusNode.Vnet != vn {
 		vn.RegisterNode(defaultLinkStatusNode, "fe1-link-status")
 	}
@@ -206,7 +206,7 @@ type LinkStatus [6]uint32
 
 const LinkStatusWordBits = 32
 
-func (c *Cmic) getLinkStatus(v *LinkStatus) {
+func (c *Main) getLinkStatus(v *LinkStatus) {
 	r := &c.regs.miim
 	lm := &c.linkScanMain
 	for i := range r.port_link_is_down_0 {
@@ -232,14 +232,14 @@ func (n *linkStatusNode) EventHandler() {}
 var defaultLinkStatusNode = &linkStatusNode{}
 
 type linkStatusEvent struct {
-	c *Cmic
+	c *Main
 	v LinkStatus
 }
 
 func (e *linkStatusEvent) EventAction()   { e.c.changer.LinkStatusChange(&e.v) }
 func (e *linkStatusEvent) String() string { return fmt.Sprintf("fe1 link status change %x", e.v) }
 
-func (c *Cmic) LinkStatusChangeInterrupt() {
+func (c *Main) LinkStatusChangeInterrupt() {
 	r := &c.regs.miim
 	r.clear_scan_status = 1 << 4
 	e := &linkStatusEvent{c: c}
@@ -251,7 +251,7 @@ func (c *Cmic) LinkStatusChangeInterrupt() {
 	}
 }
 
-func (c *Cmic) PauseStatusChangeInterrupt() {
+func (c *Main) PauseStatusChangeInterrupt() {
 	panic("not yet")
 }
 
@@ -275,7 +275,7 @@ func (e *linkStatusElogEvent) Decode(b []byte) (i int) {
 	return
 }
 
-//go:generate gentemplate -d Package=cmic -id linkStatusElogEvent -d Type=linkStatusElogEvent github.com/platinasystems/go/elib/elog/event.tmpl
+//go:generate gentemplate -d Package=cpu.-id linkStatusElogEvent -d Type=linkStatusElogEvent github.com/platinasystems/go/elib/elog/event.tmpl
 
 type LinkScanPort struct {
 	IsExternal bool
@@ -287,7 +287,7 @@ type LinkScanPort struct {
 	Index      uint16
 }
 
-func (c *Cmic) LinkScanAdd(p *LinkScanPort) {
+func (c *Main) LinkScanAdd(p *LinkScanPort) {
 	r := &c.regs.miim
 	r.set_internal(p.Index, p.IsExternal)
 	r.set_phy_id(p.Index, p.PhyId)
@@ -303,7 +303,7 @@ func (c *Cmic) LinkScanAdd(p *LinkScanPort) {
 	}
 }
 
-func (c *Cmic) setMdioFreq(coreFreqInHz float64) {
+func (c *Main) setMdioFreq(coreFreqInHz float64) {
 	r := &c.regs.miim
 
 	// Set external mdio frequency to ~2Mhz

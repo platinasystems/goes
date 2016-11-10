@@ -57,7 +57,7 @@ func (p *Platform) DeviceMatch(pd *pci.Device) (pci.DriverDevice, error) {
 	c.index = uint(len(p.Switches))
 	p.Switches = append(p.Switches, s)
 
-	c.Cmic.Init(cmicRegs, iprocRegs)
+	c.CpuMain.Init(cmicRegs, iprocRegs)
 
 	return s, err
 }

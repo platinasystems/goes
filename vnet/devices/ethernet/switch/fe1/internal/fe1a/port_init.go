@@ -7,7 +7,7 @@ package fe1a
 import (
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/cmic"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/cpu"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/packet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/port"
@@ -177,7 +177,7 @@ func (t *fe1a) addPort(p *Port, pb *port.PortBlock) {
 		Use_module_header: true,
 		Dst_port:          uint8(p.physical_port_number.toPipe()),
 	}
-	p.InterfaceNode.Init(&t.Cmic.PacketDma, hi, &cf)
+	p.InterfaceNode.Init(&t.CpuMain.PacketDma, hi, &cf)
 	v.RegisterOutputInterfaceNode(&p.InterfaceNode, hi, name)
 
 	t.linkScanAdd(p, pb)
@@ -204,7 +204,7 @@ func (t *fe1a) addCpuLoopbackPort(p *Port, name string, pn physical_port_number,
 		Loopback_port:        uint8(phys_port_loopback_pipe_0),
 		Is_visibility_packet: true,
 	}
-	in.Init(&t.Cmic.PacketDma, hi, &cf)
+	in.Init(&t.CpuMain.PacketDma, hi, &cf)
 	v.RegisterOutputInterfaceNode(in, hi, name)
 
 	t.port_by_phys_port[p.physical_port_number] = p
@@ -396,11 +396,11 @@ func (t *fe1a) PortInit(vn *vnet.Vnet) {
 		if len(tn) > 0 {
 			nm += "-" + tn
 		}
-		t.Cmic.PacketDma.StartRx(vn, nm, t.packet_dma_ports[:])
-		c.Cmic.StartPacketDma()
+		t.CpuMain.PacketDma.StartRx(vn, nm, t.packet_dma_ports[:])
+		c.CpuMain.StartPacketDma()
 	}
 
-	t.Cmic.LinkScanEnable(vn, true)
+	t.CpuMain.LinkScanEnable(vn, true)
 }
 
 type port_bitmap_main struct {
@@ -459,14 +459,14 @@ func (p *physical_port_number) fromLinkScan(i uint16) (ok bool) {
 }
 
 func (t *fe1a) linkScanAdd(p *Port, pb *port.PortBlock) {
-	var ls cmic.LinkScanPort
+	var ls cpu.LinkScanPort
 	id, bus := t.PhyIDForPort(pb.SbusBlock, p.SubPortIndex)
 	ls.Index = p.physical_port_number.toLinkScan()
 	ls.PhyId, ls.PhyBusId = uint8(id), uint8(bus)
 	ls.Enable = true
 	ls.IsExternal = false
 	ls.IsClause45 = true
-	t.Cmic.LinkScanAdd(&ls)
+	t.CpuMain.LinkScanAdd(&ls)
 }
 
 const (
@@ -489,13 +489,13 @@ func (t *fe1a) setLedPortState(p physical_port_number, bit uint8, isSet bool) {
 	default:
 		panic(fmt.Errorf("physical port number out of range %d", p))
 	}
-	t.Cmic.Leds[li].SetPortState(pi, bit, isSet)
+	t.CpuMain.Leds[li].SetPortState(pi, bit, isSet)
 }
 
-func (t *fe1a) LinkStatusChange(v *cmic.LinkStatus) {
+func (t *fe1a) LinkStatusChange(v *cpu.LinkStatus) {
 	n := uint16(0)
 	for i := range v {
-		for j := uint(0); j < cmic.LinkStatusWordBits; j++ {
+		for j := uint(0); j < cpu.LinkStatusWordBits; j++ {
 			var p physical_port_number
 			if ok := p.fromLinkScan(n); ok {
 				linkUp := v[i]&(1<<j) != 0

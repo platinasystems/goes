@@ -593,10 +593,10 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 		q.Do()
 	}
 
-	t.Cmic.MdioInit(t.CoreFrequencyInHz, t)
+	t.CpuMain.MdioInit(t.CoreFrequencyInHz, t)
 
 	// Ports start at data ram offset 0xa0 on fe1a.
-	t.Cmic.LedInit(0xa0)
+	t.CpuMain.LedInit(0xa0)
 
 	// Re-program eprg kill timeout
 	{
