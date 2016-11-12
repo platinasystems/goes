@@ -9,182 +9,182 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-type tx_pipe_reg32 m.U32
+type tx_pipe_u32 m.U32
 
-func (r *tx_pipe_reg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
+func (r *tx_pipe_u32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
 	(*m.U32)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_reg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
+func (r *tx_pipe_u32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
 	(*m.U32)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_reg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
-func (r *tx_pipe_reg32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
+func (r *tx_pipe_u32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
+func (r *tx_pipe_u32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
 	r.geta(q, c, &v)
 	q.Do()
 	return
 }
 
-type tx_pipe_reg64 m.U64
+type tx_pipe_u64 m.U64
 
-func (r *tx_pipe_reg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
+func (r *tx_pipe_u64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
 	(*m.U64)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_reg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
+func (r *tx_pipe_u64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
 	(*m.U64)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_reg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
-func (r *tx_pipe_reg64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
+func (r *tx_pipe_u64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
+func (r *tx_pipe_u64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
 	r.geta(q, c, &v)
 	q.Do()
 	return
 }
 
-type tx_pipe_preg32 m.Pu32
-type tx_pipe_portreg32 [1 << m.Log2NPorts]tx_pipe_preg32
+type tx_pipe_pu32 m.Pu32
+type tx_pipe_port_u32 [1 << m.Log2NPorts]tx_pipe_pu32
 
-func (r *tx_pipe_preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
+func (r *tx_pipe_pu32) address() sbus.Address { return (*m.Pu32)(r).Address() }
 
-func (r *tx_pipe_preg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
+func (r *tx_pipe_pu32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
 	(*m.Pu32)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
+func (r *tx_pipe_pu32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
 	(*m.Pu32)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
+func (r *tx_pipe_pu32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
 
-type tx_pipe_preg64 m.Pu64
-type tx_pipe_portreg64 [1 << m.Log2NPorts]tx_pipe_preg64
+type tx_pipe_pu64 m.Pu64
+type tx_pipe_port_u64 [1 << m.Log2NPorts]tx_pipe_pu64
 
-func (r *tx_pipe_preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
+func (r *tx_pipe_pu64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 
-func (r *tx_pipe_preg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
+func (r *tx_pipe_pu64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
 	(*m.Pu64)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_preg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
+func (r *tx_pipe_pu64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
 	(*m.Pu64)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
-func (r *tx_pipe_preg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
+func (r *tx_pipe_pu64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
 
 type tx_pipe_controller struct {
-	latency_mode tx_pipe_reg32
+	latency_mode tx_pipe_u32
 	_            [0x01000000 - 0x00000100]byte
 
-	hw_reset_control_0      tx_pipe_reg32
+	hw_reset_control_0      tx_pipe_u32
 	_                       [0x01010000 - 0x01000100]byte
-	hw_reset_control_1      tx_pipe_reg32
+	hw_reset_control_1      tx_pipe_u32
 	_                       [0x01030000 - 0x01010100]byte
-	arbiter_timeout_control tx_pipe_reg32
+	arbiter_timeout_control tx_pipe_u32
 	_                       [0x01040000 - 0x01030100]byte
-	arbiter_misc_control    tx_pipe_reg32
+	arbiter_misc_control    tx_pipe_u32
 
 	_ [0x04000000 - 0x01040100]byte
 
-	config                     tx_pipe_reg32
-	config_1                   tx_pipe_reg32
-	_                          [1]tx_pipe_reg32
-	vlan_control_1             tx_pipe_portreg32
-	mirror_select              tx_pipe_reg32
-	l3_tunnel_pfm_vid          tx_pipe_reg32
-	niv_ethertype              tx_pipe_reg32
-	_                          [0x10 - 0x07]tx_pipe_reg32
-	ip_multicast_config_2      tx_pipe_portreg32
-	qcn_cntag_ethertype        tx_pipe_reg32
-	_                          [0x18 - 0x12]tx_pipe_reg32
-	port_to_next_hop_mapping   tx_pipe_portreg32
-	port_extender_ethertype    tx_pipe_reg32
-	_                          [0x20 - 0x1a]tx_pipe_reg32
-	ieee_1588_ingress_control  tx_pipe_portreg32
-	hg_eh_control              tx_pipe_reg64
-	_                          [0x23 - 0x22]tx_pipe_reg32
-	vlan_tag_action_for_bypass tx_pipe_portreg32
+	config                     tx_pipe_u32
+	config_1                   tx_pipe_u32
+	_                          [1]tx_pipe_u32
+	vlan_control_1             tx_pipe_port_u32
+	mirror_select              tx_pipe_u32
+	l3_tunnel_pfm_vid          tx_pipe_u32
+	niv_ethertype              tx_pipe_u32
+	_                          [0x10 - 0x07]tx_pipe_u32
+	ip_multicast_config_2      tx_pipe_port_u32
+	qcn_cntag_ethertype        tx_pipe_u32
+	_                          [0x18 - 0x12]tx_pipe_u32
+	port_to_next_hop_mapping   tx_pipe_port_u32
+	port_extender_ethertype    tx_pipe_u32
+	_                          [0x20 - 0x1a]tx_pipe_u32
+	ieee_1588_ingress_control  tx_pipe_port_u32
+	hg_eh_control              tx_pipe_u64
+	_                          [0x23 - 0x22]tx_pipe_u32
+	vlan_tag_action_for_bypass tx_pipe_port_u32
 	_                          [0x08000000 - 0x04002400]byte
 
-	outer_tpid                      [4]tx_pipe_reg32
-	_                               [0x10 - 0x04]tx_pipe_reg32
-	vlan_translate_hash_control     tx_pipe_reg32
-	vlan_control_2                  tx_pipe_portreg32
-	vlan_control_3                  tx_pipe_portreg32
-	pvlan_eport_control             tx_pipe_portreg32
-	ingress_port_tpid_select        tx_pipe_portreg32
-	tunnel_id_mask                  tx_pipe_reg32
-	vp_vlan_membership_hash_control tx_pipe_reg32
+	outer_tpid                      [4]tx_pipe_u32
+	_                               [0x10 - 0x04]tx_pipe_u32
+	vlan_translate_hash_control     tx_pipe_u32
+	vlan_control_2                  tx_pipe_port_u32
+	vlan_control_3                  tx_pipe_port_u32
+	pvlan_eport_control             tx_pipe_port_u32
+	ingress_port_tpid_select        tx_pipe_port_u32
+	tunnel_id_mask                  tx_pipe_u32
+	vp_vlan_membership_hash_control tx_pipe_u32
 	_                               [0x0c000000 - 0x08001700]byte
 
-	port_debug           tx_pipe_portreg32
-	niv_config           tx_pipe_reg32
-	sys_reserved_vid     tx_pipe_reg32
-	etag_multicast_range tx_pipe_reg32
+	port_debug           tx_pipe_port_u32
+	niv_config           tx_pipe_u32
+	sys_reserved_vid     tx_pipe_u32
+	etag_multicast_range tx_pipe_u32
 	_                    [0x10000000 - 0x0c000400]byte
 
-	trill_header_attributes tx_pipe_reg32
-	l2gre_control           tx_pipe_reg32
-	vxlan_control           tx_pipe_reg32
-	ecn_control             tx_pipe_reg32
+	trill_header_attributes tx_pipe_u32
+	l2gre_control           tx_pipe_u32
+	vxlan_control           tx_pipe_u32
+	ecn_control             tx_pipe_u32
 	_                       [0x14000000 - 0x10000400]byte
 
-	tunnel_pimdr       [2][2]tx_pipe_reg32
-	modmap_control     tx_pipe_portreg32
-	sf_src_modid_check tx_pipe_portreg32
-	mim_ethertype      tx_pipe_reg32
+	tunnel_pimdr       [2][2]tx_pipe_u32
+	modmap_control     tx_pipe_port_u32
+	sf_src_modid_check tx_pipe_port_u32
+	mim_ethertype      tx_pipe_u32
 	_                  [0x18000000 - 0x14000700]byte
 
-	multicast_control_1           tx_pipe_reg32
-	multicast_control_2           tx_pipe_reg32
-	shaping_control               tx_pipe_portreg32
-	counter_control               tx_pipe_portreg32
-	packet_modification_control   tx_pipe_reg32
-	port_mtu                      tx_pipe_portreg32
-	_                             [0x7 - 0x6]tx_pipe_reg32
-	niv_ethertype_2               tx_pipe_reg32
-	pe_ethertype_2                tx_pipe_reg32
-	hg_hdr_prot_status_tx_control tx_pipe_reg32
-	_                             [0x10 - 0x0a]tx_pipe_reg32
-	qcn_cntag_ethertype_2         tx_pipe_reg32
-	hbfc_cntag_ethertype_2        tx_pipe_reg32
-	port_outer_tpid_enable        tx_pipe_portreg32
+	multicast_control_1           tx_pipe_u32
+	multicast_control_2           tx_pipe_u32
+	shaping_control               tx_pipe_port_u32
+	counter_control               tx_pipe_port_u32
+	packet_modification_control   tx_pipe_u32
+	port_mtu                      tx_pipe_port_u32
+	_                             [0x7 - 0x6]tx_pipe_u32
+	niv_ethertype_2               tx_pipe_u32
+	pe_ethertype_2                tx_pipe_u32
+	hg_hdr_prot_status_tx_control tx_pipe_u32
+	_                             [0x10 - 0x0a]tx_pipe_u32
+	qcn_cntag_ethertype_2         tx_pipe_u32
+	hbfc_cntag_ethertype_2        tx_pipe_u32
+	port_outer_tpid_enable        tx_pipe_port_u32
 	_                             [0x1c000000 - 0x18001300]byte
 
-	wesp_proto_control            tx_pipe_reg32
-	_                             [0x3 - 0x1]tx_pipe_reg32
-	flexible_ip6_extension_header tx_pipe_reg32
-	_                             [0x5 - 0x4]tx_pipe_reg32
-	ieee_1588_parsing_control     tx_pipe_reg32
+	wesp_proto_control            tx_pipe_u32
+	_                             [0x3 - 0x1]tx_pipe_u32
+	flexible_ip6_extension_header tx_pipe_u32
+	_                             [0x5 - 0x4]tx_pipe_u32
+	ieee_1588_parsing_control     tx_pipe_u32
 	_                             [0x20000000 - 0x1c000600]byte
 
-	txf_slice_control        tx_pipe_reg32
-	txf_meter_control        tx_pipe_reg32
-	txf_slice_map            tx_pipe_reg32
-	txf_class_id_selector    tx_pipe_reg32
-	txf_key4_dvp_selector    tx_pipe_reg32
-	txf_key4_mdl_selector    tx_pipe_reg32
-	ieee_1588_egress_control tx_pipe_portreg32
-	ieee_1588_link_delay_64  tx_pipe_portreg64
-	_                        [0x13 - 0x08]tx_pipe_reg32
-	txf_key8_dvp_selector    tx_pipe_reg32
+	txf_slice_control        tx_pipe_u32
+	txf_meter_control        tx_pipe_u32
+	txf_slice_map            tx_pipe_u32
+	txf_class_id_selector    tx_pipe_u32
+	txf_key4_dvp_selector    tx_pipe_u32
+	txf_key4_mdl_selector    tx_pipe_u32
+	ieee_1588_egress_control tx_pipe_port_u32
+	ieee_1588_link_delay_64  tx_pipe_port_u64
+	_                        [0x13 - 0x08]tx_pipe_u32
+	txf_key8_dvp_selector    tx_pipe_u32
 	_                        [0x24000000 - 0x20001400]byte
 
-	event_debug                            tx_pipe_reg32
+	event_debug                            tx_pipe_u32
 	_                                      [0x28000000 - 0x24000100]byte
-	counters                               [0x11 - 0x0]tx_pipe_portreg64
-	_                                      [0x20 - 0x11]tx_pipe_reg32
-	debug_counter_select                   [12]tx_pipe_reg32
-	_                                      [0x30 - 0x2c]tx_pipe_reg32
-	debug_counter_select_hi                [12]tx_pipe_reg32
-	_                                      [0x41 - 0x3c]tx_pipe_reg32
-	device_to_physical_port_number_mapping tx_pipe_portreg32
-	_                                      [0x50 - 0x42]tx_pipe_reg32
-	mmu_max_cell_credit                    tx_pipe_portreg32
+	counters                               [0x11 - 0x0]tx_pipe_port_u64
+	_                                      [0x20 - 0x11]tx_pipe_u32
+	debug_counter_select                   [12]tx_pipe_u32
+	_                                      [0x30 - 0x2c]tx_pipe_u32
+	debug_counter_select_hi                [12]tx_pipe_u32
+	_                                      [0x41 - 0x3c]tx_pipe_u32
+	device_to_physical_port_number_mapping tx_pipe_port_u32
+	_                                      [0x50 - 0x42]tx_pipe_u32
+	mmu_max_cell_credit                    tx_pipe_port_u32
 	perq_counter, txf_counter              pipe_counter_1pool_control
-	_                                      [0x113 - 0x59]tx_pipe_reg32
-	data_buffer_misc_control               tx_pipe_reg32
-	_                                      [0x400 - 0x114]tx_pipe_reg32
+	_                                      [0x113 - 0x59]tx_pipe_u32
+	data_buffer_misc_control               tx_pipe_u32
+	_                                      [0x400 - 0x114]tx_pipe_u32
 
 	pipe_counter pipe_counter_4pool_control
 	_            [0x29040000 - 0x28050000]byte
 
-	data_buffer_control_parity_enable tx_pipe_reg32
+	data_buffer_control_parity_enable tx_pipe_u32
 	_                                 [0x29500000 - 0x29040100]byte
-	data_buffer_1dbg_a                tx_pipe_reg32
+	data_buffer_1dbg_a                tx_pipe_u32
 }
 
 type tx_pipe_mems struct {

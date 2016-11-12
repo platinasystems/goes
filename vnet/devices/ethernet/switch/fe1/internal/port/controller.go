@@ -9,223 +9,223 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-type reg32 m.U32
+type u32 m.U32
 
-func (r *reg32) get(q *dmaRequest, v *uint32) {
+func (r *u32) get(q *dmaRequest, v *uint32) {
 	(*m.U32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
-func (r *reg32) getDo(q *dmaRequest) (v uint32) { r.get(q, &v); q.Do(); return }
+func (r *u32) getDo(q *dmaRequest) (v uint32) { r.get(q, &v); q.Do(); return }
 
-func (r *reg32) set(q *dmaRequest, v uint32) {
+func (r *u32) set(q *dmaRequest, v uint32) {
 	(*m.U32)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 
-func (r *reg32) offset() uint          { return (*m.U32)(r).Offset() }
-func (r *reg32) address() sbus.Address { return (*m.U32)(r).Address() }
+func (r *u32) offset() uint          { return (*m.U32)(r).Offset() }
+func (r *u32) address() sbus.Address { return (*m.U32)(r).Address() }
 
-type preg32 m.Pu32
-type portreg32 [1 << m.Log2NPorts]preg32
-type preg64 m.Pu64
-type portreg64 [1 << m.Log2NPorts]preg64
+type pu32 m.Pu32
+type port_u32 [1 << m.Log2NPorts]pu32
+type pu64 m.Pu64
+type port_u64 [1 << m.Log2NPorts]pu64
 
-func (r *preg32) get(q *dmaRequest, v *uint32) {
+func (r *pu32) get(q *dmaRequest, v *uint32) {
 	(*m.Pu32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
-func (r *preg32) getDo(q *dmaRequest) (v uint32) { r.get(q, &v); q.Do(); return }
+func (r *pu32) getDo(q *dmaRequest) (v uint32) { r.get(q, &v); q.Do(); return }
 
-func (r *preg32) set(q *dmaRequest, v uint32) {
+func (r *pu32) set(q *dmaRequest, v uint32) {
 	(*m.Pu32)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 
-func (r *preg64) get(q *dmaRequest, v *uint64) {
+func (r *pu64) get(q *dmaRequest, v *uint64) {
 	(*m.Pu64)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
-func (r *preg64) getDo(q *dmaRequest) (v uint64) { r.get(q, &v); q.Do(); return }
+func (r *pu64) getDo(q *dmaRequest) (v uint64) { r.get(q, &v); q.Do(); return }
 
-func (r *preg64) set(q *dmaRequest, v uint64) {
+func (r *pu64) set(q *dmaRequest, v uint64) {
 	(*m.Pu64)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 
-func (r *preg32) offset() uint          { return (*m.Pu32)(r).Offset() }
-func (r *preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
-func (r *preg64) offset() uint          { return (*m.Pu64)(r).Offset() }
-func (r *preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
+func (r *pu32) offset() uint          { return (*m.Pu32)(r).Offset() }
+func (r *pu32) address() sbus.Address { return (*m.Pu32)(r).Address() }
+func (r *pu64) offset() uint          { return (*m.Pu64)(r).Offset() }
+func (r *pu64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 
-type xclport_regs struct {
-	counters [N_counters]portreg64
+type port_controller struct {
+	counters [N_counters]port_u64
 
-	_ [0x200 - N_counters]portreg64
+	_ [0x200 - N_counters]port_u64
 
-	higig_config portreg32
+	higig_config port_u32
 
-	mib_stats_max_packet_size portreg32
+	mib_stats_max_packet_size port_u32
 
-	lag_failover_config portreg32
+	lag_failover_config port_u32
 
-	eee_counter_mode portreg32
+	eee_counter_mode port_u32
 
-	_ reg32
+	_ u32
 
-	link_status_to_cmic_control portreg32
+	link_status_to_cmic_control port_u32
 
-	sw_flow_control portreg32
+	sw_flow_control port_u32
 
-	flow_control_config reg32
+	flow_control_config u32
 
-	mac_rsv_mask portreg32
+	mac_rsv_mask port_u32
 
-	_ reg32
+	_ u32
 
-	mode reg32
+	mode u32
 
-	port_enable reg32
+	port_enable u32
 
-	soft_reset reg32
+	soft_reset u32
 
-	power_save reg32
+	power_save u32
 
-	_ [0x210 - 0x20e]reg32
+	_ [0x210 - 0x20e]u32
 
-	mac_control reg32
+	mac_control u32
 
-	counter_mode reg32
+	counter_mode u32
 
-	_ reg32
+	_ u32
 
-	phy_pll_status reg32
+	phy_pll_status u32
 
-	phy_control reg32
+	phy_control u32
 
-	phy_lane_status [4]reg32
+	phy_lane_status [4]u32
 
-	phy_uc_data_access_mode reg32
+	phy_uc_data_access_mode u32
 
-	_ [0x224 - 0x21a]reg32
+	_ [0x224 - 0x21a]u32
 
-	reset_mib_counters reg32
+	reset_mib_counters u32
 
-	time_stamp_timer [2]reg32
+	time_stamp_timer [2]u32
 
-	link_status_down reg32
+	link_status_down u32
 
-	link_status_down_clear reg32
+	link_status_down_clear u32
 
-	interrupt_status reg32
-	interrupt_enable reg32
+	interrupt_status u32
+	interrupt_enable u32
 
-	sbus_control reg32
+	sbus_control u32
 
-	_ [0x600 - 0x22c]reg32
+	_ [0x600 - 0x22c]u32
 }
 
-type xclmac_common_regs_0 struct {
-	control portreg64
+type mac_common_0 struct {
+	control port_u64
 
-	mode portreg64
+	mode port_u64
 
-	spare [2]portreg64
+	spare [2]port_u64
 
-	tx_control portreg64
+	tx_control port_u64
 
-	tx_src_address portreg64
+	tx_src_address port_u64
 
 	rx struct {
-		control portreg64
+		control port_u64
 
-		src_address portreg64
+		src_address port_u64
 
-		max_bytes_per_packet portreg64
+		max_bytes_per_packet port_u64
 
-		ethernet_type_for_vlan portreg64
+		ethernet_type_for_vlan port_u64
 
-		lss_control portreg64
+		lss_control port_u64
 
-		lss_status       portreg64
-		clear_lss_status portreg64
+		lss_status       port_u64
+		clear_lss_status port_u64
 	}
 
-	pause_control portreg64
+	pause_control port_u64
 
 	pfc struct {
-		control     portreg64
-		pfc_type    portreg64
-		opcode      portreg64
-		dst_address portreg64
+		control     port_u64
+		pfc_type    port_u64
+		opcode      port_u64
+		dst_address port_u64
 	}
 
 	llfc struct {
-		control       portreg64
-		tx_msg_fields portreg64
-		rx_msg_fields portreg64
+		control       port_u64
+		tx_msg_fields port_u64
+		rx_msg_fields port_u64
 	}
 
-	tx_timestamp_fifo_data   portreg64
-	tx_timestamp_fifo_status portreg64
+	tx_timestamp_fifo_data   port_u64
+	tx_timestamp_fifo_status port_u64
 
-	fifo_status       portreg64
-	fifo_status_clear portreg64
+	fifo_status       port_u64
+	fifo_status_clear port_u64
 
-	lag_failover_status portreg64
+	lag_failover_status port_u64
 
-	eee_control                 portreg64
-	eee_timers                  portreg64
-	eee_1_sec_link_status_timer portreg64
+	eee_control                 port_u64
+	eee_timers                  port_u64
+	eee_1_sec_link_status_timer port_u64
 
-	higig_hdr [2]portreg64
+	higig_hdr [2]port_u64
 
-	gmii_eee_control       portreg64
-	tx_timestamp_adjust    portreg64
-	tx_corrupt_crc_control portreg64
+	gmii_eee_control       port_u64
+	tx_timestamp_adjust    port_u64
+	tx_corrupt_crc_control port_u64
 
 	e2e struct {
-		control       portreg64
-		cc_module_hdr [2]portreg64
-		cc_data_hdr   [2]portreg64
-		fc_module_hdr [2]portreg64
-		fc_data_hdr   [2]portreg64
+		control       port_u64
+		cc_module_hdr [2]port_u64
+		cc_data_hdr   [2]port_u64
+		fc_module_hdr [2]port_u64
+		fc_data_hdr   [2]port_u64
 	}
 
-	tx_fifo_cell_count portreg64
+	tx_fifo_cell_count port_u64
 
-	tx_fifo_cell_request_count portreg64
+	tx_fifo_cell_request_count port_u64
 
-	memory_control               portreg64
-	ecc_control                  portreg64
-	ecc_force_multiple_bit_error portreg64
-	ecc_force_single_bit_error   portreg64
+	memory_control               port_u64
+	ecc_control                  port_u64
+	ecc_force_multiple_bit_error port_u64
+	ecc_force_single_bit_error   port_u64
 }
 
-type xclmac_common_regs_1 struct {
-	rx_cdc_memory_ecc_status portreg64
-	tx_cdc_memory_ecc_status portreg64
-	ecc_status_clear         portreg64
-	version                  portreg64
+type mac_common_1 struct {
+	rx_cdc_memory_ecc_status port_u64
+	tx_cdc_memory_ecc_status port_u64
+	ecc_status_clear         port_u64
+	version                  port_u64
 }
 
-type clmac_uncommon_regs_0 struct {
-	rx_timestamp_memory_ecc_status portreg64
+type hundred_gig_mac_uncommon_0 struct {
+	rx_timestamp_memory_ecc_status port_u64
 }
 
-type clport_regs struct {
-	xclport_regs
-	xclmac_common_regs_0
-	clmac_uncommon_regs_0
-	xclmac_common_regs_1
+type hundred_gig_port_controller struct {
+	port_controller
+	mac_common_0
+	hundred_gig_mac_uncommon_0
+	mac_common_1
 }
 
-type xlport_regs struct {
-	xclport_regs
-	xclmac_common_regs_0
-	xclmac_common_regs_1
+type forty_gig_port_controller struct {
+	port_controller
+	mac_common_0
+	mac_common_1
 }
 
-func (p *PortBlock) get_regs() (*xclport_regs, *xclmac_common_regs_0, *xclmac_common_regs_1, *clmac_uncommon_regs_0) {
+func (p *PortBlock) get_controllers() (*port_controller, *mac_common_0, *mac_common_1, *hundred_gig_mac_uncommon_0) {
 	if p.IsXlPort {
-		x := (*xlport_regs)(m.BasePointer)
-		return &x.xclport_regs, &x.xclmac_common_regs_0, &x.xclmac_common_regs_1, (*clmac_uncommon_regs_0)(nil)
+		x := (*forty_gig_port_controller)(m.BasePointer)
+		return &x.port_controller, &x.mac_common_0, &x.mac_common_1, (*hundred_gig_mac_uncommon_0)(nil)
 	} else {
-		x := (*clport_regs)(m.BasePointer)
-		return &x.xclport_regs, &x.xclmac_common_regs_0, &x.xclmac_common_regs_1, &x.clmac_uncommon_regs_0
+		x := (*hundred_gig_port_controller)(m.BasePointer)
+		return &x.port_controller, &x.mac_common_0, &x.mac_common_1, &x.hundred_gig_mac_uncommon_0
 	}
 }
 

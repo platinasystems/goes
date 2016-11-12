@@ -114,7 +114,7 @@ func (p *PortBlock) dmaReq() *dmaRequest {
 }
 
 func (p *PortBlock) Enable(enable bool) {
-	r, _, _, _ := p.get_regs()
+	r, _, _, _ := p.get_controllers()
 	q := p.dmaReq()
 
 	var v [2]uint32
@@ -162,7 +162,7 @@ func (p *PortBlock) Enable(enable bool) {
 }
 
 func (p *PortBlock) SetPortEnable(port m.Porter, enable bool) {
-	block_regs, mac_regs, _, _ := p.get_regs()
+	block_regs, mac_regs, _, _ := p.get_controllers()
 	q := p.dmaReq()
 	i := m.GetSubPortIndex(port)
 	pc := port.GetPortCommon()
@@ -214,7 +214,7 @@ func (p *PortBlock) SetPortEnable(port m.Porter, enable bool) {
 }
 
 func (p *PortBlock) SetPortLoopback(port m.Porter, enable bool) {
-	_, r, _, _ := p.get_regs()
+	_, r, _, _ := p.get_controllers()
 	q := p.dmaReq()
 	i := m.GetSubPortIndex(port)
 
@@ -237,7 +237,7 @@ type portStatus struct {
 }
 
 func (p *PortBlock) getStatus(port m.Porter) (s portStatus) {
-	r, _, _, _ := p.get_regs()
+	r, _, _, _ := p.get_controllers()
 	i := m.GetSubPortIndex(port)
 	q := p.dmaReq()
 	v := r.phy_lane_status[i].getDo(q)

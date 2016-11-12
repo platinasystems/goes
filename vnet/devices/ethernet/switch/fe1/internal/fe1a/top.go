@@ -142,7 +142,7 @@ type fe1a struct {
 
 	dmaReq DmaRequest
 
-	revision_id revision_id_reg
+	revision_id revision_id_u32
 
 	top_controller        *top_controller
 	rx_pipe_mems          *rx_pipe_mems
@@ -338,12 +338,12 @@ func (t *fe1a) Init() {
 	q.Do()
 
 	// Read revision id once and for all.
-	t.revision_id = revision_id_reg(r.revision_id.getDo(q))
+	t.revision_id = revision_id_u32(r.revision_id.getDo(q))
 
 	t.clear_memories()
 }
 
-type revision_id_reg uint32
+type revision_id_u32 uint32
 type revision_id uint8
 
 const (
@@ -352,11 +352,11 @@ const (
 	revision_id_b1 revision_id = 0x12
 )
 
-func (i revision_id_reg) getId() revision_id {
+func (i revision_id_u32) getId() revision_id {
 	return revision_id((i >> 16) & 0xff)
 }
 
-func (i revision_id_reg) String() string {
+func (i revision_id_u32) String() string {
 	return fmt.Sprintf("0x%x", i.getId())
 }
 

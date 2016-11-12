@@ -11,7 +11,7 @@ import (
 	"fmt"
 )
 
-type phy_reg_dma_cmd struct {
+type phy_dma_cmd struct {
 	sbus.DmaCmd
 
 	index uint16
@@ -22,12 +22,12 @@ type phy_reg_dma_cmd struct {
 	// Storage for Rx/Tx.
 	buf [4]uint32
 
-	*phy_reg_dma_rw
+	*phy_dma_rw
 }
 
-func (p *PortBlock) phy_address(isPMD bool, lane_mask m.LaneMask, reg_offset uint16) (a uint32) {
-	a = uint32(reg_offset)
-	if isPMD {
+func (p *PortBlock) phy_address(is_pmd bool, lane_mask m.LaneMask, address uint16) (a uint32) {
+	a = uint32(address)
+	if is_pmd {
 		a |= 1 << 27 // DEVAD
 	}
 	sw := p.Switch
@@ -57,15 +57,15 @@ func (p *PortBlock) phy_address(isPMD bool, lane_mask m.LaneMask, reg_offset uin
 	return
 }
 
-func (c *phy_reg_dma_cmd) address() uint32 {
-	return c.portBlock.phy_address(c.is_pmd_reg, c.lane_mask, c.reg_offset+c.index)
+func (c *phy_dma_cmd) get_address() uint32 {
+	return c.portBlock.phy_address(c.is_pmd, c.lane_mask, c.address+c.index)
 }
 
-func (c *phy_reg_dma_cmd) Pre() {
+func (c *phy_dma_cmd) Pre() {
 	if c.Command.Opcode == sbus.WriteMemory {
 		c.Tx = c.buf[:]
 
-		c.Tx[0] = c.address()
+		c.Tx[0] = c.get_address()
 
 		// Hardware performs: (read_value &^ write_mask) | (write_value & write_mask)
 		// Ignored for reads.
@@ -81,7 +81,7 @@ func (c *phy_reg_dma_cmd) Pre() {
 	}
 }
 
-func (c *phy_reg_dma_cmd) Post() {
+func (c *phy_dma_cmd) Post() {
 	if !c.is_write && c.Command.Opcode == sbus.ReadMemory {
 		v := uint16(c.Rx[1])
 		if c.result32 != nil {
@@ -97,13 +97,13 @@ func (c *phy_reg_dma_cmd) Post() {
 	}
 }
 
-type phy_reg_dma_rw struct {
+type phy_dma_rw struct {
 	portBlock *PortBlock
 
-	is_write   bool
-	is_pmd_reg bool
+	is_write bool
+	is_pmd   bool
 
-	reg_offset uint16
+	address uint16
 
 	lane_mask m.LaneMask
 
@@ -111,14 +111,14 @@ type phy_reg_dma_rw struct {
 	result16 *uint16
 }
 
-func (rw *phy_reg_dma_rw) get_set(q *sbus.DmaRequest, isSet bool, index, write_data, write_mask uint16) {
-	cmds := [2]phy_reg_dma_cmd{}
+func (rw *phy_dma_rw) get_set(q *sbus.DmaRequest, isSet bool, index, write_data, write_mask uint16) {
+	cmds := [2]phy_dma_cmd{}
 	m := get_xclport_mems()
-	cmds[0] = phy_reg_dma_cmd{
-		phy_reg_dma_rw: rw,
-		index:          index,
-		write_data:     write_data,
-		write_mask:     write_mask,
+	cmds[0] = phy_dma_cmd{
+		phy_dma_rw: rw,
+		index:      index,
+		write_data: write_data,
+		write_mask: write_mask,
 		DmaCmd: sbus.DmaCmd{
 			Command: sbus.Command{Opcode: sbus.WriteMemory, Block: rw.portBlock.SbusBlock},
 			Address: m.wc_ucmem_data[0].Address(),
@@ -132,57 +132,57 @@ func (rw *phy_reg_dma_rw) get_set(q *sbus.DmaRequest, isSet bool, index, write_d
 	}
 }
 
-func (p *PortBlock) GetPhyReg(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, value *uint16) {
-	rw := phy_reg_dma_rw{
-		portBlock:  p,
-		lane_mask:  lane_mask,
-		is_pmd_reg: isPMD,
-		reg_offset: address,
-		result16:   value,
+func (p *PortBlock) GetPhyU16(q *sbus.DmaRequest, is_pmd bool, lane_mask m.LaneMask, address uint16, value *uint16) {
+	rw := phy_dma_rw{
+		portBlock: p,
+		lane_mask: lane_mask,
+		is_pmd:    is_pmd,
+		address:   address,
+		result16:  value,
 	}
 	rw.get_set(q, false, 0, 0, 0)
 }
 
-func (p *PortBlock) SetPhyReg(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, write_data, write_mask uint16) {
-	rw := phy_reg_dma_rw{
-		portBlock:  p,
-		lane_mask:  lane_mask,
-		is_pmd_reg: isPMD,
-		reg_offset: address,
-		is_write:   true,
+func (p *PortBlock) SetPhyU16(q *sbus.DmaRequest, is_pmd bool, lane_mask m.LaneMask, address uint16, write_data, write_mask uint16) {
+	rw := phy_dma_rw{
+		portBlock: p,
+		lane_mask: lane_mask,
+		is_pmd:    is_pmd,
+		address:   address,
+		is_write:  true,
 	}
 	rw.get_set(q, true, 0, write_data, write_mask)
 }
 
-func (p *PortBlock) GetPhyReg32(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, value *uint32) {
-	rw := phy_reg_dma_rw{
-		portBlock:  p,
-		lane_mask:  lane_mask,
-		is_pmd_reg: isPMD,
-		reg_offset: address,
-		result32:   value,
+func (p *PortBlock) GetPhyU32(q *sbus.DmaRequest, is_pmd bool, lane_mask m.LaneMask, address uint16, value *uint32) {
+	rw := phy_dma_rw{
+		portBlock: p,
+		lane_mask: lane_mask,
+		is_pmd:    is_pmd,
+		address:   address,
+		result32:  value,
 	}
 	// Lo bits first for 32 bit registers where lo bit read triggers hardware read.
 	rw.get_set(q, false, 0, 0, 0)
 	rw.get_set(q, false, 1, 0, 0)
 }
 
-func (p *PortBlock) SetPhyReg32(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, value uint32) {
-	rw := phy_reg_dma_rw{
-		portBlock:  p,
-		lane_mask:  lane_mask,
-		is_pmd_reg: isPMD,
-		reg_offset: address,
-		is_write:   true,
+func (p *PortBlock) SetPhyU32(q *sbus.DmaRequest, is_pmd bool, lane_mask m.LaneMask, address uint16, value uint32) {
+	rw := phy_dma_rw{
+		portBlock: p,
+		lane_mask: lane_mask,
+		is_pmd:    is_pmd,
+		address:   address,
+		is_write:  true,
 	}
 	// Lo bits last for 32 bit registers where lo bit write triggers hardware write.
 	rw.get_set(q, true, 1, uint16(value>>16), 0xffff)
 	rw.get_set(q, true, 0, uint16(value), 0xffff)
 }
 
-func (p *PortBlock) sync_rw(is_write bool, isPMD bool, lane_mask m.LaneMask, address, write_data, write_mask uint16) (read_data uint16, err error) {
+func (p *PortBlock) sync_rw(is_write bool, is_pmd bool, lane_mask m.LaneMask, address, write_data, write_mask uint16) (read_data uint16, err error) {
 	var d [4]uint32
-	d[0] = p.phy_address(isPMD, lane_mask, address)
+	d[0] = p.phy_address(is_pmd, lane_mask, address)
 	d[1] = uint32(write_data)<<16 | (0xffff &^ uint32(write_mask))
 	if is_write {
 		d[2] = 1
@@ -197,16 +197,16 @@ func (p *PortBlock) sync_rw(is_write bool, isPMD bool, lane_mask m.LaneMask, add
 	return
 }
 
-func (p *PortBlock) GetPhyRegSync(isPMD bool, lane_mask m.LaneMask, address uint16) uint16 {
-	v, err := p.sync_rw(false, isPMD, lane_mask, address, 0, 0)
+func (p *PortBlock) GetPhyU16Sync(is_pmd bool, lane_mask m.LaneMask, address uint16) uint16 {
+	v, err := p.sync_rw(false, is_pmd, lane_mask, address, 0, 0)
 	if err != nil {
 		panic(err)
 	}
 	return v
 }
 
-func (p *PortBlock) SetPhyRegSync(isPMD bool, lane_mask m.LaneMask, address, write_data, write_mask uint16) {
-	_, err := p.sync_rw(true, isPMD, lane_mask, address, write_data, write_mask)
+func (p *PortBlock) SetPhyU16Sync(is_pmd bool, lane_mask m.LaneMask, address, write_data, write_mask uint16) {
+	_, err := p.sync_rw(true, is_pmd, lane_mask, address, write_data, write_mask)
 	if err != nil {
 		panic(err)
 	}
@@ -225,7 +225,7 @@ func (p *PortBlock) LoadFirmware(q *sbus.DmaRequest, ucode_bytes []byte) {
 	}
 
 	mems := get_xclport_mems()
-	regs, _, _, _ := p.get_regs()
+	r, _, _, _ := p.get_controllers()
 
 	// Enable and disable uc memory access before and after downloading firmware.
 	block := p.SbusBlock
@@ -234,7 +234,7 @@ func (p *PortBlock) LoadFirmware(q *sbus.DmaRequest, ucode_bytes []byte) {
 			Opcode: sbus.WriteRegister,
 			Block:  block,
 		},
-		Address: regs.phy_uc_data_access_mode.address(),
+		Address: r.phy_uc_data_access_mode.address(),
 	}
 	enable_mem_cmds := [2]sbus.DmaCmd{enable_mem_cmd, enable_mem_cmd}
 	enable_mem_cmds[0].Tx = []uint32{1}

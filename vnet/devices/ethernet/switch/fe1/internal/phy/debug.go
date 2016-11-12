@@ -11,9 +11,9 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 )
 
-func (r *pcs_reg) offset() uint      { return uint((*reg)(r).offset()) }
-func (r *pcs_lane_reg) offset() uint { return uint((*reg)(r).offset()) }
-func (r *pmd_lane_reg) offset() uint { return uint((*reg)(r).offset()) }
+func (r *pcs_reg) offset() uint      { return uint((*u16)(r).offset()) }
+func (r *pcs_lane_reg) offset() uint { return uint((*u16)(r).offset()) }
+func (r *pmd_lane_reg) offset() uint { return uint((*u16)(r).offset()) }
 func (r *pcs_reg_32) offset() uint   { return uint(r[0].offset()) }
 func (r *pmd_reg_32) offset() uint   { return uint(r[0].offset()) }
 

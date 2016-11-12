@@ -352,7 +352,7 @@ var Counter_order = [vnet.NRxTx][]Counter_type{
 
 // Dma port counters and add to running count.
 func (p *PortBlock) GetCounters(port m.Porter, v *[N_counters]uint64) {
-	r, _, _, _ := p.get_regs()
+	r, _, _, _ := p.get_controllers()
 	q := p.dmaReq()
 	pi := m.GetSubPortIndex(port)
 
