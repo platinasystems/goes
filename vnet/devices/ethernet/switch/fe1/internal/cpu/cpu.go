@@ -18,7 +18,7 @@ import (
 	"unsafe"
 )
 
-type cmc_regs struct {
+type sub_controllers struct {
 	pio      sbus.PIOController
 	fast_pio sbus.FastPIOController
 
@@ -61,7 +61,7 @@ type cmc_regs struct {
 }
 
 type regs struct {
-	i2c icpu.I2cRegs
+	i2c icpu.I2cController
 
 	_ [0x10c - 0x50]byte
 
@@ -194,8 +194,9 @@ type regs struct {
 	led1 led.Regs
 	_    [0x29000 - 0x22000]byte
 	led2 led.Regs
-	_    [0x31000 - 0x2a000]byte
-	cmc  [3]cmc_regs
+
+	_               [0x31000 - 0x2a000]byte
+	sub_controllers [3]sub_controllers
 }
 
 type Config struct {
@@ -204,9 +205,9 @@ type Config struct {
 }
 
 type Main struct {
-	regs     *regs
-	icpuRegs *icpu.Regs
-	Config   Config
+	regs            *regs
+	icpu_controller *icpu.Controller
+	Config          Config
 
 	sbus.Sbus
 	mdio.Mdio
@@ -252,14 +253,14 @@ func (cm *Main) Reset() {
 	}
 	r.sbus.timeout.Set(cf.SbusTimeout)
 
-	if cm.icpuRegs != nil {
-		a := cm.icpuRegs.Init()
+	if cm.icpu_controller != nil {
+		a := cm.icpu_controller.Init()
 		addr33_28 := uint32(a >> 28)
 		var v [4]uint32
 		for i := uint32(0); i < 16; i++ {
 			v[i/5] |= (addr33_28 | i) << uint(6*(i%5))
 		}
-		x := &r.cmc[0]
+		x := &r.sub_controllers[0]
 		x.hostmem_addr_remap0[0].Set(v[0])
 		x.hostmem_addr_remap0[1].Set(v[1])
 		x.hostmem_addr_remap0[2].Set(v[2])
@@ -269,11 +270,11 @@ func (cm *Main) Reset() {
 	cm.interrupt_init()
 }
 
-func (cm *Main) Init(pRegs, pIcpu unsafe.Pointer) {
-	cm.regs = (*regs)(pRegs)
-	cm.icpuRegs = (*icpu.Regs)(pIcpu)
+func (cm *Main) Init(pCpu, pIcpu unsafe.Pointer) {
+	cm.regs = (*regs)(pCpu)
+	cm.icpu_controller = (*icpu.Controller)(pIcpu)
 
-	c := &cm.regs.cmc[0]
+	c := &cm.regs.sub_controllers[0]
 
 	cm.PIO.Controller = &c.pio
 	cm.PIO.FastController = &c.fast_pio
@@ -303,7 +304,7 @@ func (cm *Main) Init(pRegs, pIcpu unsafe.Pointer) {
 	cm.setInterruptHandler(phy_scan_link_status_interrupt, cm.LinkStatusChangeInterrupt)
 	cm.setInterruptHandler(phy_scan_pause_status_interrupt, cm.PauseStatusChangeInterrupt)
 
-	cm.I2cRegs = &cm.regs.i2c
+	cm.I2cController = &cm.regs.i2c
 	cm.setInterruptHandler(i2c_interrupt, cm.I2c.Interrupt)
 }
 

@@ -18,7 +18,7 @@ type addr_map struct {
 	lower, upper u32
 }
 
-type Regs struct {
+type Controller struct {
 	_ [0x2000]byte
 
 	paxb [2]struct {
@@ -171,16 +171,16 @@ type Regs struct {
 
 	window7 [1024]u32
 
-	smbus0 I2cRegs
+	smbus0 I2cController
 
 	_ [0xb000 - 0x8050]byte
 
-	smbus1 I2cRegs
+	smbus1 I2cController
 
 	_ [0xc000 - 0xb050]byte
 }
 
-func (r *Regs) iGetSet(x *hw.U32, v *uint32, isSet bool) {
+func (r *Controller) iGetSet(x *hw.U32, v *uint32, isSet bool) {
 	paxb := &r.paxb[0]
 	addr := uint32(uintptr(unsafe.Pointer(x)) - uintptr(unsafe.Pointer(r)))
 	page, offset := addr&^0xfff, (addr&0xfff)/4
@@ -193,12 +193,12 @@ func (r *Regs) iGetSet(x *hw.U32, v *uint32, isSet bool) {
 	}
 }
 
-func (r *Regs) IndirectGet32(x *hw.U32) (v uint32) { r.iGetSet(x, &v, false); return }
-func (r *Regs) IndirectSet32(x *hw.U32, v uint32)  { r.iGetSet(x, &v, true) }
+func (r *Controller) IndirectGet32(x *hw.U32) (v uint32) { r.iGetSet(x, &v, false); return }
+func (r *Controller) IndirectSet32(x *hw.U32, v uint32)  { r.iGetSet(x, &v, true) }
 
 type U32 hw.U32
 
-func (r *U32) Get(regs *Regs) uint32 {
+func (r *U32) Get(regs *Controller) uint32 {
 	x := (*hw.U32)(r)
 	if regs != nil {
 		return regs.IndirectGet32(x)
@@ -207,7 +207,7 @@ func (r *U32) Get(regs *Regs) uint32 {
 	}
 }
 
-func (r *U32) Set(regs *Regs, v uint32) {
+func (r *U32) Set(regs *Controller, v uint32) {
 	x := (*hw.U32)(r)
 	if regs != nil {
 		regs.IndirectSet32(x, v)
@@ -216,7 +216,7 @@ func (r *U32) Set(regs *Regs, v uint32) {
 	}
 }
 
-func (r *Regs) Init() uint64 {
+func (r *Controller) Init() uint64 {
 	paxb := &r.paxb[0]
 
 	pci_num := uint(0)

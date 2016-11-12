@@ -177,7 +177,7 @@ func (c *Main) setInterruptHandler(which interrupt, h func()) {
 }
 
 func (c *Main) Interrupt() (nInt uint) {
-	r := &c.regs.cmc[0]
+	r := &c.regs.sub_controllers[0]
 	c.interruptCount++
 	for i := range r.irq_status0 {
 		s := r.irq_status0[i].Get()
@@ -227,7 +227,7 @@ func (e *irqEvent) Decode(b []byte) (i int) { e.i, i = elog.DecodeUint32(b, i); 
 //go:generate gentemplate -d Package=cpu.-id irqEvent -d Type=irqEvent github.com/platinasystems/go/elib/elog/event.tmpl
 
 func (c *Main) interrupt_init() {
-	r := &c.regs.cmc[0]
+	r := &c.regs.sub_controllers[0]
 
 	c.interruptHandlers.Validate(uint(32*(len(r.irq_status0)+len(r.irq_status1)) - 1))
 
@@ -245,13 +245,13 @@ func (c *Main) interrupt_init() {
 }
 
 func (cm *Main) interruptEnable(i, mask uint32, enable bool) {
-	v := cm.regs.cmc[0].irq_enable0[0][i].Get()
+	v := cm.regs.sub_controllers[0].irq_enable0[0][i].Get()
 	if enable {
 		v |= mask
 	} else {
 		v &^= mask
 	}
-	cm.regs.cmc[0].irq_enable0[0][i].Set(v)
+	cm.regs.sub_controllers[0].irq_enable0[0][i].Set(v)
 }
 
 type interruptSummary struct {

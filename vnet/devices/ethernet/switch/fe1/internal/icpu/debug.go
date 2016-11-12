@@ -11,13 +11,13 @@ import (
 	"unsafe"
 )
 
-func (r *u32) offset(regs *Regs) uint {
+func (r *u32) offset(regs *Controller) uint {
 	return uint(uintptr(unsafe.Pointer(r)) - uintptr(unsafe.Pointer(regs)))
 }
 
 // Check memory map.
 func init() {
-	r := (*Regs)(unsafe.Pointer(&struct{ _ [32 << 10]byte }{}))
+	r := (*Controller)(unsafe.Pointer(&struct{ _ [32 << 10]byte }{}))
 	CheckRegAddr("paxb[0]", r.paxb[0].clock_control.offset(r), 0x2000)
 	CheckRegAddr("paxb[0].config_indirect_address", r.paxb[0].config_indirect_address.offset(r), 0x2120)
 	CheckRegAddr("paxb[0].pcie_sys_msi_request", r.paxb[0].pcie_sys_msi_request.offset(r), 0x2340)

@@ -4,7 +4,7 @@
 
 package icpu
 
-type I2cRegs struct {
+type I2cController struct {
 	Config U32
 
 	Timing_config U32

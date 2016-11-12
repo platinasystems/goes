@@ -91,35 +91,35 @@ func (r *request) addData(b byte) {
 }
 
 type I2c struct {
-	*icpu.I2cRegs
-	IcpuRegs    *icpu.Regs
-	requestFifo chan *request
-	lock        sync.Mutex
+	*icpu.I2cController
+	IcpuController *icpu.Controller
+	requestFifo    chan *request
+	lock           sync.Mutex
 }
 
 func (r *request) start(bus *I2c) {
-	regs := bus.I2cRegs
+	regs := bus.I2cController
 
 	for i := 0; i < r.nData; i++ {
 		x := uint32(r.data[i])
 		if i+1 == r.nData {
 			x |= 1 << 31
 		}
-		regs.Data_fifo[master].Write.Set(bus.IcpuRegs, x)
+		regs.Data_fifo[master].Write.Set(bus.IcpuController, x)
 	}
 
 	cmd := uint32(r.op)<<9 | 1<<31
-	regs.Command[master].Set(bus.IcpuRegs, cmd)
+	regs.Command[master].Set(bus.IcpuController, cmd)
 }
 
 func (q *request) finish(s *I2c) {
-	regs := s.I2cRegs
-	q.status = status((regs.Command[master].Get(s.IcpuRegs) >> 25) & 0x7)
+	regs := s.I2cController
+	q.status = status((regs.Command[master].Get(s.IcpuController) >> 25) & 0x7)
 
 	if q.status == ok {
 		q.nData = 0
 		for {
-			x := regs.Data_fifo[master].Read.Get(s.IcpuRegs)
+			x := regs.Data_fifo[master].Read.Get(s.IcpuController)
 			status := x >> 30
 			const (
 				empty = iota
@@ -148,8 +148,8 @@ func (q *request) finish(s *I2c) {
 }
 
 func (i *I2c) Interrupt() {
-	status := i.Interrupt_status_write_1_to_clear.Get(i.IcpuRegs)
-	i.Interrupt_status_write_1_to_clear.Set(i.IcpuRegs, status)
+	status := i.Interrupt_status_write_1_to_clear.Get(i.IcpuController)
+	i.Interrupt_status_write_1_to_clear.Set(i.IcpuController, status)
 
 	select {
 	case a := <-i.requestFifo:
@@ -221,7 +221,7 @@ func (s *I2c) Do(rw RW, address byte, op Operation, command byte, data *Data, nD
 }
 
 func (i *I2c) Init() {
-	ir := i.IcpuRegs
+	ir := i.IcpuController
 
 	i.Config.Set(ir, i.Config.Get(ir)|1<<30)
 

@@ -25,6 +25,6 @@ func init() {
 	check("tx_buf", unsafe.Pointer(&r.tx_buf), 0x1b000)
 	check("led0", unsafe.Pointer(&r.led0), 0x20000)
 	check("led1", unsafe.Pointer(&r.led1), 0x21000)
-	check("cmc[0]", unsafe.Pointer(&r.cmc[0]), 0x31000)
-	check("packet dma", unsafe.Pointer(&r.cmc[0].packet_dma), 0x31110)
+	check("sub_controllers[0]", unsafe.Pointer(&r.sub_controllers[0]), 0x31000)
+	check("packet dma", unsafe.Pointer(&r.sub_controllers[0].packet_dma), 0x31110)
 }
