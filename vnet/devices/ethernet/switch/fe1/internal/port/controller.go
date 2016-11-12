@@ -9,47 +9,47 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-type reg32 m.Reg32
+type reg32 m.U32
 
 func (r *reg32) get(q *dmaRequest, v *uint32) {
-	(*m.Reg32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
+	(*m.U32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 func (r *reg32) getDo(q *dmaRequest) (v uint32) { r.get(q, &v); q.Do(); return }
 
 func (r *reg32) set(q *dmaRequest, v uint32) {
-	(*m.Reg32)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
+	(*m.U32)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 
-func (r *reg32) offset() uint          { return (*m.Reg32)(r).Offset() }
-func (r *reg32) address() sbus.Address { return (*m.Reg32)(r).Address() }
+func (r *reg32) offset() uint          { return (*m.U32)(r).Offset() }
+func (r *reg32) address() sbus.Address { return (*m.U32)(r).Address() }
 
-type preg32 m.Preg32
+type preg32 m.Pu32
 type portreg32 [1 << m.Log2NRegPorts]preg32
-type preg64 m.Preg64
+type preg64 m.Pu64
 type portreg64 [1 << m.Log2NRegPorts]preg64
 
 func (r *preg32) get(q *dmaRequest, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 func (r *preg32) getDo(q *dmaRequest) (v uint32) { r.get(q, &v); q.Do(); return }
 
 func (r *preg32) set(q *dmaRequest, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 
 func (r *preg64) get(q *dmaRequest, v *uint64) {
-	(*m.Preg64)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 func (r *preg64) getDo(q *dmaRequest) (v uint64) { r.get(q, &v); q.Do(); return }
 
 func (r *preg64) set(q *dmaRequest, v uint64) {
-	(*m.Preg64)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)
 }
 
-func (r *preg32) offset() uint          { return (*m.Preg32)(r).Offset() }
-func (r *preg32) address() sbus.Address { return (*m.Preg32)(r).Address() }
-func (r *preg64) offset() uint          { return (*m.Preg64)(r).Offset() }
-func (r *preg64) address() sbus.Address { return (*m.Preg64)(r).Address() }
+func (r *preg32) offset() uint          { return (*m.Pu32)(r).Offset() }
+func (r *preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
+func (r *preg64) offset() uint          { return (*m.Pu64)(r).Offset() }
+func (r *preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 
 type xclport_regs struct {
 	counters [N_counters]portreg64

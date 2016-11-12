@@ -77,13 +77,13 @@ const (
 	mmuBaseTypeLayer
 )
 
-type mmu_global_reg32 m.Reg32
+type mmu_global_reg32 m.U32
 
 func (r *mmu_global_reg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
-	(*m.Reg32)(r)[0].Get(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
+	(*m.U32)(r)[0].Get(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
 }
 func (r *mmu_global_reg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
-	(*m.Reg32)(r)[0].Set(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
+	(*m.U32)(r)[0].Set(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
 }
 
 func (r *mmu_global_reg32) get(q *DmaRequest, v *uint32) { r.geta(q, sbus.Single, v) }
@@ -95,26 +95,26 @@ func (r *mmu_global_reg32) getDo(q *DmaRequest) (v uint32) {
 	return v
 }
 
-type mmu_global_reg64 m.Reg64
+type mmu_global_reg64 m.U64
 
 func (r *mmu_global_reg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
-	(*m.Reg64)(r).Get(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
+	(*m.U64)(r).Get(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
 }
 func (r *mmu_global_reg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
-	(*m.Reg64)(r).Set(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
+	(*m.U64)(r).Set(&q.DmaRequest, mmuBaseTypeChip, BlockMmuGlobal, c, v)
 }
 
 func (r *mmu_global_reg64) get(q *DmaRequest, v *uint64) { r.geta(q, sbus.Single, v) }
 func (r *mmu_global_reg64) set(q *DmaRequest, v uint64)  { r.seta(q, sbus.Single, v) }
 
-type mmu_global_preg32 m.Preg32
+type mmu_global_preg32 m.Pu32
 type mmu_global_portreg32 [1 << m.Log2NRegPorts]mmu_global_preg32
 
 func (r *mmu_global_preg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, mmuBaseTypeRxPort, BlockMmuGlobal, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, mmuBaseTypeRxPort, BlockMmuGlobal, c, v)
 }
 func (r *mmu_global_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, mmuBaseTypeRxPort, BlockMmuGlobal, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, mmuBaseTypeRxPort, BlockMmuGlobal, c, v)
 }
 func (r *mmu_global_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Single, v) }
 
@@ -123,7 +123,7 @@ type mmu_global_regs struct {
 
 	misc_config mmu_global_reg32
 
-	_ [1]m.Reg32
+	_ [1]m.U32
 
 	parity_interrupt struct {
 		enable                  mmu_global_reg32
@@ -135,7 +135,7 @@ type mmu_global_regs struct {
 
 	interrupt_status mmu_global_reg32
 
-	_ [0xb - 0x7]m.Reg32
+	_ [0xb - 0x7]m.U32
 
 	bst_tracking_enable mmu_global_reg32
 
@@ -143,58 +143,58 @@ type mmu_global_regs struct {
 
 	bst_hw_snapshot_enable mmu_global_reg32
 
-	_ [0x1000 - 0xe]m.Reg32
+	_ [0x1000 - 0xe]m.U32
 
 	device_port_by_mmu_port mmu_global_portreg32
 
-	_ [0x1100 - 0x1001]m.Reg32
+	_ [0x1100 - 0x1001]m.U32
 
 	physical_port_by_mmu_port mmu_global_portreg32
 
-	_ [0x1200 - 0x1101]m.Reg32
+	_ [0x1200 - 0x1101]m.U32
 
 	global_physical_port_by_mmu_port mmu_global_portreg32
 }
 
 type mmu_global_mems struct{}
 
-type mmu_xpe_reg32 [1 << m.Log2NRegPorts]m.Greg32
+type mmu_xpe_reg32 [1 << m.Log2NRegPorts]m.Gu32
 
 func (r *mmu_xpe_reg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Greg32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 func (r *mmu_xpe_reg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Greg32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_gpreg32 m.Preg32
+type mmu_xpe_gpreg32 m.Pu32
 type mmu_xpe_xreg32 [1 << m.Log2NRegPorts]mmu_xpe_gpreg32
 
 func (r *mmu_xpe_gpreg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 func (r *mmu_xpe_gpreg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_gpreg64 m.Preg64
+type mmu_xpe_gpreg64 m.Pu64
 type mmu_xpe_xreg64 [1 << m.Log2NRegPorts]mmu_xpe_gpreg64
 
 func (r *mmu_xpe_gpreg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
-	(*m.Preg64)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 func (r *mmu_xpe_gpreg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
-	(*m.Preg64)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_preg32 m.Preg32
+type mmu_xpe_preg32 m.Pu32
 type mmu_xpe_portreg32 [1 << m.Log2NRegPorts]mmu_xpe_preg32
 
 func (r *mmu_xpe_preg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 func (r *mmu_xpe_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
 type mmu_xpe_regs struct {
@@ -203,67 +203,67 @@ type mmu_xpe_regs struct {
 	rx_admission_control struct {
 		port_rx_and_pause_enable mmu_xpe_portreg32
 
-		_ [0x7 - 0x1]m.Reg32
+		_ [0x7 - 0x1]m.U32
 
 		global_headroom_limit mmu_xpe_xreg32
 
-		_ [0x22 - 0x8]m.Reg32
+		_ [0x22 - 0x8]m.U32
 
 		max_packet_cells mmu_xpe_reg32
 
-		_ [0x70 - 0x23]m.Reg32
+		_ [0x70 - 0x23]m.U32
 
 		port_priority_group [2]mmu_xpe_portreg32
 
-		_ [0x73 - 0x72]m.Reg32
+		_ [0x73 - 0x72]m.U32
 
 		port_service_pool_for_priority_group mmu_xpe_portreg32
 
 		port_headroom_pool_for_priority_group mmu_xpe_portreg32
 
-		_ [0x7b - 0x75]m.Reg32
+		_ [0x7b - 0x75]m.U32
 
 		global_headroom_cells_in_use          mmu_xpe_xreg32
 		global_headroom_reserved_cells_in_use mmu_xpe_xreg32
 
-		_ [0x100 - 0x7d]m.Reg32
+		_ [0x100 - 0x7d]m.U32
 
 		service_pool_n_shared_cells_in_use [n_mmu_service_pool_plus_public]mmu_xpe_xreg32
 
-		_ [0x10a - 0x105]m.Reg32
+		_ [0x10a - 0x105]m.U32
 
 		service_pool_shared_cell_limit [n_mmu_service_pool_plus_public]mmu_xpe_xreg32
 
-		_ [0x114 - 0x10f]m.Reg32
+		_ [0x114 - 0x10f]m.U32
 
 		service_pool_cell_reset_limit_offset [n_mmu_service_pool]mmu_xpe_xreg32
 
-		_ [0x11c - 0x118]m.Reg32
+		_ [0x11c - 0x118]m.U32
 
 		cell_spap_yellow_offset [n_mmu_service_pool]mmu_xpe_xreg32
 		cell_spap_red_offset    [n_mmu_service_pool]mmu_xpe_xreg32
 
-		_ [0x131 - 0x124]m.Reg32
+		_ [0x131 - 0x124]m.U32
 
 		service_pool_config mmu_xpe_xreg32
 
-		_ [0x134 - 0x132]m.Reg32
+		_ [0x134 - 0x132]m.U32
 
 		port_limit_states mmu_xpe_portreg32
 
-		_ [0x138 - 0x135]m.Reg32
+		_ [0x138 - 0x135]m.U32
 
 		priority_group_xoff_status mmu_xpe_portreg32
 
 		pool_drop_state mmu_xpe_xreg32
 
-		_ [0x140 - 0x13a]m.Reg32
+		_ [0x140 - 0x13a]m.U32
 
 		headroom_pool_peak_count_update_enable mmu_xpe_xreg32
 
 		headroom_pool_status mmu_xpe_xreg32
 
-		_ [0x150 - 0x142]m.Reg32
+		_ [0x150 - 0x142]m.U32
 
 		headroom_pool_n_cells_in_use [4]mmu_xpe_xreg32
 
@@ -271,14 +271,14 @@ type mmu_xpe_regs struct {
 
 		headroom_pool_peak_cell_count [4]mmu_xpe_xreg32
 
-		_ [0x170 - 0x15c]m.Reg32
+		_ [0x170 - 0x15c]m.U32
 
 		buffer_stats_tracking struct {
 			priority_group_shared_cell_threshold   [8]mmu_xpe_reg32
 			priority_group_headroom_cell_threshold [8]mmu_xpe_reg32
 			service_pool_shared_cell_threshold     [8]mmu_xpe_reg32
 
-			_ [0x190 - 0x188]m.Reg32
+			_ [0x190 - 0x188]m.U32
 
 			service_pool_global_shared_cells [n_mmu_service_pool_plus_public]mmu_xpe_reg32
 
@@ -304,7 +304,7 @@ type mmu_xpe_regs struct {
 
 	time_domain [4]mmu_xpe_reg32
 
-	_ [0x6 - 0x4]m.Reg32
+	_ [0x6 - 0x4]m.U32
 
 	wred_refresh_control mmu_xpe_reg32
 
@@ -319,45 +319,45 @@ type mmu_xpe_regs struct {
 
 		fifo_overflow_port_bitmap [2]mmu_xpe_xreg32
 
-		_ [0x5 - 0x4]m.Reg32
+		_ [0x5 - 0x4]m.U32
 
 		fifo_pointer_equal_bitmap [2]mmu_xpe_xreg32
 
-		_ [0x8 - 0x7]m.Reg32
+		_ [0x8 - 0x7]m.U32
 
 		qcn_fifo_empty_port_bitmap [2]mmu_xpe_xreg32
 
-		_ [0x10 - 0xa]m.Reg32
+		_ [0x10 - 0xa]m.U32
 	}
 
 	_ [0x28000000 - 0x24002000]byte
 
 	clear_counters mmu_xpe_reg32
 
-	_ [0x10 - 0x1]m.Reg32
+	_ [0x10 - 0x1]m.U32
 
 	tx_counter_config [8]mmu_xpe_xreg32
 
-	_ [0x20 - 0x18]m.Reg32
+	_ [0x20 - 0x18]m.U32
 
 	tx_counter_packets [8]mmu_xpe_xreg64
 
-	_ [0x110 - 0x28]m.Reg32
+	_ [0x110 - 0x28]m.U32
 
 	multicast_replication_fifo_drop_packets [mmu_n_rqe_queue]mmu_xpe_xreg64
 
-	_ [0x120 - 0x11b]m.Reg32
+	_ [0x120 - 0x11b]m.U32
 
 	multicast_replication_fifo_drop_bytes [mmu_n_rqe_queue]mmu_xpe_xreg64
-	_                                     [0x12f - 0x12b]m.Reg32
+	_                                     [0x12f - 0x12b]m.U32
 
 	data_buffer_full_packets_dropped mmu_xpe_xreg64
 
-	_ [0x200 - 0x130]m.Reg32
+	_ [0x200 - 0x130]m.U32
 
 	multicast_replication_fifo_red_drop_packets [mmu_n_rqe_queue]mmu_xpe_xreg64
 
-	_ [0x220 - 0x20b]m.Reg32
+	_ [0x220 - 0x20b]m.U32
 
 	multicast_replication_fifo_yellow_drop_packets [mmu_n_rqe_queue]mmu_xpe_xreg64
 
@@ -365,15 +365,15 @@ type mmu_xpe_regs struct {
 
 	rqe_priority_scheduling_type [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x60 - 0x41]m.Reg32
+	_ [0x60 - 0x41]m.U32
 
 	rqe_priority_werr_weight [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x88 - 0x6b]m.Reg32
+	_ [0x88 - 0x6b]m.U32
 
 	port_cos_mode mmu_xpe_xreg64
 
-	_ [0x110 - 0x89]m.Reg32
+	_ [0x110 - 0x89]m.U32
 
 	port_initial_copy_count_width mmu_xpe_portreg32
 
@@ -382,50 +382,50 @@ type mmu_xpe_regs struct {
 	tx_admission_control struct {
 		bypass mmu_xpe_reg32
 
-		_ [0x12 - 0x11]m.Reg32
+		_ [0x12 - 0x11]m.U32
 
 		config mmu_xpe_reg32
 
-		_ [0x74 - 0x13]m.Reg32
+		_ [0x74 - 0x13]m.U32
 
 		tx_port_enable mmu_xpe_xreg64
 
-		_ [0x100 - 0x75]m.Reg32
+		_ [0x100 - 0x75]m.U32
 
 		queue_drop_state_bitmap [6]mmu_xpe_xreg64
 
-		_ [0x200 - 0x106]m.Reg32
+		_ [0x200 - 0x106]m.U32
 
 		queue_yellow_drop_state_bitmap [6]mmu_xpe_xreg64
-		_                              [0x300 - 0x206]m.Reg32
+		_                              [0x300 - 0x206]m.U32
 
 		queue_red_drop_state_bitmap [6]mmu_xpe_xreg64
 
-		_ [0x500 - 0x306]m.Reg32
+		_ [0x500 - 0x306]m.U32
 
 		queue_group_drop_state mmu_xpe_xreg64
 
-		_ [0x520 - 0x501]m.Reg32
+		_ [0x520 - 0x501]m.U32
 
 		queue_group_yellow_drop_state mmu_xpe_xreg64
 
-		_ [0x540 - 0x521]m.Reg32
+		_ [0x540 - 0x521]m.U32
 
 		queue_group_red_drop_state mmu_xpe_xreg64
 
-		_ [0x610 - 0x541]m.Reg32
+		_ [0x610 - 0x541]m.U32
 
 		per_service_pool_port_drop_state [4]mmu_xpe_xreg64
 
-		_ [0x620 - 0x614]m.Reg32
+		_ [0x620 - 0x614]m.U32
 
 		per_service_pool_port_yellow_drop_state [4]mmu_xpe_xreg64
 
-		_ [0x630 - 0x624]m.Reg32
+		_ [0x630 - 0x624]m.U32
 
 		per_service_pool_port_red_drop_state [4]mmu_xpe_xreg64
 
-		_ [0x820 - 0x634]m.Reg32
+		_ [0x820 - 0x634]m.U32
 
 		queue_bst_threshold [8]mmu_xpe_xreg32
 
@@ -433,15 +433,15 @@ type mmu_xpe_regs struct {
 
 		port_bst_threshold [8]mmu_xpe_xreg32
 
-		_ [0x850 - 0x838]m.Reg32
+		_ [0x850 - 0x838]m.U32
 
 		bst_status mmu_xpe_xreg32
 
-		_ [0x900 - 0x851]m.Reg32
+		_ [0x900 - 0x851]m.U32
 
 		port_e2ecc_cos_spid mmu_xpe_portreg32
 
-		_ [0xa0b - 0x901]m.Reg32
+		_ [0xa0b - 0x901]m.U32
 
 		congestion_state_reset mmu_xpe_xreg32
 	}
@@ -455,51 +455,51 @@ type mmu_xpe_regs struct {
 			service_pool_yellow_shared_limit [4]mmu_xpe_reg32
 			service_pool_red_shared_limit    [4]mmu_xpe_reg32
 
-			_ [0x12 - 0x10]m.Reg32
+			_ [0x12 - 0x10]m.U32
 
 			config mmu_xpe_reg32
 
-			_ [0x30 - 0x13]m.Reg32
+			_ [0x30 - 0x13]m.U32
 
 			service_pool_bst_threshold_profile_select [4]mmu_xpe_portreg32
 
-			_ [0x40 - 0x34]m.Reg32
+			_ [0x40 - 0x34]m.U32
 
 			service_pool_shared_count [4]mmu_xpe_xreg32
 
-			_ [0x4c - 0x44]m.Reg32
+			_ [0x4c - 0x44]m.U32
 
 			service_pool_multicast_shared_count [4]mmu_xpe_xreg32
 
 			port_service_pool_shared_count [4]mmu_xpe_portreg32
 
-			_ [0x6c - 0x54]m.Reg32
+			_ [0x6c - 0x54]m.U32
 
 			service_pool_drop_states mmu_xpe_xreg32
 
-			_ [0x74 - 0x6d]m.Reg32
+			_ [0x74 - 0x6d]m.U32
 
 			port_tx_enable mmu_xpe_xreg64
 
-			_ [0x80 - 0x75]m.Reg32
+			_ [0x80 - 0x75]m.U32
 
 			port_service_pool_yellow_drop_state [4]mmu_xpe_xreg64
 
 			service_pool_resume_limit [n_packet_color][4]mmu_xpe_reg32
 
-			_ [0xa0 - 0x90]m.Reg32
+			_ [0xa0 - 0x90]m.U32
 
 			port_service_pool_red_drop_state [4]mmu_xpe_xreg64
 
-			_ [0x260 - 0xa4]m.Reg32
+			_ [0x260 - 0xa4]m.U32
 
 			port_service_pool_drop_state [4]mmu_xpe_xreg64
 
-			_ [0x500 - 0x264]m.Reg32
+			_ [0x500 - 0x264]m.U32
 
 			cpu_queue_bst_threshold_profile [8]mmu_xpe_xreg32
 
-			_ [0x540 - 0x508]m.Reg32
+			_ [0x540 - 0x508]m.U32
 
 			queue_resume_offset_profile_yellow [8]mmu_xpe_reg32
 
@@ -507,7 +507,7 @@ type mmu_xpe_regs struct {
 
 			queue_e2e_ds mmu_xpe_portreg32
 
-			_ [0x638 - 0x551]m.Reg32
+			_ [0x638 - 0x551]m.U32
 
 			service_pool_mcuc_bst_threshold [4]mmu_xpe_reg32
 
@@ -515,31 +515,31 @@ type mmu_xpe_regs struct {
 
 			queue_multicast_bst_threshold_profile [8]mmu_xpe_reg32
 
-			_ [0x650 - 0x648]m.Reg32
+			_ [0x650 - 0x648]m.U32
 
 			device_bst_status mmu_xpe_xreg64
 
-			_ [0x6a0 - 0x651]m.Reg32
+			_ [0x6a0 - 0x651]m.U32
 
 			service_pool_multicast_bst_threshold [4]mmu_xpe_reg32
 
 			service_pool_multicast_bst_status [4]mmu_xpe_xreg32
 
-			_ [0x6b0 - 0x6a8]m.Reg32
+			_ [0x6b0 - 0x6a8]m.U32
 
 			port_service_pool_bst_threshold [8]mmu_xpe_reg32
 
-			_ [0x700 - 0x6b8]m.Reg32
+			_ [0x700 - 0x6b8]m.U32
 
 			queue_e2e_spid mmu_xpe_portreg32
 
-			_ [0x950 - 0x701]m.Reg32
+			_ [0x950 - 0x701]m.U32
 
 			enable_eccp_mem mmu_xpe_reg32
 
 			enable_correctable_error_reporting mmu_xpe_reg32
 
-			_ [0xa00 - 0x952]m.Reg32
+			_ [0xa00 - 0x952]m.U32
 
 			queue_e2e_ds_en mmu_xpe_portreg32
 
@@ -552,72 +552,72 @@ type mmu_xpe_regs struct {
 			pool_yellow_shared_limit [4]mmu_xpe_reg32
 			pool_red_shared_limit    [4]mmu_xpe_reg32
 
-			_ [0x12 - 0x10]m.Reg32
+			_ [0x12 - 0x10]m.U32
 
 			config mmu_xpe_reg32
 
-			_ [0x30 - 0x13]m.Reg32
+			_ [0x30 - 0x13]m.U32
 
 			port_service_pool_bst_threshold_profile_select [4]mmu_xpe_xreg32
 
-			_ [0x40 - 0x34]m.Reg32
+			_ [0x40 - 0x34]m.U32
 
 			pool_shared_count [4]mmu_xpe_xreg32
 
-			_ [0x50 - 0x44]m.Reg32
+			_ [0x50 - 0x44]m.U32
 
 			port_service_pool_shared_count [4]mmu_xpe_portreg32
 
-			_ [0x6c - 0x54]m.Reg32
+			_ [0x6c - 0x54]m.U32
 
 			pool_drop_states mmu_xpe_xreg32
 
-			_ [0x74 - 0x6d]m.Reg32
+			_ [0x74 - 0x6d]m.U32
 
 			port_tx_enable mmu_xpe_xreg64
 
-			_ [0x80 - 0x75]m.Reg32
+			_ [0x80 - 0x75]m.U32
 
 			port_service_pool_yellow_drop_state [4]mmu_xpe_xreg64
 
 			pool_resume_limit [n_packet_color][4]mmu_xpe_reg32
 
-			_ [0xa0 - 0x90]m.Reg32
+			_ [0xa0 - 0x90]m.U32
 
 			port_service_pool_red_drop_state [4]mmu_xpe_xreg64
 
-			_ [0x260 - 0xa4]m.Reg32
+			_ [0x260 - 0xa4]m.U32
 
 			port_service_pool_drop_state [4]mmu_xpe_xreg64
 
-			_ [0x500 - 0x264]m.Reg32
+			_ [0x500 - 0x264]m.U32
 
 			cpu_queue_bst_threshold_profile [8]mmu_xpe_xreg32
 
-			_ [0x540 - 0x508]m.Reg32
+			_ [0x540 - 0x508]m.U32
 
 			queue_resume_offset_profile_yellow [8]mmu_xpe_reg32
 			queue_resume_offset_profile_red    [8]mmu_xpe_reg32
 
-			_ [0x640 - 0x550]m.Reg32
+			_ [0x640 - 0x550]m.U32
 
 			queue_bst_threshold_profile [8]mmu_xpe_reg32
 
-			_ [0x650 - 0x648]m.Reg32
+			_ [0x650 - 0x648]m.U32
 
 			bst_status mmu_xpe_xreg32
 
-			_ [0x6a0 - 0x651]m.Reg32
+			_ [0x6a0 - 0x651]m.U32
 
 			pool_multicast_bst_threshold [4]mmu_xpe_reg32
 
 			pool_multicast_bst_status [4]mmu_xpe_xreg32
 
-			_ [0x6b0 - 0x6a8]m.Reg32
+			_ [0x6b0 - 0x6a8]m.U32
 
 			port_service_pool_bst_threshold [8]mmu_xpe_reg32
 
-			_ [0x850 - 0x6b8]m.Reg32
+			_ [0x850 - 0x6b8]m.U32
 
 			enable_ecc_parity mmu_xpe_reg32
 
@@ -641,7 +641,7 @@ type mmu_xpe_regs struct {
 }
 
 type mmu_xpe_rqe_admission_control_regs struct {
-	_ [1]m.Reg32
+	_ [1]m.U32
 
 	config mmu_xpe_reg32
 
@@ -651,59 +651,59 @@ type mmu_xpe_rqe_admission_control_regs struct {
 
 	resume_color_limit [4]mmu_xpe_reg32
 
-	_ [0x10 - 0xe]m.Reg32
+	_ [0x10 - 0xe]m.U32
 
 	config_0 [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x20 - 0x1b]m.Reg32
+	_ [0x20 - 0x1b]m.U32
 
 	config_1 [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x30 - 0x2b]m.Reg32
+	_ [0x30 - 0x2b]m.U32
 
 	min_guaranteed_cells [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x40 - 0x3b]m.Reg32
+	_ [0x40 - 0x3b]m.U32
 
 	color_shared_limits [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x50 - 0x4b]m.Reg32
+	_ [0x50 - 0x4b]m.U32
 
 	color_reset_offset [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0x60 - 0x5b]m.Reg32
+	_ [0x60 - 0x5b]m.U32
 
 	min_guaranteed_cells_used [mmu_n_rqe_queue]mmu_xpe_xreg32
 
-	_ [0x70 - 0x6b]m.Reg32
+	_ [0x70 - 0x6b]m.U32
 
 	shared_cells_used [mmu_n_rqe_queue]mmu_xpe_xreg32
 
-	_ [0x80 - 0x7b]m.Reg32
+	_ [0x80 - 0x7b]m.U32
 
 	calculated_color_resume_limits [mmu_n_rqe_queue]mmu_xpe_xreg32
 
-	_ [0x90 - 0x8b]m.Reg32
+	_ [0x90 - 0x8b]m.U32
 
 	status [mmu_n_rqe_queue]mmu_xpe_xreg32
 
-	_ [0xa0 - 0x9b]m.Reg32
+	_ [0xa0 - 0x9b]m.U32
 
 	bst_threshold [mmu_n_rqe_queue]mmu_xpe_reg32
 
-	_ [0xb0 - 0xab]m.Reg32
+	_ [0xb0 - 0xab]m.U32
 
 	bst_total_usage_counts [mmu_n_rqe_queue]mmu_xpe_xreg32
 
-	_ [0xc0 - 0xbb]m.Reg32
+	_ [0xc0 - 0xbb]m.U32
 
 	bst_threshold_service_pool [4]mmu_xpe_reg32
 
-	_ [0xd0 - 0xc4]m.Reg32
+	_ [0xd0 - 0xc4]m.U32
 
 	bst_service_pool_usage_counts [4]mmu_xpe_xreg32
 
-	_ [0xe0 - 0xd4]m.Reg32
+	_ [0xe0 - 0xd4]m.U32
 
 	service_pool_status [4]mmu_xpe_xreg32
 
@@ -711,11 +711,11 @@ type mmu_xpe_rqe_admission_control_regs struct {
 
 	bst_status [4]mmu_xpe_xreg32
 
-	_ [0xf0 - 0xec]m.Reg32
+	_ [0xf0 - 0xec]m.U32
 
 	qe_status mmu_xpe_xreg32
 
-	_ [0x100 - 0xf1]m.Reg32
+	_ [0x100 - 0xf1]m.U32
 }
 
 type mmu_xpe_mems struct {
@@ -744,10 +744,10 @@ type mmu_xpe_mems struct {
 
 		_ [3]m.Mem
 
-		port_priority_group_bst [n_mmu_port][n_mmu_priority_group]m.Mem32
+		port_priority_group_bst [n_mmu_port][n_mmu_priority_group]m.M32
 		_                       [m.MemMax - n_mmu_port*n_mmu_priority_group]m.MemElt
 
-		port_service_pool_bst [n_mmu_port][n_mmu_service_pool]m.Mem32
+		port_service_pool_bst [n_mmu_port][n_mmu_service_pool]m.M32
 		_                     [m.MemMax - n_mmu_port*n_mmu_service_pool]m.MemElt
 	}
 
@@ -798,7 +798,7 @@ type mmu_xpe_mems struct {
 	_ [m.MemMax - n_pipe*mmu_per_pipe_mem_bytes]m.MemElt
 
 	wred_color_drops [n_mmu_xpe]struct {
-		entries [mmu_per_pipe_mem_bytes]m.Mem64
+		entries [mmu_per_pipe_mem_bytes]m.M64
 	}
 	_ [m.MemMax - n_pipe*mmu_per_pipe_mem_bytes]m.MemElt
 
@@ -920,9 +920,9 @@ type mmu_xpe_mems struct {
 		_ [3]m.Mem
 
 		db_queue_offset [n_tx_pipe]struct {
-			ports    [n_mmu_data_port][mmu_n_tx_queues]m.Mem32
-			loopback [mmu_n_tx_queues]m.Mem32
-			cpu      [mmu_n_cpu_queues]m.Mem32
+			ports    [n_mmu_data_port][mmu_n_tx_queues]m.M32
+			loopback [mmu_n_tx_queues]m.M32
+			cpu      [mmu_n_cpu_queues]m.M32
 			_        [mmu_per_pipe_mem_bytes - (n_mmu_data_port+1)*mmu_n_tx_queues - mmu_n_cpu_queues]m.MemElt
 		}
 		_ [m.MemMax - n_pipe*mmu_per_pipe_mem_bytes]m.MemElt
@@ -958,9 +958,9 @@ type mmu_xpe_mems struct {
 		_ [3]m.Mem
 
 		mcqe_queue_offset [n_tx_pipe]struct {
-			ports    [n_mmu_data_port][mmu_n_tx_queues]m.Mem32
-			loopback [mmu_n_tx_queues]m.Mem32
-			cpu      [mmu_n_cpu_queues]m.Mem32
+			ports    [n_mmu_data_port][mmu_n_tx_queues]m.M32
+			loopback [mmu_n_tx_queues]m.M32
+			cpu      [mmu_n_cpu_queues]m.M32
 			_        [mmu_per_pipe_mem_bytes - (n_mmu_data_port+1)*mmu_n_tx_queues - mmu_n_cpu_queues]m.MemElt
 		}
 		_ [m.MemMax - n_pipe*mmu_per_pipe_mem_bytes]m.MemElt
@@ -985,52 +985,52 @@ type mmu_xpe_mems struct {
 	}
 }
 
-type mmu_sc_reg32 [1 << m.Log2NRegPorts]m.Greg32
+type mmu_sc_reg32 [1 << m.Log2NRegPorts]m.Gu32
 
 func (r *mmu_sc_reg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Greg32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 func (r *mmu_sc_reg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Greg32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 
-type mmu_sc_reg64 [1 << m.Log2NRegPorts]m.Greg64
+type mmu_sc_reg64 [1 << m.Log2NRegPorts]m.Gu64
 
 func (r *mmu_sc_reg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
-	(*m.Greg64)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu64)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 func (r *mmu_sc_reg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
-	(*m.Greg64)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu64)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 
-type mmu_sc_gpreg32 m.Preg32
+type mmu_sc_gpreg32 m.Pu32
 type mmu_sc_xreg32 [1 << m.Log2NRegPorts]mmu_sc_gpreg32
 
 func (r *mmu_sc_gpreg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 func (r *mmu_sc_gpreg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 
-type mmu_sc_gpreg64 m.Preg64
+type mmu_sc_gpreg64 m.Pu64
 type mmu_sc_xreg64 [1 << m.Log2NRegPorts]mmu_sc_gpreg64
 
 func (r *mmu_sc_gpreg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
-	(*m.Preg64)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 func (r *mmu_sc_gpreg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
-	(*m.Preg64)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 
-type mmu_sc_preg32 m.Preg32
+type mmu_sc_preg32 m.Pu32
 type mmu_sc_portreg32 [1 << m.Log2NRegPorts]mmu_sc_preg32
 
 func (r *mmu_sc_preg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 func (r *mmu_sc_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 
 type mmu_sc_regs struct {
@@ -1038,12 +1038,12 @@ type mmu_sc_regs struct {
 
 	asf_eport_config mmu_sc_portreg32
 
-	_ [0x45 - 0x2]m.Reg32
+	_ [0x45 - 0x2]m.U32
 
 	asf_iport_config mmu_sc_portreg32
 
 	enqs struct {
-		_ [0xce - 0x46]m.Reg32
+		_ [0xce - 0x46]m.U32
 
 		asf_error mmu_sc_xreg32
 
@@ -1051,11 +1051,11 @@ type mmu_sc_regs struct {
 
 		port_non_empty_bitmap [2]mmu_sc_xreg64
 
-		_ [0xd4 - 0xd2]m.Reg32
+		_ [0xd4 - 0xd2]m.U32
 
 		debug mmu_sc_xreg32
 
-		_ [0xd6 - 0xd5]m.Reg32
+		_ [0xd6 - 0xd5]m.U32
 
 		no_destination_drops mmu_sc_xreg64
 
@@ -1068,7 +1068,7 @@ type mmu_sc_regs struct {
 		unicast_cache_debug         mmu_sc_xreg32
 		multicast_cache_count_debug mmu_sc_xreg32
 		unicast_cache_count_debug   mmu_sc_xreg32
-		_                           [0x28 - 0x07]m.Reg32
+		_                           [0x28 - 0x07]m.U32
 		init                        mmu_sc_xreg32
 		debug                       mmu_sc_xreg32
 		_                           [0x0c100000 - 0x08002a00]byte
@@ -1089,15 +1089,15 @@ type mmu_sc_regs struct {
 
 		read_pointer mmu_sc_xreg32
 
-		_ [0x10 - 0x05]m.Reg32
+		_ [0x10 - 0x05]m.U32
 
 		bank_full_limit [mmu_n_banks]mmu_sc_xreg32
 
-		_ [0x30 - 0x1f]m.Reg32
+		_ [0x30 - 0x1f]m.U32
 
 		bank_status [mmu_n_banks]mmu_sc_xreg32
 
-		_ [0x70 - 0x3f]m.Reg32
+		_ [0x70 - 0x3f]m.U32
 
 		debug         mmu_sc_xreg32
 		debug_scratch [3]mmu_sc_xreg32
@@ -1108,7 +1108,7 @@ type mmu_sc_regs struct {
 
 		arbiter_mask mmu_sc_xreg32
 
-		_ [0x80 - 0x77]m.Reg32
+		_ [0x80 - 0x77]m.U32
 
 		ecc_multi_bit_enable mmu_sc_xreg32
 
@@ -1119,7 +1119,7 @@ type mmu_sc_regs struct {
 
 	mtro_refresh_config mmu_sc_xreg32
 
-	_ [1]m.Reg32
+	_ [1]m.U32
 
 	mtro_port_entity_disable mmu_sc_xreg64
 
@@ -1129,7 +1129,7 @@ type mmu_sc_regs struct {
 
 	xport_to_mmu_bkp mmu_sc_portreg32
 
-	_ [0x50 - 0x41]m.Reg32
+	_ [0x50 - 0x41]m.U32
 
 	port_llfc_config mmu_sc_portreg32
 
@@ -1155,7 +1155,7 @@ type mmu_sc_regs struct {
 
 			port_config mmu_sc_portreg32
 
-			_ [0x15 - 0x0f]m.Reg32
+			_ [0x15 - 0x0f]m.U32
 		}
 
 		port_config mmu_sc_portreg32
@@ -1176,19 +1176,19 @@ type mmu_sc_regs struct {
 
 	mmu_port_credit mmu_sc_portreg32
 
-	_ [0x40 - 0x01]m.Reg32
+	_ [0x40 - 0x01]m.U32
 
 	asf_credit_threshold_hi mmu_sc_portreg32
 
-	_ [0x80 - 0x41]m.Reg32
+	_ [0x80 - 0x41]m.U32
 
 	mmu_1dbg_c mmu_sc_xreg32
 
-	_ [1]m.Reg32
+	_ [1]m.U32
 
 	mmu_dbg_c [3]mmu_sc_xreg32
 
-	_ [0x90 - 0x85]m.Reg32
+	_ [0x90 - 0x85]m.U32
 
 	mmu_1dbg_a mmu_sc_xreg32
 
@@ -1198,13 +1198,13 @@ type mmu_sc_regs struct {
 
 	misc_config mmu_sc_reg32
 
-	_ [1]m.Reg32
+	_ [1]m.U32
 
 	interrupt_enable mmu_sc_reg32
 	interrupt_status mmu_sc_xreg32
 	interrupt_clear  mmu_sc_xreg32
 
-	_ [0x7 - 0x5]m.Reg32
+	_ [0x7 - 0x5]m.U32
 
 	toq_multicast_config_0 mmu_sc_reg32
 
@@ -1261,11 +1261,11 @@ type mmu_sc_mems struct {
 		l1_accumulated_compensation m.Mem
 		l1_credit                   m.Mem
 		l1_weight                   [n_tx_pipe]struct {
-			unicast                  [n_mmu_data_port][mmu_n_tx_queues]m.Mem32
-			unicast_cpu_management   [mmu_n_tx_queues]m.Mem32
-			multicast                [n_mmu_data_port][mmu_n_tx_queues]m.Mem32
-			unicast_loopback         [mmu_n_tx_queues]m.Mem32
-			multicast_cpu_management [mmu_n_tx_queues]m.Mem32
+			unicast                  [n_mmu_data_port][mmu_n_tx_queues]m.M32
+			unicast_cpu_management   [mmu_n_tx_queues]m.M32
+			multicast                [n_mmu_data_port][mmu_n_tx_queues]m.M32
+			unicast_loopback         [mmu_n_tx_queues]m.M32
+			multicast_cpu_management [mmu_n_tx_queues]m.M32
 
 			_ [mmu_per_pipe_mem_bytes - (2*n_mmu_data_port+3)*mmu_n_tx_queues]m.MemElt
 		}
@@ -1273,7 +1273,7 @@ type mmu_sc_mems struct {
 		l0_accumulated_compensation m.Mem
 		l0_credit                   m.Mem
 		l0_weight                   [n_tx_pipe]struct {
-			unicast [n_mmu_port][mmu_n_tx_queues]m.Mem32
+			unicast [n_mmu_port][mmu_n_tx_queues]m.M32
 
 			_ [mmu_per_pipe_mem_bytes - n_mmu_port*mmu_n_tx_queues]m.MemElt
 		}

@@ -9,13 +9,13 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-type rx_pipe_reg32 m.Reg32
+type rx_pipe_reg32 m.U32
 
 func (r *rx_pipe_reg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
-	(*m.Reg32)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.U32)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_reg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
-	(*m.Reg32)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.U32)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_reg32) get(q *DmaRequest, v *uint32) { r.geta(q, sbus.Duplicate, v) }
 func (r *rx_pipe_reg32) set(q *DmaRequest, v uint32)  { r.seta(q, sbus.Duplicate, v) }
@@ -25,13 +25,13 @@ func (r *rx_pipe_reg32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
 	return
 }
 
-type rx_pipe_reg64 m.Reg64
+type rx_pipe_reg64 m.U64
 
 func (r *rx_pipe_reg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
-	(*m.Reg64)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.U64)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_reg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
-	(*m.Reg64)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.U64)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_reg64) get(q *DmaRequest, v *uint64) { r.geta(q, sbus.Duplicate, v) }
 func (r *rx_pipe_reg64) set(q *DmaRequest, v uint64)  { r.seta(q, sbus.Duplicate, v) }
@@ -41,29 +41,29 @@ func (r *rx_pipe_reg64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
 	return
 }
 
-type rx_pipe_preg32 m.Preg32
+type rx_pipe_preg32 m.Pu32
 type rx_pipe_portreg32 [1 << m.Log2NRegPorts]rx_pipe_preg32
 
-func (r *rx_pipe_preg32) address() sbus.Address { return (*m.Preg32)(r).Address() }
+func (r *rx_pipe_preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
 
 func (r *rx_pipe_preg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
 
-type rx_pipe_preg64 m.Preg64
+type rx_pipe_preg64 m.Pu64
 type rx_pipe_portreg64 [1 << m.Log2NRegPorts]rx_pipe_preg64
 
-func (r *rx_pipe_preg64) address() sbus.Address { return (*m.Preg64)(r).Address() }
+func (r *rx_pipe_preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 
 func (r *rx_pipe_preg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
-	(*m.Preg64)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_preg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
-	(*m.Preg64)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
 func (r *rx_pipe_preg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
 
@@ -376,13 +376,13 @@ type rx_pipe_regs struct {
 	_                              [0x64000000 - 0x60002200]byte
 }
 
-type rx_pipe_mem32 m.Mem32
+type rx_pipe_mem32 m.M32
 
 func (x *rx_pipe_mem32) seta(q *DmaRequest, a sbus.AccessType, v uint32) {
-	(*m.Mem32)(x).Set(&q.DmaRequest, BlockRxPipe, a, v)
+	(*m.M32)(x).Set(&q.DmaRequest, BlockRxPipe, a, v)
 }
 func (x *rx_pipe_mem32) geta(q *DmaRequest, a sbus.AccessType, v *uint32) {
-	(*m.Mem32)(x).Get(&q.DmaRequest, BlockRxPipe, a, v)
+	(*m.M32)(x).Get(&q.DmaRequest, BlockRxPipe, a, v)
 }
 func (x *rx_pipe_mem32) set(q *DmaRequest, v uint32) { x.seta(q, sbus.Duplicate, v) }
 
@@ -399,9 +399,9 @@ type rx_pipe_mems struct {
 	_ [0x08000000 - 0x04080000]byte
 
 	over_subscription_buffer [8]struct {
-		dscp_map                 [4][m.MemMax]m.Mem32
-		priority_map             [4][m.MemMax]m.Mem32
-		etag_map                 [4][m.MemMax]m.Mem32
+		dscp_map                 [4][m.MemMax]m.M32
+		priority_map             [4][m.MemMax]m.M32
+		etag_map                 [4][m.MemMax]m.M32
 		iom_stats_window_results m.Mem
 		_                        [0x04000000 - 0x00340000]byte
 	}
@@ -412,7 +412,7 @@ type rx_pipe_mems struct {
 	system_config_table_modbase m.Mem
 	system_config_table         m.Mem
 
-	source_trunk_map_modbase [n_global_physical_port]m.Mem32
+	source_trunk_map_modbase [n_global_physical_port]m.M32
 	_                        [m.MemMax - n_global_physical_port]m.MemElt
 	_                        [0x2c000000 - 0x28100000]byte
 	source_trunk_map         [8 << 10]source_trunk_map_mem
@@ -434,7 +434,7 @@ type rx_pipe_mems struct {
 	vlan_range [256]vlan_range_mem
 	_          [m.MemMax - 256]m.MemElt
 
-	cpu_traffic_class_map [256]m.Mem32
+	cpu_traffic_class_map [256]m.M32
 	_                     [m.MemMax - 256]m.MemElt
 
 	trill_parse_control m.Mem
@@ -445,7 +445,7 @@ type rx_pipe_mems struct {
 	l3_tunnel_only      m.Mem
 	_                   [0x30000000 - 0x2c3c0000]byte
 
-	vlan_protocol [1 << 4]m.Mem32
+	vlan_protocol [1 << 4]m.M32
 	_             [m.MemMax - 16]m.MemElt
 
 	vlan_protocol_data [1 << 7][1 << 4]vlan_protocol_data_mem
@@ -507,7 +507,7 @@ type rx_pipe_mems struct {
 
 	trill_payload_parse_control m.Mem
 
-	visibility_packet_capture_buffer_ivp [2]m.Mem64
+	visibility_packet_capture_buffer_ivp [2]m.M64
 	_                                    [m.MemMax - 2]m.MemElt
 
 	_ [0x38000000 - 0x34280000]byte
@@ -525,7 +525,7 @@ type rx_pipe_mems struct {
 	vlan_spanning_tree_group [n_vlan_spanning_tree_group_entry]rx_vlan_spanning_tree_group_mem
 	_                        [m.MemMax - n_vlan_spanning_tree_group_entry]m.MemElt
 
-	vlan_profile [128]m.Mem64
+	vlan_profile [128]m.M64
 	_            [m.MemMax - 128]m.MemElt
 
 	outer_dot1p_mapping_table m.Mem
@@ -614,7 +614,7 @@ type rx_pipe_mems struct {
 	ttl_fn m.Mem
 	tos_fn m.Mem
 
-	rxf_range_check [32]m.Mem64
+	rxf_range_check [32]m.M64
 	_               [m.MemMax - 32]m.MemElt
 
 	src_compression_tcam_only m.Mem
@@ -699,7 +699,7 @@ type rx_pipe_mems struct {
 	rxf_key_gen_program_profile        [n_rxf_key_generation_profiles]rxf_key_generation_profile_mem
 	_                                  [m.MemMax - n_rxf_key_generation_profiles]m.MemElt
 	_                                  [0x42140000 - 0x42080000]byte
-	rxf_key_gen_program_profile2       [n_rxf_key_generation_profiles]m.Mem32
+	rxf_key_gen_program_profile2       [n_rxf_key_generation_profiles]m.M32
 	_                                  [m.MemMax - n_rxf_key_generation_profiles]m.MemElt
 	rxf_logical_table_select_tcam_only [n_rxf_slice][n_rxf_logical_tables]rxf_logical_table_select_tcam_only_mem
 	_                                  [m.MemMax - n_rxf_slice*n_rxf_logical_tables]m.MemElt
@@ -715,7 +715,7 @@ type rx_pipe_mems struct {
 	fib_tcam_pair_128_hit_only m.Mem
 	fib_tcam_bucket_hit_only   m.Mem
 
-	visibility_packet_capture_buffer_isw1 [4]m.Mem64
+	visibility_packet_capture_buffer_isw1 [4]m.M64
 	_                                     [m.MemMax - 4]m.MemElt
 
 	_ [0x47200000 - 0x44180000]byte
@@ -794,7 +794,7 @@ type rx_pipe_mems struct {
 	dest_trunk_bitmap [m.MemMax]port_bitmap_mem
 	egr_mask          [m.MemMax]port_bitmap_mem
 
-	l3_interface_mtu [m.N_cast][8 << 10]m.Mem32
+	l3_interface_mtu [m.N_cast][8 << 10]m.M32
 	_                [m.MemMax - 2*(8<<10)]m.MemElt
 
 	modport_map_sw     m.Mem
@@ -872,7 +872,7 @@ type rx_pipe_mems struct {
 
 	fast_trunk_group m.Mem
 
-	visibility_packet_capture_buffer_isw2 [8]m.Mem64
+	visibility_packet_capture_buffer_isw2 [8]m.M64
 	_                                     [m.MemMax - 8]m.MemElt
 
 	device_port_by_global_physical [n_global_physical_port]rx_pipe_mem32

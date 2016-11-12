@@ -14,13 +14,13 @@ import (
 	"sync"
 )
 
-type rx_tx_pipe_reg32 m.Reg32
+type rx_tx_pipe_reg32 m.U32
 
 func (r *rx_tx_pipe_reg32) geta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v *uint32) {
-	(*m.Reg32)(r).Get(&q.DmaRequest, 0, b, c, v)
+	(*m.U32)(r).Get(&q.DmaRequest, 0, b, c, v)
 }
 func (r *rx_tx_pipe_reg32) seta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v uint32) {
-	(*m.Reg32)(r).Set(&q.DmaRequest, 0, b, c, v)
+	(*m.U32)(r).Set(&q.DmaRequest, 0, b, c, v)
 }
 func (r *rx_tx_pipe_reg32) get(q *DmaRequest, b sbus.Block, v *uint32) {
 	r.geta(q, b, sbus.Duplicate, v)
@@ -32,13 +32,13 @@ func (r *rx_tx_pipe_reg32) getDo(q *DmaRequest, b sbus.Block, c sbus.AccessType)
 	return
 }
 
-type rx_tx_pipe_reg64 m.Reg64
+type rx_tx_pipe_reg64 m.U64
 
 func (r *rx_tx_pipe_reg64) geta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v *uint64) {
-	(*m.Reg64)(r).Get(&q.DmaRequest, 0, b, c, v)
+	(*m.U64)(r).Get(&q.DmaRequest, 0, b, c, v)
 }
 func (r *rx_tx_pipe_reg64) seta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v uint64) {
-	(*m.Reg64)(r).Set(&q.DmaRequest, 0, b, c, v)
+	(*m.U64)(r).Set(&q.DmaRequest, 0, b, c, v)
 }
 func (r *rx_tx_pipe_reg64) get(q *DmaRequest, b sbus.Block, v *uint64) {
 	r.geta(q, b, sbus.Duplicate, v)
@@ -130,7 +130,7 @@ const n_pipe_counter_mode = 4 // 2 bits of mode
 
 type pipe_counter_4pool_mems struct {
 	pool_offset_tables [4]struct {
-		entries [n_pipe_counter_mode][256]m.Mem32
+		entries [n_pipe_counter_mode][256]m.M32
 		_       [0x1000 - n_pipe_counter_mode*256]m.MemElt
 	}
 

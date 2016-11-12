@@ -9,13 +9,13 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-type tx_pipe_reg32 m.Reg32
+type tx_pipe_reg32 m.U32
 
 func (r *tx_pipe_reg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
-	(*m.Reg32)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.U32)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_reg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
-	(*m.Reg32)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.U32)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_reg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
 func (r *tx_pipe_reg32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
@@ -24,13 +24,13 @@ func (r *tx_pipe_reg32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
 	return
 }
 
-type tx_pipe_reg64 m.Reg64
+type tx_pipe_reg64 m.U64
 
 func (r *tx_pipe_reg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
-	(*m.Reg64)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.U64)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_reg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
-	(*m.Reg64)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.U64)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_reg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
 func (r *tx_pipe_reg64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
@@ -39,29 +39,29 @@ func (r *tx_pipe_reg64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
 	return
 }
 
-type tx_pipe_preg32 m.Preg32
+type tx_pipe_preg32 m.Pu32
 type tx_pipe_portreg32 [1 << m.Log2NRegPorts]tx_pipe_preg32
 
-func (r *tx_pipe_preg32) address() sbus.Address { return (*m.Preg32)(r).Address() }
+func (r *tx_pipe_preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
 
 func (r *tx_pipe_preg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
-	(*m.Preg32)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
-	(*m.Preg32)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
 
-type tx_pipe_preg64 m.Preg64
+type tx_pipe_preg64 m.Pu64
 type tx_pipe_portreg64 [1 << m.Log2NRegPorts]tx_pipe_preg64
 
-func (r *tx_pipe_preg64) address() sbus.Address { return (*m.Preg64)(r).Address() }
+func (r *tx_pipe_preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 
 func (r *tx_pipe_preg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
-	(*m.Preg64)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_preg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
-	(*m.Preg64)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, 0, BlockTxPipe, c, v)
 }
 func (r *tx_pipe_preg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
 
@@ -208,12 +208,12 @@ type tx_pipe_mems struct {
 
 	trill_parse_control m.Mem
 
-	mpls_dst_ethernet_address [512]m.Mem64
+	mpls_dst_ethernet_address [512]m.M64
 	_                         [m.MemMax - 512]m.MemElt
 
 	ip_multicast m.Mem
 
-	rx_port [n_pipe_ports + 1]m.Mem32
+	rx_port [n_pipe_ports + 1]m.M32
 	_       [m.MemMax - (n_pipe_ports + 1)]m.MemElt
 
 	_ [1]m.Mem
@@ -350,10 +350,10 @@ type tx_pipe_mems struct {
 		priority_cng      m.Mem
 	}
 
-	ip_cut_thru_class [n_phys_ports]m.Mem32
+	ip_cut_thru_class [n_phys_ports]m.M32
 	_                 [m.MemMax - n_phys_ports]m.MemElt
 
-	tx_start_count [34][16]m.Mem32
+	tx_start_count [34][16]m.M32
 	_              [m.MemMax - 34*16]m.MemElt
 
 	pipe_counter_cos_map m.Mem
@@ -376,23 +376,23 @@ type tx_pipe_mems struct {
 
 	_ [0x28200000 - 0x280c0000]byte
 
-	port_enable [n_pipe_ports]m.Mem32
+	port_enable [n_pipe_ports]m.M32
 	_           [m.MemMax - n_pipe_ports]m.MemElt
 
 	_ [1]m.Mem
 
-	port_mmu_cell_requests_outstanding [n_phys_ports]m.Mem32
+	port_mmu_cell_requests_outstanding [n_phys_ports]m.M32
 	_                                  [m.MemMax - n_phys_ports]m.MemElt
 
-	max_used_entries [n_pipe_ports]m.Mem32
+	max_used_entries [n_pipe_ports]m.M32
 	_                [m.MemMax - n_pipe_ports]m.MemElt
 
-	per_port_buffer_soft_reset [n_pipe_ports]m.Mem32
+	per_port_buffer_soft_reset [n_pipe_ports]m.M32
 	_                          [m.MemMax - n_pipe_ports]m.MemElt
 
 	_ [0x287c0000 - 0x28340000]byte
 
-	data_buffer_1dbg_b [n_pipe_ports]m.Mem32
+	data_buffer_1dbg_b [n_pipe_ports]m.M32
 	_                  [m.MemMax - n_pipe_ports]m.MemElt
 
 	_ [0x2a800000 - 0x28800000]byte

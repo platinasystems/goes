@@ -16,72 +16,72 @@ var (
 	RegsBaseAddress = hw.RegsBaseAddress
 )
 
-type Greg32 byte
-type Greg64 byte
-type Preg32 byte
-type Preg64 byte
+type Gu32 byte
+type Gu64 byte
+type Pu32 byte
+type Pu64 byte
 
 const Log2NRegPorts = 8
 
-type Reg32 [1 << Log2NRegPorts]Greg32
-type Reg64 [1 << Log2NRegPorts]Greg64
-type PortReg32 [1 << Log2NRegPorts]Preg32
-type PortReg64 [1 << Log2NRegPorts]Preg64
+type U32 [1 << Log2NRegPorts]Gu32
+type U64 [1 << Log2NRegPorts]Gu64
+type PortU32 [1 << Log2NRegPorts]Pu32
+type PortU64 [1 << Log2NRegPorts]Pu64
 
-func (r *Greg32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
-func (r *Greg64) Offset() uint { return (*Greg32)(r).Offset() }
-func (r *Preg32) Offset() uint { return (*Greg32)(r).Offset() }
-func (r *Preg64) Offset() uint { return (*Greg32)(r).Offset() }
+func (r *Gu32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *Gu64) Offset() uint { return (*Gu32)(r).Offset() }
+func (r *Pu32) Offset() uint { return (*Gu32)(r).Offset() }
+func (r *Pu64) Offset() uint { return (*Gu32)(r).Offset() }
 
-func (r *Reg32) Offset() uint { return r[0].Offset() }
-func (r *Reg64) Offset() uint { return r[0].Offset() }
+func (r *U32) Offset() uint { return r[0].Offset() }
+func (r *U64) Offset() uint { return r[0].Offset() }
 
-func (r *Preg32) Address() sbus.Address { return sbus.Address(r.Offset()) | sbus.PortReg }
-func (r *Reg32) Address() sbus.Address  { return sbus.Address(r.Offset()) | sbus.GenReg }
-func (r *Preg64) Address() sbus.Address { return sbus.Address(r.Offset()) | sbus.PortReg }
-func (r *Reg64) Address() sbus.Address  { return sbus.Address(r.Offset()) | sbus.GenReg }
+func (r *Pu32) Address() sbus.Address { return sbus.Address(r.Offset()) | sbus.PortReg }
+func (r *U32) Address() sbus.Address  { return sbus.Address(r.Offset()) | sbus.GenReg }
+func (r *Pu64) Address() sbus.Address { return sbus.Address(r.Offset()) | sbus.PortReg }
+func (r *U64) Address() sbus.Address  { return sbus.Address(r.Offset()) | sbus.GenReg }
 
-func (r *Reg32) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint32) {
-	q.GetReg32(v, b, a|r.Address(), c)
+func (r *U32) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint32) {
+	q.GetU32(v, b, a|r.Address(), c)
 }
-func (r *Reg32) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint32) {
-	q.SetReg32(v, b, a|r.Address(), c)
-}
-
-func (r *Reg64) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint64) {
-	q.GetReg64(v, b, a|r.Address(), c)
-}
-func (r *Reg64) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint64) {
-	q.SetReg64(v, b, a|r.Address(), c)
+func (r *U32) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint32) {
+	q.SetU32(v, b, a|r.Address(), c)
 }
 
-func (r *Preg32) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint32) {
-	q.GetReg32(v, b, a|r.Address(), c)
+func (r *U64) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint64) {
+	q.GetU64(v, b, a|r.Address(), c)
 }
-func (r *Preg32) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint32) {
-	q.SetReg32(v, b, a|r.Address(), c)
-}
-
-func (r *Preg64) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint64) {
-	q.GetReg64(v, b, a|r.Address(), c)
-}
-func (r *Preg64) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint64) {
-	q.SetReg64(v, b, a|r.Address(), c)
+func (r *U64) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint64) {
+	q.SetU64(v, b, a|r.Address(), c)
 }
 
-func (r *Greg32) address() sbus.Address { return sbus.Address(r.Offset()) | sbus.GenReg }
-func (r *Greg64) address() sbus.Address { return sbus.Address(r.Offset()) | sbus.GenReg }
-
-func (r *Greg32) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint32) {
-	q.GetReg32(v, b, a|r.address(), c)
+func (r *Pu32) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint32) {
+	q.GetU32(v, b, a|r.Address(), c)
 }
-func (r *Greg32) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint32) {
-	q.SetReg32(v, b, a|r.address(), c)
+func (r *Pu32) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint32) {
+	q.SetU32(v, b, a|r.Address(), c)
 }
 
-func (r *Greg64) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint64) {
-	q.GetReg64(v, b, a|r.address(), c)
+func (r *Pu64) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint64) {
+	q.GetU64(v, b, a|r.Address(), c)
 }
-func (r *Greg64) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint64) {
-	q.SetReg64(v, b, a|r.address(), c)
+func (r *Pu64) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint64) {
+	q.SetU64(v, b, a|r.Address(), c)
+}
+
+func (r *Gu32) address() sbus.Address { return sbus.Address(r.Offset()) | sbus.GenReg }
+func (r *Gu64) address() sbus.Address { return sbus.Address(r.Offset()) | sbus.GenReg }
+
+func (r *Gu32) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint32) {
+	q.GetU32(v, b, a|r.address(), c)
+}
+func (r *Gu32) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint32) {
+	q.SetU32(v, b, a|r.address(), c)
+}
+
+func (r *Gu64) Get(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v *uint64) {
+	q.GetU64(v, b, a|r.address(), c)
+}
+func (r *Gu64) Set(q *sbus.DmaRequest, a sbus.Address, b sbus.Block, c sbus.AccessType, v uint64) {
+	q.SetU64(v, b, a|r.address(), c)
 }

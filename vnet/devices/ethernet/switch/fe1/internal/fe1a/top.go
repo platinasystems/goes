@@ -17,8 +17,8 @@ import (
 
 type top_reg uint32
 
-func (r *top_reg) set(q *DmaRequest, v uint32)  { q.SetReg32(v, BlockTop, r.address(), sbus.Unique0) }
-func (r *top_reg) get(q *DmaRequest, v *uint32) { q.GetReg32(v, BlockTop, r.address(), sbus.Unique0) }
+func (r *top_reg) set(q *DmaRequest, v uint32)  { q.SetU32(v, BlockTop, r.address(), sbus.Unique0) }
+func (r *top_reg) get(q *DmaRequest, v *uint32) { q.GetU32(v, BlockTop, r.address(), sbus.Unique0) }
 func (r *top_reg) getDo(q *DmaRequest) (v uint32) {
 	r.get(q, &v)
 	q.Do()

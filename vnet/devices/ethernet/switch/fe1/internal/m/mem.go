@@ -25,39 +25,39 @@ func (e *MemElt) Address() sbus.Address {
 	return sbus.Address(uintptr(unsafe.Pointer(e)) - RegsBaseAddress)
 }
 
-type Mem32 MemElt
-type Mem64 MemElt
+type M32 MemElt
+type M64 MemElt
 
-func (r *Mem32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
-func (r *Mem64) Offset() uint { return (*Mem32)(r).Offset() }
+func (r *M32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *M64) Offset() uint { return (*M32)(r).Offset() }
 
-func (r *Mem32) Address() sbus.Address { return sbus.Address(r.Offset()) }
-func (r *Mem64) Address() sbus.Address { return sbus.Address(r.Offset()) }
+func (r *M32) Address() sbus.Address { return sbus.Address(r.Offset()) }
+func (r *M64) Address() sbus.Address { return sbus.Address(r.Offset()) }
 
-func (r *Mem32) Geta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v *uint32) {
-	q.GetMem32(v, b, r.Address()|a, c)
+func (r *M32) Geta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v *uint32) {
+	q.GetM32(v, b, r.Address()|a, c)
 }
-func (r *Mem32) Get(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v *uint32) {
+func (r *M32) Get(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v *uint32) {
 	r.Geta(q, b, c, 0, v)
 }
 
-func (r *Mem32) Seta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v uint32) {
-	q.SetMem32(v, b, r.Address()|a, c)
+func (r *M32) Seta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v uint32) {
+	q.SetM32(v, b, r.Address()|a, c)
 }
-func (r *Mem32) Set(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v uint32) {
+func (r *M32) Set(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v uint32) {
 	r.Seta(q, b, c, 0, v)
 }
 
-func (r *Mem64) Geta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v *uint64) {
-	q.GetMem64(v, b, r.Address()|a, c)
+func (r *M64) Geta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v *uint64) {
+	q.GetM64(v, b, r.Address()|a, c)
 }
-func (r *Mem64) Get(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v *uint64) {
+func (r *M64) Get(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v *uint64) {
 	r.Geta(q, b, c, 0, v)
 }
-func (r *Mem64) Seta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v uint64) {
-	q.SetMem64(v, b, r.Address()|a, c)
+func (r *M64) Seta(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, a sbus.Address, v uint64) {
+	q.SetM64(v, b, r.Address()|a, c)
 }
-func (r *Mem64) Set(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v uint64) {
+func (r *M64) Set(q *sbus.DmaRequest, b sbus.Block, c sbus.AccessType, v uint64) {
 	r.Seta(q, b, c, 0, v)
 }
 

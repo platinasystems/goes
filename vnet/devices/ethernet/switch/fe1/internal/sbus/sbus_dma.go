@@ -588,16 +588,16 @@ func (q *DmaRequest) doRw32(v *uint32, o Opcode, b Block, a Address, c AccessTyp
 	}
 	q.Add(&r)
 }
-func (q *DmaRequest) GetReg32(v *uint32, b Block, a Address, c AccessType) {
+func (q *DmaRequest) GetU32(v *uint32, b Block, a Address, c AccessType) {
 	q.doRw32(v, ReadRegister, b, a, c)
 }
-func (q *DmaRequest) SetReg32(v uint32, b Block, a Address, c AccessType) {
+func (q *DmaRequest) SetU32(v uint32, b Block, a Address, c AccessType) {
 	q.doRw32(&v, WriteRegister, b, a, c)
 }
-func (q *DmaRequest) GetMem32(v *uint32, b Block, a Address, c AccessType) {
+func (q *DmaRequest) GetM32(v *uint32, b Block, a Address, c AccessType) {
 	q.doRw32(v, ReadMemory, b, a, c)
 }
-func (q *DmaRequest) SetMem32(v uint32, b Block, a Address, c AccessType) {
+func (q *DmaRequest) SetM32(v uint32, b Block, a Address, c AccessType) {
 	q.doRw32(&v, WriteMemory, b, a, c)
 }
 
@@ -633,16 +633,16 @@ func (q *DmaRequest) doRw64(v *uint64, o Opcode, b Block, a Address, c AccessTyp
 	}
 	q.Add(&r)
 }
-func (q *DmaRequest) GetReg64(v *uint64, b Block, a Address, c AccessType) {
+func (q *DmaRequest) GetU64(v *uint64, b Block, a Address, c AccessType) {
 	q.doRw64(v, ReadRegister, b, a, c)
 }
-func (q *DmaRequest) SetReg64(v uint64, b Block, a Address, c AccessType) {
+func (q *DmaRequest) SetU64(v uint64, b Block, a Address, c AccessType) {
 	q.doRw64(&v, WriteRegister, b, a, c)
 }
-func (q *DmaRequest) GetMem64(v *uint64, b Block, a Address, c AccessType) {
+func (q *DmaRequest) GetM64(v *uint64, b Block, a Address, c AccessType) {
 	q.doRw64(v, ReadMemory, b, a, c)
 }
-func (q *DmaRequest) SetMem64(v uint64, b Block, a Address, c AccessType) {
+func (q *DmaRequest) SetM64(v uint64, b Block, a Address, c AccessType) {
 	q.doRw64(&v, WriteMemory, b, a, c)
 }
 

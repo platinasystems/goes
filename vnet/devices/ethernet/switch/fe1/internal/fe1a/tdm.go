@@ -14,7 +14,7 @@ import (
 
 type tdm_reg32 struct {
 	// Ipipe versions are not "port regs" and so have GenReg bit explicitly set.
-	Array [1 << m.Log2NRegPorts]m.Preg32
+	Array [1 << m.Log2NRegPorts]m.Pu32
 }
 
 func tdmAccessType(b sbus.Block, pipe_index uint) (a sbus.Address, c sbus.AccessType, ri uint) {
