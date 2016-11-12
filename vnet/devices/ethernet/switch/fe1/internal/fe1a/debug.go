@@ -115,7 +115,7 @@ func init() {
 	check("global_physical_port_by_mmu_port", unsafe.Pointer(&r.global_physical_port_by_mmu_port), 0x08120000)
 }
 
-// Verify mmu xpe memory maps.
+// Verify mmu pipe memory maps.
 func init() {
 	r := (*mmu_pipe_regs)(base)
 	m := (*mmu_pipe_mems)(base)

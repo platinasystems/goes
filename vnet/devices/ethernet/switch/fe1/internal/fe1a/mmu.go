@@ -18,11 +18,11 @@ func (t *fe1a) mmu_init() {
 	max_packet_cells := bytesToCells(mmu_max_packet_bytes)
 
 	{
-		enter := uint32(mmu_n_cells_per_xpe - mmu_reserved_cfap_cells)
+		enter := uint32(mmu_n_cells_per_pipe - mmu_reserved_cfap_cells)
 		exit := enter - 2*uint32(max_packet_cells)
-		for xpe := 0; xpe < n_mmu_pipe; xpe++ {
-			t.mmu_slice_controller.cfap.enter_full_threshold[xpe].set(q, mmuBaseTypeXpe, sbus.Single, enter)
-			t.mmu_slice_controller.cfap.exit_full_threshold[xpe].set(q, mmuBaseTypeXpe, sbus.Single, exit)
+		for p := 0; p < n_mmu_pipe; p++ {
+			t.mmu_slice_controller.cfap.enter_full_threshold[p].set(q, mmuBaseTypeMmuPipe, sbus.Single, enter)
+			t.mmu_slice_controller.cfap.exit_full_threshold[p].set(q, mmuBaseTypeMmuPipe, sbus.Single, exit)
 		}
 		q.Do()
 	}
@@ -67,20 +67,20 @@ func (t *fe1a) mmu_init() {
 		// Configure the Ingress Process Group settings
 		// Currently not dynamic, and setup as Hi and Lo priority pools
 		// for the traffic priority (Hi: priority/process group 0, otherwise Lo:)
-		total_cells := float64(mmu_n_cells_per_xpe - mmu_reserved_cfap_cells - global_headroom_cells)
+		total_cells := float64(mmu_n_cells_per_pipe - mmu_reserved_cfap_cells - global_headroom_cells)
 		cells_left := total_cells
 
-		const n_rx_port_per_xpe = 16
+		const n_rx_port_per_mmu_pipe = 16
 
 		// Hi priority traffic gets dedicated service pool.
 		per_port_hi_cells := .02 * total_cells
 		cells_left -= per_port_hi_cells
-		per_port_hi_cells /= n_rx_port_per_xpe
+		per_port_hi_cells /= n_rx_port_per_mmu_pipe
 
 		// Allocate 3% of total cells as guaranteed split evenly among data ports.
 		per_port_lo_cells := .03 * total_cells
 		cells_left -= per_port_lo_cells
-		per_port_lo_cells /= n_rx_port_per_xpe
+		per_port_lo_cells /= n_rx_port_per_mmu_pipe
 
 		pgs := [...]mmu_priority_group_config_entry{
 			0: mmu_priority_group_config_entry{
@@ -108,7 +108,7 @@ func (t *fe1a) mmu_init() {
 		q.Do()
 	}
 
-	rx_pool_shared_limit := uint32(mmu_n_cells_per_xpe - mmu_reserved_cfap_cells - global_headroom_cells)
+	rx_pool_shared_limit := uint32(mmu_n_cells_per_pipe - mmu_reserved_cfap_cells - global_headroom_cells)
 
 	rx_service_pools := [...]mmu_rx_service_pool_config_entry{
 		0: mmu_rx_service_pool_config_entry{
@@ -244,14 +244,14 @@ func (t *fe1a) mmu_init() {
 		for pipe := uint(0); pipe < n_tx_pipe; pipe++ {
 			for tq := 0; tq < mmu_n_tx_queues; tq++ {
 				for port := 0; port < n_mmu_data_port; port++ {
-					t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
-					t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].multicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+					t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe, weight)
+					t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].multicast[port][tq].Seta(&q.DmaRequest, BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe, weight)
 				}
-				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
-				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].multicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
-				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast_loopback[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe, weight)
+				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].multicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe, weight)
+				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast_loopback[tq].Seta(&q.DmaRequest, BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe, weight)
 				for port := 0; port < n_mmu_port; port++ {
-					t.mmu_slice_mems.queue_scheduler.l0_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+					t.mmu_slice_mems.queue_scheduler.l0_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe, weight)
 				}
 			}
 			q.Do()
@@ -306,12 +306,12 @@ func (t *fe1a) mmu_init() {
 			}
 		}
 		for p := uint(0); p < n_tx_pipe; p++ {
-			xpeMask := tx_pipe_xpe_mask(p)
-			for xpe := uint(0); xpe < n_mmu_pipe; xpe++ {
-				if xpeMask&(1<<xpe) != 0 {
-					t.mmu_pipe_regs.tx_admission_control.tx_port_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
-					t.mmu_pipe_regs.multicast_admission_control.db.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
-					t.mmu_pipe_regs.multicast_admission_control.mcqe.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
+			pipe_mask := mmu_pipe_mask_for_tx_pipe(p)
+			for mmu_pipe := uint(0); mmu_pipe < n_mmu_pipe; mmu_pipe++ {
+				if pipe_mask&(1<<mmu_pipe) != 0 {
+					t.mmu_pipe_regs.tx_admission_control.tx_port_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
+					t.mmu_pipe_regs.multicast_admission_control.db.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
+					t.mmu_pipe_regs.multicast_admission_control.mcqe.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
 				}
 			}
 		}
@@ -353,24 +353,24 @@ func (e *mmu_wred_counter_entry) MemGetSet(b []uint32, isSet bool) {
 }
 
 func (e *mmu_rx_counter_mem) get(q *DmaRequest, v *mmu_rx_counter_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Single, mmuBaseTypeXpe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Single, mmuBaseTypeMmuPipe)
 }
 func (e *mmu_rx_counter_mem) set(q *DmaRequest, v *mmu_rx_counter_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Single, mmuBaseTypeXpe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Single, mmuBaseTypeMmuPipe)
 }
 
-func (e *mmu_tx_counter_mem) get(q *DmaRequest, xpe_index uint, v *mmu_tx_counter_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Unique(xpe_index), mmuBaseTypeTxPipe)
+func (e *mmu_tx_counter_mem) get(q *DmaRequest, mmu_pipe uint, v *mmu_tx_counter_entry) {
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Unique(mmu_pipe), mmuBaseTypeTxPipe)
 }
-func (e *mmu_tx_counter_mem) set(q *DmaRequest, xpe_index uint, v *mmu_tx_counter_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Unique(xpe_index), mmuBaseTypeTxPipe)
+func (e *mmu_tx_counter_mem) set(q *DmaRequest, mmu_pipe uint, v *mmu_tx_counter_entry) {
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Unique(mmu_pipe), mmuBaseTypeTxPipe)
 }
 
-func (e *mmu_wred_counter_mem) get(q *DmaRequest, xpe_index uint, v *mmu_wred_counter_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Unique(xpe_index), mmuBaseTypeTxPipe)
+func (e *mmu_wred_counter_mem) get(q *DmaRequest, mmu_pipe uint, v *mmu_wred_counter_entry) {
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Unique(mmu_pipe), mmuBaseTypeTxPipe)
 }
-func (e *mmu_wred_counter_mem) set(q *DmaRequest, xpe_index uint, v *mmu_wred_counter_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Unique(xpe_index), mmuBaseTypeTxPipe)
+func (e *mmu_wred_counter_mem) set(q *DmaRequest, mmu_pipe uint, v *mmu_wred_counter_entry) {
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Unique(mmu_pipe), mmuBaseTypeTxPipe)
 }
 
 // ASF: alternate store and forward mode (cut through)

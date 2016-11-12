@@ -25,7 +25,7 @@ func tdmAccessType(b sbus.Block, pipe_index uint) (a sbus.Address, c sbus.Access
 		ri = 0
 		// Need to set GenReg bit but only for rx pipe.
 		a = sbus.GenReg
-	case BlockMmuSc:
+	case BlockMmuSlice:
 		// For MMU pipe is encoded in register index.  Also need to set base type.
 		c = sbus.Single
 		ri = pipe_index
@@ -257,7 +257,7 @@ func (t *fe1a) install_tdm_calendar(pipe uint) {
 			d[j][1] = c.entryBuf[j][i+1]
 		}
 		t.rx_pipe_mems.tdm_calendar[ci].entries[i2].seta(q, &d[rx], BlockRxPipe, sbus.Unique(pipe), 0)
-		t.mmu_slice_mems.tdm_calendar[ci].entries[pipe][i2].seta(q, &d[tx], BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe)
+		t.mmu_slice_mems.tdm_calendar[ci].entries[pipe][i2].seta(q, &d[tx], BlockMmuSlice, sbus.Single, mmuBaseTypeTxPipe)
 	}
 	q.Do()
 
@@ -267,7 +267,7 @@ func (t *fe1a) install_tdm_calendar(pipe uint) {
 	v |= uint32(ci) << 16
 	v |= uint32(len(c.entries[rx])-1) << (8 * ci)
 	t.rx_pipe_controller.rx_buffer_tdm_scheduler.config.set(q, BlockRxPipe, pipe, v)
-	t.mmu_slice_controller.tdm.config.set(q, BlockMmuSc, pipe, v)
+	t.mmu_slice_controller.tdm.config.set(q, BlockMmuSlice, pipe, v)
 	q.Do()
 }
 
@@ -327,7 +327,7 @@ func (t *fe1a) install_over_subscription_groups() {
 			v[0] |= w
 			v[1] |= w
 			t.rx_pipe_controller.rx_buffer_tdm_scheduler.over_subscription_group_config[gi].set(q, BlockRxPipe, pipe, v[0])
-			t.mmu_slice_controller.tdm.over_subscription_group_config[gi].set(q, BlockMmuSc, pipe, v[1])
+			t.mmu_slice_controller.tdm.over_subscription_group_config[gi].set(q, BlockMmuSlice, pipe, v[1])
 			q.Do()
 
 			// Set group members.
@@ -348,13 +348,13 @@ func (t *fe1a) install_over_subscription_groups() {
 				}
 
 				t.rx_pipe_controller.rx_buffer_tdm_scheduler.over_subscription_group_members[gi][i].set(q, BlockRxPipe, pipe, w[0])
-				t.mmu_slice_controller.tdm.over_subscription_group_members[gi][i].set(q, BlockMmuSc, pipe, w[1])
+				t.mmu_slice_controller.tdm.over_subscription_group_members[gi][i].set(q, BlockMmuSlice, pipe, w[1])
 			}
 			// Invalidate unused group members.
 			for i := l; i < uint(len(t.rx_pipe_controller.rx_buffer_tdm_scheduler.over_subscription_group_members)); i++ {
 				w := uint32(0x3f | (0x7 << 6))
 				t.rx_pipe_controller.rx_buffer_tdm_scheduler.over_subscription_group_members[gi][i].set(q, BlockRxPipe, pipe, w)
-				t.mmu_slice_controller.tdm.over_subscription_group_members[gi][i].set(q, BlockMmuSc, pipe, w)
+				t.mmu_slice_controller.tdm.over_subscription_group_members[gi][i].set(q, BlockMmuSlice, pipe, w)
 			}
 
 			// Advance to next group.
@@ -363,7 +363,7 @@ func (t *fe1a) install_over_subscription_groups() {
 
 		// Set high speed port bitmap for this pipe.
 		t.rx_pipe_controller.rx_buffer_tdm_scheduler.high_speed_port_bitmap.set(q, BlockRxPipe, pipe, high_speed_port_bitmap[pipe][0])
-		t.mmu_slice_controller.tdm.high_speed_port_bitmap.set(q, BlockMmuSc, pipe, high_speed_port_bitmap[pipe][1])
+		t.mmu_slice_controller.tdm.high_speed_port_bitmap.set(q, BlockMmuSlice, pipe, high_speed_port_bitmap[pipe][1])
 	}
 
 	q.Do()
@@ -459,7 +459,7 @@ func (t *fe1a) install_port_block_calendar() {
 				v[0], v[1] = 0, 0
 			}
 			t.rx_pipe_controller.rx_buffer_tdm_scheduler.port_block_calendar[sub_pbi][ci].set(q, BlockRxPipe, pb.pipe, v[0])
-			t.mmu_slice_controller.tdm.port_block_calendar[sub_pbi][ci].set(q, BlockMmuSc, pb.pipe, v[1])
+			t.mmu_slice_controller.tdm.port_block_calendar[sub_pbi][ci].set(q, BlockMmuSlice, pb.pipe, v[1])
 		}
 	}
 	q.Do()
@@ -472,9 +472,9 @@ func (t *fe1a) opportunistic_scheduler_init(pipe uint) {
 		u [2]uint32
 	)
 	t.rx_pipe_controller.rx_buffer_tdm_scheduler.opportunistic_scheduler_config.get(q, BlockRxPipe, pipe, &v[0])
-	t.mmu_slice_controller.tdm.opportunistic_scheduler_config.get(q, BlockMmuSc, pipe, &v[1])
+	t.mmu_slice_controller.tdm.opportunistic_scheduler_config.get(q, BlockMmuSlice, pipe, &v[1])
 	t.rx_pipe_controller.rx_buffer_tdm_scheduler.cpu_loopback_opportunistic_scheduler_config.get(q, BlockRxPipe, pipe, &u[0])
-	t.mmu_slice_controller.tdm.cpu_loopback_opportunistic_scheduler_config.get(q, BlockMmuSc, pipe, &u[1])
+	t.mmu_slice_controller.tdm.cpu_loopback_opportunistic_scheduler_config.get(q, BlockMmuSlice, pipe, &u[1])
 	q.Do()
 	const (
 		enable_opportunistic_port1    = 1 << 0
@@ -490,9 +490,9 @@ func (t *fe1a) opportunistic_scheduler_init(pipe uint) {
 		u[i] |= enable_cpu_port | enable_loopback_port
 	}
 	t.rx_pipe_controller.rx_buffer_tdm_scheduler.opportunistic_scheduler_config.set(q, BlockRxPipe, pipe, v[0])
-	t.mmu_slice_controller.tdm.opportunistic_scheduler_config.set(q, BlockMmuSc, pipe, v[1])
+	t.mmu_slice_controller.tdm.opportunistic_scheduler_config.set(q, BlockMmuSlice, pipe, v[1])
 	t.rx_pipe_controller.rx_buffer_tdm_scheduler.cpu_loopback_opportunistic_scheduler_config.set(q, BlockRxPipe, pipe, u[0])
-	t.mmu_slice_controller.tdm.cpu_loopback_opportunistic_scheduler_config.set(q, BlockMmuSc, pipe, u[1])
+	t.mmu_slice_controller.tdm.cpu_loopback_opportunistic_scheduler_config.set(q, BlockMmuSlice, pipe, u[1])
 	q.Do()
 }
 

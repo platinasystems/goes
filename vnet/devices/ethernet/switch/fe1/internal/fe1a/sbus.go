@@ -86,14 +86,14 @@ func (p *parallelReq) flush() {
 const (
 	BlockRxPipe    sbus.Block = 1
 	BlockTxPipe    sbus.Block = 2
-	BlockMmuXpe    sbus.Block = 3
-	BlockMmuSc     sbus.Block = 4
+	BlockMmuPipe   sbus.Block = 3
+	BlockMmuSlice  sbus.Block = 4
 	BlockMmuGlobal sbus.Block = 5
 	BlockOtpc      sbus.Block = 6
 	BlockTop       sbus.Block = 7
 	BlockSer       sbus.Block = 8
-	BlockCMIC      sbus.Block = 9 // used for schan replies
-	BlockIproc     sbus.Block = 10
+	BlockCPU       sbus.Block = 9 // used for schan replies
+	BlockIcpu      sbus.Block = 10
 	BlockXlport0   sbus.Block = 11
 	BlockClport0   sbus.Block = 15 // ports 0 - 31
 	BlockLoopback0 sbus.Block = 54
@@ -108,12 +108,12 @@ func sbusBlockString(b sbus.Block) string {
 	var n = [...]string{
 		BlockRxPipe:    "rx pipe",
 		BlockTxPipe:    "tx pipe",
-		BlockMmuXpe:    "mmu xpe",
-		BlockMmuSc:     "mmu sc",
+		BlockMmuPipe:   "mmu pipe",
+		BlockMmuSlice:  "mmu slice",
 		BlockMmuGlobal: "mmu global",
 		BlockTop:       "top",
 		BlockSer:       "ser",
-		BlockCMIC:      "cmic",
+		BlockCPU:       "cpu",
 		BlockAvs:       "avs",
 	}
 	if int(b) < len(n) && len(n[b]) > 0 {

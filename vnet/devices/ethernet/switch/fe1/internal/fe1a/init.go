@@ -19,8 +19,8 @@ func (t *fe1a) clear_mmu_packet_memory() {
 		for j := 0; j < 2; j++ {
 			for k := 0; k < mmu_n_cells_per_bank; k++ {
 				for bank := 0; bank < mmu_n_banks; bank++ {
-					for xpe := 0; xpe < 4; xpe++ {
-						t.mmu_slice_mems.cbp_data_slices[i].entries[j][bank][xpe][k].set(q, &zero)
+					for x := 0; x < 4; x++ {
+						t.mmu_slice_mems.cbp_data_slices[i].entries[j][bank][x][k].set(q, &zero)
 					}
 				}
 				q.Do()

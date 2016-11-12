@@ -16,7 +16,7 @@ const (
 	mmu_per_pipe_mem_bytes  = 0x8000
 	mmu_n_cells_per_bank    = 1536
 	mmu_n_banks             = 15
-	mmu_n_cells_per_xpe     = mmu_n_banks * mmu_n_cells_per_bank
+	mmu_n_cells_per_pipe    = mmu_n_banks * mmu_n_cells_per_bank
 
 	mmu_per_packet_metadata_overhead = 64
 
@@ -36,7 +36,7 @@ const (
 	mmu_n_rqe  = 1 << 10
 )
 
-func tx_pipe_xpe_mask(tx_pipe uint) (mask uint) {
+func mmu_pipe_mask_for_tx_pipe(tx_pipe uint) (mask uint) {
 	switch tx_pipe {
 	case 0, 1:
 		mask = 1<<0 | 1<<2
@@ -48,7 +48,7 @@ func tx_pipe_xpe_mask(tx_pipe uint) (mask uint) {
 	return
 }
 
-func rx_pipe_xpe_mask(rx_pipe uint) (mask uint) {
+func mmu_pipe_mask_for_rx_pipe(rx_pipe uint) (mask uint) {
 	switch rx_pipe {
 	case 0, 3:
 		mask = 1<<0 | 1<<1
@@ -72,7 +72,7 @@ const (
 	mmuBaseTypeRxPipe
 	mmuBaseTypeTxPipe
 	mmuBaseTypeChip
-	mmuBaseTypeXpe
+	mmuBaseTypeMmuPipe
 	mmuBaseTypeSlice
 	mmuBaseTypeLayer
 )
@@ -161,40 +161,40 @@ type mmu_global_mems struct{}
 type mmu_pipe_reg32 [1 << m.Log2NPorts]m.Gu32
 
 func (r *mmu_pipe_reg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 func (r *mmu_pipe_reg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 
 type mmu_pipe_gpreg32 m.Pu32
 type mmu_pipe_xreg32 [1 << m.Log2NPorts]mmu_pipe_gpreg32
 
 func (r *mmu_pipe_gpreg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 func (r *mmu_pipe_gpreg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 
 type mmu_pipe_gpreg64 m.Pu64
 type mmu_pipe_xreg64 [1 << m.Log2NPorts]mmu_pipe_gpreg64
 
 func (r *mmu_pipe_gpreg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
-	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 func (r *mmu_pipe_gpreg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
-	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 
 type mmu_pipe_preg32 m.Pu32
 type mmu_pipe_portreg32 [1 << m.Log2NPorts]mmu_pipe_preg32
 
 func (r *mmu_pipe_preg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 func (r *mmu_pipe_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuPipe, c, v)
 }
 
 type mmu_pipe_regs struct {
@@ -988,49 +988,49 @@ type mmu_pipe_mems struct {
 type mmu_sc_reg32 [1 << m.Log2NPorts]m.Gu32
 
 func (r *mmu_sc_reg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 func (r *mmu_sc_reg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 
 type mmu_sc_reg64 [1 << m.Log2NPorts]m.Gu64
 
 func (r *mmu_sc_reg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
-	(*m.Gu64)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu64)(&r[0]).Get(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 func (r *mmu_sc_reg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
-	(*m.Gu64)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Gu64)(&r[0]).Set(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 
 type mmu_sc_gpreg32 m.Pu32
 type mmu_sc_xreg32 [1 << m.Log2NPorts]mmu_sc_gpreg32
 
 func (r *mmu_sc_gpreg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 func (r *mmu_sc_gpreg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 
 type mmu_sc_gpreg64 m.Pu64
 type mmu_sc_xreg64 [1 << m.Log2NPorts]mmu_sc_gpreg64
 
 func (r *mmu_sc_gpreg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
-	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 func (r *mmu_sc_gpreg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
-	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 
 type mmu_sc_preg32 m.Pu32
 type mmu_sc_portreg32 [1 << m.Log2NPorts]mmu_sc_preg32
 
 func (r *mmu_sc_preg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
-	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 func (r *mmu_sc_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
-	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
+	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSlice, c, v)
 }
 
 type mmu_slice_controller struct {

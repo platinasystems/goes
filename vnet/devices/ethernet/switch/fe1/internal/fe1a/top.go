@@ -289,8 +289,8 @@ func (t *fe1a) Init() {
 		ringByBlock := [...]uint8{
 			BlockRxPipe:    0,
 			BlockLoopback0: 0, BlockLoopback1: 0, BlockLoopback2: 0, BlockLoopback3: 0,
-			BlockTxPipe: 1,
-			BlockMmuXpe: 2, BlockMmuSc: 2, BlockMmuGlobal: 2,
+			BlockTxPipe:  1,
+			BlockMmuPipe: 2, BlockMmuSlice: 2, BlockMmuGlobal: 2,
 			BlockTop: 5, BlockSer: 5, BlockAvs: 5, BlockOtpc: 5,
 			BlockClport32: 3,
 			BlockXlport0:  4,

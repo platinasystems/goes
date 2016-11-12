@@ -188,7 +188,7 @@ const (
 // 8 bit global mmu port number: 2 bit pipe + 6 bit mmu port number
 type mmu_global_port_number uint16
 type rx_tx_pipe uint8 // rx/tx pipe index [0,3]
-type mmu_pipe uint8   // mmu pipe (xpe) index [0,3]
+type mmu_pipe uint8   // mmu pipe index [0,3]
 
 const mmu_global_port_number_invalid = 0xffff
 
@@ -252,7 +252,7 @@ func (t *fe1a) set_mmu_pipe_map() {
 	c := t.GetSwitchCommon()
 	cf := &c.SwitchConfig
 
-	// Allow configuration to specify which port blocks belong to which mmu pipes (xpes).
+	// Allow configuration to specify which port blocks belong to which mmu pipes.
 	for p := range t.mmu_pipe_by_phys_port {
 		t.mmu_pipe_by_phys_port[p] = mmu_pipe(ie_pipe_by_phys[p])
 	}

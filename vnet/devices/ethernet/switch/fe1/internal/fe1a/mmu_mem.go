@@ -70,10 +70,10 @@ func (e *mmu_rx_service_pool_config_entry) MemGetSet(b []uint32, isSet bool) {
 type mmu_rx_service_pool_config_mem m.MemElt
 
 func (e *mmu_rx_service_pool_config_mem) get(q *DmaRequest, v *mmu_rx_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeRxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeRxPipe)
 }
 func (e *mmu_rx_service_pool_config_mem) set(q *DmaRequest, v *mmu_rx_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeRxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeRxPipe)
 }
 
 // Up to 8 priority groups (mapped from packet internal priority) may share a single service pool.
@@ -137,10 +137,10 @@ func (e *mmu_priority_group_config_entry) MemGetSet(b []uint32, isSet bool) {
 type mmu_priority_group_config_mem m.MemElt
 
 func (e *mmu_priority_group_config_mem) get(q *DmaRequest, v *mmu_priority_group_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeRxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeRxPipe)
 }
 func (e *mmu_priority_group_config_mem) set(q *DmaRequest, v *mmu_priority_group_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeRxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeRxPipe)
 }
 
 type mmu_tx_service_pool_config_entry struct {
@@ -160,10 +160,10 @@ func (e *mmu_tx_service_pool_config_entry) MemGetSet(b []uint32, isSet bool) {
 type mmu_tx_service_pool_config_mem m.MemElt
 
 func (e *mmu_tx_service_pool_config_mem) get(q *DmaRequest, v *mmu_tx_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 func (e *mmu_tx_service_pool_config_mem) set(q *DmaRequest, v *mmu_tx_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 
 type mmu_tx_color_config_entry struct {
@@ -183,10 +183,10 @@ func (e *mmu_tx_color_config_entry) MemGetSet(b []uint32, isSet bool) {
 type mmu_tx_color_config_mem m.MemElt
 
 func (e *mmu_tx_color_config_mem) get(q *DmaRequest, v *mmu_tx_color_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 func (e *mmu_tx_color_config_mem) set(q *DmaRequest, v *mmu_tx_color_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 
 type mmu_tx_queue_config_entry struct {
@@ -243,10 +243,10 @@ func (e *mmu_tx_queue_config_entry) MemGetSet(b []uint32, isSet bool) {
 type mmu_tx_queue_config_mem m.MemElt
 
 func (e *mmu_tx_queue_config_mem) get(q *DmaRequest, v *mmu_tx_queue_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 func (e *mmu_tx_queue_config_mem) set(q *DmaRequest, v *mmu_tx_queue_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 
 type mmu_tx_queue_to_queue_group_map_entry struct {
@@ -285,10 +285,10 @@ func (e *mmu_tx_queue_to_queue_group_map_entry) MemGetSet(b []uint32, isSet bool
 type mmu_tx_queue_to_queue_group_map_mem m.MemElt
 
 func (e *mmu_tx_queue_to_queue_group_map_mem) get(q *DmaRequest, v *mmu_tx_queue_to_queue_group_map_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 func (e *mmu_tx_queue_to_queue_group_map_mem) set(q *DmaRequest, v *mmu_tx_queue_to_queue_group_map_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 
 type mmu_multicast_db_service_pool_config_entry struct {
@@ -320,10 +320,10 @@ func (e *mmu_multicast_db_service_pool_config_entry) MemGetSet(b []uint32, isSet
 type mmu_multicast_db_service_pool_config_mem m.MemElt
 
 func (e *mmu_multicast_db_service_pool_config_mem) get(q *DmaRequest, v *mmu_multicast_db_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 func (e *mmu_multicast_db_service_pool_config_mem) set(q *DmaRequest, v *mmu_multicast_db_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 
 type mmu_multicast_mcqe_service_pool_config_entry struct {
@@ -355,10 +355,10 @@ func (e *mmu_multicast_mcqe_service_pool_config_entry) MemGetSet(b []uint32, isS
 type mmu_multicast_mcqe_service_pool_config_mem m.MemElt
 
 func (e *mmu_multicast_mcqe_service_pool_config_mem) get(q *DmaRequest, v *mmu_multicast_mcqe_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 func (e *mmu_multicast_mcqe_service_pool_config_mem) set(q *DmaRequest, v *mmu_multicast_mcqe_service_pool_config_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuXpe, sbus.Duplicate, mmuBaseTypeTxPipe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuPipe, sbus.Duplicate, mmuBaseTypeTxPipe)
 }
 
 const (
@@ -388,8 +388,8 @@ func (e *mmu_cell_buffer_pool_entry) MemGetSet(b []uint32, isSet bool) {
 type mmu_cell_buffer_pool_mem m.MemElt
 
 func (e *mmu_cell_buffer_pool_mem) get(q *DmaRequest, v *mmu_cell_buffer_pool_entry) {
-	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuSc, sbus.Single, mmuBaseTypeXpe)
+	(*m.MemElt)(e).MemDmaGeta(&q.DmaRequest, v, BlockMmuSlice, sbus.Single, mmuBaseTypeMmuPipe)
 }
 func (e *mmu_cell_buffer_pool_mem) set(q *DmaRequest, v *mmu_cell_buffer_pool_entry) {
-	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuSc, sbus.Single, mmuBaseTypeXpe)
+	(*m.MemElt)(e).MemDmaSeta(&q.DmaRequest, v, BlockMmuSlice, sbus.Single, mmuBaseTypeMmuPipe)
 }
