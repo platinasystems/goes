@@ -14,7 +14,7 @@ import (
 	"unsafe"
 )
 
-var regs_base = m.RegsBasePointer
+var regs_base = m.BasePointer
 
 func check(tag string, p unsafe.Pointer, expect uint) {
 	CheckRegAddr(tag, uint(uintptr(p)-uintptr(regs_base)), expect)

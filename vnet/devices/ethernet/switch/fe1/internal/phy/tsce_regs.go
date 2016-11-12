@@ -9,7 +9,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 )
 
-func get_tsce_regs() *tsce_regs { return (*tsce_regs)(m.RegsBasePointer) }
+func get_tsce_regs() *tsce_regs { return (*tsce_regs)(m.BasePointer) }
 
 // Register Map for TSCE core
 type tsce_regs struct {

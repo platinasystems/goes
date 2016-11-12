@@ -8,7 +8,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 )
 
-func get_tscf_regs() *tscf_regs { return (*tscf_regs)(m.RegsBasePointer) }
+func get_tscf_regs() *tscf_regs { return (*tscf_regs)(m.BasePointer) }
 
 // Register Map for TSCF core
 type tscf_regs struct {

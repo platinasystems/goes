@@ -17,11 +17,11 @@ type fuc_uint8 uint8
 type euc_uint16 uint16
 type euc_uint8 uint8
 
-func (phy *Tsce) get_uc_mem() *tsce_uc_mem { return (*tsce_uc_mem)(m.RegsBasePointer) }
-func (phy *Tscf) get_uc_mem() *tscf_uc_mem { return (*tscf_uc_mem)(m.RegsBasePointer) }
+func (phy *Tsce) get_uc_mem() *tsce_uc_mem { return (*tsce_uc_mem)(m.BasePointer) }
+func (phy *Tscf) get_uc_mem() *tscf_uc_mem { return (*tscf_uc_mem)(m.BasePointer) }
 
 func getSetTscf(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data *uint32, log2NBytes int) (read_data uint32) {
-	addr := uint32(uintptr(r) - m.RegsBaseAddress)
+	addr := uint32(uintptr(r) - m.BaseAddress)
 	addr |= 0x20000000 // ARM AHB device address space.
 
 	regs := get_tscf_regs()
@@ -48,7 +48,7 @@ func getSetTscf(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data
 }
 
 func getSetTsce(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data *uint32, log2NBytes int) (read_data uint32) {
-	addr := uint16(uintptr(r) - m.RegsBaseAddress)
+	addr := uint16(uintptr(r) - m.BaseAddress)
 
 	regs := get_tsce_regs()
 

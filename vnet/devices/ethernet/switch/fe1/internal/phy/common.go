@@ -76,7 +76,7 @@ type pmd_reg_32 [2]reg
 type pmd_lane_reg_32 [2]reg
 type pad_reg reg // for padding
 
-func (r *reg) offset() uint16   { return uint16(uintptr(unsafe.Pointer(r)) - m.RegsBaseAddress) }
+func (r *reg) offset() uint16   { return uint16(uintptr(unsafe.Pointer(r)) - m.BaseAddress) }
 func (r *reg32) offset() uint16 { return r[0].offset() }
 
 const default_lane_mask = 0x1

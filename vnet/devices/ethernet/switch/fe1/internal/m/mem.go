@@ -22,13 +22,13 @@ type Mem [MemMax]MemElt
 const MemMax = 1 << 18
 
 func (e *MemElt) Address() sbus.Address {
-	return sbus.Address(uintptr(unsafe.Pointer(e)) - RegsBaseAddress)
+	return sbus.Address(uintptr(unsafe.Pointer(e)) - BaseAddress)
 }
 
 type M32 MemElt
 type M64 MemElt
 
-func (r *M32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *M32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
 func (r *M64) Offset() uint { return (*M32)(r).Offset() }
 
 func (r *M32) Address() sbus.Address { return sbus.Address(r.Offset()) }

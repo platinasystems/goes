@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	RegsBasePointer = hw.BasePointer
-	RegsBaseAddress = hw.BaseAddress
+	BasePointer = hw.BasePointer
+	BaseAddress = hw.BaseAddress
 )
 
 type Gu32 byte
@@ -28,7 +28,7 @@ type U64 [1 << Log2NRegPorts]Gu64
 type PortU32 [1 << Log2NRegPorts]Pu32
 type PortU64 [1 << Log2NRegPorts]Pu64
 
-func (r *Gu32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *Gu32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
 func (r *Gu64) Offset() uint { return (*Gu32)(r).Offset() }
 func (r *Pu32) Offset() uint { return (*Gu32)(r).Offset() }
 func (r *Pu64) Offset() uint { return (*Gu32)(r).Offset() }

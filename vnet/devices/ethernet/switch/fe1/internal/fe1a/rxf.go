@@ -1035,10 +1035,10 @@ type rxf_u1 rxf_field
 type rxf_u0 rxf_field
 
 func get_rxf_field_extractor_l0_bus() *rxf_field_extractor_l0_bus {
-	return (*rxf_field_extractor_l0_bus)(m.RegsBasePointer)
+	return (*rxf_field_extractor_l0_bus)(m.BasePointer)
 }
 
-func (x *rxf_field) offset() uint { return uint(uintptr(unsafe.Pointer(x)) - m.RegsBaseAddress) }
+func (x *rxf_field) offset() uint { return uint(uintptr(unsafe.Pointer(x)) - m.BaseAddress) }
 func (x *rxf_u5) offset() uint    { return (*rxf_field)(x).offset() }
 func (x *rxf_u4) offset() uint    { return (*rxf_field)(x).offset() }
 func (x *rxf_u3) offset() uint    { return (*rxf_field)(x).offset() }

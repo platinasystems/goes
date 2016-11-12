@@ -13,6 +13,6 @@ import (
 
 // Check memory map.
 func init() {
-	r := (*clport_regs)(m.RegsBasePointer)
+	r := (*clport_regs)(m.BasePointer)
 	CheckRegAddr("phy_uc_data_access_mode", r.phy_uc_data_access_mode.offset(), 0x21900)
 }

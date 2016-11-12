@@ -19,7 +19,7 @@ func (r *pmd_reg_32) offset() uint   { return uint(r[0].offset()) }
 
 // Check TSCF memory map.
 func init() {
-	r := (*tscf_regs)(m.RegsBasePointer)
+	r := (*tscf_regs)(m.BasePointer)
 	CheckRegAddr("main", r.main.setup.offset(), 0x9000)
 	CheckRegAddr("pmd_x1", r.pmd_x1.reset.offset(), 0x9010)
 	CheckRegAddr("packet_generator", r.packet_generator.control[0].offset(), 0x9030)
@@ -66,7 +66,7 @@ func init() {
 
 // Check TSCE memory map.
 func init() {
-	r := (*tsce_regs)(m.RegsBasePointer)
+	r := (*tsce_regs)(m.BasePointer)
 	CheckRegAddr("main", r.main.setup.offset(), 0x9000)
 	CheckRegAddr("pmd_x1", r.pmd_x1.reset.offset(), 0x9010)
 	CheckRegAddr("packet_generator", r.packet_generator.control[0].offset(), 0x9030)

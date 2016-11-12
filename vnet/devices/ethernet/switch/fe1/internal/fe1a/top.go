@@ -26,7 +26,7 @@ func (r *top_reg) getDo(q *DmaRequest) (v uint32) {
 }
 
 func (r *top_reg) address() sbus.Address { return sbus.GenReg | sbus.Address(r.offset()) }
-func (r *top_reg) offset() uint          { return uint(uintptr(unsafe.Pointer(r))-m.RegsBaseAddress) << 8 }
+func (r *top_reg) offset() uint          { return uint(uintptr(unsafe.Pointer(r))-m.BaseAddress) << 8 }
 
 type top_pll_regs struct {
 	// [0]:
@@ -307,17 +307,17 @@ func (t *fe1a) Init() {
 	}
 
 	// Initialize fictitious memory-map pointers to all memories and registers.
-	t.top_regs = (*top_regs)(m.RegsBasePointer)
-	t.rx_pipe_mems = (*rx_pipe_mems)(m.RegsBasePointer)
-	t.rx_pipe_regs = (*rx_pipe_regs)(m.RegsBasePointer)
-	t.tx_pipe_mems = (*tx_pipe_mems)(m.RegsBasePointer)
-	t.tx_pipe_regs = (*tx_pipe_regs)(m.RegsBasePointer)
-	t.mmu_global_mems = (*mmu_global_mems)(m.RegsBasePointer)
-	t.mmu_global_regs = (*mmu_global_regs)(m.RegsBasePointer)
-	t.mmu_xpe_mems = (*mmu_xpe_mems)(m.RegsBasePointer)
-	t.mmu_xpe_regs = (*mmu_xpe_regs)(m.RegsBasePointer)
-	t.mmu_sc_mems = (*mmu_sc_mems)(m.RegsBasePointer)
-	t.mmu_sc_regs = (*mmu_sc_regs)(m.RegsBasePointer)
+	t.top_regs = (*top_regs)(m.BasePointer)
+	t.rx_pipe_mems = (*rx_pipe_mems)(m.BasePointer)
+	t.rx_pipe_regs = (*rx_pipe_regs)(m.BasePointer)
+	t.tx_pipe_mems = (*tx_pipe_mems)(m.BasePointer)
+	t.tx_pipe_regs = (*tx_pipe_regs)(m.BasePointer)
+	t.mmu_global_mems = (*mmu_global_mems)(m.BasePointer)
+	t.mmu_global_regs = (*mmu_global_regs)(m.BasePointer)
+	t.mmu_xpe_mems = (*mmu_xpe_mems)(m.BasePointer)
+	t.mmu_xpe_regs = (*mmu_xpe_regs)(m.BasePointer)
+	t.mmu_sc_mems = (*mmu_sc_mems)(m.BasePointer)
+	t.mmu_sc_regs = (*mmu_sc_regs)(m.BasePointer)
 
 	t.dmaReq = DmaRequest{fe1a: t}
 	q := t.getDmaReq()

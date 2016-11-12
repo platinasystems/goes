@@ -221,17 +221,17 @@ type xlport_regs struct {
 
 func (p *PortBlock) get_regs() (*xclport_regs, *xclmac_common_regs_0, *xclmac_common_regs_1, *clmac_uncommon_regs_0) {
 	if p.IsXlPort {
-		x := (*xlport_regs)(m.RegsBasePointer)
+		x := (*xlport_regs)(m.BasePointer)
 		return &x.xclport_regs, &x.xclmac_common_regs_0, &x.xclmac_common_regs_1, (*clmac_uncommon_regs_0)(nil)
 	} else {
-		x := (*clport_regs)(m.RegsBasePointer)
+		x := (*clport_regs)(m.BasePointer)
 		return &x.xclport_regs, &x.xclmac_common_regs_0, &x.xclmac_common_regs_1, &x.clmac_uncommon_regs_0
 	}
 }
 
 type wc_ucmem_data_elt [4]uint32
 
-func get_xclport_mems() *xclport_mems { return (*xclport_mems)(m.RegsBasePointer) }
+func get_xclport_mems() *xclport_mems { return (*xclport_mems)(m.BasePointer) }
 
 type xclport_mems struct {
 	wc_ucmem_data m.Mem

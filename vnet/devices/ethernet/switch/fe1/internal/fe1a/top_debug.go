@@ -13,7 +13,7 @@ import (
 
 func init() {
 	// Check register addresses.
-	r := (*top_regs)(m.RegsBasePointer)
+	r := (*top_regs)(m.BasePointer)
 	CheckRegAddr("core_pll0_control[0]", r.core_pll0_control[0].offset(), 0x38000)
 	CheckRegAddr("temperature_sensor.control[0]", r.temperature_sensor.control[0].offset(), 0x50000)
 	CheckRegAddr("core_pll_frequency_select", r.core_pll_frequency_select.offset(), 0x75c00)
