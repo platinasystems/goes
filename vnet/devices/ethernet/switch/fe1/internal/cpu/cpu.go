@@ -24,7 +24,7 @@ type sub_controllers struct {
 
 	_ [0x110 - 0x80]byte
 
-	packet_dma packet.DmaRegs
+	packet_dma packet.DmaController
 
 	_ [0x2c0 - 0x1c0]byte
 

@@ -215,15 +215,15 @@ func (d *Dma) StartRx(v *vnet.Vnet, node_name string, ports []Port) {
 	}
 
 	// Accept all cos values for this channel.
-	c.regs.rx_cos_control[c.index][0].Set(^uint32(0))
-	c.regs.rx_cos_control[c.index][1].Set(^uint32(0))
+	c.controller.rx_cos_control[c.index][0].Set(^uint32(0))
+	c.controller.rx_cos_control[c.index][1].Set(^uint32(0))
 
 	// Start dma engine.
-	c.regs.start_descriptor_address[c.index].Set(start)
+	c.controller.start_descriptor_address[c.index].Set(start)
 	n.halt_index = rx_ring_len_without_reload_descriptor - 1
-	c.regs.halt_descriptor_address[c.index].Set(n.rxDescPhysAddr(n.halt_index))
+	c.controller.halt_descriptor_address[c.index].Set(n.rxDescPhysAddr(n.halt_index))
 	hw.MemoryBarrier()
-	c.regs.control[c.index].Set(uint32(c.start_control))
+	c.controller.control[c.index].Set(uint32(c.start_control))
 }
 
 func (n *rxNode) syncSwIfCounters(v *vnet.Vnet) {
@@ -397,9 +397,9 @@ func (n *rxNode) rx_no_wrap(out *vnet.RefOut, iʹ, n_doneʹ, l uint) (done rx_do
 func (n *rxNode) DumpRxRing(w io.Writer, tag string) {
 	c := n.channel
 	var v [3]uint32
-	v[0] = c.regs.halt_status.Get()
-	v[1] = c.regs.status.Get()
-	v[2] = c.regs.current_descriptor_address[c.index].Get()
+	v[0] = c.controller.halt_status.Get()
+	v[1] = c.controller.status.Get()
+	v[2] = c.controller.current_descriptor_address[c.index].Get()
 	fmt.Fprintf(w, "%s: index %d, halt %d, halt status %x status %x cur %d\n", tag, n.ring_index, n.halt_index, v[0], v[1], n.rxDescIndex(v[2]))
 	for i := uint(0); i < rx_ring_len_with_reload_descriptor; i++ {
 		c := ':'
@@ -450,7 +450,7 @@ func (n *rxNode) NodeInput(out *vnet.RefOut) {
 	if n.halt_index >= rx_ring_len_without_reload_descriptor {
 		n.halt_index -= rx_ring_len_without_reload_descriptor
 	}
-	c.regs.halt_descriptor_address[c.index].Set(n.rxDescPhysAddr(n.halt_index))
+	c.controller.halt_descriptor_address[c.index].Set(n.rxDescPhysAddr(n.halt_index))
 
 	if elog.Enabled() {
 		elog.GenEventf("fe1 rx index %d, halt %d", n.ring_index, n.halt_index)

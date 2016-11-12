@@ -41,7 +41,7 @@ var descFlagStrings = [...]string{
 
 func (x descFlag) String() string { return elib.FlagStringer(descFlagStrings[:], elib.Word(x)) }
 
-type control_reg uint32
+type control_u32 uint32
 
 const (
 	control_tx = 1 << iota
@@ -58,20 +58,20 @@ const (
 	control_rx = 0 << 0
 )
 
-type status_reg int32
+type status_u32 int32
 
 const (
-	bad_status_write_address   status_reg = 1 << (4 * 3)
-	bad_packet_address         status_reg = 1 << (4 * 4)
-	bad_descriptor_address     status_reg = 1 << (4 * 5)
-	rx_status_buffer_ecc_error status_reg = 1 << (4 * 6)
-	rx_packet_buffer_ecc_error status_reg = 1 << (4 * 7)
-	status_reg_all_errors      status_reg = 0x11111000
+	bad_status_write_address   status_u32 = 1 << (4 * 3)
+	bad_packet_address         status_u32 = 1 << (4 * 4)
+	bad_descriptor_address     status_u32 = 1 << (4 * 5)
+	rx_status_buffer_ecc_error status_u32 = 1 << (4 * 6)
+	rx_packet_buffer_ecc_error status_u32 = 1 << (4 * 7)
+	status_all_errors          status_u32 = 0x11111000
 )
 
 const n_channel = 4
 
-type DmaRegs struct {
+type DmaController struct {
 	// [8] enable => backpressure mmu if outstanding cell count exceeds threshold (default: 1)
 	// [7:0] threshold 1 <= t <= 128 (default 4)
 	rx_buffer_threshold [n_channel]hw.U32
@@ -144,19 +144,19 @@ const (
 )
 
 type dma_channel struct {
-	dma  *Dma
-	regs *DmaRegs
+	dma        *Dma
+	controller *DmaController
 
 	// Channel index 0-3
 	index uint32
 
 	tx_node *txNode
 
-	start_control control_reg
+	start_control control_u32
 }
 
 type Dma struct {
-	regs        *DmaRegs
+	controller  *DmaController
 	Channels    [n_channel]dma_channel
 	rx_channels []*dma_channel
 	tx_channels []*dma_channel
@@ -179,7 +179,7 @@ func (e *dma_error) toError() error {
 	return e
 }
 
-var status_reg_details = []string{
+var status_details = []string{
 	12: "bad rx status write address",
 	16: "bad packet read/write address",
 	20: "bad descriptor read address",
@@ -192,19 +192,19 @@ func (e *dma_error) Error() (s string) {
 	x := e.status
 	if x != 0 {
 		s = fmt.Sprintf("[%d] 0x%x: ", e.index, e.memory_address)
-		s += elib.FlagStringer(status_reg_details, elib.Word(x))
+		s += elib.FlagStringer(status_details, elib.Word(x))
 	}
 	return
 }
 
 func (c *dma_channel) ack_desc_controlled_interrupt() {
-	c.regs.status_write_1_to_clear.Set(1 << (c.index + status_write_1_to_clear_desc_controlled))
+	c.controller.status_write_1_to_clear.Set(1 << (c.index + status_write_1_to_clear_desc_controlled))
 }
 
 func (c *dma_channel) DescControlledInterrupt() {
-	v := c.regs.status.Get()
+	v := c.controller.status.Get()
 	if v>>12 != 0 {
-		panic(fmt.Errorf("dma error status %s", elib.FlagStringer(status_reg_details, elib.Word(v))))
+		panic(fmt.Errorf("dma error status %s", elib.FlagStringer(status_details, elib.Word(v))))
 	}
 	d := c.dma
 	if !d.interruptsEnabled {
@@ -219,13 +219,13 @@ func (c *dma_channel) DescControlledInterrupt() {
 	}
 }
 
-func (m *Dma) InitChannels(regs *DmaRegs) {
+func (m *Dma) InitChannels(controller *DmaController) {
 	m.interruptsEnabled = true
 	for i := range m.Channels {
 		c := &m.Channels[i]
 		c.index = uint32(i)
 		c.dma = m
-		c.regs = regs
+		c.controller = controller
 		is_rx := i == 0
 		c.start_control = control_start | control_continuous | control_interrupt_based_on_descriptor
 		if is_rx {

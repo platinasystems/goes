@@ -166,11 +166,11 @@ func (t *txNode) start(v *vnet.Vnet) {
 	}
 
 	// Start dma engine; initially halted on first descriptor.
-	c.regs.start_descriptor_address[c.index].Set(start)
+	c.controller.start_descriptor_address[c.index].Set(start)
 	t.halt_index = 0
-	c.regs.halt_descriptor_address[c.index].Set(t.txDescPhysAddr(t.halt_index))
+	c.controller.halt_descriptor_address[c.index].Set(t.txDescPhysAddr(t.halt_index))
 	hw.MemoryBarrier()
-	c.regs.control[c.index].Set(uint32(c.start_control))
+	c.controller.control[c.index].Set(uint32(c.start_control))
 }
 
 func (d0 *TxDescriptor) adjustModuleheader(r0 *vnet.Ref, nextFlag0 vnet.BufferFlag, is_sopʹ bool) (is_sop bool) {
@@ -320,7 +320,7 @@ func (node *InterfaceNode) output(t *txNode, in *vnet.TxRefVecIn) {
 	if di != t.halt_index {
 		c := t.channel
 		t.halt_index = di
-		c.regs.halt_descriptor_address[c.index].Set(t.txDescPhysAddr(di))
+		c.controller.halt_descriptor_address[c.index].Set(t.txDescPhysAddr(di))
 	}
 
 	t.txRing.ToInterrupt <- in
@@ -348,7 +348,7 @@ func (t *txNode) DescDoneInterrupt() {
 	defer t.mu.Unlock()
 
 	c := t.channel
-	di := t.txDescIndex(c.regs.current_descriptor_address[c.index].Get())
+	di := t.txDescIndex(c.controller.current_descriptor_address[c.index].Get())
 	cur := di
 	if di == tx_ring_len {
 		di = tx_ring_len - 1
@@ -360,7 +360,7 @@ func (t *txNode) DescDoneInterrupt() {
 	}
 
 	if elog.Enabled() {
-		v := c.regs.halt_status.Get()
+		v := c.controller.halt_status.Get()
 		elog.GenEventf("fe1 tx adv %d halt %d/%d head %d/%d %d", n_advance, t.halt_index, 1&(v>>(27+c.index)), di, cur, t.ring_index)
 	}
 
@@ -373,9 +373,9 @@ func (t *txNode) DescDoneInterrupt() {
 func (t *txNode) DumpTxRing(tag string) {
 	c := t.channel
 	var w [3]uint32
-	w[0] = c.regs.halt_status.Get()
-	w[1] = c.regs.status.Get()
-	w[2] = c.regs.current_descriptor_address[c.index].Get()
+	w[0] = c.controller.halt_status.Get()
+	w[1] = c.controller.status.Get()
+	w[2] = c.controller.current_descriptor_address[c.index].Get()
 	fmt.Printf("%s: index %d, halt %d, halt %d status %x cur %d\n", tag, t.ring_index, t.halt_index,
 		1&(w[0]>>(27+c.index)), w[1], t.txDescIndex(w[2]))
 	for i := uint(0); i <= tx_ring_len; i++ {
