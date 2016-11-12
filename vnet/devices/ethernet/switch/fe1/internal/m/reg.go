@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	RegsBasePointer = hw.RegsBasePointer
-	RegsBaseAddress = hw.RegsBaseAddress
+	RegsBasePointer = hw.BasePointer
+	RegsBaseAddress = hw.BaseAddress
 )
 
 type Gu32 byte

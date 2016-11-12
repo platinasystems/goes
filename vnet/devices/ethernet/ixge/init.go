@@ -91,7 +91,7 @@ func (m *main) DeviceMatch(pdev *pci.Device) (dd pci.DriverDevice, err error) {
 		return
 	}
 	// Can't directly use mmapped registers because of compiler's read probes/nil checks.
-	d.regs = (*regs)(hw.RegsBasePointer)
+	d.regs = (*regs)(hw.BasePointer)
 	d.mmaped_regs = d.bar0()
 	return d, nil
 }

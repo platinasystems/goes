@@ -14,8 +14,8 @@ import (
 // Must point to readable memory since compiler may perform
 // read probes (nil checks) as part of memory addressing.
 var (
-	RegsBasePointer = basePointer()
-	RegsBaseAddress = uintptr(RegsBasePointer)
+	BasePointer = basePointer()
+	BaseAddress = uintptr(BasePointer)
 )
 
 func basePointer() unsafe.Pointer {
@@ -47,9 +47,9 @@ type U16 uint16
 type U32 uint32
 
 // Byte offsets
-func (r *U8) Offset() uint  { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
-func (r *U16) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
-func (r *U32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *U8) Offset() uint  { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
+func (r *U16) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
+func (r *U32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
 
 func (r *U32) Get() uint32  { return LoadUint32((*uint32)(r)) }
 func (r *U32) Set(x uint32) { StoreUint32((*uint32)(r), x) }

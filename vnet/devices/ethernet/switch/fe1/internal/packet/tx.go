@@ -456,7 +456,7 @@ type tx_loopback_header struct {
 	is_src_virtual_port_valid bool
 	src_port                  uint16
 
-	// 3 bit index into ipipe cpu_pkt_profile registers.
+	// 3 bit index into ipipe cpu_pkt_profile.
 	visibility_packet_profile_index uint8
 
 	dst_port uint8

@@ -37,7 +37,7 @@ func (r *U32) Set(d *Device, v uint32) {
 }
 
 func (d *Device) getRegs(o uint) unsafe.Pointer {
-	return unsafe.Pointer(hw.RegsBaseAddress + uintptr(o))
+	return unsafe.Pointer(hw.BaseAddress + uintptr(o))
 }
 
 // Under PCI, each device has 256 bytes of configuration address space,

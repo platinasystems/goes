@@ -23,7 +23,7 @@ func (d *dev) addr_for_offset32(offset uint) *uint32 {
 func (d *dev) addr_for_offset64(offset uint) *uint64 {
 	return (*uint64)(unsafe.Pointer(&d.mmaped_regs[offset]))
 }
-func (r *reg) offset() uint        { return uint(uintptr(unsafe.Pointer(r)) - hw.RegsBaseAddress) }
+func (r *reg) offset() uint        { return uint(uintptr(unsafe.Pointer(r)) - hw.BaseAddress) }
 func (r *reg) addr(d *dev) *uint32 { return d.addr_for_offset32(r.offset()) }
 func (r *reg) get(d *dev) reg      { return reg(hw.LoadUint32(r.addr(d))) }
 func (r *reg) set(d *dev, v reg)   { hw.StoreUint32(r.addr(d), uint32(v)) }

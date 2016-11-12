@@ -13,12 +13,12 @@ import (
 )
 
 func check(tag string, p unsafe.Pointer, expect uint) {
-	hw.CheckRegAddr(tag, uint(uintptr(p)-hw.RegsBaseAddress), expect)
+	hw.CheckRegAddr(tag, uint(uintptr(p)-hw.BaseAddress), expect)
 }
 
 // Validate memory map.
 func init() {
-	r := (*regs)(hw.RegsBasePointer)
+	r := (*regs)(hw.BasePointer)
 	check("pf_0", unsafe.Pointer(&r.pf_0), 0x700)
 	check("interrupt", unsafe.Pointer(&r.interrupt), 0x800)
 	check("rx_dma0", unsafe.Pointer(&r.rx_dma0[0]), 0x1000)
