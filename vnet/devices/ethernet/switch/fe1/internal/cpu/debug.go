@@ -14,7 +14,7 @@ import (
 var basePointer = unsafe.Pointer(&struct{}{})
 
 func check(tag string, p unsafe.Pointer, expect uint) {
-	CheckRegAddr(tag, uint(uintptr(p)-uintptr(basePointer)), expect)
+	CheckAddr(tag, uint(uintptr(p)-uintptr(basePointer)), expect)
 }
 
 // Check memory map.
