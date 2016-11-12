@@ -125,6 +125,6 @@ type CapabilityHeader struct {
 	}
 }
 
-func GetRegs(d *pci.Device) *CapabilityHeader {
+func GetCapabilityHeader(d *pci.Device) *CapabilityHeader {
 	return (*CapabilityHeader)(d.GetCap(pci.PCIE))
 }

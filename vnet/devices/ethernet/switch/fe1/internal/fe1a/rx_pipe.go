@@ -42,7 +42,7 @@ func (r *rx_pipe_reg64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
 }
 
 type rx_pipe_preg32 m.Pu32
-type rx_pipe_portreg32 [1 << m.Log2NRegPorts]rx_pipe_preg32
+type rx_pipe_portreg32 [1 << m.Log2NPorts]rx_pipe_preg32
 
 func (r *rx_pipe_preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
 
@@ -55,7 +55,7 @@ func (r *rx_pipe_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
 func (r *rx_pipe_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
 
 type rx_pipe_preg64 m.Pu64
-type rx_pipe_portreg64 [1 << m.Log2NRegPorts]rx_pipe_preg64
+type rx_pipe_portreg64 [1 << m.Log2NPorts]rx_pipe_preg64
 
 func (r *rx_pipe_preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 

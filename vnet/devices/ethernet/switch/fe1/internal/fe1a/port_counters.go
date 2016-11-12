@@ -270,7 +270,7 @@ func (t *fe1a) add_zero_rx_pipe_port_counters_cmd(q *DmaRequest, p pipe_port_num
 		Address: t.rx_pipe_regs.counters[0][p].address(),
 		Tx:      zero[:],
 		Count:   uint(n_rx_counters),
-		Log2SbusAddressIncrement: m.Log2NRegPorts,
+		Log2SbusAddressIncrement: m.Log2NPorts,
 	}
 	q.Add(&zerocmd)
 }

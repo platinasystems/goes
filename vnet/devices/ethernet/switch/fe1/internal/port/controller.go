@@ -24,9 +24,9 @@ func (r *reg32) offset() uint          { return (*m.U32)(r).Offset() }
 func (r *reg32) address() sbus.Address { return (*m.U32)(r).Address() }
 
 type preg32 m.Pu32
-type portreg32 [1 << m.Log2NRegPorts]preg32
+type portreg32 [1 << m.Log2NPorts]preg32
 type preg64 m.Pu64
-type portreg64 [1 << m.Log2NRegPorts]preg64
+type portreg64 [1 << m.Log2NPorts]preg64
 
 func (r *preg32) get(q *dmaRequest, v *uint32) {
 	(*m.Pu32)(r).Get(&q.DmaRequest, 0, q.portBlock.SbusBlock, sbus.Unique0, v)

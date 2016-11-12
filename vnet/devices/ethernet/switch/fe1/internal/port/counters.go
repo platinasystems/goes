@@ -365,7 +365,7 @@ func (p *PortBlock) GetCounters(port m.Porter, v *[N_counters]uint64) {
 		Address: r.counters[0][pi].address(),
 		Rx:      buf[:],
 		Count:   uint(N_counters),
-		Log2SbusAddressIncrement: m.Log2NRegPorts,
+		Log2SbusAddressIncrement: m.Log2NPorts,
 	})
 	q.Do()
 	for i := range v {

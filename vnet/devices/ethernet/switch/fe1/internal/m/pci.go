@@ -23,13 +23,13 @@ func (p *Platform) DeviceMatch(pd *pci.Device) (pci.DriverDevice, error) {
 		return nil, nil
 	}
 
-	haveIproc := false
+	haveIcpu := false
 	if b, _, ok := pd.FindExtCap(pci.ExtVendorSpecific); ok {
 		r := binary.LittleEndian.Uint32(b[8:])
-		haveIproc = r == 0x101 || r == 0x100
+		haveIcpu = r == 0x101 || r == 0x100
 	}
 
-	if pr := pcie.GetRegs(pd); pr != nil {
+	if pr := pcie.GetCapabilityHeader(pd); pr != nil {
 		max := uint16(2)
 		v := pr.Device.Control.Get(pd)
 		v = (v &^ (7 << 5)) | (max << 5)   // max payload
@@ -39,16 +39,16 @@ func (p *Platform) DeviceMatch(pd *pci.Device) (pci.DriverDevice, error) {
 	}
 
 	// PCI BAR 0
-	cmicRegs, err := pd.MapResource(&pd.Resources[0])
+	r, err := pd.MapResource(&pd.Resources[0])
 	if err != nil {
 		panic(err)
 	}
-	var iprocRegs unsafe.Pointer
-	if haveIproc {
-		iprocRegs = cmicRegs
+	var rr unsafe.Pointer
+	if haveIcpu {
+		rr = r
 
-		// For iproc devices CMIC is PCI BAR 2.
-		cmicRegs, err = pd.MapResource(&pd.Resources[1])
+		// For icpu devices cpu controller is PCI BAR 2.
+		r, err = pd.MapResource(&pd.Resources[1])
 		if err != nil {
 			panic(err)
 		}
@@ -57,7 +57,7 @@ func (p *Platform) DeviceMatch(pd *pci.Device) (pci.DriverDevice, error) {
 	c.index = uint(len(p.Switches))
 	p.Switches = append(p.Switches, s)
 
-	c.CpuMain.Init(cmicRegs, iprocRegs)
+	c.CpuMain.Init(r, rr)
 
 	return s, err
 }

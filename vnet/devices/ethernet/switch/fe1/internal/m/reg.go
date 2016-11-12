@@ -21,12 +21,12 @@ type Gu64 byte
 type Pu32 byte
 type Pu64 byte
 
-const Log2NRegPorts = 8
+const Log2NPorts = 8
 
-type U32 [1 << Log2NRegPorts]Gu32
-type U64 [1 << Log2NRegPorts]Gu64
-type PortU32 [1 << Log2NRegPorts]Pu32
-type PortU64 [1 << Log2NRegPorts]Pu64
+type U32 [1 << Log2NPorts]Gu32
+type U64 [1 << Log2NPorts]Gu64
+type PortU32 [1 << Log2NPorts]Pu32
+type PortU64 [1 << Log2NPorts]Pu64
 
 func (r *Gu32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
 func (r *Gu64) Offset() uint { return (*Gu32)(r).Offset() }
