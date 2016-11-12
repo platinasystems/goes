@@ -13,20 +13,20 @@ import (
 	"time"
 )
 
-type Tscf struct {
+type HundredGig struct {
 	Common
 	core_config  uc_core_config_word
 	lane_configs [4]uc_lane_config_word
 }
 
-func (r *tscf_regs) set_master_port_number(q *DmaRequest, n uint) {
+func (r *hundred_gig_controller) set_master_port_number(q *DmaRequest, n uint) {
 	if n >= N_lane {
 		panic(n)
 	}
 	r.main.setup.Modify(q, uint16(n)<<14, 3<<14)
 }
 
-func (phy *Tscf) apply_lane_map(q *DmaRequest, r *tscf_regs) {
+func (phy *HundredGig) apply_lane_map(q *DmaRequest, r *hundred_gig_controller) {
 	// Inverse logical -> physical mappings.
 	var (
 		rx_phys_by_logical, tx_phys_by_logical [N_lane]uint16
@@ -69,8 +69,8 @@ func (phy *Tscf) apply_lane_map(q *DmaRequest, r *tscf_regs) {
 	q.Do()
 }
 
-func (phy *Tscf) setPortMode(mode port.PortBlockMode) {
-	r := get_tscf_regs()
+func (phy *HundredGig) setPortMode(mode port.PortBlockMode) {
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 
 	const (
@@ -100,7 +100,7 @@ func (phy *Tscf) setPortMode(mode port.PortBlockMode) {
 	q.Do()
 }
 
-func (r *pmd_lane_reg) GetDoForeach(q *DmaRequest, laneMask m.LaneMask) uint16 {
+func (r *pmd_lane_u16) GetDoForeach(q *DmaRequest, laneMask m.LaneMask) uint16 {
 	v := [4]uint16{0xffff, 0xffff, 0xffff, 0xffff}
 	laneMask.Foreach(func(l m.LaneMask) {
 		r.Get(q, m.LaneMask(1<<l), &v[l])
@@ -109,7 +109,7 @@ func (r *pmd_lane_reg) GetDoForeach(q *DmaRequest, laneMask m.LaneMask) uint16 {
 	return v[0] & v[1] & v[2] & v[3]
 }
 
-func (r *pcs_lane_reg) GetDoForeach(q *DmaRequest, laneMask m.LaneMask) uint16 {
+func (r *pcs_lane_u16) GetDoForeach(q *DmaRequest, laneMask m.LaneMask) uint16 {
 	v := [4]uint16{0xffff, 0xffff, 0xffff, 0xffff}
 	laneMask.Foreach(func(l m.LaneMask) {
 		r.Get(q, m.LaneMask(1<<l), &v[l])
@@ -118,9 +118,9 @@ func (r *pcs_lane_reg) GetDoForeach(q *DmaRequest, laneMask m.LaneMask) uint16 {
 	return v[0] & v[1] & v[2] & v[3]
 }
 
-func (phy *Tscf) Init() {
+func (phy *HundredGig) Init() {
 
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	laneMask := m.LaneMask(1 << 0)
 	allLanes := m.LaneMask(0xf)
@@ -287,7 +287,7 @@ func (phy *Tscf) Init() {
 
 	// TX FIR coefficient init.
 	allLanes.ForeachMask(func(lm m.LaneMask) {
-		setupTscfTxSettings(q, lm)
+		setupHundredGigTxSettings(q, lm)
 	})
 
 	// Initialize uC lane config word to all zeros.
@@ -324,9 +324,9 @@ func (phy *Tscf) Init() {
 	}
 }
 
-func (phy *Tscf) SetEnable(p m.Porter, enable bool) {
+func (phy *HundredGig) SetEnable(p m.Porter, enable bool) {
 	laneMask := p.GetLaneMask()
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 
 	disable := uint16(1)
@@ -356,8 +356,8 @@ func (phy *Tscf) SetEnable(p m.Porter, enable bool) {
 	}
 }
 
-func (phy *Tscf) SetAutoneg(port m.Porter, enable bool) {
-	r := get_tscf_regs()
+func (phy *HundredGig) SetAutoneg(port m.Porter, enable bool) {
+	r := get_hundred_gig_controller()
 
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
@@ -447,8 +447,8 @@ func (phy *Tscf) SetAutoneg(port m.Porter, enable bool) {
 	phy.setAnEnable(port, enable)
 }
 
-func (phy *Tscf) setCL72(port m.Porter, enable bool) {
-	r := get_tscf_regs()
+func (phy *HundredGig) setCL72(port m.Porter, enable bool) {
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLaneMask := m.LaneMask(1 << laneMask.FirstLane())
@@ -485,9 +485,9 @@ func (phy *Tscf) setCL72(port m.Porter, enable bool) {
 }
 
 // NB Drive from redis db data
-func (phy *Tscf) setLocalAdvert(port m.Porter) {
+func (phy *HundredGig) setLocalAdvert(port m.Porter) {
 
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLaneMask := m.LaneMask(1 << laneMask.FirstLane())
@@ -526,9 +526,9 @@ func (phy *Tscf) setLocalAdvert(port m.Porter) {
 	q.Do()
 }
 
-func (phy *Tscf) setAnEnable(port m.Porter, enable bool) {
+func (phy *HundredGig) setAnEnable(port m.Porter, enable bool) {
 	// Used to signal PLL to restart after AN
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
@@ -603,8 +603,8 @@ func (phy *Tscf) setAnEnable(port m.Porter, enable bool) {
 	}
 }
 
-func (phy *Tscf) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
-	r := get_tscf_regs()
+func (phy *HundredGig) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLaneMask := m.LaneMask(1 << laneMask.FirstLane())
@@ -696,8 +696,8 @@ func (phy *Tscf) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
 
 }
 
-func (phy *Tscf) SetLoopback(port m.Porter, loopback_type m.PortLoopbackType) {
-	r := get_tscf_regs()
+func (phy *HundredGig) SetLoopback(port m.Porter, loopback_type m.PortLoopbackType) {
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLaneMask := m.LaneMask(1 << laneMask.FirstLane())
@@ -735,9 +735,9 @@ func (phy *Tscf) SetLoopback(port m.Porter, loopback_type m.PortLoopbackType) {
 	q.Do()
 }
 
-func setupTscfTxSettings(q *DmaRequest, laneMask m.LaneMask) {
+func setupHundredGigTxSettings(q *DmaRequest, laneMask m.LaneMask) {
 	// Set pre, main, post1, post2, post3, amp
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 
 	// tx fir main +0 tap value
 	r.cl93n72_tx.control[3].Modify(q, laneMask, 0x64, 0x7f)
@@ -758,12 +758,12 @@ type tscf_speed_config struct {
 	mul   tscf_pll_multipler
 }
 
-func (phy *Tscf) ValidateSpeed(port m.Porter, speed float64, isHiGig bool) (ok bool) {
+func (phy *HundredGig) ValidateSpeed(port m.Porter, speed float64, isHiGig bool) (ok bool) {
 	_, ok = phy.speedConfig(port.GetLaneMask(), port.GetPhyInterface(), speed, isHiGig)
 	return
 }
 
-func (phy *Tscf) speedConfig(laneMask m.LaneMask, pi m.PhyInterface, speed float64, isHiGig bool) (sc tscf_speed_config, ok bool) {
+func (phy *HundredGig) speedConfig(laneMask m.LaneMask, pi m.PhyInterface, speed float64, isHiGig bool) (sc tscf_speed_config, ok bool) {
 	var (
 		c uc_core_config_word
 		l uc_lane_config_word
@@ -900,16 +900,16 @@ func (phy *Tscf) speedConfig(laneMask m.LaneMask, pi m.PhyInterface, speed float
 }
 
 // Return whether PMD is locked or not.
-func (phy *Tscf) PmdLocked(laneMask m.LaneMask) (locked bool) {
-	r := get_tscf_regs()
+func (phy *HundredGig) PmdLocked(laneMask m.LaneMask) (locked bool) {
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	locked = r.tlb_rx.pmd_lock_status.GetDo(q, laneMask)&(1<<0) != 0
 	return
 }
 
-func (phy *Tscf) getStatus(port m.Porter, lane m.LaneMask) (s portStatus) {
+func (phy *HundredGig) getStatus(port m.Porter, lane m.LaneMask) (s portStatus) {
 	laneMask := m.LaneMask(1 << lane)
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	var v [11]uint16
 	r.rx_x4.pcs_live_status.Get(q, laneMask, &v[0])

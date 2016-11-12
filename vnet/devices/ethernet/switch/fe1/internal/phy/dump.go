@@ -13,14 +13,14 @@ import (
 	"fmt"
 )
 
-func (phy *Tscf) fu(tag string) { phy.fu2(tag, 0) }
+func (phy *HundredGig) fu(tag string) { phy.fu2(tag, 0) }
 
-func (phy *Tscf) fu2(tag string, bi m.PortBlockIndex) {
+func (phy *HundredGig) fu2(tag string, bi m.PortBlockIndex) {
 	if bi != 99 && phy.PortBlock.PortBlockIndex != bi {
 		return
 	}
 
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	mem := phy.get_uc_mem()
 
@@ -71,9 +71,9 @@ func (phy *Tscf) fu2(tag string, bi m.PortBlockIndex) {
 }
 
 func uc_control_cmd(q *DmaRequest, subCmd uc_sub_command) (err error) {
-	regs := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	c := uc_cmd{command: uc_cmd_control, sub_command: subCmd}
-	err = c.do(q, 1<<0, &regs.uc_cmd)
+	err = c.do(q, 1<<0, &r.uc_cmd)
 	return
 }
 
@@ -198,8 +198,8 @@ func (e *uc_event) String() string {
 		elib.Stringer(uc_event_code_strings[:], int(e.code)))
 }
 
-func (phy *Tscf) dump_event_log() {
-	r := get_tscf_regs()
+func (phy *HundredGig) dump_event_log() {
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 	c := uc_cmd{command: uc_cmd_event_log_read}
 	var err error
@@ -336,7 +336,7 @@ func (ss *switchSelect) showPhyEventLog(c cli.Commander, w cli.Writer, in *cli.I
 					continue
 				}
 			}
-			phy := p.GetPhy().(*Tscf)
+			phy := p.GetPhy().(*HundredGig)
 			phy.dump_event_log()
 		}
 	}

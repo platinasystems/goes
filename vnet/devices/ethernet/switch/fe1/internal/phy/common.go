@@ -67,112 +67,112 @@ func (r *u16) SetSync(b *port.PortBlock, isPmd bool, lane_mask m.LaneMask, v uin
 	r.ModifySync(b, isPmd, lane_mask, v, 0xffff)
 }
 
-// Differentiate PCS(reg0)/PMD(reg1) registers so that we can derive DEVAD.
-type pcs_reg u16
-type pcs_lane_reg u16
-type pcs_reg_32 [2]u16
-type pmd_lane_reg u16
-type pmd_reg_32 [2]u16
-type pmd_lane_reg_32 [2]u16
-type pad_reg u16 // for padding
+// Differentiate PCS/PMD so that we can derive DEVAD bit.
+type pcs_u16 u16
+type pcs_lane_u16 u16
+type pcs_u32 [2]u16
+type pmd_lane_u16 u16
+type pmd_u32 [2]u16
+type pmd_lane_u32 [2]u16
+type pad_u16 u16 // for padding
 
 func (r *u16) offset() uint16 { return uint16(uintptr(unsafe.Pointer(r)) - m.BaseAddress) }
 func (r *u32) offset() uint16 { return r[0].offset() }
 
 const default_lane_mask = 0x1
 
-func (r *pcs_reg) Get(q *DmaRequest, v *uint16) {
+func (r *pcs_u16) Get(q *DmaRequest, v *uint16) {
 	(*u16)(r).Get(q, false, default_lane_mask, v)
 }
-func (r *pcs_reg) GetDo(q *DmaRequest) (v uint16) {
+func (r *pcs_u16) GetDo(q *DmaRequest) (v uint16) {
 	(*u16)(r).Get(q, false, default_lane_mask, &v)
 	q.Do()
 	return
 }
-func (r *pcs_reg) Set(q *DmaRequest, v uint16) {
+func (r *pcs_u16) Set(q *DmaRequest, v uint16) {
 	(*u16)(r).Set(q, false, default_lane_mask, v)
 }
-func (r *pcs_reg) Modify(q *DmaRequest, v, m uint16) {
+func (r *pcs_u16) Modify(q *DmaRequest, v, m uint16) {
 	(*u16)(r).Modify(q, false, default_lane_mask, v, m)
 }
 
-func (r *pcs_reg) GetSync(b *port.PortBlock) uint16 {
+func (r *pcs_u16) GetSync(b *port.PortBlock) uint16 {
 	return (*u16)(r).GetSync(b, false, default_lane_mask)
 }
-func (r *pcs_reg) SetSync(b *port.PortBlock, v uint16) {
+func (r *pcs_u16) SetSync(b *port.PortBlock, v uint16) {
 	(*u16)(r).SetSync(b, false, default_lane_mask, v)
 }
-func (r *pcs_reg) ModifySync(b *port.PortBlock, v, m uint16) {
+func (r *pcs_u16) ModifySync(b *port.PortBlock, v, m uint16) {
 	(*u16)(r).ModifySync(b, false, default_lane_mask, v, m)
 }
 
-func (r *pcs_lane_reg) Get(q *DmaRequest, laneMask m.LaneMask, v *uint16) {
+func (r *pcs_lane_u16) Get(q *DmaRequest, laneMask m.LaneMask, v *uint16) {
 	(*u16)(r).Get(q, false, laneMask, v)
 }
-func (r *pcs_lane_reg) GetDo(q *DmaRequest, laneMask m.LaneMask) (v uint16) {
+func (r *pcs_lane_u16) GetDo(q *DmaRequest, laneMask m.LaneMask) (v uint16) {
 	(*u16)(r).Get(q, false, laneMask, &v)
 	q.Do()
 	return
 }
-func (r *pcs_lane_reg) Set(q *DmaRequest, laneMask m.LaneMask, v uint16) {
+func (r *pcs_lane_u16) Set(q *DmaRequest, laneMask m.LaneMask, v uint16) {
 	(*u16)(r).Set(q, false, laneMask, v)
 }
-func (r *pcs_lane_reg) Modify(q *DmaRequest, laneMask m.LaneMask, v, m uint16) {
+func (r *pcs_lane_u16) Modify(q *DmaRequest, laneMask m.LaneMask, v, m uint16) {
 	(*u16)(r).Modify(q, false, laneMask, v, m)
 }
 
-func (r *pcs_lane_reg) GetSync(b *port.PortBlock, laneMask m.LaneMask) uint16 {
+func (r *pcs_lane_u16) GetSync(b *port.PortBlock, laneMask m.LaneMask) uint16 {
 	return (*u16)(r).GetSync(b, false, laneMask)
 }
-func (r *pcs_lane_reg) SetSync(b *port.PortBlock, laneMask m.LaneMask, v uint16) {
+func (r *pcs_lane_u16) SetSync(b *port.PortBlock, laneMask m.LaneMask, v uint16) {
 	(*u16)(r).SetSync(b, false, laneMask, v)
 }
-func (r *pcs_lane_reg) ModifySync(b *port.PortBlock, laneMask m.LaneMask, v, m uint16) {
+func (r *pcs_lane_u16) ModifySync(b *port.PortBlock, laneMask m.LaneMask, v, m uint16) {
 	(*u16)(r).ModifySync(b, false, laneMask, v, m)
 }
 
-func (r *pmd_lane_reg) Get(q *DmaRequest, laneMask m.LaneMask, v *uint16) {
+func (r *pmd_lane_u16) Get(q *DmaRequest, laneMask m.LaneMask, v *uint16) {
 	(*u16)(r).Get(q, true, laneMask, v)
 }
-func (r *pmd_lane_reg) GetDo(q *DmaRequest, laneMask m.LaneMask) (v uint16) {
+func (r *pmd_lane_u16) GetDo(q *DmaRequest, laneMask m.LaneMask) (v uint16) {
 	(*u16)(r).Get(q, true, laneMask, &v)
 	q.Do()
 	return
 }
-func (r *pmd_lane_reg) Set(q *DmaRequest, laneMask m.LaneMask, v uint16) {
+func (r *pmd_lane_u16) Set(q *DmaRequest, laneMask m.LaneMask, v uint16) {
 	(*u16)(r).Set(q, true, laneMask, v)
 }
-func (r *pmd_lane_reg) Modify(q *DmaRequest, laneMask m.LaneMask, v, m uint16) {
+func (r *pmd_lane_u16) Modify(q *DmaRequest, laneMask m.LaneMask, v, m uint16) {
 	(*u16)(r).Modify(q, true, laneMask, v, m)
 }
 
-func (r *pmd_lane_reg) GetSync(b *port.PortBlock, laneMask m.LaneMask) uint16 {
+func (r *pmd_lane_u16) GetSync(b *port.PortBlock, laneMask m.LaneMask) uint16 {
 	return (*u16)(r).GetSync(b, true, laneMask)
 }
-func (r *pmd_lane_reg) SetSync(b *port.PortBlock, laneMask m.LaneMask, v uint16) {
+func (r *pmd_lane_u16) SetSync(b *port.PortBlock, laneMask m.LaneMask, v uint16) {
 	(*u16)(r).SetSync(b, true, laneMask, v)
 }
-func (r *pmd_lane_reg) ModifySync(b *port.PortBlock, laneMask m.LaneMask, v, m uint16) {
+func (r *pmd_lane_u16) ModifySync(b *port.PortBlock, laneMask m.LaneMask, v, m uint16) {
 	(*u16)(r).ModifySync(b, true, laneMask, v, m)
 }
 
-func (r *pcs_reg_32) Get(q *DmaRequest, v *uint32) {
+func (r *pcs_u32) Get(q *DmaRequest, v *uint32) {
 	(*u32)(r).Get(q, false, default_lane_mask, v)
 }
-func (r *pcs_reg_32) Set(q *DmaRequest, v uint32) {
+func (r *pcs_u32) Set(q *DmaRequest, v uint32) {
 	(*u32)(r).Set(q, false, default_lane_mask, v)
 }
 
-func (r *pmd_reg_32) Get(q *DmaRequest, v *uint32) {
+func (r *pmd_u32) Get(q *DmaRequest, v *uint32) {
 	(*u32)(r).Get(q, true, default_lane_mask, v)
 }
-func (r *pmd_reg_32) Set(q *DmaRequest, v uint32) {
+func (r *pmd_u32) Set(q *DmaRequest, v uint32) {
 	(*u32)(r).Set(q, true, default_lane_mask, v)
 }
 
-func (r *pmd_lane_reg_32) Get(q *DmaRequest, laneMask m.LaneMask, v *uint32) {
+func (r *pmd_lane_u32) Get(q *DmaRequest, laneMask m.LaneMask, v *uint32) {
 	(*u32)(r).Get(q, true, laneMask, v)
 }
-func (r *pmd_lane_reg_32) Set(q *DmaRequest, laneMask m.LaneMask, v uint32) {
+func (r *pmd_lane_u32) Set(q *DmaRequest, laneMask m.LaneMask, v uint32) {
 	(*u32)(r).Set(q, true, laneMask, v)
 }

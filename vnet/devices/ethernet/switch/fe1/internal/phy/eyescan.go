@@ -45,7 +45,7 @@ func (ss *switchSelect) showEyeScan(c cli.Commander, w cli.Writer, in *cli.Input
 				fmt.Fprintln(w, s.String())
 				return
 			}
-			phy := p.GetPhy().(*Tscf)
+			phy := p.GetPhy().(*HundredGig)
 			phy.printEyeScan(p, uint(laneIndex), w)
 		})
 	}
@@ -63,7 +63,7 @@ type eyeScan struct {
 	bitErrorRate [n_y][n_x]float64
 }
 
-func (phy *Tscf) printEyeScan(port m.Porter, lane uint, w cli.Writer) {
+func (phy *HundredGig) printEyeScan(port m.Porter, lane uint, w cli.Writer) {
 	fmt.Fprintf(w, "Starting eye for port %s\n", port.GetPortName())
 
 	result := &eyeScan{}
@@ -146,9 +146,9 @@ func (x float8) bitErrorRate() float64 {
 	return float64(i) * c
 }
 
-func (phy *Tscf) doEyeScan(result *eyeScan, port m.Porter, lane uint) (err error) {
+func (phy *HundredGig) doEyeScan(result *eyeScan, port m.Porter, lane uint) (err error) {
 	laneMask := m.LaneMask(1 << lane)
-	r := get_tscf_regs()
+	r := get_hundred_gig_controller()
 	q := phy.dmaReq()
 
 	//check PMD is locked status

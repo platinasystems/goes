@@ -45,8 +45,8 @@ func (p *Port) GetPortName() string { return p.HwIf.Name() }
 type portMain struct {
 	port_blocks_100g [n_port_block_100g]port.PortBlock
 	port_blocks_10g  [n_port_block_10g]port.PortBlock
-	phys_100g        [n_port_block_100g]phy.Tscf
-	phys_10g         [n_port_block_10g]phy.Tsce
+	phys_100g        [n_port_block_100g]phy.HundredGig
+	phys_10g         [n_port_block_10g]phy.FortyGig
 	loopbackPorts    [n_pipe]Port
 	cpuPort          Port
 
@@ -249,7 +249,7 @@ func (t *fe1a) PortInit(vn *vnet.Vnet) {
 			AllLanesMask:    m.LaneMask(0xf),
 		}
 		c.PortBlocks = append(c.PortBlocks, &t.port_blocks_100g[p])
-		t.phys_100g[p] = phy.Tscf{
+		t.phys_100g[p] = phy.HundredGig{
 			Common: phy.Common{
 				Switch:    t,
 				PortBlock: &t.port_blocks_100g[p],
@@ -269,7 +269,7 @@ func (t *fe1a) PortInit(vn *vnet.Vnet) {
 			AllLanesMask:    m.LaneMask(1 << uint(2*p)),
 		}
 		c.PortBlocks = append(c.PortBlocks, &t.port_blocks_10g[p])
-		t.phys_10g[p] = phy.Tsce{
+		t.phys_10g[p] = phy.FortyGig{
 			Common: phy.Common{
 				Switch:    t,
 				PortBlock: &t.port_blocks_10g[p],

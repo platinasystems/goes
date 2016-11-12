@@ -84,12 +84,12 @@ func (ss *switchSelect) showPortStatus(c cli.Commander, w cli.Writer, in *cli.In
 		}
 		laneMask := p.GetLaneMask()
 		if p.GetPortCommon().IsManagement {
-			phy := p.GetPhy().(*Tsce)
+			phy := p.GetPhy().(*FortyGig)
 			laneMask.Foreach(func(l m.LaneMask) {
 				stats = append(stats, phy.getMgmtStatus(p, l))
 			})
 		} else {
-			phy := p.GetPhy().(*Tscf)
+			phy := p.GetPhy().(*HundredGig)
 			laneMask.Foreach(func(l m.LaneMask) {
 				stats = append(stats, phy.getStatus(p, l))
 			})

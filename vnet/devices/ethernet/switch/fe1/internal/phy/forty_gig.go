@@ -14,20 +14,20 @@ import (
 	"time"
 )
 
-type Tsce struct {
+type FortyGig struct {
 	Common
 	core_config  uc_core_config_word
 	lane_configs [4]uc_lane_config_word
 }
 
-func (r *tsce_regs) set_master_port_number(q *DmaRequest, n uint) {
+func (r *forty_gig_controller) set_master_port_number(q *DmaRequest, n uint) {
 	if n >= N_lane {
 		panic(n)
 	}
 	r.main.setup.Modify(q, uint16(n)<<8, 3<<8)
 }
 
-func (phy *Tsce) apply_lane_map(q *DmaRequest, r *tsce_regs, laneMask m.LaneMask) {
+func (phy *FortyGig) apply_lane_map(q *DmaRequest, r *forty_gig_controller, laneMask m.LaneMask) {
 	// Inverse logical -> physical mappings.
 	var (
 		rx_phys_by_logical, tx_phys_by_logical [N_lane]uint16
@@ -67,12 +67,12 @@ func (phy *Tsce) apply_lane_map(q *DmaRequest, r *tsce_regs, laneMask m.LaneMask
 	})
 }
 
-func (phy *Tsce) Init() {
+func (phy *FortyGig) Init() {
 
 	// 2 lanes - one for each mgmt port
 	laneMask := m.LaneMask(0x1)
 	allLanes := m.LaneMask(0x5)
-	r := get_tsce_regs()
+	r := get_forty_gig_controller()
 	uc_mem := phy.get_uc_mem()
 
 	q := phy.dmaReq()
@@ -270,7 +270,7 @@ func (phy *Tsce) Init() {
 
 	// TX FIR coefficient init.
 	allLanes.ForeachMask(func(lm m.LaneMask) {
-		setupTsceTxSettings(q, lm)
+		setupFortyGigTxSettings(q, lm)
 	})
 
 	// Initialize uC lane config word to all zeros.
@@ -300,9 +300,9 @@ func (phy *Tsce) Init() {
 	q.Do()
 }
 
-func setupTsceTxSettings(q *DmaRequest, laneMask m.LaneMask) {
+func setupFortyGigTxSettings(q *DmaRequest, laneMask m.LaneMask) {
 	// Set pre, main, post1, post2, post3, amp
-	r := get_tsce_regs()
+	r := get_forty_gig_controller()
 
 	// pre
 	r.tx_equalizer.control[0].Modify(q, laneMask, 0xc, 0x1f)
@@ -319,9 +319,9 @@ func setupTsceTxSettings(q *DmaRequest, laneMask m.LaneMask) {
 	q.Do()
 }
 
-func (phy *Tsce) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
+func (phy *FortyGig) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
 
-	r := get_tsce_regs()
+	r := get_forty_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLane := laneMask.FirstLane()
@@ -419,8 +419,8 @@ func (phy *Tsce) SetSpeed(port m.Porter, speed float64, isHiGig bool) {
 	q.Do()
 }
 
-func (phy *Tsce) setPortMode(mode port.PortBlockMode) {
-	r := get_tsce_regs()
+func (phy *FortyGig) setPortMode(mode port.PortBlockMode) {
+	r := get_forty_gig_controller()
 	q := phy.dmaReq()
 
 	const (
@@ -456,12 +456,12 @@ type tsce_speed_config struct {
 	mul   tsce_pll_multiplier
 }
 
-func (phy *Tsce) ValidateSpeed(port m.Porter, speed float64, isHiGig bool) (ok bool) {
+func (phy *FortyGig) ValidateSpeed(port m.Porter, speed float64, isHiGig bool) (ok bool) {
 	_, ok = phy.speedConfig(port.GetLaneMask(), port.GetPhyInterface(), speed, isHiGig)
 	return
 }
 
-func (phy *Tsce) speedConfig(laneMask m.LaneMask, pi m.PhyInterface, speed float64, isHiGig bool) (sc tsce_speed_config, ok bool) {
+func (phy *FortyGig) speedConfig(laneMask m.LaneMask, pi m.PhyInterface, speed float64, isHiGig bool) (sc tsce_speed_config, ok bool) {
 	var (
 		c uc_core_config_word
 		l uc_lane_config_word
@@ -533,10 +533,10 @@ func (phy *Tsce) speedConfig(laneMask m.LaneMask, pi m.PhyInterface, speed float
 	return
 }
 
-func (phy *Tsce) SetLoopback(port m.Porter, loopback_type m.PortLoopbackType) {}
+func (phy *FortyGig) SetLoopback(port m.Porter, loopback_type m.PortLoopbackType) {}
 
-func (phy *Tsce) SetAutoneg(port m.Porter, enable bool) {
-	r := get_tsce_regs()
+func (phy *FortyGig) SetAutoneg(port m.Porter, enable bool) {
+	r := get_forty_gig_controller()
 
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
@@ -628,9 +628,9 @@ func (phy *Tsce) SetAutoneg(port m.Porter, enable bool) {
 	phy.setAnEnable(port, enable)
 }
 
-func (phy *Tsce) setAnEnable(port m.Porter, enable bool) {
+func (phy *FortyGig) setAnEnable(port m.Porter, enable bool) {
 	// Used to signal PLL to restart after AN
-	r := get_tsce_regs()
+	r := get_forty_gig_controller()
 
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
@@ -705,8 +705,8 @@ func (phy *Tsce) setAnEnable(port m.Porter, enable bool) {
 
 }
 
-func (phy *Tsce) setCL72(port m.Porter, enable bool) {
-	r := get_tsce_regs()
+func (phy *FortyGig) setCL72(port m.Porter, enable bool) {
+	r := get_forty_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLaneMask := m.LaneMask(1 << laneMask.FirstLane())
@@ -746,9 +746,9 @@ func (phy *Tsce) setCL72(port m.Porter, enable bool) {
 	}
 }
 
-func (phy *Tsce) setLocalAdvert(port m.Porter) {
+func (phy *FortyGig) setLocalAdvert(port m.Porter) {
 
-	r := get_tsce_regs()
+	r := get_forty_gig_controller()
 	q := phy.dmaReq()
 	laneMask := port.GetLaneMask()
 	firstLaneMask := m.LaneMask(1 << laneMask.FirstLane())
@@ -786,11 +786,11 @@ func (phy *Tsce) setLocalAdvert(port m.Porter) {
 	q.Do()
 }
 
-func (phy *Tsce) SetEnable(p m.Porter, enable bool) {}
+func (phy *FortyGig) SetEnable(p m.Porter, enable bool) {}
 
-func (phy *Tsce) getMgmtStatus(port m.Porter, lane m.LaneMask) (s portStatus) {
+func (phy *FortyGig) getMgmtStatus(port m.Porter, lane m.LaneMask) (s portStatus) {
 	laneMask := m.LaneMask(1 << lane)
-	r := get_tsce_regs()
+	r := get_forty_gig_controller()
 	q := phy.dmaReq()
 	var v [25]uint16
 	r.rx_x4.pcs_live_status.Get(q, laneMask, &v[0])

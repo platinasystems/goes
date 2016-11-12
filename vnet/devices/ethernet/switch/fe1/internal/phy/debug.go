@@ -11,15 +11,15 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/m"
 )
 
-func (r *pcs_reg) offset() uint      { return uint((*u16)(r).offset()) }
-func (r *pcs_lane_reg) offset() uint { return uint((*u16)(r).offset()) }
-func (r *pmd_lane_reg) offset() uint { return uint((*u16)(r).offset()) }
-func (r *pcs_reg_32) offset() uint   { return uint(r[0].offset()) }
-func (r *pmd_reg_32) offset() uint   { return uint(r[0].offset()) }
+func (r *pcs_u16) offset() uint      { return uint((*u16)(r).offset()) }
+func (r *pcs_lane_u16) offset() uint { return uint((*u16)(r).offset()) }
+func (r *pmd_lane_u16) offset() uint { return uint((*u16)(r).offset()) }
+func (r *pcs_u32) offset() uint      { return uint(r[0].offset()) }
+func (r *pmd_u32) offset() uint      { return uint(r[0].offset()) }
 
-// Check TSCF memory map.
+// Check 100g memory map.
 func init() {
-	r := (*tscf_regs)(m.BasePointer)
+	r := (*hundred_gig_controller)(m.BasePointer)
 	CheckAddr("main", r.main.setup.offset(), 0x9000)
 	CheckAddr("pmd_x1", r.pmd_x1.reset.offset(), 0x9010)
 	CheckAddr("packet_generator", r.packet_generator.control[0].offset(), 0x9030)
@@ -66,7 +66,7 @@ func init() {
 
 // Check TSCE memory map.
 func init() {
-	r := (*tsce_regs)(m.BasePointer)
+	r := (*forty_gig_controller)(m.BasePointer)
 	CheckAddr("main", r.main.setup.offset(), 0x9000)
 	CheckAddr("pmd_x1", r.pmd_x1.reset.offset(), 0x9010)
 	CheckAddr("packet_generator", r.packet_generator.control[0].offset(), 0x9030)

@@ -43,7 +43,7 @@ func (p *PortBlock) phy_address(is_pmd bool, lane_mask m.LaneMask, address uint1
 		a |= 2 << 16
 	case 0x1 << 3:
 		a |= 3 << 16
-	// Multiple lane broadcast does not reliably work for all serdes registers.
+	// Multiple lane broadcast does not reliably work.
 	// case 0x3 << 0:
 	// 	a |= 4 << 16
 	// case 0x3 << 2:

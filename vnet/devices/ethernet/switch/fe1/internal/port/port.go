@@ -56,7 +56,6 @@ func (p *PortBlock) GetPortIndex(port m.Porter) uint {
 	return uint(4*p.PortBlockIndex) + m.GetSubPortIndex(port)
 }
 
-// Mode as in mode register.
 type PortBlockMode uint8
 
 const (
@@ -162,7 +161,7 @@ func (p *PortBlock) Enable(enable bool) {
 }
 
 func (p *PortBlock) SetPortEnable(port m.Porter, enable bool) {
-	block_regs, mac_regs, _, _ := p.get_controllers()
+	block, mac, _, _ := p.get_controllers()
 	q := p.dmaReq()
 	i := m.GetSubPortIndex(port)
 	pc := port.GetPortCommon()
@@ -181,9 +180,9 @@ func (p *PortBlock) SetPortEnable(port m.Porter, enable bool) {
 		v [2]uint64
 		w uint32
 	)
-	block_regs.port_enable.get(q, &w)
-	mac_regs.control[i].get(q, &v[0])
-	mac_regs.tx_control[i].get(q, &v[1])
+	block.port_enable.get(q, &w)
+	mac.control[i].get(q, &v[0])
+	mac.tx_control[i].get(q, &v[1])
 	q.Do()
 
 	if enable {
@@ -196,18 +195,18 @@ func (p *PortBlock) SetPortEnable(port m.Porter, enable bool) {
 		w &^= 1 << i
 	}
 
-	mac_regs.control[i].set(q, v[0])
-	block_regs.port_enable.set(q, w)
+	mac.control[i].set(q, v[0])
+	block.port_enable.set(q, w)
 
 	if enable {
 		// We never want to drop packets in MAC on rx.
 		mtu := 1<<14 - 1
-		mac_regs.rx.max_bytes_per_packet[i].set(q, uint64(mtu))
-		block_regs.mib_stats_max_packet_size[i].set(q, uint32(mtu))
+		mac.rx.max_bytes_per_packet[i].set(q, uint64(mtu))
+		block.mib_stats_max_packet_size[i].set(q, uint32(mtu))
 
 		// Default crc mode is 2 replace; set to 0 append.
 		v[1] = (v[1] &^ (3 << 0)) | (0 << 0)
-		mac_regs.tx_control[i].set(q, v[1])
+		mac.tx_control[i].set(q, v[1])
 	}
 
 	q.Do()

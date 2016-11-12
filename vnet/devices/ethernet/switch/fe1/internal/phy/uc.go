@@ -17,14 +17,14 @@ type fuc_uint8 uint8
 type euc_uint16 uint16
 type euc_uint8 uint8
 
-func (phy *Tsce) get_uc_mem() *tsce_uc_mem { return (*tsce_uc_mem)(m.BasePointer) }
-func (phy *Tscf) get_uc_mem() *tscf_uc_mem { return (*tscf_uc_mem)(m.BasePointer) }
+func (phy *FortyGig) get_uc_mem() *tsce_uc_mem   { return (*tsce_uc_mem)(m.BasePointer) }
+func (phy *HundredGig) get_uc_mem() *tscf_uc_mem { return (*tscf_uc_mem)(m.BasePointer) }
 
-func getSetTscf(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data *uint32, log2NBytes int) (read_data uint32) {
+func getSetHundredGig(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data *uint32, log2NBytes int) (read_data uint32) {
 	addr := uint32(uintptr(r) - m.BaseAddress)
 	addr |= 0x20000000 // ARM AHB device address space.
 
-	regs := get_tscf_regs()
+	c := get_hundred_gig_controller()
 
 	// Set read/write data size.
 	m, v := uint16(3), uint16(log2NBytes)
@@ -32,44 +32,44 @@ func getSetTscf(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data
 		m, v = m<<4, v<<4
 	}
 
-	regs.uc.ahb_control.Modify(q, laneMask, v, m)
+	c.uc.ahb_control.Modify(q, laneMask, v, m)
 
 	if write_data != nil {
-		regs.uc.write_address.Set(q, laneMask, addr)
-		regs.uc.write_data.Set(q, laneMask, *write_data)
+		c.uc.write_address.Set(q, laneMask, addr)
+		c.uc.write_data.Set(q, laneMask, *write_data)
 		read_data = *write_data
 	} else {
-		regs.uc.read_address.Set(q, laneMask, addr)
-		regs.uc.read_data.Get(q, laneMask, &read_data)
+		c.uc.read_address.Set(q, laneMask, addr)
+		c.uc.read_data.Get(q, laneMask, &read_data)
 	}
 	q.Do()
 
 	return
 }
 
-func getSetTsce(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data *uint32, log2NBytes int) (read_data uint32) {
+func getSetFortyGig(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data *uint32, log2NBytes int) (read_data uint32) {
 	addr := uint16(uintptr(r) - m.BaseAddress)
 
-	regs := get_tsce_regs()
+	c := get_forty_gig_controller()
 
 	// Select data memory access mode thru mdio
-	regs.uc.command1.Modify(q, laneMask, 2<<7, 3<<7)
+	c.uc.command1.Modify(q, laneMask, 2<<7, 3<<7)
 
 	// Access-width selection - 0 for word; 1 for byte
 	if log2NBytes > 0 {
-		regs.uc.command1.Modify(q, laneMask, 0<<9, 1<<9)
+		c.uc.command1.Modify(q, laneMask, 0<<9, 1<<9)
 	} else {
-		regs.uc.command1.Modify(q, laneMask, 1<<9, 1<<9)
+		c.uc.command1.Modify(q, laneMask, 1<<9, 1<<9)
 	}
 
-	regs.uc.address.Set(q, laneMask, addr)
+	c.uc.address.Set(q, laneMask, addr)
 
 	if write_data != nil {
-		regs.uc.write_data.Set(q, laneMask, uint16(*write_data))
+		c.uc.write_data.Set(q, laneMask, uint16(*write_data))
 		read_data = *write_data
 	} else {
 		var tmp uint16
-		regs.uc.read_data.Get(q, laneMask, &tmp)
+		c.uc.read_data.Get(q, laneMask, &tmp)
 		read_data = uint32(tmp)
 	}
 	q.Do()
@@ -78,49 +78,49 @@ func getSetTsce(q *DmaRequest, laneMask m.LaneMask, r unsafe.Pointer, write_data
 }
 
 func (r *euc_uint16) Get(q *DmaRequest, laneMask m.LaneMask) uint16 {
-	return uint16(getSetTsce(q, laneMask, unsafe.Pointer(r), nil, 1))
+	return uint16(getSetFortyGig(q, laneMask, unsafe.Pointer(r), nil, 1))
 }
 
 func (r *euc_uint16) Set(q *DmaRequest, laneMask m.LaneMask, v uint16) {
 	u := uint32(v)
-	getSetTsce(q, laneMask, unsafe.Pointer(r), &u, 1)
+	getSetFortyGig(q, laneMask, unsafe.Pointer(r), &u, 1)
 }
 
 func (r *euc_uint8) Get(q *DmaRequest, laneMask m.LaneMask) uint8 {
-	return uint8(getSetTsce(q, laneMask, unsafe.Pointer(r), nil, 0))
+	return uint8(getSetFortyGig(q, laneMask, unsafe.Pointer(r), nil, 0))
 }
 
 func (r *euc_uint8) Set(q *DmaRequest, laneMask m.LaneMask, v uint8) {
 	u := uint32(v)
-	getSetTsce(q, laneMask, unsafe.Pointer(r), &u, 0)
+	getSetFortyGig(q, laneMask, unsafe.Pointer(r), &u, 0)
 }
 
 func (r *fuc_uint16) Get(q *DmaRequest, laneMask m.LaneMask) uint16 {
-	return uint16(getSetTscf(q, laneMask, unsafe.Pointer(r), nil, 1))
+	return uint16(getSetHundredGig(q, laneMask, unsafe.Pointer(r), nil, 1))
 }
 
 func (r *fuc_uint16) Set(q *DmaRequest, laneMask m.LaneMask, v uint16) {
 	u := uint32(v)
-	getSetTscf(q, laneMask, unsafe.Pointer(r), &u, 1)
+	getSetHundredGig(q, laneMask, unsafe.Pointer(r), &u, 1)
 }
 
 func (r *fuc_uint8) Get(q *DmaRequest, laneMask m.LaneMask) uint8 {
-	return uint8(getSetTscf(q, laneMask, unsafe.Pointer(r), nil, 0))
+	return uint8(getSetHundredGig(q, laneMask, unsafe.Pointer(r), nil, 0))
 }
 
 func (r *fuc_uint8) Set(q *DmaRequest, laneMask m.LaneMask, v uint8) {
 	u := uint32(v)
-	getSetTscf(q, laneMask, unsafe.Pointer(r), &u, 0)
+	getSetHundredGig(q, laneMask, unsafe.Pointer(r), &u, 0)
 }
 
 type tsce_uc_mem struct {
 	_ [0x50]byte
 
-	config_word tsce_uc_core_config_word_reg
+	config_word tsce_uc_core_config_word_u16
 
 	temp_frc_val               euc_uint16
 	common_ucode_version       euc_uint16
-	avg_tmon_reg13bit          euc_uint16
+	avg_tmon_u1613bit          euc_uint16
 	trace_mem_rd_idx           euc_uint16
 	trace_mem_wr_idx           euc_uint16
 	temp_idx                   euc_uint8
@@ -134,7 +134,7 @@ type tsce_uc_mem struct {
 	_ [0x400 - 0x63]byte
 
 	lanes [4]struct {
-		config_word tsce_uc_lane_config_word_reg
+		config_word tsce_uc_lane_config_word_u16
 
 		retune_after_restart               euc_uint8
 		clk90_offset_adjust                euc_uint8
@@ -167,11 +167,11 @@ type tsce_uc_mem struct {
 type tscf_uc_mem struct {
 	_ [0x400]byte
 
-	config_word tscf_uc_core_config_word_reg
+	config_word tscf_uc_core_config_word_u16
 
 	temp_frc_val               fuc_uint16
 	common_ucode_version       fuc_uint16
-	avg_tmon_reg13bit          fuc_uint16
+	avg_tmon_u1613bit          fuc_uint16
 	trace_mem_rd_idx           fuc_uint16
 	trace_mem_wr_idx           fuc_uint16
 	temp_idx                   fuc_uint8
@@ -187,7 +187,7 @@ type tscf_uc_mem struct {
 	_ [0x420 - 0x416]byte
 
 	lanes [4]struct {
-		config_word tscf_uc_lane_config_word_reg
+		config_word tscf_uc_lane_config_word_u16
 
 		retune_after_restart               fuc_uint8
 		clk90_offset_adjust                fuc_uint8
@@ -315,7 +315,7 @@ type uc_cmd struct {
 	outAux      *uint16
 }
 
-func (c *uc_cmd) do(q *DmaRequest, laneMask m.LaneMask, r *uc_cmd_regs) (err error) {
+func (c *uc_cmd) do(q *DmaRequest, laneMask m.LaneMask, r *uc_cmd_controller) (err error) {
 	if c.in != nil {
 		r.data.Set(q, laneMask, *c.in)
 	}
@@ -359,8 +359,8 @@ func (c *uc_cmd) do(q *DmaRequest, laneMask m.LaneMask, r *uc_cmd_regs) (err err
 	}
 }
 
-type tscf_uc_core_config_word_reg fuc_uint16
-type tsce_uc_core_config_word_reg euc_uint16
+type tscf_uc_core_config_word_u16 fuc_uint16
+type tsce_uc_core_config_word_u16 euc_uint16
 
 type uc_core_config_word struct {
 	vco_rate_in_hz                        float64
@@ -373,13 +373,13 @@ const (
 	tscf_vco_rate_unit = 62.5e6
 )
 
-func (w *uc_core_config_word) fromTscfUint16(v uint16) {
+func (w *uc_core_config_word) fromHundredGigUint16(v uint16) {
 	w.vco_rate_in_hz = tscf_vco_rate_unit * float64(224+(v&0xff))
 	w.core_config_from_pcs = v&(1<<8) != 0
 	w.disable_write_pll_charge_pump_current = v&(1<<9) != 0
 }
 
-func (w *uc_core_config_word) toTscfUint16() (v uint16) {
+func (w *uc_core_config_word) toHundredGigUint16() (v uint16) {
 	v = (uint16(w.vco_rate_in_hz/tscf_vco_rate_unit+.5) - 224) & 0xff
 	if w.core_config_from_pcs {
 		v |= 1 << 8
@@ -390,12 +390,12 @@ func (w *uc_core_config_word) toTscfUint16() (v uint16) {
 	return
 }
 
-func (w *uc_core_config_word) fromTsceUint16(v uint16) {
+func (w *uc_core_config_word) fromFortyGigUint16(v uint16) {
 	w.core_config_from_pcs = v&(1<<0) != 0
 	w.vco_rate_in_hz = tsce_vco_rate_unit * float64(22+((v>>1)&0x1f))
 }
 
-func (w *uc_core_config_word) toTsceUint16() (v uint16) {
+func (w *uc_core_config_word) toFortyGigUint16() (v uint16) {
 	if w.core_config_from_pcs {
 		v |= 1 << 0
 	}
@@ -403,30 +403,30 @@ func (w *uc_core_config_word) toTsceUint16() (v uint16) {
 	return
 }
 
-func (r *tscf_uc_core_config_word_reg) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_core_config_word) {
+func (r *tscf_uc_core_config_word_u16) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_core_config_word) {
 	v := (*fuc_uint16)(r).Get(q, laneMask)
-	w.fromTscfUint16(v)
+	w.fromHundredGigUint16(v)
 	return
 }
 
-func (r *tscf_uc_core_config_word_reg) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_core_config_word) {
-	v := w.toTscfUint16()
+func (r *tscf_uc_core_config_word_u16) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_core_config_word) {
+	v := w.toHundredGigUint16()
 	(*fuc_uint16)(r).Set(q, laneMask, v)
 }
 
-func (r *tsce_uc_core_config_word_reg) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_core_config_word) {
+func (r *tsce_uc_core_config_word_u16) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_core_config_word) {
 	v := (*euc_uint16)(r).Get(q, laneMask)
-	w.fromTsceUint16(v)
+	w.fromFortyGigUint16(v)
 	return
 }
 
-func (r *tsce_uc_core_config_word_reg) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_core_config_word) {
-	v := w.toTsceUint16()
+func (r *tsce_uc_core_config_word_u16) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_core_config_word) {
+	v := w.toFortyGigUint16()
 	(*euc_uint16)(r).Set(q, laneMask, v)
 }
 
-type tscf_uc_lane_config_word_reg fuc_uint16
-type tsce_uc_lane_config_word_reg euc_uint16
+type tscf_uc_lane_config_word_u16 fuc_uint16
+type tsce_uc_lane_config_word_u16 euc_uint16
 
 type uc_lane_config_media_type uint8
 
@@ -449,7 +449,7 @@ type uc_lane_config_word struct {
 	media_type                  uc_lane_config_media_type
 }
 
-func (w *uc_lane_config_word) fromTscfUint16(v uint16) {
+func (w *uc_lane_config_word) fromHundredGigUint16(v uint16) {
 	if v&(1<<10) != 0 {
 		w.cl72_restart_timeout_enable = true
 	}
@@ -481,7 +481,7 @@ func (w *uc_lane_config_word) fromTscfUint16(v uint16) {
 	return
 }
 
-func (w *uc_lane_config_word) toTscfUint16() (v uint16) {
+func (w *uc_lane_config_word) toHundredGigUint16() (v uint16) {
 	v = uint16(0)
 	if w.cl72_restart_timeout_enable {
 		v |= 1 << 10
@@ -514,18 +514,18 @@ func (w *uc_lane_config_word) toTscfUint16() (v uint16) {
 	return
 }
 
-func (r *tscf_uc_lane_config_word_reg) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_lane_config_word) {
+func (r *tscf_uc_lane_config_word_u16) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_lane_config_word) {
 	v := (*fuc_uint16)(r).Get(q, laneMask)
-	w.fromTscfUint16(v)
+	w.fromHundredGigUint16(v)
 	return
 }
 
-func (r *tscf_uc_lane_config_word_reg) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_lane_config_word) {
-	v := w.toTscfUint16()
+func (r *tscf_uc_lane_config_word_u16) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_lane_config_word) {
+	v := w.toHundredGigUint16()
 	(*fuc_uint16)(r).Set(q, laneMask, v)
 }
 
-func (w *uc_lane_config_word) fromTsceUint16(v uint16) {
+func (w *uc_lane_config_word) fromFortyGigUint16(v uint16) {
 	if v&(1<<9) != 0 {
 		w.cl72_restart_timeout_enable = true
 	}
@@ -554,7 +554,7 @@ func (w *uc_lane_config_word) fromTsceUint16(v uint16) {
 	return
 }
 
-func (w *uc_lane_config_word) toTsceUint16() (v uint16) {
+func (w *uc_lane_config_word) toFortyGigUint16() (v uint16) {
 	v = uint16(0)
 	if w.cl72_restart_timeout_enable {
 		v |= 1 << 9
@@ -584,13 +584,13 @@ func (w *uc_lane_config_word) toTsceUint16() (v uint16) {
 	return
 }
 
-func (r *tsce_uc_lane_config_word_reg) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_lane_config_word) {
+func (r *tsce_uc_lane_config_word_u16) Get(q *DmaRequest, laneMask m.LaneMask) (w uc_lane_config_word) {
 	v := (*euc_uint16)(r).Get(q, laneMask)
-	w.fromTsceUint16(v)
+	w.fromFortyGigUint16(v)
 	return
 }
 
-func (r *tsce_uc_lane_config_word_reg) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_lane_config_word) {
-	v := w.toTsceUint16()
+func (r *tsce_uc_lane_config_word_u16) Set(q *DmaRequest, laneMask m.LaneMask, w *uc_lane_config_word) {
+	v := w.toFortyGigUint16()
 	(*euc_uint16)(r).Set(q, laneMask, v)
 }
