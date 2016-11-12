@@ -713,7 +713,7 @@ type rxf_logical_table_select_tcam_key struct {
 	rxf_tunnel_type
 	rxf_l3_type
 
-	// 32 bit combination of classes configured via rxf_logical_table_select_config register.
+	// 32 bit combination of classes configured via rxf_logical_table_select_config.
 	source_class uint32
 
 	exact_match_logical_table_id [2]uint8

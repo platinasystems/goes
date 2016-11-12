@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	// Check register addresses.
+	// Check address map.
 	r := (*top_controller)(m.BasePointer)
 	CheckAddr("core_pll0_control[0]", r.core_pll0_control[0].offset(), 0x38000)
 	CheckAddr("temperature_sensor.control[0]", r.temperature_sensor.control[0].offset(), 0x50000)

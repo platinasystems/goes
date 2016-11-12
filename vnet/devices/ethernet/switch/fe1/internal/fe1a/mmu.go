@@ -44,7 +44,7 @@ func (t *fe1a) mmu_init() {
 		}
 		for p := 0; p < n_mmu_port; p++ {
 			for i := 0; i < 2; i++ {
-				t.mmu_pipe_regs.rx_admission_control.port_priority_group[i][p].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v[i])
+				t.mmu_pipe_controller.rx_admission_control.port_priority_group[i][p].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v[i])
 			}
 		}
 		q.Do()
@@ -55,11 +55,11 @@ func (t *fe1a) mmu_init() {
 	{
 		// Allow headroom for 1 max packet cells.
 		for p := 0; p < n_pipe; p++ {
-			t.mmu_pipe_regs.rx_admission_control.global_headroom_limit[p].set(q, mmuBaseTypeRxPipe, sbus.Duplicate, uint32(global_headroom_cells))
+			t.mmu_pipe_controller.rx_admission_control.global_headroom_limit[p].set(q, mmuBaseTypeRxPipe, sbus.Duplicate, uint32(global_headroom_cells))
 		}
 
 		// Subtract one since first cell of packet is never stored in global headroom.
-		t.mmu_pipe_regs.rx_admission_control.max_packet_cells.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(max_packet_cells-1))
+		t.mmu_pipe_controller.rx_admission_control.max_packet_cells.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(max_packet_cells-1))
 		q.Do()
 	}
 
@@ -124,8 +124,8 @@ func (t *fe1a) mmu_init() {
 			p := &rx_service_pools[pi]
 			for layer := 0; layer < n_mmu_layer; layer++ {
 				// Packets dropped when limit is reached.  Drop state is released at limit - reset offset.
-				t.mmu_pipe_regs.rx_admission_control.service_pool_shared_cell_limit[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(p.limit))
-				t.mmu_pipe_regs.rx_admission_control.service_pool_cell_reset_limit_offset[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(16))
+				t.mmu_pipe_controller.rx_admission_control.service_pool_shared_cell_limit[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(p.limit))
+				t.mmu_pipe_controller.rx_admission_control.service_pool_cell_reset_limit_offset[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(16))
 			}
 
 			for port := 0; port < n_mmu_port; port++ {
@@ -144,20 +144,20 @@ func (t *fe1a) mmu_init() {
 				mmuPort := phys.toGlobalMmu(t)
 				// Input port rx enable; no pause frames or priority xon enabled.
 				const v = 1 << 17
-				t.mmu_pipe_regs.rx_admission_control.port_rx_and_pause_enable[mmuPort].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v)
+				t.mmu_pipe_controller.rx_admission_control.port_rx_and_pause_enable[mmuPort].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v)
 			}
 		}
 		q.Do()
 	}
 
 	// Egress service pools apply to both unicast & multicast.
-	t.mmu_pipe_regs.multicast_admission_control.db.service_pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
-	t.mmu_pipe_regs.multicast_admission_control.mcqe.pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, mmu_n_mcqe/4-1)
-	t.mmu_pipe_regs.db.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
-	t.mmu_pipe_regs.qe.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
-	for i := range t.mmu_pipe_regs.db.config_1 {
-		t.mmu_pipe_regs.db.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
-		t.mmu_pipe_regs.qe.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
+	t.mmu_pipe_controller.multicast_admission_control.db.service_pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
+	t.mmu_pipe_controller.multicast_admission_control.mcqe.pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, mmu_n_mcqe/4-1)
+	t.mmu_pipe_controller.db.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
+	t.mmu_pipe_controller.qe.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
+	for i := range t.mmu_pipe_controller.db.config_1 {
+		t.mmu_pipe_controller.db.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
+		t.mmu_pipe_controller.qe.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
 	}
 	q.Do()
 
@@ -167,9 +167,9 @@ func (t *fe1a) mmu_init() {
 			mop_policy_1b                 = 1 << 1
 			mop_policy                    = 1 << 0
 		)
-		t.mmu_pipe_regs.tx_admission_control.config.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(enable_queue_and_group_ticket|mop_policy_1b))
-		t.mmu_pipe_regs.multicast_admission_control.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, mop_policy)
-		t.mmu_pipe_regs.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, (1<<2)|mop_policy_1b)
+		t.mmu_pipe_controller.tx_admission_control.config.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(enable_queue_and_group_ticket|mop_policy_1b))
+		t.mmu_pipe_controller.multicast_admission_control.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, mop_policy)
+		t.mmu_pipe_controller.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, (1<<2)|mop_policy_1b)
 		q.Do()
 	}
 
@@ -273,7 +273,6 @@ func (t *fe1a) mmu_init() {
 	}
 
 	{
-		// Undocumented mmu_3dbg_c register.
 		for _, porter := range t.Ports {
 			p := porter.(*Port)
 			v := uint32(15)
@@ -309,9 +308,9 @@ func (t *fe1a) mmu_init() {
 			pipe_mask := mmu_pipe_mask_for_tx_pipe(p)
 			for mmu_pipe := uint(0); mmu_pipe < n_mmu_pipe; mmu_pipe++ {
 				if pipe_mask&(1<<mmu_pipe) != 0 {
-					t.mmu_pipe_regs.tx_admission_control.tx_port_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
-					t.mmu_pipe_regs.multicast_admission_control.db.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
-					t.mmu_pipe_regs.multicast_admission_control.mcqe.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
+					t.mmu_pipe_controller.tx_admission_control.tx_port_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
+					t.mmu_pipe_controller.multicast_admission_control.db.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
+					t.mmu_pipe_controller.multicast_admission_control.mcqe.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(mmu_pipe), v[p])
 				}
 			}
 		}
@@ -319,7 +318,7 @@ func (t *fe1a) mmu_init() {
 	}
 
 	if false {
-		t.mmu_pipe_regs.tx_admission_control.bypass.set(q, mmuBaseTypeChip, sbus.Duplicate, 1)
+		t.mmu_pipe_controller.tx_admission_control.bypass.set(q, mmuBaseTypeChip, sbus.Duplicate, 1)
 		q.Do()
 	}
 }

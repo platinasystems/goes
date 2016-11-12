@@ -12,7 +12,7 @@ import (
 	"math"
 )
 
-type tdm_reg32 struct {
+type tdm_u32 struct {
 	// Ipipe versions are not "port regs" and so have GenReg bit explicitly set.
 	Array [1 << m.Log2NPorts]m.Pu32
 }
@@ -36,42 +36,42 @@ func tdmAccessType(b sbus.Block, pipe_index uint) (a sbus.Address, c sbus.Access
 	return
 }
 
-func (r *tdm_reg32) get(q *DmaRequest, b sbus.Block, pipe_index uint, v *uint32) {
+func (r *tdm_u32) get(q *DmaRequest, b sbus.Block, pipe_index uint, v *uint32) {
 	a, c, ri := tdmAccessType(b, pipe_index)
 	r.Array[ri].Get(&q.DmaRequest, a, b, c, v)
 }
-func (r *tdm_reg32) set(q *DmaRequest, b sbus.Block, pipe_index uint, v uint32) {
+func (r *tdm_u32) set(q *DmaRequest, b sbus.Block, pipe_index uint, v uint32) {
 	a, c, ri := tdmAccessType(b, pipe_index)
 	r.Array[ri].Set(&q.DmaRequest, a, b, c, v)
 }
 
-// TDM registers shared between rx pipe and mmu.
-type tdm_regs struct {
-	_ [0x1]tdm_reg32
+// TDM controller shared between rx pipe and mmu interface to tx pipe.
+type tdm_controller struct {
+	_ [0x1]tdm_u32
 
-	config tdm_reg32
+	config tdm_u32
 
-	high_speed_port_bitmap tdm_reg32
+	high_speed_port_bitmap tdm_u32
 
-	opportunistic_scheduler_config tdm_reg32
+	opportunistic_scheduler_config tdm_u32
 
-	cpu_loopback_opportunistic_scheduler_config tdm_reg32
+	cpu_loopback_opportunistic_scheduler_config tdm_u32
 
-	_ [0x8 - 0x5]tdm_reg32
+	_ [0x8 - 0x5]tdm_u32
 
-	over_subscription_group_config [8]tdm_reg32
+	over_subscription_group_config [8]tdm_u32
 
-	_ [0x14 - 0x10]tdm_reg32
+	_ [0x14 - 0x10]tdm_u32
 
-	over_subscription_group_members [8][12]tdm_reg32
+	over_subscription_group_members [8][12]tdm_u32
 
-	port_block_calendar [8][7]tdm_reg32
+	port_block_calendar [8][7]tdm_u32
 
-	calendar_ecc_enable tdm_reg32
+	calendar_ecc_enable tdm_u32
 
-	_ [0x4b2 - 0x4ad]tdm_reg32
+	_ [0x4b2 - 0x4ad]tdm_u32
 
-	dft_input tdm_reg32
+	dft_input tdm_u32
 
 	_ [0x08000000 - 0x0404b300]byte
 }

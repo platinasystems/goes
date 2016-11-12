@@ -14,37 +14,37 @@ import (
 	"sync"
 )
 
-type rx_tx_pipe_reg32 m.U32
+type rx_tx_pipe_u32 m.U32
 
-func (r *rx_tx_pipe_reg32) geta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v *uint32) {
+func (r *rx_tx_pipe_u32) geta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v *uint32) {
 	(*m.U32)(r).Get(&q.DmaRequest, 0, b, c, v)
 }
-func (r *rx_tx_pipe_reg32) seta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v uint32) {
+func (r *rx_tx_pipe_u32) seta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v uint32) {
 	(*m.U32)(r).Set(&q.DmaRequest, 0, b, c, v)
 }
-func (r *rx_tx_pipe_reg32) get(q *DmaRequest, b sbus.Block, v *uint32) {
+func (r *rx_tx_pipe_u32) get(q *DmaRequest, b sbus.Block, v *uint32) {
 	r.geta(q, b, sbus.Duplicate, v)
 }
-func (r *rx_tx_pipe_reg32) set(q *DmaRequest, b sbus.Block, v uint32) { r.seta(q, b, sbus.Duplicate, v) }
-func (r *rx_tx_pipe_reg32) getDo(q *DmaRequest, b sbus.Block, c sbus.AccessType) (v uint32) {
+func (r *rx_tx_pipe_u32) set(q *DmaRequest, b sbus.Block, v uint32) { r.seta(q, b, sbus.Duplicate, v) }
+func (r *rx_tx_pipe_u32) getDo(q *DmaRequest, b sbus.Block, c sbus.AccessType) (v uint32) {
 	r.geta(q, b, c, &v)
 	q.Do()
 	return
 }
 
-type rx_tx_pipe_reg64 m.U64
+type rx_tx_pipe_u64 m.U64
 
-func (r *rx_tx_pipe_reg64) geta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v *uint64) {
+func (r *rx_tx_pipe_u64) geta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v *uint64) {
 	(*m.U64)(r).Get(&q.DmaRequest, 0, b, c, v)
 }
-func (r *rx_tx_pipe_reg64) seta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v uint64) {
+func (r *rx_tx_pipe_u64) seta(q *DmaRequest, b sbus.Block, c sbus.AccessType, v uint64) {
 	(*m.U64)(r).Set(&q.DmaRequest, 0, b, c, v)
 }
-func (r *rx_tx_pipe_reg64) get(q *DmaRequest, b sbus.Block, v *uint64) {
+func (r *rx_tx_pipe_u64) get(q *DmaRequest, b sbus.Block, v *uint64) {
 	r.geta(q, b, sbus.Duplicate, v)
 }
-func (r *rx_tx_pipe_reg64) set(q *DmaRequest, b sbus.Block, v uint64) { r.seta(q, b, sbus.Duplicate, v) }
-func (r *rx_tx_pipe_reg64) getDo(q *DmaRequest, b sbus.Block, c sbus.AccessType) (v uint64) {
+func (r *rx_tx_pipe_u64) set(q *DmaRequest, b sbus.Block, v uint64) { r.seta(q, b, sbus.Duplicate, v) }
+func (r *rx_tx_pipe_u64) getDo(q *DmaRequest, b sbus.Block, c sbus.AccessType) (v uint64) {
 	r.geta(q, b, c, &v)
 	q.Do()
 	return
@@ -56,26 +56,26 @@ const (
 )
 
 type pipe_counter_4pool_control struct {
-	control [4]rx_tx_pipe_reg32
+	control [4]rx_tx_pipe_u32
 
-	packet_attribute_selector_key [4]rx_tx_pipe_reg64
+	packet_attribute_selector_key [4]rx_tx_pipe_u64
 
-	eviction_control   [4]eviction_control_reg
-	eviction_lfsr_seed [4]eviction_seed_reg
-	eviction_threshold [4]eviction_threshold_reg
+	eviction_control   [4]eviction_control_u32
+	eviction_lfsr_seed [4]eviction_seed_u32
+	eviction_threshold [4]eviction_threshold_u32
 
-	_ [0x80 - 0x14]rx_tx_pipe_reg32
+	_ [0x80 - 0x14]rx_tx_pipe_u32
 
-	offset_table_control [4]rx_tx_pipe_reg32
+	offset_table_control [4]rx_tx_pipe_u32
 
-	_ [0x100 - 0x84]rx_tx_pipe_reg32
+	_ [0x100 - 0x84]rx_tx_pipe_u32
 }
 
 type pipe_counter_1pool_control struct {
-	control            rx_tx_pipe_reg32
-	eviction_control   eviction_control_reg
-	eviction_threshold eviction_threshold_reg
-	eviction_seed      eviction_seed_reg
+	control            rx_tx_pipe_u32
+	eviction_control   eviction_control_u32
+	eviction_threshold eviction_threshold_u32
+	eviction_seed      eviction_seed_u32
 }
 
 type pipe_counter_config struct {
@@ -88,30 +88,30 @@ type pipe_counter_config struct {
 func (r *pipe_counter_1pool_control) enable(t *fe1a, c pipe_counter_config) {
 }
 
-type eviction_control_reg rx_tx_pipe_reg32
+type eviction_control_u32 rx_tx_pipe_u32
 
-func (r *eviction_control_reg) set(c pipe_counter_config, b sbus.Block, pipe uint, memory_id int) {
+func (r *eviction_control_u32) set(c pipe_counter_config, b sbus.Block, pipe uint, memory_id int) {
 	mode := 2
 	if c.random_eviction_enable {
 		mode = 1
 	}
 	v := uint32(mode << 8)
 	v |= uint32(memory_id) | uint32(pipe)<<6
-	(*rx_tx_pipe_reg32)(r).seta(c.q, b, sbus.Unique(pipe), v)
+	(*rx_tx_pipe_u32)(r).seta(c.q, b, sbus.Unique(pipe), v)
 }
 
-type eviction_threshold_reg rx_tx_pipe_reg64
+type eviction_threshold_u32 rx_tx_pipe_u64
 
-func (r *eviction_threshold_reg) set(c pipe_counter_config, b sbus.Block, pipe uint) {
+func (r *eviction_threshold_u32) set(c pipe_counter_config, b sbus.Block, pipe uint) {
 	v := c.eviction_threshold.Packets | c.eviction_threshold.Bytes<<26
-	(*rx_tx_pipe_reg64)(r).seta(c.q, b, sbus.Unique(pipe), v)
+	(*rx_tx_pipe_u64)(r).seta(c.q, b, sbus.Unique(pipe), v)
 }
 
-type eviction_seed_reg rx_tx_pipe_reg64
+type eviction_seed_u32 rx_tx_pipe_u64
 
-func (r *eviction_seed_reg) set(c pipe_counter_config, b sbus.Block, pipe uint) {
+func (r *eviction_seed_u32) set(c pipe_counter_config, b sbus.Block, pipe uint) {
 	v := uint64(rand.Int())
-	(*rx_tx_pipe_reg64)(r).seta(c.q, b, sbus.Unique(pipe), v)
+	(*rx_tx_pipe_u64)(r).seta(c.q, b, sbus.Unique(pipe), v)
 }
 
 func (r *pipe_counter_1pool_control) set(c pipe_counter_config, b sbus.Block, pipe uint, memory_id int) {
@@ -583,7 +583,6 @@ func (e *pipe_counter_eviction_fifo_elt) pool(pm *pipe_counter_pipe_main, i int)
 	pool.mu.Unlock()
 }
 
-// Indexing from tx_pipe_regs:
 // perq_xmit_counters struct {
 // 	cpu   [mmu_n_cpu_queues]tx_pipe_pipe_counter_mem
 // 	ports [n_idb_mmu_port]struct {

@@ -199,7 +199,6 @@ type rx_port_table_entry struct {
 
 	rx_drop_bpdu bool
 
-	// Bitmap of ing_outer_tpid register to enable matching outer vlan header.
 	outer_tpid_enable         uint8
 	outer_tpid_cfi_bit_as_cng uint8
 

@@ -9,63 +9,63 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/sbus"
 )
 
-type rx_pipe_reg32 m.U32
+type rx_pipe_u32 m.U32
 
-func (r *rx_pipe_reg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
+func (r *rx_pipe_u32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
 	(*m.U32)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_reg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
+func (r *rx_pipe_u32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
 	(*m.U32)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_reg32) get(q *DmaRequest, v *uint32) { r.geta(q, sbus.Duplicate, v) }
-func (r *rx_pipe_reg32) set(q *DmaRequest, v uint32)  { r.seta(q, sbus.Duplicate, v) }
-func (r *rx_pipe_reg32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
+func (r *rx_pipe_u32) get(q *DmaRequest, v *uint32) { r.geta(q, sbus.Duplicate, v) }
+func (r *rx_pipe_u32) set(q *DmaRequest, v uint32)  { r.seta(q, sbus.Duplicate, v) }
+func (r *rx_pipe_u32) getDo(q *DmaRequest, c sbus.AccessType) (v uint32) {
 	r.geta(q, c, &v)
 	q.Do()
 	return
 }
 
-type rx_pipe_reg64 m.U64
+type rx_pipe_u64 m.U64
 
-func (r *rx_pipe_reg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
+func (r *rx_pipe_u64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
 	(*m.U64)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_reg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
+func (r *rx_pipe_u64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
 	(*m.U64)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_reg64) get(q *DmaRequest, v *uint64) { r.geta(q, sbus.Duplicate, v) }
-func (r *rx_pipe_reg64) set(q *DmaRequest, v uint64)  { r.seta(q, sbus.Duplicate, v) }
-func (r *rx_pipe_reg64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
+func (r *rx_pipe_u64) get(q *DmaRequest, v *uint64) { r.geta(q, sbus.Duplicate, v) }
+func (r *rx_pipe_u64) set(q *DmaRequest, v uint64)  { r.seta(q, sbus.Duplicate, v) }
+func (r *rx_pipe_u64) getDo(q *DmaRequest, c sbus.AccessType) (v uint64) {
 	r.geta(q, c, &v)
 	q.Do()
 	return
 }
 
-type rx_pipe_preg32 m.Pu32
-type rx_pipe_portreg32 [1 << m.Log2NPorts]rx_pipe_preg32
+type rx_pipe_pu32 m.Pu32
+type rx_pipe_port_u32 [1 << m.Log2NPorts]rx_pipe_pu32
 
-func (r *rx_pipe_preg32) address() sbus.Address { return (*m.Pu32)(r).Address() }
+func (r *rx_pipe_pu32) address() sbus.Address { return (*m.Pu32)(r).Address() }
 
-func (r *rx_pipe_preg32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
+func (r *rx_pipe_pu32) geta(q *DmaRequest, c sbus.AccessType, v *uint32) {
 	(*m.Pu32)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
+func (r *rx_pipe_pu32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
 	(*m.Pu32)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
+func (r *rx_pipe_pu32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Duplicate, v) }
 
-type rx_pipe_preg64 m.Pu64
-type rx_pipe_portreg64 [1 << m.Log2NPorts]rx_pipe_preg64
+type rx_pipe_pu64 m.Pu64
+type rx_pipe_port_u64 [1 << m.Log2NPorts]rx_pipe_pu64
 
-func (r *rx_pipe_preg64) address() sbus.Address { return (*m.Pu64)(r).Address() }
+func (r *rx_pipe_pu64) address() sbus.Address { return (*m.Pu64)(r).Address() }
 
-func (r *rx_pipe_preg64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
+func (r *rx_pipe_pu64) geta(q *DmaRequest, c sbus.AccessType, v *uint64) {
 	(*m.Pu64)(r).Get(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_preg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
+func (r *rx_pipe_pu64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
 	(*m.Pu64)(r).Set(&q.DmaRequest, 0, BlockRxPipe, c, v)
 }
-func (r *rx_pipe_preg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
+func (r *rx_pipe_pu64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
 
 const (
 	n_pipe    = 4
@@ -76,303 +76,303 @@ const (
 type rx_pipe_controller struct {
 	// Buffers data from PHY selected by TDM scheduler to cover latency of rx pipe packet processing.
 	rx_buffer struct {
-		monitor_config                            rx_pipe_reg64
-		force_store_and_forward_config            rx_pipe_reg32
+		monitor_config                            rx_pipe_u64
+		force_store_and_forward_config            rx_pipe_u32
 		cell_assembly_cpu, cell_assembly_loopback struct {
-			control          rx_pipe_reg32
-			cut_thru_control rx_pipe_reg32
+			control          rx_pipe_u32
+			cut_thru_control rx_pipe_u32
 		}
-		_                              [0x2000 - 0x6]rx_pipe_reg32
-		tdm_calendar_init              rx_pipe_reg32
-		_                              [0x2100 - 0x2001]rx_pipe_reg32
-		aux_arb_control                rx_pipe_reg32
-		_                              [0x2200 - 0x2101]rx_pipe_reg32
-		hw_reset_control_0             rx_pipe_reg32
-		_                              [0x2300 - 0x2201]rx_pipe_reg32
-		hw_reset_control_1             rx_pipe_reg32
-		_                              [0x2600 - 0x2301]rx_pipe_reg32
-		sbus_timer                     rx_pipe_reg32
-		_                              [0x2900 - 0x2601]rx_pipe_reg32
-		ts_to_core_sync_enable         rx_pipe_reg32
-		_                              [0x2b00 - 0x2901]rx_pipe_reg32
-		cell_assembly_cpu_control      rx_pipe_reg32
-		_                              [0x2c00 - 0x2b01]rx_pipe_reg32
-		cell_assembly_cpu_status       rx_pipe_reg32
-		_                              [0x2e00 - 0x2c01]rx_pipe_reg32
-		cell_assembly_loopback_control rx_pipe_reg32
-		_                              [0x2f00 - 0x2e01]rx_pipe_reg32
-		cell_assembly_loopback_status  rx_pipe_reg32
+		_                              [0x2000 - 0x6]rx_pipe_u32
+		tdm_calendar_init              rx_pipe_u32
+		_                              [0x2100 - 0x2001]rx_pipe_u32
+		aux_arb_control                rx_pipe_u32
+		_                              [0x2200 - 0x2101]rx_pipe_u32
+		hw_reset_control_0             rx_pipe_u32
+		_                              [0x2300 - 0x2201]rx_pipe_u32
+		hw_reset_control_1             rx_pipe_u32
+		_                              [0x2600 - 0x2301]rx_pipe_u32
+		sbus_timer                     rx_pipe_u32
+		_                              [0x2900 - 0x2601]rx_pipe_u32
+		ts_to_core_sync_enable         rx_pipe_u32
+		_                              [0x2b00 - 0x2901]rx_pipe_u32
+		cell_assembly_cpu_control      rx_pipe_u32
+		_                              [0x2c00 - 0x2b01]rx_pipe_u32
+		cell_assembly_cpu_status       rx_pipe_u32
+		_                              [0x2e00 - 0x2c01]rx_pipe_u32
+		cell_assembly_loopback_control rx_pipe_u32
+		_                              [0x2f00 - 0x2e01]rx_pipe_u32
+		cell_assembly_loopback_status  rx_pipe_u32
 		_                              [0x04040000 - 0x002f0100]byte
 	}
 
-	rx_buffer_tdm_scheduler tdm_regs
+	rx_buffer_tdm_scheduler tdm_controller
 
 	over_subscription_buffer [8]struct {
-		control                           rx_pipe_reg32
-		port_config                       [4]rx_pipe_reg32
-		niv_ethernet_type                 rx_pipe_reg32
-		etag_ethernet_type                rx_pipe_reg32
-		outer_tpid                        [4]rx_pipe_reg32
-		inner_tpid                        [1]rx_pipe_reg32
-		protocol_config                   [3][4]rx_pipe_reg64
-		threshold                         [4]rx_pipe_reg64
-		cut_through_threshold             [4]rx_pipe_reg32
-		flow_control_config               [4]rx_pipe_reg64
-		flow_control_threshold            [4]rx_pipe_reg64
-		usage                             [4]rx_pipe_reg64
-		shared_config                     rx_pipe_reg32
-		_                                 [0x2e - 0x2d]rx_pipe_reg32
-		shared_usage                      rx_pipe_reg64
-		packets_dropped                   [obm_n_priority][4]rx_pipe_reg32
-		bytes_dropped                     [obm_n_priority][4]rx_pipe_reg64
-		flow_control_event_count          [4]rx_pipe_reg64
-		max_usage_select                  rx_pipe_reg32
-		max_usage                         rx_pipe_reg64
-		monitor_stats_config              [4]rx_pipe_reg32
-		force_store_and_forward_config    [4]rx_pipe_reg32
-		cell_assembly_control             rx_pipe_reg32
-		cell_assembly_cut_through_control rx_pipe_reg32
-		_                                 [0x60 - 0x5f]rx_pipe_reg32
-		ram_control                       rx_pipe_reg32
-		_                                 [0x65 - 0x61]rx_pipe_reg32
-		cell_assembly_hw_control          rx_pipe_reg32
-		cell_assembly_hw_status           rx_pipe_reg64
-		cell_assembly_pointer_status      rx_pipe_reg64
+		control                           rx_pipe_u32
+		port_config                       [4]rx_pipe_u32
+		niv_ethernet_type                 rx_pipe_u32
+		etag_ethernet_type                rx_pipe_u32
+		outer_tpid                        [4]rx_pipe_u32
+		inner_tpid                        [1]rx_pipe_u32
+		protocol_config                   [3][4]rx_pipe_u64
+		threshold                         [4]rx_pipe_u64
+		cut_through_threshold             [4]rx_pipe_u32
+		flow_control_config               [4]rx_pipe_u64
+		flow_control_threshold            [4]rx_pipe_u64
+		usage                             [4]rx_pipe_u64
+		shared_config                     rx_pipe_u32
+		_                                 [0x2e - 0x2d]rx_pipe_u32
+		shared_usage                      rx_pipe_u64
+		packets_dropped                   [obm_n_priority][4]rx_pipe_u32
+		bytes_dropped                     [obm_n_priority][4]rx_pipe_u64
+		flow_control_event_count          [4]rx_pipe_u64
+		max_usage_select                  rx_pipe_u32
+		max_usage                         rx_pipe_u64
+		monitor_stats_config              [4]rx_pipe_u32
+		force_store_and_forward_config    [4]rx_pipe_u32
+		cell_assembly_control             rx_pipe_u32
+		cell_assembly_cut_through_control rx_pipe_u32
+		_                                 [0x60 - 0x5f]rx_pipe_u32
+		ram_control                       rx_pipe_u32
+		_                                 [0x65 - 0x61]rx_pipe_u32
+		cell_assembly_hw_control          rx_pipe_u32
+		cell_assembly_hw_status           rx_pipe_u64
+		cell_assembly_pointer_status      rx_pipe_u64
 		_                                 [0x4000000 - 0x6800]byte
 	}
 
-	rx_config                     rx_pipe_reg64
-	dos_control_3                 rx_pipe_reg64
-	vlan_control                  rx_pipe_reg32
-	flexible_ip6_extension_header rx_pipe_reg32
-	multicast_control_1           rx_pipe_reg32
-	ecmp_config                   rx_pipe_reg32
-	latency_control               rx_pipe_reg32
-	module_remapping_control      rx_pipe_portreg32
+	rx_config                     rx_pipe_u64
+	dos_control_3                 rx_pipe_u64
+	vlan_control                  rx_pipe_u32
+	flexible_ip6_extension_header rx_pipe_u32
+	multicast_control_1           rx_pipe_u32
+	ecmp_config                   rx_pipe_u32
+	latency_control               rx_pipe_u32
+	module_remapping_control      rx_pipe_port_u32
 
 	_ [0x2c000000 - 0x28000800]byte
 
-	hi_gig_lookup                   rx_pipe_portreg32
-	hi_gig_lookup_destination       rx_pipe_portreg32
-	sys_reserved_vlan_id            rx_pipe_reg32
-	rtag7_hash_control              rx_pipe_reg64
-	global_mpls_range               [2]struct{ lower, upper rx_pipe_reg32 }
-	remote_cpu_dst_ethernet_address [2]rx_pipe_reg32
-	remote_cpu_ethernet_type        rx_pipe_reg32
-	mim_ethertype                   rx_pipe_reg32
-	outer_tpid                      [4]rx_pipe_reg32
+	hi_gig_lookup                   rx_pipe_port_u32
+	hi_gig_lookup_destination       rx_pipe_port_u32
+	sys_reserved_vlan_id            rx_pipe_u32
+	rtag7_hash_control              rx_pipe_u64
+	global_mpls_range               [2]struct{ lower, upper rx_pipe_u32 }
+	remote_cpu_dst_ethernet_address [2]rx_pipe_u32
+	remote_cpu_ethernet_type        rx_pipe_u32
+	mim_ethertype                   rx_pipe_u32
+	outer_tpid                      [4]rx_pipe_u32
 	mmrp, srp                       struct {
-		control [2]rx_pipe_reg32
+		control [2]rx_pipe_u32
 	}
-	niv_ethertype                   rx_pipe_reg32
-	fcoe_ethertype                  rx_pipe_reg32
-	wesp_proto_control              rx_pipe_reg32
-	qcn_cntag_ethertype             rx_pipe_reg32
-	hbfc_cntag_ethertype            rx_pipe_reg32
-	multicast_control_3             rx_pipe_reg32
-	sctp_control                    rx_pipe_reg32
-	l2gre_control                   rx_pipe_reg32
-	pe_ethertype                    rx_pipe_reg32
-	ieee_1588_parsing_control       rx_pipe_reg32
-	hi_gig_extension_header_control rx_pipe_reg32
-	bfd_rx_udp_control              rx_pipe_reg32
-	vxlan_control                   rx_pipe_reg32
-	from_remote_cpu_dst_address     [2]rx_pipe_reg64
-	from_remote_cpu_ethertype       rx_pipe_reg32
-	from_remote_cpu_signature       rx_pipe_reg32
-	_                               [0x81 - 0x25]rx_pipe_reg32
-	multicast_control_2             rx_pipe_reg32
+	niv_ethertype                   rx_pipe_u32
+	fcoe_ethertype                  rx_pipe_u32
+	wesp_proto_control              rx_pipe_u32
+	qcn_cntag_ethertype             rx_pipe_u32
+	hbfc_cntag_ethertype            rx_pipe_u32
+	multicast_control_3             rx_pipe_u32
+	sctp_control                    rx_pipe_u32
+	l2gre_control                   rx_pipe_u32
+	pe_ethertype                    rx_pipe_u32
+	ieee_1588_parsing_control       rx_pipe_u32
+	hi_gig_extension_header_control rx_pipe_u32
+	bfd_rx_udp_control              rx_pipe_u32
+	vxlan_control                   rx_pipe_u32
+	from_remote_cpu_dst_address     [2]rx_pipe_u64
+	from_remote_cpu_ethertype       rx_pipe_u32
+	from_remote_cpu_signature       rx_pipe_u32
+	_                               [0x81 - 0x25]rx_pipe_u32
+	multicast_control_2             rx_pipe_u32
 	_                               [0x30000000 - 0x2c008200]byte
 
-	niv_config                      rx_pipe_reg32
-	vlan_translate_hash_control     rx_pipe_reg32
-	rxv_slice_control               rx_pipe_reg32
-	rxv_key_control_1               rx_pipe_reg32
-	rxv_key_control_2               rx_pipe_reg32
-	rxv_slice_map                   rx_pipe_reg32
-	mpls_entry_hash_control         rx_pipe_reg32
-	etag_multicast_range            rx_pipe_reg32
-	hash_config_0                   rx_pipe_reg32
-	cpu_visibility_packet_profile_1 rx_pipe_reg32
+	niv_config                      rx_pipe_u32
+	vlan_translate_hash_control     rx_pipe_u32
+	rxv_slice_control               rx_pipe_u32
+	rxv_key_control_1               rx_pipe_u32
+	rxv_key_control_2               rx_pipe_u32
+	rxv_slice_map                   rx_pipe_u32
+	mpls_entry_hash_control         rx_pipe_u32
+	etag_multicast_range            rx_pipe_u32
+	hash_config_0                   rx_pipe_u32
+	cpu_visibility_packet_profile_1 rx_pipe_u32
 	_                               [0x34000000 - 0x30000a00]byte
 
-	mim_default_network_svp   rx_pipe_reg32
-	l2gre_default_network_svp rx_pipe_reg32
-	trill_adjacency           rx_pipe_portreg64
-	vxlan_default_network_svp rx_pipe_reg32
-	mpls_tpid                 [4]rx_pipe_reg32
-	mpls_inner_tpid           rx_pipe_reg32
-	vrf_mask                  rx_pipe_reg32
-	l2_tunnel_parse_control   rx_pipe_reg32
-	bfd_rx_ach_type_control0  rx_pipe_reg32
-	bfd_rx_ach_type_control1  rx_pipe_reg32
-	bfd_rx_ach_type_mplstp    rx_pipe_reg32
-	bfd_rx_ach_type_mplstp1   rx_pipe_reg32
+	mim_default_network_svp   rx_pipe_u32
+	l2gre_default_network_svp rx_pipe_u32
+	trill_adjacency           rx_pipe_port_u64
+	vxlan_default_network_svp rx_pipe_u32
+	mpls_tpid                 [4]rx_pipe_u32
+	mpls_inner_tpid           rx_pipe_u32
+	vrf_mask                  rx_pipe_u32
+	l2_tunnel_parse_control   rx_pipe_u32
+	bfd_rx_ach_type_control0  rx_pipe_u32
+	bfd_rx_ach_type_control1  rx_pipe_u32
+	bfd_rx_ach_type_mplstp    rx_pipe_u32
+	bfd_rx_ach_type_mplstp1   rx_pipe_u32
 	_                         [0x38000000 - 0x34000f00]byte
 
-	rtag7_hash_field_selection_bitmaps              [10]rx_pipe_reg32
-	rtag7_hash_seed                                 [2]rx_pipe_reg32
-	drop_control_0                                  rx_pipe_reg32
-	rtag7_hash_control_2                            rx_pipe_reg32
-	rtag7_hash_control_3                            rx_pipe_reg32
-	rtag7_hash_field_selection_bitmaps_1            [0x17 - 0x0f]rx_pipe_reg32
-	hash_control                                    rx_pipe_reg32
-	trill_rbridge_nickname_select                   rx_pipe_reg32
-	rtag7_hash_control_l2gre_mask                   [2]rx_pipe_reg32
-	rtag7_hash_field_selection_bitmaps_2            [0x1e - 0x1b]rx_pipe_reg32
-	bfd_rx_udp_control_1                            rx_pipe_reg32
-	vlan_membership_hash_control                    rx_pipe_reg32
-	dnat_address_type_hash_control                  rx_pipe_reg32
-	rtag7_hash_control_4                            rx_pipe_reg32
-	rtag7_vxlan_payload_l2_hash_field_bmap          rx_pipe_reg32
-	rtag7_vxlan_payload_l3_hash_field_bmap          rx_pipe_reg32
-	icmp_error_type                                 rx_pipe_reg32
-	ip6_min_fragment_size                           rx_pipe_reg32
-	dos_control                                     rx_pipe_reg32
-	dos_control_2                                   rx_pipe_reg32
-	l2_table_hash_control                           rx_pipe_reg32
-	l3_table_hash_control                           rx_pipe_reg32
-	rtag7_hash_select                               rx_pipe_reg32
-	ecn_control                                     rx_pipe_reg32
-	_                                               [0x41 - 0x2c]rx_pipe_reg32
-	shared_lookup_sram_bank_config                  rx_pipe_reg32
-	shared_lookup_sram_logical_to_physical_bank_map rx_pipe_reg32
-	_                                               [0x4f - 0x43]rx_pipe_reg32
-	gtp_control                                     rx_pipe_reg32
-	_                                               [0x100 - 0x50]rx_pipe_reg32
-	rxf_ethernet_type_map                           [16]rx_pipe_reg32
-	_                                               [0x120 - 0x110]rx_pipe_reg32
-	rxf_l4_src_port_map                             [16]rx_pipe_reg32
-	_                                               [0x140 - 0x130]rx_pipe_reg32
-	rxf_l4_dst_port_map                             [16]rx_pipe_reg32
-	_                                               [0x160 - 0x150]rx_pipe_reg32
-	exact_match_logical_table_select_config         rx_pipe_reg32
+	rtag7_hash_field_selection_bitmaps              [10]rx_pipe_u32
+	rtag7_hash_seed                                 [2]rx_pipe_u32
+	drop_control_0                                  rx_pipe_u32
+	rtag7_hash_control_2                            rx_pipe_u32
+	rtag7_hash_control_3                            rx_pipe_u32
+	rtag7_hash_field_selection_bitmaps_1            [0x17 - 0x0f]rx_pipe_u32
+	hash_control                                    rx_pipe_u32
+	trill_rbridge_nickname_select                   rx_pipe_u32
+	rtag7_hash_control_l2gre_mask                   [2]rx_pipe_u32
+	rtag7_hash_field_selection_bitmaps_2            [0x1e - 0x1b]rx_pipe_u32
+	bfd_rx_udp_control_1                            rx_pipe_u32
+	vlan_membership_hash_control                    rx_pipe_u32
+	dnat_address_type_hash_control                  rx_pipe_u32
+	rtag7_hash_control_4                            rx_pipe_u32
+	rtag7_vxlan_payload_l2_hash_field_bmap          rx_pipe_u32
+	rtag7_vxlan_payload_l3_hash_field_bmap          rx_pipe_u32
+	icmp_error_type                                 rx_pipe_u32
+	ip6_min_fragment_size                           rx_pipe_u32
+	dos_control                                     rx_pipe_u32
+	dos_control_2                                   rx_pipe_u32
+	l2_table_hash_control                           rx_pipe_u32
+	l3_table_hash_control                           rx_pipe_u32
+	rtag7_hash_select                               rx_pipe_u32
+	ecn_control                                     rx_pipe_u32
+	_                                               [0x41 - 0x2c]rx_pipe_u32
+	shared_lookup_sram_bank_config                  rx_pipe_u32
+	shared_lookup_sram_logical_to_physical_bank_map rx_pipe_u32
+	_                                               [0x4f - 0x43]rx_pipe_u32
+	gtp_control                                     rx_pipe_u32
+	_                                               [0x100 - 0x50]rx_pipe_u32
+	rxf_ethernet_type_map                           [16]rx_pipe_u32
+	_                                               [0x120 - 0x110]rx_pipe_u32
+	rxf_l4_src_port_map                             [16]rx_pipe_u32
+	_                                               [0x140 - 0x130]rx_pipe_u32
+	rxf_l4_dst_port_map                             [16]rx_pipe_u32
+	_                                               [0x160 - 0x150]rx_pipe_u32
+	exact_match_logical_table_select_config         rx_pipe_u32
 	_                                               [0x398b0000 - 0x38016100]byte
-	ilpm_ecc_control                                rx_pipe_reg32
+	ilpm_ecc_control                                rx_pipe_u32
 	_                                               [0x398d0000 - 0x398b0100]byte
 	fib_tcam                                        struct {
-		control       rx_pipe_reg32
+		control       rx_pipe_u32
 		_             [0x398e0000 - 0x398d0100]byte
-		key_select    rx_pipe_reg32
+		key_select    rx_pipe_u32
 		_             [0x398f0000 - 0x398e0100]byte
-		aux_control_0 rx_pipe_reg32
+		aux_control_0 rx_pipe_u32
 		_             [0x39900000 - 0x398f0100]byte
-		aux_control_1 rx_pipe_reg32
+		aux_control_1 rx_pipe_u32
 		_             [0x39910000 - 0x39900100]byte
-		bucket_config rx_pipe_reg32
+		bucket_config rx_pipe_u32
 		_             [0x3c000000 - 0x39910100]byte
 	}
-	shared_table_hash_control            rx_pipe_reg32
+	shared_table_hash_control            rx_pipe_u32
 	_                                    [0x3d000000 - 0x3c000100]byte
-	shared_lookup_sram_memory_control_0  rx_pipe_reg32
-	_                                    [0x100 - 0x001]rx_pipe_reg32
-	shared_lookup_sram_memory_control_1  rx_pipe_reg32
-	_                                    [0x200 - 0x101]rx_pipe_reg32
-	shared_lookup_sram_memory_control_2  rx_pipe_reg32
-	_                                    [0x300 - 0x201]rx_pipe_reg32
-	shared_lookup_sram_memory_control_3  rx_pipe_reg32
-	_                                    [0x400 - 0x301]rx_pipe_reg32
-	shared_lookup_sram_memory_control_4  rx_pipe_reg32
-	_                                    [0x500 - 0x401]rx_pipe_reg32
-	shared_lookup_sram_memory_control_5  rx_pipe_reg32
-	_                                    [0x600 - 0x501]rx_pipe_reg32
-	shared_lookup_sram_memory_control_84 rx_pipe_reg32
+	shared_lookup_sram_memory_control_0  rx_pipe_u32
+	_                                    [0x100 - 0x001]rx_pipe_u32
+	shared_lookup_sram_memory_control_1  rx_pipe_u32
+	_                                    [0x200 - 0x101]rx_pipe_u32
+	shared_lookup_sram_memory_control_2  rx_pipe_u32
+	_                                    [0x300 - 0x201]rx_pipe_u32
+	shared_lookup_sram_memory_control_3  rx_pipe_u32
+	_                                    [0x400 - 0x301]rx_pipe_u32
+	shared_lookup_sram_memory_control_4  rx_pipe_u32
+	_                                    [0x500 - 0x401]rx_pipe_u32
+	shared_lookup_sram_memory_control_5  rx_pipe_u32
+	_                                    [0x600 - 0x501]rx_pipe_u32
+	shared_lookup_sram_memory_control_84 rx_pipe_u32
 	_                                    [0x40000000 - 0x3d060100]byte
 
-	rep_id_remap_control                                         rx_pipe_reg32
-	shared_lookup_sram_exact_match_logical_to_phyysical_bank_map rx_pipe_reg32
-	cpu_control_1                                                rx_pipe_reg32
-	cpu_control_m                                                rx_pipe_reg32
-	misc_config2                                                 rx_pipe_reg32
-	mc_control_4                                                 rx_pipe_reg32
-	mc_control_5                                                 rx_pipe_reg32
-	_                                                            [0x8 - 0x7]rx_pipe_reg32
-	cpu_control_0                                                rx_pipe_reg32
-	priority_control                                             rx_pipe_reg32
-	trill_drop_control                                           rx_pipe_reg32
-	_                                                            [0x64 - 0xb]rx_pipe_reg32
-	cbl_attribute                                                [4]rx_pipe_reg32
-	_                                                            [0x80 - 0x68]rx_pipe_reg32
-	protocol_pkt_control                                         [64]rx_pipe_reg32
-	igmp_mld_pkt_control                                         [64]rx_pipe_reg32
-	rxf_logical_table_select_config                              rx_pipe_reg32
+	rep_id_remap_control                                         rx_pipe_u32
+	shared_lookup_sram_exact_match_logical_to_phyysical_bank_map rx_pipe_u32
+	cpu_control_1                                                rx_pipe_u32
+	cpu_control_m                                                rx_pipe_u32
+	misc_config2                                                 rx_pipe_u32
+	mc_control_4                                                 rx_pipe_u32
+	mc_control_5                                                 rx_pipe_u32
+	_                                                            [0x8 - 0x7]rx_pipe_u32
+	cpu_control_0                                                rx_pipe_u32
+	priority_control                                             rx_pipe_u32
+	trill_drop_control                                           rx_pipe_u32
+	_                                                            [0x64 - 0xb]rx_pipe_u32
+	cbl_attribute                                                [4]rx_pipe_u32
+	_                                                            [0x80 - 0x68]rx_pipe_u32
+	protocol_pkt_control                                         [64]rx_pipe_u32
+	igmp_mld_pkt_control                                         [64]rx_pipe_u32
+	rxf_logical_table_select_config                              rx_pipe_u32
 	_                                                            [0x44000000 - 0x40010100]byte
 
-	storm_control_meter_mapping                            rx_pipe_reg32
-	storm_control_meter_config                             rx_pipe_portreg32
-	_                                                      [0x7 - 0x2]rx_pipe_reg32
-	rxf_meter_control                                      rx_pipe_portreg32
-	_                                                      [0xb - 0x8]rx_pipe_reg32
-	shared_lookup_sram_bucket_logical_to_physical_bank_map rx_pipe_reg32
+	storm_control_meter_mapping                            rx_pipe_u32
+	storm_control_meter_config                             rx_pipe_port_u32
+	_                                                      [0x7 - 0x2]rx_pipe_u32
+	rxf_meter_control                                      rx_pipe_port_u32
+	_                                                      [0xb - 0x8]rx_pipe_u32
+	shared_lookup_sram_bucket_logical_to_physical_bank_map rx_pipe_u32
 	_                                                      [0x48000000 - 0x44000c00]byte
 
-	_                                 [0x3 - 0x0]rx_pipe_reg32
-	rxf_slice_meter_map_enable        rx_pipe_reg32
-	_                                 [0x100 - 0x4]rx_pipe_reg32
-	rxf_config                        [12]rx_pipe_reg32
-	_                                 [0x120 - 0x10c]rx_pipe_reg32
-	rxf_logical_table_config          [n_rxf_logical_tables]rx_pipe_reg64
+	_                                 [0x3 - 0x0]rx_pipe_u32
+	rxf_slice_meter_map_enable        rx_pipe_u32
+	_                                 [0x100 - 0x4]rx_pipe_u32
+	rxf_config                        [12]rx_pipe_u32
+	_                                 [0x120 - 0x10c]rx_pipe_u32
+	rxf_logical_table_config          [n_rxf_logical_tables]rx_pipe_u64
 	_                                 [0x4c000000 - 0x48014000]byte
-	rxf_ecmp_hash_control             rx_pipe_reg32
-	ecmp_random_load_balancing_config rx_pipe_reg32
+	rxf_ecmp_hash_control             rx_pipe_u32
+	ecmp_random_load_balancing_config rx_pipe_u32
 	_                                 [0x50000000 - 0x4c000200]byte
 
-	mirror_select                     rx_pipe_reg32
-	module_port_map_select            rx_pipe_portreg32
-	local_sw_disable_control          rx_pipe_portreg32
-	src_module_id_egress_select       rx_pipe_portreg32
-	sflow_rx_rand_seed                rx_pipe_reg32
-	sflow_pipe_rand_seed              rx_pipe_reg32
-	sflow_mirror_config               rx_pipe_reg32
-	misc_config                       rx_pipe_reg32
-	sw2_rxf_dst_action_control        rx_pipe_reg32
-	trunk_rand_load_balancing_seed    rx_pipe_reg32
-	hg_trunk_rand_load_balancing_seed rx_pipe_reg32
-	cpu_visibility_packet_profile_2   rx_pipe_reg32
+	mirror_select                     rx_pipe_u32
+	module_port_map_select            rx_pipe_port_u32
+	local_sw_disable_control          rx_pipe_port_u32
+	src_module_id_egress_select       rx_pipe_port_u32
+	sflow_rx_rand_seed                rx_pipe_u32
+	sflow_pipe_rand_seed              rx_pipe_u32
+	sflow_mirror_config               rx_pipe_u32
+	misc_config                       rx_pipe_u32
+	sw2_rxf_dst_action_control        rx_pipe_u32
+	trunk_rand_load_balancing_seed    rx_pipe_u32
+	hg_trunk_rand_load_balancing_seed rx_pipe_u32
+	cpu_visibility_packet_profile_2   rx_pipe_u32
 	_                                 [0x510b0000 - 0x50000c00]byte
-	sw2_hw_control                    rx_pipe_reg32
+	sw2_hw_control                    rx_pipe_u32
 	_                                 [0x54000000 - 0x510b0100]byte
 
-	sflow_tx_threshold        rx_pipe_portreg32
-	sflow_tx_rand_seed        rx_pipe_reg32
-	event_debug               [3]rx_pipe_reg32
-	counters                  [0x26 - 0x05]rx_pipe_portreg64
-	debug_counter_select      [2][9]rx_pipe_reg32
-	cos_mode                  rx_pipe_portreg64
-	mirror_cos_control        rx_pipe_reg32
-	mirror_cpu_cos_config     rx_pipe_reg32
-	tx_sflow_cpu_cos_config   rx_pipe_reg32
-	instrument_cpu_cos_config rx_pipe_reg32
-	ptr_copytocpu_mask        [2]rx_pipe_reg64
-	cpu_rqe_queue_num         [2]rx_pipe_reg32
-	mirror_rqe_queue_num      rx_pipe_reg32
-	_                         [0xb8 - 0x42]rx_pipe_reg32
-	nat_counters              [5][16]rx_pipe_reg32
+	sflow_tx_threshold        rx_pipe_port_u32
+	sflow_tx_rand_seed        rx_pipe_u32
+	event_debug               [3]rx_pipe_u32
+	counters                  [0x26 - 0x05]rx_pipe_port_u64
+	debug_counter_select      [2][9]rx_pipe_u32
+	cos_mode                  rx_pipe_port_u64
+	mirror_cos_control        rx_pipe_u32
+	mirror_cpu_cos_config     rx_pipe_u32
+	tx_sflow_cpu_cos_config   rx_pipe_u32
+	instrument_cpu_cos_config rx_pipe_u32
+	ptr_copytocpu_mask        [2]rx_pipe_u64
+	cpu_rqe_queue_num         [2]rx_pipe_u32
+	mirror_rqe_queue_num      rx_pipe_u32
+	_                         [0xb8 - 0x42]rx_pipe_u32
+	nat_counters              [5][16]rx_pipe_u32
 	_                         [0x54040000 - 0x54010800]byte
 
 	pipe_counter                       [5]pipe_counter_4pool_control
 	_                                  [0x5c000000 - 0x54090000]byte
-	pipe_counter_eviction_control      rx_pipe_reg32
-	pipe_counter_eviction_counter_flag rx_pipe_reg32
+	pipe_counter_eviction_control      rx_pipe_u32
+	pipe_counter_eviction_counter_flag rx_pipe_u32
 	_                                  [0x60000000 - 0x5c000200]byte
 
-	l2_management_control          rx_pipe_reg32
-	l2_learn_control               rx_pipe_reg32
-	l2_bulk_control                rx_pipe_reg32
-	l2_bulk_ecc_status             rx_pipe_reg32
-	aux_l2_bulk_control            rx_pipe_reg32
-	l2_mod_fifo_enable             rx_pipe_reg32
-	l2_mod_fifo_read_pointer       rx_pipe_reg32
-	l2_mod_fifo_write_pointer      rx_pipe_reg32
-	_                              [0x9 - 0x8]rx_pipe_reg32
-	l2_mod_fifo_claim_avail        rx_pipe_reg32
-	l2_management_hw_reset_control [2]rx_pipe_reg32
-	l2_management_ser_fifo_control rx_pipe_reg32
-	l2_management_interrupt        rx_pipe_reg32
-	l2_management_interrupt_enable rx_pipe_reg32
-	_                              [0x20 - 0xf]rx_pipe_reg32
-	l2_mod_fifo_memory_control_0   rx_pipe_reg32
-	l2_mod_fifo_parity_control     rx_pipe_reg32
+	l2_management_control          rx_pipe_u32
+	l2_learn_control               rx_pipe_u32
+	l2_bulk_control                rx_pipe_u32
+	l2_bulk_ecc_status             rx_pipe_u32
+	aux_l2_bulk_control            rx_pipe_u32
+	l2_mod_fifo_enable             rx_pipe_u32
+	l2_mod_fifo_read_pointer       rx_pipe_u32
+	l2_mod_fifo_write_pointer      rx_pipe_u32
+	_                              [0x9 - 0x8]rx_pipe_u32
+	l2_mod_fifo_claim_avail        rx_pipe_u32
+	l2_management_hw_reset_control [2]rx_pipe_u32
+	l2_management_ser_fifo_control rx_pipe_u32
+	l2_management_interrupt        rx_pipe_u32
+	l2_management_interrupt_enable rx_pipe_u32
+	_                              [0x20 - 0xf]rx_pipe_u32
+	l2_mod_fifo_memory_control_0   rx_pipe_u32
+	l2_mod_fifo_parity_control     rx_pipe_u32
 	_                              [0x64000000 - 0x60002200]byte
 }
 

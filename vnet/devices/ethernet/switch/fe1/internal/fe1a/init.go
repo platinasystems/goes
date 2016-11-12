@@ -262,10 +262,10 @@ func (t *fe1a) rx_pipe_buffer_init() {
 		}
 		// Set port mode and reset/unreset cell-assembly logic for all ports.
 		v := port_mode << 4
-		obm_regs := &t.rx_pipe_controller.over_subscription_buffer[obm_index]
+		or := &t.rx_pipe_controller.over_subscription_buffer[obm_index]
 		acc := sbus.Unique(pb.pipe)
-		obm_regs.cell_assembly_control.seta(q, acc, v|0xf)
-		obm_regs.cell_assembly_control.seta(q, acc, v|0x0)
+		or.cell_assembly_control.seta(q, acc, v|0xf)
+		or.cell_assembly_control.seta(q, acc, v|0x0)
 
 		v = 0
 		for i := range ports {
@@ -274,7 +274,7 @@ func (t *fe1a) rx_pipe_buffer_init() {
 			// Enable over subscription mode.
 			v |= 1 << (4*ports[i] + 0)
 		}
-		obm_regs.control.seta(q, acc, v)
+		or.control.seta(q, acc, v)
 
 		// Skip reset if port not over subscription mode.
 		if false {
@@ -287,7 +287,7 @@ func (t *fe1a) rx_pipe_buffer_init() {
 				sop_threshold           = 1023 << 10
 				sop_discard_mode_enable = 1 << 20
 			)
-			obm_regs.shared_config.seta(q, acc, uint32(discard_threshold|sop_threshold|sop_discard_mode_enable))
+			or.shared_config.seta(q, acc, uint32(discard_threshold|sop_threshold|sop_discard_mode_enable))
 		}
 
 		lossless := false
@@ -302,7 +302,7 @@ func (t *fe1a) rx_pipe_buffer_init() {
 				v |= s.lossy_0_plus_1 << 20
 				v |= s.lossy_0 << 10
 				v |= s.lossy_0_plus_1_min_guarantee << 0
-				obm_regs.threshold[pi].seta(q, acc, v)
+				or.threshold[pi].seta(q, acc, v)
 
 				// Set port flow control thresholds.
 				v = (s.combined_xoff - 10) << 50
@@ -311,14 +311,14 @@ func (t *fe1a) rx_pipe_buffer_init() {
 				v |= s.lossless_xoff[1] << 20
 				v |= (s.lossless_xoff[0] - 10) << 10
 				v |= s.lossless_xoff[0] << 0
-				obm_regs.flow_control_threshold[pi].seta(q, acc, v)
+				or.flow_control_threshold[pi].seta(q, acc, v)
 
 				// Enable port/lossless[01] flow control.  Cos bitmap for lossless01 packets: 0xff
 				v = (1 << 34) | (1 << 33) | (1 << 32) | (0xff << 16) | (0xff << 0)
-				obm_regs.flow_control_config[pi].seta(q, acc, v)
+				or.flow_control_config[pi].seta(q, acc, v)
 
 				// Default priority is lossless low (0).
-				obm_regs.port_config[pi].seta(q, acc, uint32(obm_priority_lossless_0)<<0)
+				or.port_config[pi].seta(q, acc, uint32(obm_priority_lossless_0)<<0)
 
 				// Map all 16 priorities to lossless low (0).
 				w := uint32(0)
@@ -329,7 +329,7 @@ func (t *fe1a) rx_pipe_buffer_init() {
 			}
 
 			// Select lossless low (0) for max usage counter.
-			obm_regs.max_usage_select.seta(q, acc, uint32(obm_priority_lossless_0)<<0)
+			or.max_usage_select.seta(q, acc, uint32(obm_priority_lossless_0)<<0)
 		} else {
 			for pi := range ports {
 				s := &obm_settings[pb.n_lanes[pi]]
@@ -341,7 +341,7 @@ func (t *fe1a) rx_pipe_buffer_init() {
 				v |= s.lossy_0_plus_1 << 20
 				v |= s.lossy_0 << 10
 				v |= s.lossy_0_plus_1_min_guarantee << 0
-				obm_regs.threshold[pi].seta(q, acc, v)
+				or.threshold[pi].seta(q, acc, v)
 			}
 		}
 	}

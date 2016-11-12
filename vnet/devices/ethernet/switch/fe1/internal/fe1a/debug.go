@@ -117,7 +117,7 @@ func init() {
 
 // Verify mmu pipe memory maps.
 func init() {
-	r := (*mmu_pipe_regs)(base)
+	r := (*mmu_pipe_controller)(base)
 	m := (*mmu_pipe_mems)(base)
 
 	check("cut_through_purge_count", unsafe.Pointer(&r.cut_through_purge_count), 0x10002b00)

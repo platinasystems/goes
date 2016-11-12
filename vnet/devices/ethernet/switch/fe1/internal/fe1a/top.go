@@ -28,85 +28,19 @@ func (r *top_u32) getDo(q *DmaRequest) (v uint32) {
 func (r *top_u32) address() sbus.Address { return sbus.GenReg | sbus.Address(r.offset()) }
 func (r *top_u32) offset() uint          { return uint(uintptr(unsafe.Pointer(r))-m.BaseAddress) << 8 }
 
-type top_pll_regs struct {
-	// [0]:
-	//   channel 0: post divider [7:0], output delay enable [8],
-	//   channel 5: post divider [16:9], output delay enable [17],
-	//   feedback divider radio [27:18],
-	//   input reference clock pre divider [31:28]
-	//
-	// [1] [29:8] SSC_LIMIT
-	//   Spread Spectrum Clocking limit.  The nominal feedback value N is a 30-bit number,
-	//   constructed from {i_ndiv_int,i_ndiv_frac}. When SSC mode is enabled, N^, the
-	//   instantaneous feedback value is incremented/decremented, changing direction when it exceeds the limits.
-	//   N^ < (N - {i_ssc_limit,4'b0000})
-	//   N^ > (N + {i_ssc_limit,4'b0000})
-	//   If N is modified while SSC mode is enabled, the stepping direction will change as the new limits are exceeded.
-	//     [7] SSC_MODE Enable for spread spectrum Clocking mode; 0=normal mode; 1=spread spectrum mode enable
-	//     [6] FREF_SEL R/W input reference selection: 0 = i_refclk (CMOS), 1 = pad_Fref
-	//     [5:3] TESTOUT_SEL Test output clock selection:
-	//   000 = no clock
-	//   001 = o_fref
-	//   010 = o_clock[0]
-	//   011 = o_clock[1]
-	//   100 = o_clock[2]
-	//   101 = o_clock[3]
-	//   110 = o_clock[4]
-	//   111 = o_clock[5]
-	//     [2]  TESTOUT_EN R/W Test enable: 0 = test output disabled, 1 = test output enabled
-	//     [1:0] LDO LDO output voltage control default value 0x1
-	//   00 = 1.05V
-	//   01 = 1.00V
-	//   10 = 0.95V
-	//   11 = 0.90V
-	//
-	// [2] [20:17] PDIV input reference clock pre-divider control, default is 2 (decimal)
-	//     [16] HOLD_CH0 Postdivider Channel0 hold: 0 = divider operational, 1 = clock hold at "0"
-	//     [15:0] SSC_STEP Spread Spectrum Clocking Step Rate
-	//            When SSC mode is enabled, this value determines the value that will be added to, or subtracted from N^ every refclk.
-	//            N^ = N^ +/- {14'b0,i_ssc_step}
-	//
-	// [3] 29:10 NDIV_FRAC Fractional part of Feedback Divider Rate (N). Default is 0 (decimal).
-	//   This value, divided by 2^20, is added to i_ndiv_int to determine the effective feedback divider rate N.
-	//   Concatenating these busses {i_ndiv_int, i_ndiv_frac} creates a 30-bit number sometimes referred to as the Frequency Control Word (fcw),
-	//   with 10 integer bits and 20 fractional bits.
-	//   9:0 NDIV_INT Integer part of Feedback Divider Rate (N). Default is 100 (decimal).
-	//     f(vcoclk) = f(i_refclk) * N / P., where N = Integer part, from the table below + Fractional part.
-	//       P = value of i_pdiv
-	//   0 => 1024, i => i
-	//
-	// [4]
-	//   enable vco output [0], power on cml buffer 0/1 [2:1]
-	//   mux test select [5:3]
-	//   test buf power on [6]
-	//   output level control of internal ldo [12:7]
-	//   pwm rate [14:13]
-	//   tdc bang bang mode [15]
-	//   tdc offset control [19:16]
-	//   post divider reset mode [21:20]
+type top_pll_controller struct {
 	control [5]top_u32
 
-	// [31] pll is locked
 	status top_u32
 }
 
 type top_controller struct {
 	_ [0x2fc - 0]byte
 
-	// port resets
 	port_reset top_u32
 
-	// [31:27] device skew
-	// [26:24] chip id
-	// [23:16] revision id
-	// [15:0] device id (e.g. 0xb960)
 	revision_id top_u32
 
-	// All resets active low.
-	// register 0: rx_pipe [0], tx pipe [1], mmu [2], ts [3], management port [4]
-	// register 1: xg 0-3 ts bs 0-1 core 0-1: 9 x 2 bits: [0] reset, [1] post reset
-	//             [18]/[19] temp mon/max min reset, [20] avs reset
-	//   [1] defaults avs + core 0-1 out of reset (set to 1)
 	soft_reset [2]top_u32
 
 	_ [0x380 - 0x30c]byte
@@ -121,41 +55,30 @@ type top_controller struct {
 
 	_ [0x420 - 0x410]byte
 
-	xg_pll [4]top_pll_regs
+	xg_pll [4]top_pll_controller
 
 	_ [0x498 - 0x480]byte
 
-	ts_pll                         top_pll_regs
-	bs_pll0                        top_pll_regs
+	ts_pll                         top_pll_controller
+	bs_pll0                        top_pll_controller
 	l1_received_clock_valid_status [3]top_u32
-	bs_pll1                        top_pll_regs
+	bs_pll1                        top_pll_controller
 
 	_ [0x500 - 0x4ec]byte
 
 	temperature_sensor struct {
 		control [2]top_u32
-		// current [9:0] min [21:12] max [31:22]; value v => 410.04 - v*.48705 degrees Celcius
 		current [9]top_u32
 	}
 
 	_ [0x600 - 0x52c]byte
 
-	// [31:0] tsc disable
 	tsc_disable top_u32
 
-	// [31:0] tsc afe pll lock
 	tsc_afe_pll_status top_u32
 
 	_ [0x75c - 0x608]byte
 
-	// [25:10] reserved counter threshold
-	// [9] reserved hw control enable
-	// [8] sw mode mux sel
-	// [7] sw core clock 1 select enable
-	// [6:4] core clock 1 frequency
-	//   0 => debug(950Mhz), 1 => 850Mhz, 2 => 765.625Mhz, 3 => 672Mhz, 4 => 645Mhz, 5 => 545Mhz
-	// [3] sw core clock 0 select enable
-	// [2:0] core clock 0 frequency
 	core_pll_frequency_select top_u32
 
 	_ [0x77c - 0x760]byte
@@ -164,7 +87,6 @@ type top_controller struct {
 	misc_control_2                   top_u32
 	freq_switch_status               top_u32
 
-	// ports 0-127
 	port_enable            [4]top_u32
 	management_port_enable top_u32
 	tsc_disable_status     top_u32
@@ -172,7 +94,6 @@ type top_controller struct {
 	_ [0x800 - 0x7a0]byte
 
 	temperature_sensor_interrupt struct {
-		// [0] min 0 [1] max 0, [2] min 1 [3] max 1 etc.
 		enable     top_u32
 		thresholds [9]top_u32
 		status     top_u32
@@ -184,17 +105,6 @@ type top_controller struct {
 
 	_ [0x914 - 0x8fc]byte
 
-	// [7:0] interrupt status clear
-	// [8:7] sram mon n process
-	// [10:9] sram mon p process
-	// [11] sram mon valid
-	// [12] vtrap enable
-	// [15:13] pvtmon bg
-	// [18:16] pvtmon ref max
-	// [22:19] pvtmon ref min0
-	// [25:23] pvtmon ref min1
-	// [26] avs disable
-	// [27] cpu2avx tap enable
 	avs_control top_u32
 }
 
@@ -241,7 +151,7 @@ type fe1a struct {
 	tx_pipe_controller    *tx_pipe_controller
 	mmu_global_controller *mmu_global_controller
 	mmu_global_mems       *mmu_global_mems
-	mmu_pipe_regs         *mmu_pipe_regs
+	mmu_pipe_controller   *mmu_pipe_controller
 	mmu_pipe_mems         *mmu_pipe_mems
 	mmu_slice_controller  *mmu_slice_controller
 	mmu_slice_mems        *mmu_slice_mems
@@ -315,7 +225,7 @@ func (t *fe1a) Init() {
 	t.mmu_global_mems = (*mmu_global_mems)(m.BasePointer)
 	t.mmu_global_controller = (*mmu_global_controller)(m.BasePointer)
 	t.mmu_pipe_mems = (*mmu_pipe_mems)(m.BasePointer)
-	t.mmu_pipe_regs = (*mmu_pipe_regs)(m.BasePointer)
+	t.mmu_pipe_controller = (*mmu_pipe_controller)(m.BasePointer)
 	t.mmu_slice_mems = (*mmu_slice_mems)(m.BasePointer)
 	t.mmu_slice_controller = (*mmu_slice_controller)(m.BasePointer)
 
