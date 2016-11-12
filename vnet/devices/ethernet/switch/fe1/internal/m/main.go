@@ -167,12 +167,21 @@ func (c *PortCommon) DriverName() string { return "fe1" }
 // else sort by front panel index.
 func (a *PortCommon) LessThan(b *PortCommon) bool {
 	ia, ib := a.FrontPanelIndex, b.FrontPanelIndex
-	const mgt_offset = 1 << 30
+	const (
+		mgt_offset     = 1 << 30
+		special_offset = 2 << 30
+	)
 	if a.IsManagement {
 		ia += mgt_offset
 	}
 	if b.IsManagement {
 		ib += mgt_offset
+	}
+	if a.PortBlock == nil {
+		ia += special_offset
+	}
+	if b.PortBlock == nil {
+		ib += special_offset
 	}
 	return ia < ib
 }
