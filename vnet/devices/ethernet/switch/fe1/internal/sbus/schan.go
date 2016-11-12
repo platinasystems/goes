@@ -13,15 +13,15 @@ import (
 )
 
 type Sbus struct {
-	Schan
+	PIO
 	Dma
 	FifoDma
 }
 
-type Schan struct {
-	Regs        *SchanRegs
-	FastRegs    *FastSchanRegs
-	requestFifo chan *request
+type PIO struct {
+	Controller     *PIOController
+	FastController *FastPIOController
+	requestFifo    chan *request
 }
 
 type request struct {
@@ -36,15 +36,15 @@ type request struct {
 	Done chan *request
 }
 
-type SchanRegs struct {
+type PIOController struct {
 	/* start [0] done [1] abort [2] */
 	control                  control
-	n_data_words_in_last_ack hw.Reg32
+	n_data_words_in_last_ack hw.U32
 	// [31:26] opcode, [25:20] dst block, [19:14] src block,
 	// [13:7] data len, [6] is error [5:4] error code, [0] nack
-	error   hw.Reg32
+	error   hw.U32
 	command command_reg
-	message [21]hw.Reg32
+	message [21]hw.U32
 }
 
 type Opcode uint8
@@ -163,23 +163,23 @@ func (a *Address) get() Address {
 	return Address(hw.LoadUint32((*uint32)(a)))
 }
 
-type FastSchanRegs struct {
-	enable_command hw.Reg32
-	write_is_busy  hw.Reg32
+type FastPIOController struct {
+	enable_command hw.U32
+	write_is_busy  hw.U32
 	command        command_reg
 	address        Address
-	data32         hw.Reg32
-	data64         [2]hw.Reg32 // lo/hi
+	data32         hw.U32
+	data64         [2]hw.U32 // lo/hi
 }
 
-func (f *FastSchanRegs) read32(b Block, addr Address) uint32 {
+func (f *FastPIOController) read32(b Block, addr Address) uint32 {
 	f.command.set(Command{Opcode: ReadRegister, Block: b})
 	f.address.set(addr)
 	hw.MemoryBarrier()
 	return f.data32.Get()
 }
 
-func (f *FastSchanRegs) read64(b Block, addr Address) uint64 {
+func (f *FastPIOController) read64(b Block, addr Address) uint64 {
 	f.command.set(Command{Opcode: ReadRegister, Block: b})
 	f.address.set(addr)
 	hw.MemoryBarrier()
@@ -187,7 +187,7 @@ func (f *FastSchanRegs) read64(b Block, addr Address) uint64 {
 	return uint64(lo) | (uint64(hi) << 32)
 }
 
-func (f *FastSchanRegs) write32(b Block, addr Address, value uint32) {
+func (f *FastPIOController) write32(b Block, addr Address, value uint32) {
 	f.command.set(Command{Opcode: WriteRegister, Block: b, Size: 4})
 	f.address.set(addr)
 	f.data32.Set(value)
@@ -196,7 +196,7 @@ func (f *FastSchanRegs) write32(b Block, addr Address, value uint32) {
 	}
 }
 
-func (f *FastSchanRegs) write64(b Block, addr Address, value uint64) {
+func (f *FastPIOController) write64(b Block, addr Address, value uint64) {
 	f.command.set(Command{Opcode: WriteRegister, Block: b, Size: 8})
 	f.address.set(addr)
 	f.data64[1].Set(uint32(value >> 32))
@@ -206,11 +206,11 @@ func (f *FastSchanRegs) write64(b Block, addr Address, value uint64) {
 	}
 }
 
-func (s *Schan) FastRead32(b Block, addr Address) uint32 {
-	return s.FastRegs.read32(b, addr)
+func (s *PIO) FastRead32(b Block, addr Address) uint32 {
+	return s.FastController.read32(b, addr)
 }
-func (s *Schan) FastWrite32(b Block, addr Address, value uint32) {
-	s.FastRegs.write32(b, addr, value)
+func (s *PIO) FastWrite32(b Block, addr Address, value uint32) {
+	s.FastController.write32(b, addr, value)
 }
 
 type control uint32
@@ -250,11 +250,11 @@ func (x control) toError() error {
 	return x
 }
 
-func (a *request) start(s *Schan) {
+func (a *request) start(s *PIO) {
 	// Size in bytes of message.
 	a.Command.Size = uint(len(a.Tx)) * 4
 
-	r := s.Regs
+	r := s.Controller
 	r.command.set(a.Command)
 	r.message[0].Set(uint32(a.Address))
 	for i := range a.Tx {
@@ -264,9 +264,9 @@ func (a *request) start(s *Schan) {
 	r.control.set(start)
 }
 
-func (a *request) finish(s *Schan) {
+func (a *request) finish(s *PIO) {
 	// Fetch request status
-	r := s.Regs
+	r := s.Controller
 	a.Status = r.control.get()
 	for i := range a.Rx {
 		a.Rx[i] = r.message[i].Get()
@@ -284,7 +284,7 @@ func (a *request) finish(s *Schan) {
 	}
 }
 
-func (a *request) do(s *Schan) {
+func (a *request) do(s *PIO) {
 	if s.requestFifo == nil {
 		s.requestFifo = make(chan *request, 64)
 	}
@@ -297,16 +297,16 @@ func (a *request) do(s *Schan) {
 	}
 }
 
-func (s *Schan) DoneInterrupt() {
+func (s *PIO) DoneInterrupt() {
 	select {
 	case a := <-s.requestFifo:
 		a.finish(s)
 	default:
-		s.Regs.control.set(0)
+		s.Controller.control.set(0)
 	}
 }
 
-func (s *Schan) rw(cmd Command, a Address, v uint64, nBits int, isWrite, panicError bool) (u uint64, err error) {
+func (s *PIO) rw(cmd Command, a Address, v uint64, nBits int, isWrite, panicError bool) (u uint64, err error) {
 	var buf [4]uint32
 	req := request{
 		Command: cmd,
@@ -336,28 +336,28 @@ func (s *Schan) rw(cmd Command, a Address, v uint64, nBits int, isWrite, panicEr
 	return
 }
 
-func (s *Schan) read(b Block, a Address, access AccessType, nBits int) (x uint64) {
+func (s *PIO) read(b Block, a Address, access AccessType, nBits int) (x uint64) {
 	cmd := Command{Opcode: ReadRegister, Block: b, AccessType: access}
 	x, _ = s.rw(cmd, a, 0, nBits, false, true)
 	return
 }
 
-func (s *Schan) write(b Block, a Address, access AccessType, nBits int, v uint64) {
+func (s *PIO) write(b Block, a Address, access AccessType, nBits int, v uint64) {
 	cmd := Command{Opcode: WriteRegister, Block: b, AccessType: access}
 	s.rw(cmd, a, v, nBits, true, true)
 }
 
-func (s *Schan) Read32A(b Block, a Address, c AccessType) uint32     { return uint32(s.read(b, a, c, 32)) }
-func (s *Schan) Read64A(b Block, a Address, c AccessType) uint64     { return s.read(b, a, c, 64) }
-func (s *Schan) Write64A(b Block, a Address, c AccessType, v uint64) { s.write(b, a, c, 64, v) }
-func (s *Schan) Write32A(b Block, a Address, c AccessType, v uint32) { s.write(b, a, c, 32, uint64(v)) }
+func (s *PIO) Read32A(b Block, a Address, c AccessType) uint32     { return uint32(s.read(b, a, c, 32)) }
+func (s *PIO) Read64A(b Block, a Address, c AccessType) uint64     { return s.read(b, a, c, 64) }
+func (s *PIO) Write64A(b Block, a Address, c AccessType, v uint64) { s.write(b, a, c, 64, v) }
+func (s *PIO) Write32A(b Block, a Address, c AccessType, v uint32) { s.write(b, a, c, 32, uint64(v)) }
 
-func (s *Schan) Read32(b Block, a Address) uint32     { return s.Read32A(b, a, Unique0) }
-func (s *Schan) Write32(b Block, a Address, v uint32) { s.Write32A(b, a, Unique0, v) }
-func (s *Schan) Read64(b Block, a Address) uint64     { return s.Read64A(b, a, Unique0) }
-func (s *Schan) Write64(b Block, a Address, v uint64) { s.Write64A(b, a, Unique0, v) }
+func (s *PIO) Read32(b Block, a Address) uint32     { return s.Read32A(b, a, Unique0) }
+func (s *PIO) Write32(b Block, a Address, v uint32) { s.Write32A(b, a, Unique0, v) }
+func (s *PIO) Read64(b Block, a Address) uint64     { return s.Read64A(b, a, Unique0) }
+func (s *PIO) Write64(b Block, a Address, v uint64) { s.Write64A(b, a, Unique0, v) }
 
-func (s *Schan) Read128(b Block, addr Address, buf []uint32) error {
+func (s *PIO) Read128(b Block, addr Address, buf []uint32) error {
 	req := request{
 		Command: Command{Opcode: ReadMemory, Block: b},
 		Address: addr,
@@ -368,7 +368,7 @@ func (s *Schan) Read128(b Block, addr Address, buf []uint32) error {
 	return req.Status.toError()
 }
 
-func (s *Schan) Write128(b Block, addr Address, data []uint32) error {
+func (s *PIO) Write128(b Block, addr Address, data []uint32) error {
 	var buf [4]uint32
 	req := request{
 		Command: Command{Opcode: WriteMemory, Block: b},

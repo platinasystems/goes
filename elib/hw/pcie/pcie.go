@@ -54,10 +54,10 @@ type Flags struct {
 	Msi uint8
 }
 
-type flags pci.Reg16
+type flags pci.U16
 
 func (r *flags) Get(d *pci.Device) (v Flags) {
-	x := (*pci.Reg16)(r).Get(d)
+	x := (*pci.U16)(r).Get(d)
 	v.Version = uint8(x & 0xf)
 	v.Type = Type((x >> 4) & 0xf)
 	v.SlotImplemented = x&(1<<8) != 0
@@ -69,7 +69,7 @@ func (f *Flags) String() string {
 	return fmt.Sprintf("type %s, version %d, msi %d", f.Type.String(), f.Version, f.Msi)
 }
 
-type devCap pci.Reg32
+type devCap pci.U32
 
 type DeviceCapabilities struct {
 	// In bytes: 128 to 4k.
@@ -77,7 +77,7 @@ type DeviceCapabilities struct {
 }
 
 func (r *devCap) Get(d *pci.Device) (v DeviceCapabilities) {
-	x := (*pci.Reg32)(r).Get(d)
+	x := (*pci.U32)(r).Get(d)
 	v.Log2MaxPayloadSize = uint8(7 + x&7)
 	return
 }
@@ -107,21 +107,21 @@ type CapabilityHeader struct {
 		//   [27:26] slot power limit scale
 		//   [28] function level reset
 		Capabilities devCap
-		Control      pci.Reg16
-		Status       pci.Reg16
+		Control      pci.U16
+		Status       pci.U16
 	}
 
 	Link, Slot struct {
-		Capabilities pci.Reg32
+		Capabilities pci.U32
 
-		Control pci.Reg16
+		Control pci.U16
 
-		Status pci.Reg16
+		Status pci.U16
 	}
 	Root struct {
-		Control      pci.Reg16
-		Capabilities pci.Reg16
-		Status       pci.Reg32
+		Control      pci.U16
+		Capabilities pci.U16
+		Status       pci.U32
 	}
 }
 

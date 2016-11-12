@@ -92,13 +92,13 @@ type xclport_regs struct {
 
 	_ reg32
 
-	tsc_pll_status reg32
+	phy_pll_status reg32
 
-	tsc_control reg32
+	phy_control reg32
 
-	tsc_lane_status [4]reg32
+	phy_lane_status [4]reg32
 
-	tsc_uc_data_access_mode reg32
+	phy_uc_data_access_mode reg32
 
 	_ [0x224 - 0x21a]reg32
 

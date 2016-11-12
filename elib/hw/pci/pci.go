@@ -13,27 +13,27 @@ import (
 	"unsafe"
 )
 
-type Reg8 hw.Reg8
-type Reg16 hw.Reg16
-type Reg32 hw.Reg32
+type U8 hw.U8
+type U16 hw.U16
+type U32 hw.U32
 
-func (r *Reg8) Get(d *Device) uint8 {
-	return d.ReadConfigUint8((*hw.Reg8)(r).Offset())
+func (r *U8) Get(d *Device) uint8 {
+	return d.ReadConfigUint8((*hw.U8)(r).Offset())
 }
-func (r *Reg8) Set(d *Device, v uint8) {
-	d.WriteConfigUint8((*hw.Reg8)(r).Offset(), v)
+func (r *U8) Set(d *Device, v uint8) {
+	d.WriteConfigUint8((*hw.U8)(r).Offset(), v)
 }
-func (r *Reg16) Get(d *Device) uint16 {
-	return d.ReadConfigUint16((*hw.Reg16)(r).Offset())
+func (r *U16) Get(d *Device) uint16 {
+	return d.ReadConfigUint16((*hw.U16)(r).Offset())
 }
-func (r *Reg16) Set(d *Device, v uint16) {
-	d.WriteConfigUint16((*hw.Reg16)(r).Offset(), v)
+func (r *U16) Set(d *Device, v uint16) {
+	d.WriteConfigUint16((*hw.U16)(r).Offset(), v)
 }
-func (r *Reg32) Get(d *Device) uint32 {
-	return d.ReadConfigUint32((*hw.Reg32)(r).Offset())
+func (r *U32) Get(d *Device) uint32 {
+	return d.ReadConfigUint32((*hw.U32)(r).Offset())
 }
-func (r *Reg32) Set(d *Device, v uint32) {
-	d.WriteConfigUint32((*hw.Reg32)(r).Offset(), v)
+func (r *U32) Set(d *Device, v uint32) {
+	d.WriteConfigUint32((*hw.U32)(r).Offset(), v)
 }
 
 func (d *Device) getRegs(o uint) unsafe.Pointer {
@@ -47,7 +47,7 @@ type ConfigHeader struct {
 	Command
 	Status
 
-	Revision Reg8
+	Revision U8
 
 	// Distinguishes programming interface for device.
 	// For example, different standards for USB controllers.
@@ -77,13 +77,13 @@ const (
 	CardBus
 )
 
-type SoftwareInterface Reg8
+type SoftwareInterface U8
 
 func (x SoftwareInterface) String() string {
 	return fmt.Sprintf("0x%02x", uint8(x))
 }
 
-type Command Reg16
+type Command U16
 
 const (
 	IOEnable Command = 1 << iota
@@ -99,14 +99,14 @@ const (
 	INTxEmulationDisable
 )
 
-type Status Reg16
+type Status U16
 
 // Device/vendor ID from PCI config space.
-type VendorID Reg16
-type VendorDeviceID Reg16
+type VendorID U16
+type VendorDeviceID U16
 
-func (r *VendorID) Get(d *Device) VendorID             { return VendorID((*Reg16)(r).Get(d)) }
-func (r *VendorDeviceID) Get(d *Device) VendorDeviceID { return VendorDeviceID((*Reg16)(r).Get(d)) }
+func (r *VendorID) Get(d *Device) VendorID             { return VendorID((*U16)(r).Get(d)) }
+func (r *VendorDeviceID) Get(d *Device) VendorDeviceID { return VendorDeviceID((*U16)(r).Get(d)) }
 
 func (d VendorDeviceID) String() string { return fmt.Sprintf("0x%04x", uint16(d)) }
 
@@ -119,7 +119,7 @@ type DeviceID struct {
 func (d *Device) VendorID() VendorID       { return d.Config.Vendor }
 func (d *Device) DeviceID() VendorDeviceID { return d.Config.Device }
 
-type BaseAddressReg Reg32
+type BaseAddressReg U32
 
 func (b BaseAddressReg) IsMem() bool {
 	return b&(1<<0) == 0
@@ -169,25 +169,25 @@ type DeviceConfig struct {
 	// Only 1 bits are decoded.
 	BaseAddressRegs [6]BaseAddressReg
 
-	CardBusCIS Reg32
+	CardBusCIS U32
 
 	SubID DeviceID
 
-	RomAddress Reg32
+	RomAddress U32
 
 	// Config space offset of start of capability list.
-	CapabilityOffset Reg8
-	_                [7]Reg8
+	CapabilityOffset U8
+	_                [7]U8
 
-	InterruptLine Reg8
-	InterruptPin  Reg8
-	MinGrant      Reg8
-	MaxLatency    Reg8
+	InterruptLine U8
+	InterruptPin  U8
+	MinGrant      U8
+	MaxLatency    U8
 }
 
 func (d *Device) GetDeviceConfig() *DeviceConfig { return (*DeviceConfig)(d.getRegs(0)) }
 
-type Capability Reg8
+type Capability U8
 
 const (
 	PowerManagement Capability = iota + 1
@@ -216,10 +216,10 @@ type CapabilityHeader struct {
 	Capability
 
 	// Pointer to next capability header
-	NextCapabilityHeader Reg8
+	NextCapabilityHeader U8
 }
 
-type ExtCapability Reg16
+type ExtCapability U16
 
 const (
 	AdvancedErrorReporting ExtCapability = iota + 1
@@ -257,7 +257,7 @@ type ExtCapabilityHeader struct {
 
 	// [15:4] next pointer
 	// [3:0] version
-	VersionAndNextOffset Reg16
+	VersionAndNextOffset U16
 }
 
 type BusAddress struct {
@@ -366,7 +366,7 @@ func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint, contents []
 	for o < l {
 		var h CapabilityHeader
 		h.Capability = Capability(d.configBytes[o+0])
-		h.NextCapabilityHeader = Reg8(d.configBytes[o+1])
+		h.NextCapabilityHeader = U8(d.configBytes[o+1])
 		b := d.configBytes[o+0:] // include CapabilityHeader
 		done, err = f(&h, o, b)
 		if err != nil || done {
@@ -414,7 +414,7 @@ func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint, conte
 	for o < l {
 		var h ExtCapabilityHeader
 		h.ExtCapability = ExtCapability(d.configBytes[o+0]) | ExtCapability(d.configBytes[o+1])<<8
-		h.VersionAndNextOffset = Reg16(d.configBytes[o+2]) | Reg16(d.configBytes[o+3])<<8
+		h.VersionAndNextOffset = U16(d.configBytes[o+2]) | U16(d.configBytes[o+3])<<8
 		b := d.configBytes[o+0:] // include CapabilityHeader
 		done, err = f(&h, o, b)
 		if err != nil || done {

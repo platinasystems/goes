@@ -5,7 +5,7 @@
 package i2c
 
 import (
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/iproc"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/icpu"
 
 	"fmt"
 	"sync"
@@ -91,8 +91,8 @@ func (r *request) addData(b byte) {
 }
 
 type I2c struct {
-	*iproc.I2cRegs
-	IprocRegs   *iproc.Regs
+	*icpu.I2cRegs
+	IcpuRegs    *icpu.Regs
 	requestFifo chan *request
 	lock        sync.Mutex
 }
@@ -105,21 +105,21 @@ func (r *request) start(bus *I2c) {
 		if i+1 == r.nData {
 			x |= 1 << 31
 		}
-		regs.Data_fifo[master].Write.Set(bus.IprocRegs, x)
+		regs.Data_fifo[master].Write.Set(bus.IcpuRegs, x)
 	}
 
 	cmd := uint32(r.op)<<9 | 1<<31
-	regs.Command[master].Set(bus.IprocRegs, cmd)
+	regs.Command[master].Set(bus.IcpuRegs, cmd)
 }
 
 func (q *request) finish(s *I2c) {
 	regs := s.I2cRegs
-	q.status = status((regs.Command[master].Get(s.IprocRegs) >> 25) & 0x7)
+	q.status = status((regs.Command[master].Get(s.IcpuRegs) >> 25) & 0x7)
 
 	if q.status == ok {
 		q.nData = 0
 		for {
-			x := regs.Data_fifo[master].Read.Get(s.IprocRegs)
+			x := regs.Data_fifo[master].Read.Get(s.IcpuRegs)
 			status := x >> 30
 			const (
 				empty = iota
@@ -148,8 +148,8 @@ func (q *request) finish(s *I2c) {
 }
 
 func (i *I2c) Interrupt() {
-	status := i.Interrupt_status_write_1_to_clear.Get(i.IprocRegs)
-	i.Interrupt_status_write_1_to_clear.Set(i.IprocRegs, status)
+	status := i.Interrupt_status_write_1_to_clear.Get(i.IcpuRegs)
+	i.Interrupt_status_write_1_to_clear.Set(i.IcpuRegs, status)
 
 	select {
 	case a := <-i.requestFifo:
@@ -221,7 +221,7 @@ func (s *I2c) Do(rw RW, address byte, op Operation, command byte, data *Data, nD
 }
 
 func (i *I2c) Init() {
-	ir := i.IprocRegs
+	ir := i.IcpuRegs
 
 	i.Config.Set(ir, i.Config.Get(ir)|1<<30)
 

@@ -4,14 +4,14 @@
 
 // +build debug
 
-package iproc
+package icpu
 
 import (
 	. "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/internal/debug"
 	"unsafe"
 )
 
-func (r *reg) offset(regs *Regs) uint {
+func (r *u32) offset(regs *Regs) uint {
 	return uint(uintptr(unsafe.Pointer(r)) - uintptr(unsafe.Pointer(regs)))
 }
 

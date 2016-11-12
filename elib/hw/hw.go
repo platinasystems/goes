@@ -42,14 +42,14 @@ func StoreUint64(addr *uint64, data uint64)
 func MemoryBarrier()
 
 // Generic 8/16/32 bit registers
-type Reg8 uint8
-type Reg16 uint16
-type Reg32 uint32
+type U8 uint8
+type U16 uint16
+type U32 uint32
 
 // Byte offsets
-func (r *Reg8) Offset() uint  { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
-func (r *Reg16) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
-func (r *Reg32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *U8) Offset() uint  { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *U16) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
+func (r *U32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - RegsBaseAddress) }
 
-func (r *Reg32) Get() uint32  { return LoadUint32((*uint32)(r)) }
-func (r *Reg32) Set(x uint32) { StoreUint32((*uint32)(r), x) }
+func (r *U32) Get() uint32  { return LoadUint32((*uint32)(r)) }
+func (r *U32) Set(x uint32) { StoreUint32((*uint32)(r), x) }

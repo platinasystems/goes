@@ -11,15 +11,15 @@ import (
 )
 
 type Regs struct {
-	param hw.Reg32
+	param hw.U32
 
-	read_data hw.Reg32
+	read_data hw.U32
 
-	address hw.Reg32
+	address hw.U32
 
-	control hw.Reg32
+	control hw.U32
 
-	status hw.Reg32
+	status hw.U32
 }
 
 type request struct {

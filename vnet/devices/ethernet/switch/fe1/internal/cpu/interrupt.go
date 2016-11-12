@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	schan_done_interrupt                    interrupt = 20
+	pio_done_interrupt                      interrupt = 20
 	mdio_done_interrupt                     interrupt = 7
 	cross_coupled_memory_dma_done_interrupt interrupt = 21
 
@@ -61,7 +61,7 @@ const (
 	spi_interrupt                          interrupt = 32 + 5
 	uart0_interrupt                        interrupt = 32 + 6
 	uart1_interrupt                        interrupt = 32 + 7
-	common_schan_op_done_interrupt         interrupt = 32 + 8
+	common_pio_op_done_interrupt           interrupt = 32 + 8
 	common_mii_op_done_interrupt           interrupt = 32 + 9
 	gpio_interrupt                         interrupt = 32 + 10
 	chip_func0_interrupt                   interrupt = 32 + 11
@@ -93,7 +93,7 @@ type interruptHandler struct {
 }
 
 var interruptNames = []string{
-	schan_done_interrupt:                    "schan done",
+	pio_done_interrupt:                      "pio done",
 	mdio_done_interrupt:                     "mdio done",
 	cross_coupled_memory_dma_done_interrupt: "cc memory dma done",
 	sbus_dma0_interrupt:                     "sbus dma ch 0 done",
@@ -138,7 +138,7 @@ var interruptNames = []string{
 	spi_interrupt:                          "spi",
 	uart0_interrupt:                        "uart0",
 	uart1_interrupt:                        "uart1",
-	common_schan_op_done_interrupt:         "common schan done",
+	common_pio_op_done_interrupt:           "common pio done",
 	common_mii_op_done_interrupt:           "common mii done",
 	gpio_interrupt:                         "gpio",
 	chip_func0_interrupt:                   "chip function 0",

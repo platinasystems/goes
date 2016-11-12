@@ -11,7 +11,7 @@ import (
 	"fmt"
 )
 
-type tsc_reg_dma_cmd struct {
+type phy_reg_dma_cmd struct {
 	sbus.DmaCmd
 
 	index uint16
@@ -22,10 +22,10 @@ type tsc_reg_dma_cmd struct {
 	// Storage for Rx/Tx.
 	buf [4]uint32
 
-	*tsc_reg_dma_rw
+	*phy_reg_dma_rw
 }
 
-func (p *PortBlock) tsc_address(isPMD bool, lane_mask m.LaneMask, reg_offset uint16) (a uint32) {
+func (p *PortBlock) phy_address(isPMD bool, lane_mask m.LaneMask, reg_offset uint16) (a uint32) {
 	a = uint32(reg_offset)
 	if isPMD {
 		a |= 1 << 27 // DEVAD
@@ -57,11 +57,11 @@ func (p *PortBlock) tsc_address(isPMD bool, lane_mask m.LaneMask, reg_offset uin
 	return
 }
 
-func (c *tsc_reg_dma_cmd) address() uint32 {
-	return c.portBlock.tsc_address(c.is_pmd_reg, c.lane_mask, c.reg_offset+c.index)
+func (c *phy_reg_dma_cmd) address() uint32 {
+	return c.portBlock.phy_address(c.is_pmd_reg, c.lane_mask, c.reg_offset+c.index)
 }
 
-func (c *tsc_reg_dma_cmd) Pre() {
+func (c *phy_reg_dma_cmd) Pre() {
 	if c.Command.Opcode == sbus.WriteMemory {
 		c.Tx = c.buf[:]
 
@@ -81,7 +81,7 @@ func (c *tsc_reg_dma_cmd) Pre() {
 	}
 }
 
-func (c *tsc_reg_dma_cmd) Post() {
+func (c *phy_reg_dma_cmd) Post() {
 	if !c.is_write && c.Command.Opcode == sbus.ReadMemory {
 		v := uint16(c.Rx[1])
 		if c.result32 != nil {
@@ -97,7 +97,7 @@ func (c *tsc_reg_dma_cmd) Post() {
 	}
 }
 
-type tsc_reg_dma_rw struct {
+type phy_reg_dma_rw struct {
 	portBlock *PortBlock
 
 	is_write   bool
@@ -111,11 +111,11 @@ type tsc_reg_dma_rw struct {
 	result16 *uint16
 }
 
-func (rw *tsc_reg_dma_rw) get_set(q *sbus.DmaRequest, isSet bool, index, write_data, write_mask uint16) {
-	cmds := [2]tsc_reg_dma_cmd{}
+func (rw *phy_reg_dma_rw) get_set(q *sbus.DmaRequest, isSet bool, index, write_data, write_mask uint16) {
+	cmds := [2]phy_reg_dma_cmd{}
 	m := get_xclport_mems()
-	cmds[0] = tsc_reg_dma_cmd{
-		tsc_reg_dma_rw: rw,
+	cmds[0] = phy_reg_dma_cmd{
+		phy_reg_dma_rw: rw,
 		index:          index,
 		write_data:     write_data,
 		write_mask:     write_mask,
@@ -133,7 +133,7 @@ func (rw *tsc_reg_dma_rw) get_set(q *sbus.DmaRequest, isSet bool, index, write_d
 }
 
 func (p *PortBlock) GetPhyReg(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, value *uint16) {
-	rw := tsc_reg_dma_rw{
+	rw := phy_reg_dma_rw{
 		portBlock:  p,
 		lane_mask:  lane_mask,
 		is_pmd_reg: isPMD,
@@ -144,7 +144,7 @@ func (p *PortBlock) GetPhyReg(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMa
 }
 
 func (p *PortBlock) SetPhyReg(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, write_data, write_mask uint16) {
-	rw := tsc_reg_dma_rw{
+	rw := phy_reg_dma_rw{
 		portBlock:  p,
 		lane_mask:  lane_mask,
 		is_pmd_reg: isPMD,
@@ -155,7 +155,7 @@ func (p *PortBlock) SetPhyReg(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMa
 }
 
 func (p *PortBlock) GetPhyReg32(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, value *uint32) {
-	rw := tsc_reg_dma_rw{
+	rw := phy_reg_dma_rw{
 		portBlock:  p,
 		lane_mask:  lane_mask,
 		is_pmd_reg: isPMD,
@@ -168,7 +168,7 @@ func (p *PortBlock) GetPhyReg32(q *sbus.DmaRequest, isPMD bool, lane_mask m.Lane
 }
 
 func (p *PortBlock) SetPhyReg32(q *sbus.DmaRequest, isPMD bool, lane_mask m.LaneMask, address uint16, value uint32) {
-	rw := tsc_reg_dma_rw{
+	rw := phy_reg_dma_rw{
 		portBlock:  p,
 		lane_mask:  lane_mask,
 		is_pmd_reg: isPMD,
@@ -182,16 +182,16 @@ func (p *PortBlock) SetPhyReg32(q *sbus.DmaRequest, isPMD bool, lane_mask m.Lane
 
 func (p *PortBlock) sync_rw(is_write bool, isPMD bool, lane_mask m.LaneMask, address, write_data, write_mask uint16) (read_data uint16, err error) {
 	var d [4]uint32
-	d[0] = p.tsc_address(isPMD, lane_mask, address)
+	d[0] = p.phy_address(isPMD, lane_mask, address)
 	d[1] = uint32(write_data)<<16 | (0xffff &^ uint32(write_mask))
 	if is_write {
 		d[2] = 1
 	}
 	mem := get_xclport_mems()
 	sw := p.Switch.GetSwitchCommon()
-	err = sw.CpuMain.Schan.Write128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
+	err = sw.CpuMain.PIO.Write128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
 	if err == nil && !is_write {
-		err = sw.CpuMain.Schan.Read128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
+		err = sw.CpuMain.PIO.Read128(p.SbusBlock, mem.wc_ucmem_data[0].Address(), d[:])
 		read_data = uint16(d[1])
 	}
 	return
@@ -234,7 +234,7 @@ func (p *PortBlock) LoadFirmware(q *sbus.DmaRequest, ucode_bytes []byte) {
 			Opcode: sbus.WriteRegister,
 			Block:  block,
 		},
-		Address: regs.tsc_uc_data_access_mode.address(),
+		Address: regs.phy_uc_data_access_mode.address(),
 	}
 	enable_mem_cmds := [2]sbus.DmaCmd{enable_mem_cmd, enable_mem_cmd}
 	enable_mem_cmds[0].Tx = []uint32{1}

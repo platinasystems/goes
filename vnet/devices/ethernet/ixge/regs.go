@@ -15,7 +15,7 @@ import (
 	"unsafe"
 )
 
-type reg hw.Reg32
+type reg hw.U32
 
 func (d *dev) addr_for_offset32(offset uint) *uint32 {
 	return (*uint32)(unsafe.Pointer(&d.mmaped_regs[offset]))

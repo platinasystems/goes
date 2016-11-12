@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-type reg hw.Reg32
+type reg hw.U32
 
-func (r *reg) get() uint32  { return (*hw.Reg32)(r).Get() }
-func (r *reg) set(v uint32) { (*hw.Reg32)(r).Set(v) }
+func (r *reg) get() uint32  { return (*hw.U32)(r).Get() }
+func (r *reg) set(v uint32) { (*hw.U32)(r).Set(v) }
 func (r *reg) get8() uint8  { return uint8(r.get() & 0xff) }
 func (r *reg) set8(v uint8) {
 	val := r.get()

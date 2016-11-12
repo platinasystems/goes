@@ -13,68 +13,68 @@ import (
 )
 
 type miim_regs struct {
-	rate_adjust_external_mdio hw.Reg32
-	rate_adjust_internal_mdio hw.Reg32
+	rate_adjust_external_mdio hw.U32
+	rate_adjust_internal_mdio hw.U32
 
-	control hw.Reg32
+	control hw.U32
 
-	status hw.Reg32
+	status hw.U32
 
-	auto_scan_address hw.Reg32
+	auto_scan_address hw.U32
 
-	pause_address hw.Reg32
+	pause_address hw.U32
 
-	port_link_is_down_0 [3]hw.Reg32
-	rx_pause_status_0   [3]hw.Reg32
-	tx_pause_status_0   [3]hw.Reg32
+	port_link_is_down_0 [3]hw.U32
+	rx_pause_status_0   [3]hw.U32
+	tx_pause_status_0   [3]hw.U32
 
-	port_enable_link_scan_0  [3]hw.Reg32
-	port_enable_pause_scan_0 [3]hw.Reg32
+	port_enable_link_scan_0  [3]hw.U32
+	port_enable_pause_scan_0 [3]hw.U32
 
-	port_scan_is_clause45_0 [3]hw.Reg32
+	port_scan_is_clause45_0 [3]hw.U32
 
-	port_phy_is_internal_0 [3]hw.Reg32
+	port_phy_is_internal_0 [3]hw.U32
 
-	port_bus_index_0 [10]hw.Reg32
+	port_bus_index_0 [10]hw.U32
 
-	port_phy_address_0 [24]hw.Reg32
+	port_phy_address_0 [24]hw.U32
 
-	rx_pause_capability_0       [3]hw.Reg32
-	rx_pause_override_control_0 [3]hw.Reg32
-	tx_pause_capability_0       [3]hw.Reg32
-	tx_pause_override_control_0 [3]hw.Reg32
+	rx_pause_capability_0       [3]hw.U32
+	rx_pause_override_control_0 [3]hw.U32
+	tx_pause_capability_0       [3]hw.U32
+	tx_pause_override_control_0 [3]hw.U32
 
-	clear_scan_status hw.Reg32
+	clear_scan_status hw.U32
 
-	port_link_is_down_1         [1]hw.Reg32
-	rx_pause_status_1           [1]hw.Reg32
-	tx_pause_status_1           [1]hw.Reg32
-	port_enable_link_scan_1     [1]hw.Reg32
-	port_enable_pause_scan_1    [1]hw.Reg32
-	port_scan_is_clause45_1     [1]hw.Reg32
-	port_phy_is_internal_1      [1]hw.Reg32
-	port_bus_index_1            [4]hw.Reg32
-	port_phy_address_1          [8]hw.Reg32
-	rx_pause_capability_1       [1]hw.Reg32
-	rx_pause_override_control_1 [1]hw.Reg32
-	tx_pause_capability_1       [1]hw.Reg32
-	tx_pause_override_control_1 [1]hw.Reg32
+	port_link_is_down_1         [1]hw.U32
+	rx_pause_status_1           [1]hw.U32
+	tx_pause_status_1           [1]hw.U32
+	port_enable_link_scan_1     [1]hw.U32
+	port_enable_pause_scan_1    [1]hw.U32
+	port_scan_is_clause45_1     [1]hw.U32
+	port_phy_is_internal_1      [1]hw.U32
+	port_bus_index_1            [4]hw.U32
+	port_phy_address_1          [8]hw.U32
+	rx_pause_capability_1       [1]hw.U32
+	rx_pause_override_control_1 [1]hw.U32
+	tx_pause_capability_1       [1]hw.U32
+	tx_pause_override_control_1 [1]hw.U32
 
-	config hw.Reg32
+	config hw.U32
 
-	port_link_is_down_2         [2]hw.Reg32
-	rx_pause_status_2           [2]hw.Reg32
-	tx_pause_status_2           [2]hw.Reg32
-	port_enable_link_scan_2     [2]hw.Reg32
-	port_enable_pause_scan_2    [2]hw.Reg32
-	port_scan_is_clause45_2     [2]hw.Reg32
-	port_phy_is_internal_2      [2]hw.Reg32
-	port_bus_index_2            [7]hw.Reg32
-	port_phy_address_2          [16]hw.Reg32
-	rx_pause_capability_2       [2]hw.Reg32
-	rx_pause_override_control_2 [2]hw.Reg32
-	tx_pause_capability_2       [2]hw.Reg32
-	tx_pause_override_control_2 [2]hw.Reg32
+	port_link_is_down_2         [2]hw.U32
+	rx_pause_status_2           [2]hw.U32
+	tx_pause_status_2           [2]hw.U32
+	port_enable_link_scan_2     [2]hw.U32
+	port_enable_pause_scan_2    [2]hw.U32
+	port_scan_is_clause45_2     [2]hw.U32
+	port_phy_is_internal_2      [2]hw.U32
+	port_bus_index_2            [7]hw.U32
+	port_phy_address_2          [16]hw.U32
+	rx_pause_capability_2       [2]hw.U32
+	rx_pause_override_control_2 [2]hw.U32
+	tx_pause_capability_2       [2]hw.U32
+	tx_pause_override_control_2 [2]hw.U32
 }
 
 type linkStatusChanger interface {
@@ -91,7 +91,7 @@ func i32(i uint16) (uint32, uint32) {
 	return uint32(i / 32), uint32(1) << (i % 32)
 }
 
-func findReg(i0 uint32, r0 *[3]hw.Reg32, r1 *[1]hw.Reg32, r2 *[2]hw.Reg32) (reg *hw.Reg32) {
+func findReg(i0 uint32, r0 *[3]hw.U32, r1 *[1]hw.U32, r2 *[2]hw.U32) (reg *hw.U32) {
 	switch {
 	case i0 < 3:
 		reg = &r0[i0]
@@ -143,7 +143,7 @@ func (r *miim_regs) set_clause45_enable(i uint16, enable bool) {
 
 func (r *miim_regs) set_phy_id(i uint16, id uint8) {
 	i0, i1 := uint32(i/4), uint32(5*(i%4))
-	var reg *hw.Reg32
+	var reg *hw.U32
 	switch {
 	case i0 < 24:
 		reg = &r.port_phy_address_0[i0]
@@ -162,7 +162,7 @@ func (r *miim_regs) set_phy_id(i uint16, id uint8) {
 
 func (r *miim_regs) set_phy_bus_id(i uint16, id uint8) {
 	i0, i1 := uint32(i/10), uint32(3*(i%10))
-	var reg *hw.Reg32
+	var reg *hw.U32
 	switch {
 	case i0 < 10:
 		reg = &r.port_bus_index_0[i0]

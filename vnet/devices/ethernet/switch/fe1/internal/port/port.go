@@ -120,27 +120,27 @@ func (p *PortBlock) Enable(enable bool) {
 	var v [2]uint32
 
 	r.mac_control.get(q, &v[0])
-	r.tsc_control.get(q, &v[1])
+	r.phy_control.get(q, &v[1])
 	q.Do()
 
 	const (
 		mac_reset_h    uint32 = 1 << 0
-		tsc_reset_l    uint32 = 1 << 0
-		tsc_power_down uint32 = 1 << 3
+		phy_reset_l    uint32 = 1 << 0
+		phy_power_down uint32 = 1 << 3
 	)
 
 	if enable {
 		v[0] &^= mac_reset_h
-		v[1] |= tsc_reset_l
-		v[1] &^= tsc_power_down
+		v[1] |= phy_reset_l
+		v[1] &^= phy_power_down
 	} else {
 		v[0] |= mac_reset_h
-		v[1] &^= tsc_reset_l
-		v[1] |= tsc_power_down
+		v[1] &^= phy_reset_l
+		v[1] |= phy_power_down
 	}
 
 	r.mac_control.set(q, v[0])
-	r.tsc_control.set(q, v[1])
+	r.phy_control.set(q, v[1])
 	// Reset counters or garbage will be returned
 	r.reset_mib_counters.set(q, 0xf)
 	r.reset_mib_counters.set(q, 0)
@@ -240,7 +240,7 @@ func (p *PortBlock) getStatus(port m.Porter) (s portStatus) {
 	r, _, _, _ := p.get_regs()
 	i := m.GetSubPortIndex(port)
 	q := p.dmaReq()
-	v := r.tsc_lane_status[i].getDo(q)
+	v := r.phy_lane_status[i].getDo(q)
 	s.name = port.GetPortName()
 	s.pmd_lock = v&(1<<2) != 0
 	s.signal_detect = v&(1<<1) != 0

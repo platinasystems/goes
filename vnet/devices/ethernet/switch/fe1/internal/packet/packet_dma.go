@@ -74,16 +74,16 @@ const n_channel = 4
 type DmaRegs struct {
 	// [8] enable => backpressure mmu if outstanding cell count exceeds threshold (default: 1)
 	// [7:0] threshold 1 <= t <= 128 (default 4)
-	rx_buffer_threshold [n_channel]hw.Reg32
+	rx_buffer_threshold [n_channel]hw.U32
 
 	// In continuous mode, hardware stops fetching if current descriptor address matches this address.
-	halt_descriptor_address [n_channel]hw.Reg32
+	halt_descriptor_address [n_channel]hw.U32
 
 	// [30:27] channel halt because halt_address = curr_desc_address
 	// Read-only; cleared when descriptor_halt_address moves.
-	halt_status hw.Reg32
+	halt_status hw.U32
 
-	_ [3]hw.Reg32
+	_ [3]hw.U32
 
 	// [9] enable continuous dma (enables channel in halt interrupt)
 	// [8] 0 => desc done interrupt for every done descriptor; 1 => only when interrupt bit is set in descriptor.
@@ -95,7 +95,7 @@ type DmaRegs struct {
 	// [2] abort dma
 	// [1] enable dma
 	// [0] direction 0 => rx, 1 => tx
-	control [n_channel]hw.Reg32
+	control [n_channel]hw.U32
 
 	// [31:28] ecc error reading rx packet buffer; cleared by control enable
 	// [27:24] ecc error reading rx status buffer; cleared by control enable
@@ -105,36 +105,36 @@ type DmaRegs struct {
 	// [11:8]  dma channel active
 	// [7:4]   current descriptor done
 	// [3:0]   descriptor chain done
-	status hw.Reg32
+	status hw.U32
 
-	_ [1]hw.Reg32
+	_ [1]hw.U32
 
 	// Chain start address.
-	start_descriptor_address [n_channel]hw.Reg32
+	start_descriptor_address [n_channel]hw.U32
 
 	// Bitmap of cos accepted for channel.
-	rx_cos_control [n_channel][2]hw.Reg32
+	rx_cos_control [n_channel][2]hw.U32
 
 	// [31] enable
 	// [30:16] descriptor count
 	// [15:0] timer (units? probably 125MHz core clock).
-	interrupt_coallesce [n_channel]hw.Reg32
+	interrupt_coallesce [n_channel]hw.U32
 
 	// ??
-	rx_buffer_threshold_config hw.Reg32
+	rx_buffer_threshold_config hw.U32
 
 	// 64 bit cos mask for this cmc.  Masks cos from this cmc.
-	programmable_cos_mask [2]hw.Reg32
+	programmable_cos_mask [2]hw.U32
 
 	// [11:8] clear descriptor controlled interrupt
 	// [7:4]  clear coallescing interrupt
 	// [3:0]  clear descriptor read complete
-	status_write_1_to_clear hw.Reg32
+	status_write_1_to_clear hw.U32
 
 	// Incremented as descriptors are processed by hardware.
-	current_descriptor_address [n_channel]hw.Reg32
+	current_descriptor_address [n_channel]hw.U32
 
-	_ [2]hw.Reg32
+	_ [2]hw.U32
 }
 
 const (

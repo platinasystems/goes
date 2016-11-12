@@ -19,8 +19,8 @@ import (
 
 type dma_control uint32
 
-func (x *dma_control) get() dma_control  { return dma_control(((*hw.Reg32)(x)).Get()) }
-func (x *dma_control) set(v dma_control) { ((*hw.Reg32)(x)).Set(uint32(v)) }
+func (x *dma_control) get() dma_control  { return dma_control(((*hw.U32)(x)).Get()) }
+func (x *dma_control) set(v dma_control) { ((*hw.U32)(x)).Set(uint32(v)) }
 
 const (
 	dma_start            dma_control = 1 << 0
@@ -36,14 +36,14 @@ const (
 type dma_descriptor struct {
 	control dma_control
 
-	options hw.Reg32
+	options hw.U32
 
-	count hw.Reg32
+	count hw.U32
 
 	command command_reg
 
 	sbus_address Address
-	cpu_address  hw.Reg32
+	cpu_address  hw.U32
 }
 
 type dma_data uint32
@@ -121,30 +121,30 @@ type DmaRegs struct {
 	// Single descriptor registers for register mode.
 	desc dma_descriptor
 	// Descriptor address.  Incremented by hardware as descriptors are processed.
-	desc_address hw.Reg32
+	desc_address hw.U32
 	status       dma_status
 
 	current struct {
-		cpu_address        hw.Reg32
-		sbus_address       hw.Reg32
-		descriptor_address hw.Reg32
+		cpu_address        hw.U32
+		sbus_address       hw.U32
+		descriptor_address hw.U32
 
 		/* From descriptor. */
-		request hw.Reg32
+		request hw.U32
 
 		/* Number of operations to execute. */
-		count hw.Reg32
+		count hw.U32
 
 		/* Starting SBUS and host mem address. */
 		sbus_start_address Address
-		cpu_start_address  hw.Reg32
+		cpu_start_address  hw.U32
 
 		command command_reg
 
-		debug             hw.Reg32
-		debug_clear       hw.Reg32
-		ecc_error_address hw.Reg32
-		ecc_error_control hw.Reg32
+		debug             hw.U32
+		debug_clear       hw.U32
+		ecc_error_address hw.U32
+		ecc_error_control hw.U32
 	}
 }
 
@@ -273,7 +273,7 @@ func (ch *dma_channel) start(req *DmaRequest) {
 		o = *req.Commands[idesc].GetCmd()
 
 		if idesc == 0 {
-			d.cpu_address = hw.Reg32(ch.data[0].PhysAddress())
+			d.cpu_address = hw.U32(ch.data[0].PhysAddress())
 		} else {
 			d.control |= dma_append_cpu
 		}
@@ -291,7 +291,7 @@ func (ch *dma_channel) start(req *DmaRequest) {
 		o.Command.dma = true
 		d.command.set(o.Command)
 		d.sbus_address = o.Address
-		d.count = hw.Reg32(count)
+		d.count = hw.U32(count)
 
 		if o.DecrementSbusAddress {
 			d.options |= 1 << 31
@@ -306,12 +306,12 @@ func (ch *dma_channel) start(req *DmaRequest) {
 		if o.Log2SbusAddressIncrement > 31 {
 			panic(fmt.Errorf("sbus address increment too large: %d > 31", o.Log2SbusAddressIncrement))
 		}
-		d.options |= hw.Reg32(o.Log2SbusAddressIncrement) << 24
+		d.options |= hw.U32(o.Log2SbusAddressIncrement) << 24
 
 		if o.CoreClocksBetweenCommands > 0xff {
 			panic(fmt.Errorf("core clocks too large: %d > 255", o.CoreClocksBetweenCommands))
 		}
-		d.options |= hw.Reg32(o.CoreClocksBetweenCommands) << 16
+		d.options |= hw.U32(o.CoreClocksBetweenCommands) << 16
 
 		if o.Command.Size/4 > 31 {
 			panic(fmt.Errorf("message tx words too large: %d > 31", len(o.Tx)))
@@ -323,8 +323,8 @@ func (ch *dma_channel) start(req *DmaRequest) {
 		if rxSize > 31 {
 			panic(fmt.Errorf("message rx words too large: %d > 31", rxSize))
 		}
-		d.options |= hw.Reg32(o.Command.Size/4) << 5
-		d.options |= hw.Reg32(rxSize) << 0
+		d.options |= hw.U32(o.Command.Size/4) << 5
+		d.options |= hw.U32(rxSize) << 0
 
 		for i := range o.Tx {
 			ch.data[idata] = dma_data(o.Tx[i])

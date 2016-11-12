@@ -14,29 +14,29 @@ import (
 
 const n_fifo_dma_channels = 4
 
-type FifoDmaRegs struct {
-	control [n_fifo_dma_channels]hw.Reg32
+type FifoDmaController struct {
+	control [n_fifo_dma_channels]hw.U32
 
-	sbus_start_address     [n_fifo_dma_channels]hw.Reg32
-	host_mem_start_address [n_fifo_dma_channels]hw.Reg32
+	sbus_start_address     [n_fifo_dma_channels]hw.U32
+	host_mem_start_address [n_fifo_dma_channels]hw.U32
 
-	host_mem [n_fifo_dma_channels]struct{ n_entries_read, n_entries_valid hw.Reg32 }
+	host_mem [n_fifo_dma_channels]struct{ n_entries_read, n_entries_valid hw.U32 }
 
-	ecc_error_address       [n_fifo_dma_channels]hw.Reg32
-	ecc_error_control       [n_fifo_dma_channels]hw.Reg32
-	host_mem_write_pointers [n_fifo_dma_channels]hw.Reg32
+	ecc_error_address       [n_fifo_dma_channels]hw.U32
+	ecc_error_control       [n_fifo_dma_channels]hw.U32
+	host_mem_write_pointers [n_fifo_dma_channels]hw.U32
 
 	_ [0x354 - 0x340]byte
 
-	host_mem_interrupt_threshold [n_fifo_dma_channels]hw.Reg32
+	host_mem_interrupt_threshold [n_fifo_dma_channels]hw.U32
 
 	status [n_fifo_dma_channels]fifo_dma_status
 
-	status_clear [n_fifo_dma_channels]hw.Reg32
+	status_clear [n_fifo_dma_channels]hw.U32
 
 	sbus_opcode [n_fifo_dma_channels]command_reg
 
-	debug hw.Reg32
+	debug hw.U32
 
 	_ [0x3a0 - 0x398]byte
 }
@@ -46,7 +46,7 @@ type fifo_dma_channel struct {
 	sequence     uint
 	nWords       uint
 	log2MemElts  uint
-	regs         *FifoDmaRegs
+	controller   *FifoDmaController
 	data         dma_data_vec
 	data_heap_id elib.Index
 	free         chan elib.Uint32Vec
@@ -66,24 +66,25 @@ type FifoDmaData struct {
 
 func (d *FifoDmaData) Free() { d.free <- d.Data }
 
-type fifo_dma_status hw.Reg32
+type fifo_dma_status hw.U32
 
 func (r *fifo_dma_status) get() (v fifo_dma_status) {
-	v = fifo_dma_status((*hw.Reg32)(r).Get())
+	v = fifo_dma_status((*hw.U32)(r).Get())
 	return
 }
 
 func (c *fifo_dma_channel) Interrupt() {
-	status := c.regs.status[c.index].get()
+	r := c.controller
+	status := r.status[c.index].get()
 	if status&1 != 0 {
-		c.regs.status_clear[c.index].Set(0x7)
+		r.status_clear[c.index].Set(0x7)
 		panic(fmt.Errorf("fifo dma channel %d status %x", c.index, status))
 	}
 	if status&0xff8 != 0 {
 		panic(fmt.Errorf("fifo dma channel %d unexpected status 0x%x", c.index, status))
 	}
 	if status&4 != 0 {
-		c.regs.status_clear[c.index].Set(1)
+		r.status_clear[c.index].Set(1)
 		c.resultFifo <- c.poll()
 	}
 }
@@ -99,7 +100,7 @@ func (c *fifo_dma_channel) get_buf() (v elib.Uint32Vec) {
 
 func (c *fifo_dma_channel) start_address() uint32 { return uint32(c.data[0].PhysAddress()) }
 func (c *fifo_dma_channel) write_index() uint {
-	v := c.regs.host_mem_write_pointers[c.index].Get()
+	v := c.controller.host_mem_write_pointers[c.index].Get()
 	return uint(v-c.start_address()) / (4 * c.nWords)
 }
 
@@ -138,7 +139,7 @@ func (c *fifo_dma_channel) poll() (r FifoDmaData) {
 			b[n_end+i] = uint32(c.data[i])
 		}
 	}
-	c.regs.host_mem[c.index].n_entries_read.Set(uint32(n))
+	c.controller.host_mem[c.index].n_entries_read.Set(uint32(n))
 	c.sequence += uint(n)
 	r.Data = buf
 	r.free = c.free
@@ -187,23 +188,24 @@ func (d *FifoDma) FifoDmaInit(resultFifo chan FifoDmaData, channel uint,
 		ch.data = ch.data[:n]
 	}
 
-	ch.regs.sbus_start_address[i].Set(uint32(a))
-	ch.regs.host_mem_start_address[i].Set(ch.start_address())
-	ch.regs.sbus_opcode[i].set(cmd)
+	r := ch.controller
+	r.sbus_start_address[i].Set(uint32(a))
+	r.host_mem_start_address[i].Set(ch.start_address())
+	r.sbus_opcode[i].set(cmd)
 	// Interrupt when half full.
-	ch.regs.host_mem_interrupt_threshold[i].Set(1 << (log2MemElts - 1))
+	r.host_mem_interrupt_threshold[i].Set(1 << (log2MemElts - 1))
 
-	v := ch.regs.control[i].Get()
+	v := r.control[i].Get()
 	v |= uint32(1 << 0) // enable bit
 	v = (v &^ (0xf << 7)) | uint32(log2MemElts-min)<<7
 	v = (v &^ (0x1f << 2)) | (uint32(ch.nWords) << 2)
-	ch.regs.control[i].Set(v)
+	r.control[i].Set(v)
 }
 
-func (m *FifoDma) InitChannels(regs *FifoDmaRegs) {
+func (m *FifoDma) InitChannels(controller *FifoDmaController) {
 	for i := range m.Channels {
 		c := &m.Channels[i]
 		c.index = uint(i)
-		c.regs = regs
+		c.controller = controller
 	}
 }
