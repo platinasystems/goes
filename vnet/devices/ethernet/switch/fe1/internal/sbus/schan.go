@@ -43,7 +43,7 @@ type PIOController struct {
 	// [31:26] opcode, [25:20] dst block, [19:14] src block,
 	// [13:7] data len, [6] is error [5:4] error code, [0] nack
 	error   hw.U32
-	command command_reg
+	command command_u32
 	message [21]hw.U32
 }
 
@@ -82,11 +82,11 @@ func Unique(i uint) AccessType {
 	return Unique0 + AccessType(i)
 }
 
-type command_reg uint32
+type command_u32 uint32
 
 const (
-	command_nack command_reg = 1 << 0
-	command_dma  command_reg = 1 << 3
+	command_nack command_u32 = 1 << 0
+	command_dma  command_u32 = 1 << 3
 )
 
 type Command struct {
@@ -112,8 +112,8 @@ func (c *Command) String() string {
 	return s
 }
 
-func (c *command_reg) set(a Command) {
-	r := command_reg(uint32(a.Opcode)<<26 |
+func (c *command_u32) set(a Command) {
+	r := command_u32(uint32(a.Opcode)<<26 |
 		uint32(a.Block)<<19 |
 		uint32(a.AccessType)<<14 |
 		uint32(a.Size)<<7)
@@ -123,8 +123,8 @@ func (c *command_reg) set(a Command) {
 	hw.StoreUint32((*uint32)(c), uint32(r))
 }
 
-func (c *command_reg) get() (a Command) {
-	r := command_reg(hw.LoadUint32((*uint32)(c)))
+func (c *command_u32) get() (a Command) {
+	r := command_u32(hw.LoadUint32((*uint32)(c)))
 	a.Opcode = Opcode(r >> 26)
 	a.Block = Block((r >> 19) & 0x7f)
 	a.AccessType = AccessType((r >> 14) & 0x1f)
@@ -166,7 +166,7 @@ func (a *Address) get() Address {
 type FastPIOController struct {
 	enable_command hw.U32
 	write_is_busy  hw.U32
-	command        command_reg
+	command        command_u32
 	address        Address
 	data32         hw.U32
 	data64         [2]hw.U32 // lo/hi

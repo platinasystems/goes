@@ -13,7 +13,7 @@ import (
 )
 
 type tdm_u32 struct {
-	// Ipipe versions are not "port regs" and so have GenReg bit explicitly set.
+	// Rx pipe versions are not "port regs" and so have GenReg bit explicitly set.
 	Array [1 << m.Log2NPorts]m.Pu32
 }
 

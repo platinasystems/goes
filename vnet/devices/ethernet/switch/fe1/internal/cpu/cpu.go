@@ -53,14 +53,14 @@ type sub_controllers struct {
 
 	_ [0x600 - 0x4d0]byte
 
-	sbus_dma                 [3]sbus.DmaRegs
+	sbus_dma                 [3]sbus.DmaController
 	sbus_dma_timers          [3]hw.U32
 	subs_dma_iteration_count [3]hw.U32
 
 	_ [0x1000 - 0x708]byte
 }
 
-type regs struct {
+type controller struct {
 	i2c icpu.I2cController
 
 	_ [0x10c - 0x50]byte
@@ -73,7 +73,7 @@ type regs struct {
 
 	_ [0x10080 - 0x10064]byte
 
-	mdio mdio.Regs
+	mdio mdio.Controller
 
 	sbus struct {
 		timeout hw.U32
@@ -130,7 +130,7 @@ type regs struct {
 
 	_ [0x11000 - 0x10274]byte
 
-	miim miim_regs
+	miim miim_controller
 
 	_ [0x1a000 - 0x1123c]byte
 
@@ -190,10 +190,10 @@ type regs struct {
 
 	_ [0x20000 - 0x1b050]byte
 
-	led0 led.Regs
-	led1 led.Regs
+	led0 led.Controller
+	led1 led.Controller
 	_    [0x29000 - 0x22000]byte
-	led2 led.Regs
+	led2 led.Controller
 
 	_               [0x31000 - 0x2a000]byte
 	sub_controllers [3]sub_controllers
@@ -205,7 +205,7 @@ type Config struct {
 }
 
 type Main struct {
-	regs            *regs
+	controller      *controller
 	icpu_controller *icpu.Controller
 	Config          Config
 
@@ -230,12 +230,12 @@ func (cm *Main) SetSbusRingMap(data []uint8) {
 		d[i/8] |= (uint32(data[i]) & 0xf) << (4 * (uint(i) % 8))
 	}
 	for i := range d {
-		cm.regs.sbus.ring_map[i].Set(d[i])
+		cm.controller.sbus.ring_map[i].Set(d[i])
 	}
 }
 
 func (cm *Main) Reset() {
-	r := cm.regs
+	r := cm.controller
 
 	// Hard reset of chip.
 	start := time.Now()
@@ -271,10 +271,10 @@ func (cm *Main) Reset() {
 }
 
 func (cm *Main) Init(pCpu, pIcpu unsafe.Pointer) {
-	cm.regs = (*regs)(pCpu)
+	cm.controller = (*controller)(pCpu)
 	cm.icpu_controller = (*icpu.Controller)(pIcpu)
 
-	c := &cm.regs.sub_controllers[0]
+	c := &cm.controller.sub_controllers[0]
 
 	cm.PIO.Controller = &c.pio
 	cm.PIO.FastController = &c.fast_pio
@@ -298,13 +298,13 @@ func (cm *Main) Init(pCpu, pIcpu unsafe.Pointer) {
 	cm.setInterruptHandler(fifo_dma2_interrupt, cm.FifoDma.Channels[2].Interrupt)
 	cm.setInterruptHandler(fifo_dma3_interrupt, cm.FifoDma.Channels[3].Interrupt)
 
-	cm.Mdio.Regs = &cm.regs.mdio
+	cm.Mdio.Controller = &cm.controller.mdio
 	cm.setInterruptHandler(mdio_done_interrupt, cm.Mdio.DoneInterrupt)
 
 	cm.setInterruptHandler(phy_scan_link_status_interrupt, cm.LinkStatusChangeInterrupt)
 	cm.setInterruptHandler(phy_scan_pause_status_interrupt, cm.PauseStatusChangeInterrupt)
 
-	cm.I2cController = &cm.regs.i2c
+	cm.I2cController = &cm.controller.i2c
 	cm.setInterruptHandler(i2c_interrupt, cm.I2c.Interrupt)
 }
 
@@ -312,7 +312,7 @@ func (cm *Main) HardwareInit() {
 	cm.Reset()
 
 	// Override master mode on i2c.
-	cm.regs.override_strap.Set(cm.regs.override_strap.Get() | (1 << 1) | (1 << 4))
+	cm.controller.override_strap.Set(cm.controller.override_strap.Get() | (1 << 1) | (1 << 4))
 	cm.I2c.Init()
 }
 
@@ -325,22 +325,22 @@ func (cm *Main) packetDmaInterruptEnable(enable bool) {
 }
 
 func (cm *Main) StartPacketDma() {
-	cm.regs.rx_buf.epipe_interface_release_all_credits.Set(1)
+	cm.controller.rx_buf.epipe_interface_release_all_credits.Set(1)
 }
 
 func (cm *Main) LedInit(data_ram_port_offset uint) {
 	// FIXME skip this when there are no leds.
-	cm.Leds[0].Regs = &cm.regs.led0
-	cm.Leds[1].Regs = &cm.regs.led1
-	cm.Leds[2].Regs = &cm.regs.led2
+	cm.Leds[0].Controller = &cm.controller.led0
+	cm.Leds[1].Controller = &cm.controller.led1
+	cm.Leds[2].Controller = &cm.controller.led2
 	for i := range cm.Leds {
 		cm.Leds[i].Init(data_ram_port_offset, i)
 	}
 }
 
 func (cm *Main) LedDataRamDump() {
-	cm.Leds[0].Regs = &cm.regs.led0
-	cm.Leds[1].Regs = &cm.regs.led1
+	cm.Leds[0].Controller = &cm.controller.led0
+	cm.Leds[1].Controller = &cm.controller.led1
 	for i := uint32(0); i < 2; i++ {
 		fmt.Printf("LED Data Ram[%d]\n", i)
 		cm.Leds[i].DumpDataRam()

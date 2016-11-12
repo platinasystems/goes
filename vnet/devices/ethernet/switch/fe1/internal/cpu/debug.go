@@ -19,7 +19,7 @@ func check(tag string, p unsafe.Pointer, expect uint) {
 
 // Check memory map.
 func init() {
-	r := (*regs)(basePointer)
+	r := (*controller)(basePointer)
 	check("miim", unsafe.Pointer(&r.miim), 0x11000)
 	check("rx_buf", unsafe.Pointer(&r.rx_buf), 0x1a000)
 	check("tx_buf", unsafe.Pointer(&r.tx_buf), 0x1b000)

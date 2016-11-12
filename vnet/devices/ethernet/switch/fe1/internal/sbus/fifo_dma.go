@@ -34,7 +34,7 @@ type FifoDmaController struct {
 
 	status_clear [n_fifo_dma_channels]hw.U32
 
-	sbus_opcode [n_fifo_dma_channels]command_reg
+	sbus_opcode [n_fifo_dma_channels]command_u32
 
 	debug hw.U32
 

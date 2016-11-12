@@ -11,8 +11,8 @@ import (
 	"unsafe"
 )
 
-func (r *u32) offset(regs *Controller) uint {
-	return uint(uintptr(unsafe.Pointer(r)) - uintptr(unsafe.Pointer(regs)))
+func (r *u32) offset(c *Controller) uint {
+	return uint(uintptr(unsafe.Pointer(r)) - uintptr(unsafe.Pointer(c)))
 }
 
 // Check memory map.

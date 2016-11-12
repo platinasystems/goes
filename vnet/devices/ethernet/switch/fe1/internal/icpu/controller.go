@@ -198,19 +198,19 @@ func (r *Controller) IndirectSet32(x *hw.U32, v uint32)  { r.iGetSet(x, &v, true
 
 type U32 hw.U32
 
-func (r *U32) Get(regs *Controller) uint32 {
+func (r *U32) Get(c *Controller) uint32 {
 	x := (*hw.U32)(r)
-	if regs != nil {
-		return regs.IndirectGet32(x)
+	if c != nil {
+		return c.IndirectGet32(x)
 	} else {
 		return x.Get()
 	}
 }
 
-func (r *U32) Set(regs *Controller, v uint32) {
+func (r *U32) Set(c *Controller, v uint32) {
 	x := (*hw.U32)(r)
-	if regs != nil {
-		regs.IndirectSet32(x, v)
+	if c != nil {
+		c.IndirectSet32(x, v)
 	} else {
 		x.Set(v)
 	}

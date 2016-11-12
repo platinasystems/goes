@@ -10,7 +10,7 @@ import (
 	"fmt"
 )
 
-type Regs struct {
+type Controller struct {
 	param hw.U32
 
 	read_data hw.U32
@@ -36,12 +36,12 @@ type request struct {
 }
 
 type Mdio struct {
-	Regs        *Regs
+	Controller  *Controller
 	requestFifo chan *request
 }
 
 func (a *request) start(s *Mdio) {
-	r := s.Regs
+	r := s.Controller
 
 	isWrite := a.ReadData == nil
 	p := uint32(0)
@@ -72,7 +72,7 @@ func (a *request) start(s *Mdio) {
 
 func (a *request) finish(s *Mdio) {
 	// Fetch request status
-	r := s.Regs
+	r := s.Controller
 	if a.ReadData != nil {
 		*a.ReadData = uint16(r.read_data.Get())
 	}
@@ -94,7 +94,7 @@ func (s *Mdio) DoneInterrupt() {
 	case a := <-s.requestFifo:
 		a.finish(s)
 	default:
-		s.Regs.control.Set(0)
+		s.Controller.control.Set(0)
 	}
 }
 

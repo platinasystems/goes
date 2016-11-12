@@ -98,28 +98,28 @@ type I2c struct {
 }
 
 func (r *request) start(bus *I2c) {
-	regs := bus.I2cController
+	c := bus.I2cController
 
 	for i := 0; i < r.nData; i++ {
 		x := uint32(r.data[i])
 		if i+1 == r.nData {
 			x |= 1 << 31
 		}
-		regs.Data_fifo[master].Write.Set(bus.IcpuController, x)
+		c.Data_fifo[master].Write.Set(bus.IcpuController, x)
 	}
 
 	cmd := uint32(r.op)<<9 | 1<<31
-	regs.Command[master].Set(bus.IcpuController, cmd)
+	c.Command[master].Set(bus.IcpuController, cmd)
 }
 
 func (q *request) finish(s *I2c) {
-	regs := s.I2cController
-	q.status = status((regs.Command[master].Get(s.IcpuController) >> 25) & 0x7)
+	c := s.I2cController
+	q.status = status((c.Command[master].Get(s.IcpuController) >> 25) & 0x7)
 
 	if q.status == ok {
 		q.nData = 0
 		for {
-			x := regs.Data_fifo[master].Read.Get(s.IcpuController)
+			x := c.Data_fifo[master].Read.Get(s.IcpuController)
 			status := x >> 30
 			const (
 				empty = iota

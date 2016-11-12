@@ -12,7 +12,7 @@ import (
 	"fmt"
 )
 
-type miim_regs struct {
+type miim_controller struct {
 	rate_adjust_external_mdio hw.U32
 	rate_adjust_internal_mdio hw.U32
 
@@ -91,92 +91,92 @@ func i32(i uint16) (uint32, uint32) {
 	return uint32(i / 32), uint32(1) << (i % 32)
 }
 
-func findReg(i0 uint32, r0 *[3]hw.U32, r1 *[1]hw.U32, r2 *[2]hw.U32) (reg *hw.U32) {
+func findAddr(i0 uint32, r0 *[3]hw.U32, r1 *[1]hw.U32, r2 *[2]hw.U32) (r *hw.U32) {
 	switch {
 	case i0 < 3:
-		reg = &r0[i0]
+		r = &r0[i0]
 	case i0 < 4:
-		reg = &r1[i0-3]
+		r = &r1[i0-3]
 	case i0 < 6:
-		reg = &r2[i0-4]
+		r = &r2[i0-4]
 	default:
 		panic("port index")
 	}
 	return
 }
 
-func (r *miim_regs) set_internal(i uint16, isExternal bool) {
+func (c *miim_controller) set_internal(i uint16, isExternal bool) {
 	i0, i1 := i32(i)
-	reg := findReg(i0, &r.port_phy_is_internal_0, &r.port_phy_is_internal_1, &r.port_phy_is_internal_2)
-	v := reg.Get()
+	r := findAddr(i0, &c.port_phy_is_internal_0, &c.port_phy_is_internal_1, &c.port_phy_is_internal_2)
+	v := r.Get()
 	if isExternal {
 		v &^= i1
 	} else {
 		v |= i1
 	}
-	reg.Set(v)
+	r.Set(v)
 }
 
-func (r *miim_regs) set_enable(i uint16, enable bool) {
+func (c *miim_controller) set_enable(i uint16, enable bool) {
 	i0, i1 := i32(i)
-	reg := findReg(i0, &r.port_enable_link_scan_0, &r.port_enable_link_scan_1, &r.port_enable_link_scan_2)
-	v := reg.Get()
+	r := findAddr(i0, &c.port_enable_link_scan_0, &c.port_enable_link_scan_1, &c.port_enable_link_scan_2)
+	v := r.Get()
 	if enable {
 		v |= i1
 	} else {
 		v &^= i1
 	}
-	reg.Set(v)
+	r.Set(v)
 }
 
-func (r *miim_regs) set_clause45_enable(i uint16, enable bool) {
+func (c *miim_controller) set_clause45_enable(i uint16, enable bool) {
 	i0, i1 := i32(i)
-	reg := findReg(i0, &r.port_scan_is_clause45_0, &r.port_scan_is_clause45_1, &r.port_scan_is_clause45_2)
-	v := reg.Get()
+	r := findAddr(i0, &c.port_scan_is_clause45_0, &c.port_scan_is_clause45_1, &c.port_scan_is_clause45_2)
+	v := r.Get()
 	if enable {
 		v |= i1
 	} else {
 		v &^= i1
 	}
-	reg.Set(v)
+	r.Set(v)
 }
 
-func (r *miim_regs) set_phy_id(i uint16, id uint8) {
+func (c *miim_controller) set_phy_id(i uint16, id uint8) {
 	i0, i1 := uint32(i/4), uint32(5*(i%4))
-	var reg *hw.U32
+	var r *hw.U32
 	switch {
 	case i0 < 24:
-		reg = &r.port_phy_address_0[i0]
+		r = &c.port_phy_address_0[i0]
 	case i0 < 32:
-		reg = &r.port_phy_address_1[i0-24]
+		r = &c.port_phy_address_1[i0-24]
 	case i0 < 48:
-		reg = &r.port_phy_address_2[i0-32]
+		r = &c.port_phy_address_2[i0-32]
 	default:
 		panic("port index")
 	}
-	v := reg.Get()
+	v := r.Get()
 	m := uint32(0x1f) << i1
 	v = (v &^ m) | uint32(id)<<i1
-	reg.Set(v)
+	r.Set(v)
 }
 
-func (r *miim_regs) set_phy_bus_id(i uint16, id uint8) {
+func (c *miim_controller) set_phy_bus_id(i uint16, id uint8) {
 	i0, i1 := uint32(i/10), uint32(3*(i%10))
-	var reg *hw.U32
+	var r *hw.U32
 	switch {
 	case i0 < 10:
-		reg = &r.port_bus_index_0[i0]
+		r = &c.port_bus_index_0[i0]
 	case i0 < 14:
-		reg = &r.port_bus_index_1[i0-10]
+		r = &c.port_bus_index_1[i0-10]
 	case i0 < 21:
-		reg = &r.port_bus_index_2[i0-14]
+		r = &c.port_bus_index_2[i0-14]
 	default:
 		panic("port index")
 	}
-	v := reg.Get()
+	v := r.Get()
 	m := uint32(0x7) << i1
 	v = (v &^ m) | uint32(id)<<i1
-	reg.Set(v)
+	r.Set(v)
 }
 
 func (c *Main) MdioInit(coreFreqInHz float64, ch linkStatusChanger) {
@@ -189,7 +189,7 @@ func (c *Main) LinkScanEnable(vn *vnet.Vnet, enable bool) {
 		vn.RegisterNode(defaultLinkStatusNode, "fe1-link-status")
 	}
 
-	r := &c.regs.miim
+	r := &c.controller.miim
 
 	const link_scan_enable = 1 << 0
 
@@ -207,7 +207,7 @@ type LinkStatus [6]uint32
 const LinkStatusWordBits = 32
 
 func (c *Main) getLinkStatus(v *LinkStatus) {
-	r := &c.regs.miim
+	r := &c.controller.miim
 	lm := &c.linkScanMain
 	for i := range r.port_link_is_down_0 {
 		v[i+0] = r.port_link_is_down_0[i].Get()
@@ -240,7 +240,7 @@ func (e *linkStatusEvent) EventAction()   { e.c.changer.LinkStatusChange(&e.v) }
 func (e *linkStatusEvent) String() string { return fmt.Sprintf("fe1 link status change %x", e.v) }
 
 func (c *Main) LinkStatusChangeInterrupt() {
-	r := &c.regs.miim
+	r := &c.controller.miim
 	r.clear_scan_status = 1 << 4
 	e := &linkStatusEvent{c: c}
 	c.getLinkStatus(&e.v)
@@ -288,7 +288,7 @@ type LinkScanPort struct {
 }
 
 func (c *Main) LinkScanAdd(p *LinkScanPort) {
-	r := &c.regs.miim
+	r := &c.controller.miim
 	r.set_internal(p.Index, p.IsExternal)
 	r.set_phy_id(p.Index, p.PhyId)
 	r.set_phy_bus_id(p.Index, p.PhyBusId)
@@ -304,7 +304,7 @@ func (c *Main) LinkScanAdd(p *LinkScanPort) {
 }
 
 func (c *Main) setMdioFreq(coreFreqInHz float64) {
-	r := &c.regs.miim
+	r := &c.controller.miim
 
 	// Set external mdio frequency to ~2Mhz
 	{

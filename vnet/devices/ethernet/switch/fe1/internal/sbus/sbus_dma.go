@@ -40,7 +40,7 @@ type dma_descriptor struct {
 
 	count hw.U32
 
-	command command_reg
+	command command_u32
 
 	sbus_address Address
 	cpu_address  hw.U32
@@ -117,7 +117,7 @@ func (q *DmaRequest) Error() (s string) {
 	return
 }
 
-type DmaRegs struct {
+type DmaController struct {
 	// Single descriptor registers for register mode.
 	desc dma_descriptor
 	// Descriptor address.  Incremented by hardware as descriptors are processed.
@@ -139,7 +139,7 @@ type DmaRegs struct {
 		sbus_start_address Address
 		cpu_start_address  hw.U32
 
-		command command_reg
+		command command_u32
 
 		debug             hw.U32
 		debug_clear       hw.U32
@@ -216,7 +216,7 @@ type DmaRequest struct {
 
 type dma_channel struct {
 	index        uint
-	regs         *DmaRegs
+	c            *DmaController
 	desc         dma_descriptor_vec
 	desc_heap_id elib.Index
 	data         dma_data_vec
@@ -338,9 +338,9 @@ func (ch *dma_channel) start(req *DmaRequest) {
 		ch.desc[idesc] = d
 	}
 
-	ch.regs.desc_address.Set(uint32(ch.desc[0].PhysAddress()))
+	ch.c.desc_address.Set(uint32(ch.desc[0].PhysAddress()))
 	hw.MemoryBarrier()
-	ch.regs.desc.control.set(dma_start | dma_mode_descriptors)
+	ch.c.desc.control.set(dma_start | dma_mode_descriptors)
 }
 
 // Get a request from fifo if there is one.
@@ -362,12 +362,12 @@ func (ch *dma_channel) putReq(req *DmaRequest) (newLen int) {
 
 func (ch *dma_channel) finish(req *DmaRequest) {
 	// Get status and received message data.
-	req.status = ch.regs.status
+	req.status = ch.c.status
 
 	req.Err = req.toError()
 	if req.Err != nil {
 		// If status indicates error find offending command from hardware.
-		hi := uintptr(ch.regs.desc_address.Get())
+		hi := uintptr(ch.c.desc_address.Get())
 		lo := ch.desc[0].PhysAddress()
 		req.error_command_index = uint((hi - lo) / unsafe.Sizeof(ch.desc[0]))
 	}
@@ -391,7 +391,7 @@ func (ch *dma_channel) finish(req *DmaRequest) {
 	}
 
 	// Stop dma hardware & ack interrupt.
-	ch.regs.desc.control.set(0)
+	ch.c.desc.control.set(0)
 
 	// Either start next request or leave hardware idle.
 	if nextReq := ch.getReq(); nextReq != nil {
@@ -425,8 +425,8 @@ func (c *dma_channel) Interrupt() {
 	if c.currentReq != nil {
 		c.finish(c.currentReq)
 	} else {
-		status := c.regs.status.get()
-		c.regs.desc.control.set(0)
+		status := c.c.status.get()
+		c.c.desc.control.set(0)
 		panic(fmt.Errorf("request fifo empty: channel %d dma status 0x%x", c.index, status))
 	}
 }
@@ -480,12 +480,12 @@ func (s *Dma) Do(req *DmaRequest) {
 	<-req.Done
 }
 
-func (m *Dma) InitChannels(regs []DmaRegs) {
-	m.Channels = make([]dma_channel, len(regs))
+func (m *Dma) InitChannels(controllers []DmaController) {
+	m.Channels = make([]dma_channel, len(controllers))
 	for i := range m.Channels {
 		c := &m.Channels[i]
 		c.index = uint(i)
-		c.regs = &regs[i]
+		c.c = &controllers[i]
 		c.reqFifo = make(chan *DmaRequest, 64)
 	}
 }

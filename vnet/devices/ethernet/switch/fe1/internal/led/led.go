@@ -13,28 +13,28 @@ import (
 	"time"
 )
 
-type reg hw.U32
+type u32 hw.U32
 
-func (r *reg) get() uint32  { return (*hw.U32)(r).Get() }
-func (r *reg) set(v uint32) { (*hw.U32)(r).Set(v) }
-func (r *reg) get8() uint8  { return uint8(r.get() & 0xff) }
-func (r *reg) set8(v uint8) {
+func (r *u32) get() uint32  { return (*hw.U32)(r).Get() }
+func (r *u32) set(v uint32) { (*hw.U32)(r).Set(v) }
+func (r *u32) get8() uint8  { return uint8(r.get() & 0xff) }
+func (r *u32) set8(v uint8) {
 	val := r.get()
 	val = (val & 0xffffff00) | (uint32(v) & 0xff)
 	r.set(val)
 }
 
-type Regs struct {
+type Controller struct {
 	// [9:4] scan start delay
 	// [3:1] intra port scan delay
 	// [0] enable uproc
-	control reg
+	control u32
 	// [9] initializing
 	// [8] running
 	// [7:0] program counter
-	status                         reg
-	scan_chain_assembly_start_addr reg
-	_                              reg
+	status                         u32
+	scan_chain_assembly_start_addr u32
+	_                              u32
 	// port order remap => used to 'remap' the LED id to front panel port id:
 	// each port has 6 bits and 4 ports per register, so:
 	// 31..24 - not used
@@ -42,12 +42,12 @@ type Regs struct {
 	// 17..12 - port_id = (reg# * 3)+2
 	// 11..6  - port_id = (reg# * 2)+1
 	// 5..0   - port_id = reg# * 4
-	port_order_remap [16]reg
-	clock_params     reg
+	port_order_remap [16]u32
+	clock_params     u32
 	// upper 2 bits of scan out counter [9:0] [1:0]
-	scan_out_count_upper reg
-	tm_control           reg
-	clock_divider        reg
+	scan_out_count_upper u32
+	tm_control           u32
+	clock_divider        u32
 	_                    [0x400 - 0x60]byte
 
 	// beginning at offset 0xa0: 1 byte per from panel port
@@ -61,9 +61,9 @@ type Regs struct {
 	//                    0x11 - undefined
 	// [6] maintenance => RED LED: 0 = off, 1 = on
 	// [7] turbo mode - not currently used
-	data_ram [256]reg
+	data_ram [256]u32
 
-	program_ram [256]reg
+	program_ram [256]u32
 	_           [0x1000 - 0xc00]byte
 }
 
@@ -76,7 +76,7 @@ const (
 
 type Led struct {
 	bank                 int
-	Regs                 *Regs
+	Controller           *Controller
 	data_ram_port_offset uint
 }
 
@@ -100,7 +100,7 @@ func (s status) String() string { return status_strings[s] }
 
 // Mutually exclusive states
 func (l *Led) getStatus() (s status) {
-	r := l.Regs
+	r := l.Controller
 	var v [2]uint32
 	v[0] = r.control.get()
 	if v[0]&(1<<0) == 0 {
@@ -118,7 +118,7 @@ func (l *Led) getStatus() (s status) {
 
 // unReset the led Microprocessor
 func (l *Led) enable(enable bool) {
-	r := l.Regs
+	r := l.Controller
 	v := r.control.get()
 	const (
 		enable_uproc = 1 << 0
@@ -161,7 +161,7 @@ var firmware = [...]uint8{
 // Clear Data RAM and Program RAM
 func (l *Led) initMem() {
 	var x uint8
-	r := l.Regs
+	r := l.Controller
 	for i := range r.program_ram {
 		if i < len(firmware) {
 			x = firmware[i]
@@ -217,7 +217,7 @@ func (l *Led) SetPortState(port_index uint, mask uint8, isSet bool) {
 		}
 	}
 
-	r := &l.Regs.data_ram[mem_index]
+	r := &l.Controller.data_ram[mem_index]
 	v := uint8(r.get8())
 	if isSet {
 		v |= mask
@@ -229,7 +229,7 @@ func (l *Led) SetPortState(port_index uint, mask uint8, isSet bool) {
 
 func (l *Led) DumpDataRam() {
 	for i := 0; i < 256; i++ {
-		r := &l.Regs.data_ram[i]
+		r := &l.Controller.data_ram[i]
 		v := uint8(r.get8())
 		fmt.Printf("led_data[0x%x] = 0x%x\n", i, v)
 	}
@@ -294,14 +294,14 @@ var mapLedLight = map[uint]uint{
 
 func (l *Led) initPortMap() {
 	var v int
-	r := l.Regs
+	r := l.Controller
 	for i := range r.port_order_remap {
 		if l.bank == 0 {
 			v = bank0PortMap[i]
 		} else {
 			v = bank1PortMap[i]
 		}
-		l.Regs.port_order_remap[i].set(uint32(v))
+		l.Controller.port_order_remap[i].set(uint32(v))
 	}
 }
 
