@@ -610,13 +610,13 @@ func (t *fe1a) port_mapping_init() {
 		t.rx_pipe_mems.device_port_by_global_physical[gpp].set(q, uint32(pipePort))
 
 		// Tx_pipe device port to physical.
-		t.tx_pipe_regs.device_to_physical_port_number_mapping[pipePort].seta(q, sbus.AddressSplit, uint32(phys))
+		t.tx_pipe_controller.device_to_physical_port_number_mapping[pipePort].seta(q, sbus.AddressSplit, uint32(phys))
 
 		mmu_port := phys.toGlobalMmu(t)
 		if mmu_port != mmu_global_port_number_invalid {
-			t.mmu_global_regs.device_port_by_mmu_port[mmu_port].set(q, uint32(pipePort))
-			t.mmu_global_regs.physical_port_by_mmu_port[mmu_port].set(q, uint32(phys))
-			t.mmu_global_regs.global_physical_port_by_mmu_port[mmu_port].set(q, uint32(gpp))
+			t.mmu_global_controller.device_port_by_mmu_port[mmu_port].set(q, uint32(pipePort))
+			t.mmu_global_controller.physical_port_by_mmu_port[mmu_port].set(q, uint32(phys))
+			t.mmu_global_controller.global_physical_port_by_mmu_port[mmu_port].set(q, uint32(gpp))
 		}
 	}
 	q.Do()

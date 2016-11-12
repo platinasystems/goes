@@ -15,18 +15,18 @@ import (
 	"unsafe"
 )
 
-type top_reg uint32
+type top_u32 uint32
 
-func (r *top_reg) set(q *DmaRequest, v uint32)  { q.SetU32(v, BlockTop, r.address(), sbus.Unique0) }
-func (r *top_reg) get(q *DmaRequest, v *uint32) { q.GetU32(v, BlockTop, r.address(), sbus.Unique0) }
-func (r *top_reg) getDo(q *DmaRequest) (v uint32) {
+func (r *top_u32) set(q *DmaRequest, v uint32)  { q.SetU32(v, BlockTop, r.address(), sbus.Unique0) }
+func (r *top_u32) get(q *DmaRequest, v *uint32) { q.GetU32(v, BlockTop, r.address(), sbus.Unique0) }
+func (r *top_u32) getDo(q *DmaRequest) (v uint32) {
 	r.get(q, &v)
 	q.Do()
 	return
 }
 
-func (r *top_reg) address() sbus.Address { return sbus.GenReg | sbus.Address(r.offset()) }
-func (r *top_reg) offset() uint          { return uint(uintptr(unsafe.Pointer(r))-m.BaseAddress) << 8 }
+func (r *top_u32) address() sbus.Address { return sbus.GenReg | sbus.Address(r.offset()) }
+func (r *top_u32) offset() uint          { return uint(uintptr(unsafe.Pointer(r))-m.BaseAddress) << 8 }
 
 type top_pll_regs struct {
 	// [0]:
@@ -84,40 +84,40 @@ type top_pll_regs struct {
 	//   tdc bang bang mode [15]
 	//   tdc offset control [19:16]
 	//   post divider reset mode [21:20]
-	control [5]top_reg
+	control [5]top_u32
 
 	// [31] pll is locked
-	status top_reg
+	status top_u32
 }
 
-type top_regs struct {
+type top_controller struct {
 	_ [0x2fc - 0]byte
 
 	// port resets
-	port_reset top_reg
+	port_reset top_u32
 
 	// [31:27] device skew
 	// [26:24] chip id
 	// [23:16] revision id
 	// [15:0] device id (e.g. 0xb960)
-	revision_id top_reg
+	revision_id top_u32
 
 	// All resets active low.
 	// register 0: rx_pipe [0], tx pipe [1], mmu [2], ts [3], management port [4]
 	// register 1: xg 0-3 ts bs 0-1 core 0-1: 9 x 2 bits: [0] reset, [1] post reset
 	//             [18]/[19] temp mon/max min reset, [20] avs reset
 	//   [1] defaults avs + core 0-1 out of reset (set to 1)
-	soft_reset [2]top_reg
+	soft_reset [2]top_u32
 
 	_ [0x380 - 0x30c]byte
 
-	core_pll0_control    [5]top_reg
-	core_pll1_control012 [3]top_reg
+	core_pll0_control    [5]top_u32
+	core_pll1_control012 [3]top_u32
 
 	_ [0x400 - 0x3a0]byte
 
-	core_pll1_control34 [2]top_reg
-	core_pll_status     [2]top_reg
+	core_pll1_control34 [2]top_u32
+	core_pll_status     [2]top_u32
 
 	_ [0x420 - 0x410]byte
 
@@ -127,24 +127,24 @@ type top_regs struct {
 
 	ts_pll                         top_pll_regs
 	bs_pll0                        top_pll_regs
-	l1_received_clock_valid_status [3]top_reg
+	l1_received_clock_valid_status [3]top_u32
 	bs_pll1                        top_pll_regs
 
 	_ [0x500 - 0x4ec]byte
 
 	temperature_sensor struct {
-		control [2]top_reg
+		control [2]top_u32
 		// current [9:0] min [21:12] max [31:22]; value v => 410.04 - v*.48705 degrees Celcius
-		current [9]top_reg
+		current [9]top_u32
 	}
 
 	_ [0x600 - 0x52c]byte
 
 	// [31:0] tsc disable
-	tsc_disable top_reg
+	tsc_disable top_u32
 
 	// [31:0] tsc afe pll lock
-	tsc_afe_pll_status top_reg
+	tsc_afe_pll_status top_u32
 
 	_ [0x75c - 0x608]byte
 
@@ -156,31 +156,31 @@ type top_regs struct {
 	//   0 => debug(950Mhz), 1 => 850Mhz, 2 => 765.625Mhz, 3 => 672Mhz, 4 => 645Mhz, 5 => 545Mhz
 	// [3] sw core clock 0 select enable
 	// [2:0] core clock 0 frequency
-	core_pll_frequency_select top_reg
+	core_pll_frequency_select top_u32
 
 	_ [0x77c - 0x760]byte
 
-	l1_received_clock_valid_status34 top_reg
-	misc_control_2                   top_reg
-	freq_switch_status               top_reg
+	l1_received_clock_valid_status34 top_u32
+	misc_control_2                   top_u32
+	freq_switch_status               top_u32
 
 	// ports 0-127
-	port_enable            [4]top_reg
-	management_port_enable top_reg
-	tsc_disable_status     top_reg
+	port_enable            [4]top_u32
+	management_port_enable top_u32
+	tsc_disable_status     top_u32
 
 	_ [0x800 - 0x7a0]byte
 
 	temperature_sensor_interrupt struct {
 		// [0] min 0 [1] max 0, [2] min 1 [3] max 1 etc.
-		enable     top_reg
-		thresholds [9]top_reg
-		status     top_reg
+		enable     top_u32
+		thresholds [9]top_u32
+		status     top_u32
 	}
 
 	_ [0x87c - 0x82c]byte
 
-	tsc_resolved_speed_status [32]top_reg
+	tsc_resolved_speed_status [32]top_u32
 
 	_ [0x914 - 0x8fc]byte
 
@@ -195,7 +195,7 @@ type top_regs struct {
 	// [25:23] pvtmon ref min1
 	// [26] avs disable
 	// [27] cpu2avx tap enable
-	avs_control top_reg
+	avs_control top_u32
 }
 
 func (t *fe1a) setCoreFreq(q *DmaRequest) {
@@ -217,9 +217,9 @@ func (t *fe1a) setCoreFreq(q *DmaRequest) {
 		panic(fmt.Errorf("unknown core frequency %eHz", t.CoreFrequencyInHz))
 	}
 	const core_clock0_sw_select_enable = 1 << 3
-	v := t.top_regs.core_pll_frequency_select.getDo(q)
+	v := t.top_controller.core_pll_frequency_select.getDo(q)
 	v |= (f << 0) | core_clock0_sw_select_enable
-	t.top_regs.core_pll_frequency_select.set(q, v)
+	t.top_controller.core_pll_frequency_select.set(q, v)
 	q.Do()
 }
 
@@ -234,17 +234,17 @@ type fe1a struct {
 
 	revision_id revision_id_reg
 
-	top_regs        *top_regs
-	rx_pipe_mems    *rx_pipe_mems
-	rx_pipe_regs    *rx_pipe_regs
-	tx_pipe_mems    *tx_pipe_mems
-	tx_pipe_regs    *tx_pipe_regs
-	mmu_global_regs *mmu_global_regs
-	mmu_global_mems *mmu_global_mems
-	mmu_xpe_regs    *mmu_xpe_regs
-	mmu_xpe_mems    *mmu_xpe_mems
-	mmu_sc_regs     *mmu_sc_regs
-	mmu_sc_mems     *mmu_sc_mems
+	top_controller        *top_controller
+	rx_pipe_mems          *rx_pipe_mems
+	rx_pipe_controller    *rx_pipe_controller
+	tx_pipe_mems          *tx_pipe_mems
+	tx_pipe_controller    *tx_pipe_controller
+	mmu_global_controller *mmu_global_controller
+	mmu_global_mems       *mmu_global_mems
+	mmu_pipe_regs         *mmu_pipe_regs
+	mmu_pipe_mems         *mmu_pipe_mems
+	mmu_slice_controller  *mmu_slice_controller
+	mmu_slice_mems        *mmu_slice_mems
 
 	mmu_pipe_by_phys_port [n_phys_ports]mmu_pipe
 
@@ -266,7 +266,7 @@ func (t *fe1a) getDmaReq() *DmaRequest { return &t.dmaReq }
 func (t *fe1a) Interrupt()             { t.CpuMain.Interrupt() }
 func (t *fe1a) GetLedDataRam()         { t.CpuMain.LedDataRamDump() }
 
-func (t *fe1a) pll_wait(r *top_reg, tag string) {
+func (t *fe1a) pll_wait(r *top_u32, tag string) {
 	q := t.getDmaReq()
 	start := time.Now()
 	for {
@@ -307,22 +307,22 @@ func (t *fe1a) Init() {
 	}
 
 	// Initialize fictitious memory-map pointers to all memories and registers.
-	t.top_regs = (*top_regs)(m.BasePointer)
+	t.top_controller = (*top_controller)(m.BasePointer)
 	t.rx_pipe_mems = (*rx_pipe_mems)(m.BasePointer)
-	t.rx_pipe_regs = (*rx_pipe_regs)(m.BasePointer)
+	t.rx_pipe_controller = (*rx_pipe_controller)(m.BasePointer)
 	t.tx_pipe_mems = (*tx_pipe_mems)(m.BasePointer)
-	t.tx_pipe_regs = (*tx_pipe_regs)(m.BasePointer)
+	t.tx_pipe_controller = (*tx_pipe_controller)(m.BasePointer)
 	t.mmu_global_mems = (*mmu_global_mems)(m.BasePointer)
-	t.mmu_global_regs = (*mmu_global_regs)(m.BasePointer)
-	t.mmu_xpe_mems = (*mmu_xpe_mems)(m.BasePointer)
-	t.mmu_xpe_regs = (*mmu_xpe_regs)(m.BasePointer)
-	t.mmu_sc_mems = (*mmu_sc_mems)(m.BasePointer)
-	t.mmu_sc_regs = (*mmu_sc_regs)(m.BasePointer)
+	t.mmu_global_controller = (*mmu_global_controller)(m.BasePointer)
+	t.mmu_pipe_mems = (*mmu_pipe_mems)(m.BasePointer)
+	t.mmu_pipe_regs = (*mmu_pipe_regs)(m.BasePointer)
+	t.mmu_slice_mems = (*mmu_slice_mems)(m.BasePointer)
+	t.mmu_slice_controller = (*mmu_slice_controller)(m.BasePointer)
 
 	t.dmaReq = DmaRequest{fe1a: t}
 	q := t.getDmaReq()
 
-	r := t.top_regs
+	r := t.top_controller
 
 	t.CoreFrequencyInHz = 850e6
 	t.setCoreFreq(q)

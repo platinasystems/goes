@@ -221,12 +221,12 @@ func (t *fe1a) cpu_rx_init() {
 			unknown_multicast         = 1 << 3
 		)
 		// For IP packets with ttl = 1 either you punt to cpu here or packet gets dropped.
-		t.rx_pipe_regs.cpu_control_1.set(q, ip_unicast_ttl_equals_1|ip_multicast_ttl_equals_1|unknown_multicast)
+		t.rx_pipe_controller.cpu_control_1.set(q, ip_unicast_ttl_equals_1|ip_multicast_ttl_equals_1|unknown_multicast)
 		q.Do()
 	}
 
 	// Enable arp request/reply to be sent to cpu.
-	t.rx_pipe_regs.protocol_pkt_control[0].set(q, 1<<4|1<<6)
+	t.rx_pipe_controller.protocol_pkt_control[0].set(q, 1<<4|1<<6)
 	q.Do()
 
 	{

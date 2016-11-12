@@ -208,7 +208,7 @@ func (t *fe1a) pipe_counter_init() {
 	{
 		v := uint32(1 << 0) // enable bit
 		v |= uint32(n_pipe_counter_memory_id << 1)
-		t.rx_pipe_regs.pipe_counter_eviction_control.set(q, v)
+		t.rx_pipe_controller.pipe_counter_eviction_control.set(q, v)
 		q.Do()
 	}
 
@@ -226,18 +226,18 @@ func (t *fe1a) pipe_counter_init() {
 		for pipe := uint(0); pipe < n_pipe; pipe++ {
 			// Rx pipe counters.
 			mem_id := pipe_counter_memory_id_pool_rx_pipe
-			for i := range t.rx_pipe_regs.pipe_counter {
-				for j := range t.rx_pipe_regs.pipe_counter[i].eviction_control {
-					t.rx_pipe_regs.pipe_counter[i].set(c, BlockRxPipe, pipe, mem_id, j)
+			for i := range t.rx_pipe_controller.pipe_counter {
+				for j := range t.rx_pipe_controller.pipe_counter[i].eviction_control {
+					t.rx_pipe_controller.pipe_counter[i].set(c, BlockRxPipe, pipe, mem_id, j)
 					mem_id++
 				}
 			}
 
 			// Tx pipe counters.
-			t.tx_pipe_regs.perq_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_tx_pipe_perq_pool)
-			t.tx_pipe_regs.txf_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_tx_pipe_txf_pool)
-			for i := range t.tx_pipe_regs.pipe_counter.eviction_control {
-				t.tx_pipe_regs.pipe_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_pool_tx_pipe+i, i)
+			t.tx_pipe_controller.perq_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_tx_pipe_perq_pool)
+			t.tx_pipe_controller.txf_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_tx_pipe_txf_pool)
+			for i := range t.tx_pipe_controller.pipe_counter.eviction_control {
+				t.tx_pipe_controller.pipe_counter.set(c, BlockTxPipe, pipe, pipe_counter_memory_id_pool_tx_pipe+i, i)
 			}
 		}
 		q.Do()
@@ -246,14 +246,14 @@ func (t *fe1a) pipe_counter_init() {
 	// Enable all counters and set to clear on read.
 	{
 		const v uint32 = pipe_counter_control_enable | pipe_counter_control_clear_on_read
-		t.tx_pipe_regs.perq_counter.control.set(q, BlockTxPipe, v)
-		t.tx_pipe_regs.txf_counter.control.set(q, BlockTxPipe, v)
-		for i := range t.tx_pipe_regs.pipe_counter.control {
-			t.tx_pipe_regs.pipe_counter.control[i].set(q, BlockTxPipe, v)
+		t.tx_pipe_controller.perq_counter.control.set(q, BlockTxPipe, v)
+		t.tx_pipe_controller.txf_counter.control.set(q, BlockTxPipe, v)
+		for i := range t.tx_pipe_controller.pipe_counter.control {
+			t.tx_pipe_controller.pipe_counter.control[i].set(q, BlockTxPipe, v)
 		}
-		for i := range t.rx_pipe_regs.pipe_counter {
-			for j := range t.rx_pipe_regs.pipe_counter[i].control {
-				t.rx_pipe_regs.pipe_counter[i].control[j].set(q, BlockRxPipe, v)
+		for i := range t.rx_pipe_controller.pipe_counter {
+			for j := range t.rx_pipe_controller.pipe_counter[i].control {
+				t.rx_pipe_controller.pipe_counter[i].control[j].set(q, BlockRxPipe, v)
 			}
 		}
 		q.Do()

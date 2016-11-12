@@ -76,7 +76,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 	{
 		var v [n_rx_counters]uint64
 		for i := range rx_counter_names {
-			t.rx_pipe_regs.counters[i][pipe_port].geta(q, sbus.AddressSplit, &v[i])
+			t.rx_pipe_controller.counters[i][pipe_port].geta(q, sbus.AddressSplit, &v[i])
 		}
 		q.Do()
 		for i := range rx_counter_names {
@@ -100,7 +100,7 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 	{
 		var v [n_tx_counters]uint64
 		for i := range tx_counter_names {
-			t.tx_pipe_regs.counters[i][pipe_port].geta(q, sbus.AddressSplit, &v[i])
+			t.tx_pipe_controller.counters[i][pipe_port].geta(q, sbus.AddressSplit, &v[i])
 		}
 		q.Do()
 		for i := range tx_counter_names {
@@ -171,9 +171,9 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 			i = (mmu_rx_pipe + 1) & 1
 		}
 		for x := 0; x < 2; x++ {
-			t.mmu_xpe_mems.rx_drops[xpe+x].entries[i][mmu_port].get(q, &v[x])
+			t.mmu_pipe_mems.rx_drops[xpe+x].entries[i][mmu_port].get(q, &v[x])
 			// clear on read
-			t.mmu_xpe_mems.rx_drops[xpe+x].entries[i][mmu_port].set(q, &zero)
+			t.mmu_pipe_mems.rx_drops[xpe+x].entries[i][mmu_port].set(q, &zero)
 		}
 		q.Do()
 		(cm.mmu_rx_drops_kind + 0).Add64(th, hi, v[0].Packets+v[1].Packets)
@@ -197,19 +197,19 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 				xpe := uint(baseXpe + 2*x)
 				for txq := 0; txq < mmu_n_tx_queues; txq++ {
 					if cast == m.Unicast {
-						t.mmu_xpe_mems.unicast_tx_drops[mmu_tx_pipe].entries[mmu_port][txq].get(q, xpe, &v[cast][txq][x])
-						t.mmu_xpe_mems.unicast_tx_drops[mmu_tx_pipe].entries[mmu_port][txq].set(q, xpe, &zero)
+						t.mmu_pipe_mems.unicast_tx_drops[mmu_tx_pipe].entries[mmu_port][txq].get(q, xpe, &v[cast][txq][x])
+						t.mmu_pipe_mems.unicast_tx_drops[mmu_tx_pipe].entries[mmu_port][txq].set(q, xpe, &zero)
 					} else {
 						switch {
 						case mmu_port < n_mmu_data_port:
-							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].ports[mmu_port][txq].get(q, xpe, &v[cast][txq][x])
-							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].ports[mmu_port][txq].set(q, xpe, &zero)
+							t.mmu_pipe_mems.multicast_tx_drops[mmu_tx_pipe].ports[mmu_port][txq].get(q, xpe, &v[cast][txq][x])
+							t.mmu_pipe_mems.multicast_tx_drops[mmu_tx_pipe].ports[mmu_port][txq].set(q, xpe, &zero)
 						case mmu_port == rx_pipe_mmu_port_loopback:
-							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].loopback[txq].get(q, xpe, &v[cast][txq][x])
-							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].loopback[txq].set(q, xpe, &zero)
+							t.mmu_pipe_mems.multicast_tx_drops[mmu_tx_pipe].loopback[txq].get(q, xpe, &v[cast][txq][x])
+							t.mmu_pipe_mems.multicast_tx_drops[mmu_tx_pipe].loopback[txq].set(q, xpe, &zero)
 						case mmu_port == rx_pipe_mmu_port_any_pipe_cpu_or_management:
-							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].cpu[txq].get(q, xpe, &v[cast][txq][x])
-							t.mmu_xpe_mems.multicast_tx_drops[mmu_tx_pipe].cpu[txq].set(q, xpe, &zero)
+							t.mmu_pipe_mems.multicast_tx_drops[mmu_tx_pipe].cpu[txq].get(q, xpe, &v[cast][txq][x])
+							t.mmu_pipe_mems.multicast_tx_drops[mmu_tx_pipe].cpu[txq].set(q, xpe, &zero)
 						}
 					}
 				}
@@ -239,12 +239,12 @@ func (t *fe1a) get_port_counters(p *Port, th *vnet.InterfaceThread) {
 			xpe := uint(baseXpe + 2*x)
 			for txq := 0; txq < mmu_n_tx_queues; txq++ {
 				if mmu_port < n_mmu_data_port {
-					t.mmu_xpe_mems.wred_drops[mmu_tx_pipe].data_port_entries[mmu_port][txq].get(q, xpe, &v[txq][x])
-					t.mmu_xpe_mems.wred_drops[mmu_tx_pipe].data_port_entries[mmu_port][txq].set(q, xpe, &zero)
+					t.mmu_pipe_mems.wred_drops[mmu_tx_pipe].data_port_entries[mmu_port][txq].get(q, xpe, &v[txq][x])
+					t.mmu_pipe_mems.wred_drops[mmu_tx_pipe].data_port_entries[mmu_port][txq].set(q, xpe, &zero)
 				} else if txq < mmu_n_tx_cos_queues {
 					i := mmu_port - n_mmu_data_port
-					t.mmu_xpe_mems.wred_drops[mmu_tx_pipe].cpu_loopback_port_entries[i][txq].get(q, xpe, &v[txq][x])
-					t.mmu_xpe_mems.wred_drops[mmu_tx_pipe].cpu_loopback_port_entries[i][txq].set(q, xpe, &zero)
+					t.mmu_pipe_mems.wred_drops[mmu_tx_pipe].cpu_loopback_port_entries[i][txq].get(q, xpe, &v[txq][x])
+					t.mmu_pipe_mems.wred_drops[mmu_tx_pipe].cpu_loopback_port_entries[i][txq].set(q, xpe, &zero)
 				}
 			}
 		}
@@ -267,7 +267,7 @@ func (t *fe1a) add_zero_rx_pipe_port_counters_cmd(q *DmaRequest, p pipe_port_num
 			Block:      BlockRxPipe,
 			AccessType: sbus.AddressSplit,
 		},
-		Address: t.rx_pipe_regs.counters[0][p].address(),
+		Address: t.rx_pipe_controller.counters[0][p].address(),
 		Tx:      zero[:],
 		Count:   uint(n_rx_counters),
 		Log2SbusAddressIncrement: m.Log2NPorts,
@@ -298,16 +298,16 @@ func (t *fe1a) rx_pipe_port_counter_init(kind vnet.HwIfCounterKind) vnet.HwIfCou
 
 	for i := range rx {
 		di, mask := rx[i].de/32, uint32(1<<(rx[i].de%32))
-		if i >= len(t.rx_pipe_regs.debug_counter_select[di]) {
+		if i >= len(t.rx_pipe_controller.debug_counter_select[di]) {
 			break
 		}
-		t.rx_pipe_regs.debug_counter_select[di][i].set(q, mask)
+		t.rx_pipe_controller.debug_counter_select[di][i].set(q, mask)
 		all_mask[di] |= mask
 		rx_counter_names[int(rx_debug_0)+i] = rx[i].name
 	}
-	if len(rx) < len(t.rx_pipe_regs.debug_counter_select[0]) {
-		t.rx_pipe_regs.debug_counter_select[0][len(rx)].set(q, ^uint32(0)&^all_mask[0])
-		t.rx_pipe_regs.debug_counter_select[1][len(rx)].set(q, ^uint32(0)&^all_mask[1])
+	if len(rx) < len(t.rx_pipe_controller.debug_counter_select[0]) {
+		t.rx_pipe_controller.debug_counter_select[0][len(rx)].set(q, ^uint32(0)&^all_mask[0])
+		t.rx_pipe_controller.debug_counter_select[1][len(rx)].set(q, ^uint32(0)&^all_mask[1])
 	}
 	q.Do()
 
@@ -360,16 +360,16 @@ func (t *fe1a) tx_pipe_port_counter_init(kind vnet.HwIfCounterKind) vnet.HwIfCou
 			break
 		}
 		if di == 0 {
-			t.tx_pipe_regs.debug_counter_select[i].set(q, mask)
+			t.tx_pipe_controller.debug_counter_select[i].set(q, mask)
 		} else {
-			t.tx_pipe_regs.debug_counter_select_hi[i].set(q, mask)
+			t.tx_pipe_controller.debug_counter_select_hi[i].set(q, mask)
 		}
 		all_mask[di] |= mask
 		tx_counter_names[int(tx_debug_0)+i] = tx[i].name
 	}
-	if len(tx) < len(t.tx_pipe_regs.debug_counter_select) {
-		t.tx_pipe_regs.debug_counter_select[len(tx)].set(q, ^uint32(0)&^all_mask[0])
-		t.tx_pipe_regs.debug_counter_select_hi[len(tx)].set(q, ^uint32(0)&^all_mask[1])
+	if len(tx) < len(t.tx_pipe_controller.debug_counter_select) {
+		t.tx_pipe_controller.debug_counter_select[len(tx)].set(q, ^uint32(0)&^all_mask[0])
+		t.tx_pipe_controller.debug_counter_select_hi[len(tx)].set(q, ^uint32(0)&^all_mask[1])
 	}
 	q.Do()
 

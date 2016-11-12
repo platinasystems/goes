@@ -20,9 +20,9 @@ func (t *fe1a) mmu_init() {
 	{
 		enter := uint32(mmu_n_cells_per_xpe - mmu_reserved_cfap_cells)
 		exit := enter - 2*uint32(max_packet_cells)
-		for xpe := 0; xpe < n_mmu_xpe; xpe++ {
-			t.mmu_sc_regs.cfap.enter_full_threshold[xpe].set(q, mmuBaseTypeXpe, sbus.Single, enter)
-			t.mmu_sc_regs.cfap.exit_full_threshold[xpe].set(q, mmuBaseTypeXpe, sbus.Single, exit)
+		for xpe := 0; xpe < n_mmu_pipe; xpe++ {
+			t.mmu_slice_controller.cfap.enter_full_threshold[xpe].set(q, mmuBaseTypeXpe, sbus.Single, enter)
+			t.mmu_slice_controller.cfap.exit_full_threshold[xpe].set(q, mmuBaseTypeXpe, sbus.Single, exit)
 		}
 		q.Do()
 	}
@@ -44,7 +44,7 @@ func (t *fe1a) mmu_init() {
 		}
 		for p := 0; p < n_mmu_port; p++ {
 			for i := 0; i < 2; i++ {
-				t.mmu_xpe_regs.rx_admission_control.port_priority_group[i][p].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v[i])
+				t.mmu_pipe_regs.rx_admission_control.port_priority_group[i][p].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v[i])
 			}
 		}
 		q.Do()
@@ -55,11 +55,11 @@ func (t *fe1a) mmu_init() {
 	{
 		// Allow headroom for 1 max packet cells.
 		for p := 0; p < n_pipe; p++ {
-			t.mmu_xpe_regs.rx_admission_control.global_headroom_limit[p].set(q, mmuBaseTypeRxPipe, sbus.Duplicate, uint32(global_headroom_cells))
+			t.mmu_pipe_regs.rx_admission_control.global_headroom_limit[p].set(q, mmuBaseTypeRxPipe, sbus.Duplicate, uint32(global_headroom_cells))
 		}
 
 		// Subtract one since first cell of packet is never stored in global headroom.
-		t.mmu_xpe_regs.rx_admission_control.max_packet_cells.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(max_packet_cells-1))
+		t.mmu_pipe_regs.rx_admission_control.max_packet_cells.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(max_packet_cells-1))
 		q.Do()
 	}
 
@@ -101,7 +101,7 @@ func (t *fe1a) mmu_init() {
 		for pgi := range pgs {
 			for port := 0; port < n_mmu_port; port++ {
 				for pipe := uint(0); pipe < n_rx_pipe; pipe++ {
-					t.mmu_xpe_mems.rx_admission_control.port_priority_group_config[pipe].entries[port][pgi].set(q, &pgs[pgi])
+					t.mmu_pipe_mems.rx_admission_control.port_priority_group_config[pipe].entries[port][pgi].set(q, &pgs[pgi])
 				}
 			}
 		}
@@ -124,13 +124,13 @@ func (t *fe1a) mmu_init() {
 			p := &rx_service_pools[pi]
 			for layer := 0; layer < n_mmu_layer; layer++ {
 				// Packets dropped when limit is reached.  Drop state is released at limit - reset offset.
-				t.mmu_xpe_regs.rx_admission_control.service_pool_shared_cell_limit[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(p.limit))
-				t.mmu_xpe_regs.rx_admission_control.service_pool_cell_reset_limit_offset[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(16))
+				t.mmu_pipe_regs.rx_admission_control.service_pool_shared_cell_limit[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(p.limit))
+				t.mmu_pipe_regs.rx_admission_control.service_pool_cell_reset_limit_offset[pi][layer].set(q, mmuBaseTypeLayer, sbus.Duplicate, uint32(16))
 			}
 
 			for port := 0; port < n_mmu_port; port++ {
 				for pipe := uint(0); pipe < n_rx_pipe; pipe++ {
-					t.mmu_xpe_mems.rx_admission_control.port_service_pool_config[pipe].entries[port][pi].set(q, p)
+					t.mmu_pipe_mems.rx_admission_control.port_service_pool_config[pipe].entries[port][pi].set(q, p)
 				}
 			}
 		}
@@ -144,20 +144,20 @@ func (t *fe1a) mmu_init() {
 				mmuPort := phys.toGlobalMmu(t)
 				// Input port rx enable; no pause frames or priority xon enabled.
 				const v = 1 << 17
-				t.mmu_xpe_regs.rx_admission_control.port_rx_and_pause_enable[mmuPort].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v)
+				t.mmu_pipe_regs.rx_admission_control.port_rx_and_pause_enable[mmuPort].set(q, mmuBaseTypeRxPort, sbus.Duplicate, v)
 			}
 		}
 		q.Do()
 	}
 
 	// Egress service pools apply to both unicast & multicast.
-	t.mmu_xpe_regs.multicast_admission_control.db.service_pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
-	t.mmu_xpe_regs.multicast_admission_control.mcqe.pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, mmu_n_mcqe/4-1)
-	t.mmu_xpe_regs.db.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
-	t.mmu_xpe_regs.qe.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
-	for i := range t.mmu_xpe_regs.db.config_1 {
-		t.mmu_xpe_regs.db.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
-		t.mmu_xpe_regs.qe.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
+	t.mmu_pipe_regs.multicast_admission_control.db.service_pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
+	t.mmu_pipe_regs.multicast_admission_control.mcqe.pool_shared_limit[0].set(q, mmuBaseTypeChip, sbus.Duplicate, mmu_n_mcqe/4-1)
+	t.mmu_pipe_regs.db.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
+	t.mmu_pipe_regs.qe.service_pool_config[0].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
+	for i := range t.mmu_pipe_regs.db.config_1 {
+		t.mmu_pipe_regs.db.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, rx_pool_shared_limit)
+		t.mmu_pipe_regs.qe.config_1[i].set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(mmu_n_rqe)/8-1)
 	}
 	q.Do()
 
@@ -167,9 +167,9 @@ func (t *fe1a) mmu_init() {
 			mop_policy_1b                 = 1 << 1
 			mop_policy                    = 1 << 0
 		)
-		t.mmu_xpe_regs.tx_admission_control.config.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(enable_queue_and_group_ticket|mop_policy_1b))
-		t.mmu_xpe_regs.multicast_admission_control.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, mop_policy)
-		t.mmu_xpe_regs.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, (1<<2)|mop_policy_1b)
+		t.mmu_pipe_regs.tx_admission_control.config.set(q, mmuBaseTypeChip, sbus.Duplicate, uint32(enable_queue_and_group_ticket|mop_policy_1b))
+		t.mmu_pipe_regs.multicast_admission_control.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, mop_policy)
+		t.mmu_pipe_regs.db.config.set(q, mmuBaseTypeChip, sbus.Duplicate, (1<<2)|mop_policy_1b)
 		q.Do()
 	}
 
@@ -184,7 +184,7 @@ func (t *fe1a) mmu_init() {
 					yellow_limit: y,
 					red_limit:    y,
 				}
-				t.mmu_xpe_mems.tx_admission_control.service_pool_config[pipe].entries[port][pi].set(q, &x)
+				t.mmu_pipe_mems.tx_admission_control.service_pool_config[pipe].entries[port][pi].set(q, &x)
 
 				l := mmu_8cell_count((p.limit - p.resume_limit) / 8)
 
@@ -193,7 +193,7 @@ func (t *fe1a) mmu_init() {
 					yellow: l,
 					red:    l,
 				}
-				t.mmu_xpe_mems.tx_admission_control.resume_config[pipe].entries[port][pi].set(q, &r)
+				t.mmu_pipe_mems.tx_admission_control.resume_config[pipe].entries[port][pi].set(q, &r)
 			}
 		}
 	}
@@ -212,8 +212,8 @@ func (t *fe1a) mmu_init() {
 
 		for port := 0; port < n_mmu_port; port++ {
 			for pipe := uint(0); pipe < n_tx_pipe; pipe++ {
-				t.mmu_xpe_mems.multicast_admission_control.db_port_service_pool_config[pipe].ports[port][0].set(q, &e)
-				t.mmu_xpe_mems.multicast_admission_control.mcqe_port_service_pool_config[pipe].ports[port][0].set(q, &f)
+				t.mmu_pipe_mems.multicast_admission_control.db_port_service_pool_config[pipe].ports[port][0].set(q, &e)
+				t.mmu_pipe_mems.multicast_admission_control.mcqe_port_service_pool_config[pipe].ports[port][0].set(q, &f)
 			}
 		}
 		q.Do()
@@ -229,10 +229,10 @@ func (t *fe1a) mmu_init() {
 		for pipe := uint(0); pipe < n_tx_pipe; pipe++ {
 			for qi := range queue_configs {
 				for port := 0; port < n_mmu_data_port; port++ {
-					t.mmu_xpe_mems.tx_admission_control.queue_config[pipe].data_port_entries[port][qi].set(q, &queue_configs[qi])
+					t.mmu_pipe_mems.tx_admission_control.queue_config[pipe].data_port_entries[port][qi].set(q, &queue_configs[qi])
 				}
 				for port := 0; port < 2; port++ {
-					t.mmu_xpe_mems.tx_admission_control.queue_config[pipe].cpu_loopback_port_entries[port][qi].set(q, &queue_configs[qi])
+					t.mmu_pipe_mems.tx_admission_control.queue_config[pipe].cpu_loopback_port_entries[port][qi].set(q, &queue_configs[qi])
 				}
 			}
 		}
@@ -244,14 +244,14 @@ func (t *fe1a) mmu_init() {
 		for pipe := uint(0); pipe < n_tx_pipe; pipe++ {
 			for tq := 0; tq < mmu_n_tx_queues; tq++ {
 				for port := 0; port < n_mmu_data_port; port++ {
-					t.mmu_sc_mems.queue_scheduler.l1_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
-					t.mmu_sc_mems.queue_scheduler.l1_weight[pipe].multicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+					t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+					t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].multicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
 				}
-				t.mmu_sc_mems.queue_scheduler.l1_weight[pipe].unicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
-				t.mmu_sc_mems.queue_scheduler.l1_weight[pipe].multicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
-				t.mmu_sc_mems.queue_scheduler.l1_weight[pipe].unicast_loopback[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].multicast_cpu_management[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+				t.mmu_slice_mems.queue_scheduler.l1_weight[pipe].unicast_loopback[tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
 				for port := 0; port < n_mmu_port; port++ {
-					t.mmu_sc_mems.queue_scheduler.l0_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
+					t.mmu_slice_mems.queue_scheduler.l0_weight[pipe].unicast[port][tq].Seta(&q.DmaRequest, BlockMmuSc, sbus.Single, mmuBaseTypeTxPipe, weight)
 				}
 			}
 			q.Do()
@@ -262,12 +262,12 @@ func (t *fe1a) mmu_init() {
 		// Set undocumented a/c fields
 		for pipe := uint(0); pipe < n_tx_pipe; pipe++ {
 			var v uint32
-			t.mmu_sc_regs.mmu_1dbg_c[pipe].get(q, mmuBaseTypeTxPipe, sbus.Single, &v)
+			t.mmu_slice_controller.mmu_1dbg_c[pipe].get(q, mmuBaseTypeTxPipe, sbus.Single, &v)
 			q.Do()
 
 			v |= 1 << 0
-			t.mmu_sc_regs.mmu_1dbg_c[pipe].set(q, mmuBaseTypeTxPipe, sbus.Single, v)
-			t.mmu_sc_regs.mmu_1dbg_a[pipe].set(q, mmuBaseTypeTxPipe, sbus.Single, ^uint32(0))
+			t.mmu_slice_controller.mmu_1dbg_c[pipe].set(q, mmuBaseTypeTxPipe, sbus.Single, v)
+			t.mmu_slice_controller.mmu_1dbg_a[pipe].set(q, mmuBaseTypeTxPipe, sbus.Single, ^uint32(0))
 			q.Do()
 		}
 	}
@@ -290,7 +290,7 @@ func (t *fe1a) mmu_init() {
 			v += uint32(rand.Intn(20))
 			i := p.physical_port_number.toGlobalMmu(t)
 			if (i & 0x3f) != 32 { // cpu/management ports cause crash.
-				t.mmu_sc_regs.mmu_dbg_c[2][i].set(q, mmuBaseTypeTxPort, sbus.Single, v)
+				t.mmu_slice_controller.mmu_dbg_c[2][i].set(q, mmuBaseTypeTxPort, sbus.Single, v)
 			}
 		}
 		q.Do()
@@ -307,11 +307,11 @@ func (t *fe1a) mmu_init() {
 		}
 		for p := uint(0); p < n_tx_pipe; p++ {
 			xpeMask := tx_pipe_xpe_mask(p)
-			for xpe := uint(0); xpe < n_mmu_xpe; xpe++ {
+			for xpe := uint(0); xpe < n_mmu_pipe; xpe++ {
 				if xpeMask&(1<<xpe) != 0 {
-					t.mmu_xpe_regs.tx_admission_control.tx_port_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
-					t.mmu_xpe_regs.multicast_admission_control.db.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
-					t.mmu_xpe_regs.multicast_admission_control.mcqe.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
+					t.mmu_pipe_regs.tx_admission_control.tx_port_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
+					t.mmu_pipe_regs.multicast_admission_control.db.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
+					t.mmu_pipe_regs.multicast_admission_control.mcqe.port_tx_enable[p].set(q, mmuBaseTypeTxPipe, sbus.Unique(xpe), v[p])
 				}
 			}
 		}
@@ -319,7 +319,7 @@ func (t *fe1a) mmu_init() {
 	}
 
 	if false {
-		t.mmu_xpe_regs.tx_admission_control.bypass.set(q, mmuBaseTypeChip, sbus.Duplicate, 1)
+		t.mmu_pipe_regs.tx_admission_control.bypass.set(q, mmuBaseTypeChip, sbus.Duplicate, 1)
 		q.Do()
 	}
 }
@@ -401,10 +401,10 @@ func (t *fe1a) set_cell_assembly_cut_through_threshold(q *DmaRequest, p physical
 	port_block_index := 8*pipe + i0
 	obm := obm_for_port_block_index(port_block_index)
 	var v uint32
-	t.rx_pipe_regs.over_subscription_buffer[obm].cell_assembly_cut_through_control.geta(q, sbus.Unique(pipe), &v)
+	t.rx_pipe_controller.over_subscription_buffer[obm].cell_assembly_cut_through_control.geta(q, sbus.Unique(pipe), &v)
 	q.Do()
 	v = (v &^ (3 << (20 + 2*i1))) | (uint32(i1) << (20 + 2*i1))
 	v = (v &^ (0x1f << (0 + 5*i1))) | ((uint32(thresh) & 0x1f) << (0 + 5*i1))
-	t.rx_pipe_regs.over_subscription_buffer[obm].cell_assembly_cut_through_control.seta(q, sbus.Unique(pipe), v)
+	t.rx_pipe_controller.over_subscription_buffer[obm].cell_assembly_cut_through_control.seta(q, sbus.Unique(pipe), v)
 	q.Do()
 }

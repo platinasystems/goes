@@ -52,7 +52,7 @@ type tMon struct {
 //Read temp sensors
 func (m *Temperature) get(t *fe1a, i int) {
 	q := t.getDmaReq()
-	data := t.top_regs.temperature_sensor.current[i].getDo(q)
+	data := t.top_controller.temperature_sensor.current[i].getDo(q)
 	m.current = float64((4100400 - (4870 * (data & 0x3FF))) / 10000.)
 	m.max = float64((4100400 - (4870 * ((data >> 12) & 0x3FF))) / 10000.)
 	m.min = float64((4100400 - (4870 * ((data >> 22) & 0x3FF))) / 10000.)
@@ -63,9 +63,9 @@ func (m *Temperature) get(t *fe1a, i int) {
 func (t *fe1a) resetTemp() {
 	q := t.getDmaReq()
 	const tmon_reset = (1 << 18) | (1 << 19)
-	v := t.top_regs.soft_reset[1].getDo(q)
-	t.top_regs.soft_reset[1].set(q, v&^tmon_reset)
-	t.top_regs.soft_reset[1].set(q, v|tmon_reset)
+	v := t.top_controller.soft_reset[1].getDo(q)
+	t.top_controller.soft_reset[1].set(q, v&^tmon_reset)
+	t.top_controller.soft_reset[1].set(q, v|tmon_reset)
 	q.Do()
 	return
 }
@@ -80,9 +80,9 @@ func (t *fe1a) tmon_init() {
 	}
 
 	const BG_ADJF = 0x7
-	v := t.top_regs.temperature_sensor.control[0].getDo(q)
+	v := t.top_controller.temperature_sensor.control[0].getDo(q)
 	// set BG_ADJF to 0
-	t.top_regs.temperature_sensor.control[0].set(q, v&^BG_ADJF)
+	t.top_controller.temperature_sensor.control[0].set(q, v&^BG_ADJF)
 	q.Do()
 
 	//reset min max tracking
@@ -91,8 +91,8 @@ func (t *fe1a) tmon_init() {
 	//setup max temp interrupt threshold to 125°C on all sensors
 	const maxDegC = 125
 	const maxTempThresh = (410040 - (maxDegC * 1000)) / 478
-	for i := range t.top_regs.temperature_sensor_interrupt.thresholds {
-		t.top_regs.temperature_sensor_interrupt.thresholds[i].set(q, (maxTempThresh<<10)|0x3ff)
+	for i := range t.top_controller.temperature_sensor_interrupt.thresholds {
+		t.top_controller.temperature_sensor_interrupt.thresholds[i].set(q, (maxTempThresh<<10)|0x3ff)
 		q.Do()
 		// sensor 8 is unused
 		if i == 7 {
@@ -101,7 +101,7 @@ func (t *fe1a) tmon_init() {
 	}
 
 	// enable max temp interrupt for sensor 6
-	t.top_regs.temperature_sensor_interrupt.enable.set(q, 0x00002000)
+	t.top_controller.temperature_sensor_interrupt.enable.set(q, 0x00002000)
 	q.Do()
 
 	return

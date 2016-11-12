@@ -124,12 +124,12 @@ func (ss *switchSelect) show_rx_tx_pipe_debug_events(c cli.Commander, w cli.Writ
 				r [1]uint32
 			)
 			for i := range v {
-				t.rx_pipe_regs.event_debug[i].geta(q, sbus.Unique(pipe), &v[i])
-				t.rx_pipe_regs.event_debug[i].seta(q, sbus.Unique(pipe), 0)
+				t.rx_pipe_controller.event_debug[i].geta(q, sbus.Unique(pipe), &v[i])
+				t.rx_pipe_controller.event_debug[i].seta(q, sbus.Unique(pipe), 0)
 			}
 			for i := range r {
-				t.tx_pipe_regs.event_debug.geta(q, sbus.Unique(pipe), &r[i])
-				t.tx_pipe_regs.event_debug.seta(q, sbus.Unique(pipe), 0)
+				t.tx_pipe_controller.event_debug.geta(q, sbus.Unique(pipe), &r[i])
+				t.tx_pipe_controller.event_debug.seta(q, sbus.Unique(pipe), 0)
 			}
 			q.Do()
 

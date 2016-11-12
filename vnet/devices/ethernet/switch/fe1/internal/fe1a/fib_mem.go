@@ -769,7 +769,7 @@ func (r *l3_ip4_entry_mem) get(q *DmaRequest, v *l3_ip4_entry) { r.geta(q, v, sb
 func (r *l3_ip4_entry_mem) set(q *DmaRequest, v *l3_ip4_entry) { r.seta(q, v, sbus.Duplicate) }
 
 func (t *fe1a) shared_lookup_sram_init() {
-	r := t.rx_pipe_regs
+	r := t.rx_pipe_controller
 	q := t.getDmaReq()
 
 	// Bypass iss memory lp.

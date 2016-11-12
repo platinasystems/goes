@@ -20,7 +20,7 @@ func (t *fe1a) clear_mmu_packet_memory() {
 			for k := 0; k < mmu_n_cells_per_bank; k++ {
 				for bank := 0; bank < mmu_n_banks; bank++ {
 					for xpe := 0; xpe < 4; xpe++ {
-						t.mmu_sc_mems.cbp_data_slices[i].entries[j][bank][xpe][k].set(q, &zero)
+						t.mmu_slice_mems.cbp_data_slices[i].entries[j][bank][xpe][k].set(q, &zero)
 					}
 				}
 				q.Do()
@@ -45,10 +45,10 @@ func (t *fe1a) clear_memories() {
 
 		// Initialize for largest memory size in rx pipe: ip4 fib tcam buckets
 		count := uint32((n_shared_lookup_sram_bits_per_bucket / 70) * n_shared_lookup_sram_buckets_per_bank * n_shared_lookup_sram_banks)
-		t.rx_pipe_regs.rx_buffer.hw_reset_control_1.set(q, rx_pipe_valid|rx_pipe_reset_all|count)
+		t.rx_pipe_controller.rx_buffer.hw_reset_control_1.set(q, rx_pipe_valid|rx_pipe_reset_all|count)
 
 		count = uint32(len(t.tx_pipe_mems.l3_next_hop)) // next hops
-		t.tx_pipe_regs.hw_reset_control_1.set(q, tx_pipe_valid|tx_pipe_reset_all|count)
+		t.tx_pipe_controller.hw_reset_control_1.set(q, tx_pipe_valid|tx_pipe_reset_all|count)
 		q.Do()
 
 		// Wait for rx/tx pipe memory initialize to complete.
@@ -65,10 +65,10 @@ func (t *fe1a) clear_memories() {
 
 			for i := uint(0); i < n_pipe; i++ {
 				if iDone&(1<<i) == 0 {
-					t.rx_pipe_regs.rx_buffer.hw_reset_control_1.geta(q, sbus.Unique(i), &v[i])
+					t.rx_pipe_controller.rx_buffer.hw_reset_control_1.geta(q, sbus.Unique(i), &v[i])
 				}
 				if eDone&(1<<i) == 0 {
-					t.tx_pipe_regs.hw_reset_control_1.geta(q, sbus.Unique(i), &v[n_pipe+i])
+					t.tx_pipe_controller.hw_reset_control_1.geta(q, sbus.Unique(i), &v[n_pipe+i])
 				}
 			}
 
@@ -86,15 +86,15 @@ func (t *fe1a) clear_memories() {
 	}
 
 	// Initialize TDM calendar for rx scheduler.
-	t.rx_pipe_regs.rx_buffer.tdm_calendar_init.set(q, 1)
-	t.rx_pipe_regs.rx_buffer.tdm_calendar_init.set(q, 0)
+	t.rx_pipe_controller.rx_buffer.tdm_calendar_init.set(q, 1)
+	t.rx_pipe_controller.rx_buffer.tdm_calendar_init.set(q, 0)
 	q.Do()
 
 	// Initialize l2 management memories.
 	{
-		t.rx_pipe_regs.l2_management_hw_reset_control[0].seta(q, sbus.Unique0, 0)
+		t.rx_pipe_controller.l2_management_hw_reset_control[0].seta(q, sbus.Unique0, 0)
 		count := uint32(128) // L2 MOD FIFO
-		t.rx_pipe_regs.l2_management_hw_reset_control[1].seta(q, sbus.Unique0, 1<<29|1<<30|count)
+		t.rx_pipe_controller.l2_management_hw_reset_control[1].seta(q, sbus.Unique0, 1<<29|1<<30|count)
 		q.Do()
 
 		// Wait for done bit.
@@ -102,7 +102,7 @@ func (t *fe1a) clear_memories() {
 		for {
 			time.Sleep(200 * time.Microsecond)
 			var v uint32
-			t.rx_pipe_regs.l2_management_hw_reset_control[1].get(q, &v)
+			t.rx_pipe_controller.l2_management_hw_reset_control[1].get(q, &v)
 			q.Do()
 			if v&(1<<31) != 0 {
 				break
@@ -121,8 +121,8 @@ func (t *fe1a) clear_memories() {
 		)
 
 		v := uint32(parity_enable)
-		t.mmu_global_regs.misc_config.set(q, v|init_mem)
-		t.mmu_global_regs.misc_config.set(q, v)
+		t.mmu_global_controller.misc_config.set(q, v|init_mem)
+		t.mmu_global_controller.misc_config.set(q, v)
 		q.Do()
 	}
 
@@ -262,7 +262,7 @@ func (t *fe1a) rx_pipe_buffer_init() {
 		}
 		// Set port mode and reset/unreset cell-assembly logic for all ports.
 		v := port_mode << 4
-		obm_regs := &t.rx_pipe_regs.over_subscription_buffer[obm_index]
+		obm_regs := &t.rx_pipe_controller.over_subscription_buffer[obm_index]
 		acc := sbus.Unique(pb.pipe)
 		obm_regs.cell_assembly_control.seta(q, acc, v|0xf)
 		obm_regs.cell_assembly_control.seta(q, acc, v|0x0)
@@ -347,10 +347,10 @@ func (t *fe1a) rx_pipe_buffer_init() {
 	}
 
 	// Put cpu/loopback cell assembly in reset and release to send initial credit to tx_pipe.
-	t.rx_pipe_regs.rx_buffer.cell_assembly_cpu.control.set(q, 1)
-	t.rx_pipe_regs.rx_buffer.cell_assembly_loopback.control.set(q, 1)
-	t.rx_pipe_regs.rx_buffer.cell_assembly_cpu.control.set(q, 0)
-	t.rx_pipe_regs.rx_buffer.cell_assembly_loopback.control.set(q, 0)
+	t.rx_pipe_controller.rx_buffer.cell_assembly_cpu.control.set(q, 1)
+	t.rx_pipe_controller.rx_buffer.cell_assembly_loopback.control.set(q, 1)
+	t.rx_pipe_controller.rx_buffer.cell_assembly_cpu.control.set(q, 0)
+	t.rx_pipe_controller.rx_buffer.cell_assembly_loopback.control.set(q, 0)
 
 	q.Do()
 }
@@ -392,9 +392,9 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 
 	// MMU refresh clock enable.
 	{
-		v := t.mmu_global_regs.misc_config.getDo(q)
+		v := t.mmu_global_controller.misc_config.getDo(q)
 		v |= 1 << 0
-		t.mmu_global_regs.misc_config.set(q, v)
+		t.mmu_global_controller.misc_config.set(q, v)
 		q.Do()
 	}
 
@@ -404,17 +404,17 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 
 		// l2_entry table: 1k entries x 2 banks
 		// bank0 crc32[15:0] bank1 crc32[31:16]
-		t.rx_pipe_regs.l2_table_hash_control.set(q, 0<<(6*0)|16<<(6*1))
+		t.rx_pipe_controller.l2_table_hash_control.set(q, 0<<(6*0)|16<<(6*1))
 
 		// l3_entry table: 512 entries x 4 banks
 		// banks 6-9
-		t.rx_pipe_regs.l3_table_hash_control.set(q, (9*0)<<(6*0)|(9*1)<<(6*1)|(9*2)<<(6*2)|(9*3)<<(6*3))
+		t.rx_pipe_controller.l3_table_hash_control.set(q, (9*0)<<(6*0)|(9*1)<<(6*1)|(9*2)<<(6*2)|(9*3)<<(6*3))
 
 		// shared iss: 8k entries x 4 banks
 		// banks 2-5
 		v := uint32(0xf << 24) // enable all 4 banks
 		v |= 0<<(6*0) | 6<<(6*1) | 13<<(6*2) | 19<<(6*3)
-		t.rx_pipe_regs.shared_table_hash_control.set(q, v)
+		t.rx_pipe_controller.shared_table_hash_control.set(q, v)
 		q.Do()
 	}
 
@@ -452,10 +452,10 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			}
 		}
 		for slice := range vs {
-			t.mmu_sc_regs.toq_multicast_config_1[slice].set(q, mmuBaseTypeSlice, sbus.Single, vs[slice])
+			t.mmu_slice_controller.toq_multicast_config_1[slice].set(q, mmuBaseTypeSlice, sbus.Single, vs[slice])
 		}
 		// Set MCQE_FULL_THRESHOLD to 0.
-		t.mmu_sc_regs.toq_multicast_config_0.set(q, mmuBaseTypeChip, sbus.Duplicate, 0)
+		t.mmu_slice_controller.toq_multicast_config_0.set(q, mmuBaseTypeChip, sbus.Duplicate, 0)
 		q.Do()
 	}
 
@@ -490,7 +490,7 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			c := uint32(8)
 			v := uint32(a<<0 | b<<10 | c<<24)
 			for tx_pipe := uint(0); tx_pipe < n_tx_pipe; tx_pipe++ {
-				t.tx_pipe_regs.data_buffer_1dbg_a.seta(q, sbus.Unique(tx_pipe), v)
+				t.tx_pipe_controller.data_buffer_1dbg_a.seta(q, sbus.Unique(tx_pipe), v)
 			}
 		}
 		q.Do()
@@ -507,11 +507,11 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			if mmuPort&0x3f < 32 {
 				asf_class := uint32(asf_100g)
 				t.tx_pipe_mems.ip_cut_thru_class[pipePort].Set(&q.DmaRequest, BlockTxPipe, sbus.Duplicate, asf_class)
-				t.mmu_sc_regs.asf_iport_config[mmuPort].set(q, mmuBaseTypeRxPort, sbus.Duplicate, asf_class)
-				t.mmu_sc_regs.asf_credit_threshold_hi[mmuPort].set(q, mmuBaseTypeTxPort, sbus.Single, 0x1b)
+				t.mmu_slice_controller.asf_iport_config[mmuPort].set(q, mmuBaseTypeRxPort, sbus.Duplicate, asf_class)
+				t.mmu_slice_controller.asf_credit_threshold_hi[mmuPort].set(q, mmuBaseTypeTxPort, sbus.Single, 0x1b)
 			}
-			t.mmu_sc_regs.mmu_port_credit[mmuPort].set(q, mmuBaseTypeTxPort, sbus.Single, 1<<16)
-			t.mmu_sc_regs.mmu_port_credit[mmuPort].set(q, mmuBaseTypeTxPort, sbus.Single, 0)
+			t.mmu_slice_controller.mmu_port_credit[mmuPort].set(q, mmuBaseTypeTxPort, sbus.Single, 1<<16)
+			t.mmu_slice_controller.mmu_port_credit[mmuPort].set(q, mmuBaseTypeTxPort, sbus.Single, 0)
 			t.tx_pipe_mems.per_port_buffer_soft_reset[pipePort].Set(&q.DmaRequest, BlockTxPipe, sbus.AddressSplit, 0)
 			t.set_cell_assembly_cut_through_threshold(q, phys, 4)
 		}
@@ -543,7 +543,7 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 
 	// Rx pipe config.
 	{
-		v := t.rx_pipe_regs.rx_config.getDo(q, sbus.Duplicate)
+		v := t.rx_pipe_controller.rx_config.getDo(q, sbus.Duplicate)
 
 		const (
 			apply_mask_on_l2_packets          = 1 << 12
@@ -562,15 +562,15 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 			v |= ignore_hi_gig_header_lag_failover
 		}
 
-		t.rx_pipe_regs.rx_config.set(q, v)
+		t.rx_pipe_controller.rx_config.set(q, v)
 		q.Do()
 	}
 
 	{
-		v := t.tx_pipe_regs.config_1.getDo(q, sbus.Duplicate)
+		v := t.tx_pipe_controller.config_1.getDo(q, sbus.Duplicate)
 		// Enable ring mode
 		v |= uint32(1 << 0)
-		t.tx_pipe_regs.config_1.set(q, v)
+		t.tx_pipe_controller.config_1.set(q, v)
 		q.Do()
 	}
 
@@ -579,7 +579,7 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 		v |= 0 << 3  // disable force vlan translation misses to be untagged.
 		v |= 1 << 11 // enable pri/cfi remarking.
 		for p := pipe_port_number(0); p < n_pipe_ports; p++ {
-			t.tx_pipe_regs.vlan_control_1[p].seta(q, sbus.AddressSplit, v)
+			t.tx_pipe_controller.vlan_control_1[p].seta(q, sbus.AddressSplit, v)
 		}
 		q.Do()
 	}
@@ -599,7 +599,7 @@ func (t *fe1a) port_bitmap_garbage_dump_init() {
 	{
 		v := uint32(512) | (1 << 10)
 		for slice := 0; slice < 2; slice++ {
-			t.mmu_sc_regs.toq_multicast_config_2[slice].set(q, mmuBaseTypeSlice, sbus.Single, v)
+			t.mmu_slice_controller.toq_multicast_config_2[slice].set(q, mmuBaseTypeSlice, sbus.Single, v)
 		}
 	}
 	q.Do()
@@ -650,7 +650,7 @@ func (t *fe1a) tx_pipe_mmu_credits_set() {
 		}
 		if ok {
 			pipePort := physical_port_number(phys).toPipe()
-			t.tx_pipe_regs.mmu_max_cell_credit[pipePort].seta(q, sbus.AddressSplit, v)
+			t.tx_pipe_controller.mmu_max_cell_credit[pipePort].seta(q, sbus.AddressSplit, v)
 		}
 	}
 	q.Do()

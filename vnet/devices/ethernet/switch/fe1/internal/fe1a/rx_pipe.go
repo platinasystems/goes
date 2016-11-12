@@ -73,7 +73,7 @@ const (
 	n_tx_pipe = n_pipe
 )
 
-type rx_pipe_regs struct {
+type rx_pipe_controller struct {
 	// Buffers data from PHY selected by TDM scheduler to cover latency of rx pipe packet processing.
 	rx_buffer struct {
 		monitor_config                            rx_pipe_reg64

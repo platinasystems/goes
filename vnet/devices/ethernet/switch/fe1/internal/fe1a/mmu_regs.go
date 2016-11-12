@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	n_mmu_xpe               = 4
+	n_mmu_pipe              = 4
 	n_mmu_slice_controllers = 2
 	n_mmu_layer             = 2
 	mmu_per_pipe_mem_bytes  = 0x8000
@@ -118,7 +118,7 @@ func (r *mmu_global_preg32) seta(q *DmaRequest, c sbus.AccessType, v uint32) {
 }
 func (r *mmu_global_preg32) set(q *DmaRequest, v uint32) { r.seta(q, sbus.Single, v) }
 
-type mmu_global_regs struct {
+type mmu_global_controller struct {
 	_ [0x08000000 - 0x0]byte
 
 	misc_config mmu_global_reg32
@@ -158,567 +158,567 @@ type mmu_global_regs struct {
 
 type mmu_global_mems struct{}
 
-type mmu_xpe_reg32 [1 << m.Log2NPorts]m.Gu32
+type mmu_pipe_reg32 [1 << m.Log2NPorts]m.Gu32
 
-func (r *mmu_xpe_reg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
+func (r *mmu_pipe_reg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
 	(*m.Gu32)(&r[0]).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
-func (r *mmu_xpe_reg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
+func (r *mmu_pipe_reg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
 	(*m.Gu32)(&r[0]).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_gpreg32 m.Pu32
-type mmu_xpe_xreg32 [1 << m.Log2NPorts]mmu_xpe_gpreg32
+type mmu_pipe_gpreg32 m.Pu32
+type mmu_pipe_xreg32 [1 << m.Log2NPorts]mmu_pipe_gpreg32
 
-func (r *mmu_xpe_gpreg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
+func (r *mmu_pipe_gpreg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
 	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
-func (r *mmu_xpe_gpreg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
+func (r *mmu_pipe_gpreg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
 	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_gpreg64 m.Pu64
-type mmu_xpe_xreg64 [1 << m.Log2NPorts]mmu_xpe_gpreg64
+type mmu_pipe_gpreg64 m.Pu64
+type mmu_pipe_xreg64 [1 << m.Log2NPorts]mmu_pipe_gpreg64
 
-func (r *mmu_xpe_gpreg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
+func (r *mmu_pipe_gpreg64) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint64) {
 	(*m.Pu64)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
-func (r *mmu_xpe_gpreg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
+func (r *mmu_pipe_gpreg64) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint64) {
 	(*m.Pu64)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_preg32 m.Pu32
-type mmu_xpe_portreg32 [1 << m.Log2NPorts]mmu_xpe_preg32
+type mmu_pipe_preg32 m.Pu32
+type mmu_pipe_portreg32 [1 << m.Log2NPorts]mmu_pipe_preg32
 
-func (r *mmu_xpe_preg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
+func (r *mmu_pipe_preg32) get(q *DmaRequest, a sbus.Address, c sbus.AccessType, v *uint32) {
 	(*m.Pu32)(r).Get(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
-func (r *mmu_xpe_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
+func (r *mmu_pipe_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v uint32) {
 	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuXpe, c, v)
 }
 
-type mmu_xpe_regs struct {
+type mmu_pipe_regs struct {
 	_ [0x08000000 - 0x0]byte
 
 	rx_admission_control struct {
-		port_rx_and_pause_enable mmu_xpe_portreg32
+		port_rx_and_pause_enable mmu_pipe_portreg32
 
 		_ [0x7 - 0x1]m.U32
 
-		global_headroom_limit mmu_xpe_xreg32
+		global_headroom_limit mmu_pipe_xreg32
 
 		_ [0x22 - 0x8]m.U32
 
-		max_packet_cells mmu_xpe_reg32
+		max_packet_cells mmu_pipe_reg32
 
 		_ [0x70 - 0x23]m.U32
 
-		port_priority_group [2]mmu_xpe_portreg32
+		port_priority_group [2]mmu_pipe_portreg32
 
 		_ [0x73 - 0x72]m.U32
 
-		port_service_pool_for_priority_group mmu_xpe_portreg32
+		port_service_pool_for_priority_group mmu_pipe_portreg32
 
-		port_headroom_pool_for_priority_group mmu_xpe_portreg32
+		port_headroom_pool_for_priority_group mmu_pipe_portreg32
 
 		_ [0x7b - 0x75]m.U32
 
-		global_headroom_cells_in_use          mmu_xpe_xreg32
-		global_headroom_reserved_cells_in_use mmu_xpe_xreg32
+		global_headroom_cells_in_use          mmu_pipe_xreg32
+		global_headroom_reserved_cells_in_use mmu_pipe_xreg32
 
 		_ [0x100 - 0x7d]m.U32
 
-		service_pool_n_shared_cells_in_use [n_mmu_service_pool_plus_public]mmu_xpe_xreg32
+		service_pool_n_shared_cells_in_use [n_mmu_service_pool_plus_public]mmu_pipe_xreg32
 
 		_ [0x10a - 0x105]m.U32
 
-		service_pool_shared_cell_limit [n_mmu_service_pool_plus_public]mmu_xpe_xreg32
+		service_pool_shared_cell_limit [n_mmu_service_pool_plus_public]mmu_pipe_xreg32
 
 		_ [0x114 - 0x10f]m.U32
 
-		service_pool_cell_reset_limit_offset [n_mmu_service_pool]mmu_xpe_xreg32
+		service_pool_cell_reset_limit_offset [n_mmu_service_pool]mmu_pipe_xreg32
 
 		_ [0x11c - 0x118]m.U32
 
-		cell_spap_yellow_offset [n_mmu_service_pool]mmu_xpe_xreg32
-		cell_spap_red_offset    [n_mmu_service_pool]mmu_xpe_xreg32
+		cell_spap_yellow_offset [n_mmu_service_pool]mmu_pipe_xreg32
+		cell_spap_red_offset    [n_mmu_service_pool]mmu_pipe_xreg32
 
 		_ [0x131 - 0x124]m.U32
 
-		service_pool_config mmu_xpe_xreg32
+		service_pool_config mmu_pipe_xreg32
 
 		_ [0x134 - 0x132]m.U32
 
-		port_limit_states mmu_xpe_portreg32
+		port_limit_states mmu_pipe_portreg32
 
 		_ [0x138 - 0x135]m.U32
 
-		priority_group_xoff_status mmu_xpe_portreg32
+		priority_group_xoff_status mmu_pipe_portreg32
 
-		pool_drop_state mmu_xpe_xreg32
+		pool_drop_state mmu_pipe_xreg32
 
 		_ [0x140 - 0x13a]m.U32
 
-		headroom_pool_peak_count_update_enable mmu_xpe_xreg32
+		headroom_pool_peak_count_update_enable mmu_pipe_xreg32
 
-		headroom_pool_status mmu_xpe_xreg32
+		headroom_pool_status mmu_pipe_xreg32
 
 		_ [0x150 - 0x142]m.U32
 
-		headroom_pool_n_cells_in_use [4]mmu_xpe_xreg32
+		headroom_pool_n_cells_in_use [4]mmu_pipe_xreg32
 
-		headroom_pool_cell_limit [4]mmu_xpe_xreg32
+		headroom_pool_cell_limit [4]mmu_pipe_xreg32
 
-		headroom_pool_peak_cell_count [4]mmu_xpe_xreg32
+		headroom_pool_peak_cell_count [4]mmu_pipe_xreg32
 
 		_ [0x170 - 0x15c]m.U32
 
 		buffer_stats_tracking struct {
-			priority_group_shared_cell_threshold   [8]mmu_xpe_reg32
-			priority_group_headroom_cell_threshold [8]mmu_xpe_reg32
-			service_pool_shared_cell_threshold     [8]mmu_xpe_reg32
+			priority_group_shared_cell_threshold   [8]mmu_pipe_reg32
+			priority_group_headroom_cell_threshold [8]mmu_pipe_reg32
+			service_pool_shared_cell_threshold     [8]mmu_pipe_reg32
 
 			_ [0x190 - 0x188]m.U32
 
-			service_pool_global_shared_cells [n_mmu_service_pool_plus_public]mmu_xpe_reg32
+			service_pool_global_shared_cells [n_mmu_service_pool_plus_public]mmu_pipe_reg32
 
-			_ [8 - n_mmu_service_pool_plus_public]mmu_xpe_reg32
+			_ [8 - n_mmu_service_pool_plus_public]mmu_pipe_reg32
 
-			service_pool_global_shared_cell_threshold [8]mmu_xpe_xreg32
+			service_pool_global_shared_cell_threshold [8]mmu_pipe_xreg32
 
-			trigger_status_type mmu_xpe_xreg32
+			trigger_status_type mmu_pipe_xreg32
 
-			trigger_status mmu_xpe_xreg32
+			trigger_status mmu_pipe_xreg32
 		}
 	}
 
 	_ [0x10002b00 - 0x0801a200]byte
 
-	cut_through_purge_count mmu_xpe_xreg32
+	cut_through_purge_count mmu_pipe_xreg32
 
 	_ [0x14001000 - 0x10002c00]byte
 
-	ccp_status mmu_xpe_xreg32
+	ccp_status mmu_pipe_xreg32
 
 	_ [0x20000000 - 0x14001100]byte
 
-	time_domain [4]mmu_xpe_reg32
+	time_domain [4]mmu_pipe_reg32
 
 	_ [0x6 - 0x4]m.U32
 
-	wred_refresh_control mmu_xpe_reg32
+	wred_refresh_control mmu_pipe_reg32
 
-	wred_congestion_notification_resolution_table [4]mmu_xpe_reg32
+	wred_congestion_notification_resolution_table [4]mmu_pipe_reg32
 
-	wred_pool_congestion_limit [4]mmu_xpe_reg32
+	wred_pool_congestion_limit [4]mmu_pipe_reg32
 
 	_ [0x24000000 - 0x20000f00]byte
 
 	pqe [2]struct {
-		fifo_empty_port_bitmap [2]mmu_xpe_xreg32
+		fifo_empty_port_bitmap [2]mmu_pipe_xreg32
 
-		fifo_overflow_port_bitmap [2]mmu_xpe_xreg32
+		fifo_overflow_port_bitmap [2]mmu_pipe_xreg32
 
 		_ [0x5 - 0x4]m.U32
 
-		fifo_pointer_equal_bitmap [2]mmu_xpe_xreg32
+		fifo_pointer_equal_bitmap [2]mmu_pipe_xreg32
 
 		_ [0x8 - 0x7]m.U32
 
-		qcn_fifo_empty_port_bitmap [2]mmu_xpe_xreg32
+		qcn_fifo_empty_port_bitmap [2]mmu_pipe_xreg32
 
 		_ [0x10 - 0xa]m.U32
 	}
 
 	_ [0x28000000 - 0x24002000]byte
 
-	clear_counters mmu_xpe_reg32
+	clear_counters mmu_pipe_reg32
 
 	_ [0x10 - 0x1]m.U32
 
-	tx_counter_config [8]mmu_xpe_xreg32
+	tx_counter_config [8]mmu_pipe_xreg32
 
 	_ [0x20 - 0x18]m.U32
 
-	tx_counter_packets [8]mmu_xpe_xreg64
+	tx_counter_packets [8]mmu_pipe_xreg64
 
 	_ [0x110 - 0x28]m.U32
 
-	multicast_replication_fifo_drop_packets [mmu_n_rqe_queue]mmu_xpe_xreg64
+	multicast_replication_fifo_drop_packets [mmu_n_rqe_queue]mmu_pipe_xreg64
 
 	_ [0x120 - 0x11b]m.U32
 
-	multicast_replication_fifo_drop_bytes [mmu_n_rqe_queue]mmu_xpe_xreg64
+	multicast_replication_fifo_drop_bytes [mmu_n_rqe_queue]mmu_pipe_xreg64
 	_                                     [0x12f - 0x12b]m.U32
 
-	data_buffer_full_packets_dropped mmu_xpe_xreg64
+	data_buffer_full_packets_dropped mmu_pipe_xreg64
 
 	_ [0x200 - 0x130]m.U32
 
-	multicast_replication_fifo_red_drop_packets [mmu_n_rqe_queue]mmu_xpe_xreg64
+	multicast_replication_fifo_red_drop_packets [mmu_n_rqe_queue]mmu_pipe_xreg64
 
 	_ [0x220 - 0x20b]m.U32
 
-	multicast_replication_fifo_yellow_drop_packets [mmu_n_rqe_queue]mmu_xpe_xreg64
+	multicast_replication_fifo_yellow_drop_packets [mmu_n_rqe_queue]mmu_pipe_xreg64
 
 	_ [0x2c003600 - 0x28022b00]byte
 
-	rqe_priority_scheduling_type [mmu_n_rqe_queue]mmu_xpe_reg32
+	rqe_priority_scheduling_type [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x60 - 0x41]m.U32
 
-	rqe_priority_werr_weight [mmu_n_rqe_queue]mmu_xpe_reg32
+	rqe_priority_werr_weight [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x88 - 0x6b]m.U32
 
-	port_cos_mode mmu_xpe_xreg64
+	port_cos_mode mmu_pipe_xreg64
 
 	_ [0x110 - 0x89]m.U32
 
-	port_initial_copy_count_width mmu_xpe_portreg32
+	port_initial_copy_count_width mmu_pipe_portreg32
 
 	_ [0x38001000 - 0x2c011100]byte
 
 	tx_admission_control struct {
-		bypass mmu_xpe_reg32
+		bypass mmu_pipe_reg32
 
 		_ [0x12 - 0x11]m.U32
 
-		config mmu_xpe_reg32
+		config mmu_pipe_reg32
 
 		_ [0x74 - 0x13]m.U32
 
-		tx_port_enable mmu_xpe_xreg64
+		tx_port_enable mmu_pipe_xreg64
 
 		_ [0x100 - 0x75]m.U32
 
-		queue_drop_state_bitmap [6]mmu_xpe_xreg64
+		queue_drop_state_bitmap [6]mmu_pipe_xreg64
 
 		_ [0x200 - 0x106]m.U32
 
-		queue_yellow_drop_state_bitmap [6]mmu_xpe_xreg64
+		queue_yellow_drop_state_bitmap [6]mmu_pipe_xreg64
 		_                              [0x300 - 0x206]m.U32
 
-		queue_red_drop_state_bitmap [6]mmu_xpe_xreg64
+		queue_red_drop_state_bitmap [6]mmu_pipe_xreg64
 
 		_ [0x500 - 0x306]m.U32
 
-		queue_group_drop_state mmu_xpe_xreg64
+		queue_group_drop_state mmu_pipe_xreg64
 
 		_ [0x520 - 0x501]m.U32
 
-		queue_group_yellow_drop_state mmu_xpe_xreg64
+		queue_group_yellow_drop_state mmu_pipe_xreg64
 
 		_ [0x540 - 0x521]m.U32
 
-		queue_group_red_drop_state mmu_xpe_xreg64
+		queue_group_red_drop_state mmu_pipe_xreg64
 
 		_ [0x610 - 0x541]m.U32
 
-		per_service_pool_port_drop_state [4]mmu_xpe_xreg64
+		per_service_pool_port_drop_state [4]mmu_pipe_xreg64
 
 		_ [0x620 - 0x614]m.U32
 
-		per_service_pool_port_yellow_drop_state [4]mmu_xpe_xreg64
+		per_service_pool_port_yellow_drop_state [4]mmu_pipe_xreg64
 
 		_ [0x630 - 0x624]m.U32
 
-		per_service_pool_port_red_drop_state [4]mmu_xpe_xreg64
+		per_service_pool_port_red_drop_state [4]mmu_pipe_xreg64
 
 		_ [0x820 - 0x634]m.U32
 
-		queue_bst_threshold [8]mmu_xpe_xreg32
+		queue_bst_threshold [8]mmu_pipe_xreg32
 
-		queue_group_bst_threshold [8]mmu_xpe_xreg32
+		queue_group_bst_threshold [8]mmu_pipe_xreg32
 
-		port_bst_threshold [8]mmu_xpe_xreg32
+		port_bst_threshold [8]mmu_pipe_xreg32
 
 		_ [0x850 - 0x838]m.U32
 
-		bst_status mmu_xpe_xreg32
+		bst_status mmu_pipe_xreg32
 
 		_ [0x900 - 0x851]m.U32
 
-		port_e2ecc_cos_spid mmu_xpe_portreg32
+		port_e2ecc_cos_spid mmu_pipe_portreg32
 
 		_ [0xa0b - 0x901]m.U32
 
-		congestion_state_reset mmu_xpe_xreg32
+		congestion_state_reset mmu_pipe_xreg32
 	}
 
 	_ [0x3c000400 - 0x380a0c00]byte
 
 	multicast_admission_control struct {
 		db struct {
-			service_pool_shared_limit [4]mmu_xpe_reg32
+			service_pool_shared_limit [4]mmu_pipe_reg32
 
-			service_pool_yellow_shared_limit [4]mmu_xpe_reg32
-			service_pool_red_shared_limit    [4]mmu_xpe_reg32
+			service_pool_yellow_shared_limit [4]mmu_pipe_reg32
+			service_pool_red_shared_limit    [4]mmu_pipe_reg32
 
 			_ [0x12 - 0x10]m.U32
 
-			config mmu_xpe_reg32
+			config mmu_pipe_reg32
 
 			_ [0x30 - 0x13]m.U32
 
-			service_pool_bst_threshold_profile_select [4]mmu_xpe_portreg32
+			service_pool_bst_threshold_profile_select [4]mmu_pipe_portreg32
 
 			_ [0x40 - 0x34]m.U32
 
-			service_pool_shared_count [4]mmu_xpe_xreg32
+			service_pool_shared_count [4]mmu_pipe_xreg32
 
 			_ [0x4c - 0x44]m.U32
 
-			service_pool_multicast_shared_count [4]mmu_xpe_xreg32
+			service_pool_multicast_shared_count [4]mmu_pipe_xreg32
 
-			port_service_pool_shared_count [4]mmu_xpe_portreg32
+			port_service_pool_shared_count [4]mmu_pipe_portreg32
 
 			_ [0x6c - 0x54]m.U32
 
-			service_pool_drop_states mmu_xpe_xreg32
+			service_pool_drop_states mmu_pipe_xreg32
 
 			_ [0x74 - 0x6d]m.U32
 
-			port_tx_enable mmu_xpe_xreg64
+			port_tx_enable mmu_pipe_xreg64
 
 			_ [0x80 - 0x75]m.U32
 
-			port_service_pool_yellow_drop_state [4]mmu_xpe_xreg64
+			port_service_pool_yellow_drop_state [4]mmu_pipe_xreg64
 
-			service_pool_resume_limit [n_packet_color][4]mmu_xpe_reg32
+			service_pool_resume_limit [n_packet_color][4]mmu_pipe_reg32
 
 			_ [0xa0 - 0x90]m.U32
 
-			port_service_pool_red_drop_state [4]mmu_xpe_xreg64
+			port_service_pool_red_drop_state [4]mmu_pipe_xreg64
 
 			_ [0x260 - 0xa4]m.U32
 
-			port_service_pool_drop_state [4]mmu_xpe_xreg64
+			port_service_pool_drop_state [4]mmu_pipe_xreg64
 
 			_ [0x500 - 0x264]m.U32
 
-			cpu_queue_bst_threshold_profile [8]mmu_xpe_xreg32
+			cpu_queue_bst_threshold_profile [8]mmu_pipe_xreg32
 
 			_ [0x540 - 0x508]m.U32
 
-			queue_resume_offset_profile_yellow [8]mmu_xpe_reg32
+			queue_resume_offset_profile_yellow [8]mmu_pipe_reg32
 
-			queue_resume_offset_profile_red [8]mmu_xpe_reg32
+			queue_resume_offset_profile_red [8]mmu_pipe_reg32
 
-			queue_e2e_ds mmu_xpe_portreg32
+			queue_e2e_ds mmu_pipe_portreg32
 
 			_ [0x638 - 0x551]m.U32
 
-			service_pool_mcuc_bst_threshold [4]mmu_xpe_reg32
+			service_pool_mcuc_bst_threshold [4]mmu_pipe_reg32
 
-			service_pool_mcuc_bst_stat [4]mmu_xpe_xreg32
+			service_pool_mcuc_bst_stat [4]mmu_pipe_xreg32
 
-			queue_multicast_bst_threshold_profile [8]mmu_xpe_reg32
+			queue_multicast_bst_threshold_profile [8]mmu_pipe_reg32
 
 			_ [0x650 - 0x648]m.U32
 
-			device_bst_status mmu_xpe_xreg64
+			device_bst_status mmu_pipe_xreg64
 
 			_ [0x6a0 - 0x651]m.U32
 
-			service_pool_multicast_bst_threshold [4]mmu_xpe_reg32
+			service_pool_multicast_bst_threshold [4]mmu_pipe_reg32
 
-			service_pool_multicast_bst_status [4]mmu_xpe_xreg32
+			service_pool_multicast_bst_status [4]mmu_pipe_xreg32
 
 			_ [0x6b0 - 0x6a8]m.U32
 
-			port_service_pool_bst_threshold [8]mmu_xpe_reg32
+			port_service_pool_bst_threshold [8]mmu_pipe_reg32
 
 			_ [0x700 - 0x6b8]m.U32
 
-			queue_e2e_spid mmu_xpe_portreg32
+			queue_e2e_spid mmu_pipe_portreg32
 
 			_ [0x950 - 0x701]m.U32
 
-			enable_eccp_mem mmu_xpe_reg32
+			enable_eccp_mem mmu_pipe_reg32
 
-			enable_correctable_error_reporting mmu_xpe_reg32
+			enable_correctable_error_reporting mmu_pipe_reg32
 
 			_ [0xa00 - 0x952]m.U32
 
-			queue_e2e_ds_en mmu_xpe_portreg32
+			queue_e2e_ds_en mmu_pipe_portreg32
 
 			_ [0x40000400 - 0x3c0a0100]byte
 		}
 
 		mcqe struct {
-			pool_shared_limit [4]mmu_xpe_reg32
+			pool_shared_limit [4]mmu_pipe_reg32
 
-			pool_yellow_shared_limit [4]mmu_xpe_reg32
-			pool_red_shared_limit    [4]mmu_xpe_reg32
+			pool_yellow_shared_limit [4]mmu_pipe_reg32
+			pool_red_shared_limit    [4]mmu_pipe_reg32
 
 			_ [0x12 - 0x10]m.U32
 
-			config mmu_xpe_reg32
+			config mmu_pipe_reg32
 
 			_ [0x30 - 0x13]m.U32
 
-			port_service_pool_bst_threshold_profile_select [4]mmu_xpe_xreg32
+			port_service_pool_bst_threshold_profile_select [4]mmu_pipe_xreg32
 
 			_ [0x40 - 0x34]m.U32
 
-			pool_shared_count [4]mmu_xpe_xreg32
+			pool_shared_count [4]mmu_pipe_xreg32
 
 			_ [0x50 - 0x44]m.U32
 
-			port_service_pool_shared_count [4]mmu_xpe_portreg32
+			port_service_pool_shared_count [4]mmu_pipe_portreg32
 
 			_ [0x6c - 0x54]m.U32
 
-			pool_drop_states mmu_xpe_xreg32
+			pool_drop_states mmu_pipe_xreg32
 
 			_ [0x74 - 0x6d]m.U32
 
-			port_tx_enable mmu_xpe_xreg64
+			port_tx_enable mmu_pipe_xreg64
 
 			_ [0x80 - 0x75]m.U32
 
-			port_service_pool_yellow_drop_state [4]mmu_xpe_xreg64
+			port_service_pool_yellow_drop_state [4]mmu_pipe_xreg64
 
-			pool_resume_limit [n_packet_color][4]mmu_xpe_reg32
+			pool_resume_limit [n_packet_color][4]mmu_pipe_reg32
 
 			_ [0xa0 - 0x90]m.U32
 
-			port_service_pool_red_drop_state [4]mmu_xpe_xreg64
+			port_service_pool_red_drop_state [4]mmu_pipe_xreg64
 
 			_ [0x260 - 0xa4]m.U32
 
-			port_service_pool_drop_state [4]mmu_xpe_xreg64
+			port_service_pool_drop_state [4]mmu_pipe_xreg64
 
 			_ [0x500 - 0x264]m.U32
 
-			cpu_queue_bst_threshold_profile [8]mmu_xpe_xreg32
+			cpu_queue_bst_threshold_profile [8]mmu_pipe_xreg32
 
 			_ [0x540 - 0x508]m.U32
 
-			queue_resume_offset_profile_yellow [8]mmu_xpe_reg32
-			queue_resume_offset_profile_red    [8]mmu_xpe_reg32
+			queue_resume_offset_profile_yellow [8]mmu_pipe_reg32
+			queue_resume_offset_profile_red    [8]mmu_pipe_reg32
 
 			_ [0x640 - 0x550]m.U32
 
-			queue_bst_threshold_profile [8]mmu_xpe_reg32
+			queue_bst_threshold_profile [8]mmu_pipe_reg32
 
 			_ [0x650 - 0x648]m.U32
 
-			bst_status mmu_xpe_xreg32
+			bst_status mmu_pipe_xreg32
 
 			_ [0x6a0 - 0x651]m.U32
 
-			pool_multicast_bst_threshold [4]mmu_xpe_reg32
+			pool_multicast_bst_threshold [4]mmu_pipe_reg32
 
-			pool_multicast_bst_status [4]mmu_xpe_xreg32
+			pool_multicast_bst_status [4]mmu_pipe_xreg32
 
 			_ [0x6b0 - 0x6a8]m.U32
 
-			port_service_pool_bst_threshold [8]mmu_xpe_reg32
+			port_service_pool_bst_threshold [8]mmu_pipe_reg32
 
 			_ [0x850 - 0x6b8]m.U32
 
-			enable_ecc_parity mmu_xpe_reg32
+			enable_ecc_parity mmu_pipe_reg32
 
-			enable_ecc_error_reporting mmu_xpe_reg32
+			enable_ecc_error_reporting mmu_pipe_reg32
 		}
 	}
 
 	_ [0x44000000 - 0x40085200]byte
 
-	db mmu_xpe_rqe_admission_control_regs
+	db mmu_pipe_rqe_admission_control_regs
 
 	_ [0x48010000 - 0x44010000]byte
 
-	qe mmu_xpe_rqe_admission_control_regs
+	qe mmu_pipe_rqe_admission_control_regs
 
 	_ [0x4c000100 - 0x48020000]byte
 
-	interrupt_enable mmu_xpe_reg32
-	interrupt_status mmu_xpe_xreg32
-	intterupt_clear  mmu_xpe_xreg32
+	interrupt_enable mmu_pipe_reg32
+	interrupt_status mmu_pipe_xreg32
+	intterupt_clear  mmu_pipe_xreg32
 }
 
-type mmu_xpe_rqe_admission_control_regs struct {
+type mmu_pipe_rqe_admission_control_regs struct {
 	_ [1]m.U32
 
-	config mmu_xpe_reg32
+	config mmu_pipe_reg32
 
-	service_pool_config [4]mmu_xpe_reg32
+	service_pool_config [4]mmu_pipe_reg32
 
-	service_pool_per_color_shared_limit [4]mmu_xpe_reg32
+	service_pool_per_color_shared_limit [4]mmu_pipe_reg32
 
-	resume_color_limit [4]mmu_xpe_reg32
+	resume_color_limit [4]mmu_pipe_reg32
 
 	_ [0x10 - 0xe]m.U32
 
-	config_0 [mmu_n_rqe_queue]mmu_xpe_reg32
+	config_0 [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x20 - 0x1b]m.U32
 
-	config_1 [mmu_n_rqe_queue]mmu_xpe_reg32
+	config_1 [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x30 - 0x2b]m.U32
 
-	min_guaranteed_cells [mmu_n_rqe_queue]mmu_xpe_reg32
+	min_guaranteed_cells [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x40 - 0x3b]m.U32
 
-	color_shared_limits [mmu_n_rqe_queue]mmu_xpe_reg32
+	color_shared_limits [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x50 - 0x4b]m.U32
 
-	color_reset_offset [mmu_n_rqe_queue]mmu_xpe_reg32
+	color_reset_offset [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0x60 - 0x5b]m.U32
 
-	min_guaranteed_cells_used [mmu_n_rqe_queue]mmu_xpe_xreg32
+	min_guaranteed_cells_used [mmu_n_rqe_queue]mmu_pipe_xreg32
 
 	_ [0x70 - 0x6b]m.U32
 
-	shared_cells_used [mmu_n_rqe_queue]mmu_xpe_xreg32
+	shared_cells_used [mmu_n_rqe_queue]mmu_pipe_xreg32
 
 	_ [0x80 - 0x7b]m.U32
 
-	calculated_color_resume_limits [mmu_n_rqe_queue]mmu_xpe_xreg32
+	calculated_color_resume_limits [mmu_n_rqe_queue]mmu_pipe_xreg32
 
 	_ [0x90 - 0x8b]m.U32
 
-	status [mmu_n_rqe_queue]mmu_xpe_xreg32
+	status [mmu_n_rqe_queue]mmu_pipe_xreg32
 
 	_ [0xa0 - 0x9b]m.U32
 
-	bst_threshold [mmu_n_rqe_queue]mmu_xpe_reg32
+	bst_threshold [mmu_n_rqe_queue]mmu_pipe_reg32
 
 	_ [0xb0 - 0xab]m.U32
 
-	bst_total_usage_counts [mmu_n_rqe_queue]mmu_xpe_xreg32
+	bst_total_usage_counts [mmu_n_rqe_queue]mmu_pipe_xreg32
 
 	_ [0xc0 - 0xbb]m.U32
 
-	bst_threshold_service_pool [4]mmu_xpe_reg32
+	bst_threshold_service_pool [4]mmu_pipe_reg32
 
 	_ [0xd0 - 0xc4]m.U32
 
-	bst_service_pool_usage_counts [4]mmu_xpe_xreg32
+	bst_service_pool_usage_counts [4]mmu_pipe_xreg32
 
 	_ [0xe0 - 0xd4]m.U32
 
-	service_pool_status [4]mmu_xpe_xreg32
+	service_pool_status [4]mmu_pipe_xreg32
 
-	service_pool_shared_cells_used [4]mmu_xpe_xreg32
+	service_pool_shared_cells_used [4]mmu_pipe_xreg32
 
-	bst_status [4]mmu_xpe_xreg32
+	bst_status [4]mmu_pipe_xreg32
 
 	_ [0xf0 - 0xec]m.U32
 
-	qe_status mmu_xpe_xreg32
+	qe_status mmu_pipe_xreg32
 
 	_ [0x100 - 0xf1]m.U32
 }
 
-type mmu_xpe_mems struct {
+type mmu_pipe_mems struct {
 	_            [0x04040000 - 0x0]byte
 	enqx_pipemem [2]m.Mem
 	_            [0x08000000 - 0x040c0000]byte
@@ -797,12 +797,12 @@ type mmu_xpe_mems struct {
 	}
 	_ [m.MemMax - n_pipe*mmu_per_pipe_mem_bytes]m.MemElt
 
-	wred_color_drops [n_mmu_xpe]struct {
+	wred_color_drops [n_mmu_pipe]struct {
 		entries [mmu_per_pipe_mem_bytes]m.M64
 	}
 	_ [m.MemMax - n_pipe*mmu_per_pipe_mem_bytes]m.MemElt
 
-	rx_drops [n_mmu_xpe]struct {
+	rx_drops [n_mmu_pipe]struct {
 		entries [2][n_mmu_port]mmu_rx_counter_mem
 		_       [mmu_per_pipe_mem_bytes - 2*n_mmu_port]m.MemElt
 	}
@@ -1033,7 +1033,7 @@ func (r *mmu_sc_preg32) set(q *DmaRequest, a sbus.Address, c sbus.AccessType, v 
 	(*m.Pu32)(r).Set(&q.DmaRequest, a, BlockMmuSc, c, v)
 }
 
-type mmu_sc_regs struct {
+type mmu_slice_controller struct {
 	_ [0x04000100 - 0x0]byte
 
 	asf_eport_config mmu_sc_portreg32
@@ -1215,7 +1215,7 @@ type mmu_sc_regs struct {
 	start_by_start_error mmu_sc_xreg64
 }
 
-type mmu_sc_mems struct {
+type mmu_slice_mems struct {
 	_ [0x08040000 - 0x0]byte
 
 	cell_link m.Mem

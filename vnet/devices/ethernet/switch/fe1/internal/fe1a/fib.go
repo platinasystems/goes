@@ -57,9 +57,9 @@ func (t *fe1a) adjacency_main_init() {
 			enable_ip_dst_address   = 1 << 12
 		)
 
-		v := t.rx_pipe_regs.hash_control.getDo(q, sbus.Duplicate)
+		v := t.rx_pipe_controller.hash_control.getDo(q, sbus.Duplicate)
 		v |= enable_ip_dst_address | enable_ip_tcp_udp_ports
-		t.rx_pipe_regs.hash_control.set(q, v)
+		t.rx_pipe_controller.hash_control.set(q, v)
 		q.Do()
 	}
 }

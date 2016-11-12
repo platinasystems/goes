@@ -22,7 +22,7 @@ func check(tag string, p unsafe.Pointer, expect uint) {
 
 // Verify top memory map.
 func init() {
-	r := (*top_regs)(base)
+	r := (*top_controller)(base)
 	check("port_reset", unsafe.Pointer(&r.port_reset), 0x2fc)
 	check("tsc_disable", unsafe.Pointer(&r.tsc_disable), 0x600)
 	check("core_pll_frequency_select", unsafe.Pointer(&r.core_pll_frequency_select), 0x75c)
@@ -34,7 +34,7 @@ func init() {
 
 // Verify rx pipe memory maps.
 func init() {
-	r := (*rx_pipe_regs)(base)
+	r := (*rx_pipe_controller)(base)
 	m := (*rx_pipe_mems)(base)
 
 	check("over_subscription_buffer[0]", unsafe.Pointer(&m.over_subscription_buffer[0]), 0x08000000)
@@ -79,7 +79,7 @@ func init() {
 
 // Verify tx pipe memory maps.
 func init() {
-	r := (*tx_pipe_regs)(base)
+	r := (*tx_pipe_controller)(base)
 	m := (*tx_pipe_mems)(base)
 
 	check("latency_mode", unsafe.Pointer(&r.latency_mode), 0x00000000)
@@ -109,7 +109,7 @@ func init() {
 
 // Verify mmu global memory maps.
 func init() {
-	r := (*mmu_global_regs)(base)
+	r := (*mmu_global_controller)(base)
 
 	check("misc_config", unsafe.Pointer(&r.misc_config), 0x08000000)
 	check("global_physical_port_by_mmu_port", unsafe.Pointer(&r.global_physical_port_by_mmu_port), 0x08120000)
@@ -117,8 +117,8 @@ func init() {
 
 // Verify mmu xpe memory maps.
 func init() {
-	r := (*mmu_xpe_regs)(base)
-	m := (*mmu_xpe_mems)(base)
+	r := (*mmu_pipe_regs)(base)
+	m := (*mmu_pipe_mems)(base)
 
 	check("cut_through_purge_count", unsafe.Pointer(&r.cut_through_purge_count), 0x10002b00)
 	check("time_domain", unsafe.Pointer(&r.time_domain), 0x20000000)
@@ -149,8 +149,8 @@ func init() {
 
 // Verify mmu sc memory maps.
 func init() {
-	r := (*mmu_sc_regs)(base)
-	m := (*mmu_sc_mems)(base)
+	r := (*mmu_slice_controller)(base)
+	m := (*mmu_slice_mems)(base)
 
 	check("toq.fatal_error", unsafe.Pointer(&r.toq.fatal_error), 0x08000200)
 	check("l3_multicast_port_aggregate_id", unsafe.Pointer(&r.l3_multicast_port_aggregate_id), 0x0c100000)

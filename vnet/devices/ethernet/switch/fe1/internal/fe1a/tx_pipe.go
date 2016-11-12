@@ -65,7 +65,7 @@ func (r *tx_pipe_preg64) seta(q *DmaRequest, c sbus.AccessType, v uint64) {
 }
 func (r *tx_pipe_preg64) set(q *DmaRequest, v uint64) { r.seta(q, sbus.Duplicate, v) }
 
-type tx_pipe_regs struct {
+type tx_pipe_controller struct {
 	latency_mode tx_pipe_reg32
 	_            [0x01000000 - 0x00000100]byte
 
