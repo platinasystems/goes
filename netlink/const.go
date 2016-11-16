@@ -229,10 +229,19 @@ func attrAlignLen(l int) int {
 
 type NlAttr struct {
 	Len  uint16
-	Kind uint16
+	kind uint16
 }
 
 const SizeofNlAttr = 4
+
+const (
+	NLA_F_NESTED        = 1 << 15
+	NLA_F_NET_BYTEORDER = 1 << 14
+)
+
+func (a *NlAttr) Kind() uint16 {
+	return a.kind &^ (NLA_F_NESTED | NLA_F_NET_BYTEORDER)
+}
 
 type RtScope uint8
 

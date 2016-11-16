@@ -90,13 +90,13 @@ func nextAttr(b []byte, i int) (n *NlAttr, v []byte, j int) {
 	return
 }
 
-func parse_af_spec(b []byte) *AttrArray {
+func parse_af_spec(b []byte, kind uint16) *AttrArray {
 	as := pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewAddressFamilyAttrType()
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		af := AddressFamily(n.Kind)
+		af := AddressFamily(n.Kind())
 		as.X.Validate(uint(af))
 		switch af {
 		case AF_INET:
@@ -116,7 +116,7 @@ func parse_ip4_af_spec(b []byte) *AttrArray {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		t := Ip4IfAttrKind(n.Kind)
+		t := Ip4IfAttrKind(n.Kind())
 		as.X.Validate(uint(t))
 		switch t {
 		case IFLA_INET_UNSPEC:
@@ -135,7 +135,7 @@ func parse_ip6_af_spec(b []byte) *AttrArray {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		t := Ip6IfAttrKind(n.Kind)
+		t := Ip6IfAttrKind(n.Kind())
 		as.X.Validate(uint(t))
 		switch t {
 		case IFLA_INET6_UNSPEC:
@@ -181,7 +181,7 @@ func (a AttrVec) Set(v []byte) {
 
 		// Fill in attribute header.
 		nla := (*NlAttr)(unsafe.Pointer(&v[vi]))
-		nla.Kind = uint16(i)
+		nla.kind = uint16(i)
 		nla.Len = uint16(SizeofNlAttr + s)
 
 		// Fill in attribute value.

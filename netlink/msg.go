@@ -318,9 +318,9 @@ func (m *IfInfoMessage) Parse(b []byte) {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		switch t := IfInfoAttrKind(n.Kind); t {
+		switch t := IfInfoAttrKind(n.Kind()); t {
 		case IFLA_IFNAME, IFLA_QDISC:
-			m.Attrs[n.Kind] = StringAttrBytes(v[:len(v)-1])
+			m.Attrs[t] = StringAttrBytes(v[:len(v)-1])
 		case IFLA_MTU, IFLA_LINK, IFLA_MASTER,
 			IFLA_WEIGHT,
 			IFLA_NET_NS_PID, IFLA_NET_NS_FD, IFLA_LINK_NETNSID,
@@ -329,25 +329,25 @@ func (m *IfInfoMessage) Parse(b []byte) {
 			IFLA_GSO_MAX_SEGS, IFLA_GSO_MAX_SIZE,
 			IFLA_CARRIER_CHANGES,
 			IFLA_GROUP:
-			m.Attrs[n.Kind] = Uint32AttrBytes(v)
+			m.Attrs[t] = Uint32AttrBytes(v)
 		case IFLA_CARRIER, IFLA_LINKMODE, IFLA_PROTO_DOWN:
-			m.Attrs[n.Kind] = Uint8Attr(v[0])
+			m.Attrs[t] = Uint8Attr(v[0])
 		case IFLA_OPERSTATE:
-			m.Attrs[n.Kind] = IfOperState(v[0])
+			m.Attrs[t] = IfOperState(v[0])
 		case IFLA_STATS:
-			m.Attrs[n.Kind] = NewLinkStatsBytes(v)
+			m.Attrs[t] = NewLinkStatsBytes(v)
 		case IFLA_STATS64:
-			m.Attrs[n.Kind] = NewLinkStats64Bytes(v)
+			m.Attrs[t] = NewLinkStats64Bytes(v)
 		case IFLA_AF_SPEC:
-			m.Attrs[n.Kind] = parse_af_spec(v)
+			m.Attrs[t] = parse_af_spec(v, n.kind)
 		case IFLA_ADDRESS, IFLA_BROADCAST:
-			m.Attrs[n.Kind] = afAddr(AF_UNSPEC, v)
+			m.Attrs[t] = afAddr(AF_UNSPEC, v)
 		case IFLA_MAP:
 		default:
 			if t < IFLA_MAX {
-				m.Attrs[n.Kind] = NewHexStringAttrBytes(v)
+				m.Attrs[t] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown attr", n.Kind))
+				panic(fmt.Errorf("%#v: unknown IfInfoMessage attr", t))
 			}
 		}
 	}
@@ -431,22 +431,22 @@ func (m *IfAddrMessage) Parse(b []byte) {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		k := IfAddrAttrKind(n.Kind)
+		k := IfAddrAttrKind(n.Kind())
 		switch k {
 		case IFA_LABEL:
-			m.Attrs[n.Kind] = StringAttrBytes(v[:len(v)-1])
+			m.Attrs[k] = StringAttrBytes(v[:len(v)-1])
 		case IFA_FLAGS:
-			m.Attrs[n.Kind] = IfAddrFlagAttrBytes(v)
+			m.Attrs[k] = IfAddrFlagAttrBytes(v)
 		case IFA_CACHEINFO:
-			m.Attrs[n.Kind] = NewIfAddrCacheInfoBytes(v)
+			m.Attrs[k] = NewIfAddrCacheInfoBytes(v)
 		case IFA_ADDRESS, IFA_LOCAL, IFA_BROADCAST, IFA_ANYCAST,
 			IFA_MULTICAST:
-			m.Attrs[n.Kind] = afAddr(AddressFamily(m.Family), v)
+			m.Attrs[k] = afAddr(AddressFamily(m.Family), v)
 		default:
 			if k < IFA_MAX {
-				m.Attrs[n.Kind] = NewHexStringAttrBytes(v)
+				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown attr", k))
+				panic(fmt.Errorf("%#v: unknown IfAddrMessage attr", k))
 			}
 		}
 	}
@@ -533,23 +533,23 @@ func (m *RouteMessage) Parse(b []byte) {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		k := RouteAttrKind(n.Kind)
+		k := RouteAttrKind(n.Kind())
 		switch k {
 		case RTA_DST, RTA_SRC, RTA_PREFSRC, RTA_GATEWAY:
-			m.Attrs[n.Kind] = afAddr(AddressFamily(m.Family), v)
+			m.Attrs[k] = afAddr(AddressFamily(m.Family), v)
 		case RTA_TABLE, RTA_IIF, RTA_OIF, RTA_PRIORITY, RTA_FLOW:
-			m.Attrs[n.Kind] = Uint32AttrBytes(v)
+			m.Attrs[k] = Uint32AttrBytes(v)
 		case RTA_ENCAP_TYPE:
-			m.Attrs[n.Kind] = Uint16AttrBytes(v)
+			m.Attrs[k] = Uint16AttrBytes(v)
 		case RTA_PREF:
-			m.Attrs[n.Kind] = Uint8Attr(v[0])
+			m.Attrs[k] = Uint8Attr(v[0])
 		case RTA_CACHEINFO:
-			m.Attrs[n.Kind] = NewRtaCacheInfoBytes(v)
+			m.Attrs[k] = NewRtaCacheInfoBytes(v)
 		default:
 			if k < RTA_MAX {
-				m.Attrs[n.Kind] = NewHexStringAttrBytes(v)
+				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown attr", k))
+				panic(fmt.Errorf("%#v: unknown RouteMessage attr", k))
 			}
 		}
 	}
@@ -643,24 +643,24 @@ func (m *NeighborMessage) Parse(b []byte) {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		k := NeighborAttrKind(n.Kind)
+		k := NeighborAttrKind(n.Kind())
 		switch k {
 		case NDA_DST:
-			m.Attrs[n.Kind] = afAddr(AddressFamily(m.Family), v)
+			m.Attrs[k] = afAddr(AddressFamily(m.Family), v)
 		case NDA_LLADDR:
-			m.Attrs[n.Kind] = afAddr(AF_UNSPEC, v)
+			m.Attrs[k] = afAddr(AF_UNSPEC, v)
 		case NDA_CACHEINFO:
-			m.Attrs[n.Kind] = NewNdaCacheInfoBytes(v)
+			m.Attrs[k] = NewNdaCacheInfoBytes(v)
 		case NDA_PROBES, NDA_VNI, NDA_IFINDEX, NDA_MASTER,
 			NDA_LINK_NETNSID:
-			m.Attrs[n.Kind] = Uint32AttrBytes(v)
+			m.Attrs[k] = Uint32AttrBytes(v)
 		case NDA_VLAN:
-			m.Attrs[n.Kind] = Uint16AttrBytes(v)
+			m.Attrs[k] = Uint16AttrBytes(v)
 		default:
 			if k < NDA_MAX {
-				m.Attrs[n.Kind] = NewHexStringAttrBytes(v)
+				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown attr", k))
+				panic(fmt.Errorf("%#v: unknown NeighborMessage attr", k))
 			}
 		}
 	}
@@ -754,15 +754,15 @@ func (m *NetnsMessage) Parse(b []byte) {
 	for i := 0; i < len(b); {
 		n, v, next_i := nextAttr(b, i)
 		i = next_i
-		k := NetnsAttrKind(n.Kind)
+		k := NetnsAttrKind(n.Kind())
 		switch k {
 		case NETNSA_NONE:
 		case NETNSA_NSID:
-			m.Attrs[n.Kind] = Int32AttrBytes(v)
+			m.Attrs[k] = Int32AttrBytes(v)
 		case NETNSA_PID, NETNSA_FD:
-			m.Attrs[n.Kind] = Uint32AttrBytes(v)
+			m.Attrs[k] = Uint32AttrBytes(v)
 		default:
-			panic(fmt.Errorf("%#v: unknown attr", k))
+			panic(fmt.Errorf("%#v: unknown NetnsMessage attr", k))
 		}
 	}
 	return
