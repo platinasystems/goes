@@ -1,5 +1,11 @@
 This repos contains Platina System's open source GO projects.
 
+You'll need `platinasystems/fe1` to compile `goes-platina-mk1` or `go-wip`.
+
+```console
+$ git clone git@github.com:platinasystems/fe1 vnet/devices/ethernet/switch/fe1
+```
+
 To install a select MACHINE,
 
 ```console
