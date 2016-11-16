@@ -5,8 +5,10 @@ gitdir := $(shell git rev-parse --git-dir)
 ALL  = goes-example
 ALL += goes-example-arm.cpio.xz
 ALL += goes-platina-mk1-bmc-arm.cpio.xz
+ifneq (,$(wildcard vnet/devices/ethernet/switch/fe1/*.go))
 ALL += goes-platina-mk1
 ALL += go-wip
+endif
 
 .PHONY: all
 all: $(ALL)

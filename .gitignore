@@ -4,3 +4,4 @@
 /go-*
 /goes-*
 /*.cpio.xz
+vnet/devices/ethernet/switch/fe1
