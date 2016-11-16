@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/firmware/fe1a"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -45,10 +44,6 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-
-	if err = fe1a.Load(); err != nil {
-		return
-	}
 
 	var in parse.Input
 	in.Add(os.Args[1:]...)

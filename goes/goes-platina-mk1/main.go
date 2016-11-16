@@ -5,10 +5,7 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/commands/builtin"
@@ -17,14 +14,11 @@ import (
 	"github.com/platinasystems/go/commands/fs"
 	"github.com/platinasystems/go/commands/kernel"
 	"github.com/platinasystems/go/commands/machine"
-	"github.com/platinasystems/go/commands/machine/install"
 	"github.com/platinasystems/go/commands/machine/machined"
 	"github.com/platinasystems/go/commands/machine/start"
-	"github.com/platinasystems/go/commands/machine/uninstall"
 	netcmds "github.com/platinasystems/go/commands/net"
 	vnetcmd "github.com/platinasystems/go/commands/net/vnet"
 	"github.com/platinasystems/go/commands/redis"
-	"github.com/platinasystems/go/firmware/fe1a"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/hostname"
@@ -57,8 +51,6 @@ func main() {
 	command.Sort()
 	start.Hook = startHook
 	machined.Hook = machinedHook
-	install.Hook = installHook
-	uninstall.Hook = uninstallHook
 	goes.Main()
 }
 
@@ -70,10 +62,6 @@ func startHook() error {
 }
 
 func machinedHook() error {
-	err := fe1a.Load()
-	if err != nil {
-		return err
-	}
 	machined.Plot(
 		cmdline.New(),
 		hostname.New(),
@@ -90,54 +78,6 @@ func machinedHook() error {
 	)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
 	return nil
-}
-
-func installHook() error {
-	_, err := os.Stat(UsrShareGoes)
-	if os.IsNotExist(err) {
-		err = os.Mkdir(UsrShareGoes, os.FileMode(0755))
-		if err != nil {
-			return err
-		}
-	}
-	for _, fn := range []string{"fe1a-e.ucode", "fe1a-f.ucode"} {
-		var src, dst *os.File
-		for _, dir := range []string{
-			".",
-			"firmware/fe1a",
-			"src/github.com/platinasystems/go/firmware/fe1a",
-		} {
-			src, err = os.Open(filepath.Join(dir, fn))
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			return fmt.Errorf("%s: not found")
-		}
-		dst, err = os.Create(filepath.Join(UsrShareGoes, fn))
-		if err != nil {
-			src.Close()
-			return err
-		}
-		_, err = io.Copy(dst, src)
-		src.Close()
-		dst.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func uninstallHook() (err error) {
-	for _, fn := range []string{"fe1a-e.ucode", "fe1a-f.ucode"} {
-		terr := os.Remove(filepath.Join("/usr/share/goes", fn))
-		if err == nil && !os.IsNotExist(terr) {
-			err = terr
-		}
-	}
-	return
 }
 
 func vnetHook(i *vnetinfo.Info) error {
