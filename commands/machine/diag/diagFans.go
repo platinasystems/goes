@@ -21,11 +21,13 @@ func diagFans() error {
 	const (
 		w83795Bus    = 0
 		w83795Adr    = 0x2f
+		w83795MuxBus = 0
 		w83795MuxAdr = 0x76
 		w83795MuxVal = 0x80
 	)
 
-	var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxAdr, w83795MuxVal}
+	var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w83795MuxVal}
+	//var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w83795MuxVal}
 	var cpu = imx6.Cpu{}
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")

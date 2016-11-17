@@ -21,7 +21,3 @@ type pwmRegs struct {
 	ReadTemp1    reg16r
 	ReadTemp2    reg16r
 }
-
-type genRegs struct {
-	Reg reg8
-}

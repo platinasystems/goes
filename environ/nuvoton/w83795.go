@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/redis"
 )
 
@@ -28,6 +29,7 @@ var (
 type HwMonitor struct {
 	Bus      int
 	Addr     int
+	MuxBus   int
 	MuxAddr  int
 	MuxValue int
 }
@@ -70,7 +72,7 @@ func (h *HwMonitor) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *
 func (h *HwMonitor) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
 	var bus i2c.Bus
 
-	err = bus.Open(h.Bus)
+	err = bus.Open(h.MuxBus)
 	if err != nil {
 		return
 	}
@@ -87,67 +89,260 @@ func (h *HwMonitor) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, dat
 
 func (r *reg8) get(h *HwMonitor) byte {
 	var data i2c.SMBusData
-	err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-	if err != nil {
-		panic(err)
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
 	return data[0]
 }
 
-func (r *reg8) setErr(h *HwMonitor, v uint8) error {
-	var data i2c.SMBusData
-	data[0] = v
-	return h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
-}
-
-func (r *reg8) set(h *HwMonitor, v uint8) {
-	err := r.setErr(h, v)
-	if err != nil {
-		panic(err)
-	}
-}
-
+/*
 func (r *reg8) setMux(h *HwMonitor) error {
 	var data i2c.SMBusData
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
 	data[0] = byte(h.MuxValue)
 	return h.i2cDoMux(i2c.Write, r.offset(), i2c.ByteData, &data)
 }
+*/
 
 func (r *reg16) get(h *HwMonitor) (v uint16) {
 	var data i2c.SMBusData
-	err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
+
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	return uint16(data[0])<<8 | uint16(data[1])
 }
 
 func (r *reg16r) get(h *HwMonitor) (v uint16) {
 	var data i2c.SMBusData
-	err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
+
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	return uint16(data[1])<<8 | uint16(data[0])
+}
+
+func (r *reg8) set(h *HwMonitor, v uint8) {
+	var data i2c.SMBusData
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
+	data[0] = v
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set8 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
 }
 
 func (r *reg16) set(h *HwMonitor, v uint16) {
 	var data i2c.SMBusData
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	data[0] = uint8(v >> 8)
 	data[1] = uint8(v)
-	err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
 }
 
 func (r *reg16r) set(h *HwMonitor, v uint16) {
 	var data i2c.SMBusData
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	data[1] = uint8(v >> 8)
 	data[0] = uint8(v)
-	err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16r #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
 }
 
@@ -161,11 +356,8 @@ func fanSpeed(countHi uint8, countLo uint8) uint16 {
 }
 
 func (h *HwMonitor) FrontTemp() float64 {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
-	q := getGenRegs()
-	q.Reg.setMux(h)
+	//q := getGenRegs()
+	//q.Reg.setMux(h)
 	r := getHwmRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	t := r.FrontTemp.get(h)
@@ -174,11 +366,8 @@ func (h *HwMonitor) FrontTemp() float64 {
 }
 
 func (h *HwMonitor) RearTemp() float64 {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
-	q := getGenRegs()
-	q.Reg.setMux(h)
+	//q := getGenRegs()
+	//q.Reg.setMux(h)
 	r := getHwmRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	t := r.RearTemp.get(h)
@@ -187,12 +376,9 @@ func (h *HwMonitor) RearTemp() float64 {
 }
 
 func (h *HwMonitor) FanCount(i uint8) uint16 {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	var rpm uint16
-	q := getGenRegs()
-	q.Reg.setMux(h)
+	//q := getGenRegs()
+	//q.Reg.setMux(h)
 
 	if i > 14 {
 		panic("FanCount subscript out of range\n")
@@ -245,11 +431,8 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 }
 
 func (h *HwMonitor) FanInit() {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
-	q := getGenRegs()
-	q.Reg.setMux(h)
+	//q := getGenRegs()
+	//q.Reg.setMux(h)
 
 	r0 := getHwmRegsBank0()
 	r0.BankSelect.set(h, 0x80)
@@ -284,11 +467,8 @@ func (h *HwMonitor) FanInit() {
 }
 
 func (h *HwMonitor) SetFanSpeed(s string) {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
-	q := getGenRegs()
-	q.Reg.setMux(h)
+	//q := getGenRegs()
+	//q.Reg.setMux(h)
 
 	r2 := getHwmRegsBank2()
 	r2.BankSelect.set(h, 0x82)
@@ -368,12 +548,9 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 }
 
 func (h *HwMonitor) GetFanSpeed() string {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	var speed string
-	q := getGenRegs()
-	q.Reg.setMux(h)
+	//q := getGenRegs()
+	//q.Reg.setMux(h)
 
 	r2 := getHwmRegsBank2()
 	r2.BankSelect.set(h, 0x82)

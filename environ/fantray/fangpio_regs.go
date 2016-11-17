@@ -14,7 +14,3 @@ type fanGpioRegs struct {
 	Polarity [2]reg8
 	Config   [2]reg8
 }
-
-type genRegs struct {
-	Reg reg8
-}

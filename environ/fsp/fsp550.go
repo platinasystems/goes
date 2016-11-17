@@ -82,7 +82,7 @@ func (r *reg8) get(h *Psu) byte {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in fsp550: get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -122,7 +122,7 @@ func (r *reg16) get(h *Psu) (v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get16: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in fsp550: get16: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -162,7 +162,7 @@ func (r *reg16r) get(h *Psu) (v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get16r: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in fsp550: get16r: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -199,12 +199,11 @@ func (r *reg16r) get(h *Psu) (v uint16) {
 
 func (r *reg8) set(h *Psu, v uint8) {
 	var data i2c.SMBusData
-	data[0] = v
 
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.set8: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in fsp550: set8: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -223,6 +222,7 @@ func (r *reg8) set(h *Psu, v uint8) {
 		}
 	}
 
+	data[0] = v
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
 		if err == nil {
@@ -239,13 +239,11 @@ func (r *reg8) set(h *Psu, v uint8) {
 
 func (r *reg16) set(h *Psu, v uint16) {
 	var data i2c.SMBusData
-	data[0] = uint8(v >> 8)
-	data[1] = uint8(v)
 
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.set16: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in fsp550: set16: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -264,6 +262,8 @@ func (r *reg16) set(h *Psu, v uint16) {
 		}
 	}
 
+	data[0] = uint8(v >> 8)
+	data[1] = uint8(v)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
 		if err == nil {
@@ -280,13 +280,11 @@ func (r *reg16) set(h *Psu, v uint16) {
 
 func (r *reg16r) set(h *Psu, v uint16) {
 	var data i2c.SMBusData
-	data[1] = uint8(v >> 8)
-	data[0] = uint8(v)
 
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.set16r: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in fsp550: set16r: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -305,6 +303,8 @@ func (r *reg16r) set(h *Psu, v uint16) {
 		}
 	}
 
+	data[1] = uint8(v >> 8)
+	data[0] = uint8(v)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
 		if err == nil {
