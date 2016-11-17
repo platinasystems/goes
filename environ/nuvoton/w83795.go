@@ -45,7 +45,6 @@ const (
 
 func getHwmRegsBank0() *hwmRegsBank0 { return (*hwmRegsBank0)(regsPointer) }
 func getHwmRegsBank2() *hwmRegsBank2 { return (*hwmRegsBank2)(regsPointer) }
-func getGenRegs() *genRegs           { return (*genRegs)(regsPointer) }
 
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
@@ -92,7 +91,7 @@ func (r *reg8) get(h *HwMonitor) byte {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -102,7 +101,7 @@ func (r *reg8) get(h *HwMonitor) byte {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -115,7 +114,7 @@ func (r *reg8) get(h *HwMonitor) byte {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get8 #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: get8 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -126,29 +125,13 @@ func (r *reg8) get(h *HwMonitor) byte {
 	return data[0]
 }
 
-/*
-func (r *reg8) setMux(h *HwMonitor) error {
-	var data i2c.SMBusData
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	return h.i2cDoMux(i2c.Write, r.offset(), i2c.ByteData, &data)
-}
-*/
-
 func (r *reg16) get(h *HwMonitor) (v uint16) {
 	var data i2c.SMBusData
 
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -158,7 +141,7 @@ func (r *reg16) get(h *HwMonitor) (v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -171,7 +154,7 @@ func (r *reg16) get(h *HwMonitor) (v uint16) {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: get16 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -189,7 +172,7 @@ func (r *reg16r) get(h *HwMonitor) (v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -199,7 +182,7 @@ func (r *reg16r) get(h *HwMonitor) (v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -212,7 +195,7 @@ func (r *reg16r) get(h *HwMonitor) (v uint16) {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: get16 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -230,7 +213,7 @@ func (r *reg8) set(h *HwMonitor, v uint8) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -240,7 +223,7 @@ func (r *reg8) set(h *HwMonitor, v uint8) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -254,7 +237,7 @@ func (r *reg8) set(h *HwMonitor, v uint8) {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set8 #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: set8 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -270,7 +253,7 @@ func (r *reg16) set(h *HwMonitor, v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -280,7 +263,7 @@ func (r *reg16) set(h *HwMonitor, v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -295,7 +278,7 @@ func (r *reg16) set(h *HwMonitor, v uint16) {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16 #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: set16 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -311,7 +294,7 @@ func (r *reg16r) set(h *HwMonitor, v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550.get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -321,7 +304,7 @@ func (r *reg16r) set(h *HwMonitor, v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -336,7 +319,7 @@ func (r *reg16r) set(h *HwMonitor, v uint16) {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16r #retries: ", i, ", addr: ", r.offset())
+				log.Print("w83795: set16r #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -356,8 +339,6 @@ func fanSpeed(countHi uint8, countLo uint8) uint16 {
 }
 
 func (h *HwMonitor) FrontTemp() float64 {
-	//q := getGenRegs()
-	//q.Reg.setMux(h)
 	r := getHwmRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	t := r.FrontTemp.get(h)
@@ -366,8 +347,6 @@ func (h *HwMonitor) FrontTemp() float64 {
 }
 
 func (h *HwMonitor) RearTemp() float64 {
-	//q := getGenRegs()
-	//q.Reg.setMux(h)
 	r := getHwmRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	t := r.RearTemp.get(h)
@@ -377,8 +356,6 @@ func (h *HwMonitor) RearTemp() float64 {
 
 func (h *HwMonitor) FanCount(i uint8) uint16 {
 	var rpm uint16
-	//q := getGenRegs()
-	//q.Reg.setMux(h)
 
 	if i > 14 {
 		panic("FanCount subscript out of range\n")
@@ -431,9 +408,6 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 }
 
 func (h *HwMonitor) FanInit() {
-	//q := getGenRegs()
-	//q.Reg.setMux(h)
-
 	r0 := getHwmRegsBank0()
 	r0.BankSelect.set(h, 0x80)
 
@@ -467,9 +441,6 @@ func (h *HwMonitor) FanInit() {
 }
 
 func (h *HwMonitor) SetFanSpeed(s string) {
-	//q := getGenRegs()
-	//q.Reg.setMux(h)
-
 	r2 := getHwmRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 
@@ -549,8 +520,6 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 
 func (h *HwMonitor) GetFanSpeed() string {
 	var speed string
-	//q := getGenRegs()
-	//q.Reg.setMux(h)
 
 	r2 := getHwmRegsBank2()
 	r2.BankSelect.set(h, 0x82)

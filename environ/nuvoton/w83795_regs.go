@@ -57,7 +57,3 @@ type hwmRegsBank2 struct {
 	TempHyster1           reg8 //0x70
 	TempHyster2           reg8 //0x71
 }
-
-type genRegs struct {
-	Reg reg8
-}

@@ -18,7 +18,3 @@ type ledRegs struct {
 	Config0   reg8
 	Config1   reg8
 }
-
-type genRegs struct {
-	Reg reg8
-}

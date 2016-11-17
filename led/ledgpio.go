@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/redis"
 )
 
@@ -30,6 +31,7 @@ var (
 type LedCon struct {
 	Bus      int
 	Addr     int
+	MuxBus   int
 	MuxAddr  int
 	MuxValue int
 }
@@ -77,7 +79,7 @@ func (h *LedCon) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c
 func (h *LedCon) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
 	var bus i2c.Bus
 
-	err = bus.Open(h.Bus)
+	err = bus.Open(h.MuxBus)
 	if err != nil {
 		return
 	}
@@ -94,67 +96,243 @@ func (h *LedCon) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *
 
 func (r *reg8) get(h *LedCon) byte {
 	var data i2c.SMBusData
-	err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-	if err != nil {
-		panic(err)
-	}
-	return data[0]
-}
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: get8: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
 
-func (r *reg8) setErr(h *LedCon, v uint8) error {
-	var data i2c.SMBusData
-	data[0] = v
-	return h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
-}
-
-func (r *reg8) set(h *LedCon, v uint8) {
-	err := r.setErr(h, v)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (r *reg8) setMux(h *LedCon) error {
-	var data i2c.SMBusData
 	data[0] = byte(h.MuxValue)
-	return h.i2cDoMux(i2c.Write, r.offset(), i2c.ByteData, &data)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
+	return data[0]
 }
 
 func (r *reg16) get(h *LedCon) (v uint16) {
 	var data i2c.SMBusData
-	err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: get16: ", rc, ", addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
+
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	return uint16(data[0])<<8 | uint16(data[1])
 }
 
 func (r *reg16r) get(h *LedCon) (v uint16) {
 	var data i2c.SMBusData
-	err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: get16r: ", rc, ", addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16r MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
+
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get16r #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	return uint16(data[1])<<8 | uint16(data[0])
+}
+
+func (r *reg8) set(h *LedCon, v uint8) {
+	var data i2c.SMBusData
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: set8: ", rc, ", addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
+	data[0] = v
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set8 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
 }
 
 func (r *reg16) set(h *LedCon, v uint16) {
 	var data i2c.SMBusData
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: set16: ", rc, ", addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	data[0] = uint8(v >> 8)
 	data[1] = uint8(v)
-	err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16 #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
 }
 
 func (r *reg16r) set(h *LedCon, v uint16) {
 	var data i2c.SMBusData
+
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: set16r: ", rc, ", addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+
 	data[1] = uint8(v >> 8)
 	data[0] = uint8(v)
-	err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-	if err != nil {
-		panic(err)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: set16r #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
 	}
 }
 
@@ -162,17 +340,12 @@ func (r *regi16) get(h *LedCon) (v int16) { v = int16((*reg16)(r).get(h)); retur
 func (r *regi16) set(h *LedCon, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 
 func (h *LedCon) LedFpInit() {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	var d byte
 	fanFail = true
 	lastFanFail = true
 	lastPsuStatus[0] = "value"
 	lastPsuStatus[1] = "value"
 
-	q := getGenRegs()
-	q.Reg.setMux(h)
 	r := getLedRegs()
 	o := r.Output0.get(h)
 
@@ -188,11 +361,6 @@ func (h *LedCon) LedFpInit() {
 }
 
 func (h *LedCon) LedStatus() {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
-	q := getGenRegs()
-	q.Reg.setMux(h)
 	r := getLedRegs()
 	var o, c uint8
 	var d byte

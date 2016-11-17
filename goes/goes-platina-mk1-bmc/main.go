@@ -75,6 +75,7 @@ const (
 	ucd9090MuxVal = 0x01
 	ledgpioBus    = 0
 	ledgpioAdr    = 0x22
+	ledgpioMuxBus = 0
 	ledgpioMuxAdr = 0x76
 	ledgpioMuxVal = 0x02
 	fangpioBus    = 1
@@ -106,7 +107,7 @@ type Address [AddressBytes]byte
 
 var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w83795MuxVal}
 var pm = ucd9090.PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
-var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxAdr, ledgpioMuxVal}
+var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxBus, ledgpioMuxAdr, ledgpioMuxVal}
 var fanTray = fantray.FanStat{fangpioBus, fangpioAdr, fangpioMuxBus, fangpioMuxAdr, fangpioMuxVal}
 var ps2 = fsp.Psu{ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
 var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps1MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
