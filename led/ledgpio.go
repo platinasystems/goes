@@ -52,7 +52,6 @@ const (
 )
 
 func getLedRegs() *ledRegs { return (*ledRegs)(regsPointer) }
-func getGenRegs() *genRegs { return (*genRegs)(regsPointer) }
 
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
@@ -99,7 +98,7 @@ func (r *reg8) get(h *LedCon) byte {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get8: ", rc, " addr: ", r.offset())
+			log.Print("Recovered in ledgpio: get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -109,7 +108,7 @@ func (r *reg8) get(h *LedCon) byte {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -122,7 +121,7 @@ func (r *reg8) get(h *LedCon) byte {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get8 #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: get8 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -139,7 +138,7 @@ func (r *reg16) get(h *LedCon) (v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get16: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in ledgpio: get16: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -149,7 +148,7 @@ func (r *reg16) get(h *LedCon) (v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -162,7 +161,7 @@ func (r *reg16) get(h *LedCon) (v uint16) {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: get16 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -179,7 +178,7 @@ func (r *reg16r) get(h *LedCon) (v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get16r: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in ledgpio: get16r: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -189,7 +188,7 @@ func (r *reg16r) get(h *LedCon) (v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16r MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: get16r MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -202,7 +201,7 @@ func (r *reg16r) get(h *LedCon) (v uint16) {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: get16r #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: get16r #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -220,7 +219,7 @@ func (r *reg8) set(h *LedCon, v uint8) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: set8: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in ledgpio: set8: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -230,7 +229,7 @@ func (r *reg8) set(h *LedCon, v uint8) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -244,7 +243,7 @@ func (r *reg8) set(h *LedCon, v uint8) {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set8 #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: set8 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -260,7 +259,7 @@ func (r *reg16) set(h *LedCon, v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: set16: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in ledgpio: set16: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -270,7 +269,7 @@ func (r *reg16) set(h *LedCon, v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -285,7 +284,7 @@ func (r *reg16) set(h *LedCon, v uint16) {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16 #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: set16 #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -301,7 +300,7 @@ func (r *reg16r) set(h *LedCon, v uint16) {
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: set16r: ", rc, ", addr: ", r.offset())
+			log.Print("Recovered in ledgpio: set16r: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
 	}()
@@ -311,7 +310,7 @@ func (r *reg16r) set(h *LedCon, v uint16) {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
@@ -326,7 +325,7 @@ func (r *reg16r) set(h *LedCon, v uint16) {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
 		if err == nil {
 			if i > 0 {
-				log.Print("fsp550: set16r #retries: ", i, ", addr: ", r.offset())
+				log.Print("ledgpio: set16r #retries: ", i, ", addr: ", r.offset())
 			}
 			break
 		}
