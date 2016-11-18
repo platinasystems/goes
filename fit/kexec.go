@@ -7,18 +7,11 @@ import (
 )
 
 func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {
-	var segments []kexec.KexecSegment
+	segments := make([]kexec.KexecSegment, 0, len(conf.ImageList))
 
-	segments = make([]kexec.KexecSegment, len(conf.ImageList),
-		len(conf.ImageList))
-
-	for i, image := range conf.ImageList {
-		segments[i].Buf = &image.Data[0]
-		bufsz := uint(len(image.Data))
-		segments[i].Bufsz = bufsz
-		memsz := (bufsz + 4095) &^ 4095
-		segments[i].Mem = uintptr(image.LoadAddr) + offset
-		segments[i].Memsz = memsz
+	for _, image := range conf.ImageList {
+		segments = kexec.SliceAddSegment(segments, &image.Data,
+			uintptr(image.LoadAddr) + offset)
 	}
 	if f.Debug {
 		fmt.Printf("Segments: %+v\n", segments)
