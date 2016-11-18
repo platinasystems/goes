@@ -66,6 +66,15 @@ type Tree struct {
 
 var defaultTree Tree
 
+func DefaultTree() (t *Tree) {
+	d := defaultTree;	// Deliberate copy - caller can modify
+	if d.RootNode != nil && len(d.RootNode.Properties) != 0 &&
+		len(d.RootNode.Children) != 0 {
+		return &d
+	}
+	return nil
+}
+
 func (n *Node) String() (s string) {
 	if n == nil {
 		return "nil"
