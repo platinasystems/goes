@@ -320,7 +320,7 @@ func (t *Tree) alignTo(b []byte, align int) []byte {
 	return b
 }
 
-func (t *Tree) propUint32ToSlice(v uint32) (r []byte) {
+func (t *Tree) PropUint32ToSlice(v uint32) (r []byte) {
 	r = make([]byte, 4)
 	if t.IsLittleEndian {
 		binary.LittleEndian.PutUint32(r, v)
@@ -330,7 +330,7 @@ func (t *Tree) propUint32ToSlice(v uint32) (r []byte) {
 	return r
 }
 
-func (t *Tree) propUint64ToSlice(v uint64) (r []byte) {
+func (t *Tree) PropUint64ToSlice(v uint64) (r []byte) {
 	r = make([]byte, 8)
 	if t.IsLittleEndian {
 		binary.LittleEndian.PutUint64(r, v)
@@ -341,11 +341,11 @@ func (t *Tree) propUint64ToSlice(v uint64) (r []byte) {
 }
 
 func (t *Tree) putCell(b []byte, v uint32) []byte {
-	return append(b, t.propUint32ToSlice(v)...)
+	return append(b, t.PropUint32ToSlice(v)...)
 }
 
 func (t *Tree) putCellUint64(b []byte, v uint64) []byte {
-	return append(b, t.propUint64ToSlice(v)...)
+	return append(b, t.PropUint64ToSlice(v)...)
 }
 
 func (t *Tree) putNode(b []byte, s []byte, n *Node) (bOut []byte, sOut []byte) {
@@ -377,7 +377,7 @@ func (t *Tree) putNode(b []byte, s []byte, n *Node) (bOut []byte, sOut []byte) {
 }
 
 func (t *Tree) putUint32(w *uint32, v uint32) {
-	r := t.propUint32ToSlice(v)
+	r := t.PropUint32ToSlice(v)
 	*w = *(*uint32)(unsafe.Pointer(&r[0]))
 }
 
