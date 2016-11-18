@@ -115,8 +115,6 @@ func (t *Tree) readHeader(buf []byte) {
 	}
 }
 
-func Parse(b []byte) { defaultTree.Parse(b) }
-
 func (t *Tree) Parse(buf []byte) (err error) {
 	h := &t.header
 
