@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func FileLoad(k *os.File, i *os.File, cmdline string, flags uintptr) (err error) {
+func fileLoadSyscall(k *os.File, i *os.File, cmdline string, flags uintptr) (err error) {
 	err = syscall.ENOSYS
 	return
 }
