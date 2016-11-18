@@ -15,6 +15,19 @@ type KexecSegment struct {
 	Memsz uint
 }
 
+func SliceAddSegment(s []KexecSegment, b *[]byte, a uintptr) ([]KexecSegment) {
+	var ks KexecSegment
+	ks.Buf = &(*b)[0]
+	bufsz := uint(len(*b))
+	ks.Bufsz = bufsz
+	memsz := (bufsz + 4095) &^ 4095
+	ks.Mem = a
+	ks.Memsz = memsz
+	s = append(s, ks)
+
+	return s
+}
+
 func SegmentLoad(entry uint64, segments *[]KexecSegment, flags uintptr) (err error) {
 	_, _, e := syscall.Syscall6(syscall.SYS_KEXEC_LOAD, uintptr(entry),
 		uintptr(len(*segments)),
