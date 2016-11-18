@@ -66,6 +66,19 @@ type Tree struct {
 
 var defaultTree Tree
 
+func init() {
+	_ = defaultTree.ParseKernel()
+}
+
+func DefaultTree() (t *Tree) {
+	d := defaultTree;	// Deliberate copy - caller can modify
+	if d.RootNode != nil && len(d.RootNode.Properties) != 0 &&
+		len(d.RootNode.Children) != 0 {
+		return &d
+	}
+	return nil
+}
+
 func (n *Node) String() (s string) {
 	if n == nil {
 		return "nil"
@@ -114,8 +127,6 @@ func (t *Tree) readHeader(buf []byte) {
 		fmt.Println("binary.ReadFdtHeader failed:", err)
 	}
 }
-
-func Parse(b []byte) { defaultTree.Parse(b) }
 
 func (t *Tree) Parse(buf []byte) (err error) {
 	h := &t.header
@@ -322,7 +333,7 @@ func (t *Tree) alignTo(b []byte, align int) []byte {
 	return b
 }
 
-func (t *Tree) propUint32ToSlice(v uint32) (r []byte) {
+func (t *Tree) PropUint32ToSlice(v uint32) (r []byte) {
 	r = make([]byte, 4)
 	if t.IsLittleEndian {
 		binary.LittleEndian.PutUint32(r, v)
@@ -332,7 +343,7 @@ func (t *Tree) propUint32ToSlice(v uint32) (r []byte) {
 	return r
 }
 
-func (t *Tree) propUint64ToSlice(v uint64) (r []byte) {
+func (t *Tree) PropUint64ToSlice(v uint64) (r []byte) {
 	r = make([]byte, 8)
 	if t.IsLittleEndian {
 		binary.LittleEndian.PutUint64(r, v)
@@ -343,11 +354,11 @@ func (t *Tree) propUint64ToSlice(v uint64) (r []byte) {
 }
 
 func (t *Tree) putCell(b []byte, v uint32) []byte {
-	return append(b, t.propUint32ToSlice(v)...)
+	return append(b, t.PropUint32ToSlice(v)...)
 }
 
 func (t *Tree) putCellUint64(b []byte, v uint64) []byte {
-	return append(b, t.propUint64ToSlice(v)...)
+	return append(b, t.PropUint64ToSlice(v)...)
 }
 
 func (t *Tree) putNode(b []byte, s []byte, n *Node) (bOut []byte, sOut []byte) {
@@ -379,7 +390,7 @@ func (t *Tree) putNode(b []byte, s []byte, n *Node) (bOut []byte, sOut []byte) {
 }
 
 func (t *Tree) putUint32(w *uint32, v uint32) {
-	r := t.propUint32ToSlice(v)
+	r := t.PropUint32ToSlice(v)
 	*w = *(*uint32)(unsafe.Pointer(&r[0]))
 }
 
