@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license described in the
 // LICENSE file.
 
-package show_version
+package version
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	. "github.com/platinasystems/go/version"
 )
 
-const Name = "show-version"
+const Name = "version"
 
 type cmd struct{}
 
@@ -26,4 +26,10 @@ func (cmd) Main(args ...string) error {
 	}
 	fmt.Println(Version)
 	return nil
+}
+
+func (cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "print HEAD of source",
+	}
 }

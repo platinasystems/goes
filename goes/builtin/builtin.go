@@ -22,9 +22,9 @@ import (
 	"github.com/platinasystems/go/goes/builtin/patents"
 	"github.com/platinasystems/go/goes/builtin/resize"
 	"github.com/platinasystems/go/goes/builtin/show_commands"
-	"github.com/platinasystems/go/goes/builtin/show_version"
 	"github.com/platinasystems/go/goes/builtin/source"
 	"github.com/platinasystems/go/goes/builtin/usage"
+	"github.com/platinasystems/go/goes/builtin/version"
 )
 
 func New() []interface{} {
@@ -44,8 +44,8 @@ func New() []interface{} {
 		patents.New(),
 		resize.New(),
 		show_commands.New(),
-		show_version.New(),
 		source.New(),
 		usage.New(),
+		version.New(),
 	}
 }
