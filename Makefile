@@ -13,22 +13,25 @@ endif
 .PHONY: all
 all: $(ALL)
 
+copyright/copyright.go: LICENSE PATENTS
+	go generate ./copyright
+
 version/version.go: $(gitdir)/HEAD
 	go generate ./version
 
-goes-example: | version/version.go
+goes-example: | copyright/copyright.go version/version.go
 	go build -o $@ ./goes/goes-example
 
-goes-example-amd64.cpio.xz: | version/version.go
+goes-example-amd64.cpio.xz: | copyright/copyright.go version/version.go
 	./scripts/mkinitrd ./goes/goes-example
 
-goes-example-arm.cpio.xz: | version/version.go
+goes-example-arm.cpio.xz: | copyright/copyright.go version/version.go
 	env GOARCH=arm ./scripts/mkinitrd ./goes/goes-example
 
-goes-platina-mk1-bmc-arm.cpio.xz: | version/version.go
+goes-platina-mk1-bmc-arm.cpio.xz: | copyright/copyright.go version/version.go
 	env GOARCH=arm ./scripts/mkinitrd ./goes/goes-platina-mk1-bmc
 
-goes-platina-mk1: | version/version.go
+goes-platina-mk1: | copyright/copyright.go version/version.go
 	go build -o $@ -tags "uio_pci_dma debug foxy" -gcflags "-N -l" \
 		./goes/goes-platina-mk1
 
