@@ -30,7 +30,6 @@ type Config struct {
 
 type Info struct {
 	v         *vnet.Vnet
-	prefix    string
 	prefixes  []string
 	eventPool sync.Pool
 	Config
@@ -39,11 +38,9 @@ type Info struct {
 }
 
 func New(cf Config) (i *Info) {
-	const prefix = "vnet."
 	i = &Info{
 		v:        new(vnet.Vnet),
-		prefix:   prefix,
-		prefixes: []string{prefix},
+		prefixes: []string{"eth-"},
 		Config:   cf,
 	}
 	i.eventPool.New = i.newEvent
@@ -123,10 +120,11 @@ func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err erro
 
 type event struct {
 	vnet.Event
-	i          *Info
-	in         parse.Input
-	key, value string
-	err        chan error
+	i            *Info
+	in           parse.Input
+	key, value   string
+	err          chan error
+	isReadyEvent bool
 }
 
 func (i *Info) newEvent() interface{} {
@@ -144,12 +142,16 @@ func (e *event) EventAction() {
 		bw     vnet.Bandwidth
 		enable parse.Enable
 	)
+	if e.isReadyEvent {
+		info.Publish(e.key, e.value)
+		return
+	}
 	e.in.Init(nil)
 	e.in.Add(e.key, e.value)
 	switch {
-	case e.in.Parse(e.i.prefix+"%v.speed %v", &hi, e.i.v, &bw):
+	case e.in.Parse("%v.speed %v", &hi, e.i.v, &bw):
 		e.err <- hi.SetSpeed(e.i.v, bw)
-	case e.in.Parse(e.i.prefix+"%v.admin %v", &si, e.i.v, &enable):
+	case e.in.Parse("%v.admin %v", &si, e.i.v, &enable):
 		e.err <- si.SetAdminUp(e.i.v, bool(enable))
 	default:
 		e.err <- info.CantSet(e.key)
@@ -158,10 +160,19 @@ func (e *event) EventAction() {
 }
 
 func (i *Info) Set(key, value string) (err error) {
+	return i.set(key, value, false)
+}
+
+func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
+
 	e := i.eventPool.Get().(*event)
 	e.key = key
 	e.value = value
+	e.isReadyEvent = isReadyEvent
 	i.v.SignalEvent(e)
+	if isReadyEvent {
+		return
+	}
 	if err = <-e.err; err == nil {
 		info.Publish(key, value)
 	}
@@ -181,7 +192,6 @@ func (i *Info) Start() error {
 	fn := sockfile.Path(Name)
 	i.gdbWait()
 	i.pub_chan = make(chan key_value, 16<<10) // never want to block vnet
-	go i.publisher()
 	var in parse.Input
 	in.SetString("cli { listen { no-prompt socket " + fn + "} }")
 	return i.v.Run(&in)
@@ -199,6 +209,8 @@ func (i *Info) Init() {
 	p.i = i
 	p.addEvent(0)
 	i.initialPublish()
+	go i.publisher()
+	i.set("vnet.ready", "true", true)
 }
 
 type key_value struct {

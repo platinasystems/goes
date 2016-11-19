@@ -5,6 +5,9 @@
 package main
 
 import (
+	"time"
+
+	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/builtin"
@@ -26,6 +29,7 @@ import (
 	"github.com/platinasystems/go/info/uptime"
 	"github.com/platinasystems/go/info/version"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
+	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	fe1copyright "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
@@ -52,6 +56,7 @@ func main() {
 	command.Plot(vnetcmd.New())
 	command.Sort()
 	start.RedisDevs = []string{"lo", "eth0"}
+	start.ConfHook = wait4vnet
 	machined.Hook = machinedHook
 	goes.Main()
 }
@@ -93,5 +98,28 @@ func vnetHook(i *vnetinfo.Info) error {
 	v.AddPackage("platform", plat)
 	plat.DependsOn("pci-discovery")
 
+	return nil
+}
+
+func wait4vnet() error {
+	conn, err := sockfile.Dial("redisd")
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	psc := redigo.PubSubConn{redigo.NewConn(conn, 0, 500*time.Millisecond)}
+	if err = psc.Subscribe("platina"); err != nil {
+		return err
+	}
+	for {
+		switch t := psc.Receive().(type) {
+		case redigo.Message:
+			if string(t.Data) == "vnet.ready: true" {
+				return nil
+			}
+		case error:
+			return t
+		}
+	}
 	return nil
 }

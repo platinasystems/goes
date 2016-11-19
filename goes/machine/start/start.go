@@ -22,8 +22,11 @@ import (
 
 const Name = "start"
 
-// Machines may use this Hook to run something before redisd, machined, etc.
+// Machines may use Hook to run something before redisd, machined, and any other daemons.
 var Hook = func() error { return nil }
+
+// Machines may use ConfHook to run something after all daemons start and before source of config..
+var ConfHook = func() error { return nil }
 
 var RedisDevs []string
 
@@ -73,6 +76,9 @@ func (cmd cmd) Main(args ...string) error {
 		}
 	}
 	if s := parm["-conf"]; len(s) > 0 {
+		if err = ConfHook(); err != nil {
+			return err
+		}
 		if err = command.Main("source", s); err != nil {
 			return err
 		}
