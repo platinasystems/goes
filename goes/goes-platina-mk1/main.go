@@ -8,6 +8,8 @@ import (
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/builtin"
+	"github.com/platinasystems/go/goes/builtin/license"
+	"github.com/platinasystems/go/goes/builtin/patents"
 	"github.com/platinasystems/go/goes/core"
 	"github.com/platinasystems/go/goes/fs"
 	"github.com/platinasystems/go/goes/kernel"
@@ -26,6 +28,7 @@ import (
 	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
+	fe1copyright "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -36,6 +39,9 @@ import (
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
+	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
+	license.Others = []license.Other{{fe1path, fe1copyright.License}}
+	patents.Others = []patents.Other{{fe1path, fe1copyright.Patents}}
 	command.Plot(builtin.New()...)
 	command.Plot(core.New()...)
 	command.Plot(fs.New()...)
