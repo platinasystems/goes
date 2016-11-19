@@ -32,7 +32,7 @@ func New() cmd { return cmd{} }
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name }
 
-func (cmd) Main(...string) error {
+func (cmd) Main(args ...string) error {
 	err := internal.AssertRoot()
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (cmd) Main(...string) error {
 	if err = Hook(); err != nil {
 		return err
 	}
-	return start()
+	return start(args...)
 
 }
 
@@ -80,8 +80,14 @@ func stop() error {
 	return err
 }
 
-func start() error {
-	err := exec.Command(UsrBinGoes, "start").Run()
+func start(args ...string) error {
+	start := []string{"start"}
+	if len(args) > 0 {
+		args = append(start, args...)
+	} else {
+		args = start
+	}
+	err := exec.Command(UsrBinGoes, args...).Run()
 	if err != nil {
 		err = fmt.Errorf("goes start: %v", err)
 	}
