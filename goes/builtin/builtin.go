@@ -17,7 +17,9 @@ import (
 	"github.com/platinasystems/go/goes/builtin/exit"
 	"github.com/platinasystems/go/goes/builtin/export"
 	"github.com/platinasystems/go/goes/builtin/help"
+	"github.com/platinasystems/go/goes/builtin/license"
 	"github.com/platinasystems/go/goes/builtin/man"
+	"github.com/platinasystems/go/goes/builtin/patents"
 	"github.com/platinasystems/go/goes/builtin/resize"
 	"github.com/platinasystems/go/goes/builtin/show_commands"
 	"github.com/platinasystems/go/goes/builtin/show_version"
@@ -37,7 +39,9 @@ func New() []interface{} {
 		exit.New(),
 		export.New(),
 		help.New(),
+		license.New(),
 		man.New(),
+		patents.New(),
 		resize.New(),
 		show_commands.New(),
 		show_version.New(),
