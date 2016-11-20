@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/platinasystems/go/command"
@@ -101,16 +102,24 @@ const (
 	ps2GpioPrsntL = "PSU1_PRSNT_L"
 	ps2GpioPwronL = "PSU1_PWRON_L"
 	ps2GpioIntL   = "PSU1_INT_L"
+
+	redis_default_interval = 5
 )
 
 type Address [AddressBytes]byte
+
+var timerMutex = &sync.Mutex{}
+var tckr *time.Ticker
+var redis_sync uint16
+var redis_interval uint16 = redis_default_interval
+var redis_clear string
 
 var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w83795MuxVal}
 var pm = ucd9090.PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
 var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxBus, ledgpioMuxAdr, ledgpioMuxVal}
 var fanTray = fantray.FanStat{fangpioBus, fangpioAdr, fangpioMuxBus, fangpioMuxAdr, fangpioMuxVal}
 var ps2 = fsp.Psu{ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
-var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps1MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
+var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps2MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
 var cpu = imx6.Cpu{}
 
 var RedisEnvShadow = map[string]interface{}{}
@@ -159,6 +168,9 @@ func hook() error {
 	regWriteString["fan_tray.speed"] = funcS(hw.SetFanSpeed)
 	regWriteString["psu1.admin.state"] = funcS(ps1.SetAdminState)
 	regWriteString["psu2.admin.state"] = funcS(ps2.SetAdminState)
+	regWriteUint16["update.sync"] = funcU16(force_sync)
+	regWriteUint16["update.interval"] = funcU16(change_interval)
+	regWriteString["update.counters"] = funcS(clear_counters)
 
 	gpio.Aliases = make(gpio.GpioAliasMap)
 	gpio.Pins = make(gpio.PinMap)
@@ -241,6 +253,15 @@ func hook() error {
 				"mfg.diag.version":     d.Fields.DiagVersion,
 				"mfg.service.tag":      d.Fields.ServiceTag,
 				"mfg.vendor.extension": d.Fields.VendorExtension,
+			},
+		},
+		&Info{
+			name:     "update",
+			prefixes: []string{"update."},
+			attrs: machined.Attrs{
+				"update.sync":     init_sync(),
+				"update.interval": init_interval(),
+				"update.counters": init_counters(),
 			},
 		},
 		&Info{
@@ -342,16 +363,16 @@ func hook() error {
 		},
 	)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	tckr = time.NewTicker(time.Duration(redis_interval) * time.Second)
 	go timerLoop()
 	return nil
 }
 
 func timerLoop() {
-	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
+	defer tckr.Stop()
 	for {
 		select {
-		case <-t.C:
+		case <-tckr.C:
 			timerIsr()
 		}
 	}
@@ -378,7 +399,43 @@ func updateString(v string, k string) {
 	}
 }
 
+func force_sync(i uint16) {
+	go timerIsr()
+}
+
+func change_interval(i uint16) {
+	redis_interval = i
+	tckr = time.NewTicker(time.Duration(redis_interval) * time.Second)
+}
+
+func clear_counters(s string) {
+	t := time.Now()
+	s = fmt.Sprintln(t.Format(time.RFC1123))
+	s = s[:len(s)-1]
+	redis_clear = s
+}
+
+func init_sync() uint16 {
+	redis_sync = 0
+	return redis_sync
+}
+
+func init_interval() uint16 {
+	redis_interval = redis_default_interval
+	return redis_interval
+}
+
+func init_counters() string {
+	t := time.Now()
+	s := fmt.Sprintln(t.Format(time.RFC1123))
+	redis_clear = s[:len(s)-1]
+	return redis_clear
+}
+
 func timerIsr() {
+	timerMutex.Lock()
+	defer timerMutex.Unlock()
+
 	log.Print("daemon", "info", "timerISR")
 
 	if stageFlagString == 1 {
@@ -405,6 +462,9 @@ func timerIsr() {
 		}
 		stageFlagFloat64 = 0
 	}
+
+	updateUint16(redis_interval, "update.interval")
+	updateString(redis_clear, "update.counters")
 
 	updateFloat64(pm.Vout(1), "vmon.5v.sb")
 	updateFloat64(pm.Vout(2), "vmon.3v8.bmc")
