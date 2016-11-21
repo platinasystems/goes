@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -92,13 +93,14 @@ func init() {
 }
 
 func (cmd) Main(_ ...string) error {
-	goesroot := os.Getenv("goesroot")
+	goesRootEnv := os.Getenv("goesroot")
+	goesRoot := filepath.SplitList(goesRootEnv)
 	goesinstaller := os.Getenv("goesinstaller")
 	err := Hook()
 	if err != nil {
 		return err
 	}
-	if len(goesroot) > 0 {
+	if len(goesRoot) >= 1 && len(goesRoot[0]) > 0 {
 		_, err = os.Stat("/newroot")
 		if os.IsNotExist(err) {
 			err = os.Mkdir("/newroot", os.FileMode(0755))
@@ -106,7 +108,7 @@ func (cmd) Main(_ ...string) error {
 				return err
 			}
 		}
-		err = command.Main("mount", goesroot, "/newroot")
+		err = command.Main("mount", goesRoot[0], "/newroot")
 		if err != nil {
 			if len(goesinstaller) > 0 {
 				params := strings.Split(goesinstaller, ",")
@@ -114,6 +116,13 @@ func (cmd) Main(_ ...string) error {
 			}
 			if err != nil {
 				return err
+			}
+		}
+		if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
+			err := command.Main("source", goesRoot[1])
+			if err != nil {
+				log.Print("err", "source", goesRoot[1], ":",
+					err)
 			}
 		}
 		for _, dir := range []struct {
