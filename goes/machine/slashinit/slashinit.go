@@ -105,7 +105,7 @@ func (cmd) Main(_ ...string) error {
 		if os.IsNotExist(err) {
 			err = os.Mkdir("/newroot", os.FileMode(0755))
 			if err != nil {
-				return err
+				log.Print("err", "mkdir", "/newroot", ":", err)
 			}
 		}
 		err = command.Main("mount", goesRoot[0], "/newroot")
@@ -113,195 +113,202 @@ func (cmd) Main(_ ...string) error {
 			if len(goesinstaller) > 0 {
 				params := strings.Split(goesinstaller, ",")
 				err = installer(params)
+				if err != nil {
+					log.Print("err", "installer", params[0],
+						":", err)
+				}
+			} else {
+				log.Print("err", "mount", goesRoot[0],
+					"/newroot", ":", err)
 			}
+		} else {
+			if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
+				err := command.Main("source", goesRoot[1])
+				if err != nil {
+					log.Print("err", "source", goesRoot[1], ":",
+						err)
+				}
+			}
+			for _, dir := range []struct {
+				name string
+				mode os.FileMode
+			}{
+				{"/newroot/bin", 0775},
+				{"/newroot/sbin", 0755},
+				{"/newroot/usr", 0755},
+				{"/newroot/usr/bin", 0755},
+			} {
+				if _, err = os.Stat(dir.name); os.IsNotExist(err) {
+					err = os.Mkdir(dir.name, dir.mode)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			for _, cp := range []struct {
+				src, dst string
+			}{
+				{"/init", "/newroot/usr/bin/goes"},
+				{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
+			} {
+				_, err = os.Stat(cp.dst)
+				if os.IsNotExist(err) ||
+					os.Getenv("goes") == "overwrite" {
+					r, err := os.Open(cp.src)
+					if err != nil {
+						return err
+					}
+					defer r.Close()
+					w, err := os.Create(cp.dst)
+					if err != nil {
+						return err
+					}
+					defer w.Close()
+					_, err = io.Copy(w, r)
+					if err != nil {
+						return err
+					}
+					if err = os.Chmod(cp.dst, 0755); err != nil {
+						return err
+					}
+				}
+			}
+			for _, ln := range []struct {
+				src, dst string
+			}{
+				{"../usr/bin/goes", "/newroot/sbin/init"},
+			} {
+				if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
+					err = os.Symlink(ln.src, ln.dst)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			for _, mv := range []struct {
+				src  string
+				dst  string
+				mode os.FileMode
+			}{
+				{"/run", "/newroot/run", 0755},
+				{"/sys", "/newroot/sysfs", 0555},
+				{"/proc", "/newroot/proc", 0555},
+				{"/dev", "/newroot/dev", 0755},
+			} {
+				if _, err = os.Stat(mv.dst); os.IsNotExist(err) {
+					err = os.Mkdir(mv.dst, os.FileMode(mv.mode))
+					if err != nil {
+						return err
+					}
+				}
+				err = syscall.Mount(mv.src, mv.dst, "",
+					syscall.MS_MOVE, "")
+				if err != nil {
+					return err
+				}
+			}
+			if err = os.Chdir("/newroot"); err != nil {
+				return err
+			}
+			for _, fn := range []string{
+				"/usr/bin/gdbserver",
+				"/init",
+				"/bin/goes",
+			} {
+				syscall.Unlink(fn)
+			}
+			for _, dir := range []string{
+				"/run",
+				"/sys",
+				"/proc",
+				"/dev",
+				"/usr/bin",
+				"/usr",
+				"/bin",
+			} {
+				syscall.Rmdir(dir)
+			}
+			err = syscall.Mount("/newroot", "/", "", syscall.MS_MOVE, "")
 			if err != nil {
 				return err
 			}
-		}
-		if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
-			err := command.Main("source", goesRoot[1])
-			if err != nil {
-				log.Print("err", "source", goesRoot[1], ":",
-					err)
-			}
-		}
-		for _, dir := range []struct {
-			name string
-			mode os.FileMode
-		}{
-			{"/newroot/bin", 0775},
-			{"/newroot/sbin", 0755},
-			{"/newroot/usr", 0755},
-			{"/newroot/usr/bin", 0755},
-		} {
-			if _, err = os.Stat(dir.name); os.IsNotExist(err) {
-				err = os.Mkdir(dir.name, dir.mode)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		for _, cp := range []struct {
-			src, dst string
-		}{
-			{"/init", "/newroot/usr/bin/goes"},
-			{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
-		} {
-			_, err = os.Stat(cp.dst)
-			if os.IsNotExist(err) ||
-				os.Getenv("goes") == "overwrite" {
-				r, err := os.Open(cp.src)
-				if err != nil {
-					return err
-				}
-				defer r.Close()
-				w, err := os.Create(cp.dst)
-				if err != nil {
-					return err
-				}
-				defer w.Close()
-				_, err = io.Copy(w, r)
-				if err != nil {
-					return err
-				}
-				if err = os.Chmod(cp.dst, 0755); err != nil {
-					return err
-				}
-			}
-		}
-		for _, ln := range []struct {
-			src, dst string
-		}{
-			{"../usr/bin/goes", "/newroot/sbin/init"},
-		} {
-			if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
-				err = os.Symlink(ln.src, ln.dst)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		for _, mv := range []struct {
-			src  string
-			dst  string
-			mode os.FileMode
-		}{
-			{"/run", "/newroot/run", 0755},
-			{"/sys", "/newroot/sysfs", 0555},
-			{"/proc", "/newroot/proc", 0555},
-			{"/dev", "/newroot/dev", 0755},
-		} {
-			if _, err = os.Stat(mv.dst); os.IsNotExist(err) {
-				err = os.Mkdir(mv.dst, os.FileMode(mv.mode))
-				if err != nil {
-					return err
-				}
-			}
-			err = syscall.Mount(mv.src, mv.dst, "",
-				syscall.MS_MOVE, "")
-			if err != nil {
+			if err = syscall.Chroot("."); err != nil {
 				return err
 			}
-		}
-		if err = os.Chdir("/newroot"); err != nil {
-			return err
-		}
-		for _, fn := range []string{
-			"/usr/bin/gdbserver",
-			"/init",
-			"/bin/goes",
-		} {
-			syscall.Unlink(fn)
-		}
-		for _, dir := range []string{
-			"/run",
-			"/sys",
-			"/proc",
-			"/dev",
-			"/usr/bin",
-			"/usr",
-			"/bin",
-		} {
-			syscall.Rmdir(dir)
-		}
-		err = syscall.Mount("/newroot", "/", "", syscall.MS_MOVE, "")
-		if err != nil {
-			return err
-		}
-		if err = syscall.Chroot("."); err != nil {
-			return err
-		}
-	}
-	for _, dir := range []struct {
-		name string
-		mode os.FileMode
-	}{
-		{"/root", 0700},
-		{"/tmp", 01777},
-		{"/var", 0755},
-	} {
-		if _, err = os.Stat(dir.name); os.IsNotExist(err) {
-			err = os.Mkdir(dir.name, dir.mode)
-			if err != nil {
+
+			for _, dir := range []struct {
+				name string
+				mode os.FileMode
+			}{
+				{"/root", 0700},
+				{"/tmp", 01777},
+				{"/var", 0755},
+			} {
+				if _, err = os.Stat(dir.name); os.IsNotExist(err) {
+					err = os.Mkdir(dir.name, dir.mode)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			for _, ln := range []struct {
+				src, dst string
+			}{
+				{"../run", "/var/run"},
+			} {
+				if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
+					err = os.Symlink(ln.src, ln.dst)
+					if err != nil {
+						log.Print("err", "ln", ln.dst, "->", ln.src,
+							":", err)
+					}
+				}
+			}
+			for _, mnt := range []struct {
+				dir    string
+				dev    string
+				fstype string
+			}{
+				{"/tmp", "tmpfs", "tmpfs"},
+			} {
+				err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
+				if err != nil {
+					log.Print("err", "mount", mnt.dir, ":", err)
+				}
+			}
+			if err = os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
 				return err
 			}
-		}
-	}
-	for _, ln := range []struct {
-		src, dst string
-	}{
-		{"../run", "/var/run"},
-	} {
-		if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
-			err = os.Symlink(ln.src, ln.dst)
-			if err != nil {
-				log.Print("err", "ln", ln.dst, "->", ln.src,
-					":", err)
+			if err = os.Setenv("SHELL", "/bin/goes"); err != nil {
+				return err
 			}
-		}
-	}
-	for _, mnt := range []struct {
-		dir    string
-		dev    string
-		fstype string
-	}{
-		{"/tmp", "tmpfs", "tmpfs"},
-	} {
-		err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
-		if err != nil {
-			log.Print("err", "mount", mnt.dir, ":", err)
-		}
-	}
-	if err = os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
-		return err
-	}
-	if err = os.Setenv("SHELL", "/bin/goes"); err != nil {
-		return err
-	}
-	if err = os.Chdir("/root"); err != nil {
-		return err
-	}
-	if err = os.Setenv("HOME", "/root"); err != nil {
-		return err
-	}
-	if len(os.Getenv("TERM")) == 0 {
-		if err = os.Setenv("TERM", "linux"); err != nil {
+			if err = os.Chdir("/root"); err != nil {
+				return err
+			}
+			if err = os.Setenv("HOME", "/root"); err != nil {
+				return err
+			}
+			if len(os.Getenv("TERM")) == 0 {
+				if err = os.Setenv("TERM", "linux"); err != nil {
+					return err
+				}
+			}
+			const sbininit = "/sbin/init"
+			_, err = os.Stat(sbininit)
+			if err == nil {
+				err = syscall.Exec(sbininit, []string{sbininit}, []string{
+					"PATH=" + os.Getenv("PATH"),
+					"SHELL=" + os.Getenv("SHELL"),
+					"HOME=" + os.Getenv("HOME"),
+					"TERM=" + os.Getenv("TERM"),
+				})
+			} else {
+				err = command.Main("start")
+			}
 			return err
 		}
 	}
-	const sbininit = "/sbin/init"
-	_, err = os.Stat(sbininit)
-	if err == nil {
-		err = syscall.Exec(sbininit, []string{sbininit}, []string{
-			"PATH=" + os.Getenv("PATH"),
-			"SHELL=" + os.Getenv("SHELL"),
-			"HOME=" + os.Getenv("HOME"),
-			"TERM=" + os.Getenv("TERM"),
-		})
-	} else {
-		err = command.Main("start")
-	}
-	return err
+	return nil
 }
 
 func installer(params []string) error {
