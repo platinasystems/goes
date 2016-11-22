@@ -6,6 +6,7 @@ package pg
 
 import (
 	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
@@ -30,6 +31,8 @@ type stream_config struct {
 	// Number of packets to send or 0 for no limit.
 	n_packets_limit uint64
 
+	n_packets_per_print uint64
+
 	// Data rate in bits or packets per second.
 	rate_bits_per_sec    float64
 	rate_packets_per_sec float64
@@ -42,6 +45,7 @@ type Stream struct {
 	name  string
 	index uint
 	r     Streamer
+	w     cli.Writer
 
 	random_seed int64
 
@@ -51,7 +55,8 @@ type Stream struct {
 	rate_packets_per_sec float64
 	credit_packets       float64
 
-	n_packets_sent uint64
+	n_packets_sent       uint64
+	n_packets_last_print uint64
 
 	data         []byte
 	buffer_types elib.Uint32Vec
