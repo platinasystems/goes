@@ -21,6 +21,7 @@ var (
 )
 
 type Psu struct {
+	Installed  int
 	Bus        int
 	Addr       int
 	MuxBus     int
@@ -79,6 +80,9 @@ func (h *Psu) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c
 
 func (r *reg8) get(h *Psu) byte {
 	var data i2c.SMBusData
+	if h.Installed == 0 {
+		return 0
+	}
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
@@ -119,6 +123,9 @@ func (r *reg8) get(h *Psu) byte {
 
 func (r *reg16) get(h *Psu) (v uint16) {
 	var data i2c.SMBusData
+	if h.Installed == 0 {
+		return 0
+	}
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
@@ -159,6 +166,9 @@ func (r *reg16) get(h *Psu) (v uint16) {
 
 func (r *reg16r) get(h *Psu) (v uint16) {
 	var data i2c.SMBusData
+	if h.Installed == 0 {
+		return 0
+	}
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
@@ -199,7 +209,9 @@ func (r *reg16r) get(h *Psu) (v uint16) {
 
 func (r *reg8) set(h *Psu, v uint8) {
 	var data i2c.SMBusData
-
+	if h.Installed == 0 {
+		return
+	}
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
@@ -239,7 +251,9 @@ func (r *reg8) set(h *Psu, v uint8) {
 
 func (r *reg16) set(h *Psu, v uint16) {
 	var data i2c.SMBusData
-
+	if h.Installed == 0 {
+		return
+	}
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
@@ -280,7 +294,9 @@ func (r *reg16) set(h *Psu, v uint16) {
 
 func (r *reg16r) set(h *Psu, v uint16) {
 	var data i2c.SMBusData
-
+	if h.Installed == 0 {
+		return
+	}
 	i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
@@ -439,16 +455,20 @@ func (h *Psu) MfgId() uint16 {
 func (h *Psu) PsuStatus() string {
 	pin, found := gpio.Pins[h.GpioPrsntL]
 	if !found {
+		h.Installed = 0
 		return "not_found"
 	} else {
 		t, err := pin.Value()
 		if err != nil {
+			h.Installed = 0
 			return err.Error()
 		} else if t {
+			h.Installed = 0
 			return "not_installed"
 		}
 	}
 
+	h.Installed = 1
 	pin, found = gpio.Pins[h.GpioPwrok]
 	if !found {
 		return "undetermined"

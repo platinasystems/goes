@@ -56,6 +56,9 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		case (in.Parse("c%*ount %f", &x) || in.Parse("%f", &x)) && x >= 0:
 			c.n_packets_limit = uint64(x)
 			set_what |= set_limit
+		case in.Parse("p%*rint %f", &x):
+			c.n_packets_per_print = uint64(x)
+			set_what |= set_limit
 		case in.Parse("si%*ze %d-%d", &c.min_size, &c.max_size):
 			set_what |= set_size
 		case in.Parse("si%*ze %d", &c.min_size):
@@ -121,6 +124,7 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		}
 		if set_what&set_limit != 0 {
 			s.n_packets_limit = c.n_packets_limit
+			s.n_packets_per_print = c.n_packets_per_print
 			s.n_packets_sent = 0
 		}
 		if set_what&set_next != 0 {
@@ -138,6 +142,8 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 
 	s.last_time = cpu.TimeNow()
 	s.credit_packets = 0
+	s.n_packets_last_print = 0
+	s.w = w
 	ave_packet_bits := 8 * .5 * float64(s.min_size+s.max_size)
 	if create || set_what&set_rate != 0 {
 		if c.rate_bits_per_sec != 0 {

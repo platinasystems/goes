@@ -118,8 +118,8 @@ var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w837
 var pm = ucd9090.PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
 var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxBus, ledgpioMuxAdr, ledgpioMuxVal}
 var fanTray = fantray.FanStat{fangpioBus, fangpioAdr, fangpioMuxBus, fangpioMuxAdr, fangpioMuxVal}
-var ps2 = fsp.Psu{ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
-var ps1 = fsp.Psu{ps2Bus, ps2Adr, ps2MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
+var ps2 = fsp.Psu{0, ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
+var ps1 = fsp.Psu{0, ps2Bus, ps2Adr, ps2MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
 var cpu = imx6.Cpu{}
 
 var RedisEnvShadow = map[string]interface{}{}

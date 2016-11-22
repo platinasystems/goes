@@ -189,10 +189,10 @@ type counter_update_event struct {
 
 func (e *counter_update_event) String() (s string) {
 	s = fmt.Sprintf("%s counter update sequence %d: ", e.dev.Name(), e.sequence)
-	if e.only_64_bit() {
-		s += "64-bit"
+	if e.only_36_bit() {
+		s += "36-bit"
 	} else {
-		s += "32-bit and 64-bit"
+		s += "32-bit and 36-bit"
 	}
 	return
 }
@@ -202,7 +202,7 @@ func (e *counter_update_event) String() (s string) {
 // packet counters may overflow in around 5 minutes.
 const counter_update_interval = 45
 
-func (e *counter_update_event) only_64_bit() bool {
+func (e *counter_update_event) only_36_bit() bool {
 	return e.sequence%5 != 4 // 32 bit counters 5 times less often
 }
 
@@ -210,8 +210,8 @@ func (e *counter_update_event) EventAction() {
 	d := e.dev
 	hi := d.Hi()
 	th := d.m.Vnet.GetIfThread(0)
-	only_64_bit := e.only_64_bit()
-	d.foreach_counter(only_64_bit, func(i uint, v uint64) {
+	only_36_bit := e.only_36_bit()
+	d.foreach_counter(only_36_bit, func(i uint, v uint64) {
 		vnet.HwIfCounterKind(i).Add64(th, hi, v)
 	})
 	d.AddTimedEvent(e, counter_update_interval)
