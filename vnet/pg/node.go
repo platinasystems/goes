@@ -379,10 +379,16 @@ func (n *node) stream_input(o *vnet.RefOut, s *Stream) (done bool, dt float64) {
 		s.n_packets_sent += uint64(n_packets)
 	}
 	done = s.n_packets_limit != 0 && s.n_packets_sent >= s.n_packets_limit
-	if np := s.n_packets_per_print; np != 0 || done {
+	if np := s.n_packets_per_print; np != 0 {
 		for s.n_packets_sent >= s.n_packets_last_print+np {
 			s.n_packets_last_print += np
-			fmt.Fprintf(s.w, "packet-generator %s: %d packets\n", s.name, s.n_packets_last_print)
+			if done {
+				s.n_packets_last_print = s.n_packets_sent
+			}
+			fmt.Fprintf(s.w, "\npacket-generator %s: %d packets", s.name, s.n_packets_last_print)
+			if done {
+				break
+			}
 		}
 	}
 	return
