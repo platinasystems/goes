@@ -319,6 +319,7 @@ func hook() error {
 				"psu1.p_in":         ps1.Pin(),
 				"psu1.pmbus_rev":    ps1.PMBusRev(),
 				"psu1.mfg_id":       ps1.MfgId(),
+				"psu1.mfg_model":    ps1.MfgModel(),
 				"psu1.status_fans":  ps1.StatusFans(),
 				"psu1.temperature1": ps1.Temp1(),
 				"psu1.temperature2": ps1.Temp2(),
@@ -345,6 +346,7 @@ func hook() error {
 				"psu2.p_in":         ps2.Pin(),
 				"psu2.pmbus_rev":    ps2.PMBusRev(),
 				"psu2.mfg_id":       ps2.MfgId(),
+				"psu2.mfg_model":    ps2.MfgModel(),
 				"psu2.status_fans":  ps2.StatusFans(),
 				"psu2.temperature1": ps2.Temp1(),
 				"psu2.temperature2": ps2.Temp2(),
@@ -490,6 +492,10 @@ func timerIsr() {
 	updateString(ps1.GetAdminState(), "psu1.admin.state")
 	updateString(ps2.PsuStatus(), "psu2.status")
 	updateString(ps2.GetAdminState(), "psu2.admin.state")
+	updateString(ps1.MfgId(), "psu1.mfg_id")
+	updateString(ps2.MfgId(), "psu2.mfg_id")
+	updateString(ps1.MfgModel(), "psu1.mfg_model")
+	updateString(ps2.MfgModel(), "psu2.mfg_model")
 
 	updateUint16(ps1.Page(), "psu1.page")
 	updateUint16(ps1.StatusWord(), "psu1.status_word")
@@ -504,7 +510,6 @@ func timerIsr() {
 	updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
 	updateUint16(ps1.Pout(), "psu1.p_out")
 	updateUint16(ps1.Pin(), "psu1.p_in")
-	updateUint16(ps1.MfgId(), "psu1.mfg_id")
 	updateUint16(ps1.StatusFans(), "psu1.status_fans")
 	updateUint16(ps1.Temp1(), "psu1.temperature1")
 	updateUint16(ps1.Temp2(), "psu1.temperature2")
@@ -523,7 +528,6 @@ func timerIsr() {
 	updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
 	updateUint16(ps2.Pout(), "psu2.p_out")
 	updateUint16(ps2.Pin(), "psu2.p_in")
-	updateUint16(ps2.MfgId(), "psu2.mfg_id")
 	updateUint16(ps2.StatusFans(), "psu2.status_fans")
 	updateUint16(ps2.Temp1(), "psu2.temperature1")
 	updateUint16(ps2.Temp2(), "psu2.temperature2")
