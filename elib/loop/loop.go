@@ -151,11 +151,21 @@ func (n *Node) Activate(enable bool) (was bool) {
 			break
 		}
 	}
-	// Interrupt event wait to poll active nodes.
-	if !was && enable {
+	if was != enable {
 		l := n.loop
-		atomic.AddUint32(&l.nActivePollers, 1)
-		l.Interrupt()
+		d := uint32(1)
+		if !enable {
+			d = -d
+			// This can happen on wakeup from suspend when node is not active.
+			if l.nActivePollers <= 0 {
+				d = 0
+			}
+		}
+		atomic.AddUint32(&l.nActivePollers, d)
+		if enable {
+			// Interrupt event wait so that pollers may be considered.
+			l.Interrupt()
+		}
 	}
 	return
 }
@@ -255,7 +265,7 @@ func (l *Loop) Resume(in *In) {
 	if p := a.pollerNode; p != nil {
 		for {
 			old := p.flags
-			if old&node_active == 0 {
+			if old&(node_active|node_suspended) == 0 {
 				p.pollerElog(poller_resume, old)
 				return
 			}
