@@ -264,7 +264,7 @@ func (cmd) mountTargetVirtualFilesystems() (err error) {
 	return nil
 }
 
-func (c cmd) Main(_ ...string) error {
+func (c cmd) pivotRoot() error {
 	goesRootEnv := os.Getenv("goesroot")
 	goesRoot := filepath.SplitList(goesRootEnv)
 	goesinstaller := os.Getenv("goesinstaller")
@@ -353,6 +353,27 @@ func (c cmd) Main(_ ...string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (cmd) emergencyShell() () {
+	for {
+		fmt.Println("Dropping into emergency goes shell...\n")
+		err := command.Main("cli")
+		if err != nil && err != io.EOF {
+			fmt.Println(err)
+		}	
+	}
+}
+
+func (c cmd) Main(_ ...string) error {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
+		c.emergencyShell()
+	}()
+	c.pivotRoot()
 	return nil
 }
 
