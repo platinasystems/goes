@@ -59,10 +59,7 @@ func (e *pollerElogEvent) String() (s string) {
 	if e.poller_index != 0xff {
 		s += fmt.Sprintf(" %d:", e.poller_index)
 	}
-	s += fmt.Sprintf(" %s %s", elog.String(e.name[:]), e.event_type)
-	if e.flags != 0 {
-		s += fmt.Sprintf(", flags: %s", node_flags(e.flags))
-	}
+	s += fmt.Sprintf(" %s %s, new flags: %s", elog.String(e.name[:]), e.event_type, node_flags(e.flags))
 	return
 }
 func (e *pollerElogEvent) Encode(b []byte) int {
