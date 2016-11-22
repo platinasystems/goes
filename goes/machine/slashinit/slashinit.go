@@ -92,7 +92,179 @@ func init() {
 	}
 }
 
-func (cmd) Main(_ ...string) error {
+func (cmd) makeRootDirs() (err error) {
+	for _, dir := range []struct {
+		name string
+		mode os.FileMode
+	}{
+		{"/newroot/bin", 0775},
+		{"/newroot/sbin", 0755},
+		{"/newroot/usr", 0755},
+		{"/newroot/usr/bin", 0755},
+	} {
+		if _, err = os.Stat(dir.name); os.IsNotExist(err) {
+			err = os.Mkdir(dir.name, dir.mode)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (cmd) makeRootFiles() (err error) {
+	for _, cp := range []struct {
+		src, dst string
+	}{
+		{"/init", "/newroot/usr/bin/goes"},
+		{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
+	} {
+		_, err = os.Stat(cp.dst)
+		if os.IsNotExist(err) ||
+			os.Getenv("goes") == "overwrite" {
+			r, err := os.Open(cp.src)
+			if err != nil {
+				return err
+			}
+			defer r.Close()
+			w, err := os.Create(cp.dst)
+			if err != nil {
+				return err
+			}
+			defer w.Close()
+			_, err = io.Copy(w, r)
+			if err != nil {
+				return err
+			}
+			if err = os.Chmod(cp.dst, 0755); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (cmd) makeRootLinks() (err error) {
+	for _, ln := range []struct {
+		src, dst string
+	}{
+		{"../usr/bin/goes", "/newroot/sbin/init"},
+	} {
+		if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
+			err = os.Symlink(ln.src, ln.dst)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (cmd) moveVirtualFileSystems() (err error) {
+	for _, mv := range []struct {
+		src  string
+		dst  string
+		mode os.FileMode
+	}{
+		{"/run", "/newroot/run", 0755},
+		{"/sys", "/newroot/sysfs", 0555},
+		{"/proc", "/newroot/proc", 0555},
+		{"/dev", "/newroot/dev", 0755},
+	} {
+		if _, err = os.Stat(mv.dst); os.IsNotExist(err) {
+			err = os.Mkdir(mv.dst, os.FileMode(mv.mode))
+			if err != nil {
+				return err
+			}
+		}
+		err = syscall.Mount(mv.src, mv.dst, "",
+			syscall.MS_MOVE, "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd) unlinkRootFiles() error {
+	for _, fn := range []string{
+		"/usr/bin/gdbserver",
+		"/init",
+		"/bin/goes",
+	} {
+		syscall.Unlink(fn)
+	}
+	return nil
+}
+
+func (cmd) rmdirRootDirs() error {
+	for _, dir := range []string{
+		"/run",
+		"/sys",
+		"/proc",
+		"/dev",
+		"/usr/bin",
+		"/usr",
+		"/bin",
+	} {
+		syscall.Rmdir(dir)
+	}
+	return nil
+}
+
+func (cmd) makeTargetDirs () (err error) {
+	for _, dir := range []struct {
+		name string
+		mode os.FileMode
+	}{
+		{"/root", 0700},
+		{"/tmp", 01777},
+		{"/var", 0755},
+	} {
+		if _, err = os.Stat(dir.name); os.IsNotExist(err) {
+			err = os.Mkdir(dir.name, dir.mode)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (cmd) makeTargetLinks() (err error) {
+	for _, ln := range []struct {
+		src, dst string
+	}{
+		{"../run", "/var/run"},
+	} {
+		if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
+			err = os.Symlink(ln.src, ln.dst)
+			if err != nil {
+				log.Print("err", "ln", ln.dst, "->", ln.src,
+					":", err)
+			}
+		}
+	}
+	return nil
+}
+
+func (cmd) mountTargetVirtualFilesystems() (err error) {
+	for _, mnt := range []struct {
+		dir    string
+		dev    string
+		fstype string
+	}{
+		{"/tmp", "tmpfs", "tmpfs"},
+	} {
+		err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
+		if err != nil {
+			log.Print("err", "mount", mnt.dir, ":", err)
+		}
+	}
+	return nil
+}
+
+func (c cmd) Main(_ ...string) error {
 	goesRootEnv := os.Getenv("goesroot")
 	goesRoot := filepath.SplitList(goesRootEnv)
 	goesinstaller := os.Getenv("goesinstaller")
@@ -129,105 +301,16 @@ func (cmd) Main(_ ...string) error {
 						err)
 				}
 			}
-			for _, dir := range []struct {
-				name string
-				mode os.FileMode
-			}{
-				{"/newroot/bin", 0775},
-				{"/newroot/sbin", 0755},
-				{"/newroot/usr", 0755},
-				{"/newroot/usr/bin", 0755},
-			} {
-				if _, err = os.Stat(dir.name); os.IsNotExist(err) {
-					err = os.Mkdir(dir.name, dir.mode)
-					if err != nil {
-						return err
-					}
-				}
-			}
-			for _, cp := range []struct {
-				src, dst string
-			}{
-				{"/init", "/newroot/usr/bin/goes"},
-				{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
-			} {
-				_, err = os.Stat(cp.dst)
-				if os.IsNotExist(err) ||
-					os.Getenv("goes") == "overwrite" {
-					r, err := os.Open(cp.src)
-					if err != nil {
-						return err
-					}
-					defer r.Close()
-					w, err := os.Create(cp.dst)
-					if err != nil {
-						return err
-					}
-					defer w.Close()
-					_, err = io.Copy(w, r)
-					if err != nil {
-						return err
-					}
-					if err = os.Chmod(cp.dst, 0755); err != nil {
-						return err
-					}
-				}
-			}
-			for _, ln := range []struct {
-				src, dst string
-			}{
-				{"../usr/bin/goes", "/newroot/sbin/init"},
-			} {
-				if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
-					err = os.Symlink(ln.src, ln.dst)
-					if err != nil {
-						return err
-					}
-				}
-			}
-			for _, mv := range []struct {
-				src  string
-				dst  string
-				mode os.FileMode
-			}{
-				{"/run", "/newroot/run", 0755},
-				{"/sys", "/newroot/sysfs", 0555},
-				{"/proc", "/newroot/proc", 0555},
-				{"/dev", "/newroot/dev", 0755},
-			} {
-				if _, err = os.Stat(mv.dst); os.IsNotExist(err) {
-					err = os.Mkdir(mv.dst, os.FileMode(mv.mode))
-					if err != nil {
-						return err
-					}
-				}
-				err = syscall.Mount(mv.src, mv.dst, "",
-					syscall.MS_MOVE, "")
-				if err != nil {
-					return err
-				}
-			}
+			c.makeRootDirs()
+			c.makeRootFiles()
+			c.makeRootLinks()
+			c.moveVirtualFileSystems()
+			
 			if err = os.Chdir("/newroot"); err != nil {
 				return err
 			}
-			for _, fn := range []string{
-				"/usr/bin/gdbserver",
-				"/init",
-				"/bin/goes",
-			} {
-				syscall.Unlink(fn)
-			}
-			for _, dir := range []string{
-				"/run",
-				"/sys",
-				"/proc",
-				"/dev",
-				"/usr/bin",
-				"/usr",
-				"/bin",
-			} {
-				syscall.Rmdir(dir)
-			}
+			c.unlinkRootFiles()
+			c.rmdirRootDirs()
 			err = syscall.Mount("/newroot", "/", "", syscall.MS_MOVE, "")
 			if err != nil {
 				return err
@@ -235,47 +318,9 @@ func (cmd) Main(_ ...string) error {
 			if err = syscall.Chroot("."); err != nil {
 				return err
 			}
-
-			for _, dir := range []struct {
-				name string
-				mode os.FileMode
-			}{
-				{"/root", 0700},
-				{"/tmp", 01777},
-				{"/var", 0755},
-			} {
-				if _, err = os.Stat(dir.name); os.IsNotExist(err) {
-					err = os.Mkdir(dir.name, dir.mode)
-					if err != nil {
-						return err
-					}
-				}
-			}
-			for _, ln := range []struct {
-				src, dst string
-			}{
-				{"../run", "/var/run"},
-			} {
-				if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
-					err = os.Symlink(ln.src, ln.dst)
-					if err != nil {
-						log.Print("err", "ln", ln.dst, "->", ln.src,
-							":", err)
-					}
-				}
-			}
-			for _, mnt := range []struct {
-				dir    string
-				dev    string
-				fstype string
-			}{
-				{"/tmp", "tmpfs", "tmpfs"},
-			} {
-				err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
-				if err != nil {
-					log.Print("err", "mount", mnt.dir, ":", err)
-				}
-			}
+			c.makeTargetDirs()
+			c.makeTargetLinks()
+			c.mountTargetVirtualFilesystems()
 			if err = os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
 				return err
 			}
