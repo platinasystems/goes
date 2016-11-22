@@ -17,8 +17,10 @@ import (
 )
 
 type refOpaque struct {
+	// Error code for error node if packets is to be dropped.
 	err ErrorRef
 
+	// Software interface.
 	Si Si
 }
 
