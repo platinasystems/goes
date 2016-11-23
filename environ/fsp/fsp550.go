@@ -39,6 +39,7 @@ func getPsuRegs() *psuRegs { return (*psuRegs)(regsPointer) }
 
 // offset function has divide by two for 16-bit offset struct
 func (r *reg8) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
+func (r *reg8b) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 func (r *reg16) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 func (r *reg16r) offset() uint8 { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 
@@ -90,7 +91,6 @@ func (r *reg8) get(h *Psu) byte {
 		}
 		i2c.Lock.Unlock()
 	}()
-
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
@@ -104,7 +104,6 @@ func (r *reg8) get(h *Psu) byte {
 			panic(err)
 		}
 	}
-
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
 		if err == nil {
@@ -117,8 +116,81 @@ func (r *reg8) get(h *Psu) byte {
 			panic(err)
 		}
 	}
-
 	return data[0]
+}
+
+func (r *reg8b) get(h *Psu) string {
+	var data i2c.SMBusData
+	if h.Installed == 0 {
+		return "not installed"
+	}
+	i2c.Lock.Lock()
+	defer func() {
+		if rc := recover(); rc != nil {
+			log.Print("Recovered in fsp550: get8b: ", rc, " addr: ", r.offset())
+		}
+		i2c.Lock.Unlock()
+	}()
+	data[0] = byte(h.MuxValue)
+	for i := 0; i < 5000; i++ {
+		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8b MuxWr #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+	data[0] = 2
+	for i := 0; i < 5000; i++ { // read count into data[0]
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8b Count #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+	count := data[0] + 1
+	for i := 0; i < 5000; i++ { // recover bus
+		err := h.i2cDo(i2c.Read, 0, i2c.ByteData, &data)
+		if err == nil {
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+	data[0] = count
+	for i := 0; i < 5000; i++ { // read block
+		err := h.i2cDo(i2c.Read, r.offset(), i2c.BlockData, &data)
+		if err == nil {
+			if i > 0 {
+				log.Print("fsp550: get8b #retries: ", i, ", addr: ", r.offset())
+			}
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+	s := string(data[1:(data[0])])
+	for i := 0; i < 5000; i++ { // recover bus
+		err := h.i2cDo(i2c.Read, 0, i2c.ByteData, &data)
+		if err == nil {
+			break
+		}
+		if i == 4999 {
+			panic(err)
+		}
+	}
+	return s
 }
 
 func (r *reg16) get(h *Psu) (v uint16) {
@@ -133,7 +205,6 @@ func (r *reg16) get(h *Psu) (v uint16) {
 		}
 		i2c.Lock.Unlock()
 	}()
-
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
@@ -147,7 +218,6 @@ func (r *reg16) get(h *Psu) (v uint16) {
 			panic(err)
 		}
 	}
-
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
 		if err == nil {
@@ -160,7 +230,6 @@ func (r *reg16) get(h *Psu) (v uint16) {
 			panic(err)
 		}
 	}
-
 	return uint16(data[0])<<8 | uint16(data[1])
 }
 
@@ -176,7 +245,6 @@ func (r *reg16r) get(h *Psu) (v uint16) {
 		}
 		i2c.Lock.Unlock()
 	}()
-
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
@@ -190,7 +258,6 @@ func (r *reg16r) get(h *Psu) (v uint16) {
 			panic(err)
 		}
 	}
-
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
 		if err == nil {
@@ -203,7 +270,6 @@ func (r *reg16r) get(h *Psu) (v uint16) {
 			panic(err)
 		}
 	}
-
 	return uint16(data[1])<<8 | uint16(data[0])
 }
 
@@ -219,7 +285,6 @@ func (r *reg8) set(h *Psu, v uint8) {
 		}
 		i2c.Lock.Unlock()
 	}()
-
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
@@ -233,7 +298,6 @@ func (r *reg8) set(h *Psu, v uint8) {
 			panic(err)
 		}
 	}
-
 	data[0] = v
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
@@ -261,7 +325,6 @@ func (r *reg16) set(h *Psu, v uint16) {
 		}
 		i2c.Lock.Unlock()
 	}()
-
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
@@ -275,7 +338,6 @@ func (r *reg16) set(h *Psu, v uint16) {
 			panic(err)
 		}
 	}
-
 	data[0] = uint8(v >> 8)
 	data[1] = uint8(v)
 	for i := 0; i < 5000; i++ {
@@ -304,7 +366,6 @@ func (r *reg16r) set(h *Psu, v uint16) {
 		}
 		i2c.Lock.Unlock()
 	}()
-
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
 		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
@@ -318,7 +379,6 @@ func (r *reg16r) set(h *Psu, v uint16) {
 			panic(err)
 		}
 	}
-
 	data[1] = uint8(v >> 8)
 	data[0] = uint8(v)
 	for i := 0; i < 5000; i++ {
@@ -446,10 +506,16 @@ func (h *Psu) PMBusRev() uint16 {
 	return (uint16(t))
 }
 
-func (h *Psu) MfgId() uint16 {
+func (h *Psu) MfgId() string {
 	r := getPsuRegs()
 	t := r.MfgId.get(h)
-	return (uint16(t))
+	return t
+}
+
+func (h *Psu) MfgModel() string {
+	r := getPsuRegs()
+	t := r.MfgModel.get(h)
+	return t
 }
 
 func (h *Psu) PsuStatus() string {
@@ -488,9 +554,9 @@ func (h *Psu) SetAdminState(s string) {
 	if found {
 		switch s {
 		case "disable":
-			pin.SetValue(false)
-		case "enable":
 			pin.SetValue(true)
+		case "enable":
+			pin.SetValue(false)
 		}
 	}
 }
@@ -504,7 +570,7 @@ func (h *Psu) GetAdminState() string {
 	if err != nil {
 		return err.Error()
 	}
-	if !t {
+	if t {
 		return "disabled"
 	}
 	return "enabled"

@@ -1,6 +1,7 @@
 package fsp
 
 type reg8 byte
+type reg8b byte
 type reg16 [2]byte
 type reg16r [2]byte
 type regi16 reg16
@@ -28,7 +29,7 @@ type psuRegs struct {
 	StatusTemp  reg8 // 0x7d
 	_           byte
 	_           [0x03 * 2]byte
-	StatusFans  reg16r // 0x81
+	StatusFans  reg8 // 0x81
 	_           byte
 	_           [0x04 * 2]byte
 	Ein         reg8 // 0x86
@@ -49,6 +50,8 @@ type psuRegs struct {
 	Pin         reg16r // 0x97
 	PMBusRev    reg8   // 0x98
 	_           byte
-	MfgId       reg8 // 0x99
+	MfgId       reg8b // 0x99
+	_           byte
+	MfgModel    reg8b // 0x9a
 	_           byte
 }
