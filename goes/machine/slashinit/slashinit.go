@@ -264,99 +264,83 @@ func (cmd) mountTargetVirtualFilesystems() (err error) {
 	return nil
 }
 
-func (c cmd) pivotRoot() error {
-	goesRootEnv := os.Getenv("goesroot")
-	goesRoot := filepath.SplitList(goesRootEnv)
-	goesinstaller := os.Getenv("goesinstaller")
-	err := Hook()
+func (c cmd) pivotRoot(root string, script string) error {
+	_, err := os.Stat("/newroot")
+	if os.IsNotExist(err) {
+		err = os.Mkdir("/newroot", os.FileMode(0755))
+		if err != nil {
+			log.Print("err", "mkdir", "/newroot", ":", err)
+		}
+	}
+	err = command.Main("mount", root, "/newroot")
+	if err != nil {
+		log.Print("err", "mount", root,
+			"/newroot", ":", err)
+	}
+
+	if len(script) > 0 {
+		err := command.Main("source", script)
+		if err != nil {
+			log.Print("err", "source", script, ":",
+				err)
+		}
+	}
+	c.makeRootDirs()
+	c.makeRootFiles()
+	c.makeRootLinks()
+	c.moveVirtualFileSystems()
+	
+	if err = os.Chdir("/newroot"); err != nil {
+		return err
+	}
+	c.unlinkRootFiles()
+	c.rmdirRootDirs()
+	err = syscall.Mount("/newroot", "/", "", syscall.MS_MOVE, "")
 	if err != nil {
 		return err
 	}
-	if len(goesRoot) >= 1 && len(goesRoot[0]) > 0 {
-		_, err = os.Stat("/newroot")
-		if os.IsNotExist(err) {
-			err = os.Mkdir("/newroot", os.FileMode(0755))
-			if err != nil {
-				log.Print("err", "mkdir", "/newroot", ":", err)
-			}
-		}
-		err = command.Main("mount", goesRoot[0], "/newroot")
-		if err != nil {
-			if len(goesinstaller) > 0 {
-				params := strings.Split(goesinstaller, ",")
-				err = installer(params)
-				if err != nil {
-					log.Print("err", "installer", params[0],
-						":", err)
-				}
-			} else {
-				log.Print("err", "mount", goesRoot[0],
-					"/newroot", ":", err)
-			}
-		} else {
-			if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
-				err := command.Main("source", goesRoot[1])
-				if err != nil {
-					log.Print("err", "source", goesRoot[1], ":",
-						err)
-				}
-			}
-			c.makeRootDirs()
-			c.makeRootFiles()
-			c.makeRootLinks()
-			c.moveVirtualFileSystems()
-			
-			if err = os.Chdir("/newroot"); err != nil {
-				return err
-			}
-			c.unlinkRootFiles()
-			c.rmdirRootDirs()
-			err = syscall.Mount("/newroot", "/", "", syscall.MS_MOVE, "")
-			if err != nil {
-				return err
-			}
-			if err = syscall.Chroot("."); err != nil {
-				return err
-			}
-			c.makeTargetDirs()
-			c.makeTargetLinks()
-			c.mountTargetVirtualFilesystems()
-			if err = os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
-				return err
-			}
-			if err = os.Setenv("SHELL", "/bin/goes"); err != nil {
-				return err
-			}
-			if err = os.Chdir("/root"); err != nil {
-				return err
-			}
-			if err = os.Setenv("HOME", "/root"); err != nil {
-				return err
-			}
-			if len(os.Getenv("TERM")) == 0 {
-				if err = os.Setenv("TERM", "linux"); err != nil {
-					return err
-				}
-			}
-			const sbininit = "/sbin/init"
-			_, err = os.Stat(sbininit)
-			if err == nil {
-				err = syscall.Exec(sbininit, []string{sbininit}, []string{
-					"PATH=" + os.Getenv("PATH"),
-					"SHELL=" + os.Getenv("SHELL"),
-					"HOME=" + os.Getenv("HOME"),
-					"TERM=" + os.Getenv("TERM"),
-				})
-			} else {
-				err = command.Main("start")
-			}
-			return err
-		}
+	if err = syscall.Chroot("."); err != nil {
+		return err
 	}
+	c.makeTargetDirs()
+	c.makeTargetLinks()
+	c.mountTargetVirtualFilesystems()
+
 	return nil
 }
 
-func (cmd) emergencyShell() () {
+func (c cmd) runSbinInit() (err error) {
+	if err = os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
+		return err
+	}
+	if err = os.Setenv("SHELL", "/bin/goes"); err != nil {
+		return err
+	}
+	if err = os.Chdir("/root"); err != nil {
+		return err
+	}
+	if err = os.Setenv("HOME", "/root"); err != nil {
+		return err
+	}
+	if len(os.Getenv("TERM")) == 0 {
+		if err = os.Setenv("TERM", "linux"); err != nil {
+			return err
+		}
+	}
+	const sbininit = "/sbin/init"
+	_, err = os.Stat(sbininit)
+	if err == nil {
+		err = syscall.Exec(sbininit, []string{sbininit}, []string{
+			"PATH=" + os.Getenv("PATH"),
+			"SHELL=" + os.Getenv("SHELL"),
+			"HOME=" + os.Getenv("HOME"),
+			"TERM=" + os.Getenv("TERM"),
+		})
+	}
+	return err
+}
+
+func (cmd) emergencyShell() {
 	for {
 		fmt.Println("Dropping into emergency goes shell...\n")
 		err := command.Main("cli")
@@ -367,14 +351,46 @@ func (cmd) emergencyShell() () {
 }
 
 func (c cmd) Main(_ ...string) error {
+	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
+	goesinstaller := os.Getenv("goesinstaller")
 	defer func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Println(r)
+			}
+			c.emergencyShell()
+		} ()
 		if r := recover(); r != nil {
 			fmt.Println(r)
 		}
-		c.emergencyShell()
+		if len(goesinstaller) > 0 {
+			params := strings.Split(goesinstaller, ",")
+			err := installer(params)
+			if err != nil {
+				log.Print("err", "installer", params[0],
+					":", err)
+			}
+		}
 	}()
-	c.pivotRoot()
-	return nil
+	err := Hook()
+	if err != nil {
+		return err
+	}
+	var root, script string
+	if len(goesRoot) >=1 && len(goesRoot[0]) > 0 {
+		root = goesRoot[0]
+	}
+	if len(goesRoot) >=2 && len(goesRoot[1]) > 0 {
+		script = goesRoot[1]
+	}
+
+	if len(root) > 0 {
+		c.pivotRoot(root, script)
+	}
+	c.runSbinInit()
+	err = command.Main("start")
+
+	return err
 }
 
 func installer(params []string) error {
