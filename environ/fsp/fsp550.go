@@ -554,9 +554,9 @@ func (h *Psu) SetAdminState(s string) {
 	if found {
 		switch s {
 		case "disable":
-			pin.SetValue(false)
-		case "enable":
 			pin.SetValue(true)
+		case "enable":
+			pin.SetValue(false)
 		}
 	}
 }
@@ -570,7 +570,7 @@ func (h *Psu) GetAdminState() string {
 	if err != nil {
 		return err.Error()
 	}
-	if !t {
+	if t {
 		return "disabled"
 	}
 	return "enabled"
