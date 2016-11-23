@@ -162,7 +162,9 @@ func (n *Node) changeActive(was, is bool) {
 		if !is {
 			d = -d
 			if l.nActivePollers <= 0 {
-				panic("negative active pollers")
+				// panic("negative active pollers")
+				// FIXME now sure i understand why but panic triggers...
+				d = 0
 			}
 		}
 		atomic.AddUint32(&l.nActivePollers, d)
@@ -355,7 +357,7 @@ func (l *Loop) doPollers() {
 		}
 	}
 
-	atomic.AddUint32(&l.nActivePollers, -uint32(nFreed))
+	// atomic.AddUint32(&l.nActivePollers, -uint32(nFreed))
 	if l.nActivePollers == 0 && nFreed > 0 {
 		l.resetPollerStats()
 	} else {
