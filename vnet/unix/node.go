@@ -39,12 +39,13 @@ func (nm *nodeMain) Init(m *Main) {
 type node struct {
 	ethernet.Interface
 	vnet.InterfaceNode
-	i           *Interface
-	rxRefs      chan rxRef
-	txRefIns    chan txRefIn
-	txRefIn     txRefIn
-	txAvailable int32
-	txIovecs    iovecVec
+	i             *Interface
+	rxRefs        chan rxRef
+	txRefIns      chan txRefIn
+	rxActiveCount int32
+	txRefIn       txRefIn
+	txAvailable   int32
+	txIovecs      iovecVec
 }
 
 type rxNext int
@@ -58,7 +59,7 @@ func (intf *Interface) interfaceNodeInit(m *Main) {
 	vnetName := ifName + "-unix"
 	n := &intf.node
 	n.i = intf
-	n.rxRefs = make(chan rxRef, vnet.MaxVectorLen)
+	n.rxRefs = make(chan rxRef, vnet.MaxVectorLen*2)
 	n.txRefIns = make(chan txRefIn, 64)
 	m.v.RegisterHwInterface(n, vnetName)
 	n.Next = []string{
@@ -176,7 +177,7 @@ func (n *node) InterfaceInput(o *vnet.RefOut) {
 	vnet.IfRxCounter.Add(t, n.Si(), nPackets, nBytes)
 	vnet.IfDrops.Add(t, n.Si(), nDrops)
 	toTx.SetLen(m.v, nPackets)
-	n.Activate(false)
+	n.Activate(atomic.AddInt32(&n.rxActiveCount, -1) >= 0)
 }
 
 func (intf *Interface) ReadReady() (err error) {
@@ -214,8 +215,9 @@ func (intf *Interface) ReadReady() (err error) {
 	var r rxRef
 	r.len = p.chain.Len()
 	r.ref = p.chain.Done()
-	n.rxRefs <- r
+	atomic.AddInt32(&n.rxActiveCount, 1)
 	n.Activate(true)
+	n.rxRefs <- r
 
 	// Refill packet with new buffers & return for re-use.
 	p.allocRefs(m, nRefs)
@@ -235,11 +237,7 @@ func (n *node) InterfaceOutput(i *vnet.TxRefVecIn) {
 	iomux.Update(intf)
 }
 
-func (intf *Interface) WriteAvailable() (ok bool) {
-	n := &intf.node
-	ri := &n.txRefIn
-	return n.txAvailable > 0 || ri.in != nil && ri.i < ri.in.Len()
-}
+func (intf *Interface) WriteAvailable() bool { return intf.node.txAvailable > 0 }
 
 func (intf *Interface) WriteReady() (err error) {
 	n := &intf.node
@@ -253,10 +251,10 @@ func (intf *Interface) WriteReady() (err error) {
 			if ri.in != nil {
 				intf.m.Vnet.FreeTxRefIn(ri.in)
 				ri.in = nil
+				atomic.AddInt32(&n.txAvailable, -1)
 			}
 			select {
 			case *ri = <-n.txRefIns:
-				atomic.AddInt32(&n.txAvailable, -1)
 				ri.i = 0
 			default:
 				iomux.Update(intf)
