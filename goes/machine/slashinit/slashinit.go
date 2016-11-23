@@ -269,13 +269,13 @@ func (c cmd) pivotRoot(root string, script string) error {
 	if os.IsNotExist(err) {
 		err = os.Mkdir("/newroot", os.FileMode(0755))
 		if err != nil {
-			log.Print("err", "mkdir", "/newroot", ":", err)
+			panic(fmt.Errorf("Error creating /newroot: %s", err))
 		}
 	}
 	err = command.Main("mount", root, "/newroot")
 	if err != nil {
-		log.Print("err", "mount", root,
-			"/newroot", ":", err)
+		panic(fmt.Errorf("Error mounting %s on /newroot: %s",
+			root, err))
 	}
 
 	if len(script) > 0 {
@@ -302,9 +302,6 @@ func (c cmd) pivotRoot(root string, script string) error {
 	if err = syscall.Chroot("."); err != nil {
 		return err
 	}
-	c.makeTargetDirs()
-	c.makeTargetLinks()
-	c.mountTargetVirtualFilesystems()
 
 	return nil
 }
@@ -387,6 +384,9 @@ func (c cmd) Main(_ ...string) error {
 	if len(root) > 0 {
 		c.pivotRoot(root, script)
 	}
+	c.makeTargetDirs()
+	c.makeTargetLinks()
+	c.mountTargetVirtualFilesystems()
 	c.runSbinInit()
 	err = command.Main("start")
 
