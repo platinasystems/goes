@@ -59,7 +59,7 @@ func (intf *Interface) interfaceNodeInit(m *Main) {
 	vnetName := ifName + "-unix"
 	n := &intf.node
 	n.i = intf
-	n.rxRefs = make(chan rxRef, vnet.MaxVectorLen*2)
+	n.rxRefs = make(chan rxRef, vnet.MaxVectorLen*4)
 	n.txRefIns = make(chan txRefIn, 64)
 	m.v.RegisterHwInterface(n, vnetName)
 	n.Next = []string{
@@ -177,7 +177,7 @@ func (n *node) InterfaceInput(o *vnet.RefOut) {
 	vnet.IfRxCounter.Add(t, n.Si(), nPackets, nBytes)
 	vnet.IfDrops.Add(t, n.Si(), nDrops)
 	toTx.SetLen(m.v, nPackets)
-	n.Activate(atomic.AddInt32(&n.rxActiveCount, -1) >= 0)
+	n.Activate(atomic.AddInt32(&n.rxActiveCount, -int32(nPackets)) > 0)
 }
 
 func (intf *Interface) ReadReady() (err error) {
