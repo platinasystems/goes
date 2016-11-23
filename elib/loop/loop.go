@@ -151,23 +151,26 @@ func (n *Node) Activate(enable bool) (was bool) {
 			break
 		}
 	}
-	if was != enable {
-		l := n.loop
+	n.changeActive(was, enable)
+	return
+}
+
+func (n *Node) changeActive(was, is bool) {
+	l := n.loop
+	if was != is {
 		d := uint32(1)
-		if !enable {
+		if !is {
 			d = -d
-			// This can happen on wakeup from suspend when node is not active.
 			if l.nActivePollers <= 0 {
-				d = 0
+				panic("negative active pollers")
 			}
 		}
 		atomic.AddUint32(&l.nActivePollers, d)
-		if enable {
+		if is {
 			// Interrupt event wait so that pollers may be considered.
 			l.Interrupt()
 		}
 	}
-	return
 }
 
 type activateEvent struct{ n *Node }
@@ -275,6 +278,9 @@ func (l *Loop) Resume(in *In) {
 			new &^= node_suspended
 			if p.flags.compare_and_swap(old, new) {
 				p.pollerElog(poller_resume, new)
+				if was, is := old&node_active != 0, new&node_active != 0; was != is {
+					p.changeActive(was, is)
+				}
 				break
 			}
 		}
