@@ -90,6 +90,7 @@ func init() {
 			next_punt:  "punt",
 		}
 
+		v.RegisterHwInterface(MyNode, "my-node")
 		v.RegisterInterfaceNode(MyNode, MyNode.Hi(), "my-node")
 		MyNode.stream = stream{n_packets_limit: 1, min_size: 64, max_size: 64, next: next_error}
 
