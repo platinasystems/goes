@@ -92,7 +92,7 @@ func init() {
 	}
 }
 
-func (cmd) makeRootDirs() (err error) {
+func (cmd) makeRootDirs() {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -102,65 +102,63 @@ func (cmd) makeRootDirs() (err error) {
 		{"/newroot/usr", 0755},
 		{"/newroot/usr/bin", 0755},
 	} {
-		if _, err = os.Stat(dir.name); os.IsNotExist(err) {
-			err = os.Mkdir(dir.name, dir.mode)
+		if _, err := os.Stat(dir.name); os.IsNotExist(err) {
+			err := os.Mkdir(dir.name, dir.mode)
 			if err != nil {
-				return err
+				panic(fmt.Errorf("mkdir %s: %s", dir.name, err))
 			}
 		}
 	}
-	return nil
 }
 
-func (cmd) makeRootFiles() (err error) {
+func (cmd) makeRootFiles() {
 	for _, cp := range []struct {
 		src, dst string
 	}{
 		{"/init", "/newroot/usr/bin/goes"},
 		{"/usr/bin/gdbserver", "/newroot/usr/bin/gdbserver"},
 	} {
-		_, err = os.Stat(cp.dst)
+		_, err := os.Stat(cp.dst)
 		if os.IsNotExist(err) ||
 			os.Getenv("goes") == "overwrite" {
 			r, err := os.Open(cp.src)
 			if err != nil {
-				return err
+				panic(fmt.Errorf("open %s: %s", cp.src, err))
 			}
 			defer r.Close()
 			w, err := os.Create(cp.dst)
 			if err != nil {
-				return err
+				panic(fmt.Errorf("create %s: %s", cp.dst, err))
 			}
 			defer w.Close()
 			_, err = io.Copy(w, r)
 			if err != nil {
-				return err
+				panic(fmt.Errorf("copy %s to %s: %s",
+					cp.src, cp.dst, err))
 			}
 			if err = os.Chmod(cp.dst, 0755); err != nil {
-				return err
+				panic(fmt.Errorf("chmod %s: %s", cp.dst, err))
 			}
 		}
 	}
-	return nil
 }
 
-func (cmd) makeRootLinks() (err error) {
+func (cmd) makeRootLinks() {
 	for _, ln := range []struct {
 		src, dst string
 	}{
 		{"../usr/bin/goes", "/newroot/sbin/init"},
 	} {
-		if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
+		if _, err := os.Stat(ln.dst); os.IsNotExist(err) {
 			err = os.Symlink(ln.src, ln.dst)
 			if err != nil {
-				return err
+				panic(fmt.Errorf("ln %s->%s: %s", ln.src, ln.dst, err))
 			}
 		}
 	}
-	return nil
 }
 
-func (cmd) moveVirtualFileSystems() (err error) {
+func (cmd) moveVirtualFileSystems() {
 	for _, mv := range []struct {
 		src  string
 		dst  string
@@ -171,22 +169,22 @@ func (cmd) moveVirtualFileSystems() (err error) {
 		{"/proc", "/newroot/proc", 0555},
 		{"/dev", "/newroot/dev", 0755},
 	} {
-		if _, err = os.Stat(mv.dst); os.IsNotExist(err) {
+		if _, err := os.Stat(mv.dst); os.IsNotExist(err) {
 			err = os.Mkdir(mv.dst, os.FileMode(mv.mode))
 			if err != nil {
-				return err
+				panic(fmt.Errorf("mkdir %s: %s", mv.dst, err))
 			}
 		}
-		err = syscall.Mount(mv.src, mv.dst, "",
+		err := syscall.Mount(mv.src, mv.dst, "",
 			syscall.MS_MOVE, "")
 		if err != nil {
-			return err
+			panic(fmt.Errorf("mount -o move %s %s: %s",
+				mv.src, mv.dst, err))
 		}
 	}
-	return nil
 }
 
-func (cmd) unlinkRootFiles() error {
+func (cmd) unlinkRootFiles() {
 	for _, fn := range []string{
 		"/usr/bin/gdbserver",
 		"/init",
@@ -194,10 +192,9 @@ func (cmd) unlinkRootFiles() error {
 	} {
 		syscall.Unlink(fn)
 	}
-	return nil
 }
 
-func (cmd) rmdirRootDirs() error {
+func (cmd) rmdirRootDirs() {
 	for _, dir := range []string{
 		"/run",
 		"/sys",
@@ -209,10 +206,9 @@ func (cmd) rmdirRootDirs() error {
 	} {
 		syscall.Rmdir(dir)
 	}
-	return nil
 }
 
-func (cmd) makeTargetDirs () (err error) {
+func (cmd) makeTargetDirs () {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -221,34 +217,32 @@ func (cmd) makeTargetDirs () (err error) {
 		{"/tmp", 01777},
 		{"/var", 0755},
 	} {
-		if _, err = os.Stat(dir.name); os.IsNotExist(err) {
+		if _, err := os.Stat(dir.name); os.IsNotExist(err) {
 			err = os.Mkdir(dir.name, dir.mode)
 			if err != nil {
-				return err
+				panic(fmt.Errorf("mkdir %s: %s", dir.name, err))
 			}
 		}
 	}
-	return nil
 }
 
-func (cmd) makeTargetLinks() (err error) {
+func (cmd) makeTargetLinks() {
 	for _, ln := range []struct {
 		src, dst string
 	}{
 		{"../run", "/var/run"},
 	} {
-		if _, err = os.Stat(ln.dst); os.IsNotExist(err) {
+		if _, err := os.Stat(ln.dst); os.IsNotExist(err) {
 			err = os.Symlink(ln.src, ln.dst)
 			if err != nil {
-				log.Print("err", "ln", ln.dst, "->", ln.src,
-					":", err)
+				panic(fmt.Errorf("ln %s -> %s: %s",
+					ln.dst, ln.src, err))
 			}
 		}
 	}
-	return nil
 }
 
-func (cmd) mountTargetVirtualFilesystems() (err error) {
+func (cmd) mountTargetVirtualFilesystems() {
 	for _, mnt := range []struct {
 		dir    string
 		dev    string
@@ -256,15 +250,15 @@ func (cmd) mountTargetVirtualFilesystems() (err error) {
 	}{
 		{"/tmp", "tmpfs", "tmpfs"},
 	} {
-		err = syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
+		err := syscall.Mount(mnt.dev, mnt.dir, mnt.fstype, zero, "")
 		if err != nil {
-			log.Print("err", "mount", mnt.dir, ":", err)
+			panic(fmt.Errorf("mount -t %s %s %s: %s",
+				mnt.fstype, mnt.dev, mnt.dir, err))
 		}
 	}
-	return nil
 }
 
-func (c cmd) pivotRoot(root string, script string) error {
+func (c cmd) pivotRoot(root string, script string) {
 	_, err := os.Stat("/newroot")
 	if os.IsNotExist(err) {
 		err = os.Mkdir("/newroot", os.FileMode(0755))
@@ -281,8 +275,8 @@ func (c cmd) pivotRoot(root string, script string) error {
 	if len(script) > 0 {
 		err := command.Main("source", script)
 		if err != nil {
-			log.Print("err", "source", script, ":",
-				err)
+			panic(fmt.Errorf("Error running boot script %s on %s: %s",
+				script, root, err))
 		}
 	}
 	c.makeRootDirs()
@@ -291,50 +285,50 @@ func (c cmd) pivotRoot(root string, script string) error {
 	c.moveVirtualFileSystems()
 	
 	if err = os.Chdir("/newroot"); err != nil {
-		return err
+		panic(fmt.Errorf("chdir /newroot: %s", err))
 	}
 	c.unlinkRootFiles()
 	c.rmdirRootDirs()
 	err = syscall.Mount("/newroot", "/", "", syscall.MS_MOVE, "")
 	if err != nil {
-		return err
+		panic(fmt.Errorf("mount /newroot /: %s", err))
 	}
 	if err = syscall.Chroot("."); err != nil {
-		return err
+		panic(fmt.Errorf("chroot .:%s", err))
 	}
-
-	return nil
 }
 
-func (c cmd) runSbinInit() (err error) {
-	if err = os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
-		return err
+func (c cmd) runSbinInit() {
+	if err := os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
+		panic(fmt.Errorf("Setenv PATH: %s", err))
 	}
-	if err = os.Setenv("SHELL", "/bin/goes"); err != nil {
-		return err
+	if err := os.Setenv("SHELL", "/bin/goes"); err != nil {
+		panic(fmt.Errorf("Setenv SHELL: %s", err))
 	}
-	if err = os.Chdir("/root"); err != nil {
-		return err
+	if err := os.Chdir("/root"); err != nil {
+		panic(fmt.Errorf("chdir /root: %s", err))
 	}
-	if err = os.Setenv("HOME", "/root"); err != nil {
-		return err
+	if err := os.Setenv("HOME", "/root"); err != nil {
+		panic(fmt.Errorf("Setenv HOME: %s", err))
 	}
 	if len(os.Getenv("TERM")) == 0 {
-		if err = os.Setenv("TERM", "linux"); err != nil {
-			return err
+		if err := os.Setenv("TERM", "linux"); err != nil {
+			panic(fmt.Errorf("Setenv TERM: %s", err))
 		}
 	}
 	const sbininit = "/sbin/init"
-	_, err = os.Stat(sbininit)
-	if err == nil {
-		err = syscall.Exec(sbininit, []string{sbininit}, []string{
-			"PATH=" + os.Getenv("PATH"),
-			"SHELL=" + os.Getenv("SHELL"),
-			"HOME=" + os.Getenv("HOME"),
-			"TERM=" + os.Getenv("TERM"),
-		})
+	if _, err := os.Stat(sbininit); err != nil {
+		panic(fmt.Errorf("stat %s: %s", sbininit, err))
 	}
-	return err
+	
+	if err := syscall.Exec(sbininit, []string{sbininit}, []string{
+		"PATH=" + os.Getenv("PATH"),
+		"SHELL=" + os.Getenv("SHELL"),
+		"HOME=" + os.Getenv("HOME"),
+		"TERM=" + os.Getenv("TERM"),
+	}); err != nil {
+		panic(fmt.Errorf("exec %s: %s", sbininit, err))
+	}
 }
 
 func (cmd) emergencyShell() {
@@ -371,7 +365,7 @@ func (c cmd) Main(_ ...string) error {
 	}()
 	err := Hook()
 	if err != nil {
-		return err
+		panic(fmt.Errorf("Error from board hook: ", err))
 	}
 	var root, script string
 	if len(goesRoot) >=1 && len(goesRoot[0]) > 0 {
