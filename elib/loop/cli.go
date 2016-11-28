@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
+	"github.com/platinasystems/go/elib/parse"
 
 	"fmt"
 	"os"
@@ -59,6 +60,7 @@ func (l *Loop) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(for
 
 type rtNode struct {
 	Name    string  `format:"%-30s"`
+	State   string  `align:"center"`
 	Calls   uint64  `format:"%16d"`
 	Vectors uint64  `format:"%16d"`
 	Clocks  float64 `format:"%16.2f"`
@@ -70,6 +72,18 @@ func (ns rtNodes) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
 func (ns rtNodes) Len() int           { return len(ns) }
 
 func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	colMap := map[string]bool{
+		"State": false,
+	}
+	for !in.End() {
+		switch {
+		case in.Parse("d%*etail"):
+			colMap["State"] = true
+		default:
+			panic(parse.ErrInput)
+		}
+	}
+
 	ns := rtNodes{}
 	for i := range l.DataNodes {
 		n := l.DataNodes[i].GetNode()
@@ -93,8 +107,13 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 				}
 			}
 			if s[j].calls > 0 {
+				state := ""
+				if j == 0 {
+					state = fmt.Sprintf("%s", n.flags)
+				}
 				ns = append(ns, rtNode{
 					Name:    name + io,
+					State:   state,
 					Calls:   s[j].calls,
 					Vectors: s[j].vectors,
 					Clocks:  s[j].clocksPerVector(),
@@ -120,7 +139,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 	}
 
 	sort.Sort(ns)
-	elib.TabulateWrite(w, ns)
+	elib.Tabulate(ns).WriteCols(w, colMap)
 	return
 }
 
