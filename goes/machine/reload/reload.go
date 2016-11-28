@@ -1,5 +1,5 @@
 // Copyright 2016-2016 Platina Systems, Inc. All rights reserved.
-// Use of this source code is governed by a BSD-style license described in the
+// Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 // Package reload provides the named command that sends SIGHUP to all of the

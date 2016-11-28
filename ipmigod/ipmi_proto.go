@@ -1,5 +1,5 @@
 // Copyright 2015 Platina Systems, Inc. All rights reserved.
-// Use of this source code is governed by a BSD-style license described in the
+// Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 // Package contains IPMI 2.0 spec implementation
