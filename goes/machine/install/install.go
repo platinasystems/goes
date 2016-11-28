@@ -13,8 +13,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/platinasystems/go/goes/machine/internal"
+	"github.com/platinasystems/go/pidfile"
 )
 
 const Name = "install"
@@ -68,6 +70,7 @@ func (cmd) Apropos() map[string]string {
 	}
 }
 
+// run "goes stop" then wait up to 5 seconds for /run/goes/pids removal
 func stop() error {
 	_, err := os.Stat(UsrBinGoes)
 	if err != nil {
@@ -75,8 +78,21 @@ func stop() error {
 	}
 	err = exec.Command(UsrBinGoes, "stop").Run()
 	if err != nil {
-		err = fmt.Errorf("goes stop: %v", err)
+		return fmt.Errorf("goes stop: %v", err)
 	}
+	for i := 0; i < 10; i++ {
+		_, err = os.Stat(pidfile.Dir)
+		if err != nil {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if err == nil {
+		err = fmt.Errorf("goes didn't stop")
+	} else if os.IsNotExist(err) {
+		err = nil
+	}
+	time.Sleep(3 * time.Second) // FIXME: a gratuitous wait
 	return err
 }
 
