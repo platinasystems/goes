@@ -365,8 +365,8 @@ func (h *FanStat) FanTrayStatus(i uint8) string {
 		//check fan speed is above minimum
 		f1 := "fan_tray." + strconv.Itoa(int(i+1)) + ".1.rpm"
 		f2 := "fan_tray." + strconv.Itoa(int(i+1)) + ".2.rpm"
-		s1, _ := redis.Hget("platina", f1)
-		s2, _ := redis.Hget("platina", f2)
+		s1, _ := redis.Hget(redis.Machine, f1)
+		s2, _ := redis.Hget(redis.Machine, f2)
 		r1, _ := strconv.ParseInt(s1, 10, 64)
 		r2, _ := strconv.ParseInt(s2, 10, 64)
 

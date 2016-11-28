@@ -21,7 +21,7 @@ import (
 	"github.com/platinasystems/go/goes/machine/start"
 	netcmds "github.com/platinasystems/go/goes/net"
 	vnetcmd "github.com/platinasystems/go/goes/net/vnet"
-	"github.com/platinasystems/go/goes/redis"
+	rediscmds "github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/hostname"
 	name "github.com/platinasystems/go/info/machine"
@@ -29,6 +29,7 @@ import (
 	"github.com/platinasystems/go/info/uptime"
 	"github.com/platinasystems/go/info/version"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
+	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
@@ -52,7 +53,7 @@ func main() {
 	command.Plot(kernel.New()...)
 	command.Plot(machine.New()...)
 	command.Plot(netcmds.New()...)
-	command.Plot(redis.New()...)
+	command.Plot(rediscmds.New()...)
 	command.Plot(vnetcmd.New())
 	command.Sort()
 	start.RedisDevs = []string{"lo", "eth0"}
@@ -108,7 +109,7 @@ func wait4vnet() error {
 	}
 	defer conn.Close()
 	psc := redigo.PubSubConn{redigo.NewConn(conn, 0, 500*time.Millisecond)}
-	if err = psc.Subscribe("platina"); err != nil {
+	if err = psc.Subscribe(redis.Machine); err != nil {
 		return err
 	}
 	for {

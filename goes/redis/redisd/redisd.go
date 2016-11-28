@@ -20,6 +20,7 @@ import (
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/group"
 	"github.com/platinasystems/go/parms"
+	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/reg"
 	"github.com/platinasystems/go/rundir"
 	"github.com/platinasystems/go/sockfile"
@@ -29,7 +30,7 @@ const Name = "redisd"
 const Log = rundir.Dir + "/log/redisd"
 
 var Port = 6379
-var PublishedKeys = []string{"platina"}
+var PublishedKeys = []string{redis.Machine}
 
 type cmd struct {
 	redisd Redisd

@@ -18,6 +18,8 @@ import (
 
 const Timeout = 500 * time.Millisecond
 
+var Machine = "platina"
+
 var keyRe *regexp.Regexp
 var empty = struct{}{}
 

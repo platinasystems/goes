@@ -366,7 +366,7 @@ func (h *LedCon) LedStatus() {
 
 	fanFail = false
 	for j := 1; j <= maxFanTrays; j++ {
-		p, _ := redis.Hget("platina", "fan_tray."+strconv.Itoa(int(j))+".status")
+		p, _ := redis.Hget(redis.Machine, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if !strings.Contains(p, "ok") {
 			fanFail = true
 			break
@@ -392,7 +392,7 @@ func (h *LedCon) LedStatus() {
 	}
 
 	for j := 0; j < maxPsu; j++ {
-		psuStatus[j], _ = redis.Hget("platina", "psu"+strconv.Itoa(j+1)+".status")
+		psuStatus[j], _ = redis.Hget(redis.Machine, "psu"+strconv.Itoa(j+1)+".status")
 		if psuStatus[j] != lastPsuStatus[j] {
 			o = r.Output0.get(h)
 			c = r.Config0.get(h)

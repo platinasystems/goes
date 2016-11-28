@@ -82,7 +82,7 @@ func (cmd *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	info.PubCh, err = redis.Publish("platina")
+	info.PubCh, err = redis.Publish(redis.Machine)
 	if err != nil {
 		return err
 	}
