@@ -92,7 +92,6 @@ func stop() error {
 	} else if os.IsNotExist(err) {
 		err = nil
 	}
-	time.Sleep(3 * time.Second) // FIXME: a gratuitous wait
 	return err
 }
 
