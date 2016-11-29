@@ -5,6 +5,8 @@
 package main
 
 import (
+	"fmt"
+	"os/exec"
 	"time"
 
 	redigo "github.com/garyburd/redigo/redis"
@@ -19,6 +21,7 @@ import (
 	"github.com/platinasystems/go/goes/machine"
 	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/start"
+	"github.com/platinasystems/go/goes/machine/stop"
 	netcmds "github.com/platinasystems/go/goes/net"
 	vnetcmd "github.com/platinasystems/go/goes/net/vnet"
 	rediscmds "github.com/platinasystems/go/goes/redis"
@@ -58,6 +61,7 @@ func main() {
 	command.Sort()
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet
+	stop.Hook = stopHook
 	machined.Hook = machinedHook
 	goes.Main()
 }
@@ -78,6 +82,27 @@ func machinedHook() error {
 		}),
 	)
 	machined.Info["netlink"].Prefixes("lo.", "eth0.")
+	return nil
+}
+
+func stopHook() error {
+	for port := 0; port < 32; port++ {
+		for subport := 0; subport < 4; subport++ {
+			exec.Command("/bin/ip", "link", "delete",
+				fmt.Sprintf("eth-%d-%d", port, subport),
+			).Run()
+		}
+	}
+	for port := 0; port < 2; port++ {
+		exec.Command("/bin/ip", "link", "delete",
+			fmt.Sprintf("ixge2-0-%d", port),
+		).Run()
+	}
+	for port := 0; port < 2; port++ {
+		exec.Command("/bin/ip", "link", "delete",
+			fmt.Sprintf("meth-%d", port),
+		).Run()
+	}
 	return nil
 }
 
