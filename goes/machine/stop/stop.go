@@ -18,6 +18,10 @@ import (
 
 const Name = "stop"
 
+// Machines may use Hook to run something between the kill of all daemons and
+// the removal of the socks and pids directories.
+var Hook = func() error { return nil }
+
 type cmd struct{}
 
 func New() cmd { return cmd{} }
@@ -34,6 +38,11 @@ func (cmd) Main(...string) error {
 	time.Sleep(time.Second)
 	if e := internal.KillAll(syscall.SIGKILL); err == nil {
 		err = e
+	}
+	if t := Hook(); t != nil {
+		if err != nil {
+			err = t
+		}
 	}
 	os.RemoveAll(sockfile.Dir)
 	os.RemoveAll(pidfile.Dir)
