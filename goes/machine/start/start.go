@@ -17,17 +17,22 @@ import (
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/parms"
+	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/sockfile"
+	. "github.com/platinasystems/go/version"
 )
 
 const Name = "start"
 
-// Machines may use Hook to run something before redisd, machined, and any other daemons.
+// Machines may use Hook to run something before redisd, machined, and any
+// other daemons.
 var Hook = func() error { return nil }
 
-// Machines may use ConfHook to run something after all daemons start and before source of config..
+// Machines may use ConfHook to run something after all daemons start and
+// before source of config..
 var ConfHook = func() error { return nil }
 
+var Machine string
 var RedisDevs []string
 
 type cmd struct{}
@@ -63,6 +68,20 @@ func (cmd cmd) Main(args ...string) error {
 	}
 	if err = command.Main(redisd...); err != nil {
 		return err
+	}
+	pub, err := redis.Publish(redis.Machine)
+	if err != nil {
+		return err
+	}
+	defer close(pub)
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	pub <- fmt.Sprint("hostname: ", hostname)
+	pub <- fmt.Sprint("version: ", Version)
+	if len(Machine) > 0 {
+		pub <- fmt.Sprint("machine: ", Machine)
 	}
 	if err = command.Main("machined"); err != nil {
 		return err

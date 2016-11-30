@@ -18,17 +18,14 @@ import (
 	"github.com/platinasystems/go/goes/kernel"
 	"github.com/platinasystems/go/goes/machine"
 	"github.com/platinasystems/go/goes/machine/machined"
+	"github.com/platinasystems/go/goes/machine/start"
 	netcmds "github.com/platinasystems/go/goes/net"
 	"github.com/platinasystems/go/goes/net/telnetd"
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/goes/test"
 	"github.com/platinasystems/go/info/cmdline"
-	"github.com/platinasystems/go/info/hostname"
-	name "github.com/platinasystems/go/info/machine"
 	"github.com/platinasystems/go/info/netlink"
 	"github.com/platinasystems/go/info/tests"
-	"github.com/platinasystems/go/info/uptime"
-	"github.com/platinasystems/go/info/version"
 )
 
 func main() {
@@ -42,14 +39,11 @@ func main() {
 	command.Plot(telnetd.New())
 	command.Plot(test.New()...)
 	command.Sort()
+	start.Machine = "example"
 	machined.Hook = func() error {
 		machined.Plot(
 			cmdline.New(),
-			hostname.New(),
-			name.New("example"),
 			netlink.New(),
-			uptime.New(),
-			version.New(),
 		)
 		machined.Plot(tests.New()...)
 		itfs, err := net.Interfaces()

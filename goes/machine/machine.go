@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/machine/stop"
 	"github.com/platinasystems/go/goes/machine/uninstall"
+	"github.com/platinasystems/go/goes/machine/uptimed"
 )
 
 func New() []interface{} {
@@ -32,5 +33,6 @@ func New() []interface{} {
 		stop.New(),
 		slashinit.New(),
 		uninstall.New(),
+		uptimed.New(),
 	}
 }

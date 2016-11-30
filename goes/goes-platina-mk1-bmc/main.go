@@ -37,11 +37,7 @@ import (
 	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
 	"github.com/platinasystems/go/info/cmdline"
-	"github.com/platinasystems/go/info/hostname"
-	name "github.com/platinasystems/go/info/machine"
 	"github.com/platinasystems/go/info/netlink"
-	"github.com/platinasystems/go/info/uptime"
-	"github.com/platinasystems/go/info/version"
 	"github.com/platinasystems/go/led"
 	"github.com/platinasystems/go/log"
 )
@@ -151,6 +147,7 @@ func main() {
 	command.Plot(net.New()...)
 	command.Plot(redis.New()...)
 	command.Sort()
+	start.Machine = "platina-mk1-bmc"
 	start.RedisDevs = []string{"lo", "eth0"}
 	machined.Hook = hook
 	goes.Main()
@@ -222,11 +219,7 @@ func hook() error {
 
 	machined.Plot(
 		cmdline.New(),
-		hostname.New(),
-		name.New("platina-mk1-bmc"),
 		netlink.New(),
-		uptime.New(),
-		version.New(),
 		&Info{
 			name:     "fan",
 			prefixes: []string{"fan."},

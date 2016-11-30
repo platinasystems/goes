@@ -26,11 +26,7 @@ import (
 	vnetcmd "github.com/platinasystems/go/goes/net/vnet"
 	rediscmds "github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/info/cmdline"
-	"github.com/platinasystems/go/info/hostname"
-	name "github.com/platinasystems/go/info/machine"
 	"github.com/platinasystems/go/info/netlink"
-	"github.com/platinasystems/go/info/uptime"
-	"github.com/platinasystems/go/info/version"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/sockfile"
@@ -59,6 +55,7 @@ func main() {
 	command.Plot(rediscmds.New()...)
 	command.Plot(vnetcmd.New())
 	command.Sort()
+	start.Machine = "platina-mk1"
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet
 	stop.Hook = stopHook
@@ -69,11 +66,7 @@ func main() {
 func machinedHook() error {
 	machined.Plot(
 		cmdline.New(),
-		hostname.New(),
-		name.New("platina-mk1"),
 		netlink.New(),
-		uptime.New(),
-		version.New(),
 		vnetinfo.New(vnetinfo.Config{
 			UnixInterfacesOnly: true,
 			PublishAllCounters: false,

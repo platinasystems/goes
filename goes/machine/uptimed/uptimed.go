@@ -2,7 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package uptime
+// Package uptimed publishes the system uptime every 60 seconds to the local
+// redis server.
+package uptimed
 
 import (
 	"bytes"
@@ -10,50 +12,46 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/info"
+	"github.com/platinasystems/go/redis"
 )
 
-const Name = "uptime"
+const Name = "uptimed"
 
-type Info chan struct{}
+type cmd chan struct{}
 
-func New() Info { return Info(make(chan struct{})) }
+func New() cmd { return cmd(make(chan struct{})) }
 
-func (Info) String() string { return Name }
+func (cmd) Daemon() int    { return 1 }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
-func (uptime Info) Main(...string) error {
+func (cmd cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	err := syscall.Sysinfo(&si)
 	if err != nil {
 		return err
 	}
-	info.Publish(Name, update())
-	go uptime.ticker()
-	return nil
-}
-
-func (uptime Info) Close() error {
-	close(uptime)
-	return nil
-}
-
-func (Info) Del(key string) error { return info.CantDel(key) }
-
-func (Info) Prefixes(...string) []string { return []string{Name} }
-
-func (Info) Set(key, value string) error { return info.CantSet(key) }
-
-func (uptime Info) ticker() {
+	pub, err := redis.Publish(redis.Machine)
+	if err != nil {
+		return err
+	}
+	pub <- fmt.Sprint("uptime: ", update())
 	t := time.NewTicker(60 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-uptime:
-			return
+		case <-cmd:
+			return nil
 		case <-t.C:
-			info.Publish(Name, update())
+			pub <- fmt.Sprint("uptime: ", update())
 		}
 	}
+	return nil
+}
+
+func (cmd cmd) Close() error {
+	close(cmd)
+	return nil
 }
 
 func update() string {
