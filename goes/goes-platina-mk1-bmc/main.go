@@ -118,8 +118,8 @@ var hw = w83795.HwMonitor{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w837
 var pm = ucd9090.PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
 var ledfp = led.LedCon{ledgpioBus, ledgpioAdr, ledgpioMuxBus, ledgpioMuxAdr, ledgpioMuxVal}
 var fanTray = fantray.FanStat{fangpioBus, fangpioAdr, fangpioMuxBus, fangpioMuxAdr, fangpioMuxVal}
-var ps2 = fsp.Psu{0, ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
-var ps1 = fsp.Psu{0, ps2Bus, ps2Adr, ps2MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
+var ps2 = fsp.Psu{0, " ", ps1Bus, ps1Adr, ps1MuxBus, ps1MuxAdr, ps1MuxVal, ps1GpioPwrok, ps1GpioPrsntL, ps1GpioPwronL, ps1GpioIntL}
+var ps1 = fsp.Psu{0, " ", ps2Bus, ps2Adr, ps2MuxBus, ps2MuxAdr, ps2MuxVal, ps2GpioPwrok, ps2GpioPrsntL, ps2GpioPwronL, ps2GpioIntL}
 var cpu = imx6.Cpu{}
 
 var RedisEnvShadow = map[string]interface{}{}
@@ -305,6 +305,8 @@ func hook() error {
 			attrs: machined.Attrs{
 				"psu1.status":       ps1.PsuStatus(),
 				"psu1.admin.state":  ps1.GetAdminState(),
+				"psu1.mfg_id":       ps1.MfgIdent(),
+				"psu1.mfg_model":    ps1.MfgModel(),
 				"psu1.page":         uint16(ps1.Page()),
 				"psu1.status_word":  ps1.StatusWord(),
 				"psu1.status_vout":  ps1.StatusVout(),
@@ -317,9 +319,10 @@ func hook() error {
 				"psu1.status_temp":  ps1.StatusTemp(),
 				"psu1.p_out":        ps1.Pout(),
 				"psu1.p_in":         ps1.Pin(),
+				"psu1.p_out_raw":    ps1.PoutRaw(),
+				"psu1.p_in_raw":     ps1.PinRaw(),
+				"psu1.p_mode_raw":   ps1.ModeRaw(),
 				"psu1.pmbus_rev":    ps1.PMBusRev(),
-				"psu1.mfg_id":       ps1.MfgId(),
-				"psu1.mfg_model":    ps1.MfgModel(),
 				"psu1.status_fans":  ps1.StatusFans(),
 				"psu1.temperature1": ps1.Temp1(),
 				"psu1.temperature2": ps1.Temp2(),
@@ -332,6 +335,8 @@ func hook() error {
 			attrs: machined.Attrs{
 				"psu2.status":       ps2.PsuStatus(),
 				"psu2.admin.state":  ps2.GetAdminState(),
+				"psu2.mfg_id":       ps2.MfgIdent(),
+				"psu2.mfg_model":    ps2.MfgModel(),
 				"psu2.page":         uint16(ps2.Page()),
 				"psu2.status_word":  ps2.StatusWord(),
 				"psu2.status_vout":  ps2.StatusVout(),
@@ -344,9 +349,10 @@ func hook() error {
 				"psu2.status_temp":  ps2.StatusTemp(),
 				"psu2.p_out":        ps2.Pout(),
 				"psu2.p_in":         ps2.Pin(),
+				"psu2.p_out_raw":    ps2.PoutRaw(),
+				"psu2.p_in_raw":     ps2.PinRaw(),
+				"psu2.p_mode_raw":   ps2.ModeRaw(),
 				"psu2.pmbus_rev":    ps2.PMBusRev(),
-				"psu2.mfg_id":       ps2.MfgId(),
-				"psu2.mfg_model":    ps2.MfgModel(),
 				"psu2.status_fans":  ps2.StatusFans(),
 				"psu2.temperature1": ps2.Temp1(),
 				"psu2.temperature2": ps2.Temp2(),
@@ -492,9 +498,10 @@ func timerIsr() {
 	updateString(ps1.GetAdminState(), "psu1.admin.state")
 	updateString(ps2.PsuStatus(), "psu2.status")
 	updateString(ps2.GetAdminState(), "psu2.admin.state")
-	updateString(ps1.MfgId(), "psu1.mfg_id")
-	updateString(ps2.MfgId(), "psu2.mfg_id")
+
+	updateString(ps1.MfgIdent(), "psu1.mfg_id")
 	updateString(ps1.MfgModel(), "psu1.mfg_model")
+	updateString(ps2.MfgIdent(), "psu2.mfg_id")
 	updateString(ps2.MfgModel(), "psu2.mfg_model")
 
 	updateUint16(ps1.Page(), "psu1.page")
@@ -502,36 +509,40 @@ func timerIsr() {
 	updateUint16(ps1.StatusVout(), "psu1.status_vout")
 	updateUint16(ps1.StatusIout(), "psu1.status_iout")
 	updateUint16(ps1.StatusInput(), "psu1.status_input")
-	updateUint16(ps1.Vin(), "psu1.v_in")
 	updateUint16(ps1.Iin(), "psu1.i_in")
-	updateUint16(ps1.Vout(), "psu1.v_out")
 	updateUint16(ps1.Iout(), "psu1.i_out")
 	updateUint16(ps1.StatusTemp(), "psu1.status_temp")
 	updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
-	updateUint16(ps1.Pout(), "psu1.p_out")
-	updateUint16(ps1.Pin(), "psu1.p_in")
 	updateUint16(ps1.StatusFans(), "psu1.status_fans")
 	updateUint16(ps1.Temp1(), "psu1.temperature1")
 	updateUint16(ps1.Temp2(), "psu1.temperature2")
 	updateUint16(ps1.FanSpeed(), "psu1.fan_speed")
+	updateFloat64(ps1.Vin(), "psu1.v_in")
+	updateFloat64(ps1.Vout(), "psu1.v_out")
+	updateFloat64(ps1.Pout(), "psu1.p_out")
+	updateFloat64(ps1.Pin(), "psu1.p_in")
+	updateUint16(ps1.PoutRaw(), "psu1.p_out_raw")
+	updateUint16(ps1.PinRaw(), "psu1.p_in_raw")
 
 	updateUint16(ps2.Page(), "psu2.page")
 	updateUint16(ps2.StatusWord(), "psu2.status_word")
 	updateUint16(ps2.StatusVout(), "psu2.status_vout")
 	updateUint16(ps2.StatusIout(), "psu2.status_iout")
 	updateUint16(ps2.StatusInput(), "psu2.status_input")
-	updateUint16(ps2.Vin(), "psu2.v_in")
 	updateUint16(ps2.Iin(), "psu2.i_in")
-	updateUint16(ps2.Vout(), "psu2.v_out")
 	updateUint16(ps2.Iout(), "psu2.i_out")
 	updateUint16(ps2.StatusTemp(), "psu2.status_temp")
 	updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
-	updateUint16(ps2.Pout(), "psu2.p_out")
-	updateUint16(ps2.Pin(), "psu2.p_in")
 	updateUint16(ps2.StatusFans(), "psu2.status_fans")
 	updateUint16(ps2.Temp1(), "psu2.temperature1")
 	updateUint16(ps2.Temp2(), "psu2.temperature2")
 	updateUint16(ps2.FanSpeed(), "psu2.fan_speed")
+	updateFloat64(ps2.Vin(), "psu2.v_in")
+	updateFloat64(ps2.Vout(), "psu2.v_out")
+	updateFloat64(ps2.Pout(), "psu2.p_out")
+	updateFloat64(ps2.Pin(), "psu2.p_in")
+	updateUint16(ps2.PoutRaw(), "psu2.p_out_raw")
+	updateUint16(ps2.PinRaw(), "psu2.p_in_raw")
 
 	updateFloat64(cpu.ReadTemp(), "temperature.bmc_cpu")
 	updateFloat64(hw.FrontTemp(), "temperature.fan_front")

@@ -3,10 +3,13 @@
 // LICENSE file.
 
 // Package fsp provides access to the power supply unit
-//NOT INSTALLED FIX
 package fsp
 
 import (
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"unsafe"
 
 	"github.com/platinasystems/go/gpio"
@@ -22,6 +25,7 @@ var (
 
 type Psu struct {
 	Installed  int
+	Id         string
 	Bus        int
 	Addr       int
 	MuxBus     int
@@ -166,6 +170,10 @@ func (r *reg8b) get(h *Psu) string {
 		if i == 4999 {
 			panic(err)
 		}
+	}
+	if (count == 0) || (count == 1) {
+		s := "Not Supported"
+		return s
 	}
 	data[0] = count
 	for i := 0; i < 5000; i++ { // read block
@@ -398,10 +406,30 @@ func (r *reg16r) set(h *Psu, v uint16) {
 func (r *regi16) get(h *Psu) (v int16) { v = int16((*reg16)(r).get(h)); return }
 func (r *regi16) set(h *Psu, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 
+func (h *Psu) convert(v uint16) float64 {
+	if h.Id == "Great Wall" {
+		v = v & 0xfff
+		nn := float64(6) * (-1)
+		vv := float64(v) * (math.Exp2(nn))
+		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
+		return vv
+	} else if h.Id == "FSP" {
+		r := getPsuRegs()
+		n := r.VoutMode.get(h) & 0x1f
+		n = (n ^ 0x1f) & 0x1f
+		nn := float64(n) * (-1)
+		vv := (float64(v) * (math.Exp2(nn))) / 2
+		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
+		return vv
+	} else {
+		return 0
+	}
+}
+
 func (h *Psu) Page() uint16 {
 	r := getPsuRegs()
 	t := r.Page.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) PageWr(i uint16) {
@@ -413,108 +441,143 @@ func (h *Psu) PageWr(i uint16) {
 func (h *Psu) StatusWord() uint16 {
 	r := getPsuRegs()
 	t := r.StatusWord.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) StatusVout() uint16 {
 	r := getPsuRegs()
 	t := r.StatusVout.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) StatusIout() uint16 {
 	r := getPsuRegs()
 	t := r.StatusIout.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) StatusInput() uint16 {
 	r := getPsuRegs()
 	t := r.StatusInput.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) StatusTemp() uint16 {
 	r := getPsuRegs()
 	t := r.StatusTemp.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) StatusFans() uint16 {
 	r := getPsuRegs()
 	t := r.StatusFans.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
-func (h *Psu) Vin() uint16 {
+func (h *Psu) Vin() float64 {
 	r := getPsuRegs()
 	t := r.Vin.get(h)
-	return (uint16(t))
+	v := h.convert(t)
+	return v
 }
 
 func (h *Psu) Iin() uint16 {
 	r := getPsuRegs()
 	t := r.Iin.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
-func (h *Psu) Vout() uint16 {
+func (h *Psu) Vout() float64 {
 	r := getPsuRegs()
 	t := r.Vout.get(h)
-	return (uint16(t))
+	v := h.convert(t)
+	return v
 }
 
 func (h *Psu) Iout() uint16 {
 	r := getPsuRegs()
 	t := r.Iout.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) Temp1() uint16 {
 	r := getPsuRegs()
 	t := r.Temp1.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) Temp2() uint16 {
 	r := getPsuRegs()
 	t := r.Temp2.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
 func (h *Psu) FanSpeed() uint16 {
 	r := getPsuRegs()
 	t := r.FanSpeed.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
-func (h *Psu) Pout() uint16 {
+func (h *Psu) Pout() float64 {
 	r := getPsuRegs()
 	t := r.Pout.get(h)
-	return (uint16(t))
+	v := h.convert(t)
+	return v
 }
 
-func (h *Psu) Pin() uint16 {
+func (h *Psu) Pin() float64 {
 	r := getPsuRegs()
 	t := r.Pin.get(h)
-	return (uint16(t))
+	v := h.convert(t)
+	return v
+}
+
+func (h *Psu) PoutRaw() uint16 {
+	r := getPsuRegs()
+	t := r.Pout.get(h)
+	return t
+}
+
+func (h *Psu) PinRaw() uint16 {
+	r := getPsuRegs()
+	t := r.Pin.get(h)
+	return t
+}
+
+func (h *Psu) ModeRaw() uint16 {
+	if h.Id == "Great Wall" {
+		r := getPsuRegs()
+		t := r.Pin.get(h)
+		return t
+	} else {
+		return 0
+	}
 }
 
 func (h *Psu) PMBusRev() uint16 {
 	r := getPsuRegs()
 	t := r.PMBusRev.get(h)
-	return (uint16(t))
+	return uint16(t)
 }
 
-func (h *Psu) MfgId() string {
+func (h *Psu) MfgIdent() string {
 	r := getPsuRegs()
 	t := r.MfgId.get(h)
+	if t == "Not Supported" {
+		t = "FSP"
+	}
+	t = strings.Trim(t, "#")
+	h.Id = t
 	return t
 }
 
 func (h *Psu) MfgModel() string {
 	r := getPsuRegs()
-	t := r.MfgModel.get(h)
+	t := r.MfgMod.get(h)
+	if t == "Not Supported" {
+		t = "FSP"
+	}
+	t = strings.Trim(t, "#")
 	return t
 }
 
@@ -554,9 +617,9 @@ func (h *Psu) SetAdminState(s string) {
 	if found {
 		switch s {
 		case "disable":
-			pin.SetValue(true)
-		case "enable":
 			pin.SetValue(false)
+		case "enable":
+			pin.SetValue(true)
 		}
 	}
 }
@@ -570,7 +633,7 @@ func (h *Psu) GetAdminState() string {
 	if err != nil {
 		return err.Error()
 	}
-	if t {
+	if !t {
 		return "disabled"
 	}
 	return "enabled"

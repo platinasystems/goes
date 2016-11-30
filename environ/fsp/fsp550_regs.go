@@ -18,7 +18,10 @@ type psuRegs struct {
 	_           byte
 	ClearFaults reg8 // 0x03
 	_           byte
-	_           [0x75 * 2]byte
+	_           [0x1c * 2]byte
+	VoutMode    reg8 // 0x20
+	_           byte
+	_           [0x58 * 2]byte
 	StatusWord  reg16r // 0x79
 	StatusVout  reg8   // 0x7a
 	_           byte
@@ -52,6 +55,6 @@ type psuRegs struct {
 	_           byte
 	MfgId       reg8b // 0x99
 	_           byte
-	MfgModel    reg8b // 0x9a
+	MfgMod      reg8b // 0x9a
 	_           byte
 }
