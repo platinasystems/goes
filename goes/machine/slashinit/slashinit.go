@@ -324,6 +324,9 @@ func (c cmd) runSbinInit() {
 	}
 	const sbininit = "/sbin/init"
 	if _, err := os.Stat(sbininit); err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
 		panic(fmt.Errorf("stat %s: %s", sbininit, err))
 	}
 	
