@@ -88,7 +88,7 @@ func (cmd *cmd) Main(args ...string) error {
 	}
 	defer close(info.PubCh)
 	for _, entry := range cmd.registry {
-		key := fmt.Sprint("platina:", entry.prefix)
+		key := fmt.Sprintf("%s:%s", redis.Machine, entry.prefix)
 		err = redis.Assign(key, Name, "Registry")
 		if err != nil {
 			return err
