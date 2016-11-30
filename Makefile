@@ -34,8 +34,9 @@ goes-platina-mk1-bmc-arm.cpio.xz: | copyright/copyright.go version/version.go
 # make VNET_DEBUG=yes to enable vnet debugging checks and flags for gdb.
 VNET_DEBUG = no
 
-VNET_TAGS_yes = debug
-VNET_GO_BUILD_FLAGS = -tags "uio_pci_dma foxy $(VNET_TAGS_$(VNET_DEBUG))"
+VNET_TAGS_yes :=
+VNET_TAGS_yes += debug
+VNET_GO_BUILD_FLAGS = -tags "uio_pci_dma foxy$(VNET_TAGS_$(VNET_DEBUG))"
 
 VNET_GO_BUILD_FLAGS_yes = -gcflags "-N -l"
 VNET_GO_BUILD_FLAGS += $(VNET_GO_BUILD_FLAGS_$(VNET_DEBUG))
