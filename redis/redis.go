@@ -12,7 +12,6 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/redis/rpc/args"
-	"github.com/platinasystems/go/sch"
 	"github.com/platinasystems/go/sockfile"
 )
 
@@ -205,13 +204,13 @@ func Lrange(key string, start, stop int) (keys []string, err error) {
 //	defer close(pub)
 //	...
 //	pub.Print("hello world")
-func Publish(name string) (sch.In, error) {
+func Publish(name string) (chan<- string, error) {
 	conn, err := Connect()
 	if err != nil {
 		return nil, err
 	}
-	in, out := sch.New(16)
-	go func(name string, out sch.Out, conn redis.Conn) {
+	ch := make(chan string, 16)
+	go func(name string, out <-chan string, conn redis.Conn) {
 		defer conn.Close()
 
 		for {
@@ -238,8 +237,8 @@ func Publish(name string) (sch.In, error) {
 			conn.Do("")
 		}
 
-	}(name, out, conn)
-	return in, nil
+	}(name, ch, conn)
+	return ch, nil
 }
 
 func Set(key string, value interface{}) (s string, err error) {
@@ -255,24 +254,25 @@ func Set(key string, value interface{}) (s string, err error) {
 	return
 }
 
-func Subscribe(channel string) (out sch.Out) {
+func Subscribe(channel string) (out <-chan string) {
 	var err error
-	in, out := sch.New(4)
+	ch := make(chan string, 4)
+	out = ch
 	defer func() {
 		if err != nil {
-			in <- err.Error()
-			close(in)
+			ch <- err.Error()
+			close(ch)
 		}
 	}()
 	conn, err := sockfile.Dial("redisd")
 	if err != nil {
-		return out
+		return
 	}
 	psc := redis.PubSubConn{redis.NewConn(conn, 0, Timeout)}
 	if err := psc.Subscribe(channel); err != nil {
 		return
 	}
-	go func(psc redis.PubSubConn, in sch.In) {
+	go func(psc redis.PubSubConn, in chan<- string) {
 		for {
 			v := psc.Receive()
 			switch t := v.(type) {
@@ -284,7 +284,7 @@ func Subscribe(channel string) (out sch.Out) {
 				return
 			}
 		}
-	}(psc, in)
+	}(psc, ch)
 	return
 }
 

@@ -4,13 +4,9 @@
 
 package info
 
-import (
-	"fmt"
+import "fmt"
 
-	"github.com/platinasystems/go/sch"
-)
-
-var PubCh sch.In
+var PubCh chan<- string
 
 type Interface interface {
 	// Provider should return a list of longest match keys supported by
