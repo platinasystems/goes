@@ -146,7 +146,7 @@ func (cmd *cmd) Main(args ...string) error {
 					fmt.Fprint(os.Stderr, fn, ": chown: ",
 						err, "\n")
 				} else {
-					fmt.Println(fn)
+					fmt.Println("listen:", fn)
 				}
 				break
 			}
@@ -268,7 +268,7 @@ func (redisd *Redisd) listen(devs ...string) {
 			} else {
 				srvs = append(srvs, srv)
 				go srv.Start()
-				fmt.Println(id)
+				fmt.Println("listen:", id)
 			}
 		}
 		redisd.devs[dev] = srvs
