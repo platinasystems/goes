@@ -23,7 +23,6 @@ import (
 	"github.com/platinasystems/go/goes/net/telnetd"
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/goes/test"
-	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/netlink"
 	"github.com/platinasystems/go/info/tests"
 )
@@ -41,10 +40,7 @@ func main() {
 	command.Sort()
 	start.Machine = "example"
 	machined.Hook = func() error {
-		machined.Plot(
-			cmdline.New(),
-			netlink.New(),
-		)
+		machined.Plot(netlink.New())
 		machined.Plot(tests.New()...)
 		itfs, err := net.Interfaces()
 		if err != nil {

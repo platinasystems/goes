@@ -25,7 +25,6 @@ import (
 	netcmds "github.com/platinasystems/go/goes/net"
 	vnetcmd "github.com/platinasystems/go/goes/net/vnet"
 	rediscmds "github.com/platinasystems/go/goes/redis"
-	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/netlink"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/redis"
@@ -65,7 +64,6 @@ func main() {
 
 func machinedHook() error {
 	machined.Plot(
-		cmdline.New(),
 		netlink.New(),
 		vnetinfo.New(vnetinfo.Config{
 			UnixInterfacesOnly: true,

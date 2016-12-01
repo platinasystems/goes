@@ -36,7 +36,6 @@ import (
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
-	"github.com/platinasystems/go/info/cmdline"
 	"github.com/platinasystems/go/info/netlink"
 	"github.com/platinasystems/go/led"
 	"github.com/platinasystems/go/log"
@@ -218,7 +217,6 @@ func hook() error {
 	}
 
 	machined.Plot(
-		cmdline.New(),
 		netlink.New(),
 		&Info{
 			name:     "fan",

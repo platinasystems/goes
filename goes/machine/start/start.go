@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/platinasystems/go/cmdline"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/parms"
@@ -82,6 +83,13 @@ func (cmd cmd) Main(args ...string) error {
 	pub <- fmt.Sprint("version: ", Version)
 	if len(Machine) > 0 {
 		pub <- fmt.Sprint("machine: ", Machine)
+	}
+	keys, cl, err := cmdline.New()
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		pub <- fmt.Sprintf("cmdline.%s: %s", k, cl[k])
 	}
 	if err = command.Main("machined"); err != nil {
 		return err
