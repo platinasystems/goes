@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/goes/test/panic"
 	"github.com/platinasystems/go/goes/test/panicd"
 	"github.com/platinasystems/go/goes/test/sleeper"
+	"github.com/platinasystems/go/goes/test/stringd"
 )
 
 func New() []interface{} {
@@ -24,5 +25,6 @@ func New() []interface{} {
 		panic.New(),
 		panicd.New(),
 		sleeper.New(),
+		stringd.New(),
 	}
 }

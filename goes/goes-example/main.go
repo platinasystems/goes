@@ -8,7 +8,7 @@
 package main
 
 import (
-	"net"
+	stdnet "net"
 
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes"
@@ -17,14 +17,12 @@ import (
 	"github.com/platinasystems/go/goes/fs"
 	"github.com/platinasystems/go/goes/kernel"
 	"github.com/platinasystems/go/goes/machine"
-	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/start"
-	netcmds "github.com/platinasystems/go/goes/net"
+	"github.com/platinasystems/go/goes/net"
+	"github.com/platinasystems/go/goes/net/nld"
 	"github.com/platinasystems/go/goes/net/telnetd"
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/goes/test"
-	"github.com/platinasystems/go/info/netlink"
-	"github.com/platinasystems/go/info/tests"
 )
 
 func main() {
@@ -33,16 +31,14 @@ func main() {
 	command.Plot(fs.New()...)
 	command.Plot(kernel.New()...)
 	command.Plot(machine.New()...)
-	command.Plot(netcmds.New()...)
+	command.Plot(net.New()...)
 	command.Plot(redis.New()...)
 	command.Plot(telnetd.New())
 	command.Plot(test.New()...)
 	command.Sort()
 	start.Machine = "example"
-	machined.Hook = func() error {
-		machined.Plot(netlink.New())
-		machined.Plot(tests.New()...)
-		itfs, err := net.Interfaces()
+	nld.Hook = func() error {
+		itfs, err := stdnet.Interfaces()
 		if err != nil {
 			return nil
 		}
@@ -50,7 +46,7 @@ func main() {
 		for _, itf := range itfs {
 			prefixes = append(prefixes, itf.Name+".")
 		}
-		machined.Info["netlink"].Prefixes(prefixes...)
+		nld.Prefixes = prefixes
 		return nil
 	}
 	goes.Main()

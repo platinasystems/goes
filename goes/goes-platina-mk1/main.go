@@ -22,12 +22,13 @@ import (
 	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/machine/stop"
-	netcmds "github.com/platinasystems/go/goes/net"
-	vnetcmd "github.com/platinasystems/go/goes/net/vnet"
-	rediscmds "github.com/platinasystems/go/goes/redis"
-	"github.com/platinasystems/go/info/netlink"
+	"github.com/platinasystems/go/goes/net"
+	"github.com/platinasystems/go/goes/net/nld"
+	"github.com/platinasystems/go/goes/net/vnet"
+	"github.com/platinasystems/go/goes/redis"
+	"github.com/platinasystems/go/goes/test"
 	vnetinfo "github.com/platinasystems/go/info/vnet"
-	"github.com/platinasystems/go/redis"
+	goredis "github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
@@ -50,21 +51,23 @@ func main() {
 	command.Plot(fs.New()...)
 	command.Plot(kernel.New()...)
 	command.Plot(machine.New()...)
-	command.Plot(netcmds.New()...)
-	command.Plot(rediscmds.New()...)
-	command.Plot(vnetcmd.New())
+	command.Plot(net.New()...)
+	command.Plot(redis.New()...)
+	// command.Plot(test.New()...)
+	_ = test.New
+	command.Plot(vnet.New())
 	command.Sort()
 	start.Machine = "platina-mk1"
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet
 	stop.Hook = stopHook
 	machined.Hook = machinedHook
+	nld.Prefixes = []string{"lo.", "eth0."}
 	goes.Main()
 }
 
 func machinedHook() error {
 	machined.Plot(
-		netlink.New(),
 		vnetinfo.New(vnetinfo.Config{
 			UnixInterfacesOnly: true,
 			PublishAllCounters: false,
@@ -72,7 +75,6 @@ func machinedHook() error {
 			Hook:               vnetHook,
 		}),
 	)
-	machined.Info["netlink"].Prefixes("lo.", "eth0.")
 	return nil
 }
 
@@ -125,7 +127,7 @@ func wait4vnet() error {
 	}
 	defer conn.Close()
 	psc := redigo.PubSubConn{redigo.NewConn(conn, 0, 500*time.Millisecond)}
-	if err = psc.Subscribe(redis.Machine); err != nil {
+	if err = psc.Subscribe(goredis.Machine); err != nil {
 		return err
 	}
 	for {

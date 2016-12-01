@@ -33,10 +33,10 @@ import (
 	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/net"
+	"github.com/platinasystems/go/goes/net/nld"
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
-	"github.com/platinasystems/go/info/netlink"
 	"github.com/platinasystems/go/led"
 	"github.com/platinasystems/go/log"
 )
@@ -148,6 +148,7 @@ func main() {
 	command.Sort()
 	start.Machine = "platina-mk1-bmc"
 	start.RedisDevs = []string{"lo", "eth0"}
+	nld.Prefixes = []string{"lo.", "eth0."}
 	machined.Hook = hook
 	goes.Main()
 }
@@ -217,7 +218,6 @@ func hook() error {
 	}
 
 	machined.Plot(
-		netlink.New(),
 		&Info{
 			name:     "fan",
 			prefixes: []string{"fan."},
@@ -361,7 +361,6 @@ func hook() error {
 			},
 		},
 	)
-	machined.Info["netlink"].Prefixes("lo.", "eth0.")
 	tckr = time.NewTicker(time.Duration(redis_interval) * time.Second)
 	go timerLoop()
 	return nil

@@ -7,6 +7,7 @@ package net
 
 import (
 	"github.com/platinasystems/go/goes/net/femtocom"
+	"github.com/platinasystems/go/goes/net/nld"
 	"github.com/platinasystems/go/goes/net/nsid"
 	"github.com/platinasystems/go/goes/net/ping"
 	"github.com/platinasystems/go/goes/net/wget"
@@ -15,6 +16,7 @@ import (
 func New() []interface{} {
 	return []interface{}{
 		femtocom.New(),
+		nld.New(),
 		nsid.New(),
 		ping.New(),
 		wget.New(),
