@@ -241,6 +241,9 @@ func (p *ifStatsPoller) String() string {
 	return fmt.Sprintf("redis stats poller sequence %d", p.sequence)
 }
 func (p *ifStatsPoller) EventAction() {
+	// Schedule next event in 5 seconds; do before fetching counters so that time interval is accurate.
+	p.addEvent(5)
+
 	// Enable to represent all possible counters in redis (most with 0 values)
 	includeZeroCounters := p.sequence == 0 && p.i.PublishAllCounters
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, p.i.UnixInterfacesOnly,
@@ -251,6 +254,6 @@ func (p *ifStatsPoller) EventAction() {
 		func(si vnet.Si, counter string, value uint64) {
 			p.publish(si.Name(p.i.v), counter, value)
 		})
-	p.addEvent(5) // schedule next event in 5 seconds
+
 	p.sequence++
 }
