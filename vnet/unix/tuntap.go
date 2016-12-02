@@ -174,6 +174,7 @@ const (
 	ifreq_GETIFHWADDR   ifreq_type = syscall.SIOCGIFHWADDR
 	ifreq_SETIFHWADDR   ifreq_type = syscall.SIOCSIFHWADDR
 	ifreq_SETIFMTU      ifreq_type = syscall.SIOCSIFMTU
+	ifreq_SIFTXQLEN     ifreq_type = syscall.SIOCSIFTXQLEN
 )
 
 var ifreq_type_names = map[ifreq_type]string{
@@ -305,6 +306,15 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 				return
 			}
 			intf.setMtu(m, intf.mtuBytes)
+		}
+
+		// Increase transmit queue.  Default of 500 in drivers/net/tun.c causes packet loss at high rates.
+		{
+			r := ifreq_int{name: intf.name}
+			r.i = 5000
+			if err = intf.ioctl(intf.provision_fd, ifreq_SIFTXQLEN, uintptr(unsafe.Pointer(&r))); err != nil {
+				return
+			}
 		}
 
 		// For tap interfaces, set ethernet address of interface.
