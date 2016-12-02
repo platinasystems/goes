@@ -6,8 +6,8 @@ package main
 
 import (
 	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/goes/net/vnetd"
 	"github.com/platinasystems/go/i2c"
-	vnetinfo "github.com/platinasystems/go/info/vnet"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
@@ -16,7 +16,7 @@ import (
 type platform struct {
 	vnet.Package
 	*fe1.Platform
-	i *vnetinfo.Info
+	i *vnetd.Info
 }
 
 func (p *platform) Init() (err error) {
@@ -33,13 +33,14 @@ func (p *platform) Init() (err error) {
 		}
 	}
 
-	if len(p.Switches) > 0 { // don't need led enable if we're not running on hardware.
+	if len(p.Switches) > 0 {
+		// don't need led enable if we're not running on hardware.
 		if err = p.boardPortLedEnable(); err != nil {
 			v.Logf("boardPortLedEnable failure: %s", err)
 		}
 	}
 
-	p.i.Init()
+	vnetd.Init(p.i)
 	return
 }
 

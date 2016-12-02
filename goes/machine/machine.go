@@ -10,7 +10,6 @@ import (
 	"github.com/platinasystems/go/goes/machine/gpio"
 	"github.com/platinasystems/go/goes/machine/i2c"
 	"github.com/platinasystems/go/goes/machine/install"
-	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/reload"
 	"github.com/platinasystems/go/goes/machine/restart"
 	"github.com/platinasystems/go/goes/machine/slashinit"
@@ -26,7 +25,6 @@ func New() []interface{} {
 		gpio.New(),
 		diag.New(),
 		install.New(),
-		machined.New(),
 		reload.New(),
 		restart.New(),
 		start.New(),

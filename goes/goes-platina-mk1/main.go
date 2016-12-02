@@ -19,17 +19,17 @@ import (
 	"github.com/platinasystems/go/goes/fs"
 	"github.com/platinasystems/go/goes/kernel"
 	"github.com/platinasystems/go/goes/machine"
-	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/machine/stop"
 	"github.com/platinasystems/go/goes/net"
 	"github.com/platinasystems/go/goes/net/nld"
 	"github.com/platinasystems/go/goes/net/vnet"
+	"github.com/platinasystems/go/goes/net/vnetd"
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/goes/test"
-	vnetinfo "github.com/platinasystems/go/info/vnet"
 	goredis "github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/sockfile"
+	govnet "github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	fe1copyright "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
@@ -55,27 +55,18 @@ func main() {
 	command.Plot(redis.New()...)
 	// command.Plot(test.New()...)
 	_ = test.New
-	command.Plot(vnet.New())
+	command.Plot(vnet.New(), vnetd.New())
 	command.Sort()
 	start.Machine = "platina-mk1"
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet
 	stop.Hook = stopHook
-	machined.Hook = machinedHook
 	nld.Prefixes = []string{"lo.", "eth0."}
+	vnetd.UnixInterfacesOnly = true
+	vnetd.PublishAllCounters = false
+	vnetd.GdbWait = gdbwait
+	vnetd.Hook = vnetHook
 	goes.Main()
-}
-
-func machinedHook() error {
-	machined.Plot(
-		vnetinfo.New(vnetinfo.Config{
-			UnixInterfacesOnly: true,
-			PublishAllCounters: false,
-			GdbWait:            gdbwait,
-			Hook:               vnetHook,
-		}),
-	)
-	return nil
 }
 
 func stopHook() error {
@@ -99,9 +90,7 @@ func stopHook() error {
 	return nil
 }
 
-func vnetHook(i *vnetinfo.Info) error {
-	v := i.V()
-
+func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
 	// Base packages.
 	ethernet.Init(v)
 	ip4.Init(v)

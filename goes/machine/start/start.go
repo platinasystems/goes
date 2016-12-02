@@ -3,8 +3,8 @@
 // LICENSE file.
 
 // Package start provides the named command that runs a redis server followed
-// by a machine specific daemon then all of the configured daemons. If the PID
-// is 1, start doesn't return; instead, it iterates and command shell.
+// by all of the configured daemons. If the PID is 1, start doesn't return;
+// instead, it iterates and command shell.
 package start
 
 import (
@@ -90,9 +90,6 @@ func (cmd cmd) Main(args ...string) error {
 	}
 	for _, k := range keys {
 		pub <- fmt.Sprintf("cmdline.%s: %s", k, cl[k])
-	}
-	if err = command.Main("machined"); err != nil {
-		return err
 	}
 	for daemon, lvl := range command.Daemon {
 		if lvl < 0 {

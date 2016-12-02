@@ -143,6 +143,8 @@ func main() {
 	command.Plot(fs.New()...)
 	command.Plot(kernel.New()...)
 	command.Plot(machine.New()...)
+	// FIXME: remove machined after converting remaining info
+	command.Plot(machined.New())
 	command.Plot(net.New()...)
 	command.Plot(redis.New()...)
 	command.Sort()
