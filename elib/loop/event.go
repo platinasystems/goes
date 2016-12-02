@@ -222,6 +222,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 	}
 
 	// Handle expired timed events.
+	l.now = cpu.TimeNow()
 	l.eventPoolLock.Lock()
 	l.eventPool.AdvanceAdd(l.now, &l.eventVec)
 	l.eventPoolLock.Unlock()
