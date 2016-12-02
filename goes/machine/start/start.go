@@ -25,15 +25,20 @@ import (
 
 const Name = "start"
 
-// Machines may use Hook to run something before redisd, machined, and any
-// other daemons.
+// Machines may use Hook to run something before redisd and other daemons.
 var Hook = func() error { return nil }
+
+// Machines may use PubHook to publish redis "key: value" strings before any
+// daemons are run.
+var PubHook = func(chan<- string) error { return nil }
 
 // Machines may use ConfHook to run something after all daemons start and
 // before source of config..
 var ConfHook = func() error { return nil }
 
+// A non-empty Machine is published to redis as "machine: Machine"
 var Machine string
+
 var RedisDevs []string
 
 type cmd struct{}
@@ -90,6 +95,9 @@ func (cmd cmd) Main(args ...string) error {
 	}
 	for _, k := range keys {
 		pub <- fmt.Sprintf("cmdline.%s: %s", k, cl[k])
+	}
+	if err = PubHook(pub); err != nil {
+		return err
 	}
 	for daemon, lvl := range command.Daemon {
 		if lvl < 0 {
