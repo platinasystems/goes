@@ -2,14 +2,14 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package diagutils/ipmigod provides an IPMI protocol daemon.
+// Package ipmigod provides an IPMI protocol daemon.
 package ipmigod
 
 import (
 	"strconv"
 
 	"github.com/platinasystems/go/flags"
-	"github.com/platinasystems/go/ipmigod"
+	"github.com/platinasystems/go/goes/machine/ipmigod/internal"
 	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/redis"
 )
@@ -65,6 +65,6 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 
-	ipmigod.Ipmigod(mmCard, int(cardNum))
+	internal.Ipmigod(mmCard, int(cardNum))
 	return nil
 }

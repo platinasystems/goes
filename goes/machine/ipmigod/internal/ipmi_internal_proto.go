@@ -3,7 +3,7 @@
 // LICENSE file.
 
 // Package contains IPMI 2.0 spec protocol definitions
-package ipmigod
+package internal
 
 import (
 	"bytes"
