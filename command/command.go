@@ -17,10 +17,10 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes/pidfile"
 	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/nocomment"
 	"github.com/platinasystems/go/parms"
-	"github.com/platinasystems/go/pidfile"
 	"github.com/platinasystems/go/slice_args"
 	"github.com/platinasystems/go/slice_string"
 	"github.com/platinasystems/go/url"

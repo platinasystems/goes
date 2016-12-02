@@ -11,15 +11,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/platinasystems/go/rundir"
+	"github.com/platinasystems/go/goes/varrun"
 )
 
-const Dir = "/run/goes/pids"
+const Dir = varrun.Dir + "/pids"
 
 func New(name string) (string, error) {
 	pid := os.Getpid()
 	fn := filepath.Join(Dir, fmt.Sprint(pid))
-	f, err := rundir.Create(fn)
+	f, err := varrun.Create(fn)
 	if err != nil {
 		return "", err
 	}

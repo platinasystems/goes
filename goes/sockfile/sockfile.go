@@ -2,6 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// Package sockfile creates and dials servers listening to unix socket files in
+// /run/goes/socks.
 package sockfile
 
 import (
@@ -12,11 +14,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/platinasystems/go/goes/varrun"
 	"github.com/platinasystems/go/group"
-	"github.com/platinasystems/go/rundir"
 )
 
-const Dir = "/run/goes/socks"
+const Dir = varrun.Dir + "/socks"
 
 type RpcServer struct {
 	ln    net.Listener
@@ -43,7 +45,7 @@ func Listen(name string) (net.Listener, error) {
 	if err == nil || os.IsExist(err) {
 		return nil, fmt.Errorf("%s: %v", name, os.ErrExist)
 	}
-	err = rundir.New(Dir)
+	err = varrun.New(Dir)
 	if err != nil {
 		return nil, err
 	}

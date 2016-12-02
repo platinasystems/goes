@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/machine/internal"
-	"github.com/platinasystems/go/pidfile"
+	"github.com/platinasystems/go/goes/pidfile"
 )
 
 const Name = "install"

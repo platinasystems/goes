@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"net/rpc"
 
+	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/args"
 	"github.com/platinasystems/go/redis/rpc/reply"
-	"github.com/platinasystems/go/sockfile"
 )
 
 const Name = "stringd"

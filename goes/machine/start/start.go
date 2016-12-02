@@ -17,9 +17,9 @@ import (
 	"github.com/platinasystems/go/cmdline"
 	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes/machine/internal"
+	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/redis"
-	"github.com/platinasystems/go/sockfile"
 	. "github.com/platinasystems/go/version"
 )
 

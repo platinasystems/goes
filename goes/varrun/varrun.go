@@ -2,8 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package rundir creates and removes /run/goes/... files.
-package rundir
+// Package varrun creates and removes [/var]/run/goes/... files.
+package varrun
 
 import (
 	"errors"
@@ -16,9 +16,7 @@ import (
 	"github.com/platinasystems/go/group"
 )
 
-const (
-	Dir = "/run/goes"
-)
+const Dir = "/run/goes"
 
 var adm = -1
 var euid = -1

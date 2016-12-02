@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/redis/rpc/args"
-	"github.com/platinasystems/go/sockfile"
 )
 
 const Timeout = 500 * time.Millisecond

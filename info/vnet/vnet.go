@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/info"
-	"github.com/platinasystems/go/sockfile"
 	"github.com/platinasystems/go/vnet"
 )
 

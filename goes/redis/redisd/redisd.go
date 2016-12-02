@@ -18,16 +18,16 @@ import (
 	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
+	"github.com/platinasystems/go/goes/sockfile"
+	"github.com/platinasystems/go/goes/varrun"
 	"github.com/platinasystems/go/group"
 	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/reg"
-	"github.com/platinasystems/go/rundir"
-	"github.com/platinasystems/go/sockfile"
 )
 
 const Name = "redisd"
-const Log = rundir.Dir + "/log/redisd"
+const Log = varrun.Dir + "/log/redisd"
 
 var Port = 6379
 var PublishedKeys = []string{redis.Machine}
@@ -86,17 +86,17 @@ func (cmd *cmd) Main(args ...string) error {
 		}
 	}
 
-	err := rundir.New(sockfile.Dir)
+	err := varrun.New(sockfile.Dir)
 	if err != nil {
 		return err
 	}
 
-	err = rundir.New(filepath.Dir(Log))
+	err = varrun.New(filepath.Dir(Log))
 	if err != nil {
 		return err
 	}
 
-	logf, err := rundir.Create(Log)
+	logf, err := varrun.Create(Log)
 	if err != nil {
 		return err
 	}

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/machine/internal"
-	"github.com/platinasystems/go/pidfile"
-	"github.com/platinasystems/go/sockfile"
+	"github.com/platinasystems/go/goes/pidfile"
+	"github.com/platinasystems/go/goes/sockfile"
 )
 
 const Name = "stop"

@@ -5,7 +5,7 @@
 package vnet
 
 import (
-	"github.com/platinasystems/go/sockfile"
+	"github.com/platinasystems/go/goes/sockfile"
 
 	"fmt"
 	"io"
