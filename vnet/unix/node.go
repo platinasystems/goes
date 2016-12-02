@@ -11,6 +11,7 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -19,6 +20,7 @@ import (
 type nodeMain struct {
 	v            *vnet.Vnet
 	rxPacketPool chan *packet
+	rxRefsFree   chan []rxRef
 	txPacketPool chan *packet
 	puntNode     puntNode
 }
@@ -26,6 +28,7 @@ type nodeMain struct {
 func (nm *nodeMain) Init(m *Main) {
 	nm.rxPacketPool = make(chan *packet, 64)
 	nm.txPacketPool = make(chan *packet, 64)
+	nm.rxRefsFree = make(chan []rxRef, 64)
 	nm.puntNode.Errors = []string{
 		puntErrorNonUnix:       "non-unix interface",
 		puntErrorInterfaceDown: "interface is down",
@@ -40,9 +43,12 @@ type node struct {
 	ethernet.Interface
 	vnet.InterfaceNode
 	i             *Interface
-	rxRefs        chan rxRef
-	txRefIns      chan txRefIn
+	rxRefsLock    sync.Mutex
+	rxRefs        []rxRef
+	rxPending     []rxRef
+	rxDrops       int32
 	rxActiveCount int32
+	txRefIns      chan txRefIn
 	txRefIn       txRefIn
 	txAvailable   int32
 	txIovecs      iovecVec
@@ -59,12 +65,11 @@ func (intf *Interface) interfaceNodeInit(m *Main) {
 	vnetName := ifName + "-unix"
 	n := &intf.node
 	n.i = intf
-	n.rxRefs = make(chan rxRef, vnet.MaxVectorLen*4)
 	n.txRefIns = make(chan txRefIn, 64)
-	m.v.RegisterHwInterface(n, vnetName)
 	n.Next = []string{
 		rxNextTx: ifName,
 	}
+	m.v.RegisterHwInterface(n, vnetName)
 	m.v.RegisterInterfaceNode(n, n.Hi(), vnetName)
 	ni := m.v.AddNamedNext(&m.puntNode, vnetName)
 	m.puntNode.setNext(intf.si, ni)
@@ -146,36 +151,63 @@ func (m *Main) putRxPacket(p *packet) {
 	}
 }
 
+func (m *Main) rxRefsGet() (r []rxRef) {
+	select {
+	case r = <-m.rxRefsFree:
+		r = r[:0]
+	default:
+	}
+	return
+}
+
+func (m *Main) rxRefsPut(r []rxRef) {
+	select {
+	case m.rxRefsFree <- r:
+	default:
+	}
+}
+
 func (n *node) InterfaceInput(o *vnet.RefOut) {
 	m := n.i.m
 	toTx := &o.Outs[rxNextTx]
 	toTx.BufferPool = m.bufferPool
-	t := n.GetIfThread()
-	nPackets, nBytes, nDrops := uint(0), uint(0), uint(0)
 
-	done := false
-	for !done {
-		select {
-		case r := <-n.rxRefs:
-			if r.len == ^uint(0) {
-				nDrops++
-			} else {
-				nBytes += r.len
-				r.ref.Si = n.Si() // use xxx-unix interface as receive interface.
-				toTx.Refs[nPackets] = r.ref
-				nPackets++
-				if m.verbosePackets {
-					m.v.Logf("unix rx %d: %x\n", r.len, r.ref.DataSlice())
-				}
-				done = nPackets >= uint(len(toTx.Refs))
-			}
-		default:
-			done = true
-		}
+	n.rxRefsLock.Lock()
+	refs := n.rxRefs
+	n.rxRefs = m.rxRefsGet()
+	n.rxRefsLock.Unlock()
+	if n.rxPending == nil {
+		n.rxPending = refs
+	} else {
+		n.rxPending = append(n.rxPending, refs...)
+		m.rxRefsPut(refs)
 	}
 
+	nDrops := n.rxDrops
+	atomic.AddInt32(&n.rxDrops, -nDrops)
+
+	nPending := uint(len(n.rxPending))
+	nPackets, nBytes := nPending, uint(0)
+	if nPackets >= vnet.MaxVectorLen {
+		nPackets = vnet.MaxVectorLen
+	}
+
+	for i := uint(0); i < nPackets; i++ {
+		r := &n.rxPending[i]
+		nBytes += r.len
+		toTx.Refs[i] = r.ref
+		if m.verbosePackets {
+			m.v.Logf("unix rx %d: %x\n", r.len, r.ref.DataSlice())
+		}
+	}
+	if nPackets < nPending {
+		copy(n.rxPending[0:], n.rxPending[nPackets:])
+	}
+	n.rxPending = n.rxPending[:nPending-nPackets]
+
+	t := n.GetIfThread()
 	vnet.IfRxCounter.Add(t, n.Si(), nPackets, nBytes)
-	vnet.IfDrops.Add(t, n.Si(), nDrops)
+	vnet.IfDrops.Add(t, n.Si(), uint(nDrops))
 	toTx.SetLen(m.v, nPackets)
 	n.Activate(atomic.AddInt32(&n.rxActiveCount, -int32(nPackets)) > 0)
 }
@@ -191,7 +223,7 @@ func (intf *Interface) ReadReady() (err error) {
 	if errno != 0 {
 		err = errorForErrno("readv", errno)
 		m.putRxPacket(p)
-		n.rxRefs <- rxRef{len: ^uint(0)}
+		atomic.AddInt32(&n.rxDrops, 1)
 		return
 	}
 	size := m.bufferPool.Size
@@ -215,9 +247,13 @@ func (intf *Interface) ReadReady() (err error) {
 	var r rxRef
 	r.len = p.chain.Len()
 	r.ref = p.chain.Done()
+	// use xxx-unix interface as receive interface.
+	r.ref.Si = n.Si()
 	atomic.AddInt32(&n.rxActiveCount, 1)
 	n.Activate(true)
-	n.rxRefs <- r
+	n.rxRefsLock.Lock()
+	n.rxRefs = append(n.rxRefs, r)
+	n.rxRefsLock.Unlock()
 
 	// Refill packet with new buffers & return for re-use.
 	p.allocRefs(m, nRefs)
@@ -252,12 +288,12 @@ func (intf *Interface) WriteReady() (err error) {
 				intf.m.Vnet.FreeTxRefIn(ri.in)
 				ri.in = nil
 				atomic.AddInt32(&n.txAvailable, -1)
+				iomux.Update(intf)
 			}
 			select {
 			case *ri = <-n.txRefIns:
 				ri.i = 0
 			default:
-				iomux.Update(intf)
 				return
 			}
 		}
