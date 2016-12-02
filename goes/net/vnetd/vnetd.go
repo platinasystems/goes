@@ -48,8 +48,7 @@ type Info struct {
 	v         vnet.Vnet
 	eventPool sync.Pool
 	poller    ifStatsPoller
-	spub      chan<- string
-	kvpub     chan key_value
+	pub       chan<- string
 }
 
 func New() *cmd { return &cmd{} }
@@ -65,14 +64,11 @@ func (cmd *cmd) Main(...string) error {
 	)
 
 	// never want to block vnet
-	cmd.i.kvpub = make(chan key_value, 16<<10)
-	defer close(cmd.i.kvpub)
-
-	cmd.i.spub, err = redis.Publish(redis.Machine)
+	cmd.i.pub, err = redis.Publish(redis.Machine, 16<<10)
 	if err != nil {
 		return err
 	}
-	defer close(cmd.i.spub)
+	defer close(cmd.i.pub)
 
 	rpc.Register(&cmd.i)
 
@@ -117,7 +113,6 @@ func Init(i *Info) {
 	i.poller.i = i
 	i.poller.addEvent(0)
 	i.initialPublish()
-	go i.publisher()
 	i.set("vnet.ready", "true", true)
 }
 
@@ -196,7 +191,7 @@ func (e *event) EventAction() {
 		enable parse.Enable
 	)
 	if e.isReadyEvent {
-		e.i.spub <- fmt.Sprint(e.key, ": ", e.value)
+		e.i.pub <- fmt.Sprint(e.key, ": ", e.value)
 		return
 	}
 	e.in.Init(nil)
@@ -222,7 +217,7 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 		return
 	}
 	if err = <-e.err; err == nil {
-		i.spub <- fmt.Sprint(key, ": ", value)
+		i.pub <- fmt.Sprint(key, ": ", value)
 	}
 	return
 }
@@ -234,20 +229,8 @@ func (i *Info) initialPublish() {
 	})
 }
 
-type key_value struct {
-	key   string
-	value interface{}
-}
-
-func (i *Info) publisher() {
-	for c := range i.kvpub {
-		i.spub <- fmt.Sprint(c.key, ": ", c.value)
-	}
-}
-
 func (i *Info) publish(key string, value interface{}) {
-	// FIXME: pool these key_values
-	i.kvpub <- key_value{key: key, value: value}
+	i.pub <- fmt.Sprint(key, ": ", value)
 }
 
 type ifStatsPoller struct {
