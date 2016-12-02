@@ -197,19 +197,24 @@ func Lrange(key string, start, stop int) (keys []string, err error) {
 // returned channel are forwarded to the redis server until the channel is
 // closed.
 //
-//	pub, err := redis.Publish(NAME)
+//	pub, err := redis.Publish(NAME[, DEPTH])
 //	if err {
 //		panic()
 //	}
 //	defer close(pub)
 //	...
 //	pub.Print("hello world")
-func Publish(name string) (chan<- string, error) {
+//
+// The default message channel depth is 16.
+func Publish(name string, depth ...int) (chan<- string, error) {
+	if len(depth) == 0 {
+		depth = []int{16}
+	}
 	conn, err := Connect()
 	if err != nil {
 		return nil, err
 	}
-	ch := make(chan string, 16)
+	ch := make(chan string, depth[0])
 	go func(name string, out <-chan string, conn redis.Conn) {
 		defer conn.Close()
 
