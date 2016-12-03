@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/platinasystems/go/fit"
+	"github.com/platinasystems/go/goes/kernel/internal/fit"
 )
 
 const Name = "iminfo"
