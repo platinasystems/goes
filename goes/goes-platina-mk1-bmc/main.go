@@ -27,6 +27,7 @@ import (
 	"github.com/platinasystems/go/goes/builtin"
 	"github.com/platinasystems/go/goes/core"
 	"github.com/platinasystems/go/goes/fs"
+	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
 	"github.com/platinasystems/go/goes/kernel"
 	"github.com/platinasystems/go/goes/machine"
 	"github.com/platinasystems/go/goes/machine/machined"
@@ -36,7 +37,6 @@ import (
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
-	"github.com/platinasystems/go/led"
 	"github.com/platinasystems/go/log"
 )
 
