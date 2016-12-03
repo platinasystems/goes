@@ -7,7 +7,7 @@ package apropos
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "apropos"
@@ -29,12 +29,12 @@ func (cmd) Main(args ...string) error {
 		fmt.Printf(format, k, v)
 	}
 	if len(args) == 0 {
-		for _, k := range command.Keys.Apropos {
-			printApropos(k, command.Apropos[k])
+		for _, k := range goes.Keys.Apropos {
+			printApropos(k, goes.Apropos[k])
 		}
 	} else {
 		for _, k := range args {
-			v, found := command.Apropos[k]
+			v, found := goes.Apropos[k]
 			if !found {
 				v = "has no apropos"
 			}

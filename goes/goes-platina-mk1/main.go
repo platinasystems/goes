@@ -10,7 +10,6 @@ import (
 	"time"
 
 	redigo "github.com/garyburd/redigo/redis"
-	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/builtin"
 	"github.com/platinasystems/go/goes/builtin/license"
@@ -46,17 +45,17 @@ func main() {
 	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	license.Others = []license.Other{{fe1path, fe1copyright.License}}
 	patents.Others = []patents.Other{{fe1path, fe1copyright.Patents}}
-	command.Plot(builtin.New()...)
-	command.Plot(core.New()...)
-	command.Plot(fs.New()...)
-	command.Plot(kernel.New()...)
-	command.Plot(machine.New()...)
-	command.Plot(net.New()...)
-	command.Plot(redis.New()...)
-	// command.Plot(test.New()...)
+	goes.Plot(builtin.New()...)
+	goes.Plot(core.New()...)
+	goes.Plot(fs.New()...)
+	goes.Plot(kernel.New()...)
+	goes.Plot(machine.New()...)
+	goes.Plot(net.New()...)
+	goes.Plot(redis.New()...)
+	// goes.Plot(test.New()...)
 	_ = test.New
-	command.Plot(vnet.New(), vnetd.New())
-	command.Sort()
+	goes.Plot(vnet.New(), vnetd.New())
+	goes.Sort()
 	start.Machine = "platina-mk1"
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet

@@ -6,7 +6,7 @@
 // the daemons associated with this executable.
 package restart
 
-import "github.com/platinasystems/go/command"
+import "github.com/platinasystems/go/goes"
 
 const Name = "restart"
 
@@ -18,11 +18,11 @@ func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name }
 
 func (cmd) Main(...string) error {
-	err := command.Main("stop")
+	err := goes.Main("stop")
 	if err != nil {
 		return err
 	}
-	return command.Main("start")
+	return goes.Main("start")
 }
 
 func (cmd) Apropos() map[string]string {

@@ -24,7 +24,7 @@ import (
 	"syscall"
 
 	"github.com/cavaliercoder/grab"
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/url"
 )
@@ -103,10 +103,10 @@ func (cmd) makeRootDirs(mountPoint string) {
 		{"/usr/bin", 0755},
 	} {
 		if _, err := os.Stat(mountPoint + dir.name); os.IsNotExist(err) {
-			err := os.Mkdir(mountPoint + dir.name, dir.mode)
+			err := os.Mkdir(mountPoint+dir.name, dir.mode)
 			if err != nil {
 				panic(fmt.Errorf("mkdir %s: %s",
-					mountPoint + dir.name, err))
+					mountPoint+dir.name, err))
 			}
 		}
 	}
@@ -130,17 +130,17 @@ func (cmd) makeRootFiles(mountPoint string) {
 			w, err := os.Create(mountPoint + cp.dst)
 			if err != nil {
 				panic(fmt.Errorf("create %s: %s",
-					mountPoint + cp.dst, err))
+					mountPoint+cp.dst, err))
 			}
 			defer w.Close()
 			_, err = io.Copy(w, r)
 			if err != nil {
 				panic(fmt.Errorf("copy %s to %s: %s",
-					cp.src, mountPoint + cp.dst, err))
+					cp.src, mountPoint+cp.dst, err))
 			}
 			if err = os.Chmod(cp.dst, 0755); err != nil {
 				panic(fmt.Errorf("chmod %s: %s",
-					mountPoint + cp.dst, err))
+					mountPoint+cp.dst, err))
 			}
 		}
 	}
@@ -153,10 +153,10 @@ func (cmd) makeRootLinks(mountPoint string) {
 		{"../usr/bin/goes", "/sbin/init"},
 	} {
 		if _, err := os.Stat(mountPoint + ln.dst); os.IsNotExist(err) {
-			err = os.Symlink(ln.src, mountPoint + ln.dst)
+			err = os.Symlink(ln.src, mountPoint+ln.dst)
 			if err != nil {
 				panic(fmt.Errorf("ln %s->%s: %s", ln.src,
-					mountPoint + ln.dst, err))
+					mountPoint+ln.dst, err))
 			}
 		}
 	}
@@ -174,17 +174,17 @@ func (cmd) moveVirtualFileSystems(mountPoint string) {
 		{"/dev", "/dev", 0755},
 	} {
 		if _, err := os.Stat(mountPoint + mv.dst); os.IsNotExist(err) {
-			err = os.Mkdir(mountPoint + mv.dst, os.FileMode(mv.mode))
+			err = os.Mkdir(mountPoint+mv.dst, os.FileMode(mv.mode))
 			if err != nil {
 				panic(fmt.Errorf("mkdir %s: %s",
-					mountPoint + mv.dst, err))
+					mountPoint+mv.dst, err))
 			}
 		}
-		err := syscall.Mount(mv.src, mountPoint + mv.dst, "",
+		err := syscall.Mount(mv.src, mountPoint+mv.dst, "",
 			syscall.MS_MOVE, "")
 		if err != nil {
 			panic(fmt.Errorf("mount -o move %s %s: %s",
-				mv.src, mountPoint + mv.dst, err))
+				mv.src, mountPoint+mv.dst, err))
 		}
 	}
 }
@@ -213,7 +213,7 @@ func (cmd) rmdirRootDirs() {
 	}
 }
 
-func (cmd) makeTargetDirs () {
+func (cmd) makeTargetDirs() {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -272,14 +272,14 @@ func (c cmd) pivotRoot(mountPoint string, root string, script string) {
 				mountPoint, err))
 		}
 	}
-	err = command.Main("mount", root, mountPoint)
+	err = goes.Main("mount", root, mountPoint)
 	if err != nil {
 		panic(fmt.Errorf("Error mounting %s on %s: %s",
 			root, mountPoint, err))
 	}
 
 	if len(script) > 0 {
-		err := command.Main("source", script)
+		err := goes.Main("source", script)
 		if err != nil {
 			panic(fmt.Errorf("Error running boot script %s on %s: %s",
 				script, root, err))
@@ -289,7 +289,7 @@ func (c cmd) pivotRoot(mountPoint string, root string, script string) {
 	c.makeRootFiles(mountPoint)
 	c.makeRootLinks(mountPoint)
 	c.moveVirtualFileSystems(mountPoint)
-	
+
 	if err = os.Chdir(mountPoint); err != nil {
 		panic(fmt.Errorf("chdir %s: %s", mountPoint, err))
 	}
@@ -329,7 +329,7 @@ func (c cmd) runSbinInit() {
 		}
 		panic(fmt.Errorf("stat %s: %s", sbininit, err))
 	}
-	
+
 	if err := syscall.Exec(sbininit, []string{sbininit}, []string{
 		"PATH=" + os.Getenv("PATH"),
 		"SHELL=" + os.Getenv("SHELL"),
@@ -343,10 +343,10 @@ func (c cmd) runSbinInit() {
 func (cmd) emergencyShell() {
 	for {
 		fmt.Println("Dropping into emergency goes shell...\n")
-		err := command.Main("cli")
+		err := goes.Main("cli")
 		if err != nil && err != io.EOF {
 			fmt.Println(err)
-		}	
+		}
 	}
 }
 
@@ -359,7 +359,7 @@ func (c cmd) Main(_ ...string) error {
 				fmt.Println(r)
 			}
 			c.emergencyShell()
-		} ()
+		}()
 		if r := recover(); r != nil {
 			fmt.Println(r)
 		}
@@ -377,10 +377,10 @@ func (c cmd) Main(_ ...string) error {
 		panic(fmt.Errorf("Error from board hook: ", err))
 	}
 	var root, script string
-	if len(goesRoot) >=1 && len(goesRoot[0]) > 0 {
+	if len(goesRoot) >= 1 && len(goesRoot[0]) > 0 {
 		root = goesRoot[0]
 	}
-	if len(goesRoot) >=2 && len(goesRoot[1]) > 0 {
+	if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
 		script = goesRoot[1]
 	}
 
@@ -391,7 +391,7 @@ func (c cmd) Main(_ ...string) error {
 	c.makeTargetLinks()
 	c.mountTargetVirtualFilesystems()
 	c.runSbinInit()
-	err = command.Main("start")
+	err = goes.Main("start")
 
 	return err
 }
@@ -437,6 +437,6 @@ func installer(params []string) error {
 		fmt.Printf("All files loaded successfully!")
 	}
 
-	return command.Main("kexec", "-e", "-k", "kernel", "-i", "initramfs",
+	return goes.Main("kexec", "-e", "-k", "kernel", "-i", "initramfs",
 		"-c", "console=ttyS0,115200")
 }

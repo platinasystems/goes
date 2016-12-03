@@ -17,7 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "-complete"
@@ -36,9 +36,9 @@ func (cmd) Main(args ...string) error {
 		args = args[1:]
 	}
 	if len(args) == 0 {
-		ss = command.Keys.Main
-	} else if cmd, err := command.Find(args[0]); err == nil {
-		if method, found := cmd.(command.Completer); found {
+		ss = goes.Keys.Main
+	} else if cmd, err := goes.Find(args[0]); err == nil {
+		if method, found := cmd.(goes.Completer); found {
 			ss = method.Complete(args[1:]...)
 		} else if len(args[1:]) > 0 {
 			ss, _ = filepath.Glob(args[len(args)-1] + "*")
@@ -46,7 +46,7 @@ func (cmd) Main(args ...string) error {
 			ss, _ = filepath.Glob("*")
 		}
 	} else if len(args) == 1 {
-		for _, name := range command.Keys.Main {
+		for _, name := range goes.Keys.Main {
 			if strings.HasPrefix(name, args[0]) {
 				ss = append(ss, name)
 			}

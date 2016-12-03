@@ -7,7 +7,7 @@ package help
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "help"
@@ -22,22 +22,22 @@ func (help) Usage() string  { return Name + " [COMMAND [ARGS]...]" }
 
 func (a help) Main(args ...string) error {
 	if len(args) == 0 {
-		for _, k := range command.Keys.Apropos {
+		for _, k := range goes.Keys.Apropos {
 			format := "%-15s %s\n"
 			if len(k) >= 16 {
 				format = "%s\n\t\t%s\n"
 			}
-			fmt.Printf(format, k, command.Apropos[k])
+			fmt.Printf(format, k, goes.Apropos[k])
 		}
 	} else {
-		cmd, err := command.Find(args[0])
+		cmd, err := goes.Find(args[0])
 		if err != nil {
 			return err
 		}
-		if method, found := cmd.(command.Helper); found {
+		if method, found := cmd.(goes.Helper); found {
 			fmt.Println(method.Help(args...))
 		} else {
-			fmt.Println(command.Usage[args[0]])
+			fmt.Println(goes.Usage[args[0]])
 		}
 	}
 	return nil

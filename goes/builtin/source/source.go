@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/notliner"
 	"github.com/platinasystems/go/url"
 )
@@ -43,7 +43,7 @@ func (cmd) Main(args ...string) error {
 		os.Setenv("TRACE", "true")
 	}
 
-	err = command.Shell(notliner.New(f, nil))
+	err = goes.Shell(notliner.New(f, nil))
 
 	if flag["-x"] && t != "true" {
 		os.Unsetenv("TRACE")

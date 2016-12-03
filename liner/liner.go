@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/nocomment"
 	"github.com/platinasystems/go/notliner"
 	"github.com/platinasystems/go/slice_args"
@@ -63,7 +63,7 @@ func complete(line string) (lines []string) {
 		t := os.Stdout
 		defer func() { os.Stdout = t }()
 		os.Stdout = pw
-		command.Main(append([]string{"-complete"}, args...)...)
+		goes.Main(append([]string{"-complete"}, args...)...)
 		pw.Close()
 	}()
 	prs := bufio.NewScanner(pr)
@@ -94,7 +94,7 @@ func help(line string) {
 	if len(args) == 0 || pl.More {
 		fmt.Println("Enter command.")
 	} else {
-		command.Main(append([]string{"help"}, args...)...)
+		goes.Main(append([]string{"help"}, args...)...)
 	}
 }
 
@@ -123,7 +123,7 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 	if errno != 0 {
 		return "", fmt.Errorf("TCSETS: %v", errno)
 	}
-	err := command.Main("resize")
+	err := goes.Main("resize")
 	if err != nil {
 		return "", err
 	}

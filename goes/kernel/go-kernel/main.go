@@ -5,15 +5,14 @@
 package main
 
 import (
-	"github.com/platinasystems/go/command"
-	"github.com/platinasystems/go/commands/builtin"
-	"github.com/platinasystems/go/commands/kernel"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/builtin"
+	"github.com/platinasystems/go/goes/kernel"
 )
 
 func main() {
-	command.Plot(builtin.New()...)
-	command.Plot(kernel.New()...)
-	command.Sort()
+	goes.Plot(builtin.New()...)
+	goes.Plot(kernel.New()...)
+	goes.Sort()
 	goes.Main()
 }

@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "env"
@@ -42,7 +42,7 @@ func (cmd) Main(args ...string) error {
 			os.Setenv(args[0][:eq], args[0][eq+1:])
 			args = args[1:]
 		}
-		return command.Main(args...)
+		return goes.Main(args...)
 	}
 	return nil
 }

@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/environ/fantray"
 	"github.com/platinasystems/go/environ/fsp"
@@ -138,16 +137,16 @@ var stageFlagFloat64 int = 0
 
 func main() {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
-	command.Plot(builtin.New()...)
-	command.Plot(core.New()...)
-	command.Plot(fs.New()...)
-	command.Plot(kernel.New()...)
-	command.Plot(machine.New()...)
+	goes.Plot(builtin.New()...)
+	goes.Plot(core.New()...)
+	goes.Plot(fs.New()...)
+	goes.Plot(kernel.New()...)
+	goes.Plot(machine.New()...)
 	// FIXME: remove machined after converting remaining info
-	command.Plot(machined.New())
-	command.Plot(net.New()...)
-	command.Plot(redis.New()...)
-	command.Sort()
+	goes.Plot(machined.New())
+	goes.Plot(net.New()...)
+	goes.Plot(redis.New()...)
+	goes.Sort()
 	start.Machine = "platina-mk1-bmc"
 	start.RedisDevs = []string{"lo", "eth0"}
 	nld.Prefixes = []string{"lo.", "eth0."}

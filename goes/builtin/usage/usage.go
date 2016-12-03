@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 type usage struct{}
@@ -24,7 +24,7 @@ func (u usage) Main(args ...string) error {
 		return fmt.Errorf("COMMAND: missing")
 	}
 	for _, arg := range args {
-		s, found := command.Usage[arg]
+		s, found := goes.Usage[arg]
 		if !found {
 			return fmt.Errorf("%s: not found", arg)
 		}

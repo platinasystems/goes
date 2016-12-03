@@ -10,7 +10,6 @@ package main
 import (
 	stdnet "net"
 
-	"github.com/platinasystems/go/command"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/builtin"
 	"github.com/platinasystems/go/goes/core"
@@ -26,16 +25,16 @@ import (
 )
 
 func main() {
-	command.Plot(builtin.New()...)
-	command.Plot(core.New()...)
-	command.Plot(fs.New()...)
-	command.Plot(kernel.New()...)
-	command.Plot(machine.New()...)
-	command.Plot(net.New()...)
-	command.Plot(redis.New()...)
-	command.Plot(telnetd.New())
-	command.Plot(test.New()...)
-	command.Sort()
+	goes.Plot(builtin.New()...)
+	goes.Plot(core.New()...)
+	goes.Plot(fs.New()...)
+	goes.Plot(kernel.New()...)
+	goes.Plot(machine.New()...)
+	goes.Plot(net.New()...)
+	goes.Plot(redis.New()...)
+	goes.Plot(telnetd.New())
+	goes.Plot(test.New()...)
+	goes.Sort()
 	start.Machine = "example"
 	nld.Hook = func() error {
 		itfs, err := stdnet.Interfaces()

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/cmdline"
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/parms"
@@ -72,7 +72,7 @@ func (cmd cmd) Main(args ...string) error {
 	if err = Hook(); err != nil {
 		return err
 	}
-	if err = command.Main(redisd...); err != nil {
+	if err = goes.Main(redisd...); err != nil {
 		return err
 	}
 	pub, err := redis.Publish(redis.Machine)
@@ -99,11 +99,11 @@ func (cmd cmd) Main(args ...string) error {
 	if err = PubHook(pub); err != nil {
 		return err
 	}
-	for daemon, lvl := range command.Daemon {
+	for daemon, lvl := range goes.Daemon {
 		if lvl < 0 {
 			continue
 		}
-		if err = command.Main(daemon); err != nil {
+		if err = goes.Main(daemon); err != nil {
 			return err
 		}
 	}
@@ -111,23 +111,23 @@ func (cmd cmd) Main(args ...string) error {
 		if err = ConfHook(); err != nil {
 			return err
 		}
-		if err = command.Main("source", s); err != nil {
+		if err = goes.Main("source", s); err != nil {
 			return err
 		}
 	}
 	if os.Getpid() == 1 {
-		_, err = command.Find("login")
+		_, err = goes.Find("login")
 		login := err == nil
 		for {
 			if login {
-				err = command.Main("login")
+				err = goes.Main("login")
 				if err != nil {
 					fmt.Println("login:", err)
 					time.Sleep(3 * time.Second)
 					continue
 				}
 			}
-			err = command.Main("cli")
+			err = goes.Main("cli")
 			if err != nil && err != io.EOF {
 				fmt.Println(err)
 				<-make(chan struct{})

@@ -7,7 +7,7 @@ package man
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 type man struct{}
@@ -24,7 +24,7 @@ func (m man) Main(args ...string) error {
 		return fmt.Errorf("COMMAND: missing")
 	}
 	for i, arg := range args {
-		v, found := command.Man[arg]
+		v, found := goes.Man[arg]
 		if !found {
 			fmt.Print(arg, ": has no man\n")
 		} else {

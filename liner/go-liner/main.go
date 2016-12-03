@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/go/builtinutils"
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/liner"
 )
 
 func main() {
-	command.Plot(builtinutils.New()...)
+	goes.Plot(builtinutils.New()...)
 	fmt.Println("Type EOF to exit...")
 	l := liner.New()
 	prompt := filepath.Base(os.Args[0]) + "> "

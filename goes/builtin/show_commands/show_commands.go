@@ -7,7 +7,7 @@ package show_commands
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 )
 
 type cmd struct{}
@@ -23,8 +23,8 @@ func (cmd) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 
-	for _, name := range command.Keys.Main {
-		if command.IsDaemon(name) {
+	for _, name := range goes.Keys.Main {
+		if goes.IsDaemon(name) {
 			fmt.Printf("\t%s - daemon\n", name)
 		} else {
 			fmt.Printf("\t%s\n", name)

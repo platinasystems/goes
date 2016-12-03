@@ -5,7 +5,7 @@
 package cli
 
 import (
-	"github.com/platinasystems/go/command"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/liner"
 )
 
@@ -20,7 +20,7 @@ func (cmd) Tag() string    { return "builtin" }
 func (cmd) Usage() string  { return "man cli" }
 
 func (cmd) Main(args ...string) error {
-	return command.Shell(liner.New())
+	return goes.Shell(liner.New())
 }
 
 func (cmd) Man() map[string]string {
