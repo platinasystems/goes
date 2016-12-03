@@ -14,11 +14,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/platinasystems/go/cmdline"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/cmdline"
+	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/goes/sockfile"
-	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/redis"
 	. "github.com/platinasystems/go/version"
 )

@@ -7,7 +7,7 @@ package hset
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/goes/redis/internal"
 	"github.com/platinasystems/go/redis"
 )

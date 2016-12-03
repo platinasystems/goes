@@ -9,7 +9,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/platinasystems/go/url"
+	"github.com/platinasystems/go/goes/internal/url"
 )
 
 const Name = "cat"

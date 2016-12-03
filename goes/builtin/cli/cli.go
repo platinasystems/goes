@@ -6,7 +6,7 @@ package cli
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/liner"
+	"github.com/platinasystems/go/goes/internal/liner"
 )
 
 const Name = "cli"

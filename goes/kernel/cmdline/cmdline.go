@@ -7,7 +7,7 @@ package cmdline
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/cmdline"
+	"github.com/platinasystems/go/goes/internal/cmdline"
 )
 
 const Name = "cmdline"

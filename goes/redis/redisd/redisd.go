@@ -18,10 +18,10 @@ import (
 	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
+	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/goes/varrun"
 	"github.com/platinasystems/go/group"
-	"github.com/platinasystems/go/parms"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/reg"
 )

@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/log"
-	"github.com/platinasystems/go/parms"
 )
 
 const Name = "dmesg"

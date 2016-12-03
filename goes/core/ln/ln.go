@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/platinasystems/go/flags"
-	"github.com/platinasystems/go/parms"
+	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/parms"
 )
 
 const Name = "ln"

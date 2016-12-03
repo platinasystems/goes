@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/flags"
-	"github.com/platinasystems/go/url"
+	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/url"
 )
 
 const Name = "insmod"

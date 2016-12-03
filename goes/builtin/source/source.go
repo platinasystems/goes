@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/platinasystems/go/flags"
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/notliner"
-	"github.com/platinasystems/go/url"
+	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/notliner"
+	"github.com/platinasystems/go/goes/internal/url"
 )
 
 const Name = "source"

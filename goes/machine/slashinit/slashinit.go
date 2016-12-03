@@ -25,8 +25,8 @@ import (
 
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/url"
 	"github.com/platinasystems/go/log"
-	"github.com/platinasystems/go/url"
 )
 
 const (

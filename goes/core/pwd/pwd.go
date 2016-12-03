@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes/internal/flags"
 )
 
 const Name = "pwd"

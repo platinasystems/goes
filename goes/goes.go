@@ -21,14 +21,14 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/nocomment"
+	"github.com/platinasystems/go/goes/internal/parms"
+	"github.com/platinasystems/go/goes/internal/slice_args"
+	"github.com/platinasystems/go/goes/internal/slice_string"
+	"github.com/platinasystems/go/goes/internal/url"
 	"github.com/platinasystems/go/goes/pidfile"
 	"github.com/platinasystems/go/log"
-	"github.com/platinasystems/go/nocomment"
-	"github.com/platinasystems/go/parms"
-	"github.com/platinasystems/go/slice_args"
-	"github.com/platinasystems/go/slice_string"
-	"github.com/platinasystems/go/url"
 )
 
 const (

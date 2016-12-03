@@ -12,9 +12,9 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/fit"
-	"github.com/platinasystems/go/flags"
+	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/kexec"
-	"github.com/platinasystems/go/parms"
 )
 
 const Name = "kexec"

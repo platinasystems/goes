@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/platinasystems/go/parms"
+	"github.com/platinasystems/go/goes/internal/parms"
 )
 
 const Name = "watchdog"

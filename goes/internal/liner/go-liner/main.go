@@ -12,7 +12,7 @@ import (
 
 	"github.com/platinasystems/go/builtinutils"
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/liner"
+	"github.com/platinasystems/go/goes/internal/liner"
 )
 
 func main() {

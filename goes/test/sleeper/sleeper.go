@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/parms"
+	"github.com/platinasystems/go/goes/internal/parms"
 )
 
 const Name = "sleeper"
