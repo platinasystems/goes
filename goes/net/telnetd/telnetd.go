@@ -14,8 +14,8 @@ import (
 	"syscall"
 
 	"github.com/kr/pty"
-	"github.com/platinasystems/go/telnet/command"
-	"github.com/platinasystems/go/telnet/option"
+	"github.com/platinasystems/go/goes/net/internal/telnet/command"
+	"github.com/platinasystems/go/goes/net/internal/telnet/option"
 )
 
 const Name = "telnetd"
