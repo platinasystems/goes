@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/group"
+	"github.com/platinasystems/go/goes/internal/group"
 )
 
 const Dir = "/run/goes"
