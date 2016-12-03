@@ -1,9 +1,14 @@
+// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
 // package fit is for parsing flattened image tree binaries
 package fit
 
 import (
 	"fmt"
-	"github.com/platinasystems/go/kexec"
+
+	"github.com/platinasystems/go/goes/kernel/internal/kexec"
 )
 
 func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {
@@ -11,7 +16,7 @@ func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {
 
 	for _, image := range conf.ImageList {
 		segments = kexec.SliceAddSegment(segments, &image.Data,
-			uintptr(image.LoadAddr) + offset)
+			uintptr(image.LoadAddr)+offset)
 	}
 	if f.Debug {
 		fmt.Printf("Segments: %+v\n", segments)

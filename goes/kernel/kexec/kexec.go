@@ -14,7 +14,7 @@ import (
 	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/kernel/internal/fit"
-	"github.com/platinasystems/go/kexec"
+	"github.com/platinasystems/go/goes/kernel/internal/kexec"
 )
 
 const Name = "kexec"

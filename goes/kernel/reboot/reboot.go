@@ -7,7 +7,7 @@ package reboot
 import (
 	"syscall"
 
-	"github.com/platinasystems/go/kexec"
+	"github.com/platinasystems/go/goes/kernel/internal/kexec"
 )
 
 const Name = "reboot"
