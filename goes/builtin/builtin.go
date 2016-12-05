@@ -10,8 +10,6 @@ import (
 	"github.com/platinasystems/go/goes/builtin/apropos"
 	"github.com/platinasystems/go/goes/builtin/cd"
 	"github.com/platinasystems/go/goes/builtin/cli"
-	"github.com/platinasystems/go/goes/builtin/cli_escapes"
-	"github.com/platinasystems/go/goes/builtin/cli_options"
 	"github.com/platinasystems/go/goes/builtin/complete"
 	"github.com/platinasystems/go/goes/builtin/env"
 	"github.com/platinasystems/go/goes/builtin/exit"
@@ -31,8 +29,6 @@ func New() []interface{} {
 	return []interface{}{
 		apropos.New(),
 		cli.New(),
-		cli_escapes.New(),
-		cli_options.New(),
 		cd.New(),
 		complete.New(),
 		env.New(),

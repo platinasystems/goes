@@ -17,16 +17,10 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
-	"strings"
 	"syscall"
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/goes/internal/flags"
-	"github.com/platinasystems/go/goes/internal/nocomment"
-	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/goes/internal/slice_args"
-	"github.com/platinasystems/go/goes/internal/slice_string"
-	"github.com/platinasystems/go/goes/internal/url"
 	"github.com/platinasystems/go/goes/pidfile"
 	"github.com/platinasystems/go/log"
 )
@@ -278,19 +272,19 @@ type Completer interface {
 
 type daemoner interface {
 	Daemon() int // if present, Daemon() should return run level
-	mainer
+	Mainer
 }
 
 type Helper interface {
 	Help(...string) string
 }
 
-type mainer interface {
+type Mainer interface {
 	Main(...string) error
 }
 
 type mainstringer interface {
-	mainer
+	Mainer
 	stringer
 }
 
@@ -394,7 +388,7 @@ func Plot(cmds ...interface{}) {
 			panic(fmt.Errorf("%s: duplicate", k))
 		}
 		ByName[k] = cmd
-		if _, found := cmd.(mainer); found {
+		if _, found := cmd.(Mainer); found {
 			Keys.Main = append(Keys.Main, k)
 		}
 		if method, found := cmd.(daemoner); found {
@@ -425,271 +419,6 @@ func Plot(cmds ...interface{}) {
 			Usage[k] = method.Usage()
 		}
 	}
-}
-
-// Shell interates command input.
-//
-// Commands may continue to next line, e.g.:
-//
-//	echo hello \
-//	world
-//
-// Commands may be pipelined, e.g.:
-//
-//	ls -lR | more
-//	ls -Lr |
-//	more
-//
-// Command comments are ignored, e.g.:
-//
-//	mount -t tmpfs none /tmp # scratch
-//
-// Similar for leading whitespace, e.g.:
-//
-//		echo why\?
-//
-// However, the shell doesn't have command blocks so there isn't much reason to
-// indent input for anything other than "here documents".
-//
-// A pipeline may redirect input and output of the first and last commands
-// respectively, e.g.:
-//
-//	cat <<-EOF | wc -l > lines.txt
-//		...
-//	EOF
-//
-// The redirected files may be URL's, e.g.:
-//
-//	source https://github.com/MYSTUFF/MYSCRIPT
-//
-// Redirected output may be tee'd to a truncated or appended file with `>>>`
-// and `>>>>` respectively, e.g.:
-//
-//	dmesg | grep goes >>> goes.log
-func Shell(p Prompter) error {
-	var (
-		rc  io.ReadCloser
-		wc  io.WriteCloser
-		in  io.Reader
-		out io.Writer
-		err error
-
-		closers []io.Closer
-
-		pin, pout *os.File
-	)
-	pl := slice_args.New("|")
-	catline := func(prompt string) (line string, err error) {
-		for {
-			var s string
-			s, err = p.Prompt(prompt)
-			if err != nil {
-				return
-			}
-			if !strings.HasSuffix(s, "\\") {
-				line += s
-				return
-			}
-			line += s[:len(s)-1]
-			prompt = "... "
-		}
-	}
-
-commandLoop:
-	for {
-		for _, c := range closers {
-			c.Close()
-		}
-		closers = closers[:0]
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			if err.Error() != "exit status 1" {
-				fmt.Fprintln(os.Stderr, err)
-			}
-			err = nil
-		}
-		pl.Reset()
-		prompt := filepath.Base(Prog()) + "> "
-		if hn, err := os.Hostname(); err == nil {
-			prompt = hn + "> "
-		}
-	pipelineLoop:
-		for {
-			var s string
-			s, err = catline(prompt)
-			if err != nil {
-				return err
-			}
-			s = strings.TrimLeft(s, " \t")
-			if len(s) == 0 {
-				continue pipelineLoop
-			}
-			s = nocomment.New(s)
-			if len(s) == 0 {
-				continue pipelineLoop
-			}
-			pl.Slice(slice_string.New(s)...)
-			if pl.More {
-				prompt = "| "
-			} else {
-				break pipelineLoop
-			}
-		}
-		if len(pl.Slices) == 0 {
-			continue commandLoop
-		}
-		end := len(pl.Slices) - 1
-		name := pl.Slices[end][0]
-		if _, err = Find(name); err != nil {
-			continue commandLoop
-		}
-
-		if end == 0 &&
-			(IsDaemon(name) || Tag[name] == "builtin" ||
-				name == os.Args[0]) {
-			err = Main(pl.Slices[end]...)
-			continue commandLoop
-		}
-
-		for i := 1; i <= end; i++ {
-			_, found := map[string]struct{}{
-				"cli":    struct{}{},
-				"cd":     struct{}{},
-				"env":    struct{}{},
-				"exit":   struct{}{},
-				"export": struct{}{},
-				"resize": struct{}{},
-				"source": struct{}{},
-			}[name]
-			if found || IsDaemon(name) {
-				err = fmt.Errorf("%s: can't pipe\n", name)
-				continue commandLoop
-			}
-		}
-
-		iparm, args := parms.New(pl.Slices[0], "<", "<<", "<<-")
-		pl.Slices[0] = args
-		oparm, args := parms.New(pl.Slices[end],
-			">", ">>", ">>>", ">>>>")
-		pl.Slices[end] = args
-
-		in = nil
-		if fn := iparm["<"]; len(fn) > 0 {
-			rc, err = url.Open(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			in = rc
-			closers = append(closers, rc)
-		} else if len(iparm["<<"]) > 0 || len(iparm["<<-"]) > 0 {
-			var trim bool
-			lbl := iparm["<<"]
-			if len(lbl) == 0 {
-				lbl = iparm["<<-"]
-				trim = true
-			}
-			var r, w *os.File
-			r, w, err = os.Pipe()
-			if err != nil {
-				continue commandLoop
-			}
-			in = r
-			closers = append(closers, r)
-			go func(w io.WriteCloser, lbl string) {
-				defer w.Close()
-				prompt := "<<" + fn + " "
-				for {
-					s, err := catline(prompt)
-					if err != nil || s == lbl {
-						break
-					}
-					if trim {
-						s = strings.TrimLeft(s, " \t")
-					}
-					fmt.Fprintln(w, s)
-				}
-			}(w, lbl)
-		}
-		out = os.Stdout
-		if fn := oparm[">"]; len(fn) > 0 {
-			wc, err = url.Create(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = wc
-			closers = append(closers, wc)
-		} else if fn = oparm[">>"]; len(fn) > 0 {
-			wc, err = url.Append(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = wc
-			closers = append(closers, wc)
-		} else if fn := oparm[">>>"]; len(fn) > 0 {
-			wc, err = url.Create(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = io.MultiWriter(os.Stdout, wc)
-			closers = append(closers, wc)
-		} else if fn := oparm[">>"]; len(fn) > 0 {
-			wc, err = url.Append(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = io.MultiWriter(os.Stdout, wc)
-			closers = append(closers, wc)
-		}
-
-		for i := 0; i < len(pl.Slices); i++ {
-			c := exec.Command(Prog(), pl.Slices[i][1:]...)
-			c.Args[i] = pl.Slices[i][0]
-			c.Stderr = os.Stderr
-			if i == 0 {
-				c.Stdin = in
-			} else {
-				c.Stdin = pin
-			}
-			if i == end {
-				c.Stdout = out
-			} else {
-				pin, pout, err = os.Pipe()
-				if err != nil {
-					continue commandLoop
-				}
-				os.Stdout = pout
-			}
-			if err = c.Start(); err != nil {
-				err = fmt.Errorf("child: %v: %v", c.Args, err)
-				continue commandLoop
-			}
-			if i == end {
-				err = c.Wait()
-			} else {
-				go func(c *exec.Cmd) {
-					err := c.Wait()
-					if err != nil {
-						fmt.Fprintln(os.Stderr, err)
-					}
-					if c.Stdout != os.Stdout {
-						m, found := c.Stdout.(closer)
-						if found {
-							m.Close()
-						}
-					}
-					if c.Stdin != os.Stdin {
-						m, found := c.Stdin.(closer)
-						if found {
-							m.Close()
-						}
-					}
-				}(c)
-			}
-		}
-	}
-	return fmt.Errorf("oops, shouldn't be here")
 }
 
 // Sort keys

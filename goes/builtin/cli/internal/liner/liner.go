@@ -16,10 +16,10 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/internal/nocomment"
-	"github.com/platinasystems/go/goes/internal/notliner"
-	"github.com/platinasystems/go/goes/internal/slice_args"
-	"github.com/platinasystems/go/goes/internal/slice_string"
+	"github.com/platinasystems/go/goes/builtin/cli/internal/nocomment"
+	"github.com/platinasystems/go/goes/builtin/cli/internal/notliner"
+	"github.com/platinasystems/go/goes/builtin/cli/internal/slice_args"
+	"github.com/platinasystems/go/goes/builtin/cli/internal/slice_string"
 	"github.com/platinasystems/liner"
 )
 

@@ -6,12 +6,9 @@ package source
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/flags"
-	"github.com/platinasystems/go/goes/internal/notliner"
-	"github.com/platinasystems/go/goes/internal/url"
 )
 
 const Name = "source"
@@ -31,24 +28,12 @@ func (cmd) Main(args ...string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
-	f, err := url.Open(args[0])
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	t := os.Getenv("TRACE")
-
 	if flag["-x"] {
-		os.Setenv("TRACE", "true")
+		args = []string{"cli", "-x", args[0]}
+	} else {
+		args = []string{"cli", args[0]}
 	}
-
-	err = goes.Shell(notliner.New(f, nil))
-
-	if flag["-x"] && t != "true" {
-		os.Unsetenv("TRACE")
-	}
-	return err
+	return goes.Main(args...)
 }
 
 func (cmd) Apropos() map[string]string {
@@ -66,9 +51,6 @@ SYNOPSIS
 	source [-x] URL
 
 DESCRIPTION
-	Import a command script from the given URL.
-
-OPTIONS
-	-x	trace each line executed`,
+	This is equivalent to 'cli [-x] URL'.`,
 	}
 }
