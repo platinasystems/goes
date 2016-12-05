@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	InstallName = "/usr/bin/goes"
 	DefaultLang = "en_US.UTF-8"
 	daemonFlag  = "__GOES_DAEMON__"
 )
@@ -89,7 +90,7 @@ func Main(args ...string) (err error) {
 		}()
 	}
 	if _, err := Find(args[0]); err != nil {
-		if args[0] == "/usr/bin/goes" && len(args) > 2 {
+		if args[0] == InstallName && len(args) > 2 {
 			buf, err := ioutil.ReadFile(args[1])
 			if err == nil && utf8.Valid(buf) {
 				args = []string{"source", args[1]}
@@ -230,7 +231,7 @@ func Prog() string {
 		var err error
 		prog, err = os.Readlink("/proc/self/exe")
 		if err != nil {
-			prog = "/usr/bin/goes"
+			prog = InstallName
 		}
 	}
 	return prog

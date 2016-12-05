@@ -15,14 +15,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/goes/pidfile"
 )
 
 const Name = "install"
-const UsrBinGoes = "/usr/bin/goes"
-const EtcInitdGoes = "/etc/init.d/goes"
-const EtcDefaultGoes = "/etc/default/goes"
 
 // Machines may use this Hook to complete its installation.
 var Hook = func() error { return nil }
@@ -72,11 +70,11 @@ func (cmd) Apropos() map[string]string {
 
 // run "goes stop" then wait up to 5 seconds for /run/goes/pids removal
 func stop() error {
-	_, err := os.Stat(UsrBinGoes)
+	_, err := os.Stat(goes.InstallName)
 	if err != nil {
 		return nil
 	}
-	err = exec.Command(UsrBinGoes, "stop").Run()
+	err = exec.Command(goes.InstallName, "stop").Run()
 	if err != nil {
 		return fmt.Errorf("goes stop: %v", err)
 	}
@@ -102,7 +100,7 @@ func start(args ...string) error {
 	} else {
 		args = start
 	}
-	err := exec.Command(UsrBinGoes, args...).Run()
+	err := exec.Command(goes.InstallName, args...).Run()
 	if err != nil {
 		err = fmt.Errorf("goes start: %v", err)
 	}
@@ -120,7 +118,7 @@ func install_self() error {
 	}
 	defer src.Close()
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	dst, err := os.OpenFile(UsrBinGoes, flags, os.FileMode(0755))
+	dst, err := os.OpenFile(goes.InstallName, flags, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
@@ -131,7 +129,7 @@ func install_self() error {
 
 func install_init() error {
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(EtcInitdGoes, flags, os.FileMode(0755))
+	f, err := os.OpenFile("/etc/init.d/goes", flags, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
@@ -217,12 +215,13 @@ ecode="$?"
 
 // Install /etc/default/goes if and only if not already present.
 func install_default() error {
-	_, err := os.Stat(EtcDefaultGoes)
+	const fn = "/etc/default/goes"
+	_, err := os.Stat(fn)
 	if err == nil {
 		return nil
 	}
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(EtcDefaultGoes, flags, os.FileMode(0644))
+	f, err := os.OpenFile(fn, flags, os.FileMode(0644))
 	if err != nil {
 		return err
 	}
