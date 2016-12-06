@@ -6,50 +6,71 @@ package help
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/platinasystems/go/goes"
 )
 
 const Name = "help"
 
-type help struct{}
+type cmd goes.ByName
 
-func New() help { return help{} }
+func New() *cmd { return new(cmd) }
 
-func (help) String() string { return Name }
-func (help) Tag() string    { return "builtin" }
-func (help) Usage() string  { return Name + " [COMMAND [ARGS]...]" }
+func (*cmd) String() string { return Name }
+func (*cmd) Tag() string    { return "builtin" }
 
-func (a help) Main(args ...string) error {
+func (*cmd) Usage() string {
+	return "help [COMMAND [ARGS]...]\nCOMMAND -help [ARGS]..."
+}
+
+func (c *cmd) Complete(args ...string) []string {
+	return goes.ByName(*c).Complete(args...)
+}
+
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Main(args ...string) error {
 	if len(args) == 0 {
-		for _, k := range goes.Keys.Apropos {
-			format := "%-15s %s\n"
-			if len(k) >= 16 {
-				format = "%s\n\t\t%s\n"
+		for _, k := range goes.ByName(*c).Keys() {
+			g := goes.ByName(*c)[k]
+			for _, lang := range []string{
+				os.Getenv("LANG"),
+				goes.Lang,
+				goes.DefaultLang,
+			} {
+				s := g.Apropos[lang]
+				if len(s) > 0 {
+					format := "%-15s %s\n"
+					if len(k) >= 16 {
+						format = "%s\n\t\t%s\n"
+					}
+					fmt.Printf(format, k, s)
+					break
+				}
 			}
-			fmt.Printf(format, k, goes.Apropos[k])
 		}
 	} else {
-		cmd, err := goes.Find(args[0])
-		if err != nil {
-			return err
+		g := goes.ByName(*c)[args[0]]
+		if g == nil {
+			return fmt.Errorf("%s: not found", args[0])
 		}
-		if method, found := cmd.(goes.Helper); found {
-			fmt.Println(method.Help(args...))
+		if g.Help != nil {
+			fmt.Println(g.Help(args[1:]...))
 		} else {
-			fmt.Println(goes.Usage[args[0]])
+			fmt.Println(g.Usage)
 		}
 	}
 	return nil
 }
 
-func (help) Apropos() map[string]string {
+func (*cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "print command guidance",
 	}
 }
 
-func (help) Man() map[string]string {
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	help - print a command guidance

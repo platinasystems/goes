@@ -267,7 +267,7 @@ func bash_completion() error {
 	_, err = f.WriteString(`
 _goes ()
 {
-	COMPREPLY=($(goes -complete ${COMP_WORDS[@]}))
+	COMPREPLY=($(goes complete ${COMP_WORDS[@]}))
 	return 0
 }
 

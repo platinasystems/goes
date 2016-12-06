@@ -8,25 +8,31 @@ package restart
 
 import "github.com/platinasystems/go/goes"
 
-const Name = "restart"
+func New() *goes.Goes {
+	cmd := new(cmd)
+	return &goes.Goes{
+		Name:   "restart",
+		ByName: cmd.ByName,
+		Main:   cmd.Main,
+		Usage:  "restart",
+		Apropos: map[string]string{
+			"en_US.UTF-8": "stop, then start this goes machine",
+		},
+	}
+}
 
-type cmd struct{}
+type cmd struct {
+	byName goes.ByName
+}
 
-func New() cmd { return cmd{} }
+func (cmd *cmd) ByName(byName goes.ByName) {
+	cmd.byName = byName
+}
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
-
-func (cmd) Main(...string) error {
-	err := goes.Main("stop")
+func (cmd *cmd) Main(args ...string) error {
+	err := cmd.byName.Main("stop")
 	if err != nil {
 		return err
 	}
-	return goes.Main("start")
-}
-
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "stop, then start this goes machine",
-	}
+	return cmd.byName.Main("start")
 }

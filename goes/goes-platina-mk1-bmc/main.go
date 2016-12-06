@@ -138,21 +138,21 @@ var stageFlagFloat64 int = 0
 
 func main() {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
-	goes.Plot(builtin.New()...)
-	goes.Plot(core.New()...)
-	goes.Plot(fs.New()...)
-	goes.Plot(kernel.New()...)
-	goes.Plot(machine.New()...)
+	g := make(goes.ByName)
+	g.Plot(builtin.New()...)
+	g.Plot(core.New()...)
+	g.Plot(fs.New()...)
+	g.Plot(kernel.New()...)
+	g.Plot(machine.New()...)
 	// FIXME: remove machined after converting remaining info
-	goes.Plot(machined.New())
-	goes.Plot(net.New()...)
-	goes.Plot(redis.New()...)
-	goes.Sort()
+	g.Plot(machined.New())
+	g.Plot(net.New()...)
+	g.Plot(redis.New()...)
 	start.Machine = "platina-mk1-bmc"
 	start.RedisDevs = []string{"lo", "eth0"}
 	nld.Prefixes = []string{"lo.", "eth0."}
 	machined.Hook = hook
-	goes.Main()
+	g.Main()
 }
 
 func enableToggle() error {

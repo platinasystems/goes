@@ -34,14 +34,17 @@ const (
 	zero = uintptr(0)
 )
 
-type cmd struct{}
-
 var Hook = func() error { return nil }
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func New() *goes.Goes {
+	cmd := new(cmd)
+	return &goes.Goes{
+		Name:   Name,
+		ByName: cmd.ByName,
+		Main:   cmd.Main,
+		Usage:  Name,
+	}
+}
 
 func init() {
 	if os.Getpid() != 1 {
@@ -92,7 +95,15 @@ func init() {
 	}
 }
 
-func (cmd) makeRootDirs(mountPoint string) {
+type cmd struct {
+	byName goes.ByName
+}
+
+func (cmd *cmd) ByName(byName goes.ByName) {
+	cmd.byName = byName
+}
+
+func (*cmd) makeRootDirs(mountPoint string) {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -112,7 +123,7 @@ func (cmd) makeRootDirs(mountPoint string) {
 	}
 }
 
-func (cmd) makeRootFiles(mountPoint string) {
+func (*cmd) makeRootFiles(mountPoint string) {
 	for _, cp := range []struct {
 		src, dst string
 	}{
@@ -146,7 +157,7 @@ func (cmd) makeRootFiles(mountPoint string) {
 	}
 }
 
-func (cmd) makeRootLinks(mountPoint string) {
+func (*cmd) makeRootLinks(mountPoint string) {
 	for _, ln := range []struct {
 		src, dst string
 	}{
@@ -162,7 +173,7 @@ func (cmd) makeRootLinks(mountPoint string) {
 	}
 }
 
-func (cmd) moveVirtualFileSystems(mountPoint string) {
+func (*cmd) moveVirtualFileSystems(mountPoint string) {
 	for _, mv := range []struct {
 		src  string
 		dst  string
@@ -189,7 +200,7 @@ func (cmd) moveVirtualFileSystems(mountPoint string) {
 	}
 }
 
-func (cmd) unlinkRootFiles() {
+func (*cmd) unlinkRootFiles() {
 	for _, fn := range []string{
 		"/usr/bin/gdbserver",
 		"/init",
@@ -199,7 +210,7 @@ func (cmd) unlinkRootFiles() {
 	}
 }
 
-func (cmd) rmdirRootDirs() {
+func (*cmd) rmdirRootDirs() {
 	for _, dir := range []string{
 		"/run",
 		"/sys",
@@ -213,7 +224,7 @@ func (cmd) rmdirRootDirs() {
 	}
 }
 
-func (cmd) makeTargetDirs() {
+func (*cmd) makeTargetDirs() {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -231,7 +242,7 @@ func (cmd) makeTargetDirs() {
 	}
 }
 
-func (cmd) makeTargetLinks() {
+func (*cmd) makeTargetLinks() {
 	for _, ln := range []struct {
 		src, dst string
 	}{
@@ -247,7 +258,7 @@ func (cmd) makeTargetLinks() {
 	}
 }
 
-func (cmd) mountTargetVirtualFilesystems() {
+func (*cmd) mountTargetVirtualFilesystems() {
 	for _, mnt := range []struct {
 		dir    string
 		dev    string
@@ -263,7 +274,7 @@ func (cmd) mountTargetVirtualFilesystems() {
 	}
 }
 
-func (c cmd) pivotRoot(mountPoint string, root string, script string) {
+func (cmd *cmd) pivotRoot(mountPoint string, root string, script string) {
 	_, err := os.Stat(mountPoint)
 	if os.IsNotExist(err) {
 		err = os.Mkdir(mountPoint, os.FileMode(0755))
@@ -272,29 +283,29 @@ func (c cmd) pivotRoot(mountPoint string, root string, script string) {
 				mountPoint, err))
 		}
 	}
-	err = goes.Main("mount", root, mountPoint)
+	err = cmd.byName.Main("mount", root, mountPoint)
 	if err != nil {
 		panic(fmt.Errorf("Error mounting %s on %s: %s",
 			root, mountPoint, err))
 	}
 
 	if len(script) > 0 {
-		err := goes.Main("source", script)
+		err := cmd.byName.Main("source", script)
 		if err != nil {
-			panic(fmt.Errorf("Error running boot script %s on %s: %s",
-				script, root, err))
+			const format = "Error running boot script %s on %s: %s"
+			panic(fmt.Errorf(format, script, root, err))
 		}
 	}
-	c.makeRootDirs(mountPoint)
-	c.makeRootFiles(mountPoint)
-	c.makeRootLinks(mountPoint)
-	c.moveVirtualFileSystems(mountPoint)
+	cmd.makeRootDirs(mountPoint)
+	cmd.makeRootFiles(mountPoint)
+	cmd.makeRootLinks(mountPoint)
+	cmd.moveVirtualFileSystems(mountPoint)
 
 	if err = os.Chdir(mountPoint); err != nil {
 		panic(fmt.Errorf("chdir %s: %s", mountPoint, err))
 	}
-	c.unlinkRootFiles()
-	c.rmdirRootDirs()
+	cmd.unlinkRootFiles()
+	cmd.rmdirRootDirs()
 	err = syscall.Mount(mountPoint, "/", "", syscall.MS_MOVE, "")
 	if err != nil {
 		panic(fmt.Errorf("mount %s /: %s", mountPoint, err))
@@ -304,7 +315,7 @@ func (c cmd) pivotRoot(mountPoint string, root string, script string) {
 	}
 }
 
-func (c cmd) runSbinInit() {
+func (cmd *cmd) runSbinInit() {
 	if err := os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
 		panic(fmt.Errorf("Setenv PATH: %s", err))
 	}
@@ -340,17 +351,17 @@ func (c cmd) runSbinInit() {
 	}
 }
 
-func (cmd) emergencyShell() {
+func (cmd *cmd) emergencyShell() {
 	for {
 		fmt.Println("Dropping into emergency goes shell...\n")
-		err := goes.Main("cli")
+		err := cmd.byName.Main("cli")
 		if err != nil && err != io.EOF {
 			fmt.Println(err)
 		}
 	}
 }
 
-func (c cmd) Main(_ ...string) error {
+func (cmd *cmd) Main(_ ...string) error {
 	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
 	goesinstaller := os.Getenv("goesinstaller")
 	defer func() {
@@ -358,14 +369,14 @@ func (c cmd) Main(_ ...string) error {
 			if r := recover(); r != nil {
 				fmt.Println(r)
 			}
-			c.emergencyShell()
+			cmd.emergencyShell()
 		}()
 		if r := recover(); r != nil {
 			fmt.Println(r)
 		}
 		if len(goesinstaller) > 0 {
 			params := strings.Split(goesinstaller, ",")
-			err := installer(params)
+			err := cmd.installer(params)
 			if err != nil {
 				log.Print("err", "installer", params[0],
 					":", err)
@@ -385,18 +396,18 @@ func (c cmd) Main(_ ...string) error {
 	}
 
 	if len(root) > 0 {
-		c.pivotRoot("/newroot", root, script)
+		cmd.pivotRoot("/newroot", root, script)
 	}
-	c.makeTargetDirs()
-	c.makeTargetLinks()
-	c.mountTargetVirtualFilesystems()
-	c.runSbinInit()
-	err = goes.Main("start")
+	cmd.makeTargetDirs()
+	cmd.makeTargetLinks()
+	cmd.mountTargetVirtualFilesystems()
+	cmd.runSbinInit()
+	err = cmd.byName.Main("start")
 
 	return err
 }
 
-func installer(params []string) error {
+func (cmd *cmd) installer(params []string) error {
 	if len(params) < 1 || len(params[0]) == 0 {
 		return fmt.Errorf("KERNEL: missing")
 	}
@@ -437,6 +448,8 @@ func installer(params []string) error {
 		fmt.Printf("All files loaded successfully!")
 	}
 
-	return goes.Main("kexec", "-e", "-k", "kernel", "-i", "initramfs",
+	return cmd.byName.Main("kexec", "-e",
+		"-k", "kernel",
+		"-i", "initramfs",
 		"-c", "console=ttyS0,115200")
 }

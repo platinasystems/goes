@@ -64,15 +64,17 @@ import (
 
 const Name = "cli"
 
-type cmd struct{}
+type cmd goes.ByName
 
-func New() cmd { return cmd{} }
+func New() *cmd { return new(cmd) }
 
-func (cmd) String() string { return Name }
-func (cmd) Tag() string    { return "builtin" }
-func (cmd) Usage() string  { return "cli [-x] [URL]" }
+func (*cmd) String() string { return Name }
+func (*cmd) Tag() string    { return "builtin" }
+func (*cmd) Usage() string  { return "cli [-x] [URL]" }
 
-func (cmd) Main(args ...string) error {
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Main(args ...string) error {
 	var (
 		rc  io.ReadCloser
 		wc  io.WriteCloser
@@ -94,7 +96,7 @@ func (cmd) Main(args ...string) error {
 		if flag["-no-liner"] {
 			prompter = notliner.New(os.Stdin, os.Stdout)
 		} else {
-			prompter = liner.New()
+			prompter = liner.New(goes.ByName(*c))
 		}
 	case 1:
 		script, err := url.Open(args[0])
@@ -170,18 +172,20 @@ commandLoop:
 		}
 		end := len(pl.Slices) - 1
 		name := pl.Slices[end][0]
-		cmd, terr := goes.Find(name)
-		if terr != nil {
-			err = terr
+		g := goes.ByName(*c)[name]
+		if g == nil {
+			err = fmt.Errorf("%s: not found", name)
 			continue commandLoop
 		}
 
-		if end == 0 && (goes.IsDaemon(name) ||
-			goes.Tag[name] == "builtin" || name == os.Args[0]) {
+		if end == 0 &&
+			(g.Kind == goes.Daemon ||
+				g.Kind == goes.Builtin ||
+				name == os.Args[0]) {
 			if flag["-x"] {
 				fmt.Println("+", pl.Slices[end])
 			}
-			err = cmd.(goes.Mainer).Main(pl.Slices[end]...)
+			err = goes.ByName(*c).Main(pl.Slices[end]...)
 			continue commandLoop
 		}
 
@@ -195,7 +199,7 @@ commandLoop:
 				"resize": struct{}{},
 				"source": struct{}{},
 			}[name]
-			if found || goes.IsDaemon(name) {
+			if found || g.Kind == goes.Daemon {
 				err = fmt.Errorf("%s: can't pipe", name)
 				continue commandLoop
 			}
@@ -327,7 +331,13 @@ commandLoop:
 	return fmt.Errorf("oops, shouldn't be here")
 }
 
-func (cmd) Man() map[string]string {
+func (*cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "command line interpreter",
+	}
+}
+
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	cli - command line interpreter

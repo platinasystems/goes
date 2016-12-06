@@ -32,20 +32,22 @@ type Liner struct {
 		i     int
 	}
 	fallback *notliner.Prompter
+	byName   goes.ByName
 }
 
-func New() *Liner {
+func New(byName goes.ByName) *Liner {
 	l := new(Liner)
 	l.history.buf = new(bytes.Buffer)
 	l.history.lines = make([]string, 0, 1<<6)
 	if woliner {
 		l.fallback = notliner.New(os.Stdin, os.Stdout)
 	}
+	l.byName = byName
 	return l
 }
 
 // Returns all completions of the given command line.
-func complete(line string) (lines []string) {
+func (l *Liner) complete(line string) (lines []string) {
 	lsi := strings.LastIndex(line, " ")
 	pl := slice_args.New("|")
 	defer pl.Reset()
@@ -63,7 +65,7 @@ func complete(line string) (lines []string) {
 		t := os.Stdout
 		defer func() { os.Stdout = t }()
 		os.Stdout = pw
-		goes.Main(append([]string{"-complete"}, args...)...)
+		l.byName.Main(append([]string{"complete"}, args...)...)
 		pw.Close()
 	}()
 	prs := bufio.NewScanner(pr)
@@ -82,7 +84,7 @@ func complete(line string) (lines []string) {
 }
 
 // Prints the best available help text for the last arg of line
-func help(line string) {
+func (l *Liner) help(line string) {
 	pl := slice_args.New("|")
 	defer pl.Reset()
 	pl.Slice(slice_string.New(nocomment.New(strings.TrimLeft(line,
@@ -94,7 +96,7 @@ func help(line string) {
 	if len(args) == 0 || pl.More {
 		fmt.Println("Enter command.")
 	} else {
-		goes.Main(append([]string{"help"}, args...)...)
+		l.byName.Main(append([]string{"help"}, args...)...)
 	}
 }
 
@@ -123,14 +125,14 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 	if errno != 0 {
 		return "", fmt.Errorf("TCSETS: %v", errno)
 	}
-	err := goes.Main("resize")
+	err := l.byName.Main("resize")
 	if err != nil {
 		return "", err
 	}
 
 	state := liner.NewLiner()
-	state.SetCompleter(complete)
-	state.SetHelper(help)
+	state.SetCompleter(l.complete)
+	state.SetHelper(l.help)
 	if len(l.history.lines) > 0 {
 		l.history.buf.Reset()
 		if len(l.history.lines) < cap(l.history.lines) {

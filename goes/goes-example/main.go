@@ -25,16 +25,16 @@ import (
 )
 
 func main() {
-	goes.Plot(builtin.New()...)
-	goes.Plot(core.New()...)
-	goes.Plot(fs.New()...)
-	goes.Plot(kernel.New()...)
-	goes.Plot(machine.New()...)
-	goes.Plot(net.New()...)
-	goes.Plot(redis.New()...)
-	goes.Plot(telnetd.New())
-	goes.Plot(test.New()...)
-	goes.Sort()
+	g := make(goes.ByName)
+	g.Plot(builtin.New()...)
+	g.Plot(core.New()...)
+	g.Plot(fs.New()...)
+	g.Plot(kernel.New()...)
+	g.Plot(machine.New()...)
+	g.Plot(net.New()...)
+	g.Plot(redis.New()...)
+	g.Plot(telnetd.New())
+	g.Plot(test.New()...)
 	start.Machine = "example"
 	nld.Hook = func() error {
 		itfs, err := stdnet.Interfaces()
@@ -48,5 +48,5 @@ func main() {
 		nld.Prefixes = prefixes
 		return nil
 	}
-	goes.Main()
+	g.Main()
 }

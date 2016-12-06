@@ -23,8 +23,6 @@ import (
 	. "github.com/platinasystems/go/version"
 )
 
-const Name = "start"
-
 // Machines may use Hook to run something before redisd and other daemons.
 var Hook = func() error { return nil }
 
@@ -41,15 +39,46 @@ var Machine string
 
 var RedisDevs []string
 
-type cmd struct{}
+func New() *goes.Goes {
+	cmd := new(cmd)
+	return &goes.Goes{
+		Name:   "start",
+		ByName: cmd.ByName,
+		Main:   cmd.Main,
+		Usage:  "start [OPTION]...",
+		Apropos: map[string]string{
+			"en_US.UTF-8": "start this goes machine",
+		},
+		Man: map[string]string{
+			"en_US.UTF-8": `NAME
+	start - start this goes machine
 
-func New() cmd { return cmd{} }
+SYNOPSIS
+	start [-conf=URL] [REDIS OPTIONS]...
 
-func (cmd) String() string { return Name }
+DESCRIPTION
+	Start a redis server followed by the machine and its embedded daemons.
 
-func (cmd) Usage() string { return Name + " [OPTION]..." }
+OPTIONS
+	-conf URL
+		Specifies the URL of the machine's configuration script that's
+		sourced immediately after start of all daemons.
 
-func (cmd cmd) Main(args ...string) error {
+SEE ALSO
+	redisd`,
+		},
+	}
+}
+
+type cmd struct {
+	byName goes.ByName
+}
+
+func (cmd *cmd) ByName(byName goes.ByName) {
+	cmd.byName = byName
+}
+
+func (cmd *cmd) Main(args ...string) error {
 	parm, args := parms.New(args, "-conf")
 	redisd := []string{"redisd"}
 	if len(args) > 0 {
@@ -72,7 +101,7 @@ func (cmd cmd) Main(args ...string) error {
 	if err = Hook(); err != nil {
 		return err
 	}
-	if err = goes.Main(redisd...); err != nil {
+	if err = cmd.byName.Main(redisd...); err != nil {
 		return err
 	}
 	pub, err := redis.Publish(redis.Machine)
@@ -99,35 +128,33 @@ func (cmd cmd) Main(args ...string) error {
 	if err = PubHook(pub); err != nil {
 		return err
 	}
-	for daemon, lvl := range goes.Daemon {
-		if lvl < 0 {
-			continue
-		}
-		if err = goes.Main(daemon); err != nil {
-			return err
+	for name, g := range cmd.byName {
+		if g.Kind == goes.Daemon {
+			if err = cmd.byName.Main(name); err != nil {
+				return err
+			}
 		}
 	}
 	if s := parm["-conf"]; len(s) > 0 {
 		if err = ConfHook(); err != nil {
 			return err
 		}
-		if err = goes.Main("source", s); err != nil {
+		if err = cmd.byName.Main("source", s); err != nil {
 			return err
 		}
 	}
 	if os.Getpid() == 1 {
-		_, err = goes.Find("login")
-		login := err == nil
+		_, login := cmd.byName["login"]
 		for {
 			if login {
-				err = goes.Main("login")
+				err = cmd.byName.Main("login")
 				if err != nil {
 					fmt.Println("login:", err)
 					time.Sleep(3 * time.Second)
 					continue
 				}
 			}
-			err = goes.Main("cli")
+			err = cmd.byName.Main("cli")
 			if err != nil && err != io.EOF {
 				fmt.Println(err)
 				<-make(chan struct{})
@@ -135,31 +162,4 @@ func (cmd cmd) Main(args ...string) error {
 		}
 	}
 	return nil
-}
-
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "start this goes machine",
-	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	start - start this goes machine
-
-SYNOPSIS
-	start [-conf=URL] [REDIS OPTIONS]...
-
-DESCRIPTION
-	Start a redis server followed by the machine and its embedded daemons.
-
-OPTIONS
-	-conf URL
-		Specifies the URL of the machine's configuration script that's
-		sourced immediately after start of all daemons.
-
-SEE ALSO
-	redisd`,
-	}
 }

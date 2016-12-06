@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 	"unicode/utf8"
 
@@ -31,22 +32,94 @@ const (
 	daemonFlag  = "__GOES_DAEMON__"
 )
 
+const (
+	Builtin Kind = 1 + iota
+	Daemon
+)
+
 var (
 	Exit = os.Exit
+
 	// Lang may be set prior to the first Plot for alt preferred languages
 	Lang = DefaultLang
-	Keys struct {
-		Apropos []string
-		Main    []string
-		Daemon  Daemons
-	}
-	ByName  map[string]interface{}
-	Daemon  map[string]int
-	Apropos map[string]string
-	Man     map[string]string
-	Tag     map[string]string
-	Usage   map[string]string
 )
+
+type ByName map[string]*Goes
+
+type Goes struct {
+	Name     string
+	ByName   func(ByName)
+	Close    func() error
+	Complete func(...string) []string
+	Help     func(...string) string
+	Main     func(...string) error
+	Kind     Kind
+	Usage    string
+	Apropos  map[string]string
+	Man      map[string]string
+}
+
+type Kind int
+
+type aproposer interface {
+	Apropos() map[string]string
+}
+
+type byNamer interface {
+	ByName(ByName)
+}
+
+type completer interface {
+	Complete(...string) []string
+}
+
+type daemoner interface {
+	Daemon() int
+	mainer
+}
+
+type helper interface {
+	Help(...string) string
+}
+type mainer interface {
+	Main(...string) error
+}
+type manner interface {
+	Man() map[string]string
+}
+type tagger interface {
+	Tag() string
+}
+type usager interface {
+	Usage() string
+}
+
+var keys []string // cache
+
+func (byName ByName) Keys() []string {
+	// this assumes different Goes maps would have different lengths
+	if len(keys) == len(byName) {
+		return keys
+	}
+	keys = make([]string, 0, len(byName))
+	for k := range byName {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (byName ByName) Complete(args ...string) (ss []string) {
+	if len(args) < 1 {
+		return
+	}
+	for _, k := range byName.Keys() {
+		if strings.HasPrefix(k, args[len(args)-1]) {
+			ss = append(ss, k)
+		}
+	}
+	return
+}
 
 // Main runs the arg[0] command in the current context.
 // When run w/o args this uses os.Args and exits instead of returns on error.
@@ -59,7 +132,7 @@ var (
 //
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
-func Main(args ...string) (err error) {
+func (byName ByName) Main(args ...string) (err error) {
 	var isDaemon bool
 
 	if len(args) == 0 {
@@ -89,7 +162,7 @@ func Main(args ...string) (err error) {
 			}
 		}()
 	}
-	if _, err := Find(args[0]); err != nil {
+	if _, found := byName[args[0]]; !found {
 		if args[0] == InstallName && len(args) > 2 {
 			buf, err := ioutil.ReadFile(args[1])
 			if err == nil && utf8.Valid(buf) {
@@ -117,12 +190,7 @@ func Main(args ...string) (err error) {
 	flag.Aka("-complete", "--complete")
 	flag.Aka("-man", "--man")
 	flag.Aka("-usage", "--usage")
-	isDaemon = IsDaemon(name)
 	daemonFlagValue := os.Getenv(daemonFlag)
-	if ByName == nil {
-		err = fmt.Errorf("no commands")
-		return
-	}
 	targs := []string{name}
 	switch {
 	case flag["-h"]:
@@ -142,24 +210,20 @@ func Main(args ...string) (err error) {
 		args = targs
 		name = "usage"
 	case flag["-complete"]:
-		name = "-complete"
+		name = "complete"
 		if len(args) == 0 {
 			args = append(targs, args...)
 		} else {
 			args = targs
 		}
 	}
-	cmd, err := Find(name)
-	if err != nil {
-		return
+	g := byName[name]
+	if g == nil {
+		return fmt.Errorf("%s: command not found", name)
 	}
-	ms, found := cmd.(mainstringer)
-	if !found {
-		err = fmt.Errorf("%s: can't execute", name)
-		return
-	}
+	isDaemon = g.Kind == Daemon
 	if !isDaemon {
-		err = ms.Main(args...)
+		err = g.Main(args...)
 		return
 	}
 	switch daemonFlagValue {
@@ -217,143 +281,77 @@ func Main(args ...string) (err error) {
 		}
 		sigch := make(chan os.Signal)
 		signal.Notify(sigch, syscall.SIGTERM)
-		go terminate(cmd, pidfn, sigch)
-		err = ms.Main(args...)
+		go g.wait(pidfn, sigch)
+		err = g.Main(args...)
 		sigch <- syscall.SIGABRT
 	}
 	return
 }
 
-var prog string
-
-func Prog() string {
-	if len(prog) == 0 {
-		var err error
-		prog, err = os.Readlink("/proc/self/exe")
-		if err != nil {
-			prog = InstallName
+// Plot commands on map.
+func (byName ByName) Plot(cmds ...interface{}) {
+	for _, v := range cmds {
+		g, ok := v.(*Goes)
+		if ok {
+			byName[g.Name] = g
+			if g.ByName != nil {
+				g.ByName(byName)
+			}
+			continue
 		}
-	}
-	return prog
-}
-
-var progbase string
-
-func ProgBase() string {
-	if len(progbase) == 0 {
-		progbase = filepath.Base(Prog())
-	}
-	return progbase
-}
-
-var path string
-
-func Path() string {
-	if len(path) == 0 {
-		path = "/bin:/usr/bin"
-		dir := filepath.Dir(Prog())
-		if dir != "/bin" && dir != "/usr/bin" {
-			path += ":" + dir
+		g = &Goes{
+			Name: "command",
 		}
+		if method, found := v.(fmt.Stringer); found {
+			g.Name = method.String()
+		} else {
+			panic(fmt.Errorf("%T: doesn't have String method", v))
+		}
+		if _, found := byName[g.Name]; found {
+			panic(fmt.Errorf("%s: duplicate", g.Name))
+		}
+		if method, found := v.(mainer); found {
+			g.Main = method.Main
+		} else {
+			panic(fmt.Errorf("%s: doesn't have Main method",
+				g.Name))
+		}
+		if method, found := v.(byNamer); found {
+			method.ByName(byName)
+		}
+		if method, found := v.(io.Closer); found {
+			g.Close = method.Close
+		}
+		if method, found := v.(completer); found {
+			g.Complete = method.Complete
+		}
+		if method, found := v.(helper); found {
+			g.Help = method.Help
+		}
+		if _, found := v.(daemoner); found {
+			g.Kind = Daemon
+		} else if method, found := v.(tagger); found &&
+			method.Tag() == "builtin" {
+			g.Kind = Builtin
+		}
+		if method, found := v.(usager); found {
+			g.Usage = method.Usage()
+		}
+		if method, found := v.(aproposer); found {
+			g.Apropos = method.Apropos()
+		}
+		if method, found := v.(manner); found {
+			g.Man = method.Man()
+		}
+		byName[g.Name] = g
 	}
-	return path
 }
 
-type aproposer interface {
-	Apropos() map[string]string
-}
-
-type closer interface {
-	Close() error
-}
-
-type Completer interface {
-	Complete(...string) []string
-}
-
-type daemoner interface {
-	Daemon() int // if present, Daemon() should return run level
-	Mainer
-}
-
-type Helper interface {
-	Help(...string) string
-}
-
-type Mainer interface {
-	Main(...string) error
-}
-
-type mainstringer interface {
-	Mainer
-	stringer
-}
-
-type manner interface {
-	Man() map[string]string
-}
-
-// A Prompter returns the prompted input upto but not including `\n`.
-type Prompter interface {
-	Prompt(string) (string, error)
-}
-
-type stringer interface {
-	String() string
-}
-
-type tagger interface {
-	Tag() string
-}
-
-type Usager interface {
-	Usage() string
-}
-
-// Daemons are sorted by level
-type Daemons []string
-
-func (d Daemons) Len() int {
-	return len(d)
-}
-
-func (d Daemons) Less(i, j int) bool {
-	ilvl := ByName[d[i]].(daemoner).Daemon()
-	jlvl := ByName[d[j]].(daemoner).Daemon()
-	return ilvl < jlvl || (ilvl == jlvl && d[i] < d[j])
-}
-
-func (d Daemons) Swap(i, j int) {
-	d[i], d[j] = d[j], d[i]
-}
-
-func IsDaemon(name string) bool {
-	if ByName == nil {
-		return false
-	}
-	cmd, found := ByName[name]
-	if found {
-		_, found = cmd.(daemoner)
-	}
-	return found
-}
-
-//Find returns the command with the given name or nil.
-func Find(name string) (interface{}, error) {
-	var err error
-	v, found := ByName[name]
-	if !found {
-		err = fmt.Errorf("%s: command not found", name)
-	}
-	return v, err
-}
-
-func terminate(cmd interface{}, pidfn string, ch chan os.Signal) {
+func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 	for sig := range ch {
 		if sig == syscall.SIGTERM {
-			method, found := cmd.(io.Closer)
-			if found {
-				method.Close()
+			if g.Close != nil {
+				g.Close()
 			}
 			os.Remove(pidfn)
 			fmt.Println("killed")
@@ -362,69 +360,4 @@ func terminate(cmd interface{}, pidfn string, ch chan os.Signal) {
 		os.Remove(pidfn)
 		break
 	}
-}
-
-// Plot commands on respective maps and key lists.
-func Plot(cmds ...interface{}) {
-	lang := os.Getenv("LANG")
-	if len(lang) == 0 {
-		lang = Lang
-	}
-	if ByName == nil {
-		ByName = make(map[string]interface{})
-		Daemon = make(map[string]int)
-		Apropos = make(map[string]string)
-		Man = make(map[string]string)
-		Tag = make(map[string]string)
-		Usage = make(map[string]string)
-	}
-	for _, cmd := range cmds {
-		var k string
-		if method, found := cmd.(stringer); !found {
-			panic("command doesn't have String method")
-		} else {
-			k = method.String()
-		}
-		if _, found := ByName[k]; found {
-			panic(fmt.Errorf("%s: duplicate", k))
-		}
-		ByName[k] = cmd
-		if _, found := cmd.(Mainer); found {
-			Keys.Main = append(Keys.Main, k)
-		}
-		if method, found := cmd.(daemoner); found {
-			Keys.Daemon = append(Keys.Daemon, k)
-			Daemon[k] = method.Daemon()
-		}
-		if method, found := cmd.(aproposer); found {
-			m := method.Apropos()
-			s, found := m[lang]
-			if !found {
-				s = m[DefaultLang]
-			}
-			Apropos[k] = s
-			Keys.Apropos = append(Keys.Apropos, k)
-		}
-		if method, found := cmd.(manner); found {
-			m := method.Man()
-			s, found := m[lang]
-			if !found {
-				s = m[DefaultLang]
-			}
-			Man[k] = s
-		}
-		if method, found := cmd.(tagger); found {
-			Tag[k] = method.Tag()
-		}
-		if method, found := cmd.(Usager); found {
-			Usage[k] = method.Usage()
-		}
-	}
-}
-
-// Sort keys
-func Sort() {
-	sort.Strings(Keys.Apropos)
-	sort.Strings(Keys.Main)
-	sort.Sort(Keys.Daemon)
 }

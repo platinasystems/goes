@@ -14,18 +14,22 @@ import (
 
 const Name = "env"
 
-type cmd struct{}
+type cmd goes.ByName
 
-func New() cmd { return cmd{} }
+func New() *cmd { return new(cmd) }
 
-func (cmd) String() string { return Name }
-func (cmd) Tag() string    { return "builtin" }
+func (*cmd) String() string { return Name }
+func (*cmd) Tag() string    { return "builtin" }
 
-func (cmd) Usage() string {
+func (*cmd) Usage() string {
 	return Name + " [NAME[=VALUE... COMMAND [ARGS...]]]"
 }
 
-func (cmd) Main(args ...string) error {
+func (c *cmd) ByName(byName goes.ByName) {
+	*c = cmd(byName)
+}
+
+func (c *cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		for _, env := range os.Environ() {
@@ -42,18 +46,18 @@ func (cmd) Main(args ...string) error {
 			os.Setenv(args[0][:eq], args[0][eq+1:])
 			args = args[1:]
 		}
-		return goes.Main(args...)
+		return goes.ByName(*c).Main(args...)
 	}
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
+func (*cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "run a program in a modified environment",
 	}
 }
 
-func (cmd) Man() map[string]string {
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	env - run a program in a modified environment

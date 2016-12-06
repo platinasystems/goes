@@ -45,17 +45,17 @@ func main() {
 	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	license.Others = []license.Other{{fe1path, fe1copyright.License}}
 	patents.Others = []patents.Other{{fe1path, fe1copyright.Patents}}
-	goes.Plot(builtin.New()...)
-	goes.Plot(core.New()...)
-	goes.Plot(fs.New()...)
-	goes.Plot(kernel.New()...)
-	goes.Plot(machine.New()...)
-	goes.Plot(net.New()...)
-	goes.Plot(redis.New()...)
-	// goes.Plot(test.New()...)
+	g := make(goes.ByName)
+	g.Plot(builtin.New()...)
+	g.Plot(core.New()...)
+	g.Plot(fs.New()...)
+	g.Plot(kernel.New()...)
+	g.Plot(machine.New()...)
+	g.Plot(net.New()...)
+	g.Plot(redis.New()...)
+	// g.Plot(test.New()...)
 	_ = test.New
-	goes.Plot(vnet.New(), vnetd.New())
-	goes.Sort()
+	g.Plot(vnet.New(), vnetd.New())
 	start.Machine = "platina-mk1"
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet
@@ -65,7 +65,7 @@ func main() {
 	vnetd.PublishAllCounters = false
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook
-	goes.Main()
+	g.Main()
 }
 
 func stopHook() error {

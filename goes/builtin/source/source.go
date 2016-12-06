@@ -13,14 +13,17 @@ import (
 
 const Name = "source"
 
-type cmd struct{}
+type cmd goes.ByName
 
-func New() cmd { return cmd{} }
+func New() *cmd { return new(cmd) }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return "source [-x] FILE" }
+func (*cmd) String() string { return Name }
+func (*cmd) Tag() string    { return "builtin" }
+func (*cmd) Usage() string  { return "source [-x] FILE" }
 
-func (cmd) Main(args ...string) error {
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-x")
 	if len(args) == 0 {
 		return fmt.Errorf("FILE: missing")
@@ -33,16 +36,16 @@ func (cmd) Main(args ...string) error {
 	} else {
 		args = []string{"cli", args[0]}
 	}
-	return goes.Main(args...)
+	return goes.ByName(*c).Main(args...)
 }
 
-func (cmd) Apropos() map[string]string {
+func (*cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "import command script",
 	}
 }
 
-func (cmd) Man() map[string]string {
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	source - import command script

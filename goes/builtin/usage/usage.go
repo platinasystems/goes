@@ -11,28 +11,44 @@ import (
 	"github.com/platinasystems/go/goes"
 )
 
-type usage struct{}
+const Naem = "usage"
 
-func New() usage { return usage{} }
+type cmd goes.ByName
 
-func (usage) String() string { return "usage" }
-func (usage) Tag() string    { return "builtin" }
-func (usage) Usage() string  { return "usage  COMMAND..." }
+func New() *cmd { return new(cmd) }
 
-func (u usage) Main(args ...string) error {
+func (*cmd) String() string { return "usage" }
+func (*cmd) Tag() string    { return "builtin" }
+func (*cmd) Usage() string  { return "usage  COMMAND...\nCOMMAND -usage" }
+
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Complete(args ...string) []string {
+	return goes.ByName(*c).Complete(args...)
+}
+
+func (c *cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("COMMAND: missing")
 	}
 	for _, arg := range args {
-		s, found := goes.Usage[arg]
-		if !found {
+		g := goes.ByName(*c)[arg]
+		if g == nil {
 			return fmt.Errorf("%s: not found", arg)
 		}
-		if strings.IndexRune(s, '\n') >= 0 {
-			fmt.Print("usage:\t", s, "\n")
+		if strings.IndexRune(g.Usage, '\n') >= 0 {
+			fmt.Print("usage:\t",
+				strings.Replace(g.Usage, "\n", "\n\t", -1),
+				"\n")
 		} else {
-			fmt.Println("usage:", s)
+			fmt.Println("usage:", g.Usage)
 		}
 	}
 	return nil
+}
+
+func (*cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "print a command synopsis",
+	}
 }
