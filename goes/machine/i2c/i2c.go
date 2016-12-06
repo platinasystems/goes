@@ -181,6 +181,57 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
+func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock() //FIX THIS EVERYWHERE
+	var (
+		bus i2c.Bus
+		sd  i2c.SMBusData
+	)
+	err := bus.Open(int(b))
+	if err != nil {
+		return 0, err
+	}
+	defer bus.Close()
+	err = bus.ForceSlaveAddress(int(a))
+	if err != nil {
+		return 0, err
+	}
+	rw := i2c.Read
+	op := i2c.ByteData
+	err = bus.Do(rw, c, op, &sd)
+	if err != nil {
+		return 0, err
+	}
+	return sd[0], nil
+}
+
+func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
+	i2c.Lock.Lock()
+	defer i2c.Lock.Unlock()
+	var (
+		bus i2c.Bus
+		sd  i2c.SMBusData
+	)
+	err := bus.Open(int(b))
+	if err != nil {
+		return err
+	}
+	defer bus.Close()
+	err = bus.ForceSlaveAddress(int(a))
+	if err != nil {
+		return err
+	}
+	rw := i2c.Write
+	op := i2c.ByteData
+	sd[0] = v
+	err = bus.Do(rw, c, op, &sd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "read/write I2C bus devices",

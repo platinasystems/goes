@@ -30,6 +30,7 @@ import (
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
 	"github.com/platinasystems/go/goes/kernel"
 	"github.com/platinasystems/go/goes/machine"
+	"github.com/platinasystems/go/goes/machine/i2c"
 	"github.com/platinasystems/go/goes/machine/machined"
 	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/net"
@@ -154,6 +155,38 @@ func main() {
 	goes.Main()
 }
 
+func enableToggle() error {
+	time.Sleep(time.Second * time.Duration(45))
+
+	gpio.Aliases = make(gpio.GpioAliasMap)
+	gpio.Pins = make(gpio.PinMap)
+
+	// Parse linux.dtb to generate gpio map for this machine
+	if b, err := ioutil.ReadFile(gpio.File); err == nil {
+		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+		t.Parse(b)
+
+		t.MatchNode("aliases", fdtgpio.GatherAliases)
+		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
+	} else {
+		return fmt.Errorf("%s: %v", gpio.File, err)
+	}
+
+	pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
+	if !found {
+		return fmt.Errorf("%s: not found", "CPU_TO_MAIN_I2C_EN")
+	}
+	pin.SetValue(true)
+	i2c.WriteByte(0, 0x74, 2, 0xff)
+	i2c.WriteByte(0, 0x74, 6, 0xdf)
+	pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
+	if !found {
+		return fmt.Errorf("%s: not found", "FP_BTN_UARTSEL_EN_L")
+	}
+	pin.SetValue(true)
+	return nil
+}
+
 func hook() error {
 	regWriteString = make(map[string]func(string))
 	regWriteInt = make(map[string]func(int))
@@ -194,6 +227,7 @@ func hook() error {
 	ledfp.LedFpInit()
 	fanTray.FanTrayLedInit()
 	hw.FanInit()
+	go enableToggle()
 
 	d := eeprom.Device{
 		BusIndex:   0,

@@ -24,6 +24,7 @@ import (
 	"github.com/platinasystems/go/goes/core/sleep"
 	"github.com/platinasystems/go/goes/core/stty"
 	"github.com/platinasystems/go/goes/core/sync"
+	"github.com/platinasystems/go/goes/core/toggle"
 )
 
 func New() []interface{} {
@@ -45,5 +46,6 @@ func New() []interface{} {
 		sleep.New(),
 		stty.New(),
 		sync.New(),
+		toggle.New(),
 	}
 }
