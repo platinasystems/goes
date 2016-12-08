@@ -284,7 +284,7 @@ commandLoop:
 				fmt.Println("+", pl.Slices[i])
 			}
 			c := exec.Command(goes.Prog(), pl.Slices[i][1:]...)
-			c.Args[i] = pl.Slices[i][0]
+			c.Args[0] = pl.Slices[i][0]
 			c.Stderr = os.Stderr
 			if i == 0 {
 				c.Stdin = in
@@ -298,7 +298,7 @@ commandLoop:
 				if err != nil {
 					continue commandLoop
 				}
-				os.Stdout = pout
+				c.Stdout = pout
 			}
 			if err = c.Start(); err != nil {
 				err = fmt.Errorf("child: %v: %v", c.Args, err)
