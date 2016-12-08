@@ -19,7 +19,8 @@ type cmd struct{}
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " COMMAND [ARGS]..." }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return "! COMMAND [ARGS]..." }
 
 func (cmd) Main(args ...string) error {
 	var background bool

@@ -7,7 +7,6 @@
 package core
 
 import (
-	"github.com/platinasystems/go/goes/core/bang"
 	"github.com/platinasystems/go/goes/core/cat"
 	"github.com/platinasystems/go/goes/core/chmod"
 	"github.com/platinasystems/go/goes/core/cp"
@@ -29,7 +28,6 @@ import (
 
 func New() []interface{} {
 	return []interface{}{
-		bang.New(),
 		cat.New(),
 		chmod.New(),
 		cp.New(),

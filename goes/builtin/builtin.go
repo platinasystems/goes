@@ -8,6 +8,7 @@ package builtin
 
 import (
 	"github.com/platinasystems/go/goes/builtin/apropos"
+	"github.com/platinasystems/go/goes/builtin/bang"
 	"github.com/platinasystems/go/goes/builtin/cd"
 	"github.com/platinasystems/go/goes/builtin/cli"
 	"github.com/platinasystems/go/goes/builtin/complete"
@@ -28,6 +29,7 @@ import (
 func New() []interface{} {
 	return []interface{}{
 		apropos.New(),
+		bang.New(),
 		cli.New(),
 		cd.New(),
 		complete.New(),
