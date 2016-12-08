@@ -123,7 +123,7 @@ func (byName ByName) Complete(args ...string) (ss []string) {
 
 // Main runs the arg[0] command in the current context.
 // When run w/o args this uses os.Args and exits instead of returns on error.
-// Use Shell() to iterate command input.
+// Use cli to iterate command input.
 //
 // If the args has "-h", "-help", or "--help", this runs
 // ByName["help"].Main(args...) to print text.
@@ -141,6 +141,14 @@ func (byName ByName) Main(args ...string) (err error) {
 			return
 		}
 		defer func() {
+			for _, g := range byName {
+				if g.Kind == Builtin && g.Close != nil {
+					t := g.Close()
+					if err == nil {
+						err = t
+					}
+				}
+			}
 			if err != nil && err != io.EOF {
 				fmt.Fprintf(os.Stderr, "%s: %v\n",
 					ProgBase(), err)
