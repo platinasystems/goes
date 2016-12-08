@@ -56,10 +56,10 @@ type fields struct {
 	VendorName      string
 	Manufacturer    string
 	Vendor          string
-	LabelRevision   string
+	LabelRevision   byte
 	PartNumber      string
 	SerialNumber    string
-	DeviceVersion   string
+	DeviceVersion   byte
 	ManufactureDate string
 	CountryCode     string
 	DiagVersion     string
@@ -189,9 +189,9 @@ func (d *Device) getInfo() {
 		case manufacture_date:
 			f.ManufactureDate = string(v)
 		case device_version:
-			f.DeviceVersion = string(v)
+			f.DeviceVersion = v[0]
 		case label_revision:
-			f.LabelRevision = string(v)
+			f.LabelRevision = v[0]
 		case platform_name:
 			f.PlatformName = string(v)
 		case onie_version:
