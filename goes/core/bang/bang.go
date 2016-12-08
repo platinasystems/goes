@@ -34,6 +34,9 @@ func (cmd) Main(args ...string) error {
 	}
 
 	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	if background {
 		go func() {
