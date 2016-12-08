@@ -129,7 +129,7 @@ func (cmd *cmd) Main(args ...string) error {
 		return err
 	}
 	for name, g := range cmd.byName {
-		if g.Kind == goes.Daemon {
+		if g.Kind == goes.Daemon && g.Name != "redisd" {
 			if err = cmd.byName.Main(name); err != nil {
 				return err
 			}
