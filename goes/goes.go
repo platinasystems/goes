@@ -188,7 +188,7 @@ func (byName ByName) Main(args ...string) (err error) {
 	name := args[0]
 	args = args[1:]
 	flag, args := flags.New(args,
-		"-h", "-help", "--help", "help",
+		"-h", "-help", "--help",
 		"-apropos", "--apropos",
 		"-man", "--man",
 		"-usage", "--usage",
