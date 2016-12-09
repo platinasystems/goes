@@ -224,10 +224,6 @@ func hook() error {
 			fmt.Printf("%s: %v\n", name, err)
 		}
 	}
-	ledfp.LedFpInit()
-	fanTray.FanTrayLedInit()
-	hw.FanInit()
-	go enableToggle()
 
 	d := eeprom.Device{
 		BusIndex:   0,
@@ -251,6 +247,25 @@ func hook() error {
 		dd[4] = uint8((g & 0xff00) >> 8)
 		dd[5] = uint8(g & 0xff)
 	}
+
+	switch d.Fields.DeviceVersion {
+	case 0xff:
+		pm.Addr = 0x7e
+		ledfp.Addr = 0x22
+	case 0x00:
+		//pm.Addr = 0x34
+		//ledfp.Addr = 0x75
+		pm.Addr = 0x7e
+		ledfp.Addr = 0x22
+	default:
+		pm.Addr = 0x34
+		ledfp.Addr = 0x75
+	}
+
+	ledfp.LedFpInit()
+	fanTray.FanTrayLedInit()
+	hw.FanInit()
+	go enableToggle()
 
 	machined.Plot(
 		&Info{
