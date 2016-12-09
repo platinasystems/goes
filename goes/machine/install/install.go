@@ -37,7 +37,7 @@ func (cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	if err = stop(); err != nil {
+	if err = stop(args...); err != nil {
 		return err
 	}
 	if err = install_self(); err != nil {
@@ -69,12 +69,18 @@ func (cmd) Apropos() map[string]string {
 }
 
 // run "goes stop" then wait up to 5 seconds for /run/goes/pids removal
-func stop() error {
+func stop(args ...string) error {
 	_, err := os.Stat(goes.InstallName)
 	if err != nil {
 		return nil
 	}
-	err = exec.Command(goes.InstallName, "stop").Run()
+	stop := []string{"stop"}
+	if len(args) > 0 {
+		args = append(stop, args...)
+	} else {
+		args = stop
+	}
+	err = exec.Command(goes.InstallName, args...).Run()
 	if err != nil {
 		return fmt.Errorf("goes stop: %v", err)
 	}
@@ -179,10 +185,12 @@ case "$1" in
 	;;
   stop)
 	cmd="stop"
+	args="$ARGS"
 	msg="Stopping"
 	;;
   restart)
 	cmd="restart"
+	args="$ARGS"
 	msg="Restarting"
 	;;
   force-reload)
@@ -229,10 +237,11 @@ func install_default() error {
 	_, err = f.WriteString(`
 # goes start arguments
 
-# ARGS: [-conf URL] [-port PORT] [DEV]...
-# URL: goes command script that is sourced after starting embedded daemons
-# PORT: redis listening port; default, 6379
-# DEV: network device(s) that the redis server should listen to; default, lo
+# ARGS: [-start URL] [-stop URL] [-port PORT] [DEV]...
+# URL:	goes command scripts that are sourced after starting or before stopping
+#	the embedded daemons; defaults: /etc/goes/{start,stop}
+# PORT:	redis listening port; default, 6379
+# DEV:	network device(s) that the redis server should listen to; default, lo
 
 #ARGS=""
 `[1:])

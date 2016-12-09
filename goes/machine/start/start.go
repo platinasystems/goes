@@ -23,6 +23,8 @@ import (
 	. "github.com/platinasystems/go/version"
 )
 
+const Name = "start"
+
 // Machines may use Hook to run something before redisd and other daemons.
 var Hook = func() error { return nil }
 
@@ -31,7 +33,7 @@ var Hook = func() error { return nil }
 var PubHook = func(chan<- string) error { return nil }
 
 // Machines may use ConfHook to run something after all daemons start and
-// before source of config..
+// before source of start command script.
 var ConfHook = func() error { return nil }
 
 // A non-empty Machine is published to redis as "machine: Machine"
@@ -39,47 +41,18 @@ var Machine string
 
 var RedisDevs []string
 
-func New() *goes.Goes {
-	cmd := new(cmd)
-	return &goes.Goes{
-		Name:   "start",
-		ByName: cmd.ByName,
-		Main:   cmd.Main,
-		Usage:  "start [OPTION]...",
-		Apropos: map[string]string{
-			"en_US.UTF-8": "start this goes machine",
-		},
-		Man: map[string]string{
-			"en_US.UTF-8": `NAME
-	start - start this goes machine
+func New() *cmd { return new(cmd) }
 
-SYNOPSIS
-	start [-conf=URL] [REDIS OPTIONS]...
+type cmd goes.ByName
 
-DESCRIPTION
-	Start a redis server followed by the machine and its embedded daemons.
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return "start [OPTION]..." }
 
-OPTIONS
-	-conf URL
-		Specifies the URL of the machine's configuration script that's
-		sourced immediately after start of all daemons.
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
-SEE ALSO
-	redisd`,
-		},
-	}
-}
-
-type cmd struct {
-	byName goes.ByName
-}
-
-func (cmd *cmd) ByName(byName goes.ByName) {
-	cmd.byName = byName
-}
-
-func (cmd *cmd) Main(args ...string) error {
-	parm, args := parms.New(args, "-conf")
+func (c *cmd) Main(args ...string) error {
+	byName := goes.ByName(*c)
+	parm, args := parms.New(args, "-start", "-stop")
 	redisd := []string{"redisd"}
 	if len(args) > 0 {
 		redisd = append(redisd, args...)
@@ -101,7 +74,7 @@ func (cmd *cmd) Main(args ...string) error {
 	if err = Hook(); err != nil {
 		return err
 	}
-	if err = cmd.byName.Main(redisd...); err != nil {
+	if err = byName.Main(redisd...); err != nil {
 		return err
 	}
 	pub, err := redis.Publish(redis.Machine)
@@ -128,33 +101,39 @@ func (cmd *cmd) Main(args ...string) error {
 	if err = PubHook(pub); err != nil {
 		return err
 	}
-	for name, g := range cmd.byName {
+	for name, g := range byName {
 		if g.Kind == goes.Daemon && g.Name != "redisd" {
-			if err = cmd.byName.Main(name); err != nil {
+			if err = byName.Main(name); err != nil {
 				return err
 			}
 		}
 	}
-	if s := parm["-conf"]; len(s) > 0 {
+	start := parm["-start"]
+	if len(start) == 0 {
+		if _, xerr := os.Stat("/etc/goes/start"); xerr == nil {
+			start = "/etc/goes/start"
+		}
+	}
+	if len(start) > 0 {
 		if err = ConfHook(); err != nil {
 			return err
 		}
-		if err = cmd.byName.Main("source", s); err != nil {
+		if err = byName.Main("source", start); err != nil {
 			return err
 		}
 	}
 	if os.Getpid() == 1 {
-		_, login := cmd.byName["login"]
+		_, login := byName["login"]
 		for {
 			if login {
-				err = cmd.byName.Main("login")
+				err = byName.Main("login")
 				if err != nil {
 					fmt.Println("login:", err)
 					time.Sleep(3 * time.Second)
 					continue
 				}
 			}
-			err = cmd.byName.Main("cli")
+			err = byName.Main("cli")
 			if err != nil && err != io.EOF {
 				fmt.Println(err)
 				<-make(chan struct{})
@@ -162,4 +141,32 @@ func (cmd *cmd) Main(args ...string) error {
 		}
 	}
 	return nil
+}
+
+func (c *cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "start this goes machine",
+	}
+}
+
+func (c *cmd) Man() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": `NAME
+	start - start this goes machine
+
+SYNOPSIS
+	start [-start=URL] [REDIS OPTIONS]...
+
+DESCRIPTION
+	Start a redis server followed by the machine and its embedded daemons.
+
+OPTIONS
+	-start URL
+		Specifies the URL of the machine's configuration script that's
+		sourced immediately after start of all daemons.
+		default: /etc/goes/start
+
+SEE ALSO
+	redisd`,
+	}
 }

@@ -8,31 +8,44 @@ package restart
 
 import "github.com/platinasystems/go/goes"
 
-func New() *goes.Goes {
-	cmd := new(cmd)
-	return &goes.Goes{
-		Name:   "restart",
-		ByName: cmd.ByName,
-		Main:   cmd.Main,
-		Usage:  "restart",
-		Apropos: map[string]string{
-			"en_US.UTF-8": "stop, then start this goes machine",
-		},
-	}
-}
+const Name = "restart"
 
-type cmd struct {
-	byName goes.ByName
-}
+func New() *cmd { return new(cmd) }
 
-func (cmd *cmd) ByName(byName goes.ByName) {
-	cmd.byName = byName
-}
+type cmd goes.ByName
 
-func (cmd *cmd) Main(args ...string) error {
-	err := cmd.byName.Main("stop")
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return "restart [OPTION]..." }
+
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Main(args ...string) error {
+	byName := goes.ByName(*c)
+	err := byName.Main(append([]string{"stop"}, args...)...)
 	if err != nil {
 		return err
 	}
-	return cmd.byName.Main("start")
+	return byName.Main(append([]string{"start"}, args...)...)
+}
+
+func (*cmd) Apropos() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": "stop, then start this goes machine",
+	}
+}
+
+func (c *cmd) Man() map[string]string {
+	return map[string]string{
+		"en_US.UTF-8": `NAME
+	restart - stop, then start this goes machine
+
+SYNOPSIS
+	restart [STOP, STOP, and REDISD OPTIONS]...
+
+DESCRIPTION
+	Run the goes machine stop then start commands.
+
+SEE ALSO
+	start, stop, and redisd`,
+	}
 }
