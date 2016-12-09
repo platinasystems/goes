@@ -5,13 +5,12 @@
 package vnet
 
 import (
-	"github.com/platinasystems/go/goes/sockfile"
-
+	"bytes"
 	"fmt"
 	"io"
-	"net"
 	"os"
-	"strings"
+
+	"github.com/platinasystems/go/goes/net/vnet/internal"
 )
 
 const Name = "vnet"
@@ -21,43 +20,60 @@ type cmd struct{}
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [COMMAND-STRING]..." }
+func (cmd) Tag() string    { return "builtin" }
+func (cmd) Usage() string  { return "vnet [COMMAND-STRING]..." }
+func (cmd) Close() error   { return internal.Conn.Close() }
 
 func (cmd) Main(args ...string) error {
-	conn, err := net.Dial("unix", sockfile.Path(Name))
+	err := internal.Conn.Connect()
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	fmt.Fprintln(conn, strings.Join(args, " ")+"\nquit\n")
+	iargs := make([]interface{}, len(args))
+	for i, s := range args {
+		iargs[i] = s
+	}
+	fmt.Fprintln(internal.Conn, iargs...)
+	fmt.Fprintln(internal.Conn, "break")
 	for {
 		var buf [4096]byte
 		var n int
-		n, err = conn.Read(buf[:])
+		n, err = internal.Conn.Read(buf[:])
 		if err != nil {
 			break
 		}
-		os.Stdout.Write(buf[:n])
+		x := bytes.Index(buf[:n], []byte("unknown: break"))
+		if x >= 0 {
+			if x > 0 {
+				os.Stdout.Write(buf[:x])
+			}
+			break
+		} else {
+			os.Stdout.Write(buf[:n])
+		}
 	}
 	return err
 }
 
 func (cmd) Help(...string) string {
-	buf := make([]byte, 4*4096)
-	conn, err := net.Dial("unix", sockfile.Path(Name))
+	err := internal.Conn.Connect()
 	if err != nil {
 		return err.Error()
 	}
-	defer conn.Close()
-	fmt.Fprintln(conn, "help")
-	fmt.Fprintln(conn, "quit")
+	buf := make([]byte, 4*4096)
+	fmt.Fprintln(internal.Conn, "help")
+	fmt.Fprintln(internal.Conn, "break")
 	for i, n := 0, 0; i < len(buf); i += n {
-		n, err = conn.Read(buf[i:])
+		n, err = internal.Conn.Read(buf[i:])
 		if err != nil {
 			if err != io.EOF {
 				return err.Error()
 			}
 			return string(buf[:i+n])
+		}
+		x := bytes.Index(buf[:i+n], []byte("unknown: break"))
+		if x >= 0 {
+			return string(buf[:x])
 		}
 	}
 	return string(buf)
