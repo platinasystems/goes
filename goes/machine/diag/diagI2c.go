@@ -8,9 +8,31 @@ import (
 	"fmt"
 	"github.com/platinasystems/go/i2c"
 	"time"
+
+	"github.com/platinasystems/go/eeprom"
 )
 
 func diagI2c() error {
+
+	var ucd9090Adr uint8 = 0x34
+	var ledgpioAdr uint8 = 0x75
+
+	d := eeprom.Device{
+                BusIndex:   0,
+                BusAddress: 0x55,
+        }
+        d.GetInfo()
+        switch d.Fields.DeviceVersion {
+        case 0xff:
+                ucd9090Adr = 0x7e
+                ledgpioAdr = 0x22
+        case 0x00:
+                ucd9090Adr = 0x7e
+                ledgpioAdr = 0x22
+        default:
+                ucd9090Adr = 0x34
+                ledgpioAdr = 0x75
+        }
 
 	var r string
 	var result bool
@@ -56,13 +78,13 @@ func diagI2c() error {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_main_i2c_en_off", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "disable host bus, ping host eeprom")
 	gpioSet("CPU_TO_FRU_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
-	result, _ = diagI2cPing(0x00, 0x51, 0x00, 1)
+	result, _ = diagI2cPing(0x01, 0x51, 0x00, 1)
 	r = CheckPassB(result, true)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_fru_i2c_en_on", "-", result, i2cping_response_min, i2cping_response_max, r, "enable host bus, ping host eeprom")
 
 	gpioSet("CPU_TO_FRU_I2C_EN", false)
 	time.Sleep(50 * time.Millisecond)
-	result, _ = diagI2cPing(0x00, 0x51, 0x00, 1)
+	result, _ = diagI2cPing(0x01, 0x51, 0x00, 1)
 	r = CheckPassB(result, false)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_fru_i2c_en_off", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "disable host bus, ping host eeprom")
 	/* diagTest: i2c power cycle
@@ -139,16 +161,16 @@ func diagI2c() error {
 
 	diagI2cWrite1Byte(0x00, 0x76, 0x01)
 	time.Sleep(10 * time.Millisecond)
-	result, _ = diagI2cPing(0x00, 0x7e, 0x00, 10)
+	result, _ = diagI2cPing(0x00, ucd9090Adr, 0x00, 10)
 	r = CheckPassB(result, true)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_ucd9090", "-", result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")
 
 	diagI2cWrite1Byte(0x00, 0x76, 0x02)
 	time.Sleep(10 * time.Millisecond)
-	diagI2cWrite1Byte(0x00, 0x22, 0x00)
-	result, _ = diagI2cPing(0x00, 0x22, 0x00, 10)
+	diagI2cWrite1Byte(0x00, ledgpioAdr, 0x00)
+	result, _ = diagI2cPing(0x00, ledgpioAdr, 0x00, 10)
 	r = CheckPassB(result, true)
-	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_led_pca9535", "-", result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")
+	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_led_pca9539", "-", result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")
 
 	diagI2cWrite1Byte(0x00, 0x76, 0x04)
 	time.Sleep(10 * time.Millisecond)

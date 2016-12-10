@@ -41,6 +41,12 @@ const (
 	service_tag           = 0x2f
 	vendor_extension      = 0xfd
 	crc                   = 0xfe
+	//platina vendor extension fields
+        chassis_type       = 0x50
+        board_type         = 0x51
+        sub_type           = 0x52
+        pcba_number        = 0x53
+        pcba_serial_number = 0x54
 )
 
 var ONIEId = "TlvInfo" + string(0x00)
@@ -53,10 +59,8 @@ type fields struct {
 	ONIEDataVersion byte
 	ProductName     string
 	PlatformName    string
-	VendorName      string
 	Manufacturer    string
 	Vendor          string
-	LabelRevision   byte
 	PartNumber      string
 	SerialNumber    string
 	DeviceVersion   byte
@@ -70,6 +74,13 @@ type fields struct {
 	BaseEthernetAddress [6]byte
 	NEthernetAddress    uint
 	CRC32               uint
+	ChassisType              byte
+        BoardType                byte
+        SubType                  byte
+        PcbaPartNumber           string
+        Tor1MainPcbaSerialNumber string
+        Tor1CpuPcbaSerialNumber  string
+        Tor1FanPcbaSerialNumber  string
 }
 
 // i2c bus id, i2c bus address, Fields of content, and raw data
@@ -190,8 +201,6 @@ func (d *Device) getInfo() {
 			f.ManufactureDate = string(v)
 		case device_version:
 			f.DeviceVersion = v[0]
-		case label_revision:
-			f.LabelRevision = v[0]
 		case platform_name:
 			f.PlatformName = string(v)
 		case onie_version:
@@ -207,6 +216,30 @@ func (d *Device) getInfo() {
 		case service_tag:
 			f.ServiceTag = string(v)
 		case vendor_extension:
+			 for j := uint(2); j < uint(len(v)); {
+                                etlv, etlen := v[j], uint(v[j+1])
+                                ev := v[j+2 : j+2+etlen]
+                                switch etlv {
+                                case chassis_type:
+                                        f.ChassisType = ev[0]
+                                case board_type:
+                                        f.BoardType = ev[0]
+                                case sub_type:
+                                        f.SubType = ev[0]
+                                case pcba_number:
+                                        f.PcbaPartNumber = string(ev)
+                                case pcba_serial_number:
+                                        if (string(ev[0:3]) == "cpu"){
+                                                f.Tor1CpuPcbaSerialNumber = string(ev)
+                                        } else if (string(ev[0:3]) == "fan"){
+                                                f.Tor1FanPcbaSerialNumber = string(ev)
+                                        } else if (string(ev[0:4]) == "main"){
+                                                f.Tor1MainPcbaSerialNumber = string (ev)
+                                        }
+                                default:
+                                }
+                                j += 2 + etlen
+                        }
 			f.VendorExtension = string(v)
 		case crc:
 			f.CRC32 = uint(v[0])<<24 | uint(v[1])<<16 | uint(v[2])<<8 | uint(v[3])

@@ -33,8 +33,8 @@ const (
 	boardTypebde8c  = 0x3
 
 	ppnTor1  = "900-000000-000"
-	ppnBde2c = "900-000000-001"
-	ppnBde4c = "900-000000-002"
+	ppnBde2c = "900-000001-000"
+	ppnBde4c = "900-000002-000"
 
 	subTypeGa    = 0x0
 	subTypeProto = 0x1
@@ -76,7 +76,11 @@ func diagProm() error {
 
 	//dump prom
 	if len(argF) == 1 {
-		_, rawData := d.DumpProm()
+		result, rawData := d.DumpProm()
+		if (!result) {
+			fmt.Printf("invalid: eeprom is not in onie format\n")
+			return nil
+		}
 		fmt.Printf("raw data: %v\n\n", rawData)
 		fmt.Printf("id: %s, rev: 0x%x, length: %d\n", string(rawData[0:7]), rawData[8], (uint(rawData[9])<<8)|uint(rawData[10]))
 		fmt.Printf("Type | Length | Value \n")
@@ -185,7 +189,7 @@ func diagProm() error {
 		switch c {
 		case "onie":
 			//write onie header
-			fmt.Printf("onie: c: %v, v: %v\n", c, vByte)
+			//fmt.Printf("onie: c: %v, v: %v\n", c, vByte)
 			fmt.Printf("%s\n", d.WriteField(c, vByte))
 		case "crc":
 			//recalculate crc32 and update crc field
@@ -228,7 +232,8 @@ func diagProm() error {
 							for k := uint(0); k < uint(len(ppnNew)); k++ {
 								rawData[i+2+j+2+k] = ppnNew[k]
 							}
-							break
+							j += 2 + tlen
+							continue
 						} else if tlv == 0x51 {
 							var boardTypeNew uint8
 							if !x86 {
@@ -237,7 +242,8 @@ func diagProm() error {
 								boardTypeNew = boardTypeBde4c
 							}
 							rawData[i+2+j+2] = boardTypeNew
-							break
+							j += 2 + tlen
+							continue
 						}
 						j += 2 + tlen
 					}

@@ -424,10 +424,9 @@ func (h *HwMonitor) FanInit() {
 	r2.FanPwmPrescale1.set(h, 0x84)
 	r2.FanPwmPrescale2.set(h, 0x84)
 
-	//set default speed to medium
-	r2.FanOutValue1.set(h, med)
-	r2.FanOutValue2.set(h, med)
-	lastSpeed = "med"
+	//set default speed to auto
+	h.SetFanSpeed("auto")
+	lastSpeed = "auto"
 
 	//enable temperature monitoring
 	r2.BankSelect.set(h, 0x80)
@@ -473,12 +472,12 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 		r2.FanStartValue2.set(h, 0x30)
 
 		//set fan stop speed
-		r2.FanStopValue1.set(h, 0x20)
-		r2.FanStopValue2.set(h, 0x20)
+		r2.FanStopValue1.set(h, 0x30)
+		r2.FanStopValue2.set(h, 0x30)
 
-		//set fan stop time to max 25.5s
-		r2.FanStopTime1.set(h, 0xff)
-		r2.FanStopTime2.set(h, 0xff)
+		//set fan stop time to never stop
+		r2.FanStopTime1.set(h, 0x0)
+		r2.FanStopTime2.set(h, 0x0)
 
 		//set target temps to 50°C
 		r2.TargetTemp1.set(h, 0x32)
