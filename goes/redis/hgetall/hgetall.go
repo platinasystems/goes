@@ -19,12 +19,12 @@ type cmd struct{}
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " KEY [PATTERN]" }
+func (cmd) Usage() string  { return "hgetall [KEY [PATTERN]]" }
 
 func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
-		return fmt.Errorf("KEY: missing")
+		args = []string{redis.Machine}
 	case 1:
 	case 2:
 	default:
