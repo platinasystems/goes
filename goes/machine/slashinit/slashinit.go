@@ -36,15 +36,7 @@ const (
 
 var Hook = func() error { return nil }
 
-func New() *goes.Goes {
-	cmd := new(cmd)
-	return &goes.Goes{
-		Name:   Name,
-		ByName: cmd.ByName,
-		Main:   cmd.Main,
-		Usage:  Name,
-	}
-}
+func New() *cmd { return new(cmd) }
 
 func init() {
 	if os.Getpid() != 1 {
@@ -95,12 +87,58 @@ func init() {
 	}
 }
 
-type cmd struct {
-	byName goes.ByName
-}
+type cmd goes.ByName
 
-func (cmd *cmd) ByName(byName goes.ByName) {
-	cmd.byName = byName
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Name }
+
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Main(_ ...string) error {
+	byName := goes.ByName(*c)
+	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
+	goesinstaller := os.Getenv("goesinstaller")
+	defer func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Println(r)
+			}
+			c.emergencyShell()
+		}()
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
+		if len(goesinstaller) > 0 {
+			params := strings.Split(goesinstaller, ",")
+			err := c.installer(params)
+			if err != nil {
+				log.Print("err", "installer", params[0],
+					":", err)
+			}
+		}
+	}()
+	err := Hook()
+	if err != nil {
+		panic(fmt.Errorf("Error from board hook: ", err))
+	}
+	var root, script string
+	if len(goesRoot) >= 1 && len(goesRoot[0]) > 0 {
+		root = goesRoot[0]
+	}
+	if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
+		script = goesRoot[1]
+	}
+
+	if len(root) > 0 {
+		c.pivotRoot("/newroot", root, script)
+	}
+	c.makeTargetDirs()
+	c.makeTargetLinks()
+	c.mountTargetVirtualFilesystems()
+	c.runSbinInit()
+	err = byName.Main("start")
+
+	return err
 }
 
 func (*cmd) makeRootDirs(mountPoint string) {
@@ -274,7 +312,8 @@ func (*cmd) mountTargetVirtualFilesystems() {
 	}
 }
 
-func (cmd *cmd) pivotRoot(mountPoint string, root string, script string) {
+func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
+	byName := goes.ByName(*c)
 	_, err := os.Stat(mountPoint)
 	if os.IsNotExist(err) {
 		err = os.Mkdir(mountPoint, os.FileMode(0755))
@@ -283,29 +322,29 @@ func (cmd *cmd) pivotRoot(mountPoint string, root string, script string) {
 				mountPoint, err))
 		}
 	}
-	err = cmd.byName.Main("mount", root, mountPoint)
+	err = byName.Main("mount", root, mountPoint)
 	if err != nil {
 		panic(fmt.Errorf("Error mounting %s on %s: %s",
 			root, mountPoint, err))
 	}
 
 	if len(script) > 0 {
-		err := cmd.byName.Main("source", script)
+		err := byName.Main("source", script)
 		if err != nil {
 			const format = "Error running boot script %s on %s: %s"
 			panic(fmt.Errorf(format, script, root, err))
 		}
 	}
-	cmd.makeRootDirs(mountPoint)
-	cmd.makeRootFiles(mountPoint)
-	cmd.makeRootLinks(mountPoint)
-	cmd.moveVirtualFileSystems(mountPoint)
+	c.makeRootDirs(mountPoint)
+	c.makeRootFiles(mountPoint)
+	c.makeRootLinks(mountPoint)
+	c.moveVirtualFileSystems(mountPoint)
 
 	if err = os.Chdir(mountPoint); err != nil {
 		panic(fmt.Errorf("chdir %s: %s", mountPoint, err))
 	}
-	cmd.unlinkRootFiles()
-	cmd.rmdirRootDirs()
+	c.unlinkRootFiles()
+	c.rmdirRootDirs()
 	err = syscall.Mount(mountPoint, "/", "", syscall.MS_MOVE, "")
 	if err != nil {
 		panic(fmt.Errorf("mount %s /: %s", mountPoint, err))
@@ -315,7 +354,7 @@ func (cmd *cmd) pivotRoot(mountPoint string, root string, script string) {
 	}
 }
 
-func (cmd *cmd) runSbinInit() {
+func (*cmd) runSbinInit() {
 	if err := os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
 		panic(fmt.Errorf("Setenv PATH: %s", err))
 	}
@@ -351,63 +390,19 @@ func (cmd *cmd) runSbinInit() {
 	}
 }
 
-func (cmd *cmd) emergencyShell() {
+func (c *cmd) emergencyShell() {
+	byName := goes.ByName(*c)
 	for {
 		fmt.Println("Dropping into emergency goes shell...\n")
-		err := cmd.byName.Main("cli")
+		err := byName.Main("cli")
 		if err != nil && err != io.EOF {
 			fmt.Println(err)
 		}
 	}
 }
 
-func (cmd *cmd) Main(_ ...string) error {
-	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
-	goesinstaller := os.Getenv("goesinstaller")
-	defer func() {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Println(r)
-			}
-			cmd.emergencyShell()
-		}()
-		if r := recover(); r != nil {
-			fmt.Println(r)
-		}
-		if len(goesinstaller) > 0 {
-			params := strings.Split(goesinstaller, ",")
-			err := cmd.installer(params)
-			if err != nil {
-				log.Print("err", "installer", params[0],
-					":", err)
-			}
-		}
-	}()
-	err := Hook()
-	if err != nil {
-		panic(fmt.Errorf("Error from board hook: ", err))
-	}
-	var root, script string
-	if len(goesRoot) >= 1 && len(goesRoot[0]) > 0 {
-		root = goesRoot[0]
-	}
-	if len(goesRoot) >= 2 && len(goesRoot[1]) > 0 {
-		script = goesRoot[1]
-	}
-
-	if len(root) > 0 {
-		cmd.pivotRoot("/newroot", root, script)
-	}
-	cmd.makeTargetDirs()
-	cmd.makeTargetLinks()
-	cmd.mountTargetVirtualFilesystems()
-	cmd.runSbinInit()
-	err = cmd.byName.Main("start")
-
-	return err
-}
-
-func (cmd *cmd) installer(params []string) error {
+func (c *cmd) installer(params []string) error {
+	byName := goes.ByName(*c)
 	if len(params) < 1 || len(params[0]) == 0 {
 		return fmt.Errorf("KERNEL: missing")
 	}
@@ -448,7 +443,7 @@ func (cmd *cmd) installer(params []string) error {
 		fmt.Printf("All files loaded successfully!")
 	}
 
-	return cmd.byName.Main("kexec", "-e",
+	return byName.Main("kexec", "-e",
 		"-k", "kernel",
 		"-i", "initramfs",
 		"-c", "console=ttyS0,115200")
