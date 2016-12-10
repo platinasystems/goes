@@ -6,7 +6,7 @@
 // like this.
 //
 //	_goes() {
-//		COMPREPLY=($(goes -complete ${COMP_WORDS[@]}))
+//		COMPREPLY=($(goes complete ${COMP_WORDS[@]}))
 //		return 0
 //	}
 //	complete -F _goes goes
