@@ -18,21 +18,21 @@ func diagI2c() error {
 	var ledgpioAdr uint8 = 0x75
 
 	d := eeprom.Device{
-                BusIndex:   0,
-                BusAddress: 0x55,
-        }
-        d.GetInfo()
-        switch d.Fields.DeviceVersion {
-        case 0xff:
-                ucd9090Adr = 0x7e
-                ledgpioAdr = 0x22
-        case 0x00:
-                ucd9090Adr = 0x7e
-                ledgpioAdr = 0x22
-        default:
-                ucd9090Adr = 0x34
-                ledgpioAdr = 0x75
-        }
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
+	d.GetInfo()
+	switch d.Fields.DeviceVersion {
+	case 0xff:
+		ucd9090Adr = 0x7e
+		ledgpioAdr = 0x22
+	case 0x00:
+		ucd9090Adr = 0x7e
+		ledgpioAdr = 0x22
+	default:
+		ucd9090Adr = 0x34
+		ledgpioAdr = 0x75
+	}
 
 	var r string
 	var result bool

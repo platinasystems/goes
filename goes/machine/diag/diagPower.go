@@ -26,18 +26,18 @@ func diagPower() error {
 	var pm = ucd9090.PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
 
 	d := eeprom.Device{
-                BusIndex:   0,
-                BusAddress: 0x55,
-        }
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
 	d.GetInfo()
-        switch d.Fields.DeviceVersion {
-        case 0xff:
-                pm.Addr = 0x7e
-        case 0x00:
-                pm.Addr = 0x7e
-        default:
-                pm.Addr = 0x34
-        }
+	switch d.Fields.DeviceVersion {
+	case 0xff:
+		pm.Addr = 0x7e
+	case 0x00:
+		pm.Addr = 0x7e
+	default:
+		pm.Addr = 0x34
+	}
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
 	fmt.Printf("---------------|-------------------------|----------|----------|----------|----------|------|-----------------------------------\n")

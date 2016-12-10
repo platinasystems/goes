@@ -77,7 +77,7 @@ func diagProm() error {
 	//dump prom
 	if len(argF) == 1 {
 		result, rawData := d.DumpProm()
-		if (!result) {
+		if !result {
 			fmt.Printf("invalid: eeprom is not in onie format\n")
 			return nil
 		}
