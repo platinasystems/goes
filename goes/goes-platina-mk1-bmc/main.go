@@ -253,10 +253,8 @@ func hook() error {
 		pm.Addr = 0x7e
 		ledfp.Addr = 0x22
 	case 0x00:
-		//pm.Addr = 0x34
-		//ledfp.Addr = 0x75
-		pm.Addr = 0x7e
-		ledfp.Addr = 0x22
+		pm.Addr = 0x34
+		ledfp.Addr = 0x75
 	default:
 		pm.Addr = 0x34
 		ledfp.Addr = 0x75
@@ -280,12 +278,12 @@ func hook() error {
 			name:     "mfg",
 			prefixes: []string{"mfg."},
 			attrs: machined.Attrs{
-				"mfg.platform.name": d.Fields.PlatformName,
-				"mfg.vendor": d.Fields.Vendor,
-				"mfg.part.number":      d.Fields.PartNumber,
-				"mfg.serial.number":    d.Fields.SerialNumber,
-				"mfg.device.version":   d.Fields.DeviceVersion,
-				"mfg.manufacture.date": d.Fields.ManufactureDate,
+				"mfg.platform.name":           d.Fields.PlatformName,
+				"mfg.vendor":                  d.Fields.Vendor,
+				"mfg.part.number":             d.Fields.PartNumber,
+				"mfg.serial.number":           d.Fields.SerialNumber,
+				"mfg.device.version":          d.Fields.DeviceVersion,
+				"mfg.manufacture.date":        d.Fields.ManufactureDate,
 				"mfg.main.pcba.part.number":   d.Fields.PcbaPartNumber,
 				"mfg.main.pcba.serial.number": d.Fields.Tor1MainPcbaSerialNumber,
 				"mfg.cpu.pcba.serial.number":  d.Fields.Tor1CpuPcbaSerialNumber,
