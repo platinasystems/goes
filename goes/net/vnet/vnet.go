@@ -21,10 +21,13 @@ func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
 func (cmd) Tag() string    { return "builtin" }
-func (cmd) Usage() string  { return "vnet [COMMAND-STRING]..." }
+func (cmd) Usage() string  { return "vnet COMMAND [ARG]..." }
 func (cmd) Close() error   { return internal.Conn.Close() }
 
 func (cmd) Main(args ...string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("no COMMAND")
+	}
 	err := internal.Conn.Connect()
 	if err != nil {
 		return err
