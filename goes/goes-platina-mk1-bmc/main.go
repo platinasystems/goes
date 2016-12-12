@@ -35,6 +35,7 @@ import (
 	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/net"
 	"github.com/platinasystems/go/goes/net/nld"
+	"github.com/platinasystems/go/goes/net/telnetd"
 	"github.com/platinasystems/go/goes/redis"
 	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
@@ -148,6 +149,7 @@ func main() {
 	g.Plot(machined.New())
 	g.Plot(net.New()...)
 	g.Plot(redis.New()...)
+	g.Plot(telnetd.New())
 	start.Machine = "platina-mk1-bmc"
 	start.RedisDevs = []string{"lo", "eth0"}
 	nld.Prefixes = []string{"lo.", "eth0."}
