@@ -13,7 +13,6 @@
 package eeprom
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -244,7 +243,6 @@ func (d *Device) getInfo() {
 		case crc:
 			f.CRC32 = uint(v[0])<<24 | uint(v[1])<<16 | uint(v[2])<<8 | uint(v[3])
 		default:
-			panic(fmt.Errorf("unknown tlv in eeprom: %x %x", tlv, v))
 		}
 	}
 	return
