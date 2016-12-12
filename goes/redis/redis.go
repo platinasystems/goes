@@ -8,6 +8,7 @@ package redis
 import (
 	"github.com/platinasystems/go/goes/redis/get"
 	"github.com/platinasystems/go/goes/redis/hdel"
+	"github.com/platinasystems/go/goes/redis/hdelta"
 	"github.com/platinasystems/go/goes/redis/hexists"
 	"github.com/platinasystems/go/goes/redis/hget"
 	"github.com/platinasystems/go/goes/redis/hgetall"
@@ -24,6 +25,7 @@ func New() []interface{} {
 	return []interface{}{
 		get.New(),
 		hdel.New(),
+		hdelta.New(),
 		hexists.New(),
 		hget.New(),
 		hgetall.New(),
