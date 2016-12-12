@@ -75,7 +75,6 @@ type completer interface {
 
 type daemoner interface {
 	Daemon() int
-	mainer
 }
 
 type helper interface {
@@ -307,9 +306,7 @@ func (byName ByName) Plot(cmds ...interface{}) {
 			}
 			continue
 		}
-		g = &Goes{
-			Name: "command",
-		}
+		g = new(Goes)
 		if method, found := v.(fmt.Stringer); found {
 			g.Name = method.String()
 		} else {
@@ -336,11 +333,18 @@ func (byName ByName) Plot(cmds ...interface{}) {
 		if method, found := v.(helper); found {
 			g.Help = method.Help
 		}
-		if _, found := v.(daemoner); found {
-			g.Kind = Daemon
-		} else if method, found := v.(tagger); found &&
-			method.Tag() == "builtin" {
-			g.Kind = Builtin
+		if method, found := v.(daemoner); found {
+			if method.Daemon() >= 0 {
+				g.Kind = Daemon
+			} else {
+				g = nil
+				continue
+			}
+		}
+		if method, found := v.(tagger); found {
+			if method.Tag() == "builtin" {
+				g.Kind = Builtin
+			}
 		}
 		if method, found := v.(usager); found {
 			g.Usage = method.Usage()
