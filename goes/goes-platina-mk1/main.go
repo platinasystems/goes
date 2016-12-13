@@ -10,6 +10,7 @@ import (
 	"time"
 
 	redigo "github.com/garyburd/redigo/redis"
+	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/builtin"
 	"github.com/platinasystems/go/goes/builtin/license"
@@ -59,6 +60,7 @@ func main() {
 	start.Machine = "platina-mk1"
 	start.RedisDevs = []string{"lo", "eth0"}
 	start.ConfHook = wait4vnet
+	start.PubHook = getEepromData
 	stop.Hook = stopHook
 	nld.Prefixes = []string{"lo.", "eth0."}
 	vnetd.UnixInterfacesOnly = true
@@ -105,6 +107,34 @@ func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
 	v.AddPackage("platform", plat)
 	plat.DependsOn("pci-discovery")
 
+	return nil
+}
+
+func getEepromData(pub chan<- string) error {
+	// The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
+	d := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x51,
+	}
+
+	// Read and store the EEPROM Contents
+	if err := d.GetInfo(); err != nil {
+		return err
+	}
+
+	pub <- fmt.Sprint("eeprom.product_name: ", d.Fields.ProductName)
+	pub <- fmt.Sprint("eeprom.platform_name: ", d.Fields.PlatformName)
+	pub <- fmt.Sprint("eeprom.manufacturer: ", d.Fields.Manufacturer)
+	pub <- fmt.Sprint("eeprom.vendor: ", d.Fields.Vendor)
+	pub <- fmt.Sprint("eeprom.part_number: ", d.Fields.PartNumber)
+	pub <- fmt.Sprint("eeprom.serial_number: ", d.Fields.SerialNumber)
+	pub <- fmt.Sprint("eeprom.device_version: ", d.Fields.DeviceVersion)
+	pub <- fmt.Sprint("eeprom.manufacture_date: ", d.Fields.ManufactureDate)
+	pub <- fmt.Sprint("eeprom.country_code: ", d.Fields.CountryCode)
+	pub <- fmt.Sprint("eeprom.diag_version: ", d.Fields.DiagVersion)
+	pub <- fmt.Sprint("eeprom.service_tag: ", d.Fields.ServiceTag)
+	pub <- fmt.Sprint("eeprom.base_ethernet_address: ", d.Fields.BaseEthernetAddress)
+	pub <- fmt.Sprint("eeprom.number_of_ethernet_addrs: ", d.Fields.NEthernetAddress)
 	return nil
 }
 

@@ -5,12 +5,15 @@
 package main
 
 import (
-	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes/net/vnetd"
 	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
+
+	"strconv"
+	"strings"
 )
 
 type platform struct {
@@ -75,21 +78,35 @@ func (p *platform) boardPortLedEnable() (err error) {
 }
 
 func (p *platform) boardInit() (err error) {
-	// The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
-	// Read and store the EEPROM Contents
-	d := eeprom.Device{
-		BusIndex:   0,
-		BusAddress: 0x51,
-	}
-	e := d.GetInfo()
-	if e == nil && d.Fields.NEthernetAddress == 134 {
-		p.Vnet.Logf("using eeprom MAC addresses\n")
-		p.Platform.AddressBlock = ethernet.AddressBlock{
-			Base:  d.Fields.BaseEthernetAddress,
-			Count: uint32(d.Fields.NEthernetAddress),
+	nMacs, err := redis.Hget(redis.Machine, "eeprom.number_of_ethernet_addrs")
+	if err == nil {
+		n, err := strconv.ParseUint(nMacs, 10, 32)
+		if err == nil {
+			baseMacAddr, err := redis.Hget(redis.Machine, "eeprom.base_ethernet_address")
+			if err == nil {
+				// remove the '[ ]' brackets from the string before processing
+				s := baseMacAddr[1:(len(baseMacAddr) - 1)]
+				str := strings.Fields(s)
+				var ethAddr [6]byte
+				for i := range str {
+					s, err := strconv.ParseUint(str[i], 10, 32)
+					if err == nil {
+						ethAddr[i] = uint8(s & 0xff)
+					}
+				}
+				if err == nil {
+					p.Vnet.Logf("using eeprom MAC addresses\n")
+					p.Platform.AddressBlock = ethernet.AddressBlock{
+						Base:  ethAddr,
+						Count: uint32(n),
+					}
+				}
+			}
 		}
-	} else {
-		// in case the eeprom read fails or not programmed
+	}
+
+	if err != nil {
+		// in case the eeprom values are invalid or not programmed correctly
 		p.Vnet.Logf("eeprom data invalid: %s; using random addresses\n", err)
 		p.Platform.AddressBlock = ethernet.AddressBlock{
 			Base:  ethernet.RandomAddress(),
