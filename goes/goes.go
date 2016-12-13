@@ -278,6 +278,7 @@ func (byName ByName) Main(args ...string) (err error) {
 			Setsid: true,
 			Pgid:   0,
 		}
+		signal.Ignore(syscall.SIGTERM)
 		err = c.Start()
 		<-waitOut
 		<-waitErr
