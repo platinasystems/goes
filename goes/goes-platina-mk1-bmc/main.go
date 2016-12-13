@@ -255,8 +255,8 @@ func hook() error {
 		pm.Addr = 0x7e
 		ledfp.Addr = 0x22
 	case 0x00:
-		pm.Addr = 0x34
-		ledfp.Addr = 0x75
+		pm.Addr = 0x7e
+		ledfp.Addr = 0x22
 	default:
 		pm.Addr = 0x34
 		ledfp.Addr = 0x75

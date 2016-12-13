@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/log"
 	"hash/crc32"
 )
 
@@ -215,34 +216,37 @@ func (d *Device) getInfo() {
 		case service_tag:
 			f.ServiceTag = string(v)
 		case vendor_extension:
-			for j := uint(2); j < uint(len(v)); {
-				etlv, etlen := v[j], uint(v[j+1])
-				ev := v[j+2 : j+2+etlen]
-				switch etlv {
-				case chassis_type:
-					f.ChassisType = ev[0]
-				case board_type:
-					f.BoardType = ev[0]
-				case sub_type:
-					f.SubType = ev[0]
-				case pcba_number:
-					f.PcbaPartNumber = string(ev)
-				case pcba_serial_number:
-					if string(ev[0:3]) == "cpu" {
-						f.Tor1CpuPcbaSerialNumber = string(ev)
-					} else if string(ev[0:3]) == "fan" {
-						f.Tor1FanPcbaSerialNumber = string(ev)
-					} else if string(ev[0:4]) == "main" {
-						f.Tor1MainPcbaSerialNumber = string(ev)
+			if (f.DeviceVersion != 0x00) && (f.DeviceVersion != 0xff) {
+				for j := uint(2); j < uint(len(v)); {
+					etlv, etlen := v[j], uint(v[j+1])
+					ev := v[j+2 : j+2+etlen]
+					switch etlv {
+					case chassis_type:
+						f.ChassisType = ev[0]
+					case board_type:
+						f.BoardType = ev[0]
+					case sub_type:
+						f.SubType = ev[0]
+					case pcba_number:
+						f.PcbaPartNumber = string(ev)
+					case pcba_serial_number:
+						if string(ev[0:3]) == "cpu" {
+							f.Tor1CpuPcbaSerialNumber = string(ev)
+						} else if string(ev[0:3]) == "fan" {
+							f.Tor1FanPcbaSerialNumber = string(ev)
+						} else if string(ev[0:4]) == "main" {
+							f.Tor1MainPcbaSerialNumber = string(ev)
+						}
+					default:
 					}
-				default:
+					j += 2 + etlen
 				}
-				j += 2 + etlen
 			}
 			f.VendorExtension = string(v)
 		case crc:
 			f.CRC32 = uint(v[0])<<24 | uint(v[1])<<16 | uint(v[2])<<8 | uint(v[3])
 		default:
+			log.Print("unknown tlv in eeprom: %x %x", tlv, v)
 		}
 	}
 	return
