@@ -31,7 +31,7 @@ func (c *conn) Close() (err error) {
 	c.Lock()
 	defer c.Unlock()
 	if c.Conn != nil {
-		err = c.Close()
+		err = c.Conn.Close()
 		c.Conn = nil
 	}
 	return
