@@ -2,6 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// Watchdog is only run by an embedded machine's /init, not by
+// /usr/bin/goes start
 package watchdog
 
 import (
@@ -11,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/parms"
 )
 
@@ -20,16 +23,16 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
+func (cmd) Kind() goes.Kind {
+	k := goes.Disabled
+	if os.Getpid() == 1 {
+		k = goes.Daemon
+	}
+	return k
+}
+
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [OPTION]... [DEVICE]" }
-
-func (cmd) Daemon() int {
-	lvl := -1 // don't run from /usr/sbin/goesd
-	if os.Getpid() == 1 {
-		lvl = 0
-	}
-	return lvl
-}
 
 func (cmd) Main(args ...string) error {
 	parm, args := parms.New(args, "-T", "-t")

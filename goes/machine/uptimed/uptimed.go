@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/redis"
 )
 
@@ -21,9 +22,9 @@ type cmd chan struct{}
 
 func New() cmd { return cmd(make(chan struct{})) }
 
-func (cmd) Daemon() int    { return 1 }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name }
 
 func (cmd cmd) Main(...string) error {
 	var si syscall.Sysinfo_t

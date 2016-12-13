@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/netlink"
 	"github.com/platinasystems/go/redis"
@@ -71,9 +72,9 @@ type getAddrReqParm struct {
 
 func New() *cmd { return &cmd{} }
 
-func (*cmd) Daemon() int    { return 1 }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Name }
+func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
 	err := Hook()

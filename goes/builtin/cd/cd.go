@@ -7,6 +7,8 @@ package cd
 import (
 	"fmt"
 	"os"
+
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "cd"
@@ -17,9 +19,9 @@ type cmd struct {
 
 func New() *cmd { return &cmd{} }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Tag() string    { return "builtin" }
-func (*cmd) Usage() string  { return Name + " [- | DIRECTORY]" }
+func (*cmd) Kind() goes.Kind { return goes.Builtin }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return "cd [- | DIRECTORY]" }
 
 func (cd *cmd) Main(args ...string) error {
 	var dir string

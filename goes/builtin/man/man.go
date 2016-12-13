@@ -17,9 +17,9 @@ type cmd goes.ByName
 
 func New() *cmd { return new(cmd) }
 
-func (*cmd) String() string { return "man" }
-func (*cmd) Tag() string    { return "builtin" }
-func (*cmd) Usage() string  { return "man COMMAND...\nCOMMAND -man" }
+func (*cmd) Kind() goes.Kind { return goes.Builtin }
+func (*cmd) String() string  { return "man" }
+func (*cmd) Usage() string   { return "man COMMAND...\nCOMMAND -man" }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 

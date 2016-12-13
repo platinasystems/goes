@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "!"
@@ -18,9 +20,9 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return Name }
-func (cmd) Tag() string    { return "builtin" }
-func (cmd) Usage() string  { return "! COMMAND [ARGS]..." }
+func (cmd) Kind() goes.Kind { return goes.Builtin }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return "! COMMAND [ARGS]..." }
 
 func (cmd) Main(args ...string) error {
 	var background bool

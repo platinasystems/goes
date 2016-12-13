@@ -8,6 +8,7 @@ package ipmigod
 import (
 	"strconv"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/machine/ipmigod/internal"
@@ -29,7 +30,7 @@ func (cmd) Apropos() map[string]string {
 	}
 }
 
-func (cmd) Daemon() int { return 1 }
+func (cmd) Kind() goes.Kind { return goes.Daemon }
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-mm")

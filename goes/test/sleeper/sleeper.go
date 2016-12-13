@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/parms"
 )
 
@@ -22,9 +23,9 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) Daemon() int    { return -1 }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [-s SECONDS] [MESSAGE]..." }
+func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return "sleeperd [-s SECONDS] [MESSAGE]..." }
 
 func (cmd) Main(args ...string) error {
 	var sec uint

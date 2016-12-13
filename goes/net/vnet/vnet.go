@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/net/vnet/internal"
 )
 
@@ -19,10 +20,10 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return Name }
-func (cmd) Tag() string    { return "builtin" }
-func (cmd) Usage() string  { return "vnet COMMAND [ARG]..." }
-func (cmd) Close() error   { return internal.Conn.Close() }
+func (cmd) Close() error    { return internal.Conn.Close() }
+func (cmd) Kind() goes.Kind { return goes.Builtin }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return "vnet COMMAND [ARG]..." }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {

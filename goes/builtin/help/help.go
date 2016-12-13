@@ -17,8 +17,8 @@ type cmd goes.ByName
 
 func New() *cmd { return new(cmd) }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Tag() string    { return "builtin" }
+func (*cmd) Kind() goes.Kind { return goes.Builtin }
+func (*cmd) String() string  { return Name }
 
 func (*cmd) Usage() string {
 	return "help [COMMAND [ARGS]...]\nCOMMAND -help [ARGS]..."

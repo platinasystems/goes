@@ -18,16 +18,13 @@ type cmd goes.ByName
 
 func New() *cmd { return new(cmd) }
 
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (*cmd) Kind() goes.Kind { return goes.Builtin }
+
 func (*cmd) String() string { return Name }
-func (*cmd) Tag() string    { return "builtin" }
 
-func (*cmd) Usage() string {
-	return Name + " [NAME[=VALUE... COMMAND [ARGS...]]]"
-}
-
-func (c *cmd) ByName(byName goes.ByName) {
-	*c = cmd(byName)
-}
+func (*cmd) Usage() string { return "env [NAME[=VALUE... COMMAND [ARGS...]]]" }
 
 func (c *cmd) Main(args ...string) error {
 	switch len(args) {

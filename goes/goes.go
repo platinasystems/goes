@@ -35,6 +35,7 @@ const (
 const (
 	Builtin Kind = 1 + iota
 	Daemon
+	Disabled
 )
 
 var (
@@ -73,22 +74,22 @@ type completer interface {
 	Complete(...string) []string
 }
 
-type daemoner interface {
-	Daemon() int
-}
-
 type helper interface {
 	Help(...string) string
 }
+
+type kinder interface {
+	Kind() Kind
+}
+
 type mainer interface {
 	Main(...string) error
 }
+
 type manner interface {
 	Man() map[string]string
 }
-type tagger interface {
-	Tag() string
-}
+
 type usager interface {
 	Usage() string
 }
@@ -333,17 +334,11 @@ func (byName ByName) Plot(cmds ...interface{}) {
 		if method, found := v.(helper); found {
 			g.Help = method.Help
 		}
-		if method, found := v.(daemoner); found {
-			if method.Daemon() >= 0 {
-				g.Kind = Daemon
-			} else {
+		if method, found := v.(kinder); found {
+			g.Kind = method.Kind()
+			if g.Kind == Disabled {
 				g = nil
 				continue
-			}
-		}
-		if method, found := v.(tagger); found {
-			if method.Tag() == "builtin" {
-				g.Kind = Builtin
 			}
 		}
 		if method, found := v.(usager); found {

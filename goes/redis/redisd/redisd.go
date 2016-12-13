@@ -2,7 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package redisd provides a redis server daemon.
+// Package redisd provides a redis server daemon that is started by /sbin/init
+// or /usr/sbin/goesd *before* all other daemons.
 package redisd
 
 import (
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/group"
 	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/sockfile"
@@ -60,11 +62,9 @@ type assignment struct {
 
 func New() *cmd { return &cmd{} }
 
-// The redis server is started by /sbin/init or /usr/sbin/goesd *before* all
-// other daemons.
-func (*cmd) Daemon() int    { return -1 }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Name + " [-port PORT] [DEVICE]..." }
+func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name + " [-port PORT] [DEVICE]..." }
 
 func (cmd *cmd) Main(args ...string) error {
 	var devs []string

@@ -2,6 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// This telnet daemon is only run from an embedded machine's /init, not
+// /usr/bin/goes start
 package telnetd
 
 import (
@@ -14,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/kr/pty"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/net/internal/telnet/command"
 	"github.com/platinasystems/go/goes/net/internal/telnet/option"
 )
@@ -24,16 +27,16 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
+func (cmd) Kind() goes.Kind {
+	k := goes.Disabled
+	if os.Getpid() == 1 {
+		k = goes.Daemon
+	}
+	return k
+}
+
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name }
-
-func (cmd) Daemon() int {
-	lvl := -1 // don't run from /usr/sbin/goesd
-	if os.Getpid() == 1 {
-		lvl = 2
-	}
-	return lvl
-}
 
 func (cmd) Main(args ...string) error {
 	ln, err := net.Listen("tcp", ":23")

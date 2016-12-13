@@ -7,6 +7,8 @@ package exit
 import (
 	"os"
 	"strconv"
+
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "exit"
@@ -15,9 +17,9 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return Name }
-func (cmd) Tag() string    { return "builtin" }
-func (cmd) Usage() string  { return Name + " [N]" }
+func (cmd) Kind() goes.Kind { return goes.Builtin }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name + " [N]" }
 
 func (cmd) Main(args ...string) error {
 	var ecode int

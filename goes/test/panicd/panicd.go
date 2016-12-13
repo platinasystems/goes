@@ -4,7 +4,11 @@
 
 package panicd
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/platinasystems/go/goes"
+)
 
 const Name = "panicd"
 
@@ -12,9 +16,9 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) Daemon() int    { return -1 }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [MESSAGE]..." }
+func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name + " [MESSAGE]..." }
 
 func (cmd) Main(args ...string) error {
 	msg := "---"

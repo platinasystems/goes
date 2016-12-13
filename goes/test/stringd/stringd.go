@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/rpc"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/args"
@@ -26,9 +27,9 @@ type Stringd struct {
 
 func New() cmd { return cmd(make(chan struct{})) }
 
-func (cmd) Daemon() int    { return 1 }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name }
 
 func (cmd cmd) Main(...string) error {
 	pub, err := redis.Publish(redis.Machine)

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/platinasystems/go/goes"
 )
 
 const Name = "export"
@@ -16,9 +18,9 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) String() string { return Name }
-func (cmd) Tag() string    { return "builtin" }
-func (cmd) Usage() string  { return Name + " [NAME[=VALUE]]..." }
+func (cmd) Kind() goes.Kind { return goes.Builtin }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name + " [NAME[=VALUE]]..." }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
