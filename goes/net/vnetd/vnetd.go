@@ -36,8 +36,11 @@ var GdbWait bool
 // start vnet.
 var gdb_wait int
 
-// Machines may reassign this for platform sepecific init before vnet Run.
+// Machines may reassign this for platform sepecific init before vnet.Run.
 var Hook = func(*Info, *vnet.Vnet) error { return nil }
+
+// Machines may reassign this for platform sepecific cleanup after vnet.Quit.
+var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
 
 var Prefixes = []string{"eth-"}
 
@@ -107,7 +110,7 @@ func (cmd *cmd) Main(...string) error {
 func (cmd *cmd) Close() error {
 	// Exit vnet main loop.
 	cmd.i.v.Quit()
-	return nil
+	return CloseHook(&cmd.i, &cmd.i.v)
 }
 
 func Init(i *Info) {
