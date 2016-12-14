@@ -113,18 +113,6 @@ func (m *Main) listener(l *loop.Loop) {
 func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 	m4 := ip4.GetMain(nm.m.v)
 	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
-
-	var err error
-	nm.c = make(chan netlink.Message, 64)
-	cf := netlink.SocketConfig{
-		Rx: nm.c,
-		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
-		RcvbufBytes: 8 << 20,
-	}
-	nm.s, err = netlink.NewWithConfig(cf)
-	if err != nil {
-		panic(err)
-	}
 	go nm.s.Listen()
 	go nm.m.listener(l)
 }
@@ -136,6 +124,13 @@ func (nm *netlinkMain) Init(m *Main) (err error) {
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
 	nm.cliInit()
+	nm.c = make(chan netlink.Message, 64)
+	cf := netlink.SocketConfig{
+		Rx: nm.c,
+		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
+		RcvbufBytes: 8 << 20,
+	}
+	nm.s, err = netlink.NewWithConfig(cf)
 	return
 }
 

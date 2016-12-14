@@ -387,7 +387,7 @@ type IfOperState uint8
 
 func (a IfOperState) attr() {}
 func (a IfOperState) Set(v []byte) {
-	panic("should never be called")
+	v[0] = byte(a)
 }
 func (a IfOperState) Size() int {
 	return 1

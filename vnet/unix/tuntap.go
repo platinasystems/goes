@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
@@ -207,6 +208,18 @@ func (i *Interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
 	return
 }
 
+func (i *Interface) setOperState() {
+	os := netlink.IF_OPER_DOWN
+	if i.si.IsAdminUp(i.m.v) && i.hi.IsLinkUp(i.m.v) {
+		os = netlink.IF_OPER_UP
+	}
+	msg := netlink.NewIfInfoMessage()
+	msg.Header.Type = netlink.RTM_SETLINK
+	msg.Index = uint32(i.ifindex)
+	msg.Attrs[netlink.IFLA_OPERSTATE] = os
+	i.m.s.Tx(msg)
+}
+
 func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	hi := m.v.SupHi(si)
 	if !m.okHi(hi) {
@@ -241,6 +254,7 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		} else {
 			r.flags |= iff_tap
 		}
+		// NB: kernel tun.c sets lower_up flag.  Always set; link state reflected in operstate via netlink.
 		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 			return
 		}
@@ -355,6 +369,9 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	m.ifBySi[intf.si] = intf
 	m.ifByIndex[intf.ifindex] = intf
 
+	// Set operational state to down.
+	intf.setOperState()
+
 	// Create Vnet interface.
 	intf.interfaceNodeInit(m)
 
@@ -392,6 +409,7 @@ func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 	}
 	// Reflect admin state in node interface (e.g. XXX unix).
 	intf.node.SetAdminUp(isUp)
+	intf.setOperState()
 	return
 }
 
@@ -406,6 +424,7 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	}
 	// Reflect link state in node interface (e.g. XXX unix).
 	intf.node.SetLinkUp(isUp)
+	intf.setOperState()
 	return
 }
 
