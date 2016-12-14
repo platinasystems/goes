@@ -90,6 +90,16 @@ func (c *cmd) Main(args ...string) error {
 			Prompt(string) (string, error)
 		}
 	)
+	defer func() {
+		for _, g := range goes.ByName(*c) {
+			if g.Kind == goes.Builtin && g.Close != nil {
+				t := g.Close()
+				if err == nil {
+					err = t
+				}
+			}
+		}
+	}()
 	flag, args := flags.New(args, "-x", "-no-liner")
 	switch len(args) {
 	case 0:

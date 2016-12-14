@@ -141,14 +141,6 @@ func (byName ByName) Main(args ...string) (err error) {
 			return
 		}
 		defer func() {
-			for _, g := range byName {
-				if g.Kind == Builtin && g.Close != nil {
-					t := g.Close()
-					if err == nil {
-						err = t
-					}
-				}
-			}
 			if err != nil && err != io.EOF {
 				fmt.Fprintf(os.Stderr, "%s: %v\n",
 					ProgBase(), err)
