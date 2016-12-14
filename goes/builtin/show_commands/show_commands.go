@@ -28,7 +28,7 @@ func (c *cmd) Main(args ...string) error {
 	}
 
 	for _, name := range goes.ByName(*c).Keys() {
-		if g := goes.ByName(*c)[name]; g.Kind == goes.Daemon {
+		if g := goes.ByName(*c)[name]; g.Kind.IsDaemon() {
 			fmt.Printf("\t%s - daemon\n", name)
 		} else {
 			fmt.Printf("\t%s\n", name)

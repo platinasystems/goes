@@ -33,7 +33,7 @@ const (
 )
 
 const (
-	Builtin Kind = 1 + iota
+	Builtin Kind = 1 << iota
 	Daemon
 	Disabled
 )
@@ -60,7 +60,7 @@ type Goes struct {
 	Man      map[string]string
 }
 
-type Kind int
+type Kind uint16
 
 type aproposer interface {
 	Apropos() map[string]string
@@ -221,7 +221,7 @@ func (byName ByName) Main(args ...string) (err error) {
 	if g == nil {
 		return fmt.Errorf("%s: command not found", name)
 	}
-	isDaemon = g.Kind == Daemon
+	isDaemon = g.Kind.IsDaemon()
 	if !isDaemon {
 		err = g.Main(args...)
 		return
@@ -329,7 +329,7 @@ func (byName ByName) Plot(cmds ...interface{}) {
 		}
 		if method, found := v.(kinder); found {
 			g.Kind = method.Kind()
-			if g.Kind == Disabled {
+			if g.Kind.IsDisabled() {
 				g = nil
 				continue
 			}
@@ -360,4 +360,25 @@ func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 		os.Remove(pidfn)
 		break
 	}
+}
+
+func (k Kind) IsBuiltin() bool  { return (k & Builtin) == Builtin }
+func (k Kind) IsDaemon() bool   { return (k & Daemon) == Daemon }
+func (k Kind) IsDisabled() bool { return (k & Disabled) == Disabled }
+
+func (k Kind) String() string {
+	s := "unknown"
+	switch k {
+	case Builtin:
+		s = "builtin"
+	case Daemon:
+		s = "daemon"
+	case Disabled:
+		s = "disabled"
+	case Disabled | Builtin:
+		s = "disabled builtin"
+	case Disabled | Daemon:
+		s = "disabled daemon"
+	}
+	return s
 }
