@@ -262,9 +262,8 @@ func hook() error {
 		ledfp.Addr = 0x75
 	}
 
-	ledfp.LedFpInit()
-	fanTray.FanTrayLedInit()
 	hw.FanInit()
+
 	go enableToggle()
 
 	machined.Plot(
@@ -407,6 +406,9 @@ func hook() error {
 			},
 		},
 	)
+	ledfp.LedFpInit()
+	fanTray.FanTrayLedInit()
+
 	tckr = time.NewTicker(time.Duration(redis_interval) * time.Second)
 	go timerLoop()
 	return nil

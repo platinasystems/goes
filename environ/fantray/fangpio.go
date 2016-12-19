@@ -30,7 +30,7 @@ type FanStat struct {
 
 const (
 	fanTrayLeds = 0x33
-	minRpm      = 1500
+	minRpm      = 2000
 )
 
 var fanTrayLedOff = []uint8{0x0, 0x0, 0x0, 0x0}
@@ -333,6 +333,7 @@ func (h *FanStat) FanTrayLedInit() {
 	r.Output[1].set(h, 0xff&(fanTrayLedOff[0]|fanTrayLedOff[1]))
 	r.Config[0].set(h, 0xff^fanTrayLeds)
 	r.Config[1].set(h, 0xff^fanTrayLeds)
+	log.Print("notice: fan tray led init complete")
 }
 
 func (h *FanStat) FanTrayStatus(i uint8) string {
@@ -370,7 +371,9 @@ func (h *FanStat) FanTrayStatus(i uint8) string {
 		r1, _ := strconv.ParseInt(s1, 10, 64)
 		r2, _ := strconv.ParseInt(s2, 10, 64)
 
-		if (r1 > minRpm) && (r2 > minRpm) {
+		if s1 == "" && s2 == "" {
+			o |= fanTrayLedYellow[i]
+		} else if (r1 > minRpm) && (r2 > minRpm) {
 			s = "ok" + "." + f
 			o |= fanTrayLedGreen[i]
 		} else {

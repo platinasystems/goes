@@ -15,27 +15,6 @@ import (
 	"github.com/platinasystems/go/redis"
 )
 
-var (
-	dummy         byte
-	regsPointer   = unsafe.Pointer(&dummy)
-	regsAddr      = uintptr(unsafe.Pointer(&dummy))
-	fanFail       = true
-	lastFanFail   = true
-	psuStatus     [2]string
-	lastPsuStatus [2]string
-	psuLed        = []uint8{0x0c, 0x03}
-	psuLedYellow  = []uint8{0x00, 0x00}
-	psuLedOff     = []uint8{0x04, 0x01}
-)
-
-type LedCon struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
-
 const (
 	sysLed       = 0xc0
 	sysLedGreen  = 0x0
@@ -48,8 +27,28 @@ const (
 	fanLedYellow = 0x20
 	fanLedOff    = 0x30
 
-	maxPsu = 2
+	maxPsu     = 2
+	maxFanTray = 4
 )
+
+var (
+	dummy         byte
+	regsPointer   = unsafe.Pointer(&dummy)
+	regsAddr      = uintptr(unsafe.Pointer(&dummy))
+	lastFanStatus [maxFanTray]string
+	lastPsuStatus [maxPsu]string
+	psuLed        = []uint8{0x0c, 0x03}
+	psuLedYellow  = []uint8{0x00, 0x00}
+	psuLedOff     = []uint8{0x04, 0x01}
+)
+
+type LedCon struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
 
 func getLedRegs() *ledRegs { return (*ledRegs)(regsPointer) }
 
@@ -340,10 +339,6 @@ func (r *regi16) set(h *LedCon, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 
 func (h *LedCon) LedFpInit() {
 	var d byte
-	fanFail = true
-	lastFanFail = true
-	lastPsuStatus[0] = "value"
-	lastPsuStatus[1] = "value"
 
 	r := getLedRegs()
 	o := r.Output0.get(h)
@@ -364,43 +359,66 @@ func (h *LedCon) LedStatus() {
 	var o, c uint8
 	var d byte
 
-	fanFail = false
+	fanFail := false
+	fanStatChange := false
 	for j := 1; j <= maxFanTrays; j++ {
 		p, _ := redis.Hget(redis.Machine, "fan_tray."+strconv.Itoa(int(j))+".status")
-		if !strings.Contains(p, "ok") {
-			fanFail = true
-			break
+		if lastFanStatus[j-1] != p {
+			fanStatChange = true
+			//if any fan tray is failed or not installed, set front panel FAN led to yellow
+			if strings.Contains(p, "warning") {
+				o = r.Output0.get(h)
+				d = 0xff ^ fanLed
+				o &= d
+				o |= fanLedYellow
+				r.Output0.set(h, o)
+				log.Print("warning: fan tray ", j, " failure")
+				fanFail = true
+			} else if strings.Contains(p, "not installed") {
+				o = r.Output0.get(h)
+				d = 0xff ^ fanLed
+				o &= d
+				o |= fanLedYellow
+				r.Output0.set(h, o)
+				log.Print("warning: fan tray ", j, " not installed")
+				fanFail = true
+			}
 		}
+		lastFanStatus[j-1] = p
 	}
 
 	//if any fan tray is failed or not installed, set front panel FAN led to yellow
-	if fanFail && !lastFanFail {
-		o = r.Output0.get(h)
-		d = 0xff ^ fanLed
-		o &= d
-		o |= fanLedYellow
-		lastFanFail = fanFail
-		r.Output0.set(h, o)
-	} else if !fanFail && lastFanFail {
-		// if all fan trays have "ok" status, set front panel FAN led to green
-		o = r.Output0.get(h)
-		d = 0xff ^ fanLed
-		o &= d
-		o |= fanLedGreen
-		lastFanFail = fanFail
-		r.Output0.set(h, o)
+	if fanStatChange {
+		if !fanFail {
+			// if all fan trays have "ok" status, set front panel FAN led to green
+			allStat := true
+			for i := range lastFanStatus {
+				if lastFanStatus[i] == "" {
+					allStat = false
+				}
+			}
+			if allStat {
+				o = r.Output0.get(h)
+				d = 0xff ^ fanLed
+				o &= d
+				o |= fanLedGreen
+				r.Output0.set(h, o)
+				log.Print("notice: all fan trays up")
+			}
+		}
+
 	}
 
 	for j := 0; j < maxPsu; j++ {
-		psuStatus[j], _ = redis.Hget(redis.Machine, "psu"+strconv.Itoa(j+1)+".status")
-		if psuStatus[j] != lastPsuStatus[j] {
+		p, _ := redis.Hget(redis.Machine, "psu"+strconv.Itoa(j+1)+".status")
+		if lastPsuStatus[j] != p {
 			o = r.Output0.get(h)
 			c = r.Config0.get(h)
 
 			//if PSU is not installed or installed and powered on, set front panel PSU led to off or green (PSU drives)
-			if strings.Contains(psuStatus[j], "not_installed") || strings.Contains(psuStatus[j], "powered_on") {
+			if strings.Contains(p, "not_installed") || strings.Contains(p, "powered_on") {
 				c |= psuLed[j]
-			} else if strings.Contains(psuStatus[j], "powered_off") {
+			} else if strings.Contains(p, "powered_off") {
 				//if PSU is installed but powered off, set front panel PSU led to yellow
 				d = 0xff ^ psuLed[j]
 				o &= d
@@ -409,7 +427,8 @@ func (h *LedCon) LedStatus() {
 			}
 			r.Output0.set(h, o)
 			r.Config0.set(h, c)
-			lastPsuStatus[j] = psuStatus[j]
+			lastPsuStatus[j] = p
+			log.Print("notice: psu", j+1, " ", p)
 		}
 	}
 }
