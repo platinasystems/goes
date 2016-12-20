@@ -32,7 +32,7 @@ func (cmd) String() string  { return Name }
 func (cmd) Usage() string   { return Name }
 
 func (cmd cmd) Main(...string) error {
-	pub, err := redis.Publish(redis.Machine)
+	pub, err := redis.Publish(redis.DefaultHash)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (cmd cmd) Main(...string) error {
 		return err
 	}
 	defer sock.Close()
-	key := fmt.Sprintf("%s:%s", redis.Machine, pubkey)
+	key := fmt.Sprintf("%s:%s", redis.DefaultHash, pubkey)
 	err = redis.Assign(key, Name, "Stringd")
 	if err != nil {
 		return err

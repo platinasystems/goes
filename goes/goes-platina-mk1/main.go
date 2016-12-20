@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"time"
 
-	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/builtin"
@@ -26,7 +25,7 @@ import (
 	"github.com/platinasystems/go/goes/net/vnet"
 	"github.com/platinasystems/go/goes/net/vnetd"
 	"github.com/platinasystems/go/goes/redis"
-	"github.com/platinasystems/go/goes/sockfile"
+	"github.com/platinasystems/go/goes/redis/redisd"
 	"github.com/platinasystems/go/goes/test"
 	goredis "github.com/platinasystems/go/redis"
 	govnet "github.com/platinasystems/go/vnet"
@@ -57,10 +56,13 @@ func main() {
 	// g.Plot(test.New()...)
 	_ = test.New
 	g.Plot(vnet.New(), vnetd.New())
-	start.Machine = "platina-mk1"
-	start.RedisDevs = []string{"lo", "eth0"}
-	start.ConfHook = wait4vnet
-	start.PubHook = getEepromData
+	redisd.Machine = "platina-mk1"
+	redisd.Devs = []string{"lo", "eth0"}
+	redisd.Hook = getEepromData
+	start.ConfHook = func() error {
+		return goredis.Hwait(goredis.DefaultHash, "vnet.ready", "true",
+			10*time.Second)
+	}
 	stop.Hook = stopHook
 	nld.Prefixes = []string{"lo.", "eth0."}
 	vnetd.UnixInterfacesOnly = true
@@ -135,28 +137,5 @@ func getEepromData(pub chan<- string) error {
 	pub <- fmt.Sprint("eeprom.service_tag: ", d.Fields.ServiceTag)
 	pub <- fmt.Sprint("eeprom.base_ethernet_address: ", d.Fields.BaseEthernetAddress)
 	pub <- fmt.Sprint("eeprom.number_of_ethernet_addrs: ", d.Fields.NEthernetAddress)
-	return nil
-}
-
-func wait4vnet() error {
-	conn, err := sockfile.Dial("redisd")
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	psc := redigo.PubSubConn{redigo.NewConn(conn, 0, 500*time.Millisecond)}
-	if err = psc.Subscribe(goredis.Machine); err != nil {
-		return err
-	}
-	for {
-		switch t := psc.Receive().(type) {
-		case redigo.Message:
-			if string(t.Data) == "vnet.ready: true" {
-				return nil
-			}
-		case error:
-			return t
-		}
-	}
 	return nil
 }

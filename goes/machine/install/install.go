@@ -68,6 +68,15 @@ func (cmd) Apropos() map[string]string {
 	}
 }
 
+func run(args ...string) error {
+	cmd := exec.Command(goes.InstallName, args...)
+	cmd.Stdin = nil
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = "/"
+	return cmd.Run()
+}
+
 // run "goes stop" then wait up to 5 seconds for /run/goes/pids removal
 func stop(args ...string) error {
 	_, err := os.Stat(goes.InstallName)
@@ -80,23 +89,16 @@ func stop(args ...string) error {
 	} else {
 		args = stop
 	}
-	err = exec.Command(goes.InstallName, args...).Run()
+	err = run(args...)
 	if err != nil {
 		return fmt.Errorf("goes stop: %v", err)
 	}
-	for i := 0; i < 10; i++ {
-		_, err = os.Stat(pidfile.Dir)
-		if err != nil {
-			break
+	for end := time.Now().Add(10 * time.Second); time.Now().Before(end); time.Sleep(500 * time.Millisecond) {
+		if _, err := os.Stat(pidfile.Dir); os.IsNotExist(err) {
+			return nil
 		}
-		time.Sleep(500 * time.Millisecond)
 	}
-	if err == nil {
-		err = fmt.Errorf("goes didn't stop")
-	} else if os.IsNotExist(err) {
-		err = nil
-	}
-	return err
+	return fmt.Errorf("goes didn't stop")
 }
 
 func start(args ...string) error {
@@ -106,9 +108,9 @@ func start(args ...string) error {
 	} else {
 		args = start
 	}
-	err := exec.Command(goes.InstallName, args...).Run()
+	err := run(args...)
 	if err != nil {
-		err = fmt.Errorf("goes start: %v", err)
+		err = fmt.Errorf("%s: start: %v", err)
 	}
 	return err
 }

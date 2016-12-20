@@ -20,19 +20,36 @@ import (
 
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/cmdline"
 	"github.com/platinasystems/go/goes/internal/group"
 	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/goes/varrun"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/redis/rpc/reg"
+	. "github.com/platinasystems/go/version"
 )
 
 const Name = "redisd"
 const Log = varrun.Dir + "/log/redisd"
 
+// Machines may restrict redisd listening to this list of net devices.
+// If unset, the local admin may restrict this through /etc/default/goes ARGS.
+// Otherwise, the default is all active net devices.
+var Devs []string
+
+// Machines may use this Hook to publish redis "key: value" strings before any
+// other daemons are run.
+var Hook = func(chan<- string) error { return nil }
+
+// A non-empty Machine is published to redis as "machine: Machine"
+var Machine string
+
+// Admins may override the redis listening port through /etc/default/goes ARGS.
 var Port = 6379
-var PublishedKeys = []string{redis.Machine}
+
+// Machines may override this list of published hashes.
+var PublishedKeys = []string{redis.DefaultHash}
 
 type cmd struct {
 	redisd Redisd
@@ -64,10 +81,9 @@ func New() *cmd { return &cmd{} }
 
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
 func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name + " [-port PORT] [DEVICE]..." }
+func (*cmd) Usage() string   { return "redisd [-port PORT] [DEVICE]..." }
 
 func (cmd *cmd) Main(args ...string) error {
-	var devs []string
 	parm, args := parms.New(args, "-port")
 	if s := parm["-port"]; len(s) > 0 {
 		_, err := fmt.Sscan(s, &Port)
@@ -76,13 +92,17 @@ func (cmd *cmd) Main(args ...string) error {
 		}
 	}
 
-	for _, name := range args {
-		dev, err := net.InterfaceByName(name)
-		if err != nil {
-			return err
-		}
-		if (dev.Flags & net.FlagUp) == net.FlagUp {
-			devs = append(devs, name)
+	if len(args) == 0 {
+		if len(Devs) == 0 {
+			itfs, err := net.Interfaces()
+			if err == nil {
+				args = make([]string, len(itfs))
+				for i, itf := range itfs {
+					args[i] = itf.Name
+				}
+			}
+		} else {
+			args = Devs
 		}
 	}
 
@@ -126,6 +146,10 @@ func (cmd *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
+	err = sockfile.Chgroup(sfn, "adm")
+	if err != nil {
+		return err
+	}
 
 	cmd.redisd.reg, err =
 		reg.New("redis-reg", cmd.redisd.assign, cmd.redisd.unassign)
@@ -135,7 +159,7 @@ func (cmd *cmd) Main(args ...string) error {
 
 	cmd.redisd.devs[sfn] = []*grs.Server{srv}
 
-	go func(redisd *Redisd, fn string, devs ...string) {
+	go func(redisd *Redisd, fn string, args ...string) {
 		adm := group.Parse()["adm"].Gid()
 		for i := 0; i < 30; i++ {
 			if _, err := os.Stat(fn); err == nil {
@@ -152,8 +176,35 @@ func (cmd *cmd) Main(args ...string) error {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-		redisd.listen(devs...)
-	}(&cmd.redisd, sfn, devs...)
+		redisd.listen(args...)
+	}(&cmd.redisd, sfn, args...)
+
+	pub := make(chan string)
+	go func(pub <-chan string) {
+		for s := range pub {
+			field := strings.Split(s, ": ")
+			cmd.redisd.published[redis.DefaultHash][field[0]] =
+				[]byte(field[1])
+		}
+	}(pub)
+	pub <- fmt.Sprint("version: ", Version)
+	if hostname, err := os.Hostname(); err == nil {
+		pub <- fmt.Sprint("hostname: ", hostname)
+	}
+	if len(Machine) > 0 {
+		pub <- fmt.Sprint("machine: ", Machine)
+	}
+	if keys, cl, err := cmdline.New(); err == nil {
+		for _, k := range keys {
+			pub <- fmt.Sprintf("cmdline.%s: %s", k, cl[k])
+		}
+	}
+	err = Hook(pub)
+	pub <- "redis.ready: true"
+	close(pub)
+	if err != nil {
+		return err
+	}
 
 	return srv.Start()
 }
@@ -222,24 +273,29 @@ func (redisd *Redisd) unassign(key string) error {
 	return nil
 }
 
-func (redisd *Redisd) listen(devs ...string) {
-	for _, dev := range devs {
-		srvs := make([]*grs.Server, 0, 2)
-		netdev, err := net.InterfaceByName(dev)
+func (redisd *Redisd) listen(names ...string) {
+	for _, name := range names {
+		dev, err := net.InterfaceByName(name)
 		if err != nil {
-			fmt.Fprint(os.Stderr, dev, ": ", err, "\n")
+			fmt.Fprint(os.Stderr, name, ": ", err, "\n")
 			continue
 		}
-		addrs, err := netdev.Addrs()
+		if (dev.Flags & net.FlagUp) != net.FlagUp {
+			fmt.Fprint(os.Stderr, name, ": down\n")
+			continue
+		}
+		addrs, err := dev.Addrs()
 		if err != nil {
-			fmt.Fprint(os.Stderr, dev, ": ", err, "\n")
+			fmt.Fprint(os.Stderr, name, ": ", err, "\n")
 			continue
 		}
 		if len(addrs) == 0 {
-			fmt.Fprint(os.Stderr, dev,
+			fmt.Fprint(os.Stderr, name,
 				": no address or isn't up\n")
 			continue
 		}
+
+		srvs := make([]*grs.Server, 0, 2)
 
 		for _, addr := range addrs {
 			ip, _, err := net.ParseCIDR(addr.String())
@@ -251,13 +307,13 @@ func (redisd *Redisd) listen(devs ...string) {
 			if ip.IsMulticast() {
 				continue
 			}
-			id := fmt.Sprint("[", ip, "%", dev, "]:", Port)
+			id := fmt.Sprint("[", ip, "%", name, "]:", Port)
 			cfg := grs.DefaultConfig()
 			cfg = cfg.Handler(redisd)
 			cfg = cfg.Port(Port)
 			if ip.To4() == nil {
 				cfg = cfg.Proto("tcp6")
-				host := fmt.Sprint("[", ip, "%", dev, "]")
+				host := fmt.Sprint("[", ip, "%", name, "]")
 				cfg = cfg.Host(host)
 			} else {
 				cfg = cfg.Host(ip.String())
@@ -271,7 +327,7 @@ func (redisd *Redisd) listen(devs ...string) {
 				fmt.Println("listen:", id)
 			}
 		}
-		redisd.devs[dev] = srvs
+		redisd.devs[name] = srvs
 	}
 }
 

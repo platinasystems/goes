@@ -54,7 +54,7 @@ func (c *cmd) Main(args ...string) error {
 	}
 	switch len(args) {
 	case 0:
-		args = []string{redis.Machine}
+		args = []string{redis.DefaultHash}
 	case 1:
 	default:
 		return fmt.Errorf("%v: unexpected", args[1:])

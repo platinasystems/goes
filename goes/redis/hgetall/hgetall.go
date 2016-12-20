@@ -24,7 +24,7 @@ func (cmd) Usage() string  { return "hgetall [KEY [PATTERN]]" }
 func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
-		args = []string{redis.Machine}
+		args = []string{redis.DefaultHash}
 	case 1:
 	case 2:
 	default:

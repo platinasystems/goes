@@ -10,17 +10,15 @@ package start
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
+	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/internal/cmdline"
 	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/goes/sockfile"
-	"github.com/platinasystems/go/redis"
-	. "github.com/platinasystems/go/version"
 )
 
 const Name = "start"
@@ -28,18 +26,9 @@ const Name = "start"
 // Machines may use Hook to run something before redisd and other daemons.
 var Hook = func() error { return nil }
 
-// Machines may use PubHook to publish redis "key: value" strings before any
-// daemons are run.
-var PubHook = func(chan<- string) error { return nil }
-
 // Machines may use ConfHook to run something after all daemons start and
 // before source of start command script.
 var ConfHook = func() error { return nil }
-
-// A non-empty Machine is published to redis as "machine: Machine"
-var Machine string
-
-var RedisDevs []string
 
 func New() *cmd { return new(cmd) }
 
@@ -51,18 +40,8 @@ func (*cmd) Usage() string  { return "start [OPTION]..." }
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Main(args ...string) error {
-	byName := goes.ByName(*c)
 	parm, args := parms.New(args, "-start", "-stop")
-	redisd := []string{"redisd"}
-	if len(args) > 0 {
-		redisd = append(redisd, args...)
-	} else if len(RedisDevs) > 0 {
-		redisd = append(redisd, RedisDevs...)
-	} else if itfs, err := net.Interfaces(); err == nil {
-		for _, itf := range itfs {
-			redisd = append(redisd, itf.Name)
-		}
-	}
+
 	err := internal.AssertRoot()
 	if err != nil {
 		return err
@@ -71,43 +50,29 @@ func (c *cmd) Main(args ...string) error {
 	if err == nil {
 		return fmt.Errorf("already started")
 	}
-	if err = Hook(); err != nil {
-		return err
-	}
-	if err = byName.Main(redisd...); err != nil {
-		return err
-	}
-	pub, err := redis.Publish(redis.Machine)
+	err = Hook()
 	if err != nil {
 		return err
 	}
-	defer close(pub)
-	hostname, err := os.Hostname()
+	daemons := exec.Command(goes.Prog(), args...)
+	daemons.Args[0] = "goes-daemons"
+	daemons.Stdin = nil
+	daemons.Stdout = nil
+	daemons.Stderr = nil
+	daemons.Dir = "/"
+	daemons.Env = []string{
+		"PATH=" + goes.Path(),
+		"TERM=linux",
+	}
+	daemons.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
+		Pgid:   0,
+	}
+	err = daemons.Start()
 	if err != nil {
 		return err
 	}
-	pub <- fmt.Sprint("hostname: ", hostname)
-	pub <- fmt.Sprint("version: ", Version)
-	if len(Machine) > 0 {
-		pub <- fmt.Sprint("machine: ", Machine)
-	}
-	keys, cl, err := cmdline.New()
-	if err != nil {
-		return err
-	}
-	for _, k := range keys {
-		pub <- fmt.Sprintf("cmdline.%s: %s", k, cl[k])
-	}
-	if err = PubHook(pub); err != nil {
-		return err
-	}
-	for name, g := range byName {
-		if g.Kind.IsDaemon() && g.Name != "redisd" {
-			if err = byName.Main(name); err != nil {
-				return err
-			}
-		}
-	}
+
 	start := parm["-start"]
 	if len(start) == 0 {
 		if _, xerr := os.Stat("/etc/goes/start"); xerr == nil {
@@ -115,32 +80,49 @@ func (c *cmd) Main(args ...string) error {
 		}
 	}
 	if len(start) > 0 {
-		if err = ConfHook(); err != nil {
+		err = ConfHook()
+		if err != nil {
 			return err
 		}
-		if err = byName.Main("source", start); err != nil {
+		err = goes.ByName(*c).Main("source", start)
+		if err != nil {
 			return err
 		}
 	}
-	if os.Getpid() == 1 {
-		_, login := byName["login"]
-		for {
-			if login {
-				err = byName.Main("login")
-				if err != nil {
-					fmt.Println("login:", err)
-					time.Sleep(3 * time.Second)
-					continue
-				}
-			}
-			err = byName.Main("cli")
-			if err != nil && err != io.EOF {
-				fmt.Println(err)
-				<-make(chan struct{})
+
+	if os.Getpid() != 1 {
+		return nil
+	}
+
+	go daemons.Wait()
+
+	for {
+		if _, found := goes.ByName(*c)["login"]; found {
+			if err = run("login"); err != nil {
+				fmt.Fprintln(os.Stderr, "login:", err)
+				time.Sleep(3 * time.Second)
+				continue
 			}
 		}
+		err = run("cli")
+		if err == io.EOF {
+			err = nil
+		}
+		if err != nil {
+			fmt.Fprint(os.Stderr, goes.ProgBase(), ": ", err, "\n")
+		}
 	}
-	return nil
+
+}
+
+func run(arg0 string) error {
+	x := exec.Command(goes.Prog())
+	x.Args[0] = arg0
+	x.Stdin = os.Stdin
+	x.Stdout = os.Stdout
+	x.Stderr = os.Stderr
+	x.Dir = "/"
+	return x.Run()
 }
 
 func (c *cmd) Apropos() map[string]string {

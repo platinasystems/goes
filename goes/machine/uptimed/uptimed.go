@@ -32,7 +32,7 @@ func (cmd cmd) Main(...string) error {
 	if err != nil {
 		return err
 	}
-	pub, err := redis.Publish(redis.Machine)
+	pub, err := redis.Publish(redis.DefaultHash)
 	if err != nil {
 		return err
 	}

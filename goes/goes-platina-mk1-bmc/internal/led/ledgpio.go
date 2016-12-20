@@ -362,7 +362,7 @@ func (h *LedCon) LedStatus() {
 	fanFail := false
 	fanStatChange := false
 	for j := 1; j <= maxFanTrays; j++ {
-		p, _ := redis.Hget(redis.Machine, "fan_tray."+strconv.Itoa(int(j))+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if lastFanStatus[j-1] != p {
 			fanStatChange = true
 			//if any fan tray is failed or not installed, set front panel FAN led to yellow
@@ -410,7 +410,7 @@ func (h *LedCon) LedStatus() {
 	}
 
 	for j := 0; j < maxPsu; j++ {
-		p, _ := redis.Hget(redis.Machine, "psu"+strconv.Itoa(j+1)+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "psu"+strconv.Itoa(j+1)+".status")
 		if lastPsuStatus[j] != p {
 			o = r.Output0.get(h)
 			c = r.Config0.get(h)

@@ -29,14 +29,15 @@ import (
 	"github.com/platinasystems/go/goes/fs"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
 	"github.com/platinasystems/go/goes/kernel"
+	"github.com/platinasystems/go/goes/kernel/watchdog"
 	"github.com/platinasystems/go/goes/machine"
 	"github.com/platinasystems/go/goes/machine/i2c"
 	"github.com/platinasystems/go/goes/machine/machined"
-	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/net"
 	"github.com/platinasystems/go/goes/net/nld"
 	"github.com/platinasystems/go/goes/net/telnetd"
 	"github.com/platinasystems/go/goes/redis"
+	"github.com/platinasystems/go/goes/redis/redisd"
 	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
 	"github.com/platinasystems/go/log"
@@ -144,14 +145,15 @@ func main() {
 	g.Plot(core.New()...)
 	g.Plot(fs.New()...)
 	g.Plot(kernel.New()...)
+	g.Plot(watchdog.New())
 	g.Plot(machine.New()...)
 	// FIXME: remove machined after converting remaining info
 	g.Plot(machined.New())
 	g.Plot(net.New()...)
 	g.Plot(redis.New()...)
 	g.Plot(telnetd.New())
-	start.Machine = "platina-mk1-bmc"
-	start.RedisDevs = []string{"lo", "eth0"}
+	redisd.Machine = "platina-mk1-bmc"
+	redisd.Devs = []string{"lo", "eth0"}
 	nld.Prefixes = []string{"lo.", "eth0."}
 	machined.Hook = hook
 	g.Main()

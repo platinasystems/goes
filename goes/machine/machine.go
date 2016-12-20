@@ -6,6 +6,7 @@
 package machine
 
 import (
+	"github.com/platinasystems/go/goes/machine/daemons"
 	"github.com/platinasystems/go/goes/machine/diag"
 	"github.com/platinasystems/go/goes/machine/gpio"
 	"github.com/platinasystems/go/goes/machine/i2c"
@@ -21,9 +22,10 @@ import (
 
 func New() []interface{} {
 	return []interface{}{
-		i2c.New(),
-		gpio.New(),
+		daemons.New(),
 		diag.New(),
+		gpio.New(),
+		i2c.New(),
 		install.New(),
 		reload.New(),
 		restart.New(),
