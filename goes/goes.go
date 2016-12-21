@@ -129,6 +129,8 @@ func (byName ByName) Main(args ...string) (err error) {
 		}
 		if sig != nil {
 			sig <- syscall.SIGABRT
+			os.Stdout.Sync()
+			os.Stderr.Sync()
 			os.Stdout.Close()
 			os.Stderr.Close()
 		}
@@ -274,7 +276,9 @@ func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 	for sig := range ch {
 		if sig == syscall.SIGTERM {
 			if g.Close != nil {
-				g.Close()
+				if err := g.Close(); err != nil {
+					fmt.Fprintln(os.Stderr, err)
+				}
 			}
 			os.Remove(pidfn)
 			fmt.Println("killed")
