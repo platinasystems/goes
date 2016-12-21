@@ -45,8 +45,8 @@ func KillAll(sig syscall.Signal) (err error) {
 		_, e = os.Stat(fmt.Sprint("/proc/", spid, "/stat"))
 		if e == nil {
 			e = syscall.Kill(pid, sig)
-			if err == nil {
-				err = e
+			if e != nil && err == nil {
+				err = fmt.Errorf("%s %d: %v", sig, pid, e)
 			}
 		}
 	}
