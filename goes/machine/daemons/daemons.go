@@ -101,12 +101,13 @@ func (c *cmd) daemon(done chan<- struct{}, arg0 string, args ...string) error {
 	go log.LinesFrom(rout, id, "info")
 	go log.LinesFrom(rerr, id, "err")
 	go func(d *exec.Cmd, wout, werr *os.File, done chan<- struct{}) {
-		err := d.Wait()
-		if err != nil {
-			fmt.Fprintln(d.Stderr, err)
+		if err := d.Wait(); err != nil {
+			fmt.Fprintln(werr, err)
 		} else {
-			fmt.Fprintln(d.Stdout, "done")
+			fmt.Fprintln(wout, "done")
 		}
+		wout.Sync()
+		werr.Sync()
 		wout.Close()
 		werr.Close()
 		done <- struct{}{}
