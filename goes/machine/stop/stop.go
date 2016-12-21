@@ -52,7 +52,7 @@ func (c *cmd) Main(args ...string) error {
 		}
 	}
 	err = internal.KillAll(syscall.SIGTERM)
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 	if e := internal.KillAll(syscall.SIGKILL); err == nil {
 		err = e
 	}
