@@ -188,9 +188,12 @@ commandLoop:
 			continue commandLoop
 		}
 
-		if end == 0 &&
-			(g.Kind.IsDaemon() || g.Kind.IsBuiltin() ||
-				name == os.Args[0]) {
+		if !g.Kind.IsInteractive() {
+			err = fmt.Errorf("%s: inoperative", name)
+			continue commandLoop
+		}
+
+		if end == 0 && (g.Kind.IsBuiltin() || name == os.Args[0]) {
 			if flag["-x"] {
 				fmt.Println("+", pl.Slices[end])
 			}
@@ -208,7 +211,7 @@ commandLoop:
 				"resize": struct{}{},
 				"source": struct{}{},
 			}[name]
-			if found || g.Kind.IsDaemon() {
+			if found {
 				err = fmt.Errorf("%s: can't pipe", name)
 				continue commandLoop
 			}
