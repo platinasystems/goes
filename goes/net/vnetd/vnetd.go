@@ -111,9 +111,10 @@ func (cmd *cmd) Main(...string) error {
 }
 
 func (cmd *cmd) Close() error {
-	// Exit vnet main loop.
-	cmd.i.v.Quit()
-	return CloseHook(&cmd.i, &cmd.i.v)
+	// FIXME the following isn't working.
+	// cmd.i.v.Quit()
+	// return CloseHook(&cmd.i, &cmd.i.v)
+	return nil
 }
 
 func Init(i *Info) {
