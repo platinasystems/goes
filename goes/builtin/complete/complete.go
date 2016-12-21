@@ -37,12 +37,13 @@ func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Main(args ...string) error {
 	var ss []string
+	byName := goes.ByName(*c)
 	if len(args) > 0 && strings.HasPrefix(filepath.Base(args[0]), "goes") {
 		args = args[1:]
 	}
 	if len(args) == 0 {
-		ss = goes.ByName(*c).Keys()
-	} else if g := goes.ByName(*c)[args[0]]; g != nil {
+		ss = byName.Complete("")
+	} else if g := byName[args[0]]; g != nil {
 		if g.Complete != nil {
 			ss = g.Complete(args[1:]...)
 		} else if len(args[1:]) > 0 {
@@ -51,11 +52,7 @@ func (c *cmd) Main(args ...string) error {
 			ss, _ = filepath.Glob("*")
 		}
 	} else if len(args) == 1 {
-		for _, name := range goes.ByName(*c).Keys() {
-			if strings.HasPrefix(name, args[0]) {
-				ss = append(ss, name)
-			}
-		}
+		ss = byName.Complete(args[0])
 	} else {
 		return fmt.Errorf("%s: not found", args[0])
 	}

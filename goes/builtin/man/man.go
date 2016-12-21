@@ -24,7 +24,11 @@ func (*cmd) Usage() string   { return "man COMMAND...\nCOMMAND -man" }
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Complete(args ...string) []string {
-	return goes.ByName(*c).Complete(args...)
+	var prefix string
+	if len(args) > 0 {
+		prefix = args[len(args)-1]
+	}
+	return goes.ByName(*c).Complete(prefix)
 }
 
 func (c *cmd) Main(args ...string) error {

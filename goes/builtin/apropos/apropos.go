@@ -24,7 +24,11 @@ func (*cmd) Usage() string   { return "apropos COMMAND...\nCOMMAND -apropos" }
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Complete(args ...string) []string {
-	return goes.ByName(*c).Complete(args...)
+	var prefix string
+	if len(args) > 0 {
+		prefix = args[len(args)-1]
+	}
+	return goes.ByName(*c).Complete(prefix)
 }
 
 func (c *cmd) Main(args ...string) error {
@@ -45,7 +49,7 @@ func (c *cmd) Main(args ...string) error {
 		}
 	}
 	if len(args) == 0 {
-		for _, k := range goes.ByName(*c).Keys() {
+		for _, k := range goes.ByName(*c).Complete("") {
 			apropos := goes.ByName(*c)[k].Apropos
 			if apropos != nil {
 				printApropos(apropos, k)

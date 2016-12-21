@@ -6,6 +6,7 @@ package show_commands
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/platinasystems/go/goes"
 )
@@ -27,11 +28,19 @@ func (c *cmd) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 
-	for _, name := range goes.ByName(*c).Keys() {
-		if g := goes.ByName(*c)[name]; g.Kind.IsDaemon() {
-			fmt.Printf("\t%s - daemon\n", name)
+	keys := make([]string, 0, len(goes.ByName(*c)))
+	for k := range goes.ByName(*c) {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		g := goes.ByName(*c)[k]
+		if g.Kind.IsDaemon() {
+			fmt.Printf("\t%s - daemon\n", k)
+		} else if g.Kind.IsHidden() {
+			fmt.Printf("\t%s - hidden\n", k)
 		} else {
-			fmt.Printf("\t%s\n", name)
+			fmt.Printf("\t%s\n", k)
 		}
 	}
 	return nil

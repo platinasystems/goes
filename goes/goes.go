@@ -90,29 +90,14 @@ type usager interface {
 	Usage() string
 }
 
-var keys []string // cache
-
-func (byName ByName) Keys() []string {
-	// this assumes different Goes maps would have different lengths
-	if len(keys) == len(byName) {
-		return keys
-	}
-	keys = make([]string, 0, len(byName))
-	for k := range byName {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-func (byName ByName) Complete(args ...string) (ss []string) {
-	if len(args) < 1 {
-		return
-	}
-	for _, k := range byName.Keys() {
-		if strings.HasPrefix(k, args[len(args)-1]) {
+func (byName ByName) Complete(prefix string) (ss []string) {
+	for k, g := range byName {
+		if strings.HasPrefix(k, prefix) && g.Kind.IsInteractive() {
 			ss = append(ss, k)
 		}
+	}
+	if len(ss) > 0 {
+		sort.Strings(ss)
 	}
 	return
 }
@@ -300,8 +285,10 @@ func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 	}
 }
 
-func (k Kind) IsBuiltin() bool { return (k & Builtin) == Builtin }
-func (k Kind) IsDaemon() bool  { return (k & Daemon) == Daemon }
+func (k Kind) IsBuiltin() bool     { return (k & Builtin) == Builtin }
+func (k Kind) IsDaemon() bool      { return (k & Daemon) == Daemon }
+func (k Kind) IsHidden() bool      { return (k & Hidden) == Hidden }
+func (k Kind) IsInteractive() bool { return (k & (Daemon | Hidden)) == 0 }
 
 func (k Kind) String() string {
 	s := "unknown"
