@@ -78,11 +78,11 @@ func (p *platform) boardPortLedEnable() (err error) {
 }
 
 func (p *platform) boardInit() (err error) {
-	nMacs, err := redis.Hget(redis.Machine, "eeprom.number_of_ethernet_addrs")
+	nMacs, err := redis.Hget(redis.DefaultHash, "eeprom.number_of_ethernet_addrs")
 	if err == nil {
 		n, err := strconv.ParseUint(nMacs, 10, 32)
 		if err == nil {
-			baseMacAddr, err := redis.Hget(redis.Machine, "eeprom.base_ethernet_address")
+			baseMacAddr, err := redis.Hget(redis.DefaultHash, "eeprom.base_ethernet_address")
 			if err == nil {
 				// remove the '[ ]' brackets from the string before processing
 				s := baseMacAddr[1:(len(baseMacAddr) - 1)]

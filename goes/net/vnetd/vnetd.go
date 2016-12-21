@@ -68,7 +68,7 @@ func (cmd *cmd) Main(...string) error {
 	)
 
 	// never want to block vnet
-	cmd.i.pub, err = redis.Publish(redis.Machine, 16<<10)
+	cmd.i.pub, err = redis.Publish(redis.DefaultHash, 16<<10)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (cmd *cmd) Main(...string) error {
 	defer sock.Close()
 
 	for _, prefix := range Prefixes {
-		key := fmt.Sprintf("%s:%s", redis.Machine, prefix)
+		key := fmt.Sprintf("%s:%s", redis.DefaultHash, prefix)
 		err = redis.Assign(key, Name, "Info")
 		if err != nil {
 			return err
@@ -102,8 +102,11 @@ func (cmd *cmd) Main(...string) error {
 	for GdbWait && gdb_wait == 0 {
 		time.Sleep(100 * time.Millisecond)
 	}
-	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s} }",
-		sockfile.Path("vnet")))
+
+	sfn := sockfile.Path("vnet")
+	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s} }", sfn))
+	go sockfile.Chgroup(sfn, "adm")
+
 	return cmd.i.v.Run(&in)
 }
 

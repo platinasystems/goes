@@ -15,9 +15,9 @@ import (
 	"github.com/platinasystems/go/redis/rpc/args"
 )
 
-const Timeout = 500 * time.Millisecond
+const timeout = 500 * time.Millisecond
 
-var Machine = "platina"
+var DefaultHash = "platina"
 
 var keyRe *regexp.Regexp
 var empty = struct{}{}
@@ -74,7 +74,7 @@ func Connect() (redis.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return redis.NewConn(conn, Timeout, Timeout), nil
+	return redis.NewConn(conn, timeout, timeout), nil
 }
 
 func Get(key string) (s string, err error) {
@@ -176,6 +176,22 @@ func Keys(pattern string) (keys []string, err error) {
 	return
 }
 
+// Wait for the given (key, field) to have value or anything if value is "".
+func Hwait(key, field, value string, dur time.Duration) error {
+	const t = 250 * time.Millisecond
+	for end := time.Now().Add(dur); time.Now().Before(end); time.Sleep(t) {
+		s, err := Hget(key, field)
+		if err == nil && len(s) > 0 {
+			if len(value) > 0 && s != value {
+				err = fmt.Errorf("(%s,%s) is %q instead of %q",
+					key, field, s, value)
+			}
+			return err
+		}
+	}
+	return fmt.Errorf("(%s,%s) timeout", key, field)
+}
+
 func Lrange(key string, start, stop int) (keys []string, err error) {
 	conn, err := Connect()
 	if err != nil {
@@ -273,7 +289,7 @@ func Subscribe(channel string) (out <-chan string) {
 	if err != nil {
 		return
 	}
-	psc := redis.PubSubConn{redis.NewConn(conn, 0, Timeout)}
+	psc := redis.PubSubConn{redis.NewConn(conn, 0, timeout)}
 	if err := psc.Subscribe(channel); err != nil {
 		return
 	}

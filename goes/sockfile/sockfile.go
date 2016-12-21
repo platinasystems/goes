@@ -25,6 +25,29 @@ type RpcServer struct {
 	conns []net.Conn
 }
 
+// Wait up to 10 seconds for the socket then set it to the named group and
+// enable group writes.
+func Chgroup(path, name string) error {
+	for end := time.Now().Add(10 * time.Second); time.Now().Before(end); time.Sleep(250 * time.Millisecond) {
+		fi, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		gid := group.Parse()[name].Gid()
+		if gid != 0 {
+			err = os.Chown(path, os.Geteuid(), gid)
+			if err != nil {
+				return err
+			}
+		}
+		return os.Chmod(path, fi.Mode()|0020)
+	}
+	return fmt.Errorf("oops, shouldn't be here")
+}
+
 func Dial(name string) (net.Conn, error) {
 	path := Path(name)
 	for i := 0; ; i++ {
@@ -53,10 +76,7 @@ func Listen(name string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	if adm := group.Parse()["adm"].Gid(); adm > 0 {
-		err = os.Chown(path, os.Geteuid(), adm)
-	}
-	return ln, err
+	return ln, Chgroup(path, "adm")
 }
 
 func NewRpcClient(name string) (*rpc.Client, error) {

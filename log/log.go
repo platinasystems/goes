@@ -63,8 +63,6 @@ var Writer io.Writer
 var mutex sync.Mutex
 var earlyBufs []*bytes.Buffer
 
-var prog string
-
 var PriorityByName = map[string]syslog.Priority{
 	"emerg": syslog.LOG_EMERG,
 	"alert": syslog.LOG_ALERT,
@@ -133,14 +131,6 @@ var LogFacilityByValue = map[syslog.Priority]string{
 	syslog.LOG_LOCAL7:   "local7",
 }
 
-func DaemonErr(args ...interface{}) {
-	log(syslog.LOG_DAEMON|syslog.LOG_ERR, fmt.Sprint(args...))
-}
-
-func DaemonInfo(args ...interface{}) {
-	log(syslog.LOG_DAEMON|syslog.LOG_INFO, fmt.Sprint(args...))
-}
-
 // NewLimited returns a logger with the given iteration restriction.
 func NewLimited(n uint32) *Limited { return &Limited{N: n} }
 
@@ -164,31 +154,19 @@ func NewRateLimited(n uint32, d time.Duration) *RateLimited {
 	return rl
 }
 
-// Pipe returns a *File after starting a go routine that loops logging the
-// other end of the pipe until EOF; then signals complete by closing the
-// returned channel..
-func Pipe(priority string) (w *os.File, wait <-chan struct{}, err error) {
+// log lines from the given reader until EOF or error.
+func LinesFrom(rc io.ReadCloser, id, priority string) {
+	defer rc.Close()
 	pri, found := PriorityByName[priority]
 	if !found {
 		pri = syslog.LOG_ERR
 	}
-	r, w, err := os.Pipe()
-	if err == nil {
-		stop := make(chan struct{})
-		wait = stop
-		go func(pri syslog.Priority, r io.Reader,
-			stop chan<- struct{}) {
-			scan := bufio.NewScanner(r)
-			for scan.Scan() {
-				s := scan.Text()
-				s = strings.Replace(s, "\t", "        ", -1)
-				log(pri|syslog.LOG_DAEMON, s)
-			}
-			close(stop)
-			log(pri|syslog.LOG_DAEMON, "closed pipe")
-		}(pri, r, stop)
+	scan := bufio.NewScanner(rc)
+	for scan.Scan() {
+		s := scan.Text()
+		s = strings.Replace(s, "\t", "        ", -1)
+		log(pri|syslog.LOG_DAEMON, id, s)
 	}
-	return
 }
 
 // The default level is: Debug, User. Upto the first two arguments may change
@@ -199,7 +177,7 @@ func Pipe(priority string) (w *os.File, wait <-chan struct{}, err error) {
 //	Print("err", ...)
 func Print(args ...interface{}) {
 	pri, fac, a := logArgs(args...)
-	log(pri|fac, fmt.Sprint(a...))
+	log(pri|fac, id(), fmt.Sprint(a...))
 }
 
 // The default level is: Debug, User. Upto the first two arguments may preceed
@@ -220,8 +198,27 @@ func Printf(args ...interface{}) {
 		return
 	}
 	a = a[1:]
-	log(pri|fac, fmt.Sprintf(format, a...))
+	log(pri|fac, id(), fmt.Sprintf(format, a...))
 }
+
+func id() string {
+	if len(id_) == 0 {
+		var prog string
+		s, err := os.Readlink("/proc/self/exe")
+		if err == nil {
+			prog = filepath.Base(s)
+			if s != os.Args[0] {
+				prog += "." + os.Args[0]
+			}
+		} else {
+			prog = filepath.Base(os.Args[0])
+		}
+		id_ = fmt.Sprintf("%s[%d]", prog, os.Getpid())
+	}
+	return id_
+}
+
+var id_ string
 
 func logArgs(args ...interface{}) (pri, fac syslog.Priority, a []interface{}) {
 	pri = syslog.LOG_DEBUG
@@ -245,32 +242,15 @@ func logArgs(args ...interface{}) (pri, fac syslog.Priority, a []interface{}) {
 	return
 }
 
-func log(pri syslog.Priority, args ...interface{}) {
+func log(pri syslog.Priority, id string, args ...interface{}) {
 	mutex.Lock()
 	defer mutex.Unlock()
-
-	if pid == 0 {
-		pid = int64(os.Getpid())
-	}
-
-	if len(prog) == 0 {
-		s, err := os.Readlink("/proc/self/exe")
-		if err == nil {
-			prog = filepath.Base(s)
-			if s != os.Args[0] {
-				prog += "." + os.Args[0]
-			}
-		} else {
-			prog = filepath.Base(os.Args[0])
-		}
-	}
 
 	msg := strings.Split(fmt.Sprint(args...), "\n")
 
 	if Writer != nil {
 		for _, s := range msg {
-			fmt.Fprintf(Writer, "<%d>%s[%d]: %s\n", pri, prog,
-				pid, s)
+			fmt.Fprintf(Writer, "<%d>%s: %s\n", pri, id, s)
 		}
 	} else if _, err := os.Stat(DevLog); err == nil {
 		conn, err := net.Dial("unixgram", DevLog)
@@ -280,9 +260,9 @@ func log(pri syslog.Priority, args ...interface{}) {
 		}
 		defer conn.Close()
 		for _, s := range msg {
-			fmt.Fprintf(conn, "<%d>%s %s[%d]: %s\n",
+			fmt.Fprintf(conn, "<%d>%s %s: %s\n",
 				pri, time.Now().Format(time.Stamp),
-				prog, pid, s)
+				id, s)
 		}
 	} else if kmsg, err := os.OpenFile(DevKmsg, os.O_RDWR, 0644); err == nil {
 		defer kmsg.Close()
@@ -294,14 +274,12 @@ func log(pri syslog.Priority, args ...interface{}) {
 			earlyBufs = earlyBufs[:0]
 		}
 		for _, s := range msg {
-			fmt.Fprintf(kmsg, "<%d>%s[%d]: %s\n", pri, prog,
-				pid, s)
+			fmt.Fprintf(kmsg, "<%d>%s: %s\n", pri, id, s)
 		}
 	} else if os.IsNotExist(err) {
 		buf := new(bytes.Buffer)
 		for _, s := range msg {
-			fmt.Fprintf(buf, "<%d>%s[%d]: %s\n", pri, prog,
-				pid, s)
+			fmt.Fprintf(buf, "<%d>%s: %s\n", pri, id, s)
 		}
 		earlyBufs = append(earlyBufs, buf)
 	}

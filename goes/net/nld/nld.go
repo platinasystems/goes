@@ -85,7 +85,7 @@ func (cmd *cmd) Main(...string) error {
 	if err != nil {
 		return err
 	}
-	cmd.info.pub, err = redis.Publish(redis.Machine)
+	cmd.info.pub, err = redis.Publish(redis.DefaultHash)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (cmd *cmd) Main(...string) error {
 
 	rpc.Register(&cmd.info)
 	for _, prefix := range Prefixes {
-		key := fmt.Sprintf("%s:%s", redis.Machine, prefix)
+		key := fmt.Sprintf("%s:%s", redis.DefaultHash, prefix)
 		err = redis.Assign(key, Name, "Info")
 		if err != nil {
 			return err

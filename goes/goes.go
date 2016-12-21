@@ -13,9 +13,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -23,19 +21,17 @@ import (
 
 	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/goes/pidfile"
-	"github.com/platinasystems/go/log"
 )
 
 const (
 	InstallName = "/usr/bin/goes"
 	DefaultLang = "en_US.UTF-8"
-	daemonFlag  = "__GOES_DAEMON__"
 )
 
 const (
-	Builtin Kind = 1 + iota
+	Builtin Kind = 1 << iota
 	Daemon
-	Disabled
+	Hidden
 )
 
 var (
@@ -60,7 +56,7 @@ type Goes struct {
 	Man      map[string]string
 }
 
-type Kind int
+type Kind uint16
 
 type aproposer interface {
 	Apropos() map[string]string
@@ -133,43 +129,38 @@ func (byName ByName) Complete(args ...string) (ss []string) {
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
 func (byName ByName) Main(args ...string) (err error) {
-	var isDaemon bool
+	var sig chan os.Signal
+	defer func() {
+		if err == io.EOF {
+			err = nil
+		}
+		if err != nil {
+			if sig != nil {
+				fmt.Fprintln(os.Stderr, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "%s: %v\n",
+					ProgBase(), err)
+			}
+		}
+		if sig != nil {
+			sig <- syscall.SIGABRT
+			os.Stdout.Close()
+			os.Stderr.Close()
+		}
+	}()
 
 	if len(args) == 0 {
 		args = os.Args
-		if len(args) == 0 {
+		switch len(args) {
+		case 0:
 			return
+		case 1:
+			if args[0] == ProgBase() {
+				args[0] = "cli"
+			}
 		}
-		defer func() {
-			for _, g := range byName {
-				if g.Kind == Builtin && g.Close != nil {
-					t := g.Close()
-					if err == nil {
-						err = t
-					}
-				}
-			}
-			if err != nil && err != io.EOF {
-				fmt.Fprintf(os.Stderr, "%s: %v\n",
-					ProgBase(), err)
-				Exit(1)
-			}
-		}()
-	} else {
-		defer func() {
-			if err == io.EOF {
-				err = nil
-			}
-			if isDaemon {
-				if err != nil {
-					log.Print("daemon", "err", err)
-				}
-			} else if err != nil {
-				fmt.Fprintf(os.Stderr, "%s: %v\n",
-					filepath.Base(Prog()), err)
-			}
-		}()
 	}
+
 	if _, found := byName[args[0]]; !found {
 		if args[0] == InstallName && len(args) > 2 {
 			buf, err := ioutil.ReadFile(args[1])
@@ -182,9 +173,7 @@ func (byName ByName) Main(args ...string) (err error) {
 			args = args[1:]
 		}
 	}
-	if len(args) < 1 {
-		args = []string{"cli"}
-	}
+
 	name := args[0]
 	args = args[1:]
 	flag, args := flags.New(args,
@@ -198,7 +187,6 @@ func (byName ByName) Main(args ...string) (err error) {
 	flag.Aka("-complete", "--complete")
 	flag.Aka("-man", "--man")
 	flag.Aka("-usage", "--usage")
-	daemonFlagValue := os.Getenv(daemonFlag)
 	targs := []string{name}
 	switch {
 	case flag["-h"]:
@@ -229,71 +217,17 @@ func (byName ByName) Main(args ...string) (err error) {
 	if g == nil {
 		return fmt.Errorf("%s: command not found", name)
 	}
-	isDaemon = g.Kind == Daemon
-	if !isDaemon {
-		err = g.Main(args...)
-		return
-	}
-	switch daemonFlagValue {
-	case "":
-		c := exec.Command(Prog(), args...)
-		c.Args[0] = name
-		c.Stdin = nil
-		c.Stdout = nil
-		c.Stderr = nil
-		c.Env = []string{
-			"PATH=" + Path(),
-			"TERM=linux",
-			daemonFlag + "=child",
-		}
-		c.Dir = "/"
-		c.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
-			Pgid:   0,
-		}
-		err = c.Start()
-	case "child":
-		syscall.Umask(002)
-		pipeOut, waitOut, terr := log.Pipe("info")
-		if terr != nil {
-			err = terr
-			return
-		}
-		pipeErr, waitErr, terr := log.Pipe("err")
-		if terr != nil {
-			err = terr
-			return
-		}
-		c := exec.Command(Prog(), args...)
-		c.Args[0] = name
-		c.Stdin = nil
-		c.Stdout = pipeOut
-		c.Stderr = pipeErr
-		c.Env = []string{
-			"PATH=" + Path(),
-			"TERM=linux",
-			daemonFlag + "=grandchild",
-		}
-		c.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
-			Pgid:   0,
-		}
-		signal.Ignore(syscall.SIGTERM)
-		err = c.Start()
-		<-waitOut
-		<-waitErr
-	case "grandchild":
+	if g.Kind.IsDaemon() {
+		sig := make(chan os.Signal)
 		pidfn, terr := pidfile.New(name)
 		if terr != nil {
 			err = terr
 			return
 		}
-		sigch := make(chan os.Signal)
-		signal.Notify(sigch, syscall.SIGTERM)
-		go g.wait(pidfn, sigch)
-		err = g.Main(args...)
-		sigch <- syscall.SIGABRT
+		signal.Notify(sig, syscall.SIGTERM)
+		go g.wait(pidfn, sig)
 	}
+	err = g.Main(args...)
 	return
 }
 
@@ -337,10 +271,6 @@ func (byName ByName) Plot(cmds ...interface{}) {
 		}
 		if method, found := v.(kinder); found {
 			g.Kind = method.Kind()
-			if g.Kind == Disabled {
-				g = nil
-				continue
-			}
 		}
 		if method, found := v.(usager); found {
 			g.Usage = method.Usage()
@@ -368,4 +298,18 @@ func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 		os.Remove(pidfn)
 		break
 	}
+}
+
+func (k Kind) IsBuiltin() bool { return (k & Builtin) == Builtin }
+func (k Kind) IsDaemon() bool  { return (k & Daemon) == Daemon }
+
+func (k Kind) String() string {
+	s := "unknown"
+	switch k {
+	case Builtin:
+		s = "builtin"
+	case Daemon:
+		s = "daemon"
+	}
+	return s
 }

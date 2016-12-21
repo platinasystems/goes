@@ -23,13 +23,7 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) Kind() goes.Kind {
-	k := goes.Disabled
-	if os.Getpid() == 1 {
-		k = goes.Daemon
-	}
-	return k
-}
+func (cmd) Kind() goes.Kind { return goes.Daemon }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [OPTION]... [DEVICE]" }

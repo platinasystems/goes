@@ -364,13 +364,13 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 
 	n := i/2 + 1
 	s := "fan_tray." + strconv.Itoa(int(n)) + ".status"
-	p, _ := redis.Hget(redis.Machine, s)
+	p, _ := redis.Hget(redis.DefaultHash, s)
 
 	//set fan speed to max and return 0 rpm if fan tray is not present
 	if strings.Contains(p, "not installed") {
 		allInstalled = false
 		if lastAllInstalled != allInstalled {
-			redis.Hset(redis.Machine, "fan_tray.speed", "high")
+			redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
 			lastAllInstalled = false
 		}
 		rpm = uint16(0)
@@ -380,7 +380,7 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 		fanFail = false
 		for j := 1; j <= maxFanTrays; j++ {
 			s = "fan_tray." + strconv.Itoa(int(j)) + ".status"
-			p, _ = redis.Hget(redis.Machine, s)
+			p, _ = redis.Hget(redis.DefaultHash, s)
 			if strings.Contains(p, "not installed") {
 				fanFail = true
 				break
@@ -391,7 +391,7 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 			allInstalled = true
 			if lastAllInstalled != allInstalled {
 				lastAllInstalled = true
-				redis.Hset(redis.Machine, "fan_tray.speed", lastSpeed)
+				redis.Hset(redis.DefaultHash, "fan_tray.speed", lastSpeed)
 			}
 		}
 

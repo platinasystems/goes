@@ -83,13 +83,13 @@ func (cmd *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	info.PubCh, err = redis.Publish(redis.Machine)
+	info.PubCh, err = redis.Publish(redis.DefaultHash)
 	if err != nil {
 		return err
 	}
 	defer close(info.PubCh)
 	for _, entry := range cmd.registry {
-		key := fmt.Sprintf("%s:%s", redis.Machine, entry.prefix)
+		key := fmt.Sprintf("%s:%s", redis.DefaultHash, entry.prefix)
 		err = redis.Assign(key, Name, "Registry")
 		if err != nil {
 			return err

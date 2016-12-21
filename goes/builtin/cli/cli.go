@@ -90,6 +90,16 @@ func (c *cmd) Main(args ...string) error {
 			Prompt(string) (string, error)
 		}
 	)
+	defer func() {
+		for _, g := range goes.ByName(*c) {
+			if g.Kind.IsBuiltin() && g.Close != nil {
+				t := g.Close()
+				if err == nil {
+					err = t
+				}
+			}
+		}
+	}()
 	flag, args := flags.New(args, "-x", "-no-liner")
 	switch len(args) {
 	case 0:
@@ -179,8 +189,7 @@ commandLoop:
 		}
 
 		if end == 0 &&
-			(g.Kind == goes.Daemon ||
-				g.Kind == goes.Builtin ||
+			(g.Kind.IsDaemon() || g.Kind.IsBuiltin() ||
 				name == os.Args[0]) {
 			if flag["-x"] {
 				fmt.Println("+", pl.Slices[end])
@@ -199,7 +208,7 @@ commandLoop:
 				"resize": struct{}{},
 				"source": struct{}{},
 			}[name]
-			if found || g.Kind == goes.Daemon {
+			if found || g.Kind.IsDaemon() {
 				err = fmt.Errorf("%s: can't pipe", name)
 				continue commandLoop
 			}

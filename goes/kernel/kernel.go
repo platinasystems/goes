@@ -14,7 +14,6 @@ import (
 	"github.com/platinasystems/go/goes/kernel/lsmod"
 	"github.com/platinasystems/go/goes/kernel/reboot"
 	"github.com/platinasystems/go/goes/kernel/rmmod"
-	"github.com/platinasystems/go/goes/kernel/watchdog"
 )
 
 func New() []interface{} {
@@ -27,6 +26,5 @@ func New() []interface{} {
 		lsmod.New(),
 		reboot.New(),
 		rmmod.New(),
-		watchdog.New(),
 	}
 }

@@ -16,11 +16,11 @@ import (
 	"github.com/platinasystems/go/goes/fs"
 	"github.com/platinasystems/go/goes/kernel"
 	"github.com/platinasystems/go/goes/machine"
-	"github.com/platinasystems/go/goes/machine/start"
 	"github.com/platinasystems/go/goes/net"
 	"github.com/platinasystems/go/goes/net/nld"
 	"github.com/platinasystems/go/goes/net/telnetd"
 	"github.com/platinasystems/go/goes/redis"
+	"github.com/platinasystems/go/goes/redis/redisd"
 	"github.com/platinasystems/go/goes/test"
 )
 
@@ -35,7 +35,7 @@ func main() {
 	g.Plot(redis.New()...)
 	g.Plot(telnetd.New())
 	g.Plot(test.New()...)
-	start.Machine = "example"
+	redisd.Machine = "example"
 	nld.Hook = func() error {
 		itfs, err := stdnet.Interfaces()
 		if err != nil {
