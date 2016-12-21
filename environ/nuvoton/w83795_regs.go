@@ -12,14 +12,14 @@ type hwmRegsBank0 struct {
 	BankSelect    reg8
 	Configuration reg8
 	_             [0x2]byte
-	TempCntl1     reg8
-	TempCntl2     reg8
+	TempCntl1     reg8 //0x04
+	TempCntl2     reg8 //0x05
 	_             [0x1b]byte
-	FrontTemp     reg8
-	RearTemp      reg8
+	FrontTemp     reg8 //0x21
+	RearTemp      reg8 //0x22
 	_             [0x0b]byte
-	FanCount      [14]reg8
-	FractionLSB   reg8
+	FanCount      [14]reg8 //0x2e
+	FractionLSB   reg8     //0x3c
 }
 
 type hwmRegsBank2 struct {

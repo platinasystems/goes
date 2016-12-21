@@ -10,36 +10,36 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/i2c"
 	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/redis"
 )
 
 const (
-	sysLed       = 0xc0
-	sysLedGreen  = 0x0
-	sysLedYellow = 0xc
-	sysLedOff    = 0x80
-
-	maxFanTrays  = 4
-	fanLed       = 0x30
-	fanLedGreen  = 0x10
-	fanLedYellow = 0x20
-	fanLedOff    = 0x30
-
-	maxPsu     = 2
-	maxFanTray = 4
+	maxFanTrays = 4
+	maxPsu      = 2
 )
 
 var (
 	dummy         byte
 	regsPointer   = unsafe.Pointer(&dummy)
 	regsAddr      = uintptr(unsafe.Pointer(&dummy))
-	lastFanStatus [maxFanTray]string
+	lastFanStatus [maxFanTrays]string
 	lastPsuStatus [maxPsu]string
-	psuLed        = []uint8{0x0c, 0x03}
-	psuLedYellow  = []uint8{0x00, 0x00}
-	psuLedOff     = []uint8{0x04, 0x01}
+	psuLed             = []uint8{0x8, 0x10}
+	psuLedYellow       = []uint8{0x8, 0x10}
+	psuLedOff          = []uint8{0x04, 0x01}
+	sysLed        byte = 0x1
+	sysLedGreen   byte = 0x1
+	sysLedYellow  byte = 0xc
+	sysLedOff     byte = 0x80
+	fanLed        byte = 0x6
+	fanLedGreen   byte = 0x2
+	fanLedYellow  byte = 0x6
+	fanLedOff     byte = 0x0
+	deviceVer     byte
 )
 
 type LedCon struct {
@@ -48,6 +48,7 @@ type LedCon struct {
 	MuxBus   int
 	MuxAddr  int
 	MuxValue int
+	Reset    string
 }
 
 func getLedRegs() *ledRegs { return (*ledRegs)(regsPointer) }
@@ -340,6 +341,31 @@ func (r *regi16) set(h *LedCon, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 func (h *LedCon) LedFpInit() {
 	var d byte
 
+	pin, found := gpio.Pins[h.Reset]
+	if found {
+		pin.SetValue(true)
+	}
+
+	e := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
+	e.GetInfo()
+	deviceVer = e.Fields.DeviceVersion
+	if deviceVer == 0xff || deviceVer == 0x00 {
+		psuLed = []uint8{0x0c, 0x03}
+		psuLedYellow = []uint8{0x00, 0x00}
+		psuLedOff = []uint8{0x04, 0x01}
+		sysLed = 0xc0
+		sysLedGreen = 0x0
+		sysLedYellow = 0xc
+		sysLedOff = 0x80
+		fanLed = 0x30
+		fanLedGreen = 0x10
+		fanLedYellow = 0x20
+		fanLedOff = 0x30
+	}
+
 	r := getLedRegs()
 	o := r.Output0.get(h)
 
@@ -358,6 +384,20 @@ func (h *LedCon) LedStatus() {
 	r := getLedRegs()
 	var o, c uint8
 	var d byte
+
+	if deviceVer == 0xff || deviceVer == 0x00 {
+		psuLed = []uint8{0x0c, 0x03}
+		psuLedYellow = []uint8{0x00, 0x00}
+		psuLedOff = []uint8{0x04, 0x01}
+		sysLed = 0xc0
+		sysLedGreen = 0x0
+		sysLedYellow = 0xc
+		sysLedOff = 0x80
+		fanLed = 0x30
+		fanLedGreen = 0x10
+		fanLedYellow = 0x20
+		fanLedOff = 0x30
+	}
 
 	fanFail := false
 	fanStatChange := false
@@ -428,7 +468,9 @@ func (h *LedCon) LedStatus() {
 			r.Output0.set(h, o)
 			r.Config0.set(h, c)
 			lastPsuStatus[j] = p
-			log.Print("notice: psu", j+1, " ", p)
+			if p != "" {
+				log.Print("notice: psu", j+1, " ", p)
+			}
 		}
 	}
 }

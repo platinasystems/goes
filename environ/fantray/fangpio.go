@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"unsafe"
 
+	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/i2c"
 	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/redis"
@@ -34,11 +35,12 @@ const (
 )
 
 var fanTrayLedOff = []uint8{0x0, 0x0, 0x0, 0x0}
-var fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
-var fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
+var fanTrayLedGreen = []uint8{0x20, 0x02, 0x20, 0x02}
+var fanTrayLedYellow = []uint8{0x10, 0x01, 0x10, 0x01}
 var fanTrayLedBits = []uint8{0x30, 0x03, 0x30, 0x03}
 var fanTrayDirBits = []uint8{0x80, 0x08, 0x80, 0x08}
 var fanTrayAbsBits = []uint8{0x40, 0x04, 0x40, 0x04}
+var deviceVer byte
 
 func getFanGpioRegs() *fanGpioRegs { return (*fanGpioRegs)(regsPointer) }
 
@@ -329,6 +331,21 @@ func (r *regi16) set(h *FanStat, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 
 func (h *FanStat) FanTrayLedInit() {
 	r := getFanGpioRegs()
+
+	e := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
+	e.GetInfo()
+	deviceVer = e.Fields.DeviceVersion
+	if deviceVer == 0xff || deviceVer == 0x00 {
+		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
+		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
+	} else {
+		fanTrayLedGreen = []uint8{0x20, 0x02, 0x20, 0x02}
+		fanTrayLedYellow = []uint8{0x10, 0x01, 0x10, 0x01}
+	}
+
 	r.Output[0].set(h, 0xff&(fanTrayLedOff[2]|fanTrayLedOff[3]))
 	r.Output[1].set(h, 0xff&(fanTrayLedOff[0]|fanTrayLedOff[1]))
 	r.Config[0].set(h, 0xff^fanTrayLeds)
@@ -339,6 +356,16 @@ func (h *FanStat) FanTrayLedInit() {
 func (h *FanStat) FanTrayStatus(i uint8) string {
 	var s string
 	var f string
+
+	if deviceVer == 0xff || deviceVer == 0x00 {
+		log.Print("jlp: here")
+		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
+		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
+	} else {
+		fanTrayLedGreen = []uint8{0x20, 0x02, 0x20, 0x02}
+		fanTrayLedYellow = []uint8{0x10, 0x01, 0x10, 0x01}
+	}
+
 	r := getFanGpioRegs()
 	n := 0
 	i--
