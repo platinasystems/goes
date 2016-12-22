@@ -23,12 +23,13 @@ import (
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/nuvoton"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/nxp"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/ti"
+	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/info"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
+	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/machined"
 	"github.com/platinasystems/go/goes/internal/fdt"
 	"github.com/platinasystems/go/goes/internal/fdtgpio"
 	"github.com/platinasystems/go/goes/optional/gpio"
 	"github.com/platinasystems/go/goes/optional/i2c"
-	"github.com/platinasystems/go/goes/optional/machined"
 	"github.com/platinasystems/go/goes/optional/telnetd"
 	"github.com/platinasystems/go/goes/optional/toggle"
 	"github.com/platinasystems/go/goes/optional/watchdog"
@@ -36,7 +37,6 @@ import (
 	"github.com/platinasystems/go/goes/required/nld"
 	"github.com/platinasystems/go/goes/required/redisd"
 	gogpio "github.com/platinasystems/go/gpio"
-	"github.com/platinasystems/go/info"
 )
 
 type parser interface {
