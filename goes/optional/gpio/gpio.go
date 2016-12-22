@@ -11,7 +11,7 @@ import (
 	"sort"
 
 	"github.com/platinasystems/go/fdt"
-	"github.com/platinasystems/go/fdtgpio"
+	"github.com/platinasystems/go/goes/internal/fdtgpio"
 	"github.com/platinasystems/go/gpio"
 )
 

@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/platinasystems/go/fdt"
-	"github.com/platinasystems/go/fdtgpio"
+	"github.com/platinasystems/go/goes/internal/fdtgpio"
 	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/gpio"
 )
