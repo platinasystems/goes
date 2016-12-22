@@ -20,7 +20,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/goes/internal/flags"
-	"github.com/platinasystems/go/goes/pidfile"
 )
 
 const (
@@ -206,13 +205,8 @@ func (byName ByName) Main(args ...string) (err error) {
 	}
 	if g.Kind.IsDaemon() {
 		sig := make(chan os.Signal)
-		pidfn, terr := pidfile.New(name)
-		if terr != nil {
-			err = terr
-			return
-		}
 		signal.Notify(sig, syscall.SIGTERM)
-		go g.wait(pidfn, sig)
+		go g.wait(sig)
 	}
 	err = g.Main(args...)
 	return
@@ -272,7 +266,7 @@ func (byName ByName) Plot(cmds ...interface{}) {
 	}
 }
 
-func (g *Goes) wait(pidfn string, ch chan os.Signal) {
+func (g *Goes) wait(ch chan os.Signal) {
 	for sig := range ch {
 		if sig == syscall.SIGTERM {
 			if g.Close != nil {
@@ -280,11 +274,9 @@ func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 					fmt.Fprintln(os.Stderr, err)
 				}
 			}
-			os.Remove(pidfn)
 			fmt.Println("killed")
 			os.Exit(0)
 		}
-		os.Remove(pidfn)
 		break
 	}
 }

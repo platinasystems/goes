@@ -15,7 +15,6 @@ import (
 	"github.com/platinasystems/go/goes/internal/assert"
 	"github.com/platinasystems/go/goes/internal/kill"
 	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/goes/pidfile"
 	"github.com/platinasystems/go/goes/sockfile"
 )
 
@@ -63,7 +62,6 @@ func (c *cmd) Main(args ...string) error {
 		}
 	}
 	os.RemoveAll(sockfile.Dir)
-	os.RemoveAll(pidfile.Dir)
 	return err
 }
 
