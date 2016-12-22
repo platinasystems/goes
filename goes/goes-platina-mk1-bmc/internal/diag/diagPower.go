@@ -6,10 +6,10 @@ package diag
 
 import (
 	"fmt"
-	"github.com/platinasystems/go/environ/ti"
 	"time"
 
 	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/ti"
 )
 
 func diagPower() error {
