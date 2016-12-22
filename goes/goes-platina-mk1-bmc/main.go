@@ -24,6 +24,7 @@ import (
 	"github.com/platinasystems/go/fdt"
 	"github.com/platinasystems/go/fdtgpio"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/diag"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
 	"github.com/platinasystems/go/goes/optional/gpio"
 	"github.com/platinasystems/go/goes/optional/i2c"
@@ -141,6 +142,7 @@ func main() {
 	g := make(goes.ByName)
 	g.Plot(required.New()...)
 	g.Plot(
+		diag.New(),
 		gpio.New(),
 		i2c.New(),
 		// FIXME: remove machined after converting remaining info
