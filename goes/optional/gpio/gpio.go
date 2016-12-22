@@ -12,7 +12,7 @@ import (
 
 	"github.com/platinasystems/go/goes/internal/fdt"
 	"github.com/platinasystems/go/goes/internal/fdtgpio"
-	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/goes/internal/gpio"
 )
 
 const Name = "gpio"

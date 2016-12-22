@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/goes/internal/gpio"
 	"github.com/platinasystems/go/i2c"
 	"github.com/platinasystems/go/log"
 )

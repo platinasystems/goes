@@ -11,7 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/eeprom"
-	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/goes/internal/gpio"
 	"github.com/platinasystems/go/i2c"
 	"github.com/platinasystems/go/log"
 	"github.com/platinasystems/go/redis"
