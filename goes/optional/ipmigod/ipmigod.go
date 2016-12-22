@@ -11,8 +11,8 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/goes/internal/parms"
+	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/goes/machine/ipmigod/internal"
-	"github.com/platinasystems/go/redis"
 )
 
 const Name = "ipmigod"

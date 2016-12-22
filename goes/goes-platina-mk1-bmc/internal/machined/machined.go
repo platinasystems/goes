@@ -13,10 +13,10 @@ import (
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/info"
+	"github.com/platinasystems/go/goes/internal/redis"
+	"github.com/platinasystems/go/goes/internal/redis/rpc/args"
+	"github.com/platinasystems/go/goes/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/goes/sockfile"
-	"github.com/platinasystems/go/redis"
-	"github.com/platinasystems/go/redis/rpc/args"
-	"github.com/platinasystems/go/redis/rpc/reply"
 )
 
 const Name = "machined"

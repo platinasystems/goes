@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/goes/internal/redis"
 )
 
 const Name = "hgetall"

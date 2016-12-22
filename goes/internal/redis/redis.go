@@ -14,8 +14,8 @@ import (
 	"unicode"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/platinasystems/go/goes/internal/redis/rpc/args"
 	"github.com/platinasystems/go/goes/sockfile"
-	"github.com/platinasystems/go/redis/rpc/args"
 )
 
 const timeout = 500 * time.Millisecond

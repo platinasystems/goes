@@ -8,9 +8,9 @@ package reg
 import (
 	netrpc "net/rpc"
 
+	"github.com/platinasystems/go/goes/internal/redis/rpc"
+	"github.com/platinasystems/go/goes/internal/redis/rpc/args"
 	"github.com/platinasystems/go/goes/sockfile"
-	"github.com/platinasystems/go/redis/rpc"
-	"github.com/platinasystems/go/redis/rpc/args"
 )
 
 type Reg struct {

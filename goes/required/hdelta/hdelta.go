@@ -14,7 +14,7 @@ import (
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/goes/internal/redis"
 )
 
 const Name = "hdelta"

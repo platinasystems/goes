@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/goes/internal/redis"
 )
 
 const Name = "uptimed"

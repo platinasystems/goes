@@ -23,10 +23,10 @@ import (
 	"github.com/platinasystems/go/goes/internal/cmdline"
 	"github.com/platinasystems/go/goes/internal/group"
 	"github.com/platinasystems/go/goes/internal/parms"
+	"github.com/platinasystems/go/goes/internal/redis"
+	"github.com/platinasystems/go/goes/internal/redis/rpc/reg"
 	"github.com/platinasystems/go/goes/sockfile"
 	"github.com/platinasystems/go/goes/varrun"
-	"github.com/platinasystems/go/redis"
-	"github.com/platinasystems/go/redis/rpc/reg"
 	. "github.com/platinasystems/go/version"
 )
 

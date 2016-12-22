@@ -11,6 +11,7 @@ import (
 
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/goes/optional/gpio"
 	"github.com/platinasystems/go/goes/optional/i2c"
 	"github.com/platinasystems/go/goes/optional/toggle"
@@ -23,7 +24,6 @@ import (
 	"github.com/platinasystems/go/goes/required/redisd"
 	"github.com/platinasystems/go/goes/required/start"
 	"github.com/platinasystems/go/goes/required/stop"
-	goredis "github.com/platinasystems/go/redis"
 	govnet "github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
@@ -48,7 +48,7 @@ func main() {
 	redisd.Devs = []string{"lo", "eth0"}
 	redisd.Hook = getEepromData
 	start.ConfHook = func() error {
-		return goredis.Hwait(goredis.DefaultHash, "vnet.ready", "true",
+		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
 			10*time.Second)
 	}
 	stop.Hook = stopHook

@@ -5,9 +5,9 @@
 package main
 
 import (
+	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/goes/optional/vnetd"
 	"github.com/platinasystems/go/i2c"
-	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"

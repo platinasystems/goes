@@ -7,7 +7,7 @@ package hdel
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/goes/internal/redis"
 )
 
 const Name = "hdel"

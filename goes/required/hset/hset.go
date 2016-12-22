@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/goes/internal/flags"
-	"github.com/platinasystems/go/redis"
+	"github.com/platinasystems/go/goes/internal/redis"
 )
 
 const Name = "hset"
