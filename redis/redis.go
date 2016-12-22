@@ -7,8 +7,11 @@ package redis
 
 import (
 	"fmt"
+	"io"
 	"regexp"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/goes/sockfile"
@@ -21,6 +24,47 @@ var DefaultHash = "platina"
 
 var keyRe *regexp.Regexp
 var empty = struct{}{}
+
+func Fprintln(w io.Writer, s string) {
+	s = Quotes(s)
+	if len(s) == 0 {
+		return
+	}
+	w.Write([]byte(s))
+	if s[len(s)-1] != '\n' {
+		w.Write([]byte{'\n'})
+	}
+}
+
+func Quotes(s string) string {
+	for _, r := range s {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return fmt.Sprintf("%q", s)
+		}
+	}
+	return s
+}
+
+// Complete redis Key and Subkey. This skips over leading '-' prefaced flags.
+func Complete(args ...string) (c []string) {
+	if len(args) != 0 && strings.HasPrefix(args[0], "-") {
+		args = args[1:]
+	}
+	switch len(args) {
+	case 0:
+		c, _ = Keys(".*")
+	case 1:
+		c, _ = Keys(args[0] + ".*")
+	case 2:
+		subkeys, _ := Hkeys(args[0])
+		for _, subkey := range subkeys {
+			if strings.HasPrefix(subkey, args[1]) {
+				c = append(c, subkey)
+			}
+		}
+	}
+	return
+}
 
 // Split a structured redis key.
 //

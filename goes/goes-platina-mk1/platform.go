@@ -5,7 +5,7 @@
 package main
 
 import (
-	"github.com/platinasystems/go/goes/net/vnetd"
+	"github.com/platinasystems/go/goes/optional/vnetd"
 	"github.com/platinasystems/go/i2c"
 	"github.com/platinasystems/go/redis"
 	"github.com/platinasystems/go/vnet"

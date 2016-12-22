@@ -11,22 +11,18 @@ import (
 
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/builtin"
-	"github.com/platinasystems/go/goes/builtin/license"
-	"github.com/platinasystems/go/goes/builtin/patents"
-	"github.com/platinasystems/go/goes/core"
-	"github.com/platinasystems/go/goes/fs"
-	"github.com/platinasystems/go/goes/kernel"
-	"github.com/platinasystems/go/goes/machine"
-	"github.com/platinasystems/go/goes/machine/start"
-	"github.com/platinasystems/go/goes/machine/stop"
-	"github.com/platinasystems/go/goes/net"
-	"github.com/platinasystems/go/goes/net/nld"
-	"github.com/platinasystems/go/goes/net/vnet"
-	"github.com/platinasystems/go/goes/net/vnetd"
-	"github.com/platinasystems/go/goes/redis"
-	"github.com/platinasystems/go/goes/redis/redisd"
-	"github.com/platinasystems/go/goes/test"
+	"github.com/platinasystems/go/goes/optional/gpio"
+	"github.com/platinasystems/go/goes/optional/i2c"
+	"github.com/platinasystems/go/goes/optional/toggle"
+	"github.com/platinasystems/go/goes/optional/vnet"
+	"github.com/platinasystems/go/goes/optional/vnetd"
+	"github.com/platinasystems/go/goes/required"
+	"github.com/platinasystems/go/goes/required/license"
+	"github.com/platinasystems/go/goes/required/nld"
+	"github.com/platinasystems/go/goes/required/patents"
+	"github.com/platinasystems/go/goes/required/redisd"
+	"github.com/platinasystems/go/goes/required/start"
+	"github.com/platinasystems/go/goes/required/stop"
 	goredis "github.com/platinasystems/go/redis"
 	govnet "github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -46,16 +42,8 @@ func main() {
 	license.Others = []license.Other{{fe1path, fe1copyright.License}}
 	patents.Others = []patents.Other{{fe1path, fe1copyright.Patents}}
 	g := make(goes.ByName)
-	g.Plot(builtin.New()...)
-	g.Plot(core.New()...)
-	g.Plot(fs.New()...)
-	g.Plot(kernel.New()...)
-	g.Plot(machine.New()...)
-	g.Plot(net.New()...)
-	g.Plot(redis.New()...)
-	// g.Plot(test.New()...)
-	_ = test.New
-	g.Plot(vnet.New(), vnetd.New())
+	g.Plot(required.New()...)
+	g.Plot(gpio.New(), i2c.New(), toggle.New(), vnet.New(), vnetd.New())
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
 	redisd.Hook = getEepromData

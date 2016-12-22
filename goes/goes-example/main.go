@@ -11,30 +11,14 @@ import (
 	stdnet "net"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/builtin"
-	"github.com/platinasystems/go/goes/core"
-	"github.com/platinasystems/go/goes/fs"
-	"github.com/platinasystems/go/goes/kernel"
-	"github.com/platinasystems/go/goes/machine"
-	"github.com/platinasystems/go/goes/net"
-	"github.com/platinasystems/go/goes/net/nld"
-	"github.com/platinasystems/go/goes/net/telnetd"
-	"github.com/platinasystems/go/goes/redis"
-	"github.com/platinasystems/go/goes/redis/redisd"
-	"github.com/platinasystems/go/goes/test"
+	"github.com/platinasystems/go/goes/required"
+	"github.com/platinasystems/go/goes/required/nld"
+	"github.com/platinasystems/go/goes/required/redisd"
 )
 
 func main() {
 	g := make(goes.ByName)
-	g.Plot(builtin.New()...)
-	g.Plot(core.New()...)
-	g.Plot(fs.New()...)
-	g.Plot(kernel.New()...)
-	g.Plot(machine.New()...)
-	g.Plot(net.New()...)
-	g.Plot(redis.New()...)
-	g.Plot(telnetd.New())
-	g.Plot(test.New()...)
+	g.Plot(required.New()...)
 	redisd.Machine = "example"
 	nld.Hook = func() error {
 		itfs, err := stdnet.Interfaces()

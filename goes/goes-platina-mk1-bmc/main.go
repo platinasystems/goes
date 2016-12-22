@@ -24,21 +24,17 @@ import (
 	"github.com/platinasystems/go/fdt"
 	"github.com/platinasystems/go/fdtgpio"
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/builtin"
-	"github.com/platinasystems/go/goes/core"
-	"github.com/platinasystems/go/goes/fs"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
-	"github.com/platinasystems/go/goes/kernel"
-	"github.com/platinasystems/go/goes/kernel/watchdog"
-	"github.com/platinasystems/go/goes/machine"
-	"github.com/platinasystems/go/goes/machine/i2c"
-	"github.com/platinasystems/go/goes/machine/machined"
-	"github.com/platinasystems/go/goes/net"
-	"github.com/platinasystems/go/goes/net/nld"
-	"github.com/platinasystems/go/goes/net/telnetd"
-	"github.com/platinasystems/go/goes/redis"
-	"github.com/platinasystems/go/goes/redis/redisd"
-	"github.com/platinasystems/go/gpio"
+	"github.com/platinasystems/go/goes/optional/gpio"
+	"github.com/platinasystems/go/goes/optional/i2c"
+	"github.com/platinasystems/go/goes/optional/machined"
+	"github.com/platinasystems/go/goes/optional/telnetd"
+	"github.com/platinasystems/go/goes/optional/toggle"
+	"github.com/platinasystems/go/goes/optional/watchdog"
+	"github.com/platinasystems/go/goes/required"
+	"github.com/platinasystems/go/goes/required/nld"
+	"github.com/platinasystems/go/goes/required/redisd"
+	gogpio "github.com/platinasystems/go/gpio"
 	"github.com/platinasystems/go/info"
 )
 
@@ -141,19 +137,18 @@ var stageKeyFloat64 string
 var stageFlagFloat64 int = 0
 
 func main() {
-	gpio.File = "/boot/platina-mk1-bmc.dtb"
+	gogpio.File = "/boot/platina-mk1-bmc.dtb"
 	g := make(goes.ByName)
-	g.Plot(builtin.New()...)
-	g.Plot(core.New()...)
-	g.Plot(fs.New()...)
-	g.Plot(kernel.New()...)
-	g.Plot(watchdog.New())
-	g.Plot(machine.New()...)
-	// FIXME: remove machined after converting remaining info
-	g.Plot(machined.New())
-	g.Plot(net.New()...)
-	g.Plot(redis.New()...)
-	g.Plot(telnetd.New())
+	g.Plot(required.New()...)
+	g.Plot(
+		gpio.New(),
+		i2c.New(),
+		// FIXME: remove machined after converting remaining info
+		machined.New(),
+		telnetd.New(),
+		toggle.New(),
+		watchdog.New(),
+	)
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}
 	nld.Prefixes = []string{"lo.", "eth0."}
@@ -164,28 +159,28 @@ func main() {
 func enableToggle() error {
 	time.Sleep(time.Second * time.Duration(45))
 
-	gpio.Aliases = make(gpio.GpioAliasMap)
-	gpio.Pins = make(gpio.PinMap)
+	gogpio.Aliases = make(gogpio.GpioAliasMap)
+	gogpio.Pins = make(gogpio.PinMap)
 
 	// Parse linux.dtb to generate gpio map for this machine
-	if b, err := ioutil.ReadFile(gpio.File); err == nil {
+	if b, err := ioutil.ReadFile(gogpio.File); err == nil {
 		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
 		t.Parse(b)
 
 		t.MatchNode("aliases", fdtgpio.GatherAliases)
 		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
 	} else {
-		return fmt.Errorf("%s: %v", gpio.File, err)
+		return fmt.Errorf("%s: %v", gogpio.File, err)
 	}
 
-	pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
+	pin, found := gogpio.Pins["CPU_TO_MAIN_I2C_EN"]
 	if !found {
 		return fmt.Errorf("%s: not found", "CPU_TO_MAIN_I2C_EN")
 	}
 	pin.SetValue(true)
 	i2c.WriteByte(0, 0x74, 2, 0xff)
 	i2c.WriteByte(0, 0x74, 6, 0xdf)
-	pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
+	pin, found = gogpio.Pins["FP_BTN_UARTSEL_EN_L"]
 	if !found {
 		return fmt.Errorf("%s: not found", "FP_BTN_UARTSEL_EN_L")
 	}
@@ -209,22 +204,22 @@ func hook() error {
 	regWriteUint16["update.interval"] = funcU16(change_interval)
 	regWriteString["update.counters"] = funcS(clear_counters)
 
-	gpio.Aliases = make(gpio.GpioAliasMap)
-	gpio.Pins = make(gpio.PinMap)
+	gogpio.Aliases = make(gogpio.GpioAliasMap)
+	gogpio.Pins = make(gogpio.PinMap)
 
 	// Parse linux.dtb to generate gpio map for this machine
-	if b, err := ioutil.ReadFile(gpio.File); err == nil {
+	if b, err := ioutil.ReadFile(gogpio.File); err == nil {
 		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
 		t.Parse(b)
 
 		t.MatchNode("aliases", fdtgpio.GatherAliases)
 		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
 	} else {
-		return fmt.Errorf("%s: %v", gpio.File, err)
+		return fmt.Errorf("%s: %v", gogpio.File, err)
 	}
 
 	// Set gpio input/output as defined in dtb
-	for name, pin := range gpio.Pins {
+	for name, pin := range gogpio.Pins {
 		err := pin.SetDirection()
 		if err != nil {
 			fmt.Printf("%s: %v\n", name, err)
