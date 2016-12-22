@@ -1,3 +1,7 @@
+// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
 // Package fit parses Flattened Image Tree image tree blob files.
 package fit
 
@@ -6,7 +10,7 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"fmt"
-	"github.com/platinasystems/go/fdt"
+	"github.com/platinasystems/go/goes/internal/fdt"
 	"hash/crc32"
 	"strings"
 	"time"

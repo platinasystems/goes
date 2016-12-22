@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/platinasystems/go/fdt"
+	"github.com/platinasystems/go/goes/internal/fdt"
 	"github.com/platinasystems/go/goes/internal/fdtgpio"
 	"github.com/platinasystems/go/goes/internal/flags"
 	"github.com/platinasystems/go/gpio"

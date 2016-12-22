@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/platinasystems/go/fdt"
+	"github.com/platinasystems/go/goes/internal/fdt"
 	"github.com/platinasystems/go/gpio"
 )
 
