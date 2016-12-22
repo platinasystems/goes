@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/assert"
 	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/goes/sockfile"
 )
 
@@ -42,7 +42,7 @@ func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 func (c *cmd) Main(args ...string) error {
 	parm, args := parms.New(args, "-start", "-stop")
 
-	err := internal.AssertRoot()
+	err := assert.Root()
 	if err != nil {
 		return err
 	}

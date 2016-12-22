@@ -9,7 +9,8 @@ package reload
 import (
 	"syscall"
 
-	"github.com/platinasystems/go/goes/machine/internal"
+	"github.com/platinasystems/go/goes/internal/assert"
+	"github.com/platinasystems/go/goes/internal/kill"
 )
 
 const Name = "reload"
@@ -22,11 +23,11 @@ func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name }
 
 func (cmd) Main(...string) error {
-	err := internal.AssertRoot()
+	err := assert.Root()
 	if err != nil {
 		return err
 	}
-	return internal.KillAll(syscall.SIGHUP)
+	return kill.All(syscall.SIGHUP)
 }
 
 func (cmd) Apropos() map[string]string {

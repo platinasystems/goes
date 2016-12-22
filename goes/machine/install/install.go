@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/machine/internal"
+	"github.com/platinasystems/go/goes/internal/assert"
 	"github.com/platinasystems/go/goes/pidfile"
 )
 
@@ -33,7 +33,7 @@ func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name }
 
 func (cmd) Main(args ...string) error {
-	err := internal.AssertRoot()
+	err := assert.Root()
 	if err != nil {
 		return err
 	}

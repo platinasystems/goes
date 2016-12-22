@@ -12,8 +12,9 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/assert"
+	"github.com/platinasystems/go/goes/internal/kill"
 	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/goes/machine/internal"
 	"github.com/platinasystems/go/goes/pidfile"
 	"github.com/platinasystems/go/goes/sockfile"
 )
@@ -36,7 +37,7 @@ func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 func (c *cmd) Main(args ...string) error {
 	byName := goes.ByName(*c)
 	parm, args := parms.New(args, "-start", "-stop")
-	err := internal.AssertRoot()
+	err := assert.Root()
 	if err != nil {
 		return err
 	}
@@ -51,9 +52,9 @@ func (c *cmd) Main(args ...string) error {
 			return err
 		}
 	}
-	err = internal.KillAll(syscall.SIGTERM)
+	err = kill.All(syscall.SIGTERM)
 	time.Sleep(5 * time.Second)
-	if e := internal.KillAll(syscall.SIGKILL); err == nil {
+	if e := kill.All(syscall.SIGKILL); err == nil {
 		err = e
 	}
 	if t := Hook(); t != nil {

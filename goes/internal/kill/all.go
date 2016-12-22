@@ -2,10 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package internal
+package kill
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,14 +12,8 @@ import (
 	"syscall"
 )
 
-func AssertRoot() (err error) {
-	if os.Geteuid() != 0 {
-		err = errors.New("you aren't root")
-	}
-	return
-}
-
-func KillAll(sig syscall.Signal) (err error) {
+// Signal all processes with /proc/self/exe -> this program.
+func All(sig syscall.Signal) (err error) {
 	thisprog, err := os.Readlink("/proc/self/exe")
 	if err != nil {
 		return
