@@ -68,7 +68,7 @@ type cmd goes.ByName
 
 func New() *cmd { return new(cmd) }
 
-func (*cmd) Kind() goes.Kind { return goes.Builtin }
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return "cli [-x] [URL]" }
 
@@ -92,7 +92,7 @@ func (c *cmd) Main(args ...string) error {
 	)
 	defer func() {
 		for _, g := range goes.ByName(*c) {
-			if g.Kind.IsBuiltin() && g.Close != nil {
+			if g.Kind.IsDontFork() && g.Close != nil {
 				t := g.Close()
 				if err == nil {
 					err = t
@@ -193,7 +193,7 @@ commandLoop:
 			continue commandLoop
 		}
 
-		if end == 0 && (g.Kind.IsBuiltin() || name == os.Args[0]) {
+		if end == 0 && (g.Kind.IsDontFork() || name == os.Args[0]) {
 			if flag["-x"] {
 				fmt.Println("+", pl.Slices[end])
 			}

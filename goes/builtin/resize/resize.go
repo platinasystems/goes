@@ -20,7 +20,7 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) Kind() goes.Kind { return goes.Builtin }
+func (cmd) Kind() goes.Kind { return goes.DontFork }
 func (cmd) String() string  { return Name }
 func (cmd) Usage() string   { return Name }
 

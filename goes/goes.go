@@ -29,7 +29,7 @@ const (
 )
 
 const (
-	Builtin Kind = 1 << iota
+	DontFork Kind = 1 << iota
 	Daemon
 	Hidden
 )
@@ -289,7 +289,7 @@ func (g *Goes) wait(pidfn string, ch chan os.Signal) {
 	}
 }
 
-func (k Kind) IsBuiltin() bool     { return (k & Builtin) == Builtin }
+func (k Kind) IsDontFork() bool    { return (k & DontFork) == DontFork }
 func (k Kind) IsDaemon() bool      { return (k & Daemon) == Daemon }
 func (k Kind) IsHidden() bool      { return (k & Hidden) == Hidden }
 func (k Kind) IsInteractive() bool { return (k & (Daemon | Hidden)) == 0 }
@@ -297,10 +297,12 @@ func (k Kind) IsInteractive() bool { return (k & (Daemon | Hidden)) == 0 }
 func (k Kind) String() string {
 	s := "unknown"
 	switch k {
-	case Builtin:
-		s = "builtin"
+	case DontFork:
+		s = "don't fork"
 	case Daemon:
 		s = "daemon"
+	case Hidden:
+		s = "hidden"
 	}
 	return s
 }

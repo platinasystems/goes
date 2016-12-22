@@ -20,7 +20,7 @@ func New() *cmd { return new(cmd) }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
-func (*cmd) Kind() goes.Kind { return goes.Builtin }
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 
 func (*cmd) String() string { return Name }
 
