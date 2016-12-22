@@ -17,13 +17,9 @@ import (
 )
 
 var (
-	dummy            byte
-	regsPointer      = unsafe.Pointer(&dummy)
-	regsAddr         = uintptr(unsafe.Pointer(&dummy))
-	lastSpeed        string
-	fanFail          = false
-	allInstalled     = true
-	lastAllInstalled = true
+	dummy       byte
+	regsPointer = unsafe.Pointer(&dummy)
+	regsAddr    = uintptr(unsafe.Pointer(&dummy))
 )
 
 type HwMonitor struct {
@@ -366,35 +362,10 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 	s := "fan_tray." + strconv.Itoa(int(n)) + ".status"
 	p, _ := redis.Hget(redis.DefaultHash, s)
 
-	//set fan speed to max and return 0 rpm if fan tray is not present
+	//set fan speed to max and return 0 rpm if fan tray is not present or failed
 	if strings.Contains(p, "not installed") {
-		allInstalled = false
-		if lastAllInstalled != allInstalled {
-			redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
-			lastAllInstalled = false
-		}
 		rpm = uint16(0)
 	} else {
-
-		//if all fan trays are present, return to previous fan speed
-		fanFail = false
-		for j := 1; j <= maxFanTrays; j++ {
-			s = "fan_tray." + strconv.Itoa(int(j)) + ".status"
-			p, _ = redis.Hget(redis.DefaultHash, s)
-			if strings.Contains(p, "not installed") {
-				fanFail = true
-				break
-			}
-		}
-
-		if !fanFail {
-			allInstalled = true
-			if lastAllInstalled != allInstalled {
-				lastAllInstalled = true
-				redis.Hset(redis.DefaultHash, "fan_tray.speed", lastSpeed)
-			}
-		}
-
 		//remap physical to logical, 0:7 -> 7:0
 		i = i + 7 - (2 * i)
 		r := getHwmRegsBank0()
@@ -426,7 +397,6 @@ func (h *HwMonitor) FanInit() {
 
 	//set default speed to auto
 	h.SetFanSpeed("auto")
-	lastSpeed = "auto"
 
 	//enable temperature monitoring
 	r2.BankSelect.set(h, 0x80)
@@ -443,16 +413,18 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 	r2 := getHwmRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 
-	//if not all fan trays are installed, fan speed is fixed at high
-	if !allInstalled {
+	//if not all fan trays are installed or fan is failed, fan speed is fixed at high
+
+	p, _ := redis.Hget(redis.DefaultHash, s)
+
+	//set fan speed to max and return 0 rpm if fan tray is not present or failed
+	if strings.Contains(p, "not installed") || strings.Contains(p, "not installed") {
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		r2.FanOutValue2.set(h, high)
+		log.Print("notice: fan speed set to high due to a fan missing or a fan failure")
 		return
-	} else {
-		//if all fan trays present, save the set speed
-		lastSpeed = s
 	}
 
 	switch s {
@@ -494,23 +466,26 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 		//enable temp control of fans
 		r2.TempToFanMap1.set(h, 0xff)
 		r2.TempToFanMap2.set(h, 0xff)
-
+		log.Print("notice: fan speed set to ", s)
 	//static speed settings below, set hwm to manual mode, then set static speed
 	case "high":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		r2.FanOutValue2.set(h, high)
+		log.Print("notice: fan speed set to ", s)
 	case "med":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, med)
 		r2.FanOutValue2.set(h, med)
+		log.Print("notice: fan speed set to ", s)
 	case "low":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, low)
 		r2.FanOutValue2.set(h, low)
+		log.Print("notice: fan speed set to ", s)
 	default:
 	}
 

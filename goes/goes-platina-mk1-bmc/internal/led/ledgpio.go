@@ -40,6 +40,8 @@ var (
 	fanLedYellow  byte = 0x6
 	fanLedOff     byte = 0x0
 	deviceVer     byte
+	saveFanSpeed  string
+	forceFanSpeed bool
 )
 
 type LedCon struct {
@@ -365,6 +367,9 @@ func (h *LedCon) LedFpInit() {
 		fanLedYellow = 0x20
 		fanLedOff = 0x30
 	}
+	// save initial fan speed
+	saveFanSpeed, _ = redis.Hget(redis.DefaultHash, "fan_tray.speed")
+	forceFanSpeed = false
 
 	r := getLedRegs()
 	o := r.Output0.get(h)
@@ -399,21 +404,28 @@ func (h *LedCon) LedStatus() {
 		fanLedOff = 0x30
 	}
 
-	fanFail := false
+	allFanGood := true
 	fanStatChange := false
 	for j := 1; j <= maxFanTrays; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
+		if !strings.Contains(p, "ok") {
+			allFanGood = false
+		}
 		if lastFanStatus[j-1] != p {
 			fanStatChange = true
 			//if any fan tray is failed or not installed, set front panel FAN led to yellow
-			if strings.Contains(p, "warning") {
+			//log.Print ("last: ",lastFanStatus[j-1], " present: ", p)
+			if strings.Contains(p, "warning") && !strings.Contains(lastFanStatus[j-1], "not installed") {
 				o = r.Output0.get(h)
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedYellow
 				r.Output0.set(h, o)
 				log.Print("warning: fan tray ", j, " failure")
-				fanFail = true
+				if !forceFanSpeed {
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
+					forceFanSpeed = true
+				}
 			} else if strings.Contains(p, "not installed") {
 				o = r.Output0.get(h)
 				d = 0xff ^ fanLed
@@ -421,15 +433,24 @@ func (h *LedCon) LedStatus() {
 				o |= fanLedYellow
 				r.Output0.set(h, o)
 				log.Print("warning: fan tray ", j, " not installed")
-				fanFail = true
+				if !forceFanSpeed {
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
+					forceFanSpeed = true
+				}
+			} else if strings.Contains(lastFanStatus[j-1], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
+				log.Print("notice: fan tray ", j, " installed")
 			}
 		}
 		lastFanStatus[j-1] = p
 	}
 
+	if allFanGood && !forceFanSpeed {
+		saveFanSpeed, _ = redis.Hget(redis.DefaultHash, "fan_tray.speed")
+	}
+
 	//if any fan tray is failed or not installed, set front panel FAN led to yellow
 	if fanStatChange {
-		if !fanFail {
+		if allFanGood {
 			// if all fan trays have "ok" status, set front panel FAN led to green
 			allStat := true
 			for i := range lastFanStatus {
@@ -444,6 +465,8 @@ func (h *LedCon) LedStatus() {
 				o |= fanLedGreen
 				r.Output0.set(h, o)
 				log.Print("notice: all fan trays up")
+				redis.Hset(redis.DefaultHash, "fan_tray.speed", saveFanSpeed)
+				forceFanSpeed = false
 			}
 		}
 

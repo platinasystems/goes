@@ -24,6 +24,7 @@ var (
 )
 
 type Psu struct {
+	Slot       int
 	Installed  int
 	Id         string
 	Bus        int
@@ -618,8 +619,10 @@ func (h *Psu) SetAdminState(s string) {
 		switch s {
 		case "disable":
 			pin.SetValue(true)
+			log.Print("notice: psu", h.Slot, " ", s)
 		case "enable":
 			pin.SetValue(false)
+			log.Print("notice: psu", h.Slot, " ", s)
 		}
 	}
 }
