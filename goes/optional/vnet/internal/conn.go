@@ -8,7 +8,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/platinasystems/go/goes/sockfile"
+	"github.com/platinasystems/go/goes/internal/sockfile"
 )
 
 var Conn conn

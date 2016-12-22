@@ -17,7 +17,7 @@ import (
 	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/goes/internal/redis/rpc/args"
 	"github.com/platinasystems/go/goes/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/goes/sockfile"
+	"github.com/platinasystems/go/goes/internal/sockfile"
 	"github.com/platinasystems/go/netlink"
 )
 

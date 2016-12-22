@@ -10,7 +10,7 @@ import (
 
 	"github.com/platinasystems/go/goes/internal/redis/rpc"
 	"github.com/platinasystems/go/goes/internal/redis/rpc/args"
-	"github.com/platinasystems/go/goes/sockfile"
+	"github.com/platinasystems/go/goes/internal/sockfile"
 )
 
 type Reg struct {

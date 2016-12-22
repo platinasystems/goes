@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/internal/group"
-	"github.com/platinasystems/go/goes/varrun"
+	"github.com/platinasystems/go/goes/internal/varrun"
 )
 
 const Dir = varrun.Dir + "/socks"

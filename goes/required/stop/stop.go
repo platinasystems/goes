@@ -15,7 +15,7 @@ import (
 	"github.com/platinasystems/go/goes/internal/assert"
 	"github.com/platinasystems/go/goes/internal/kill"
 	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/goes/sockfile"
+	"github.com/platinasystems/go/goes/internal/sockfile"
 )
 
 const Name = "stop"

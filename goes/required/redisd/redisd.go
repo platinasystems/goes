@@ -25,8 +25,8 @@ import (
 	"github.com/platinasystems/go/goes/internal/parms"
 	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/goes/internal/redis/rpc/reg"
-	"github.com/platinasystems/go/goes/sockfile"
-	"github.com/platinasystems/go/goes/varrun"
+	"github.com/platinasystems/go/goes/internal/sockfile"
+	"github.com/platinasystems/go/goes/internal/varrun"
 	. "github.com/platinasystems/go/version"
 )
 
