@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"unsafe"
 
+	"github.com/platinasystems/go/goes/internal/log"
 	"github.com/platinasystems/go/i2c"
-	"github.com/platinasystems/go/log"
 )
 
 var (

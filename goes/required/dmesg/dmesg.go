@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/internal/flags"
+	"github.com/platinasystems/go/goes/internal/log"
 	"github.com/platinasystems/go/goes/internal/parms"
-	"github.com/platinasystems/go/log"
 )
 
 const Name = "dmesg"

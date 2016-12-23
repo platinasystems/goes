@@ -7,7 +7,7 @@ package log
 import (
 	"errors"
 
-	"github.com/platinasystems/go/log"
+	"github.com/platinasystems/go/goes/internal/log"
 )
 
 const Name = "log"

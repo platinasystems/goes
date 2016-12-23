@@ -13,13 +13,15 @@
 package eeprom
 
 import (
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/platinasystems/go/i2c"
-	"github.com/platinasystems/go/log"
 	"hash/crc32"
+
+	"github.com/platinasystems/go/i2c"
 )
 
 // EEPROM TLVs offsets
@@ -246,7 +248,7 @@ func (d *Device) getInfo() {
 		case crc:
 			f.CRC32 = uint(v[0])<<24 | uint(v[1])<<16 | uint(v[2])<<8 | uint(v[3])
 		default:
-			log.Print("unknown eeprom tlv: ", tlv, " value: ", v)
+			fmt.Fprint(os.Stderr, "unknown eeprom tlv: ", tlv, " value: ", v)
 		}
 	}
 	return

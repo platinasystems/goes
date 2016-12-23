@@ -12,9 +12,9 @@ import (
 
 	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes/internal/gpio"
+	"github.com/platinasystems/go/goes/internal/log"
 	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/i2c"
-	"github.com/platinasystems/go/log"
 )
 
 const (

@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/log"
 	"github.com/platinasystems/go/goes/internal/redis"
-	"github.com/platinasystems/go/log"
 )
 
 const Name = "goes-daemons"
