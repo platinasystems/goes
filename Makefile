@@ -29,29 +29,29 @@ version/version.go: $(gitdir)/HEAD
 	go generate ./version
 
 goes-example: | copyright/copyright.go version/version.go
-	$(gobuild) -o $@ ./goes/goes-example
+	$(gobuild) -o $@ ./main/goes-example
 
 goes-example-arm: arch=arm
 goes-example-arm: tags=netgo
 goes-example-arm: ldflags=-d
 goes-example-arm: | copyright/copyright.go version/version.go
-	$(gobuild) -o $@ ./goes/goes-example
+	$(gobuild) -o $@ ./main/goes-example
 
 goes-platina-mk1-bmc: arch=arm
 goes-platina-mk1-bmc: tags=netgo
 goes-platina-mk1-bmc: ldflags=-d
 goes-platina-mk1-bmc: | copyright/copyright.go version/version.go
-	$(gobuild) -o $@ ./goes/goes-platina-mk1-bmc
+	$(gobuild) -o $@ ./main/goes-platina-mk1-bmc
 
 goes-platina-mk1: tags=$(VNET_TAGS)
 goes-platina-mk1: gcflags=$(VNET_GCFLAGS)
 goes-platina-mk1: | copyright/copyright.go version/version.go
-	$(gobuild) -o $@ ./goes/goes-platina-mk1
+	$(gobuild) -o $@ ./main/goes-platina-mk1
 
 go-wip: tags=$(VNET_TAGS)
 go-wip: gcflags=$(VNET_GCFLAGS)
 go-wip:
-	$(gobuild) -o $@ ./goes/wip/y
+	$(gobuild) -o $@ ./wip/y
 
 .PHONY: clean
 clean:

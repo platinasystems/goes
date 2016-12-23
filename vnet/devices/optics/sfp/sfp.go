@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/platinasystems/go/goes/internal/i2c"
+	"github.com/platinasystems/go/internal/i2c"
 )
 
 type QsfpThreshold struct {

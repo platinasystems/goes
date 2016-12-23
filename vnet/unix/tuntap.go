@@ -10,7 +10,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/netlink"
+	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
