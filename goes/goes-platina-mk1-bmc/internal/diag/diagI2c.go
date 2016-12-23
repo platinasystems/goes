@@ -6,10 +6,10 @@ package diag
 
 import (
 	"fmt"
-	"github.com/platinasystems/go/i2c"
 	"time"
 
-	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/goes/internal/eeprom"
+	"github.com/platinasystems/go/goes/internal/i2c"
 )
 
 func diagI2c() error {

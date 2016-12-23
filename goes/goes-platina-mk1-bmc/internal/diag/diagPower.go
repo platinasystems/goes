@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/ti"
+	"github.com/platinasystems/go/goes/internal/eeprom"
 )
 
 func diagPower() error {

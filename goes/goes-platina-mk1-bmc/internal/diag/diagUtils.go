@@ -7,7 +7,7 @@ package diag
 import (
 	"fmt"
 	"github.com/platinasystems/go/goes/internal/gpio"
-	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/goes/internal/i2c"
 	"github.com/tatsushid/go-fastping"
 	"net"
 	"time"

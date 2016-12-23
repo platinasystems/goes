@@ -11,9 +11,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/platinasystems/go/goes/internal/i2c"
 	"github.com/platinasystems/go/goes/internal/log"
 	"github.com/platinasystems/go/goes/internal/redis"
-	"github.com/platinasystems/go/i2c"
 )
 
 var (

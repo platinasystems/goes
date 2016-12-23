@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/nuvoton"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/nxp"
-	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/goes/internal/i2c"
 	"time"
 )
 

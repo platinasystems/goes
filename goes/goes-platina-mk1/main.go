@@ -9,8 +9,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/internal/eeprom"
 	"github.com/platinasystems/go/goes/internal/redis"
 	"github.com/platinasystems/go/goes/optional/gpio"
 	"github.com/platinasystems/go/goes/optional/i2c"

@@ -51,7 +51,7 @@ goes-platina-mk1: | copyright/copyright.go version/version.go
 go-wip: tags=$(VNET_TAGS)
 go-wip: gcflags=$(VNET_GCFLAGS)
 go-wip:
-	$(gobuild) -o $@ ./wip/y
+	$(gobuild) -o $@ ./goes/wip/y
 
 .PHONY: clean
 clean:

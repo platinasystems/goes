@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/go/eeprom"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/diag"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/environ/fantray"
@@ -26,6 +25,7 @@ import (
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/info"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/led"
 	"github.com/platinasystems/go/goes/goes-platina-mk1-bmc/internal/machined"
+	"github.com/platinasystems/go/goes/internal/eeprom"
 	"github.com/platinasystems/go/goes/internal/fdt"
 	"github.com/platinasystems/go/goes/internal/fdtgpio"
 	"github.com/platinasystems/go/goes/internal/gpio"

@@ -1,19 +1,23 @@
+// Copyright 2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 //+build zion
 
 package main
 
 import (
+	"flag"
+	"fmt"
+	"unsafe"
+
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
-	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/goes/internal/i2c"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/vnetdevices/ethernet/switch/bcm"
 	"github.com/platinasystems/vnetdevices/optics/sfp"
-
-	"flag"
-	"fmt"
-	"unsafe"
 )
 
 type qsfp_cpld_regs struct {

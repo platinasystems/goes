@@ -1,7 +1,7 @@
 package eeprom
 
 import (
-	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/goes/internal/i2c"
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"

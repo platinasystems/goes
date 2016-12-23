@@ -21,7 +21,7 @@ import (
 
 	"hash/crc32"
 
-	"github.com/platinasystems/go/i2c"
+	"github.com/platinasystems/go/goes/internal/i2c"
 )
 
 // EEPROM TLVs offsets

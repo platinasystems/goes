@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/platinasystems/go/eeprom"
+	"github.com/platinasystems/go/goes/internal/eeprom"
 )
 
 const (

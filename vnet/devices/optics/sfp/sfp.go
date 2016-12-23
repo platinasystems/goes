@@ -5,13 +5,13 @@
 package sfp
 
 import (
-	"github.com/platinasystems/go/i2c"
-
 	"fmt"
 	"strings"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/platinasystems/go/goes/internal/i2c"
 )
 
 type QsfpThreshold struct {
