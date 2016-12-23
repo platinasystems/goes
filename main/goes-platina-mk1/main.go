@@ -61,7 +61,7 @@ func main() {
 }
 
 func stopHook() error {
-	for port := 0; port < 32; port++ {
+	for port := 1; port < 33; port++ {
 		for subport := 0; subport < 4; subport++ {
 			exec.Command("/bin/ip", "link", "delete",
 				fmt.Sprintf("eth-%d-%d", port, subport),

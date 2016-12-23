@@ -197,6 +197,7 @@ func (e *event) EventAction() {
 		si     vnet.Si
 		bw     vnet.Bandwidth
 		enable parse.Enable
+		media  string
 	)
 	if e.isReadyEvent {
 		e.i.pub <- fmt.Sprint(e.key, ": ", e.value)
@@ -209,6 +210,8 @@ func (e *event) EventAction() {
 		e.err <- hi.SetSpeed(&e.i.v, bw)
 	case e.in.Parse("%v.admin %v", &si, &e.i.v, &enable):
 		e.err <- si.SetAdminUp(&e.i.v, bool(enable))
+	case e.in.Parse("%v.media %s", &hi, &e.i.v, &media):
+		e.err <- hi.SetMedia(&e.i.v, media)
 	default:
 		e.err <- fmt.Errorf("can't set %s to %v", e.key, e.value)
 	}

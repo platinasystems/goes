@@ -144,11 +144,11 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 	}
 
 	phys := [32 + 1]fe1.PhyConfig{}
-	// No lane remapping, but the MK1 front panel ports are flipped..
+	// No lane remapping, but the MK1 front panel ports are flipped and 1-based.
 	for i := range phys {
 		p := &phys[i]
 		p.Index = uint8(i & 0x1f)
-		p.FrontPanelIndex = p.Index ^ 1
+		p.FrontPanelIndex = (p.Index ^ 1) + 1
 		p.IsManagement = i == 32
 	}
 	cf.Phys = phys[:]

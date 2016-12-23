@@ -32,6 +32,8 @@ type HwIf struct {
 
 	speed Bandwidth
 
+	media string
+
 	// Mask of SERDES lanes for this interface.
 	laneMask LaneMask
 
@@ -324,7 +326,18 @@ func (hw *HwIf) SetSpeed(v Bandwidth) (err error) {
 	}
 	return
 }
+func (hw *HwIf) SetMedia(pi string) (err error) {
+	vn := hw.vnet
+	h := vn.HwIfer(hw.hi)
+	err = h.SetMedia(pi)
+	if err == nil {
+		hw.media = pi
+	}
+	return
+}
+
 func (hi Hi) SetSpeed(v *Vnet, s Bandwidth) error { return v.HwIf(hi).SetSpeed(s) }
+func (hi Hi) SetMedia(v *Vnet, pi string) error   { return v.HwIf(hi).SetMedia(pi) }
 
 var ErrNotSupported = errors.New("not supported")
 
@@ -549,6 +562,7 @@ type Devicer interface {
 	LessThan(b HwInterfacer) bool
 	IsUnix() bool
 	ValidateSpeed(speed Bandwidth) error
+	SetMedia(pi string) error
 	SetLoopback(v IfLoopbackType) error
 	GetHwInterfaceCounterNames() InterfaceCounterNames
 	GetSwInterfaceCounterNames() InterfaceCounterNames

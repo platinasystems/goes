@@ -157,7 +157,7 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 		for i := range phys {
 			p := &phys[i]
 			p.Index = uint8(i & 0x1f)
-			p.FrontPanelIndex = p.Index ^ 1
+			p.FrontPanelIndex = (p.Index ^ 1) + 1
 			p.IsManagement = i == 32
 		}
 		cf.Phys = phys[:]
