@@ -8,7 +8,9 @@
 package main
 
 import (
-	stdnet "net"
+	"fmt"
+	"net"
+	"os"
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/required"
@@ -21,7 +23,7 @@ func main() {
 	g.Plot(required.New()...)
 	redisd.Machine = "example"
 	nld.Hook = func() error {
-		itfs, err := stdnet.Interfaces()
+		itfs, err := net.Interfaces()
 		if err != nil {
 			return nil
 		}
@@ -32,5 +34,7 @@ func main() {
 		nld.Prefixes = prefixes
 		return nil
 	}
-	g.Main()
+	if err := g.Main(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 }

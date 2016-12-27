@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -155,7 +156,9 @@ func main() {
 	redisd.Devs = []string{"lo", "eth0"}
 	nld.Prefixes = []string{"lo.", "eth0."}
 	machined.Hook = hook
-	g.Main()
+	if err := g.Main(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 }
 
 func enableToggle() error {

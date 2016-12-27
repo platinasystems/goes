@@ -113,34 +113,12 @@ func (byName ByName) Complete(prefix string) (ss []string) {
 //
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
-func (byName ByName) Main(args ...string) (err error) {
-	var sig chan os.Signal
-	defer func() {
-		if err == io.EOF {
-			err = nil
-		}
-		if err != nil {
-			if sig != nil {
-				fmt.Fprintln(os.Stderr, err)
-			} else {
-				fmt.Fprintf(os.Stderr, "%s: %v\n",
-					ProgBase(), err)
-			}
-		}
-		if sig != nil {
-			sig <- syscall.SIGABRT
-			os.Stdout.Sync()
-			os.Stderr.Sync()
-			os.Stdout.Close()
-			os.Stderr.Close()
-		}
-	}()
-
+func (byName ByName) Main(args ...string) error {
 	if len(args) == 0 {
 		args = os.Args
 		switch len(args) {
 		case 0:
-			return
+			return nil
 		case 1:
 			if filepath.Base(args[0]) == ProgBase() {
 				args = []string{"cli"}
@@ -207,10 +185,19 @@ func (byName ByName) Main(args ...string) (err error) {
 	if g.Kind.IsDaemon() {
 		sig := make(chan os.Signal)
 		signal.Notify(sig, syscall.SIGTERM)
+		defer func(sig chan os.Signal) {
+			sig <- syscall.SIGABRT
+		}(sig)
 		go g.wait(sig)
 	}
-	err = g.Main(args...)
-	return
+	err := g.Main(args...)
+	if err == io.EOF {
+		err = nil
+	}
+	if err != nil && !g.Kind.IsDaemon() {
+		err = fmt.Errorf("%s: %v", name, err)
+	}
+	return err
 }
 
 // Plot commands on map.
@@ -276,6 +263,10 @@ func (g *Goes) wait(ch chan os.Signal) {
 				}
 			}
 			fmt.Println("killed")
+			os.Stdout.Sync()
+			os.Stderr.Sync()
+			os.Stdout.Close()
+			os.Stderr.Close()
 			os.Exit(0)
 		}
 		break

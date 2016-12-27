@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -57,7 +58,9 @@ func main() {
 	vnetd.PublishAllCounters = false
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook
-	g.Main()
+	if err := g.Main(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 }
 
 func stopHook() error {
