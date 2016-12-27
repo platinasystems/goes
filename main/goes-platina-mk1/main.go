@@ -61,7 +61,19 @@ func main() {
 }
 
 func stopHook() error {
-	for port := 1; port < 33; port++ {
+	var startPort, endPort int
+
+	if devEeprom.Fields.DeviceVersion == 0 {
+		// Alpha level board
+		startPort = 0
+		endPort = 32
+	} else {
+		// Beta & Production level boards have version 1 and above
+		startPort = 1
+		endPort = 33
+	}
+
+	for port := startPort; port < endPort; port++ {
 		for subport := 0; subport < 4; subport++ {
 			exec.Command("/bin/ip", "link", "delete",
 				fmt.Sprintf("eth-%d-%d", port, subport),
@@ -100,30 +112,30 @@ func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
 	return nil
 }
 
-func getEepromData(pub chan<- string) error {
-	// The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
-	d := eeprom.Device{
-		BusIndex:   0,
-		BusAddress: 0x51,
-	}
+// The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
+var devEeprom = eeprom.Device{
+	BusIndex:   0,
+	BusAddress: 0x51,
+}
 
+func getEepromData(pub chan<- string) error {
 	// Read and store the EEPROM Contents
-	if err := d.GetInfo(); err != nil {
+	if err := devEeprom.GetInfo(); err != nil {
 		return err
 	}
 
-	pub <- fmt.Sprint("eeprom.product_name: ", d.Fields.ProductName)
-	pub <- fmt.Sprint("eeprom.platform_name: ", d.Fields.PlatformName)
-	pub <- fmt.Sprint("eeprom.manufacturer: ", d.Fields.Manufacturer)
-	pub <- fmt.Sprint("eeprom.vendor: ", d.Fields.Vendor)
-	pub <- fmt.Sprint("eeprom.part_number: ", d.Fields.PartNumber)
-	pub <- fmt.Sprint("eeprom.serial_number: ", d.Fields.SerialNumber)
-	pub <- fmt.Sprint("eeprom.device_version: ", d.Fields.DeviceVersion)
-	pub <- fmt.Sprint("eeprom.manufacture_date: ", d.Fields.ManufactureDate)
-	pub <- fmt.Sprint("eeprom.country_code: ", d.Fields.CountryCode)
-	pub <- fmt.Sprint("eeprom.diag_version: ", d.Fields.DiagVersion)
-	pub <- fmt.Sprint("eeprom.service_tag: ", d.Fields.ServiceTag)
-	pub <- fmt.Sprint("eeprom.base_ethernet_address: ", d.Fields.BaseEthernetAddress)
-	pub <- fmt.Sprint("eeprom.number_of_ethernet_addrs: ", d.Fields.NEthernetAddress)
+	pub <- fmt.Sprint("eeprom.product_name: ", devEeprom.Fields.ProductName)
+	pub <- fmt.Sprint("eeprom.platform_name: ", devEeprom.Fields.PlatformName)
+	pub <- fmt.Sprint("eeprom.manufacturer: ", devEeprom.Fields.Manufacturer)
+	pub <- fmt.Sprint("eeprom.vendor: ", devEeprom.Fields.Vendor)
+	pub <- fmt.Sprint("eeprom.part_number: ", devEeprom.Fields.PartNumber)
+	pub <- fmt.Sprint("eeprom.serial_number: ", devEeprom.Fields.SerialNumber)
+	pub <- fmt.Sprint("eeprom.devEepromice_version: ", devEeprom.Fields.DeviceVersion)
+	pub <- fmt.Sprint("eeprom.manufacture_date: ", devEeprom.Fields.ManufactureDate)
+	pub <- fmt.Sprint("eeprom.country_code: ", devEeprom.Fields.CountryCode)
+	pub <- fmt.Sprint("eeprom.diag_version: ", devEeprom.Fields.DiagVersion)
+	pub <- fmt.Sprint("eeprom.service_tag: ", devEeprom.Fields.ServiceTag)
+	pub <- fmt.Sprint("eeprom.base_ethernet_address: ", devEeprom.Fields.BaseEthernetAddress)
+	pub <- fmt.Sprint("eeprom.number_of_ethernet_addrs: ", devEeprom.Fields.NEthernetAddress)
 	return nil
 }
