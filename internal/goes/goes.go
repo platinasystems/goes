@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -141,8 +142,8 @@ func (byName ByName) Main(args ...string) (err error) {
 		case 0:
 			return
 		case 1:
-			if args[0] == ProgBase() {
-				args[0] = "cli"
+			if filepath.Base(args[0]) == ProgBase() {
+				args = []string{"cli"}
 			}
 		}
 	}
