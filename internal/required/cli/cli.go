@@ -48,8 +48,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/goes"
@@ -135,6 +137,7 @@ func (c *cmd) Main(args ...string) error {
 		}
 	}
 
+	signal.Ignore(syscall.SIGINT)
 commandLoop:
 	for {
 		for _, c := range closers {
