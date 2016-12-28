@@ -68,7 +68,7 @@ type cmd goes.ByName
 
 func New() *cmd { return new(cmd) }
 
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
+func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
 func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return "cli [-x] [URL]" }
 
@@ -180,49 +180,38 @@ commandLoop:
 		if len(pl.Slices) == 0 {
 			continue commandLoop
 		}
-		end := len(pl.Slices) - 1
-		name := pl.Slices[end][0]
-		g := goes.ByName(*c)[name]
-		if g == nil {
-			err = fmt.Errorf("%s: not found", name)
-			continue commandLoop
-		}
-
-		if !g.Kind.IsInteractive() {
-			err = fmt.Errorf("%s: inoperative", name)
-			continue commandLoop
-		}
-
-		if end == 0 && (g.Kind.IsDontFork() || name == os.Args[0]) {
-			if flag["-x"] {
-				fmt.Println("+", pl.Slices[end])
+		for i := 0; i < len(pl.Slices); i++ {
+			name := pl.Slices[i][0]
+			g := goes.ByName(*c)[name]
+			if g == nil {
+				err = fmt.Errorf("%s: not found", name)
+				continue commandLoop
 			}
-			err = goes.ByName(*c).Main(pl.Slices[end]...)
-			continue commandLoop
+			if !g.Kind.IsInteractive() {
+				err = fmt.Errorf("%s: inoperative", name)
+				continue commandLoop
+			}
+			if len(pl.Slices) > 0 {
+				if g.Kind.IsCantPipe() {
+					err = fmt.Errorf("%s: can't pipe", name)
+					continue commandLoop
+				}
+			}
 		}
-
-		for i := 1; i <= end; i++ {
-			_, found := map[string]struct{}{
-				"cli":    struct{}{},
-				"cd":     struct{}{},
-				"env":    struct{}{},
-				"exit":   struct{}{},
-				"export": struct{}{},
-				"resize": struct{}{},
-				"source": struct{}{},
-			}[name]
-			if found {
-				err = fmt.Errorf("%s: can't pipe", name)
+		if len(pl.Slices) == 1 {
+			name := pl.Slices[0][0]
+			g := goes.ByName(*c)[name]
+			if g.Kind.IsDontFork() || name == os.Args[0] {
+				if flag["-x"] {
+					fmt.Println("+", pl.Slices[0])
+				}
+				err = goes.ByName(*c).Main(pl.Slices[0]...)
 				continue commandLoop
 			}
 		}
 
 		iparm, args := parms.New(pl.Slices[0], "<", "<<", "<<-")
 		pl.Slices[0] = args
-		oparm, args := parms.New(pl.Slices[end],
-			">", ">>", ">>>", ">>>>")
-		pl.Slices[end] = args
-
 		in = nil
 		if fn := iparm["<"]; len(fn) > 0 {
 			rc, err = url.Open(fn)
@@ -260,6 +249,11 @@ commandLoop:
 				}
 			}(w, lbl)
 		}
+
+		end := len(pl.Slices) - 1
+		oparm, args := parms.New(pl.Slices[end],
+			">", ">>", ">>>", ">>>>")
+		pl.Slices[end] = args
 		out = os.Stdout
 		if fn := oparm[">"]; len(fn) > 0 {
 			wc, err = url.Create(fn)

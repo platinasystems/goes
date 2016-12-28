@@ -17,7 +17,7 @@ type cmd struct{}
 
 func New() cmd { return cmd{} }
 
-func (cmd) Kind() goes.Kind { return goes.DontFork }
+func (cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
 func (cmd) String() string  { return Name }
 func (cmd) Usage() string   { return Name + " [N]" }
 

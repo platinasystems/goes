@@ -32,6 +32,7 @@ const (
 	DontFork Kind = 1 << iota
 	Daemon
 	Hidden
+	CantPipe
 )
 
 var (
@@ -277,6 +278,7 @@ func (k Kind) IsDontFork() bool    { return (k & DontFork) == DontFork }
 func (k Kind) IsDaemon() bool      { return (k & Daemon) == Daemon }
 func (k Kind) IsHidden() bool      { return (k & Hidden) == Hidden }
 func (k Kind) IsInteractive() bool { return (k & (Daemon | Hidden)) == 0 }
+func (k Kind) IsCantPipe() bool    { return (k & CantPipe) == CantPipe }
 
 func (k Kind) String() string {
 	s := "unknown"

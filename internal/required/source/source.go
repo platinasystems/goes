@@ -17,7 +17,7 @@ type cmd goes.ByName
 
 func New() *cmd { return new(cmd) }
 
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
+func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
 func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return "source [-x] FILE" }
 
