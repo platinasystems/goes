@@ -16,6 +16,7 @@ ALL += goes-example-arm
 ALL += goes-platina-mk1-bmc
 ifneq (,$(wildcard vnet/devices/ethernet/switch/fe1/*.go))
 ALL += goes-platina-mk1
+ALL += goes-test
 ALL += go-wip
 endif
 
@@ -47,6 +48,9 @@ goes-platina-mk1: tags=$(VNET_TAGS)
 goes-platina-mk1: gcflags=$(VNET_GCFLAGS)
 goes-platina-mk1: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/goes-platina-mk1
+
+goes-test: | copyright/copyright.go version/version.go
+	$(gobuild) -o $@ ./main/goes-test
 
 go-wip: tags=$(VNET_TAGS)
 go-wip: gcflags=$(VNET_GCFLAGS)
