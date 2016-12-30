@@ -194,7 +194,7 @@ commandLoop:
 				err = fmt.Errorf("%s: inoperative", name)
 				continue commandLoop
 			}
-			if len(pl.Slices) > 0 {
+			if len(pl.Slices) > 1 {
 				if g.Kind.IsCantPipe() {
 					err = fmt.Errorf("%s: can't pipe", name)
 					continue commandLoop
