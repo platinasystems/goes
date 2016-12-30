@@ -5,10 +5,11 @@
 package main
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
 
 	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/optional/vnetd"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/vnet"
@@ -78,40 +79,38 @@ func (p *platform) boardPortLedEnable() (err error) {
 }
 
 func (p *platform) boardInit() (err error) {
-	nMacs, err := redis.Hget(redis.DefaultHash, "eeprom.number_of_ethernet_addrs")
-	if err == nil {
-		n, err := strconv.ParseUint(nMacs, 10, 32)
+	var s string
+	var macs uint
+	var ethAddr [6]byte
+	defer func() {
+		log.Printf("MK1 x86 eeprom MAC addresses: MAC_BASE: [% x], #MAC's: 0x%x (%d)\n", ethAddr, macs, macs)
 		if err == nil {
-			baseMacAddr, err := redis.Hget(redis.DefaultHash, "eeprom.base_ethernet_address")
-			if err == nil {
-				// remove the '[ ]' brackets from the string before processing
-				s := baseMacAddr[1:(len(baseMacAddr) - 1)]
-				str := strings.Fields(s)
-				var ethAddr [6]byte
-				for i := range str {
-					s, err := strconv.ParseUint(str[i], 10, 32)
-					if err == nil {
-						ethAddr[i] = uint8(s & 0xff)
-					}
-				}
-				if err == nil {
-					p.Vnet.Logf("using eeprom MAC addresses\n")
-					p.Platform.AddressBlock = ethernet.AddressBlock{
-						Base:  ethAddr,
-						Count: uint32(n),
-					}
-				}
+			p.Platform.AddressBlock = ethernet.AddressBlock{
+				Base:  ethAddr,
+				Count: uint32(macs),
 			}
+		} else { // eeprom values are invalid or not programmed correctly
+			log.Printf("Exiting: Invalid or incorrectly programmed MK1 x86 eeprom\n")
+			panic(err)
 		}
-	}
+	}()
 
-	if err != nil {
-		// in case the eeprom values are invalid or not programmed correctly
-		p.Vnet.Logf("eeprom data invalid: %s; using random addresses\n", err)
-		p.Platform.AddressBlock = ethernet.AddressBlock{
-			Base:  ethernet.RandomAddress(),
-			Count: 256,
+	if s, err = redis.Hget(redis.DefaultHash, "eeprom.number_of_ethernet_addrs"); err != nil {
+		return
+	}
+	if _, err = fmt.Sscan(s, &macs); err != nil && macs < 134 { // at least 134 MAC addresses..
+		return
+	}
+	if s, err = redis.Hget(redis.DefaultHash, "eeprom.base_ethernet_address"); err != nil {
+		return
+	}
+	str := strings.Fields(s[1:(len(s) - 1)]) // remove the '[ ]' brackets from the string
+	for i := range str {
+		var u8 uint8
+		if _, err = fmt.Sscan(str[i], &u8); err != nil {
+			return
 		}
+		ethAddr[i] = u8
 	}
 	return
 }
