@@ -42,12 +42,14 @@ goes-platina-mk1-bmc: arch=arm
 goes-platina-mk1-bmc: tags=netgo
 goes-platina-mk1-bmc: ldflags=-d
 goes-platina-mk1-bmc: | copyright/copyright.go version/version.go
-	$(gobuild) -o $@ ./main/goes-platina-mk1-bmc
+	$(gobuild) -o $@ ./main/$@
 
 goes-platina-mk1: tags=$(VNET_TAGS)
 goes-platina-mk1: gcflags=$(VNET_GCFLAGS)
 goes-platina-mk1: | copyright/copyright.go version/version.go
-	$(gobuild) -o $@ ./main/goes-platina-mk1
+	$(gobuild) -o $@ ./main/$@
+	$(if $(wildcard fe1a.zip),\
+	cat fe1a.zip >> $@ && zip -A $@)
 
 goes-test: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/goes-test
@@ -56,6 +58,14 @@ go-wip: tags=$(VNET_TAGS)
 go-wip: gcflags=$(VNET_GCFLAGS)
 go-wip:
 	$(gobuild) -o $@ ./wip/y
+	$(if $(wildcard fe1a.zip),\
+	cat fe1a.zip >> $@ && zip -A $@)
+
+fe1a.zip: firmware-fe1a
+	./firmware-fe1a
+
+firmware-fe1a:
+	go build github.com/platinasystems/$@
 
 .PHONY: clean
 clean:

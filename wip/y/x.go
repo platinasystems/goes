@@ -6,6 +6,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
 	"github.com/platinasystems/go/vnet/ethernet"
 	ipcli "github.com/platinasystems/go/vnet/ip/cli"
 	"github.com/platinasystems/go/vnet/ip4"
@@ -45,6 +46,11 @@ func main() {
 		}
 	}()
 
+	err = firmware.Extract(Prog())
+	if err != nil {
+		return
+	}
+
 	var in parse.Input
 	in.Add(os.Args[1:]...)
 
@@ -66,4 +72,17 @@ func main() {
 	p.DependsOn("pci-discovery") // after pci discovery
 
 	err = v.Run(&in)
+}
+
+var prog string
+
+func Prog() string {
+	if len(prog) == 0 {
+		var err error
+		prog, err = os.Readlink("/proc/self/exe")
+		if err != nil {
+			prog = "x"
+		}
+	}
+	return prog
 }

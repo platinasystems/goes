@@ -29,6 +29,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -97,6 +98,11 @@ func stopHook() error {
 }
 
 func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
+	err := firmware.Extract(goes.Prog())
+	if err != nil {
+		return err
+	}
+
 	// Base packages.
 	ethernet.Init(v)
 	ip4.Init(v)
