@@ -18,6 +18,7 @@ import (
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
@@ -54,14 +55,14 @@ func (c *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	daemons := exec.Command(goes.Prog(), args...)
+	daemons := exec.Command(prog.Name(), args...)
 	daemons.Args[0] = "goes-daemons"
 	daemons.Stdin = nil
 	daemons.Stdout = nil
 	daemons.Stderr = nil
 	daemons.Dir = "/"
 	daemons.Env = []string{
-		"PATH=" + goes.Path(),
+		"PATH=" + prog.Path(),
 		"TERM=linux",
 	}
 	daemons.SysProcAttr = &syscall.SysProcAttr{
@@ -109,14 +110,14 @@ func (c *cmd) Main(args ...string) error {
 			err = nil
 		}
 		if err != nil {
-			fmt.Fprint(os.Stderr, goes.ProgBase(), ": ", err, "\n")
+			fmt.Fprint(os.Stderr, prog.Base(), ": ", err, "\n")
 		}
 	}
 
 }
 
 func run(arg0 string) error {
-	x := exec.Command(goes.Prog())
+	x := exec.Command(prog.Name())
 	x.Args[0] = arg0
 	x.Stdin = os.Stdin
 	x.Stdout = os.Stdout

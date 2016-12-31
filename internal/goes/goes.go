@@ -21,6 +21,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/prog"
 )
 
 const (
@@ -121,7 +122,7 @@ func (byName ByName) Main(args ...string) error {
 		case 0:
 			return nil
 		case 1:
-			if filepath.Base(args[0]) == ProgBase() {
+			if filepath.Base(args[0]) == prog.Base() {
 				args = []string{"cli"}
 			}
 		}

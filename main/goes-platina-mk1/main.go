@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
 	"github.com/platinasystems/go/internal/optional/vnet"
 	"github.com/platinasystems/go/internal/optional/vnetd"
+	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/required"
 	"github.com/platinasystems/go/internal/required/license"
@@ -98,7 +99,7 @@ func stopHook() error {
 }
 
 func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
-	err := firmware.Extract(goes.Prog())
+	err := firmware.Extract(prog.Name())
 	if err != nil {
 		return err
 	}

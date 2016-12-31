@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -46,7 +47,7 @@ func main() {
 		}
 	}()
 
-	err = firmware.Extract(Prog())
+	err = firmware.Extract(prog.Name())
 	if err != nil {
 		return
 	}
@@ -72,17 +73,4 @@ func main() {
 	p.DependsOn("pci-discovery") // after pci discovery
 
 	err = v.Run(&in)
-}
-
-var prog string
-
-func Prog() string {
-	if len(prog) == 0 {
-		var err error
-		prog, err = os.Readlink("/proc/self/exe")
-		if err != nil {
-			prog = "x"
-		}
-	}
-	return prog
 }

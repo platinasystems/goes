@@ -49,13 +49,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/required/cli/internal/liner"
 	"github.com/platinasystems/go/internal/required/cli/internal/nocomment"
 	"github.com/platinasystems/go/internal/required/cli/internal/notliner"
@@ -154,7 +154,7 @@ commandLoop:
 			err = nil
 		}
 		pl.Reset()
-		prompt := filepath.Base(goes.Prog()) + "> "
+		prompt := prog.Base() + "> "
 		if hn, err := os.Hostname(); err == nil {
 			prompt = hn + "> "
 		}
@@ -292,7 +292,7 @@ commandLoop:
 			if flag["-x"] {
 				fmt.Println("+", pl.Slices[i])
 			}
-			c := exec.Command(goes.Prog(), pl.Slices[i][1:]...)
+			c := exec.Command(prog.Name(), pl.Slices[i][1:]...)
 			c.Args[0] = pl.Slices[i][0]
 			c.Stderr = os.Stderr
 			if i == 0 {

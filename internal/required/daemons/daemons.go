@@ -15,6 +15,7 @@ import (
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -83,21 +84,21 @@ func (c *cmd) daemon(done chan<- struct{}, arg0 string, args ...string) error {
 	if err != nil {
 		return err
 	}
-	d := exec.Command(goes.Prog(), args...)
+	d := exec.Command(prog.Name(), args...)
 	d.Args[0] = arg0
 	d.Stdin = nil
 	d.Stdout = wout
 	d.Stderr = werr
 	d.Dir = "/"
 	d.Env = []string{
-		"PATH=" + goes.Path(),
+		"PATH=" + prog.Path(),
 		"TERM=linux",
 	}
 	err = d.Start()
 	if err != nil {
 		return err
 	}
-	id := fmt.Sprintf("%s.%s[%d]", goes.ProgBase(), arg0, d.Process.Pid)
+	id := fmt.Sprintf("%s.%s[%d]", prog.Base(), arg0, d.Process.Pid)
 	go log.LinesFrom(rout, id, "info")
 	go log.LinesFrom(rerr, id, "err")
 	go func(d *exec.Cmd, wout, werr *os.File, done chan<- struct{}) {
