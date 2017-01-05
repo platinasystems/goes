@@ -70,7 +70,6 @@ func loadFit(image, x string) error {
 		x = fit.DefaultConfig
 	}
 	config := fit.Configs[x]
-	config.BaseAddr = 0x60008000
 
 	return fit.KexecLoadConfig(config, 0x0)
 }
