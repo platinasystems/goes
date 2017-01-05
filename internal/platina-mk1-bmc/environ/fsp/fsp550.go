@@ -409,17 +409,17 @@ func (r *regi16) set(h *Psu, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 
 func (h *Psu) convert(v uint16) float64 {
 	if h.Id == "Great Wall" {
-		v = v & 0xfff
-		nn := float64(6) * (-1)
+		nn := float64(((v>>11)^0x1f)+1) * (-1)
+		v = v & 0x7ff
 		vv := float64(v) * (math.Exp2(nn))
 		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
 		return vv
 	} else if h.Id == "FSP" {
 		r := getPsuRegs()
 		n := r.VoutMode.get(h) & 0x1f
-		n = (n ^ 0x1f) & 0x1f
+		n = ((n ^ 0x1f) + 1) & 0x1f
 		nn := float64(n) * (-1)
-		vv := (float64(v) * (math.Exp2(nn))) / 2
+		vv := (float64(v) * (math.Exp2(nn)))
 		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
 		return vv
 	} else {
@@ -482,10 +482,11 @@ func (h *Psu) Vin() float64 {
 	return v
 }
 
-func (h *Psu) Iin() uint16 {
+func (h *Psu) Iin() float64 {
 	r := getPsuRegs()
 	t := r.Iin.get(h)
-	return uint16(t)
+	v := h.convert(t)
+	return v
 }
 
 func (h *Psu) Vout() float64 {
@@ -495,28 +496,41 @@ func (h *Psu) Vout() float64 {
 	return v
 }
 
-func (h *Psu) Iout() uint16 {
+func (h *Psu) Iout() float64 {
 	r := getPsuRegs()
 	t := r.Iout.get(h)
-	return uint16(t)
+	v := h.convert(t)
+	return v
 }
 
-func (h *Psu) Temp1() uint16 {
+func (h *Psu) Temp1() float64 {
 	r := getPsuRegs()
 	t := r.Temp1.get(h)
-	return uint16(t)
+	var v float64
+	if h.Id == "Great Wall" {
+		v = h.convert(t)
+	} else if h.Id == "FSP" {
+		v = float64(t)
+	}
+	return v
 }
 
-func (h *Psu) Temp2() uint16 {
+func (h *Psu) Temp2() float64 {
 	r := getPsuRegs()
 	t := r.Temp2.get(h)
-	return uint16(t)
+	var v float64
+	if h.Id == "Great Wall" {
+		v = h.convert(t)
+	} else if h.Id == "FSP" {
+		v = float64(t)
+	}
+	return v
 }
 
 func (h *Psu) FanSpeed() uint16 {
 	r := getPsuRegs()
 	t := r.FanSpeed.get(h)
-	return uint16(t)
+	return t
 }
 
 func (h *Psu) Pout() float64 {

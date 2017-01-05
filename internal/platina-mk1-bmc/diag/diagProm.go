@@ -36,7 +36,7 @@ const (
 	ppnBde2c = "900-000001-000"
 	ppnBde4c = "900-000002-000"
 
-	subTypeGa    = 0x0
+	subTypeGa    = 0xA
 	subTypeProto = 0x1
 )
 
@@ -45,8 +45,8 @@ func diagProm() error {
 
 	//ONIE vendor exention fields
 	tor1Ved := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-	bde2cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-	bde4cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	bde2cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde2c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	bde4cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde4c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
 
 	var vByte []byte
 

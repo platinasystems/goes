@@ -274,14 +274,6 @@ func hook() error {
 
 	machined.Plot(
 		&Info{
-			name:     "fan",
-			prefixes: []string{"fan."},
-			attrs: machined.Attrs{
-				"fan.front": 100,
-				"fan.rear":  100,
-			},
-		},
-		&Info{
 			name:     "mfg",
 			prefixes: []string{"mfg."},
 			attrs: machined.Attrs{
@@ -349,7 +341,6 @@ func hook() error {
 				"psu1.admin.state":  ps1.GetAdminState(),
 				"psu1.mfg_id":       ps1.MfgIdent(),
 				"psu1.mfg_model":    ps1.MfgModel(),
-				"psu1.page":         uint16(ps1.Page()),
 				"psu1.status_word":  ps1.StatusWord(),
 				"psu1.status_vout":  ps1.StatusVout(),
 				"psu1.status_iout":  ps1.StatusIout(),
@@ -361,14 +352,9 @@ func hook() error {
 				"psu1.status_temp":  ps1.StatusTemp(),
 				"psu1.p_out":        ps1.Pout(),
 				"psu1.p_in":         ps1.Pin(),
-				"psu1.p_out_raw":    ps1.PoutRaw(),
-				"psu1.p_in_raw":     ps1.PinRaw(),
-				"psu1.p_mode_raw":   ps1.ModeRaw(),
-				"psu1.pmbus_rev":    ps1.PMBusRev(),
 				"psu1.status_fans":  ps1.StatusFans(),
 				"psu1.temperature1": ps1.Temp1(),
 				"psu1.temperature2": ps1.Temp2(),
-				"psu1.fan_speed":    ps1.FanSpeed(),
 			},
 		},
 		&Info{
@@ -379,7 +365,6 @@ func hook() error {
 				"psu2.admin.state":  ps2.GetAdminState(),
 				"psu2.mfg_id":       ps2.MfgIdent(),
 				"psu2.mfg_model":    ps2.MfgModel(),
-				"psu2.page":         uint16(ps2.Page()),
 				"psu2.status_word":  ps2.StatusWord(),
 				"psu2.status_vout":  ps2.StatusVout(),
 				"psu2.status_iout":  ps2.StatusIout(),
@@ -391,14 +376,9 @@ func hook() error {
 				"psu2.status_temp":  ps2.StatusTemp(),
 				"psu2.p_out":        ps2.Pout(),
 				"psu2.p_in":         ps2.Pin(),
-				"psu2.p_out_raw":    ps2.PoutRaw(),
-				"psu2.p_in_raw":     ps2.PinRaw(),
-				"psu2.p_mode_raw":   ps2.ModeRaw(),
-				"psu2.pmbus_rev":    ps2.PMBusRev(),
 				"psu2.status_fans":  ps2.StatusFans(),
 				"psu2.temperature1": ps2.Temp1(),
 				"psu2.temperature2": ps2.Temp2(),
-				"psu2.fan_speed":    ps2.FanSpeed(),
 			},
 		},
 		&Info{
@@ -544,45 +524,35 @@ func timerIsr() {
 	updateString(ps2.MfgIdent(), "psu2.mfg_id")
 	updateString(ps2.MfgModel(), "psu2.mfg_model")
 
-	updateUint16(ps1.Page(), "psu1.page")
 	updateUint16(ps1.StatusWord(), "psu1.status_word")
 	updateUint16(ps1.StatusVout(), "psu1.status_vout")
 	updateUint16(ps1.StatusIout(), "psu1.status_iout")
 	updateUint16(ps1.StatusInput(), "psu1.status_input")
-	updateUint16(ps1.Iin(), "psu1.i_in")
-	updateUint16(ps1.Iout(), "psu1.i_out")
+	updateFloat64(ps1.Iin(), "psu1.i_in")
+	updateFloat64(ps1.Iout(), "psu1.i_out")
 	updateUint16(ps1.StatusTemp(), "psu1.status_temp")
-	updateUint16(ps1.PMBusRev(), "psu1.pmbus_rev")
 	updateUint16(ps1.StatusFans(), "psu1.status_fans")
-	updateUint16(ps1.Temp1(), "psu1.temperature1")
-	updateUint16(ps1.Temp2(), "psu1.temperature2")
-	updateUint16(ps1.FanSpeed(), "psu1.fan_speed")
+	updateFloat64(ps1.Temp1(), "psu1.temperature1")
+	updateFloat64(ps1.Temp2(), "psu1.temperature2")
 	updateFloat64(ps1.Vin(), "psu1.v_in")
 	updateFloat64(ps1.Vout(), "psu1.v_out")
 	updateFloat64(ps1.Pout(), "psu1.p_out")
 	updateFloat64(ps1.Pin(), "psu1.p_in")
-	updateUint16(ps1.PoutRaw(), "psu1.p_out_raw")
-	updateUint16(ps1.PinRaw(), "psu1.p_in_raw")
 
-	updateUint16(ps2.Page(), "psu2.page")
 	updateUint16(ps2.StatusWord(), "psu2.status_word")
 	updateUint16(ps2.StatusVout(), "psu2.status_vout")
 	updateUint16(ps2.StatusIout(), "psu2.status_iout")
 	updateUint16(ps2.StatusInput(), "psu2.status_input")
-	updateUint16(ps2.Iin(), "psu2.i_in")
-	updateUint16(ps2.Iout(), "psu2.i_out")
+	updateFloat64(ps2.Iin(), "psu2.i_in")
+	updateFloat64(ps2.Iout(), "psu2.i_out")
 	updateUint16(ps2.StatusTemp(), "psu2.status_temp")
-	updateUint16(ps2.PMBusRev(), "psu2.pmbus_rev")
 	updateUint16(ps2.StatusFans(), "psu2.status_fans")
-	updateUint16(ps2.Temp1(), "psu2.temperature1")
-	updateUint16(ps2.Temp2(), "psu2.temperature2")
-	updateUint16(ps2.FanSpeed(), "psu2.fan_speed")
+	updateFloat64(ps2.Temp1(), "psu2.temperature1")
+	updateFloat64(ps2.Temp2(), "psu2.temperature2")
 	updateFloat64(ps2.Vin(), "psu2.v_in")
 	updateFloat64(ps2.Vout(), "psu2.v_out")
 	updateFloat64(ps2.Pout(), "psu2.p_out")
 	updateFloat64(ps2.Pin(), "psu2.p_in")
-	updateUint16(ps2.PoutRaw(), "psu2.p_out_raw")
-	updateUint16(ps2.PinRaw(), "psu2.p_in_raw")
 
 	updateFloat64(cpu.ReadTemp(), "temperature.bmc_cpu")
 	updateFloat64(hw.FrontTemp(), "temperature.fan_front")
