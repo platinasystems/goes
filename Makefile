@@ -8,8 +8,9 @@ gobuild = $(if $(arch),env GOARCH=$(arch) )go build$(if $(tags),\
 -gcflags "$(gcflags)")$(if $(ldflags),\
 -ldflags "$(ldflags)")
 
-VNET_TAGS = uio_pci_dma foxy$(if $(filter yes,$(VNET_DEBUG)), debug)
-VNET_GCFLAGS = $(if $(filter yes,$(VNET_DEBUG)),-N -l)
+diag_tag=$(if $(filter yes,$(diag)), diag)
+vnet_debug_tag=$(if $(filter yes,$(VNET_DEBUG)), debug)
+vnet_gcflags=$(if $(filter yes,$(VNET_DEBUG)),-N -l)
 
 ALL  = goes-example
 ALL += goes-example-arm
@@ -44,8 +45,8 @@ goes-platina-mk1-bmc: ldflags=-d
 goes-platina-mk1-bmc: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/$@
 
-goes-platina-mk1: tags=$(VNET_TAGS)
-goes-platina-mk1: gcflags=$(VNET_GCFLAGS)
+goes-platina-mk1: tags=uio_pci_dma foxy$(vnet_debug_tag)$(diag_tag)
+goes-platina-mk1: gcflags=$(vnet_gcflags)
 goes-platina-mk1: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/$@
 	$(if $(wildcard fe1a.zip),\
@@ -54,8 +55,8 @@ goes-platina-mk1: | copyright/copyright.go version/version.go
 goes-test: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/goes-test
 
-go-wip: tags=$(VNET_TAGS)
-go-wip: gcflags=$(VNET_GCFLAGS)
+go-wip: tags=uio_pci_dma foxy$(vnet_debug_)$(diag_tag)
+go-wip: gcflags=$(vnet_gcflags)
 go-wip:
 	$(gobuild) -o $@ ./wip/y
 	$(if $(wildcard fe1a.zip),\

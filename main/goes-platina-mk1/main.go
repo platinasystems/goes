@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/optional/eeprom"
+	"github.com/platinasystems/go/internal/optional/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
 	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
@@ -45,10 +47,17 @@ func main() {
 	patents.Others = []patents.Other{{fe1path, copyright.Patents}}
 	g := make(goes.ByName)
 	g.Plot(required.New()...)
-	g.Plot(gpio.New(), i2c.New(), toggle.New(), vnet.New(), vnetd.New())
+	g.Plot(
+		eeprom.New(),
+		gpio.New(),
+		i2c.New(),
+		toggle.New(),
+		vnet.New(),
+		vnetd.New(),
+	)
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
-	redisd.Hook = pubEeprom
+	redisd.Hook = platina_eeprom.RedisdHook
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
 			10*time.Second)
@@ -59,6 +68,13 @@ func main() {
 	vnetd.PublishAllCounters = false
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook
+	platina_eeprom.Config(
+		platina_eeprom.BusIndex(0),
+		platina_eeprom.BusAddress(0x51),
+		platina_eeprom.BusDelay(10*time.Millisecond),
+		platina_eeprom.MinMacs(134),
+		platina_eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
+	)
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
