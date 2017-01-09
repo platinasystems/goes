@@ -26,12 +26,12 @@ func (p *platform) Init() (err error) {
 	v := p.Vnet
 	p.Platform = fe1.GetPlatform(v)
 	if err = p.boardInit(); err != nil {
-		v.Logf("boardInit failure: %s", err)
+		v.Logf("boardInit failure: %s\n", err)
 		return
 	}
 	for _, s := range p.Switches {
 		if err = p.boardPortInit(s); err != nil {
-			v.Logf("boardPortInit failure: %s", err)
+			v.Logf("boardPortInit failure: %s\n", err)
 			return
 		}
 	}
@@ -39,7 +39,7 @@ func (p *platform) Init() (err error) {
 	if len(p.Switches) > 0 {
 		// don't need led enable if we're not running on hardware.
 		if err = p.boardPortLedEnable(); err != nil {
-			v.Logf("boardPortLedEnable failure: %s", err)
+			v.Logf("boardPortLedEnable failure: %s\n", err)
 		}
 	}
 
