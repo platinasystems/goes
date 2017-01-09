@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/log"
 	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
 	//"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
@@ -221,6 +222,16 @@ func hook() error {
 		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
 	} else {
 		return fmt.Errorf("%s: %v", gpio.File, err)
+	}
+
+	qspiMuxPin, found := gpio.Pins["QSPI_MUX_SEL"]
+	if found {
+		sel, _ := qspiMuxPin.Value()
+		if sel {
+			log.Print("notice: booted from qspi 1")
+		} else {
+			log.Print("notice: booted from qspi 0")
+		}
 	}
 
 	// Set gpio input/output as defined in dtb
