@@ -23,7 +23,7 @@ import (
 	"github.com/platinasystems/go/internal/gpio"
 	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
-	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
+	//"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
 	"github.com/platinasystems/go/internal/optional/telnetd"
 	"github.com/platinasystems/go/internal/optional/watchdog"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
@@ -149,7 +149,7 @@ func main() {
 		// FIXME: remove machined after converting remaining info
 		machined.New(),
 		telnetd.New(),
-		toggle.New(),
+		//toggle.New(),
 		watchdog.New(),
 	)
 	redisd.Machine = "platina-mk1-bmc"
@@ -270,7 +270,7 @@ func hook() error {
 	ledfp.LedFpInit()
 	fanTray.FanTrayLedInit()
 
-	go enableToggle()
+	//go enableToggle()
 
 	machined.Plot(
 		&Info{
