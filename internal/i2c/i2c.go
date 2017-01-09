@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -36,6 +37,15 @@ type Bus struct {
 	fd int
 
 	features FeatureFlag
+}
+
+func New(index, address int) (*Bus, error) {
+	bus := new(Bus)
+	err := bus.Open(index)
+	if err == nil {
+		err = bus.ForceSlaveAddress(address)
+	}
+	return bus, err
 }
 
 func (b *Bus) Open(index int) (err error) {
@@ -245,6 +255,29 @@ func (b *Bus) Do(rw RW, command uint8, size SMBusSize, data *SMBusData) (err err
 func (b *Bus) Read(cmd uint8, size SMBusSize, data *SMBusData) (err error) {
 	return b.Do(Read, cmd, size, data)
 }
+
+func (bus *Bus) ReadBlock(offset, n int, delay time.Duration) ([]byte, error) {
+	// FIXME this should use BlockData
+	var err error
+	buf := make([]byte, n)
+	for i := 0; i < n; i++ {
+		var data SMBusData
+		data[0] = uint8(offset & 0x00ff)
+		err = bus.Do(Write, uint8(offset>>8), ByteData, &data)
+		if err != nil {
+			break
+		}
+		time.Sleep(delay)
+		err = bus.Do(Read, 0, Byte, &data)
+		if err != nil {
+			break
+		}
+		buf[i] = data[0]
+		offset++
+	}
+	return buf, err
+}
+
 func (b *Bus) Write(cmd uint8, size SMBusSize, data *SMBusData) (err error) {
 	return b.Do(Write, cmd, size, data)
 }

@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
@@ -49,7 +48,7 @@ func main() {
 	g.Plot(gpio.New(), i2c.New(), toggle.New(), vnet.New(), vnetd.New())
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
-	redisd.Hook = getEepromData
+	redisd.Hook = pubEeprom
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
 			10*time.Second)
@@ -68,11 +67,16 @@ func main() {
 func stopHook() error {
 	var startPort, endPort int
 
-	if devEeprom.Fields.DeviceVersion == 0 {
+	ver, err := deviceVersion()
+	if err != nil {
+		return err
+	}
+	switch ver {
+	case 0:
 		// Alpha level board
 		startPort = 0
 		endPort = 32
-	} else {
+	default:
 		// Beta & Production level boards have version 1 and above
 		startPort = 1
 		endPort = 33
@@ -119,33 +123,5 @@ func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
 	v.AddPackage("platform", plat)
 	plat.DependsOn("pci-discovery")
 
-	return nil
-}
-
-// The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
-var devEeprom = eeprom.Device{
-	BusIndex:   0,
-	BusAddress: 0x51,
-}
-
-func getEepromData(pub chan<- string) error {
-	// Read and store the EEPROM Contents
-	if err := devEeprom.GetInfo(); err != nil {
-		return err
-	}
-
-	pub <- fmt.Sprint("eeprom.product_name: ", devEeprom.Fields.ProductName)
-	pub <- fmt.Sprint("eeprom.platform_name: ", devEeprom.Fields.PlatformName)
-	pub <- fmt.Sprint("eeprom.manufacturer: ", devEeprom.Fields.Manufacturer)
-	pub <- fmt.Sprint("eeprom.vendor: ", devEeprom.Fields.Vendor)
-	pub <- fmt.Sprint("eeprom.part_number: ", devEeprom.Fields.PartNumber)
-	pub <- fmt.Sprint("eeprom.serial_number: ", devEeprom.Fields.SerialNumber)
-	pub <- fmt.Sprint("eeprom.devEepromice_version: ", devEeprom.Fields.DeviceVersion)
-	pub <- fmt.Sprint("eeprom.manufacture_date: ", devEeprom.Fields.ManufactureDate)
-	pub <- fmt.Sprint("eeprom.country_code: ", devEeprom.Fields.CountryCode)
-	pub <- fmt.Sprint("eeprom.diag_version: ", devEeprom.Fields.DiagVersion)
-	pub <- fmt.Sprint("eeprom.service_tag: ", devEeprom.Fields.ServiceTag)
-	pub <- fmt.Sprint("eeprom.base_ethernet_address: ", devEeprom.Fields.BaseEthernetAddress)
-	pub <- fmt.Sprint("eeprom.number_of_ethernet_addrs: ", devEeprom.Fields.NEthernetAddress)
 	return nil
 }

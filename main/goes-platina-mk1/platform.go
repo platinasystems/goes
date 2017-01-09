@@ -6,10 +6,9 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/optional/vnetd"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/vnet"
@@ -78,41 +77,22 @@ func (p *platform) boardPortLedEnable() (err error) {
 	return err
 }
 
-func (p *platform) boardInit() (err error) {
-	var s string
-	var macs uint
-	var ethAddr [6]byte
-	defer func() {
-		log.Printf("MK1 x86 eeprom MAC addresses: MAC_BASE: [% x], #MAC's: 0x%x (%d)\n", ethAddr, macs, macs)
-		if err == nil {
-			p.Platform.AddressBlock = ethernet.AddressBlock{
-				Base:  ethAddr,
-				Count: uint32(macs),
-			}
-		} else { // eeprom values are invalid or not programmed correctly
-			log.Printf("Exiting: Invalid or incorrectly programmed MK1 x86 eeprom\n")
-			panic(err)
-		}
-	}()
-
-	if s, err = redis.Hget(redis.DefaultHash, "eeprom.number_of_ethernet_addrs"); err != nil {
-		return
+func (p *platform) boardInit() error {
+	macs, err := nMacs()
+	if err != nil {
+		return err
 	}
-	if _, err = fmt.Sscan(s, &macs); err != nil && macs < 134 { // at least 134 MAC addresses..
-		return
+	base, err := baseEtherAddr()
+	if err != nil {
+		return err
 	}
-	if s, err = redis.Hget(redis.DefaultHash, "eeprom.base_ethernet_address"); err != nil {
-		return
+	p.Platform.AddressBlock = ethernet.AddressBlock{
+		Base:  base,
+		Count: uint32(macs),
 	}
-	str := strings.Fields(s[1:(len(s) - 1)]) // remove the '[ ]' brackets from the string
-	for i := range str {
-		var u8 uint8
-		if _, err = fmt.Sscan(str[i], &u8); err != nil {
-			return
-		}
-		ethAddr[i] = u8
-	}
-	return
+	fmt.Println("eeprom.NEthernetAddress:", macs)
+	fmt.Println("eeprom.BaseEthernetAddress:", base.String())
+	return nil
 }
 
 func (p *platform) boardPortInit(s fe1.Switch) (err error) {
@@ -144,14 +124,20 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 
 	phys := [32 + 1]fe1.PhyConfig{}
 
+	ver, err := deviceVersion()
+	if err != nil {
+		return
+	}
+
 	for i := range phys {
 		p := &phys[i]
 		p.Index = uint8(i & 0x1f)
-		if devEeprom.Fields.DeviceVersion == 0 {
+		switch ver {
+		case 0:
 			// Alpha level board
 			// No lane remapping, but the MK1 front panel ports are flipped and 0-based.
 			p.FrontPanelIndex = p.Index ^ 1
-		} else {
+		default:
 			// Beta & Production level boards have version 1 and above
 			// No lane remapping, but the MK1 front panel ports are flipped and 1-based.
 			p.FrontPanelIndex = (p.Index ^ 1) + 1
@@ -161,5 +147,34 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 	cf.Phys = phys[:]
 
 	cf.Configure(p.Vnet, s)
+	return
+}
+
+func deviceVersion() (ver int, err error) {
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	if err != nil {
+		return
+	}
+	_, err = fmt.Sscan(s, &ver)
+	return
+}
+
+func nMacs() (n uint, err error) {
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.NEthernetAddress")
+	if err != nil {
+		return
+	}
+	_, err = fmt.Sscan(s, &n)
+	return
+}
+
+func baseEtherAddr() (ea ethernet.Address, err error) {
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+	if err != nil {
+		return
+	}
+	input := new(parse.Input)
+	input.SetString(s)
+	ea.Parse(input)
 	return
 }
