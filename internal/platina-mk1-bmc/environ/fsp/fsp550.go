@@ -409,16 +409,32 @@ func (r *regi16) set(h *Psu, v int16)  { (*reg16)(r).set(h, uint16(v)) }
 
 func (h *Psu) convert(v uint16) float64 {
 	if h.Id == "Great Wall" {
-		nn := float64(((v>>11)^0x1f)+1) * (-1)
+		var nn int
+		var y int
+		if (v >> 11) > 0xf {
+			nn = int(((v>>11)^0x1f)+1) * (-1)
+		} else {
+			nn = int(v >> 11)
+		}
 		v = v & 0x7ff
-		vv := float64(v) * (math.Exp2(nn))
+		if v > 0x3ff {
+			y = int(v^0x7ff+1) * (-1)
+		} else {
+			y = int(v)
+		}
+		vv := float64(y) * (math.Exp2(float64(nn)))
 		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
 		return vv
 	} else if h.Id == "FSP" {
 		r := getPsuRegs()
+		var nn float64
 		n := r.VoutMode.get(h) & 0x1f
-		n = ((n ^ 0x1f) + 1) & 0x1f
-		nn := float64(n) * (-1)
+		if n > 0xf {
+			n = ((n ^ 0x1f) + 1) & 0x1f
+			nn = float64(n) * (-1)
+		} else {
+			nn = float64(n)
+		}
 		vv := (float64(v) * (math.Exp2(nn)))
 		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
 		return vv
@@ -492,7 +508,16 @@ func (h *Psu) Iin() float64 {
 func (h *Psu) Vout() float64 {
 	r := getPsuRegs()
 	t := r.Vout.get(h)
-	v := h.convert(t)
+	var nn float64
+	n := r.VoutMode.get(h) & 0x1f
+	if n > 0xf {
+		n = ((n ^ 0x1f) + 1) & 0x1f
+		nn = float64(n) * (-1)
+	} else {
+		nn = float64(n)
+	}
+	v := (float64(t) * (math.Exp2(nn)))
+	v, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", v), 64)
 	return v
 }
 
