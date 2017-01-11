@@ -358,7 +358,6 @@ func (h *FanStat) FanTrayStatus(i uint8) string {
 	var f string
 
 	if deviceVer == 0xff || deviceVer == 0x00 {
-		log.Print("jlp: here")
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
 		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
 	} else {
