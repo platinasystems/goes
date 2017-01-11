@@ -17,9 +17,6 @@ import (
 
 const Name = "eeprom"
 
-// cache
-var flags_, parms_, vendorFlags_, vendorParms_ []string
-
 type cmd struct{}
 
 func New() cmd { return cmd{} }
@@ -29,73 +26,34 @@ func (cmd) Usage() string  { return "eeprom [-n] [-FIELD | FIELD=VALUE]..." }
 
 func (cmd cmd) Complete(args ...string) []string {
 	a := append(cmd.flags(), cmd.parms()...)
-	a = append(a, cmd.vendorFlags()...)
-	a = append(a, cmd.vendorParms()...)
 	sort.Strings(a)
 	return a
 }
 
 func (cmd) flags() []string {
-	if len(flags_) == 0 {
-		a := make([]string, 1+len(NamesByType))
-		a[0] = "-n"
-		i := 1
-		for _, name := range NamesByType {
-			a[i] = name
-			i++
-		}
-		flags_ = a
+	a := make([]string, 1+len(Types))
+	a[0] = "-n"
+	for i, t := range Types {
+		a[1+i] = fmt.Sprint("-", t)
 	}
-	return flags_
+	return a
 }
 
 func (cmd) parms() []string {
-	if len(parms_) == 0 {
-		a := make([]string, 2+len(Vendor.Extension.NamesByType))
-		a[0] = "Onie.Data"
-		a[1] = "Onie.Version"
-		i := 2
-		for _, name := range Vendor.Extension.NamesByType {
-			a[i] = name
-			i++
-		}
-		parms_ = a
+	a := make([]string, 2+len(Types))
+	a[0] = "Onie.Data"
+	a[1] = "Onie.Version"
+	for i, t := range Types {
+		a[2+i] = t.String()
 	}
-	return parms_
-}
-
-func (cmd) vendorFlags() []string {
-	if len(vendorFlags_) == 0 {
-		a := make([]string, len(Vendor.Extension.NamesByType))
-		i := 0
-		for _, name := range Vendor.Extension.NamesByType {
-			a[i] = name
-			i++
-		}
-		vendorFlags_ = a
-	}
-	return vendorFlags_
-}
-
-func (cmd) vendorParms() []string {
-	if len(vendorParms_) == 0 {
-		a := make([]string, len(Vendor.Extension.NamesByType))
-		i := 0
-		for _, name := range Vendor.Extension.NamesByType {
-			a[i] = name
-			i++
-		}
-		vendorParms_ = a
-	}
-	return vendorParms_
+	return a
 }
 
 func (cmd cmd) Main(args ...string) error {
 	var eeprom Eeprom
+	nargs := len(args)
 	flag, args := flags.New(args, cmd.flags()...)
 	parm, args := parms.New(args, cmd.parms()...)
-	vendorFlag, args := flags.New(args, cmd.vendorFlags()...)
-	vendorParm, args := parms.New(args, cmd.vendorParms()...)
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
@@ -107,53 +65,22 @@ func (cmd cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	if len(args) == 0 {
-		os.Stdout.WriteString(eeprom.String())
-		return nil
-	}
-	for _, k := range cmd.flags() {
-		if flag[k] {
+	for k, t := range flag {
+		if k != "-n" && t {
 			eeprom.Del(k[1:])
 		}
 	}
-	for _, k := range cmd.parms() {
-		s := parm[k]
+	for k, s := range parm {
 		if len(s) == 0 {
 			continue
 		}
-		eeprom.Set(k, s)
-		if err != nil {
+		if err = eeprom.Set(k, s); err != nil {
 			return err
 		}
 
 	}
-	ve := eeprom.Tlv[VendorExtensionType]
-	for _, k := range cmd.vendorFlags() {
-		if vendorFlag[k] {
-			k = k[1:]
-			method, found := ve.(Deler)
-			if !found {
-				return fmt.Errorf("%s: missing deleter", k)
-			}
-			method.Del(k)
-		}
-	}
-	for _, k := range cmd.vendorParms() {
-		s := vendorParm[k]
-		if len(s) == 0 {
-			continue
-		}
-		method, found := ve.(Setter)
-		if !found {
-			return fmt.Errorf("%s: missing setter", k)
-		}
-		err = method.Set(k, s)
-		if err != nil {
-			return err
-		}
-	}
 	os.Stdout.WriteString(eeprom.String())
-	if flag["-n"] {
+	if nargs == 0 || flag["-n"] {
 		return nil
 	}
 	if !WriteEnable {
@@ -161,11 +88,11 @@ func (cmd cmd) Main(args ...string) error {
 	}
 	clone, err := eeprom.Clone()
 	if err != nil {
-		return nil
+		return err
 	}
 	err = eeprom.Equal(clone)
 	if err != nil {
-		return nil
+		return err
 	}
 	fmt.Print("Write in  ")
 	for i := 5; i > 0; i-- {

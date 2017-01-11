@@ -41,18 +41,18 @@ func Config(args ...interface{}) {
 			copy(config.oui[:], t[:])
 		}
 	}
-	eeprom.Vendor.Extension.NamesByType = map[eeprom.Type]string{
-		ChassisTypeType:      "ChassisType",
-		BoardTypeType:        "BoardType",
-		SubTypeType:          "SubType",
-		PcbaNumberType:       "PcbaNumber",
-		PcbaSerialNumberType: "PcbaSerialNumber",
+	eeprom.Types = append(eeprom.Types,
+		ChassisTypeType,
+		BoardTypeType,
+		SubTypeType,
+		PcbaNumberType,
+		PcbaSerialNumberType,
 
-		Tor1CpuPcbaSerialNumberType:  "Tor1CpuPcbaSerialNumber",
-		Tor1FanPcbaSerialNumberType:  "Tor1FanPcbaSerialNumber",
-		Tor1MainPcbaSerialNumberType: "Tor1MainPcbaSerialNumber",
-	}
-	eeprom.Vendor.Extension.New = func() interface{} {
+		Tor1CpuPcbaSerialNumberType,
+		Tor1FanPcbaSerialNumberType,
+		Tor1MainPcbaSerialNumberType,
+	)
+	eeprom.Vendor.New = func() eeprom.VendorExtension {
 		return make(XtlvMap)
 	}
 	eeprom.Vendor.ReadBytes = ReadBytes

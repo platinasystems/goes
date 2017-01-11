@@ -32,27 +32,27 @@ const (
 	CrcType                 = Type(0xfe)
 )
 
-var NamesByType = map[Type]string{
-	ProductNameType:         "ProductName",
-	PartNumberType:          "PartNumber",
-	SerialNumberType:        "SerialNumber",
-	BaseEthernetAddressType: "BaseEthernetAddress",
-	ManufactureDateType:     "ManufactureDate",
-	DeviceVersionType:       "DeviceVersion",
-	LabelRevisionType:       "LabelRevision",
-	PlatformNameType:        "PlatformName",
-	OnieVersionType:         "OnieVersion",
-	NEthernetAddressType:    "NEthernetAddress",
-	ManufacturerType:        "Manufacturer",
-	CountryCodeType:         "CountryCode",
-	VendorType:              "Vendor",
-	DiagVersionType:         "DiagVersion",
-	ServiceTagType:          "ServiceTag",
-	VendorExtensionType:     "VendorExtension",
-	CrcType:                 "Crc",
+var Types = []Typer{
+	ProductNameType,
+	PartNumberType,
+	SerialNumberType,
+	BaseEthernetAddressType,
+	ManufactureDateType,
+	DeviceVersionType,
+	LabelRevisionType,
+	PlatformNameType,
+	OnieVersionType,
+	NEthernetAddressType,
+	ManufacturerType,
+	CountryCodeType,
+	VendorType,
+	DiagVersionType,
+	ServiceTagType,
+	VendorExtensionType,
+	CrcType,
 }
 
-var TypesByName = map[string]Type{
+var typesByName = map[string]Type{
 	"ProductName":         ProductNameType,
 	"PartNumber":          PartNumberType,
 	"SerialNumber":        SerialNumberType,
@@ -72,8 +72,20 @@ var TypesByName = map[string]Type{
 	"Crc":                 CrcType,
 }
 
+type Byter interface {
+	Byte() byte
+}
+
+type Byteser interface {
+	Bytes() []byte
+}
+
 type Deler interface {
 	Del(string)
+}
+
+type Reseter interface {
+	Reset()
 }
 
 type Setter interface {
@@ -84,15 +96,46 @@ type Scanner interface {
 	Scan(string) error
 }
 
+type Typer interface {
+	Byter
+	fmt.Stringer
+}
+
+type VendorExtension interface {
+	Byteser
+	Deler
+	Setter
+	fmt.Stringer
+}
+
 type Type uint8
 
+func (t Type) Byte() byte {
+	return byte(t)
+}
+
 func (t Type) String() string {
-	s := NamesByType[t]
+	s := map[Type]string{
+		ProductNameType:         "ProductName",
+		PartNumberType:          "PartNumber",
+		SerialNumberType:        "SerialNumber",
+		BaseEthernetAddressType: "BaseEthernetAddress",
+		ManufactureDateType:     "ManufactureDate",
+		DeviceVersionType:       "DeviceVersion",
+		LabelRevisionType:       "LabelRevision",
+		PlatformNameType:        "PlatformName",
+		OnieVersionType:         "OnieVersion",
+		NEthernetAddressType:    "NEthernetAddress",
+		ManufacturerType:        "Manufacturer",
+		CountryCodeType:         "CountryCode",
+		VendorType:              "Vendor",
+		DiagVersionType:         "DiagVersion",
+		ServiceTagType:          "ServiceTag",
+		VendorExtensionType:     "VendorExtension",
+		CrcType:                 "Crc",
+	}[t]
 	if len(s) == 0 {
-		s = Vendor.Extension.NamesByType[t]
-		if len(s) == 0 {
-			s = fmt.Sprintf("%#x", t)
-		}
+		s = fmt.Sprintf("%#x", t)
 	}
 	return s
 }

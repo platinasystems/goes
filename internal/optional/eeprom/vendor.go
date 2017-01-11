@@ -6,11 +6,7 @@ package eeprom
 
 // Each machine main must assign the following Vendor parameters
 var Vendor struct {
-	Extension struct {
-		NamesByType map[Type]string
-
-		New func() interface{}
-	}
+	New       func() VendorExtension
 	ReadBytes func() ([]byte, error)
 	Write     func([]byte) (int, error)
 }

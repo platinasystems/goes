@@ -10,15 +10,7 @@ import (
 	"io"
 )
 
-type TlvMap map[Type]interface{}
-
-type Byteser interface {
-	Bytes() []byte
-}
-
-type Reseter interface {
-	Reset()
-}
+type TlvMap map[Typer]interface{}
 
 func (m TlvMap) Add(t Type) (v interface{}) {
 	switch t {
@@ -29,7 +21,7 @@ func (m TlvMap) Add(t Type) (v interface{}) {
 	case NEthernetAddressType:
 		v = new(Dec16)
 	case VendorExtensionType:
-		v = Vendor.Extension.New()
+		v = Vendor.New()
 	case CrcType:
 		v = new(Hex32)
 	default:
@@ -43,7 +35,7 @@ func (m TlvMap) Bytes() []byte {
 	buf := new(bytes.Buffer)
 	for t, v := range m {
 		b := v.(Byteser).Bytes()
-		buf.WriteByte(byte(t))
+		buf.WriteByte(t.Byte())
 		buf.WriteByte(byte(len(b)))
 		buf.Write(b)
 	}

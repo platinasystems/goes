@@ -7,60 +7,34 @@ package platina_eeprom
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/platinasystems/go/internal/optional/eeprom"
 )
 
-const (
-	ChassisTypeType      = eeprom.Type(0x50)
-	BoardTypeType        = eeprom.Type(0x51)
-	SubTypeType          = eeprom.Type(0x52)
-	PcbaNumberType       = eeprom.Type(0x53)
-	PcbaSerialNumberType = eeprom.Type(0x54)
-
-	Tor1CpuPcbaSerialNumberType  = eeprom.Type(0x10)
-	Tor1FanPcbaSerialNumberType  = eeprom.Type(0x11)
-	Tor1MainPcbaSerialNumberType = eeprom.Type(0x12)
-)
-
-var TypesByName = map[string]eeprom.Type{
-	"ChassisType":      ChassisTypeType,
-	"BoardType":        BoardTypeType,
-	"SubType":          SubTypeType,
-	"PcbaNumber":       PcbaNumberType,
-	"PcbaSerialNumber": PcbaSerialNumberType,
-
-	"Tor1CpuPcbaSerialNumber":  Tor1CpuPcbaSerialNumberType,
-	"Tor1FanPcbaSerialNumber":  Tor1FanPcbaSerialNumberType,
-	"Tor1MainPcbaSerialNumber": Tor1MainPcbaSerialNumberType,
-}
-
-type XtlvMap map[eeprom.Type]*bytes.Buffer
+type XtlvMap map[Type]*bytes.Buffer
 
 func (m XtlvMap) Bytes() []byte {
 	buf := new(bytes.Buffer)
-	if b, found := m[eeprom.VendorExtensionType]; found {
+	if b, found := m[VendorExtensionType]; found {
 		buf.Write(b.Bytes())
 		return buf.Bytes()
 	}
-	for _, t := range []eeprom.Type{
+	for _, t := range []Type{
 		BoardTypeType,
 		ChassisTypeType,
 		SubTypeType,
 	} {
 		if b, found := m[t]; found {
-			buf.WriteByte(byte(t))
+			buf.WriteByte(t.Byte())
 			buf.WriteByte(byte(b.Len()))
 			buf.Write(b.Bytes())
 		}
 	}
-	for _, t := range []eeprom.Type{
+	for _, t := range []Type{
 		Tor1CpuPcbaSerialNumberType,
 		Tor1FanPcbaSerialNumberType,
 		Tor1MainPcbaSerialNumberType,
 	} {
 		if b, found := m[t]; found {
-			buf.WriteByte(byte(PcbaSerialNumberType))
+			buf.WriteByte(PcbaSerialNumberType.Byte())
 			buf.WriteByte(byte(b.Len()))
 			buf.Write(b.Bytes())
 		}
@@ -69,14 +43,14 @@ func (m XtlvMap) Bytes() []byte {
 }
 
 func (m XtlvMap) Del(name string) {
-	t, found := TypesByName[name]
+	t, found := typesByName[name]
 	if found {
 		delete(m, t)
 	}
 }
 
 func (m XtlvMap) Set(name, s string) error {
-	t, found := TypesByName[name]
+	t, found := typesByName[name]
 	if !found {
 		return fmt.Errorf("%s: unknown", name)
 	}
@@ -87,11 +61,11 @@ func (m XtlvMap) Set(name, s string) error {
 }
 
 func (m XtlvMap) String() string {
-	if b, found := m[eeprom.VendorExtensionType]; found {
+	if b, found := m[VendorExtensionType]; found {
 		return fmt.Sprintf("eeprom.VendorExtension: %q\n", b.String())
 	}
 	buf := new(bytes.Buffer)
-	for _, t := range []eeprom.Type{
+	for _, t := range []Type{
 		BoardTypeType,
 		ChassisTypeType,
 		SubTypeType,
@@ -101,7 +75,7 @@ func (m XtlvMap) String() string {
 			continue
 		}
 		x := b.Bytes()[0]
-		s := map[eeprom.Type]map[byte]string{
+		s := map[Type]map[byte]string{
 			BoardTypeType: map[byte]string{
 				0x00: "ToR",
 				0x01: "Broadwell 2-Core",
@@ -130,7 +104,7 @@ func (m XtlvMap) String() string {
 		}
 		fmt.Fprintf(buf, "eeprom.%s: %s\n", t, s)
 	}
-	for _, t := range []eeprom.Type{
+	for _, t := range []Type{
 		Tor1CpuPcbaSerialNumberType,
 		Tor1FanPcbaSerialNumberType,
 		Tor1MainPcbaSerialNumberType,
@@ -146,14 +120,14 @@ func (m XtlvMap) String() string {
 
 func (m XtlvMap) Write(buf []byte) (n int, err error) {
 	for len(buf) > 2 {
-		t := eeprom.Type(buf[0])
+		t := Type(buf[0])
 		switch t {
 		case BoardTypeType, ChassisTypeType, SubTypeType,
 			PcbaSerialNumberType:
 		default:
 			v := new(bytes.Buffer)
 			v.Write(buf)
-			m[eeprom.VendorExtensionType] = v
+			m[VendorExtensionType] = v
 			n = len(buf)
 			return
 		}

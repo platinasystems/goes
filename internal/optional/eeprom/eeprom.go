@@ -41,15 +41,21 @@ func (p *Eeprom) Clone() (*Eeprom, error) {
 }
 
 func (p *Eeprom) Del(name string) {
-	delete(p.Tlv, TypesByName[name])
+	if name == "VendorExtension" {
+		if method, found := p.Tlv[VendorExtensionType].(Deler); found {
+			method.Del(name)
+			return
+		}
+	}
+	delete(p.Tlv, typesByName[name])
 }
 
 func (p *Eeprom) Equal(clone *Eeprom) error {
-	if p.Onie.Data != clone.Onie.Data {
+	if !bytes.Equal(p.Onie.Data[:], clone.Onie.Data[:]) {
 		return fmt.Errorf("Onie.Data: [% x] vs. [% x]",
-			p.Onie.Data, clone.Onie.Data)
+			p.Onie.Data[:], clone.Onie.Data[:])
 	}
-	if p.Onie.Version != clone.Onie.Version {
+	if !bytes.Equal(p.Onie.Version.Bytes(), clone.Onie.Version.Bytes()) {
 		return fmt.Errorf("Onie.Version: %x vs. %x",
 			p.Onie.Version, clone.Onie.Version)
 	}
@@ -63,17 +69,23 @@ func (p *Eeprom) Set(name, s string) (err error) {
 	case "Onie.Version":
 		err = p.Onie.Version.Scan(s)
 	default:
-		t := TypesByName[name]
+		t, found := typesByName[name]
+		if !found {
+			err = p.Tlv[VendorExtensionType].(Setter).Set(name, s)
+		}
 		v := p.Tlv[t]
 		if v == nil {
 			v = p.Tlv.Add(t)
 		}
-		b, isBytesBuffer := v.(*bytes.Buffer)
-		if isBytesBuffer {
+		if b, found := v.(*bytes.Buffer); found {
 			b.Reset()
 			_, err = b.Write([]byte(s))
+		} else if method, found := v.(Scanner); found {
+			err = method.Scan(s)
+		} else if method, found := v.(Setter); found {
+			err = method.Set(name, s)
 		} else {
-			err = v.(Scanner).Scan(s)
+			err = fmt.Errorf("can't set %s", name)
 		}
 	}
 	return
