@@ -419,13 +419,15 @@ func (redisd *Redisd) Hget(key, subkey string) ([]byte, error) {
 	f := func(key, subkey string) ([]byte, error) {
 		return nil, fmt.Errorf("can't hget %s %s", key, subkey)
 	}
+	var b []byte
+	hashkey := fmt.Sprint(key, ":", subkey)
 	redisd.mutex.Lock()
 	if hv, found := redisd.published[key]; found {
-		defer redisd.mutex.Unlock()
-		return hv[subkey], nil
-	}
-	hashkey := fmt.Sprint(key, ":", subkey)
-	if method, found := redisd.assignments.Find(hashkey).(t); found {
+		b = hv[subkey]
+		f = func(string, string) ([]byte, error) {
+			return b, nil
+		}
+	} else if method, found := redisd.assignments.Find(hashkey).(t); found {
 		f = method.Hget
 	} else if method, found := redisd.assignments.Find(key).(t); found {
 		f = method.Hget
@@ -441,17 +443,18 @@ func (redisd *Redisd) Hgetall(key string) ([][]byte, error) {
 	f := func(key string) ([][]byte, error) {
 		return nil, fmt.Errorf("can't hgetall %s", key)
 	}
+	var bs [][]byte
 	redisd.mutex.Lock()
 	if hv, found := redisd.published[key]; found {
 		subkeys := redisd.subkeys(key, hv)
-		reply := make([][]byte, 0, len(hv)*2)
+		bs = make([][]byte, 0, len(hv)*2)
 		for _, k := range subkeys {
-			reply = append(reply, []byte(k), hv[k])
+			bs = append(bs, []byte(k), hv[k])
 		}
-		redisd.mutex.Unlock()
-		return reply, nil
-	}
-	if method, found := redisd.assignments.Find(key).(t); found {
+		f = func(string) ([][]byte, error) {
+			return bs, nil
+		}
+	} else if method, found := redisd.assignments.Find(key).(t); found {
 		f = method.Hgetall
 	}
 	redisd.mutex.Unlock()
@@ -465,17 +468,18 @@ func (redisd *Redisd) Hkeys(key string) ([][]byte, error) {
 	f := func(key string) ([][]byte, error) {
 		return nil, fmt.Errorf("can't hkeys %s", key)
 	}
+	var bs [][]byte
 	redisd.mutex.Lock()
 	if hv, found := redisd.published[key]; found {
 		subkeys := redisd.subkeys(key, hv)
-		reply := make([][]byte, 0, len(subkeys))
+		bs = make([][]byte, 0, len(subkeys))
 		for _, k := range subkeys {
-			reply = append(reply, []byte(k))
+			bs = append(bs, []byte(k))
 		}
-		redisd.mutex.Unlock()
-		return reply, nil
-	}
-	if method, found := redisd.assignments.Find(key).(t); found {
+		f = func(string) ([][]byte, error) {
+			return bs, nil
+		}
+	} else if method, found := redisd.assignments.Find(key).(t); found {
 		f = method.Hkeys
 	}
 	redisd.mutex.Unlock()
@@ -489,8 +493,8 @@ func (redisd *Redisd) Hset(key, field string, value []byte) (int, error) {
 	f := func(key, field string, value []byte) (int, error) {
 		return 0, fmt.Errorf("can't hset %s %s", key, field)
 	}
-	redisd.mutex.Lock()
 	hashkey := fmt.Sprint(key, ":", field)
+	redisd.mutex.Lock()
 	if method, found := redisd.assignments.Find(hashkey).(t); found {
 		f = method.Hset
 	} else if method, found := redisd.assignments.Find(key).(t); found {
