@@ -3,6 +3,74 @@
 // LICENSE file.
 
 // Package w83795 provides access to the H/W Monitor chip
+
+package w83795
+
+import (
+	"fmt"
+	"syscall"
+	"time"
+
+	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/redis"
+)
+
+const Name = "w83795"
+const everything = true
+const onlyChanges = false
+
+type cmd chan struct{}
+
+func New() cmd { return cmd(make(chan struct{})) }
+
+func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name }
+
+func (cmd cmd) Main(...string) error {
+	var si syscall.Sysinfo_t
+	err := syscall.Sysinfo(&si)
+	if err != nil {
+		return err
+	}
+	//update(everything)
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-cmd:
+			return nil
+		case <-t.C:
+			update(onlyChanges)
+		}
+	}
+	return nil
+}
+
+func (cmd cmd) Close() error {
+	close(cmd)
+	return nil
+}
+
+func update(everything bool) error {
+	var si syscall.Sysinfo_t
+	if err := syscall.Sysinfo(&si); err != nil {
+		return err
+	}
+	pub, err := redis.Publish(redis.DefaultHash)
+	if err != nil {
+		return err
+	}
+
+	if everything {
+		pub <- fmt.Sprint("fan_tray.1.1.rpm: ", 1)
+	} else {
+		pub <- fmt.Sprint("fan_tray.1.1.rpm: ", 1)
+	}
+	return nil
+}
+
+/*
 package w83795
 
 import (
@@ -513,3 +581,4 @@ func (h *HwMonitor) GetFanSpeed() string {
 	}
 	return speed
 }
+*/

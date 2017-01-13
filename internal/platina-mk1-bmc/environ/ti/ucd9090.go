@@ -7,330 +7,82 @@ package ucd9090
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"unsafe"
+	"syscall"
+	"time"
 
-	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/redis"
 )
 
-var (
-	dummy       byte
-	regsPointer = unsafe.Pointer(&dummy)
-	regsAddr    = uintptr(unsafe.Pointer(&dummy))
-)
+const Name = "ucd9090"
+const everything = true
+const onlyChanges = false
 
-type PMon struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
+type cmd chan struct{}
 
-func getPwmRegs() *pwmRegs { return (*pwmRegs)(regsPointer) }
+func New() cmd { return cmd(make(chan struct{})) }
 
-func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
+func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (cmd) String() string  { return Name }
+func (cmd) Usage() string   { return Name }
 
-func (h *PMon) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
-
-	err = bus.Open(h.Bus)
+func (cmd cmd) Main(...string) error {
+	var si syscall.Sysinfo_t
+	err := syscall.Sysinfo(&si)
 	if err != nil {
-		return
+		return err
 	}
-	defer bus.Close()
+	//update(everything)
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-cmd:
+			return nil
+		case <-t.C:
+			update(onlyChanges)
+		}
+	}
+	return nil
+}
 
-	err = bus.ForceSlaveAddress(h.Addr)
+func (cmd cmd) Close() error {
+	close(cmd)
+	return nil
+}
+
+func update(everything bool) error {
+	var si syscall.Sysinfo_t
+	if err := syscall.Sysinfo(&si); err != nil {
+		return err
+	}
+	pub, err := redis.Publish(redis.DefaultHash)
 	if err != nil {
-		return
+		return err
 	}
 
-	err = bus.Do(rw, regOffset, size, data)
-	return
-}
-
-func (h *PMon) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
-
-	err = bus.Open(h.MuxBus)
-	if err != nil {
-		return
+	if everything {
+		pub <- fmt.Sprint("vmon.5v.sb: ", pm.Vout(1))
+		pub <- fmt.Sprint("vmon.3v8.bmc: ", pm.Vout(2))
+		pub <- fmt.Sprint("vmon.3v3.sys: ", pm.Vout(3))
+		pub <- fmt.Sprint("vmon.3v3.bmc: ", pm.Vout(4))
+		pub <- fmt.Sprint("vmon.3v3.sb: ", pm.Vout(5))
+		pub <- fmt.Sprint("vmon.1v0.thc: ", pm.Vout(6))
+		pub <- fmt.Sprint("vmon.1v8.sys: ", pm.Vout(7))
+		pub <- fmt.Sprint("vmon.1v25.sys: ", pm.Vout(8))
+		pub <- fmt.Sprint("vmon.1v2.ethx: ", pm.Vout(9))
+		pub <- fmt.Sprint("vmon.1v0.tha: ", pm.Vout(10))
+	} else {
+		pub <- fmt.Sprint("vmon.5v.sb: ", pm.Vout(1))
+		pub <- fmt.Sprint("vmon.3v8.bmc: ", pm.Vout(2))
+		pub <- fmt.Sprint("vmon.3v3.sys: ", pm.Vout(3))
+		pub <- fmt.Sprint("vmon.3v3.bmc: ", pm.Vout(4))
+		pub <- fmt.Sprint("vmon.3v3.sb: ", pm.Vout(5))
+		pub <- fmt.Sprint("vmon.1v0.thc: ", pm.Vout(6))
+		pub <- fmt.Sprint("vmon.1v8.sys: ", pm.Vout(7))
+		pub <- fmt.Sprint("vmon.1v25.sys: ", pm.Vout(8))
+		pub <- fmt.Sprint("vmon.1v2.ethx: ", pm.Vout(9))
+		pub <- fmt.Sprint("vmon.1v0.tha: ", pm.Vout(10))
 	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(h.MuxAddr)
-	if err != nil {
-		return
-	}
-
-	err = bus.Do(rw, regOffset, size, data)
-	return
-}
-
-func (r *reg8) get(h *PMon) byte {
-	var data i2c.SMBusData
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ucd9090: get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: get8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return data[0]
-}
-
-func (r *reg16) get(h *PMon) (v uint16) {
-	var data i2c.SMBusData
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ucd9090: get16: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: get16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return uint16(data[0])<<8 | uint16(data[1])
-}
-
-func (r *reg16r) get(h *PMon) (v uint16) {
-	var data i2c.SMBusData
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ucd9090: get16r: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: get16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: get16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return uint16(data[1])<<8 | uint16(data[0])
-}
-
-func (r *reg8) set(h *PMon, v uint8) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ucd9090: set8: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[0] = v
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: set8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16) set(h *PMon, v uint16) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ucd9090: set16: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[0] = uint8(v >> 8)
-	data[1] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: set16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16r) set(h *PMon, v uint16) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ucd9090: set16r: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[1] = uint8(v >> 8)
-	data[0] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ucd9090: set16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *regi16) get(h *PMon) (v int16) { v = int16((*reg16)(r).get(h)); return }
-func (r *regi16) set(h *PMon, v int16)  { (*reg16)(r).set(h, uint16(v)) }
-
-func (h *PMon) Vout(i uint8) float64 {
-	if i > 10 {
-		panic("Voltage rail subscript out of range\n")
-	}
-	i--
-	r := getPwmRegs()
-	r.Page.set(h, i)
-
-	n := r.VoutMode.get(h) & 0xf
-	n--
-	n = (n ^ 0xf) & 0xf
-	v := r.ReadVout.get(h)
-
-	nn := float64(n) * (-1)
-	vv := float64(v) * (math.Exp2(nn))
-	vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
-	return float64(vv)
+	return nil
 }
