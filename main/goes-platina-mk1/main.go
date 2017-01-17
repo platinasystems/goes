@@ -81,24 +81,10 @@ func main() {
 }
 
 func stopHook() error {
-	var startPort, endPort int
-
-	ver, err := deviceVersion()
-	if err != nil {
-		return err
-	}
-	switch ver {
-	case 0:
-		// Alpha level board
-		startPort = 0
-		endPort = 32
-	default:
-		// Beta & Production level boards have version 1 and above
-		startPort = 1
-		endPort = 33
-	}
-
-	for port := startPort; port < endPort; port++ {
+	// Alpha: 0:32
+	// Beta: 1:33
+	// So, cover all with 0..33
+	for port := 0; port < 33; port++ {
 		for subport := 0; subport < 4; subport++ {
 			exec.Command("/bin/ip", "link", "delete",
 				fmt.Sprintf("eth-%d-%d", port, subport),
