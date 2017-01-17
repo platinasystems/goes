@@ -10,9 +10,11 @@ import (
 
 type Mux struct {
 	// Poll/epoll file descriptor.
-	fd       int
-	once     sync.Once
-	poolLock sync.Mutex // protects following
+	fd            int
+	once          sync.Once
+	poolLock      sync.Mutex // protects following
+	errorLog      [1024]error
+	errorLogIndex int
 	filePool
 }
 
@@ -52,4 +54,9 @@ func (m *Mux) Wait(once bool) {
 			break
 		}
 	}
+}
+
+func (m *Mux) logError(err error) {
+	m.errorLog[m.errorLogIndex%len(m.errorLog)] = err
+	m.errorLogIndex++
 }

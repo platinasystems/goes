@@ -140,13 +140,13 @@ func (m *Mux) do(e *epollEvent) {
 	if em&eventWrite != 0 {
 		err := m.files[fi].WriteReady()
 		if err != nil {
-			panic(err)
+			m.logError(err)
 		}
 	}
 	if em&eventRead != 0 {
 		err := m.files[fi].ReadReady()
 		if err != nil {
-			panic(err)
+			m.logError(err)
 		}
 	}
 	if em&eventError != 0 {
