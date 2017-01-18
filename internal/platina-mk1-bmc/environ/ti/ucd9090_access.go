@@ -7,6 +7,7 @@ package ucd9090
 
 import (
 	"bufio"
+	"encoding/gob"
 	"fmt"
 	"math"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/golang/go/src/pkg/encoding/gob"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 )

@@ -7,13 +7,12 @@ package i2cd
 
 import (
 	"bufio"
+	"encoding/gob"
 	"os"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	//	"github.com/platinasystems/go/internal/redis"
-	"github.com/golang/go/src/pkg/encoding/gob"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 )
