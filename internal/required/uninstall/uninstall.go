@@ -7,14 +7,13 @@
 package uninstall
 
 import (
-	"os"
 	"os/exec"
+	"syscall"
 
-	"github.com/platinasystems/go/internal/assert"
+	"github.com/platinasystems/go/internal/goes"
 )
 
 const Name = "uninstall"
-const UsrBinGoes = "/usr/bin/goes"
 const EtcInitdGoes = "/etc/init.d/goes"
 const EtcDefaultGoes = "/etc/default/goes"
 const BashCompletionGoes = "/usr/share/bash-completion/completions/goes"
@@ -22,30 +21,30 @@ const BashCompletionGoes = "/usr/share/bash-completion/completions/goes"
 // Machines may use this Hook to complete its removal.
 var Hook = func() error { return nil }
 
-type cmd struct{}
+type cmd goes.ByName
 
-func New() cmd { return cmd{} }
+func New() *cmd { return new(cmd) }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Name }
 
-func (cmd) Main(...string) error {
-	err := assert.Root()
+func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (c *cmd) Main(...string) error {
+	err := goes.ByName(*c).Main("stop")
 	if err != nil {
 		return err
 	}
-	_, err = os.Stat(UsrBinGoes)
-	exec.Command(UsrBinGoes, "stop").Run()
-	os.Remove(EtcInitdGoes)
-	os.Remove(EtcDefaultGoes)
-	os.Remove(BashCompletionGoes)
 	exec.Command("/usr/sbin/update-rc.d", "goes", "remove").Run()
 	err = Hook()
-	os.Remove(UsrBinGoes)
+	syscall.Unlink(EtcInitdGoes)
+	syscall.Unlink(EtcDefaultGoes)
+	syscall.Unlink(BashCompletionGoes)
+	syscall.Unlink(goes.InstallName)
 	return err
 }
 
-func (cmd) Apropos() map[string]string {
+func (*cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "uninstall this goes machine",
 	}

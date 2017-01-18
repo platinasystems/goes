@@ -7,6 +7,7 @@
 package stop
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 )
 
 const Name = "stop"
+const EtcGoesStop = "/etc/goes/stop"
 
 // Machines may use Hook to run something between the kill of all daemons and
 // the removal of the socks and pids directories.
@@ -34,21 +36,19 @@ func (*cmd) Usage() string  { return "stop [OPTION]..." }
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Main(args ...string) error {
-	byName := goes.ByName(*c)
 	parm, args := parms.New(args, "-start", "-stop")
 	err := assert.Root()
 	if err != nil {
 		return err
 	}
 	stop := parm["-stop"]
-	if len(stop) == 0 {
-		if _, xerr := os.Stat("/etc/goes/stop"); xerr == nil {
-			stop = "/etc/goes/stop"
-		}
+	if len(stop) == 0 && haveEtcGoesStop() {
+		stop = EtcGoesStop
 	}
 	if len(stop) > 0 {
-		if err = byName.Main("source", stop); err != nil {
-			return err
+		err = goes.ByName(*c).Main("source", stop)
+		if err != nil {
+			return fmt.Errorf("source %s: %v", stop, err)
 		}
 	}
 	err = kill.All(syscall.SIGTERM)
@@ -88,4 +88,9 @@ OPTIONS
 		sourced immediately before killing all daemons.
 		default: /etc/goes/start`,
 	}
+}
+
+func haveEtcGoesStop() bool {
+	_, err := os.Stat(EtcGoesStop)
+	return err == nil
 }
