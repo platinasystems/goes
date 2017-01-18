@@ -7,25 +7,15 @@ package ucd9090
 
 import (
 	"bufio"
-	"encoding/gob"
-	"fmt"
-	"math"
 	"os"
-	"strconv"
 	"time"
 	"unsafe"
 
+	"github.com/golang/go/src/pkg/encoding/gob"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 )
 
-const (
-	ucd9090Bus    = 0
-	ucd9090Adr    = 0x7e
-	ucd9090MuxBus = 0
-	ucd9090MuxAdr = 0x76
-	ucd9090MuxVal = 0x01
-)
 const (
 	NONE  = 0
 	DO    = 1
@@ -38,13 +28,6 @@ const (
 )
 const MAXTRANS = 10
 
-type PMon struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
 type I struct {
 	Op        int
 	RegType   int
@@ -67,10 +50,6 @@ type R struct {
 	E error
 }
 
-var pm = PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
-var dummy byte
-var regsPointer = unsafe.Pointer(&dummy)
-var regsAddr = uintptr(unsafe.Pointer(&dummy))
 var b = [4]byte{0, 0, 0, 0}
 var i = I{NONE, 0, 0, 0, 0, b, nil, 0, 0, 0, 0, 0}
 var j [MAXTRANS]I
@@ -78,18 +57,14 @@ var x int
 var r = R{float64(0), uint8(0), uint16(0), "string", nil}
 var s [MAXTRANS]R
 
+var dummy byte
+var regsPointer = unsafe.Pointer(&dummy)
+var regsAddr = uintptr(unsafe.Pointer(&dummy))
+
 func getPwmRegs() *pwmRegs      { return (*pwmRegs)(regsPointer) }
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-
-func clearJS() {
-	x = 0
-	for k := 0; k < MAXTRANS; k++ {
-		j[k] = i
-		s[k] = r
-	}
-}
 
 func (r *reg8) get(h *PMon) {
 	var data = [4]byte{0, 0, 0, 0}
@@ -159,26 +134,12 @@ func (r *reg16r) set(h *PMon, v uint16) {
 	x++
 }
 
-func (h *PMon) Vout(i uint8) float64 {
-	if i > 10 {
-		panic("Voltage rail subscript out of range\n")
+func clearJS() {
+	x = 0
+	for k := 0; k < MAXTRANS; k++ {
+		j[k] = i
+		s[k] = r
 	}
-	i--
-
-	clearJS()
-	r := getPwmRegs()
-	r.Page.set(h, i)
-	r.ReadVout.get(h)
-	DoI2cRpc()
-	n := s[0].I & 0xf //Response #0, uint8
-	n--
-	n = (n ^ 0xf) & 0xf
-	v := s[1].J //Response #1, uint16
-
-	nn := float64(n) * (-1)
-	vv := float64(v) * (math.Exp2(nn))
-	vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
-	return float64(vv)
 }
 
 //FIXME: REPLACE THIS WITH RPC, CHANGE RETURN to error
