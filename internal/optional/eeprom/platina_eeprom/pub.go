@@ -52,10 +52,11 @@ func RedisdHook(pub chan<- string) error {
 			return fmt.Errorf("eeprom: %s: not found",
 				eeprom.BaseEthernetAddressType.String())
 		}
+
+		// all non-blank MAC addresses are allowed
 		ea := ev.(*eeprom.EthernetAddress)
-		if !bytes.Equal(ea[:3], config.oui[:]) {
-			return fmt.Errorf("eeprom: O.U.I:. %0x vs. %0x",
-				ea[:3], config.oui[:])
+		if bytes.Equal(ea[:], []byte{0, 0, 0, 0, 0, 0}) {
+			return fmt.Errorf("eeprom: invalid MAC BASE: %0x", ea[:6])
 		}
 	}
 	return nil
