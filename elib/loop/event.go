@@ -49,8 +49,9 @@ func (l *eventLoop) putLoopEvent(x *loopEvent) { l.loopEvents.Put(x) }
 
 type eventNode struct {
 	activateEvent
-	rxEvents chan *loopEvent
-	eventVec event.ActorVec
+	rxEvents      chan *loopEvent
+	nActiveEvents uint32
+	eventVec      event.ActorVec
 }
 
 type loopEvent struct {
@@ -100,8 +101,8 @@ func (n *Node) AddTimedEvent(e event.Actor, dst EventHandler, dt float64) {
 
 func (e *loopEvent) EventAction() {
 	if e.dst != nil {
+		e.dst.nActiveEvents++
 		e.dst.rxEvents <- e
-		e.dst.set_active(true)
 	} else {
 		e.do()
 	}
@@ -145,7 +146,7 @@ const eventHandlerChanDepth = 16 << 10
 
 func (l *Loop) startHandler(n EventHandler) {
 	c := n.GetNode()
-	c.toLoop = make(chan struct{}, 1)
+	c.toLoop = make(chan struct{}, 64)
 	c.fromLoop = make(chan struct{}, 1)
 	c.rxEvents = make(chan *loopEvent, eventHandlerChanDepth)
 	go l.eventHandler(n)
@@ -241,9 +242,9 @@ func (l *Loop) doEvents() (quitLoop bool) {
 func (l *eventLoop) Wait() {
 	for _, h := range l.handlers {
 		c := h.GetNode()
-		if c.is_active() {
+		for c.nActiveEvents > 0 {
+			c.nActiveEvents--
 			<-c.toLoop
-			c.set_active(false)
 		}
 	}
 }
