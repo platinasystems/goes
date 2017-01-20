@@ -17,7 +17,6 @@ import (
 	"github.com/platinasystems/go/internal/optional/watchdog"
 	//	"github.com/platinasystems/go/internal/prog"
 	//	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/gpio"
 	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/environ"
@@ -31,7 +30,7 @@ import (
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
-	gpio.File = "/boot/platina-mk1-bmc.dtb"
+	var h platform
 	g := make(goes.ByName)
 	g.Plot(required.New()...)
 	g.Plot(diag.New(), optgpio.New(), i2c.New(), telnetd.New(), toggle.New(), watchdog.New())
@@ -39,6 +38,9 @@ func main() {
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}
 	redisd.Hook = getEepromData
+	if err := h.Init(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 	start.ConfHook = func() error {
 		return nil
 	}

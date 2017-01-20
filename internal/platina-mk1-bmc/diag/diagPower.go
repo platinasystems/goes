@@ -23,7 +23,7 @@ func diagPower() error {
 		ucd9090MuxAdr = 0x76
 		ucd9090MuxVal = 0x01
 	)
-	var pm = ucd9090.PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
+	var pm = ucd9090.I2cDev{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
 
 	d := eeprom.Device{
 		BusIndex:   0,

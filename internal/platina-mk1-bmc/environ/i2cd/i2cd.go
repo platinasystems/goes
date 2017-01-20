@@ -52,50 +52,35 @@ func (cmd cmd) Close() error {
 	return nil
 }
 
-const (
-	NONE  = 0
-	DO    = 1
-	DOMUX = 2
-)
-const (
-	REG8   = 1
-	REG16  = 2
-	REG16R = 3
-)
-const MAXTRANS = 10
+const MAXOPS = 10
 
 type I struct {
-	Op        int
-	RegType   int
+	InUse     bool
 	RW        i2c.RW
 	RegOffset uint8
 	BusSize   i2c.SMBusSize
-	Data      [4]byte
-	ErrCode   error
+	Data      [34]byte
 	Bus       int
 	Addr      int
-	MuxBus    int
-	MuxAddr   int
-	MuxValue  int
+	Count     int
+	Delay     int
+	Eeprom    int
 }
 type R struct {
-	F float64
-	I uint8
-	J uint16
-	S string
+	D [34]byte
 	E error
 }
 
-var b = [4]byte{0, 0, 0, 0}
-var i = I{NONE, 0, 0, 0, 0, b, nil, 0, 0, 0, 0, 0}
-var j [MAXTRANS]I
+var b = [34]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0, 0, 0}
+var j [MAXOPS]I
+var r = R{b, nil}
+var s [MAXOPS]R
 var x int
-var r = R{float64(0), uint8(0), uint16(0), "string", nil}
-var s [MAXTRANS]R
 
 func clearJS() {
 	x = 0
-	for k := 0; k < MAXTRANS; k++ {
+	for k := 0; k < MAXOPS; k++ {
 		j[k] = i
 		s[k] = r
 	}
@@ -121,10 +106,10 @@ func ServeI2cRpc() {
 			log.Print("ti error: ", er)
 		}
 		size := fi.Size()
-		if size == 319 {
+		if size == 584 {
 			break
 		}
-		log.Print("i2cd SIZE: ", size)
+		//log.Print("i2cd SIZE: ", size)
 	}
 
 	clearJS() //open, reader
@@ -142,8 +127,37 @@ func ServeI2cRpc() {
 		log.Print("i2c decode error:", err)
 	}
 
-	for x := 0; x < MAXTRANS; x++ { //loop over all i2c req
-		//log.Print(x, j[x].Op)
+	var bus i2c.Bus
+	var data i2c.SMBusData
+	for x := 0; x < MAXOPS; x++ {
+		//log.Print(x, j[x].InUse, j[x].Bus, j[x].Addr, j[x].RegOffset)
+		if j[x].InUse == true {
+			err = bus.Open(j[x].Bus)
+			if err != nil {
+				log.Print("ERR1")
+				return
+			}
+			defer bus.Close()
+
+			err = bus.ForceSlaveAddress(j[x].Addr)
+			if err != nil {
+				log.Print("ERR2")
+				return
+			}
+			data[0] = j[x].Data[0]
+			data[1] = j[x].Data[1]
+			data[2] = j[x].Data[2]
+			data[3] = j[x].Data[3]
+			//log.Print("PRE: ", j[x].RW, j[x].RegOffset, j[x].BusSize, data[0])
+			err = bus.Do(j[x].RW, j[x].RegOffset, j[x].BusSize, &data)
+			if err != nil {
+				log.Print("ERR3", err)
+				return
+			}
+			s[x].D[0] = data[0]
+			s[x].D[1] = data[1]
+			//log.Print("RESULT: ", x, s[x].D[0], s[x].D[1])
+		}
 	}
 
 	f.Close() //close, remove

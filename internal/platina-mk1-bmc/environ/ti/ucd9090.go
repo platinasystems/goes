@@ -31,7 +31,7 @@ const (
 
 type cmd chan struct{}
 
-type PMon struct {
+type I2cDev struct {
 	Bus      int
 	Addr     int
 	MuxBus   int
@@ -39,7 +39,7 @@ type PMon struct {
 	MuxValue int
 }
 
-var pm = PMon{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
+var dev = I2cDev{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
 
 func New() cmd { return cmd(make(chan struct{})) }
 
@@ -81,30 +81,30 @@ func update() error {
 	if err != nil {
 		return err
 	}
-	pub <- fmt.Sprint("vmon.5v.sb: ", pm.Vout(1))
-	pub <- fmt.Sprint("vmon.3v8.bmc: ", pm.Vout(2))
-	pub <- fmt.Sprint("vmon.3v3.sys: ", pm.Vout(3))
-	pub <- fmt.Sprint("vmon.3v3.bmc: ", pm.Vout(4))
-	pub <- fmt.Sprint("vmon.3v3.sb: ", pm.Vout(5))
-	pub <- fmt.Sprint("vmon.1v0.thc: ", pm.Vout(6))
-	pub <- fmt.Sprint("vmon.1v8.sys: ", pm.Vout(7))
-	pub <- fmt.Sprint("vmon.1v25.sys: ", pm.Vout(8))
-	pub <- fmt.Sprint("vmon.1v2.ethx: ", pm.Vout(9))
-	pub <- fmt.Sprint("vmon.1v0.tha: ", pm.Vout(10))
-	pub <- fmt.Sprint("vmon.5v.sb: ", pm.Vout(1))
-	pub <- fmt.Sprint("vmon.3v8.bmc: ", pm.Vout(2))
-	pub <- fmt.Sprint("vmon.3v3.sys: ", pm.Vout(3))
-	pub <- fmt.Sprint("vmon.3v3.bmc: ", pm.Vout(4))
-	pub <- fmt.Sprint("vmon.3v3.sb: ", pm.Vout(5))
-	pub <- fmt.Sprint("vmon.1v0.thc: ", pm.Vout(6))
-	pub <- fmt.Sprint("vmon.1v8.sys: ", pm.Vout(7))
-	pub <- fmt.Sprint("vmon.1v25.sys: ", pm.Vout(8))
-	pub <- fmt.Sprint("vmon.1v2.ethx: ", pm.Vout(9))
-	pub <- fmt.Sprint("vmon.1v0.tha: ", pm.Vout(10))
+	pub <- fmt.Sprint("vmon.5v.sb: ", dev.Vout(1))
+	pub <- fmt.Sprint("vmon.3v8.bmc: ", dev.Vout(2))
+	pub <- fmt.Sprint("vmon.3v3.sys: ", dev.Vout(3))
+	pub <- fmt.Sprint("vmon.3v3.bmc: ", dev.Vout(4))
+	pub <- fmt.Sprint("vmon.3v3.sb: ", dev.Vout(5))
+	pub <- fmt.Sprint("vmon.1v0.thc: ", dev.Vout(6))
+	pub <- fmt.Sprint("vmon.1v8.sys: ", dev.Vout(7))
+	pub <- fmt.Sprint("vmon.1v25.sys: ", dev.Vout(8))
+	pub <- fmt.Sprint("vmon.1v2.ethx: ", dev.Vout(9))
+	pub <- fmt.Sprint("vmon.1v0.tha: ", dev.Vout(10))
+	pub <- fmt.Sprint("vmon.5v.sb: ", dev.Vout(1))
+	pub <- fmt.Sprint("vmon.3v8.bmc: ", dev.Vout(2))
+	pub <- fmt.Sprint("vmon.3v3.sys: ", dev.Vout(3))
+	pub <- fmt.Sprint("vmon.3v3.bmc: ", dev.Vout(4))
+	pub <- fmt.Sprint("vmon.3v3.sb: ", dev.Vout(5))
+	pub <- fmt.Sprint("vmon.1v0.thc: ", dev.Vout(6))
+	pub <- fmt.Sprint("vmon.1v8.sys: ", dev.Vout(7))
+	pub <- fmt.Sprint("vmon.1v25.sys: ", dev.Vout(8))
+	pub <- fmt.Sprint("vmon.1v2.ethx: ", dev.Vout(9))
+	pub <- fmt.Sprint("vmon.1v0.tha: ", dev.Vout(10))
 	return nil
 }
 
-func (h *PMon) Vout(i uint8) float64 {
+func (h *I2cDev) Vout(i uint8) float64 {
 	if i > 10 {
 		panic("Voltage rail subscript out of range\n")
 	}
@@ -113,12 +113,14 @@ func (h *PMon) Vout(i uint8) float64 {
 	clearJS()
 	r := getPwmRegs()
 	r.Page.set(h, i)
+	r.VoutMode.get(h)
 	r.ReadVout.get(h)
 	DoI2cRpc()
-	n := s[0].I & 0xf //Response #0, uint8
+	//log.Print("return vals: ", s[0].D[0], s[1].D[0], s[2].D[0], s[3].D[0], s[4].D[0], s[5].D[0], s[5].D[1])
+	n := s[3].D[0] & 0xf
 	n--
 	n = (n ^ 0xf) & 0xf
-	v := s[1].J //Response #1, uint16
+	v := uint16(s[5].D[1])<<8 | uint16(s[5].D[0])
 
 	nn := float64(n) * (-1)
 	vv := float64(v) * (math.Exp2(nn))
