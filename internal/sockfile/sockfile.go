@@ -27,48 +27,46 @@ type RpcServer struct {
 
 // Wait up to 10 seconds for the socket then set it to the named group and
 // enable group writes.
-func Chgroup(path, name string) error {
-	for end := time.Now().Add(10 * time.Second); time.Now().Before(end); time.Sleep(250 * time.Millisecond) {
-		fi, err := os.Stat(path)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		gid := group.Parse()[name].Gid()
-		if gid != 0 {
-			err = os.Chown(path, os.Geteuid(), gid)
-			if err != nil {
-				return err
-			}
-		}
-		return os.Chmod(path, fi.Mode()|0020)
+func Chgroup(path, name string) (err error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return
 	}
-	return fmt.Errorf("oops, shouldn't be here")
+	if gid := group.Parse()[name].Gid(); gid != 0 {
+		err = os.Chown(path, os.Geteuid(), gid)
+		if err != nil {
+			return
+		}
+	}
+	err = os.Chmod(path, fi.Mode()|0020)
+	return
 }
 
 func Dial(name string) (net.Conn, error) {
 	path := Path(name)
-	for i := 0; ; i++ {
-		conn, err := net.Dial("unix", path)
-		if err == nil {
-			return conn, err
-		}
-		if i == 30 {
-			return nil, err
-		}
-		time.Sleep(100 * time.Millisecond)
+	err := WaitFor(path, time.Now().Add(10*time.Second))
+	if err != nil {
+		return nil, err
 	}
+	return net.Dial("unix", path)
+}
+
+func DialUnixgram(name string) (*net.UnixConn, error) {
+	path := Path(name)
+	err := WaitFor(path, time.Now().Add(10*time.Second))
+	if err != nil {
+		return nil, err
+	}
+	a, err := net.ResolveUnixAddr("unixgram", path)
+	if err != nil {
+		return nil, err
+	}
+	return net.DialUnix("unixgram", nil, a)
 }
 
 func Listen(name string) (net.Listener, error) {
 	path := Path(name)
-	_, err := os.Stat(path)
-	if err == nil || os.IsExist(err) {
-		return nil, fmt.Errorf("%s: %v", name, os.ErrExist)
-	}
-	err = varrun.New(Dir)
+	err := varrun.New(Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +74,40 @@ func Listen(name string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ln, Chgroup(path, "adm")
+	err = WaitFor(path, time.Now().Add(10*time.Second))
+	if err == nil {
+		err = Chgroup(path, "adm")
+	}
+	if err != nil {
+		ln.Close()
+		ln = nil
+	}
+	return ln, err
+}
+
+func ListenUnixgram(name string) (*net.UnixConn, error) {
+	path := Path(name)
+	err := varrun.New(Dir)
+	if err != nil {
+		return nil, err
+	}
+	a, err := net.ResolveUnixAddr("unixgram", path)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := net.ListenUnixgram("unixgram", a)
+	if err != nil {
+		return nil, err
+	}
+	err = WaitFor(path, time.Now().Add(10*time.Second))
+	if err == nil {
+		err = Chgroup(path, "adm")
+	}
+	if err != nil {
+		conn.Close()
+		conn = nil
+	}
+	return conn, err
 }
 
 func NewRpcClient(name string) (*rpc.Client, error) {
@@ -113,6 +144,21 @@ func RemoveAll() {
 		}
 		os.Remove(Dir)
 	}
+}
+
+func WaitFor(path string, timeout time.Time) (err error) {
+	for {
+		_, err = os.Stat(path)
+		if err == nil {
+			break
+		}
+		if time.Now().After(timeout) {
+			err = fmt.Errorf("%s: timeout", path)
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return
 }
 
 func (srvr *RpcServer) Close() error {
