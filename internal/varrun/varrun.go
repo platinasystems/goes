@@ -18,10 +18,29 @@ import (
 
 const Dir = "/run/goes"
 
-var adm = -1
-var euid = -1
+var cached = struct {
+	ready bool
+	adm   int
+	euid  int
+	perms os.FileMode
+}{
+	adm:   -1,
+	euid:  -1,
+	perms: os.FileMode(0644),
+}
+
 var perms = os.FileMode(0644)
 var ErrNotRoot = errors.New("you aren't root")
+
+func cache() {
+	if !cached.ready {
+		cached.ready = true
+		cached.euid = os.Geteuid()
+		if cached.adm = group.Parse()["adm"].Gid(); cached.adm > 0 {
+			cached.perms = os.FileMode(0664)
+		}
+	}
+}
 
 // Create the named file within Dir with proper permissions.
 func Create(name string) (*os.File, error) {
@@ -37,14 +56,18 @@ func Create(name string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if adm > 0 {
-		f.Chown(euid, adm)
+	if cached.adm > 0 {
+		f.Chown(cached.euid, cached.adm)
 	}
 	return f, nil
 }
 
 // New creates dir within Dir if it doesn't exist.
 func New(dir string) error {
+	cache()
+	if cached.euid != 0 {
+		return ErrNotRoot
+	}
 	if !strings.HasPrefix(dir, Dir) {
 		return fmt.Errorf("%s: not in %q", dir, Dir)
 	}
@@ -52,31 +75,19 @@ func New(dir string) error {
 	if err == nil {
 		return nil
 	}
-	if euid < 0 {
-		euid = os.Geteuid()
-		if euid != 0 {
-			return ErrNotRoot
-		}
-	}
-	if adm < 0 {
-		adm = group.Parse()["adm"].Gid()
-		if adm > 0 {
-			perms = os.FileMode(0664)
-		}
-	}
 	_, err = os.Stat(Dir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(Dir, os.FileMode(0755))
 		if err != nil {
 			return err
 		}
-		if adm > 0 {
-			os.Chown(Dir, euid, adm)
+		if cached.adm > 0 {
+			os.Chown(Dir, cached.euid, cached.adm)
 		}
 	}
 	err = os.Mkdir(dir, os.FileMode(0775))
-	if adm > 0 {
-		err = os.Chown(dir, euid, adm)
+	if cached.adm > 0 {
+		err = os.Chown(dir, cached.euid, cached.adm)
 	}
 	return err
 }
