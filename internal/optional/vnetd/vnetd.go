@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/internal/sockfile"
@@ -52,7 +53,7 @@ type Info struct {
 	v         vnet.Vnet
 	eventPool sync.Pool
 	poller    ifStatsPoller
-	pub       chan<- string
+	pub       *publisher.Publisher
 }
 
 func New() *cmd { return &cmd{} }
@@ -68,11 +69,11 @@ func (cmd *cmd) Main(...string) error {
 	)
 
 	// never want to block vnet
-	cmd.i.pub, err = redis.Publish(redis.DefaultHash, 16<<10)
+	cmd.i.pub, err = publisher.New()
 	if err != nil {
 		return err
 	}
-	defer close(cmd.i.pub)
+	defer cmd.i.pub.Close()
 
 	rpc.Register(&cmd.i)
 
@@ -200,7 +201,7 @@ func (e *event) EventAction() {
 		media  string
 	)
 	if e.isReadyEvent {
-		e.i.pub <- fmt.Sprint(e.key, ": ", e.value)
+		e.i.pub.Print(e.key, ": ", e.value)
 		return
 	}
 	e.in.Init(nil)
@@ -228,7 +229,7 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 		return
 	}
 	if err = <-e.err; err == nil {
-		i.pub <- fmt.Sprint(key, ": ", value)
+		i.pub.Print(key, ": ", value)
 	}
 	return
 }
@@ -241,7 +242,7 @@ func (i *Info) initialPublish() {
 }
 
 func (i *Info) publish(key string, value interface{}) {
-	i.pub <- fmt.Sprint(key, ": ", value)
+	i.pub.Print(key, ": ", value)
 }
 
 type ifStatsPoller struct {

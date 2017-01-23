@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
 const Name = "uptimed"
@@ -32,11 +32,14 @@ func (cmd cmd) Main(...string) error {
 	if err != nil {
 		return err
 	}
-	pub, err := redis.Publish(redis.DefaultHash)
+
+	pub, err := publisher.New()
 	if err != nil {
 		return err
 	}
-	pub <- fmt.Sprint("uptime: ", update())
+	defer pub.Close()
+
+	pub.Print("uptime: ", update())
 	t := time.NewTicker(60 * time.Second)
 	defer t.Stop()
 	for {
@@ -44,7 +47,7 @@ func (cmd cmd) Main(...string) error {
 		case <-cmd:
 			return nil
 		case <-t.C:
-			pub <- fmt.Sprint("uptime: ", update())
+			pub.Print("uptime: ", update())
 		}
 	}
 	return nil

@@ -10,6 +10,7 @@ import (
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/internal/sockfile"
@@ -22,7 +23,7 @@ type cmd chan struct{}
 
 type Stringd struct {
 	s   string
-	pub chan<- string
+	pub *publisher.Publisher
 }
 
 func New() cmd { return cmd(make(chan struct{})) }
@@ -32,27 +33,30 @@ func (cmd) String() string  { return Name }
 func (cmd) Usage() string   { return Name }
 
 func (cmd cmd) Main(...string) error {
-	pub, err := redis.Publish(redis.DefaultHash)
+	pub, err := publisher.New()
 	if err != nil {
 		return err
 	}
-	defer close(pub)
+	defer pub.Close()
+
 	stringd := &Stringd{
 		s:   "hello world",
 		pub: pub,
 	}
 	rpc.Register(stringd)
+
 	sock, err := sockfile.NewRpcServer(Name)
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
+
 	key := fmt.Sprintf("%s:%s", redis.DefaultHash, pubkey)
 	err = redis.Assign(key, Name, "Stringd")
 	if err != nil {
 		return err
 	}
-	stringd.pub <- fmt.Sprint(pubkey, ": ", stringd.s)
+	pub.Print(pubkey, ": ", stringd.s)
 	<-cmd
 	return nil
 }
@@ -70,7 +74,7 @@ func (cmd) Apropos() map[string]string {
 
 func (stringd *Stringd) Hset(args args.Hset, reply *reply.Hset) error {
 	stringd.s = string(args.Value)
-	stringd.pub <- fmt.Sprint(pubkey, ": ", stringd.s)
+	stringd.pub.Print(pubkey, ": ", stringd.s)
 	*reply = 1
 	return nil
 }

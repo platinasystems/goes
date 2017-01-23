@@ -37,7 +37,16 @@ func main() {
 	g.Plot(environ.New()...)
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}
-	redisd.Hook = getEepromData
+	/* FIXME
+	redisd.Hook = platina_eeprom.RedisdHook
+	platina_eeprom.Config(
+		platina_eeprom.BusIndex(0),
+		platina_eeprom.BusAddress(0x51),
+		platina_eeprom.BusDelay(10*time.Millisecond),
+		platina_eeprom.MinMacs(2),
+		platina_eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
+	)
+	*/
 	if err := h.Init(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -59,28 +68,4 @@ func stopHook() error {
 var devEeprom = eeprom.Device{
 	BusIndex:   0,
 	BusAddress: 0x51,
-}
-
-func getEepromData(pub chan<- string) error {
-	// Read and store the EEPROM Contents
-	/*
-		if err := devEeprom.GetInfo(); err != nil {
-			return err
-		}
-
-		pub <- fmt.Sprint("eeprom.product_name: ", devEeprom.Fields.ProductName)
-		pub <- fmt.Sprint("eeprom.platform_name: ", devEeprom.Fields.PlatformName)
-		pub <- fmt.Sprint("eeprom.manufacturer: ", devEeprom.Fields.Manufacturer)
-		pub <- fmt.Sprint("eeprom.vendor: ", devEeprom.Fields.Vendor)
-		pub <- fmt.Sprint("eeprom.part_number: ", devEeprom.Fields.PartNumber)
-		pub <- fmt.Sprint("eeprom.serial_number: ", devEeprom.Fields.SerialNumber)
-		pub <- fmt.Sprint("eeprom.devEepromice_version: ", devEeprom.Fields.DeviceVersion)
-		pub <- fmt.Sprint("eeprom.manufacture_date: ", devEeprom.Fields.ManufactureDate)
-		pub <- fmt.Sprint("eeprom.country_code: ", devEeprom.Fields.CountryCode)
-		pub <- fmt.Sprint("eeprom.diag_version: ", devEeprom.Fields.DiagVersion)
-		pub <- fmt.Sprint("eeprom.service_tag: ", devEeprom.Fields.ServiceTag)
-		pub <- fmt.Sprint("eeprom.base_ethernet_address: ", devEeprom.Fields.BaseEthernetAddress)
-		pub <- fmt.Sprint("eeprom.number_of_ethernet_addrs: ", devEeprom.Fields.NEthernetAddress)
-	*/
-	return nil
 }

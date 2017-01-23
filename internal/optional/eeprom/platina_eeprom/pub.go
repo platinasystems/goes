@@ -12,54 +12,52 @@ import (
 
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/optional/eeprom"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-func RedisdHook(pub chan<- string) error {
+func RedisdHook(pub *publisher.Publisher) {
 	buf, err := readbytes()
-	if err != nil {
-		return err
+	if pub.Error(err) != nil {
+		return
 	}
 
 	var p eeprom.Eeprom
 
 	_, err = p.Write(buf)
-	if err != nil {
-		return err
+	if pub.Error(err) != nil {
+		return
 	}
 
 	for _, s := range strings.Split(p.String(), "\n") {
 		if len(s) > 0 {
-			pub <- s
+			pub.WriteString(s)
 		}
 	}
 
 	if config.minMacs > 0 {
 		v, found := p.Tlv[eeprom.NEthernetAddressType]
 		if !found {
-			return fmt.Errorf("eeprom: %s: not found",
-				eeprom.NEthernetAddressType)
-		}
-		n := int(*v.(*eeprom.Dec16))
-		if n < config.minMacs {
-			return fmt.Errorf("%d < %d MAC addresses",
-				n, config.minMacs)
+			pub.Error(fmt.Errorf("eeprom: %s: not found",
+				eeprom.NEthernetAddressType))
+		} else if n := int(*v.(*eeprom.Dec16)); n < config.minMacs {
+			pub.Error(fmt.Errorf("%d < %d MAC addresses",
+				n, config.minMacs))
 		}
 	}
 
 	if !bytes.Equal(config.oui[:], []byte{0, 0, 0}) {
 		ev, found := p.Tlv[eeprom.BaseEthernetAddressType]
 		if !found {
-			return fmt.Errorf("eeprom: %s: not found",
-				eeprom.BaseEthernetAddressType.String())
-		}
-
-		// all non-blank MAC addresses are allowed
-		ea := ev.(*eeprom.EthernetAddress)
-		if bytes.Equal(ea[:], []byte{0, 0, 0, 0, 0, 0}) {
-			return fmt.Errorf("eeprom: invalid MAC BASE: %0x", ea[:6])
+			pub.Error(fmt.Errorf("eeprom: %s: not found",
+				eeprom.BaseEthernetAddressType.String()))
+		} else {
+			// all non-blank MAC addresses are allowed
+			ea := ev.(*eeprom.EthernetAddress)
+			if bytes.Equal(ea[:], []byte{0, 0, 0, 0, 0, 0}) {
+				pub.Error(fmt.Errorf("eeprom: zero MAC BASE"))
+			}
 		}
 	}
-	return nil
 }
 
 func readbytes() ([]byte, error) {

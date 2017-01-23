@@ -24,6 +24,7 @@ import (
 	"github.com/platinasystems/go/internal/group"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/reg"
 	"github.com/platinasystems/go/internal/sockfile"
 	"github.com/platinasystems/go/internal/varrun"
@@ -38,9 +39,9 @@ const Log = varrun.Dir + "/log/redisd"
 // Otherwise, the default is all active net devices.
 var Devs []string
 
-// Machines may use this Hook to publish redis "key: value" strings before any
-// other daemons are run.
-var Hook = func(chan<- string) error { return nil }
+// Machines may use this Hook to Print redis "[key: ]field: value" strings
+// before any other daemons are run.
+var Hook = func(*publisher.Publisher) {}
 
 // A non-empty Machine is published to redis as "machine: Machine"
 var Machine string
@@ -52,7 +53,8 @@ var Port = 6379
 var PublishedKeys = []string{redis.DefaultHash}
 
 type cmd struct {
-	redisd Redisd
+	pubconn *net.UnixConn
+	redisd  Redisd
 }
 
 type Redisd struct {
@@ -179,29 +181,13 @@ func (cmd *cmd) Main(args ...string) error {
 		redisd.listen(args...)
 	}(&cmd.redisd, sfn, args...)
 
-	pub := make(chan string)
-	go func(pub <-chan string) {
-		for s := range pub {
-			field := strings.Split(s, ": ")
-			cmd.redisd.published[redis.DefaultHash][field[0]] =
-				[]byte(field[1])
-		}
-	}(pub)
-	pub <- fmt.Sprint("version: ", Version)
-	if hostname, err := os.Hostname(); err == nil {
-		pub <- fmt.Sprint("hostname: ", hostname)
+	cmd.pubconn, err = sockfile.ListenUnixgram(publisher.FileName)
+	if err != nil {
+		return err
 	}
-	if len(Machine) > 0 {
-		pub <- fmt.Sprint("machine: ", Machine)
-	}
-	if keys, cl, err := cmdline.New(); err == nil {
-		for _, k := range keys {
-			pub <- fmt.Sprintf("cmdline.%s: %s", k, cl[k])
-		}
-	}
-	err = Hook(pub)
-	pub <- "redis.ready: true"
-	close(pub)
+	go cmd.gopub()
+
+	err = cmd.pubinit()
 	if err != nil {
 		return err
 	}
@@ -227,16 +213,100 @@ func (cmd *cmd) Close() error {
 	if cmd.redisd.reg != nil {
 		cmd.redisd.reg.Srvr.Close()
 	}
+	cmd.pubconn.Close()
 	return err
 }
 
-func (cmd) Apropos() map[string]string {
+func (cmd *cmd) gopub() {
+	b := make([]byte, 4096)
+	for {
+		var key, field string
+		var value []byte
+		n, err := cmd.pubconn.Read(b)
+		if err != nil {
+			break
+		}
+		t := bytes.TrimSpace(b[:n])
+		x := bytes.Split(t, []byte(": "))
+		switch len(x) {
+		case 2:
+			key = redis.DefaultHash
+			field = string(x[0])
+			value = x[1]
+		case 3:
+			key = string(x[0])
+			field = string(x[1])
+			value = x[2]
+		default:
+			continue
+		}
+		cmd.redisd.mutex.Lock()
+		cws := cmd.redisd.sub[key]
+		hv, found := cmd.redisd.published[key]
+		if !found {
+			hv = make(grs.HashValue)
+			cmd.redisd.published[key] = hv
+		}
+		if field == "delete" {
+			delete(hv, string(value))
+		} else {
+			_, found := hv[field]
+			if !found {
+				hv[field] = make([]byte, 0, 256)
+			} else {
+				hv[field] = hv[field][:0]
+			}
+			hv[field] = append(hv[field], value...)
+		}
+		cmd.redisd.flushSubkeyCache(key)
+		cmd.redisd.mutex.Unlock()
+		if len(cws) > 0 {
+			msg := []interface{}{
+				"message",
+				key,
+				b,
+			}
+			for _, cw := range cws {
+				select {
+				case cw.Channel <- msg:
+				default:
+				}
+			}
+		}
+	}
+}
+
+func (cmd *cmd) pubinit() error {
+	pub, err := publisher.New()
+	if err != nil {
+		return err
+	}
+	defer pub.Close()
+
+	pub.Print("version: ", Version)
+	if hostname, err := os.Hostname(); err == nil {
+		pub.Print("hostname: ", hostname)
+	}
+	if len(Machine) > 0 {
+		pub.Print("machine: ", Machine)
+	}
+	if keys, cl, err := cmdline.New(); err == nil {
+		for _, k := range keys {
+			pub.Printf("cmdline.%s: %s", k, cl[k])
+		}
+	}
+	Hook(pub)
+	pub.Print("redis.ready: true")
+	return pub.Error()
+}
+
+func (*cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "a redis server",
 	}
 }
 
-func (cmd) Man() map[string]string {
+func (*cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	redisd - a redis server

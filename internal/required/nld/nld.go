@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/internal/sockfile"
@@ -42,7 +43,7 @@ type cmd struct {
 
 type Info struct {
 	mutex     sync.Mutex
-	pub       chan<- string
+	pub       *publisher.Publisher
 	req       chan<- netlink.Message
 	idx       map[string]uint32
 	dev       map[uint32]*dev
@@ -85,10 +86,11 @@ func (cmd *cmd) Main(...string) error {
 	if err != nil {
 		return err
 	}
-	cmd.info.pub, err = redis.Publish(redis.DefaultHash)
+	cmd.info.pub, err = publisher.New()
 	if err != nil {
 		return err
 	}
+
 	wait := make(chan struct{})
 	cmd.stop = wait
 	cmd.info.idx = make(map[string]uint32)
@@ -149,7 +151,7 @@ func (cmd *cmd) Close() error {
 	defer close(cmd.stop)
 	close(cmd.info.getCountersStop)
 	close(cmd.info.getLinkAddrStop)
-	close(cmd.info.pub)
+	cmd.info.pub.Close()
 	return cmd.sock.Close()
 }
 
@@ -257,7 +259,7 @@ func (info *Info) ifDelAddr(msg *netlink.IfAddrMessage) {
 		_, found := dev.addrs[k]
 		if found {
 			delete(dev.addrs, k)
-			info.pub <- fmt.Sprintf("delete: %s.%s", dev.name, k)
+			info.pub.Printf("delete: %s.%s", dev.name, k)
 		}
 	}
 }
@@ -287,7 +289,7 @@ func (info *Info) ifNewAddr(msg *netlink.IfAddrMessage) {
 
 		as, found := dev.addrs[k]
 		if !found || s != as {
-			info.pub <- fmt.Sprintf("%s.%s: %s", dev.name, k, s)
+			info.pub.Printf("%s.%s: %s", dev.name, k, s)
 			dev.addrs[k] = s
 		}
 	}
@@ -446,13 +448,12 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 		} else if dev.flags&flag.bit == flag.bit {
 			if !found {
 				dev.attrs[flag.name] = flag.show
-				info.pub <- fmt.Sprintf("%s.%s: %s",
+				info.pub.Printf("%s.%s: %s",
 					dev.name, flag.name, flag.show)
 			}
 		} else if found {
 			delete(dev.attrs, flag.name)
-			info.pub <- fmt.Sprintf("delete: %s.%s",
-				dev.name, flag.name)
+			info.pub.Printf("delete: %s.%s", dev.name, flag.name)
 		}
 	}
 	for i, attr := range msg.Attrs {
@@ -471,7 +472,7 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 			for i, n := range attr.(*netlink.LinkStats64) {
 				if n > dev.stats[i] {
 					dev.stats[i] = n
-					info.pub <- fmt.Sprintf("%s.%s: %v",
+					info.pub.Printf("%s.%s: %v",
 						dev.name, info.statNames[i], n)
 				}
 			}
@@ -483,8 +484,7 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 			as, found := dev.attrs[aname]
 			if !found || s != as {
 				dev.attrs[aname] = s
-				info.pub <- fmt.Sprintf("%s.%s: %s",
-					dev.name, aname, s)
+				info.pub.Printf("%s.%s: %s", dev.name, aname, s)
 				break
 			}
 		}
