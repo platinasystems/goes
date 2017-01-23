@@ -5,22 +5,26 @@
 package accumulate
 
 import (
-	"fmt"
 	"io/ioutil"
 	"testing"
 )
 
 func Test(t *testing.T) {
-	const (
-		s0 = "The quick brown fox jumped "
-		s1 = "over the lazy dog's back"
-		n  = len(s0) + len(s1)
-	)
-	w := New(ioutil.Discard)
-	defer w.Fini()
-	fmt.Fprint(w, s0)
-	fmt.Fprint(w, s1)
-	if int(w.N) != n {
-		t.Fatalf("accumulated %d, expected %d", w.N, n)
+	var n int64
+	acc := New(ioutil.Discard)
+	defer acc.Fini()
+
+	for _, s := range []string{
+		"The quick brown fox jumped ",
+		"over the lazy dog's back",
+	} {
+		acc.WriteString(s)
+		n += int64(len(s))
+	}
+	if err := acc.Error(); err != nil {
+		t.Fatal(err)
+	}
+	if sum := acc.Total(); sum != n {
+		t.Fatalf("accumulated %d, expected %d", sum, n)
 	}
 }

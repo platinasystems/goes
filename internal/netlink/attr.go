@@ -80,7 +80,7 @@ func fprintAttrs(w io.Writer, names []string, attrs []Attr) (int64,
 			fmt.Fprintln(acc)
 		}
 	}
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 func nextAttr(b []byte, i int) (n *NlAttr, v []byte, j int) {
@@ -242,7 +242,7 @@ func (a *AttrArray) WriteTo(w io.Writer) (int64, error) {
 			fmt.Fprintln(acc)
 		}
 	}
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type EthernetAddress [6]byte
@@ -278,7 +278,7 @@ func (a *EthernetAddress) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprintf(acc, "%02x:%02x:%02x:%02x:%02x:%02x",
 		a[0], a[1], a[2], a[3], a[4], a[5])
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type HexStringAttr bytes.Buffer
@@ -313,7 +313,7 @@ func (a *HexStringAttr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, hex.EncodeToString(a.Buffer().Bytes()))
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type IfAddrCacheInfo struct {
@@ -357,7 +357,7 @@ func (a *IfAddrCacheInfo) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprintln(acc, "valid:", a.Valid)
 	fmt.Fprintln(acc, "created:", a.CreatedTimestamp)
 	fmt.Fprintln(acc, "updated:", a.UpdatedTimestamp)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type IfAddrFlagAttr uint32
@@ -380,7 +380,7 @@ func (a IfAddrFlagAttr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, IfAddrFlags(a))
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type IfOperState uint8
@@ -402,7 +402,7 @@ func (a IfOperState) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Int8Attr int8
@@ -427,7 +427,7 @@ func (a Int8Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Int())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Int16Attr int16
@@ -453,7 +453,7 @@ func (a Int16Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Int())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Int32Attr int32
@@ -479,7 +479,7 @@ func (a Int32Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Int())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Int64Attr int64
@@ -505,7 +505,7 @@ func (a Int64Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Int())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Ip4Address [4]byte
@@ -540,7 +540,7 @@ func (a *Ip4Address) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprintf(acc, "%d.%d.%d.%d", a[0], a[1], a[2], a[3])
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Ip4DevConf [IPV4_DEVCONF_MAX]uint32
@@ -582,7 +582,7 @@ func (a *Ip4DevConf) WriteTo(w io.Writer) (int64, error) {
 		}
 	}
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Ip6Address [16]byte
@@ -617,7 +617,7 @@ func (a *Ip6Address) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, net.IP(a[:]))
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Ip6DevConf [IPV6_DEVCONF_MAX]uint32
@@ -659,7 +659,7 @@ func (a *Ip6DevConf) WriteTo(w io.Writer) (int64, error) {
 		}
 	}
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Ip6IfFlagsAttr uint32
@@ -697,13 +697,13 @@ func (a Ip6IfFlagsAttr) WriteTo(w io.Writer) (int64, error) {
 		{INET6_IF_READY, "READY"},
 	} {
 		if a&match.bit == match.bit {
-			if acc.N > 0 {
+			if acc.Total() > 0 {
 				fmt.Fprint(acc, " | ")
 			}
 			fmt.Fprint(acc, match.name)
 		}
 	}
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type LinkStats [N_link_stat]uint32
@@ -743,7 +743,7 @@ func (a *LinkStats) WriteTo(w io.Writer) (int64, error) {
 			fmt.Fprint(acc, t, ": ", v, "\n")
 		}
 	}
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type LinkStats64 [N_link_stat]uint64
@@ -783,7 +783,7 @@ func (a *LinkStats64) WriteTo(w io.Writer) (int64, error) {
 			fmt.Fprint(acc, t, ": ", v, "\n")
 		}
 	}
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type NdaCacheInfo struct {
@@ -827,7 +827,7 @@ func (a *NdaCacheInfo) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprintln(acc, "used:", a.Used)
 	fmt.Fprintln(acc, "updated:", a.Updated)
 	fmt.Fprintln(acc, "refcnt:", a.RefCnt)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type RtaCacheInfo struct {
@@ -873,7 +873,7 @@ func (a *RtaCacheInfo) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprintln(acc, "expires:", a.Expires)
 	fmt.Fprintln(acc, "error:", a.Error)
 	fmt.Fprintln(acc, "used:", a.Used)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type StringAttr string
@@ -896,7 +896,7 @@ func (a StringAttr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Uint8Attr uint8
@@ -921,7 +921,7 @@ func (a Uint8Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Uint())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Uint16Attr uint16
@@ -947,7 +947,7 @@ func (a Uint16Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Uint())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Uint32Attr uint32
@@ -973,7 +973,7 @@ func (a Uint32Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Uint())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type Uint64Attr uint64
@@ -999,5 +999,5 @@ func (a Uint64Attr) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Uint())
-	return acc.N, acc.Err
+	return acc.Tuple()
 }

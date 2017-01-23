@@ -68,7 +68,7 @@ func (h *Header) WriteTo(w io.Writer) (int64, error) {
 	if h.Flags != 0 {
 		fmt.Fprintln(acc, "flags:", h.Flags)
 	}
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 func (h *Header) MsgType() MsgType { return h.Type }
 
@@ -120,7 +120,7 @@ func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "family:", m.AddressFamily)
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type NoopMessage struct {
@@ -165,7 +165,7 @@ func (m *NoopMessage) WriteTo(w io.Writer) (int64, error) {
 	indent.Increase(acc)
 	m.Header.WriteTo(acc)
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type DoneMessage struct {
@@ -210,7 +210,7 @@ func (m *DoneMessage) WriteTo(w io.Writer) (int64, error) {
 	indent.Increase(acc)
 	m.Header.WriteTo(acc)
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type ErrorMessage struct {
@@ -267,7 +267,7 @@ func (m *ErrorMessage) WriteTo(w io.Writer) (int64, error) {
 	m.Req.WriteTo(acc)
 	indent.Decrease(acc)
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type IfInfoMessage struct {
@@ -381,7 +381,7 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 	}
 	fprintAttrs(acc, ifInfoAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type IfAddrMessage struct {
@@ -479,7 +479,7 @@ func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprintln(acc, "scope:", RtScope(m.Scope))
 	fprintAttrs(acc, ifAddrAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type RouteMessage struct {
@@ -588,7 +588,7 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 	}
 	fprintAttrs(acc, routeAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type NeighborMessage struct {
@@ -695,7 +695,7 @@ func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
 	}
 	fprintAttrs(acc, neighborAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
 
 type NetnsMessage struct {
@@ -787,5 +787,5 @@ func (m *NetnsMessage) WriteTo(w io.Writer) (int64, error) {
 	indent.Increase(acc)
 	fprintAttrs(acc, netnsAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
-	return acc.N, acc.Err
+	return acc.Tuple()
 }
