@@ -412,148 +412,65 @@ func (redisd *Redisd) flushSubkeyCache(key string) {
 	}
 }
 
-func (redisd *Redisd) Del(key string, keys ...string) (int, error) {
-	type t interface {
-		Del(string, ...string) (int, error)
-	}
-	redisd.mutex.Lock()
-	method, found := redisd.assignments.Find(key).(t)
-	redisd.mutex.Unlock()
-	if found {
-		i, err := method.Del(key)
-		if err == nil {
-			redisd.mutex.Lock()
-			redisd.assignments.Delete(key)
-			redisd.mutex.Unlock()
-		}
-		return i, err
-	}
-	return 0, fmt.Errorf("can't del %s", key)
-}
-
-func (redisd *Redisd) Get(key string) ([]byte, error) {
-	type t interface {
-		Get(string) ([]byte, error)
-	}
-	f := func(key string) ([]byte, error) {
-		return nil, fmt.Errorf("can't get %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Get
-	}
-	redisd.mutex.Unlock()
-	return f(key)
-}
-
-func (redisd *Redisd) Hdel(key, subkey string, subkeys ...string) (int, error) {
-	type t interface {
-		Hdel(string, string, ...string) (int, error)
-	}
-	f := func(key, subkey string, subkeys ...string) (int, error) {
-		return 0, fmt.Errorf("can't hdel %s", key)
-	}
-	hashkey := fmt.Sprint(key, ":", subkey)
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(hashkey).(t); found {
-		f = method.Hdel
-	} else if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Hdel
-	}
-	redisd.mutex.Unlock()
-	return f(key, subkey, subkeys...)
-}
-
 func (redisd *Redisd) Hexists(key, field string) (int, error) {
-	type t interface {
-		Hexists(string, string) (int, error)
-	}
-	f := func(key, field string) (int, error) {
-		return 0, fmt.Errorf("can't hexists %s %s", key, field)
-	}
 	redisd.mutex.Lock()
-	hashkey := fmt.Sprint(key, ":", field)
-	if method, found := redisd.assignments.Find(hashkey).(t); found {
-		f = method.Hexists
-	} else if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Hexists
+	defer redisd.mutex.Unlock()
+	hv, found := redisd.published[key]
+	if !found {
+		return 0, fmt.Errorf("%s: not found", key)
 	}
-	redisd.mutex.Unlock()
-	return f(key, field)
+	_, found = hv[field]
+	if !found {
+		return 0, fmt.Errorf("%s: not found in %s", field, key)
+	}
+	return 1, nil
 }
 
-func (redisd *Redisd) Hget(key, subkey string) ([]byte, error) {
-	type t interface {
-		Hget(string, string) ([]byte, error)
-	}
-	f := func(key, subkey string) ([]byte, error) {
-		return nil, fmt.Errorf("can't hget %s %s", key, subkey)
-	}
+func (redisd *Redisd) Hget(key, field string) ([]byte, error) {
 	var b []byte
-	hashkey := fmt.Sprint(key, ":", subkey)
 	redisd.mutex.Lock()
-	if hv, found := redisd.published[key]; found {
-		b = hv[subkey]
-		f = func(string, string) ([]byte, error) {
-			return b, nil
-		}
-	} else if method, found := redisd.assignments.Find(hashkey).(t); found {
-		f = method.Hget
-	} else if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Hget
+	defer redisd.mutex.Unlock()
+	hv, found := redisd.published[key]
+	if !found {
+		return b, fmt.Errorf("%s: not found", key)
 	}
-	redisd.mutex.Unlock()
-	return f(key, subkey)
+	b, found = hv[field]
+	if !found {
+		return b, fmt.Errorf("%s: not found in %s", field, key)
+	}
+	return b, nil
 }
 
 func (redisd *Redisd) Hgetall(key string) ([][]byte, error) {
-	type t interface {
-		Hgetall(string) ([][]byte, error)
-	}
-	f := func(key string) ([][]byte, error) {
-		return nil, fmt.Errorf("can't hgetall %s", key)
-	}
 	var bs [][]byte
 	redisd.mutex.Lock()
-	if hv, found := redisd.published[key]; found {
-		subkeys := redisd.subkeys(key, hv)
-		bs = make([][]byte, 0, len(hv)*2)
-		for _, k := range subkeys {
-			bs = append(bs, []byte(k), hv[k])
-		}
-		f = func(string) ([][]byte, error) {
-			return bs, nil
-		}
-	} else if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Hgetall
+	defer redisd.mutex.Unlock()
+	hv, found := redisd.published[key]
+	if !found {
+		return bs, fmt.Errorf("%s: not found", key)
 	}
-	redisd.mutex.Unlock()
-	return f(key)
+	subkeys := redisd.subkeys(key, hv)
+	bs = make([][]byte, 0, len(hv)*2)
+	for _, k := range subkeys {
+		bs = append(bs, []byte(k), hv[k])
+	}
+	return bs, nil
 }
 
 func (redisd *Redisd) Hkeys(key string) ([][]byte, error) {
-	type t interface {
-		Hkeys(string) ([][]byte, error)
-	}
-	f := func(key string) ([][]byte, error) {
-		return nil, fmt.Errorf("can't hkeys %s", key)
-	}
 	var bs [][]byte
 	redisd.mutex.Lock()
-	if hv, found := redisd.published[key]; found {
-		subkeys := redisd.subkeys(key, hv)
-		bs = make([][]byte, 0, len(subkeys))
-		for _, k := range subkeys {
-			bs = append(bs, []byte(k))
-		}
-		f = func(string) ([][]byte, error) {
-			return bs, nil
-		}
-	} else if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Hkeys
+	defer redisd.mutex.Unlock()
+	hv, found := redisd.published[key]
+	if !found {
+		return bs, fmt.Errorf("%s: not found", key)
 	}
-	redisd.mutex.Unlock()
-	return f(key)
+	subkeys := redisd.subkeys(key, hv)
+	bs = make([][]byte, len(subkeys))
+	for i, k := range subkeys {
+		bs[i] = []byte(k)
+	}
+	return bs, nil
 }
 
 func (redisd *Redisd) Hset(key, field string, value []byte) (int, error) {
@@ -632,111 +549,6 @@ func (redisd *Redisd) keys() []string {
 	return redisd.cachedKeys
 }
 
-func (redisd *Redisd) Set(key string, value []byte) error {
-	type t interface {
-		Set(string, []byte) error
-	}
-	f := func(key string, value []byte) error {
-		return fmt.Errorf("can't set %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Set
-	}
-	redisd.mutex.Unlock()
-	return f(key, value)
-}
-
-func (redisd *Redisd) Lrange(key string, start, stop int) ([][]byte, error) {
-	type t interface {
-		Lrange(string, int, int) ([][]byte, error)
-	}
-	f := func(key string, start, stop int) ([][]byte, error) {
-		return nil, fmt.Errorf("can't lrange %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Lrange
-	}
-	redisd.mutex.Unlock()
-	return f(key, start, stop)
-}
-
-func (redisd *Redisd) Lindex(key string, index int) ([]byte, error) {
-	type t interface {
-		Lindex(string, int) ([]byte, error)
-	}
-	f := func(key string, index int) ([]byte, error) {
-		return nil, fmt.Errorf("can't lindex %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Lindex
-	}
-	redisd.mutex.Unlock()
-	return f(key, index)
-}
-
-func (redisd *Redisd) Blpop(key string, keys ...string) ([][]byte, error) {
-	type t interface {
-		Blpop(string, ...string) ([][]byte, error)
-	}
-	f := func(key string, keys ...string) ([][]byte, error) {
-		return nil, fmt.Errorf("can't blpop %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Blpop
-	}
-	redisd.mutex.Unlock()
-	return f(key, keys...)
-}
-
-func (redisd *Redisd) Brpop(key string, keys ...string) ([][]byte, error) {
-	type t interface {
-		Brpop(string, ...string) ([][]byte, error)
-	}
-	f := func(key string, keys ...string) ([][]byte, error) {
-		return nil, fmt.Errorf("can't brpop %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Brpop
-	}
-	redisd.mutex.Unlock()
-	return f(key, keys...)
-}
-
-func (redisd *Redisd) Lpush(key string, value []byte, values ...[]byte) (int, error) {
-	type t interface {
-		Lpush(string, []byte, ...[]byte) (int, error)
-	}
-	f := func(key string, value []byte, values ...[]byte) (int, error) {
-		return 0, fmt.Errorf("can't lpush %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Lpush
-	}
-	redisd.mutex.Unlock()
-	return f(key, value, values...)
-}
-
-func (redisd *Redisd) Rpush(key string, value []byte, values ...[]byte) (int, error) {
-	type t interface {
-		Rpush(string, []byte, ...[]byte) (int, error)
-	}
-	f := func(key string, value []byte, values ...[]byte) (int, error) {
-		return 0, fmt.Errorf("can't rpush %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Rpush
-	}
-	redisd.mutex.Unlock()
-	return f(key, value, values...)
-}
-
 func (redisd *Redisd) Monitor() (*grs.MonitorReply, error) {
 	// FIXME
 	return &grs.MonitorReply{}, nil
@@ -744,53 +556,6 @@ func (redisd *Redisd) Monitor() (*grs.MonitorReply, error) {
 
 func (redisd *Redisd) Ping() (*grs.StatusReply, error) {
 	return grs.NewStatusReply("PONG"), nil
-}
-
-func (redisd *Redisd) Publish(key string, value []byte) (int, error) {
-	redisd.mutex.Lock()
-	if hv, found := redisd.published[key]; found {
-		fields := bytes.Split(value, []byte(": "))
-		if bytes.Compare(fields[0], []byte("delete")) == 0 {
-			delete(hv, string(fields[1]))
-		} else {
-			hv[string(fields[0])] = fields[1]
-		}
-		redisd.flushSubkeyCache(key)
-	}
-	cws, found := redisd.sub[key]
-	redisd.mutex.Unlock()
-	if !found || len(cws) == 0 {
-		return 0, nil
-	}
-	msg := []interface{}{
-		"message",
-		key,
-		value,
-	}
-	i := 0
-	for _, cw := range cws {
-		select {
-		case cw.Channel <- msg:
-			i++
-		default:
-		}
-	}
-	return i, nil
-}
-
-func (redisd *Redisd) Select(key string) error {
-	type t interface {
-		Select(string) error
-	}
-	f := func(key string) error {
-		return fmt.Errorf("can't select %s", key)
-	}
-	redisd.mutex.Lock()
-	if method, found := redisd.assignments.Find(key).(t); found {
-		f = method.Select
-	}
-	redisd.mutex.Unlock()
-	return f(key)
 }
 
 func (redisd *Redisd) Subscribe(channels ...[]byte) (*grs.MultiChannelWriter,
