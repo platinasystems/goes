@@ -7,6 +7,7 @@ package subscribe
 import (
 	"fmt"
 
+	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -28,10 +29,26 @@ func (cmd) Main(args ...string) error {
 	default:
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
-	for s := range redis.Subscribe(args[0]) {
-		fmt.Println(s)
+	psc, err := redis.Subscribe(args[0])
+	if err != nil {
+		return err
 	}
-	return nil
+	defer psc.Close()
+	for {
+		v := psc.Receive()
+		switch t := v.(type) {
+		case redigo.Message:
+			if t.Channel == redis.DefaultHash {
+				fmt.Println(string(t.Data))
+			} else {
+				fmt.Printf("%s <- %q\n", t.Channel, t.Data)
+			}
+		case error:
+			err = t
+			break
+		}
+	}
+	return err
 }
 
 func (cmd) Apropos() map[string]string {

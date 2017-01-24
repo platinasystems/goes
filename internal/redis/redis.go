@@ -319,37 +319,16 @@ func Set(key string, value interface{}) (s string, err error) {
 	return
 }
 
-func Subscribe(channel string) (out <-chan string) {
-	var err error
-	ch := make(chan string, 4)
-	out = ch
-	defer func() {
-		if err != nil {
-			ch <- err.Error()
-			close(ch)
-		}
-	}()
+func Subscribe(channel string) (psc redis.PubSubConn, err error) {
 	conn, err := sockfile.Dial("redisd")
 	if err != nil {
 		return
 	}
-	psc := redis.PubSubConn{redis.NewConn(conn, 0, timeout)}
-	if err := psc.Subscribe(channel); err != nil {
-		return
+	psc = redis.PubSubConn{redis.NewConn(conn, 0, timeout)}
+	err = psc.Subscribe(channel)
+	if err != nil {
+		psc.Close()
 	}
-	go func(psc redis.PubSubConn, in chan<- string) {
-		for {
-			v := psc.Receive()
-			switch t := v.(type) {
-			case redis.Message:
-				in <- string(t.Data)
-			case error:
-				in <- t.Error()
-				close(in)
-				return
-			}
-		}
-	}(psc, ch)
 	return
 }
 
