@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/info"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/internal/sockfile"
@@ -83,11 +84,13 @@ func (cmd *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	info.PubCh, err = redis.Publish(redis.DefaultHash)
+
+	info.Pub, err = publisher.New()
 	if err != nil {
 		return err
 	}
-	defer close(info.PubCh)
+	defer info.Pub.Close()
+
 	for _, entry := range cmd.registry {
 		key := fmt.Sprintf("%s:%s", redis.DefaultHash, entry.prefix)
 		err = redis.Assign(key, Name, "Registry")

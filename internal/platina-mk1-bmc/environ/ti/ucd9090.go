@@ -13,23 +13,38 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name        = "ucd9090"
-	everything  = true
-	onlyChanges = false
-)
-const (
-	ucd9090Bus    = 0
-	ucd9090Adr    = 0x7e
-	ucd9090MuxBus = 0
-	ucd9090MuxAdr = 0x76
-	ucd9090MuxVal = 0x01
+const Name = "ucd9090"
+
+var ( // FIXME these are is machine specific
+	VpageByKey = map[string]uint8{
+		"vmon.5v.sb":    1,
+		"vmon.3v8.bmc":  2,
+		"vmon.3v3.sys":  3,
+		"vmon.3v3.bmc":  4,
+		"vmon.3v3.sb":   5,
+		"vmon.1v0.thc":  6,
+		"vmon.1v8.sys":  7,
+		"vmon.1v25.sys": 8,
+		"vmon.1v2.ethx": 9,
+		"vmon.1v0.tha":  10,
+	}
+	Vdev = I2cDev{
+		Bus:      0,
+		Addr:     0x7e,
+		MuxBus:   0,
+		MuxAddr:  0x76,
+		MuxValue: 0x01,
+	}
 )
 
-type cmd chan struct{}
+type cmd struct {
+	stop chan struct{}
+	pub  *publisher.Publisher
+	last map[string]float64
+}
 
 type I2cDev struct {
 	Bus      int
@@ -39,69 +54,55 @@ type I2cDev struct {
 	MuxValue int
 }
 
-var dev = I2cDev{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
+func New() *cmd { return new(cmd) }
 
-func New() cmd { return cmd(make(chan struct{})) }
+func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name }
 
-func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
-
-func (cmd cmd) Main(...string) error {
+func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
-	err := syscall.Sysinfo(&si)
-	if err != nil {
+	var err error
+
+	cmd.stop = make(chan struct{})
+	cmd.last = make(map[string]float64)
+
+	if cmd.pub, err = publisher.New(); err != nil {
 		return err
 	}
-	//update()
+
+	if err = syscall.Sysinfo(&si); err != nil {
+		return err
+	}
+
+	cmd.update()
+
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd:
+		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			update()
+			cmd.update()
 		}
 	}
 	return nil
 }
 
-func (cmd cmd) Close() error {
-	close(cmd)
+func (cmd *cmd) Close() error {
+	close(cmd.stop)
 	return nil
 }
 
-func update() error {
-	var si syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&si); err != nil {
-		return err
+func (cmd *cmd) update() {
+	for k, i := range VpageByKey {
+		v := Vdev.Vout(i)
+		if v != cmd.last[k] {
+			cmd.pub.Print(k, ": ", v)
+			cmd.last[k] = v
+		}
 	}
-	pub, err := redis.Publish(redis.DefaultHash)
-	if err != nil {
-		return err
-	}
-	pub <- fmt.Sprint("vmon.5v.sb: ", dev.Vout(1))
-	pub <- fmt.Sprint("vmon.3v8.bmc: ", dev.Vout(2))
-	pub <- fmt.Sprint("vmon.3v3.sys: ", dev.Vout(3))
-	pub <- fmt.Sprint("vmon.3v3.bmc: ", dev.Vout(4))
-	pub <- fmt.Sprint("vmon.3v3.sb: ", dev.Vout(5))
-	pub <- fmt.Sprint("vmon.1v0.thc: ", dev.Vout(6))
-	pub <- fmt.Sprint("vmon.1v8.sys: ", dev.Vout(7))
-	pub <- fmt.Sprint("vmon.1v25.sys: ", dev.Vout(8))
-	pub <- fmt.Sprint("vmon.1v2.ethx: ", dev.Vout(9))
-	pub <- fmt.Sprint("vmon.1v0.tha: ", dev.Vout(10))
-	pub <- fmt.Sprint("vmon.5v.sb: ", dev.Vout(1))
-	pub <- fmt.Sprint("vmon.3v8.bmc: ", dev.Vout(2))
-	pub <- fmt.Sprint("vmon.3v3.sys: ", dev.Vout(3))
-	pub <- fmt.Sprint("vmon.3v3.bmc: ", dev.Vout(4))
-	pub <- fmt.Sprint("vmon.3v3.sb: ", dev.Vout(5))
-	pub <- fmt.Sprint("vmon.1v0.thc: ", dev.Vout(6))
-	pub <- fmt.Sprint("vmon.1v8.sys: ", dev.Vout(7))
-	pub <- fmt.Sprint("vmon.1v25.sys: ", dev.Vout(8))
-	pub <- fmt.Sprint("vmon.1v2.ethx: ", dev.Vout(9))
-	pub <- fmt.Sprint("vmon.1v0.tha: ", dev.Vout(10))
-	return nil
 }
 
 func (h *I2cDev) Vout(i uint8) float64 {

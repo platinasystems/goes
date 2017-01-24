@@ -4,9 +4,13 @@
 
 package info
 
-import "fmt"
+import (
+	"fmt"
 
-var PubCh chan<- string
+	"github.com/platinasystems/go/internal/redis/publisher"
+)
+
+var Pub *publisher.Publisher
 
 type Interface interface {
 	// Provider should return a list of longest match keys supported by
@@ -55,5 +59,5 @@ func CantSet(key string) error {
 }
 
 func Publish(key, value interface{}) {
-	PubCh <- fmt.Sprint(key, ": ", value)
+	Pub.Print(key, ": ", value)
 }

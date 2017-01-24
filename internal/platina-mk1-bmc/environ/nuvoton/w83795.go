@@ -7,65 +7,77 @@
 package w83795
 
 import (
-	"fmt"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
 const Name = "w83795"
 const everything = true
 const onlyChanges = false
 
-type cmd chan struct{}
+type cmd struct {
+	stop chan struct{}
+	pub  *publisher.Publisher
+}
 
-func New() cmd { return cmd(make(chan struct{})) }
+func New() *cmd { return new(cmd) }
 
-func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
+func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name }
 
-func (cmd cmd) Main(...string) error {
+func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
-	err := syscall.Sysinfo(&si)
-	if err != nil {
+	var err error
+
+	cmd.stop = make(chan struct{})
+
+	if cmd.pub, err = publisher.New(); err != nil {
 		return err
 	}
-	//update(everything)
+
+	if err = syscall.Sysinfo(&si); err != nil {
+		return err
+	}
+
+	if err = cmd.update(everything); err != nil {
+		return err
+	}
+
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd:
+		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			update(onlyChanges)
+			if err = cmd.update(onlyChanges); err != nil {
+				close(cmd.stop)
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (cmd cmd) Close() error {
-	close(cmd)
+func (cmd *cmd) Close() error {
+	close(cmd.stop)
 	return nil
 }
 
-func update(everything bool) error {
+func (cmd *cmd) update(everything bool) error {
 	var si syscall.Sysinfo_t
 	if err := syscall.Sysinfo(&si); err != nil {
 		return err
 	}
-	pub, err := redis.Publish(redis.DefaultHash)
-	if err != nil {
-		return err
-	}
 
 	if everything {
-		pub <- fmt.Sprint("fan_tray.1.1.rpm: ", 1)
+		cmd.pub.Print("fan_tray.1.1.rpm: ", 1)
 	} else {
-		pub <- fmt.Sprint("fan_tray.1.1.rpm: ", 1)
+		cmd.pub.Print("fan_tray.1.1.rpm: ", 1)
 	}
 	return nil
 }
