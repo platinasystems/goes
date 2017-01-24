@@ -6,9 +6,9 @@
 package i2cd
 
 import (
-	"bufio"
-	"encoding/gob"
-	"os"
+	"net"
+	"net/http"
+	"net/rpc"
 	"syscall"
 	"time"
 
@@ -33,7 +33,17 @@ func (cmd cmd) Main(...string) error {
 	if err != nil {
 		return err
 	}
-	//i2cServer()
+
+	i2cReq := new(I2cReq)
+	rpc.Register(i2cReq)
+	rpc.HandleHTTP()
+	l, e := net.Listen("tcp", ":1233")
+	if e != nil {
+		log.Print("listen error:", e)
+	}
+	log.Print("listen OKAY")
+	go http.Serve(l, nil)
+
 	t := time.NewTicker(20 * time.Millisecond)
 	defer t.Stop()
 	for {
@@ -41,7 +51,6 @@ func (cmd cmd) Main(...string) error {
 		case <-cmd:
 			return nil
 		case <-t.C:
-			i2cServer()
 		}
 	}
 	return nil
@@ -71,12 +80,49 @@ type R struct {
 	E error
 }
 
-var b = [34]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+type I2cReq int
+
+var b = [34]byte{0}
 var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0, 0, 0}
 var j [MAXOPS]I
 var r = R{b, nil}
 var s [MAXOPS]R
 var x int
+
+func (t *I2cReq) ReadWrite(g *[10]I, f *[10]R) error {
+	var bus i2c.Bus
+	var data i2c.SMBusData
+	for x := 0; x < MAXOPS; x++ {
+		if g[x].InUse == true {
+			err := bus.Open(g[x].Bus)
+			if err != nil {
+				log.Print("Error opening I2C bus")
+				return err
+			}
+			defer bus.Close()
+
+			err = bus.ForceSlaveAddress(g[x].Addr)
+			if err != nil {
+				log.Print("ERR2")
+				log.Print("Error setting I2C slave address")
+				return err
+			}
+			data[0] = g[x].Data[0]
+			data[1] = g[x].Data[1]
+			data[2] = g[x].Data[2]
+			data[3] = g[x].Data[3]
+			err = bus.Do(g[x].RW, g[x].RegOffset, g[x].BusSize, &data)
+			if err != nil {
+				log.Print("Error doing I2C R/W")
+				return err
+			}
+			f[x].D[0] = data[0]
+			f[x].D[1] = data[1]
+			bus.Close()
+		}
+	}
+	return nil
+}
 
 func clearJS() {
 	x = 0
@@ -84,101 +130,4 @@ func clearJS() {
 		j[k] = i
 		s[k] = r
 	}
-}
-
-func i2cServer() {
-	//LOOP OVER ALL FILES
-
-	ServeI2cRpc()
-
-	//NEXT FILE CHECK
-}
-
-//CONVERT TO RPC
-func ServeI2cRpc() {
-	_, err := os.Stat("/tmp/i2c_ti.dat") //file available?
-	if os.IsNotExist(err) {
-		return
-	}
-	for {
-		fi, er := os.Stat("/tmp/i2c_ti.dat")
-		if er != nil {
-			log.Print("ti error: ", er)
-		}
-		size := fi.Size()
-		if size == 584 {
-			break
-		}
-		//log.Print("i2cd SIZE: ", size)
-	}
-
-	clearJS() //open, reader
-	filename := "/tmp/i2c_ti.dat"
-	f, err := os.Open(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	reader := bufio.NewReader(f)
-
-	dec := gob.NewDecoder(reader) //read, decode
-	err = dec.Decode(&j)
-	if err != nil {
-		log.Print("i2c decode error:", err)
-	}
-
-	var bus i2c.Bus
-	var data i2c.SMBusData
-	for x := 0; x < MAXOPS; x++ {
-		//log.Print(x, j[x].InUse, j[x].Bus, j[x].Addr, j[x].RegOffset)
-		if j[x].InUse == true {
-			err = bus.Open(j[x].Bus)
-			if err != nil {
-				log.Print("ERR1")
-				return
-			}
-			defer bus.Close()
-
-			err = bus.ForceSlaveAddress(j[x].Addr)
-			if err != nil {
-				log.Print("ERR2")
-				return
-			}
-			data[0] = j[x].Data[0]
-			data[1] = j[x].Data[1]
-			data[2] = j[x].Data[2]
-			data[3] = j[x].Data[3]
-			//log.Print("PRE: ", j[x].RW, j[x].RegOffset, j[x].BusSize, data[0])
-			err = bus.Do(j[x].RW, j[x].RegOffset, j[x].BusSize, &data)
-			if err != nil {
-				log.Print("ERR3", err)
-				return
-			}
-			s[x].D[0] = data[0]
-			s[x].D[1] = data[1]
-			//log.Print("RESULT: ", x, s[x].D[0], s[x].D[1])
-		}
-	}
-
-	f.Close() //close, remove
-	err = os.Remove("/tmp/i2c_ti.dat")
-	if err != nil {
-		log.Print("could not remove i2c_ti.dat file, error:", err)
-		return
-	}
-
-	f, err = os.Create("/tmp/i2c_ti.res") //create, writer
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-
-	enc := gob.NewEncoder(w) //encode, write
-	err = enc.Encode(&s)
-	if err != nil {
-		log.Print("err", "i2c encode error: ", err)
-	}
-	w.Flush()
-	f.Close()
 }

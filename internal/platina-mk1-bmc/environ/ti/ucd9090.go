@@ -18,7 +18,7 @@ import (
 
 const Name = "ucd9090"
 
-var ( // FIXME these are is machine specific
+var ( // FIXME these are machine specific
 	VpageByKey = map[string]uint8{
 		"vmon.5v.sb":    1,
 		"vmon.3v8.bmc":  2,
@@ -75,8 +75,7 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	cmd.update()
-
+	//cmd.update()
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -117,7 +116,7 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	r.VoutMode.get(h)
 	r.ReadVout.get(h)
 	DoI2cRpc()
-	//log.Print("return vals: ", s[0].D[0], s[1].D[0], s[2].D[0], s[3].D[0], s[4].D[0], s[5].D[0], s[5].D[1])
+
 	n := s[3].D[0] & 0xf
 	n--
 	n = (n ^ 0xf) & 0xf

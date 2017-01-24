@@ -6,10 +6,7 @@
 package ucd9090
 
 import (
-	"bufio"
-	"encoding/gob"
-	"os"
-	"time"
+	"net/rpc"
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/i2c"
@@ -35,7 +32,9 @@ type R struct {
 	E error
 }
 
-var b = [34]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+type I2cReq int
+
+var b = [34]byte{0}
 var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0, 0, 0}
 var j [MAXOPS]I
 var r = R{b, nil}
@@ -45,6 +44,9 @@ var x int
 var dummy byte
 var regsPointer = unsafe.Pointer(&dummy)
 var regsAddr = uintptr(unsafe.Pointer(&dummy))
+
+var clientA *rpc.Client
+var dialed int = 0
 
 func getPwmRegs() *pwmRegs      { return (*pwmRegs)(regsPointer) }
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
@@ -125,61 +127,17 @@ func clearJS() {
 }
 
 func DoI2cRpc() {
-	f, err := os.Create("/tmp/i2c_ti.dat") //create file, writer
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-
-	enc := gob.NewEncoder(w) //encode i2c ops, write file
-	err = enc.Encode(&j)
-	if err != nil {
-		log.Print("err", "ti2 encode error: ", err)
-	}
-	w.Flush()
-	f.Close()
-
-	for { //wait for file to appear
-		_, err = os.Stat("/tmp/i2c_ti.res")
-		if !os.IsNotExist(err) {
-			break
-		}
+	if dialed == 0 {
+		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")
 		if err != nil {
-			//log.Print("err", "ti2 server response error: ", err)
+			log.Print("dialing:", err)
 		}
-		time.Sleep(time.Millisecond * time.Duration(5))
+		clientA = client
+		dialed = 1
 	}
-	for {
-		fi, er := os.Stat("/tmp/i2c_ti.res")
-		if er != nil {
-			log.Print("ti error: ", er)
-		}
-		size := fi.Size()
-		if size == 445 {
-			break
-		}
-		time.Sleep(time.Millisecond * time.Duration(5))
-	}
-
-	filename := "/tmp/i2c_ti.res" //open, reader
-	file, err := os.Open(filename)
+	err := clientA.Call("I2cReq.ReadWrite", &j, &s)
 	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	reader := bufio.NewReader(file)
-
-	dec := gob.NewDecoder(reader) //read, decode
-	err = dec.Decode(&s)
-	if err != nil {
-		log.Print("ti2 decode error:", err)
-	}
-
-	f.Close() //close, remove
-	err = os.Remove("/tmp/i2c_ti.res")
-	if err != nil {
-		log.Print("could not remove i2c_ti.res file, error:", err)
+		log.Print("i2cReq error:", err)
 	}
 	return
 }
