@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"strings"
 )
 
@@ -215,7 +216,7 @@ func (m *Main) ExecInput(w io.Writer, in *Input) (err error) {
 	if err == nil {
 		defer func() {
 			if e := recover(); e != nil {
-				err = fmt.Errorf("%s: %s `%s'", c.CliName(), e, in)
+				err = fmt.Errorf("%s: %s `%s': %s", c.CliName(), e, in, debug.Stack())
 			}
 		}()
 		err = c.CliAction(w, in)

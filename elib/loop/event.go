@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/event"
 
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 )
@@ -122,10 +123,10 @@ func (e *loopEvent) String() string { return e.actor.String() }
 
 func (l *Loop) doEvent(e *loopEvent) {
 	defer func() {
-		if err := recover(); err == ErrQuit {
-			l.Quit()
-		} else if err != nil {
-			fmt.Println(err)
+		if err := recover(); err != nil {
+			if err != ErrQuit {
+				fmt.Printf("%s: %s", err, debug.Stack())
+			}
 			l.Quit()
 		}
 	}()
