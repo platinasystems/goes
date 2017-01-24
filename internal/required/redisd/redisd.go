@@ -218,25 +218,28 @@ func (cmd *cmd) Close() error {
 }
 
 func (cmd *cmd) gopub() {
+	const sep = ": "
+	var key, field string
+	var fv, value []byte
 	b := make([]byte, 4096)
 	for {
-		var key, field string
-		var value []byte
 		n, err := cmd.pubconn.Read(b)
 		if err != nil {
 			break
 		}
 		t := bytes.TrimSpace(b[:n])
-		x := bytes.Split(t, []byte(": "))
+		x := bytes.Split(t, []byte(sep))
 		switch len(x) {
 		case 2:
 			key = redis.DefaultHash
 			field = string(x[0])
 			value = x[1]
+			fv = t
 		case 3:
 			key = string(x[0])
 			field = string(x[1])
 			value = x[2]
+			fv = t[bytes.Index(t, []byte(sep))+2:]
 		default:
 			continue
 		}
@@ -261,17 +264,23 @@ func (cmd *cmd) gopub() {
 		cmd.redisd.flushSubkeyCache(key)
 		cmd.redisd.mutex.Unlock()
 		if len(cws) > 0 {
-			msg := []interface{}{
-				"message",
-				key,
-				b,
-			}
-			for _, cw := range cws {
-				select {
-				case cw.Channel <- msg:
-				default:
-				}
-			}
+			cmd.pubdist(cws, key, fv)
+		}
+	}
+}
+
+func (*cmd) pubdist(cws []*grs.ChannelWriter, key string, fv []byte) {
+	mb := make([]byte, len(fv))
+	copy(mb, fv)
+	msg := []interface{}{
+		"message",
+		key,
+		mb,
+	}
+	for _, cw := range cws {
+		select {
+		case cw.Channel <- msg:
+		default:
 		}
 	}
 }
