@@ -7,6 +7,7 @@ package cli
 import (
 	"github.com/platinasystems/go/elib/iomux"
 
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"syscall"
@@ -63,6 +64,7 @@ func (c *File) RxReady() (err error) {
 					fmt.Fprintf(c, "%s\n", s)
 				}
 			}
+			c.markEndOfOutput()
 			if err == ErrQuit {
 				// Quit is only quit from stdin; otherwise just close file.
 				if !c.isStdin() {
@@ -105,6 +107,25 @@ func (f *File) isStdin() bool {
 		return f.Fd == syscall.Stdin
 	}
 	return false
+}
+
+func (f *File) markEndOfOutput() {
+	if f.disablePrompt {
+		f.Write([]byte{})
+	}
+}
+
+func (f *File) Write(p []byte) (n int, err error) {
+	if f.disablePrompt {
+		var tmp [4]byte
+		binary.BigEndian.PutUint32(tmp[:], uint32(len(p)))
+		n, err = f.FileReadWriteCloser.Write(tmp[:])
+		if n != len(tmp) {
+			return
+		}
+	}
+	n, err = f.FileReadWriteCloser.Write(p)
+	return
 }
 
 func (m *Main) Write(p []byte) (n int, err error) {

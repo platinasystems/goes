@@ -7,7 +7,6 @@ package vnet
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/platinasystems/go/internal/goes"
@@ -37,25 +36,7 @@ func (cmd) Main(args ...string) error {
 	for i, s := range args {
 		iargs[i] = s
 	}
-	fmt.Fprintln(internal.Conn, iargs...)
-	fmt.Fprintln(internal.Conn, "break")
-	for {
-		var buf [4096]byte
-		var n int
-		n, err = internal.Conn.Read(buf[:])
-		if err != nil {
-			break
-		}
-		x := bytes.Index(buf[:n], []byte("unknown: break"))
-		if x >= 0 {
-			if x > 0 {
-				os.Stdout.Write(buf[:x])
-			}
-			break
-		} else {
-			os.Stdout.Write(buf[:n])
-		}
-	}
+	err = internal.Conn.Exec(os.Stdout, iargs...)
 	return err
 }
 
@@ -64,23 +45,13 @@ func (cmd) Help(...string) string {
 	if err != nil {
 		return err.Error()
 	}
-	buf := make([]byte, 4*4096)
-	fmt.Fprintln(internal.Conn, "help")
-	fmt.Fprintln(internal.Conn, "break")
-	for i, n := 0, 0; i < len(buf); i += n {
-		n, err = internal.Conn.Read(buf[i:])
-		if err != nil {
-			if err != io.EOF {
-				return err.Error()
-			}
-			return string(buf[:i+n])
-		}
-		x := bytes.Index(buf[:i+n], []byte("unknown: break"))
-		if x >= 0 {
-			return string(buf[:x])
-		}
+	buf := new(bytes.Buffer)
+	err = internal.Conn.Exec(buf, "help")
+	if err != nil {
+		return err.Error()
+	} else {
+		return buf.String()
 	}
-	return string(buf)
 }
 
 func (cmd) Apropos() map[string]string {
