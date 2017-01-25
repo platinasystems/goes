@@ -48,7 +48,7 @@ var regsAddr = uintptr(unsafe.Pointer(&dummy))
 var clientA *rpc.Client
 var dialed int = 0
 
-func getPwmRegs() *pwmRegs      { return (*pwmRegs)(regsPointer) }
+func getRegs() *regs            { return (*regs)(regsPointer) }
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }

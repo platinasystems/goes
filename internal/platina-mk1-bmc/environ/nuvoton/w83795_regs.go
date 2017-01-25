@@ -8,7 +8,7 @@ type reg16r [2]byte
 type regi16 reg16
 
 // Memory map
-type hwmRegsBank0 struct {
+type regsBank0 struct {
 	BankSelect    reg8
 	Configuration reg8
 	_             [0x2]byte
@@ -22,7 +22,7 @@ type hwmRegsBank0 struct {
 	FractionLSB   reg8     //0x3c
 }
 
-type hwmRegsBank2 struct {
+type regsBank2 struct {
 	BankSelect            reg8
 	FanControlModeSelect1 reg8
 	TempToFanMap1         reg8

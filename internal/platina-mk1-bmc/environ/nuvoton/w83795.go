@@ -7,20 +7,43 @@
 package w83795
 
 import (
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
 const Name = "w83795"
-const everything = true
-const onlyChanges = false
+
+var ( // FIXME these are machine specific
+	VpageByKey = map[string]uint8{
+		"fan_tray.1.1.rpm": 1,
+		"fan_tray.1.2.rpm": 2,
+		"fan_tray.2.1.rpm": 3,
+		"fan_tray.2.2.rpm": 4,
+		"fan_tray.3.1.rpm": 5,
+		"fan_tray.3.2.rpm": 6,
+		"fan_tray.4.1.rpm": 7,
+		"fan_tray.4.2.rpm": 8,
+	}
+	Vdev = I2cDev{ //externall defined
+		Bus:      0,
+		Addr:     0x2f,
+		MuxBus:   0,
+		MuxAddr:  0x76,
+		MuxValue: 0x80,
+	}
+)
 
 type cmd struct {
 	stop chan struct{}
 	pub  *publisher.Publisher
+	last map[string]uint16
 }
 
 func New() *cmd { return new(cmd) }
@@ -34,6 +57,7 @@ func (cmd *cmd) Main(...string) error {
 	var err error
 
 	cmd.stop = make(chan struct{})
+	cmd.last = make(map[string]uint16)
 
 	if cmd.pub, err = publisher.New(); err != nil {
 		return err
@@ -43,10 +67,10 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	if err = cmd.update(everything); err != nil {
-		return err
-	}
-
+	//if err = cmd.update(); err != nil {
+	//	close(cmd.stop)
+	//	return err
+	//}
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -54,7 +78,7 @@ func (cmd *cmd) Main(...string) error {
 		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			if err = cmd.update(onlyChanges); err != nil {
+			if err = cmd.update(); err != nil {
 				close(cmd.stop)
 				return err
 			}
@@ -68,41 +92,18 @@ func (cmd *cmd) Close() error {
 	return nil
 }
 
-func (cmd *cmd) update(everything bool) error {
-	var si syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&si); err != nil {
-		return err
-	}
-
-	if everything {
-		cmd.pub.Print("fan_tray.1.1.rpm: ", 1)
-	} else {
-		cmd.pub.Print("fan_tray.1.1.rpm: ", 1)
+func (cmd *cmd) update() error {
+	for k, i := range VpageByKey {
+		v := Vdev.FanCount(i)
+		if v != cmd.last[k] {
+			cmd.pub.Print(k, ": ", v)
+			cmd.last[k] = v
+		}
 	}
 	return nil
 }
 
-/*
-package w83795
-
-import (
-	"strconv"
-	"strings"
-	"time"
-	"unsafe"
-
-	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-)
-
-var (
-	dummy       byte
-	regsPointer = unsafe.Pointer(&dummy)
-	regsAddr    = uintptr(unsafe.Pointer(&dummy))
-)
-
-type HwMonitor struct {
+type I2cDev struct {
 	Bus      int
 	Addr     int
 	MuxBus   int
@@ -119,318 +120,37 @@ const (
 	maxFanTrays = 4
 )
 
-func getHwmRegsBank0() *hwmRegsBank0 { return (*hwmRegsBank0)(regsPointer) }
-func getHwmRegsBank2() *hwmRegsBank2 { return (*hwmRegsBank2)(regsPointer) }
-
-func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-
-func (h *HwMonitor) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
-
-	err = bus.Open(h.Bus)
-	if err != nil {
-		return
-	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(h.Addr)
-	if err != nil {
-		return
-	}
-
-	err = bus.Do(rw, regOffset, size, data)
-	return
-}
-
-func (h *HwMonitor) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
-
-	err = bus.Open(h.MuxBus)
-	if err != nil {
-		return
-	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(h.MuxAddr)
-	if err != nil {
-		return
-	}
-
-	err = bus.Do(rw, regOffset, size, data)
-	return
-}
-
-func (r *reg8) get(h *HwMonitor) byte {
-	var data i2c.SMBusData
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: get8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	return data[0]
-}
-
-func (r *reg16) get(h *HwMonitor) (v uint16) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: get16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return uint16(data[0])<<8 | uint16(data[1])
-}
-
-func (r *reg16r) get(h *HwMonitor) (v uint16) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: get16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return uint16(data[1])<<8 | uint16(data[0])
-}
-
-func (r *reg8) set(h *HwMonitor, v uint8) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[0] = v
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: set8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16) set(h *HwMonitor, v uint16) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[0] = uint8(v >> 8)
-	data[1] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: set16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16r) set(h *HwMonitor, v uint16) {
-	var data i2c.SMBusData
-
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in w83795.get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[1] = uint8(v >> 8)
-	data[0] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("w83795: set16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *regi16) get(h *HwMonitor) (v int16) { v = int16((*reg16)(r).get(h)); return }
-func (r *regi16) set(h *HwMonitor, v int16)  { (*reg16)(r).set(h, uint16(v)) }
-
 func fanSpeed(countHi uint8, countLo uint8) uint16 {
 	d := ((uint16(countHi) << 4) + (uint16(countLo & 0xf))) * (uint16(fanPoles / 4))
 	speed := 1.35E06 / float64(d)
 	return uint16(speed)
 }
 
-func (h *HwMonitor) FrontTemp() float64 {
-	r := getHwmRegsBank0()
+func (h *I2cDev) FrontTemp() float64 {
+	clearJS()
+	r := getRegsBank0()
 	r.BankSelect.set(h, 0x80)
-	t := r.FrontTemp.get(h)
-	u := r.FractionLSB.get(h)
+	r.FrontTemp.get(h)
+	r.FractionLSB.get(h)
+	DoI2cRpc()
+	t := uint8(s[3].D[0])
+	u := uint8(s[5].D[0])
 	return (float64(t) + ((float64(u >> 7)) * 0.25))
 }
 
-func (h *HwMonitor) RearTemp() float64 {
-	r := getHwmRegsBank0()
+func (h *I2cDev) RearTemp() float64 {
+	clearJS()
+	r := getRegsBank0()
 	r.BankSelect.set(h, 0x80)
-	t := r.RearTemp.get(h)
-	u := r.FractionLSB.get(h)
+	r.RearTemp.get(h)
+	r.FractionLSB.get(h)
+	DoI2cRpc()
+	t := uint8(s[3].D[0])
+	u := uint8(s[5].D[0])
 	return (float64(t) + ((float64(u >> 7)) * 0.25))
 }
 
-func (h *HwMonitor) FanCount(i uint8) uint16 {
+func (h *I2cDev) FanCount(i uint8) uint16 {
 	var rpm uint16
 
 	if i > 14 {
@@ -439,58 +159,65 @@ func (h *HwMonitor) FanCount(i uint8) uint16 {
 	i--
 
 	n := i/2 + 1
-	s := "fan_tray." + strconv.Itoa(int(n)) + ".status"
-	p, _ := redis.Hget(redis.DefaultHash, s)
+	w := "fan_tray." + strconv.Itoa(int(n)) + ".status"
+	p, _ := redis.Hget(redis.DefaultHash, w)
 
 	//set fan speed to max and return 0 rpm if fan tray is not present or failed
 	if strings.Contains(p, "not installed") {
 		rpm = uint16(0)
 	} else {
 		//remap physical to logical, 0:7 -> 7:0
+		clearJS()
 		i = i + 7 - (2 * i)
-		r := getHwmRegsBank0()
+		r := getRegsBank0()
 		r.BankSelect.set(h, 0x80)
-		t := r.FanCount[i].get(h)
-		u := r.FractionLSB.get(h)
+		r.FanCount[i].get(h)
+		r.FractionLSB.get(h)
+		DoI2cRpc()
+		t := uint8(s[3].D[0])
+		u := uint8(s[5].D[0])
 		rpm = fanSpeed(t, u)
 	}
-
 	return rpm
 }
 
-func (h *HwMonitor) FanInit() {
-	r0 := getHwmRegsBank0()
+func (h *I2cDev) FanInit() {
+	clearJS()
+	r0 := getRegsBank0()
 	r0.BankSelect.set(h, 0x80)
-
 	//reset hwm to default values
 	r0.Configuration.set(h, 0x9c)
+	DoI2cRpc()
 
-	r2 := getHwmRegsBank2()
+	clearJS()
+	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
-
 	//set fan speed output to PWM mode
 	r2.FanOutputModeControl.set(h, 0x0)
-
 	//set up clk frequency and dividers
 	r2.FanPwmPrescale1.set(h, 0x84)
 	r2.FanPwmPrescale2.set(h, 0x84)
+	DoI2cRpc()
 
+	clearJS()
 	//set default speed to auto
 	h.SetFanSpeed("auto")
-
 	//enable temperature monitoring
 	r2.BankSelect.set(h, 0x80)
 	r0.TempCntl2.set(h, tempCtrl2)
+	DoI2cRpc()
 
+	clearJS()
 	//temperature monitoring requires a delay before readings are valid
 	time.Sleep(500 * time.Millisecond)
 	r0.Configuration.set(h, 0x1d)
+	DoI2cRpc()
 
 	//	time.Sleep(1 * time.Second)
 }
 
-func (h *HwMonitor) SetFanSpeed(s string) {
-	r2 := getHwmRegsBank2()
+func (h *I2cDev) SetFanSpeed(s string) { //TIE INTO SET //ADD DoI2c
+	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 
 	//if not all fan trays are installed or fan is failed, fan speed is fixed at high
@@ -509,7 +236,7 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 
 	switch s {
 	case "auto":
-		r2 := getHwmRegsBank2()
+		r2 := getRegsBank2()
 		r2.BankSelect.set(h, 0x82)
 		//set thermal cruise
 		r2.FanControlModeSelect1.set(h, 0x00)
@@ -572,13 +299,17 @@ func (h *HwMonitor) SetFanSpeed(s string) {
 	return
 }
 
-func (h *HwMonitor) GetFanSpeed() string {
+func (h *I2cDev) GetFanSpeed() string {
 	var speed string
 
-	r2 := getHwmRegsBank2()
+	clearJS()
+	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
-	t := r2.TempToFanMap1.get(h)
-	m := r2.FanOutValue1.get(h)
+	r2.TempToFanMap1.get(h)
+	r2.FanOutValue1.get(h)
+	DoI2cRpc()
+	t := uint8(s[3].D[0])
+	m := uint8(s[5].D[0])
 
 	if t == 0xff {
 		speed = "auto"
@@ -593,4 +324,3 @@ func (h *HwMonitor) GetFanSpeed() string {
 	}
 	return speed
 }
-*/

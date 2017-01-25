@@ -46,14 +46,6 @@ type cmd struct {
 	last map[string]float64
 }
 
-type I2cDev struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
-
 func New() *cmd { return new(cmd) }
 
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
@@ -75,7 +67,10 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	//cmd.update()
+	//if err = cmd.update(); err != nil {
+	//	close(cmd.stop)
+	//	return err
+	//}
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -83,7 +78,10 @@ func (cmd *cmd) Main(...string) error {
 		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			cmd.update()
+			if err = cmd.update(); err != nil {
+				close(cmd.stop)
+				return err
+			}
 		}
 	}
 	return nil
@@ -94,7 +92,7 @@ func (cmd *cmd) Close() error {
 	return nil
 }
 
-func (cmd *cmd) update() {
+func (cmd *cmd) update() error {
 	for k, i := range VpageByKey {
 		v := Vdev.Vout(i)
 		if v != cmd.last[k] {
@@ -102,6 +100,15 @@ func (cmd *cmd) update() {
 			cmd.last[k] = v
 		}
 	}
+	return nil
+}
+
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
 }
 
 func (h *I2cDev) Vout(i uint8) float64 {
@@ -111,7 +118,7 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	i--
 
 	clearJS()
-	r := getPwmRegs()
+	r := getRegs()
 	r.Page.set(h, i)
 	r.VoutMode.get(h)
 	r.ReadVout.get(h)
