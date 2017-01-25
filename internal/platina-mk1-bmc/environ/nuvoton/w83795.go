@@ -20,25 +20,17 @@ import (
 
 const Name = "w83795"
 
-var ( // FIXME these are machine specific
-	VpageByKey = map[string]uint8{
-		"fan_tray.1.1.rpm": 1,
-		"fan_tray.1.2.rpm": 2,
-		"fan_tray.2.1.rpm": 3,
-		"fan_tray.2.2.rpm": 4,
-		"fan_tray.3.1.rpm": 5,
-		"fan_tray.3.2.rpm": 6,
-		"fan_tray.4.1.rpm": 7,
-		"fan_tray.4.2.rpm": 8,
-	}
-	Vdev = I2cDev{ //externall defined
-		Bus:      0,
-		Addr:     0x2f,
-		MuxBus:   0,
-		MuxAddr:  0x76,
-		MuxValue: 0x80,
-	}
-)
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
+
+var Vdev I2cDev
+
+var VpageByKey map[string]uint8
 
 type cmd struct {
 	stop chan struct{}
@@ -101,14 +93,6 @@ func (cmd *cmd) update() error {
 		}
 	}
 	return nil
-}
-
-type I2cDev struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
 }
 
 const (

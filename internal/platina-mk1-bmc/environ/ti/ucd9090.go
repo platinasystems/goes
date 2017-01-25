@@ -18,27 +18,17 @@ import (
 
 const Name = "ucd9090"
 
-var ( // FIXME these are machine specific
-	VpageByKey = map[string]uint8{
-		"vmon.5v.sb":    1,
-		"vmon.3v8.bmc":  2,
-		"vmon.3v3.sys":  3,
-		"vmon.3v3.bmc":  4,
-		"vmon.3v3.sb":   5,
-		"vmon.1v0.thc":  6,
-		"vmon.1v8.sys":  7,
-		"vmon.1v25.sys": 8,
-		"vmon.1v2.ethx": 9,
-		"vmon.1v0.tha":  10,
-	}
-	Vdev = I2cDev{
-		Bus:      0,
-		Addr:     0x7e,
-		MuxBus:   0,
-		MuxAddr:  0x76,
-		MuxValue: 0x01,
-	}
-)
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
+
+var Vdev I2cDev
+
+var VpageByKey map[string]uint8
 
 type cmd struct {
 	stop chan struct{}
@@ -101,14 +91,6 @@ func (cmd *cmd) update() error {
 		}
 	}
 	return nil
-}
-
-type I2cDev struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
 }
 
 func (h *I2cDev) Vout(i uint8) float64 {
