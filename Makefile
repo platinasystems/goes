@@ -40,7 +40,7 @@ goes-example-arm: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/goes-example
 
 goes-platina-mk1-bmc: arch=arm
-goes-platina-mk1-bmc: tags=netgo
+goes-platina-mk1-bmc: tags=netgo$(diag_tag)
 goes-platina-mk1-bmc: ldflags=-d
 goes-platina-mk1-bmc: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/$@
