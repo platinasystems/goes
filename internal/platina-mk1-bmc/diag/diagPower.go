@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/environ/ti"
+	"github.com/platinasystems/go/internal/environ/ti"
 )
 
 func diagPower() error {

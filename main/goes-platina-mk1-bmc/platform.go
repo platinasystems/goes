@@ -8,23 +8,19 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/platinasystems/go/internal/environ/nuvoton"
+	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/environ/nuvoton"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/environ/ti"
 )
 
 type platform struct {
 }
 
 func (p *platform) Init() (err error) {
-	if err = p.ucd9090Init(); err != nil {
-		return err
-	}
-	if err = p.w83795Init(); err != nil {
-		return err
-	}
+	p.ucd9090Init()
+	p.w83795Init()
 	if err = p.boardInit(); err != nil {
 		return err
 	}
@@ -57,7 +53,7 @@ func (p *platform) boardInit() (err error) {
 	return nil
 }
 
-func (p *platform) ucd9090Init() (err error) {
+func (p *platform) ucd9090Init() {
 	ucd9090.Vdev.Bus = 0
 	ucd9090.Vdev.Addr = 0x7e
 	ucd9090.Vdev.MuxBus = 0
@@ -76,11 +72,9 @@ func (p *platform) ucd9090Init() (err error) {
 		"vmon.1v2.ethx": 9,
 		"vmon.1v0.tha":  10,
 	}
-
-	return nil
 }
 
-func (p *platform) w83795Init() (err error) {
+func (p *platform) w83795Init() {
 	w83795.Vdev.Bus = 0
 	w83795.Vdev.Addr = 0x2f
 	w83795.Vdev.MuxBus = 0
@@ -97,6 +91,4 @@ func (p *platform) w83795Init() (err error) {
 		"fan_tray.4.1.rpm": 7,
 		"fan_tray.4.2.rpm": 8,
 	}
-
-	return nil
 }
