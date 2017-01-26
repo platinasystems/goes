@@ -32,11 +32,7 @@ func (cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	iargs := make([]interface{}, len(args))
-	for i, s := range args {
-		iargs[i] = s
-	}
-	err = internal.Conn.Exec(os.Stdout, iargs...)
+	err = internal.Conn.Exec(os.Stdout, args...)
 	return err
 }
 

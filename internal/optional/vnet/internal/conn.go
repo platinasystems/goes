@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/platinasystems/go/internal/sockfile"
+	"strings"
 )
 
 var Conn conn
@@ -41,9 +42,9 @@ func (c *conn) Close() (err error) {
 }
 
 // Exec runs a vnet cli command and copies output to given io.Writer.
-func (c *conn) Exec(w io.Writer, args ...interface{}) (err error) {
+func (c *conn) Exec(w io.Writer, args ...string) (err error) {
 	// Send cli command to vnet.
-	fmt.Fprintln(c, args...)
+	fmt.Fprintf(c, "%s\n", strings.Join(args, " "))
 	for {
 		// First read 32 bit network byte order length.
 		var tmp [4]byte
