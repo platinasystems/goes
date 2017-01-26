@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/redis"
@@ -26,9 +27,6 @@ const Name = "vnetd"
 // Enable publish of Non-unix (e.g. non-tuntap) interfaces.
 // This will include all vnet interfaces.
 var UnixInterfacesOnly bool
-
-// Publish all counters including those with zero values.
-var PublishAllCounters bool
 
 // Wait for gdb before starting vnet.
 var GdbWait bool
@@ -247,8 +245,10 @@ func (i *Info) publish(key string, value interface{}) {
 
 type ifStatsPoller struct {
 	vnet.Event
-	i        *Info
-	sequence uint
+	i            *Info
+	sequence     uint
+	hwLastValues elib.Uint64Vec
+	swLastValues elib.Uint64Vec
 }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
@@ -263,15 +263,25 @@ func (p *ifStatsPoller) EventAction() {
 	// Schedule next event in 5 seconds; do before fetching counters so that time interval is accurate.
 	p.addEvent(5)
 
-	// Enable to represent all possible counters in redis (most with 0 values)
-	includeZeroCounters := p.sequence == 0 && PublishAllCounters
+	// Publish all sw/hw interface counters even with zero values for first poll.
+	// This was all possible counters have valid values in redis.
+	// Otherwise only publish to redis when counter values change.
+	includeZeroCounters := p.sequence == 0
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, UnixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
-			p.publish(hi.Name(&p.i.v), counter, value)
+			p.hwLastValues.Validate(uint(hi))
+			if v := p.hwLastValues[hi]; v != value || includeZeroCounters {
+				p.hwLastValues[hi] = value
+				p.publish(hi.Name(&p.i.v), counter, value)
+			}
 		})
 	p.i.v.ForeachSwIfCounter(includeZeroCounters,
 		func(si vnet.Si, counter string, value uint64) {
-			p.publish(si.Name(&p.i.v), counter, value)
+			p.swLastValues.Validate(uint(si))
+			if v := p.swLastValues[si]; v != value || includeZeroCounters {
+				p.swLastValues[si] = value
+				p.publish(si.Name(&p.i.v), counter, value)
+			}
 		})
 
 	p.sequence++
