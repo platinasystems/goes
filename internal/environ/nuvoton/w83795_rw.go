@@ -120,11 +120,10 @@ func (r *reg16r) set(h *I2cDev, v uint16) {
 	x++
 }
 
-func clearJS() {
+func clearJ() {
 	x = 0
 	for k := 0; k < MAXOPS; k++ {
 		j[k] = i
-		s[k] = r
 	}
 }
 
@@ -141,5 +140,6 @@ func DoI2cRpc() {
 	if err != nil {
 		log.Print("i2cReq error:", err)
 	}
+	clearJ()
 	return
 }

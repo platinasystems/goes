@@ -90,5 +90,6 @@ func (p *platform) w83795Init() {
 		"fan_tray.3.2.rpm": 6,
 		"fan_tray.4.1.rpm": 7,
 		"fan_tray.4.2.rpm": 8,
+		"fan_tray.speed":   1,
 	}
 }

@@ -3,6 +3,7 @@
 // LICENSE file.
 
 // Package w83795 provides access to the H/W Monitor chip
+// remove_global, fix set fn with i2cdorpc, set function
 
 package w83795
 
@@ -33,9 +34,10 @@ var Vdev I2cDev
 var VpageByKey map[string]uint8
 
 type cmd struct {
-	stop chan struct{}
-	pub  *publisher.Publisher
-	last map[string]uint16
+	stop  chan struct{}
+	pub   *publisher.Publisher
+	last  map[string]uint16
+	lasts map[string]string
 }
 
 func New() *cmd { return new(cmd) }
@@ -50,6 +52,7 @@ func (cmd *cmd) Main(...string) error {
 
 	cmd.stop = make(chan struct{})
 	cmd.last = make(map[string]uint16)
+	cmd.lasts = make(map[string]string)
 
 	if cmd.pub, err = publisher.New(); err != nil {
 		return err
@@ -86,10 +89,19 @@ func (cmd *cmd) Close() error {
 
 func (cmd *cmd) update() error {
 	for k, i := range VpageByKey {
-		v := Vdev.FanCount(i)
-		if v != cmd.last[k] {
-			cmd.pub.Print(k, ": ", v)
-			cmd.last[k] = v
+		if strings.Contains(k, "rpm") {
+			v := Vdev.FanCount(i)
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "speed") {
+			v := Vdev.GetFanSpeed()
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
+			}
 		}
 	}
 	return nil
@@ -111,7 +123,6 @@ func fanSpeed(countHi uint8, countLo uint8) uint16 {
 }
 
 func (h *I2cDev) FrontTemp() float64 {
-	clearJS()
 	r := getRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	r.FrontTemp.get(h)
@@ -123,7 +134,6 @@ func (h *I2cDev) FrontTemp() float64 {
 }
 
 func (h *I2cDev) RearTemp() float64 {
-	clearJS()
 	r := getRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	r.RearTemp.get(h)
@@ -151,7 +161,6 @@ func (h *I2cDev) FanCount(i uint8) uint16 {
 		rpm = uint16(0)
 	} else {
 		//remap physical to logical, 0:7 -> 7:0
-		clearJS()
 		i = i + 7 - (2 * i)
 		r := getRegsBank0()
 		r.BankSelect.set(h, 0x80)
@@ -166,14 +175,12 @@ func (h *I2cDev) FanCount(i uint8) uint16 {
 }
 
 func (h *I2cDev) FanInit() {
-	clearJS()
 	r0 := getRegsBank0()
 	r0.BankSelect.set(h, 0x80)
 	//reset hwm to default values
 	r0.Configuration.set(h, 0x9c)
 	DoI2cRpc()
 
-	clearJS()
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 	//set fan speed output to PWM mode
@@ -183,7 +190,6 @@ func (h *I2cDev) FanInit() {
 	r2.FanPwmPrescale2.set(h, 0x84)
 	DoI2cRpc()
 
-	clearJS()
 	//set default speed to auto
 	h.SetFanSpeed("auto")
 	//enable temperature monitoring
@@ -191,7 +197,6 @@ func (h *I2cDev) FanInit() {
 	r0.TempCntl2.set(h, tempCtrl2)
 	DoI2cRpc()
 
-	clearJS()
 	//temperature monitoring requires a delay before readings are valid
 	time.Sleep(500 * time.Millisecond)
 	r0.Configuration.set(h, 0x1d)
@@ -200,13 +205,13 @@ func (h *I2cDev) FanInit() {
 	//	time.Sleep(1 * time.Second)
 }
 
-func (h *I2cDev) SetFanSpeed(s string) { //TIE INTO SET //ADD DoI2c
+func (h *I2cDev) SetFanSpeed(w string) {
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 
 	//if not all fan trays are installed or fan is failed, fan speed is fixed at high
 
-	p, _ := redis.Hget(redis.DefaultHash, s)
+	p, _ := redis.Hget(redis.DefaultHash, w)
 
 	//set fan speed to max and return 0 rpm if fan tray is not present or failed
 	if strings.Contains(p, "not installed") || strings.Contains(p, "not installed") {
@@ -218,7 +223,7 @@ func (h *I2cDev) SetFanSpeed(s string) { //TIE INTO SET //ADD DoI2c
 		return
 	}
 
-	switch s {
+	switch w {
 	case "auto":
 		r2 := getRegsBank2()
 		r2.BankSelect.set(h, 0x82)
@@ -257,26 +262,26 @@ func (h *I2cDev) SetFanSpeed(s string) { //TIE INTO SET //ADD DoI2c
 		//enable temp control of fans
 		r2.TempToFanMap1.set(h, 0xff)
 		r2.TempToFanMap2.set(h, 0xff)
-		log.Print("notice: fan speed set to ", s)
+		log.Print("notice: fan speed set to ", w)
 	//static speed settings below, set hwm to manual mode, then set static speed
 	case "high":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		r2.FanOutValue2.set(h, high)
-		log.Print("notice: fan speed set to ", s)
+		log.Print("notice: fan speed set to ", w)
 	case "med":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, med)
 		r2.FanOutValue2.set(h, med)
-		log.Print("notice: fan speed set to ", s)
+		log.Print("notice: fan speed set to ", w)
 	case "low":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, low)
 		r2.FanOutValue2.set(h, low)
-		log.Print("notice: fan speed set to ", s)
+		log.Print("notice: fan speed set to ", w)
 	default:
 	}
 
@@ -286,7 +291,6 @@ func (h *I2cDev) SetFanSpeed(s string) { //TIE INTO SET //ADD DoI2c
 func (h *I2cDev) GetFanSpeed() string {
 	var speed string
 
-	clearJS()
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 	r2.TempToFanMap1.get(h)

@@ -99,7 +99,6 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	}
 	i--
 
-	clearJS()
 	r := getRegs()
 	r.Page.set(h, i)
 	r.VoutMode.get(h)
