@@ -18,40 +18,22 @@ import (
 
 const Name = "ucd9090"
 
-var ( // FIXME these are machine specific
-	VpageByKey = map[string]uint8{
-		"vmon.5v.sb":    1,
-		"vmon.3v8.bmc":  2,
-		"vmon.3v3.sys":  3,
-		"vmon.3v3.bmc":  4,
-		"vmon.3v3.sb":   5,
-		"vmon.1v0.thc":  6,
-		"vmon.1v8.sys":  7,
-		"vmon.1v25.sys": 8,
-		"vmon.1v2.ethx": 9,
-		"vmon.1v0.tha":  10,
-	}
-	Vdev = I2cDev{
-		Bus:      0,
-		Addr:     0x7e,
-		MuxBus:   0,
-		MuxAddr:  0x76,
-		MuxValue: 0x01,
-	}
-)
-
-type cmd struct {
-	stop chan struct{}
-	pub  *publisher.Publisher
-	last map[string]float64
-}
-
 type I2cDev struct {
 	Bus      int
 	Addr     int
 	MuxBus   int
 	MuxAddr  int
 	MuxValue int
+}
+
+var Vdev I2cDev
+
+var VpageByKey map[string]uint8
+
+type cmd struct {
+	stop chan struct{}
+	pub  *publisher.Publisher
+	last map[string]float64
 }
 
 func New() *cmd { return new(cmd) }
@@ -75,7 +57,10 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	//cmd.update()
+	//if err = cmd.update(); err != nil {
+	//	close(cmd.stop)
+	//	return err
+	//}
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -83,7 +68,10 @@ func (cmd *cmd) Main(...string) error {
 		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			cmd.update()
+			if err = cmd.update(); err != nil {
+				close(cmd.stop)
+				return err
+			}
 		}
 	}
 	return nil
@@ -94,7 +82,7 @@ func (cmd *cmd) Close() error {
 	return nil
 }
 
-func (cmd *cmd) update() {
+func (cmd *cmd) update() error {
 	for k, i := range VpageByKey {
 		v := Vdev.Vout(i)
 		if v != cmd.last[k] {
@@ -102,6 +90,7 @@ func (cmd *cmd) update() {
 			cmd.last[k] = v
 		}
 	}
+	return nil
 }
 
 func (h *I2cDev) Vout(i uint8) float64 {
@@ -111,7 +100,7 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	i--
 
 	clearJS()
-	r := getPwmRegs()
+	r := getRegs()
 	r.Page.set(h, i)
 	r.VoutMode.get(h)
 	r.ReadVout.get(h)

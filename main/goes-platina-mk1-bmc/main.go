@@ -10,16 +10,19 @@ import (
 	"os"
 
 	"github.com/platinasystems/go/internal/eeprom"
+	"github.com/platinasystems/go/internal/environ/fantray"
+	"github.com/platinasystems/go/internal/environ/fsp"
+	"github.com/platinasystems/go/internal/environ/i2cd"
+	"github.com/platinasystems/go/internal/environ/nuvoton"
+	"github.com/platinasystems/go/internal/environ/nxp"
+	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/goes"
+	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
 	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
 	"github.com/platinasystems/go/internal/optional/telnetd"
 	"github.com/platinasystems/go/internal/optional/watchdog"
-	//	"github.com/platinasystems/go/internal/prog"
-	//	"github.com/platinasystems/go/internal/redis"
-	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/environ"
 	"github.com/platinasystems/go/internal/required"
 	"github.com/platinasystems/go/internal/required/nld"
 	"github.com/platinasystems/go/internal/required/redisd"
@@ -33,8 +36,20 @@ func main() {
 	var h platform
 	g := make(goes.ByName)
 	g.Plot(required.New()...)
-	g.Plot(diag.New(), optgpio.New(), i2c.New(), telnetd.New(), toggle.New(), watchdog.New())
-	g.Plot(environ.New()...)
+	g.Plot(
+		diag.New(),
+		optgpio.New(),
+		i2c.New(),
+		telnetd.New(),
+		toggle.New(),
+		watchdog.New(),
+		i2cd.New(),
+		fantray.New(),
+		fsp.New(),
+		imx6.New(),
+		w83795.New(),
+		ucd9090.New(),
+	)
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}
 	/* FIXME

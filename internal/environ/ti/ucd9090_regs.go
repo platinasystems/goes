@@ -8,7 +8,7 @@ type reg16r [2]byte
 type regi16 reg16
 
 // Memory map
-type pwmRegs struct {
+type regs struct {
 	Page         reg8
 	_            [0x1f]byte
 	VoutMode     reg8

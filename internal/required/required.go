@@ -23,7 +23,6 @@ import (
 	"github.com/platinasystems/go/internal/required/exit"
 	"github.com/platinasystems/go/internal/required/export"
 	"github.com/platinasystems/go/internal/required/femtocom"
-	"github.com/platinasystems/go/internal/required/get"
 	"github.com/platinasystems/go/internal/required/hdel"
 	"github.com/platinasystems/go/internal/required/hdelta"
 	"github.com/platinasystems/go/internal/required/help"
@@ -41,7 +40,6 @@ import (
 	"github.com/platinasystems/go/internal/required/license"
 	"github.com/platinasystems/go/internal/required/ln"
 	"github.com/platinasystems/go/internal/required/log"
-	"github.com/platinasystems/go/internal/required/lrange"
 	"github.com/platinasystems/go/internal/required/ls"
 	"github.com/platinasystems/go/internal/required/lsmod"
 	"github.com/platinasystems/go/internal/required/man"
@@ -61,7 +59,6 @@ import (
 	"github.com/platinasystems/go/internal/required/restart"
 	"github.com/platinasystems/go/internal/required/rm"
 	"github.com/platinasystems/go/internal/required/rmmod"
-	"github.com/platinasystems/go/internal/required/set"
 	"github.com/platinasystems/go/internal/required/show_commands"
 	"github.com/platinasystems/go/internal/required/slashinit"
 	"github.com/platinasystems/go/internal/required/sleep"
@@ -98,7 +95,6 @@ func New() []interface{} {
 		exit.New(),
 		export.New(),
 		femtocom.New(),
-		get.New(),
 		hdel.New(),
 		hdelta.New(),
 		help.New(),
@@ -116,7 +112,6 @@ func New() []interface{} {
 		license.New(),
 		ln.New(),
 		log.New(),
-		lrange.New(),
 		ls.New(),
 		lsmod.New(),
 		man.New(),
@@ -136,7 +131,6 @@ func New() []interface{} {
 		restart.New(),
 		rm.New(),
 		rmmod.New(),
-		set.New(),
 		show_commands.New(),
 		slashinit.New(),
 		sleep.New(),

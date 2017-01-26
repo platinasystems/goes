@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/platinasystems/go/internal/environ/nuvoton"
+	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/gpio"
@@ -17,6 +19,8 @@ type platform struct {
 }
 
 func (p *platform) Init() (err error) {
+	p.ucd9090Init()
+	p.w83795Init()
 	if err = p.boardInit(); err != nil {
 		return err
 	}
@@ -47,4 +51,44 @@ func (p *platform) boardInit() (err error) {
 		}
 	}
 	return nil
+}
+
+func (p *platform) ucd9090Init() {
+	ucd9090.Vdev.Bus = 0
+	ucd9090.Vdev.Addr = 0x7e
+	ucd9090.Vdev.MuxBus = 0
+	ucd9090.Vdev.MuxAddr = 0x76
+	ucd9090.Vdev.MuxValue = 0x01
+
+	ucd9090.VpageByKey = map[string]uint8{
+		"vmon.5v.sb":    1,
+		"vmon.3v8.bmc":  2,
+		"vmon.3v3.sys":  3,
+		"vmon.3v3.bmc":  4,
+		"vmon.3v3.sb":   5,
+		"vmon.1v0.thc":  6,
+		"vmon.1v8.sys":  7,
+		"vmon.1v25.sys": 8,
+		"vmon.1v2.ethx": 9,
+		"vmon.1v0.tha":  10,
+	}
+}
+
+func (p *platform) w83795Init() {
+	w83795.Vdev.Bus = 0
+	w83795.Vdev.Addr = 0x2f
+	w83795.Vdev.MuxBus = 0
+	w83795.Vdev.MuxAddr = 0x76
+	w83795.Vdev.MuxValue = 0x80
+
+	w83795.VpageByKey = map[string]uint8{
+		"fan_tray.1.1.rpm": 1,
+		"fan_tray.1.2.rpm": 2,
+		"fan_tray.2.1.rpm": 3,
+		"fan_tray.2.2.rpm": 4,
+		"fan_tray.3.1.rpm": 5,
+		"fan_tray.3.2.rpm": 6,
+		"fan_tray.4.1.rpm": 7,
+		"fan_tray.4.2.rpm": 8,
+	}
 }

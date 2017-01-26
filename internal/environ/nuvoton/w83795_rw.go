@@ -2,8 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package ucd9090
+// Package w83795 provides access to the H/W Monitor chip
+
+package w83795
 
 import (
 	"net/rpc"
@@ -48,7 +49,8 @@ var regsAddr = uintptr(unsafe.Pointer(&dummy))
 var clientA *rpc.Client
 var dialed int = 0
 
-func getPwmRegs() *pwmRegs      { return (*pwmRegs)(regsPointer) }
+func getRegsBank0() *regsBank0  { return (*regsBank0)(regsPointer) }
+func getRegsBank2() *regsBank2  { return (*regsBank2)(regsPointer) }
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
