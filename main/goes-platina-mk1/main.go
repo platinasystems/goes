@@ -65,7 +65,6 @@ func main() {
 	stop.Hook = stopHook
 	nld.Prefixes = []string{"lo.", "eth0."}
 	vnetd.UnixInterfacesOnly = true
-	vnetd.PublishAllCounters = false
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook
 	platina_eeprom.Config(
