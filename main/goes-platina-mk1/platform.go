@@ -90,8 +90,10 @@ func (p *platform) boardInit() error {
 		Base:  base,
 		Count: uint32(macs),
 	}
-	fmt.Println("eeprom.NEthernetAddress:", macs)
-	fmt.Println("eeprom.BaseEthernetAddress:", base.String())
+	if false {
+		fmt.Println("eeprom.NEthernetAddress:", macs)
+		fmt.Println("eeprom.BaseEthernetAddress:", base.String())
+	}
 	return nil
 }
 
@@ -129,20 +131,19 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 		return
 	}
 
+	// Alpha level board (version 0):
+	//   No lane remapping, but the MK1 front panel ports are flipped and 0-based.
+	// Beta & Production level boards have version 1 and above:
+	//   No lane remapping, but the MK1 front panel ports are flipped and 1-based.
+	if ver > 0 {
+		p.PortNumberOffset = 1
+	}
+
 	for i := range phys {
-		p := &phys[i]
-		p.Index = uint8(i & 0x1f)
-		switch ver {
-		case 0:
-			// Alpha level board
-			// No lane remapping, but the MK1 front panel ports are flipped and 0-based.
-			p.FrontPanelIndex = p.Index ^ 1
-		default:
-			// Beta & Production level boards have version 1 and above
-			// No lane remapping, but the MK1 front panel ports are flipped and 1-based.
-			p.FrontPanelIndex = (p.Index ^ 1) + 1
-		}
-		p.IsManagement = i == 32
+		phy := &phys[i]
+		phy.Index = uint8(i & 0x1f)
+		phy.FrontPanelIndex = phy.Index ^ 1
+		phy.IsManagement = i == 32
 	}
 	cf.Phys = phys[:]
 
