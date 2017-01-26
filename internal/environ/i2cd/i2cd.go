@@ -61,7 +61,7 @@ func (cmd cmd) Close() error {
 	return nil
 }
 
-const MAXOPS = 10
+const MAXOPS = 30
 
 type I struct {
 	InUse     bool
@@ -89,7 +89,7 @@ var r = R{b, nil}
 var s [MAXOPS]R
 var x int
 
-func (t *I2cReq) ReadWrite(g *[10]I, f *[10]R) error {
+func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 	var bus i2c.Bus
 	var data i2c.SMBusData
 	for x := 0; x < MAXOPS; x++ {

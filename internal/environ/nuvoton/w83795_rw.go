@@ -14,7 +14,7 @@ import (
 	"github.com/platinasystems/go/internal/log"
 )
 
-const MAXOPS = 10
+const MAXOPS = 30
 
 type I struct {
 	InUse     bool

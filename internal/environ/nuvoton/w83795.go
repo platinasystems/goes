@@ -177,21 +177,23 @@ func (h *I2cDev) FanCount(i uint8) uint16 {
 func (h *I2cDev) FanInit() {
 	r0 := getRegsBank0()
 	r0.BankSelect.set(h, 0x80)
+
 	//reset hwm to default values
 	r0.Configuration.set(h, 0x9c)
-	DoI2cRpc()
-
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
+
 	//set fan speed output to PWM mode
 	r2.FanOutputModeControl.set(h, 0x0)
+
 	//set up clk frequency and dividers
+
 	r2.FanPwmPrescale1.set(h, 0x84)
 	r2.FanPwmPrescale2.set(h, 0x84)
-	DoI2cRpc()
 
 	//set default speed to auto
 	h.SetFanSpeed("auto")
+
 	//enable temperature monitoring
 	r2.BankSelect.set(h, 0x80)
 	r0.TempCntl2.set(h, tempCtrl2)
@@ -219,6 +221,7 @@ func (h *I2cDev) SetFanSpeed(w string) {
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		r2.FanOutValue2.set(h, high)
+		DoI2cRpc()
 		log.Print("notice: fan speed set to high due to a fan missing or a fan failure")
 		return
 	}
@@ -269,20 +272,24 @@ func (h *I2cDev) SetFanSpeed(w string) {
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		r2.FanOutValue2.set(h, high)
+		DoI2cRpc()
 		log.Print("notice: fan speed set to ", w)
 	case "med":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, med)
 		r2.FanOutValue2.set(h, med)
+		DoI2cRpc()
 		log.Print("notice: fan speed set to ", w)
 	case "low":
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, low)
 		r2.FanOutValue2.set(h, low)
+		DoI2cRpc()
 		log.Print("notice: fan speed set to ", w)
 	default:
+		DoI2cRpc()
 	}
 
 	return
