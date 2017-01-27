@@ -404,14 +404,14 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 	err = m4.AddDelRouteNextHop(&p, &nh, isDel)
 	if err == ip4.ErrNextHopNotFound {
 		err = nil
-		if u, ok := m.unreachable_ip4_next_hops[nh]; !ok {
-			if !isDel {
-				m.add_ip4_unreachable_next_hop(p, nh)
-			} else {
+		if isDel {
+			if u, ok := m.unreachable_ip4_next_hops[nh]; !ok {
 				err = ip4.ErrNextHopNotFound
+			} else {
+				delete(u, p)
 			}
-		} else if isDel {
-			delete(u, p)
+		} else {
+			m.add_ip4_unreachable_next_hop(p, nh)
 		}
 	}
 	return
