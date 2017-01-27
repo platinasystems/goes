@@ -10,6 +10,7 @@ import (
 
 	"github.com/platinasystems/go/internal/environ/fantray"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
+	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
@@ -23,6 +24,7 @@ func (p *platform) Init() (err error) {
 	p.ucd9090Init()
 	p.w83795Init()
 	p.fantrayInit()
+	p.imx6Init()
 	if err = p.boardInit(); err != nil {
 		return err
 	}
@@ -108,5 +110,11 @@ func (p *platform) fantrayInit() {
 		"fan_tray.2.status": 2,
 		"fan_tray.3.status": 3,
 		"fan_tray.4.status": 4,
+	}
+}
+
+func (p *platform) imx6Init() {
+	imx6.VpageByKey = map[string]uint8{
+		"temperature.bmc_cpu": 1,
 	}
 }

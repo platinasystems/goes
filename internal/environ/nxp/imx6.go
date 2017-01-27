@@ -7,6 +7,9 @@
 package imx6
 
 import (
+	"fmt"
+	"io/ioutil"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,12 +18,13 @@ import (
 )
 
 const Name = "imx6"
-const everything = true
-const onlyChanges = false
+
+var VpageByKey map[string]uint8
 
 type cmd struct {
 	stop chan struct{}
 	pub  *publisher.Publisher
+	last map[string]float64
 }
 
 func New() *cmd { return new(cmd) }
@@ -34,6 +38,7 @@ func (cmd *cmd) Main(...string) error {
 	var err error
 
 	cmd.stop = make(chan struct{})
+	cmd.last = make(map[string]float64)
 
 	if cmd.pub, err = publisher.New(); err != nil {
 		return err
@@ -43,10 +48,10 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	if err = cmd.update(everything); err != nil {
-		return err
-	}
-
+	//if err = cmd.update(); err != nil {
+	//	close(cmd.stop)
+	//	return err
+	//}
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -54,7 +59,7 @@ func (cmd *cmd) Main(...string) error {
 		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			if err = cmd.update(onlyChanges); err != nil {
+			if err = cmd.update(); err != nil {
 				close(cmd.stop)
 				return err
 			}
@@ -68,37 +73,21 @@ func (cmd *cmd) Close() error {
 	return nil
 }
 
-func (cmd *cmd) update(everything bool) error {
-	var si syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&si); err != nil {
-		return err
-	}
-
-	if everything {
-		cmd.pub.Print("cpu.status: ", 1)
-	} else {
-		cmd.pub.Print("cpu.status: ", 1)
+func (cmd *cmd) update() error {
+	for k, _ := range VpageByKey {
+		v := ReadTemp()
+		if v != cmd.last[k] {
+			cmd.pub.Print(k, ": ", v)
+			cmd.last[k] = v
+		}
 	}
 	return nil
 }
 
-/*
-package imx6
-
-import (
-	"fmt"
-	"io/ioutil"
-	"strconv"
-)
-
-type Cpu struct {
-}
-
-func (h *Cpu) ReadTemp() float64 {
+func ReadTemp() float64 {
 	tmp, _ := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
 	tmp2 := fmt.Sprintf("%.4s", string(tmp[:]))
 	tmp3, _ := strconv.Atoi(tmp2)
 	tmp4 := float64(tmp3)
 	return float64(tmp4 / 100.0)
 }
-*/
