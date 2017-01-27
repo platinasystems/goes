@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/platinasystems/go/internal/environ/fantray"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/fdt"
@@ -21,6 +22,7 @@ type platform struct {
 func (p *platform) Init() (err error) {
 	p.ucd9090Init()
 	p.w83795Init()
+	p.fantrayInit()
 	if err = p.boardInit(); err != nil {
 		return err
 	}
@@ -91,5 +93,20 @@ func (p *platform) w83795Init() {
 		"fan_tray.4.1.rpm": 7,
 		"fan_tray.4.2.rpm": 8,
 		"fan_tray.speed":   1,
+	}
+}
+
+func (p *platform) fantrayInit() {
+	fantray.Vdev.Bus = 1
+	fantray.Vdev.Addr = 0x20
+	fantray.Vdev.MuxBus = 1
+	fantray.Vdev.MuxAddr = 0x72
+	fantray.Vdev.MuxValue = 0x04
+
+	fantray.VpageByKey = map[string]uint8{
+		"fan_tray.1.status": 1,
+		"fan_tray.2.status": 2,
+		"fan_tray.3.status": 3,
+		"fan_tray.4.status": 4,
 	}
 }

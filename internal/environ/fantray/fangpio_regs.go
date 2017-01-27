@@ -8,7 +8,7 @@ type reg16r [2]byte
 type regi16 reg16
 
 // Memory map
-type fanGpioRegs struct {
+type regs struct {
 	Input    [2]reg8
 	Output   [2]reg8
 	Polarity [2]reg8
