@@ -9,7 +9,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 
 	"github.com/platinasystems/go/internal/goes"
@@ -22,7 +21,6 @@ import (
 	"github.com/platinasystems/go/internal/optional/test/sleeper"
 	"github.com/platinasystems/go/internal/optional/test/stringd"
 	"github.com/platinasystems/go/internal/required"
-	"github.com/platinasystems/go/internal/required/nld"
 	"github.com/platinasystems/go/internal/required/redisd"
 )
 
@@ -40,18 +38,6 @@ func main() {
 		stringd.New(),
 	)
 	redisd.Machine = "test"
-	nld.Hook = func() error {
-		itfs, err := net.Interfaces()
-		if err != nil {
-			return nil
-		}
-		prefixes := make([]string, 0, len(itfs))
-		for _, itf := range itfs {
-			prefixes = append(prefixes, itf.Name+".")
-		}
-		nld.Prefixes = prefixes
-		return nil
-	}
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}

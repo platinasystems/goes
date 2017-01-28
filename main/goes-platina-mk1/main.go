@@ -22,7 +22,6 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/required"
 	"github.com/platinasystems/go/internal/required/license"
-	"github.com/platinasystems/go/internal/required/nld"
 	"github.com/platinasystems/go/internal/required/patents"
 	"github.com/platinasystems/go/internal/required/redisd"
 	"github.com/platinasystems/go/internal/required/start"
@@ -63,7 +62,6 @@ func main() {
 			10*time.Second)
 	}
 	stop.Hook = stopHook
-	nld.Prefixes = []string{"lo.", "eth0."}
 	vnetd.UnixInterfacesOnly = true
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook

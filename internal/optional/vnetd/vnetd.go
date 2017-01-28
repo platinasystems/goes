@@ -41,8 +41,6 @@ var Hook = func(*Info, *vnet.Vnet) error { return nil }
 // Machines may reassign this for platform sepecific cleanup after vnet.Quit.
 var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
 
-var Prefixes = []string{"eth-"}
-
 type cmd struct {
 	i Info
 }
@@ -81,12 +79,9 @@ func (cmd *cmd) Main(...string) error {
 	}
 	defer sock.Close()
 
-	for _, prefix := range Prefixes {
-		key := fmt.Sprintf("%s:%s", redis.DefaultHash, prefix)
-		err = redis.Assign(key, Name, "Info")
-		if err != nil {
-			return err
-		}
+	err = redis.Assign(redis.DefaultHash+":vnet.", Name, "Info")
+	if err != nil {
+		return err
 	}
 
 	cmd.i.eventPool.New = cmd.i.newEvent
@@ -120,11 +115,12 @@ func Init(i *Info) {
 	i.poller.i = i
 	i.poller.addEvent(0)
 	i.initialPublish()
-	i.set("vnet.ready", "true", true)
+	i.set("ready", "true", true)
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
-	err := i.set(args.Field, string(args.Value), false)
+	field := strings.TrimPrefix(args.Field, "vnet.")
+	err := i.set(field, string(args.Value), false)
 	if err == nil {
 		*reply = 1
 	}
@@ -199,7 +195,7 @@ func (e *event) EventAction() {
 		media  string
 	)
 	if e.isReadyEvent {
-		e.i.pub.Print(e.key, ": ", e.value)
+		e.i.pub.Print("vnet.", e.key, ": ", e.value)
 		return
 	}
 	e.in.Init(nil)
@@ -227,7 +223,7 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 		return
 	}
 	if err = <-e.err; err == nil {
-		i.pub.Print(key, ": ", value)
+		i.pub.Print("vnet.", key, ": ", value)
 	}
 	return
 }
@@ -240,7 +236,7 @@ func (i *Info) initialPublish() {
 }
 
 func (i *Info) publish(key string, value interface{}) {
-	i.pub.Print(key, ": ", value)
+	i.pub.Print("vnet.", key, ": ", value)
 }
 
 type ifStatsPoller struct {

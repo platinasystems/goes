@@ -24,7 +24,6 @@ import (
 	"github.com/platinasystems/go/internal/optional/watchdog"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
 	"github.com/platinasystems/go/internal/required"
-	"github.com/platinasystems/go/internal/required/nld"
 	"github.com/platinasystems/go/internal/required/redisd"
 	"github.com/platinasystems/go/internal/required/start"
 	"github.com/platinasystems/go/internal/required/stop"
@@ -69,7 +68,6 @@ func main() {
 		return nil
 	}
 	stop.Hook = stopHook
-	nld.Prefixes = []string{"lo.", "eth0."}
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
