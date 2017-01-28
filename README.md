@@ -21,8 +21,8 @@ Ctrl-A, Home | Move cursor to beginning of line
 Ctrl-E, End  | Move cursor to end of line
 Ctrl-B, Left | Move cursor one character left
 Ctrl-F, Right| Move cursor one character right
-Ctrl-Left    | Move cursor to previous word
-Ctrl-Right   | Move cursor to next word
+Ctrl-Left, Alt-B    | Move cursor to previous word
+Ctrl-Right, Alt-F   | Move cursor to next word
 Ctrl-D, Del  | (if line is *not* empty) Delete character under cursor
 Ctrl-D       | (if line *is* empty) End of File - usually quits application
 Ctrl-C       | Reset input (create new empty prompt)
@@ -49,13 +49,14 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/peterh/liner"
 )
 
 var (
-	history_fn = "/tmp/.liner_history"
+	history_fn = filepath.Join(os.TempDir(), ".liner_example_history")
 	names      = []string{"john", "james", "mary", "nancy"}
 )
 
