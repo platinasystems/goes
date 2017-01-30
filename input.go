@@ -331,6 +331,12 @@ func (s *State) readNext() (interface{}, error) {
 	case 'f':
 		s.pending = s.pending[:0] // escape code complete
 		return altF, nil
+	case 'n':
+		s.pending = s.pending[:0] // escape code complete
+		return altN, nil
+	case 'p':
+		s.pending = s.pending[:0] // escape code complete
+		return altP, nil
 	case 'y':
 		s.pending = s.pending[:0] // escape code complete
 		return altY, nil
