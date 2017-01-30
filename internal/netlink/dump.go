@@ -12,12 +12,13 @@ import (
 )
 
 var usage = `
-usage: nldump [noop | error | done | link | addr | route | neighor ]...
+usage: nldump [-all-nsid] [ noop|error|done|link|addr|route|neighor ]...
 `[1:]
 
 // Dump all or the selected netlink messages
 func Dump(w io.Writer, args ...string) error {
-	var mayDumpNoop,
+	var allnsid,
+		mayDumpNoop,
 		mayDumpError,
 		mayDumpDone,
 		mayDumpLink,
@@ -38,6 +39,8 @@ func Dump(w io.Writer, args ...string) error {
 			case "-h", "-help", "--help":
 				fmt.Fprint(w, usage)
 				return nil
+			case "-all-nsid", "--all-nsid", "all-nsid":
+				allnsid = true
 			case "noop":
 				mayDumpNoop = true
 			case "error":
@@ -61,6 +64,12 @@ func Dump(w io.Writer, args ...string) error {
 	nl, err := New(rx)
 	if err != nil {
 		return err
+	}
+	if allnsid {
+		err = nl.ListenAllNsid()
+		if err != nil {
+			return err
+		}
 	}
 	go nl.Listen()
 	for msg := range rx {

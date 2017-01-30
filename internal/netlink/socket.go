@@ -122,6 +122,12 @@ func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
 	return
 }
 
+func (s *Socket) ListenAllNsid() error {
+	return os.NewSyscallError("setsockopt NETLINK_LISTEN_ALL_NSID",
+		syscall.SetsockoptInt(s.socket, SOL_NETLINK,
+			NETLINK_LISTEN_ALL_NSID, 1))
+}
+
 func (s *Socket) Close() error {
 	close(s.quit_chan)
 	s.Lock()

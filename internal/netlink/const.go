@@ -1402,3 +1402,21 @@ var netnsAttrKindNames = []string{
 func (x NetnsAttrKind) String() string {
 	return elib.Stringer(netnsAttrKindNames, int(x))
 }
+
+// Socket options
+const (
+	SOL_NETLINK = 270
+)
+
+const (
+	NETLINK_ADD_MEMBERSHIP = iota + 1
+	NETLINK_DROP_MEMBERSHIP
+	NETLINK_PKTINFO
+	NETLINK_BROADCAST_ERROR
+	NETLINK_NO_ENOBUFS
+	NETLINK_RX_RING
+	NETLINK_TX_RING
+	NETLINK_LISTEN_ALL_NSID
+	NETLINK_LIST_MEMBERSHIPS
+	NETLINK_CAP_ACK
+)
