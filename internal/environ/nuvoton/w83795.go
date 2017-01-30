@@ -3,7 +3,6 @@
 // LICENSE file.
 
 // Package w83795 provides access to the H/W Monitor chip
-// remove_global, fix set fn with i2cdorpc, set function
 
 package w83795
 
