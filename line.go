@@ -39,6 +39,8 @@ const (
 	f12
 	altB
 	altF
+	altN
+	altP
 	altY
 	shiftTab
 	wordLeft
@@ -589,10 +591,12 @@ func (s *State) PromptWithSuggestion(prompt string, text string, pos int) (strin
 	var line = []rune(text)
 	historyEnd := ""
 	var historyPrefix []string
-	historyPos := 0
-	historyStale := true
-	historyAction := false // used to mark history related actions
+	prefixPos := 0
+	prefixStale := true
+	prefixAction := false // used to mark history related actions
 	killAction := 0        // used to mark kill related actions
+
+	historyPos := len(s.history)
 
 	defer s.stopPrompt()
 
@@ -617,8 +621,7 @@ mainLoop:
 			}
 			return "", err
 		}
-
-		historyAction = false
+		prefixAction = false
 		switch v := next.(type) {
 		case rune:
 			switch v {
@@ -679,43 +682,6 @@ mainLoop:
 					line = line[:pos]
 					s.needRefresh = true
 				}
-			case ctrlP: // up
-				historyAction = true
-				if historyStale {
-					historyPrefix = s.getHistoryByPrefix(string(line))
-					historyPos = len(historyPrefix)
-					historyStale = false
-				}
-				if historyPos > 0 {
-					if historyPos == len(historyPrefix) {
-						historyEnd = string(line)
-					}
-					historyPos--
-					line = []rune(historyPrefix[historyPos])
-					pos = len(line)
-					s.needRefresh = true
-				} else {
-					fmt.Print(beep)
-				}
-			case ctrlN: // down
-				historyAction = true
-				if historyStale {
-					historyPrefix = s.getHistoryByPrefix(string(line))
-					historyPos = len(historyPrefix)
-					historyStale = false
-				}
-				if historyPos < len(historyPrefix) {
-					historyPos++
-					if historyPos == len(historyPrefix) {
-						line = []rune(historyEnd)
-					} else {
-						line = []rune(historyPrefix[historyPos])
-					}
-					pos = len(line)
-					s.needRefresh = true
-				} else {
-					fmt.Print(beep)
-				}
 			case ctrlT: // transpose prev glyph with glyph under cursor
 				if len(line) < 2 || pos < 1 {
 					fmt.Print(beep)
@@ -756,6 +722,23 @@ mainLoop:
 					pos -= n
 					s.needRefresh = true
 				}
+			case ctrlN: // next
+				if historyPos >= len(s.history)-1 {
+					historyPos = 0
+				} else {
+					historyPos++
+				}
+				line = []rune(s.history[historyPos])
+				pos = len(line)
+				s.needRefresh = true
+			case ctrlP: // previous
+				if historyPos == 0 {
+					historyPos = len(s.history)
+				}
+				historyPos--
+				line = []rune(s.history[historyPos])
+				pos = len(line)
+				s.needRefresh = true
 			case ctrlU: // Erase line before cursor
 				if killAction > 0 {
 					s.addToKillRing(line[:pos], 2) // Add in prepend mode
@@ -907,41 +890,59 @@ mainLoop:
 				} else {
 					fmt.Print(beep)
 				}
-			case up:
-				historyAction = true
-				if historyStale {
+			case altN: // down with prefix search
+				prefixAction = true
+				if prefixStale {
 					historyPrefix = s.getHistoryByPrefix(string(line))
-					historyPos = len(historyPrefix)
-					historyStale = false
+					prefixPos = len(historyPrefix)
+					prefixStale = false
 				}
-				if historyPos > 0 {
-					if historyPos == len(historyPrefix) {
-						historyEnd = string(line)
-					}
-					historyPos--
-					line = []rune(historyPrefix[historyPos])
-					pos = len(line)
-				} else {
-					fmt.Print(beep)
-				}
-			case down:
-				historyAction = true
-				if historyStale {
-					historyPrefix = s.getHistoryByPrefix(string(line))
-					historyPos = len(historyPrefix)
-					historyStale = false
-				}
-				if historyPos < len(historyPrefix) {
-					historyPos++
-					if historyPos == len(historyPrefix) {
+				if prefixPos < len(historyPrefix) {
+					prefixPos++
+					if prefixPos == len(historyPrefix) {
 						line = []rune(historyEnd)
 					} else {
-						line = []rune(historyPrefix[historyPos])
+						line = []rune(historyPrefix[prefixPos])
 					}
 					pos = len(line)
+					s.needRefresh = true
 				} else {
 					fmt.Print(beep)
 				}
+			case altP: // up with prefix search
+				prefixAction = true
+				if prefixStale {
+					historyPrefix = s.getHistoryByPrefix(string(line))
+					prefixPos = len(historyPrefix)
+					prefixStale = false
+				}
+				if prefixPos > 0 {
+					if prefixPos == len(historyPrefix) {
+						historyEnd = string(line)
+					}
+					prefixPos--
+					line = []rune(historyPrefix[prefixPos])
+					pos = len(line)
+					s.needRefresh = true
+				} else {
+					fmt.Print(beep)
+				}
+			case up:
+				if historyPos == 0 {
+					historyPos = len(s.history)
+				}
+				historyPos--
+				line = []rune(s.history[historyPos])
+				pos = len(line)
+				s.needRefresh = true
+			case down:
+				if historyPos >= len(s.history)-1 {
+					historyPos = 0
+				} else {
+					historyPos++
+				}
+				line = []rune(s.history[historyPos])
+				pos = len(line)
 			case home: // Start of line
 				pos = 0
 			case end: // End of line
@@ -966,8 +967,8 @@ mainLoop:
 		if s.needRefresh && !s.inputWaiting() {
 			s.refresh(p, line, pos)
 		}
-		if !historyAction {
-			historyStale = true
+		if !prefixAction {
+			prefixStale = true
 		}
 		if killAction > 0 {
 			killAction--
