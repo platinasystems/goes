@@ -47,6 +47,7 @@ type node struct {
 	rxRefs        []rxRef
 	rxPending     []rxRef
 	rxDrops       int32
+	rxActiveLock  sync.Mutex
 	rxActiveCount int32
 	txRefIns      chan txRefIn
 	txRefIn       txRefIn
@@ -209,7 +210,9 @@ func (n *node) InterfaceInput(o *vnet.RefOut) {
 	vnet.IfRxCounter.Add(t, n.Si(), nPackets, nBytes)
 	vnet.IfDrops.Add(t, n.Si(), uint(nDrops))
 	toTx.SetLen(m.v, nPackets)
+	n.rxActiveLock.Lock()
 	n.Activate(atomic.AddInt32(&n.rxActiveCount, -int32(nPackets)) > 0)
+	n.rxActiveLock.Unlock()
 }
 
 func (intf *Interface) ReadReady() (err error) {
@@ -249,8 +252,10 @@ func (intf *Interface) ReadReady() (err error) {
 	r.ref = p.chain.Done()
 	// use xxx-unix interface as receive interface.
 	r.ref.Si = n.Si()
+	n.rxActiveLock.Lock()
 	atomic.AddInt32(&n.rxActiveCount, 1)
 	n.Activate(true)
+	n.rxActiveLock.Unlock()
 	n.rxRefsLock.Lock()
 	n.rxRefs = append(n.rxRefs, r)
 	n.rxRefsLock.Unlock()
