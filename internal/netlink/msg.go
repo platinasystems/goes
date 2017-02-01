@@ -72,8 +72,12 @@ func (h *Header) WriteTo(w io.Writer) (int64, error) {
 }
 func (h *Header) MsgType() MsgType { return h.Type }
 
-// AFMessage is a generic message depending only on address family.
 type GenMessage struct {
+	Nsid int
+	GenMessageActual
+}
+
+type GenMessageActual struct {
 	Header
 	AddressFamily
 }
@@ -87,8 +91,9 @@ func NewGenMessage() *GenMessage {
 	return m
 }
 
-func NewGenMessageBytes(b []byte) *GenMessage {
+func NewGenMessageBytes(b []byte, nsid int) *GenMessage {
 	m := NewGenMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -100,16 +105,14 @@ func (m *GenMessage) Close() error {
 	return nil
 }
 func (m *GenMessage) Parse(b []byte) {
-	p := (*GenMessage)(unsafe.Pointer(&b[0]))
-	m.Header = p.Header
-	m.AddressFamily = p.AddressFamily
+	m.GenMessageActual = *(*GenMessageActual)(unsafe.Pointer(&b[0]))
 }
 func (m *GenMessage) String() string {
 	return StringOf(m)
 }
 func (m *GenMessage) TxAdd(s *Socket) {
 	b := s.TxAddReq(&m.Header, SizeofGenmsg)
-	p := (*GenMessage)(unsafe.Pointer(&b[0]))
+	p := (*GenMessageActual)(unsafe.Pointer(&b[0]))
 	p.AddressFamily = m.AddressFamily
 }
 func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
@@ -117,6 +120,9 @@ func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "family:", m.AddressFamily)
 	indent.Decrease(acc)
@@ -124,6 +130,11 @@ func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type NoopMessage struct {
+	Nsid int
+	NoopMessageActual
+}
+
+type NoopMessageActual struct {
 	Header
 }
 
@@ -135,8 +146,9 @@ func NewNoopMessage() *NoopMessage {
 	return m
 }
 
-func NewNoopMessageBytes(b []byte) *NoopMessage {
+func NewNoopMessageBytes(b []byte, nsid int) *NoopMessage {
 	m := NewNoopMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -148,7 +160,7 @@ func (m *NoopMessage) Close() error {
 	return nil
 }
 func (m *NoopMessage) Parse(b []byte) {
-	*m = *(*NoopMessage)(unsafe.Pointer(&b[0]))
+	m.NoopMessageActual = *(*NoopMessageActual)(unsafe.Pointer(&b[0]))
 }
 func (m *NoopMessage) String() string {
 	return StringOf(m)
@@ -163,12 +175,20 @@ func (m *NoopMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	indent.Decrease(acc)
 	return acc.Tuple()
 }
 
 type DoneMessage struct {
+	Nsid int
+	DoneMessageActual
+}
+
+type DoneMessageActual struct {
 	Header
 }
 
@@ -180,8 +200,9 @@ func NewDoneMessage() *DoneMessage {
 	return m
 }
 
-func NewDoneMessageBytes(b []byte) *DoneMessage {
+func NewDoneMessageBytes(b []byte, nsid int) *DoneMessage {
 	m := NewDoneMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -196,7 +217,7 @@ func (m *DoneMessage) String() string {
 	return StringOf(m)
 }
 func (m *DoneMessage) Parse(b []byte) {
-	*m = *(*DoneMessage)(unsafe.Pointer(&b[0]))
+	m.DoneMessageActual = *(*DoneMessageActual)(unsafe.Pointer(&b[0]))
 }
 func (m *DoneMessage) TxAdd(s *Socket) {
 	defer m.Close()
@@ -208,12 +229,20 @@ func (m *DoneMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	indent.Decrease(acc)
 	return acc.Tuple()
 }
 
 type ErrorMessage struct {
+	Nsid int
+	ErrorMessageActual
+}
+
+type ErrorMessageActual struct {
 	Header
 	// Unix errno for error.
 	Errno int32
@@ -229,8 +258,9 @@ func NewErrorMessage() *ErrorMessage {
 	return m
 }
 
-func NewErrorMessageBytes(b []byte) *ErrorMessage {
+func NewErrorMessageBytes(b []byte, nsid int) *ErrorMessage {
 	m := NewErrorMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -242,7 +272,7 @@ func (m *ErrorMessage) Close() error {
 	return nil
 }
 func (m *ErrorMessage) Parse(b []byte) {
-	*m = *(*ErrorMessage)(unsafe.Pointer(&b[0]))
+	m.ErrorMessageActual = *(*ErrorMessageActual)(unsafe.Pointer(&b[0]))
 }
 func (m *ErrorMessage) String() string {
 	return StringOf(m)
@@ -251,7 +281,7 @@ func (m *ErrorMessage) TxAdd(s *Socket) {
 	defer m.Close()
 	m.Header.Type = NLMSG_ERROR
 	b := s.TxAddReq(&m.Header, 4+SizeofHeader)
-	e := (*ErrorMessage)(unsafe.Pointer(&b[0]))
+	e := (*ErrorMessageActual)(unsafe.Pointer(&b[0]))
 	e.Errno = m.Errno
 	e.Req = m.Req
 }
@@ -260,6 +290,9 @@ func (m *ErrorMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "error:", syscall.Errno(-m.Errno))
 	fmt.Fprintln(acc, "req:", m.Req.Type)
@@ -271,6 +304,11 @@ func (m *ErrorMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type IfInfoMessage struct {
+	Nsid int
+	IfInfoMessageActual
+}
+
+type IfInfoMessageActual struct {
 	Header
 	IfInfomsg
 	Attrs [IFLA_MAX]Attr
@@ -295,8 +333,9 @@ func NewIfInfoMessage() *IfInfoMessage {
 	return m
 }
 
-func NewIfInfoMessageBytes(b []byte) *IfInfoMessage {
+func NewIfInfoMessageBytes(b []byte, nsid int) *IfInfoMessage {
 	m := NewIfInfoMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -311,7 +350,7 @@ func (m *IfInfoMessage) Close() error {
 }
 
 func (m *IfInfoMessage) Parse(b []byte) {
-	p := (*IfInfoMessage)(unsafe.Pointer(&b[0]))
+	p := (*IfInfoMessageActual)(unsafe.Pointer(&b[0]))
 	m.Header = p.Header
 	m.IfInfomsg = p.IfInfomsg
 	b = b[SizeofIfInfoMessage:]
@@ -361,7 +400,7 @@ func (m *IfInfoMessage) TxAdd(s *Socket) {
 	defer m.Close()
 	as := AttrVec(m.Attrs[:])
 	b := s.TxAddReq(&m.Header, SizeofIfInfomsg+as.Size())
-	i := (*IfInfoMessage)(unsafe.Pointer(&b[0]))
+	i := (*IfInfoMessageActual)(unsafe.Pointer(&b[0]))
 	i.IfInfomsg = m.IfInfomsg
 	as.Set(b[SizeofIfInfoMessage:])
 }
@@ -371,6 +410,9 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
 	fmt.Fprintln(acc, "family:", AddressFamily(m.Family))
@@ -385,6 +427,11 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type IfAddrMessage struct {
+	Nsid int
+	IfAddrMessageActual
+}
+
+type IfAddrMessageActual struct {
 	Header
 	IfAddrmsg
 	Attrs [IFA_MAX]Attr
@@ -408,8 +455,9 @@ func NewIfAddrMessage() *IfAddrMessage {
 	return m
 }
 
-func NewIfAddrMessageBytes(b []byte) *IfAddrMessage {
+func NewIfAddrMessageBytes(b []byte, nsid int) *IfAddrMessage {
 	m := NewIfAddrMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -424,7 +472,7 @@ func (m *IfAddrMessage) Close() error {
 }
 
 func (m *IfAddrMessage) Parse(b []byte) {
-	p := (*IfAddrMessage)(unsafe.Pointer(&b[0]))
+	p := (*IfAddrMessageActual)(unsafe.Pointer(&b[0]))
 	m.Header = p.Header
 	m.IfAddrmsg = p.IfAddrmsg
 	b = b[SizeofIfAddrMessage:]
@@ -461,7 +509,7 @@ func (m *IfAddrMessage) TxAdd(s *Socket) {
 	defer m.Close()
 	as := AttrVec(m.Attrs[:])
 	b := s.TxAddReq(&m.Header, SizeofIfAddrmsg+as.Size())
-	i := (*IfAddrMessage)(unsafe.Pointer(&b[0]))
+	i := (*IfAddrMessageActual)(unsafe.Pointer(&b[0]))
 	i.IfAddrmsg = m.IfAddrmsg
 	as.Set(b[SizeofIfAddrMessage:])
 }
@@ -471,6 +519,9 @@ func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
 	fmt.Fprintln(acc, "family:", AddressFamily(m.Family))
@@ -483,6 +534,11 @@ func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type RouteMessage struct {
+	Nsid int
+	RouteMessageActual
+}
+
+type RouteMessageActual struct {
 	Header
 	Rtmsg
 	Attrs [RTA_MAX]Attr
@@ -510,8 +566,9 @@ func NewRouteMessage() *RouteMessage {
 	return m
 }
 
-func NewRouteMessageBytes(b []byte) *RouteMessage {
+func NewRouteMessageBytes(b []byte, nsid int) *RouteMessage {
 	m := NewRouteMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -526,7 +583,7 @@ func (m *RouteMessage) Close() error {
 }
 
 func (m *RouteMessage) Parse(b []byte) {
-	p := (*RouteMessage)(unsafe.Pointer(&b[0]))
+	p := (*RouteMessageActual)(unsafe.Pointer(&b[0]))
 	m.Header = p.Header
 	m.Rtmsg = p.Rtmsg
 	b = b[SizeofRouteMessage:]
@@ -564,7 +621,7 @@ func (m *RouteMessage) TxAdd(s *Socket) {
 	defer m.Close()
 	as := AttrVec(m.Attrs[:])
 	b := s.TxAddReq(&m.Header, SizeofRtmsg+as.Size())
-	i := (*RouteMessage)(unsafe.Pointer(&b[0]))
+	i := (*RouteMessageActual)(unsafe.Pointer(&b[0]))
 	i.Rtmsg = m.Rtmsg
 	as.Set(b[SizeofRouteMessage:])
 }
@@ -574,6 +631,9 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "family:", AddressFamily(m.Family))
 	fmt.Fprintln(acc, "srclen:", m.SrcLen)
@@ -592,6 +652,11 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type NeighborMessage struct {
+	Nsid int
+	NeighborMessageActual
+}
+
+type NeighborMessageActual struct {
 	Header
 	Ndmsg
 	Attrs [NDA_MAX]Attr
@@ -616,8 +681,9 @@ func NewNeighborMessage() *NeighborMessage {
 	return m
 }
 
-func NewNeighborMessageBytes(b []byte) *NeighborMessage {
+func NewNeighborMessageBytes(b []byte, nsid int) *NeighborMessage {
 	m := NewNeighborMessage()
+	m.Nsid = nsid
 	m.Parse(b)
 	return m
 }
@@ -636,7 +702,7 @@ func (m *NeighborMessage) Close() error {
 }
 
 func (m *NeighborMessage) Parse(b []byte) {
-	p := (*NeighborMessage)(unsafe.Pointer(&b[0]))
+	p := (*NeighborMessageActual)(unsafe.Pointer(&b[0]))
 	m.Header = p.Header
 	m.Ndmsg = p.Ndmsg
 	b = b[SizeofNeighborMessage:]
@@ -675,7 +741,7 @@ func (m *NeighborMessage) TxAdd(s *Socket) {
 	defer m.Close()
 	as := AttrVec(m.Attrs[:])
 	b := s.TxAddReq(&m.Header, SizeofNdmsg+as.Size())
-	i := (*NeighborMessage)(unsafe.Pointer(&b[0]))
+	i := (*NeighborMessageActual)(unsafe.Pointer(&b[0]))
 	i.Ndmsg = m.Ndmsg
 	as.Set(b[SizeofNeighborMessage:])
 }
@@ -685,6 +751,9 @@ func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
+	if m.Nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
 	fmt.Fprintln(acc, "address family:", AddressFamily(m.Family))

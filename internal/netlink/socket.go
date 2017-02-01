@@ -15,6 +15,8 @@ import (
 	"github.com/platinasystems/go/elib"
 )
 
+const PAGESZ = 4096
+
 var DefaultGroups = []MulticastGroup{
 	RTNLGRP_LINK,
 	RTNLGRP_NEIGH,
@@ -39,7 +41,8 @@ type Socket struct {
 	pid                uint32
 	tx_sequence_number uint
 	tx_buffer          elib.ByteVec
-	rx_buffer          elib.ByteVec
+	rx_buffer          []byte
+	rx_oob_buffer      []byte
 	rx_chan            chan Message
 	quit_chan          chan struct{}
 	sync.Mutex
@@ -118,6 +121,9 @@ func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
 			}
 		}
 	}
+
+	s.rx_buffer = make([]byte, 16*PAGESZ)
+	s.rx_oob_buffer = make([]byte, 2*PAGESZ)
 
 	return
 }
@@ -253,23 +259,6 @@ func (s *Socket) TxFlush() {
 	s.reset_tx_buffer()
 }
 
-func (s *Socket) fillRxBuffer() {
-	i := len(s.rx_buffer)
-	s.rx_buffer.Resize(4096)
-	m, err := syscall.Read(s.socket, s.rx_buffer[i:])
-	if err != nil {
-		s.reset_rx_buffer()
-		panic(err)
-	}
-	s.rx_buffer = s.rx_buffer[:i+m]
-}
-
-func (s *Socket) reset_rx_buffer() {
-	if len(s.rx_buffer) != 0 {
-		s.rx_buffer = s.rx_buffer[:0]
-	}
-}
-
 func (s *Socket) reset_tx_buffer() {
 	s.Lock()
 	defer s.Unlock()
@@ -279,54 +268,63 @@ func (s *Socket) reset_tx_buffer() {
 }
 
 func (s *Socket) rx() (done bool) {
-	s.fillRxBuffer()
-	i := 0
-	for {
-		q := len(s.rx_buffer)
-		// Have at least a valid message header in buffer?
-		if i+SizeofHeader > q {
-			s.rx_buffer = s.rx_buffer[:q-i]
-			break
-		}
-		// Have a full message in recieve buffer?
-		h := (*Header)(unsafe.Pointer(&s.rx_buffer[i]))
-		l := messageAlignLen(int(h.Len))
-		if i+l > q {
-			if i == len(s.rx_buffer) {
-				s.rx_buffer = s.rx_buffer[:0]
-			} else {
-				copy(s.rx_buffer, s.rx_buffer[i:])
-				s.rx_buffer = s.rx_buffer[:q-i]
-			}
-			break
-		}
+	var h *Header
+	nsid := -1
 
+	n, noob, _, _, err := syscall.Recvmsg(s.socket, s.rx_buffer,
+		s.rx_oob_buffer, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	if noob > 0 {
+		oob := s.rx_oob_buffer[:noob]
+		scms, err := syscall.ParseSocketControlMessage(oob)
+		if err != nil {
+			panic(err)
+		}
+		for _, scm := range scms {
+			if scm.Header.Level == SOL_NETLINK &&
+				scm.Header.Type == NETLINK_LISTEN_ALL_NSID {
+				nsid = *(*int)(unsafe.Pointer(&scm.Data[0]))
+			}
+		}
+	}
+
+	for i, l := 0, 0; i < n; i += l {
+		if i+SizeofHeader > n {
+			panic("rx incomplete header")
+		}
+		h = (*Header)(unsafe.Pointer(&s.rx_buffer[i]))
 		done = h.Type == NLMSG_DONE
-		s.rxDispatch(h, s.rx_buffer[i:i+int(h.Len)])
-		i += l
+		l = messageAlignLen(int(h.Len))
+		if i+l > n {
+			panic("rx incomplete message")
+		}
+		s.rxDispatch(h, s.rx_buffer[i:i+int(h.Len)], nsid)
 	}
 	return
 }
 
-func (s *Socket) rxDispatch(h *Header, msg []byte) {
+func (s *Socket) rxDispatch(h *Header, msg []byte, nsid int) {
 	var m Message
 	var errMsg *ErrorMessage
 	switch h.Type {
 	case NLMSG_NOOP:
-		m = NewNoopMessageBytes(msg)
+		m = NewNoopMessageBytes(msg, nsid)
 	case NLMSG_ERROR:
-		errMsg = NewErrorMessageBytes(msg)
+		errMsg = NewErrorMessageBytes(msg, nsid)
 		m = errMsg
 	case NLMSG_DONE:
-		m = NewDoneMessageBytes(msg)
+		m = NewDoneMessageBytes(msg, nsid)
 	case RTM_NEWLINK, RTM_DELLINK, RTM_GETLINK, RTM_SETLINK:
-		m = NewIfInfoMessageBytes(msg)
+		m = NewIfInfoMessageBytes(msg, nsid)
 	case RTM_NEWADDR, RTM_DELADDR, RTM_GETADDR:
-		m = NewIfAddrMessageBytes(msg)
+		m = NewIfAddrMessageBytes(msg, nsid)
 	case RTM_NEWROUTE, RTM_DELROUTE, RTM_GETROUTE:
-		m = NewRouteMessageBytes(msg)
+		m = NewRouteMessageBytes(msg, nsid)
 	case RTM_NEWNEIGH, RTM_DELNEIGH, RTM_GETNEIGH:
-		m = NewNeighborMessageBytes(msg)
+		m = NewNeighborMessageBytes(msg, nsid)
 	case RTM_NEWNSID, RTM_DELNSID, RTM_GETNSID:
 		m = NewNetnsMessageBytes(msg)
 	default:
