@@ -25,7 +25,34 @@ func Dump(w io.Writer, args ...string) error {
 		mayDumpAddr,
 		mayDumpRoute,
 		mayDumpNeighbor bool
-	if len(args) == 0 {
+	for _, arg := range args {
+		switch arg {
+		case "-h", "-help", "--help":
+			fmt.Fprint(w, usage)
+			return nil
+		case "-all-nsid", "--all-nsid", "all-nsid":
+			allnsid = true
+		case "noop":
+			mayDumpNoop = true
+		case "error":
+			mayDumpError = true
+		case "done":
+			mayDumpDone = true
+		case "link":
+			mayDumpLink = true
+		case "addr":
+			mayDumpAddr = true
+		case "route":
+			mayDumpRoute = true
+		case "neighbor":
+			mayDumpNeighbor = true
+		default:
+			return fmt.Errorf("%s: unknown", arg)
+		}
+	}
+	if !mayDumpNoop && !mayDumpError && !mayDumpDone && !mayDumpLink &&
+		!mayDumpAddr && !mayDumpRoute && !mayDumpNeighbor {
+
 		mayDumpNoop = true
 		mayDumpError = true
 		mayDumpDone = true
@@ -33,32 +60,6 @@ func Dump(w io.Writer, args ...string) error {
 		mayDumpAddr = true
 		mayDumpRoute = true
 		mayDumpNeighbor = true
-	} else {
-		for _, arg := range args {
-			switch arg {
-			case "-h", "-help", "--help":
-				fmt.Fprint(w, usage)
-				return nil
-			case "-all-nsid", "--all-nsid", "all-nsid":
-				allnsid = true
-			case "noop":
-				mayDumpNoop = true
-			case "error":
-				mayDumpError = true
-			case "done":
-				mayDumpDone = true
-			case "link":
-				mayDumpLink = true
-			case "addr":
-				mayDumpAddr = true
-			case "route":
-				mayDumpRoute = true
-			case "neighbor":
-				mayDumpNeighbor = true
-			default:
-				return fmt.Errorf("%s: unknown", arg)
-			}
-		}
 	}
 	rx := make(chan Message, 64)
 	nl, err := New(rx)
