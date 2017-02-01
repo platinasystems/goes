@@ -8,108 +8,21 @@ package fsp
 
 import (
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
 const Name = "fsp"
-const everything = true
-const onlyChanges = false
 
-type cmd struct {
-	stop chan struct{}
-	pub  *publisher.Publisher
-}
-
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
-
-func (cmd *cmd) Main(...string) error {
-	var si syscall.Sysinfo_t
-	var err error
-
-	cmd.stop = make(chan struct{})
-
-	if cmd.pub, err = publisher.New(); err != nil {
-		return err
-	}
-
-	if err = syscall.Sysinfo(&si); err != nil {
-		return err
-	}
-
-	if err = cmd.update(everything); err != nil {
-		return err
-	}
-
-	t := time.NewTicker(10 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-cmd.stop:
-			return nil
-		case <-t.C:
-			if err = cmd.update(onlyChanges); err != nil {
-				close(cmd.stop)
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (cmd *cmd) Close() error {
-	close(cmd.stop)
-	return nil
-}
-
-func (cmd *cmd) update(everything bool) error {
-	var si syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&si); err != nil {
-		return err
-	}
-	pub, err := redis.Publish(redis.DefaultHash)
-	if err != nil {
-		return err
-	}
-
-	if everything {
-		pub <- fmt.Sprint("psu1.status: ", 1)
-	} else {
-		pub <- fmt.Sprint("psu1.status: ", 1)
-	}
-	return nil
-}
-
-/*
-package fsp
-
-import (
-	"fmt"
-	"math"
-	"strconv"
-	"strings"
-	"unsafe"
-
-	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
-)
-
-var (
-	dummy       byte
-	regsPointer = unsafe.Pointer(&dummy)
-	regsAddr    = uintptr(unsafe.Pointer(&dummy))
-)
-
-type Psu struct {
+type I2cDev struct {
 	Slot       int
 	Installed  int
 	Id         string
@@ -124,376 +37,230 @@ type Psu struct {
 	GpioIntL   string
 }
 
-const ()
+var Vdev [2]I2cDev
 
-func getPsuRegs() *psuRegs { return (*psuRegs)(regsPointer) }
+var VpageByKey map[string]uint8
 
-// offset function has divide by two for 16-bit offset struct
-func (r *reg8) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-func (r *reg8b) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-func (r *reg16) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-func (r *reg16r) offset() uint8 { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-
-func (h *Psu) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
-
-	err = bus.Open(h.Bus)
-	if err != nil {
-		return
-	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(h.Addr)
-	if err != nil {
-		return
-	}
-
-	err = bus.Do(rw, regOffset, size, data)
-	return
+type cmd struct {
+	stop  chan struct{}
+	pub   *publisher.Publisher
+	last  map[string]float64
+	lasts map[string]string
+	lastu map[string]uint16
 }
 
-func (h *Psu) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
+func New() *cmd { return new(cmd) }
 
-	err = bus.Open(h.MuxBus)
-	if err != nil {
-		return
+func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name }
+
+func (cmd *cmd) Main(...string) error {
+	var si syscall.Sysinfo_t
+	var err error
+
+	cmd.stop = make(chan struct{})
+	cmd.last = make(map[string]float64)
+	cmd.lasts = make(map[string]string)
+	cmd.lastu = make(map[string]uint16)
+
+	if cmd.pub, err = publisher.New(); err != nil {
+		return err
 	}
-	defer bus.Close()
 
-	err = bus.ForceSlaveAddress(h.MuxAddr)
-	if err != nil {
-		return
+	if err = syscall.Sysinfo(&si); err != nil {
+		return err
 	}
 
-	err = bus.Do(rw, regOffset, size, data)
-	return
+	//if err = cmd.update(); err != nil {
+	//	close(cmd.stop)
+	//	return err
+	//}
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-cmd.stop:
+			return nil
+		case <-t.C:
+			if err = cmd.update(); err != nil {
+				close(cmd.stop)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-func (r *reg8) get(h *Psu) byte {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return 0
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	return data[0]
+func (cmd *cmd) Close() error {
+	close(cmd.stop)
+	return nil
 }
 
-func (r *reg8b) get(h *Psu) string {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return "not installed"
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get8b: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8b MuxWr #retries: ", i, ", addr: ", r.offset())
+func (cmd *cmd) update() error {
+	for k, i := range VpageByKey {
+		if strings.Contains(k, "psu_status") {
+			v := Vdev[i].PsuStatus()
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
 			}
-			break
 		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	data[0] = 2
-	for i := 0; i < 5000; i++ { // read count into data[0]
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8b Count #retries: ", i, ", addr: ", r.offset())
+		if strings.Contains(k, "admin.state") {
+			v := Vdev[i].GetAdminState()
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
 			}
-			break
 		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	count := data[0] + 1
-	for i := 0; i < 5000; i++ { // recover bus
-		err := h.i2cDo(i2c.Read, 0, i2c.ByteData, &data)
-		if err == nil {
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	if (count == 0) || (count == 1) {
-		s := "Not Supported"
-		return s
-	}
-	data[0] = count
-	for i := 0; i < 5000; i++ { // read block
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.BlockData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8b #retries: ", i, ", addr: ", r.offset())
+		if strings.Contains(k, "page") {
+			v := Vdev[i].Page()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
 			}
-			break
 		}
-		if i == 4999 {
-			panic(err)
+		if strings.Contains(k, "status_word") {
+			v := Vdev[i].StatusWord()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "status_vout") {
+			v := Vdev[i].StatusVout()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "status_iout") {
+			v := Vdev[i].StatusIout()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "status_input") {
+			v := Vdev[i].StatusInput()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "v_in") {
+			v := Vdev[i].Vin()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "i_in") {
+			v := Vdev[i].Iin()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "v_out") {
+			v := Vdev[i].Vout()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "i_out") {
+			v := Vdev[i].Iout()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "status_temp") {
+			v := Vdev[i].StatusTemp()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "p_out") {
+			v := Vdev[i].Pout()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "p_in") {
+			v := Vdev[i].Pin()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "p_out_raw") {
+			v := Vdev[i].PoutRaw()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "p_in_raw") {
+			v := Vdev[i].PinRaw()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "p_mode_raw") {
+			v := Vdev[i].ModeRaw()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "pmbus_rev") {
+			v := Vdev[i].PMBusRev()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "status_fans") {
+			v := Vdev[i].StatusFans()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
+		}
+		if strings.Contains(k, "temperature1") {
+			v := Vdev[i].Temp1()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "temperature2") {
+			v := Vdev[i].Temp2()
+			if v != cmd.last[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.last[k] = v
+			}
+		}
+		if strings.Contains(k, "fan_speed") {
+			v := Vdev[i].FanSpeed()
+			if v != cmd.lastu[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lastu[k] = v
+			}
 		}
 	}
-	s := string(data[1:(data[0])])
-	for i := 0; i < 5000; i++ { // recover bus
-		err := h.i2cDo(i2c.Read, 0, i2c.ByteData, &data)
-		if err == nil {
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	return s
+	return nil
+	//				"psu1.mfg_id":       ps1.MfgIdent(),
+	//				"psu1.mfg_model":    ps1.MfgModel(),
 }
 
-func (r *reg16) get(h *Psu) (v uint16) {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return 0
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get16: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	return uint16(data[0])<<8 | uint16(data[1])
-}
-
-func (r *reg16r) get(h *Psu) (v uint16) {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return 0
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get16r: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	return uint16(data[1])<<8 | uint16(data[0])
-}
-
-func (r *reg8) set(h *Psu, v uint8) {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: set8: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	data[0] = v
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: set8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16) set(h *Psu, v uint16) {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: set16: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	data[0] = uint8(v >> 8)
-	data[1] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: set16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16r) set(h *Psu, v uint16) {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: set16r: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	data[1] = uint8(v >> 8)
-	data[0] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: set16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *regi16) get(h *Psu) (v int16) { v = int16((*reg16)(r).get(h)); return }
-func (r *regi16) set(h *Psu, v int16)  { (*reg16)(r).set(h, uint16(v)) }
-
-func (h *Psu) convert(v uint16) float64 {
+func (h *I2cDev) convert(v uint16) float64 {
+	h.Id = "Great Wall" //
 	if h.Id == "Great Wall" {
 		var nn int
 		var y int
@@ -512,9 +279,11 @@ func (h *Psu) convert(v uint16) float64 {
 		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
 		return vv
 	} else if h.Id == "FSP" {
-		r := getPsuRegs()
+		r := getRegs()
 		var nn float64
-		n := r.VoutMode.get(h) & 0x1f
+		r.VoutMode.get(h)
+		DoI2cRpc()
+		n := (uint16(s[1].D[0])) & 0x1f
 		if n > 0xf {
 			n = ((n ^ 0x1f) + 1) & 0x1f
 			nn = float64(n) * (-1)
@@ -529,73 +298,95 @@ func (h *Psu) convert(v uint16) float64 {
 	}
 }
 
-func (h *Psu) Page() uint16 {
-	r := getPsuRegs()
-	t := r.Page.get(h)
+func (h *I2cDev) Page() uint16 {
+	r := getRegs()
+	r.Page.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) PageWr(i uint16) {
-	r := getPsuRegs()
+func (h *I2cDev) PageWr(i uint16) {
+	r := getRegs()
 	r.Page.set(h, uint8(i))
+	DoI2cRpc()
 	return
 }
 
-func (h *Psu) StatusWord() uint16 {
-	r := getPsuRegs()
-	t := r.StatusWord.get(h)
+func (h *I2cDev) StatusWord() uint16 {
+	r := getRegs()
+	r.StatusWord.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) StatusVout() uint16 {
-	r := getPsuRegs()
-	t := r.StatusVout.get(h)
+func (h *I2cDev) StatusVout() uint16 {
+	r := getRegs()
+	r.StatusVout.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) StatusIout() uint16 {
-	r := getPsuRegs()
-	t := r.StatusIout.get(h)
+func (h *I2cDev) StatusIout() uint16 {
+	r := getRegs()
+	r.StatusIout.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) StatusInput() uint16 {
-	r := getPsuRegs()
-	t := r.StatusInput.get(h)
+func (h *I2cDev) StatusInput() uint16 {
+	r := getRegs()
+	r.StatusInput.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) StatusTemp() uint16 {
-	r := getPsuRegs()
-	t := r.StatusTemp.get(h)
+func (h *I2cDev) StatusTemp() uint16 {
+	r := getRegs()
+	r.StatusTemp.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) StatusFans() uint16 {
-	r := getPsuRegs()
-	t := r.StatusFans.get(h)
+func (h *I2cDev) StatusFans() uint16 {
+	r := getRegs()
+	r.StatusFans.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) Vin() float64 {
-	r := getPsuRegs()
-	t := r.Vin.get(h)
+func (h *I2cDev) Vin() float64 {
+	r := getRegs()
+	r.Vin.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	v := h.convert(t)
 	return v
 }
 
-func (h *Psu) Iin() float64 {
-	r := getPsuRegs()
-	t := r.Iin.get(h)
+func (h *I2cDev) Iin() float64 {
+	r := getRegs()
+	r.Iin.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	v := h.convert(t)
 	return v
 }
 
-func (h *Psu) Vout() float64 {
-	r := getPsuRegs()
-	t := r.Vout.get(h)
+func (h *I2cDev) Vout() float64 {
+	r := getRegs()
+	r.Vout.get(h)
 	var nn float64
-	n := r.VoutMode.get(h) & 0x1f
+	r.VoutMode.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
+	n := (uint16(s[3].D[0])) & 0x1f
 	if n > 0xf {
 		n = ((n ^ 0x1f) + 1) & 0x1f
 		nn = float64(n) * (-1)
@@ -607,16 +398,20 @@ func (h *Psu) Vout() float64 {
 	return v
 }
 
-func (h *Psu) Iout() float64 {
-	r := getPsuRegs()
-	t := r.Iout.get(h)
+func (h *I2cDev) Iout() float64 {
+	r := getRegs()
+	r.Iout.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	v := h.convert(t)
 	return v
 }
 
-func (h *Psu) Temp1() float64 {
-	r := getPsuRegs()
-	t := r.Temp1.get(h)
+func (h *I2cDev) Temp1() float64 {
+	r := getRegs()
+	r.Temp1.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	var v float64
 	if h.Id == "Great Wall" {
 		v = h.convert(t)
@@ -626,9 +421,11 @@ func (h *Psu) Temp1() float64 {
 	return v
 }
 
-func (h *Psu) Temp2() float64 {
-	r := getPsuRegs()
-	t := r.Temp2.get(h)
+func (h *I2cDev) Temp2() float64 {
+	r := getRegs()
+	r.Temp2.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	var v float64
 	if h.Id == "Great Wall" {
 		v = h.convert(t)
@@ -638,56 +435,71 @@ func (h *Psu) Temp2() float64 {
 	return v
 }
 
-func (h *Psu) FanSpeed() uint16 {
-	r := getPsuRegs()
-	t := r.FanSpeed.get(h)
+func (h *I2cDev) FanSpeed() uint16 {
+	r := getRegs()
+	r.FanSpeed.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return t
 }
 
-func (h *Psu) Pout() float64 {
-	r := getPsuRegs()
-	t := r.Pout.get(h)
+func (h *I2cDev) Pout() float64 {
+	r := getRegs()
+	r.Pout.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	v := h.convert(t)
 	return v
 }
 
-func (h *Psu) Pin() float64 {
-	r := getPsuRegs()
-	t := r.Pin.get(h)
+func (h *I2cDev) Pin() float64 {
+	r := getRegs()
+	r.Pin.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	v := h.convert(t)
 	return v
 }
 
-func (h *Psu) PoutRaw() uint16 {
-	r := getPsuRegs()
-	t := r.Pout.get(h)
+func (h *I2cDev) PoutRaw() uint16 {
+	r := getRegs()
+	r.Pout.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return t
 }
 
-func (h *Psu) PinRaw() uint16 {
-	r := getPsuRegs()
-	t := r.Pin.get(h)
+func (h *I2cDev) PinRaw() uint16 {
+	r := getRegs()
+	r.Pin.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return t
 }
 
-func (h *Psu) ModeRaw() uint16 {
+func (h *I2cDev) ModeRaw() uint16 {
 	if h.Id == "Great Wall" {
-		r := getPsuRegs()
-		t := r.Pin.get(h)
+		r := getRegs()
+		r.Pin.get(h)
+		DoI2cRpc()
+		t := uint16(s[1].D[0])
 		return t
 	} else {
 		return 0
 	}
 }
 
-func (h *Psu) PMBusRev() uint16 {
-	r := getPsuRegs()
-	t := r.PMBusRev.get(h)
+func (h *I2cDev) PMBusRev() uint16 {
+	r := getRegs()
+	r.PMBusRev.get(h)
+	DoI2cRpc()
+	t := uint16(s[1].D[0])
 	return uint16(t)
 }
 
-func (h *Psu) MfgIdent() string {
-	r := getPsuRegs()
+/*
+func (h *I2cDev) MfgIdent() string {
+	r := getRegs()
 	t := r.MfgId.get(h)
 	if t == "Not Supported" {
 		t = "FSP"
@@ -697,8 +509,8 @@ func (h *Psu) MfgIdent() string {
 	return t
 }
 
-func (h *Psu) MfgModel() string {
-	r := getPsuRegs()
+func (h *I2cDev) MfgModel() string {
+	r := getRegs()
 	t := r.MfgMod.get(h)
 	if t == "Not Supported" {
 		t = "FSP"
@@ -706,8 +518,9 @@ func (h *Psu) MfgModel() string {
 	t = strings.Trim(t, "#")
 	return t
 }
+*/
 
-func (h *Psu) PsuStatus() string {
+func (h *I2cDev) PsuStatus() string {
 	pin, found := gpio.Pins[h.GpioPrsntL]
 	if !found {
 		h.Installed = 0
@@ -738,7 +551,7 @@ func (h *Psu) PsuStatus() string {
 	return "powered_on"
 }
 
-func (h *Psu) SetAdminState(s string) {
+func (h *I2cDev) SetAdminState(s string) {
 	pin, found := gpio.Pins[h.GpioPwronL]
 	if found {
 		switch s {
@@ -752,7 +565,7 @@ func (h *Psu) SetAdminState(s string) {
 	}
 }
 
-func (h *Psu) GetAdminState() string {
+func (h *I2cDev) GetAdminState() string {
 	pin, found := gpio.Pins[h.GpioPwronL]
 	if !found {
 		return "not found"
@@ -766,4 +579,3 @@ func (h *Psu) GetAdminState() string {
 	}
 	return "enabled"
 }
-*/

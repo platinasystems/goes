@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/platinasystems/go/internal/environ/fantray"
+	"github.com/platinasystems/go/internal/environ/fsp"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
@@ -25,6 +26,7 @@ func (p *platform) Init() (err error) {
 	p.w83795Init()
 	p.fantrayInit()
 	p.imx6Init()
+	p.fspInit()
 	if err = p.boardInit(); err != nil {
 		return err
 	}
@@ -116,5 +118,80 @@ func (p *platform) fantrayInit() {
 func (p *platform) imx6Init() {
 	imx6.VpageByKey = map[string]uint8{
 		"temperature.bmc_cpu": 1,
+	}
+}
+
+func (p *platform) fspInit() {
+	fsp.Vdev[0].Slot = 2
+	fsp.Vdev[0].Bus = 1
+	fsp.Vdev[0].Addr = 0x58
+	fsp.Vdev[0].MuxBus = 1
+	fsp.Vdev[0].MuxAddr = 0x72
+	fsp.Vdev[0].MuxValue = 0x01
+	fsp.Vdev[0].GpioPwrok = "PSU0_PWROK"
+	fsp.Vdev[0].GpioPrsntL = "PSU0_PRSNT_L"
+	fsp.Vdev[0].GpioPwronL = "PSU0_PWRON_L"
+	fsp.Vdev[0].GpioIntL = "PSU0_INT_L"
+
+	fsp.Vdev[1].Slot = 1
+	fsp.Vdev[1].Bus = 1
+	fsp.Vdev[1].Addr = 0x58
+	fsp.Vdev[1].MuxBus = 1
+	fsp.Vdev[1].MuxAddr = 0x72
+	fsp.Vdev[1].MuxValue = 0x02
+	fsp.Vdev[1].GpioPwrok = "PSU1_PWROK"
+	fsp.Vdev[1].GpioPrsntL = "PSU1_PRSNT_L"
+	fsp.Vdev[1].GpioPwronL = "PSU1_PWRON_L"
+	fsp.Vdev[1].GpioIntL = "PSU1_INT_L"
+
+	fsp.VpageByKey = map[string]uint8{
+		"psu1.psu_status":   0,
+		"psu1.admin.state":  0,
+		"psu1.mfg_id":       0,
+		"psu1.mfg_model":    0,
+		"psu1.page":         0,
+		"psu1.status_word":  0,
+		"psu1.status_vout":  0,
+		"psu1.status_iout":  0,
+		"psu1.status_input": 0,
+		"psu1.v_in":         0,
+		"psu1.i_in":         0,
+		"psu1.v_out":        0,
+		"psu1.i_out":        0,
+		"psu1.status_temp":  0,
+		"psu1.p_out":        0,
+		"psu1.p_in":         0,
+		"psu1.p_out_raw":    0,
+		"psu1.p_in_raw":     0,
+		"psu1.p_mode_raw":   0,
+		"psu1.pmbus_rev":    0,
+		"psu1.status_fans":  0,
+		"psu1.temperature1": 0,
+		"psu1.temperature2": 0,
+		"psu1.fan_speed":    0,
+		"psu2.psu_status":   1,
+		"psu2.admin.state":  1,
+		"psu2.mfg_id":       1,
+		"psu2.mfg_model":    1,
+		"psu2.page":         1,
+		"psu2.status_word":  1,
+		"psu2.status_vout":  1,
+		"psu2.status_iout":  1,
+		"psu2.status_input": 1,
+		"psu2.v_in":         1,
+		"psu2.i_in":         1,
+		"psu2.v_out":        1,
+		"psu2.i_out":        1,
+		"psu2.status_temp":  1,
+		"psu2.p_out":        1,
+		"psu2.p_in":         1,
+		"psu2.p_out_raw":    1,
+		"psu2.p_in_raw":     1,
+		"psu2.p_mode_raw":   1,
+		"psu2.pmbus_rev":    1,
+		"psu2.status_fans":  1,
+		"psu2.temperature1": 1,
+		"psu2.temperature2": 1,
+		"psu2.fan_speed":    1,
 	}
 }

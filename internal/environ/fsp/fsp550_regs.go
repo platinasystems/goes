@@ -9,7 +9,7 @@ type regi16 reg16
 // Memory map
 // offsets are 16-bit to accomodate the mixed 8-bit 16-bit accesses
 // the offset function has a divide by two to restore to proper address
-type psuRegs struct {
+type regs struct {
 	Page        reg8 // 0x00
 	_           byte
 	Operation   reg8 // 0x01
