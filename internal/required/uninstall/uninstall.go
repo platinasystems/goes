@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/prog"
 )
 
 const Name = "uninstall"
@@ -40,7 +41,7 @@ func (c *cmd) Main(...string) error {
 	syscall.Unlink(EtcInitdGoes)
 	syscall.Unlink(EtcDefaultGoes)
 	syscall.Unlink(BashCompletionGoes)
-	syscall.Unlink(goes.InstallName)
+	syscall.Unlink(prog.Install)
 	return err
 }
 

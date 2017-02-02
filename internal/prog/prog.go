@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 )
 
+var Install = "/usr/bin/goes"
 var base, name, path string
 
 func Base() string {

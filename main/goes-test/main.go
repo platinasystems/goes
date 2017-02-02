@@ -40,5 +40,6 @@ func main() {
 	redisd.Machine = "test"
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }

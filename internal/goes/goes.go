@@ -24,10 +24,7 @@ import (
 	"github.com/platinasystems/go/internal/prog"
 )
 
-const (
-	InstallName = "/usr/bin/goes"
-	DefaultLang = "en_US.UTF-8"
-)
+const DefaultLang = "en_US.UTF-8"
 
 const (
 	DontFork Kind = 1 << iota
@@ -129,7 +126,7 @@ func (byName ByName) Main(args ...string) error {
 	}
 
 	if _, found := byName[args[0]]; !found {
-		if args[0] == InstallName && len(args) > 2 {
+		if args[0] == prog.Install && len(args) > 2 {
 			buf, err := ioutil.ReadFile(args[1])
 			if err == nil && utf8.Valid(buf) {
 				args = []string{"source", args[1]}

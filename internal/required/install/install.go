@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/go/internal/assert"
-	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/prog"
 )
 
 const Name = "install"
@@ -67,7 +67,7 @@ func (cmd) Apropos() map[string]string {
 }
 
 func run(args ...string) error {
-	cmd := exec.Command(goes.InstallName, args...)
+	cmd := exec.Command(prog.Install, args...)
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -77,7 +77,7 @@ func run(args ...string) error {
 
 // run "goes stop"
 func stop(args ...string) error {
-	_, err := os.Stat(goes.InstallName)
+	_, err := os.Stat(prog.Install)
 	if err != nil {
 		return nil
 	}
@@ -89,7 +89,7 @@ func stop(args ...string) error {
 	}
 	err = run(args...)
 	if err != nil {
-		err = fmt.Errorf("goes stop: %v", err)
+		err = fmt.Errorf("stop: %v", err)
 	}
 	return err
 }
@@ -103,7 +103,7 @@ func start(args ...string) error {
 	}
 	err := run(args...)
 	if err != nil {
-		err = fmt.Errorf("%s: start: %v", err)
+		err = fmt.Errorf("start: %v", err)
 	}
 	return err
 }
@@ -119,7 +119,7 @@ func install_self() error {
 	}
 	defer src.Close()
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	dst, err := os.OpenFile(goes.InstallName, flags, os.FileMode(0755))
+	dst, err := os.OpenFile(prog.Install, flags, os.FileMode(0755))
 	if err != nil {
 		return err
 	}

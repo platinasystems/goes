@@ -70,6 +70,7 @@ func main() {
 	stop.Hook = stopHook
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
 

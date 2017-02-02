@@ -74,6 +74,7 @@ func main() {
 	)
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
 

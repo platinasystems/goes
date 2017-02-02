@@ -47,6 +47,9 @@ func (c *cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
+	if prog.Name() != prog.Install && prog.Base() != "init" {
+		return fmt.Errorf("use `%s start`", prog.Install)
+	}
 	_, err = os.Stat(sockfile.Path("redisd"))
 	if err == nil {
 		return fmt.Errorf("already started")

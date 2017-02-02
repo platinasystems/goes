@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/kill"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
@@ -40,6 +41,9 @@ func (c *cmd) Main(args ...string) error {
 	err := assert.Root()
 	if err != nil {
 		return err
+	}
+	if prog.Name() != prog.Install && prog.Base() != "init" {
+		return fmt.Errorf("use `%s stop`", prog.Install)
 	}
 	stop := parm["-stop"]
 	if len(stop) == 0 && haveEtcGoesStop() {
