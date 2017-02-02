@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/platinasystems/go/internal/sockfile"
 	"strings"
@@ -43,8 +46,14 @@ func (c *conn) Close() (err error) {
 
 // Exec runs a vnet cli command and copies output to given io.Writer.
 func (c *conn) Exec(w io.Writer, args ...string) (err error) {
+	var werr error
+
 	// Send cli command to vnet.
 	fmt.Fprintf(c, "%s\n", strings.Join(args, " "))
+
+	// Ignore pipe error e.g. vnet command | head
+	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
+
 	for {
 		// First read 32 bit network byte order length.
 		var tmp [4]byte
@@ -54,11 +63,9 @@ func (c *conn) Exec(w io.Writer, args ...string) (err error) {
 		if l := int64(binary.BigEndian.Uint32(tmp[:])); l == 0 {
 			// Zero length means end of vnet command output.
 			break
-		} else {
-			// Otherwise copy input to output.
-			if _, err = io.CopyN(w, c, l); err != nil {
-				return
-			}
+		} else if werr == nil {
+			// Otherwise copy input to output up to first error
+			_, werr = io.CopyN(w, c, l)
 		}
 	}
 	return

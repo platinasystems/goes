@@ -7,8 +7,11 @@ package vnetd
 import (
 	"fmt"
 	"net/rpc"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/elib"
@@ -99,7 +102,17 @@ func (cmd *cmd) Main(...string) error {
 
 	sfn := sockfile.Path("vnet")
 	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s} }", sfn))
-	go sockfile.Chgroup(sfn, "adm")
+	go func(sfn string) {
+		for {
+			_, err := os.Stat(sfn)
+			if err == nil {
+				sockfile.Chgroup(sfn, "adm")
+				break
+			}
+		}
+	}(sfn)
+
+	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
 
 	return cmd.i.v.Run(&in)
 }
