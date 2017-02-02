@@ -768,7 +768,8 @@ func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type NetnsMessage struct {
-	GenMessage
+	Header
+	AddressFamily
 	Attrs [NETNSA_MAX]Attr
 }
 
@@ -815,7 +816,8 @@ func (m *NetnsMessage) Close() error {
 
 func (m *NetnsMessage) Parse(b []byte) {
 	p := (*NetnsMessage)(unsafe.Pointer(&b[0]))
-	m.GenMessage = p.GenMessage
+	m.Header = p.Header
+	m.AddressFamily = p.AddressFamily
 	b = b[SizeofNetnsMessage:]
 	m.Attrs[NETNSA_NSID] = Int32Attr(-2)
 	m.Attrs[NETNSA_PID] = Uint32Attr(0)
@@ -852,8 +854,10 @@ func (m *NetnsMessage) TxAdd(s *Socket) {
 func (m *NetnsMessage) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
-	m.GenMessage.WriteTo(acc)
+	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
+	m.Header.WriteTo(acc)
+	fmt.Fprintln(acc, "family:", m.AddressFamily)
 	fprintAttrs(acc, netnsAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
 	return acc.Tuple()

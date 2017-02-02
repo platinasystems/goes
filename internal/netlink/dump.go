@@ -24,7 +24,8 @@ func Dump(w io.Writer, args ...string) error {
 		mayDumpLink,
 		mayDumpAddr,
 		mayDumpRoute,
-		mayDumpNeighbor bool
+		mayDumpNeighbor,
+		mayDumpNetns bool
 	for _, arg := range args {
 		switch arg {
 		case "-h", "-help", "--help":
@@ -46,12 +47,15 @@ func Dump(w io.Writer, args ...string) error {
 			mayDumpRoute = true
 		case "neighbor":
 			mayDumpNeighbor = true
+		case "netns":
+			mayDumpNetns = true
 		default:
 			return fmt.Errorf("%s: unknown", arg)
 		}
 	}
 	if !mayDumpNoop && !mayDumpError && !mayDumpDone && !mayDumpLink &&
-		!mayDumpAddr && !mayDumpRoute && !mayDumpNeighbor {
+		!mayDumpAddr && !mayDumpRoute && !mayDumpNeighbor &&
+		!mayDumpNetns {
 
 		mayDumpNoop = true
 		mayDumpError = true
@@ -60,6 +64,7 @@ func Dump(w io.Writer, args ...string) error {
 		mayDumpAddr = true
 		mayDumpRoute = true
 		mayDumpNeighbor = true
+		mayDumpNetns = true
 	}
 	rx := make(chan Message, 64)
 	nl, err := New(rx)
@@ -81,13 +86,15 @@ func Dump(w io.Writer, args ...string) error {
 		_, isAddr := msg.(*IfAddrMessage)
 		_, isRoute := msg.(*RouteMessage)
 		_, isNeighbor := msg.(*NeighborMessage)
+		_, isNetns := msg.(*NetnsMessage)
 		if (mayDumpNoop && isNoop) ||
 			(mayDumpError && isError) ||
 			(mayDumpDone && isDone) ||
 			(mayDumpLink && isLink) ||
 			(mayDumpAddr && isAddr) ||
 			(mayDumpRoute && isRoute) ||
-			(mayDumpNeighbor && isNeighbor) {
+			(mayDumpNeighbor && isNeighbor) ||
+			(mayDumpNetns && isNetns) {
 			_, err = msg.WriteTo(indent.New(w, "    "))
 			if err != nil {
 				return err

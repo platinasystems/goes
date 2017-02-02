@@ -26,6 +26,7 @@ var DefaultGroups = []MulticastGroup{
 	RTNLGRP_IPV6_IFADDR,
 	RTNLGRP_IPV6_ROUTE,
 	RTNLGRP_IPV6_MROUTE,
+	RTNLGRP_NSID,
 }
 
 type SocketConfig struct {
