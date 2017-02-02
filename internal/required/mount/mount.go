@@ -84,6 +84,34 @@ var filesystems struct {
 	all, auto Filesystems
 }
 
+type MountResult struct {
+	err	error
+	dev	string
+	fstype	string
+	dir	string
+	flag	flags.Flag
+}
+	
+func (r *MountResult) String() string {
+	if r.err != nil {
+		return fmt.Sprintf("%s: %v", r.dev, r.err)
+	}
+	if r.flag["--fake"] {
+		return fmt.Sprintf("Would mount %s type %s at %s", r.dev, r.fstype, r.dir)
+	}
+	if r.flag["-v"] {
+		return fmt.Sprintf("Mounted %s type %s at %s", r.dev, r.fstype, r.dir)
+	}
+	return ""
+}
+	
+func (r *MountResult) ShowResult() {
+	s := r.String()
+	if s != "" {
+		fmt.Println(s)
+	}
+}
+
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [OPTION]... DEVICE [DIRECTORY]" }
 
@@ -146,8 +174,10 @@ func (cmd) Main(args ...string) error {
 		case 1:
 			err = fstab(args[0], flag, parm)
 		case 2:
-			err = mountone(parm["-t"], args[0], args[1], flag,
+			r := mountone(parm["-t"], args[0], args[1], flag,
 				parm)
+			r.ShowResult()
+			err = r.err
 		default:
 			err = fmt.Errorf("%v: unexpected", args[2:])
 		}
@@ -161,8 +191,9 @@ func mountall(flag flags.Flag, parm parms.Parm) error {
 		return err
 	}
 	for _, x := range fstab {
-		err = mountone(x.fsType, x.fsSpec, x.fsFile, flag, parm)
-		if err != nil {
+		r := mountone(x.fsType, x.fsSpec, x.fsFile, flag, parm)
+		r.ShowResult()
+		if err = r.err; err != nil {
 			break
 		}
 	}
@@ -176,8 +207,10 @@ func fstab(name string, flag flags.Flag, parm parms.Parm) error {
 	}
 	for _, x := range fstab {
 		if name == x.fsSpec || name == x.fsFile {
-			return mountone(x.fsType, x.fsSpec, x.fsFile,
+			r := mountone(x.fsType, x.fsSpec, x.fsFile,
 				flag, parm)
+			r.ShowResult()
+			return r.err
 		}
 	}
 	return nil
@@ -206,7 +239,7 @@ func loadFstab() ([]fstabEntry, error) {
 	return fstab, scanner.Err()
 }
 
-func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) error {
+func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult {
 	var flags uintptr
 	if flag["-defaults"] {
 		//  rw, suid, dev, exec, auto, nouser, async
@@ -230,8 +263,7 @@ func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) error {
 		}
 	}
 	if flag["--fake"] {
-		fmt.Println("Would mount", dev, "type", t, "at", dir)
-		return nil
+		return &MountResult{nil, dev, t, dir, flag}
 	}
 
 	tryTypes := []string{t}
@@ -243,16 +275,11 @@ func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) error {
 	for _, t := range tryTypes {
 		err = syscall.Mount(dev, dir, t, flags, parm["-o"])
 		if err == nil {
-			if flag["-v"] {
-				fmt.Println("Mounted", dev, "at", dir)
-			}
-			break
+			return &MountResult{err, dev, t, dir, flag}
 		}
 	}
-	if err != nil {
-		return fmt.Errorf("%s: %v", dev, err)
-	}
-	return nil
+
+	return &MountResult{err, dev, t, dir, flag}
 }
 
 func show() error {
