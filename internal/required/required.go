@@ -45,6 +45,7 @@ import (
 	"github.com/platinasystems/go/internal/required/man"
 	"github.com/platinasystems/go/internal/required/mkdir"
 	"github.com/platinasystems/go/internal/required/mount"
+	"github.com/platinasystems/go/internal/required/nlcounters"
 	"github.com/platinasystems/go/internal/required/nld"
 	"github.com/platinasystems/go/internal/required/nldump"
 	"github.com/platinasystems/go/internal/required/nsid"
@@ -118,6 +119,7 @@ func New() []interface{} {
 		mkdir.New(),
 		mount.New(),
 		nld.New(),
+		nlcounters.New(),
 		nldump.New(),
 		nsid.New(),
 		patents.New(),

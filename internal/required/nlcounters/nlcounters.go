@@ -2,29 +2,36 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package nldump
+package nlcounters
 
-import "github.com/platinasystems/go/internal/netlink/nldump"
+import "github.com/platinasystems/go/internal/netlink/nlcounters"
 
-const Name = "nldump"
+const Name = "nlcounters"
 
 type cmd struct{}
 
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return nldump.Usage }
+func (cmd) Usage() string  { return nlcounters.Usage }
 
 func (cmd) Main(args ...string) error {
-	return nldump.Main(args...)
+	return nlcounters.Main(args...)
 }
 
 func (cmd) Apropos() map[string]string {
 	return map[string]string{
-		"en_US.UTF-8": "print netlink multicast messages",
+		"en_US.UTF-8": "periodic print of netlink interface counters",
 	}
 }
 
 func (cmd) Help(args ...string) string {
-	return "link | addr | route | neighor | nsid"
+	help := "no help"
+	switch {
+	case len(args) == 0:
+		help = "[-i SECONDS]"
+	case args[0] == "-i":
+		return "SECONDS"
+	}
+	return help
 }

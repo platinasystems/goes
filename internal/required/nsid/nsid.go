@@ -2,108 +2,99 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// +build linux
-
-// Package `nsid` provides a List, Set and Unset of network namespace
-// identifiers.
 package nsid
 
-import "fmt"
+import (
+	"io/ioutil"
+	"strings"
 
-const VarRunNetns = "/var/run/netns"
+	"github.com/platinasystems/go/internal/netlink/nsid"
+)
 
-type Entry struct {
-	Name string
-	Id   int32
-	Pid  uint32
+const Name = "nsid"
+
+type cmd struct{}
+
+func New() cmd { return cmd{} }
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return nsid.Usage }
+
+func (cmd) Main(args ...string) error {
+	return nsid.Main(args...)
 }
 
-type nsid struct {
-	seq uint32
-}
-
-func New() *nsid { return &nsid{} }
-
-func (nsid *nsid) String() string { return "nsid" }
-
-func (nsid *nsid) Usage() string {
-	return `nsid [list]
-	nsid set NAME ID
-	nsid unset NAME ID`
-}
-
-func (nsid *nsid) Main(args ...string) error {
-	cmd := "list"
-	if len(args) > 0 {
-		cmd = args[0]
-	}
-	setf := nsid.Unset
-	switch cmd {
-	case "list":
-		list, err := nsid.List()
-		if err != nil {
-			return err
-		}
-		for _, entry := range list {
-			fmt.Print(entry.Name, ": ", entry.Id, "\n")
-		}
-	case "set":
-		setf = nsid.Set
-		fallthrough
-	case "unset":
-		if len(args) < 2 {
-			return fmt.Errorf("NAME: missing")
-		}
-		name := args[1]
-		if len(args) < 3 {
-			return fmt.Errorf("ID: missing")
-		}
-		var id int32
-		if _, err := fmt.Sscan(args[2], &id); err != nil {
-			return fmt.Errorf("%s: %v", args[2], err)
-		}
-		return setf(name, id)
-	case "apropos", "-apropos", "--apropos":
-		fmt.Println(nsid.Apropos())
-	case "complete", "-complete", "--complete":
-		for _, s := range nsid.Complete(args[1:]...) {
-			fmt.Println(s)
-		}
-	case "help", "-h", "-help", "--help":
-		if len(args) > 1 {
-			fmt.Println(nsid.Help(args[1:]...))
-			break
-		}
-		fallthrough
-	case "usage", "-usage", "--usage":
-		fmt.Print("usage:\t", nsid.Usage(), "\n")
-	case "man", "-man", "--man":
-		fmt.Println(nsid.Man())
-	default:
-		return fmt.Errorf("%s: command not found\nusage:\t%s", cmd,
-			nsid.Usage())
-	}
-	return nil
-}
-
-func (*nsid) Apropos() map[string]string {
+func (cmd) Apropos() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": "net namespace identifier config",
 	}
 }
 
-func (*nsid) Man() map[string]string {
+func (cmd) Complete(args ...string) (c []string) {
+	var cmds = []string{
+		"list",
+		"set",
+		"unset",
+	}
+	if len(args) > 0 && strings.HasSuffix(args[0], "nsid") {
+		args = args[1:]
+	}
+	switch len(args) {
+	case 0:
+		c = cmds
+	case 1:
+		for _, cmd := range cmds {
+			if strings.HasPrefix(cmd, args[0]) {
+				c = append(c, cmd)
+			}
+		}
+	default:
+		lastarg := args[len(args)-1]
+		dir, err := ioutil.ReadDir(nsid.VarRunNetns)
+		if err != nil {
+			break
+		}
+		for _, info := range dir {
+			name := info.Name()
+			if strings.HasPrefix(name, lastarg) {
+				c = append(c, name)
+			}
+		}
+	}
+	return
+}
+
+func (cmd) Help(args ...string) string {
+	help := "no help"
+	switch {
+	case len(args) == 0:
+		help = "list | set | unset"
+	case args[0] == "list":
+		return "NAME"
+	case args[0] == "set", args[0] == "unset":
+		switch len(args) {
+		case 1:
+			help = "NAME"
+		case 2:
+			help = "ID"
+		}
+	}
+	return help
+}
+
+func (cmd) Man() map[string]string {
 	return map[string]string{
 		"en_US.UTF-8": `NAME
 	nsid - net namespace identifier config
 
 SYNOPSIS
-	nsid [list]
+	nsid [list [NAME]...]
 	nsid set NAME ID
 	nsid unet NAME ID
 
 DESCRIPTION
-	[list]	show the identifier of each network namespace with "-1"
+	[list [NAME]...]
+		show the identifier of each network namespace with "-1"
 		indicating an unidentifeid namespace.
 
 	set	set the namespace identifier

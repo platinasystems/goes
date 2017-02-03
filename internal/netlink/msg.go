@@ -6,6 +6,7 @@ package netlink
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"runtime"
@@ -17,17 +18,29 @@ import (
 	"github.com/platinasystems/go/internal/indent"
 )
 
+var ErrBufSz = errors.New("undersized buffer")
+
 type Byter interface {
 	Bytes() []byte
 }
 
 type Message interface {
-	netlinkMessage()
-	MsgType() MsgType
+	// The Message Closer returns itself to its respective pool.
 	io.Closer
-	Parse([]byte)
+
+	MsgType() MsgType
+	Nsid() *int
+
+	// The Message Reader stores itself in a given byte buffer.
+	io.Reader
+
+	// The Message Stringer returns itself as a formatted string.
 	fmt.Stringer
-	TxAdd(*Socket)
+
+	// The Message Writer loads itself from a given byte buffer.
+	io.Writer
+
+	// The Message WriterTo string formats itself into the given writer.
 	io.WriterTo
 }
 
@@ -54,11 +67,30 @@ type Header struct {
 	Pid      uint32
 }
 
-const SizeofHeader = 16
+const SizeofHeader = 4 + SizeofMsgType + SizeofHeaderFlags + 4 + 4
+
+func (h *Header) MsgType() MsgType { return h.Type }
+
+func (h *Header) Read(b []byte) (int, error) {
+	if len(b) < SizeofHeader {
+		return 0, ErrBufSz
+	}
+	*(*Header)(unsafe.Pointer(&b[0])) = *h
+	return SizeofHeader, nil
+}
 
 func (h *Header) String() string {
 	return StringOf(h)
 }
+
+func (h *Header) Write(b []byte) (int, error) {
+	if len(b) < SizeofHeader {
+		return 0, ErrBufSz
+	}
+	*h = *(*Header)(unsafe.Pointer(&b[0]))
+	return SizeofHeader, nil
+}
+
 func (h *Header) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
@@ -70,58 +102,65 @@ func (h *Header) WriteTo(w io.Writer) (int64, error) {
 	}
 	return acc.Tuple()
 }
-func (h *Header) MsgType() MsgType { return h.Type }
-
-type GenMessage struct {
-	Nsid int
-	GenMessageActual
-}
-
-type GenMessageActual struct {
-	Header
-	AddressFamily
-}
-
-const SizeofGenMessage = SizeofHeader + SizeofGenmsg
-const SizeofGenmsg = SizeofAddressFamily
 
 func NewGenMessage() *GenMessage {
 	m := pool.GenMessage.Get().(*GenMessage)
 	runtime.SetFinalizer(m, (*GenMessage).Close)
+	m.nsid = -1
 	return m
 }
 
-func NewGenMessageBytes(b []byte, nsid int) *GenMessage {
-	m := NewGenMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
+type GenMessage struct {
+	nsid int
+	Header
+	Genmsg
 }
 
-func (m *GenMessage) netlinkMessage() {}
+const SizeofGenMessage = SizeofHeader + SizeofGenmsg
+
+type Genmsg struct {
+	AddressFamily
+}
+
+const SizeofGenmsg = SizeofAddressFamily
+
 func (m *GenMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
 	repool(m)
 	return nil
 }
-func (m *GenMessage) Parse(b []byte) {
-	m.GenMessageActual = *(*GenMessageActual)(unsafe.Pointer(&b[0]))
+
+func (m *GenMessage) Nsid() *int { return &m.nsid }
+
+func (m *GenMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofGenMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*Genmsg)(unsafe.Pointer(&b[n])) = m.Genmsg
+	n += SizeofGenmsg
+	return n, nil
 }
-func (m *GenMessage) String() string {
-	return StringOf(m)
+
+func (m *GenMessage) String() string { return StringOf(m) }
+
+func (m *GenMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofGenMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.Genmsg = *(*Genmsg)(unsafe.Pointer(&b[n]))
+	n += SizeofGenmsg
+	return n, nil
 }
-func (m *GenMessage) TxAdd(s *Socket) {
-	b := s.TxAddReq(&m.Header, SizeofGenmsg)
-	p := (*GenMessageActual)(unsafe.Pointer(&b[0]))
-	p.AddressFamily = m.AddressFamily
-}
+
 func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "family:", m.AddressFamily)
@@ -130,11 +169,7 @@ func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type NoopMessage struct {
-	Nsid int
-	NoopMessageActual
-}
-
-type NoopMessageActual struct {
+	nsid int
 	Header
 }
 
@@ -143,40 +178,41 @@ const SizeofNoopMessage = SizeofHeader
 func NewNoopMessage() *NoopMessage {
 	m := pool.NoopMessage.Get().(*NoopMessage)
 	runtime.SetFinalizer(m, (*NoopMessage).Close)
+	m.nsid = -1
 	return m
 }
 
-func NewNoopMessageBytes(b []byte, nsid int) *NoopMessage {
-	m := NewNoopMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *NoopMessage) netlinkMessage() {}
 func (m *NoopMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
 	repool(m)
 	return nil
 }
-func (m *NoopMessage) Parse(b []byte) {
-	m.NoopMessageActual = *(*NoopMessageActual)(unsafe.Pointer(&b[0]))
+
+func (m *NoopMessage) Nsid() *int { return &m.nsid }
+
+func (m *NoopMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofNoopMessage {
+		return 0, ErrBufSz
+	}
+	return m.Header.Read(b)
 }
-func (m *NoopMessage) String() string {
-	return StringOf(m)
+
+func (m *NoopMessage) String() string { return StringOf(m) }
+
+func (m *NoopMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofNoopMessage {
+		return 0, ErrBufSz
+	}
+	return m.Header.Write(b)
 }
-func (m *NoopMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	m.Header.Type = NLMSG_NOOP
-	s.TxAddReq(&m.Header, 0)
-}
+
 func (m *NoopMessage) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	indent.Decrease(acc)
@@ -184,11 +220,7 @@ func (m *NoopMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type DoneMessage struct {
-	Nsid int
-	DoneMessageActual
-}
-
-type DoneMessageActual struct {
+	nsid int
 	Header
 }
 
@@ -197,40 +229,41 @@ const SizeofDoneMessage = SizeofHeader
 func NewDoneMessage() *DoneMessage {
 	m := pool.DoneMessage.Get().(*DoneMessage)
 	runtime.SetFinalizer(m, (*DoneMessage).Close)
+	m.nsid = -1
 	return m
 }
 
-func NewDoneMessageBytes(b []byte, nsid int) *DoneMessage {
-	m := NewDoneMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *DoneMessage) netlinkMessage() {}
 func (m *DoneMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
 	repool(m)
 	return nil
 }
-func (m *DoneMessage) String() string {
-	return StringOf(m)
+
+func (m *DoneMessage) Nsid() *int { return &m.nsid }
+
+func (m *DoneMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofDoneMessage {
+		return 0, ErrBufSz
+	}
+	return m.Header.Read(b)
 }
-func (m *DoneMessage) Parse(b []byte) {
-	m.DoneMessageActual = *(*DoneMessageActual)(unsafe.Pointer(&b[0]))
+
+func (m *DoneMessage) String() string { return StringOf(m) }
+
+func (m *DoneMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofDoneMessage {
+		return 0, ErrBufSz
+	}
+	return m.Header.Write(b)
 }
-func (m *DoneMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	m.Header.Type = NLMSG_NOOP
-	s.TxAddReq(&m.Header, 0)
-}
+
 func (m *DoneMessage) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	indent.Decrease(acc)
@@ -238,60 +271,66 @@ func (m *DoneMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type ErrorMessage struct {
-	Nsid int
-	ErrorMessageActual
+	nsid int
+	Header
+	Errormsg
 }
 
-type ErrorMessageActual struct {
-	Header
+const SizeofErrorMessage = SizeofHeader + SizeofErrormsg
+
+type Errormsg struct {
 	// Unix errno for error.
 	Errno int32
 	// Header for message with error.
 	Req Header
 }
 
-const SizeofErrorMessage = SizeofHeader + 4 + SizeofHeader
+const SizeofErrormsg = 4 + SizeofHeader
 
 func NewErrorMessage() *ErrorMessage {
 	m := pool.ErrorMessage.Get().(*ErrorMessage)
 	runtime.SetFinalizer(m, (*ErrorMessage).Close)
+	m.nsid = -1
 	return m
 }
 
-func NewErrorMessageBytes(b []byte, nsid int) *ErrorMessage {
-	m := NewErrorMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *ErrorMessage) netlinkMessage() {}
 func (m *ErrorMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
 	repool(m)
 	return nil
 }
-func (m *ErrorMessage) Parse(b []byte) {
-	m.ErrorMessageActual = *(*ErrorMessageActual)(unsafe.Pointer(&b[0]))
+
+func (m *ErrorMessage) Nsid() *int { return &m.nsid }
+
+func (m *ErrorMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofErrorMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*Errormsg)(unsafe.Pointer(&b[n])) = m.Errormsg
+	n += SizeofErrormsg
+	return n, nil
 }
-func (m *ErrorMessage) String() string {
-	return StringOf(m)
+
+func (m *ErrorMessage) String() string { return StringOf(m) }
+
+func (m *ErrorMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofErrorMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.Errormsg = *(*Errormsg)(unsafe.Pointer(&b[n]))
+	n += SizeofErrormsg
+	return n, nil
 }
-func (m *ErrorMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	m.Header.Type = NLMSG_ERROR
-	b := s.TxAddReq(&m.Header, 4+SizeofHeader)
-	e := (*ErrorMessageActual)(unsafe.Pointer(&b[0]))
-	e.Errno = m.Errno
-	e.Req = m.Req
-}
+
 func (m *ErrorMessage) WriteTo(w io.Writer) (int64, error) {
 	acc := accumulate.New(w)
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "error:", syscall.Errno(-m.Errno))
@@ -304,11 +343,7 @@ func (m *ErrorMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type IfInfoMessage struct {
-	Nsid int
-	IfInfoMessageActual
-}
-
-type IfInfoMessageActual struct {
+	nsid int
 	Header
 	IfInfomsg
 	Attrs [IFLA_MAX]Attr
@@ -330,17 +365,9 @@ const SizeofIfInfomsg = 16
 func NewIfInfoMessage() *IfInfoMessage {
 	m := pool.IfInfoMessage.Get().(*IfInfoMessage)
 	runtime.SetFinalizer(m, (*IfInfoMessage).Close)
+	m.nsid = -1
 	return m
 }
-
-func NewIfInfoMessageBytes(b []byte, nsid int) *IfInfoMessage {
-	m := NewIfInfoMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *IfInfoMessage) netlinkMessage() {}
 
 func (m *IfInfoMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
@@ -349,17 +376,35 @@ func (m *IfInfoMessage) Close() error {
 	return nil
 }
 
-func (m *IfInfoMessage) Parse(b []byte) {
-	p := (*IfInfoMessageActual)(unsafe.Pointer(&b[0]))
-	m.Header = p.Header
-	m.IfInfomsg = p.IfInfomsg
-	b = b[SizeofIfInfoMessage:]
-	for i := 0; i < len(b); {
-		n, v, next_i := nextAttr(b, i)
-		i = next_i
-		switch t := IfInfoAttrKind(n.Kind()); t {
+func (m *IfInfoMessage) Nsid() *int { return &m.nsid }
+
+func (m *IfInfoMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofIfInfoMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*IfInfomsg)(unsafe.Pointer(&b[n])) = m.IfInfomsg
+	n += SizeofIfInfomsg
+	n += AttrVec(m.Attrs[:]).Set(b[n:])
+	return n, nil
+}
+
+func (m *IfInfoMessage) String() string { return StringOf(m) }
+
+func (m *IfInfoMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofIfInfoMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.IfInfomsg = *(*IfInfomsg)(unsafe.Pointer(&b[n]))
+	n += SizeofIfInfomsg
+	for n < len(b) {
+		a, v, next := nextAttr(b, n)
+		n = next
+		k := IfInfoAttrKind(a.Kind())
+		switch k {
 		case IFLA_IFNAME, IFLA_QDISC:
-			m.Attrs[t] = StringAttrBytes(v[:len(v)-1])
+			m.Attrs[k] = StringAttrBytes(v[:len(v)-1])
 		case IFLA_MTU, IFLA_LINK, IFLA_MASTER,
 			IFLA_WEIGHT,
 			IFLA_NET_NS_PID, IFLA_NET_NS_FD, IFLA_LINK_NETNSID,
@@ -368,41 +413,29 @@ func (m *IfInfoMessage) Parse(b []byte) {
 			IFLA_GSO_MAX_SEGS, IFLA_GSO_MAX_SIZE,
 			IFLA_CARRIER_CHANGES,
 			IFLA_GROUP:
-			m.Attrs[t] = Uint32AttrBytes(v)
+			m.Attrs[k] = Uint32AttrBytes(v)
 		case IFLA_CARRIER, IFLA_LINKMODE, IFLA_PROTO_DOWN:
-			m.Attrs[t] = Uint8Attr(v[0])
+			m.Attrs[k] = Uint8Attr(v[0])
 		case IFLA_OPERSTATE:
-			m.Attrs[t] = IfOperState(v[0])
+			m.Attrs[k] = IfOperState(v[0])
 		case IFLA_STATS:
-			m.Attrs[t] = NewLinkStatsBytes(v)
+			m.Attrs[k] = NewLinkStatsBytes(v)
 		case IFLA_STATS64:
-			m.Attrs[t] = NewLinkStats64Bytes(v)
+			m.Attrs[k] = NewLinkStats64Bytes(v)
 		case IFLA_AF_SPEC:
-			m.Attrs[t] = parse_af_spec(v, n.kind)
+			m.Attrs[k] = parse_af_spec(v)
 		case IFLA_ADDRESS, IFLA_BROADCAST:
-			m.Attrs[t] = afAddr(AF_UNSPEC, v)
+			m.Attrs[k] = afAddr(AF_UNSPEC, v)
 		case IFLA_MAP:
 		default:
-			if t < IFLA_MAX {
-				m.Attrs[t] = NewHexStringAttrBytes(v)
+			if k < IFLA_MAX {
+				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown IfInfoMessage attr", t))
+				return n, fmt.Errorf("%#v: unknown attr", k)
 			}
 		}
 	}
-}
-
-func (m *IfInfoMessage) String() string {
-	return StringOf(m)
-}
-
-func (m *IfInfoMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	as := AttrVec(m.Attrs[:])
-	b := s.TxAddReq(&m.Header, SizeofIfInfomsg+as.Size())
-	i := (*IfInfoMessageActual)(unsafe.Pointer(&b[0]))
-	i.IfInfomsg = m.IfInfomsg
-	as.Set(b[SizeofIfInfoMessage:])
+	return n, nil
 }
 
 func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
@@ -410,8 +443,8 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
@@ -427,11 +460,7 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type IfAddrMessage struct {
-	Nsid int
-	IfAddrMessageActual
-}
-
-type IfAddrMessageActual struct {
+	nsid int
 	Header
 	IfAddrmsg
 	Attrs [IFA_MAX]Attr
@@ -452,17 +481,9 @@ const SizeofIfAddrmsg = 8
 func NewIfAddrMessage() *IfAddrMessage {
 	m := pool.IfAddrMessage.Get().(*IfAddrMessage)
 	runtime.SetFinalizer(m, (*IfAddrMessage).Close)
+	m.nsid = -1
 	return m
 }
-
-func NewIfAddrMessageBytes(b []byte, nsid int) *IfAddrMessage {
-	m := NewIfAddrMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *IfAddrMessage) netlinkMessage() {}
 
 func (m *IfAddrMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
@@ -471,15 +492,32 @@ func (m *IfAddrMessage) Close() error {
 	return nil
 }
 
-func (m *IfAddrMessage) Parse(b []byte) {
-	p := (*IfAddrMessageActual)(unsafe.Pointer(&b[0]))
-	m.Header = p.Header
-	m.IfAddrmsg = p.IfAddrmsg
-	b = b[SizeofIfAddrMessage:]
-	for i := 0; i < len(b); {
-		n, v, next_i := nextAttr(b, i)
-		i = next_i
-		k := IfAddrAttrKind(n.Kind())
+func (m *IfAddrMessage) Nsid() *int { return &m.nsid }
+
+func (m *IfAddrMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofIfAddrMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*IfAddrmsg)(unsafe.Pointer(&b[n])) = m.IfAddrmsg
+	n += SizeofIfAddrmsg
+	n += AttrVec(m.Attrs[:]).Set(b[n:])
+	return n, nil
+}
+
+func (m *IfAddrMessage) String() string { return StringOf(m) }
+
+func (m *IfAddrMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofIfAddrMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.IfAddrmsg = *(*IfAddrmsg)(unsafe.Pointer(&b[n]))
+	n += SizeofIfAddrmsg
+	for n < len(b) {
+		a, v, next := nextAttr(b, n)
+		n = next
+		k := IfAddrAttrKind(a.Kind())
 		switch k {
 		case IFA_LABEL:
 			m.Attrs[k] = StringAttrBytes(v[:len(v)-1])
@@ -494,24 +532,11 @@ func (m *IfAddrMessage) Parse(b []byte) {
 			if k < IFA_MAX {
 				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown IfAddrMessage attr", k))
+				return n, fmt.Errorf("%#v: unknown attr", k)
 			}
 		}
 	}
-	return
-}
-
-func (m *IfAddrMessage) String() string {
-	return StringOf(m)
-}
-
-func (m *IfAddrMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	as := AttrVec(m.Attrs[:])
-	b := s.TxAddReq(&m.Header, SizeofIfAddrmsg+as.Size())
-	i := (*IfAddrMessageActual)(unsafe.Pointer(&b[0]))
-	i.IfAddrmsg = m.IfAddrmsg
-	as.Set(b[SizeofIfAddrMessage:])
+	return n, nil
 }
 
 func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
@@ -519,8 +544,8 @@ func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
@@ -534,11 +559,7 @@ func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type RouteMessage struct {
-	Nsid int
-	RouteMessageActual
-}
-
-type RouteMessageActual struct {
+	nsid int
 	Header
 	Rtmsg
 	Attrs [RTA_MAX]Attr
@@ -563,17 +584,9 @@ const SizeofRtmsg = 12
 func NewRouteMessage() *RouteMessage {
 	m := pool.RouteMessage.Get().(*RouteMessage)
 	runtime.SetFinalizer(m, (*RouteMessage).Close)
+	m.nsid = -1
 	return m
 }
-
-func NewRouteMessageBytes(b []byte, nsid int) *RouteMessage {
-	m := NewRouteMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *RouteMessage) netlinkMessage() {}
 
 func (m *RouteMessage) Close() error {
 	runtime.SetFinalizer(m, nil)
@@ -582,15 +595,32 @@ func (m *RouteMessage) Close() error {
 	return nil
 }
 
-func (m *RouteMessage) Parse(b []byte) {
-	p := (*RouteMessageActual)(unsafe.Pointer(&b[0]))
-	m.Header = p.Header
-	m.Rtmsg = p.Rtmsg
-	b = b[SizeofRouteMessage:]
-	for i := 0; i < len(b); {
-		n, v, next_i := nextAttr(b, i)
-		i = next_i
-		k := RouteAttrKind(n.Kind())
+func (m *RouteMessage) Nsid() *int { return &m.nsid }
+
+func (m *RouteMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofRouteMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*Rtmsg)(unsafe.Pointer(&b[n])) = m.Rtmsg
+	n += SizeofRtmsg
+	n += AttrVec(m.Attrs[:]).Set(b[n:])
+	return n, nil
+}
+
+func (m *RouteMessage) String() string { return StringOf(m) }
+
+func (m *RouteMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofRouteMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.Rtmsg = *(*Rtmsg)(unsafe.Pointer(&b[n]))
+	n += SizeofRtmsg
+	for n < len(b) {
+		a, v, next := nextAttr(b, n)
+		n = next
+		k := RouteAttrKind(a.Kind())
 		switch k {
 		case RTA_DST, RTA_SRC, RTA_PREFSRC, RTA_GATEWAY:
 			m.Attrs[k] = afAddr(AddressFamily(m.Family), v)
@@ -606,24 +636,11 @@ func (m *RouteMessage) Parse(b []byte) {
 			if k < RTA_MAX {
 				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown RouteMessage attr", k))
+				return n, fmt.Errorf("%#v: unknown attr", k)
 			}
 		}
 	}
-	return
-}
-
-func (m *RouteMessage) String() string {
-	return StringOf(m)
-}
-
-func (m *RouteMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	as := AttrVec(m.Attrs[:])
-	b := s.TxAddReq(&m.Header, SizeofRtmsg+as.Size())
-	i := (*RouteMessageActual)(unsafe.Pointer(&b[0]))
-	i.Rtmsg = m.Rtmsg
-	as.Set(b[SizeofRouteMessage:])
+	return n, nil
 }
 
 func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
@@ -631,8 +648,8 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "family:", AddressFamily(m.Family))
@@ -652,11 +669,7 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type NeighborMessage struct {
-	Nsid int
-	NeighborMessageActual
-}
-
-type NeighborMessageActual struct {
+	nsid int
 	Header
 	Ndmsg
 	Attrs [NDA_MAX]Attr
@@ -678,17 +691,9 @@ const SizeofNdmsg = 12
 func NewNeighborMessage() *NeighborMessage {
 	m := pool.NeighborMessage.Get().(*NeighborMessage)
 	runtime.SetFinalizer(m, (*NeighborMessage).Close)
+	m.nsid = -1
 	return m
 }
-
-func NewNeighborMessageBytes(b []byte, nsid int) *NeighborMessage {
-	m := NewNeighborMessage()
-	m.Nsid = nsid
-	m.Parse(b)
-	return m
-}
-
-func (m *NeighborMessage) netlinkMessage() {}
 
 func (m *NeighborMessage) AttrBytes(kind NeighborAttrKind) []byte {
 	return m.Attrs[kind].(Byter).Bytes()
@@ -701,15 +706,32 @@ func (m *NeighborMessage) Close() error {
 	return nil
 }
 
-func (m *NeighborMessage) Parse(b []byte) {
-	p := (*NeighborMessageActual)(unsafe.Pointer(&b[0]))
-	m.Header = p.Header
-	m.Ndmsg = p.Ndmsg
-	b = b[SizeofNeighborMessage:]
-	for i := 0; i < len(b); {
-		n, v, next_i := nextAttr(b, i)
-		i = next_i
-		k := NeighborAttrKind(n.Kind())
+func (m *NeighborMessage) Nsid() *int { return &m.nsid }
+
+func (m *NeighborMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofNeighborMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*Ndmsg)(unsafe.Pointer(&b[n])) = m.Ndmsg
+	n += SizeofNdmsg
+	n += AttrVec(m.Attrs[:]).Set(b[n:])
+	return n, nil
+}
+
+func (m *NeighborMessage) String() string { return StringOf(m) }
+
+func (m *NeighborMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofNeighborMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.Ndmsg = *(*Ndmsg)(unsafe.Pointer(&b[n]))
+	n += SizeofNdmsg
+	for n < len(b) {
+		a, v, next := nextAttr(b, n)
+		n = next
+		k := NeighborAttrKind(a.Kind())
 		switch k {
 		case NDA_DST:
 			m.Attrs[k] = afAddr(AddressFamily(m.Family), v)
@@ -726,24 +748,11 @@ func (m *NeighborMessage) Parse(b []byte) {
 			if k < NDA_MAX {
 				m.Attrs[k] = NewHexStringAttrBytes(v)
 			} else {
-				panic(fmt.Errorf("%#v: unknown NeighborMessage attr", k))
+				return 0, fmt.Errorf("%#v: unknown attr", k)
 			}
 		}
 	}
-	return
-}
-
-func (m *NeighborMessage) String() string {
-	return StringOf(m)
-}
-
-func (m *NeighborMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	as := AttrVec(m.Attrs[:])
-	b := s.TxAddReq(&m.Header, SizeofNdmsg+as.Size())
-	i := (*NeighborMessageActual)(unsafe.Pointer(&b[0]))
-	i.Ndmsg = m.Ndmsg
-	as.Set(b[SizeofNeighborMessage:])
+	return n, nil
 }
 
 func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
@@ -751,8 +760,8 @@ func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.Nsid != -1 {
-		fmt.Fprintln(acc, "nsid:", m.Nsid)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
@@ -768,24 +777,26 @@ func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
 }
 
 type NetnsMessage struct {
+	nsid int
 	Header
-	AddressFamily
+	Netnsmsg
 	Attrs [NETNSA_MAX]Attr
 }
 
+const SizeofNetnsMessage = SizeofHeader + SizeofNetnsmsg
+
+type Netnsmsg struct {
+	AddressFamily
+	_ [NetnsPad]byte
+}
+
+const SizeofNetnsmsg = SizeofAddressFamily + NetnsPad
 const NetnsPad = 3
-const SizeofNetnsmsg = SizeofGenmsg + NetnsPad
-const SizeofNetnsMessage = SizeofGenMessage + NetnsPad
 
 func NewNetnsMessage() *NetnsMessage {
 	m := pool.NetnsMessage.Get().(*NetnsMessage)
 	runtime.SetFinalizer(m, (*NetnsMessage).Close)
-	return m
-}
-
-func NewNetnsMessageBytes(b []byte) *NetnsMessage {
-	m := NewNetnsMessage()
-	m.Parse(b)
+	m.nsid = -1
 	return m
 }
 
@@ -801,8 +812,6 @@ func (m *NetnsMessage) FD() uint32 {
 	return m.Attrs[NETNSA_FD].(Uint32Attr).Uint()
 }
 
-func (m *NetnsMessage) netlinkMessage() {}
-
 func (m *NetnsMessage) AttrBytes(kind NetnsAttrKind) []byte {
 	return m.Attrs[kind].(Byter).Bytes()
 }
@@ -814,18 +823,35 @@ func (m *NetnsMessage) Close() error {
 	return nil
 }
 
-func (m *NetnsMessage) Parse(b []byte) {
-	p := (*NetnsMessage)(unsafe.Pointer(&b[0]))
-	m.Header = p.Header
-	m.AddressFamily = p.AddressFamily
-	b = b[SizeofNetnsMessage:]
+func (m *NetnsMessage) Nsid() *int { return &m.nsid }
+
+func (m *NetnsMessage) Read(b []byte) (int, error) {
+	if len(b) < SizeofNetnsMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Read(b)
+	*(*Netnsmsg)(unsafe.Pointer(&b[n])) = m.Netnsmsg
+	n += SizeofNetnsmsg
+	n += AttrVec(m.Attrs[:]).Set(b[n:])
+	return n, nil
+}
+
+func (m *NetnsMessage) String() string { return StringOf(m) }
+
+func (m *NetnsMessage) Write(b []byte) (int, error) {
+	if len(b) < SizeofNetnsMessage {
+		return 0, ErrBufSz
+	}
+	n, _ := m.Header.Write(b)
+	m.Netnsmsg = *(*Netnsmsg)(unsafe.Pointer(&b[n]))
+	n += SizeofNetnsmsg
 	m.Attrs[NETNSA_NSID] = Int32Attr(-2)
 	m.Attrs[NETNSA_PID] = Uint32Attr(0)
 	m.Attrs[NETNSA_FD] = Uint32Attr(^uint32(0))
-	for i := 0; i < len(b); {
-		n, v, next_i := nextAttr(b, i)
-		i = next_i
-		k := NetnsAttrKind(n.Kind())
+	for n < len(b) {
+		a, v, next := nextAttr(b, n)
+		n = next
+		k := NetnsAttrKind(a.Kind())
 		switch k {
 		case NETNSA_NONE:
 		case NETNSA_NSID:
@@ -833,22 +859,10 @@ func (m *NetnsMessage) Parse(b []byte) {
 		case NETNSA_PID, NETNSA_FD:
 			m.Attrs[k] = Uint32AttrBytes(v)
 		default:
-			panic(fmt.Errorf("%#v: unknown NetnsMessage attr", k))
+			return n, fmt.Errorf("%#v: unknown attr", k)
 		}
 	}
-	return
-}
-
-func (m *NetnsMessage) String() string {
-	return StringOf(m)
-}
-
-func (m *NetnsMessage) TxAdd(s *Socket) {
-	defer m.Close()
-	as := AttrVec(m.Attrs[:])
-	b := s.TxAddReq(&m.Header, SizeofNetnsmsg+as.Size())
-	b[SizeofHeader] = byte(m.AddressFamily)
-	as.Set(b[SizeofNetnsMessage:])
+	return n, nil
 }
 
 func (m *NetnsMessage) WriteTo(w io.Writer) (int64, error) {
@@ -856,6 +870,9 @@ func (m *NetnsMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
+	if m.nsid != -1 {
+		fmt.Fprintln(acc, "nsid:", m.nsid)
+	}
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "family:", m.AddressFamily)
 	fprintAttrs(acc, netnsAttrKindNames, m.Attrs[:])

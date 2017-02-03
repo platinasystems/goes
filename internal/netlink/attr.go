@@ -90,13 +90,13 @@ func nextAttr(b []byte, i int) (n *NlAttr, v []byte, j int) {
 	return
 }
 
-func parse_af_spec(b []byte, kind uint16) *AttrArray {
+func parse_af_spec(b []byte) *AttrArray {
 	as := pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewAddressFamilyAttrType()
 	for i := 0; i < len(b); {
-		n, v, next_i := nextAttr(b, i)
-		i = next_i
-		af := AddressFamily(n.Kind())
+		a, v, next := nextAttr(b, i)
+		i = next
+		af := AddressFamily(a.Kind())
 		as.X.Validate(uint(af))
 		switch af {
 		case AF_INET:
@@ -170,8 +170,7 @@ func (a AttrVec) Size() (l int) {
 	return
 }
 
-func (a AttrVec) Set(v []byte) {
-	vi := 0
+func (a AttrVec) Set(v []byte) (vi int) {
 	for i := range a {
 		if a[i] == nil {
 			continue
@@ -188,6 +187,7 @@ func (a AttrVec) Set(v []byte) {
 		a[i].Set(v[vi+SizeofNlAttr : vi+SizeofNlAttr+s])
 		vi += SizeofNlAttr + attrAlignLen(s)
 	}
+	return
 }
 
 type AttrArray struct {

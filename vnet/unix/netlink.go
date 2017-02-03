@@ -5,6 +5,10 @@
 package unix
 
 import (
+	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
@@ -12,10 +16,6 @@ import (
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
-
-	"fmt"
-	"strings"
-	"sync"
 )
 
 type unreachable_ip4_next_hop map[ip4.Prefix]struct{}
@@ -37,7 +37,6 @@ type netlinkMain struct {
 	loop.Node
 	m                         *Main
 	s                         *netlink.Socket
-	c                         chan netlink.Message
 	e                         *netlinkEvent
 	eventPool                 sync.Pool
 	add_del_chan              chan netlink_add_del
@@ -117,10 +116,8 @@ func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
 		ok = m.knownInterface(uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr)))
 	case *netlink.NeighborMessage:
 		ok = m.knownInterface(v.Index)
-	case *netlink.DoneMessage, *netlink.ErrorMessage:
-		ok = false // ignore done/error messages
 	default:
-		panic("unknown netlink message")
+		ok = false // ignore done/error and other messages
 	}
 	return
 }
@@ -143,14 +140,14 @@ func (m *Main) listener(l *loop.Loop) {
 	nm := &m.netlinkMain
 	for {
 		// Block until next message.
-		msg := <-nm.c
+		msg := <-nm.s.Rx
 		m.addMsg(msg)
 
 		// Read any remaining messages without blocking.
 	loop:
 		for {
 			select {
-			case msg := <-nm.c:
+			case msg := <-nm.s.Rx:
 				m.addMsg(msg)
 			default:
 				break loop
@@ -163,9 +160,20 @@ func (m *Main) listener(l *loop.Loop) {
 }
 
 func (nm *netlinkMain) LoopInit(l *loop.Loop) {
+	mustaddevent := false
 	m4 := ip4.GetMain(nm.m.v)
 	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
-	go nm.s.Listen()
+	err := nm.s.Listen(func(msg netlink.Message) error {
+		nm.m.addMsg(msg)
+		mustaddevent = true
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	if mustaddevent {
+		nm.e.add()
+	}
 	go nm.m.listener(l)
 }
 
@@ -176,11 +184,9 @@ func (nm *netlinkMain) Init(m *Main) (err error) {
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
 	nm.cliInit()
-	nm.c = make(chan netlink.Message, 64)
 	cf := netlink.SocketConfig{
-		Rx: nm.c,
 		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
-		RcvbufBytes: 8 << 20,
+		RxBytes: 8 << 20,
 	}
 	nm.s, err = netlink.NewWithConfig(cf)
 	return

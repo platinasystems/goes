@@ -6,13 +6,20 @@ package netlink
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/platinasystems/go/elib"
 )
 
+func Key(s string) string {
+	return strings.Replace(strings.ToLower(s), " ", "_", -1)
+}
+
 type Empty struct{}
 
 type MsgType uint16
+
+const SizeofMsgType = 2
 
 // Header type field values
 const (
@@ -182,6 +189,8 @@ const (
 )
 
 type HeaderFlags uint16
+
+const SizeofHeaderFlags = 2
 
 const (
 	NLM_F_REQUEST   HeaderFlags = 1  /* It is request message. */

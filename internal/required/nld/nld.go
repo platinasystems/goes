@@ -5,10 +5,11 @@
 package nld
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/rpc"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -30,24 +31,32 @@ const (
 )
 
 type cmd struct {
-	stop chan<- struct{}
-	sock *sockfile.RpcServer
-	info Info
+	Info
 }
 
 type Info struct {
-	mutex     sync.Mutex
-	pub       *publisher.Publisher
-	req       chan<- netlink.Message
-	idx       map[string]uint32
-	dev       map[uint32]*dev
-	efilter   map[uint32]struct{}
-	addrNames [netlink.IFA_MAX]string
-	attrNames [netlink.IFLA_MAX]string
-	statNames [netlink.N_link_stat]string
+	mutex  sync.Mutex
+	nl     *netlink.Socket
+	rpc    *sockfile.RpcServer
+	pub    *publisher.Publisher
+	bynsid map[int]*devidx
+	name   struct {
+		addr [netlink.IFA_MAX]string
+		attr [netlink.IFLA_MAX]string
+		stat [netlink.N_link_stat]string
+	}
+}
 
-	getCountersStop chan<- struct{}
-	getLinkAddrStop chan<- struct{}
+type devidx struct {
+	dev map[uint32]*dev
+	idx map[string]uint32
+}
+
+func newdevidx() *devidx {
+	return &devidx{
+		dev: make(map[uint32]*dev),
+		idx: make(map[string]uint32),
+	}
 }
 
 type dev struct {
@@ -59,6 +68,13 @@ type dev struct {
 	stats  netlink.LinkStats64
 }
 
+func newdev() *dev {
+	return &dev{
+		addrs: make(map[string]string),
+		attrs: make(map[string]string),
+	}
+}
+
 type getAddrReqParm struct {
 	idx uint32
 	af  netlink.AddressFamily
@@ -66,62 +82,118 @@ type getAddrReqParm struct {
 
 func New() *cmd { return &cmd{} }
 
+var kbuf = &bytes.Buffer{}
+
+func newkey(nsid int, vs ...interface{}) string {
+	kbuf.Reset()
+	kbuf.WriteString("nl")
+	if nsid != -1 {
+		fmt.Fprint(kbuf, ".", nsid)
+	}
+	for _, v := range vs {
+		fmt.Fprint(kbuf, ".", v)
+	}
+	return kbuf.String()
+}
+
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
 func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
 	var err error
-	cmd.sock, err = sockfile.NewRpcServer(Name)
+	cmd.nl, err = netlink.New(
+		netlink.RTNLGRP_LINK,
+		netlink.RTNLGRP_IPV4_IFADDR,
+		netlink.RTNLGRP_IPV6_IFADDR)
 	if err != nil {
 		return err
 	}
-	cmd.info.pub, err = publisher.New()
+	cmd.rpc, err = sockfile.NewRpcServer(Name)
+	if err != nil {
+		return err
+	}
+	cmd.pub, err = publisher.New()
 	if err != nil {
 		return err
 	}
 
-	wait := make(chan struct{})
-	cmd.stop = wait
-	cmd.info.idx = make(map[string]uint32)
-	cmd.info.dev = make(map[uint32]*dev)
-	cmd.info.efilter = make(map[uint32]struct{})
+	cmd.bynsid = make(map[int]*devidx)
 
-	for i := range cmd.info.addrNames {
-		s := netlink.IfAddrAttrKind(i).String()
-		lc := strings.ToLower(s)
-		cmd.info.addrNames[i] = strings.Replace(lc, " ", "_", -1)
+	for i := range cmd.name.addr {
+		cmd.name.addr[i] =
+			netlink.Key(netlink.IfAddrAttrKind(i).String())
 	}
-	for i := range cmd.info.attrNames {
-		s := netlink.IfInfoAttrKind(i).String()
-		lc := strings.ToLower(s)
-		cmd.info.attrNames[i] = strings.Replace(lc, " ", "_", -1)
+	for i := range cmd.name.attr {
+		cmd.name.attr[i] =
+			netlink.Key(netlink.IfInfoAttrKind(i).String())
 	}
-	for i := range cmd.info.statNames {
-		s := netlink.LinkStatType(i).String()
-		lc := strings.ToLower(s)
-		cmd.info.statNames[i] = strings.Replace(lc, " ", "_", -1)
+	for i := range cmd.name.stat {
+		cmd.name.stat[i] =
+			netlink.Key(netlink.LinkStatType(i).String())
 	}
 
-	rpc.Register(&cmd.info)
+	rpc.Register(&cmd.Info)
 	err = redis.Assign(redis.DefaultHash+":nl.", Name, "Info")
 	if err != nil {
 		return err
 	}
 
-	cmd.info.getCounters()
-	cmd.info.getLinkAddr()
+	err = cmd.nl.Listen(cmd.handler,
+		netlink.ListenReq{netlink.RTM_GETLINK, netlink.AF_PACKET},
+		netlink.ListenReq{netlink.RTM_GETADDR, netlink.AF_INET},
+		netlink.ListenReq{netlink.RTM_GETADDR, netlink.AF_INET6},
+	)
+	if err != nil {
+		return err
+	}
 
-	<-wait
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	cmd.nl.Getlink()
+	for {
+		select {
+		case <-t.C:
+			cmd.nl.Getlink()
+		case msg, opened := <-cmd.nl.Rx:
+			if !opened {
+				return nil
+			}
+			if err = cmd.handler(msg); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 func (cmd *cmd) Close() error {
-	defer close(cmd.stop)
-	close(cmd.info.getCountersStop)
-	close(cmd.info.getLinkAddrStop)
-	cmd.info.pub.Close()
-	return cmd.sock.Close()
+	var err error
+	for _, c := range []io.Closer{
+		cmd.nl,
+		cmd.rpc,
+		cmd.pub,
+	} {
+		t := c.Close()
+		if err == nil {
+			err = t
+		}
+	}
+	return err
+}
+
+func (cmd *cmd) handler(msg netlink.Message) error {
+	defer msg.Close()
+	switch msg.MsgType() {
+	case netlink.RTM_NEWLINK, netlink.RTM_GETLINK:
+		// FIXME what about RTM_DELLINK and RTM_SETLINK ?
+		cmd.ifInfo(msg.(*netlink.IfInfoMessage))
+	case netlink.RTM_DELADDR:
+		cmd.ifDelAddr(msg.(*netlink.IfAddrMessage))
+	case netlink.RTM_NEWADDR:
+		cmd.ifNewAddr(msg.(*netlink.IfAddrMessage))
+	}
+	return nil
 }
 
 func (info *Info) Hdel(args args.Hset, reply *reply.Hset) error {
@@ -137,22 +209,31 @@ func (info *Info) Hdel(args args.Hset, reply *reply.Hset) error {
 }
 
 func (info *Info) Hset(args args.Hset, reply *reply.Hset) (err error) {
+	nsid := -1
 	a := redis.Split(args.Field)
 	if len(a) > 0 && a[0] == "nl" {
 		a = a[1:]
 	}
+	if len(a) > 0 {
+		_, xerr := fmt.Sscan(a[0], &nsid)
+		if xerr == nil {
+			a = a[1:]
+		} else {
+			nsid = -1
+		}
+	}
 	s := string(args.Value)
 	switch {
 	case len(a) == 1:
-		err = info.newLinkAddr(a[0], s, "", "")
+		err = info.newLinkAddr(nsid, a[0], s, "", "")
 	case strings.ContainsAny(a[1], ".:"):
 		var attr string
 		if len(a) > 2 {
 			attr = a[2]
 		}
-		err = info.newLinkAddr(a[0], a[1], attr, s)
+		err = info.newLinkAddr(nsid, a[0], a[1], attr, s)
 	default:
-		err = info.setLinkAttr(a[0], a[1], s)
+		err = info.setLinkAttr(nsid, a[0], a[1], s)
 	}
 	if err == nil {
 		*reply = 1
@@ -160,49 +241,17 @@ func (info *Info) Hset(args args.Hset, reply *reply.Hset) (err error) {
 	return
 }
 
-// getLinkAddr listens to Netlink multicast groups for link info (besides
-// counters) and address changes.
-func (info *Info) getLinkAddr() {
-	stop := make(chan struct{})
-	info.getLinkAddrStop = stop
-	rxch := make(chan netlink.Message, 1024)
-	sock, err := netlink.New(rxch,
-		netlink.RTNLGRP_LINK,
-		netlink.RTNLGRP_IPV4_IFADDR,
-		netlink.RTNLGRP_IPV6_IFADDR)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-	go func(sock *netlink.Socket, wait <-chan struct{}) {
-		defer sock.Close()
-		<-wait
-	}(sock, stop)
-	go sock.Listen()
-	go func(rxch <-chan netlink.Message) {
-		for msg := range rxch {
-			switch t := msg.(type) {
-			case *netlink.IfInfoMessage:
-				info.ifInfo(t, withoutCounters)
-			case *netlink.IfAddrMessage:
-				switch t.Header.Type {
-				case netlink.RTM_DELADDR:
-					info.ifDelAddr(t)
-				case netlink.RTM_NEWADDR:
-					info.ifNewAddr(t)
-				}
-			}
-			msg.Close()
-		}
-	}(rxch)
-}
-
 func (info *Info) ifDelAddr(msg *netlink.IfAddrMessage) {
 	info.mutex.Lock()
 	defer info.mutex.Unlock()
 
+	nsid := *msg.Nsid()
 	idx := msg.Index
-	dev, found := info.dev[idx]
+	di, found := info.bynsid[nsid]
+	if !found {
+		return
+	}
+	dev, found := di.dev[idx]
 	if !found {
 		return
 	}
@@ -217,12 +266,13 @@ func (info *Info) ifDelAddr(msg *netlink.IfAddrMessage) {
 			continue
 		}
 
-		k := fmt.Sprint(cidr, ".", info.addrNames[i])
+		addr := fmt.Sprint(cidr, ".", info.name.addr[i])
 
-		_, found := dev.addrs[k]
+		_, found := dev.addrs[addr]
 		if found {
-			delete(dev.addrs, k)
-			info.pub.Printf("delete: nl.%s.%s", dev.name, k)
+			delete(dev.addrs, addr)
+			k := newkey(nsid, dev.name, addr)
+			info.pub.Print("delete: ", k)
 		}
 	}
 }
@@ -231,10 +281,17 @@ func (info *Info) ifNewAddr(msg *netlink.IfAddrMessage) {
 	info.mutex.Lock()
 	defer info.mutex.Unlock()
 
+	nsid := *msg.Nsid()
 	idx := msg.Index
-	dev, found := info.dev[idx]
+	di, found := info.bynsid[nsid]
 	if !found {
-		dev = info.newdev(idx)
+		di = newdevidx()
+		info.bynsid[nsid] = di
+	}
+	dev, found := di.dev[idx]
+	if !found {
+		dev = newdev()
+		di.dev[idx] = dev
 	}
 
 	cidr := fmt.Sprint(msg.Attrs[netlink.IFA_ADDRESS], "/", msg.Prefixlen)
@@ -247,86 +304,23 @@ func (info *Info) ifNewAddr(msg *netlink.IfAddrMessage) {
 			continue
 		}
 
-		k := fmt.Sprint(cidr, ".", info.addrNames[i])
+		addr := fmt.Sprint(cidr, ".", info.name.addr[i])
 		s := attr.String()
 
-		as, found := dev.addrs[k]
+		as, found := dev.addrs[addr]
 		if !found || s != as {
-			info.pub.Printf("nl.%s.%s: %s", dev.name, k, s)
-			dev.addrs[k] = s
+			k := newkey(nsid, dev.name, addr)
+			info.pub.Print(k, ": ", s)
+			dev.addrs[addr] = s
 		}
 	}
 }
 
-// getCounters uses a periodic ticker to request link counters.
-// The same request socket is used for SETLINK, NEWADDR and DELADDR.
-func (info *Info) getCounters() {
-	stop := make(chan struct{})
-	info.getCountersStop = stop
-	rxch := make(chan netlink.Message, 1024)
-	sock, err := netlink.New(rxch, netlink.NOOP_RTNLGRP)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-	go sock.Listen(netlink.NoopListenReq)
-	go info.getCounterTicker(sock, stop)
-	go info.getCounterRx(rxch)
-	return
-}
-
-func (info *Info) getCounterTicker(sock *netlink.Socket, wait <-chan struct{}) {
-	defer sock.Close()
-	seq := uint32(1000000)
-	reqch := make(chan netlink.Message, 4)
-	info.req = reqch
-	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			req := netlink.NewGenMessage()
-			req.Header.Type = netlink.RTM_GETLINK
-			req.Header.Flags = netlink.NLM_F_MATCH
-			req.Header.Sequence = seq
-			req.AddressFamily = netlink.AF_UNSPEC
-			seq++
-			req.TxAdd(sock)
-			sock.TxFlush()
-		case req := <-reqch:
-			switch t := req.(type) {
-			case *netlink.IfInfoMessage:
-				t.Header.Sequence = seq
-			case *netlink.IfAddrMessage:
-				t.Header.Sequence = seq
-			}
-			seq++
-			req.TxAdd(sock)
-			sock.TxFlush()
-		case <-wait:
-			return
-		}
-	}
-}
-
-func (info *Info) getCounterRx(rxch <-chan netlink.Message) {
-	for msg := range rxch {
-		switch t := msg.(type) {
-		case *netlink.ErrorMessage:
-			if t.Errno != 0 {
-				info.logerr(t)
-			}
-		case *netlink.IfInfoMessage:
-			info.ifInfo(t, withCounters)
-		}
-		msg.Close()
-	}
-}
-
-func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
+func (info *Info) ifInfo(msg *netlink.IfInfoMessage) {
 	info.mutex.Lock()
 	defer info.mutex.Unlock()
 
+	nsid := *msg.Nsid()
 	idx := uint32(msg.Index)
 
 	var name string
@@ -340,18 +334,24 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 		}
 	}
 
-	dev, found := info.dev[idx]
+	di, found := info.bynsid[nsid]
 	if !found {
-		dev = info.newdev(idx)
+		di = newdevidx()
+		info.bynsid[nsid] = di
+	}
+	dev, found := di.dev[idx]
+	if !found {
+		dev = newdev()
 		dev.name = name
-		info.idx[name] = idx
+		di.dev[idx] = dev
+		di.idx[name] = idx
 	}
 
 	if len(name) > 0 && name != dev.name {
 		// renamed
-		delete(info.idx, dev.name)
+		delete(di.idx, dev.name)
 		dev.name = name
-		info.idx[name] = idx
+		di.idx[name] = idx
 	}
 
 	if dev.family == 0 {
@@ -359,8 +359,6 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 	}
 
 	switch {
-	case counters:
-		// don't import flags from timed counters responses
 	case dev.flags == 0:
 		dev.flags = msg.IfInfomsg.Flags
 	case msg.Change != 0:
@@ -406,18 +404,16 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 		{netlink.IFF_ECHO, "echo", "true"},
 	} {
 		_, found = dev.attrs[flag.name]
-		if counters {
-			// don't import flags from timed counters responses
-		} else if dev.flags&flag.bit == flag.bit {
+		if dev.flags&flag.bit == flag.bit {
 			if !found {
 				dev.attrs[flag.name] = flag.show
-				info.pub.Printf("nl.%s.%s: %s",
-					dev.name, flag.name, flag.show)
+				k := newkey(nsid, dev.name, flag.name)
+				info.pub.Print(k, ": ", flag.show)
 			}
 		} else if found {
 			delete(dev.attrs, flag.name)
-			info.pub.Printf("delete: nl.%s.%s",
-				dev.name, flag.name)
+			k := newkey(nsid, dev.name, flag.name)
+			info.pub.Print("delete: ", k)
 		}
 	}
 	for i, attr := range msg.Attrs {
@@ -425,70 +421,70 @@ func (info *Info) ifInfo(msg *netlink.IfInfoMessage, counters bool) {
 			continue
 		}
 		k := netlink.IfInfoAttrKind(i)
-		aname := info.attrNames[i]
+		aname := info.name.attr[i]
 		switch k {
 		case netlink.IFLA_STATS:
 		case netlink.IFLA_AF_SPEC:
 		case netlink.IFLA_STATS64:
-			if !counters {
-				continue
-			}
 			for i, n := range attr.(*netlink.LinkStats64) {
 				if n > dev.stats[i] {
 					dev.stats[i] = n
-					info.pub.Printf("nl.%s.%s: %v",
-						dev.name, info.statNames[i], n)
+					k := newkey(nsid, dev.name,
+						info.name.stat[i])
+					info.pub.Print(k, ": ", n)
 				}
 			}
 		default:
-			if counters {
-				continue
-			}
 			s := attr.String()
 			as, found := dev.attrs[aname]
 			if !found || s != as {
 				dev.attrs[aname] = s
-				info.pub.Printf("nl.%s.%s: %s",
-					dev.name, aname, s)
+				k := newkey(nsid, dev.name, aname)
+				info.pub.Print(k, ": ", s)
 				break
 			}
 		}
 	}
 }
 
-func (info *Info) logerr(msg *netlink.ErrorMessage) {
-	info.mutex.Lock()
-	defer info.mutex.Unlock()
-
-	seq := msg.Header.Sequence
-	_, found := info.efilter[seq]
-	if !found {
-		fmt.Fprintln(os.Stderr, msg)
-		info.efilter[seq] = struct{}{}
-	}
-}
-
-// args: LINK, CIDR
+// args: [NSID,] LINK, CIDR
 func (info *Info) delLinkAddr(args []string) error {
 	info.mutex.Lock()
 	defer info.mutex.Unlock()
 
-	if len(args) != 2 {
+	var link, cidr string
+	nsid := -1
+
+	switch len(args) {
+	case 2:
+		_, err := fmt.Sscan(args[0], &nsid)
+		if err != nil {
+			return err
+		}
+		link, cidr = args[0], args[1]
+	case 3:
+		link, cidr = args[1], args[2]
+	default:
 		return fmt.Errorf("%v invalid", args)
 	}
 
-	idx, found := info.idx[args[0]]
+	di, found := info.bynsid[nsid]
 	if !found {
-		return fmt.Errorf("%s not found", args[0])
+		return fmt.Errorf("nsid: %d: not found", nsid)
 	}
-	ip, ipnet, err := net.ParseCIDR(args[1])
+	idx, found := di.idx[link]
+	if !found {
+		return fmt.Errorf("link: %s: not found", link)
+	}
+	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return err
 	}
 
 	req := netlink.NewIfAddrMessage()
+	*req.Nsid() = nsid
 	req.Header.Type = netlink.RTM_DELADDR
-	req.Header.Flags = netlink.NLM_F_REPLACE
+	req.Header.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_REPLACE
 	req.IfAddrmsg.Index = idx
 
 	prefixlen, _ := ipnet.Mask.Size()
@@ -504,33 +500,28 @@ func (info *Info) delLinkAddr(args []string) error {
 			netlink.NewIp6AddressBytes(ip[:16])
 	}
 
-	info.req <- req
+	info.nl.Tx <- req
 	return nil
 }
 
-func (info *Info) newdev(idx uint32) *dev {
-	d := &dev{
-		addrs: make(map[string]string),
-		attrs: make(map[string]string),
-	}
-	info.dev[idx] = d
-	return d
-}
-
-func (info *Info) newLinkAddr(link, cidr, attr, value string) error {
+func (info *Info) newLinkAddr(nsid int, link, cidr, attr, value string) error {
 	var addrAttr netlink.Attr
 
 	info.mutex.Lock()
 	defer info.mutex.Unlock()
 
-	idx, found := info.idx[link]
+	di, found := info.bynsid[nsid]
 	if !found {
-		return fmt.Errorf("%s not found", link)
+		return fmt.Errorf("nsid: %d: not found", nsid)
+	}
+	idx, found := di.idx[link]
+	if !found {
+		return fmt.Errorf("link: %s: not found", link)
 	}
 
 	req := netlink.NewIfAddrMessage()
 	req.Header.Type = netlink.RTM_NEWADDR
-	req.Header.Flags = netlink.NLM_F_CREATE
+	req.Header.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_CREATE
 	req.IfAddrmsg.Index = idx
 
 	ip, ipnet, err := net.ParseCIDR(cidr)
@@ -592,23 +583,28 @@ func (info *Info) newLinkAddr(link, cidr, attr, value string) error {
 		return fmt.Errorf("%s: unknown", attr)
 	}
 
-	info.req <- req
+	info.nl.Tx <- req
 	return nil
 }
 
-func (info *Info) setLinkAttr(link, attr, value string) error {
+func (info *Info) setLinkAttr(nsid int, link, attr, value string) error {
 	info.mutex.Lock()
 	defer info.mutex.Unlock()
 
-	idx, found := info.idx[link]
+	di, found := info.bynsid[nsid]
 	if !found {
-		return fmt.Errorf("%s not found", link)
+		return fmt.Errorf("nsid: %d: not found", nsid)
+	}
+	idx, found := di.idx[link]
+	if !found {
+		return fmt.Errorf("link: %s: not found", link)
 	}
 
-	dev := info.dev[idx]
+	dev := di.dev[idx]
 
 	req := netlink.NewIfInfoMessage()
 	req.Header.Type = netlink.RTM_SETLINK
+	req.Header.Flags = netlink.NLM_F_REQUEST
 	req.IfInfomsg.Index = idx
 	req.IfInfomsg.Family = dev.family
 	req.IfInfomsg.Flags = dev.flags
@@ -655,6 +651,6 @@ func (info *Info) setLinkAttr(link, attr, value string) error {
 		return fmt.Errorf("can't set %s", attr)
 	}
 
-	info.req <- req
+	info.nl.Tx <- req
 	return nil
 }

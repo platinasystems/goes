@@ -215,9 +215,10 @@ func (i *Interface) setOperState() {
 	}
 	msg := netlink.NewIfInfoMessage()
 	msg.Header.Type = netlink.RTM_SETLINK
+	msg.Header.Flags = netlink.NLM_F_REQUEST
 	msg.Index = uint32(i.ifindex)
 	msg.Attrs[netlink.IFLA_OPERSTATE] = os
-	i.m.s.Tx(msg)
+	i.m.s.Tx <- msg
 }
 
 func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {

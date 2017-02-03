@@ -5,15 +5,15 @@
 package unix
 
 import (
+	"fmt"
+	"sort"
+	"time"
+
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
-
-	"fmt"
-	"sort"
-	"time"
 )
 
 type netlink_add_del struct {
@@ -39,7 +39,6 @@ func (m *netlinkMain) add_del() {
 	for {
 		x := <-m.add_del_chan
 		m.m.v.Logf("start %s\n", &x)
-		n_tx := 0
 		for i := uint(0); i < x.count; i++ {
 			p := x.ip4_prefix.Add(i)
 
@@ -49,12 +48,15 @@ func (m *netlinkMain) add_del() {
 				var addrs [2]netlink.Ip4Address
 				addrs[0] = netlink.Ip4Address(p.Address)
 				addrs[1] = netlink.Ip4Address(nh.Address)
-				msg := &netlink.RouteMessage{}
+				msg := netlink.NewRouteMessage()
 				msg.Type = netlink.RTM_NEWROUTE
 				if x.is_del {
 					msg.Type = netlink.RTM_DELROUTE
 				}
-				msg.Flags = netlink.NLM_F_CREATE | netlink.NLM_F_REPLACE | netlink.NLM_F_ECHO
+				msg.Flags = netlink.NLM_F_REQUEST |
+					netlink.NLM_F_CREATE |
+					netlink.NLM_F_REPLACE |
+					netlink.NLM_F_ECHO
 				msg.Family = netlink.AF_INET
 				msg.Table = netlink.RT_TABLE_MAIN
 				msg.RouteType = netlink.RTN_UNICAST
@@ -62,22 +64,9 @@ func (m *netlinkMain) add_del() {
 				msg.Attrs[netlink.RTA_DST] = &addrs[0]
 				msg.DstLen = uint8(p.Len)
 				msg.Attrs[netlink.RTA_GATEWAY] = &addrs[1]
-				msg.Attrs[netlink.RTA_OIF] = netlink.Int32Attr(intf.ifindex)
-				m.s.TxAdd(msg)
-				n_tx++
-				if n_tx > 256 {
-					m.s.TxFlush()
-					if x.wait != 0 {
-						time.Sleep(x.wait)
-					}
-					n_tx = 0
-				}
-			}
-		}
-		if n_tx > 0 {
-			m.s.TxFlush()
-			if x.wait != 0 {
-				time.Sleep(x.wait)
+				msg.Attrs[netlink.RTA_OIF] =
+					netlink.Int32Attr(intf.ifindex)
+				m.s.Tx <- msg
 			}
 		}
 		m.m.v.Logf("done %s\n", &x)
