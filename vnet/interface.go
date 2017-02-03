@@ -332,6 +332,10 @@ func (hw *HwIf) SetMedia(pi string) (err error) {
 	err = h.SetMedia(pi)
 	if err == nil {
 		hw.media = pi
+
+		// In case media is set after speed do a speed change with
+		// speed on record
+		err = hw.SetSpeed(hw.speed)
 	}
 	return
 }
