@@ -7,6 +7,7 @@ package mount
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
@@ -122,6 +123,7 @@ func (cmd) Main(args ...string) error {
 		"-a",
 		"-F",
 		"-defaults",
+		"-p",
 		"-r",
 		"-read-write",
 		"-suid",
@@ -173,7 +175,11 @@ func (cmd) Main(args ...string) error {
 		case 0:
 			err = show()
 		case 1:
-			err = fstab(args[0], flag, parm)
+			if flag["-p"] {
+				err = mountprobe(args[0], flag, parm)
+			} else {
+				err = fstab(args[0], flag, parm)
+			}
 		case 2:
 			r := mountone(parm["-t"], args[0], args[1], flag,
 				parm)
@@ -199,6 +205,13 @@ func pollMountResults (c chan *MountResult) (i int) {
 	return i
 }
 
+func flushMountResults (c chan *MountResult, complete, count int) () {
+	for i := complete; i < count; i++ {
+		r := <- c
+		r.ShowResult()
+	}
+}
+
 func mountall(flag flags.Flag, parm parms.Parm) error {
 	fstab, err := loadFstab()
 	if err != nil {
@@ -219,11 +232,36 @@ func mountall(flag flags.Flag, parm parms.Parm) error {
 		complete += pollMountResults(rchan)
 	}
 
+	flushMountResults(rchan, complete, count)
+	return nil
+}
 
-	for i := complete; i < count; i++ {
-		r := <- rchan
-		r.ShowResult()
+func mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
+	files, err := ioutil.ReadDir("/sys/block")
+	if err != nil {
+		return err
 	}
+	complete := 0
+	cap := 1
+	if flag["-F"] {
+		cap = len(files)
+	}
+	rchan := make(chan *MountResult, cap)
+	
+	for _, file := range files {
+		mp := mountpoint + "/" + file.Name()
+		if _, err := os.Stat(mp); os.IsNotExist(err) {
+			err := os.Mkdir(mp, os.FileMode(0555))
+			if err != nil {
+				fmt.Println("mkdir", mp, "err:", err)
+				return err
+			}
+		}
+		go goMountone(parm["-t"], "/dev/" + file.Name(), mp, flag, parm, rchan)
+		complete += pollMountResults(rchan)
+	}
+
+	flushMountResults(rchan, complete, len(files))
 	return nil
 }
 
