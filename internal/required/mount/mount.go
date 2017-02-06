@@ -120,6 +120,7 @@ func (cmd) Main(args ...string) error {
 		"--fake",
 		"-v",
 		"-a",
+		"-F",
 		"-defaults",
 		"-r",
 		"-read-write",
@@ -185,19 +186,45 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
+func pollMountResults (c chan *MountResult) (i int) {
+	for {
+		select {
+		case r := <-c:
+			r.ShowResult()
+			i++
+		default:
+			return i
+		}
+	}		
+	return i
+}
+
 func mountall(flag flags.Flag, parm parms.Parm) error {
 	fstab, err := loadFstab()
 	if err != nil {
 		return err
 	}
-	for _, x := range fstab {
-		r := mountone(x.fsType, x.fsSpec, x.fsFile, flag, parm)
-		r.ShowResult()
-		if err = r.err; err != nil {
-			break
-		}
+
+	count := len(fstab)
+	cap := 1
+	if flag["-F"] {
+		cap = count
 	}
-	return err
+
+	complete := 0
+	rchan := make(chan *MountResult, cap)
+
+	for _, x := range fstab {
+		go goMountone(x.fsType, x.fsSpec, x.fsFile, flag, parm, rchan)
+		complete += pollMountResults(rchan)
+	}
+
+
+	for i := complete; i < count; i++ {
+		r := <- rchan
+		r.ShowResult()
+	}
+	return nil
 }
 
 func fstab(name string, flag flags.Flag, parm parms.Parm) error {
@@ -282,6 +309,10 @@ func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult
 	return &MountResult{err, dev, t, dir, flag}
 }
 
+func goMountone(t, dev, dir string, flag flags.Flag, parm parms.Parm, c chan *MountResult) {
+	c <- mountone(t, dev, dir, flag, parm)
+}
+	
 func show() error {
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
@@ -350,6 +381,7 @@ OPTIONS
 	-a		all [-match MATCH[,...]]
 	-t FSTYPE[,...]
 	-o FSOPT[,...]
+	-F		run mounts in parallel
 
 	Where MATCH, FSTYPE and FSOPT are comma separated lists.
 
