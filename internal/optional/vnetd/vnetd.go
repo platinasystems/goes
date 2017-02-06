@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/redis"
@@ -252,12 +251,34 @@ func (i *Info) publish(key string, value interface{}) {
 	i.pub.Print("vnet.", key, ": ", value)
 }
 
+// One per each hw/sw interface from vnet.
+type ifStatsPollerInterface struct {
+	lastValues map[string]uint64
+}
+
+func (i *ifStatsPollerInterface) update(counter string, value uint64) (updated bool) {
+	if i.lastValues == nil {
+		i.lastValues = make(map[string]uint64)
+	}
+	if v, ok := i.lastValues[counter]; ok {
+		if updated = v != value; updated {
+			i.lastValues[counter] = value
+		}
+	} else {
+		updated = true
+		i.lastValues[counter] = value
+	}
+	return
+}
+
+//go:generate gentemplate -d Package=vnetd -id ifStatsPollerInterface -d VecType=ifStatsPollerInterfaceVec -d Type=ifStatsPollerInterface github.com/platinasystems/go/elib/vec.tmpl
+
 type ifStatsPoller struct {
 	vnet.Event
 	i            *Info
 	sequence     uint
-	hwLastValues elib.Uint64Vec
-	swLastValues elib.Uint64Vec
+	hwInterfaces ifStatsPollerInterfaceVec
+	swInterfaces ifStatsPollerInterfaceVec
 }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
@@ -278,17 +299,15 @@ func (p *ifStatsPoller) EventAction() {
 	includeZeroCounters := p.sequence == 0
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, UnixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
-			p.hwLastValues.Validate(uint(hi))
-			if v := p.hwLastValues[hi]; v != value || includeZeroCounters {
-				p.hwLastValues[hi] = value
+			p.hwInterfaces.Validate(uint(hi))
+			if p.hwInterfaces[hi].update(counter, value) {
 				p.publish(hi.Name(&p.i.v), counter, value)
 			}
 		})
 	p.i.v.ForeachSwIfCounter(includeZeroCounters,
 		func(si vnet.Si, counter string, value uint64) {
-			p.swLastValues.Validate(uint(si))
-			if v := p.swLastValues[si]; v != value || includeZeroCounters {
-				p.swLastValues[si] = value
+			p.swInterfaces.Validate(uint(si))
+			if p.swInterfaces[si].update(counter, value) {
 				p.publish(si.Name(&p.i.v), counter, value)
 			}
 		})
