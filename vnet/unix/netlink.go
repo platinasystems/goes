@@ -131,12 +131,8 @@ func (m *Main) addMsg(msg netlink.Message) {
 		e.msgs = append(e.msgs, msg)
 	} else {
 		m.msg_stats.ignored.count(msg)
-		if m.verboseNetlink > 0 {
-			if _, ok := msg.(*netlink.NeighborMessage); ok {
-			} else if x, ok := msg.(*netlink.RouteMessage); ok && x.Family == netlink.AF_INET6 {
-			} else {
-				m.v.Logf("netlink ignore %s\n", msg)
-			}
+		if m.verboseNetlink > 1 {
+			m.v.Logf("netlink ignore %s\n", msg)
 		}
 		// Done with message.
 		msg.Close()
