@@ -8,6 +8,7 @@ package required
 import (
 	"github.com/platinasystems/go/internal/required/apropos"
 	"github.com/platinasystems/go/internal/required/bang"
+	"github.com/platinasystems/go/internal/required/boot"
 	"github.com/platinasystems/go/internal/required/cat"
 	"github.com/platinasystems/go/internal/required/cd"
 	"github.com/platinasystems/go/internal/required/chmod"
@@ -82,6 +83,7 @@ func New() []interface{} {
 	return []interface{}{
 		apropos.New(),
 		bang.New(),
+		boot.New(),
 		cat.New(),
 		cd.New(),
 		chmod.New(),
