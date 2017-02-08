@@ -3,7 +3,6 @@ package i2c
 
 import (
 	"fmt"
-	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -26,8 +25,6 @@ const (
 	I2C_PEC         IoctlOp = 0x0708 /* != 0 to use PEC with SMBus */
 	I2C_SMBUS       IoctlOp = 0x0720 /* SMBus transfer */
 )
-
-var Lock = &sync.Mutex{}
 
 type Bus struct {
 	// Bus index X for corresponding device /dev/i2c-X

@@ -24,9 +24,6 @@ func (cmd) Usage() string {
 }
 
 func (cmd) Main(args ...string) error {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	var (
 		bus        i2c.Bus
 		sd         i2c.SMBusData
@@ -182,8 +179,6 @@ func (cmd) Main(args ...string) error {
 }
 
 func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock() //FIX THIS EVERYWHERE
 	var (
 		bus i2c.Bus
 		sd  i2c.SMBusData
@@ -207,8 +202,6 @@ func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
 }
 
 func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
 	var (
 		bus i2c.Bus
 		sd  i2c.SMBusData

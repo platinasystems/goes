@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/i2c"
 )
 
 func diagI2c() error {
@@ -59,8 +58,6 @@ func diagI2c() error {
 	r = CheckPassB(pinstate, true)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "i2c2_sda_mon", "-", pinstate, i2cmon_min, i2cmon_max, r, "check mon pin is high")
 
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
 	/* diagTest: host i2c
 	enable host access to main_i2c bus and check that bmc can access mfg eeprom on cpu card
 	repeat with fru_i2c bus

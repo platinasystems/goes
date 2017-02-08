@@ -163,9 +163,6 @@ func (d *Device) GetInfo() (err error) {
 }
 
 func (d *Device) getInfo() {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	f := &d.Fields
 	var i uint
 
@@ -255,9 +252,6 @@ func (d *Device) getInfo() {
 }
 
 func (d *Device) DumpProm() (bool, []byte) {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	f := &d.Fields
 	var i uint8
 	var rawData []byte
@@ -280,8 +274,6 @@ func (d *Device) DumpProm() (bool, []byte) {
 }
 
 func (d *Device) CalcCrc() string {
-	i2c.Lock.Lock()
-
 	f := &d.Fields
 	var i uint8
 
@@ -292,13 +284,9 @@ func (d *Device) CalcCrc() string {
 			return "Invalid: EEPROM not in ONIE format"
 		}
 	}
-	i2c.Lock.Unlock()
 
 	//read ONIE prom
 	_, rawData := d.DumpProm()
-
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
 
 	//calculate crc32 up old crc value, write new crc value
 	l := uint16(len(rawData))
@@ -324,8 +312,6 @@ func (d *Device) DeleteField(n string) string {
 	if !r {
 		return "Invalid: EEPROM not in ONIE format"
 	}
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
 
 	//delete field + 2 byte header if found, shift remaining fields
 	t, _ := strconv.ParseUint(n, 16, 64)
@@ -354,9 +340,6 @@ func (d *Device) DeleteField(n string) string {
 
 }
 func (d *Device) AddCrc() string {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	dataLen := d.getUint16(lengthOffset)
 	d.setByte(uint16(lengthOffset), uint8((dataLen+6)>>8))
 	d.setByte(uint16(lengthOffset+1), uint8((dataLen+6)&0xFF))
@@ -371,9 +354,6 @@ func (d *Device) AddCrc() string {
 }
 
 func (d *Device) CopyAll(rawData []byte) string {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	for j := uint(0); j < uint(len(rawData)); j++ {
 		d.setByte(uint16(j), rawData[j])
 	}
@@ -381,9 +361,6 @@ func (d *Device) CopyAll(rawData []byte) string {
 }
 
 func (d *Device) WriteField(n string, v []byte) string {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	f := &d.Fields
 	var i uint8
 
