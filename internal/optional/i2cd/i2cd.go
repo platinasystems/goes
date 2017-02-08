@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/rpc"
+	"sync"
 	"syscall"
 	"time"
 
@@ -90,6 +91,10 @@ var s [MAXOPS]R
 var x int
 
 func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
+	var mutex = &sync.Mutex{}
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	var bus i2c.Bus
 	var data i2c.SMBusData
 	for x := 0; x < MAXOPS; x++ {
