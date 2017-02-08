@@ -97,13 +97,13 @@ func (h *LedCon) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *
 
 func (r *reg8) get(h *LedCon) byte {
 	var data i2c.SMBusData
-	i2c.Lock.Lock()
+	/* i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
 			log.Print("Recovered in ledgpio: get8: ", rc, " addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
-	}()
+	}() */
 
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
@@ -137,13 +137,13 @@ func (r *reg8) get(h *LedCon) byte {
 
 func (r *reg16) get(h *LedCon) (v uint16) {
 	var data i2c.SMBusData
-	i2c.Lock.Lock()
+	/* i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
 			log.Print("Recovered in ledgpio: get16: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
-	}()
+	}() */
 
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
@@ -177,13 +177,13 @@ func (r *reg16) get(h *LedCon) (v uint16) {
 
 func (r *reg16r) get(h *LedCon) (v uint16) {
 	var data i2c.SMBusData
-	i2c.Lock.Lock()
+	/* i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
 			log.Print("Recovered in ledgpio: get16r: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
-	}()
+	}() */
 
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
@@ -218,13 +218,13 @@ func (r *reg16r) get(h *LedCon) (v uint16) {
 func (r *reg8) set(h *LedCon, v uint8) {
 	var data i2c.SMBusData
 
-	i2c.Lock.Lock()
+	/* i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
 			log.Print("Recovered in ledgpio: set8: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
-	}()
+	}() */
 
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
@@ -258,13 +258,13 @@ func (r *reg8) set(h *LedCon, v uint8) {
 func (r *reg16) set(h *LedCon, v uint16) {
 	var data i2c.SMBusData
 
-	i2c.Lock.Lock()
+	/* i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
 			log.Print("Recovered in ledgpio: set16: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
-	}()
+	}() */
 
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {
@@ -299,13 +299,13 @@ func (r *reg16) set(h *LedCon, v uint16) {
 func (r *reg16r) set(h *LedCon, v uint16) {
 	var data i2c.SMBusData
 
-	i2c.Lock.Lock()
+	/* i2c.Lock.Lock()
 	defer func() {
 		if rc := recover(); rc != nil {
 			log.Print("Recovered in ledgpio: set16r: ", rc, ", addr: ", r.offset())
 		}
 		i2c.Lock.Unlock()
-	}()
+	}() */
 
 	data[0] = byte(h.MuxValue)
 	for i := 0; i < 5000; i++ {

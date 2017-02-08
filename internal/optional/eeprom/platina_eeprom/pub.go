@@ -61,9 +61,6 @@ func RedisdHook(pub *publisher.Publisher) {
 }
 
 func readbytes() ([]byte, error) {
-	i2c.Lock.Lock()
-	defer i2c.Lock.Unlock()
-
 	bus, err := i2c.New(config.bus.index, config.bus.address)
 	if err != nil {
 		return nil, fmt.Errorf("eeprom: bus open: %v", err)
