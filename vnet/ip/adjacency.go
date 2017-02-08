@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
+	"fmt"
 	"math"
 	"sort"
 	"unsafe"
@@ -120,6 +121,8 @@ type Adj uint32
 // Miss adjacency is always first in adjacency table.
 const (
 	AdjMiss Adj = 0
+	AdjDrop Adj = 1
+	AdjPunt Adj = 2
 	AdjNil  Adj = (^Adj(0) - 1) // so AdjNil + 1 is non-zero for remaps.
 )
 
@@ -141,7 +144,7 @@ type adjacencyMain struct {
 	adjSyncCounterHookVec
 	adjGetCounterHookVec
 
-	missAdjIndex Adj
+	specialAdj [3]Adj
 }
 
 type adjAddDelHook func(m *Main, adj Adj, isDel bool)
@@ -690,6 +693,7 @@ func (m *adjacencyMain) NewAdjWithTemplate(n uint, template *Adjacency) (ai Adj,
 		}
 		as[i].Si = vnet.SiNil
 		as[i].NAdj = uint16(n)
+		as[i].IfAddr = IfAddrNil
 		m.clearCounter(ai + Adj(i))
 	}
 	return
@@ -703,12 +707,22 @@ func (m *multipathMain) init() {
 func (m *Main) adjacencyInit() {
 	m.multipathMain.init()
 
-	// Build miss adjacency.
-	var as []Adjacency
-	m.missAdjIndex, as = m.NewAdj(1)
-	as[0].LookupNextIndex = LookupNextMiss
-	if m.missAdjIndex != AdjMiss {
-		panic("miss adjacency must be index 0")
+	// Build special adjacencies.
+	for i, v := range []struct {
+		Adj
+		LookupNext
+	}{
+		{Adj: AdjMiss, LookupNext: LookupNextMiss}, // must be in order 0 1 2 else panic below triggers.
+		{Adj: AdjDrop, LookupNext: LookupNextDrop},
+		{Adj: AdjPunt, LookupNext: LookupNextPunt},
+	} {
+		var as []Adjacency
+		a, as := m.NewAdj(1)
+		m.specialAdj[i] = a
+		as[0].LookupNextIndex = v.LookupNext
+		if got, want := a, v.Adj; got != want {
+			panic(fmt.Errorf("special adjacency index mismatch got %d != want %d", got, want))
+		}
+		m.CallAdjAddHooks(a)
 	}
-	m.CallAdjAddHooks(m.missAdjIndex)
 }
