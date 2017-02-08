@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/go/vnet/ip6"
 
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -45,6 +46,7 @@ type netlinkMain struct {
 	msg_stats                 struct {
 		ignored, handled msg_counts
 	}
+	dummyInterfaceMain
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -52,15 +54,65 @@ func (m *Main) getInterface(ifindex uint32) (intf *Interface) {
 	intf = m.ifByIndex[int(ifindex)]
 	return
 }
+
+type dummyInterface struct {
+	isAdminUp bool
+	// Current set of ip4/ip6 addresses for dummy interface collected from netlink IfAddrMessage.
+	ip4Addrs map[ip4.Address]ip.FibIndex
+	ip6Addrs map[ip6.Address]ip.FibIndex
+}
+
+type dummyInterfaceMain struct {
+	// Linux ifindex to dummy interface map.
+	dummyIfByIndex map[uint32]*dummyInterface
+}
+
+// True if given netlink NEWLINK message is for a dummy interface (indicated by ifname starting with "dummy").
+func (m *Main) forDummyInterface(msg *netlink.IfInfoMessage) (ok bool) {
+	ifname := msg.Attrs[netlink.IFLA_IFNAME].(netlink.StringAttr).String()
+	if ok = strings.HasPrefix(ifname, "dummy"); ok {
+		if m.dummyIfByIndex == nil {
+			m.dummyIfByIndex = make(map[uint32]*dummyInterface)
+		}
+		if _, known := m.dummyIfByIndex[msg.Index]; !known {
+			m.dummyIfByIndex[msg.Index] = &dummyInterface{}
+		}
+	}
+	return
+}
+
+func (m *Main) getDummyInterface(ifindex uint32) (i *dummyInterface, ok bool) {
+	i, ok = m.dummyIfByIndex[ifindex]
+	return
+}
+
+func (i *dummyInterface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
+	for addr, fi := range i.ip4Addrs {
+		m4 := ip4.GetMain(m.v)
+		p := ip4.Prefix{Address: addr, Len: 32}
+		q := p.ToIpPrefix()
+		m4.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
+	}
+	for addr, fi := range i.ip6Addrs {
+		m6 := ip6.GetMain(m.v)
+		p := ip6.Prefix{Address: addr, Len: 128}
+		q := p.ToIpPrefix()
+		m6.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
+	}
+}
 func (m *Main) knownInterface(i uint32) bool { return nil != m.getInterface(i) }
 
 func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
 	ok = true
 	switch v := msg.(type) {
 	case *netlink.IfInfoMessage:
-		ok = m.knownInterface(v.Index)
+		if ok = m.knownInterface(v.Index); !ok {
+			ok = m.forDummyInterface(v)
+		}
 	case *netlink.IfAddrMessage:
-		ok = m.knownInterface(v.Index)
+		if ok = m.knownInterface(v.Index); !ok {
+			_, ok = m.getDummyInterface(v.Index)
+		}
 	case *netlink.RouteMessage:
 		ok = m.knownInterface(uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr)))
 	case *netlink.NeighborMessage:
@@ -79,8 +131,12 @@ func (m *Main) addMsg(msg netlink.Message) {
 		e.msgs = append(e.msgs, msg)
 	} else {
 		m.msg_stats.ignored.count(msg)
-		if m.verboseNetlink > 1 {
-			m.v.Logf("netlink ignore %s\n", msg)
+		if m.verboseNetlink > 0 {
+			if _, ok := msg.(*netlink.NeighborMessage); ok {
+			} else if x, ok := msg.(*netlink.RouteMessage); ok && x.Family == netlink.AF_INET6 {
+			} else {
+				m.v.Logf("netlink ignore %s\n", msg)
+			}
 		}
 		// Done with message.
 		msg.Close()
@@ -212,10 +268,17 @@ func (e *netlinkEvent) EventAction() {
 		}
 		switch v := msg.(type) {
 		case *netlink.IfInfoMessage:
-			known = true
-			intf := e.m.getInterface(v.Index)
 			// Respect flag admin state changes from unix shell via ifconfig or "ip link" commands.
-			err = intf.si.SetAdminUp(vn, v.IfInfomsg.Flags&netlink.IFF_UP != 0)
+			known = true
+			isUp := v.IfInfomsg.Flags&netlink.IFF_UP != 0
+			if di, ok := e.m.getDummyInterface(v.Index); ok {
+				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
+				di.isAdminUp = isUp
+				di.addDelDummyPuntPrefixes(e.m, !isUp)
+			} else {
+				intf := e.m.getInterface(v.Index)
+				err = intf.si.SetAdminUp(vn, isUp)
+			}
 		case *netlink.IfAddrMessage:
 			switch v.Family {
 			case netlink.AF_INET:
@@ -313,9 +376,25 @@ func (m *Main) ifAttr(t netlink.Attr) (intf *Interface) {
 func (m *Main) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 	p := ip4Prefix(v.Attrs[netlink.IFA_ADDRESS], v.Prefixlen)
 	m4 := ip4.GetMain(m.v)
-	intf := m.getInterface(v.Index)
 	isDel := v.Header.Type == netlink.RTM_DELADDR
-	err = m4.AddDelInterfaceAddress(intf.si, &p, isDel)
+	if di, ok := m.getDummyInterface(v.Index); ok {
+		const fi = 0 // fixme
+		q := p.ToIpPrefix()
+		if di.isAdminUp || isDel {
+			m4.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
+		}
+		if isDel {
+			delete(di.ip4Addrs, p.Address)
+		} else {
+			if di.ip4Addrs == nil {
+				di.ip4Addrs = make(map[ip4.Address]ip.FibIndex)
+			}
+			di.ip4Addrs[p.Address] = fi
+		}
+	} else {
+		intf := m.getInterface(v.Index)
+		err = m4.AddDelInterfaceAddress(intf.si, &p, isDel)
+	}
 	return
 }
 
