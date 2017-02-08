@@ -315,6 +315,7 @@ func (h *HwIf) SetMaxPacketSize(v uint) (err error) {
 }
 
 func (h *HwIf) Speed() Bandwidth   { return h.speed }
+func (h *HwIf) Media() string      { return h.media }
 func (h *HwIf) LaneMask() LaneMask { return h.laneMask }
 
 func (hw *HwIf) SetSpeed(v Bandwidth) (err error) {
@@ -329,7 +330,7 @@ func (hw *HwIf) SetSpeed(v Bandwidth) (err error) {
 func (hw *HwIf) SetMedia(pi string) (err error) {
 	vn := hw.vnet
 	h := vn.HwIfer(hw.hi)
-	err = h.SetMedia(pi)
+	err = h.ValidateMedia(pi)
 	if err == nil {
 		hw.media = pi
 
@@ -347,6 +348,7 @@ var ErrNotSupported = errors.New("not supported")
 
 // Default versions.
 func (h *HwIf) ValidateSpeed(v Bandwidth) (err error) { return }
+func (h *HwIf) ValidateMedia(pi string) (err error)   { return }
 func (h *HwIf) SetLoopback(v IfLoopbackType) (err error) {
 	switch v {
 	case IfLoopbackNone:
@@ -566,7 +568,7 @@ type Devicer interface {
 	LessThan(b HwInterfacer) bool
 	IsUnix() bool
 	ValidateSpeed(speed Bandwidth) error
-	SetMedia(pi string) error
+	ValidateMedia(pi string) error
 	SetLoopback(v IfLoopbackType) error
 	GetHwInterfaceCounterNames() InterfaceCounterNames
 	GetSwInterfaceCounterNames() InterfaceCounterNames

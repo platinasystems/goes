@@ -244,6 +244,7 @@ func (i *Info) initialPublish() {
 	i.v.ForeachHwIf(UnixInterfacesOnly, func(hi vnet.Hi) {
 		h := i.v.HwIf(hi)
 		i.publish(hi.Name(&i.v)+".speed", h.Speed().String())
+		i.publish(hi.Name(&i.v)+".media", h.Media())
 	})
 }
 
