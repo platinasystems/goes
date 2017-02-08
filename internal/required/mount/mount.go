@@ -420,6 +420,9 @@ OPTIONS
 	-t FSTYPE[,...]
 	-o FSOPT[,...]
 	-F		run mounts in parallel
+	-p MNTPOINT	Probe for devices and mount under MNTPOINT
+			Creating directories, and naming mount points
+			after the Linux device name.
 
 	Where MATCH, FSTYPE and FSOPT are comma separated lists.
 
