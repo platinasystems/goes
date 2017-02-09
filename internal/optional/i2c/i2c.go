@@ -25,7 +25,6 @@ func (cmd) Usage() string {
 
 func (cmd) Main(args ...string) error {
 	var (
-		bus        i2c.Bus
 		sd         i2c.SMBusData
 		b, a, d, w uint8
 		cs         [2]uint8
@@ -87,28 +86,17 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 
-	err = bus.Open(int(b))
-	if err != nil {
-		return err
-	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(int(a))
-	if err != nil {
-		return err
-	}
-
 	c := uint8(0)
 	op := i2c.ByteData
 	if eeprom == 1 {
 		sd[0] = cs[0]
-		err = bus.Do(i2c.Write, c, op, &sd)
+		j[0] = I{true, i2c.Write, c, op, sd, int(b), int(a), 0, 0, 0}
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
 	}
 
-	op = i2c.ByteData
 	if nc == 0 || eeprom == 1 || w == 8 {
 		op = i2c.Byte
 	}
@@ -124,37 +112,39 @@ func (cmd) Main(args ...string) error {
 
 	c = cs[0]
 	if nc < 2 {
-		err = bus.Do(rw, c, op, &sd)
+		j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
 		if w == 16 {
-			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, uint16(sd[1])<<8|uint16(sd[0]))
+			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, uint16(s[0].D[1])<<8|uint16(s[0].D[0]))
 			return nil
 		} else {
-			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
+			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, s[0].D[0])
 			return nil
 		}
 	}
 
-	s := ""
+	t := ""
 	count := 0
 	ascii := ""
 	for {
-		err = bus.Do(rw, c, op, &sd)
+		j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
 		if count == 0 {
-			s += fmt.Sprintf("%02x: ", c)
+			t += fmt.Sprintf("%02x: ", c)
 		}
 		if w == 16 {
-			s += fmt.Sprintf("%02x ", (uint16(sd[1])<<8 | uint16(sd[0])))
+			t += fmt.Sprintf("%02x ", (uint16(s[0].D[1])<<8 | uint16(s[0].D[0])))
 		} else {
-			s += fmt.Sprintf("%02x ", sd[0])
+			t += fmt.Sprintf("%02x ", s[0].D[0])
 		}
-		if sd[0] < 0x7e && sd[0] > 0x1f {
-			ascii += fmt.Sprintf("%c", sd[0])
+		if s[0].D[0] < 0x7e && s[0].D[0] > 0x1f {
+			ascii += fmt.Sprintf("%c", s[0].D[0])
 		} else {
 			ascii += "."
 		}
@@ -165,60 +155,42 @@ func (cmd) Main(args ...string) error {
 		count++
 		if count == 16 {
 			count = 0
-			s += "   "
-			s += ascii
-			s += "\n"
+			t += "   "
+			t += ascii
+			t += "\n"
 			ascii = ""
 		}
 		if rw == i2c.Write && writeDelay > 0 {
 			time.Sleep(time.Second * time.Duration(writeDelay))
 		}
 	}
-	fmt.Println(s)
+	fmt.Println(t)
 	return nil
 }
 
 func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
 	var (
-		bus i2c.Bus
-		sd  i2c.SMBusData
+		sd i2c.SMBusData
 	)
-	err := bus.Open(int(b))
-	if err != nil {
-		return 0, err
-	}
-	defer bus.Close()
-	err = bus.ForceSlaveAddress(int(a))
-	if err != nil {
-		return 0, err
-	}
 	rw := i2c.Read
 	op := i2c.ByteData
-	err = bus.Do(rw, c, op, &sd)
+	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+	err := DoI2cRpc()
 	if err != nil {
 		return 0, err
 	}
-	return sd[0], nil
+	return s[0].D[0], nil
 }
 
 func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
 	var (
-		bus i2c.Bus
-		sd  i2c.SMBusData
+		sd i2c.SMBusData
 	)
-	err := bus.Open(int(b))
-	if err != nil {
-		return err
-	}
-	defer bus.Close()
-	err = bus.ForceSlaveAddress(int(a))
-	if err != nil {
-		return err
-	}
 	rw := i2c.Write
 	op := i2c.ByteData
 	sd[0] = v
-	err = bus.Do(rw, c, op, &sd)
+	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+	err := DoI2cRpc()
 	if err != nil {
 		return err
 	}
