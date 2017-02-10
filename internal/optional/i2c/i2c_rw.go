@@ -23,9 +23,7 @@ type I struct {
 	Data      [34]byte
 	Bus       int
 	Addr      int
-	Count     int
 	Delay     int
-	Eeprom    int
 }
 type R struct {
 	D [34]byte
@@ -35,7 +33,7 @@ type R struct {
 type I2cReq int
 
 var b = [34]byte{0}
-var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0, 0, 0}
+var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0}
 var j [MAXOPS]I
 var r = R{b, nil}
 var s [MAXOPS]R

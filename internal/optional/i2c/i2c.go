@@ -20,7 +20,7 @@ func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string {
-	return Name + " ['EEPROM'] BUS.ADDR[.BEGIN][-END][/8][/16] [VALUE] [WRITE-DELAY-IN-SEC]"
+	return Name + " [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END][/8][/16] [VALUE] [WR-DELAY-IN-SEC]"
 }
 
 func (cmd) Main(args ...string) error {
@@ -37,8 +37,12 @@ func (cmd) Main(args ...string) error {
 	}
 
 	eeprom := 0
+	block := 0
 	if args[0] == "EEPROM" {
 		eeprom, args = 1, args[1:]
+	}
+	if args[0] == "BLOCK" {
+		block, args = 1, args[1:]
 	}
 
 	dValid := len(args) > 1
@@ -88,13 +92,18 @@ func (cmd) Main(args ...string) error {
 
 	c := uint8(0)
 	op := i2c.ByteData
+
 	if eeprom == 1 {
 		sd[0] = cs[0]
-		j[0] = I{true, i2c.Write, c, op, sd, int(b), int(a), 0, 0, 0}
+		j[0] = I{true, i2c.Write, c, op, sd, int(b), int(a), 0}
 		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
+	}
+	if block == 1 {
+		op = i2c.I2CBlockData
+		sd[0] = 32
 	}
 
 	if nc == 0 || eeprom == 1 || w == 8 {
@@ -112,7 +121,7 @@ func (cmd) Main(args ...string) error {
 
 	c = cs[0]
 	if nc < 2 {
-		j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+		j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
 		err := DoI2cRpc()
 		if err != nil {
 			return err
@@ -121,7 +130,40 @@ func (cmd) Main(args ...string) error {
 			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, uint16(s[0].D[1])<<8|uint16(s[0].D[0]))
 			return nil
 		} else {
-			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, s[0].D[0])
+			if block == 0 {
+				fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, s[0].D[0])
+			}
+			if block == 1 {
+				fmt.Printf("%02x %02x\n", s[0].D[0], s[0].D[1])
+				k := 2
+				t := ""
+				count := 0
+				ascii := ""
+				for {
+					if count == 0 {
+						t += fmt.Sprintf("%02x: ", c)
+					}
+					t += fmt.Sprintf("%02x ", s[0].D[k])
+					if s[0].D[k] < 0x7e && s[0].D[k] > 0x1f {
+						ascii += fmt.Sprintf("%c", s[0].D[k])
+					} else {
+						ascii += "."
+					}
+					count++
+					k++
+					if count == 8 {
+						count = 0
+						t += "   "
+						t += ascii
+						t += "\n"
+						ascii = ""
+					}
+					if k == 34 {
+						break
+					}
+				}
+				fmt.Println(t)
+			}
 			return nil
 		}
 	}
@@ -130,7 +172,7 @@ func (cmd) Main(args ...string) error {
 	count := 0
 	ascii := ""
 	for {
-		j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+		j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
 		err := DoI2cRpc()
 		if err != nil {
 			return err
@@ -174,7 +216,7 @@ func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
 	)
 	rw := i2c.Read
 	op := i2c.ByteData
-	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
 	err := DoI2cRpc()
 	if err != nil {
 		return 0, err
@@ -189,7 +231,7 @@ func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
 	rw := i2c.Write
 	op := i2c.ByteData
 	sd[0] = v
-	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0, 0, 0}
+	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
 	err := DoI2cRpc()
 	if err != nil {
 		return err
@@ -219,6 +261,7 @@ DESCRIPTION
 	    i2c 0.2f.1f            reads device 0x2f, register 0x1f
 	    i2c 0.2f.1f-20         reads two bytes
 	    i2c EEPROM 0.55.0-30   reads 0x0-0x30 from EEPROM
+	    i2c BLOCK 1.58.99      reads upto 32 bytes from BLOCK at reg 0x99
             i2c 0.76/8             force reads at 8-bits
             i2c 0.76.0/8           force reads at 8-bits
 	    i2c 0.55.0-30/8        reads 0x0-0x30 8-bits at a time

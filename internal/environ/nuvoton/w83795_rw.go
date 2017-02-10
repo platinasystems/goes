@@ -24,9 +24,7 @@ type I struct {
 	Data      [34]byte
 	Bus       int
 	Addr      int
-	Count     int
 	Delay     int
-	Eeprom    int
 }
 type R struct {
 	D [34]byte
@@ -36,7 +34,7 @@ type R struct {
 type I2cReq int
 
 var b = [34]byte{0}
-var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0, 0, 0}
+var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0}
 var j [MAXOPS]I
 var r = R{b, nil}
 var s [MAXOPS]R
@@ -59,9 +57,9 @@ func (r *reg8) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
-	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
-	j[x] = I{true, i2c.Read, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0, 0, 0}
+	j[x] = I{true, i2c.Read, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
@@ -69,9 +67,9 @@ func (r *reg16) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
-	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
-	j[x] = I{true, i2c.Read, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0, 0, 0}
+	j[x] = I{true, i2c.Read, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
@@ -79,9 +77,9 @@ func (r *reg16r) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
-	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
-	j[x] = I{true, i2c.Read, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0, 0, 0}
+	j[x] = I{true, i2c.Read, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
@@ -89,10 +87,10 @@ func (r *reg8) set(h *I2cDev, v uint8) {
 	var data = [34]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
-	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
 	data[0] = v
-	j[x] = I{true, i2c.Write, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
@@ -100,11 +98,11 @@ func (r *reg16) set(h *I2cDev, v uint16) {
 	var data = [34]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
-	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
 	data[0] = uint8(v >> 8)
 	data[1] = uint8(v)
-	j[x] = I{true, i2c.Write, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
@@ -112,11 +110,11 @@ func (r *reg16r) set(h *I2cDev, v uint16) {
 	var data = [34]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
-	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
 	data[1] = uint8(v >> 8)
 	data[0] = uint8(v)
-	j[x] = I{true, i2c.Write, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0, 0, 0}
+	j[x] = I{true, i2c.Write, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
