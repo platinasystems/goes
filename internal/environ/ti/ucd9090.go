@@ -83,6 +83,10 @@ func (cmd *cmd) Close() error {
 }
 
 func (cmd *cmd) update() error {
+	stopped := readStopped()
+	if stopped == 1 {
+		return nil
+	}
 	for k, i := range VpageByKey {
 		v := Vdev.Vout(i)
 		if v != cmd.last[k] {

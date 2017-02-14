@@ -20,7 +20,7 @@ func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string {
-	return Name + " [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END][/8][/16] [VALUE] [WR-DELAY-IN-SEC]"
+	return Name + " [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END, -CNT][/8][/16] [VALUE] [WR-DELAY-SEC]"
 }
 
 func (cmd) Main(args ...string) error {
@@ -43,6 +43,34 @@ func (cmd) Main(args ...string) error {
 	}
 	if args[0] == "BLOCK" {
 		block, args = 1, args[1:]
+	}
+	if args[0] == "STOP" {
+		sd[0] = 0
+		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(1), 0}
+		err := DoI2cRpc()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	if args[0] == "START" {
+		sd[0] = 0
+		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
+		err := DoI2cRpc()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	if args[0] == "READ" {
+		sd[0] = 0
+		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x98), int(0), 0}
+		err := DoI2cRpc()
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Stop polling bit is 0x%x\n", s[0].D[0])
+		return nil
 	}
 
 	dValid := len(args) > 1
@@ -103,7 +131,15 @@ func (cmd) Main(args ...string) error {
 	}
 	if block == 1 {
 		op = i2c.I2CBlockData
-		sd[0] = 32
+		if nc < 2 {
+			sd[0] = 32 + 1
+		} else {
+			sd[0] = cs[1] + 1
+			if sd[0] > 31 {
+				sd[0] = 32 + 1
+			}
+			nc = 1
+		}
 	}
 
 	if nc == 0 || eeprom == 1 || w == 8 {
@@ -134,7 +170,6 @@ func (cmd) Main(args ...string) error {
 				fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, s[0].D[0])
 			}
 			if block == 1 {
-				fmt.Printf("%02x %02x\n", s[0].D[0], s[0].D[1])
 				k := 2
 				t := ""
 				count := 0
@@ -151,14 +186,16 @@ func (cmd) Main(args ...string) error {
 					}
 					count++
 					k++
-					if count == 8 {
+					if count == 8 || k > int(sd[0]) {
+						for z := count; z < 9; z++ {
+							t += "   "
+						}
 						count = 0
-						t += "   "
 						t += ascii
 						t += "\n"
 						ascii = ""
 					}
-					if k == 34 {
+					if k > int(sd[0]) {
 						break
 					}
 				}
@@ -262,9 +299,32 @@ DESCRIPTION
 	    i2c 0.2f.1f-20         reads two bytes
 	    i2c EEPROM 0.55.0-30   reads 0x0-0x30 from EEPROM
 	    i2c BLOCK 1.58.99      reads upto 32 bytes from BLOCK at reg 0x99
+	    i2c BLOCK 1.58.99-10   reads upto 0x10 bytes from BLOCK at reg 0x99
             i2c 0.76/8             force reads at 8-bits
             i2c 0.76.0/8           force reads at 8-bits
 	    i2c 0.55.0-30/8        reads 0x0-0x30 8-bits at a time
 	    i2c 0.55.0-30/16       reads 0x0-0x30 16-bits at a time`,
 	}
+}
+
+func toByte(a byte) byte {
+	b := a - 0x30
+	if b > 9 {
+		b = b - 7
+	}
+	return b
+}
+func hexToByte(s string) (int, []byte) {
+	arr := make([]byte, 40)
+	m := 0
+	for k, v := range []byte(s) {
+		ak := (byte(v))
+		if k == (k>>1)*2 {
+			arr[m] = toByte(ak) << 4
+		} else {
+			arr[m] += toByte(ak)
+			m++
+		}
+	}
+	return m, arr
 }

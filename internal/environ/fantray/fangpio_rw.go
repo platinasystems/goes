@@ -122,6 +122,13 @@ func clearJ() {
 	}
 }
 
+func readStopped() byte {
+	var data = [34]byte{0, 0, 0, 0}
+	j[0] = I{true, i2c.Write, 0, i2c.ByteData, data, int(0x98), int(0), 0}
+	DoI2cRpc()
+	return s[0].D[0]
+}
+
 func DoI2cRpc() {
 	if dialed == 0 {
 		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")

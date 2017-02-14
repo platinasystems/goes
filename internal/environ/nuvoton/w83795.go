@@ -87,6 +87,10 @@ func (cmd *cmd) Close() error {
 }
 
 func (cmd *cmd) update() error {
+	stopped := readStopped()
+	if stopped == 1 {
+		return nil
+	}
 	for k, i := range VpageByKey {
 		if strings.Contains(k, "rpm") {
 			v := Vdev.FanCount(i)

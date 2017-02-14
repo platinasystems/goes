@@ -87,6 +87,7 @@ var j [MAXOPS]I
 var r = R{b, nil}
 var s [MAXOPS]R
 var x int
+var stopped byte = 0
 
 func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 	var mutex = &sync.Mutex{}
@@ -95,6 +96,14 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 
 	var bus i2c.Bus
 	var data i2c.SMBusData
+	if g[0].Bus == 0x99 {
+		stopped = byte(g[0].Addr)
+		return nil
+	}
+	if g[0].Bus == 0x98 {
+		f[0].D[0] = stopped
+		return nil
+	}
 	for x := 0; x < MAXOPS; x++ {
 		if g[x].InUse == true {
 			err := bus.Open(g[x].Bus)
