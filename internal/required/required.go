@@ -44,6 +44,7 @@ import (
 	"github.com/platinasystems/go/internal/required/lsmod"
 	"github.com/platinasystems/go/internal/required/man"
 	"github.com/platinasystems/go/internal/required/mkdir"
+	"github.com/platinasystems/go/internal/required/mknod"
 	"github.com/platinasystems/go/internal/required/mount"
 	"github.com/platinasystems/go/internal/required/nlcounters"
 	"github.com/platinasystems/go/internal/required/nld"
@@ -117,6 +118,7 @@ func New() []interface{} {
 		lsmod.New(),
 		man.New(),
 		mkdir.New(),
+		mknod.New(),
 		mount.New(),
 		nld.New(),
 		nlcounters.New(),
