@@ -436,16 +436,48 @@ func (redisd *Redisd) Hexists(key, field string) (int, error) {
 }
 
 func (redisd *Redisd) Hget(key, field string) ([]byte, error) {
-	var b []byte
+	var keys []string
+
 	redisd.mutex.Lock()
 	defer redisd.mutex.Unlock()
+
 	hv, found := redisd.published[key]
 	if !found {
-		return b, fmt.Errorf("%s: not found", key)
+		return nil, fmt.Errorf("%s: not found", key)
 	}
-	b, found = hv[field]
-	if !found {
-		return b, fmt.Errorf("%s: not found in %s", field, key)
+	if len(field) == 0 {
+		keys = make([]string, 0, len(hv))
+		for k := range hv {
+			keys = append(keys, k)
+		}
+	} else if b, found := hv[field]; found {
+		return b, nil
+	}
+	if len(keys) == 0 {
+		re, err := regexp.Compile(field)
+		if err != nil {
+			return nil, err
+		}
+		keys = make([]string, 0, len(hv))
+		for k := range hv {
+			if re.MatchString(k) {
+				keys = append(keys, k)
+			}
+		}
+		if len(keys) == 0 {
+			return nil, fmt.Errorf("%s: not found in %s",
+				field, key)
+		}
+	}
+	sort.Strings(keys)
+	b := make([]byte, 0, 4096)
+	for i, k := range keys {
+		if i > 0 {
+			b = append(b, '\n')
+		}
+		b = append(b, []byte(k)...)
+		b = append(b, []byte(": ")...)
+		b = append(b, hv[k]...)
 	}
 	return b, nil
 }
