@@ -6,7 +6,6 @@ package hgetall
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/platinasystems/go/internal/redis"
 )
@@ -18,16 +17,16 @@ type cmd struct{}
 func New() cmd { return cmd{} }
 
 func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return "hgetall [KEY [PATTERN]]" }
+func (cmd) Usage() string  { return "hgetall [KEY]" }
 
 func (cmd) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		args = []string{redis.DefaultHash}
 	case 1:
-	case 2:
 	default:
-		return fmt.Errorf("%v: unexpected", args[2:])
+		return fmt.Errorf("%v: unexpected; use: `hget %s '%s'`",
+			args[1:], args[0], args[1])
 	}
 	r, err := redis.Connect()
 	if err != nil {
@@ -39,30 +38,14 @@ func (cmd) Main(args ...string) error {
 		return err
 	}
 	list := ret.([]interface{})
-	if len(args) == 1 {
-		for i := 0; i < len(list); i += 2 {
-			fmt.Print(redis.Quotes(string(list[i].([]byte))))
-			if list[i+1] != nil {
-				fmt.Print(": ")
-				fmt.Print(redis.Quotes(
-					string(list[i+1].([]byte))))
-			}
-			fmt.Println()
+	for i := 0; i < len(list); i += 2 {
+		fmt.Print(redis.Quotes(string(list[i].([]byte))))
+		if list[i+1] != nil {
+			fmt.Print(": ")
+			fmt.Print(redis.Quotes(
+				string(list[i+1].([]byte))))
 		}
-	} else {
-		for i := 0; i < len(list); i += 2 {
-			if strings.Contains(string(list[i].([]byte)),
-				args[1]) {
-				fmt.Print(redis.Quotes(
-					string(list[i].([]byte))))
-				if list[i+1] != nil {
-					fmt.Print(": ")
-					fmt.Print(redis.Quotes(
-						string(list[i+1].([]byte))))
-				}
-				fmt.Println()
-			}
-		}
+		fmt.Println()
 	}
 	return nil
 }
