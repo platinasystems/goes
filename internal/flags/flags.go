@@ -24,7 +24,7 @@ func New(args []string, flags ...string) (Flag, []string) {
 				copy(args[i:], args[i+1:])
 			}
 			args = args[:len(args)-1]
-		} else if args[i][0] == '-' {
+		} else if len(args[i]) > 0 && args[i][0] == '-' {
 			set := make([]string, 0, len(flags))
 			for _, c := range args[i][1:] {
 				s := string([]rune{'-', c})
