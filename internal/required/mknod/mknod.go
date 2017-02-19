@@ -86,7 +86,7 @@ func flagValue(a []string, f string) uint32 {
 		if strings.Contains(arg, "-"+f+"=") {
 			result := strings.SplitAfter(arg, "=")
 			if len(result) > 1 {
-				i, err := strconv.ParseInt("0x"+strings.TrimSpace(result[1]), 0, 32)
+				i, err := strconv.ParseInt("0"+strings.TrimSpace(result[1]), 8, 32)
 				if err != nil {
 					return 0
 				}
