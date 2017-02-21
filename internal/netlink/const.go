@@ -11,6 +11,12 @@ import (
 	"github.com/platinasystems/go/elib"
 )
 
+const (
+	DefaultMessages = 64
+	PageSz          = 4096
+	SizeofInt       = (32 << (^uint(0) >> 63)) >> 3
+)
+
 func Key(s string) string {
 	return strings.Replace(strings.ToLower(s), " ", "_", -1)
 }

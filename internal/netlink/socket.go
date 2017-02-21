@@ -13,14 +13,7 @@ import (
 	"unsafe"
 )
 
-const (
-	DefaultMessages = 64
-	PageSz          = 4096
-)
-
 var (
-	once sync.Once
-
 	DefaultGroups = []MulticastGroup{
 		RTNLGRP_LINK,
 		RTNLGRP_NEIGH,
@@ -66,6 +59,7 @@ type ListenReq struct {
 }
 
 type Socket struct {
+	once sync.Once
 	fd   int
 	addr *syscall.SockaddrNetlink
 	Rx   <-chan Message
@@ -232,7 +226,7 @@ func (s *Socket) Listen(handler Handler, reqs ...ListenReq) (err error) {
 		if r.MsgType == NLMSG_NOOP {
 			continue
 		}
-		msg := pool.GenMessage.Get().(*GenMessage)
+		msg := NewGenMessage()
 		msg.Type = r.MsgType
 		msg.Flags = NLM_F_REQUEST | NLM_F_DUMP
 		msg.AddressFamily = r.AddressFamily
@@ -338,7 +332,7 @@ func (s *Socket) gorx() {
 				*msg.Nsid() = nsid
 				_, err = msg.Write(buf[i : i+l])
 				if err != nil {
-					once.Do(func() {
+					s.once.Do(func() {
 						fmt.Fprint(os.Stderr,
 							"Rx: ", err,
 							"\n", buf[i:i+l])
@@ -357,18 +351,23 @@ func (s *Socket) gorx() {
 func (s *Socket) gotx() {
 	seq := uint32(1)
 	buf := make([]byte, 16*PageSz)
-	oob := make([]byte, 2*PageSz)
+	oob := make([]byte, PageSz)
 	h := (*Header)(unsafe.Pointer(&buf[0]))
+	scm := (*syscall.SocketControlMessage)(unsafe.Pointer(&oob[0]))
+	scmNsid := (*int)(unsafe.Pointer(&oob[syscall.SizeofCmsghdr]))
+	const noob = syscall.SizeofCmsghdr + SizeofInt
+
 	for msg := range s.tx {
 		n, err := msg.Read(buf)
 		if err != nil {
-			once.Do(func() {
+			s.once.Do(func() {
 				fmt.Fprintln(os.Stderr, "Read:", msg,
 					"ERROR:", err)
 			})
 			msg.Close()
 			continue
 		}
+		nsid := *msg.Nsid()
 		msg.Close()
 		if h.Flags == 0 {
 			h.Flags = NLM_F_REQUEST
@@ -381,18 +380,15 @@ func (s *Socket) gotx() {
 			seq++
 		}
 		h.Len = uint32(n)
-		noob := 0
-		if nsid := msg.Nsid(); *nsid != -1 {
-			// FIXME format control block
-		}
-		if true {
-			// FIXME Hack around Sendmsg
-			_, err = syscall.Write(s.fd, buf[:n])
-		} else if noob == 0 {
-			err = syscall.Sendmsg(s.fd, buf[:n], nil, s.addr, 0)
-		} else {
+		if nsid != -1 {
+			scm.Header.Level = SOL_NETLINK
+			scm.Header.Type = NETLINK_LISTEN_ALL_NSID
+			*scmNsid = nsid
+			scm.Header.SetLen(noob)
 			err = syscall.Sendmsg(s.fd, buf[:n], oob[:noob],
 				s.addr, 0)
+		} else {
+			_, err = syscall.Write(s.fd, buf[:n])
 		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Send:", msg, "ERROR:", err)
