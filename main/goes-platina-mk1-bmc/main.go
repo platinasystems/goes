@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/platinasystems/go/internal/eeprom"
@@ -15,7 +16,10 @@ import (
 	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
+	"github.com/platinasystems/go/internal/fdt"
+	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/gpio"
 	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
 	"github.com/platinasystems/go/internal/optional/i2cd"
@@ -32,6 +36,7 @@ import (
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
+	gpio.File = "/boot/platina-mk1-bmc.dtb"
 	var h platform
 	g := make(goes.ByName)
 	g.Plot(required.New()...)
@@ -63,6 +68,26 @@ func main() {
 	*/
 	if err := h.Init(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+	}
+	start.ConfGpioHook = func() error {
+		gpio.Aliases = make(gpio.GpioAliasMap)
+		gpio.Pins = make(gpio.PinMap)
+		if b, err := ioutil.ReadFile(gpio.File); err == nil {
+			t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+			t.Parse(b)
+
+			t.MatchNode("aliases", fdtgpio.GatherAliases)
+			t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
+		} else {
+			return fmt.Errorf("%s: %v", gpio.File, err)
+		}
+		for name, pin := range gpio.Pins {
+			err := pin.SetDirection()
+			if err != nil {
+				fmt.Printf("%s: %v\n", name, err)
+			}
+		}
+		return nil
 	}
 	start.ConfHook = func() error {
 		return nil

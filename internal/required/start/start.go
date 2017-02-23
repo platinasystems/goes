@@ -31,6 +31,9 @@ var Hook = func() error { return nil }
 // before source of start command script.
 var ConfHook = func() error { return nil }
 
+// GPIO init hook for machines than need it
+var ConfGpioHook = func() error { return nil }
+
 func New() *cmd { return new(cmd) }
 
 type cmd goes.ByName
@@ -83,6 +86,12 @@ func (c *cmd) Main(args ...string) error {
 			start = "/etc/goes/start"
 		}
 	}
+
+	ConfGpioHook()
+	if err != nil {
+		return err
+	}
+
 	if len(start) > 0 {
 		err = ConfHook()
 		if err != nil {
