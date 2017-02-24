@@ -141,6 +141,13 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		present = qsfpIG.present[1]
 	}
 
+	//swap upper/lower ports
+	if (port % 2) == 0 {
+		port++
+	} else {
+		port--
+	}
+
 	pmask := uint16(1) << (port % 16)
 	log.Print("p: ", present, " port: ", port, " pmask: ", pmask)
 	if (present&pmask)>>(port%16) == 1 {
