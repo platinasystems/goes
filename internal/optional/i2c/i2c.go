@@ -170,7 +170,7 @@ func (cmd) Main(args ...string) error {
 				fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, s[0].D[0])
 			}
 			if block == 1 {
-				k := 2
+				k := 1
 				t := ""
 				count := 0
 				ascii := ""
@@ -186,7 +186,7 @@ func (cmd) Main(args ...string) error {
 					}
 					count++
 					k++
-					if count == 8 || k > int(sd[0]) {
+					if count == 8 || k >= int(sd[0]) {
 						for z := count; z < 9; z++ {
 							t += "   "
 						}
@@ -195,7 +195,7 @@ func (cmd) Main(args ...string) error {
 						t += "\n"
 						ascii = ""
 					}
-					if k > int(sd[0]) {
+					if k >= int(sd[0]) {
 						break
 					}
 				}
