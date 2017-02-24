@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
+	"github.com/platinasystems/go/vnet/devices/optics/qsfpio"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
@@ -149,6 +150,55 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 
 	cf.Configure(p.Vnet, s)
 	return
+}
+
+func (p *platform) QsfpioInit() {
+	qsfpio.Vdev[0].Bus = 0
+	qsfpio.Vdev[0].Addr = 0x20
+	qsfpio.Vdev[0].MuxBus = 0
+	qsfpio.Vdev[0].MuxAddr = 0x70
+	qsfpio.Vdev[0].MuxValue = 0x10
+
+	qsfpio.Vdev[1].Bus = 0
+	qsfpio.Vdev[1].Addr = 0x21
+	qsfpio.Vdev[1].MuxBus = 0
+	qsfpio.Vdev[1].MuxAddr = 0x70
+	qsfpio.Vdev[1].MuxValue = 0x10
+
+	qsfpio.VpageByKey = map[string]uint8{
+		"port.1.qsfp.type":  0,
+		"port.2.qsfp.type":  0,
+		"port.3.qsfp.type":  0,
+		"port.4.qsfp.type":  0,
+		"port.5.qsfp.type":  0,
+		"port.6.qsfp.type":  0,
+		"port.7.qsfp.type":  0,
+		"port.8.qsfp.type":  0,
+		"port.9.qsfp.type":  0,
+		"port.10.qsfp.type": 0,
+		"port.11.qsfp.type": 0,
+		"port.12.qsfp.type": 0,
+		"port.13.qsfp.type": 0,
+		"port.14.qsfp.type": 0,
+		"port.15.qsfp.type": 0,
+		"port.16.qsfp.type": 0,
+		"port.17.qsfp.type": 1,
+		"port.18.qsfp.type": 1,
+		"port.19.qsfp.type": 1,
+		"port.20.qsfp.type": 1,
+		"port.21.qsfp.type": 1,
+		"port.22.qsfp.type": 1,
+		"port.23.qsfp.type": 1,
+		"port.24.qsfp.type": 1,
+		"port.25.qsfp.type": 1,
+		"port.26.qsfp.type": 1,
+		"port.27.qsfp.type": 1,
+		"port.28.qsfp.type": 1,
+		"port.29.qsfp.type": 1,
+		"port.30.qsfp.type": 1,
+		"port.31.qsfp.type": 1,
+		"port.32.qsfp.type": 1,
+	}
 }
 
 func deviceVersion() (ver int, err error) {

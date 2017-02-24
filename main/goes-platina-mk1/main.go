@@ -15,7 +15,9 @@ import (
 	"github.com/platinasystems/go/internal/optional/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
+	"github.com/platinasystems/go/internal/optional/i2cd"
 	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
+	"github.com/platinasystems/go/internal/optional/telnetd"
 	"github.com/platinasystems/go/internal/optional/vnet"
 	"github.com/platinasystems/go/internal/optional/vnetd"
 	"github.com/platinasystems/go/internal/prog"
@@ -31,6 +33,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
+	"github.com/platinasystems/go/vnet/devices/optics/qsfpio"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -41,6 +44,7 @@ import (
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
+	var h platform
 	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	license.Others = []license.Other{{fe1path, copyright.License}}
 	patents.Others = []patents.Other{{fe1path, copyright.Patents}}
@@ -50,12 +54,16 @@ func main() {
 		eeprom.New(),
 		gpio.New(),
 		i2c.New(),
+		telnetd.New(),
+		i2cd.New(),
+		qsfpio.New(),
 		toggle.New(),
 		vnet.New(),
 		vnetd.New(),
 	)
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
+	h.QsfpioInit()
 	redisd.Hook = platina_eeprom.RedisdHook
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
