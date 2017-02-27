@@ -514,8 +514,9 @@ func (h *I2cDev) PMBusRev() uint16 {
 }
 
 func (h *I2cDev) MfgIdent() string {
+	var l byte = 15
 	r := getRegs()
-	r.MfgId.get(h)
+	r.MfgId.get(h, l)
 	DoI2cRpc()
 	n := s[1].D[1] + 2
 	t := string(s[1].D[2:n])
@@ -528,8 +529,9 @@ func (h *I2cDev) MfgIdent() string {
 }
 
 func (h *I2cDev) MfgModel() string {
+	var l byte = 15
 	r := getRegs()
-	r.MfgMod.get(h)
+	r.MfgMod.get(h, l)
 	DoI2cRpc()
 	n := s[1].D[1] + 2
 	t := string(s[1].D[2:n])
