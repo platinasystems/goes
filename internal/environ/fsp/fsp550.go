@@ -257,10 +257,22 @@ func (cmd *cmd) update() error {
 				cmd.lastu[k] = v
 			}
 		}
+		if strings.Contains(k, "mfg_id") {
+			v := Vdev[i].MfgIdent()
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "mfg_model") {
+			v := Vdev[i].MfgModel()
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
+			}
+		}
 	}
 	return nil
-	//				"psu1.mfg_id":       ps1.MfgIdent(),
-	//				"psu1.mfg_model":    ps1.MfgModel(),
 }
 
 func (h *I2cDev) convert(v uint16) float64 {
@@ -501,10 +513,12 @@ func (h *I2cDev) PMBusRev() uint16 {
 	return uint16(t)
 }
 
-/*
 func (h *I2cDev) MfgIdent() string {
 	r := getRegs()
-	t := r.MfgId.get(h)
+	r.MfgId.get(h)
+	DoI2cRpc()
+	n := s[1].D[1] + 2
+	t := string(s[1].D[2:n])
 	if t == "Not Supported" {
 		t = "FSP"
 	}
@@ -515,14 +529,17 @@ func (h *I2cDev) MfgIdent() string {
 
 func (h *I2cDev) MfgModel() string {
 	r := getRegs()
-	t := r.MfgMod.get(h)
+	r.MfgMod.get(h)
+	DoI2cRpc()
+	n := s[1].D[1] + 2
+	t := string(s[1].D[2:n])
 	if t == "Not Supported" {
 		t = "FSP"
 	}
 	t = strings.Trim(t, "#")
+	h.Id = t
 	return t
 }
-*/
 
 func (h *I2cDev) PsuStatus() string {
 	pin, found := gpio.Pins[h.GpioPrsntL]

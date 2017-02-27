@@ -63,87 +63,16 @@ func (r *reg8) get(h *I2cDev) {
 	x++
 }
 
-/*
-func (r *reg8b) get(h *I2cDev) string {
-	var data i2c.SMBusData
-	if h.Installed == 0 {
-		return "not installed"
-	}
-	i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in fsp550: get8b: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}()
+func (r *reg8b) get(h *I2cDev) {
+	var data = [34]byte{0, 0, 0, 0}
+
 	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8b MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	data[0] = 2
-	for i := 0; i < 5000; i++ { // read count into data[0]
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8b Count #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	count := data[0] + 1
-	for i := 0; i < 5000; i++ { // recover bus
-		err := h.i2cDo(i2c.Read, 0, i2c.ByteData, &data)
-		if err == nil {
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	if (count == 0) || (count == 1) {
-		s := "Not Supported"
-		return s
-	}
-	data[0] = count
-	for i := 0; i < 5000; i++ { // read block
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.BlockData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("fsp550: get8b #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	s := string(data[1:(data[0])])
-	for i := 0; i < 5000; i++ { // recover bus
-		err := h.i2cDo(i2c.Read, 0, i2c.ByteData, &data)
-		if err == nil {
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-	return s
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+	data[0] = byte(32)
+	j[x] = I{true, i2c.Read, r.offset(), i2c.I2CBlockData, data, h.Bus, h.Addr, 0}
+	x++
 }
-func (r *regi16) get(h *I2cDev) (v int16) { v = int16((*reg16)(r).get(h)); return }
-func (r *regi16) set(h *I2cDev, v int16)  { (*reg16)(r).set(h, uint16(v)) }
-*/
 
 func (r *reg16) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
