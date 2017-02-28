@@ -5,15 +5,12 @@
 package qsfpio
 
 import (
-	//	"strconv"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/log"
-	//	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -102,7 +99,6 @@ func (cmd *cmd) update() error {
 		for j := 1; j < 33; j++ {
 			if strings.Contains(k, "port."+strconv.Itoa(int(j))+".") {
 				port = uint8(j) - 1
-				//log.Print("qsfp port: ", port)
 				break
 			}
 		}
@@ -149,7 +145,6 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 	}
 
 	pmask := uint16(1) << (port % 16)
-	log.Print("p: ", present, " port: ", port, " pmask: ", pmask)
 	if (present&pmask)>>(port%16) == 1 {
 		return "not_installed"
 	}
