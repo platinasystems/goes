@@ -88,9 +88,9 @@ var r = R{b, nil}
 var s [MAXOPS]R
 var x int
 var stopped byte = 0
+var mutex = &sync.Mutex{}
 
 func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
-	var mutex = &sync.Mutex{}
 	mutex.Lock()
 	defer mutex.Unlock()
 
