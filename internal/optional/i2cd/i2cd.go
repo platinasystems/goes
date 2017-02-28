@@ -136,6 +136,9 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 				}
 			}
 			bus.Close()
+			if g[x].Delay > 0 {
+				time.Sleep(time.Duration(g[x].Delay) * time.Millisecond)
+			}
 		}
 	}
 	return nil
