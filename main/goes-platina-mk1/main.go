@@ -33,6 +33,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
+	"github.com/platinasystems/go/vnet/devices/optics/qsfp"
 	"github.com/platinasystems/go/vnet/devices/optics/qsfpio"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
@@ -56,6 +57,7 @@ func main() {
 		i2c.New(),
 		telnetd.New(),
 		i2cd.New(),
+		qsfp.New(),
 		qsfpio.New(),
 		toggle.New(),
 		vnet.New(),
@@ -64,6 +66,7 @@ func main() {
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
 	h.QsfpioInit()
+	h.QsfpInit()
 	redisd.Hook = platina_eeprom.RedisdHook
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",

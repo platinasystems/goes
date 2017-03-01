@@ -28,7 +28,7 @@ type qsfpI2cGpio struct {
 	present [2]uint16
 }
 
-var Vdev [2]I2cDev
+var Vdev [8]I2cDev
 var qsfpIG qsfpI2cGpio
 
 var VpageByKey map[string]uint8
@@ -67,7 +67,7 @@ func (cmd *cmd) Main(...string) error {
 	//	close(cmd.stop)
 	//	return err
 	//}
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 	for {
 		select {
