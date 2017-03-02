@@ -211,39 +211,41 @@ func (p *platform) QsfpioInit() {
 	qsfpio.Vdev[7].MuxValue = 0x20
 
 	qsfpio.VpageByKey = map[string]uint8{
-		"port.1.qsfp.type":  0,
-		"port.2.qsfp.type":  0,
-		"port.3.qsfp.type":  0,
-		"port.4.qsfp.type":  0,
-		"port.5.qsfp.type":  0,
-		"port.6.qsfp.type":  0,
-		"port.7.qsfp.type":  0,
-		"port.8.qsfp.type":  0,
-		"port.9.qsfp.type":  0,
-		"port.10.qsfp.type": 0,
-		"port.11.qsfp.type": 0,
-		"port.12.qsfp.type": 0,
-		"port.13.qsfp.type": 0,
-		"port.14.qsfp.type": 0,
-		"port.15.qsfp.type": 0,
-		"port.16.qsfp.type": 0,
-		"port.17.qsfp.type": 1,
-		"port.18.qsfp.type": 1,
-		"port.19.qsfp.type": 1,
-		"port.20.qsfp.type": 1,
-		"port.21.qsfp.type": 1,
-		"port.22.qsfp.type": 1,
-		"port.23.qsfp.type": 1,
-		"port.24.qsfp.type": 1,
-		"port.25.qsfp.type": 1,
-		"port.26.qsfp.type": 1,
-		"port.27.qsfp.type": 1,
-		"port.28.qsfp.type": 1,
-		"port.29.qsfp.type": 1,
-		"port.30.qsfp.type": 1,
-		"port.31.qsfp.type": 1,
-		"port.32.qsfp.type": 1,
+		"port.1.qsfp.presence":  0,
+		"port.2.qsfp.presence":  0,
+		"port.3.qsfp.presence":  0,
+		"port.4.qsfp.presence":  0,
+		"port.5.qsfp.presence":  0,
+		"port.6.qsfp.presence":  0,
+		"port.7.qsfp.presence":  0,
+		"port.8.qsfp.presence":  0,
+		"port.9.qsfp.presence":  0,
+		"port.10.qsfp.presence": 0,
+		"port.11.qsfp.presence": 0,
+		"port.12.qsfp.presence": 0,
+		"port.13.qsfp.presence": 0,
+		"port.14.qsfp.presence": 0,
+		"port.15.qsfp.presence": 0,
+		"port.16.qsfp.presence": 0,
+		"port.17.qsfp.presence": 1,
+		"port.18.qsfp.presence": 1,
+		"port.19.qsfp.presence": 1,
+		"port.20.qsfp.presence": 1,
+		"port.21.qsfp.presence": 1,
+		"port.22.qsfp.presence": 1,
+		"port.23.qsfp.presence": 1,
+		"port.24.qsfp.presence": 1,
+		"port.25.qsfp.presence": 1,
+		"port.26.qsfp.presence": 1,
+		"port.27.qsfp.presence": 1,
+		"port.28.qsfp.presence": 1,
+		"port.29.qsfp.presence": 1,
+		"port.30.qsfp.presence": 1,
+		"port.31.qsfp.presence": 1,
+		"port.32.qsfp.presence": 1,
 	}
+
+	return
 }
 
 func (p *platform) QsfpInit() {
@@ -535,27 +537,7 @@ func (p *platform) QsfpInit() {
 	qsfp.Vdev[31].MuxAddr2 = 0x71
 	qsfp.Vdev[31].MuxValue2 = 0x80
 
-	/* Comment out for now until RPC between qsfpio and qsfp packages are added
-	 */
-	qsfp.VpageByKey = map[string]uint8{
-		"port.1.qsfp.compliance":   1,
-		"port.1.qsfp.vendor":       1,
-		"port.1.qsfp.partnumber":   1,
-		"port.1.qsfp.serialnumber": 1,
-		"port.2.qsfp.compliance":   0,
-		"port.2.qsfp.vendor":       0,
-		"port.2.qsfp.partnumber":   0,
-		"port.2.qsfp.serialnumber": 0,
-		"port.3.qsfp.compliance":   3,
-		"port.3.qsfp.vendor":       3,
-		"port.3.qsfp.partnumber":   3,
-		"port.3.qsfp.serialnumber": 3,
-		"port.4.qsfp.compliance":   2,
-		"port.4.qsfp.vendor":       2,
-		"port.4.qsfp.partnumber":   2,
-		"port.4.qsfp.serialnumber": 2,
-	}
-
+	return
 }
 
 func deviceVersion() (ver int, err error) {

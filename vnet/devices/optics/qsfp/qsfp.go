@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/rpc"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -36,6 +37,7 @@ type I2cDev struct {
 var Vdev [32]I2cDev
 
 var VpageByKey map[string]uint8
+var present = [2]uint16{0xffff, 0xffff}
 
 type cmd struct {
 	stop  chan struct{}
@@ -82,7 +84,7 @@ func (cmd *cmd) Main(...string) error {
 	//		close(cmd.stop)
 	//		return err
 	//	}
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 	for {
 		select {
@@ -105,49 +107,87 @@ func (cmd *cmd) Close() error {
 
 func (cmd *cmd) update() error {
 	stopped := readStopped()
+
 	if stopped == 1 {
 		return nil
 	}
 
-	if l.Present[0] == 0 {
-		//add logic here to conditiionally do the read and publish
-		//l will change automatically
-	}
-	if l.Present[1] == 0 {
-		//add logic here to conditiionally do the read and publish
-		//l will change automatically
-	}
+	for j := 0; j < 2; j++ {
 
-	for k, i := range VpageByKey {
-		if strings.Contains(k, "compliance") {
-			v := Vdev[i].Compliance()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
-			}
-		}
-		if strings.Contains(k, "vendor") {
-			v := Vdev[i].Vendor()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
-			}
-		}
-		if strings.Contains(k, "partnumber") {
-			v := Vdev[i].PN()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
-			}
-		}
-		if strings.Contains(k, "serialnumber") {
-			v := Vdev[i].SN()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
+		//when qsfp is installed or removed from a port
+		if present[j] != l.Present[j] {
+			for i := 0; i < 16; i++ {
+				if (1<<uint(i))&(l.Present[j]^present[j]) != 0 {
+					//physical to logical port translation
+					lp := i + j*16
+					if (lp % 2) == 0 {
+						lp += 2
+					}
+					var typeString string
+					if ((1 << uint(i)) & (l.Present[j] ^ 0xffff)) != 0 {
+						//when qsfp is installed, fetch and publish data
+						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
+						v := Vdev[i+j*16].Compliance()
+						typeString += strings.Trim(v, " ") + ", "
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						k = "port." + strconv.Itoa(lp) + ".qsfp.vendor"
+						v = Vdev[i+j*16].Vendor()
+						typeString += strings.Trim(v, " ") + ", "
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						k = "port." + strconv.Itoa(lp) + ".qsfp.partnumber"
+						v = Vdev[i+j*16].PN()
+						typeString += strings.Trim(v, " ") + ", "
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						k = "port." + strconv.Itoa(lp) + ".qsfp.serialnumber"
+						v = Vdev[i+j*16].SN()
+						typeString += strings.Trim(v, " ")
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						log.Print("QSFP detected in port ", lp, ": ", typeString)
+					} else {
+						//when qsfp is removed, publish empty data
+						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
+						v := "empty"
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						k = "port." + strconv.Itoa(lp) + ".qsfp.vendor"
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						k = "port." + strconv.Itoa(lp) + ".qsfp.partnumber"
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						k = "port." + strconv.Itoa(lp) + ".qsfp.serialnumber"
+						if v != cmd.lasts[k] {
+							cmd.pub.Print(k, ": ", v)
+							cmd.lasts[k] = v
+						}
+						log.Print("QSFP removed from port ", lp)
+
+					}
+				}
 			}
 		}
 	}
+	present[0] = l.Present[0]
+	present[1] = l.Present[1]
+
 	return nil
 }
 

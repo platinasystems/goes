@@ -119,8 +119,8 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 	var Present uint16
 
 	if port == 0 || port == 16 {
+		//initialize reset I2C GPIO
 		if qsfpIG.init == 1 {
-			//log.Print("init")
 			Vdev[6].QsfpInit()
 			Vdev[7].QsfpInit()
 			qsfpIG.init = 0
@@ -134,39 +134,25 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		DoI2cRpc()
 		p += uint16(s[1].D[0]) << 8
 		if port == 0 && qsfpIG.Present[0] != p {
+			//Take installed ports out of reset and empty ports in reset
 			Vdev[6].QsfpReset((p ^ qsfpIG.Present[0]), p^0xffff)
-			//log.Printf("ports 1-16 changed: 0x%x", p^qsfpIG.Present[0])
-			for i := 0; i < 16; i++ {
-				if (1<<uint(i))&(p^qsfpIG.Present[0]) != 0 {
-					lp := i
-					if (lp % 2) == 0 {
-						lp += 2
-					}
-					if ((p ^ qsfpIG.Present[0]) & (p ^ 0xffff)) != 0 {
-						log.Print("QSFP detected in port ", lp)
-					} else {
-						log.Print("QSFP removed from port ", lp)
-					}
-				}
-			}
 			qsfpIG.Present[0] = p
-		} else if port == 16 && qsfpIG.Present[1] != p {
-			//log.Printf("ports 17-32 changed: 0x%x", p^qsfpIG.Present[1])
-			Vdev[7].QsfpReset((p ^ qsfpIG.Present[1]), p^0xffff)
-			for i := 0; i < 16; i++ {
-				if (1<<uint(i))&(p^qsfpIG.Present[1]) != 0 {
-					lp := i + 16
-					if (lp % 2) == 0 {
-						lp += 2
-					}
-					if ((p ^ qsfpIG.Present[1]) & (p ^ 0xffff)) != 0 {
-						log.Print("QSFP detected in port ", lp)
-					} else {
-						log.Print("QSFP removed from port ", lp)
-					}
-				}
+
+			//send to qspi.go
+			err := SendPresRpc()
+			if err != nil {
+				log.Print("SendPresRpc error:", err)
 			}
+		} else if port == 16 && qsfpIG.Present[1] != p {
+			//Take installed ports out of reset and empty ports in reset
+			Vdev[7].QsfpReset((p ^ qsfpIG.Present[1]), p^0xffff)
 			qsfpIG.Present[1] = p
+
+			//send to qspi.go
+			err := SendPresRpc()
+			if err != nil {
+				log.Print("SendPresRpc error:", err)
+			}
 		}
 	}
 
@@ -176,43 +162,34 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		Present = qsfpIG.Present[1]
 	}
 
-	//swap upper/lower ports
+	//swap upper/lower ports to match front panel numbering
 	if (port % 2) == 0 {
 		port++
 	} else {
 		port--
 	}
 
-	//send to qspi.go
-	err := SendPresRpc()
-	if err != nil {
-		log.Print("SendPresRpc error:", err)
-	}
-
 	pmask := uint16(1) << (port % 16)
 	if (Present&pmask)>>(port%16) == 1 {
-		return "not_installed"
+		return "empty"
 	}
 	return "installed"
 }
 
 func (h *I2cDev) QsfpReset(ports uint16, reset uint16) {
 
-	//log.Printf("port 0x%x, reset 0x%x", ports, reset)
-
+	//if module was removed or inserted into a port, set reset line accordingly
 	r := getRegs()
 	if (ports & 0xff) != 0 {
 		r.Output[0].get(h)
 		DoI2cRpc()
 		v := uint8((s[1].D[0] & uint8((ports&0xff)^0xff)) | uint8((ports&reset)&0xff))
-		//log.Printf("old 0x%x mask 0x%x reset 0x%x new 0x%x", s[1].D[0], uint8((ports&0xff)^0xff), uint8((ports&reset)&0xff), v)
 		r.Output[0].set(h, v)
 	}
 	if (ports & 0xff00) != 0 {
 		r.Output[1].get(h)
 		DoI2cRpc()
 		v := uint8((s[1].D[0] & uint8(((ports&0xff00)>>8)^0xff)) | uint8(((ports&reset)&0xff00)>>8))
-		//log.Printf("old 0x%x mask 0x%x reset 0x%x new 0x%x", s[1].D[0], uint8(((ports&0xff00)>>8)^0xff), uint8(((ports&reset)&0xff00)>>8), v)
 		r.Output[1].set(h, v)
 	}
 	DoI2cRpc()
@@ -220,6 +197,7 @@ func (h *I2cDev) QsfpReset(ports uint16, reset uint16) {
 }
 
 func (h *I2cDev) QsfpInit() {
+	//all ports default in reset
 	r := getRegs()
 	r.Output[0].set(h, 0x0)
 	r.Output[1].set(h, 0x0)
