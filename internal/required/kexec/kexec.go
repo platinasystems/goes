@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/platinasystems/go/internal/fit"
@@ -35,6 +36,23 @@ func (cmd) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 
+	kc, err := ioutil.ReadFile("/proc/cmdline")
+	if err != nil {
+		fmt.Printf("Warning: unable to read kernel command line: %v\n",
+			err)
+	}
+
+	kcstr := strings.TrimSpace(string(kc))
+
+	cmdline := parm["-c"]
+	if cmdline != "" {
+		if cmdline[0] == '+' {
+			cmdline = kcstr + " " + cmdline[1:]
+		}
+	} else {
+		cmdline = kcstr
+	}
+
 	if image := parm["-l"]; len(image) > 0 {
 		err = loadFit(image, parm["-x"])
 		if err != nil {
@@ -43,7 +61,7 @@ func (cmd) Main(args ...string) error {
 	}
 
 	if kernel := parm["-k"]; len(kernel) > 0 {
-		err = loadKernel(kernel, parm["-i"], parm["-c"])
+		err = loadKernel(kernel, parm["-i"], cmdline)
 		if err != nil {
 			return err
 		}
