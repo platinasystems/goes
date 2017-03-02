@@ -121,8 +121,14 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 	if port == 0 || port == 16 {
 		//initialize reset I2C GPIO
 		if qsfpIG.init == 1 {
-			Vdev[6].QsfpInit()
-			Vdev[7].QsfpInit()
+			Vdev[0].QsfpInit(0xff, 0xff, 0xff, 0xff)
+			Vdev[1].QsfpInit(0xff, 0xff, 0xff, 0xff)
+			Vdev[2].QsfpInit(0xff, 0xff, 0xff, 0xff)
+			Vdev[3].QsfpInit(0xff, 0xff, 0xff, 0xff)
+			Vdev[4].QsfpInit(0xff, 0xff, 0x00, 0x00)
+			Vdev[5].QsfpInit(0xff, 0xff, 0x00, 0x00)
+			Vdev[6].QsfpInit(0x0, 0x0, 0x0, 0x0)
+			Vdev[7].QsfpInit(0x0, 0x0, 0x0, 0x0)
 			qsfpIG.init = 0
 		}
 
@@ -134,8 +140,9 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		DoI2cRpc()
 		p += uint16(s[1].D[0]) << 8
 		if port == 0 && qsfpIG.Present[0] != p {
-			//Take installed ports out of reset and empty ports in reset
+			//Take port out of reset and LP mode if qsfp is installed
 			Vdev[6].QsfpReset((p ^ qsfpIG.Present[0]), p^0xffff)
+			Vdev[4].QsfpLpMode((p ^ qsfpIG.Present[0]), p)
 			qsfpIG.Present[0] = p
 
 			//send to qspi.go
@@ -144,8 +151,9 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 				log.Print("SendPresRpc error:", err)
 			}
 		} else if port == 16 && qsfpIG.Present[1] != p {
-			//Take installed ports out of reset and empty ports in reset
+			//Take port out of reset and LP mode if qsfp is installed
 			Vdev[7].QsfpReset((p ^ qsfpIG.Present[1]), p^0xffff)
+			Vdev[5].QsfpLpMode((p ^ qsfpIG.Present[1]), p)
 			qsfpIG.Present[1] = p
 
 			//send to qspi.go
@@ -196,14 +204,34 @@ func (h *I2cDev) QsfpReset(ports uint16, reset uint16) {
 	return
 }
 
-func (h *I2cDev) QsfpInit() {
+func (h *I2cDev) QsfpLpMode(ports uint16, reset uint16) {
+
+	//if module was removed or inserted into a port, set reset line accordingly
+	r := getRegs()
+	if (ports & 0xff) != 0 {
+		r.Output[0].get(h)
+		DoI2cRpc()
+		v := uint8((s[1].D[0] & uint8((ports&0xff)^0xff)) | uint8((ports&reset)&0xff))
+		r.Output[0].set(h, v)
+	}
+	if (ports & 0xff00) != 0 {
+		r.Output[1].get(h)
+		DoI2cRpc()
+		v := uint8((s[1].D[0] & uint8(((ports&0xff00)>>8)^0xff)) | uint8(((ports&reset)&0xff00)>>8))
+		r.Output[1].set(h, v)
+	}
+	DoI2cRpc()
+	return
+}
+
+func (h *I2cDev) QsfpInit(out0 byte, out1 byte, conf0 byte, conf1 byte) {
 	//all ports default in reset
 	r := getRegs()
-	r.Output[0].set(h, 0x0)
-	r.Output[1].set(h, 0x0)
+	r.Output[0].set(h, out0)
+	r.Output[1].set(h, out1)
 	DoI2cRpc()
-	r.Config[0].set(h, 0x0)
-	r.Config[1].set(h, 0x0)
+	r.Config[0].set(h, conf0)
+	r.Config[1].set(h, conf1)
 	DoI2cRpc()
 	return
 }

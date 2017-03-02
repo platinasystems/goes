@@ -17,7 +17,6 @@ import (
 	"github.com/platinasystems/go/internal/optional/i2c"
 	"github.com/platinasystems/go/internal/optional/i2cd"
 	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
-	"github.com/platinasystems/go/internal/optional/telnetd"
 	"github.com/platinasystems/go/internal/optional/vnet"
 	"github.com/platinasystems/go/internal/optional/vnetd"
 	"github.com/platinasystems/go/internal/prog"
@@ -55,7 +54,6 @@ func main() {
 		eeprom.New(),
 		gpio.New(),
 		i2c.New(),
-		telnetd.New(),
 		i2cd.New(),
 		qsfp.New(),
 		qsfpio.New(),

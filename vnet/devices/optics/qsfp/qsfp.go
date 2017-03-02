@@ -18,6 +18,7 @@ import (
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -84,6 +85,7 @@ func (cmd *cmd) Main(...string) error {
 	//		close(cmd.stop)
 	//		return err
 	//	}
+	time.Sleep(5 * time.Second)
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 	for {
@@ -107,7 +109,6 @@ func (cmd *cmd) Close() error {
 
 func (cmd *cmd) update() error {
 	stopped := readStopped()
-
 	if stopped == 1 {
 		return nil
 	}
@@ -128,6 +129,42 @@ func (cmd *cmd) update() error {
 						//when qsfp is installed, fetch and publish data
 						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
 						v := Vdev[i+j*16].Compliance()
+
+						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
+						if err != nil {
+							log.Print("qsfp hget error:", err)
+						}
+						speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed")
+						if err != nil {
+							log.Print("qsfp hget error:", err)
+						}
+						if strings.Contains(v, "-CR") {
+							if media != "copper" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "copper")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									log.Printf("Port %d set to copper", lp)
+								}
+							}
+						} else {
+							if media != "fiber" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									log.Printf("Port %d set to fiber", lp)
+								}
+							}
+							if speed != "100g" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "100g")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									log.Print("Port %d set to fixed speed 100G", lp)
+								}
+							}
+						}
 						typeString += strings.Trim(v, " ") + ", "
 						if v != cmd.lasts[k] {
 							cmd.pub.Print(k, ": ", v)
