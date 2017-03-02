@@ -198,14 +198,14 @@ func (p *platform) QsfpioInit() {
 
 	//port 1-16 reset signals
 	qsfpio.Vdev[6].Bus = 0
-	qsfpio.Vdev[6].Addr = 0x21
+	qsfpio.Vdev[6].Addr = 0x22
 	qsfpio.Vdev[6].MuxBus = 0
 	qsfpio.Vdev[6].MuxAddr = 0x70
 	qsfpio.Vdev[6].MuxValue = 0x20
 
 	//port 1-32 reset signals
 	qsfpio.Vdev[7].Bus = 0
-	qsfpio.Vdev[7].Addr = 0x21
+	qsfpio.Vdev[7].Addr = 0x23
 	qsfpio.Vdev[7].MuxBus = 0
 	qsfpio.Vdev[7].MuxAddr = 0x70
 	qsfpio.Vdev[7].MuxValue = 0x20
@@ -536,6 +536,7 @@ func (p *platform) QsfpInit() {
 	qsfp.Vdev[31].MuxValue2 = 0x80
 
 	/* Comment out for now until RPC between qsfpio and qsfp packages are added
+	 */
 	qsfp.VpageByKey = map[string]uint8{
 		"port.1.qsfp.compliance":   1,
 		"port.1.qsfp.vendor":       1,
@@ -554,7 +555,7 @@ func (p *platform) QsfpInit() {
 		"port.4.qsfp.partnumber":   2,
 		"port.4.qsfp.serialnumber": 2,
 	}
-	*/
+
 }
 
 func deviceVersion() (ver int, err error) {
