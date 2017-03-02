@@ -206,7 +206,7 @@ type X struct {
 }
 type QsfpPres int
 
-var l QsfpI2cGpio
+var l = QsfpI2cGpio{[2]uint16{0xffff, 0xffff}}
 var mutex = &sync.Mutex{}
 
 func (t *QsfpPres) Write(g *QsfpI2cGpio, f *X) error {
