@@ -145,3 +145,29 @@ func DoI2cRpc() {
 	clearJ()
 	return
 }
+
+var clientB *rpc.Client
+var dialedB int = 0
+
+type X struct {
+	Resp uint32
+}
+type QsfpPres int
+
+var y X
+
+func SendPresRpc() error {
+	if dialedB == 0 {
+		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1232")
+		if err != nil {
+			log.Print("dialing:", err)
+		}
+		clientB = client
+		dialedB = 1
+	}
+	err := clientB.Call("QsfpPres.Write", &qsfpIG, &y)
+	if err != nil {
+		log.Print("qsfpPres error:", err)
+	}
+	return err
+}

@@ -7,11 +7,16 @@
 package qsfp
 
 import (
+	"net"
+	"net/http"
+	"net/rpc"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -49,6 +54,16 @@ func (*cmd) Usage() string   { return Name }
 func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
+
+	qsfpPres := new(QsfpPres)
+	rpc.Register(qsfpPres)
+	rpc.HandleHTTP()
+	l, e := net.Listen("tcp", ":1232")
+	if e != nil {
+		log.Print("listen ERROR QsfpPres:", e)
+	}
+	log.Print("listen QsfpPres OKAY")
+	go http.Serve(l, nil)
 
 	cmd.stop = make(chan struct{})
 	cmd.last = make(map[string]float64)
@@ -93,6 +108,16 @@ func (cmd *cmd) update() error {
 	if stopped == 1 {
 		return nil
 	}
+
+	if l.Present[0] == 0 {
+		//add logic here to conditiionally do the read and publish
+		//l will change automatically
+	}
+	if l.Present[1] == 0 {
+		//add logic here to conditiionally do the read and publish
+		//l will change automatically
+	}
+
 	for k, i := range VpageByKey {
 		if strings.Contains(k, "compliance") {
 			v := Vdev[i].Compliance()
@@ -171,4 +196,24 @@ func (h *I2cDev) SN() string {
 	t := string(s[2].D[1:16])
 
 	return t
+}
+
+type QsfpI2cGpio struct {
+	Present [2]uint16
+}
+type X struct {
+	Resp uint32
+}
+type QsfpPres int
+
+var l QsfpI2cGpio
+var mutex = &sync.Mutex{}
+
+func (t *QsfpPres) Write(g *QsfpI2cGpio, f *X) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	l = *g
+	f.Resp = 0
+	return nil
 }

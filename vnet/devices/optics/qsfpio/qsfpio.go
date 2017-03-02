@@ -25,13 +25,13 @@ type I2cDev struct {
 	MuxValue int
 }
 
-type qsfpI2cGpio struct {
+type QsfpI2cGpio struct {
 	init    int
-	present [2]uint16
+	Present [2]uint16
 }
 
 var Vdev [8]I2cDev
-var qsfpIG qsfpI2cGpio
+var qsfpIG QsfpI2cGpio
 
 var VpageByKey map[string]uint8
 
@@ -51,8 +51,8 @@ func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
 
-	qsfpIG.present[0] = 0xffff
-	qsfpIG.present[1] = 0xffff
+	qsfpIG.Present[0] = 0xffff
+	qsfpIG.Present[1] = 0xffff
 	qsfpIG.init = 1
 
 	cmd.stop = make(chan struct{})
@@ -116,7 +116,7 @@ func (cmd *cmd) update() error {
 
 func (h *I2cDev) QsfpStatus(port uint8) string {
 	r := getRegs()
-	var present uint16
+	var Present uint16
 
 	if port == 0 || port == 16 {
 		if qsfpIG.init == 1 {
@@ -133,47 +133,47 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		r.Input[1].get(h)
 		DoI2cRpc()
 		p += uint16(s[1].D[0]) << 8
-		if port == 0 && qsfpIG.present[0] != p {
-			Vdev[6].QsfpReset((p ^ qsfpIG.present[0]), p^0xffff)
-			//log.Printf("ports 1-16 changed: 0x%x", p^qsfpIG.present[0])
+		if port == 0 && qsfpIG.Present[0] != p {
+			Vdev[6].QsfpReset((p ^ qsfpIG.Present[0]), p^0xffff)
+			//log.Printf("ports 1-16 changed: 0x%x", p^qsfpIG.Present[0])
 			for i := 0; i < 16; i++ {
-				if (1<<uint(i))&(p^qsfpIG.present[0]) != 0 {
+				if (1<<uint(i))&(p^qsfpIG.Present[0]) != 0 {
 					lp := i
 					if (lp % 2) == 0 {
 						lp += 2
 					}
-					if ((p ^ qsfpIG.present[0]) & (p ^ 0xffff)) != 0 {
+					if ((p ^ qsfpIG.Present[0]) & (p ^ 0xffff)) != 0 {
 						log.Print("QSFP detected in port ", lp)
 					} else {
 						log.Print("QSFP removed from port ", lp)
 					}
 				}
 			}
-			qsfpIG.present[0] = p
-		} else if port == 16 && qsfpIG.present[1] != p {
-			//log.Printf("ports 17-32 changed: 0x%x", p^qsfpIG.present[1])
-			Vdev[7].QsfpReset((p ^ qsfpIG.present[1]), p^0xffff)
+			qsfpIG.Present[0] = p
+		} else if port == 16 && qsfpIG.Present[1] != p {
+			//log.Printf("ports 17-32 changed: 0x%x", p^qsfpIG.Present[1])
+			Vdev[7].QsfpReset((p ^ qsfpIG.Present[1]), p^0xffff)
 			for i := 0; i < 16; i++ {
-				if (1<<uint(i))&(p^qsfpIG.present[1]) != 0 {
+				if (1<<uint(i))&(p^qsfpIG.Present[1]) != 0 {
 					lp := i + 16
 					if (lp % 2) == 0 {
 						lp += 2
 					}
-					if ((p ^ qsfpIG.present[1]) & (p ^ 0xffff)) != 0 {
+					if ((p ^ qsfpIG.Present[1]) & (p ^ 0xffff)) != 0 {
 						log.Print("QSFP detected in port ", lp)
 					} else {
 						log.Print("QSFP removed from port ", lp)
 					}
 				}
 			}
-			qsfpIG.present[1] = p
+			qsfpIG.Present[1] = p
 		}
 	}
 
 	if port < 16 {
-		present = qsfpIG.present[0]
+		Present = qsfpIG.Present[0]
 	} else {
-		present = qsfpIG.present[1]
+		Present = qsfpIG.Present[1]
 	}
 
 	//swap upper/lower ports
@@ -183,8 +183,14 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		port--
 	}
 
+	//send to qspi.go
+	err := SendPresRpc()
+	if err != nil {
+		log.Print("SendPresRpc error:", err)
+	}
+
 	pmask := uint16(1) << (port % 16)
-	if (present&pmask)>>(port%16) == 1 {
+	if (Present&pmask)>>(port%16) == 1 {
 		return "not_installed"
 	}
 	return "installed"
