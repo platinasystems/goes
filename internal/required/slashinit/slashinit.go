@@ -18,6 +18,7 @@ package slashinit
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,6 +108,7 @@ func init() {
 
 type cmd goes.ByName
 
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 func (*cmd) String() string { return Name }
 func (*cmd) Usage() string  { return Name }
 
@@ -340,6 +342,33 @@ func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
 				mountPoint, err))
 		}
 	}
+
+	if root == "auto" {
+		err := byName.Main("mount", "-p", "-F", mountPoint)
+		if err != nil {
+			panic(fmt.Errorf("Error in automount: %v", err))
+		}
+		err = byName.Main("resize")
+		bootCmd := []string{"boot"}
+		if script != "" {
+			bootCmd = append(bootCmd, "-t")
+			bootCmd = append(bootCmd, script)
+		}			
+		dirs, err := ioutil.ReadDir(mountPoint)
+		if err != nil {
+			panic(fmt.Errorf("Error reading automount dir: %v",
+				err))
+		}
+		for _, dir := range dirs {
+			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
+				":+root=/dev/"+dir.Name())
+			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
+				"/boot:+root=/dev/"+dir.Name())
+		}
+		err = byName.Main(bootCmd...)
+		panic(fmt.Errorf("Error in autoboot: %v", err))
+	}
+
 	err = byName.Main("mount", root, mountPoint)
 	if err != nil {
 		panic(fmt.Errorf("Error mounting %s on %s: %s",
