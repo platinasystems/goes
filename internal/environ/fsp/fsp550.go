@@ -102,182 +102,239 @@ func (cmd *cmd) update() error {
 	if stopped == 1 {
 		return nil
 	}
+
 	for k, i := range VpageByKey {
-		if strings.Contains(k, "psu_status") {
-			v := Vdev[i].PsuStatus()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
+
+		pin, found := gpio.Pins[Vdev[i].GpioPrsntL]
+		t, err := pin.Value()
+		if !found || err != nil || t {
+			//not present
+			if strings.Contains(k, "psu_status") {
+				v := Vdev[i].PsuStatus()
+				if v != cmd.lasts[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lasts[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "admin.state") {
-			v := Vdev[i].GetAdminState()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
+			if strings.Contains(k, "admin.state") {
+				v := Vdev[i].GetAdminState()
+				if v != cmd.lasts[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lasts[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "page") {
-			v := Vdev[i].Page()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature1"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature2"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out"
+			cmd.pub.Print("delete: ", k)
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in"
+			cmd.pub.Print("delete: ", k)
+
+			if err != nil {
+				log.Print("fsp550 gpio error: ", err)
 			}
-		}
-		if strings.Contains(k, "status_word") {
-			v := Vdev[i].StatusWord()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+		} else {
+			//present
+			if strings.Contains(k, "psu_status") {
+				v := Vdev[i].PsuStatus()
+				if v != cmd.lasts[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lasts[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "status_vout") {
-			v := Vdev[i].StatusVout()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "admin.state") {
+				v := Vdev[i].GetAdminState()
+				if v != cmd.lasts[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lasts[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "status_iout") {
-			v := Vdev[i].StatusIout()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "page") {
+				v := Vdev[i].Page()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "status_input") {
-			v := Vdev[i].StatusInput()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "status_word") {
+				v := Vdev[i].StatusWord()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "v_in") {
-			v := Vdev[i].Vin()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "status_vout") {
+				v := Vdev[i].StatusVout()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "i_in") {
-			v := Vdev[i].Iin()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "status_iout") {
+				v := Vdev[i].StatusIout()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "v_out") {
-			v := Vdev[i].Vout()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "status_input") {
+				v := Vdev[i].StatusInput()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "i_out") {
-			v := Vdev[i].Iout()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "v_in") {
+				v := Vdev[i].Vin()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "status_temp") {
-			v := Vdev[i].StatusTemp()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "i_in") {
+				v := Vdev[i].Iin()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "p_out") {
-			v := Vdev[i].Pout()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "v_out") {
+				v := Vdev[i].Vout()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "p_in") {
-			v := Vdev[i].Pin()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "i_out") {
+				v := Vdev[i].Iout()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "p_out_raw") {
-			v := Vdev[i].PoutRaw()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "status_temp") {
+				v := Vdev[i].StatusTemp()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "p_in_raw") {
-			v := Vdev[i].PinRaw()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "p_out") {
+				v := Vdev[i].Pout()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "p_mode_raw") {
-			v := Vdev[i].ModeRaw()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "p_in") {
+				v := Vdev[i].Pin()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "pmbus_rev") {
-			v := Vdev[i].PMBusRev()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "p_out_raw") {
+				v := Vdev[i].PoutRaw()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "status_fans") {
-			v := Vdev[i].StatusFans()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "p_in_raw") {
+				v := Vdev[i].PinRaw()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "temperature1") {
-			v := Vdev[i].Temp1()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "p_mode_raw") {
+				v := Vdev[i].ModeRaw()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "temperature2") {
-			v := Vdev[i].Temp2()
-			if v != cmd.last[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.last[k] = v
+			if strings.Contains(k, "pmbus_rev") {
+				v := Vdev[i].PMBusRev()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "fan_speed") {
-			v := Vdev[i].FanSpeed()
-			if v != cmd.lastu[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lastu[k] = v
+			if strings.Contains(k, "status_fans") {
+				v := Vdev[i].StatusFans()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "mfg_id") {
-			v := Vdev[i].MfgIdent()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
+			if strings.Contains(k, "temperature1") {
+				v := Vdev[i].Temp1()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
-		}
-		if strings.Contains(k, "mfg_model") {
-			v := Vdev[i].MfgModel()
-			if v != cmd.lasts[k] {
-				cmd.pub.Print(k, ": ", v)
-				cmd.lasts[k] = v
+			if strings.Contains(k, "temperature2") {
+				v := Vdev[i].Temp2()
+				if v != cmd.last[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.last[k] = v
+				}
 			}
+			if strings.Contains(k, "fan_speed") {
+				v := Vdev[i].FanSpeed()
+				if v != cmd.lastu[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lastu[k] = v
+				}
+			}
+			if strings.Contains(k, "mfg_id") {
+				v := Vdev[i].MfgIdent()
+				if v != cmd.lasts[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lasts[k] = v
+				}
+			}
+			if strings.Contains(k, "mfg_model") {
+				v := Vdev[i].MfgModel()
+				if v != cmd.lasts[k] {
+					cmd.pub.Print(k, ": ", v)
+					cmd.lasts[k] = v
+				}
+			}
+
 		}
 	}
 	return nil
 }
 
+func (h *I2cDev) convertVoutMode(voutMode uint8, vout uint16) float64 {
+	var nn float64
+	n := voutMode & 0x1f
+	if n > 0xf {
+		n = ((n ^ 0x1f) + 1) & 0x1f
+		nn = float64(n) * (-1)
+	} else {
+		nn = float64(n)
+	}
+	vv := (float64(vout) * (math.Exp2(nn)))
+	vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
+	return vv
+}
+
 func (h *I2cDev) convert(v uint16) float64 {
-	h.Id = "Great Wall" //
-	if h.Id == "Great Wall" {
+	if strings.Contains(h.Id, "Great Wall") {
 		var nn int
 		var y int
 		if (v >> 11) > 0xf {
@@ -294,10 +351,11 @@ func (h *I2cDev) convert(v uint16) float64 {
 		vv := float64(y) * (math.Exp2(float64(nn)))
 		vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
 		return vv
-	} else if h.Id == "FSP" {
+	} else if strings.Contains(h.Id, "FSP") {
 		r := getRegs()
 		var nn float64
 		r.VoutMode.get(h)
+		closeMux(h)
 		DoI2cRpc()
 		n := (uint16(s[1].D[0])) & 0x1f
 		if n > 0xf {
@@ -317,6 +375,7 @@ func (h *I2cDev) convert(v uint16) float64 {
 func (h *I2cDev) Page() uint16 {
 	r := getRegs()
 	r.Page.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -325,6 +384,7 @@ func (h *I2cDev) Page() uint16 {
 func (h *I2cDev) PageWr(i uint16) {
 	r := getRegs()
 	r.Page.set(h, uint8(i))
+	closeMux(h)
 	DoI2cRpc()
 	return
 }
@@ -332,14 +392,16 @@ func (h *I2cDev) PageWr(i uint16) {
 func (h *I2cDev) StatusWord() uint16 {
 	r := getRegs()
 	r.StatusWord.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	return uint16(t)
 }
 
 func (h *I2cDev) StatusVout() uint16 {
 	r := getRegs()
 	r.StatusVout.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -348,6 +410,7 @@ func (h *I2cDev) StatusVout() uint16 {
 func (h *I2cDev) StatusIout() uint16 {
 	r := getRegs()
 	r.StatusIout.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -356,6 +419,7 @@ func (h *I2cDev) StatusIout() uint16 {
 func (h *I2cDev) StatusInput() uint16 {
 	r := getRegs()
 	r.StatusInput.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -364,6 +428,7 @@ func (h *I2cDev) StatusInput() uint16 {
 func (h *I2cDev) StatusTemp() uint16 {
 	r := getRegs()
 	r.StatusTemp.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -372,6 +437,7 @@ func (h *I2cDev) StatusTemp() uint16 {
 func (h *I2cDev) StatusFans() uint16 {
 	r := getRegs()
 	r.StatusFans.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -380,8 +446,9 @@ func (h *I2cDev) StatusFans() uint16 {
 func (h *I2cDev) Vin() float64 {
 	r := getRegs()
 	r.Vin.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v := h.convert(t)
 	return v
 }
@@ -389,8 +456,9 @@ func (h *I2cDev) Vin() float64 {
 func (h *I2cDev) Iin() float64 {
 	r := getRegs()
 	r.Iin.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v := h.convert(t)
 	return v
 }
@@ -398,27 +466,24 @@ func (h *I2cDev) Iin() float64 {
 func (h *I2cDev) Vout() float64 {
 	r := getRegs()
 	r.Vout.get(h)
-	var nn float64
+	//var nn float64
 	r.VoutMode.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
-	n := (uint16(s[3].D[0])) & 0x1f
-	if n > 0xf {
-		n = ((n ^ 0x1f) + 1) & 0x1f
-		nn = float64(n) * (-1)
-	} else {
-		nn = float64(n)
-	}
-	v := (float64(t) * (math.Exp2(nn)))
-	v, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", v), 64)
+
+	vout := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
+	voutMode := uint8(s[3].D[0])
+	v := h.convertVoutMode(voutMode, vout)
+
 	return v
 }
 
 func (h *I2cDev) Iout() float64 {
 	r := getRegs()
 	r.Iout.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v := h.convert(t)
 	return v
 }
@@ -426,12 +491,13 @@ func (h *I2cDev) Iout() float64 {
 func (h *I2cDev) Temp1() float64 {
 	r := getRegs()
 	r.Temp1.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	var v float64
-	if h.Id == "Great Wall" {
+	if strings.Contains(h.Id, "Great Wall") {
 		v = h.convert(t)
-	} else if h.Id == "FSP" {
+	} else if strings.Contains(h.Id, "FSP") {
 		v = float64(t)
 	}
 	return v
@@ -440,12 +506,13 @@ func (h *I2cDev) Temp1() float64 {
 func (h *I2cDev) Temp2() float64 {
 	r := getRegs()
 	r.Temp2.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	var v float64
-	if h.Id == "Great Wall" {
+	if strings.Contains(h.Id, "Great Wall") {
 		v = h.convert(t)
-	} else if h.Id == "FSP" {
+	} else if strings.Contains(h.Id, "FSP") {
 		v = float64(t)
 	}
 	return v
@@ -454,16 +521,18 @@ func (h *I2cDev) Temp2() float64 {
 func (h *I2cDev) FanSpeed() uint16 {
 	r := getRegs()
 	r.FanSpeed.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[1]) + (uint16(s[1].D[0]) << 8)
 	return t
 }
 
 func (h *I2cDev) Pout() float64 {
 	r := getRegs()
 	r.Pout.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v := h.convert(t)
 	return v
 }
@@ -471,8 +540,9 @@ func (h *I2cDev) Pout() float64 {
 func (h *I2cDev) Pin() float64 {
 	r := getRegs()
 	r.Pin.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v := h.convert(t)
 	return v
 }
@@ -480,16 +550,18 @@ func (h *I2cDev) Pin() float64 {
 func (h *I2cDev) PoutRaw() uint16 {
 	r := getRegs()
 	r.Pout.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	return t
 }
 
 func (h *I2cDev) PinRaw() uint16 {
 	r := getRegs()
 	r.Pin.get(h)
+	closeMux(h)
 	DoI2cRpc()
-	t := uint16(s[1].D[0])
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	return t
 }
 
@@ -497,8 +569,9 @@ func (h *I2cDev) ModeRaw() uint16 {
 	if h.Id == "Great Wall" {
 		r := getRegs()
 		r.Pin.get(h)
+		closeMux(h)
 		DoI2cRpc()
-		t := uint16(s[1].D[0])
+		t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 		return t
 	} else {
 		return 0
@@ -508,6 +581,7 @@ func (h *I2cDev) ModeRaw() uint16 {
 func (h *I2cDev) PMBusRev() uint16 {
 	r := getRegs()
 	r.PMBusRev.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	t := uint16(s[1].D[0])
 	return uint16(t)
@@ -517,6 +591,7 @@ func (h *I2cDev) MfgIdent() string {
 	var l byte = 15
 	r := getRegs()
 	r.MfgId.get(h, l)
+	closeMux(h)
 	DoI2cRpc()
 	n := s[1].D[1] + 2
 	t := string(s[1].D[2:n])
@@ -532,6 +607,7 @@ func (h *I2cDev) MfgModel() string {
 	var l byte = 15
 	r := getRegs()
 	r.MfgMod.get(h, l)
+	closeMux(h)
 	DoI2cRpc()
 	n := s[1].D[1] + 2
 	t := string(s[1].D[2:n])
@@ -539,7 +615,6 @@ func (h *I2cDev) MfgModel() string {
 		t = "FSP"
 	}
 	t = strings.Trim(t, "#")
-	h.Id = t
 	return t
 }
 
