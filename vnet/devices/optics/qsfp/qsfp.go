@@ -129,7 +129,7 @@ func (cmd *cmd) update() error {
 						//when qsfp is installed, fetch and publish data
 						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
 						v := Vdev[i+j*16].Compliance()
-
+						var portConfig string
 						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
@@ -144,7 +144,7 @@ func (cmd *cmd) update() error {
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
-									log.Printf("Port %d set to copper", lp)
+									portConfig += "copper "
 								}
 							}
 						} else {
@@ -153,7 +153,7 @@ func (cmd *cmd) update() error {
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
-									log.Printf("Port %d set to fiber", lp)
+									portConfig += "fiber "
 								}
 							}
 							if speed != "100g" {
@@ -161,7 +161,7 @@ func (cmd *cmd) update() error {
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
-									log.Print("Port %d set to fixed speed 100G", lp)
+									portConfig += "100g fixed speed"
 								}
 							}
 						}
@@ -192,6 +192,9 @@ func (cmd *cmd) update() error {
 							cmd.lasts[k] = v
 						}
 						log.Print("QSFP detected in port ", lp, ": ", typeString)
+						if portConfig != "" {
+							log.Print("Port ", lp, " setting changed to ", portConfig)
+						}
 					} else {
 						//when qsfp is removed, publish empty data
 						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
