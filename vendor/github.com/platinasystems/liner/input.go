@@ -5,6 +5,7 @@ package liner
 import (
 	"bufio"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -68,7 +69,9 @@ func NewLiner() *State {
 	return &s
 }
 
-var errTimedOut = errors.New("timeout")
+var errTimedOut = errors.New("timeout")		// internal timeout
+var ErrTimeOut = errors.New("timed out")	// external timeout
+var ErrInternalError = errors.New("liner: internal error")
 
 func (s *State) startPrompt() {
 	if s.terminalSupported {
@@ -76,6 +79,14 @@ func (s *State) startPrompt() {
 			s.defaultMode = *m.(*termios)
 			mode := s.defaultMode
 			mode.Lflag &^= isig
+			if s.timeout != 0 {
+				mode.Cc[syscall.VTIME] = uint8(s.timeout /
+					(time.Second / 10))
+				mode.Cc[syscall.VMIN] = 0
+			} else {
+				mode.Cc[syscall.VTIME] = 0
+				mode.Cc[syscall.VMIN] = 1
+			}
 			mode.ApplyMode()
 		}
 	}
@@ -92,6 +103,13 @@ func (s *State) restartPrompt() {
 		for {
 			var n nexter
 			n.r, _, n.err = s.r.ReadRune()
+			if n.err == io.EOF {
+				if s.timeout != 0 {
+					n.err = ErrTimeOut
+				} else {
+					n.err = ErrInternalError
+				}
+			}
 			next <- n
 			// Shut down nexter loop when an end condition has been reached
 			if n.err != nil || n.r == '\n' || n.r == '\r' || n.r == ctrlC || n.r == ctrlD {
@@ -113,7 +131,7 @@ func (s *State) nextPending(timeout <-chan time.Time) (rune, error) {
 	select {
 	case thing, ok := <-s.next:
 		if !ok {
-			return 0, errors.New("liner: internal error")
+			return 0, ErrInternalError
 		}
 		if thing.err != nil {
 			return 0, thing.err
@@ -137,7 +155,7 @@ func (s *State) readNext() (interface{}, error) {
 	select {
 	case thing, ok := <-s.next:
 		if !ok {
-			return 0, errors.New("liner: internal error")
+			return 0, ErrInternalError
 		}
 		if thing.err != nil {
 			return nil, thing.err
