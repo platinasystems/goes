@@ -76,7 +76,7 @@ func (cmd *cmd) Main(...string) error {
 	//	close(cmd.stop)
 	//	return err
 	//}
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {
@@ -109,7 +109,7 @@ func (cmd *cmd) update() error {
 		t, err := pin.Value()
 		if !found || err != nil || t {
 			//not present
-			if strings.Contains(k, "psu_status") {
+			if strings.Contains(k, "status") {
 				v := Vdev[i].PsuStatus()
 				if v != cmd.lasts[k] {
 					cmd.pub.Print(k, ": ", v)
@@ -145,7 +145,7 @@ func (cmd *cmd) update() error {
 			}
 		} else {
 			//present
-			if strings.Contains(k, "psu_status") {
+			if strings.Contains(k, "status") {
 				v := Vdev[i].PsuStatus()
 				if v != cmd.lasts[k] {
 					cmd.pub.Print(k, ": ", v)

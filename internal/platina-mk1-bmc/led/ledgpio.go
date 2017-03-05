@@ -3,19 +3,31 @@
 // LICENSE file.
 
 // Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package led
+package ledgpio
 
 import (
 	"strconv"
 	"strings"
-	"unsafe"
+	"syscall"
+	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
+	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
+
+const Name = "ledgpio"
+
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
 
 const (
 	maxFanTrays = 4
@@ -23,9 +35,6 @@ const (
 )
 
 var (
-	dummy         byte
-	regsPointer   = unsafe.Pointer(&dummy)
-	regsAddr      = uintptr(unsafe.Pointer(&dummy))
 	lastFanStatus [maxFanTrays]string
 	lastPsuStatus [maxPsu]string
 	psuLed             = []uint8{0x8, 0x10}
@@ -44,306 +53,87 @@ var (
 	forceFanSpeed bool
 )
 
-type LedCon struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-	Reset    string
+var first int
+
+var Vdev I2cDev
+
+var VpageByKey map[string]uint8
+
+type cmd struct {
+	stop  chan struct{}
+	pub   *publisher.Publisher
+	last  map[string]float64
+	lasts map[string]string
+	lastu map[string]uint16
 }
 
-func getLedRegs() *ledRegs { return (*ledRegs)(regsPointer) }
+func New() *cmd { return new(cmd) }
 
-func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
+func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name }
 
-func (h *LedCon) i2cDo(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
+func (cmd *cmd) Main(...string) error {
+	var si syscall.Sysinfo_t
+	var err error
+	first = 1
 
-	err = bus.Open(h.Bus)
-	if err != nil {
-		return
+	cmd.stop = make(chan struct{})
+	cmd.last = make(map[string]float64)
+	cmd.lasts = make(map[string]string)
+	cmd.lastu = make(map[string]uint16)
+
+	if cmd.pub, err = publisher.New(); err != nil {
+		return err
 	}
-	defer bus.Close()
 
-	err = bus.ForceSlaveAddress(h.Addr)
-	if err != nil {
-		return
+	if err = syscall.Sysinfo(&si); err != nil {
+		return err
 	}
+	//if err = cmd.update(); err != nil {
+	//      close(cmd.stop)
+	//      return err
+	//}
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
 
-	err = bus.Do(rw, regOffset, size, data)
-	return
+	for {
+		select {
+		case <-cmd.stop:
+			return nil
+		case <-t.C:
+			if err = cmd.update(); err != nil {
+				close(cmd.stop)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-func (h *LedCon) i2cDoMux(rw i2c.RW, regOffset uint8, size i2c.SMBusSize, data *i2c.SMBusData) (err error) {
-	var bus i2c.Bus
-
-	err = bus.Open(h.MuxBus)
-	if err != nil {
-		return
-	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(h.MuxAddr)
-	if err != nil {
-		return
-	}
-
-	err = bus.Do(rw, regOffset, size, data)
-	return
+func (cmd *cmd) Close() error {
+	close(cmd.stop)
+	return nil
 }
 
-func (r *reg8) get(h *LedCon) byte {
-	var data i2c.SMBusData
-	/* i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ledgpio: get8: ", rc, " addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}() */
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: get8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
+func (cmd *cmd) update() error {
+	stopped := readStopped()
+	if stopped == 1 {
+		return nil
 	}
 
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: get8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
+	if first == 1 {
+		Vdev.LedFpInit()
+		first = 0
 	}
-
-	return data[0]
+	Vdev.LedStatus()
+	return nil
 }
 
-func (r *reg16) get(h *LedCon) (v uint16) {
-	var data i2c.SMBusData
-	/* i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ledgpio: get16: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}() */
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: get16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: get16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return uint16(data[0])<<8 | uint16(data[1])
-}
-
-func (r *reg16r) get(h *LedCon) (v uint16) {
-	var data i2c.SMBusData
-	/* i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ledgpio: get16r: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}() */
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: get16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Read, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: get16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	return uint16(data[1])<<8 | uint16(data[0])
-}
-
-func (r *reg8) set(h *LedCon, v uint8) {
-	var data i2c.SMBusData
-
-	/* i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ledgpio: set8: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}() */
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: set8 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[0] = v
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: set8 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16) set(h *LedCon, v uint16) {
-	var data i2c.SMBusData
-
-	/* i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ledgpio: set16: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}() */
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: set16 MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[0] = uint8(v >> 8)
-	data[1] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: set16 #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *reg16r) set(h *LedCon, v uint16) {
-	var data i2c.SMBusData
-
-	/* i2c.Lock.Lock()
-	defer func() {
-		if rc := recover(); rc != nil {
-			log.Print("Recovered in ledgpio: set16r: ", rc, ", addr: ", r.offset())
-		}
-		i2c.Lock.Unlock()
-	}() */
-
-	data[0] = byte(h.MuxValue)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDoMux(i2c.Write, 0, i2c.ByteData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: set16r MuxWr #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-
-	data[1] = uint8(v >> 8)
-	data[0] = uint8(v)
-	for i := 0; i < 5000; i++ {
-		err := h.i2cDo(i2c.Write, r.offset(), i2c.WordData, &data)
-		if err == nil {
-			if i > 0 {
-				log.Print("ledgpio: set16r #retries: ", i, ", addr: ", r.offset())
-			}
-			break
-		}
-		if i == 4999 {
-			panic(err)
-		}
-	}
-}
-
-func (r *regi16) get(h *LedCon) (v int16) { v = int16((*reg16)(r).get(h)); return }
-func (r *regi16) set(h *LedCon, v int16)  { (*reg16)(r).set(h, uint16(v)) }
-
-func (h *LedCon) LedFpInit() {
+func (h *I2cDev) LedFpInit() {
 	var d byte
 
-	pin, found := gpio.Pins[h.Reset]
+	pin, found := gpio.Pins["SYSTEM_LED_RST_L"]
 	if found {
 		pin.SetValue(true)
 	}
@@ -371,22 +161,35 @@ func (h *LedCon) LedFpInit() {
 	saveFanSpeed, _ = redis.Hget(redis.DefaultHash, "fan_tray.speed")
 	forceFanSpeed = false
 
-	r := getLedRegs()
-	o := r.Output0.get(h)
+	r := getRegs()
+	r.Output[0].get(h)
+	closeMux(h)
+	DoI2cRpc()
+	o := s[1].D[0]
 
 	//on bmc boot up set front panel SYS led to green, FAN led to yellow, let PSU drive PSU LEDs
 	d = 0xff ^ (sysLed | fanLed)
 	o &= d
 	o |= sysLedGreen | fanLedYellow
-	r.Output0.set(h, o)
-	o = r.Config0.get(h)
+
+	r.Output[0].set(h, o)
+	closeMux(h)
+	DoI2cRpc()
+
+	r.Config[0].get(h)
+	closeMux(h)
+	DoI2cRpc()
+	o = s[1].D[0]
 	o |= psuLed[0] | psuLed[1]
 	o &= (sysLed | fanLed) ^ 0xff
-	r.Config0.set(h, o)
+
+	r.Config[0].set(h, o)
+	closeMux(h)
+	DoI2cRpc()
 }
 
-func (h *LedCon) LedStatus() {
-	r := getLedRegs()
+func (h *I2cDev) LedStatus() {
+	r := getRegs()
 	var o, c uint8
 	var d byte
 
@@ -416,22 +219,32 @@ func (h *LedCon) LedStatus() {
 			//if any fan tray is failed or not installed, set front panel FAN led to yellow
 			//log.Print ("last: ",lastFanStatus[j-1], " present: ", p)
 			if strings.Contains(p, "warning") && !strings.Contains(lastFanStatus[j-1], "not installed") {
-				o = r.Output0.get(h)
+				r.Output[0].get(h)
+				closeMux(h)
+				DoI2cRpc()
+				o = s[1].D[0]
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedYellow
-				r.Output0.set(h, o)
+				r.Output[0].set(h, o)
+				closeMux(h)
+				DoI2cRpc()
 				log.Print("warning: fan tray ", j, " failure")
 				if !forceFanSpeed {
 					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(p, "not installed") {
-				o = r.Output0.get(h)
+				r.Output[0].get(h)
+				closeMux(h)
+				DoI2cRpc()
+				o = s[1].D[0]
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedYellow
-				r.Output0.set(h, o)
+				r.Output[0].set(h, o)
+				closeMux(h)
+				DoI2cRpc()
 				log.Print("warning: fan tray ", j, " not installed")
 				if !forceFanSpeed {
 					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
@@ -459,11 +272,16 @@ func (h *LedCon) LedStatus() {
 				}
 			}
 			if allStat {
-				o = r.Output0.get(h)
+				r.Output[0].get(h)
+				closeMux(h)
+				DoI2cRpc()
+				o = s[1].D[0]
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedGreen
-				r.Output0.set(h, o)
+				r.Output[0].set(h, o)
+				closeMux(h)
+				DoI2cRpc()
 				log.Print("notice: all fan trays up")
 				redis.Hset(redis.DefaultHash, "fan_tray.speed", saveFanSpeed)
 				forceFanSpeed = false
@@ -474,10 +292,14 @@ func (h *LedCon) LedStatus() {
 
 	for j := 0; j < maxPsu; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "psu"+strconv.Itoa(j+1)+".status")
-		if lastPsuStatus[j] != p {
-			o = r.Output0.get(h)
-			c = r.Config0.get(h)
 
+		if lastPsuStatus[j] != p {
+			r.Output[0].get(h)
+			r.Config[0].get(h)
+			closeMux(h)
+			DoI2cRpc()
+			o = s[1].D[0]
+			c = s[3].D[0]
 			//if PSU is not installed or installed and powered on, set front panel PSU led to off or green (PSU drives)
 			if strings.Contains(p, "not_installed") || strings.Contains(p, "powered_on") {
 				c |= psuLed[j]
@@ -488,8 +310,11 @@ func (h *LedCon) LedStatus() {
 				o |= psuLedYellow[j]
 				c &= (psuLed[j]) ^ 0xff
 			}
-			r.Output0.set(h, o)
-			r.Config0.set(h, c)
+			r.Output[0].set(h, o)
+			r.Config[0].set(h, c)
+			closeMux(h)
+			DoI2cRpc()
+
 			lastPsuStatus[j] = p
 			if p != "" {
 				log.Print("notice: psu", j+1, " ", p)

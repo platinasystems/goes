@@ -125,7 +125,7 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 			data[3] = g[x].Data[3]
 			err = bus.Do(g[x].RW, g[x].RegOffset, g[x].BusSize, &data)
 			if err != nil {
-				log.Print("Error doing I2C R/W")
+				log.Printf("Error doing I2C R/W: bus 0x%x addr 0x%x offset 0x%x data 0x%x RW %d BusSize %d delay %d", g[x].Bus, g[x].Addr, g[x].RegOffset, data[0], g[x].RW, g[x].BusSize, g[x].Delay)
 				return err
 			}
 			f[x].D[0] = data[0]

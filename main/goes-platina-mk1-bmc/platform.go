@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 )
 
 type platform struct {
@@ -27,6 +28,7 @@ func (p *platform) Init() (err error) {
 	p.fantrayInit()
 	p.imx6Init()
 	p.fspInit()
+	p.ledgpioInit()
 	if err = p.boardInit(); err != nil {
 		return err
 	}
@@ -50,6 +52,14 @@ func (p *platform) boardInit() (err error) {
 	}
 
 	return nil
+}
+
+func (p *platform) ledgpioInit() {
+	ledgpio.Vdev.Bus = 0
+	ledgpio.Vdev.Addr = 0x75
+	ledgpio.Vdev.MuxBus = 0x0
+	ledgpio.Vdev.MuxAddr = 0x76
+	ledgpio.Vdev.MuxValue = 0x2
 }
 
 func (p *platform) ucd9090Init() {
@@ -138,7 +148,7 @@ func (p *platform) fspInit() {
 	fsp.Vdev[1].GpioIntL = "PSU1_INT_L"
 
 	fsp.VpageByKey = map[string]uint8{
-		"psu1.psu_status":   1,
+		"psu1.status":       1,
 		"psu1.admin.state":  1,
 		"psu1.mfg_id":       1,
 		"psu1.mfg_model":    1,
@@ -148,7 +158,7 @@ func (p *platform) fspInit() {
 		"psu1.p_in":         1,
 		"psu1.temperature1": 1,
 		"psu1.temperature2": 1,
-		"psu2.psu_status":   0,
+		"psu2.status":       0,
 		"psu2.admin.state":  0,
 		"psu2.mfg_id":       0,
 		"psu2.mfg_model":    0,

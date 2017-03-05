@@ -27,6 +27,7 @@ import (
 	"github.com/platinasystems/go/internal/optional/telnetd"
 	"github.com/platinasystems/go/internal/optional/watchdog"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
+	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 	"github.com/platinasystems/go/internal/required"
 	"github.com/platinasystems/go/internal/required/redisd"
 	"github.com/platinasystems/go/internal/required/start"
@@ -53,6 +54,7 @@ func main() {
 		imx6.New(),
 		w83795.New(),
 		ucd9090.New(),
+		ledgpio.New(),
 	)
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}

@@ -53,6 +53,15 @@ func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regs
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 
+func closeMux(h *I2cDev) {
+	var data = [34]byte{0, 0, 0, 0}
+
+	data[0] = byte(0)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+
+}
+
 func (r *reg8) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
 

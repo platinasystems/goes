@@ -60,7 +60,7 @@ func (cmd *cmd) Main(...string) error {
 	//	close(cmd.stop)
 	//	return err
 	//}
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {
@@ -155,12 +155,14 @@ func (h *I2cDev) FanTrayStatus(i uint8) string {
 	}
 
 	r.Output[n].get(h)
+	closeMux(h)
 	DoI2cRpc()
 	o := s[1].D[0]
 	d := 0xff ^ fanTrayLedBits[i]
 	o &= d
 
 	r.Input[n].get(h)
+	closeMux(h)
 	DoI2cRpc()
 	rInputNGet := s[1].D[0]
 
@@ -196,6 +198,7 @@ func (h *I2cDev) FanTrayStatus(i uint8) string {
 	}
 
 	r.Output[n].set(h, o)
+	closeMux(h)
 	DoI2cRpc()
 	return w
 }

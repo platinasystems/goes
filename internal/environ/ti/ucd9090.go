@@ -107,6 +107,7 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	r.Page.set(h, i)
 	r.VoutMode.get(h)
 	r.ReadVout.get(h)
+	closeMux(h)
 	DoI2cRpc()
 
 	n := s[3].D[0] & 0xf
