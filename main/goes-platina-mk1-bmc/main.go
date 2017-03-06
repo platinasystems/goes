@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/environ/fantray"
@@ -88,6 +89,19 @@ func main() {
 			if err != nil {
 				fmt.Printf("%s: %v\n", name, err)
 			}
+		}
+		pin, found := gpio.Pins["FRU_I2C_MUX_RST_L"]
+		if found {
+			pin.SetValue(false)
+			time.Sleep(1 * time.Microsecond)
+			pin.SetValue(true)
+		}
+
+		pin, found = gpio.Pins["MAIN_I2C_MUX_RST_L"]
+		if found {
+			pin.SetValue(false)
+			time.Sleep(1 * time.Microsecond)
+			pin.SetValue(true)
 		}
 		return nil
 	}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
+	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
@@ -217,7 +218,6 @@ func (h *I2cDev) LedStatus() {
 		if lastFanStatus[j-1] != p {
 			fanStatChange = true
 			//if any fan tray is failed or not installed, set front panel FAN led to yellow
-			//log.Print ("last: ",lastFanStatus[j-1], " present: ", p)
 			if strings.Contains(p, "warning") && !strings.Contains(lastFanStatus[j-1], "not installed") {
 				r.Output[0].get(h)
 				closeMux(h)
@@ -231,7 +231,7 @@ func (h *I2cDev) LedStatus() {
 				DoI2cRpc()
 				log.Print("warning: fan tray ", j, " failure")
 				if !forceFanSpeed {
-					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
+					w83795.Vdev.SetFanSpeed("high")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(p, "not installed") {
@@ -247,7 +247,7 @@ func (h *I2cDev) LedStatus() {
 				DoI2cRpc()
 				log.Print("warning: fan tray ", j, " not installed")
 				if !forceFanSpeed {
-					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
+					w83795.Vdev.SetFanSpeed("high")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(lastFanStatus[j-1], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
@@ -283,7 +283,9 @@ func (h *I2cDev) LedStatus() {
 				closeMux(h)
 				DoI2cRpc()
 				log.Print("notice: all fan trays up")
-				redis.Hset(redis.DefaultHash, "fan_tray.speed", saveFanSpeed)
+				if w83795.Vdev.GetFanSpeed() != saveFanSpeed {
+					w83795.Vdev.SetFanSpeed(saveFanSpeed)
+				}
 				forceFanSpeed = false
 			}
 		}

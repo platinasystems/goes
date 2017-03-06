@@ -125,20 +125,28 @@ func (cmd *cmd) update() error {
 			}
 			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature1"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature2"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in"
 			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
 
 			if err != nil {
 				log.Print("fsp550 gpio error: ", err)
@@ -278,14 +286,7 @@ func (cmd *cmd) update() error {
 					cmd.lastu[k] = v
 				}
 			}
-			if strings.Contains(k, "temperature1") {
-				v := Vdev[i].Temp1()
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "temperature2") {
+			if strings.Contains(k, "temperature") {
 				v := Vdev[i].Temp2()
 				if v != cmd.last[k] {
 					cmd.pub.Print(k, ": ", v)
