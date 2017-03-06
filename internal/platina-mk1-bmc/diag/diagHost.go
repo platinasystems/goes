@@ -25,7 +25,7 @@ func diagHost() error {
 	diagI2cWriteOffsetByte(0x00, 0x77, 0x07, 0xFE)
 
 	gpioSet("BMC_TO_HOST_INT_L", false)
-	gpioSet("BMC_TO_HOST_NMI", false)
+	gpioSet("BMC_TO_HOST_NMI_L", false)
 	pinstate, err := gpioGet("HOST_TO_BMC_INT_L")
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func diagHost() error {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "host", "h2b_int=b2h_int|b2h_nmi", "-", pinstate, active_low_off_min, active_low_off_max, r, "h2b_int(1)=b2h_int(1)|b2h_nmi(0)")
 	gpioSet("BMC_TO_HOST_INT_L", false)
 
-	gpioSet("BMC_TO_HOST_NMI", true)
+	gpioSet("BMC_TO_HOST_NMI_L", true)
 	pinstate, err = gpioGet("HOST_TO_BMC_INT_L")
 	if err != nil {
 		return err
