@@ -130,38 +130,42 @@ func (cmd *cmd) update() error {
 						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
 						v := Vdev[i+j*16].Compliance()
 						var portConfig string
-						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
-						if err != nil {
-							log.Print("qsfp hget error:", err)
-						}
-						speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed")
-						if err != nil {
-							log.Print("qsfp hget error:", err)
-						}
-						if strings.Contains(v, "-CR") {
-							if media != "copper" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "copper")
-								if err != nil || ret != 1 {
-									log.Print("qsfp hset error:", err, " ", ret)
-								} else {
-									portConfig += "copper "
-								}
+
+						ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+						if err == nil && ready == "true" {
+							media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
+							if err != nil {
+								log.Print("qsfp hget error:", err)
 							}
-						} else {
-							if media != "fiber" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
-								if err != nil || ret != 1 {
-									log.Print("qsfp hset error:", err, " ", ret)
-								} else {
-									portConfig += "fiber "
-								}
+							speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed")
+							if err != nil {
+								log.Print("qsfp hget error:", err)
 							}
-							if speed != "100g" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "100g")
-								if err != nil || ret != 1 {
-									log.Print("qsfp hset error:", err, " ", ret)
-								} else {
-									portConfig += "100g fixed speed"
+							if strings.Contains(v, "-CR") {
+								if media != "copper" {
+									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "copper")
+									if err != nil || ret != 1 {
+										log.Print("qsfp hset error:", err, " ", ret)
+									} else {
+										portConfig += "copper "
+									}
+								}
+							} else {
+								if media != "fiber" {
+									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+									if err != nil || ret != 1 {
+										log.Print("qsfp hset error:", err, " ", ret)
+									} else {
+										portConfig += "fiber "
+									}
+								}
+								if speed != "100g" {
+									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "100g")
+									if err != nil || ret != 1 {
+										log.Print("qsfp hset error:", err, " ", ret)
+									} else {
+										portConfig += "100g fixed speed"
+									}
 								}
 							}
 						}
@@ -196,28 +200,19 @@ func (cmd *cmd) update() error {
 							log.Print("Port ", lp, " setting changed to ", portConfig)
 						}
 					} else {
-						//when qsfp is removed, publish empty data
+						//when qsfp is removed, delete associated fields
 						k := "port." + strconv.Itoa(lp) + ".qsfp.compliance"
-						v := "empty"
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
-						}
+						cmd.pub.Print("delete: ", k)
+						cmd.lasts[k] = ""
 						k = "port." + strconv.Itoa(lp) + ".qsfp.vendor"
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
-						}
+						cmd.pub.Print("delete: ", k)
+						cmd.lasts[k] = ""
 						k = "port." + strconv.Itoa(lp) + ".qsfp.partnumber"
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
-						}
+						cmd.pub.Print("delete: ", k)
+						cmd.lasts[k] = ""
 						k = "port." + strconv.Itoa(lp) + ".qsfp.serialnumber"
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
-						}
+						cmd.pub.Print("delete: ", k)
+						cmd.lasts[k] = ""
 						log.Print("QSFP removed from port ", lp)
 
 					}
