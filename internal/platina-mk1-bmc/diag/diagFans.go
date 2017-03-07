@@ -149,82 +149,154 @@ func diagFans() error {
 
 	hw.SetFanSpeed("high")
 	time.Sleep(6 * time.Second)
-	p := hw.FanCount(1)
+	p, err := hw.FanCount(1)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan1_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(2)
+	p, err = hw.FanCount(2)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan2_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(3)
+	p, err = hw.FanCount(3)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan3_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(4)
+	p, err = hw.FanCount(4)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan4_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(5)
+	p, err = hw.FanCount(5)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan5_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(6)
+	p, err = hw.FanCount(6)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan6_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(7)
+	p, err = hw.FanCount(7)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan7_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
-	p = hw.FanCount(8)
+	p, err = hw.FanCount(8)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan8_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
 
 	hw.SetFanSpeed("med")
 	time.Sleep(6 * time.Second)
-	p = hw.FanCount(1)
+	p, err = hw.FanCount(1)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan1_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(2)
+	p, err = hw.FanCount(2)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan2_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(3)
+	p, err = hw.FanCount(3)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan3_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(4)
+	p, err = hw.FanCount(4)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan4_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(5)
+	p, err = hw.FanCount(5)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan5_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(6)
+	p, err = hw.FanCount(6)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan6_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(7)
+	p, err = hw.FanCount(7)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan7_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
-	p = hw.FanCount(8)
+	p, err = hw.FanCount(8)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan8_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
 
 	hw.SetFanSpeed("low")
 	time.Sleep(6 * time.Second)
-	p = hw.FanCount(1)
+	p, err = hw.FanCount(1)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan1_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(2)
+	p, err = hw.FanCount(2)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan2_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(3)
+	p, err = hw.FanCount(3)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan3_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(4)
+	p, err = hw.FanCount(4)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan4_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(5)
+	p, err = hw.FanCount(5)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan5_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(6)
+	p, err = hw.FanCount(6)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan6_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(7)
+	p, err = hw.FanCount(7)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan7_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	p = hw.FanCount(8)
+	p, err = hw.FanCount(8)
+	if err != nil {
+		return err
+	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan8_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
 	hw.SetFanSpeed("med")
@@ -236,11 +308,17 @@ func diagFans() error {
 	r = CheckPassF(f, tmon_bmc_cpu_min, tmon_bmc_cpu_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_bmc_cpu", "°C", f, tmon_bmc_cpu_min, tmon_bmc_cpu_max, r, "check bmc temp sense")
 
-	f = hw.RearTemp()
+	f, err = hw.RearTemp()
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, tmon_fan_rear_min, tmon_fan_rear_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_fan_rear", "°C", f, tmon_fan_rear_min, tmon_fan_rear_max, r, "check hwm exhuast temp sense")
 
-	f = hw.FrontTemp()
+	f, err = hw.FrontTemp()
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, tmon_fan_front_min, tmon_fan_front_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_fan_front", "°C", f, tmon_fan_front_min, tmon_fan_front_max, r, "check hwm intake temp sense")
 

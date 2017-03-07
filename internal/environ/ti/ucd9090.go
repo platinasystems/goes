@@ -88,7 +88,10 @@ func (cmd *cmd) update() error {
 		return nil
 	}
 	for k, i := range VpageByKey {
-		v := Vdev.Vout(i)
+		v, err := Vdev.Vout(i)
+		if err != nil {
+			return err
+		}
 		if v != cmd.last[k] {
 			cmd.pub.Print(k, ": ", v)
 			cmd.last[k] = v
@@ -97,7 +100,7 @@ func (cmd *cmd) update() error {
 	return nil
 }
 
-func (h *I2cDev) Vout(i uint8) float64 {
+func (h *I2cDev) Vout(i uint8) (float64, error) {
 	if i > 10 {
 		panic("Voltage rail subscript out of range\n")
 	}
@@ -108,8 +111,10 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	r.VoutMode.get(h)
 	r.ReadVout.get(h)
 	closeMux(h)
-	DoI2cRpc()
-
+	err := DoI2cRpc()
+	if err != nil {
+		return 0, err
+	}
 	n := s[3].D[0] & 0xf
 	n--
 	n = (n ^ 0xf) & 0xf
@@ -118,5 +123,5 @@ func (h *I2cDev) Vout(i uint8) float64 {
 	nn := float64(n) * (-1)
 	vv := float64(v) * (math.Exp2(nn))
 	vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
-	return float64(vv)
+	return float64(vv), nil
 }

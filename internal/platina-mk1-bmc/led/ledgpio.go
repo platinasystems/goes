@@ -283,7 +283,8 @@ func (h *I2cDev) LedStatus() {
 				closeMux(h)
 				DoI2cRpc()
 				log.Print("notice: all fan trays up")
-				if w83795.Vdev.GetFanSpeed() != saveFanSpeed {
+				fanspeed, _ := w83795.Vdev.GetFanSpeed()
+				if fanspeed != saveFanSpeed {
 					w83795.Vdev.SetFanSpeed(saveFanSpeed)
 				}
 				forceFanSpeed = false

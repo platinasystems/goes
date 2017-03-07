@@ -67,43 +67,73 @@ func diagPower() error {
 	/* diagTest: ucd voltage monitoring
 	check monitored voltages are within operating range
 	*/
-	f := float64(pm.Vout(10))
+	f, err := pm.Vout(10)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_1v0_tha_min, vmon_1v0_tha_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_1v0_tha", "V", f, vmon_1v0_tha_min, vmon_1v0_tha_max, r, "check P1V0 is +/-5% nominal")
 
-	f = float64(pm.Vout(6))
+	f, err = pm.Vout(6)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_1v0_thc_min, vmon_1v0_thc_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_1v0_thc", "V", f, vmon_1v0_thc_min, vmon_1v0_thc_max, r, "check VDD_CORE is +/-5% nominal")
 
-	f = float64(pm.Vout(9))
+	f, err = pm.Vout(9)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_1v2_ethx_min, vmon_1v2_ethx_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_1v2_ethx", "V", f, vmon_1v2_ethx_min, vmon_1v2_ethx_max, r, "check P1V2 is +/-5% nominal")
 
-	f = float64(pm.Vout(8))
+	f, err = pm.Vout(8)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_1v25_sys_min, vmon_1v25_sys_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_1v25_sys", "V", f, vmon_1v25_sys_min, vmon_1v25_sys_max, r, "check P1V25 is +/-5% nominal")
 
-	f = float64(pm.Vout(7))
+	f, err = pm.Vout(7)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_1v8_sys_min, vmon_1v8_sys_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_1v8_sys", "V", f, vmon_1v8_sys_min, vmon_1v8_sys_max, r, "check P1V8 is +/-5% nominal")
 
-	f = float64(pm.Vout(4))
+	f, err = pm.Vout(4)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_3v3_bmc_min, vmon_3v3_bmc_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_3v3_bmc", "V", f, vmon_3v3_bmc_min, vmon_3v3_bmc_max, r, "check PERI_3V3 is +/-5% nominal")
 
-	f = float64(pm.Vout(5))
+	f, err = pm.Vout(5)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_3v3_sb_min, vmon_3v3_sb_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_3v3_sb", "V", f, vmon_3v3_sb_min, vmon_3v3_sb_max, r, "check P3V3_SB is +/-5% nominal")
 
-	f = float64(pm.Vout(3))
+	f, err = pm.Vout(3)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_3v3_sys_min, vmon_3v3_sys_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_3v3_sys", "V", f, vmon_3v3_sys_min, vmon_3v3_sys_max, r, "check P3V3 is +/-5% nominal")
 
-	f = float64(pm.Vout(2))
+	f, err = pm.Vout(2)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_3v8_bmc_min, vmon_3v8_bmc_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_3v8_bmc", "V", f, vmon_3v8_bmc_min, vmon_3v8_bmc_max, r, "check P3V8_BMC is +/-5% nominal")
 
-	f = float64(pm.Vout(1))
+	f, err = pm.Vout(1)
+	if err != nil {
+		return err
+	}
 	r = CheckPassF(f, vmon_5v0_sb_min, vmon_5v0_sb_max)
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_5v0_sb", "V", f, vmon_5v0_sb_min, vmon_5v0_sb_max, r, "check P5V_SB is +/-5% nominal")
 
