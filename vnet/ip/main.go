@@ -29,9 +29,9 @@ type Main struct {
 	ifAddressMain
 }
 
-func (m *Main) Init(v *vnet.Vnet, c FamilyConfig) {
+func (m *Main) Init(v *vnet.Vnet) { m.adjacencyInit() }
+func (m *Main) PackageInit(v *vnet.Vnet, c FamilyConfig) {
 	m.v = v
 	m.FamilyConfig = c
-	m.adjacencyInit()
 	m.ifAddressMain.init(v)
 }

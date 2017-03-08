@@ -14,6 +14,13 @@ var packageIndex uint
 func Init(v *vnet.Vnet) {
 	m := &Main{}
 	packageIndex = v.AddPackage("ip6", m)
+	cf := ip.FamilyConfig{
+		Family:          ip.Ip6,
+		AddressStringer: ipAddressStringer,
+		RewriteNode:     &m.rewriteNode,
+		PacketType:      vnet.IP6,
+	}
+	m.Main.PackageInit(v, cf)
 }
 
 func GetMain(v *vnet.Vnet) *Main { return v.GetPackage(packageIndex).(*Main) }
@@ -28,14 +35,7 @@ type Main struct {
 
 func (m *Main) Init() (err error) {
 	v := m.Vnet
-	cf := ip.FamilyConfig{
-		Family:          ip.Ip6,
-		AddressStringer: ipAddressStringer,
-		RewriteNode:     &m.rewriteNode,
-		PacketType:      vnet.IP6,
-	}
-	m.Main.Init(v, cf)
+	m.Main.Init(v)
 	m.nodeInit(v)
-
 	return
 }

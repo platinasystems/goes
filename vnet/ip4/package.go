@@ -14,7 +14,18 @@ var packageIndex uint
 func Init(v *vnet.Vnet) {
 	m := &Main{}
 	packageIndex = v.AddPackage("ip4", m)
-	m.DependsOn("pg")
+	cf := ip.FamilyConfig{
+		Family:           ip.Ip4,
+		AddressStringer:  ipAddressStringer,
+		RewriteNode:      &m.rewriteNode,
+		PacketType:       vnet.IP4,
+		GetRoute:         m.getRoute,
+		GetRouteFibIndex: m.getRouteFibIndex,
+		AddDelRoute:      m.addDelRoute,
+		RemapAdjacency:   m.remapAdjacency,
+	}
+	m.Main.PackageInit(v, cf)
+	v.RegisterSwIfAdminUpDownHook(m.swIfAdminUpDown)
 }
 
 func GetMain(v *vnet.Vnet) *Main { return v.GetPackage(packageIndex).(*Main) }
@@ -32,18 +43,7 @@ type Main struct {
 
 func (m *Main) Init() (err error) {
 	v := m.Vnet
-	v.RegisterSwIfAdminUpDownHook(m.swIfAdminUpDown)
-	cf := ip.FamilyConfig{
-		Family:           ip.Ip4,
-		AddressStringer:  ipAddressStringer,
-		RewriteNode:      &m.rewriteNode,
-		PacketType:       vnet.IP4,
-		GetRoute:         m.getRoute,
-		GetRouteFibIndex: m.getRouteFibIndex,
-		AddDelRoute:      m.addDelRoute,
-		RemapAdjacency:   m.remapAdjacency,
-	}
-	m.Main.Init(v, cf)
+	m.Main.Init(v)
 	m.nodeInit(v)
 	m.pgInit(v)
 	m.cliInit(v)
