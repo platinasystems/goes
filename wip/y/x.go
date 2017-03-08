@@ -51,6 +51,8 @@ func main() {
 	if err != nil {
 		if e := firmware.Extract("fe1a.zip"); e != nil {
 			return
+		} else {
+			err = nil
 		}
 	}
 
