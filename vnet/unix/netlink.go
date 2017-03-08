@@ -123,6 +123,10 @@ func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
 }
 
 func (m *Main) addMsg(msg netlink.Message) {
+	if msg == nil {
+		// Can happen when reading message from closed channel.
+		return
+	}
 	e := m.getEvent()
 	if m.msgGeneratesEvent(msg) {
 		e.msgs = append(e.msgs, msg)
