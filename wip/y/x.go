@@ -49,7 +49,9 @@ func main() {
 
 	err = firmware.Extract(prog.Name())
 	if err != nil {
-		return
+		if e := firmware.Extract("fe1a.zip"); e != nil {
+			return
+		}
 	}
 
 	var in parse.Input
@@ -71,6 +73,8 @@ func main() {
 	p := &platform{}
 	v.AddPackage("platform", p)
 	p.DependsOn("pci-discovery") // after pci discovery
+	p.DependedOnBy("ip4")        // adjacencies/fib init needs to happen after fe1 init.
+	p.DependedOnBy("ip6")
 
 	err = v.Run(&in)
 }
