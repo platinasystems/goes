@@ -29,9 +29,15 @@ type fstabEntry struct {
 	mntOpts string
 }
 
-type Filesystems struct {
-	name string
-	list []string
+type fsType struct {
+	name	string
+	nodev	bool
+}
+
+
+type filesystems struct {
+	isNoDev		map[string]bool
+	autoList	[]string
 }
 
 type cmd struct{}
@@ -79,10 +85,6 @@ var translations = []struct {
 	{"-no-iversion", syscall.MS_I_VERSION, false},
 	{"-strictatime", syscall.MS_STRICTATIME, true},
 	{"-no-strictatime", syscall.MS_STRICTATIME, false},
-}
-
-var filesystems struct {
-	all, auto Filesystems
 }
 
 type MountResult struct {
@@ -165,23 +167,22 @@ func (cmd) Main(args ...string) error {
 		parm["-t"] = "auto"
 	}
 
-	filesystems.all.name = "all"
-	filesystems.auto.name = "auto"
-	var err error
+	fs, err := getFilesystems()
+
 	if flag["-a"] {
-		err = mountall(flag, parm)
+		err = fs.mountall(flag, parm)
 	} else {
 		switch len(args) {
 		case 0:
 			err = show()
 		case 1:
 			if flag["-p"] {
-				err = mountprobe(args[0], flag, parm)
+				err = fs.mountprobe(args[0], flag, parm)
 			} else {
-				err = fstab(args[0], flag, parm)
+				err = fs.fstab(args[0], flag, parm)
 			}
 		case 2:
-			r := mountone(parm["-t"], args[0], args[1], flag,
+			r := fs.mountone(parm["-t"], args[0], args[1], flag,
 				parm)
 			r.ShowResult()
 			err = r.err
@@ -212,7 +213,7 @@ func flushMountResults (c chan *MountResult, complete, count int) () {
 	}
 }
 
-func mountall(flag flags.Flag, parm parms.Parm) error {
+func (fs *filesystems) mountall(flag flags.Flag, parm parms.Parm) error {
 	fstab, err := loadFstab()
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func mountall(flag flags.Flag, parm parms.Parm) error {
 	rchan := make(chan *MountResult, cap)
 
 	for _, x := range fstab {
-		go goMountone(x.fsType, x.fsSpec, x.fsFile, flag, parm, rchan)
+		go fs.goMountone(x.fsType, x.fsSpec, x.fsFile, flag, parm, rchan)
 		complete += pollMountResults(rchan)
 	}
 
@@ -236,7 +237,7 @@ func mountall(flag flags.Flag, parm parms.Parm) error {
 	return nil
 }
 
-func mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
+func (fs *filesystems)mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
 	files, err := ioutil.ReadDir("/sys/block")
 	if err != nil {
 		return err
@@ -257,7 +258,7 @@ func mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
 				return err
 			}
 		}
-		go goMountone(parm["-t"], "/dev/" + file.Name(), mp, flag, parm, rchan)
+		go fs.goMountone(parm["-t"], "/dev/" + file.Name(), mp, flag, parm, rchan)
 		complete += pollMountResults(rchan)
 	}
 
@@ -265,14 +266,14 @@ func mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
 	return nil
 }
 
-func fstab(name string, flag flags.Flag, parm parms.Parm) error {
+func (fs *filesystems)fstab(name string, flag flags.Flag, parm parms.Parm) error {
 	fstab, err := loadFstab()
 	if err != nil {
 		return err
 	}
 	for _, x := range fstab {
 		if name == x.fsSpec || name == x.fsFile {
-			r := mountone(x.fsType, x.fsSpec, x.fsFile,
+			r := fs.mountone(x.fsType, x.fsSpec, x.fsFile,
 				flag, parm)
 			r.ShowResult()
 			return r.err
@@ -304,7 +305,7 @@ func loadFstab() ([]fstabEntry, error) {
 	return fstab, scanner.Err()
 }
 
-func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult {
+func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult {
 	var flags uintptr
 	if flag["-defaults"] {
 		//  rw, suid, dev, exec, auto, nouser, async
@@ -333,8 +334,8 @@ func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult
 
 	tryTypes := []string{t}
 	if t == "auto" {
-		tryTypes = filesystems.auto.List()
-	}
+		tryTypes = fs.autoList
+	}	
 
 	var err error
 	for _, t := range tryTypes {
@@ -347,8 +348,8 @@ func mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult
 	return &MountResult{err, dev, t, dir, flag}
 }
 
-func goMountone(t, dev, dir string, flag flags.Flag, parm parms.Parm, c chan *MountResult) {
-	c <- mountone(t, dev, dir, flag, parm)
+func (fs *filesystems)goMountone(t, dev, dir string, flag flags.Flag, parm parms.Parm, c chan *MountResult) {
+	c <- fs.mountone(t, dev, dir, flag, parm)
 }
 	
 func show() error {
@@ -368,32 +369,35 @@ func show() error {
 	return scanner.Err()
 }
 
-func (fs *Filesystems) List() []string {
-	if len(fs.list) > 0 {
-		return fs.list
-	}
+func getFilesystems() (fsPtr *filesystems, err error) {
 	f, err := os.Open(procFilesystems)
 	if err != nil {
-		return fs.list
+		return nil, err
 	}
 	defer f.Close()
+
+	var fs filesystems
+	fs.isNoDev = make(map[string]bool)
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
+		nodev := false
 		if strings.HasPrefix(line, "nodev") {
-			if fs.name == "auto" {
-				continue
-			}
+			nodev = true
 			line = strings.TrimPrefix(line, "nodev")
 		}
 		line = strings.TrimSpace(line)
-		fs.list = append(fs.list, line)
+		fs.isNoDev[line] = nodev
+		if !nodev {
+			fs.autoList = append(fs.autoList, line)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "scan:", procFilesystems, err)
+		return nil, err
 	}
-	return fs.list
+	return &fs, nil
 }
 
 func (cmd) Apropos() map[string]string {
