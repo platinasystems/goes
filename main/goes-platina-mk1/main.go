@@ -131,9 +131,11 @@ func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
 	plat := &platform{i: i}
 	v.AddPackage("platform", plat)
 	plat.DependsOn("pci-discovery")
+
+	// Revert for now - fixes dummy interfaces but breaks tuntaps
 	// Need FE1 init/port init to complete before default fib/adjacencies can be installed.
-	plat.DependedOnBy("ip4")
-	plat.DependedOnBy("ip6")
+	//plat.DependedOnBy("ip4")
+	//plat.DependedOnBy("ip6")
 
 	return nil
 }
