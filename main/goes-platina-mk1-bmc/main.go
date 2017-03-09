@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/log"
 	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
 	"github.com/platinasystems/go/internal/optional/i2cd"
@@ -84,13 +85,24 @@ func main() {
 		} else {
 			return fmt.Errorf("%s: %v", gpio.File, err)
 		}
+		pin, found := gpio.Pins["QSPI_MUX_SEL"]
+		if found {
+			r, _ := pin.Value()
+			if r {
+				log.Print("Booted from QSPI1")
+			} else {
+				log.Print("Booted from QSPI0")
+			}
+
+		}
+
 		for name, pin := range gpio.Pins {
 			err := pin.SetDirection()
 			if err != nil {
 				fmt.Printf("%s: %v\n", name, err)
 			}
 		}
-		pin, found := gpio.Pins["FRU_I2C_MUX_RST_L"]
+		pin, found = gpio.Pins["FRU_I2C_MUX_RST_L"]
 		if found {
 			pin.SetValue(false)
 			time.Sleep(1 * time.Microsecond)
