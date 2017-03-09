@@ -104,7 +104,7 @@ func (cmd *cmd) Main(...string) error {
 			return nil
 		case <-t.C:
 			if err = cmd.update(); err != nil {
-				close(cmd.stop)
+				//close(cmd.stop)
 				return err
 			}
 		}
@@ -124,14 +124,20 @@ func (cmd *cmd) update() error {
 	}
 
 	if first == 1 {
-		Vdev.LedFpInit()
+		err := Vdev.LedFpInit()
+		if err != nil {
+			return err
+		}
 		first = 0
 	}
-	Vdev.LedStatus()
+	err := Vdev.LedStatus()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (h *I2cDev) LedFpInit() {
+func (h *I2cDev) LedFpInit() error {
 	var d byte
 
 	pin, found := gpio.Pins["SYSTEM_LED_RST_L"]
@@ -165,7 +171,10 @@ func (h *I2cDev) LedFpInit() {
 	r := getRegs()
 	r.Output[0].get(h)
 	closeMux(h)
-	DoI2cRpc()
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
 	o := s[1].D[0]
 
 	//on bmc boot up set front panel SYS led to green, FAN led to yellow, let PSU drive PSU LEDs
@@ -175,21 +184,31 @@ func (h *I2cDev) LedFpInit() {
 
 	r.Output[0].set(h, o)
 	closeMux(h)
-	DoI2cRpc()
+	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
 
 	r.Config[0].get(h)
 	closeMux(h)
-	DoI2cRpc()
+	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
 	o = s[1].D[0]
 	o |= psuLed[0] | psuLed[1]
 	o &= (sysLed | fanLed) ^ 0xff
 
 	r.Config[0].set(h, o)
 	closeMux(h)
-	DoI2cRpc()
+	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (h *I2cDev) LedStatus() {
+func (h *I2cDev) LedStatus() error {
 	r := getRegs()
 	var o, c uint8
 	var d byte
@@ -221,14 +240,20 @@ func (h *I2cDev) LedStatus() {
 			if strings.Contains(p, "warning") && !strings.Contains(lastFanStatus[j-1], "not installed") {
 				r.Output[0].get(h)
 				closeMux(h)
-				DoI2cRpc()
+				err := DoI2cRpc()
+				if err != nil {
+					return err
+				}
 				o = s[1].D[0]
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedYellow
 				r.Output[0].set(h, o)
 				closeMux(h)
-				DoI2cRpc()
+				err = DoI2cRpc()
+				if err != nil {
+					return err
+				}
 				log.Print("warning: fan tray ", j, " failure")
 				if !forceFanSpeed {
 					w83795.Vdev.SetFanSpeed("high")
@@ -237,14 +262,20 @@ func (h *I2cDev) LedStatus() {
 			} else if strings.Contains(p, "not installed") {
 				r.Output[0].get(h)
 				closeMux(h)
-				DoI2cRpc()
+				err := DoI2cRpc()
+				if err != nil {
+					return err
+				}
 				o = s[1].D[0]
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedYellow
 				r.Output[0].set(h, o)
 				closeMux(h)
-				DoI2cRpc()
+				err = DoI2cRpc()
+				if err != nil {
+					return err
+				}
 				log.Print("warning: fan tray ", j, " not installed")
 				if !forceFanSpeed {
 					w83795.Vdev.SetFanSpeed("high")
@@ -255,6 +286,7 @@ func (h *I2cDev) LedStatus() {
 			}
 		}
 		lastFanStatus[j-1] = p
+		return nil
 	}
 
 	if allFanGood && !forceFanSpeed {
@@ -274,14 +306,20 @@ func (h *I2cDev) LedStatus() {
 			if allStat {
 				r.Output[0].get(h)
 				closeMux(h)
-				DoI2cRpc()
+				err := DoI2cRpc()
+				if err != nil {
+					return err
+				}
 				o = s[1].D[0]
 				d = 0xff ^ fanLed
 				o &= d
 				o |= fanLedGreen
 				r.Output[0].set(h, o)
 				closeMux(h)
-				DoI2cRpc()
+				err = DoI2cRpc()
+				if err != nil {
+					return err
+				}
 				log.Print("notice: all fan trays up")
 				fanspeed, _ := w83795.Vdev.GetFanSpeed()
 				if fanspeed != saveFanSpeed {
@@ -300,7 +338,10 @@ func (h *I2cDev) LedStatus() {
 			r.Output[0].get(h)
 			r.Config[0].get(h)
 			closeMux(h)
-			DoI2cRpc()
+			err := DoI2cRpc()
+			if err != nil {
+				return err
+			}
 			o = s[1].D[0]
 			c = s[3].D[0]
 			//if PSU is not installed or installed and powered on, set front panel PSU led to off or green (PSU drives)
@@ -316,7 +357,10 @@ func (h *I2cDev) LedStatus() {
 			r.Output[0].set(h, o)
 			r.Config[0].set(h, c)
 			closeMux(h)
-			DoI2cRpc()
+			err = DoI2cRpc()
+			if err != nil {
+				return err
+			}
 
 			lastPsuStatus[j] = p
 			if p != "" {
@@ -324,4 +368,5 @@ func (h *I2cDev) LedStatus() {
 			}
 		}
 	}
+	return nil
 }

@@ -87,7 +87,10 @@ func (cmd *cmd) update() error {
 		return nil
 	}
 	for k, i := range VpageByKey {
-		v := Vdev.FanTrayStatus(i)
+		v, err := Vdev.FanTrayStatus(i)
+		if err != nil {
+			return err
+		}
 		if v != cmd.last[k] {
 			cmd.pub.Print(k, ": ", v)
 			cmd.last[k] = v
@@ -134,7 +137,7 @@ func (h *I2cDev) FanTrayLedInit() {
 	log.Print("notice: fan tray led init complete")
 }
 
-func (h *I2cDev) FanTrayStatus(i uint8) string {
+func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 	var w string
 	var f string
 
@@ -156,14 +159,20 @@ func (h *I2cDev) FanTrayStatus(i uint8) string {
 
 	r.Output[n].get(h)
 	closeMux(h)
-	DoI2cRpc()
+	err := DoI2cRpc()
+	if err != nil {
+		return "error", err
+	}
 	o := s[1].D[0]
 	d := 0xff ^ fanTrayLedBits[i]
 	o &= d
 
 	r.Input[n].get(h)
 	closeMux(h)
-	DoI2cRpc()
+	err = DoI2cRpc()
+	if err != nil {
+		return "error", err
+	}
 	rInputNGet := s[1].D[0]
 
 	if (rInputNGet & fanTrayAbsBits[i]) != 0 {
@@ -199,6 +208,9 @@ func (h *I2cDev) FanTrayStatus(i uint8) string {
 
 	r.Output[n].set(h, o)
 	closeMux(h)
-	DoI2cRpc()
-	return w
+	err = DoI2cRpc()
+	if err != nil {
+		return "error", err
+	}
+	return w, nil
 }

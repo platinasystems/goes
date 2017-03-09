@@ -148,15 +148,19 @@ func clearJ() {
 func readStopped() byte {
 	var data = [34]byte{0, 0, 0, 0}
 	j[0] = I{true, i2c.Write, 0, i2c.ByteData, data, int(0x98), int(0), 0}
-	DoI2cRpc()
+	err := DoI2cRpc()
+	if err != nil {
+		return 1
+	}
 	return s[0].D[0]
 }
 
-func DoI2cRpc() {
+func DoI2cRpc() error {
 	if dialed == 0 {
 		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")
 		if err != nil {
 			log.Print("dialing:", err)
+			return err
 		}
 		clientA = client
 		dialed = 1
@@ -164,7 +168,8 @@ func DoI2cRpc() {
 	err := clientA.Call("I2cReq.ReadWrite", &j, &s)
 	if err != nil {
 		log.Print("i2cReq error:", err)
+		return err
 	}
 	clearJ()
-	return
+	return nil
 }
