@@ -147,6 +147,10 @@ func (Command) Main(args ...string) error {
 		fs.parms.ByName["-t"] = "auto"
 	}
 
+	if len(args) == 2 && fs.isNoDev[fs.parms.ByName["-t"]] && args[0][0] == '/' {
+		fmt.Fprintln(os.Stderr, "Warning: nodev and device path begins with slash")
+	}
+
 	if fs.flags.ByName["-a"] {
 		err = fs.mountall()
 	} else {
