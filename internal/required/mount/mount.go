@@ -115,6 +115,16 @@ func (r *MountResult) ShowResult() {
 	}
 }
 
+type superBlock interface {
+}
+
+type unknownSB struct {
+}
+
+func readSuperBlock(dev string) (superBlock, error) {
+	return &unknownSB{}, nil
+}
+
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [OPTION]... DEVICE [DIRECTORY]" }
 
@@ -333,10 +343,20 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 	}
 
 	tryTypes := []string{t}
+	nodev := false
 	if t == "auto" {
 		tryTypes = fs.autoList
-	}	
+	} else {
+		nodev = fs.isNoDev[t]
+	}
 
+	if !nodev {
+		_, err := readSuperBlock(dev)
+		if err != nil {
+			return &MountResult{err, dev, t, dir, flag}
+		}
+	}
+	
 	var err error
 	for _, t := range tryTypes {
 		err = syscall.Mount(dev, dir, t, flags, parm["-o"])
