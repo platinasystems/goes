@@ -121,7 +121,34 @@ type superBlock interface {
 type unknownSB struct {
 }
 
+const (
+	ext234SMagicOffL  = 0x438
+	ext234SMagicOffM = 0x439
+	ext234SMagicValL  = 0x53
+	ext234SMagicValM  = 0xef
+)
+
+type ext234 struct {
+}
+
 func readSuperBlock(dev string) (superBlock, error) {
+	f, err := os.Open(dev)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	fsHeader := make([]byte, 4096)
+	_, err = f.Read(fsHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	if fsHeader[ext234SMagicOffL] == ext234SMagicValL &&
+		fsHeader[ext234SMagicOffM] == ext234SMagicValM {
+		sb := &ext234{}
+		return sb, nil
+	}
+
 	return &unknownSB{}, nil
 }
 
