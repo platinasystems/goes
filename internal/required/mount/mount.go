@@ -7,7 +7,6 @@ package mount
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
@@ -275,19 +274,28 @@ func (fs *filesystems) mountall(flag flags.Flag, parm parms.Parm) error {
 }
 
 func (fs *filesystems)mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
-	files, err := ioutil.ReadDir("/sys/block")
+	f, err := os.Open("/proc/partitions")
 	if err != nil {
 		return err
 	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
 	complete := 0
 	cap := 1
 	if flag["-F"] {
-		cap = len(files)
+		cap = 100	// Arbitrary - hard to count lines
 	}
 	rchan := make(chan *MountResult, cap)
+	lines := 0
 	
-	for _, file := range files {
-		mp := mountpoint + "/" + file.Name()
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
+		if len(fields) < 4 || fields[0] == "major" {
+			continue
+		}
+		fileName := fields[3]
+		mp := mountpoint + "/" + fileName
 		if _, err := os.Stat(mp); os.IsNotExist(err) {
 			err := os.Mkdir(mp, os.FileMode(0555))
 			if err != nil {
@@ -295,11 +303,12 @@ func (fs *filesystems)mountprobe(mountpoint string, flag flags.Flag, parm parms.
 				return err
 			}
 		}
-		go fs.goMountone(parm["-t"], "/dev/" + file.Name(), mp, flag, parm, rchan)
+		go fs.goMountone(parm["-t"], "/dev/" + fileName, mp, flag, parm, rchan)
 		complete += pollMountResults(rchan)
+		lines++
 	}
 
-	flushMountResults(rchan, complete, len(files))
+	flushMountResults(rchan, complete, lines)
 	return nil
 }
 
