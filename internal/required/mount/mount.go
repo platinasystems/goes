@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
@@ -395,9 +396,16 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 	
 	var err error
 	for _, t := range tryTypes {
-		err = syscall.Mount(dev, dir, t, flags, parm["-o"])
-		if err == nil {
-			return &MountResult{err, dev, t, dir, flag}
+		for i := 0; i < 5; i++ {
+			err = syscall.Mount(dev, dir, t, flags, parm["-o"])
+			if err == nil {
+				return &MountResult{err, dev, t, dir, flag}
+			}
+			if err == syscall.EBUSY {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			break;
 		}
 	}
 
