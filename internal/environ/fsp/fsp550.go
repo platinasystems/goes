@@ -129,22 +129,19 @@ func (cmd *cmd) update() error {
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in"
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in.units.W"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out"
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out.units.W"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature1"
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature.units.C"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature2"
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out.units.V"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in"
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in.units.V"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
 

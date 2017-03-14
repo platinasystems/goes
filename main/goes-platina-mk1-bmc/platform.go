@@ -70,16 +70,16 @@ func (p *platform) ucd9090Init() {
 	ucd9090.Vdev.MuxValue = 0x01
 
 	ucd9090.VpageByKey = map[string]uint8{
-		"vmon.5v.sb":    1,
-		"vmon.3v8.bmc":  2,
-		"vmon.3v3.sys":  3,
-		"vmon.3v3.bmc":  4,
-		"vmon.3v3.sb":   5,
-		"vmon.1v0.thc":  6,
-		"vmon.1v8.sys":  7,
-		"vmon.1v25.sys": 8,
-		"vmon.1v2.ethx": 9,
-		"vmon.1v0.tha":  10,
+		"vmon.5v.sb.units.V":    1,
+		"vmon.3v8.bmc.units.V":  2,
+		"vmon.3v3.sys.units.V":  3,
+		"vmon.3v3.bmc.units.V":  4,
+		"vmon.3v3.sb.units.V":   5,
+		"vmon.1v0.thc.units.V":  6,
+		"vmon.1v8.sys.units.V":  7,
+		"vmon.1v25.sys.units.V": 8,
+		"vmon.1v2.ethx.units.V": 9,
+		"vmon.1v0.tha.units.V":  10,
 	}
 }
 
@@ -91,15 +91,15 @@ func (p *platform) w83795Init() {
 	w83795.Vdev.MuxValue = 0x80
 
 	w83795.VpageByKey = map[string]uint8{
-		"fan_tray.1.1.rpm": 1,
-		"fan_tray.1.2.rpm": 2,
-		"fan_tray.2.1.rpm": 3,
-		"fan_tray.2.2.rpm": 4,
-		"fan_tray.3.1.rpm": 5,
-		"fan_tray.3.2.rpm": 6,
-		"fan_tray.4.1.rpm": 7,
-		"fan_tray.4.2.rpm": 8,
-		"fan_tray.speed":   1,
+		"fan_tray.1.1.speed.units.rpm": 1,
+		"fan_tray.1.2.speed.units.rpm": 2,
+		"fan_tray.2.1.speed.units.rpm": 3,
+		"fan_tray.2.2.speed.units.rpm": 4,
+		"fan_tray.3.1.speed.units.rpm": 5,
+		"fan_tray.3.2.speed.units.rpm": 6,
+		"fan_tray.4.1.speed.units.rpm": 7,
+		"fan_tray.4.2.speed.units.rpm": 8,
+		"fan_tray.speed":               1,
 	}
 }
 
@@ -120,7 +120,7 @@ func (p *platform) fantrayInit() {
 
 func (p *platform) imx6Init() {
 	imx6.VpageByKey = map[string]uint8{
-		"temperature.bmc_cpu": 1,
+		"bmc.temperature.units.C": 1,
 	}
 }
 
@@ -148,23 +148,23 @@ func (p *platform) fspInit() {
 	fsp.Vdev[1].GpioIntL = "PSU1_INT_L"
 
 	fsp.VpageByKey = map[string]uint8{
-		"psu1.status":      1,
-		"psu1.admin.state": 1,
-		"psu1.mfg_id":      1,
-		"psu1.mfg_model":   1,
-		"psu1.v_in":        1,
-		"psu1.v_out":       1,
-		"psu1.p_out":       1,
-		"psu1.p_in":        1,
-		"psu1.temperature": 1,
-		"psu2.status":      0,
-		"psu2.admin.state": 0,
-		"psu2.mfg_id":      0,
-		"psu2.mfg_model":   0,
-		"psu2.v_in":        0,
-		"psu2.v_out":       0,
-		"psu2.p_out":       0,
-		"psu2.p_in":        0,
-		"psu2.temperature": 0,
+		"psu1.status":              1,
+		"psu1.admin.state":         1,
+		"psu1.mfg_id":              1,
+		"psu1.mfg_model":           1,
+		"psu1.v_in.units.V":        1,
+		"psu1.v_out.units.V":       1,
+		"psu1.p_out.units.W":       1,
+		"psu1.p_in.units.W":        1,
+		"psu1.temperature.units.C": 1,
+		"psu2.status":              0,
+		"psu2.admin.state":         0,
+		"psu2.mfg_id":              0,
+		"psu2.mfg_model":           0,
+		"psu2.v_in.units.V":        0,
+		"psu2.v_out.units.V":       0,
+		"psu2.p_out.units.W":       0,
+		"psu2.p_in.units.W":        0,
+		"psu2.temperature.units.C": 0,
 	}
 }

@@ -111,7 +111,7 @@ func (cmd *cmd) update() error {
 				cmd.last[k] = v
 			}
 		}
-		if strings.Contains(k, "speed") {
+		if strings.Contains(k, "fan_tray.speed") {
 			v, err := Vdev.GetFanSpeed()
 			if err != nil {
 				return err
