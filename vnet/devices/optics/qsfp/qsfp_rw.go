@@ -2,7 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
 package qsfp
 
 import (
@@ -47,11 +46,24 @@ var clientA *rpc.Client
 var dialed int = 0
 
 // offset function has divide by two for 16-bit offset struct
-func getRegs() *regs            { return (*regs)(regsPointer) }
-func (r *reg8) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-func (r *reg8b) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-func (r *reg16) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
-func (r *reg16r) offset() uint8 { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
+func getRegsLpage0() *regsLpage0 { return (*regsLpage0)(regsPointer) }
+func getRegsUpage0() *regsUpage0 { return (*regsUpage0)(regsPointer) }
+func getBlocks() *blocks         { return (*blocks)(regsPointer) }
+func (r *reg8) offset() uint8    { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr)) }
+func (r *reg8b) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr)) }
+func (r *reg16) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr)) }
+func (r *reg16r) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr)) }
+
+func closeMux(h *I2cDev) {
+	var data = [34]byte{0, 0, 0, 0}
+
+	data[0] = byte(0)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+
+}
 
 func (r *reg8) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
@@ -97,6 +109,9 @@ func (r *reg16) get(h *I2cDev) {
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
+	data[0] = byte(h.MuxValue2)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus2, h.MuxAddr2, 0}
+	x++
 	j[x] = I{true, i2c.Read, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0}
 	x++
 }
@@ -106,6 +121,9 @@ func (r *reg16r) get(h *I2cDev) {
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+	data[0] = byte(h.MuxValue2)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus2, h.MuxAddr2, 0}
 	x++
 	j[x] = I{true, i2c.Read, r.offset(), i2c.WordData, data, h.Bus, h.Addr, 0}
 	x++
@@ -117,9 +135,18 @@ func (r *reg8) set(h *I2cDev, v uint8) {
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
+	data[0] = byte(h.MuxValue2)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus2, h.MuxAddr2, 0}
+	x++
 	data[0] = v
 	j[x] = I{true, i2c.Write, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0}
 	x++
+	data[0] = 0
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus2, h.MuxAddr2, 0}
+	x++
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+
 }
 
 func (r *reg16) set(h *I2cDev, v uint16) {
@@ -127,6 +154,9 @@ func (r *reg16) set(h *I2cDev, v uint16) {
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+	data[0] = byte(h.MuxValue2)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus2, h.MuxAddr2, 0}
 	x++
 	data[0] = uint8(v >> 8)
 	data[1] = uint8(v)
@@ -139,6 +169,9 @@ func (r *reg16r) set(h *I2cDev, v uint16) {
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+	data[0] = byte(h.MuxValue2)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus2, h.MuxAddr2, 0}
 	x++
 	data[1] = uint8(v >> 8)
 	data[0] = uint8(v)

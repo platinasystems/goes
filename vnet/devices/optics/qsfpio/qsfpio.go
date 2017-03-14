@@ -65,7 +65,6 @@ func (cmd *cmd) Main(...string) error {
 	if err = syscall.Sysinfo(&si); err != nil {
 		return err
 	}
-
 	//if err = cmd.update(); err != nil {
 	//	close(cmd.stop)
 	//	return err
@@ -96,11 +95,10 @@ func (cmd *cmd) update() error {
 	if stopped == 1 {
 		return nil
 	}
-
 	port := uint8(0)
 	for k, i := range VpageByKey {
 		for j := 1; j < 33; j++ {
-			if strings.Contains(k, "port."+strconv.Itoa(int(j))+".") {
+			if strings.Contains(k, "port-"+strconv.Itoa(int(j))+".") {
 				port = uint8(j) - 1
 				break
 			}
@@ -117,7 +115,6 @@ func (cmd *cmd) update() error {
 func (h *I2cDev) QsfpStatus(port uint8) string {
 	r := getRegs()
 	var Present uint16
-
 	if port == 0 || port == 16 {
 		//initialize reset I2C GPIO
 		if qsfpIG.init == 1 {
