@@ -201,121 +201,121 @@ func (cmd *cmd) update() error {
 							// get monitoring thresholds if qsfp is not a cable
 							Vdev[i+j*16].StaticBlocks(i + j*16)
 							v = Temp(portUpage3[i+j*16].tempHighAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.highAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.highAlarmThreshold.units.C"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Temp(portUpage3[i+j*16].tempLowAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.lowAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.lowAlarmThreshold.units.C"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Temp(portUpage3[i+j*16].tempHighWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.highWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.highWarnThreshold.units.C"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Temp(portUpage3[i+j*16].tempLowWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.lowWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.lowWarnThreshold.units.C"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccHighAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.highAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.highAlarmThreshold.units.V"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccLowAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.lowAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.lowAlarmThreshold.units.V"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccHighWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.highWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.highWarnThreshold.units.V"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccLowWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.lowWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.lowWarnThreshold.units.V"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerHighAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.highAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.highAlarmThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerLowAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.lowAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.lowAlarmThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerHighWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.highWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.highWarnThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerLowWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.lowWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.lowWarnThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerHighAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.highAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.highAlarmThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerLowAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.lowAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.lowAlarmThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerHighWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.highWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.highWarnThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerLowWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.lowWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.lowWarnThreshold.units.mW"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasHighAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasHighAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasHighAlarmThreshold.units.mA"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasLowAlarm)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasLowAlarmThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasLowAlarmThreshold.units.mA"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasHighWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasHighWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasHighWarnThreshold.units.mA"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasLowWarning)
-							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasLowWarnThreshold"
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasLowWarnThreshold.units.mA"
 							if v != cmd.lasts[k] {
 								cmd.pub.Print(k, ": ", v)
 								cmd.lasts[k] = v
@@ -328,7 +328,7 @@ func (cmd *cmd) update() error {
 					} else {
 						//when qsfp is removed, delete associated fields
 						for _, v := range redisFields {
-							k := "port-" + strconv.Itoa(lp) + v
+							k := "port-" + strconv.Itoa(lp) + "." + v
 							cmd.pub.Print("delete: ", k)
 							cmd.lasts[k] = ""
 						}
@@ -353,13 +353,13 @@ func (cmd *cmd) update() error {
 				// get monitoring data only if qsfp is present and not a cable
 				if Vdev[i].DataReady() {
 					Vdev[i].DynamicBlocks(i)
-					k := "port-" + strconv.Itoa(port) + ".qsfp.temperature"
+					k := "port-" + strconv.Itoa(port) + ".qsfp.temperature.units.C"
 					v := Temp(portLpage0[i].freeMonTemp)
 					if v != cmd.lasts[k] {
 						cmd.pub.Print(k, ": ", v)
 						cmd.lasts[k] = v
 					}
-					k = "port-" + strconv.Itoa(port) + ".qsfp.vcc"
+					k = "port-" + strconv.Itoa(port) + ".qsfp.vcc.units.V"
 					v = Voltage(portLpage0[i].freeMonVoltage)
 					if v != cmd.lasts[k] {
 						cmd.pub.Print(k, ": ", v)
@@ -367,7 +367,7 @@ func (cmd *cmd) update() error {
 					}
 					va := LanePower(portLpage0[i].rxPower)
 					for x := 0; x < 4; x++ {
-						k = "port-" + strconv.Itoa(port) + ".qsfp.rx" + strconv.Itoa(x+1) + ".power"
+						k = "port-" + strconv.Itoa(port) + ".qsfp.rx" + strconv.Itoa(x+1) + ".power.units.mW"
 						if va[x] != cmd.lasts[k] {
 							cmd.pub.Print(k, ": ", va[x])
 							cmd.lasts[k] = va[x]
@@ -375,7 +375,7 @@ func (cmd *cmd) update() error {
 					}
 					va = LanePower(portLpage0[i].txPower)
 					for x := 0; x < 4; x++ {
-						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x+1) + ".power"
+						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x+1) + ".power.units.mW"
 						if va[x] != cmd.lasts[k] {
 							cmd.pub.Print(k, ": ", va[x])
 							cmd.lasts[k] = va[x]
@@ -383,7 +383,7 @@ func (cmd *cmd) update() error {
 					}
 					va = LanesTxBias(portLpage0[i].txBias)
 					for x := 0; x < 4; x++ {
-						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x+1) + ".bias"
+						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x+1) + ".bias.units.mA"
 						if va[x] != cmd.lasts[k] {
 							cmd.pub.Print(k, ": ", va[x])
 							cmd.lasts[k] = va[x]
