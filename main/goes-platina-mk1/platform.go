@@ -153,62 +153,20 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 	return
 }
 
-func (p *platform) QsfpioInit() {
-	//port 1-16 present signals
-	qsfpio.Vdev[0].Bus = 0
-	qsfpio.Vdev[0].Addr = 0x20
-	qsfpio.Vdev[0].MuxBus = 0
-	qsfpio.Vdev[0].MuxAddr = 0x70
-	qsfpio.Vdev[0].MuxValue = 0x10
+func i2cAddrs() {
+	qsfpioInit()
+	qsfpInit()
+}
 
-	//port 17-32 present signals
-	qsfpio.Vdev[1].Bus = 0
-	qsfpio.Vdev[1].Addr = 0x21
-	qsfpio.Vdev[1].MuxBus = 0
-	qsfpio.Vdev[1].MuxAddr = 0x70
-	qsfpio.Vdev[1].MuxValue = 0x10
-
-	//port 1-16 interrupt signals
-	qsfpio.Vdev[2].Bus = 0
-	qsfpio.Vdev[2].Addr = 0x22
-	qsfpio.Vdev[2].MuxBus = 0
-	qsfpio.Vdev[2].MuxAddr = 0x70
-	qsfpio.Vdev[2].MuxValue = 0x10
-
-	//port 17-32 interrupt signals
-	qsfpio.Vdev[3].Bus = 0
-	qsfpio.Vdev[3].Addr = 0x23
-	qsfpio.Vdev[3].MuxBus = 0
-	qsfpio.Vdev[3].MuxAddr = 0x70
-	qsfpio.Vdev[3].MuxValue = 0x10
-
-	//port 1-16 LP mode signals
-	qsfpio.Vdev[4].Bus = 0
-	qsfpio.Vdev[4].Addr = 0x20
-	qsfpio.Vdev[4].MuxBus = 0
-	qsfpio.Vdev[4].MuxAddr = 0x70
-	qsfpio.Vdev[4].MuxValue = 0x20
-
-	//port 17-32 LP mode signals
-	qsfpio.Vdev[5].Bus = 0
-	qsfpio.Vdev[5].Addr = 0x21
-	qsfpio.Vdev[5].MuxBus = 0
-	qsfpio.Vdev[5].MuxAddr = 0x70
-	qsfpio.Vdev[5].MuxValue = 0x20
-
-	//port 1-16 reset signals
-	qsfpio.Vdev[6].Bus = 0
-	qsfpio.Vdev[6].Addr = 0x22
-	qsfpio.Vdev[6].MuxBus = 0
-	qsfpio.Vdev[6].MuxAddr = 0x70
-	qsfpio.Vdev[6].MuxValue = 0x20
-
-	//port 1-32 reset signals
-	qsfpio.Vdev[7].Bus = 0
-	qsfpio.Vdev[7].Addr = 0x23
-	qsfpio.Vdev[7].MuxBus = 0
-	qsfpio.Vdev[7].MuxAddr = 0x70
-	qsfpio.Vdev[7].MuxValue = 0x20
+func qsfpioInit() {
+	qsfpio.Vdev[0] = qsfpio.I2cDev{0, 0x20, 0, 0x70, 0x10} //port 1-16 present signals
+	qsfpio.Vdev[1] = qsfpio.I2cDev{0, 0x21, 0, 0x70, 0x10} //port 17-32 present signals
+	qsfpio.Vdev[2] = qsfpio.I2cDev{0, 0x22, 0, 0x70, 0x10} //port 1-16 interrupt signals
+	qsfpio.Vdev[3] = qsfpio.I2cDev{0, 0x23, 0, 0x70, 0x10} //port 17-32 interrupt signals
+	qsfpio.Vdev[4] = qsfpio.I2cDev{0, 0x20, 0, 0x70, 0x20} //port 1-16 LP mode signals
+	qsfpio.Vdev[5] = qsfpio.I2cDev{0, 0x21, 0, 0x70, 0x20} //port 17-32 LP mode signals
+	qsfpio.Vdev[6] = qsfpio.I2cDev{0, 0x22, 0, 0x70, 0x20} //port 1-16 reset signals
+	qsfpio.Vdev[7] = qsfpio.I2cDev{0, 0x23, 0, 0x70, 0x20} //port 17-32 reset signals
 
 	qsfpio.VpageByKey = map[string]uint8{
 		"port-1.qsfp.presence":  0,
@@ -244,300 +202,41 @@ func (p *platform) QsfpioInit() {
 		"port-31.qsfp.presence": 1,
 		"port-32.qsfp.presence": 1,
 	}
-
-	return
 }
 
-func (p *platform) QsfpInit() {
-	qsfp.Vdev[0].Bus = 0
-	qsfp.Vdev[0].Addr = 0x50
-	qsfp.Vdev[0].MuxBus = 0
-	qsfp.Vdev[0].MuxAddr = 0x70
-	qsfp.Vdev[0].MuxValue = 0x1
-	qsfp.Vdev[0].MuxBus2 = 0
-	qsfp.Vdev[0].MuxAddr2 = 0x71
-	qsfp.Vdev[0].MuxValue2 = 0x1
-
-	qsfp.Vdev[1].Bus = 0
-	qsfp.Vdev[1].Addr = 0x50
-	qsfp.Vdev[1].MuxBus = 0
-	qsfp.Vdev[1].MuxAddr = 0x70
-	qsfp.Vdev[1].MuxValue = 0x1
-	qsfp.Vdev[1].MuxBus2 = 0
-	qsfp.Vdev[1].MuxAddr2 = 0x71
-	qsfp.Vdev[1].MuxValue2 = 0x2
-
-	qsfp.Vdev[2].Bus = 0
-	qsfp.Vdev[2].Addr = 0x50
-	qsfp.Vdev[2].MuxBus = 0
-	qsfp.Vdev[2].MuxAddr = 0x70
-	qsfp.Vdev[2].MuxValue = 0x1
-	qsfp.Vdev[2].MuxBus2 = 0
-	qsfp.Vdev[2].MuxAddr2 = 0x71
-	qsfp.Vdev[2].MuxValue2 = 0x4
-
-	qsfp.Vdev[3].Bus = 0
-	qsfp.Vdev[3].Addr = 0x50
-	qsfp.Vdev[3].MuxBus = 0
-	qsfp.Vdev[3].MuxAddr = 0x70
-	qsfp.Vdev[3].MuxValue = 0x1
-	qsfp.Vdev[3].MuxBus2 = 0
-	qsfp.Vdev[3].MuxAddr2 = 0x71
-	qsfp.Vdev[3].MuxValue2 = 0x8
-
-	qsfp.Vdev[4].Bus = 0
-	qsfp.Vdev[4].Addr = 0x50
-	qsfp.Vdev[4].MuxBus = 0
-	qsfp.Vdev[4].MuxAddr = 0x70
-	qsfp.Vdev[4].MuxValue = 0x1
-	qsfp.Vdev[4].MuxBus2 = 0
-	qsfp.Vdev[4].MuxAddr2 = 0x71
-	qsfp.Vdev[4].MuxValue2 = 0x10
-
-	qsfp.Vdev[5].Bus = 0
-	qsfp.Vdev[5].Addr = 0x50
-	qsfp.Vdev[5].MuxBus = 0
-	qsfp.Vdev[5].MuxAddr = 0x70
-	qsfp.Vdev[5].MuxValue = 0x1
-	qsfp.Vdev[5].MuxBus2 = 0
-	qsfp.Vdev[5].MuxAddr2 = 0x71
-	qsfp.Vdev[5].MuxValue2 = 0x20
-
-	qsfp.Vdev[6].Bus = 0
-	qsfp.Vdev[6].Addr = 0x50
-	qsfp.Vdev[6].MuxBus = 0
-	qsfp.Vdev[6].MuxAddr = 0x70
-	qsfp.Vdev[6].MuxValue = 0x1
-	qsfp.Vdev[6].MuxBus2 = 0
-	qsfp.Vdev[6].MuxAddr2 = 0x71
-	qsfp.Vdev[6].MuxValue2 = 0x40
-
-	qsfp.Vdev[7].Bus = 0
-	qsfp.Vdev[7].Addr = 0x50
-	qsfp.Vdev[7].MuxBus = 0
-	qsfp.Vdev[7].MuxAddr = 0x70
-	qsfp.Vdev[7].MuxValue = 0x1
-	qsfp.Vdev[7].MuxBus2 = 0
-	qsfp.Vdev[7].MuxAddr2 = 0x71
-	qsfp.Vdev[7].MuxValue2 = 0x80
-
-	qsfp.Vdev[8].Bus = 0
-	qsfp.Vdev[8].Addr = 0x50
-	qsfp.Vdev[8].MuxBus = 0
-	qsfp.Vdev[8].MuxAddr = 0x70
-	qsfp.Vdev[8].MuxValue = 0x2
-	qsfp.Vdev[8].MuxBus2 = 0
-	qsfp.Vdev[8].MuxAddr2 = 0x71
-	qsfp.Vdev[8].MuxValue2 = 0x1
-
-	qsfp.Vdev[9].Bus = 0
-	qsfp.Vdev[9].Addr = 0x50
-	qsfp.Vdev[9].MuxBus = 0
-	qsfp.Vdev[9].MuxAddr = 0x70
-	qsfp.Vdev[9].MuxValue = 0x2
-	qsfp.Vdev[9].MuxBus2 = 0
-	qsfp.Vdev[9].MuxAddr2 = 0x71
-	qsfp.Vdev[9].MuxValue2 = 0x2
-
-	qsfp.Vdev[10].Bus = 0
-	qsfp.Vdev[10].Addr = 0x50
-	qsfp.Vdev[10].MuxBus = 0
-	qsfp.Vdev[10].MuxAddr = 0x70
-	qsfp.Vdev[10].MuxValue = 0x2
-	qsfp.Vdev[10].MuxBus2 = 0
-	qsfp.Vdev[10].MuxAddr2 = 0x71
-	qsfp.Vdev[10].MuxValue2 = 0x4
-
-	qsfp.Vdev[11].Bus = 0
-	qsfp.Vdev[11].Addr = 0x50
-	qsfp.Vdev[11].MuxBus = 0
-	qsfp.Vdev[11].MuxAddr = 0x70
-	qsfp.Vdev[11].MuxValue = 0x2
-	qsfp.Vdev[11].MuxBus2 = 0
-	qsfp.Vdev[11].MuxAddr2 = 0x71
-	qsfp.Vdev[11].MuxValue2 = 0x8
-
-	qsfp.Vdev[12].Bus = 0
-	qsfp.Vdev[12].Addr = 0x50
-	qsfp.Vdev[12].MuxBus = 0
-	qsfp.Vdev[12].MuxAddr = 0x70
-	qsfp.Vdev[12].MuxValue = 0x2
-	qsfp.Vdev[12].MuxBus2 = 0
-	qsfp.Vdev[12].MuxAddr2 = 0x71
-	qsfp.Vdev[12].MuxValue2 = 0x10
-
-	qsfp.Vdev[13].Bus = 0
-	qsfp.Vdev[13].Addr = 0x50
-	qsfp.Vdev[13].MuxBus = 0
-	qsfp.Vdev[13].MuxAddr = 0x70
-	qsfp.Vdev[13].MuxValue = 0x2
-	qsfp.Vdev[13].MuxBus2 = 0
-	qsfp.Vdev[13].MuxAddr2 = 0x71
-	qsfp.Vdev[13].MuxValue2 = 0x20
-
-	qsfp.Vdev[14].Bus = 0
-	qsfp.Vdev[14].Addr = 0x50
-	qsfp.Vdev[14].MuxBus = 0
-	qsfp.Vdev[14].MuxAddr = 0x70
-	qsfp.Vdev[14].MuxValue = 0x2
-	qsfp.Vdev[14].MuxBus2 = 0
-	qsfp.Vdev[14].MuxAddr2 = 0x71
-	qsfp.Vdev[14].MuxValue2 = 0x40
-
-	qsfp.Vdev[15].Bus = 0
-	qsfp.Vdev[15].Addr = 0x50
-	qsfp.Vdev[15].MuxBus = 0
-	qsfp.Vdev[15].MuxAddr = 0x70
-	qsfp.Vdev[15].MuxValue = 0x2
-	qsfp.Vdev[15].MuxBus2 = 0
-	qsfp.Vdev[15].MuxAddr2 = 0x71
-	qsfp.Vdev[15].MuxValue2 = 0x80
-
-	qsfp.Vdev[16].Bus = 0
-	qsfp.Vdev[16].Addr = 0x50
-	qsfp.Vdev[16].MuxBus = 0
-	qsfp.Vdev[16].MuxAddr = 0x70
-	qsfp.Vdev[16].MuxValue = 0x4
-	qsfp.Vdev[16].MuxBus2 = 0
-	qsfp.Vdev[16].MuxAddr2 = 0x71
-	qsfp.Vdev[16].MuxValue2 = 0x1
-
-	qsfp.Vdev[17].Bus = 0
-	qsfp.Vdev[17].Addr = 0x50
-	qsfp.Vdev[17].MuxBus = 0
-	qsfp.Vdev[17].MuxAddr = 0x70
-	qsfp.Vdev[17].MuxValue = 0x4
-	qsfp.Vdev[17].MuxBus2 = 0
-	qsfp.Vdev[17].MuxAddr2 = 0x71
-	qsfp.Vdev[17].MuxValue2 = 0x2
-
-	qsfp.Vdev[18].Bus = 0
-	qsfp.Vdev[18].Addr = 0x50
-	qsfp.Vdev[18].MuxBus = 0
-	qsfp.Vdev[18].MuxAddr = 0x70
-	qsfp.Vdev[18].MuxValue = 0x4
-	qsfp.Vdev[18].MuxBus2 = 0
-	qsfp.Vdev[18].MuxAddr2 = 0x71
-	qsfp.Vdev[18].MuxValue2 = 0x4
-
-	qsfp.Vdev[19].Bus = 0
-	qsfp.Vdev[19].Addr = 0x50
-	qsfp.Vdev[19].MuxBus = 0
-	qsfp.Vdev[19].MuxAddr = 0x70
-	qsfp.Vdev[19].MuxValue = 0x4
-	qsfp.Vdev[19].MuxBus2 = 0
-	qsfp.Vdev[19].MuxAddr2 = 0x71
-	qsfp.Vdev[19].MuxValue2 = 0x8
-
-	qsfp.Vdev[20].Bus = 0
-	qsfp.Vdev[20].Addr = 0x50
-	qsfp.Vdev[20].MuxBus = 0
-	qsfp.Vdev[20].MuxAddr = 0x70
-	qsfp.Vdev[20].MuxValue = 0x4
-	qsfp.Vdev[20].MuxBus2 = 0
-	qsfp.Vdev[20].MuxAddr2 = 0x71
-	qsfp.Vdev[20].MuxValue2 = 0x10
-
-	qsfp.Vdev[21].Bus = 0
-	qsfp.Vdev[21].Addr = 0x50
-	qsfp.Vdev[21].MuxBus = 0
-	qsfp.Vdev[21].MuxAddr = 0x70
-	qsfp.Vdev[21].MuxValue = 0x4
-	qsfp.Vdev[21].MuxBus2 = 0
-	qsfp.Vdev[21].MuxAddr2 = 0x71
-	qsfp.Vdev[21].MuxValue2 = 0x20
-
-	qsfp.Vdev[22].Bus = 0
-	qsfp.Vdev[22].Addr = 0x50
-	qsfp.Vdev[22].MuxBus = 0
-	qsfp.Vdev[22].MuxAddr = 0x70
-	qsfp.Vdev[22].MuxValue = 0x4
-	qsfp.Vdev[22].MuxBus2 = 0
-	qsfp.Vdev[22].MuxAddr2 = 0x71
-	qsfp.Vdev[22].MuxValue2 = 0x40
-
-	qsfp.Vdev[23].Bus = 0
-	qsfp.Vdev[23].Addr = 0x50
-	qsfp.Vdev[23].MuxBus = 0
-	qsfp.Vdev[23].MuxAddr = 0x70
-	qsfp.Vdev[23].MuxValue = 0x4
-	qsfp.Vdev[23].MuxBus2 = 0
-	qsfp.Vdev[23].MuxAddr2 = 0x71
-	qsfp.Vdev[23].MuxValue2 = 0x80
-
-	qsfp.Vdev[24].Bus = 0
-	qsfp.Vdev[24].Addr = 0x50
-	qsfp.Vdev[24].MuxBus = 0
-	qsfp.Vdev[24].MuxAddr = 0x70
-	qsfp.Vdev[24].MuxValue = 0x8
-	qsfp.Vdev[24].MuxBus2 = 0
-	qsfp.Vdev[24].MuxAddr2 = 0x71
-	qsfp.Vdev[24].MuxValue2 = 0x1
-
-	qsfp.Vdev[25].Bus = 0
-	qsfp.Vdev[25].Addr = 0x50
-	qsfp.Vdev[25].MuxBus = 0
-	qsfp.Vdev[25].MuxAddr = 0x70
-	qsfp.Vdev[25].MuxValue = 0x8
-	qsfp.Vdev[25].MuxBus2 = 0
-	qsfp.Vdev[25].MuxAddr2 = 0x71
-	qsfp.Vdev[25].MuxValue2 = 0x2
-
-	qsfp.Vdev[26].Bus = 0
-	qsfp.Vdev[26].Addr = 0x50
-	qsfp.Vdev[26].MuxBus = 0
-	qsfp.Vdev[26].MuxAddr = 0x70
-	qsfp.Vdev[26].MuxValue = 0x8
-	qsfp.Vdev[26].MuxBus2 = 0
-	qsfp.Vdev[26].MuxAddr2 = 0x71
-	qsfp.Vdev[26].MuxValue2 = 0x4
-
-	qsfp.Vdev[27].Bus = 0
-	qsfp.Vdev[27].Addr = 0x50
-	qsfp.Vdev[27].MuxBus = 0
-	qsfp.Vdev[27].MuxAddr = 0x70
-	qsfp.Vdev[27].MuxValue = 0x8
-	qsfp.Vdev[27].MuxBus2 = 0
-	qsfp.Vdev[27].MuxAddr2 = 0x71
-	qsfp.Vdev[27].MuxValue2 = 0x8
-
-	qsfp.Vdev[28].Bus = 0
-	qsfp.Vdev[28].Addr = 0x50
-	qsfp.Vdev[28].MuxBus = 0
-	qsfp.Vdev[28].MuxAddr = 0x70
-	qsfp.Vdev[28].MuxValue = 0x8
-	qsfp.Vdev[28].MuxBus2 = 0
-	qsfp.Vdev[28].MuxAddr2 = 0x71
-	qsfp.Vdev[28].MuxValue2 = 0x10
-
-	qsfp.Vdev[29].Bus = 0
-	qsfp.Vdev[29].Addr = 0x50
-	qsfp.Vdev[29].MuxBus = 0
-	qsfp.Vdev[29].MuxAddr = 0x70
-	qsfp.Vdev[29].MuxValue = 0x8
-	qsfp.Vdev[29].MuxBus2 = 0
-	qsfp.Vdev[29].MuxAddr2 = 0x71
-	qsfp.Vdev[29].MuxValue2 = 0x20
-
-	qsfp.Vdev[30].Bus = 0
-	qsfp.Vdev[30].Addr = 0x50
-	qsfp.Vdev[30].MuxBus = 0
-	qsfp.Vdev[30].MuxAddr = 0x70
-	qsfp.Vdev[30].MuxValue = 0x8
-	qsfp.Vdev[30].MuxBus2 = 0
-	qsfp.Vdev[30].MuxAddr2 = 0x71
-	qsfp.Vdev[30].MuxValue2 = 0x40
-
-	qsfp.Vdev[31].Bus = 0
-	qsfp.Vdev[31].Addr = 0x50
-	qsfp.Vdev[31].MuxBus = 0
-	qsfp.Vdev[31].MuxAddr = 0x70
-	qsfp.Vdev[31].MuxValue = 0x8
-	qsfp.Vdev[31].MuxBus2 = 0
-	qsfp.Vdev[31].MuxAddr2 = 0x71
-	qsfp.Vdev[31].MuxValue2 = 0x80
-
-	return
+func qsfpInit() {
+	qsfp.Vdev[0] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x1}
+	qsfp.Vdev[1] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x2}
+	qsfp.Vdev[2] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x4}
+	qsfp.Vdev[3] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x8}
+	qsfp.Vdev[4] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x10}
+	qsfp.Vdev[5] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x20}
+	qsfp.Vdev[6] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x40}
+	qsfp.Vdev[7] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x80}
+	qsfp.Vdev[8] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x1}
+	qsfp.Vdev[9] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x2}
+	qsfp.Vdev[10] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x4}
+	qsfp.Vdev[11] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x8}
+	qsfp.Vdev[12] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x10}
+	qsfp.Vdev[13] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x20}
+	qsfp.Vdev[14] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x40}
+	qsfp.Vdev[15] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x2, 0, 0x71, 0x80}
+	qsfp.Vdev[16] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x1}
+	qsfp.Vdev[17] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x2}
+	qsfp.Vdev[18] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x4}
+	qsfp.Vdev[19] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x8}
+	qsfp.Vdev[20] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x10}
+	qsfp.Vdev[21] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x20}
+	qsfp.Vdev[22] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x40}
+	qsfp.Vdev[23] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x4, 0, 0x71, 0x80}
+	qsfp.Vdev[24] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x1}
+	qsfp.Vdev[25] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x2}
+	qsfp.Vdev[26] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x4}
+	qsfp.Vdev[27] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x8}
+	qsfp.Vdev[28] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x10}
+	qsfp.Vdev[29] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x20}
+	qsfp.Vdev[30] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x40}
+	qsfp.Vdev[31] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x8, 0, 0x71, 0x80}
 }
 
 func deviceVersion() (ver int, err error) {

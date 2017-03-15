@@ -44,7 +44,6 @@ import (
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
-	var h platform
 	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	license.Others = []license.Other{{fe1path, copyright.License}}
 	patents.Others = []patents.Other{{fe1path, copyright.Patents}}
@@ -61,10 +60,9 @@ func main() {
 		vnet.New(),
 		vnetd.New(),
 	)
+	i2cAddrs()
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
-	h.QsfpioInit()
-	h.QsfpInit()
 	redisd.Hook = platina_eeprom.RedisdHook
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
