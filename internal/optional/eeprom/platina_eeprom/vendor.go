@@ -7,7 +7,7 @@ package platina_eeprom
 import "fmt"
 
 func ReadBytes() ([]byte, error) {
-	return readbytes() // FIXME need rpc from i2cd
+	return readbytes()
 }
 
 func Write([]byte) (int, error) {

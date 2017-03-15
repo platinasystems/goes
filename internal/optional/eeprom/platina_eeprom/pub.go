@@ -61,6 +61,8 @@ func RedisdHook(pub *publisher.Publisher) {
 }
 
 func readbytes() ([]byte, error) {
+	// eeprom reads are called early, by redis hook in start
+	// i2cd is not up in start, so direct i2c calls are used
 	bus, err := i2c.New(config.bus.index, config.bus.address)
 	if err != nil {
 		return nil, fmt.Errorf("eeprom: bus open: %v", err)
