@@ -11,7 +11,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/environ/fantray"
 	"github.com/platinasystems/go/internal/environ/fsp"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
@@ -22,6 +21,8 @@ import (
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/optional/eeprom"
+	"github.com/platinasystems/go/internal/optional/eeprom/platina_eeprom"
 	optgpio "github.com/platinasystems/go/internal/optional/gpio"
 	"github.com/platinasystems/go/internal/optional/i2c"
 	"github.com/platinasystems/go/internal/optional/i2cd"
@@ -40,10 +41,10 @@ const UsrShareGoes = "/usr/share/goes"
 
 func main() {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
-	var h platform
 	g := make(goes.ByName)
 	g.Plot(required.New()...)
 	g.Plot(
+		eeprom.New(),
 		diag.New(),
 		optgpio.New(),
 		i2c.New(),
@@ -60,17 +61,15 @@ func main() {
 	)
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}
-	/* FIXME
 	redisd.Hook = platina_eeprom.RedisdHook
 	platina_eeprom.Config(
 		platina_eeprom.BusIndex(0),
-		platina_eeprom.BusAddress(0x51),
+		platina_eeprom.BusAddress(0x55),
 		platina_eeprom.BusDelay(10*time.Millisecond),
 		platina_eeprom.MinMacs(2),
 		platina_eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
 	)
-	*/
-	if err := h.Init(); err != nil {
+	if err := Init(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	start.ConfGpioHook = func() error {
@@ -132,7 +131,8 @@ func stopHook() error {
 }
 
 // The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
-var devEeprom = eeprom.Device{
+/*var devEeprom = eeprom.Device{
 	BusIndex:   0,
 	BusAddress: 0x51,
 }
+*/

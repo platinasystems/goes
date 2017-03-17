@@ -19,23 +19,21 @@ import (
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 )
 
-type platform struct {
-}
-
-func (p *platform) Init() (err error) {
-	p.ucd9090Init()
-	p.w83795Init()
-	p.fantrayInit()
-	p.imx6Init()
-	p.fspInit()
-	p.ledgpioInit()
-	if err = p.boardInit(); err != nil {
+func Init() (err error) {
+	/* FIXME - ADD REDIS GET FOR VERSION HERE */
+	ucd9090Init()
+	w83795Init()
+	fantrayInit()
+	imx6Init()
+	fspInit()
+	ledgpioInit()
+	if err = boardInit(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *platform) boardInit() (err error) {
+func boardInit() (err error) {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
 	gpio.Aliases = make(gpio.GpioAliasMap)
 	gpio.Pins = make(gpio.PinMap)
@@ -54,7 +52,7 @@ func (p *platform) boardInit() (err error) {
 	return nil
 }
 
-func (p *platform) ledgpioInit() {
+func ledgpioInit() {
 	ledgpio.Vdev.Bus = 0
 	ledgpio.Vdev.Addr = 0x75
 	ledgpio.Vdev.MuxBus = 0x0
@@ -62,7 +60,7 @@ func (p *platform) ledgpioInit() {
 	ledgpio.Vdev.MuxValue = 0x2
 }
 
-func (p *platform) ucd9090Init() {
+func ucd9090Init() {
 	ucd9090.Vdev.Bus = 0
 	ucd9090.Vdev.Addr = 0x34
 	ucd9090.Vdev.MuxBus = 0
@@ -83,7 +81,7 @@ func (p *platform) ucd9090Init() {
 	}
 }
 
-func (p *platform) w83795Init() {
+func w83795Init() {
 	w83795.Vdev.Bus = 0
 	w83795.Vdev.Addr = 0x2f
 	w83795.Vdev.MuxBus = 0
@@ -103,7 +101,7 @@ func (p *platform) w83795Init() {
 	}
 }
 
-func (p *platform) fantrayInit() {
+func fantrayInit() {
 	fantray.Vdev.Bus = 1
 	fantray.Vdev.Addr = 0x20
 	fantray.Vdev.MuxBus = 1
@@ -118,13 +116,13 @@ func (p *platform) fantrayInit() {
 	}
 }
 
-func (p *platform) imx6Init() {
+func imx6Init() {
 	imx6.VpageByKey = map[string]uint8{
 		"bmc.temperature.units.C": 1,
 	}
 }
 
-func (p *platform) fspInit() {
+func fspInit() {
 	fsp.Vdev[0].Slot = 2
 	fsp.Vdev[0].Bus = 1
 	fsp.Vdev[0].Addr = 0x58
