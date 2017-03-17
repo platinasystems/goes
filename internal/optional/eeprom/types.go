@@ -7,9 +7,7 @@ package eeprom
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/vnet/ethernet"
+	"net"
 )
 
 const (
@@ -162,24 +160,24 @@ func (p *Dec16) Write(b []byte) (int, error) {
 	return 2, nil
 }
 
-type EthernetAddress ethernet.Address
+type EthernetAddress net.HardwareAddr
 
-func (p *EthernetAddress) Bytes() []byte {
+func (p EthernetAddress) Bytes() []byte {
 	return []byte(p[:])
 }
 
-func (p *EthernetAddress) Scan(s string) error {
-	input := new(parse.Input)
-	input.SetString(s)
-	(*ethernet.Address)(p).Parse(input)
+func (p EthernetAddress) Scan(s string) error {
+	//input := new(parse.Input)
+	//input.SetString(s)
+	//(*ethernet.Address)(p).Parse(input)
 	return nil
 }
 
-func (p *EthernetAddress) String() string {
-	return (*ethernet.Address)(p).String()
+func (p EthernetAddress) String() string {
+	return (net.HardwareAddr)(p).String()
 }
 
-func (p *EthernetAddress) Write(b []byte) (int, error) {
+func (p EthernetAddress) Write(b []byte) (int, error) {
 	copy(p[:], b)
 	return 6, nil
 }

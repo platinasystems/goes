@@ -15,7 +15,7 @@ type TlvMap map[Typer]interface{}
 func (m TlvMap) Add(t Type) (v interface{}) {
 	switch t {
 	case BaseEthernetAddressType:
-		v = new(EthernetAddress)
+		v = make(EthernetAddress, 6)
 	case DeviceVersionType, LabelRevisionType:
 		v = new(Hex8)
 	case NEthernetAddressType:

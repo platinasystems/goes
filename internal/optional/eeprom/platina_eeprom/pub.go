@@ -52,7 +52,7 @@ func RedisdHook(pub *publisher.Publisher) {
 				eeprom.BaseEthernetAddressType.String()))
 		} else {
 			// all non-blank MAC addresses are allowed
-			ea := ev.(*eeprom.EthernetAddress)
+			ea := ev.(eeprom.EthernetAddress)
 			if bytes.Equal(ea[:], []byte{0, 0, 0, 0, 0, 0}) {
 				pub.Error(fmt.Errorf("eeprom: zero MAC BASE"))
 			}
