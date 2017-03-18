@@ -31,6 +31,7 @@ import (
 	"github.com/platinasystems/go/internal/optional/watchdog"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/required"
 	"github.com/platinasystems/go/internal/required/redisd"
 	"github.com/platinasystems/go/internal/required/start"
@@ -117,6 +118,30 @@ func main() {
 		return nil
 	}
 	start.ConfHook = func() error {
+		ver := 0
+		redis.Hwait(redis.DefaultHash, "redis.ready", "true",
+			2*time.Second)
+		s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		_, err = fmt.Sscan(s, &ver)
+		if err != nil {
+			log.Print(err)
+			return err
+		}
+		switch ver {
+		case 0xff:
+			ledgpio.Vdev.Addr = 0x22
+			ucd9090.Vdev.Addr = 0x7e
+		case 0x00:
+			ledgpio.Vdev.Addr = 0x22
+			ucd9090.Vdev.Addr = 0x7e
+		default:
+			ledgpio.Vdev.Addr = 0x75
+			ucd9090.Vdev.Addr = 0x34
+		}
 		return nil
 	}
 	stop.Hook = stopHook

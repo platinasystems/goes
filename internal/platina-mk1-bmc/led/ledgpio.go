@@ -103,9 +103,11 @@ func (cmd *cmd) Main(...string) error {
 		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			if err = cmd.update(); err != nil {
-				//close(cmd.stop)
-				return err
+			if Vdev.Addr != 0 {
+				if err = cmd.update(); err != nil {
+					//close(cmd.stop)
+					return err
+				}
 			}
 		}
 	}

@@ -20,7 +20,6 @@ import (
 )
 
 func Init() (err error) {
-	/* FIXME - ADD REDIS GET FOR VERSION HERE */
 	ucd9090Init()
 	w83795Init()
 	fantrayInit()
@@ -54,7 +53,7 @@ func boardInit() (err error) {
 
 func ledgpioInit() {
 	ledgpio.Vdev.Bus = 0
-	ledgpio.Vdev.Addr = 0x75
+	ledgpio.Vdev.Addr = 0x0 //update after eeprom read
 	ledgpio.Vdev.MuxBus = 0x0
 	ledgpio.Vdev.MuxAddr = 0x76
 	ledgpio.Vdev.MuxValue = 0x2
@@ -62,7 +61,7 @@ func ledgpioInit() {
 
 func ucd9090Init() {
 	ucd9090.Vdev.Bus = 0
-	ucd9090.Vdev.Addr = 0x34
+	ucd9090.Vdev.Addr = 0x0 //update after eeprom read
 	ucd9090.Vdev.MuxBus = 0
 	ucd9090.Vdev.MuxAddr = 0x76
 	ucd9090.Vdev.MuxValue = 0x01
