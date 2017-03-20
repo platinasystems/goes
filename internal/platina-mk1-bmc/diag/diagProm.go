@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	pen = 0xBC65
+	pen = 0x0000BC65
 
 	chassisTypeT = 0x50
 	boardTypeT   = 0x51
@@ -44,9 +44,12 @@ func diagProm() error {
 	var c, v string
 
 	//ONIE vendor exention fields
-	tor1Ved := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-	bde2cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde2c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-	bde4cVed := []byte{byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde4c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	tor1Vedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	bde2cVedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde2c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	bde4cVedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde4c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
+	tor1Vedga := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeTor1, subTypeT, subTypeL, subTypeGa, ppnT, ppnL}
+	bde2cVedga := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde2c, subTypeT, subTypeL, subTypeGa, ppnT, ppnL}
+	bde4cVedga := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde4c, subTypeT, subTypeL, subTypeGa, ppnT, ppnL}
 
 	var vByte []byte
 
@@ -57,9 +60,12 @@ func diagProm() error {
 	diagI2cWrite1Byte(0x01, 0x72, 0x00)
 
 	for i := 0; i < ppnL; i++ {
-		tor1Ved = append(tor1Ved, ppnTor1[i])
-		bde2cVed = append(bde2cVed, ppnBde2c[i])
-		bde4cVed = append(bde4cVed, ppnBde4c[i])
+		tor1Vedp = append(tor1Vedp, ppnTor1[i])
+		bde2cVedp = append(bde2cVedp, ppnBde2c[i])
+		bde4cVedp = append(bde4cVedp, ppnBde4c[i])
+		tor1Vedga = append(tor1Vedga, ppnTor1[i])
+		bde2cVedga = append(bde2cVedga, ppnBde2c[i])
+		bde4cVedga = append(bde4cVedga, ppnBde4c[i])
 	}
 
 	d := eeprom.Device{
@@ -81,7 +87,7 @@ func diagProm() error {
 			fmt.Printf("invalid: eeprom is not in onie format\n")
 			return nil
 		}
-		fmt.Printf("raw data: %v\n\n", rawData)
+		fmt.Printf("raw data: %x\n\n", rawData)
 		fmt.Printf("id: %s, rev: 0x%x, length: %d\n", string(rawData[0:7]), rawData[8], (uint(rawData[9])<<8)|uint(rawData[10]))
 		fmt.Printf("Type | Length | Value \n")
 		fmt.Printf("-----------------------------------------\n")
@@ -104,12 +110,12 @@ func diagProm() error {
 		if vf != 0 {
 			ved := rawData[vf : vf+vl]
 			fmt.Printf("\npen: %x%x\n", ved[0], ved[1])
-			if ved[0] != 0xbc || ved[1] != 0x65 {
+			if ved[0] != 0x00 || ved[1] != 0x00 || ved[2] != 0xbc || ved[3] != 0x65 {
 				fmt.Print("Invalid vendor extension PEN\n")
 			} else {
 				fmt.Printf("Type | Length | Value \n")
 				fmt.Printf("-----------------------------------------\n")
-				for j := uint(2); j < uint(len(ved)); {
+				for j := uint(4); j < uint(len(ved)); {
 					tlv, tlen := ved[j], uint(ved[j+1])
 					v := ved[j+2 : j+2+tlen]
 					switch tlv {
@@ -152,12 +158,18 @@ func diagProm() error {
 		case "fd":
 			//write vendor extension fields
 			switch v {
-			case "tor1":
-				fmt.Printf("%s\n", d.WriteField(c, tor1Ved))
-			case "bde4c":
-				fmt.Printf("%s\n", d.WriteField(c, bde4cVed))
-			case "bde2c":
-				fmt.Printf("%s\n", d.WriteField(c, bde2cVed))
+			case "tor1p":
+				fmt.Printf("%s\n", d.WriteField(c, tor1Vedp))
+			case "bde4cp":
+				fmt.Printf("%s\n", d.WriteField(c, bde4cVedp))
+			case "bde2cp":
+				fmt.Printf("%s\n", d.WriteField(c, bde2cVedp))
+			case "tor1ga":
+				fmt.Printf("%s\n", d.WriteField(c, tor1Vedga))
+			case "bde4cga":
+				fmt.Printf("%s\n", d.WriteField(c, bde4cVedga))
+			case "bde2cga":
+				fmt.Printf("%s\n", d.WriteField(c, bde2cVedga))
 			default:
 			}
 		case "vsn":
@@ -220,7 +232,7 @@ func diagProm() error {
 				tlv, tlen := rawData[i], uint(rawData[i+1])
 				v := rawData[i+2 : i+2+tlen]
 				if tlv == 0xfd {
-					for j := uint(2); j < uint(len(v)); {
+					for j := uint(4); j < uint(len(v)); {
 						tlv, tlen := v[j], uint(v[j+1])
 						if tlv == 0x53 {
 							var ppnNew string

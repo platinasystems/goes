@@ -100,7 +100,7 @@ func diagHost() error {
 	gpioSet("CPU_TO_MAIN_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
 	diagI2cWriteOffsetByte(0x00, 0x74, 0x02, 0xF7)
-	diagI2cWriteOffsetByte(0x00, 0x74, 0x06, 0xF7)
+	diagI2cWriteOffsetByte(0x00, 0x74, 0x06, 0xD7)
 	pinstate, err = gpioGet("HOST_TO_BMC_I2C_GPIO")
 	if err != nil {
 		return err
