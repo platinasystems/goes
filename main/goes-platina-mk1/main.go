@@ -76,7 +76,7 @@ func main() {
 		platina_eeprom.BusIndex(0),
 		platina_eeprom.BusAddress(0x51),
 		platina_eeprom.BusDelay(10*time.Millisecond),
-		platina_eeprom.MinMacs(134),
+		platina_eeprom.MinMacs(132),
 		platina_eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
 	)
 	if err := g.Main(); err != nil {
