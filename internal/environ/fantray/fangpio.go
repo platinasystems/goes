@@ -30,9 +30,11 @@ var Vdev I2cDev
 var VpageByKey map[string]uint8
 
 type cmd struct {
-	stop chan struct{}
-	pub  *publisher.Publisher
-	last map[string]string
+	stop  chan struct{}
+	pub   *publisher.Publisher
+	last  map[string]float64
+	lasts map[string]string
+	lastu map[string]uint16
 }
 
 func New() *cmd { return new(cmd) }
@@ -46,7 +48,9 @@ func (cmd *cmd) Main(...string) error {
 	var err error
 
 	cmd.stop = make(chan struct{})
-	cmd.last = make(map[string]string)
+	cmd.last = make(map[string]float64)
+	cmd.lasts = make(map[string]string)
+	cmd.lastu = make(map[string]uint16)
 
 	if cmd.pub, err = publisher.New(); err != nil {
 		return err
@@ -91,9 +95,9 @@ func (cmd *cmd) update() error {
 		if err != nil {
 			return err
 		}
-		if v != cmd.last[k] {
+		if v != cmd.lasts[k] {
 			cmd.pub.Print(k, ": ", v)
-			cmd.last[k] = v
+			cmd.lasts[k] = v
 		}
 	}
 	return nil
@@ -111,8 +115,9 @@ var fanTrayLedBits = []uint8{0x30, 0x03, 0x30, 0x03}
 var fanTrayDirBits = []uint8{0x80, 0x08, 0x80, 0x08}
 var fanTrayAbsBits = []uint8{0x40, 0x04, 0x40, 0x04}
 var deviceVer byte
+var first int
 
-func (h *I2cDev) FanTrayLedInit() {
+func (h *I2cDev) FanTrayLedInit() error {
 	r := getRegs()
 
 	//e := eeprom.Device{
@@ -121,7 +126,7 @@ func (h *I2cDev) FanTrayLedInit() {
 	//}
 	//e.GetInfo()
 	//deviceVer = e.Fields.DeviceVersion
-	deviceVer := 0xff //
+	deviceVer := 0x01 //
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
 		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
@@ -134,12 +139,28 @@ func (h *I2cDev) FanTrayLedInit() {
 	r.Output[1].set(h, 0xff&(fanTrayLedOff[0]|fanTrayLedOff[1]))
 	r.Config[0].set(h, 0xff^fanTrayLeds)
 	r.Config[1].set(h, 0xff^fanTrayLeds)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+
 	log.Print("notice: fan tray led init complete")
+	return err
 }
 
 func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 	var w string
 	var f string
+
+	if first == 1 {
+		err := Vdev.FanTrayLedInit()
+		if err != nil {
+			return "error", err
+		}
+
+		first = 0
+	}
 
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
@@ -174,7 +195,6 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 		return "error", err
 	}
 	rInputNGet := s[1].D[0]
-
 	if (rInputNGet & fanTrayAbsBits[i]) != 0 {
 		//fan tray is not present, turn LED off
 		w = "not installed"
@@ -188,8 +208,8 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 		}
 
 		//check fan speed is above minimum
-		f1 := "fan_tray." + strconv.Itoa(int(i+1)) + ".1.rpm"
-		f2 := "fan_tray." + strconv.Itoa(int(i+1)) + ".2.rpm"
+		f1 := "fan_tray." + strconv.Itoa(int(i+1)) + ".1.speed.units.rpm"
+		f2 := "fan_tray." + strconv.Itoa(int(i+1)) + ".2.speed.units.rpm"
 		s1, _ := redis.Hget(redis.DefaultHash, f1)
 		s2, _ := redis.Hget(redis.DefaultHash, f2)
 		r1, _ := strconv.ParseInt(s1, 10, 64)

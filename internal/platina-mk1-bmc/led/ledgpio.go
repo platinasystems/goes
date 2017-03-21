@@ -231,15 +231,15 @@ func (h *I2cDev) LedStatus() error {
 
 	allFanGood := true
 	fanStatChange := false
-	for j := 1; j <= maxFanTrays; j++ {
-		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
+	for j := 0; j < maxFanTrays; j++ {
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j+1))+".status")
 		if !strings.Contains(p, "ok") {
 			allFanGood = false
 		}
-		if lastFanStatus[j-1] != p {
+		if lastFanStatus[j] != p {
 			fanStatChange = true
 			//if any fan tray is failed or not installed, set front panel FAN led to yellow
-			if strings.Contains(p, "warning") && !strings.Contains(lastFanStatus[j-1], "not installed") {
+			if strings.Contains(p, "warning") && !strings.Contains(lastFanStatus[j], "not installed") {
 				r.Output[0].get(h)
 				closeMux(h)
 				err := DoI2cRpc()
@@ -256,7 +256,7 @@ func (h *I2cDev) LedStatus() error {
 				if err != nil {
 					return err
 				}
-				log.Print("warning: fan tray ", j, " failure")
+				log.Print("warning: fan tray ", j+1, " failure")
 				if !forceFanSpeed {
 					w83795.Vdev.SetFanSpeed("high")
 					forceFanSpeed = true
@@ -278,17 +278,16 @@ func (h *I2cDev) LedStatus() error {
 				if err != nil {
 					return err
 				}
-				log.Print("warning: fan tray ", j, " not installed")
+				log.Print("warning: fan tray ", j+1, " not installed")
 				if !forceFanSpeed {
 					w83795.Vdev.SetFanSpeed("high")
 					forceFanSpeed = true
 				}
-			} else if strings.Contains(lastFanStatus[j-1], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
-				log.Print("notice: fan tray ", j, " installed")
+			} else if strings.Contains(lastFanStatus[j], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
+				log.Print("notice: fan tray ", j+1, " installed")
 			}
 		}
-		lastFanStatus[j-1] = p
-		return nil
+		lastFanStatus[j] = p
 	}
 
 	if allFanGood && !forceFanSpeed {
@@ -335,7 +334,6 @@ func (h *I2cDev) LedStatus() error {
 
 	for j := 0; j < maxPsu; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "psu"+strconv.Itoa(j+1)+".status")
-
 		if lastPsuStatus[j] != p {
 			r.Output[0].get(h)
 			r.Config[0].get(h)
