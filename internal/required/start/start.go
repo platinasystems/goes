@@ -87,7 +87,7 @@ func (c *cmd) Main(args ...string) error {
 		}
 	}
 
-	ConfGpioHook()
+	err = ConfGpioHook()
 	if err != nil {
 		return err
 	}

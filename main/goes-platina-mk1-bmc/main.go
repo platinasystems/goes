@@ -115,10 +115,6 @@ func main() {
 			time.Sleep(1 * time.Microsecond)
 			pin.SetValue(true)
 		}
-		return nil
-	}
-	start.ConfHook = func() error {
-		ver := 0
 		redis.Hwait(redis.DefaultHash, "redis.ready", "true",
 			2*time.Second)
 		s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
@@ -126,22 +122,27 @@ func main() {
 			log.Print(err)
 			return err
 		}
+		ver := 0
 		_, err = fmt.Sscan(s, &ver)
 		if err != nil {
 			log.Print(err)
 			return err
 		}
-		switch ver {
-		case 0xff:
-			ledgpio.Vdev.Addr = 0x22
-			ucd9090.Vdev.Addr = 0x7e
-		case 0x00:
-			ledgpio.Vdev.Addr = 0x22
-			ucd9090.Vdev.Addr = 0x7e
-		default:
-			ledgpio.Vdev.Addr = 0x75
-			ucd9090.Vdev.Addr = 0x34
+		f, err := os.Create("/tmp/ver")
+		if err != nil {
+			return err
 		}
+		defer f.Close()
+		d2 := []byte{byte(ver), 10}
+		_, err = f.Write(d2)
+		if err != nil {
+			return err
+		}
+		f.Sync()
+		f.Close()
+		return nil
+	}
+	start.ConfHook = func() error {
 		return nil
 	}
 	stop.Hook = stopHook
@@ -154,10 +155,3 @@ func main() {
 func stopHook() error {
 	return nil
 }
-
-// The MK1 x86 CPU Card EEPROM is located on bus 0, addr 0x51:
-/*var devEeprom = eeprom.Device{
-	BusIndex:   0,
-	BusAddress: 0x51,
-}
-*/

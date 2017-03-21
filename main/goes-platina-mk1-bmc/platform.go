@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"github.com/platinasystems/go/internal/environ/fantray"
 	"github.com/platinasystems/go/internal/environ/fsp"
@@ -57,6 +58,15 @@ func ledgpioInit() {
 	ledgpio.Vdev.MuxBus = 0x0
 	ledgpio.Vdev.MuxAddr = 0x76
 	ledgpio.Vdev.MuxValue = 0x2
+	ver, _ := readVer()
+	switch ver {
+	case 0xff:
+		ledgpio.Vdev.Addr = 0x22
+	case 0x00:
+		ledgpio.Vdev.Addr = 0x22
+	default:
+		ledgpio.Vdev.Addr = 0x75
+	}
 }
 
 func ucd9090Init() {
@@ -65,6 +75,15 @@ func ucd9090Init() {
 	ucd9090.Vdev.MuxBus = 0
 	ucd9090.Vdev.MuxAddr = 0x76
 	ucd9090.Vdev.MuxValue = 0x01
+	ver, _ := readVer()
+	switch ver {
+	case 0xff:
+		ucd9090.Vdev.Addr = 0x7e
+	case 0x00:
+		ucd9090.Vdev.Addr = 0x7e
+	default:
+		ucd9090.Vdev.Addr = 0x34
+	}
 
 	ucd9090.VpageByKey = map[string]uint8{
 		"vmon.5v.sb.units.V":    1,
@@ -164,4 +183,18 @@ func fspInit() {
 		"psu2.p_in.units.W":        0,
 		"psu2.temperature.units.C": 0,
 	}
+}
+
+func readVer() (v int, err error) {
+	f, err := os.Open("/tmp/ver")
+	if err != nil {
+		return 0, err
+	}
+	b1 := make([]byte, 5)
+	_, err = f.Read(b1)
+	if err != nil {
+		return 0, err
+	}
+	f.Close()
+	return int(b1[0]), nil
 }
