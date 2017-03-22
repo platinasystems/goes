@@ -4,29 +4,24 @@
 
 package parms
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+var ErrNotFound = errors.New("not found")
 
 type Parm map[string]string
 
-// New parses NAME[= ]VALUE parameters from the given arguments.
+// Parses {NAME VALUE} and NAME=VALUE parameters from the given arguments.
 func New(args []string, parms ...string) (Parm, []string) {
 	parm := make(Parm)
 	for _, s := range parms {
 		parm[s] = ""
 	}
 	for i := 0; i < len(args); {
-		if _, found := parm[args[i]]; found {
-			if i < len(args)-1 {
-				parm[args[i]] = args[i+1]
-				copy(args[i:], args[i+2:])
-				args = args[:len(args)-2]
-			} else {
-				args = args[:len(args)-1]
-			}
-		} else if eq := strings.Index(args[i], "="); eq > 0 {
-			name, value := args[i][:eq], args[i][eq+1:]
-			if _, found := parm[name]; found {
-				parm[name] = value
+		if eq := strings.Index(args[i], "="); eq > 0 {
+			if parm.Set(args[i][:eq], args[i][eq+1:]) == nil {
 				if i < len(args)-1 {
 					copy(args[i:], args[i+1:])
 				}
@@ -34,9 +29,28 @@ func New(args []string, parms ...string) (Parm, []string) {
 			} else {
 				i++
 			}
+		} else if i < len(args)-1 &&
+			parm.Set(args[i], args[i+1]) == nil {
+			copy(args[i:], args[i+2:])
+			args = args[:len(args)-2]
+			i += 2
 		} else {
 			i++
 		}
 	}
 	return parm, args
+}
+
+// Set will concatenate a non empty parm
+func (parm Parm) Set(name, value string) error {
+	cur, found := parm[name]
+	if !found {
+		return ErrNotFound
+	}
+	if len(cur) > 0 && len(value) > 0 {
+		parm[name] = cur + " " + value
+	} else {
+		parm[name] = value
+	}
+	return nil
 }

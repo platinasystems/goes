@@ -80,3 +80,55 @@ func TestDdBsCountFileGtOut(t *testing.T) {
 		t.Error("wrong args:", args)
 	}
 }
+
+func TestConcat(t *testing.T) {
+	cmd := []string{"foo", "-bar=FOO", "-bar", "BAR"}
+	parm, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(parm, Parm{
+		"-bar": "FOO BAR",
+	}) {
+		t.Error("wrong parm:", parm)
+	}
+	if !reflect.DeepEqual(args, []string{"foo"}) {
+		t.Error("wrong args:", args)
+	}
+}
+
+func TestConcatPlus(t *testing.T) {
+	cmd := []string{"foo", "-bar=FOO", "-bar", "BAR", "bar"}
+	parm, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(parm, Parm{
+		"-bar": "FOO BAR",
+	}) {
+		t.Error("wrong parm:", parm)
+	}
+	if !reflect.DeepEqual(args, []string{"foo", "bar"}) {
+		t.Error("wrong args:", args)
+	}
+}
+
+func TestClearAndSet(t *testing.T) {
+	cmd := []string{"foo", "-bar=FOO", "-bar=", "-bar=BAR"}
+	parm, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(parm, Parm{
+		"-bar": "BAR",
+	}) {
+		t.Error("wrong parm:", parm)
+	}
+	if !reflect.DeepEqual(args, []string{"foo"}) {
+		t.Error("wrong args:", args)
+	}
+}
+
+func TestClearAndSetPlus(t *testing.T) {
+	cmd := []string{"foo", "-bar=FOO", "-bar=", "-bar=BAR", "bar"}
+	parm, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(parm, Parm{
+		"-bar": "BAR",
+	}) {
+		t.Error("wrong parm:", parm)
+	}
+	if !reflect.DeepEqual(args, []string{"foo", "bar"}) {
+		t.Error("wrong args:", args)
+	}
+}
