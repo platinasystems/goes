@@ -26,6 +26,7 @@ type I2cDev struct {
 	Slot       int
 	Installed  int
 	Id         string
+	Model      string
 	Bus        int
 	Addr       int
 	MuxBus     int
@@ -581,7 +582,16 @@ func (h *I2cDev) Vout() (float64, error) {
 	}
 	vout := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	voutMode := uint8(s[3].D[0])
-	v := h.convertVoutMode(voutMode, vout)
+	var v float64
+	var errs error
+	if !strings.Contains(h.Model, "CRPS800") {
+		v = h.convertVoutMode(voutMode, vout)
+	} else {
+		v, errs = h.convert(vout)
+		if errs != nil {
+			return 0, errs
+		}
+	}
 
 	return v, nil
 }
@@ -774,6 +784,7 @@ func (h *I2cDev) MfgModel() (string, error) {
 		t = "FSP"
 	}
 	t = strings.Trim(t, "#")
+	h.Model = t
 	return t, nil
 }
 

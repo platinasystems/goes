@@ -109,7 +109,7 @@ func diagProm() error {
 
 		if vf != 0 {
 			ved := rawData[vf : vf+vl]
-			fmt.Printf("\npen: %x%x\n", ved[0], ved[1])
+			fmt.Printf("\npen: 0x%x\n", ved[0:4])
 			if ved[0] != 0x00 || ved[1] != 0x00 || ved[2] != 0xbc || ved[3] != 0x65 {
 				fmt.Print("Invalid vendor extension PEN\n")
 			} else {
@@ -191,6 +191,23 @@ func diagProm() error {
 				}
 				i += 2 + tlen
 			}
+		case "pen4":
+			//write serial number to vendor extension field
+			_, rawData := d.DumpProm()
+			for i := uint(0 + 11); i < uint(len(rawData)); {
+				tlv, tlen := rawData[i], uint(rawData[i+1])
+				w := rawData[i+2 : i+2+tlen]
+				if tlv == 0xfd {
+					data := []byte{0, 0}
+					w = append(data, w...)
+					d.DeleteField("fd")
+					d.WriteField("fd", w)
+					fmt.Printf("added 0x0000 to pen\n")
+					break
+				}
+				i += 2 + tlen
+			}
+
 		default:
 			//write any field with value
 			fmt.Printf("%s\n", d.WriteField(c, vByte))
