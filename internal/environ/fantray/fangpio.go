@@ -64,6 +64,7 @@ func (cmd *cmd) Main(...string) error {
 	//	close(cmd.stop)
 	//	return err
 	//}
+	holdoff := 3
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
@@ -71,9 +72,14 @@ func (cmd *cmd) Main(...string) error {
 		case <-cmd.stop:
 			return nil
 		case <-t.C:
-			if err = cmd.update(); err != nil {
-				close(cmd.stop)
-				return err
+			if holdoff > 0 {
+				holdoff--
+			}
+			if holdoff == 0 {
+				if err = cmd.update(); err != nil {
+					close(cmd.stop)
+					return err
+				}
 			}
 		}
 	}

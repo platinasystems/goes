@@ -7,6 +7,7 @@ package fsp
 
 import (
 	"net/rpc"
+	"time"
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/i2c"
@@ -164,10 +165,13 @@ func DoI2cRpc() error {
 		}
 		clientA = client
 		dialed = 1
+		time.Sleep(time.Millisecond * time.Duration(50))
 	}
 	err := clientA.Call("I2cReq.ReadWrite", &j, &s)
 	if err != nil {
 		log.Print("i2cReq error:", err)
+		dialed = 0
+		clientA.Close()
 		return err
 	}
 	clearJ()
