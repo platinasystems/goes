@@ -67,7 +67,7 @@ func (c *cmd) Main(args ...string) (err error) {
 		fields := strings.Split(arg, ":")
 		m := &bootMnt{}
 		m.mnt = fields[0]
-		if len(fields) > 0 {
+		if len(fields) > 1 {
 			m.cmd = fields[1]
 		}
 		go c.tryScanFiles(m, done)
