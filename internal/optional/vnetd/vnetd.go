@@ -222,11 +222,11 @@ func (e *event) EventAction() {
 	case e.in.Parse("%v.media %s", &hi, &e.i.v, &media):
 		e.err <- hi.SetMedia(&e.i.v, media)
 	case e.in.Parse("pollInterval %f", &itv):
-	        if itv < 1 {
-		   e.err <- fmt.Errorf("pollInterval must be 1 second or longer")
+		if itv < 1 {
+			e.err <- fmt.Errorf("pollInterval must be 1 second or longer")
 		} else {
-     		   e.i.poller.pollInterval = itv
-		   e.err <- nil
+			e.i.poller.pollInterval = itv
+			e.err <- nil
 		}
 	default:
 		e.err <- fmt.Errorf("can't set %s to %v", e.key, e.value)
@@ -290,7 +290,7 @@ type ifStatsPoller struct {
 	sequence     uint
 	hwInterfaces ifStatsPollerInterfaceVec
 	swInterfaces ifStatsPollerInterfaceVec
-	pollInterval float64   // pollInterval in seconds
+	pollInterval float64 // pollInterval in seconds
 }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
@@ -327,6 +327,6 @@ func (p *ifStatsPoller) EventAction() {
 		})
 	stop := time.Now()
 	p.i.publish("poll.finish", stop.Format(time.StampMilli))
-	
+
 	p.sequence++
 }
