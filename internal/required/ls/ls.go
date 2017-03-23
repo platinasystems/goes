@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"syscall"
 
 	"github.com/platinasystems/go/internal/flags"
@@ -29,7 +28,7 @@ func (cmd) Usage() string  { return Name + " [OPTION]... [FILE]..." }
 
 func (cmd) Main(args ...string) error {
 	var err error
-	var ls func(string, []string) error
+	var ls func([]os.FileInfo) error
 
 	flag, args := flags.New(args, "-l", "-C", "-1")
 
@@ -44,14 +43,18 @@ func (cmd) Main(args ...string) error {
 		ls = tabulate
 	}
 
-	files := make([]string, 0, 128)
-	dirs := make([]string, 0, 128)
+	files := make([]os.FileInfo, 0, 128)
+	dirs := make([]os.FileInfo, 0, 128)
 	defer func() {
 		files = files[:0]
 		dirs = dirs[:0]
 	}()
 	if len(args) == 0 {
-		dirs = append(dirs, ".")
+		dir, err := os.Stat(".")
+		if err != nil {
+			return err
+		}
+		dirs = append(dirs, dir)
 	} else {
 		for _, pat := range args {
 			globs, err := filepath.Glob(pat)
@@ -66,16 +69,16 @@ func (cmd) Main(args ...string) error {
 				fi, err := os.Stat(name)
 				if err == nil {
 					if fi.IsDir() {
-						dirs = append(dirs, name)
+						dirs = append(dirs, fi)
 					} else {
-						files = append(files, name)
+						files = append(files, fi)
 					}
 				}
 			}
 		}
 	}
 	if len(files) > 0 {
-		err = ls("", files)
+		err = ls(files)
 		if len(dirs) > 0 {
 			fmt.Println()
 		}
@@ -86,37 +89,32 @@ func (cmd) Main(args ...string) error {
 			if i > 0 {
 				fmt.Println()
 			}
-			fmt.Print(dir, ":\n")
+			fmt.Print(dir.Name(), ":\n")
 		}
 		files = files[:0]
-		fis, err := ioutil.ReadDir(dir)
+		fis, err := ioutil.ReadDir(dir.Name())
 		if err != nil {
 			return err
 		}
 		for _, fi := range fis {
-			files = append(files, filepath.Join(dir, fi.Name()))
+			files = append(files, fi)
 		}
-		err = ls(dir+PathSeparatorString, files)
+		err = ls(files)
 	}
 	return err
 }
 
 // List one file per line.
-func one(prefix string, names []string) error {
-	sort.Strings(names)
-	for _, name := range names {
-		fmt.Println(strings.TrimPrefix(name, prefix))
+func one(files []os.FileInfo) error {
+	for _, file := range files {
+		fmt.Println(file.Name())
 	}
 	return nil
 }
 
-func long(prefix string, names []string) error {
-	sort.Strings(names)
-	for _, name := range names {
-		fi, err := os.Stat(name)
-		if err != nil {
-			return err
-		}
+func long(files []os.FileInfo) error {
+	for _, fi := range files {
+		name := fi.Name()
 		st := fi.Sys().(*syscall.Stat_t)
 		switch st.Mode & syscall.S_IFMT {
 		case syscall.S_IFBLK, syscall.S_IFCHR:
@@ -133,10 +131,7 @@ func long(prefix string, names []string) error {
 				fi.Name())
 		case syscall.S_IFLNK:
 			lnk, err := os.Readlink(name)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("%12s %2d %4d %4d %10d %s %s -> %s\n",
+			fmt.Printf("%12s %2d %4d %4d %10d %s %s -> %s",
 				fi.Mode().String(),
 				st.Nlink,
 				st.Uid,
@@ -145,6 +140,11 @@ func long(prefix string, names []string) error {
 				fi.ModTime().Format("Jan 02 15:04"),
 				fi.Name(),
 				lnk)
+			if err == nil {
+				fmt.Printf("\n")
+			} else {
+				fmt.Printf(": %v\n", name, err)
+			}
 		default:
 			fmt.Printf("%12s %2d %4d %4d %10d %s %s\n",
 				fi.Mode().String(),
@@ -161,7 +161,12 @@ func long(prefix string, names []string) error {
 
 // Arrange file names in tabular form with names longer than 24 runes printed
 // first on separate lines.
-func tabulate(prefix string, names []string) error {
+func tabulate(files []os.FileInfo) error {
+	names := make([]string, 0, len(files))
+	for i := 0; i < len(files); i++ {
+		names = append(names, files[i].Name())
+	}
+
 	sort.Strings(names)
 	columns := 80
 	if env := os.Getenv("COLUMNS"); len(env) > 0 {
@@ -173,7 +178,6 @@ func tabulate(prefix string, names []string) error {
 
 	width := 8
 	for i := 0; i < len(names); {
-		names[i] = strings.TrimPrefix(names[i], prefix)
 		if n := len(names[i]); n > 24 {
 			fmt.Println(names[i])
 			if i < len(names)-1 {
