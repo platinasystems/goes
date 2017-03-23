@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	
+
+	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/liner"
-
 )
 
 const Name = "boot"
@@ -26,10 +26,10 @@ type bootSet struct {
 }
 
 type bootMnt struct {
-	mnt string
-	cmd string
-	err error
-	files [] bootSet
+	mnt   string
+	cmd   string
+	err   error
+	files []bootSet
 }
 
 type cmd goes.ByName
@@ -37,15 +37,15 @@ type cmd goes.ByName
 func New() *cmd { return new(cmd) }
 
 func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Name + " [OPTIONS]..." }
+func (*cmd) String() string  { return Name }
+func (*cmd) Usage() string   { return Name + " [OPTIONS]..." }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Main(args ...string) (err error) {
 	byName := goes.ByName(*c)
-	parm,args := parms.New(args, "-t")
-	
+	parm, args := parms.New(args, "-t")
+
 	if len(args) == 0 {
 		args = append(args, "/boot")
 	}
@@ -85,7 +85,7 @@ func (c *cmd) Main(args ...string) (err error) {
 	defBoot := ""
 
 	for i := 0; i < cnt; i++ {
-		m := <- done
+		m := <-done
 		for _, file := range m.files {
 			c := fmt.Sprintf("kexec -k %s/%s -i %s/%s -e",
 				m.mnt, file.kernel, m.mnt, file.initrd)
@@ -109,7 +109,7 @@ func (c *cmd) Main(args ...string) (err error) {
 			return err
 		}
 	}
-	kCmd := strings.Fields(resp)
+	kCmd := fields.New(resp)
 
 	err = byName.Main(kCmd...)
 
