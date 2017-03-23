@@ -96,6 +96,7 @@ func ucd9090Init() {
 		"vmon.1v25.sys.units.V": 8,
 		"vmon.1v2.ethx.units.V": 9,
 		"vmon.1v0.tha.units.V":  10,
+		"vmon.poweroff.events":  0,
 	}
 }
 

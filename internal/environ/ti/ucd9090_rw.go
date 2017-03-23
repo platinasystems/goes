@@ -48,9 +48,10 @@ var clientA *rpc.Client
 var dialed int = 0
 
 func getRegs() *regs            { return (*regs)(regsPointer) }
-func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
-func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
+func (r *reg8) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
+func (r *reg8b) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
+func (r *reg16) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
+func (r *reg16r) offset() uint8 { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 
 func closeMux(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
@@ -68,6 +69,17 @@ func (r *reg8) get(h *I2cDev) {
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	x++
 	j[x] = I{true, i2c.Read, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0}
+	x++
+}
+
+func (r *reg8b) get(h *I2cDev, readLen byte) {
+	var data = [34]byte{0, 0, 0, 0}
+
+	data[0] = byte(h.MuxValue)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
+	x++
+	data[0] = readLen
+	j[x] = I{true, i2c.Read, r.offset(), i2c.I2CBlockData, data, h.Bus, h.Addr, 0}
 	x++
 }
 
@@ -102,6 +114,17 @@ func (r *reg8) set(h *I2cDev, v uint8) {
 	x++
 }
 
+/*
+func (r *reg8b) set(h *I2cDev, v []byte) {
+	var data = [34]byte{0, 0, 0, 0}
+
+	data[0] = byte(h.MuxValue)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	x++
+	j[x] = I{true, i2c.Write, r.offset(), i2c.I2CBlockData, v, h.Bus, h.Addr, 0}
+	x++
+}
+*/
 func (r *reg16) set(h *I2cDev, v uint16) {
 	var data = [34]byte{0, 0, 0, 0}
 

@@ -139,3 +139,33 @@ func diagPower() error {
 
 	return nil
 }
+
+func diagLoggedFaults() error {
+	const (
+		ucd9090Bus    = 0
+		ucd9090Adr    = 0x34
+		ucd9090MuxBus = 0
+		ucd9090MuxAdr = 0x76
+		ucd9090MuxVal = 0x01
+	)
+	var pm = ucd9090.I2cDev{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
+
+	d := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
+	d.GetInfo()
+	switch d.Fields.DeviceVersion {
+	case 0xff:
+		pm.Addr = 0x7e
+	case 0x00:
+		pm.Addr = 0x7e
+	default:
+		pm.Addr = 0x34
+	}
+	log, err := pm.LoggedFaultDetail()
+	if err == nil {
+		fmt.Printf("%v", log)
+	}
+	return nil
+}
