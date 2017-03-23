@@ -132,3 +132,20 @@ func TestClearAndSetPlus(t *testing.T) {
 		t.Error("wrong args:", args)
 	}
 }
+
+func TestKexecBug(t *testing.T) {
+	cmd := []string{"kexec", "-k", "foo.vmlinuz", "-i", "foo.initrd"}
+	parm, args := New(cmd, "-c", "-i", "-k", "-l", "-x")
+	if !reflect.DeepEqual(parm, Parm{
+		"-c": "",
+		"-i": "foo.initrd",
+		"-k": "foo.vmlinuz",
+		"-l": "",
+		"-x": "",
+	}) {
+		t.Error("Wrong parm:", parm)
+	}
+	if !reflect.DeepEqual(args, []string{"kexec"}) {
+		t.Error("wrong args:", args)
+	}
+}
