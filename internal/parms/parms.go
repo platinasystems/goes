@@ -33,7 +33,6 @@ func New(args []string, parms ...string) (Parm, []string) {
 			parm.Set(args[i], args[i+1]) == nil {
 			copy(args[i:], args[i+2:])
 			args = args[:len(args)-2]
-			i += 2
 		} else {
 			i++
 		}
