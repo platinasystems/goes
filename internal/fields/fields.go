@@ -8,7 +8,7 @@
 //	echo hello\ beautiful\ world
 //	echo "hello 'beautiful world'"
 //	echo 'hello \"beautiful world\"'
-package slice_string
+package fields
 
 import (
 	"regexp"

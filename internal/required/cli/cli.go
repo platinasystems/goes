@@ -52,6 +52,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/parms"
@@ -60,7 +61,6 @@ import (
 	"github.com/platinasystems/go/internal/required/cli/internal/nocomment"
 	"github.com/platinasystems/go/internal/required/cli/internal/notliner"
 	"github.com/platinasystems/go/internal/required/cli/internal/slice_args"
-	"github.com/platinasystems/go/internal/required/cli/internal/slice_string"
 	"github.com/platinasystems/go/internal/url"
 )
 
@@ -173,7 +173,7 @@ commandLoop:
 			if len(s) == 0 {
 				continue pipelineLoop
 			}
-			pl.Slice(slice_string.New(s)...)
+			pl.Slice(fields.New(s)...)
 			if pl.More {
 				prompt = "| "
 			} else {
