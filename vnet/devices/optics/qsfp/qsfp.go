@@ -5,12 +5,8 @@
 package qsfp
 
 import (
-	"net"
-	"net/http"
-	"net/rpc"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -41,6 +37,7 @@ var portIsCopper [32]bool
 
 var VpageByKey map[string]uint8
 
+var latestPresent = [2]uint16{0xffff, 0xffff}
 var present = [2]uint16{0xffff, 0xffff}
 
 type cmd struct {
@@ -61,16 +58,6 @@ func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
 
-	qsfpPres := new(QsfpPres)
-	rpc.Register(qsfpPres)
-	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", ":1232")
-	if e != nil {
-		log.Print("listen ERROR QsfpPres:", e)
-	}
-	log.Print("listen QsfpPres OKAY")
-	go http.Serve(l, nil)
-
 	cmd.stop = make(chan struct{})
 	cmd.last = make(map[string]float64)
 	cmd.lasts = make(map[string]string)
@@ -86,6 +73,19 @@ func (cmd *cmd) Main(...string) error {
 	//		close(cmd.stop)
 	//		return err
 	//	}
+	tIo := time.NewTicker(1 * time.Second)
+	defer tIo.Stop()
+	for {
+		select {
+		case <-cmd.stop:
+			return nil
+		case <-tIo.C:
+			if err = cmd.updateio(); err != nil {
+				close(cmd.stop)
+				return err
+			}
+		}
+	}
 	time.Sleep(5 * time.Second)
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
@@ -116,16 +116,16 @@ func (cmd *cmd) update() error {
 
 	for j := 0; j < 2; j++ {
 		//when qsfp is installed or removed from a port
-		if present[j] != l.Present[j] {
+		if present[j] != latestPresent[j] {
 			for i := 0; i < 16; i++ {
-				if (1<<uint(i))&(l.Present[j]^present[j]) != 0 {
+				if (1<<uint(i))&(latestPresent[j]^present[j]) != 0 {
 					//physical to logical port translation
 					lp := i + j*16
 					if (lp % 2) == 0 {
 						lp += 2
 					}
 					var typeString string
-					if ((1 << uint(i)) & (l.Present[j] ^ 0xffff)) != 0 {
+					if ((1 << uint(i)) & (latestPresent[j] ^ 0xffff)) != 0 {
 						//when qsfp is installed publish static data
 						k := "port-" + strconv.Itoa(lp) + ".qsfp.compliance"
 						v := Vdev[i+j*16].Compliance()
@@ -338,7 +338,7 @@ func (cmd *cmd) update() error {
 				}
 			}
 		}
-		present[j] = l.Present[j]
+		present[j] = latestPresent[j]
 	}
 	for i := 0; i < 32; i++ {
 		//publish dynamic monitoring data
@@ -696,24 +696,4 @@ func (h *I2cDev) StaticBlocks(port int) {
 		DoI2cRpc()
 	}
 	return
-}
-
-type QsfpI2cGpio struct {
-	Present [2]uint16
-}
-type X struct {
-	Resp uint32
-}
-type QsfpPres int
-
-var l = QsfpI2cGpio{[2]uint16{0xffff, 0xffff}}
-var mutex = &sync.Mutex{}
-
-func (t *QsfpPres) Write(g *QsfpI2cGpio, f *X) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	l = *g
-	f.Resp = 0
-	return nil
 }

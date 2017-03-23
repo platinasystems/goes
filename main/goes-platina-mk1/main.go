@@ -33,7 +33,6 @@ import (
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
 	"github.com/platinasystems/go/vnet/devices/optics/qsfp"
-	"github.com/platinasystems/go/vnet/devices/optics/qsfpio"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -55,7 +54,6 @@ func main() {
 		i2c.New(),
 		i2cd.New(),
 		qsfp.New(),
-		qsfpio.New(),
 		toggle.New(),
 		vnet.New(),
 		vnetd.New(),

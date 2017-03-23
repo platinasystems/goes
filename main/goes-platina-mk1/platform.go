@@ -14,7 +14,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/devices/optics/qsfp"
-	"github.com/platinasystems/go/vnet/devices/optics/qsfpio"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
@@ -159,16 +158,16 @@ func i2cAddrs() {
 }
 
 func qsfpioInit() {
-	qsfpio.Vdev[0] = qsfpio.I2cDev{0, 0x20, 0, 0x70, 0x10} //port 1-16 present signals
-	qsfpio.Vdev[1] = qsfpio.I2cDev{0, 0x21, 0, 0x70, 0x10} //port 17-32 present signals
-	qsfpio.Vdev[2] = qsfpio.I2cDev{0, 0x22, 0, 0x70, 0x10} //port 1-16 interrupt signals
-	qsfpio.Vdev[3] = qsfpio.I2cDev{0, 0x23, 0, 0x70, 0x10} //port 17-32 interrupt signals
-	qsfpio.Vdev[4] = qsfpio.I2cDev{0, 0x20, 0, 0x70, 0x20} //port 1-16 LP mode signals
-	qsfpio.Vdev[5] = qsfpio.I2cDev{0, 0x21, 0, 0x70, 0x20} //port 17-32 LP mode signals
-	qsfpio.Vdev[6] = qsfpio.I2cDev{0, 0x22, 0, 0x70, 0x20} //port 1-16 reset signals
-	qsfpio.Vdev[7] = qsfpio.I2cDev{0, 0x23, 0, 0x70, 0x20} //port 17-32 reset signals
+	qsfp.VdevIo[0] = qsfp.I2cDev{0, 0x20, 0, 0x70, 0x10, 0, 0, 0} //port 1-16 present signals
+	qsfp.VdevIo[1] = qsfp.I2cDev{0, 0x21, 0, 0x70, 0x10, 0, 0, 0} //port 17-32 present signals
+	qsfp.VdevIo[2] = qsfp.I2cDev{0, 0x22, 0, 0x70, 0x10, 0, 0, 0} //port 1-16 interrupt signals
+	qsfp.VdevIo[3] = qsfp.I2cDev{0, 0x23, 0, 0x70, 0x10, 0, 0, 0} //port 17-32 interrupt signals
+	qsfp.VdevIo[4] = qsfp.I2cDev{0, 0x20, 0, 0x70, 0x20, 0, 0, 0} //port 1-16 LP mode signals
+	qsfp.VdevIo[5] = qsfp.I2cDev{0, 0x21, 0, 0x70, 0x20, 0, 0, 0} //port 17-32 LP mode signals
+	qsfp.VdevIo[6] = qsfp.I2cDev{0, 0x22, 0, 0x70, 0x20, 0, 0, 0} //port 1-16 reset signals
+	qsfp.VdevIo[7] = qsfp.I2cDev{0, 0x23, 0, 0x70, 0x20, 0, 0, 0} //port 17-32 reset signals
 
-	qsfpio.VpageByKey = map[string]uint8{
+	qsfp.VpageByKeyIo = map[string]uint8{
 		"port-1.qsfp.presence":  0,
 		"port-2.qsfp.presence":  0,
 		"port-3.qsfp.presence":  0,
