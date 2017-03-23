@@ -116,7 +116,7 @@ func main() {
 			pin.SetValue(true)
 		}
 		redis.Hwait(redis.DefaultHash, "redis.ready", "true",
-			2*time.Second)
+			10*time.Second)
 		s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 		if err != nil {
 			log.Print(err)
