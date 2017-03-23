@@ -66,6 +66,7 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 				return fmt.Errorf("%v: %v", cmd.Args, err)
 			}
 			pfname = newname
+			numvfsFn = filepath.Join("/sys/class/net", pfname, "device/sriov_numvfs")
 		}
 
 		pfdev, err := net.InterfaceByName(pfname)
