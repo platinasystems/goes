@@ -56,11 +56,11 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/pizza"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/required/cli/internal/liner"
 	"github.com/platinasystems/go/internal/required/cli/internal/nocomment"
 	"github.com/platinasystems/go/internal/required/cli/internal/notliner"
-	"github.com/platinasystems/go/internal/required/cli/internal/slice_args"
 	"github.com/platinasystems/go/internal/url"
 )
 
@@ -121,7 +121,7 @@ func (c *cmd) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
 
-	pl := slice_args.New("|")
+	pl := pizza.New("|")
 	catline := func(prompt string) (string, error) {
 		var line string
 		for {

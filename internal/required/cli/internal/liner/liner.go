@@ -17,9 +17,9 @@ import (
 
 	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/pizza"
 	"github.com/platinasystems/go/internal/required/cli/internal/nocomment"
 	"github.com/platinasystems/go/internal/required/cli/internal/notliner"
-	"github.com/platinasystems/go/internal/required/cli/internal/slice_args"
 	"github.com/platinasystems/liner"
 )
 
@@ -49,7 +49,7 @@ func New(byName goes.ByName) *Liner {
 // Returns all completions of the given command line.
 func (l *Liner) complete(line string) (lines []string) {
 	lsi := strings.LastIndex(line, " ")
-	pl := slice_args.New("|")
+	pl := pizza.New("|")
 	defer pl.Reset()
 	pl.Slice(fields.New(nocomment.New(strings.TrimLeft(line, " \t")))...)
 	if len(pl.Slices) == 0 {
@@ -84,7 +84,7 @@ func (l *Liner) complete(line string) (lines []string) {
 
 // Prints the best available help text for the last arg of line
 func (l *Liner) help(line string) {
-	pl := slice_args.New("|")
+	pl := pizza.New("|")
 	defer pl.Reset()
 	pl.Slice(fields.New(nocomment.New(strings.TrimLeft(line, " \t")))...)
 	if len(pl.Slices) == 0 {

@@ -2,9 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// slice_args at boundary. For example,
+// Slice args at boundary. For example,
 //
-//	pl := slice_args.New("|")
+//	pl := pizza.New("|")
 //	pl.Slice("ls", "-lR", "|", "more")
 //	// pl.Slices == [][]string{
 //	// 	[]string{"ls", "-lR"},
@@ -22,7 +22,7 @@
 //	// 	[]string{"ls", "-lR"},
 //	// 	[]string{"more"},
 //	// }
-package slice_args
+package pizza
 
 type Pizza struct {
 	Boundary string
