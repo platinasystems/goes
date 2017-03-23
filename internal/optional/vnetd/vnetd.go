@@ -126,6 +126,7 @@ func (cmd *cmd) Close() error {
 func Init(i *Info) {
 	i.poller.i = i
 	i.poller.addEvent(0)
+	i.poller.pollInterval = 5 // default 5 seconds
 	i.initialPublish()
 	i.set("ready", "true", true)
 }
@@ -205,6 +206,7 @@ func (e *event) EventAction() {
 		bw     vnet.Bandwidth
 		enable parse.Enable
 		media  string
+		itv    float64
 	)
 	if e.isReadyEvent {
 		e.i.pub.Print("vnet.", e.key, ": ", e.value)
@@ -219,6 +221,13 @@ func (e *event) EventAction() {
 		e.err <- si.SetAdminUp(&e.i.v, bool(enable))
 	case e.in.Parse("%v.media %s", &hi, &e.i.v, &media):
 		e.err <- hi.SetMedia(&e.i.v, media)
+	case e.in.Parse("pollInterval %f", &itv):
+	        if itv < 1 {
+		   e.err <- fmt.Errorf("pollInterval must be 1 second or longer")
+		} else {
+     		   e.i.poller.pollInterval = itv
+		   e.err <- nil
+		}
 	default:
 		e.err <- fmt.Errorf("can't set %s to %v", e.key, e.value)
 	}
@@ -246,6 +255,7 @@ func (i *Info) initialPublish() {
 		i.publish(hi.Name(&i.v)+".speed", h.Speed().String())
 		i.publish(hi.Name(&i.v)+".media", h.Media())
 	})
+	i.publish("pollInterval", i.poller.pollInterval)
 }
 
 func (i *Info) publish(key string, value interface{}) {
@@ -280,6 +290,7 @@ type ifStatsPoller struct {
 	sequence     uint
 	hwInterfaces ifStatsPollerInterfaceVec
 	swInterfaces ifStatsPollerInterfaceVec
+	pollInterval float64   // pollInterval in seconds
 }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
@@ -292,8 +303,10 @@ func (p *ifStatsPoller) String() string {
 }
 func (p *ifStatsPoller) EventAction() {
 	// Schedule next event in 5 seconds; do before fetching counters so that time interval is accurate.
-	p.addEvent(5)
+	p.addEvent(p.pollInterval)
 
+	start := time.Now()
+	p.i.publish("poll.start", start.Format(time.StampMilli))
 	// Publish all sw/hw interface counters even with zero values for first poll.
 	// This was all possible counters have valid values in redis.
 	// Otherwise only publish to redis when counter values change.
@@ -312,6 +325,8 @@ func (p *ifStatsPoller) EventAction() {
 				p.publish(si.Name(&p.i.v), counter, value)
 			}
 		})
-
+	stop := time.Now()
+	p.i.publish("poll.finish", stop.Format(time.StampMilli))
+	
 	p.sequence++
 }
