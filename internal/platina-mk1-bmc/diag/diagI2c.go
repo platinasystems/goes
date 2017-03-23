@@ -6,10 +6,40 @@ package diag
 
 import (
 	"fmt"
+	"net/rpc"
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
+	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/go/internal/log"
 )
+
+var clientA *rpc.Client
+var dialed int = 0
+var j [MAXOPS]I
+var s [MAXOPS]R
+var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0}
+var x int
+var b = [34]byte{0}
+
+const MAXOPS = 30
+
+var sd i2c.SMBusData
+
+type I struct {
+	InUse     bool
+	RW        i2c.RW
+	RegOffset uint8
+	BusSize   i2c.SMBusSize
+	Data      [34]byte
+	Bus       int
+	Addr      int
+	Delay     int
+}
+type R struct {
+	D [34]byte
+	E error
+}
 
 func diagI2c() error {
 
@@ -226,5 +256,63 @@ func diagI2c() error {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_fan_board", "-", result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")
 
 	diagI2cWrite1Byte(0x01, 0x72, 0x00)
+	return nil
+}
+
+func diagSwitchConsole() error {
+
+	//i2c STOP
+	sd[0] = 0
+	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(1), 0}
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+
+	//switch console
+	gpioSet("CPU_TO_MAIN_I2C_EN", true)
+	time.Sleep(50 * time.Millisecond)
+	diagI2cWriteOffsetByte(0x00, 0x74, 0x06, 0xFB)
+	gpioSet("CPU_TO_MAIN_I2C_EN", false)
+	gpioSet("FP_BTN_UARTSEL_EN_L", true)
+	time.Sleep(50 * time.Millisecond)
+
+	//i2c START
+	sd[0] = 0
+	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
+	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func clearJ() {
+	x = 0
+	for k := 0; k < MAXOPS; k++ {
+		j[k] = i
+	}
+}
+
+func DoI2cRpc() error {
+	if dialed == 0 {
+		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")
+		if err != nil {
+			log.Print("dialing:", err)
+			return err
+		}
+		clientA = client
+		dialed = 1
+		time.Sleep(time.Millisecond * time.Duration(50))
+	}
+	err := clientA.Call("I2cReq.ReadWrite", &j, &s)
+	if err != nil {
+		log.Print("i2cReq error:", err)
+		dialed = 0
+		clientA.Close()
+		return err
+	}
+	clearJ()
 	return nil
 }

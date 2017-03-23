@@ -5,6 +5,7 @@
 package fantray
 
 import (
+	"os"
 	"strconv"
 	"syscall"
 	"time"
@@ -47,6 +48,7 @@ func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
 
+	first = 1
 	cmd.stop = make(chan struct{})
 	cmd.last = make(map[string]float64)
 	cmd.lasts = make(map[string]string)
@@ -120,19 +122,13 @@ var fanTrayLedYellow = []uint8{0x10, 0x01, 0x10, 0x01}
 var fanTrayLedBits = []uint8{0x30, 0x03, 0x30, 0x03}
 var fanTrayDirBits = []uint8{0x80, 0x08, 0x80, 0x08}
 var fanTrayAbsBits = []uint8{0x40, 0x04, 0x40, 0x04}
-var deviceVer byte
+var deviceVer int
 var first int
 
 func (h *I2cDev) FanTrayLedInit() error {
 	r := getRegs()
 
-	//e := eeprom.Device{
-	//	BusIndex:   0,
-	//	BusAddress: 0x55,
-	//}
-	//e.GetInfo()
-	//deviceVer = e.Fields.DeviceVersion
-	deviceVer := 0x01 //
+	deviceVer, _ = readVer()
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
 		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
@@ -143,6 +139,29 @@ func (h *I2cDev) FanTrayLedInit() error {
 
 	r.Output[0].set(h, 0xff&(fanTrayLedOff[2]|fanTrayLedOff[3]))
 	r.Output[1].set(h, 0xff&(fanTrayLedOff[0]|fanTrayLedOff[1]))
+	r.Config[0].set(h, 0xff^fanTrayLeds)
+	r.Config[1].set(h, 0xff^fanTrayLeds)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	log.Print("notice: fan tray led init complete")
+	return err
+}
+
+func (h *I2cDev) FanTrayLedReinit() error {
+	r := getRegs()
+
+	deviceVer, _ = readVer()
+	if deviceVer == 0xff || deviceVer == 0x00 {
+		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
+		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
+	} else {
+		fanTrayLedGreen = []uint8{0x20, 0x02, 0x20, 0x02}
+		fanTrayLedYellow = []uint8{0x10, 0x01, 0x10, 0x01}
+	}
+
 	r.Config[0].set(h, 0xff^fanTrayLeds)
 	r.Config[1].set(h, 0xff^fanTrayLeds)
 	closeMux(h)
@@ -239,4 +258,18 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 		return "error", err
 	}
 	return w, nil
+}
+
+func readVer() (v int, err error) {
+	f, err := os.Open("/tmp/ver")
+	if err != nil {
+		return 0, err
+	}
+	b1 := make([]byte, 5)
+	_, err = f.Read(b1)
+	if err != nil {
+		return 0, err
+	}
+	f.Close()
+	return int(b1[0]), nil
 }

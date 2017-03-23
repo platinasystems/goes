@@ -6,7 +6,14 @@ package diag
 
 import (
 	"fmt"
+	"os"
 	"time"
+
+	"github.com/platinasystems/go/internal/environ/fantray"
+	"github.com/platinasystems/go/internal/environ/nuvoton"
+	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 )
 
 func diagPSU() error {
@@ -67,4 +74,80 @@ func diagPSU() error {
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "psu", "psu1_int_l_off", "-", pinstate, active_low_off_min, active_low_off_max, r, "check interrupt is high")
 
 	return nil
+}
+
+func diagPowerCycle() error {
+
+	//i2c STOP
+	sd[0] = 0
+	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(1), 0}
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	log.Print("initiate manual power cycle")
+	gpioSet("PSU1_PWRON_L", true)
+	gpioSet("PSU0_PWRON_L", true)
+	time.Sleep(1 * time.Second)
+	gpioSet("PSU1_PWRON_L", false)
+	gpioSet("PSU0_PWRON_L", false)
+
+	time.Sleep(100 * time.Millisecond)
+
+	//i2c START
+	sd[0] = 0
+	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
+	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	time.Sleep(1 * time.Second)
+
+	log.Print("re-init fan controller")
+	w83795.Vdev.Bus = 0
+	w83795.Vdev.Addr = 0x2f
+	w83795.Vdev.MuxBus = 0
+	w83795.Vdev.MuxAddr = 0x76
+	w83795.Vdev.MuxValue = 0x80
+	w83795.Vdev.FanInit()
+
+	log.Print("re-init fan trays")
+	fantray.Vdev.Bus = 1
+	fantray.Vdev.Addr = 0x20
+	fantray.Vdev.MuxBus = 1
+	fantray.Vdev.MuxAddr = 0x72
+	fantray.Vdev.MuxValue = 0x04
+	fantray.Vdev.FanTrayLedReinit()
+
+	log.Print("re-init front panel LEDs")
+	deviceVer, _ := readVer()
+	if deviceVer == 0 || deviceVer == 1 {
+		ledgpio.Vdev.Addr = 0x22
+	} else {
+		ledgpio.Vdev.Addr = 0x75
+	}
+	ledgpio.Vdev.Bus = 0
+	ledgpio.Vdev.MuxBus = 0x0
+	ledgpio.Vdev.MuxAddr = 0x76
+	ledgpio.Vdev.MuxValue = 0x2
+	ledgpio.Vdev.LedFpReinit()
+	log.Print("manual power cycle complete")
+	return nil
+}
+
+func readVer() (v int, err error) {
+	f, err := os.Open("/tmp/ver")
+	if err != nil {
+		return 0, err
+	}
+	b1 := make([]byte, 5)
+	_, err = f.Read(b1)
+	if err != nil {
+		return 0, err
+	}
+	f.Close()
+	return int(b1[0]), nil
 }

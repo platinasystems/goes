@@ -210,6 +210,48 @@ func (h *I2cDev) LedFpInit() error {
 	return nil
 }
 
+func (h *I2cDev) LedFpReinit() error {
+
+	e := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x55,
+	}
+	e.GetInfo()
+	deviceVer = e.Fields.DeviceVersion
+	if deviceVer == 0xff || deviceVer == 0x00 {
+		psuLed = []uint8{0x0c, 0x03}
+		psuLedYellow = []uint8{0x00, 0x00}
+		psuLedOff = []uint8{0x04, 0x01}
+		sysLed = 0xc0
+		sysLedGreen = 0x0
+		sysLedYellow = 0xc
+		sysLedOff = 0x80
+		fanLed = 0x30
+		fanLedGreen = 0x10
+		fanLedYellow = 0x20
+		fanLedOff = 0x30
+	}
+	r := getRegs()
+
+	r.Config[0].get(h)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	o := s[1].D[0]
+	o |= psuLed[0] | psuLed[1]
+	o &= (sysLed | fanLed) ^ 0xff
+
+	r.Config[0].set(h, o)
+	closeMux(h)
+	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (h *I2cDev) LedStatus() error {
 	r := getRegs()
 	var o, c uint8
