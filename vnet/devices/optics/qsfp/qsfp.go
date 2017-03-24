@@ -69,24 +69,8 @@ func (cmd *cmd) Main(...string) error {
 	if err = syscall.Sysinfo(&si); err != nil {
 		return err
 	}
-	//	if err = cmd.update(); err != nil {
-	//		close(cmd.stop)
-	//		return err
-	//	}
-	tIo := time.NewTicker(1 * time.Second)
-	defer tIo.Stop()
-	for {
-		select {
-		case <-cmd.stop:
-			return nil
-		case <-tIo.C:
-			if err = cmd.updateio(); err != nil {
-				close(cmd.stop)
-				return err
-			}
-		}
-	}
-	time.Sleep(5 * time.Second)
+
+	go qsfpioTicker(cmd)
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {

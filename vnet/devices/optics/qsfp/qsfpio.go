@@ -7,6 +7,7 @@ package qsfp
 import (
 	"strconv"
 	"strings"
+	"time"
 )
 
 type QsfpI2cGpioIo struct {
@@ -19,6 +20,22 @@ var VdevIo [32]I2cDev
 var VpageByKeyIo map[string]uint8
 
 var qsfpIo = QsfpI2cGpioIo{1, [2]uint16{0xffff, 0xffff}}
+
+func qsfpioTicker(cmd *cmd) error {
+	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-cmd.stop:
+			return nil
+		case <-t.C:
+			if err := cmd.updateio(); err != nil {
+				close(cmd.stop)
+				return err
+			}
+		}
+	}
+}
 
 func (cmd *cmd) updateio() error {
 	stopped := readStopped()
