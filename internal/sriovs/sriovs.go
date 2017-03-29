@@ -127,7 +127,7 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 			if _, err = fmt.Sscan(svfi, &vfi); err != nil {
 				return err
 			}
-			if vfi > uint(len(vfs[pfi])) {
+			if vfi >= uint(len(vfs[pfi])) {
 				continue
 			}
 
