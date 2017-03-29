@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/goes/cmd/apropos"
@@ -41,6 +40,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/i2c"
 	"github.com/platinasystems/go/internal/goes/cmd/i2cd"
 	"github.com/platinasystems/go/internal/goes/cmd/iminfo"
+	"github.com/platinasystems/go/internal/goes/cmd/imx6"
 	"github.com/platinasystems/go/internal/goes/cmd/insmod"
 	"github.com/platinasystems/go/internal/goes/cmd/install"
 	"github.com/platinasystems/go/internal/goes/cmd/kexec"
