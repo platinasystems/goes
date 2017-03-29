@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/optional/vnetd"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"

@@ -6,7 +6,8 @@ package toggle
 
 import (
 	"fmt"
-	"github.com/platinasystems/go/internal/optional/i2c"
+
+	"github.com/platinasystems/go/internal/goes/cmd/i2c"
 )
 
 const Name = "toggle"

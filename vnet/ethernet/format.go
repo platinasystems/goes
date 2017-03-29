@@ -38,6 +38,38 @@ func (h *Header) Parse(in *parse.Input) {
 	}
 }
 
+func (h *VlanHeader) Parse(sup_in *parse.Input) {
+	var (
+		in  parse.Input
+		id  vnet.Uint16
+		pri vnet.Uint16
+	)
+	if sup_in.Parse("vlan %v", &in) {
+		var tag vnet.Uint16
+		for !in.End() {
+			switch {
+			case in.Parse("%v", &id):
+				if id > 0xfff {
+					panic(parse.ErrInput)
+				}
+				tag = (tag &^ 0xfff) | id
+			case in.Parse("cfi"):
+				tag |= 1 << 12
+			case in.Parse("pri%*ority %d", &pri):
+				if pri > 8 {
+					panic(parse.ErrInput)
+				}
+				tag = (tag &^ (7 << 13)) | pri<<13
+			default:
+				panic(parse.ErrInput)
+			}
+		}
+		h.Priority_cfi_and_id = tag.FromHost()
+	} else {
+		panic(parse.ErrInput)
+	}
+}
+
 func (h *VlanHeader) String() (s string) {
 	return fmt.Sprintf("%s: vlan %d", h.GetType().String(), h.Priority_cfi_and_id.ToHost()&0xfff)
 }

@@ -17,9 +17,9 @@ import (
 
 	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/cmd/cli/internal/notliner"
 	"github.com/platinasystems/go/internal/nocomment"
 	"github.com/platinasystems/go/internal/pizza"
-	"github.com/platinasystems/go/internal/required/cli/internal/notliner"
 	"github.com/platinasystems/liner"
 )
 
