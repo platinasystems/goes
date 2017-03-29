@@ -10,29 +10,20 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/optional/eeprom"
-	"github.com/platinasystems/go/internal/optional/eeprom/platina_eeprom"
-	"github.com/platinasystems/go/internal/optional/gpio"
-	"github.com/platinasystems/go/internal/optional/i2c"
-	"github.com/platinasystems/go/internal/optional/i2cd"
-	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
-	"github.com/platinasystems/go/internal/optional/vnet"
-	"github.com/platinasystems/go/internal/optional/vnetd"
+	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
+	"github.com/platinasystems/go/internal/goes/cmd/license"
+	"github.com/platinasystems/go/internal/goes/cmd/patents"
+	"github.com/platinasystems/go/internal/goes/cmd/redisd"
+	"github.com/platinasystems/go/internal/goes/cmd/start"
+	"github.com/platinasystems/go/internal/goes/cmd/stop"
+	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/required"
-	"github.com/platinasystems/go/internal/required/license"
-	"github.com/platinasystems/go/internal/required/patents"
-	"github.com/platinasystems/go/internal/required/redisd"
-	"github.com/platinasystems/go/internal/required/start"
-	"github.com/platinasystems/go/internal/required/stop"
-	govnet "github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
-	"github.com/platinasystems/go/vnet/devices/optics/qsfp"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -46,18 +37,7 @@ func main() {
 	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	license.Others = []license.Other{{fe1path, copyright.License}}
 	patents.Others = []patents.Other{{fe1path, copyright.Patents}}
-	g := make(goes.ByName)
-	g.Plot(required.New()...)
-	g.Plot(
-		eeprom.New(),
-		gpio.New(),
-		i2c.New(),
-		i2cd.New(),
-		qsfp.New(),
-		toggle.New(),
-		vnet.New(),
-		vnetd.New(),
-	)
+	g := mkgoes()
 	i2cAddrs()
 	redisd.Machine = "platina-mk1"
 	redisd.Devs = []string{"lo", "eth0"}
@@ -107,7 +87,7 @@ func stopHook() error {
 	return nil
 }
 
-func vnetHook(i *vnetd.Info, v *govnet.Vnet) error {
+func vnetHook(i *vnetd.Info, v *vnet.Vnet) error {
 	err := firmware.Extract(prog.Name())
 	if err != nil {
 		return err

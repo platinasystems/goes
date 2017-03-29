@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/optional/vnet/internal"
+	"github.com/platinasystems/go/internal/goes/cmd/vnet/internal"
 )
 
 const Name = "vnet"

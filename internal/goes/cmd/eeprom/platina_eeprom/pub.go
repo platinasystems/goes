@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/platinasystems/go/internal/goes/cmd/eeprom"
 	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/optional/eeprom"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 

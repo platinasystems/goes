@@ -7,7 +7,7 @@ package platina_eeprom
 import (
 	"time"
 
-	"github.com/platinasystems/go/internal/optional/eeprom"
+	"github.com/platinasystems/go/internal/goes/cmd/eeprom"
 )
 
 var config struct {

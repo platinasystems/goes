@@ -11,55 +11,22 @@ import (
 	"os"
 	"time"
 
-	"github.com/platinasystems/go/internal/environ/fantray"
-	"github.com/platinasystems/go/internal/environ/fsp"
-	"github.com/platinasystems/go/internal/environ/nuvoton"
-	"github.com/platinasystems/go/internal/environ/nxp"
-	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
-	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
+	"github.com/platinasystems/go/internal/goes/cmd/redisd"
+	"github.com/platinasystems/go/internal/goes/cmd/start"
+	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/optional/eeprom"
-	"github.com/platinasystems/go/internal/optional/eeprom/platina_eeprom"
-	optgpio "github.com/platinasystems/go/internal/optional/gpio"
-	"github.com/platinasystems/go/internal/optional/i2c"
-	"github.com/platinasystems/go/internal/optional/i2cd"
-	"github.com/platinasystems/go/internal/optional/platina-mk1/toggle"
-	"github.com/platinasystems/go/internal/optional/telnetd"
-	"github.com/platinasystems/go/internal/optional/watchdog"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/required"
-	"github.com/platinasystems/go/internal/required/redisd"
-	"github.com/platinasystems/go/internal/required/start"
-	"github.com/platinasystems/go/internal/required/stop"
 )
 
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
-	g := make(goes.ByName)
-	g.Plot(required.New()...)
-	g.Plot(
-		eeprom.New(),
-		diag.New(),
-		optgpio.New(),
-		i2c.New(),
-		telnetd.New(),
-		toggle.New(),
-		watchdog.New(),
-		i2cd.New(),
-		fantray.New(),
-		fsp.New(),
-		imx6.New(),
-		w83795.New(),
-		ucd9090.New(),
-		ledgpio.New(),
-	)
+	g := mkgoes()
 	redisd.Machine = "platina-mk1-bmc"
 	redisd.Devs = []string{"lo", "eth0"}
 	redisd.Hook = platina_eeprom.RedisdHook

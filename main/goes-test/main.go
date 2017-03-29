@@ -10,35 +10,11 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/optional/test/gohellod"
-	"github.com/platinasystems/go/internal/optional/test/gopanic"
-	"github.com/platinasystems/go/internal/optional/test/gopanicd"
-	"github.com/platinasystems/go/internal/optional/test/hellod"
-	"github.com/platinasystems/go/internal/optional/test/panic"
-	"github.com/platinasystems/go/internal/optional/test/panicd"
-	"github.com/platinasystems/go/internal/optional/test/sleeper"
-	"github.com/platinasystems/go/internal/optional/test/stringd"
-	"github.com/platinasystems/go/internal/required"
-	"github.com/platinasystems/go/internal/required/redisd"
 )
 
 func main() {
-	g := make(goes.ByName)
-	g.Plot(required.New()...)
-	g.Plot(
-		gohellod.New(),
-		gopanic.New(),
-		gopanicd.New(),
-		hellod.New(),
-		panic.New(),
-		panicd.New(),
-		sleeper.New(),
-		stringd.New(),
-	)
-	redisd.Machine = "test"
-	if err := g.Main(); err != nil {
+	err := mkgoes().Main()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
