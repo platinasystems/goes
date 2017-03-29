@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"

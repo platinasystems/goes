@@ -7,8 +7,8 @@ package diag
 import (
 	"fmt"
 	//"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"time"
 )
 

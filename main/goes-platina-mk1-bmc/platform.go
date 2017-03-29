@@ -9,13 +9,13 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes/cmd/fantray"
 	"github.com/platinasystems/go/internal/goes/cmd/fsp"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 )

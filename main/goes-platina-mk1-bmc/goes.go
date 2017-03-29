@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/goes"
@@ -87,6 +86,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/uptimed"
 	"github.com/platinasystems/go/internal/goes/cmd/usage"
 	"github.com/platinasystems/go/internal/goes/cmd/version"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/goes/cmd/watchdog"
 	"github.com/platinasystems/go/internal/goes/cmd/wget"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
