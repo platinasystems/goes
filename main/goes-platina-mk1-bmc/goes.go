@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/environ/fsp"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
 	"github.com/platinasystems/go/internal/environ/ti"
@@ -30,6 +29,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/export"
 	"github.com/platinasystems/go/internal/goes/cmd/fantray"
 	"github.com/platinasystems/go/internal/goes/cmd/femtocom"
+	"github.com/platinasystems/go/internal/goes/cmd/fsp"
 	"github.com/platinasystems/go/internal/goes/cmd/gpio"
 	"github.com/platinasystems/go/internal/goes/cmd/hdel"
 	"github.com/platinasystems/go/internal/goes/cmd/hdelta"
