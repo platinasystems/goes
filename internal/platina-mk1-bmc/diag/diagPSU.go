@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/platinasystems/go/internal/environ/fantray"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
+	"github.com/platinasystems/go/internal/goes/cmd/fantray"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"

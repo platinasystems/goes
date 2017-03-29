@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/environ/fantray"
 	"github.com/platinasystems/go/internal/environ/fsp"
 	"github.com/platinasystems/go/internal/environ/nuvoton"
 	"github.com/platinasystems/go/internal/environ/nxp"
@@ -29,6 +28,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/exec"
 	"github.com/platinasystems/go/internal/goes/cmd/exit"
 	"github.com/platinasystems/go/internal/goes/cmd/export"
+	"github.com/platinasystems/go/internal/goes/cmd/fantray"
 	"github.com/platinasystems/go/internal/goes/cmd/femtocom"
 	"github.com/platinasystems/go/internal/goes/cmd/gpio"
 	"github.com/platinasystems/go/internal/goes/cmd/hdel"
