@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/environ/ti"
+	"github.com/platinasystems/go/internal/goes/cmd/ucd9090"
 )
 
 func diagPower() error {

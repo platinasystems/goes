@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/environ/ti"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/goes/cmd/apropos"
 	"github.com/platinasystems/go/internal/goes/cmd/bang"
@@ -81,6 +80,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/subscribe"
 	"github.com/platinasystems/go/internal/goes/cmd/sync"
 	"github.com/platinasystems/go/internal/goes/cmd/telnetd"
+	"github.com/platinasystems/go/internal/goes/cmd/ucd9090"
 	"github.com/platinasystems/go/internal/goes/cmd/umount"
 	"github.com/platinasystems/go/internal/goes/cmd/uninstall"
 	"github.com/platinasystems/go/internal/goes/cmd/uptimed"
