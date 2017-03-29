@@ -136,6 +136,24 @@ func (cmd *cmd) update() error {
 										portConfig += "copper "
 									}
 								}
+							} else if strings.Contains(v, "40G") {
+								portIsCopper[i+j*16] = false
+								if media != "fiber" {
+									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+									if err != nil || ret != 1 {
+										log.Print("qsfp hset error:", err, " ", ret)
+									} else {
+										portConfig += "fiber "
+									}
+								}
+								if speed != "40g" {
+									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "40g")
+									if err != nil || ret != 1 {
+										log.Print("qsfp hset error:", err, " ", ret)
+									} else {
+										portConfig += "40g fixed speed"
+									}
+								}
 							} else {
 								portIsCopper[i+j*16] = false
 								if media != "fiber" {
@@ -409,7 +427,7 @@ func (h *I2cDev) DataReady() bool {
 	r.status.get(h)
 	DoI2cRpc()
 
-	if (s[2].D[0] & 0x1) == 1 {
+	if (s[2].D[1] & 0x1) == 1 {
 		t = false
 	} else {
 		t = true
