@@ -9,6 +9,7 @@ package w83795
 import (
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -28,11 +29,16 @@ type I2cDev struct {
 	MuxValue int
 }
 
-var first int
+var (
+	Hook = func() {}
+	once sync.Once
 
-var Vdev I2cDev
+	first int
 
-var VpageByKey map[string]uint8
+	Vdev I2cDev
+
+	VpageByKey map[string]uint8
+)
 
 type cmd struct {
 	stop  chan struct{}
@@ -48,6 +54,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
+	once.Do(Hook)
+
 	var si syscall.Sysinfo_t
 	var err error
 	first = 1

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,7 +20,12 @@ import (
 
 const Name = "imx6"
 
-var VpageByKey map[string]uint8
+var (
+	Hook = func() {}
+	once sync.Once
+
+	VpageByKey map[string]uint8
+)
 
 type cmd struct {
 	stop chan struct{}
@@ -34,6 +40,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
+	once.Do(Hook)
+
 	var si syscall.Sysinfo_t
 	var err error
 

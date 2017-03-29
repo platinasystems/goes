@@ -1,0 +1,40 @@
+// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
+package main
+
+import "github.com/platinasystems/go/internal/goes/cmd/ucd9090"
+
+func init() { ucd9090.Hook = ucd9090Hook }
+
+func ucd9090Hook() {
+	ucd9090.Vdev.Bus = 0
+	ucd9090.Vdev.Addr = 0x0 //update after eeprom read
+	ucd9090.Vdev.MuxBus = 0
+	ucd9090.Vdev.MuxAddr = 0x76
+	ucd9090.Vdev.MuxValue = 0x01
+	ver, _ := readVer()
+	switch ver {
+	case 0xff:
+		ucd9090.Vdev.Addr = 0x7e
+	case 0x00:
+		ucd9090.Vdev.Addr = 0x7e
+	default:
+		ucd9090.Vdev.Addr = 0x34
+	}
+
+	ucd9090.VpageByKey = map[string]uint8{
+		"vmon.5v.sb.units.V":    1,
+		"vmon.3v8.bmc.units.V":  2,
+		"vmon.3v3.sys.units.V":  3,
+		"vmon.3v3.bmc.units.V":  4,
+		"vmon.3v3.sb.units.V":   5,
+		"vmon.1v0.thc.units.V":  6,
+		"vmon.1v8.sys.units.V":  7,
+		"vmon.1v25.sys.units.V": 8,
+		"vmon.1v2.ethx.units.V": 9,
+		"vmon.1v0.tha.units.V":  10,
+		"vmon.poweroff.events":  0,
+	}
+}

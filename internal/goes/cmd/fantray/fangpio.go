@@ -7,6 +7,7 @@ package fantray
 import (
 	"os"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,9 +27,14 @@ type I2cDev struct {
 	MuxValue int
 }
 
-var Vdev I2cDev
+var (
+	Hook = func() {}
+	once sync.Once
 
-var VpageByKey map[string]uint8
+	Vdev I2cDev
+
+	VpageByKey map[string]uint8
+)
 
 type cmd struct {
 	stop  chan struct{}
@@ -45,6 +51,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
+	once.Do(Hook)
+
 	var si syscall.Sysinfo_t
 	var err error
 

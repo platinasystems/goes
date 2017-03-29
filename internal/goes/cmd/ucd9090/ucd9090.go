@@ -10,6 +10,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -27,12 +28,19 @@ type I2cDev struct {
 	MuxValue int
 }
 
-var Vdev I2cDev
-var VpageByKey map[string]uint8
-var loggedFaultCount uint8
-var lastLoggedFaultDetail [12]byte
+var (
+	Hook = func() {}
+	once sync.Once
 
-var first int
+	Vdev I2cDev
+
+	VpageByKey map[string]uint8
+
+	loggedFaultCount      uint8
+	lastLoggedFaultDetail [12]byte
+
+	first int
+)
 
 type cmd struct {
 	stop  chan struct{}
@@ -49,6 +57,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
+	once.Do(Hook)
+
 	var si syscall.Sysinfo_t
 	var err error
 	first = 1
