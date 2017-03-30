@@ -11,11 +11,9 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
-	"github.com/platinasystems/go/internal/goes/cmd/start"
 	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/prog"
-	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
@@ -32,10 +30,6 @@ const UsrShareGoes = "/usr/share/goes"
 func main() {
 	g := mkgoes()
 	i2cAddrs()
-	start.ConfHook = func() error {
-		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
-			10*time.Second)
-	}
 	stop.Hook = stopHook
 	vnetd.UnixInterfacesOnly = true
 	vnetd.GdbWait = gdbwait
