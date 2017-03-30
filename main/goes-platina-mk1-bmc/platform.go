@@ -7,23 +7,13 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
-	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/bmc/ledgpio"
 	"github.com/platinasystems/go/internal/gpio"
 )
 
 func Init() (err error) {
-	ledgpioInit()
-	if err = boardInit(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func boardInit() (err error) {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
 	gpio.Aliases = make(gpio.GpioAliasMap)
 	gpio.Pins = make(gpio.PinMap)
@@ -40,35 +30,4 @@ func boardInit() (err error) {
 	}
 
 	return nil
-}
-
-func ledgpioInit() {
-	ledgpio.Vdev.Bus = 0
-	ledgpio.Vdev.Addr = 0x0 //update after eeprom read
-	ledgpio.Vdev.MuxBus = 0x0
-	ledgpio.Vdev.MuxAddr = 0x76
-	ledgpio.Vdev.MuxValue = 0x2
-	ver, _ := readVer()
-	switch ver {
-	case 0xff:
-		ledgpio.Vdev.Addr = 0x22
-	case 0x00:
-		ledgpio.Vdev.Addr = 0x22
-	default:
-		ledgpio.Vdev.Addr = 0x75
-	}
-}
-
-func readVer() (v int, err error) {
-	f, err := os.Open("/tmp/ver")
-	if err != nil {
-		return 0, err
-	}
-	b1 := make([]byte, 5)
-	_, err = f.Read(b1)
-	if err != nil {
-		return 0, err
-	}
-	f.Close()
-	return int(b1[0]), nil
 }

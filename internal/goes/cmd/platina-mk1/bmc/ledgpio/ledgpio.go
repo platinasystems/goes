@@ -8,6 +8,7 @@ package ledgpio
 import (
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -38,27 +39,34 @@ const (
 var (
 	lastFanStatus [maxFanTrays]string
 	lastPsuStatus [maxPsu]string
-	psuLed             = []uint8{0x8, 0x10}
-	psuLedYellow       = []uint8{0x8, 0x10}
-	psuLedOff          = []uint8{0x04, 0x01}
-	sysLed        byte = 0x1
-	sysLedGreen   byte = 0x1
-	sysLedYellow  byte = 0xc
-	sysLedOff     byte = 0x80
-	fanLed        byte = 0x6
-	fanLedGreen   byte = 0x2
-	fanLedYellow  byte = 0x6
-	fanLedOff     byte = 0x0
+
+	psuLed       = []uint8{0x8, 0x10}
+	psuLedYellow = []uint8{0x8, 0x10}
+	psuLedOff    = []uint8{0x04, 0x01}
+
+	sysLed       byte = 0x1
+	sysLedGreen  byte = 0x1
+	sysLedYellow byte = 0xc
+	sysLedOff    byte = 0x80
+
+	fanLed       byte = 0x6
+	fanLedGreen  byte = 0x2
+	fanLedYellow byte = 0x6
+	fanLedOff    byte = 0x0
+
 	deviceVer     byte
 	saveFanSpeed  string
 	forceFanSpeed bool
+
+	once sync.Once
+	Init = func() {}
+
+	first int
+
+	Vdev I2cDev
+
+	VpageByKey map[string]uint8
 )
-
-var first int
-
-var Vdev I2cDev
-
-var VpageByKey map[string]uint8
 
 type cmd struct {
 	stop  chan struct{}
@@ -75,6 +83,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
+	once.Do(Init)
+
 	var si syscall.Sysinfo_t
 	var err error
 	first = 1
