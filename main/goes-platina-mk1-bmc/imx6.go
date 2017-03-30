@@ -6,9 +6,9 @@ package main
 
 import "github.com/platinasystems/go/internal/goes/cmd/imx6"
 
-func init() { imx6.Hook = imx6Hook }
+func init() { imx6.Init = imx6Init }
 
-func imx6Hook() {
+func imx6Init() {
 	imx6.VpageByKey = map[string]uint8{
 		"bmc.temperature.units.C": 1,
 	}

@@ -30,7 +30,7 @@ type I2cDev struct {
 }
 
 var (
-	Hook = func() {}
+	Init = func() {}
 	once sync.Once
 
 	first int
@@ -54,7 +54,7 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
-	once.Do(Hook)
+	once.Do(Init)
 
 	var si syscall.Sysinfo_t
 	var err error

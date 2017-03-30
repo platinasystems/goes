@@ -6,9 +6,9 @@ package main
 
 import "github.com/platinasystems/go/internal/goes/cmd/fsp"
 
-func init() { fsp.Hook = fspHook }
+func init() { fsp.Init = fspInit }
 
-func fspHook() {
+func fspInit() {
 	fsp.Vdev[0].Slot = 2
 	fsp.Vdev[0].Bus = 1
 	fsp.Vdev[0].Addr = 0x58

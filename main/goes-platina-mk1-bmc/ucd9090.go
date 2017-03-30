@@ -6,9 +6,9 @@ package main
 
 import "github.com/platinasystems/go/internal/goes/cmd/ucd9090"
 
-func init() { ucd9090.Hook = ucd9090Hook }
+func init() { ucd9090.Init = ucd9090Init }
 
-func ucd9090Hook() {
+func ucd9090Init() {
 	ucd9090.Vdev.Bus = 0
 	ucd9090.Vdev.Addr = 0x0 //update after eeprom read
 	ucd9090.Vdev.MuxBus = 0

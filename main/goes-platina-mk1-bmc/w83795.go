@@ -6,9 +6,9 @@ package main
 
 import "github.com/platinasystems/go/internal/goes/cmd/w83795"
 
-func init() { w83795.Hook = w83795Hook }
+func init() { w83795.Init = w83795Init }
 
-func w83795Hook() {
+func w83795Init() {
 	w83795.Vdev.Bus = 0
 	w83795.Vdev.Addr = 0x2f
 	w83795.Vdev.MuxBus = 0

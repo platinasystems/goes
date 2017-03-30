@@ -6,9 +6,9 @@ package main
 
 import "github.com/platinasystems/go/internal/goes/cmd/fantray"
 
-func init() { fantray.Hook = fantrayHook }
+func init() { fantray.Init = fantrayInit }
 
-func fantrayHook() {
+func fantrayInit() {
 	fantray.Vdev.Bus = 1
 	fantray.Vdev.Addr = 0x20
 	fantray.Vdev.MuxBus = 1
