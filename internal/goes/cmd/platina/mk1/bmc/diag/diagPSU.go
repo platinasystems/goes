@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/fantray"
-	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/bmc/ledgpio"
+	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
 	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"

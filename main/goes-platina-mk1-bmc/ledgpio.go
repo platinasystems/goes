@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/bmc/ledgpio"
+	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
 )
 
 func init() { ledgpio.Init = ledgpioInit }
