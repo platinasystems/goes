@@ -15,7 +15,6 @@ import (
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/internal/goes/cmd/start"
-	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
@@ -105,16 +104,8 @@ func main() {
 		f.Close()
 		return nil
 	}
-	start.ConfHook = func() error {
-		return nil
-	}
-	stop.Hook = stopHook
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func stopHook() error {
-	return nil
 }
