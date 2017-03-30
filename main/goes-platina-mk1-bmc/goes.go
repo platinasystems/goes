@@ -60,6 +60,8 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/nsid"
 	"github.com/platinasystems/go/internal/goes/cmd/patents"
 	"github.com/platinasystems/go/internal/goes/cmd/ping"
+	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/bmc/diag"
+	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/bmc/ledgpio"
 	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/toggle"
 	"github.com/platinasystems/go/internal/goes/cmd/ps"
 	"github.com/platinasystems/go/internal/goes/cmd/pwd"
@@ -89,8 +91,6 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/goes/cmd/watchdog"
 	"github.com/platinasystems/go/internal/goes/cmd/wget"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/diag"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 )
 
 func mkgoes() goes.ByName {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
+	"github.com/platinasystems/go/internal/goes/cmd/platina-mk1/bmc/ledgpio"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/platina-mk1-bmc/led"
 )
 
 func Init() (err error) {
