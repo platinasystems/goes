@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
-	"github.com/platinasystems/go/internal/goes/cmd/license"
-	"github.com/platinasystems/go/internal/goes/cmd/patents"
 	"github.com/platinasystems/go/internal/goes/cmd/start"
 	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
@@ -21,7 +19,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
@@ -33,9 +30,6 @@ import (
 const UsrShareGoes = "/usr/share/goes"
 
 func main() {
-	const fe1path = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
-	license.Others = []license.Other{{fe1path, copyright.License}}
-	patents.Others = []patents.Other{{fe1path, copyright.Patents}}
 	g := mkgoes()
 	i2cAddrs()
 	start.ConfHook = func() error {

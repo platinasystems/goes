@@ -6,6 +6,7 @@ package license
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/platinasystems/go/copyright"
 	"github.com/platinasystems/go/internal/goes"
@@ -13,8 +14,12 @@ import (
 
 const Name = "license"
 
-// Some machines may have additional licenses.
-var Others []Other
+var (
+	Init = func() {}
+	once sync.Once
+	// Some machines may have additional licenses.
+	Others []Other
+)
 
 type Other struct {
 	Name, Text string
@@ -29,6 +34,7 @@ func (cmd) String() string  { return Name }
 func (cmd) Usage() string   { return Name }
 
 func (cmd) Main(args ...string) error {
+	once.Do(Init)
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
