@@ -34,6 +34,10 @@ import (
 const Name = "redisd"
 const Log = varrun.Dir + "/log/redisd"
 
+// Machines may use Init to set redisd parameters before exec.
+var Init = func() {}
+var once sync.Once
+
 // Machines may restrict redisd listening to this list of net devices.
 // If unset, the local admin may restrict this through /etc/default/goes ARGS.
 // Otherwise, the default is all active net devices.
@@ -86,6 +90,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return "redisd [-port PORT] [DEVICE]..." }
 
 func (cmd *cmd) Main(args ...string) error {
+	once.Do(Init)
+
 	parm, args := parms.New(args, "-port")
 	if s := parm["-port"]; len(s) > 0 {
 		_, err := fmt.Sscan(s, &Port)

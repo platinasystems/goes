@@ -14,7 +14,6 @@ import (
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
-	"github.com/platinasystems/go/internal/goes/cmd/redisd"
 	"github.com/platinasystems/go/internal/goes/cmd/start"
 	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/gpio"
@@ -27,9 +26,6 @@ const UsrShareGoes = "/usr/share/goes"
 func main() {
 	gpio.File = "/boot/platina-mk1-bmc.dtb"
 	g := mkgoes()
-	redisd.Machine = "platina-mk1-bmc"
-	redisd.Devs = []string{"lo", "eth0"}
-	redisd.Hook = platina_eeprom.RedisdHook
 	platina_eeprom.Config(
 		platina_eeprom.BusIndex(0),
 		platina_eeprom.BusAddress(0x55),

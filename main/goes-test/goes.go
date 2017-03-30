@@ -88,7 +88,6 @@ import (
 )
 
 func mkgoes() goes.ByName {
-	redisd.Machine = "test"
 	g := make(goes.ByName)
 	g.Plot(
 		apropos.New(),

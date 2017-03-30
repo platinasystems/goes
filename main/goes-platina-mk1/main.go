@@ -13,7 +13,6 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/internal/goes/cmd/license"
 	"github.com/platinasystems/go/internal/goes/cmd/patents"
-	"github.com/platinasystems/go/internal/goes/cmd/redisd"
 	"github.com/platinasystems/go/internal/goes/cmd/start"
 	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
@@ -39,9 +38,6 @@ func main() {
 	patents.Others = []patents.Other{{fe1path, copyright.Patents}}
 	g := mkgoes()
 	i2cAddrs()
-	redisd.Machine = "platina-mk1"
-	redisd.Devs = []string{"lo", "eth0"}
-	redisd.Hook = platina_eeprom.RedisdHook
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
 			10*time.Second)
