@@ -25,9 +25,6 @@ type platform struct {
 func (p *platform) Init() (err error) {
 	v := p.Vnet
 	p.Platform = fe1.GetPlatform(v)
-	if err = mksriovs(); err != nil {
-		return
-	}
 	if err = p.boardInit(); err != nil {
 		v.Logf("boardInit failure: %s\n", err)
 		return

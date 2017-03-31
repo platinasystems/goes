@@ -5,39 +5,32 @@
 package main
 
 import (
-	"fmt"
+	"net"
 	"os/exec"
+	"strings"
 
 	"github.com/platinasystems/go/internal/goes/cmd/stop"
+	"github.com/platinasystems/go/internal/sriovs"
 )
 
 func init() {
-	// FIXME remove this after integrating sriov branch
-	if true {
-		stop.Hook = stopHook
-	}
-}
-
-func stopHook() error {
-	// Alpha: 0:32
-	// Beta: 1:33
-	// So, cover all with 0..33
-	for port := 0; port < 33; port++ {
-		for subport := 0; subport < 4; subport++ {
-			exec.Command("/bin/ip", "link", "delete",
-				fmt.Sprintf("eth-%d-%d", port, subport),
-			).Run()
+	stop.Hook = func() error {
+		fns, err := sriovs.NumvfsFns()
+		if err == nil && len(fns) > 0 {
+			return nil
 		}
+		interfaces, err := net.Interfaces()
+		if err != nil {
+			return err
+		}
+		for _, dev := range interfaces {
+			if strings.HasPrefix(dev.Name, "eth-") ||
+				strings.HasPrefix(dev.Name, "ixge") ||
+				strings.HasPrefix(dev.Name, "meth-") {
+				exec.Command("/bin/ip", "link", "delete",
+					dev.Name).Run()
+			}
+		}
+		return nil
 	}
-	for port := 0; port < 2; port++ {
-		exec.Command("/bin/ip", "link", "delete",
-			fmt.Sprintf("ixge2-0-%d", port),
-		).Run()
-	}
-	for port := 0; port < 2; port++ {
-		exec.Command("/bin/ip", "link", "delete",
-			fmt.Sprintf("meth-%d", port),
-		).Run()
-	}
-	return nil
 }

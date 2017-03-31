@@ -38,7 +38,7 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 	if err != nil {
 		return err
 	}
-	numvfsFns, err := filepath.Glob("/sys/class/net/*/device/sriov_numvfs")
+	numvfsFns, err := NumvfsFns()
 	if err != nil {
 		return err
 	}
@@ -208,4 +208,8 @@ func FnScan(fn string, a ...interface{}) (n int, err error) {
 		n, err = fmt.Sscan(string(b), a...)
 	}
 	return
+}
+
+func NumvfsFns() ([]string, error) {
+	return filepath.Glob("/sys/class/net/*/device/sriov_numvfs")
 }

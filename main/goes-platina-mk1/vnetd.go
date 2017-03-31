@@ -7,6 +7,7 @@ package main
 import (
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
@@ -19,10 +20,14 @@ import (
 )
 
 func init() {
-	vnetd.UnixInterfacesOnly = true
-	vnetd.GdbWait = gdbwait
 	vnetd.Hook = func(i *vnetd.Info, v *vnet.Vnet) error {
-		err := firmware.Extract(prog.Name())
+		fns, err := sriovs.NumvfsFns()
+		have_numvfs := err == nil && len(fns) > 0
+
+		vnetd.UnixInterfacesOnly = true
+		vnetd.GdbWait = gdbwait
+
+		err = firmware.Extract(prog.Name())
 		if err != nil {
 			return err
 		}
@@ -35,8 +40,12 @@ func init() {
 		unix.Init(v)
 
 		// Device drivers.
-		ixge.Init(v)
 		fe1.Init(v)
+		if !have_numvfs {
+			ixge.Init(v)
+		} else if err = mksriovs(); err != nil {
+			return err
+		}
 
 		plat := &platform{i: i}
 		v.AddPackage("platform", plat)
