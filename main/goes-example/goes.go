@@ -79,9 +79,11 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/wget"
 )
 
-func mkgoes() goes.ByName {
-	g := make(goes.ByName)
-	g.Plot(
+var Goes goes.ByName
+
+func init() {
+	Goes = make(goes.ByName)
+	Goes.Plot(
 		apropos.New(),
 		bang.New(),
 		boot.New(),
@@ -154,5 +156,4 @@ func mkgoes() goes.ByName {
 		version.New(),
 		wget.New(),
 	)
-	return g
 }
