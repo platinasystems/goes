@@ -6,12 +6,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 )
 
