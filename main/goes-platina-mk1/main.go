@@ -7,9 +7,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
-	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/vnet"
@@ -28,7 +26,6 @@ const UsrShareGoes = "/usr/share/goes"
 func main() {
 	g := mkgoes()
 	i2cAddrs()
-	stop.Hook = stopHook
 	vnetd.UnixInterfacesOnly = true
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook
@@ -36,30 +33,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func stopHook() error {
-	// Alpha: 0:32
-	// Beta: 1:33
-	// So, cover all with 0..33
-	for port := 0; port < 33; port++ {
-		for subport := 0; subport < 4; subport++ {
-			exec.Command("/bin/ip", "link", "delete",
-				fmt.Sprintf("eth-%d-%d", port, subport),
-			).Run()
-		}
-	}
-	for port := 0; port < 2; port++ {
-		exec.Command("/bin/ip", "link", "delete",
-			fmt.Sprintf("ixge2-0-%d", port),
-		).Run()
-	}
-	for port := 0; port < 2; port++ {
-		exec.Command("/bin/ip", "link", "delete",
-			fmt.Sprintf("meth-%d", port),
-		).Run()
-	}
-	return nil
 }
 
 func vnetHook(i *vnetd.Info, v *vnet.Vnet) error {
