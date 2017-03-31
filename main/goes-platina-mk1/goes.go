@@ -60,6 +60,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/internal/goes/cmd/ps"
 	"github.com/platinasystems/go/internal/goes/cmd/pwd"
+	"github.com/platinasystems/go/internal/goes/cmd/qsfp"
 	"github.com/platinasystems/go/internal/goes/cmd/reboot"
 	"github.com/platinasystems/go/internal/goes/cmd/redisd"
 	"github.com/platinasystems/go/internal/goes/cmd/reload"
@@ -84,7 +85,6 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/vnet"
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/goes/cmd/wget"
-	"github.com/platinasystems/go/vnet/devices/optics/qsfp"
 )
 
 var Goes goes.ByName

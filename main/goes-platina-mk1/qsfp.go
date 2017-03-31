@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/vnet/devices/optics/qsfp"
+import "github.com/platinasystems/go/internal/goes/cmd/qsfp"
 
 func init() {
 	qsfp.Init = func() {
