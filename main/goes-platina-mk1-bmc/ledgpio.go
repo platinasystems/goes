@@ -29,7 +29,7 @@ func ledgpioInit() {
 	}
 }
 
-func readVer() (v int, err error) {
+func readVer() (v byte, err error) {
 	f, err := os.Open("/tmp/ver")
 	if err != nil {
 		return 0, err
@@ -40,5 +40,5 @@ func readVer() (v int, err error) {
 		return 0, err
 	}
 	f.Close()
-	return int(b1[0]), nil
+	return b1[0], nil
 }
