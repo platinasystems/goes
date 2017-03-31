@@ -7,6 +7,7 @@ package qsfp
 import (
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -28,6 +29,9 @@ type I2cDev struct {
 	MuxAddr2  int
 	MuxValue2 int
 }
+
+var Init = func() {}
+var once sync.Once
 
 var Vdev [32]I2cDev
 
@@ -55,6 +59,8 @@ func (*cmd) String() string  { return Name }
 func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
+	once.Do(Init)
+
 	var si syscall.Sysinfo_t
 	var err error
 
