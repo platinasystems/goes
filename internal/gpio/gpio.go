@@ -41,6 +41,7 @@ type Chip struct {
 	Compatible map[string]bool
 }
 
+var Init = func() {}
 var File = "/boot/linux.dtb"
 var Aliases GpioAliasMap
 var Pins PinMap

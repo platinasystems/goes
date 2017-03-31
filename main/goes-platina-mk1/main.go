@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
 
-	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/internal/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/prog"
@@ -34,13 +32,6 @@ func main() {
 	vnetd.UnixInterfacesOnly = true
 	vnetd.GdbWait = gdbwait
 	vnetd.Hook = vnetHook
-	platina_eeprom.Config(
-		platina_eeprom.BusIndex(0),
-		platina_eeprom.BusAddress(0x51),
-		platina_eeprom.BusDelay(10*time.Millisecond),
-		platina_eeprom.MinMacs(132),
-		platina_eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
-	)
 	if err := g.Main(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -6,32 +6,18 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
 
-	"github.com/platinasystems/go/internal/fdt"
-	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/redis"
 )
 
 func init() {
-	gpio.File = "/boot/platina-mk1-bmc.dtb"
 	start.ConfGpioHook = func() error {
-		gpio.Aliases = make(gpio.GpioAliasMap)
-		gpio.Pins = make(gpio.PinMap)
-		if b, err := ioutil.ReadFile(gpio.File); err == nil {
-			t := &fdt.Tree{Debug: false, IsLittleEndian: false}
-			t.Parse(b)
-
-			t.MatchNode("aliases", fdtgpio.GatherAliases)
-			t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
-		} else {
-			return fmt.Errorf("%s: %v", gpio.File, err)
-		}
+		gpio.Init()
 		pin, found := gpio.Pins["QSPI_MUX_SEL"]
 		if found {
 			r, _ := pin.Value()

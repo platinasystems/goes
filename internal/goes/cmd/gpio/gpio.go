@@ -7,11 +7,8 @@ package gpio
 
 import (
 	"fmt"
-	"io/ioutil"
 	"sort"
 
-	"github.com/platinasystems/go/internal/fdt"
-	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/gpio"
 )
 
@@ -25,20 +22,7 @@ func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " PIN_NAME [VALUE]" }
 
 func (cmd) Main(args ...string) error {
-	gpio.Aliases = make(gpio.GpioAliasMap)
-	gpio.Pins = make(gpio.PinMap)
-
-	// Parse linux.dtb to generate gpio map for this machine
-	if b, err := ioutil.ReadFile(gpio.File); err == nil {
-		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
-		t.Parse(b)
-
-		t.MatchNode("aliases", fdtgpio.GatherAliases)
-		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
-	} else {
-		return fmt.Errorf("%s: %v", gpio.File, err)
-	}
-
+	gpio.Init()
 	switch len(args) {
 	case 0: // No args?  Report all pin values.
 		names := make([]string, 0, len(gpio.Pins))
