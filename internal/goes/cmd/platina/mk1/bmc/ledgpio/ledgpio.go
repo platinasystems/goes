@@ -6,7 +6,7 @@
 package ledgpio
 
 import (
-	"os"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -157,7 +157,8 @@ func (h *I2cDev) LedFpInit() error {
 		pin.SetValue(true)
 	}
 
-	deviceVer, _ = readVer()
+	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(ss, &deviceVer)
 	// save initial fan speed
 	saveFanSpeed, _ = redis.Hget(redis.DefaultHash, "fan_tray.speed")
 	forceFanSpeed = false
@@ -204,7 +205,8 @@ func (h *I2cDev) LedFpInit() error {
 
 func (h *I2cDev) LedFpReinit() error {
 
-	deviceVer, _ = readVer()
+	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(ss, &deviceVer)
 	r := getRegs()
 
 	r.Config[0].get(h)
@@ -387,18 +389,4 @@ func (h *I2cDev) LedStatus() error {
 		}
 	}
 	return nil
-}
-
-func readVer() (v byte, err error) {
-	f, err := os.Open("/tmp/ver")
-	if err != nil {
-		return 0, err
-	}
-	b1 := make([]byte, 5)
-	_, err = f.Read(b1)
-	if err != nil {
-		return 0, err
-	}
-	f.Close()
-	return b1[0], nil
 }

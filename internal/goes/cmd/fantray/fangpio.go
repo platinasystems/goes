@@ -5,7 +5,7 @@
 package fantray
 
 import (
-	"os"
+	"fmt"
 	"strconv"
 	"sync"
 	"syscall"
@@ -136,7 +136,9 @@ var first int
 func (h *I2cDev) FanTrayLedInit() error {
 	r := getRegs()
 
-	deviceVer, _ = readVer()
+	deviceVer := 0
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(s, &deviceVer)
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
 		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
@@ -161,7 +163,9 @@ func (h *I2cDev) FanTrayLedInit() error {
 func (h *I2cDev) FanTrayLedReinit() error {
 	r := getRegs()
 
-	deviceVer, _ = readVer()
+	deviceVer := 0
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(s, &deviceVer)
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
 		fanTrayLedYellow = []uint8{0x20, 0x02, 0x20, 0x02}
@@ -266,18 +270,4 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 		return "error", err
 	}
 	return w, nil
-}
-
-func readVer() (v int, err error) {
-	f, err := os.Open("/tmp/ver")
-	if err != nil {
-		return 0, err
-	}
-	b1 := make([]byte, 5)
-	_, err = f.Read(b1)
-	if err != nil {
-		return 0, err
-	}
-	f.Close()
-	return int(b1[0]), nil
 }

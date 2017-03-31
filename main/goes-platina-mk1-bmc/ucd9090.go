@@ -4,17 +4,24 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/ucd9090"
+import (
+	"fmt"
+
+	"github.com/platinasystems/go/internal/goes/cmd/ucd9090"
+	"github.com/platinasystems/go/internal/redis"
+)
 
 func init() { ucd9090.Init = ucd9090Init }
 
 func ucd9090Init() {
+	ver := 0
 	ucd9090.Vdev.Bus = 0
 	ucd9090.Vdev.Addr = 0x0 //update after eeprom read
 	ucd9090.Vdev.MuxBus = 0
 	ucd9090.Vdev.MuxAddr = 0x76
 	ucd9090.Vdev.MuxValue = 0x01
-	ver, _ := readVer()
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(s, &ver)
 	switch ver {
 	case 0xff:
 		ucd9090.Vdev.Addr = 0x7e

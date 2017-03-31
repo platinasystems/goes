@@ -5,20 +5,23 @@
 package main
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 func init() { ledgpio.Init = ledgpioInit }
 
 func ledgpioInit() {
+	ver := 0
 	ledgpio.Vdev.Bus = 0
-	ledgpio.Vdev.Addr = 0x0 //update after eeprom read
+	ledgpio.Vdev.Addr = 0x0
 	ledgpio.Vdev.MuxBus = 0x0
 	ledgpio.Vdev.MuxAddr = 0x76
 	ledgpio.Vdev.MuxValue = 0x2
-	ver, _ := readVer()
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(s, &ver)
 	switch ver {
 	case 0xff:
 		ledgpio.Vdev.Addr = 0x22
@@ -27,18 +30,4 @@ func ledgpioInit() {
 	default:
 		ledgpio.Vdev.Addr = 0x75
 	}
-}
-
-func readVer() (v byte, err error) {
-	f, err := os.Open("/tmp/ver")
-	if err != nil {
-		return 0, err
-	}
-	b1 := make([]byte, 5)
-	_, err = f.Read(b1)
-	if err != nil {
-		return 0, err
-	}
-	f.Close()
-	return b1[0], nil
 }

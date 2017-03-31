@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/start"
@@ -50,29 +49,6 @@ func init() {
 		}
 		redis.Hwait(redis.DefaultHash, "redis.ready", "true",
 			10*time.Second)
-		s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
-		if err != nil {
-			log.Print(err)
-			return err
-		}
-		ver := 0
-		_, err = fmt.Sscan(s, &ver)
-		if err != nil {
-			log.Print(err)
-			return err
-		}
-		f, err := os.Create("/tmp/ver")
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		d2 := []byte{byte(ver), 10}
-		_, err = f.Write(d2)
-		if err != nil {
-			return err
-		}
-		f.Sync()
-		f.Close()
 		return nil
 	}
 }

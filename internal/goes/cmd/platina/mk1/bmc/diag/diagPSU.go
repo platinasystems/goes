@@ -6,7 +6,6 @@ package diag
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/fantray"
@@ -14,6 +13,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 func diagPSU() error {
@@ -123,7 +123,9 @@ func diagPowerCycle() error {
 	fantray.Vdev.FanTrayLedReinit()
 
 	log.Print("re-init front panel LEDs")
-	deviceVer, _ := readVer()
+	deviceVer := 0
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(s, &deviceVer)
 	if deviceVer == 0 || deviceVer == 1 {
 		ledgpio.Vdev.Addr = 0x22
 	} else {
@@ -136,18 +138,4 @@ func diagPowerCycle() error {
 	ledgpio.Vdev.LedFpReinit()
 	log.Print("manual power cycle complete")
 	return nil
-}
-
-func readVer() (v int, err error) {
-	f, err := os.Open("/tmp/ver")
-	if err != nil {
-		return 0, err
-	}
-	b1 := make([]byte, 5)
-	_, err = f.Read(b1)
-	if err != nil {
-		return 0, err
-	}
-	f.Close()
-	return int(b1[0]), nil
 }
