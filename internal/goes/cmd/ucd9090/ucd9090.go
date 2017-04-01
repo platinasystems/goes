@@ -15,6 +15,11 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/cmd/fantray"
+	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795"
+	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -39,7 +44,8 @@ var (
 	loggedFaultCount      uint8
 	lastLoggedFaultDetail [12]byte
 
-	first int
+	first    int
+	firstLog int
 )
 
 type cmd struct {
@@ -62,7 +68,7 @@ func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
 	first = 1
-
+	firstLog = 1
 	cmd.stop = make(chan struct{})
 	cmd.last = make(map[string]float64)
 	cmd.lasts = make(map[string]string)
@@ -286,6 +292,39 @@ func (h *I2cDev) PowerCycles() (string, error) {
 			if !new {
 				return "", nil
 			}
+			if firstLog == 0 {
+				log.Printf("warning: power event detected")
+				log.Print("notice: re-init fan controller")
+				w83795.Vdev.Bus = 0
+				w83795.Vdev.Addr = 0x2f
+				w83795.Vdev.MuxBus = 0
+				w83795.Vdev.MuxAddr = 0x76
+				w83795.Vdev.MuxValue = 0x80
+				w83795.Vdev.FanInit()
+
+				log.Print("notice: re-init fan trays")
+				fantray.Vdev.Bus = 1
+				fantray.Vdev.Addr = 0x20
+				fantray.Vdev.MuxBus = 1
+				fantray.Vdev.MuxAddr = 0x72
+				fantray.Vdev.MuxValue = 0x04
+				fantray.Vdev.FanTrayLedReinit()
+
+				log.Print("notice: re-init front panel LEDs")
+				ver := 0
+				s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+				_, _ = fmt.Sscan(s, &ver)
+				if ver == 0 || ver == 0xff {
+					ledgpio.Vdev.Addr = 0x22
+				} else {
+					ledgpio.Vdev.Addr = 0x75
+				}
+				ledgpio.Vdev.Bus = 0
+				ledgpio.Vdev.MuxBus = 0x0
+				ledgpio.Vdev.MuxAddr = 0x76
+				ledgpio.Vdev.MuxValue = 0x2
+				ledgpio.Vdev.LedFpReinit()
+			}
 		}
 		milli = uint32(s[1].D[5]) + uint32(s[1].D[4])<<8 + uint32(s[1].D[3])<<16 + uint32(s[1].D[2])<<24
 		seconds = milli / 1000
@@ -298,6 +337,7 @@ func (h *I2cDev) PowerCycles() (string, error) {
 		}
 	}
 	pwrCycles = strings.Trim(pwrCycles, ".")
+	firstLog = 0
 	return pwrCycles, nil
 }
 

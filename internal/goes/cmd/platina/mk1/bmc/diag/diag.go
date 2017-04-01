@@ -46,11 +46,10 @@ func (cmd) Main(args ...string) error {
 	if n := len(args); n != 0 {
 		diag = args[0]
 	}
-
 	gpio.Aliases = make(gpio.GpioAliasMap)
 	gpio.Pins = make(gpio.PinMap)
 
-	if b, err := ioutil.ReadFile(gpio.File); err == nil {
+	if b, err := ioutil.ReadFile("/boot/platina-mk1-bmc.dtb"); err == nil {
 		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
 		t.Parse(b)
 
@@ -66,7 +65,6 @@ func (cmd) Main(args ...string) error {
 			fmt.Printf("%s: %v\n", name, err)
 		}
 	}
-
 	diags, found := map[string][]Diag{
 		"": []Diag{
 			diagI2c,

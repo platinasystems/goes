@@ -8,12 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/platinasystems/go/internal/goes/cmd/fantray"
-	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
-	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
 )
 
 func diagPSU() error {
@@ -106,36 +102,5 @@ func diagPowerCycle() error {
 	}
 	time.Sleep(1 * time.Second)
 
-	log.Print("re-init fan controller")
-	w83795.Vdev.Bus = 0
-	w83795.Vdev.Addr = 0x2f
-	w83795.Vdev.MuxBus = 0
-	w83795.Vdev.MuxAddr = 0x76
-	w83795.Vdev.MuxValue = 0x80
-	w83795.Vdev.FanInit()
-
-	log.Print("re-init fan trays")
-	fantray.Vdev.Bus = 1
-	fantray.Vdev.Addr = 0x20
-	fantray.Vdev.MuxBus = 1
-	fantray.Vdev.MuxAddr = 0x72
-	fantray.Vdev.MuxValue = 0x04
-	fantray.Vdev.FanTrayLedReinit()
-
-	log.Print("re-init front panel LEDs")
-	deviceVer := 0
-	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
-	_, _ = fmt.Sscan(s, &deviceVer)
-	if deviceVer == 0 || deviceVer == 1 {
-		ledgpio.Vdev.Addr = 0x22
-	} else {
-		ledgpio.Vdev.Addr = 0x75
-	}
-	ledgpio.Vdev.Bus = 0
-	ledgpio.Vdev.MuxBus = 0x0
-	ledgpio.Vdev.MuxAddr = 0x76
-	ledgpio.Vdev.MuxValue = 0x2
-	ledgpio.Vdev.LedFpReinit()
-	log.Print("manual power cycle complete")
 	return nil
 }
