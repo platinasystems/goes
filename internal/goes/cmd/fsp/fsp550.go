@@ -797,6 +797,9 @@ func (h *I2cDev) MfgModel() (string, error) {
 }
 
 func (h *I2cDev) PsuStatus() string {
+	if len(gpio.Pins) == 0 {
+		gpio.Init()
+	}
 	pin, found := gpio.Pins[h.GpioPrsntL]
 	if !found {
 		h.Installed = 0
