@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -42,17 +41,6 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 	if err != nil {
 		return err
 	}
-	if len(numvfsFns) == 0 {
-		return fmt.Errorf("don't have an SRIOV capable device")
-	}
-	sort.Slice(numvfsFns, func(i, j int) bool {
-		// /sys/class/net/DEV/device is a symlink to the bus id
-		// so, it's the best thing to sort on to have consistent
-		// interfaces
-		iln, _ := os.Readlink(filepath.Dir(numvfsFns[i]))
-		jln, _ := os.Readlink(filepath.Dir(numvfsFns[j]))
-		return filepath.Base(iln) < filepath.Base(jln)
-	})
 	for pfi, numvfsFn := range numvfsFns {
 		var numvfs, totalvfs uint
 		var virtfns []string
@@ -208,8 +196,4 @@ func FnScan(fn string, a ...interface{}) (n int, err error) {
 		n, err = fmt.Sscan(string(b), a...)
 	}
 	return
-}
-
-func NumvfsFns() ([]string, error) {
-	return filepath.Glob("/sys/class/net/*/device/sriov_numvfs")
 }
