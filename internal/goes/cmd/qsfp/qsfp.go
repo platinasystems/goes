@@ -64,6 +64,9 @@ func (cmd *cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
 
+	for i := 0; i < 32; i++ {
+		portIsCopper[i] = true
+	}
 	cmd.stop = make(chan struct{})
 	cmd.last = make(map[string]float64)
 	cmd.lasts = make(map[string]string)
@@ -118,6 +121,7 @@ func (cmd *cmd) update() error {
 					if ((1 << uint(i)) & (latestPresent[j] ^ 0xffff)) != 0 {
 						//when qsfp is installed publish static data
 						k := "port-" + strconv.Itoa(lp) + ".qsfp.compliance"
+						time.Sleep(100 * time.Millisecond)
 						v := Vdev[i+j*16].Compliance()
 						var portConfig string
 
@@ -185,6 +189,9 @@ func (cmd *cmd) update() error {
 							cmd.pub.Print(k, ": ", v)
 							cmd.lasts[k] = v
 						}
+
+						time.Sleep(100 * time.Millisecond)
+
 						k = "port-" + strconv.Itoa(lp) + ".qsfp.vendor"
 						v = Vdev[i+j*16].Vendor()
 						typeString += strings.Trim(v, " ") + ", "
