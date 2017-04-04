@@ -52,7 +52,6 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/mknod"
 	"github.com/platinasystems/go/internal/goes/cmd/mount"
 	"github.com/platinasystems/go/internal/goes/cmd/nlcounters"
-	"github.com/platinasystems/go/internal/goes/cmd/nld"
 	"github.com/platinasystems/go/internal/goes/cmd/nldump"
 	"github.com/platinasystems/go/internal/goes/cmd/nsid"
 	"github.com/platinasystems/go/internal/goes/cmd/patents"
@@ -138,7 +137,6 @@ func init() {
 		mknod.New(),
 		mount.New(),
 		nlcounters.New(),
-		nld.New(),
 		nldump.New(),
 		nsid.New(),
 		patents.New(),
