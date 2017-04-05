@@ -77,12 +77,11 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		}
 
 		r.Input[0].get(h)
+		r.Input[1].get(h)
+		closeMuxio(h)
 		DoI2cRpcio()
 		p := uint16(sio[1].D[0])
-
-		r.Input[1].get(h)
-		DoI2cRpcio()
-		p += uint16(sio[1].D[0]) << 8
+		p += uint16(sio[3].D[0]) << 8
 		if port == 0 && qsfpIo.Present[0] != p {
 			//Take port out of reset and LP mode if qsfp is installed
 			VdevIo[6].QsfpReset((p ^ qsfpIo.Present[0]), p^0xffff)
@@ -128,16 +127,19 @@ func (h *I2cDev) QsfpReset(ports uint16, reset uint16) {
 	r := getRegs()
 	if (ports & 0xff) != 0 {
 		r.Output[0].get(h)
+		closeMuxio(h)
 		DoI2cRpcio()
 		v := uint8((sio[1].D[0] & uint8((ports&0xff)^0xff)) | uint8((ports&reset)&0xff))
 		r.Output[0].set(h, v)
 	}
 	if (ports & 0xff00) != 0 {
 		r.Output[1].get(h)
+		closeMuxio(h)
 		DoI2cRpcio()
 		v := uint8((sio[1].D[0] & uint8(((ports&0xff00)>>8)^0xff)) | uint8(((ports&reset)&0xff00)>>8))
 		r.Output[1].set(h, v)
 	}
+	closeMuxio(h)
 	DoI2cRpcio()
 	return
 }
@@ -148,16 +150,19 @@ func (h *I2cDev) QsfpLpMode(ports uint16, reset uint16) {
 	r := getRegs()
 	if (ports & 0xff) != 0 {
 		r.Output[0].get(h)
+		closeMuxio(h)
 		DoI2cRpcio()
 		v := uint8((sio[1].D[0] & uint8((ports&0xff)^0xff)) | uint8((ports&reset)&0xff))
 		r.Output[0].set(h, v)
 	}
 	if (ports & 0xff00) != 0 {
 		r.Output[1].get(h)
+		closeMuxio(h)
 		DoI2cRpcio()
 		v := uint8((sio[1].D[0] & uint8(((ports&0xff00)>>8)^0xff)) | uint8(((ports&reset)&0xff00)>>8))
 		r.Output[1].set(h, v)
 	}
+	closeMuxio(h)
 	DoI2cRpcio()
 	return
 }
@@ -167,12 +172,15 @@ func (h *I2cDev) QsfpInit(out0 byte, out1 byte, pol0 byte, pol1 byte, conf0 byte
 	r := getRegs()
 	r.Output[0].set(h, out0)
 	r.Output[1].set(h, out1)
+	closeMuxio(h)
 	DoI2cRpcio()
 	r.Polarity[0].set(h, pol0)
 	r.Polarity[1].set(h, pol1)
+	closeMuxio(h)
 	DoI2cRpcio()
 	r.Config[0].set(h, conf0)
 	r.Config[1].set(h, conf1)
+	closeMuxio(h)
 	DoI2cRpcio()
 	return
 }

@@ -31,6 +31,15 @@ func (r *regio8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - re
 func (r *regio16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddrio) }
 func (r *regio16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddrio) }
 
+func closeMuxio(h *I2cDev) {
+	var data = [34]byte{0, 0, 0, 0}
+
+	data[0] = byte(0)
+	jio[xio] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
+	xio++
+
+}
+
 func (r *regio8) get(h *I2cDev) {
 	var data = [34]byte{0, 0, 0, 0}
 
@@ -38,9 +47,6 @@ func (r *regio8) get(h *I2cDev) {
 	jio[xio] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	xio++
 	jio[xio] = I{true, i2c.Read, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0}
-	xio++
-	data[0] = byte(0)
-	jio[xio] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	xio++
 }
 
@@ -72,9 +78,6 @@ func (r *regio8) set(h *I2cDev, v uint8) {
 	xio++
 	data[0] = v
 	jio[xio] = I{true, i2c.Write, r.offset(), i2c.ByteData, data, h.Bus, h.Addr, 0}
-	xio++
-	data[0] = byte(0)
-	jio[xio] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 0}
 	xio++
 }
 

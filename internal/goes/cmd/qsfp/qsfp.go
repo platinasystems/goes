@@ -106,6 +106,10 @@ func (cmd *cmd) update() error {
 	if stopped == 1 {
 		return nil
 	}
+	ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+	if err != nil || ready == "false" {
+		return nil
+	}
 
 	for j := 0; j < 2; j++ {
 		//when qsfp is installed or removed from a port
@@ -121,66 +125,62 @@ func (cmd *cmd) update() error {
 					if ((1 << uint(i)) & (latestPresent[j] ^ 0xffff)) != 0 {
 						//when qsfp is installed publish static data
 						k := "port-" + strconv.Itoa(lp) + ".qsfp.compliance"
-						time.Sleep(100 * time.Millisecond)
 						v := Vdev[i+j*16].Compliance()
 						var portConfig string
 
 						//identify copper vs optic and set media and speed
-						ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
-						if err == nil && ready == "true" {
-							media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
-							if err != nil {
-								log.Print("qsfp hget error:", err)
+						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
+						if err != nil {
+							log.Print("qsfp hget error:", err)
+						}
+						speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed")
+						if err != nil {
+							log.Print("qsfp hget error:", err)
+						}
+						if strings.Contains(v, "-CR") {
+							portIsCopper[i+j*16] = true
+							if media != "copper" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "copper")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									portConfig += "copper "
+								}
 							}
-							speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed")
-							if err != nil {
-								log.Print("qsfp hget error:", err)
+						} else if strings.Contains(v, "40G") {
+							portIsCopper[i+j*16] = false
+							if media != "fiber" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									portConfig += "fiber "
+								}
 							}
-							if strings.Contains(v, "-CR") {
-								portIsCopper[i+j*16] = true
-								if media != "copper" {
-									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "copper")
-									if err != nil || ret != 1 {
-										log.Print("qsfp hset error:", err, " ", ret)
-									} else {
-										portConfig += "copper "
-									}
+							if speed != "40g" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "40g")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									portConfig += "40g fixed speed"
 								}
-							} else if strings.Contains(v, "40G") {
-								portIsCopper[i+j*16] = false
-								if media != "fiber" {
-									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
-									if err != nil || ret != 1 {
-										log.Print("qsfp hset error:", err, " ", ret)
-									} else {
-										portConfig += "fiber "
-									}
+							}
+						} else {
+							portIsCopper[i+j*16] = false
+							if media != "fiber" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									portConfig += "fiber "
 								}
-								if speed != "40g" {
-									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "40g")
-									if err != nil || ret != 1 {
-										log.Print("qsfp hset error:", err, " ", ret)
-									} else {
-										portConfig += "40g fixed speed"
-									}
-								}
-							} else {
-								portIsCopper[i+j*16] = false
-								if media != "fiber" {
-									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
-									if err != nil || ret != 1 {
-										log.Print("qsfp hset error:", err, " ", ret)
-									} else {
-										portConfig += "fiber "
-									}
-								}
-								if speed != "100g" {
-									ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "100g")
-									if err != nil || ret != 1 {
-										log.Print("qsfp hset error:", err, " ", ret)
-									} else {
-										portConfig += "100g fixed speed"
-									}
+							}
+							if speed != "100g" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "100g")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									portConfig += "100g fixed speed"
 								}
 							}
 						}
@@ -189,8 +189,6 @@ func (cmd *cmd) update() error {
 							cmd.pub.Print(k, ": ", v)
 							cmd.lasts[k] = v
 						}
-
-						time.Sleep(100 * time.Millisecond)
 
 						k = "port-" + strconv.Itoa(lp) + ".qsfp.vendor"
 						v = Vdev[i+j*16].Vendor()
@@ -438,6 +436,7 @@ func (h *I2cDev) DataReady() bool {
 	r := getRegsLpage0()
 
 	r.status.get(h)
+	closeMux(h)
 	DoI2cRpc()
 
 	if (s[2].D[1] & 0x1) == 1 {
@@ -452,10 +451,12 @@ func (h *I2cDev) Compliance() string {
 	r := getRegsUpage0()
 
 	r.SpecCompliance.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	cp := s[2].D[0]
 
 	r.ExtSpecCompliance.get(h)
+	closeMux(h)
 	DoI2cRpc()
 	ecp := s[2].D[0]
 
@@ -471,6 +472,7 @@ func (h *I2cDev) Compliance() string {
 func (h *I2cDev) Vendor() string {
 	r := getRegsUpage0()
 	r.VendorName.get(h, 16)
+	closeMux(h)
 	DoI2cRpc()
 	t := string(s[2].D[1:16])
 
@@ -480,6 +482,7 @@ func (h *I2cDev) Vendor() string {
 func (h *I2cDev) PN() string {
 	r := getRegsUpage0()
 	r.VendorPN.get(h, 16)
+	closeMux(h)
 	DoI2cRpc()
 	t := string(s[2].D[1:16])
 
@@ -489,6 +492,7 @@ func (h *I2cDev) PN() string {
 func (h *I2cDev) SN() string {
 	r := getRegsUpage0()
 	r.VendorSN.get(h, 16)
+	closeMux(h)
 	DoI2cRpc()
 	t := string(s[2].D[1:16])
 
@@ -649,9 +653,11 @@ func Voltage(t uint16) string {
 func (h *I2cDev) DynamicBlocks(port int) {
 	r := getRegsLpage0()
 	r.pageSelect.set(h, 0)
+	closeMux(h)
 	DoI2cRpc()
 	rb := getBlocks()
 	rb.lpage0b.get(h, 32)
+	closeMux(h)
 	DoI2cRpc()
 
 	portLpage0[port].id = s[2].D[1]
@@ -663,6 +669,7 @@ func (h *I2cDev) DynamicBlocks(port int) {
 	portLpage0[port].freeMonVoltage = uint16(s[2].D[28]) + uint16(s[2].D[27])<<8
 
 	rb.lpage1b.get(h, 32)
+	closeMux(h)
 	DoI2cRpc()
 
 	copy(portLpage0[port].rxPower[:], s[2].D[3:11])
@@ -674,10 +681,12 @@ func (h *I2cDev) StaticBlocks(port int) {
 	if !portIsCopper[port] {
 		r := getRegsLpage0()
 		r.pageSelect.set(h, 3)
+		closeMux(h)
 		DoI2cRpc()
 
 		rb := getBlocks()
 		rb.upage0b.get(h, 32)
+		closeMux(h)
 		DoI2cRpc()
 		portUpage3[port].tempHighAlarm = (uint16(s[2].D[1]) << 8) + uint16(s[2].D[2])
 		portUpage3[port].tempLowAlarm = (uint16(s[2].D[3]) << 8) + uint16(s[2].D[4])
@@ -689,6 +698,7 @@ func (h *I2cDev) StaticBlocks(port int) {
 		portUpage3[port].vccLowWarning = (uint16(s[2].D[23]) << 8) + uint16(s[2].D[24])
 
 		rb.upage1b.get(h, 32)
+		closeMux(h)
 		DoI2cRpc()
 		portUpage3[port].rxPowerHighAlarm = (uint16(s[2].D[17]) << 8) + uint16(s[2].D[18])
 		portUpage3[port].rxPowerLowAlarm = (uint16(s[2].D[19]) << 8) + uint16(s[2].D[20])
@@ -700,6 +710,7 @@ func (h *I2cDev) StaticBlocks(port int) {
 		portUpage3[port].txBiasLowWarning = (uint16(s[2].D[31]) << 8) + uint16(s[2].D[32])
 
 		rb.upage2b.get(h, 32)
+		closeMux(h)
 		DoI2cRpc()
 		portUpage3[port].txPowerHighAlarm = (uint16(s[2].D[1]) << 8) + uint16(s[2].D[2])
 		portUpage3[port].txPowerLowAlarm = (uint16(s[2].D[3]) << 8) + uint16(s[2].D[4])
@@ -708,6 +719,7 @@ func (h *I2cDev) StaticBlocks(port int) {
 
 		r = getRegsLpage0()
 		r.pageSelect.set(h, 0)
+		closeMux(h)
 		DoI2cRpc()
 	}
 	return
