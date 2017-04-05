@@ -6,7 +6,9 @@ package fantray
 
 import (
 	"fmt"
+	"net/rpc"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -15,6 +17,9 @@ import (
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/go/internal/redis/rpc/args"
+	"github.com/platinasystems/go/internal/redis/rpc/reply"
+	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const Name = "fantray"
@@ -34,11 +39,20 @@ var (
 	Vdev I2cDev
 
 	VpageByKey map[string]uint8
+
+	WrRegFn  = make(map[string]string)
+	WrRegVal = make(map[string]string)
 )
 
 type cmd struct {
-	stop  chan struct{}
+	Info
+}
+
+type Info struct {
+	mutex sync.Mutex
+	rpc   *sockfile.RpcServer
 	pub   *publisher.Publisher
+	stop  chan struct{}
 	last  map[string]float64
 	lasts map[string]string
 	lastu map[string]uint16
@@ -70,10 +84,16 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	//if err = cmd.update(); err != nil {
-	//	close(cmd.stop)
-	//	return err
-	//}
+	if cmd.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+		return err
+	}
+
+	rpc.Register(&cmd.Info)
+	err = redis.Assign(redis.DefaultHash+":fan_tray.", Name, "Info")
+	if err != nil {
+		return err
+	}
+
 	holdoff := 3
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
@@ -105,6 +125,9 @@ func (cmd *cmd) update() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
+	}
+	if err := writeRegs(); err != nil {
+		return err
 	}
 	for k, i := range VpageByKey {
 		v, err := Vdev.FanTrayStatus(i)
@@ -270,4 +293,38 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 		return "error", err
 	}
 	return w, nil
+}
+
+func writeRegs() error {
+	for k, v := range WrRegVal {
+		switch WrRegFn[k] {
+		case "speed":
+			//log.Print("test", k, v)
+		}
+		delete(WrRegVal, k)
+	}
+	return nil
+}
+
+func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
+	_, p := WrRegFn[args.Field]
+	if !p {
+		return fmt.Errorf("cannot hset: %s", args.Field)
+	}
+	field := strings.TrimPrefix(args.Field, "fan_tray.")
+	err := i.set(field, string(args.Value), false)
+	if err == nil {
+		*reply = 1
+		WrRegVal[args.Field] = string(args.Value)
+	}
+	return err
+}
+
+func (i *Info) set(key, value string, isReadyEvent bool) error {
+	i.pub.Print("fan_tray.", key, ": ", value)
+	return nil
+}
+
+func (i *Info) publish(key string, value interface{}) {
+	i.pub.Print("fan_tray.", key, ": ", value)
 }
