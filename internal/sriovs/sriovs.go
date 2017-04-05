@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,7 +21,8 @@ import (
 
 const DefaultNumvfs = 16
 
-type Mac []byte
+type MacByIfindex map[int][6]byte
+type Mac [6]byte
 type Vf uint
 
 func (vf Vf) Port() uint    { return uint((vf &^ (Port(1) - 1)) >> 20) }
@@ -31,21 +33,23 @@ func Port(u uint) Vf    { return Vf(u << 20) }
 func SubPort(u uint) Vf { return Vf((u & 0xf) << 16) }
 func Vlan(u uint) Vf    { return Vf(u & 0xffff) }
 
-func Mksriovs(porto uint, vfs ...[]Vf) error {
-	mac := make(Mac, 6)
+func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
+	var mac Mac
 	err := assert.Root()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	numvfsFns, err := NumvfsFns()
 	if err != nil {
-		return err
+		return nil, err
 	}
+	macByIfindex := make(MacByIfindex)
+pfloop:
 	for pfi, numvfsFn := range numvfsFns {
 		var numvfs, totalvfs uint
 		var virtfns []string
 		if pfi > len(vfs) {
-			break
+			break pfloop
 		}
 
 		pfname := filepath.Base(filepath.Dir(filepath.Dir(numvfsFn)))
@@ -54,7 +58,8 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 			cmd := exec.Command("ip", "link", "set", pfname,
 				"name", newname)
 			if err = cmd.Run(); err != nil {
-				return fmt.Errorf("%v: %v", cmd.Args, err)
+				err = fmt.Errorf("%v: %v", cmd.Args, err)
+				break pfloop
 			}
 			numvfsFn = filepath.Join("/sys/class/net", newname,
 				"device/sriov_numvfs")
@@ -62,43 +67,49 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 		}
 
 		if _, err = FnScan(numvfsFn, &numvfs); err != nil {
-			return fmt.Errorf("%s: numvfs: %v", pfname, err)
+			err = fmt.Errorf("%s: numvfs: %v", pfname, err)
+			break pfloop
 		}
 
 		totalvfsFn := filepath.Join(filepath.Dir(numvfsFn),
 			"sriov_totalvfs")
 		if _, err = FnScan(totalvfsFn, &totalvfs); err != nil {
-			return fmt.Errorf("%s: totalvfs: %v", pfname, err)
+			err = fmt.Errorf("%s: totalvfs: %v", pfname, err)
+			break pfloop
 		}
 
-		pfdev, err := net.InterfaceByName(pfname)
+		var pfdev *net.Interface
+		pfdev, err = net.InterfaceByName(pfname)
 		if err != nil {
-			return err
+			break pfloop
 		}
 		if pfdev.Flags&net.FlagUp != net.FlagUp {
 			cmd := exec.Command("ip", "link", "set", pfname, "up")
 			if err = cmd.Run(); err != nil {
-				return fmt.Errorf("%v: %v", cmd.Args, err)
+				err = fmt.Errorf("%v: %v", cmd.Args, err)
+				break pfloop
 			}
 		}
 
-		copy(mac, pfdev.HardwareAddr)
+		copy(mac[:], pfdev.HardwareAddr)
 		mac.Plus(uint(len(numvfsFns)-pfi) + (uint(pfi) * totalvfs))
 
 		virtfnPat := filepath.Join(filepath.Dir(numvfsFn), "virtfn*")
 		if numvfs == 0 {
 			numvfs = DefaultNumvfs
 			if s := os.Getenv("NUMVFS"); len(s) > 0 {
-				_, err := fmt.Sscan(s, &numvfs)
+				_, err = fmt.Sscan(s, &numvfs)
 				if err != nil {
-					return fmt.Errorf("NUMVFS: %v", err)
+					err = fmt.Errorf("NUMVFS: %v", err)
+					break pfloop
 				}
 			}
 			if n := uint(len(vfs[pfi])); n < numvfs {
 				numvfs = n
 			}
 			if err = FnPrintln(numvfsFn, numvfs); err != nil {
-				return fmt.Errorf("set %s: %v", numvfsFn, err)
+				err = fmt.Errorf("set %s: %v", numvfsFn, err)
+				break pfloop
 			}
 			for tries := 0; true; tries++ {
 				virtfns, err = filepath.Glob(virtfnPat)
@@ -106,12 +117,13 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 					break
 				}
 				if tries == 5 {
-					return fmt.Errorf("%s: vf t/o", pfname)
+					err = fmt.Errorf("%s: vf t/o", pfname)
+					break pfloop
 				}
 				time.Sleep(time.Second)
 			}
 		} else if virtfns, err = filepath.Glob(virtfnPat); err != nil {
-			return err
+			break pfloop
 		}
 
 		for _, virtfn := range virtfns {
@@ -119,7 +131,7 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 			base := filepath.Base(virtfn)
 			svfi := strings.TrimPrefix(base, "virtfn")
 			if _, err = fmt.Sscan(svfi, &vfi); err != nil {
-				return err
+				break pfloop
 			}
 			if vfi >= uint(len(vfs[pfi])) {
 				continue
@@ -133,44 +145,74 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 				"mac", mac.String(),
 				"vlan", fmt.Sprint(vf.Vlan()))
 			if err = cmd.Run(); err != nil {
-				return fmt.Errorf("%v: %v", cmd.Args, err)
+				err = fmt.Errorf("%v: %v", cmd.Args, err)
+				break pfloop
 			}
+
+			var vfdev *net.Interface
+			vfdev, err = net.InterfaceByName(vfname)
+			if err != nil {
+				break pfloop
+			}
+			macByIfindex[vfdev.Index] = mac
 			mac.Plus(1)
 
-			match, err := filepath.Glob(filepath.Join(virtfn,
+			var match []string
+			match, err = filepath.Glob(filepath.Join(virtfn,
 				"net/*"))
 			if err != nil {
-				return fmt.Errorf("glob %s/net*: %v",
-					virtfn, err)
+				err = fmt.Errorf("glob %s/net*: %v", virtfn,
+					err)
+				break pfloop
 			}
 			if len(match) == 0 {
-				return fmt.Errorf("%s has no virtfns", pfname)
+				err = fmt.Errorf("%s has no virtfns", pfname)
+				break pfloop
 			}
 			if name := filepath.Base(match[0]); name != vfname {
 				cmd = exec.Command("ip", "link", "set", name,
 					"name", vfname)
 				if err = cmd.Run(); err != nil {
-					return fmt.Errorf("%v: %v", cmd.Args,
+					err = fmt.Errorf("%v: %v", cmd.Args,
 						err)
+					break pfloop
 				}
 			}
 
 			// bounce the vf to reload its mac from the pf
 			cmd = exec.Command("ip", "link", "set", vfname, "up")
 			if err = cmd.Run(); err != nil {
-				return fmt.Errorf("%v: %v", cmd.Args, err)
+				err = fmt.Errorf("%v: %v", cmd.Args, err)
+				break pfloop
 			}
 			cmd = exec.Command("ip", "link", "set", vfname, "down")
 			if err = cmd.Run(); err != nil {
-				return fmt.Errorf("%v: %v", cmd.Args, err)
+				err = fmt.Errorf("%v: %v", cmd.Args, err)
+				break pfloop
 			}
 		}
-
 	}
-	return nil
+
+	if false {
+		idxs := make([]int, 0, len(macByIfindex))
+		for idx := range macByIfindex {
+			idxs = append(idxs, idx)
+		}
+		sort.Ints(idxs)
+		for _, idx := range idxs {
+			fmt.Print("if[", idx, "].mac: ",
+				Mac(macByIfindex[idx]), "\n")
+		}
+	}
+
+	return macByIfindex, err
 }
 
-func (mac Mac) Plus(u uint) {
+func (macs MacByIfindex) Cast() map[int][6]byte {
+	return map[int][6]byte(macs)
+}
+
+func (mac *Mac) Plus(u uint) {
 	base := mac[5]
 	mac[5] += byte(u)
 	if mac[5] < base {

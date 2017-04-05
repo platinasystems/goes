@@ -43,7 +43,7 @@ func init() {
 		fe1.Init(v)
 		if !have_numvfs {
 			ixge.Init(v)
-		} else if err = mksriovs(); err != nil {
+		} else if unix.MacByIfindex, err = mksriovs(); err != nil {
 			return err
 		}
 

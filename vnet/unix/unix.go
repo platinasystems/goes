@@ -8,6 +8,8 @@ import (
 	"github.com/platinasystems/go/vnet"
 )
 
+var MacByIfindex map[int][6]byte
+
 func Init(v *vnet.Vnet) {
 	m := &Main{}
 	m.v = v
