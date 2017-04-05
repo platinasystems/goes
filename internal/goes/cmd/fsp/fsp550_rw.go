@@ -156,6 +156,26 @@ func readStopped() byte {
 	return s[0].D[0]
 }
 
+func stopI2c() error {
+	var data = [34]byte{0, 0, 0, 0}
+	j[0] = I{true, i2c.Write, 0, 0, data, int(0x99), int(1), 0}
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func startI2c() error {
+	var data = [34]byte{0, 0, 0, 0}
+	j[0] = I{true, i2c.Write, 0, 0, data, int(0x99), int(0), 0}
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func DoI2cRpc() error {
 	if dialed == 0 {
 		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")

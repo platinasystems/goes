@@ -607,7 +607,6 @@ func (h *I2cDev) Iin() (float64, error) {
 func (h *I2cDev) Vout() (float64, error) {
 	r := getRegs()
 	r.Vout.get(h)
-	//var nn float64
 	r.VoutMode.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
@@ -885,6 +884,37 @@ func (h *I2cDev) GetAdminState() string {
 	return "enabled"
 }
 
+func powerCycle() error {
+
+	stopI2c()
+	time.Sleep(500 * time.Millisecond)
+
+	log.Print("initiate manual power cycle")
+	pin, found := gpio.Pins["PSU0_PWRON_L"]
+	if found {
+		pin.SetValue(true)
+	}
+	pin, found = gpio.Pins["PSU1_PWRON_L"]
+	if found {
+		pin.SetValue(true)
+	}
+	time.Sleep(1 * time.Second)
+	pin, found = gpio.Pins["PSU0_PWRON_L"]
+	if found {
+		pin.SetValue(false)
+	}
+	pin, found = gpio.Pins["PSU1_PWRON_L"]
+	if found {
+		pin.SetValue(false)
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	startI2c()
+	time.Sleep(1 * time.Second)
+
+	return nil
+}
+
 func writeRegs() error {
 	for k, v := range WrRegVal {
 		switch WrRegFn[k] {
@@ -892,6 +922,10 @@ func writeRegs() error {
 			//check for psuX when writing
 			if false {
 				log.Print("test", k, v)
+			}
+		case "powercycle":
+			if v == "true" {
+				powerCycle()
 			}
 		}
 		delete(WrRegVal, k)
