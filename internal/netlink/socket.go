@@ -226,14 +226,19 @@ func (s *Socket) Listen(handler Handler, reqs ...ListenReq) (err error) {
 		if r.MsgType == NLMSG_NOOP {
 			continue
 		}
-		msg := NewGenMessage()
-		msg.Type = r.MsgType
-		msg.Flags = NLM_F_REQUEST | NLM_F_DUMP
-		msg.AddressFamily = r.AddressFamily
-		s.Tx <- msg
-		err := s.RxUntilDone(handler)
-		if err != nil {
-			return err
+		for tries := 1; true; tries++ {
+			msg := NewGenMessage()
+			msg.Type = r.MsgType
+			msg.Flags = NLM_F_REQUEST | NLM_F_DUMP
+			msg.AddressFamily = r.AddressFamily
+			s.Tx <- msg
+			err := s.RxUntilDone(handler)
+			if err == nil {
+				break
+			}
+			if tries >= 5 {
+				return err
+			}
 		}
 	}
 	return nil
