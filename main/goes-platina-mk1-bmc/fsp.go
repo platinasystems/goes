@@ -51,4 +51,9 @@ func fspInit() {
 		"psu2.p_in.units.W":        0,
 		"psu2.temperature.units.C": 0,
 	}
+
+	fsp.WrRegDv["psu1"] = "psu1"
+	fsp.WrRegDv["psu2"] = "psu2"
+	fsp.WrRegFn["psu1.example"] = "example"
+	fsp.WrRegFn["psu2.example"] = "example"
 }

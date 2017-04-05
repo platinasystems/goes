@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/rpc"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -40,6 +39,7 @@ var (
 
 	VpageByKey map[string]uint8
 
+	WrRegDv  = make(map[string]string)
 	WrRegFn  = make(map[string]string)
 	WrRegVal = make(map[string]string)
 )
@@ -89,9 +89,11 @@ func (cmd *cmd) Main(...string) error {
 	}
 
 	rpc.Register(&cmd.Info)
-	err = redis.Assign(redis.DefaultHash+":fan_tray.", Name, "Info")
-	if err != nil {
-		return err
+	for _, v := range WrRegDv {
+		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
+		if err != nil {
+			return err
+		}
 	}
 
 	holdoff := 3
@@ -313,8 +315,7 @@ func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
 	if !p {
 		return fmt.Errorf("cannot hset: %s", args.Field)
 	}
-	field := strings.TrimPrefix(args.Field, "fan_tray.")
-	err := i.set(field, string(args.Value), false)
+	err := i.set(args.Field, string(args.Value), false)
 	if err == nil {
 		*reply = 1
 		WrRegVal[args.Field] = string(args.Value)
@@ -323,10 +324,10 @@ func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
 }
 
 func (i *Info) set(key, value string, isReadyEvent bool) error {
-	i.pub.Print("fan_tray.", key, ": ", value)
+	i.pub.Print(key, ": ", value)
 	return nil
 }
 
 func (i *Info) publish(key string, value interface{}) {
-	i.pub.Print("fan_tray.", key, ": ", value)
+	i.pub.Print(key, ": ", value)
 }
