@@ -26,4 +26,8 @@ func w83795Init() {
 		"fan_tray.4.2.speed.units.rpm": 8,
 		"fan_tray.speed":               1,
 	}
+
+	w83795.WrRegDv["fan_tray"] = "fan_tray"
+	w83795.WrRegFn["fan_tray.example"] = "example"
+	w83795.WrRegFn["fan_tray.speed"] = "speed"
 }

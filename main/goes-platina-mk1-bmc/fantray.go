@@ -22,7 +22,6 @@ func fantrayInit() {
 		"fan_tray.4.status": 4,
 	}
 
-	fantray.WrRegDv["fan_tray"] = "fan_tray"
-	fantray.WrRegFn["fan_tray.example"] = "example"
-	fantray.WrRegFn["fan_tray.speed"] = "speed"
+	fantray.WrRegDv["fantray"] = "fantray"
+	fantray.WrRegFn["fantray.example"] = "example"
 }

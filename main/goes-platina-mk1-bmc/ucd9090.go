@@ -44,4 +44,7 @@ func ucd9090Init() {
 		"vmon.1v0.tha.units.V":  10,
 		"vmon.poweroff.events":  0,
 	}
+
+	ucd9090.WrRegDv["vmon"] = "vmon"
+	ucd9090.WrRegFn["vmon.example"] = "example"
 }

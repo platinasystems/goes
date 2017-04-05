@@ -7,6 +7,8 @@
 package w83795
 
 import (
+	"fmt"
+	"net/rpc"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +19,9 @@ import (
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/go/internal/redis/rpc/args"
+	"github.com/platinasystems/go/internal/redis/rpc/reply"
+	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const Name = "w83795"
@@ -38,11 +43,21 @@ var (
 	Vdev I2cDev
 
 	VpageByKey map[string]uint8
+
+	WrRegDv  = make(map[string]string)
+	WrRegFn  = make(map[string]string)
+	WrRegVal = make(map[string]string)
 )
 
 type cmd struct {
-	stop  chan struct{}
+	Info
+}
+
+type Info struct {
+	mutex sync.Mutex
+	rpc   *sockfile.RpcServer
 	pub   *publisher.Publisher
+	stop  chan struct{}
 	last  map[string]uint16
 	lasts map[string]string
 }
@@ -72,10 +87,18 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	//if err = cmd.update(); err != nil {
-	//	close(cmd.stop)
-	//	return err
-	//}
+	if cmd.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+		return err
+	}
+
+	rpc.Register(&cmd.Info)
+	for _, v := range WrRegDv {
+		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
+		if err != nil {
+			return err
+		}
+	}
+
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -101,6 +124,9 @@ func (cmd *cmd) update() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
+	}
+	if err := writeRegs(); err != nil {
+		return err
 	}
 
 	if first == 1 {
@@ -439,4 +465,39 @@ func (h *I2cDev) GetFanSpeed() (string, error) {
 		speed = "invalid " + strconv.Itoa(int(m))
 	}
 	return speed, nil
+}
+
+func writeRegs() error {
+	for k, v := range WrRegVal {
+		switch WrRegFn[k] {
+		case "speed":
+			if false {
+				log.Print("test", k, v)
+			}
+		}
+		delete(WrRegVal, k)
+	}
+	return nil
+}
+
+func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
+	_, p := WrRegFn[args.Field]
+	if !p {
+		return fmt.Errorf("cannot hset: %s", args.Field)
+	}
+	err := i.set(args.Field, string(args.Value), false)
+	if err == nil {
+		*reply = 1
+		WrRegVal[args.Field] = string(args.Value)
+	}
+	return err
+}
+
+func (i *Info) set(key, value string, isReadyEvent bool) error {
+	i.pub.Print(key, ": ", value)
+	return nil
+}
+
+func (i *Info) publish(key string, value interface{}) {
+	i.pub.Print(key, ": ", value)
 }
