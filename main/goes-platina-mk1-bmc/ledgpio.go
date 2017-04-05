@@ -30,4 +30,7 @@ func ledgpioInit() {
 	default:
 		ledgpio.Vdev.Addr = 0x75
 	}
+
+	ledgpio.WrRegDv["ledgpio"] = "ledgpio"
+	ledgpio.WrRegFn["ledgpio.example"] = "example"
 }
