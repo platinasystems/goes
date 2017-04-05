@@ -299,7 +299,9 @@ func writeRegs() error {
 	for k, v := range WrRegVal {
 		switch WrRegFn[k] {
 		case "speed":
-			//log.Print("test", k, v)
+			if false {
+				log.Print("test", k, v)
+			}
 		}
 		delete(WrRegVal, k)
 	}
