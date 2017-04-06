@@ -471,8 +471,8 @@ func writeRegs() error {
 	for k, v := range WrRegVal {
 		switch WrRegFn[k] {
 		case "speed":
-			if false {
-				log.Print("test", k, v)
+			if v == "auto" || v == "high" || v == "med" || v == "low" {
+				Vdev.SetFanSpeed(v)
 			}
 		}
 		delete(WrRegVal, k)
