@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/assert"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 const DefaultNumvfs = 16
@@ -44,6 +45,13 @@ func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
 		return nil, err
 	}
 	macByIfindex := make(MacByIfindex)
+	numvfsReq := uint(DefaultNumvfs)
+	if s, _ := redis.Hget(redis.DefaultHash, "sriov.numvfs"); len(s) > 0 {
+		_, err = fmt.Sscan(s, &numvfsReq)
+		if err != nil {
+			return nil, fmt.Errorf("sriov.numvfs: %v", err)
+		}
+	}
 pfloop:
 	for pfi, numvfsFn := range numvfsFns {
 		var numvfs, totalvfs uint
@@ -95,13 +103,12 @@ pfloop:
 		mac.Plus(uint(len(numvfsFns)-pfi) + (uint(pfi) * totalvfs))
 
 		virtfnPat := filepath.Join(filepath.Dir(numvfsFn), "virtfn*")
-		if numvfs == 0 {
-			numvfs = DefaultNumvfs
+		if numvfs < numvfsReq {
+			numvfs = numvfsReq
 			if n := uint(len(vfs[pfi])); n < numvfs {
 				numvfs = n
 			}
 			if err = FnPrintln(numvfsFn, numvfs); err != nil {
-				err = fmt.Errorf("set %s: %v", numvfsFn, err)
 				break pfloop
 			}
 			for tries := 0; true; tries++ {
