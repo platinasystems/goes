@@ -927,6 +927,12 @@ func writeRegs() error {
 			if v == "true" {
 				powerCycle()
 			}
+		case "admin.state":
+			if strings.Contains(k, "psu1") {
+				Vdev[1].SetAdminState(v)
+			} else if strings.Contains(k, "psu2") {
+				Vdev[0].SetAdminState(v)
+			}
 		}
 		delete(WrRegVal, k)
 	}
