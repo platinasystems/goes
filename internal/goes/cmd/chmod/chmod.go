@@ -27,7 +27,7 @@ func (cmd) Main(args ...string) error {
 		return fmt.Errorf("FILE: missing")
 	}
 
-	u64, err := strconv.ParseUint(args[0], 0, 32)
+	u64, err := strconv.ParseUint(args[0], 8, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
