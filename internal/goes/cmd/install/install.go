@@ -230,11 +230,7 @@ func install_default() error {
 	}
 	defer f.Close()
 	_, err = f.WriteString(`
-# goes start environment and arguments
-
-# NUMVFS: number of Virtual Function devices per Physical Function device
-
-#export NUMVFS=16
+# goes start arguments
 
 # ARGS: [-start URL] [-stop URL] [-port PORT] [DEV]...
 # URL:	goes command scripts that are sourced after starting or before stopping

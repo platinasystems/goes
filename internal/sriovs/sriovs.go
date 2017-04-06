@@ -97,13 +97,6 @@ pfloop:
 		virtfnPat := filepath.Join(filepath.Dir(numvfsFn), "virtfn*")
 		if numvfs == 0 {
 			numvfs = DefaultNumvfs
-			if s := os.Getenv("NUMVFS"); len(s) > 0 {
-				_, err = fmt.Sscan(s, &numvfs)
-				if err != nil {
-					err = fmt.Errorf("NUMVFS: %v", err)
-					break pfloop
-				}
-			}
 			if n := uint(len(vfs[pfi])); n < numvfs {
 				numvfs = n
 			}
