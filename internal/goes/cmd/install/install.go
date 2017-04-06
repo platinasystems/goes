@@ -232,11 +232,11 @@ func install_default() error {
 	_, err = f.WriteString(`
 # goes start arguments
 
-# ARGS: [-start URL] [-stop URL] [-port PORT] [DEV]...
+# ARGS: [-start URL] [-stop URL] [REDISD OPTIONS]...
 # URL:	goes command scripts that are sourced after starting or before stopping
 #	the embedded daemons; defaults: /etc/goes/{start,stop}
-# PORT:	redis listening port; default, 6379
-# DEV:	network device(s) that the redis server should listen to; default, lo
+#
+# See also, $(goes man redisd)
 
 #ARGS=""
 `[1:])

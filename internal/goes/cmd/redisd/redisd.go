@@ -20,6 +20,7 @@ import (
 
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/internal/cmdline"
+	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/group"
 	"github.com/platinasystems/go/internal/parms"
@@ -87,12 +88,14 @@ func New() *cmd { return &cmd{} }
 
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
 func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return "redisd [-port PORT] [DEVICE]..." }
+func (*cmd) Usage() string {
+	return "redisd [-port PORT] [-set FIELD=VALUE]... [DEVICE]..."
+}
 
 func (cmd *cmd) Main(args ...string) error {
 	once.Do(Init)
 
-	parm, args := parms.New(args, "-port")
+	parm, args := parms.New(args, "-port", "-set")
 	if s := parm["-port"]; len(s) > 0 {
 		_, err := fmt.Sscan(s, &Port)
 		if err != nil {
@@ -193,7 +196,7 @@ func (cmd *cmd) Main(args ...string) error {
 	}
 	go cmd.gopub()
 
-	err = cmd.pubinit()
+	err = cmd.pubinit(fields.New(parm["-set"])...)
 	if err != nil {
 		return err
 	}
@@ -291,7 +294,7 @@ func (*cmd) pubdist(cws []*grs.ChannelWriter, key string, fv []byte) {
 	}
 }
 
-func (cmd *cmd) pubinit() error {
+func (cmd *cmd) pubinit(fieldEqValues ...string) error {
 	pub, err := publisher.New()
 	if err != nil {
 		return err
@@ -310,7 +313,26 @@ func (cmd *cmd) pubinit() error {
 			pub.Printf("cmdline.%s: %s", k, cl[k])
 		}
 	}
+
 	Hook(pub)
+
+	for _, feqv := range fieldEqValues {
+		var field, value string
+		eq := strings.Index(feqv, "=")
+		if eq == 0 {
+			continue
+		}
+		if eq < 0 {
+			field = feqv
+		} else {
+			field = feqv[:eq]
+		}
+		if eq < len(feqv)-1 {
+			value = feqv[eq+1:]
+		}
+		pub.Print(field, ": ", value)
+	}
+
 	pub.Print("redis.ready: true")
 	return pub.Error()
 }
@@ -327,12 +349,17 @@ func (*cmd) Man() map[string]string {
 	redisd - a redis server
 
 SYNOPSIS
-	redisd [-port PORT] [DEV]...
+	redisd [-port PORT] [-set FIELD=VALUE]... [DEV]...
 
 DESCRIPTION
-	Run a redis server on the /run/goes/socks/redisd unix files socket and
-	on all of the given network devices and the given or default port of
-	6379.`,
+	Run a redis server on the /run/goes/socks/redisd unix socket file.
+
+OPTIONS
+	DEV...	list of listening network devices
+	-port PORT
+		network port, default: 6379
+	-set FIELD=VALUE
+		initialize the default hash with the given field values`,
 	}
 }
 
