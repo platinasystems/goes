@@ -309,26 +309,16 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 		return err
 	}
 
-	//if not all fan trays are installed or fan is failed, fan speed is fixed at high
-	/*for j := 1; j <= maxFanTrays; j++ {
+	//if not all fan trays are ok, only allow high setting
+	for j := 1; j <= maxFanTrays; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
-		log.Print("status: ", p)
-		//set fan speed to max and return 0 rpm if fan tray is not present or failed
-		if strings.Contains(p, "not installed") || strings.Contains(p, "warning") {
-			log.Print("SetFanSpeed fail mode")
-			r2.TempToFanMap1.set(h, 0x0)
-			r2.TempToFanMap2.set(h, 0x0)
-			r2.FanOutValue1.set(h, high)
-			r2.FanOutValue2.set(h, high)
-			closeMux(h)
-			err = DoI2cRpc()
-		        if err != nil {
-			        return err
-		        }
-			log.Print("notice: fan speed set to high due to a fan missing or a fan failure")
-			return
+		if p != "" && !strings.Contains(p, "ok") {
+			log.Print("warning: fan failure mode, speed fixed at high")
+			w = "high"
+			break
 		}
-	}*/
+	}
+
 	switch w {
 	case "auto":
 		r2 := getRegsBank2()

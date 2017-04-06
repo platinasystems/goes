@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
@@ -301,7 +300,7 @@ func (h *I2cDev) LedStatus() error {
 				}
 				log.Print("warning: fan tray ", j+1, " failure")
 				if !forceFanSpeed {
-					w83795.Vdev.SetFanSpeed("high")
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(p, "not installed") {
@@ -323,7 +322,7 @@ func (h *I2cDev) LedStatus() error {
 				}
 				log.Print("warning: fan tray ", j+1, " not installed")
 				if !forceFanSpeed {
-					w83795.Vdev.SetFanSpeed("high")
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(lastFanStatus[j], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
@@ -365,11 +364,9 @@ func (h *I2cDev) LedStatus() error {
 					return err
 				}
 				log.Print("notice: all fan trays up")
-				if w83795.Vdev.Addr != 0 {
-					fanspeed, _ := w83795.Vdev.GetFanSpeed()
-					if fanspeed != saveFanSpeed {
-						w83795.Vdev.SetFanSpeed(saveFanSpeed)
-					}
+				fanspeed, _ := redis.Hget(redis.DefaultHash, "fan_tray.speed")
+				if fanspeed != saveFanSpeed {
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", saveFanSpeed)
 				}
 				forceFanSpeed = false
 			}

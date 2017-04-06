@@ -161,7 +161,7 @@ var first int
 func (h *I2cDev) FanTrayLedInit() error {
 	r := getRegs()
 
-	deviceVer := 0
+	deviceVer = 0x1
 	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(s, &deviceVer)
 	if deviceVer == 0xff || deviceVer == 0x00 {
