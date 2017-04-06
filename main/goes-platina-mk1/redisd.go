@@ -9,6 +9,7 @@ import (
 
 	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/internal/goes/cmd/redisd"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
 func init() {
@@ -22,6 +23,9 @@ func init() {
 		)
 		redisd.Machine = "platina-mk1"
 		redisd.Devs = []string{"lo", "eth0"}
-		redisd.Hook = platina_eeprom.RedisdHook
+		redisd.Hook = func(pub *publisher.Publisher) {
+			pub.Print("sriov.numvfs: 16")
+			platina_eeprom.RedisdHook(pub)
+		}
 	}
 }
