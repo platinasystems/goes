@@ -149,14 +149,6 @@ pfloop:
 				break pfloop
 			}
 
-			var vfdev *net.Interface
-			vfdev, err = net.InterfaceByName(vfname)
-			if err != nil {
-				break pfloop
-			}
-			macByIfindex[vfdev.Index] = mac
-			mac.Plus(1)
-
 			var match []string
 			match, err = filepath.Glob(filepath.Join(virtfn,
 				"net/*"))
@@ -178,6 +170,14 @@ pfloop:
 					break pfloop
 				}
 			}
+
+			var vfdev *net.Interface
+			vfdev, err = net.InterfaceByName(vfname)
+			if err != nil {
+				break pfloop
+			}
+			macByIfindex[vfdev.Index] = mac
+			mac.Plus(1)
 
 			// bounce the vf to reload its mac from the pf
 			cmd = exec.Command("ip", "link", "set", vfname, "up")
