@@ -24,4 +24,5 @@ func fantrayInit() {
 
 	fantray.WrRegDv["fantray"] = "fantray"
 	fantray.WrRegFn["fantray.example"] = "example"
+	fantray.WrRegRng["fantray.example"] = []string{"true", "false"}
 }

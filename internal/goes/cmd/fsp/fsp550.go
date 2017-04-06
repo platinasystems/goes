@@ -55,6 +55,7 @@ var (
 	WrRegDv  = make(map[string]string)
 	WrRegFn  = make(map[string]string)
 	WrRegVal = make(map[string]string)
+	WrRegRng = make(map[string][]string)
 )
 
 type cmd struct {
@@ -944,12 +945,26 @@ func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
 	if !p {
 		return fmt.Errorf("cannot hset: %s", args.Field)
 	}
-	err := i.set(args.Field, string(args.Value), false)
-	if err == nil {
-		*reply = 1
-		WrRegVal[args.Field] = string(args.Value)
+	_, q := WrRegRng[args.Field]
+	if !q {
+		err := i.set(args.Field, string(args.Value), false)
+		if err == nil {
+			*reply = 1
+			WrRegVal[args.Field] = string(args.Value)
+		}
+		return err
 	}
-	return err
+	for _, v := range WrRegRng[args.Field] {
+		if v == string(args.Value) {
+			err := i.set(args.Field, string(args.Value), false)
+			if err == nil {
+				*reply = 1
+				WrRegVal[args.Field] = string(args.Value)
+			}
+			return err
+		}
+	}
+	return fmt.Errorf("Cannot hset.  Valid values are: %s", WrRegRng[args.Field])
 }
 
 func (i *Info) set(key, value string, isReadyEvent bool) error {

@@ -33,4 +33,5 @@ func ledgpioInit() {
 
 	ledgpio.WrRegDv["ledgpio"] = "ledgpio"
 	ledgpio.WrRegFn["ledgpio.example"] = "example"
+	ledgpio.WrRegRng["ledgpio.example"] = []string{"true", "false"}
 }

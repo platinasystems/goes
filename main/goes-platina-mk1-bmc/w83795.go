@@ -30,4 +30,5 @@ func w83795Init() {
 	w83795.WrRegDv["fan_tray"] = "fan_tray"
 	w83795.WrRegFn["fan_tray.example"] = "example"
 	w83795.WrRegFn["fan_tray.speed"] = "speed"
+	w83795.WrRegRng["w83795.example"] = []string{"true", "false"}
 }
