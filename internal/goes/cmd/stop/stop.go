@@ -37,7 +37,7 @@ func (*cmd) Usage() string  { return "stop [OPTION]..." }
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (c *cmd) Main(args ...string) error {
-	parm, args := parms.New(args, "-start", "-stop")
+	parm, args := parms.New(args, "-stop")
 	err := assert.Root()
 	if err != nil {
 		return err
