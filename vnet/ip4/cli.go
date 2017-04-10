@@ -78,7 +78,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			line := fmt.Sprintf("%s%d: ", initialSpace, int(r.adj)+ai)
 			ss := adjs[ai].String(&m.Main)
 
-			m.Main.ForeachAdjCounter(r.adj+ip.Adj(ai), func(tag string, v vnet.CombinedCounter) {
+			m.Main.ForeachAdjCounter(r.adj, ip.Adj(ai), func(tag string, v vnet.CombinedCounter) {
 				if v.Packets != 0 || detail {
 					ss = append(ss, fmt.Sprintf("%s%spackets %16d", initialSpace, tag, v.Packets))
 					ss = append(ss, fmt.Sprintf("%s%sbytes   %16d", initialSpace, tag, v.Bytes))
