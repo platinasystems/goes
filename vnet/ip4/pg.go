@@ -15,10 +15,7 @@ import (
 
 type pgStream struct {
 	pg.Stream
-	h []vnet.PacketHeader
 }
-
-func (s *pgStream) PacketHeaders() []vnet.PacketHeader { return s.h }
 
 type pgMain struct {
 	v           *vnet.Vnet
@@ -52,9 +49,40 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 	var s pgStream
 	h := defaultHeader
 	for !in.End() {
+		var min, max uint64
 		switch {
 		case in.Parse("%v", &h):
-			s.h = append(s.h, &h)
+		incLoop:
+			for {
+				switch {
+				case in.Parse("src %d-%d", &min, &max):
+					ai := &addressIncrement{
+						s:     &s,
+						base:  h.Src,
+						isSrc: true,
+						min:   min,
+						max:   max,
+						cur:   min,
+					}
+					s.DataHooks.Add(ai.Do)
+
+				case in.Parse("dst %d-%d", &min, &max):
+					ai := &addressIncrement{
+						s:     &s,
+						base:  h.Dst,
+						isSrc: false,
+						min:   min,
+						max:   max,
+						cur:   min,
+					}
+					s.DataHooks.Add(ai.Do)
+
+				default:
+					break incLoop
+				}
+			}
+
+			s.AddHeader(&h)
 			if t, ok := m.protocolMap[h.Protocol]; ok {
 				var sub_r pg.Streamer
 				sub_r, err = t.ParseStream(in)
@@ -62,7 +90,7 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 					err = fmt.Errorf("ip4 %s: %s `%s'", t.Name(), err, in)
 					return
 				}
-				s.h = append(s.h, sub_r.PacketHeaders()...)
+				s.AddStreamer(sub_r)
 			}
 		default:
 			err = parse.ErrInput
@@ -73,6 +101,33 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 		r = &s
 	}
 	return
+}
+
+type addressIncrement struct {
+	s     *pgStream
+	base  Address
+	cur   uint64
+	min   uint64
+	max   uint64
+	isSrc bool
+}
+
+func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
+	for i := range dst {
+		h := (*Header)(dst[i].DataOffset(dataOffset))
+		if ai.isSrc {
+			h.Src = ai.base
+			h.Src.Add(ai.cur)
+		} else {
+			h.Dst = ai.base
+			h.Dst.Add(ai.cur)
+		}
+		h.Checksum = h.ComputeChecksum()
+		ai.cur++
+		if ai.cur > ai.max {
+			ai.cur = ai.min
+		}
+	}
 }
 
 func (m *pgMain) pgInit(v *vnet.Vnet) {

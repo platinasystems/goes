@@ -143,7 +143,7 @@ func (n *node) free1(r0 *vnet.Ref, ti0 uint32) {
 	t0.free_refs = append(t0.free_refs, *r0)
 }
 
-func (n *node) free_buffers(refs vnet.RefVec, t *buffer_type) {
+func (n *node) free_buffers(s *Stream, refs vnet.RefVec, t *buffer_type) {
 	i, n_left := uint(0), refs.Len()
 
 	fl := t.free_refs.Len()
@@ -170,10 +170,10 @@ func (n *node) free_buffers(refs vnet.RefVec, t *buffer_type) {
 		n_left -= 4
 		if ti0 != ti || ti1 != ti || ti2 != ti || ti3 != ti {
 			fi -= 4
-			fi = n.slow_path(t, tf, fi, r0, b0, ti0)
-			fi = n.slow_path(t, tf, fi, r1, b1, ti1)
-			fi = n.slow_path(t, tf, fi, r2, b2, ti2)
-			fi = n.slow_path(t, tf, fi, r3, b3, ti3)
+			fi = n.slow_path(s, t, tf, fi, r0, b0, ti0)
+			fi = n.slow_path(s, t, tf, fi, r1, b1, ti1)
+			fi = n.slow_path(s, t, tf, fi, r2, b2, ti2)
+			fi = n.slow_path(s, t, tf, fi, r3, b3, ti3)
 			tf.ValidateLen(fi + n_left)
 		}
 	}
@@ -189,7 +189,7 @@ func (n *node) free_buffers(refs vnet.RefVec, t *buffer_type) {
 		n_left -= 1
 		if ti0 != ti {
 			fi -= 1
-			fi = n.slow_path(t, tf, fi, r0, b0, ti0)
+			fi = n.slow_path(s, t, tf, fi, r0, b0, ti0)
 			tf.ValidateLen(fi + n_left)
 		}
 	}
@@ -197,7 +197,7 @@ func (n *node) free_buffers(refs vnet.RefVec, t *buffer_type) {
 	t.free_refs = tf[:fi]
 }
 
-func (n *node) slow_path(t *buffer_type, tf []vnet.Ref, fiʹ uint, r0 *vnet.Ref, b0 *vnet.Buffer, ti0 uint32) (fi uint) {
+func (n *node) slow_path(s *Stream, t *buffer_type, tf []vnet.Ref, fiʹ uint, r0 *vnet.Ref, b0 *vnet.Buffer, ti0 uint32) (fi uint) {
 	fi = fiʹ
 	if ti0 == buffer_type_nil {
 		ti0 = t.index
@@ -219,7 +219,9 @@ func (n *node) slow_path(t *buffer_type, tf []vnet.Ref, fiʹ uint, r0 *vnet.Ref,
 
 	*f0 = *r0
 	f0.SetDataLen(uint(len(t0.data)))
-	t0.validate_ref(f0)
+	if s.validate() {
+		t0.validate_ref(f0)
+	}
 	return
 }
 
@@ -241,7 +243,7 @@ func (n *node) return_buffers() {
 	}
 }
 
-func (n *node) buffer_type_get_refs(dst []vnet.Ref, want, ti uint) {
+func (n *node) buffer_type_get_refs(s *Stream, dst []vnet.Ref, want, ti uint) {
 	t := &n.buffer_type_pool.elts[ti]
 	var got uint
 	for {
@@ -250,12 +252,12 @@ func (n *node) buffer_type_get_refs(dst []vnet.Ref, want, ti uint) {
 		}
 		var tmp [vnet.MaxVectorLen]vnet.Ref
 		n.pool.AllocRefs(tmp[:])
-		n.free_buffers(tmp[:], t)
+		n.free_buffers(s, tmp[:], t)
 	}
 
 	copy(dst, t.free_refs[got-want:got])
 
-	if elib.Debug {
+	if s.validate() {
 		for i := uint(0); i < want; i++ {
 			t.validate_ref(&dst[i])
 		}
@@ -264,6 +266,8 @@ func (n *node) buffer_type_get_refs(dst []vnet.Ref, want, ti uint) {
 	t.free_refs = t.free_refs[:got-want]
 	return
 }
+
+func (s *Stream) validate() bool { return elib.Debug && len(s.DataHooks.hooks) == 0 }
 
 type node_validate struct {
 	validate_data     []byte
@@ -282,7 +286,7 @@ func (n *node) generate_n_types(s *Stream, dst []vnet.Ref, n_packets, n_types ui
 		n_bytes = s.min_size * n_packets
 	}
 	for i := uint(0); i < n_types; i++ {
-		n.buffer_type_get_refs(this, n_packets, uint(s.buffer_types[i]))
+		n.buffer_type_get_refs(s, this, n_packets, uint(s.buffer_types[i]))
 		if i+1 >= n_types && !is_single_size {
 			for j := uint(0); j < n_packets; j++ {
 				last_size := s.cur_size - d
@@ -303,7 +307,12 @@ func (n *node) generate_n_types(s *Stream, dst []vnet.Ref, n_packets, n_types ui
 		this = tmp[i&3][:]
 	}
 
-	if elib.Debug {
+	for i := range s.DataHooks.hooks {
+		// FIXME derive 14 from packet headers
+		s.DataHooks.Get(i)(dst[:n_packets], 14)
+	}
+
+	if s.validate() {
 		save, s.cur_size = s.cur_size, save
 		for i := uint(0); i < n_packets; i++ {
 			n.validate_ref(&dst[i], s)

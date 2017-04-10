@@ -25,6 +25,7 @@ func (s *Stream) Del()                {}
 
 type stream_config struct {
 	random_size bool
+
 	// Min, max packet size.
 	min_size uint
 	max_size uint
@@ -62,12 +63,16 @@ type Stream struct {
 	buffer_types elib.Uint32Vec
 
 	stream_config
+
+	h         []vnet.PacketHeader
+	DataHooks DataHookVec
 }
 
 //go:generate gentemplate -d Package=pg -id stream -d PoolType=stream_pool -d Type=Streamer -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
 
-func (s *Stream) GetSize() uint { return s.cur_size }
-func (s *Stream) MaxSize() uint { return s.max_size }
+func (s *Stream) GetSize() uint                      { return s.cur_size }
+func (s *Stream) MaxSize() uint                      { return s.max_size }
+func (s *Stream) PacketHeaders() []vnet.PacketHeader { return s.h }
 
 func (s *Stream) next_size(cur, i uint) uint {
 	if x := cur + 1 + i; x <= s.max_size {
@@ -145,3 +150,16 @@ func (n *node) FormatAddress() (s string)                                       
 func (n *node) FormatRewrite(rw *vnet.Rewrite) (s string)                                        { return }
 func (n *node) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.PacketType, da []byte) {}
 func (n *node) ParseRewrite(rw *vnet.Rewrite, in *parse.Input)                                   {}
+
+type DataHook func(dst []vnet.Ref, dataOffset uint)
+
+//go:generate gentemplate -id DataHook -d Package=pg -d DepsType=DataHookVec -d Type=DataHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
+
+func (s *Stream) AddHeader(v vnet.PacketHeader) { s.h = append(s.h, v) }
+func (s *Stream) AddStreamer(r Streamer) {
+	t := r.get_stream()
+	s.h = append(s.h, t.h...)
+	for i := range t.DataHooks.hooks {
+		s.DataHooks.hooks = append(s.DataHooks.hooks, t.DataHooks.Get(i))
+	}
+}

@@ -14,10 +14,7 @@ import (
 
 type pgStream struct {
 	pg.Stream
-	h []vnet.PacketHeader
 }
-
-func (s *pgStream) PacketHeaders() []vnet.PacketHeader { return s.h }
 
 type pgMain struct {
 	v       *vnet.Vnet
@@ -43,6 +40,7 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 			v []VlanHeader
 			h Header
 		}
+		var min, max uint64
 		switch {
 		case in.Parse("%v", &h.h):
 			for {
@@ -51,6 +49,34 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 					h.v = append(h.v, v)
 				} else {
 					break
+				}
+			}
+
+		incLoop:
+			for {
+				switch {
+				case in.Parse("src %d-%d", &min, &max):
+					ai := &addressIncrement{
+						s:     &s,
+						base:  h.h.Src,
+						isSrc: true,
+						min:   min,
+						max:   max,
+					}
+					s.DataHooks.Add(ai.Do)
+
+				case in.Parse("dst %d-%d", &min, &max):
+					ai := &addressIncrement{
+						s:     &s,
+						base:  h.h.Dst,
+						isSrc: false,
+						min:   min,
+						max:   max,
+					}
+					s.DataHooks.Add(ai.Do)
+
+				default:
+					break incLoop
 				}
 			}
 
@@ -69,9 +95,9 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 				return
 			}
 
-			s.h = append(s.h, &h.h)
+			s.AddHeader(&h.h)
 			for i := range h.v {
-				s.h = append(s.h, &h.v[i])
+				s.AddHeader(&h.v[i])
 			}
 			if t, ok := m.typeMap[inner_type]; ok {
 				var sub_r pg.Streamer
@@ -80,8 +106,9 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 					err = fmt.Errorf("ethernet %s: %s `%s'", t.Name(), err, in)
 					return
 				}
-				s.h = append(s.h, sub_r.PacketHeaders()...)
+				s.AddStreamer(sub_r)
 			}
+
 		default:
 			err = parse.ErrInput
 			return
@@ -91,6 +118,32 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 		r = &s
 	}
 	return
+}
+
+type addressIncrement struct {
+	s     *pgStream
+	base  Address
+	cur   uint64
+	min   uint64
+	max   uint64
+	isSrc bool
+}
+
+func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
+	for i := range dst {
+		h := GetHeader(&dst[i])
+		if ai.isSrc {
+			h.Src = ai.base
+			h.Src.Add(ai.cur)
+		} else {
+			h.Dst = ai.base
+			h.Dst.Add(ai.cur)
+		}
+		ai.cur++
+		if ai.cur > ai.max {
+			ai.cur = ai.min
+		}
+	}
 }
 
 func (m *pgMain) pgInit(v *vnet.Vnet) {
