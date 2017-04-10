@@ -11,6 +11,7 @@ import (
 	"github.com/platinasystems/go/vnet/pg"
 
 	"fmt"
+	"math/rand"
 )
 
 type pgStream struct {
@@ -55,33 +56,22 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 		incLoop:
 			for {
 				switch {
-				case in.Parse("src %d-%d", &min, &max):
-					ai := &addressIncrement{
-						s:     &s,
-						base:  h.Src,
-						isSrc: true,
-						min:   min,
-						max:   max,
-						cur:   min,
-					}
-					s.DataHooks.Add(ai.Do)
-
-				case in.Parse("dst %d-%d", &min, &max):
-					ai := &addressIncrement{
-						s:     &s,
-						base:  h.Dst,
-						isSrc: false,
-						min:   min,
-						max:   max,
-						cur:   min,
-					}
-					s.DataHooks.Add(ai.Do)
-
+				case in.Parse("src %v-%v", &min, &max):
+					s.addInc(true, false, &h, min, max)
+				case in.Parse("src %v", &max):
+					s.addInc(true, false, &h, 0, max-1)
+				case in.Parse("dst %v-%v", &min, &max):
+					s.addInc(false, false, &h, min, max)
+				case in.Parse("dst %v", &max):
+					s.addInc(false, false, &h, 0, max-1)
+				case in.Parse("rand%*om src %v-%v", &min, &max):
+					s.addInc(true, true, &h, min, max)
+				case in.Parse("rand%*om dst %v-%v", &min, &max):
+					s.addInc(false, true, &h, min, max)
 				default:
 					break incLoop
 				}
 			}
-
 			s.AddHeader(&h)
 			if t, ok := m.protocolMap[h.Protocol]; ok {
 				var sub_r pg.Streamer
@@ -103,25 +93,49 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 	return
 }
 
+func (s *pgStream) addInc(isSrc, isRandom bool, h *Header, min, max uint64) {
+	if max < min {
+		max = min
+	}
+	ai := &addressIncrement{
+		s:        s,
+		min:      min,
+		max:      max,
+		cur:      min,
+		isSrc:    isSrc,
+		isRandom: isRandom,
+	}
+	if isSrc {
+		ai.base = h.Src
+	} else {
+		ai.base = h.Dst
+	}
+	s.DataHooks.Add(ai.Do)
+}
+
 type addressIncrement struct {
-	s     *pgStream
-	base  Address
-	cur   uint64
-	min   uint64
-	max   uint64
-	isSrc bool
+	s        *pgStream
+	base     Address
+	cur      uint64
+	min      uint64
+	max      uint64
+	isSrc    bool
+	isRandom bool
 }
 
 func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
 	for i := range dst {
 		h := (*Header)(dst[i].DataOffset(dataOffset))
-		if ai.isSrc {
-			h.Src = ai.base
-			h.Src.Add(ai.cur)
-		} else {
-			h.Dst = ai.base
-			h.Dst.Add(ai.cur)
+		v := ai.cur
+		if ai.isRandom {
+			v = uint64(rand.Intn(int(1 + ai.max - ai.min)))
 		}
+		a := &h.Dst
+		if ai.isSrc {
+			a = &h.Src
+		}
+		*a = ai.base
+		a.Add(v)
 		h.Checksum = h.ComputeChecksum()
 		ai.cur++
 		if ai.cur > ai.max {

@@ -55,8 +55,9 @@ type myNode struct {
 	vnet.InterfaceNode
 	ethernet.Interface
 	vnet.Package
-	pool   vnet.BufferPool
-	isUnix bool
+	pool           vnet.BufferPool
+	isUnix         bool
+	verbose_output bool
 	stream
 }
 
@@ -235,9 +236,12 @@ func (n *myNode) Init() (err error) {
 }
 
 func (n *myNode) Configure(in *parse.Input) {
-	if in.Parse("tuntap") {
+	switch {
+	case in.Parse("tuntap"):
 		n.isUnix = true
-	} else {
+	case in.Parse("verbose"):
+		n.verbose_output = true
+	default:
 		panic(parse.ErrInput)
 	}
 }
@@ -286,14 +290,22 @@ func (n *myNode) InterfaceInput(o *vnet.RefOut) {
 	}
 }
 
-func (n *myNode) InterfaceOutput(i *vnet.TxRefVecIn) {
+func (n *myNode) InterfaceOutput(in *vnet.TxRefVecIn) {
 	if false {
 		// Enable to test poller suspend/resume.
 		// Send my-node output to my-node (send to self).
 		time.Sleep(1 * time.Second)
 	}
-	n.CountError(tx_packets_dropped, i.NPackets())
-	n.Vnet.FreeTxRefIn(i)
+	if n.verbose_output {
+		// Enable to echo ethernet/ip4.
+		for i := range in.Refs {
+			eh := (*ethernet.Header)(in.Refs[i].Data())
+			ih := (*ip4.Header)(in.Refs[i].DataOffset(14))
+			fmt.Printf("%s %s\n", eh, ih)
+		}
+	}
+	n.CountError(tx_packets_dropped, in.NPackets())
+	n.Vnet.FreeTxRefIn(in)
 }
 
 func main() {
