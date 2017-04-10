@@ -194,7 +194,7 @@ func (heap *Heap) get(sizeArg uint, size Index) (id Index, offset uint) {
 	}
 
 	if size <= 0 {
-		panic("size")
+		panic(fmt.Errorf("heap get bad size: %d", size))
 	}
 
 	// Quickly allocate from free list of given size.
