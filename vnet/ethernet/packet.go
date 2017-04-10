@@ -75,20 +75,7 @@ func (h *Header) IsUnicast() bool {
 	return !h.Dst.IsBroadcast()
 }
 
-func (a *Address) Add(x uint64) {
-	var i int
-	i = AddressBytes - 1
-	for x != 0 && i > 0 {
-		ai := uint64(a[i])
-		y := ai + (x & 0xff)
-		a[i] = byte(ai)
-		x >>= 8
-		if y < ai {
-			x += 1
-		}
-		i--
-	}
-}
+func (a *Address) Add(x uint64) { vnet.ByteAdd(a[:], x) }
 
 func (a *Address) FromUint64(x vnet.Uint64) {
 	for i := 0; i < AddressBytes; i++ {

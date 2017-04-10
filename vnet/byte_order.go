@@ -20,3 +20,18 @@ func (x *Uint32) Set(v uint)      { *x = Uint32(swap32(uint32(v))) }
 func (x Uint64) ToHost() uint64   { return swap64(uint64(x)) }
 func (x Uint64) FromHost() Uint64 { return Uint64(swap64(uint64(x))) }
 func (x *Uint64) Set(v uint)      { *x = Uint64(swap64(uint64(v))) }
+
+func ByteAdd(a []byte, x uint64) {
+	i := len(a) - 1
+	for x != 0 && i >= 0 {
+		ai := uint64(a[i])
+		y := ai + (x & 0xff)
+		a[i] = byte(y)
+		x >>= 8
+		// Carry.
+		if y < ai {
+			x += 1
+		}
+		i--
+	}
+}

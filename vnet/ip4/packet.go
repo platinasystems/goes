@@ -64,6 +64,7 @@ func (a *Address) AsUint32() vnet.Uint32    { return *(*vnet.Uint32)(unsafe.Poin
 func (a *Address) FromUint32(x vnet.Uint32) { *(*vnet.Uint32)(unsafe.Pointer(&a[0])) = x }
 func (a *Address) IsEqual(b *Address) bool  { return a.AsUint32() == b.AsUint32() }
 func (a *Address) IsZero() bool             { return a.AsUint32() == 0 }
+func (a *Address) Add(x uint64)             { vnet.ByteAdd(a[:], x) }
 
 // Compare 2 addresses for sorting.
 func (a *Address) Diff(b *Address) (v int) {
