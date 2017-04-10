@@ -53,10 +53,11 @@ type Ref struct {
 func (r *RefHeader) offset() uint32         { return r.offsetAndFlags &^ 0xf }
 func (r *RefHeader) Buffer() unsafe.Pointer { return DmaGetPointer(uint(r.offset())) }
 func (r *RefHeader) GetBuffer() *Buffer     { return (*Buffer)(r.Buffer()) }
-func (r *RefHeader) Data() unsafe.Pointer {
-	return DmaGetPointer(uint(r.offset() + uint32(r.dataOffset)))
+func (r *RefHeader) DataOffset(o uint) unsafe.Pointer {
+	return DmaGetPointer(uint(r.offset() + uint32(r.dataOffset) + uint32(o)))
 }
-func (r *RefHeader) DataPhys() uintptr { return DmaPhysAddress(uintptr(r.Data())) }
+func (r *RefHeader) Data() unsafe.Pointer { return r.DataOffset(0) }
+func (r *RefHeader) DataPhys() uintptr    { return DmaPhysAddress(uintptr(r.Data())) }
 
 func (r *RefHeader) Flags() BufferFlag         { return BufferFlag(r.offsetAndFlags & 0xf) }
 func (r *RefHeader) NextValidFlag() BufferFlag { return BufferFlag(r.offsetAndFlags) & NextValid }
