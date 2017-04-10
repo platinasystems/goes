@@ -308,6 +308,11 @@ func (in *Input) parseInt(base, bitSize int, signed bool) (x uint64, ok bool) {
 		}
 		if d >= base {
 			in.Unread(size)
+			// Accept "0" as number 0.
+			if nDigits == 0 && base == 8 {
+				x, ok = 0, true
+				return
+			}
 			break
 		}
 		xʹ := uint64(base)*x + uint64(d)
