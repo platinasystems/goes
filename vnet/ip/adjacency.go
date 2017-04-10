@@ -179,6 +179,7 @@ type nextHopHashValue struct {
 type multipathMain struct {
 	cachedNextHopVec [2]nextHopVec
 
+	// Expressed as max allowable fraction of traffic sent the wrong way assuming perfectly random distribution.
 	multipathErrorTolerance float64
 	nextHopHash             elib.Hash
 	nextHopHashValues       []nextHopHashValue
@@ -294,6 +295,7 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 
 	// Save copies of all next hop weights to avoid being overwritten in loop below.
 	copy(t[n:], t[:n])
+	t_save := t[n:]
 
 	if m.multipathErrorTolerance == 0 {
 		m.multipathErrorTolerance = .01
@@ -303,27 +305,35 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 	// find one where traffic flows to within 1% of specified weights.
 	nAdj = uint(elib.Word(n).MaxPow2())
 	for {
-		error := float64(0)
 		w := float64(nAdj) / sumWeight
 		nLeft := nAdj
 
-		i := uint(0)
-		for ; i < n; i++ {
-			nf := w * float64(t[i].Weight)
+		for i := uint(0); i < n; i++ {
+			nf := w * float64(t_save[i].Weight)
 			n := uint(nf + .5) // round to nearest integer
 			if n > nLeft {
 				n = nLeft
 			}
 			nLeft -= n
-			error += math.Abs(nf - float64(n))
 			t[i].Weight = NextHopWeight(n)
 		}
 		// Add left over weight to largest weight next hop.
 		t[0].Weight += NextHopWeight(nLeft)
-
-		if error < m.multipathErrorTolerance*float64(nAdj) {
+		error := float64(0)
+		i_zero := n
+		for i := uint(0); i < n; i++ {
+			if t[i].Weight == 0 && i_zero == n {
+				i_zero = i
+			}
+			// perfect distribution of weight:
+			want := float64(t_save[i].Weight) / sumWeight
+			// approximate distribution with nAdj
+			have := float64(t[i].Weight) / float64(nAdj)
+			error += math.Abs(want - have)
+		}
+		if error < m.multipathErrorTolerance {
 			// Truncate any next hops with zero weight.
-			norm = t[:i]
+			norm = t[:i_zero]
 			break
 		}
 
