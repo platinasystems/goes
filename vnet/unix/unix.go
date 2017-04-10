@@ -8,12 +8,14 @@ import (
 	"github.com/platinasystems/go/vnet"
 )
 
-var MacByIfindex map[int][6]byte
+var packageIndex uint
+
+func GetMain(v *vnet.Vnet) *Main { return v.GetPackage(packageIndex).(*Main) }
 
 func Init(v *vnet.Vnet) {
 	m := &Main{}
 	m.v = v
 	m.tuntapMain.Init(v)
 	m.netlinkMain.Init(m)
-	v.AddPackage("tuntap", m)
+	packageIndex = v.AddPackage("tuntap", m)
 }

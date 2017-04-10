@@ -61,6 +61,17 @@ type Main struct {
 	netlinkMain
 	nodeMain
 	tuntapMain
+
+	// For external (e.g. non tuntap) interfaces.
+	siByIfIndex map[int]vnet.Si
+}
+
+func AddExternalInterface(v *vnet.Vnet, ifIndex int, si vnet.Si) {
+	m := GetMain(v)
+	if m.siByIfIndex == nil {
+		m.siByIfIndex = make(map[int]vnet.Si)
+	}
+	m.siByIfIndex[ifIndex] = si
 }
 
 type tuntapMain struct {

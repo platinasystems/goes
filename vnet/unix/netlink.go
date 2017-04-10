@@ -49,7 +49,7 @@ type netlinkMain struct {
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
-func (m *Main) getInterface(ifindex uint32) (intf *Interface) {
+func (m *Main) getTuntapInterface(ifindex uint32) (intf *Interface) {
 	intf = m.ifByIndex[int(ifindex)]
 	return
 }
@@ -99,7 +99,13 @@ func (i *dummyInterface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
 		m6.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
 	}
 }
-func (m *Main) knownInterface(i uint32) bool { return nil != m.getInterface(i) }
+func (m *Main) knownInterface(i uint32) (ok bool) {
+	ok = nil != m.getTuntapInterface(i)
+	if !ok {
+		_, ok = m.siByIfIndex[int(i)]
+	}
+	return
+}
 
 func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
 	ok = true
@@ -263,6 +269,20 @@ func (e *netlinkEvent) String() (s string) {
 	return
 }
 
+func (m *Main) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
+	intf := m.getTuntapInterface(ifIndex)
+	if intf != nil {
+		si = intf.si
+		ok = true
+	} else {
+		si, ok = m.siByIfIndex[int(ifIndex)]
+	}
+	if !ok {
+		si = vnet.SiNil
+	}
+	return
+}
+
 func (e *netlinkEvent) EventAction() {
 	var err error
 	vn := e.m.v
@@ -281,9 +301,8 @@ func (e *netlinkEvent) EventAction() {
 				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
 				di.isAdminUp = isUp
 				di.addDelDummyPuntPrefixes(e.m, !isUp)
-			} else {
-				intf := e.m.getInterface(v.Index)
-				err = intf.si.SetAdminUp(vn, isUp)
+			} else if si, ok := e.m.siForIfIndex(v.Index); ok {
+				err = si.SetAdminUp(vn, isUp)
 			}
 		case *netlink.IfAddrMessage:
 			switch v.Family {
@@ -347,16 +366,13 @@ func ip4Address(t netlink.Attr) (a ip4.Address) {
 	return
 }
 
-func ip4NextHop(t netlink.Attr, w ip.NextHopWeight, intf *Interface) (n ip4.NextHop) {
+func ip4NextHop(t netlink.Attr, w ip.NextHopWeight, si vnet.Si) (n ip4.NextHop) {
 	if t != nil {
 		b := t.(*netlink.Ip4Address)
 		for i := range b {
 			n.Address[i] = b[i]
 		}
-		n.Si = vnet.SiNil
-		if intf != nil {
-			n.Si = intf.si
-		}
+		n.Si = si
 		n.Weight = w
 	}
 	return
@@ -372,9 +388,10 @@ func ethernetAddress(t netlink.Attr) (a ethernet.Address) {
 	return
 }
 
-func (m *Main) ifAttr(t netlink.Attr) (intf *Interface) {
+func (m *Main) ifAttr(t netlink.Attr) (si vnet.Si) {
+	si = vnet.SiNil
 	if t != nil {
-		intf = m.getInterface(t.(netlink.Uint32Attr).Uint())
+		si, _ = m.siForIfIndex(t.(netlink.Uint32Attr).Uint())
 	}
 	return
 }
@@ -397,9 +414,8 @@ func (m *Main) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 			}
 			di.ip4Addrs[p.Address] = fi
 		}
-	} else {
-		intf := m.getInterface(v.Index)
-		err = m4.AddDelInterfaceAddress(intf.si, &p, isDel)
+	} else if si, ok := m.siForIfIndex(v.Index); ok {
+		err = m4.AddDelInterfaceAddress(si, &p, isDel)
 	}
 	return
 }
@@ -419,10 +435,10 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	case netlink.NUD_PERMANENT:
 		isStatic = true
 	}
-	intf := m.getInterface(v.Index)
-	nh := ip4NextHop(v.Attrs[netlink.NDA_DST], next_hop_weight, intf)
+	si, _ := m.siForIfIndex(v.Index)
+	nh := ip4NextHop(v.Attrs[netlink.NDA_DST], next_hop_weight, si)
 	nbr := ethernet.IpNeighbor{
-		Si:       intf.si,
+		Si:       si,
 		Ethernet: ethernetAddress(v.Attrs[netlink.NDA_LLADDR]),
 		Ip:       nh.Address.ToIp(),
 	}
@@ -481,9 +497,8 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 		return
 	}
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
-	intf := m.ifAttr(v.Attrs[netlink.RTA_OIF])
-
-	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, intf)
+	si := m.ifAttr(v.Attrs[netlink.RTA_OIF])
+	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, si)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
 	m4 := ip4.GetMain(m.v)
 	err = m4.AddDelRouteNextHop(&p, &nh, isDel)
