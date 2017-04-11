@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build debug
-
 package elib
 
 import (
@@ -55,7 +53,7 @@ type testSparse struct {
 	x       Sparse
 	objs    randSparseVec
 	toDense map[Index]Index
-	unique  []Bitmap
+	unique  []Word
 
 	profile string
 }
@@ -64,7 +62,7 @@ type randSparse struct {
 	sparse, dense Index
 }
 
-//go:generate gentemplate -d Package=elib -id randSparse -d VecType=randSparseVec -tags debug -d Type=randSparse vec.tmpl
+//go:generate gentemplate -d Package=elib -id randSparse -d VecType=randSparseVec -d Type=randSparse vec.tmpl
 
 func SparseTest() {
 	t := testSparse{
