@@ -330,7 +330,7 @@ type pending struct {
 type Out struct {
 	Len       viVec
 	nextNodes elib.Uint32Vec
-	isPending elib.BitmapVec
+	isPending elib.WordVec
 }
 
 func (f *Out) addNext(i, next_node_index uint) {
