@@ -214,6 +214,10 @@ func (n *Node) findNext(name string, create bool) (x uint, ok bool) {
 func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) (nextIndex uint, err error) {
 	n := nr.GetNode()
 
+	if len(n.name) == 0 {
+		panic(fmt.Errorf("add next to unregistered node: %s", nextName))
+	}
+
 	var (
 		xr Noder
 		xi inNoder
