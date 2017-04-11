@@ -25,30 +25,30 @@ func (p *dump_node_vec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *dump_node_vec) validate(new_len uint, zero *dump_node) *dump_node {
+func (p *dump_node_vec) validate(new_len uint, zero dump_node) *dump_node {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *dump_node_vec) validateSlowPath(zero *dump_node,
-	c, l, lʹ elib.Index) *dump_node {
+func (p *dump_node_vec) validateSlowPath(zero dump_node, c, l, lʹ elib.Index) *dump_node {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]dump_node, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *dump_node_vec) validateSlowPath(zero *dump_node,
 }
 
 func (p *dump_node_vec) Validate(i uint) *dump_node {
-	return p.validate(i+1, (*dump_node)(nil))
+	var zero dump_node
+	return p.validate(i+1, zero)
 }
 
 func (p *dump_node_vec) ValidateInit(i uint, zero dump_node) *dump_node {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *dump_node_vec) ValidateLen(l uint) (v *dump_node) {
 	if l > 0 {
-		v = p.validate(l, (*dump_node)(nil))
+		var zero dump_node
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *dump_node_vec) ValidateLenInit(l uint, zero dump_node) (v *dump_node) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

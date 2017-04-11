@@ -25,30 +25,30 @@ func (p *EventVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *EventVec) validate(new_len uint, zero *Event) *Event {
+func (p *EventVec) validate(new_len uint, zero Event) *Event {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *EventVec) validateSlowPath(zero *Event,
-	c, l, lʹ elib.Index) *Event {
+func (p *EventVec) validateSlowPath(zero Event, c, l, lʹ elib.Index) *Event {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]Event, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *EventVec) validateSlowPath(zero *Event,
 }
 
 func (p *EventVec) Validate(i uint) *Event {
-	return p.validate(i+1, (*Event)(nil))
+	var zero Event
+	return p.validate(i+1, zero)
 }
 
 func (p *EventVec) ValidateInit(i uint, zero Event) *Event {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *EventVec) ValidateLen(l uint) (v *Event) {
 	if l > 0 {
-		v = p.validate(l, (*Event)(nil))
+		var zero Event
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *EventVec) ValidateLenInit(l uint, zero Event) (v *Event) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

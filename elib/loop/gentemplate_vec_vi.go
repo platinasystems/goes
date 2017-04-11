@@ -25,30 +25,30 @@ func (p *viVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *viVec) validate(new_len uint, zero *Vi) *Vi {
+func (p *viVec) validate(new_len uint, zero Vi) *Vi {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *viVec) validateSlowPath(zero *Vi,
-	c, l, lʹ elib.Index) *Vi {
+func (p *viVec) validateSlowPath(zero Vi, c, l, lʹ elib.Index) *Vi {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]Vi, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *viVec) validateSlowPath(zero *Vi,
 }
 
 func (p *viVec) Validate(i uint) *Vi {
-	return p.validate(i+1, (*Vi)(nil))
+	var zero Vi
+	return p.validate(i+1, zero)
 }
 
 func (p *viVec) ValidateInit(i uint, zero Vi) *Vi {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *viVec) ValidateLen(l uint) (v *Vi) {
 	if l > 0 {
-		v = p.validate(l, (*Vi)(nil))
+		var zero Vi
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *viVec) ValidateLenInit(l uint, zero Vi) (v *Vi) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }
