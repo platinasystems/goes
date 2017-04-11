@@ -25,30 +25,30 @@ func (p *FibVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *FibVec) validate(new_len uint, zero **Fib) **Fib {
+func (p *FibVec) validate(new_len uint, zero *Fib) **Fib {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *FibVec) validateSlowPath(zero **Fib,
-	c, l, lʹ elib.Index) **Fib {
+func (p *FibVec) validateSlowPath(zero *Fib, c, l, lʹ elib.Index) **Fib {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]*Fib, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *FibVec) validateSlowPath(zero **Fib,
 }
 
 func (p *FibVec) Validate(i uint) **Fib {
-	return p.validate(i+1, (**Fib)(nil))
+	var zero *Fib
+	return p.validate(i+1, zero)
 }
 
 func (p *FibVec) ValidateInit(i uint, zero *Fib) **Fib {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *FibVec) ValidateLen(l uint) (v **Fib) {
 	if l > 0 {
-		v = p.validate(l, (**Fib)(nil))
+		var zero *Fib
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *FibVec) ValidateLenInit(l uint, zero *Fib) (v **Fib) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

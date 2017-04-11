@@ -25,30 +25,30 @@ func (p *interfaceVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *interfaceVec) validate(new_len uint, zero **Interface) **Interface {
+func (p *interfaceVec) validate(new_len uint, zero *Interface) **Interface {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *interfaceVec) validateSlowPath(zero **Interface,
-	c, l, lʹ elib.Index) **Interface {
+func (p *interfaceVec) validateSlowPath(zero *Interface, c, l, lʹ elib.Index) **Interface {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]*Interface, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *interfaceVec) validateSlowPath(zero **Interface,
 }
 
 func (p *interfaceVec) Validate(i uint) **Interface {
-	return p.validate(i+1, (**Interface)(nil))
+	var zero *Interface
+	return p.validate(i+1, zero)
 }
 
 func (p *interfaceVec) ValidateInit(i uint, zero *Interface) **Interface {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *interfaceVec) ValidateLen(l uint) (v **Interface) {
 	if l > 0 {
-		v = p.validate(l, (**Interface)(nil))
+		var zero *Interface
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *interfaceVec) ValidateLenInit(l uint, zero *Interface) (v **Interface) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

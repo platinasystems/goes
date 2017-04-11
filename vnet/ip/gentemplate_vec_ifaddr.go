@@ -25,30 +25,30 @@ func (p *IfAddrVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *IfAddrVec) validate(new_len uint, zero *IfAddr) *IfAddr {
+func (p *IfAddrVec) validate(new_len uint, zero IfAddr) *IfAddr {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *IfAddrVec) validateSlowPath(zero *IfAddr,
-	c, l, lʹ elib.Index) *IfAddr {
+func (p *IfAddrVec) validateSlowPath(zero IfAddr, c, l, lʹ elib.Index) *IfAddr {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]IfAddr, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *IfAddrVec) validateSlowPath(zero *IfAddr,
 }
 
 func (p *IfAddrVec) Validate(i uint) *IfAddr {
-	return p.validate(i+1, (*IfAddr)(nil))
+	var zero IfAddr
+	return p.validate(i+1, zero)
 }
 
 func (p *IfAddrVec) ValidateInit(i uint, zero IfAddr) *IfAddr {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *IfAddrVec) ValidateLen(l uint) (v *IfAddr) {
 	if l > 0 {
-		v = p.validate(l, (*IfAddr)(nil))
+		var zero IfAddr
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *IfAddrVec) ValidateLenInit(l uint, zero IfAddr) (v *IfAddr) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }
