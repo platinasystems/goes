@@ -21,30 +21,30 @@ func (p *BitmapVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *BitmapVec) validate(new_len uint, zero *Bitmap) *Bitmap {
+func (p *BitmapVec) validate(new_len uint, zero Bitmap) *Bitmap {
 	c := Index(cap(*p))
 	lʹ := Index(len(*p))
 	l := Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *BitmapVec) validateSlowPath(zero *Bitmap,
-	c, l, lʹ Index) *Bitmap {
+func (p *BitmapVec) validateSlowPath(zero Bitmap, c, l, lʹ Index) *Bitmap {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]Bitmap, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -55,23 +55,25 @@ func (p *BitmapVec) validateSlowPath(zero *Bitmap,
 }
 
 func (p *BitmapVec) Validate(i uint) *Bitmap {
-	return p.validate(i+1, (*Bitmap)(nil))
+	var zero Bitmap
+	return p.validate(i+1, zero)
 }
 
 func (p *BitmapVec) ValidateInit(i uint, zero Bitmap) *Bitmap {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *BitmapVec) ValidateLen(l uint) (v *Bitmap) {
 	if l > 0 {
-		v = p.validate(l, (*Bitmap)(nil))
+		var zero Bitmap
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *BitmapVec) ValidateLenInit(l uint, zero Bitmap) (v *Bitmap) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

@@ -21,30 +21,30 @@ func (p *Uint16Vec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *Uint16Vec) validate(new_len uint, zero *uint16) *uint16 {
+func (p *Uint16Vec) validate(new_len uint, zero uint16) *uint16 {
 	c := Index(cap(*p))
 	lʹ := Index(len(*p))
 	l := Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *Uint16Vec) validateSlowPath(zero *uint16,
-	c, l, lʹ Index) *uint16 {
+func (p *Uint16Vec) validateSlowPath(zero uint16, c, l, lʹ Index) *uint16 {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]uint16, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -55,23 +55,25 @@ func (p *Uint16Vec) validateSlowPath(zero *uint16,
 }
 
 func (p *Uint16Vec) Validate(i uint) *uint16 {
-	return p.validate(i+1, (*uint16)(nil))
+	var zero uint16
+	return p.validate(i+1, zero)
 }
 
 func (p *Uint16Vec) ValidateInit(i uint, zero uint16) *uint16 {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *Uint16Vec) ValidateLen(l uint) (v *uint16) {
 	if l > 0 {
-		v = p.validate(l, (*uint16)(nil))
+		var zero uint16
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *Uint16Vec) ValidateLenInit(l uint, zero uint16) (v *uint16) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

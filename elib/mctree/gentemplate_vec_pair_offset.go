@@ -25,30 +25,30 @@ func (p *pair_offset_vec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *pair_offset_vec) validate(new_len uint, zero *pair_offset) *pair_offset {
+func (p *pair_offset_vec) validate(new_len uint, zero pair_offset) *pair_offset {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *pair_offset_vec) validateSlowPath(zero *pair_offset,
-	c, l, lʹ elib.Index) *pair_offset {
+func (p *pair_offset_vec) validateSlowPath(zero pair_offset, c, l, lʹ elib.Index) *pair_offset {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]pair_offset, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *pair_offset_vec) validateSlowPath(zero *pair_offset,
 }
 
 func (p *pair_offset_vec) Validate(i uint) *pair_offset {
-	return p.validate(i+1, (*pair_offset)(nil))
+	var zero pair_offset
+	return p.validate(i+1, zero)
 }
 
 func (p *pair_offset_vec) ValidateInit(i uint, zero pair_offset) *pair_offset {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *pair_offset_vec) ValidateLen(l uint) (v *pair_offset) {
 	if l > 0 {
-		v = p.validate(l, (*pair_offset)(nil))
+		var zero pair_offset
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *pair_offset_vec) ValidateLenInit(l uint, zero pair_offset) (v *pair_offset) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

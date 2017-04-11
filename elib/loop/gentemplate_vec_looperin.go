@@ -25,30 +25,30 @@ func (p *looperInVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *looperInVec) validate(new_len uint, zero *LooperIn) *LooperIn {
+func (p *looperInVec) validate(new_len uint, zero LooperIn) *LooperIn {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *looperInVec) validateSlowPath(zero *LooperIn,
-	c, l, lʹ elib.Index) *LooperIn {
+func (p *looperInVec) validateSlowPath(zero LooperIn, c, l, lʹ elib.Index) *LooperIn {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]LooperIn, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *looperInVec) validateSlowPath(zero *LooperIn,
 }
 
 func (p *looperInVec) Validate(i uint) *LooperIn {
-	return p.validate(i+1, (*LooperIn)(nil))
+	var zero LooperIn
+	return p.validate(i+1, zero)
 }
 
 func (p *looperInVec) ValidateInit(i uint, zero LooperIn) *LooperIn {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *looperInVec) ValidateLen(l uint) (v *LooperIn) {
 	if l > 0 {
-		v = p.validate(l, (*LooperIn)(nil))
+		var zero LooperIn
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *looperInVec) ValidateLenInit(l uint, zero LooperIn) (v *LooperIn) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

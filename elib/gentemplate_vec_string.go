@@ -21,30 +21,30 @@ func (p *StringVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *StringVec) validate(new_len uint, zero *string) *string {
+func (p *StringVec) validate(new_len uint, zero string) *string {
 	c := Index(cap(*p))
 	lʹ := Index(len(*p))
 	l := Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *StringVec) validateSlowPath(zero *string,
-	c, l, lʹ Index) *string {
+func (p *StringVec) validateSlowPath(zero string, c, l, lʹ Index) *string {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]string, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -55,23 +55,25 @@ func (p *StringVec) validateSlowPath(zero *string,
 }
 
 func (p *StringVec) Validate(i uint) *string {
-	return p.validate(i+1, (*string)(nil))
+	var zero string
+	return p.validate(i+1, zero)
 }
 
 func (p *StringVec) ValidateInit(i uint, zero string) *string {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *StringVec) ValidateLen(l uint) (v *string) {
 	if l > 0 {
-		v = p.validate(l, (*string)(nil))
+		var zero string
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *StringVec) ValidateLenInit(l uint, zero string) (v *string) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }
