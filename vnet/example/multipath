@@ -1,0 +1,23 @@
+// create 3 rewrite adjacencies
+ip route add 0.0.0.3/32 rewrite eth-3-0 IP4: 1.2.3 -> 4.5.6
+ip route add 0.0.0.4/32 rewrite eth-4-0 IP4: 1.2.3 -> 4.5.6
+ip route add 0.0.0.5/32 rewrite eth-5-0 IP4: 1.2.3 -> 4.5.6
+
+// 1.1.1.1/32 has 3 paths
+ip route add 1.1.1.1/32 via eth-3-0 0.0.0.3
+ip route add 1.1.1.1/32 via eth-4-0 0.0.0.4
+ip route add 1.1.1.1/32 via eth-5-0 0.0.0.5
+
+// generate packets from random ip4 sources.
+pa {
+	ethernet {
+   	    IP4: 00:a0:c9:00:00:00 -> 0.0.0
+		UDP: 1.0.0.0 -> 1.1.1.1
+		random src 0-0xffffff
+	}
+
+	size 100
+	disable
+	// have fe1 switch packets
+	next fe1-cpu
+}

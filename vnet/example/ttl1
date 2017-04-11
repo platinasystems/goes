@@ -1,0 +1,13 @@
+ip route add 1.1.1.1/32 punt
+
+pa {
+	ethernet {
+   	    IP4: 00:a0:c9:00:00:00 -> 0.0.0
+		UDP: 1.0.0.0 -> 1.1.1.1 ttl 1
+	}
+
+	size 100
+	disable
+	// have fe1 switch packets
+	next fe1-cpu
+}
