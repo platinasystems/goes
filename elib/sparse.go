@@ -11,7 +11,7 @@ import (
 // Sparse arrays map sparse indices into dense indices.
 type Sparse struct {
 	// Bitmap of valid sparse indices.
-	valid BitmapVec
+	valid WordVec
 
 	// Count of number of dense indices with smaller indices.
 	// COUNT[I] is number of dense indices with sparse INDEX < bitmapBits*I.
