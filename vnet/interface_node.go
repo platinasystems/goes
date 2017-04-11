@@ -76,8 +76,6 @@ func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 	go n.ifOutputThread()
 }
 
-//go:generate gentemplate -d Package=vnet -id interfaceNodeThreadVec -d VecType=interfaceNodeThreadVec -d Type=*interfaceNodeThread github.com/platinasystems/go/elib/vec.tmpl
-
 func (n *interfaceNode) send(i *TxRefVecIn) {
 	n.cur_tx_refs += i.Len()
 	n.tx_chan <- i
