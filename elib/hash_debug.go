@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build debug
-
 package elib
 
 import (
@@ -31,7 +29,7 @@ type uiPair struct {
 
 func (p *uiPair) Equal(q *uiPair) bool { return p.key == q.key && p.value == q.value }
 
-//go:generate gentemplate -d Package=elib -id uiPair -d VecType=uiPairVec -d Type=uiPair -tags debug vec.tmpl
+//go:generate gentemplate -d Package=elib -id uiPair -d VecType=uiPairVec -d Type=uiPair vec.tmpl
 
 func (k *uiKey) HashKey(s *HashState)               { s.HashUint64(uint64(*k), 0, 0, 0) }
 func (k *uiKey) HashKeyEqual(h Hasher, i uint) bool { return *k == h.(*uiHash).pairs[i].key }

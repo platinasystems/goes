@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build debug
-
 package elib
 
 import (
@@ -185,7 +183,7 @@ type randHeapObj struct {
 	align  uint
 }
 
-//go:generate gentemplate -d Package=elib -id randHeapObj -d VecType=randHeapObjVec -tags debug -d Type=randHeapObj vec.tmpl
+//go:generate gentemplate -d Package=elib -id randHeapObj -d VecType=randHeapObjVec -d Type=randHeapObj vec.tmpl
 
 func (t *testHeap) validate(iter int) (err error) {
 	if t.validateEvery != 0 && iter%int(t.validateEvery) == 0 {
