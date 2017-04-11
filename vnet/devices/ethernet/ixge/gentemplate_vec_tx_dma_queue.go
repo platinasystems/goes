@@ -25,30 +25,30 @@ func (p *tx_dma_queue_vec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *tx_dma_queue_vec) validate(new_len uint, zero *tx_dma_queue) *tx_dma_queue {
+func (p *tx_dma_queue_vec) validate(new_len uint, zero tx_dma_queue) *tx_dma_queue {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *tx_dma_queue_vec) validateSlowPath(zero *tx_dma_queue,
-	c, l, lʹ elib.Index) *tx_dma_queue {
+func (p *tx_dma_queue_vec) validateSlowPath(zero tx_dma_queue, c, l, lʹ elib.Index) *tx_dma_queue {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]tx_dma_queue, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *tx_dma_queue_vec) validateSlowPath(zero *tx_dma_queue,
 }
 
 func (p *tx_dma_queue_vec) Validate(i uint) *tx_dma_queue {
-	return p.validate(i+1, (*tx_dma_queue)(nil))
+	var zero tx_dma_queue
+	return p.validate(i+1, zero)
 }
 
 func (p *tx_dma_queue_vec) ValidateInit(i uint, zero tx_dma_queue) *tx_dma_queue {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *tx_dma_queue_vec) ValidateLen(l uint) (v *tx_dma_queue) {
 	if l > 0 {
-		v = p.validate(l, (*tx_dma_queue)(nil))
+		var zero tx_dma_queue
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *tx_dma_queue_vec) ValidateLenInit(l uint, zero tx_dma_queue) (v *tx_dma_queue) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

@@ -25,30 +25,30 @@ func (p *multipathAdjacencyVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *multipathAdjacencyVec) validate(new_len uint, zero *multipathAdjacency) *multipathAdjacency {
+func (p *multipathAdjacencyVec) validate(new_len uint, zero multipathAdjacency) *multipathAdjacency {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *multipathAdjacencyVec) validateSlowPath(zero *multipathAdjacency,
-	c, l, lʹ elib.Index) *multipathAdjacency {
+func (p *multipathAdjacencyVec) validateSlowPath(zero multipathAdjacency, c, l, lʹ elib.Index) *multipathAdjacency {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]multipathAdjacency, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *multipathAdjacencyVec) validateSlowPath(zero *multipathAdjacency,
 }
 
 func (p *multipathAdjacencyVec) Validate(i uint) *multipathAdjacency {
-	return p.validate(i+1, (*multipathAdjacency)(nil))
+	var zero multipathAdjacency
+	return p.validate(i+1, zero)
 }
 
 func (p *multipathAdjacencyVec) ValidateInit(i uint, zero multipathAdjacency) *multipathAdjacency {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *multipathAdjacencyVec) ValidateLen(l uint) (v *multipathAdjacency) {
 	if l > 0 {
-		v = p.validate(l, (*multipathAdjacency)(nil))
+		var zero multipathAdjacency
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *multipathAdjacencyVec) ValidateLenInit(l uint, zero multipathAdjacency) (v *multipathAdjacency) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

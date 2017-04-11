@@ -25,30 +25,30 @@ func (p *CountersVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *CountersVec) validate(new_len uint, zero *Counters) *Counters {
+func (p *CountersVec) validate(new_len uint, zero Counters) *Counters {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *CountersVec) validateSlowPath(zero *Counters,
-	c, l, lʹ elib.Index) *Counters {
+func (p *CountersVec) validateSlowPath(zero Counters, c, l, lʹ elib.Index) *Counters {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]Counters, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *CountersVec) validateSlowPath(zero *Counters,
 }
 
 func (p *CountersVec) Validate(i uint) *Counters {
-	return p.validate(i+1, (*Counters)(nil))
+	var zero Counters
+	return p.validate(i+1, zero)
 }
 
 func (p *CountersVec) ValidateInit(i uint, zero Counters) *Counters {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *CountersVec) ValidateLen(l uint) (v *Counters) {
 	if l > 0 {
-		v = p.validate(l, (*Counters)(nil))
+		var zero Counters
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *CountersVec) ValidateLenInit(l uint, zero Counters) (v *Counters) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }

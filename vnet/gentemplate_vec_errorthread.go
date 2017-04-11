@@ -25,30 +25,30 @@ func (p *errorThreadVec) Resize(n uint) {
 	*p = (*p)[:l]
 }
 
-func (p *errorThreadVec) validate(new_len uint, zero **errorThread) **errorThread {
+func (p *errorThreadVec) validate(new_len uint, zero *errorThread) **errorThread {
 	c := elib.Index(cap(*p))
 	lʹ := elib.Index(len(*p))
 	l := elib.Index(new_len)
 	if l <= c {
 		// Need to reslice to larger length?
-		if l >= lʹ {
+		if l > lʹ {
 			*p = (*p)[:l]
+			for i := lʹ; i < l; i++ {
+				(*p)[i] = zero
+			}
 		}
 		return &(*p)[l-1]
 	}
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *errorThreadVec) validateSlowPath(zero **errorThread,
-	c, l, lʹ elib.Index) **errorThread {
+func (p *errorThreadVec) validateSlowPath(zero *errorThread, c, l, lʹ elib.Index) **errorThread {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]*errorThread, cNext, cNext)
 		copy(q, *p)
-		if zero != nil {
-			for i := c; i < cNext; i++ {
-				q[i] = *zero
-			}
+		for i := c; i < cNext; i++ {
+			q[i] = zero
 		}
 		*p = q[:l]
 	}
@@ -59,23 +59,25 @@ func (p *errorThreadVec) validateSlowPath(zero **errorThread,
 }
 
 func (p *errorThreadVec) Validate(i uint) **errorThread {
-	return p.validate(i+1, (**errorThread)(nil))
+	var zero *errorThread
+	return p.validate(i+1, zero)
 }
 
 func (p *errorThreadVec) ValidateInit(i uint, zero *errorThread) **errorThread {
-	return p.validate(i+1, &zero)
+	return p.validate(i+1, zero)
 }
 
 func (p *errorThreadVec) ValidateLen(l uint) (v **errorThread) {
 	if l > 0 {
-		v = p.validate(l, (**errorThread)(nil))
+		var zero *errorThread
+		v = p.validate(l, zero)
 	}
 	return
 }
 
 func (p *errorThreadVec) ValidateLenInit(l uint, zero *errorThread) (v **errorThread) {
 	if l > 0 {
-		v = p.validate(l, &zero)
+		v = p.validate(l, zero)
 	}
 	return
 }
