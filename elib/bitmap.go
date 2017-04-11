@@ -9,53 +9,32 @@ import (
 	"fmt"
 )
 
-// Number of bits per bitmap element
-const bitmapBits = WordBits
-
 // Bitmaps of <= 63 are stored as positive int64s.
 // Negative int64s are indices into pool of all known bitmaps
 type Bitmap Word
 
 //go:generate gentemplate -d Package=elib -id Bitmap -d VecType=BitmapVec -d Type=Bitmap vec.tmpl
-//go:generate gentemplate -d Package=elib -id Bitmaps -d VecType=BitmapsVec -d Type=[]Bitmap vec.tmpl
+//go:generate gentemplate -d Package=elib -id BitmapVec -d VecType=BitmapsVec -d Type=[]BitmapVec vec.tmpl
 
-func (b Bitmap) isPoolIndex() bool {
-	if b>>(WordBits-1) != 0 { // sign bit
-		return true
-	}
-	return false
-}
-
-func (b Bitmap) isInline() bool {
-	return !b.isPoolIndex()
-}
+func (b Bitmap) isPoolIndex() bool { return b>>(WordBits-1) != 0 }
+func (b Bitmap) isInline() bool    { return !b.isPoolIndex() }
 
 // bothMemory is true iff both arguments are direct non-memory bitmaps
-func bothInline(b, c Bitmap) bool {
-	return (b | c) >= 0
-}
-
-func firstSet(x Bitmap) Bitmap {
-	return Bitmap(FirstSet(Word(x)))
-}
-
-func minLog2(x Bitmap) uint {
-	return uint(MinLog2(Word(x)))
-}
+func bothInline(b, c Bitmap) bool { return (b | c).isInline() }
 
 // index gives word index and mask for given bit index
-func bitmapIndex(x uint) (i uint, m Bitmap) {
-	i = x / bitmapBits
-	m = Bitmap(1) << (x % bitmapBits)
+func bitmapIndex(x uint) (i uint, m Word) {
+	i = x / WordBits
+	m = 1 << (x % WordBits)
 	return
 }
 
-func bitmapGet(b []Bitmap, x uint) bool {
+func bitmapGet(b []Word, x uint) bool {
 	i, m := bitmapIndex(x)
 	return b[i]&m != 0
 }
 
-func bitmapSet(b []Bitmap, x uint) (old bool) {
+func bitmapSet(b []Word, x uint) (old bool) {
 	i, m := bitmapIndex(x)
 	v := b[i]
 	old = v&m != 0
@@ -63,7 +42,7 @@ func bitmapSet(b []Bitmap, x uint) (old bool) {
 	return
 }
 
-func bitmapUnset(b []Bitmap, x uint) (old bool) {
+func bitmapUnset(b []Word, x uint) (old bool) {
 	i, m := bitmapIndex(x)
 	v := b[i]
 	old = v&m != 0
@@ -71,12 +50,12 @@ func bitmapUnset(b []Bitmap, x uint) (old bool) {
 	return
 }
 
-func bitmapMake(nBits uint) []Bitmap {
+func bitmapMake(nBits uint) []Word {
 	n, _ := bitmapIndex(nBits)
-	return make([]Bitmap, n)
+	return make([]Word, n)
 }
 
-//go:generate gentemplate -d Package=elib -id Bitmap -d PoolType=BitmapPool -d Type=BitmapVec -d Data=bitmaps pool.tmpl
+//go:generate gentemplate -d Package=elib -id Bitmap -d PoolType=BitmapPool -d Type=WordVec -d Data=bitmaps pool.tmpl
 
 var Bitmaps = &BitmapPool{}
 
@@ -89,10 +68,10 @@ func (p *BitmapPool) new() uint {
 func (p *BitmapPool) toMem(b Bitmap) Bitmap {
 	bi := p.new()
 	if len(p.bitmaps[bi]) == 0 {
-		p.bitmaps[bi] = append(p.bitmaps[bi], b)
+		p.bitmaps[bi] = append(p.bitmaps[bi], Word(b))
 	} else {
 		p.bitmaps[bi] = p.bitmaps[bi][:1]
-		p.bitmaps[bi][0] = b
+		p.bitmaps[bi][0] = Word(b)
 	}
 	return ^Bitmap(bi)
 }
@@ -112,7 +91,7 @@ func (p *BitmapPool) Set2(b Bitmap, x uint) (r Bitmap, v bool) {
 
 	r = b
 	if b.isInline() {
-		if x < bitmapBits-1 {
+		if x < WordBits-1 {
 			m := Bitmap(1) << x
 			v = b&m != 0
 			r |= m
@@ -182,7 +161,7 @@ func (p *BitmapPool) Invert2(b Bitmap, x uint) (r Bitmap, v bool) {
 
 	r = b
 	if b.isInline() {
-		if x < bitmapBits-1 {
+		if x < WordBits-1 {
 			m := Bitmap(1) << x
 			v = b&m != 0
 			r ^= m
@@ -217,7 +196,7 @@ func (b Bitmap) Invert2(x uint) (Bitmap, bool) { return Bitmaps.Invert2(b, x) }
 func (p *BitmapPool) Orx(b Bitmap, x uint) (r Bitmap) {
 	r = b
 	if !r.isPoolIndex() {
-		if x < bitmapBits-1 {
+		if x < WordBits-1 {
 			r |= Bitmap(1) << x
 			return
 		}
@@ -238,11 +217,11 @@ func (p *BitmapPool) Or(b Bitmap, c Bitmap) (r Bitmap) {
 	}
 	r = p.inlineToMem(r)
 	bi := uint(^r)
-	var cs []Bitmap
+	var cs []Word
 	if c.isPoolIndex() {
 		cs = p.bitmaps[^c]
 	} else {
-		cs = []Bitmap{c}
+		cs = []Word{Word(c)}
 	}
 	p.bitmaps[bi].Validate(uint(len(cs) - 1))
 	for i := range cs {
@@ -267,12 +246,12 @@ func (p *BitmapPool) checkInline(b Bitmap) (r Bitmap) {
 	if l > 1 {
 		return
 	}
-	if l == 1 && !p.bitmaps[bi][0].isInline() {
+	if l == 1 && !Bitmap(p.bitmaps[bi][0]).isInline() {
 		return
 	}
 	r = 0
 	if l == 1 {
-		r = p.bitmaps[bi][0]
+		r = Bitmap(p.bitmaps[bi][0])
 	}
 	p.PutIndex(uint(bi))
 	return
@@ -286,11 +265,11 @@ func (p *BitmapPool) AndNot(b Bitmap, c Bitmap) (r Bitmap) {
 	}
 	r = p.inlineToMem(r)
 	bi := uint(^r)
-	var cs []Bitmap
+	var cs []Word
 	if c.isPoolIndex() {
 		cs = p.bitmaps[^c]
 	} else {
-		cs = []Bitmap{c}
+		cs = []Word{Word(c)}
 	}
 	p.bitmaps[bi].Validate(uint(len(cs) - 1))
 	l := 0
@@ -309,7 +288,7 @@ func (p *BitmapPool) AndNot(b Bitmap, c Bitmap) (r Bitmap) {
 func (p *BitmapPool) AndNotx(b Bitmap, x uint) (r Bitmap) {
 	r = b
 	if !r.isPoolIndex() {
-		if x < bitmapBits-1 {
+		if x < WordBits-1 {
 			r &= ^(Bitmap(1) << x)
 			return
 		}
@@ -370,18 +349,18 @@ func (b Bitmap) Free() Bitmap {
 }
 
 func (p *BitmapPool) ForeachSetBit(b Bitmap, fn func(uint)) {
-	var s []Bitmap
+	var s []Word
 	if !b.isPoolIndex() {
-		s = []Bitmap{b}
+		s = []Word{Word(b)}
 	} else {
 		s = p.bitmaps[^b]
 	}
 	for i := range s {
 		x := s[i]
 		for x != 0 {
-			f := firstSet(x)
-			l := minLog2(f)
-			fn(uint(i*bitmapBits) + l)
+			f := x.FirstSet()
+			l := f.MinLog2()
+			fn(uint(i*WordBits) + l)
 			x ^= f
 		}
 	}
@@ -392,28 +371,28 @@ func (b Bitmap) ForeachSetBit(fn func(uint)) { Bitmaps.ForeachSetBit(b, fn) }
 func (p *BitmapPool) Next(b Bitmap, px *uint) (ok bool) {
 	x := *px
 	i := uint(0)
-	m := ^Bitmap(0)
+	m := ^Word(0)
 	if x != ^uint(0) {
 		i, m = bitmapIndex(x)
 		m = ^(m | (m - 1))
 	}
-	var s []Bitmap
+	var s []Word
 	if !b.isPoolIndex() {
-		s = []Bitmap{b}
+		s = []Word{Word(b)}
 	} else {
 		s = p.bitmaps[^b]
 	}
 
 	m &= s[i]
 	if m != 0 {
-		*px = i*bitmapBits + minLog2(firstSet(m))
+		*px = i*WordBits + m.FirstSet().MinLog2()
 		ok = true
 		return
 	} else {
 		for i++; i < uint(len(s)); i++ {
 			m = s[i]
 			if m != 0 {
-				*px = i*bitmapBits + minLog2(firstSet(m))
+				*px = i*WordBits + m.FirstSet().MinLog2()
 				ok = true
 				return
 			}
@@ -446,9 +425,9 @@ func (b Bitmap) String() string {
 }
 
 func (p *BitmapPool) HexString(b Bitmap) string {
-	var x []Bitmap
+	var x []Word
 	if !b.isPoolIndex() {
-		x = []Bitmap{b}
+		x = []Word{Word(b)}
 	} else {
 		x = p.bitmaps[^b]
 	}
@@ -464,7 +443,7 @@ func (b Bitmap) HexString() string {
 	return Bitmaps.HexString(b)
 }
 
-func (bm BitmapVec) Get(x uint) (v bool) {
+func (bm WordVec) Get(x uint) (v bool) {
 	i, m := bitmapIndex(x)
 	if i < uint(len(bm)) {
 		v = bm[i]&m != 0
@@ -472,7 +451,7 @@ func (bm BitmapVec) Get(x uint) (v bool) {
 	return
 }
 
-func (bm BitmapVec) Set(x uint, v bool) (oldValue bool) {
+func (bm WordVec) Set(x uint, v bool) (oldValue bool) {
 	i, m := bitmapIndex(x)
 	b := bm[i]
 	oldValue = b&m != 0
@@ -481,7 +460,7 @@ func (bm BitmapVec) Set(x uint, v bool) (oldValue bool) {
 	return
 }
 
-func (bm BitmapVec) Unset(x uint) (v bool) {
+func (bm WordVec) Unset(x uint) (v bool) {
 	i, m := bitmapIndex(x)
 	b := bm[i]
 	v = b&m != 0
@@ -490,7 +469,87 @@ func (bm BitmapVec) Unset(x uint) (v bool) {
 	return
 }
 
-func (bm *BitmapVec) Alloc(nBits uint) {
+// Fetch bits I through I + N_BITS.
+func (bm *WordVec) GetMultiple(x, n_bits uint) (v Word) {
+	i0, i1 := x/WordBits, x%WordBits
+	l := bm.Len()
+	m := ^Word(0) >> (WordBits - n_bits)
+	b := *bm
+
+	// Check first word.
+	if i0 < l {
+		v = (b[i0] >> i1) & m
+	}
+
+	// Check for overlap into next word.
+	i0++
+	if i1+n_bits > WordBits && i0 < l {
+		r := WordBits - i1
+		n_bits -= r
+		v |= Word((b[i0] & (1<<n_bits - 1)) << r)
+	}
+	return
+}
+
+func (b Bitmap) GetMultiple(x, n_bits uint) (v Word) {
+	if b.isInline() {
+		v = (Word(b) >> x) & (1<<n_bits - 1)
+	} else {
+		v = Bitmaps.bitmaps[^b].GetMultiple(x, n_bits)
+	}
+	return
+}
+
+// Give bits I through I + N_BITS to new value; return old value.
+func (bm *WordVec) SetMultiple(x, n_bits uint, new_value Word) (old_value Word) {
+	i0, i1 := x/WordBits, x%WordBits
+	m := ^Word(0) >> (WordBits - n_bits)
+	v := new_value & m
+
+	bm.Validate((x + n_bits - 1) / WordBits)
+	l := bm.Len()
+	b := *bm
+
+	// Insert into first word.
+	t := b[i0]
+	old_value |= (t >> i1) & m
+	t &^= m << i1
+	t |= v << i1
+	b[i0] = t
+
+	// Insert into second word.
+	i0++
+	if i1+n_bits > WordBits && i0 < l {
+		r := WordBits - i1
+		v >>= r
+		m >>= r
+		n_bits -= r
+
+		u := b[i0]
+		old_value |= (u & m) << r
+		u &^= m
+		u |= v
+		b[i0] = u
+	}
+	return
+}
+
+func (b Bitmap) SetMultiple(x, n_bits uint, new_value Word) (r Bitmap, old_value Word) {
+	if b.isInline() {
+		if x+n_bits <= WordBits-1 {
+			m := Word(1)<<n_bits - 1
+			old_value = (Word(b) >> x) & m
+			r = Bitmap((Word(b) &^ (m << x)) | (new_value << x))
+			return
+		}
+		b = Bitmaps.toMem(b)
+	}
+	r = b
+	old_value = Bitmaps.bitmaps[^r].SetMultiple(x, n_bits, new_value)
+	return
+}
+
+func (bm *WordVec) Alloc(nBits uint) {
 	if nBits > 0 {
 		i, _ := bitmapIndex(nBits - 1)
 		bm.Validate(i)
