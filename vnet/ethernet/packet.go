@@ -35,9 +35,12 @@ const MaxVlan = 1 << 12
 // Packet type from ethernet header.
 type Type vnet.Uint16
 
-func (h *Header) GetType() Type     { return Type(vnet.Uint16(h.Type).ToHost()) }
-func (h *VlanHeader) GetType() Type { return Type(vnet.Uint16(h.Type).ToHost()) }
-func (t Type) FromHost() Type       { return Type(vnet.Uint16(t).FromHost()) }
+func (t Type) ToHost() Type   { return Type(vnet.Uint16(t).ToHost()) }
+func (t Type) FromHost() Type { return Type(vnet.Uint16(t).FromHost()) }
+
+func (h *Header) GetType() Type      { return h.Type.ToHost() }
+func (h *VlanHeader) GetType() Type  { return h.Type.ToHost() }
+func (h *Header) TypeIs(t Type) bool { return t.ToHost() == h.Type }
 
 func (h *Header) GetPayload() unsafe.Pointer {
 	return unsafe.Pointer(uintptr(unsafe.Pointer(h)) + unsafe.Sizeof(*h))
