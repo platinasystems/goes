@@ -138,19 +138,19 @@ func (m *Mux) do(e *epollEvent) {
 	}
 
 	if em&eventWrite != 0 {
-		err := m.files[fi].WriteReady()
-		if err != nil {
+		if err := m.files[fi].WriteReady(); err != nil {
 			m.logError(err)
 		}
 	}
 	if em&eventRead != 0 {
-		err := m.files[fi].ReadReady()
-		if err != nil {
+		if err := m.files[fi].ReadReady(); err != nil {
 			m.logError(err)
 		}
 	}
 	if em&eventError != 0 {
-		m.files[fi].ErrorReady()
+		if err := m.files[fi].ErrorReady(); err != nil {
+			m.logError(err)
+		}
 	}
 }
 

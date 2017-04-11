@@ -135,10 +135,13 @@ func (s *FileBuf) WriteReady() (err error) {
 	return
 }
 
-func (s *FileBuf) ErrorReady() error {
-	// FIXME
-	panic("error")
-	return nil
+func (s *FileBuf) ErrorReady() (err error) {
+	var v int
+	v, err = syscall.GetsockoptInt(s.Fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+	if err == nil && v != 0 {
+		err = syscall.Errno(v)
+	}
+	return
 }
 
 func (s *FileBuf) Close() (err error) {
