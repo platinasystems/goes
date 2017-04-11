@@ -218,7 +218,13 @@ func (s *socket) TxBuf() elib.ByteVec { return s.txBuffer }
 func (s *socket) TxLen() int          { return len(s.txBuffer) }
 
 func (s *socket) ErrorReady() (err error) {
-	panic(s)
+	var v int
+	v, err = syscall.GetsockoptInt(s.Fd, syscall.SOL_SOCKET,
+		syscall.SO_ERROR)
+	if err == nil && v != 0 {
+		err = syscall.Errno(v)
+	}
+	return
 }
 
 /* Return and bind to an unused port. */
