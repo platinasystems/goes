@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -35,176 +34,76 @@ func SubPort(u uint) Vf { return Vf((u & 0xf) << 16) }
 func Vlan(u uint) Vf    { return Vf(u & 0xffff) }
 
 func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
-	var mac Mac
 	err := assert.Root()
 	if err != nil {
 		return nil, err
 	}
-	numvfsFns, err := NumvfsFns()
-	if err != nil {
-		return nil, err
-	}
-	macByIfindex := make(MacByIfindex)
-	numvfsReq := uint(DefaultNumvfs)
+	numpfs := len(vfs)
+	numvfs := DefaultNumvfs
 	if s, _ := redis.Hget(redis.DefaultHash, "sriov.numvfs"); len(s) > 0 {
-		_, err = fmt.Sscan(s, &numvfsReq)
+		_, err = fmt.Sscan(s, &numvfs)
 		if err != nil {
 			return nil, fmt.Errorf("sriov.numvfs: %v", err)
 		}
 	}
-pfloop:
-	for pfi, numvfsFn := range numvfsFns {
-		var numvfs, totalvfs uint
+	pfs, totalvfs, err := pfinit(numpfs, numvfs)
+	if err != nil {
+		return nil, err
+	}
+	macByIfindex := make(MacByIfindex)
+	for pfi, pf := range pfs {
+		var mac Mac
 		var virtfns []string
-		if pfi > len(vfs) {
-			break pfloop
-		}
 
-		pfname := filepath.Base(filepath.Dir(filepath.Dir(numvfsFn)))
-		if !strings.HasPrefix(pfname, "pf") {
-			newname := fmt.Sprint("pf", pfi)
-			cmd := exec.Command("ip", "link", "set", pfname,
-				"name", newname)
-			if err = cmd.Run(); err != nil {
-				err = fmt.Errorf("%v: %v", cmd.Args, err)
-				break pfloop
-			}
-			numvfsFn = filepath.Join("/sys/class/net", newname,
-				"device/sriov_numvfs")
-			pfname = newname
-		}
+		copy(mac[:], pf.HardwareAddr)
+		mac.Plus(uint(len(pfs) - pfi + (pfi * totalvfs)))
 
-		if _, err = FnScan(numvfsFn, &numvfs); err != nil {
-			err = fmt.Errorf("%s: numvfs: %v", pfname, err)
-			break pfloop
-		}
-
-		totalvfsFn := filepath.Join(filepath.Dir(numvfsFn),
-			"sriov_totalvfs")
-		if _, err = FnScan(totalvfsFn, &totalvfs); err != nil {
-			err = fmt.Errorf("%s: totalvfs: %v", pfname, err)
-			break pfloop
-		}
-
-		var pfdev *net.Interface
-		pfdev, err = net.InterfaceByName(pfname)
+		virtfns, err = pfvirtfns(pf.Name, numvfs)
 		if err != nil {
-			break pfloop
+			return nil, err
 		}
-		if pfdev.Flags&net.FlagUp != net.FlagUp {
-			cmd := exec.Command("ip", "link", "set", pfname, "up")
-			if err = cmd.Run(); err != nil {
-				err = fmt.Errorf("%v: %v", cmd.Args, err)
-				break pfloop
-			}
-		}
-
-		copy(mac[:], pfdev.HardwareAddr)
-		mac.Plus(uint(len(numvfsFns)-pfi) + (uint(pfi) * totalvfs))
-
-		virtfnPat := filepath.Join(filepath.Dir(numvfsFn), "virtfn*")
-		if numvfs < numvfsReq {
-			numvfs = numvfsReq
-			if n := uint(len(vfs[pfi])); n < numvfs {
-				numvfs = n
-			}
-			if err = FnPrintln(numvfsFn, numvfs); err != nil {
-				break pfloop
-			}
-			for tries := 0; true; tries++ {
-				virtfns, err = filepath.Glob(virtfnPat)
-				if err == nil && uint(len(virtfns)) == numvfs {
-					break
-				}
-				if tries == 5 {
-					err = fmt.Errorf("%s: vf t/o", pfname)
-					break pfloop
-				}
-				time.Sleep(time.Second)
-			}
-		} else if virtfns, err = filepath.Glob(virtfnPat); err != nil {
-			break pfloop
-		}
-
 		for _, virtfn := range virtfns {
-			var vfi uint
-			base := filepath.Base(virtfn)
-			svfi := strings.TrimPrefix(base, "virtfn")
-			if _, err = fmt.Sscan(svfi, &vfi); err != nil {
-				break pfloop
+			vfi, err := getVfi(virtfn)
+			if err != nil {
+				return nil, err
 			}
-			if vfi >= uint(len(vfs[pfi])) {
+			if vfi >= len(vfs[pfi]) {
 				continue
 			}
-
 			vf := vfs[pfi][vfi]
-			vfname := fmt.Sprintf("eth-%d-%d", vf.Port()+porto,
+			err = ifset(pf.Name, "vf", vfi, "mac", mac, "vlan",
+				vf.Vlan())
+			if err != nil {
+				return nil, err
+			}
+			vfname, err := getVfname(virtfn)
+			if err != nil {
+				return nil, err
+			}
+			want := fmt.Sprintf("eth-%d-%d", vf.Port()+porto,
 				vf.SubPort())
-			cmd := exec.Command("ip", "link", "set", pfname,
-				"vf", fmt.Sprint(vfi),
-				"mac", mac.String(),
-				"vlan", fmt.Sprint(vf.Vlan()))
-			if err = cmd.Run(); err != nil {
-				err = fmt.Errorf("%v: %v", cmd.Args, err)
-				break pfloop
-			}
-
-			var match []string
-			match, err = filepath.Glob(filepath.Join(virtfn,
-				"net/*"))
-			if err != nil {
-				err = fmt.Errorf("glob %s/net*: %v", virtfn,
-					err)
-				break pfloop
-			}
-			if len(match) == 0 {
-				err = fmt.Errorf("%s has no virtfns", pfname)
-				break pfloop
-			}
-			if name := filepath.Base(match[0]); name != vfname {
-				cmd = exec.Command("ip", "link", "set", name,
-					"name", vfname)
-				if err = cmd.Run(); err != nil {
-					err = fmt.Errorf("%v: %v", cmd.Args,
-						err)
-					break pfloop
+			if vfname != want {
+				err = ifset(vfname, "name", want)
+				if err != nil {
+					return nil, err
 				}
+				vfname = want
 			}
-
-			var vfdev *net.Interface
-			vfdev, err = net.InterfaceByName(vfname)
+			vfdev, err := getVfdev(vfname)
 			if err != nil {
-				break pfloop
+				return nil, err
 			}
 			macByIfindex[vfdev.Index] = mac
 			mac.Plus(1)
-
-			// bounce the vf to reload its mac from the pf
-			cmd = exec.Command("ip", "link", "set", vfname, "up")
-			if err = cmd.Run(); err != nil {
-				err = fmt.Errorf("%v: %v", cmd.Args, err)
-				break pfloop
+			// bounce vf to reload its mac from the pf
+			if err = ifset(vfname, "up"); err != nil {
+				return nil, err
 			}
-			cmd = exec.Command("ip", "link", "set", vfname, "down")
-			if err = cmd.Run(); err != nil {
-				err = fmt.Errorf("%v: %v", cmd.Args, err)
-				break pfloop
+			if err = ifset(vfname, "down"); err != nil {
+				return nil, err
 			}
 		}
 	}
-
-	if false {
-		idxs := make([]int, 0, len(macByIfindex))
-		for idx := range macByIfindex {
-			idxs = append(idxs, idx)
-		}
-		sort.Ints(idxs)
-		for _, idx := range idxs {
-			fmt.Print("if[", idx, "].mac: ",
-				Mac(macByIfindex[idx]), "\n")
-		}
-	}
-
 	return macByIfindex, err
 }
 
@@ -229,19 +128,119 @@ func (mac Mac) String() string {
 		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
 }
 
-func FnPrintln(fn string, values ...interface{}) error {
-	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC, 0)
-	if err == nil {
-		defer f.Close()
-		_, err = fmt.Fprintln(f, values...)
+func pfinit(numpfs, numvfs int) (devs []net.Interface, total int, err error) {
+	all, err := net.Interfaces()
+	if err != nil {
+		return
 	}
-	return err
+	for _, dev := range all {
+		var cur int
+		fn := filepath.Join("/sys/class/net", dev.Name,
+			"device/sriov_numvfs")
+		f, terr := os.Open(fn)
+		if terr != nil {
+			continue
+		}
+		_, terr = fmt.Fscan(f, &cur)
+		f.Close()
+		if terr != nil {
+			continue
+		}
+		if dev.Flags&net.FlagUp != net.FlagUp {
+			if err = ifset(dev.Name, "up"); err != nil {
+				return
+			}
+		}
+		devs = append(devs, dev)
+		if cur < numvfs {
+			f, err = os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC, 0)
+			if err != nil {
+				return
+			}
+			_, err = fmt.Fprintln(f, numvfs)
+			f.Close()
+			if err != nil {
+				return
+			}
+		}
+	}
+	if len(devs) == 0 {
+		err = fmt.Errorf("no sriovs")
+	}
+	f, err := os.Open(filepath.Join("/sys/class/net", devs[0].Name,
+		"device/sriov_totalvfs"))
+	if err != nil {
+		return
+	}
+	_, err = fmt.Fscan(f, &total)
+	f.Close()
+	return
 }
 
-func FnScan(fn string, a ...interface{}) (n int, err error) {
-	b, err := ioutil.ReadFile(fn)
-	if err == nil {
-		n, err = fmt.Sscan(string(b), a...)
+func pfvirtfns(pfname string, numvfs int) (virtfns []string, err error) {
+	pat := filepath.Join("/sys/class/net", pfname, "device/virtfn*")
+	for tries := 0; true; tries++ {
+		virtfns, err = filepath.Glob(pat)
+		if err == nil && len(virtfns) >= numvfs {
+			break
+		}
+		if tries == 5 {
+			err = fmt.Errorf("%s: vf t/o", pfname)
+			break
+		}
+		time.Sleep(time.Second)
 	}
 	return
+}
+
+func getVfi(virtfn string) (int, error) {
+	var vfi int
+	base := filepath.Base(virtfn)
+	s := strings.TrimPrefix(base, "virtfn")
+	_, err := fmt.Sscan(s, &vfi)
+	return vfi, err
+}
+
+func getVfname(virtfn string) (string, error) {
+	dn := filepath.Join(virtfn, "net")
+	for tries := 0; true; tries++ {
+		dir, err := ioutil.ReadDir(dn)
+		if err == nil {
+			if len(dir) == 0 {
+				return "", fmt.Errorf("%s: empty", dn)
+			}
+			return dir[0].Name(), nil
+		}
+		if tries == 5 {
+			return "", fmt.Errorf("%s: vf t/o", dn)
+		}
+		time.Sleep(time.Second)
+	}
+	panic("oops")
+}
+
+func getVfdev(vfname string) (*net.Interface, error) {
+	for tries := 0; true; tries++ {
+		vfdev, err := net.InterfaceByName(vfname)
+		if err == nil {
+			return vfdev, nil
+		}
+		if tries == 5 {
+			return nil, fmt.Errorf("%s: t/o", vfname)
+		}
+		time.Sleep(time.Second)
+	}
+	panic("oops")
+}
+
+func ifset(name string, args ...interface{}) error {
+	cmd := exec.Command("ip", "link", "set", name)
+	for _, arg := range args {
+		cmd.Args = append(cmd.Args, fmt.Sprint(arg))
+	}
+	err := cmd.Run()
+	if err != nil {
+		err = fmt.Errorf("%v: %v", cmd.Args, err)
+	}
+	return err
 }
