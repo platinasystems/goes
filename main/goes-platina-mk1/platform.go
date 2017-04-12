@@ -119,6 +119,7 @@ func (p *platform) boardPortInit(s fe1.Switch) (err error) {
 			SubPortIndex:    i,
 			IsManagement:    true,
 			SpeedBitsPerSec: 10e9,
+			InitAutoneg:     true,
 			LaneMask:        1 << (2 * uint(i)),
 			PhyInterface:    fe1.PhyInterfaceKR,
 		})
