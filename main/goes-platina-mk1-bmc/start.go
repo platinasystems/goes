@@ -15,9 +15,9 @@ import (
 )
 
 func init() {
-	var deviceVer byte
-
 	start.ConfGpioHook = func() error {
+		var deviceVer byte
+
 		gpio.Init()
 		pin, found := gpio.Pins["QSPI_MUX_SEL"]
 		if found {
