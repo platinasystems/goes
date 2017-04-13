@@ -81,7 +81,7 @@ func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
 				return nil, err
 			}
 			want := fmt.Sprintf("eth-%d-%d", vf.Port()+porto,
-				vf.SubPort())
+				vf.SubPort()+porto)
 			if vfname != want {
 				err = ifset(vfname, "name", want)
 				if err != nil {
