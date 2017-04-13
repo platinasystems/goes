@@ -24,7 +24,7 @@ func init() {
 		fns, err := sriovs.NumvfsFns()
 		have_numvfs := err == nil && len(fns) > 0
 
-		vnetd.UnixInterfacesOnly = true
+		vnetd.UnixInterfacesOnly = !have_numvfs
 		vnetd.GdbWait = gdbwait
 
 		err = firmware.Extract(prog.Name())
