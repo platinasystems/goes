@@ -35,9 +35,11 @@ func (cmd) Main(args ...string) error {
 			aa++
 		}
 	}
+	l := len(args) - aa
 	a0 := 0 + aa
 	a1 := 1 + aa
 	a2 := 2 + aa
+	a3 := 3 + aa
 	switch args[a1] {
 	case "b":
 		filetype = syscall.S_IFBLK
@@ -51,10 +53,22 @@ func (cmd) Main(args ...string) error {
 		filetype = syscall.S_IFREG
 	}
 	filetype |= uint32(os.FileMode(flagValue(args, "m")))
-	n, err := strconv.Atoi(args[a2])
-	if err != nil {
-		return fmt.Errorf("%v", err)
+	nmaj := 0
+	nmin := 0
+	var err error
+	if l > 2 {
+		nmaj, err = strconv.Atoi(args[a2])
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
 	}
+	if l > 3 {
+		nmin, err = strconv.Atoi(args[a3])
+		if err != nil {
+			return fmt.Errorf("%v", err)
+		}
+	}
+	n := (nmaj * 256) + nmin
 	err = syscall.Mknod(args[a0], filetype, n)
 	if err != nil {
 		return fmt.Errorf("%v", err)
