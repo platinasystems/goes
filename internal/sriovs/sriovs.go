@@ -21,7 +21,6 @@ import (
 
 const DefaultNumvfs = 16
 
-type MacByIfindex map[int][6]byte
 type Mac [6]byte
 type Vf uint
 
@@ -33,24 +32,23 @@ func Port(u uint) Vf    { return Vf(u << 20) }
 func SubPort(u uint) Vf { return Vf((u & 0xf) << 16) }
 func Vlan(u uint) Vf    { return Vf(u & 0xffff) }
 
-func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
+func Mksriovs(porto uint, vfs ...[]Vf) error {
 	err := assert.Root()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	numpfs := len(vfs)
 	numvfs := DefaultNumvfs
 	if s, _ := redis.Hget(redis.DefaultHash, "sriov.numvfs"); len(s) > 0 {
 		_, err = fmt.Sscan(s, &numvfs)
 		if err != nil {
-			return nil, fmt.Errorf("sriov.numvfs: %v", err)
+			return fmt.Errorf("sriov.numvfs: %v", err)
 		}
 	}
 	pfs, totalvfs, err := pfinit(numpfs, numvfs)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	macByIfindex := make(MacByIfindex)
 	for pfi, pf := range pfs {
 		var mac Mac
 		var virtfns []string
@@ -60,12 +58,12 @@ func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
 
 		virtfns, err = pfvirtfns(pf.Name, numvfs)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, virtfn := range virtfns {
 			vfi, err := getVfi(virtfn)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if vfi >= len(vfs[pfi]) {
 				continue
@@ -74,41 +72,32 @@ func Mksriovs(porto uint, vfs ...[]Vf) (MacByIfindex, error) {
 			err = ifset(pf.Name, "vf", vfi, "mac", mac, "vlan",
 				vf.Vlan())
 			if err != nil {
-				return nil, err
+				return err
 			}
+			mac.Plus(1)
 			vfname, err := getVfname(virtfn)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			want := fmt.Sprintf("eth-%d-%d", vf.Port()+porto,
 				vf.SubPort()+porto)
 			if vfname != want {
 				err = ifset(vfname, "name", want)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				vfname = want
 			}
-			vfdev, err := getVfdev(vfname)
-			if err != nil {
-				return nil, err
-			}
-			macByIfindex[vfdev.Index] = mac
-			mac.Plus(1)
 			// bounce vf to reload its mac from the pf
 			if err = ifset(vfname, "up"); err != nil {
-				return nil, err
+				return err
 			}
 			if err = ifset(vfname, "down"); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
-	return macByIfindex, err
-}
-
-func (macs MacByIfindex) Cast() map[int][6]byte {
-	return map[int][6]byte(macs)
+	return err
 }
 
 func (mac *Mac) Plus(u uint) {

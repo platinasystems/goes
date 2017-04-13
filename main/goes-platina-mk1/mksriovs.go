@@ -137,10 +137,10 @@ var (
 	eth_31_3 = Vf(Port(31) | SubPort(3) | Vlan(125))
 )
 
-func mksriovs() (MacByIfindex, error) {
+func mksriovs() error {
 	var porto uint
 	if ver, err := deviceVersion(); err != nil {
-		return nil, err
+		return err
 	} else if ver > 0 {
 		porto = 1
 	}
