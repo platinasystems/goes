@@ -15,6 +15,8 @@ import (
 )
 
 func init() {
+	var deviceVer byte
+
 	start.ConfGpioHook = func() error {
 		gpio.Init()
 		pin, found := gpio.Pins["QSPI_MUX_SEL"]
@@ -49,6 +51,15 @@ func init() {
 		}
 		redis.Hwait(redis.DefaultHash, "redis.ready", "true",
 			10*time.Second)
+
+		ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+		_, _ = fmt.Sscan(ss, &deviceVer)
+		if deviceVer == 0x0 || deviceVer == 0xff {
+			pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
+			if found {
+				pin.SetValue(false)
+			}
+		}
 		return nil
 	}
 }
