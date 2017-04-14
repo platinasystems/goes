@@ -24,6 +24,11 @@ const DefaultNumvfs = 16
 type Mac [6]byte
 type Vf uint
 
+type pf struct {
+	net.Interface
+	numvfs int
+}
+
 func (vf Vf) Port() uint    { return uint((vf &^ (Port(1) - 1)) >> 20) }
 func (vf Vf) SubPort() uint { return uint((vf & 0xf0000) >> 16) }
 func (vf Vf) Vlan() uint    { return uint(vf & 0xffff) }
@@ -33,6 +38,7 @@ func SubPort(u uint) Vf { return Vf((u & 0xf) << 16) }
 func Vlan(u uint) Vf    { return Vf(u & 0xffff) }
 
 func Mksriovs(porto uint, vfs ...[]Vf) error {
+	var totalvfs int
 	err := assert.Root()
 	if err != nil {
 		return err
@@ -45,13 +51,40 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 			return fmt.Errorf("sriov.numvfs: %v", err)
 		}
 	}
-	pfs, totalvfs, err := pfinit(numpfs, numvfs)
+	pfs, err := getPfs(numpfs)
 	if err != nil {
 		return err
+	}
+	fn := filepath.Join("/sys/class/net", pfs[0].Interface.Name,
+		"device/sriov_totalvfs")
+	f, err := os.Open(fn)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fscan(f, &totalvfs)
+	f.Close()
+	if err != nil {
+		return fmt.Errorf("%s: %v", fn, err)
 	}
 	for pfi, pf := range pfs {
 		var mac Mac
 		var virtfns []string
+
+		if pf.numvfs == numvfs {
+			// assume pf and its vfs are set
+			continue
+		}
+		fn = filepath.Join("/sys/class/net", pf.Name,
+			"device/sriov_numvfs")
+		f, err = os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC, 0)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(f, numvfs)
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("%s: %v", fn, err)
+		}
 
 		copy(mac[:], pf.HardwareAddr)
 		mac.Plus(uint(len(pfs) - pfi + (pfi * totalvfs)))
@@ -117,20 +150,20 @@ func (mac Mac) String() string {
 		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
 }
 
-func pfinit(numpfs, numvfs int) (devs []net.Interface, total int, err error) {
+func getPfs(numpfs int) (pfs []pf, err error) {
 	all, err := net.Interfaces()
 	if err != nil {
 		return
 	}
 	for _, dev := range all {
-		var cur int
+		var numvfs int
 		fn := filepath.Join("/sys/class/net", dev.Name,
 			"device/sriov_numvfs")
 		f, terr := os.Open(fn)
 		if terr != nil {
 			continue
 		}
-		_, terr = fmt.Fscan(f, &cur)
+		_, terr = fmt.Fscan(f, &numvfs)
 		f.Close()
 		if terr != nil {
 			continue
@@ -140,29 +173,14 @@ func pfinit(numpfs, numvfs int) (devs []net.Interface, total int, err error) {
 				return
 			}
 		}
-		devs = append(devs, dev)
-		if cur < numvfs {
-			f, err = os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC, 0)
-			if err != nil {
-				return
-			}
-			_, err = fmt.Fprintln(f, numvfs)
-			f.Close()
-			if err != nil {
-				return
-			}
+		pfs = append(pfs, pf{dev, numvfs})
+		if len(pfs) == numpfs {
+			return
 		}
 	}
-	if len(devs) == 0 {
-		err = fmt.Errorf("no sriovs")
+	if n := len(pfs); n != numpfs {
+		err = fmt.Errorf("insufficient pfs: %d vs. %d", n, numpfs)
 	}
-	f, err := os.Open(filepath.Join("/sys/class/net", devs[0].Name,
-		"device/sriov_totalvfs"))
-	if err != nil {
-		return
-	}
-	_, err = fmt.Fscan(f, &total)
-	f.Close()
 	return
 }
 
