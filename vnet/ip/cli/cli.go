@@ -120,6 +120,22 @@ loop:
 	return
 }
 
+func (m *Main) ip_interface(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	var (
+		si vnet.Si
+		i  int
+	)
+	v := m.Vnet
+	m4 := ip4.GetMain(m.Vnet)
+	switch {
+	case in.Parse("fib %v %d", &si, v, &i):
+		m4.SetFibIndexForSi(si, ip.FibIndex(i))
+	default:
+		err = cli.ParseError
+	}
+	return
+}
+
 func (m *Main) Init() (err error) {
 	v := m.Vnet
 
@@ -128,6 +144,11 @@ func (m *Main) Init() (err error) {
 			Name:      "ip route",
 			ShortHelp: "add/delete ip4/ip6 routes",
 			Action:    m.ip_route,
+		},
+		cli.Command{
+			Name:      "set ip interface",
+			ShortHelp: "ip interface commands",
+			Action:    m.ip_interface,
 		},
 	}
 	for i := range cmds {
