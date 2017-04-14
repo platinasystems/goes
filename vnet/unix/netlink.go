@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
@@ -46,6 +47,8 @@ type netlinkMain struct {
 		ignored, handled msg_counts
 	}
 	dummyInterfaceMain
+	fibIndexByNsid map[int]ip.FibIndex
+	fibIndexPool   elib.Pool
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -283,6 +286,23 @@ func (m *Main) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
 	return
 }
 
+func (m *Main) fibIndexForNsid(nsid int) (fi ip.FibIndex) {
+	if m.fibIndexByNsid == nil {
+		m.fibIndexByNsid = make(map[int]ip.FibIndex)
+	}
+	if _, ok := m.fibIndexByNsid[nsid]; !ok {
+		// Use pool so that nsid's may be deleted.
+		fi = ip.FibIndex(m.fibIndexPool.GetIndex(uint(len(m.fibIndexByNsid))))
+	}
+	m.fibIndexByNsid[nsid] = fi
+	return
+}
+
+func (m *Main) validateFibIndexForNsid(si vnet.Si, nsid int) {
+	m4 := ip4.GetMain(m.v)
+	m4.SetFibIndexForSi(si, m.fibIndexForNsid(nsid))
+}
+
 func (e *netlinkEvent) EventAction() {
 	var err error
 	vn := e.m.v
@@ -302,6 +322,7 @@ func (e *netlinkEvent) EventAction() {
 				di.isAdminUp = isUp
 				di.addDelDummyPuntPrefixes(e.m, !isUp)
 			} else if si, ok := e.m.siForIfIndex(v.Index); ok {
+				e.m.validateFibIndexForNsid(si, *msg.Nsid())
 				err = si.SetAdminUp(vn, isUp)
 			}
 		case *netlink.IfAddrMessage:
@@ -494,6 +515,11 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 		return
 	}
 	if v.RouteType != netlink.RTN_UNICAST {
+		return
+	}
+	// No linux VRF support.  Only main table is meaningful.
+	if v.Table != netlink.RT_TABLE_MAIN {
+		m.v.Logf("netlink ignore route with table not main: %s\n", v)
 		return
 	}
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
