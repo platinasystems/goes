@@ -159,6 +159,67 @@ func parse_ip6_af_spec(b []byte) *AttrArray {
 	return as
 }
 
+const (
+	IFLA_INFO_UNSPEC IfLinkInfoAttrKind = iota
+	IFLA_INFO_KIND
+	IFLA_INFO_DATA
+	IFLA_INFO_XSTATS
+	IFLA_INFO_SLAVE_KIND
+	IFLA_INFO_SLAVE_DATA
+)
+
+var ifLinkInfoAttrTypeNames = []string{
+	IFLA_INFO_UNSPEC:     "UNSPEC",
+	IFLA_INFO_KIND:       "KIND",
+	IFLA_INFO_DATA:       "DATA",
+	IFLA_INFO_XSTATS:     "XSTATS",
+	IFLA_INFO_SLAVE_KIND: "SLAVE_KIND",
+	IFLA_INFO_SLAVE_DATA: "SLAVE_DATA",
+}
+
+func (t IfLinkInfoAttrKind) String() string { return elib.Stringer(ifLinkInfoAttrTypeNames, int(t)) }
+
+type IfLinkInfoAttrKind int
+type IfLinkInfoAttrType Empty
+
+func NewIfLinkInfoAttrType() *IfLinkInfoAttrType {
+	return (*IfLinkInfoAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *IfLinkInfoAttrType) attrType() {}
+func (t *IfLinkInfoAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *IfLinkInfoAttrType) IthString(i int) string {
+	return elib.Stringer(ifLinkInfoAttrTypeNames, i)
+}
+
+func parse_link_info(b []byte) *AttrArray {
+	as := pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewIfLinkInfoAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := IfLinkInfoAttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case IFLA_INFO_KIND:
+			// Remove trailing 0.
+			l := len(v)
+			for l > 0 && v[l-1] == 0 {
+				l = l - 1
+			}
+			as.X[kind] = StringAttrBytes(v[:l])
+		case IFLA_INFO_DATA:
+			as.X[kind] = Uint32AttrBytes(v)
+		default:
+			panic("unknown link info attribute kind " + kind.String())
+		}
+	}
+	return as
+}
+
 //go:generate gentemplate -d Package=netlink -id Attr -d VecType=AttrVec -d Type=Attr github.com/platinasystems/go/elib/vec.tmpl
 
 func (a AttrVec) Size() (l int) {

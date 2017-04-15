@@ -426,6 +426,8 @@ func (m *IfInfoMessage) Write(b []byte) (int, error) {
 			m.Attrs[k] = parse_af_spec(v)
 		case IFLA_ADDRESS, IFLA_BROADCAST:
 			m.Attrs[k] = afAddr(AF_UNSPEC, v)
+		case IFLA_LINKINFO:
+			m.Attrs[k] = parse_link_info(v)
 		case IFLA_MAP:
 		default:
 			if k < IFLA_MAX {
