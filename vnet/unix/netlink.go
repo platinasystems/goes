@@ -5,10 +5,6 @@
 package unix
 
 import (
-	"fmt"
-	"strings"
-	"sync"
-
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/netlink"
@@ -17,6 +13,9 @@ import (
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
+
+	"fmt"
+	"sync"
 )
 
 type unreachable_ip4_next_hop map[ip4.Prefix]struct{}
@@ -69,10 +68,12 @@ type dummyInterfaceMain struct {
 	dummyIfByIndex map[uint32]*dummyInterface
 }
 
-// True if given netlink NEWLINK message is for a dummy interface (indicated by ifname starting with "dummy").
+// True if given netlink NEWLINK message is for a dummy interface as indicated by IFLA_INFO_KIND.
 func (m *Main) forDummyInterface(msg *netlink.IfInfoMessage) (ok bool) {
-	ifname := msg.Attrs[netlink.IFLA_IFNAME].(netlink.StringAttr).String()
-	if ok = strings.HasPrefix(ifname, "dummy"); ok {
+	if la, la_ok := msg.Attrs[netlink.IFLA_LINKINFO].(*netlink.AttrArray); la_ok {
+		ok = la.X[netlink.IFLA_INFO_KIND].String() == "dummy"
+	}
+	if ok {
 		if m.dummyIfByIndex == nil {
 			m.dummyIfByIndex = make(map[uint32]*dummyInterface)
 		}
