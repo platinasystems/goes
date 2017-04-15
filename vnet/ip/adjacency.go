@@ -450,7 +450,7 @@ func (m *adjacencyMain) mpAdjForAdj(a Adj, validate bool) (ma *multipathAdjacenc
 func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
 	mm := &m.multipathMain
 	ma, _ := m.mpAdjForAdj(a, false)
-	if ma.nAdj > 0 {
+	if ma != nil && ma.nAdj > 0 {
 		nhs = nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
 	} else {
 		nhs = []nextHop{{Adj: a, Weight: 1}}
