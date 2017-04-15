@@ -72,13 +72,21 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	for ri := range rs {
 		r := &rs[ri]
 		lines := []string{}
-		adjs := m.GetAdj(r.adj)
-		for ai := range adjs {
-			initialSpace := "  "
-			line := fmt.Sprintf("%s%d: ", initialSpace, int(r.adj)+ai)
-			ss := adjs[ai].String(&m.Main)
 
-			m.Main.ForeachAdjCounter(r.adj, ip.Adj(ai), func(tag string, v vnet.CombinedCounter) {
+		nhs := m.NextHopsForAdj(r.adj)
+		adjs := m.GetAdj(r.adj)
+		ai := 0
+		for ni := range nhs {
+			nh := &nhs[ni]
+			initialSpace := "  "
+			line := fmt.Sprintf("%s%6d: ", initialSpace, int(r.adj)+ai)
+			ss := []string{}
+			ss = append(ss, adjs[ai].String(&m.Main))
+
+			if nh.Weight != 1 || nh.Adj != r.adj {
+				ss[0] += fmt.Sprintf(" %d-%d, %d x %d", int(r.adj)+ai, int(r.adj)+ai+int(nh.Weight)-1, nh.Weight, nh.Adj)
+			}
+			m.Main.ForeachAdjCounter(nh.Adj, ip.Adj(0), func(tag string, v vnet.CombinedCounter) {
 				if v.Packets != 0 || detail {
 					ss = append(ss, fmt.Sprintf("%s%spackets %16d", initialSpace, tag, v.Packets))
 					ss = append(ss, fmt.Sprintf("%s%sbytes   %16d", initialSpace, tag, v.Bytes))
@@ -89,6 +97,8 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 				lines = append(lines, line+s)
 				line = initialSpace
 			}
+
+			ai += int(nh.Weight)
 		}
 		for i := range lines {
 			if i == 0 {

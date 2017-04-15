@@ -86,8 +86,8 @@ type Adjacency struct {
 	vnet.Rewrite
 }
 
-func (a *Adjacency) String(m *Main) (ss []string) {
-	s := a.LookupNextIndex.String()
+func (a *Adjacency) String(m *Main) (s string) {
+	s = a.LookupNextIndex.String()
 	ni := a.LookupNextIndex
 	switch {
 	case ni == LookupNextRewrite:
@@ -95,7 +95,6 @@ func (a *Adjacency) String(m *Main) (ss []string) {
 	case a.IfAddr != IfAddrNil:
 		s += " " + a.IfAddr.String(m)
 	}
-	ss = append(ss, s)
 	return
 }
 
@@ -451,7 +450,11 @@ func (m *adjacencyMain) mpAdjForAdj(a Adj, validate bool) (ma *multipathAdjacenc
 func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
 	mm := &m.multipathMain
 	ma, _ := m.mpAdjForAdj(a, false)
-	nhs = nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
+	if ma.nAdj > 0 {
+		nhs = nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
+	} else {
+		nhs = []nextHop{{Adj: a, Weight: 1}}
+	}
 	return
 }
 
