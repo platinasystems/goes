@@ -1,0 +1,23 @@
+set int state eth-0-0 down
+set int state eth-1-0 down
+set ip interface fib eth-0-0 1
+set ip interface fib eth-1-0 2
+set int state eth-0-0 up
+set int state eth-1-0 up
+
+ip route add 1.1.1.1/32 table 1 rewrite eth-2-0 IP4: 1.2.3 -> 4.5.6
+ip route add 1.1.1.1/32 table 2 rewrite eth-3-0 IP4: 1.2.3 -> 4.5.6
+
+// generate packets from random ip4 sources.
+pa {
+	ethernet {
+   	    IP4: 00:a0:c9:00:00:00 -> 00:a0:c9:00:00:03
+		UDP: 1.0.0.0 -> 1.1.1.1
+	}
+
+	size 100
+	disable
+	next eth-0-0
+}
+
+

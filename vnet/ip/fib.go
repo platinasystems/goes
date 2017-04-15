@@ -40,6 +40,10 @@ func (f *fibMain) FibIndexForSi(si vnet.Si) FibIndex {
 func (f *fibMain) ValidateFibIndexForSi(si vnet.Si) FibIndex {
 	return f.fibIndexForSi(si, true)
 }
+func (f *fibMain) SetFibIndexForSi(si vnet.Si, fi FibIndex) {
+	f.fibIndexBySi.Validate(uint(si))
+	f.fibIndexBySi[si] = fi
+}
 func (f *fibMain) FibIndexForId(id FibId) (i FibIndex, ok bool) { i, ok = f.fibIndexById[id]; return }
 func (f *fibMain) SetFibIndexForId(id FibId, i FibIndex) {
 	if f.fibIndexById == nil {
