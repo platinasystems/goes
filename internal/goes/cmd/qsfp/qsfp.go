@@ -121,6 +121,7 @@ func (cmd *cmd) update() error {
 					if (lp % 2) == 0 {
 						lp += 2
 					}
+					lp += porto
 					var typeString string
 					if ((1 << uint(i)) & (latestPresent[j] ^ 0xffff)) != 0 {
 						//when qsfp is installed publish static data
@@ -129,18 +130,18 @@ func (cmd *cmd) update() error {
 						var portConfig string
 
 						//identify copper vs optic and set media and speed
-						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media")
+						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
-						speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed")
+						speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
 						if strings.Contains(v, "-CR") {
 							portIsCopper[i+j*16] = true
 							if media != "copper" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "copper")
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "copper")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -150,7 +151,7 @@ func (cmd *cmd) update() error {
 						} else if strings.Contains(v, "40G") {
 							portIsCopper[i+j*16] = false
 							if media != "fiber" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -158,7 +159,7 @@ func (cmd *cmd) update() error {
 								}
 							}
 							if speed != "40g" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "40g")
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed", "40g")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -168,7 +169,7 @@ func (cmd *cmd) update() error {
 						} else {
 							portIsCopper[i+j*16] = false
 							if media != "fiber" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.media", "fiber")
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -176,7 +177,7 @@ func (cmd *cmd) update() error {
 								}
 							}
 							if speed != "100g" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-1.speed", "100g")
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed", "100g")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -361,6 +362,7 @@ func (cmd *cmd) update() error {
 		} else {
 			port = i
 		}
+		port += porto
 		if present[i/16]&(1<<uint(i%16)) == 0 {
 			if !portIsCopper[i] {
 				// get monitoring data only if qsfp is present and not a cable

@@ -4,7 +4,11 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/qsfp"
+import (
+	"strconv"
+
+	"github.com/platinasystems/go/internal/goes/cmd/qsfp"
+)
 
 func init() {
 	qsfp.Init = func() {
@@ -25,39 +29,45 @@ func init() {
 		//port 17-32 reset signals
 		qsfp.VdevIo[7] = qsfp.I2cDev{0, 0x23, 0, 0x70, 0x20, 0, 0, 0}
 
+		portOffset := 0
+		ver, err := deviceVersion()
+		if err == nil && (ver == 0 || ver == 0xff) {
+			portOffset = -1
+		}
+
 		qsfp.VpageByKeyIo = map[string]uint8{
-			"port-1.qsfp.presence":  0,
-			"port-2.qsfp.presence":  0,
-			"port-3.qsfp.presence":  0,
-			"port-4.qsfp.presence":  0,
-			"port-5.qsfp.presence":  0,
-			"port-6.qsfp.presence":  0,
-			"port-7.qsfp.presence":  0,
-			"port-8.qsfp.presence":  0,
-			"port-9.qsfp.presence":  0,
-			"port-10.qsfp.presence": 0,
-			"port-11.qsfp.presence": 0,
-			"port-12.qsfp.presence": 0,
-			"port-13.qsfp.presence": 0,
-			"port-14.qsfp.presence": 0,
-			"port-15.qsfp.presence": 0,
-			"port-16.qsfp.presence": 0,
-			"port-17.qsfp.presence": 1,
-			"port-18.qsfp.presence": 1,
-			"port-19.qsfp.presence": 1,
-			"port-20.qsfp.presence": 1,
-			"port-21.qsfp.presence": 1,
-			"port-22.qsfp.presence": 1,
-			"port-23.qsfp.presence": 1,
-			"port-24.qsfp.presence": 1,
-			"port-25.qsfp.presence": 1,
-			"port-26.qsfp.presence": 1,
-			"port-27.qsfp.presence": 1,
-			"port-28.qsfp.presence": 1,
-			"port-29.qsfp.presence": 1,
-			"port-30.qsfp.presence": 1,
-			"port-31.qsfp.presence": 1,
-			"port-32.qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+1) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+2) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+3) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+4) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+5) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+6) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+7) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+8) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+9) + ".qsfp.presence":  0,
+			"port-" + strconv.Itoa(portOffset+10) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+11) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+12) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+13) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+14) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+15) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+16) + ".qsfp.presence": 0,
+			"port-" + strconv.Itoa(portOffset+17) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+18) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+19) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+20) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+21) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+22) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+23) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+24) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+25) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+26) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+27) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+28) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+29) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+30) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+31) + ".qsfp.presence": 1,
+			"port-" + strconv.Itoa(portOffset+32) + ".qsfp.presence": 1,
 		}
 
 		qsfp.Vdev[0] = qsfp.I2cDev{0, 0x50, 0, 0x70, 0x1, 0, 0x71, 0x1}

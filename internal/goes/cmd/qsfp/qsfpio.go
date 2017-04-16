@@ -5,9 +5,12 @@
 package qsfp
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/platinasystems/go/internal/redis"
 )
 
 type QsfpI2cGpioIo struct {
@@ -20,6 +23,9 @@ var VdevIo [32]I2cDev
 var VpageByKeyIo map[string]uint8
 
 var qsfpIo = QsfpI2cGpioIo{1, [2]uint16{0xffff, 0xffff}}
+
+var deviceVer byte
+var porto int
 
 func qsfpioTicker(cmd *cmd) error {
 	t := time.NewTicker(1 * time.Second)
@@ -42,10 +48,18 @@ func (cmd *cmd) updateio() error {
 	if stopped == 1 {
 		return nil
 	}
+	if qsfpIo.init == 1 {
+		ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+		_, _ = fmt.Sscan(ss, &deviceVer)
+	}
 	port := uint8(0)
+	porto = 0
+	if deviceVer == 0 || deviceVer == 0xff {
+		porto = -1
+	}
 	for k, i := range VpageByKeyIo {
 		for j := 1; j < 33; j++ {
-			if strings.Contains(k, "port-"+strconv.Itoa(int(j))+".") {
+			if strings.Contains(k, "port-"+strconv.Itoa(int(j)+porto)+".") {
 				port = uint8(j) - 1
 				break
 			}
