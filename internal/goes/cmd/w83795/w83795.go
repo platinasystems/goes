@@ -156,6 +156,26 @@ func (cmd *cmd) update() error {
 				cmd.lasts[k] = v
 			}
 		}
+		if strings.Contains(k, "hwmon.front.temp.units.C") {
+			v, err := Vdev.FrontTemp()
+			if err != nil {
+				return err
+			}
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "hwmon.rear.temp.units.C") {
+			v, err := Vdev.RearTemp()
+			if err != nil {
+				return err
+			}
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
+			}
+		}
 	}
 	return nil
 }
@@ -175,7 +195,7 @@ func fanSpeed(countHi uint8, countLo uint8) uint16 {
 	return uint16(speed)
 }
 
-func (h *I2cDev) FrontTemp() (float64, error) {
+func (h *I2cDev) FrontTemp() (string, error) {
 	r := getRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	r.FrontTemp.get(h)
@@ -183,14 +203,16 @@ func (h *I2cDev) FrontTemp() (float64, error) {
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint8(s[3].D[0])
 	u := uint8(s[5].D[0])
-	return (float64(t) + ((float64(u >> 7)) * 0.25)), nil
+	v := float64(t) + ((float64(u >> 7)) * 0.25)
+	strconv.FormatFloat(v, 'f', 3, 64)
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) RearTemp() (float64, error) {
+func (h *I2cDev) RearTemp() (string, error) {
 	r := getRegsBank0()
 	r.BankSelect.set(h, 0x80)
 	r.RearTemp.get(h)
@@ -198,11 +220,12 @@ func (h *I2cDev) RearTemp() (float64, error) {
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint8(s[3].D[0])
 	u := uint8(s[5].D[0])
-	return (float64(t) + ((float64(u >> 7)) * 0.25)), nil
+	v := float64(t) + ((float64(u >> 7)) * 0.25)
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
 func (h *I2cDev) FanCount(i uint8) (uint16, error) {

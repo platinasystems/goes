@@ -165,7 +165,10 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
+			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
+			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
@@ -177,7 +180,10 @@ func (cmd *cmd) update() error {
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out.units.W"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temperature.units.C"
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp1.units.C"
+			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp2.units.C"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out.units.V"
@@ -206,196 +212,6 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-			if strings.Contains(k, "page") {
-				v, err := Vdev[i].Page()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "status_word") {
-				v, err := Vdev[i].StatusWord()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "status_vout") {
-				v, err := Vdev[i].StatusVout()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "status_iout") {
-				v, err := Vdev[i].StatusIout()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "status_input") {
-				v, err := Vdev[i].StatusInput()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "v_in") {
-				v, err := Vdev[i].Vin()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "i_in") {
-				v, err := Vdev[i].Iin()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "v_out") {
-				v, err := Vdev[i].Vout()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "i_out") {
-				v, err := Vdev[i].Iout()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "status_temp") {
-				v, err := Vdev[i].StatusTemp()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "p_out") {
-				v, err := Vdev[i].Pout()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "p_in") {
-				v, err := Vdev[i].Pin()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "p_out_raw") {
-				v, err := Vdev[i].PoutRaw()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "p_in_raw") {
-				v, err := Vdev[i].PinRaw()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "p_mode_raw") {
-				v, err := Vdev[i].ModeRaw()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "pmbus_rev") {
-				v, err := Vdev[i].PMBusRev()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "status_fans") {
-				v, err := Vdev[i].StatusFans()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
-			if strings.Contains(k, "temperature") {
-				v, err := Vdev[i].Temp2()
-				if err != nil {
-					return err
-				}
-				if v != cmd.last[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.last[k] = v
-				}
-			}
-			if strings.Contains(k, "fan_speed") {
-				v, err := Vdev[i].FanSpeed()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lastu[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lastu[k] = v
-				}
-			}
 			if strings.Contains(k, "mfg_id") {
 				v, err := Vdev[i].MfgIdent()
 				if err != nil {
@@ -416,7 +232,228 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-
+			if Vdev[i].Id != "" {
+				if strings.Contains(k, "page") {
+					v, err := Vdev[i].Page()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "status_word") {
+					v, err := Vdev[i].StatusWord()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "status_vout") {
+					v, err := Vdev[i].StatusVout()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "status_iout") {
+					v, err := Vdev[i].StatusIout()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "status_input") {
+					v, err := Vdev[i].StatusInput()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "v_in") {
+					v, err := Vdev[i].Vin()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "i_in") {
+					v, err := Vdev[i].Iin()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "v_out") {
+					v, err := Vdev[i].Vout()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "i_out") {
+					v, err := Vdev[i].Iout()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "status_temp") {
+					v, err := Vdev[i].StatusTemp()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "p_out") {
+					v, err := Vdev[i].Pout()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "p_in") {
+					v, err := Vdev[i].Pin()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "p_out_raw") {
+					v, err := Vdev[i].PoutRaw()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "p_in_raw") {
+					v, err := Vdev[i].PinRaw()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "p_mode_raw") {
+					v, err := Vdev[i].ModeRaw()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "pmbus_rev") {
+					v, err := Vdev[i].PMBusRev()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "status_fans") {
+					v, err := Vdev[i].StatusFans()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				if strings.Contains(k, "temp1") {
+					v, err := Vdev[i].Temp1()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "temp2") {
+					v, err := Vdev[i].Temp2()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "fan_speed") {
+					v, err := Vdev[i].FanSpeed()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lastu[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lastu[k] = v
+					}
+				}
+				/*if strings.Contains(k, "mfg_id") {
+					v, err := Vdev[i].MfgIdent()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}
+				if strings.Contains(k, "mfg_model") {
+					v, err := Vdev[i].MfgModel()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+				}*/
+			}
 		}
 	}
 	return nil
@@ -573,46 +610,46 @@ func (h *I2cDev) StatusFans() (uint16, error) {
 	return uint16(t), nil
 }
 
-func (h *I2cDev) Vin() (float64, error) {
+func (h *I2cDev) Vin() (string, error) {
 	r := getRegs()
 	r.Vin.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v, errs := h.convert(t)
 	if errs != nil {
-		return 0, errs
+		return "", errs
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) Iin() (float64, error) {
+func (h *I2cDev) Iin() (string, error) {
 	r := getRegs()
 	r.Iin.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v, errs := h.convert(t)
 	if errs != nil {
-		return 0, errs
+		return "", errs
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) Vout() (float64, error) {
+func (h *I2cDev) Vout() (string, error) {
 	r := getRegs()
 	r.Vout.get(h)
 	r.VoutMode.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	vout := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	voutMode := uint8(s[3].D[0])
@@ -623,69 +660,70 @@ func (h *I2cDev) Vout() (float64, error) {
 	} else {
 		v, errs = h.convert(vout)
 		if errs != nil {
-			return 0, errs
+			return "", errs
 		}
 	}
 
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) Iout() (float64, error) {
+func (h *I2cDev) Iout() (string, error) {
 	r := getRegs()
 	r.Iout.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v, errs := h.convert(t)
 	if errs != nil {
-		return 0, errs
+		log.Print("convert err")
+		return "", errs
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) Temp1() (float64, error) {
+func (h *I2cDev) Temp1() (string, error) {
 	r := getRegs()
 	r.Temp1.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	var v float64
 	if strings.Contains(h.Id, "Great Wall") {
 		v, err = h.convert(t)
 		if err != nil {
-			return 0, err
+			return "", err
 		}
 	} else if strings.Contains(h.Id, "FSP") {
 		v = float64(t)
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) Temp2() (float64, error) {
+func (h *I2cDev) Temp2() (string, error) {
 	r := getRegs()
 	r.Temp2.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	var v float64
 	if strings.Contains(h.Id, "Great Wall") {
 		v, err = h.convert(t)
 		if err != nil {
-			return 0, err
+			return "", err
 		}
 	} else if strings.Contains(h.Id, "FSP") {
 		v = float64(t)
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
 func (h *I2cDev) FanSpeed() (uint16, error) {
@@ -700,36 +738,36 @@ func (h *I2cDev) FanSpeed() (uint16, error) {
 	return t, nil
 }
 
-func (h *I2cDev) Pout() (float64, error) {
+func (h *I2cDev) Pout() (string, error) {
 	r := getRegs()
 	r.Pout.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v, errs := h.convert(t)
 	if errs != nil {
-		return 0, errs
+		return "", errs
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) Pin() (float64, error) {
+func (h *I2cDev) Pin() (string, error) {
 	r := getRegs()
 	r.Pin.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
 	v, errs := h.convert(t)
 	if errs != nil {
-		return 0, errs
+		return "", errs
 	}
-	return v, nil
+	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
 func (h *I2cDev) PoutRaw() (uint16, error) {

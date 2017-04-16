@@ -32,24 +32,31 @@ func fspInit() {
 	fsp.Vdev[1].GpioIntL = "PSU1_INT_L"
 
 	fsp.VpageByKey = map[string]uint8{
+
+		"psu1.fan_speed.units.rpm": 1,
 		"psu1.status":              1,
 		"psu1.admin.state":         1,
 		"psu1.mfg_id":              1,
 		"psu1.mfg_model":           1,
+		"psu1.i_out.units.A":       1,
 		"psu1.v_in.units.V":        1,
 		"psu1.v_out.units.V":       1,
 		"psu1.p_out.units.W":       1,
 		"psu1.p_in.units.W":        1,
-		"psu1.temperature.units.C": 1,
+		"psu1.temp1.units.C":       1,
+		"psu1.temp2.units.C":       1,
+		"psu2.fan_speed.units.rpm": 0,
 		"psu2.status":              0,
 		"psu2.admin.state":         0,
 		"psu2.mfg_id":              0,
 		"psu2.mfg_model":           0,
+		"psu2.i_out.units.A":       0,
 		"psu2.v_in.units.V":        0,
 		"psu2.v_out.units.V":       0,
 		"psu2.p_out.units.W":       0,
 		"psu2.p_in.units.W":        0,
-		"psu2.temperature.units.C": 0,
+		"psu2.temp1.units.C":       0,
+		"psu2.temp2.units.C":       0,
 	}
 
 	fsp.WrRegDv["psu1"] = "psu1"

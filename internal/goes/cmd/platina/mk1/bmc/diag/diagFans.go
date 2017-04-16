@@ -6,7 +6,8 @@ package diag
 
 import (
 	"fmt"
-	//"github.com/platinasystems/go/internal/i2c"
+	"strconv"
+
 	"github.com/platinasystems/go/internal/goes/cmd/imx6"
 	"github.com/platinasystems/go/internal/goes/cmd/w83795"
 	"time"
@@ -308,17 +309,19 @@ func diagFans() error {
 	r = CheckPassF(f, tmon_bmc_cpu_min, tmon_bmc_cpu_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_bmc_cpu", "°C", f, tmon_bmc_cpu_min, tmon_bmc_cpu_max, r, "check bmc temp sense")
 
-	f, err = hw.RearTemp()
+	v, err := hw.RearTemp()
 	if err != nil {
 		return err
 	}
+	f, _ = strconv.ParseFloat(v, 64)
 	r = CheckPassF(f, tmon_fan_rear_min, tmon_fan_rear_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_fan_rear", "°C", f, tmon_fan_rear_min, tmon_fan_rear_max, r, "check hwm exhuast temp sense")
 
-	f, err = hw.FrontTemp()
+	v, err = hw.FrontTemp()
 	if err != nil {
 		return err
 	}
+	f, _ = strconv.ParseFloat(v, 64)
 	r = CheckPassF(f, tmon_fan_front_min, tmon_fan_front_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_fan_front", "°C", f, tmon_fan_front_min, tmon_fan_front_max, r, "check hwm intake temp sense")
 
