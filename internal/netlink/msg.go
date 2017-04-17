@@ -106,7 +106,7 @@ func (h *Header) WriteTo(w io.Writer) (int64, error) {
 func NewGenMessage() *GenMessage {
 	m := pool.GenMessage.Get().(*GenMessage)
 	runtime.SetFinalizer(m, (*GenMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -159,7 +159,7 @@ func (m *GenMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -178,7 +178,7 @@ const SizeofNoopMessage = SizeofHeader
 func NewNoopMessage() *NoopMessage {
 	m := pool.NoopMessage.Get().(*NoopMessage)
 	runtime.SetFinalizer(m, (*NoopMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -211,7 +211,7 @@ func (m *NoopMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -229,7 +229,7 @@ const SizeofDoneMessage = SizeofHeader
 func NewDoneMessage() *DoneMessage {
 	m := pool.DoneMessage.Get().(*DoneMessage)
 	runtime.SetFinalizer(m, (*DoneMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -262,7 +262,7 @@ func (m *DoneMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -290,7 +290,7 @@ const SizeofErrormsg = 4 + SizeofHeader
 func NewErrorMessage() *ErrorMessage {
 	m := pool.ErrorMessage.Get().(*ErrorMessage)
 	runtime.SetFinalizer(m, (*ErrorMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -329,7 +329,7 @@ func (m *ErrorMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -365,7 +365,7 @@ const SizeofIfInfomsg = 16
 func NewIfInfoMessage() *IfInfoMessage {
 	m := pool.IfInfoMessage.Get().(*IfInfoMessage)
 	runtime.SetFinalizer(m, (*IfInfoMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -445,7 +445,7 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -483,7 +483,7 @@ const SizeofIfAddrmsg = 8
 func NewIfAddrMessage() *IfAddrMessage {
 	m := pool.IfAddrMessage.Get().(*IfAddrMessage)
 	runtime.SetFinalizer(m, (*IfAddrMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -546,7 +546,7 @@ func (m *IfAddrMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -586,7 +586,7 @@ const SizeofRtmsg = 12
 func NewRouteMessage() *RouteMessage {
 	m := pool.RouteMessage.Get().(*RouteMessage)
 	runtime.SetFinalizer(m, (*RouteMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -650,7 +650,7 @@ func (m *RouteMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -693,7 +693,7 @@ const SizeofNdmsg = 12
 func NewNeighborMessage() *NeighborMessage {
 	m := pool.NeighborMessage.Get().(*NeighborMessage)
 	runtime.SetFinalizer(m, (*NeighborMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -762,7 +762,7 @@ func (m *NeighborMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, MessageType(m.Header.Type), ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)
@@ -798,7 +798,7 @@ const NetnsPad = 3
 func NewNetnsMessage() *NetnsMessage {
 	m := pool.NetnsMessage.Get().(*NetnsMessage)
 	runtime.SetFinalizer(m, (*NetnsMessage).Close)
-	m.nsid = -1
+	m.nsid = DefaultNsid
 	return m
 }
 
@@ -872,7 +872,7 @@ func (m *NetnsMessage) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, m.Header.Type, ":\n")
 	indent.Increase(acc)
-	if m.nsid != -1 {
+	if m.nsid != DefaultNsid {
 		fmt.Fprintln(acc, "nsid:", m.nsid)
 	}
 	m.Header.WriteTo(acc)

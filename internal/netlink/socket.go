@@ -285,7 +285,7 @@ func (s *Socket) gorx() {
 	}
 
 	for {
-		nsid := -1
+		nsid := DefaultNsid
 
 		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, 0)
 		if err != nil {
@@ -385,7 +385,7 @@ func (s *Socket) gotx() {
 			seq++
 		}
 		h.Len = uint32(n)
-		if nsid != -1 {
+		if nsid != DefaultNsid {
 			scm.Header.Level = SOL_NETLINK
 			scm.Header.Type = NETLINK_LISTEN_ALL_NSID
 			*scmNsid = nsid
