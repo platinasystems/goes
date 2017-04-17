@@ -106,11 +106,11 @@ func Main(args ...string) error {
 	}
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
-	nl.Getlink()
+	nl.GetlinkReq(DefaultNsid)
 	for {
 		select {
 		case <-t.C:
-			nl.Getlink()
+			nl.GetlinkReq(DefaultNsid)
 		case msg, opened := <-nl.Rx:
 			if !opened {
 				return nil

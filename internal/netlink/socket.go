@@ -208,8 +208,9 @@ func (s *Socket) Close() error {
 	return err
 }
 
-func (s *Socket) Getlink() {
+func (s *Socket) GetlinkReq(nsid int) {
 	req := NewGenMessage()
+	req.nsid = nsid
 	req.Type = RTM_GETLINK
 	req.Flags = NLM_F_REQUEST | NLM_F_MATCH
 	req.AddressFamily = AF_UNSPEC

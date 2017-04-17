@@ -150,11 +150,11 @@ func (cmd *cmd) Main(...string) error {
 
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
-	cmd.nl.Getlink()
+	cmd.nl.GetlinkReq(netlink.DefaultNsid)
 	for {
 		select {
 		case <-t.C:
-			cmd.nl.Getlink()
+			cmd.nl.GetlinkReq(netlink.DefaultNsid)
 		case msg, opened := <-cmd.nl.Rx:
 			if !opened {
 				return nil

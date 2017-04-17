@@ -11,6 +11,7 @@ import (
 	"time"
 
 	. "github.com/platinasystems/go/internal/netlink"
+	"github.com/platinasystems/go/internal/parms"
 )
 
 const Usage = "nlcounters [-i SECONDS]"
@@ -41,11 +42,11 @@ func Main(args ...string) error {
 	}
 	t := time.NewTicker(seconds)
 	defer t.Stop()
-	nl.Getlink()
-	for {
+	nl.GetlinkReq(DefaultNsid)
+	for i := 0; ; {
 		select {
 		case <-t.C:
-			nl.Getlink()
+			nl.GetlinkReq(DefaultNsid)
 		case msg, opened := <-nl.Rx:
 			if !opened {
 				return nil
