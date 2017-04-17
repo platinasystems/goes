@@ -6,7 +6,6 @@ package netlink
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"runtime"
@@ -17,8 +16,6 @@ import (
 	"github.com/platinasystems/go/internal/accumulate"
 	"github.com/platinasystems/go/internal/indent"
 )
-
-var ErrBufSz = errors.New("undersized buffer")
 
 type Byter interface {
 	Bytes() []byte
@@ -73,7 +70,7 @@ func (h *Header) MsgType() MsgType { return h.Type }
 
 func (h *Header) Read(b []byte) (int, error) {
 	if len(b) < SizeofHeader {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	*(*Header)(unsafe.Pointer(&b[0])) = *h
 	return SizeofHeader, nil
@@ -85,7 +82,7 @@ func (h *Header) String() string {
 
 func (h *Header) Write(b []byte) (int, error) {
 	if len(b) < SizeofHeader {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	*h = *(*Header)(unsafe.Pointer(&b[0]))
 	return SizeofHeader, nil
@@ -134,7 +131,7 @@ func (m *GenMessage) Nsid() *int { return &m.nsid }
 
 func (m *GenMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofGenMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*Genmsg)(unsafe.Pointer(&b[n])) = m.Genmsg
@@ -146,7 +143,7 @@ func (m *GenMessage) String() string { return StringOf(m) }
 
 func (m *GenMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofGenMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.Genmsg = *(*Genmsg)(unsafe.Pointer(&b[n]))
@@ -192,7 +189,7 @@ func (m *NoopMessage) Nsid() *int { return &m.nsid }
 
 func (m *NoopMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofNoopMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	return m.Header.Read(b)
 }
@@ -201,7 +198,7 @@ func (m *NoopMessage) String() string { return StringOf(m) }
 
 func (m *NoopMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofNoopMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	return m.Header.Write(b)
 }
@@ -243,7 +240,7 @@ func (m *DoneMessage) Nsid() *int { return &m.nsid }
 
 func (m *DoneMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofDoneMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	return m.Header.Read(b)
 }
@@ -252,7 +249,7 @@ func (m *DoneMessage) String() string { return StringOf(m) }
 
 func (m *DoneMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofDoneMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	return m.Header.Write(b)
 }
@@ -306,7 +303,7 @@ func (m *ErrorMessage) Nsid() *int { return &m.nsid }
 
 func (m *ErrorMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofErrorMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*Errormsg)(unsafe.Pointer(&b[n])) = m.Errormsg
@@ -318,7 +315,7 @@ func (m *ErrorMessage) String() string { return StringOf(m) }
 
 func (m *ErrorMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofErrorMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.Errormsg = *(*Errormsg)(unsafe.Pointer(&b[n]))
@@ -382,7 +379,7 @@ func (m *IfInfoMessage) Nsid() *int { return &m.nsid }
 
 func (m *IfInfoMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofIfInfoMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*IfInfomsg)(unsafe.Pointer(&b[n])) = m.IfInfomsg
@@ -395,7 +392,7 @@ func (m *IfInfoMessage) String() string { return StringOf(m) }
 
 func (m *IfInfoMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofIfInfoMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.IfInfomsg = *(*IfInfomsg)(unsafe.Pointer(&b[n]))
@@ -500,7 +497,7 @@ func (m *IfAddrMessage) Nsid() *int { return &m.nsid }
 
 func (m *IfAddrMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofIfAddrMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*IfAddrmsg)(unsafe.Pointer(&b[n])) = m.IfAddrmsg
@@ -513,7 +510,7 @@ func (m *IfAddrMessage) String() string { return StringOf(m) }
 
 func (m *IfAddrMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofIfAddrMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.IfAddrmsg = *(*IfAddrmsg)(unsafe.Pointer(&b[n]))
@@ -603,7 +600,7 @@ func (m *RouteMessage) Nsid() *int { return &m.nsid }
 
 func (m *RouteMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofRouteMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*Rtmsg)(unsafe.Pointer(&b[n])) = m.Rtmsg
@@ -616,7 +613,7 @@ func (m *RouteMessage) String() string { return StringOf(m) }
 
 func (m *RouteMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofRouteMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.Rtmsg = *(*Rtmsg)(unsafe.Pointer(&b[n]))
@@ -714,7 +711,7 @@ func (m *NeighborMessage) Nsid() *int { return &m.nsid }
 
 func (m *NeighborMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofNeighborMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*Ndmsg)(unsafe.Pointer(&b[n])) = m.Ndmsg
@@ -727,7 +724,7 @@ func (m *NeighborMessage) String() string { return StringOf(m) }
 
 func (m *NeighborMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofNeighborMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.Ndmsg = *(*Ndmsg)(unsafe.Pointer(&b[n]))
@@ -831,7 +828,7 @@ func (m *NetnsMessage) Nsid() *int { return &m.nsid }
 
 func (m *NetnsMessage) Read(b []byte) (int, error) {
 	if len(b) < SizeofNetnsMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Read(b)
 	*(*Netnsmsg)(unsafe.Pointer(&b[n])) = m.Netnsmsg
@@ -844,7 +841,7 @@ func (m *NetnsMessage) String() string { return StringOf(m) }
 
 func (m *NetnsMessage) Write(b []byte) (int, error) {
 	if len(b) < SizeofNetnsMessage {
-		return 0, ErrBufSz
+		return 0, syscall.EOVERFLOW
 	}
 	n, _ := m.Header.Write(b)
 	m.Netnsmsg = *(*Netnsmsg)(unsafe.Pointer(&b[n]))
