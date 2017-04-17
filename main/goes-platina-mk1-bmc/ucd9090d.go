@@ -7,31 +7,31 @@ package main
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/internal/goes/cmd/ucd9090"
+	"github.com/platinasystems/go/internal/goes/cmd/ucd9090d"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-func init() { ucd9090.Init = ucd9090Init }
+func init() { ucd9090d.Init = ucd9090dInit }
 
-func ucd9090Init() {
+func ucd9090dInit() {
 	ver := 0
-	ucd9090.Vdev.Bus = 0
-	ucd9090.Vdev.Addr = 0x0 //update after eeprom read
-	ucd9090.Vdev.MuxBus = 0
-	ucd9090.Vdev.MuxAddr = 0x76
-	ucd9090.Vdev.MuxValue = 0x01
+	ucd9090d.Vdev.Bus = 0
+	ucd9090d.Vdev.Addr = 0x0 //update after eeprom read
+	ucd9090d.Vdev.MuxBus = 0
+	ucd9090d.Vdev.MuxAddr = 0x76
+	ucd9090d.Vdev.MuxValue = 0x01
 	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(s, &ver)
 	switch ver {
 	case 0xff:
-		ucd9090.Vdev.Addr = 0x7e
+		ucd9090d.Vdev.Addr = 0x7e
 	case 0x00:
-		ucd9090.Vdev.Addr = 0x7e
+		ucd9090d.Vdev.Addr = 0x7e
 	default:
-		ucd9090.Vdev.Addr = 0x34
+		ucd9090d.Vdev.Addr = 0x34
 	}
 
-	ucd9090.VpageByKey = map[string]uint8{
+	ucd9090d.VpageByKey = map[string]uint8{
 		"vmon.5v.sb.units.V":    1,
 		"vmon.3v8.bmc.units.V":  2,
 		"vmon.3v3.sys.units.V":  3,
@@ -45,7 +45,7 @@ func ucd9090Init() {
 		"vmon.poweroff.events":  0,
 	}
 
-	ucd9090.WrRegDv["vmon"] = "vmon"
-	ucd9090.WrRegFn["vmon.example"] = "example"
-	ucd9090.WrRegRng["ucd9090.example"] = []string{"true", "false"}
+	ucd9090d.WrRegDv["vmon"] = "vmon"
+	ucd9090d.WrRegFn["vmon.example"] = "example"
+	ucd9090d.WrRegRng["ucd9090d.example"] = []string{"true", "false"}
 }

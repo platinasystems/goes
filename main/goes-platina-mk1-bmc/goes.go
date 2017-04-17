@@ -82,7 +82,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/subscribe"
 	"github.com/platinasystems/go/internal/goes/cmd/sync"
 	"github.com/platinasystems/go/internal/goes/cmd/telnetd"
-	"github.com/platinasystems/go/internal/goes/cmd/ucd9090"
+	"github.com/platinasystems/go/internal/goes/cmd/ucd9090d"
 	"github.com/platinasystems/go/internal/goes/cmd/umount"
 	"github.com/platinasystems/go/internal/goes/cmd/uninstall"
 	"github.com/platinasystems/go/internal/goes/cmd/uptimed"
@@ -173,7 +173,7 @@ func init() {
 		sync.New(),
 		telnetd.New(),
 		toggle.New(),
-		ucd9090.New(),
+		ucd9090d.New(),
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),

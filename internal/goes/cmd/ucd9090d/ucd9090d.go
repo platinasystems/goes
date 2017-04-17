@@ -2,8 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package ucd9090
+// Package ucd9090d provides access to the UCD9090 Power Sequencer/Monitor chip
+package ucd9090d
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "ucd9090"
+const Name = "ucd9090d"
 
 type I2cDev struct {
 	Bus      int

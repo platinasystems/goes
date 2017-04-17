@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/goes/cmd/ucd9090"
+	"github.com/platinasystems/go/internal/goes/cmd/ucd9090d"
 )
 
 func diagPower() error {
@@ -17,13 +17,13 @@ func diagPower() error {
 	var r string
 
 	const (
-		ucd9090Bus    = 0
-		ucd9090Adr    = 0x34
-		ucd9090MuxBus = 0
-		ucd9090MuxAdr = 0x76
-		ucd9090MuxVal = 0x01
+		ucd9090dBus    = 0
+		ucd9090dAdr    = 0x34
+		ucd9090dMuxBus = 0
+		ucd9090dMuxAdr = 0x76
+		ucd9090dMuxVal = 0x01
 	)
-	var pm = ucd9090.I2cDev{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
+	var pm = ucd9090d.I2cDev{ucd9090dBus, ucd9090dAdr, ucd9090dMuxBus, ucd9090dMuxAdr, ucd9090dMuxVal}
 
 	d := eeprom.Device{
 		BusIndex:   0,
@@ -142,13 +142,13 @@ func diagPower() error {
 
 func diagLoggedFaults() error {
 	const (
-		ucd9090Bus    = 0
-		ucd9090Adr    = 0x34
-		ucd9090MuxBus = 0
-		ucd9090MuxAdr = 0x76
-		ucd9090MuxVal = 0x01
+		ucd9090dBus    = 0
+		ucd9090dAdr    = 0x34
+		ucd9090dMuxBus = 0
+		ucd9090dMuxAdr = 0x76
+		ucd9090dMuxVal = 0x01
 	)
-	var pm = ucd9090.I2cDev{ucd9090Bus, ucd9090Adr, ucd9090MuxBus, ucd9090MuxAdr, ucd9090MuxVal}
+	var pm = ucd9090d.I2cDev{ucd9090dBus, ucd9090dAdr, ucd9090dMuxBus, ucd9090dMuxAdr, ucd9090dMuxVal}
 
 	d := eeprom.Device{
 		BusIndex:   0,

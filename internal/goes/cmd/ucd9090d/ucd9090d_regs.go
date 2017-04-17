@@ -1,4 +1,4 @@
-package ucd9090
+package ucd9090d
 
 const ()
 
