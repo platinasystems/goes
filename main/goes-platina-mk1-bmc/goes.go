@@ -39,7 +39,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/i2c"
 	"github.com/platinasystems/go/internal/goes/cmd/i2cd"
 	"github.com/platinasystems/go/internal/goes/cmd/iminfo"
-	"github.com/platinasystems/go/internal/goes/cmd/imx6"
+	"github.com/platinasystems/go/internal/goes/cmd/imx6d"
 	"github.com/platinasystems/go/internal/goes/cmd/insmod"
 	"github.com/platinasystems/go/internal/goes/cmd/install"
 	"github.com/platinasystems/go/internal/goes/cmd/kexec"
@@ -131,7 +131,7 @@ func init() {
 		i2c.New(),
 		i2cd.New(),
 		iminfo.New(),
-		imx6.New(),
+		imx6d.New(),
 		insmod.New(),
 		install.New(),
 		kexec.New(),

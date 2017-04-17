@@ -4,12 +4,12 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/imx6"
+import "github.com/platinasystems/go/internal/goes/cmd/imx6d"
 
-func init() { imx6.Init = imx6Init }
+func init() { imx6d.Init = imx6dInit }
 
-func imx6Init() {
-	imx6.VpageByKey = map[string]uint8{
+func imx6dInit() {
+	imx6d.VpageByKey = map[string]uint8{
 		"bmc.temperature.units.C": 1,
 	}
 }

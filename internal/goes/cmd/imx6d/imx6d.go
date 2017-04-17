@@ -2,9 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package nxp provides access to the NXP iMX6 ARM CPU
-
-package imx6
+package imx6d
 
 import (
 	"fmt"
@@ -18,7 +16,7 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const Name = "imx6"
+const Name = "imx6d"
 
 var (
 	Init = func() {}

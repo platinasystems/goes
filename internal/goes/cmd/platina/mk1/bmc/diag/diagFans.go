@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/platinasystems/go/internal/goes/cmd/imx6"
+	"github.com/platinasystems/go/internal/goes/cmd/imx6d"
 	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
 	"time"
 )
@@ -305,7 +305,7 @@ func diagFans() error {
 	// diagTest: temp sensors
 	// check temperature sensors are in expected range
 	//
-	f := float64(imx6.ReadTemp())
+	f := float64(imx6d.ReadTemp())
 	r = CheckPassF(f, tmon_bmc_cpu_min, tmon_bmc_cpu_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_bmc_cpu", "°C", f, tmon_bmc_cpu_min, tmon_bmc_cpu_max, r, "check bmc temp sense")
 
