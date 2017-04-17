@@ -337,15 +337,20 @@ func (s *Socket) gorx() {
 				*msg.Nsid() = nsid
 				_, err = msg.Write(buf[i : i+l])
 				if err != nil {
-					s.once.Do(func() {
-						fmt.Fprint(os.Stderr,
-							"Rx: ", err,
-							"\n", buf[i:i+l])
-					})
+					errno, ok := err.(syscall.Errno)
+					if !ok {
+						errno = syscall.EINVAL
+					}
 					msg.Close()
-				} else {
-					s.rx <- msg
+					e := NewErrorMessage()
+					e.Errormsg.Errno = -int32(errno)
+					e.Errormsg.Req = *h
+					msg = e
 				}
+				if false {
+					fmt.Fprint(os.Stderr, "Rx: ", msg)
+				}
+				s.rx <- msg
 			}
 		}
 	}
