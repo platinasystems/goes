@@ -1,4 +1,4 @@
-package fsp
+package fspd
 
 type reg8 byte
 type reg8b byte

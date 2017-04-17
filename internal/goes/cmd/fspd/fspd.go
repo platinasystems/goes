@@ -2,9 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package fsp provides access to the power supply unit
+// Package fspd provides access to the power supply unit
 
-package fsp
+package fspd
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "fsp"
+const Name = "fspd"
 
 type I2cDev struct {
 	Slot       int
@@ -194,7 +194,7 @@ func (cmd *cmd) update() error {
 			cmd.lasts[k] = ""
 
 			if err != nil {
-				log.Print("fsp550 gpio error: ", err)
+				log.Print("fspd gpio error: ", err)
 			}
 		} else {
 			//present

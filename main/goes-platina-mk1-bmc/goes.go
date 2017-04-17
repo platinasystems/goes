@@ -26,7 +26,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/export"
 	"github.com/platinasystems/go/internal/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/internal/goes/cmd/femtocom"
-	"github.com/platinasystems/go/internal/goes/cmd/fsp"
+	"github.com/platinasystems/go/internal/goes/cmd/fspd"
 	"github.com/platinasystems/go/internal/goes/cmd/gpio"
 	"github.com/platinasystems/go/internal/goes/cmd/hdel"
 	"github.com/platinasystems/go/internal/goes/cmd/hdelta"
@@ -118,7 +118,7 @@ func init() {
 		export.New(),
 		fantrayd.New(),
 		femtocom.New(),
-		fsp.New(),
+		fspd.New(),
 		gpio.New(),
 		hdel.New(),
 		hdelta.New(),
