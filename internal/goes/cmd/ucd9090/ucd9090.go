@@ -17,7 +17,7 @@ import (
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/goes/cmd/fantray"
-	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
+	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
@@ -343,15 +343,15 @@ func (h *I2cDev) PowerCycles() (string, error) {
 				s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 				_, _ = fmt.Sscan(s, &ver)
 				if ver == 0 || ver == 0xff {
-					ledgpio.Vdev.Addr = 0x22
+					ledgpiod.Vdev.Addr = 0x22
 				} else {
-					ledgpio.Vdev.Addr = 0x75
+					ledgpiod.Vdev.Addr = 0x75
 				}
-				ledgpio.Vdev.Bus = 0
-				ledgpio.Vdev.MuxBus = 0x0
-				ledgpio.Vdev.MuxAddr = 0x76
-				ledgpio.Vdev.MuxValue = 0x2
-				ledgpio.Vdev.LedFpReinit()
+				ledgpiod.Vdev.Bus = 0
+				ledgpiod.Vdev.MuxBus = 0x0
+				ledgpiod.Vdev.MuxAddr = 0x76
+				ledgpiod.Vdev.MuxValue = 0x2
+				ledgpiod.Vdev.LedFpReinit()
 			}
 		}
 		milli = uint32(s[1].D[5]) + uint32(s[1].D[4])<<8 + uint32(s[1].D[3])<<16 + uint32(s[1].D[2])<<24

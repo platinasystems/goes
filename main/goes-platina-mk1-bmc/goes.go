@@ -61,7 +61,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/patents"
 	"github.com/platinasystems/go/internal/goes/cmd/ping"
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/diag"
-	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
+	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/internal/goes/cmd/ps"
 	"github.com/platinasystems/go/internal/goes/cmd/pwd"
@@ -137,7 +137,7 @@ func init() {
 		kexec.New(),
 		keys.New(),
 		kill.New(),
-		ledgpio.New(),
+		ledgpiod.New(),
 		license.New(),
 		ln.New(),
 		log.New(),

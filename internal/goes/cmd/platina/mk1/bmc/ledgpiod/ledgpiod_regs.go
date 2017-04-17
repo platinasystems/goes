@@ -1,4 +1,4 @@
-package ledgpio
+package ledgpiod
 
 const ()
 

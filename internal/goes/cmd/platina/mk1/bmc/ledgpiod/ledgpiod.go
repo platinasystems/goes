@@ -3,7 +3,7 @@
 // LICENSE file.
 
 // Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package ledgpio
+package ledgpiod
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "ledgpio"
+const Name = "ledgpiod"
 
 type I2cDev struct {
 	Bus      int

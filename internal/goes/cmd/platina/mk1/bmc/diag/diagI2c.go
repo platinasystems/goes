@@ -44,7 +44,7 @@ type R struct {
 func diagI2c() error {
 
 	var ucd9090Adr uint8 = 0x34
-	var ledgpioAdr uint8 = 0x75
+	var ledgpiodAdr uint8 = 0x75
 
 	d := eeprom.Device{
 		BusIndex:   0,
@@ -54,13 +54,13 @@ func diagI2c() error {
 	switch d.Fields.DeviceVersion {
 	case 0xff:
 		ucd9090Adr = 0x7e
-		ledgpioAdr = 0x22
+		ledgpiodAdr = 0x22
 	case 0x00:
 		ucd9090Adr = 0x7e
-		ledgpioAdr = 0x22
+		ledgpiodAdr = 0x22
 	default:
 		ucd9090Adr = 0x34
-		ledgpioAdr = 0x75
+		ledgpiodAdr = 0x75
 	}
 
 	var r string
@@ -196,8 +196,8 @@ func diagI2c() error {
 
 	diagI2cWrite1Byte(0x00, 0x76, 0x02)
 	time.Sleep(10 * time.Millisecond)
-	diagI2cWrite1Byte(0x00, ledgpioAdr, 0x00)
-	result, _ = diagI2cPing(0x00, ledgpioAdr, 0x00, 10)
+	diagI2cWrite1Byte(0x00, ledgpiodAdr, 0x00)
+	result, _ = diagI2cPing(0x00, ledgpiodAdr, 0x00, 10)
 	r = CheckPassB(result, true)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_led_pca9539", "-", result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")
 

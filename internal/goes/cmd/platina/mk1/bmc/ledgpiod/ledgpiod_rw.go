@@ -3,7 +3,7 @@
 // LICENSE file.
 
 // Package ucd9090 provides access to the UCD9090 Power Sequencer/Monitor chip
-package ledgpio
+package ledgpiod
 
 import (
 	"net/rpc"
