@@ -64,8 +64,11 @@ func fspInit() {
 	fsp.WrRegDv["psu"] = "psu"
 	fsp.WrRegFn["psu1.example"] = "example"
 	fsp.WrRegFn["psu1.admin.state"] = "admin.state"
+	fsp.WrRegRng["psu1.admin.state"] = []string{"true", "false"}
 	fsp.WrRegFn["psu2.example"] = "example"
 	fsp.WrRegFn["psu2.admin.state"] = "admin.state"
+	fsp.WrRegRng["psu2.admin.state"] = []string{"true", "false"}
 	fsp.WrRegFn["psu.powercycle"] = "powercycle"
+	fsp.WrRegRng["psu.powercycle"] = []string{"true"}
 	fsp.WrRegRng["psu1.example"] = []string{"true", "false"}
 }

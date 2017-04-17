@@ -147,7 +147,17 @@ func (cmd *cmd) update() error {
 			}
 		}
 		if strings.Contains(k, "fan_tray.speed") {
-			v, err := Vdev.GetFanSpeed()
+			v, err := Vdev.GetFanSpeed(i)
+			if err != nil {
+				return err
+			}
+			if v != cmd.lasts[k] {
+				cmd.pub.Print(k, ": ", v)
+				cmd.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "fan_tray.duty") {
+			v, err := Vdev.GetFanSpeed(i)
 			if err != nil {
 				return err
 			}
@@ -448,7 +458,7 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 	return nil
 }
 
-func (h *I2cDev) GetFanSpeed() (string, error) {
+func (h *I2cDev) GetFanSpeed(i uint8) (string, error) {
 	var speed string
 
 	r2 := getRegsBank2()
@@ -467,6 +477,10 @@ func (h *I2cDev) GetFanSpeed() (string, error) {
 	}
 	t := uint8(s[1].D[0])
 	m := uint8(s[3].D[0])
+	if i == 1 {
+		return fmt.Sprintf("0x%x", m), nil
+	}
+
 	if t == 0xff {
 		speed = "auto"
 	} else if m == high {
