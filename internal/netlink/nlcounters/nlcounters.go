@@ -14,39 +14,57 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Usage = "nlcounters [-i SECONDS]"
+const Usage = "nlcounters [-i SECONDS] [-n COUNT] [-nsid ID]"
 
 var istats map[uint32]*LinkStats64
 
 // Dump all or select netlink messages
 func Main(args ...string) error {
-	seconds := 5 * time.Second
-	switch len(args) {
-	case 0:
-	case 2:
-		if args[0] != "-i" {
-			return fmt.Errorf("%s: unknown", args[0])
+	usage := func(format string, args ...interface{}) error {
+		return fmt.Errorf(format+"\nusage: "+Usage, args...)
+	}
+	interval := 0
+	n := 0
+	nsid := DefaultNsid
+	parm, args := parms.New(args, "-i", "-n", "-nsid")
+	if len(args) > 0 {
+		return usage("%s: unknown", args[0])
+	}
+	for _, x := range []struct {
+		name string
+		p    *int
+	}{
+		{"-i", &interval},
+		{"-n", &n},
+		{"-nsid", &nsid},
+	} {
+		if arg := parm[x.name]; len(arg) > 0 {
+			_, err := fmt.Sscan(arg, x.p)
+			if err != nil {
+				return usage("%s: %v", x.name[1:], err)
+			}
 		}
-		_, err := fmt.Sscan(args[1], &seconds)
-		if err != nil {
-			return err
-		}
-		seconds *= time.Second
-	default:
-		return fmt.Errorf("%v: unexpected", args)
 	}
 	istats = make(map[uint32]*LinkStats64)
 	nl, err := New()
 	if err != nil {
 		return err
 	}
-	t := time.NewTicker(seconds)
+	nl.GetlinkReq(nsid)
+	if interval <= 0 {
+		return nl.RxUntilDone(handler)
+	}
+	t := time.NewTicker(time.Duration(interval) * time.Second)
 	defer t.Stop()
-	nl.GetlinkReq(DefaultNsid)
 	for i := 0; ; {
 		select {
 		case <-t.C:
-			nl.GetlinkReq(DefaultNsid)
+			if n > 0 {
+				if i++; i == n {
+					return nil
+				}
+			}
+			nl.GetlinkReq(nsid)
 		case msg, opened := <-nl.Rx:
 			if !opened {
 				return nil
