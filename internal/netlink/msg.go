@@ -291,6 +291,8 @@ func NewErrorMessage() *ErrorMessage {
 	m := pool.ErrorMessage.Get().(*ErrorMessage)
 	runtime.SetFinalizer(m, (*ErrorMessage).Close)
 	m.nsid = DefaultNsid
+	m.Header.Type = NLMSG_ERROR
+	m.Header.Len = SizeofErrormsg
 	return m
 }
 
