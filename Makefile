@@ -17,6 +17,7 @@ ALL += goes-example-arm
 ALL += goes-platina-mk1-bmc
 ifneq (,$(wildcard vnet/devices/ethernet/switch/fe1/*.go))
 ALL += goes-platina-mk1
+ALL  = goes-coreboot
 ALL += goes-test
 ALL += go-wip
 endif
@@ -51,6 +52,9 @@ goes-platina-mk1: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/$@
 	$(if $(wildcard fe1a.zip),\
 	cat fe1a.zip >> $@ && zip -A $@)
+
+goes-coreboot: | copyright/copyright.go version/version.go
+	$(gobuild) -o $@ ./main/goes-coreboot
 
 goes-test: | copyright/copyright.go version/version.go
 	$(gobuild) -o $@ ./main/goes-test
