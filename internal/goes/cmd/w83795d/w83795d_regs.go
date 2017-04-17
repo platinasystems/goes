@@ -1,4 +1,4 @@
-package w83795
+package w83795d
 
 const ()
 

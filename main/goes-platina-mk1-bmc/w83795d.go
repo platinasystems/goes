@@ -4,18 +4,18 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/w83795"
+import "github.com/platinasystems/go/internal/goes/cmd/w83795d"
 
-func init() { w83795.Init = w83795Init }
+func init() { w83795d.Init = w83795dInit }
 
-func w83795Init() {
-	w83795.Vdev.Bus = 0
-	w83795.Vdev.Addr = 0x2f
-	w83795.Vdev.MuxBus = 0
-	w83795.Vdev.MuxAddr = 0x76
-	w83795.Vdev.MuxValue = 0x80
+func w83795dInit() {
+	w83795d.Vdev.Bus = 0
+	w83795d.Vdev.Addr = 0x2f
+	w83795d.Vdev.MuxBus = 0
+	w83795d.Vdev.MuxAddr = 0x76
+	w83795d.Vdev.MuxValue = 0x80
 
-	w83795.VpageByKey = map[string]uint8{
+	w83795d.VpageByKey = map[string]uint8{
 		"fan_tray.1.1.speed.units.rpm": 1,
 		"fan_tray.1.2.speed.units.rpm": 2,
 		"fan_tray.2.1.speed.units.rpm": 3,
@@ -29,8 +29,8 @@ func w83795Init() {
 		"hwmon.rear.temp.units.C":      0,
 	}
 
-	w83795.WrRegDv["fan_tray"] = "fan_tray"
-	w83795.WrRegFn["fan_tray.example"] = "example"
-	w83795.WrRegFn["fan_tray.speed"] = "speed"
-	w83795.WrRegRng["w83795.example"] = []string{"true", "false"}
+	w83795d.WrRegDv["fan_tray"] = "fan_tray"
+	w83795d.WrRegFn["fan_tray.example"] = "example"
+	w83795d.WrRegFn["fan_tray.speed"] = "speed"
+	w83795d.WrRegRng["w83795d.example"] = []string{"true", "false"}
 }

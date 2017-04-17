@@ -18,7 +18,7 @@ import (
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/goes/cmd/fantray"
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpio"
-	"github.com/platinasystems/go/internal/goes/cmd/w83795"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -323,12 +323,12 @@ func (h *I2cDev) PowerCycles() (string, error) {
 			if firstLog == 0 {
 				log.Printf("warning: power event detected")
 				log.Print("notice: re-init fan controller")
-				w83795.Vdev.Bus = 0
-				w83795.Vdev.Addr = 0x2f
-				w83795.Vdev.MuxBus = 0
-				w83795.Vdev.MuxAddr = 0x76
-				w83795.Vdev.MuxValue = 0x80
-				w83795.Vdev.FanInit()
+				w83795d.Vdev.Bus = 0
+				w83795d.Vdev.Addr = 0x2f
+				w83795d.Vdev.MuxBus = 0
+				w83795d.Vdev.MuxAddr = 0x76
+				w83795d.Vdev.MuxValue = 0x80
+				w83795d.Vdev.FanInit()
 
 				log.Print("notice: re-init fan trays")
 				fantray.Vdev.Bus = 1

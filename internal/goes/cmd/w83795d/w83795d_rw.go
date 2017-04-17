@@ -2,9 +2,9 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package w83795 provides access to the H/W Monitor chip
+// Package w83795d provides access to the H/W Monitor chip
 
-package w83795
+package w83795d
 
 import (
 	"net/rpc"

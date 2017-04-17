@@ -88,7 +88,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/uptimed"
 	"github.com/platinasystems/go/internal/goes/cmd/usage"
 	"github.com/platinasystems/go/internal/goes/cmd/version"
-	"github.com/platinasystems/go/internal/goes/cmd/w83795"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
 	"github.com/platinasystems/go/internal/goes/cmd/watchdog"
 	"github.com/platinasystems/go/internal/goes/cmd/wget"
 )
@@ -179,7 +179,7 @@ func init() {
 		uptimed.New(),
 		usage.New(),
 		version.New(),
-		w83795.New(),
+		w83795d.New(),
 		watchdog.New(),
 		wget.New(),
 	)

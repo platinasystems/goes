@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/platinasystems/go/internal/goes/cmd/imx6"
-	"github.com/platinasystems/go/internal/goes/cmd/w83795"
+	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
 	"time"
 )
 
@@ -20,13 +20,13 @@ func diagFans() error {
 	var d0, d1 uint8
 
 	const (
-		w83795Bus    = 0
-		w83795Adr    = 0x2f
-		w83795MuxBus = 0
-		w83795MuxAdr = 0x76
-		w83795MuxVal = 0x80
+		w83795dBus    = 0
+		w83795dAdr    = 0x2f
+		w83795dMuxBus = 0
+		w83795dMuxAdr = 0x76
+		w83795dMuxVal = 0x80
 	)
-	var hw = w83795.I2cDev{w83795Bus, w83795Adr, w83795MuxBus, w83795MuxAdr, w83795MuxVal}
+	var hw = w83795d.I2cDev{w83795dBus, w83795dAdr, w83795dMuxBus, w83795dMuxAdr, w83795dMuxVal}
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
 	fmt.Printf("---------------|-------------------------|----------|----------|----------|----------|------|-----------------------------------\n")
