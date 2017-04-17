@@ -4,25 +4,25 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/fantray"
+import "github.com/platinasystems/go/internal/goes/cmd/fantrayd"
 
-func init() { fantray.Init = fantrayInit }
+func init() { fantrayd.Init = fantraydInit }
 
-func fantrayInit() {
-	fantray.Vdev.Bus = 1
-	fantray.Vdev.Addr = 0x20
-	fantray.Vdev.MuxBus = 1
-	fantray.Vdev.MuxAddr = 0x72
-	fantray.Vdev.MuxValue = 0x04
+func fantraydInit() {
+	fantrayd.Vdev.Bus = 1
+	fantrayd.Vdev.Addr = 0x20
+	fantrayd.Vdev.MuxBus = 1
+	fantrayd.Vdev.MuxAddr = 0x72
+	fantrayd.Vdev.MuxValue = 0x04
 
-	fantray.VpageByKey = map[string]uint8{
+	fantrayd.VpageByKey = map[string]uint8{
 		"fan_tray.1.status": 1,
 		"fan_tray.2.status": 2,
 		"fan_tray.3.status": 3,
 		"fan_tray.4.status": 4,
 	}
 
-	fantray.WrRegDv["fantray"] = "fantray"
-	fantray.WrRegFn["fantray.example"] = "example"
-	fantray.WrRegRng["fantray.example"] = []string{"true", "false"}
+	fantrayd.WrRegDv["fantrayd"] = "fantrayd"
+	fantrayd.WrRegFn["fantrayd.example"] = "example"
+	fantrayd.WrRegRng["fantrayd.example"] = []string{"true", "false"}
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package fantray
+package fantrayd
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "fantray"
+const Name = "fantrayd"
 
 type I2cDev struct {
 	Bus      int

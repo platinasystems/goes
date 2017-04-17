@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
-	"github.com/platinasystems/go/internal/goes/cmd/fantray"
+	"github.com/platinasystems/go/internal/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
 	"github.com/platinasystems/go/internal/log"
@@ -331,12 +331,12 @@ func (h *I2cDev) PowerCycles() (string, error) {
 				w83795d.Vdev.FanInit()
 
 				log.Print("notice: re-init fan trays")
-				fantray.Vdev.Bus = 1
-				fantray.Vdev.Addr = 0x20
-				fantray.Vdev.MuxBus = 1
-				fantray.Vdev.MuxAddr = 0x72
-				fantray.Vdev.MuxValue = 0x04
-				fantray.Vdev.FanTrayLedReinit()
+				fantrayd.Vdev.Bus = 1
+				fantrayd.Vdev.Addr = 0x20
+				fantrayd.Vdev.MuxBus = 1
+				fantrayd.Vdev.MuxAddr = 0x72
+				fantrayd.Vdev.MuxValue = 0x04
+				fantrayd.Vdev.FanTrayLedReinit()
 
 				log.Print("notice: re-init front panel LEDs")
 				ver := 0
