@@ -191,7 +191,7 @@ func (nm *netlinkMain) LoopInit(l *loop.Loop) {
 	go nm.m.listener(l)
 }
 
-func (nm *netlinkMain) Init(m *Main) (err error) {
+func (nm *netlinkMain) Init(m *Main) {
 	nm.m = m
 	nm.eventPool.New = nm.newEvent
 	nm.unreachable_ip4_next_hops = make(map[ip4.NextHop]unreachable_ip4_next_hop)
@@ -202,8 +202,11 @@ func (nm *netlinkMain) Init(m *Main) (err error) {
 		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
 		RxBytes: 8 << 20,
 	}
-	nm.s, err = netlink.NewWithConfig(cf)
-	return
+	if socket, err := netlink.NewWithConfig(cf); err != nil {
+		panic(err)
+	} else {
+		nm.s = socket
+	}
 }
 
 type netlinkEvent struct {
