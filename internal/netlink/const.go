@@ -220,11 +220,15 @@ const (
 )
 
 var headerFlagNames = []string{
-	0: "Request",
-	1: "Multipart",
-	2: "ACK",
-	3: "Echo",
-	4: "Interrupt",
+	0:  "request",
+	1:  "multipart",
+	2:  "ack",
+	3:  "echo",
+	4:  "interrupt",
+	8:  "root|replace",
+	9:  "match|exclude",
+	10: "atomic|create",
+	11: "append",
 }
 
 func (x HeaderFlags) String() string { return elib.FlagStringer(headerFlagNames, elib.Word(x)) }
