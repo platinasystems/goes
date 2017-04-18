@@ -413,10 +413,10 @@ func ethernetAddress(t netlink.Attr) (a ethernet.Address) {
 	return
 }
 
-func (m *Main) ifAttr(t netlink.Attr) (si vnet.Si) {
+func (m *Main) ifAttr(t netlink.Attr) (si vnet.Si, ok bool) {
 	si = vnet.SiNil
 	if t != nil {
-		si, _ = m.siForIfIndex(t.(netlink.Uint32Attr).Uint())
+		si, ok = m.siForIfIndex(t.(netlink.Uint32Attr).Uint())
 	}
 	return
 }
@@ -460,7 +460,11 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	case netlink.NUD_PERMANENT:
 		isStatic = true
 	}
-	si, _ := m.siForIfIndex(v.Index)
+	si, ok := m.siForIfIndex(v.Index)
+	if !ok {
+		// Ignore neighbors for non vnet interfaces.
+		return
+	}
 	nh := ip4NextHop(v.Attrs[netlink.NDA_DST], next_hop_weight, si)
 	nbr := ethernet.IpNeighbor{
 		Si:       si,
@@ -526,8 +530,12 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 		m.v.Logf("netlink ignore route with table not main: %s\n", v)
 		return
 	}
+	si, ok := m.ifAttr(v.Attrs[netlink.RTA_OIF])
+	if !ok {
+		// Ignore routes for non vnet interfaces.
+		return
+	}
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
-	si := m.ifAttr(v.Attrs[netlink.RTA_OIF])
 	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, si)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
 	m4 := ip4.GetMain(m.v)
