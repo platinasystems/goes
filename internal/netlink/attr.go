@@ -204,14 +204,14 @@ func parse_link_info(b []byte) *AttrArray {
 		kind := IfLinkInfoAttrKind(a.Kind())
 		as.X.Validate(uint(kind))
 		switch kind {
-		case IFLA_INFO_KIND:
+		case IFLA_INFO_KIND, IFLA_INFO_SLAVE_KIND:
 			// Remove trailing 0.
 			l := len(v)
 			for l > 0 && v[l-1] == 0 {
 				l = l - 1
 			}
 			as.X[kind] = StringAttrBytes(v[:l])
-		case IFLA_INFO_DATA:
+		case IFLA_INFO_DATA, IFLA_INFO_SLAVE_DATA:
 			as.X[kind] = Uint32AttrBytes(v)
 		default:
 			panic("unknown link info attribute kind " + kind.String())
