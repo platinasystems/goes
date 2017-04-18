@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -24,9 +25,33 @@ const DefaultNumvfs = 16
 type Mac [6]byte
 type Vf uint
 
-type pf struct {
+type Pf struct {
 	net.Interface
 	numvfs int
+}
+
+type Pfs []Pf
+
+type Virtfns []string
+
+func (p Pfs) Len() int      { return len(p) }
+func (p Pfs) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p Pfs) Less(i, j int) bool {
+	ni := uint32(p[i].Interface.HardwareAddr[3]) << 16
+	ni |= uint32(p[i].Interface.HardwareAddr[4]) << 8
+	ni |= uint32(p[i].Interface.HardwareAddr[5])
+	nj := uint32(p[j].Interface.HardwareAddr[3]) << 16
+	nj |= uint32(p[j].Interface.HardwareAddr[4]) << 8
+	nj |= uint32(p[j].Interface.HardwareAddr[5])
+	return ni < nj
+}
+
+func (v Virtfns) Len() int      { return len(v) }
+func (v Virtfns) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
+func (v Virtfns) Less(i, j int) bool {
+	ni, _ := getVfi(v[i])
+	nj, _ := getVfi(v[j])
+	return ni < nj
 }
 
 func (vf Vf) Port() uint    { return uint((vf &^ (Port(1) - 1)) >> 20) }
@@ -68,7 +93,7 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 	}
 	for pfi, pf := range pfs {
 		var mac Mac
-		var virtfns []string
+		var virtfns Virtfns
 
 		if pf.numvfs == numvfs {
 			// assume pf and its vfs are set
@@ -150,10 +175,11 @@ func (mac Mac) String() string {
 		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
 }
 
-func getPfs(numpfs int) (pfs []pf, err error) {
+func getPfs(numpfs int) (Pfs, error) {
+	pfs := make(Pfs, 0, numpfs)
 	all, err := net.Interfaces()
 	if err != nil {
-		return
+		return nil, err
 	}
 	for _, dev := range all {
 		var numvfs int
@@ -170,42 +196,40 @@ func getPfs(numpfs int) (pfs []pf, err error) {
 		}
 		if dev.Flags&net.FlagUp != net.FlagUp {
 			if err = ifset(dev.Name, "up"); err != nil {
-				return
+				return nil, err
 			}
 		}
-		pfs = append(pfs, pf{dev, numvfs})
-		if len(pfs) == numpfs {
-			return
+		pfs = append(pfs, Pf{dev, numvfs})
+		if pfs.Len() == numpfs {
+			sort.Sort(pfs)
+			return pfs, nil
 		}
 	}
-	if n := len(pfs); n != numpfs {
-		err = fmt.Errorf("insufficient pfs: %d vs. %d", n, numpfs)
-	}
-	return
+	return nil, fmt.Errorf("have %d vs. %d pfs", pfs.Len(), numpfs)
 }
 
-func pfvirtfns(pfname string, numvfs int) (virtfns []string, err error) {
+func pfvirtfns(pfname string, numvfs int) (Virtfns, error) {
+	var virtfns Virtfns
 	pat := filepath.Join("/sys/class/net", pfname, "device/virtfn*")
 	for tries := 0; true; tries++ {
-		virtfns, err = filepath.Glob(pat)
-		if err == nil && len(virtfns) >= numvfs {
+		matches, err := filepath.Glob(pat)
+		if err == nil && len(matches) >= numvfs {
+			virtfns = Virtfns(matches)
 			break
 		}
 		if tries == 5 {
-			err = fmt.Errorf("%s: vf t/o", pfname)
-			break
+			return nil, fmt.Errorf("%s: vf t/o", pfname)
 		}
 		time.Sleep(time.Second)
 	}
-	return
+	sort.Sort(virtfns)
+	return virtfns, nil
 }
 
-func getVfi(virtfn string) (int, error) {
-	var vfi int
-	base := filepath.Base(virtfn)
-	s := strings.TrimPrefix(base, "virtfn")
-	_, err := fmt.Sscan(s, &vfi)
-	return vfi, err
+func getVfi(virtfn string) (vfi int, err error) {
+	s := strings.TrimPrefix(filepath.Base(virtfn), "virtfn")
+	_, err = fmt.Sscan(s, &vfi)
+	return
 }
 
 func getVfname(virtfn string) (string, error) {
