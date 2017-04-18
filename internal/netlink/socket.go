@@ -323,7 +323,9 @@ func (s *Socket) gorx() {
 				msg = NewErrorMessage()
 			case NLMSG_DONE:
 				msg = NewDoneMessage()
-			case RTM_NEWLINK, RTM_DELLINK, RTM_GETLINK, RTM_SETLINK:
+			case RTM_GETLINK:
+				msg = NewGenMessage()
+			case RTM_NEWLINK, RTM_DELLINK, RTM_SETLINK:
 				msg = NewIfInfoMessage()
 			case RTM_NEWADDR, RTM_DELADDR, RTM_GETADDR:
 				msg = NewIfAddrMessage()
@@ -334,25 +336,26 @@ func (s *Socket) gorx() {
 			case RTM_NEWNSID, RTM_DELNSID, RTM_GETNSID:
 				msg = NewNetnsMessage()
 			}
-			if msg != nil {
-				*msg.Nsid() = nsid
-				_, err = msg.Write(buf[i : i+l])
-				if err != nil {
-					errno, ok := err.(syscall.Errno)
-					if !ok {
-						errno = syscall.EINVAL
-					}
-					msg.Close()
-					e := NewErrorMessage()
-					e.Errormsg.Errno = -int32(errno)
-					e.Errormsg.Req = *h
-					msg = e
-				}
-				if false {
-					fmt.Fprint(os.Stderr, "Rx: ", msg)
-				}
-				s.rx <- msg
+			if msg == nil {
+				continue
 			}
+			_, err = msg.Write(buf[i : i+l])
+			if err != nil {
+				errno, ok := err.(syscall.Errno)
+				if !ok {
+					errno = syscall.EINVAL
+				}
+				msg.Close()
+				e := NewErrorMessage()
+				e.Errormsg.Errno = -int32(errno)
+				e.Errormsg.Req = *h
+				msg = e
+			}
+			*msg.Nsid() = nsid
+			if false {
+				fmt.Print("Rx: ", msg)
+			}
+			s.rx <- msg
 		}
 	}
 	close(s.rx)
@@ -360,50 +363,64 @@ func (s *Socket) gorx() {
 }
 
 func (s *Socket) gotx() {
+	var noob int
 	seq := uint32(1)
 	buf := make([]byte, 16*PageSz)
 	oob := make([]byte, PageSz)
-	h := (*Header)(unsafe.Pointer(&buf[0]))
+	bh := (*Header)(unsafe.Pointer(&buf[0]))
 	scm := (*syscall.SocketControlMessage)(unsafe.Pointer(&oob[0]))
 	scmNsid := (*int)(unsafe.Pointer(&oob[syscall.SizeofCmsghdr]))
-	const noob = syscall.SizeofCmsghdr + SizeofInt
-
+	to := &syscall.SockaddrNetlink{
+		Family: uint16(AF_NETLINK),
+	}
 	for msg := range s.tx {
-		n, err := msg.Read(buf)
-		if err != nil {
-			s.once.Do(func() {
-				fmt.Fprintln(os.Stderr, "Read:", msg,
-					"ERROR:", err)
-			})
-			msg.Close()
-			continue
+		mh := msg.MsgHeader()
+		if mh.Flags == 0 {
+			mh.Flags = NLM_F_REQUEST
 		}
-		nsid := *msg.Nsid()
-		msg.Close()
-		if h.Flags == 0 {
-			h.Flags = NLM_F_REQUEST
+		if mh.Pid == 0 {
+			mh.Pid = s.addr.Pid
 		}
-		if h.Pid == 0 {
-			h.Pid = s.addr.Pid
-		}
-		if h.Sequence == 0 {
-			h.Sequence = seq
+		if mh.Sequence == 0 {
+			mh.Sequence = seq
 			seq++
 		}
-		h.Len = uint32(n)
-		if nsid != DefaultNsid {
-			scm.Header.Level = SOL_NETLINK
-			scm.Header.Type = NETLINK_LISTEN_ALL_NSID
+		n, err := msg.Read(buf)
+		if err != nil {
+			goto emsg
+		}
+		mh.Len = uint32(n)
+		bh.Len = mh.Len
+		if false {
+			fmt.Print("Tx: ", msg)
+		}
+		if nsid := *msg.Nsid(); nsid != DefaultNsid {
+			noob = syscall.SizeofCmsghdr + SizeofInt
 			*scmNsid = nsid
 			scm.Header.SetLen(noob)
-			err = syscall.Sendmsg(s.fd, buf[:n], oob[:noob],
-				s.addr, 0)
+			scm.Header.Level = SOL_NETLINK
+			scm.Header.Type = NETLINK_LISTEN_ALL_NSID
+			if false {
+				fmt.Print("scm: ", *scm, *scmNsid, "\n")
+			}
 		} else {
-			_, err = syscall.Write(s.fd, buf[:n])
+			noob = 0
 		}
+		err = syscall.Sendmsg(s.fd, buf[:n], oob[:noob], to, 0)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Send:", msg, "ERROR:", err)
-			break
+			goto emsg
 		}
+		msg.Close()
+		continue
+	emsg:
+		errno, ok := err.(syscall.Errno)
+		if !ok {
+			errno = syscall.EINVAL
+		}
+		e := NewErrorMessage()
+		e.Errormsg.Errno = -int32(errno)
+		e.Errormsg.Req = *mh
+		s.rx <- e
+		msg.Close()
 	}
 }
