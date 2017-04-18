@@ -106,6 +106,7 @@ func NewGenMessage() *GenMessage {
 	m := pool.GenMessage.Get().(*GenMessage)
 	runtime.SetFinalizer(m, (*GenMessage).Close)
 	m.nsid = DefaultNsid
+	m.Header.Len = SizeofGenMessage
 	return m
 }
 
