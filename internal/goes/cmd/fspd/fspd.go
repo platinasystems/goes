@@ -165,7 +165,10 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
+			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
+			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
@@ -423,14 +426,14 @@ func (cmd *cmd) update() error {
 						cmd.lasts[k] = v
 					}
 				}
-				if strings.Contains(k, "fan_speed") {
+				if strings.Contains(k, "fan_speed.units.rpm") {
 					v, err := Vdev[i].FanSpeed()
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
+					if v != cmd.lasts[k] {
 						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+						cmd.lasts[k] = v
 					}
 				}
 				/*if strings.Contains(k, "mfg_id") {
@@ -726,16 +729,21 @@ func (h *I2cDev) Temp2() (string, error) {
 	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
 
-func (h *I2cDev) FanSpeed() (uint16, error) {
+func (h *I2cDev) FanSpeed() (string, error) {
 	r := getRegs()
 	r.FanSpeed.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	t := uint16(s[1].D[1]) + (uint16(s[1].D[0]) << 8)
-	return t, nil
+	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
+	log.Printf("fanspeed 0x%x", t)
+	v, errs := h.convert(t)
+	if errs != nil {
+		return "", errs
+	}
+	return strconv.FormatFloat(v, 'f', 0, 64), nil
 }
 
 func (h *I2cDev) Pout() (string, error) {
