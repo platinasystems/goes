@@ -25,6 +25,7 @@ type Message interface {
 	// The Message Closer returns itself to its respective pool.
 	io.Closer
 
+	MsgHeader() *Header
 	MsgType() MsgType
 	Nsid() *int
 
@@ -66,7 +67,8 @@ type Header struct {
 
 const SizeofHeader = 4 + SizeofMsgType + SizeofHeaderFlags + 4 + 4
 
-func (h *Header) MsgType() MsgType { return h.Type }
+func (h *Header) MsgHeader() *Header { return h }
+func (h *Header) MsgType() MsgType   { return h.Type }
 
 func (h *Header) Read(b []byte) (int, error) {
 	if len(b) < SizeofHeader {
