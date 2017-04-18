@@ -18,6 +18,7 @@ import (
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -35,6 +36,7 @@ type I2cDev struct {
 	Model      string
 	Bus        int
 	Addr       int
+	AddrProm   int
 	MuxBus     int
 	MuxAddr    int
 	MuxValue   int
@@ -42,6 +44,7 @@ type I2cDev struct {
 	GpioPrsntL string
 	GpioPwronL string
 	GpioIntL   string
+	Update     [3]bool
 }
 
 var (
@@ -165,7 +168,10 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
+			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".eeprom"
+			cmd.pub.Print("delete: ", k)
+			cmd.lasts[k] = ""
+			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
 			cmd.pub.Print("delete: ", k)
 			cmd.lasts[k] = ""
 			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
@@ -215,26 +221,46 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-			if strings.Contains(k, "mfg_id") {
-				v, err := Vdev[i].MfgIdent()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lasts[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lasts[k] = v
-				}
-			}
-			if strings.Contains(k, "mfg_model") {
-				v, err := Vdev[i].MfgModel()
-				if err != nil {
-					return err
-				}
-				if v != cmd.lasts[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lasts[k] = v
+			if Vdev[i].Update[0] {
+				if strings.Contains(k, "mfg_id") {
+					v, err := Vdev[i].MfgIdent()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+					Vdev[i].Update[0] = false
 				}
 			}
+			if Vdev[i].Update[1] {
+				if strings.Contains(k, "mfg_model") {
+					v, err := Vdev[i].MfgModel()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+					Vdev[i].Update[1] = false
+				}
+			}
+			if Vdev[i].Update[2] {
+				if strings.Contains(k, "eeprom") {
+					v, err := Vdev[i].Eeprom()
+					if err != nil {
+						return err
+					}
+					if v != cmd.lasts[k] {
+						cmd.pub.Print(k, ": ", v)
+						cmd.lasts[k] = v
+					}
+					Vdev[i].Update[2] = false
+				}
+			}
+
 			if Vdev[i].Id != "" {
 				if strings.Contains(k, "page") {
 					v, err := Vdev[i].Page()
@@ -738,7 +764,6 @@ func (h *I2cDev) FanSpeed() (string, error) {
 		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
-	log.Printf("fanspeed 0x%x", t)
 	v, errs := h.convert(t)
 	if errs != nil {
 		return "", errs
@@ -868,6 +893,32 @@ func (h *I2cDev) MfgModel() (string, error) {
 	return t, nil
 }
 
+func (h *I2cDev) Eeprom() (string, error) {
+
+	var v string
+	var data = [34]byte{0, 0, 0, 0}
+	data[0] = byte(h.MuxValue)
+
+	for n := 0; n < 16; n++ {
+		j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
+		x++
+		for i := n * 16; i < n*16+16; i++ {
+			j[x] = I{true, i2c.Read, uint8(i), i2c.ByteData, data, h.Bus, h.AddrProm, 0}
+			x++
+		}
+		closeMux(h)
+		err := DoI2cRpc()
+		if err != nil {
+			return "", err
+		}
+
+		for k := 1; k < 17; k++ {
+			v += fmt.Sprintf("%02x ", s[k].D[0])
+		}
+	}
+	return v, nil
+}
+
 func (h *I2cDev) PsuStatus() string {
 	if len(gpio.Pins) == 0 {
 		gpio.Init()
@@ -886,7 +937,9 @@ func (h *I2cDev) PsuStatus() string {
 			return "not_installed"
 		}
 	}
-
+	if h.Installed == 0 {
+		h.Update = [3]bool{true, true, true}
+	}
 	h.Installed = 1
 	pin, found = gpio.Pins[h.GpioPwrok]
 	if !found {

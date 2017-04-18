@@ -12,6 +12,7 @@ func fspdInit() {
 	fspd.Vdev[0].Slot = 2
 	fspd.Vdev[0].Bus = 1
 	fspd.Vdev[0].Addr = 0x58
+	fspd.Vdev[0].AddrProm = 0x50
 	fspd.Vdev[0].MuxBus = 1
 	fspd.Vdev[0].MuxAddr = 0x72
 	fspd.Vdev[0].MuxValue = 0x01
@@ -23,6 +24,7 @@ func fspdInit() {
 	fspd.Vdev[1].Slot = 1
 	fspd.Vdev[1].Bus = 1
 	fspd.Vdev[1].Addr = 0x58
+	fspd.Vdev[1].AddrProm = 0x50
 	fspd.Vdev[1].MuxBus = 1
 	fspd.Vdev[1].MuxAddr = 0x72
 	fspd.Vdev[1].MuxValue = 0x02
@@ -33,6 +35,7 @@ func fspdInit() {
 
 	fspd.VpageByKey = map[string]uint8{
 
+		"psu1.eeprom":              1,
 		"psu1.fan_speed.units.rpm": 1,
 		"psu1.status":              1,
 		"psu1.admin.state":         1,
@@ -45,6 +48,7 @@ func fspdInit() {
 		"psu1.p_in.units.W":        1,
 		"psu1.temp1.units.C":       1,
 		"psu1.temp2.units.C":       1,
+		"psu2.eeprom":              0,
 		"psu2.fan_speed.units.rpm": 0,
 		"psu2.status":              0,
 		"psu2.admin.state":         0,
