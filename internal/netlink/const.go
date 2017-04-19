@@ -14,7 +14,6 @@ import (
 const (
 	DefaultMessages = 64
 	DefaultNsid     = -1
-	PageSz          = 4096
 	SizeofInt       = (32 << (^uint(0) >> 63)) >> 3
 )
 

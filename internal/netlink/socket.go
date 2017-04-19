@@ -36,7 +36,10 @@ var (
 		{RTM_GETROUTE, AF_INET6},
 	}
 	NoopListenReq = ListenReq{NLMSG_NOOP, AF_UNSPEC}
+	PageSize      int
 )
+
+func init() { PageSize = syscall.Getpagesize() }
 
 // Zero means use default value.
 type SocketConfig struct {
@@ -269,8 +272,8 @@ func (s *Socket) RxUntilDone(handler Handler) (err error) {
 }
 
 func (s *Socket) gorx() {
-	buf := make([]byte, 16*PageSz)
-	oob := make([]byte, 2*PageSz)
+	buf := make([]byte, 4*PageSize)
+	oob := make([]byte, PageSize)
 
 	hasNsid := func(scm syscall.SocketControlMessage) bool {
 		return scm.Header.Level == SOL_NETLINK &&
