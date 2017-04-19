@@ -337,7 +337,7 @@ func (s *Socket) gorx() {
 			if msg == nil {
 				continue
 			}
-			_, err = msg.Write(buf[i : i+l])
+			_, err = msg.Write(buf[i : i+int(h.Len)])
 			if err != nil {
 				errno, ok := err.(syscall.Errno)
 				if !ok {
