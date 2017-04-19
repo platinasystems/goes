@@ -361,17 +361,26 @@ func (s *Socket) gorx() {
 }
 
 func (s *Socket) gotx() {
-	var noob int
+	var cmsgdata [SizeofInt]byte
 	seq := uint32(1)
-	buf := make([]byte, 16*PageSz)
-	oob := make([]byte, PageSz)
+	buf := make([]byte, 4*PageSize)
 	bh := (*Header)(unsafe.Pointer(&buf[0]))
-	scm := (*syscall.SocketControlMessage)(unsafe.Pointer(&oob[0]))
-	scmNsid := (*int)(unsafe.Pointer(&oob[syscall.SizeofCmsghdr]))
+	oob := make([]byte, syscall.CmsgSpace(SizeofInt))
+	cmsghdrp := (*syscall.Cmsghdr)(unsafe.Pointer(&oob[0]))
+	nsidp := (*int)(unsafe.Pointer(&cmsgdata[0]))
+	cmsg := syscall.SocketControlMessage{
+		syscall.Cmsghdr{
+			Len:   uint64(syscall.CmsgLen(SizeofInt)),
+			Level: SOL_NETLINK,
+			Type:  NETLINK_LISTEN_ALL_NSID,
+		},
+		cmsgdata[:],
+	}
 	to := &syscall.SockaddrNetlink{
 		Family: uint16(AF_NETLINK),
 	}
 	for msg := range s.tx {
+		var noob int
 		mh := msg.MsgHeader()
 		if mh.Flags == 0 {
 			mh.Flags = NLM_F_REQUEST
@@ -393,16 +402,14 @@ func (s *Socket) gotx() {
 			fmt.Print("Tx: ", msg)
 		}
 		if nsid := *msg.Nsid(); nsid != DefaultNsid {
-			noob = syscall.SizeofCmsghdr + SizeofInt
-			*scmNsid = nsid
-			scm.Header.SetLen(noob)
-			scm.Header.Level = SOL_NETLINK
-			scm.Header.Type = NETLINK_LISTEN_ALL_NSID
+			noob = len(oob)
+			*nsidp = nsid
+			*cmsghdrp = cmsg.Header
+			copy(oob[syscall.CmsgLen(0):], cmsgdata[:])
 			if false {
-				fmt.Print("scm: ", *scm, *scmNsid, "\n")
+				fmt.Println("cmsg:", cmsg)
+				fmt.Println("oob:", oob[:noob])
 			}
-		} else {
-			noob = 0
 		}
 		err = syscall.Sendmsg(s.fd, buf[:n], oob[:noob], to, 0)
 		if err != nil {
