@@ -913,7 +913,7 @@ func (h *I2cDev) Eeprom() (string, error) {
 		}
 
 		for k := 1; k < 17; k++ {
-			v += fmt.Sprintf("%02x ", s[k].D[0])
+			v += fmt.Sprintf("%02x", s[k].D[0])
 		}
 	}
 	return v, nil
