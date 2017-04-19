@@ -594,7 +594,7 @@ func (s *State) PromptWithSuggestion(prompt string, text string, pos int) (strin
 	prefixPos := 0
 	prefixStale := true
 	prefixAction := false // used to mark history related actions
-	killAction := 0       // used to mark kill related actions
+	killAction := 0        // used to mark kill related actions
 
 	historyPos := len(s.history)
 
@@ -928,25 +928,21 @@ mainLoop:
 					fmt.Print(beep)
 				}
 			case up:
-				if len(s.history) > 0 {
-					if historyPos == 0 {
-						historyPos = len(s.history)
-					}
-					historyPos--
-					line = []rune(s.history[historyPos])
-					pos = len(line)
-					s.needRefresh = true
+				if historyPos == 0 {
+					historyPos = len(s.history)
 				}
+				historyPos--
+				line = []rune(s.history[historyPos])
+				pos = len(line)
+				s.needRefresh = true
 			case down:
-				if len(s.history) > 0 {
-					if historyPos >= len(s.history)-1 {
-						historyPos = 0
-					} else {
-						historyPos++
-					}
-					line = []rune(s.history[historyPos])
-					pos = len(line)
+				if historyPos >= len(s.history)-1 {
+					historyPos = 0
+				} else {
+					historyPos++
 				}
+				line = []rune(s.history[historyPos])
+				pos = len(line)
 			case home: // Start of line
 				pos = 0
 			case end: // End of line
@@ -967,7 +963,7 @@ mainLoop:
 			}
 			s.needRefresh = true
 		}
-	checkRefresh:
+ checkRefresh:
 		if s.needRefresh && !s.inputWaiting() {
 			s.refresh(p, line, pos)
 		}
