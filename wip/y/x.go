@@ -66,7 +66,9 @@ func main() {
 	ethernet.Init(v)
 	ip4.Init(v)
 	ip6.Init(v)
-	ixge.Init(v)
+	if false {
+		ixge.Init(v)
+	}
 	pci.Init(v)
 	pg.Init(v)
 	ipcli.Init(v)
