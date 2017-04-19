@@ -26,6 +26,7 @@ type Message interface {
 	io.Closer
 
 	MsgHeader() *Header
+	MsgLen() int
 	MsgType() MsgType
 	Nsid() *int
 
@@ -69,6 +70,11 @@ const SizeofHeader = 4 + SizeofMsgType + SizeofHeaderFlags + 4 + 4
 
 func (h *Header) MsgHeader() *Header { return h }
 func (h *Header) MsgType() MsgType   { return h.Type }
+
+// Roundup netlink message length for proper alignment.
+func (h *Header) MsgLen() int {
+	return (int(h.Len) + NLMSG_ALIGNTO - 1) & ^(NLMSG_ALIGNTO - 1)
+}
 
 func (h *Header) Read(b []byte) (int, error) {
 	if len(b) < SizeofHeader {

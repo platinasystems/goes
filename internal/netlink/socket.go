@@ -280,11 +280,6 @@ func (s *Socket) gorx() {
 		return *(*int)(unsafe.Pointer(&scm.Data[0]))
 	}
 
-	// Round the length of a netlink message up to align it properly.
-	messageAlignLen := func(l int) int {
-		return (l + NLMSG_ALIGNTO - 1) & ^(NLMSG_ALIGNTO - 1)
-	}
-
 	for {
 		nsid := DefaultNsid
 
@@ -314,7 +309,7 @@ func (s *Socket) gorx() {
 				panic("incomplete header")
 			}
 			h := (*Header)(unsafe.Pointer(&buf[i]))
-			l = messageAlignLen(int(h.Len))
+			l = h.MsgLen()
 			var msg Message
 			switch h.Type {
 			case NLMSG_NOOP:
