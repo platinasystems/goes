@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -62,34 +61,31 @@ func Port(u uint) Vf    { return Vf(u << 20) }
 func SubPort(u uint) Vf { return Vf((u & 0xf) << 16) }
 func Vlan(u uint) Vf    { return Vf(u & 0xffff) }
 
-func Mksriovs(porto uint, vfs ...[]Vf) error {
-	var totalvfs int
-	err := assert.Root()
+func Del(vfs [][]Vf) error {
+	pfs, err := getPfs(len(vfs))
 	if err != nil {
 		return err
 	}
-	numpfs := len(vfs)
-	numvfs := DefaultNumvfs
-	if s, _ := redis.Hget(redis.DefaultHash, "sriov.numvfs"); len(s) > 0 {
-		_, err = fmt.Sscan(s, &numvfs)
-		if err != nil {
-			return fmt.Errorf("sriov.numvfs: %v", err)
+	for _, pf := range pfs {
+		if terr := setNumvfs(pf.Name, 0); terr != nil && err == nil {
+			err = terr
 		}
 	}
-	pfs, err := getPfs(numpfs)
+	return err
+}
+
+func New(porto uint, vfs [][]Vf) error {
+	numvfs, err := getNumvfs()
 	if err != nil {
 		return err
 	}
-	fn := filepath.Join("/sys/class/net", pfs[0].Interface.Name,
-		"device/sriov_totalvfs")
-	f, err := os.Open(fn)
+	pfs, err := getPfs(len(vfs))
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fscan(f, &totalvfs)
-	f.Close()
+	totalvfs, err := getTotalvfs(pfs[0].Interface.Name)
 	if err != nil {
-		return fmt.Errorf("%s: %v", fn, err)
+		return err
 	}
 	for pfi, pf := range pfs {
 		var mac Mac
@@ -99,16 +95,8 @@ func Mksriovs(porto uint, vfs ...[]Vf) error {
 			// assume pf and its vfs are set
 			continue
 		}
-		fn = filepath.Join("/sys/class/net", pf.Name,
-			"device/sriov_numvfs")
-		f, err = os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC, 0)
-		if err != nil {
+		if err = setNumvfs(pf.Name, numvfs); err != nil {
 			return err
-		}
-		_, err = fmt.Fprintln(f, numvfs)
-		f.Close()
-		if err != nil {
-			return fmt.Errorf("%s: %v", fn, err)
 		}
 
 		copy(mac[:], pf.HardwareAddr)
@@ -206,6 +194,43 @@ func getPfs(numpfs int) (Pfs, error) {
 		}
 	}
 	return nil, fmt.Errorf("have %d vs. %d pfs", pfs.Len(), numpfs)
+}
+
+func getNumvfs() (numvfs int, err error) {
+	numvfs = DefaultNumvfs
+	if s, _ := redis.Hget(redis.DefaultHash, "sriov.numvfs"); len(s) > 0 {
+		if _, err = fmt.Sscan(s, &numvfs); err != nil {
+			err = fmt.Errorf("sriov.numvfs: %v", err)
+		}
+	}
+	return
+}
+
+func setNumvfs(ifname string, n int) error {
+	fn := filepath.Join("/sys/class/net", ifname, "device/sriov_numvfs")
+	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err = fmt.Fprintln(f, n); err != nil {
+		err = fmt.Errorf("%s: %v", fn, err)
+	}
+	return err
+}
+
+func getTotalvfs(ifname string) (totalvfs int, err error) {
+	fn := filepath.Join("/sys/class/net", ifname, "device/sriov_totalvfs")
+	f, err := os.Open(fn)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, err = fmt.Fscan(f, &totalvfs)
+	if err != nil {
+		err = fmt.Errorf("%s: %v", fn, err)
+	}
+	return
 }
 
 func pfvirtfns(pfname string, numvfs int) (Virtfns, error) {

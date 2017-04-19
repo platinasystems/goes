@@ -17,7 +17,7 @@ func init() {
 	stop.Hook = func() error {
 		fns, err := sriovs.NumvfsFns()
 		if err == nil && len(fns) > 0 {
-			return nil
+			return delSriovs()
 		}
 		interfaces, err := net.Interfaces()
 		if err != nil {
