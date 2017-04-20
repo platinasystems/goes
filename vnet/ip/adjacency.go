@@ -435,6 +435,8 @@ func (m *Main) createMpAdj(unnorm nextHopVec) (*multipathAdjacency, uint, bool) 
 	return m.getMpAdj(unnorm, true)
 }
 
+func (m *Main) GetAdjacencyUsage() elib.HeapUsage { return m.adjacencyHeap.GetUsage() }
+
 func (m *adjacencyMain) mpAdjForAdj(a Adj, validate bool) (ma *multipathAdjacency, maIndex uint) {
 	maIndex = uint(m.adjacencyHeap.Id(uint(a)))
 	mm := &m.multipathMain

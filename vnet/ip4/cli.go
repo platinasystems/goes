@@ -31,6 +31,10 @@ func (x showIpFibRoutes) Less(i, j int) bool {
 func (x showIpFibRoutes) Swap(i, j int) { x[i], x[j] = x[j], x[i] }
 func (x showIpFibRoutes) Len() int      { return len(x) }
 
+type fibShowUsageHook func(w cli.Writer)
+
+//go:generate gentemplate -id FibShowUsageHook -d Package=ip4 -d DepsType=fibShowUsageHookVec -d Type=fibShowUsageHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
+
 func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 
 	detail := false
@@ -52,6 +56,11 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		for fi := range m.fibs {
 			fib := m.fibs[fi]
 			fmt.Fprintf(w, "%6d%12d\n", fi, fib.Len())
+		}
+		u := m.GetAdjacencyUsage()
+		fmt.Fprintf(w, "Adjacencies: heap %d used, %d free\n", u.Used, u.Free)
+		for i := range m.FibShowUsageHooks.hooks {
+			m.FibShowUsageHooks.Get(i)(w)
 		}
 		return
 	}

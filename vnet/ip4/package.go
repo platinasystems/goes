@@ -36,9 +36,10 @@ type Main struct {
 	vnet.Package
 	ip.Main
 	fibMain
-	ifAddrAddDelHooks IfAddrAddDelHookVec
 	nodeMain
 	pgMain
+	ifAddrAddDelHooks IfAddrAddDelHookVec
+	FibShowUsageHooks fibShowUsageHookVec
 }
 
 func (m *Main) Init() (err error) {
