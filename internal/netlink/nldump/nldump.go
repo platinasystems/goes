@@ -7,96 +7,86 @@ package nldump
 import (
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/indent"
-	. "github.com/platinasystems/go/internal/netlink"
+	"github.com/platinasystems/go/internal/netlink"
 )
 
-const Usage = "nldump [ link|addr|route|neighor|nsid ]..."
-
-type flags uint
+const Usage = "nldump [ link|addr|route|neighor|nsid ]... [NSID]..."
 
 // Dump all or select netlink messages
 func Main(args ...string) error {
-	const (
-		link flags = 1 << iota
-		addr
-		route
-		neighbor
-		nsid
-		end
-
-		all = end - 1
-	)
 	var (
-		dump   flags
-		groups []MulticastGroup
-		reqs   []ListenReq
+		groups []netlink.MulticastGroup
+		reqs   []netlink.ListenReq
+		nsids  []int
 	)
-	for _, arg := range args {
-		switch arg {
-		case "-h", "-help", "--help":
-			fmt.Println("usage:", Usage)
-			return nil
-		case "link":
-			dump |= link
-		case "addr":
-			dump |= addr
-		case "route":
-			dump |= route
-		case "neighbor":
-			dump |= neighbor
-		case "nsid":
-			dump |= nsid
-		default:
-			return fmt.Errorf("%s: unknown", arg)
+	flag, args := flags.New(args, "-help", "-h", "--help",
+		"link", "addr", "route", "neighbor", "nsid")
+	flag.Aka("-help", "-h", "--help")
+	if len(args) > 0 {
+		for _, s := range args {
+			var nsid int
+			_, err := fmt.Sscan(s, &nsid)
+			if err != nil {
+				return fmt.Errorf("%s: %v\nusage: %s",
+					s, err, Usage)
+			}
+			nsids = append(nsids, nsid)
 		}
+	} else {
+		nsids = []int{netlink.DefaultNsid}
 	}
-	if dump == 0 {
-		dump = all
+	if flag["-help"] {
+		fmt.Println("usage:", Usage)
+		return nil
 	}
-	if dump.has(link) {
-		groups = append(groups, RTNLGRP_LINK)
-		reqs = append(reqs,
-			ListenReq{RTM_GETLINK, AF_PACKET})
+	if len(flag) == 0 {
+		flag["link"] = true
+		flag["addr"] = true
+		flag["route"] = true
+		flag["neighbor"] = true
+		flag["nsid"] = true
 	}
-	if dump.has(addr) {
-		groups = append(groups,
-			RTNLGRP_IPV4_IFADDR,
-			RTNLGRP_IPV6_IFADDR)
-		reqs = append(reqs,
-			ListenReq{RTM_GETADDR, AF_INET},
-			ListenReq{RTM_GETADDR, AF_INET6})
+	sort.Ints(nsids)
+	if flag["link"] {
+		groups = append(groups, netlink.LinkMulticastGroups...)
+		reqs = append(reqs, netlink.LinkListenReqs...)
 	}
-	if dump.has(route) {
-		groups = append(groups,
-			RTNLGRP_IPV4_ROUTE,
-			RTNLGRP_IPV6_ROUTE,
-			RTNLGRP_IPV4_MROUTE,
-			RTNLGRP_IPV6_MROUTE)
-		reqs = append(reqs,
-			ListenReq{RTM_GETROUTE, AF_INET},
-			ListenReq{RTM_GETROUTE, AF_INET6})
+	if flag["addr"] {
+		groups = append(groups, netlink.AddrMulticastGroups...)
+		reqs = append(reqs, netlink.AddrListenReqs...)
 	}
-	if dump.has(neighbor) {
-		groups = append(groups, RTNLGRP_NEIGH)
-		reqs = append(reqs,
-			ListenReq{RTM_GETNEIGH, AF_INET},
-			ListenReq{RTM_GETNEIGH, AF_INET6})
+	if flag["route"] {
+		groups = append(groups, netlink.RouteMulticastGroups...)
+		reqs = append(reqs, netlink.RouteListenReqs...)
 	}
-	if dump.has(nsid) {
-		groups = append(groups, RTNLGRP_NSID)
-		reqs = append(reqs,
-			ListenReq{RTM_GETNSID, AF_UNSPEC})
+	if flag["neighbor"] {
+		groups = append(groups, netlink.NeighborMulticastGroups...)
+		reqs = append(reqs, netlink.NeighborListenReqs...)
 	}
-	nl, err := New(groups...)
+	if flag["nsid"] {
+		groups = append(groups, netlink.NsidMulticastGroups...)
+		reqs = append(reqs, netlink.NsidListenReqs...)
+	}
+	nl, err := netlink.New(groups...)
 	if err != nil {
 		return err
 	}
-	handler := func(msg Message) (err error) {
+	getlink := func() {
+		for _, nsid := range nsids {
+			nl.GetlinkReq(nsid)
+		}
+	}
+	handler := func(msg netlink.Message) (err error) {
 		defer msg.Close()
-		if msg.MsgType() != NLMSG_DONE {
+		nsid := *msg.Nsid()
+		i := sort.SearchInts(nsids, nsid)
+		found := i < len(nsids) && nsids[i] == nsid
+		if msg.MsgType() != netlink.NLMSG_DONE && found {
 			_, err = msg.WriteTo(indent.New(os.Stdout, "    "))
 		}
 		return err
@@ -106,11 +96,11 @@ func Main(args ...string) error {
 	}
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
-	nl.GetlinkReq(DefaultNsid)
+	getlink()
 	for {
 		select {
 		case <-t.C:
-			nl.GetlinkReq(DefaultNsid)
+			getlink()
 		case msg, opened := <-nl.Rx:
 			if !opened {
 				return nil
@@ -122,5 +112,3 @@ func Main(args ...string) error {
 	}
 	return err
 }
-
-func (f flags) has(t flags) bool { return (f & t) == t }
