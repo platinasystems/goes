@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	DefaultGroups = []MulticastGroup{
+	DefaultMulticastGroups = []MulticastGroup{
 		RTNLGRP_LINK,
 		RTNLGRP_NEIGH,
 		RTNLGRP_IPV4_IFADDR,
@@ -23,6 +23,25 @@ var (
 		RTNLGRP_IPV6_IFADDR,
 		RTNLGRP_IPV6_ROUTE,
 		RTNLGRP_IPV6_MROUTE,
+		RTNLGRP_NSID,
+	}
+	LinkMulticastGroups = []MulticastGroup{
+		RTNLGRP_LINK,
+	}
+	AddrMulticastGroups = []MulticastGroup{
+		RTNLGRP_IPV4_IFADDR,
+		RTNLGRP_IPV6_IFADDR,
+	}
+	RouteMulticastGroups = []MulticastGroup{
+		RTNLGRP_IPV4_ROUTE,
+		RTNLGRP_IPV6_ROUTE,
+		RTNLGRP_IPV4_MROUTE,
+		RTNLGRP_IPV6_MROUTE,
+	}
+	NeighborMulticastGroups = []MulticastGroup{
+		RTNLGRP_NEIGH,
+	}
+	NsidMulticastGroups = []MulticastGroup{
 		RTNLGRP_NSID,
 	}
 	DefaultListenReqs = []ListenReq{
@@ -34,6 +53,24 @@ var (
 		{RTM_GETNEIGH, AF_INET6},
 		{RTM_GETROUTE, AF_INET},
 		{RTM_GETROUTE, AF_INET6},
+	}
+	LinkListenReqs = []ListenReq{
+		{RTM_GETLINK, AF_PACKET},
+	}
+	AddrListenReqs = []ListenReq{
+		{RTM_GETADDR, AF_INET},
+		{RTM_GETADDR, AF_INET6},
+	}
+	RouteListenReqs = []ListenReq{
+		{RTM_GETROUTE, AF_INET},
+		{RTM_GETROUTE, AF_INET6},
+	}
+	NeighborListenReqs = []ListenReq{
+		{RTM_GETNEIGH, AF_INET},
+		{RTM_GETNEIGH, AF_INET6},
+	}
+	NsidListenReqs = []ListenReq{
+		{RTM_GETNSID, AF_UNSPEC},
 	}
 	NoopListenReq = ListenReq{NLMSG_NOOP, AF_UNSPEC}
 	PageSize      int
@@ -95,7 +132,7 @@ func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
 	tx := make(chan Message, cf.TxMessages)
 
 	if len(cf.Groups) == 0 {
-		cf.Groups = DefaultGroups
+		cf.Groups = DefaultMulticastGroups
 	}
 
 	s = &Socket{
