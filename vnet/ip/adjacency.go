@@ -555,7 +555,10 @@ func (m *Main) FreeAdj(a Adj, delMultipath bool) {
 	m.adjacencyHeap.Put(uint(a))
 }
 
-func (m *Main) DelAdj(a Adj) { m.FreeAdj(a, true) }
+func (m *Main) DelAdj(a Adj) {
+	m.CallAdjDelHooks(a)
+	m.FreeAdj(a, true)
+}
 
 func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
 	for i = 0; i < uint(len(nhs)); i++ {
