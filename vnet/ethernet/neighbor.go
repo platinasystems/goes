@@ -87,6 +87,7 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 			return
 		}
 
+		im.CallAdjDelHooks(ai)
 		im.DelAdj(ai)
 
 		*in = ipNeighbor{}
