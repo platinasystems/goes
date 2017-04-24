@@ -66,7 +66,13 @@ Or debug.
 $ gdb ./goesd-example
 ```
 
-See each [goes/cmd]'s README and `godoc`.
+Each [goes/cmd] provides _apropos_, _man_, and _usage_.
+The command may also provide context sensitive _help_, _README_, and _godoc_.
+
+- `goes apropos` _COMMAND_
+- `goes man` _COMMAND_
+- `goes usage` _COMMAND_
+- `goes help` _COMMAND_ [_ARGS_]...
 - https://github.com/platinasystems/go/tree/master/internal/goes/cmd/COMMAND/README.md
 - https://godoc.org/github.com/platinasystems/go/internal/goes/cmd/COMMAND
 
