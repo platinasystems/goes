@@ -502,6 +502,25 @@ func (h *I2cDev) convertVoutMode(voutMode uint8, vout uint16) float64 {
 	return vv
 }
 
+func (h *I2cDev) convertLinear(v uint16) (float64, error) {
+	var nn int
+	var y int
+	if (v >> 11) > 0xf {
+		nn = int(((v>>11)^0x1f)+1) * (-1)
+	} else {
+		nn = int(v >> 11)
+	}
+	v = v & 0x7ff
+	if v > 0x3ff {
+		y = int(v^0x7ff+1) * (-1)
+	} else {
+		y = int(v)
+	}
+	vv := float64(y) * (math.Exp2(float64(nn)))
+	vv, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", vv), 64)
+	return vv, nil
+}
+
 func (h *I2cDev) convert(v uint16) (float64, error) {
 	if strings.Contains(h.Id, "Great Wall") {
 		var nn int
@@ -705,10 +724,17 @@ func (h *I2cDev) Iout() (string, error) {
 		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
-	v, errs := h.convert(t)
-	if errs != nil {
-		log.Print("convert err")
-		return "", errs
+	var v float64
+	if strings.Contains(h.Id, "Great Wall") {
+		v, err = h.convert(t)
+		if err != nil {
+			return "", err
+		}
+	} else if strings.Contains(h.Id, "FSP") {
+		v, err = h.convertLinear(t)
+		if err != nil {
+			return "", err
+		}
 	}
 	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
