@@ -14,11 +14,11 @@ vnet_gcflags=$(if $(filter yes,$(VNET_DEBUG)),-N -l)
 
 ALL  = goes-example
 ALL += goes-example-arm
+ALL += goes-test
+ALL += goes-coreboot
 ALL += goes-platina-mk1-bmc
 ifneq (,$(wildcard vnet/devices/ethernet/switch/fe1/*.go))
 ALL += goes-platina-mk1
-ALL  = goes-coreboot
-ALL += goes-test
 ALL += go-wip
 endif
 
