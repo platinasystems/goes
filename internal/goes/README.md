@@ -27,7 +27,7 @@ Machines are main packages that provide a `goes` command manifest,
 configuration, and customization before calling `Goes.Main()`.
 See [main] for examples.
 
-Run this to build the example machine.
+To build the example machine.
 
 ```console
 $ make goes-example
@@ -36,7 +36,7 @@ go generate ./version
 go build -o goes-example ./main/goes-example
 ```
 
-Or build all machines.
+To build all machines,
 
 ```console
 $ make
@@ -45,7 +45,7 @@ go generate ./version
 ...
 ```
 
-Install and run the example on your build system.
+To install,
 
 ```console
 $ sudo ./goes-example install
@@ -53,23 +53,30 @@ $ goes show-commands
 ...
 ```
 
-Or run its interactive commands without install.
+To enable BASH completion after install,
+
+```console
+. /usr/share/bash-completion/completions/goes
+```
+
+To run commands without install,
 
 ```console
 $ ./goes-example show-commands
 ...
 ```
 
-Or debug.
+To debug,
 
 ```console
 $ gdb ./goesd-example
 ```
 
-Each [goes/cmd] provides _apropos_, _man_, and _usage_.
+Each [goes/cmd] provides _apropos_, _completion_, _man_, and _usage_.
 The command may also provide context sensitive _help_, _README_, and _godoc_.
 
 - `goes apropos` _COMMAND_
+- `goes complete` _COMMAND_ [_ARGS_]...
 - `goes man` _COMMAND_
 - `goes usage` _COMMAND_
 - `goes help` _COMMAND_ [_ARGS_]...
