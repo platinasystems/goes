@@ -142,11 +142,12 @@ func (c *SwIfChooser) Foreach(f func(v *Vnet, si Si)) {
 }
 
 type showIfConfig struct {
-	detail bool
-	re     parse.Regexp
-	colMap map[string]bool
-	siMap  map[Si]bool
-	hiMap  map[Hi]bool
+	detail  bool
+	summary bool
+	re      parse.Regexp
+	colMap  map[string]bool
+	siMap   map[Si]bool
+	hiMap   map[Hi]bool
 }
 
 func (c *showIfConfig) parse(v *Vnet, in *cli.Input, isHw bool) {
@@ -174,10 +175,19 @@ func (c *showIfConfig) parse(v *Vnet, in *cli.Input, isHw bool) {
 		case in.Parse("d%*etail"):
 			c.detail = true
 			c.colMap["Driver"] = true
+		case in.Parse("s%*ummary"):
+			c.summary = true
 		case in.Parse("r%*ate"):
 			c.colMap["Rate"] = true
 		default:
 			panic(parse.ErrInput)
+		}
+	}
+	if c.summary {
+		c.colMap["Counter"] = false
+		c.colMap["Count"] = false
+		if isHw {
+			c.colMap["Driver"] = true
 		}
 	}
 }
@@ -239,6 +249,10 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			Name:  si.IfName(v),
 			State: si.flags.String(),
 		}
+		if cf.summary {
+			sifs = append(sifs, firstIf)
+			continue
+		}
 		v.foreachSwIfCounter(cf.detail, si.si, func(counter string, count uint64) {
 			s := showSwIf{
 				Counter: counter,
@@ -281,9 +295,9 @@ func (h *hwIfIndices) Len() int           { return len(h.ifs) }
 
 type showHwIf struct {
 	Name    string `format:"%-30s"`
-	Driver  string `format:"%-12s" align:"center"`
+	Driver  string `width:"20" format:"%-12s" align:"center"`
 	Address string `format:"%-12s" align:"center"`
-	Link    string `width:12`
+	Link    string `width:"12"`
 	Counter string `format:"%-30s" align:"left"`
 	Count   string `format:"%16s" align:"right"`
 	Rate    string `format:"%16s" align:"right"`
@@ -336,6 +350,10 @@ func (v *Vnet) showHwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			Driver:  hi.DriverName(),
 			Address: hi.FormatAddress(),
 			Link:    h.LinkString(),
+		}
+		if cf.summary {
+			ifs = append(ifs, firstIf)
+			continue
 		}
 		v.foreachHwIfCounter(cf.detail, h.hi, func(counter string, count uint64) {
 			s := showHwIf{
