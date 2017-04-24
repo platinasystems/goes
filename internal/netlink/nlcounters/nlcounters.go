@@ -6,7 +6,10 @@
 package nlcounters
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,7 +19,10 @@ import (
 
 const Usage = "nlcounters [-i SECONDS | -n COUNT"
 
-var istats map[uint32]*netlink.LinkStats64
+type Handler struct {
+	istats map[uint32]*netlink.LinkStats64
+	netns  string
+}
 
 // Dump all or select netlink messages
 func Main(args ...string) error {
@@ -42,12 +48,15 @@ func Main(args ...string) error {
 			}
 		}
 	}
-	istats = make(map[uint32]*netlink.LinkStats64)
+	h, err := New()
+	if err != nil {
+		return err
+	}
 	nl, err := netlink.New(netlink.LinkMulticastGroups...)
 	if err != nil {
 		return err
 	}
-	err = nl.Listen(handler, netlink.LinkListenReqs...)
+	err = nl.Listen(h.Handle, netlink.LinkListenReqs...)
 	if err != nil {
 		return err
 	}
@@ -69,7 +78,7 @@ func Main(args ...string) error {
 			if !opened {
 				return nil
 			}
-			if err = handler(msg); err != nil {
+			if err = h.Handle(msg); err != nil {
 				return err
 			}
 		}
@@ -77,7 +86,27 @@ func Main(args ...string) error {
 	return err
 }
 
-func handler(msg netlink.Message) (err error) {
+func New() (*Handler, error) {
+	var netns string
+
+	f, err := os.Open("/proc/mounts")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		x := strings.Fields(scanner.Text())
+		if x[1] == "/sys" && x[0] != "sysfs" {
+			netns = x[0]
+		}
+	}
+	err = scanner.Err()
+	return &Handler{make(map[uint32]*netlink.LinkStats64), netns}, err
+}
+
+func (h *Handler) Handle(msg netlink.Message) (err error) {
 	defer msg.Close()
 	switch msg.MsgType() {
 	case netlink.NLMSG_ERROR:
@@ -89,12 +118,15 @@ func handler(msg netlink.Message) (err error) {
 		ifinfo := msg.(*netlink.IfInfoMessage)
 		attr := ifinfo.Attrs[netlink.IFLA_IFNAME]
 		name := attr.(netlink.StringAttr).String()
+		if len(h.netns) > 0 && !strings.HasPrefix(name, "eth-") {
+			name = fmt.Sprint(name, "[", h.netns, "]")
+		}
 		attr = ifinfo.Attrs[netlink.IFLA_STATS64]
 		stats := attr.(*netlink.LinkStats64)
-		old, found := istats[ifinfo.Index]
+		old, found := h.istats[ifinfo.Index]
 		if !found {
 			old = new(netlink.LinkStats64)
-			istats[ifinfo.Index] = old
+			h.istats[ifinfo.Index] = old
 		}
 		for i, v := range stats {
 			k := netlink.Key(netlink.LinkStatType(i).String())
