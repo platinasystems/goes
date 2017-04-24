@@ -248,9 +248,8 @@ func (s *Socket) Close() error {
 	return err
 }
 
-func (s *Socket) GetlinkReq(nsid int) {
+func (s *Socket) GetlinkReq() {
 	req := NewGenMessage()
-	req.nsid = nsid
 	req.Type = RTM_GETLINK
 	req.Flags = NLM_F_REQUEST | NLM_F_MATCH
 	req.AddressFamily = AF_UNSPEC
@@ -398,26 +397,10 @@ func (s *Socket) gorx() {
 }
 
 func (s *Socket) gotx() {
-	var cmsgdata [SizeofInt]byte
 	seq := uint32(1)
 	buf := make([]byte, 4*PageSize)
 	bh := (*Header)(unsafe.Pointer(&buf[0]))
-	oob := make([]byte, syscall.CmsgSpace(SizeofInt))
-	cmsghdrp := (*syscall.Cmsghdr)(unsafe.Pointer(&oob[0]))
-	nsidp := (*int)(unsafe.Pointer(&cmsgdata[0]))
-	cmsg := syscall.SocketControlMessage{
-		syscall.Cmsghdr{
-			Len:   uint64(syscall.CmsgLen(SizeofInt)),
-			Level: SOL_NETLINK,
-			Type:  NETLINK_LISTEN_ALL_NSID,
-		},
-		cmsgdata[:],
-	}
-	to := &syscall.SockaddrNetlink{
-		Family: uint16(AF_NETLINK),
-	}
 	for msg := range s.tx {
-		var noob int
 		mh := msg.MsgHeader()
 		if mh.Flags == 0 {
 			mh.Flags = NLM_F_REQUEST
@@ -438,17 +421,7 @@ func (s *Socket) gotx() {
 		if false {
 			fmt.Print("Tx: ", msg)
 		}
-		if nsid := *msg.Nsid(); nsid != DefaultNsid {
-			noob = len(oob)
-			*nsidp = nsid
-			*cmsghdrp = cmsg.Header
-			copy(oob[syscall.CmsgLen(0):], cmsgdata[:])
-			if false {
-				fmt.Println("cmsg:", cmsg)
-				fmt.Println("oob:", oob[:noob])
-			}
-		}
-		err = syscall.Sendmsg(s.fd, buf[:n], oob[:noob], to, 0)
+		_, err = syscall.Write(s.fd, buf[:n])
 		if err != nil {
 			goto emsg
 		}

@@ -7,7 +7,6 @@ package nlcounters
 
 import (
 	"fmt"
-	"sort"
 	"syscall"
 	"time"
 
@@ -15,34 +14,20 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Usage = "nlcounters [-i SECONDS] [-n COUNT] [NSID]..."
+const Usage = "nlcounters [-i SECONDS | -n COUNT"
 
 var istats map[uint32]*netlink.LinkStats64
-var nsids []int
 
 // Dump all or select netlink messages
 func Main(args ...string) error {
 	usage := func(format string, args ...interface{}) error {
 		return fmt.Errorf(format+"\nusage: "+Usage, args...)
 	}
-	interval := 0
-	n := 0
+	var interval, n int
 	parm, args := parms.New(args, "-i", "-n")
 	if len(args) > 0 {
-		for _, arg := range args {
-			var nsid int
-			_, err := fmt.Sscan(arg, &nsid)
-			if err != nil {
-				return usage("%s: %v", arg, err)
-			}
-			nsids = append(nsids, nsid)
-		}
-	} else {
-		nsids = []int{
-			netlink.DefaultNsid,
-		}
+		return fmt.Errorf("%v: unexpected", args)
 	}
-	sort.Ints(nsids)
 	for _, x := range []struct {
 		name string
 		p    *int
@@ -62,14 +47,12 @@ func Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	getlink := func() {
-		for _, nsid := range nsids {
-			nl.GetlinkReq(nsid)
-		}
+	err = nl.Listen(handler, netlink.LinkListenReqs...)
+	if err != nil {
+		return err
 	}
-	getlink()
 	if interval <= 0 {
-		return nl.RxUntilDone(handler)
+		return nil
 	}
 	t := time.NewTicker(time.Duration(interval) * time.Second)
 	defer t.Stop()
@@ -81,7 +64,7 @@ func Main(args ...string) error {
 					return nil
 				}
 			}
-			getlink()
+			nl.GetlinkReq()
 		case msg, opened := <-nl.Rx:
 			if !opened {
 				return nil
@@ -103,11 +86,6 @@ func handler(msg netlink.Message) (err error) {
 			err = syscall.Errno(-e.Errno)
 		}
 	case netlink.RTM_NEWLINK:
-		nsid := *msg.Nsid()
-		i := sort.SearchInts(nsids, nsid)
-		if i >= len(nsids) || nsids[i] != nsid {
-			return
-		}
 		ifinfo := msg.(*netlink.IfInfoMessage)
 		attr := ifinfo.Attrs[netlink.IFLA_IFNAME]
 		name := attr.(netlink.StringAttr).String()
@@ -120,7 +98,7 @@ func handler(msg netlink.Message) (err error) {
 		}
 		for i, v := range stats {
 			k := netlink.Key(netlink.LinkStatType(i).String())
-			if v != 0 && v != old[i] {
+			if !found || v != old[i] {
 				fmt.Print(name, ".", k, ": ", v-old[i], "\n")
 				old[i] = v
 			}

@@ -76,11 +76,6 @@ func Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	getlink := func() {
-		for _, nsid := range nsids {
-			nl.GetlinkReq(nsid)
-		}
-	}
 	handler := func(msg netlink.Message) (err error) {
 		defer msg.Close()
 		nsid := *msg.Nsid()
@@ -96,11 +91,11 @@ func Main(args ...string) error {
 	}
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
-	getlink()
+	nl.GetlinkReq()
 	for {
 		select {
 		case <-t.C:
-			getlink()
+			nl.GetlinkReq()
 		case msg, opened := <-nl.Rx:
 			if !opened {
 				return nil
