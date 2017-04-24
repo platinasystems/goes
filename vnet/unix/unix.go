@@ -10,12 +10,26 @@ import (
 
 var packageIndex uint
 
+type Main struct {
+	vnet.Package
+
+	verbosePackets bool
+	verboseNetlink int
+
+	netlink_main
+	nodeMain
+	tuntapMain
+
+	// For external (e.g. non tuntap) interfaces.
+	siByIfIndex map[int]vnet.Si
+}
+
 func GetMain(v *vnet.Vnet) *Main { return v.GetPackage(packageIndex).(*Main) }
 
 func Init(v *vnet.Vnet) {
 	m := &Main{}
 	m.v = v
 	m.tuntapMain.Init(v)
-	m.netlinkMain.Init(m)
+	m.netlink_main.Init(m)
 	packageIndex = v.AddPackage("tuntap", m)
 }

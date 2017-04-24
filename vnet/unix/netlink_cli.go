@@ -24,6 +24,7 @@ type netlink_add_del struct {
 	ip4_nhs    []ip4.NextHop
 	wait       time.Duration
 	fib_index  ip.FibIndex
+	ns         *net_namespace
 }
 
 func (x *netlink_add_del) String() (s string) {
@@ -35,7 +36,7 @@ func (x *netlink_add_del) String() (s string) {
 	return
 }
 
-func (m *netlinkMain) add_del() {
+func (m *netlink_main) netlink_add_del_routes() {
 	for {
 		x := <-m.add_del_chan
 		m.m.v.Logf("start %s\n", &x)
@@ -66,14 +67,14 @@ func (m *netlinkMain) add_del() {
 				msg.Attrs[netlink.RTA_GATEWAY] = &addrs[1]
 				msg.Attrs[netlink.RTA_OIF] =
 					netlink.Int32Attr(intf.ifindex)
-				m.s.Tx <- msg
+				x.ns.NetlinkTx(msg, false)
 			}
 		}
 		m.m.v.Logf("done %s\n", &x)
 	}
 }
 
-func (m *netlinkMain) ip_route(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (m *netlink_main) ip_route(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	var x netlink_add_del
 
 	switch {
@@ -113,7 +114,7 @@ loop:
 
 	if m.add_del_chan == nil {
 		m.add_del_chan = make(chan netlink_add_del)
-		go m.add_del()
+		go m.netlink_add_del_routes()
 	}
 	m.add_del_chan <- x
 
@@ -131,7 +132,7 @@ func (ns showMsgs) Less(i, j int) bool { return ns[i].Type < ns[j].Type }
 func (ns showMsgs) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
 func (ns showMsgs) Len() int           { return len(ns) }
 
-func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (m *netlink_main) show_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	sm := make(map[netlink.MsgType]showMsg)
 	var (
 		x  showMsg
@@ -171,7 +172,7 @@ func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input)
 	return
 }
 
-func (m *netlinkMain) cliInit() (err error) {
+func (m *netlink_main) cliInit() (err error) {
 	v := m.m.v
 	cmds := []cli.Command{
 		cli.Command{
@@ -181,8 +182,13 @@ func (m *netlinkMain) cliInit() (err error) {
 		},
 		cli.Command{
 			Name:      "show netlink summary",
-			ShortHelp: "summary netlink messages received",
+			ShortHelp: "show summary of netlink messages received",
 			Action:    m.show_summary,
+		},
+		cli.Command{
+			Name:      "show netlink namespaces",
+			ShortHelp: "show netlink namespaces",
+			Action:    m.show_net_namespaces,
 		},
 	}
 	for i := range cmds {

@@ -42,7 +42,7 @@ func (nm *nodeMain) Init(m *Main) {
 type node struct {
 	ethernet.Interface
 	vnet.InterfaceNode
-	i             *Interface
+	i             *tuntap_interface
 	rxRefsLock    sync.Mutex
 	rxRefs        []rxRef
 	rxPending     []rxRef
@@ -61,7 +61,7 @@ const (
 	rxNextTx rxNext = iota
 )
 
-func (intf *Interface) interfaceNodeInit(m *Main) {
+func (intf *tuntap_interface) interfaceNodeInit(m *Main) {
 	ifName := intf.Name()
 	vnetName := ifName + "-unix"
 	n := &intf.node
@@ -76,7 +76,7 @@ func (intf *Interface) interfaceNodeInit(m *Main) {
 	m.puntNode.setNext(intf.si, ni)
 
 	// Use /dev/net/tun file descriptor for input/output.
-	intf.Fd = intf.dev_net_tun_fd
+	intf.Fd = intf.namespace.dev_net_tun_fd
 	iomux.Add(intf)
 }
 
@@ -109,8 +109,8 @@ type rxRef struct {
 
 type packet struct {
 	iovs  iovecVec
-	chain vnet.RefChain
 	refs  vnet.RefVec
+	chain vnet.RefChain
 }
 
 func (p *packet) allocRefs(m *Main, n uint) {
@@ -121,7 +121,7 @@ func (p *packet) allocRefs(m *Main, n uint) {
 	}
 }
 
-func (p *packet) initForRx(m *Main, intf *Interface) {
+func (p *packet) initForRx(m *Main, intf *tuntap_interface) {
 	n := intf.mtuBuffers
 	p.iovs.Validate(n - 1)
 	p.refs.Validate(n - 1)
@@ -134,7 +134,7 @@ func (p *packet) free(m *Main) {
 	m.bufferPool.FreeRefs(&p.refs[0], p.refs.Len(), false)
 }
 
-func (m *Main) getRxPacket(intf *Interface) (p *packet) {
+func (m *Main) getRxPacket(intf *tuntap_interface) (p *packet) {
 	select {
 	case p = <-m.rxPacketPool:
 	default:
@@ -215,7 +215,7 @@ func (n *node) InterfaceInput(o *vnet.RefOut) {
 	n.rxActiveLock.Unlock()
 }
 
-func (intf *Interface) ReadReady() (err error) {
+func (intf *tuntap_interface) ReadReady() (err error) {
 	m, n := intf.m, &intf.node
 	p := m.getRxPacket(intf)
 	var (
@@ -278,9 +278,9 @@ func (n *node) InterfaceOutput(i *vnet.TxRefVecIn) {
 	iomux.Update(intf)
 }
 
-func (intf *Interface) WriteAvailable() bool { return intf.node.txAvailable > 0 }
+func (intf *tuntap_interface) WriteAvailable() bool { return intf.node.txAvailable > 0 }
 
-func (intf *Interface) WriteReady() (err error) {
+func (intf *tuntap_interface) WriteReady() (err error) {
 	n := &intf.node
 	ri := &n.txRefIn
 	for {
@@ -357,7 +357,7 @@ func errorForErrno(tag string, errno syscall.Errno) (err error) {
 	return
 }
 
-func (intf *Interface) ErrorReady() (err error) {
+func (intf *tuntap_interface) ErrorReady() (err error) {
 	var e int
 	if e, err = syscall.GetsockoptInt(intf.Fd, syscall.SOL_SOCKET, syscall.SO_ERROR); err == nil {
 		err = errorForErrno("error ready", syscall.Errno(e))
