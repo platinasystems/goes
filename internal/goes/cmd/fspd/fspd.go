@@ -764,9 +764,14 @@ func (h *I2cDev) FanSpeed() (string, error) {
 		return "", err
 	}
 	t := uint16(s[1].D[0]) + (uint16(s[1].D[1]) << 8)
-	v, errs := h.convert(t)
-	if errs != nil {
-		return "", errs
+	var v float64
+	if strings.Contains(h.Id, "Great Wall") {
+		v, err = h.convert(t)
+		if err != nil {
+			return "", err
+		}
+	} else if strings.Contains(h.Id, "FSP") {
+		v = float64(t)
 	}
 	return strconv.FormatFloat(v, 'f', 0, 64), nil
 }
@@ -864,6 +869,10 @@ func (h *I2cDev) MfgIdent() (string, error) {
 	if err != nil {
 		return "error", err
 	}
+	if s[1].D[1] == 0xff {
+		h.Id = "FSP"
+		return "FSP", nil
+	}
 	n := s[1].D[1] + 2
 	t := string(s[1].D[2:n])
 	if t == "Not Supported" {
@@ -882,6 +891,9 @@ func (h *I2cDev) MfgModel() (string, error) {
 	err := DoI2cRpc()
 	if err != nil {
 		return "error", err
+	}
+	if s[1].D[1] == 0xff {
+		return "FSP", nil
 	}
 	n := s[1].D[1] + 2
 	t := string(s[1].D[2:n])
