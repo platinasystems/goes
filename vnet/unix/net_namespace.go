@@ -343,16 +343,6 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 	return
 }
 
-func (ns *net_namespace) del(m *netlink_main) {
-	if ns.ns_fd > 0 {
-		syscall.Close(ns.ns_fd)
-	}
-	if ns.dev_net_tun_fd > 0 {
-		syscall.Close(ns.dev_net_tun_fd)
-	}
-	ns.netlink_socket_pair.close()
-}
-
 func (ns *net_namespace) allocate_sockets() (err error) {
 	ns.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0)
 	if err == nil {
@@ -395,10 +385,26 @@ func (ns *net_namespace) add(m *netlink_main) {
 	ns.listen(m)
 }
 
+func (ns *net_namespace) del(m *netlink_main) {
+	ns.del_nodes(m)
+	if ns.ns_fd > 0 {
+		syscall.Close(ns.ns_fd)
+	}
+	if ns.dev_net_tun_fd > 0 {
+		syscall.Close(ns.dev_net_tun_fd)
+	}
+	ns.netlink_socket_pair.close()
+}
+
 func (ns *net_namespace) add_nodes(m *netlink_main) {
+	ns.Fd = ns.dev_net_tun_fd
 	iomux.Add(ns)
 	ns.rx_node.add(ns, m.m.v)
 	ns.tx_node.add(ns, m.m.v)
+}
+
+func (ns *net_namespace) del_nodes(m *netlink_main) {
+	iomux.Del(ns)
 }
 
 func (ns *net_namespace) ErrorReady() (err error) {

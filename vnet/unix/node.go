@@ -77,7 +77,9 @@ func (intf *tuntap_interface) interfaceNodeInit(m *Main) {
 
 	// Use /dev/net/tun file descriptor for input/output.
 	intf.Fd = intf.namespace.dev_net_tun_fd
-	iomux.Add(intf)
+	if false {
+		iomux.Add(intf)
+	}
 }
 
 func (n *node) DriverName() string                                          { return "tuntap" }
