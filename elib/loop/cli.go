@@ -75,10 +75,12 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 	colMap := map[string]bool{
 		"State": false,
 	}
+	show_detail := false
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
 			colMap["State"] = true
+			show_detail = true
 		default:
 			panic(parse.ErrInput)
 		}
@@ -97,16 +99,25 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 			}
 		})
 		name := n.name
+		_, isIn := n.noder.(inLooper)
+		_, isOut := n.noder.(outLooper)
+		_, isInOut := n.noder.(inOutLooper)
 		for j := range s {
-			io := " input"
-			if j == 1 {
-				if _, ok := n.noder.(inOutLooper); ok {
-					io = ""
+			if j == 0 && !isIn && !isInOut {
+				continue
+			}
+			if j == 1 && !isOut {
+				continue
+			}
+			io := ""
+			if (isIn && isOut) || isInOut {
+				if j == 0 {
+					io = " in"
 				} else {
-					io = " output"
+					io = " out"
 				}
 			}
-			if s[j].calls > 0 {
+			if s[j].calls > 0 || show_detail {
 				state := ""
 				if j == 0 {
 					state = fmt.Sprintf("%s", n.flags)
