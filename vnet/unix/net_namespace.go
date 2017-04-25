@@ -7,6 +7,7 @@ package unix
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
+	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 
@@ -66,9 +67,11 @@ func (m *netlink_main) namespace_init() (err error) {
 		if ns.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
 			return
 		}
-
 		m.namespace_by_name = make(map[string]*net_namespace)
 		m.namespace_by_name[ns.name] = ns
+
+		ns.add_nodes(m)
+
 		if err = ns.configure(-1, -1); err != nil {
 			return
 		}
@@ -143,6 +146,8 @@ type net_namespace struct {
 	// File descriptor for /dev/net/tun in this namespace.
 	dev_net_tun_fd int
 
+	iomux.File // provisioning socket
+
 	nsid int
 
 	tuntap_interface_by_ifindex map[uint32]*tuntap_interface
@@ -158,6 +163,9 @@ type net_namespace struct {
 
 	interface_by_index map[uint32]*net_namespace_interface
 	interface_by_name  map[string]*net_namespace_interface
+
+	rx_node rx_node
+	tx_node tx_node
 }
 
 type net_namespace_main struct {
@@ -380,8 +388,19 @@ func (ns *net_namespace) add(m *netlink_main) {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
+	ns.add_nodes(m)
 	if err = ns.netlink_socket_pair.configure(ns.netlink_socket_fds[0], ns.netlink_socket_fds[1]); err != nil {
 		panic(err)
 	}
 	ns.listen(m)
+}
+
+func (ns *net_namespace) add_nodes(m *netlink_main) {
+	iomux.Add(ns)
+	ns.rx_node.add(ns, m.m.v)
+	ns.tx_node.add(ns, m.m.v)
+}
+
+func (ns *net_namespace) ErrorReady() (err error) {
+	return
 }

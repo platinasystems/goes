@@ -85,26 +85,33 @@ func (n *node) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames) { re
 func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)         {}
 func (n *node) ValidateSpeed(speed vnet.Bandwidth) (err error)              { return }
 
-type iovec syscall.Iovec
-
-//go:generate gentemplate -d Package=unix -id iovec -d VecType=iovecVec -d Type=iovec github.com/platinasystems/go/elib/vec.tmpl
-
-func rwv(fd int, iov []iovec, isWrite bool) (n int, e syscall.Errno) {
-	sc := syscall.SYS_READV
-	if isWrite {
-		sc = syscall.SYS_WRITEV
-	}
-	r0, _, e := syscall.Syscall(uintptr(sc), uintptr(fd), uintptr(unsafe.Pointer(&iov[0])), uintptr(len(iov)))
-	n = int(r0)
-	return
-}
-
-func readv(fd int, iov []iovec) (int, syscall.Errno)  { return rwv(fd, iov, false) }
-func writev(fd int, iov []iovec) (int, syscall.Errno) { return rwv(fd, iov, true) }
-
 type rxRef struct {
 	ref vnet.Ref
 	len uint
+}
+
+func (h *msghdr) set(a *syscall.RawSockaddrLinklayer, iovs iovecVec) {
+	h.Name = (*byte)(unsafe.Pointer(a))
+	h.Namelen = syscall.SizeofSockaddrLinklayer
+	h.Iov = (*syscall.Iovec)(&iovs[0])
+	h.Iovlen = uint64(len(iovs))
+}
+
+// Maximum sized packet vector.
+type packet_vector struct {
+	a  [vnet.MaxVectorLen]syscall.RawSockaddrLinklayer
+	mm [vnet.MaxVectorLen]mmsghdr
+}
+
+var raw_sockaddr_ll_template = syscall.RawSockaddrLinklayer{
+	Family: syscall.AF_PACKET,
+}
+
+func (v *packet_vector) tx_add(p *packet, ifindex uint32, i uint) {
+	a := &v.a[i]
+	*a = raw_sockaddr_ll_template
+	a.Ifindex = int32(ifindex)
+	v.mm[i].msg_hdr.set(a, p.iovs)
 }
 
 type packet struct {
