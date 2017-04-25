@@ -2,6 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// Print a short command description.
 package apropos
 
 import (
@@ -13,9 +14,20 @@ import (
 
 const Name = "apropos"
 
+type Interface interface {
+	Apropos() map[string]string
+	ByName(goes.ByName)
+	Complete(...string) []string
+	Kind() goes.Kind
+	Main(...string) error
+	Man() map[string]string
+	String() string
+	Usage() string
+}
+
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
+func New() Interface { return new(cmd) }
 
 func (*cmd) Kind() goes.Kind { return goes.DontFork }
 func (*cmd) String() string  { return Name }
