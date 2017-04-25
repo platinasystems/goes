@@ -42,6 +42,12 @@ var (
 
 type ByName map[string]*Goes
 
+type Cmd interface {
+	Main(...string) error
+	// The command's String() should return its name.
+	String() string
+}
+
 type Goes struct {
 	Name     string
 	ByName   func(ByName)
@@ -67,6 +73,10 @@ type byNamer interface {
 
 type completer interface {
 	Complete(...string) []string
+}
+
+type goeser interface {
+	goes() *Goes
 }
 
 type helper interface {
@@ -200,30 +210,26 @@ func (byName ByName) Main(args ...string) error {
 }
 
 // Plot commands on map.
-func (byName ByName) Plot(cmds ...interface{}) {
+func (byName ByName) Plot(cmds ...Cmd) {
 	for _, v := range cmds {
-		g, ok := v.(*Goes)
-		if ok {
+		if method, found := v.(goeser); found {
+			g := method.goes()
 			byName[g.Name] = g
 			if g.ByName != nil {
 				g.ByName(byName)
 			}
 			continue
 		}
-		g = new(Goes)
-		if method, found := v.(fmt.Stringer); found {
-			g.Name = method.String()
-		} else {
-			panic(fmt.Errorf("%T: doesn't have String method", v))
+		name := v.String()
+		if _, found := byName[name]; found {
+			panic(fmt.Errorf("%s: duplicate", name))
 		}
-		if _, found := byName[g.Name]; found {
-			panic(fmt.Errorf("%s: duplicate", g.Name))
+		g := &Goes{
+			Name: name,
+			Main: v.Main,
 		}
-		if method, found := v.(mainer); found {
-			g.Main = method.Main
-		} else {
-			panic(fmt.Errorf("%s: doesn't have Main method",
-				g.Name))
+		if method, found := v.(aproposer); found {
+			g.Apropos = method.Apropos()
 		}
 		if method, found := v.(byNamer); found {
 			method.ByName(byName)
@@ -240,18 +246,17 @@ func (byName ByName) Plot(cmds ...interface{}) {
 		if method, found := v.(kinder); found {
 			g.Kind = method.Kind()
 		}
-		if method, found := v.(usager); found {
-			g.Usage = method.Usage()
-		}
-		if method, found := v.(aproposer); found {
-			g.Apropos = method.Apropos()
-		}
 		if method, found := v.(manner); found {
 			g.Man = method.Man()
+		}
+		if method, found := v.(usager); found {
+			g.Usage = method.Usage()
 		}
 		byName[g.Name] = g
 	}
 }
+
+func (g *Goes) goes() *Goes { return g }
 
 func (g *Goes) wait(ch chan os.Signal) {
 	for sig := range ch {
