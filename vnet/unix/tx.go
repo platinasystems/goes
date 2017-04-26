@@ -9,29 +9,24 @@ import (
 )
 
 type tx_node struct {
-	v  *vnet.Vnet
-	ns *net_namespace
+	rx_tx_node_common
 	vnet.OutputNode
 }
 
-func (n *tx_node) add(ns *net_namespace, v *vnet.Vnet) {
-	n.v = v
-	n.ns = ns
-	node_name := "unix-tx"
-	if len(ns.name) > 0 {
-		node_name += "-" + ns.name
-	}
-	v.RegisterOutputNode(n, node_name)
+func (n *tx_node) add(m *net_namespace_main, ns *net_namespace) {
+	n.rx_tx_node_common.add(m, ns, "tx")
+	m.m.v.RegisterOutputNode(n, n.name)
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 	panic("tx")
 }
 
-func (ns *net_namespace) WriteReady() (err error) {
-	return
-}
-
 func (ns *net_namespace) WriteAvailable() bool {
 	return false
+}
+
+func (ns *net_namespace) WriteReady() (err error) {
+	panic("tx")
+	return
 }

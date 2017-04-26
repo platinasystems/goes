@@ -14,7 +14,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-	"unsafe"
 )
 
 type nodeMain struct {
@@ -90,30 +89,6 @@ func (n *node) ValidateSpeed(speed vnet.Bandwidth) (err error)              { re
 type rxRef struct {
 	ref vnet.Ref
 	len uint
-}
-
-func (h *msghdr) set(a *syscall.RawSockaddrLinklayer, iovs iovecVec) {
-	h.Name = (*byte)(unsafe.Pointer(a))
-	h.Namelen = syscall.SizeofSockaddrLinklayer
-	h.Iov = (*syscall.Iovec)(&iovs[0])
-	h.Iovlen = uint64(len(iovs))
-}
-
-// Maximum sized packet vector.
-type packet_vector struct {
-	a  [vnet.MaxVectorLen]syscall.RawSockaddrLinklayer
-	mm [vnet.MaxVectorLen]mmsghdr
-}
-
-var raw_sockaddr_ll_template = syscall.RawSockaddrLinklayer{
-	Family: syscall.AF_PACKET,
-}
-
-func (v *packet_vector) tx_add(p *packet, ifindex uint32, i uint) {
-	a := &v.a[i]
-	*a = raw_sockaddr_ll_template
-	a.Ifindex = int32(ifindex)
-	v.mm[i].msg_hdr.set(a, p.iovs)
 }
 
 type packet struct {

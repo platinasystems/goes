@@ -54,6 +54,7 @@ const netnsDir = "/var/run/netns"
 
 func (m *netlink_main) namespace_init() (err error) {
 	nm := &m.net_namespace_main
+	nm.m = m.m
 
 	// Handcraft default name space.
 	{
@@ -70,7 +71,7 @@ func (m *netlink_main) namespace_init() (err error) {
 		m.namespace_by_name = make(map[string]*net_namespace)
 		m.namespace_by_name[ns.name] = ns
 
-		ns.add_nodes(m)
+		ns.add_nodes(nm)
 
 		if err = ns.configure(-1, -1); err != nil {
 			return
@@ -169,10 +170,12 @@ type net_namespace struct {
 }
 
 type net_namespace_main struct {
+	m                        *Main
 	default_namespace        net_namespace
 	namespace_by_name        map[string]*net_namespace
 	tuntap_interface_by_name map[string]*tuntap_interface
 	n_initial_namespace_done uint
+	rx_tx_node_main
 }
 
 func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {
@@ -378,7 +381,7 @@ func (ns *net_namespace) add(m *netlink_main) {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
-	ns.add_nodes(m)
+	ns.add_nodes(&m.net_namespace_main)
 	if err = ns.netlink_socket_pair.configure(ns.netlink_socket_fds[0], ns.netlink_socket_fds[1]); err != nil {
 		panic(err)
 	}
@@ -396,11 +399,11 @@ func (ns *net_namespace) del(m *netlink_main) {
 	ns.netlink_socket_pair.close()
 }
 
-func (ns *net_namespace) add_nodes(m *netlink_main) {
+func (ns *net_namespace) add_nodes(m *net_namespace_main) {
 	ns.Fd = ns.dev_net_tun_fd
 	iomux.Add(ns)
-	ns.rx_node.add(ns, m.m.v)
-	ns.tx_node.add(ns, m.m.v)
+	ns.rx_node.add(m, ns)
+	ns.tx_node.add(m, ns)
 }
 
 func (ns *net_namespace) del_nodes(m *netlink_main) {
