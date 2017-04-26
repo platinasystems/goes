@@ -8,16 +8,27 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/internal/cmdline"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "cmdline"
+const (
+	Name    = "cmdline"
+	Apropos = "parse and print /proc/cmdline variables"
+	Usage   = "cmdline [NAME]..."
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [NAME]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	keys, m, err := cmdline.New()
@@ -42,21 +53,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "parse and print /proc/cmdline variables",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	cmdline - parse and print /proc/cmdline variables
-
-SYNOPSIS
-	cmdline [NAME]...
-
-DESCRIPTION
-	Print the named or all variables parsed from /proc/cmdline.`,
-	}
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

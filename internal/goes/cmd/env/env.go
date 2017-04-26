@@ -10,21 +10,41 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "env"
+const (
+	Name    = "env"
+	Apropos = "run a program in a modified environment"
+	Usage   = "env [NAME[=VALUE... COMMAND [ARGS...]]]"
+	Man     = `
+DESCRIPTION
+	Running 'env' without any arguments prints all environment
+	variables.  Runnung 'env' with one argument prints the value of
+	the named variable.  Running this with at least one NAME=VALUE
+	argument sets each NAME to VALUE in the environment and runs
+	COMMAND.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-
-func (*cmd) String() string { return Name }
-
-func (*cmd) Usage() string { return "env [NAME[=VALUE... COMMAND [ARGS...]]]" }
 
 func (c *cmd) Main(args ...string) error {
 	switch len(args) {
@@ -48,25 +68,15 @@ func (c *cmd) Main(args ...string) error {
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "run a program in a modified environment",
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	env - run a program in a modified environment
-
-SYNOPSIS
-	env [NAME[=VALUE... COMMAND [ARGS...]]]
-
-DESCRIPTION
-	Running 'env' without any arguments prints all environment
-	variables.  Runnung 'env' with one argument prints the value of
-	the named variable.  Running this with at least one NAME=VALUE
-	argument sets each NAME to VALUE in the environment and runs
-	COMMAND.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

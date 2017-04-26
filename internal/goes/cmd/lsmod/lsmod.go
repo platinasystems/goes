@@ -9,16 +9,32 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "lsmod"
+const (
+	Name    = "lsmod"
+	Apropos = "print status of Linux Kernel modules"
+	Usage   = "lsmod"
+	Man     = `
+DESCRIPTION
+	Formatted print of /proc/modules.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(_ ...string) error {
 	f, err := os.Open("/proc/modules")
@@ -50,21 +66,15 @@ func (cmd) Main(_ ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print status of Linux Kernel modules",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	lsmod - print Linux Kernel module status
-
-SYNOPSIS
-	lsmod
-
-DESCRIPTION
-	Formatted print of /proc/modules.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

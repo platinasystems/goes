@@ -14,23 +14,36 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const Name = "goes-daemons"
+const (
+	Name    = "goes-daemons"
+	Apropos = "start redisd then all other daemons"
+	Usage   = "goes-daemons [OPTIONS]..."
+)
 
-func New() *cmd { return new(cmd) }
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
+
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
 func (*cmd) Kind() goes.Kind { return goes.Hidden }
-func (*cmd) String() string  { return Name }
-
-func (*cmd) Usage() string { return "goes-daemons [OPTIONS]..." }
 
 func (c *cmd) Main(args ...string) (err error) {
 	var daemons int
@@ -75,6 +88,9 @@ func (c *cmd) Main(args ...string) (err error) {
 	return
 }
 
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
 func (c *cmd) daemon(done chan<- struct{}, arg0 string, args ...string) error {
 	rout, wout, err := os.Pipe()
 	if err != nil {
@@ -116,8 +132,6 @@ func (c *cmd) daemon(done chan<- struct{}, arg0 string, args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "start redisd then all other daemons",
-	}
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

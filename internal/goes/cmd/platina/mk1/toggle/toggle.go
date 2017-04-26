@@ -9,20 +9,38 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes/cmd/i2c"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 	ii2c "github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const Name = "toggle"
+const (
+	Name    = "toggle"
+	Apropos = "toggle console port between x86 and BMC"
+	Usage   = "toggle SECONDS"
+	Man     = `
+DESCRIPTION
+	The toggle command toggles the console port between x86 and BMC.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " SECONDS" }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Man() lang.Alt     { return man }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 var clientA *rpc.Client
 var dialed int = 0
@@ -108,25 +126,6 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "toggle console port between x86 and BMC",
-	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	toggle - toggle console port between x86 and BMC
-
-SYNOPSIS
-	toggle
-
-DESCRIPTION
-	The toggle command toggles the console port between x86 and BMC.`,
-	}
-}
-
 func clearJ() {
 	x = 0
 	for k := 0; k < MAXOPS; k++ {
@@ -155,3 +154,12 @@ func DoI2cRpc() error {
 	clearJ()
 	return nil
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

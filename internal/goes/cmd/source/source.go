@@ -9,19 +9,37 @@ import (
 
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "source"
+const (
+	Name    = "source"
+	Apropos = "import command script"
+	Usage   = "source [-x] FILE"
+	Man     = `
+DESCRIPTION
+	This is equivalent to 'cli [-x] URL'.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return "source [-x] FILE" }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
 
 func (c *cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-x")
@@ -39,21 +57,15 @@ func (c *cmd) Main(args ...string) error {
 	return goes.ByName(*c).Main(args...)
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "import command script",
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	source - import command script
-
-SYNOPSIS
-	source [-x] URL
-
-DESCRIPTION
-	This is equivalent to 'cli [-x] URL'.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

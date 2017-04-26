@@ -10,17 +10,28 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/assert"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/kill"
 )
 
-const Name = "reload"
+const (
+	Name    = "reload"
+	Apropos = "SIGHUP this goes machine"
+	Usage   = "reload"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(...string) error {
 	err := assert.Root()
@@ -30,8 +41,9 @@ func (cmd) Main(...string) error {
 	return kill.All(syscall.SIGHUP)
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "SIGHUP this goes machine",
-	}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

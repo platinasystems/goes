@@ -8,18 +8,31 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	. "github.com/platinasystems/go/version"
 )
 
-const Name = "version"
+const (
+	Name    = "version"
+	Apropos = "print HEAD of source"
+	Usage   = "version"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Kind() goes.Kind { return goes.DontFork }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
 
 func (cmd) Main(args ...string) error {
 	if len(args) > 0 {
@@ -29,8 +42,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print HEAD of source",
-	}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

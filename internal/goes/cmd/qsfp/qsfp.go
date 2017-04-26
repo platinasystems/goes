@@ -12,12 +12,41 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const Name = "qsfp"
+const (
+	Name    = "qsfp"
+	Apropos = "FIXME"
+	Usage   = "qsfp"
+)
+
+var Init = func() {}
+var once sync.Once
+
+var Vdev [32]I2cDev
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
+
+type cmd struct {
+	stop  chan struct{}
+	pub   *publisher.Publisher
+	last  map[string]float64
+	lasts map[string]string
+	lastu map[string]uint8
+}
 
 type I2cDev struct {
 	Bus       int
@@ -30,11 +59,6 @@ type I2cDev struct {
 	MuxValue2 int
 }
 
-var Init = func() {}
-var once sync.Once
-
-var Vdev [32]I2cDev
-
 var portLpage0 [32]lpage0
 var portUpage3 [32]upage3
 var portIsCopper [32]bool
@@ -44,19 +68,14 @@ var VpageByKey map[string]uint8
 var latestPresent = [2]uint16{0xffff, 0xffff}
 var present = [2]uint16{0xffff, 0xffff}
 
-type cmd struct {
-	stop  chan struct{}
-	pub   *publisher.Publisher
-	last  map[string]float64
-	lasts map[string]string
-	lastu map[string]uint8
+func (cmd) Apropos() lang.Alt { return apropos }
+
+func (cmd *cmd) Close() error {
+	close(cmd.stop)
+	return nil
 }
 
-func New() *cmd { return new(cmd) }
-
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
 	once.Do(Init)
@@ -96,10 +115,8 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd *cmd) Close() error {
-	close(cmd.stop)
-	return nil
-}
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
 
 func (cmd *cmd) update() error {
 	stopped := readStopped()
@@ -725,4 +742,8 @@ func (h *I2cDev) StaticBlocks(port int) {
 		DoI2cRpc()
 	}
 	return
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

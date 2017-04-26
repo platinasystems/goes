@@ -10,24 +10,45 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "ln"
-
-type cmd struct{}
-
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-
-func (cmd) Usage() string {
-	return `ln [OPTION]... -t DIRECTORY TARGET...
+const (
+	Name    = "ln"
+	Apropos = "make links between files"
+	Usage   = `
+	ln [OPTION]... -t DIRECTORY TARGET...
 	ln [OPTION]... -T TARGET LINK
 	ln [OPTION]... TARGET LINK
 	ln [OPTION]... TARGET... DIRECTORY
 	ln [OPTION]... TARGET`
+	Man = `
+DESCRIPTION
+	Create a link LINK or DIR/TARGET to the specified TARGET(s)
+
+OPTIONS
+	-s	Make symlinks instead of hardlinks
+	-f	Remove existing destinations
+	-backup	Make a backup of the target (if exists) before link operation
+	-suffix SUFFIX
+		Use suffix instead of ~ when making backup files
+	-v	verbose`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
 }
+
+func New() Interface { return cmd{} }
+
+type cmd struct{}
+
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	var err error
@@ -90,6 +111,10 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
 func ln(target, link string, flag flags.Flag, parm parms.Parm) error {
 	var err error
 	if _, err = os.Stat(link); err == nil {
@@ -138,33 +163,11 @@ func valid(dir string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "make links between files",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	ln - make links between files
-
-SYNOPSIS
-	ln [OPTION]... -t DIRECTORY TARGET...
-	ln [OPTION]... -T TARGET LINK
-	ln [OPTION]... TARGET LINK
-	ln [OPTION]... TARGET... DIRECTORY
-	ln [OPTION]... TARGET
-
-DESCRIPTION
-	Create a link LINK or DIR/TARGET to the specified TARGET(s)
-
-OPTIONS
-	-s	Make symlinks instead of hardlinks
-	-f	Remove existing destinations
-	-backup	Make a backup of the target (if exists) before link operation
-	-suffix SUFFIX
-		Use suffix instead of ~ when making backup files
-	-v	verbose`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

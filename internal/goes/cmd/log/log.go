@@ -7,17 +7,43 @@ package log
 import (
 	"errors"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 )
 
-const Name = "log"
+const (
+	Name    = "log"
+	Apropos = "print text to /dev/kmsg"
+	Usage   = "log [PRIORITY [FACILITY]] TEXT..."
+	Man     = `
+DESCRIPTION
+	Logged text may be viewed with 'dmesg' command.
+
+PRIORITIES
+	emerg, alert, crit, err, warn, note, info, debug
+
+	The default priority is: info.
+
+FACILITIES
+	kern, user, mail, daemon, auth, syslog, lpr, news, uucp, cron, priv,
+	ftp, local0, local1, local2, local3, local4, local5, local6, local7
+
+	The default priority is: user.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [PRIORITY [FACILITY]] TEXT..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -32,32 +58,16 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print text to /dev/kmsg",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
 
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	log - print text to /dev/kmsg
-
-SYNOPSIS
-	log [PRIORITY [FACILITY]] TEXT...
-
-DESCRIPTION
-	Logged text may be viewed with 'dmesg' command.
-
-PRIORITIES
-	emerg, alert, crit, err, warn, note, info, debug
-
-	The default priority is: info.
-
-FACILITIES
-	kern, user, mail, daemon, auth, syslog, lpr, news, uucp, cron, priv,
-	ftp, local0, local1, local2, local3, local4, local5, local6, local7
-
-	The default priority is: user.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

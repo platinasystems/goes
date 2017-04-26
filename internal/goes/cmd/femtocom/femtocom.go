@@ -12,17 +12,56 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "femtocom"
+const (
+	Name    = "femtocom"
+	Apropos = "tiny serial-terminal emulation"
+	Usage   = "femtocom [OPTION]... DEVICE"
+	Man     = `
+DESCRIPTION
+	femtocom copies console input to DEVICE and DEVICE output to the
+	console until input of "^A^X".
+
+OPTIONS
+	-baud BAUD
+		The valid baud rates are 300, 600, 1200, 2400,
+		4800, 9600, 19200, 38400, 57600, and 115200.
+
+	-parity PARITY
+		The valid parity options are "odd", "even" and default, "none".
+
+	-databits BITS
+		The valid bits per character are 5, 6, 7, and default, 8.
+
+	-stopbits BITS
+		The valid stop bits per character are 2 and default, 1.
+
+	-noinit
+		Don't initialize the device at start-up or reset on exit.
+
+	-noreset
+		Don't reset the device on exit.
+
+	-nolock
+		Don't attempt exclusive device use.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]... DEVICE" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	const (
@@ -269,45 +308,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "tiny serial-terminal emulation",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	femtocom - tiny serial-terminal emulation
-
-SYNOPSIS
-	femtocom [OPTION]... DEVICE
-
-DESCRIPTION
-	femtocom copies console input to DEVICE and DEVICE output to the
-	console until input of "^A^X".
-
-OPTIONS
-	-baud BAUD
-		The valid baud rates are 300, 600, 1200, 2400,
-		4800, 9600, 19200, 38400, 57600, and 115200.
-
-	-parity PARITY
-		The valid parity options are "odd", "even" and default, "none".
-
-	-databits BITS
-		The valid bits per character are 5, 6, 7, and default, 8.
-
-	-stopbits BITS
-		The valid stop bits per character are 2 and default, 1.
-
-	-noinit
-		Don't initialize the device at start-up or reset on exit.
-
-	-noreset
-		Don't reset the device on exit.
-
-	-nolock
-		Don't attempt exclusive device use.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

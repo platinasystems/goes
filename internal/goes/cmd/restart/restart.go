@@ -2,20 +2,39 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package restart provides the named command that stops; then starts  all of
-// the daemons associated with this executable.
 package restart
 
-import "github.com/platinasystems/go/internal/goes"
+import (
+	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
+)
 
-const Name = "restart"
+const (
+	Name    = "restart"
+	Apropos = "stop, then start this goes machine"
+	Usage   = "restart [STOP, STOP, and REDISD OPTIONS]..."
+	Man     = `
+DESCRIPTION
+	Run the goes machine stop then start commands.
 
-func New() *cmd { return new(cmd) }
+SEE ALSO
+	start, stop, and redisd`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return "restart [OPTION]..." }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -28,24 +47,15 @@ func (c *cmd) Main(args ...string) error {
 	return byName.Main(append([]string{"start"}, args...)...)
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "stop, then start this goes machine",
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (c *cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	restart - stop, then start this goes machine
-
-SYNOPSIS
-	restart [STOP, STOP, and REDISD OPTIONS]...
-
-DESCRIPTION
-	Run the goes machine stop then start commands.
-
-SEE ALSO
-	start, stop, and redisd`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

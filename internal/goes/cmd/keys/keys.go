@@ -8,17 +8,32 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const Name = "keys"
+const (
+	Name    = "keys"
+	Apropos = "find all redis keys matching the given pattern"
+	Usage   = "keys [PATTERN]"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+func (cmd) Apropos() lang.Alt { return apropos }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [PATTERN]" }
+func (cmd) Complete(args ...string) []string {
+	return redis.Complete(args...)
+}
 
 func (cmd) Main(args ...string) error {
 	var pattern string
@@ -40,12 +55,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "find all redis keys matching the given pattern",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-func (cmd) Complete(args ...string) []string {
-	return redis.Complete(args...)
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -24,81 +25,47 @@ import (
 )
 
 const (
-	Name = "nld"
+	Name    = "nld"
+	Apropos = "forward netlink info to redis"
+	Usage   = "nld"
 
 	withCounters    = true
 	withoutCounters = false
 )
 
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return &cmd{} }
+
 type cmd struct {
 	Info
 }
 
-type Info struct {
-	mutex  sync.Mutex
-	nl     *netlink.Socket
-	rpc    *sockfile.RpcServer
-	pub    *publisher.Publisher
-	bynsid map[int]*devidx
-	name   struct {
-		addr [netlink.IFA_MAX]string
-		attr [netlink.IFLA_MAX]string
-		stat [netlink.N_link_stat]string
+func (*cmd) Apropos() lang.Alt { return apropos }
+
+func (cmd *cmd) Close() error {
+	var err error
+	for _, c := range []io.Closer{
+		cmd.nl,
+		cmd.rpc,
+		cmd.pub,
+	} {
+		t := c.Close()
+		if err == nil {
+			err = t
+		}
 	}
-}
-
-type devidx struct {
-	dev map[uint32]*dev
-	idx map[string]uint32
-}
-
-func newdevidx() *devidx {
-	return &devidx{
-		dev: make(map[uint32]*dev),
-		idx: make(map[string]uint32),
-	}
-}
-
-type dev struct {
-	name   string
-	family uint8
-	flags  netlink.IfInfoFlags
-	addrs  map[string]string
-	attrs  map[string]string
-	stats  netlink.LinkStats64
-}
-
-func newdev() *dev {
-	return &dev{
-		addrs: make(map[string]string),
-		attrs: make(map[string]string),
-	}
-}
-
-type getAddrReqParm struct {
-	idx uint32
-	af  netlink.AddressFamily
-}
-
-func New() *cmd { return &cmd{} }
-
-var kbuf = &bytes.Buffer{}
-
-func newkey(nsid int, vs ...interface{}) string {
-	kbuf.Reset()
-	kbuf.WriteString("nl")
-	if nsid != -1 {
-		fmt.Fprint(kbuf, ".", nsid)
-	}
-	for _, v := range vs {
-		fmt.Fprint(kbuf, ".", v)
-	}
-	return kbuf.String()
+	return err
 }
 
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
 
 func (cmd *cmd) Main(...string) error {
 	var err error
@@ -167,20 +134,8 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd *cmd) Close() error {
-	var err error
-	for _, c := range []io.Closer{
-		cmd.nl,
-		cmd.rpc,
-		cmd.pub,
-	} {
-		t := c.Close()
-		if err == nil {
-			err = t
-		}
-	}
-	return err
-}
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
 
 func (cmd *cmd) handler(msg netlink.Message) error {
 	defer msg.Close()
@@ -194,6 +149,66 @@ func (cmd *cmd) handler(msg netlink.Message) error {
 		cmd.ifNewAddr(msg.(*netlink.IfAddrMessage))
 	}
 	return nil
+}
+
+type Info struct {
+	mutex  sync.Mutex
+	nl     *netlink.Socket
+	rpc    *sockfile.RpcServer
+	pub    *publisher.Publisher
+	bynsid map[int]*devidx
+	name   struct {
+		addr [netlink.IFA_MAX]string
+		attr [netlink.IFLA_MAX]string
+		stat [netlink.N_link_stat]string
+	}
+}
+
+type devidx struct {
+	dev map[uint32]*dev
+	idx map[string]uint32
+}
+
+func newdevidx() *devidx {
+	return &devidx{
+		dev: make(map[uint32]*dev),
+		idx: make(map[string]uint32),
+	}
+}
+
+type dev struct {
+	name   string
+	family uint8
+	flags  netlink.IfInfoFlags
+	addrs  map[string]string
+	attrs  map[string]string
+	stats  netlink.LinkStats64
+}
+
+func newdev() *dev {
+	return &dev{
+		addrs: make(map[string]string),
+		attrs: make(map[string]string),
+	}
+}
+
+type getAddrReqParm struct {
+	idx uint32
+	af  netlink.AddressFamily
+}
+
+var kbuf = &bytes.Buffer{}
+
+func newkey(nsid int, vs ...interface{}) string {
+	kbuf.Reset()
+	kbuf.WriteString("nl")
+	if nsid != -1 {
+		fmt.Fprint(kbuf, ".", nsid)
+	}
+	for _, v := range vs {
+		fmt.Fprint(kbuf, ".", v)
+	}
+	return kbuf.String()
 }
 
 func (info *Info) Hdel(args args.Hset, reply *reply.Hset) error {
@@ -653,4 +668,8 @@ func (info *Info) setLinkAttr(nsid int, link, attr, value string) error {
 
 	info.nl.Tx <- req
 	return nil
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

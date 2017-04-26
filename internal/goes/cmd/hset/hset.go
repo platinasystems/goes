@@ -8,17 +8,33 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const Name = "hset"
+const (
+	Name    = "hset"
+	Apropos = "set the string value of a redis hash field"
+	Usage   = "hset [-q] KEY FIELD VALUE"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Complete(...string) []string
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+func (cmd) Apropos() lang.Alt { return apropos }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [-q] KEY FIELD VALUE" }
+func (cmd) Complete(args ...string) []string {
+	return redis.Complete(args...)
+}
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-q")
@@ -43,12 +59,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "set the string value of a redis hash field",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-func (cmd) Complete(args ...string) []string {
-	return redis.Complete(args...)
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

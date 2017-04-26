@@ -22,6 +22,7 @@ import (
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/group"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/redis"
@@ -32,8 +33,23 @@ import (
 	. "github.com/platinasystems/go/version"
 )
 
-const Name = "redisd"
-const Log = varrun.Dir + "/log/redisd"
+const (
+	Name    = "redisd"
+	Apropos = "a redis server"
+	Usage   = "redisd [-port PORT] [-set FIELD=VALUE]... [DEVICE]..."
+	Man     = `
+DESCRIPTION
+	Run a redis server on the /run/goes/socks/redisd unix socket file.
+
+OPTIONS
+	DEV...	list of listening network devices
+	-port PORT
+		network port, default: 6379
+	-set FIELD=VALUE
+		initialize the default hash with the given field values`
+
+	Log = varrun.Dir + "/log/redisd"
+)
 
 // Machines may use Init to set redisd parameters before exec.
 var Init = func() {}
@@ -57,40 +73,48 @@ var Port = 6379
 // Machines may override this list of published hashes.
 var PublishedKeys = []string{redis.DefaultHash}
 
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return &cmd{} }
+
 type cmd struct {
 	pubconn *net.UnixConn
 	redisd  Redisd
 }
 
-type Redisd struct {
-	mutex sync.Mutex
-	devs  map[string][]*grs.Server
-	sub   grs.HashSub
+func (*cmd) Apropos() lang.Alt { return apropos }
 
-	reg *reg.Reg
-
-	assignments Assignments
-
-	published grs.HashHash
-
-	cachedKeys    []string
-	cachedSubkeys map[string][]string
+func (cmd *cmd) Close() error {
+	var err error
+	cmd.redisd.mutex.Lock()
+	defer cmd.redisd.mutex.Unlock()
+	for k, srvs := range cmd.redisd.devs {
+		for i, srv := range srvs {
+			xerr := srv.Close()
+			if err == nil {
+				err = xerr
+			}
+			srvs[i] = nil
+		}
+		cmd.redisd.devs[k] = cmd.redisd.devs[k][:0]
+		delete(cmd.redisd.devs, k)
+	}
+	if cmd.redisd.reg != nil {
+		cmd.redisd.reg.Srvr.Close()
+	}
+	cmd.pubconn.Close()
+	return err
 }
-
-type Assignments []*assignment
-
-type assignment struct {
-	prefix string
-	v      interface{}
-}
-
-func New() *cmd { return &cmd{} }
 
 func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string {
-	return "redisd [-port PORT] [-set FIELD=VALUE]... [DEVICE]..."
-}
 
 func (cmd *cmd) Main(args ...string) error {
 	once.Do(Init)
@@ -204,27 +228,9 @@ func (cmd *cmd) Main(args ...string) error {
 	return srv.Start()
 }
 
-func (cmd *cmd) Close() error {
-	var err error
-	cmd.redisd.mutex.Lock()
-	defer cmd.redisd.mutex.Unlock()
-	for k, srvs := range cmd.redisd.devs {
-		for i, srv := range srvs {
-			xerr := srv.Close()
-			if err == nil {
-				err = xerr
-			}
-			srvs[i] = nil
-		}
-		cmd.redisd.devs[k] = cmd.redisd.devs[k][:0]
-		delete(cmd.redisd.devs, k)
-	}
-	if cmd.redisd.reg != nil {
-		cmd.redisd.reg.Srvr.Close()
-	}
-	cmd.pubconn.Close()
-	return err
-}
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
 
 func (cmd *cmd) gopub() {
 	const sep = ": "
@@ -337,30 +343,26 @@ func (cmd *cmd) pubinit(fieldEqValues ...string) error {
 	return pub.Error()
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "a redis server",
-	}
+type Redisd struct {
+	mutex sync.Mutex
+	devs  map[string][]*grs.Server
+	sub   grs.HashSub
+
+	reg *reg.Reg
+
+	assignments Assignments
+
+	published grs.HashHash
+
+	cachedKeys    []string
+	cachedSubkeys map[string][]string
 }
 
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	redisd - a redis server
+type Assignments []*assignment
 
-SYNOPSIS
-	redisd [-port PORT] [-set FIELD=VALUE]... [DEV]...
-
-DESCRIPTION
-	Run a redis server on the /run/goes/socks/redisd unix socket file.
-
-OPTIONS
-	DEV...	list of listening network devices
-	-port PORT
-		network port, default: 6379
-	-set FIELD=VALUE
-		initialize the default hash with the given field values`,
-	}
+type assignment struct {
+	prefix string
+	v      interface{}
 }
 
 func (redisd *Redisd) assign(key string, v interface{}) error {
@@ -750,3 +752,12 @@ func (as Assignments) Less(i, j int) (t bool) {
 func (as Assignments) Swap(i, j int) {
 	as[i], as[j] = as[j], as[i]
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

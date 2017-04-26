@@ -16,82 +16,35 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "ps"
+const (
+	Name    = "ps"
+	Apropos = "print process state"
+	Usage   = "ps [OPTION]..."
+	Man     = `
+DESCRIPTION
+	Print information for current processes.
+	The default list is limitted to processes on controlling TTY.
 
-type cmd struct{}
-type psStats []*psStat
-type psStat struct {
-	uid     uint32
-	gid     uint32
-	pid     int    //  %d
-	comm    string //  %s
-	state   string //  %c
-	ppid    int    //  %d
-	pgrp    int    //  %d
-	session int    //  %d
-	tty_nr  uint   //  %d
-	tpgid   int    //  %d
-	flags   uint   //  %u
-	minflt  uint64 //  %lu
-	cminflt uint64 //  %lu
-	majflt  uint64 //  %lu
-	cmajflt uint64 //  %lu
+	-e  Select all processes.
+	-f  Full format listing.`
+)
 
-	utime time.Duration //  %lu
-
-	stime       uint64 //  %lu
-	cutime      uint64 //  %ld
-	cstime      uint64 //  %ld
-	priority    int64  //  %ld
-	nice        int64  //  %ld
-	num_threads int64  //  %ld
-	itrealvalue int64  //  %ld
-
-	starttime string //  %llu
-
-	vsize       uint64 //  %lu
-	rss         int64  //  %ld
-	rsslim      uint64 //  %lu
-	startcode   uint64 //  %lu
-	endcode     uint64 //  %lu
-	startstack  uint64 //  %lu
-	kstkesp     uint64 //  %lu
-	kstkeip     uint64 //  %lu
-	signal      uint64 //  %lu
-	blocked     uint64 //  %lu
-	sigignore   uint64 //  %lu
-	sigcatch    uint64 //  %lu
-	wchan       uint64 //  %lu
-	nswap       uint64 //  %lu
-	cnswap      uint64 //  %lu
-	exit_signal int    //  %d  (since Linux 2.1.22)
-	processor   int    //  %d  (since Linux 2.2.8)
-	rt_priority uint   //  %u  (since Linux 2.5.19)
-	policy      uint   //  %u  (since Linux 2.5.19)
-
-	delayacct_blkio_ticks uint64 //  %llu  (since Linux 2.6.18)
-
-	guest_time  uint64 //  %lu  (since Linux 2.6.24)
-	cguest_time uint64 //  %ld  (since Linux 2.6.24)
-	start_data  uint64 //  %lu  (since Linux 3.3)
-	end_data    uint64 //  %lu  (since Linux 3.3)
-	start_brk   uint64 //  %lu  (since Linux 3.3)
-	arg_start   uint64 //  %lu  (since Linux 3.5)
-	arg_end     uint64 //  %lu  (since Linux 3.5)
-	env_start   uint64 //  %lu  (since Linux 3.5)
-	env_end     uint64 //  %lu  (since Linux 3.5)
-	exit_code   int    //  %d  (since Linux 3.5)
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
 }
 
-var epoch time.Time
-var hz uint64
+func New() Interface { return cmd{} }
 
-func New() cmd { return cmd{} }
+type cmd struct{}
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (ps cmd) Main(args ...string) error {
 	hz = Hz()
@@ -410,6 +363,77 @@ func (ps cmd) Main(args ...string) error {
 	return nil
 }
 
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+type psStats []*psStat
+type psStat struct {
+	uid     uint32
+	gid     uint32
+	pid     int    //  %d
+	comm    string //  %s
+	state   string //  %c
+	ppid    int    //  %d
+	pgrp    int    //  %d
+	session int    //  %d
+	tty_nr  uint   //  %d
+	tpgid   int    //  %d
+	flags   uint   //  %u
+	minflt  uint64 //  %lu
+	cminflt uint64 //  %lu
+	majflt  uint64 //  %lu
+	cmajflt uint64 //  %lu
+
+	utime time.Duration //  %lu
+
+	stime       uint64 //  %lu
+	cutime      uint64 //  %ld
+	cstime      uint64 //  %ld
+	priority    int64  //  %ld
+	nice        int64  //  %ld
+	num_threads int64  //  %ld
+	itrealvalue int64  //  %ld
+
+	starttime string //  %llu
+
+	vsize       uint64 //  %lu
+	rss         int64  //  %ld
+	rsslim      uint64 //  %lu
+	startcode   uint64 //  %lu
+	endcode     uint64 //  %lu
+	startstack  uint64 //  %lu
+	kstkesp     uint64 //  %lu
+	kstkeip     uint64 //  %lu
+	signal      uint64 //  %lu
+	blocked     uint64 //  %lu
+	sigignore   uint64 //  %lu
+	sigcatch    uint64 //  %lu
+	wchan       uint64 //  %lu
+	nswap       uint64 //  %lu
+	cnswap      uint64 //  %lu
+	exit_signal int    //  %d  (since Linux 2.1.22)
+	processor   int    //  %d  (since Linux 2.2.8)
+	rt_priority uint   //  %u  (since Linux 2.5.19)
+	policy      uint   //  %u  (since Linux 2.5.19)
+
+	delayacct_blkio_ticks uint64 //  %llu  (since Linux 2.6.18)
+
+	guest_time  uint64 //  %lu  (since Linux 2.6.24)
+	cguest_time uint64 //  %ld  (since Linux 2.6.24)
+	start_data  uint64 //  %lu  (since Linux 3.3)
+	end_data    uint64 //  %lu  (since Linux 3.3)
+	start_brk   uint64 //  %lu  (since Linux 3.3)
+	arg_start   uint64 //  %lu  (since Linux 3.5)
+	arg_end     uint64 //  %lu  (since Linux 3.5)
+	env_start   uint64 //  %lu  (since Linux 3.5)
+	env_end     uint64 //  %lu  (since Linux 3.5)
+	exit_code   int    //  %d  (since Linux 3.5)
+}
+
+var epoch time.Time
+var hz uint64
+
 func ttyName(tty_nr uint) (string, error) {
 	const devname = "DEVNAME="
 	name := "?"
@@ -521,25 +545,11 @@ func startTimeString(start, boy, bod time.Time) (s string) {
 	return s
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "process state",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	ps - process state
-
-SYNOPSIS
-	ps [OPTION]...
-
-DESCRIPTION
-	Print information for current processes.
-	The default list is limitted to processes on controlling TTY.
-
-	-e  Select all processes.
-	-f  Full format listing.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

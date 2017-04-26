@@ -9,16 +9,28 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "stty"
+const (
+	Name    = "stty"
+	Apropos = "print info for given or current TTY"
+	Usage   = "stty [DEVICE]"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [DEVICE]" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	dev := os.Stdin
@@ -254,8 +266,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print info for given or current TTY",
-	}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

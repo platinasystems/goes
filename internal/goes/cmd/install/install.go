@@ -15,20 +15,31 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/go/internal/assert"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/prog"
 )
 
-const Name = "install"
+const (
+	Name    = "install"
+	Apropos = "install this goes machine"
+	Usage   = "install [START, STOP and REDISD options]..."
+)
 
 // Machines may use this Hook to complete its installation.
 var Hook = func() error { return nil }
 
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
+
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	err := assert.Root()
@@ -60,11 +71,8 @@ func (cmd) Main(args ...string) error {
 
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "install this goes machine",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
 func run(args ...string) error {
 	cmd := exec.Command(prog.Install, args...)
@@ -278,4 +286,8 @@ _goes ()
 type -p goes >/dev/null && complete -F _goes goes
 `[1:])
 	return err
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

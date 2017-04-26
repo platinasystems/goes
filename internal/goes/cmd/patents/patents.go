@@ -9,9 +9,14 @@ import (
 
 	"github.com/platinasystems/go/copyright"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "patents"
+const (
+	Name    = "patents"
+	Apropos = "print machine patent rights"
+	Usage   = "patents"
+)
 
 // Some machines may have additional patent claims.
 var Others []Other
@@ -20,13 +25,20 @@ type Other struct {
 	Name, Text string
 }
 
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
+
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.DontFork }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Kind() goes.Kind   { return goes.DontFork }
 
 func (cmd) Main(args ...string) error {
 	if len(args) > 0 {
@@ -40,11 +52,8 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print machine patent rights",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
 
 func prettyprint(title, text string) {
 	fmt.Println(title)
@@ -52,4 +61,8 @@ func prettyprint(title, text string) {
 		fmt.Print("=")
 	}
 	fmt.Print("\n\n", text, "\n")
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

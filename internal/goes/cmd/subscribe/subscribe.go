@@ -8,18 +8,28 @@ import (
 	"fmt"
 
 	redigo "github.com/garyburd/redigo/redis"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const Name = "subscribe"
+const (
+	Name    = "subscribe"
+	Apropos = "print messages published to the given redis channel"
+	Usage   = "subscribe CHANNEL"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-
-func (cmd) Usage() string { return Name + " CHANNEL" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	switch len(args) {
@@ -51,8 +61,9 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print messages published to the given redis channel",
-	}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

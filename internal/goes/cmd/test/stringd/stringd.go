@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
@@ -16,8 +17,24 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "stringd"
-const pubkey = "test.string"
+const (
+	Name    = "stringd"
+	Apropos = "provides a redis settable test string"
+	Usage   = "stringd"
+
+	pubkey = "test.string"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd(make(chan struct{})) }
 
 type cmd chan struct{}
 
@@ -26,11 +43,10 @@ type Stringd struct {
 	pub *publisher.Publisher
 }
 
-func New() cmd { return cmd(make(chan struct{})) }
-
-func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Kind() goes.Kind   { return goes.Daemon }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 func (cmd cmd) Main(...string) error {
 	pub, err := publisher.New()
@@ -66,15 +82,13 @@ func (cmd cmd) Close() error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "provides a redis settable test string",
-	}
-}
-
 func (stringd *Stringd) Hset(args args.Hset, reply *reply.Hset) error {
 	stringd.s = string(args.Value)
 	stringd.pub.Print(pubkey, ": ", stringd.s)
 	*reply = 1
 	return nil
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

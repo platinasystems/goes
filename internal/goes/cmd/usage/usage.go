@@ -9,17 +9,32 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Naem = "usage"
+const (
+	Name    = "usage"
+	Apropos = "print a command synopsis"
+	Usage   = `
+	usage COMMAND...
+	COMMAND -usage`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Complete(...string) []string
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return "usage" }
-func (*cmd) Usage() string   { return "usage  COMMAND...\nCOMMAND -usage" }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -31,6 +46,8 @@ func (c *cmd) Complete(args ...string) []string {
 	return goes.ByName(*c).Complete(prefix)
 }
 
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
+
 func (c *cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("COMMAND: missing")
@@ -40,19 +57,21 @@ func (c *cmd) Main(args ...string) error {
 		if g == nil {
 			return fmt.Errorf("%s: not found", arg)
 		}
-		if strings.IndexRune(g.Usage, '\n') >= 0 {
-			fmt.Print("usage:\t",
-				strings.Replace(g.Usage, "\n", "\n\t", -1),
-				"\n")
-		} else {
-			fmt.Println("usage:", g.Usage)
+		fmt.Print("usage:")
+		if !strings.HasPrefix(g.Usage, "\t") {
+			fmt.Print("\t")
+		}
+		fmt.Print(g.Usage)
+		if !strings.HasSuffix(g.Usage, "\n") {
+			fmt.Println()
 		}
 	}
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print a command synopsis",
-	}
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

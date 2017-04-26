@@ -10,9 +10,14 @@ import (
 
 	"github.com/platinasystems/go/copyright"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "license"
+const (
+	Name    = "license"
+	Apropos = "print machine license(s)"
+	Usage   = "license"
+)
 
 var (
 	Init = func() {}
@@ -21,17 +26,24 @@ var (
 	Others []Other
 )
 
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
+
 type Other struct {
 	Name, Text string
 }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Kind() goes.Kind { return goes.DontFork }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
 
 func (cmd) Main(args ...string) error {
 	once.Do(Init)
@@ -46,11 +58,8 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print machine license(s)",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 func prettyprint(title, text string) {
 	fmt.Println(title)
@@ -58,4 +67,8 @@ func prettyprint(title, text string) {
 		fmt.Print("=")
 	}
 	fmt.Print("\n\n", text, "\n")
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

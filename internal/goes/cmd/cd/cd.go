@@ -9,19 +9,35 @@ import (
 	"os"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "cd"
+const (
+	Name    = "cd"
+	Apropos = "change the current directory"
+	Usage   = "cd [- | DIRECTORY]"
+	Man     = `
+DESCRIPTION
+	Change the working directory to the given name or the last one if '-'.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return &cmd{} }
 
 type cmd struct {
 	last string
 }
 
-func New() *cmd { return &cmd{} }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return "cd [- | DIRECTORY]" }
+func (*cmd) Apropos() lang.Alt { return apropos }
+func (*cmd) Kind() goes.Kind   { return goes.DontFork | goes.CantPipe }
 
 func (cd *cmd) Main(args ...string) error {
 	var dir string
@@ -57,21 +73,15 @@ func (cd *cmd) Main(args ...string) error {
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "change the current directory",
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	cd - change the current directory
-
-SYNOPSIS
-	cd [- | DIRECTORY]
-
-DESCRIPTION
-	Change the working directory to the given name or the last one if '-'.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

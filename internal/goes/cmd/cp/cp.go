@@ -11,23 +11,40 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/url"
 )
 
-const Name = "cp"
+const (
+	Name    = "cp"
+	Apropos = "copy files and directories"
+	Usage   = `
+	cp [-v] -T SOURCE DESTINATION
+	cp [-v] -t DIRECTORY SOURCE...
+	cp [-v] SOURCE... DIRECTORY`
+	Man = `
+DESCRIPTION
+	Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY where
+	SOURCE, DEST and DIRECTORY may all be URLs.
+
+OPTIONS
+	-v	verbose`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-
-func (cmd) Usage() string {
-	return `cp [-v] -T SOURCE DESTINATION
-	cp [-v] -t DIRECTORY SOURCE...
-	cp [-v] SOURCE... DIRECTORY`
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	cp := func(source, dest string, verbose bool) error {
@@ -114,27 +131,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "copy files and directories",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	cp - copy files and directories
-
-SYNOPSIS
-	cp [-v] [-T] SOURCE DESTINATION
-	cp [-v] SOURCE... DIRECTORY
-	cp [-v] -t DIRECTORY SOURCE...
-
-DESCRIPTION
-	Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY where
-	SOURCE, DEST and DIRECTORY may all be URLs.
-
-OPTIONS
-	-v	verbose`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

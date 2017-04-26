@@ -8,17 +8,36 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "panicd"
+const (
+	Name    = "panicd"
+	Apropos = "test daemon error log"
+	Usage   = "panicd [MESSAGE]..."
+	Man     = `
+DESCRIPTION
+	Print the given or default message to klog or syslog.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name + " [MESSAGE]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Man() lang.Alt     { return man }
+func (cmd) Kind() goes.Kind   { return goes.Daemon }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 func (cmd) Main(args ...string) error {
 	msg := "---"
@@ -29,21 +48,11 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "test daemon error log",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	panicd - test daemon error log
-
-SYNOPSIS
-	panicd [MESSAGE]...
-
-DESCRIPTION
-	Print the given or default message to klog or syslog.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

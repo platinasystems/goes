@@ -11,23 +11,36 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/prog"
 )
 
-const Name = "uninstall"
-const EtcInitdGoes = "/etc/init.d/goes"
-const EtcDefaultGoes = "/etc/default/goes"
-const BashCompletionGoes = "/usr/share/bash-completion/completions/goes"
+const (
+	Name    = "uninstall"
+	Apropos = "uninstall this goes machine"
+	Usage   = "uninstall"
+
+	EtcInitdGoes       = "/etc/init.d/goes"
+	EtcDefaultGoes     = "/etc/default/goes"
+	BashCompletionGoes = "/usr/share/bash-completion/completions/goes"
+)
 
 // Machines may use this Hook to complete its removal.
 var Hook = func() error { return nil }
 
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
+
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Name }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -45,8 +58,9 @@ func (c *cmd) Main(...string) error {
 	return err
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "uninstall this goes machine",
-	}
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

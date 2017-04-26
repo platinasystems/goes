@@ -4,26 +4,30 @@
 
 package nlcounters
 
-import "github.com/platinasystems/go/internal/netlink/nlcounters"
+import (
+	"github.com/platinasystems/go/internal/goes/lang"
+	"github.com/platinasystems/go/internal/netlink/nlcounters"
+)
 
-const Name = "nlcounters"
+const (
+	Name    = "nlcounters"
+	Apropos = "periodic print of netlink interface counters"
+	Usage   = nlcounters.Usage
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Help(...string) string
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return nlcounters.Usage }
-
-func (cmd) Main(args ...string) error {
-	return nlcounters.Main(args...)
-}
-
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "periodic print of netlink interface counters",
-	}
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Help(args ...string) string {
 	help := "no help"
@@ -34,4 +38,13 @@ func (cmd) Help(args ...string) string {
 		return "SECONDS"
 	}
 	return help
+}
+
+func (cmd) Main(args ...string) error { return nlcounters.Main(args...) }
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

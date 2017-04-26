@@ -7,17 +7,33 @@ package hdel
 import (
 	"fmt"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const Name = "hdel"
+const (
+	Name    = "hdel"
+	Apropos = "delete one or more redis hash fields"
+	Usage   = "hdel KEY FIELD"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Complete(...string) []string
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+func (cmd) Apropos() lang.Alt { return apropos }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " KEY FIELD" }
+func (cmd) Complete(args ...string) []string {
+	return redis.Complete(args...)
+}
 
 func (cmd) Main(args ...string) error {
 	switch len(args) {
@@ -42,12 +58,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "delete one or more redis hash fields",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-func (cmd) Complete(args ...string) []string {
-	return redis.Complete(args...)
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

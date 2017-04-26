@@ -2,17 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package slashinit provides the '/init' command that mounts and pivots to the
-// 'goesroot' kernel parameter before executing its '/sbin/init'.  The machine
-// may reassign the Hook closure to perform target specific tasks prior to the
-// 'goesroot' pivot. The kernel command may include 'goes=overwrite' to force
-// copy of '/bin/goes' from the initrd to the named 'goesroot'.
-//
-// If the target root is not mountable, the 'goesinstaller' parameter specifies
-// an installer/recovery system to use to repair the system. The parameter to
-// this is three comma-seperated URLs. The first is mandatory, and is the
-// kernel to load. The second is the optional initramfs to load. The third is
-// the optional FDT to load. The kernel is loaded via the kexec command.
 package slashinit
 
 import (
@@ -26,18 +15,44 @@ import (
 
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/url"
 )
 
 const (
-	Name = "/init"
+	Name    = "/init"
+	Apropos = "bootstrap"
+	Usage   = "init"
+	Man     = `
+DESCRIPTION
+	The '/init' command that mounts and pivots to the 'goesroot' kernel
+	parameter before executing its '/sbin/init'.  The machine may reassign
+	the Hook closure to perform target specific tasks prior to the
+	'goesroot' pivot. The kernel command may include 'goes=overwrite' to
+	force copy of '/bin/goes' from the initrd to the named 'goesroot'.
+
+	If the target root is not mountable, the 'goesinstaller' parameter
+	specifies an installer/recovery system to use to repair the system. The
+	parameter to this is three comma-seperated URLs. The first is
+	mandatory, and is the kernel to load. The second is the optional
+	initramfs to load. The third is the optional FDT to load. The kernel is
+	loaded via the kexec command.`
+
 	zero = uintptr(0)
 )
 
 var Hook = func() error { return nil }
 
-func New() *cmd { return new(cmd) }
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 func init() {
 	if os.Getpid() != 1 {
@@ -108,11 +123,11 @@ func init() {
 
 type cmd goes.ByName
 
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Name }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 
 func (c *cmd) Main(_ ...string) error {
 	byName := goes.ByName(*c)
@@ -160,6 +175,10 @@ func (c *cmd) Main(_ ...string) error {
 
 	return err
 }
+
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
 
 func (*cmd) makeRootDirs(mountPoint string) {
 	for _, dir := range []struct {
@@ -353,7 +372,7 @@ func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
 		if script != "" {
 			bootCmd = append(bootCmd, "-t")
 			bootCmd = append(bootCmd, script)
-		}			
+		}
 		dirs, err := ioutil.ReadDir(mountPoint)
 		if err != nil {
 			panic(fmt.Errorf("Error reading automount dir: %v",
@@ -495,3 +514,12 @@ func (c *cmd) installer(params []string) error {
 		"-i", "initramfs",
 		"-c", "console=ttyS0,115200")
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

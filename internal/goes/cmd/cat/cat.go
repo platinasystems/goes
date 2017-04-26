@@ -9,17 +9,41 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/url"
 )
 
-const Name = "cat"
+const (
+	Name    = "cat"
+	Apropos = "print concatenated files"
+	Usage   = "cat [FILE]..."
+	Man     = `
+DESCRIPTION
+	Concatenate FILE(s), or standard input, to standard output.
+
+	With no FILE, or when FILE is -, read standard input.
+
+EXAMPLES
+	cat f - g
+		Output f's contents, then standard input, then g's contents.
+
+	cat
+		Copy standard input to standard output.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [FILE]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -44,29 +68,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print concatenated files",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	cat - print concatenates files
-
-SYNOPSIS
-	cat [OPTION]... [FILE]...
-
-DESCRIPTION
-	Concatenate FILE(s), or standard input, to standard output.
-
-	With no FILE, or when FILE is -, read standard input.
-
-EXAMPLES
-	cat f - g
-		Output f's contents, then standard input, then g's contents.
-
-		cat	Copy standard input to standard output.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

@@ -4,27 +4,40 @@
 
 package nldump
 
-import "github.com/platinasystems/go/internal/netlink/nldump"
+import (
+	"github.com/platinasystems/go/internal/goes/lang"
+	"github.com/platinasystems/go/internal/netlink/nldump"
+)
 
-const Name = "nldump"
+const (
+	Name    = "nldump"
+	Apropos = "print netlink multicast messages"
+	Usage   = nldump.Usage
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Help(...string) string
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return nldump.Usage }
-
-func (cmd) Main(args ...string) error {
-	return nldump.Main(args...)
-}
-
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print netlink multicast messages",
-	}
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Help(args ...string) string {
 	return "link | addr | route | neighor | nsid"
+}
+
+func (cmd) Main(args ...string) error { return nldump.Main(args...) }
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

@@ -12,40 +12,44 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "eeprom"
+const (
+	Name    = "eeprom"
+	Apropos = "show, delete or modify eeprom fields"
+	Usage   = "eeprom [-n] [-FIELD | FIELD=VALUE]..."
+	Man     = `
+DESCRIPTION
+	Show, delete or modify system eeprom fields.
+
+	-n     dry-run to show modifications
+
+	-vendor-extension 
+		set, modify, or delete vendor sub-fields
+
+	Without any args, show current eeprom configuation.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Complete(...string) []string
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return "eeprom [-n] [-FIELD | FIELD=VALUE]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd cmd) Complete(args ...string) []string {
 	a := append(cmd.flags(), cmd.parms()...)
 	sort.Strings(a)
-	return a
-}
-
-func (cmd) flags() []string {
-	a := make([]string, 1+len(Types))
-	a[0] = "-n"
-	for i, t := range Types {
-		a[1+i] = fmt.Sprint("-", t)
-	}
-	return a
-}
-
-func (cmd) parms() []string {
-	a := make([]string, 2+len(Types))
-	a[0] = "Onie.Data"
-	a[1] = "Onie.Version"
-	for i, t := range Types {
-		a[2+i] = t.String()
-	}
 	return a
 }
 
@@ -106,28 +110,34 @@ func (cmd cmd) Main(args ...string) error {
 	return err
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "show, delete or modify eeprom fields",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+func (cmd) flags() []string {
+	a := make([]string, 1+len(Types))
+	a[0] = "-n"
+	for i, t := range Types {
+		a[1+i] = fmt.Sprint("-", t)
 	}
+	return a
 }
 
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	eeprom - show, delete or modify eeprom fields
-
-SYNOPSIS
-	eeprom [-n] [-vendor-extension] [-FIELD | FIELD=VALUE]...
-
-DESCRIPTION
-	Show, delete or modify system eeprom fields.
-
-	-n     dry-run to show modifications
-
-	-vendor-extension 
-		set, modify, or delete vendor sub-fields
-
-	Without any args, show current eeprom configuation.`,
+func (cmd) parms() []string {
+	a := make([]string, 2+len(Types))
+	a[0] = "Onie.Data"
+	a[1] = "Onie.Version"
+	for i, t := range Types {
+		a[2+i] = t.String()
 	}
+	return a
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

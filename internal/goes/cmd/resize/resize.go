@@ -2,7 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Resize window per ROWS, COLUMNS and [XPIXELS, YPIXELS] env variables
 package resize
 
 import (
@@ -12,17 +11,29 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "resize"
+const (
+	Name    = "resize"
+	Apropos = "Resize per ROWS, COLUMNS and [XPIXELS, YPIXELS]"
+	Usage   = "resize"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Kind() goes.Kind   { return goes.DontFork | goes.CantPipe }
 
 func (cmd) Main(args ...string) error {
 	var (
@@ -84,4 +95,11 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 	return err
+}
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

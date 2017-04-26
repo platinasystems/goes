@@ -9,32 +9,27 @@ import (
 	"io/ioutil"
 
 	"github.com/platinasystems/go/internal/fit"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "iminfo"
+const (
+	Name    = "iminfo"
+	Apropos = "FIXME"
+	Usage   = "iminfo"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
-
-func listImages(imageList []*fit.Image) {
-	for _, image := range imageList {
-		fmt.Printf(`  %s:
-    Description=%s
-    Type=%s
-    Arch=%s
-    OS=%s
-    Compression=%s
-    LoadAddr=%x
-`,
-			image.Name, image.Description, image.Type,
-			image.Arch, image.Os, image.Compression,
-			image.LoadAddr)
-	}
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if n := len(args); n == 0 {
@@ -57,4 +52,27 @@ func (cmd) Main(args ...string) error {
 		listImages(cfg.ImageList)
 	}
 	return nil
+}
+
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Name }
+
+func listImages(imageList []*fit.Image) {
+	for _, image := range imageList {
+		fmt.Printf(`  %s:
+    Description=%s
+    Type=%s
+    Arch=%s
+    OS=%s
+    Compression=%s
+    LoadAddr=%x
+`,
+			image.Name, image.Description, image.Type,
+			image.Arch, image.Os, image.Compression,
+			image.LoadAddr)
+	}
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

@@ -13,10 +13,25 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const Name = "imx6d"
+const (
+	Name    = "imx6d"
+	Apropos = "FIXME"
+	Usage   = "imx6d"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 var (
 	Init = func() {}
@@ -31,11 +46,10 @@ type cmd struct {
 	last map[string]float64
 }
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
+func (*cmd) Apropos() lang.Alt { return apropos }
+func (*cmd) Kind() goes.Kind   { return goes.Daemon }
+func (*cmd) String() string    { return Name }
+func (*cmd) Usage() string     { return Name }
 
 func (cmd *cmd) Main(...string) error {
 	once.Do(Init)
@@ -96,4 +110,8 @@ func ReadTemp() float64 {
 	tmp3, _ := strconv.Atoi(tmp2)
 	tmp4 := float64(tmp3)
 	return float64(tmp4 / 100.0)
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

@@ -11,11 +11,39 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "dmesg"
+const (
+	Name    = "dmesg"
+	Apropos = "print or control the kernel ring buffer"
+	Usage   = "dmesg [OPTION]..."
+	Man     = `
+DESCRIPTION
+	The default action is to print new kernel ring buffer messages since
+	the last command invocation.
+
+OPTIONS
+	-C	Clear the ring buffer.
+	-c	Clear the ring buffer after first printing its contents.
+	-D	Disable the printing of messages to the console.
+	-d	Display the delta time between messages.
+	-E	Enable printing messages to the console.
+	-F	Read the messages from the given file instead of /dev/kmsg.
+	-H	Enable human-readable output.
+	-k	Print kernel messages.
+	-n level
+		Set console to the given numbered or named log level.
+	-r	Print the raw message, i.e. do not strip the priority prefix.
+	-T	Print human-readable timestamps.
+	-t	Do not print timestamps.
+	-u	Print userspace messages.
+	-w	Wait for new messages.
+	-x	Decode facility and level (priority) numbers.
+	-z	Reprint entire ring buffer.`
+)
 
 const (
 	SYSLOG_ACTION_CLOSE = iota
@@ -31,14 +59,21 @@ const (
 	SYSLOG_ACTION_SIZE_BUFFER
 )
 
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
+
 type timeT time.Time
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	const (
@@ -203,6 +238,10 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
 func (t timeT) H() string {
 	return time.Time(t).Format(time.Stamp)
 }
@@ -211,41 +250,11 @@ func (t timeT) T() string {
 	return time.Time(t).Format("Mon " + time.Stamp + " 2006")
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print or control the kernel ring buffer",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	dmesg - print or control the kernel ring buffer
-
-SYNOPSIS
-	dmesg [OPTION]...
-
-DESCRIPTION
-	The default action is to print new kernel ring buffer messages since
-	the last command invocation.
-
-OPTIONS
-	-C	Clear the ring buffer.
-	-c	Clear the ring buffer after first printing its contents.
-	-D	Disable the printing of messages to the console.
-	-d	Display the delta time between messages.
-	-E	Enable printing messages to the console.
-	-F	Read the messages from the given file instead of /dev/kmsg.
-	-H	Enable human-readable output.
-	-k	Print kernel messages.
-	-n level
-		Set console to the given numbered or named log level.
-	-r	Print the raw message, i.e. do not strip the priority prefix.
-	-T	Print human-readable timestamps.
-	-t	Do not print timestamps.
-	-u	Print userspace messages.
-	-w	Wait for new messages.
-	-x	Decode facility and level (priority) numbers.
-	-z	Reprint entire ring buffer.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

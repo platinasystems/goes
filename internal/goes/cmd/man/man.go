@@ -6,20 +6,35 @@ package man
 
 import (
 	"fmt"
-	"os"
+	"strings"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "man"
+const (
+	Name    = "man"
+	Apropos = "print command documentation"
+	Usage   = `
+	man COMMAND...
+	COMMAND -man`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Complete(...string) []string
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return "man" }
-func (*cmd) Usage() string   { return "man COMMAND...\nCOMMAND -man" }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -31,31 +46,39 @@ func (c *cmd) Complete(args ...string) []string {
 	return goes.ByName(*c).Complete(prefix)
 }
 
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
+
 func (c *cmd) Main(args ...string) error {
 	n := len(args)
 	if n == 0 {
 		return fmt.Errorf("COMMAND: missing")
 	}
 	for i, arg := range args {
-		var man string
 		g := goes.ByName(*c)[arg]
 		if g == nil {
 			return fmt.Errorf("%s: not found", arg)
 		}
-		for _, lang := range []string{
-			os.Getenv("LANG"),
-			goes.Lang,
-			goes.DefaultLang,
-		} {
-			man = g.Man[lang]
-			if len(man) > 0 {
-				break
+		man := g.Man.String()
+		if len(man) == 0 || strings.HasPrefix(man, "\n") {
+			usage := g.Usage
+			if strings.HasPrefix(usage, "\t") {
+				usage = usage[1:]
 			}
+			fmt.Print(section.name, "\n\t", g.Name, " - ",
+				g.Apropos, "\n\n", section.synopsis, "\n\t",
+				usage, "\n")
+			if len(man) > 0 {
+				if !strings.HasPrefix(man, "\n") {
+					fmt.Println()
+				}
+				fmt.Print(man)
+				if !strings.HasSuffix(man, "\n") {
+					fmt.Println()
+				}
+			}
+		} else {
+			fmt.Println(man)
 		}
-		if len(man) == 0 {
-			man = fmt.Sprint(arg, ": has no man")
-		}
-		fmt.Println(man)
 		if n > 1 && i < n-1 {
 			fmt.Println()
 		}
@@ -63,8 +86,21 @@ func (c *cmd) Main(args ...string) error {
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print command documentation",
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
+	section = struct {
+		name, synopsis lang.Alt
+	}{
+		name: lang.Alt{
+			lang.EnUS: "NAME",
+		},
+		synopsis: lang.Alt{
+			lang.EnUS: "SYNOPSIS",
+		},
+	}
+)

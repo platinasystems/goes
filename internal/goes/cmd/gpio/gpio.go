@@ -9,17 +9,28 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 )
 
-const Name = "gpio"
+const (
+	Name    = "gpio"
+	Apropos = "manipulate GPIO pins"
+	Usage   = "gpio PIN_NAME [VALUE]"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " PIN_NAME [VALUE]" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	gpio.Init()
@@ -78,21 +89,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "manipulate GPIO pins",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	gpio - Manipulate GPIO pins
-
-SYNOPSIS
-	gpio
-
-DESCRIPTION
-	Manipulate GPIO pins`,
-	}
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

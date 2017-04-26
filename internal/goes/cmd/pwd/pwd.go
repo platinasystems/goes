@@ -9,17 +9,37 @@ import (
 	"os"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "pwd"
+const (
+	Name    = "pwd"
+	Apropos = "print working directory"
+	Usage   = "pwd [-L]"
+	Man     = `
+DESCRIPTION
+	Print the full filename of the process working directory.
+
+	-L  use PWD from environment, even if it contains symlinks;
+	    default avoids symlinks
+
+NOTE 
+	This may be different than the context directory.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [-L]" }
-
+func (cmd) Apropos() lang.Alt { return apropos }
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-L")
 	if len(args) != 0 {
@@ -37,27 +57,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print working directory",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	pwd - print working directory
-
-SYNOPSIS
-	pwd [-L]
-
-DESCRIPTION
-	Print the full filename of the process working directory.
-
-	-L  use PWD from environment, even if it contains symlinks;
-	    default avoids symlinks
-
-NOTE 
-	This may be different than the context directory.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

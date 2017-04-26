@@ -19,6 +19,7 @@ import (
 	"github.com/platinasystems/go/internal/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/internal/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/internal/goes/cmd/w83795d"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -27,7 +28,21 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "ucd9090d"
+const (
+	Name    = "ucd9090d"
+	Apropos = "FIXME"
+	Usage   = "ucd9090d"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type I2cDev struct {
 	Bus      int
@@ -71,11 +86,10 @@ type Info struct {
 	lastu map[string]uint16
 }
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
+func (*cmd) Apropos() lang.Alt { return apropos }
+func (*cmd) Kind() goes.Kind   { return goes.Daemon }
+func (*cmd) String() string    { return Name }
+func (*cmd) Usage() string     { return Name }
 
 func (cmd *cmd) Main(...string) error {
 	once.Do(Init)
@@ -543,4 +557,8 @@ func (i *Info) set(key, value string, isReadyEvent bool) error {
 
 func (i *Info) publish(key string, value interface{}) {
 	i.pub.Print(key, ": ", value)
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

@@ -12,17 +12,36 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "!"
+const (
+	Name    = "!"
+	Apropos = "run an external command"
+	Usage   = "! COMMAND [ARGS]... [&]"
+	Man     = `
+DESCRIPTION
+	Sh-bang!
+
+	Command executes in background if last argument ends with '&'.
+	The standard i/o redirections apply.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.DontFork }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return "! COMMAND [ARGS]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Kind() goes.Kind   { return goes.DontFork }
 
 func (cmd) Main(args ...string) error {
 	var background bool
@@ -56,24 +75,15 @@ func (cmd) Main(args ...string) error {
 	}
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "run an external command",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	! - run an external command"
-
-SYNOPSIS
-	! COMMAND [ARG]... [&]
-
-DESCRIPTION
-	Sh-bang!
-
-	Command executes in background if last argument ends with '&'.
-	The standard i/o redirections apply.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

@@ -2,36 +2,38 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Print a short command description.
 package apropos
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "apropos"
+const (
+	Name    = "apropos"
+	Apropos = "print a short command description"
+	Usage   = `
+	apropos COMMAND...
+	COMMAND -apropos`
+)
 
 type Interface interface {
-	Apropos() map[string]string
+	Apropos() lang.Alt
 	ByName(goes.ByName)
 	Complete(...string) []string
 	Kind() goes.Kind
 	Main(...string) error
-	Man() map[string]string
 	String() string
 	Usage() string
 }
 
-type cmd goes.ByName
-
 func New() Interface { return new(cmd) }
 
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return "apropos COMMAND...\nCOMMAND -apropos" }
+type cmd goes.ByName
+
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -43,28 +45,23 @@ func (c *cmd) Complete(args ...string) []string {
 	return goes.ByName(*c).Complete(prefix)
 }
 
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
+
 func (c *cmd) Main(args ...string) error {
-	printApropos := func(apropos map[string]string, key string) {
-		format := "%-15s %s\n"
-		if len(key) >= 16 {
-			format = "%s\n\t\t%s\n"
-		}
-		for _, lang := range []string{
-			os.Getenv("LANG"),
-			goes.Lang,
-			goes.DefaultLang,
-		} {
-			if s := apropos[lang]; len(s) > 0 {
-				fmt.Printf(format, key, s)
-				break
-			}
+	pad := func(n int) {
+		if n < 0 {
+			fmt.Print("\n\t\t")
+		} else {
+			fmt.Print("                "[:n])
 		}
 	}
 	if len(args) == 0 {
 		for _, k := range goes.ByName(*c).Complete("") {
 			apropos := goes.ByName(*c)[k].Apropos
 			if apropos != nil {
-				printApropos(apropos, k)
+				fmt.Print(k)
+				pad(16 - len(k))
+				fmt.Println(apropos)
 			}
 		}
 	} else {
@@ -76,27 +73,17 @@ func (c *cmd) Main(args ...string) error {
 			if g.Apropos == nil {
 				return fmt.Errorf("%s: has no apropos", k)
 			}
-			printApropos(g.Apropos, k)
+			fmt.Print(k)
+			pad(16 - len(k))
+			fmt.Println(g.Apropos)
 		}
 	}
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print a short command description",
-	}
-}
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
 
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	apropos - print a short command description
-
-SYNOPSIS
-	apropos [COMMAND]...
-
-DESCRIPTION
-	Print a short description of given or all COMMANDS.`,
-	}
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

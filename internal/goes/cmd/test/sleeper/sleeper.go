@@ -14,18 +14,51 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "sleeper"
+const (
+	Name    = "sleeper"
+	Apropos = "periodic message logger"
+	Usage   = "sleeper [-s SECONDS] [MESSAGE]..."
+	Man     = `
+DESCRIPTION
+	Periodicaly log MESSAGE.  The default is 3 seconds.
+
+EXAMPLE
+	Use this to test job control like this:
+
+	goes> sleeper &
+	[1] Runing	sleeper
+	goes> show log
+	2015/10/28 22:06:18 sleeper
+	goes> show jobs
+	[1] Runing	sleeper
+	goes> kill %1
+	goes> show jobs
+	[1] Terminated	sleeper
+	goes>`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return "sleeperd [-s SECONDS] [MESSAGE]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Man() lang.Alt     { return man }
+func (cmd) Kind() goes.Kind   { return goes.Daemon }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 func (cmd) Main(args ...string) error {
 	var sec uint
@@ -68,35 +101,11 @@ func (cmd) Main(args ...string) error {
 	}
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "periodic message logger",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	sleeper - periodic message logger
-
-SYNOPSIS
-	sleeper [-s SECONDS] [MESSAGE]...
-
-DESCRIPTION
-	Periodicaly log MESSAGE.  The default is 3 seconds.
-
-EXAMPLE
-	Use this to test job control like this:
-
-	goes> sleeper &
-	[1] Runing	sleeper
-	goes> show log
-	2015/10/28 22:06:18 sleeper
-	goes> show jobs
-	[1] Runing	sleeper
-	goes> kill %1
-	goes> show jobs
-	[1] Terminated	sleeper
-	goes>`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

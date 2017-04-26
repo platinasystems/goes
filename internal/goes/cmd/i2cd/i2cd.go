@@ -14,19 +14,38 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 )
 
-const Name = "i2cd"
+const (
+	Name    = "i2cd"
+	Apropos = "FIXME"
+	Usage   = "i2cd"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd(make(chan struct{})) }
 
 type cmd chan struct{}
 
-func New() cmd { return cmd(make(chan struct{})) }
+func (cmd) Apropos() lang.Alt { return apropos }
+
+func (cmd cmd) Close() error {
+	close(cmd)
+	return nil
+}
 
 func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
 
 func (cmd cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
@@ -57,10 +76,8 @@ func (cmd cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd cmd) Close() error {
-	close(cmd)
-	return nil
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 const MAXOPS = 30
 
@@ -150,4 +167,8 @@ func clearJS() {
 		j[k] = i
 		s[k] = r
 	}
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

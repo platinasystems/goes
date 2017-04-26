@@ -9,16 +9,33 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "echo"
+const (
+	Name    = "echo"
+	Apropos = "print a line of text"
+	Usage   = "echo [-n] [STRING]..."
+	Man     = `
+DESCRIPTION
+	Echo the STRING(s) to standard output.
+
+	-n     do not output the trailing newline`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [-n] [STRING]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-n")
@@ -31,23 +48,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print a line of text",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	echo - print a line of text
-
-SYNOPSIS
-	echo [-n] [STRING]...
-
-DESCRIPTION
-	Echo the STRING(s) to standard output.
-
-	-n     do not output the trailing newline`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

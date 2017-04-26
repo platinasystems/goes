@@ -9,17 +9,32 @@ import (
 	"net"
 	"time"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/tatsushid/go-fastping"
 )
 
-const Name = "ping"
+const (
+	Name    = "ping"
+	Apropos = "send ICMP ECHO_REQUEST to network host"
+	Usage   = "ping DESTINATION"
+	Man     = `
+DESCRIPTION
+	Send ICMP ECHO_REQUEST to given host and print ECHO_REPLY.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " DESTINATION" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if n := len(args); n == 0 {
@@ -44,21 +59,15 @@ func (cmd) Main(args ...string) error {
 	return pinger.Run()
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "send ICMP ECHO_REQUEST to network host",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	ping - send ICMP ECHO_REQUEST to network hosts
-
-SYNOPSIS
-	ping DESTINATION
-
-DESCRIPTION
-	Send ICMP ECHO_REQUEST to given host and print ECHO_REPLY.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

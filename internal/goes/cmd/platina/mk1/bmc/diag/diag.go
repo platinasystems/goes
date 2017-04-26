@@ -11,10 +11,52 @@ import (
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 )
 
-const Name = "diag"
+const (
+	Name    = "diag"
+	Apropos = "run diagnostics"
+	Usage   = `
+	diag [-debug] | prom [-w | -d | -x86] \
+		[TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]`
+	Man = `
+DESCRIPTION
+	Runs diagnostic tests to validate BMC functionality and interfaces
+
+	EEPROM writing utility with diag prom
+
+OPTIONS
+	-x86	executes command on host EEPROM
+
+	-w 	write flag with the following arguments
+	crc 	recalculates and updates crc field
+	onie 	erases contents and adds an ONIE header with crc field
+	length 	debug tool to write VALUE into length field
+	copy	copies host eeprom contents, updates PPN field,
+		recalculates crc (vice versa with -x86)
+	TYPE VALUE
+		debug tool to write ONIE field of TYPE with VALUE
+	-d	delete flag with the following arguments
+	TYPE	delete the first ONIE field found with TYPE
+
+EXAMPLES
+	diag prom		dumps bmc eeprom
+	diag prom -x86		dumps host eeprom
+	diag prom -w copy	copies host to bmc eeprom
+	diag prom -x86 -w crc	updates host eeprom crc field`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 var debug, x86, writeField, delField, writeSN bool
 var argF []string
@@ -23,12 +65,10 @@ var flagF flags.Flag
 type cmd struct{}
 type Diag func() error
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string {
-	return Name + " [-debug] | prom [-w | -d | -x86] [TYPE | \"crc\" | \"length\" | \"onie\" | \"copy\" ] [VALUE]"
-}
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Man() lang.Alt     { return man }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 func (cmd) Main(args ...string) error {
 	var diag string
@@ -162,42 +202,11 @@ func diagLED() error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "run diagnostics",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	diag - run diagnostics
-
-SYNOPSIS
-	diag [-debug] [DIAG | "all"]
-
-DESCRIPTION
-	Runs diagnostic tests to validate BMC functionality and interfaces
-
-	EEPROM writing utility with diag prom
-	diag prom [-w | -d | -x86] [TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]
-
-	[-x86]			executes command on host EEPROM
-
-	[-w] 			write flag with the following arguments
-	"crc" 			recalculates and updates crc field
-	"onie" 			erases contents and adds an ONIE header with crc field
-	"length" 		debug tool to write VALUE into length field
-	"copy"			copies host eeprom contents, updates PPN field, recalculates crc (vice versa with -x86)
-	TYPE VALUE 		debug tool to write ONIE field of TYPE with VALUE
-
-	[-d]			delete flag with the following arguments
-	TYPE			delete the first ONIE field found with TYPE
-
-EXAMPLES
-	diag prom		dumps bmc eeprom
-	diag prom -x86		dumps host eeprom
-	diag prom -w copy	copies host to bmc eeprom
-	diag prom -x86 -w crc	updates host eeprom crc field`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

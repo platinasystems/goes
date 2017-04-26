@@ -8,16 +8,32 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "sleep"
+const (
+	Name    = "sleep"
+	Apropos = "suspend execution for an interval of time"
+	Usage   = "sleep SECONDS"
+	Man     = `
+DESCRIPTION
+	The sleep command suspends execution for a number of SECONDS.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " SECONDS" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -33,21 +49,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "suspend execution for an interval of time",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	sleep - suspend execution for an interval of time
-
-SYNOPSIS
-	sleep SECONDS
-
-DESCRIPTION
-	The sleep command suspends execution for a number of SECONDS.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

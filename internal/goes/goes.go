@@ -21,10 +21,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/prog"
 )
-
-const DefaultLang = "en_US.UTF-8"
 
 const (
 	DontFork Kind = 1 << iota
@@ -33,19 +32,16 @@ const (
 	CantPipe
 )
 
-var (
-	Exit = os.Exit
-
-	// Lang may be set prior to the first Plot for alt preferred languages
-	Lang = DefaultLang
-)
+var Exit = os.Exit
 
 type ByName map[string]*Goes
 
 type Cmd interface {
+	Apropos() lang.Alt
 	Main(...string) error
-	// The command's String() should return its name.
+	// The command's String() is its name.
 	String() string
+	Usage() string
 }
 
 type Goes struct {
@@ -57,16 +53,13 @@ type Goes struct {
 	Main     func(...string) error
 	Kind     Kind
 	Usage    string
-	Apropos  map[string]string
-	Man      map[string]string
+	Apropos  lang.Alt
+	Man      lang.Alt
 }
 
 type Kind uint16
 
-type aproposer interface {
-	Apropos() map[string]string
-}
-
+// optional methods
 type byNamer interface {
 	ByName(ByName)
 }
@@ -87,16 +80,8 @@ type kinder interface {
 	Kind() Kind
 }
 
-type mainer interface {
-	Main(...string) error
-}
-
 type manner interface {
-	Man() map[string]string
-}
-
-type usager interface {
-	Usage() string
+	Man() lang.Alt
 }
 
 func (byName ByName) Complete(prefix string) (ss []string) {
@@ -225,11 +210,13 @@ func (byName ByName) Plot(cmds ...Cmd) {
 			panic(fmt.Errorf("%s: duplicate", name))
 		}
 		g := &Goes{
-			Name: name,
-			Main: v.Main,
+			Name:    name,
+			Main:    v.Main,
+			Usage:   v.Usage(),
+			Apropos: v.Apropos(),
 		}
-		if method, found := v.(aproposer); found {
-			g.Apropos = method.Apropos()
+		if strings.HasPrefix(g.Usage, "\n\t") {
+			g.Usage = g.Usage[1:]
 		}
 		if method, found := v.(byNamer); found {
 			method.ByName(byName)
@@ -248,9 +235,6 @@ func (byName ByName) Plot(cmds ...Cmd) {
 		}
 		if method, found := v.(manner); found {
 			g.Man = method.Man()
-		}
-		if method, found := v.(usager); found {
-			g.Usage = method.Usage()
 		}
 		byName[g.Name] = g
 	}

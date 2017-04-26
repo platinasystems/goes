@@ -14,25 +14,48 @@ import (
 
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/kill"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "stop"
-const EtcGoesStop = "/etc/goes/stop"
+const (
+	Name    = "stop"
+	Apropos = "stop this goes machine"
+	Usage   = "stop [-stop=URL]"
+	Man     = `
+DESCRIPTION
+	Stop all embedded daemons.
+
+OPTIONS
+	-stop URL
+		Specifies the URL of the machine's stop script that's
+		sourced immediately before killing all daemons.
+		default: /etc/goes/start`
+
+	EtcGoesStop = "/etc/goes/stop"
+)
 
 // Machines may use Hook to run something between the kill of all daemons and
 // the removal of the socks and pids directories.
 var Hook = func() error { return nil }
 
-func New() *cmd { return new(cmd) }
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return "stop [OPTION]..." }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -69,32 +92,20 @@ func (c *cmd) Main(args ...string) error {
 	return err
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "stop this goes machine",
-	}
-}
-
-func (c *cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	stop - stop this goes machine
-
-SYNOPSIS
-	stop [-stop=URL]
-
-DESCRIPTION
-	Stop all embedded daemons.
-
-OPTIONS
-	-stop URL
-		Specifies the URL of the machine's stop script that's
-		sourced immediately before killing all daemons.
-		default: /etc/goes/start`,
-	}
-}
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
 
 func haveEtcGoesStop() bool {
 	_, err := os.Stat(EtcGoesStop)
 	return err == nil
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

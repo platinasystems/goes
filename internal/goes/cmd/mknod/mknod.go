@@ -10,19 +10,32 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "mknod"
+const (
+	Name    = "mknod"
+	Apropos = "make block or character special files"
+	Usage   = "mknod [OPTION]... NAME TYPE [MAJOR MINOR]"
+	Man     = `
+OPTIONS
+        -m MAJOR`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-
-func (cmd) Usage() string {
-	return Name + " [OPTION]... NAME TYPE [MAJOR MINOR]"
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	var filetype uint32 = 0
@@ -76,24 +89,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "make block or character special files",
-	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-        mknod - make block or character special files
-
-SYNOPSIS
-        mknod [OPTION]... NAME TYPE [MAJOR MINOR]
-
-OPTIONS
-        -m`,
-	}
-}
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 func flagValue(a []string, f string) uint32 {
 	for _, arg := range a {
@@ -110,3 +108,12 @@ func flagValue(a []string, f string) uint32 {
 	}
 	return 0
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

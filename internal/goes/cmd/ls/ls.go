@@ -13,18 +13,39 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "ls"
+const (
+	Name    = "ls"
+	Apropos = "list directory contents"
+	Usage   = "ls [OPTION]... [FILE]..."
+	Man     = `
+DESCRIPTION
+	List information about the FILEs (the current directory by default).
+
+OPTIONS
+
+	-C	list entries by columns (default)
+	-l	long listing format
+	-1	list one entry per line`
+)
 
 var PathSeparatorString = string([]byte{os.PathSeparator})
 
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
+
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]... [FILE]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	var err error
@@ -103,6 +124,10 @@ func (cmd) Main(args ...string) error {
 	}
 	return err
 }
+
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 // List one file per line.
 func one(files []os.FileInfo) error {
@@ -210,28 +235,11 @@ func tabulate(files []os.FileInfo) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "list directory contents",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	ls - list directory contents
-
-SYNOPSIS
-	ls [OPTION]... [FILE]...
-
-DESCRIPTION
-
-	List information about the FILEs (the current directory by default).
-
-OPTIONS
-
-	-C	list entries by columns (default)
-	-l	long listing format
-	-1	list one entry per line`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

@@ -8,27 +8,40 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/netlink/nsid"
 )
 
-const Name = "nsid"
+const (
+	Name    = "nsid"
+	Apropos = "net namespace identifier config"
+	Usage   = nsid.Usage
+	Man     = `
+DESCRIPTION
+	[list [NAME]...]
+		show the identifier of each network namespace with "-1"
+		indicating an unidentifeid namespace.
+
+	set	set the namespace identifier
+
+	unset	unset the namespace identifier`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Complete(...string) []string
+	Help(...string) string
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return nsid.Usage }
-
-func (cmd) Main(args ...string) error {
-	return nsid.Main(args...)
-}
-
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "net namespace identifier config",
-	}
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Complete(args ...string) (c []string) {
 	var cmds = []string{
@@ -82,23 +95,17 @@ func (cmd) Help(args ...string) string {
 	return help
 }
 
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	nsid - net namespace identifier config
+func (cmd) Main(args ...string) error { return nsid.Main(args...) }
 
-SYNOPSIS
-	nsid [list [NAME]...]
-	nsid set NAME ID
-	nsid unet NAME ID
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-DESCRIPTION
-	[list [NAME]...]
-		show the identifier of each network namespace with "-1"
-		indicating an unidentifeid namespace.
-
-	set	set the namespace identifier
-
-	unset	unset the namespace identifier`,
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

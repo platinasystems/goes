@@ -11,18 +11,42 @@ import (
 
 	"github.com/platinasystems/go/internal/goes"
 	"github.com/platinasystems/go/internal/goes/cmd/vnet/internal"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "vnet"
+const (
+	Name    = "vnet"
+	Apropos = "send commands to hidden cli"
+	Usage   = "vnet COMMAND [ARG]..."
+	Man     = `
+DESCRIPTION
+	Send argument to vnet cli
+
+EXAMPLES
+	vnet	"show interfaces"`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Help(...string) string
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Close() error    { return internal.Conn.Close() }
-func (cmd) Kind() goes.Kind { return goes.DontFork }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return "vnet COMMAND [ARG]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Man() lang.Alt     { return man }
+func (cmd) Close() error      { return internal.Conn.Close() }
+func (cmd) Kind() goes.Kind   { return goes.DontFork }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -50,24 +74,11 @@ func (cmd) Help(...string) string {
 	}
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "send commands to hidden cli",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	vnet - send commands to hidden cli
-
-SYNOPSIS
-	vnet [command]
-
-DESCRIPTION
-	Send argument to vnet cli
-
-EXAMPLES
-	vnet	"show interfaces"`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

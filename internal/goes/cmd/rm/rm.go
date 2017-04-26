@@ -11,16 +11,46 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "rm"
+const (
+	Name    = "rm"
+	Apropos = "remove files or directories"
+	Usage   = " [OPTION]... FILE..."
+	Man     = `
+DESCRIPTION
+	Remove named files.  By default, it does not remove directories.
+
+OPTIONS
+	-f	ignore nonexistent files and arguments, never prompt
+
+	-r	remove directories and their contents recursively
+
+	-d	remove empty directories
+
+	-v	verbose
+
+	Include a relative of full path prefix to remove a file whose name
+	starts with a '-'; for example:
+
+              rm ./-f
+              rm ./-v`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]... FILE..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-d", "-f", "-r", "-v")
@@ -52,6 +82,10 @@ func (cmd) Main(args ...string) error {
 	}
 	return nil
 }
+
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 func rmdir(dn string, flag flags.Flag) error {
 	fis, err := ioutil.ReadDir(dn)
@@ -90,36 +124,11 @@ func rmdir(dn string, flag flags.Flag) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "remove files or directories",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	rm - remove files or directories
-
-SYNOPSIS
-	rm [OPTION]... FILE...
-
-DESCRIPTION
-	Remove named files.  By default, it does not remove directories.
-
-OPTIONS
-	-f	ignore nonexistent files and arguments, never prompt
-
-	-r	remove directories and their contents recursively
-
-	-d	remove empty directories
-
-	-v	verbose
-
-	Include a relative of full path prefix to remove a file whose name
-	starts with a '-'; for example:
-
-              rm ./-f
-              rm ./-v`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

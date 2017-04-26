@@ -2,14 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package complete provides a command that may be used for bash completion
-// like this.
-//
-//	_goes() {
-//		COMPREPLY=($(goes complete ${COMP_WORDS[@]}))
-//		return 0
-//	}
-//	complete -F _goes goes
 package complete
 
 import (
@@ -18,22 +10,45 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "complete"
+const (
+	Name    = "complete"
+	Apropos = "tab to complete command argument"
+	Usage   = `
+	complete COMMAND [ARGS]...
+	COMMAND -complete [ARGS]...`
+	Man = `
+DESCRIPTION
+	This may be used for bash completion of goes commands like this.
+
+	_goes() {
+		COMPREPLY=($(goes complete ${COMP_WORDS[@]}))
+		return 0
+	}
+	complete -F _goes goes`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return Name }
-
-func (*cmd) Usage() string {
-	return "complete COMMAND [ARGS]...\nCOMMAND -complete [ARGS]..."
-}
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 
 func (c *cmd) Main(args ...string) error {
 	var ss []string
@@ -62,8 +77,15 @@ func (c *cmd) Main(args ...string) error {
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "tab to complete command argument",
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

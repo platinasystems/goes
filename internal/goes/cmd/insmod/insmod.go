@@ -12,20 +12,33 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/url"
 )
 
-const Name = "insmod"
+const (
+	Name    = "insmod"
+	Apropos = "insert a module into the Linux Kernel"
+	Usage   = "insmod [OPTION]... FILE [NAME[=VAL[,VAL]]]..."
+	Man     = `
+OPTIONS
+	-v	verbose
+	-f	force`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-
-func (cmd) Usage() string {
-	return Name + " [OPTION]... FILE [NAME[=VAL[,VAL]]]..."
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-v")
@@ -58,22 +71,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "insert a module into the Linux Kernel",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	insmod - insert a module into the Linux Kernel
-
-SYNOPSIS
-	insmod [OPTION]... FILE [NAME[=VALUE[,VALUE]]...
-
-OPTIONS
-	-v	verbose
-	-f	force`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

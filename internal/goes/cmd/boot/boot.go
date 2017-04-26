@@ -14,11 +14,38 @@ import (
 
 	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/liner"
 )
 
-const Name = "boot"
+const (
+	Name    = "boot"
+	Apropos = "boot another operating system"
+	Usage   = "boot [-t SECONDS] [PATH]..."
+	Man     = `
+DESCRIPTION
+	The boot command finds other operating systems to load, and chooses
+	an appropriate one to execute.
+
+	Boot is a high level interface to the kexec command. While kexec
+	performs the actual work, boot is a higher level interface that
+	simplifies the process of selecting a kernel to execute.
+
+OPTIONS
+	-t	Specify a timeout in seconds`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type bootSet struct {
 	kernel string
@@ -34,13 +61,11 @@ type bootMnt struct {
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name + " [OPTIONS]..." }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 
 func (c *cmd) Main(args ...string) (err error) {
 	byName := goes.ByName(*c)
@@ -116,6 +141,8 @@ func (c *cmd) Main(args ...string) (err error) {
 	return err
 }
 
+func (*cmd) Man() lang.Alt { return man }
+
 func (c *cmd) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	files, err := ioutil.ReadDir(m.mnt)
 	if err != nil {
@@ -140,30 +167,14 @@ func (c *cmd) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	done <- m
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "boot another operating system",
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	boot - Boot another operating system
-
-SYNOPSIS
-	boot [-t seconds] [path]...
-
-DESCRIPTION
-
-The boot command finds other operating systems to load, and chooses an
-appropriate one to execute.
-
-Boot is a high level interface to the kexec command. While kexec performs
-the actual work, boot is a higher level interface that simplifies the process
-of selecting a kernel to execute.
-
-OPTIONS
-	-t	Specify a timeout in seconds`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

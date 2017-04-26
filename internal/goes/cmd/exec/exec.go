@@ -9,16 +9,32 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "exec"
+const (
+	Name    = "exec"
+	Apropos = "execute a file"
+	Usage   = "exec COMMAND..."
+	Man     = `
+DESCRIPTION
+	Replace the current goes process with the given command.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " COMMAND..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -37,21 +53,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "execute a file",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	exec - execute a file"
-
-SYNOPSIS
-	exec COMMAND [ARG]...
-
-DESCRIPTION
-	Replace the current goes process with the given command.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

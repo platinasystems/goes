@@ -4,37 +4,49 @@
 
 package sync
 
-import "syscall"
+import (
+	"syscall"
 
-const Name = "sync"
+	"github.com/platinasystems/go/internal/goes/lang"
+)
+
+const (
+	Name    = "sync"
+	Apropos = "flush file system buffers"
+	Usage   = "sync"
+	Man     = `
+DESCRIPTION
+	Force changed blocks to disk, update the super block.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	syscall.Sync()
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "flush file system buffers",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	sync - flush file system buffers
-
-SYNOPSIS
-	sync
-
-DESCRIPTION
-	Force changed blocks to disk, update the super block.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

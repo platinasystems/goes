@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -21,7 +22,22 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "fantrayd"
+const (
+	Name    = "fantrayd"
+	Apropos = "FIXME"
+	Usage   = "fantrayd"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type I2cDev struct {
 	Bus      int
@@ -59,11 +75,10 @@ type Info struct {
 	lastu map[string]uint16
 }
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
+func (*cmd) Apropos() lang.Alt { return apropos }
+func (*cmd) Kind() goes.Kind   { return goes.Daemon }
+func (*cmd) String() string    { return Name }
+func (*cmd) Usage() string     { return Usage }
 
 func (cmd *cmd) Main(...string) error {
 	once.Do(Init)
@@ -345,4 +360,8 @@ func (i *Info) set(key, value string, isReadyEvent bool) error {
 
 func (i *Info) publish(key string, value interface{}) {
 	i.pub.Print(key, ": ", value)
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

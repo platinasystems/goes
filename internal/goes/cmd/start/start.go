@@ -17,12 +17,29 @@ import (
 
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const Name = "start"
+const (
+	Name    = "start"
+	Apropos = "start this goes machine"
+	Usage   = "start [-start=URL] [REDIS OPTIONS]..."
+	Man     = `
+DESCRIPTION
+	Start a redis server followed by the machine and its embedded daemons.
+
+OPTIONS
+	-start URL
+		Specifies the URL of the machine's configuration script that's
+		sourced immediately after start of all daemons.
+		default: /etc/goes/start
+
+SEE ALSO
+	redisd`
+)
 
 // Machines may use Hook to run something before redisd and other daemons.
 var Hook = func() error { return nil }
@@ -34,12 +51,20 @@ var ConfHook = func() error { return nil }
 // GPIO init hook for machines than need it
 var ConfGpioHook = func() error { return nil }
 
-func New() *cmd { return new(cmd) }
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return "start [OPTION]..." }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
@@ -128,6 +153,10 @@ func (c *cmd) Main(args ...string) error {
 
 }
 
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
 func run(arg0 string) error {
 	x := exec.Command(prog.Name())
 	x.Args[0] = arg0
@@ -138,30 +167,11 @@ func run(arg0 string) error {
 	return x.Run()
 }
 
-func (c *cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "start this goes machine",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (c *cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	start - start this goes machine
-
-SYNOPSIS
-	start [-start=URL] [REDIS OPTIONS]...
-
-DESCRIPTION
-	Start a redis server followed by the machine and its embedded daemons.
-
-OPTIONS
-	-start URL
-		Specifies the URL of the machine's configuration script that's
-		sourced immediately after start of all daemons.
-		default: /etc/goes/start
-
-SEE ALSO
-	redisd`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

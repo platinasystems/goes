@@ -13,16 +13,56 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "rmmod"
+const (
+	Name    = "rmmod"
+	Apropos = "remove a module from the Linux Kernel"
+	Usage   = "rmmod [OPTION]... MODULE..."
+	Man     = `
+DESCRIPTION
+	Remove the named MODULE from the Linux Kernel.
+	(MODULE must support unloading)
+
+OPTIONS
+	-v	verbose
+	-f	force
+	-q	silently ignore errors`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Complete(...string) []string
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
+func (cmd) Apropos() lang.Alt { return apropos }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]... MODULE..." }
+func (cmd) Complete(args ...string) (c []string) {
+	f, err := os.Open("/proc/modules")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		x := strings.Fields(line)
+		if len(args) == 0 ||
+			strings.HasPrefix(x[0], args[len(args)-1]) {
+			c = append(c, x[0])
+		}
+	}
+	return
+}
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-q", "-v")
@@ -51,45 +91,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Complete(args ...string) (c []string) {
-	f, err := os.Open("/proc/modules")
-	if err != nil {
-		return
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		x := strings.Fields(line)
-		if len(args) == 0 ||
-			strings.HasPrefix(x[0], args[len(args)-1]) {
-			c = append(c, x[0])
-		}
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-	return
-}
-
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "remove a module from the Linux Kernel",
-	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	rmmod - remove a module from the Linux Kernel
-
-SYNOPSIS
-	rmmod [OPTION]... MODULE
-
-DESCRIPTION
-	Remove the named MODULE from the Linux Kernel.
-	(MODULE must support unloading)
-
-OPTIONS
-	-v	verbose
-	-f	force
-	-q	silently ignore errors`,
-	}
-}
+)

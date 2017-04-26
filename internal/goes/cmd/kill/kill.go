@@ -12,54 +12,54 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "kill"
+const (
+	Name    = "kill"
+	Apropos = "signal a process"
+	Usage   = "kill [OPTION] [PID]..."
+	Man     = `
+DESCRIPTION
+	The default signal for kill is 'SIGTERM'.  Use -l to list available
+	signals.  Particularly useful signals include '-hup', '-int', '-kill',
+	'-stop', '-cont', and '-0'.  Signals may be specified by name or
+	number, e.g: '-9' or or '-kill'.  Negative PID values may be used to
+	choose whole process groups; see the PGID column in ps  command
+	output.  A PID of -1 is special; it indicates all processes except the
+	kill process itself and init.
 
-var sigByOptName = map[string]syscall.Signal{
-	"-abrt":   syscall.SIGABRT,
-	"-alrm":   syscall.SIGALRM,
-	"-bus":    syscall.SIGBUS,
-	"-chld":   syscall.SIGCHLD,
-	"-cld":    syscall.SIGCLD,
-	"-cont":   syscall.SIGCONT,
-	"-fpe":    syscall.SIGFPE,
-	"-hup":    syscall.SIGHUP,
-	"-ill":    syscall.SIGILL,
-	"-int":    syscall.SIGINT,
-	"-io":     syscall.SIGIO,
-	"-iot":    syscall.SIGIOT,
-	"-kill":   syscall.SIGKILL,
-	"-pipe":   syscall.SIGPIPE,
-	"-poll":   syscall.SIGPOLL,
-	"-prof":   syscall.SIGPROF,
-	"-pwr":    syscall.SIGPWR,
-	"-quit":   syscall.SIGQUIT,
-	"-segv":   syscall.SIGSEGV,
-	"-stkflt": syscall.SIGSTKFLT,
-	"-stop":   syscall.SIGSTOP,
-	"-sys":    syscall.SIGSYS,
-	"-term":   syscall.SIGTERM,
-	"-trap":   syscall.SIGTRAP,
-	"-tstp":   syscall.SIGTSTP,
-	"-ttin":   syscall.SIGTTIN,
-	"-ttou":   syscall.SIGTTOU,
-	"-unused": syscall.SIGUNUSED,
-	"-urg":    syscall.SIGURG,
-	"-usr1":   syscall.SIGUSR1,
-	"-usr2":   syscall.SIGUSR2,
-	"-vtalrm": syscall.SIGVTALRM,
-	"-winch":  syscall.SIGWINCH,
-	"-xcpu":   syscall.SIGXCPU,
-	"-xfsz":   syscall.SIGXFSZ,
+OPTIONS
+	<PID> [...]
+		Send signal to every <PID> listed.
+
+       -<NAME>
+       -<NUMBER>
+		Specify the signal to be sent.
+
+	-l	List signal names.
+
+EXAMPLES
+	kill -9 -1
+		Kill all processes you can kill.
+
+	kill 123 543 2341 3453
+		Send the default signal, SIGTERM, to all those processes.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
 }
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION] [PID]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-l")
@@ -153,44 +153,52 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "signal a process",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	kill - signal a process
-
-SYNOPSIS
-	kill [OPTION]... <PID> [...]
-
-DESCRIPTION
-	The default signal for kill is 'SIGTERM'.  Use -l to list available
-	signals.  Particularly useful signals include '-hup', '-int', '-kill',
-	'-stop', '-cont', and '-0'.  Signals may be specified by name or
-	number, e.g: '-9' or or '-kill'.  Negative PID values may be used to
-	choose whole process groups; see the PGID column in ps  command
-	output.  A PID of -1 is special; it indicates all processes except the
-	kill process itself and init.
-
-OPTIONS
-	<PID> [...]
-		Send signal to every <PID> listed.
-
-       -<NAME>
-       -<NUMBER>
-		Specify the signal to be sent.
-
-	-l	List signal names.
-
-EXAMPLES
-	kill -9 -1
-		Kill all processes you can kill.
-
-	kill 123 543 2341 3453
-		Send the default signal, SIGTERM, to all those processes.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+	sigByOptName = map[string]syscall.Signal{
+		"-abrt":   syscall.SIGABRT,
+		"-alrm":   syscall.SIGALRM,
+		"-bus":    syscall.SIGBUS,
+		"-chld":   syscall.SIGCHLD,
+		"-cld":    syscall.SIGCLD,
+		"-cont":   syscall.SIGCONT,
+		"-fpe":    syscall.SIGFPE,
+		"-hup":    syscall.SIGHUP,
+		"-ill":    syscall.SIGILL,
+		"-int":    syscall.SIGINT,
+		"-io":     syscall.SIGIO,
+		"-iot":    syscall.SIGIOT,
+		"-kill":   syscall.SIGKILL,
+		"-pipe":   syscall.SIGPIPE,
+		"-poll":   syscall.SIGPOLL,
+		"-prof":   syscall.SIGPROF,
+		"-pwr":    syscall.SIGPWR,
+		"-quit":   syscall.SIGQUIT,
+		"-segv":   syscall.SIGSEGV,
+		"-stkflt": syscall.SIGSTKFLT,
+		"-stop":   syscall.SIGSTOP,
+		"-sys":    syscall.SIGSYS,
+		"-term":   syscall.SIGTERM,
+		"-trap":   syscall.SIGTRAP,
+		"-tstp":   syscall.SIGTSTP,
+		"-ttin":   syscall.SIGTTIN,
+		"-ttou":   syscall.SIGTTOU,
+		"-unused": syscall.SIGUNUSED,
+		"-urg":    syscall.SIGURG,
+		"-usr1":   syscall.SIGUSR1,
+		"-usr2":   syscall.SIGUSR2,
+		"-vtalrm": syscall.SIGVTALRM,
+		"-winch":  syscall.SIGWINCH,
+		"-xcpu":   syscall.SIGXCPU,
+		"-xfsz":   syscall.SIGXFSZ,
+	}
+)

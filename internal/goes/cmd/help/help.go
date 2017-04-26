@@ -6,23 +6,42 @@ package help
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "help"
+const (
+	Name    = "help"
+	Apropos = "print command guidance"
+	Usage   = `
+	help [COMMAND [ARGS]...]
+	COMMAND -help [ARGS]...
+	`
+	Man = `
+DESCRIPTION
+	Print context sensitive command help, if available; otherwise, print
+	its usage page.
+
+	Print all available apropos if no COMMAND is given.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Complete(...string) []string
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return Name }
-
-func (*cmd) Usage() string {
-	return "help [COMMAND [ARGS]...]\nCOMMAND -help [ARGS]..."
-}
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) Complete(args ...string) []string {
 	var prefix string
@@ -34,24 +53,19 @@ func (c *cmd) Complete(args ...string) []string {
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
 
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
+
 func (c *cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		for _, k := range goes.ByName(*c).Complete("") {
 			g := goes.ByName(*c)[k]
-			for _, lang := range []string{
-				os.Getenv("LANG"),
-				goes.Lang,
-				goes.DefaultLang,
-			} {
-				s := g.Apropos[lang]
-				if len(s) > 0 {
-					format := "%-15s %s\n"
-					if len(k) >= 16 {
-						format = "%s\n\t\t%s\n"
-					}
-					fmt.Printf(format, k, s)
-					break
+			apropos := g.Apropos.String()
+			if len(apropos) > 0 {
+				format := "%-15s %s\n"
+				if len(k) >= 16 {
+					format = "%s\n\t\t%s\n"
 				}
+				fmt.Printf(format, k, apropos)
 			}
 		}
 	} else {
@@ -68,24 +82,15 @@ func (c *cmd) Main(args ...string) error {
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "print command guidance",
+func (*cmd) Man() lang.Alt  { return man }
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (*cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	help - print a command guidance
-
-SYNOPSIS
-	help [COMMAND [ARGS]...]
-
-DESCRIPTION
-	Print context sensitive command help, if available; otherwise, print
-	its usage page.
-
-	Print all available apropos if no COMMAND is given.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

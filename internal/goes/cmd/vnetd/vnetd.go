@@ -16,6 +16,7 @@ import (
 
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
@@ -24,7 +25,22 @@ import (
 	"github.com/platinasystems/go/vnet"
 )
 
-const Name = "vnetd"
+const (
+	Name    = "vnetd"
+	Apropos = "FIXME"
+	Usage   = "vnetd"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return &cmd{} }
 
 // Enable publish of Non-unix (e.g. non-tuntap) interfaces.
 // This will include all vnet interfaces.
@@ -54,11 +70,10 @@ type Info struct {
 	pub       *publisher.Publisher
 }
 
-func New() *cmd { return &cmd{} }
-
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
-func (*cmd) String() string  { return Name }
-func (*cmd) Usage() string   { return Name }
+func (*cmd) Apropos() lang.Alt { return apropos }
+func (*cmd) Kind() goes.Kind   { return goes.Daemon }
+func (*cmd) String() string    { return Name }
+func (*cmd) Usage() string     { return Usage }
 
 func (cmd *cmd) Main(...string) error {
 	var (
@@ -329,4 +344,8 @@ func (p *ifStatsPoller) EventAction() {
 	p.i.publish("poll.finish", stop.Format(time.StampMilli))
 
 	p.sequence++
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

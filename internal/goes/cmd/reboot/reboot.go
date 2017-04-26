@@ -7,17 +7,28 @@ package reboot
 import (
 	"syscall"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/kexec"
 )
 
-const Name = "reboot"
+const (
+	Name    = "reboot"
+	Apropos = "reboot system"
+	Usage   = "reboot"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	kexec.Prepare()
@@ -27,21 +38,9 @@ func (cmd) Main(args ...string) error {
 	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "reboot system",
-	}
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	reboot - reboots system
-
-SYNOPSIS
-	reboot
-
-DESCRIPTION
-	Reboots system.`,
-	}
+var apropos = lang.Alt{
+	"en_US.UTF-8": Apropos,
 }

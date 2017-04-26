@@ -15,11 +15,36 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "watchdog"
+const (
+	Name    = "watchdog"
+	Apropos = "periodic write to device"
+	Usage   = "watchdog [OPTION]... [DEVICE]"
+	Man     = `
+DESCRIPTION
+	Periodically write to the watchdog device (default /dev/watchdog).
+
+OPTIONS
+	-T TIMEOUT	Reboot after TIMEOUT seconds without a watchdog write
+			(default 60)
+	-t FREQUENCY	Write frequency in seconds
+			(default 30)`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 var (
 	Init = func() {}
@@ -30,12 +55,11 @@ var (
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.Daemon }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]... [DEVICE]" }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Man() lang.Alt     { return man }
+func (cmd) Kind() goes.Kind   { return goes.Daemon }
+func (cmd) String() string    { return Name }
+func (cmd) Usage() string     { return Usage }
 
 func (cmd) Main(args ...string) error {
 	once.Do(Init)
@@ -100,27 +124,11 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "periodic write to device",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	watchdog - periodic write to device
-
-SYNOPSIS
-	watchdog [OPTION]... [DEVICE]
-
-DESCRIPTION
-	Periodically write to the watchdog device (default /dev/watchdog).
-
-OPTIONS
-	-T TIMEOUT	Reboot after TIMEOUT seconds without a watchdog write
-			(default 60)
-	-t FREQUENCY	Write frequency in seconds
-			(default 30)`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

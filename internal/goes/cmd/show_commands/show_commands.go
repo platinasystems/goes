@@ -9,19 +9,33 @@ import (
 	"sort"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "show-commands"
+const (
+	Name    = "show-commands"
+	Apropos = "list all commands and daemons"
+	Usage   = "show-commands"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	ByName(goes.ByName)
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return new(cmd) }
 
 type cmd goes.ByName
 
-func New() *cmd { return new(cmd) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-func (*cmd) String() string  { return "show-commands" }
-func (*cmd) Usage() string   { return "show-commands" }
+func (*cmd) Apropos() lang.Alt { return apropos }
 
 func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
+
+func (*cmd) Kind() goes.Kind { return goes.DontFork }
 
 func (c *cmd) Main(args ...string) error {
 	if len(args) > 0 {
@@ -46,8 +60,9 @@ func (c *cmd) Main(args ...string) error {
 	return nil
 }
 
-func (*cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "list all commands and daemons",
-	}
+func (*cmd) String() string { return Name }
+func (*cmd) Usage() string  { return Usage }
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

@@ -8,16 +8,32 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "chmod"
+const (
+	Name    = "chmod"
+	Apropos = "change file mode"
+	Usage   = "chmod MODE FILE..."
+	Man     = `
+DESCRIPTION
+	Changed each FILE's mode bits to the given octal MODE.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " MODE FILE..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -42,21 +58,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "change file mode",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	chmod - change file mode"
-
-SYNOPSIS
-	chmod MODE FILE...
-
-DESCRIPTION
-	Changed each FILE's mode bits to the given octal MODE.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

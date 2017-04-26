@@ -8,12 +8,14 @@ package nsid
 
 import "fmt"
 
-const VarRunNetns = "/var/run/netns"
-
-var Usage = `
+const (
+	Usage = `
 	nsid [list [NAME]...]
 	nsid set NAME ID
-	nsid unset NAME ID`[1:]
+	nsid unset NAME ID`
+
+	VarRunNetns = "/var/run/netns"
+)
 
 func Main(args ...string) error {
 	cmd := "list"
@@ -24,7 +26,7 @@ func Main(args ...string) error {
 	setf := Unset
 	switch cmd {
 	case "-h", "-help", "--help":
-		fmt.Print("usage:", Usage, "\n")
+		fmt.Print("usage:", Usage[1:], "\n")
 		return nil
 	case "list":
 		entries, err := List(args...)
@@ -52,7 +54,7 @@ func Main(args ...string) error {
 		return setf(name, id)
 	default:
 		return fmt.Errorf("%s: command not found\nusage:%s", cmd,
-			Usage)
+			Usage[1:])
 	}
 	return nil
 }

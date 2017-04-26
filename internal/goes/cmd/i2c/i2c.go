@@ -9,19 +9,44 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/i2c"
 )
 
-const Name = "i2c"
+const (
+	Name    = "i2c"
+	Apropos = "read/write I2C bus devices"
+	Usage   = "i2c [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END, -CNT][/8][/16] [VALUE] [WR-DELAY-SEC]"
+	Man     = `
+DESCRIPTION
+	Read/write I2C bus devices.
+
+	Examples:
+	    i2c 0.76.0 80          writes a 0x80
+	    i2c 0.2f.1f            reads device 0x2f, register 0x1f
+	    i2c 0.2f.1f-20         reads two bytes
+	    i2c EEPROM 0.55.0-30   reads 0x0-0x30 from EEPROM
+	    i2c BLOCK 1.58.99      reads upto 32 bytes from BLOCK at reg 0x99
+	    i2c BLOCK 1.58.99-10   reads upto 0x10 bytes from BLOCK at reg 0x99
+            i2c 0.76/8             force reads at 8-bits
+            i2c 0.76.0/8           force reads at 8-bits
+	    i2c 0.55.0-30/8        reads 0x0-0x30 8-bits at a time
+	    i2c 0.55.0-30/16       reads 0x0-0x30 16-bits at a time`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string {
-	return Name + " [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END, -CNT][/8][/16] [VALUE] [WR-DELAY-SEC]"
-}
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	var (
@@ -247,6 +272,10 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
 func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
 	var (
 		sd i2c.SMBusData
@@ -276,37 +305,6 @@ func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "read/write I2C bus devices",
-	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	i2c - Read/write I2C bus devices
-
-SYNOPSIS
-	i2c
-
-DESCRIPTION
-	Read/write I2C bus devices.
-
-	Examples:
-	    i2c 0.76.0 80          writes a 0x80
-	    i2c 0.2f.1f            reads device 0x2f, register 0x1f
-	    i2c 0.2f.1f-20         reads two bytes
-	    i2c EEPROM 0.55.0-30   reads 0x0-0x30 from EEPROM
-	    i2c BLOCK 1.58.99      reads upto 32 bytes from BLOCK at reg 0x99
-	    i2c BLOCK 1.58.99-10   reads upto 0x10 bytes from BLOCK at reg 0x99
-            i2c 0.76/8             force reads at 8-bits
-            i2c 0.76.0/8           force reads at 8-bits
-	    i2c 0.55.0-30/8        reads 0x0-0x30 8-bits at a time
-	    i2c 0.55.0-30/16       reads 0x0-0x30 16-bits at a time`,
-	}
-}
-
 func toByte(a byte) byte {
 	b := a - 0x30
 	if b > 9 {
@@ -328,3 +326,12 @@ func hexToByte(s string) (int, []byte) {
 	}
 	return m, arr
 }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)

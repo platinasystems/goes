@@ -10,17 +10,38 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "export"
+const (
+	Name    = "export"
+	Apropos = "set process configuration"
+	Usage   = "export [NAME[=VALUE]]..."
+	Man     = `
+DESCRIPTION
+	Configure the named process environment parameter.
+
+	If no VALUE is given, NAME is reset.
+
+	If no NAMES are supplied, a list of names of all exported variables
+	is printed.`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Kind() goes.Kind
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name + " [NAME[=VALUE]]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
+func (cmd) Kind() goes.Kind   { return goes.DontFork | goes.CantPipe }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
@@ -42,26 +63,15 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "set process configuration",
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	export - process configuration
-
-SYNOPSIS
-	export [NAME=[VALUE]]...
-
-DESCRIPTION
-	Configure the named process environment parameter.
-
-	If no VALUE is given, NAME is reset.
-
-	If no NAMES are supplied, a list of names of all exported variables
-	is printed.`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

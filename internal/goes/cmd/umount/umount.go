@@ -12,16 +12,37 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 )
 
-const Name = "umount"
+const (
+	Name    = "umount"
+	Apropos = "deactivate filesystems"
+	Usage   = "umount [OPTION]... FILESYSTEM|DIR"
+	Man     = `
+OPTIONS
+	--fake
+	-v		verbose
+	-a		all
+	-r		Try to remount devices as read-only if mount is busy
+	-l		Lazy umount (detach filesystem)
+	-f		Force umount from unreachable NFS server
+	-donot-free-loop-device`
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	Man() lang.Alt
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTION]... FILESYSTEM|DIR" }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	var err error
@@ -40,6 +61,10 @@ func (cmd) Main(args ...string) error {
 	}
 	return err
 }
+
+func (cmd) Man() lang.Alt  { return man }
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 // Unmount all filesystems in reverse order of /proc/mounts
 func umountall(flag flags.Flag) error {
@@ -90,27 +115,11 @@ func umountone(target string, flag flags.Flag) error {
 	return nil
 }
 
-func (cmd) Apropos() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": "deactivate filesystems",
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
 	}
-}
-
-func (cmd) Man() map[string]string {
-	return map[string]string{
-		"en_US.UTF-8": `NAME
-	umount [OPTION]... FILESYSTEM|DIRECTORY
-
-DESCRIPTION
-	Deactivate file systems
-
-OPTIONS
-	--fake
-	-v		verbose
-	-a		all
-	-r		Try to remount devices as read-only if mount is busy
-	-l		Lazy umount (detach filesystem)
-	-f		Force umount from unreachable NFS server
-	-donot-free-loop-device`,
+	man = lang.Alt{
+		lang.EnUS: Man,
 	}
-}
+)

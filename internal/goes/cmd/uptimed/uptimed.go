@@ -13,18 +13,37 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const Name = "uptimed"
+const (
+	Name    = "uptimed"
+	Apropos = "record system uptime in redis"
+	Usage   = "uptimed"
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Close() error
+	Kind() goes.Kind
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd(make(chan struct{})) }
 
 type cmd chan struct{}
 
-func New() cmd { return cmd(make(chan struct{})) }
+func (cmd cmd) Apropos() lang.Alt { return apropos }
+
+func (cmd cmd) Close() error {
+	close(cmd)
+	return nil
+}
 
 func (cmd) Kind() goes.Kind { return goes.Daemon }
-func (cmd) String() string  { return Name }
-func (cmd) Usage() string   { return Name }
 
 func (cmd cmd) Main(...string) error {
 	var si syscall.Sysinfo_t
@@ -53,10 +72,8 @@ func (cmd cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd cmd) Close() error {
-	close(cmd)
-	return nil
-}
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
 
 func update() string {
 	var si syscall.Sysinfo_t
@@ -117,4 +134,8 @@ func update() string {
 		}
 	}
 	return buf.String()
+}
+
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }

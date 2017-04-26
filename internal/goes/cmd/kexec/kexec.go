@@ -14,18 +14,29 @@ import (
 
 	"github.com/platinasystems/go/internal/fit"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/goes/lang"
 	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const Name = "kexec"
+const (
+	Name    = "kexec"
+	Apropos = "load a new kernel for later execution"
+	Usage   = "kexec [OPTIONS]..."
+)
+
+type Interface interface {
+	Apropos() lang.Alt
+	Main(...string) error
+	String() string
+	Usage() string
+}
+
+func New() Interface { return cmd{} }
 
 type cmd struct{}
 
-func New() cmd { return cmd{} }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name + " [OPTIONS]..." }
+func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	var err error
@@ -76,6 +87,9 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
+func (cmd) String() string { return Name }
+func (cmd) Usage() string  { return Usage }
+
 func loadFit(image, x string) error {
 	b, err := ioutil.ReadFile(image)
 	if err != nil {
@@ -112,4 +126,6 @@ func loadKernel(kernel, initramfs, cmdline string) error {
 	return kexec.FileLoad(k, i, cmdline, 0)
 }
 
-// FIXME add Apropos() and Man()
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
+}
