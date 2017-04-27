@@ -305,11 +305,13 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 		}
 	}
 
-	// Create provisioning socket.
-	if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
-		err = fmt.Errorf("tuntap socket: %s", err)
+	// Create provisioning socket in given namespace.
+	elib.WithNamespace(ns.ns_fd, ns.m.default_namespace.ns_fd, syscall.CLONE_NEWNET, func() (err error) {
+		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
+			err = fmt.Errorf("tuntap socket: %s", err)
+		}
 		return
-	}
+	})
 	defer func() {
 		if err != nil {
 			syscall.Close(intf.provision_fd)
@@ -424,6 +426,7 @@ func (m *Main) maybeChangeFlag(intf *tuntap_interface, isUp bool, flag iff_flag)
 		change = true
 		intf.flags &^= flag
 	}
+	// fixme use netlink
 	if change {
 		r := ifreq_int{
 			name: intf.name,

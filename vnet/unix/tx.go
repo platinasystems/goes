@@ -9,16 +9,15 @@ import (
 )
 
 type tx_node struct {
-	rx_tx_node_common
 	vnet.OutputNode
 }
 
-func (n *tx_node) add(m *net_namespace_main, ns *net_namespace) {
-	n.rx_tx_node_common.add(m, ns, "tx")
-	m.m.v.RegisterOutputNode(n, n.name)
+func (n *tx_node) init(v *vnet.Vnet) {
+	v.RegisterOutputNode(n, "unix-tx")
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
+	n.Suspend(out)
 	panic("tx")
 }
 

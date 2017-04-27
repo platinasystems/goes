@@ -50,24 +50,35 @@ func (m *net_namespace_main) read_dir(dir_name string, f func(dir, name string, 
 	return
 }
 
-const netnsDir = "/var/run/netns"
+const (
+	netnsDir               = "/var/run/netns"
+	default_namespace_name = "default"
+)
 
 func (m *netlink_main) namespace_init() (err error) {
 	nm := &m.net_namespace_main
 	nm.m = m.m
 
+	nm.rx_node.init(m.m.v)
+	nm.tx_node.init(m.m.v)
+
 	// Handcraft default name space.
 	{
 		ns := &nm.default_namespace
-		ns.name = ""
+		ns.m = nm
+		ns.name = default_namespace_name
 		ns.nsid = -1
 		ns.is_default = true
 		if ns.ns_fd, err = nm.fd_for_path("", "/proc/self/ns/net"); err != nil {
 			return
 		}
-		if ns.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
+		err = elib.WithDefaultNamespace(func() (err error) {
+			if ns.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
+				return
+			}
 			return
-		}
+		})
+
 		m.namespace_by_name = make(map[string]*net_namespace)
 		m.namespace_by_name[ns.name] = ns
 
@@ -139,6 +150,8 @@ type net_namespace_interface struct {
 }
 
 type net_namespace struct {
+	m *net_namespace_main
+
 	name string
 
 	// File descriptor for /proc/self/ns/net for default name space or /var/run/netns/NAME.
@@ -164,9 +177,6 @@ type net_namespace struct {
 
 	interface_by_index map[uint32]*net_namespace_interface
 	interface_by_name  map[string]*net_namespace_interface
-
-	rx_node rx_node
-	tx_node tx_node
 }
 
 type net_namespace_main struct {
@@ -175,7 +185,8 @@ type net_namespace_main struct {
 	namespace_by_name        map[string]*net_namespace
 	tuntap_interface_by_name map[string]*tuntap_interface
 	n_initial_namespace_done uint
-	rx_tx_node_main
+	rx_node                  rx_node
+	tx_node                  tx_node
 }
 
 func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {
@@ -364,6 +375,7 @@ func (ns *net_namespace) add(m *netlink_main) {
 		first_setns_errno syscall.Errno
 	)
 	for {
+		ns.m = &m.net_namespace_main
 		if ns.ns_fd, err = m.fd_for_path(netnsDir, ns.name); err != nil {
 			panic(err)
 		}
@@ -402,8 +414,6 @@ func (ns *net_namespace) del(m *netlink_main) {
 func (ns *net_namespace) add_nodes(m *net_namespace_main) {
 	ns.Fd = ns.dev_net_tun_fd
 	iomux.Add(ns)
-	ns.rx_node.add(m, ns)
-	ns.tx_node.add(m, ns)
 }
 
 func (ns *net_namespace) del_nodes(m *netlink_main) {

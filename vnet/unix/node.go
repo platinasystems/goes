@@ -26,7 +26,6 @@ type nodeMain struct {
 
 func (nm *nodeMain) Init(m *Main) {
 	nm.rxPacketPool = make(chan *packet, 64)
-	nm.txPacketPool = make(chan *packet, 64)
 	nm.rxRefsFree = make(chan []rxRef, 64)
 	nm.puntNode.Errors = []string{
 		puntErrorNonUnix:       "non-unix interface",
