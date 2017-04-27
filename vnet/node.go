@@ -19,6 +19,7 @@ type Node struct {
 }
 
 func (n *Node) GetVnetNode() *Node { return n }
+func (n *Node) Suspend(i *RefIn)   { n.Vnet.loop.Suspend(&i.In) }
 
 const MaxVectorLen = loop.MaxVectorLen
 
