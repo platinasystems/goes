@@ -11,13 +11,22 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/platinasystems/go/internal/goes"
+	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/parms"
 )
 
 const Name = "watchdog"
+
+var (
+	Init = func() {}
+	once sync.Once
+
+	GpioPin string
+)
 
 type cmd struct{}
 
@@ -29,6 +38,8 @@ func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name + " [OPTION]... [DEVICE]" }
 
 func (cmd) Main(args ...string) error {
+	once.Do(Init)
+
 	parm, args := parms.New(args, "-T", "-t")
 	for k, v := range map[string]string{
 		"-T": "60",
@@ -67,6 +78,17 @@ func (cmd) Main(args ...string) error {
 	defer ticker.Stop()
 
 	for _ = range ticker.C {
+		if len(GpioPin) > 0 {
+			if len(gpio.Pins) == 0 {
+				gpio.Init()
+			}
+			pin, found := gpio.Pins[GpioPin]
+			t, err := pin.Value()
+			if found && err == nil {
+				pin.SetValue(!t)
+			}
+		}
+
 		n, err := f.Write([]byte{0})
 		if err != nil {
 			return err
