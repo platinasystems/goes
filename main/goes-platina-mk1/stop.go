@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/platinasystems/go/internal/goes/cmd/stop"
+	"github.com/platinasystems/go/goes/cmd/stop"
 	"github.com/platinasystems/go/internal/sriovs"
 )
 

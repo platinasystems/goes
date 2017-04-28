@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/fspd"
+import "github.com/platinasystems/go/goes/cmd/fspd"
 
 func init() { fspd.Init = fspdInit }
 

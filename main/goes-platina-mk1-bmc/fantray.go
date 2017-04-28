@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/fantrayd"
+import "github.com/platinasystems/go/goes/cmd/fantrayd"
 
 func init() { fantrayd.Init = fantraydInit }
 

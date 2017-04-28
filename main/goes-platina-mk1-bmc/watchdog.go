@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/watchdog"
+import "github.com/platinasystems/go/goes/cmd/watchdog"
 
 func init() { watchdog.Init = watchdogInit }
 
