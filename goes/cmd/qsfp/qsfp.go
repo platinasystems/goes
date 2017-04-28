@@ -41,11 +41,12 @@ type Interface interface {
 func New() Interface { return new(cmd) }
 
 type cmd struct {
-	stop  chan struct{}
-	pub   *publisher.Publisher
-	last  map[string]float64
-	lasts map[string]string
-	lastu map[string]uint8
+	stop    chan struct{}
+	pub     *publisher.Publisher
+	last    map[string]float64
+	lasts   map[string]string
+	lastu   map[string]uint8
+	lastsio map[string]string
 }
 
 type I2cDev struct {
@@ -90,6 +91,7 @@ func (cmd *cmd) Main(...string) error {
 	cmd.last = make(map[string]float64)
 	cmd.lasts = make(map[string]string)
 	cmd.lastu = make(map[string]uint8)
+	cmd.lastsio = make(map[string]string)
 
 	if cmd.pub, err = publisher.New(); err != nil {
 		return err

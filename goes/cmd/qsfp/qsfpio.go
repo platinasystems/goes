@@ -65,9 +65,9 @@ func (cmd *cmd) updateio() error {
 			}
 		}
 		v := VdevIo[i].QsfpStatus(port)
-		if v != cmd.lasts[k] {
+		if v != cmd.lastsio[k] {
 			cmd.pub.Print(k, ": ", v)
-			cmd.lasts[k] = v
+			cmd.lastsio[k] = v
 		}
 	}
 	return nil
