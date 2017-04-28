@@ -1,4 +1,5 @@
 #!/usr/bin/make
+# make V=1 for verbose go builds
 # make VNET_DEBUG=yes to enable vnet debugging checks and flags for gdb.
 
 gitdir := $(shell git rev-parse --git-dir)
@@ -6,7 +7,8 @@ gitdir := $(shell git rev-parse --git-dir)
 gobuild = $(if $(arch),env GOARCH=$(arch) )go build$(if $(tags),\
 -tags "$(tags)")$(if $(gcflags),\
 -gcflags "$(gcflags)")$(if $(ldflags),\
--ldflags "$(ldflags)")
+-ldflags "$(ldflags)")$(if $(V),\
+-v)
 
 diag_tag=$(if $(filter yes,$(diag)), diag)
 vnet_debug_tag=$(if $(filter yes,$(VNET_DEBUG)), debug)
