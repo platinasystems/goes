@@ -61,6 +61,7 @@ type I2cDev struct {
 	GpioPwronL string
 	GpioIntL   string
 	Update     [3]bool
+	Delete     bool
 }
 
 var (
@@ -183,39 +184,42 @@ func (cmd *cmd) update() error {
 					cmd.lasts[k] = v
 				}
 			}
-			k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".eeprom"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in.units.W"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out.units.W"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp1.units.C"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp2.units.C"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out.units.V"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
-			k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in.units.V"
-			cmd.pub.Print("delete: ", k)
-			cmd.lasts[k] = ""
+			if Vdev[i].Delete {
+				k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".eeprom"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in.units.W"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out.units.W"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp1.units.C"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp2.units.C"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out.units.V"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in.units.V"
+				cmd.pub.Print("delete: ", k)
+				cmd.lasts[k] = ""
+				Vdev[i].Delete = false
+			}
 
 			if err != nil {
 				log.Print("fspd gpio error: ", err)
@@ -986,6 +990,9 @@ func (h *I2cDev) PsuStatus() string {
 			h.Installed = 0
 			return err.Error()
 		} else if t {
+			if h.Installed == 1 {
+				h.Delete = true
+			}
 			h.Installed = 0
 			return "not_installed"
 		}
