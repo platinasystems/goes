@@ -10,3 +10,7 @@ import (
 
 func GetHeader(r *vnet.Ref) *Header                 { return (*Header)(r.Data()) }
 func GetPacketHeader(r *vnet.Ref) vnet.PacketHeader { return GetHeader(r) }
+func RefString(r *vnet.Ref) string {
+	eh := (*Header)(r.Data())
+	return eh.String()
+}
