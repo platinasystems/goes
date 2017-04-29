@@ -215,7 +215,8 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	n := nr.GetNode()
 
 	if len(n.name) == 0 {
-		panic(fmt.Errorf("add next to unregistered node: %s", nextName))
+		err = fmt.Errorf("add next to unregistered node: %s", nextName)
+		return
 	}
 
 	var (
@@ -452,7 +453,7 @@ type In struct {
 }
 
 func (i *In) GetIn() *In     { return i }
-func (i *In) Len() uint      { return uint(i.len) }
+func (i *In) InLen() uint    { return uint(i.len) }
 func (i *In) ThreadId() uint { return uint(i.activeIndex) }
 
 type LooperOut interface {

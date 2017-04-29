@@ -76,7 +76,7 @@ func (en *errorNode) NodeOutput(ri *RefIn) {
 
 	cache := ts.cache
 	cacheCount := uint64(0)
-	i, n := uint(0), ri.Len()
+	i, n := uint(0), ri.InLen()
 	for i+4 <= n {
 		e0, e1, e2, e3 := ri.Refs[i+0].err, ri.Refs[i+1].err, ri.Refs[i+2].err, ri.Refs[i+3].err
 		cacheCount += 4

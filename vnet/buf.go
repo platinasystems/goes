@@ -162,7 +162,7 @@ func (i *RefIn) FreeRefs(n uint)  { i.FreePoolRefs(i.BufferPool, n) }
 
 func (in *RefIn) SetLen(v *Vnet, new_len uint) {
 	if elib.Debug {
-		old_len := in.GetLen(&v.loop)
+		old_len := in.In.GetLen(&v.loop)
 		for i := old_len; i < new_len; i++ {
 			in.BufferPool.ValidateRef(&in.Refs[i], hw.BufferKnownAllocated)
 		}
@@ -170,9 +170,11 @@ func (in *RefIn) SetLen(v *Vnet, new_len uint) {
 	in.In.SetLen(&v.loop, new_len)
 }
 
+func (i *RefIn) GetLen(v *Vnet) uint { return i.In.GetLen(&v.loop) }
+
 func (i *RefIn) AddLen(v *Vnet) (l uint) {
-	l = i.GetLen(&v.loop)
-	i.SetLen(v, l+1)
+	l = i.In.GetLen(&v.loop)
+	i.In.SetLen(&v.loop, l+1)
 	return
 }
 func (i *RefIn) SetPoolAndLen(v *Vnet, p *BufferPool, l uint) {
