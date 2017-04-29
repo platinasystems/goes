@@ -148,7 +148,7 @@ func (n *interfaceNode) ifOutputThread() {
 
 func (n *interfaceNode) ifOutput(ri *RefIn) {
 	rvi := n.allocTxRefVecIn(ri)
-	n_packets_in := ri.Len()
+	n_packets_in := ri.InLen()
 
 	// Copy common fields.
 	rvi.refInCommon = ri.refInCommon

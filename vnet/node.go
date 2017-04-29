@@ -131,7 +131,7 @@ func (v *Vnet) RegisterNode(n Noder, format string, args ...interface{}) {
 
 func (node *Node) Redirect(in *RefIn, out *RefOut, next uint) {
 	o := &out.Outs[next]
-	n := in.Len()
+	n := in.InLen()
 	for i := uint(0); i < n; i++ {
 		o.Refs[i] = in.Refs[i]
 	}
@@ -140,7 +140,7 @@ func (node *Node) Redirect(in *RefIn, out *RefOut, next uint) {
 
 func (node *Node) ErrorRedirect(in *RefIn, out *RefOut, next uint, err ErrorRef) {
 	o := &out.Outs[next]
-	n := in.Len()
+	n := in.InLen()
 	for i := uint(0); i < n; i++ {
 		r := &o.Refs[i]
 		*r = in.Refs[i]

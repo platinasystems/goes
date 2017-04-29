@@ -224,7 +224,7 @@ func (g *RxDmaRing) slow_path(r0 *Ref, f0 RxDmaDescriptorFlags) {
 		in.Refs[n_next] = ref
 		n_next++
 	} else {
-		n_next0 := in.Len()
+		n_next0 := in.InLen()
 		in.SetPoolAndLen(g.v, g.pool, n_next0+1)
 		in.Refs[n_next0] = ref
 		n_next0++
