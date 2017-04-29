@@ -109,20 +109,31 @@ func (m *Mux) Add(f Filer) {
 	l.poolIndex = fi
 
 	var changes [2]event
-	changes[0] = event{
+	n_changes := 0
+	if !l.disableRead {
+		changes[n_changes] = event{
+			ident:  uint64(l.Fd),
+			filter: EVFILT_READ,
+			flags:  EV_ADD,
+			udata:  uint64(l.poolIndex),
+		}
+		n_changes++
+	}
+
+	changes[n_changes] = event{
 		ident:  uint64(l.Fd),
-		filter: EVFILT_READ,
+		filter: EVFILT_WRITE,
 		flags:  EV_ADD,
 		udata:  uint64(l.poolIndex),
 	}
-	changes[1] = changes[0]
-	changes[1].filter = EVFILT_WRITE
 	flags := EV_DISABLE
-	if f.WriteAvailable() {
+	if !l.disableWrite && f.WriteAvailable() {
 		flags = EV_ENABLE
 	}
-	changes[1].flags |= uint16(flags)
-	if _, err := kevent64(m.fd, changes[:], nil, nil); err != nil {
+	changes[n_changes].flags |= uint16(flags)
+	n_changes++
+
+	if _, err := kevent64(m.fd, changes[:n_changes], nil, nil); err != nil {
 		panic(fmt.Errorf("kevent64: add %s", err))
 	}
 }

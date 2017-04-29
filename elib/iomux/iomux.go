@@ -19,11 +19,15 @@ type Mux struct {
 }
 
 type File struct {
-	Fd        int
-	poolIndex uint
+	Fd           int
+	disableWrite bool
+	disableRead  bool
+	poolIndex    uint
 }
 
 func (f *File) GetFile() *File { return f }
+func (f *File) SetWriteOnly()  { f.disableRead = true }
+func (f *File) SetReadOnly()   { f.disableWrite = true }
 func (f *File) Index() uint    { return f.poolIndex }
 
 type Filer interface {

@@ -73,8 +73,10 @@ func (m *Mux) maybe_epoll_create() {
 }
 
 func (l *File) event(f Filer) (e epollEvent) {
-	e.mask = eventRead
-	if f.WriteAvailable() {
+	if !l.disableRead {
+		e.mask = eventRead
+	}
+	if !l.disableWrite && f.WriteAvailable() {
 		e.mask |= eventWrite
 	}
 	e.data[0] = uint32(l.poolIndex)
