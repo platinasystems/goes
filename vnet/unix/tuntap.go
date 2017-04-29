@@ -25,17 +25,18 @@ type tuntap_interface struct {
 	// Namespace this interface is currently in.
 	namespace *net_namespace
 	// Raw socket bound to this interface used for provisioning.
-	provision_fd int
-	iomux.File   // provisioning socket
-	hi           vnet.Hi
-	si           vnet.Si
-	name         ifreq_name
-	ifindex      uint32 // linux interface index
-	flags        iff_flag
-	node         node
-	mtuBytes     uint
-	mtuBuffers   uint
-	operState    netlink.IfOperState
+	provision_fd               int
+	dev_net_tun_fd             int
+	iomux.File                 // /dev/net/tun fd for this interface.
+	hi                         vnet.Hi
+	si                         vnet.Si
+	name                       ifreq_name
+	ifindex                    uint32 // linux interface index
+	flags                      iff_flag
+	set_flags_at_first_up_down bool
+	mtuBytes                   uint
+	mtuBuffers                 uint
+	operState                  netlink.IfOperState
 }
 
 //go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
@@ -215,17 +216,22 @@ func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error
 	return
 }
 
-func (i *tuntap_interface) setOperState() {
+func (i *tuntap_interface) setOperState(from_init bool) {
+	return
 	os := netlink.IF_OPER_DOWN
 	if i.si.IsAdminUp(i.m.v) && i.hi.IsLinkUp(i.m.v) {
 		os = netlink.IF_OPER_UP
 	}
-	if os != i.operState {
+	if os != i.operState || from_init {
 		i.operState = os
+		if !i.is_initialized() {
+			return
+		}
 		msg := netlink.NewIfInfoMessage()
 		msg.Header.Type = netlink.RTM_SETLINK
 		msg.Header.Flags = netlink.NLM_F_REQUEST
 		msg.Index = uint32(i.ifindex)
+		msg.L2IfType = uint16(netlink.ARPHRD_ETHER)
 		msg.Attrs[netlink.IFLA_OPERSTATE] = os
 		i.namespace.NetlinkTx(msg, false)
 	}
@@ -235,7 +241,7 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	hi := m.v.SupHi(si)
 	if !m.okHi(hi) {
 		// Unknown interface punts get sent to error node.
-		m.puntNode.setNext(si, puntNextError)
+		m.rx_node.set_next(si, rx_node_next_error)
 		return
 	}
 
@@ -267,7 +273,9 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	return
 }
 
-func (m *Main) init_all_unix_interfaces() (err error) {
+func (intf *tuntap_interface) is_initialized() bool { return intf.namespace != nil }
+
+func (m *Main) netlink_dump_done_for_all_namespaces() (err error) {
 	nm := &m.net_namespace_main
 	for _, intf := range m.ifBySi {
 		name := intf.name.String()
@@ -279,16 +287,43 @@ func (m *Main) init_all_unix_interfaces() (err error) {
 			i.tuntap = intf
 		}
 		intf.namespace = ns
-		err = intf.init(m)
+		err = intf.create(m)
 		if err != nil {
 			return
 		}
+
+		next := m.v.AddNamedNext(&nm.rx_node, intf.Name())
+		m.rx_node.set_next(intf.si, rx_node_next(next))
 	}
 	return
 }
 
-func (intf *tuntap_interface) init(m *Main) (err error) {
+func (intf *tuntap_interface) create(m *Main) (err error) {
 	ns := intf.namespace
+
+	// Create provisioning socket in given namespace.
+	elib.WithNamespace(ns.ns_fd, ns.m.default_namespace.ns_fd, syscall.CLONE_NEWNET, func() (err error) {
+		if intf.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
+			err = fmt.Errorf("tuntap /dev/net/tun open: %s", err)
+			return
+		}
+		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
+			err = fmt.Errorf("tuntap socket AF_PACKET: %s", err)
+		}
+		return
+	})
+	defer func() {
+		if err != nil {
+			if intf.provision_fd != 0 {
+				syscall.Close(intf.provision_fd)
+				intf.provision_fd = -1
+			}
+			if intf.dev_net_tun_fd != 0 {
+				syscall.Close(intf.dev_net_tun_fd)
+				intf.provision_fd = -1
+			}
+		}
+	}()
 
 	// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
 	{
@@ -299,24 +334,13 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 		} else {
 			r.flags |= iff_tap
 		}
-		// NB: kernel tun.c sets lower_up flag.  Always set; link state reflected in operstate via netlink.
-		if err = intf.ioctl(ns.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
+		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
+			return
+		}
+		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 0); err != nil {
 			return
 		}
 	}
-
-	// Create provisioning socket in given namespace.
-	elib.WithNamespace(ns.ns_fd, ns.m.default_namespace.ns_fd, syscall.CLONE_NEWNET, func() (err error) {
-		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
-			err = fmt.Errorf("tuntap socket: %s", err)
-		}
-		return
-	})
-	defer func() {
-		if err != nil {
-			syscall.Close(intf.provision_fd)
-		}
-	}()
 
 	// Find linux interface index.
 	{
@@ -343,8 +367,8 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 		}
 	}
 
-	// Fetch initial interface flags.
-	{
+	if !intf.set_flags_at_first_up_down {
+		// Fetch initial interface flags.
 		r := ifreq_int{name: intf.name}
 		if err = intf.ioctl(intf.provision_fd, ifreq_GETIFFLAGS, uintptr(unsafe.Pointer(&r))); err != nil {
 			return
@@ -407,12 +431,21 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 		}
 	}
 
-	// Set operational state to down.
-	intf.setOperState()
+	intf.setOperState(true)
 
-	// Create Vnet interface.
-	intf.interfaceNodeInit(m)
+	intf.Fd = intf.provision_fd
+	intf.File.SetReadOnly()
+	iomux.Add(intf)
 
+	return
+}
+
+func (intf *tuntap_interface) set_flags() (err error) {
+	r := ifreq_int{
+		name: intf.name,
+		i:    int(intf.flags),
+	}
+	err = intf.ioctl(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)))
 	return
 }
 
@@ -428,11 +461,11 @@ func (m *Main) maybeChangeFlag(intf *tuntap_interface, isUp bool, flag iff_flag)
 	}
 	// fixme use netlink
 	if change {
-		r := ifreq_int{
-			name: intf.name,
-			i:    int(intf.flags),
+		if intf.is_initialized() {
+			err = intf.set_flags()
+		} else {
+			intf.set_flags_at_first_up_down = true
 		}
-		err = intf.ioctl(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)))
 	}
 	return
 }
@@ -442,13 +475,16 @@ func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 		return
 	}
 	intf := m.interfaceForSi(si)
+	if intf.is_initialized() && intf.set_flags_at_first_up_down {
+		intf.set_flags_at_first_up_down = false
+		err = intf.set_flags()
+		return
+	}
 	err = m.maybeChangeFlag(intf, isUp, iff_up|iff_running)
 	if err != nil {
 		return
 	}
-	// Reflect admin state in node interface (e.g. XXX unix).
-	intf.node.SetAdminUp(isUp)
-	intf.setOperState()
+	intf.setOperState(false)
 	return
 }
 
@@ -461,9 +497,7 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if err != nil {
 		return
 	}
-	// Reflect link state in node interface (e.g. XXX unix).
-	intf.node.SetLinkUp(isUp)
-	intf.setOperState()
+	intf.setOperState(false)
 	return
 }
 
@@ -476,8 +510,6 @@ func (i *tuntap_interface) close() (err error) {
 }
 
 func (m *Main) Init() (err error) {
-	m.nodeMain.Init(m)
-
 	// Suitable defaults for an Ethernet-like tun/tap device.
 	m.mtuBytes = 4096 + 256
 
@@ -495,9 +527,9 @@ func (m *Main) Configure(in *parse.Input) {
 			m.isTun = false
 		case in.Parse("tun"):
 			m.isTun = true
-		case in.Parse("dump-packets"):
+		case in.Parse("verbose-packets"):
 			m.verbosePackets = true
-		case in.Parse("dump-netlink"):
+		case in.Parse("verbose-netlink"):
 			m.verboseNetlink++
 		default:
 			panic(parse.ErrInput)

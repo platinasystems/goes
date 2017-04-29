@@ -59,8 +59,8 @@ func (m *netlink_main) namespace_init() (err error) {
 	nm := &m.net_namespace_main
 	nm.m = m.m
 
-	nm.rx_node.init(m.m.v)
-	nm.tx_node.init(m.m.v)
+	nm.rx_node.init(m.m.Vnet)
+	nm.tx_node.init(m.m.Vnet)
 
 	// Handcraft default name space.
 	{
@@ -72,17 +72,13 @@ func (m *netlink_main) namespace_init() (err error) {
 		if ns.ns_fd, err = nm.fd_for_path("", "/proc/self/ns/net"); err != nil {
 			return
 		}
-		err = elib.WithDefaultNamespace(func() (err error) {
-			if ns.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
-				return
-			}
+		if ns.tx_raw_socket_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, 0); err != nil {
 			return
-		})
+		}
+		ns.iomux_add()
 
 		m.namespace_by_name = make(map[string]*net_namespace)
 		m.namespace_by_name[ns.name] = ns
-
-		ns.add_nodes(nm)
 
 		if err = ns.configure(-1, -1); err != nil {
 			return
@@ -101,7 +97,7 @@ func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm.n_initial_namespace_done++
 	if nm.n_initial_namespace_done == uint(len(nm.namespace_by_name)) {
 		nm.n_initial_namespace_done = ^uint(0) // only happens once
-		err = m.init_all_unix_interfaces()
+		err = m.netlink_dump_done_for_all_namespaces()
 	}
 	return
 }
@@ -157,10 +153,9 @@ type net_namespace struct {
 	// File descriptor for /proc/self/ns/net for default name space or /var/run/netns/NAME.
 	ns_fd int
 
-	// File descriptor for /dev/net/tun in this namespace.
-	dev_net_tun_fd int
-
-	iomux.File // provisioning socket
+	// Raw socket for transmit path.
+	tx_raw_socket_fd int
+	iomux.File
 
 	nsid int
 
@@ -286,14 +281,17 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			if tif, ok := ns.tuntap_interface_by_ifindex[index]; ok {
 				tif.set_name(name)
 			}
-		}
-
-		if !name_changed {
+		} else {
 			if tif, ok := m.tuntap_interface_by_name[name]; ok {
+				// Interface moved to a new namespace?
 				if tif.namespace != ns {
 					tif.add_del_namespace(m, ns, is_del)
 					tif.namespace = ns
 				}
+				if ns.si_by_ifindex == nil {
+					ns.si_by_ifindex = make(map[uint32]vnet.Si)
+				}
+				ns.si_by_ifindex[index] = tif.si
 			}
 		}
 	} else {
@@ -301,6 +299,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		if tif := intf.tuntap; tif != nil {
 			tif.add_del_namespace(m, ns, is_del)
 			tif.namespace = nil
+			delete(ns.si_by_ifindex, index)
 		}
 		delete(ns.interface_by_index, index)
 		delete(ns.interface_by_name, name)
@@ -358,7 +357,7 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 }
 
 func (ns *net_namespace) allocate_sockets() (err error) {
-	ns.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0)
+	ns.tx_raw_socket_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, 0)
 	if err == nil {
 		ns.netlink_socket_fds[0], err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
 	}
@@ -366,6 +365,12 @@ func (ns *net_namespace) allocate_sockets() (err error) {
 		ns.netlink_socket_fds[1], err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
 	}
 	return
+}
+
+func (ns *net_namespace) iomux_add() {
+	ns.File.SetWriteOnly()
+	ns.File.Fd = ns.tx_raw_socket_fd
+	iomux.Add(ns)
 }
 
 func (ns *net_namespace) add(m *netlink_main) {
@@ -393,7 +398,7 @@ func (ns *net_namespace) add(m *netlink_main) {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
-	ns.add_nodes(&m.net_namespace_main)
+	ns.iomux_add()
 	if err = ns.netlink_socket_pair.configure(ns.netlink_socket_fds[0], ns.netlink_socket_fds[1]); err != nil {
 		panic(err)
 	}
@@ -401,25 +406,23 @@ func (ns *net_namespace) add(m *netlink_main) {
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
-	ns.del_nodes(m)
+	iomux.Del(ns)
 	if ns.ns_fd > 0 {
 		syscall.Close(ns.ns_fd)
+		ns.ns_fd = -1
 	}
-	if ns.dev_net_tun_fd > 0 {
-		syscall.Close(ns.dev_net_tun_fd)
+	if ns.Fd > 0 {
+		syscall.Close(ns.Fd)
+		ns.Fd = -1
 	}
 	ns.netlink_socket_pair.close()
 }
 
-func (ns *net_namespace) add_nodes(m *net_namespace_main) {
-	ns.Fd = ns.dev_net_tun_fd
-	iomux.Add(ns)
-}
-
-func (ns *net_namespace) del_nodes(m *netlink_main) {
-	iomux.Del(ns)
-}
-
 func (ns *net_namespace) ErrorReady() (err error) {
+	var v int
+	v, err = syscall.GetsockoptInt(ns.Fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+	if err == nil && v != 0 {
+		err = syscall.Errno(v)
+	}
 	return
 }

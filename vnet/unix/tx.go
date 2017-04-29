@@ -13,7 +13,7 @@ type tx_node struct {
 }
 
 func (n *tx_node) init(v *vnet.Vnet) {
-	v.RegisterOutputNode(n, "unix-tx")
+	v.RegisterOutputNode(n, "punt")
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
@@ -27,5 +27,10 @@ func (ns *net_namespace) WriteAvailable() bool {
 
 func (ns *net_namespace) WriteReady() (err error) {
 	panic("tx")
+	return
+}
+
+func (ns *net_namespace) ReadReady() (err error) {
+	panic("not used")
 	return
 }

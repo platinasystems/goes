@@ -13,11 +13,12 @@ var packageIndex uint
 type Main struct {
 	vnet.Package
 
+	v *vnet.Vnet
+
 	verbosePackets bool
 	verboseNetlink int
 
 	netlink_main
-	nodeMain
 	tuntapMain
 
 	// For external (e.g. non tuntap) interfaces.

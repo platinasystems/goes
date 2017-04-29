@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// +build ignore
+
 package unix
 
 import (
@@ -74,8 +76,8 @@ func (intf *tuntap_interface) interfaceNodeInit(m *Main) {
 	m.puntNode.setNext(intf.si, ni)
 
 	// Use /dev/net/tun file descriptor for input/output.
-	intf.Fd = intf.namespace.dev_net_tun_fd
 	if false {
+		intf.Fd = intf.namespace.Fd
 		iomux.Add(intf)
 	}
 }
@@ -88,12 +90,6 @@ func (n *node) ValidateSpeed(speed vnet.Bandwidth) (err error)              { re
 type rxRef struct {
 	ref vnet.Ref
 	len uint
-}
-
-type packet struct {
-	iovs  iovecVec
-	refs  vnet.RefVec
-	chain vnet.RefChain
 }
 
 func (p *packet) allocRefs(m *Main, n uint) {

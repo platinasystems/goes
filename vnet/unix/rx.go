@@ -5,7 +5,9 @@
 package unix
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
 	"sync"
@@ -14,24 +16,14 @@ import (
 	"unsafe"
 )
 
-func (h *msghdr) set(a *syscall.RawSockaddrLinklayer, iovs []iovec) {
-	h.Name = (*byte)(unsafe.Pointer(a))
-	h.Namelen = syscall.SizeofSockaddrLinklayer
-	h.Iov = (*syscall.Iovec)(&iovs[0])
-	h.Iovlen = uint64(len(iovs))
-}
-
 var raw_sockaddr_ll_template = syscall.RawSockaddrLinklayer{
 	Family: syscall.AF_PACKET,
 }
 
-func (v *packet_vector) add_packet(iovs []iovec, ifindex uint32) {
-	i := v.i
-	v.i++
-	a := &v.a[i]
-	*a = raw_sockaddr_ll_template
-	a.Ifindex = int32(ifindex)
-	v.m[i].msg_hdr.set(a, iovs)
+type packet struct {
+	iovs  iovecVec
+	refs  vnet.RefVec
+	chain vnet.RefChain
 }
 
 func (p *packet) alloc_refs(rx *rx_node, n uint) {
@@ -53,6 +45,15 @@ func (p *packet) rx_init(rx *rx_node) {
 
 func (p *packet) rx_free(rx *rx_node) { rx.buffer_pool.FreeRefs(&p.refs[0], p.refs.Len(), false) }
 
+func (v *packet_vector) add_packet(iovs []iovec, ifindex uint32) {
+	i := v.i
+	v.i++
+	a := &v.a[i]
+	*a = raw_sockaddr_ll_template
+	a.Ifindex = int32(ifindex)
+	v.m[i].msg_hdr.set(a, iovs)
+}
+
 const (
 	packet_vector_max_len = 64
 	max_rx_packet_size    = 16 << 10
@@ -70,6 +71,8 @@ func (n *rx_node) new_packet_vector() (v *packet_vector) {
 	v = &packet_vector{}
 	for i := range v.p {
 		v.p[i].rx_init(n)
+		v.a[i] = raw_sockaddr_ll_template
+		v.m[i].msg_hdr.set(&v.a[i], v.p[i].iovs)
 	}
 	return
 }
@@ -126,6 +129,12 @@ type rx_node struct {
 	max_buffers_per_packet uint
 	active_lock            sync.Mutex
 	active_count           int32
+	next_by_si             elib.Uint32Vec
+}
+
+func (n *rx_node) set_next(si vnet.Si, next rx_node_next) {
+	n.next_by_si.ValidateInit(uint(si), uint32(rx_node_next_error))
+	n.next_by_si[si] = uint32(next)
 }
 
 type rx_node_next uint32
@@ -139,7 +148,7 @@ const (
 	rx_error_non_vnet_interface
 )
 
-func (v *rx_ref_vector) rx(p *packet, rx *rx_node, i, n_bytes_in_packet, ifindex uint) {
+func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *packet, rx *rx_node, i, n_bytes_in_packet, ifindex uint) {
 	size := rx.buffer_pool.Size
 	n_left := n_bytes_in_packet
 	var n_refs uint
@@ -159,9 +168,19 @@ func (v *rx_ref_vector) rx(p *packet, rx *rx_node, i, n_bytes_in_packet, ifindex
 	p.alloc_refs(rx, n_refs)
 	ref := p.chain.Done()
 	ref.SetError(&rx.Node, rx_error_non_vnet_interface)
-	ref.Si = vnet.SiNil // fixme
+	if ns.m.m.verbosePackets {
+		i := ns.interface_by_index[uint32(ifindex)]
+		fmt.Printf("unix rx ns %s %s: %s\n", ns.name, i.name, ethernet.RefString(&ref))
+	}
+	if si, ok := ns.si_by_ifindex[uint32(ifindex)]; ok {
+		ref.Si = si
+		v.nexts[i] = rx_node_next(rx.next_by_si[si])
+		vnet.IfRxCounter.Add(rx.Vnet.GetIfThread(0), si, 1, n_bytes_in_packet)
+	} else {
+		ref.Si = vnet.SiNil
+		v.nexts[i] = rx_node_next_error
+	}
 	v.refs[i] = ref
-	v.nexts[i] = rx_node_next_error
 	v.lens[i] = uint32(n_bytes_in_packet)
 	return
 }
@@ -178,12 +197,38 @@ type rx_ref_vector struct {
 	nexts     [packet_vector_max_len]rx_node_next
 }
 
-func (ns *net_namespace) ReadReady() (err error) {
-	rx := &ns.m.rx_node
+func errorForErrno(tag string, errno syscall.Errno) (err error) {
+	// Ignore "network is down" errors.  Just silently drop packet.
+	// These happen when interface is IFF_RUNNING (e.g. link up) but not yet IFF_UP (admin up).
+	switch errno {
+	case 0, syscall.ENETDOWN:
+	default:
+		err = fmt.Errorf("%s: %s", tag, errno)
+	}
+	return
+}
+
+// Write side is not used.  Per-namespace raw socket is used for tx path.
+func (intf *tuntap_interface) WriteReady() (err error) { panic("shoudn't be called") }
+func (intf *tuntap_interface) WriteAvailable() bool    { return false }
+
+func (intf *tuntap_interface) ErrorReady() (err error) {
+	var e int
+	if e, err = syscall.GetsockoptInt(intf.Fd, syscall.SOL_SOCKET, syscall.SO_ERROR); err == nil {
+		err = errorForErrno("error ready", syscall.Errno(e))
+	}
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (intf *tuntap_interface) ReadReady() (err error) {
+	rx := &intf.m.rx_node
 	v := rx.get_packet_vector()
-	n_packets, errno := recvmmsg(ns.Fd, syscall.MSG_WAITFORONE, v.m[:])
+	n_packets, errno := recvmmsg(intf.Fd, syscall.MSG_WAITFORONE, v.m[:])
 	if errno != 0 {
-		err = errorForErrno("readv", errno)
+		err = errorForErrno("recvmmsg", errno)
 		if n_packets != 0 {
 			panic(fmt.Errorf("ReadReady error %s but n packets %d > 0", err, n_packets))
 		}
@@ -196,7 +241,7 @@ func (ns *net_namespace) ReadReady() (err error) {
 	for i := 0; i < n_packets; i++ {
 		p := &v.p[i]
 		m := &v.m[i]
-		rv.rx(p, rx, uint(i), uint(m.msg_len), uint(m.msg_hdr.ifindex()))
+		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), uint(m.msg_hdr.ifindex()))
 	}
 
 	rx.rv_input <- rv
@@ -225,45 +270,43 @@ func (rx *rx_node) copy_pending(rv *rx_ref_vector, i uint) {
 	rx.rv_pending = p
 }
 
-func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_packets, n_bytes *uint) (done bool) {
-	np, nb := *n_packets, *n_bytes
+func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ uint) (n_done uint, done bool) {
+	n_done = n_doneʹ
 	var i uint
 	for i = 0; i < rv.n_packets; i++ {
 		out := &o.Outs[rv.nexts[i]]
-		l := out.Len()
+		out.BufferPool = rx.buffer_pool
+		l := out.GetLen(rx.Vnet)
 		if done = l == vnet.MaxVectorLen; done {
 			rx.copy_pending(rv, i)
 			break
 		}
-		out.Refs[l] = rv.refs[i]
+		r := &rv.refs[i]
+		out.Refs[l] = *r
 		out.SetLen(rx.Vnet, l+1)
-		np++
-		nb += uint(rv.lens[i])
+		n_done++
 	}
 	if i >= rv.n_packets {
 		rx.put_rx_ref_vector(rv)
 	}
-	*n_packets, *n_bytes = np, nb
 	return
 }
 
 func (rx *rx_node) NodeInput(out *vnet.RefOut) {
-	n_packets, n_bytes := uint(0), uint(0)
-
-	done := false
+	n_done, done := uint(0), false
 	if rx.rv_pending != nil {
-		done = rx.input_ref_vector(rx.rv_pending, out, &n_packets, &n_bytes)
+		n_done, done = rx.input_ref_vector(rx.rv_pending, out, n_done)
 	}
 	for !done {
 		select {
 		case rv := <-rx.rv_input:
-			done = rx.input_ref_vector(rv, out, &n_packets, &n_bytes)
+			n_done, done = rx.input_ref_vector(rv, out, n_done)
 		default:
 			done = true
 		}
 	}
 
 	rx.active_lock.Lock()
-	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_packets)) > 0)
+	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_done)) > 0)
 	rx.active_lock.Unlock()
 }
