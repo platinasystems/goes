@@ -91,7 +91,6 @@ func init() {
 			next_punt:  "punt",
 		}
 
-		v.RegisterInterfaceNode(MyNode, MyNode.Hi(), "my-node")
 		MyNode.stream = stream{n_packets_limit: 1, min_size: 64, max_size: 64, next: next_error}
 
 		if false {
@@ -210,11 +209,16 @@ func (n *myNode) Init() (err error) {
 	config := &ethernet.InterfaceConfig{
 		Address: ethernet.Address{0, 1, 2, 3, 4, 5},
 	}
-	ethernet.RegisterInterface(v, MyNode, config, "my-node")
+	ethernet.RegisterInterface(v, n, config, "my-node")
+	v.RegisterInterfaceNode(n, n.Hi(), "my-node")
 
 	// Link is always up for packet generator.
-	n.SetLinkUp(true)
-	n.SetAdminUp(true)
+	if err = n.SetLinkUp(true); err != nil {
+		return
+	}
+	if err = n.SetAdminUp(true); err != nil {
+		return
+	}
 
 	t := &n.pool.BufferTemplate
 	*t = vnet.DefaultBufferPool.BufferTemplate
