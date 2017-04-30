@@ -256,14 +256,13 @@ func (n *node) buffer_type_get_refs(s *Stream, dst []vnet.Ref, want, ti uint) {
 	}
 
 	copy(dst, t.free_refs[got-want:got])
+	t.free_refs = t.free_refs[:got-want]
 
 	if s.validate() {
 		for i := uint(0); i < want; i++ {
 			t.validate_ref(&dst[i])
 		}
 	}
-
-	t.free_refs = t.free_refs[:got-want]
 	return
 }
 
@@ -293,6 +292,12 @@ func (n *node) generate_n_types(s *Stream, dst []vnet.Ref, n_packets, n_types ui
 				this[j].SetDataLen(last_size)
 				n_bytes += last_size
 				s.cur_size = s.next_size(s.cur_size, 0)
+			}
+		}
+		// Set interface for first buffer in chain.
+		if i == 0 {
+			for j := uint(0); j < n_packets; j++ {
+				this[j].Si = s.si
 			}
 		}
 		if prev != nil {

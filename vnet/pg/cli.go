@@ -27,10 +27,11 @@ func (s *default_stream) PacketHeaders() []vnet.PacketHeader {
 
 func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	default_stream_config := stream_config{
-		n_packets_limit: 1,
+		n_packets_limit: 0,
 		min_size:        64,
 		max_size:        64,
 		next:            next_error,
+		si:              n.Si(),
 	}
 	const (
 		set_limit = 1 << iota
@@ -38,6 +39,7 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		set_rate
 		set_next
 		set_stream
+		set_interface
 	)
 	var set_what uint
 	enable, disable := true, false
@@ -87,6 +89,8 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		case in.Parse("dis%*able"):
 			disable = true
 		case in.Parse("na%*me %s", &stream_name):
+		case in.Parse("in%*terface %v", &c.si, n.Vnet):
+			set_what |= set_interface
 		case in.Parse("%v %v", &n.stream_type_map, &index, &sub_in):
 			r, err = n.stream_types[index].ParseStream(&sub_in)
 			if err != nil {
@@ -137,6 +141,9 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		if set_what&set_rate != 0 {
 			s.rate_bits_per_sec = c.rate_bits_per_sec
 			s.rate_packets_per_sec = c.rate_packets_per_sec
+		}
+		if set_what&set_interface != 0 {
+			s.stream_config.si = c.si
 		}
 	}
 

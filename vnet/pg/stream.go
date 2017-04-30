@@ -38,6 +38,8 @@ type stream_config struct {
 	rate_bits_per_sec    float64
 	rate_packets_per_sec float64
 
+	si vnet.Si
+
 	// Next index relative to input node for this stream.
 	next uint
 }
