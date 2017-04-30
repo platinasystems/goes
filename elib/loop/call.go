@@ -354,7 +354,7 @@ func (i *In) currentOut(l *Loop) *Out             { return i.currentThread(l).cu
 func (i *In) SetLen(l *Loop, nVec uint) {
 	xi, a, o := uint(i.nextIndex), i.currentThread(l), i.currentOut(l)
 	o.Len[xi] = Vi(nVec)
-	if isPending := nVec > 0; isPending && !o.isPending.Set(xi, isPending) {
+	if isPending := nVec > 0; isPending && !o.isPending.SetBit(xi, isPending) {
 		a.pending = append(a.pending, pending{
 			in:            i,
 			out:           o,
@@ -364,9 +364,13 @@ func (i *In) SetLen(l *Loop, nVec uint) {
 		})
 	}
 }
-func (i *In) GetLen(l *Loop) uint {
+func (i *In) GetLen(l *Loop) (nVec uint) {
 	xi, o := uint(i.nextIndex), i.currentOut(l)
-	return uint(o.Len[xi])
+	nVec = uint(o.Len[xi])
+	if nVec == 0 && o.isPending.GetBit(xi) {
+		nVec = MaxVectorLen
+	}
+	return
 }
 
 func (f *Out) nextVectors(xi uint) (nVec uint) {
@@ -426,7 +430,7 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 
 		// Reset this frame.
 		o.Len[xi] = 0
-		o.isPending.Unset(uint(xi))
+		o.isPending.UnsetBit(uint(xi))
 
 		// Call next node.
 		a.currentNode = next
