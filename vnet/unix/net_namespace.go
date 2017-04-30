@@ -384,6 +384,9 @@ func (ns *net_namespace) allocate_sockets() (err error) {
 }
 
 func (ns *net_namespace) iomux_add() {
+	if err := syscall.SetsockoptInt(ns.tx_raw_socket_fd, syscall.SOL_SOCKET, syscall.SO_SNDBUF, 1<<20); err != nil {
+		panic(err)
+	}
 	ns.File.SetWriteOnly()
 	ns.File.Fd = ns.tx_raw_socket_fd
 	iomux.Add(ns)

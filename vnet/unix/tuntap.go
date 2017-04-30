@@ -434,6 +434,9 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 	intf.setOperState(true)
 
 	intf.Fd = intf.provision_fd
+	if err := syscall.SetsockoptInt(intf.Fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 1<<20); err != nil {
+		panic(err)
+	}
 	intf.File.SetReadOnly()
 	iomux.Add(intf)
 

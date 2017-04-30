@@ -218,10 +218,10 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 func (intf *tuntap_interface) ReadReady() (err error) {
 	rx := &intf.m.rx_node
 	v := rx.get_packet_vector()
-	n_packets, errno := recvmmsg(intf.Fd, syscall.MSG_WAITFORONE, v.m[:])
+	n_packets, errno := recvmmsg(intf.Fd, 0, v.m[:])
 	if errno != 0 {
 		err = errorForErrno("recvmmsg", errno)
-		if n_packets != 0 {
+		if n_packets > 0 {
 			panic(fmt.Errorf("ReadReady error %s but n packets %d > 0", err, n_packets))
 		}
 		rx.put_packet_vector(v)
