@@ -60,7 +60,7 @@ func (m *netlink_main) namespace_init() (err error) {
 	nm.m = m.m
 
 	nm.rx_node.init(m.m.Vnet)
-	nm.tx_node.init(m.m.Vnet)
+	nm.tx_node.init(nm)
 
 	// Handcraft default name space.
 	{
@@ -77,6 +77,9 @@ func (m *netlink_main) namespace_init() (err error) {
 		}
 		ns.iomux_add()
 
+		ns.index = nm.namespace_pool.GetIndex()
+		nm.namespace_pool.entries[ns.index] = ns
+
 		m.namespace_by_name = make(map[string]*net_namespace)
 		m.namespace_by_name[ns.name] = ns
 
@@ -84,6 +87,7 @@ func (m *netlink_main) namespace_init() (err error) {
 			return
 		}
 		ns.listen(m)
+		ns.net_namespace_tx_node.init(nm)
 	}
 
 	// Setup initial namespaces.
@@ -140,22 +144,22 @@ func (m *net_namespace_main) watch_dir(dir_name string, f func(dir, name string,
 }
 
 type net_namespace_interface struct {
-	name    string
-	ifindex uint32
-	tuntap  *tuntap_interface
+	name      string
+	namespace *net_namespace
+	ifindex   uint32
+	tuntap    *tuntap_interface
 }
 
 type net_namespace struct {
 	m *net_namespace_main
 
+	// Unique index allocated from index_pool.
+	index uint
+
 	name string
 
 	// File descriptor for /proc/self/ns/net for default name space or /var/run/netns/NAME.
 	ns_fd int
-
-	// Raw socket for transmit path.
-	tx_raw_socket_fd int
-	iomux.File
 
 	nsid int
 
@@ -172,7 +176,11 @@ type net_namespace struct {
 
 	interface_by_index map[uint32]*net_namespace_interface
 	interface_by_name  map[string]*net_namespace_interface
+
+	net_namespace_tx_node
 }
+
+//go:generate gentemplate -d Package=unix -id net_namespace -d PoolType=net_namespace_pool -d Type=*net_namespace -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
 
 type net_namespace_main struct {
 	m                        *Main
@@ -180,6 +188,8 @@ type net_namespace_main struct {
 	namespace_by_name        map[string]*net_namespace
 	tuntap_interface_by_name map[string]*tuntap_interface
 	n_initial_namespace_done uint
+	interface_by_si          map[vnet.Si]*net_namespace_interface
+	namespace_pool           net_namespace_pool
 	rx_node                  rx_node
 	tx_node                  tx_node
 }
@@ -264,8 +274,9 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		name_changed := false
 		if !ok {
 			intf = &net_namespace_interface{
-				name:    name,
-				ifindex: index,
+				namespace: ns,
+				name:      name,
+				ifindex:   index,
 			}
 			ns.interface_by_index[index] = intf
 			ns.interface_by_name[name] = intf
@@ -292,6 +303,10 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 					ns.si_by_ifindex = make(map[uint32]vnet.Si)
 				}
 				ns.si_by_ifindex[index] = tif.si
+				if m.interface_by_si == nil {
+					m.interface_by_si = make(map[vnet.Si]*net_namespace_interface)
+				}
+				m.interface_by_si[tif.si] = intf
 			}
 		}
 	} else {
@@ -300,6 +315,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			tif.add_del_namespace(m, ns, is_del)
 			tif.namespace = nil
 			delete(ns.si_by_ifindex, index)
+			delete(m.interface_by_si, tif.si)
 		}
 		delete(ns.interface_by_index, index)
 		delete(ns.interface_by_name, name)
@@ -373,14 +389,22 @@ func (ns *net_namespace) iomux_add() {
 	iomux.Add(ns)
 }
 
+func (m *net_namespace_main) max_n_namespace() uint { return uint(len(m.namespace_by_name)) }
+
 func (ns *net_namespace) add(m *netlink_main) {
+	// Allocate unique index for namespace.
+	nm := &m.net_namespace_main
+	ns.index = nm.namespace_pool.GetIndex()
+	nm.namespace_pool.entries[ns.index] = ns
+
+	// Loop until namespace sockets are allocated.
 	time_start := time.Now()
 	var (
 		err               error
 		first_setns_errno syscall.Errno
 	)
 	for {
-		ns.m = &m.net_namespace_main
+		ns.m = nm
 		if ns.ns_fd, err = m.fd_for_path(netnsDir, ns.name); err != nil {
 			panic(err)
 		}
@@ -403,9 +427,14 @@ func (ns *net_namespace) add(m *netlink_main) {
 		panic(err)
 	}
 	ns.listen(m)
+	ns.net_namespace_tx_node.init(nm)
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
+	ns.m.namespace_pool.PutIndex(ns.index)
+	ns.m.namespace_pool.entries[ns.index] = nil
+	ns.index = ^uint(0)
+
 	iomux.Del(ns)
 	if ns.ns_fd > 0 {
 		syscall.Close(ns.ns_fd)

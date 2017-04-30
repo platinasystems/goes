@@ -20,13 +20,13 @@ var raw_sockaddr_ll_template = syscall.RawSockaddrLinklayer{
 	Family: syscall.AF_PACKET,
 }
 
-type packet struct {
+type rx_packet struct {
 	iovs  iovecVec
 	refs  vnet.RefVec
 	chain vnet.RefChain
 }
 
-func (p *packet) alloc_refs(rx *rx_node, n uint) {
+func (p *rx_packet) alloc_refs(rx *rx_node, n uint) {
 	rx.buffer_pool.AllocRefs(p.refs[:n])
 	for i := uint(0); i < n; i++ {
 		p.iovs[i].Base = (*byte)(p.refs[i].Data())
@@ -34,7 +34,7 @@ func (p *packet) alloc_refs(rx *rx_node, n uint) {
 	}
 }
 
-func (p *packet) rx_init(rx *rx_node) {
+func (p *rx_packet) rx_init(rx *rx_node) {
 	n := rx.max_buffers_per_packet
 	p.iovs.Validate(n - 1)
 	p.refs.Validate(n - 1)
@@ -43,16 +43,7 @@ func (p *packet) rx_init(rx *rx_node) {
 	p.alloc_refs(rx, n)
 }
 
-func (p *packet) rx_free(rx *rx_node) { rx.buffer_pool.FreeRefs(&p.refs[0], p.refs.Len(), false) }
-
-func (v *packet_vector) add_packet(iovs []iovec, ifindex uint32) {
-	i := v.i
-	v.i++
-	a := &v.a[i]
-	*a = raw_sockaddr_ll_template
-	a.Ifindex = int32(ifindex)
-	v.m[i].msg_hdr.set(a, iovs)
-}
+func (p *rx_packet) rx_free(rx *rx_node) { rx.buffer_pool.FreeRefs(&p.refs[0], p.refs.Len(), false) }
 
 const (
 	packet_vector_max_len = 64
@@ -60,15 +51,15 @@ const (
 )
 
 // Maximum sized packet vector.
-type packet_vector struct {
+type rx_packet_vector struct {
 	i uint
 	a [packet_vector_max_len]syscall.RawSockaddrLinklayer
 	m [packet_vector_max_len]mmsghdr
-	p [packet_vector_max_len]packet
+	p [packet_vector_max_len]rx_packet
 }
 
-func (n *rx_node) new_packet_vector() (v *packet_vector) {
-	v = &packet_vector{}
+func (n *rx_node) new_packet_vector() (v *rx_packet_vector) {
+	v = &rx_packet_vector{}
 	for i := range v.p {
 		v.p[i].rx_init(n)
 		v.a[i] = raw_sockaddr_ll_template
@@ -77,7 +68,7 @@ func (n *rx_node) new_packet_vector() (v *packet_vector) {
 	return
 }
 
-func (n *rx_node) get_packet_vector() (v *packet_vector) {
+func (n *rx_node) get_packet_vector() (v *rx_packet_vector) {
 	select {
 	case v = <-n.pv_pool:
 	default:
@@ -86,7 +77,7 @@ func (n *rx_node) get_packet_vector() (v *packet_vector) {
 	return
 }
 
-func (n *rx_node) put_packet_vector(v *packet_vector) { n.pv_pool <- v }
+func (n *rx_node) put_packet_vector(v *rx_packet_vector) { n.pv_pool <- v }
 
 func (n *rx_node) get_rx_ref_vector() (v *rx_ref_vector) {
 	select {
@@ -110,9 +101,9 @@ func (n *rx_node) init(v *vnet.Vnet) {
 	v.RegisterInputNode(n, "unix-rx")
 	n.buffer_pool = vnet.DefaultBufferPool
 	v.AddBufferPool(n.buffer_pool)
-	n.pv_pool = make(chan *packet_vector, 64)
-	n.rv_pool = make(chan *rx_ref_vector, 64)
-	n.rv_input = make(chan *rx_ref_vector, 64)
+	n.pv_pool = make(chan *rx_packet_vector, 256)
+	n.rv_pool = make(chan *rx_ref_vector, 256)
+	n.rv_input = make(chan *rx_ref_vector, 256)
 	n.max_buffers_per_packet = max_rx_packet_size / n.buffer_pool.Size
 	if max_rx_packet_size%n.buffer_pool.Size != 0 {
 		n.max_buffers_per_packet++
@@ -122,7 +113,7 @@ func (n *rx_node) init(v *vnet.Vnet) {
 type rx_node struct {
 	vnet.InputNode
 	buffer_pool            *vnet.BufferPool
-	pv_pool                chan *packet_vector
+	pv_pool                chan *rx_packet_vector
 	rv_pool                chan *rx_ref_vector
 	rv_input               chan *rx_ref_vector
 	rv_pending             *rx_ref_vector
@@ -148,7 +139,7 @@ const (
 	rx_error_non_vnet_interface
 )
 
-func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *packet, rx *rx_node, i, n_bytes_in_packet, ifindex uint) {
+func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, i, n_bytes_in_packet, ifindex uint) {
 	size := rx.buffer_pool.Size
 	n_left := n_bytes_in_packet
 	var n_refs uint
@@ -170,7 +161,7 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *packet, rx *rx_node, i, 
 	ref.SetError(&rx.Node, rx_error_non_vnet_interface)
 	if ns.m.m.verbosePackets {
 		i := ns.interface_by_index[uint32(ifindex)]
-		fmt.Printf("unix rx ns %s %s: %s\n", ns.name, i.name, ethernet.RefString(&ref))
+		ns.m.m.v.Logf("unix rx ns %s %s: %s\n", ns.name, i.name, ethernet.RefString(&ref))
 	}
 	if si, ok := ns.si_by_ifindex[uint32(ifindex)]; ok {
 		ref.Si = si
@@ -263,21 +254,23 @@ func (rx *rx_node) copy_pending(rv *rx_ref_vector, i uint) {
 	}
 	n := rv.n_packets
 	n_left := n - i
-	copy(p.refs[:n_left], rv.refs[i:])
-	copy(p.lens[:n_left], rv.lens[i:])
-	copy(p.nexts[:n_left], rv.nexts[i:])
-	p.n_packets = n_left
+	if n_left < packet_vector_max_len {
+		copy(p.refs[:n_left], rv.refs[i:])
+		copy(p.lens[:n_left], rv.lens[i:])
+		copy(p.nexts[:n_left], rv.nexts[i:])
+		p.n_packets = n_left
+	}
 	rx.rv_pending = p
 }
 
-func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ uint) (n_done uint, done bool) {
+func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ uint) (n_done uint, out_is_full bool) {
 	n_done = n_doneʹ
 	var i uint
 	for i = 0; i < rv.n_packets; i++ {
 		out := &o.Outs[rv.nexts[i]]
 		out.BufferPool = rx.buffer_pool
 		l := out.GetLen(rx.Vnet)
-		if done = l == vnet.MaxVectorLen; done {
+		if out_is_full = l == vnet.MaxVectorLen; out_is_full {
 			rx.copy_pending(rv, i)
 			break
 		}
@@ -287,25 +280,28 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 		n_done++
 	}
 	if i >= rv.n_packets {
+		if rv == rx.rv_pending { // clear pending
+			rx.rv_pending = nil
+		}
 		rx.put_rx_ref_vector(rv)
 	}
 	return
 }
 
 func (rx *rx_node) NodeInput(out *vnet.RefOut) {
-	n_done, done := uint(0), false
+	n_done, out_is_full := uint(0), false
 	if rx.rv_pending != nil {
-		n_done, done = rx.input_ref_vector(rx.rv_pending, out, n_done)
+		n_done, out_is_full = rx.input_ref_vector(rx.rv_pending, out, n_done)
 	}
-	for !done {
+loop:
+	for !out_is_full {
 		select {
 		case rv := <-rx.rv_input:
-			n_done, done = rx.input_ref_vector(rv, out, n_done)
+			n_done, out_is_full = rx.input_ref_vector(rv, out, n_done)
 		default:
-			done = true
+			break loop
 		}
 	}
-
 	rx.active_lock.Lock()
 	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_done)) > 0)
 	rx.active_lock.Unlock()
