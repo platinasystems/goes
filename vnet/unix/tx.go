@@ -5,6 +5,7 @@
 package unix
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
@@ -31,10 +32,12 @@ type net_namespace_tx_node struct {
 	active_count int32
 	to_tx        chan *tx_packet_vector
 	pv           *tx_packet_vector
+
+	suspend_out *vnet.RefIn
 }
 
 func (n *net_namespace_tx_node) init(m *net_namespace_main) {
-	n.to_tx = make(chan *tx_packet_vector, 64)
+	n.to_tx = make(chan *tx_packet_vector, vnet.MaxVectorLen)
 	n.n = &m.tx_node
 }
 
@@ -58,6 +61,7 @@ func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) {
 		if r.NextValidFlag() == 0 {
 			break
 		}
+		r = r.NextRef()
 	}
 }
 
@@ -80,7 +84,9 @@ func (n *tx_node) get_packet_vector() (v *tx_packet_vector) {
 	return
 }
 
-func (n *tx_node) put_packet_vector(v *tx_packet_vector) { n.pv_pool <- v }
+func (n *tx_node) put_packet_vector(v *tx_packet_vector) {
+	n.pv_pool <- v
+}
 
 func (v *tx_packet_vector) add_packet(n *tx_node, r *vnet.Ref, ifindex uint32) {
 	i := v.n_packets
@@ -108,42 +114,42 @@ func (n *tx_node) init(m *net_namespace_main) {
 		tx_error_interface_down:    "interface is down",
 	}
 	m.m.v.RegisterOutputNode(n, "punt")
-	n.pv_pool = make(chan *tx_packet_vector, 256)
+	n.pv_pool = make(chan *tx_packet_vector, 2*vnet.MaxVectorLen)
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
-	if false {
-		n.Suspend(out)
-	}
 	pv := tx_packet_vector{
 		buffer_pool: out.BufferPool,
 	}
+	elog.GenEventf("unix-tx output %d", out.InLen())
 	n_unknown := uint(0)
 	for i := uint(0); i < out.InLen(); i++ {
 		r := &out.Refs[i]
 		if intf, ok := n.m.interface_by_si[r.Si]; ok {
 			if intf.namespace != pv.ns {
-				pv.tx(n)
+				pv.tx(n, out)
 				pv.ns = intf.namespace
 			}
 			pv.add_packet(n, r, intf.ifindex)
 			if pv.n_packets >= packet_vector_max_len {
-				pv.tx(n)
+				pv.tx(n, out)
 			}
 		} else {
 			n_unknown++
 		}
 	}
 	n.CountError(tx_error_unknown_interface, n_unknown)
-	pv.tx(n)
+	pv.tx(n, out)
 }
 
-func (pv *tx_packet_vector) tx(n *tx_node) {
+func (pv *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
 	// Read check and clear number of packets in vector.
 	np := pv.n_packets
 	if np == 0 {
 		return
 	}
+
+	elog.GenEventf("unix-tx %d", np)
 
 	// Make a copy for channel send.
 	v := n.get_packet_vector()
@@ -153,7 +159,16 @@ func (pv *tx_packet_vector) tx(n *tx_node) {
 	ns := v.ns
 	atomic.AddInt32(&ns.active_count, int32(np))
 	iomux.Update(ns)
-	ns.to_tx <- v
+loop:
+	for {
+		select {
+		case ns.to_tx <- v:
+			break loop
+		default:
+			ns.suspend_out = out
+			n.Suspend(out)
+		}
+	}
 }
 
 func (pv *tx_packet_vector) advance(n *net_namespace_tx_node, i uint) {
@@ -161,9 +176,9 @@ func (pv *tx_packet_vector) advance(n *net_namespace_tx_node, i uint) {
 	n_left := np - i
 	pv.buffer_pool.FreeRefs(&pv.r[0], i, true)
 	if n_left > 0 {
-		copy(pv.a[:n_left], pv.a[:i])
-		copy(pv.m[:n_left], pv.m[:i])
-		copy(pv.r[:n_left], pv.r[:i])
+		copy(pv.a[:n_left], pv.a[i:])
+		copy(pv.m[:n_left], pv.m[i:])
+		copy(pv.r[:n_left], pv.r[i:])
 		// For packets swap them to avoid leaking iovecs.
 		for j := uint(0); j < n_left; j++ {
 			pv.p[j], pv.p[i+j] = pv.p[i+j], pv.p[j]
@@ -201,9 +216,15 @@ func (ns *net_namespace) WriteReady() (err error) {
 				n.n.m.m.v.Logf("unix tx ns %s %s: %s\n", ns, intf.name, ethernet.RefString(r))
 			}
 		}
+		elog.GenEventf("unix write-ready tx %d", n_packets)
 		pv.advance(n, uint(n_packets))
 		atomic.AddInt32(&ns.active_count, int32(-n_packets))
 		iomux.Update(ns)
+		if ns.suspend_out != nil && len(n.to_tx) < cap(n.to_tx)/2 {
+			out := ns.suspend_out
+			ns.suspend_out = nil
+			n.n.Resume(out)
+		}
 	}
 	return
 }
