@@ -443,7 +443,7 @@ func (b Bitmap) HexString() string {
 	return Bitmaps.HexString(b)
 }
 
-func (bm WordVec) Get(x uint) (v bool) {
+func (bm WordVec) GetBit(x uint) (v bool) {
 	i, m := bitmapIndex(x)
 	if i < uint(len(bm)) {
 		v = bm[i]&m != 0
@@ -451,7 +451,7 @@ func (bm WordVec) Get(x uint) (v bool) {
 	return
 }
 
-func (bm WordVec) Set(x uint, v bool) (oldValue bool) {
+func (bm WordVec) SetBit(x uint, v bool) (oldValue bool) {
 	i, m := bitmapIndex(x)
 	b := bm[i]
 	oldValue = b&m != 0
@@ -460,7 +460,7 @@ func (bm WordVec) Set(x uint, v bool) (oldValue bool) {
 	return
 }
 
-func (bm WordVec) Unset(x uint) (v bool) {
+func (bm WordVec) UnsetBit(x uint) (v bool) {
 	i, m := bitmapIndex(x)
 	b := bm[i]
 	v = b&m != 0
