@@ -6,6 +6,7 @@ package unix
 
 import (
 	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
@@ -101,9 +102,9 @@ func (n *rx_node) init(v *vnet.Vnet) {
 	v.RegisterInputNode(n, "unix-rx")
 	n.buffer_pool = vnet.DefaultBufferPool
 	v.AddBufferPool(n.buffer_pool)
-	n.pv_pool = make(chan *rx_packet_vector, 256)
-	n.rv_pool = make(chan *rx_ref_vector, 256)
-	n.rv_input = make(chan *rx_ref_vector, 256)
+	n.pv_pool = make(chan *rx_packet_vector, vnet.MaxVectorLen)
+	n.rv_pool = make(chan *rx_ref_vector, vnet.MaxVectorLen)
+	n.rv_input = make(chan *rx_ref_vector, vnet.MaxVectorLen)
 	n.max_buffers_per_packet = max_rx_packet_size / n.buffer_pool.Size
 	if max_rx_packet_size%n.buffer_pool.Size != 0 {
 		n.max_buffers_per_packet++
@@ -235,6 +236,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), uint(m.msg_hdr.ifindex()))
 	}
 
+	elog.GenEventf("unix-rx ready %d", n_packets)
 	rx.rv_input <- rv
 	rx.active_lock.Lock()
 	atomic.AddInt32(&rx.active_count, int32(n_packets))
@@ -258,8 +260,8 @@ func (rx *rx_node) copy_pending(rv *rx_ref_vector, i uint) {
 		copy(p.refs[:n_left], rv.refs[i:])
 		copy(p.lens[:n_left], rv.lens[i:])
 		copy(p.nexts[:n_left], rv.nexts[i:])
-		p.n_packets = n_left
 	}
+	p.n_packets = n_left
 	rx.rv_pending = p
 }
 
@@ -302,6 +304,7 @@ loop:
 			break loop
 		}
 	}
+	elog.GenEventf("unix-rx input %d", n_done)
 	rx.active_lock.Lock()
 	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_done)) > 0)
 	rx.active_lock.Unlock()
