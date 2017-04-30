@@ -13,8 +13,8 @@ import (
 )
 
 type stats struct {
-	calls, vectors uint64
-	clocks         cpu.Time
+	calls, vectors, suspends uint64
+	clocks                   cpu.Time
 }
 
 type nodeStats struct {
@@ -29,14 +29,16 @@ func (s *nodeStats) zero() {
 }
 
 func (s *stats) add_helper(n *nodeStats, raw bool) {
-	c, v, l := n.current.calls, n.current.vectors, n.current.clocks
+	c, v, d, l := n.current.calls, n.current.vectors, n.current.suspends, n.current.clocks
 	if !raw {
 		c -= n.lastClear.calls
 		v -= n.lastClear.vectors
 		l -= n.lastClear.clocks
+		d -= n.lastClear.suspends
 	}
 	s.calls += c
 	s.vectors += v
+	s.suspends += d
 	s.clocks += l
 }
 

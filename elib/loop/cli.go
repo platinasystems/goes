@@ -59,11 +59,12 @@ func (l *Loop) Logf(format string, args ...interface{})   { fmt.Fprintf(&l.Cli.M
 func (l *Loop) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(format, args...)) }
 
 type rtNode struct {
-	Name    string  `format:"%-30s"`
-	State   string  `align:"center"`
-	Calls   uint64  `format:"%16d"`
-	Vectors uint64  `format:"%16d"`
-	Clocks  float64 `format:"%16.2f"`
+	Name     string  `format:"%-30s"`
+	State    string  `align:"center"`
+	Calls    uint64  `format:"%16d"`
+	Vectors  uint64  `format:"%16d"`
+	Suspends uint64  `format:"%16d"`
+	Clocks   float64 `format:"%16.2f"`
 }
 type rtNodes []rtNode
 
@@ -123,11 +124,12 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 					state = fmt.Sprintf("%s", n.flags)
 				}
 				ns = append(ns, rtNode{
-					Name:    name + io,
-					State:   state,
-					Calls:   s[j].calls,
-					Vectors: s[j].vectors,
-					Clocks:  s[j].clocksPerVector(),
+					Name:     name + io,
+					State:    state,
+					Calls:    s[j].calls,
+					Vectors:  s[j].vectors,
+					Suspends: s[j].suspends,
+					Clocks:   s[j].clocksPerVector(),
 				})
 			}
 		}
