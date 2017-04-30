@@ -31,6 +31,9 @@ type Ref struct {
 
 func (r *Ref) Flags() BufferFlag         { return BufferFlag(r.RefHeader.Flags()) }
 func (r *Ref) NextValidFlag() BufferFlag { return BufferFlag(r.RefHeader.NextValidFlag()) }
+func (r *Ref) NextRef() *Ref {
+	return (*Ref)(unsafe.Pointer(r.RefHeader.NextRef()))
+}
 
 type BufferFlag hw.BufferFlag
 
