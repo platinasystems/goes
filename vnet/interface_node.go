@@ -233,7 +233,7 @@ func (n *interfaceNode) slowPath(
 		rv[iv] = s
 		iv++
 
-		if h := s.NextRef(); h == nil {
+		if h := s.RefHeader.NextRef(); h == nil {
 			break
 		} else {
 			s.RefHeader = *h
