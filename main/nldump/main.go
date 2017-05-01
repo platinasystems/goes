@@ -6,15 +6,23 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
-	"github.com/platinasystems/go/internal/netlink/nldump"
+	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd/flags"
+	"github.com/platinasystems/go/goes/cmd/nldump"
 )
 
+var Exit = os.Exit
+var Stderr io.Writer = os.Stderr
+
 func main() {
-	err := nldump.Main(os.Args[1:]...)
+	m := goes.New(flags.New()...)
+	m.Plot(nldump.New())
+	err := m.Main()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		Exit(1)
 	}
 }
