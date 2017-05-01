@@ -32,8 +32,6 @@ const (
 	CantPipe
 )
 
-var Exit = os.Exit
-
 type ByName map[string]*Goes
 
 type Cmd interface {
