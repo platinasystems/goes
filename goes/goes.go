@@ -20,8 +20,8 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/prog"
 )
 
@@ -103,7 +103,8 @@ func (byName ByName) Complete(prefix string) (ss []string) {
 // If the args has "-h", "-help", or "--help", this runs
 // ByName["help"].Main(args...) to print text.
 //
-// Similarly for "-apropos", "-complete", "-man", and "-usage".
+// Similarly for "-apropos", "-complete", "-license", "-man", "-patents",
+// "-usage" and "-version".
 //
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
@@ -133,45 +134,7 @@ func (byName ByName) Main(args ...string) error {
 		}
 	}
 
-	name := args[0]
-	args = args[1:]
-	flag, args := flags.New(args,
-		"-h", "-help", "--help",
-		"-apropos", "--apropos",
-		"-man", "--man",
-		"-usage", "--usage",
-		"-complete", "--complete")
-	flag.Aka("-h", "-help", "--help")
-	flag.Aka("-apropos", "--apropos")
-	flag.Aka("-complete", "--complete")
-	flag.Aka("-man", "--man")
-	flag.Aka("-usage", "--usage")
-	targs := []string{name}
-	switch {
-	case flag["-h"]:
-		name = "help"
-		if len(args) == 0 {
-			args = append(targs, args...)
-		} else {
-			args = targs
-		}
-	case flag["-apropos"]:
-		args = targs
-		name = "apropos"
-	case flag["-man"]:
-		args = targs
-		name = "man"
-	case flag["-usage"]:
-		args = targs
-		name = "usage"
-	case flag["-complete"]:
-		name = "complete"
-		if len(args) == 0 {
-			args = append(targs, args...)
-		} else {
-			args = targs
-		}
-	}
+	name, args := byName.pseudonym(args)
 	g := byName[name]
 	if g == nil {
 		return fmt.Errorf("%s: command not found", name)
@@ -192,6 +155,69 @@ func (byName ByName) Main(args ...string) error {
 		err = fmt.Errorf("%s: %v", name, err)
 	}
 	return err
+}
+
+// parse pseudo flags, e.g.
+//
+//	COMMAND {"-license", "-patents", or "-version"}
+// returns
+//	{"license", "patents", or "version"}
+//
+//	COMMAND {"-apropos", "-man", or "-usage"}
+// returns
+//	{"apropos", "man", or "usage"} COMMAND
+//
+//	COMMAND {"-complete" or "-help"} [ARGS]...
+// returns
+//	{"complete" or "help"} COMMAND [ARGS]...
+func (byName ByName) pseudonym(args []string) (string, []string) {
+	name := args[0]
+	args = args[1:]
+	flag, args := flags.New(args,
+		"-apropos", "--apropos",
+		"-complete", "--complete",
+		"-help", "--help", "-h",
+		"-license", "--license",
+		"-man", "--man",
+		"-patents", "--patents",
+		"-usage", "--usage",
+		"-version", "--version",
+	)
+	flag.Aka("-apropos", "--apropos")
+	flag.Aka("-complete", "--complete")
+	flag.Aka("-help", "--help", "-h")
+	flag.Aka("-license", "--license")
+	flag.Aka("-man", "--man")
+	flag.Aka("-patents", "--patents")
+	flag.Aka("-usage", "--usage")
+	flag.Aka("-version", "--version")
+	for _, x := range []string{
+		"-license",
+		"-patents",
+		"-version",
+	} {
+		if flag[x] {
+			return x[1:], args[:0]
+		}
+	}
+	for _, x := range []string{
+		"-apropos",
+		"-man",
+		"-usage",
+	} {
+		if flag[x] {
+			return x[1:], []string{name}
+		}
+	}
+	for _, x := range []string{
+		"-complete",
+		"-help",
+	} {
+		if flag[x] {
+			return x[1:], append([]string{name}, args...)
+		}
+	}
+	return name, args
 }
 
 // Plot commands on map.
