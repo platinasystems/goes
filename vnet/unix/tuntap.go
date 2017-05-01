@@ -67,8 +67,32 @@ func AddExternalInterface(v *vnet.Vnet, ifIndex int, si vnet.Si) {
 	m.siByIfIndex[ifIndex] = si
 }
 
+func (i *tuntap_interface) close() {
+	if i.provision_fd > 0 {
+		if i.Fd == i.provision_fd {
+			iomux.Del(i)
+		}
+		syscall.Close(i.provision_fd)
+		i.provision_fd = -1
+	}
+	if i.dev_net_tun_fd > 0 {
+		syscall.Close(i.dev_net_tun_fd)
+		i.dev_net_tun_fd = -1
+	}
+}
+
 func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del bool) {
 	if is_del {
+		i.close()
+	} else {
+		i.namespace = ns
+		if err := i.open_sockets(); err != nil {
+			panic(err)
+		}
+		if err := i.bind(); err != nil {
+			panic(err)
+		}
+		i.start_up()
 	}
 }
 
@@ -291,20 +315,15 @@ func (m *Main) netlink_dump_done_for_all_namespaces() (err error) {
 		if err != nil {
 			return
 		}
-
-		next := m.v.AddNamedNext(&nm.rx_node, intf.Name())
-		m.rx_node.set_next(intf.si, rx_node_next(next))
 	}
 	return
 }
 
-func (intf *tuntap_interface) create(m *Main) (err error) {
+func (intf *tuntap_interface) open_sockets() (err error) {
 	ns := intf.namespace
-
-	// Create provisioning socket in given namespace.
-	elib.WithNamespace(ns.ns_fd, ns.m.default_namespace.ns_fd, syscall.CLONE_NEWNET, func() (err error) {
+	err, _ = elib.WithNamespace(ns.ns_fd, ns.m.default_namespace.ns_fd, syscall.CLONE_NEWNET, func() (err error) {
 		if intf.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
-			err = fmt.Errorf("tuntap /dev/net/tun open: %s", err)
+			err = fmt.Errorf("tuntap open /dev/net/tun: %s", err)
 			return
 		}
 		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
@@ -312,16 +331,38 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		}
 		return
 	})
+	if err = syscall.SetsockoptInt(intf.provision_fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 4<<20); err != nil {
+		err = fmt.Errorf("tuntap SO_RCVBUF: %s", err)
+	}
+	return
+}
+
+// Bind the provisioning socket to the interface.
+func (intf *tuntap_interface) bind() (err error) {
+	sa := syscall.SockaddrLinklayer{
+		Ifindex:  int(intf.ifindex),
+		Protocol: eth_p_all,
+	}
+	if err = syscall.Bind(intf.provision_fd, &sa); err != nil {
+		err = fmt.Errorf("tuntap bind: %s", err)
+	}
+	return
+}
+
+func (intf *tuntap_interface) start_up() {
+	intf.setOperState(true)
+	intf.Fd = intf.provision_fd
+	intf.File.SetReadOnly()
+	iomux.Add(intf)
+}
+
+func (intf *tuntap_interface) create(m *Main) (err error) {
+	ns := intf.namespace
+
+	err = intf.open_sockets()
 	defer func() {
 		if err != nil {
-			if intf.provision_fd != 0 {
-				syscall.Close(intf.provision_fd)
-				intf.provision_fd = -1
-			}
-			if intf.dev_net_tun_fd != 0 {
-				syscall.Close(intf.dev_net_tun_fd)
-				intf.provision_fd = -1
-			}
+			intf.close()
 		}
 	}()
 
@@ -355,17 +396,7 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		ns.tuntap_interface_by_ifindex[intf.ifindex] = intf
 	}
 
-	// Bind the provisioning socket to the interface.
-	{
-		sa := syscall.SockaddrLinklayer{
-			Ifindex:  int(intf.ifindex),
-			Protocol: eth_p_all,
-		}
-		if err = syscall.Bind(intf.provision_fd, &sa); err != nil {
-			err = fmt.Errorf("tuntap bind: %s", err)
-			return
-		}
-	}
+	intf.bind()
 
 	if !intf.set_flags_at_first_up_down {
 		// Fetch initial interface flags.
@@ -431,14 +462,11 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		}
 	}
 
-	intf.setOperState(true)
+	// Hook up unix rx node to interface transmit node.
+	next := m.v.AddNamedNext(&m.rx_node, intf.Name())
+	m.rx_node.set_next(intf.si, rx_node_next(next))
 
-	intf.Fd = intf.provision_fd
-	if err := syscall.SetsockoptInt(intf.Fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 1<<20); err != nil {
-		panic(err)
-	}
-	intf.File.SetReadOnly()
-	iomux.Add(intf)
+	intf.start_up()
 
 	return
 }
@@ -505,12 +533,6 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 }
 
 var eth_p_all = uint16(vnet.Uint16(syscall.ETH_P_ALL).FromHost())
-
-func (i *tuntap_interface) close() (err error) {
-	err = syscall.Close(i.provision_fd)
-	i.provision_fd = -1
-	return
-}
 
 func (m *Main) Init() (err error) {
 	// Suitable defaults for an Ethernet-like tun/tap device.

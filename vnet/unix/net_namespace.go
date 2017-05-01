@@ -92,6 +92,7 @@ func (m *netlink_main) namespace_init() (err error) {
 
 	// Setup initial namespaces.
 	m.read_dir(netnsDir, m.watch_namespace_add_del)
+	m.n_initial_namespace = uint(len(nm.namespace_by_name))
 	return
 }
 
@@ -99,7 +100,7 @@ func (m *netlink_main) namespace_init() (err error) {
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
 	nm.n_initial_namespace_done++
-	if nm.n_initial_namespace_done == uint(len(nm.namespace_by_name)) {
+	if nm.n_initial_namespace_done == nm.n_initial_namespace {
 		nm.n_initial_namespace_done = ^uint(0) // only happens once
 		err = m.netlink_dump_done_for_all_namespaces()
 	}
@@ -188,6 +189,7 @@ type net_namespace_main struct {
 	namespace_by_name        map[string]*net_namespace
 	tuntap_interface_by_name map[string]*tuntap_interface
 	n_initial_namespace_done uint
+	n_initial_namespace      uint
 	interface_by_si          map[vnet.Si]*net_namespace_interface
 	namespace_pool           net_namespace_pool
 	rx_node                  rx_node
@@ -294,11 +296,6 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			}
 		} else {
 			if tif, ok := m.tuntap_interface_by_name[name]; ok {
-				// Interface moved to a new namespace?
-				if tif.namespace != ns {
-					tif.add_del_namespace(m, ns, is_del)
-					tif.namespace = ns
-				}
 				if ns.si_by_ifindex == nil {
 					ns.si_by_ifindex = make(map[uint32]vnet.Si)
 				}
@@ -307,6 +304,11 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 					m.interface_by_si = make(map[vnet.Si]*net_namespace_interface)
 				}
 				m.interface_by_si[tif.si] = intf
+				// Interface moved to a new namespace?
+				if tif.namespace != ns {
+					tif.add_del_namespace(m, ns, is_del)
+					tif.namespace = ns
+				}
 			}
 		}
 	} else {
