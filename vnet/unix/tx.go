@@ -33,7 +33,7 @@ type net_namespace_tx_node struct {
 	to_tx        chan *tx_packet_vector
 	pv           *tx_packet_vector
 
-	suspend_out *vnet.RefIn
+	suspend_saved_out *vnet.RefIn
 }
 
 func (n *net_namespace_tx_node) init(m *net_namespace_main) {
@@ -46,23 +46,27 @@ type tx_packet struct {
 	iovs    iovecVec
 }
 
-func (p *tx_packet) add_one_ref(r *vnet.Ref, i uint) uint {
+func (p *tx_packet) add_one_ref(r *vnet.Ref, iʹ, lʹ uint) (i, l uint) {
+	i, l = iʹ, lʹ
+	d := r.DataLen()
 	p.iovs.Validate(i)
 	p.iovs[i].Base = (*byte)(r.Data())
-	p.iovs[i].Len = uint64(r.DataLen())
-	return i + 1
+	p.iovs[i].Len = uint64(d)
+	return i + 1, l + d
 }
 
-func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) {
+func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) (l uint) {
 	p.ifindex = ifindex
 	i := uint(0)
 	for {
-		i = p.add_one_ref(r, i)
+		i, l = p.add_one_ref(r, i, l)
 		if r.NextValidFlag() == 0 {
 			break
 		}
 		r = r.NextRef()
 	}
+	p.iovs = p.iovs[:i]
+	return
 }
 
 type tx_packet_vector struct {
@@ -75,31 +79,32 @@ type tx_packet_vector struct {
 	r           [packet_vector_max_len]vnet.Ref
 }
 
-func (n *tx_node) get_packet_vector() (v *tx_packet_vector) {
+func (n *tx_node) get_packet_vector(p *vnet.BufferPool, ns *net_namespace) (v *tx_packet_vector) {
 	select {
 	case v = <-n.pv_pool:
 	default:
 		v = &tx_packet_vector{}
 	}
+	v.n_packets = 0
+	v.buffer_pool = p
+	v.ns = ns
 	return
 }
-
-func (n *tx_node) put_packet_vector(v *tx_packet_vector) {
-	n.pv_pool <- v
-}
+func (n *tx_node) put_packet_vector(v *tx_packet_vector) { n.pv_pool <- v }
 
 func (v *tx_packet_vector) add_packet(n *tx_node, r *vnet.Ref, ifindex uint32) {
 	i := v.n_packets
 	v.n_packets++
 
 	p := &v.p[i]
-	p.add_ref(r, ifindex)
+	l := p.add_ref(r, ifindex)
 	v.r[i] = *r
 
 	a := &v.a[i]
 	*a = raw_sockaddr_ll_template
 	a.Ifindex = int32(p.ifindex)
 	v.m[i].msg_hdr.set(a, p.iovs)
+	v.m[i].msg_len = uint32(l)
 }
 
 const (
@@ -118,54 +123,50 @@ func (n *tx_node) init(m *net_namespace_main) {
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
-	pv := tx_packet_vector{
-		buffer_pool: out.BufferPool,
-	}
 	elog.GenEventf("unix-tx output %d", out.InLen())
-	n_unknown := uint(0)
+	var (
+		pv        *tx_packet_vector
+		ns        *net_namespace
+		n_unknown uint
+	)
 	for i := uint(0); i < out.InLen(); i++ {
 		r := &out.Refs[i]
 		if intf, ok := n.m.interface_by_si[r.Si]; ok {
-			if intf.namespace != pv.ns {
-				pv.tx(n, out)
-				pv.ns = intf.namespace
+			if intf.namespace != ns {
+				if pv != nil {
+					pv.tx(n, out)
+				}
+				ns = intf.namespace
+			}
+			if pv == nil {
+				pv = n.get_packet_vector(out.BufferPool, ns)
 			}
 			pv.add_packet(n, r, intf.ifindex)
 			if pv.n_packets >= packet_vector_max_len {
 				pv.tx(n, out)
+				pv = nil
 			}
 		} else {
 			n_unknown++
 		}
 	}
 	n.CountError(tx_error_unknown_interface, n_unknown)
-	pv.tx(n, out)
+	if pv != nil {
+		pv.tx(n, out)
+	}
 }
 
-func (pv *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
-	// Read check and clear number of packets in vector.
-	np := pv.n_packets
-	if np == 0 {
-		return
-	}
-
+func (v *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
+	np, ns := v.n_packets, v.ns
 	elog.GenEventf("unix-tx %d", np)
-
-	// Make a copy for channel send.
-	v := n.get_packet_vector()
-	*v = *pv
-	pv.n_packets = 0
-
-	ns := v.ns
 	atomic.AddInt32(&ns.active_count, int32(np))
 	iomux.Update(ns)
-loop:
 	for {
 		select {
 		case ns.to_tx <- v:
-			break loop
+			return
 		default:
-			ns.suspend_out = out
+			ns.suspend_saved_out = out
 			n.Suspend(out)
 		}
 	}
@@ -220,9 +221,8 @@ func (ns *net_namespace) WriteReady() (err error) {
 		pv.advance(n, uint(n_packets))
 		atomic.AddInt32(&ns.active_count, int32(-n_packets))
 		iomux.Update(ns)
-		if ns.suspend_out != nil && len(n.to_tx) < cap(n.to_tx)/2 {
-			out := ns.suspend_out
-			ns.suspend_out = nil
+		if out := ns.suspend_saved_out; out != nil && len(n.to_tx) < cap(n.to_tx)/2 {
+			ns.suspend_saved_out = nil
 			n.n.Resume(out)
 		}
 	}

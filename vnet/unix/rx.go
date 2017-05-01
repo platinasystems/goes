@@ -102,9 +102,9 @@ func (n *rx_node) init(v *vnet.Vnet) {
 	v.RegisterInputNode(n, "unix-rx")
 	n.buffer_pool = vnet.DefaultBufferPool
 	v.AddBufferPool(n.buffer_pool)
-	n.pv_pool = make(chan *rx_packet_vector, vnet.MaxVectorLen)
-	n.rv_pool = make(chan *rx_ref_vector, vnet.MaxVectorLen)
-	n.rv_input = make(chan *rx_ref_vector, vnet.MaxVectorLen)
+	n.pv_pool = make(chan *rx_packet_vector, 2*vnet.MaxVectorLen)
+	n.rv_pool = make(chan *rx_ref_vector, 2*vnet.MaxVectorLen)
+	n.rv_input = make(chan *rx_ref_vector, 2*vnet.MaxVectorLen)
 	n.max_buffers_per_packet = max_rx_packet_size / n.buffer_pool.Size
 	if max_rx_packet_size%n.buffer_pool.Size != 0 {
 		n.max_buffers_per_packet++
