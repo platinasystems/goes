@@ -95,8 +95,10 @@ func (byName ByName) Complete(prefix string) (ss []string) {
 }
 
 // Main runs the arg[0] command in the current context.
-// When run w/o args this uses os.Args and exits instead of returns on error.
-// Use cli to iterate command input.
+// When run w/o args, this uses os.Args.
+//
+// If len(args) == 1 and args[0] doesn't match a mapped command, this will run
+// the "cli".
 //
 // If the args has "-h", "-help", or "--help", this runs
 // ByName["help"].Main(args...) to print text.
@@ -108,27 +110,34 @@ func (byName ByName) Complete(prefix string) (ss []string) {
 // the daemon from the tty and initiating process.
 func (byName ByName) Main(args ...string) error {
 	if len(args) == 0 {
-		args = os.Args
-		switch len(args) {
-		case 0:
+		if len(os.Args) == 0 {
 			return nil
-		case 1:
-			if filepath.Base(args[0]) == prog.Base() {
-				args = []string{"cli"}
-			}
 		}
+		args = os.Args
 	}
 
 	if _, found := byName[args[0]]; !found {
-		if args[0] == prog.Install && len(args) > 2 {
-			buf, err := ioutil.ReadFile(args[1])
-			if err == nil && utf8.Valid(buf) {
-				args = []string{"source", args[1]}
+		base := filepath.Base(args[0])
+		if _, found = byName[base]; found {
+			// e.g. ./COMMAND [ARGS]...
+			args[0] = base
+		} else if len(args) > 1 {
+			if args[0] == prog.Install {
+				buf, err := ioutil.ReadFile(args[1])
+				if err == nil && utf8.Valid(buf) {
+					// e.g. /usr/bin/goes SCRIPT
+					args = []string{"source", args[1]}
+				} else {
+					// e.g. /usr/bin/goes COMMAND [ARGS]...
+					args = args[1:]
+				}
 			} else {
+				// e.g. ./goes COMMAND [ARGS]...
 				args = args[1:]
 			}
 		} else {
-			args = args[1:]
+			// e.g. ./goes
+			args = []string{"cli"}
 		}
 	}
 
