@@ -342,35 +342,53 @@ func (ns *net_namespace) String() (s string) {
 	return
 }
 
-type showNsMsg struct {
+type showNsLine struct {
 	Interface string `format:"%-30s"`
 	Namespace string `format:"%s" align:"center"`
 	NSID      string `format:"%s" align:"center"`
+	si        vnet.Si
 }
-type showNsMsgs []showNsMsg
+type showNsLines struct {
+	lines []showNsLine
+	v     *vnet.Vnet
+}
 
-func (ns showNsMsgs) Less(i, j int) bool {
-	if ns[i].Namespace == ns[j].Namespace {
-		return ns[i].Interface < ns[j].Interface
+func (ns showNsLines) Less(i, j int) bool {
+	ni, nj := &ns.lines[i], &ns.lines[j]
+	if ni.Namespace == nj.Namespace {
+		if ni.si == vnet.SiNil {
+			return false
+		}
+		if nj.si == vnet.SiNil {
+			return true
+		}
+		ifi, ifj := ns.v.SwIf(ni.si), ns.v.SwIf(nj.si)
+		return ns.v.SwLessThan(ifi, ifj)
 	}
-	return ns[i].Namespace < ns[j].Namespace
+	return ni.Namespace < nj.Namespace
 }
-func (ns showNsMsgs) Swap(i, j int) { ns[i], ns[j] = ns[j], ns[i] }
-func (ns showNsMsgs) Len() int      { return len(ns) }
+func (ns showNsLines) Swap(i, j int) { ns.lines[i], ns.lines[j] = ns.lines[j], ns.lines[i] }
+func (ns showNsLines) Len() int      { return len(ns.lines) }
 
 func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
-	ms := showNsMsgs{}
+	ms := showNsLines{v: m.m.v}
 	for _, ns := range m.namespace_by_name {
 		for _, intf := range ns.interface_by_index {
-			x := showNsMsg{Namespace: ns.name, Interface: intf.name}
+			x := showNsLine{Namespace: ns.name, Interface: intf.name, si: vnet.SiNil}
+			if intf.tuntap != nil {
+				x.si = intf.tuntap.si
+			}
 			if ns.nsid != -1 {
 				x.NSID = fmt.Sprintf("%d", ns.nsid)
 			}
-			ms = append(ms, x)
+			ms.lines = append(ms.lines, x)
 		}
 	}
 	sort.Sort(ms)
-	elib.TabulateWrite(w, ms)
+	colMap := map[string]bool{
+		"si": false,
+	}
+	elib.Tabulate(ms.lines).WriteCols(w, colMap)
 	return
 }
 
