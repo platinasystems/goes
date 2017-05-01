@@ -167,7 +167,6 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 	if si, ok := ns.si_by_ifindex[uint32(ifindex)]; ok {
 		ref.Si = si
 		v.nexts[i] = rx_node_next(rx.next_by_si[si])
-		vnet.IfRxCounter.Add(rx.Vnet.GetIfThread(0), si, 1, n_bytes_in_packet)
 	} else {
 		ref.Si = vnet.SiNil
 		v.nexts[i] = rx_node_next_error
@@ -277,6 +276,7 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 			break
 		}
 		r := &rv.refs[i]
+		vnet.IfRxCounter.Add(rx.Vnet.GetIfThread(0), r.Si, 1, uint(rv.lens[i]))
 		out.Refs[l] = *r
 		out.SetLen(rx.Vnet, l+1)
 		n_done++
