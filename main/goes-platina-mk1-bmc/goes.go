@@ -6,7 +6,6 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/apropos"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -14,7 +13,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/chmod"
 	"github.com/platinasystems/go/goes/cmd/cli"
 	"github.com/platinasystems/go/goes/cmd/cmdline"
-	"github.com/platinasystems/go/goes/cmd/complete"
 	"github.com/platinasystems/go/goes/cmd/cp"
 	"github.com/platinasystems/go/goes/cmd/daemons"
 	"github.com/platinasystems/go/goes/cmd/dmesg"
@@ -26,6 +24,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/export"
 	"github.com/platinasystems/go/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
+	"github.com/platinasystems/go/goes/cmd/flags"
 	"github.com/platinasystems/go/goes/cmd/fspd"
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
@@ -45,12 +44,10 @@ import (
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
 	"github.com/platinasystems/go/goes/cmd/kill"
-	"github.com/platinasystems/go/goes/cmd/license"
 	"github.com/platinasystems/go/goes/cmd/ln"
 	"github.com/platinasystems/go/goes/cmd/log"
 	"github.com/platinasystems/go/goes/cmd/ls"
 	"github.com/platinasystems/go/goes/cmd/lsmod"
-	"github.com/platinasystems/go/goes/cmd/man"
 	"github.com/platinasystems/go/goes/cmd/mkdir"
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
@@ -58,7 +55,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/nld"
 	"github.com/platinasystems/go/goes/cmd/nldump"
 	"github.com/platinasystems/go/goes/cmd/nsid"
-	"github.com/platinasystems/go/goes/cmd/patents"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
@@ -86,26 +82,20 @@ import (
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
-	"github.com/platinasystems/go/goes/cmd/usage"
-	"github.com/platinasystems/go/goes/cmd/version"
 	"github.com/platinasystems/go/goes/cmd/w83795d"
 	"github.com/platinasystems/go/goes/cmd/watchdog"
 	"github.com/platinasystems/go/goes/cmd/wget"
 )
 
-var Goes goes.ByName
-
-func init() {
-	Goes = make(goes.ByName)
-	Goes.Plot(apropos.New(),
-		bang.New(),
+func Goes() goes.ByName {
+	m := goes.New(flags.New()...)
+	m.Plot(bang.New(),
 		boot.New(),
 		cat.New(),
 		cd.New(),
 		chmod.New(),
 		cli.New(),
 		cmdline.New(),
-		complete.New(),
 		cp.New(),
 		daemons.New(),
 		diag.New(),
@@ -138,12 +128,10 @@ func init() {
 		keys.New(),
 		kill.New(),
 		ledgpiod.New(),
-		license.New(),
 		ln.New(),
 		log.New(),
 		ls.New(),
 		lsmod.New(),
-		man.New(),
 		mkdir.New(),
 		mknod.New(),
 		mount.New(),
@@ -151,7 +139,6 @@ func init() {
 		nld.New(),
 		nldump.New(),
 		nsid.New(),
-		patents.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),
@@ -177,10 +164,9 @@ func init() {
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),
-		usage.New(),
-		version.New(),
 		w83795d.New(),
 		watchdog.New(),
 		wget.New(),
 	)
+	return m
 }
