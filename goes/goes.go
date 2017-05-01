@@ -82,6 +82,12 @@ type manner interface {
 	Man() lang.Alt
 }
 
+func New(cmd ...Cmd) ByName {
+	m := make(ByName)
+	m.Plot(cmd...)
+	return m
+}
+
 func (byName ByName) Complete(prefix string) (ss []string) {
 	for k, g := range byName {
 		if strings.HasPrefix(k, prefix) && g.Kind.IsInteractive() {
