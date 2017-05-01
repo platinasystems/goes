@@ -5,7 +5,6 @@
 package unix
 
 import (
-	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
@@ -90,8 +89,6 @@ type netlink_main struct {
 	msg_stats                 struct {
 		ignored, handled msg_counts
 	}
-	fibIndexByNsid map[int]ip.FibIndex
-	fibIndexPool   elib.Pool
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
@@ -334,21 +331,10 @@ func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
 	return
 }
 
-func (m *Main) fibIndexForNsid(nsid int) (fi ip.FibIndex) {
-	if m.fibIndexByNsid == nil {
-		m.fibIndexByNsid = make(map[int]ip.FibIndex)
-	}
-	if _, ok := m.fibIndexByNsid[nsid]; !ok {
-		// Use pool so that nsid's may be deleted.
-		fi = ip.FibIndex(m.fibIndexPool.GetIndex(uint(len(m.fibIndexByNsid))))
-	}
-	m.fibIndexByNsid[nsid] = fi
-	return
-}
-
-func (m *Main) validateFibIndexForNsid(si vnet.Si, nsid int) {
+// Take fib index from namespace index.  So, default namespace gets fib index 0, the default table.
+func (m *Main) validateFibIndexForNamespace(si vnet.Si, ns *net_namespace) {
 	m4 := ip4.GetMain(m.v)
-	m4.SetFibIndexForSi(si, m.fibIndexForNsid(nsid))
+	m4.SetFibIndexForSi(si, ip.FibIndex(ns.index))
 }
 
 func (e *netlinkEvent) EventAction() {
@@ -370,7 +356,6 @@ func (e *netlinkEvent) EventAction() {
 				di.isAdminUp = isUp
 				di.addDelDummyPuntPrefixes(e.m, !isUp)
 			} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
-				e.m.validateFibIndexForNsid(si, *msg.Nsid())
 				err = si.SetAdminUp(vn, isUp)
 			}
 		case *netlink.IfAddrMessage:
