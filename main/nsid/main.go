@@ -6,15 +6,23 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
-	"github.com/platinasystems/go/internal/netlink/nsid"
+	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd/flags"
+	"github.com/platinasystems/go/goes/cmd/nsid"
 )
 
+var Exit = os.Exit
+var Stderr io.Writer = os.Stderr
+
 func main() {
-	err := nsid.Main(os.Args[1:]...)
+	m := goes.New(flags.New()...)
+	m.Plot(nsid.New())
+	err := m.Main()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		Exit(1)
 	}
 }
