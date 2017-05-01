@@ -6,15 +6,23 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
-	"github.com/platinasystems/go/internal/netlink/nlcounters"
+	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd/flags"
+	"github.com/platinasystems/go/goes/cmd/nlcounters"
 )
 
+var Exit = os.Exit
+var Stderr io.Writer = os.Stderr
+
 func main() {
-	err := nlcounters.Main(os.Args[1:]...)
+	m := goes.New(flags.New()...)
+	m.Plot(nlcounters.New())
+	err := m.Main()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(Stderr, err)
+		Exit(1)
 	}
 }
