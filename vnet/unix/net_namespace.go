@@ -17,6 +17,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -164,6 +165,8 @@ type net_namespace struct {
 
 	nsid int
 
+	mu sync.Mutex
+
 	tuntap_interface_by_ifindex map[uint32]*tuntap_interface
 	dummy_interface_by_ifindex  map[uint32]*dummy_interface
 	si_by_ifindex               map[uint32]vnet.Si
@@ -304,6 +307,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 					m.interface_by_si = make(map[vnet.Si]*net_namespace_interface)
 				}
 				m.interface_by_si[tif.si] = intf
+				intf.tuntap = tif
 				// Interface moved to a new namespace?
 				if tif.namespace != ns {
 					tif.add_del_namespace(m, ns, is_del)
@@ -356,11 +360,8 @@ type showNsLines struct {
 func (ns showNsLines) Less(i, j int) bool {
 	ni, nj := &ns.lines[i], &ns.lines[j]
 	if ni.Namespace == nj.Namespace {
-		if ni.si == vnet.SiNil {
-			return false
-		}
-		if nj.si == vnet.SiNil {
-			return true
+		if ni.si == vnet.SiNil || nj.si == vnet.SiNil {
+			return ni.Interface < nj.Interface
 		}
 		ifi, ifj := ns.v.SwIf(ni.si), ns.v.SwIf(nj.si)
 		return ns.v.SwLessThan(ifi, ifj)

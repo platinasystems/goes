@@ -93,7 +93,9 @@ type netlink_main struct {
 
 // Ignore non-tuntap interfaces (e.g. eth0).
 func (ns *net_namespace) getTuntapInterface(ifindex uint32) (intf *tuntap_interface, ok bool) {
+	ns.mu.Lock()
 	intf, ok = ns.tuntap_interface_by_ifindex[ifindex]
+	ns.mu.Unlock()
 	return
 }
 

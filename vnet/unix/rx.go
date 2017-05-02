@@ -276,7 +276,9 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 			break
 		}
 		r := &rv.refs[i]
-		vnet.IfRxCounter.Add(rx.Vnet.GetIfThread(0), r.Si, 1, uint(rv.lens[i]))
+		if r.Si != vnet.SiNil {
+			vnet.IfRxCounter.Add(rx.Vnet.GetIfThread(0), r.Si, 1, uint(rv.lens[i]))
+		}
 		out.Refs[l] = *r
 		out.SetLen(rx.Vnet, l+1)
 		n_done++

@@ -390,10 +390,12 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 			return
 		}
 		intf.ifindex = uint32(r.i)
+		ns.mu.Lock()
 		if ns.tuntap_interface_by_ifindex == nil {
 			ns.tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
 		}
 		ns.tuntap_interface_by_ifindex[intf.ifindex] = intf
+		ns.mu.Unlock()
 	}
 
 	intf.bind()
