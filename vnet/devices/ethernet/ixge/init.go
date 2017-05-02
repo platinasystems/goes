@@ -7,6 +7,7 @@ package ixge
 import (
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/hw/pci"
+	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	vnetpci "github.com/platinasystems/go/vnet/devices/bus/pci"
 
@@ -16,6 +17,7 @@ import (
 type main struct {
 	vnet.Package
 	vnet.InterfaceCounterNames
+	Config
 	devs []dever
 }
 
@@ -204,7 +206,7 @@ func (d *dev) software_firmware_sync_release(sw_mask_0_4, sw_mask_11_12 reg) {
 	d.regs.software_firmware_sync.andnot(d, sw_mask)
 }
 
-func Init(v *vnet.Vnet) {
+func Init(v *vnet.Vnet, c ...Config) {
 	m := &main{}
 	devs := []pci.VendorDeviceID{}
 	for id, _ := range dev_id_names {
@@ -215,10 +217,29 @@ func Init(v *vnet.Vnet) {
 		panic(err)
 	}
 
+	if len(c) > 0 {
+		m.Config = c[0]
+	}
+
 	vnetpci.Init(v)
 	v.AddPackage("ixge", m)
 	m.Package.DependsOn("tuntap")
 	m.Package.DependedOnBy("pci-discovery")
 
 	m.cliInit()
+}
+
+type Config struct {
+	DisableUnix bool
+}
+
+func (m *main) Configure(in *parse.Input) {
+	for !in.End() {
+		switch {
+		case in.Parse("no-unix"):
+			m.DisableUnix = true
+		default:
+			panic(parse.ErrInput)
+		}
+	}
 }
