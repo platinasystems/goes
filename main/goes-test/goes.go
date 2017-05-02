@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -22,7 +23,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
-	"github.com/platinasystems/go/goes/cmd/flags"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
 	"github.com/platinasystems/go/goes/cmd/hexists"
@@ -81,8 +81,7 @@ import (
 )
 
 func Goes() goes.ByName {
-	m := goes.New(flags.New()...)
-	m.Plot(
+	return cmd.New(
 		bang.New(),
 		boot.New(),
 		cat.New(),
@@ -155,5 +154,4 @@ func Goes() goes.ByName {
 		uptimed.New(),
 		wget.New(),
 	)
-	return m
 }

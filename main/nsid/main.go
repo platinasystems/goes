@@ -9,8 +9,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/flags"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/nsid"
 )
 
@@ -18,9 +17,7 @@ var Exit = os.Exit
 var Stderr io.Writer = os.Stderr
 
 func main() {
-	m := goes.New(flags.New()...)
-	m.Plot(nsid.New())
-	err := m.Main()
+	err := cmd.New(nsid.New()).Main()
 	if err != nil {
 		fmt.Fprintln(Stderr, err)
 		Exit(1)

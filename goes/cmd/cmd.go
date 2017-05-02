@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package flags
+package cmd
 
 import (
 	"github.com/platinasystems/go/goes"
@@ -16,10 +16,10 @@ import (
 	"github.com/platinasystems/go/goes/cmd/version"
 )
 
-// Returns these flag initiated commands:
+// Returns a goes.ByName with the given plus these flag initiated commands:
 //	apropos, complete, help, license, man, patents, usage, version
-func New(c ...goes.Cmd) []goes.Cmd {
-	return []goes.Cmd{
+func New(cmd ...goes.Cmd) goes.ByName {
+	return goes.New().Plot(
 		apropos.New(),
 		complete.New(),
 		help.New(),
@@ -28,5 +28,5 @@ func New(c ...goes.Cmd) []goes.Cmd {
 		patents.New(),
 		usage.New(),
 		version.New(),
-	}
+	).Plot(cmd...)
 }

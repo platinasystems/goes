@@ -83,9 +83,7 @@ type manner interface {
 }
 
 func New(cmd ...Cmd) ByName {
-	m := make(ByName)
-	m.Plot(cmd...)
-	return m
+	return make(ByName).Plot(cmd...)
 }
 
 func (byName ByName) Complete(prefix string) (ss []string) {
@@ -234,7 +232,7 @@ func (byName ByName) pseudonym(args []string) (string, []string) {
 }
 
 // Plot commands on map.
-func (byName ByName) Plot(cmds ...Cmd) {
+func (byName ByName) Plot(cmds ...Cmd) ByName {
 	for _, v := range cmds {
 		if method, found := v.(goeser); found {
 			g := method.goes()
@@ -277,6 +275,7 @@ func (byName ByName) Plot(cmds ...Cmd) {
 		}
 		byName[g.Name] = g
 	}
+	return byName
 }
 
 func (g *Goes) goes() *Goes { return g }
