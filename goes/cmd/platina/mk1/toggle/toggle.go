@@ -5,14 +5,11 @@
 package toggle
 
 import (
-	"net/rpc"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd/i2c"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
-	ii2c "github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -42,32 +39,7 @@ func (cmd) Man() lang.Alt     { return man }
 func (cmd) String() string    { return Name }
 func (cmd) Usage() string     { return Usage }
 
-var clientA *rpc.Client
-var dialed int = 0
-var j [MAXOPS]I
-var s [MAXOPS]R
-var i = I{false, ii2c.RW(0), 0, 0, b, 0, 0, 0}
-var x int
-var b = [34]byte{0}
-
-const MAXOPS = 30
-
-var sd ii2c.SMBusData
-
-type I struct {
-	InUse     bool
-	RW        ii2c.RW
-	RegOffset uint8
-	BusSize   ii2c.SMBusSize
-	Data      [34]byte
-	Bus       int
-	Addr      int
-	Delay     int
-}
-type R struct {
-	D [34]byte
-	E error
-}
+var sd i2c.SMBusData
 
 func (cmd) Main(args ...string) error {
 
@@ -87,7 +59,7 @@ func (cmd) Main(args ...string) error {
 
 		//i2c STOP
 		sd[0] = 0
-		j[0] = I{true, ii2c.Write, 0, 0, sd, int(0x99), int(1), 0}
+		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(1), 0}
 		err := DoI2cRpc()
 		if err != nil {
 			return err
@@ -97,10 +69,10 @@ func (cmd) Main(args ...string) error {
 			pin.SetValue(true)
 		}
 		time.Sleep(10 * time.Millisecond)
-		x, _ := i2c.ReadByte(0, 0x74, 2)
-		i2c.WriteByte(0, 0x74, 0x2, x|0x20)
-		x, _ = i2c.ReadByte(0, 0x74, 6)
-		i2c.WriteByte(0, 0x74, 0x6, x|0x20)
+		x, _ := ReadByte(0, 0x74, 2)
+		WriteByte(0, 0x74, 0x2, x|0x20)
+		x, _ = ReadByte(0, 0x74, 6)
+		WriteByte(0, 0x74, 0x6, x|0x20)
 		if found {
 			pin.SetValue(false)
 		}
@@ -112,46 +84,46 @@ func (cmd) Main(args ...string) error {
 
 		//i2c START
 		sd[0] = 0
-		j[0] = I{true, ii2c.Write, 0, 0, sd, int(0x99), int(0), 0}
+		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
 		err = DoI2cRpc()
 		if err != nil {
 			return err
 		}
 	} else {
-		x, _ := i2c.ReadByte(0, 0x74, 2)
-		i2c.WriteByte(0, 0x74, 0x2, x|0x20)
-		x, _ = i2c.ReadByte(0, 0x74, 6)
-		i2c.WriteByte(0, 0x74, 0x6, x^0x20)
+		x, _ := ReadByte(0, 0x74, 2)
+		WriteByte(0, 0x74, 0x2, x|0x20)
+		x, _ = ReadByte(0, 0x74, 6)
+		WriteByte(0, 0x74, 0x6, x^0x20)
 	}
 	return nil
 }
 
-func clearJ() {
-	x = 0
-	for k := 0; k < MAXOPS; k++ {
-		j[k] = i
+func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
+	var (
+		sd i2c.SMBusData
+	)
+	rw := i2c.Read
+	op := i2c.ByteData
+	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
+	err := DoI2cRpc()
+	if err != nil {
+		return 0, err
 	}
+	return s[0].D[0], nil
 }
 
-func DoI2cRpc() error {
-	if dialed == 0 {
-		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")
-		if err != nil {
-			log.Print("dialing:", err)
-			return err
-		}
-		clientA = client
-		dialed = 1
-		time.Sleep(time.Millisecond * time.Duration(50))
-	}
-	err := clientA.Call("I2cReq.ReadWrite", &j, &s)
+func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
+	var (
+		sd i2c.SMBusData
+	)
+	rw := i2c.Write
+	op := i2c.ByteData
+	sd[0] = v
+	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
+	err := DoI2cRpc()
 	if err != nil {
-		log.Print("i2cReq error:", err)
-		dialed = 0
-		clientA.Close()
 		return err
 	}
-	clearJ()
 	return nil
 }
 
