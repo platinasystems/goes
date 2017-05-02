@@ -147,6 +147,7 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 				pv = nil
 			}
 		} else {
+			out.BufferPool.FreeRefs(r, 1, true)
 			n_unknown++
 		}
 	}
