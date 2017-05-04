@@ -35,8 +35,10 @@ pipeline {
 	stage('Build') {
 	    steps {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
-		    env.PATH = "/usr/local/go/bin/:${env.PATH}"
-		    env.GOPATH = "/home/jenkins/workspace/go"
+		    environnent {
+			env.PATH = "/usr/local/go/bin/:${env.PATH}"
+			env.GOPATH = "/home/jenkins/workspace/go"
+		    }
 		    echo "Building goes..."
 		    sh 'make -B goes-platina-mk1'
 		}
