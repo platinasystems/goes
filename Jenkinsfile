@@ -34,8 +34,8 @@ pipeline {
 
 	stage('Build') {
 	    environment {
-		env.PATH = "/usr/local/go/bin/:${env.PATH}"
-		env.GOPATH = "/home/jenkins/workspace/go"
+		env.PATH = '/usr/local/go/bin/:${env.PATH}'
+		env.GOPATH = '/home/jenkins/workspace/go'
 	    }
 	    steps {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
