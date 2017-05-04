@@ -23,11 +23,10 @@ pipeline {
 			    credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
 			    branch: 'master'
 			])
-
-			sh('rm -rf ./vnet/devices/ethernet/switch/fe1/')
-			sh('mkdir -p ./vnet/devices/ethernet/switch/fe1/')
-			sh('cp -r ./CheckoutFe1/* ./vnet/devices/ethernet/switch/fe1')
 		    }
+		    sh('rm -rf ./vnet/devices/ethernet/switch/fe1/')
+		    sh('mkdir -p ./vnet/devices/ethernet/switch/fe1/')
+		    sh('cp -r ./CheckoutFe1/* ./vnet/devices/ethernet/switch/fe1')
 		}
 	    }
 	}
