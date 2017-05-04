@@ -19,10 +19,10 @@ import (
 	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
-	"github.com/platinasystems/go/internal/cmdline"
-	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/cmdline"
+	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/group"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/redis"
@@ -165,7 +165,7 @@ func (cmd *cmd) Main(args ...string) error {
 	}
 
 	cmd.redisd.devs = make(map[string][]*grs.Server)
-	cmd.redisd.sub = make(grs.HashSub)
+	cmd.redisd.sub = make(map[string]*grs.MultiChannelWriter)
 	cmd.redisd.published = make(grs.HashHash)
 	for _, k := range PublishedKeys {
 		cmd.redisd.published[k] = make(grs.HashValue)
@@ -236,7 +236,7 @@ func (cmd *cmd) gopub() {
 	const sep = ": "
 	var key, field string
 	var fv, value []byte
-	b := make([]byte, 4096)
+	b := make([]byte, os.Getpagesize())
 	for {
 		n, err := cmd.pubconn.Read(b)
 		if err != nil {
@@ -259,7 +259,6 @@ func (cmd *cmd) gopub() {
 			continue
 		}
 		cmd.redisd.mutex.Lock()
-		cws := cmd.redisd.sub[key]
 		hv, found := cmd.redisd.published[key]
 		if !found {
 			hv = make(grs.HashValue)
@@ -275,28 +274,33 @@ func (cmd *cmd) gopub() {
 				hv[field] = hv[field][:0]
 			}
 			hv[field] = append(hv[field], value...)
+			if sub, found := cmd.redisd.sub[key]; found {
+				mb := make([]byte, len(fv))
+				copy(mb, fv)
+				msg := make([]interface{}, 3)
+				msg[0] = "message"
+				msg[1] = key
+				msg[2] = mb
+				for i := 0; i < len(sub.Chans); {
+					select {
+					case sub.Chans[i].Channel <- msg:
+						i++
+					default:
+						// cull this subscriber
+						close(sub.Chans[i].Channel)
+						n := len(sub.Chans) - 1
+						if i != n {
+							copy(sub.Chans[i:],
+								sub.Chans[i+1:])
+						}
+						sub.Chans[n] = nil
+						sub.Chans = sub.Chans[:n]
+					}
+				}
+			}
 		}
 		cmd.redisd.flushSubkeyCache(key)
 		cmd.redisd.mutex.Unlock()
-		if len(cws) > 0 {
-			cmd.pubdist(cws, key, fv)
-		}
-	}
-}
-
-func (*cmd) pubdist(cws []*grs.ChannelWriter, key string, fv []byte) {
-	mb := make([]byte, len(fv))
-	copy(mb, fv)
-	msg := []interface{}{
-		"message",
-		key,
-		mb,
-	}
-	for _, cw := range cws {
-		select {
-		case cw.Channel <- msg:
-		default:
-		}
 	}
 }
 
@@ -346,7 +350,7 @@ func (cmd *cmd) pubinit(fieldEqValues ...string) error {
 type Redisd struct {
 	mutex sync.Mutex
 	devs  map[string][]*grs.Server
-	sub   grs.HashSub
+	sub   map[string]*grs.MultiChannelWriter
 
 	reg *reg.Reg
 
@@ -650,13 +654,14 @@ func (redisd *Redisd) Subscribe(channels ...[]byte) (*grs.MultiChannelWriter,
 				key,
 				1,
 			},
-			Channel: make(chan []interface{}, 128),
+			Channel: make(chan []interface{}, 1024),
 		}
-		if redisd.sub[string(key)] == nil {
-			redisd.sub[string(key)] = []*grs.ChannelWriter{cw}
+		if sub := redisd.sub[string(key)]; sub == nil {
+			redisd.sub[string(key)] = &grs.MultiChannelWriter{
+				Chans: []*grs.ChannelWriter{cw},
+			}
 		} else {
-			redisd.sub[string(key)] =
-				append(redisd.sub[string(key)], cw)
+			sub.Chans = append(sub.Chans, cw)
 		}
 		mcw.Chans[i] = cw
 	}
