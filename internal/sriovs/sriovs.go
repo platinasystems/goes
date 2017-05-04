@@ -53,13 +53,16 @@ func (v Virtfns) Less(i, j int) bool {
 	return ni < nj
 }
 
-func (vf Vf) Port() uint    { return uint((vf &^ (Port(1) - 1)) >> 20) }
-func (vf Vf) SubPort() uint { return uint((vf & 0xf0000) >> 16) }
-func (vf Vf) Vlan() uint    { return uint(vf & 0xffff) }
+func (vf Vf) Port() uint    { return uint(vf >> PortShift) }
+func (vf Vf) SubPort() uint { return uint((vf & (Port1 - 1)) >> SubPortShift) }
+func (vf Vf) Vlan() uint    { return uint(vf & (SubPort1 - 1)) }
 
-func Port(u uint) Vf    { return Vf(u << 20) }
-func SubPort(u uint) Vf { return Vf((u & 0xf) << 16) }
-func Vlan(u uint) Vf    { return Vf(u & 0xffff) }
+func (vf Vf) String() string { return VfName(vf.Port(), vf.SubPort()) }
+
+// Machines may customize VfName for 1 based ports
+var VfName = func(port, subport uint) string {
+	return fmt.Sprintf("eth-%d-%d", port, subport)
+}
 
 func Del(vfs [][]Vf) error {
 	pfs, err := getPfs(len(vfs))
@@ -74,7 +77,7 @@ func Del(vfs [][]Vf) error {
 	return err
 }
 
-func New(porto uint, vfs [][]Vf) error {
+func New(vfs [][]Vf) error {
 	numvfs, err := getNumvfs()
 	if err != nil {
 		return err
@@ -125,8 +128,7 @@ func New(porto uint, vfs [][]Vf) error {
 			if err != nil {
 				return err
 			}
-			want := fmt.Sprintf("eth-%d-%d", vf.Port()+porto,
-				vf.SubPort()+porto)
+			want := vf.String()
 			if vfname != want {
 				err = ifset(vfname, "name", want)
 				if err != nil {
