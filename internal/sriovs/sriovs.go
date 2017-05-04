@@ -21,7 +21,7 @@ import (
 
 const DefaultNumvfs = 16
 
-type Mac [6]byte
+type Mac net.HardwareAddr
 type Vf uint
 
 type Pf struct {
@@ -64,6 +64,9 @@ var VfName = func(port, subport uint) string {
 	return fmt.Sprintf("eth-%d-%d", port, subport)
 }
 
+// Machines must customize VfMac to allocate the next HardwareAddr
+var VfMac = func() net.HardwareAddr { panic("FIXME") }
+
 func Del(vfs [][]Vf) error {
 	pfs, err := getPfs(len(vfs))
 	if err != nil {
@@ -86,12 +89,7 @@ func New(vfs [][]Vf) error {
 	if err != nil {
 		return err
 	}
-	totalvfs, err := getTotalvfs(pfs[0].Interface.Name)
-	if err != nil {
-		return err
-	}
 	for pfi, pf := range pfs {
-		var mac Mac
 		var virtfns Virtfns
 
 		if pf.numvfs == numvfs {
@@ -101,9 +99,6 @@ func New(vfs [][]Vf) error {
 		if err = setNumvfs(pf.Name, numvfs); err != nil {
 			return err
 		}
-
-		copy(mac[:], pf.HardwareAddr)
-		mac.Plus(uint(len(pfs) - pfi + (pfi * totalvfs)))
 
 		virtfns, err = pfvirtfns(pf.Name, numvfs)
 		if err != nil {
@@ -118,12 +113,11 @@ func New(vfs [][]Vf) error {
 				continue
 			}
 			vf := vfs[pfi][vfi]
-			err = ifset(pf.Name, "vf", vfi, "mac", mac, "vlan",
+			err = ifset(pf.Name, "vf", vfi, "mac", VfMac(), "vlan",
 				vf.Vlan())
 			if err != nil {
 				return err
 			}
-			mac.Plus(1)
 			vfname, err := getVfname(virtfn)
 			if err != nil {
 				return err
@@ -148,7 +142,7 @@ func New(vfs [][]Vf) error {
 	return err
 }
 
-func (mac *Mac) Plus(u uint) {
+func (mac Mac) Plus(u uint) {
 	base := mac[5]
 	mac[5] += byte(u)
 	if mac[5] < base {
@@ -160,9 +154,11 @@ func (mac *Mac) Plus(u uint) {
 	}
 }
 
-func (mac Mac) String() string {
-	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%2x",
-		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5])
+func (mac Mac) VfMac() net.HardwareAddr {
+	vfmac := make(net.HardwareAddr, len(mac))
+	copy(vfmac[:], mac[:])
+	mac.Plus(1)
+	return vfmac
 }
 
 func getPfs(numpfs int) (Pfs, error) {

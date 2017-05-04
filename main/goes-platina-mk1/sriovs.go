@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/platinasystems/go/internal/sriovs"
 )
@@ -20,5 +21,13 @@ func newSriovs() error {
 			return fmt.Sprintf("eth-%d-%d", port+1, subport+1)
 		}
 	}
+	eth0, err := net.InterfaceByName("eth0")
+	if err != nil {
+		return err
+	}
+	mac := sriovs.Mac(eth0.HardwareAddr)
+	// skip over eth0, eth1, and eth2
+	mac.Plus(3)
+	sriovs.VfMac = mac.VfMac
 	return sriovs.New(vfs)
 }
