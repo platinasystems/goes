@@ -33,11 +33,13 @@ pipeline {
 	}
 
 	stage('Build') {
-	    dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
-		env.PATH = "/usr/local/go/bin/:${env.PATH}"
-		env.GOPATH = "/home/jenkins/workspace/go"
-		echo "Building goes..."
-		sh 'make -B goes-platina-mk1'
+	    steps {
+		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
+		    env.PATH = "/usr/local/go/bin/:${env.PATH}"
+		    env.GOPATH = "/home/jenkins/workspace/go"
+		    echo "Building goes..."
+		    sh 'make -B goes-platina-mk1'
+		}
 	    }
 	}
     }
@@ -55,7 +57,7 @@ pipeline {
 	    mail body: "GOES build error: ${env.BUILD_URL}",
 		from: email_from,
 		replyTo: email_reply_to,
-		subject: 'GOES buildroot BUILD FAILED',
+		subject: 'GOES BUILD FAILED',
 		cc: email_cc,
 		to: email_to
 	}
