@@ -110,7 +110,11 @@ type Socket struct {
 }
 
 func New(groups ...MulticastGroup) (*Socket, error) {
-	return NewWithConfig(SocketConfig{Groups: groups})
+	return NewWithConfig(SocketConfig{
+		Groups: groups,
+
+		DontListenAllNsid: true,
+	})
 }
 
 func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
