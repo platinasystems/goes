@@ -49,7 +49,9 @@ pipeline {
 		subject: 'GOES build ok',
 		cc: email_cc,
 		to: email_to
+	    trigger job: 'buildroot pipeline'
 	}
+
 	failure {
 	    mail body: "GOES build error: ${env.BUILD_URL}",
 		from: email_from,
