@@ -33,7 +33,7 @@ pipeline {
 	}
 
 	stage('Build') {
-	    environnent {
+	    environment {
 		env.PATH = "/usr/local/go/bin/:${env.PATH}"
 		env.GOPATH = "/home/jenkins/workspace/go"
 	    }
