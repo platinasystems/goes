@@ -30,7 +30,7 @@ import (
 
 const (
 	Name    = "ucd9090d"
-	Apropos = "FIXME"
+	Apropos = "ucd9090 power sequencer daemon, publishes to redis"
 	Usage   = "ucd9090d"
 )
 

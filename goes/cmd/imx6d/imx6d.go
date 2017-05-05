@@ -19,7 +19,7 @@ import (
 
 const (
 	Name    = "imx6d"
-	Apropos = "FIXME"
+	Apropos = "ARM CPU temperature daemon, publishes to redis"
 	Usage   = "imx6d"
 )
 
@@ -68,10 +68,6 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	//if err = cmd.update(); err != nil {
-	//	close(cmd.stop)
-	//	return err
-	//}
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {

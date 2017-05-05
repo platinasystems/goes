@@ -21,7 +21,7 @@ import (
 
 const (
 	Name    = "i2cd"
-	Apropos = "FIXME"
+	Apropos = "i2c server daemon"
 	Usage   = "i2cd"
 )
 

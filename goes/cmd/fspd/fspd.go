@@ -30,7 +30,7 @@ import (
 
 const (
 	Name    = "fspd"
-	Apropos = "FIXME"
+	Apropos = "fsp power supply daemon, publishes to redis"
 	Usage   = "fspd"
 )
 

@@ -24,7 +24,7 @@ import (
 
 const (
 	Name    = "fantrayd"
-	Apropos = "FIXME"
+	Apropos = "fantray monitoring daemon, publishes to redis"
 	Usage   = "fantrayd"
 )
 

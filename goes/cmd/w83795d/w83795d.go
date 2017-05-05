@@ -27,7 +27,7 @@ import (
 
 const (
 	Name    = "w83795d"
-	Apropos = "FIXME"
+	Apropos = "w83795 hardware monitoring daemon, publishes to redis"
 	Usage   = "w83795d"
 )
 

@@ -24,7 +24,7 @@ import (
 
 const (
 	Name    = "telnetd"
-	Apropos = "FIXME"
+	Apropos = "telnet server daemon"
 	Usage   = "telnetd"
 )
 

@@ -20,7 +20,7 @@ import (
 
 const (
 	Name    = "qsfp"
-	Apropos = "FIXME"
+	Apropos = "qsfp monitoring daemon, publishes to redis"
 	Usage   = "qsfp"
 )
 
