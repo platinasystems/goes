@@ -29,7 +29,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
-	"github.com/platinasystems/go/goes/cmd/help"
 	"github.com/platinasystems/go/goes/cmd/hexists"
 	"github.com/platinasystems/go/goes/cmd/hget"
 	"github.com/platinasystems/go/goes/cmd/hgetall"
@@ -112,7 +111,6 @@ func Goes() goes.ByName {
 		gpio.New(),
 		hdel.New(),
 		hdelta.New(),
-		help.New(),
 		hexists.New(),
 		hget.New(),
 		hgetall.New(),
