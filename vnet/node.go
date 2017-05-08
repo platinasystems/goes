@@ -133,9 +133,7 @@ func (v *Vnet) RegisterNode(n Noder, format string, args ...interface{}) {
 func (node *Node) Redirect(in *RefIn, out *RefOut, next uint) {
 	o := &out.Outs[next]
 	n := in.InLen()
-	for i := uint(0); i < n; i++ {
-		o.Refs[i] = in.Refs[i]
-	}
+	copy(o.Refs[:n], in.Refs[:n])
 	node.SetOutLen(o, in, n)
 }
 
