@@ -477,13 +477,15 @@ type InterfaceKind int
 
 const (
 	InterfaceKindUnknown = iota
-	InterfaceKindTun
 	InterfaceKindDummy
+	InterfaceKindTun
+	InterfaceKindVeth
 )
 
 var kindMap = map[string]InterfaceKind{
-	"tun":   InterfaceKindTun,
 	"dummy": InterfaceKindDummy,
+	"tun":   InterfaceKindTun,
+	"veth":  InterfaceKindVeth,
 }
 
 func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {

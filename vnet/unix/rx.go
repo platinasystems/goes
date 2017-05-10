@@ -160,7 +160,7 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 	p.alloc_refs(rx, n_refs)
 	ref := p.chain.Done()
 	ref.SetError(&rx.Node, rx_error_non_vnet_interface)
-	if ns.m.m.verbosePackets {
+	if ns.m.m.verbose_packets {
 		i := ns.interface_by_index[uint32(ifindex)]
 		ns.m.m.v.Logf("unix rx ns %s %s: %s\n", ns.name, i.name, ethernet.RefString(&ref))
 	}
@@ -277,7 +277,7 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 		}
 		r := &rv.refs[i]
 		if r.Si != vnet.SiNil {
-			vnet.IfRxCounter.Add(rx.Vnet.GetIfThread(0), r.Si, 1, uint(rv.lens[i]))
+			vnet.IfRxCounter.Add(rx.GetIfThread(), r.Si, 1, uint(rv.lens[i]))
 		}
 		out.Refs[l] = *r
 		out.SetLen(rx.Vnet, l+1)

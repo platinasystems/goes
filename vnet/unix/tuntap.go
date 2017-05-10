@@ -9,7 +9,6 @@ package unix
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/iomux"
-	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
@@ -25,18 +24,20 @@ type tuntap_interface struct {
 	// Namespace this interface is currently in.
 	namespace *net_namespace
 	// Raw socket bound to this interface used for provisioning.
-	provision_fd               int
-	dev_net_tun_fd             int
-	iomux.File                 // /dev/net/tun fd for this interface.
-	hi                         vnet.Hi
-	si                         vnet.Si
-	name                       ifreq_name
-	ifindex                    uint32 // linux interface index
+	provision_fd   int
+	dev_net_tun_fd int
+	iomux.File     // /dev/net/tun fd for this interface.
+	hi             vnet.Hi
+	si             vnet.Si
+	name           ifreq_name
+	ifindex        uint32 // linux interface index
+
 	flags                      iff_flag
 	set_flags_at_first_up_down bool
-	mtuBytes                   uint
-	mtuBuffers                 uint
 	operState                  netlink.IfOperState
+
+	mtuBytes   uint
+	mtuBuffers uint
 }
 
 //go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
@@ -61,10 +62,10 @@ func (i *tuntap_interface) setMtu(m *Main, mtu uint) {
 
 func AddExternalInterface(v *vnet.Vnet, ifIndex int, si vnet.Si) {
 	m := GetMain(v)
-	if m.siByIfIndex == nil {
-		m.siByIfIndex = make(map[int]vnet.Si)
+	if m.externalSiByIfIndex == nil {
+		m.externalSiByIfIndex = make(map[int]vnet.Si)
 	}
-	m.siByIfIndex[ifIndex] = si
+	m.externalSiByIfIndex[ifIndex] = si
 }
 
 func (i *tuntap_interface) close() {
@@ -96,7 +97,7 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 	}
 }
 
-type tuntapMain struct {
+type tuntap_main struct {
 	// Selects whether we create tun or tap interfaces.
 	isTun bool
 
@@ -108,7 +109,7 @@ type tuntapMain struct {
 	bufferPool *vnet.BufferPool
 }
 
-func (m *tuntapMain) Init(v *vnet.Vnet) {
+func (m *tuntap_main) Init(v *vnet.Vnet) {
 	m.bufferPool = vnet.DefaultBufferPool
 	v.AddBufferPool(m.bufferPool)
 }
@@ -544,22 +545,4 @@ func (m *Main) Init() (err error) {
 	m.v.RegisterSwIfAdminUpDownHook(m.SwIfAdminUpDown)
 	m.v.RegisterHwIfLinkUpDownHook(m.HwIfLinkUpDown)
 	return
-}
-
-func (m *Main) Configure(in *parse.Input) {
-	for !in.End() {
-		switch {
-		case in.Parse("mtu %d", &m.mtuBytes):
-		case in.Parse("tap"):
-			m.isTun = false
-		case in.Parse("tun"):
-			m.isTun = true
-		case in.Parse("verbose-packets"):
-			m.verbosePackets = true
-		case in.Parse("verbose-netlink"):
-			m.verboseNetlink++
-		default:
-			panic(parse.ErrInput)
-		}
-	}
 }

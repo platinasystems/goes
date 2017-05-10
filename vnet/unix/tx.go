@@ -211,7 +211,7 @@ func (ns *net_namespace) WriteReady() (err error) {
 		err = fmt.Errorf("sendmmsg: %s", errno)
 		return
 	default:
-		if n.n.m.m.verbosePackets {
+		if n.n.m.m.verbose_packets {
 			for i := 0; i < n_packets; i++ {
 				r := &pv.r[i]
 				intf := ns.interface_by_index[pv.p[i].ifindex]

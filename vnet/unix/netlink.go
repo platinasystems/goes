@@ -184,7 +184,7 @@ func (m *Main) addMsg(ns *net_namespace, msg netlink.Message) {
 		e.msgs = append(e.msgs, msg)
 	} else {
 		m.msg_stats.ignored.count(msg)
-		if m.verboseNetlink > 1 {
+		if m.verbose_netlink > 1 {
 			m.v.Logf("%s: netlink ignore %s\n", e.ns, msg)
 		}
 		// Done with message.
@@ -345,7 +345,7 @@ func (e *netlinkEvent) EventAction() {
 	known := false
 	for imsg, msg := range e.msgs {
 		isLastInEvent := imsg+1 == len(e.msgs)
-		if e.m.verboseNetlink > 0 {
+		if e.m.verbose_netlink > 0 {
 			e.m.v.Logf("%s: netlink %s\n", e.ns, msg)
 		}
 		switch v := msg.(type) {

@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -93,16 +94,14 @@ func (m *netlink_main) namespace_init() (err error) {
 
 	// Setup initial namespaces.
 	m.read_dir(netnsDir, m.watch_namespace_add_del)
-	m.n_initial_namespace = uint(len(nm.namespace_by_name))
+	m.n_namespace_learned_at_init = uint32(len(nm.namespace_by_name))
 	return
 }
 
 // Called when initial netlink dump via netlink.Listen is done.
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
-	nm.n_initial_namespace_done++
-	if nm.n_initial_namespace_done == nm.n_initial_namespace {
-		nm.n_initial_namespace_done = ^uint(0) // only happens once
+	if atomic.AddUint32(&nm.n_netlink_dump_done, 1) == nm.n_namespace_learned_at_init {
 		err = m.netlink_dump_done_for_all_namespaces()
 	}
 	return
@@ -187,16 +186,16 @@ type net_namespace struct {
 //go:generate gentemplate -d Package=unix -id net_namespace -d PoolType=net_namespace_pool -d Type=*net_namespace -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
 
 type net_namespace_main struct {
-	m                        *Main
-	default_namespace        net_namespace
-	namespace_by_name        map[string]*net_namespace
-	tuntap_interface_by_name map[string]*tuntap_interface
-	n_initial_namespace_done uint
-	n_initial_namespace      uint
-	interface_by_si          map[vnet.Si]*net_namespace_interface
-	namespace_pool           net_namespace_pool
-	rx_node                  rx_node
-	tx_node                  tx_node
+	m                           *Main
+	default_namespace           net_namespace
+	namespace_by_name           map[string]*net_namespace
+	tuntap_interface_by_name    map[string]*tuntap_interface
+	n_netlink_dump_done         uint32
+	n_namespace_learned_at_init uint32
+	interface_by_si             map[vnet.Si]*net_namespace_interface
+	namespace_pool              net_namespace_pool
+	rx_node                     rx_node
+	tx_node                     tx_node
 }
 
 func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {

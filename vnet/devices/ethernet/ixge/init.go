@@ -223,7 +223,7 @@ func Init(v *vnet.Vnet, c ...Config) {
 
 	vnetpci.Init(v)
 	v.AddPackage("ixge", m)
-	m.Package.DependsOn("tuntap")
+	m.Package.DependsOn("unix")
 	m.Package.DependedOnBy("pci-discovery")
 
 	m.cliInit()
