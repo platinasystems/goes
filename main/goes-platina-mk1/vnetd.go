@@ -5,13 +5,11 @@
 package main
 
 import (
+	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
-	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -26,11 +24,6 @@ func init() {
 
 		vnetd.UnixInterfacesOnly = !have_numvfs
 		vnetd.GdbWait = gdbwait
-
-		err = firmware.Extract(prog.Name())
-		if err != nil {
-			return err
-		}
 
 		// Base packages.
 		ethernet.Init(v)

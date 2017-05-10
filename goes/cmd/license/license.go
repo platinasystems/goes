@@ -6,9 +6,9 @@ package license
 
 import (
 	"fmt"
-	"sync"
+	"strings"
 
-	"github.com/platinasystems/go/copyright"
+	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
 )
@@ -19,12 +19,7 @@ const (
 	Usage   = "license"
 )
 
-var (
-	Init = func() {}
-	once sync.Once
-	// Some machines may have additional licenses.
-	Others []Other
-)
+var Packages = func() []map[string]string { return []map[string]string{} }
 
 type Interface interface {
 	Apropos() lang.Alt
@@ -35,10 +30,6 @@ type Interface interface {
 
 func New() Interface { return cmd{} }
 
-type Other struct {
-	Name, Text string
-}
-
 type cmd struct{}
 
 func (cmd) Apropos() lang.Alt { return apropos }
@@ -46,28 +37,21 @@ func (cmd) Apropos() lang.Alt { return apropos }
 func (cmd) Kind() goes.Kind { return goes.DontFork }
 
 func (cmd) Main(args ...string) error {
-	once.Do(Init)
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-	prettyprint("github.com/platinasystems/go", copyright.License)
-	for _, l := range Others {
-		fmt.Print("\n\n")
-		prettyprint(l.Name, l.Text)
+	for _, m := range append([]map[string]string{Package}, Packages()...) {
+		if license, found := m["license"]; found {
+			fmt.Print(m["importpath"], ":\n    ",
+				strings.Replace(license, "\n", "\n    ", -1),
+				"\n")
+		}
 	}
 	return nil
 }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Usage }
-
-func prettyprint(title, text string) {
-	fmt.Println(title)
-	for _ = range title {
-		fmt.Print("=")
-	}
-	fmt.Print("\n\n", text, "\n")
-}
 
 var apropos = lang.Alt{
 	lang.EnUS: Apropos,

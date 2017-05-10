@@ -7,9 +7,9 @@ package version
 import (
 	"fmt"
 
+	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
-	. "github.com/platinasystems/go/version"
 )
 
 const (
@@ -17,6 +17,8 @@ const (
 	Apropos = "print HEAD of source"
 	Usage   = "version"
 )
+
+var Packages = func() []map[string]string { return []map[string]string{} }
 
 type Interface interface {
 	Apropos() lang.Alt
@@ -38,7 +40,9 @@ func (cmd) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-	fmt.Println(Version)
+	for _, m := range append([]map[string]string{Package}, Packages()...) {
+		fmt.Print(m["importpath"], ": ", m["version"], "\n")
+	}
 	return nil
 }
 

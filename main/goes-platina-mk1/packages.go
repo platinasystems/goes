@@ -7,11 +7,12 @@ package main
 import (
 	"github.com/platinasystems/go/goes/cmd/license"
 	"github.com/platinasystems/go/goes/cmd/patents"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
+	"github.com/platinasystems/go/goes/cmd/version"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugin/fe1"
 )
 
 func init() {
-	const dir = "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
-	license.Others = []license.Other{{dir, copyright.License}}
-	patents.Others = []patents.Other{{dir, copyright.Patents}}
+	license.Packages = fe1.Packages
+	patents.Packages = fe1.Packages
+	version.Packages = fe1.Packages
 }

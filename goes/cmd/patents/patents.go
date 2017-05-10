@@ -6,8 +6,9 @@ package patents
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/platinasystems/go/copyright"
+	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
 )
@@ -18,12 +19,7 @@ const (
 	Usage   = "patents"
 )
 
-// Some machines may have additional patent claims.
-var Others []Other
-
-type Other struct {
-	Name, Text string
-}
+var Packages = func() []map[string]string { return []map[string]string{} }
 
 type Interface interface {
 	Apropos() lang.Alt
@@ -44,24 +40,18 @@ func (cmd) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-	prettyprint("github.com/platinasystems/go", copyright.Patents)
-	for _, l := range Others {
-		fmt.Print("\n\n")
-		prettyprint(l.Name, l.Text)
+	for _, m := range append([]map[string]string{Package}, Packages()...) {
+		if patents, found := m["patents"]; found {
+			fmt.Print(m["importpath"], ":\n    ",
+				strings.Replace(patents, "\n", "\n    ", -1),
+				"\n")
+		}
 	}
 	return nil
 }
 
 func (cmd) String() string { return Name }
 func (cmd) Usage() string  { return Name }
-
-func prettyprint(title, text string) {
-	fmt.Println(title)
-	for _ = range title {
-		fmt.Print("=")
-	}
-	fmt.Print("\n\n", text, "\n")
-}
 
 var apropos = lang.Alt{
 	lang.EnUS: Apropos,

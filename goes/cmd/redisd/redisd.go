@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/platinasystems/go"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
@@ -30,7 +31,6 @@ import (
 	"github.com/platinasystems/go/internal/redis/rpc/reg"
 	"github.com/platinasystems/go/internal/sockfile"
 	"github.com/platinasystems/go/internal/varrun"
-	. "github.com/platinasystems/go/version"
 )
 
 const (
@@ -311,7 +311,10 @@ func (cmd *cmd) pubinit(fieldEqValues ...string) error {
 	}
 	defer pub.Close()
 
-	pub.Print("version: ", Version)
+	importpath := Package["importpath"]
+	for _, k := range []string{"version", "generated.by", "generated.on"} {
+		pub.Print(importpath, ".", k, ": ", Package[k])
+	}
 	if hostname, err := os.Hostname(); err == nil {
 		pub.Print("hostname: ", hostname)
 	}
