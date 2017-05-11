@@ -9,7 +9,6 @@ import (
 
 	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/vnet"
@@ -19,7 +18,7 @@ import (
 type platform struct {
 	vnet.Package
 	*fe1.Platform
-	i *vnetd.Info
+	Hook func()
 }
 
 func (p *platform) Init() (err error) {
@@ -43,7 +42,7 @@ func (p *platform) Init() (err error) {
 		}
 	}
 
-	vnetd.Init(p.i)
+	p.Hook()
 	return
 }
 

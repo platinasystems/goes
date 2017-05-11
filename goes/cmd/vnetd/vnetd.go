@@ -138,7 +138,7 @@ func (cmd *cmd) Close() error {
 	return nil
 }
 
-func Init(i *Info) {
+func (i *Info) Init() {
 	i.poller.i = i
 	i.poller.addEvent(0)
 	i.poller.pollInterval = 5 // default 5 seconds

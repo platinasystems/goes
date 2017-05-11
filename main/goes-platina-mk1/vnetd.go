@@ -40,7 +40,7 @@ func init() {
 			return err
 		}
 
-		plat := &platform{i: i}
+		plat := &platform{Hook: i.Init}
 		v.AddPackage("platform", plat)
 		plat.DependsOn("pci-discovery")
 
