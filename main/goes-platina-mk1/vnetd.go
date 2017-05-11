@@ -40,14 +40,7 @@ func init() {
 			return err
 		}
 
-		plat := &platform{Hook: i.Init}
-		v.AddPackage("platform", plat)
-		plat.DependsOn("pci-discovery")
-
-		// Need FE1 init/port init to complete before default
-		// fib/adjacencies can be installed.
-		plat.DependedOnBy("ip4")
-		plat.DependedOnBy("ip6")
+		AddPlatform(v, i.Init)
 
 		return nil
 	}

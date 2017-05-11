@@ -18,7 +18,20 @@ import (
 type platform struct {
 	vnet.Package
 	*fe1.Platform
-	Hook func()
+	hook func()
+}
+
+func AddPlatform(v *vnet.Vnet, hook func()) {
+	plat := &platform{
+		hook: hook,
+	}
+	v.AddPackage("platform", plat)
+	plat.DependsOn("pci-discovery")
+
+	// Need FE1 init/port init to complete before default
+	// fib/adjacencies can be installed.
+	plat.DependedOnBy("ip4")
+	plat.DependedOnBy("ip6")
 }
 
 func (p *platform) Init() (err error) {
@@ -42,7 +55,7 @@ func (p *platform) Init() (err error) {
 		}
 	}
 
-	p.Hook()
+	p.hook()
 	return
 }
 
