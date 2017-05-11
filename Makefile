@@ -12,7 +12,8 @@ gobuild = $(if $(arch),env GOARCH=$(arch) )go build$(if $(tags),\
 -ldflags "$(ldflags)")$(if $(V),\
 -v)
 
-noplugin_tag=$(if $(filter yes,$(noplugin)), noplugin)
+fe1_tags=uio_pci_dma foxy
+noplugin_tags=$(if $(filter yes,$(noplugin)),$(fe1_tags) noplugin)
 diag_tag=$(if $(filter yes,$(diag)), diag)
 vnet_debug_tag=$(if $(filter yes,$(VNET_DEBUG)), debug)
 vnet_gcflags=$(if $(filter yes,$(VNET_DEBUG)),-N -l)
@@ -33,6 +34,12 @@ all: $(ALL)
 package.go: LICENSE PATENTS
 	go generate
 
+../fe1/package.go: ../fe1/LICENSE ../fe1/PATENTS
+	go generate ../fe1
+
+../firmware-fe1a/package.go: ../firmware-fe1a/LICENSE
+	go generate ../firmware-fe1a
+
 goes-example: | package.go
 	$(gobuild) -o $@ ./main/goes-example
 
@@ -48,7 +55,7 @@ goes-platina-mk1-bmc: ldflags=-d
 goes-platina-mk1-bmc: | package.go
 	$(gobuild) -o $@ ./main/$@
 
-goes-platina-mk1: tags=uio_pci_dma foxy$(noplugin_tag)$(vnet_debug_tag)$(diag_tag)
+goes-platina-mk1: tags=$(noplugin_tags)$(vnet_debug_tag)$(diag_tag)
 goes-platina-mk1: gcflags=$(vnet_gcflags)
 goes-platina-mk1: | package.go
 	$(gobuild) -o $@ ./main/$@
@@ -61,15 +68,16 @@ goes-coreboot: | package.go
 goes-test: | package.go
 	$(gobuild) -o $@ ./main/goes-test
 
-go-wip: tags=uio_pci_dma foxy noplugin$(vnet_debug_)$(diag_tag)
+go-wip: tags=$(fe1_tags) noplugin$(vnet_debug_)$(diag_tag)
 go-wip: gcflags=$(vnet_gcflags)
 go-wip:
 	$(gobuild) -o $@ ./wip/y
 	$(if $(wildcard fe1a.zip),\
 	cat fe1a.zip >> $@ && zip -A $@)
 
-lib/fe1.so: | ../fe1/package.go
-	$(gobuild) -o $@ -buildmode=plugin ./main/fe1
+fe1.so: tags=$(fe1_tags)
+fe1.so: | ../fe1/package.go ../firmware-fe1a/package.go
+	$(gobuild) -buildmode=plugin ./main/fe1
 
 .PHONY: clean
 clean:
