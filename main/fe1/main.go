@@ -7,16 +7,11 @@ package main
 
 import (
 	"github.com/platinasystems/fe1"
-	firmware "github.com/platinasystems/firmware-fe1a"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
-func main() {}
-
-func Packages() []map[string]string {
-	return []map[string]string{fe1.Package, firmware.Package}
-}
+func Packages() []map[string]string { return fe1.Packages }
 
 func AddPlatform(v *vnet.Vnet, ver int, nmacs uint32, basea ethernet.Address,
 	init func(), leden func() error) {

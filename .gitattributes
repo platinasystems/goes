@@ -2,3 +2,4 @@
 *.a binary
 *.so binary
 *.ucode binary
+*.zip binary
