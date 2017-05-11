@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
+	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
@@ -72,8 +73,38 @@ func init() {
 			return err
 		}
 
-		AddPlatform(v, i.Init, ver, nmacs, basea)
+		AddPlatform(v, ver, nmacs, basea, i.Init, boardPortLedEnable)
 
 		return nil
 	}
+}
+
+// MK1 board front panel port LED's require PCA9535 GPIO device
+// configuration - to provide an output signal that allows LED
+// operation.
+func boardPortLedEnable() (err error) {
+	var bus i2c.Bus
+	var busIndex, busAddress int = 0, 0x74
+
+	err = bus.Open(busIndex)
+	if err != nil {
+		return err
+	}
+	defer bus.Close()
+
+	err = bus.ForceSlaveAddress(busAddress)
+	if err != nil {
+		return err
+	}
+
+	// Configure the gpio pin as an output:
+	// Register 6 controls the configuration, bit 2 is led enable, '0' => 'output'
+	const (
+		pca9535ConfigReg = 0x6
+		ledOutputEnable  = 1 << 2
+	)
+	var data i2c.SMBusData
+	data[0] = ^uint8(ledOutputEnable)
+	err = bus.Do(i2c.Write, uint8(pca9535ConfigReg), i2c.ByteData, &data)
+	return err
 }

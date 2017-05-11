@@ -6,7 +6,6 @@ package main
 
 import (
 	"github.com/platinasystems/fe1"
-	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
@@ -14,19 +13,21 @@ import (
 type platform struct {
 	vnet.Package
 	*fe1.Platform
-	hook  func()
 	ver   int
 	nmacs uint32
 	basea ethernet.Address
+	init  func()
+	leden func() error
 }
 
-func AddPlatform(v *vnet.Vnet, hook func(), ver int, nmacs uint32,
-	basea ethernet.Address) {
+func AddPlatform(v *vnet.Vnet, ver int, nmacs uint32, basea ethernet.Address,
+	init func(), leden func() error) {
 	plat := &platform{
-		hook:  hook,
 		ver:   ver,
 		nmacs: nmacs,
 		basea: basea,
+		init:  init,
+		leden: leden,
 	}
 	v.AddPackage("platform", plat)
 	plat.DependsOn("pci-discovery")
@@ -54,43 +55,13 @@ func (p *platform) Init() (err error) {
 
 	if len(p.Switches) > 0 {
 		// don't need led enable if we're not running on hardware.
-		if err = p.boardPortLedEnable(); err != nil {
-			v.Logf("boardPortLedEnable failure: %s\n", err)
+		if err = p.leden(); err != nil {
+			v.Logf("LED enable failure: %s\n", err)
 		}
 	}
 
-	p.hook()
+	p.init()
 	return
-}
-
-// MK1 board front panel port LED's require PCA9535 GPIO device
-// configuration - to provide an output signal that allows LED
-// operation.
-func (p *platform) boardPortLedEnable() (err error) {
-	var bus i2c.Bus
-	var busIndex, busAddress int = 0, 0x74
-
-	err = bus.Open(busIndex)
-	if err != nil {
-		return err
-	}
-	defer bus.Close()
-
-	err = bus.ForceSlaveAddress(busAddress)
-	if err != nil {
-		return err
-	}
-
-	// Configure the gpio pin as an output:
-	// Register 6 controls the configuration, bit 2 is led enable, '0' => 'output'
-	const (
-		pca9535ConfigReg = 0x6
-		ledOutputEnable  = 1 << 2
-	)
-	var data i2c.SMBusData
-	data[0] = ^uint8(ledOutputEnable)
-	err = bus.Do(i2c.Write, uint8(pca9535ConfigReg), i2c.ByteData, &data)
-	return err
 }
 
 func (p *platform) boardPortInit(s fe1.Switch) (err error) {
