@@ -7,7 +7,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/i2c"
@@ -15,6 +14,7 @@ import (
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugin/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -73,7 +73,7 @@ func init() {
 			return err
 		}
 
-		AddPlatform(v, ver, nmacs, basea, i.Init, boardPortLedEnable)
+		fe1.AddPlatform(v, ver, nmacs, basea, i.Init, leden)
 
 		return nil
 	}
@@ -82,7 +82,7 @@ func init() {
 // MK1 board front panel port LED's require PCA9535 GPIO device
 // configuration - to provide an output signal that allows LED
 // operation.
-func boardPortLedEnable() (err error) {
+func leden() (err error) {
 	var bus i2c.Bus
 	var busIndex, busAddress int = 0, 0x74
 
