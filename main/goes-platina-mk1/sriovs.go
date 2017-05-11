@@ -13,10 +13,8 @@ import (
 
 func delSriovs() error { return sriovs.Del(vfs) }
 
-func newSriovs() error {
-	if ver, err := deviceVersion(); err != nil {
-		return err
-	} else if ver > 0 {
+func newSriovs(ver int) error {
+	if ver > 0 {
 		sriovs.VfName = func(port, subport uint) string {
 			return fmt.Sprintf("eth-%d-%d", port+1, subport+1)
 		}
