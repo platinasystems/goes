@@ -280,33 +280,21 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 
 func (h *I2cDev) FanInit() error {
 
+	//reset hwm to default values
 	r0 := getRegsBank0()
 	r0.BankSelect.set(h, 0x80)
-	closeMux(h)
-	err := DoI2cRpc()
-	if err != nil {
-		return err
-	}
-	//reset hwm to default values
 	r0.Configuration.set(h, 0x9c)
 	closeMux(h)
-	err = DoI2cRpc()
+	err := DoI2cRpc()
 	if err != nil {
 		return err
 	}
 
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
-	closeMux(h)
-	err = DoI2cRpc()
-	if err != nil {
-		return err
-	}
 	//set fan speed output to PWM mode
 	r2.FanOutputModeControl.set(h, 0x0)
-
 	//set up clk frequency and dividers
-
 	r2.FanPwmPrescale1.set(h, 0x84)
 	r2.FanPwmPrescale2.set(h, 0x84)
 	closeMux(h)
@@ -314,40 +302,34 @@ func (h *I2cDev) FanInit() error {
 	if err != nil {
 		return err
 	}
+
 	//set default speed to auto
 	h.SetFanSpeed("auto")
+
 	//enable temperature monitoring
-	r2.BankSelect.set(h, 0x80)
-	closeMux(h)
-	err = DoI2cRpc()
-	if err != nil {
-		return err
-	}
+	r0.BankSelect.set(h, 0x80)
 	r0.TempCntl2.set(h, tempCtrl2)
 	closeMux(h)
 	err = DoI2cRpc()
 	if err != nil {
 		return err
 	}
+
 	//temperature monitoring requires a delay before readings are valid
 	time.Sleep(500 * time.Millisecond)
+	r0.BankSelect.set(h, 0x80)
 	r0.Configuration.set(h, 0x1d)
 	closeMux(h)
 	err = DoI2cRpc()
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (h *I2cDev) SetFanSpeed(w string) error {
 	r2 := getRegsBank2()
-	r2.BankSelect.set(h, 0x82)
-	closeMux(h)
-	err := DoI2cRpc()
-	if err != nil {
-		return err
-	}
 
 	//if not all fan trays are ok, only allow high setting
 	for j := 1; j <= maxFanTrays; j++ {
@@ -361,31 +343,23 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 
 	switch w {
 	case "auto":
-		r2 := getRegsBank2()
 		r2.BankSelect.set(h, 0x82)
-		closeMux(h)
-		err = DoI2cRpc()
-		if err != nil {
-			return err
-		}
-
 		//set thermal cruise
 		r2.FanControlModeSelect1.set(h, 0x00)
 		r2.FanControlModeSelect2.set(h, 0x00)
-
 		//set step up and down time to 1s
 		r2.FanStepUpTime.set(h, 0x0a)
 		r2.FanStepDownTime.set(h, 0x0a)
 		closeMux(h)
-		err = DoI2cRpc()
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
 
+		r2.BankSelect.set(h, 0x82)
 		//set fan start speed
 		r2.FanStartValue1.set(h, 0x30)
 		r2.FanStartValue2.set(h, 0x30)
-
 		//set fan stop speed
 		r2.FanStopValue1.set(h, 0x30)
 		r2.FanStopValue2.set(h, 0x30)
@@ -394,10 +368,11 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 		if err != nil {
 			return err
 		}
+
+		r2.BankSelect.set(h, 0x82)
 		//set fan stop time to never stop
 		r2.FanStopTime1.set(h, 0x0)
 		r2.FanStopTime2.set(h, 0x0)
-
 		//set target temps to 50°C
 		r2.TargetTemp1.set(h, 0x32)
 		r2.TargetTemp2.set(h, 0x32)
@@ -407,14 +382,13 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 			return err
 		}
 
+		r2.BankSelect.set(h, 0x82)
 		//set critical temp to set 100% fan speed to 65°C
 		r2.FanCritTemp1.set(h, 0x41)
 		r2.FanCritTemp2.set(h, 0x41)
-
 		//set target temp hysteresis to +/- 5°C
 		r2.TempHyster1.set(h, 0x55)
 		r2.TempHyster2.set(h, 0x55)
-
 		//enable temp control of fans
 		r2.TempToFanMap1.set(h, 0xff)
 		r2.TempToFanMap2.set(h, 0xff)
@@ -426,34 +400,37 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 		log.Print("notice: fan speed set to ", w)
 	//static speed settings below, set hwm to manual mode, then set static speed
 	case "high":
+		r2.BankSelect.set(h, 0x82)
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		r2.FanOutValue2.set(h, high)
 		closeMux(h)
-		err = DoI2cRpc()
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
 		log.Print("notice: fan speed set to ", w)
 	case "med":
+		r2.BankSelect.set(h, 0x82)
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, med)
 		r2.FanOutValue2.set(h, med)
 		closeMux(h)
-		err = DoI2cRpc()
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
 		log.Print("notice: fan speed set to ", w)
 	case "low":
+		r2.BankSelect.set(h, 0x82)
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, low)
 		r2.FanOutValue2.set(h, low)
 		closeMux(h)
-		err = DoI2cRpc()
+		err := DoI2cRpc()
 		if err != nil {
 			return err
 		}
@@ -469,20 +446,15 @@ func (h *I2cDev) GetFanSpeed(i uint8) (string, error) {
 
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
+	r2.TempToFanMap1.get(h)
+	r2.FanOutValue1.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
 		return "error", err
 	}
-	r2.TempToFanMap1.get(h)
-	r2.FanOutValue1.get(h)
-	closeMux(h)
-	err = DoI2cRpc()
-	if err != nil {
-		return "error", err
-	}
-	t := uint8(s[1].D[0])
-	m := uint8(s[3].D[0])
+	t := uint8(s[3].D[0])
+	m := uint8(s[5].D[0])
 	if i == 1 {
 		return fmt.Sprintf("0x%x", m), nil
 	}
