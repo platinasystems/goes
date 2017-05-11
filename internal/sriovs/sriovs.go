@@ -19,7 +19,7 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const DefaultNumvfs = 16
+const DefaultNumvfs = 32
 
 type Mac net.HardwareAddr
 type Vf uint
