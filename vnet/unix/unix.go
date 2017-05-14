@@ -15,7 +15,9 @@ import (
 var packageIndex uint
 
 type interface_filter struct {
+	// Map of source string regexp to indication of whether or not matching interfaces should be terminated.
 	s map[string]bool
+	// As above but after compilation of regexps.
 	m map[*regexp.Regexp]bool
 }
 
