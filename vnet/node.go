@@ -80,45 +80,47 @@ func (v *Vnet) RegisterOutputNode(n OutputNoder, name string, args ...interface{
 }
 
 type enqueue struct {
-	cached_next   uint32
-	n_cached_next uint32
-	v             *Vnet
-	i             *RefIn
-	o             *RefOut
+	x, n uint32
+	v    *Vnet
+	i    *RefIn
+	o    *RefOut
 }
 
-func (q *enqueue) x(x0 uint, r0 *Ref) {
+func (q *enqueue) put(x0 uint, r0 *Ref) {
 	q.o.Outs[x0].Dup(q.i)
 	i0 := q.o.Outs[x0].AddLen(q.v)
 	q.o.Outs[x0].Refs[i0] = *r0
 }
 func (q *enqueue) sync() {
-	if q.n_cached_next > 0 {
-		q.o.Outs[q.cached_next].SetLen(q.v, uint(q.n_cached_next))
-		q.n_cached_next = 0
+	l := q.o.Outs[q.x].GetLen(q.v)
+	if n := uint(q.n); n > l {
+		q.o.Outs[q.x].Dup(q.i)
+		q.o.Outs[q.x].SetLen(q.v, n)
 	}
 }
 
 func (q *enqueue) Put1(r0 *Ref, x0 uint) {
-	q.o.Outs[q.cached_next].Refs[q.n_cached_next] = *r0
-	q.n_cached_next++
-	if uint32(x0) != q.cached_next {
-		q.n_cached_next--
-		q.x(x0, r0)
+	q.o.Outs[q.x].Refs[q.n] = *r0
+	q.n++
+	if uint32(x0) != q.x {
+		q.n--
+		q.put(x0, r0)
 	}
 }
 
 func (q *enqueue) Put2(r0, r1 *Ref, x0, x1 uint) {
-	q.o.Outs[q.cached_next+0].Refs[q.n_cached_next] = *r0
-	q.o.Outs[q.cached_next+1].Refs[q.n_cached_next] = *r1
-	q.n_cached_next += 2
-	if same := x0 == x1; !same || uint32(x0) != q.cached_next {
-		q.n_cached_next -= 2
-		q.x(x0, r0)
-		q.x(x1, r1)
+	n0 := q.n
+	q.o.Outs[q.x].Refs[n0+0] = *r0
+	q.o.Outs[q.x].Refs[n0+1] = *r1
+	q.n = n0 + 2
+	if same := x0 == x1; !same || uint32(x0) != q.x {
+		q.n = n0
+		q.sync()
+		q.put(x0, r0)
+		q.put(x1, r1)
 		if same {
-			q.sync()
-			q.cached_next = uint32(x0)
+			q.x = uint32(x0)
+			q.n = uint32(q.o.Outs[x0].GetLen(q.v))
 		}
 	}
 }
@@ -134,7 +136,7 @@ func (n *InOutNode) MakeLoopIn() loop.LooperIn   { return &RefIn{} }
 func (n *InOutNode) MakeLoopOut() loop.LooperOut { return &RefOut{} }
 func (n *InOutNode) LoopInputOutput(l *loop.Loop, i loop.LooperIn, o loop.LooperOut) {
 	q, in, out := &n.enqueue, i.(*RefIn), o.(*RefOut)
-	q.i, q.o, q.v = in, out, n.Vnet
+	q.n, q.i, q.o, q.v = 0, in, out, n.Vnet
 	n.t.NodeInput(in, out)
 	q.sync()
 }
