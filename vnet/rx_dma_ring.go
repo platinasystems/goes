@@ -91,7 +91,7 @@ type RxDmaRefState struct {
 	Advance int
 
 	// Interface and error.
-	refOpaque
+	RefOpaque
 }
 
 func (g *RxDmaRing) is_end_of_packet(f RxDmaDescriptorFlags) uint8 {
@@ -107,7 +107,7 @@ func (g *RxDmaRing) Rx1Descriptor(ri rxDmaRingIndex, b0 uint, f0 RxDmaDescriptor
 
 	r0.SetDataLen(b0)
 	r0.Advance(g.Advance)
-	r0.refOpaque = g.refOpaque
+	r0.RefOpaque = g.RefOpaque
 	g.Out.Outs[g.Next].Refs[g.n_next] = *r0
 	g.n_next += 1
 
@@ -137,10 +137,10 @@ func (g *RxDmaRing) Rx4Descriptors(ri rxDmaRingIndex, b0, b1, b2, b3 uint, f0, f
 	r2.Advance(g.Advance)
 	r3.Advance(g.Advance)
 
-	r0.refOpaque = g.refOpaque
-	r1.refOpaque = g.refOpaque
-	r2.refOpaque = g.refOpaque
-	r3.refOpaque = g.refOpaque
+	r0.RefOpaque = g.RefOpaque
+	r1.RefOpaque = g.RefOpaque
+	r2.RefOpaque = g.RefOpaque
+	r3.RefOpaque = g.RefOpaque
 
 	g.Out.Outs[g.Next].Refs[g.n_next+0] = *r0
 	g.Out.Outs[g.Next].Refs[g.n_next+1] = *r1
@@ -206,8 +206,8 @@ func (g *RxDmaRing) slow_path(r0 *Ref, f0 RxDmaDescriptorFlags) {
 	}
 
 	// Set interface and error at the same time.
-	r0.refOpaque = rs0.refOpaque
-	g.refOpaque = rs0.refOpaque
+	r0.RefOpaque = rs0.RefOpaque
+	g.RefOpaque = rs0.RefOpaque
 
 	// Enqueue packet.
 	ref := s.chain.Done()

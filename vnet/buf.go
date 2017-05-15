@@ -16,17 +16,18 @@ import (
 	"unsafe"
 )
 
-type refOpaque struct {
-	// Error code for error node if packets is to be dropped.
-	err ErrorRef
-
+type RefOpaque struct {
 	// Software interface.
 	Si Si
+
+	// Aux data.
+	// For example, used by error node to give reason for dropping this packet.
+	Aux uint32
 }
 
 type Ref struct {
 	hw.RefHeader
-	refOpaque
+	RefOpaque
 }
 
 func (r *Ref) Flags() BufferFlag         { return BufferFlag(r.RefHeader.Flags()) }
@@ -119,7 +120,7 @@ func getDefaultBufferTemplate() hw.BufferTemplate {
 	t := *hw.DefaultBufferTemplate
 	r := (*Ref)(unsafe.Pointer(&t.Ref))
 	// Poison so that if user does not override its obvious.
-	r.err = poisonErrorRef
+	r.Aux = poisonErrorRef
 	r.Si = ^r.Si
 	return t
 }
