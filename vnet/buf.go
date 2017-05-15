@@ -26,6 +26,7 @@ type RefOpaque struct {
 }
 
 //go:generate gentemplate -d Package=vnet -id RefOpaque -d VecType=RefOpaqueVec -d Type=RefOpaque github.com/platinasystems/go/elib/vec.tmpl
+//go:generate gentemplate -d Package=vnet -id RefOpaque -d PoolType=RefOpaquePool -d Type=RefOpaque -d Data=Entries github.com/platinasystems/go/elib/pool.tmpl
 
 type Ref struct {
 	hw.RefHeader
