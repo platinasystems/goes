@@ -25,6 +25,8 @@ type RefOpaque struct {
 	Aux uint32
 }
 
+//go:generate gentemplate -d Package=vnet -id RefOpaque -d VecType=RefOpaqueVec -d Type=RefOpaque github.com/platinasystems/go/elib/vec.tmpl
+
 type Ref struct {
 	hw.RefHeader
 	RefOpaque
