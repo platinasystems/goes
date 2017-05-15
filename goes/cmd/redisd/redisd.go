@@ -171,6 +171,10 @@ func (cmd *cmd) Main(args ...string) error {
 		cmd.redisd.published[k] = make(grs.HashValue)
 	}
 
+	pkgs := new(bytes.Buffer)
+	WriteTo(pkgs)
+	cmd.redisd.published[redis.DefaultHash]["packages"] = pkgs.Bytes()
+
 	sfn := sockfile.Path(Name)
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
@@ -311,10 +315,6 @@ func (cmd *cmd) pubinit(fieldEqValues ...string) error {
 	}
 	defer pub.Close()
 
-	importpath := Package["importpath"]
-	for _, k := range []string{"version", "generated.by", "generated.on"} {
-		pub.Print(importpath, ".", k, ": ", Package[k])
-	}
 	if hostname, err := os.Hostname(); err == nil {
 		pub.Print("hostname: ", hostname)
 	}

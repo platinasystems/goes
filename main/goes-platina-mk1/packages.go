@@ -5,14 +5,8 @@
 package main
 
 import (
-	"github.com/platinasystems/go/goes/cmd/license"
-	"github.com/platinasystems/go/goes/cmd/patents"
-	"github.com/platinasystems/go/goes/cmd/version"
+	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugin/fe1"
 )
 
-func init() {
-	license.Packages = fe1.Packages
-	patents.Packages = fe1.Packages
-	version.Packages = fe1.Packages
-}
+func init() { Packages = fe1.Packages }

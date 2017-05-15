@@ -2,10 +2,11 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package version
+package show_packages
 
 import (
 	"fmt"
+	"os"
 
 	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes"
@@ -13,12 +14,10 @@ import (
 )
 
 const (
-	Name    = "version"
-	Apropos = "print HEAD of source"
+	Name    = "show-packages"
+	Apropos = "print package repos info"
 	Usage   = "version"
 )
-
-var Packages = func() []map[string]string { return []map[string]string{} }
 
 type Interface interface {
 	Apropos() lang.Alt
@@ -40,10 +39,8 @@ func (cmd) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-	for _, m := range append([]map[string]string{Package}, Packages()...) {
-		fmt.Print(m["importpath"], ": ", m["version"], "\n")
-	}
-	return nil
+	_, err := WriteTo(os.Stdout)
+	return err
 }
 
 func (cmd) String() string { return Name }
