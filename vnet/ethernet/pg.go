@@ -28,7 +28,7 @@ func (m *pgMain) initTypes() {
 		return
 	}
 	m.typeMap = make(map[Type]pg.StreamType)
-	m.typeMap[IP4.FromHost()] = pg.GetStreamType(m.v, "ip4")
+	m.typeMap[TYPE_IP4.FromHost()] = pg.GetStreamType(m.v, "ip4")
 }
 
 func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
@@ -85,11 +85,11 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 			case 0:
 			case 1:
 				h.v[0].Type = inner_type
-				h.h.Type = VLAN.FromHost()
+				h.h.Type = TYPE_VLAN.FromHost()
 			case 2:
 				h.v[1].Type = inner_type
-				h.v[0].Type = VLAN.FromHost()
-				h.h.Type = VLAN_IN_VLAN.FromHost()
+				h.v[0].Type = TYPE_VLAN.FromHost()
+				h.h.Type = TYPE_VLAN_IN_VLAN.FromHost()
 			case 3:
 				err = fmt.Errorf("number of vlans must be <= 2, given %d", len(h.v))
 				return
