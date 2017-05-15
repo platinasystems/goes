@@ -89,7 +89,7 @@ type refInDupCopy struct {
 	BufferPool *BufferPool
 }
 
-func (i *RefIn) dup(x *RefIn) { i.refInDupCopy = x.refInDupCopy }
+func (i *RefIn) Dup(x *RefIn) { i.refInDupCopy = x.refInDupCopy }
 
 type RefIn struct {
 	refInCommon
@@ -194,11 +194,6 @@ func Get4Refs(rs []Ref, i uint) (r0, r1, r2, r3 *Ref) {
 	return
 }
 
-func Get1Ref(rs []Ref, i uint) (r0 *Ref) {
-	r0 = &rs[i+0]
-	return
-}
-
 func (p *BufferPool) ValidateRef(r *Ref, want hw.BufferState) {
 	(*hw.BufferPool)(p).ValidateRefs((*hw.RefHeader)(&r.RefHeader), want, 1, 1)
 }
@@ -221,11 +216,14 @@ func Get1Buffer(rs []Ref, i uint) (b0 *Buffer) {
 	return
 }
 
-func (r *RefIn) Get4Refs(i uint) (r0, r1, r2, r3 *Ref) { return Get4Refs(r.Refs[:], i) }
-func (r *RefIn) Get1Ref(i uint) (r0 *Ref)              { return Get1Ref(r.Refs[:], i) }
+func (r *RefIn) Get1(i uint) (_ *Ref)    { return &r.Refs[i] }
+func (r *RefIn) Get2(i uint) (_, _ *Ref) { return &r.Refs[i+0], &r.Refs[i+1] }
+func (r *RefIn) Get4(i uint) (_, _, _, _ *Ref) {
+	return &r.Refs[i+0], &r.Refs[i+1], &r.Refs[i+2], &r.Refs[i+3]
+}
 
 func (n *Node) SetOutLen(out *RefIn, in *RefIn, l uint) {
-	out.dup(in)
+	out.Dup(in)
 	out.SetLen(n.Vnet, l)
 }
 

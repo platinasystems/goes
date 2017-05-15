@@ -268,6 +268,8 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	return
 }
 
+func (n *Node) MaxNext() uint { return uint(len(n.nextNodes)) }
+
 func (l *Loop) AddNextWithIndex(n Noder, x inNoder, withIndex uint) (uint, error) {
 	return l.AddNamedNextWithIndex(n, nodeName(x), withIndex)
 }
@@ -458,9 +460,10 @@ type In struct {
 	nextIndex   uint32
 }
 
-func (i *In) GetIn() *In     { return i }
-func (i *In) InLen() uint    { return uint(i.len) }
-func (i *In) ThreadId() uint { return uint(i.activeIndex) }
+func (i *In) GetIn() *In          { return i }
+func (i *In) InLen() uint         { return uint(i.len) }
+func (i *In) Range() (uint, uint) { return 0, i.InLen() }
+func (i *In) ThreadId() uint      { return uint(i.activeIndex) }
 
 type LooperOut interface {
 	GetOut() *Out
