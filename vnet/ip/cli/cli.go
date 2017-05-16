@@ -127,9 +127,14 @@ func (m *Main) ip_interface(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 	)
 	v := m.Vnet
 	m4 := ip4.GetMain(m.Vnet)
+	var p ip4.Prefix
 	switch {
 	case in.Parse("fib %v %d", &si, v, &i):
 		m4.SetFibIndexForSi(si, ip.FibIndex(i))
+	case in.Parse("a%*ddress %v %v", &si, v, &p):
+		m4.AddDelInterfaceAddress(si, &p, false)
+	case in.Parse("d%*elete %v %v", &si, v, &p):
+		m4.AddDelInterfaceAddress(si, &p, true)
 	default:
 		err = cli.ParseError
 	}
@@ -146,7 +151,7 @@ func (m *Main) Init() (err error) {
 			Action:    m.ip_route,
 		},
 		cli.Command{
-			Name:      "set ip interface",
+			Name:      "ip interface",
 			ShortHelp: "ip interface commands",
 			Action:    m.ip_interface,
 		},
