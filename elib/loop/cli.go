@@ -107,7 +107,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 			if j == 0 && !isIn && !isInOut {
 				continue
 			}
-			if j == 1 && !isOut {
+			if j == 1 && !isOut && !isInOut {
 				continue
 			}
 			io := ""
