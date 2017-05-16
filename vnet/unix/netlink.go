@@ -294,7 +294,8 @@ func (m *Main) fibIndexForNsid(nsid int) (fi ip.FibIndex) {
 	if m.fibIndexByNsid == nil {
 		m.fibIndexByNsid = make(map[int]ip.FibIndex)
 	}
-	if _, ok := m.fibIndexByNsid[nsid]; !ok {
+	var ok bool
+	if fi, ok = m.fibIndexByNsid[nsid]; !ok {
 		// Use pool so that nsid's may be deleted.
 		fi = ip.FibIndex(m.fibIndexPool.GetIndex(uint(len(m.fibIndexByNsid))))
 	}

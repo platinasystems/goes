@@ -71,9 +71,11 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	rs := []showIpFibRoute{}
 	for fi := range m.fibs {
 		fib := m.fibs[fi]
-		fib.foreach(func(p *Prefix, a ip.Adj) {
-			rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
-		})
+		if fib != nil {
+			fib.foreach(func(p *Prefix, a ip.Adj) {
+				rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
+			})
+		}
 	}
 	sort.Sort(showIpFibRoutes(rs))
 
