@@ -379,7 +379,7 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 			return
 		}
-		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 0); err != nil {
+		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
 			return
 		}
 	}
