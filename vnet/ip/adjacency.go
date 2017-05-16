@@ -105,12 +105,10 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	}
 	a.NAdj = 1
 	a.IfAddr = IfAddrNil
-	switch a.LookupNextIndex {
-	case LookupNextRewrite:
+	if a.LookupNextIndex == LookupNextRewrite {
 		if !in.Parse("%v", &a.Rewrite, v) {
 			panic(parse.ErrInput)
 		}
-	case LookupNextGlean:
 	}
 }
 
