@@ -1,20 +1,28 @@
 This repos contains Platina System's open source GO projects.
 
-You'll need `platinasystems/fe1` to compile `goes-platina-mk1` or `go-wip`.
+You'll need `platinasystems/fe1` and `platinasystems/firmware-fe1a` to compile
+`goes-platina-mk1` or `go-wip`.
 
 ```console
-$ git clone git@github.com:platinasystems/fe1 vnet/devices/ethernet/switch/fe1
+$ git clone git@github.com:platinasystems/fe1 ../fe1
+$ git clone git@github.com:platinasystems/firmware-fe1a ../firmware-fe1a
 ```
 
-In addition, machines with an `fe1` forwarding-engine require the
-`firmware-fe1a` program or the archive it creates, `fe1a.zip` installed
-in this top directory.
+Alternatively, you may build `goes-platina-mk1` to plugin an existing
+`/usr/lib/goes/fe1.so`.
 
 To install a select MACHINE,
 
 ```console
 $ make -B goes-MACHINE
 $ sudo ./goes-MACHINE install
+```
+
+Some machines also have a self extracting, compressed archive installer.
+
+```console
+$ make -B goes-MACHINE-installer
+$ sudo ./goes-MACHINE-installer
 ```
 
 These are the available MACHINEs,
