@@ -1,13 +1,11 @@
 package main
 
 import (
+	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
-	"github.com/platinasystems/fe1"
-	"github.com/platinasystems/fe1/firmware"
 	"github.com/platinasystems/go/vnet/ethernet"
 	ipcli "github.com/platinasystems/go/vnet/ip/cli"
 	"github.com/platinasystems/go/vnet/ip4"
@@ -46,15 +44,6 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-
-	err = firmware.Extract(prog.Name())
-	if err != nil {
-		if e := firmware.Extract("fe1a.zip"); e != nil {
-			return
-		} else {
-			err = nil
-		}
-	}
 
 	var in parse.Input
 	in.Add(os.Args[1:]...)
