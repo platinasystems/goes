@@ -28,7 +28,7 @@ var Package = map[string]string{
 	"generated.by": "{{.Info.Generated.By}}",
 	"generated.on": "{{.Info.Generated.On}}",
 	"version": "{{.Info.Version}}",
-	"statdif": ` + "`" + `{{.Info.Statdif}}` + "`" + `,
+	"diff": ` + "`" + `{{.Info.Diff}}` + "`" + `,
 	"license": ` + "`" + `{{.Info.License}}` + "`" + `,
 	"patents": ` + "`" + `{{.Info.Patents}}` + "`" + `,
 }
@@ -39,8 +39,9 @@ var Exit = os.Exit
 var Stderr io.Writer = os.Stderr
 
 type Info struct {
-	GoPkgDir, Version, Statdif, License, Patents string
-	Generated                                    struct {
+	GoPkgDir, Diff, Version, License, Patents string
+
+	Generated struct {
 		By, On string
 	}
 }
@@ -107,17 +108,9 @@ func main() {
 				pkg.ImportPath)
 			assume_unchanged = "--no-assume-unchanged"
 		}
-		if _, err = os.Stat(pkgfn); err == nil {
-			buf, err := exec.Command("git", "diff", "--stat").Output()
-			if err != nil {
-				panic(err)
-			}
-			info.Statdif = string(buf[:len(buf)-1])
-			assume_unchanged = "--assume-unchanged"
-		} else {
-			info.Statdif = fmt.Sprint("FIXME with go generate ",
-				pkg.ImportPath)
-			assume_unchanged = "--no-assume-unchanged"
+		buf, err = exec.Command("git", "diff", "--numstat").Output()
+		if err == nil && len(buf) > 0 {
+			info.Diff = string(buf[:len(buf)-1])
 		}
 		for _, x := range []struct {
 			fn string
