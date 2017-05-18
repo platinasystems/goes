@@ -53,12 +53,13 @@ func main() {
 			Exit(1)
 		}
 	}()
+	useremail := "no.one@no.where"
 	buf, err := exec.Command("git", "config", "--get",
 		"user.email").Output()
-	if err != nil {
-		panic(err)
+	if err == nil && len(buf) > 0 {
+		useremail = string(bytes.TrimSpace(buf))
 	}
-	generatedBy := string(bytes.TrimSpace(buf))
+	generatedBy := useremail
 	generatedOn := time.Now().UTC().String()
 	gopkg, err := build.Import(gopkgpath, "", 0)
 	if err != nil {
