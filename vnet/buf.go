@@ -25,9 +25,6 @@ type RefOpaque struct {
 	Aux uint32
 }
 
-//go:generate gentemplate -d Package=vnet -id RefOpaque -d VecType=RefOpaqueVec -d Type=RefOpaque github.com/platinasystems/go/elib/vec.tmpl
-//go:generate gentemplate -d Package=vnet -id RefOpaque -d PoolType=RefOpaquePool -d Type=RefOpaque -d Data=Entries github.com/platinasystems/go/elib/pool.tmpl
-
 type Ref struct {
 	hw.RefHeader
 	RefOpaque
@@ -37,6 +34,17 @@ func (r *Ref) Flags() BufferFlag         { return BufferFlag(r.RefHeader.Flags()
 func (r *Ref) NextValidFlag() BufferFlag { return BufferFlag(r.RefHeader.NextValidFlag()) }
 func (r *Ref) NextRef() *Ref {
 	return (*Ref)(unsafe.Pointer(r.RefHeader.NextRef()))
+}
+
+func (r *Ref) Foreach(f func(r *Ref, i uint)) {
+	i := uint(0)
+	for {
+		f(r, i)
+		if r = r.NextRef(); r == nil {
+			break
+		}
+		i++
+	}
 }
 
 type BufferFlag hw.BufferFlag
