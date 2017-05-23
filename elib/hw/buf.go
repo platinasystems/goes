@@ -77,14 +77,15 @@ func refFlag4(f BufferFlag, r0, r1, r2, r3 *Ref) bool {
 	return RefFlag4(f, &r0.RefHeader, &r1.RefHeader, &r2.RefHeader, &r3.RefHeader)
 }
 
-func (r *RefHeader) DataSlice() (b []byte) {
+func (r *RefHeader) DataOffsetSlice(o uint) (b []byte) {
 	var h reflect.SliceHeader
-	h.Data = uintptr(r.Data())
-	h.Len = int(r.dataLen)
-	h.Cap = int(r.dataLen)
+	h.Data = uintptr(r.DataOffset(o))
+	h.Len = int(r.dataLen) - int(o)
+	h.Cap = h.Len
 	b = *(*[]byte)(unsafe.Pointer(&h))
 	return
 }
+func (r *RefHeader) DataSlice() (b []byte) { return r.DataOffsetSlice(0) }
 
 func (r *RefHeader) DataLen() uint     { return uint(r.dataLen) }
 func (r *RefHeader) SetDataLen(l uint) { r.dataLen = uint16(l) }
