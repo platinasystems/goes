@@ -64,12 +64,12 @@ func (h *VlanHeader) Parse(sup_in *parse.Input) {
 				panic(parse.ErrInput)
 			}
 		}
-		h.Priority_cfi_and_id = tag.FromHost()
+		h.Tag = VlanTag(tag).FromHost()
 	} else {
 		panic(parse.ErrInput)
 	}
 }
 
 func (h *VlanHeader) String() (s string) {
-	return fmt.Sprintf("%s: vlan %d", h.GetType().String(), h.Priority_cfi_and_id.ToHost()&0xfff)
+	return fmt.Sprintf("%s: vlan %d", h.GetType().String(), h.Tag.Id())
 }

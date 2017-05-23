@@ -184,7 +184,7 @@ func (hi *Interface) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.
 	size := uintptr(HeaderBytes)
 	if sw != sup {
 		h.Type = TYPE_VLAN.FromHost()
-		h.vlan[0].Priority_cfi_and_id = vnet.Uint16(sw.Id(v)).FromHost()
+		h.vlan[0].Tag = VlanTag(sw.Id(v)).FromHost()
 		h.vlan[0].Type = t
 		size += VlanHeaderBytes
 	} else {

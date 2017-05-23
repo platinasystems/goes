@@ -18,12 +18,20 @@ type Header struct {
 	Type Type
 }
 
+// A 12 bit vlan id.
 type Vlan vnet.Uint16
+
+// A 16 bit vlan tag in network byte order.
+type VlanTag vnet.Uint16
+
+func (t VlanTag) ToHost() VlanTag   { return VlanTag(vnet.Uint16(t).ToHost()) }
+func (t VlanTag) FromHost() VlanTag { return VlanTag(vnet.Uint16(t).FromHost()) }
+func (v VlanTag) Id() vnet.Uint16   { return vnet.Uint16(v.ToHost()) & 0xfff }
 
 // Tagged packets have VlanHeader after ethernet header.
 type VlanHeader struct {
 	/* 3 bit priority, 1 bit CFI and 12 bit vlan id. */
-	Priority_cfi_and_id vnet.Uint16
+	Tag VlanTag
 
 	/* Inner ethernet type. */
 	Type Type
