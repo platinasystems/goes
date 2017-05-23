@@ -327,8 +327,13 @@ func (e *netlinkEvent) EventAction() {
 				di.isAdminUp = isUp
 				di.addDelDummyPuntPrefixes(e.m, !isUp)
 			} else if si, ok := e.m.siForIfIndex(v.Index); ok {
-				e.m.validateFibIndexForNsid(si, *msg.Nsid())
-				err = si.SetAdminUp(vn, isUp)
+				if isUp {
+					e.m.validateFibIndexForNsid(si, *msg.Nsid())
+					err = si.SetAdminUp(vn, isUp)
+				} else {
+					err = si.SetAdminUp(vn, isUp)
+					e.m.validateFibIndexForNsid(si, *msg.Nsid())
+				}
 			}
 		case *netlink.IfAddrMessage:
 			switch v.Family {
@@ -340,6 +345,8 @@ func (e *netlinkEvent) EventAction() {
 				err = e.m.ip6IfaddrMsg(v)
 			}
 		case *netlink.RouteMessage:
+			fmt.Printf("netlink %s\n", msg)
+
 			switch v.Family {
 			case netlink.AF_INET:
 				known = true
