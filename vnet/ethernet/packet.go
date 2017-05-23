@@ -7,7 +7,6 @@ package ethernet
 import (
 	"github.com/platinasystems/go/vnet"
 
-	"bytes"
 	"math/rand"
 	"unsafe"
 )
@@ -113,20 +112,18 @@ func RandomAddress() (a Address) {
 }
 
 // Implement vnet.Header interface.
-func (h *Header) Len() uint                      { return HeaderBytes }
-func (h *Header) Finalize(l []vnet.PacketHeader) {}
-func (h *Header) Write(b *bytes.Buffer) {
-	type t struct{ data [unsafe.Sizeof(*h)]byte }
+func (h *Header) Len() uint { return HeaderBytes }
+func (h *Header) Write(b []byte) {
+	type t struct{ data [HeaderBytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
 
-func (h *VlanHeader) Len() uint                      { return VlanHeaderBytes }
-func (h *VlanHeader) Finalize(l []vnet.PacketHeader) {}
-func (h *VlanHeader) Write(b *bytes.Buffer) {
-	type t struct{ data [unsafe.Sizeof(*h)]byte }
+func (h *VlanHeader) Len() uint { return VlanHeaderBytes }
+func (h *VlanHeader) Write(b []byte) {
+	type t struct{ data [VlanHeaderBytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *VlanHeader) Read(b []byte) vnet.PacketHeader { return (*VlanHeader)(vnet.Pointer(b)) }
