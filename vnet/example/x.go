@@ -157,7 +157,7 @@ func (n *myNode) GetHwInterfaceCounterValues(t *vnet.InterfaceThread) { return }
 func ip4Template(t *hw.BufferTemplate) {
 	t.Data = vnet.MakePacket(
 		&ethernet.Header{
-			Type: ethernet.IP4.FromHost(),
+			Type: ethernet.TYPE_IP4.FromHost(),
 			Src:  ethernet.Address{0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5},
 			Dst:  ethernet.Address{0xea, 0xeb, 0xec, 0xed, 0xee, 0xef},
 		},
@@ -178,7 +178,7 @@ func ip4Template(t *hw.BufferTemplate) {
 func arpTemplate(t *hw.BufferTemplate) {
 	t.Data = vnet.MakePacket(
 		&ethernet.Header{
-			Type: ethernet.ARP.FromHost(),
+			Type: ethernet.TYPE_ARP.FromHost(),
 			Src:  ethernet.Address{0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5},
 			Dst:  ethernet.BroadcastAddr,
 		},
@@ -186,7 +186,7 @@ func arpTemplate(t *hw.BufferTemplate) {
 			Header: arp.Header{
 				Opcode:          arp.Request.FromHost(),
 				L2Type:          arp.L2TypeEthernet.FromHost(),
-				L3Type:          vnet.Uint16(ethernet.IP4.FromHost()),
+				L3Type:          vnet.Uint16(ethernet.TYPE_IP4.FromHost()),
 				NL2AddressBytes: ethernet.AddressBytes,
 				NL3AddressBytes: ip4.AddressBytes,
 			},
@@ -212,7 +212,7 @@ func (n *myNode) Init() (err error) {
 	ethernet.RegisterInterface(v, n, config, "my-node")
 	v.RegisterInterfaceNode(n, n.Hi(), "my-node")
 
-	// Link is always up for packet generator.
+	// Link is always up for my-node.
 	if err = n.SetLinkUp(true); err != nil {
 		return
 	}
