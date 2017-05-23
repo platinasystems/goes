@@ -7,6 +7,7 @@ package ip4
 import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/icmp4"
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/pg"
 
@@ -16,11 +17,13 @@ import (
 
 type pgStream struct {
 	pg.Stream
+	ai_src, ai_dst addressIncrement
 }
 
 type pgMain struct {
 	v           *vnet.Vnet
 	protocolMap map[ip.Protocol]pg.StreamType
+	icmpMain
 }
 
 func (m *pgMain) initProtocolMap() {
@@ -28,8 +31,7 @@ func (m *pgMain) initProtocolMap() {
 		return
 	}
 	m.protocolMap = make(map[ip.Protocol]pg.StreamType)
-	// FIXME: not yet
-	// m.protocol[ICMP] = pg.GetStreamType(m.v, "icmp")
+	m.protocolMap[ip.ICMP] = pg.GetStreamType(m.v, "icmp4")
 }
 
 func (m *pgMain) Name() string { return "ip4" }
@@ -97,33 +99,32 @@ func (s *pgStream) addInc(isSrc, isRandom bool, h *Header, min, max uint64) {
 	if max < min {
 		max = min
 	}
-	ai := &addressIncrement{
-		s:        s,
+	ai := addressIncrement{
 		min:      min,
 		max:      max,
 		cur:      min,
-		isSrc:    isSrc,
 		isRandom: isRandom,
 	}
 	if isSrc {
 		ai.base = h.Src
+		s.ai_src = ai
 	} else {
 		ai.base = h.Dst
+		s.ai_dst = ai
 	}
-	s.DataHooks.Add(ai.Do)
 }
 
 type addressIncrement struct {
-	s        *pgStream
 	base     Address
 	cur      uint64
 	min      uint64
 	max      uint64
-	isSrc    bool
 	isRandom bool
 }
 
-func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
+func (ai *addressIncrement) valid() bool { return ai.max != ai.min }
+
+func (ai *addressIncrement) do(dst []vnet.Ref, dataOffset uint, isSrc bool) {
 	for i := range dst {
 		h := (*Header)(dst[i].DataOffset(dataOffset))
 		v := ai.cur
@@ -131,7 +132,7 @@ func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
 			v = uint64(rand.Intn(int(1 + ai.max - ai.min)))
 		}
 		a := &h.Dst
-		if ai.isSrc {
+		if isSrc {
 			a = &h.Src
 		}
 		*a = ai.base
@@ -144,7 +145,78 @@ func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
 	}
 }
 
+func (s *pgStream) Finalize(r []vnet.Ref, data_offset uint) (changed bool) {
+	if s.ai_src.valid() {
+		s.ai_src.do(r, data_offset, true)
+		changed = true
+	}
+	if s.ai_dst.valid() {
+		s.ai_dst.do(r, data_offset, false)
+		changed = true
+	}
+	if s.IsVariableSize() {
+		s.setLength(r, data_offset)
+		changed = true
+	}
+	return
+}
+
+func (s *pgStream) setLength(dst []vnet.Ref, dataOffset uint) {
+	for i := range dst {
+		r := &dst[i]
+		h := (*Header)(r.DataOffset(dataOffset))
+		h.Length.Set(r.ChainLen() - dataOffset)
+		h.Checksum = h.ComputeChecksum()
+	}
+}
+
+type icmpMain struct {
+}
+
+type icmpStream struct {
+	pg.Stream
+}
+
+func (m *icmpMain) Name() string { return "icmp4" }
+
+func (m *icmpMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
+	var s icmpStream
+	h := icmp4.Header{}
+	for !in.End() {
+		switch {
+		case in.Parse("%v", &h):
+			s.AddHeader(&h)
+			switch h.Type {
+			case icmp4.Echo_request, icmp4.Echo_reply:
+				s.AddHeader(&icmp4.EchoRequest{})
+			}
+		default:
+			err = parse.ErrInput
+			return
+		}
+	}
+	if err == nil {
+		r = &s
+	}
+	return
+}
+
+func (s *icmpStream) Finalize(dst []vnet.Ref, do uint) (changed bool) {
+	if changed = s.IsVariableSize(); !changed {
+		return
+	}
+	for i := range dst {
+		r := &dst[i]
+		h := (*icmp4.Header)(r.DataOffset(do))
+		h.Checksum = 0
+		sum := ip.Checksum(0).AddRef(r, do)
+		h.Checksum = ^sum.Fold()
+	}
+	return
+}
+
 func (m *pgMain) pgInit(v *vnet.Vnet) {
 	m.v = v
 	pg.AddStreamType(v, "ip4", m)
+	pg.AddStreamType(v, "icmp4", &m.icmpMain)
 }
