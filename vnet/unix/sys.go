@@ -26,6 +26,18 @@ func rwv(fd int, iov []iovec, isWrite bool) (n int, e syscall.Errno) {
 func readv(fd int, iov []iovec) (int, syscall.Errno)  { return rwv(fd, iov, false) }
 func writev(fd int, iov []iovec) (int, syscall.Errno) { return rwv(fd, iov, true) }
 
+func rwmsg(fd, flags int, msg *msghdr, isWrite bool) (n int, e syscall.Errno) {
+	sc := syscall.SYS_RECVMSG
+	if isWrite {
+		sc = syscall.SYS_SENDMSG
+	}
+	r0, _, e := syscall.Syscall(uintptr(sc), uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(flags))
+	n = int(r0)
+	return
+}
+func recvmsg(fd, flags int, msg *msghdr) (int, syscall.Errno) { return rwmsg(fd, flags, msg, false) }
+func sendmsg(fd, flags int, msg *msghdr) (int, syscall.Errno) { return rwmsg(fd, flags, msg, true) }
+
 type msghdr syscall.Msghdr
 
 type mmsghdr struct {
@@ -44,7 +56,6 @@ func rwmmsg(fd, flags int, msgs []mmsghdr, isWrite bool) (n int, e syscall.Errno
 	n = int(r0)
 	return
 }
-
 func recvmmsg(fd, flags int, msgs []mmsghdr) (int, syscall.Errno) {
 	return rwmmsg(fd, flags, msgs, false)
 }
