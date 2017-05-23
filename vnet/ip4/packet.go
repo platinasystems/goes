@@ -8,7 +8,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 
-	"bytes"
 	"unsafe"
 )
 
@@ -108,19 +107,12 @@ func (h *Header) ComputeChecksum() vnet.Uint16 {
 }
 
 func (h *Header) Len() uint { return HeaderBytes }
-func (h *Header) Finalize(payload []vnet.PacketHeader) {
-	var sum uint
-	for _, l := range payload {
-		sum += l.Len()
-	}
-	h.Length.Set(HeaderBytes + sum)
+func (h *Header) Write(b []byte) {
+	h.Length.Set(uint(len(b)))
 	h.Checksum = 0
 	h.Checksum = h.checksum()
-}
-
-func (h *Header) Write(b *bytes.Buffer) {
-	type t struct{ data [20]byte }
+	type t struct{ data [HeaderBytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
