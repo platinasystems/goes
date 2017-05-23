@@ -306,6 +306,8 @@ func (e *LinkStateEvent) String() string {
 	return fmt.Sprintf("link-state %s %v", e.Hi.Name(e.Vnet()), e.IsUp)
 }
 
+func (i Hi) GetAddress(v *Vnet) []byte { return v.HwIfer(i).GetAddress() }
+
 func (h *HwIf) MaxPacketSize() uint { return h.maxPacketSize }
 
 func (h *HwIf) SetMaxPacketSize(v uint) (err error) {
@@ -555,6 +557,7 @@ func (b *Bandwidth) Parse(in *parse.Input) {
 // Class of hardware interfaces, for example, ethernet, sonet, srp, docsis, etc.
 type HwIfClasser interface {
 	DefaultId() IfIndex
+	GetAddress() []byte
 	FormatAddress() string
 	SetRewrite(v *Vnet, r *Rewrite, t PacketType, dstAddr []byte)
 	FormatRewrite(r *Rewrite) string
