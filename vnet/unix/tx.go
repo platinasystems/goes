@@ -22,25 +22,6 @@ type tx_node struct {
 	p_pool  chan *tx_packet
 }
 
-type net_namespace_tx_node struct {
-	n *tx_node
-
-	// Raw socket for transmit path.
-	tx_raw_socket_fd int
-	iomux.File
-
-	active_count int32
-	to_tx        chan *tx_packet_vector
-	pv           *tx_packet_vector
-
-	suspend_saved_out *vnet.RefIn
-}
-
-func (n *net_namespace_tx_node) init(m *net_namespace_main) {
-	n.to_tx = make(chan *tx_packet_vector, vnet.MaxVectorLen)
-	n.n = &m.tx_node
-}
-
 type tx_packet struct {
 	ifindex uint32
 	iovs    iovecVec
@@ -71,7 +52,7 @@ func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) (l uint) {
 
 type tx_packet_vector struct {
 	n_packets   uint
-	ns          *net_namespace
+	intf        *tuntap_interface
 	buffer_pool *vnet.BufferPool
 	a           [packet_vector_max_len]syscall.RawSockaddrLinklayer
 	m           [packet_vector_max_len]mmsghdr
@@ -79,7 +60,7 @@ type tx_packet_vector struct {
 	r           [packet_vector_max_len]vnet.Ref
 }
 
-func (n *tx_node) get_packet_vector(p *vnet.BufferPool, ns *net_namespace) (v *tx_packet_vector) {
+func (n *tx_node) get_packet_vector(p *vnet.BufferPool, intf *tuntap_interface) (v *tx_packet_vector) {
 	select {
 	case v = <-n.pv_pool:
 	default:
@@ -87,7 +68,7 @@ func (n *tx_node) get_packet_vector(p *vnet.BufferPool, ns *net_namespace) (v *t
 	}
 	v.n_packets = 0
 	v.buffer_pool = p
-	v.ns = ns
+	v.intf = intf
 	return
 }
 func (n *tx_node) put_packet_vector(v *tx_packet_vector) { n.pv_pool <- v }
@@ -110,6 +91,7 @@ func (v *tx_packet_vector) add_packet(n *tx_node, r *vnet.Ref, ifindex uint32) {
 const (
 	tx_error_unknown_interface = iota
 	tx_error_interface_down
+	tx_error_packet_too_large
 )
 
 func (n *tx_node) init(m *net_namespace_main) {
@@ -117,6 +99,7 @@ func (n *tx_node) init(m *net_namespace_main) {
 	n.Errors = []string{
 		tx_error_unknown_interface: "unknown interface",
 		tx_error_interface_down:    "interface is down",
+		tx_error_packet_too_large:  "packet too large",
 	}
 	m.m.v.RegisterOutputNode(n, "punt")
 	n.pv_pool = make(chan *tx_packet_vector, 2*vnet.MaxVectorLen)
@@ -126,20 +109,20 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 	elog.GenEventf("unix-tx output %d", out.InLen())
 	var (
 		pv        *tx_packet_vector
-		ns        *net_namespace
+		pv_intf   *tuntap_interface
 		n_unknown uint
 	)
 	for i := uint(0); i < out.InLen(); i++ {
 		r := &out.Refs[i]
-		if intf, ok := n.m.interface_by_si[r.Si]; ok {
-			if intf.namespace != ns {
+		if intf, ok := n.m.vnet_tuntap_interface_by_si[r.Si]; ok {
+			if intf != pv_intf {
 				if pv != nil {
 					pv.tx(n, out)
 				}
-				ns = intf.namespace
+				pv_intf = intf
 			}
 			if pv == nil {
-				pv = n.get_packet_vector(out.BufferPool, ns)
+				pv = n.get_packet_vector(out.BufferPool, intf)
 			}
 			pv.add_packet(n, r, intf.ifindex)
 			if pv.n_packets >= packet_vector_max_len {
@@ -158,22 +141,22 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 }
 
 func (v *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
-	np, ns := v.n_packets, v.ns
+	np, intf := v.n_packets, v.intf
 	elog.GenEventf("unix-tx %d", np)
-	atomic.AddInt32(&ns.active_count, int32(np))
-	iomux.Update(ns)
+	atomic.AddInt32(&intf.active_count, int32(np))
+	iomux.Update(intf)
 	for {
 		select {
-		case ns.to_tx <- v:
+		case intf.to_tx <- v:
 			return
 		default:
-			ns.suspend_saved_out = out
+			intf.suspend_saved_out = out
 			n.Suspend(out)
 		}
 	}
 }
 
-func (pv *tx_packet_vector) advance(n *net_namespace_tx_node, i uint) {
+func (pv *tx_packet_vector) advance(n *tx_node, intf *tuntap_interface, i uint) {
 	np := pv.n_packets
 	n_left := np - i
 	pv.buffer_pool.FreeRefs(&pv.r[0], i, true)
@@ -187,45 +170,58 @@ func (pv *tx_packet_vector) advance(n *net_namespace_tx_node, i uint) {
 		}
 		pv.n_packets = n_left
 	} else {
-		n.n.put_packet_vector(pv)
-		n.pv = nil
+		n.put_packet_vector(pv)
+		intf.pv = nil
 	}
 }
 
-func (n *net_namespace) WriteAvailable() bool { return n.active_count > 0 }
+func (intf *tuntap_interface) WriteAvailable() bool { return intf.active_count > 0 }
 
-func (ns *net_namespace) WriteReady() (err error) {
-	n := &ns.net_namespace_tx_node
-	if n.pv == nil {
-		n.pv = <-n.to_tx
+func (intf *tuntap_interface) WriteReady() (err error) {
+	if intf.pv == nil {
+		intf.pv = <-intf.to_tx
 	}
-	pv := n.pv
-	n_packets, errno := sendmmsg(n.Fd, 0, pv.m[:pv.n_packets])
-	switch {
-	case errno == syscall.EWOULDBLOCK:
-		return
-	case errno == syscall.EIO:
-		// Signaled by tun.c in kernel and means that interface is down.
-		n.n.CountError(tx_error_interface_down, 1)
-	case errno != 0:
-		err = fmt.Errorf("sendmmsg: %s", errno)
-		return
-	default:
-		if n.n.m.m.verbose_packets {
-			for i := 0; i < n_packets; i++ {
-				r := &pv.r[i]
-				intf := ns.interface_by_index[pv.p[i].ifindex]
-				n.n.m.m.v.Logf("unix tx ns %s %s: %s\n", ns, intf.name, ethernet.RefString(r))
+	pv := intf.pv
+	n := &intf.namespace.m.tx_node
+
+	n_packets := 0
+loop:
+	for i := uint(0); i < pv.n_packets; i++ {
+		_, errno := writev(intf.Fd, pv.p[i].iovs)
+		switch errno {
+		case syscall.EWOULDBLOCK:
+			break loop
+		case syscall.EIO:
+			// Signaled by tun.c in kernel and means that interface is down.
+			n.CountError(tx_error_interface_down, 1)
+		case syscall.EMSGSIZE:
+			n.CountError(tx_error_packet_too_large, 1)
+		default:
+			if errno != 0 {
+				err = fmt.Errorf("writev: %s", errno)
+				break loop
 			}
 		}
-		elog.GenEventf("unix write-ready tx %d", n_packets)
-		pv.advance(n, uint(n_packets))
-		atomic.AddInt32(&ns.active_count, int32(-n_packets))
-		iomux.Update(ns)
-		if out := ns.suspend_saved_out; out != nil && len(n.to_tx) < cap(n.to_tx)/2 {
-			ns.suspend_saved_out = nil
-			n.n.Resume(out)
+		n_packets++
+	}
+	if n.m.m.verbose_packets {
+		for i := 0; i < n_packets; i++ {
+			r := &pv.r[i]
+			n.m.m.v.Logf("unix tx %s: %s\n", intf.Name(), ethernet.RefString(r))
 		}
+	}
+	np := n_packets
+	// Advance to next packet in error case.
+	if np < 0 {
+		np = 1
+	}
+	elog.GenEventf("unix write-ready tx %d", np)
+	pv.advance(n, intf, uint(np))
+	atomic.AddInt32(&intf.active_count, int32(-np))
+	iomux.Update(intf)
+	if out := intf.suspend_saved_out; out != nil && len(intf.to_tx) < cap(intf.to_tx)/2 {
+		intf.suspend_saved_out = nil
+		n.Resume(out)
 	}
 	return
 }

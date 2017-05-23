@@ -7,7 +7,6 @@ package unix
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
-	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 
@@ -74,10 +73,6 @@ func (m *netlink_main) namespace_init() (err error) {
 		if ns.ns_fd, err = nm.fd_for_path("", "/proc/self/ns/net"); err != nil {
 			return
 		}
-		if ns.tx_raw_socket_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, 0); err != nil {
-			return
-		}
-		ns.iomux_add()
 
 		ns.index = nm.namespace_pool.GetIndex()
 		nm.namespace_pool.entries[ns.index] = ns
@@ -89,20 +84,19 @@ func (m *netlink_main) namespace_init() (err error) {
 			return
 		}
 		ns.listen(m)
-		ns.net_namespace_tx_node.init(nm)
 	}
 
 	// Setup initial namespaces.
 	m.read_dir(netnsDir, m.watch_namespace_add_del)
-	m.n_namespace_learned_at_init = uint32(len(nm.namespace_by_name))
+	m.n_namespace_discovered_at_init = uint32(len(nm.namespace_by_name))
 	return
 }
 
 // Called when initial netlink dump via netlink.Listen is done.
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
-	if atomic.AddUint32(&nm.n_netlink_dump_done, 1) == nm.n_namespace_learned_at_init {
-		err = m.netlink_dump_done_for_all_namespaces()
+	if atomic.AddUint32(&nm.n_namespace_discovery_done, 1) == nm.n_namespace_discovered_at_init {
+		err = m.netlink_discovery_done_for_all_namespaces()
 	}
 	return
 }
@@ -166,9 +160,9 @@ type net_namespace struct {
 
 	mu sync.Mutex
 
-	tuntap_interface_by_ifindex map[uint32]*tuntap_interface
-	dummy_interface_by_ifindex  map[uint32]*dummy_interface
-	si_by_ifindex               map[uint32]vnet.Si
+	vnet_tuntap_interface_by_ifindex map[uint32]*tuntap_interface
+	dummy_interface_by_ifindex       map[uint32]*dummy_interface
+	si_by_ifindex                    map[uint32]vnet.Si
 
 	is_default bool
 
@@ -179,23 +173,22 @@ type net_namespace struct {
 
 	interface_by_index map[uint32]*net_namespace_interface
 	interface_by_name  map[string]*net_namespace_interface
-
-	net_namespace_tx_node
 }
 
 //go:generate gentemplate -d Package=unix -id net_namespace -d PoolType=net_namespace_pool -d Type=*net_namespace -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
 
 type net_namespace_main struct {
-	m                           *Main
-	default_namespace           net_namespace
-	namespace_by_name           map[string]*net_namespace
-	tuntap_interface_by_name    map[string]*tuntap_interface
-	n_netlink_dump_done         uint32
-	n_namespace_learned_at_init uint32
-	interface_by_si             map[vnet.Si]*net_namespace_interface
-	namespace_pool              net_namespace_pool
-	rx_node                     rx_node
-	tx_node                     tx_node
+	m                                *Main
+	default_namespace                net_namespace
+	namespace_by_name                map[string]*net_namespace
+	vnet_tuntap_interface_by_si      map[vnet.Si]*tuntap_interface
+	vnet_tuntap_interface_by_address map[string]*tuntap_interface
+	n_namespace_discovery_done       uint32
+	n_namespace_discovered_at_init   uint32
+	interface_by_si                  map[vnet.Si]*net_namespace_interface
+	namespace_pool                   net_namespace_pool
+	rx_node                          rx_node
+	tx_node                          tx_node
 }
 
 func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {
@@ -268,6 +261,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		return
 	}
 	name := msg.Attrs[netlink.IFLA_IFNAME].String()
+	address := msg.Attrs[netlink.IFLA_ADDRESS].(*netlink.EthernetAddress).Bytes()
 	index := msg.Index
 	if !is_del {
 		if ns.interface_by_index == nil {
@@ -293,11 +287,11 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			intf.name = name
 
 			// Change name of corresponding vnet interface.
-			if tif, ok := ns.tuntap_interface_by_ifindex[index]; ok {
+			if tif, ok := ns.vnet_tuntap_interface_by_ifindex[index]; ok {
 				tif.set_name(name)
 			}
 		} else {
-			if tif, ok := m.tuntap_interface_by_name[name]; ok {
+			if tif, ok := m.vnet_tuntap_interface_by_address[string(address)]; ok {
 				if ns.si_by_ifindex == nil {
 					ns.si_by_ifindex = make(map[uint32]vnet.Si)
 				}
@@ -393,23 +387,11 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 }
 
 func (ns *net_namespace) allocate_sockets() (err error) {
-	ns.tx_raw_socket_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, 0)
-	if err == nil {
-		ns.netlink_socket_fds[0], err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
-	}
+	ns.netlink_socket_fds[0], err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
 	if err == nil {
 		ns.netlink_socket_fds[1], err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
 	}
 	return
-}
-
-func (ns *net_namespace) iomux_add() {
-	if err := syscall.SetsockoptInt(ns.tx_raw_socket_fd, syscall.SOL_SOCKET, syscall.SO_SNDBUF, 1<<20); err != nil {
-		panic(err)
-	}
-	ns.File.SetWriteOnly()
-	ns.File.Fd = ns.tx_raw_socket_fd
-	iomux.Add(ns)
 }
 
 func (m *net_namespace_main) max_n_namespace() uint { return uint(len(m.namespace_by_name)) }
@@ -445,12 +427,10 @@ func (ns *net_namespace) add(m *netlink_main) {
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
-	ns.iomux_add()
 	if err = ns.netlink_socket_pair.configure(ns.netlink_socket_fds[0], ns.netlink_socket_fds[1]); err != nil {
 		panic(err)
 	}
 	ns.listen(m)
-	ns.net_namespace_tx_node.init(nm)
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
@@ -458,23 +438,9 @@ func (ns *net_namespace) del(m *netlink_main) {
 	ns.m.namespace_pool.entries[ns.index] = nil
 	ns.index = ^uint(0)
 
-	iomux.Del(ns)
 	if ns.ns_fd > 0 {
 		syscall.Close(ns.ns_fd)
 		ns.ns_fd = -1
 	}
-	if ns.Fd > 0 {
-		syscall.Close(ns.Fd)
-		ns.Fd = -1
-	}
 	ns.netlink_socket_pair.close()
-}
-
-func (ns *net_namespace) ErrorReady() (err error) {
-	var v int
-	v, err = syscall.GetsockoptInt(ns.Fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
-	if err == nil && v != 0 {
-		err = syscall.Errno(v)
-	}
-	return
 }

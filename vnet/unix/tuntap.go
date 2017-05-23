@@ -38,12 +38,19 @@ type tuntap_interface struct {
 
 	mtuBytes   uint
 	mtuBuffers uint
+
+	active_count int32
+	to_tx        chan *tx_packet_vector
+	pv           *tx_packet_vector
+
+	suspend_saved_out *vnet.RefIn
 }
 
 //go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
 
-func (m *Main) interfaceForSi(si vnet.Si) *tuntap_interface { return m.ifVec[si] }
-
+func (m *Main) interface_for_si(si vnet.Si) *tuntap_interface {
+	return m.vnet_tuntap_interface_by_si[si]
+}
 func (i *tuntap_interface) Name() string   { return i.name.String() }
 func (i *tuntap_interface) String() string { return i.Name() }
 
@@ -70,13 +77,11 @@ func AddExternalInterface(v *vnet.Vnet, ifIndex int, si vnet.Si) {
 
 func (i *tuntap_interface) close() {
 	if i.provision_fd > 0 {
-		if i.Fd == i.provision_fd {
-			iomux.Del(i)
-		}
 		syscall.Close(i.provision_fd)
 		i.provision_fd = -1
 	}
 	if i.dev_net_tun_fd > 0 {
+		iomux.Del(i)
 		syscall.Close(i.dev_net_tun_fd)
 		i.dev_net_tun_fd = -1
 	}
@@ -86,7 +91,11 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 	if is_del {
 		i.close()
 	} else {
+		is_discovery := i.namespace == nil
 		i.namespace = ns
+		if is_discovery {
+			return
+		}
 		if err := i.open_sockets(); err != nil {
 			panic(err)
 		}
@@ -99,13 +108,8 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 
 type tuntap_main struct {
 	// Selects whether we create tun or tap interfaces.
-	isTun bool
-
-	mtuBytes uint
-
-	ifVec  interfaceVec
-	ifBySi map[vnet.Si]*tuntap_interface
-
+	isTun      bool
+	mtuBytes   uint
 	bufferPool *vnet.BufferPool
 }
 
@@ -284,37 +288,41 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	name := si.Name(v)
 	copy(intf.name[:], name)
 
-	m.ifVec.Validate(uint(intf.si))
-	m.ifVec[intf.si] = intf
-	if m.ifBySi == nil {
-		m.ifBySi = make(map[vnet.Si]*tuntap_interface)
+	if m.vnet_tuntap_interface_by_si == nil {
+		m.vnet_tuntap_interface_by_si = make(map[vnet.Si]*tuntap_interface)
 	}
-	m.ifBySi[intf.si] = intf
-
-	if m.tuntap_interface_by_name == nil {
-		m.tuntap_interface_by_name = make(map[string]*tuntap_interface)
+	m.vnet_tuntap_interface_by_si[si] = intf
+	if m.vnet_tuntap_interface_by_address == nil {
+		m.vnet_tuntap_interface_by_address = make(map[string]*tuntap_interface)
 	}
-	m.tuntap_interface_by_name[name] = intf
+	m.vnet_tuntap_interface_by_address[string(hi.GetAddress(v))] = intf
 	return
 }
 
 func (intf *tuntap_interface) is_initialized() bool { return intf.namespace != nil }
 
-func (m *Main) netlink_dump_done_for_all_namespaces() (err error) {
+func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 	nm := &m.net_namespace_main
-	for _, intf := range m.ifBySi {
-		name := intf.name.String()
-		ns, i := nm.interface_by_name(name)
-		if ns == nil {
-			ns = &nm.default_namespace
+
+	// Create any interfaces that were not found via netlink discovery.
+	for si, intf := range m.vnet_tuntap_interface_by_si {
+		if _, ok := nm.interface_by_si[si]; !ok {
+			intf.namespace = nil // &nm.default_namespace // use default namespace.
+			err = intf.create(m)
+			if err != nil {
+				return
+			}
 		}
-		if i != nil {
-			i.tuntap = intf
-		}
-		intf.namespace = ns
-		err = intf.create(m)
-		if err != nil {
-			return
+	}
+
+	for _, nsi := range nm.interface_by_si {
+		intf := nsi.tuntap
+		if intf != nil {
+			intf.namespace = nsi.namespace
+			err = intf.create(m)
+			if err != nil {
+				return
+			}
 		}
 	}
 	return
@@ -351,9 +359,9 @@ func (intf *tuntap_interface) bind() (err error) {
 }
 
 func (intf *tuntap_interface) start_up() {
+	intf.to_tx = make(chan *tx_packet_vector, vnet.MaxVectorLen)
 	intf.setOperState(true)
-	intf.Fd = intf.provision_fd
-	intf.File.SetReadOnly()
+	intf.Fd = intf.dev_net_tun_fd
 	iomux.Add(intf)
 }
 
@@ -392,10 +400,10 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		}
 		intf.ifindex = uint32(r.i)
 		ns.mu.Lock()
-		if ns.tuntap_interface_by_ifindex == nil {
-			ns.tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
+		if ns.vnet_tuntap_interface_by_ifindex == nil {
+			ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
 		}
-		ns.tuntap_interface_by_ifindex[intf.ifindex] = intf
+		ns.vnet_tuntap_interface_by_ifindex[intf.ifindex] = intf
 		ns.mu.Unlock()
 	}
 
@@ -508,7 +516,7 @@ func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 	if !m.okSi(si) {
 		return
 	}
-	intf := m.interfaceForSi(si)
+	intf := m.interface_for_si(si)
 	if intf.is_initialized() && intf.set_flags_at_first_up_down {
 		intf.set_flags_at_first_up_down = false
 		err = intf.set_flags()
@@ -526,7 +534,7 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if !m.okHi(hi) {
 		return
 	}
-	intf := m.interfaceForSi(v.HwIf(hi).Si())
+	intf := m.interface_for_si(v.HwIf(hi).Si())
 	err = m.maybeChangeFlag(intf, isUp, iff_lower_up)
 	if err != nil {
 		return

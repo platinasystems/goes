@@ -45,7 +45,7 @@ func (m *netlink_main) netlink_add_del_routes() {
 
 			for i := range x.ip4_nhs {
 				nh := &x.ip4_nhs[i]
-				intf := m.m.ifBySi[nh.Si]
+				intf := m.m.interface_by_si[nh.Si]
 				var addrs [2]netlink.Ip4Address
 				addrs[0] = netlink.Ip4Address(p.Address)
 				addrs[1] = netlink.Ip4Address(nh.Address)
@@ -65,8 +65,7 @@ func (m *netlink_main) netlink_add_del_routes() {
 				msg.Attrs[netlink.RTA_DST] = &addrs[0]
 				msg.DstLen = uint8(p.Len)
 				msg.Attrs[netlink.RTA_GATEWAY] = &addrs[1]
-				msg.Attrs[netlink.RTA_OIF] =
-					netlink.Int32Attr(intf.ifindex)
+				msg.Attrs[netlink.RTA_OIF] = netlink.Int32Attr(intf.ifindex)
 				x.ns.NetlinkTx(msg, false)
 			}
 		}

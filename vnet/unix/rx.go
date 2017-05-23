@@ -192,24 +192,19 @@ func errorForErrno(tag string, errno syscall.Errno) (err error) {
 	// Ignore "network is down" errors.  Just silently drop packet.
 	// These happen when interface is IFF_RUNNING (e.g. link up) but not yet IFF_UP (admin up).
 	switch errno {
-	case 0, syscall.ENETDOWN:
+	case 0, syscall.EAGAIN, syscall.ENETDOWN:
 	default:
 		err = fmt.Errorf("%s: %s", tag, errno)
 	}
 	return
 }
 
-// Write side is not used.  Per-namespace raw socket is used for tx path.
-func (intf *tuntap_interface) WriteReady() (err error) { panic("shoudn't be called") }
-func (intf *tuntap_interface) WriteAvailable() bool    { return false }
-
 func (intf *tuntap_interface) ErrorReady() (err error) {
-	var e int
-	if e, err = syscall.GetsockoptInt(intf.Fd, syscall.SOL_SOCKET, syscall.SO_ERROR); err == nil {
-		err = errorForErrno("error ready", syscall.Errno(e))
-	}
+	// Perform 0 byte read to get error from tuntap device.
+	var b [0]byte
+	_, err = syscall.Read(intf.Fd, b[:])
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
 	return
 }
@@ -217,12 +212,17 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 func (intf *tuntap_interface) ReadReady() (err error) {
 	rx := &intf.m.rx_node
 	v := rx.get_packet_vector()
-	n_packets, errno := recvmmsg(intf.Fd, 0, v.m[:])
-	if errno != 0 {
-		err = errorForErrno("recvmmsg", errno)
-		if n_packets > 0 {
-			panic(fmt.Errorf("ReadReady error %s but n packets %d > 0", err, n_packets))
+	n_packets := 0
+	for i := range v.m {
+		n, errno := readv(intf.Fd, v.p[i].iovs)
+		if errno != 0 {
+			err = errorForErrno("readv", errno)
+			break
 		}
+		v.m[i].msg_len = uint32(n)
+		n_packets++
+	}
+	if err != nil {
 		rx.put_packet_vector(v)
 		rx.CountError(rx_error_drop, 1)
 		return
@@ -232,9 +232,8 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 	for i := 0; i < n_packets; i++ {
 		p := &v.p[i]
 		m := &v.m[i]
-		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), uint(m.msg_hdr.ifindex()))
+		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), uint(intf.ifindex))
 	}
-
 	elog.GenEventf("unix-rx ready %d", n_packets)
 	rx.rv_input <- rv
 	rx.active_lock.Lock()
