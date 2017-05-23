@@ -298,6 +298,7 @@ type rx_next uint8
 const (
 	rx_next_error rx_next = iota
 	rx_next_punt
+	rx_next_punt_node
 	rx_next_ethernet_input
 	rx_next_ip4_input_valid_checksum
 	rx_next_ip6_input

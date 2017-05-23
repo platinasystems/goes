@@ -159,7 +159,19 @@ func (d *dev) Init() {
 
 	// Accept all broadcast packets.
 	// Multicasts must be explicitly added to dst_ethernet_address register array.
-	d.regs.filter_control.set(d, 1<<10)
+	{
+		const (
+			accept_all_broadcast = 1 << 10
+			accept_all_unicast   = 1 << 9
+			accept_all_multicast = 1 << 8
+			accept_all_tags      = 1 << 7
+		)
+		v := reg(accept_all_broadcast)
+		if d.m.Config.PuntNode != "" {
+			v |= accept_all_multicast | accept_all_unicast | accept_all_tags
+		}
+		d.regs.filter_control.set(d, v)
+	}
 
 	// Enable frames up to size in mac frame size register.
 	// Set max frame size so we never drop frames.
@@ -231,13 +243,17 @@ func Init(v *vnet.Vnet, c ...Config) {
 
 type Config struct {
 	DisableUnix bool
+	// In punt mode all packets are accepted and passed to double tag punt node.
+	PuntNode string
 }
 
 func (m *main) Configure(in *parse.Input) {
+	c := &m.Config
 	for !in.End() {
 		switch {
 		case in.Parse("no-unix"):
-			m.DisableUnix = true
+			c.DisableUnix = true
+		case in.Parse("punt %v", &c.PuntNode):
 		default:
 			panic(parse.ErrInput)
 		}

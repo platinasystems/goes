@@ -66,7 +66,7 @@ func main() {
 	ethernet.Init(v)
 	ip4.Init(v)
 	ip6.Init(v)
-	ixge.Init(v, ixge.Config{DisableUnix: true})
+	ixge.Init(v, ixge.Config{DisableUnix: true, PuntNode: "punt"})
 	pci.Init(v)
 	pg.Init(v)
 	ipcli.Init(v)
