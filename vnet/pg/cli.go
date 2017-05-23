@@ -163,7 +163,7 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 	}
 
 	if set_what&(set_stream|set_size) != 0 || create {
-		s.SetData()
+		s.setData()
 		n.setData(s)
 	}
 
