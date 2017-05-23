@@ -19,6 +19,9 @@ import (
 type rx_dma_queue struct {
 	vnet.RxDmaRing
 
+	punt_mode bool
+	punt_next rx_next
+
 	dma_queue
 
 	rx_desc rx_from_hw_descriptor_vec
@@ -45,6 +48,9 @@ func (d *dev) rx_dma_init(queue uint) {
 	q := d.rx_queues.Validate(queue)
 	q.d = d
 	q.index = queue
+	if q.punt_mode = d.m.Config.PuntNode != ""; q.punt_mode {
+		q.punt_next = rx_next(d.m.Vnet.AddNamedNext(d, d.m.Config.PuntNode))
+	}
 
 	// DMA buffer pool init.
 	if len(d.rx_pool.Name) == 0 {
@@ -314,7 +320,14 @@ const (
 func (q *rx_dma_queue) GetRefState(f vnet.RxDmaDescriptorFlags) (s vnet.RxDmaRefState) {
 	error, next, advance := rx_error_none, rx_next_ethernet_input, 0
 
-	is_ip4 := f&rx_desc_is_ip4_checksummed != 0
+	var is_ip4 bool
+
+	if q.punt_mode {
+		error, next, advance = rx_error_none, q.punt_next, 0
+		goto done
+	}
+
+	is_ip4 = f&rx_desc_is_ip4_checksummed != 0
 	if is_ip4 {
 		next = rx_next_ip4_input_valid_checksum
 	}
@@ -343,6 +356,7 @@ func (q *rx_dma_queue) GetRefState(f vnet.RxDmaDescriptorFlags) (s vnet.RxDmaRef
 		}
 	}
 
+done:
 	s.Next = uint(next)
 	s.Si = q.d.Si()
 	s.SetError(&q.d.Node, uint(error))
