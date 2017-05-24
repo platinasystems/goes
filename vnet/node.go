@@ -133,8 +133,8 @@ type InOutNode struct {
 	t  InOutNoder
 }
 
-func (n *InOutNode) GetEnqueue() (q *enqueue) {
-	i := n.ThreadId()
+func (n *InOutNode) GetEnqueue(in *RefIn) (q *enqueue) {
+	i := in.ThreadId()
 	n.qs.Validate(i)
 	q = n.qs[i]
 	if n.qs[i] == nil {
@@ -148,7 +148,8 @@ func (n *InOutNode) GetInOutNode() *InOutNode    { return n }
 func (n *InOutNode) MakeLoopIn() loop.LooperIn   { return &RefIn{} }
 func (n *InOutNode) MakeLoopOut() loop.LooperOut { return &RefOut{} }
 func (n *InOutNode) LoopInputOutput(l *loop.Loop, i loop.LooperIn, o loop.LooperOut) {
-	q, in, out := n.GetEnqueue(), i.(*RefIn), o.(*RefOut)
+	in, out := i.(*RefIn), o.(*RefOut)
+	q := n.GetEnqueue(in)
 	q.n, q.i, q.o, q.v = 0, in, out, n.Vnet
 	n.t.NodeInput(in, out)
 	q.sync()

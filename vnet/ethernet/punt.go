@@ -175,7 +175,7 @@ func (n *DoubleTaggedPuntNode) Init(v *vnet.Vnet, name string) {
 }
 
 func (n *DoubleTaggedPuntNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {
-	q := n.GetEnqueue()
+	q := n.GetEnqueue(in)
 	i, n_left := in.Range()
 
 	for n_left >= 2 {
@@ -296,7 +296,7 @@ func (n *DoubleTaggedInjectNode) Init(v *vnet.Vnet, name string) {
 }
 
 func (n *DoubleTaggedInjectNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {
-	q := n.GetEnqueue()
+	q := n.GetEnqueue(in)
 	i, n_left := in.Range()
 
 	for n_left >= 2 {
