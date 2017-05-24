@@ -225,6 +225,7 @@ type DoubleTaggedInjectNode struct {
 }
 
 func (n *DoubleTaggedInjectNode) AddDisposition(next uint, offset_valid bool, si vnet.Si, tags [2]VlanTag) {
+	n.sw_if_add_del(n.Vnet, si, true)
 	d := &n.disposition_by_si[si]
 	d.tags = tags
 	d.next.set(next, offset_valid)
