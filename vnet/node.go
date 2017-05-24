@@ -125,17 +125,30 @@ func (q *enqueue) Put2(r0, r1 *Ref, x0, x1 uint) {
 	}
 }
 
+//go:generate gentemplate -d Package=vnet -id enqueue -d VecType=enqueue_vec -d Type=*enqueue github.com/platinasystems/go/elib/vec.tmpl
+
 type InOutNode struct {
 	Node
-	enqueue
-	t InOutNoder
+	qs enqueue_vec
+	t  InOutNoder
+}
+
+func (n *InOutNode) GetEnqueue() (q *enqueue) {
+	i := n.ThreadId()
+	n.qs.Validate(i)
+	q = n.qs[i]
+	if n.qs[i] == nil {
+		q = &enqueue{}
+		n.qs[i] = q
+	}
+	return
 }
 
 func (n *InOutNode) GetInOutNode() *InOutNode    { return n }
 func (n *InOutNode) MakeLoopIn() loop.LooperIn   { return &RefIn{} }
 func (n *InOutNode) MakeLoopOut() loop.LooperOut { return &RefOut{} }
 func (n *InOutNode) LoopInputOutput(l *loop.Loop, i loop.LooperIn, o loop.LooperOut) {
-	q, in, out := &n.enqueue, i.(*RefIn), o.(*RefOut)
+	q, in, out := n.GetEnqueue(), i.(*RefIn), o.(*RefOut)
 	q.n, q.i, q.o, q.v = 0, in, out, n.Vnet
 	n.t.NodeInput(in, out)
 	q.sync()
