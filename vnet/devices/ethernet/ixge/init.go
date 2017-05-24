@@ -234,7 +234,7 @@ func Init(v *vnet.Vnet, c ...Config) {
 	}
 
 	vnetpci.Init(v)
-	v.AddPackage("ixge", m)
+	packageIndex = v.AddPackage("ixge", m)
 	m.Package.DependsOn("unix")
 	m.Package.DependedOnBy("pci-discovery")
 
@@ -245,6 +245,19 @@ type Config struct {
 	DisableUnix bool
 	// In punt mode all packets are accepted and passed to double tag punt node.
 	PuntNode string
+}
+
+var packageIndex uint
+
+func getMain(v *vnet.Vnet) *main { return v.GetPackage(packageIndex).(*main) }
+
+func GetPortNames(v *vnet.Vnet) (names []string) {
+	m := getMain(v)
+	for i := range m.devs {
+		d := m.devs[i].get()
+		names = append(names, d.Name())
+	}
+	return
 }
 
 func (m *main) Configure(in *parse.Input) {
