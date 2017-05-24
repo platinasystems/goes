@@ -239,13 +239,15 @@ func (n *myNode) Init() (err error) {
 }
 
 func (n *myNode) Configure(in *parse.Input) {
-	switch {
-	case in.Parse("tuntap"):
-		n.isUnix = true
-	case in.Parse("verbose"):
-		n.verbose_output = true
-	default:
-		panic(parse.ErrInput)
+	for !in.End() {
+		switch {
+		case in.Parse("tuntap"):
+			n.isUnix = true
+		case in.Parse("verbose"):
+			n.verbose_output = true
+		default:
+			panic(parse.ErrInput)
+		}
 	}
 }
 
@@ -300,11 +302,8 @@ func (n *myNode) InterfaceOutput(in *vnet.TxRefVecIn) {
 		time.Sleep(1 * time.Second)
 	}
 	if n.verbose_output {
-		// Enable to echo ethernet/ip4.
 		for i := range in.Refs {
-			eh := (*ethernet.Header)(in.Refs[i].Data())
-			ih := (*ip4.Header)(in.Refs[i].DataOffset(14))
-			fmt.Printf("%s %s\n", eh, ih)
+			fmt.Printf("%s: %x\n", n.Name(), in.Refs[i].DataSlice())
 		}
 	}
 	n.CountError(tx_packets_dropped, in.NPackets())
