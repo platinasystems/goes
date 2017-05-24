@@ -6,6 +6,8 @@ package ethernet
 
 import (
 	"github.com/platinasystems/go/vnet"
+
+	"sync/atomic"
 )
 
 const (
@@ -195,8 +197,22 @@ func (n *DoubleTaggedPuntNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {
 	}
 }
 
+type inject_next uint32
+
+func (n inject_next) get(next_offset uint) (next uint) {
+	next = uint((n >> 1) + (inject_next(next_offset) & -(n & 1)))
+	return
+}
+func (n *inject_next) set(next uint, offset_valid bool) {
+	v := inject_next(2 * next)
+	if offset_valid {
+		v += 1
+	}
+	*n = v
+}
+
 type inject_packet_disposition struct {
-	next uint32
+	next inject_next
 	tags [2]VlanTag
 }
 
@@ -205,22 +221,24 @@ type inject_packet_disposition struct {
 type DoubleTaggedInjectNode struct {
 	vnet.InOutNode
 	disposition_by_si inject_packet_disposition_vec
+	sequence          uint32
 }
 
-func (n *DoubleTaggedInjectNode) AddDisposition(next string, si vnet.Si, tags [2]VlanTag) {
+func (n *DoubleTaggedInjectNode) AddDisposition(next uint, offset_valid bool, si vnet.Si, tags [2]VlanTag) {
 	d := &n.disposition_by_si[si]
 	d.tags = tags
-	d.next = uint32(n.Vnet.AddNamedNext(n, next))
+	d.next.set(next, offset_valid)
 	return
 }
 
 func (n *DoubleTaggedInjectNode) sw_if_add_del(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) {
-	zero := inject_packet_disposition{next: uint32(inject_2tag_next_error)}
+	var zero inject_packet_disposition
+	zero.next.set(uint(inject_2tag_next_error), false)
 	n.disposition_by_si.ValidateInit(uint(si), zero)
 	return
 }
 
-func (n *DoubleTaggedInjectNode) inject_x1(r0 *vnet.Ref) (next0 uint) {
+func (n *DoubleTaggedInjectNode) inject_x1(r0 *vnet.Ref, next_offset uint) (next0 uint) {
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 
 	d0 := &n.disposition_by_si[r0.Si]
@@ -242,11 +260,11 @@ func (n *DoubleTaggedInjectNode) inject_x1(r0 *vnet.Ref) (next0 uint) {
 
 	n.SetError(r0, inject_2tag_error_unknown_interface)
 
-	next0 = uint(d0.next)
+	next0 = d0.next.get(next_offset)
 
 	return
 }
-func (n *DoubleTaggedInjectNode) inject_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
+func (n *DoubleTaggedInjectNode) inject_x2(r0, r1 *vnet.Ref, next_offset uint) (next0, next1 uint) {
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 
 	d0, d1 := &n.disposition_by_si[r0.Si], &n.disposition_by_si[r1.Si]
@@ -274,8 +292,8 @@ func (n *DoubleTaggedInjectNode) inject_x2(r0, r1 *vnet.Ref) (next0, next1 uint)
 	n.SetError(r0, inject_2tag_error_unknown_interface)
 	n.SetError(r1, inject_2tag_error_unknown_interface)
 
-	next0 = uint(d0.next)
-	next1 = uint(d1.next)
+	next0 = d0.next.get(next_offset)
+	next1 = d1.next.get(next_offset)
 
 	return
 }
@@ -303,10 +321,11 @@ func (n *DoubleTaggedInjectNode) Init(v *vnet.Vnet, name string) {
 func (n *DoubleTaggedInjectNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {
 	q := n.GetEnqueue(in)
 	i, n_left := in.Range()
+	next_offset := uint(atomic.AddUint32(&n.sequence, 1)) & 1
 
 	for n_left >= 2 {
 		r0, r1 := in.Get2(i)
-		x0, x1 := n.inject_x2(r0, r1)
+		x0, x1 := n.inject_x2(r0, r1, next_offset)
 		q.Put2(r0, r1, x0, x1)
 		n_left -= 2
 		i += 2
@@ -314,7 +333,7 @@ func (n *DoubleTaggedInjectNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {
 
 	for n_left >= 1 {
 		r0 := in.Get1(i)
-		x0 := n.inject_x1(r0)
+		x0 := n.inject_x1(r0, next_offset)
 		q.Put1(r0, x0)
 		n_left -= 1
 		i += 1
