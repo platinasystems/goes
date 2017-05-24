@@ -121,12 +121,19 @@ type rx_node struct {
 	max_buffers_per_packet uint
 	active_lock            sync.Mutex
 	active_count           int32
+	next_for_inject        rx_node_next
 	next_by_si             elib.Uint32Vec
 }
 
 func (n *rx_node) set_next(si vnet.Si, next rx_node_next) {
 	n.next_by_si.ValidateInit(uint(si), uint32(rx_node_next_error))
 	n.next_by_si[si] = uint32(next)
+}
+
+func SetRxInjectNext(v *vnet.Vnet, inject_node_name string) {
+	m := GetMain(v)
+	n := &m.rx_node
+	n.next_for_inject = rx_node_next(v.AddNamedNext(n, inject_node_name))
 }
 
 type rx_node_next uint32
@@ -167,6 +174,9 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 	if si, ok := ns.si_by_ifindex[uint32(ifindex)]; ok {
 		ref.Si = si
 		v.nexts[i] = rx_node_next(rx.next_by_si[si])
+		if rx.next_for_inject != rx_node_next_error {
+			v.nexts[i] = rx.next_for_inject
+		}
 	} else {
 		ref.Si = vnet.SiNil
 		v.nexts[i] = rx_node_next_error
