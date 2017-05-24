@@ -51,6 +51,8 @@ func (m *Main) ip_route(c cli.Commander, w cli.Writer, in *cli.Input) (err error
 		return
 	}
 
+	m4 := ip4.GetMain(m.Vnet)
+
 	x.count = 1
 loop:
 	for !in.End() {
@@ -69,14 +71,13 @@ loop:
 	switch {
 	case in.Parse("via %v", &nh4, m.Vnet):
 		x.ip4_nhs = append(x.ip4_nhs, nh4)
-	case in.Parse("%v", &adj, m.Vnet):
+	case in.Parse("%v", &adj, &m4.Main):
 		x.adjs = append(x.adjs, adj)
 	default:
 		err = fmt.Errorf("looking for via NEXT-HOP or adjacency, got `%s'", in)
 		return
 	}
 
-	m4 := ip4.GetMain(m.Vnet)
 	for i := uint(0); i < x.count; i++ {
 		p := x.ip4_prefix.Add(i)
 

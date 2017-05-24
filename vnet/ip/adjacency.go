@@ -99,15 +99,21 @@ func (a *Adjacency) String(m *Main) (s string) {
 }
 
 func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
-	v := args.Get().(*vnet.Vnet)
+	m := args.Get().(*Main)
 	if !in.Parse("%v", &a.LookupNextIndex) {
 		panic(parse.ErrInput)
 	}
 	a.NAdj = 1
 	a.IfAddr = IfAddrNil
-	if a.LookupNextIndex == LookupNextRewrite {
-		if !in.Parse("%v", &a.Rewrite, v) {
+	switch a.LookupNextIndex {
+	case LookupNextRewrite:
+		if !in.Parse("%v", &a.Rewrite, m.v) {
 			panic(parse.ErrInput)
+		}
+	case LookupNextLocal, LookupNextGlean:
+		var si vnet.Si
+		if in.Parse("%v", &si, m.v) {
+			a.IfAddr = m.IfFirstAddr(si)
 		}
 	}
 }
