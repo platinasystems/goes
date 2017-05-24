@@ -249,6 +249,7 @@ func (nm *netlink_main) Init(m *Main) {
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
 	nm.cliInit()
+	nm.namespace_register_nodes()
 }
 
 type netlinkEvent struct {
