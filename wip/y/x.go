@@ -27,6 +27,16 @@ type platform struct {
 func (p *platform) Init() (err error) {
 	v := p.Vnet
 	p.Platform = fe1.GetPlatform(v)
+
+	// 2 ixge ports are used to inject packets.
+	{
+		ns := ixge.GetPortNames(v)
+		p.DoubleTaggedInjectNexts = make([]uint, len(ns))
+		for i := range ns {
+			p.DoubleTaggedInjectNexts[i] = v.AddNamedNext(&p.Platform.DoubleTaggedPuntInjectNodes.Inject, ns[i])
+		}
+	}
+
 	if err = p.boardInit(); err != nil {
 		return
 	}
