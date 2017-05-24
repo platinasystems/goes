@@ -225,9 +225,3 @@ loop:
 	}
 	return
 }
-
-// Namespace iomux.File is write only so ReadReady should never be called.
-func (ns *net_namespace) ReadReady() (err error) {
-	panic("not used")
-	return
-}
