@@ -56,12 +56,15 @@ const (
 	default_namespace_name = "default"
 )
 
-func (m *netlink_main) namespace_init() (err error) {
+func (m *netlink_main) namespace_register_nodes() {
 	nm := &m.net_namespace_main
 	nm.m = m.m
-
-	nm.rx_node.init(m.m.Vnet)
+	nm.rx_node.init(m.m.v)
 	nm.tx_node.init(nm)
+}
+
+func (m *netlink_main) namespace_init() (err error) {
+	nm := &m.net_namespace_main
 
 	// Handcraft default name space.
 	{
