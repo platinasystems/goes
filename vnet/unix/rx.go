@@ -130,7 +130,7 @@ func (n *rx_node) set_next(si vnet.Si, next rx_node_next) {
 	n.next_by_si[si] = uint32(next)
 }
 
-func SetRxInjectNext(v *vnet.Vnet, inject_node_name string) {
+func SetRxInject(v *vnet.Vnet, inject_node_name string) {
 	m := GetMain(v)
 	n := &m.rx_node
 	n.next_for_inject = rx_node_next(v.AddNamedNext(n, inject_node_name))
