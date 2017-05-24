@@ -240,6 +240,8 @@ func (n *DoubleTaggedInjectNode) inject_x1(r0 *vnet.Ref) (next0 uint) {
 
 	*(*header_no_type)(r0.DataOffset(0)) = h0
 
+	n.SetError(r0, inject_2tag_error_unknown_interface)
+
 	next0 = uint(d0.next)
 
 	return
@@ -268,6 +270,9 @@ func (n *DoubleTaggedInjectNode) inject_x2(r0, r1 *vnet.Ref) (next0, next1 uint)
 
 	*(*header_no_type)(r0.DataOffset(0)) = h0
 	*(*header_no_type)(r1.DataOffset(0)) = h1
+
+	n.SetError(r0, inject_2tag_error_unknown_interface)
+	n.SetError(r1, inject_2tag_error_unknown_interface)
 
 	next0 = uint(d0.next)
 	next1 = uint(d1.next)
