@@ -7,7 +7,6 @@
 fe1_pkg  := github.com/platinasystems/fe1
 fe1_dir  := $(shell go list -e -f {{.Dir}} $(fe1_pkg))
 fe1_gen  := $(if $(fe1_dir),$(fe1_dir)/package.go)
-fe1_tags := uio_pci_dma foxy
 libfe1so := $(wildcard /usr/lib/goes/fe1.so)
 
 fe1a_pkg := github.com/platinasystems/firmware-fe1a
@@ -62,7 +61,7 @@ goes-platina-mk1-installer: goes-platina-mk1.zip
 	zip -q -A $@
 
 goes-platina-mk1: gcflags=$(if $(VNET_DEBUG_yes),-N -l)
-goes-platina-mk1: tags=$(fe1_tags)$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
+goes-platina-mk1: tags=uio_pci_dma$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
 goes-platina-mk1: | $(if $(noplugin_yes),$(fe1_gen) $(fe1a_gen)) package.go
 	$(gobuild) ./main/$@
 
@@ -76,7 +75,7 @@ goes-coreboot: | package.go
 goes-test: | package.go
 	$(gobuild) ./main/goes-test
 
-go-wip: tags=$(fe1_tags)$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
+go-wip: tags=uio_pci_dma foxy$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
 go-wip: gcflags=$(if $(VNET_DEBUG_yes),-N -l)
 go-wip:
 	$(gobuild) -o $@ ./wip/y
@@ -84,7 +83,7 @@ go-wip:
 package.go: LICENSE PATENTS
 	go generate
 
-fe1.so: tags=$(fe1_tags)$(VNET_DEBUG_tag)$(diag_tag)
+fe1.so: tags=uio_pci_dma$(VNET_DEBUG_tag)$(diag_tag)
 fe1.so: $(if $(fe1_dir),| $(fe1_gen) $(fe1a_gen),$(libfe1so))
 	$(if $(fe1_dir),$(gobuild) -buildmode=plugin ./main/fe1,\
 		$(if $(libfe1so),cp $(libfe1so),touch) $@)
