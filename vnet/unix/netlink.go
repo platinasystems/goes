@@ -345,8 +345,6 @@ func (e *netlinkEvent) EventAction() {
 				err = e.m.ip6IfaddrMsg(v)
 			}
 		case *netlink.RouteMessage:
-			fmt.Printf("netlink %s\n", msg)
-
 			switch v.Family {
 			case netlink.AF_INET:
 				known = true
