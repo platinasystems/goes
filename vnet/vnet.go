@@ -10,7 +10,42 @@ import (
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/elib/parse"
+
+	"sort"
 )
+
+type MaskedStringer interface {
+	MaskedString(mask MaskedStringer) string
+}
+
+type masked_string_pair struct{ v, m MaskedStringer }
+type MaskedStrings struct {
+	m map[string]masked_string_pair
+}
+
+func (x *MaskedStrings) Add(key string, v, m MaskedStringer) {
+	if x.m == nil {
+		x.m = make(map[string]masked_string_pair)
+	}
+	x.m[key] = masked_string_pair{v: v, m: m}
+}
+
+func (x *MaskedStrings) String() (s string) {
+	type t struct{ k, v string }
+	var ts []t
+	for k, v := range x.m {
+		ts = append(ts, t{k: k, v: v.v.MaskedString(v.m)})
+	}
+	sort.Slice(ts, func(i, j int) bool { return ts[i].k < ts[j].k })
+	for i := range ts {
+		t := &ts[i]
+		if s != "" {
+			s += ", "
+		}
+		s += t.k + ": " + t.v
+	}
+	return
+}
 
 type RxTx int
 
