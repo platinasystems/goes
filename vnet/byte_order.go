@@ -5,6 +5,7 @@
 package vnet
 
 // Network byte order helpers.
+type Uint8 uint8 // dummy used to satisfy MaskedStringer interface
 type Uint16 uint16
 type Uint32 uint32
 type Uint64 uint64
