@@ -27,27 +27,33 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade BMC images"
-	Usage   = "upgrade [LATEST | -version=HASH] [-list] [-server=IPADDR]"
-	Man     = `The BMC upgrade command can upgrade any or all of the
-	          images in the QSPI0 flash.  A blob containing any or all
-		  of the new images is specified through either LATEST or
-		  a version hash string.
-
-		  The independently erased and replaced images are:
-		      1. u-boot, QSPI header, DTB file
-		      2. u-boot envvar block
-		      3. linux kernel
-		      4. initrd filesystem containing goes
-
-		  The blob contains a table at the beginning of the file
-		  that contains offset, size, sha1 of each of the images.
-		  If the size is 0, then the image is not present in the
-		  blob.
-
-		  If u-boot sees the blob exists in the mmc, it will parse
-		  it and update the images that are present in the blob if
-		  the sha1 matches. u-boot erases the blob when done.
+	Usage   = "upgrade [LATEST | -v HASH] [-l] [-s SERVER]"
+	Man     = `
 DESCRIPTION
+	The upgrade command upgrades BMC QSPI0 flash images.
+
+	The BMC upgrade command can upgrade any or all of the
+	images in the QSPI0 flash.  A blob containing any or all
+	of the new images is specified through either LATEST or
+	a version hash string.
+
+	The independently erasable and replacable images are:
+	   1. uboot :  QSPI header, u-boot bootloader, DTB file
+	   2. envvar:  u-boot envvar block
+	   3. kernel:  linux kernel
+	   4. initrd:  initrd  filesystem containing goes
+
+	The blob contains a table at the beginning of the file
+	that includes offset, size, sha1 of each of the images.
+	If the size is 0, then the image is not present in the
+	blob.  This allows a blob to contain any or all images.
+
+OPTIONS
+	LATEST		upgrades flash to platina-mk1-bmc-LATEST
+	-v [HASH]	upgrades flash to platina-mk1-bmc-[HASH]
+	-l		lists available upgrade hashes
+	-s [SERVER]     specifies SERVER, overrides default www.platina.com
+	The BMC upgrade command can upgrade any or all of the
 	The upgrade command upgrades BMC QSPI0 flash images`
 
 	DefaultMode   = 0755
@@ -85,15 +91,16 @@ func (cmd) Main(args ...string) error {
 			return err
 		}
 
-		b := LatestBlob
 		s := DefaultServer
+		b := LatestBlob
+		g := GenericBlob
 
 		err = getBlob(s, b)
 		if err != nil {
 			return err
 		}
 
-		err = copyBlob(b)
+		err = copyBlob(b, g)
 		if err != nil {
 			return err
 		}
@@ -145,14 +152,14 @@ func getBlob(serverName string, blobName string) error {
 	return nil
 }
 
-func copyBlob(blobName string) error {
-	sFile, err := os.Open(MmcDirectory + "/" + blobName)
+func copyBlob(blobName string, genericBlob string) error {
+	sFile, err := os.Open("/" + blobName)
 	if err != nil {
 		return err
 	}
 	defer sFile.Close()
 
-	eFile, err := os.Create(MmcDirectory + "/" + GenericBlob)
+	eFile, err := os.Create(MmcDirectory + "/" + genericBlob)
 	if err != nil {
 		return err
 	}
@@ -171,12 +178,20 @@ func copyBlob(blobName string) error {
 }
 
 func rmBlob(blobName string) error {
-	_, err := os.Stat(blobName)
+	_, err := os.Stat("/" + blobName)
 	if err != nil {
 		return err
 	}
 
-	if err = os.Remove(blobName); err != nil {
+	if err = os.Remove("/" + blobName); err != nil {
+		return err
+	}
+	return nil
+}
+
+func renameBlob(blobName string, genericName string) error {
+	err := os.Rename("/"+blobName, MmcDirectory+"/"+genericName)
+	if err != nil {
 		return err
 	}
 	return nil
@@ -193,7 +208,7 @@ func mountMmc() error {
 		return err
 	}
 
-	err := os.Chdir(dn)
+	err := os.Chdir("/")
 	if err != nil {
 		return err
 	}
@@ -246,8 +261,11 @@ func mountMmc() error {
 	parm["-t"] = "ext4"
 
 	fs, err := getFilesystems()
+	if err != nil {
+		return err
+	}
 
-	fs.mountone(parm["-t"], dn, mdev, flag, parm)
+	fs.mountone(parm["-t"], mdev, dn, flag, parm)
 
 	return nil
 }
