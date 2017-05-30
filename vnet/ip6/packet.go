@@ -8,9 +8,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 
-	"bytes"
-	"encoding/binary"
-	"net"
 	"unsafe"
 )
 
@@ -39,12 +36,17 @@ type Header struct {
 	Src, Dst Address
 }
 
-func (a *Address) String() string {
-	return (net.IP)(a[:]).String()
-}
-
 func (a *Address) Uint32(i int) uint32 {
 	return uint32(a[4*i+3]) | uint32(a[4*i+2])<<8 | uint32(a[4*i+1])<<16 | uint32(a[4*i+0])<<24
+}
+
+func (a *Address) IsZero() bool {
+	for i := range a {
+		if a[i] != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *Address) FromUint32(i int, x uint32) {
@@ -56,8 +58,12 @@ func (a *Address) FromUint32(i int, x uint32) {
 
 func IpAddress(a *ip.Address) *Address { return (*Address)(unsafe.Pointer(&a[0])) }
 
-func (h *Header) Len() int              { return HeaderBytes }
-func (h *Header) Write(b *bytes.Buffer) { binary.Write(b, binary.BigEndian, h) }
+func (h *Header) Len() int { return HeaderBytes }
+func (h *Header) Write(b []byte) {
+	type t struct{ data [HeaderBytes]byte }
+	i := (*t)(unsafe.Pointer(h))
+	copy(b[:], i.data[:])
+}
 func (h *Header) Finalize(hs []vnet.PacketHeader) {
 	sum := uint(0)
 	for _, h := range hs {
