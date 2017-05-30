@@ -44,31 +44,46 @@ func (x *MaskedStrings) String() (s string) {
 
 type Bool bool
 
-func (v *Bool) MaskedString(r MaskedStringer) (s string) {
-	m := r.(*Bool)
-	s = fmt.Sprintf("%v", *v)
-	if *m != true {
-		s += fmt.Sprintf("/%v", *m)
+func (v Bool) MaskedString(r MaskedStringer) (s string) {
+	m := r.(Bool)
+	s = fmt.Sprintf("%v", v)
+	if m != true {
+		s += fmt.Sprintf("/%v", m)
 	}
 	return
 }
 
-func (v *Uint8) MaskedString(r MaskedStringer) string {
-	m := r.(*Uint8)
-	return fmt.Sprintf("0x%x/%x", *v, *m)
+func (v Uint8) MaskedString(r MaskedStringer) string {
+	m := r.(Uint8)
+	return fmt.Sprintf("0x%x/%x", v, m)
 }
-
-func (v *Uint16) MaskedString(r MaskedStringer) string {
-	m := r.(*Uint16)
+func (v Uint16) MaskedString(r MaskedStringer) string {
+	m := r.(Uint16)
+	return fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
+}
+func (v Uint32) MaskedString(r MaskedStringer) string {
+	m := r.(Uint32)
+	return fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
+}
+func (v Uint64) MaskedString(r MaskedStringer) string {
+	m := r.(Uint64)
 	return fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
 }
 
-func (v *Uint32) MaskedString(r MaskedStringer) string {
-	m := r.(*Uint32)
-	return fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
-}
+// As above but host byte order.
+type HostUint16 uint16
+type HostUint32 uint32
+type HostUint64 uint64
 
-func (v *Uint64) MaskedString(r MaskedStringer) string {
-	m := r.(*Uint64)
-	return fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
+func (v HostUint16) MaskedString(r MaskedStringer) string {
+	m := r.(HostUint16)
+	return fmt.Sprintf("0x%x/%x", v, m)
+}
+func (v HostUint32) MaskedString(r MaskedStringer) string {
+	m := r.(HostUint32)
+	return fmt.Sprintf("0x%x/%x", v, m)
+}
+func (v HostUint64) MaskedString(r MaskedStringer) string {
+	m := r.(HostUint64)
+	return fmt.Sprintf("0x%x/%x", v, m)
 }
