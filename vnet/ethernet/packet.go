@@ -109,6 +109,15 @@ func (a *Address) Equal(b Address) bool {
 	return true
 }
 
+func (a *Address) IsZero() bool {
+	for i := range a {
+		if a[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func RandomAddress() (a Address) {
 	for i := range a {
 		a[i] = uint8(rand.Int())

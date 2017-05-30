@@ -76,20 +76,26 @@ func (h *VlanHeader) String() (s string) {
 
 func (v *VlanTag) String() string { return fmt.Sprintf("0x%04x", vnet.Uint16(*v).ToHost()) }
 
-func (v *Type) MaskedString(r vnet.MaskedStringer) (s string) {
-	m := r.(*Type)
-	if *m == 0xffff {
+func (v *Address) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(*Address)
+	s = v.String() + "/" + m.String()
+	return
+}
+
+func (v Type) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(Type)
+	if m == 0xffff {
 		s = v.String()
 	} else {
-		s += fmt.Sprintf("0x%x/%x", (*v).ToHost(), (*m).ToHost())
+		s += fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
 	}
 	return
 }
 
-func (v *VlanTag) MaskedString(r vnet.MaskedStringer) (s string) {
-	m := r.(*VlanTag)
+func (v VlanTag) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(VlanTag)
 	s = v.String()
-	if *m != 0 {
+	if m != 0 {
 		s += fmt.Sprintf("/%s", m.String())
 	}
 	return
