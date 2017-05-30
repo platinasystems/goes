@@ -76,18 +76,16 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 			}
 
 			inner_type := h.h.Type
-			switch len(h.v) {
-			case 0:
-			case 1:
-				h.v[0].Type = inner_type
-				h.h.Type = TYPE_VLAN.FromHost()
-			case 2:
-				h.v[1].Type = inner_type
-				h.v[0].Type = TYPE_VLAN.FromHost()
-				h.h.Type = TYPE_VLAN_IN_VLAN.FromHost()
-			case 3:
-				err = fmt.Errorf("number of vlans must be <= 2, given %d", len(h.v))
-				return
+			if len(h.v) > 0 {
+				vt := TYPE_VLAN.FromHost()
+				h.h.Type = vt
+				for i := range h.v {
+					t := inner_type
+					if i+1 < len(h.v) {
+						t = vt
+					}
+					h.v[i].Type = t
+				}
 			}
 
 			s.AddHeader(&h.h)
