@@ -293,12 +293,12 @@ func (p *Protocol) String() string {
 	return elib.StringerHex(protocolStrings[:], int(*p))
 }
 
-func (v *Protocol) MaskedString(r vnet.MaskedStringer) (s string) {
-	m := r.(*Protocol)
-	if *m == 0xff {
+func (v Protocol) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(Protocol)
+	if m == 0xff {
 		return v.String()
 	}
-	return fmt.Sprintf("0x%x/%x", *v, *m)
+	return fmt.Sprintf("0x%x/%x", v, m)
 }
 
 var protocolMap = parse.NewStringMap(protocolStrings[:])
