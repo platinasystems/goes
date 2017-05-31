@@ -8,13 +8,17 @@ package cmdline
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
 	"regexp"
 	"sort"
+	"strings"
 )
+
+type Cmdline map[string]string
 
 var File = "/proc/cmdline"
 
-func New() (keys []string, m map[string]string, err error) {
+func New() (keys []string, m Cmdline, err error) {
 	bf, err := ioutil.ReadFile(File)
 	if err != nil {
 		return
@@ -23,25 +27,13 @@ func New() (keys []string, m map[string]string, err error) {
 	if err != nil {
 		return
 	}
-	m = make(map[string]string)
+	m = make(Cmdline)
 	for _, bl := range bytes.Split(bf, []byte{'\n'}) {
 		if len(bl) == 0 {
 			continue
 		}
 		for _, b := range clre.FindAll(bl, -1) {
-			eq := bytes.Index(b, []byte{'='})
-			if eq <= 1 || eq == len(b)-1 {
-				m[string(b)] = "true"
-				continue
-			}
-			name := string(b[:eq])
-			var value []byte
-			if b[eq+1] == '\'' || b[eq+1] == '"' {
-				value = b[eq+2 : len(b)-1]
-			} else {
-				value = b[eq+1:]
-			}
-			m[name] = string(value)
+			m.Set(string(b))
 		}
 	}
 	keys = make([]string, 0, len(m))
@@ -50,4 +42,32 @@ func New() (keys []string, m map[string]string, err error) {
 	}
 	sort.Strings(keys)
 	return
+}
+
+// Set() is m[KEY] = VALUE if kv has '=' and m[KEY] = "true" otherwise
+func (m Cmdline) Set(kv string) {
+	eq := strings.Index(kv, "=")
+	if eq <= 1 || eq == len(kv)-1 {
+		m[kv] = "true"
+	} else if kv[eq+1] == '\'' || kv[eq+1] == '"' {
+		m[kv[:eq]] = kv[eq+2 : len(kv)-1]
+	} else {
+		m[kv[:eq]] = kv[eq+1:]
+	}
+}
+
+// String() reformats the command line
+func (m Cmdline) String() string {
+	buf := make([]byte, 0, os.Getpagesize())
+	for k, v := range m {
+		if len(buf) > 0 {
+			buf = append(buf, ' ')
+		}
+		buf = append(buf, []byte(k)...)
+		if v != "true" {
+			buf = append(buf, '=')
+			buf = append(buf, []byte(v)...)
+		}
+	}
+	return string(buf)
 }
