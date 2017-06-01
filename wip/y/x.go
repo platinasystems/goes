@@ -31,9 +31,9 @@ func (p *platform) Init() (err error) {
 	// 2 ixge ports are used to inject packets.
 	{
 		ns := ixge.GetPortNames(v)
-		p.DoubleTaggedInjectNexts = make([]uint, len(ns))
+		p.SingleTaggedInjectNexts = make([]uint, len(ns))
 		for i := range ns {
-			p.DoubleTaggedInjectNexts[i] = v.AddNamedNext(&p.Platform.DoubleTaggedPuntInjectNodes.Inject, ns[i])
+			p.SingleTaggedInjectNexts[i] = v.AddNamedNext(&p.Platform.SingleTaggedPuntInjectNodes.Inject, ns[i])
 		}
 	}
 
