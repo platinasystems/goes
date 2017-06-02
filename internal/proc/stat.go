@@ -40,7 +40,7 @@ type Stat struct {
 	NumThreads  int64  //  %ld
 	ItRealValue int64  //  %ld
 
-	StartTime string //  %llu
+	StartTime time.Time //  %llu
 
 	Vsize      uint64 //  %lu
 	Rss        int64  //  %ld
@@ -90,11 +90,6 @@ func (p *Stat) ReadFrom(r io.Reader) error {
 	if hz == 0 {
 		hz = sysconf.Hz()
 	}
-
-	now := time.Now()
-	boy := time.Date(now.Year(), 1, 1, 12, 0, 0, 0, now.Location())
-	bod := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0,
-		now.Location())
 
 	for _, x := range []struct {
 		s string
@@ -161,17 +156,8 @@ func (p *Stat) ReadFrom(r io.Reader) error {
 	epoch := time.Unix(0, 0)
 	p.Utime = time.Unix(int64(utime/hz), int64(utime%hz)).Sub(epoch)
 
-	t := now.Add(time.Second *
+	p.StartTime = time.Now().Add(time.Second *
 		-time.Duration(uint64(si.Uptime)-(starttime/hz)))
-	if t.Before(boy) {
-		p.StartTime = fmt.Sprintf("%4d", t.Year())
-	} else if t.Before(bod) {
-		p.StartTime = fmt.Sprintf("%s%02d",
-			t.Month().String()[:3], t.Day())
-	} else {
-		p.StartTime = fmt.Sprintf("%2d:%02d",
-			t.Hour(), t.Minute())
-	}
 
 	if p.Pid == 2 || p.Ppid == 2 {
 		// replace enclosing parentheses of kernel threads

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
@@ -61,6 +62,19 @@ func (cmd) Main(args ...string) error {
 	}
 
 	pid := os.Getpid()
+	now := time.Now()
+	boy := time.Date(now.Year(), 1, 1, 12, 0, 0, 0, now.Location())
+	bod := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0,
+		now.Location())
+	start := func(t time.Time) string {
+		if t.Before(boy) {
+			return fmt.Sprintf("%4d", t.Year())
+		} else if t.Before(bod) {
+			return fmt.Sprintf("%s%02d", t.Month().String()[:3],
+				t.Day())
+		}
+		return fmt.Sprintf("%2d:%02d", t.Hour(), t.Minute())
+	}
 
 	fns, err := filepath.Glob("/proc/[0-9]*/stat")
 	if err != nil {
@@ -135,7 +149,7 @@ func (cmd) Main(args ...string) error {
 					ps.stat.Pid,
 					ps.stat.Ppid,
 					"  "+ps.stat.State+"  ",
-					ps.stat.StartTime,
+					start(ps.stat.StartTime),
 					ps.stat.Utime,
 					cmdline)
 			default:
