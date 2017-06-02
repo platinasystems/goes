@@ -1,9 +1,15 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2017 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO Implement custom version, list of avail versions, custom IP address
-//TODO cleanup flags and args
+//TODO enable all 5 files
+//TODO SERVER -s, HASH -v, LIST -l
+//TODO mk1
+//TODO real server on web
+//TODO AUTH WGET
+//TODO BLOB / DEBLOB
+//TODO upgrade to be called automatically if enabled
+//TODO script to generate uboot.bin, envvar.bin
 
 package upgrade
 
@@ -26,43 +32,42 @@ import (
 
 const (
 	Name    = "upgrade"
-	Apropos = "upgrade BMC images"
+	Apropos = "upgrade images"
 	Usage   = "upgrade [LATEST | -v HASH] [-l] [-s SERVER]"
 	Man     = `
 DESCRIPTION
-	The upgrade command upgrades BMC QSPI0 flash images.
+	The upgrade command upgrades firmware images in flash.
 
-	The BMC upgrade command can upgrade any or all of the
-	images in the QSPI0 flash.  A blob containing any or all
-	of the new images is specified through either LATEST or
-	a version hash string.
+	The upgrade command can upgrade any or all of the images
+	in flash, depending what is in the image blob.  Images blobs
+	can be downloaded either from the Platina webserver on the
+	internet, or, a local server in the enterprise.
+	Image versions can be either LATEST, or a particular past
+	version can be specified with a version hash.
 
-	The independently erasable and replacable images are:
-	   1. uboot :  QSPI header, u-boot bootloader, DTB file
-	   2. envvar:  u-boot envvar block
-	   3. kernel:  linux kernel
-	   4. initrd:  initrd  filesystem containing goes
-
-	The blob contains a table at the beginning of the file
-	that includes offset, size, sha1 of each of the images.
-	If the size is 0, then the image is not present in the
-	blob.  This allows a blob to contain any or all images.
+	For the BMC the independently erasable and replacable images are:
+	   1. uboot :  QSPI header, u-boot bootloader
+	   2. dtb   :  device tree file
+	   3. envvar:  u-boot envvar block
+	   4. kernel:  linux kernel
+	   5. initrd:  initrd  filesystem containing goes
 
 OPTIONS
 	LATEST		upgrades flash to platina-mk1-bmc-LATEST
 	-v [HASH]	upgrades flash to platina-mk1-bmc-[HASH]
 	-l		lists available upgrade hashes
-	-s [SERVER]     specifies SERVER, overrides default www.platina.com
-	The BMC upgrade command can upgrade any or all of the
-	The upgrade command upgrades BMC QSPI0 flash images`
+	-s [SERVER]     specifies SERVER, overrides default www.platina.com`
 
 	DefaultMode   = 0755
 	MmcDirectory  = "/mmc"
 	MmcDevice     = "/dev/mmcblk0p1"
-	DefaultServer = "http://192.168.101.127/" //FIXME: invader7 for now
-	LatestBlob    = "platina-mk1-bmc-LATEST"
-	GenericBlob   = "platina-mk1-bmc"
+	DefaultServer = "http://192.168.101.127" //FIXME invader7 for now
+	PlatinaServer = "www.platina.com"
+	M             = "platina-mk1-bmc"
 )
+
+// var imageNames = []string{"uboot", "dtb", "envvar", "kernel", "initrd"}
+var imageNames = []string{"initrd"}
 
 type Interface interface {
 	Apropos() lang.Alt
@@ -82,41 +87,16 @@ func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("Missing version: LATEST or hash")
 	}
-
 	t := args[0]
+	s := DefaultServer
+	v := ""
 	if t == "LATEST" {
-
-		err := mountMmc()
-		if err != nil {
-			return err
-		}
-
-		s := DefaultServer
-		b := LatestBlob
-		g := GenericBlob
-
-		err = getBlob(s, b)
-		if err != nil {
-			return err
-		}
-
-		err = copyBlob(b, g)
-		if err != nil {
-			return err
-		}
-
-		err = rmBlob(b)
-		if err != nil {
-			return err
-		}
-
-		if false { //disable reboot for now
-			kexec.Prepare()
-			_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
-			return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-		}
+		v = "LATEST"
 	}
-
+	err := doUpgrade(s, v)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -133,9 +113,49 @@ var (
 	}
 )
 
-func getBlob(serverName string, blobName string) error {
-	urls := []string{serverName + blobName}
+func doUpgrade(s string, v string) error {
+	err := mountMmc()
+	if err != nil {
+		return err
+	}
+	err = getFiles(s, v)
+	if err != nil {
+		return err
+	}
+	//err = deBlob()
+	err = copyFiles(v)
+	if err != nil {
+		return err
+	}
+	err = rmFiles(v)
+	if err != nil {
+		return err
+	}
+	reboot()
+	return nil
+}
 
+func reboot() error {
+	kexec.Prepare()
+	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
+	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+}
+
+func getFiles(s string, v string) error {
+	for _, f := range imageNames {
+		files := []string{
+			s + "/" + M + "/" + M + "-" + f + "-" + v + ".bin",
+			s + "/" + M + "/" + M + "-" + f + "-" + v + ".crc",
+		}
+		err := wgetFiles(files)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func wgetFiles(urls []string) error {
 	reqs := make([]*grab.Request, 0)
 	for _, url := range urls {
 		req, err := grab.NewRequest(url)
@@ -152,20 +172,34 @@ func getBlob(serverName string, blobName string) error {
 	return nil
 }
 
-func copyBlob(blobName string, genericBlob string) error {
-	sFile, err := os.Open("/" + blobName)
+func copyFiles(v string) error {
+	for _, f := range imageNames {
+		err := copyFile("/"+M+"-"+f+"-"+v+".bin", MmcDirectory+"/"+f+".bin")
+		if err != nil {
+			return err
+		}
+		err = copyFile("/"+M+"-"+f+"-"+v+".crc", MmcDirectory+"/"+f+".crc")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyFile(f string, d string) error {
+	sFile, err := os.Open(f)
 	if err != nil {
 		return err
 	}
 	defer sFile.Close()
 
-	eFile, err := os.Create(MmcDirectory + "/" + genericBlob)
+	eFile, err := os.Create(d)
 	if err != nil {
 		return err
 	}
 	defer eFile.Close()
 
-	_, err = io.Copy(eFile, sFile) // first var shows number of bytes
+	_, err = io.Copy(eFile, sFile)
 	if err != nil {
 		return err
 	}
@@ -177,21 +211,27 @@ func copyBlob(blobName string, genericBlob string) error {
 	return nil
 }
 
-func rmBlob(blobName string) error {
-	_, err := os.Stat("/" + blobName)
-	if err != nil {
-		return err
-	}
-
-	if err = os.Remove("/" + blobName); err != nil {
-		return err
+func rmFiles(v string) error {
+	for _, f := range imageNames {
+		err := rmFile("/" + M + "-" + f + "-" + v + ".bin")
+		if err != nil {
+			return err
+		}
+		err = rmFile("/" + M + "-" + f + "-" + v + ".crc")
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func renameBlob(blobName string, genericName string) error {
-	err := os.Rename("/"+blobName, MmcDirectory+"/"+genericName)
+func rmFile(f string) error {
+	_, err := os.Stat(f)
 	if err != nil {
+		return err
+	}
+
+	if err = os.Remove(f); err != nil {
 		return err
 	}
 	return nil
