@@ -595,10 +595,15 @@ func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
 		"cpu":     redisd.infoCpu,
 	}
 	for _, sec := range secs {
-		if f, found := m[sec]; !found {
+		f, found := m[sec]
+		if !found {
 			err = fmt.Errorf("%s: unavailable", sec)
 			break
-		} else if err = f(buf); err != nil {
+		}
+		if len(secs) > 1 {
+			fmt.Fprintln(buf, "#", strings.Title(sec))
+		}
+		if err = f(buf); err != nil {
 			break
 		}
 	}
