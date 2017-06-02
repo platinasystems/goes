@@ -184,7 +184,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 	pv := intf.pv
 	n := &intf.namespace.m.tx_node
 
-	n_packets := 0
+	n_packets, n_drops := 0, 0
 loop:
 	for i := uint(0); i < pv.n_packets; i++ {
 		_, errno := writev(intf.Fd, pv.p[i].iovs)
@@ -194,8 +194,10 @@ loop:
 		case syscall.EIO:
 			// Signaled by tun.c in kernel and means that interface is down.
 			n.CountError(tx_error_interface_down, 1)
+			n_drops++
 		case syscall.EMSGSIZE:
 			n.CountError(tx_error_packet_too_large, 1)
+			n_drops++
 		default:
 			if errno != 0 {
 				err = fmt.Errorf("writev: %s", errno)
@@ -222,6 +224,12 @@ loop:
 	if out := intf.suspend_saved_out; out != nil && len(intf.to_tx) < cap(intf.to_tx)/2 {
 		intf.suspend_saved_out = nil
 		n.Resume(out)
+	}
+	// Count punts and drops on this interface.
+	{
+		th := n.Vnet.GetIfThread(0)
+		vnet.IfPunts.Add(th, intf.si, uint(n_packets))
+		vnet.IfDrops.Add(th, intf.si, uint(n_drops))
 	}
 	return
 }
