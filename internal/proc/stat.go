@@ -78,7 +78,7 @@ type Stat struct {
 
 var hz uint64
 
-func (p *Stat) ReadFrom(r io.Reader) error {
+func (p *Stat) Load(r io.Reader) error {
 	var utime, stime, cutime, cstime, starttime uint64
 	var si syscall.Sysinfo_t
 
@@ -148,7 +148,7 @@ func (p *Stat) ReadFrom(r io.Reader) error {
 		{"EnvEnd", &p.EnvEnd},
 		{"ExitCode", &p.ExitCode},
 	} {
-		if _, err = fmt.Fscanf(r, "%v", x.v); err != nil {
+		if _, err = fmt.Fscan(r, x.v); err != nil {
 			return fmt.Errorf("%s: %v", x.s, err)
 		}
 	}

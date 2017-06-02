@@ -9,7 +9,6 @@ package redisd
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -573,41 +572,6 @@ func (redisd *Redisd) Hset(key, field string, value []byte) (int, error) {
 	}
 	redisd.mutex.Unlock()
 	return f(key, field, value)
-}
-
-func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
-	var err error
-	buf := new(bytes.Buffer)
-	if len(secs) == 0 || secs[0] == "default" || secs[0] == "all" {
-		secs = []string{
-			"server",
-			"clients",
-			"memory",
-			"stats",
-			"cpu",
-		}
-	}
-	m := map[string]func(io.Writer) error{
-		"server":  redisd.infoServer,
-		"clients": redisd.infoClients,
-		"memory":  redisd.infoMemory,
-		"stats":   redisd.infoStats,
-		"cpu":     redisd.infoCpu,
-	}
-	for _, sec := range secs {
-		f, found := m[sec]
-		if !found {
-			err = fmt.Errorf("%s: unavailable", sec)
-			break
-		}
-		if len(secs) > 1 {
-			fmt.Fprintln(buf, "#", strings.Title(sec))
-		}
-		if err = f(buf); err != nil {
-			break
-		}
-	}
-	return grs.NewStatusReply(buf.String()), err
 }
 
 func (redisd *Redisd) Keys(pattern string) ([][]byte, error) {

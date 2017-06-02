@@ -41,12 +41,6 @@ type Interface interface {
 	Usage() string
 }
 
-type ps struct {
-	uid  uint32
-	gid  uint32
-	stat proc.Stat
-}
-
 func New() Interface { return cmd{} }
 
 type cmd struct{}
@@ -83,25 +77,12 @@ func (cmd) Main(args ...string) error {
 
 	l := make([]*ps, len(fns))
 	for i, fn := range fns {
-		f, err := os.Open(fn)
+		l[i], err = newps(fn)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: %v", fn, err)
 		}
-		fi, err := f.Stat()
-		if err == nil {
-			l[i] = &ps{
-				uid: fi.Sys().(*syscall.Stat_t).Uid,
-				gid: fi.Sys().(*syscall.Stat_t).Gid,
-			}
-			if err = l[i].stat.ReadFrom(f); err != nil {
-				err = fmt.Errorf("%s: %v", fn, err)
-			} else if l[i].stat.Pid == pid {
-				ttynr = l[i].stat.TtyNr
-			}
-		}
-		f.Close()
-		if err != nil {
-			return err
+		if l[i].stat.Pid == pid {
+			ttynr = l[i].stat.TtyNr
 		}
 	}
 
@@ -176,6 +157,30 @@ var (
 		lang.EnUS: Man,
 	}
 )
+
+type ps struct {
+	uid  uint32
+	gid  uint32
+	stat proc.Stat
+}
+
+func newps(fn string) (p *ps, err error) {
+	fi, err := os.Stat(fn)
+	if err != nil {
+		return
+	}
+	f, err := os.Open(fn)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	p = &ps{
+		uid: fi.Sys().(*syscall.Stat_t).Uid,
+		gid: fi.Sys().(*syscall.Stat_t).Gid,
+	}
+	err = proc.Load(&p.stat).FromFile(fn)
+	return
+}
 
 type tty map[uint]string
 
