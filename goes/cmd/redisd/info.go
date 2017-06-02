@@ -18,16 +18,20 @@ import (
 
 const SizeofInt = (32 << (^uint(0) >> 63)) >> 3
 
+func newStat() (p *proc.Stat, err error) {
+	f, err := os.Open("/proc/self/stat")
+	if err == nil {
+		defer f.Close()
+		p = new(proc.Stat)
+		err = p.ReadFrom(f)
+	}
+	return
+}
+
 func (redisd *Redisd) infoServer(w io.Writer) error {
-	var stat proc.Stat
-	if f, err := os.Open("/proc/self/stat"); err != nil {
+	stat, err := newStat()
+	if err != nil {
 		return err
-	} else {
-		err = stat.ReadFrom(f)
-		f.Close()
-		if err != nil {
-			return err
-		}
 	}
 	fmt.Fprintln(w, "redis_git_sha1:", Package["version"])
 	fmt.Fprintln(w, "redis_git_dirty:", len(Package["diff"]) > 0)
@@ -56,6 +60,13 @@ func (redisd *Redisd) infoStats(w io.Writer) error {
 }
 
 func (redisd *Redisd) infoCpu(w io.Writer) error {
-	_, err := fmt.Fprintln(w, "FIXME")
-	return err
+	stat, err := newStat()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(w, "used_cpu_sys:", stat.Stime)
+	fmt.Fprintln(w, "used_cpu_user:", stat.Utime)
+	fmt.Fprintln(w, "used_cpu_sys_children:", stat.Cstime)
+	fmt.Fprintln(w, "used_cpu_user_children:", stat.Cutime)
+	return nil
 }
