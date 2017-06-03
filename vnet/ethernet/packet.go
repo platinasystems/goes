@@ -26,7 +26,9 @@ type VlanTag vnet.Uint16
 
 func (t VlanTag) ToHost() VlanTag   { return VlanTag(vnet.Uint16(t).ToHost()) }
 func (t VlanTag) FromHost() VlanTag { return VlanTag(vnet.Uint16(t).FromHost()) }
-func (v VlanTag) Id() vnet.Uint16   { return vnet.Uint16(v.ToHost()) & 0xfff }
+func (v VlanTag) Id() uint16        { return uint16(v.ToHost()) & 0xfff }
+func (v VlanTag) Priority() uint8   { return uint8(v.ToHost() >> 13) }
+func (v VlanTag) CFI() bool         { return v.ToHost()&(1<<12) != 0 }
 
 // Tagged packets have VlanHeader after ethernet header.
 type VlanHeader struct {
