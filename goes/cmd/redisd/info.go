@@ -31,9 +31,7 @@ func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
 	if len(secs) == 0 || secs[0] == "default" || secs[0] == "all" {
 		secs = []string{
 			"server",
-			"clients",
 			"memory",
-			"stats",
 			"cpu",
 		}
 	}
@@ -54,15 +52,9 @@ func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
 				fmt.Fprintln(w, "uptime_in_days:",
 					math.Floor((s/(60*60*24))+.5))
 			},
-			"clients": func(w io.Writer) {
-				fmt.Fprintln(w, "FIXME")
-			},
 			"memory": func(w io.Writer) {
 				fmt.Fprintln(w, "used_memory:", stat.Vsize)
 				fmt.Fprintln(w, "used_memory_rss:", stat.Rss)
-			},
-			"stats": func(w io.Writer) {
-				fmt.Fprintln(w, "FIXME")
 			},
 			"cpu": func(w io.Writer) {
 				fmt.Fprintln(w, "used_cpu_sys:", stat.Stime)
