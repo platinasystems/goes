@@ -6,6 +6,7 @@ package ps
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -60,7 +61,7 @@ func (cmd) Main(args ...string) error {
 	boy := time.Date(now.Year(), 1, 1, 12, 0, 0, 0, now.Location())
 	bod := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0,
 		now.Location())
-	start := func(t time.Time) string {
+	stime := func(t time.Time) string {
 		if t.Before(boy) {
 			return fmt.Sprintf("%4d", t.Year())
 		} else if t.Before(bod) {
@@ -98,15 +99,13 @@ func (cmd) Main(args ...string) error {
 
 	switch {
 	case flag["-f"]:
-		fmt.Printf("%5s %8s %6s %6s %5s %5s %16s %s\n",
-			"UID", "TTY", "PID", "PPID", "STATE", "START", "TIME",
-			"COMMAND")
+		fmt.Println("UID        PID  PPID  C STIME TTY          TIME CMD")
 	default:
-		fmt.Printf("%6s %8s %16s %s\n",
-			"PID", "TTY", "TIME", "COMMAND")
+		fmt.Println("  PID TTY          TIME CMD")
 	}
 
 	tty := make(tty)
+	uid := make(uid)
 
 	for _, ps := range l {
 		if flag["-e"] || ps.stat.TtyNr == ttynr {
@@ -124,17 +123,17 @@ func (cmd) Main(args ...string) error {
 					}
 					cmdline = string(buf)
 				}
-				fmt.Printf("%5d %8s %6d %6d %5s %5s %16s %s\n",
-					ps.uid,
-					tty.Name(ps.stat.TtyNr),
+				fmt.Printf("%-8s %5d %5d %2s %5s %-7s %9s %s\n",
+					uid.Name(ps.uid),
 					ps.stat.Pid,
 					ps.stat.Ppid,
-					"  "+ps.stat.State+"  ",
-					start(ps.stat.StartTime),
+					ps.stat.State,
+					tty.Name(ps.stat.TtyNr),
+					stime(ps.stat.StartTime),
 					ps.stat.Utime,
 					cmdline)
 			default:
-				fmt.Printf("%6d %8s %16s %s\n",
+				fmt.Printf("%5d %-7s %9s %s\n",
 					ps.stat.Pid,
 					tty.Name(ps.stat.TtyNr),
 					ps.stat.Utime,
@@ -225,5 +224,29 @@ func (tty tty) Name(u uint) string {
 		name = "?"
 	}
 	tty[u] = name
+	return name
+}
+
+type uid map[uint32]string
+
+func (uid uid) Name(u uint32) string {
+	name, found := uid[u]
+	if found {
+		return name
+	}
+	name = fmt.Sprint(u)
+	if f, err := os.Open("/etc/passwd"); err == nil {
+		defer f.Close()
+		scan := bufio.NewScanner(f)
+		for scan.Scan() {
+			field := bytes.Split(scan.Bytes(), []byte(":"))
+			var n uint32
+			fmt.Sscan(string(field[2]), &n)
+			uid[n] = string(field[0])
+			if u == n {
+				name = uid[n]
+			}
+		}
+	}
 	return name
 }
