@@ -171,6 +171,27 @@ func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input)
 	return
 }
 
+func (m *netlinkMain) show_unreachable(c cli.Commander, w cli.Writer,
+	in *cli.Input) (err error) {
+
+	if len(m.unreachable_ip4_next_hops) == 0 {
+		fmt.Fprintln(w, "No unreachable next hops")
+		return
+	}
+	fmt.Fprintf(w, "%-20s %-15s\n", "Destination", "Next hop")
+	for key, val := range m.unreachable_ip4_next_hops {
+		nh := key.Address
+		nhs := fmt.Sprintf("%d.%d.%d.%d", nh[0], nh[1], nh[2], nh[3])
+		for prefix := range val {
+			a := prefix.Address
+			ps := fmt.Sprintf("%d.%d.%d.%d/%d",
+				a[0], a[1], a[2], a[3], prefix.Len)
+			fmt.Fprintf(w, "%-20s %-15s\n", ps, nhs)
+		}
+	}
+	return
+}
+
 func (m *netlinkMain) cliInit() (err error) {
 	v := m.m.v
 	cmds := []cli.Command{
@@ -183,6 +204,11 @@ func (m *netlinkMain) cliInit() (err error) {
 			Name:      "show netlink summary",
 			ShortHelp: "summary netlink messages received",
 			Action:    m.show_summary,
+		},
+		cli.Command{
+			Name:      "show unreachable",
+			ShortHelp: "show unreachable next hops",
+			Action:    m.show_unreachable,
 		},
 	}
 	for i := range cmds {
