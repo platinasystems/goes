@@ -55,7 +55,9 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		fmt.Fprintf(w, "%6s%12s\n", "Table", "Routes")
 		for fi := range m.fibs {
 			fib := m.fibs[fi]
-			fmt.Fprintf(w, "%6d%12d\n", fi, fib.Len())
+			if fib != nil {
+				fmt.Fprintf(w, "%6d%12d\n", fi, fib.Len())
+			}
 		}
 		u := m.GetAdjacencyUsage()
 		fmt.Fprintf(w, "Adjacencies: heap %d used, %d free\n", u.Used, u.Free)
