@@ -2,14 +2,11 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO enable all 5 files
-//TODO SERVER -s, HASH -v, LIST -l
-//TODO mk1
-//TODO real server on web
+//TODO SERVER -s, HASH -v, LIST -l with parm,flag
 //TODO AUTH WGET
 //TODO BLOB / DEBLOB
-//TODO upgrade to be called automatically if enabled
-//TODO script to generate uboot.bin, envvar.bin
+//TODO upgrade to be called automatically if enabled, register with bootsrvr
+//TODO generate ubo.bin, env.bin
 
 package upgrade
 
@@ -46,11 +43,11 @@ DESCRIPTION
 	version can be specified with a version hash.
 
 	For the BMC the independently erasable and replacable images are:
-	   1. uboot :  QSPI header, u-boot bootloader
-	   2. dtb   :  device tree file
-	   3. envvar:  u-boot envvar block
-	   4. kernel:  linux kernel
-	   5. initrd:  initrd  filesystem containing goes
+	   1. ubo:  QSPI header, u-boot bootloader
+	   2. dtb:  device tree file
+	   3. env:  u-boot envvar block
+	   4. ker:  linux kernel
+	   5. ini:  initrd  filesystem containing goes
 
 OPTIONS
 	LATEST		upgrades flash to platina-mk1-bmc-LATEST
@@ -58,16 +55,15 @@ OPTIONS
 	-l		lists available upgrade hashes
 	-s [SERVER]     specifies SERVER, overrides default www.platina.com`
 
-	DefaultMode   = 0755
-	MmcDirectory  = "/mmc"
-	MmcDevice     = "/dev/mmcblk0p1"
-	DefaultServer = "http://192.168.101.127" //FIXME invader7 for now
-	PlatinaServer = "www.platina.com"
-	M             = "platina-mk1-bmc"
+	DfltMod = 0755
+	MmcDir  = "/mmc"
+	MmcDev  = "/dev/mmcblk0p1"
+	DfltSrv = "192.168.101.127" //FIXME invader7 for now
+	PlatSvr = "www.platina.com"
+	Machine = "platina-mk1-bmc"
 )
 
-// var imageNames = []string{"uboot", "dtb", "envvar", "kernel", "initrd"}
-var imageNames = []string{"initrd"}
+var imageNames = []string{"ubo", "dtb", "env", "ker", "ini"}
 
 type Interface interface {
 	Apropos() lang.Alt
@@ -85,13 +81,19 @@ func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("Missing version: LATEST or hash")
+		return fmt.Errorf("Missing version:  LATEST or hash")
 	}
-	t := args[0]
-	s := DefaultServer
 	v := ""
+	s := "http://" + DfltSrv
+	t := args[0]
 	if t == "LATEST" {
 		v = "LATEST"
+	}
+	if len(args) == 3 { //FIXME
+		u := args[1]
+		if u == "-s" {
+			s = "http://" + args[2]
+		}
 	}
 	err := doUpgrade(s, v)
 	if err != nil {
@@ -122,7 +124,7 @@ func doUpgrade(s string, v string) error {
 	if err != nil {
 		return err
 	}
-	//err = deBlob()
+	//err = deBlob() //FIXME
 	err = copyFiles(v)
 	if err != nil {
 		return err
@@ -144,8 +146,10 @@ func reboot() error {
 func getFiles(s string, v string) error {
 	for _, f := range imageNames {
 		files := []string{
-			s + "/" + M + "/" + M + "-" + f + "-" + v + ".bin",
-			s + "/" + M + "/" + M + "-" + f + "-" + v + ".crc",
+			s + "/" + Machine + "/" + Machine +
+				"-" + f + "-" + v + ".bin",
+			s + "/" + Machine + "/" + Machine +
+				"-" + f + "-" + v + ".crc",
 		}
 		err := wgetFiles(files)
 		if err != nil {
@@ -174,11 +178,13 @@ func wgetFiles(urls []string) error {
 
 func copyFiles(v string) error {
 	for _, f := range imageNames {
-		err := copyFile("/"+M+"-"+f+"-"+v+".bin", MmcDirectory+"/"+f+".bin")
+		err := copyFile("/"+Machine+"-"+f+"-"+v+
+			".bin", MmcDir+"/"+f+".bin")
 		if err != nil {
 			return err
 		}
-		err = copyFile("/"+M+"-"+f+"-"+v+".crc", MmcDirectory+"/"+f+".crc")
+		err = copyFile("/"+Machine+"-"+f+"-"+v+
+			".crc", MmcDir+"/"+f+".crc")
 		if err != nil {
 			return err
 		}
@@ -213,11 +219,11 @@ func copyFile(f string, d string) error {
 
 func rmFiles(v string) error {
 	for _, f := range imageNames {
-		err := rmFile("/" + M + "-" + f + "-" + v + ".bin")
+		err := rmFile("/" + Machine + "-" + f + "-" + v + ".bin")
 		if err != nil {
 			return err
 		}
-		err = rmFile("/" + M + "-" + f + "-" + v + ".crc")
+		err = rmFile("/" + Machine + "-" + f + "-" + v + ".crc")
 		if err != nil {
 			return err
 		}
@@ -238,10 +244,10 @@ func rmFile(f string) error {
 }
 
 func mountMmc() error {
-	var perm os.FileMode = DefaultMode
+	var perm os.FileMode = DfltMod
 
-	dn := MmcDirectory
-	mdev := MmcDevice
+	dn := MmcDir
+	mdev := MmcDev
 	f := os.MkdirAll
 
 	if err := f(dn, perm); err != nil {
