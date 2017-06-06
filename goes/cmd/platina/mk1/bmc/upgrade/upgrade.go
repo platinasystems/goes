@@ -2,11 +2,10 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO SERVER -s, HASH -v, LIST -l with parm,flag
-//TODO AUTH WGET
+//TODO AUTH WGET, CERT OR EQUIV
 //TODO BLOB / DEBLOB
-//TODO upgrade to be called automatically if enabled, register with bootsrvr
-//TODO generate ubo.bin, env.bin
+//TODO UPGRADE AUTOMATICALLY IF ENB., contact boot server
+//TODO script to generate ubo.bin, env.bin
 
 package upgrade
 
@@ -50,16 +49,14 @@ DESCRIPTION
 	   5. ini:  initrd  filesystem containing goes
 
 OPTIONS
-	LATEST		upgrades flash to platina-mk1-bmc-LATEST
-	-v [HASH]	upgrades flash to platina-mk1-bmc-[HASH]
-	-l		lists available upgrade hashes
-	-s [SERVER]     specifies SERVER, overrides default www.platina.com`
+	-v ["LATEST" | HASH] upgrades flash to platina-mk1-bmc-[HASH]
+	-l	             lists available upgrade hashes
+	-s [SERVER]          specifies SERVER, default: www.platina.com`
 
 	DfltMod = 0755
 	MmcDir  = "/mmc"
 	MmcDev  = "/dev/mmcblk0p1"
-	DfltSrv = "192.168.101.127" //FIXME invader7 for now
-	PlatSvr = "www.platina.com"
+	DfltSrv = "www.platina.com"
 	Machine = "platina-mk1-bmc"
 )
 
@@ -80,22 +77,21 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("Missing version:  LATEST or hash")
+	flag, args := flags.New(args, "-l")
+	parm, args := parms.New(args, "-v", "-s")
+
+	if len(parm["-v"]) == 0 && !flag["-l"] {
+		return fmt.Errorf("Missing -v or -l flag")
 	}
-	v := ""
-	s := "http://" + DfltSrv
-	t := args[0]
-	if t == "LATEST" {
-		v = "LATEST"
+	if len(parm["-s"]) == 0 {
+		parm["-s"] = DfltSrv
 	}
-	if len(args) == 3 { //FIXME
-		u := args[1]
-		if u == "-s" {
-			s = "http://" + args[2]
-		}
+	if flag["-l"] {
+		getList(parm["-s"])
+		return nil
 	}
-	err := doUpgrade(s, v)
+
+	err := doUpgrade(parm["-s"], parm["-v"])
 	if err != nil {
 		return err
 	}
@@ -143,12 +139,23 @@ func reboot() error {
 	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
 
+func getList(s string) error {
+	files := []string{
+		"http://" + s + "/" + Machine + "/" + "LIST",
+	}
+	err := wgetFiles(files)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func getFiles(s string, v string) error {
 	for _, f := range imageNames {
 		files := []string{
-			s + "/" + Machine + "/" + Machine +
+			"http://" + s + "/" + Machine + "/" + Machine +
 				"-" + f + "-" + v + ".bin",
-			s + "/" + Machine + "/" + Machine +
+			"http://" + s + "/" + Machine + "/" + Machine +
 				"-" + f + "-" + v + ".crc",
 		}
 		err := wgetFiles(files)
