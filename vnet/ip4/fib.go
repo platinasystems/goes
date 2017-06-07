@@ -264,10 +264,11 @@ func (f *Fib) mapFibRemapAdjacency(m *Main, from, to ip.Adj) {
 }
 
 func (m *Main) remapAdjacency(from, to ip.Adj) {
-	for i := range m.fibs {
-		f := m.fibs[i]
-		f.mapFibRemapAdjacency(m, from, to)
-		f.mtrie.remapAdjacency(from, to)
+	for _, f := range m.fibs {
+		if f != nil {
+			f.mapFibRemapAdjacency(m, from, to)
+			f.mtrie.remapAdjacency(from, to)
+		}
 	}
 }
 
