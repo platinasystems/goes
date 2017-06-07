@@ -53,7 +53,7 @@ OPTIONS
 	-v ["LATEST" | HASH] upgrades flash to platina-mk1-bmc-[HASH]
 	-l	             lists available upgrade hashes
 	-s [SERVER]          specifies SERVER, default: www.platina.com
-	-d [DIRECTORY]       user DIRECTORY, default is platina-mk1-bmc`
+	-d [DIRECTORY]       server DIRECTORY, default is platina-mk1-bmc`
 
 	DfltMod = 0755
 	MmcDir  = "/mmc"
@@ -80,7 +80,7 @@ func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-l")
-	parm, args := parms.New(args, "-v", "-s")
+	parm, args := parms.New(args, "-v", "-s", "-d")
 
 	if len(parm["-v"]) == 0 && !flag["-l"] {
 		return fmt.Errorf("Error: missing -v or -l flag")
@@ -88,16 +88,19 @@ func (cmd) Main(args ...string) error {
 	if len(parm["-s"]) == 0 {
 		parm["-s"] = DfltSrv
 	}
+	if len(parm["-d"]) == 0 {
+		parm["-d"] = Machine
+	}
 	if flag["-l"] {
-		getList(parm["-s"])
-		d, err := ioutil.ReadFile("/LIST")
+		getList(parm["-s"], parm["-d"])
+		l, err := ioutil.ReadFile("/LIST")
 		if err != nil {
 			return fmt.Errorf("Error: 'LIST' file not found")
 		}
-		fmt.Print(string(d))
+		fmt.Print(string(l))
 		return nil
 	}
-	err := doUpgrade(parm["-s"], parm["-v"])
+	err := doUpgrade(parm["-s"], parm["-v"], parm["-d"])
 	if err != nil {
 		return err
 	}
@@ -117,12 +120,12 @@ var (
 	}
 )
 
-func doUpgrade(s string, v string) error {
+func doUpgrade(s string, v string, d string) error {
 	err := mountMmc()
 	if err != nil {
 		return err
 	}
-	err = getFiles(s, v)
+	err = getFiles(s, v, d)
 	if err != nil {
 		return err
 	}
@@ -145,9 +148,9 @@ func reboot() error {
 	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
 
-func getList(s string) error {
+func getList(s string, d string) error {
 	files := []string{
-		"http://" + s + "/" + Machine + "/" + "LIST",
+		"http://" + s + "/" + d + "/" + "LIST",
 	}
 	err := wgetFiles(files)
 	if err != nil {
@@ -156,12 +159,12 @@ func getList(s string) error {
 	return nil
 }
 
-func getFiles(s string, v string) error {
+func getFiles(s string, v string, d string) error {
 	for _, f := range imageNames {
 		files := []string{
-			"http://" + s + "/" + Machine + "/" + Machine +
+			"http://" + s + "/" + d + "/" + Machine +
 				"-" + f + "-" + v + ".bin",
-			"http://" + s + "/" + Machine + "/" + Machine +
+			"http://" + s + "/" + d + "/" + Machine +
 				"-" + f + "-" + v + ".crc",
 		}
 		err := wgetFiles(files)
