@@ -14,13 +14,12 @@ import (
 	"time"
 
 	. "github.com/platinasystems/go"
-	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/internal/proc"
 )
 
 const SizeofInt = (32 << (^uint(0) >> 63)) >> 3
 
-func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
+func (redisd *Redisd) Info(secs ...string) ([]byte, error) {
 	stat := new(proc.Stat)
 	err := proc.Load(stat).FromFile("/proc/self/stat")
 	if err != nil {
@@ -36,33 +35,41 @@ func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
 		}
 	}
 
-	for _, sec := range secs {
+	for i, sec := range secs {
 		f, found := map[string]func(io.Writer){
 			"server": func(w io.Writer) {
-				fmt.Fprintln(w, "redis_git_sha1:",
-					Package["version"])
-				fmt.Fprintln(w, "redis_git_dirty:",
-					len(Package["diff"]) > 0)
-				fmt.Fprintln(w, "os:", runtime.GOOS)
-				fmt.Fprintln(w, "arch_bits:", SizeofInt*8)
-				fmt.Fprintln(w, "process_id:", stat.Pid)
+				fmt.Fprint(w, "redis_git_sha1: ",
+					Package["version"], "\r\n")
+				fmt.Fprint(w, "redis_git_dirty: ",
+					len(Package["diff"]) > 0, "\r\n")
+				fmt.Fprint(w, "os: ",
+					runtime.GOOS, "\r\n")
+				fmt.Fprint(w, "arch_bits: ",
+					SizeofInt*8, "\r\n")
+				fmt.Fprint(w, "process_id: ",
+					stat.Pid, "\r\n")
 				s := time.Now().Sub(stat.StartTime).Seconds()
-				fmt.Fprintln(w, "uptime_in_seconds:",
-					math.Floor(s+.5))
-				fmt.Fprintln(w, "uptime_in_days:",
-					math.Floor((s/(60*60*24))+.5))
+				fmt.Fprint(w, "uptime_in_seconds: ",
+					math.Floor(s+.5), "\r\n")
+				fmt.Fprint(w, "uptime_in_days: ",
+					math.Floor((s/(60*60*24))+.5),
+					"\r\n")
 			},
 			"memory": func(w io.Writer) {
-				fmt.Fprintln(w, "used_memory:", stat.Vsize)
-				fmt.Fprintln(w, "used_memory_rss:", stat.Rss)
+				fmt.Fprint(w, "used_memory: ",
+					stat.Vsize, "\r\n")
+				fmt.Fprint(w, "used_memory_rss: ",
+					stat.Rss, "\r\n")
 			},
 			"cpu": func(w io.Writer) {
-				fmt.Fprintln(w, "used_cpu_sys:", stat.Stime)
-				fmt.Fprintln(w, "used_cpu_user:", stat.Utime)
-				fmt.Fprintln(w, "used_cpu_sys_children:",
-					stat.Cstime)
-				fmt.Fprintln(w, "used_cpu_user_children:",
-					stat.Cutime)
+				fmt.Fprint(w, "used_cpu_sys: ",
+					stat.Stime, "\r\n")
+				fmt.Fprint(w, "used_cpu_user: ",
+					stat.Utime, "\r\n")
+				fmt.Fprint(w, "used_cpu_sys_children: ",
+					stat.Cstime, "\r\n")
+				fmt.Fprint(w, "used_cpu_user_children: ",
+					stat.Cutime, "\r\n")
 			},
 		}[sec]
 		if !found {
@@ -70,9 +77,12 @@ func (redisd *Redisd) Info(secs ...string) (*grs.StatusReply, error) {
 			break
 		}
 		if len(secs) > 1 {
-			fmt.Fprintln(buf, "#", strings.Title(sec))
+			if i > 0 {
+				fmt.Fprint(buf, "\r\n")
+			}
+			fmt.Fprint(buf, "# ", strings.Title(sec), "\r\n")
 		}
 		f(buf)
 	}
-	return grs.NewStatusReply(buf.String()), err
+	return buf.Bytes(), err
 }
