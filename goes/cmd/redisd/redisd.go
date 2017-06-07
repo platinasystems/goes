@@ -641,10 +641,6 @@ func (redisd *Redisd) Ping() (*grs.StatusReply, error) {
 	return grs.NewStatusReply("PONG"), nil
 }
 
-func (redisd *Redisd) Quit() (*grs.StatusReply, error) {
-	return nil, grs.Quit
-}
-
 func (redisd *Redisd) Subscribe(channels ...[]byte) (*grs.MultiChannelWriter,
 	error) {
 	mcw := &grs.MultiChannelWriter{
