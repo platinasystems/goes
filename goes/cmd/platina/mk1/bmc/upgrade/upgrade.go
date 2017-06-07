@@ -13,6 +13,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
@@ -29,7 +30,7 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [LATEST | -v HASH] [-l] [-s SERVER]"
+	Usage   = "upgrade [-v 'LATEST' | HASH] [-l] [-s SERVER] [-d DIR]"
 	Man     = `
 DESCRIPTION
 	The upgrade command upgrades firmware images in flash.
@@ -51,7 +52,8 @@ DESCRIPTION
 OPTIONS
 	-v ["LATEST" | HASH] upgrades flash to platina-mk1-bmc-[HASH]
 	-l	             lists available upgrade hashes
-	-s [SERVER]          specifies SERVER, default: www.platina.com`
+	-s [SERVER]          specifies SERVER, default: www.platina.com
+	-d [DIRECTORY]       user DIRECTORY, default is platina-mk1-bmc`
 
 	DfltMod = 0755
 	MmcDir  = "/mmc"
@@ -81,16 +83,20 @@ func (cmd) Main(args ...string) error {
 	parm, args := parms.New(args, "-v", "-s")
 
 	if len(parm["-v"]) == 0 && !flag["-l"] {
-		return fmt.Errorf("Missing -v or -l flag")
+		return fmt.Errorf("Error: missing -v or -l flag")
 	}
 	if len(parm["-s"]) == 0 {
 		parm["-s"] = DfltSrv
 	}
 	if flag["-l"] {
 		getList(parm["-s"])
+		d, err := ioutil.ReadFile("/LIST")
+		if err != nil {
+			return fmt.Errorf("Error: 'LIST' file not found")
+		}
+		fmt.Print(string(d))
 		return nil
 	}
-
 	err := doUpgrade(parm["-s"], parm["-v"])
 	if err != nil {
 		return err
