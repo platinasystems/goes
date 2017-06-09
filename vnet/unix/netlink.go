@@ -432,7 +432,7 @@ func (m *Main) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 	m4 := ip4.GetMain(m.v)
 	isDel := v.Header.Type == netlink.RTM_DELADDR
 	if di, ok := m.getDummyInterface(v.Index); ok {
-		const fi = 0 // fixme
+		fi := m.fibIndexForNsid(*v.Nsid())
 		q := p.ToIpPrefix()
 		if di.isAdminUp || isDel {
 			m4.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
