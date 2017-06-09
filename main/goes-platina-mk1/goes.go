@@ -67,6 +67,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/sleep"
 	"github.com/platinasystems/go/goes/cmd/source"
 	"github.com/platinasystems/go/goes/cmd/start"
+	"github.com/platinasystems/go/goes/cmd/status"
 	"github.com/platinasystems/go/goes/cmd/stop"
 	"github.com/platinasystems/go/goes/cmd/stty"
 	"github.com/platinasystems/go/goes/cmd/subscribe"
@@ -141,6 +142,7 @@ func Goes() goes.ByName {
 		source.New(),
 		start.New(),
 		stop.New(),
+		status.New(),
 		stty.New(),
 		subscribe.New(),
 		sync.New(),
