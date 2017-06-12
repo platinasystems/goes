@@ -20,6 +20,15 @@ const (
 	punt_2tag_error_unknown_disposition
 )
 
+type PuntConfig struct {
+	// Next hop in vnet packet processing for this dispostion.
+	Next string
+	// Software interface and aux data to use for packet.
+	RefOpaque vnet.RefOpaque
+	// True to advance past vlan/2-vlan tags to layer 3 header.
+	AdvanceL3Header bool
+}
+
 type punt_packet_disposition struct {
 	o            vnet.RefOpaque
 	next         uint32
@@ -33,13 +42,15 @@ type DoubleTaggedPuntNode struct {
 	punt_packet_disposition_pool
 }
 
-func (n *DoubleTaggedPuntNode) AddDisposition(next string, o vnet.RefOpaque, data_advance int32) (i uint32) {
+func (n *DoubleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
 	p := &n.punt_packet_disposition_pool
 	i = uint32(p.GetIndex())
 	d := &p.dispositions[i]
-	d.o = o
-	d.next = uint32(n.Vnet.AddNamedNext(n, next))
-	d.data_advance = data_advance
+	d.o = cf.RefOpaque
+	d.next = uint32(n.Vnet.AddNamedNext(n, cf.Next))
+	if cf.AdvanceL3Header {
+		d.data_advance = HeaderBytes + 2*VlanHeaderBytes
+	}
 	return
 }
 func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) {
@@ -164,7 +175,7 @@ func (n *DoubleTaggedPuntNode) Init(v *vnet.Vnet, name string) {
 		punt_2tag_error_unknown_disposition: "unknown packet disposition",
 	}
 	v.RegisterInOutNode(n, name+"-double-tagged-punt")
-	n.AddDisposition("punt", vnet.RefOpaque{}, 0)
+	n.AddDisposition(PuntConfig{Next: "punt"})
 }
 
 func (n *DoubleTaggedPuntNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {

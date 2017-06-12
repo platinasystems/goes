@@ -25,13 +25,15 @@ type SingleTaggedPuntNode struct {
 	punt_packet_disposition_pool
 }
 
-func (n *SingleTaggedPuntNode) AddDisposition(next string, o vnet.RefOpaque, data_advance int32) (i uint32) {
+func (n *SingleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
 	p := &n.punt_packet_disposition_pool
 	i = uint32(p.GetIndex())
 	d := &p.dispositions[i]
-	d.o = o
-	d.next = uint32(n.Vnet.AddNamedNext(n, next))
-	d.data_advance = data_advance
+	d.o = cf.RefOpaque
+	d.next = uint32(n.Vnet.AddNamedNext(n, cf.Next))
+	if cf.AdvanceL3Header {
+		d.data_advance = HeaderBytes + 1*VlanHeaderBytes
+	}
 	return
 }
 func (n *SingleTaggedPuntNode) DelDisposition(i uint32) {
@@ -39,7 +41,7 @@ func (n *SingleTaggedPuntNode) DelDisposition(i uint32) {
 }
 
 // Ethernet header followed by is 1 vlan tag.
-// Packet looks like this DST-ETHERNET SRC-ETHERNET 0x8100 TAG0 ETHERNET-TYPE
+// Packet looks like this DST-ETHERNET SRC-ETHERNET 0x8100 TAG ETHERNET-TYPE
 type header_no_type struct {
 	dst, src Address
 }
@@ -148,7 +150,7 @@ func (n *SingleTaggedPuntNode) Init(v *vnet.Vnet, name string) {
 		punt_1tag_error_unknown_disposition: "unknown packet disposition",
 	}
 	v.RegisterInOutNode(n, name+"-single-tagged-punt")
-	n.AddDisposition("punt", vnet.RefOpaque{}, 0)
+	n.AddDisposition(PuntConfig{Next: "punt"})
 }
 
 func (n *SingleTaggedPuntNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {
