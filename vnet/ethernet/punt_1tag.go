@@ -64,7 +64,7 @@ func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 		error0 = punt_1tag_error_not_single_tagged
 	}
 
-	di0 := uint32(p0.g)
+	di0 := uint32(p0.g.ToHost())
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_1tag_error_unknown_disposition
@@ -102,7 +102,7 @@ func (n *SingleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 		error1 = punt_1tag_error_not_single_tagged
 	}
 
-	di0, di1 := uint32(p0.g), uint32(p1.g)
+	di0, di1 := uint32(p0.g.ToHost()), uint32(p1.g.ToHost())
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_1tag_error_unknown_disposition

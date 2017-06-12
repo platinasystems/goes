@@ -56,11 +56,20 @@ func (n *DoubleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
 func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) {
 	n.punt_packet_disposition_pool.PutIndex(uint(i))
 }
+func PuntDispositionForTags(outer, inner VlanTag) (i uint32) {
+	return uint32(inner.ToHost()<<16) | uint32(outer.ToHost())
+}
+func PuntTagsForDisposition(i uint32) (outer, inner VlanTag) {
+	inner = VlanTag(i >> 16).FromHost()
+	outer = VlanTag(i).FromHost()
+	return
+}
 
 const sizeof_double_tag = 8
 
 func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	p0 := *(*vnet.Uint64)(r0.DataOffset(sizeof_header_no_type))
+	q0 := (*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type))
 
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
@@ -70,14 +79,7 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 		error0 = punt_2tag_error_not_double_tagged
 	}
 
-	o0 := p0 &^ m
-	if vnet.HostIsNetworkByteOrder() {
-		o0 |= p0 >> 16
-	} else {
-		o0 |= p0 >> 48
-	}
-
-	di0 := uint32(o0)
+	di0 := PuntDispositionForTags(q0[0].g, q0[1].g)
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
@@ -106,6 +108,8 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	p0 := *(*vnet.Uint64)(r0.DataOffset(sizeof_header_no_type))
 	p1 := *(*vnet.Uint64)(r1.DataOffset(sizeof_header_no_type))
+	q0 := (*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type))
+	q1 := (*[2]type_and_tag)(r1.DataOffset(sizeof_header_no_type))
 
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
@@ -118,16 +122,8 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 		error1 = punt_2tag_error_not_double_tagged
 	}
 
-	o0, o1 := p0&^m, p1&^m
-	if vnet.HostIsNetworkByteOrder() {
-		o0 |= p0 >> 16
-		o1 |= p1 >> 16
-	} else {
-		o0 |= p0 >> 48
-		o1 |= p1 >> 48
-	}
-
-	di0, di1 := uint32(o0), uint32(o1)
+	di0 := PuntDispositionForTags(q0[0].g, q0[1].g)
+	di1 := PuntDispositionForTags(q1[0].g, q1[1].g)
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
