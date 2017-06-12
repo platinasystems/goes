@@ -335,9 +335,10 @@ func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
 }
 
 // Take fib index from namespace index.  So, default namespace gets fib index 0, the default table.
-func (m *Main) validateFibIndexForNamespace(si vnet.Si, ns *net_namespace) {
+func (m *Main) validateFibIndexForNamespace(si vnet.Si, ns *net_namespace) (err error) {
 	m4 := ip4.GetMain(m.v)
-	m4.SetFibIndexForSi(si, ip.FibIndex(ns.index))
+	err = m4.SetFibIndexForSi(si, ip.FibIndex(ns.index))
+	return
 }
 
 func (e *netlinkEvent) EventAction() {
