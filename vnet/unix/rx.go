@@ -47,7 +47,7 @@ func (p *rx_packet) rx_init(rx *rx_node) {
 func (p *rx_packet) rx_free(rx *rx_node) { rx.buffer_pool.FreeRefs(&p.refs[0], p.refs.Len(), false) }
 
 const (
-	packet_vector_max_len = 64
+	packet_vector_max_len = 8
 	max_rx_packet_size    = 16 << 10
 )
 
