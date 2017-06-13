@@ -5,6 +5,7 @@
 package elib
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -187,6 +188,8 @@ func (heap *Heap) newElt() (ei Index) {
 
 func (heap *Heap) Get(size uint) (id Index, offset uint) { return heap.get(size, Index(size)) }
 
+var ErrHeapOverflow = errors.New("heap overflow")
+
 func (heap *Heap) get(sizeArg uint, size Index) (id Index, offset uint) {
 	// Keep track of largest size caller asks for.
 	if Index(sizeArg) > heap.maxSize {
@@ -240,7 +243,8 @@ func (heap *Heap) get(sizeArg uint, size Index) (id Index, offset uint) {
 	}
 
 	if heap.maxLen != 0 && heap.len+size > heap.maxLen {
-		panic(fmt.Errorf("heap overflow allocating object of length %d", size))
+		panic(ErrHeapOverflow)
+		return
 	}
 
 	if heap.len == 0 {
