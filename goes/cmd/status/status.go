@@ -194,8 +194,13 @@ func checkVnetdHung() bool {
 }
 
 func (cmd) Main(args ...string) error {
+	if os.Getuid() != 0 {
+		fmt.Println("must be run as root")
+		os.Exit(1)
+	}
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
+		os.Exit(1)
 	}
 	fmt.Println("GOES status")
 	fmt.Println("======================")
