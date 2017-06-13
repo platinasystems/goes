@@ -36,11 +36,16 @@ func (i IfAddr) String(m *Main) string {
 
 //go:generate gentemplate -d Package=ip -id ifaddress -d PoolType=ifAddressPool -d Type=IfAddress -d Data=ifAddrs github.com/platinasystems/go/elib/pool.tmpl
 
+type ifAddrMapKey struct {
+	a Address
+	i FibIndex
+}
+
 type ifAddressMain struct {
 	ifAddressPool
 
 	// Maps ip4/ip6 address to pool index.
-	addrMap map[Address]IfAddr
+	addrMap map[ifAddrMapKey]IfAddr
 
 	// Head of doubly-linked list indexed by software interface.
 	headBySwIf IfAddrVec
@@ -55,9 +60,14 @@ func (m *ifAddressMain) init(v *vnet.Vnet) {
 	v.RegisterSwIfAddDelHook(m.swIfAddDel)
 }
 
-func (m *ifAddressMain) GetIfAddress(a []uint8) (ia *IfAddress) {
-	var k Address
-	copy(k[:], a)
+func makeIfAddrMapKey(a []uint8, i FibIndex) (k ifAddrMapKey) {
+	copy(k.a[:], a)
+	k.i = i
+	return
+}
+
+func (m *ifAddressMain) GetIfAddress(a []uint8, i FibIndex) (ia *IfAddress) {
+	k := makeIfAddrMapKey(a, i)
 	if i, ok := m.addrMap[k]; ok {
 		ia = &m.ifAddrs[i]
 	}
@@ -79,14 +89,16 @@ func (m *ifAddressMain) ForeachIfAddress(si vnet.Si, f func(ia IfAddr, i *IfAddr
 	return nil
 }
 
-func (m *Main) IfAddrForPrefix(p *Prefix) (ai IfAddr, exists bool) {
-	ai, exists = m.addrMap[p.Address]
+func (m *Main) IfAddrForPrefix(p *Prefix, si vnet.Si) (ai IfAddr, exists bool) {
+	k := makeIfAddrMapKey(p.Address[:], m.FibIndexForSi(si))
+	ai, exists = m.addrMap[k]
 	return
 }
 
 func (m *Main) AddDelInterfaceAddress(si vnet.Si, p *Prefix, isDel bool) (ai IfAddr, exists bool, err error) {
 	var a *IfAddress
-	if ai, exists = m.addrMap[p.Address]; exists {
+	k := makeIfAddrMapKey(p.Address[:], m.FibIndexForSi(si))
+	if ai, exists = m.addrMap[k]; exists {
 		a = m.GetIfAddr(ai)
 	}
 
@@ -107,7 +119,7 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, p *Prefix, isDel bool) (ai IfA
 			next.prev = a.prev
 		}
 
-		delete(m.addrMap, p.Address)
+		delete(m.addrMap, k)
 		m.ifAddressPool.PutIndex(uint(ai))
 		ai = IfAddrNil
 	} else if a == nil {
@@ -115,9 +127,9 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, p *Prefix, isDel bool) (ai IfA
 		a = m.GetIfAddr(ai)
 
 		if m.addrMap == nil {
-			m.addrMap = make(map[Address]IfAddr)
+			m.addrMap = make(map[ifAddrMapKey]IfAddr)
 		}
-		m.addrMap[p.Address] = ai
+		m.addrMap[k] = ai
 		a.Prefix = *p
 		a.Si = si
 		a.NeighborProbeAdj = AdjNil

@@ -531,7 +531,7 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 
 	// If interface is admin up, delete interface routes *before* removing address.
 	if isUp && isDel {
-		ia, exists = m.Main.IfAddrForPrefix(&pa)
+		ia, exists = m.Main.IfAddrForPrefix(&pa, si)
 		// For non-existing prefixes error will be signalled by AddDelInterfaceAddress below.
 		if exists {
 			m.addDelInterfaceRoutes(ia, isDel)
