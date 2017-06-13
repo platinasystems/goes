@@ -307,7 +307,7 @@ func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 	// Create any interfaces that were not found via netlink discovery.
 	for si, intf := range m.vnet_tuntap_interface_by_si {
 		if _, ok := nm.interface_by_si[si]; !ok {
-			intf.namespace = nil // &nm.default_namespace // use default namespace.
+			intf.namespace = &nm.default_namespace
 			err = intf.create(m)
 			if err != nil {
 				return
