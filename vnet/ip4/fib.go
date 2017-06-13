@@ -339,7 +339,10 @@ func (m *Main) fibById(id ip.FibId, create bool) *Fib {
 	return m.fibByIndex(i, create)
 }
 
-func (m *Main) fibBySi(si vnet.Si) *Fib { return m.fibs[m.FibIndexForSi(si)] }
+func (m *Main) fibBySi(si vnet.Si) *Fib {
+	i := m.FibIndexForSi(si)
+	return m.fibByIndex(i, true)
+}
 
 func (m *Main) validateDefaultFibForSi(si vnet.Si) {
 	i := m.ValidateFibIndexForSi(si)
