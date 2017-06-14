@@ -86,7 +86,8 @@ func (cmd) Main(args ...string) error {
 		return fmt.Errorf("Error: missing -v or -l flag")
 	}
 	if len(parm["-s"]) == 0 {
-		parm["-s"] = DfltSrv
+		return fmt.Errorf("Error: missing -s server name or IP")
+		//parm["-s"] = DfltSrv
 	}
 	if len(parm["-d"]) == 0 {
 		parm["-d"] = Machine
