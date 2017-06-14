@@ -58,7 +58,7 @@ OPTIONS
 	DfltMod = 0755
 	MmcDir  = "/mmc"
 	MmcDev  = "/dev/mmcblk0p1"
-	DfltSrv = "www.platina.com"
+	DfltSrv = "www.platinasystems.com/doc"
 	Machine = "platina-mk1-bmc"
 )
 
