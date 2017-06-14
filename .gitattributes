@@ -3,3 +3,4 @@
 *.so binary
 *.ucode binary
 *.zip binary
+*.pdf binary
