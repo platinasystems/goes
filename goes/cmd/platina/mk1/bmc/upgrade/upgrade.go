@@ -10,6 +10,7 @@
 package upgrade
 
 import (
+	"archive/tar"
 	"bufio"
 	"fmt"
 	"io"
@@ -130,7 +131,10 @@ func doUpgrade(s string, v string, d string) error {
 	if err != nil {
 		return err
 	}
-	//err = deBlob() //FIXME
+	err = unTar()
+	if err != nil {
+		return err
+	}
 	err = copyFiles(v)
 	if err != nil {
 		return err
@@ -149,6 +153,49 @@ func reboot() error {
 	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
 
+func unTar() error {
+	file, err := os.Open("/platina-mk1-bmc-LATEST.tar")
+	defer file.Close()
+	if err != nil {
+		return fmt.Errorf("Error: bad open")
+		return err
+	}
+	tr := tar.NewReader(file)
+	i := 0
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if i == 0 {
+			i++
+			continue
+		}
+		i++
+		if err != nil {
+			return fmt.Errorf("Error: bad NewReader")
+			return err
+		}
+
+		f, err := os.Create(hdr.Name)
+		if err != nil {
+			return fmt.Errorf("Error: bad Create")
+			return err
+		}
+		defer f.Close()
+		w := bufio.NewWriter(f)
+
+		if _, err := io.Copy(w, tr); err != nil {
+			return fmt.Errorf("Error: bad Copy")
+			return err
+		}
+		f.Sync()
+		w.Flush()
+		f.Close()
+	}
+	return nil
+}
+
 func getList(s string, d string) error {
 	files := []string{
 		"http://" + s + "/" + d + "/" + "LIST",
@@ -161,17 +208,12 @@ func getList(s string, d string) error {
 }
 
 func getFiles(s string, v string, d string) error {
-	for _, f := range imageNames {
-		files := []string{
-			"http://" + s + "/" + d + "/" + Machine +
-				"-" + f + "-" + v + ".bin",
-			"http://" + s + "/" + d + "/" + Machine +
-				"-" + f + "-" + v + ".crc",
-		}
-		err := wgetFiles(files)
-		if err != nil {
-			return err
-		}
+	files := []string{
+		"http://" + s + "/" + d + "/" + Machine + "-" + v + ".tar",
+	}
+	err := wgetFiles(files)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -244,6 +286,10 @@ func rmFiles(v string) error {
 		if err != nil {
 			return err
 		}
+	}
+	err := rmFile("/" + Machine + "-" + v + ".tar")
+	if err != nil {
+		return err
 	}
 	return nil
 }
