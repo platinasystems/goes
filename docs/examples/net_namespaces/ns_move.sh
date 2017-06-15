@@ -116,7 +116,7 @@ check_ns () {
 check_intf () {
     intf=$1
 
-    ip link show $intf 2> /dev/null
+    ip link show $intf &> /dev/null
     if [ $? != 0 ]; then
 	echo "Error: interface [$intf] not found in default namespace."
 	exit 1
@@ -128,8 +128,8 @@ up_it () {
     intf=$2
     addr=$3
 
-    #check_ns $ns
-    #check_intf $intf
+    check_ns $ns
+    check_intf $intf
     setup_ns $ns $intf $addr
 }
 
