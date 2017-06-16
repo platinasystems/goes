@@ -5,6 +5,7 @@
 package ip
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/vnet"
 
 	"fmt"
@@ -21,6 +22,8 @@ type FibId uint32
 type fibMain struct {
 	// Table index indexed by software interface.
 	fibIndexBySi FibIndexVec
+
+	nameByIndex elib.StringVec
 
 	// Hash table mapping table id to fib index.
 	// ID space is not necessarily dense; index space is dense.
@@ -57,6 +60,15 @@ func (f *fibMain) SetFibIndexForId(id FibId, i FibIndex) {
 	f.fibIndexById[id] = i
 }
 
+func (f *fibMain) SetFibNameForIndex(name string, i FibIndex) {
+	f.nameByIndex.Validate(uint(i))
+	f.nameByIndex[i] = name
+}
 func (i FibIndex) Name(m *Main) string {
-	return fmt.Sprintf("%d", i)
+	f := &m.fibMain
+	if uint(i) < f.nameByIndex.Len() {
+		return f.nameByIndex[i]
+	} else {
+		return fmt.Sprintf("%d", i)
+	}
 }
