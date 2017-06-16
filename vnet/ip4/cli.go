@@ -55,7 +55,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		fmt.Fprintf(w, "%6s%12s\n", "Table", "Routes")
 		for fi := range m.fibs {
 			fib := m.fibs[fi]
-			fmt.Fprintf(w, "%6d%12d\n", fi, fib.Len())
+			fmt.Fprintf(w, "%12s%12d\n", ip.FibIndex(fi).Name(&m.Main), fib.Len())
 		}
 		u := m.GetAdjacencyUsage()
 		fmt.Fprintf(w, "Adjacencies: heap %d used, %d free\n", u.Used, u.Free)
@@ -71,9 +71,11 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	rs := []showIpFibRoute{}
 	for fi := range m.fibs {
 		fib := m.fibs[fi]
-		fib.foreach(func(p *Prefix, a ip.Adj) {
-			rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
-		})
+		if fib != nil {
+			fib.foreach(func(p *Prefix, a ip.Adj) {
+				rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
+			})
+		}
 	}
 	sort.Sort(showIpFibRoutes(rs))
 
@@ -111,9 +113,9 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		}
 		for i := range lines {
 			if i == 0 {
-				fmt.Fprintf(w, "%6d%30s%s\n", r.table, &r.prefix, lines[i])
+				fmt.Fprintf(w, "%12s%30s%s\n", r.table.Name(&m.Main), &r.prefix, lines[i])
 			} else {
-				fmt.Fprintf(w, "%6s%30s%s\n", "", "", lines[i])
+				fmt.Fprintf(w, "%12s%30s%s\n", "", "", lines[i])
 			}
 		}
 	}

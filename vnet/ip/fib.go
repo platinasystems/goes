@@ -5,8 +5,10 @@
 package ip
 
 import (
-	"errors"
 	"github.com/platinasystems/go/vnet"
+
+	"errors"
+	"fmt"
 )
 
 // Dense index into fib vector.
@@ -60,4 +62,8 @@ func (f *fibMain) SetFibIndexForId(id FibId, i FibIndex) {
 		f.fibIndexById = make(map[FibId]FibIndex)
 	}
 	f.fibIndexById[id] = i
+}
+
+func (i FibIndex) Name(m *Main) string {
+	return fmt.Sprintf("%d", i)
 }
