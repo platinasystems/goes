@@ -87,6 +87,7 @@ func (m *netlink_main) namespace_init() (err error) {
 			return
 		}
 		ns.listen(m)
+		ns.fibInit(false)
 	}
 
 	// Setup initial namespaces.
@@ -447,6 +448,7 @@ func (ns *net_namespace) add(m *netlink_main) {
 		panic(err)
 	}
 	ns.listen(m)
+	ns.fibInit(false)
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
@@ -459,4 +461,5 @@ func (ns *net_namespace) del(m *netlink_main) {
 		ns.ns_fd = -1
 	}
 	ns.netlink_socket_pair.close()
+	ns.fibInit(true)
 }

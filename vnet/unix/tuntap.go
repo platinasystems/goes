@@ -96,11 +96,15 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 	if is_del {
 		i.close()
 	} else {
-		is_discovery := i.namespace == nil
+		is_discovery := !i.created && i.namespace == nil
 		if is_discovery {
 			return
 		}
+		i.namespace = ns
 		if err := i.open_sockets(); err != nil {
+			panic(err)
+		}
+		if err := i.create(); err != nil {
 			panic(err)
 		}
 		if err := i.bind(); err != nil {
@@ -241,12 +245,21 @@ func (t ifreq_type) String() string {
 func (m *Main) okHi(hi vnet.Hi) (ok bool) { return m.v.HwIfer(hi).IsUnix() }
 func (m *Main) okSi(si vnet.Si) bool      { return m.okHi(m.v.SupHi(si)) }
 
-func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
+func (i *tuntap_interface) ioctl_helper(fd int, req ifreq_type, arg uintptr, is_set_flags_down bool) (err error) {
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(req), arg)
+
+	// Ignore set if flags "no such device" error on if down.
+	// This can happen when an interfaces moves to a new namespace and is harmless.
+	if is_set_flags_down && e == syscall.ENODEV {
+		return
+	}
 	if e != 0 {
 		err = fmt.Errorf("tuntap ioctl %s: %s", req, e)
 	}
 	return
+}
+func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
+	return i.ioctl_helper(fd, req, arg, false)
 }
 
 func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.flag_sync_done }
@@ -367,6 +380,25 @@ func (intf *tuntap_interface) open_sockets() (err error) {
 	return
 }
 
+// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
+func (intf *tuntap_interface) create() (err error) {
+	r := ifreq_flags{name: intf.name}
+	r.flags = iff_no_pi
+	if intf.m.isTun {
+		r.flags |= iff_tun
+	} else {
+		r.flags |= iff_tap
+	}
+	intf.created = true
+	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
+		return
+	}
+	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
+		return
+	}
+	return
+}
+
 // Bind the provisioning socket to the interface.
 func (intf *tuntap_interface) bind() (err error) {
 	sa := syscall.SockaddrLinklayer{
@@ -394,21 +426,8 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 	}()
 
 	// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
-	{
-		r := ifreq_flags{name: intf.name}
-		r.flags = iff_no_pi
-		if m.isTun {
-			r.flags |= iff_tun
-		} else {
-			r.flags |= iff_tap
-		}
-		intf.created = true
-		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
-			return
-		}
-		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
-			return
-		}
+	if err = intf.create(); err != nil {
+		return
 	}
 
 	intf.bind()
@@ -482,7 +501,8 @@ func (intf *tuntap_interface) set_flags() (err error) {
 		name: intf.name,
 		i:    int(intf.flags),
 	}
-	err = intf.ioctl(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)))
+	is_set_flags_down := intf.flags&iff_up == 0
+	err = intf.ioctl_helper(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)), is_set_flags_down)
 	return
 }
 

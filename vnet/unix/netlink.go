@@ -326,7 +326,15 @@ func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_int
 }
 
 func (ns *net_namespace) fibIndexForNamespace() ip.FibIndex { return ip.FibIndex(ns.index) }
-func (ns *net_namespace) validateFibIndexForNamespace(si vnet.Si) {
+func (ns *net_namespace) fibInit(is_del bool) {
+	m4 := ip4.GetMain(ns.m.m.v)
+	var name string
+	if !is_del {
+		name = ns.name
+	}
+	m4.SetFibNameForIndex(name, ns.fibIndexForNamespace())
+}
+func (ns *net_namespace) validateFibIndexForSi(si vnet.Si) {
 	m4 := ip4.GetMain(ns.m.m.v)
 	m4.SetFibIndexForSi(si, ns.fibIndexForNamespace())
 	return
@@ -368,7 +376,7 @@ func (e *netlinkEvent) EventAction() {
 				di.addDelDummyPuntPrefixes(m, !isUp)
 			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok && intf != nil {
 				if intf.flags_synced() {
-					e.ns.validateFibIndexForNamespace(si)
+					e.ns.validateFibIndexForSi(si)
 					err = si.SetAdminUp(vn, isUp)
 				} else if intf.flag_sync_in_progress {
 					intf.check_flag_sync_done(v)
