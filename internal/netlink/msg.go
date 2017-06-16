@@ -10,7 +10,6 @@ import (
 	"io"
 	"runtime"
 	"syscall"
-
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/accumulate"
@@ -481,6 +480,15 @@ const (
 	InterfaceKindTun
 	InterfaceKindVeth
 )
+
+var kindStrings = [...]string{
+	InterfaceKindUnknown: "",
+	InterfaceKindDummy:   "dummy",
+	InterfaceKindTun:     "tun",
+	InterfaceKindVeth:    "veth",
+}
+
+func (k InterfaceKind) String() string { return kindStrings[k] }
 
 var kindMap = map[string]InterfaceKind{
 	"dummy": InterfaceKindDummy,
