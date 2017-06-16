@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/vnet/internal"
 	"github.com/platinasystems/go/goes/lang"
 )
@@ -26,29 +26,27 @@ EXAMPLES
 	vnet	"show interfaces"`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Help(...string) string
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) Close() error      { return internal.Conn.Close() }
-func (cmd) Kind() goes.Kind   { return goes.DontFork }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) Close() error      { return internal.Conn.Close() }
+func (Command) Kind() cmd.Kind    { return cmd.DontFork }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no COMMAND")
 	}
@@ -60,7 +58,7 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
-func (cmd) Help(...string) string {
+func (Command) Help(...string) string {
 	err := internal.Conn.Connect()
 	if err != nil {
 		return err.Error()
@@ -73,12 +71,3 @@ func (cmd) Help(...string) string {
 		return buf.String()
 	}
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/internal/redis"
@@ -33,29 +33,20 @@ const (
 	withoutCounters = false
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
-}
+func New() *Command { return new(Command) }
 
-func New() Interface { return &cmd{} }
-
-type cmd struct {
+type Command struct {
 	Info
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt { return apropos }
 
-func (cmd *cmd) Close() error {
+func (c *Command) Close() error {
 	var err error
 	for _, c := range []io.Closer{
-		cmd.nl,
-		cmd.rpc,
-		cmd.pub,
+		c.nl,
+		c.rpc,
+		c.pub,
 	} {
 		t := c.Close()
 		if err == nil {
@@ -65,48 +56,48 @@ func (cmd *cmd) Close() error {
 	return err
 }
 
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (cmd *cmd) Main(...string) error {
+func (c *Command) Main(...string) error {
 	var err error
-	cmd.nl, err = netlink.New(
+	c.nl, err = netlink.New(
 		netlink.RTNLGRP_LINK,
 		netlink.RTNLGRP_IPV4_IFADDR,
 		netlink.RTNLGRP_IPV6_IFADDR)
 	if err != nil {
 		return err
 	}
-	cmd.rpc, err = sockfile.NewRpcServer(Name)
+	c.rpc, err = sockfile.NewRpcServer(Name)
 	if err != nil {
 		return err
 	}
-	cmd.pub, err = publisher.New()
+	c.pub, err = publisher.New()
 	if err != nil {
 		return err
 	}
 
-	cmd.bynsid = make(map[int]*devidx)
+	c.bynsid = make(map[int]*devidx)
 
-	for i := range cmd.name.addr {
-		cmd.name.addr[i] =
+	for i := range c.name.addr {
+		c.name.addr[i] =
 			netlink.Key(netlink.IfAddrAttrKind(i).String())
 	}
-	for i := range cmd.name.attr {
-		cmd.name.attr[i] =
+	for i := range c.name.attr {
+		c.name.attr[i] =
 			netlink.Key(netlink.IfInfoAttrKind(i).String())
 	}
-	for i := range cmd.name.stat {
-		cmd.name.stat[i] =
+	for i := range c.name.stat {
+		c.name.stat[i] =
 			netlink.Key(netlink.LinkStatType(i).String())
 	}
 
-	rpc.Register(&cmd.Info)
+	rpc.Register(&c.Info)
 	err = redis.Assign(redis.DefaultHash+":nl.", Name, "Info")
 	if err != nil {
 		return err
 	}
 
-	err = cmd.nl.Listen(cmd.handler,
+	err = c.nl.Listen(c.handler,
 		netlink.ListenReq{netlink.RTM_GETLINK, netlink.AF_PACKET},
 		netlink.ListenReq{netlink.RTM_GETADDR, netlink.AF_INET},
 		netlink.ListenReq{netlink.RTM_GETADDR, netlink.AF_INET6},
@@ -117,16 +108,16 @@ func (cmd *cmd) Main(...string) error {
 
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
-	cmd.nl.GetlinkReq()
+	c.nl.GetlinkReq()
 	for {
 		select {
 		case <-t.C:
-			cmd.nl.GetlinkReq()
-		case msg, opened := <-cmd.nl.Rx:
+			c.nl.GetlinkReq()
+		case msg, opened := <-c.nl.Rx:
 			if !opened {
 				return nil
 			}
-			if err = cmd.handler(msg); err != nil {
+			if err = c.handler(msg); err != nil {
 				return err
 			}
 		}
@@ -134,19 +125,19 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
-func (cmd *cmd) handler(msg netlink.Message) error {
+func (c *Command) handler(msg netlink.Message) error {
 	defer msg.Close()
 	switch msg.MsgType() {
 	case netlink.RTM_NEWLINK, netlink.RTM_GETLINK:
 		// FIXME what about RTM_DELLINK and RTM_SETLINK ?
-		cmd.ifInfo(msg.(*netlink.IfInfoMessage))
+		c.ifInfo(msg.(*netlink.IfInfoMessage))
 	case netlink.RTM_DELADDR:
-		cmd.ifDelAddr(msg.(*netlink.IfAddrMessage))
+		c.ifDelAddr(msg.(*netlink.IfAddrMessage))
 	case netlink.RTM_NEWADDR:
-		cmd.ifNewAddr(msg.(*netlink.IfAddrMessage))
+		c.ifNewAddr(msg.(*netlink.IfAddrMessage))
 	}
 	return nil
 }

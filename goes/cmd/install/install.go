@@ -265,10 +265,6 @@ func update_rc() error {
 
 func bash_completion() error {
 	const fn = "/usr/share/bash-completion/completions/goes"
-	_, err := os.Stat(filepath.Dir(fn))
-	if err != nil {
-		return nil
-	}
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	f, err := os.OpenFile(fn, flags, os.FileMode(0644))
 	if err != nil {
@@ -278,11 +274,11 @@ func bash_completion() error {
 	_, err = f.WriteString(`
 _goes ()
 {
-	COMPREPLY=($(goes complete ${COMP_WORDS[@]}))
+	COMPREPLY=($(goes complete ${COMP_WORDS[@]:1}))
 	return 0
 }
 
-type -p goes >/dev/null && complete -F _goes goes
+type -p goes >/dev/null && complete -o filenames -F _goes goes
 `[1:])
 	return err
 }

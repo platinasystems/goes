@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sockfile"
@@ -41,6 +41,15 @@ SEE ALSO
 	redisd`
 )
 
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
 // Machines may use Hook to run something before redisd and other daemons.
 var Hook = func() error { return nil }
 
@@ -51,24 +60,16 @@ var ConfHook = func() error { return nil }
 // GPIO init hook for machines than need it
 var ConfGpioHook = func() error { return nil }
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func New() *Command { return new(Command) }
+
+type Command struct {
+	g *goes.Goes
 }
 
-func New() Interface { return new(cmd) }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
-type cmd goes.ByName
-
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (c *cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-start", "-stop")
 
 	err := assert.Root()
@@ -122,7 +123,7 @@ func (c *cmd) Main(args ...string) error {
 		if err != nil {
 			return err
 		}
-		err = goes.ByName(*c).Main("source", start)
+		err = c.g.Main("source", start)
 		if err != nil {
 			return err
 		}
@@ -135,7 +136,7 @@ func (c *cmd) Main(args ...string) error {
 	go daemons.Wait()
 
 	for {
-		if _, found := goes.ByName(*c)["login"]; found {
+		if v := c.g.ByName("login"); v != nil {
 			if err = run("login"); err != nil {
 				fmt.Fprintln(os.Stderr, "login:", err)
 				time.Sleep(3 * time.Second)
@@ -153,9 +154,9 @@ func (c *cmd) Main(args ...string) error {
 
 }
 
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) Man() lang.Alt  { return man }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
 func run(arg0 string) error {
 	x := exec.Command(prog.Name())
@@ -166,12 +167,3 @@ func run(arg0 string) error {
 	x.Dir = "/"
 	return x.Run()
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

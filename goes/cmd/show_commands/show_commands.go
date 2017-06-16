@@ -6,9 +6,9 @@ package show_commands
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -18,51 +18,38 @@ const (
 	Usage   = "show-commands"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
 
-type cmd goes.ByName
+type Command struct {
+	g *goes.Goes
+}
 
-func (*cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Kind() cmd.Kind      { return cmd.DontFork }
 
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-
-func (c *cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-
-	keys := make([]string, 0, len(goes.ByName(*c)))
-	for k := range goes.ByName(*c) {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		g := goes.ByName(*c)[k]
-		if g.Kind.IsDaemon() {
-			fmt.Printf("\t%s - daemon\n", k)
-		} else if g.Kind.IsHidden() {
-			fmt.Printf("\t%s - hidden\n", k)
-		} else {
-			fmt.Printf("\t%s\n", k)
+	for _, name := range c.g.Names {
+		v := c.g.ByName(name)
+		k := cmd.WhatKind(v)
+		switch {
+		case k.IsDaemon():
+			fmt.Println(v, "- daemon")
+		case k.IsHidden():
+			fmt.Println(v, "- hidden")
+		default:
+			fmt.Println(v)
 		}
 	}
 	return nil
 }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }

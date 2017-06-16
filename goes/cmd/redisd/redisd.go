@@ -20,7 +20,7 @@ import (
 
 	. "github.com/platinasystems/go"
 	grs "github.com/platinasystems/go-redis-server"
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
@@ -51,6 +51,15 @@ OPTIONS
 	Log = varrun.Dir + "/log/redisd"
 )
 
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
 // Machines may use Init to set redisd parameters before exec.
 var Init = func() {}
 var once sync.Once
@@ -73,30 +82,20 @@ var Port = 6379
 // Machines may override this list of published hashes.
 var PublishedKeys = []string{redis.DefaultHash}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+func New() *Command { return new(Command) }
 
-func New() Interface { return &cmd{} }
-
-type cmd struct {
+type Command struct {
 	pubconn *net.UnixConn
 	redisd  Redisd
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt { return apropos }
 
-func (cmd *cmd) Close() error {
+func (c *Command) Close() error {
 	var err error
-	cmd.redisd.mutex.Lock()
-	defer cmd.redisd.mutex.Unlock()
-	for k, srvs := range cmd.redisd.devs {
+	c.redisd.mutex.Lock()
+	defer c.redisd.mutex.Unlock()
+	for k, srvs := range c.redisd.devs {
 		for i, srv := range srvs {
 			xerr := srv.Close()
 			if err == nil {
@@ -104,19 +103,19 @@ func (cmd *cmd) Close() error {
 			}
 			srvs[i] = nil
 		}
-		cmd.redisd.devs[k] = cmd.redisd.devs[k][:0]
-		delete(cmd.redisd.devs, k)
+		c.redisd.devs[k] = c.redisd.devs[k][:0]
+		delete(c.redisd.devs, k)
 	}
-	if cmd.redisd.reg != nil {
-		cmd.redisd.reg.Srvr.Close()
+	if c.redisd.reg != nil {
+		c.redisd.reg.Srvr.Close()
 	}
-	cmd.pubconn.Close()
+	c.pubconn.Close()
 	return err
 }
 
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (cmd *cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	once.Do(Init)
 
 	parm, args := parms.New(args, "-port", "-set")
@@ -164,22 +163,22 @@ func (cmd *cmd) Main(args ...string) error {
 		grs.Stderr = logf
 	}
 
-	cmd.redisd.devs = make(map[string][]*grs.Server)
-	cmd.redisd.sub = make(map[string]*grs.MultiChannelWriter)
-	cmd.redisd.published = make(grs.HashHash)
+	c.redisd.devs = make(map[string][]*grs.Server)
+	c.redisd.sub = make(map[string]*grs.MultiChannelWriter)
+	c.redisd.published = make(grs.HashHash)
 	for _, k := range PublishedKeys {
-		cmd.redisd.published[k] = make(grs.HashValue)
+		c.redisd.published[k] = make(grs.HashValue)
 	}
 
 	pkgs := new(bytes.Buffer)
 	WriteTo(pkgs)
-	cmd.redisd.published[redis.DefaultHash]["packages"] = pkgs.Bytes()
+	c.redisd.published[redis.DefaultHash]["packages"] = pkgs.Bytes()
 
 	sfn := sockfile.Path(Name)
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
 	cfg = cfg.Host(sfn)
-	cfg = cfg.Handler(&cmd.redisd)
+	cfg = cfg.Handler(&c.redisd)
 
 	srv, err := grs.NewServer(cfg)
 	if err != nil {
@@ -190,13 +189,13 @@ func (cmd *cmd) Main(args ...string) error {
 		return err
 	}
 
-	cmd.redisd.reg, err =
-		reg.New("redis-reg", cmd.redisd.assign, cmd.redisd.unassign)
+	c.redisd.reg, err =
+		reg.New("redis-reg", c.redisd.assign, c.redisd.unassign)
 	if err != nil {
 		return err
 	}
 
-	cmd.redisd.devs[sfn] = []*grs.Server{srv}
+	c.redisd.devs[sfn] = []*grs.Server{srv}
 
 	go func(redisd *Redisd, fn string, args ...string) {
 		adm := group.Parse()["adm"].Gid()
@@ -216,15 +215,15 @@ func (cmd *cmd) Main(args ...string) error {
 			time.Sleep(100 * time.Millisecond)
 		}
 		redisd.listen(args...)
-	}(&cmd.redisd, sfn, args...)
+	}(&c.redisd, sfn, args...)
 
-	cmd.pubconn, err = sockfile.ListenUnixgram(publisher.FileName)
+	c.pubconn, err = sockfile.ListenUnixgram(publisher.FileName)
 	if err != nil {
 		return err
 	}
-	go cmd.gopub()
+	go c.gopub()
 
-	err = cmd.pubinit(fields.New(parm["-set"])...)
+	err = c.pubinit(fields.New(parm["-set"])...)
 	if err != nil {
 		return err
 	}
@@ -232,17 +231,17 @@ func (cmd *cmd) Main(args ...string) error {
 	return srv.Start()
 }
 
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) Man() lang.Alt  { return man }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
-func (cmd *cmd) gopub() {
+func (c *Command) gopub() {
 	const sep = ": "
 	var key, field string
 	var fv, value []byte
 	b := make([]byte, os.Getpagesize())
 	for {
-		n, err := cmd.pubconn.Read(b)
+		n, err := c.pubconn.Read(b)
 		if err != nil {
 			break
 		}
@@ -262,11 +261,11 @@ func (cmd *cmd) gopub() {
 		default:
 			continue
 		}
-		cmd.redisd.mutex.Lock()
-		hv, found := cmd.redisd.published[key]
+		c.redisd.mutex.Lock()
+		hv, found := c.redisd.published[key]
 		if !found {
 			hv = make(grs.HashValue)
-			cmd.redisd.published[key] = hv
+			c.redisd.published[key] = hv
 		}
 		if field == "delete" {
 			delete(hv, string(value))
@@ -278,7 +277,7 @@ func (cmd *cmd) gopub() {
 				hv[field] = hv[field][:0]
 			}
 			hv[field] = append(hv[field], value...)
-			if sub, found := cmd.redisd.sub[key]; found {
+			if sub, found := c.redisd.sub[key]; found {
 				mb := make([]byte, len(fv))
 				copy(mb, fv)
 				msg := make([]interface{}, 3)
@@ -303,12 +302,12 @@ func (cmd *cmd) gopub() {
 				}
 			}
 		}
-		cmd.redisd.flushSubkeyCache(key)
-		cmd.redisd.mutex.Unlock()
+		c.redisd.flushSubkeyCache(key)
+		c.redisd.mutex.Unlock()
 	}
 }
 
-func (cmd *cmd) pubinit(fieldEqValues ...string) error {
+func (c *Command) pubinit(fieldEqValues ...string) error {
 	pub, err := publisher.New()
 	if err != nil {
 		return err
@@ -760,12 +759,3 @@ func (as Assignments) Less(i, j int) (t bool) {
 func (as Assignments) Swap(i, j int) {
 	as[i], as[j] = as[j], as[i]
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

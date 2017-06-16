@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/cli/internal/notliner"
+	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/nocomment"
 	"github.com/platinasystems/go/internal/pizza"
 	"github.com/platinasystems/liner"
@@ -32,17 +32,17 @@ type Liner struct {
 		i     int
 	}
 	fallback *notliner.Prompter
-	byName   goes.ByName
+	goes     *goes.Goes
 }
 
-func New(byName goes.ByName) *Liner {
+func New(g *goes.Goes) *Liner {
 	l := new(Liner)
 	l.history.buf = new(bytes.Buffer)
 	l.history.lines = make([]string, 0, 1<<6)
 	if woliner {
 		l.fallback = notliner.New(os.Stdin, os.Stdout)
 	}
-	l.byName = byName
+	l.goes = g
 	return l
 }
 
@@ -64,7 +64,7 @@ func (l *Liner) complete(line string) (lines []string) {
 		t := os.Stdout
 		defer func() { os.Stdout = t }()
 		os.Stdout = pw
-		l.byName.Main(append([]string{"complete"}, args...)...)
+		l.goes.Main(append([]string{"complete"}, args...)...)
 		pw.Close()
 	}()
 	prs := bufio.NewScanner(pr)
@@ -94,23 +94,32 @@ func (l *Liner) help(line string) {
 	if len(args) == 0 || pl.More {
 		fmt.Println("Enter command.")
 	} else {
-		l.byName.Main(append([]string{"help"}, args...)...)
+		l.goes.Main(append([]string{"help"}, args...)...)
 	}
 }
 
 func (l *Liner) Prompt(prompt string) (string, error) {
+	var t syscall.Termios
 	if l.fallback != nil {
 		return l.fallback.Prompt(prompt)
 	}
-	t := &syscall.Termios{}
 
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
 		uintptr(syscall.Stdin),
 		uintptr(syscall.TCGETS),
-		uintptr(unsafe.Pointer(t)))
+		uintptr(unsafe.Pointer(&t)))
 	if errno != 0 {
 		return "", fmt.Errorf("TCGETS: %v", errno)
 	}
+
+	it := t
+	defer func() {
+		syscall.Syscall(syscall.SYS_IOCTL,
+			uintptr(syscall.Stdin),
+			uintptr(syscall.TCSETS),
+			uintptr(unsafe.Pointer(&it)))
+	}()
+
 	t.Iflag |= syscall.BRKINT
 	t.Iflag |= syscall.IMAXBEL
 	t.Iflag |= syscall.IUTF8
@@ -119,11 +128,12 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL,
 		uintptr(syscall.Stdin),
 		uintptr(syscall.TCSETS),
-		uintptr(unsafe.Pointer(t)))
+		uintptr(unsafe.Pointer(&t)))
 	if errno != 0 {
 		return "", fmt.Errorf("TCSETS: %v", errno)
 	}
-	err := l.byName.Main("resize")
+
+	err := l.goes.Main("resize")
 	if err != nil {
 		return "", err
 	}

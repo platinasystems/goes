@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
@@ -23,29 +23,24 @@ const (
 	Usage   = "uptimed"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd(make(chan struct{})) }
+func New() Command { return make(Command) }
 
-type cmd chan struct{}
+type Command chan struct{}
 
-func (cmd cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
 
-func (cmd cmd) Close() error {
-	close(cmd)
+func (c Command) Close() error {
+	close(c)
 	return nil
 }
 
-func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (cmd cmd) Main(...string) error {
+func (c Command) Main(...string) error {
 	var si syscall.Sysinfo_t
 	err := syscall.Sysinfo(&si)
 	if err != nil {
@@ -63,7 +58,7 @@ func (cmd cmd) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd:
+		case <-c:
 			return nil
 		case <-t.C:
 			pub.Print("uptime: ", update())
@@ -72,8 +67,8 @@ func (cmd cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
+func (Command) String() string { return Name }
+func (Command) Usage() string  { return Usage }
 
 func update() string {
 	var si syscall.Sysinfo_t
@@ -134,8 +129,4 @@ func update() string {
 		}
 	}
 	return buf.String()
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

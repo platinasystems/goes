@@ -27,23 +27,23 @@ var qsfpIo = QsfpI2cGpioIo{1, [2]uint16{0xffff, 0xffff}}
 var deviceVer byte
 var porto int
 
-func qsfpioTicker(cmd *cmd) error {
+func qsfpioTicker(c *Command) error {
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd.stop:
+		case <-c.stop:
 			return nil
 		case <-t.C:
-			if err := cmd.updateio(); err != nil {
-				close(cmd.stop)
+			if err := c.updateio(); err != nil {
+				close(c.stop)
 				return err
 			}
 		}
 	}
 }
 
-func (cmd *cmd) updateio() error {
+func (c *Command) updateio() error {
 	stopped := readStoppedio()
 	if stopped == 1 {
 		return nil
@@ -65,9 +65,9 @@ func (cmd *cmd) updateio() error {
 			}
 		}
 		v := VdevIo[i].QsfpStatus(port)
-		if v != cmd.lastsio[k] {
-			cmd.pub.Print(k, ": ", v)
-			cmd.lastsio[k] = v
+		if v != c.lastsio[k] {
+			c.pub.Print(k, ": ", v)
+			c.lastsio[k] = v
 		}
 	}
 	return nil

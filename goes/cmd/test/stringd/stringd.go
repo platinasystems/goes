@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net/rpc"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -25,30 +25,25 @@ const (
 	pubkey = "test.string"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd(make(chan struct{})) }
+func New() Command { return make(Command) }
 
-type cmd chan struct{}
+type Command chan struct{}
 
 type Stringd struct {
 	s   string
 	pub *publisher.Publisher
 }
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Kind() goes.Kind   { return goes.Daemon }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd cmd) Main(...string) error {
+func (c Command) Main(...string) error {
 	pub, err := publisher.New()
 	if err != nil {
 		return err
@@ -73,12 +68,12 @@ func (cmd cmd) Main(...string) error {
 		return err
 	}
 	pub.Print(pubkey, ": ", stringd.s)
-	<-cmd
+	<-c
 	return nil
 }
 
-func (cmd cmd) Close() error {
-	defer close(cmd)
+func (c Command) Close() error {
+	defer close(c)
 	return nil
 }
 
@@ -87,8 +82,4 @@ func (stringd *Stringd) Hset(args args.Hset, reply *reply.Hset) error {
 	stringd.pub.Print(pubkey, ": ", stringd.s)
 	*reply = 1
 	return nil
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

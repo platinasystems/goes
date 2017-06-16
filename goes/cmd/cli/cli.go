@@ -13,12 +13,14 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/fields"
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/cli/internal/liner"
 	"github.com/platinasystems/go/goes/cmd/cli/internal/notliner"
+	"github.com/platinasystems/go/goes/cmd/resize"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/fields"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/nocomment"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/pizza"
@@ -29,7 +31,7 @@ import (
 const (
 	Name    = "cli"
 	Apropos = "command line interpreter"
-	Usage   = "cli [-x] [URL]"
+	Usage   = "cli [-x] [-p PROMPT] [URL]"
 	Man     = `
 DESCRIPTION
 	The go-es command line interpreter is an incomplete shell with just
@@ -145,26 +147,30 @@ PIPES
 		EOF`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
+func New() []cmd.Cmd {
+	return []cmd.Cmd{new(Command), resize.New()}
 }
 
-func New() Interface { return new(cmd) }
+type Command struct {
+	g *goes.Goes
+}
 
-type cmd goes.ByName
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Man() lang.Alt       { return man }
+func (*Command) String() string      { return Name }
+func (*Command) Usage() string       { return Usage }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-
-func (c *cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	var (
 		rc  io.ReadCloser
 		wc  io.WriteCloser
@@ -179,24 +185,36 @@ func (c *cmd) Main(args ...string) error {
 		prompter interface {
 			Prompt(string) (string, error)
 		}
+
+		isScript bool
 	)
+
 	defer func() {
-		for _, g := range goes.ByName(*c) {
-			if g.Kind.IsDontFork() && g.Close != nil {
-				t := g.Close()
-				if err == nil {
-					err = t
+		for _, name := range c.g.Names {
+			v := c.g.ByName(name)
+			k := cmd.WhatKind(v)
+			if k.IsDontFork() {
+				if m, found := v.(io.Closer); found {
+					t := m.Close()
+					if err == nil {
+						err = t
+					}
 				}
 			}
 		}
 	}()
-	flag, args := flags.New(args, "-x", "-no-liner")
+
+	flag, args := flags.New(args, "-f", "-x", "-", "-no-liner")
 	switch len(args) {
 	case 0:
-		if flag["-no-liner"] {
+		switch {
+		case flag["-"]:
+			prompter = notliner.New(os.Stdin, nil)
+			isScript = true
+		case flag["-no-liner"]:
 			prompter = notliner.New(os.Stdin, os.Stdout)
-		} else {
-			prompter = liner.New(goes.ByName(*c))
+		default:
+			prompter = liner.New(c.g)
 		}
 	case 1:
 		script, err := url.Open(args[0])
@@ -205,6 +223,7 @@ func (c *cmd) Main(args ...string) error {
 		}
 		defer script.Close()
 		prompter = notliner.New(script, nil)
+		isScript = true
 	default:
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
@@ -239,19 +258,24 @@ commandLoop:
 			if err.Error() != "exit status 1" {
 				fmt.Fprintln(os.Stderr, err)
 			}
+			if isScript && !flag["-f"] {
+				return nil
+			}
 			err = nil
 		}
 		pl.Reset()
-		prompt := prog.Base() + "> "
-		if hn, err := os.Hostname(); err == nil {
-			prompt = hn + "> "
+		prompt := fmt.Sprint(c.g, "> ")
+		if c.g.Parent == nil {
+			if hn, err := os.Hostname(); err == nil {
+				prompt = fmt.Sprint(hn, "> ")
+			}
 		}
 	pipelineLoop:
 		for {
 			var s string
 			s, err = catline(prompt)
 			if err != nil {
-				return err
+				continue commandLoop
 			}
 			s = strings.TrimLeft(s, " \t")
 			if len(s) == 0 {
@@ -271,39 +295,34 @@ commandLoop:
 		if len(pl.Slices) == 0 {
 			continue commandLoop
 		}
-		for i := 0; i < len(pl.Slices); i++ {
-			name := pl.Slices[i][0]
-			g := goes.ByName(*c)[name]
-			if g == nil {
-				err = fmt.Errorf("%s: not found", name)
-				continue commandLoop
-			}
-			if !g.Kind.IsInteractive() {
-				err = fmt.Errorf("%s: inoperative", name)
-				continue commandLoop
-			}
-			if len(pl.Slices) > 1 {
-				if g.Kind.IsCantPipe() {
-					err = fmt.Errorf("%s: can't pipe", name)
+		for _, sl := range pl.Slices {
+			name := sl[0]
+			if v := c.g.ByName(name); v != nil {
+				k := cmd.WhatKind(v)
+				if !k.IsInteractive() {
+					err = fmt.Errorf("%s: inoperative",
+						name)
+					continue commandLoop
+				}
+				if len(pl.Slices) > 1 {
+					if k.IsCantPipe() {
+						err = fmt.Errorf(
+							"%s: can't pipe", name)
+						continue commandLoop
+					}
+				} else if k.IsDontFork() ||
+					name == os.Args[0] {
+					if flag["-x"] {
+						fmt.Println("+", sl)
+					}
+					err = c.g.Main(sl...)
 					continue commandLoop
 				}
 			}
 		}
-		if len(pl.Slices) == 1 {
-			name := pl.Slices[0][0]
-			g := goes.ByName(*c)[name]
-			if g.Kind.IsDontFork() || name == os.Args[0] {
-				if flag["-x"] {
-					fmt.Println("+", pl.Slices[0])
-				}
-				err = goes.ByName(*c).Main(pl.Slices[0]...)
-				continue commandLoop
-			}
-		}
-
 		iparm, args := parms.New(pl.Slices[0], "<", "<<", "<<-")
 		pl.Slices[0] = args
-		in = nil
+		in = os.Stdin
 		if fn := iparm["<"]; len(fn) > 0 {
 			rc, err = url.Open(fn)
 			if err != nil {
@@ -376,67 +395,55 @@ commandLoop:
 			closers = append(closers, wc)
 		}
 
-		for i := 0; i < len(pl.Slices); i++ {
+		for i, sl := range pl.Slices {
 			if flag["-x"] {
-				fmt.Println("+", pl.Slices[i])
+				fmt.Println("+", strings.Join(sl, " "))
 			}
-			c := exec.Command(prog.Name(), pl.Slices[i][1:]...)
-			c.Args[0] = pl.Slices[i][0]
-			c.Stderr = os.Stderr
+			a := append(c.g.Path, sl...)
+			x := exec.Command(prog.Name(), a[1:]...)
+			x.Args[0] = a[0]
+			x.Stderr = os.Stderr
 			if i == 0 {
-				c.Stdin = in
+				x.Stdin = in
 			} else {
-				c.Stdin = pin
+				x.Stdin = pin
 			}
 			if i == end {
-				c.Stdout = out
+				x.Stdout = out
 			} else {
 				pin, pout, err = os.Pipe()
 				if err != nil {
 					continue commandLoop
 				}
-				c.Stdout = pout
+				x.Stdout = pout
 			}
-			if err = c.Start(); err != nil {
-				err = fmt.Errorf("child: %v: %v", c.Args, err)
+			if err = x.Start(); err != nil {
+				err = fmt.Errorf("child: %v: %v", x.Args, err)
 				continue commandLoop
 			}
 			if i == end {
-				err = c.Wait()
+				err = x.Wait()
 			} else {
-				go func(c *exec.Cmd) {
-					err := c.Wait()
+				go func(x *exec.Cmd) {
+					err := x.Wait()
 					if err != nil {
 						fmt.Fprintln(os.Stderr, err)
 					}
-					if c.Stdout != os.Stdout {
-						m, found := c.Stdout.(io.Closer)
+					if x.Stdout != os.Stdout {
+						m, found := x.Stdout.(io.Closer)
 						if found {
 							m.Close()
 						}
 					}
-					if c.Stdin != os.Stdin {
-						m, found := c.Stdin.(io.Closer)
+					if x.Stdin != os.Stdin {
+						m, found := x.Stdin.(io.Closer)
 						if found {
 							m.Close()
 						}
 					}
-				}(c)
+				}(x)
 			}
 		}
 	}
 	return fmt.Errorf("oops, shouldn't be here")
 }
-
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

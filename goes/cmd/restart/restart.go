@@ -21,36 +21,6 @@ SEE ALSO
 	start, stop, and redisd`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
-
-func New() Interface { return new(cmd) }
-
-type cmd goes.ByName
-
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (c *cmd) Main(args ...string) error {
-	byName := goes.ByName(*c)
-	err := byName.Main(append([]string{"stop"}, args...)...)
-	if err != nil {
-		return err
-	}
-	return byName.Main(append([]string{"start"}, args...)...)
-}
-
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
 var (
 	apropos = lang.Alt{
 		lang.EnUS: Apropos,
@@ -59,3 +29,25 @@ var (
 		lang.EnUS: Man,
 	}
 )
+
+func New() *Command { return new(Command) }
+
+type Command struct {
+	g *goes.Goes
+}
+
+func (*Command) Apropos() lang.Alt { return apropos }
+
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+
+func (c *Command) Main(args ...string) error {
+	err := c.g.Main(append([]string{"stop"}, args...)...)
+	if err != nil {
+		return err
+	}
+	return c.g.Main(append([]string{"start"}, args...)...)
+}
+
+func (*Command) Man() lang.Alt  { return man }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }

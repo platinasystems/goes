@@ -7,9 +7,10 @@ package source
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -21,27 +22,26 @@ DESCRIPTION
 	This is equivalent to 'cli [-x] URL'.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
+func New() *Command { return new(Command) }
+
+type Command struct {
+	g *goes.Goes
 }
 
-func New() Interface { return new(cmd) }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Kind() cmd.Kind      { return cmd.DontFork | cmd.CantPipe }
 
-type cmd goes.ByName
-
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork | goes.CantPipe }
-
-func (c *cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-x")
 	if len(args) == 0 {
 		return fmt.Errorf("FILE: missing")
@@ -54,18 +54,9 @@ func (c *cmd) Main(args ...string) error {
 	} else {
 		args = []string{"cli", args[0]}
 	}
-	return goes.ByName(*c).Main(args...)
+	return c.g.Main(args...)
 }
 
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+func (*Command) Man() lang.Alt  { return man }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }

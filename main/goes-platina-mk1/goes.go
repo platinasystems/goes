@@ -6,7 +6,6 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -27,6 +26,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
+	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/hexists"
 	"github.com/platinasystems/go/goes/cmd/hget"
 	"github.com/platinasystems/go/goes/cmd/hgetall"
@@ -58,11 +58,11 @@ import (
 	"github.com/platinasystems/go/goes/cmd/reboot"
 	"github.com/platinasystems/go/goes/cmd/redisd"
 	"github.com/platinasystems/go/goes/cmd/reload"
-	"github.com/platinasystems/go/goes/cmd/resize"
 	"github.com/platinasystems/go/goes/cmd/restart"
 	"github.com/platinasystems/go/goes/cmd/rm"
 	"github.com/platinasystems/go/goes/cmd/rmmod"
 	"github.com/platinasystems/go/goes/cmd/show_commands"
+	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/cmd/slashinit"
 	"github.com/platinasystems/go/goes/cmd/sleep"
 	"github.com/platinasystems/go/goes/cmd/source"
@@ -78,16 +78,27 @@ import (
 	"github.com/platinasystems/go/goes/cmd/vnet"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/goes/cmd/wget"
+	"github.com/platinasystems/go/goes/lang"
 )
 
-func Goes() goes.ByName {
-	return cmd.New(
-		bang.New(),
+const (
+	Name    = "goes-platina-mk1"
+	Apropos = "the goes machine for platina's mk1 TOR"
+)
+
+func Goes() *goes.Goes {
+	g := goes.New(Name, "",
+		lang.Alt{
+			lang.EnUS: Apropos,
+		},
+		lang.Alt{})
+	g.Plot(helpers.New()...)
+	g.Plot(cli.New()...)
+	g.Plot(bang.New(),
 		boot.New(),
 		cat.New(),
 		cd.New(),
 		chmod.New(),
-		cli.New(),
 		cmdline.New(),
 		cp.New(),
 		daemons.New(),
@@ -132,11 +143,11 @@ func Goes() goes.ByName {
 		reboot.New(),
 		redisd.New(),
 		reload.New(),
-		resize.New(),
 		restart.New(),
 		rm.New(),
 		rmmod.New(),
 		show_commands.New(),
+		show_packages.New(),
 		slashinit.New(),
 		sleep.New(),
 		source.New(),
@@ -154,4 +165,5 @@ func Goes() goes.ByName {
 		vnetd.New(),
 		wget.New(),
 	)
+	return g
 }

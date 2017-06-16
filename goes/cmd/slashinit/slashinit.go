@@ -15,6 +15,7 @@ import (
 
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/url"
@@ -42,17 +43,17 @@ DESCRIPTION
 	zero = uintptr(0)
 )
 
-var Hook = func() error { return nil }
+var (
+	Hook    = func() error { return nil }
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
-
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
 
 func init() {
 	if os.Getpid() != 1 {
@@ -121,16 +122,15 @@ func init() {
 
 }
 
-type cmd goes.ByName
+type Command struct {
+	g *goes.Goes
+}
 
-func (*cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Kind() cmd.Kind      { return cmd.DontFork }
 
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-
-func (c *cmd) Main(_ ...string) error {
-	byName := goes.ByName(*c)
+func (c *Command) Main(_ ...string) error {
 	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
 	goesinstaller := os.Getenv("goesinstaller")
 	defer func() {
@@ -171,16 +171,16 @@ func (c *cmd) Main(_ ...string) error {
 	c.makeTargetLinks()
 	c.mountTargetVirtualFilesystems()
 	c.runSbinInit()
-	err = byName.Main("start")
+	err = c.g.Main("start")
 
 	return err
 }
 
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) Man() lang.Alt  { return man }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
-func (*cmd) makeRootDirs(mountPoint string) {
+func (*Command) makeRootDirs(mountPoint string) {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -200,7 +200,7 @@ func (*cmd) makeRootDirs(mountPoint string) {
 	}
 }
 
-func (*cmd) makeRootFiles(mountPoint string) {
+func (*Command) makeRootFiles(mountPoint string) {
 	for _, cp := range []struct {
 		src, dst string
 	}{
@@ -234,7 +234,7 @@ func (*cmd) makeRootFiles(mountPoint string) {
 	}
 }
 
-func (*cmd) makeRootLinks(mountPoint string) {
+func (*Command) makeRootLinks(mountPoint string) {
 	for _, ln := range []struct {
 		src, dst string
 	}{
@@ -250,7 +250,7 @@ func (*cmd) makeRootLinks(mountPoint string) {
 	}
 }
 
-func (*cmd) moveVirtualFileSystems(mountPoint string) {
+func (*Command) moveVirtualFileSystems(mountPoint string) {
 	for _, mv := range []struct {
 		src  string
 		dst  string
@@ -277,7 +277,7 @@ func (*cmd) moveVirtualFileSystems(mountPoint string) {
 	}
 }
 
-func (*cmd) unlinkRootFiles() {
+func (*Command) unlinkRootFiles() {
 	for _, fn := range []string{
 		"/usr/bin/gdbserver",
 		"/init",
@@ -287,7 +287,7 @@ func (*cmd) unlinkRootFiles() {
 	}
 }
 
-func (*cmd) rmdirRootDirs() {
+func (*Command) rmdirRootDirs() {
 	for _, dir := range []string{
 		"/run",
 		"/sys",
@@ -301,7 +301,7 @@ func (*cmd) rmdirRootDirs() {
 	}
 }
 
-func (*cmd) makeTargetDirs() {
+func (*Command) makeTargetDirs() {
 	for _, dir := range []struct {
 		name string
 		mode os.FileMode
@@ -319,7 +319,7 @@ func (*cmd) makeTargetDirs() {
 	}
 }
 
-func (*cmd) makeTargetLinks() {
+func (*Command) makeTargetLinks() {
 	for _, ln := range []struct {
 		src, dst string
 	}{
@@ -335,7 +335,7 @@ func (*cmd) makeTargetLinks() {
 	}
 }
 
-func (*cmd) mountTargetVirtualFilesystems() {
+func (*Command) mountTargetVirtualFilesystems() {
 	for _, mnt := range []struct {
 		dir    string
 		dev    string
@@ -351,8 +351,7 @@ func (*cmd) mountTargetVirtualFilesystems() {
 	}
 }
 
-func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
-	byName := goes.ByName(*c)
+func (c *Command) pivotRoot(mountPoint string, root string, script string) {
 	_, err := os.Stat(mountPoint)
 	if os.IsNotExist(err) {
 		err = os.Mkdir(mountPoint, os.FileMode(0755))
@@ -363,11 +362,11 @@ func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
 	}
 
 	if root == "auto" {
-		err := byName.Main("mount", "-p", "-F", mountPoint)
+		err := c.g.Main("mount", "-p", "-F", mountPoint)
 		if err != nil {
 			panic(fmt.Errorf("Error in automount: %v", err))
 		}
-		err = byName.Main("resize")
+		err = c.g.Main("resize")
 		bootCmd := []string{"boot"}
 		if script != "" {
 			bootCmd = append(bootCmd, "-t")
@@ -384,18 +383,18 @@ func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
 			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
 				"/boot:root=/dev/"+dir.Name())
 		}
-		err = byName.Main(bootCmd...)
+		err = c.g.Main(bootCmd...)
 		panic(fmt.Errorf("Error in autoboot: %v", err))
 	}
 
-	err = byName.Main("mount", root, mountPoint)
+	err = c.g.Main("mount", root, mountPoint)
 	if err != nil {
 		panic(fmt.Errorf("Error mounting %s on %s: %s",
 			root, mountPoint, err))
 	}
 
 	if len(script) > 0 {
-		err := byName.Main("source", script)
+		err := c.g.Main("source", script)
 		if err != nil {
 			const format = "Error running boot script %s on %s: %s"
 			panic(fmt.Errorf(format, script, root, err))
@@ -420,7 +419,7 @@ func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
 	}
 }
 
-func (*cmd) runSbinInit() {
+func (*Command) runSbinInit() {
 	if err := os.Setenv("PATH", "/bin:/usr/bin"); err != nil {
 		panic(fmt.Errorf("Setenv PATH: %s", err))
 	}
@@ -456,19 +455,17 @@ func (*cmd) runSbinInit() {
 	}
 }
 
-func (c *cmd) emergencyShell() {
-	byName := goes.ByName(*c)
+func (c *Command) emergencyShell() {
 	for {
 		fmt.Println("Dropping into emergency goes shell...\n")
-		err := byName.Main("cli")
+		err := c.g.Main("cli")
 		if err != nil && err != io.EOF {
 			fmt.Println(err)
 		}
 	}
 }
 
-func (c *cmd) installer(params []string) error {
-	byName := goes.ByName(*c)
+func (c *Command) installer(params []string) error {
 	if len(params) < 1 || len(params[0]) == 0 {
 		return fmt.Errorf("KERNEL: missing")
 	}
@@ -509,17 +506,8 @@ func (c *cmd) installer(params []string) error {
 		fmt.Printf("All files loaded successfully!")
 	}
 
-	return byName.Main("kexec", "-e",
+	return c.g.Main("kexec", "-e",
 		"-k", "kernel",
 		"-i", "initramfs",
 		"-c", "console=ttyS0,115200")
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

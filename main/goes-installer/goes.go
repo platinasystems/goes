@@ -6,14 +6,28 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/install"
 	"github.com/platinasystems/go/goes/cmd/show_commands"
+	"github.com/platinasystems/go/goes/cmd/show_packages"
+	"github.com/platinasystems/go/goes/lang"
 )
 
-func Goes() goes.ByName {
-	return cmd.New(
-		install.New(),
+const (
+	Name    = "goes-installer"
+	Apropos = "a self extracting goes machine"
+)
+
+func Goes() *goes.Goes {
+	g := goes.New(Name, "",
+		lang.Alt{
+			lang.EnUS: Apropos,
+		},
+		lang.Alt{})
+	g.Plot(helpers.New()...)
+	g.Plot(install.New(),
 		show_commands.New(),
+		show_packages.New(),
 	)
+	return g
 }

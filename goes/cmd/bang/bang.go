@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -27,23 +27,23 @@ DESCRIPTION
 	The standard i/o redirections apply.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Kind() goes.Kind   { return goes.DontFork }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Kind() cmd.Kind    { return cmd.DontFork }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var background bool
 
 	if len(args) == 0 {
@@ -75,15 +75,6 @@ func (cmd) Main(args ...string) error {
 	}
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+func (Command) Man() lang.Alt  { return man }
+func (Command) String() string { return Name }
+func (Command) Usage() string  { return Usage }

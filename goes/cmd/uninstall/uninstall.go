@@ -25,27 +25,24 @@ const (
 	BashCompletionGoes = "/usr/share/bash-completion/completions/goes"
 )
 
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
+}
+
 // Machines may use this Hook to complete its removal.
 var Hook = func() error { return nil }
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Main(...string) error
-	String() string
-	Usage() string
+func New() *Command { return new(Command) }
+
+type Command struct {
+	g *goes.Goes
 }
 
-func New() Interface { return new(cmd) }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
-type cmd goes.ByName
-
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (c *cmd) Main(...string) error {
-	err := goes.ByName(*c).Main("stop")
+func (c *Command) Main(...string) error {
+	err := c.g.Main("stop")
 	if err != nil {
 		return err
 	}
@@ -58,9 +55,5 @@ func (c *cmd) Main(...string) error {
 	return err
 }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }

@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
@@ -25,29 +25,20 @@ const (
 	Usage   = "i2cd"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
-}
+func New() Command { return make(Command) }
 
-func New() Interface { return cmd(make(chan struct{})) }
+type Command chan struct{}
 
-type cmd chan struct{}
+func (Command) Apropos() lang.Alt { return apropos }
 
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd cmd) Close() error {
-	close(cmd)
+func (c Command) Close() error {
+	close(c)
 	return nil
 }
 
-func (cmd) Kind() goes.Kind { return goes.Daemon }
+func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (cmd cmd) Main(...string) error {
+func (c Command) Main(...string) error {
 	var si syscall.Sysinfo_t
 	err := syscall.Sysinfo(&si)
 	if err != nil {
@@ -68,7 +59,7 @@ func (cmd cmd) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd:
+		case <-c:
 			return nil
 		case <-t.C:
 		}
@@ -76,8 +67,8 @@ func (cmd cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
+func (Command) String() string { return Name }
+func (Command) Usage() string  { return Usage }
 
 const MAXOPS = 30
 

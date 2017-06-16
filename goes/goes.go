@@ -9,6 +9,7 @@
 package goes
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,46 +21,40 @@ import (
 	"syscall"
 	"unicode/utf8"
 
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/prog"
 )
 
 const (
-	DontFork Kind = 1 << iota
-	Daemon
-	Hidden
-	CantPipe
+	USAGE = `
+	goes COMMAND [ ARGS ]...
+	goes COMMAND -[-]HELPER [ ARGS ]...
+	goes HELPER [ COMMAND ] [ ARGS ]...
+	goes [ -x ] [[ -f ][ - | SCRIPT ]]
+
+	HELPER := { apropos | complete | help | man | usage }
+	`
+	MAN = `
+OPTIONS
+	-x	print command trace
+	-f	don't terminate script on error
+	-	execute standard input script
+	SCRIPT	execute named script file
+
+SEE ALSO
+	goes apropos [COMMAND], goes man COMMAND`
 )
 
-type ByName map[string]*Goes
-
-type Cmd interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	// The command's String() is its name.
-	String() string
-	Usage() string
-}
-
 type Goes struct {
-	Name     string
-	ByName   func(ByName)
-	Close    func() error
-	Complete func(...string) []string
-	Help     func(...string) string
-	Main     func(...string) error
-	Kind     Kind
-	Usage    string
-	Apropos  lang.Alt
-	Man      lang.Alt
-}
+	name, usage  string
+	apropos, man lang.Alt
 
-type Kind uint16
+	byname map[string]cmd.Cmd
+	Names  []string
 
-// optional methods
-type byNamer interface {
-	ByName(ByName)
+	Parent *Goes
+	Path   []string
 }
 
 type completer interface {
@@ -67,227 +62,263 @@ type completer interface {
 }
 
 type goeser interface {
-	goes() *Goes
+	Goes(*Goes)
 }
 
 type helper interface {
 	Help(...string) string
 }
 
-type kinder interface {
-	Kind() Kind
-}
-
-type manner interface {
-	Man() lang.Alt
-}
-
-func New(cmd ...Cmd) ByName {
-	return make(ByName).Plot(cmd...)
-}
-
-func (byName ByName) Complete(prefix string) (ss []string) {
-	for k, g := range byName {
-		if strings.HasPrefix(k, prefix) && g.Kind.IsInteractive() {
-			ss = append(ss, k)
+func New(name, usage string, apropos, man lang.Alt) *Goes {
+	if len(usage) == 0 {
+		usage = strings.Replace(USAGE, "goes", name, -1)
+	}
+	if len(man) == 0 {
+		man = lang.Alt{
+			lang.EnUS: strings.Replace(MAN, "goes", name, -1),
 		}
 	}
-	if len(ss) > 0 {
-		sort.Strings(ss)
+	return &Goes{
+		name:    name,
+		usage:   usage,
+		apropos: apropos,
+		man:     man,
+		byname:  make(map[string]cmd.Cmd),
 	}
-	return
 }
 
-// Main runs the arg[0] command in the current context.
-// When run w/o args, this uses os.Args.
+func (g *Goes) Apropos() lang.Alt { return g.apropos }
+
+func (g *Goes) ByName(name string) cmd.Cmd { return g.byname[name] }
+
+func (g *Goes) Complete(args ...string) []string {
+	var ss []string
+	pat := "*"
+
+	if len(args) == 0 {
+		return g.Names
+	}
+
+	cmd.Swap(args)
+
+	if _, found := cmd.Helpers[args[0]]; found {
+		n := len(args)
+		if n == 1 {
+			return g.Names
+		}
+		for helper := range cmd.Helpers {
+			if strings.HasPrefix(helper, args[n-1]) {
+				ss = append(ss, helper)
+			}
+		}
+		for _, name := range g.Names {
+			if strings.HasPrefix(name, args[n-1]) {
+				ss = append(ss, name)
+			}
+		}
+		sort.Strings(ss)
+		return ss
+	}
+
+	g.Shift(args)
+
+	n := len(args)
+
+	if n == 0 {
+		return g.Names
+	}
+
+	if v, found := g.byname[args[0]]; found {
+		if method, found := v.(completer); found {
+			return method.Complete(args[1:]...)
+		}
+		if n > 1 {
+			pat = args[n-1] + pat
+		}
+
+		ss, _ = filepath.Glob(pat)
+	} else if n == 1 {
+		for helper := range cmd.Helpers {
+			if strings.HasPrefix(helper, args[0]) {
+				ss = append(ss, helper)
+			}
+		}
+		for _, name := range g.Names {
+			if strings.HasPrefix(name, args[0]) {
+				ss = append(ss, name)
+			}
+		}
+	} else {
+		ss, _ = filepath.Glob(args[n-1] + pat)
+	}
+	return ss
+}
+
+func (g *Goes) Help(args ...string) string {
+	cmd.Swap(args)
+	g.Shift(args)
+	if len(args) > 0 {
+		if v, found := g.byname[args[0]]; found {
+			if method, found := v.(helper); found {
+				return method.Help(args[1:]...)
+			}
+			return Usage(v)
+		}
+	}
+	return Usage(g)
+}
+
+// Run a command in the current context.
 //
 // If len(args) == 1 and args[0] doesn't match a mapped command, this will run
 // the "cli".
 //
-// If the args has "-h", "-help", or "--help", this runs
-// ByName["help"].Main(args...) to print text.
+// If the args has "-help", or "--help", this runs ByName("help").Main(args...)
+// to print text.
 //
-// Similarly for "-apropos", "-complete", "-license", "-man", "-patents",
-// "-usage" and "-version".
+// Similarly for "-apropos", "-complete", "-man", and "-usage".
 //
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
-func (byName ByName) Main(args ...string) error {
-	if len(args) == 0 {
-		if len(os.Args) == 0 {
-			return nil
+func (g *Goes) Main(args ...string) error {
+	if g.Parent != nil && len(g.Path) == 0 {
+		// set Path of sub-goes. e.g. "ip address"
+		for p := g; p != nil; p = p.Parent {
+			g.Path = append([]string{p.String()}, g.Path...)
 		}
-		args = os.Args
 	}
-
-	if _, found := byName[args[0]]; !found {
+	if len(args) > 0 {
 		base := filepath.Base(args[0])
-		if _, found = byName[base]; found {
-			// e.g. ./COMMAND [ARGS]...
-			args[0] = base
-		} else if len(args) > 1 {
-			if args[0] == prog.Install {
-				buf, err := ioutil.ReadFile(args[1])
-				if err == nil && utf8.Valid(buf) {
-					// e.g. /usr/bin/goes SCRIPT
-					args = []string{"source", args[1]}
-				} else {
-					// e.g. /usr/bin/goes COMMAND [ARGS]...
-					args = args[1:]
-				}
-			} else {
-				// e.g. ./goes COMMAND [ARGS]...
-				args = args[1:]
-			}
-		} else if _, found := byName["cli"]; found {
-			// e.g. ./goes
-			args = []string{"cli"}
-		} else {
+		switch {
+		case strings.HasPrefix(base, "goes-") &&
+			strings.HasSuffix(base, "-installer"):
 			// e.g. ./goes-MACHINE-installer
-			args = []string{"install"}
+			args[0] = "install"
+		case base == g.name:
+			// e.g. ./goes-MACHINE ...
+			fallthrough
+		case base == "goes":
+			args = args[1:]
 		}
 	}
 
-	name, args := byName.pseudonym(args)
-	g := byName[name]
-	if g == nil {
-		return fmt.Errorf("%s: command not found", name)
+	cli := g.byname["cli"]
+	cliFlags, cliArgs := flags.New(args, "-f", "-no-liner", "-x")
+	switch len(cliArgs) {
+	case 0:
+		if cli != nil {
+			if cliFlags["-no-liner"] {
+				cliArgs = append(cliArgs, "-no-liner")
+			}
+			if cliFlags["-x"] {
+				cliArgs = append(cliArgs, "-x")
+			}
+			return cli.Main(cliArgs...)
+		}
+		fmt.Println(Usage(g))
+		return nil
+	case 1:
+		buf, err := ioutil.ReadFile(cliArgs[0])
+		if cliArgs[0] == "-" || (err == nil &&
+			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes")) &&
+			utf8.Valid(buf)) {
+			// e.g. /usr/bin/goes SCRIPT
+			if cli == nil {
+				return fmt.Errorf("has no cli")
+			}
+			for _, t := range []string{"-f", "-x"} {
+				if cliFlags[t] {
+					cliArgs = append(cliArgs, t)
+				}
+			}
+			return cli.Main(cliArgs...)
+		}
 	}
-	if g.Kind.IsDaemon() {
+
+	cmd.Swap(args)
+
+	if _, found := cmd.Helpers[args[0]]; found {
+		return g.byname[args[0]].Main(args[1:]...)
+	}
+
+	g.Shift(args)
+
+	v := g.byname[args[0]]
+	if v == nil {
+		return fmt.Errorf("%s: command not found", args[0])
+	}
+
+	k := cmd.WhatKind(v)
+	if k.IsDaemon() {
 		sig := make(chan os.Signal)
 		signal.Notify(sig, syscall.SIGTERM)
 		defer func(sig chan os.Signal) {
 			sig <- syscall.SIGABRT
 		}(sig)
-		go g.wait(sig)
+		go wait(v, sig)
 	}
-	err := g.Main(args...)
+
+	err := v.Main(args[1:]...)
 	if err == io.EOF {
 		err = nil
 	}
-	if err != nil && !g.Kind.IsDaemon() {
-		err = fmt.Errorf("%s: %v", name, err)
+	if err != nil && !k.IsDaemon() {
+		err = fmt.Errorf("%s: %v", args[0], err)
 	}
 	return err
 }
 
-// parse pseudo flags, e.g.
-//
-//	COMMAND {"-license", "-patents", or "-version"}
-// returns
-//	{"license", "patents", or "version"}
-//
-//	COMMAND {"-apropos", "-man", or "-usage"}
-// returns
-//	{"apropos", "man", or "usage"} COMMAND
-//
-//	COMMAND {"-complete" or "-help"} [ARGS]...
-// returns
-//	{"complete" or "help"} COMMAND [ARGS]...
-func (byName ByName) pseudonym(args []string) (string, []string) {
-	name := args[0]
-	args = args[1:]
-	flag, args := flags.New(args,
-		"-apropos", "--apropos",
-		"-complete", "--complete",
-		"-help", "--help", "-h",
-		"-license", "--license",
-		"-man", "--man",
-		"-patents", "--patents",
-		"-usage", "--usage",
-		"-version", "--version",
-	)
-	flag.Aka("-apropos", "--apropos")
-	flag.Aka("-complete", "--complete")
-	flag.Aka("-help", "--help", "-h")
-	flag.Aka("-license", "--license")
-	flag.Aka("-man", "--man")
-	flag.Aka("-patents", "--patents")
-	flag.Aka("-usage", "--usage")
-	flag.Aka("-version", "--version")
-	for _, x := range []string{
-		"-license",
-		"-patents",
-		"-version",
-	} {
-		if flag[x] {
-			return x[1:], args[:0]
-		}
-	}
-	for _, x := range []string{
-		"-apropos",
-		"-man",
-		"-usage",
-	} {
-		if flag[x] {
-			return x[1:], []string{name}
-		}
-	}
-	for _, x := range []string{
-		"-complete",
-		"-help",
-	} {
-		if flag[x] {
-			return x[1:], append([]string{name}, args...)
-		}
-	}
-	return name, args
-}
+func (g *Goes) Man() lang.Alt { return g.man }
 
-// Plot commands on map.
-func (byName ByName) Plot(cmds ...Cmd) ByName {
+// Plot command by name.
+func (g *Goes) Plot(cmds ...cmd.Cmd) {
 	for _, v := range cmds {
-		if method, found := v.(goeser); found {
-			g := method.goes()
-			byName[g.Name] = g
-			if g.ByName != nil {
-				g.ByName(byName)
-			}
-			continue
-		}
 		name := v.String()
-		if _, found := byName[name]; found {
+		if _, found := g.byname[name]; found {
 			panic(fmt.Errorf("%s: duplicate", name))
 		}
-		g := &Goes{
-			Name:    name,
-			Main:    v.Main,
-			Usage:   v.Usage(),
-			Apropos: v.Apropos(),
+		g.byname[name] = v
+		if _, found := cmd.Helpers[name]; !found {
+			g.Names = append(g.Names, name)
 		}
-		if strings.HasPrefix(g.Usage, "\n\t") {
-			g.Usage = g.Usage[1:]
+		if method, found := v.(goeser); found {
+			method.Goes(g)
 		}
-		if method, found := v.(byNamer); found {
-			method.ByName(byName)
+		if vg, found := v.(*Goes); found {
+			vg.Parent = g
 		}
-		if method, found := v.(io.Closer); found {
-			g.Close = method.Close
-		}
-		if method, found := v.(completer); found {
-			g.Complete = method.Complete
-		}
-		if method, found := v.(helper); found {
-			g.Help = method.Help
-		}
-		if method, found := v.(kinder); found {
-			g.Kind = method.Kind()
-		}
-		if method, found := v.(manner); found {
-			g.Man = method.Man()
-		}
-		byName[g.Name] = g
 	}
-	return byName
+	sort.Strings(g.Names)
 }
 
-func (g *Goes) goes() *Goes { return g }
+// Shift first recognized command to args[0], so,
+//
+//	OPTIONS... COMMAND [ARGS]...
+//
+// becomes
+//
+//	COMMAND OPTIONS... [ARGS]...
+func (g *Goes) Shift(args []string) {
+	for i := range args {
+		if _, found := g.byname[args[i]]; found {
+			if i > 0 {
+				name := args[i]
+				copy(args[1:i+1], args[:i])
+				args[0] = name
+			}
+			break
+		}
+	}
+}
 
-func (g *Goes) wait(ch chan os.Signal) {
+func (g *Goes) String() string { return g.name }
+func (g *Goes) Usage() string  { return g.usage }
+
+func wait(v cmd.Cmd, ch chan os.Signal) {
 	for sig := range ch {
 		if sig == syscall.SIGTERM {
-			if g.Close != nil {
-				if err := g.Close(); err != nil {
+			if method, found := v.(io.Closer); found {
+				if err := method.Close(); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 				}
 			}
@@ -302,21 +333,10 @@ func (g *Goes) wait(ch chan os.Signal) {
 	}
 }
 
-func (k Kind) IsDontFork() bool    { return (k & DontFork) == DontFork }
-func (k Kind) IsDaemon() bool      { return (k & Daemon) == Daemon }
-func (k Kind) IsHidden() bool      { return (k & Hidden) == Hidden }
-func (k Kind) IsInteractive() bool { return (k & (Daemon | Hidden)) == 0 }
-func (k Kind) IsCantPipe() bool    { return (k & CantPipe) == CantPipe }
+func Usage(v Usager) string {
+	return fmt.Sprint("usage:\t", strings.TrimSpace(v.Usage()))
+}
 
-func (k Kind) String() string {
-	s := "unknown"
-	switch k {
-	case DontFork:
-		s = "don't fork"
-	case Daemon:
-		s = "daemon"
-	case Hidden:
-		s = "hidden"
-	}
-	return s
+type Usager interface {
+	Usage() string
 }

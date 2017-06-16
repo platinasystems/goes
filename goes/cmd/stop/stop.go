@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/kill"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
@@ -38,28 +38,29 @@ OPTIONS
 	EtcGoesStop = "/etc/goes/stop"
 )
 
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
 // Machines may use Hook to run something between the kill of all daemons and
 // the removal of the socks and pids directories.
 var Hook = func() error { return nil }
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func New() *Command { return new(Command) }
+
+type Command struct {
+	g *goes.Goes
 }
 
-func New() Interface { return new(cmd) }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
-type cmd goes.ByName
-
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (c *cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-stop")
 	err := assert.Root()
 	if err != nil {
@@ -73,7 +74,7 @@ func (c *cmd) Main(args ...string) error {
 		stop = EtcGoesStop
 	}
 	if len(stop) > 0 {
-		err = goes.ByName(*c).Main("source", stop)
+		err = c.g.Main("source", stop)
 		if err != nil {
 			return fmt.Errorf("source %s: %v", stop, err)
 		}
@@ -92,20 +93,11 @@ func (c *cmd) Main(args ...string) error {
 	return err
 }
 
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) Man() lang.Alt  { return man }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
 func haveEtcGoesStop() bool {
 	_, err := os.Stat(EtcGoesStop)
 	return err == nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

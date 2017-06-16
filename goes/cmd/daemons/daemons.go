@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/prog"
@@ -26,26 +27,21 @@ const (
 	Usage   = "goes-daemons [OPTIONS]..."
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	ByName(goes.ByName)
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
 
-type cmd goes.ByName
+type Command struct {
+	g *goes.Goes
+}
 
-func (*cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Kind() cmd.Kind      { return cmd.Hidden }
 
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (*cmd) Kind() goes.Kind { return goes.Hidden }
-
-func (c *cmd) Main(args ...string) (err error) {
+func (c *Command) Main(args ...string) (err error) {
 	var daemons int
 	done := make(chan struct{})
 
@@ -71,11 +67,13 @@ func (c *cmd) Main(args ...string) (err error) {
 		return
 	}
 
-	for name, g := range goes.ByName(*c) {
-		if g.Kind.IsDaemon() && g.Name != "redisd" {
+	for _, name := range c.g.Names {
+		v := c.g.ByName(name)
+		k := cmd.WhatKind(v)
+		if k.IsDaemon() && name != "redisd" {
 			err := c.daemon(done, name)
 			if err != nil {
-				log.Print("daemon", "err", g.Name, ": ", err)
+				log.Print("daemon", "err", name, ": ", err)
 			} else {
 				daemons++
 			}
@@ -88,10 +86,10 @@ func (c *cmd) Main(args ...string) (err error) {
 	return
 }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
-func (c *cmd) daemon(done chan<- struct{}, arg0 string, args ...string) error {
+func (*Command) daemon(done chan<- struct{}, arg0 string, args ...string) error {
 	rout, wout, err := os.Pipe()
 	if err != nil {
 		return err
@@ -130,8 +128,4 @@ func (c *cmd) daemon(done chan<- struct{}, arg0 string, args ...string) error {
 		done <- struct{}{}
 	}(d, wout, werr, done)
 	return nil
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

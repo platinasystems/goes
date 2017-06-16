@@ -16,7 +16,7 @@ import (
 	"syscall"
 
 	"github.com/kr/pty"
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/telnet/command"
 	"github.com/platinasystems/go/internal/telnet/option"
@@ -28,24 +28,20 @@ const (
 	Usage   = "telnetd"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Kind() goes.Kind   { return goes.Daemon }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	ln, err := net.Listen("tcp", ":23")
 	if err != nil {
 		return err
@@ -160,8 +156,4 @@ func nullFilteredCopy(w io.Writer, r io.Reader) {
 			return
 		}
 	}
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

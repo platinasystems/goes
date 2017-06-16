@@ -7,7 +7,7 @@ package panicd
 import (
 	"strings"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -20,34 +20,6 @@ DESCRIPTION
 	Print the given or default message to klog or syslog.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
-
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) Kind() goes.Kind   { return goes.Daemon }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
-
-func (cmd) Main(args ...string) error {
-	msg := "---"
-	if len(args) > 0 {
-		msg = strings.Join(args, " ")
-	}
-	panic(msg)
-	return nil
-}
-
 var (
 	apropos = lang.Alt{
 		lang.EnUS: Apropos,
@@ -56,3 +28,22 @@ var (
 		lang.EnUS: Man,
 	}
 )
+
+func New() Command { return Command{} }
+
+type Command struct{}
+
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
+
+func (Command) Main(args ...string) error {
+	msg := "---"
+	if len(args) > 0 {
+		msg = strings.Join(args, " ")
+	}
+	panic(msg)
+	return nil
+}

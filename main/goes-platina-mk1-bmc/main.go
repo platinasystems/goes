@@ -11,12 +11,12 @@ import (
 	"os"
 )
 
+var Args = os.Args
 var Exit = os.Exit
 var Stderr io.Writer = os.Stderr
 
 func main() {
-	err := Goes().Main()
-	if err != nil {
+	if err := Goes().Main(Args...); err != nil {
 		fmt.Fprintln(Stderr, err)
 		Exit(1)
 	}

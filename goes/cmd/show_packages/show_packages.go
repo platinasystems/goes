@@ -9,7 +9,7 @@ import (
 	"os"
 
 	. "github.com/platinasystems/go"
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -19,23 +19,18 @@ const (
 	Usage   = "version"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Kind() cmd.Kind    { return cmd.DontFork }
 
-func (cmd) Kind() goes.Kind { return goes.DontFork }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
@@ -43,9 +38,5 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
+func (Command) String() string { return Name }
+func (Command) Usage() string  { return Usage }

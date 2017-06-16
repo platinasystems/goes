@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
@@ -29,18 +29,9 @@ var once sync.Once
 
 var Vdev [32]I2cDev
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
-}
+func New() *Command { return new(Command) }
 
-func New() Interface { return new(cmd) }
-
-type cmd struct {
+type Command struct {
 	stop    chan struct{}
 	pub     *publisher.Publisher
 	last    map[string]float64
@@ -69,16 +60,16 @@ var VpageByKey map[string]uint8
 var latestPresent = [2]uint16{0xffff, 0xffff}
 var present = [2]uint16{0xffff, 0xffff}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt { return apropos }
 
-func (cmd *cmd) Close() error {
-	close(cmd.stop)
+func (c *Command) Close() error {
+	close(c.stop)
 	return nil
 }
 
-func (*cmd) Kind() goes.Kind { return goes.Daemon }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (cmd *cmd) Main(...string) error {
+func (c *Command) Main(...string) error {
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
@@ -87,29 +78,29 @@ func (cmd *cmd) Main(...string) error {
 	for i := 0; i < 32; i++ {
 		portIsCopper[i] = true
 	}
-	cmd.stop = make(chan struct{})
-	cmd.last = make(map[string]float64)
-	cmd.lasts = make(map[string]string)
-	cmd.lastu = make(map[string]uint8)
-	cmd.lastsio = make(map[string]string)
+	c.stop = make(chan struct{})
+	c.last = make(map[string]float64)
+	c.lasts = make(map[string]string)
+	c.lastu = make(map[string]uint8)
+	c.lastsio = make(map[string]string)
 
-	if cmd.pub, err = publisher.New(); err != nil {
+	if c.pub, err = publisher.New(); err != nil {
 		return err
 	}
 	if err = syscall.Sysinfo(&si); err != nil {
 		return err
 	}
 
-	go qsfpioTicker(cmd)
+	go qsfpioTicker(c)
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd.stop:
+		case <-c.stop:
 			return nil
 		case <-t.C:
-			if err = cmd.update(); err != nil {
-				close(cmd.stop)
+			if err = c.update(); err != nil {
+				close(c.stop)
 				return err
 			}
 		}
@@ -117,10 +108,10 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
 
-func (cmd *cmd) update() error {
+func (c *Command) update() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
@@ -205,153 +196,153 @@ func (cmd *cmd) update() error {
 							}
 						}
 						typeString += strings.Trim(v, " ") + ", "
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
+						if v != c.lasts[k] {
+							c.pub.Print(k, ": ", v)
+							c.lasts[k] = v
 						}
 
 						k = "port-" + strconv.Itoa(lp) + ".qsfp.vendor"
 						v = Vdev[i+j*16].Vendor()
 						typeString += strings.Trim(v, " ") + ", "
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
+						if v != c.lasts[k] {
+							c.pub.Print(k, ": ", v)
+							c.lasts[k] = v
 						}
 						k = "port-" + strconv.Itoa(lp) + ".qsfp.partnumber"
 						v = Vdev[i+j*16].PN()
 						typeString += strings.Trim(v, " ") + ", "
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
-							cmd.lasts[k] = v
+						if v != c.lasts[k] {
+							c.pub.Print(k, ": ", v)
+							c.lasts[k] = v
 						}
 						k = "port-" + strconv.Itoa(lp) + ".qsfp.serialnumber"
 						v = Vdev[i+j*16].SN()
 						typeString += strings.Trim(v, " ")
-						if v != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", v)
+						if v != c.lasts[k] {
+							c.pub.Print(k, ": ", v)
 						}
 						if !portIsCopper[i+j*16] {
 							// get monitoring thresholds if qsfp is not a cable
 							Vdev[i+j*16].StaticBlocks(i + j*16)
 							v = Temp(portUpage3[i+j*16].tempHighAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.highAlarmThreshold.units.C"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Temp(portUpage3[i+j*16].tempLowAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.lowAlarmThreshold.units.C"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Temp(portUpage3[i+j*16].tempHighWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.highWarnThreshold.units.C"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Temp(portUpage3[i+j*16].tempLowWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.temperature.lowWarnThreshold.units.C"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccHighAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.highAlarmThreshold.units.V"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccLowAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.lowAlarmThreshold.units.V"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccHighWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.highWarnThreshold.units.V"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Voltage(portUpage3[i+j*16].vccLowWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.vcc.lowWarnThreshold.units.V"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerHighAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.highAlarmThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerLowAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.lowAlarmThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerHighWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.highWarnThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].rxPowerLowWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.rx.power.lowWarnThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerHighAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.highAlarmThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerLowAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.lowAlarmThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerHighWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.highWarnThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = Power(portUpage3[i+j*16].txPowerLowWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.power.lowWarnThreshold.units.mW"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasHighAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasHighAlarmThreshold.units.mA"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasLowAlarm)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasLowAlarmThreshold.units.mA"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasHighWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasHighWarnThreshold.units.mA"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 							v = TxBias(portUpage3[i+j*16].txBiasLowWarning)
 							k = "port-" + strconv.Itoa(lp) + ".qsfp.tx.biasLowWarnThreshold.units.mA"
-							if v != cmd.lasts[k] {
-								cmd.pub.Print(k, ": ", v)
-								cmd.lasts[k] = v
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
 							}
 						}
 						log.Print("QSFP detected in port ", lp, ": ", typeString)
@@ -362,8 +353,8 @@ func (cmd *cmd) update() error {
 						//when qsfp is removed, delete associated fields
 						for _, v := range redisFields {
 							k := "port-" + strconv.Itoa(lp) + "." + v
-							cmd.pub.Print("delete: ", k)
-							cmd.lasts[k] = ""
+							c.pub.Print("delete: ", k)
+							c.lasts[k] = ""
 						}
 						log.Print("QSFP removed from port ", lp)
 						portIsCopper[lp-1] = true
@@ -389,60 +380,60 @@ func (cmd *cmd) update() error {
 					Vdev[i].DynamicBlocks(i)
 					k := "port-" + strconv.Itoa(port) + ".qsfp.temperature.units.C"
 					v := Temp(portLpage0[i].freeMonTemp)
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 					k = "port-" + strconv.Itoa(port) + ".qsfp.vcc.units.V"
 					v = Voltage(portLpage0[i].freeMonVoltage)
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 					va := LanePower(portLpage0[i].rxPower)
 					for x := 0; x < 4; x++ {
 						k = "port-" + strconv.Itoa(port) + ".qsfp.rx" + strconv.Itoa(x+1) + ".power.units.mW"
-						if va[x] != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", va[x])
-							cmd.lasts[k] = va[x]
+						if va[x] != c.lasts[k] {
+							c.pub.Print(k, ": ", va[x])
+							c.lasts[k] = va[x]
 						}
 					}
 					va = LanePower(portLpage0[i].txPower)
 					for x := 0; x < 4; x++ {
 						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x+1) + ".power.units.mW"
-						if va[x] != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", va[x])
-							cmd.lasts[k] = va[x]
+						if va[x] != c.lasts[k] {
+							c.pub.Print(k, ": ", va[x])
+							c.lasts[k] = va[x]
 						}
 					}
 					va = LanesTxBias(portLpage0[i].txBias)
 					for x := 0; x < 4; x++ {
 						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x+1) + ".bias.units.mA"
-						if va[x] != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", va[x])
-							cmd.lasts[k] = va[x]
+						if va[x] != c.lasts[k] {
+							c.pub.Print(k, ": ", va[x])
+							c.lasts[k] = va[x]
 						}
 					}
 					vs := ChannelAlarms(portLpage0[i].channelStatusInterrupt, portLpage0[i].channelMonitorInterruptFlags)
 					for x := 0; x < 4; x++ {
 						k = "port-" + strconv.Itoa(port) + ".qsfp.rx" + strconv.Itoa(x+1) + ".alarms"
-						if vs[x] != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", vs[x])
-							cmd.lasts[k] = vs[x]
+						if vs[x] != c.lasts[k] {
+							c.pub.Print(k, ": ", vs[x])
+							c.lasts[k] = vs[x]
 						}
 					}
 					for x := 4; x < 8; x++ {
 						k = "port-" + strconv.Itoa(port) + ".qsfp.tx" + strconv.Itoa(x-3) + ".alarms"
-						if vs[x] != cmd.lasts[k] {
-							cmd.pub.Print(k, ": ", vs[x])
-							cmd.lasts[k] = vs[x]
+						if vs[x] != c.lasts[k] {
+							c.pub.Print(k, ": ", vs[x])
+							c.lasts[k] = vs[x]
 						}
 					}
 					vs[0] = FreeSideAlarms(portLpage0[i].freeMonitorInterruptFlags)
 					k = "port-" + strconv.Itoa(port) + ".qsfp.alarms"
-					if vs[0] != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", vs[0])
-						cmd.lasts[k] = vs[0]
+					if vs[0] != c.lasts[k] {
+						c.pub.Print(k, ": ", vs[0])
+						c.lasts[k] = vs[0]
 					}
 				}
 			}

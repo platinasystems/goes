@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
@@ -23,15 +23,11 @@ const (
 	Usage   = "imx6d"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
 
 var (
 	Init = func() {}
@@ -40,27 +36,27 @@ var (
 	VpageByKey map[string]uint8
 )
 
-type cmd struct {
+type Command struct {
 	stop chan struct{}
 	pub  *publisher.Publisher
 	last map[string]float64
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
-func (*cmd) Kind() goes.Kind   { return goes.Daemon }
-func (*cmd) String() string    { return Name }
-func (*cmd) Usage() string     { return Name }
+func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (*Command) String() string    { return Name }
+func (*Command) Usage() string     { return Name }
 
-func (cmd *cmd) Main(...string) error {
+func (c *Command) Main(...string) error {
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
 	var err error
 
-	cmd.stop = make(chan struct{})
-	cmd.last = make(map[string]float64)
+	c.stop = make(chan struct{})
+	c.last = make(map[string]float64)
 
-	if cmd.pub, err = publisher.New(); err != nil {
+	if c.pub, err = publisher.New(); err != nil {
 		return err
 	}
 
@@ -72,11 +68,11 @@ func (cmd *cmd) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd.stop:
+		case <-c.stop:
 			return nil
 		case <-t.C:
-			if err = cmd.update(); err != nil {
-				close(cmd.stop)
+			if err = c.update(); err != nil {
+				close(c.stop)
 				return err
 			}
 		}
@@ -84,17 +80,17 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd *cmd) Close() error {
-	close(cmd.stop)
+func (c *Command) Close() error {
+	close(c.stop)
 	return nil
 }
 
-func (cmd *cmd) update() error {
+func (c *Command) update() error {
 	for k, _ := range VpageByKey {
 		v := ReadTemp()
-		if v != cmd.last[k] {
-			cmd.pub.Print(k, ": ", v)
-			cmd.last[k] = v
+		if v != c.last[k] {
+			c.pub.Print(k, ": ", v)
+			c.last[k] = v
 		}
 	}
 	return nil
@@ -106,8 +102,4 @@ func ReadTemp() float64 {
 	tmp3, _ := strconv.Atoi(tmp2)
 	tmp4 := float64(tmp3)
 	return float64(tmp4 / 100.0)
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

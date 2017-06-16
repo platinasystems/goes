@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -31,16 +31,11 @@ const (
 	Usage   = "vnetd"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return &cmd{} }
+func New() *Command { return new(Command) }
 
 // Enable publish of Non-unix (e.g. non-tuntap) interfaces.
 // This will include all vnet interfaces.
@@ -59,7 +54,7 @@ var Hook = func(*Info, *vnet.Vnet) error { return nil }
 // Machines may reassign this for platform sepecific cleanup after vnet.Quit.
 var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
 
-type cmd struct {
+type Command struct {
 	i Info
 }
 
@@ -70,25 +65,25 @@ type Info struct {
 	pub       *publisher.Publisher
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
-func (*cmd) Kind() goes.Kind   { return goes.Daemon }
-func (*cmd) String() string    { return Name }
-func (*cmd) Usage() string     { return Usage }
+func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (*Command) String() string    { return Name }
+func (*Command) Usage() string     { return Usage }
 
-func (cmd *cmd) Main(...string) error {
+func (c *Command) Main(...string) error {
 	var (
 		err error
 		in  parse.Input
 	)
 
 	// never want to block vnet
-	cmd.i.pub, err = publisher.New()
+	c.i.pub, err = publisher.New()
 	if err != nil {
 		return err
 	}
-	defer cmd.i.pub.Close()
+	defer c.i.pub.Close()
 
-	rpc.Register(&cmd.i)
+	rpc.Register(&c.i)
 
 	sock, err := sockfile.NewRpcServer(Name)
 	if err != nil {
@@ -101,12 +96,12 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	cmd.i.eventPool.New = cmd.i.newEvent
-	cmd.i.v.RegisterHwIfAddDelHook(cmd.i.hw_if_add_del)
-	cmd.i.v.RegisterHwIfLinkUpDownHook(cmd.i.hw_if_link_up_down)
-	cmd.i.v.RegisterSwIfAddDelHook(cmd.i.sw_if_add_del)
-	cmd.i.v.RegisterSwIfAdminUpDownHook(cmd.i.sw_if_admin_up_down)
-	if err = Hook(&cmd.i, &cmd.i.v); err != nil {
+	c.i.eventPool.New = c.i.newEvent
+	c.i.v.RegisterHwIfAddDelHook(c.i.hw_if_add_del)
+	c.i.v.RegisterHwIfLinkUpDownHook(c.i.hw_if_link_up_down)
+	c.i.v.RegisterSwIfAddDelHook(c.i.sw_if_add_del)
+	c.i.v.RegisterSwIfAdminUpDownHook(c.i.sw_if_admin_up_down)
+	if err = Hook(&c.i, &c.i.v); err != nil {
 		return err
 	}
 
@@ -128,13 +123,13 @@ func (cmd *cmd) Main(...string) error {
 
 	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
 
-	return cmd.i.v.Run(&in)
+	return c.i.v.Run(&in)
 }
 
-func (cmd *cmd) Close() error {
+func (c *Command) Close() error {
 	// FIXME the following isn't working.
-	// cmd.i.v.Quit()
-	// return CloseHook(&cmd.i, &cmd.i.v)
+	// c.i.v.Quit()
+	// return CloseHook(&c.i, &c.i.v)
 	return nil
 }
 
@@ -344,8 +339,4 @@ func (p *ifStatsPoller) EventAction() {
 	p.i.publish("poll.finish", stop.Format(time.StampMilli))
 
 	p.sequence++
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

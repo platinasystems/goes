@@ -7,7 +7,7 @@ package hellod
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -20,26 +20,26 @@ DESCRIPTION
 	Print the given or default message to klog or syslog.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) Kind() goes.Kind   { return goes.Daemon }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	iargs := []interface{}{"hello", "world"}
 	if len(args) > 0 {
 		iargs = make([]interface{}, 0, len(args))
@@ -50,12 +50,3 @@ func (cmd) Main(args ...string) error {
 	fmt.Println(iargs...)
 	return nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

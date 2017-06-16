@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
@@ -34,16 +34,11 @@ const (
 	Usage   = "fspd"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
 
 type I2cDev struct {
 	Slot       int
@@ -78,7 +73,7 @@ var (
 	WrRegRng = make(map[string][]string)
 )
 
-type cmd struct {
+type Command struct {
 	Info
 }
 
@@ -92,23 +87,23 @@ type Info struct {
 	lastu map[string]uint16
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
-func (*cmd) Kind() goes.Kind   { return goes.Daemon }
-func (*cmd) String() string    { return Name }
-func (*cmd) Usage() string     { return Usage }
+func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (*Command) String() string    { return Name }
+func (*Command) Usage() string     { return Usage }
 
-func (cmd *cmd) Main(...string) error {
+func (c *Command) Main(...string) error {
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
 	var err error
 
-	cmd.stop = make(chan struct{})
-	cmd.last = make(map[string]float64)
-	cmd.lasts = make(map[string]string)
-	cmd.lastu = make(map[string]uint16)
+	c.stop = make(chan struct{})
+	c.last = make(map[string]float64)
+	c.lasts = make(map[string]string)
+	c.lastu = make(map[string]uint16)
 
-	if cmd.pub, err = publisher.New(); err != nil {
+	if c.pub, err = publisher.New(); err != nil {
 		return err
 	}
 
@@ -116,11 +111,11 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	if cmd.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+	if c.rpc, err = sockfile.NewRpcServer(Name); err != nil {
 		return err
 	}
 
-	rpc.Register(&cmd.Info)
+	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
 		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
 		if err != nil {
@@ -133,15 +128,15 @@ func (cmd *cmd) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd.stop:
+		case <-c.stop:
 			return nil
 		case <-t.C:
 			if holdOff > 0 {
 				holdOff--
 			}
 			if holdOff == 0 {
-				if err = cmd.update(); err != nil {
-					close(cmd.stop)
+				if err = c.update(); err != nil {
+					close(c.stop)
 					return err
 				}
 			}
@@ -150,12 +145,12 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd *cmd) Close() error {
-	close(cmd.stop)
+func (c *Command) Close() error {
+	close(c.stop)
 	return nil
 }
 
-func (cmd *cmd) update() error {
+func (c *Command) update() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
@@ -172,52 +167,52 @@ func (cmd *cmd) update() error {
 			//not present
 			if strings.Contains(k, "status") {
 				v := Vdev[i].PsuStatus()
-				if v != cmd.lasts[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lasts[k] = v
+				if v != c.lasts[k] {
+					c.pub.Print(k, ": ", v)
+					c.lasts[k] = v
 				}
 			}
 			if strings.Contains(k, "admin.state") {
 				v := Vdev[i].GetAdminState()
-				if v != cmd.lasts[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lasts[k] = v
+				if v != c.lasts[k] {
+					c.pub.Print(k, ": ", v)
+					c.lasts[k] = v
 				}
 			}
 			if Vdev[i].Delete {
 				k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".eeprom"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".i_out.units.A"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_id"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".mfg_model"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_in.units.W"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".p_out.units.W"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp1.units.C"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".temp2.units.C"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_out.units.V"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".v_in.units.V"
-				cmd.pub.Print("delete: ", k)
-				cmd.lasts[k] = ""
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				Vdev[i].Delete = false
 			}
 
@@ -228,16 +223,16 @@ func (cmd *cmd) update() error {
 			//present
 			if strings.Contains(k, "status") {
 				v := Vdev[i].PsuStatus()
-				if v != cmd.lasts[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lasts[k] = v
+				if v != c.lasts[k] {
+					c.pub.Print(k, ": ", v)
+					c.lasts[k] = v
 				}
 			}
 			if strings.Contains(k, "admin.state") {
 				v := Vdev[i].GetAdminState()
-				if v != cmd.lasts[k] {
-					cmd.pub.Print(k, ": ", v)
-					cmd.lasts[k] = v
+				if v != c.lasts[k] {
+					c.pub.Print(k, ": ", v)
+					c.lasts[k] = v
 				}
 			}
 			if Vdev[i].Update[0] {
@@ -246,9 +241,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 					Vdev[i].Update[0] = false
 				}
@@ -259,9 +254,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 					Vdev[i].Update[1] = false
 				}
@@ -272,9 +267,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 					Vdev[i].Update[2] = false
 				}
@@ -286,9 +281,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "status_word") {
@@ -296,9 +291,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "status_vout") {
@@ -306,9 +301,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "status_iout") {
@@ -316,9 +311,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "status_input") {
@@ -326,9 +321,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "v_in") {
@@ -336,9 +331,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "i_in") {
@@ -346,9 +341,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "v_out") {
@@ -356,9 +351,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "i_out") {
@@ -366,9 +361,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "status_temp") {
@@ -376,9 +371,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "p_out") {
@@ -386,9 +381,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "p_in") {
@@ -396,9 +391,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "p_out_raw") {
@@ -406,9 +401,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "p_in_raw") {
@@ -416,9 +411,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "p_mode_raw") {
@@ -426,9 +421,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "pmbus_rev") {
@@ -436,9 +431,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "status_fans") {
@@ -446,9 +441,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lastu[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lastu[k] = v
+					if v != c.lastu[k] {
+						c.pub.Print(k, ": ", v)
+						c.lastu[k] = v
 					}
 				}
 				if strings.Contains(k, "temp1") {
@@ -456,9 +451,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "temp2") {
@@ -466,9 +461,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "fan_speed.units.rpm") {
@@ -476,9 +471,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				/*if strings.Contains(k, "mfg_id") {
@@ -486,9 +481,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}
 				if strings.Contains(k, "mfg_model") {
@@ -496,9 +491,9 @@ func (cmd *cmd) update() error {
 					if err != nil {
 						return err
 					}
-					if v != cmd.lasts[k] {
-						cmd.pub.Print(k, ": ", v)
-						cmd.lasts[k] = v
+					if v != c.lasts[k] {
+						c.pub.Print(k, ": ", v)
+						c.lasts[k] = v
 					}
 				}*/
 			}
@@ -1136,8 +1131,4 @@ func (i *Info) set(key, value string, isReadyEvent bool) error {
 
 func (i *Info) publish(key string, value interface{}) {
 	i.pub.Print(key, ": ", value)
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

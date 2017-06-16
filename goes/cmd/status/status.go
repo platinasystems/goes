@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 )
@@ -24,32 +24,26 @@ const (
 	Usage   = "status"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	vnetd_down bool = false
+)
 
-var vnetd_down bool = false
+func New() Command { return Command{} }
 
-func New() Interface { return cmd{} }
+type Command struct{}
 
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Kind() goes.Kind { return goes.DontFork }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Kind() cmd.Kind    { return cmd.DontFork }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
 func checkForChip() bool {
-	var (
-		cmdOut []byte
-		err    error
-	)
-	cmd := "/usr/bin/lspci"
-	args := []string{}
-	if cmdOut, err = exec.Command(cmd, args...).Output(); err != nil {
+	args := []string{"/usr/bin/lspci"}
+	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err, "out =", cmdOut)
 		os.Exit(1)
 	}
@@ -65,13 +59,9 @@ func checkForChip() bool {
 }
 
 func checkForKmod() bool {
-	var (
-		cmdOut []byte
-		err    error
-	)
-	cmd := "/bin/lsmod"
-	args := []string{}
-	if cmdOut, err = exec.Command(cmd, args...).Output(); err != nil {
+	args := []string{"/bin/lsmod"}
+	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err, "out =", cmdOut)
 		os.Exit(1)
 	}
@@ -85,11 +75,6 @@ func checkForKmod() bool {
 }
 
 func checkDaemons() bool {
-	var (
-		cmdOut []byte
-		err    error
-	)
-
 	daemons := map[string]bool{
 		"goes-daemons": true,
 		"vnetd":        true,
@@ -102,9 +87,9 @@ func checkDaemons() bool {
 	mypid := os.Getpid()
 	status := true
 
-	cmd := "/bin/ps"
-	args := []string{"-C", "goes", "-o", "pid="}
-	if cmdOut, err = exec.Command(cmd, args...).Output(); err != nil {
+	args := []string{"/bin/ps", "-C", "goes", "-o", "pid="}
+	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err, "out =", string(cmdOut))
 		os.Exit(1)
 	}
@@ -131,8 +116,8 @@ func checkDaemons() bool {
 			continue
 		}
 
-		args = []string{"-p", pid, "-o", "cmd="}
-		cmdOut, err = exec.Command(cmd, args...).Output()
+		args = []string{"/bin/ps", "-p", pid, "-o", "cmd="}
+		cmdOut, err = exec.Command(args[0], args[1:]...).Output()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err, "out =",
 				string(cmdOut))
@@ -180,13 +165,9 @@ func checkRedis() bool {
 }
 
 func checkVnetdHung() bool {
-	var (
-		cmdOut []byte
-		err    error
-	)
-	cmd := "/usr/bin/goes"
-	args := []string{"vnet", "show", "hardware"}
-	if cmdOut, err = exec.Command(cmd, args...).Output(); err != nil {
+	args := []string{"/usr/bin/goes", "vnet", "show", "hardware"}
+	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err, "out =", cmdOut)
 		return false
 	}
@@ -194,7 +175,7 @@ func checkVnetdHung() bool {
 	return true
 }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if os.Getuid() != 0 {
 		fmt.Println("must be run as root")
 		os.Exit(1)
@@ -244,11 +225,4 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 	return nil
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

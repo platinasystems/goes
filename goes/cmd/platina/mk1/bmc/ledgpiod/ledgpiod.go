@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
@@ -31,16 +31,11 @@ const (
 	Usage   = "ledgpiod"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Kind() goes.Kind
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
 
 type I2cDev struct {
 	Bus      int
@@ -92,7 +87,7 @@ var (
 	WrRegRng = make(map[string][]string)
 )
 
-type cmd struct {
+type Command struct {
 	Info
 }
 
@@ -106,24 +101,24 @@ type Info struct {
 	lastu map[string]uint16
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
-func (*cmd) Kind() goes.Kind   { return goes.Daemon }
-func (*cmd) String() string    { return Name }
-func (*cmd) Usage() string     { return Name }
+func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (*Command) String() string    { return Name }
+func (*Command) Usage() string     { return Name }
 
-func (cmd *cmd) Main(...string) error {
+func (c *Command) Main(...string) error {
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
 	var err error
 	first = 1
 
-	cmd.stop = make(chan struct{})
-	cmd.last = make(map[string]float64)
-	cmd.lasts = make(map[string]string)
-	cmd.lastu = make(map[string]uint16)
+	c.stop = make(chan struct{})
+	c.last = make(map[string]float64)
+	c.lasts = make(map[string]string)
+	c.lastu = make(map[string]uint16)
 
-	if cmd.pub, err = publisher.New(); err != nil {
+	if c.pub, err = publisher.New(); err != nil {
 		return err
 	}
 
@@ -131,11 +126,11 @@ func (cmd *cmd) Main(...string) error {
 		return err
 	}
 
-	if cmd.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+	if c.rpc, err = sockfile.NewRpcServer(Name); err != nil {
 		return err
 	}
 
-	rpc.Register(&cmd.Info)
+	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
 		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
 		if err != nil {
@@ -147,12 +142,12 @@ func (cmd *cmd) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-cmd.stop:
+		case <-c.stop:
 			return nil
 		case <-t.C:
 			if Vdev.Addr != 0 {
-				if err = cmd.update(); err != nil {
-					//close(cmd.stop)
+				if err = c.update(); err != nil {
+					//close(c.stop)
 					return err
 				}
 			}
@@ -161,12 +156,12 @@ func (cmd *cmd) Main(...string) error {
 	return nil
 }
 
-func (cmd *cmd) Close() error {
-	close(cmd.stop)
+func (c *Command) Close() error {
+	close(c.stop)
 	return nil
 }
 
-func (cmd *cmd) update() error {
+func (c *Command) update() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
@@ -476,8 +471,4 @@ func (i *Info) set(key, value string, isReadyEvent bool) error {
 
 func (i *Info) publish(key string, value interface{}) {
 	i.pub.Print(key, ": ", value)
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

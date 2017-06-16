@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
@@ -37,16 +38,20 @@ OPTIONS
 	-t	Specify a timeout in seconds`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Kind() goes.Kind
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return new(cmd) }
+func New() *Command { return new(Command) }
+
+type Command struct {
+	g *goes.Goes
+}
 
 type bootSet struct {
 	kernel string
@@ -60,16 +65,11 @@ type bootMnt struct {
 	files []bootSet
 }
 
-type cmd goes.ByName
+func (*Command) Apropos() lang.Alt   { return apropos }
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Kind() cmd.Kind      { return cmd.DontFork }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
-
-func (c *cmd) ByName(byName goes.ByName) { *c = cmd(byName) }
-
-func (*cmd) Kind() goes.Kind { return goes.DontFork }
-
-func (c *cmd) Main(args ...string) (err error) {
-	byName := goes.ByName(*c)
+func (c *Command) Main(args ...string) (err error) {
 	parm, args := parms.New(args, "-t")
 
 	if len(args) == 0 {
@@ -140,14 +140,14 @@ func (c *cmd) Main(args ...string) (err error) {
 	}
 	kCmd := fields.New(resp)
 
-	err = byName.Main(kCmd...)
+	err = c.g.Main(kCmd...)
 
 	return err
 }
 
-func (*cmd) Man() lang.Alt { return man }
+func (*Command) Man() lang.Alt { return man }
 
-func (c *cmd) tryScanFiles(m *bootMnt, done chan *bootMnt) {
+func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	files, err := ioutil.ReadDir(m.mnt)
 	if err != nil {
 		m.err = err
@@ -171,14 +171,5 @@ func (c *cmd) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	done <- m
 }
 
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+func (*Command) String() string { return Name }
+func (*Command) Usage() string  { return Usage }
