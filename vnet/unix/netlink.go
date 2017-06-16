@@ -325,10 +325,10 @@ func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_int
 	return
 }
 
-// Take fib index from namespace index.  So, default namespace gets fib index 0, the default table.
-func (m *Main) validateFibIndexForNamespace(si vnet.Si, ns *net_namespace) (err error) {
-	m4 := ip4.GetMain(m.v)
-	err = m4.SetFibIndexForSi(si, ip.FibIndex(ns.index))
+func (ns *net_namespace) fibIndexForNamespace() ip.FibIndex { return ip.FibIndex(ns.index) }
+func (ns *net_namespace) validateFibIndexForNamespace(si vnet.Si) (err error) {
+	m4 := ip4.GetMain(ns.m.m.v)
+	err = m4.SetFibIndexForSi(si, ns.fibIndexForNamespace())
 	return
 }
 
@@ -368,7 +368,15 @@ func (e *netlinkEvent) EventAction() {
 				di.addDelDummyPuntPrefixes(m, !isUp)
 			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok && intf != nil {
 				if intf.flags_synced() {
-					err = si.SetAdminUp(vn, isUp)
+					if isUp {
+						err = e.ns.validateFibIndexForNamespace(si)
+					}
+					if err == nil {
+						err = si.SetAdminUp(vn, isUp)
+					}
+					if !isUp && err == nil {
+						err = e.ns.validateFibIndexForNamespace(si)
+					}
 				} else if intf.flag_sync_in_progress {
 					intf.check_flag_sync_done(v)
 				}
@@ -476,7 +484,7 @@ func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 	m4 := ip4.GetMain(e.m.v)
 	isDel := v.Header.Type == netlink.RTM_DELADDR
 	if di, ok := e.ns.getDummyInterface(v.Index); ok {
-		const fi = 0 // fixme
+		fi := e.ns.fibIndexForNamespace()
 		q := p.ToIpPrefix()
 		if di.isAdminUp || isDel {
 			m4.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
