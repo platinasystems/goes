@@ -146,7 +146,7 @@ func (ns *net_namespace) knownInterface(i uint32) (ok bool) {
 	return
 }
 
-func (ns *net_namespace) msgGeneratesEvent(msg netlink.Message) (ok bool) {
+func (ns *net_namespace) msg_for_vnet_interface(msg netlink.Message) (ok bool) {
 	ok = true
 	switch v := msg.(type) {
 	case *netlink.IfInfoMessage:
@@ -173,23 +173,9 @@ func (m *Main) addMsg(ns *net_namespace, msg netlink.Message) {
 		// Can happen when reading message from closed channel.
 		return
 	}
-
-	if v, ok := msg.(*netlink.IfInfoMessage); ok {
-		ns.add_del_interface(m, v)
-	}
-
 	e := ns.getEvent(m)
 	e.ns = ns
-	if ns.msgGeneratesEvent(msg) {
-		e.msgs = append(e.msgs, msg)
-	} else {
-		m.msg_stats.ignored.count(msg)
-		if m.verbose_netlink > 1 {
-			m.v.Logf("%s: netlink ignore %s\n", e.ns, msg)
-		}
-		// Done with message.
-		msg.Close()
-	}
+	e.msgs = append(e.msgs, msg)
 }
 
 func (nm *netlink_main) listener(ns *net_namespace) {
@@ -320,8 +306,7 @@ func (e *netlinkEvent) String() (s string) {
 	return
 }
 
-func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
-	var i *tuntap_interface
+func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_interface, ok bool) {
 	i, ok = ns.getTuntapInterface(ifIndex)
 	if ok {
 		si = i.si
@@ -343,12 +328,28 @@ func (m *Main) validateFibIndexForNamespace(si vnet.Si, ns *net_namespace) (err 
 
 func (e *netlinkEvent) EventAction() {
 	var err error
-	vn := e.m.v
+	m := e.m
+	vn := m.v
 	known := false
+
 	for imsg, msg := range e.msgs {
+		if v, ok := msg.(*netlink.IfInfoMessage); ok {
+			e.ns.add_del_interface(m, v)
+		}
+
+		if !e.ns.msg_for_vnet_interface(msg) {
+			m.msg_stats.ignored.count(msg)
+			if m.verbose_netlink > 1 {
+				m.v.Logf("%s: netlink ignore %s\n", e.ns, msg)
+			}
+			// Done with message.
+			msg.Close()
+			continue
+		}
+
 		isLastInEvent := imsg+1 == len(e.msgs)
-		if e.m.verbose_netlink > 0 {
-			e.m.v.Logf("%s: netlink %s\n", e.ns, msg)
+		if m.verbose_netlink > 0 {
+			m.v.Logf("%s: netlink %s\n", e.ns, msg)
 		}
 		switch v := msg.(type) {
 		case *netlink.IfInfoMessage:
@@ -358,9 +359,13 @@ func (e *netlinkEvent) EventAction() {
 			if di, ok := e.ns.getDummyInterface(v.Index); ok {
 				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
 				di.isAdminUp = isUp
-				di.addDelDummyPuntPrefixes(e.m, !isUp)
-			} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
-				err = si.SetAdminUp(vn, isUp)
+				di.addDelDummyPuntPrefixes(m, !isUp)
+			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok && intf != nil {
+				if intf.flags_synced() {
+					err = si.SetAdminUp(vn, isUp)
+				} else if intf.flag_sync_in_progress {
+					intf.check_flag_sync_done(v)
+				}
 			}
 		case *netlink.IfAddrMessage:
 			switch v.Family {
@@ -394,15 +399,15 @@ func (e *netlinkEvent) EventAction() {
 			err = e.netnsMessage(v)
 		case *netlink.DoneMessage:
 			known = true
-			err = e.ns.netlink_dump_done(e.m)
+			err = e.ns.netlink_dump_done(m)
 		}
 		if !known {
 			err = fmt.Errorf("unkown")
 		}
 		if err != nil {
-			e.m.v.Logf("%s: netlink %s: %s\n", e.ns, err, msg.String())
+			m.v.Logf("%s: netlink %s: %s\n", e.ns, err, msg.String())
 		}
-		e.m.msg_stats.handled.count(msg)
+		m.msg_stats.handled.count(msg)
 		// Return message to pools.
 		msg.Close()
 	}
@@ -455,7 +460,7 @@ func ethernetAddress(t netlink.Attr) (a ethernet.Address) {
 func (ns *net_namespace) ifAttr(t netlink.Attr) (si vnet.Si, ok bool) {
 	si = vnet.SiNil
 	if t != nil {
-		si, ok = ns.siForIfIndex(t.(netlink.Uint32Attr).Uint())
+		si, _, ok = ns.siForIfIndex(t.(netlink.Uint32Attr).Uint())
 	}
 	return
 }
@@ -478,7 +483,7 @@ func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 			}
 			di.ip4Addrs[p.Address] = fi
 		}
-	} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
+	} else if si, _, ok := e.ns.siForIfIndex(v.Index); ok {
 		err = m4.AddDelInterfaceAddress(si, &p, isDel)
 	}
 	return
@@ -499,7 +504,7 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	case netlink.NUD_PERMANENT:
 		isStatic = true
 	}
-	si, ok := e.ns.siForIfIndex(v.Index)
+	si, _, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
 		// Ignore neighbors for non vnet interfaces.
 		return

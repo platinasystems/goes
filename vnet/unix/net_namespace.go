@@ -145,6 +145,7 @@ type net_namespace_interface struct {
 	name      string
 	namespace *net_namespace
 	ifindex   uint32
+	kind      netlink.InterfaceKind
 	tuntap    *tuntap_interface
 }
 
@@ -271,13 +272,14 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			ns.interface_by_index = make(map[uint32]*net_namespace_interface)
 			ns.interface_by_name = make(map[string]*net_namespace_interface)
 		}
-		intf, ok := ns.interface_by_index[index]
+		intf, exists := ns.interface_by_index[index]
 		name_changed := false
-		if !ok {
+		if !exists {
 			intf = &net_namespace_interface{
 				namespace: ns,
 				name:      name,
 				ifindex:   index,
+				kind:      msg.InterfaceKind(),
 			}
 			ns.interface_by_index[index] = intf
 			ns.interface_by_name[name] = intf
@@ -304,10 +306,20 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 				}
 				m.interface_by_si[tif.si] = intf
 				intf.tuntap = tif
+
+				if ns.vnet_tuntap_interface_by_ifindex == nil {
+					ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
+				}
+				tif.ifindex = index
+				ns.vnet_tuntap_interface_by_ifindex[tif.ifindex] = tif
+
+				if tif.created && !tif.flag_sync_done && !tif.flag_sync_in_progress {
+					tif.sync_flags()
+				}
+
 				// Interface moved to a new namespace?
 				if tif.namespace != ns {
 					tif.add_del_namespace(m, ns, is_del)
-					tif.namespace = ns
 				}
 			}
 		}
@@ -344,6 +356,7 @@ func (ns *net_namespace) String() (s string) {
 
 type showNsLine struct {
 	Interface string `format:"%-30s"`
+	Type      string `format:"%s" align:"center"`
 	Namespace string `format:"%s" align:"center"`
 	NSID      string `format:"%s" align:"center"`
 	si        vnet.Si
@@ -371,7 +384,7 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 	ms := showNsLines{v: m.m.v}
 	for _, ns := range m.namespace_by_name {
 		for _, intf := range ns.interface_by_index {
-			x := showNsLine{Namespace: ns.name, Interface: intf.name, si: vnet.SiNil}
+			x := showNsLine{Namespace: ns.name, Interface: intf.name, Type: intf.kind.String(), si: vnet.SiNil}
 			if intf.tuntap != nil {
 				x.si = intf.tuntap.si
 			}

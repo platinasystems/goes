@@ -32,9 +32,14 @@ type tuntap_interface struct {
 	name           ifreq_name
 	ifindex        uint32 // linux interface index
 
-	flags                      iff_flag
-	set_flags_at_first_up_down bool
-	operState                  netlink.IfOperState
+	// Tuntap interface has been created (via TUNSETIFF ioctl).
+	created bool
+	// True when vnet/kernel interface flag sync has started.
+	flag_sync_in_progress bool
+	// True when vnet/kernel interface flags have been successfully synchronized.
+	flag_sync_done bool
+	flags          iff_flag
+	operState      netlink.IfOperState
 
 	mtuBytes   uint
 	mtuBuffers uint
@@ -92,7 +97,6 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 		i.close()
 	} else {
 		is_discovery := i.namespace == nil
-		i.namespace = ns
 		if is_discovery {
 			return
 		}
@@ -245,24 +249,44 @@ func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error
 	return
 }
 
-func (i *tuntap_interface) setOperState(from_init bool) {
-	return
+func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.flag_sync_done }
+
+// Set flags and operational state when vnet-owned tuntap interface becomes ready.
+func (intf *tuntap_interface) sync_flags() {
+	intf.flag_sync_in_progress = true
+	intf.forceOperState(true)
+	if err := intf.set_flags(); err != nil {
+		panic(err)
+	}
+}
+
+func (intf *tuntap_interface) check_flag_sync_done(msg *netlink.IfInfoMessage) {
+	ok := msg.Attrs[netlink.IFLA_OPERSTATE] == intf.operState
+	if ok {
+		ok = iff_flag(msg.IfInfomsg.Flags)&(iff_up|iff_running|iff_lower_up) == intf.flags
+	}
+	intf.flag_sync_done = ok
+	intf.flag_sync_in_progress = !ok
+}
+
+func (intf *tuntap_interface) setOperState() { intf.forceOperState(false) }
+func (intf *tuntap_interface) forceOperState(is_force bool) {
 	os := netlink.IF_OPER_DOWN
-	if i.si.IsAdminUp(i.m.v) && i.hi.IsLinkUp(i.m.v) {
+	if intf.si.IsAdminUp(intf.m.v) && intf.hi.IsLinkUp(intf.m.v) {
 		os = netlink.IF_OPER_UP
 	}
-	if os != i.operState || from_init {
-		i.operState = os
-		if !i.is_initialized() {
+	if os != intf.operState {
+		if !intf.flags_synced() && !is_force {
 			return
 		}
+		intf.operState = os
 		msg := netlink.NewIfInfoMessage()
 		msg.Header.Type = netlink.RTM_SETLINK
 		msg.Header.Flags = netlink.NLM_F_REQUEST
-		msg.Index = uint32(i.ifindex)
+		msg.Index = uint32(intf.ifindex)
 		msg.L2IfType = uint16(netlink.ARPHRD_ETHER)
 		msg.Attrs[netlink.IFLA_OPERSTATE] = os
-		i.namespace.NetlinkTx(msg, false)
+		intf.namespace.NetlinkTx(msg, false)
 	}
 }
 
@@ -299,30 +323,30 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	return
 }
 
-func (intf *tuntap_interface) is_initialized() bool { return intf.namespace != nil }
-
 func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 	nm := &m.net_namespace_main
 
-	// Create any interfaces that were not found via netlink discovery.
+	// Create any VNET interfaces that were not found via netlink discovery.
 	for si, intf := range m.vnet_tuntap_interface_by_si {
 		if _, ok := nm.interface_by_si[si]; !ok {
 			intf.namespace = &nm.default_namespace
-			err = intf.create(m)
+			err = intf.init(m)
 			if err != nil {
 				return
 			}
 		}
 	}
 
+	// Initialize other previously existing vnet tuntap interfaces.
 	for _, nsi := range nm.interface_by_si {
-		intf := nsi.tuntap
-		if intf != nil {
+		if intf := nsi.tuntap; intf != nil {
 			intf.namespace = nsi.namespace
-			err = intf.create(m)
+			err = intf.init(m)
 			if err != nil {
 				return
 			}
+
+			intf.sync_flags()
 		}
 	}
 	return
@@ -360,14 +384,11 @@ func (intf *tuntap_interface) bind() (err error) {
 
 func (intf *tuntap_interface) start_up() {
 	intf.to_tx = make(chan *tx_packet_vector, vnet.MaxVectorLen)
-	intf.setOperState(true)
 	intf.Fd = intf.dev_net_tun_fd
 	iomux.Add(intf)
 }
 
-func (intf *tuntap_interface) create(m *Main) (err error) {
-	ns := intf.namespace
-
+func (intf *tuntap_interface) init(m *Main) (err error) {
 	err = intf.open_sockets()
 	defer func() {
 		if err != nil {
@@ -384,6 +405,7 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		} else {
 			r.flags |= iff_tap
 		}
+		intf.created = true
 		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 			return
 		}
@@ -392,31 +414,7 @@ func (intf *tuntap_interface) create(m *Main) (err error) {
 		}
 	}
 
-	// Find linux interface index.
-	{
-		r := ifreq_int{name: intf.name}
-		if err = intf.ioctl(intf.provision_fd, ifreq_GETIFINDEX, uintptr(unsafe.Pointer(&r))); err != nil {
-			return
-		}
-		intf.ifindex = uint32(r.i)
-		ns.mu.Lock()
-		if ns.vnet_tuntap_interface_by_ifindex == nil {
-			ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
-		}
-		ns.vnet_tuntap_interface_by_ifindex[intf.ifindex] = intf
-		ns.mu.Unlock()
-	}
-
 	intf.bind()
-
-	if !intf.set_flags_at_first_up_down {
-		// Fetch initial interface flags.
-		r := ifreq_int{name: intf.name}
-		if err = intf.ioctl(intf.provision_fd, ifreq_GETIFFLAGS, uintptr(unsafe.Pointer(&r))); err != nil {
-			return
-		}
-		intf.flags = iff_flag(r.i)
-	}
 
 	if eifer, ok := m.v.HwIfer(intf.hi).(ethernet.HwInterfacer); ok {
 		ei := eifer.GetInterface()
@@ -501,13 +499,8 @@ func (m *Main) maybeChangeFlag(intf *tuntap_interface, isUp bool, flag iff_flag)
 		change = true
 		intf.flags &^= flag
 	}
-	// fixme use netlink
-	if change {
-		if intf.is_initialized() {
-			err = intf.set_flags()
-		} else {
-			intf.set_flags_at_first_up_down = true
-		}
+	if change && intf.flags_synced() {
+		err = intf.set_flags()
 	}
 	return
 }
@@ -517,16 +510,11 @@ func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 		return
 	}
 	intf := m.interface_for_si(si)
-	if intf.is_initialized() && intf.set_flags_at_first_up_down {
-		intf.set_flags_at_first_up_down = false
-		err = intf.set_flags()
-		return
-	}
 	err = m.maybeChangeFlag(intf, isUp, iff_up|iff_running)
 	if err != nil {
 		return
 	}
-	intf.setOperState(false)
+	intf.setOperState()
 	return
 }
 
@@ -539,7 +527,7 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if err != nil {
 		return
 	}
-	intf.setOperState(false)
+	intf.setOperState()
 	return
 }
 
