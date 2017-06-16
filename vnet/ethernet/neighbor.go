@@ -76,18 +76,19 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 	}
 	if ok {
 		ai, ok = im.GetRoute(&prefix, n.Si)
-		if !ok {
-			panic("get route")
+		if ok {
+			as = im.GetAdj(ai)
 		}
-		as = im.GetAdj(ai)
 		delete(nf.indexByAddress, k)
 	}
 	if isDel {
-		if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
-			return
-		}
+		if len(as) > 0 {
+			if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
+				return
+			}
 
-		im.DelAdj(ai)
+			im.DelAdj(ai)
+		}
 
 		*in = ipNeighbor{}
 	} else {
