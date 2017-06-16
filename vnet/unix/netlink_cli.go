@@ -120,6 +120,29 @@ loop:
 	return
 }
 
+func (m *netlink_main) enable_disable_log(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	v := m.m.verbose_netlink
+	for !in.End() {
+		switch {
+		case in.Parse("e%*nable"):
+			v = 1
+		case in.Parse("d%*isable"):
+			v = 0
+		case in.Parse("t%*oggle"):
+			if v > 0 {
+				v = 0
+			} else {
+				v = 1
+			}
+		default:
+			err = cli.ParseError
+			return
+		}
+	}
+	m.m.verbose_netlink = v
+	return
+}
+
 type showMsg struct {
 	Type    string `format:"%-30s"`
 	Ignored uint64 `format:"%16d"`
@@ -158,7 +181,9 @@ func (m *netlink_main) show_summary(c cli.Commander, w cli.Writer, in *cli.Input
 
 	msgs := showMsgs{}
 	for _, v := range sm {
-		msgs = append(msgs, v)
+		if v.Ignored+v.Handled != 0 {
+			msgs = append(msgs, v)
+		}
 	}
 	sort.Sort(msgs)
 	msgs = append(msgs, showMsg{
@@ -171,6 +196,12 @@ func (m *netlink_main) show_summary(c cli.Commander, w cli.Writer, in *cli.Input
 	return
 }
 
+func (m *netlink_main) clear_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	m.msg_stats.ignored.clear()
+	m.msg_stats.handled.clear()
+	return
+}
+
 func (m *netlink_main) cliInit() (err error) {
 	v := m.m.v
 	cmds := []cli.Command{
@@ -180,9 +211,19 @@ func (m *netlink_main) cliInit() (err error) {
 			Action:    m.ip_route,
 		},
 		cli.Command{
+			Name:      "netlink log",
+			ShortHelp: "enable/disable netlink message logging",
+			Action:    m.enable_disable_log,
+		},
+		cli.Command{
 			Name:      "show netlink summary",
 			ShortHelp: "show summary of netlink messages received",
 			Action:    m.show_summary,
+		},
+		cli.Command{
+			Name:      "clear netlink summary",
+			ShortHelp: "clear netlink message counters",
+			Action:    m.clear_summary,
 		},
 		cli.Command{
 			Name:      "show netlink namespaces",

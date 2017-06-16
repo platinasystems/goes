@@ -31,6 +31,12 @@ func (c *msg_counts) count(m netlink.Message) {
 	c.by_type[m.MsgType()]++
 	c.total++
 }
+func (c *msg_counts) clear() {
+	c.total = 0
+	for i := range c.by_type {
+		c.by_type[i] = 0
+	}
+}
 
 type netlink_socket_pair struct {
 	broadcast_socket, unicast_socket *netlink.Socket
