@@ -7,7 +7,6 @@ package ip
 import (
 	"github.com/platinasystems/go/vnet"
 
-	"errors"
 	"fmt"
 )
 
@@ -44,14 +43,8 @@ func (f *fibMain) ValidateFibIndexForSi(si vnet.Si) FibIndex {
 	return f.fibIndexForSi(si, true)
 }
 
-var ErrInterfaceIsUp = errors.New("interface is up")
-
-func (m *Main) SetFibIndexForSi(si vnet.Si, fi FibIndex) (err error) {
+func (m *Main) SetFibIndexForSi(si vnet.Si, fi FibIndex) {
 	f := &m.fibMain
-	if si.IsAdminUp(m.v) {
-		err = ErrInterfaceIsUp
-		return
-	}
 	f.fibIndexBySi.Validate(uint(si))
 	f.fibIndexBySi[si] = fi
 	return

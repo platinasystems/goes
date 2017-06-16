@@ -131,7 +131,7 @@ func (m *Main) ip_interface(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 	var p ip4.Prefix
 	switch {
 	case in.Parse("fib %v %d", &si, v, &i):
-		err = m4.SetFibIndexForSi(si, ip.FibIndex(i))
+		m4.SetFibIndexForSi(si, ip.FibIndex(i))
 	case in.Parse("a%*ddress %v %v", &si, v, &p):
 		m4.AddDelInterfaceAddress(si, &p, false)
 	case in.Parse("d%*elete %v %v", &si, v, &p):
