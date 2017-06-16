@@ -90,13 +90,13 @@ func (s *HashState) MixPointer(h0, h1, h2, h3 hash64, p unsafe.Pointer, size uin
 
 	for i+4*8 <= n8 {
 		h0, h1, h2, h3 = s.MixUint64(h0, h1, h2, h3,
-			s.get64(p, i*0*8), s.get64(p, i*1*8),
-			s.get64(p, i*2*8), s.get64(p, i*3*8))
+			s.get64(p, i+0*8), s.get64(p, i+1*8),
+			s.get64(p, i+2*8), s.get64(p, i+3*8))
 		i += 4 * 8
 	}
 
 	if i+2*8 <= n8 {
-		h0, h1, h2, h3 = s.MixUint64(h0, h1, h2, h3, s.get64(p, i*0*8), s.get64(p, i*1*8), 0, 0)
+		h0, h1, h2, h3 = s.MixUint64(h0, h1, h2, h3, s.get64(p, i+0*8), s.get64(p, i+1*8), 0, 0)
 		i += 2 * 8
 	}
 
