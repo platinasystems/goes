@@ -5,7 +5,7 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/goes/cmd/vnetd"
+	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"

@@ -7,7 +7,7 @@ package main
 import (
 	"time"
 
-	"github.com/platinasystems/go/internal/goes/cmd/start"
+	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/redis"
 )
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/platinasystems/go/internal/goes/cmd/start"
+	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"

@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/imx6d"
+import "github.com/platinasystems/go/goes/cmd/imx6d"
 
 func init() { imx6d.Init = imx6dInit }
 

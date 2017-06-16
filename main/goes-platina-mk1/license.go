@@ -5,8 +5,8 @@
 package main
 
 import (
-	"github.com/platinasystems/go/internal/goes/cmd/license"
-	"github.com/platinasystems/go/internal/goes/cmd/patents"
+	"github.com/platinasystems/go/goes/cmd/license"
+	"github.com/platinasystems/go/goes/cmd/patents"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/copyright"
 )
 

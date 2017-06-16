@@ -7,8 +7,8 @@ package main
 import (
 	"time"
 
-	"github.com/platinasystems/go/internal/goes/cmd/eeprom/platina_eeprom"
-	"github.com/platinasystems/go/internal/goes/cmd/redisd"
+	"github.com/platinasystems/go/goes/cmd/eeprom/platina_eeprom"
+	"github.com/platinasystems/go/goes/cmd/redisd"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 

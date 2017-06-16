@@ -7,7 +7,7 @@ package main
 import (
 	"strconv"
 
-	"github.com/platinasystems/go/internal/goes/cmd/qsfp"
+	"github.com/platinasystems/go/goes/cmd/qsfp"
 )
 
 func init() {

@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/redisd"
+import "github.com/platinasystems/go/goes/cmd/redisd"
 
 func init() {
 	redisd.Init = func() {

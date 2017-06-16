@@ -1,4 +1,5 @@
 #!/usr/bin/make
+# make V=1 for verbose go builds
 # make VNET_DEBUG=yes to enable vnet debugging checks and flags for gdb.
 
 gitdir := $(shell git rev-parse --git-dir)
@@ -6,7 +7,8 @@ gitdir := $(shell git rev-parse --git-dir)
 gobuild = $(if $(arch),env GOARCH=$(arch) )go build$(if $(tags),\
 -tags "$(tags)")$(if $(gcflags),\
 -gcflags "$(gcflags)")$(if $(ldflags),\
--ldflags "$(ldflags)")
+-ldflags "$(ldflags)")$(if $(V),\
+-v)
 
 diag_tag=$(if $(filter yes,$(diag)), diag)
 vnet_debug_tag=$(if $(filter yes,$(VNET_DEBUG)), debug)
@@ -14,11 +16,11 @@ vnet_gcflags=$(if $(filter yes,$(VNET_DEBUG)),-N -l)
 
 ALL  = goes-example
 ALL += goes-example-arm
+ALL += goes-test
+ALL += goes-coreboot
 ALL += goes-platina-mk1-bmc
 ifneq (,$(wildcard vnet/devices/ethernet/switch/fe1/*.go))
 ALL += goes-platina-mk1
-ALL  = goes-coreboot
-ALL += goes-test
 ALL += go-wip
 endif
 

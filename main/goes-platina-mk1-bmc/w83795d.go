@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/platinasystems/go/internal/goes/cmd/w83795d"
+import "github.com/platinasystems/go/goes/cmd/w83795d"
 
 func init() { w83795d.Init = w83795dInit }
 
