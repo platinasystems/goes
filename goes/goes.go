@@ -139,9 +139,12 @@ func (byName ByName) Main(args ...string) error {
 				// e.g. ./goes COMMAND [ARGS]...
 				args = args[1:]
 			}
-		} else {
+		} else if _, found := byName["cli"]; found {
 			// e.g. ./goes
 			args = []string{"cli"}
+		} else {
+			// e.g. ./goes-MACHINE-installer
+			args = []string{"install"}
 		}
 	}
 

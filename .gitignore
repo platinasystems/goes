@@ -1,9 +1,7 @@
 *~
+*.so
 *.swp
 /*.patch
-/*.zip
 /go-*
 /goes-*
-/*.cpio.xz
-/firmware-fe1a
-vnet/devices/ethernet/switch/fe1
+/*.zip

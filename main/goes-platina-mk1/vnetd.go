@@ -5,13 +5,16 @@
 package main
 
 import (
+	"fmt"
+
+	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
-	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1/firmware"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugin/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -21,16 +24,39 @@ import (
 
 func init() {
 	vnetd.Hook = func(i *vnetd.Info, v *vnet.Vnet) error {
+		var ver int
+		var nmacs uint32
+		var basea ethernet.Address
+		s, err := redis.Hget(redis.DefaultHash,
+			"eeprom.DeviceVersion")
+		if err != nil {
+			return err
+		}
+		if _, err = fmt.Sscan(s, &ver); err != nil {
+			return err
+		}
+		s, err = redis.Hget(redis.DefaultHash,
+			"eeprom.NEthernetAddress")
+		if err != nil {
+			return err
+		}
+		if _, err = fmt.Sscan(s, &nmacs); err != nil {
+			return err
+		}
+		s, err = redis.Hget(redis.DefaultHash,
+			"eeprom.BaseEthernetAddress")
+		if err != nil {
+			return err
+		}
+		input := new(parse.Input)
+		input.SetString(s)
+		basea.Parse(input)
+
 		fns, err := sriovs.NumvfsFns()
 		have_numvfs := err == nil && len(fns) > 0
 
 		vnetd.UnixInterfacesOnly = !have_numvfs
 		vnetd.GdbWait = gdbwait
-
-		err = firmware.Extract(prog.Name())
-		if err != nil {
-			return err
-		}
 
 		// Base packages.
 		ethernet.Init(v)
@@ -43,19 +69,42 @@ func init() {
 		fe1.Init(v)
 		if !have_numvfs {
 			ixge.Init(v)
-		} else if err = newSriovs(); err != nil {
+		} else if err = newSriovs(ver); err != nil {
 			return err
 		}
 
-		plat := &platform{i: i}
-		v.AddPackage("platform", plat)
-		plat.DependsOn("pci-discovery")
-
-		// Need FE1 init/port init to complete before default
-		// fib/adjacencies can be installed.
-		plat.DependedOnBy("ip4")
-		plat.DependedOnBy("ip6")
+		fe1.AddPlatform(v, ver, nmacs, basea, i.Init, leden)
 
 		return nil
 	}
+}
+
+// MK1 board front panel port LED's require PCA9535 GPIO device
+// configuration - to provide an output signal that allows LED
+// operation.
+func leden() (err error) {
+	var bus i2c.Bus
+	var busIndex, busAddress int = 0, 0x74
+
+	err = bus.Open(busIndex)
+	if err != nil {
+		return err
+	}
+	defer bus.Close()
+
+	err = bus.ForceSlaveAddress(busAddress)
+	if err != nil {
+		return err
+	}
+
+	// Configure the gpio pin as an output:
+	// Register 6 controls the configuration, bit 2 is led enable, '0' => 'output'
+	const (
+		pca9535ConfigReg = 0x6
+		ledOutputEnable  = 1 << 2
+	)
+	var data i2c.SMBusData
+	data[0] = ^uint8(ledOutputEnable)
+	err = bus.Do(i2c.Write, uint8(pca9535ConfigReg), i2c.ByteData, &data)
+	return err
 }

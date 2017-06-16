@@ -16,17 +16,20 @@ pipeline {
 		// Change to usual go subdir.
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
 		    git url: 'https://github.com/platinasystems/go.git'
-		    // Clone private 'fe1' repo to a holding subdir.
-		    dir('CheckoutFe1') {
-			git([
-			    url: 'git@github.com:platinasystems/fe1.git',
-			    credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
-			    branch: 'master'
-			])
-		    }
-		    sh('rm -rf ./vnet/devices/ethernet/switch/fe1/')
-		    sh('mkdir -p ./vnet/devices/ethernet/switch/fe1/')
-		    sh('cp -r ./CheckoutFe1/* ./vnet/devices/ethernet/switch/fe1')
+		}
+		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/fe1') {
+		    git([
+			url: 'git@github.com:platinasystems/fe1.git',
+			credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
+			branch: 'master'
+		    ])
+		}
+		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/firmware-fe1a') {
+		    git([
+			url: 'git@github.com:platinasystems/firmware-fe1a.git',
+			credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
+			branch: 'master'
+		    ])
 		}
 	    }
 	}
@@ -35,7 +38,7 @@ pipeline {
 	    steps {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
 		    echo "Building goes..."
-		    sh 'env PATH=/usr/local/go/bin:${PATH} GOPATH=/home/jenkins/workspace/go make -B goes-platina-mk1'
+		    sh 'env PATH=/usr/local/go/bin:${PATH} GOPATH=/home/jenkins/workspace/go make noplugin=yes -B goes-platina-mk1-installer'
 		}
 	    }
 	}
@@ -43,7 +46,7 @@ pipeline {
 
     post {
 	success {
-	    mail body: "GOES build ok: ${env.BUILD_URL}\n\ngoes-platina-mk1 is stored on platina4 at /home/jenkins/workspace/go/src/github.com/platinasystems/go/goes-platina-mk1\neg.\nscp 172.16.2.23:/home/jenkins/workspace/go/src/github.com/platinasystems/go/goes-platina-mk1 ~/path/to/somewhere/",
+	    mail body: "GOES build ok: ${env.BUILD_URL}\n\ngoes-platina-mk1-installer is stored on platina4 at /home/jenkins/workspace/go/src/github.com/platinasystems/go/goes-platina-mk1\neg.\nscp 172.16.2.23:/home/jenkins/workspace/go/src/github.com/platinasystems/go/goes-platina-mk1 ~/path/to/somewhere/",
 		from: email_from,
 		replyTo: email_reply_to,
 		subject: 'GOES build ok',

@@ -128,6 +128,10 @@ func (srv *Server) ServeClient(conn net.Conn) (err error) {
 		if err != nil {
 			return err
 		}
+		if request.Name == "quit" {
+			fmt.Fprintln(conn, "+OK")
+			break
+		}
 		request.Host = clientAddr
 		request.ClientChan = clientChan
 		reply, err := srv.Apply(request)

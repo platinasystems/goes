@@ -13,6 +13,11 @@ var ErrNotFound = errors.New("not found")
 
 type Parm map[string]string
 
+type Aka struct {
+	Name    string
+	Aliases []string
+}
+
 // Parses {NAME VALUE} and NAME=VALUE parameters from the given arguments.
 func New(args []string, parms ...string) (Parm, []string) {
 	parm := make(Parm)
@@ -38,6 +43,21 @@ func New(args []string, parms ...string) (Parm, []string) {
 		}
 	}
 	return parm, args
+}
+
+// Aka will set the named parm with the non-empty value of the given aliases.
+func (parm Parm) Aka(name string, aliases ...string) {
+	for _, alias := range aliases {
+		if s := parm[alias]; len(s) > 0 {
+			parm.Set(name, s)
+		}
+	}
+}
+
+func (parm Parm) Akas(akas ...Aka) {
+	for _, aka := range akas {
+		parm.Aka(aka.Name, aka.Aliases...)
+	}
 }
 
 // Set will concatenate a non empty parm

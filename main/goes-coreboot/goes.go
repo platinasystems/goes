@@ -43,10 +43,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mkdir"
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
-	"github.com/platinasystems/go/goes/cmd/nlcounters"
-	"github.com/platinasystems/go/goes/cmd/nld"
-	"github.com/platinasystems/go/goes/cmd/nldump"
-	"github.com/platinasystems/go/goes/cmd/nsid"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
@@ -68,7 +64,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
-	"github.com/platinasystems/go/goes/cmd/uptimed"
 	"github.com/platinasystems/go/goes/cmd/wget"
 )
 
@@ -110,10 +105,6 @@ func Goes() goes.ByName {
 		mkdir.New(),
 		mknod.New(),
 		mount.New(),
-		nld.New(),
-		nlcounters.New(),
-		nldump.New(),
-		nsid.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),
@@ -135,7 +126,6 @@ func Goes() goes.ByName {
 		sync.New(),
 		umount.New(),
 		uninstall.New(),
-		uptimed.New(),
 		wget.New(),
 	)
 }

@@ -7,6 +7,11 @@ package flags
 
 type Flag map[string]bool
 
+type Aka struct {
+	Name    string
+	Aliases []string
+}
+
 // New parses boolean flags from the given command arguments.
 // If an argument has a leading hyphen ('-') followed by runes that each match
 // '-?' flags, all of these flags are set and the argument is removed from the
@@ -53,11 +58,17 @@ func New(args []string, flags ...string) (Flag, []string) {
 	return flag, args
 }
 
-// Aka will or the named flag with each of the given aliases.
+// Aka will OR the named flag with each of the given aliases.
 func (flag Flag) Aka(name string, aliases ...string) {
 	for _, alias := range aliases {
 		if !flag[name] {
 			flag[name] = flag[alias]
 		}
+	}
+}
+
+func (flag Flag) Akas(akas ...Aka) {
+	for _, aka := range akas {
+		flag.Aka(aka.Name, aka.Aliases...)
 	}
 }

@@ -104,7 +104,12 @@ func parse_af_spec(b []byte) *AttrArray {
 		case AF_INET6:
 			as.X[af] = parse_ip6_af_spec(v)
 		default:
-			panic("unknown address family " + af.String())
+			// For now don't panic.
+			// With bridgemodeset() an AF_UNSPEC msg comes down
+			// which we ignore.
+			if false {
+				panic("unknown address family " + af.String())
+			}
 		}
 	}
 	return as

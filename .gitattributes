@@ -1,3 +1,6 @@
 /bin/* binary
 *.a binary
+*.so binary
 *.ucode binary
+*.zip binary
+*.pdf binary

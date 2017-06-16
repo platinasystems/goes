@@ -1067,11 +1067,14 @@ func powerCycle() error {
 	if found {
 		pin.SetValue(false)
 	}
-	time.Sleep(100 * time.Millisecond)
-
-	startI2c()
 	time.Sleep(1 * time.Second)
-
+	pin, found = gpio.Pins["ETHX_RST_L"]
+	if found {
+		pin.SetValue(false)
+		time.Sleep(50 * time.Millisecond)
+		pin.SetValue(true)
+	}
+	startI2c()
 	return nil
 }
 

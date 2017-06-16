@@ -9,11 +9,9 @@ import (
 	"github.com/platinasystems/go/goes/cmd/apropos"
 	"github.com/platinasystems/go/goes/cmd/complete"
 	"github.com/platinasystems/go/goes/cmd/help"
-	"github.com/platinasystems/go/goes/cmd/license"
 	"github.com/platinasystems/go/goes/cmd/man"
-	"github.com/platinasystems/go/goes/cmd/patents"
+	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/cmd/usage"
-	"github.com/platinasystems/go/goes/cmd/version"
 )
 
 // Returns a goes.ByName with the given plus these flag initiated commands:
@@ -23,10 +21,8 @@ func New(cmd ...goes.Cmd) goes.ByName {
 		apropos.New(),
 		complete.New(),
 		help.New(),
-		license.New(),
 		man.New(),
-		patents.New(),
+		show_packages.New(),
 		usage.New(),
-		version.New(),
 	).Plot(cmd...)
 }

@@ -380,9 +380,9 @@ func (c *cmd) pivotRoot(mountPoint string, root string, script string) {
 		}
 		for _, dir := range dirs {
 			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
-				":+root=/dev/"+dir.Name())
+				":root=/dev/"+dir.Name())
 			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
-				"/boot:+root=/dev/"+dir.Name())
+				"/boot:root=/dev/"+dir.Name())
 		}
 		err = byName.Main(bootCmd...)
 		panic(fmt.Errorf("Error in autoboot: %v", err))

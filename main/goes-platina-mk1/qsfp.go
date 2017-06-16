@@ -5,13 +5,24 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/platinasystems/go/goes/cmd/qsfp"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 func init() {
 	qsfp.Init = func() {
+		var ver, portOffset int
+		s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+		if err == nil {
+			_, err = fmt.Sscan(s, &ver)
+			if err == nil && (ver == 0 || ver == 0xff) {
+				portOffset = -1
+			}
+		}
+
 		//port 1-16 present signals
 		qsfp.VdevIo[0] = qsfp.I2cDev{0, 0x20, 0, 0x70, 0x10, 0, 0, 0}
 		//port 17-32 present signals
@@ -28,12 +39,6 @@ func init() {
 		qsfp.VdevIo[6] = qsfp.I2cDev{0, 0x22, 0, 0x70, 0x20, 0, 0, 0}
 		//port 17-32 reset signals
 		qsfp.VdevIo[7] = qsfp.I2cDev{0, 0x23, 0, 0x70, 0x20, 0, 0, 0}
-
-		portOffset := 0
-		ver, err := deviceVersion()
-		if err == nil && (ver == 0 || ver == 0xff) {
-			portOffset = -1
-		}
 
 		qsfp.VpageByKeyIo = map[string]uint8{
 			"port-" + strconv.Itoa(portOffset+1) + ".qsfp.presence":  0,

@@ -4,18 +4,21 @@
 
 // Package install provides the named command that installs this executable to
 // /usr/bin/NAME; creates /etc/init.d/NAME and /etc/default/goes; then a bunch
-// of other stuff.
+// of other stuff. If the executable is a self extracting archive, this unzips
+// the appended contents.
 package install
 
 import (
+	"archive/zip"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
-	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/prog"
 )
 
@@ -62,6 +65,9 @@ func (cmd) Main(args ...string) error {
 		return err
 	}
 	if err = bash_completion(); err != nil {
+		return err
+	}
+	if err = unzip(); err != nil {
 		return err
 	}
 	if err = Hook(); err != nil {
@@ -121,19 +127,12 @@ func install_self() error {
 	if err != nil {
 		return err
 	}
-	src, err := os.Open(self)
+	r, err := os.Open(self)
 	if err != nil {
 		return err
 	}
-	defer src.Close()
-	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	dst, err := os.OpenFile(prog.Install, flags, os.FileMode(0755))
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-	_, err = io.Copy(dst, src)
-	return err
+	defer r.Close()
+	return new_bin(r)
 }
 
 func install_init() error {
@@ -285,6 +284,57 @@ _goes ()
 
 type -p goes >/dev/null && complete -F _goes goes
 `[1:])
+	return err
+}
+
+func unzip() error {
+	progname := prog.Name()
+	if z, err := zip.OpenReader(progname); err == nil {
+		defer z.Close()
+		for _, f := range z.File {
+			r, err := f.Open()
+			if err != nil {
+				return fmt.Errorf("%s: %s: %v",
+					progname, f.Name, err)
+			}
+			if strings.HasPrefix(f.Name, "goes-") {
+				err = new_bin(r)
+			} else if strings.HasSuffix(f.Name, ".so") {
+				err = new_lib(f.Name, r)
+			}
+			r.Close()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func new_bin(r io.Reader) error {
+	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	w, err := os.OpenFile(prog.Install, flags, os.FileMode(0755))
+	if err == nil {
+		defer w.Close()
+		_, err = io.Copy(w, r)
+	}
+	return err
+}
+
+func new_lib(sofn string, r io.Reader) error {
+	const libdir = "/usr/lib/goes"
+	err := os.MkdirAll(libdir, os.FileMode(0755))
+	if err != nil {
+		return err
+	}
+	fullname := filepath.Join(libdir, sofn)
+	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	mode := os.FileMode(0644)
+	w, err := os.OpenFile(fullname, flags, mode)
+	if err == nil {
+		defer w.Close()
+		_, err = io.Copy(w, r)
+	}
 	return err
 }
 

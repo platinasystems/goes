@@ -19,7 +19,7 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const DefaultNumvfs = 16
+const DefaultNumvfs = 32
 
 type Mac net.HardwareAddr
 type Vf uint
@@ -137,6 +137,13 @@ func New(vfs [][]Vf) error {
 			if err = ifset(vfname, "down"); err != nil {
 				return err
 			}
+		}
+		// Setting VEPA bridge mode (instead of default VEB) for the pf allows
+		// external loopback cable pings to work (while not hurting regular
+		// connectivity).
+		err = bridgemodeset(pf.Name, "hwmode", "vepa")
+		if err != nil {
+			return err
 		}
 	}
 	return err
@@ -295,6 +302,18 @@ func ifset(name string, args ...interface{}) error {
 	err := cmd.Run()
 	if err != nil {
 		err = fmt.Errorf("%v: %v", cmd.Args, err)
+	}
+	return err
+}
+
+func bridgemodeset(name string, args ...interface{}) error {
+	cmd := exec.Command("/sbin/bridge", "link", "set", "dev", name)
+	for _, arg := range args {
+		cmd.Args = append(cmd.Args, fmt.Sprint(arg))
+	}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("%v: %v - %s", cmd.Args, err, output)
 	}
 	return err
 }

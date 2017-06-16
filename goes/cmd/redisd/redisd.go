@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/platinasystems/go"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
@@ -30,7 +31,6 @@ import (
 	"github.com/platinasystems/go/internal/redis/rpc/reg"
 	"github.com/platinasystems/go/internal/sockfile"
 	"github.com/platinasystems/go/internal/varrun"
-	. "github.com/platinasystems/go/version"
 )
 
 const (
@@ -170,6 +170,10 @@ func (cmd *cmd) Main(args ...string) error {
 	for _, k := range PublishedKeys {
 		cmd.redisd.published[k] = make(grs.HashValue)
 	}
+
+	pkgs := new(bytes.Buffer)
+	WriteTo(pkgs)
+	cmd.redisd.published[redis.DefaultHash]["packages"] = pkgs.Bytes()
 
 	sfn := sockfile.Path(Name)
 	cfg := grs.DefaultConfig()
@@ -311,7 +315,6 @@ func (cmd *cmd) pubinit(fieldEqValues ...string) error {
 	}
 	defer pub.Close()
 
-	pub.Print("version: ", Version)
 	if hostname, err := os.Hostname(); err == nil {
 		pub.Print("hostname: ", hostname)
 	}
