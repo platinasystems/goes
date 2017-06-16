@@ -456,7 +456,7 @@ func (f *Fib) deleteMatchingRoutes(m *Main, key *Prefix) {
 func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
 	oldAdj, ok := f.addDel(m, p, r, isDel)
 	if !ok {
-		panic("addDelReplace") // should never fail
+		fmt.Printf("addDelReplace adjacency not found %s\n", p) // should never fail
 	}
 	if oldAdj != ip.AdjNil {
 		m.DelAdj(oldAdj)
