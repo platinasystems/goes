@@ -54,8 +54,9 @@ func checkForChip() bool {
 		os.Exit(1)
 	}
 
-	match, err := regexp.MatchString("Broadcom Corporation Device b960",
+	match, err := regexp.MatchString("Broadcom Corporation Device b96[05]",
 		string(cmdOut))
+
 	if err == nil && match == true {
 		return true
 	} else {
