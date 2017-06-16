@@ -303,10 +303,11 @@ func (f *Fib) mapFibRemapAdjacency(m *Main, from, to ip.Adj) {
 }
 
 func (m *Main) remapAdjacency(from, to ip.Adj) {
-	for i := range m.fibs {
-		f := m.fibs[i]
-		f.mapFibRemapAdjacency(m, from, to)
-		f.mtrie.remapAdjacency(from, to)
+	for _, f := range m.fibs {
+		if f != nil {
+			f.mapFibRemapAdjacency(m, from, to)
+			f.mtrie.remapAdjacency(from, to)
+		}
 	}
 }
 
@@ -377,7 +378,10 @@ func (m *Main) fibById(id ip.FibId, create bool) *Fib {
 	return m.fibByIndex(i, create)
 }
 
-func (m *Main) fibBySi(si vnet.Si) *Fib { return m.fibs[m.FibIndexForSi(si)] }
+func (m *Main) fibBySi(si vnet.Si) *Fib {
+	i := m.FibIndexForSi(si)
+	return m.fibByIndex(i, true)
+}
 
 func (m *Main) validateDefaultFibForSi(si vnet.Si) {
 	i := m.ValidateFibIndexForSi(si)

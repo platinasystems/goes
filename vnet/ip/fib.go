@@ -44,12 +44,12 @@ func (f *fibMain) ValidateFibIndexForSi(si vnet.Si) FibIndex {
 	return f.fibIndexForSi(si, true)
 }
 
-var ErrInterfaceIsDown = errors.New("interface is down")
+var ErrInterfaceIsUp = errors.New("interface is up")
 
 func (m *Main) SetFibIndexForSi(si vnet.Si, fi FibIndex) (err error) {
 	f := &m.fibMain
-	if !si.IsAdminUp(m.v) {
-		err = ErrInterfaceIsDown
+	if si.IsAdminUp(m.v) {
+		err = ErrInterfaceIsUp
 		return
 	}
 	f.fibIndexBySi.Validate(uint(si))
