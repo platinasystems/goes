@@ -254,17 +254,14 @@ func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.
 // Set flags and operational state when vnet-owned tuntap interface becomes ready.
 func (intf *tuntap_interface) sync_flags() {
 	intf.flag_sync_in_progress = true
-	intf.forceOperState(true)
 	if err := intf.set_flags(); err != nil {
 		panic(err)
 	}
+	intf.forceOperState(true)
 }
 
 func (intf *tuntap_interface) check_flag_sync_done(msg *netlink.IfInfoMessage) {
-	ok := msg.Attrs[netlink.IFLA_OPERSTATE] == intf.operState
-	if ok {
-		ok = iff_flag(msg.IfInfomsg.Flags)&(iff_up|iff_running|iff_lower_up) == intf.flags
-	}
+	ok := iff_flag(msg.IfInfomsg.Flags)&(iff_up|iff_running|iff_lower_up) == intf.flags
 	intf.flag_sync_done = ok
 	intf.flag_sync_in_progress = !ok
 }
@@ -346,7 +343,7 @@ func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 				return
 			}
 
-			intf.sync_flags()
+			intf.get_flags()
 		}
 	}
 	return
@@ -486,6 +483,20 @@ func (intf *tuntap_interface) set_flags() (err error) {
 		i:    int(intf.flags),
 	}
 	err = intf.ioctl(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)))
+	return
+}
+
+func (intf *tuntap_interface) get_flags() (err error) {
+	r := ifreq_int{
+		name: intf.name,
+	}
+	err = intf.ioctl(intf.provision_fd, ifreq_GETIFFLAGS, uintptr(unsafe.Pointer(&r)))
+	intf.flags = iff_flag(r.i)
+	isUp := intf.flags&iff_up != 0
+	err = intf.si.SetAdminUp(intf.m.v, isUp)
+	intf.flag_sync_in_progress = false
+	intf.flag_sync_done = true
+	intf.forceOperState(true)
 	return
 }
 
