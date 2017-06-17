@@ -558,6 +558,7 @@ func (b *Bandwidth) Parse(in *parse.Input) {
 type HwIfClasser interface {
 	DefaultId() IfIndex
 	GetAddress() []byte
+	SetAddress(a []byte)
 	FormatAddress() string
 	SetRewrite(v *Vnet, r *Rewrite, t PacketType, dstAddr []byte)
 	FormatRewrite(r *Rewrite) string

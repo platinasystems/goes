@@ -169,6 +169,7 @@ func (n *node) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)     
 func (n *node) GetSwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
 func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)                              {}
 func (n *node) GetAddress() (a []byte)                                                           { return }
+func (n *node) SetAddress(a []byte)                                                              {}
 func (n *node) FormatAddress() (s string)                                                        { return }
 func (n *node) FormatRewrite(rw *vnet.Rewrite) (s string)                                        { return }
 func (n *node) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.PacketType, da []byte) {}

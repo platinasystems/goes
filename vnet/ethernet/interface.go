@@ -161,6 +161,7 @@ func RegisterInterface(v *vnet.Vnet, hi HwInterfacer, config *InterfaceConfig, f
 
 func (hi *Interface) FormatAddress() string    { return hi.Address.String() }
 func (hi *Interface) GetAddress() []byte       { return hi.Address[:] }
+func (hi *Interface) SetAddress(a []byte)      { copy(hi.Address[:], a) }
 func (hi *Interface) EthernetAddress() Address { return hi.Address }
 
 var rewriteTypeMap = [...]Type{
