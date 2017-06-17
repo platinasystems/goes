@@ -87,14 +87,14 @@ func vlan_for_port(port, subport sriovs.Vf) (vf sriovs.Vf) {
 var vfs = make_vfs()
 
 func make_vfs() [][]sriovs.Vf {
-	// pf0 = fe1 pipes 0 & 1; only 63 vfs supported so last sub port is not accessible.
-	// pf1 = fe1 pipes 2 & 3; only 63 vfs supported so last sub port is not accessible.
-	var pfs [2][63]sriovs.Vf
+	// pf0 = fe1 pipes 0 & 1; only 32 vfs.
+	// pf1 = fe1 pipes 2 & 3; only 32 vfs.
+	var pfs [2][16]sriovs.Vf
 	for port := sriovs.Vf(0); port < 32; port++ {
-		for subport := sriovs.Vf(0); subport < 4; subport++ {
+		for subport := sriovs.Vf(0); subport < 1; subport++ {
 			vf := port<<sriovs.PortShift | subport<<sriovs.SubPortShift | vlan_for_port(port, subport)
 			pf := port / 16
-			i := 4*(port%16) + subport
+			i := port%16 + subport
 			if i < sriovs.Vf(len(pfs[pf])) {
 				pfs[pf][i] = vf
 			}
