@@ -300,7 +300,8 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		if exists && string(intf.address) != string(address) {
 			// fixme address change
 		}
-		intf.address = address
+		intf.address = make([]byte, len(address))
+		copy(intf.address[:], address[:])
 		if name_changed {
 			delete(ns.interface_by_name, name)
 			ns.interface_by_name[name] = intf
