@@ -22,14 +22,15 @@ import (
 type platform struct {
 	vnet.Package
 	*fe1.Platform
+	sriov_mode bool
 }
 
 func (p *platform) Init() (err error) {
 	v := p.Vnet
 	p.Platform = fe1.GetPlatform(v)
 
-	// 2 ixge ports are used to inject packets.
-	{
+	if !p.sriov_mode {
+		// 2 ixge ports are used to inject packets.
 		ns := ixge.GetPortNames(v)
 		p.SingleTaggedInjectNexts = make([]uint, len(ns))
 		for i := range ns {
@@ -113,16 +114,17 @@ func main() {
 	in.Add(os.Args[1:]...)
 
 	v := &vnet.Vnet{}
+	p := &platform{}
 
 	fns, err := sriovs.NumvfsFns()
-	have_numvfs := err == nil && len(fns) > 0
+	p.sriov_mode = err == nil && len(fns) > 0
 
 	// Select packages we want to run with.
 	fe1.Init(v)
 	ethernet.Init(v)
 	ip4.Init(v)
 	ip6.Init(v)
-	if !have_numvfs {
+	if !p.sriov_mode {
 		ixge.Init(v, ixge.Config{DisableUnix: true, PuntNode: "fe1-single-tagged-punt"})
 	} else if err = newSriovs(0); err != nil {
 		return
@@ -132,7 +134,6 @@ func main() {
 	ipcli.Init(v)
 	unix.Init(v)
 
-	p := &platform{}
 	v.AddPackage("platform", p)
 	p.DependsOn("pci-discovery") // after pci discovery
 	p.DependedOnBy("ip4")        // adjacencies/fib init needs to happen after fe1 init.
