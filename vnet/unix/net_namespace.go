@@ -98,7 +98,7 @@ func (m *netlink_main) namespace_init() (err error) {
 
 // True when all namespaces have been discovered.
 func (m *net_namespace_main) discovery_is_done() bool {
-	return m.n_namespace_discovery_done >= m.n_namespace_discovered_at_init
+	return m.n_namespace_discovery_done > 0 && m.n_namespace_discovery_done >= m.n_namespace_discovered_at_init
 }
 
 // Called when initial netlink dump via netlink.Listen is done.

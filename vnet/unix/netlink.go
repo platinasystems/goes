@@ -374,8 +374,8 @@ func (e *netlinkEvent) EventAction() {
 				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
 				di.isAdminUp = isUp
 				di.addDelDummyPuntPrefixes(m, !isUp)
-			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok && intf != nil {
-				if intf.flags_synced() {
+			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok {
+				if intf == nil || intf.flags_synced() {
 					e.ns.validateFibIndexForSi(si)
 					err = si.SetAdminUp(vn, isUp)
 				} else if intf.flag_sync_in_progress {
