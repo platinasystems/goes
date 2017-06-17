@@ -92,12 +92,16 @@ func New(vfs [][]Vf) error {
 	for pfi, pf := range pfs {
 		var virtfns Virtfns
 
-		if pf.numvfs == numvfs {
-			// assume pf and its vfs are set
-			continue
-		}
-		if err = setNumvfs(pf.Name, numvfs); err != nil {
-			return err
+		if pf.numvfs != numvfs {
+			// First set to zero to avoid device busy error on second setNumvfs.
+			if numvfs != 0 {
+				if err = setNumvfs(pf.Name, 0); err != nil {
+					return err
+				}
+			}
+			if err = setNumvfs(pf.Name, numvfs); err != nil {
+				return err
+			}
 		}
 
 		virtfns, err = pfvirtfns(pf.Name, numvfs)
