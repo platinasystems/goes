@@ -66,6 +66,8 @@ func newSriovs(ver int) error {
 	return sriovs.New(vfs)
 }
 
+func delSriovs() error { return sriovs.Del(vfs) }
+
 func vlan_for_port(port, subport sriovs.Vf) (vf sriovs.Vf) {
 	// physical port number for data ports are numbered starting at 1.
 	// (phys 0 is cpu port...)
@@ -140,4 +142,12 @@ func main() {
 	p.DependedOnBy("ip6")
 
 	err = v.Run(&in)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = delSriovs()
+	if err != nil {
+		fmt.Println(err)
+	}
 }
