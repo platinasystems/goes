@@ -351,6 +351,12 @@ func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 			intf.get_flags()
 		}
 	}
+
+	// Perform all defered registrations for unix interfaces.
+	for _, hw := range m.registered_hwifer_by_si {
+		m.RegisterHwInterface(hw)
+	}
+
 	return
 }
 

@@ -96,6 +96,11 @@ func (m *netlink_main) namespace_init() (err error) {
 	return
 }
 
+// True when all namespaces have been discovered.
+func (m *net_namespace_main) discovery_is_done() bool {
+	return m.n_namespace_discovery_done >= m.n_namespace_discovered_at_init
+}
+
 // Called when initial netlink dump via netlink.Listen is done.
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
@@ -193,6 +198,7 @@ type net_namespace_main struct {
 	n_namespace_discovery_done       uint32
 	n_namespace_discovered_at_init   uint32
 	interface_by_si                  map[vnet.Si]*net_namespace_interface
+	registered_hwifer_by_si          map[vnet.Si]vnet.HwInterfacer
 	namespace_pool                   net_namespace_pool
 	rx_node                          rx_node
 	tx_node                          tx_node
@@ -302,7 +308,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			}
 		} else {
 			if tif, ok := m.vnet_tuntap_interface_by_address[string(address)]; ok {
-				m.SetSi(intf, tif.si)
+				m.set_si(intf, tif.si)
 				intf.tuntap = tif
 
 				if ns.vnet_tuntap_interface_by_ifindex == nil {
@@ -334,7 +340,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 	}
 }
 
-func (m *net_namespace_main) InterfaceByName(name string) (ns *net_namespace, intf *net_namespace_interface) {
+func (m *net_namespace_main) interface_by_name(name string) (ns *net_namespace, intf *net_namespace_interface) {
 	for _, s := range m.namespace_by_name {
 		if i, ok := s.interface_by_name[name]; ok {
 			ns, intf = s, i
@@ -344,10 +350,7 @@ func (m *net_namespace_main) InterfaceByName(name string) (ns *net_namespace, in
 	return
 }
 
-func (intf *net_namespace_interface) GetAddress() []byte { return intf.address }
-func (intf *net_namespace_interface) GetIfIndex() uint32 { return intf.ifindex }
-
-func (m *net_namespace_main) SetSi(intf *net_namespace_interface, si vnet.Si) {
+func (m *net_namespace_main) set_si(intf *net_namespace_interface, si vnet.Si) {
 	intf.si = si
 
 	ns := intf.namespace
@@ -363,6 +366,26 @@ func (m *net_namespace_main) SetSi(intf *net_namespace_interface, si vnet.Si) {
 		m.interface_by_si = make(map[vnet.Si]*net_namespace_interface)
 	}
 	m.interface_by_si[si] = intf
+}
+
+func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
+	hw := h.GetHwIf()
+	si := hw.Si()
+	// Defer registration until after discovery is done.
+	if m.registered_hwifer_by_si == nil {
+		m.registered_hwifer_by_si = make(map[vnet.Si]vnet.HwInterfacer)
+	}
+	m.registered_hwifer_by_si[si] = h
+
+	if !m.discovery_is_done() {
+		return
+	}
+	ns, intf := m.interface_by_name(hw.Name())
+	if ns == nil {
+		panic("unknown interface: " + hw.Name())
+	}
+	m.set_si(intf, si)
+	h.SetAddress(intf.address)
 }
 
 func (ns *net_namespace) String() (s string) {
