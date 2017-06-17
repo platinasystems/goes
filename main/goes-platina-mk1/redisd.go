@@ -24,7 +24,7 @@ func init() {
 		redisd.Machine = "platina-mk1"
 		redisd.Devs = []string{"lo", "eth0"}
 		redisd.Hook = func(pub *publisher.Publisher) {
-			pub.Print("sriov.numvfs: 32")
+			pub.Print("sriov.numvfs: 63")
 			platina_eeprom.RedisdHook(pub)
 		}
 	}
