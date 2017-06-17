@@ -68,7 +68,7 @@ func init() {
 		// Device drivers.
 		fe1.Init(v)
 		if !have_numvfs {
-			ixge.Init(v)
+			ixge.Init(v, ixge.Config{DisableUnix: true, PuntNode: "fe1-single-tagged-punt"})
 		} else if err = newSriovs(ver); err != nil {
 			return err
 		}
