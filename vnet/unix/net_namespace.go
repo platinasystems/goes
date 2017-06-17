@@ -199,6 +199,7 @@ type net_namespace_main struct {
 	n_namespace_discovered_at_init   uint32
 	interface_by_si                  map[vnet.Si]*net_namespace_interface
 	registered_hwifer_by_si          map[vnet.Si]vnet.HwInterfacer
+	registered_hwifer_by_address     map[string]vnet.HwInterfacer
 	namespace_pool                   net_namespace_pool
 	rx_node                          rx_node
 	tx_node                          tx_node
@@ -296,6 +297,9 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		} else {
 			name_changed = intf.name != name
 		}
+		if exists && string(intf.address) != string(address) {
+			// fixme address change
+		}
 		intf.address = address
 		if name_changed {
 			delete(ns.interface_by_name, name)
@@ -306,25 +310,30 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			if tif, ok := ns.vnet_tuntap_interface_by_ifindex[index]; ok {
 				tif.set_name(name)
 			}
-		} else {
-			if tif, ok := m.vnet_tuntap_interface_by_address[string(address)]; ok {
-				m.set_si(intf, tif.si)
-				intf.tuntap = tif
+		}
 
-				if ns.vnet_tuntap_interface_by_ifindex == nil {
-					ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
-				}
-				tif.ifindex = index
-				ns.vnet_tuntap_interface_by_ifindex[tif.ifindex] = tif
+		// Ethernet address uniquely identifies register hw interfaces.
+		if h, ok := m.registered_hwifer_by_address[string(address)]; ok {
+			m.set_si(intf, h.GetHwIf().Si())
+		}
 
-				if tif.created && !tif.flag_sync_done && !tif.flag_sync_in_progress {
-					tif.sync_flags()
-				}
+		if tif, ok := m.vnet_tuntap_interface_by_address[string(address)]; ok {
+			m.set_si(intf, tif.si)
+			intf.tuntap = tif
 
-				// Interface moved to a new namespace?
-				if tif.namespace != ns {
-					tif.add_del_namespace(m, ns, is_del)
-				}
+			if ns.vnet_tuntap_interface_by_ifindex == nil {
+				ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
+			}
+			tif.ifindex = index
+			ns.vnet_tuntap_interface_by_ifindex[tif.ifindex] = tif
+
+			if tif.created && !tif.flag_sync_done && !tif.flag_sync_in_progress {
+				tif.sync_flags()
+			}
+
+			// Interface moved to a new namespace?
+			if tif.namespace != ns {
+				tif.add_del_namespace(m, ns, is_del)
 			}
 		}
 	} else {
@@ -332,8 +341,10 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		if tif := intf.tuntap; tif != nil {
 			tif.add_del_namespace(m, ns, is_del)
 			tif.namespace = nil
+		}
+		if intf.si != vnet.SiNil {
 			delete(ns.si_by_ifindex, index)
-			delete(m.interface_by_si, tif.si)
+			delete(m.interface_by_si, intf.si)
 		}
 		delete(ns.interface_by_index, index)
 		delete(ns.interface_by_name, name)
@@ -380,12 +391,18 @@ func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
 	if !m.discovery_is_done() {
 		return
 	}
+
 	ns, intf := m.interface_by_name(hw.Name())
 	if ns == nil {
 		panic("unknown interface: " + hw.Name())
 	}
 	m.set_si(intf, si)
 	h.SetAddress(intf.address)
+
+	if m.registered_hwifer_by_address == nil {
+		m.registered_hwifer_by_address = make(map[string]vnet.HwInterfacer)
+	}
+	m.registered_hwifer_by_address[string(intf.address)] = h
 }
 
 func (ns *net_namespace) String() (s string) {
