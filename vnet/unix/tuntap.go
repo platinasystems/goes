@@ -72,14 +72,6 @@ func (i *tuntap_interface) setMtu(m *Main, mtu uint) {
 	}
 }
 
-func AddExternalInterface(v *vnet.Vnet, ifIndex int, si vnet.Si) {
-	m := GetMain(v)
-	if m.externalSiByIfIndex == nil {
-		m.externalSiByIfIndex = make(map[int]vnet.Si)
-	}
-	m.externalSiByIfIndex[ifIndex] = si
-}
-
 func (i *tuntap_interface) close() {
 	if i.provision_fd > 0 {
 		syscall.Close(i.provision_fd)

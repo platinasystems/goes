@@ -72,9 +72,6 @@ type Main struct {
 
 	netlink_main
 	tuntap_main
-
-	// For external (e.g. non tuntap) interfaces.
-	externalSiByIfIndex map[int]vnet.Si
 }
 
 func GetMain(v *vnet.Vnet) *Main { return v.GetPackage(packageIndex).(*Main) }

@@ -146,7 +146,9 @@ type net_namespace_interface struct {
 	name      string
 	namespace *net_namespace
 	ifindex   uint32
+	address   []byte
 	kind      netlink.InterfaceKind
+	si        vnet.Si
 	tuntap    *tuntap_interface
 }
 
@@ -281,12 +283,14 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 				name:      name,
 				ifindex:   index,
 				kind:      msg.InterfaceKind(),
+				si:        vnet.SiNil,
 			}
 			ns.interface_by_index[index] = intf
 			ns.interface_by_name[name] = intf
 		} else {
 			name_changed = intf.name != name
 		}
+		intf.address = address
 		if name_changed {
 			delete(ns.interface_by_name, name)
 			ns.interface_by_name[name] = intf
@@ -298,14 +302,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			}
 		} else {
 			if tif, ok := m.vnet_tuntap_interface_by_address[string(address)]; ok {
-				if ns.si_by_ifindex == nil {
-					ns.si_by_ifindex = make(map[uint32]vnet.Si)
-				}
-				ns.si_by_ifindex[index] = tif.si
-				if m.interface_by_si == nil {
-					m.interface_by_si = make(map[vnet.Si]*net_namespace_interface)
-				}
-				m.interface_by_si[tif.si] = intf
+				m.SetSi(intf, tif.si)
 				intf.tuntap = tif
 
 				if ns.vnet_tuntap_interface_by_ifindex == nil {
@@ -337,7 +334,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 	}
 }
 
-func (m *net_namespace_main) interface_by_name(name string) (ns *net_namespace, intf *net_namespace_interface) {
+func (m *net_namespace_main) InterfaceByName(name string) (ns *net_namespace, intf *net_namespace_interface) {
 	for _, s := range m.namespace_by_name {
 		if i, ok := s.interface_by_name[name]; ok {
 			ns, intf = s, i
@@ -345,6 +342,27 @@ func (m *net_namespace_main) interface_by_name(name string) (ns *net_namespace, 
 		}
 	}
 	return
+}
+
+func (intf *net_namespace_interface) GetAddress() []byte { return intf.address }
+func (intf *net_namespace_interface) GetIfIndex() uint32 { return intf.ifindex }
+
+func (m *net_namespace_main) SetSi(intf *net_namespace_interface, si vnet.Si) {
+	intf.si = si
+
+	ns := intf.namespace
+
+	// Set up ifindex to vnet Si mapping.
+	if ns.si_by_ifindex == nil {
+		ns.si_by_ifindex = make(map[uint32]vnet.Si)
+	}
+	ns.si_by_ifindex[intf.ifindex] = si
+
+	// Set up si to interface mapping.
+	if m.interface_by_si == nil {
+		m.interface_by_si = make(map[vnet.Si]*net_namespace_interface)
+	}
+	m.interface_by_si[si] = intf
 }
 
 func (ns *net_namespace) String() (s string) {
