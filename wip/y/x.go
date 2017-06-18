@@ -146,8 +146,10 @@ func main() {
 		fmt.Println(err)
 	}
 
-	err = delSriovs()
-	if err != nil {
-		fmt.Println(err)
+	if p.sriov_mode {
+		err = delSriovs()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
