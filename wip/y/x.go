@@ -89,12 +89,18 @@ var vfs = make_vfs()
 func make_vfs() [][]sriovs.Vf {
 	// pf0 = fe1 pipes 0 & 1; only 32 vfs.
 	// pf1 = fe1 pipes 2 & 3; only 32 vfs.
-	var pfs [2][16]sriovs.Vf
-	for port := sriovs.Vf(0); port < 32; port++ {
-		for subport := sriovs.Vf(0); subport < 1; subport++ {
+	const (
+		n_port        = 32
+		n_sub_port    = 1
+		n_pf          = 2
+		n_port_per_pf = n_port / n_pf
+	)
+	var pfs [n_pf][n_port / n_pf]sriovs.Vf
+	for port := sriovs.Vf(0); port < n_port; port++ {
+		for subport := sriovs.Vf(0); subport < n_sub_port; subport++ {
 			vf := port<<sriovs.PortShift | subport<<sriovs.SubPortShift | vlan_for_port(port, subport)
-			pf := port / 16
-			i := port%16 + subport
+			pf := port / n_port_per_pf
+			i := port%n_port_per_pf + n_port_per_pf*subport
 			if i < sriovs.Vf(len(pfs[pf])) {
 				pfs[pf][i] = vf
 			}
