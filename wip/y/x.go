@@ -126,6 +126,7 @@ func main() {
 
 	fns, err := sriovs.NumvfsFns()
 	p.sriov_mode = err == nil && len(fns) > 0
+	err = nil
 
 	// Select packages we want to run with.
 	fe1.Init(v)
