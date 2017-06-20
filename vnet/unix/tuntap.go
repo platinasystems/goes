@@ -311,6 +311,10 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		return
 	}
 
+	if si.IsSwSubInterface(m.v) {
+		return
+	}
+
 	intf := &tuntap_interface{
 		m:  m,
 		hi: hi,
@@ -541,7 +545,7 @@ func (m *Main) maybeChangeFlag(intf *tuntap_interface, isUp bool, flag iff_flag)
 }
 
 func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) {
-	if !m.okSi(si) {
+	if !m.okSi(si) || si.IsSwSubInterface(v) {
 		return
 	}
 	intf := m.interface_for_si(si)

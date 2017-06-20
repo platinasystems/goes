@@ -70,13 +70,6 @@ func (v *Vnet) HwIfByName(name string) (Hi, bool) {
 	return Hi(hi), ok
 }
 
-func (h *HwIf) SetSubInterface(id IfIndex, si Si) {
-	if h.subSiById == nil {
-		h.subSiById = make(map[IfIndex]Si)
-	}
-	h.subSiById[id] = si
-}
-
 func (h *HwIf) LinkString() (s string) {
 	s = "down"
 	if h.linkUp {
@@ -145,23 +138,58 @@ type swIf struct {
 
 //go:generate gentemplate -d Package=vnet -id swIf -d PoolType=swIfPool -d Type=swIf -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
 
-func (m *Vnet) NewSwIf(typ swIfType, id IfIndex) (si Si) {
-	si = Si(m.swInterfaces.GetIndex())
-	s := m.SwIf(si)
-	s.typ = typ
-	s.si = si
-	s.supSi = si
-	s.id = id
-	m.counterValidateSw(si)
+func (m *Vnet) addDelSwInterface(siʹ, supSi Si, typ swIfType, id IfIndex, isDel bool) (si Si) {
+	si = siʹ
+	if !isDel {
+		si = Si(m.swInterfaces.GetIndex())
+		if supSi == SiNil {
+			supSi = si
+		}
+		s := m.SwIf(si)
+		s.typ = typ
+		s.si = si
+		s.supSi = supSi
+		s.id = id
+		m.counterValidateSw(si)
+	}
 
-	isDel := false
 	for i := range m.swIfAddDelHooks.hooks {
-		err := m.swIfAddDelHooks.Get(i)(m, s.si, isDel)
+		err := m.swIfAddDelHooks.Get(i)(m, si, isDel)
 		if err != nil {
 			panic(err) // how to recover?
 		}
 	}
+
+	if isDel {
+		if s := m.SwIf(si); s.typ == swIfTypeSubInterface {
+			h := m.SupHwIf(s)
+			delete(h.subSiById, s.id)
+		}
+		m.swInterfaces.PutIndex(uint(si))
+		si = SiNil
+	}
+
 	return
+}
+
+func (m *Vnet) newSwIf(typ swIfType, id IfIndex) Si {
+	return m.addDelSwInterface(SiNil, SiNil, typ, id, false)
+}
+func (m *Vnet) DelSwIf(si Si) { m.addDelSwInterface(si, si, 0, 0, true) }
+
+func (m *Vnet) NewSwSubInterface(supSi Si, id uint) (si Si) {
+	x := IfIndex(id)
+	si = m.addDelSwInterface(SiNil, supSi, swIfTypeSubInterface, x, false)
+	s := m.SwIf(si)
+	h := m.SupHwIf(s)
+	if h.subSiById == nil {
+		h.subSiById = make(map[IfIndex]Si)
+	}
+	h.subSiById[x] = si
+	return
+}
+func (si Si) IsSwSubInterface(v *Vnet) bool { return v.SwIf(si).typ == swIfTypeSubInterface }
+func (h *HwIf) setSubInterface(si Si, id IfIndex) {
 }
 
 func (m *interfaceMain) SwIf(i Si) *swIf { return &m.swInterfaces.elts[i] }
@@ -175,6 +203,7 @@ func (m *interfaceMain) SupSwIf(s *swIf) (sup *swIf) {
 }
 func (m *interfaceMain) HwIfer(i Hi) HwInterfacer { return m.hwIferPool.elts[i] }
 func (m *interfaceMain) HwIf(i Hi) *HwIf          { return m.HwIfer(i).GetHwIf() }
+func (hi Hi) Si(m *Vnet) Si                       { return m.HwIf(hi).si }
 func (m *interfaceMain) SupHwIf(s *swIf) *HwIf {
 	sup := m.SupSwIf(s)
 	return m.HwIf(Hi(sup.id))
@@ -398,7 +427,7 @@ func (v *Vnet) RegisterAndProvisionHwInterface(h HwInterfacer, provision bool, f
 	hw.vnet = v
 	hw.defaultId = h.DefaultId()
 	hw.unprovisioned = !provision
-	hw.si = v.NewSwIf(swIfTypeHardware, IfIndex(hw.hi))
+	hw.si = v.newSwIf(swIfTypeHardware, IfIndex(hw.hi))
 
 	isDel := false
 	m := &v.interfaceMain
