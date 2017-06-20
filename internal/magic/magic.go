@@ -12,9 +12,18 @@ const (
 
 	ext234SUUIDOff = 0x468
 	ext234SUUIDLen = 16
+
+	mbrMagicOffL = 0x1fe
+	mbrMagicOffM = 0x1ff
+	mbrMagicValL = 0x55
+	mbrMagicValM = 0xaa
 )
 
 func IdentifyPartitionMap(sniff []byte) string {
+	if sniff[mbrMagicOffL] == mbrMagicValL &&
+		sniff[mbrMagicOffM] == mbrMagicValM {
+		return "mbr"
+	}
 	return ""
 }
 
