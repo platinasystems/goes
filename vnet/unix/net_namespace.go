@@ -240,6 +240,12 @@ func (e *netlinkEvent) netnsMessage(msg *netlink.NetnsMessage) (err error) {
 func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) {
 	if is_del {
 		delete(m.namespace_by_name, name)
+		return
+	}
+
+	// If it exists set id; otherwise make a new namespace.
+	if ns, ok := m.namespace_by_name[name]; ok {
+		ns.nsid = nsid
 	} else {
 		ns := &net_namespace{name: name, nsid: nsid}
 		m.namespace_by_name[name] = ns
