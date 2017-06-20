@@ -46,6 +46,9 @@ func (c *Command) Main(args ...string) error {
 		args = c.g.Names
 	}
 	for i, name := range args {
+		if len(name) == 0 {
+			continue
+		}
 		v := c.g.ByName(name)
 		if v == nil {
 			if i == 0 {

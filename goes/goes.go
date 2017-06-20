@@ -214,6 +214,8 @@ func (g *Goes) Main(args ...string) error {
 				cliArgs = append(cliArgs, "-x")
 			}
 			return cli.Main(cliArgs...)
+		} else if def, found := g.byname[""]; found {
+			return def.Main()
 		}
 		fmt.Println(Usage(g))
 		return nil
