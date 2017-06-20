@@ -125,15 +125,11 @@ func (m *netlink_main) enable_disable_log(c cli.Commander, w cli.Writer, in *cli
 	for !in.End() {
 		switch {
 		case in.Parse("e%*nable"):
-			v = 1
+			v = true
 		case in.Parse("d%*isable"):
-			v = 0
+			v = false
 		case in.Parse("t%*oggle"):
-			if v > 0 {
-				v = 0
-			} else {
-				v = 1
-			}
+			v = !m.m.verbose_netlink
 		default:
 			err = cli.ParseError
 			return

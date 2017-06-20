@@ -353,7 +353,7 @@ func (e *netlinkEvent) EventAction() {
 
 		if !e.ns.msg_for_vnet_interface(msg) {
 			m.msg_stats.ignored.count(msg)
-			if m.verbose_netlink > 1 {
+			if m.verbose_netlink {
 				m.v.Logf("%s: netlink ignore %s\n", e.ns, msg)
 			}
 			// Done with message.
@@ -362,7 +362,7 @@ func (e *netlinkEvent) EventAction() {
 		}
 
 		isLastInEvent := imsg+1 == len(e.msgs)
-		if m.verbose_netlink > 0 {
+		if m.verbose_netlink {
 			m.v.Logf("%s: netlink %s\n", e.ns, msg)
 		}
 		switch v := msg.(type) {
@@ -499,6 +499,7 @@ func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 			di.ip4Addrs[p.Address] = fi
 		}
 	} else if si, _, ok := e.ns.siForIfIndex(v.Index); ok {
+		e.ns.validateFibIndexForSi(si)
 		err = m4.AddDelInterfaceAddress(si, &p, isDel)
 	}
 	return

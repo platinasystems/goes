@@ -67,7 +67,7 @@ type Main struct {
 	v *vnet.Vnet
 
 	verbose_packets bool
-	verbose_netlink int
+	verbose_netlink bool
 	interface_filter
 
 	netlink_main
@@ -96,7 +96,7 @@ func (m *Main) Configure(in *parse.Input) {
 		case in.Parse("verbose-packets"):
 			m.verbose_packets = true
 		case in.Parse("verbose-netlink"):
-			m.verbose_netlink++
+			m.verbose_netlink = true
 		case in.Parse("filter-accept %s", &s):
 			m.interface_filter.add(s, true)
 		case in.Parse("filter-reject %s", &s):
