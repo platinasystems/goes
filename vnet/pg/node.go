@@ -339,6 +339,11 @@ func (sup *Stream) finalize(r Streamer, refs []vnet.Ref) {
 	if changed := r.Finalize(refs, t.data_offset); changed {
 		sup.finalizer_changed = changed
 	}
+	if sup.verbose {
+		for i := range refs {
+			fmt.Printf("%s: %x", sup.name, refs[i].DataSlice())
+		}
+	}
 }
 
 func (n *node) generate(s *Stream, dst []vnet.Ref, n_packets uint) (n_bytes uint) {

@@ -69,3 +69,14 @@ func (i *IncrementingPayload) Write(b []byte) {
 	}
 }
 func (i *IncrementingPayload) Read(b []byte) PacketHeader { return i }
+
+type GivenPayload struct{ Payload []byte }
+
+func (i *GivenPayload) Len() uint                 { return uint(len(i.Payload)) }
+func (i *GivenPayload) Finalize(l []PacketHeader) {}
+func (i *GivenPayload) String() string            { return fmt.Sprintf("payload %x", i.Payload) }
+
+func (i *GivenPayload) Write(b []byte) {
+	copy(b[:], i.Payload)
+}
+func (i *GivenPayload) Read(b []byte) PacketHeader { return i }

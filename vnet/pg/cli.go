@@ -40,6 +40,7 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		set_next
 		set_stream
 		set_interface
+		set_verbose
 	)
 	var set_what uint
 	enable, disable := true, false
@@ -81,6 +82,9 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		case in.Parse("random"):
 			c.random_size = true
 			set_what |= set_size
+		case in.Parse("ve%*rbose"):
+			c.verbose = true
+			set_what |= set_verbose
 		case in.Parse("n%*ext %s", &name):
 			c.next = n.v.AddNamedNext(n, name)
 			set_what |= set_next
@@ -144,6 +148,9 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		}
 		if set_what&set_interface != 0 {
 			s.stream_config.si = c.si
+		}
+		if set_what&set_verbose != 0 {
+			s.stream_config.verbose = c.verbose
 		}
 	}
 

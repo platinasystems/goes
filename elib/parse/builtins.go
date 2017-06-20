@@ -5,6 +5,7 @@
 package parse
 
 import (
+	"encoding/hex"
 	"regexp"
 	"unicode"
 )
@@ -52,6 +53,17 @@ func (b *UpDown) Parse(in *Input) {
 		panic(ErrInput)
 	}
 	return
+}
+
+type HexString []byte
+
+func (x *HexString) Parse(in *Input) {
+	src := in.Token()
+	dst := make([]byte, len(src)/2)
+	if _, err := hex.Decode(dst, []byte(src)); err != nil {
+		panic(err)
+	}
+	*x = HexString(dst)
 }
 
 type StringMap map[string]uint
