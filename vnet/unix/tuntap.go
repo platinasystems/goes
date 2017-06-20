@@ -15,12 +15,14 @@ import (
 
 	"fmt"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 )
 
 type tuntap_interface struct {
-	m *Main
+	m  *Main
+	mu sync.Mutex
 	// Namespace this interface is currently in.
 	namespace *net_namespace
 	// Raw socket bound to this interface used for provisioning.
@@ -73,6 +75,8 @@ func (i *tuntap_interface) setMtu(m *Main, mtu uint) {
 }
 
 func (i *tuntap_interface) close() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	if i.provision_fd > 0 {
 		syscall.Close(i.provision_fd)
 		i.provision_fd = -1
@@ -93,6 +97,8 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 			return
 		}
 		i.namespace = ns
+		// Close sockets before re-opening in new namespace.
+		i.close()
 		if err := i.open_sockets(); err != nil {
 			panic(err)
 		}
