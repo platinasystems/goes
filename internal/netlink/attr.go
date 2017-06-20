@@ -200,9 +200,44 @@ func (t *IfLinkInfoAttrType) IthString(i int) string {
 	return elib.Stringer(ifLinkInfoAttrTypeNames, i)
 }
 
+type InterfaceKind int
+
+const (
+	InterfaceKindUnknown InterfaceKind = iota
+	InterfaceKindDummy
+	InterfaceKindTun
+	InterfaceKindVeth
+	InterfaceKindVlan
+)
+
+var kindStrings = [...]string{
+	InterfaceKindUnknown: "",
+	InterfaceKindDummy:   "dummy",
+	InterfaceKindTun:     "tun",
+	InterfaceKindVeth:    "veth",
+	InterfaceKindVlan:    "vlan",
+}
+
+func (k InterfaceKind) String() string { return kindStrings[k] }
+
+var kindMap = map[string]InterfaceKind{
+	"dummy": InterfaceKindDummy,
+	"tun":   InterfaceKindTun,
+	"veth":  InterfaceKindVeth,
+	"vlan":  InterfaceKindVlan,
+}
+
+func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
+	if a, ok := m.Attrs[IFLA_LINKINFO].(*AttrArray); ok {
+		k = kindMap[a.X[IFLA_INFO_KIND].String()]
+	}
+	return
+}
+
 func parse_link_info(b []byte) *AttrArray {
 	as := pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfLinkInfoAttrType()
+	linkKind := InterfaceKindUnknown
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
@@ -216,13 +251,142 @@ func parse_link_info(b []byte) *AttrArray {
 				l = l - 1
 			}
 			as.X[kind] = StringAttrBytes(v[:l])
+			linkKind = kindMap[string(v[:l])]
 		case IFLA_INFO_DATA, IFLA_INFO_SLAVE_DATA:
-			as.X[kind] = Uint32AttrBytes(v)
+			as.X[kind] = StringAttrBytes(v)
 		default:
 			panic("unknown link info attribute kind " + kind.String())
 		}
 	}
+	switch linkKind {
+	case InterfaceKindVlan:
+		as.X[IFLA_INFO_DATA] = parse_vlan_info([]byte(as.X[IFLA_INFO_DATA].(StringAttr)))
+	}
 	return as
+}
+
+const (
+	IFLA_VLAN_UNSPEC IfVlanLinkInfoDataAttrKind = iota
+	IFLA_VLAN_ID
+	IFLA_VLAN_FLAGS
+	IFLA_VLAN_EGRESS_QOS
+	IFLA_VLAN_INGRESS_QOS
+	IFLA_VLAN_PROTOCOL
+)
+
+var ifVlanLinkInfoDataAttrKindNames = []string{
+	IFLA_VLAN_UNSPEC:      "UNSPEC",
+	IFLA_VLAN_ID:          "VLAN_ID",
+	IFLA_VLAN_FLAGS:       "VLAN_FLAGS",
+	IFLA_VLAN_EGRESS_QOS:  "VLAN_EGRESS_QOS",
+	IFLA_VLAN_INGRESS_QOS: "VLAN_INGRESS_QOS",
+	IFLA_VLAN_PROTOCOL:    "VLAN_PROTOCOL",
+}
+
+func (t IfVlanLinkInfoDataAttrKind) String() string {
+	return elib.Stringer(ifVlanLinkInfoDataAttrKindNames, int(t))
+}
+
+type IfVlanLinkInfoDataAttrKind int
+type IfVlanLinkInfoDataAttrType Empty
+
+func NewIfVlanLinkInfoDataAttrType() *IfVlanLinkInfoDataAttrType {
+	return (*IfVlanLinkInfoDataAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *IfVlanLinkInfoDataAttrType) attrType() {}
+func (t *IfVlanLinkInfoDataAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *IfVlanLinkInfoDataAttrType) IthString(i int) string {
+	return elib.Stringer(ifVlanLinkInfoDataAttrKindNames, i)
+}
+
+func parse_vlan_info(b []byte) (as *AttrArray) {
+	as = pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewIfVlanLinkInfoDataAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := IfVlanLinkInfoDataAttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case IFLA_VLAN_ID:
+			as.X[kind] = Uint16AttrBytes(v)
+		case IFLA_VLAN_PROTOCOL:
+			as.X[kind] = VlanProtocolAttrBytes(v)
+		case IFLA_VLAN_FLAGS:
+			as.X[kind] = NewVlanFlagsBytes(v)
+		default:
+			panic("unknown vlan link data attribute kind " + kind.String())
+		}
+	}
+	return as
+}
+
+type VlanProtocolAttr uint16
+
+func VlanProtocolAttrBytes(b []byte) VlanProtocolAttr {
+	return VlanProtocolAttr(uint16(b[0])<<8 | uint16(b[1]))
+}
+
+func (a VlanProtocolAttr) attr() {}
+func (a VlanProtocolAttr) Set(v []byte) {
+	v[0] = byte(a >> 8)
+	v[1] = byte(a)
+}
+func (a VlanProtocolAttr) Size() int {
+	return 2
+}
+func (a VlanProtocolAttr) String() string {
+	return StringOf(a)
+}
+func (a VlanProtocolAttr) Uint() uint16 {
+	return uint16(a)
+}
+func (a VlanProtocolAttr) WriteTo(w io.Writer) (int64, error) {
+	acc := accumulate.New(w)
+	defer acc.Fini()
+	fmt.Fprintf(acc, "0x%04x", a.Uint())
+	return acc.Tuple()
+}
+
+type VlanFlags struct {
+	Flags uint32
+	Mask  uint32
+}
+
+func NewVlanFlagsBytes(b []byte) *VlanFlags {
+	a := pool.VlanFlags.Get().(*VlanFlags)
+	a.Parse(b)
+	return a
+}
+
+func (a *VlanFlags) attr() {}
+
+func (a *VlanFlags) Close() error {
+	repool(a)
+	return nil
+}
+func (a *VlanFlags) Set(v []byte) {
+	panic("should never be called")
+}
+func (a *VlanFlags) Size() int {
+	panic("should never be called")
+	return 0
+}
+func (a *VlanFlags) String() string {
+	return StringOf(a)
+}
+func (a *VlanFlags) Parse(b []byte) {
+	*a = *(*VlanFlags)(unsafe.Pointer(&b[0]))
+}
+func (a *VlanFlags) WriteTo(w io.Writer) (int64, error) {
+	acc := accumulate.New(w)
+	defer acc.Fini()
+	fmt.Fprintf(acc, "flags: %x mask: %x", a.Flags, a.Mask)
+	return acc.Tuple()
 }
 
 //go:generate gentemplate -d Package=netlink -id Attr -d VecType=AttrVec -d Type=Attr github.com/platinasystems/go/elib/vec.tmpl

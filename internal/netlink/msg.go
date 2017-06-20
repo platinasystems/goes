@@ -472,37 +472,6 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 	return acc.Tuple()
 }
 
-type InterfaceKind int
-
-const (
-	InterfaceKindUnknown = iota
-	InterfaceKindDummy
-	InterfaceKindTun
-	InterfaceKindVeth
-)
-
-var kindStrings = [...]string{
-	InterfaceKindUnknown: "",
-	InterfaceKindDummy:   "dummy",
-	InterfaceKindTun:     "tun",
-	InterfaceKindVeth:    "veth",
-}
-
-func (k InterfaceKind) String() string { return kindStrings[k] }
-
-var kindMap = map[string]InterfaceKind{
-	"dummy": InterfaceKindDummy,
-	"tun":   InterfaceKindTun,
-	"veth":  InterfaceKindVeth,
-}
-
-func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
-	if a, ok := m.Attrs[IFLA_LINKINFO].(*AttrArray); ok {
-		k = kindMap[a.X[IFLA_INFO_KIND].String()]
-	}
-	return
-}
-
 type IfAddrMessage struct {
 	nsid int
 	Header
