@@ -100,6 +100,14 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 					return
 				}
 				s.AddStreamer(sub_r)
+			} else {
+				var x parse.HexString
+				if !in.Parse("%v", &x) {
+					err = parse.ErrInput
+					return
+				}
+				y := vnet.GivenPayload{Payload: []byte(x)}
+				s.AddHeader(&y)
 			}
 
 		default:
