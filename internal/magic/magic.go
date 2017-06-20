@@ -4,11 +4,25 @@
 
 package magic
 
+const (
+	ext234SMagicOffL = 0x438
+	ext234SMagicOffM = 0x439
+	ext234SMagicValL = 0x53
+	ext234SMagicValM = 0xef
+
+	ext234SUUIDOff = 0x468
+	ext234SUUIDLen = 16
+)
+
 func IdentifyPartitionMap(sniff []byte) string {
 	return ""
 }
 
 func IdentifyPartition(sniff []byte) string {
+	if sniff[ext234SMagicOffL] == ext234SMagicValL &&
+		sniff[ext234SMagicOffM] == ext234SMagicValM {
+		return "ext234"
+	}
 	return ""
 }
 
