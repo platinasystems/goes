@@ -26,6 +26,7 @@ func (s *Stream) Finalize(r []vnet.Ref, data_offset uint) (changed bool) { retur
 
 type stream_config struct {
 	random_size bool
+	verbose     bool
 
 	// Min, max packet size.
 	min_size uint
