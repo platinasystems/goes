@@ -6,14 +6,16 @@ package mount
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/magic"
 	"github.com/platinasystems/go/internal/parms"
 )
 
@@ -269,20 +271,12 @@ func (r *MountResult) ShowResult() {
 	}
 }
 
+var ErrNotFilesystem = errors.New("not a filesystem")
+
 type superBlock interface {
 }
 
 type unknownSB struct {
-}
-
-const (
-	ext234SMagicOffL = 0x438
-	ext234SMagicOffM = 0x439
-	ext234SMagicValL = 0x53
-	ext234SMagicValM = 0xef
-)
-
-type ext234 struct {
 }
 
 func readSuperBlock(dev string) (superBlock, error) {
@@ -297,10 +291,10 @@ func readSuperBlock(dev string) (superBlock, error) {
 		return nil, err
 	}
 
-	if fsHeader[ext234SMagicOffL] == ext234SMagicValL &&
-		fsHeader[ext234SMagicOffM] == ext234SMagicValM {
-		sb := &ext234{}
-		return sb, nil
+	partitionMapType := magic.IdentifyPartitionMap(fsHeader)
+
+	if partitionMapType != "" {
+		return nil, ErrNotFilesystem
 	}
 
 	return &unknownSB{}, nil
