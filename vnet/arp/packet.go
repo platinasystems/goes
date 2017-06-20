@@ -10,7 +10,6 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip4"
 
-	"bytes"
 	"fmt"
 	"unsafe"
 )
@@ -83,12 +82,11 @@ func (h *HeaderEthernetIp4) String() (s string) {
 }
 
 // Implement vnet.Header interface.
-func (h *HeaderEthernetIp4) Len() uint                      { return HeaderEthernetIp4Bytes }
-func (h *HeaderEthernetIp4) Finalize(l []vnet.PacketHeader) {}
-func (h *HeaderEthernetIp4) Write(b *bytes.Buffer) {
-	type t struct{ data [unsafe.Sizeof(*h)]byte }
+func (h *HeaderEthernetIp4) Len() uint { return HeaderEthernetIp4Bytes }
+func (h *HeaderEthernetIp4) Write(b []byte) {
+	type t struct{ data [HeaderEthernetIp4Bytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *HeaderEthernetIp4) Read(b []byte) vnet.PacketHeader {
 	return (*HeaderEthernetIp4)(vnet.Pointer(b))

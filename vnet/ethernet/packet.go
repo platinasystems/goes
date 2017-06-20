@@ -7,7 +7,6 @@ package ethernet
 import (
 	"github.com/platinasystems/go/vnet"
 
-	"bytes"
 	"math/rand"
 	"unsafe"
 )
@@ -19,12 +18,29 @@ type Header struct {
 	Type Type
 }
 
+// A 12 bit vlan id.
 type Vlan vnet.Uint16
+
+// A 16 bit vlan tag in network byte order.
+type VlanTag vnet.Uint16
+
+func (t VlanTag) ToHost() VlanTag   { return VlanTag(vnet.Uint16(t).ToHost()) }
+func (t VlanTag) FromHost() VlanTag { return VlanTag(vnet.Uint16(t).FromHost()) }
+func (v VlanTag) Id() uint16        { return uint16(v.ToHost()) & 0xfff }
+func (v VlanTag) Priority() uint8   { return uint8(v.ToHost() >> 13) }
+func (v VlanTag) CFI() bool         { return v.ToHost()&(1<<12) != 0 }
+func (v *VlanTag) Set(i uint16, p uint8, cfi bool) {
+	t := VlanTag((i & 0xfff) | ((uint16(p) & 7) << 13))
+	if cfi {
+		t |= 1 << 12
+	}
+	*v = t.FromHost()
+}
 
 // Tagged packets have VlanHeader after ethernet header.
 type VlanHeader struct {
 	/* 3 bit priority, 1 bit CFI and 12 bit vlan id. */
-	Priority_cfi_and_id vnet.Uint16
+	Tag VlanTag
 
 	/* Inner ethernet type. */
 	Type Type
@@ -102,6 +118,15 @@ func (a *Address) Equal(b Address) bool {
 	return true
 }
 
+func (a *Address) IsZero() bool {
+	for i := range a {
+		if a[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func RandomAddress() (a Address) {
 	for i := range a {
 		a[i] = uint8(rand.Int())
@@ -113,20 +138,18 @@ func RandomAddress() (a Address) {
 }
 
 // Implement vnet.Header interface.
-func (h *Header) Len() uint                      { return HeaderBytes }
-func (h *Header) Finalize(l []vnet.PacketHeader) {}
-func (h *Header) Write(b *bytes.Buffer) {
-	type t struct{ data [unsafe.Sizeof(*h)]byte }
+func (h *Header) Len() uint { return HeaderBytes }
+func (h *Header) Write(b []byte) {
+	type t struct{ data [HeaderBytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
 
-func (h *VlanHeader) Len() uint                      { return VlanHeaderBytes }
-func (h *VlanHeader) Finalize(l []vnet.PacketHeader) {}
-func (h *VlanHeader) Write(b *bytes.Buffer) {
-	type t struct{ data [unsafe.Sizeof(*h)]byte }
+func (h *VlanHeader) Len() uint { return VlanHeaderBytes }
+func (h *VlanHeader) Write(b []byte) {
+	type t struct{ data [VlanHeaderBytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *VlanHeader) Read(b []byte) vnet.PacketHeader { return (*VlanHeader)(vnet.Pointer(b)) }

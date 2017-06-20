@@ -10,7 +10,6 @@ import (
 	"io"
 	"runtime"
 	"syscall"
-
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/accumulate"
@@ -360,12 +359,12 @@ type IfInfoMessage struct {
 const SizeofIfInfoMessage = SizeofHeader + SizeofIfInfomsg
 
 type IfInfomsg struct {
-	Family uint8
-	_      uint8
-	Type   uint16
-	Index  uint32
-	Flags  IfInfoFlags
-	Change IfInfoFlags
+	Family   uint8
+	_        uint8
+	L2IfType uint16
+	Index    uint32
+	Flags    IfInfoFlags
+	Change   IfInfoFlags
 }
 
 const SizeofIfInfomsg = 16
@@ -459,10 +458,14 @@ func (m *IfInfoMessage) WriteTo(w io.Writer) (int64, error) {
 	m.Header.WriteTo(acc)
 	fmt.Fprintln(acc, "index:", m.Index)
 	fmt.Fprintln(acc, "family:", AddressFamily(m.Family))
-	fmt.Fprintln(acc, "type:", IfInfoAttrKind(m.Header.Type))
+	fmt.Fprintln(acc, "type:", L2IfType(m.L2IfType))
 	fmt.Fprintln(acc, "ifinfo flags:", m.IfInfomsg.Flags)
 	if m.Change != 0 {
-		fmt.Fprintln(acc, "changed flags:", IfInfoFlags(m.Change))
+		if m.Change == ^IfInfoFlags(0) { // means everything changed
+			fmt.Fprintln(acc, "changed flags: everything")
+		} else {
+			fmt.Fprintln(acc, "changed flags:", m.Change)
+		}
 	}
 	fprintAttrs(acc, ifInfoAttrKindNames, m.Attrs[:])
 	indent.Decrease(acc)
@@ -855,9 +858,6 @@ func (m *NetnsMessage) Write(b []byte) (int, error) {
 	n, _ := m.Header.Write(b)
 	m.Netnsmsg = *(*Netnsmsg)(unsafe.Pointer(&b[n]))
 	n += SizeofNetnsmsg
-	m.Attrs[NETNSA_NSID] = Int32Attr(-2)
-	m.Attrs[NETNSA_PID] = Uint32Attr(0)
-	m.Attrs[NETNSA_FD] = Uint32Attr(^uint32(0))
 	for n < len(b) {
 		a, v, next := nextAttr(b, n)
 		n = next

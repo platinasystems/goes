@@ -16,21 +16,36 @@ import (
 	"unsafe"
 )
 
-type refOpaque struct {
-	// Error code for error node if packets is to be dropped.
-	err ErrorRef
-
+type RefOpaque struct {
 	// Software interface.
 	Si Si
+
+	// Aux data.
+	// For example, used by error node to give reason for dropping this packet.
+	Aux uint32
 }
 
 type Ref struct {
 	hw.RefHeader
-	refOpaque
+	RefOpaque
 }
 
 func (r *Ref) Flags() BufferFlag         { return BufferFlag(r.RefHeader.Flags()) }
 func (r *Ref) NextValidFlag() BufferFlag { return BufferFlag(r.RefHeader.NextValidFlag()) }
+func (r *Ref) NextRef() *Ref {
+	return (*Ref)(unsafe.Pointer(r.RefHeader.NextRef()))
+}
+
+func (r *Ref) Foreach(f func(r *Ref, i uint)) {
+	i := uint(0)
+	for {
+		f(r, i)
+		if r = r.NextRef(); r == nil {
+			break
+		}
+		i++
+	}
+}
 
 type BufferFlag hw.BufferFlag
 
@@ -82,7 +97,7 @@ type refInDupCopy struct {
 	BufferPool *BufferPool
 }
 
-func (i *RefIn) dup(x *RefIn) { i.refInDupCopy = x.refInDupCopy }
+func (i *RefIn) Dup(x *RefIn) { i.refInDupCopy = x.refInDupCopy }
 
 type RefIn struct {
 	refInCommon
@@ -116,7 +131,7 @@ func getDefaultBufferTemplate() hw.BufferTemplate {
 	t := *hw.DefaultBufferTemplate
 	r := (*Ref)(unsafe.Pointer(&t.Ref))
 	// Poison so that if user does not override its obvious.
-	r.err = poisonErrorRef
+	r.Aux = poisonErrorRef
 	r.Si = ^r.Si
 	return t
 }
@@ -157,12 +172,24 @@ func (p *BufferPool) FreeRefs(r *Ref, n uint, freeNext bool) {
 	(*hw.BufferPool)(p).FreeRefs((*hw.RefHeader)(&r.RefHeader), n, freeNext)
 }
 
-func (i *RefIn) AllocRefs(n uint)       { i.AllocPoolRefs(i.BufferPool, n) }
-func (i *RefIn) FreeRefs(n uint)        { i.FreePoolRefs(i.BufferPool, n) }
-func (i *RefIn) SetLen(v *Vnet, l uint) { i.In.SetLen(&v.loop, l) }
+func (i *RefIn) AllocRefs(n uint) { i.AllocPoolRefs(i.BufferPool, n) }
+func (i *RefIn) FreeRefs(n uint)  { i.FreePoolRefs(i.BufferPool, n) }
+
+func (in *RefIn) SetLen(v *Vnet, new_len uint) {
+	if elib.Debug {
+		old_len := in.In.GetLen(&v.loop)
+		for i := old_len; i < new_len; i++ {
+			in.BufferPool.ValidateRef(&in.Refs[i], hw.BufferKnownAllocated)
+		}
+	}
+	in.In.SetLen(&v.loop, new_len)
+}
+
+func (i *RefIn) GetLen(v *Vnet) uint { return i.In.GetLen(&v.loop) }
+
 func (i *RefIn) AddLen(v *Vnet) (l uint) {
-	l = i.GetLen(&v.loop)
-	i.SetLen(v, l+1)
+	l = i.In.GetLen(&v.loop)
+	i.In.SetLen(&v.loop, l+1)
 	return
 }
 func (i *RefIn) SetPoolAndLen(v *Vnet, p *BufferPool, l uint) {
@@ -172,11 +199,6 @@ func (i *RefIn) SetPoolAndLen(v *Vnet, p *BufferPool, l uint) {
 
 func Get4Refs(rs []Ref, i uint) (r0, r1, r2, r3 *Ref) {
 	r0, r1, r2, r3 = &rs[i+0], &rs[i+1], &rs[i+2], &rs[i+3]
-	return
-}
-
-func Get1Ref(rs []Ref, i uint) (r0 *Ref) {
-	r0 = &rs[i+0]
 	return
 }
 
@@ -202,11 +224,14 @@ func Get1Buffer(rs []Ref, i uint) (b0 *Buffer) {
 	return
 }
 
-func (r *RefIn) Get4Refs(i uint) (r0, r1, r2, r3 *Ref) { return Get4Refs(r.Refs[:], i) }
-func (r *RefIn) Get1Ref(i uint) (r0 *Ref)              { return Get1Ref(r.Refs[:], i) }
+func (r *RefIn) Get1(i uint) (_ *Ref)    { return &r.Refs[i] }
+func (r *RefIn) Get2(i uint) (_, _ *Ref) { return &r.Refs[i+0], &r.Refs[i+1] }
+func (r *RefIn) Get4(i uint) (_, _, _, _ *Ref) {
+	return &r.Refs[i+0], &r.Refs[i+1], &r.Refs[i+2], &r.Refs[i+3]
+}
 
 func (n *Node) SetOutLen(out *RefIn, in *RefIn, l uint) {
-	out.dup(in)
+	out.Dup(in)
 	out.SetLen(n.Vnet, l)
 }
 

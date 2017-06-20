@@ -7,7 +7,6 @@ package vnet
 
 import (
 	"github.com/platinasystems/go/elib"
-	"math"
 )
 
 // Array of single counters
@@ -114,10 +113,8 @@ func (c *miniCombinedCounter) Zero() {
 //go:generate gentemplate -d Package=vnet -id CombinedCounter -d VecType=CombinedCounterVec -d Type=CombinedCounter github.com/platinasystems/go/elib/vec.tmpl
 
 type CombinedCounters struct {
-	// Compact cache-friendly counters that may (rarely) overflow.
-	mini miniCombinedCounterVec
-	// 64 bit counters to hold overflow from mini counters.
-	maxi CombinedCounterVec
+	// 64 bit packet and byte counters.
+	values CombinedCounterVec
 
 	valuesLastClear CombinedCounterVec
 
@@ -133,51 +130,21 @@ type CombinedCounters struct {
 //go:generate gentemplate -d Package=vnet -id combinedCountersVec -d VecType=CombinedCountersVec -d Type=CombinedCounters github.com/platinasystems/go/elib/vec.tmpl
 
 func (c *CombinedCounters) Validate(i uint) {
-	c.mini.Validate(i)
-	c.maxi.Validate(i)
+	c.values.Validate(i)
 	c.valuesLastClear.Validate(i)
 }
 
 // Add packet and byte increment to counter.
-func (c *CombinedCounters) Add(i uint, p, b uint) {
-	mini := &c.mini[i]
-
-	op := uint(mini.packets)
-	od := int(mini.byteDiff)
-
-	np := op + p
-	nd := od + int(b-p*uint(c.avePacketSize))
-
-	mini.packets = uint16(np)
-	mini.byteDiff = int16(nd)
-
-	if uint(mini.packets) != np || int(mini.byteDiff) != nd {
-		maxi := &c.maxi[i]
-
-		nb := uint(int(op*uint(c.avePacketSize))+od) + b
-
-		maxi.Packets += uint64(np)
-		maxi.Bytes += uint64(nb)
-		mini.Zero()
-
-		// Update average packet size.
-		c.sumPackets += np
-		c.sumBytes += nb
-		if c.sumPackets >= c.avePacketSizeRecomputeInterval {
-			c.recomputeAvePacketSize()
-		}
-	}
-}
-
 func (c *CombinedCounters) Add64(i uint, p, b uint64) {
-	c.maxi[i].Packets += p
-	c.maxi[i].Bytes += b
+	v := &c.values[i]
+	v.Packets += p
+	v.Bytes += b
 }
+func (c *CombinedCounters) Add(i uint, p, b uint) { c.Add64(i, uint64(p), uint64(b)) }
 
 // Get counter value: 2 flavors.
 func (c *CombinedCounters) Get(i uint, r *CombinedCounter) {
-	*r = c.maxi[i]
-	c.addMini(&c.mini[i], r)
+	*r = c.values[i]
 	r.subNoValidate(&c.valuesLastClear[i])
 }
 
@@ -187,61 +154,12 @@ func (c *CombinedCounters) Value(i uint) (v CombinedCounter) {
 }
 
 func (c *CombinedCounters) Clear(i uint) {
-	v := c.maxi[i]
-	c.addMini(&c.mini[i], &v)
-	c.valuesLastClear[i] = v
-	c.maxi[i] = v
-	c.mini[i].Zero()
+	c.valuesLastClear[i] = c.values[i]
 }
-
-func (c *CombinedCounters) ClearAll() {
-	for i := range c.valuesLastClear {
-		c.Clear(uint(i))
-	}
-}
+func (c *CombinedCounters) ClearAll() { copy(c.valuesLastClear[:], c.values) }
 
 func (c CombinedCountersVec) ClearAll() {
 	for i := range c {
 		c[i].ClearAll()
-	}
-}
-
-func (c *CombinedCounters) addMini(mini *miniCombinedCounter, maxi *CombinedCounter) {
-	maxi.Packets += uint64(mini.packets)
-	maxi.Bytes += uint64(int(uint(mini.packets)*uint(c.avePacketSize)) + int(mini.byteDiff))
-}
-
-func (c *CombinedCounters) flushMini(mini *miniCombinedCounter, maxi *CombinedCounter) {
-	c.addMini(mini, maxi)
-	mini.Zero()
-}
-
-func (c *CombinedCounters) recomputeAvePacketSize() {
-	if c.avePacketSizeRecomputeInterval == 0 {
-		c.avePacketSizeRecomputeInterval = 4 << 10 // sane default
-		return
-	}
-
-	newAve := uint(math.Floor(.5 + float64(c.sumBytes)/float64(c.sumPackets)))
-	if newAve != uint(c.avePacketSize) {
-		// Flush counters since ave packet size is about to change.
-		i, n_left := 0, len(c.mini)
-		for n_left >= 4 {
-			c.flushMini(&c.mini[i+0], &c.maxi[i+0])
-			c.flushMini(&c.mini[i+1], &c.maxi[i+1])
-			c.flushMini(&c.mini[i+2], &c.maxi[i+2])
-			c.flushMini(&c.mini[i+3], &c.maxi[i+3])
-			i += 4
-			n_left -= 4
-		}
-
-		for n_left > 0 {
-			c.flushMini(&c.mini[i+0], &c.maxi[i+0])
-			i++
-			n_left--
-		}
-
-		c.avePacketSize = newAve
-		c.sumBytes, c.sumPackets = 0, 0
 	}
 }

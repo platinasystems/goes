@@ -15,7 +15,7 @@ type vnet_dev struct {
 	ethIfConfig ethernet.InterfaceConfig
 }
 
-func (d *dev) IsUnix() bool { return true }
+func (d *dev) IsUnix() bool { return !d.m.DisableUnix }
 
 func (d *dev) vnetInit() {
 	v := d.m.Vnet
@@ -23,9 +23,13 @@ func (d *dev) vnetInit() {
 	d.Next = []string{
 		rx_next_error:                    "error",
 		rx_next_punt:                     "punt",
+		rx_next_punt_node:                "punt",
 		rx_next_ethernet_input:           "ethernet-input",
 		rx_next_ip4_input_valid_checksum: "ip4-input-valid-checksum",
 		rx_next_ip6_input:                "ip6-input",
+	}
+	if d.m.PuntNode != "" {
+		d.Next[rx_next_punt_node] = d.m.PuntNode
 	}
 	d.Errors = []string{
 		rx_error_none:                 "no error",

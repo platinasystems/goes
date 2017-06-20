@@ -16,12 +16,13 @@ import (
 
 type Streamer interface {
 	get_stream() *Stream
-	Del()
-	PacketHeaders() []vnet.PacketHeader
+	Finalize(refs []vnet.Ref, data_offset uint) bool
 }
 
-func (s *Stream) get_stream() *Stream { return s }
-func (s *Stream) Del()                {}
+//go:generate gentemplate -d Package=pg -id stream -d PoolType=stream_pool -d Type=Streamer -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
+
+func (s *Stream) get_stream() *Stream                                    { return s }
+func (s *Stream) Finalize(r []vnet.Ref, data_offset uint) (changed bool) { return }
 
 type stream_config struct {
 	random_size bool
@@ -37,6 +38,8 @@ type stream_config struct {
 	// Data rate in bits or packets per second.
 	rate_bits_per_sec    float64
 	rate_packets_per_sec float64
+
+	si vnet.Si
 
 	// Next index relative to input node for this stream.
 	next uint
@@ -64,15 +67,19 @@ type Stream struct {
 
 	stream_config
 
-	h         []vnet.PacketHeader
-	DataHooks DataHookVec
+	// Set when Finalizer() changes packet content.
+	finalizer_changed bool
+
+	data_offset uint
+
+	subs []Streamer
+	h    []vnet.PacketHeader
 }
 
-//go:generate gentemplate -d Package=pg -id stream -d PoolType=stream_pool -d Type=Streamer -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
-
-func (s *Stream) GetSize() uint                      { return s.cur_size }
-func (s *Stream) MaxSize() uint                      { return s.max_size }
-func (s *Stream) PacketHeaders() []vnet.PacketHeader { return s.h }
+func (s *Stream) GetSize() uint        { return s.cur_size }
+func (s *Stream) MaxSize() uint        { return s.max_size }
+func (s *Stream) IsVariableSize() bool { return s.max_size != s.min_size }
+func (s *Stream) DataOffset() uint     { return s.data_offset }
 
 func (s *Stream) next_size(cur, i uint) uint {
 	if x := cur + 1 + i; x <= s.max_size {
@@ -82,20 +89,39 @@ func (s *Stream) next_size(cur, i uint) uint {
 	}
 }
 
-func (s *Stream) SetData() {
+func (s *Stream) setData() {
 	if s.max_size < s.min_size {
 		s.max_size = s.min_size
 	}
 	s.cur_size = s.min_size
-	h := s.r.PacketHeaders()
+	var h []vnet.PacketHeader
 
 	// Add incrementing payload to pad to max size.
 	l := uint(0)
+
+	h = append(h, s.h...)
 	for i := range h {
 		l += h[i].Len()
 	}
-	if l < s.MaxSize() {
-		h = append(h, &vnet.IncrementingPayload{Count: s.MaxSize() - l})
+
+	for i := range s.subs {
+		r := s.subs[i]
+		t := r.get_stream()
+		t.stream_config = s.stream_config
+
+		// Subtrace data offset from sizes of sub-stream headers.
+		t.data_offset = l
+		t.min_size -= l
+		t.max_size -= l
+		t.cur_size -= l
+
+		for j := range t.h {
+			l += t.h[j].Len()
+		}
+		h = append(h, t.h...)
+	}
+	if max := s.MaxSize(); max > l {
+		h = append(h, &vnet.IncrementingPayload{Count: max - l})
 	}
 
 	s.data = vnet.MakePacket(h...)
@@ -112,10 +138,7 @@ func (n *node) get_stream_by_name(name string) (r Streamer) {
 func (n *node) new_stream(r Streamer, format string, args ...interface{}) {
 	name := fmt.Sprintf(format, args...)
 	si, ok := n.stream_index_by_name[name]
-	if ok {
-		x := n.get_stream(si)
-		x.Del()
-	} else {
+	if !ok {
 		si = n.stream_pool.GetIndex()
 		n.stream_index_by_name.Set(name, si)
 	}
@@ -139,27 +162,22 @@ func (n *node) del_stream(r Streamer) {
 	n.stream_pool.PutIndex(s.index)
 	delete(n.stream_index_by_name, s.name)
 	s.index = ^uint(0)
-	s.r.Del()
 	s.clean()
 }
 
 func (n *node) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
 func (n *node) GetSwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
 func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)                              {}
+func (n *node) GetAddress() (a []byte)                                                           { return }
+func (n *node) SetAddress(a []byte)                                                              {}
 func (n *node) FormatAddress() (s string)                                                        { return }
 func (n *node) FormatRewrite(rw *vnet.Rewrite) (s string)                                        { return }
 func (n *node) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.PacketType, da []byte) {}
 func (n *node) ParseRewrite(rw *vnet.Rewrite, in *parse.Input)                                   {}
 
-type DataHook func(dst []vnet.Ref, dataOffset uint)
-
-//go:generate gentemplate -id DataHook -d Package=pg -d DepsType=DataHookVec -d Type=DataHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
-
 func (s *Stream) AddHeader(v vnet.PacketHeader) { s.h = append(s.h, v) }
 func (s *Stream) AddStreamer(r Streamer) {
 	t := r.get_stream()
-	s.h = append(s.h, t.h...)
-	for i := range t.DataHooks.hooks {
-		s.DataHooks.hooks = append(s.DataHooks.hooks, t.DataHooks.Get(i))
-	}
+	s.subs = append(s.subs, r)
+	s.subs = append(s.subs, t.subs...)
 }

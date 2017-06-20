@@ -256,18 +256,17 @@ func (n *node) buffer_type_get_refs(s *Stream, dst []vnet.Ref, want, ti uint) {
 	}
 
 	copy(dst, t.free_refs[got-want:got])
+	t.free_refs = t.free_refs[:got-want]
 
 	if s.validate() {
 		for i := uint(0); i < want; i++ {
 			t.validate_ref(&dst[i])
 		}
 	}
-
-	t.free_refs = t.free_refs[:got-want]
 	return
 }
 
-func (s *Stream) validate() bool { return elib.Debug && len(s.DataHooks.hooks) == 0 }
+func (s *Stream) validate() bool { return elib.Debug && !s.finalizer_changed }
 
 type node_validate struct {
 	validate_data     []byte
@@ -295,6 +294,12 @@ func (n *node) generate_n_types(s *Stream, dst []vnet.Ref, n_packets, n_types ui
 				s.cur_size = s.next_size(s.cur_size, 0)
 			}
 		}
+		// Set interface for first buffer in chain.
+		if i == 0 {
+			for j := uint(0); j < n_packets; j++ {
+				this[j].Si = s.si
+			}
+		}
 		if prev != nil {
 			var pp *hw.RefHeader
 			if prev_prev != nil {
@@ -307,9 +312,14 @@ func (n *node) generate_n_types(s *Stream, dst []vnet.Ref, n_packets, n_types ui
 		this = tmp[i&3][:]
 	}
 
-	for i := range s.DataHooks.hooks {
-		// FIXME derive 14 from packet headers
-		s.DataHooks.Get(i)(dst[:n_packets], 14)
+	{
+		refs := dst[:n_packets]
+		l := len(s.subs)
+		for i := 0; i < l; i++ {
+			sub := s.subs[l-1-i]
+			s.finalize(sub, refs)
+		}
+		s.finalize(s.r, refs)
 	}
 
 	if s.validate() {
@@ -322,6 +332,13 @@ func (n *node) generate_n_types(s *Stream, dst []vnet.Ref, n_packets, n_types ui
 	}
 
 	return
+}
+
+func (sup *Stream) finalize(r Streamer, refs []vnet.Ref) {
+	t := r.get_stream()
+	if changed := r.Finalize(refs, t.data_offset); changed {
+		sup.finalizer_changed = changed
+	}
 }
 
 func (n *node) generate(s *Stream, dst []vnet.Ref, n_packets uint) (n_bytes uint) {

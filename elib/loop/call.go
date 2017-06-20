@@ -13,8 +13,8 @@ import (
 )
 
 type stats struct {
-	calls, vectors uint64
-	clocks         cpu.Time
+	calls, vectors, suspends uint64
+	clocks                   cpu.Time
 }
 
 type nodeStats struct {
@@ -29,14 +29,16 @@ func (s *nodeStats) zero() {
 }
 
 func (s *stats) add_helper(n *nodeStats, raw bool) {
-	c, v, l := n.current.calls, n.current.vectors, n.current.clocks
+	c, v, d, l := n.current.calls, n.current.vectors, n.current.suspends, n.current.clocks
 	if !raw {
 		c -= n.lastClear.calls
 		v -= n.lastClear.vectors
 		l -= n.lastClear.clocks
+		d -= n.lastClear.suspends
 	}
 	s.calls += c
 	s.vectors += v
+	s.suspends += d
 	s.clocks += l
 }
 
@@ -215,7 +217,8 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	n := nr.GetNode()
 
 	if len(n.name) == 0 {
-		panic(fmt.Errorf("add next to unregistered node: %s", nextName))
+		err = fmt.Errorf("add next to unregistered node: %s", nextName)
+		return
 	}
 
 	var (
@@ -264,6 +267,8 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	}
 	return
 }
+
+func (n *Node) MaxNext() uint { return uint(len(n.nextNodes)) }
 
 func (l *Loop) AddNextWithIndex(n Noder, x inNoder, withIndex uint) (uint, error) {
 	return l.AddNamedNextWithIndex(n, nodeName(x), withIndex)
@@ -353,7 +358,7 @@ func (i *In) currentOut(l *Loop) *Out             { return i.currentThread(l).cu
 func (i *In) SetLen(l *Loop, nVec uint) {
 	xi, a, o := uint(i.nextIndex), i.currentThread(l), i.currentOut(l)
 	o.Len[xi] = Vi(nVec)
-	if isPending := nVec > 0; isPending && !o.isPending.Set(xi, isPending) {
+	if isPending := nVec > 0; isPending && !o.isPending.SetBit(xi, isPending) {
 		a.pending = append(a.pending, pending{
 			in:            i,
 			out:           o,
@@ -363,9 +368,13 @@ func (i *In) SetLen(l *Loop, nVec uint) {
 		})
 	}
 }
-func (i *In) GetLen(l *Loop) uint {
+func (i *In) GetLen(l *Loop) (nVec uint) {
 	xi, o := uint(i.nextIndex), i.currentOut(l)
-	return uint(o.Len[xi])
+	nVec = uint(o.Len[xi])
+	if nVec == 0 && o.isPending.GetBit(xi) {
+		nVec = MaxVectorLen
+	}
+	return
 }
 
 func (f *Out) nextVectors(xi uint) (nVec uint) {
@@ -425,7 +434,7 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 
 		// Reset this frame.
 		o.Len[xi] = 0
-		o.isPending.Unset(uint(xi))
+		o.isPending.UnsetBit(uint(xi))
 
 		// Call next node.
 		a.currentNode = next
@@ -451,9 +460,10 @@ type In struct {
 	nextIndex   uint32
 }
 
-func (i *In) GetIn() *In     { return i }
-func (i *In) Len() uint      { return uint(i.len) }
-func (i *In) ThreadId() uint { return uint(i.activeIndex) }
+func (i *In) GetIn() *In          { return i }
+func (i *In) InLen() uint         { return uint(i.len) }
+func (i *In) Range() (uint, uint) { return 0, i.InLen() }
+func (i *In) ThreadId() uint      { return uint(i.activeIndex) }
 
 type LooperOut interface {
 	GetOut() *Out

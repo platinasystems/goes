@@ -74,7 +74,8 @@ func (m *ifAddressMain) GetIfAddress(a []uint8, i FibIndex) (ia *IfAddress) {
 	return
 }
 func (m *ifAddressMain) GetIfAddr(i IfAddr) *IfAddress                 { return &m.ifAddrs[i] }
-func (m *ifAddressMain) IfFirstAddress(i vnet.Si) *IfAddress           { return m.GetIfAddr(m.headBySwIf[i]) }
+func (m *ifAddressMain) IfFirstAddr(i vnet.Si) IfAddr                  { return m.headBySwIf[i] }
+func (m *ifAddressMain) IfFirstAddress(i vnet.Si) *IfAddress           { return m.GetIfAddr(m.IfFirstAddr(i)) }
 func (m *ifAddressMain) IfAddressForAdjacency(a *Adjacency) *IfAddress { return m.GetIfAddr(a.IfAddr) }
 
 func (m *ifAddressMain) ForeachIfAddress(si vnet.Si, f func(ia IfAddr, i *IfAddress) error) error {

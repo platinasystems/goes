@@ -5,9 +5,10 @@
 package ip
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/vnet"
 
-	"errors"
+	"fmt"
 )
 
 // Dense index into fib vector.
@@ -21,6 +22,8 @@ type FibId uint32
 type fibMain struct {
 	// Table index indexed by software interface.
 	fibIndexBySi FibIndexVec
+
+	nameByIndex elib.StringVec
 
 	// Hash table mapping table id to fib index.
 	// ID space is not necessarily dense; index space is dense.
@@ -43,14 +46,8 @@ func (f *fibMain) ValidateFibIndexForSi(si vnet.Si) FibIndex {
 	return f.fibIndexForSi(si, true)
 }
 
-var ErrInterfaceIsUp = errors.New("interface is up")
-
-func (m *Main) SetFibIndexForSi(si vnet.Si, fi FibIndex) (err error) {
+func (m *Main) SetFibIndexForSi(si vnet.Si, fi FibIndex) {
 	f := &m.fibMain
-	if si.IsAdminUp(m.v) {
-		err = ErrInterfaceIsUp
-		return
-	}
 	f.fibIndexBySi.Validate(uint(si))
 	f.fibIndexBySi[si] = fi
 	return
@@ -61,4 +58,17 @@ func (f *fibMain) SetFibIndexForId(id FibId, i FibIndex) {
 		f.fibIndexById = make(map[FibId]FibIndex)
 	}
 	f.fibIndexById[id] = i
+}
+
+func (f *fibMain) SetFibNameForIndex(name string, i FibIndex) {
+	f.nameByIndex.Validate(uint(i))
+	f.nameByIndex[i] = name
+}
+func (i FibIndex) Name(m *Main) string {
+	f := &m.fibMain
+	if uint(i) < f.nameByIndex.Len() {
+		return f.nameByIndex[i]
+	} else {
+		return fmt.Sprintf("%d", i)
+	}
 }

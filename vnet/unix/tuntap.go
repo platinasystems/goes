@@ -9,42 +9,64 @@ package unix
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/iomux"
-	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 )
 
-type Interface struct {
-	m *Main
-	// /dev/net/tun
-	dev_net_tun_fd int
+type tuntap_interface struct {
+	m  *Main
+	mu sync.Mutex
+	// Namespace this interface is currently in.
+	namespace *net_namespace
 	// Raw socket bound to this interface used for provisioning.
-	provision_fd int
-	iomux.File   // provisioning socket
-	hi           vnet.Hi
-	si           vnet.Si
-	name         ifreq_name
-	ifindex      int // linux interface index
-	flags        iff_flag
-	node         node
-	mtuBytes     uint
-	mtuBuffers   uint
+	provision_fd   int
+	dev_net_tun_fd int
+	iomux.File     // /dev/net/tun fd for this interface.
+	hi             vnet.Hi
+	si             vnet.Si
+	name           ifreq_name
+	ifindex        uint32 // linux interface index
+
+	// Tuntap interface has been created (via TUNSETIFF ioctl).
+	created bool
+	// True when vnet/kernel interface flag sync has started.
+	flag_sync_in_progress bool
+	// True when vnet/kernel interface flags have been successfully synchronized.
+	flag_sync_done bool
+	flags          iff_flag
+	operState      netlink.IfOperState
+
+	mtuBytes   uint
+	mtuBuffers uint
+
+	active_count int32
+	to_tx        chan *tx_packet_vector
+	pv           *tx_packet_vector
+
+	suspend_saved_out *vnet.RefIn
 }
 
-//go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*Interface github.com/platinasystems/go/elib/vec.tmpl
+//go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
 
-func (m *Main) interfaceForSi(si vnet.Si) *Interface { return m.ifVec[si] }
+func (m *Main) interface_for_si(si vnet.Si) *tuntap_interface {
+	return m.vnet_tuntap_interface_by_si[si]
+}
+func (i *tuntap_interface) Name() string   { return i.name.String() }
+func (i *tuntap_interface) String() string { return i.Name() }
 
-func (i *Interface) Name() string   { return i.name.String() }
-func (i *Interface) String() string { return i.Name() }
+func (i *tuntap_interface) set_name(name string) {
+	v := i.m.v
+	v.HwIf(i.hi).SetName(v, name)
+}
 
-func (i *Interface) setMtu(m *Main, mtu uint) {
+func (i *tuntap_interface) setMtu(m *Main, mtu uint) {
 	i.mtuBytes = mtu
 	i.mtuBuffers = mtu / m.bufferPool.Size
 	if mtu%m.bufferPool.Size != 0 {
@@ -52,42 +74,52 @@ func (i *Interface) setMtu(m *Main, mtu uint) {
 	}
 }
 
-type Main struct {
-	vnet.Package
-
-	verbosePackets bool
-	verboseNetlink int
-
-	netlinkMain
-	nodeMain
-	tuntapMain
-
-	// For external (e.g. non tuntap) interfaces.
-	siByIfIndex map[int]vnet.Si
-}
-
-func AddExternalInterface(v *vnet.Vnet, ifIndex int, si vnet.Si) {
-	m := GetMain(v)
-	if m.siByIfIndex == nil {
-		m.siByIfIndex = make(map[int]vnet.Si)
+func (i *tuntap_interface) close() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.provision_fd > 0 {
+		syscall.Close(i.provision_fd)
+		i.provision_fd = -1
 	}
-	m.siByIfIndex[ifIndex] = si
+	if i.dev_net_tun_fd > 0 {
+		iomux.Del(i)
+		syscall.Close(i.dev_net_tun_fd)
+		i.dev_net_tun_fd = -1
+	}
 }
 
-type tuntapMain struct {
+func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del bool) {
+	if is_del {
+		i.close()
+	} else {
+		is_discovery := !i.created && i.namespace == nil
+		if is_discovery {
+			return
+		}
+		i.namespace = ns
+		// Close sockets before re-opening in new namespace.
+		i.close()
+		if err := i.open_sockets(); err != nil {
+			panic(err)
+		}
+		if err := i.create(); err != nil {
+			panic(err)
+		}
+		if err := i.bind(); err != nil {
+			panic(err)
+		}
+		i.start_up()
+	}
+}
+
+type tuntap_main struct {
 	// Selects whether we create tun or tap interfaces.
-	isTun bool
-
-	mtuBytes uint
-
-	ifVec     interfaceVec
-	ifByIndex map[int]*Interface
-	ifBySi    map[vnet.Si]*Interface
-
+	isTun      bool
+	mtuBytes   uint
 	bufferPool *vnet.BufferPool
 }
 
-func (m *tuntapMain) Init(v *vnet.Vnet) {
+func (m *tuntap_main) Init(v *vnet.Vnet) {
 	m.bufferPool = vnet.DefaultBufferPool
 	v.AddBufferPool(m.bufferPool)
 }
@@ -211,32 +243,66 @@ func (t ifreq_type) String() string {
 func (m *Main) okHi(hi vnet.Hi) (ok bool) { return m.v.HwIfer(hi).IsUnix() }
 func (m *Main) okSi(si vnet.Si) bool      { return m.okHi(m.v.SupHi(si)) }
 
-func (i *Interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
+func (i *tuntap_interface) ioctl_helper(fd int, req ifreq_type, arg uintptr, is_set_flags_down bool) (err error) {
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(req), arg)
+
+	// Ignore set if flags "no such device" error on if down.
+	// This can happen when an interfaces moves to a new namespace and is harmless.
+	if is_set_flags_down && e == syscall.ENODEV {
+		return
+	}
 	if e != 0 {
 		err = fmt.Errorf("tuntap ioctl %s: %s", req, e)
 	}
 	return
 }
+func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
+	return i.ioctl_helper(fd, req, arg, false)
+}
 
-func (i *Interface) setOperState() {
+func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.flag_sync_done }
+
+// Set flags and operational state when vnet-owned tuntap interface becomes ready.
+func (intf *tuntap_interface) sync_flags() {
+	intf.flag_sync_in_progress = true
+	if err := intf.set_flags(); err != nil {
+		panic(err)
+	}
+	intf.forceOperState(true)
+}
+
+func (intf *tuntap_interface) check_flag_sync_done(msg *netlink.IfInfoMessage) {
+	ok := iff_flag(msg.IfInfomsg.Flags)&(iff_up|iff_running|iff_lower_up) == intf.flags
+	intf.flag_sync_done = ok
+	intf.flag_sync_in_progress = !ok
+}
+
+func (intf *tuntap_interface) setOperState() { intf.forceOperState(false) }
+func (intf *tuntap_interface) forceOperState(is_force bool) {
 	os := netlink.IF_OPER_DOWN
-	if i.si.IsAdminUp(i.m.v) && i.hi.IsLinkUp(i.m.v) {
+	if intf.si.IsAdminUp(intf.m.v) && intf.hi.IsLinkUp(intf.m.v) {
 		os = netlink.IF_OPER_UP
 	}
-	msg := netlink.NewIfInfoMessage()
-	msg.Header.Type = netlink.RTM_SETLINK
-	msg.Header.Flags = netlink.NLM_F_REQUEST
-	msg.Index = uint32(i.ifindex)
-	msg.Attrs[netlink.IFLA_OPERSTATE] = os
-	i.m.s.Tx <- msg
+	if os != intf.operState {
+		if !intf.flags_synced() && !is_force {
+			return
+		}
+		intf.operState = os
+		msg := netlink.NewIfInfoMessage()
+		msg.Header.Type = netlink.RTM_SETLINK
+		msg.Header.Flags = netlink.NLM_F_REQUEST
+		msg.Index = uint32(intf.ifindex)
+		msg.L2IfType = uint16(netlink.ARPHRD_ETHER)
+		msg.Attrs[netlink.IFLA_OPERSTATE] = os
+		intf.namespace.NetlinkTx(msg, false)
+	}
 }
 
 func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	hi := m.v.SupHi(si)
 	if !m.okHi(hi) {
 		// Unknown interface punts get sent to error node.
-		m.puntNode.setNext(si, puntNextError)
+		m.rx_node.set_next(si, rx_node_next_error)
 		return
 	}
 
@@ -245,79 +311,136 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		return
 	}
 
-	intf := &Interface{
+	if si.IsSwSubInterface(m.v) {
+		return
+	}
+
+	intf := &tuntap_interface{
 		m:  m,
 		hi: hi,
 		si: si,
 	}
 
-	copy(intf.name[:], si.Name(v))
+	name := si.Name(v)
+	copy(intf.name[:], name)
 
-	if err = intf.open(); err != nil {
-		return
+	if m.vnet_tuntap_interface_by_si == nil {
+		m.vnet_tuntap_interface_by_si = make(map[vnet.Si]*tuntap_interface)
+	}
+	m.vnet_tuntap_interface_by_si[si] = intf
+	if m.vnet_tuntap_interface_by_address == nil {
+		m.vnet_tuntap_interface_by_address = make(map[string]*tuntap_interface)
+	}
+	m.vnet_tuntap_interface_by_address[string(hi.GetAddress(v))] = intf
+	return
+}
+
+func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
+	nm := &m.net_namespace_main
+
+	// Create any VNET interfaces that were not found via netlink discovery.
+	for si, intf := range m.vnet_tuntap_interface_by_si {
+		if _, ok := nm.interface_by_si[si]; !ok {
+			intf.namespace = &nm.default_namespace
+			err = intf.init(m)
+			if err != nil {
+				return
+			}
+		}
 	}
 
-	// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
-	{
-		r := ifreq_flags{name: intf.name}
-		r.flags = iff_no_pi
-		if m.isTun {
-			r.flags |= iff_tun
-		} else {
-			r.flags |= iff_tap
+	// Initialize other previously existing vnet tuntap interfaces.
+	for _, nsi := range nm.interface_by_si {
+		if intf := nsi.tuntap; intf != nil {
+			intf.namespace = nsi.namespace
+			err = intf.init(m)
+			if err != nil {
+				return
+			}
+
+			intf.get_flags()
 		}
-		// NB: kernel tun.c sets lower_up flag.  Always set; link state reflected in operstate via netlink.
-		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
+	}
+
+	// Perform all defered registrations for unix interfaces.
+	for _, hw := range m.registered_hwifer_by_si {
+		m.RegisterHwInterface(hw)
+	}
+
+	return
+}
+
+func (intf *tuntap_interface) open_sockets() (err error) {
+	ns := intf.namespace
+	err, _ = elib.WithNamespace(ns.ns_fd, ns.m.default_namespace.ns_fd, syscall.CLONE_NEWNET, func() (err error) {
+		if intf.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0); err != nil {
+			err = fmt.Errorf("tuntap open /dev/net/tun: %s", err)
 			return
 		}
-		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
-			return
+		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
+			err = fmt.Errorf("tuntap socket AF_PACKET: %s", err)
 		}
+		return
+	})
+	if err = syscall.SetsockoptInt(intf.provision_fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 4<<20); err != nil {
+		err = fmt.Errorf("tuntap SO_RCVBUF: %s", err)
 	}
+	return
+}
 
-	// Create provisioning socket.
-	eth_p_all := uint16(vnet.Uint16(syscall.ETH_P_ALL).FromHost())
-	if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
-		err = fmt.Errorf("tuntap socket: %s", err)
+// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
+func (intf *tuntap_interface) create() (err error) {
+	r := ifreq_flags{name: intf.name}
+	r.flags = iff_no_pi
+	if intf.m.isTun {
+		r.flags |= iff_tun
+	} else {
+		r.flags |= iff_tap
+	}
+	intf.created = true
+	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 		return
 	}
+	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
+		return
+	}
+	return
+}
+
+// Bind the provisioning socket to the interface.
+func (intf *tuntap_interface) bind() (err error) {
+	sa := syscall.SockaddrLinklayer{
+		Ifindex:  int(intf.ifindex),
+		Protocol: eth_p_all,
+	}
+	if err = syscall.Bind(intf.provision_fd, &sa); err != nil {
+		err = fmt.Errorf("tuntap bind: %s", err)
+	}
+	return
+}
+
+func (intf *tuntap_interface) start_up() {
+	intf.to_tx = make(chan *tx_packet_vector, vnet.MaxVectorLen)
+	intf.Fd = intf.dev_net_tun_fd
+	iomux.Add(intf)
+}
+
+func (intf *tuntap_interface) init(m *Main) (err error) {
+	err = intf.open_sockets()
 	defer func() {
 		if err != nil {
-			syscall.Close(intf.provision_fd)
+			intf.close()
 		}
 	}()
 
-	// Find linux interface index.
-	{
-		r := ifreq_int{name: intf.name}
-		if err = intf.ioctl(intf.provision_fd, ifreq_GETIFINDEX, uintptr(unsafe.Pointer(&r))); err != nil {
-			return
-		}
-		intf.ifindex = r.i
+	// Create interface (set flags) and make persistent (e.g. interface stays around when we die).
+	if err = intf.create(); err != nil {
+		return
 	}
 
-	// Bind the provisioning socket to the interface.
-	{
-		sa := syscall.SockaddrLinklayer{
-			Ifindex:  intf.ifindex,
-			Protocol: eth_p_all,
-		}
-		if err = syscall.Bind(intf.provision_fd, &sa); err != nil {
-			err = fmt.Errorf("tuntap bind: %s", err)
-			return
-		}
-	}
+	intf.bind()
 
-	// Fetch initial interface flags.
-	{
-		r := ifreq_int{name: intf.name}
-		if err = intf.ioctl(intf.provision_fd, ifreq_GETIFFLAGS, uintptr(unsafe.Pointer(&r))); err != nil {
-			return
-		}
-		intf.flags = iff_flag(r.i)
-	}
-
-	if eifer, ok := m.v.HwIfer(hi).(ethernet.HwInterfacer); ok {
+	if eifer, ok := m.v.HwIfer(intf.hi).(ethernet.HwInterfacer); ok {
 		ei := eifer.GetInterface()
 
 		// Set MTU.
@@ -372,25 +495,40 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		}
 	}
 
-	m.ifVec.Validate(uint(si))
-	m.ifVec[si] = intf
-	if m.ifByIndex == nil {
-		m.ifByIndex = make(map[int]*Interface)
-		m.ifBySi = make(map[vnet.Si]*Interface)
-	}
-	m.ifBySi[intf.si] = intf
-	m.ifByIndex[intf.ifindex] = intf
+	// Hook up unix rx node to interface transmit node.
+	next := m.v.AddNamedNext(&m.rx_node, intf.Name())
+	m.rx_node.set_next(intf.si, rx_node_next(next))
 
-	// Set operational state to down.
-	intf.setOperState()
-
-	// Create Vnet interface.
-	intf.interfaceNodeInit(m)
+	intf.start_up()
 
 	return
 }
 
-func (m *Main) maybeChangeFlag(intf *Interface, isUp bool, flag iff_flag) (err error) {
+func (intf *tuntap_interface) set_flags() (err error) {
+	r := ifreq_int{
+		name: intf.name,
+		i:    int(intf.flags),
+	}
+	is_set_flags_down := intf.flags&iff_up == 0
+	err = intf.ioctl_helper(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)), is_set_flags_down)
+	return
+}
+
+func (intf *tuntap_interface) get_flags() (err error) {
+	r := ifreq_int{
+		name: intf.name,
+	}
+	err = intf.ioctl(intf.provision_fd, ifreq_GETIFFLAGS, uintptr(unsafe.Pointer(&r)))
+	intf.flags = iff_flag(r.i)
+	isUp := intf.flags&iff_up != 0
+	err = intf.si.SetAdminUp(intf.m.v, isUp)
+	intf.flag_sync_in_progress = false
+	intf.flag_sync_done = true
+	intf.forceOperState(true)
+	return
+}
+
+func (m *Main) maybeChangeFlag(intf *tuntap_interface, isUp bool, flag iff_flag) (err error) {
 	change := false
 	switch {
 	case isUp && intf.flags&flag != flag:
@@ -400,27 +538,21 @@ func (m *Main) maybeChangeFlag(intf *Interface, isUp bool, flag iff_flag) (err e
 		change = true
 		intf.flags &^= flag
 	}
-	if change {
-		r := ifreq_int{
-			name: intf.name,
-			i:    int(intf.flags),
-		}
-		err = intf.ioctl(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)))
+	if change && intf.flags_synced() {
+		err = intf.set_flags()
 	}
 	return
 }
 
 func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) {
-	if !m.okSi(si) {
+	if !m.okSi(si) || si.IsSwSubInterface(v) {
 		return
 	}
-	intf := m.interfaceForSi(si)
+	intf := m.interface_for_si(si)
 	err = m.maybeChangeFlag(intf, isUp, iff_up|iff_running)
 	if err != nil {
 		return
 	}
-	// Reflect admin state in node interface (e.g. XXX unix).
-	intf.node.SetAdminUp(isUp)
 	intf.setOperState()
 	return
 }
@@ -429,33 +561,18 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if !m.okHi(hi) {
 		return
 	}
-	intf := m.interfaceForSi(v.HwIf(hi).Si())
+	intf := m.interface_for_si(v.HwIf(hi).Si())
 	err = m.maybeChangeFlag(intf, isUp, iff_lower_up)
 	if err != nil {
 		return
 	}
-	// Reflect link state in node interface (e.g. XXX unix).
-	intf.node.SetLinkUp(isUp)
 	intf.setOperState()
 	return
 }
 
-func (i *Interface) open() (err error) {
-	i.dev_net_tun_fd, err = syscall.Open("/dev/net/tun", syscall.O_RDWR, 0)
-	return
-}
-
-func (i *Interface) close() (err error) {
-	err = syscall.Close(i.provision_fd)
-	err = syscall.Close(i.dev_net_tun_fd)
-	i.dev_net_tun_fd = -1
-	i.provision_fd = -1
-	return
-}
+var eth_p_all = uint16(vnet.Uint16(syscall.ETH_P_ALL).FromHost())
 
 func (m *Main) Init() (err error) {
-	m.nodeMain.Init(m)
-
 	// Suitable defaults for an Ethernet-like tun/tap device.
 	m.mtuBytes = 4096 + 256
 
@@ -463,22 +580,4 @@ func (m *Main) Init() (err error) {
 	m.v.RegisterSwIfAdminUpDownHook(m.SwIfAdminUpDown)
 	m.v.RegisterHwIfLinkUpDownHook(m.HwIfLinkUpDown)
 	return
-}
-
-func (m *Main) Configure(in *parse.Input) {
-	for !in.End() {
-		switch {
-		case in.Parse("mtu %d", &m.mtuBytes):
-		case in.Parse("tap"):
-			m.isTun = false
-		case in.Parse("tun"):
-			m.isTun = true
-		case in.Parse("dump-packets"):
-			m.verbosePackets = true
-		case in.Parse("dump-netlink"):
-			m.verboseNetlink++
-		default:
-			panic(parse.ErrInput)
-		}
-	}
 }

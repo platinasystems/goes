@@ -160,14 +160,16 @@ func RegisterInterface(v *vnet.Vnet, hi HwInterfacer, config *InterfaceConfig, f
 }
 
 func (hi *Interface) FormatAddress() string    { return hi.Address.String() }
+func (hi *Interface) GetAddress() []byte       { return hi.Address[:] }
+func (hi *Interface) SetAddress(a []byte)      { copy(hi.Address[:], a) }
 func (hi *Interface) EthernetAddress() Address { return hi.Address }
 
 var rewriteTypeMap = [...]Type{
-	vnet.IP4:            IP4,
-	vnet.IP6:            IP6,
-	vnet.MPLS_UNICAST:   MPLS_UNICAST,
-	vnet.MPLS_MULTICAST: MPLS_MULTICAST,
-	vnet.ARP:            ARP,
+	vnet.IP4:            TYPE_IP4,
+	vnet.IP6:            TYPE_IP6,
+	vnet.MPLS_UNICAST:   TYPE_MPLS_UNICAST,
+	vnet.MPLS_MULTICAST: TYPE_MPLS_MULTICAST,
+	vnet.ARP:            TYPE_ARP,
 }
 
 type rwHeader struct {
@@ -182,8 +184,8 @@ func (hi *Interface) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.
 	t := rewriteTypeMap[packetType].FromHost()
 	size := uintptr(HeaderBytes)
 	if sw != sup {
-		h.Type = VLAN.FromHost()
-		h.vlan[0].Priority_cfi_and_id = vnet.Uint16(sw.Id(v)).FromHost()
+		h.Type = TYPE_VLAN.FromHost()
+		h.vlan[0].Tag = VlanTag(sw.Id(v)).FromHost()
 		h.vlan[0].Type = t
 		size += VlanHeaderBytes
 	} else {

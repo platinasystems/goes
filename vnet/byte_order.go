@@ -5,6 +5,7 @@
 package vnet
 
 // Network byte order helpers.
+type Uint8 uint8 // dummy used to satisfy MaskedStringer interface
 type Uint16 uint16
 type Uint32 uint32
 type Uint64 uint64
@@ -20,6 +21,8 @@ func (x *Uint32) Set(v uint)      { *x = Uint32(swap32(uint32(v))) }
 func (x Uint64) ToHost() uint64   { return swap64(uint64(x)) }
 func (x Uint64) FromHost() Uint64 { return Uint64(swap64(uint64(x))) }
 func (x *Uint64) Set(v uint)      { *x = Uint64(swap64(uint64(v))) }
+
+func HostIsNetworkByteOrder() bool { return Uint16(0x1234).FromHost() == 0x1234 }
 
 func ByteAdd(a []byte, x uint64) {
 	i := len(a) - 1

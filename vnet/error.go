@@ -76,9 +76,9 @@ func (en *errorNode) NodeOutput(ri *RefIn) {
 
 	cache := ts.cache
 	cacheCount := uint64(0)
-	i, n := uint(0), ri.Len()
+	i, n := uint(0), ri.InLen()
 	for i+4 <= n {
-		e0, e1, e2, e3 := ri.Refs[i+0].err, ri.Refs[i+1].err, ri.Refs[i+2].err, ri.Refs[i+3].err
+		e0, e1, e2, e3 := ErrorRef(ri.Refs[i+0].Aux), ErrorRef(ri.Refs[i+1].Aux), ErrorRef(ri.Refs[i+2].Aux), ErrorRef(ri.Refs[i+3].Aux)
 		cacheCount += 4
 		i += 4
 		if e0 == cache && e1 == cache && e2 == cache && e3 == cache {
@@ -96,7 +96,7 @@ func (en *errorNode) NodeOutput(ri *RefIn) {
 	}
 
 	for i < n {
-		ts.count(ri.Refs[i+0].err, 1)
+		ts.count(ErrorRef(ri.Refs[i+0].Aux), 1)
 		i++
 	}
 
@@ -118,7 +118,7 @@ func (n *Node) NewError(s string) (r ErrorRef) {
 	return
 }
 
-func (r *refOpaque) SetError(n *Node, i uint) { r.err = n.errorRefs[i] }
+func (r *RefOpaque) SetError(n *Node, i uint) { r.Aux = uint32(n.errorRefs[i]) }
 func (n *Node) SetError(r *Ref, i uint)       { r.SetError(n, i) }
 func (n *Node) CountError(i, count uint) {
 	ts := ErrorNode.getThread(0)

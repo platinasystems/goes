@@ -5,7 +5,6 @@
 package unix
 
 import (
-	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
@@ -32,12 +31,63 @@ func (c *msg_counts) count(m netlink.Message) {
 	c.by_type[m.MsgType()]++
 	c.total++
 }
+func (c *msg_counts) clear() {
+	c.total = 0
+	for i := range c.by_type {
+		c.by_type[i] = 0
+	}
+}
 
-type netlinkMain struct {
+type netlink_socket_pair struct {
+	broadcast_socket, unicast_socket *netlink.Socket
+}
+
+func (p *netlink_socket_pair) close() {
+	p.broadcast_socket.Close()
+	p.unicast_socket.Close()
+}
+
+func (p *netlink_socket_pair) configure(broadcast_fd, unicast_fd int) (err error) {
+	cf := netlink.SocketConfig{
+		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
+		RxBytes:           8 << 20,
+		DontListenAllNsid: true,
+	}
+	cf.Groups = []netlink.MulticastGroup{
+		netlink.RTNLGRP_LINK,
+		netlink.RTNLGRP_NEIGH,
+		netlink.RTNLGRP_IPV4_IFADDR,
+		netlink.RTNLGRP_IPV4_ROUTE,
+		netlink.RTNLGRP_IPV4_MROUTE,
+		netlink.RTNLGRP_IPV6_IFADDR,
+		netlink.RTNLGRP_IPV6_ROUTE,
+		netlink.RTNLGRP_IPV6_MROUTE,
+		netlink.RTNLGRP_NSID,
+	}
+	if p.broadcast_socket, err = netlink.NewWithConfigAndFile(cf, broadcast_fd); err != nil {
+		return
+	}
+	cf.Groups = []netlink.MulticastGroup{netlink.NOOP_RTNLGRP}
+	if p.unicast_socket, err = netlink.NewWithConfigAndFile(cf, unicast_fd); err != nil {
+		p.broadcast_socket.Close()
+		return
+	}
+	return
+}
+
+func (p *netlink_socket_pair) NetlinkTx(request netlink.Message, wait bool) (reply netlink.Message) {
+	p.unicast_socket.Tx <- request
+	if wait {
+		reply = <-p.unicast_socket.Rx
+	}
+	return
+}
+
+type netlink_main struct {
 	loop.Node
+	net_namespace_main
+
 	m                         *Main
-	s                         *netlink.Socket
-	e                         *netlinkEvent
 	eventPool                 sync.Pool
 	add_del_chan              chan netlink_add_del
 	unreachable_ip4_next_hops map[ip4.NextHop]unreachable_ip4_next_hop
@@ -45,51 +95,42 @@ type netlinkMain struct {
 	msg_stats                 struct {
 		ignored, handled msg_counts
 	}
-	dummyInterfaceMain
-	fibIndexByNsid map[int]ip.FibIndex
-	fibIndexPool   elib.Pool
 }
 
 // Ignore non-tuntap interfaces (e.g. eth0).
-func (m *Main) getTuntapInterface(ifindex uint32) (intf *Interface) {
-	intf = m.ifByIndex[int(ifindex)]
+func (ns *net_namespace) getTuntapInterface(ifindex uint32) (intf *tuntap_interface, ok bool) {
+	ns.mu.Lock()
+	intf, ok = ns.vnet_tuntap_interface_by_ifindex[ifindex]
+	ns.mu.Unlock()
 	return
 }
 
-type dummyInterface struct {
+type dummy_interface struct {
 	isAdminUp bool
 	// Current set of ip4/ip6 addresses for dummy interface collected from netlink IfAddrMessage.
 	ip4Addrs map[ip4.Address]ip.FibIndex
 	ip6Addrs map[ip6.Address]ip.FibIndex
 }
 
-type dummyInterfaceMain struct {
-	// Linux ifindex to dummy interface map.
-	dummyIfByIndex map[uint32]*dummyInterface
-}
-
 // True if given netlink NEWLINK message is for a dummy interface as indicated by IFLA_INFO_KIND.
-func (m *Main) forDummyInterface(msg *netlink.IfInfoMessage) (ok bool) {
-	if la, la_ok := msg.Attrs[netlink.IFLA_LINKINFO].(*netlink.AttrArray); la_ok {
-		ok = la.X[netlink.IFLA_INFO_KIND].String() == "dummy"
-	}
-	if ok {
-		if m.dummyIfByIndex == nil {
-			m.dummyIfByIndex = make(map[uint32]*dummyInterface)
+func (ns *net_namespace) forDummyInterface(msg *netlink.IfInfoMessage) (ok bool) {
+	if k := msg.InterfaceKind(); k == netlink.InterfaceKindDummy {
+		if ns.dummy_interface_by_ifindex == nil {
+			ns.dummy_interface_by_ifindex = make(map[uint32]*dummy_interface)
 		}
-		if _, known := m.dummyIfByIndex[msg.Index]; !known {
-			m.dummyIfByIndex[msg.Index] = &dummyInterface{}
+		if _, known := ns.dummy_interface_by_ifindex[msg.Index]; !known {
+			ns.dummy_interface_by_ifindex[msg.Index] = &dummy_interface{}
 		}
 	}
 	return
 }
 
-func (m *Main) getDummyInterface(ifindex uint32) (i *dummyInterface, ok bool) {
-	i, ok = m.dummyIfByIndex[ifindex]
+func (ns *net_namespace) getDummyInterface(ifindex uint32) (i *dummy_interface, ok bool) {
+	i, ok = ns.dummy_interface_by_ifindex[ifindex]
 	return
 }
 
-func (i *dummyInterface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
+func (i *dummy_interface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
 	for addr, fi := range i.ip4Addrs {
 		m4 := ip4.GetMain(m.v)
 		p := ip4.Prefix{Address: addr, Len: 32}
@@ -103,132 +144,127 @@ func (i *dummyInterface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
 		m6.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
 	}
 }
-func (m *Main) knownInterface(i uint32) (ok bool) {
-	ok = nil != m.getTuntapInterface(i)
+func (ns *net_namespace) knownInterface(i uint32) (ok bool) {
+	_, ok = ns.getTuntapInterface(i)
 	if !ok {
-		_, ok = m.siByIfIndex[int(i)]
+		_, ok = ns.si_by_ifindex[i]
 	}
 	return
 }
 
-func (m *Main) msgGeneratesEvent(msg netlink.Message) (ok bool) {
+func (ns *net_namespace) msg_for_vnet_interface(msg netlink.Message) (ok bool) {
 	ok = true
 	switch v := msg.(type) {
 	case *netlink.IfInfoMessage:
-		if ok = m.knownInterface(v.Index); !ok {
-			ok = m.forDummyInterface(v)
+		if ok = ns.knownInterface(v.Index); !ok {
+			ok = ns.forDummyInterface(v)
 		}
 	case *netlink.IfAddrMessage:
-		if ok = m.knownInterface(v.Index); !ok {
-			_, ok = m.getDummyInterface(v.Index)
+		if ok = ns.knownInterface(v.Index); !ok {
+			_, ok = ns.getDummyInterface(v.Index)
 		}
 	case *netlink.RouteMessage:
-		ok = m.knownInterface(uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr)))
+		ok = ns.knownInterface(uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr)))
 	case *netlink.NeighborMessage:
-		ok = m.knownInterface(v.Index)
+		ok = ns.knownInterface(v.Index)
+	case *netlink.DoneMessage, *netlink.NetnsMessage, *netlink.ErrorMessage:
 	default:
-		ok = false // ignore done/error and other messages
+		panic(fmt.Errorf("unknown message %s", msg))
 	}
 	return
 }
 
-func (m *Main) addMsg(msg netlink.Message) {
+func (m *Main) addMsg(ns *net_namespace, msg netlink.Message) {
 	if msg == nil {
 		// Can happen when reading message from closed channel.
 		return
 	}
-	e := m.getEvent()
-	if m.msgGeneratesEvent(msg) {
-		e.msgs = append(e.msgs, msg)
-	} else {
-		m.msg_stats.ignored.count(msg)
-		if m.verboseNetlink > 1 {
-			m.v.Logf("netlink ignore %s\n", msg)
-		}
-		// Done with message.
-		msg.Close()
-	}
+	e := ns.getEvent(m)
+	e.ns = ns
+	e.msgs = append(e.msgs, msg)
 }
 
-func (m *Main) listener(l *loop.Loop) {
-	nm := &m.netlinkMain
-	for {
-		// Block until next message.
-		msg := <-nm.s.Rx
-		m.addMsg(msg)
+func (nm *netlink_main) listener(ns *net_namespace) {
+	// Block until next message.
+	for msg := range ns.broadcast_socket.Rx {
+		nm.m.addMsg(ns, msg)
 
 		// Read any remaining messages without blocking.
 	loop:
 		for {
 			select {
-			case msg := <-nm.s.Rx:
-				m.addMsg(msg)
+			case msg := <-ns.broadcast_socket.Rx:
+				nm.m.addMsg(ns, msg)
 			default:
 				break loop
 			}
 		}
 
 		// Add event to be handled next time through main loop.
-		nm.e.add()
+		ns.current_event.add()
 	}
 }
 
-func (nm *netlinkMain) LoopInit(l *loop.Loop) {
-	mustaddevent := false
-	m4 := ip4.GetMain(nm.m.v)
-	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
-	err := nm.s.Listen(func(msg netlink.Message) error {
-		nm.m.addMsg(msg)
-		mustaddevent = true
+func (ns *net_namespace) listen(nm *netlink_main) {
+	err := ns.broadcast_socket.Listen(func(msg netlink.Message) error {
+		nm.m.addMsg(ns, msg)
 		return nil
 	})
 	if err != nil {
 		panic(err)
 	}
-	if mustaddevent {
-		nm.e.add()
+
+	// Add artificial done message to mark end of initial dump for this namespace.
+	{
+		msg := netlink.NewDoneMessage()
+		msg.Type = netlink.NLMSG_DONE
+		nm.m.addMsg(ns, msg)
 	}
-	go nm.m.listener(l)
+
+	ns.current_event.add()
+	go nm.listener(ns)
 }
 
-func (nm *netlinkMain) Init(m *Main) {
+func (nm *netlink_main) LoopInit(l *loop.Loop) {
+	m4 := ip4.GetMain(nm.m.v)
+	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
+	if err := nm.namespace_init(); err != nil {
+		panic(err)
+	}
+	nm.watch_for_new_net_namespaces()
+}
+
+func (nm *netlink_main) Init(m *Main) {
 	nm.m = m
 	nm.eventPool.New = nm.newEvent
 	nm.unreachable_ip4_next_hops = make(map[ip4.NextHop]unreachable_ip4_next_hop)
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
 	nm.cliInit()
-	cf := netlink.SocketConfig{
-		// Tested and needed to insert/delete 1e6 routes via "netlink route" cli.
-		RxBytes: 8 << 20,
-	}
-	if socket, err := netlink.NewWithConfig(cf); err != nil {
-		panic(err)
-	} else {
-		nm.s = socket
-	}
+	nm.namespace_register_nodes()
 }
 
 type netlinkEvent struct {
 	vnet.Event
 	m    *Main
 	msgs []netlink.Message
+	ns   *net_namespace
 }
 
-func (m *netlinkMain) newEvent() interface{} {
+func (m *netlink_main) newEvent() interface{} {
 	return &netlinkEvent{m: m.m}
 }
 
-func (m *netlinkMain) getEvent() *netlinkEvent {
-	if m.e == nil {
-		m.e = m.eventPool.Get().(*netlinkEvent)
+func (ns *net_namespace) getEvent(m *Main) *netlinkEvent {
+	if ns.current_event == nil {
+		ns.current_event = m.eventPool.Get().(*netlinkEvent)
 	}
-	return m.e
+	return ns.current_event
 }
 func (e *netlinkEvent) add() {
 	if len(e.msgs) > 0 {
 		e.m.v.SignalEvent(e)
-		e.m.e = nil
+		e.ns.current_event = nil
 	}
 }
 func (e *netlinkEvent) put() {
@@ -276,13 +312,12 @@ func (e *netlinkEvent) String() (s string) {
 	return
 }
 
-func (m *Main) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
-	intf := m.getTuntapInterface(ifIndex)
-	if intf != nil {
-		si = intf.si
-		ok = true
+func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_interface, ok bool) {
+	i, ok = ns.getTuntapInterface(ifIndex)
+	if ok {
+		si = i.si
 	} else {
-		si, ok = m.siByIfIndex[int(ifIndex)]
+		si, ok = ns.si_by_ifindex[ifIndex]
 	}
 	if !ok {
 		si = vnet.SiNil
@@ -290,86 +325,104 @@ func (m *Main) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
 	return
 }
 
-func (m *Main) fibIndexForNsid(nsid int) (fi ip.FibIndex) {
-	if m.fibIndexByNsid == nil {
-		m.fibIndexByNsid = make(map[int]ip.FibIndex)
+func (ns *net_namespace) fibIndexForNamespace() ip.FibIndex { return ip.FibIndex(ns.index) }
+func (ns *net_namespace) fibInit(is_del bool) {
+	m4 := ip4.GetMain(ns.m.m.v)
+	var name string
+	if !is_del {
+		name = ns.name
 	}
-	var ok bool
-	if fi, ok = m.fibIndexByNsid[nsid]; !ok {
-		// Use pool so that nsid's may be deleted.
-		fi = ip.FibIndex(m.fibIndexPool.GetIndex(uint(len(m.fibIndexByNsid))))
-	}
-	m.fibIndexByNsid[nsid] = fi
-	return
+	m4.SetFibNameForIndex(name, ns.fibIndexForNamespace())
 }
-
-func (m *Main) validateFibIndexForNsid(si vnet.Si, nsid int) {
-	m4 := ip4.GetMain(m.v)
-	m4.SetFibIndexForSi(si, m.fibIndexForNsid(nsid))
+func (ns *net_namespace) validateFibIndexForSi(si vnet.Si) {
+	m4 := ip4.GetMain(ns.m.m.v)
+	m4.SetFibIndexForSi(si, ns.fibIndexForNamespace())
+	return
 }
 
 func (e *netlinkEvent) EventAction() {
 	var err error
-	vn := e.m.v
+	m := e.m
+	vn := m.v
 	known := false
+
 	for imsg, msg := range e.msgs {
+		if v, ok := msg.(*netlink.IfInfoMessage); ok {
+			e.ns.add_del_interface(m, v)
+		}
+
+		if !e.ns.msg_for_vnet_interface(msg) {
+			m.msg_stats.ignored.count(msg)
+			if m.verbose_netlink {
+				m.v.Logf("%s: netlink ignore %s\n", e.ns, msg)
+			}
+			// Done with message.
+			msg.Close()
+			continue
+		}
+
 		isLastInEvent := imsg+1 == len(e.msgs)
-		if e.m.verboseNetlink > 0 {
-			e.m.v.Logf("netlink %s\n", msg)
+		if m.verbose_netlink {
+			m.v.Logf("%s: netlink %s\n", e.ns, msg)
 		}
 		switch v := msg.(type) {
 		case *netlink.IfInfoMessage:
 			// Respect flag admin state changes from unix shell via ifconfig or "ip link" commands.
 			known = true
 			isUp := v.IfInfomsg.Flags&netlink.IFF_UP != 0
-			if di, ok := e.m.getDummyInterface(v.Index); ok {
+			if di, ok := e.ns.getDummyInterface(v.Index); ok {
 				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
 				di.isAdminUp = isUp
-				di.addDelDummyPuntPrefixes(e.m, !isUp)
-			} else if si, ok := e.m.siForIfIndex(v.Index); ok {
-				if isUp {
-					e.m.validateFibIndexForNsid(si, *msg.Nsid())
+				di.addDelDummyPuntPrefixes(m, !isUp)
+			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok {
+				if intf == nil || intf.flags_synced() {
+					e.ns.validateFibIndexForSi(si)
 					err = si.SetAdminUp(vn, isUp)
-				} else {
-					err = si.SetAdminUp(vn, isUp)
-					e.m.validateFibIndexForNsid(si, *msg.Nsid())
+				} else if intf.flag_sync_in_progress {
+					intf.check_flag_sync_done(v)
 				}
 			}
 		case *netlink.IfAddrMessage:
 			switch v.Family {
 			case netlink.AF_INET:
 				known = true
-				err = e.m.ip4IfaddrMsg(v)
+				err = e.ip4IfaddrMsg(v)
 			case netlink.AF_INET6:
 				known = true
-				err = e.m.ip6IfaddrMsg(v)
+				err = e.ip6IfaddrMsg(v)
 			}
 		case *netlink.RouteMessage:
 			switch v.Family {
 			case netlink.AF_INET:
 				known = true
-				err = e.m.ip4RouteMsg(v, isLastInEvent)
+				err = e.ip4RouteMsg(v, isLastInEvent)
 			case netlink.AF_INET6:
 				known = true
-				err = e.m.ip6RouteMsg(v, isLastInEvent)
+				err = e.ip6RouteMsg(v, isLastInEvent)
 			}
 		case *netlink.NeighborMessage:
 			switch v.Family {
 			case netlink.AF_INET:
 				known = true
-				err = e.m.ip4NeighborMsg(v)
+				err = e.ip4NeighborMsg(v)
 			case netlink.AF_INET6:
 				known = true
-				err = e.m.ip6NeighborMsg(v)
+				err = e.ip6NeighborMsg(v)
 			}
+		case *netlink.NetnsMessage:
+			known = true
+			err = e.netnsMessage(v)
+		case *netlink.DoneMessage:
+			known = true
+			err = e.ns.netlink_dump_done(m)
 		}
 		if !known {
 			err = fmt.Errorf("unkown")
 		}
 		if err != nil {
-			e.m.v.Logf("netlink %s: %s\n", err, msg.String())
+			m.v.Logf("%s: netlink %s: %s\n", e.ns, err, msg.String())
 		}
-		e.m.msg_stats.handled.count(msg)
+		m.msg_stats.handled.count(msg)
 		// Return message to pools.
 		msg.Close()
 	}
@@ -419,20 +472,20 @@ func ethernetAddress(t netlink.Attr) (a ethernet.Address) {
 	return
 }
 
-func (m *Main) ifAttr(t netlink.Attr) (si vnet.Si, ok bool) {
+func (ns *net_namespace) ifAttr(t netlink.Attr) (si vnet.Si, ok bool) {
 	si = vnet.SiNil
 	if t != nil {
-		si, ok = m.siForIfIndex(t.(netlink.Uint32Attr).Uint())
+		si, _, ok = ns.siForIfIndex(t.(netlink.Uint32Attr).Uint())
 	}
 	return
 }
 
-func (m *Main) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
+func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 	p := ip4Prefix(v.Attrs[netlink.IFA_ADDRESS], v.Prefixlen)
-	m4 := ip4.GetMain(m.v)
+	m4 := ip4.GetMain(e.m.v)
 	isDel := v.Header.Type == netlink.RTM_DELADDR
-	if di, ok := m.getDummyInterface(v.Index); ok {
-		fi := m.fibIndexForNsid(*v.Nsid())
+	if di, ok := e.ns.getDummyInterface(v.Index); ok {
+		fi := e.ns.fibIndexForNamespace()
 		q := p.ToIpPrefix()
 		if di.isAdminUp || isDel {
 			m4.AddDelRoute(&q, fi, ip.AdjPunt, isDel)
@@ -445,13 +498,14 @@ func (m *Main) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 			}
 			di.ip4Addrs[p.Address] = fi
 		}
-	} else if si, ok := m.siForIfIndex(v.Index); ok {
+	} else if si, _, ok := e.ns.siForIfIndex(v.Index); ok {
+		e.ns.validateFibIndexForSi(si)
 		err = m4.AddDelInterfaceAddress(si, &p, isDel)
 	}
 	return
 }
 
-func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
+func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	if v.Ndmsg.Type != netlink.RTN_UNICAST {
 		return
 	}
@@ -466,7 +520,7 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	case netlink.NUD_PERMANENT:
 		isStatic = true
 	}
-	si, ok := m.siForIfIndex(v.Index)
+	si, _, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
 		// Ignore neighbors for non vnet interfaces.
 		return
@@ -477,11 +531,11 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		Ethernet: ethernetAddress(v.Attrs[netlink.NDA_LLADDR]),
 		Ip:       nh.Address.ToIp(),
 	}
-	m4 := ip4.GetMain(m.v)
-	em := ethernet.GetMain(m.v)
+	m4 := ip4.GetMain(e.m.v)
+	em := ethernet.GetMain(e.m.v)
 	// Save away currently deleted next hop for use in ip4_fib_add_del callback.
 	if isDel {
-		m.current_del_next_hop = nh
+		e.m.current_del_next_hop = nh
 	}
 	err = em.AddDelIpNeighbor(&m4.Main, &nbr, isDel)
 
@@ -491,8 +545,8 @@ func (m *Main) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	}
 	// Add previously unreachable prefixes when next-hop becomes reachable.
 	if err == nil && !isDel {
-		if u, ok := m.unreachable_ip4_next_hops[nh]; ok {
-			delete(m.unreachable_ip4_next_hops, nh)
+		if u, ok := e.m.unreachable_ip4_next_hops[nh]; ok {
+			delete(e.m.unreachable_ip4_next_hops, nh)
 			for p := range u {
 				err = m4.AddDelRouteNextHop(&p, &nh, isDel)
 				if err != nil {
@@ -522,7 +576,7 @@ func (m *Main) ip4_fib_add_del(fib_index ip.FibIndex, p *ip4.Prefix, adj ip.Adj,
 // FIXME: Not sure how netlink specifies nexthop weight, so we just set all weights to equal.
 const next_hop_weight = 1
 
-func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) {
+func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) {
 	switch v.Protocol {
 	case netlink.RTPROT_KERNEL, netlink.RTPROT_REDIRECT:
 		// Ignore all except routes that are static (RTPROT_BOOT) or originating from routing-protocols.
@@ -533,10 +587,10 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 	}
 	// No linux VRF support.  Only main table is meaningful.
 	if v.Table != netlink.RT_TABLE_MAIN {
-		m.v.Logf("netlink ignore route with table not main: %s\n", v)
+		e.m.v.Logf("netlink ignore route with table not main: %s\n", v)
 		return
 	}
-	si, ok := m.ifAttr(v.Attrs[netlink.RTA_OIF])
+	si, ok := e.ns.ifAttr(v.Attrs[netlink.RTA_OIF])
 	if !ok {
 		// Ignore routes for non vnet interfaces.
 		return
@@ -544,18 +598,18 @@ func (m *Main) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err err
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
 	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, si)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
-	m4 := ip4.GetMain(m.v)
+	m4 := ip4.GetMain(e.m.v)
 	err = m4.AddDelRouteNextHop(&p, &nh, isDel)
 	if err == ip4.ErrNextHopNotFound {
 		err = nil
 		if isDel {
-			if u, ok := m.unreachable_ip4_next_hops[nh]; !ok {
+			if u, ok := e.m.unreachable_ip4_next_hops[nh]; !ok {
 				err = ip4.ErrNextHopNotFound
 			} else {
 				delete(u, p)
 			}
 		} else {
-			m.add_ip4_unreachable_next_hop(p, nh)
+			e.m.add_ip4_unreachable_next_hop(p, nh)
 		}
 	}
 	return
@@ -573,6 +627,6 @@ func ip6Prefix(t netlink.Attr, l uint8) (p ip6.Prefix) {
 }
 
 // not yet
-func (m *Main) ip6IfaddrMsg(v *netlink.IfAddrMessage) (err error)                   { return }
-func (m *Main) ip6NeighborMsg(v *netlink.NeighborMessage) (err error)               { return }
-func (m *Main) ip6RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) { return }
+func (e *netlinkEvent) ip6IfaddrMsg(v *netlink.IfAddrMessage) (err error)                   { return }
+func (e *netlinkEvent) ip6NeighborMsg(v *netlink.NeighborMessage) (err error)               { return }
+func (e *netlinkEvent) ip6RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) { return }

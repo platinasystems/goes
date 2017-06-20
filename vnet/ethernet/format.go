@@ -64,12 +64,39 @@ func (h *VlanHeader) Parse(sup_in *parse.Input) {
 				panic(parse.ErrInput)
 			}
 		}
-		h.Priority_cfi_and_id = tag.FromHost()
+		h.Tag = VlanTag(tag).FromHost()
 	} else {
 		panic(parse.ErrInput)
 	}
 }
 
 func (h *VlanHeader) String() (s string) {
-	return fmt.Sprintf("%s: vlan %d", h.GetType().String(), h.Priority_cfi_and_id.ToHost()&0xfff)
+	return fmt.Sprintf("%s: vlan %d", h.GetType().String(), h.Tag.Id())
+}
+
+func (v *VlanTag) String() string { return fmt.Sprintf("0x%04x", vnet.Uint16(*v).ToHost()) }
+
+func (v *Address) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(*Address)
+	s = v.String() + "/" + m.String()
+	return
+}
+
+func (v Type) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(Type)
+	if m == 0xffff {
+		s = v.String()
+	} else {
+		s += fmt.Sprintf("0x%x/%x", v.ToHost(), m.ToHost())
+	}
+	return
+}
+
+func (v VlanTag) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(VlanTag)
+	s = v.String()
+	if m != 0 {
+		s += fmt.Sprintf("/%s", m.String())
+	}
+	return
 }

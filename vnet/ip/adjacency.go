@@ -99,7 +99,7 @@ func (a *Adjacency) String(m *Main) (s string) {
 }
 
 func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
-	v := args.Get().(*vnet.Vnet)
+	m := args.Get().(*Main)
 	if !in.Parse("%v", &a.LookupNextIndex) {
 		panic(parse.ErrInput)
 	}
@@ -107,10 +107,14 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	a.IfAddr = IfAddrNil
 	switch a.LookupNextIndex {
 	case LookupNextRewrite:
-		if !in.Parse("%v", &a.Rewrite, v) {
+		if !in.Parse("%v", &a.Rewrite, m.v) {
 			panic(parse.ErrInput)
 		}
-	case LookupNextGlean:
+	case LookupNextLocal, LookupNextGlean:
+		var si vnet.Si
+		if in.Parse("%v", &si, m.v) {
+			a.IfAddr = m.IfFirstAddr(si)
+		}
 	}
 }
 

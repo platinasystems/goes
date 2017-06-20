@@ -8,7 +8,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 
-	"bytes"
 	"unsafe"
 )
 
@@ -60,7 +59,7 @@ type Header struct {
 	Src, Dst Address
 }
 
-func (a *Address) AsUint32() vnet.Uint32    { return *(*vnet.Uint32)(unsafe.Pointer(&a[0])) }
+func (a Address) AsUint32() vnet.Uint32     { return *(*vnet.Uint32)(unsafe.Pointer(&a[0])) }
 func (a *Address) FromUint32(x vnet.Uint32) { *(*vnet.Uint32)(unsafe.Pointer(&a[0])) = x }
 func (a *Address) IsEqual(b *Address) bool  { return a.AsUint32() == b.AsUint32() }
 func (a *Address) IsZero() bool             { return a.AsUint32() == 0 }
@@ -108,19 +107,12 @@ func (h *Header) ComputeChecksum() vnet.Uint16 {
 }
 
 func (h *Header) Len() uint { return HeaderBytes }
-func (h *Header) Finalize(payload []vnet.PacketHeader) {
-	var sum uint
-	for _, l := range payload {
-		sum += l.Len()
-	}
-	h.Length.Set(HeaderBytes + sum)
+func (h *Header) Write(b []byte) {
+	h.Length.Set(uint(len(b)))
 	h.Checksum = 0
 	h.Checksum = h.checksum()
-}
-
-func (h *Header) Write(b *bytes.Buffer) {
-	type t struct{ data [20]byte }
+	type t struct{ data [HeaderBytes]byte }
 	i := (*t)(unsafe.Pointer(h))
-	b.Write(i.data[:])
+	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }

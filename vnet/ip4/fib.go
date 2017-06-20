@@ -5,6 +5,7 @@
 package ip4
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
@@ -18,6 +19,44 @@ type Prefix struct {
 	Address
 	Len uint32
 }
+
+var masks = compute_masks()
+
+func compute_masks() (m [33]Address) {
+	for l := uint(0); l < uint(len(m)); l++ {
+		mask := vnet.Uint32(0)
+		if l > 0 {
+			mask = (vnet.Uint32(1)<<l - 1) << (32 - l)
+		}
+		m[l].FromUint32(mask.FromHost())
+	}
+	return
+}
+
+func (a *Address) MaskLen() (l uint, ok bool) {
+	m := ^a.AsUint32().ToHost()
+	l = ^uint(0)
+	if ok = (m+1)&m == 0; ok {
+		l = 32
+		if m != 0 {
+			l -= 1 + elib.Word(m).MinLog2()
+		}
+	}
+	return
+}
+
+func (v *Address) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(*Address)
+	s = v.String() + "/"
+	if l, ok := m.MaskLen(); ok {
+		s += fmt.Sprintf("%d", l)
+	} else {
+		s += fmt.Sprintf("%s", m.HexString())
+	}
+	return
+}
+
+func AddressMaskForLen(l uint) Address { return masks[l] }
 
 func (p *Prefix) SetLen(l uint) { p.Len = uint32(l) }
 func (a *Address) toPrefix() (p Prefix) {

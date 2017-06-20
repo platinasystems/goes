@@ -59,11 +59,12 @@ func (l *Loop) Logf(format string, args ...interface{})   { fmt.Fprintf(&l.Cli.M
 func (l *Loop) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(format, args...)) }
 
 type rtNode struct {
-	Name    string  `format:"%-30s"`
-	State   string  `align:"center"`
-	Calls   uint64  `format:"%16d"`
-	Vectors uint64  `format:"%16d"`
-	Clocks  float64 `format:"%16.2f"`
+	Name     string  `format:"%-30s"`
+	State    string  `align:"center"`
+	Calls    uint64  `format:"%16d"`
+	Vectors  uint64  `format:"%16d"`
+	Suspends uint64  `format:"%16d"`
+	Clocks   float64 `format:"%16.2f"`
 }
 type rtNodes []rtNode
 
@@ -75,10 +76,12 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 	colMap := map[string]bool{
 		"State": false,
 	}
+	show_detail := false
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
 			colMap["State"] = true
+			show_detail = true
 		default:
 			panic(parse.ErrInput)
 		}
@@ -97,26 +100,36 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 			}
 		})
 		name := n.name
+		_, isIn := n.noder.(inLooper)
+		_, isOut := n.noder.(outLooper)
+		_, isInOut := n.noder.(inOutLooper)
 		for j := range s {
-			io := " input"
-			if j == 1 {
-				if _, ok := n.noder.(inOutLooper); ok {
-					io = ""
+			if j == 0 && !isIn && !isInOut {
+				continue
+			}
+			if j == 1 && !isOut && !isInOut {
+				continue
+			}
+			io := ""
+			if (isIn && isOut) || isInOut {
+				if j == 0 {
+					io = " in"
 				} else {
-					io = " output"
+					io = " out"
 				}
 			}
-			if s[j].calls > 0 {
+			if s[j].calls > 0 || show_detail {
 				state := ""
 				if j == 0 {
 					state = fmt.Sprintf("%s", n.flags)
 				}
 				ns = append(ns, rtNode{
-					Name:    name + io,
-					State:   state,
-					Calls:   s[j].calls,
-					Vectors: s[j].vectors,
-					Clocks:  s[j].clocksPerVector(),
+					Name:     name + io,
+					State:    state,
+					Calls:    s[j].calls,
+					Vectors:  s[j].vectors,
+					Suspends: s[j].suspends,
+					Clocks:   s[j].clocksPerVector(),
 				})
 			}
 		}

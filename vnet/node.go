@@ -19,6 +19,8 @@ type Node struct {
 }
 
 func (n *Node) GetVnetNode() *Node { return n }
+func (n *Node) Suspend(i *RefIn)   { n.Vnet.loop.Suspend(&i.In) }
+func (n *Node) Resume(i *RefIn)    { n.Vnet.loop.Resume(&i.In) }
 
 const MaxVectorLen = loop.MaxVectorLen
 
@@ -77,16 +79,80 @@ func (v *Vnet) RegisterOutputNode(n OutputNoder, name string, args ...interface{
 	x.o = n
 }
 
+type enqueue struct {
+	x, n uint32
+	v    *Vnet
+	i    *RefIn
+	o    *RefOut
+}
+
+func (q *enqueue) put(x0 uint, r0 *Ref) {
+	q.o.Outs[x0].Dup(q.i)
+	i0 := q.o.Outs[x0].AddLen(q.v)
+	q.o.Outs[x0].Refs[i0] = *r0
+}
+func (q *enqueue) sync() {
+	l := q.o.Outs[q.x].GetLen(q.v)
+	if n := uint(q.n); n > l {
+		q.o.Outs[q.x].Dup(q.i)
+		q.o.Outs[q.x].SetLen(q.v, n)
+	}
+}
+
+func (q *enqueue) Put1(r0 *Ref, x0 uint) {
+	q.o.Outs[q.x].Refs[q.n] = *r0
+	q.n++
+	if uint32(x0) != q.x {
+		q.n--
+		q.put(x0, r0)
+	}
+}
+
+func (q *enqueue) Put2(r0, r1 *Ref, x0, x1 uint) {
+	n0 := q.n
+	q.o.Outs[q.x].Refs[n0+0] = *r0
+	q.o.Outs[q.x].Refs[n0+1] = *r1
+	q.n = n0 + 2
+	if same := x0 == x1; !same || uint32(x0) != q.x {
+		q.n = n0
+		q.sync()
+		q.put(x0, r0)
+		q.put(x1, r1)
+		if same {
+			q.x = uint32(x0)
+			q.n = uint32(q.o.Outs[x0].GetLen(q.v))
+		}
+	}
+}
+
+//go:generate gentemplate -d Package=vnet -id enqueue -d VecType=enqueue_vec -d Type=*enqueue github.com/platinasystems/go/elib/vec.tmpl
+
 type InOutNode struct {
 	Node
-	t InOutNoder
+	qs enqueue_vec
+	t  InOutNoder
+}
+
+func (n *InOutNode) GetEnqueue(in *RefIn) (q *enqueue) {
+	i := in.ThreadId()
+	n.qs.Validate(i)
+	q = n.qs[i]
+	if n.qs[i] == nil {
+		q = &enqueue{}
+		n.qs[i] = q
+	}
+	return
 }
 
 func (n *InOutNode) GetInOutNode() *InOutNode    { return n }
 func (n *InOutNode) MakeLoopIn() loop.LooperIn   { return &RefIn{} }
 func (n *InOutNode) MakeLoopOut() loop.LooperOut { return &RefOut{} }
 func (n *InOutNode) LoopInputOutput(l *loop.Loop, i loop.LooperIn, o loop.LooperOut) {
-	n.t.NodeInput(i.(*RefIn), o.(*RefOut))
+	in, out := i.(*RefIn), o.(*RefOut)
+	q := n.GetEnqueue(in)
+	q.n, q.i, q.o, q.v = 0, in, out, n.Vnet
+	n.t.NodeInput(in, out)
+	q.sync()
 }
 
 type InOutNoder interface {
@@ -130,20 +196,18 @@ func (v *Vnet) RegisterNode(n Noder, format string, args ...interface{}) {
 
 func (node *Node) Redirect(in *RefIn, out *RefOut, next uint) {
 	o := &out.Outs[next]
-	n := in.Len()
-	for i := uint(0); i < n; i++ {
-		o.Refs[i] = in.Refs[i]
-	}
+	n := in.InLen()
+	copy(o.Refs[:n], in.Refs[:n])
 	node.SetOutLen(o, in, n)
 }
 
 func (node *Node) ErrorRedirect(in *RefIn, out *RefOut, next uint, err ErrorRef) {
 	o := &out.Outs[next]
-	n := in.Len()
+	n := in.InLen()
 	for i := uint(0); i < n; i++ {
 		r := &o.Refs[i]
 		*r = in.Refs[i]
-		r.err = err
+		r.Aux = uint32(err)
 	}
 	node.SetOutLen(o, in, n)
 }

@@ -84,24 +84,33 @@ func (n *interfaceNode) send(i *TxRefVecIn) {
 func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
 	l := n.Vnet.loop
 	for {
+		// Find a place to put a vector of packets (TxRefVecIn).
 		select {
 		case i = <-n.freeChan:
+			// Re-cycle one that output routine is done with.
 			i.FreeRefs(false)
 			n.cur_tx_refs -= i.Len()
 		default:
 			if l := len(n.free_list); l > 0 {
+				// Re-cycle one from free list.
 				i = n.free_list[l-1]
 				n.free_list = n.free_list[:l-1]
 			} else {
+				// Make a new one.
 				i = &TxRefVecIn{n: n}
 			}
 			i.refInCommon = in.refInCommon
 			i.nPackets = 0
 		}
+		// Check that we stay within ref limit.
 		if n.cur_tx_refs+MaxVectorLen <= n.max_tx_refs {
 			return
 		}
+
+		// We're over ref limit.  Add ref back to free list.
 		n.free_list = append(n.free_list, i)
+
+		// Suspend unless another has appeared.
 		if len(n.freeChan) == 0 {
 			l.Suspend(&in.In)
 		}
@@ -139,7 +148,7 @@ func (n *interfaceNode) ifOutputThread() {
 
 func (n *interfaceNode) ifOutput(ri *RefIn) {
 	rvi := n.allocTxRefVecIn(ri)
-	n_packets_in := ri.Len()
+	n_packets_in := ri.InLen()
 
 	// Copy common fields.
 	rvi.refInCommon = ri.refInCommon
@@ -224,7 +233,7 @@ func (n *interfaceNode) slowPath(
 		rv[iv] = s
 		iv++
 
-		if h := s.NextRef(); h == nil {
+		if h := s.RefHeader.NextRef(); h == nil {
 			break
 		} else {
 			s.RefHeader = *h

@@ -14,6 +14,7 @@ import (
 
 type pgStream struct {
 	pg.Stream
+	ai_src, ai_dst addressIncrement
 }
 
 type pgMain struct {
@@ -28,7 +29,7 @@ func (m *pgMain) initTypes() {
 		return
 	}
 	m.typeMap = make(map[Type]pg.StreamType)
-	m.typeMap[IP4.FromHost()] = pg.GetStreamType(m.v, "ip4")
+	m.typeMap[TYPE_IP4.FromHost()] = pg.GetStreamType(m.v, "ip4")
 }
 
 func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
@@ -56,24 +57,18 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 			for {
 				switch {
 				case in.Parse("src %d-%d", &min, &max):
-					ai := &addressIncrement{
-						s:     &s,
-						base:  h.h.Src,
-						isSrc: true,
-						min:   min,
-						max:   max,
+					s.ai_src = addressIncrement{
+						base: h.h.Src,
+						min:  min,
+						max:  max,
 					}
-					s.DataHooks.Add(ai.Do)
 
 				case in.Parse("dst %d-%d", &min, &max):
-					ai := &addressIncrement{
-						s:     &s,
-						base:  h.h.Dst,
-						isSrc: false,
-						min:   min,
-						max:   max,
+					s.ai_dst = addressIncrement{
+						base: h.h.Dst,
+						min:  min,
+						max:  max,
 					}
-					s.DataHooks.Add(ai.Do)
 
 				default:
 					break incLoop
@@ -81,18 +76,16 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 			}
 
 			inner_type := h.h.Type
-			switch len(h.v) {
-			case 0:
-			case 1:
-				h.v[0].Type = inner_type
-				h.h.Type = VLAN.FromHost()
-			case 2:
-				h.v[1].Type = inner_type
-				h.v[0].Type = VLAN.FromHost()
-				h.h.Type = VLAN_IN_VLAN.FromHost()
-			case 3:
-				err = fmt.Errorf("number of vlans must be <= 2, given %d", len(h.v))
-				return
+			if len(h.v) > 0 {
+				vt := TYPE_VLAN.FromHost()
+				h.h.Type = vt
+				for i := range h.v {
+					t := inner_type
+					if i+1 < len(h.v) {
+						t = vt
+					}
+					h.v[i].Type = t
+				}
 			}
 
 			s.AddHeader(&h.h)
@@ -121,18 +114,18 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 }
 
 type addressIncrement struct {
-	s     *pgStream
-	base  Address
-	cur   uint64
-	min   uint64
-	max   uint64
-	isSrc bool
+	base Address
+	cur  uint64
+	min  uint64
+	max  uint64
 }
 
-func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
+func (ai *addressIncrement) valid() bool { return ai.max > ai.min }
+
+func (ai *addressIncrement) do(dst []vnet.Ref, dataOffset uint, isSrc bool) {
 	for i := range dst {
-		h := GetHeader(&dst[i])
-		if ai.isSrc {
+		h := (*Header)(dst[i].DataOffset(dataOffset))
+		if isSrc {
 			h.Src = ai.base
 			h.Src.Add(ai.cur)
 		} else {
@@ -144,6 +137,17 @@ func (ai *addressIncrement) Do(dst []vnet.Ref, dataOffset uint) {
 			ai.cur = ai.min
 		}
 	}
+}
+func (s *pgStream) Finalize(r []vnet.Ref, do uint) (changed bool) {
+	if s.ai_src.valid() {
+		s.ai_src.do(r, do, true)
+		changed = true
+	}
+	if s.ai_dst.valid() {
+		s.ai_dst.do(r, do, false)
+		changed = true
+	}
+	return
 }
 
 func (m *pgMain) pgInit(v *vnet.Vnet) {

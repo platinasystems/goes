@@ -118,11 +118,16 @@ func New(groups ...MulticastGroup) (*Socket, error) {
 }
 
 func NewWithConfig(cf SocketConfig) (s *Socket, err error) {
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW,
-		syscall.NETLINK_ROUTE)
-	if err != nil {
-		err = os.NewSyscallError("socket", err)
-		return
+	return NewWithConfigAndFile(cf, -1)
+}
+
+func NewWithConfigAndFile(cf SocketConfig, fd int) (s *Socket, err error) {
+	if fd < 0 {
+		fd, err = syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, syscall.NETLINK_ROUTE)
+		if err != nil {
+			err = os.NewSyscallError("socket", err)
+			return
+		}
 	}
 
 	if cf.RxMessages == 0 {
@@ -246,10 +251,14 @@ SO_SNDBUF truncated to %d bytes; run: sysctl -w net.core.wmem_max=%d`[1:],
 	return
 }
 
-func (s *Socket) Close() error {
-	err := syscall.Close(s.fd)
+func (s *Socket) Close() (err error) {
+	close(s.rx)
+	close(s.Tx)
+	if err = syscall.Close(s.fd); err != nil {
+		return
+	}
 	s.fd = -1
-	return err
+	return
 }
 
 func (s *Socket) GetlinkReq() {

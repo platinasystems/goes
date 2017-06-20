@@ -7,6 +7,7 @@ package ixge
 import (
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/hw/pci"
+	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	vnetpci "github.com/platinasystems/go/vnet/devices/bus/pci"
 
@@ -16,6 +17,7 @@ import (
 type main struct {
 	vnet.Package
 	vnet.InterfaceCounterNames
+	Config
 	devs []dever
 }
 
@@ -157,7 +159,19 @@ func (d *dev) Init() {
 
 	// Accept all broadcast packets.
 	// Multicasts must be explicitly added to dst_ethernet_address register array.
-	d.regs.filter_control.set(d, 1<<10)
+	{
+		const (
+			accept_all_broadcast = 1 << 10
+			accept_all_unicast   = 1 << 9
+			accept_all_multicast = 1 << 8
+			accept_all_tags      = 1 << 7
+		)
+		v := reg(accept_all_broadcast)
+		if d.m.Config.PuntNode != "" {
+			v |= accept_all_multicast | accept_all_unicast | accept_all_tags
+		}
+		d.regs.filter_control.set(d, v)
+	}
 
 	// Enable frames up to size in mac frame size register.
 	// Set max frame size so we never drop frames.
@@ -204,7 +218,7 @@ func (d *dev) software_firmware_sync_release(sw_mask_0_4, sw_mask_11_12 reg) {
 	d.regs.software_firmware_sync.andnot(d, sw_mask)
 }
 
-func Init(v *vnet.Vnet) {
+func Init(v *vnet.Vnet, c ...Config) {
 	m := &main{}
 	devs := []pci.VendorDeviceID{}
 	for id, _ := range dev_id_names {
@@ -215,10 +229,46 @@ func Init(v *vnet.Vnet) {
 		panic(err)
 	}
 
+	if len(c) > 0 {
+		m.Config = c[0]
+	}
+
 	vnetpci.Init(v)
-	v.AddPackage("ixge", m)
-	m.Package.DependsOn("tuntap")
+	packageIndex = v.AddPackage("ixge", m)
+	m.Package.DependsOn("unix")
 	m.Package.DependedOnBy("pci-discovery")
 
 	m.cliInit()
+}
+
+type Config struct {
+	DisableUnix bool
+	// In punt mode all packets are accepted and passed to double tag punt node.
+	PuntNode string
+}
+
+var packageIndex uint
+
+func getMain(v *vnet.Vnet) *main { return v.GetPackage(packageIndex).(*main) }
+
+func GetPortNames(v *vnet.Vnet) (names []string) {
+	m := getMain(v)
+	for i := range m.devs {
+		d := m.devs[i].get()
+		names = append(names, d.Name())
+	}
+	return
+}
+
+func (m *main) Configure(in *parse.Input) {
+	c := &m.Config
+	for !in.End() {
+		switch {
+		case in.Parse("no-unix"):
+			c.DisableUnix = true
+		case in.Parse("punt %v", &c.PuntNode):
+		default:
+			panic(parse.ErrInput)
+		}
+	}
 }

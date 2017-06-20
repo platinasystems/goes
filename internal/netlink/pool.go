@@ -32,6 +32,7 @@ var pool = struct {
 	RtaCacheInfo    sync.Pool
 	NdaCacheInfo    sync.Pool
 	Bytes           sync.Pool
+	VlanFlags       sync.Pool
 }{
 	Empty: sync.Pool{
 		New: func() interface{} {
@@ -143,6 +144,11 @@ var pool = struct {
 			return new(bytes.Buffer)
 		},
 	},
+	VlanFlags: sync.Pool{
+		New: func() interface{} {
+			return new(VlanFlags)
+		},
+	},
 }
 
 func repool(v interface{}) {
@@ -218,6 +224,8 @@ func repool(v interface{}) {
 	case *bytes.Buffer:
 		t.Reset()
 		pool.Bytes.Put(t)
-
+	case *VlanFlags:
+		*t = VlanFlags{}
+		pool.VlanFlags.Put(t)
 	}
 }

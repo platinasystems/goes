@@ -255,6 +255,8 @@ func (l *Loop) Suspend(in *In) (resumed bool) {
 		}
 	}
 	if !resumed {
+		p.inputStats.current.suspends++
+
 		// Signal polling done to main loop.
 		p.toLoop <- struct{}{}
 		// Wait for continue (resume) signal from main loop.

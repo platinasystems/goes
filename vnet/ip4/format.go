@@ -10,7 +10,8 @@ import (
 	"fmt"
 )
 
-func (a *Address) String() string { return fmt.Sprintf("%d.%d.%d.%d", a[0], a[1], a[2], a[3]) }
+func (a *Address) String() string    { return fmt.Sprintf("%d.%d.%d.%d", a[0], a[1], a[2], a[3]) }
+func (a *Address) HexString() string { return fmt.Sprintf("0x%x.%x.%x.%x", a[0], a[1], a[2], a[3]) }
 func (a *Address) Parse(in *parse.Input) {
 	if !in.Parse("%d.%d.%d.%d", &a[0], &a[1], &a[2], &a[3]) {
 		panic(parse.ErrInput)

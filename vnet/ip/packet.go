@@ -7,6 +7,9 @@ package ip
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/vnet"
+
+	"fmt"
 )
 
 // 8-bit protocol field from IP 4/6 headers.
@@ -288,6 +291,14 @@ var protocolStrings = [...]string{
 
 func (p *Protocol) String() string {
 	return elib.StringerHex(protocolStrings[:], int(*p))
+}
+
+func (v Protocol) MaskedString(r vnet.MaskedStringer) (s string) {
+	m := r.(Protocol)
+	if m == 0xff {
+		return v.String()
+	}
+	return fmt.Sprintf("0x%x/%x", v, m)
 }
 
 var protocolMap = parse.NewStringMap(protocolStrings[:])

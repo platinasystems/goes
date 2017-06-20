@@ -56,7 +56,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		for fi := range m.fibs {
 			fib := m.fibs[fi]
 			if fib != nil {
-				fmt.Fprintf(w, "%6d%12d\n", fi, fib.Len())
+				fmt.Fprintf(w, "%12s%12d\n", ip.FibIndex(fi).Name(&m.Main), fib.Len())
 			}
 		}
 		u := m.GetAdjacencyUsage()
@@ -115,9 +115,9 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		}
 		for i := range lines {
 			if i == 0 {
-				fmt.Fprintf(w, "%6d%30s%s\n", r.table, &r.prefix, lines[i])
+				fmt.Fprintf(w, "%12s%30s%s\n", r.table.Name(&m.Main), &r.prefix, lines[i])
 			} else {
-				fmt.Fprintf(w, "%6s%30s%s\n", "", "", lines[i])
+				fmt.Fprintf(w, "%12s%30s%s\n", "", "", lines[i])
 			}
 		}
 	}

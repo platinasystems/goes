@@ -11,132 +11,132 @@ import (
 
 const (
 	// Types < 0x600 (1536) are LLC packet lengths.
-	LLC_LENGTH              Type = 0x600
-	XNS_IDP                 Type = 0x600
-	IP4                     Type = 0x800
-	ARP                     Type = 0x806
-	VINES_IP                Type = 0x0BAD
-	VINES_LOOPBACK          Type = 0x0BAE
-	VINES_ECHO              Type = 0x0BAF
-	TRAIN                   Type = 0x1984
-	CDP                     Type = 0x2000
-	CGMP                    Type = 0x2001
-	SRP_CONTROL             Type = 0x2007
-	CENTRINO_PROMISC        Type = 0x2452
-	DECNET                  Type = 0x6000
-	DECNET_DUMP_LOAD        Type = 0x6001
-	DECNET_REMOTE_CONSOLE   Type = 0x6002
-	DECNET_ROUTE            Type = 0x6003
-	DEC_LAT                 Type = 0x6004
-	DEC_DIAGNOSTIC          Type = 0x6005
-	DEC_CUSTOMER            Type = 0x6006
-	DEC_SCA                 Type = 0x6007
-	TRANSPARENT_BRIDGING    Type = 0x6558
-	RAW_FRAME_RELAY         Type = 0x6559
-	REVERSE_ARP             Type = 0x8035
-	DEC_LAN_BRIDGE          Type = 0x8038
-	DEC_ETHERNET_ENCRYPTION Type = 0x803D
-	DEC_LAN_TRAFFIC_MONITOR Type = 0x803F
-	DEC_LAST                Type = 0x8041
-	APPLETALK               Type = 0x809B
-	IBM_SNA                 Type = 0x80D5
-	APPLETALK_AARP          Type = 0x80F3
-	WELLFLEET_COMPRESSION   Type = 0x80FF
-	VLAN                    Type = 0x8100
-	VLAN_IN_VLAN            Type = 0x9100
-	IPX                     Type = 0x8137
-	SNMP                    Type = 0x814C
-	CABLETRON_ISMP          Type = 0x81FD
-	CABLETRON_ISMP_TBFLOOD  Type = 0x81FF
-	IP6                     Type = 0x86DD
-	ATOMIC                  Type = 0x86DF
-	TCP_IP_COMPRESSION      Type = 0x876B
-	IP_AUTONOMOUS_SYSTEMS   Type = 0x876C
-	SECURE_DATA             Type = 0x876D
-	MAC_CONTROL             Type = 0x8808
-	SLOW_PROTOCOLS          Type = 0x8809
-	PPP                     Type = 0x880B
-	MPLS_UNICAST            Type = 0x8847
-	MPLS_MULTICAST          Type = 0x8848
-	PPPOE_DISCOVERY         Type = 0x8863
-	PPPOE_SESSION           Type = 0x8864
-	INTEL_ANS               Type = 0x886D
-	MICROSOFT_NLB_HEARTBEAT Type = 0x886F
-	CDMA_2000               Type = 0x8881
-	PROFINET                Type = 0x8892
-	HYPERSCSI               Type = 0x889a
-	AOE                     Type = 0x88a2
-	BRDWALK                 Type = 0x88AE
-	LOOPBACK                Type = 0x9000
-	RTNET_MAC               Type = 0x9021
-	RTNET_CONFIG            Type = 0x9022
-	PGLAN                   Type = 0x9999
-	SRP_ISIS                Type = 0xFEFE
-	RESERVED                Type = 0xFFFF
+	TYPE_LLC_LENGTH              Type = 0x600
+	TYPE_XNS_IDP                 Type = 0x600
+	TYPE_IP4                     Type = 0x800
+	TYPE_ARP                     Type = 0x806
+	TYPE_VINES_IP                Type = 0x0BAD
+	TYPE_VINES_LOOPBACK          Type = 0x0BAE
+	TYPE_VINES_ECHO              Type = 0x0BAF
+	TYPE_TRAIN                   Type = 0x1984
+	TYPE_CDP                     Type = 0x2000
+	TYPE_CGMP                    Type = 0x2001
+	TYPE_SRP_CONTROL             Type = 0x2007
+	TYPE_CENTRINO_PROMISC        Type = 0x2452
+	TYPE_DECNET                  Type = 0x6000
+	TYPE_DECNET_DUMP_LOAD        Type = 0x6001
+	TYPE_DECNET_REMOTE_CONSOLE   Type = 0x6002
+	TYPE_DECNET_ROUTE            Type = 0x6003
+	TYPE_DEC_LAT                 Type = 0x6004
+	TYPE_DEC_DIAGNOSTIC          Type = 0x6005
+	TYPE_DEC_CUSTOMER            Type = 0x6006
+	TYPE_DEC_SCA                 Type = 0x6007
+	TYPE_TRANSPARENT_BRIDGING    Type = 0x6558
+	TYPE_RAW_FRAME_RELAY         Type = 0x6559
+	TYPE_REVERSE_ARP             Type = 0x8035
+	TYPE_DEC_LAN_BRIDGE          Type = 0x8038
+	TYPE_DEC_ETHERNET_ENCRYPTION Type = 0x803D
+	TYPE_DEC_LAN_TRAFFIC_MONITOR Type = 0x803F
+	TYPE_DEC_LAST                Type = 0x8041
+	TYPE_APPLETALK               Type = 0x809B
+	TYPE_IBM_SNA                 Type = 0x80D5
+	TYPE_APPLETALK_AARP          Type = 0x80F3
+	TYPE_WELLFLEET_COMPRESSION   Type = 0x80FF
+	TYPE_VLAN                    Type = 0x8100
+	TYPE_VLAN_IN_VLAN            Type = 0x9100
+	TYPE_IPX                     Type = 0x8137
+	TYPE_SNMP                    Type = 0x814C
+	TYPE_CABLETRON_ISMP          Type = 0x81FD
+	TYPE_CABLETRON_ISMP_TBFLOOD  Type = 0x81FF
+	TYPE_IP6                     Type = 0x86DD
+	TYPE_ATOMIC                  Type = 0x86DF
+	TYPE_TCP_IP_COMPRESSION      Type = 0x876B
+	TYPE_IP_AUTONOMOUS_SYSTEMS   Type = 0x876C
+	TYPE_SECURE_DATA             Type = 0x876D
+	TYPE_MAC_CONTROL             Type = 0x8808
+	TYPE_SLOW_PROTOCOLS          Type = 0x8809
+	TYPE_PPP                     Type = 0x880B
+	TYPE_MPLS_UNICAST            Type = 0x8847
+	TYPE_MPLS_MULTICAST          Type = 0x8848
+	TYPE_PPPOE_DISCOVERY         Type = 0x8863
+	TYPE_PPPOE_SESSION           Type = 0x8864
+	TYPE_INTEL_ANS               Type = 0x886D
+	TYPE_MICROSOFT_NLB_HEARTBEAT Type = 0x886F
+	TYPE_CDMA_2000               Type = 0x8881
+	TYPE_PROFINET                Type = 0x8892
+	TYPE_HYPERSCSI               Type = 0x889a
+	TYPE_AOE                     Type = 0x88a2
+	TYPE_BRDWALK                 Type = 0x88AE
+	TYPE_LOOPBACK                Type = 0x9000
+	TYPE_RTNET_MAC               Type = 0x9021
+	TYPE_RTNET_CONFIG            Type = 0x9022
+	TYPE_PGLAN                   Type = 0x9999
+	TYPE_SRP_ISIS                Type = 0xFEFE
+	TYPE_RESERVED                Type = 0xFFFF
 )
 
 var typeStrings = [...]string{
-	XNS_IDP:                 "XNS_IDP",
-	IP4:                     "IP4",
-	ARP:                     "ARP",
-	VINES_IP:                "VINES_IP",
-	VINES_LOOPBACK:          "VINES_LOOPBACK",
-	VINES_ECHO:              "VINES_ECHO",
-	TRAIN:                   "TRAIN",
-	CDP:                     "CDP",
-	CGMP:                    "CGMP",
-	SRP_CONTROL:             "SRP_CONTROL",
-	CENTRINO_PROMISC:        "CENTRINO_PROMISC",
-	DECNET:                  "DECNET",
-	DECNET_DUMP_LOAD:        "DECNET_DUMP_LOAD",
-	DECNET_REMOTE_CONSOLE:   "DECNET_REMOTE_CONSOLE",
-	DECNET_ROUTE:            "DECNET_ROUTE",
-	DEC_LAT:                 "DEC_LAT",
-	DEC_DIAGNOSTIC:          "DEC_DIAGNOSTIC",
-	DEC_CUSTOMER:            "DEC_CUSTOMER",
-	DEC_SCA:                 "DEC_SCA",
-	TRANSPARENT_BRIDGING:    "TRANSPARENT_BRIDGING",
-	RAW_FRAME_RELAY:         "RAW_FRAME_RELAY",
-	REVERSE_ARP:             "REVERSE_ARP",
-	DEC_LAN_BRIDGE:          "DEC_LAN_BRIDGE",
-	DEC_ETHERNET_ENCRYPTION: "DEC_ETHERNET_ENCRYPTION",
-	DEC_LAN_TRAFFIC_MONITOR: "DEC_LAN_TRAFFIC_MONITOR",
-	DEC_LAST:                "DEC_LAST",
-	APPLETALK:               "APPLETALK",
-	IBM_SNA:                 "IBM_SNA",
-	APPLETALK_AARP:          "APPLETALK_AARP",
-	WELLFLEET_COMPRESSION:   "WELLFLEET_COMPRESSION",
-	VLAN:                   "VLAN",
-	VLAN_IN_VLAN:           "VLAN_IN_VLAN",
-	IPX:                    "IPX",
-	SNMP:                   "SNMP",
-	CABLETRON_ISMP:         "CABLETRON_ISMP",
-	CABLETRON_ISMP_TBFLOOD: "CABLETRON_ISMP_TBFLOOD",
-	IP6:                     "IP6",
-	ATOMIC:                  "ATOMIC",
-	TCP_IP_COMPRESSION:      "TCP_IP_COMPRESSION",
-	IP_AUTONOMOUS_SYSTEMS:   "IP_AUTONOMOUS_SYSTEMS",
-	SECURE_DATA:             "SECURE_DATA",
-	MAC_CONTROL:             "MAC_CONTROL",
-	SLOW_PROTOCOLS:          "SLOW_PROTOCOLS",
-	PPP:                     "PPP",
-	MPLS_UNICAST:            "MPLS_UNICAST",
-	MPLS_MULTICAST:          "MPLS_MULTICAST",
-	PPPOE_DISCOVERY:         "PPPOE_DISCOVERY",
-	PPPOE_SESSION:           "PPPOE_SESSION",
-	INTEL_ANS:               "INTEL_ANS",
-	MICROSOFT_NLB_HEARTBEAT: "MICROSOFT_NLB_HEARTBEAT",
-	CDMA_2000:               "CDMA_2000",
-	PROFINET:                "PROFINET",
-	HYPERSCSI:               "HYPERSCSI",
-	AOE:                     "AOE",
-	BRDWALK:                 "BRDWALK",
-	LOOPBACK:                "LOOPBACK",
-	RTNET_MAC:               "RTNET_MAC",
-	RTNET_CONFIG:            "RTNET_CONFIG",
-	PGLAN:                   "PGLAN",
-	SRP_ISIS:                "SRP_ISIS",
-	RESERVED:                "RESERVED",
+	TYPE_XNS_IDP:                 "XNS_IDP",
+	TYPE_IP4:                     "IP4",
+	TYPE_ARP:                     "ARP",
+	TYPE_VINES_IP:                "VINES_IP",
+	TYPE_VINES_LOOPBACK:          "VINES_LOOPBACK",
+	TYPE_VINES_ECHO:              "VINES_ECHO",
+	TYPE_TRAIN:                   "TRAIN",
+	TYPE_CDP:                     "CDP",
+	TYPE_CGMP:                    "CGMP",
+	TYPE_SRP_CONTROL:             "SRP_CONTROL",
+	TYPE_CENTRINO_PROMISC:        "CENTRINO_PROMISC",
+	TYPE_DECNET:                  "DECNET",
+	TYPE_DECNET_DUMP_LOAD:        "DECNET_DUMP_LOAD",
+	TYPE_DECNET_REMOTE_CONSOLE:   "DECNET_REMOTE_CONSOLE",
+	TYPE_DECNET_ROUTE:            "DECNET_ROUTE",
+	TYPE_DEC_LAT:                 "DEC_LAT",
+	TYPE_DEC_DIAGNOSTIC:          "DEC_DIAGNOSTIC",
+	TYPE_DEC_CUSTOMER:            "DEC_CUSTOMER",
+	TYPE_DEC_SCA:                 "DEC_SCA",
+	TYPE_TRANSPARENT_BRIDGING:    "TRANSPARENT_BRIDGING",
+	TYPE_RAW_FRAME_RELAY:         "RAW_FRAME_RELAY",
+	TYPE_REVERSE_ARP:             "REVERSE_ARP",
+	TYPE_DEC_LAN_BRIDGE:          "DEC_LAN_BRIDGE",
+	TYPE_DEC_ETHERNET_ENCRYPTION: "DEC_ETHERNET_ENCRYPTION",
+	TYPE_DEC_LAN_TRAFFIC_MONITOR: "DEC_LAN_TRAFFIC_MONITOR",
+	TYPE_DEC_LAST:                "DEC_LAST",
+	TYPE_APPLETALK:               "APPLETALK",
+	TYPE_IBM_SNA:                 "IBM_SNA",
+	TYPE_APPLETALK_AARP:          "APPLETALK_AARP",
+	TYPE_WELLFLEET_COMPRESSION:   "WELLFLEET_COMPRESSION",
+	TYPE_VLAN:                    "VLAN",
+	TYPE_VLAN_IN_VLAN:            "VLAN_IN_VLAN",
+	TYPE_IPX:                     "IPX",
+	TYPE_SNMP:                    "SNMP",
+	TYPE_CABLETRON_ISMP:          "CABLETRON_ISMP",
+	TYPE_CABLETRON_ISMP_TBFLOOD:  "CABLETRON_ISMP_TBFLOOD",
+	TYPE_IP6:                     "IP6",
+	TYPE_ATOMIC:                  "ATOMIC",
+	TYPE_TCP_IP_COMPRESSION:      "TCP_IP_COMPRESSION",
+	TYPE_IP_AUTONOMOUS_SYSTEMS:   "IP_AUTONOMOUS_SYSTEMS",
+	TYPE_SECURE_DATA:             "SECURE_DATA",
+	TYPE_MAC_CONTROL:             "MAC_CONTROL",
+	TYPE_SLOW_PROTOCOLS:          "SLOW_PROTOCOLS",
+	TYPE_PPP:                     "PPP",
+	TYPE_MPLS_UNICAST:            "MPLS_UNICAST",
+	TYPE_MPLS_MULTICAST:          "MPLS_MULTICAST",
+	TYPE_PPPOE_DISCOVERY:         "PPPOE_DISCOVERY",
+	TYPE_PPPOE_SESSION:           "PPPOE_SESSION",
+	TYPE_INTEL_ANS:               "INTEL_ANS",
+	TYPE_MICROSOFT_NLB_HEARTBEAT: "MICROSOFT_NLB_HEARTBEAT",
+	TYPE_CDMA_2000:               "CDMA_2000",
+	TYPE_PROFINET:                "PROFINET",
+	TYPE_HYPERSCSI:               "HYPERSCSI",
+	TYPE_AOE:                     "AOE",
+	TYPE_BRDWALK:                 "BRDWALK",
+	TYPE_LOOPBACK:                "LOOPBACK",
+	TYPE_RTNET_MAC:               "RTNET_MAC",
+	TYPE_RTNET_CONFIG:            "RTNET_CONFIG",
+	TYPE_PGLAN:                   "PGLAN",
+	TYPE_SRP_ISIS:                "SRP_ISIS",
+	TYPE_RESERVED:                "RESERVED",
 }
 
 func (t Type) String() string {

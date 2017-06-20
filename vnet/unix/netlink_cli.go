@@ -24,6 +24,7 @@ type netlink_add_del struct {
 	ip4_nhs    []ip4.NextHop
 	wait       time.Duration
 	fib_index  ip.FibIndex
+	ns         *net_namespace
 }
 
 func (x *netlink_add_del) String() (s string) {
@@ -35,7 +36,7 @@ func (x *netlink_add_del) String() (s string) {
 	return
 }
 
-func (m *netlinkMain) add_del() {
+func (m *netlink_main) netlink_add_del_routes() {
 	for {
 		x := <-m.add_del_chan
 		m.m.v.Logf("start %s\n", &x)
@@ -44,7 +45,7 @@ func (m *netlinkMain) add_del() {
 
 			for i := range x.ip4_nhs {
 				nh := &x.ip4_nhs[i]
-				intf := m.m.ifBySi[nh.Si]
+				intf := m.m.interface_by_si[nh.Si]
 				var addrs [2]netlink.Ip4Address
 				addrs[0] = netlink.Ip4Address(p.Address)
 				addrs[1] = netlink.Ip4Address(nh.Address)
@@ -64,16 +65,15 @@ func (m *netlinkMain) add_del() {
 				msg.Attrs[netlink.RTA_DST] = &addrs[0]
 				msg.DstLen = uint8(p.Len)
 				msg.Attrs[netlink.RTA_GATEWAY] = &addrs[1]
-				msg.Attrs[netlink.RTA_OIF] =
-					netlink.Int32Attr(intf.ifindex)
-				m.s.Tx <- msg
+				msg.Attrs[netlink.RTA_OIF] = netlink.Int32Attr(intf.ifindex)
+				x.ns.NetlinkTx(msg, false)
 			}
 		}
 		m.m.v.Logf("done %s\n", &x)
 	}
 }
 
-func (m *netlinkMain) ip_route(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (m *netlink_main) ip_route(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	var x netlink_add_del
 
 	switch {
@@ -113,10 +113,29 @@ loop:
 
 	if m.add_del_chan == nil {
 		m.add_del_chan = make(chan netlink_add_del)
-		go m.add_del()
+		go m.netlink_add_del_routes()
 	}
 	m.add_del_chan <- x
 
+	return
+}
+
+func (m *netlink_main) enable_disable_log(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	v := m.m.verbose_netlink
+	for !in.End() {
+		switch {
+		case in.Parse("e%*nable"):
+			v = true
+		case in.Parse("d%*isable"):
+			v = false
+		case in.Parse("t%*oggle"):
+			v = !m.m.verbose_netlink
+		default:
+			err = cli.ParseError
+			return
+		}
+	}
+	m.m.verbose_netlink = v
 	return
 }
 
@@ -131,7 +150,7 @@ func (ns showMsgs) Less(i, j int) bool { return ns[i].Type < ns[j].Type }
 func (ns showMsgs) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
 func (ns showMsgs) Len() int           { return len(ns) }
 
-func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+func (m *netlink_main) show_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	sm := make(map[netlink.MsgType]showMsg)
 	var (
 		x  showMsg
@@ -158,7 +177,9 @@ func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input)
 
 	msgs := showMsgs{}
 	for _, v := range sm {
-		msgs = append(msgs, v)
+		if v.Ignored+v.Handled != 0 {
+			msgs = append(msgs, v)
+		}
 	}
 	sort.Sort(msgs)
 	msgs = append(msgs, showMsg{
@@ -171,9 +192,13 @@ func (m *netlinkMain) show_summary(c cli.Commander, w cli.Writer, in *cli.Input)
 	return
 }
 
-func (m *netlinkMain) show_unreachable(c cli.Commander, w cli.Writer,
-	in *cli.Input) (err error) {
+func (m *netlink_main) clear_summary(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	m.msg_stats.ignored.clear()
+	m.msg_stats.handled.clear()
+	return
+}
 
+func (m *netlink_main) show_unreachable(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	if len(m.unreachable_ip4_next_hops) == 0 {
 		fmt.Fprintln(w, "No unreachable next hops")
 		return
@@ -192,7 +217,7 @@ func (m *netlinkMain) show_unreachable(c cli.Commander, w cli.Writer,
 	return
 }
 
-func (m *netlinkMain) cliInit() (err error) {
+func (m *netlink_main) cliInit() (err error) {
 	v := m.m.v
 	cmds := []cli.Command{
 		cli.Command{
@@ -201,9 +226,24 @@ func (m *netlinkMain) cliInit() (err error) {
 			Action:    m.ip_route,
 		},
 		cli.Command{
+			Name:      "netlink log",
+			ShortHelp: "enable/disable netlink message logging",
+			Action:    m.enable_disable_log,
+		},
+		cli.Command{
 			Name:      "show netlink summary",
-			ShortHelp: "summary netlink messages received",
+			ShortHelp: "show summary of netlink messages received",
 			Action:    m.show_summary,
+		},
+		cli.Command{
+			Name:      "clear netlink summary",
+			ShortHelp: "clear netlink message counters",
+			Action:    m.clear_summary,
+		},
+		cli.Command{
+			Name:      "show netlink namespaces",
+			ShortHelp: "show netlink namespaces",
+			Action:    m.show_net_namespaces,
 		},
 		cli.Command{
 			Name:      "show unreachable",
