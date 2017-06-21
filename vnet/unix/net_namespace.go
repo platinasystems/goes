@@ -287,7 +287,15 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		return
 	}
 	name := msg.Attrs[netlink.IFLA_IFNAME].String()
-	address := msg.Attrs[netlink.IFLA_ADDRESS].(*netlink.EthernetAddress).Bytes()
+	var address []byte
+	switch a := msg.Attrs[netlink.IFLA_ADDRESS].(type) {
+	case *netlink.EthernetAddress:
+		address = a.Bytes()
+	case *netlink.Ip4Address:
+		address = a.Bytes()
+	case *netlink.Ip6Address:
+		address = a.Bytes()
+	}
 	index := msg.Index
 	if !is_del {
 		if ns.interface_by_index == nil {
