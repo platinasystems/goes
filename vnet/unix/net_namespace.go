@@ -387,10 +387,22 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *netlink.IfInfoMessage, is_del bool) {
 	ns := intf.namespace
 	sup_index := msg.Attrs[netlink.IFLA_LINK].(netlink.Uint32Attr).Uint()
+	sup_si := vnet.SiNil
+
 	sup_intf := ns.interface_by_index[sup_index]
+	if sup_intf != nil {
+		sup_si = sup_intf.si
+	} else {
+		sa := string(intf.address)
+		if tif, ok := m.vnet_tuntap_interface_by_address[sa]; ok {
+			sup_si = tif.si
+		} else if h, ok := m.registered_hwifer_by_address[sa]; ok {
+			sup_si = h.GetHwIf().Si()
+		}
+	}
 
 	// Sup interface is Vnet interface?
-	if sup_intf.si == vnet.SiNil {
+	if sup_si == vnet.SiNil {
 		return
 	}
 
@@ -400,7 +412,7 @@ func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *ne
 		ns.m.m.v.DelSwIf(intf.si)
 	} else {
 		id := ld.X[netlink.IFLA_VLAN_ID].(netlink.Uint16Attr).Uint()
-		si := ns.m.m.v.NewSwSubInterface(sup_intf.si, uint(id))
+		si := ns.m.m.v.NewSwSubInterface(sup_si, uint(id))
 		m.set_si(intf, si)
 	}
 }
