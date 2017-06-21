@@ -237,7 +237,7 @@ func (e *netlinkEvent) netnsMessage(msg *netlink.NetnsMessage) (err error) {
 	return
 }
 
-func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) {
+func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) (err error) {
 	if is_del {
 		delete(m.namespace_by_name, name)
 		return
@@ -249,8 +249,9 @@ func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) {
 	} else {
 		ns := &net_namespace{name: name, nsid: nsid}
 		m.namespace_by_name[name] = ns
-		ns.add(m)
+		err = ns.add(m)
 	}
+	return
 }
 
 func (m *netlink_main) watch_namespace_add_del(dir, name string, is_del bool) {
@@ -260,15 +261,20 @@ func (m *netlink_main) watch_namespace_add_del(dir, name string, is_del bool) {
 	)
 	if !is_del {
 		if nsid, err = m.nsid_for_path(dir, name); err != nil {
-			panic(err)
+			m.m.v.Logf("namespace watch add: %v %v", name, err)
+			return
 		}
 	} else {
 		var ok bool
 		if _, ok = m.namespace_by_name[name]; !ok {
-			panic("delete unknown namespace " + name)
+			m.m.v.Logf("namespace watch del: unknown namespace %s", name)
+			return
 		}
 	}
-	m.add_del_nsid(name, nsid, is_del)
+	err = m.add_del_nsid(name, nsid, is_del)
+	if err != nil {
+		m.m.v.Logf("namespace watch: %v %v", name, err)
+	}
 }
 
 func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) {
@@ -511,7 +517,7 @@ func (ns *net_namespace) allocate_sockets() (err error) {
 
 func (m *net_namespace_main) max_n_namespace() uint { return uint(len(m.namespace_by_name)) }
 
-func (ns *net_namespace) add(m *netlink_main) {
+func (ns *net_namespace) add(m *netlink_main) (err error) {
 	// Allocate unique index for namespace.
 	nm := &m.net_namespace_main
 	ns.index = nm.namespace_pool.GetIndex()
@@ -519,14 +525,11 @@ func (ns *net_namespace) add(m *netlink_main) {
 
 	// Loop until namespace sockets are allocated.
 	time_start := time.Now()
-	var (
-		err               error
-		first_setns_errno syscall.Errno
-	)
+	var first_setns_errno syscall.Errno
 	for {
 		ns.m = nm
 		if ns.ns_fd, err = m.fd_for_path(netnsDir, ns.name); err != nil {
-			panic(err)
+			return
 		}
 		// First setns may return EINVAL until "ip netns add X" performs mount bind; so we need to retry.
 		err, first_setns_errno = elib.WithNamespace(ns.ns_fd, m.default_namespace.ns_fd, syscall.CLONE_NEWNET, ns.allocate_sockets)
@@ -534,7 +537,7 @@ func (ns *net_namespace) add(m *netlink_main) {
 			break
 		}
 		if time.Since(time_start) > 10*time.Millisecond {
-			panic(err)
+			return
 		}
 		syscall.Close(ns.ns_fd)
 		ns.ns_fd = -1
@@ -543,10 +546,13 @@ func (ns *net_namespace) add(m *netlink_main) {
 		}
 	}
 	if err = ns.netlink_socket_pair.configure(ns.netlink_socket_fds[0], ns.netlink_socket_fds[1]); err != nil {
-		panic(err)
+		syscall.Close(ns.ns_fd)
+		ns.ns_fd = -1
+		return
 	}
 	ns.listen(m)
 	ns.fibInit(false)
+	return
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
