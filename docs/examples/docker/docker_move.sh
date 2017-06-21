@@ -15,6 +15,7 @@ fi
 
 usage () {
     echo "Usage: $0 up <docker container> <intf> <ip_addr_with_prefix>"
+    echo "Usage: $0 up <docker container> <intf>"
     echo "Usage: $0 down <docker container> <intf>"
     exit 1
 }
@@ -27,7 +28,7 @@ action=$1
 
 case $action in
     "up")
-	if [ $# -ne 4 ]; then
+	if [ $# -ne 3 ] && [ $# -ne 4 ]; then
 	    usage
 	fi
 	addr=$4
@@ -86,6 +87,10 @@ setup_dc () {
     ip netns exec $dc_pid ip link set up lo
     ip netns exec $dc_pid ip add add 127.0.0.1/8 dev lo 2> /dev/null
     ip netns exec $dc_pid ip link set up $intf
+
+    if [ -z "$addr_mask" ]; then
+	return
+    fi
 
     if [[ "$addr_mask" =~ "/31" ]]; then
 	addr=${addr_mask%/*}
@@ -178,6 +183,9 @@ return_intf () {
 
     ip netns exec $dc_pid ip link set down $intf
     ip netns exec $dc_pid ip link set $intf netns 1
+    if [ -h /var/run/netns/$dc_pid ]; then
+	rm -f /var/run/netns/$dc_pid
+    fi
 }
 
 down_it () {
@@ -207,8 +215,7 @@ case "$1" in
 	usage
 esac
 
-if ( ! goes status > /dev/null )
-then
+if ( ! goes status > /dev/null ); then
     echo "goes not happy"
     exit 1
 fi
