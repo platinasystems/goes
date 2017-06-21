@@ -40,41 +40,44 @@ func (Command) Kind() cmd.Kind    { return cmd.DontFork }
 func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
-func checkForChip() bool {
+func checkForChip() error {
 	args := []string{"/usr/bin/lspci"}
 	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err, "out =", cmdOut)
-		os.Exit(1)
+		return err
 	}
 
 	match, err := regexp.MatchString("Broadcom Corporation Device b96[05]",
 		string(cmdOut))
-
-	if err == nil && match == true {
-		return true
-	} else {
-		return false
+	if err != nil {
+		return err
 	}
+
+	if !match {
+		err = fmt.Errorf("TH missing")
+	}
+	return err
 }
 
-func checkForKmod() bool {
+func checkForKmod() error {
 	args := []string{"/bin/lsmod"}
 	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err, "out =", cmdOut)
-		os.Exit(1)
+		return err
 	}
 
 	match, err := regexp.MatchString("uio_pci_dma", string(cmdOut))
-	if err == nil && match == true {
-		return true
-	} else {
-		return false
+	if err != nil {
+		return err
 	}
+
+	if !match {
+		err = fmt.Errorf("not loaded")
+	}
+	return err
 }
 
-func checkDaemons() bool {
+func checkDaemons() error {
 	daemons := map[string]bool{
 		"goes-daemons": true,
 		"vnetd":        true,
@@ -85,13 +88,11 @@ func checkDaemons() bool {
 	}
 
 	mypid := os.Getpid()
-	status := true
 
 	args := []string{"/bin/ps", "-C", "goes", "-o", "pid="}
 	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err, "out =", string(cmdOut))
-		os.Exit(1)
+		return err
 	}
 	pids := strings.Split(string(cmdOut), "\n")
 
@@ -119,9 +120,7 @@ func checkDaemons() bool {
 		args = []string{"/bin/ps", "-p", pid, "-o", "cmd="}
 		cmdOut, err = exec.Command(args[0], args[1:]...).Output()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err, "out =",
-				string(cmdOut))
-			os.Exit(1)
+			return err
 		}
 		daemon := string(cmdOut)
 		daemon = strings.Replace(daemon, "\n", "", -1)
@@ -129,100 +128,70 @@ func checkDaemons() bool {
 		if err = p.Signal(os.Signal(syscall.Signal(0))); err != nil {
 			fmt.Printf("Daemon [%s] not responding to signal: %s",
 				daemon, err)
-			status = false
 			continue
 		}
 
 		if _, ok := daemons[daemon]; ok == true {
-			fmt.Printf("    %-13s - OK\n", daemon)
 			delete(daemons, daemon)
 		} else {
 			fmt.Println("map NOT found for", daemon, ok)
-			status = false
 		}
 	}
 	for k := range daemons {
-		fmt.Printf("    %-13s - not running\n", k)
-		if k == "vnetd" {
-			vnetd_down = true
-		}
-		status = false
-
+		return fmt.Errorf("%s daemon not running", k)
 	}
-	return status
+	return err
 }
 
-func checkRedis() bool {
+func checkRedis() error {
 	s, err := redis.Hget("platina", "redis.ready")
 	if err != nil {
-		fmt.Println("redis error:", err)
-		return false
+		return err
 	}
 	if s == "true" {
-		return true
+		return nil
 	}
-	return true
+	return nil
 }
 
-func checkVnetdHung() bool {
-	args := []string{"/usr/bin/goes", "vnet", "show", "hardware"}
-	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
+func checkVnetdHung() error {
+	args := []string{"/usr/bin/timeout", "30", "/usr/bin/goes",
+		"vnet", "show", "hardware"}
+	_, err := exec.Command(args[0], args[1:]...).Output()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err, "out =", cmdOut)
-		return false
+		return fmt.Errorf("vnetd daemon not responding")
 	}
-
-	return true
+	return nil
 }
 
 func (Command) Main(args ...string) error {
 	if os.Getuid() != 0 {
-		fmt.Println("must be run as root")
-		os.Exit(1)
+		return fmt.Errorf("must be run as root")
 	}
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
-		os.Exit(1)
 	}
 	fmt.Println("GOES status")
 	fmt.Println("======================")
 
-	fmt.Printf("  %-15s - ", "PCI")
-	if checkForChip() {
-		fmt.Printf("OK\n")
-	} else {
-		fmt.Printf(" TH not found on PCI bus\n")
-		os.Exit(2)
-	}
-
-	fmt.Printf("  %-15s - ", "Kernel module")
-	if checkForKmod() {
-		fmt.Printf("OK\n")
-	} else {
-		fmt.Printf("uio_pci_dma module not loaded\n")
-		os.Exit(3)
-	}
-
-	fmt.Printf("  Check daemons:\n")
-	if !checkDaemons() {
-		os.Exit(4)
-	}
-
-	fmt.Printf("  %-15s - ", "Check Redis")
-	if checkRedis() {
-		fmt.Printf("OK\n")
-	} else {
-		os.Exit(4)
-	}
-
-	if vnetd_down == false {
-		fmt.Printf("  %-15s - ", "Check vnet")
-		if checkVnetdHung() {
-			fmt.Printf("OK\n")
+	for _, x := range []struct {
+		header string
+		f      func() error
+	}{
+		{"PCI", checkForChip},
+		{"Kernel module", checkForKmod},
+		{"Check daemons", checkDaemons},
+		{"Check Redis", checkRedis},
+		{"Check vnet", checkVnetdHung},
+	} {
+		fmt.Printf("  %-15s - ", x.header)
+		if err := x.f(); err == nil {
+			fmt.Println("OK")
 		} else {
-			fmt.Printf("VNET not responding\n")
-			os.Exit(5)
+			fmt.Printf("%s\n", err)
+			return err
 		}
 	}
+
 	return nil
 }
