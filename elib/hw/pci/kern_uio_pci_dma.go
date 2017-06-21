@@ -224,7 +224,14 @@ func (d *uioPciDevice) bind() (err error) {
 	return
 }
 
-func (d *uioPciDevice) unbind() (err error) { return sysfsWrite("unbind", "%s", &d.Addr) }
+func (d *uioPciDevice) unbind() (err error) {
+	err = sysfsWrite("unbind", "%s", &d.Addr)
+	if err != nil {
+		return
+	}
+	err = sysfsWrite("remove_id", "%04x %04x", int(d.VendorID()), int(d.DeviceID()))
+	return
+}
 
 func NewDevice() Devicer {
 	d := &uioPciDevice{}
