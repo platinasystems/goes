@@ -349,7 +349,11 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			m.add_del_vlan(intf, msg, is_del)
 		}
 	} else {
-		intf := ns.interface_by_index[index]
+		intf, ok := ns.interface_by_index[index]
+		// Ignore deletes of unknown interface.
+		if !ok {
+			return
+		}
 		if tif := intf.tuntap; tif != nil {
 			tif.add_del_namespace(m, ns, is_del)
 			tif.namespace = nil
