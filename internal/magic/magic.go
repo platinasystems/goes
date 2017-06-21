@@ -13,15 +13,22 @@ const (
 	ext234SUUIDOff = 0x468
 	ext234SUUIDLen = 16
 
-	mbrMagicOffL = 0x1fe
-	mbrMagicOffM = 0x1ff
-	mbrMagicValL = 0x55
-	mbrMagicValM = 0xaa
+	mbrMediaTypeOff = 0x15
+	mbrMagicOffL    = 0x1fe
+	mbrMagicOffM    = 0x1ff
+	mbrMagicValL    = 0x55
+	mbrMagicValM    = 0xaa
 )
+
+func isFatValidMedia(sniff []byte) bool {
+	return 0xf8 <= sniff[mbrMediaTypeOff] ||
+		sniff[mbrMediaTypeOff] == 0xf0
+}
 
 func IdentifyPartitionMap(sniff []byte) string {
 	if sniff[mbrMagicOffL] == mbrMagicValL &&
-		sniff[mbrMagicOffM] == mbrMagicValM {
+		sniff[mbrMagicOffM] == mbrMagicValM &&
+		!isFatValidMedia(sniff) {
 		return "mbr"
 	}
 	return ""
