@@ -3,9 +3,7 @@
 // LICENSE file.
 
 //TODO AUTH WGET, CERT OR EQUIV
-//TODO BLOB / DEBLOB
 //TODO UPGRADE AUTOMATICALLY IF ENB., contact boot server
-//TODO script to generate ubo.bin, env.bin
 
 package upgrade
 
@@ -26,24 +24,30 @@ import (
 	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/url"
+	"github.com/xi2/xz"
 )
 
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [-v 'LATEST' | HASH] [-l] [-s SERVER] [-d DIR]"
+	Usage   = "upgrade [-v VER] [-s SERVER] [-d DIR] [-l]"
 	Man     = `
 DESCRIPTION
 	The upgrade command upgrades firmware images in flash.
 
-	The upgrade command can upgrade any or all of the images
-	in flash, depending what is in the image blob.  Images blobs
-	can be downloaded either from the Platina webserver on the
-	internet, or, a local server in the enterprise.
-	Image versions can be either LATEST, or a particular past
-	version can be specified with a version hash.
+	The default version is "LATEST".  Or, a version number
+	can be supplied in the from v0.0[.0][.0]
 
-	For the BMC the independently erasable and replacable images are:
+	The -l command will list available versions.
+
+	Images are downloaded from either from 
+	"downloads.platina.com", or a user specified URL or
+	IPv4 address.
+	
+	The directory for a user server is "downloads", unless
+	overridden with the "-d" parameter.
+
+	For the BMC the images in QSPI are:
 	   1. ubo:  QSPI header, u-boot bootloader
 	   2. dtb:  device tree file
 	   3. env:  u-boot envvar block
@@ -51,16 +55,19 @@ DESCRIPTION
 	   5. ini:  initrd  filesystem containing goes
 
 OPTIONS
-	-v ["LATEST" | HASH] upgrades flash to platina-mk1-bmc-[HASH]
-	-l	             lists available upgrade hashes
-	-s [SERVER]          specifies SERVER, default: www.platina.com
-	-d [DIRECTORY]       server DIRECTORY, default is platina-mk1-bmc`
+	-v [VER]	version number or hash, default is LATEST
+	-s [SERVER]	IP4 or URL, default is downloads.platina.com
+	-d [DIR]	IP4 or URL, default is downloads.platina.com
+	-l		lists available upgrade hashes`
 
 	DfltMod = 0755
 	MmcDir  = "/mmc"
 	MmcDev  = "/dev/mmcblk0p1"
-	DfltSrv = "www.platinasystems.com/doc"
+	DfltSrv = "downloads.platinasystems.com"
+	DfltVer = "LATEST"
+	DfltDir = "downloads"
 	Machine = "platina-mk1-bmc"
+	Suffix  = ".tar.xz"
 )
 
 var imageNames = []string{"ubo", "dtb", "env", "ker", "ini"}
@@ -82,19 +89,22 @@ func (cmd) Apropos() lang.Alt { return apropos }
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-l")
 	parm, args := parms.New(args, "-v", "-s", "-d")
-
-	if len(parm["-v"]) == 0 && !flag["-l"] {
-		return fmt.Errorf("Error: missing -v or -l flag")
-	}
-	if len(parm["-s"]) == 0 {
-		return fmt.Errorf("Error: missing -s server name or IP")
-		//parm["-s"] = DfltSrv
+	if len(parm["-v"]) == 0 {
+		parm["-v"] = DfltVer
 	}
 	if len(parm["-d"]) == 0 {
-		parm["-d"] = Machine
+		if len(parm["-s"]) == 0 {
+			parm["-s"] = DfltSrv
+		} else {
+			parm["-d"] = DfltDir
+		}
+	} else {
+		if len(parm["-s"]) == 0 {
+			parm["-s"] = DfltSrv
+		}
 	}
 	if flag["-l"] {
-		getList(parm["-s"], parm["-d"])
+		getList(parm["-s"], parm["-d"], parm["-v"])
 		l, err := ioutil.ReadFile("/LIST")
 		if err != nil {
 			return fmt.Errorf("Error: 'LIST' file not found")
@@ -102,7 +112,8 @@ func (cmd) Main(args ...string) error {
 		fmt.Print(string(l))
 		return nil
 	}
-	err := doUpgrade(parm["-s"], parm["-v"], parm["-d"])
+
+	err := doUpgrade(parm["-s"], parm["-d"], parm["-v"])
 	if err != nil {
 		return err
 	}
@@ -122,24 +133,27 @@ var (
 	}
 )
 
-func doUpgrade(s string, v string, d string) error {
+func doUpgrade(s string, d string, v string) error {
 	err := mountMmc()
 	if err != nil {
 		return err
 	}
-	err = getFiles(s, v, d)
+	err, size := getFile(s, d, v)
 	if err != nil {
+		return err
+	}
+	if size < 1000 {
 		return err
 	}
 	err = unTar()
 	if err != nil {
 		return err
 	}
-	err = copyFiles(v)
+	err = copyFiles()
 	if err != nil {
 		return err
 	}
-	err = rmFiles(v)
+	err = rmFiles()
 	if err != nil {
 		return err
 	}
@@ -154,51 +168,57 @@ func reboot() error {
 }
 
 func unTar() error {
-	file, err := os.Open("/platina-mk1-bmc-LATEST.tar")
-	defer file.Close()
+	f, err := os.Open(Machine + Suffix)
 	if err != nil {
-		return fmt.Errorf("Error: bad open")
 		return err
 	}
-	tr := tar.NewReader(file)
+	r, err := xz.NewReader(f, 0)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(r)
 	i := 0
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
+		if err != nil {
+			return err
+		}
 		if i == 0 {
 			i++
 			continue
 		}
 		i++
-		if err != nil {
-			return fmt.Errorf("Error: bad NewReader")
-			return err
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			fmt.Println("creating:   " + hdr.Name)
+			err = os.MkdirAll(hdr.Name, 0777)
+			if err != nil {
+				return err
+			}
+		case tar.TypeReg, tar.TypeRegA:
+			fmt.Println("extracting: " + hdr.Name)
+			w, err := os.Create(hdr.Name)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(w, tr)
+			if err != nil {
+				return err
+			}
+			w.Close()
 		}
-
-		f, err := os.Create(hdr.Name)
-		if err != nil {
-			return fmt.Errorf("Error: bad Create")
-			return err
-		}
-		defer f.Close()
-		w := bufio.NewWriter(f)
-
-		if _, err := io.Copy(w, tr); err != nil {
-			return fmt.Errorf("Error: bad Copy")
-			return err
-		}
-		f.Sync()
-		w.Flush()
-		f.Close()
 	}
+	f.Close()
 	return nil
 }
 
-func getList(s string, d string) error {
+func getList(s string, d string, v string) error {
+	rmFile("LIST")
 	files := []string{
-		"http://" + s + "/" + d + "/" + "LIST",
+		"http://" + s + "/" + d + "/" + v + "/" + "LIST",
 	}
 	err := wgetFiles(files)
 	if err != nil {
@@ -207,15 +227,27 @@ func getList(s string, d string) error {
 	return nil
 }
 
-func getFiles(s string, v string, d string) error {
+func getFile(s string, d string, v string) (error, int64) {
+	rmFile(Machine + Suffix)
 	files := []string{
-		"http://" + s + "/" + d + "/" + Machine + "-" + v + ".tar",
+		"http://" + s + "/" + d + "/" + v + "/" + Machine + Suffix,
 	}
-	err := wgetFiles(files)
+	er := wgetFiles(files)
+	if er != nil {
+		return er, 0
+	}
+	f, err := os.Open(Machine + Suffix)
 	if err != nil {
-		return err
+		return err, 0
 	}
-	return nil
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return err, 0
+	}
+	filesize := stat.Size()
+	return nil, filesize
 }
 
 func wgetFiles(urls []string) error {
@@ -235,14 +267,14 @@ func wgetFiles(urls []string) error {
 	return nil
 }
 
-func copyFiles(v string) error {
+func copyFiles() error {
 	for _, f := range imageNames {
-		err := copyFile("/"+Machine+"-"+f+"-"+v+
+		err := copyFile("/"+Machine+"-"+f+
 			".bin", MmcDir+"/"+f+".bin")
 		if err != nil {
 			return err
 		}
-		err = copyFile("/"+Machine+"-"+f+"-"+v+
+		err = copyFile("/"+Machine+"-"+f+
 			".crc", MmcDir+"/"+f+".crc")
 		if err != nil {
 			return err
@@ -276,18 +308,18 @@ func copyFile(f string, d string) error {
 	return nil
 }
 
-func rmFiles(v string) error {
+func rmFiles() error {
 	for _, f := range imageNames {
-		err := rmFile("/" + Machine + "-" + f + "-" + v + ".bin")
+		err := rmFile("/" + Machine + "-" + f + ".bin")
 		if err != nil {
 			return err
 		}
-		err = rmFile("/" + Machine + "-" + f + "-" + v + ".crc")
+		err = rmFile("/" + Machine + "-" + f + ".crc")
 		if err != nil {
 			return err
 		}
 	}
-	err := rmFile("/" + Machine + "-" + v + ".tar")
+	err := rmFile("/" + Machine + Suffix)
 	if err != nil {
 		return err
 	}
