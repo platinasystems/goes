@@ -272,3 +272,11 @@ func (m *main) Configure(in *parse.Input) {
 		}
 	}
 }
+
+func (m *main) Exit() (err error) {
+	for i := range m.devs {
+		d := m.devs[i].get()
+		err = d.pciDev.Close()
+	}
+	return
+}

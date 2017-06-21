@@ -306,6 +306,7 @@ type DriverDevice interface {
 type Devicer interface {
 	GetDevice() *Device
 	Open() error
+	Close() error
 }
 
 var (

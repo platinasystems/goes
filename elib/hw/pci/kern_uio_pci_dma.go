@@ -224,6 +224,8 @@ func (d *uioPciDevice) bind() (err error) {
 	return
 }
 
+func (d *uioPciDevice) unbind() (err error) { return sysfsWrite("unbind", "%s", &d.Addr) }
+
 func NewDevice() Devicer {
 	d := &uioPciDevice{}
 	d.Device.Devicer = d
@@ -257,6 +259,9 @@ func (d *uioPciDevice) Open() (err error) {
 	iomux.Add(d)
 
 	return
+}
+func (d *uioPciDevice) Close() error {
+	return d.unbind()
 }
 
 var errShouldNeverHappen = errors.New("should never happen")
