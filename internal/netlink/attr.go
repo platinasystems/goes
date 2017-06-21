@@ -208,23 +208,41 @@ const (
 	InterfaceKindTun
 	InterfaceKindVeth
 	InterfaceKindVlan
+	InterfaceKindIpip
+	InterfaceKindIp6Tunnel
+	InterfaceKindIp4GRE
+	InterfaceKindIp4GRETap
+	InterfaceKindIp6GRE
+	InterfaceKindIp6GRETap
 )
 
 var kindStrings = [...]string{
-	InterfaceKindUnknown: "",
-	InterfaceKindDummy:   "dummy",
-	InterfaceKindTun:     "tun",
-	InterfaceKindVeth:    "veth",
-	InterfaceKindVlan:    "vlan",
+	InterfaceKindUnknown:   "",
+	InterfaceKindDummy:     "dummy",
+	InterfaceKindTun:       "tun",
+	InterfaceKindVeth:      "veth",
+	InterfaceKindVlan:      "vlan",
+	InterfaceKindIpip:      "ipip",
+	InterfaceKindIp6Tunnel: "ip6tnl",
+	InterfaceKindIp4GRE:    "gre",
+	InterfaceKindIp4GRETap: "gretap",
+	InterfaceKindIp6GRE:    "ip6gre",
+	InterfaceKindIp6GRETap: "ip6gretap",
 }
 
 func (k InterfaceKind) String() string { return kindStrings[k] }
 
 var kindMap = map[string]InterfaceKind{
-	"dummy": InterfaceKindDummy,
-	"tun":   InterfaceKindTun,
-	"veth":  InterfaceKindVeth,
-	"vlan":  InterfaceKindVlan,
+	"dummy":     InterfaceKindDummy,
+	"tun":       InterfaceKindTun,
+	"veth":      InterfaceKindVeth,
+	"vlan":      InterfaceKindVlan,
+	"ipip":      InterfaceKindIpip,
+	"ip6tnl":    InterfaceKindIp6Tunnel,
+	"gre":       InterfaceKindIp4GRE,
+	"gretap":    InterfaceKindIp4GRETap,
+	"ip6gre":    InterfaceKindIp6GRE,
+	"ip6gretap": InterfaceKindIp6GRETap,
 }
 
 func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
@@ -261,6 +279,10 @@ func parse_link_info(b []byte) *AttrArray {
 	switch linkKind {
 	case InterfaceKindVlan:
 		as.X[IFLA_INFO_DATA] = parse_vlan_info([]byte(as.X[IFLA_INFO_DATA].(StringAttr)))
+	case InterfaceKindIpip, InterfaceKindIp6Tunnel:
+		as.X[IFLA_INFO_DATA] = parse_iptun_info([]byte(as.X[IFLA_INFO_DATA].(StringAttr)), linkKind)
+	case InterfaceKindIp4GRE, InterfaceKindIp4GRETap, InterfaceKindIp6GRE, InterfaceKindIp6GRETap:
+		as.X[IFLA_INFO_DATA] = parse_gre_info([]byte(as.X[IFLA_INFO_DATA].(StringAttr)), linkKind)
 	}
 	return as
 }
@@ -387,6 +409,211 @@ func (a *VlanFlags) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprintf(acc, "flags: %x mask: %x", a.Flags, a.Mask)
 	return acc.Tuple()
+}
+
+const (
+	IFLA_IPTUN_UNSPEC IfIptunLinkInfoDataAttrKind = iota
+	IFLA_IPTUN_LINK
+	IFLA_IPTUN_LOCAL
+	IFLA_IPTUN_REMOTE
+	IFLA_IPTUN_TTL
+	IFLA_IPTUN_TOS
+	IFLA_IPTUN_ENCAP_LIMIT
+	IFLA_IPTUN_FLOWINFO
+	IFLA_IPTUN_FLAGS
+	IFLA_IPTUN_PROTO
+	IFLA_IPTUN_PMTUDISC
+	IFLA_IPTUN_6RD_PREFIX
+	IFLA_IPTUN_6RD_RELAY_PREFIX
+	IFLA_IPTUN_6RD_PREFIXLEN
+	IFLA_IPTUN_6RD_RELAY_PREFIXLEN
+	IFLA_IPTUN_ENCAP_TYPE
+	IFLA_IPTUN_ENCAP_FLAGS
+	IFLA_IPTUN_ENCAP_SPORT
+	IFLA_IPTUN_ENCAP_DPORT
+	IFLA_IPTUN_COLLECT_METADATA
+	IFLA_IPTUN_FWMARK
+)
+
+var ifIptunLinkInfoDataAttrKindNames = []string{
+	IFLA_IPTUN_UNSPEC:              "UNSPEC",
+	IFLA_IPTUN_LINK:                "IPTUN_LINK",
+	IFLA_IPTUN_LOCAL:               "IPTUN_LOCAL",
+	IFLA_IPTUN_REMOTE:              "IPTUN_REMOTE",
+	IFLA_IPTUN_TTL:                 "IPTUN_TTL",
+	IFLA_IPTUN_TOS:                 "IPTUN_TOS",
+	IFLA_IPTUN_ENCAP_LIMIT:         "IPTUN_ENCAP_LIMIT",
+	IFLA_IPTUN_FLOWINFO:            "IPTUN_FLOWINFO",
+	IFLA_IPTUN_FLAGS:               "IPTUN_FLAGS",
+	IFLA_IPTUN_PROTO:               "IPTUN_PROTO",
+	IFLA_IPTUN_PMTUDISC:            "IPTUN_PMTUDISC",
+	IFLA_IPTUN_6RD_PREFIX:          "IPTUN_6RD_PREFIX",
+	IFLA_IPTUN_6RD_RELAY_PREFIX:    "IPTUN_6RD_RELAY_PREFIX",
+	IFLA_IPTUN_6RD_PREFIXLEN:       "IPTUN_6RD_PREFIXLEN",
+	IFLA_IPTUN_6RD_RELAY_PREFIXLEN: "IPTUN_6RD_RELAY_PREFIXLEN",
+	IFLA_IPTUN_ENCAP_TYPE:          "IPTUN_ENCAP_TYPE",
+	IFLA_IPTUN_ENCAP_FLAGS:         "IPTUN_ENCAP_FLAGS",
+	IFLA_IPTUN_ENCAP_SPORT:         "IPTUN_ENCAP_SPORT",
+	IFLA_IPTUN_ENCAP_DPORT:         "IPTUN_ENCAP_DPORT",
+	IFLA_IPTUN_COLLECT_METADATA:    "IPTUN_COLLECT_METADATA",
+	IFLA_IPTUN_FWMARK:              "IPTUN_FWMARK",
+}
+
+func (t IfIptunLinkInfoDataAttrKind) String() string {
+	return elib.Stringer(ifIptunLinkInfoDataAttrKindNames, int(t))
+}
+
+type IfIptunLinkInfoDataAttrKind int
+type IfIptunLinkInfoDataAttrType Empty
+
+func NewIfIptunLinkInfoDataAttrType() *IfIptunLinkInfoDataAttrType {
+	return (*IfIptunLinkInfoDataAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *IfIptunLinkInfoDataAttrType) attrType() {}
+func (t *IfIptunLinkInfoDataAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *IfIptunLinkInfoDataAttrType) IthString(i int) string {
+	return elib.Stringer(ifIptunLinkInfoDataAttrKindNames, i)
+}
+
+func parse_iptun_info(b []byte, linkKind InterfaceKind) (as *AttrArray) {
+	as = pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewIfIptunLinkInfoDataAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := IfIptunLinkInfoDataAttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case IFLA_IPTUN_LOCAL, IFLA_IPTUN_REMOTE:
+			if linkKind == InterfaceKindIp6Tunnel {
+				as.X[kind] = NewIp6AddressBytes(v)
+			} else {
+				as.X[kind] = NewIp4AddressBytes(v)
+			}
+		case IFLA_IPTUN_6RD_PREFIX:
+			as.X[kind] = NewIp6AddressBytes(v)
+		case IFLA_IPTUN_6RD_RELAY_PREFIX:
+			as.X[kind] = NewIp4AddressBytes(v)
+		case IFLA_IPTUN_TTL, IFLA_IPTUN_TOS, IFLA_IPTUN_PROTO, IFLA_IPTUN_PMTUDISC, IFLA_IPTUN_ENCAP_LIMIT, IFLA_IPTUN_FWMARK, IFLA_IPTUN_FLAGS:
+			as.X[kind] = Uint8Attr(v[0])
+		case IFLA_IPTUN_ENCAP_TYPE, IFLA_IPTUN_ENCAP_FLAGS, IFLA_IPTUN_ENCAP_SPORT, IFLA_IPTUN_ENCAP_DPORT, IFLA_IPTUN_6RD_PREFIXLEN, IFLA_IPTUN_6RD_RELAY_PREFIXLEN:
+			as.X[kind] = Uint16AttrBytes(v)
+		case IFLA_IPTUN_LINK, IFLA_IPTUN_FLOWINFO:
+			as.X[kind] = Uint32AttrBytes(v)
+		case IFLA_IPTUN_COLLECT_METADATA:
+			as.X[kind] = Uint8Attr(0)
+		default:
+			panic("unknown iptun link data attribute kind " + kind.String())
+		}
+	}
+	return as
+}
+
+const (
+	IFLA_GRE_UNSPEC IfGRELinkInfoDataAttrKind = iota
+	IFLA_GRE_LINK
+	IFLA_GRE_IFLAGS
+	IFLA_GRE_OFLAGS
+	IFLA_GRE_IKEY
+	IFLA_GRE_OKEY
+	IFLA_GRE_LOCAL
+	IFLA_GRE_REMOTE
+	IFLA_GRE_TTL
+	IFLA_GRE_TOS
+	IFLA_GRE_PMTUDISC
+	IFLA_GRE_ENCAP_LIMIT
+	IFLA_GRE_FLOWINFO
+	IFLA_GRE_FLAGS
+	IFLA_GRE_ENCAP_TYPE
+	IFLA_GRE_ENCAP_FLAGS
+	IFLA_GRE_ENCAP_SPORT
+	IFLA_GRE_ENCAP_DPORT
+	IFLA_GRE_COLLECT_METADATA
+	IFLA_GRE_IGNORE_DF
+	IFLA_GRE_FWMARK
+)
+
+var ifGRELinkInfoDataAttrKindNames = []string{
+	IFLA_GRE_UNSPEC:           "GRE_UNSPEC",
+	IFLA_GRE_LINK:             "GRE_LINK",
+	IFLA_GRE_IFLAGS:           "GRE_IFLAGS",
+	IFLA_GRE_OFLAGS:           "GRE_OFLAGS",
+	IFLA_GRE_IKEY:             "GRE_IKEY",
+	IFLA_GRE_OKEY:             "GRE_OKEY",
+	IFLA_GRE_LOCAL:            "GRE_LOCAL",
+	IFLA_GRE_REMOTE:           "GRE_REMOTE",
+	IFLA_GRE_TTL:              "GRE_TTL",
+	IFLA_GRE_TOS:              "GRE_TOS",
+	IFLA_GRE_PMTUDISC:         "GRE_PMTUDISC",
+	IFLA_GRE_ENCAP_LIMIT:      "GRE_ENCAP_LIMIT",
+	IFLA_GRE_FLOWINFO:         "GRE_FLOWINFO",
+	IFLA_GRE_FLAGS:            "GRE_FLAGS",
+	IFLA_GRE_ENCAP_TYPE:       "GRE_ENCAP_TYPE",
+	IFLA_GRE_ENCAP_FLAGS:      "GRE_ENCAP_FLAGS",
+	IFLA_GRE_ENCAP_SPORT:      "GRE_ENCAP_SPORT",
+	IFLA_GRE_ENCAP_DPORT:      "GRE_ENCAP_DPORT",
+	IFLA_GRE_COLLECT_METADATA: "GRE_COLLECT_METADATA",
+	IFLA_GRE_IGNORE_DF:        "GRE_IGNORE_DF",
+	IFLA_GRE_FWMARK:           "GRE_FWMARK",
+}
+
+func (t IfGRELinkInfoDataAttrKind) String() string {
+	return elib.Stringer(ifGRELinkInfoDataAttrKindNames, int(t))
+}
+
+type IfGRELinkInfoDataAttrKind int
+type IfGRELinkInfoDataAttrType Empty
+
+func NewIfGRELinkInfoDataAttrType() *IfGRELinkInfoDataAttrType {
+	return (*IfGRELinkInfoDataAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *IfGRELinkInfoDataAttrType) attrType() {}
+func (t *IfGRELinkInfoDataAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *IfGRELinkInfoDataAttrType) IthString(i int) string {
+	return elib.Stringer(ifGRELinkInfoDataAttrKindNames, i)
+}
+
+func parse_gre_info(b []byte, linkKind InterfaceKind) (as *AttrArray) {
+	as = pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewIfGRELinkInfoDataAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := IfGRELinkInfoDataAttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case IFLA_GRE_LOCAL, IFLA_GRE_REMOTE:
+			switch linkKind {
+			case InterfaceKindIp6GRE, InterfaceKindIp6GRETap:
+				as.X[kind] = NewIp6AddressBytes(v)
+			default:
+				as.X[kind] = NewIp4AddressBytes(v)
+			}
+		case IFLA_GRE_LINK, IFLA_GRE_IKEY, IFLA_GRE_OKEY, IFLA_GRE_FLOWINFO,
+			IFLA_GRE_FLAGS, IFLA_GRE_FWMARK:
+			as.X[kind] = Uint32AttrBytes(v)
+		case IFLA_GRE_IFLAGS, IFLA_GRE_OFLAGS,
+			IFLA_GRE_ENCAP_TYPE, IFLA_GRE_ENCAP_FLAGS,
+			IFLA_GRE_ENCAP_SPORT, IFLA_GRE_ENCAP_DPORT:
+			as.X[kind] = Uint16AttrBytes(v)
+		case IFLA_GRE_TTL, IFLA_GRE_TOS, IFLA_GRE_ENCAP_LIMIT,
+			IFLA_GRE_PMTUDISC, IFLA_GRE_IGNORE_DF:
+			as.X[kind] = Uint8Attr(v[0])
+		case IFLA_GRE_COLLECT_METADATA:
+			as.X[kind] = Uint8Attr(0)
+		default:
+			panic("unknown GRE link data attribute kind " + kind.String())
+		}
+	}
+	return as
 }
 
 //go:generate gentemplate -d Package=netlink -id Attr -d VecType=AttrVec -d Type=Attr github.com/platinasystems/go/elib/vec.tmpl
