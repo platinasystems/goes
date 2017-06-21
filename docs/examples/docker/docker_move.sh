@@ -183,9 +183,6 @@ return_intf () {
 
     ip netns exec $dc_pid ip link set down $intf
     ip netns exec $dc_pid ip link set $intf netns 1
-    if [ -h /var/run/netns/$dc_pid ]; then
-	rm -f /var/run/netns/$dc_pid
-    fi
 }
 
 down_it () {
