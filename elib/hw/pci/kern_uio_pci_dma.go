@@ -267,8 +267,10 @@ func (d *uioPciDevice) Open() (err error) {
 
 	return
 }
-func (d *uioPciDevice) Close() error {
-	return d.unbind()
+func (d *uioPciDevice) Close() (err error) {
+	return
+	// FIXME: Enabling unbind causes kernel crashes.  Not sure why.
+	// return d.unbind()
 }
 
 var errShouldNeverHappen = errors.New("should never happen")
