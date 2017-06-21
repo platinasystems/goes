@@ -121,6 +121,7 @@ func (ns *net_namespace) forDummyInterface(msg *netlink.IfInfoMessage) (ok bool)
 		if _, known := ns.dummy_interface_by_ifindex[msg.Index]; !known {
 			ns.dummy_interface_by_ifindex[msg.Index] = &dummy_interface{}
 		}
+		ok = true
 	}
 	return
 }
