@@ -384,7 +384,11 @@ func (c *Command) pivotRoot(mountPoint string, root string, script string) {
 				"/boot:root=/dev/"+dir.Name())
 		}
 		err = c.g.Main(bootCmd...)
-		panic(fmt.Errorf("Error in autoboot: %v", err))
+		if err == nil {
+			panic(fmt.Errorf("Aborted"))
+		} else {
+			panic(fmt.Errorf("Error in autoboot: %v", err))
+		}
 	}
 
 	err = c.g.Main("mount", root, mountPoint)
