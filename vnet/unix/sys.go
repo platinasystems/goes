@@ -63,9 +63,10 @@ func sendmmsg(fd, flags int, msgs []mmsghdr) (int, syscall.Errno) {
 	return rwmmsg(fd, flags, msgs, true)
 }
 
-func (h *msghdr) set(a *syscall.RawSockaddrLinklayer, iovs []iovec) {
+func (h *msghdr) set(a *syscall.RawSockaddrLinklayer, iovs []iovec, flags int) {
 	h.Name = (*byte)(unsafe.Pointer(a))
 	h.Namelen = syscall.SizeofSockaddrLinklayer
 	h.Iov = (*syscall.Iovec)(&iovs[0])
 	h.Iovlen = uint64(len(iovs))
+	h.Flags = int32(flags)
 }

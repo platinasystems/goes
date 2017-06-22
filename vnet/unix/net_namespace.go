@@ -203,6 +203,7 @@ type net_namespace_main struct {
 	namespace_pool                   net_namespace_pool
 	rx_node                          rx_node
 	tx_node                          tx_node
+	tuntap_sendmsg_recvmsg_disable   bool
 }
 
 func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {
