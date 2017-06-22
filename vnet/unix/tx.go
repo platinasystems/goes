@@ -5,6 +5,7 @@
 package unix
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/vnet"
@@ -92,6 +93,7 @@ const (
 	tx_error_unknown_interface = iota
 	tx_error_interface_down
 	tx_error_packet_too_large
+	tx_error_drop
 )
 
 func (n *tx_node) init(m *net_namespace_main) {
@@ -100,9 +102,28 @@ func (n *tx_node) init(m *net_namespace_main) {
 		tx_error_unknown_interface: "unknown interface",
 		tx_error_interface_down:    "interface is down",
 		tx_error_packet_too_large:  "packet too large",
+		tx_error_drop:              "error drops",
 	}
 	m.m.v.RegisterOutputNode(n, "punt")
 	n.pv_pool = make(chan *tx_packet_vector, 2*vnet.MaxVectorLen)
+}
+
+type buffer_trace int
+
+const (
+	tx_buffer_trace_add = iota
+	tx_buffer_trace_unknown_interface
+)
+
+var buffer_trace_strings = [...]string{
+	tx_buffer_trace_add:               "add",
+	tx_buffer_trace_unknown_interface: "unknown interface",
+}
+
+func (x buffer_trace) String() string { return elib.StringerHex(buffer_trace_strings[:], int(x)) }
+
+func (intf *tuntap_interface) TraceBuffer(i int) string {
+	return fmt.Sprintf("tuntap %s %s", intf.name, buffer_trace(i))
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
@@ -113,24 +134,28 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 		n_unknown uint
 	)
 	for i := uint(0); i < out.InLen(); i++ {
-		r := &out.Refs[i]
-		if intf, ok := n.m.vnet_tuntap_interface_by_si[r.Si]; ok {
+		ref := &out.Refs[i]
+		if intf, ok := n.m.vnet_tuntap_interface_by_si[ref.Si]; ok {
 			if intf != pv_intf {
 				if pv != nil {
 					pv.tx(n, out)
+					pv = nil
 				}
 				pv_intf = intf
 			}
 			if pv == nil {
 				pv = n.get_packet_vector(out.BufferPool, intf)
 			}
-			pv.add_packet(n, r, intf.ifindex)
+			pv.add_packet(n, ref, intf.ifindex)
+			ref.Trace(out.BufferPool, intf, tx_buffer_trace_add)
 			if pv.n_packets >= packet_vector_max_len {
 				pv.tx(n, out)
 				pv = nil
+				pv_intf = nil
 			}
 		} else {
-			out.BufferPool.FreeRefs(r, 1, true)
+			out.BufferPool.FreeRefs(ref, 1, true)
+			ref.Trace(out.BufferPool, intf, tx_buffer_trace_unknown_interface)
 			n_unknown++
 		}
 	}
@@ -187,7 +212,19 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 	n_packets, n_drops := 0, 0
 loop:
 	for i := uint(0); i < pv.n_packets; i++ {
-		_, errno := writev(intf.Fd, pv.p[i].iovs)
+		pv.r[i].ValidateState(pv.buffer_pool, vnet.BufferKnownAllocated)
+		var errno syscall.Errno
+		if true {
+			_, errno = writev(intf.Fd, pv.p[i].iovs)
+		} else {
+			// sendmsg does yet not work on /dev/net/tun sockets.  ENOTSOCK
+			flags := 0
+			if i+1 < pv.n_packets {
+				// Tell kernel tun.c that we have more packets to send.
+				flags |= syscall.MSG_MORE
+			}
+			_, errno = sendmsg(intf.Fd, flags, &pv.m[i].msg_hdr)
+		}
 		switch errno {
 		case syscall.EWOULDBLOCK:
 			break loop
@@ -201,6 +238,8 @@ loop:
 		default:
 			if errno != 0 {
 				err = fmt.Errorf("writev: %s", errno)
+				n.CountError(tx_error_drop, 1)
+				n_drops++
 				break loop
 			}
 		}
@@ -212,12 +251,9 @@ loop:
 			n.m.m.v.Logf("unix tx %s: %s\n", intf.Name(), ethernet.RefString(r))
 		}
 	}
-	np := n_packets
 	// Advance to next packet in error case.
-	if np < 0 {
-		np = 1
-	}
-	elog.GenEventf("unix write-ready tx %d", np)
+	np := n_packets + n_drops
+	elog.GenEventf("unix write-ready tx %d %d", n_packets, n_drops)
 	pv.advance(n, intf, uint(np))
 	atomic.AddInt32(&intf.active_count, int32(-np))
 	iomux.Update(intf)
