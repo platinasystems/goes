@@ -231,68 +231,106 @@ var bufferStateStrings = [...]string{
 
 func (s BufferState) String() string { return elib.Stringer(bufferStateStrings[:], int(s)) }
 
-var trackBufferState = elib.Debug
+const traceBuffers = elib.Debug
 
-func (p *BufferPool) setState(offset uint32, new BufferState) (old BufferState) {
-	p.m.Lock()
-	defer p.m.Unlock()
-	if p.m.bufferStateByOffset == nil {
-		p.m.bufferStateByOffset = make(map[uint32]BufferState)
+func (m *BufferMain) getTrace(offset uint32) (t *bufferTrace) {
+	m.Lock()
+	defer m.Unlock()
+	if m.traceByOffset == nil {
+		m.traceByOffset = make(map[uint32]*bufferTrace)
 	}
-	old = p.m.bufferStateByOffset[offset]
-	p.m.bufferStateByOffset[offset] = new
+	var ok bool
+	if t, ok = m.traceByOffset[offset]; !ok {
+		t = &bufferTrace{offset: offset}
+		m.traceByOffset[offset] = t
+	}
+	return
+}
+func (m *BufferMain) putTrace(offset uint32) {
+	if t, ok := m.traceByOffset[offset]; ok {
+		t.reset()
+	}
+}
+
+func (s BufferState) TraceBuffer(i int) string { return "set-state: " + s.String() }
+
+func (p *BufferPool) setState(offset uint32, new BufferState) (t *bufferTrace, old BufferState) {
+	t = p.m.getTrace(offset)
+	old = t.state
+	t.state = new
+	if new == BufferKnownAllocated {
+		t.reset()
+	}
+	t.events = append(t.events, bufferEvent{p: p.index, i: new})
 	return
 }
 
 func (p *BufferPool) unsetState(offset uint32) {
-	if trackBufferState {
-		delete(p.m.bufferStateByOffset, offset)
+	if traceBuffers {
+		p.m.putTrace(offset)
 	}
 }
 
-func (p *BufferPool) getState(r RefHeader) (got BufferState) {
-	if !trackBufferState {
+func (r *RefHeader) Trace(p *BufferPool, i BufferTracer, e int) {
+	if !traceBuffers {
 		return
 	}
-	p.m.Lock()
-	got = p.m.bufferStateByOffset[r.offset()]
-	p.m.Unlock()
+	t := p.m.getTrace(r.offset())
+	t.events = append(t.events, bufferEvent{i: i, e: uint32(e), p: p.index})
+}
+
+func (t *bufferTrace) TraceString(m *BufferMain) (lines []string) {
+	lines = append(lines, fmt.Sprintf("offset 0x%x:", t.offset))
+	for i := range t.events {
+		e := &t.events[i]
+		p := m.bufferPools.elts[e.p]
+		lines = append(lines, fmt.Sprintf("%s %s", p.Name, e.i.TraceBuffer(int(e.e))))
+	}
 	return
 }
 
+func (p *BufferPool) panicState(t *bufferTrace, got, want BufferState) {
+	lines := t.TraceString(p.m)
+	for i := range lines {
+		fmt.Println(lines[i])
+	}
+	panic(fmt.Errorf("validate buffer offset 0x%x: want %s != got %s", t.offset, want, got))
+}
+
 func (p *BufferPool) ValidateRefs(h *RefHeader, want BufferState, n, stride uint) {
-	if !trackBufferState {
+	if !traceBuffers {
 		return
 	}
 	refs := h.slice(n)
 	for i := uint(0); i < uint(len(refs)); i += stride {
 		r := refs[i].RefHeader
-		if got := p.getState(r); got != want {
-			panic(fmt.Errorf("validate ref offset 0x%x: want %s != got %s", r.offset(), want, got))
+		t := p.m.getTrace(r.offset())
+		if got := t.state; got != want {
+			p.panicState(t, got, want)
 		}
 	}
 }
 
 func (p *BufferPool) validateSetState(r RefHeader, set BufferState) {
-	if !trackBufferState {
+	if !traceBuffers {
 		return
 	}
-	s := p.setState(r.offset(), set)
-	expect := BufferKnownAllocated
+	t, got := p.setState(r.offset(), set)
+	want := BufferKnownAllocated
 	if set == BufferKnownAllocated {
 		// Accept either known free or unknown (for initial allocation).
-		expect = BufferKnownFree
-		if s == BufferUnknown {
-			expect = BufferUnknown
+		want = BufferKnownFree
+		if got == BufferUnknown {
+			want = BufferUnknown
 		}
 	}
-	if s != expect {
-		panic(fmt.Errorf("validate buffer offset 0x%x: want %s != got %s", r.offset(), expect, s))
+	if got != want {
+		p.panicState(t, got, want)
 	}
 }
 
 func (p *BufferPool) validateSetStateRefs(r []Ref, set BufferState, stride uint) {
-	if !trackBufferState {
+	if !traceBuffers {
 		return
 	}
 	for i := uint(0); i < uint(len(r)); i += stride {
@@ -359,13 +397,36 @@ func (p *BufferPool) Init() {
 	p.Size = p.sizeIncludingOverhead - overheadBytes
 }
 
+type BufferTracer interface {
+	TraceBuffer(e int) string
+}
+
+type bufferEvent struct {
+	i BufferTracer
+	e uint32
+	p uint32
+}
+
+type bufferTrace struct {
+	offset uint32
+	// Current buffer state (known allocated or known free).
+	state  BufferState
+	events []bufferEvent
+}
+
+func (t *bufferTrace) reset() {
+	if t.events != nil {
+		t.events = t.events[:0]
+	}
+}
+
 type BufferMain struct {
 	sync.Mutex
 
 	PoolByName map[string]*BufferPool
 	bufferPools
 
-	bufferStateByOffset map[uint32]BufferState
+	traceByOffset map[uint32]*bufferTrace
 }
 
 func (m *BufferMain) AddBufferPool(p *BufferPool) {

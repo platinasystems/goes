@@ -35,6 +35,9 @@ func (r *Ref) NextValidFlag() BufferFlag { return BufferFlag(r.RefHeader.NextVal
 func (r *Ref) NextRef() *Ref {
 	return (*Ref)(unsafe.Pointer(r.RefHeader.NextRef()))
 }
+func (r *Ref) Trace(p *BufferPool, i hw.BufferTracer, e int) {
+	r.RefHeader.Trace((*hw.BufferPool)(p), i, e)
+}
 
 func (r *Ref) Foreach(f func(r *Ref, i uint)) {
 	i := uint(0)
