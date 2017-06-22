@@ -280,11 +280,11 @@ func (r *RefHeader) Trace(p *BufferPool, i BufferTracer, e int) {
 }
 
 func (t *bufferTrace) TraceString(m *BufferMain) (lines []string) {
-	lines = append(lines, fmt.Sprintf("offset 0x%x:", t.offset))
+	lines = append(lines, fmt.Sprintf("events for offset 0x%x:", t.offset))
 	for i := range t.events {
 		e := &t.events[i]
 		p := m.bufferPools.elts[e.p]
-		lines = append(lines, fmt.Sprintf("%s %s", p.Name, e.i.TraceBuffer(int(e.e))))
+		lines = append(lines, fmt.Sprintf("  %s: %s", p.Name, e.i.TraceBuffer(int(e.e))))
 	}
 	return
 }
