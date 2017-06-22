@@ -139,10 +139,11 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, p *Prefix, isDel bool) (ai IfA
 		a.next = IfAddrNil
 		a.prev = pi
 
-		// Make previous head point to added element and set added element as new head.
+		// Make previous head (P) point to added element (A) then added address becomes new head.
 		if pi != IfAddrNil {
 			p := m.GetIfAddr(pi)
 			a.next = pi
+			a.prev = IfAddrNil
 			p.prev = ai
 		}
 		m.headBySwIf[si] = ai
