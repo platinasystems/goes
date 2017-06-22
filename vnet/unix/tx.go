@@ -139,6 +139,7 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 			if intf != pv_intf {
 				if pv != nil {
 					pv.tx(n, out)
+					pv = nil
 				}
 				pv_intf = intf
 			}
@@ -150,6 +151,7 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 			if pv.n_packets >= packet_vector_max_len {
 				pv.tx(n, out)
 				pv = nil
+				pv_intf = nil
 			}
 		} else {
 			out.BufferPool.FreeRefs(ref, 1, true)
