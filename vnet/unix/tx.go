@@ -5,6 +5,7 @@
 package unix
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/vnet"
@@ -107,6 +108,24 @@ func (n *tx_node) init(m *net_namespace_main) {
 	n.pv_pool = make(chan *tx_packet_vector, 2*vnet.MaxVectorLen)
 }
 
+type buffer_trace int
+
+const (
+	tx_buffer_trace_add = iota
+	tx_buffer_trace_unknown_interface
+)
+
+var buffer_trace_strings = [...]string{
+	tx_buffer_trace_add:               "add",
+	tx_buffer_trace_unknown_interface: "unknown interface",
+}
+
+func (x buffer_trace) String() string { return elib.StringerHex(buffer_trace_strings[:], int(x)) }
+
+func (intf *tuntap_interface) TraceBuffer(i int) string {
+	return fmt.Sprintf("tuntap %s %s", intf.name, buffer_trace(i))
+}
+
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 	elog.GenEventf("unix-tx output %d", out.InLen())
 	var (
@@ -115,8 +134,8 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 		n_unknown uint
 	)
 	for i := uint(0); i < out.InLen(); i++ {
-		r := &out.Refs[i]
-		if intf, ok := n.m.vnet_tuntap_interface_by_si[r.Si]; ok {
+		ref := &out.Refs[i]
+		if intf, ok := n.m.vnet_tuntap_interface_by_si[ref.Si]; ok {
 			if intf != pv_intf {
 				if pv != nil {
 					pv.tx(n, out)
@@ -126,13 +145,15 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 			if pv == nil {
 				pv = n.get_packet_vector(out.BufferPool, intf)
 			}
-			pv.add_packet(n, r, intf.ifindex)
+			pv.add_packet(n, ref, intf.ifindex)
+			ref.Trace(out.BufferPool, intf, tx_buffer_trace_add)
 			if pv.n_packets >= packet_vector_max_len {
 				pv.tx(n, out)
 				pv = nil
 			}
 		} else {
-			out.BufferPool.FreeRefs(r, 1, true)
+			out.BufferPool.FreeRefs(ref, 1, true)
+			ref.Trace(out.BufferPool, intf, tx_buffer_trace_unknown_interface)
 			n_unknown++
 		}
 	}
