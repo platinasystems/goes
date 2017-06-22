@@ -134,15 +134,17 @@ func (c *Command) Main(args ...string) (err error) {
 	if err != nil {
 		if err == liner.ErrTimeOut {
 			resp = defBoot
+			fmt.Println("<timeout>")
 		} else {
 			return err
 		}
 	}
 	kCmd := fields.New(resp)
 
-	err = c.g.Main(kCmd...)
-
-	return err
+	if len(kCmd) > 0 {
+		return c.g.Main(kCmd...)
+	}
+	return nil
 }
 
 func (*Command) Man() lang.Alt { return man }
