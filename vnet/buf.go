@@ -35,6 +35,18 @@ func (r *Ref) NextValidFlag() BufferFlag { return BufferFlag(r.RefHeader.NextVal
 func (r *Ref) NextRef() *Ref {
 	return (*Ref)(unsafe.Pointer(r.RefHeader.NextRef()))
 }
+
+type BufferState hw.BufferState
+
+const (
+	BufferUnknown        = BufferState(hw.BufferUnknown)
+	BufferKnownAllocated = BufferState(hw.BufferKnownAllocated)
+	BufferKnownFree      = BufferState(hw.BufferKnownFree)
+)
+
+func (r *Ref) ValidateState(p *BufferPool, s BufferState) {
+	r.RefHeader.ValidateState((*hw.BufferPool)(p), hw.BufferState(s))
+}
 func (r *Ref) Trace(p *BufferPool, i hw.BufferTracer, e int) {
 	r.RefHeader.Trace((*hw.BufferPool)(p), i, e)
 }

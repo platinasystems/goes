@@ -210,6 +210,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 	n_packets, n_drops := 0, 0
 loop:
 	for i := uint(0); i < pv.n_packets; i++ {
+		pv.r[i].ValidateState(pv.buffer_pool, vnet.BufferKnownAllocated)
 		var errno syscall.Errno
 		if true {
 			_, errno = writev(intf.Fd, pv.p[i].iovs)
@@ -236,7 +237,6 @@ loop:
 			if errno != 0 {
 				err = fmt.Errorf("writev: %s", errno)
 				n.CountError(tx_error_drop, 1)
-				fmt.Println(err)
 				n_drops++
 				break loop
 			}

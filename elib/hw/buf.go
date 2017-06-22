@@ -329,6 +329,16 @@ func (p *BufferPool) validateSetState(r RefHeader, set BufferState) {
 	}
 }
 
+func (r *RefHeader) ValidateState(p *BufferPool, want BufferState) {
+	if !traceBuffers {
+		return
+	}
+	t := p.m.getTrace(r.offset())
+	if got := t.state; got != want {
+		p.panicState(t, got, want)
+	}
+}
+
 func (p *BufferPool) validateSetStateRefs(r []Ref, set BufferState, stride uint) {
 	if !traceBuffers {
 		return
