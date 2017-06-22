@@ -102,7 +102,6 @@ func Goes() *goes.Goes {
 	g.Plot(helpers.New()...)
 	g.Plot(cli.New()...)
 	g.Plot(bang.New(),
-		bang.New(),
 		boot.New(),
 		cat.New(),
 		cd.New(),
