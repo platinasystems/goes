@@ -33,6 +33,12 @@ type vfio_group struct {
 	devices []*vfio_pci_device
 }
 
+type vfio_device_region_info struct {
+	vfio_region_info
+	sparse_areas []vfio_region_sparse_mmap_area
+	cap_type     vfio_region_info_cap_type
+}
+
 type vfio_pci_device struct {
 	Device
 
@@ -40,8 +46,9 @@ type vfio_pci_device struct {
 	group *vfio_group
 
 	info         vfio_device_info
-	region_infos []vfio_region_info
-	irq_infos    []vfio_irq_info
+	region_infos []vfio_device_region_info
+
+	irq_infos []vfio_irq_info
 
 	// device fd from VFIO_GROUP_GET_DEVICE_FD
 	device_fd int
@@ -314,13 +321,45 @@ func (d *vfio_pci_device) Open() (err error) {
 	}
 
 	// Fetch regions.
-	d.region_infos = make([]vfio_region_info, d.info.num_regions)
+	d.region_infos = make([]vfio_device_region_info, d.info.num_regions)
 	for i := range d.region_infos {
-		x := &d.region_infos[i]
+		type tmp struct {
+			vfio_region_info
+			caps [4 << 10]byte
+		}
+		x := &tmp{}
 		x.set_size(unsafe.Sizeof(*x))
 		x.index = uint32(i)
 		if _, err = d.ioctl(vfio_device_get_region_info, uintptr(unsafe.Pointer(x))); err != nil {
-			return
+			if i == vfio_pci_vga_region_index {
+				// ignore vga region missing
+				err = nil
+			} else {
+				return
+			}
+		}
+		ri := &d.region_infos[i]
+		ri.vfio_region_info = x.vfio_region_info
+		if x.flags&vfio_region_info_flag_caps != 0 {
+			o := x.cap_offset - uint32(unsafe.Sizeof(vfio_region_info{}))
+			b := x.caps[o:]
+			h, p := get_vfio_info_cap_header(b, 0)
+			for h != nil {
+				switch h.kind {
+				case vfio_region_info_cap_kind_sparse_mmap:
+					m := (*vfio_region_info_cap_sparse_mmap)(p)
+					for i := uint32(0); i < m.nr_areas; i++ {
+						a := m.get_area(i)
+						ri.sparse_areas = append(ri.sparse_areas, *a)
+					}
+				case vfio_region_info_cap_kind_type:
+					m := (*vfio_region_info_cap_type)(p)
+					ri.cap_type = *m
+				default:
+					panic(fmt.Errorf("vfio region info unknown cap: %+v", h))
+				}
+				h, p = h.next(b)
+			}
 		}
 	}
 
@@ -381,6 +420,11 @@ func (d *vfio_pci_device) Open() (err error) {
 		iomux.Add(d)
 	}
 
+	// Reset device.
+	if _, err = d.ioctl(vfio_device_reset, 0); err != nil {
+		err = nil // ignore error
+	}
+
 	return
 }
 
@@ -392,13 +436,35 @@ func (d *vfio_pci_device) Close() (err error) {
 	if d.device_fd > 0 {
 		syscall.Close(d.device_fd)
 	}
-	d.remove_id()
+	// d.remove_id()
 	return
 }
 
-func (d *vfio_pci_device) MapResource(r *Resource) (res unsafe.Pointer, err error) {
+func (d *vfio_pci_device) MapResource(i uint) (res unsafe.Pointer, err error) {
+	r := &d.Device.Resources[i]
+	if r.Index >= uint32(len(d.region_infos)) {
+		err = fmt.Errorf("%s: mmap unknown resource BAR %d", d.Device.String(), r.Index)
+		return
+	}
 	ri := &d.region_infos[r.Index]
-	r.Mem, err = syscall.Mmap(d.device_fd, int64(ri.offset), int(ri.size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	prot := uintptr(syscall.PROT_READ | syscall.PROT_WRITE)
+	flags := uintptr(syscall.MAP_SHARED)
+	if len(ri.sparse_areas) > 0 {
+		var mem uintptr
+		mem, r.Mem, err = elib.MmapSlice(0, uintptr(ri.size), uintptr(syscall.PROT_NONE), uintptr(syscall.MAP_SHARED|syscall.MAP_ANONYMOUS), 0, 0)
+		if err == nil {
+			for i := range ri.sparse_areas {
+				a := &ri.sparse_areas[i]
+				_, _, err = elib.MmapSlice(mem+uintptr(a.offset), uintptr(a.size), prot, flags|uintptr(syscall.MAP_FIXED),
+					uintptr(d.device_fd), uintptr(ri.offset+a.offset))
+				if err != nil {
+					break
+				}
+			}
+		}
+	} else {
+		_, r.Mem, err = elib.MmapSlice(0, uintptr(ri.size), prot, flags, uintptr(d.device_fd), uintptr(ri.offset))
+	}
 	if err != nil {
 		err = fmt.Errorf("%s: mmap resource%d: %s", d.Device.String(), r.Index, err)
 		return

@@ -8,6 +8,8 @@ package pci
 
 import (
 	"github.com/platinasystems/go/elib"
+
+	"unsafe"
 )
 
 const vfio_api_version = 0
@@ -24,8 +26,21 @@ const (
 )
 
 type vfio_info_cap_header struct {
-	id, version uint16
-	next        uint32
+	kind, version uint16
+	next_header   uint32
+}
+
+func get_vfio_info_cap_header(b []byte, offset uint32) (h *vfio_info_cap_header, p unsafe.Pointer) {
+	h = (*vfio_info_cap_header)(unsafe.Pointer(&b[offset]))
+	p = unsafe.Pointer(&b[offset])
+	return
+}
+
+func (h *vfio_info_cap_header) next(b []byte) (n *vfio_info_cap_header, p unsafe.Pointer) {
+	if h.next_header != 0 {
+		n, p = get_vfio_info_cap_header(b, h.next_header)
+	}
+	return
 }
 
 type vfio_ioctl_kind int
@@ -158,6 +173,13 @@ type vfio_region_info_cap_sparse_mmap struct {
 	nr_areas uint32
 	_        uint32
 	// areas follow
+}
+
+func (m *vfio_region_info_cap_sparse_mmap) get_area(i uint32) (a *vfio_region_sparse_mmap_area) {
+	p := uintptr(unsafe.Pointer(m)) + unsafe.Sizeof(*m)
+	p += uintptr(i) * unsafe.Sizeof(*a)
+	a = (*vfio_region_sparse_mmap_area)(unsafe.Pointer(p))
+	return
 }
 
 type vfio_region_info_cap_type struct {
