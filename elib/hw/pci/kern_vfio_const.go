@@ -131,17 +131,17 @@ const (
 
 type vfio_region_info struct {
 	vfio_ioctl_common
-	index      uint32
-	cap_offset uint32
-	size       uint64
-	offset     uint64
+	index      uint32 /* Region index */
+	cap_offset uint32 /* Offset within info struct of first cap */
+	size       uint64 /* Region size (bytes) */
+	offset     uint64 /* Region offset from start of device fd */
 }
 
 const (
-	vfio_region_info_flag_read = 1 << iota
-	vfio_region_info_flag_write
-	vfio_region_info_flag_mmap
-	vfio_region_info_flag_caps
+	vfio_region_info_flag_read  = 1 << iota /* Region supports read */
+	vfio_region_info_flag_write             /* Region supports write */
+	vfio_region_info_flag_mmap              /* Region supports mmap */
+	vfio_region_info_flag_caps              /* Info supports caps */
 )
 
 const (

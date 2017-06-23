@@ -72,7 +72,8 @@ var is_x540 = map[dev_id]bool{
 	dev_id_x550em_x_vf_hv: true,
 }
 
-func (m *main) DeviceMatch(pdev *pci.Device) (dd pci.DriverDevice, err error) {
+func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
+	pdev := pr.GetDevice()
 	id := dev_id(pdev.DeviceID())
 	var dr dever
 	switch {
@@ -89,7 +90,7 @@ func (m *main) DeviceMatch(pdev *pci.Device) (dd pci.DriverDevice, err error) {
 	m.devs = append(m.devs, dr)
 
 	r := &pdev.Resources[0]
-	if _, err = pdev.MapResource(r); err != nil {
+	if _, err = pr.MapResource(r); err != nil {
 		return
 	}
 	// Can't directly use mmapped registers because of compiler's read probes/nil checks.

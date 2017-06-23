@@ -295,7 +295,7 @@ type Device struct {
 // Things a driver must do.
 type Driver interface {
 	// Device matches registered devices for this driver.
-	DeviceMatch(d *Device) (i DriverDevice, err error)
+	DeviceMatch(d Devicer) (i DriverDevice, err error)
 }
 
 type DriverDevice interface {
@@ -307,6 +307,8 @@ type Devicer interface {
 	GetDevice() *Device
 	Open() error
 	Close() error
+	MapResource(r *Resource) (res unsafe.Pointer, err error)
+	UnmapResource(r *Resource) (err error)
 }
 
 var (

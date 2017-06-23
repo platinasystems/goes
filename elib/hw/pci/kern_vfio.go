@@ -39,8 +39,9 @@ type vfio_pci_device struct {
 	m     *vfio_main
 	group *vfio_group
 
-	info              vfio_device_info
-	irq_info_by_index map[uint32]*vfio_irq_info
+	info         vfio_device_info
+	region_infos []vfio_region_info
+	irq_infos    []vfio_irq_info
 
 	// device fd from VFIO_GROUP_GET_DEVICE_FD
 	device_fd int
@@ -196,12 +197,13 @@ func (d *vfio_pci_device) sysfs_get_group_number() (uint, error) {
 	return uint(n), err
 }
 
-func (m *vfio_main) new_group(group_number uint) (g *vfio_group, err error) {
+func (d *vfio_pci_device) new_group(group_number uint) (g *vfio_group, err error) {
+	m := d.m
 	group_path := fmt.Sprintf("/dev/vfio/%d", group_number)
 	var fd int
 	fd, err = syscall.Open(group_path, syscall.O_RDWR, 0)
 	if err != nil {
-		err = os.NewSyscallError("open /dev/vfio/GROUP", err)
+		err = os.NewSyscallError("open "+group_path, err)
 		return
 	}
 
@@ -243,7 +245,7 @@ func (d *vfio_pci_device) find_group() (g *vfio_group, err error) {
 		return
 	}
 	if g, ok = d.m.groups_by_number[n]; !ok {
-		g, err = d.m.new_group(n)
+		g, err = d.new_group(n)
 		if err != nil {
 			return
 		}
@@ -254,6 +256,13 @@ func (d *vfio_pci_device) find_group() (g *vfio_group, err error) {
 }
 
 func (d *vfio_pci_device) Open() (err error) {
+	// Wrap error with device.
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("pci %s: %s", d.Device.String(), err)
+		}
+	}()
+
 	err = d.new_id()
 	if err != nil {
 		return
@@ -304,20 +313,29 @@ func (d *vfio_pci_device) Open() (err error) {
 		return
 	}
 
-	// Fetch interrupt infos for each interrupt.
-	d.irq_info_by_index = make(map[uint32]*vfio_irq_info)
-	for i := uint32(0); i < d.info.num_irqs; i++ {
-		var ii vfio_irq_info
-		ii.set_size(unsafe.Sizeof(ii))
-		ii.index = i
-		if _, err = d.ioctl(vfio_device_get_irq_info, uintptr(unsafe.Pointer(&ii))); err != nil {
+	// Fetch regions.
+	d.region_infos = make([]vfio_region_info, d.info.num_regions)
+	for i := range d.region_infos {
+		x := &d.region_infos[i]
+		x.set_size(unsafe.Sizeof(*x))
+		x.index = uint32(i)
+		if _, err = d.ioctl(vfio_device_get_region_info, uintptr(unsafe.Pointer(x))); err != nil {
 			return
-		}
-		if ii.count > 0 {
-			d.irq_info_by_index[ii.index] = &ii
 		}
 	}
 
+	// Fetch interrupt infos for each interrupt.
+	d.irq_infos = make([]vfio_irq_info, d.info.num_irqs)
+	for i := range d.irq_infos {
+		x := &d.irq_infos[i]
+		x.set_size(unsafe.Sizeof(*x))
+		x.index = uint32(i)
+		if _, err = d.ioctl(vfio_device_get_irq_info, uintptr(unsafe.Pointer(x))); err != nil {
+			return
+		}
+	}
+
+	// Get eventfd for interrupt.
 	{
 		r, _, e := syscall.RawSyscall(syscall.SYS_EVENTFD, 0, 0, 0)
 		if e != 0 {
@@ -329,17 +347,17 @@ func (d *vfio_pci_device) Open() (err error) {
 
 	// Enable interrupt.
 	{
-		var (
-			ii *vfio_irq_info
-			ok bool
-		)
-		if ii, ok = d.irq_info_by_index[vfio_pci_msi_irq_index]; !ok {
+		var ii *vfio_irq_info
+		if ii = &d.irq_infos[vfio_pci_msi_irq_index]; ii.count == 0 {
 			// No MSI? Choose first one.
-			for _, ii = range d.irq_info_by_index {
-				break
+			for i := range d.irq_infos {
+				if d.irq_infos[i].count > 0 {
+					ii = &d.irq_infos[i]
+					break
+				}
 			}
 		}
-		if ii == nil {
+		if ii.count == 0 {
 			panic("no irq")
 		}
 		type set struct {
@@ -365,6 +383,7 @@ func (d *vfio_pci_device) Open() (err error) {
 
 	return
 }
+
 func (d *vfio_pci_device) Close() (err error) {
 	if d.interrupt_event_fd > 0 {
 		syscall.Close(d.interrupt_event_fd)
@@ -374,6 +393,17 @@ func (d *vfio_pci_device) Close() (err error) {
 		syscall.Close(d.device_fd)
 	}
 	d.remove_id()
+	return
+}
+
+func (d *vfio_pci_device) MapResource(r *Resource) (res unsafe.Pointer, err error) {
+	ri := &d.region_infos[r.Index]
+	r.Mem, err = syscall.Mmap(d.device_fd, int64(ri.offset), int(ri.size), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	if err != nil {
+		err = fmt.Errorf("%s: mmap resource%d: %s", d.Device.String(), r.Index, err)
+		return
+	}
+	res = unsafe.Pointer(&r.Mem[0])
 	return
 }
 
