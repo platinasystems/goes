@@ -8,12 +8,13 @@
 package upgrade
 
 import (
-	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -24,7 +25,6 @@ import (
 	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/url"
-	"github.com/xi2/xz"
 )
 
 const (
@@ -65,9 +65,8 @@ OPTIONS
 	MmcDev  = "/dev/mmcblk0p1"
 	DfltSrv = "downloads.platinasystems.com"
 	DfltVer = "LATEST"
-	DfltDir = "downloads"
 	Machine = "platina-mk1-bmc"
-	Suffix  = ".tar.xz"
+	Suffix  = ".zip"
 )
 
 var imageNames = []string{"ubo", "dtb", "env", "ker", "ini"}
@@ -89,19 +88,12 @@ func (cmd) Apropos() lang.Alt { return apropos }
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-l")
 	parm, args := parms.New(args, "-v", "-s", "-d")
+
 	if len(parm["-v"]) == 0 {
 		parm["-v"] = DfltVer
 	}
-	if len(parm["-d"]) == 0 {
-		if len(parm["-s"]) == 0 {
-			parm["-s"] = DfltSrv
-		} else {
-			parm["-d"] = DfltDir
-		}
-	} else {
-		if len(parm["-s"]) == 0 {
-			parm["-s"] = DfltSrv
-		}
+	if len(parm["-s"]) == 0 {
+		parm["-s"] = DfltSrv
 	}
 	if flag["-l"] {
 		getList(parm["-s"], parm["-d"], parm["-v"])
@@ -112,7 +104,6 @@ func (cmd) Main(args ...string) error {
 		fmt.Print(string(l))
 		return nil
 	}
-
 	err := doUpgrade(parm["-s"], parm["-d"], parm["-v"])
 	if err != nil {
 		return err
@@ -134,28 +125,24 @@ var (
 )
 
 func doUpgrade(s string, d string, v string) error {
-	err := mountMmc()
-	if err != nil {
-		return err
+	if err := mountMmc(); err != nil {
+		return fmt.Errorf("Error: Could not mount SD card")
 	}
 	err, size := getFile(s, d, v)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error: Could not download file")
 	}
 	if size < 1000 {
-		return err
+		return fmt.Errorf("Error: Could not download zip file")
 	}
-	err = unTar()
-	if err != nil {
-		return err
+	if err := unzip(); err != nil {
+		return fmt.Errorf("Error: Could not unzip file")
 	}
-	err = copyFiles()
-	if err != nil {
-		return err
+	if err := copyFiles(); err != nil {
+		return fmt.Errorf("Error: Could not copy to SD card")
 	}
-	err = rmFiles()
-	if err != nil {
-		return err
+	if err := rmFiles(); err != nil {
+		return fmt.Errorf("Error: Could not remove files")
 	}
 	reboot()
 	return nil
@@ -167,51 +154,37 @@ func reboot() error {
 	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
 
-func unTar() error {
-	f, err := os.Open(Machine + Suffix)
+func unzip() error {
+	archive := Machine + Suffix
+	reader, err := zip.OpenReader(archive)
 	if err != nil {
 		return err
 	}
-	r, err := xz.NewReader(f, 0)
-	if err != nil {
-		return err
-	}
-	tr := tar.NewReader(r)
-	i := 0
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
+	target := "."
+	for _, file := range reader.File {
+		path := filepath.Join(target, file.Name)
+		if file.FileInfo().IsDir() {
+			os.MkdirAll(path, file.Mode())
+			continue
 		}
+
+		fileReader, err := file.Open()
 		if err != nil {
 			return err
 		}
-		if i == 0 {
-			i++
-			continue
+		defer fileReader.Close()
+
+		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		if err != nil {
+			return err
 		}
-		i++
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			fmt.Println("creating:   " + hdr.Name)
-			err = os.MkdirAll(hdr.Name, 0777)
-			if err != nil {
-				return err
-			}
-		case tar.TypeReg, tar.TypeRegA:
-			fmt.Println("extracting: " + hdr.Name)
-			w, err := os.Create(hdr.Name)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(w, tr)
-			if err != nil {
-				return err
-			}
-			w.Close()
+		defer targetFile.Close()
+
+		if _, err := io.Copy(targetFile, fileReader); err != nil {
+			return err
 		}
 	}
-	f.Close()
+
 	return nil
 }
 
