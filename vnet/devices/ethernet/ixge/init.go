@@ -34,6 +34,7 @@ type dev struct {
 	regs        *regs
 	mmaped_regs []byte
 	pciDev      *pci.Device
+	pci_dever   pci.Devicer
 
 	interruptsEnabled bool
 	active_count      int32
@@ -86,16 +87,9 @@ func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
 
 	d.d = dr
 	d.m = m
-	d.pciDev = pdev
+	d.pciDev = pr.GetDevice()
+	d.pci_dever = pr
 	m.devs = append(m.devs, dr)
-
-	r := &pdev.Resources[0]
-	if _, err = pr.MapResource(r); err != nil {
-		return
-	}
-	// Can't directly use mmapped registers because of compiler's read probes/nil checks.
-	d.regs = (*regs)(hw.BasePointer)
-	d.mmaped_regs = d.bar0()
 	return d, nil
 }
 
@@ -103,6 +97,14 @@ func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
 func (d *dev) write_flush() { d.regs.status_read_only.get(d) }
 
 func (d *dev) Init() {
+	if _, err := d.pci_dever.MapResource(0); err != nil {
+		panic(err)
+		return
+	}
+	// Can't directly use mmapped registers because of compiler's read probes/nil checks.
+	d.regs = (*regs)(hw.BasePointer)
+	d.mmaped_regs = d.bar0()
+
 	r := d.regs
 
 	// Reset chip.
@@ -277,7 +279,7 @@ func (m *main) Configure(in *parse.Input) {
 func (m *main) Exit() (err error) {
 	for i := range m.devs {
 		d := m.devs[i].get()
-		err = d.pciDev.Close()
+		err = d.pci_dever.Close()
 	}
 	return
 }
