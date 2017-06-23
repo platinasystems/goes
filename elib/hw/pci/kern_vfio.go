@@ -71,7 +71,9 @@ var default_vfio_main = &vfio_main{}
 
 func vfio_ioctl(fd, call int, arg uintptr) (r uintptr, err error) {
 	r, _, e := syscall.RawSyscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(call), arg)
-	err = os.NewSyscallError("ioctl", e)
+	if e != 0 {
+		err = os.NewSyscallError("ioctl", e)
+	}
 	return
 }
 
@@ -246,13 +248,13 @@ func (d *vfio_pci_device) find_group() (g *vfio_group, err error) {
 }
 
 func (d *vfio_pci_device) Open() (err error) {
-	// Make sure group exists and is viable.
-	if _, err = d.find_group(); err != nil {
+	err = d.new_id()
+	if err != nil {
 		return
 	}
 
-	err = d.new_id()
-	if err != nil {
+	// Make sure group exists and is viable.
+	if _, err = d.find_group(); err != nil {
 		return
 	}
 
