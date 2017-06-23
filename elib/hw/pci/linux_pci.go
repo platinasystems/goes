@@ -143,6 +143,7 @@ func DiscoverDevices() (err error) {
 			continue
 		}
 
+		// See if we have a registered driver for this device.
 		driver := GetDriver(d.Config.DeviceID)
 		if driver == nil {
 			continue
