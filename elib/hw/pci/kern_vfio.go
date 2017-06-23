@@ -271,7 +271,7 @@ func (d *vfio_pci_device) Open() (err error) {
 
 	// Set group container.
 	if d.group.status.flags&vfio_group_flags_container_set == 0 {
-		if _, err = vfio_ioctl(d.group.fd, vfio_group_set_container, uintptr(d.m.container_fd)); err != nil {
+		if _, err = vfio_ioctl(d.group.fd, vfio_group_set_container, uintptr(unsafe.Pointer(&d.m.container_fd))); err != nil {
 			return
 		}
 		d.group.status.flags |= vfio_group_flags_container_set
@@ -306,6 +306,7 @@ func (d *vfio_pci_device) Open() (err error) {
 	for i := range d.irq_infos {
 		ii := &d.irq_infos[i]
 		ii.set_size(unsafe.Sizeof(*ii))
+		ii.index = uint32(i)
 		if _, err = d.ioctl(vfio_device_get_irq_info, uintptr(unsafe.Pointer(ii))); err != nil {
 			return
 		}
