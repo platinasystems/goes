@@ -64,7 +64,7 @@ type vfio_main struct {
 	// Kernel gives us memory in "Chunks" which are physically contiguous.
 	log2LinesPerChunk, log2BytesPerChunk uint8
 
-	once sync.Once
+	container_init_once, dma_init_once sync.Once
 }
 
 var default_vfio_main = &vfio_main{}
@@ -87,7 +87,7 @@ func (x *vfio_pci_device) ioctl(kind vfio_ioctl_kind, arg uintptr) (uintptr, err
 	return vfio_ioctl(x.File.Fd, kind, arg)
 }
 
-func (m *vfio_main) init(dma_heap_bytes uint) (err error) {
+func (m *vfio_main) container_init() (err error) {
 	m.container_fd, err = syscall.Open("/dev/vfio/vfio", syscall.O_RDWR, 0)
 	if err != nil {
 		return
@@ -113,6 +113,10 @@ func (m *vfio_main) init(dma_heap_bytes uint) (err error) {
 		}
 	}
 
+	return
+}
+
+func (m *vfio_main) dma_init(dma_heap_bytes uint) (err error) {
 	// Enable the IOMMU model we want.
 	if _, err = m.ioctl(vfio_set_iommu, vfio_type1_iommu); err != nil {
 		return
@@ -145,7 +149,7 @@ func (m *vfio_main) init(dma_heap_bytes uint) (err error) {
 		hw.DmaInit(data)
 	}
 
-	return err
+	return
 }
 
 func sysfsWrite(path, format string, args ...interface{}) error {
@@ -220,7 +224,6 @@ func (m *vfio_main) new_group(group_number uint) (g *vfio_group, err error) {
 		m.groups_by_number = make(map[uint]*vfio_group)
 	}
 	m.groups_by_number[group_number] = g
-
 	return
 }
 
@@ -259,11 +262,11 @@ func (d *vfio_pci_device) Open() (err error) {
 	}
 
 	// Initialize DMA heap once device is open.
-	d.m.once.Do(func() {
-		err = d.m.init(64 << 20)
+	d.m.container_init_once.Do(func() {
+		err = d.m.container_init()
 	})
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	// Set group container.
@@ -272,6 +275,14 @@ func (d *vfio_pci_device) Open() (err error) {
 			return
 		}
 		d.group.status.flags |= vfio_group_flags_container_set
+	}
+
+	// Initialize DMA heap once at least one group has been added to container.
+	d.m.dma_init_once.Do(func() {
+		err = d.m.dma_init(256 << 20)
+	})
+	if err != nil {
+		return
 	}
 
 	// Get device fd.
