@@ -132,7 +132,7 @@ func (m *vfio_main) dma_init(dma_heap_bytes uint) (err error) {
 	}
 
 	{
-		addr, data, e := elib.RawMmap(0, uintptr(dma_heap_bytes),
+		addr, data, e := elib.MmapSlice(0, uintptr(dma_heap_bytes),
 			syscall.PROT_READ|syscall.PROT_WRITE,
 			syscall.MAP_PRIVATE|syscall.MAP_ANONYMOUS,
 			0, 0)
@@ -350,7 +350,7 @@ func (d *vfio_pci_device) Open() (err error) {
 		s.set(unsafe.Sizeof(s), vfio_irq_set_data_eventfd|vfio_irq_set_action_trigger)
 		s.index = ii.index
 		s.start = uint32(0)
-		s.n_data_bytes = uint32(unsafe.Sizeof(s.data))
+		s.count = uint32(len(s.data))
 		s.data[0] = int32(d.interrupt_event_fd)
 		if _, err = d.ioctl(vfio_device_set_irqs, uintptr(unsafe.Pointer(&s))); err != nil {
 			return

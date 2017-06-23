@@ -30,7 +30,7 @@ type MemHeap struct {
 	data []byte
 }
 
-func RawMmap(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []byte, err error) {
+func MmapSlice(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []byte, err error) {
 	r, _, e := syscall.RawSyscall6(syscall.SYS_MMAP, addr, length, prot, flags, fd, offset)
 	if e != 0 {
 		err = fmt.Errorf("mmap: %s", e)
@@ -46,7 +46,7 @@ func RawMmap(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []byte
 func (h *MemHeap) init(b []byte, n uint) {
 	if len(b) == 0 {
 		var err error
-		_, b, err = RawMmap(0, uintptr(n), syscall.PROT_READ|syscall.PROT_WRITE,
+		_, b, err = MmapSlice(0, uintptr(n), syscall.PROT_READ|syscall.PROT_WRITE,
 			syscall.MAP_PRIVATE|syscall.MAP_ANON|syscall.MAP_NORESERVE, 0, 0)
 		if err != nil {
 			err = fmt.Errorf("mmap: %s", err)

@@ -193,10 +193,10 @@ const (
 
 type vfio_irq_set struct {
 	vfio_ioctl_common
-	index        uint32 // one of vfio_pci_*_irq_index
-	start        uint32 // first irq
-	n_data_bytes uint32 // number of bytes of data
-	// n_data_bytes data follows
+	index uint32 // one of vfio_pci_*_irq_index
+	start uint32 // first irq
+	count uint32 // number of bytes of data
+	// count data items follows (either 1 byte each for bool or 4 bytes each for eventfd)
 }
 
 const (
