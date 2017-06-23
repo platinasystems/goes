@@ -55,7 +55,7 @@ func (c *Command) Main(args ...string) (err error) {
 
 	signal.Ignore(syscall.SIGTERM)
 
-	err = c.daemon(done, "redisd", args...)
+	err = c.daemon(done, append([]string{"redisd"}, args...)...)
 	if err != nil {
 		return
 	}
@@ -89,7 +89,7 @@ func (c *Command) Main(args ...string) (err error) {
 func (*Command) String() string { return Name }
 func (*Command) Usage() string  { return Usage }
 
-func (*Command) daemon(done chan<- struct{}, arg0 string, args ...string) error {
+func (c *Command) daemon(done chan<- struct{}, args ...string) error {
 	rout, wout, err := os.Pipe()
 	if err != nil {
 		return err
@@ -98,8 +98,7 @@ func (*Command) daemon(done chan<- struct{}, arg0 string, args ...string) error 
 	if err != nil {
 		return err
 	}
-	d := exec.Command(prog.Name(), args...)
-	d.Args[0] = arg0
+	d := c.g.Fork(args...)
 	d.Stdin = nil
 	d.Stdout = wout
 	d.Stderr = werr
@@ -112,7 +111,7 @@ func (*Command) daemon(done chan<- struct{}, arg0 string, args ...string) error 
 	if err != nil {
 		return err
 	}
-	id := fmt.Sprintf("%s.%s[%d]", prog.Base(), arg0, d.Process.Pid)
+	id := fmt.Sprintf("%s.%s[%d]", prog.Base(), args[0], d.Process.Pid)
 	go log.LinesFrom(rout, id, "info")
 	go log.LinesFrom(rerr, id, "err")
 	go func(d *exec.Cmd, wout, werr *os.File, done chan<- struct{}) {
