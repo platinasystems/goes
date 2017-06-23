@@ -280,7 +280,9 @@ func (r Resource) String() string {
 	return fmt.Sprintf("{%d: 0x%x-0x%x}", r.Index, r.Base, r.Base+r.Size-1)
 }
 
-func (d *Device) String() string { return d.Addr.String() }
+func (d *Device) String() string {
+	return fmt.Sprintf("%s %v %v", &d.Addr, d.VendorID(), d.DeviceID())
+}
 
 type Device struct {
 	Addr        BusAddress
@@ -307,8 +309,8 @@ type Devicer interface {
 	GetDevice() *Device
 	Open() error
 	Close() error
-	MapResource(r *Resource) (res unsafe.Pointer, err error)
-	UnmapResource(r *Resource) (err error)
+	MapResource(bar uint) (res unsafe.Pointer, err error)
+	UnmapResource(bar uint) (err error)
 }
 
 var (

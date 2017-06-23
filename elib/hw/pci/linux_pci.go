@@ -89,7 +89,8 @@ func (d *Device) WriteConfigUint8(o uint, value uint8) {
 	d.rw(o, uint(value), 1, true)
 }
 
-func (d *Device) MapResource(r *Resource) (res unsafe.Pointer, err error) {
+func (d *Device) MapResource(bar uint) (res unsafe.Pointer, err error) {
+	r := &d.Resources[bar]
 	var f *os.File
 	f, err = d.SysfsOpenFile("resource%d", os.O_RDWR, r.Index)
 	if err != nil {
@@ -105,10 +106,12 @@ func (d *Device) MapResource(r *Resource) (res unsafe.Pointer, err error) {
 	return
 }
 
-func (d *Device) UnmapResource(r *Resource) (err error) {
-	err = syscall.Munmap(r.Mem)
-	if err != nil {
-		return fmt.Errorf("munmap resource%d: %s", r.Index, err)
+func (d *Device) UnmapResource(bar uint) (err error) {
+	if d.Resources[bar].Mem != nil {
+		err = syscall.Munmap(d.Resources[bar].Mem)
+		if err != nil {
+			return fmt.Errorf("munmap resource%d: %s", bar, err)
+		}
 	}
 	return
 }
@@ -183,7 +186,7 @@ func DiscoverDevices() (err error) {
 		}
 
 		d.Driver = driver
-		d.DriverDevice, err = driver.DeviceMatch(d)
+		d.DriverDevice, err = driver.DeviceMatch(de)
 		if err != nil {
 			return
 		}
