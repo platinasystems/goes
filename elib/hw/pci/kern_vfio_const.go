@@ -6,6 +6,10 @@
 
 package pci
 
+import (
+	"github.com/platinasystems/go/elib"
+)
+
 const vfio_api_version = 0
 
 const (
@@ -24,9 +28,33 @@ type vfio_info_cap_header struct {
 	next        uint32
 }
 
+type vfio_ioctl_kind int
+
+var vfio_ioctl_kind_strings = [...]string{
+	vfio_get_api_version:        "vfio_get_api_version",
+	vfio_check_extension:        "vfio_check_extension",
+	vfio_set_iommu:              "vfio_set_iommu",
+	vfio_group_get_status:       "vfio_group_get_status",
+	vfio_group_set_container:    "vfio_group_set_container",
+	vfio_group_unset_container:  "vfio_group_unset_container",
+	vfio_group_get_device_fd:    "vfio_group_get_device_fd",
+	vfio_device_get_info:        "vfio_device_get_info",
+	vfio_device_get_region_info: "vfio_device_get_region_info",
+	vfio_device_get_irq_info:    "vfio_device_get_irq_info",
+	vfio_device_set_irqs:        "vfio_device_set_irqs",
+	vfio_device_reset:           "vfio_device_reset",
+	vfio_iommu_get_info:         "vfio_iommu_get_info",
+	vfio_iommu_map_dma:          "vfio_iommu_map_dma",
+	vfio_iommu_unmap_dma:        "vfio_iommu_unmap_dma",
+	vfio_iommu_enable:           "vfio_iommu_enable",
+	vfio_iommu_disable:          "vfio_iommu_disable",
+}
+
+func (k vfio_ioctl_kind) String() string { return elib.StringerHex(vfio_ioctl_kind_strings[:], int(k)) }
+
 const (
 	// /dev/vfio/vfio ioctls.
-	vfio_get_api_version = iota + 0x3b64
+	vfio_get_api_version vfio_ioctl_kind = iota + 0x3b64
 	vfio_check_extension
 	vfio_set_iommu
 	// /dev/vfio/GROUP_NUMBER ioctls.
@@ -45,7 +73,7 @@ const (
 
 const (
 	// /dev/vfio/vfio driver ioctls.
-	vfio_iommu_get_info = iota + vfio_ioctl_first_driver
+	vfio_iommu_get_info vfio_ioctl_kind = iota + vfio_ioctl_first_driver
 	vfio_iommu_map_dma
 	vfio_iommu_unmap_dma
 	vfio_iommu_enable
@@ -53,7 +81,7 @@ const (
 )
 
 const (
-	vfio_device_get_pci_hot_reset_info = iota + vfio_ioctl_first_driver
+	vfio_device_get_pci_hot_reset_info vfio_ioctl_kind = iota + vfio_ioctl_first_driver
 	vfio_device_pci_hot_reset
 )
 

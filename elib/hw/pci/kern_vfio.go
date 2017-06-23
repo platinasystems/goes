@@ -69,22 +69,22 @@ type vfio_main struct {
 
 var default_vfio_main = &vfio_main{}
 
-func vfio_ioctl(fd, call int, arg uintptr) (r uintptr, err error) {
-	r, _, e := syscall.RawSyscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(call), arg)
+func vfio_ioctl(fd int, kind vfio_ioctl_kind, arg uintptr) (r uintptr, err error) {
+	r, _, e := syscall.RawSyscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(kind), arg)
 	if e != 0 {
-		err = os.NewSyscallError("ioctl", e)
+		err = os.NewSyscallError("ioctl "+kind.String(), e)
 	}
 	return
 }
 
-func (m *vfio_main) ioctl(call int, arg uintptr) (uintptr, error) {
-	return vfio_ioctl(m.container_fd, call, arg)
+func (m *vfio_main) ioctl(kind vfio_ioctl_kind, arg uintptr) (uintptr, error) {
+	return vfio_ioctl(m.container_fd, kind, arg)
 }
-func (x *vfio_group) ioctl(call int, arg uintptr) (uintptr, error) {
-	return vfio_ioctl(x.fd, call, arg)
+func (x *vfio_group) ioctl(kind vfio_ioctl_kind, arg uintptr) (uintptr, error) {
+	return vfio_ioctl(x.fd, kind, arg)
 }
-func (x *vfio_pci_device) ioctl(call int, arg uintptr) (uintptr, error) {
-	return vfio_ioctl(x.File.Fd, call, arg)
+func (x *vfio_pci_device) ioctl(kind vfio_ioctl_kind, arg uintptr) (uintptr, error) {
+	return vfio_ioctl(x.File.Fd, kind, arg)
 }
 
 func (m *vfio_main) init(dma_heap_bytes uint) (err error) {
