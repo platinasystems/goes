@@ -440,7 +440,7 @@ func (d *vfio_pci_device) Close() (err error) {
 	return
 }
 
-func (d *vfio_pci_device) MapResource(i uint) (res unsafe.Pointer, err error) {
+func (d *vfio_pci_device) MapResource(i uint) (res uintptr, err error) {
 	r := &d.Device.Resources[i]
 	if r.Index >= uint32(len(d.region_infos)) {
 		err = fmt.Errorf("%s: mmap unknown resource BAR %d", d.Device.String(), r.Index)
@@ -469,7 +469,7 @@ func (d *vfio_pci_device) MapResource(i uint) (res unsafe.Pointer, err error) {
 		err = fmt.Errorf("%s: mmap resource%d: %s", d.Device.String(), r.Index, err)
 		return
 	}
-	res = unsafe.Pointer(&r.Mem[0])
+	res = uintptr(unsafe.Pointer(&r.Mem[0]))
 	return
 }
 

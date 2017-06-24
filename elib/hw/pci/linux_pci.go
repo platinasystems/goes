@@ -196,11 +196,12 @@ func DiscoverDevices() (err error) {
 		}
 
 		// Open and initialize matched device.
-		err = d.Devicer.Open()
-		if err != nil {
+		if err = d.Devicer.Open(); err != nil {
 			return
 		}
-		d.DriverDevice.Init()
+		if err = d.DriverDevice.Init(); err != nil {
+			return
+		}
 	}
 	return
 }

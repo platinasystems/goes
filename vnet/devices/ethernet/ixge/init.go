@@ -96,9 +96,8 @@ func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
 // Write flush by reading status register.
 func (d *dev) write_flush() { d.regs.status_read_only.get(d) }
 
-func (d *dev) Init() {
-	if _, err := d.pci_dever.MapResource(0); err != nil {
-		panic(err)
+func (d *dev) Init() (err error) {
+	if _, err = d.pci_dever.MapResource(0); err != nil {
 		return
 	}
 	// Can't directly use mmapped registers because of compiler's read probes/nil checks.
@@ -183,8 +182,8 @@ func (d *dev) Init() {
 
 	// Enable all interrupts.
 	d.InterruptEnable(true)
-
 	d.counter_init()
+	return
 }
 
 const (

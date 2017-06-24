@@ -293,7 +293,7 @@ type Driver interface {
 }
 
 type DriverDevice interface {
-	Init()
+	Init() (err error)
 	Interrupt()
 }
 
@@ -301,8 +301,8 @@ type Devicer interface {
 	GetDevice() *Device
 	Open() error
 	Close() error
-	MapResource(bar uint) (res unsafe.Pointer, err error)
-	UnmapResource(bar uint) (err error)
+	MapResource(index uint) (res uintptr, err error)
+	UnmapResource(index uint) (err error)
 }
 
 var (
