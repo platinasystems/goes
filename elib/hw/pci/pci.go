@@ -283,21 +283,28 @@ type Device struct {
 	Resources   []Resource
 	Driver
 	DriverDevice
-	Devicer
+	BusDevice
 }
 
 // Things a driver must do.
 type Driver interface {
 	// Device matches registered devices for this driver.
-	DeviceMatch(d Devicer) (i DriverDevice, err error)
+	NewDevice(d BusDevice) (i DriverDevice, err error)
 }
 
+// This a device handled by driver must do.
 type DriverDevice interface {
 	Init() (err error)
 	Interrupt()
 }
 
-type Devicer interface {
+type Bus interface {
+	NewDevice() BusDevice
+	Validate() error
+}
+
+// Things a bus driver device must do.
+type BusDevice interface {
 	GetDevice() *Device
 	Open() error
 	Close() error

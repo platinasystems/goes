@@ -33,8 +33,8 @@ type dev struct {
 	d           dever
 	regs        *regs
 	mmaped_regs []byte
-	pciDev      *pci.Device
-	pci_dever   pci.Devicer
+	pci_bus_dev pci.BusDevice
+	pci_dev     *pci.Device // as returned by pci_bus_dev.GetDevice()
 
 	interruptsEnabled bool
 	active_count      int32
@@ -56,7 +56,7 @@ type dever interface {
 }
 
 func (d *dev) get() *dev    { return d }
-func (d *dev) bar0() []byte { return d.pciDev.Resources[0].Mem }
+func (d *dev) bar0() []byte { return d.pci_dev.Resources[0].Mem }
 
 var is_x540 = map[dev_id]bool{
 	dev_id_x540t:          true,
@@ -73,8 +73,8 @@ var is_x540 = map[dev_id]bool{
 	dev_id_x550em_x_vf_hv: true,
 }
 
-func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
-	pdev := pr.GetDevice()
+func (m *main) NewDevice(bd pci.BusDevice) (dd pci.DriverDevice, err error) {
+	pdev := bd.GetDevice()
 	id := dev_id(pdev.DeviceID())
 	var dr dever
 	switch {
@@ -87,8 +87,8 @@ func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
 
 	d.d = dr
 	d.m = m
-	d.pciDev = pr.GetDevice()
-	d.pci_dever = pr
+	d.pci_dev = bd.GetDevice()
+	d.pci_bus_dev = bd
 	m.devs = append(m.devs, dr)
 	return d, nil
 }
@@ -97,7 +97,7 @@ func (m *main) DeviceMatch(pr pci.Devicer) (dd pci.DriverDevice, err error) {
 func (d *dev) write_flush() { d.regs.status_read_only.get(d) }
 
 func (d *dev) Init() (err error) {
-	if _, err = d.pci_dever.MapResource(0); err != nil {
+	if _, err = d.pci_bus_dev.MapResource(0); err != nil {
 		return
 	}
 	// Can't directly use mmapped registers because of compiler's read probes/nil checks.
@@ -278,7 +278,7 @@ func (m *main) Configure(in *parse.Input) {
 func (m *main) Exit() (err error) {
 	for i := range m.devs {
 		d := m.devs[i].get()
-		err = d.pci_dever.Close()
+		err = d.pci_bus_dev.Close()
 	}
 	return
 }

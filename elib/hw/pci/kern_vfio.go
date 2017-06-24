@@ -78,8 +78,6 @@ type vfio_main struct {
 	container_init_once, dma_init_once sync.Once
 }
 
-var default_vfio_main = &vfio_main{}
-
 func vfio_ioctl(fd int, kind vfio_ioctl_kind, arg uintptr) (r uintptr, err error) {
 	r, _, e := syscall.RawSyscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(kind), arg)
 	if e != 0 {
@@ -183,11 +181,12 @@ func (d *vfio_pci_device) remove_id() (err error) {
 	return
 }
 
-func NewDevice() Devicer {
-	d := &vfio_pci_device{m: default_vfio_main}
-	d.Device.Devicer = d
-	return d
-}
+var DefaultBus = &vfio_main{}
+
+func (d *vfio_main) NewDevice() BusDevice { return &vfio_pci_device{m: d} }
+
+// fixme should check that all iommu groups are fully populated.
+func (d *vfio_main) Validate() (err error) { return }
 
 func (d *vfio_pci_device) GetDevice() *Device { return &d.Device }
 

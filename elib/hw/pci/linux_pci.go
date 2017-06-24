@@ -116,7 +116,7 @@ func (d *Device) UnmapResource(bar uint) (err error) {
 	return
 }
 
-func DiscoverDevices() (err error) {
+func DiscoverDevices(bus Bus) (err error) {
 	fis, err := ioutil.ReadDir(sysBusPciPath)
 	if perr, ok := err.(*os.PathError); ok && perr.Err == syscall.ENOENT {
 		return
@@ -124,9 +124,12 @@ func DiscoverDevices() (err error) {
 	if err != nil {
 		return
 	}
+	registeredDevs := []BusDevice{}
 	for _, fi := range fis {
-		de := NewDevice()
+		de := bus.NewDevice()
 		d := de.GetDevice()
+		d.BusDevice = de
+
 		n := fi.Name()
 		if _, err = fmt.Sscanf(n, "%x:%x:%x.%x", &d.Addr.Domain, &d.Addr.Bus, &d.Addr.Slot, &d.Addr.Fn); err != nil {
 			return
@@ -186,18 +189,27 @@ func DiscoverDevices() (err error) {
 		}
 
 		d.Driver = driver
-		d.DriverDevice, err = driver.DeviceMatch(de)
-		if err != nil {
+		if d.DriverDevice, err = driver.NewDevice(de); err != nil {
 			return
 		}
+		registeredDevs = append(registeredDevs, de)
+	}
 
+	// Open all registered devices.
+	for _, bd := range registeredDevs {
+		if err = bd.Open(); err != nil {
+			return
+		}
+	}
+	if err = bus.Validate(); err != nil {
+		return
+	}
+
+	// Intialize all registered devices that have drivers.
+	for _, bd := range registeredDevs {
+		d := bd.GetDevice()
 		if d.DriverDevice == nil {
 			continue
-		}
-
-		// Open and initialize matched device.
-		if err = d.Devicer.Open(); err != nil {
-			return
 		}
 		if err = d.DriverDevice.Init(); err != nil {
 			return
