@@ -17,14 +17,11 @@ import (
 
 type reg hw.U32
 
-func (d *dev) addr_for_offset32(offset uint) *uint32 {
-	return (*uint32)(unsafe.Pointer(&d.mmaped_regs[offset]))
-}
-func (d *dev) addr_for_offset64(offset uint) *uint64 {
-	return (*uint64)(unsafe.Pointer(&d.mmaped_regs[offset]))
+func (d *dev) addr_for_offset(offset uint) uintptr {
+	return uintptr(unsafe.Pointer(&d.mmaped_regs[offset]))
 }
 func (r *reg) offset() uint        { return uint(uintptr(unsafe.Pointer(r)) - hw.BaseAddress) }
-func (r *reg) addr(d *dev) *uint32 { return d.addr_for_offset32(r.offset()) }
+func (r *reg) addr(d *dev) uintptr { return d.addr_for_offset(r.offset()) }
 func (r *reg) get(d *dev) reg      { return reg(hw.LoadUint32(r.addr(d))) }
 func (r *reg) set(d *dev, v reg)   { hw.StoreUint32(r.addr(d), uint32(v)) }
 func (r *reg) or(d *dev, v reg) (x reg) {

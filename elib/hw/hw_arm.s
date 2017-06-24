@@ -1,11 +1,11 @@
-// func LoadUint32(addr *uint32) (data uint32)
+// func LoadUint32(addr uintptr) (data uint32)
 TEXT ·LoadUint32(SB),4,$0-8
 	MOVW	addr+0(FP), R1
 	MOVW	0(R1), R0
 	MOVW	R0, data+4(FP)
 	RET
 	
-// func StoreUint32(addr *uint32, data uint32)
+// func StoreUint32(addr uintptr, data uint32)
 TEXT ·StoreUint32(SB),4,$0-8
 	MOVW	addr+0(FP), R1
 	MOVW	data+4(FP), R0

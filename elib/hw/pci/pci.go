@@ -17,24 +17,16 @@ type U8 hw.U8
 type U16 hw.U16
 type U32 hw.U32
 
-func (r *U8) Get(d *Device) uint8 {
-	return d.ReadConfigUint8((*hw.U8)(r).Offset())
-}
-func (r *U8) Set(d *Device, v uint8) {
-	d.WriteConfigUint8((*hw.U8)(r).Offset(), v)
-}
-func (r *U16) Get(d *Device) uint16 {
-	return d.ReadConfigUint16((*hw.U16)(r).Offset())
-}
-func (r *U16) Set(d *Device, v uint16) {
-	d.WriteConfigUint16((*hw.U16)(r).Offset(), v)
-}
-func (r *U32) Get(d *Device) uint32 {
-	return d.ReadConfigUint32((*hw.U32)(r).Offset())
-}
-func (r *U32) Set(d *Device, v uint32) {
-	d.WriteConfigUint32((*hw.U32)(r).Offset(), v)
-}
+func (r *U8) offset() uint  { return uint((*hw.U8)(r).Offset()) }
+func (r *U16) offset() uint { return uint((*hw.U16)(r).Offset()) }
+func (r *U32) offset() uint { return uint((*hw.U32)(r).Offset()) }
+
+func (r *U8) Get(d *Device) uint8      { return d.ReadConfigUint8(r.offset()) }
+func (r *U8) Set(d *Device, v uint8)   { d.WriteConfigUint8(r.offset(), v) }
+func (r *U16) Get(d *Device) uint16    { return d.ReadConfigUint16(r.offset()) }
+func (r *U16) Set(d *Device, v uint16) { d.WriteConfigUint16(r.offset(), v) }
+func (r *U32) Get(d *Device) uint32    { return d.ReadConfigUint32(r.offset()) }
+func (r *U32) Set(d *Device, v uint32) { d.WriteConfigUint32(r.offset(), v) }
 
 func (d *Device) getRegs(o uint) unsafe.Pointer {
 	return unsafe.Pointer(hw.BaseAddress + uintptr(o))
