@@ -127,7 +127,7 @@ func (m *vfio_main) container_init() (err error) {
 	return
 }
 
-func (m *vfio_main) dma_init(dma_heap_bytes uint) (err error) {
+func (m *vfio_main) dma_init(log2_dma_heap_bytes uint) (err error) {
 	// Enable the IOMMU model we want.
 	if _, err = m.ioctl(vfio_set_iommu, vfio_type1_iommu); err != nil {
 		return
@@ -139,26 +139,22 @@ func (m *vfio_main) dma_init(dma_heap_bytes uint) (err error) {
 		return
 	}
 
-	{
-		addr, data, e := elib.MmapSlice(0, uintptr(dma_heap_bytes),
-			syscall.PROT_READ|syscall.PROT_WRITE,
-			syscall.MAP_PRIVATE|syscall.MAP_ANONYMOUS,
-			0, 0)
-		if e != nil {
-			err = e
-			return
-		}
-		m.dma_map = vfio_iommu_type1_dma_map{
-			vaddr: uint64(addr),
-			size:  uint64(dma_heap_bytes),
-		}
-		m.dma_map.set(unsafe.Sizeof(m.dma_map), vfio_dma_map_flag_read|vfio_dma_map_flag_write)
-		if _, err = m.ioctl(vfio_iommu_map_dma, uintptr(unsafe.Pointer(&m.dma_map))); err != nil {
-			return
-		}
-
-		hw.DmaInit(data)
+	addr, data, e := elib.MmapSliceAligned(log2_dma_heap_bytes, hw.PhysmemLog2AddressAlign, syscall.PROT_READ|syscall.PROT_WRITE)
+	if e != nil {
+		err = e
+		return
 	}
+	m.dma_map = vfio_iommu_type1_dma_map{
+		vaddr: uint64(addr),
+		iova:  uint64(hw.DmaPhysAddress(addr)),
+		size:  uint64(1) << log2_dma_heap_bytes,
+	}
+	m.dma_map.set(unsafe.Sizeof(m.dma_map), vfio_dma_map_flag_read|vfio_dma_map_flag_write)
+	if _, err = m.ioctl(vfio_iommu_map_dma, uintptr(unsafe.Pointer(&m.dma_map))); err != nil {
+		return
+	}
+
+	hw.DmaInit(data)
 
 	return
 }
@@ -298,7 +294,7 @@ func (d *vfio_pci_device) Open() (err error) {
 
 	// Initialize DMA heap once at least one group has been added to container.
 	d.m.dma_init_once.Do(func() {
-		err = d.m.dma_init(256 << 20)
+		err = d.m.dma_init(28)
 	})
 	if err != nil {
 		return
