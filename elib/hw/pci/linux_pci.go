@@ -124,7 +124,7 @@ func DiscoverDevices(bus Bus) (err error) {
 	if err != nil {
 		return
 	}
-	registeredDevs := []BusDevice{}
+	bc := bus.getBusCommon()
 	for _, fi := range fis {
 		de := bus.NewDevice()
 		d := de.GetDevice()
@@ -192,11 +192,11 @@ func DiscoverDevices(bus Bus) (err error) {
 		if d.DriverDevice, err = driver.NewDevice(de); err != nil {
 			return
 		}
-		registeredDevs = append(registeredDevs, de)
+		bc.registeredDevs = append(bc.registeredDevs, de)
 	}
 
 	// Open all registered devices.
-	for _, bd := range registeredDevs {
+	for _, bd := range bc.registeredDevs {
 		if err = bd.Open(); err != nil {
 			return
 		}
@@ -206,12 +206,28 @@ func DiscoverDevices(bus Bus) (err error) {
 	}
 
 	// Intialize all registered devices that have drivers.
-	for _, bd := range registeredDevs {
+	for _, bd := range bc.registeredDevs {
 		d := bd.GetDevice()
 		if d.DriverDevice == nil {
 			continue
 		}
 		if err = d.DriverDevice.Init(); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func CloseDiscoveredDevices(bus Bus) (err error) {
+	bc := bus.getBusCommon()
+	for _, bd := range bc.registeredDevs {
+		d := bd.GetDevice()
+		if d.DriverDevice != nil {
+			if err = d.DriverDevice.Exit(); err != nil {
+				return
+			}
+		}
+		if err = bd.Close(); err != nil {
 			return
 		}
 	}

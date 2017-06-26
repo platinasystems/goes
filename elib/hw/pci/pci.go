@@ -298,10 +298,18 @@ type Driver interface {
 // This a device handled by driver must do.
 type DriverDevice interface {
 	Init() (err error)
+	Exit() (err error)
 	Interrupt()
 }
 
+type busCommon struct {
+	registeredDevs []BusDevice
+}
+
+func (b *busCommon) getBusCommon() *busCommon { return b }
+
 type Bus interface {
+	getBusCommon() *busCommon
 	NewDevice() BusDevice
 	Validate() error
 }

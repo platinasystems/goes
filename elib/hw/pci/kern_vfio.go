@@ -58,6 +58,8 @@ type vfio_pci_device struct {
 }
 
 type vfio_main struct {
+	busCommon
+
 	api_version int
 
 	// /dev/vfio/vfio
@@ -170,18 +172,15 @@ func sysfsWrite(path, format string, args ...interface{}) error {
 	return err
 }
 
-func (d *vfio_pci_device) new_id() (err error) {
-	err = sysfsWrite("new_id", "%04x %04x", int(d.VendorID()), int(d.DeviceID()))
-	if err != nil {
-		return
-	}
+func (d *vfio_pci_device) sysfsWrite(name string) (err error) {
+	err = sysfsWrite(name, "%04x %04x", int(d.VendorID()), int(d.DeviceID()))
 	return
 }
 
-func (d *vfio_pci_device) remove_id() (err error) {
-	err = sysfsWrite("remove_id", "%04x %04x", int(d.VendorID()), int(d.DeviceID()))
-	return
-}
+func (d *vfio_pci_device) new_id() error    { return d.sysfsWrite("new_id") }
+func (d *vfio_pci_device) remove_id() error { return d.sysfsWrite("remove_id") }
+func (d *vfio_pci_device) bind() error      { return d.sysfsWrite("bind") }
+func (d *vfio_pci_device) unbind() error    { return d.sysfsWrite("unbind") }
 
 var DefaultBus = &vfio_main{}
 
@@ -441,7 +440,10 @@ func (d *vfio_pci_device) Close() (err error) {
 	if d.device_fd > 0 {
 		syscall.Close(d.device_fd)
 	}
-	d.remove_id()
+	if err = d.unbind(); err != nil {
+		return
+	}
+	err = d.remove_id()
 	return
 }
 

@@ -96,6 +96,23 @@ func (m *main) NewDevice(bd pci.BusDevice) (dd pci.DriverDevice, err error) {
 // Write flush by reading status register.
 func (d *dev) write_flush() { d.regs.status_read_only.get(d) }
 
+func (d *dev) reset(wait bool) {
+	const (
+		mac_reset = 1 << 3
+		dev_reset = 1 << 26
+	)
+	r := d.regs
+	v := r.control.get(d)
+	v |= mac_reset | dev_reset
+	r.control.set(d, v)
+
+	if wait {
+		// Timed to take ~1e-6 secs.  No need for timeout.
+		for r.control.get(d)&(dev_reset|mac_reset) != 0 {
+		}
+	}
+}
+
 func (d *dev) Init() (err error) {
 	if _, err = d.pci_bus_dev.MapResource(0); err != nil {
 		return
@@ -106,20 +123,7 @@ func (d *dev) Init() (err error) {
 
 	r := d.regs
 
-	// Reset chip.
-	{
-		const (
-			mac_reset = 1 << 3
-			dev_reset = 1 << 26
-		)
-		v := r.control.get(d)
-		v |= mac_reset | dev_reset
-		r.control.set(d, v)
-
-		// Timed to take ~1e-6 secs.  No need for timeout.
-		for r.control.get(d)&(dev_reset|mac_reset) != 0 {
-		}
-	}
+	d.reset(true)
 
 	// Indicate software loaded.
 	r.extended_control.or(d, 1<<28)
@@ -183,6 +187,11 @@ func (d *dev) Init() (err error) {
 	// Enable all interrupts.
 	d.InterruptEnable(true)
 	d.counter_init()
+	return
+}
+
+func (d *dev) Exit() (err error) {
+	d.reset(false)
 	return
 }
 
@@ -273,12 +282,4 @@ func (m *main) Configure(in *parse.Input) {
 			panic(parse.ErrInput)
 		}
 	}
-}
-
-func (m *main) Exit() (err error) {
-	for i := range m.devs {
-		d := m.devs[i].get()
-		err = d.pci_bus_dev.Close()
-	}
-	return
 }
