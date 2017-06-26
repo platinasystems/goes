@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
-	"github.com/jlaffaye/ftp"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/kexec"
@@ -31,7 +30,7 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-f] [-l]"
+	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-l]"
 	Man     = `
 DESCRIPTION
 	The upgrade command updates firmware images.
@@ -40,8 +39,6 @@ DESCRIPTION
 	number can be supplied in the form:  v0.0[.0][.0]
 
 	The -l flag will list available versions.
-	The -f flag will use FTP instead of wget/http.
-	FTP only accesses the root ftp directory.
 
 	Images are downloaded from "downloads.platina.com",
 	or, from a user specified URL or IPv4 address.
@@ -85,7 +82,7 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-l", "-f")
+	flag, args := flags.New(args, "-l")
 	parm, args := parms.New(args, "-v", "-s")
 
 	if len(parm["-v"]) == 0 {
@@ -123,7 +120,7 @@ func doUpgrade(s string, v string, f bool) error {
 	if err := mountMmc(); err != nil { //TODO remove for QSPI direct write
 		return fmt.Errorf("Error: Could not mount SD card")
 	}
-	err, size := getFile(s, v, f)
+	err, size := getFile(s, v)
 	if err != nil {
 		return fmt.Errorf("Error: Could not download file")
 	}
@@ -200,23 +197,7 @@ func dispList(s string, v string) error {
 	return nil
 }
 
-func getFile(s string, v string, f bool) (error, int) {
-	if f == false {
-		err, filesize := getFileWget(s, v)
-		if err != nil {
-			return err, 0
-		}
-		return nil, filesize
-	} else {
-		err, filesize := getFileFtp(s, v)
-		if err != nil {
-			return err, 0
-		}
-		return nil, filesize
-	}
-}
-
-func getFileWget(s string, v string) (error, int) {
+func getFile(s string, v string) (error, int) {
 	rmFile(Machine + Suffix)
 	files := []string{
 		"http://" + s + "/" + v + "/" + Machine + Suffix,
@@ -236,31 +217,6 @@ func getFileWget(s string, v string) (error, int) {
 	}
 	filesize := int(stat.Size())
 	return nil, filesize
-}
-
-func getFileFtp(s string, v string) (error, int) {
-	client, err := ftp.Dial(s + ":21")
-	if err != nil {
-		return err, 0
-	}
-	if err := client.Login("anonymous", "guest"); err != nil {
-		return err, 0
-	}
-	name := Machine + Suffix
-	r, err := client.Retr(name)
-	if err != nil {
-		return err, 0
-	}
-	buf, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err, 0
-	}
-	err = ioutil.WriteFile(Machine+Suffix, buf, 0644)
-	if err != nil {
-		return err, 0
-	}
-	r.Close()
-	return nil, int(len(buf))
 }
 
 func wgetFiles(urls []string) error {
