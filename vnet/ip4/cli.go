@@ -39,12 +39,14 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 
 	detail := false
 	summary := false
+	table := ""
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
 			detail = true
 		case in.Parse("s%*ummary"):
 			summary = true
+		case in.Parse("t%*able %s", &table):
 		default:
 			err = cli.ParseError
 			return
@@ -74,6 +76,10 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	for fi := range m.fibs {
 		fib := m.fibs[fi]
 		if fib != nil {
+			t := ip.FibIndex(fi).Name(&m.Main)
+			if table != "" && t != table {
+				continue
+			}
 			fib.foreach(func(p *Prefix, a ip.Adj) {
 				rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
 			})
