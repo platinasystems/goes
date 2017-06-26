@@ -39,14 +39,13 @@ func munmap(a, size uintptr) (err error) {
 	return
 }
 
-func MmapSliceAligned(log2_size, log2_align uint, prot uintptr) (a uintptr, b []byte, err error) {
+func MmapSliceAligned(log2_size, log2_align uint, flags, prot uintptr) (a uintptr, b []byte, err error) {
 	const log2_page_size = 12
 	if log2_align < log2_page_size {
 		log2_align = log2_page_size
 	}
 	size := uintptr(1) << log2_size
 	align := uintptr(1) << log2_align
-	const flags = syscall.MAP_SHARED | syscall.MAP_ANONYMOUS
 	a, _, e := syscall.RawSyscall6(syscall.SYS_MMAP, 0, size+align, prot, flags, 0, 0)
 	if e != 0 {
 		err = fmt.Errorf("mmap: %s", e)
