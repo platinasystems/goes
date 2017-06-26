@@ -30,9 +30,14 @@ func (d *Device) SysfsOpenFile(format string, mode int, args ...interface{}) (f 
 	return
 }
 
-func (d *Device) configRw(offset, vʹ, nBytes uint, isWrite bool) (v uint, err error) {
+func (d *Device) ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
 	var f *os.File
-	f, err = d.SysfsOpenFile("config", os.O_RDWR)
+	f, err := d.SysfsOpenFile("config", os.O_RDWR)
+	defer func() {
+		if err != nil {
+			panic(err)
+		}
+	}()
 	if err != nil {
 		return
 	}
@@ -59,25 +64,25 @@ func (d *Device) configRw(offset, vʹ, nBytes uint, isWrite bool) (v uint, err e
 }
 
 func (d *Device) ReadConfigUint32(o uint) (v uint32) {
-	v = uint32(d.ConfigRw(o, 0, 4, false))
+	v = uint32(d.BusDevice.ConfigRw(o, 0, 4, false))
 	return
 }
 func (d *Device) WriteConfigUint32(o uint, value uint32) {
-	d.ConfigRw(o, uint(value), 4, true)
+	d.BusDevice.ConfigRw(o, uint(value), 4, true)
 }
 func (d *Device) ReadConfigUint16(o uint) (v uint16) {
-	v = uint16(d.ConfigRw(o, 0, 2, false))
+	v = uint16(d.BusDevice.ConfigRw(o, 0, 2, false))
 	return
 }
 func (d *Device) WriteConfigUint16(o uint, value uint16) {
-	d.ConfigRw(o, uint(value), 2, true)
+	d.BusDevice.ConfigRw(o, uint(value), 2, true)
 }
 func (d *Device) ReadConfigUint8(o uint) (v uint8) {
-	v = uint8(d.ConfigRw(o, 0, 1, false))
+	v = uint8(d.BusDevice.ConfigRw(o, 0, 1, false))
 	return
 }
 func (d *Device) WriteConfigUint8(o uint, value uint8) {
-	d.ConfigRw(o, uint(value), 1, true)
+	d.BusDevice.ConfigRw(o, uint(value), 1, true)
 }
 
 func (d *Device) MapResource(bar uint) (res uintptr, err error) {

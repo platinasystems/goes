@@ -481,19 +481,17 @@ func (d *vfio_pci_device) MapResource(i uint) (res uintptr, err error) {
 }
 
 func (d *vfio_pci_device) region_rw(region, offset, vʹ, nBytes uint, isWrite bool) (v uint, err error) {
-	f := os.NewFile(uintptr(d.device_fd), d.String())
-	if _, err = f.Seek(int64(region)<<40|int64(offset), os.SEEK_SET); err != nil {
-		return
-	}
 	var b [4]byte
+	fd := d.device_fd
+	o := int64(region)<<40 + int64(offset)
 	if isWrite {
 		for i := range b {
 			b[i] = byte((vʹ >> uint(8*i)) & 0xff)
 		}
-		_, err = f.Write(b[:nBytes])
+		_, err = syscall.Pwrite(fd, b[:nBytes], o)
 		v = vʹ
 	} else {
-		_, err = f.Read(b[:nBytes])
+		_, err = syscall.Pread(fd, b[:nBytes], o)
 		if err == nil {
 			for i := range b {
 				v |= uint(b[i]) << (8 * uint(i))
@@ -503,6 +501,11 @@ func (d *vfio_pci_device) region_rw(region, offset, vʹ, nBytes uint, isWrite bo
 	return
 }
 func (d *vfio_pci_device) ConfigRw(offset, v, nBytes uint, isWrite bool) uint {
+	// Before Open() is called; rely on /sys based config space read/write.
+	if d.device_fd == 0 {
+		return d.Device.ConfigRw(offset, v, nBytes, isWrite)
+	}
+
 	v, err := d.region_rw(vfio_pci_config_region_index, offset, v, nBytes, isWrite)
 	if err != nil {
 		panic(err)
