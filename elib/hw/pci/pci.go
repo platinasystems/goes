@@ -28,9 +28,8 @@ func (r *U16) Set(d *Device, v uint16) { d.WriteConfigUint16(r.offset(), v) }
 func (r *U32) Get(d *Device) uint32    { return d.ReadConfigUint32(r.offset()) }
 func (r *U32) Set(d *Device, v uint32) { d.WriteConfigUint32(r.offset(), v) }
 
-func (d *Device) getRegs(o uint) unsafe.Pointer {
-	return unsafe.Pointer(hw.BaseAddress + uintptr(o))
-}
+func (d *Device) getRegs(o uint) unsafe.Pointer { return unsafe.Pointer(hw.BaseAddress + uintptr(o)) }
+func (d *Device) GetConfig() *Config            { return (*Config)(d.getRegs(0)) }
 
 // Under PCI, each device has 256 bytes of configuration address space,
 // of which the first 64 bytes are standardized as follows:

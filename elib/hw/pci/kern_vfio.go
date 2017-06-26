@@ -370,9 +370,10 @@ func (d *vfio_pci_device) Open() (err error) {
 		}
 	}
 
-	// Set bus master.
+	// Set bus master in pci command register.
+	// Otherwise no love with device dma or msi interrupts.
 	{
-		c := (*ConfigHeader)(d.getRegs(0))
+		c := d.GetConfig()
 		v := c.Command.Get(&d.Device)
 		v |= BusMasterEnable
 		c.Command.Set(&d.Device, v)
