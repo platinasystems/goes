@@ -6,6 +6,8 @@ package show
 
 import (
 	"fmt"
+	"net"
+	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/options"
 	"github.com/platinasystems/go/goes/lang"
@@ -18,7 +20,7 @@ const (
 	Apropos = "link attributes"
 	Usage   = `
 	ip link show [ DEVICE | group GROUP ] [ up ] [ master DEVICE ]
-		[ type ETYPE ] vrf NAME ]
+		[ type ETYPE ] [ vrf NAME ]
 `
 
 	Man = `
@@ -87,11 +89,38 @@ func (c Command) Main(args ...string) error {
 		}
 	}
 
-	fmt.Println("FIXME", command, subject)
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+
+	c.show(ifs...)
 
 	_ = ipFlag
 	_ = ipParm
 	_ = flag
 
 	return nil
+}
+
+func (c Command) show(ifs ...net.Interface) {
+	// 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+	//     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+	for _, v := range ifs {
+		fmt.Print(v.Index, ": ")
+		fmt.Print(v.Name, ": ")
+		s := v.Flags.String()
+		s = strings.Replace(s, "|", ",", -1)
+		s = strings.ToUpper(s)
+		fmt.Print("<", s, ">")
+		fmt.Print(" mtu ", v.MTU)
+		fmt.Print(" qdisc ", "QDISC")
+		fmt.Print(" state ", "STATE")
+		fmt.Print(" mode ", "MODE")
+		fmt.Print(" group ", "GROUP")
+		fmt.Print(" qlen ", "QLEN")
+		fmt.Println()
+		fmt.Print("    link/TYPE ", v.HardwareAddr)
+		fmt.Println()
+	}
 }
