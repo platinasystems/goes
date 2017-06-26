@@ -480,6 +480,36 @@ func (d *vfio_pci_device) MapResource(i uint) (res uintptr, err error) {
 	return
 }
 
+func (d *vfio_pci_device) region_rw(region, offset, vʹ, nBytes uint, isWrite bool) (v uint, err error) {
+	f := os.NewFile(uintptr(d.device_fd), d.String())
+	if _, err = f.Seek(int64(region)<<40|int64(offset), os.SEEK_SET); err != nil {
+		return
+	}
+	var b [4]byte
+	if isWrite {
+		for i := range b {
+			b[i] = byte((vʹ >> uint(8*i)) & 0xff)
+		}
+		_, err = f.Write(b[:nBytes])
+		v = vʹ
+	} else {
+		_, err = f.Read(b[:nBytes])
+		if err == nil {
+			for i := range b {
+				v |= uint(b[i]) << (8 * uint(i))
+			}
+		}
+	}
+	return
+}
+func (d *vfio_pci_device) ConfigRw(offset, v, nBytes uint, isWrite bool) uint {
+	v, err := d.region_rw(vfio_pci_config_region_index, offset, v, nBytes, isWrite)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 var errShouldNeverHappen = errors.New("should never happen")
 
 func (d *vfio_pci_device) ErrorReady() error    { return errShouldNeverHappen }

@@ -316,6 +316,7 @@ type Bus interface {
 
 // Things a bus driver device must do.
 type BusDevice interface {
+	ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint)
 	GetDevice() *Device
 	Open() error
 	Close() error
