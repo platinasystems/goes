@@ -10,11 +10,12 @@ type wrapperDevice struct {
 	Device
 }
 
-func NewDevice() Devicer {
-	d := &wrapperDevice{}
-	d.Devicer = d
-	return d
-}
+type wrapperBus struct{}
+
+var DefaultBus = &wrapperBus{}
+
+func (wrapperBus) NewDevice() BusDevice  { return &wrapperDevice{} }
+func (wrapperBus) Validate() (err error) { return }
 
 func (d *wrapperDevice) GetDevice() *Device { return &d.Device }
 func (d *wrapperDevice) Open() error        { return nil }
