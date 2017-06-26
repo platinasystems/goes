@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
+	"github.com/jlaffaye/ftp"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/kexec"
@@ -30,22 +31,20 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SERVER] [-d DIR] [-l]"
+	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-f] [-l]"
 	Man     = `
 DESCRIPTION
-	The upgrade command upgrades firmware images in flash.
+	The upgrade command updates firmware images.
 
-	The default version is "LATEST".  Or, a version number
-	can be supplied in the from v0.0[.0][.0]
+	The default version is "LATEST".  Optionally, a version
+	number can be supplied in the form:  v0.0[.0][.0]
 
-	The -l command will list available versions.
+	The -l flag will list available versions.
+	The -f flag will use FTP instead of wget/http.
+	FTP only accesses the root ftp directory.
 
-	Images are downloaded from either from 
-	"downloads.platina.com", or a user specified URL or
-	IPv4 address.
-	
-	The directory for a user server is "downloads", unless
-	overridden with the "-d" parameter.
+	Images are downloaded from "downloads.platina.com",
+	or, from a user specified URL or IPv4 address.
 
 	For the BMC the images in QSPI are:
 	   1. ubo:  QSPI header, u-boot bootloader
@@ -55,10 +54,10 @@ DESCRIPTION
 	   5. ini:  initrd  filesystem containing goes
 
 OPTIONS
-	-v [VER]	version number or hash, default is LATEST
-	-s [SERVER]	IP4 or URL, default is downloads.platina.com
-	-d [DIR]	IP4 or URL, default is downloads.platina.com
-	-l		lists available upgrade hashes`
+	-v [VER]          version number or hash, default is LATEST
+	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
+	-f                use FTP instead of wget/http for downloading
+	-l                lists available upgrade hashes`
 
 	DfltMod = 0755
 	MmcDir  = "/mmc"
@@ -86,8 +85,8 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-l")
-	parm, args := parms.New(args, "-v", "-s", "-d")
+	flag, args := flags.New(args, "-l", "-f")
+	parm, args := parms.New(args, "-v", "-s")
 
 	if len(parm["-v"]) == 0 {
 		parm["-v"] = DfltVer
@@ -96,16 +95,12 @@ func (cmd) Main(args ...string) error {
 		parm["-s"] = DfltSrv
 	}
 	if flag["-l"] {
-		getList(parm["-s"], parm["-d"], parm["-v"])
-		l, err := ioutil.ReadFile("/LIST")
-		if err != nil {
-			return fmt.Errorf("Error: 'LIST' file not found")
+		if err := dispList(parm["-s"], parm["-v"]); err != nil {
+			return err
 		}
-		fmt.Print(string(l))
 		return nil
 	}
-	err := doUpgrade(parm["-s"], parm["-d"], parm["-v"])
-	if err != nil {
+	if err := doUpgrade(parm["-s"], parm["-v"], flag["-f"]); err != nil {
 		return err
 	}
 	return nil
@@ -124,21 +119,21 @@ var (
 	}
 )
 
-func doUpgrade(s string, d string, v string) error {
-	if err := mountMmc(); err != nil {
+func doUpgrade(s string, v string, f bool) error {
+	if err := mountMmc(); err != nil { //TODO remove for QSPI direct write
 		return fmt.Errorf("Error: Could not mount SD card")
 	}
-	err, size := getFile(s, d, v)
+	err, size := getFile(s, v, f)
 	if err != nil {
 		return fmt.Errorf("Error: Could not download file")
 	}
 	if size < 1000 {
-		return fmt.Errorf("Error: Could not download zip file")
+		return fmt.Errorf("Error: File too small")
 	}
 	if err := unzip(); err != nil {
 		return fmt.Errorf("Error: Could not unzip file")
 	}
-	if err := copyFiles(); err != nil {
+	if err := copyFiles(); err != nil { //TODO replace w/direct write to QSPI
 		return fmt.Errorf("Error: Could not copy to SD card")
 	}
 	if err := rmFiles(); err != nil {
@@ -188,39 +183,84 @@ func unzip() error {
 	return nil
 }
 
-func getList(s string, d string, v string) error {
-	rmFile("LIST")
+func dispList(s string, v string) error {
+	rmFile("/LIST")
 	files := []string{
-		"http://" + s + "/" + d + "/" + v + "/" + "LIST",
+		"http://" + s + "/" + v + "/" + "LIST",
 	}
 	err := wgetFiles(files)
 	if err != nil {
 		return err
 	}
+	l, err := ioutil.ReadFile("/LIST")
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(l))
 	return nil
 }
 
-func getFile(s string, d string, v string) (error, int64) {
+func getFile(s string, v string, f bool) (error, int) {
+	if f == false {
+		err, filesize := getFileWget(s, v)
+		if err != nil {
+			return err, 0
+		}
+		return nil, filesize
+	} else {
+		err, filesize := getFileFtp(s, v)
+		if err != nil {
+			return err, 0
+		}
+		return nil, filesize
+	}
+}
+
+func getFileWget(s string, v string) (error, int) {
 	rmFile(Machine + Suffix)
 	files := []string{
-		"http://" + s + "/" + d + "/" + v + "/" + Machine + Suffix,
+		"http://" + s + "/" + v + "/" + Machine + Suffix,
 	}
-	er := wgetFiles(files)
-	if er != nil {
-		return er, 0
+	err := wgetFiles(files)
+	if err != nil {
+		return err, 0
 	}
 	f, err := os.Open(Machine + Suffix)
 	if err != nil {
 		return err, 0
 	}
 	defer f.Close()
-
 	stat, err := f.Stat()
 	if err != nil {
 		return err, 0
 	}
-	filesize := stat.Size()
+	filesize := int(stat.Size())
 	return nil, filesize
+}
+
+func getFileFtp(s string, v string) (error, int) {
+	client, err := ftp.Dial(s + ":21")
+	if err != nil {
+		return err, 0
+	}
+	if err := client.Login("anonymous", "guest"); err != nil {
+		return err, 0
+	}
+	name := Machine + Suffix
+	r, err := client.Retr(name)
+	if err != nil {
+		return err, 0
+	}
+	buf, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err, 0
+	}
+	err = ioutil.WriteFile(Machine+Suffix, buf, 0644)
+	if err != nil {
+		return err, 0
+	}
+	r.Close()
+	return nil, int(len(buf))
 }
 
 func wgetFiles(urls []string) error {
