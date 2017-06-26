@@ -89,7 +89,7 @@ func (d *Device) WriteConfigUint8(o uint, value uint8) {
 	d.rw(o, uint(value), 1, true)
 }
 
-func (d *Device) MapResource(bar uint) (res unsafe.Pointer, err error) {
+func (d *Device) MapResource(bar uint) (res uintptr, err error) {
 	r := &d.Resources[bar]
 	var f *os.File
 	f, err = d.SysfsOpenFile("resource%d", os.O_RDWR, r.Index)
@@ -102,7 +102,7 @@ func (d *Device) MapResource(bar uint) (res unsafe.Pointer, err error) {
 		err = fmt.Errorf("mmap resource%d: %s", r.Index, err)
 		return
 	}
-	res = unsafe.Pointer(&r.Mem[0])
+	res = uintptr(unsafe.Pointer(&r.Mem[0]))
 	return
 }
 

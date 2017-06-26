@@ -77,6 +77,9 @@ func (x SoftwareInterface) String() string {
 
 type Command U16
 
+func (c *Command) Get(d *Device) Command    { return Command((*U16)(c).Get(d)) }
+func (c *Command) Set(d *Device, v Command) { (*U16)(c).Set(d, uint16(v)) }
+
 const (
 	IOEnable Command = 1 << iota
 	MemoryEnable

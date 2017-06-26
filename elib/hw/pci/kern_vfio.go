@@ -114,9 +114,9 @@ func (m *vfio_main) container_init() (err error) {
 		}
 		m.api_version = int(v)
 
-		if v, err = m.ioctl(vfio_check_extension, vfio_type1_iommu); v == 0 || err != nil {
+		if v, err = m.ioctl(vfio_check_extension, vfio_type1v2_iommu); v == 0 || err != nil {
 			if err == nil && v == 0 {
-				err = errors.New("vfio type 1 iommu not supported by kernel")
+				err = errors.New("vfio type 1 version 2 iommu not supported by kernel")
 			}
 			return
 		}
@@ -127,7 +127,7 @@ func (m *vfio_main) container_init() (err error) {
 
 func (m *vfio_main) dma_init(log2_dma_heap_bytes uint) (err error) {
 	// Enable the IOMMU model we want.
-	if _, err = m.ioctl(vfio_set_iommu, vfio_type1_iommu); err != nil {
+	if _, err = m.ioctl(vfio_set_iommu, vfio_type1v2_iommu); err != nil {
 		return
 	}
 
@@ -137,7 +137,9 @@ func (m *vfio_main) dma_init(log2_dma_heap_bytes uint) (err error) {
 		return
 	}
 
-	addr, data, e := elib.MmapSliceAligned(log2_dma_heap_bytes, hw.PhysmemLog2AddressAlign, syscall.PROT_READ|syscall.PROT_WRITE)
+	addr, data, e := elib.MmapSliceAligned(log2_dma_heap_bytes, hw.PhysmemLog2AddressAlign,
+		syscall.MAP_SHARED|syscall.MAP_ANONYMOUS,
+		syscall.PROT_READ|syscall.PROT_WRITE)
 	if e != nil {
 		err = e
 		return
@@ -369,9 +371,17 @@ func (d *vfio_pci_device) Open() (err error) {
 		}
 	}
 
+	// Set bus master.
+	{
+		c := (*ConfigHeader)(d.getRegs(0))
+		v := c.Command.Get(&d.Device)
+		v |= BusMasterEnable
+		c.Command.Set(&d.Device, v)
+	}
+
 	// Get eventfd for interrupt.
 	{
-		r, _, e := syscall.RawSyscall(syscall.SYS_EVENTFD, 0, 0, 0)
+		r, _, e := syscall.RawSyscall(syscall.SYS_EVENTFD, 0, syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
 		if e != 0 {
 			err = os.NewSyscallError("eventfd", e)
 			return
@@ -425,13 +435,13 @@ func (d *vfio_pci_device) Open() (err error) {
 
 func (d *vfio_pci_device) Close() (err error) {
 	if d.interrupt_event_fd > 0 {
-		syscall.Close(d.interrupt_event_fd)
 		iomux.Del(d)
+		syscall.Close(d.interrupt_event_fd)
 	}
 	if d.device_fd > 0 {
 		syscall.Close(d.device_fd)
 	}
-	// d.remove_id()
+	d.remove_id()
 	return
 }
 

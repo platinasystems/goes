@@ -168,8 +168,6 @@ func (h *uioPciDmaMain) heapInit(uioMinorDevice uint32, maxSize uint64) (err err
 	return err
 }
 
-var uioPciDma = &uioPciDmaMain{}
-
 type uioPciDevice struct {
 	Device
 
@@ -233,13 +231,11 @@ func (d *uioPciDevice) unbind() (err error) {
 	return
 }
 
-func NewDevice() Devicer {
-	d := &uioPciDevice{}
-	d.Device.Devicer = d
-	return d
-}
+var DefaultBus = &uioPciDmaMain{}
 
-func (d *uioPciDevice) GetDevice() *Device { return &d.Device }
+func (d *uioPciDevice) GetDevice() *Device     { return &d.Device }
+func (m *uioPciDmaMain) NewDevice() BusDevice  { return &uioPciDevice{} }
+func (m *uioPciDmaMain) Validate() (err error) { return }
 
 func (d *uioPciDevice) Open() (err error) {
 	err = d.bind()
@@ -254,7 +250,7 @@ func (d *uioPciDevice) Open() (err error) {
 	}
 
 	// Initialize DMA heap once device is open.
-	m := uioPciDma
+	m := DefaultBus
 	m.once.Do(func() {
 		err = m.heapInit(d.uioMinorDevice, 64<<20)
 	})
