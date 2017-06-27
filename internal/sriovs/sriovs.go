@@ -89,6 +89,13 @@ func New(vfs [][]Vf) error {
 	if err != nil {
 		return err
 	}
+	r, w, err := os.Pipe()
+	defer w.Close()
+	x := exec.Command("ip", "-batch", "-")
+	x.Stdin = r
+	x.Stdout = os.Stdout
+	x.Stderr = os.Stderr
+	go x.Run()
 	for pfi, pf := range pfs {
 		var virtfns Virtfns
 
@@ -117,34 +124,25 @@ func New(vfs [][]Vf) error {
 				continue
 			}
 			vf := vfs[pfi][vfi]
-			err = ifset(pf.Name, "vf", vfi, "mac", VfMac(), "vlan",
-				vf.Vlan())
-			if err != nil {
-				return err
-			}
+			fmt.Fprintln(w, "link", "set", pf.Name,
+				"vf", vfi, "mac", VfMac(), "vlan", vf.Vlan())
 			vfname, err := getVfname(virtfn)
 			if err != nil {
 				return err
 			}
 			want := vf.String()
 			if vfname != want {
-				err = ifset(vfname, "name", want)
-				if err != nil {
-					return err
-				}
+				fmt.Fprintln(w, "link", "set", vfname,
+					"name", want)
 				vfname = want
 			}
 			// bounce vf to reload its mac from the pf
-			if err = ifset(vfname, "up"); err != nil {
-				return err
-			}
-			if err = ifset(vfname, "down"); err != nil {
-				return err
-			}
+			fmt.Fprintln(w, "link", "set", vfname, "up")
+			fmt.Fprintln(w, "link", "set", vfname, "down")
 		}
-		// Setting VEPA bridge mode (instead of default VEB) for the pf allows
-		// external loopback cable pings to work (while not hurting regular
-		// connectivity).
+		// Setting VEPA bridge mode (instead of default VEB) for the pf
+		// allows external loopback cable pings to work (while not
+		// hurting regular connectivity).
 		err = bridgemodeset(pf.Name, "hwmode", "vepa")
 		if err != nil {
 			return err
