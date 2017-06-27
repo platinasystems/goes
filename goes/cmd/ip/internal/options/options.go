@@ -26,7 +26,6 @@ func New(args []string) (flags.Flag, parms.Parm, []string) {
 	parm, args := parms.New(args,
 		"-l", "-loops",
 		"-f", "-family",
-		"-n", "-netns",
 		"-rc", "-rcvbuf",
 	)
 	flag.Akas(

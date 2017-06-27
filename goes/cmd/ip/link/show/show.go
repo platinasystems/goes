@@ -63,9 +63,15 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (c Command) Main(args ...string) error {
+	var err error
+
 	command := c
 	if len(command) == 0 {
 		command = "show"
+	}
+
+	if args, err = options.Netns(args); err != nil {
+		return err
 	}
 
 	ipFlag, ipParm, args := options.New(args)
