@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/cli"
 	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/ip/address"
+	"github.com/platinasystems/go/goes/cmd/ip/batch"
 	"github.com/platinasystems/go/goes/cmd/ip/link"
 	"github.com/platinasystems/go/goes/cmd/ip/neighbor"
 	"github.com/platinasystems/go/goes/cmd/ip/netns"
@@ -23,7 +24,8 @@ const (
 	ip [OPTION]... OBJECT COMMAND [ARG]... 
 	ip apropos [ OBJECT ]
 	ip { man | usage } OBJECT
-	ip [ -x | -f ] { - | SCRIPT }
+	ip [ -n NAMESPACE ] -batch [ -x | -f ] [ - | FILE ]
+	ip [ -x | -f ] [ - | FILE ]
 	
 	OBJECT := { address | link | neighbor | netns | route }
 
@@ -48,6 +50,7 @@ func New() *goes.Goes {
 	g.Plot(helpers.New()...)
 	g.Plot(cli.New()...)
 	g.Plot(address.New(),
+		batch.New(),
 		link.New(),
 		neighbor.New(),
 		netns.New(),
