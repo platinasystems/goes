@@ -261,19 +261,19 @@ func (m *netlink_main) watch_namespace_add_del(dir, name string, is_del bool) {
 	)
 	if !is_del {
 		if nsid, err = m.nsid_for_path(dir, name); err != nil {
-			m.m.v.Logf("namespace watch add: %v %v", name, err)
+			m.m.v.Logf("namespace watch add: %v %v\n", name, err)
 			return
 		}
 	} else {
 		var ok bool
 		if _, ok = m.namespace_by_name[name]; !ok {
-			m.m.v.Logf("namespace watch del: unknown namespace %s", name)
+			m.m.v.Logf("namespace watch del: unknown namespace %s\n", name)
 			return
 		}
 	}
 	err = m.add_del_nsid(name, nsid, is_del)
 	if err != nil {
-		m.m.v.Logf("namespace watch: %v %v", name, err)
+		m.m.v.Logf("namespace watch: %v %v\n", name, err)
 	}
 }
 
