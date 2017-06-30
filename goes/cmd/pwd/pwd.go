@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -27,40 +27,6 @@ NOTE
 	This may be different than the context directory.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
-
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-L")
-	if len(args) != 0 {
-		return fmt.Errorf("%v: unexpected", args)
-	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	if flag["-L"] {
-		return fmt.Errorf("FIXME")
-	} else {
-		fmt.Println(wd)
-	}
-	return nil
-}
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
 var (
 	apropos = lang.Alt{
 		lang.EnUS: Apropos,
@@ -69,3 +35,29 @@ var (
 		lang.EnUS: Man,
 	}
 )
+
+func New() Command { return Command{} }
+
+type Command struct{}
+
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
+
+func (Command) Main(args ...string) error {
+	flag, args := flags.New(args, "-L")
+	if len(args) != 0 {
+		return fmt.Errorf("%v: unexpected", args)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if flag.ByName["-L"] {
+		return fmt.Errorf("FIXME")
+	} else {
+		fmt.Println(wd)
+	}
+	return nil
+}

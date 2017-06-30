@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 )
 
@@ -36,26 +36,37 @@ OPTIONS
 	-v	verbose`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
+func New() Command { return Command{} }
+
+type Command struct{}
+
+type ln struct {
+	Flags *flags.Flags
+	Parms *parms.Parms
 }
 
-func New() Interface { return cmd{} }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var err error
-	flag, args := flags.New(args, "-f", "-s", "-b", "-T", "-v")
-	parm, args := parms.New(args, "-S", "-t")
+	var ln ln
 
-	if flag["-T"] {
+	ln.Flags, args = flags.New(args, "-f", "-s", "-b", "-T", "-v")
+	ln.Parms, args = parms.New(args, "-S", "-t")
+
+	if ln.Flags.ByName["-T"] {
 		switch len(args) {
 		case 0:
 			return fmt.Errorf("TARGET LINK: missing")
@@ -65,8 +76,8 @@ func (cmd) Main(args ...string) error {
 		default:
 			return fmt.Errorf("%v:unexpected", args[2:])
 		}
-		err = ln(args[0], args[1], flag, parm)
-	} else if dir := parm["-t"]; len(dir) > 0 {
+		err = ln.ln(args[0], args[1])
+	} else if dir := ln.Parms.ByName["-t"]; len(dir) > 0 {
 		if len(args) == 0 {
 			return fmt.Errorf("TARGET...: missing")
 		}
@@ -74,7 +85,7 @@ func (cmd) Main(args ...string) error {
 		if err == nil {
 			for _, t := range args {
 				l := filepath.Join(dir, filepath.Base(t))
-				err = ln(t, l, flag, parm)
+				err = ln.ln(t, l)
 				if err != nil {
 					break
 				}
@@ -90,9 +101,9 @@ func (cmd) Main(args ...string) error {
 				return err
 			}
 			l := filepath.Join(wd, filepath.Base(args[0]))
-			err = ln(args[0], l, flag, parm)
+			err = ln.ln(args[0], l)
 		case 2:
-			err = ln(args[0], args[1], flag, parm)
+			err = ln.ln(args[0], args[1])
 		default:
 			dir := args[len(args)-1]
 			err = valid(dir)
@@ -100,7 +111,7 @@ func (cmd) Main(args ...string) error {
 				for _, t := range args[:len(args)-1] {
 					b := filepath.Base(t)
 					l := filepath.Join(dir, b)
-					err = ln(t, l, flag, parm)
+					err = ln.ln(t, l)
 					if err != nil {
 						break
 					}
@@ -111,18 +122,14 @@ func (cmd) Main(args ...string) error {
 	return err
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-func ln(target, link string, flag flags.Flag, parm parms.Parm) error {
+func (ln *ln) ln(target, link string) error {
 	var err error
 	if _, err = os.Stat(link); err == nil {
-		if !flag["-f"] {
+		if !ln.Flags.ByName["-f"] {
 			return fmt.Errorf("%s: exists", link)
 		}
-		if flag["-b"] {
-			bu := link + parm["-S"]
+		if ln.Flags.ByName["-b"] {
+			bu := link + ln.Parms.ByName["-S"]
 			if err = os.Link(link, bu); err != nil {
 				return err
 			}
@@ -130,14 +137,14 @@ func ln(target, link string, flag flags.Flag, parm parms.Parm) error {
 		if err = (os.Remove(link)); err != nil {
 			return err
 		}
-		if flag["-v"] {
+		if ln.Flags.ByName["-v"] {
 			fmt.Println("Removed", link)
 		}
 	} else if !os.IsNotExist(err) {
 		return err
 	}
 	linked := "Linked"
-	if flag["-s"] {
+	if ln.Flags.ByName["-s"] {
 		linked = "Symlinked"
 		err = os.Symlink(target, link)
 	} else {
@@ -146,7 +153,7 @@ func ln(target, link string, flag flags.Flag, parm parms.Parm) error {
 	if err != nil {
 		return err
 	}
-	if flag["-v"] {
+	if ln.Flags.ByName["-v"] {
 		fmt.Println(linked, target, "to", link)
 	}
 	return nil
@@ -162,12 +169,3 @@ func valid(dir string) error {
 	}
 	return nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

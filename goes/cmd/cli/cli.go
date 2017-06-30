@@ -207,10 +207,10 @@ func (c *Command) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		switch {
-		case flag["-"]:
+		case flag.ByName["-"]:
 			prompter = notliner.New(os.Stdin, nil)
 			isScript = true
-		case flag["-no-liner"]:
+		case flag.ByName["-no-liner"]:
 			prompter = notliner.New(os.Stdin, os.Stdout)
 		default:
 			prompter = liner.New(c.g)
@@ -257,7 +257,7 @@ commandLoop:
 			if err.Error() != "exit status 1" {
 				fmt.Fprintln(os.Stderr, err)
 			}
-			if isScript && !flag["-f"] {
+			if isScript && !flag.ByName["-f"] {
 				return nil
 			}
 			err = nil
@@ -311,7 +311,7 @@ commandLoop:
 					}
 				} else if k.IsDontFork() ||
 					name == os.Args[0] {
-					if flag["-x"] {
+					if flag.ByName["-x"] {
 						fmt.Println("+", sl)
 					}
 					err = c.g.Main(sl...)
@@ -322,18 +322,19 @@ commandLoop:
 		iparm, args := parms.New(pl.Slices[0], "<", "<<", "<<-")
 		pl.Slices[0] = args
 		in = os.Stdin
-		if fn := iparm["<"]; len(fn) > 0 {
+		if fn := iparm.ByName["<"]; len(fn) > 0 {
 			rc, err = url.Open(fn)
 			if err != nil {
 				continue commandLoop
 			}
 			in = rc
 			closers = append(closers, rc)
-		} else if len(iparm["<<"]) > 0 || len(iparm["<<-"]) > 0 {
+		} else if len(iparm.ByName["<<"]) > 0 ||
+			len(iparm.ByName["<<-"]) > 0 {
 			var trim bool
-			lbl := iparm["<<"]
+			lbl := iparm.ByName["<<"]
 			if len(lbl) == 0 {
-				lbl = iparm["<<-"]
+				lbl = iparm.ByName["<<-"]
 				trim = true
 			}
 			var r, w *os.File
@@ -364,28 +365,28 @@ commandLoop:
 			">", ">>", ">>>", ">>>>")
 		pl.Slices[end] = args
 		out = os.Stdout
-		if fn := oparm[">"]; len(fn) > 0 {
+		if fn := oparm.ByName[">"]; len(fn) > 0 {
 			wc, err = url.Create(fn)
 			if err != nil {
 				continue commandLoop
 			}
 			out = wc
 			closers = append(closers, wc)
-		} else if fn = oparm[">>"]; len(fn) > 0 {
+		} else if fn = oparm.ByName[">>"]; len(fn) > 0 {
 			wc, err = url.Append(fn)
 			if err != nil {
 				continue commandLoop
 			}
 			out = wc
 			closers = append(closers, wc)
-		} else if fn := oparm[">>>"]; len(fn) > 0 {
+		} else if fn := oparm.ByName[">>>"]; len(fn) > 0 {
 			wc, err = url.Create(fn)
 			if err != nil {
 				continue commandLoop
 			}
 			out = io.MultiWriter(os.Stdout, wc)
 			closers = append(closers, wc)
-		} else if fn := oparm[">>"]; len(fn) > 0 {
+		} else if fn := oparm.ByName[">>"]; len(fn) > 0 {
 			wc, err = url.Append(fn)
 			if err != nil {
 				continue commandLoop
@@ -395,7 +396,7 @@ commandLoop:
 		}
 
 		for i, sl := range pl.Slices {
-			if flag["-x"] {
+			if flag.ByName["-x"] {
 				fmt.Println("+", strings.Join(sl, " "))
 			}
 			x := c.g.Fork(sl...)

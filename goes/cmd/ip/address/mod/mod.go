@@ -11,8 +11,6 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -47,9 +45,14 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseFlags = []string{"home", "mngtmpaddr", "nodad", "noprefixroute",
-		"autojoin"}
-	theseParms = []string{
+	Flags = []interface{}{
+		"home",
+		"mngtmpaddr",
+		"nodad",
+		"noprefixroute",
+		"autojoin",
+	}
+	Parms = []interface{}{
 		// IFADDR
 		"peer", "broadcast", "anycast", "label", "scope",
 		"dev",
@@ -62,6 +65,8 @@ func New(name string) Command { return Command(name) }
 
 type Command string
 
+type mod options.Options
+
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (c Command) String() string  { return string(c) }
@@ -69,13 +74,19 @@ func (Command) Usage() string     { return Usage }
 
 func (c Command) Main(args ...string) error {
 	var (
+		err    error
 		ifaddr net.IP
 		ifnet  *net.IPNet
-		err    error
 	)
-	ipFlag, ipParm, args := options.New(args)
-	flag, args := flags.New(args, theseFlags...)
-	parm, args := parms.New(args, theseParms...)
+
+	if args, err = options.Netns(args); err != nil {
+		return err
+	}
+
+	o, args := options.New(args)
+	mod := (*mod)(o)
+	args = mod.Flags.More(args, Flags)
+	args = mod.Parms.More(args, Parms)
 
 	switch len(args) {
 	case 0:
@@ -92,11 +103,6 @@ func (c Command) Main(args ...string) error {
 
 	ones, _ := ifnet.Mask.Size()
 	fmt.Print("FIXME ", c, " ", ifaddr, "/", ones, "\n")
-
-	_ = ipFlag
-	_ = ipParm
-	_ = flag
-	_ = parm
 
 	return nil
 }

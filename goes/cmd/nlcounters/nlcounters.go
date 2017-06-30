@@ -23,21 +23,19 @@ const (
 	Usage   = "nlcounters [-i SECONDS | -n COUNT]"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Help(...string) string
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Help(args ...string) string {
+func (Command) Help(args ...string) string {
 	help := "no help"
 	switch {
 	case len(args) == 0:
@@ -48,7 +46,7 @@ func (cmd) Help(args ...string) string {
 	return help
 }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	usage := func(format string, args ...interface{}) error {
 		return fmt.Errorf(format+"\nusage: "+Usage, args...)
 	}
@@ -64,7 +62,7 @@ func (cmd) Main(args ...string) error {
 		{"-i", &interval},
 		{"-n", &n},
 	} {
-		if arg := parm[x.name]; len(arg) > 0 {
+		if arg := parm.ByName[x.name]; len(arg) > 0 {
 			_, err := fmt.Sscan(arg, x.p)
 			if err != nil {
 				return usage("%s: %v", x.name[1:], err)
@@ -107,13 +105,6 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 	return err
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }
 
 type Handler struct {

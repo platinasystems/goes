@@ -49,7 +49,7 @@ func (c *Command) Main(args ...string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
-	if flag["-x"] {
+	if flag.ByName["-x"] {
 		args = []string{"cli", "-x", args[0]}
 	} else {
 		args = []string{"cli", args[0]}

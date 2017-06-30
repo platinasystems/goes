@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/url"
 )
 
@@ -26,21 +26,25 @@ OPTIONS
 	-f	force`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-v")
 	if len(args) == 0 {
 		return fmt.Errorf("FILE: missing")
@@ -65,21 +69,8 @@ func (cmd) Main(args ...string) error {
 	if e != 0 {
 		return fmt.Errorf("%v", e)
 	}
-	if flag["-v"] {
+	if flag.ByName["-v"] {
 		fmt.Println("Installed", args[0])
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

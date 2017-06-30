@@ -9,8 +9,6 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -48,7 +46,7 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseFlags = []string{
+	Flags = []interface{}{
 		"permanent", "dynamic", "secondary", "primary",
 		"-tentative", "tentative",
 		"-deprecated", "deprecated",
@@ -57,7 +55,7 @@ var (
 		"home", "mngtmpaddr", "nodad", "noprefixroute", "autojoin",
 		"up",
 	}
-	theseParms = []string{
+	Parms = []interface{}{
 		"dev", "scope", "to", "label", "master", "type", "vrf",
 	}
 )
@@ -65,6 +63,8 @@ var (
 func New(s string) Command { return Command(s) }
 
 type Command string
+
+type show options.Options
 
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
@@ -80,25 +80,27 @@ func (Command) Man() lang.Alt    { return man }
 func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
-func (c Command) Main(args ...string) error {
-	command := c
-	if len(command) == 0 {
-		command = "show"
+func (Command) Main(args ...string) error {
+	var err error
+
+	if args, err = options.Netns(args); err != nil {
+		return err
 	}
 
-	ipFlag, ipParm, args := options.New(args)
-	flag, args := flags.New(args, theseFlags...)
-	parm, args := parms.New(args, theseParms...)
+	o, args := options.New(args)
+	show := (*show)(o)
+	args = show.Flags.More(args, Flags)
+	args = show.Parms.More(args, Parms)
 
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 
-	fmt.Println("FIXME", command)
+	show.show()
 
-	_ = ipFlag
-	_ = ipParm
-	_ = flag
-	_ = parm
 	return nil
+}
+
+func (show *show) show() {
+	fmt.Println("FIXME show")
 }

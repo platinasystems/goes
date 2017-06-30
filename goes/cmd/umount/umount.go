@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -30,44 +30,49 @@ OPTIONS
 	-donot-free-loop-device`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
+
+func New() Command { return Command{} }
+
+type Command struct{}
+
+type umount struct {
+	flags *flags.Flags
 }
 
-func New() Interface { return cmd{} }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var err error
-	flag, args := flags.New(args, "--fake", "-v", "-a", "-r", "-l", "-f",
-		"-donot-free-loop-device")
-	if flag["-a"] {
-		err = umountall(flag)
+	var umount umount
+	umount.flags, args = flags.New(args, "--fake", "-v", "-a", "-r", "-l",
+		"-f", "-donot-free-loop-device")
+	if umount.flags.ByName["-a"] {
+		err = umount.all()
 	} else {
 		if n := len(args); n == 0 {
 			err = fmt.Errorf("FILESYSTEM or DEVICE: missing")
 		} else if n > 1 {
 			err = fmt.Errorf("%v: unexpected", args[1:])
 		} else {
-			err = umountone(args[0], flag)
+			err = umount.one(args[0])
 		}
 	}
 	return err
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
 // Unmount all filesystems in reverse order of /proc/mounts
-func umountall(flag flags.Flag) error {
+func (umount *umount) all() error {
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
 		return err
@@ -86,7 +91,7 @@ func umountall(flag flags.Flag) error {
 		if targets[i] == "/" && i != 0 {
 			continue
 		}
-		terr := umountone(targets[i], flag)
+		terr := umount.one(targets[i])
 		if terr != nil && err == nil {
 			err = terr
 		}
@@ -94,32 +99,23 @@ func umountall(flag flags.Flag) error {
 	return err
 }
 
-func umountone(target string, flag flags.Flag) error {
+func (umount *umount) one(target string) error {
 	var flags int
-	if flag["-l"] {
+	if umount.flags.ByName["-l"] {
 		flags |= syscall.MNT_DETACH
 	}
-	if flag["-f"] {
+	if umount.flags.ByName["-f"] {
 		flags |= syscall.MNT_FORCE
 	}
-	if flag["--fake"] {
+	if umount.flags.ByName["--fake"] {
 		fmt.Println("Would umount", target)
 		return nil
 	}
 	if err := syscall.Unmount(target, flags); err != nil {
 		return err
 	}
-	if flag["-v"] {
+	if umount.flags.ByName["-v"] {
 		fmt.Println("Unmounted", target)
 	}
 	return nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

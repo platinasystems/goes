@@ -10,8 +10,6 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -73,7 +71,7 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseFlags = []string{
+	Flags = []interface{}{
 		// TYPE
 		"unicast",
 		"local",
@@ -88,7 +86,7 @@ var (
 		"onlink",
 		"pervasive",
 	}
-	theseParms = []string{
+	Parms = []interface{}{
 		// NODE_SPEC
 		"tos",
 		"table",
@@ -126,6 +124,8 @@ func New(s string) Command { return Command(s) }
 
 type Command string
 
+type mod options.Options
+
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (c Command) String() string  { return string(c) }
@@ -133,14 +133,19 @@ func (Command) Usage() string     { return Usage }
 
 func (c Command) Main(args ...string) error {
 	var (
+		err   error
 		ip    net.IP
 		ipnet *net.IPNet
-		err   error
 	)
 
-	ipFlag, ipParm, args := options.New(args)
-	flag, args := flags.New(args, theseFlags...)
-	parm, args := parms.New(args, theseParms...)
+	if args, err = options.Netns(args); err != nil {
+		return err
+	}
+
+	o, args := options.New(args)
+	mod := (*mod)(o)
+	args = mod.Flags.More(args, Flags)
+	args = mod.Parms.More(args, Parms)
 
 	if len(args) == 0 {
 		return fmt.Errorf("PREFIX: missing")
@@ -155,11 +160,6 @@ func (c Command) Main(args ...string) error {
 	// FIXME what about "nexthop NH"...?
 
 	fmt.Println("FIXME", c, ip, ipnet)
-
-	_ = ipFlag
-	_ = ipParm
-	_ = flag
-	_ = parm
 
 	return nil
 }

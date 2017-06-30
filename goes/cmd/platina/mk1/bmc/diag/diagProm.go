@@ -72,7 +72,7 @@ func diagProm() error {
 		BusIndex: 0,
 	}
 	//select host or bmc prom
-	if !flagF["-x86"] {
+	if !flagF.ByName["-x86"] {
 		d.BusAddress = 0x55
 	} else {
 		d.BusAddress = 0x51
@@ -300,7 +300,7 @@ func diagProm() error {
 		fmt.Printf("Invalid or insufficient arguments\n")
 	}
 
-	if flagF["-x86"] {
+	if flagF.ByName["-x86"] {
 		gpioSet("CPU_TO_MAIN_I2C_EN", false)
 	}
 	return nil

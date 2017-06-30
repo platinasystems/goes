@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -40,7 +40,7 @@ func (cmd) Apropos() lang.Alt { return apropos }
 func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-n")
 	s := strings.Join(args, " ")
-	if flag["-n"] {
+	if flag.ByName["-n"] {
 		fmt.Print(s)
 	} else {
 		fmt.Println(s)

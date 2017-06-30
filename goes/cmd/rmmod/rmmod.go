@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -31,22 +31,25 @@ OPTIONS
 	-q	silently ignore errors`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Complete(...string) []string
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Complete(args ...string) (c []string) {
+func (Command) Complete(args ...string) (c []string) {
 	f, err := os.Open("/proc/modules")
 	if err != nil {
 		return
@@ -64,13 +67,13 @@ func (cmd) Complete(args ...string) (c []string) {
 	return
 }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-q", "-v")
 	if len(args) == 0 {
 		return fmt.Errorf("MODULE: missing")
 	}
 	u := 0
-	if flag["-f"] {
+	if flag.ByName["-f"] {
 		u |= syscall.O_TRUNC
 	}
 	for _, name := range args {
@@ -81,25 +84,12 @@ func (cmd) Main(args ...string) error {
 		_, _, e := syscall.RawSyscall(syscall.SYS_DELETE_MODULE,
 			uintptr(unsafe.Pointer(bp)), uintptr(u), 0)
 		if e != 0 {
-			if !flag["-q"] {
+			if !flag.ByName["-q"] {
 				return fmt.Errorf("%v", e)
 			}
-		} else if flag["-v"] {
+		} else if flag.ByName["-v"] {
 			fmt.Println("Removed", name)
 		}
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

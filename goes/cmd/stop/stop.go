@@ -59,6 +59,9 @@ type Command struct {
 
 func (*Command) Apropos() lang.Alt   { return apropos }
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) Man() lang.Alt       { return man }
+func (*Command) String() string      { return Name }
+func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-stop")
@@ -69,7 +72,7 @@ func (c *Command) Main(args ...string) error {
 	if prog.Name() != prog.Install && prog.Base() != "init" {
 		return fmt.Errorf("use `%s stop`", prog.Install)
 	}
-	stop := parm["-stop"]
+	stop := parm.ByName["-stop"]
 	if len(stop) == 0 && haveEtcGoesStop() {
 		stop = EtcGoesStop
 	}
@@ -92,10 +95,6 @@ func (c *Command) Main(args ...string) error {
 	os.RemoveAll(sockfile.Dir)
 	return err
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
 
 func haveEtcGoesStop() bool {
 	_, err := os.Stat(EtcGoesStop)

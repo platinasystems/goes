@@ -34,21 +34,25 @@ DESCRIPTION
 	-f  Full format listing.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var ttynr uint
 
 	flag, args := flags.New(args, "-e", "-f")
@@ -98,7 +102,7 @@ func (cmd) Main(args ...string) error {
 	})
 
 	switch {
-	case flag["-f"]:
+	case flag.ByName["-f"]:
 		fmt.Println("UID        PID  PPID  C STIME TTY          TIME CMD")
 	default:
 		fmt.Println("  PID TTY          TIME CMD")
@@ -108,9 +112,9 @@ func (cmd) Main(args ...string) error {
 	uid := make(uid)
 
 	for _, ps := range l {
-		if flag["-e"] || ps.stat.TtyNr == ttynr {
+		if flag.ByName["-e"] || ps.stat.TtyNr == ttynr {
 			switch {
-			case flag["-f"]:
+			case flag.ByName["-f"]:
 				cmdline := ps.stat.Comm
 				fn := fmt.Sprintf("/proc/%d/cmdline",
 					ps.stat.Pid)
@@ -143,19 +147,6 @@ func (cmd) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
 
 type ps struct {
 	uid  uint32

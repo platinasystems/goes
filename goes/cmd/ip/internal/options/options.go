@@ -9,54 +9,49 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-// Parse IP options
-func New(args []string) (flags.Flag, parms.Parm, []string) {
-	flag, args := flags.New(args,
-		"-human", "-human-readable",
-		"-s", "-stats", "-statistics",
-		"-d", "-details",
-		"-o", "-oneline",
-		"-r", "-resolve",
-		"-a", "-all",
-		"-c", "-color",
-		"-t", "-timestamp",
-		"-ts", "-tshort",
+var (
+	Family = []string{"-4", "-6", "-B", "-M", "-0"}
+	Flags  = []interface{}{
+		[]string{"-human", "-human-readable"},
+		[]string{"-s", "-stats", "-statistics"},
+		[]string{"-d", "-details"},
+		[]string{"-o", "-oneline"},
+		[]string{"-r", "-resolve"},
+		[]string{"-a", "-all"},
+		[]string{"-c", "-color"},
+		[]string{"-t", "-timestamp"},
+		[]string{"-ts", "-tshort"},
 		"-iec",
-	)
-	parm, args := parms.New(args,
-		"-l", "-loops",
-		"-f", "-family",
-		"-rc", "-rcvbuf",
-	)
-	flag.Akas(
-		flags.Aka{"-human", []string{"-human-readable"}},
-		flags.Aka{"-s", []string{"-stats", "-statistics"}},
-		flags.Aka{"-d", []string{"-details"}},
-		flags.Aka{"-o", []string{"-oneline"}},
-		flags.Aka{"-r", []string{"-resolve"}},
-		flags.Aka{"-a", []string{"-all"}},
-		flags.Aka{"-c", []string{"-color"}},
-		flags.Aka{"-t", []string{"-timestamp"}},
-		flags.Aka{"-ts", []string{"-tshort"}},
-	)
-	parm.Akas(
-		parms.Aka{"-l", []string{"-loops"}},
-		parms.Aka{"-f", []string{"-family"}},
-		parms.Aka{"-n", []string{"-netns"}},
-		parms.Aka{"-rc", []string{"-recbuf"}},
-	)
-	family, args := flags.New(args, "-4", "-6", "-B", "-M", "-0")
-	switch {
-	case family["-4"]:
-		parm["-f"] = "inet"
-	case family["-6"]:
-		parm["-f"] = "inet6"
-	case family["-B"]:
-		parm["-f"] = "bridge"
-	case family["-M"]:
-		parm["-f"] = "mpls"
-	case family["-0"]:
-		parm["-f"] = "link"
 	}
-	return flag, parm, args
+	Parms = []interface{}{
+		[]string{"-l", "-loops"},
+		[]string{"-f", "-family"},
+		[]string{"-rc", "-rcvbuf"},
+	}
+)
+
+type Options struct {
+	Flags *flags.Flags
+	Parms *parms.Parms
+}
+
+// Parse common IP options from command arguments.
+func New(args []string) (*Options, []string) {
+	opt := new(Options)
+	opt.Flags, args = flags.New(args, Flags...)
+	opt.Parms, args = parms.New(args, Parms...)
+	family, args := flags.New(args, Family)
+	switch {
+	case family.ByName["-4"]:
+		opt.Parms.ByName["-f"] = "inet"
+	case family.ByName["-6"]:
+		opt.Parms.ByName["-f"] = "inet6"
+	case family.ByName["-B"]:
+		opt.Parms.ByName["-f"] = "bridge"
+	case family.ByName["-M"]:
+		opt.Parms.ByName["-f"] = "mpls"
+	case family.ByName["-0"]:
+		opt.Parms.ByName["-f"] = "link"
+	}
+	return opt, args
 }

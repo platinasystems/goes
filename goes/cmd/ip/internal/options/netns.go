@@ -12,9 +12,8 @@ import (
 // Parse [{-n | -netns} NETNS] and switch to the given namespace
 func Netns(args []string) ([]string, error) {
 	var err error
-	parm, args := parms.New(args, "-n", "-netns")
-	parm.Akas(parms.Aka{"-n", []string{"-netns"}})
-	if name := parm["-n"]; len(name) > 0 {
+	p, args := parms.New(args, []string{"-n", "-netns"})
+	if name := p.ByName["-n"]; len(name) > 0 {
 		err = netns.Switch(name)
 	}
 	return args, err

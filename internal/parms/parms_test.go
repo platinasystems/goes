@@ -9,143 +9,143 @@ import (
 	"testing"
 )
 
-var ddparms = []string{"bs", "count", "seek"}
-var ioparms = []string{"<", "<<", ">", ">>"}
+var ddparms = []interface{}{"bs", "count", "seek"}
+var ioparms = []interface{}{"<", "<<", ">", ">>"}
 
 func TestDdBs(t *testing.T) {
 	cmd := []string{"dd", "bs=4k"}
-	parm, args := New(cmd, ddparms...)
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, ddparms...)
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"bs":    "4k",
 		"count": "",
 		"seek":  "",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"dd"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestDdBsCount(t *testing.T) {
 	cmd := []string{"dd", "bs=4k", "count", "1"}
-	parm, args := New(cmd, ddparms...)
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, ddparms...)
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"bs":    "4k",
 		"count": "1",
 		"seek":  "",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"dd"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestDdBsCountFile(t *testing.T) {
 	cmd := []string{"dd", "bs=4k", "count", "1", "FILE"}
-	parm, args := New(cmd, ddparms...)
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, ddparms...)
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"bs":    "4k",
 		"count": "1",
 		"seek":  "",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"dd", "FILE"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestDdBsCountFileGtOut(t *testing.T) {
 	cmd := []string{"dd", "bs=4k", "count", "1", "FILE", ">", "OUT"}
-	parm, args := New(cmd, ddparms...)
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, ddparms...)
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"bs":    "4k",
 		"count": "1",
 		"seek":  "",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
-	ioparm, args := New(args, ioparms...)
-	if !reflect.DeepEqual(ioparm, Parm{
+	iop, args := New(args, ioparms...)
+	if !reflect.DeepEqual(iop.ByName, ByName{
 		"<":  "",
 		"<<": "",
 		">":  "OUT",
 		">>": "",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"dd", "FILE"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestConcat(t *testing.T) {
 	cmd := []string{"foo", "-bar=FOO", "-bar", "BAR"}
-	parm, args := New(cmd, "-bar")
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"-bar": "FOO BAR",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"foo"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestConcatPlus(t *testing.T) {
 	cmd := []string{"foo", "-bar=FOO", "-bar", "BAR", "bar"}
-	parm, args := New(cmd, "-bar")
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"-bar": "FOO BAR",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"foo", "bar"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestClearAndSet(t *testing.T) {
 	cmd := []string{"foo", "-bar=FOO", "-bar=", "-bar=BAR"}
-	parm, args := New(cmd, "-bar")
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"-bar": "BAR",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"foo"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestClearAndSetPlus(t *testing.T) {
 	cmd := []string{"foo", "-bar=FOO", "-bar=", "-bar=BAR", "bar"}
-	parm, args := New(cmd, "-bar")
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, "-bar")
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"-bar": "BAR",
 	}) {
-		t.Error("wrong parm:", parm)
+		t.Error("wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"foo", "bar"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }
 
 func TestKexecBug(t *testing.T) {
 	cmd := []string{"kexec", "-k", "foo.vmlinuz", "-i", "foo.initrd"}
-	parm, args := New(cmd, "-c", "-i", "-k", "-l", "-x")
-	if !reflect.DeepEqual(parm, Parm{
+	p, args := New(cmd, "-c", "-i", "-k", "-l", "-x")
+	if !reflect.DeepEqual(p.ByName, ByName{
 		"-c": "",
 		"-i": "foo.initrd",
 		"-k": "foo.vmlinuz",
 		"-l": "",
 		"-x": "",
 	}) {
-		t.Error("Wrong parm:", parm)
+		t.Error("Wrong:", p.ByName)
 	}
 	if !reflect.DeepEqual(args, []string{"kexec"}) {
-		t.Error("wrong args:", args)
+		t.Error("wrong:", args)
 	}
 }

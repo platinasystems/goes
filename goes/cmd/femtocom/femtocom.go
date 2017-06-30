@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 )
 
@@ -49,21 +49,25 @@ OPTIONS
 		Don't attempt exclusive device use.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	const (
 		ctrlA rune = 1
 		ctrlX rune = 'x' - 'a' + 1
@@ -73,8 +77,8 @@ func (cmd) Main(args ...string) error {
 	parm, args := parms.New(args, "-baud", "-parity", "-databits",
 		"-stopbits")
 
-	if len(parm["-baud"]) == 0 {
-		parm["-baud"] = "115200"
+	if len(parm.ByName["-baud"]) == 0 {
+		parm.ByName["-baud"] = "115200"
 	}
 	baud, found := map[string]uint32{
 		"50":      syscall.B50,
@@ -107,45 +111,45 @@ func (cmd) Main(args ...string) error {
 		"3000000": syscall.B3000000,
 		"3500000": syscall.B3500000,
 		"4000000": syscall.B4000000,
-	}[parm["-baud"]]
+	}[parm.ByName["-baud"]]
 	if !found {
-		return fmt.Errorf("%s: invalid baud", parm["-baud"])
+		return fmt.Errorf("%s: invalid baud", parm.ByName["-baud"])
 	}
 
-	if len(parm["-parity"]) == 0 {
-		parm["-parity"] = "none"
+	if len(parm.ByName["-parity"]) == 0 {
+		parm.ByName["-parity"] = "none"
 	}
 	parity, found := map[string]uint32{
 		"odd":  syscall.PARENB | syscall.PARODD,
 		"even": syscall.PARENB,
 		"none": 0,
-	}[parm["-partity"]]
+	}[parm.ByName["-partity"]]
 	if !found {
-		return fmt.Errorf("%s: invalid parity", parm["-partity"])
+		return fmt.Errorf("%s: invalid parity", parm.ByName["-partity"])
 	}
 
-	if len(parm["-databits"]) == 0 {
-		parm["-databits"] = "8"
+	if len(parm.ByName["-databits"]) == 0 {
+		parm.ByName["-databits"] = "8"
 	}
 	databits, found := map[string]uint32{
 		"5": syscall.CS5,
 		"6": syscall.CS6,
 		"7": syscall.CS7,
 		"8": syscall.CS8,
-	}[parm["-databites"]]
+	}[parm.ByName["-databites"]]
 	if !found {
-		return fmt.Errorf("%s: invalid databits", parm["-databites"])
+		return fmt.Errorf("%s: invalid databits", parm.ByName["-databites"])
 	}
 
-	if len(parm["-stopbits"]) == 0 {
-		parm["-stopbits"] = "1"
+	if len(parm.ByName["-stopbits"]) == 0 {
+		parm.ByName["-stopbits"] = "1"
 	}
 	stopbits, found := map[string]uint32{
 		"1": 0,
 		"2": syscall.CSTOPB,
-	}[parm["-stopbits"]]
+	}[parm.ByName["-stopbits"]]
 	if !found {
-		return fmt.Errorf("%s: invalid stopbits", parm["-stopbits"])
+		return fmt.Errorf("%s: invalid stopbits", parm.ByName["-stopbits"])
 	}
 
 	if len(args) == 0 {
@@ -161,7 +165,7 @@ func (cmd) Main(args ...string) error {
 	}
 	defer dev.Close()
 
-	if !flag["-nolock"] {
+	if !flag.ByName["-nolock"] {
 		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
 			uintptr(dev.Fd()),
 			uintptr(syscall.TIOCEXCL),
@@ -196,7 +200,7 @@ func (cmd) Main(args ...string) error {
 			uintptr(syscall.Stdin),
 			uintptr(syscall.TCSETS),
 			uintptr(unsafe.Pointer(&savedStdin)))
-		if !flag["-noinit"] && !flag["-noreset"] {
+		if !flag.ByName["-noinit"] && !flag.ByName["-noreset"] {
 			syscall.Syscall(syscall.SYS_IOCTL,
 				uintptr(dev.Fd()),
 				uintptr(syscall.TCSETS),
@@ -204,7 +208,7 @@ func (cmd) Main(args ...string) error {
 		}
 	}()
 
-	if !flag["-noinit"] {
+	if !flag.ByName["-noinit"] {
 		t := savedDev
 		t.Iflag &^= syscall.IGNBRK |
 			syscall.BRKINT |
@@ -307,16 +311,3 @@ func (cmd) Main(args ...string) error {
 	tx = tx[:0]
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

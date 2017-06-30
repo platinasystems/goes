@@ -9,7 +9,6 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -39,7 +38,7 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseParms = []string{
+	Parms = []interface{}{
 		"link", "name", "txqueuelen", "address", "broadcast", "mtu",
 		"index", "numtxqueues", "numrxqueues", "type",
 	}
@@ -49,20 +48,25 @@ func New() Command { return Command{} }
 
 type Command struct{}
 
+type add options.Options
+
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
-	ipFlag, ipParm, args := options.New(args)
-	parm, args := parms.New(args, theseParms...)
+	var err error
+
+	if args, err = options.Netns(args); err != nil {
+		return err
+	}
+
+	o, args := options.New(args)
+	add := (*add)(o)
+	args = add.Parms.More(args, Parms)
 
 	fmt.Println("FIXME", Name, args)
-
-	_ = ipFlag
-	_ = ipParm
-	_ = parm
 
 	return nil
 }

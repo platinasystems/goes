@@ -224,10 +224,10 @@ func (g *Goes) Main(args ...string) error {
 	switch len(cliArgs) {
 	case 0:
 		if cli != nil {
-			if cliFlags["-no-liner"] {
+			if cliFlags.ByName["-no-liner"] {
 				cliArgs = append(cliArgs, "-no-liner")
 			}
-			if cliFlags["-x"] {
+			if cliFlags.ByName["-x"] {
 				cliArgs = append(cliArgs, "-x")
 			}
 			return cli.Main(cliArgs...)
@@ -246,7 +246,7 @@ func (g *Goes) Main(args ...string) error {
 				return fmt.Errorf("has no cli")
 			}
 			for _, t := range []string{"-f", "-x"} {
-				if cliFlags[t] {
+				if cliFlags.ByName[t] {
 					cliArgs = append(cliArgs, t)
 				}
 			}

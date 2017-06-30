@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/parms"
 )
@@ -59,23 +59,25 @@ const (
 	SYSLOG_ACTION_SIZE_BUFFER
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type timeT time.Time
+type Command struct{}
 
-type cmd struct{}
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	const (
 		nl = "\n"
 		sp = " "
@@ -89,15 +91,15 @@ func (cmd) Main(args ...string) error {
 	flag, args := flags.New(args, "-C", "-c", "-D", "-d", "-E", "-H",
 		"-k", "-r", "-T", "-t", "-u", "-x", "-z")
 	parm, args := parms.New(args, "-F", "-n")
-	if len(parm["-F"]) == 0 {
-		parm["-F"] = "/dev/kmsg"
+	if len(parm.ByName["-F"]) == 0 {
+		parm.ByName["-F"] = "/dev/kmsg"
 	}
 
 	if len(args) > 0 {
 		fmt.Errorf("%v: unexpected", args)
 	}
 
-	f, err := os.Open(parm["-F"])
+	f, err := os.Open(parm.ByName["-F"])
 	if err != nil {
 		return err
 	}
@@ -109,19 +111,19 @@ func (cmd) Main(args ...string) error {
 	buf := make([]byte, 4096)
 	defer func() { buf = buf[:0] }()
 
-	if flag["-C"] {
+	if flag.ByName["-C"] {
 		_, err = syscall.Klogctl(SYSLOG_ACTION_CLEAR, buf)
 		return err
 	}
-	if flag["-D"] {
+	if flag.ByName["-D"] {
 		_, err = syscall.Klogctl(SYSLOG_ACTION_CONSOLE_OFF, buf)
 		return err
 	}
-	if flag["-E"] {
+	if flag.ByName["-E"] {
 		_, err = syscall.Klogctl(SYSLOG_ACTION_CONSOLE_ON, buf)
 		return err
 	}
-	if s := parm["-n"]; len(s) > 0 {
+	if s := parm.ByName["-n"]; len(s) > 0 {
 		pri, found := log.PriorityByName[s]
 		if !found {
 			fmt.Errorf("%s: unknown", s)
@@ -130,8 +132,7 @@ func (cmd) Main(args ...string) error {
 			buf[:pri])
 		return err
 	}
-
-	if flag["-z"] {
+	if flag.ByName["-z"] {
 		last.Seq = 0
 	}
 
@@ -148,8 +149,8 @@ func (cmd) Main(args ...string) error {
 		kmsg.Parse(buf[:n])
 
 		if kmsg.Stamp == log.Stamp(0) ||
-			(flag["-k"] && !kmsg.IsKern()) ||
-			(flag["-u"] && kmsg.IsKern()) {
+			(flag.ByName["-k"] && !kmsg.IsKern()) ||
+			(flag.ByName["-u"] && kmsg.IsKern()) {
 			continue
 		}
 
@@ -166,57 +167,63 @@ func (cmd) Main(args ...string) error {
 				log.LogFacilityByValue[fac]+":",
 				log.LogPriorityByValue[pri]+":")
 			switch {
-			case flag["-H"] && flag["-d"] && flag["-x"]:
+			case flag.ByName["-H"] &&
+				flag.ByName["-d"] &&
+				flag.ByName["-x"]:
 				fmt.Print(xs,
 					lb, t.H(), sp, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-H"] && flag["-d"]:
+			case flag.ByName["-H"] && flag.ByName["-d"]:
 				fmt.Print(lb, t.H(), sp, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-H"] && flag["-x"]:
+			case flag.ByName["-H"] && flag.ByName["-x"]:
 				fmt.Print(xs, sp,
 					lb, t.H(), rb,
 					sp, kmsg.Msg, nl)
-			case flag["-H"]:
+			case flag.ByName["-H"]:
 				fmt.Print(lb, t.H(), rb,
 					sp, kmsg.Msg, nl)
-			case flag["-T"] && flag["-d"] && flag["-x"]:
+			case flag.ByName["-T"] &&
+				flag.ByName["-d"] &&
+				flag.ByName["-x"]:
 				fmt.Print(xs,
 					lb, t.T(), sp, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-T"] && flag["-d"]:
+			case flag.ByName["-T"] && flag.ByName["-d"]:
 				fmt.Print(lb, t.T(), sp, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-T"] && flag["-x"]:
+			case flag.ByName["-T"] && flag.ByName["-x"]:
 				fmt.Print(xs, sp,
 					lb, t.T(), rb,
 					sp, kmsg.Msg, nl)
-			case flag["-T"]:
+			case flag.ByName["-T"]:
 				fmt.Print(lb, t.T(), rb,
 					sp, kmsg.Msg, nl)
-			case flag["-t"] && flag["-d"] && flag["-x"]:
+			case flag.ByName["-t"] &&
+				flag.ByName["-d"] &&
+				flag.ByName["-x"]:
 				fmt.Print(xs, sp,
 					lb, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-t"] && flag["-d"]:
+			case flag.ByName["-t"] && flag.ByName["-d"]:
 				fmt.Print(lb, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-t"] && flag["-x"]:
+			case flag.ByName["-t"] && flag.ByName["-x"]:
 				fmt.Print(xs, sp, kmsg.Msg, nl)
-			case flag["-t"]:
+			case flag.ByName["-t"]:
 				fmt.Print(kmsg.Msg, nl)
-			case flag["-r"]:
+			case flag.ByName["-r"]:
 				fmt.Print(lt, kmsg.Pri, gt,
 					lb, kmsg.Stamp, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-d"] && flag["-x"]:
+			case flag.ByName["-d"] && flag.ByName["-x"]:
 				fmt.Print(xs,
 					lb, kmsg.Stamp, sp, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-d"]:
+			case flag.ByName["-d"]:
 				fmt.Print(lb, kmsg.Stamp, sp, lt, delta, gt, rb,
 					sp, kmsg.Msg, nl)
-			case flag["-x"]:
+			case flag.ByName["-x"]:
 				fmt.Print(xs, sp,
 					lb, kmsg.Stamp, rb,
 					sp, kmsg.Msg, nl)
@@ -229,7 +236,7 @@ func (cmd) Main(args ...string) error {
 		last.Stamp = kmsg.Stamp
 	}
 
-	if flag["-c"] {
+	if flag.ByName["-c"] {
 		_, err = syscall.Klogctl(SYSLOG_ACTION_CLEAR, buf)
 		if err != nil {
 			return err
@@ -238,9 +245,7 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
+type timeT time.Time
 
 func (t timeT) H() string {
 	return time.Time(t).Format(time.Stamp)
@@ -249,12 +254,3 @@ func (t timeT) H() string {
 func (t timeT) T() string {
 	return time.Time(t).Format("Mon " + time.Stamp + " 2006")
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

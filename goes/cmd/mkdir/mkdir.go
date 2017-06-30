@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 )
 
@@ -38,31 +38,35 @@ OPTIONS
 	DefaultMode = 0755
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var perm os.FileMode = DefaultMode
 
 	flag, args := flags.New(args, "-p", "-v")
 	parm, args := parms.New(args, "-m")
 
-	if len(parm["-m"]) == 0 {
-		parm["-m"] = "0755"
+	if len(parm.ByName["-m"]) == 0 {
+		parm.ByName["-m"] = "0755"
 	}
 
-	mode, err := strconv.ParseUint(parm["-m"], 8, 64)
+	mode, err := strconv.ParseUint(parm.ByName["-m"], 8, 64)
 	if err != nil {
 		return err
 	}
@@ -74,7 +78,7 @@ func (cmd) Main(args ...string) error {
 	}
 
 	f := os.Mkdir
-	if flag["-p"] {
+	if flag.ByName["-p"] {
 		f = os.MkdirAll
 	}
 
@@ -82,22 +86,9 @@ func (cmd) Main(args ...string) error {
 		if err := f(dn, perm); err != nil {
 			return err
 		}
-		if flag["-v"] {
+		if flag.ByName["-v"] {
 			fmt.Printf("mkdir: created directory ‘%s’\n", dn)
 		}
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

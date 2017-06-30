@@ -48,9 +48,8 @@ func (*Command) String() string      { return Name }
 func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
-	flag, args := flags.New(args, "-a", "-all")
-	flag.Akas(flags.Aka{"-a", []string{"-all"}})
-	if flag["-a"] {
+	flag, args := flags.New(args, []string{"-a", "-all"})
+	if flag.ByName["-a"] {
 		if len(args) == 0 {
 			return fmt.Errorf("command: missing")
 		}

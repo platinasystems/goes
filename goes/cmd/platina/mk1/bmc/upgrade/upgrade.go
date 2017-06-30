@@ -82,22 +82,23 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-l")
+	flag, args := flags.New(args, "-f", "-l")
 	parm, args := parms.New(args, "-v", "-s")
 
-	if len(parm["-v"]) == 0 {
-		parm["-v"] = DfltVer
+	if len(parm.ByName["-v"]) == 0 {
+		parm.ByName["-v"] = DfltVer
 	}
-	if len(parm["-s"]) == 0 {
-		parm["-s"] = DfltSrv
+	if len(parm.ByName["-s"]) == 0 {
+		parm.ByName["-s"] = DfltSrv
 	}
-	if flag["-l"] {
-		if err := dispList(parm["-s"], parm["-v"]); err != nil {
+	if flag.ByName["-l"] {
+		if err := dispList(parm.ByName["-s"], parm.ByName["-v"]); err != nil {
 			return err
 		}
 		return nil
 	}
-	if err := doUpgrade(parm["-s"], parm["-v"], flag["-f"]); err != nil {
+	err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"], flag.ByName["-f"])
+	if err != nil {
 		return err
 	}
 	return nil
@@ -368,21 +369,21 @@ func mountMmc() error {
 		"-strictatime",
 		"-no-strictatime")
 	parm, args := parms.New(args, "-match", "-o", "-t")
-	parm["-t"] = "ext4"
+	parm.ByName["-t"] = "ext4"
 
 	fs, err := getFilesystems()
 	if err != nil {
 		return err
 	}
 
-	fs.mountone(parm["-t"], mdev, dn, flag, parm)
+	fs.mountone(parm.ByName["-t"], mdev, dn, flag, parm)
 
 	return nil
 }
 
-func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult {
+func (fs *filesystems) mountone(t, dev, dir string, flag *flags.Flags, parm *parms.Parms) *MountResult {
 	var flags uintptr
-	if flag["-defaults"] {
+	if flag.ByName["-defaults"] {
 		//  rw, suid, dev, exec, auto, nouser, async
 		flags &^= syscall.MS_RDONLY
 		flags &^= syscall.MS_NOSUID
@@ -395,7 +396,7 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 		flags |= syscall.MS_ASYNC
 	}
 	for _, x := range translations {
-		if flag[x.name] {
+		if flag.ByName[x.name] {
 			if x.set {
 				flags |= x.bits
 			} else {
@@ -403,7 +404,7 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 			}
 		}
 	}
-	if flag["--fake"] {
+	if flag.ByName["--fake"] {
 		return &MountResult{nil, dev, t, dir, flag}
 	}
 
@@ -425,7 +426,7 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 	var err error
 	for _, t := range tryTypes {
 		for i := 0; i < 5; i++ {
-			err = syscall.Mount(dev, dir, t, flags, parm["-o"])
+			err = syscall.Mount(dev, dir, t, flags, parm.ByName["-o"])
 			if err == nil {
 				return &MountResult{err, dev, t, dir, flag}
 			}
@@ -509,17 +510,17 @@ type MountResult struct {
 	dev    string
 	fstype string
 	dir    string
-	flag   flags.Flag
+	flag   *flags.Flags
 }
 
 func (r *MountResult) String() string {
 	if r.err != nil {
 		return fmt.Sprintf("%s: %v", r.dev, r.err)
 	}
-	if r.flag["--fake"] {
+	if r.flag.ByName["--fake"] {
 		return fmt.Sprintf("Would mount %s type %s at %s", r.dev, r.fstype, r.dir)
 	}
-	if r.flag["-v"] {
+	if r.flag.ByName["-v"] {
 		return fmt.Sprintf("Mounted %s type %s at %s", r.dev, r.fstype, r.dir)
 	}
 	return ""
