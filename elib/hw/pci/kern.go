@@ -10,7 +10,9 @@ type wrapperDevice struct {
 	Device
 }
 
-type wrapperBus struct{}
+type wrapperBus struct {
+	busCommon
+}
 
 var DefaultBus = &wrapperBus{}
 

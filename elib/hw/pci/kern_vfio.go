@@ -172,15 +172,19 @@ func sysfsWrite(path, format string, args ...interface{}) error {
 	return err
 }
 
-func (d *vfio_pci_device) sysfsWrite(name string) (err error) {
+func (d *vfio_pci_device) sysfsWriteID(name string) (err error) {
 	err = sysfsWrite(name, "%04x %04x", int(d.VendorID()), int(d.DeviceID()))
 	return
 }
+func (d *vfio_pci_device) sysfsWriteAddr(name string) (err error) {
+	err = sysfsWrite(name, "%v", &d.Device.Addr)
+	return
+}
 
-func (d *vfio_pci_device) new_id() error    { return d.sysfsWrite("new_id") }
-func (d *vfio_pci_device) remove_id() error { return d.sysfsWrite("remove_id") }
-func (d *vfio_pci_device) bind() error      { return d.sysfsWrite("bind") }
-func (d *vfio_pci_device) unbind() error    { return d.sysfsWrite("unbind") }
+func (d *vfio_pci_device) new_id() error    { return d.sysfsWriteID("new_id") }
+func (d *vfio_pci_device) remove_id() error { return d.sysfsWriteID("remove_id") }
+func (d *vfio_pci_device) bind() error      { return d.sysfsWriteAddr("bind") }
+func (d *vfio_pci_device) unbind() error    { return d.sysfsWriteAddr("unbind") }
 
 var DefaultBus = &vfio_main{}
 
