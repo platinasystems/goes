@@ -139,7 +139,6 @@ func (c *Command) Main(...string) error {
 	}
 
 	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
 	for {
 		select {
 		case <-c.stop:
@@ -147,8 +146,6 @@ func (c *Command) Main(...string) error {
 		case <-t.C:
 			if Vdev.Addr != 0 {
 				if err = c.update(); err != nil {
-					//close(c.stop)
-					return err
 				}
 			}
 		}

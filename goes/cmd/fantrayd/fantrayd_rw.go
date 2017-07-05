@@ -156,8 +156,6 @@ func DoI2cRpc() error {
 	err := clientA.Call("I2cReq.ReadWrite", &j, &s)
 	if err != nil {
 		log.Print("i2cReq error:", err)
-		dialed = 0
-		clientA.Close()
 		return err
 	}
 	clearJ()
