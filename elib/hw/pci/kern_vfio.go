@@ -69,7 +69,7 @@ type vfio_main struct {
 	dma_map    vfio_iommu_type1_dma_map
 
 	// Groups indexed by iommu group number.
-	groups_by_number map[uint]*vfio_group
+	group_by_number map[uint]*vfio_group
 
 	devices []*vfio_pci_device
 
@@ -232,10 +232,10 @@ func (d *vfio_pci_device) new_group(group_number uint) (g *vfio_group, err error
 		err = fmt.Errorf("vfio group %d is not viable (not all devices are bound for vfio)", g.number)
 		return
 	}
-	if m.groups_by_number == nil {
-		m.groups_by_number = make(map[uint]*vfio_group)
+	if m.group_by_number == nil {
+		m.group_by_number = make(map[uint]*vfio_group)
 	}
-	m.groups_by_number[group_number] = g
+	m.group_by_number[group_number] = g
 	return
 }
 
@@ -251,7 +251,7 @@ func (d *vfio_pci_device) find_group() (g *vfio_group, err error) {
 	if n, err = d.sysfs_get_group_number(); err != nil {
 		return
 	}
-	if g, ok = d.m.groups_by_number[n]; !ok {
+	if g, ok = d.m.group_by_number[n]; !ok {
 		g, err = d.new_group(n)
 		if err != nil {
 			return
@@ -259,6 +259,7 @@ func (d *vfio_pci_device) find_group() (g *vfio_group, err error) {
 	}
 	d.group = g
 	g.devices = append(g.devices, d)
+	d.m.devices = append(d.m.devices, d)
 	return
 }
 
@@ -437,18 +438,65 @@ func (d *vfio_pci_device) Open() (err error) {
 	return
 }
 
+func (g *vfio_group) close() (err error) {
+	syscall.Close(g.fd)
+	g.fd = -1
+	return
+}
+
+func (m *vfio_main) close() (err error) {
+	for _, g := range m.group_by_number {
+		if err = g.close(); err != nil {
+			return
+		}
+	}
+
+	{
+		unmap := vfio_iommu_type1_dma_unmap{
+			iova: m.dma_map.iova,
+			size: m.dma_map.size,
+		}
+		unmap.set(unsafe.Sizeof(unmap), 0)
+		if _, err = m.ioctl(vfio_iommu_unmap_dma, uintptr(unsafe.Pointer(&unmap))); err != nil {
+			return
+		}
+	}
+
+	syscall.Close(m.container_fd)
+	m.container_fd = -1
+
+	for i := range m.devices {
+		e := m.devices[i]
+		if err = e.unbind(); err != nil {
+			return
+		}
+		if err = e.remove_id(); err != nil {
+			return
+		}
+	}
+	return
+}
+
 func (d *vfio_pci_device) Close() (err error) {
 	if d.interrupt_event_fd > 0 {
 		iomux.Del(d)
 		syscall.Close(d.interrupt_event_fd)
+		d.interrupt_event_fd = -1
 	}
 	if d.device_fd > 0 {
 		syscall.Close(d.device_fd)
+		d.device_fd = -1
 	}
-	if err = d.unbind(); err != nil {
-		return
+	found_open := false
+	for i := range d.m.devices {
+		if d.m.devices[i].device_fd > 0 {
+			found_open = true
+			break
+		}
 	}
-	err = d.remove_id()
+	if !found_open {
+		err = d.m.close()
+	}
 	return
 }
 
