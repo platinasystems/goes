@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 
 	"sync/atomic"
+	"unsafe"
 )
 
 const (
@@ -20,24 +21,44 @@ const (
 	punt_1tag_error_unknown_disposition
 )
 
-type SingleTaggedPuntNode struct {
+type vlan_tagged_punt_node struct {
 	vnet.InOutNode
 	punt_packet_disposition_pool
 }
 
-func (n *SingleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
+func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i uint32) {
 	p := &n.punt_packet_disposition_pool
 	i = uint32(p.GetIndex())
 	d := &p.dispositions[i]
 	d.o = cf.RefOpaque
 	d.next = uint32(n.Vnet.AddNamedNext(n, cf.Next))
 	if cf.AdvanceL3Header {
-		d.data_advance = HeaderBytes + 1*VlanHeaderBytes
+		d.header_index = 0
+		d.data_advance = int32(HeaderBytes + n_tags*VlanHeaderBytes)
+	} else {
+		d.data_advance = int32(VlanHeaderBytes * (int(n_tags) - len(cf.ReplaceVlanHeaders)))
+		d.header_index = d.data_advance
+	}
+	switch len(cf.ReplaceVlanHeaders) {
+	case 1:
+		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[VlanHeaderBytes:])
+	case 2:
+		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[0:])
+		cf.ReplaceVlanHeaders[1].Write(d.replace_tags[VlanHeaderBytes:])
 	}
 	return
 }
-func (n *SingleTaggedPuntNode) DelDisposition(i uint32) {
+func (n *vlan_tagged_punt_node) del_disposition(i uint32) {
 	n.punt_packet_disposition_pool.PutIndex(uint(i))
+}
+
+type SingleTaggedPuntNode vlan_tagged_punt_node
+
+func (n *SingleTaggedPuntNode) AddDisposition(cf PuntConfig) uint32 {
+	return (*vlan_tagged_punt_node)(n).add_disposition(cf, 1)
+}
+func (n *SingleTaggedPuntNode) DelDisposition(i uint32) {
+	(*vlan_tagged_punt_node)(n).del_disposition(i)
 }
 
 // Ethernet header followed by is 1 vlan tag.
@@ -53,7 +74,7 @@ type type_and_tag struct {
 
 const (
 	sizeof_header_no_type = 12
-	sizeof_single_tag     = 4
+	sizeof_type_and_tag   = 4
 )
 
 func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
@@ -82,10 +103,16 @@ func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 		next0 = punt_1tag_next_error
 	}
 
-	// Remove single tag.  After this call packet is untagged.
-	*(*header_no_type)(r0.DataOffset(sizeof_single_tag)) = *(*header_no_type)(r0.DataOffset(0))
+	// Copy old src/dst ethernet address (maybe partially over-written by tag replacement).
+	h0 := *(*header_no_type)(r0.DataOffset(0))
 
-	r0.Advance(sizeof_single_tag + int(d0.data_advance))
+	// Possibly replace tag(s).
+	*(*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type - sizeof_type_and_tag)) = *(*[2]type_and_tag)(unsafe.Pointer(&d0.replace_tags[0]))
+
+	// Set src and dst ethernet address.
+	*(*header_no_type)(r0.DataOffset(uint(d0.header_index))) = h0
+
+	r0.Advance(int(d0.data_advance))
 
 	return
 }
@@ -129,12 +156,19 @@ func (n *SingleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 		next1 = punt_1tag_next_error
 	}
 
-	// Remove single tag.  After this call packet is untagged.
-	*(*header_no_type)(r0.DataOffset(sizeof_single_tag)) = *(*header_no_type)(r0.DataOffset(0))
-	*(*header_no_type)(r1.DataOffset(sizeof_single_tag)) = *(*header_no_type)(r1.DataOffset(0))
+	// Copy old src/dst ethernet address (maybe partially over-written by tag replacement).
+	h0, h1 := *(*header_no_type)(r0.DataOffset(0)), *(*header_no_type)(r1.DataOffset(0))
 
-	r0.Advance(sizeof_single_tag + int(d0.data_advance))
-	r1.Advance(sizeof_single_tag + int(d0.data_advance))
+	// Possibly replace tag(s).
+	*(*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type - sizeof_type_and_tag)) = *(*[2]type_and_tag)(unsafe.Pointer(&d0.replace_tags[0]))
+	*(*[2]type_and_tag)(r1.DataOffset(sizeof_header_no_type - sizeof_type_and_tag)) = *(*[2]type_and_tag)(unsafe.Pointer(&d1.replace_tags[0]))
+
+	// Set src and dst ethernet address.
+	*(*header_no_type)(r0.DataOffset(uint(d0.header_index))) = h0
+	*(*header_no_type)(r1.DataOffset(uint(d1.header_index))) = h1
+
+	r0.Advance(int(d0.data_advance))
+	r1.Advance(int(d1.data_advance))
 
 	return
 }
@@ -206,7 +240,7 @@ func (n *SingleTaggedInjectNode) inject_x1(r0 *vnet.Ref, next_offset uint) (next
 	h0 := *(*header_no_type)(r0.DataOffset(0))
 
 	// Make space for 4 byte vlan header.
-	r0.Advance(-sizeof_single_tag)
+	r0.Advance(-sizeof_type_and_tag)
 
 	// Insert tag.
 	t0 := (*type_and_tag)(r0.DataOffset(sizeof_header_no_type))
@@ -229,8 +263,8 @@ func (n *SingleTaggedInjectNode) inject_x2(r0, r1 *vnet.Ref, next_offset uint) (
 
 	h0, h1 := *(*header_no_type)(r0.DataOffset(0)), *(*header_no_type)(r1.DataOffset(0))
 
-	r0.Advance(-sizeof_single_tag)
-	r1.Advance(-sizeof_single_tag)
+	r0.Advance(-sizeof_type_and_tag)
+	r1.Advance(-sizeof_type_and_tag)
 
 	t0 := (*type_and_tag)(r0.DataOffset(sizeof_header_no_type))
 	t1 := (*type_and_tag)(r1.DataOffset(sizeof_header_no_type))
