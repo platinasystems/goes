@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
+	"fmt"
 	"unsafe"
 )
 
@@ -147,6 +148,86 @@ func (i *Interface) GetInterface() *Interface { return i }
 type HwInterfacer interface {
 	GetInterface() *Interface
 	vnet.HwInterfacer
+}
+
+type IfId vnet.IfId
+
+// 32 bit Id: 16 bit outer/inner id: 12 bit id + valid bit
+func (i IfId) inner() IfId { return i >> 16 }
+func (i IfId) outer() IfId { return i & 0xffff }
+func (i IfId) valid() bool { return i&(1<<15) != 0 }
+func (i IfId) id() (id vnet.Uint16, valid bool) {
+	id, valid = vnet.Uint16(i&0xfff), i.valid()
+	return
+}
+func (i IfId) OuterVlan() (id vnet.Uint16, valid bool) { return i.outer().id() }
+func (i IfId) InnerVlan() (id vnet.Uint16, valid bool) { return i.inner().id() }
+func (i *IfId) Set(outer vnet.Uint16)                  { *i = IfId(outer) | 1<<15 }
+func (i *IfId) Set2(outer, inner vnet.Uint16)          { *i = IfId(outer) | 1<<15 | IfId(inner)<<16 | 1<<31 }
+
+func (i *Interface) LessThanId(aʹ, bʹ vnet.IfId) bool {
+	a, b := IfId(aʹ), IfId(bʹ)
+
+	// Compare outer then inner vlan.
+	{
+		ai, av := a.OuterVlan()
+		bi, bv := b.OuterVlan()
+		if av && bv && ai != bi {
+			return ai < bi
+		}
+	}
+	{
+		ai, av := a.InnerVlan()
+		bi, bv := b.InnerVlan()
+		if av && bv && ai != bi {
+			return ai < bi
+		}
+	}
+	// Vlans not valid.
+	return a < b
+}
+
+func (intf *Interface) ParseId(a *vnet.IfId, in *parse.Input) bool {
+	var (
+		i int
+		v []int
+	)
+	for !in.End() {
+		switch {
+		case in.Parse(".%d", &i) && i <= 0xfff:
+			v = append(v, i)
+		default:
+			return false
+		}
+		if len(v) > 2 {
+			break
+		}
+	}
+	switch {
+	case len(v) == 1:
+		*a = vnet.IfId(1<<15 | v[0])
+	case len(v) == 2:
+		*a = vnet.IfId(1<<15 | v[0] | 1<<31 | v[1]<<16)
+	default:
+		return false
+	}
+	return true
+}
+
+func (i *Interface) FormatId(aʹ vnet.IfId) (v string) {
+	a := IfId(aʹ)
+	oi, ov := a.OuterVlan()
+	ii, iv := a.InnerVlan()
+	if ov {
+		v += fmt.Sprintf(".%d", oi)
+	}
+	if iv {
+		v += fmt.Sprintf(".%d", ii)
+	}
+	if !iv && !ov {
+		v = fmt.Sprintf("invalid 0x%x", a)
+	}
+	return
 }
 
 // See vnet.Arper interface.
