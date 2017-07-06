@@ -85,6 +85,14 @@ func MmapSlice(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []by
 	return
 }
 
+func Munmap(b []byte) (err error) {
+	_, _, e := syscall.RawSyscall(syscall.SYS_MUNMAP, uintptr(unsafe.Pointer(&b[0])), uintptr(len(b)), 0)
+	if e != 0 {
+		err = fmt.Errorf("munmap: %s", e)
+	}
+	return
+}
+
 // Init initializes heap with n bytes of mmap'ed anonymous memory.
 func (h *MemHeap) init(b []byte, n uint) {
 	if len(b) == 0 {

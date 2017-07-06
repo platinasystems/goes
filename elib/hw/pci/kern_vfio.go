@@ -35,6 +35,7 @@ type vfio_group struct {
 
 type vfio_device_region_info struct {
 	vfio_region_info
+	mapped_mem   []byte
 	sparse_areas []vfio_region_sparse_mmap_area
 	cap_type     vfio_region_info_cap_type
 }
@@ -467,6 +468,7 @@ func (m *vfio_main) close() (err error) {
 
 	for i := range m.devices {
 		e := m.devices[i]
+		e.unmap_resources()
 		if err = e.unbind(); err != nil {
 			return
 		}
@@ -496,6 +498,19 @@ func (d *vfio_pci_device) Close() (err error) {
 	}
 	if !found_open {
 		err = d.m.close()
+	}
+	return
+}
+
+func (d *vfio_pci_device) unmap_resources() (err error) {
+	for i := range d.region_infos {
+		ri := &d.region_infos[i]
+		if ri.mapped_mem != nil {
+			err = elib.Munmap(ri.mapped_mem)
+			if err != nil {
+				return
+			}
+		}
 	}
 	return
 }
@@ -530,6 +545,7 @@ func (d *vfio_pci_device) MapResource(i uint) (res uintptr, err error) {
 		return
 	}
 	res = uintptr(unsafe.Pointer(&r.Mem[0]))
+	ri.mapped_mem = r.Mem
 	return
 }
 
