@@ -1,0 +1,13 @@
+if [ "$1" == "up" ]; then
+    for i in {0..1}; do
+	ip netns add ns$i;
+	ip link add eth-$i-0.1 link eth-$i-0 type vlan id 1;
+	ip link set eth-$i-0.1 netns ns$i;
+	ip netns exec ns$i ip link set eth-$i-0.1 up;
+	ip netns exec ns$i ip addr add 10.0.0.$i/24 dev eth-$i-0.1;
+    done;
+else
+    for i in {0..1}; do
+	ip netns del ns$i;
+    done;
+fi
