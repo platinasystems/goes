@@ -28,13 +28,14 @@ func (si *Si) ParseWithArgs(in *parse.Input, args *parse.Args) {
 		panic(parse.ErrInput)
 	}
 	// Initially get software interface from hardware interface.
-	hw := v.HwIf(hi)
+	h := v.HwIfer(hi)
+	hw := h.GetHwIf()
 	*si = hw.si
 	var (
-		id IfIndex
+		id IfId
 		ok bool
 	)
-	if in.Parse(".%d", &id) {
+	if h.ParseId(&id, in) {
 		if *si, ok = hw.subSiById[id]; !ok {
 			panic(fmt.Errorf("unkown sub interface id: %d", id))
 		}

@@ -40,8 +40,8 @@ type HwIf struct {
 	// Max size of packet in bytes (MTU)
 	maxPacketSize uint
 
-	defaultId IfIndex
-	subSiById map[IfIndex]Si
+	defaultId IfId
+	subSiById map[IfId]Si
 }
 
 //go:generate gentemplate -d Package=vnet -id HwIf -d PoolType=hwIferPool -d Type=HwInterfacer -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
@@ -120,6 +120,8 @@ func (f swIfFlag) String() (s string) {
 	return
 }
 
+type IfId IfIndex
+
 type swIf struct {
 	typ   swIfType
 	flags swIfFlag
@@ -133,12 +135,12 @@ type swIf struct {
 
 	// For hardware interface: HwIfIndex
 	// For sub interface: sub interface id (e.g. vlan/vc number).
-	id IfIndex
+	id IfId
 }
 
 //go:generate gentemplate -d Package=vnet -id swIf -d PoolType=swIfPool -d Type=swIf -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
 
-func (m *Vnet) addDelSwInterface(siʹ, supSi Si, typ swIfType, id IfIndex, isDel bool) (si Si) {
+func (m *Vnet) addDelSwInterface(siʹ, supSi Si, typ swIfType, id IfId, isDel bool) (si Si) {
 	si = siʹ
 	if !isDel {
 		si = Si(m.swInterfaces.GetIndex())
@@ -172,25 +174,22 @@ func (m *Vnet) addDelSwInterface(siʹ, supSi Si, typ swIfType, id IfIndex, isDel
 	return
 }
 
-func (m *Vnet) newSwIf(typ swIfType, id IfIndex) Si {
+func (m *Vnet) newSwIf(typ swIfType, id IfId) Si {
 	return m.addDelSwInterface(SiNil, SiNil, typ, id, false)
 }
 func (m *Vnet) DelSwIf(si Si) { m.addDelSwInterface(si, si, 0, 0, true) }
 
-func (m *Vnet) NewSwSubInterface(supSi Si, id uint) (si Si) {
-	x := IfIndex(id)
-	si = m.addDelSwInterface(SiNil, supSi, swIfTypeSubInterface, x, false)
+func (m *Vnet) NewSwSubInterface(supSi Si, id IfId) (si Si) {
+	si = m.addDelSwInterface(SiNil, supSi, swIfTypeSubInterface, id, false)
 	s := m.SwIf(si)
 	h := m.SupHwIf(s)
 	if h.subSiById == nil {
-		h.subSiById = make(map[IfIndex]Si)
+		h.subSiById = make(map[IfId]Si)
 	}
-	h.subSiById[x] = si
+	h.subSiById[id] = si
 	return
 }
 func (si Si) IsSwSubInterface(v *Vnet) bool { return v.SwIf(si).typ == swIfTypeSubInterface }
-func (h *HwIf) setSubInterface(si Si, id IfIndex) {
-}
 
 func (m *interfaceMain) SwIf(i Si) *swIf { return &m.swInterfaces.elts[i] }
 func (m *interfaceMain) SupSi(i Si) Si   { return m.SwIf(i).supSi }
@@ -223,16 +222,18 @@ func (m *interfaceMain) HwIferForSi(i Si) (h HwInterfacer, ok bool) {
 }
 
 func (s *swIf) IfName(vn *Vnet) (v string) {
-	v = vn.SupHwIf(s).name
+	hw := vn.SupHwIf(s)
+	v = hw.name
 	if s.typ != swIfTypeHardware {
-		v += fmt.Sprintf(".%d", s.id)
+		h := vn.HwIfer(hw.hi)
+		v += h.FormatId(s.id)
 	}
 	return
 }
 func (i Si) Name(v *Vnet) string { return v.SwIf(i).IfName(v) }
 func (i Hi) Name(v *Vnet) string { return v.HwIf(i).name }
 
-func (i *swIf) Id(v *Vnet) (id IfIndex) {
+func (i *swIf) Id(v *Vnet) (id IfId) {
 	id = i.id
 	if i.typ == swIfTypeHardware {
 		h := v.HwIf(Hi(id))
@@ -389,7 +390,10 @@ func (h *HwIf) SetLoopback(v IfLoopbackType) (err error) {
 	return
 }
 func (h *HwIf) GetSwInterfaceCounterNames() (nm InterfaceCounterNames) { return }
-func (h *HwIf) DefaultId() IfIndex                                     { return 0 }
+func (h *HwIf) DefaultId() IfId                                        { return 0 }
+func (h *HwIf) LessThanId(a, b IfId) bool                              { return IfIndex(a) < IfIndex(b) }
+func (h *HwIf) ParseId(a *IfId, in *parse.Input) bool                  { return in.Parse(".%d", a) }
+func (h *HwIf) FormatId(a IfId) string                                 { return fmt.Sprintf(".%d", a) }
 func (a *HwIf) LessThan(b HwInterfacer) bool                           { return a.hi < b.GetHwIf().hi }
 
 type interfaceMain struct {
@@ -427,7 +431,7 @@ func (v *Vnet) RegisterAndProvisionHwInterface(h HwInterfacer, provision bool, f
 	hw.vnet = v
 	hw.defaultId = h.DefaultId()
 	hw.unprovisioned = !provision
-	hw.si = v.newSwIf(swIfTypeHardware, IfIndex(hw.hi))
+	hw.si = v.newSwIf(swIfTypeHardware, IfId(hw.hi))
 
 	isDel := false
 	m := &v.interfaceMain
@@ -488,11 +492,12 @@ func (v *Vnet) HwLessThan(a, b *HwIf) bool {
 }
 
 func (v *Vnet) SwLessThan(a, b *swIf) bool {
-	ha, hb := v.SupHwIf(a), v.SupHwIf(b)
-	if ha != hb {
-		return v.HwLessThan(ha, hb)
+	hwa, hwb := v.SupHwIf(a), v.SupHwIf(b)
+	if hwa != hwb {
+		return v.HwLessThan(hwa, hwb)
 	}
-	return a.id < b.id
+	ha := v.HwIfer(hwa.hi)
+	return ha.LessThanId(a.id, b.id)
 }
 
 // Interface can loopback at MAC or PHY.
@@ -585,7 +590,10 @@ func (b *Bandwidth) Parse(in *parse.Input) {
 
 // Class of hardware interfaces, for example, ethernet, sonet, srp, docsis, etc.
 type HwIfClasser interface {
-	DefaultId() IfIndex
+	DefaultId() IfId
+	LessThanId(a, b IfId) bool
+	ParseId(a *IfId, in *parse.Input) bool
+	FormatId(a IfId) string
 	GetAddress() []byte
 	SetAddress(a []byte)
 	FormatAddress() string
