@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	Family = []string{"-4", "-6", "-B", "-M", "-0"}
+	Family = []interface{}{"-4", "-6", "-B", "-M", "-0"}
 	Flags  = []interface{}{
-		[]string{"-human", "-human-readable"},
+		[]string{"-h", "-human", "-human-readable"},
 		[]string{"-s", "-stats", "-statistics"},
 		[]string{"-d", "-details"},
 		[]string{"-o", "-oneline"},
@@ -40,7 +40,7 @@ func New(args []string) (*Options, []string) {
 	opt := new(Options)
 	opt.Flags, args = flags.New(args, Flags...)
 	opt.Parms, args = parms.New(args, Parms...)
-	family, args := flags.New(args, Family)
+	family, args := flags.New(args, Family...)
 	switch {
 	case family.ByName["-4"]:
 		opt.Parms.ByName["-f"] = "inet"

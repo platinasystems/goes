@@ -49,6 +49,42 @@ type Uint64er interface {
 	Uint() uint64
 }
 
+const MaxUint8 = ^uint8(0)
+
+func Uint8(attr Attr) uint8 {
+	u := MaxUint8
+	if attr != nil {
+		if method, found := attr.(Uint8er); found {
+			u = method.Uint()
+		}
+	}
+	return u
+}
+
+const MaxUint32 = ^uint32(0)
+
+func Uint32(attr Attr) uint32 {
+	u := MaxUint32
+	if attr != nil {
+		if method, found := attr.(Uint32er); found {
+			u = method.Uint()
+		}
+	}
+	return u
+}
+
+const MaxUint64 = ^uint64(0)
+
+func Uint64(attr Attr) uint64 {
+	u := MaxUint64
+	if attr != nil {
+		if method, found := attr.(Uint64er); found {
+			u = method.Uint()
+		}
+	}
+	return u
+}
+
 func closeAttrs(attrs []Attr) {
 	for i, a := range attrs {
 		if a != nil {

@@ -125,8 +125,8 @@ func (Command) Main(args ...string) error {
 
 	o, args := options.New(args)
 	set := (*set)(o)
-	args = set.Flags.More(args, Flags)
-	args = set.Parms.More(args, Parms)
+	args = set.Flags.More(args, Flags...)
+	args = set.Parms.More(args, Parms...)
 
 	if s := set.Parms.ByName["group"]; len(s) > 0 {
 		if len(args) > 0 {
