@@ -468,7 +468,9 @@ func (m *vfio_main) close() (err error) {
 
 	for i := range m.devices {
 		e := m.devices[i]
-		e.unmap_resources()
+		if err = e.unmap_resources(); err != nil {
+			return
+		}
 		if err = e.unbind(); err != nil {
 			return
 		}
