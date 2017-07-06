@@ -36,10 +36,10 @@ func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i u
 		d.header_index = 0
 		d.data_advance = int32(HeaderBytes + n_tags*VlanHeaderBytes)
 	} else {
-		d.data_advance = int32(VlanHeaderBytes * (int(n_tags) - len(cf.ReplaceVlanHeaders)))
+		d.data_advance = int32(VlanHeaderBytes * (int(n_tags) - int(cf.NReplaceVlanHeaders)))
 		d.header_index = d.data_advance
 	}
-	switch len(cf.ReplaceVlanHeaders) {
+	switch cf.NReplaceVlanHeaders {
 	case 1:
 		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[VlanHeaderBytes:])
 	case 2:

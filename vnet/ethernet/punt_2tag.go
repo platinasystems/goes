@@ -27,8 +27,9 @@ type PuntConfig struct {
 	// Software interface and aux data to use for packet.
 	RefOpaque vnet.RefOpaque
 	// True to advance past vlan/2-vlan tags to layer 3 header.
-	AdvanceL3Header    bool
-	ReplaceVlanHeaders []VlanHeader
+	AdvanceL3Header     bool
+	NReplaceVlanHeaders uint
+	ReplaceVlanHeaders  [2]VlanHeader
 }
 
 type punt_packet_disposition struct {
