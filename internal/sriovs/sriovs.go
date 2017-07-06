@@ -80,22 +80,30 @@ func Del(vfs [][]Vf) error {
 	return err
 }
 
-func New(vfs [][]Vf) error {
+func New(vfs [][]Vf) (err error) {
 	numvfs, err := getNumvfs()
 	if err != nil {
-		return err
+		return
 	}
 	pfs, err := getPfs(len(vfs))
 	if err != nil {
-		return err
+		return
 	}
-	r, w, err := os.Pipe()
-	defer w.Close()
 	x := exec.Command("ip", "-batch", "-")
-	x.Stdin = r
-	x.Stdout = os.Stdout
-	x.Stderr = os.Stderr
-	go x.Run()
+	w, err := x.StdinPipe()
+	if err != nil {
+		return
+	}
+	if err = x.Start(); err != nil {
+		return
+	}
+	defer func() {
+		w.Close()
+		xerr := x.Wait()
+		if ee, found := xerr.(*exec.ExitError); found {
+			err = fmt.Errorf("ip -batch: %s", string(ee.Stderr))
+		}
+	}()
 	for pfi, pf := range pfs {
 		var virtfns Virtfns
 
@@ -103,52 +111,66 @@ func New(vfs [][]Vf) error {
 			// First set to zero to avoid device busy error on second setNumvfs.
 			if numvfs != 0 {
 				if err = setNumvfs(pf.Name, 0); err != nil {
-					return err
+					return
 				}
 			}
 			if err = setNumvfs(pf.Name, numvfs); err != nil {
-				return err
+				return
 			}
 		}
 
 		virtfns, err = pfvirtfns(pf.Name, numvfs)
 		if err != nil {
-			return err
+			return
 		}
 		for _, virtfn := range virtfns {
-			vfi, err := getVfi(virtfn)
+			var vfi int
+			var vfname string
+			vfi, err = getVfi(virtfn)
 			if err != nil {
-				return err
+				return
 			}
 			if vfi >= len(vfs[pfi]) {
 				continue
 			}
 			vf := vfs[pfi][vfi]
-			fmt.Fprintln(w, "link", "set", pf.Name,
+			_, err = fmt.Fprintln(w, "link", "set", pf.Name,
 				"vf", vfi, "mac", VfMac(), "vlan", vf.Vlan())
-			vfname, err := getVfname(virtfn)
 			if err != nil {
-				return err
+				return
+			}
+			vfname, err = getVfname(virtfn)
+			if err != nil {
+				return
 			}
 			want := vf.String()
 			if vfname != want {
-				fmt.Fprintln(w, "link", "set", vfname,
+				_, err = fmt.Fprintln(w, "link", "set", vfname,
 					"name", want)
+				if err != nil {
+					return
+				}
 				vfname = want
 			}
 			// bounce vf to reload its mac from the pf
-			fmt.Fprintln(w, "link", "set", vfname, "up")
-			fmt.Fprintln(w, "link", "set", vfname, "down")
+			_, err = fmt.Fprintln(w, "link", "set", vfname, "up")
+			if err != nil {
+				return
+			}
+			_, err = fmt.Fprintln(w, "link", "set", vfname, "down")
+			if err != nil {
+				return
+			}
 		}
 		// Setting VEPA bridge mode (instead of default VEB) for the pf
 		// allows external loopback cable pings to work (while not
 		// hurting regular connectivity).
 		err = bridgemodeset(pf.Name, "hwmode", "vepa")
 		if err != nil {
-			return err
+			return
 		}
 	}
-	return err
+	return
 }
 
 func (mac Mac) Plus(u uint) {
