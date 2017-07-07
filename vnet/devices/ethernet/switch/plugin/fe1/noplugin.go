@@ -9,14 +9,9 @@ package fe1
 import (
 	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/ethernet"
+	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 )
 
-func Packages() []map[string]string { return fe1.Packages }
-
-func AddPlatform(v *vnet.Vnet, ver int, nmacs uint32, basea ethernet.Address,
-	init func(), leden func() error) {
-	fe1.AddPlatform(v, ver, nmacs, basea, init, leden)
-}
-
-func Init(v *vnet.Vnet) { fe1.Init(v) }
+func Packages() []map[string]string                    { return fe1.Packages }
+func AddPlatform(v *vnet.Vnet, p *fe1_platform.Config) { fe1.AddPlatform(v, p) }
+func Init(v *vnet.Vnet)                                { fe1.Init(v) }

@@ -1,18 +1,20 @@
 package main
 
 import (
-	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugin/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 	ipcli "github.com/platinasystems/go/vnet/ip/cli"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
 	"github.com/platinasystems/go/vnet/pg"
+	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/unix"
 
 	"fmt"
@@ -20,37 +22,6 @@ import (
 	"os"
 	"time"
 )
-
-type platform struct {
-	vnet.Package
-	*fe1.Platform
-	sriov_mode bool
-	pca9535_main
-}
-
-func (p *platform) Init() (err error) {
-	v := p.Vnet
-	p.Platform = fe1.GetPlatform(v)
-
-	if !p.sriov_mode {
-		// 2 ixge ports are used to inject packets.
-		ns := ixge.GetPortNames(v)
-		p.SingleTaggedInjectNexts = make([]uint, len(ns))
-		for i := range ns {
-			p.SingleTaggedInjectNexts[i] = v.AddNamedNext(&p.Platform.SingleTaggedPuntInjectNodes.Inject, ns[i])
-		}
-	}
-
-	if err = p.boardInit(); err != nil {
-		return
-	}
-	for _, s := range p.Switches {
-		if err = p.boardPortInit(s); err != nil {
-			return
-		}
-	}
-	return
-}
 
 func newSriovs(ver int) error {
 	if ver > 0 {
@@ -112,6 +83,22 @@ func make_vfs() [][]sriovs.Vf {
 	return [][]sriovs.Vf{pfs[0][:], pfs[1][:]}
 }
 
+func platformConfigFromEEPROM(p *fe1_platform.Config) {
+	d := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x51,
+	}
+	if e := d.GetInfo(); e != nil {
+		fmt.Printf("eeprom read failed: %s; using random address block", e)
+		p.BaseEthernetAddress = ethernet.RandomAddress()
+		p.NEthernetAddress = 256
+	} else {
+		p.BaseEthernetAddress = ethernet.Address(d.Fields.BaseEthernetAddress)
+		p.NEthernetAddress = d.Fields.NEthernetAddress
+		p.Version = uint(d.Fields.DeviceVersion)
+	}
+}
+
 func main() {
 	var err error
 	defer func() {
@@ -125,10 +112,9 @@ func main() {
 	in.Add(os.Args[1:]...)
 
 	v := &vnet.Vnet{}
-	p := &platform{}
 
 	fns, err := sriovs.NumvfsFns()
-	p.sriov_mode = err == nil && len(fns) > 0
+	sriov_mode := err == nil && len(fns) > 0
 	err = nil
 
 	// Select packages we want to run with.
@@ -136,7 +122,7 @@ func main() {
 	ethernet.Init(v)
 	ip4.Init(v)
 	ip6.Init(v)
-	if !p.sriov_mode {
+	if !sriov_mode {
 		ixge.Init(v, ixge.Config{DisableUnix: true, PuntNode: "fe1-single-tagged-punt"})
 	} else if err = newSriovs(0); err != nil {
 		return
@@ -146,22 +132,21 @@ func main() {
 	ipcli.Init(v)
 	unix.Init(v)
 
-	v.AddPackage("platform", p)
-	p.DependsOn("pci-discovery") // after pci discovery
-	p.DependedOnBy("ip4")        // adjacencies/fib init needs to happen after fe1 init.
-	p.DependedOnBy("ip6")
+	gpio := pca9535_main{
+		bus_index:   0,
+		bus_address: 0x74,
+	}
+	if err = gpio.do(gpio.led_output_enable); err != nil {
+		return
+	}
+	if err = gpio.do(gpio.switch_reset); err != nil {
+		return
+	}
 
 	{
-		m := pca9535_main{
-			bus_index:   0,
-			bus_address: 0x74,
-		}
-		if err = m.do(m.led_output_enable); err != nil {
-			return
-		}
-		if err = m.do(m.switch_reset); err != nil {
-			return
-		}
+		p := fe1_platform.Config{}
+		platformConfigFromEEPROM(&p)
+		fe1.AddPlatform(v, &p)
 	}
 
 	err = v.Run(&in)
@@ -169,7 +154,7 @@ func main() {
 		fmt.Println(err)
 	}
 
-	if p.sriov_mode {
+	if sriov_mode {
 		err = delSriovs()
 		if err != nil {
 			fmt.Println(err)
