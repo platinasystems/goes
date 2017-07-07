@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
@@ -17,12 +18,14 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 )
 
 type platform struct {
 	vnet.Package
 	*fe1.Platform
 	sriov_mode bool
+	pca9535_main
 }
 
 func (p *platform) Init() (err error) {
@@ -148,6 +151,19 @@ func main() {
 	p.DependedOnBy("ip4")        // adjacencies/fib init needs to happen after fe1 init.
 	p.DependedOnBy("ip6")
 
+	{
+		m := pca9535_main{
+			bus_index:   0,
+			bus_address: 0x74,
+		}
+		if err = m.do(m.led_output_enable); err != nil {
+			return
+		}
+		if err = m.do(m.switch_reset); err != nil {
+			return
+		}
+	}
+
 	err = v.Run(&in)
 	if err != nil {
 		fmt.Println(err)
@@ -159,4 +175,83 @@ func main() {
 			fmt.Println(err)
 		}
 	}
+}
+
+type pca9535_main struct {
+	bus_index, bus_address int
+}
+
+func (m *pca9535_main) do(f func(bus *i2c.Bus) error) (err error) {
+	var bus i2c.Bus
+	if err = bus.Open(m.bus_index); err != nil {
+		return
+	}
+	defer bus.Close()
+	if err = bus.ForceSlaveAddress(m.bus_address); err != nil {
+		return
+	}
+	return f(&bus)
+}
+
+const (
+	pca9535_reg_input_0  = iota // read-only input bits [7:0]
+	pca9535_reg_input_1         // read-only input bits [15:8]
+	pca9535_reg_output_0        // output bits [7:0] (default 1)
+	pca9535_reg_output_1        // output [15:8]
+	pca9535_reg_invert_polarity_0
+	pca9535_reg_invert_polarity_1
+	pca9535_reg_is_input_0 // 1 => pin is input; 0 => output
+	pca9535_reg_is_input_1 // defaults are 1 (pin is input)
+)
+
+// MK1 pin usage.
+const (
+	mk1_pca9535_pin_switch_reset = 1 << iota
+	_
+	mk1_pca9535_pin_led_output_enable
+)
+
+// MK1 board front panel port LED's require PCA9535 GPIO device configuration
+// to provide an output signal that allows LED operation.
+func (m *pca9535_main) led_output_enable(bus *i2c.Bus) (err error) {
+	var d i2c.SMBusData
+	// Set pin to output (default is input and default value is high which we assume).
+	if err = bus.Read(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
+		return
+	}
+	d[0] &^= mk1_pca9535_pin_led_output_enable
+	return bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d)
+}
+
+func (m *pca9535_main) switch_reset(bus *i2c.Bus) (err error) {
+	var d i2c.SMBusData
+
+	// Set output low.
+	if err = bus.Read(pca9535_reg_output_0, i2c.ByteData, &d); err != nil {
+		return
+	}
+	d[0] &^= mk1_pca9535_pin_switch_reset
+	if err = bus.Write(pca9535_reg_output_0, i2c.ByteData, &d); err != nil {
+		return
+	}
+
+	// Set direction to be output asserting switch reset.
+	if err = bus.Read(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
+		return
+	}
+	d[0] &^= mk1_pca9535_pin_switch_reset
+	if err = bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
+		return
+	}
+
+	// Set back to input and deassert switch reset.
+	d[0] |= mk1_pca9535_pin_switch_reset
+	if err = bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
+		return
+	}
+
+	// Wait minimum of 2 ms before PCIE activity.
+	time.Sleep(2 * time.Millisecond)
+
+	return
 }
