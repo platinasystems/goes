@@ -40,6 +40,6 @@ func Init(v *vnet.Vnet) {
 	lookup("Init").(func(*vnet.Vnet))(v)
 }
 
-func AddPlatform(v *vnet.Vnet, p *fe1_platform.Config) {
-	lookup("AddPlatform").(func(v *vnet.Vnet, p *fe1_platform.Config))(v, p)
+func AddPlatform(v *vnet.Vnet, p *fe1_platform.Platform) {
+	lookup("AddPlatform").(func(v *vnet.Vnet, p *fe1_platform.Platform))(v, p)
 }

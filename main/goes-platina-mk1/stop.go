@@ -10,15 +10,15 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/stop"
-	"github.com/platinasystems/go/internal/sriovs"
+	"github.com/platinasystems/go/vnet/platforms/mk1"
 )
 
-func init() {
-	stop.Hook = func() error {
-		fns, err := sriovs.NumvfsFns()
-		if err == nil && len(fns) > 0 {
-			return delSriovs()
-		}
+func init() { stop.Hook = defaultMk1.stopHook }
+
+func (p *mk1Main) stopHook() error {
+	if p.SriovMode {
+		return mk1.PlatformExit(p.v, &p.Platform)
+	} else {
 		interfaces, err := net.Interfaces()
 		if err != nil {
 			return err

@@ -9,9 +9,10 @@ import (
 )
 
 // Platform configuration for FE1 based systems.
-type Config struct {
+type Platform struct {
 	Version             uint
 	BaseEthernetAddress ethernet.Address
 	NEthernetAddress    uint
 	Init                func()
+	SriovMode           bool
 }

@@ -6,7 +6,7 @@ package main
 
 import (
 	. "github.com/platinasystems/go"
-	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugin/fe1"
+	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugins/fe1"
 )
 
 func init() { Packages = fe1.Packages }

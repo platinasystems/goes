@@ -12,6 +12,6 @@ import (
 	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 )
 
-func Packages() []map[string]string                    { return fe1.Packages }
-func AddPlatform(v *vnet.Vnet, p *fe1_platform.Config) { fe1.AddPlatform(v, p) }
-func Init(v *vnet.Vnet)                                { fe1.Init(v) }
+func Packages() []map[string]string                      { return fe1.Packages }
+func AddPlatform(v *vnet.Vnet, p *fe1_platform.Platform) { fe1.AddPlatform(v, p) }
+func Init(v *vnet.Vnet)                                  { fe1.Init(v) }
