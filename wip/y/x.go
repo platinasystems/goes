@@ -223,35 +223,40 @@ func (m *pca9535_main) led_output_enable(bus *i2c.Bus) (err error) {
 	return bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d)
 }
 
+// Hard reset switch via gpio pins on MK1 board.
 func (m *pca9535_main) switch_reset(bus *i2c.Bus) (err error) {
-	var d i2c.SMBusData
+	const reset_bits = mk1_pca9535_pin_switch_reset
 
-	// Set output low.
-	if err = bus.Read(pca9535_reg_output_0, i2c.ByteData, &d); err != nil {
-		return
-	}
-	d[0] &^= mk1_pca9535_pin_switch_reset
-	if err = bus.Write(pca9535_reg_output_0, i2c.ByteData, &d); err != nil {
-		return
-	}
+	var val, dir i2c.SMBusData
 
-	// Set direction to be output asserting switch reset.
-	if err = bus.Read(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
+	// Set direction to output.
+	if err = bus.Read(pca9535_reg_is_input_0, i2c.ByteData, &dir); err != nil {
 		return
 	}
-	d[0] &^= mk1_pca9535_pin_switch_reset
-	if err = bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
-		return
+	if dir[0]&reset_bits != 0 {
+		dir[0] &^= reset_bits
+		if err = bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &dir); err != nil {
+			return
+		}
 	}
 
-	// Set back to input and deassert switch reset.
-	d[0] |= mk1_pca9535_pin_switch_reset
-	if err = bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
+	// Set output low & wait 2 us minimum.
+	if err = bus.Read(pca9535_reg_output_0, i2c.ByteData, &val); err != nil {
 		return
 	}
+	val[0] &^= reset_bits
+	if err = bus.Write(pca9535_reg_output_0, i2c.ByteData, &val); err != nil {
+		return
+	}
+	time.Sleep(2 * time.Microsecond)
 
-	// Wait minimum of 2 ms before PCIE activity.
-	time.Sleep(2 * time.Millisecond)
+	// Set output hi & wait 2 ms minimum before pci activity.
+	val[0] |= reset_bits
+	if err = bus.Write(pca9535_reg_output_0, i2c.ByteData, &val); err != nil {
+		return
+	}
+	// Need to wait a long time else the switch does not show up in pci bus and pci discovery fails.
+	time.Sleep(100 * time.Millisecond)
 
 	return
 }
