@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sort"
@@ -24,6 +25,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/prog"
 )
 
 const (
@@ -154,6 +156,21 @@ func (g *Goes) Complete(args ...string) []string {
 	return ss
 }
 
+// Fork returns an exec.Cmd ready to Run or Output this program with the
+// given args.
+func (g *Goes) Fork(args ...string) *exec.Cmd {
+	if g.Parent != nil && len(g.Path) == 0 {
+		// set Path of sub-goes. e.g. "ip address"
+		for p := g; p != nil; p = p.Parent {
+			g.Path = append([]string{p.String()}, g.Path...)
+		}
+	}
+	a := append(g.Path, args...)
+	x := exec.Command(prog.Name(), a[1:]...)
+	x.Args[0] = a[0]
+	return x
+}
+
 func (g *Goes) Help(args ...string) string {
 	cmd.Swap(args)
 	g.Shift(args)
@@ -214,6 +231,8 @@ func (g *Goes) Main(args ...string) error {
 				cliArgs = append(cliArgs, "-x")
 			}
 			return cli.Main(cliArgs...)
+		} else if def, found := g.byname[""]; found {
+			return def.Main()
 		}
 		fmt.Println(Usage(g))
 		return nil

@@ -246,8 +246,8 @@ func (m *netlink_main) cliInit() (err error) {
 			Action:    m.show_net_namespaces,
 		},
 		cli.Command{
-			Name:      "show unreachable",
-			ShortHelp: "show unreachable next hops",
+			Name:      "show ip unreachable",
+			ShortHelp: "show ip4 unreachable next hops",
 			Action:    m.show_unreachable,
 		},
 	}

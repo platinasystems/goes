@@ -76,24 +76,21 @@ rtt min/avg/max/mdev = 0.082/0.105/0.132/0.022 ms
 ```sh
 root@invader1:~# goes vnet show ip fib
  Table                   Destination           Adjacency
-     0                  10.15.0.0/24       3: glean eth-0-0
-     0                  10.15.0.1/32       4: local eth-0-0
-                                        tx pipe packets                3
-                                        tx pipe bytes                306
-     0                  10.15.0.4/32       5: rewrite eth-0-0 IP4: 02:46:8a:00:02:a3 -> 02:46:8a:00:01:97
-     2                   10.1.0.3/32      13: rewrite eth-30-0 IP4: 02:46:8a:00:02:c1 -> 02:46:8a:00:02:c2
-     3                   10.1.0.2/32      12: rewrite eth-31-0 IP4: 02:46:8a:00:02:c2 -> 02:46:8a:00:02:c1
-     4                   10.1.0.0/24       6: glean eth-30-0
-                                        tx pipe packets               10
-                                        tx pipe bytes               1020
-     4                   10.1.0.2/32      15: rewrite eth-30-0 IP4: 02:46:8a:00:02:c1 -> 02:46:8a:00:02:c2
-     5                   10.1.0.0/24      10: glean eth-31-0
-                                        tx pipe packets                8
-                                        tx pipe bytes                816
-     5                   10.1.0.1/32      14: rewrite eth-31-0 IP4: 02:46:8a:00:02:c2 -> 02:46:8a:00:02:c1
-     5                   10.1.0.3/32      11: local eth-31-0
-                                        tx pipe packets                2
-                                        tx pipe bytes                204
+     default                  10.15.0.0/24       3: glean eth-0-0
+     default                  10.15.0.1/32       4: local eth-0-0
+                                              tx pipe packets                2
+                                              tx pipe bytes                204
+     default                  10.15.0.4/32      11: rewrite eth-0-0 IP4: 02:46:8a:00:02:a3 -> 02:46:8a:00:01:97
+        net1                   10.1.0.0/24       5: glean eth-30-0
+        net1                   10.1.0.1/32       6: local eth-30-0
+                                              tx pipe packets                3
+                                              tx pipe bytes                306
+        net1                   10.1.0.2/32      10: rewrite eth-30-0 IP4: 02:46:8a:00:02:c1 -> 02:46:8a:00:02:c2
+        net2                   10.1.0.0/24       7: glean eth-31-0
+        net2                   10.1.0.1/32       9: rewrite eth-31-0 IP4: 02:46:8a:00:02:c2 -> 02:46:8a:00:02:c1
+        net2                   10.1.0.2/32       8: local eth-31-0
+                                              tx pipe packets                3
+                                              tx pipe bytes                306
 ```
 9. To delete the namespaces we can do them individually or delete them all:
 ```sh

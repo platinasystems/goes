@@ -27,8 +27,9 @@ var Package = map[string]string{
 	"importpath": "{{.Pkg.ImportPath}}",
 	"generated.by": "{{.Info.Generated.By}}",
 	"generated.on": "{{.Info.Generated.On}}",
-	"version": "{{.Info.Version}}",
-	"diff": ` + "`" + `{{.Info.Diff}}` + "`" + `,
+	"version": "{{.Info.Version}}",{{if .Info.Tag}}
+	"tag": ` + "`" + `{{.Info.Tag}}` + "`" + `,{{end}}{{if .Info.Diff}}
+	"diff": ` + "`" + `{{.Info.Diff}}` + "`" + `,{{end}}
 	"license": ` + "`" + `{{.Info.License}}` + "`" + `,
 	"patents": ` + "`" + `{{.Info.Patents}}` + "`" + `,
 }
@@ -39,7 +40,7 @@ var Exit = os.Exit
 var Stderr io.Writer = os.Stderr
 
 type Info struct {
-	GoPkgDir, Diff, Version, License, Patents string
+	GoPkgDir, Diff, Version, Tag, License, Patents string
 
 	Generated struct {
 		By, On string
@@ -108,6 +109,10 @@ func main() {
 			info.Version = fmt.Sprint("FIXME with go generate ",
 				pkg.ImportPath)
 			assume_unchanged = "--no-assume-unchanged"
+		}
+		buf, err = exec.Command("git", "describe", "--tags").Output()
+		if err == nil && len(buf) > 0 {
+			info.Tag = string(buf[:len(buf)-1])
 		}
 		buf, err = exec.Command("git", "diff", "--numstat").Output()
 		if err == nil && len(buf) > 0 {

@@ -137,13 +137,13 @@ func (c *Command) Main(args ...string) error {
 
 	for {
 		if v := c.g.ByName("login"); v != nil {
-			if err = run("login"); err != nil {
+			if err = c.run("login"); err != nil {
 				fmt.Fprintln(os.Stderr, "login:", err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
 		}
-		err = run("cli")
+		err = c.run("cli")
 		if err == io.EOF {
 			err = nil
 		}
@@ -158,9 +158,8 @@ func (*Command) Man() lang.Alt  { return man }
 func (*Command) String() string { return Name }
 func (*Command) Usage() string  { return Usage }
 
-func run(arg0 string) error {
-	x := exec.Command(prog.Name())
-	x.Args[0] = arg0
+func (c *Command) run(args ...string) error {
+	x := c.g.Fork(args...)
 	x.Stdin = os.Stdin
 	x.Stdout = os.Stdout
 	x.Stderr = os.Stderr

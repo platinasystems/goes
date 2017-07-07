@@ -24,7 +24,6 @@ import (
 	"github.com/platinasystems/go/internal/nocomment"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/pizza"
-	"github.com/platinasystems/go/internal/prog"
 	"github.com/platinasystems/go/internal/url"
 )
 
@@ -399,9 +398,7 @@ commandLoop:
 			if flag["-x"] {
 				fmt.Println("+", strings.Join(sl, " "))
 			}
-			a := append(c.g.Path, sl...)
-			x := exec.Command(prog.Name(), a[1:]...)
-			x.Args[0] = a[0]
+			x := c.g.Fork(sl...)
 			x.Stderr = os.Stderr
 			if i == 0 {
 				x.Stdin = in
