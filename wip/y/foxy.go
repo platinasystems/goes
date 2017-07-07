@@ -4,8 +4,8 @@ package main
 
 import (
 	"github.com/platinasystems/fe1"
+	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/vnet/ethernet"
-	"github.com/platinasystems/go/wip/y/internal/eeprom"
 
 	"flag"
 )
