@@ -157,7 +157,10 @@ func (i IfId) inner() IfId { return i >> 16 }
 func (i IfId) outer() IfId { return i & 0xffff }
 func (i IfId) valid() bool { return i&(1<<15) != 0 }
 func (i IfId) id() (id vnet.Uint16, valid bool) {
-	id, valid = vnet.Uint16(i&0xfff), i.valid()
+	valid = i.valid()
+	if valid {
+		id = vnet.Uint16(i & 0xfff)
+	}
 	return
 }
 func (i IfId) OuterVlan() (id vnet.Uint16, valid bool) { return i.outer().id() }

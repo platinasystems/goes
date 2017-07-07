@@ -190,6 +190,14 @@ func (m *Vnet) NewSwSubInterface(supSi Si, id IfId) (si Si) {
 	return
 }
 func (si Si) IsSwSubInterface(v *Vnet) bool { return v.SwIf(si).typ == swIfTypeSubInterface }
+func (si Si) Id(v *Vnet) (id IfId) {
+	id = ^IfId(0)
+	i := v.SwIf(si)
+	if i.typ == swIfTypeSubInterface {
+		id = i.id
+	}
+	return
+}
 
 func (m *interfaceMain) SwIf(i Si) *swIf { return &m.swInterfaces.elts[i] }
 func (m *interfaceMain) SupSi(i Si) Si   { return m.SwIf(i).supSi }
