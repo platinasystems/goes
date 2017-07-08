@@ -48,8 +48,8 @@ type DoubleTaggedPuntNode vlan_tagged_punt_node
 func (n *DoubleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
 	return (*vlan_tagged_punt_node)(n).add_disposition(cf, 2)
 }
-func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) {
-	(*vlan_tagged_punt_node)(n).del_disposition(i)
+func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) (ok bool) {
+	return (*vlan_tagged_punt_node)(n).del_disposition(i)
 }
 func PuntDispositionForTags(outer, inner VlanTag) (i uint32) {
 	return uint32(inner.ToHost()<<16) | uint32(outer.ToHost())

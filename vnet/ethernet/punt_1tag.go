@@ -48,8 +48,8 @@ func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i u
 	}
 	return
 }
-func (n *vlan_tagged_punt_node) del_disposition(i uint32) {
-	n.punt_packet_disposition_pool.PutIndex(uint(i))
+func (n *vlan_tagged_punt_node) del_disposition(i uint32) (ok bool) {
+	return n.punt_packet_disposition_pool.PutIndex(uint(i))
 }
 
 type SingleTaggedPuntNode vlan_tagged_punt_node
@@ -57,8 +57,8 @@ type SingleTaggedPuntNode vlan_tagged_punt_node
 func (n *SingleTaggedPuntNode) AddDisposition(cf PuntConfig) uint32 {
 	return (*vlan_tagged_punt_node)(n).add_disposition(cf, 1)
 }
-func (n *SingleTaggedPuntNode) DelDisposition(i uint32) {
-	(*vlan_tagged_punt_node)(n).del_disposition(i)
+func (n *SingleTaggedPuntNode) DelDisposition(i uint32) (ok bool) {
+	return (*vlan_tagged_punt_node)(n).del_disposition(i)
 }
 
 // Ethernet header followed by is 1 vlan tag.
