@@ -69,6 +69,10 @@ type header_no_type struct {
 
 const sizeof_header_no_type = 12
 
+// Like a VlanHeader but with fields in reverse order.
+// Packet looks like either of the following:
+//   DST-ETHERNET SRC-ETHERNET TypeAndTag INNER-TYPE
+//   DST-ETHERNET SRC-ETHERNET 0x8100 VlanHeader
 type VlanTypeAndTag struct {
 	Type Type
 	Tag  VlanTag
