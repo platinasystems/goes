@@ -29,7 +29,7 @@ type PuntConfig struct {
 	// True to advance past vlan/2-vlan tags to layer 3 header.
 	AdvanceL3Header     bool
 	NReplaceVlanHeaders uint
-	ReplaceVlanHeaders  [2]VlanHeader
+	ReplaceVlanHeaders  [2]VlanTypeAndTag
 }
 
 type punt_packet_disposition struct {
@@ -64,7 +64,7 @@ const sizeof_double_tag = 8
 
 func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	p0 := *(*vnet.Uint64)(r0.DataOffset(sizeof_header_no_type))
-	q0 := (*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type))
+	q0 := (*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
 
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
@@ -74,7 +74,7 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 		error0 = punt_2tag_error_not_double_tagged
 	}
 
-	di0 := PuntDispositionForTags(q0[0].g, q0[1].g)
+	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
@@ -93,7 +93,7 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	}
 
 	// Possibly replace tag.
-	*(*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type)) = *(*[2]type_and_tag)(unsafe.Pointer(&d0.replace_tags[0]))
+	*(*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type)) = *(*[2]VlanTypeAndTag)(unsafe.Pointer(&d0.replace_tags[0]))
 
 	// Copy src and dst ethernet address.
 	*(*header_no_type)(r0.DataOffset(uint(d0.header_index))) = *(*header_no_type)(r0.DataOffset(0))
@@ -106,8 +106,8 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	p0 := *(*vnet.Uint64)(r0.DataOffset(sizeof_header_no_type))
 	p1 := *(*vnet.Uint64)(r1.DataOffset(sizeof_header_no_type))
-	q0 := (*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type))
-	q1 := (*[2]type_and_tag)(r1.DataOffset(sizeof_header_no_type))
+	q0 := (*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
+	q1 := (*[2]VlanTypeAndTag)(r1.DataOffset(sizeof_header_no_type))
 
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
@@ -120,8 +120,8 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 		error1 = punt_2tag_error_not_double_tagged
 	}
 
-	di0 := PuntDispositionForTags(q0[0].g, q0[1].g)
-	di1 := PuntDispositionForTags(q1[0].g, q1[1].g)
+	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
+	di1 := PuntDispositionForTags(q1[0].Tag, q1[1].Tag)
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
@@ -149,8 +149,8 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	}
 
 	// Possibly replace tag.
-	*(*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type)) = *(*[2]type_and_tag)(unsafe.Pointer(&d0.replace_tags[0]))
-	*(*[2]type_and_tag)(r1.DataOffset(sizeof_header_no_type)) = *(*[2]type_and_tag)(unsafe.Pointer(&d1.replace_tags[0]))
+	*(*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type)) = *(*[2]VlanTypeAndTag)(unsafe.Pointer(&d0.replace_tags[0]))
+	*(*[2]VlanTypeAndTag)(r1.DataOffset(sizeof_header_no_type)) = *(*[2]VlanTypeAndTag)(unsafe.Pointer(&d1.replace_tags[0]))
 
 	// Copy src and dst ethernet address.
 	*(*header_no_type)(r0.DataOffset(uint(d0.header_index))) = *(*header_no_type)(r0.DataOffset(0))
