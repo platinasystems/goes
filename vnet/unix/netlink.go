@@ -43,8 +43,12 @@ type netlink_socket_pair struct {
 }
 
 func (p *netlink_socket_pair) close() {
-	p.broadcast_socket.Close()
-	p.unicast_socket.Close()
+	if p.broadcast_socket != nil {
+		p.broadcast_socket.Close()
+	}
+	if p.unicast_socket != nil {
+		p.unicast_socket.Close()
+	}
 }
 
 func (p *netlink_socket_pair) configure(broadcast_fd, unicast_fd int) (err error) {
