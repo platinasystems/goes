@@ -221,8 +221,7 @@ func (g *Goes) Main(args ...string) error {
 
 	cli := g.byname["cli"]
 	cliFlags, cliArgs := flags.New(args, "-f", "-no-liner", "-x")
-	switch len(cliArgs) {
-	case 0:
+	if n := len(cliArgs); n == 0 {
 		if cli != nil {
 			if cliFlags.ByName["-no-liner"] {
 				cliArgs = append(cliArgs, "-no-liner")
@@ -236,11 +235,11 @@ func (g *Goes) Main(args ...string) error {
 		}
 		fmt.Println(Usage(g))
 		return nil
-	case 1:
+	} else if _, found := g.byname[args[0]]; n == 1 && !found {
+		// only check for script if args[0] isn't a command
 		buf, err := ioutil.ReadFile(cliArgs[0])
-		if cliArgs[0] == "-" || (err == nil &&
-			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes")) &&
-			utf8.Valid(buf)) {
+		if cliArgs[0] == "-" || (err == nil && utf8.Valid(buf) &&
+			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes"))) {
 			// e.g. /usr/bin/goes SCRIPT
 			if cli == nil {
 				return fmt.Errorf("has no cli")
@@ -252,9 +251,9 @@ func (g *Goes) Main(args ...string) error {
 			}
 			return cli.Main(cliArgs...)
 		}
+	} else {
+		cmd.Swap(args)
 	}
-
-	cmd.Swap(args)
 
 	if _, found := cmd.Helpers[args[0]]; found {
 		return g.byname[args[0]].Main(args[1:]...)
