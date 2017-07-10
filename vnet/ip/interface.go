@@ -51,13 +51,26 @@ type ifAddressMain struct {
 	headBySwIf IfAddrVec
 }
 
-func (m *ifAddressMain) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
-	m.headBySwIf.ValidateInit(uint(si), IfAddrNil)
+func (m *Main) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
+	if isDel {
+		// Remove any remaining addresses when interface is deleted.
+		ai := m.headBySwIf[si]
+		for ai != IfAddrNil {
+			a := m.GetIfAddr(ai)
+			k := makeIfAddrMapKey(a.Prefix.Address[:], m.FibIndexForSi(si))
+			delete(m.addrMap, k)
+			m.ifAddressPool.PutIndex(uint(ai))
+			ai = a.next
+		}
+		m.headBySwIf[si] = IfAddrNil
+	} else {
+		m.headBySwIf.ValidateInit(uint(si), IfAddrNil)
+	}
 	return
 }
 
-func (m *ifAddressMain) init(v *vnet.Vnet) {
-	v.RegisterSwIfAddDelHook(m.swIfAddDel)
+func (*ifAddressMain) init(m *Main) {
+	m.v.RegisterSwIfAddDelHook(m.swIfAddDel)
 }
 
 func makeIfAddrMapKey(a []uint8, i FibIndex) (k ifAddrMapKey) {
