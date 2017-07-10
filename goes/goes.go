@@ -261,9 +261,14 @@ func (g *Goes) Main(args ...string) error {
 
 	g.Shift(args)
 
-	v := g.byname[args[0]]
-	if v == nil {
-		return fmt.Errorf("%s: command not found", args[0])
+	v, found := g.byname[args[0]]
+	if !found {
+		if v, found = g.byname[""]; !found {
+			return fmt.Errorf("%v: ambiguous or missing command",
+				args)
+		}
+		// e.g. ip -s add [default "show"]
+		args = append([]string{""}, args...)
 	}
 
 	k := cmd.WhatKind(v)
@@ -309,13 +314,21 @@ func (g *Goes) Plot(cmds ...cmd.Cmd) {
 	sort.Strings(g.Names)
 }
 
-// Shift first recognized command to args[0], so,
+// Shift the first unambiguous longest prefix match command to args[0], so,
 //
 //	OPTIONS... COMMAND [ARGS]...
 //
 // becomes
 //
 //	COMMAND OPTIONS... [ARGS]...
+//
+// e.g.
+//
+//	ip -s li
+//
+// becomes
+//
+//	ip link -s
 func (g *Goes) Shift(args []string) {
 	for i := range args {
 		if _, found := g.byname[args[i]]; found {
@@ -324,7 +337,22 @@ func (g *Goes) Shift(args []string) {
 				copy(args[1:i+1], args[:i])
 				args[0] = name
 			}
-			break
+			return
+		}
+		var matches int
+		var last string
+		for _, name := range g.Names {
+			if strings.HasPrefix(name, args[i]) {
+				last = name
+				matches++
+			}
+		}
+		if matches == 1 {
+			if i > 0 {
+				copy(args[1:i+1], args[:i])
+			}
+			args[0] = last
+			return
 		}
 	}
 }
