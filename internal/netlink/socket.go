@@ -402,10 +402,14 @@ func (s *Socket) gorx() {
 			if false {
 				fmt.Print("Rx: ", msg)
 			}
-			s.rx <- msg
+			if s.fd != -1 {
+				s.rx <- msg
+			}
 		}
 	}
-	close(s.rx)
+	if s.fd != -1 {
+		close(s.rx)
+	}
 	s.rx = nil
 }
 
