@@ -142,6 +142,13 @@ type swIf struct {
 
 func (m *Vnet) addDelSwInterface(siʹ, supSi Si, typ swIfType, id IfId, isDel bool) (si Si) {
 	si = siʹ
+
+	if isDel {
+		if err := si.SetAdminUp(m, false); err != nil {
+			panic(err) // how to recover?
+		}
+	}
+
 	if !isDel {
 		si = Si(m.swInterfaces.GetIndex())
 		if supSi == SiNil {

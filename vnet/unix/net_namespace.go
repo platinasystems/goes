@@ -242,6 +242,8 @@ func (e *netlinkEvent) netnsMessage(msg *netlink.NetnsMessage) (err error) {
 
 func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) (err error) {
 	if is_del {
+		ns := m.namespace_by_name[name]
+		ns.del(m)
 		delete(m.namespace_by_name, name)
 		return
 	}
@@ -268,10 +270,11 @@ func (m *netlink_main) watch_namespace_add_del(dir, name string, is_del bool) {
 			return
 		}
 	} else {
-		var ok bool
-		if _, ok = m.namespace_by_name[name]; !ok {
+		if ns, ok := m.namespace_by_name[name]; !ok {
 			m.m.v.Logf("namespace watch del: unknown namespace %s\n", name)
 			return
+		} else {
+			nsid = ns.nsid
 		}
 	}
 	err = m.add_del_nsid(name, nsid, is_del)
@@ -600,14 +603,20 @@ func (ns *net_namespace) add(m *netlink_main) (err error) {
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
+	for index, intf := range ns.interface_by_index {
+		if intf.si != vnet.SiNil {
+			m.m.v.DelSwIf(intf.si)
+		}
+		delete(ns.interface_by_index, index)
+	}
+
 	ns.m.namespace_pool.PutIndex(ns.index)
 	ns.m.namespace_pool.entries[ns.index] = nil
-	ns.index = ^uint(0)
-
+	ns.fibInit(true)
 	if ns.ns_fd > 0 {
 		syscall.Close(ns.ns_fd)
 		ns.ns_fd = -1
 	}
 	ns.netlink_socket_pair.close()
-	ns.fibInit(true)
+	ns.index = ^uint(0)
 }
