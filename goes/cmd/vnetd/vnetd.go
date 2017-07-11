@@ -123,14 +123,18 @@ func (c *Command) Main(...string) error {
 
 	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
 
-	return c.i.v.Run(&in)
+	err = c.i.v.Run(&in)
+	CloseHook(&c.i, &c.i.v)
+	closeDone <- err
+	return nil
 }
 
-func (c *Command) Close() error {
-	// FIXME the following isn't working.
-	// c.i.v.Quit()
-	// return CloseHook(&c.i, &c.i.v)
-	return nil
+var closeDone = make(chan error)
+
+func (c *Command) Close() (err error) {
+	c.i.v.Quit()
+	err = <-closeDone
+	return
 }
 
 func (i *Info) Init() {

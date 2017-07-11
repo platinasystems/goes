@@ -9,15 +9,16 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/platinasystems/go/goes/cmd/stop"
+	"github.com/platinasystems/go/goes/cmd/vnetd"
+	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
 )
 
-func init() { stop.Hook = defaultMk1.stopHook }
+func init() { vnetd.CloseHook = defaultMk1.stopHook }
 
-func (p *mk1Main) stopHook() error {
+func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 	if p.SriovMode {
-		return mk1.PlatformExit(p.v, &p.Platform)
+		return mk1.PlatformExit(v, &p.Platform)
 	} else {
 		interfaces, err := net.Interfaces()
 		if err != nil {
