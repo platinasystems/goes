@@ -92,26 +92,34 @@ func (c *Command) Main(...string) error {
 	}
 
 	go qsfpioTicker(c)
-	t := time.NewTicker(5 * time.Second)
+	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
+	tm := time.NewTicker(500 * time.Millisecond)
+	defer tm.Stop()
 	for {
 		select {
 		case <-c.stop:
 			return nil
 		case <-t.C:
-			if err = c.update(); err != nil {
+			if err = c.updateMonitor(); err != nil {
+				close(c.stop)
+				return err
+			}
+		case <-tm.C:
+			if err = c.updatePresence(); err != nil {
 				close(c.stop)
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
 func (*Command) String() string { return Name }
 func (*Command) Usage() string  { return Usage }
 
-func (c *Command) update() error {
+func (c *Command) updatePresence() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
@@ -364,6 +372,20 @@ func (c *Command) update() error {
 		}
 		present[j] = latestPresent[j]
 	}
+
+	return nil
+}
+
+func (c *Command) updateMonitor() error {
+	stopped := readStopped()
+	if stopped == 1 {
+		return nil
+	}
+	ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+	if err != nil || ready == "false" {
+		return nil
+	}
+
 	for i := 0; i < 32; i++ {
 		//publish dynamic monitoring data
 		var port int
