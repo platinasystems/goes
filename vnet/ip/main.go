@@ -27,6 +27,23 @@ type Main struct {
 	fibMain
 	adjacencyMain
 	ifAddressMain
+	layerMap map[Protocol]vnet.Layer
+}
+
+func (m *Main) RegisterLayer(v *vnet.Vnet, t Protocol, l vnet.Layer) {
+	if m.layerMap == nil {
+		m.layerMap = make(map[Protocol]vnet.Layer)
+	}
+	m.layerMap[t] = l
+}
+func (m *Main) UnregisterLayer(v *vnet.Vnet, t Protocol) (ok bool) {
+	_, ok = m.layerMap[t]
+	delete(m.layerMap, t)
+	return
+}
+func (m *Main) GetLayer(t Protocol) (l vnet.Layer, ok bool) {
+	l, ok = m.layerMap[t]
+	return
 }
 
 func (m *Main) Init(v *vnet.Vnet) { m.adjacencyInit() }

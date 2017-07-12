@@ -8,13 +8,12 @@ import (
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
-	"github.com/platinasystems/go/vnet/ip4"
-	"github.com/platinasystems/go/vnet/ip6"
 
 	"errors"
 )
 
 type ipNeighborFamily struct {
+	m              *ip.Main
 	pool           ipNeighborPool
 	indexByAddress map[ipNeighborKey]uint
 }
@@ -25,8 +24,10 @@ type ipNeighborMain struct {
 	ipNeighborFamilies [ip.NFamily]ipNeighborFamily
 }
 
-func (m *ipNeighborMain) init(v *vnet.Vnet) {
+func (m *ipNeighborMain) init(v *vnet.Vnet, im4, im6 *ip.Main) {
 	m.v = v
+	m.ipNeighborFamilies[ip.Ip4].m = im4
+	m.ipNeighborFamilies[ip.Ip6].m = im6
 	v.RegisterSwIfAddDelHook(m.swIfAddDel)
 }
 
@@ -126,20 +127,13 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 	return
 }
 
-func (m *ipNeighborMain) delKey(fi ip.Family, k *ipNeighborKey) (err error) {
-	var (
-		im *ip.Main
-		n  IpNeighbor
-	)
-	n.Ip = k.Ip
-	n.Si = k.Si
-	if fi == ip.Ip4 {
-		im = &ip4.GetMain(m.v).Main
-	} else {
-		im = &ip6.GetMain(m.v).Main
+func (m *ipNeighborMain) delKey(nf *ipNeighborFamily, k *ipNeighborKey) (err error) {
+	n := IpNeighbor{
+		Ip: k.Ip,
+		Si: k.Si,
 	}
 	const isDel = true
-	err = m.AddDelIpNeighbor(im, &n, isDel)
+	err = m.AddDelIpNeighbor(nf.m, &n, isDel)
 	return
 }
 
@@ -149,7 +143,7 @@ func (m *ipNeighborMain) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err e
 			nf := &m.ipNeighborFamilies[fi]
 			for k, _ := range nf.indexByAddress {
 				if k.Si == si {
-					if err = m.delKey(ip.Family(fi), &k); err != nil {
+					if err = m.delKey(nf, &k); err != nil {
 						return
 					}
 				}

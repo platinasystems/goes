@@ -46,6 +46,23 @@ type VlanHeader struct {
 	Type Type
 }
 
+// Like a VlanHeader but with fields in reverse order.
+// Packet looks like either of the following:
+//   DST-ETHERNET SRC-ETHERNET TypeAndTag INNER-TYPE
+//   DST-ETHERNET SRC-ETHERNET 0x8100 VlanHeader
+type VlanTypeAndTag struct {
+	Type Type
+	Tag  VlanTag
+}
+
+const SizeofVlanTypeAndTag = 4
+
+func (h *VlanTypeAndTag) Write(b []byte) {
+	type t struct{ data [SizeofVlanTypeAndTag]byte }
+	i := (*t)(unsafe.Pointer(h))
+	copy(b[:], i.data[:])
+}
+
 const MaxVlan = 1 << 12
 
 // Packet type from ethernet header.
@@ -63,12 +80,12 @@ func (h *Header) GetPayload() unsafe.Pointer {
 }
 
 const (
-	AddressBytes    = 6
-	HeaderBytes     = 14
-	VlanHeaderBytes = 4
+	SizeofAddress    = 6
+	SizeofHeader     = 14
+	SizeofVlanHeader = 4
 )
 
-type Address [AddressBytes]byte
+type Address [SizeofAddress]byte
 
 var BroadcastAddr = Address{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 
@@ -97,13 +114,13 @@ func (h *Header) IsUnicast() bool {
 func (a *Address) Add(x uint64) { vnet.ByteAdd(a[:], x) }
 
 func (a *Address) FromUint64(x vnet.Uint64) {
-	for i := 0; i < AddressBytes; i++ {
+	for i := 0; i < SizeofAddress; i++ {
 		a[i] = byte((x >> uint(40-8*i)) & 0xff)
 	}
 }
 
 func (a *Address) ToUint64() (x vnet.Uint64) {
-	for i := 0; i < AddressBytes; i++ {
+	for i := 0; i < SizeofAddress; i++ {
 		x |= vnet.Uint64(a[i]) << uint(40-8*i)
 	}
 	return
@@ -138,17 +155,17 @@ func RandomAddress() (a Address) {
 }
 
 // Implement vnet.Header interface.
-func (h *Header) Len() uint { return HeaderBytes }
+func (h *Header) Len() uint { return SizeofHeader }
 func (h *Header) Write(b []byte) {
-	type t struct{ data [HeaderBytes]byte }
+	type t struct{ data [SizeofHeader]byte }
 	i := (*t)(unsafe.Pointer(h))
 	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
 
-func (h *VlanHeader) Len() uint { return VlanHeaderBytes }
+func (h *VlanHeader) Len() uint { return SizeofVlanHeader }
 func (h *VlanHeader) Write(b []byte) {
-	type t struct{ data [VlanHeaderBytes]byte }
+	type t struct{ data [SizeofVlanHeader]byte }
 	i := (*t)(unsafe.Pointer(h))
 	copy(b[:], i.data[:])
 }

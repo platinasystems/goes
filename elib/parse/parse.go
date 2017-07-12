@@ -465,7 +465,7 @@ func (in *Input) Parse(format string, args ...interface{}) (ok bool) {
 		if e := recover(); e != nil {
 			ok = false
 			// Save away error and input context.
-			in.err = fmt.Errorf("%s: %s", e, in)
+			in.err = e.(error) // fmt.Errorf("%s: %s", e, in)
 		}
 		in.restore(ok)
 	}()
@@ -769,7 +769,7 @@ loop:
 		if backslash {
 			backslash = false
 		} else if isSpace(r) {
-			if !(is_paren_delimited || is_line_delimited) || (is_line_delimited && r == '\n') {
+			if !(is_paren_delimited || is_line_delimited) || (is_line_delimited && r == '\n' && paren == 0) {
 				in.Unread(size)
 				break loop
 			}
@@ -779,7 +779,7 @@ loop:
 				backslash = true
 				add = false
 			case '{':
-				if paren == 0 && (len(s) == 0 || is_line_delimited) {
+				if paren == 0 && len(s) == 0 {
 					is_paren_delimited = true
 					is_line_delimited = false // no longer line delimited
 					add = false

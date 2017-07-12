@@ -33,24 +33,31 @@ type Rewrite struct {
 	data [hw.BufferRewriteBytes]byte
 }
 
-func (r *Rewrite) String(v *Vnet) string {
+func (r *Rewrite) String(v *Vnet) (lines []string) {
 	hi := v.SupHi(r.Si)
 	h := v.HwIfer(hi)
-	return r.Si.Name(v) + " " + h.FormatRewrite(r)
+	lines = append(lines, r.Si.Name(v))
+	lines = append(lines, h.FormatRewrite(r)...)
+	return
 }
 
 func (r *Rewrite) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*Vnet)
-	if !in.Parse("%v", &r.Si, v) {
+	var line parse.Input
+	if !in.Parse("%v %v", &r.Si, v, &line) {
 		panic(parse.ErrInput)
 	}
 	sw := v.SwIf(r.Si)
 	hw := v.SupHwIf(sw)
 	h := v.HwIfer(hw.hi)
-	h.ParseRewrite(r, in)
+	h.ParseRewrite(r, &line)
 }
 
+func (r *Rewrite) Len() uint        { return uint(r.dataLen) }
 func (r *Rewrite) SetData(d []byte) { r.dataLen = uint16(copy(r.data[:], d)) }
+func (r *Rewrite) ResetData()       { r.SetData(nil) }
+func (r *Rewrite) Data() []byte     { return r.data[:] }
+func (r *Rewrite) Slice() []byte    { return r.data[:r.dataLen] }
 func (r *Rewrite) AddData(p unsafe.Pointer, size uintptr) (l uintptr) {
 	l = uintptr(r.dataLen)
 	r.dataLen += uint16(size)

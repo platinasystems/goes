@@ -219,7 +219,10 @@ func (m *Main) ExecInput(w io.Writer, in *Input) (err error) {
 				err = fmt.Errorf("%s: %s `%s': %s", c.CliName(), e, in, debug.Stack())
 			}
 		}()
-		err = c.CliAction(w, in)
+		// Potentially skip leading and trailing {} in input line.
+		var line Input
+		in.Parse("%l", &line.Input)
+		err = c.CliAction(w, &line)
 	}
 	return
 }

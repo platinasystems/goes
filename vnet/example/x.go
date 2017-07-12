@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/gre"
 	ipcli "github.com/platinasystems/go/vnet/ip/cli"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -162,9 +163,10 @@ func main() {
 
 	// Select packages we want to run with.
 	unix.Init(v)
-	ethernet.Init(v)
-	ip4.Init(v)
-	ip6.Init(v)
+	m4 := ip4.Init(v)
+	m6 := ip6.Init(v)
+	ethernet.Init(v, m4, m6)
+	gre.Init(v)
 	ixge.Init(v)
 	pg.Init(v)
 	ipcli.Init(v)

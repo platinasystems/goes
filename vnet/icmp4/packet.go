@@ -20,7 +20,7 @@ type Header struct {
 	Checksum vnet.Uint16
 }
 
-const HeaderBytes = 4
+const SizeofHeader = 4
 
 type Type uint8
 
@@ -111,13 +111,13 @@ func (h *Header) checksum(payload []byte) vnet.Uint16 {
 	return ^c.Fold()
 }
 
-func (h *Header) Len() uint                       { return HeaderBytes }
+func (h *Header) Len() uint                       { return SizeofHeader }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
 func (h *Header) Write(b []byte) {
 	h.Checksum = 0
-	h.Checksum = h.checksum(b[HeaderBytes:])
+	h.Checksum = h.checksum(b[SizeofHeader:])
 
-	type t struct{ data [HeaderBytes]byte }
+	type t struct{ data [SizeofHeader]byte }
 	i := (*t)(unsafe.Pointer(h))
 	copy(b[:], i.data[:])
 }

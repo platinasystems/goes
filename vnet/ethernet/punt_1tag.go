@@ -34,17 +34,17 @@ func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i u
 	d.next = uint32(n.Vnet.AddNamedNext(n, cf.Next))
 	if cf.AdvanceL3Header {
 		d.header_index = 0
-		d.data_advance = int32(HeaderBytes + n_tags*VlanHeaderBytes)
+		d.data_advance = int32(SizeofHeader + n_tags*SizeofVlanHeader)
 	} else {
-		d.data_advance = int32(VlanHeaderBytes * (int(n_tags) - int(cf.NReplaceVlanHeaders)))
+		d.data_advance = int32(SizeofVlanHeader * (int(n_tags) - int(cf.NReplaceVlanHeaders)))
 		d.header_index = d.data_advance
 	}
 	switch cf.NReplaceVlanHeaders {
 	case 1:
-		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[VlanHeaderBytes:])
+		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[SizeofVlanHeader:])
 	case 2:
 		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[0:])
-		cf.ReplaceVlanHeaders[1].Write(d.replace_tags[VlanHeaderBytes:])
+		cf.ReplaceVlanHeaders[1].Write(d.replace_tags[SizeofVlanHeader:])
 	}
 	return
 }
@@ -68,23 +68,6 @@ type header_no_type struct {
 }
 
 const sizeof_header_no_type = 12
-
-// Like a VlanHeader but with fields in reverse order.
-// Packet looks like either of the following:
-//   DST-ETHERNET SRC-ETHERNET TypeAndTag INNER-TYPE
-//   DST-ETHERNET SRC-ETHERNET 0x8100 VlanHeader
-type VlanTypeAndTag struct {
-	Type Type
-	Tag  VlanTag
-}
-
-const SizeofVlanTypeAndTag = 4
-
-func (h *VlanTypeAndTag) Write(b []byte) {
-	type t struct{ data [SizeofVlanTypeAndTag]byte }
-	i := (*t)(unsafe.Pointer(h))
-	copy(b[:], i.data[:])
-}
 
 func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	p0 := (*VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))

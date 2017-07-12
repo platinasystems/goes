@@ -74,7 +74,7 @@ loop:
 	case in.Parse("%v", &adj, &m4.Main):
 		x.adjs = append(x.adjs, adj)
 	default:
-		err = fmt.Errorf("looking for via NEXT-HOP or adjacency, got `%s'", in)
+		err = in.Error()
 		return
 	}
 

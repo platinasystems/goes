@@ -59,6 +59,7 @@ func (h *HwIf) GetHwIf() *HwIf { return h }
 func (h *HwIf) Name() string   { return h.name }
 func (h *HwIf) Si() Si         { return h.si }
 func (h *HwIf) Hi() Hi         { return h.hi }
+func (h *HwIf) GetVnet() *Vnet { return h.vnet }
 func (h *HwIf) IsUnix() bool   { return false }
 
 func (h *HwIf) SetName(v *Vnet, name string) {
@@ -614,7 +615,7 @@ type HwIfClasser interface {
 	SetAddress(a []byte)
 	FormatAddress() string
 	SetRewrite(v *Vnet, r *Rewrite, t PacketType, dstAddr []byte)
-	FormatRewrite(r *Rewrite) string
+	FormatRewrite(r *Rewrite) []string
 	ParseRewrite(r *Rewrite, in *parse.Input)
 }
 

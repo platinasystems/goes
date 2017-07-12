@@ -172,7 +172,7 @@ func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)             
 func (n *node) GetAddress() (a []byte)                                                           { return }
 func (n *node) SetAddress(a []byte)                                                              {}
 func (n *node) FormatAddress() (s string)                                                        { return }
-func (n *node) FormatRewrite(rw *vnet.Rewrite) (s string)                                        { return }
+func (n *node) FormatRewrite(rw *vnet.Rewrite) (lines []string)                                  { return }
 func (n *node) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.PacketType, da []byte) {}
 func (n *node) ParseRewrite(rw *vnet.Rewrite, in *parse.Input)                                   {}
 
