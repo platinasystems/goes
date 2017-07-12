@@ -1,7 +1,13 @@
+// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
 package upgrade
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"syscall"
 	"unsafe"
 )
@@ -30,77 +36,108 @@ const (
 	MTDdevice  = "/dev/mtd0"
 )
 
+var img = []string{"ubo", "dtb", "env", "ker", "ini"}
+var off = []uint32{0x00000, 0x80000, 0xc0000, 0x100000, 0x300000}
+var siz = []uint32{0x80000, 0x40000, 0x40000, 0x200000, 0x300000}
+
+func wrImgAll() (err error) {
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return err
+	}
+	defer syscall.Close(fd)
+
+	if err = infoQSPI(); err != err {
+		return err
+	}
+	for j, i := range img {
+		err := wrImg("/"+Machine+"-"+i+".bin", off[j], siz[j])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func wrImg(im string, of uint32, sz uint32) error {
+	if fi, err := os.Stat(im); !os.IsNotExist(err) {
+		if fi.Size() < 1000 {
+			fmt.Println("skipping file...", im)
+			return nil
+		}
+		if err = eraseQSPI(of, sz); err != nil {
+			return err
+		}
+		b, err := ioutil.ReadFile(im)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Programming...", im)
+		_, err = writeQSPI(b, of)
+		if err != nil {
+			return err
+		}
+		//TODO add verify
+	}
+	return nil
+}
+
 var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
 var ei = &EraseInfo{0, 0}
 var fd int = 0
 
-func openQSPI() (err error) {
-	path := MTDdevice
-	defer syscall.Close(fd)
-	fd, err = syscall.Open(path, syscall.O_RDWR, 0)
-	if err != nil {
-		err = fmt.Errorf("open %s: %s", path, err)
-		return err
-	}
-	_, _, e := syscall.RawSyscall(syscall.SYS_IOCTL, uintptr(fd),
+func infoQSPI() (err error) {
+	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
 		uintptr(MEMGETINFO), uintptr(unsafe.Pointer(mi)))
 	if e != 0 {
-		err = fmt.Errorf("Open %s: %s", path, e)
+		err = fmt.Errorf("Open error : %s", e)
 		return err
 	}
 	return nil
 }
 
-func closeQSPI() {
-	syscall.Close(fd)
+func readQSPI(of uint32, sz uint32) (int, []byte, error) {
+	b := make([]byte, sz)
+	_, err := syscall.Seek(fd, int64(of), 0)
+	if err != nil {
+		err = fmt.Errorf("Seek error: %s: %s", of, err)
+		return 0, b, err
+	}
+	n, err := syscall.Read(fd, b)
+	if err != nil {
+		err = fmt.Errorf("Read error %s: %s", of, err)
+		return 0, b, err
+	}
+	fmt.Println(n, string(b))
+	return n, b, nil
 }
 
-func readQSPI(offset int, length int) ([]byte, error) {
-	path := MTDdevice
-	buf := make([]byte, length)
-	defer syscall.Close(fd)
-	_, err := syscall.Seek(fd, int64(offset), 0)
+func writeQSPI(b []byte, of uint32) (int, error) {
+	_, err := syscall.Seek(fd, int64(of), 0)
 	if err != nil {
-		err = fmt.Errorf("Seek error: %s: %s", path, err)
-		return buf, err
+		err = fmt.Errorf("Seek error: %s: %s", of, err)
+		return 0, err
 	}
-	n, err := syscall.Read(fd, buf)
+	n, err := syscall.Write(fd, b)
 	if err != nil {
-		err = fmt.Errorf("Read error %s: %s", path, err)
-		return buf, err
+		err = fmt.Errorf("Write error %s: %s", of, err)
+		return 0, err
 	}
-	fmt.Println(n, string(buf))
-	return buf, nil
+	return n, nil
 }
 
-func writeQSPI(offset int, length int, b []byte) error {
-	path := MTDdevice
-	defer syscall.Close(fd)
-	_, err := syscall.Seek(fd, int64(offset), 0)
-	if err != nil {
-		err = fmt.Errorf("Seek error: %s: %s", path, err)
-		return err
-	}
-	buf := make([]byte, length)
-	buf = b
-	n, err := syscall.Write(fd, buf)
-	if err != nil {
-		err = fmt.Errorf("Write error %s: %s", path, err)
-		return err
-	}
-	fmt.Println(n, string(buf))
-	//TODO: add verify
-	return nil
-}
-
-func eraseQSPI(offset int, length int) error {
-	defer syscall.Close(fd)
+func eraseQSPI(of uint32, sz uint32) error {
 	ei.length = mi.erasesize
-	for i := 0; i < 1; i += 1 { //ei.length
-		//ioctl(fd, MEMUNLOCK, &ei)
-		//log.Print("Erasing Block %x\n", ei.start)
-		//ioctl(fd, MEMERASE, &ei)
+	end := of + sz
+	for ei.start = of; ei.start < end; ei.start += ei.length {
+		fmt.Println("Erasing Block...", ei.start)
+		_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
+			uintptr(MEMERASE), uintptr(unsafe.Pointer(ei)))
+		if e != 0 {
+			err := fmt.Errorf("Erase error %s: %s", ei.start, e)
+			return err
+		}
 	}
-	//TODO: add verify
 	return nil
 }
