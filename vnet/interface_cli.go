@@ -220,6 +220,13 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	if len(cf.siMap) == 0 {
 		v.swInterfaces.ForeachIndex(func(i uint) {
 			si := Si(i)
+			// Skip unprovisioned interfaces.
+			sw := v.SwIf(si)
+			hw := v.SupHwIf(sw)
+			if hw.unprovisioned {
+				return
+			}
+			// Skip interfaces which don't match regexps.
 			if cf.re.Valid() && !cf.re.MatchString(si.Name(v)) {
 				return
 			}
