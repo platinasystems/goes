@@ -44,7 +44,7 @@ func (r *Rewrite) String(v *Vnet) (lines []string) {
 func (r *Rewrite) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*Vnet)
 	var line parse.Input
-	if !in.Parse("%v %v", &r.Si, v, &line) {
+	if !in.Parse("%v %l", &r.Si, v, &line) {
 		panic(parse.ErrInput)
 	}
 	sw := v.SwIf(r.Si)
