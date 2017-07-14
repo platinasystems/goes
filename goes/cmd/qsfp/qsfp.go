@@ -230,6 +230,8 @@ func (c *Command) updatePresence() error {
 							c.pub.Print(k, ": ", v)
 						}
 						if !portIsCopper[i+j*16] {
+							// optics need delay from power on to make thresholds readable
+							time.Sleep(10 * time.Millisecond)
 							// get monitoring thresholds if qsfp is not a cable
 							Vdev[i+j*16].StaticBlocks(i + j*16)
 							v = Temp(portUpage3[i+j*16].tempHighAlarm)
@@ -365,7 +367,7 @@ func (c *Command) updatePresence() error {
 							c.lasts[k] = ""
 						}
 						log.Print("QSFP removed from port ", lp)
-						portIsCopper[lp-1] = true
+						portIsCopper[i+j*16] = true
 					}
 				}
 			}
@@ -686,70 +688,70 @@ func Voltage(t uint16) string {
 }
 func (h *I2cDev) DynamicBlocks(port int) {
 	r := getRegsLpage0()
-	r.pageSelect.set(h, 0)
-	closeMux(h)
-	DoI2cRpc()
 	rb := getBlocks()
+
+	r.pageSelect.set(h, 0)
 	rb.lpage0b.get(h, 32)
 	closeMux(h)
 	DoI2cRpc()
 
-	portLpage0[port].id = s[2].D[1]
-	portLpage0[port].status = uint16(s[2].D[2]) + uint16(s[2].D[3])<<8
-	copy(portLpage0[port].channelStatusInterrupt[:], s[2].D[4:7])
-	copy(portLpage0[port].freeMonitorInterruptFlags[:], s[2].D[7:10])
-	copy(portLpage0[port].channelMonitorInterruptFlags[:], s[2].D[10:16])
-	portLpage0[port].freeMonTemp = uint16(s[2].D[24]) + uint16(s[2].D[23])<<8
-	portLpage0[port].freeMonVoltage = uint16(s[2].D[28]) + uint16(s[2].D[27])<<8
+	portLpage0[port].id = s[5].D[1]
+	portLpage0[port].status = uint16(s[5].D[2]) + uint16(s[5].D[3])<<8
+	copy(portLpage0[port].channelStatusInterrupt[:], s[5].D[4:7])
+	copy(portLpage0[port].freeMonitorInterruptFlags[:], s[5].D[7:10])
+	copy(portLpage0[port].channelMonitorInterruptFlags[:], s[5].D[10:16])
+	portLpage0[port].freeMonTemp = uint16(s[5].D[24]) + uint16(s[5].D[23])<<8
+	portLpage0[port].freeMonVoltage = uint16(s[5].D[28]) + uint16(s[5].D[27])<<8
 
+	r.pageSelect.set(h, 0)
 	rb.lpage1b.get(h, 32)
 	closeMux(h)
 	DoI2cRpc()
 
-	copy(portLpage0[port].rxPower[:], s[2].D[3:11])
-	copy(portLpage0[port].txBias[:], s[2].D[11:19])
-	copy(portLpage0[port].txPower[:], s[2].D[19:27])
+	copy(portLpage0[port].rxPower[:], s[5].D[3:11])
+	copy(portLpage0[port].txBias[:], s[5].D[11:19])
+	copy(portLpage0[port].txPower[:], s[5].D[19:27])
 }
 
 func (h *I2cDev) StaticBlocks(port int) {
 	if !portIsCopper[port] {
 		r := getRegsLpage0()
-		r.pageSelect.set(h, 3)
-		closeMux(h)
-		DoI2cRpc()
-
 		rb := getBlocks()
+
+		r.pageSelect.set(h, 3)
 		rb.upage0b.get(h, 32)
 		closeMux(h)
 		DoI2cRpc()
-		portUpage3[port].tempHighAlarm = (uint16(s[2].D[1]) << 8) + uint16(s[2].D[2])
-		portUpage3[port].tempLowAlarm = (uint16(s[2].D[3]) << 8) + uint16(s[2].D[4])
-		portUpage3[port].tempHighWarning = (uint16(s[2].D[5]) << 8) + uint16(s[2].D[6])
-		portUpage3[port].tempLowWarning = (uint16(s[2].D[7]) << 8) + uint16(s[2].D[8])
-		portUpage3[port].vccHighAlarm = (uint16(s[2].D[17]) << 8) + uint16(s[2].D[18])
-		portUpage3[port].vccLowAlarm = (uint16(s[2].D[19]) << 8) + uint16(s[2].D[20])
-		portUpage3[port].vccHighWarning = (uint16(s[2].D[21]) << 8) + uint16(s[2].D[22])
-		portUpage3[port].vccLowWarning = (uint16(s[2].D[23]) << 8) + uint16(s[2].D[24])
+		portUpage3[port].tempHighAlarm = (uint16(s[5].D[1]) << 8) + uint16(s[5].D[2])
+		portUpage3[port].tempLowAlarm = (uint16(s[5].D[3]) << 8) + uint16(s[5].D[4])
+		portUpage3[port].tempHighWarning = (uint16(s[5].D[5]) << 8) + uint16(s[5].D[6])
+		portUpage3[port].tempLowWarning = (uint16(s[5].D[7]) << 8) + uint16(s[5].D[8])
+		portUpage3[port].vccHighAlarm = (uint16(s[5].D[17]) << 8) + uint16(s[5].D[18])
+		portUpage3[port].vccLowAlarm = (uint16(s[5].D[19]) << 8) + uint16(s[5].D[20])
+		portUpage3[port].vccHighWarning = (uint16(s[5].D[21]) << 8) + uint16(s[5].D[22])
+		portUpage3[port].vccLowWarning = (uint16(s[5].D[23]) << 8) + uint16(s[5].D[24])
 
+		r.pageSelect.set(h, 3)
 		rb.upage1b.get(h, 32)
 		closeMux(h)
 		DoI2cRpc()
-		portUpage3[port].rxPowerHighAlarm = (uint16(s[2].D[17]) << 8) + uint16(s[2].D[18])
-		portUpage3[port].rxPowerLowAlarm = (uint16(s[2].D[19]) << 8) + uint16(s[2].D[20])
-		portUpage3[port].rxPowerHighWarning = (uint16(s[2].D[21]) << 8) + uint16(s[2].D[22])
-		portUpage3[port].rxPowerLowWarning = (uint16(s[2].D[23]) << 8) + uint16(s[2].D[24])
-		portUpage3[port].txBiasHighAlarm = (uint16(s[2].D[25]) << 8) + uint16(s[2].D[26])
-		portUpage3[port].txBiasLowAlarm = (uint16(s[2].D[27]) << 8) + uint16(s[2].D[28])
-		portUpage3[port].txBiasHighWarning = (uint16(s[2].D[29]) << 8) + uint16(s[2].D[30])
-		portUpage3[port].txBiasLowWarning = (uint16(s[2].D[31]) << 8) + uint16(s[2].D[32])
+		portUpage3[port].rxPowerHighAlarm = (uint16(s[5].D[17]) << 8) + uint16(s[5].D[18])
+		portUpage3[port].rxPowerLowAlarm = (uint16(s[5].D[19]) << 8) + uint16(s[5].D[20])
+		portUpage3[port].rxPowerHighWarning = (uint16(s[5].D[21]) << 8) + uint16(s[5].D[22])
+		portUpage3[port].rxPowerLowWarning = (uint16(s[5].D[23]) << 8) + uint16(s[5].D[24])
+		portUpage3[port].txBiasHighAlarm = (uint16(s[5].D[25]) << 8) + uint16(s[5].D[26])
+		portUpage3[port].txBiasLowAlarm = (uint16(s[5].D[27]) << 8) + uint16(s[5].D[28])
+		portUpage3[port].txBiasHighWarning = (uint16(s[5].D[29]) << 8) + uint16(s[5].D[30])
+		portUpage3[port].txBiasLowWarning = (uint16(s[5].D[31]) << 8) + uint16(s[5].D[32])
 
+		r.pageSelect.set(h, 3)
 		rb.upage2b.get(h, 32)
 		closeMux(h)
 		DoI2cRpc()
-		portUpage3[port].txPowerHighAlarm = (uint16(s[2].D[1]) << 8) + uint16(s[2].D[2])
-		portUpage3[port].txPowerLowAlarm = (uint16(s[2].D[3]) << 8) + uint16(s[2].D[4])
-		portUpage3[port].txPowerHighWarning = (uint16(s[2].D[5]) << 8) + uint16(s[2].D[6])
-		portUpage3[port].txPowerLowWarning = (uint16(s[2].D[7]) << 8) + uint16(s[2].D[8])
+		portUpage3[port].txPowerHighAlarm = (uint16(s[5].D[1]) << 8) + uint16(s[5].D[2])
+		portUpage3[port].txPowerLowAlarm = (uint16(s[5].D[3]) << 8) + uint16(s[5].D[4])
+		portUpage3[port].txPowerHighWarning = (uint16(s[5].D[5]) << 8) + uint16(s[5].D[6])
+		portUpage3[port].txPowerLowWarning = (uint16(s[5].D[7]) << 8) + uint16(s[5].D[8])
 
 		r = getRegsLpage0()
 		r.pageSelect.set(h, 0)
