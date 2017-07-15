@@ -81,10 +81,9 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 		prefix.Len = 128
 	}
 	if ok {
-		ai, ok = im.GetRoute(&prefix, n.Si)
-		if ok {
-			as = im.GetAdj(ai)
-		}
+		ai, as, ok = im.GetRoute(&prefix, n.Si)
+		// Delete from map both of add and delete case.
+		// For add case we'll re-add to indexByAddress.
 		delete(nf.indexByAddress, k)
 	}
 	if isDel {
