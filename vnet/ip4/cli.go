@@ -80,7 +80,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			if table != "" && t != table {
 				continue
 			}
-			fib.foreach(func(p *Prefix, a ip.Adj) {
+			fib.reachable.foreach(func(p *Prefix, a ip.Adj) {
 				rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
 			})
 		}
@@ -104,7 +104,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			if nh.Weight != 1 || nh.Adj != r.adj {
 				adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", int(r.adj)+ai, int(r.adj)+ai+int(nh.Weight)-1, nh.Weight, nh.Adj)
 			}
-			// Indent subsequent lines like first line if more than 1 line.
+			// Indent subsequent lines like first line if more than 1 lines.
 			for i := 1; i < len(adj_lines); i++ {
 				adj_lines[i] = fmt.Sprintf("%*s%s", len(line), "", adj_lines[i])
 			}
