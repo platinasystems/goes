@@ -99,7 +99,7 @@ loop:
 				if x.is_del {
 					ai, ok = m4.GetRouteFibIndex(&pi, x.fib_index)
 					if !ok {
-						err = fmt.Errorf("%s not found", &pi)
+						err = fmt.Errorf("%v not found", pi.String(&m4.Main))
 						return
 					}
 				} else {
