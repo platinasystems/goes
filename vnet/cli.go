@@ -11,6 +11,7 @@ import (
 
 func (v *Vnet) CliAdd(c *cli.Command)                     { v.loop.CliAdd(c) }
 func (v *Vnet) Logf(format string, args ...interface{})   { v.loop.Logf(format, args...) }
+func (v *Vnet) Logln(args ...interface{})                 { v.loop.Logln(args...) }
 func (v *Vnet) Fatalf(format string, args ...interface{}) { v.loop.Fatalf(format, args...) }
 
 type cliListener struct {
