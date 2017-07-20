@@ -8,7 +8,6 @@ package pci
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -30,8 +29,21 @@ func (d *Device) SysfsOpenFile(format string, mode int, args ...interface{}) (f 
 	return
 }
 
-func (d *Device) ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
+func (d *Device) SysfsReadHexFile(format string, mode int, args ...interface{}) (v uint, err error) {
 	var f *os.File
+	f, err = d.SysfsOpenFile(format, mode, args...)
+	if err != nil {
+		return
+	}
+	var n int
+	if n, err = fmt.Fscanf(f, "0x%x", &v); n != 1 || err != nil {
+		return
+	}
+	defer f.Close()
+	return
+}
+
+func (d *Device) ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
 	f, err := d.SysfsOpenFile("config", os.O_RDWR)
 	defer func() {
 		if err != nil {
@@ -112,6 +124,45 @@ func (d *Device) UnmapResource(bar uint) (err error) {
 	return
 }
 
+// Loop through BARs to find resources.
+func (d *Device) findResources() (err error) {
+	var f *os.File
+	if f, err = d.SysfsOpenFile("resource", os.O_RDONLY); err != nil {
+		return
+	}
+	defer f.Close()
+
+	var b []byte
+	if b, err = ioutil.ReadAll(f); err != nil {
+		return
+	}
+	r := bytes.NewReader(b)
+	i := 0
+	for r.Len() > 0 {
+		var (
+			v [3]uint64
+			n int
+		)
+		if n, err = fmt.Fscanf(r, "0x%x 0x%x 0x%x\n", &v[0], &v[1], &v[2]); n != 3 || err != nil {
+			if n != 3 {
+				err = fmt.Errorf("short read")
+			}
+			return
+		}
+		if v[0] == 0 {
+			continue
+		}
+		res := Resource{
+			Index: uint32(i),
+			Base:  v[0],
+			Size:  1 + v[1] - v[0],
+		}
+		i++
+		d.Resources = append(d.Resources, res)
+	}
+	return
+}
+
 func DiscoverDevices(bus Bus) (err error) {
 	fis, err := ioutil.ReadDir(sysBusPciPath)
 	if perr, ok := err.(*os.PathError); ok && perr.Err == syscall.ENOENT {
@@ -131,57 +182,31 @@ func DiscoverDevices(bus Bus) (err error) {
 			return
 		}
 
-		var f *os.File
-		f, err = d.SysfsOpenFile("config", os.O_RDONLY)
-		if err != nil {
-			return
-		}
-		defer f.Close()
-		d.configBytes, err = ioutil.ReadAll(f)
-
-		r := bytes.NewReader(d.configBytes)
-		binary.Read(r, binary.LittleEndian, &d.Config)
-		if d.Config.Type() != Normal {
-			continue
-		}
+		var driver Driver
 
 		// See if we have a registered driver for this device.
-		driver := GetDriver(d.Config.DeviceID)
-		if driver == nil {
-			continue
+		{
+			var i DeviceID
+			var v [2]uint
+			v[0], err = d.SysfsReadHexFile("vendor", os.O_RDONLY)
+			if err != nil {
+				return
+			}
+			v[1], err = d.SysfsReadHexFile("device", os.O_RDONLY)
+			if err != nil {
+				return
+			}
+			i.Vendor = VendorID(v[0])
+			i.Device = VendorDeviceID(v[1])
+			d.ID = i
+
+			if driver = GetDriver(i); driver == nil {
+				continue
+			}
 		}
 
-		// Loop through BARs to find resources.
-		{
-			i := 0
-			for i < len(d.Config.BaseAddressRegs) {
-				bar := d.Config.BaseAddressRegs[i]
-				if !bar.Valid() {
-					i++
-					continue
-				}
-				var rfi os.FileInfo
-				rfi, err = os.Stat(d.SysfsPath("resource%d", i))
-				if err != nil {
-					return
-				}
-				r := Resource{
-					Index: uint32(i),
-					Base:  uint64(bar.Addr()),
-					Size:  uint64(rfi.Size()),
-				}
-				r.BAR[0] = bar
-
-				i++
-				is64bit := (bar>>1)&3 == 2
-				if is64bit {
-					r.BAR[1] = d.Config.BaseAddressRegs[i]
-					r.Base |= uint64(r.BAR[1]) << 32
-					i++
-				}
-
-				d.Resources = append(d.Resources, r)
-			}
+		if err = d.findResources(); err != nil {
+			return
 		}
 
 		d.Driver = driver

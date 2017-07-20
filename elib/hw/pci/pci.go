@@ -99,6 +99,11 @@ type Status U16
 type VendorID U16
 type VendorDeviceID U16
 
+func (r *DeviceID) Get(d *Device) (i DeviceID) {
+	i.Vendor = r.Vendor.Get(d)
+	i.Device = r.Device.Get(d)
+	return
+}
 func (r *VendorID) Get(d *Device) VendorID             { return VendorID((*U16)(r).Get(d)) }
 func (r *VendorDeviceID) Get(d *Device) VendorDeviceID { return VendorDeviceID((*U16)(r).Get(d)) }
 
@@ -110,8 +115,8 @@ type DeviceID struct {
 	Device VendorDeviceID
 }
 
-func (d *Device) VendorID() VendorID       { return d.Config.Vendor }
-func (d *Device) DeviceID() VendorDeviceID { return d.Config.Device }
+func (d *Device) VendorID() VendorID       { return d.ID.Vendor }
+func (d *Device) DeviceID() VendorDeviceID { return d.ID.Device }
 
 type BaseAddressReg U32
 
@@ -265,7 +270,6 @@ func (a BusAddress) String() string {
 
 type Resource struct {
 	Index      uint32 // index of BAR
-	BAR        [2]BaseAddressReg
 	Base, Size uint64
 	Mem        []byte
 }
@@ -279,10 +283,9 @@ func (d *Device) String() string {
 }
 
 type Device struct {
-	Addr        BusAddress
-	Config      DeviceConfig
-	configBytes []byte
-	Resources   []Resource
+	ID        DeviceID
+	Addr      BusAddress
+	Resources []Resource
 	Driver
 	DriverDevice
 	BusDevice
@@ -371,19 +374,15 @@ func GetDriver(d DeviceID) Driver {
 	return drivers[d]
 }
 
-func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint, contents []byte) (done bool, err error)) (err error) {
-	o := uint(d.Config.CapabilityOffset)
-	l := uint(len(d.configBytes))
-	if o >= l {
-		return
-	}
+func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint) (done bool, err error)) (err error) {
+	r := d.GetDeviceConfig()
+	o := uint(r.CapabilityOffset.Get(d))
 	done := false
-	for o < l {
+	for {
 		var h CapabilityHeader
-		h.Capability = Capability(d.configBytes[o+0])
-		h.NextCapabilityHeader = U8(d.configBytes[o+1])
-		b := d.configBytes[o+0:] // include CapabilityHeader
-		done, err = f(&h, o, b)
+		h.Capability = Capability(d.ReadConfigUint8(o + 0))
+		h.NextCapabilityHeader = U8(d.ReadConfigUint8(o + 1))
+		done, err = f(&h, o)
 		if err != nil || done {
 			return
 		}
@@ -395,11 +394,10 @@ func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint, contents []
 	return
 }
 
-func (d *Device) FindCap(c Capability) (b []byte, offset uint, found bool) {
-	d.ForeachCap(func(h *CapabilityHeader, o uint, contents []byte) (done bool, err error) {
+func (d *Device) FindCap(c Capability) (offset uint, found bool) {
+	d.ForeachCap(func(h *CapabilityHeader, o uint) (done bool, err error) {
 		found = h.Capability == c
 		if found {
-			b = contents
 			offset = o
 			done = true
 		}
@@ -409,7 +407,7 @@ func (d *Device) FindCap(c Capability) (b []byte, offset uint, found bool) {
 }
 
 func (d *Device) GetCap(c Capability) (p unsafe.Pointer) {
-	d.ForeachCap(func(h *CapabilityHeader, o uint, contents []byte) (done bool, err error) {
+	d.ForeachCap(func(h *CapabilityHeader, o uint) (done bool, err error) {
 		if found := h.Capability == c; found {
 			p = d.getRegs(o)
 			done = true
@@ -419,19 +417,14 @@ func (d *Device) GetCap(c Capability) (p unsafe.Pointer) {
 	return
 }
 
-func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint, contents []byte) (done bool, err error)) (err error) {
+func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint) (done bool, err error)) (err error) {
 	o := uint(0x100)
-	l := uint(len(d.configBytes))
-	if o >= l {
-		return
-	}
 	done := false
-	for o < l {
+	for {
 		var h ExtCapabilityHeader
-		h.ExtCapability = ExtCapability(d.configBytes[o+0]) | ExtCapability(d.configBytes[o+1])<<8
-		h.VersionAndNextOffset = U16(d.configBytes[o+2]) | U16(d.configBytes[o+3])<<8
-		b := d.configBytes[o+0:] // include CapabilityHeader
-		done, err = f(&h, o, b)
+		h.ExtCapability = ExtCapability(d.ReadConfigUint8(o+0)) | ExtCapability(d.ReadConfigUint8(o+1))<<8
+		h.VersionAndNextOffset = U16(d.ReadConfigUint8(o+2)) | U16(d.ReadConfigUint8(o+3))<<8
+		done, err = f(&h, o)
 		if err != nil || done {
 			return
 		}
@@ -443,11 +436,10 @@ func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint, conte
 	return
 }
 
-func (d *Device) FindExtCap(c ExtCapability) (b []byte, offset uint, found bool) {
-	d.ForeachExtCap(func(h *ExtCapabilityHeader, o uint, contents []byte) (done bool, err error) {
+func (d *Device) FindExtCap(c ExtCapability) (offset uint, found bool) {
+	d.ForeachExtCap(func(h *ExtCapabilityHeader, o uint) (done bool, err error) {
 		found = h.ExtCapability == c
 		if found {
-			b = contents
 			offset = o
 			done = true
 		}
