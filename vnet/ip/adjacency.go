@@ -74,23 +74,33 @@ func (n *LookupNext) Parse(in *parse.Input) {
 }
 
 type Adjacency struct {
-	// Interface address index for local/arp adjacency.
-	IfAddr
+	// Next hop after ip4-lookup.
+	LookupNextIndex LookupNext
 
 	// Number of adjecencies in block.  Greater than 1 means multipath; otherwise equal to 1.
 	NAdj uint16
 
-	// Next hop after ip4-lookup.
-	LookupNextIndex LookupNext
+	// Interface address index for local/arp adjacency.
+	// Destination index for rewrite.
+	Index uint32
 
 	vnet.Rewrite
+}
+
+func (a *Adjacency) IfAddr() (i IfAddr) {
+	i = IfAddrNil
+	switch a.LookupNextIndex {
+	case LookupNextGlean, LookupNextLocal:
+		i = IfAddr(a.Index)
+	}
+	return
 }
 
 func (a *Adjacency) String(m *Main) (lines []string) {
 	lines = append(lines, a.LookupNextIndex.String())
 	ni := a.LookupNextIndex
-	switch {
-	case ni == LookupNextRewrite:
+	switch ni {
+	case LookupNextRewrite:
 		l := a.Rewrite.String(m.v)
 		lines[0] += " " + l[0]
 		// If only 2 lines, fit into a single line.
@@ -99,8 +109,9 @@ func (a *Adjacency) String(m *Main) (lines []string) {
 		} else {
 			lines = append(lines, l[1:]...)
 		}
-	case a.IfAddr != IfAddrNil:
-		lines[0] += " " + a.IfAddr.String(m)
+	case LookupNextGlean, LookupNextLocal:
+		ifa := IfAddr(a.Index)
+		lines[0] += " " + ifa.String(m)
 	}
 	return
 }
@@ -111,7 +122,7 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 		panic(parse.ErrInput)
 	}
 	a.NAdj = 1
-	a.IfAddr = IfAddrNil
+	a.Index = ^uint32(0)
 	switch a.LookupNextIndex {
 	case LookupNextRewrite:
 		if !in.Parse("%v", &a.Rewrite, m.v) {
@@ -120,7 +131,7 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	case LookupNextLocal, LookupNextGlean:
 		var si vnet.Si
 		if in.Parse("%v", &si, m.v) {
-			a.IfAddr = m.IfFirstAddr(si)
+			a.Index = uint32(m.IfFirstAddr(si))
 		}
 	}
 }
@@ -559,16 +570,10 @@ func (m *adjacencyMain) PoisonAdj(a Adj) {
 	elib.PointerPoison(unsafe.Pointer(&as[0]), uintptr(len(as))*unsafe.Sizeof(as[0]))
 }
 
-func (m *Main) FreeAdj(a Adj, delMultipath bool) {
-	if delMultipath {
-		m.delMultipathAdj(a)
-	}
-	m.adjacencyHeap.Put(uint(a))
-}
-
+func (m *Main) FreeAdj(a Adj) { m.adjacencyHeap.Put(uint(a)) }
 func (m *Main) DelAdj(a Adj) {
 	m.CallAdjDelHooks(a)
-	m.FreeAdj(a, true)
+	m.FreeAdj(a)
 }
 
 func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
@@ -577,6 +582,61 @@ func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
 			break
 		}
 	}
+	return
+}
+
+func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj) (ok bool) {
+	if fromNextHopAdj == toNextHopAdj {
+		return
+	}
+
+	mm := &m.multipathMain
+	ma, _ := m.mpAdjForAdj(ai, false)
+	unhs := nextHopVec(mm.getNextHopBlock(&ma.unnormalizedNextHops))
+	nnhs := nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
+	for i := range unhs {
+		nh := &unhs[i]
+		if ok = nh.Adj == fromNextHopAdj; ok {
+			nh.Adj = toNextHopAdj
+			break
+		}
+	}
+	if !ok {
+		return
+	}
+
+	{
+		i, _ := mm.nextHopHash.Unset(nnhs)
+		mm.nextHopHashValues[i] = nextHopHashValue{
+			heapOffset: ^uint32(0),
+			adj:        AdjNil,
+		}
+	}
+
+	as := m.GetAdj(ai)
+	toAdj := m.GetAdj(toNextHopAdj)
+	sumw := 0
+	for i := range nnhs {
+		nh := &nnhs[i]
+		w := int(nh.Weight)
+		if nh.Adj == fromNextHopAdj {
+			nh.Adj = toNextHopAdj
+			for j := 0; j < w; j++ {
+				as[sumw+j] = toAdj[0]
+			}
+			break
+		}
+		sumw += w
+	}
+
+	{
+		i, _ := mm.nextHopHash.Set(nnhs)
+		mm.nextHopHashValues[i] = nextHopHashValue{
+			heapOffset: ma.normalizedNextHops.offset,
+			adj:        ai,
+		}
+	}
+
 	return
 }
 
@@ -592,40 +652,6 @@ func (m *multipathMain) delNextHop(nhs nextHopVec, result nextHopVec, nhi uint) 
 	}
 	r = r[:nnh-1]
 	return r
-}
-
-func (m *Main) delMultipathAdj(toDel Adj) {
-	mm := &m.multipathMain
-
-	for maIndex := uint(0); maIndex < uint(len(mm.mpAdjVec)); maIndex++ { // no range since len may change due to create below.
-		ma := &mm.mpAdjVec[maIndex]
-		if !ma.isValid() {
-			continue
-		}
-		nhs := nextHopVec(mm.getNextHopBlock(&ma.unnormalizedNextHops))
-		var (
-			ok  bool
-			nhi uint
-		)
-		if nhi, ok = nhs.find(toDel); !ok {
-			continue
-		}
-
-		var newMa *multipathAdjacency
-		if len(nhs) > 1 {
-			t := mm.cachedNextHopVec[0]
-			t = mm.delNextHop(nhs, t, nhi)
-			mm.cachedNextHopVec[0] = t
-			newMa, _, _ = m.createMpAdj(t)
-		}
-
-		newAdj := AdjNil
-		if newMa != nil {
-			newAdj = newMa.adj
-		}
-		m.RemapAdjacency(ma.adj, newAdj)
-		ma.free(m)
-	}
 }
 
 func (a *multipathAdjacency) invalidate()   { a.nAdj = 0 }
@@ -678,7 +704,7 @@ func (ma *multipathAdjacency) free(m *Main) {
 	}
 
 	m.PoisonAdj(ma.adj)
-	m.FreeAdj(ma.adj, ma.referenceCount == 0)
+	m.FreeAdj(ma.adj)
 	mm.freeNextHopBlock(&ma.unnormalizedNextHops)
 	mm.freeNextHopBlock(&ma.normalizedNextHops)
 
@@ -711,6 +737,13 @@ func (m *Main) ForeachAdjCounter(a, offset Adj, f func(tag string, v vnet.Combin
 }
 
 func (m *adjacencyMain) GetAdj(a Adj) (as []Adjacency) { return m.adjacencyHeap.Slice(uint(a)) }
+func (m *adjacencyMain) GetAdjRewriteSi(a Adj) (si vnet.Si) {
+	as := m.GetAdj(a)
+	if as[0].LookupNextIndex == LookupNextRewrite {
+		si = as[0].Rewrite.Si
+	}
+	return
+}
 
 func (m *adjacencyMain) NewAdjWithTemplate(n uint, template *Adjacency) (ai Adj, as []Adjacency) {
 	ai = Adj(m.adjacencyHeap.Get(n))
@@ -722,7 +755,7 @@ func (m *adjacencyMain) NewAdjWithTemplate(n uint, template *Adjacency) (ai Adj,
 		}
 		as[i].Si = vnet.SiNil
 		as[i].NAdj = uint16(n)
-		as[i].IfAddr = IfAddrNil
+		as[i].Index = ^uint32(0)
 		m.clearCounter(ai + Adj(i))
 	}
 	return

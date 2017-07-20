@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/gre"
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
 	"github.com/platinasystems/go/vnet/ip6"
@@ -16,8 +17,6 @@ import (
 	"fmt"
 	"sync"
 )
-
-type unreachable_ip4_next_hop map[ip4.Prefix]struct{}
 
 type msg_counts struct {
 	total   uint64
@@ -91,12 +90,10 @@ type netlink_main struct {
 	loop.Node
 	net_namespace_main
 
-	m                         *Main
-	eventPool                 sync.Pool
-	add_del_chan              chan netlink_add_del
-	unreachable_ip4_next_hops map[ip4.NextHop]unreachable_ip4_next_hop
-	current_del_next_hop      ip4.NextHop
-	msg_stats                 struct {
+	m            *Main
+	eventPool    sync.Pool
+	add_del_chan chan netlink_add_del
+	msg_stats    struct {
 		ignored, handled msg_counts
 	}
 }
@@ -231,8 +228,6 @@ func (ns *net_namespace) listen(nm *netlink_main) {
 }
 
 func (nm *netlink_main) LoopInit(l *loop.Loop) {
-	m4 := ip4.GetMain(nm.m.v)
-	m4.RegisterFibAddDelHook(nm.m.ip4_fib_add_del)
 	if err := nm.namespace_init(); err != nil {
 		panic(err)
 	}
@@ -242,7 +237,6 @@ func (nm *netlink_main) LoopInit(l *loop.Loop) {
 func (nm *netlink_main) Init(m *Main) {
 	nm.m = m
 	nm.eventPool.New = nm.newEvent
-	nm.unreachable_ip4_next_hops = make(map[ip4.NextHop]unreachable_ip4_next_hop)
 	l := nm.m.v.GetLoop()
 	l.RegisterNode(nm, "netlink-listener")
 	nm.cliInit()
@@ -538,44 +532,13 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	}
 	m4 := ip4.GetMain(e.m.v)
 	em := ethernet.GetMain(e.m.v)
-	// Save away currently deleted next hop for use in ip4_fib_add_del callback.
-	if isDel {
-		e.m.current_del_next_hop = nh
-	}
 	err = em.AddDelIpNeighbor(&m4.Main, &nbr, isDel)
 
 	// Ignore delete of unknown static Arp entry.
 	if err == ethernet.ErrDelUnknownNeighbor && isStatic {
 		err = nil
 	}
-	// Add previously unreachable prefixes when next-hop becomes reachable.
-	if err == nil && !isDel {
-		if u, ok := e.m.unreachable_ip4_next_hops[nh]; ok {
-			delete(e.m.unreachable_ip4_next_hops, nh)
-			for p := range u {
-				err = m4.AddDelRouteNextHop(&p, &nh, isDel)
-				if err != nil {
-					return
-				}
-			}
-		}
-	}
 	return
-}
-
-func (m *Main) add_ip4_unreachable_next_hop(p ip4.Prefix, nh ip4.NextHop) {
-	u := m.unreachable_ip4_next_hops[nh]
-	if u == nil {
-		u = unreachable_ip4_next_hop(make(map[ip4.Prefix]struct{}))
-	}
-	u[p] = struct{}{}
-	m.unreachable_ip4_next_hops[nh] = u
-}
-
-func (m *Main) ip4_fib_add_del(fib_index ip.FibIndex, p *ip4.Prefix, adj ip.Adj, isDel bool, isRemap bool) {
-	if isDel && isRemap && adj == ip.AdjNil {
-		m.add_ip4_unreachable_next_hop(*p, m.current_del_next_hop)
-	}
 }
 
 // FIXME: Not sure how netlink specifies nexthop weight, so we just set all weights to equal.
@@ -601,22 +564,74 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		return
 	}
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
-	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, si)
+
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
+
+	// Check for tunnel via RTA_ENCAP_TYPE/RTA_ENCAP attributes.
+	if encap_type, ok := v.Attrs[netlink.RTA_ENCAP_TYPE].(netlink.LwtunnelEncapType); ok {
+		as := v.Attrs[netlink.RTA_ENCAP].(*netlink.AttrArray)
+		switch encap_type {
+		case netlink.LWTUNNEL_ENCAP_IP:
+			err = e.ip4_in_ip4_route(&p, as, si, isDel)
+		case netlink.LWTUNNEL_ENCAP_IP6:
+			err = e.ip4_in_ip6_route(&p, as, si, isDel)
+		}
+		return
+	}
+
+	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, si)
 	m4 := ip4.GetMain(e.m.v)
 	err = m4.AddDelRouteNextHop(&p, &nh, isDel)
-	if err == ip4.ErrNextHopNotFound {
-		err = nil
-		if isDel {
-			if u, ok := e.m.unreachable_ip4_next_hops[nh]; !ok {
-				err = ip4.ErrNextHopNotFound
-			} else {
-				delete(u, p)
-			}
-		} else {
-			e.m.add_ip4_unreachable_next_hop(p, nh)
+	return
+}
+
+func (e *netlinkEvent) ip4_in_ip4_route(p *ip4.Prefix, as *netlink.AttrArray, si vnet.Si, isDel bool) (err error) {
+	var (
+		h     ip4.Header
+		gre   gre.Header
+		flags uint16
+	)
+	for k, a := range as.X {
+		if a == nil {
+			continue
+		}
+		kind := netlink.LwtunnelIp4AttrKind(k)
+		switch kind {
+		case netlink.LWTUNNEL_IP_SRC:
+			h.Src = ip4.Address(*a.(*netlink.Ip4Address))
+		case netlink.LWTUNNEL_IP_DST:
+			h.Dst = ip4.Address(*a.(*netlink.Ip4Address))
+		case netlink.LWTUNNEL_IP_TTL:
+			h.Ttl = a.(netlink.Uint8Attr).Uint()
+		case netlink.LWTUNNEL_IP_TOS:
+			h.Tos = a.(netlink.Uint8Attr).Uint()
+		case netlink.LWTUNNEL_IP_ID:
+		case netlink.LWTUNNEL_IP_FLAGS:
+			flags = a.(netlink.Uint16Attr).Uint()
 		}
 	}
+
+	m4 := ip4.GetMain(e.m.v)
+
+	// Give tunnel a src address if not specified or zero.
+	if as.X[netlink.LWTUNNEL_IP_SRC] == nil || h.Src.AsUint32() == 0 {
+		ifa := m4.IfFirstAddress(si)
+		h.Src = *ip4.IpAddress(&ifa.Prefix.Address)
+	}
+
+	h.Protocol = ip.GRE
+	h.Length = ip4.SizeofHeader
+	h.Checksum = h.ComputeChecksum()
+	gre.Type = ethernet.TYPE_IP4.FromHost()
+	fmt.Println("flags:", flags, &h, &gre)
+
+	ai, ok := m4.GetRoute(p, si)
+	fmt.Println(ai, ok)
+	return
+}
+
+func (e *netlinkEvent) ip4_in_ip6_route(p *ip4.Prefix, as *netlink.AttrArray, si vnet.Si, isDel bool) (err error) {
+	panic("not yet")
 	return
 }
 

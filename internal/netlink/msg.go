@@ -640,7 +640,9 @@ func (m *RouteMessage) Write(b []byte) (int, error) {
 		case RTA_TABLE, RTA_IIF, RTA_OIF, RTA_PRIORITY, RTA_FLOW:
 			m.Attrs[k] = Uint32AttrBytes(v)
 		case RTA_ENCAP_TYPE:
-			m.Attrs[k] = Uint16AttrBytes(v)
+			m.Attrs[k] = LwtunnelEncapType(v[0])
+		case RTA_ENCAP:
+			m.Attrs[k] = StringAttrBytes(v[:])
 		case RTA_PREF:
 			m.Attrs[k] = Uint8Attr(v[0])
 		case RTA_CACHEINFO:
@@ -651,6 +653,16 @@ func (m *RouteMessage) Write(b []byte) (int, error) {
 			} else {
 				return n, fmt.Errorf("%#v: unknown attr", k)
 			}
+		}
+	}
+	if a := m.Attrs[RTA_ENCAP_TYPE]; a != nil {
+		switch a.(LwtunnelEncapType) {
+		case LWTUNNEL_ENCAP_IP:
+			m.Attrs[RTA_ENCAP] = parse_lwtunnel_ip4_encap([]byte(m.Attrs[RTA_ENCAP].(StringAttr)))
+		case LWTUNNEL_ENCAP_IP6:
+			m.Attrs[RTA_ENCAP] = parse_lwtunnel_ip6_encap([]byte(m.Attrs[RTA_ENCAP].(StringAttr)))
+		default:
+			panic("not yet")
 		}
 	}
 	return n, nil

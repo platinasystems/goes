@@ -26,7 +26,6 @@ func Init(v *vnet.Vnet) *ip.Main {
 		GetRoute:         m.getRoute,
 		GetRouteFibIndex: m.getRouteFibIndex,
 		AddDelRoute:      m.addDelRoute,
-		RemapAdjacency:   m.remapAdjacency,
 	}
 	m.Main.PackageInit(v, cf)
 	v.RegisterSwIfAdminUpDownHook(m.swIfAdminUpDown)

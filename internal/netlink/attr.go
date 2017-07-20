@@ -1458,3 +1458,193 @@ func (a Uint64Attr) WriteTo(w io.Writer) (int64, error) {
 	fmt.Fprint(acc, a.Uint())
 	return acc.Tuple()
 }
+
+type LwtunnelEncapType uint8
+
+const (
+	LWTUNNEL_ENCAP_NONE = iota
+	LWTUNNEL_ENCAP_MPLS
+	LWTUNNEL_ENCAP_IP
+	LWTUNNEL_ENCAP_ILA
+	LWTUNNEL_ENCAP_IP6
+	LWTUNNEL_ENCAP_SEG6
+	LWTUNNEL_ENCAP_BPF
+)
+
+var LwtunnelEncapNames = []string{
+	LWTUNNEL_ENCAP_NONE: "NONE",
+	LWTUNNEL_ENCAP_MPLS: "MPLS",
+	LWTUNNEL_ENCAP_IP:   "IP",
+	LWTUNNEL_ENCAP_ILA:  "ILA",
+	LWTUNNEL_ENCAP_IP6:  "IP6",
+	LWTUNNEL_ENCAP_SEG6: "SEG6",
+	LWTUNNEL_ENCAP_BPF:  "BPF",
+}
+
+func (x LwtunnelEncapType) attr()          {}
+func (x LwtunnelEncapType) String() string { return elib.Stringer(LwtunnelEncapNames, int(x)) }
+func (x LwtunnelEncapType) Uint() uint8    { return uint8(x) }
+func (x LwtunnelEncapType) Size() int      { return 1 }
+func (x LwtunnelEncapType) Set(v []byte)   { *(*LwtunnelEncapType)(unsafe.Pointer(&v[0])) = x }
+func (x LwtunnelEncapType) WriteTo(w io.Writer) (int64, error) {
+	acc := accumulate.New(w)
+	defer acc.Fini()
+	fmt.Fprint(acc, x.String())
+	return acc.Tuple()
+}
+
+type LwtunnelIp4AttrKind uint8
+
+const (
+	LWTUNNEL_IP_UNSPEC LwtunnelIp4AttrKind = iota
+	LWTUNNEL_IP_ID
+	LWTUNNEL_IP_DST
+	LWTUNNEL_IP_SRC
+	LWTUNNEL_IP_TTL
+	LWTUNNEL_IP_TOS
+	LWTUNNEL_IP_FLAGS
+)
+
+var LwtunnelIp4AttrKindNames = []string{
+	LWTUNNEL_IP_UNSPEC: "UNSPEC",
+	LWTUNNEL_IP_ID:     "ID",
+	LWTUNNEL_IP_DST:    "DST",
+	LWTUNNEL_IP_SRC:    "SRC",
+	LWTUNNEL_IP_TTL:    "TTL",
+	LWTUNNEL_IP_TOS:    "TOS",
+	LWTUNNEL_IP_FLAGS:  "FLAGS",
+}
+
+func (x LwtunnelIp4AttrKind) String() string { return elib.Stringer(LwtunnelIp4AttrKindNames, int(x)) }
+
+type LwtunnelIp4EncapKindAttrType Empty
+
+func NewLwtunnelIp4EncapKindAttrType() *LwtunnelIp4EncapKindAttrType {
+	return (*LwtunnelIp4EncapKindAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp4EncapKindAttrType) attrType() {}
+func (t *LwtunnelIp4EncapKindAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp4EncapKindAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp4AttrKindNames, i)
+}
+
+type LwtunnelIp4EncapAttrType Empty
+
+func NewLwtunnelIp4EncapAttrType() *LwtunnelIp4EncapAttrType {
+	return (*LwtunnelIp4EncapAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp4EncapAttrType) attrType() {}
+func (t *LwtunnelIp4EncapAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp4EncapAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp4AttrKindNames, i)
+}
+
+func parse_lwtunnel_ip4_encap(b []byte) *AttrArray {
+	as := pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewLwtunnelIp4EncapAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := LwtunnelIp4AttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case LWTUNNEL_IP_ID:
+			as.X[kind] = Uint64AttrBytes(v[:])
+		case LWTUNNEL_IP_DST, LWTUNNEL_IP_SRC:
+			as.X[kind] = NewIp4AddressBytes(v)
+		case LWTUNNEL_IP_TTL, LWTUNNEL_IP_TOS:
+			as.X[kind] = Uint8Attr(v[0])
+		case LWTUNNEL_IP_FLAGS:
+			as.X[kind] = Uint16Attr(v[0])
+		default:
+			panic("unknown ip tunnel encap kind " + kind.String())
+		}
+	}
+	return as
+}
+
+type LwtunnelIp6AttrKind uint8
+
+const (
+	LWTUNNEL_IP6_UNSPEC LwtunnelIp6AttrKind = iota
+	LWTUNNEL_IP6_ID
+	LWTUNNEL_IP6_DST
+	LWTUNNEL_IP6_SRC
+	LWTUNNEL_IP6_HOPLIMIT
+	LWTUNNEL_IP6_TC
+	LWTUNNEL_IP6_FLAGS
+)
+
+var LwtunnelIp6AttrKindNames = []string{
+	LWTUNNEL_IP6_UNSPEC:   "UNSPEC",
+	LWTUNNEL_IP6_ID:       "ID",
+	LWTUNNEL_IP6_DST:      "DST",
+	LWTUNNEL_IP6_SRC:      "SRC",
+	LWTUNNEL_IP6_HOPLIMIT: "HOP LIMIT",
+	LWTUNNEL_IP6_TC:       "TC",
+	LWTUNNEL_IP6_FLAGS:    "FLAGS",
+}
+
+func (x LwtunnelIp6AttrKind) String() string { return elib.Stringer(LwtunnelIp6AttrKindNames, int(x)) }
+
+type LwtunnelIp6EncapKindAttrType Empty
+
+func NewLwtunnelIp6EncapKindAttrType() *LwtunnelIp6EncapKindAttrType {
+	return (*LwtunnelIp6EncapKindAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp6EncapKindAttrType) attrType() {}
+func (t *LwtunnelIp6EncapKindAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp6EncapKindAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp6AttrKindNames, i)
+}
+
+type LwtunnelIp6EncapAttrType Empty
+
+func NewLwtunnelIp6EncapAttrType() *LwtunnelIp6EncapAttrType {
+	return (*LwtunnelIp6EncapAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp6EncapAttrType) attrType() {}
+func (t *LwtunnelIp6EncapAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp6EncapAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp6AttrKindNames, i)
+}
+
+func parse_lwtunnel_ip6_encap(b []byte) *AttrArray {
+	as := pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewLwtunnelIp6EncapAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := LwtunnelIp6AttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case LWTUNNEL_IP6_ID:
+			as.X[kind] = Uint64AttrBytes(v[:])
+		case LWTUNNEL_IP6_DST, LWTUNNEL_IP6_SRC:
+			as.X[kind] = NewIp6AddressBytes(v)
+		case LWTUNNEL_IP6_HOPLIMIT, LWTUNNEL_IP6_TC:
+			as.X[kind] = Uint8Attr(v[0])
+		case LWTUNNEL_IP6_FLAGS:
+			as.X[kind] = Uint16Attr(v[0])
+		default:
+			panic("unknown ip6 tunnel encap kind " + kind.String())
+		}
+	}
+	return as
+}
