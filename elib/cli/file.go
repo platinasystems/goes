@@ -41,7 +41,7 @@ func (c *File) close() {
 }
 
 func (c *File) writePrompt() {
-	if l := len(c.main.Prompt); !c.disablePrompt && l > 0 {
+	if l := len(c.main.Prompt); !c.DisablePrompt && l > 0 {
 		c.Write([]byte(c.main.Prompt))
 	}
 }
@@ -67,7 +67,7 @@ func (c *File) RxReady() (err error) {
 			c.markEndOfOutput()
 			if err == ErrQuit {
 				// Quit is only quit from stdin; otherwise just close file.
-				if !c.isStdin() {
+				if !c.EnableQuit {
 					c.close()
 					err = nil
 				}
@@ -83,7 +83,7 @@ func (c *File) RxReady() (err error) {
 	return
 }
 
-func (c *Main) AddFile(f iomux.FileReadWriteCloser, disablePrompt ...bool) {
+func (c *Main) AddFile(f iomux.FileReadWriteCloser, cf ServerConfig) {
 	i := c.FilePool.GetIndex()
 	x := &c.Files[i]
 	*x = File{
@@ -91,15 +91,13 @@ func (c *Main) AddFile(f iomux.FileReadWriteCloser, disablePrompt ...bool) {
 		FileReadWriteCloser: f,
 		poolIndex:           fileIndex(i),
 	}
-	if len(disablePrompt) > 0 {
-		x.disablePrompt = disablePrompt[0]
-	}
+	x.ServerConfig = cf
 	iomux.Add(x)
 	x.writePrompt()
 }
 
 func (c *Main) AddStdin() {
-	c.AddFile(iomux.NewFileBuf(syscall.Stdin, "stdin"))
+	c.AddFile(iomux.NewFileBuf(syscall.Stdin, "stdin"), ServerConfig{EnableQuit: true})
 }
 
 func (f *File) isStdin() bool {
@@ -110,13 +108,13 @@ func (f *File) isStdin() bool {
 }
 
 func (f *File) markEndOfOutput() {
-	if f.disablePrompt {
+	if f.DisablePrompt {
 		f.Write([]byte{})
 	}
 }
 
 func (f *File) Write(p []byte) (n int, err error) {
-	if f.disablePrompt {
+	if f.DisablePrompt {
 		var tmp [4]byte
 		binary.BigEndian.PutUint32(tmp[:], uint32(len(p)))
 		n, err = f.FileReadWriteCloser.Write(tmp[:])

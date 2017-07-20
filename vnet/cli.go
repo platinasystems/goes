@@ -14,16 +14,18 @@ func (v *Vnet) Logf(format string, args ...interface{})   { v.loop.Logf(format, 
 func (v *Vnet) Fatalf(format string, args ...interface{}) { v.loop.Fatalf(format, args...) }
 
 type cliListener struct {
-	socketConfig  string
-	disablePrompt bool
-	server        *cli.Server
+	socketConfig string
+	serverConfig cli.ServerConfig
+	server       *cli.Server
 }
 
 func (l *cliListener) Parse(in *parse.Input) {
 	for !in.End() {
 		switch {
 		case in.Parse("no-prompt"):
-			l.disablePrompt = true
+			l.serverConfig.DisablePrompt = true
+		case in.Parse("enable-quit"):
+			l.serverConfig.EnableQuit = true
 		case in.Parse("socket %s", &l.socketConfig):
 		default:
 			panic(parse.ErrInput)
@@ -68,7 +70,7 @@ func (m *cliMain) Init() (err error) {
 	}
 	for i := range m.listeners {
 		l := &m.listeners[i]
-		l.server, err = m.v.loop.Cli.AddServer(l.socketConfig, l.disablePrompt)
+		l.server, err = m.v.loop.Cli.AddServer(l.socketConfig, l.serverConfig)
 		if err != nil {
 			return
 		}
