@@ -149,16 +149,17 @@ func (d *Device) findResources() (err error) {
 			}
 			return
 		}
-		if v[0] == 0 {
-			continue
+		size := v[0]
+		if v[0] != 0 {
+			size = 1 + v[1] - v[0]
 		}
 		res := Resource{
 			Index: uint32(i),
 			Base:  v[0],
-			Size:  1 + v[1] - v[0],
+			Size:  size,
 		}
-		i++
 		d.Resources = append(d.Resources, res)
+		i++
 	}
 	return
 }
