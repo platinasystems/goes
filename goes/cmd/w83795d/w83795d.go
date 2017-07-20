@@ -47,7 +47,15 @@ var (
 	Init = func() {}
 	once sync.Once
 
-	first int
+	first          int
+	hostTemp       float64
+	sHostTemp      float64
+	hostTempTarget float64
+	thTemp         float64
+	sThTemp        float64
+
+	hostCtrl bool
+	thCtrl   bool
 
 	Vdev I2cDev
 
@@ -85,6 +93,12 @@ func (c *Command) Main(...string) error {
 	var si syscall.Sysinfo_t
 	var err error
 	first = 1
+	hostTemp = 50
+	sHostTemp = 150
+	sThTemp = 150
+	hostTempTarget = 70
+	hostCtrl = false
+	thCtrl = false
 
 	c.stop = make(chan struct{})
 	c.last = make(map[string]uint16)
@@ -154,7 +168,7 @@ func (c *Command) update() error {
 			}
 		}
 		if strings.Contains(k, "fan_tray.speed") {
-			v, err := Vdev.GetFanSpeed(i)
+			v, err := Vdev.GetFanSpeed()
 			if err != nil {
 				return err
 			}
@@ -164,13 +178,14 @@ func (c *Command) update() error {
 			}
 		}
 		if strings.Contains(k, "fan_tray.duty") {
-			v, err := Vdev.GetFanSpeed(i)
+			v, err := Vdev.GetFanDuty()
+			sv := fmt.Sprintf("0x%x", v)
 			if err != nil {
 				return err
 			}
-			if v != c.lasts[k] {
-				c.pub.Print(k, ": ", v)
-				c.lasts[k] = v
+			if sv != c.lasts[k] {
+				c.pub.Print(k, ": ", sv)
+				c.lasts[k] = sv
 			}
 		}
 		if strings.Contains(k, "hwmon.front.temp.units.C") {
@@ -185,6 +200,26 @@ func (c *Command) update() error {
 		}
 		if strings.Contains(k, "hwmon.rear.temp.units.C") {
 			v, err := Vdev.RearTemp()
+			if err != nil {
+				return err
+			}
+			if v != c.lasts[k] {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "host.temp.units.C") {
+			v, err := Vdev.CheckHostTemp()
+			if err != nil {
+				return err
+			}
+			if v != c.lasts[k] {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "host.temp.target.units.C") {
+			v, err := Vdev.GetHostTempTarget()
 			if err != nil {
 				return err
 			}
@@ -305,7 +340,7 @@ func (h *I2cDev) FanInit() error {
 	}
 
 	//set default speed to auto
-	h.SetFanSpeed("auto")
+	h.SetFanSpeed("auto", true)
 
 	//enable temperature monitoring
 	r0.BankSelect.set(h, 0x80)
@@ -329,7 +364,22 @@ func (h *I2cDev) FanInit() error {
 	return nil
 }
 
-func (h *I2cDev) SetFanSpeed(w string) error {
+func (h *I2cDev) SetFanDuty(d uint8) error {
+	r2 := getRegsBank2()
+	r2.BankSelect.set(h, 0x82)
+	r2.TempToFanMap1.set(h, 0x0)
+	r2.TempToFanMap2.set(h, 0x0)
+	r2.FanOutValue1.set(h, d)
+	r2.FanOutValue2.set(h, d)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 	r2 := getRegsBank2()
 
 	//if not all fan trays are ok, only allow high setting
@@ -344,61 +394,65 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 
 	switch w {
 	case "auto":
-		r2.BankSelect.set(h, 0x82)
-		//set thermal cruise
-		r2.FanControlModeSelect1.set(h, 0x00)
-		r2.FanControlModeSelect2.set(h, 0x00)
-		//set step up and down time to 1s
-		r2.FanStepUpTime.set(h, 0x0a)
-		r2.FanStepDownTime.set(h, 0x0a)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
+		if !hostCtrl {
+			r2.BankSelect.set(h, 0x82)
+			//set thermal cruise
+			r2.FanControlModeSelect1.set(h, 0x00)
+			r2.FanControlModeSelect2.set(h, 0x00)
+			//set step up and down time to 1s
+			r2.FanStepUpTime.set(h, 0x0a)
+			r2.FanStepDownTime.set(h, 0x0a)
+			closeMux(h)
+			err := DoI2cRpc()
+			if err != nil {
+				return err
+			}
 
-		r2.BankSelect.set(h, 0x82)
-		//set fan start speed
-		r2.FanStartValue1.set(h, 0x30)
-		r2.FanStartValue2.set(h, 0x30)
-		//set fan stop speed
-		r2.FanStopValue1.set(h, 0x30)
-		r2.FanStopValue2.set(h, 0x30)
-		closeMux(h)
-		err = DoI2cRpc()
-		if err != nil {
-			return err
-		}
+			r2.BankSelect.set(h, 0x82)
+			//set fan start speed
+			r2.FanStartValue1.set(h, 0x30)
+			r2.FanStartValue2.set(h, 0x30)
+			//set fan stop speed
+			r2.FanStopValue1.set(h, 0x30)
+			r2.FanStopValue2.set(h, 0x30)
+			closeMux(h)
+			err = DoI2cRpc()
+			if err != nil {
+				return err
+			}
 
-		r2.BankSelect.set(h, 0x82)
-		//set fan stop time to never stop
-		r2.FanStopTime1.set(h, 0x0)
-		r2.FanStopTime2.set(h, 0x0)
-		//set target temps to 50°C
-		r2.TargetTemp1.set(h, 0x32)
-		r2.TargetTemp2.set(h, 0x32)
-		closeMux(h)
-		err = DoI2cRpc()
-		if err != nil {
-			return err
-		}
+			r2.BankSelect.set(h, 0x82)
+			//set fan stop time to never stop
+			r2.FanStopTime1.set(h, 0x0)
+			r2.FanStopTime2.set(h, 0x0)
+			//set target temps to 50°C
+			r2.TargetTemp1.set(h, 0x32)
+			r2.TargetTemp2.set(h, 0x32)
+			closeMux(h)
+			err = DoI2cRpc()
+			if err != nil {
+				return err
+			}
 
-		r2.BankSelect.set(h, 0x82)
-		//set critical temp to set 100% fan speed to 65°C
-		r2.FanCritTemp1.set(h, 0x41)
-		r2.FanCritTemp2.set(h, 0x41)
-		//set target temp hysteresis to +/- 5°C
-		r2.TempHyster1.set(h, 0x55)
-		r2.TempHyster2.set(h, 0x55)
-		//enable temp control of fans
-		r2.TempToFanMap1.set(h, 0xff)
-		r2.TempToFanMap2.set(h, 0xff)
-		closeMux(h)
-		err = DoI2cRpc()
-		if err != nil {
-			return err
+			r2.BankSelect.set(h, 0x82)
+			//set critical temp to set 100% fan speed to 65°C
+			r2.FanCritTemp1.set(h, 0x41)
+			r2.FanCritTemp2.set(h, 0x41)
+			//set target temp hysteresis to +/- 5°C
+			r2.TempHyster1.set(h, 0x55)
+			r2.TempHyster2.set(h, 0x55)
+			//enable temp control of fans
+			r2.TempToFanMap1.set(h, 0xff)
+			r2.TempToFanMap2.set(h, 0xff)
+			closeMux(h)
+			err = DoI2cRpc()
+			if err != nil {
+				return err
+			}
 		}
-		log.Print("notice: fan speed set to ", w)
+		if l {
+			log.Print("notice: fan speed set to ", w)
+		}
 	//static speed settings below, set hwm to manual mode, then set static speed
 	case "high":
 		r2.BankSelect.set(h, 0x82)
@@ -442,36 +496,130 @@ func (h *I2cDev) SetFanSpeed(w string) error {
 	return nil
 }
 
-func (h *I2cDev) GetFanSpeed(i uint8) (string, error) {
-	var speed string
-
+func (h *I2cDev) GetFanDuty() (uint8, error) {
 	r2 := getRegsBank2()
+
 	r2.BankSelect.set(h, 0x82)
-	r2.TempToFanMap1.get(h)
 	r2.FanOutValue1.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
-		return "error", err
+		return 0, err
 	}
-	t := uint8(s[3].D[0])
-	m := uint8(s[5].D[0])
-	if i == 1 {
-		return fmt.Sprintf("0x%x", m), nil
+	m := uint8(s[3].D[0])
+	return m, nil
+
+}
+
+func (h *I2cDev) GetFanSpeed() (string, error) {
+	var speed string
+	var duty uint8
+	r2 := getRegsBank2()
+
+	if !hostCtrl {
+		r2.BankSelect.set(h, 0x82)
+		r2.TempToFanMap1.get(h)
+		r2.FanOutValue1.get(h)
+		closeMux(h)
+		err := DoI2cRpc()
+		if err != nil {
+			return "error", err
+		}
+		t := uint8(s[3].D[0])
+		m := uint8(s[5].D[0])
+
+		if t == 0xff {
+			speed = "auto"
+		} else if m == high {
+			speed = "high"
+		} else if m == med {
+			speed = "med"
+		} else if m == low {
+			speed = "low"
+		} else {
+			speed = "invalid " + strconv.Itoa(int(m))
+		}
+	}
+	if hostCtrl || (!hostCtrl && speed == "auto") {
+		if (!hostCtrl && (hostTemp > hostTempTarget)) || (hostCtrl && (hostTemp > sHostTemp)) {
+			var err error
+			duty, err = h.GetFanDuty()
+			if err != nil {
+				return "auto", err
+			}
+			sHostTemp = hostTemp
+			if duty < 0xff {
+				if duty <= 0xdf {
+					h.SetFanDuty(duty + 0x20)
+				} else {
+					h.SetFanDuty(0xff)
+				}
+			} else {
+			}
+
+			if !hostCtrl {
+				hostCtrl = true
+			}
+		} else if hostCtrl && (hostTemp <= (hostTempTarget - 5)) {
+			hostCtrl = false
+			thCtrl = false
+			sHostTemp = 150
+			sThTemp = 150
+			//set fan speed to thermal cruise (auto)
+			h.SetFanSpeed("auto", false)
+		}
+		if hostCtrl {
+			ft, err := h.FrontTemp()
+			if err != nil {
+				return "auto", err
+			}
+			f, err := strconv.ParseFloat(ft, 64)
+			if err != nil {
+				return "auto", err
+			}
+			rt, err := h.RearTemp()
+			if err != nil {
+				return "auto", err
+			}
+			r, err := strconv.ParseFloat(rt, 64)
+			if err != nil {
+				return "auto", err
+			}
+			if r > f {
+				thTemp = r
+			} else {
+				thTemp = f
+			}
+			if (!thCtrl && (thTemp > 55)) || (thCtrl && (thTemp > sThTemp)) {
+				//increase fan speed
+				sThTemp = thTemp
+				if duty < 0xff {
+					if duty <= 0xdf {
+						h.SetFanDuty(duty + 0x20)
+					} else {
+						h.SetFanDuty(0xff)
+					}
+				} else {
+				}
+				if !thCtrl {
+					thCtrl = true
+				}
+			}
+		}
+		return "auto", nil
 	}
 
-	if t == 0xff {
-		speed = "auto"
-	} else if m == high {
-		speed = "high"
-	} else if m == med {
-		speed = "med"
-	} else if m == low {
-		speed = "low"
-	} else {
-		speed = "invalid " + strconv.Itoa(int(m))
-	}
 	return speed, nil
+}
+
+func (h *I2cDev) CheckHostTemp() (string, error) {
+	v := hostTemp
+	return strconv.FormatFloat(v, 'f', 2, 64), nil
+}
+
+func (h *I2cDev) GetHostTempTarget() (string, error) {
+	v := hostTempTarget
+	return strconv.FormatFloat(v, 'f', 2, 64), nil
 }
 
 func writeRegs() error {
@@ -479,8 +627,19 @@ func writeRegs() error {
 		switch WrRegFn[k] {
 		case "speed":
 			if v == "auto" || v == "high" || v == "med" || v == "low" {
-				Vdev.SetFanSpeed(v)
+				Vdev.SetFanSpeed(v, true)
 			}
+		case "temp.units.C":
+			f, err := strconv.ParseFloat(v, 64)
+			if err == nil {
+				hostTemp = f
+			}
+		case "temp.target.units.C":
+			f, err := strconv.ParseFloat(v, 64)
+			if err == nil {
+				hostTempTarget = f
+			}
+
 		}
 		delete(WrRegVal, k)
 	}
