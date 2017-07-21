@@ -189,8 +189,6 @@ func DiscoverDevices(bus Bus, l elib.Logger) (err error) {
 		var driver Driver
 
 		// See if we have a registered driver for this device.
-		l.Logln("reading vendor", &d.Addr)
-
 		{
 			var i DeviceID
 			var v [2]uint
@@ -215,7 +213,6 @@ func DiscoverDevices(bus Bus, l elib.Logger) (err error) {
 			return
 		}
 
-		l.Logln("new device", &d.Addr)
 		d.Driver = driver
 		if d.DriverDevice, err = driver.NewDevice(de); err != nil {
 			return
@@ -239,12 +236,10 @@ func DiscoverDevices(bus Bus, l elib.Logger) (err error) {
 		if d.DriverDevice == nil {
 			continue
 		}
-		l.Logln("device init", &d.Addr)
 		if err = d.DriverDevice.Init(); err != nil {
 			return
 		}
 	}
-	l.Logln("discovery done")
 	return
 }
 
