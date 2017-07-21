@@ -207,9 +207,7 @@ func (g *Goes) Main(args ...string) error {
 	if len(args) > 0 {
 		base := filepath.Base(args[0])
 		switch {
-		case strings.HasPrefix(base, "goes-") &&
-			strings.Contains(base, "-installer"):
-			// e.g. ./goes-MACHINE-installer
+		case g.name == "goes-installer":
 			if len(args) == 1 {
 				args[0] = "install"
 			} else {
