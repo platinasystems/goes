@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -123,6 +124,9 @@ func checkDaemons() error {
 		}
 		daemon := string(cmdOut)
 		daemon = strings.Replace(daemon, "\n", "", -1)
+		var words []string
+		words = strings.Split(daemon, " ") // remove paramaters
+		daemon = words[0]
 
 		if err = p.Signal(os.Signal(syscall.Signal(0))); err != nil {
 			fmt.Printf("Daemon [%s] not responding to signal: %s",
@@ -136,11 +140,16 @@ func checkDaemons() error {
 			fmt.Printf("map NOT found for [%s]\n", daemon)
 		}
 	}
+	var errstrings []string
 	for k := range daemons {
 		if k == "goes" {
 			continue // another instance of goes
 		}
-		return fmt.Errorf("%s daemon not running", k)
+		err := fmt.Errorf("%s daemon not running", k)
+		errstrings = append(errstrings, err.Error())
+	}
+	if len(errstrings) > 0 {
+		err = fmt.Errorf(strings.Join(errstrings, "\n"))
 	}
 	return err
 }
@@ -167,8 +176,8 @@ func checkVnetdHung() error {
 }
 
 func (Command) Main(args ...string) error {
-	if os.Getuid() != 0 {
-		return fmt.Errorf("must be run as root")
+	if err := assert.Root(); err != nil {
+		return err
 	}
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
@@ -190,7 +199,7 @@ func (Command) Main(args ...string) error {
 		if err := x.f(); err == nil {
 			fmt.Println("OK")
 		} else {
-			fmt.Printf("%s\n", err)
+			fmt.Printf("Not OK\n")
 			return err
 		}
 	}
