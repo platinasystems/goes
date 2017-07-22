@@ -291,6 +291,19 @@ type Device struct {
 	BusDevice
 }
 
+// Set bus master in pci command register.
+// Otherwise no love with device dma or msi interrupts.
+func (d *Device) SetMaster(enable bool) {
+	c := d.GetConfig()
+	v := c.Command.Get(d)
+	if enable {
+		v |= BusMasterEnable
+	} else {
+		v &^= BusMasterEnable
+	}
+	c.Command.Set(d, v)
+}
+
 // Things a driver must do.
 type Driver interface {
 	// Device matches registered devices for this driver.

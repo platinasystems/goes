@@ -22,6 +22,8 @@ import (
 )
 
 type uioPciDmaMain struct {
+	busCommon
+
 	// /dev/uio-dma
 	uio_dma_fd int
 
