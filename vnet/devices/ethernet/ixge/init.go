@@ -187,6 +187,7 @@ func (d *dev) Init() (err error) {
 	// Enable all interrupts.
 	d.InterruptEnable(true)
 	d.counter_init()
+	d.pci_bus_dev.InterruptEnable(true)
 	return
 }
 
