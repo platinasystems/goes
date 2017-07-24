@@ -49,6 +49,7 @@ type vfio_pci_device struct {
 	info         vfio_device_info
 	region_infos []vfio_device_region_info
 
+	irq_index uint32
 	irq_infos []vfio_irq_info
 
 	// device fd from VFIO_GROUP_GET_DEVICE_FD
@@ -380,52 +381,6 @@ func (d *vfio_pci_device) Open() (err error) {
 	// Otherwise no love with device dma or msi interrupts.
 	d.SetMaster(true)
 
-	// Get eventfd for interrupt.
-	{
-		r, _, e := syscall.RawSyscall(syscall.SYS_EVENTFD, 0, syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
-		if e != 0 {
-			err = os.NewSyscallError("eventfd", e)
-			return
-		}
-		d.interrupt_event_fd = int(r)
-	}
-
-	// Enable interrupt.
-	{
-		var ii *vfio_irq_info
-		if ii = &d.irq_infos[vfio_pci_msi_irq_index]; ii.count == 0 {
-			// No MSI? Choose first one.
-			for i := range d.irq_infos {
-				if d.irq_infos[i].count > 0 {
-					ii = &d.irq_infos[i]
-					break
-				}
-			}
-		}
-		if ii.count == 0 {
-			panic("no irq")
-		}
-		type set struct {
-			vfio_irq_set
-			data [1]int32 // event fds
-		}
-		var s set
-		s.set(unsafe.Sizeof(s), vfio_irq_set_data_eventfd|vfio_irq_set_action_trigger)
-		s.index = ii.index
-		s.start = uint32(0)
-		s.count = uint32(len(s.data))
-		s.data[0] = int32(d.interrupt_event_fd)
-		if _, err = d.ioctl(vfio_device_set_irqs, uintptr(unsafe.Pointer(&s))); err != nil {
-			return
-		}
-	}
-
-	// Listen for interrupts.
-	{
-		d.Fd = int(d.interrupt_event_fd)
-		iomux.Add(d)
-	}
-
 	// Reset device.
 	if _, err = d.ioctl(vfio_device_reset, 0); err != nil {
 		err = nil // ignore error
@@ -586,12 +541,90 @@ func (d *vfio_pci_device) WriteReady() error    { return errShouldNeverHappen }
 func (d *vfio_pci_device) WriteAvailable() bool { return false }
 func (d *vfio_pci_device) String() string       { return "pci " + d.Device.String() }
 
+func (d *vfio_pci_device) InterruptEnable(EnableMsi bool) (err error) {
+	// Get eventfd for interrupt.
+	{
+		r, _, e := syscall.RawSyscall(syscall.SYS_EVENTFD, 0, syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
+		if e != 0 {
+			err = os.NewSyscallError("eventfd", e)
+			return
+		}
+		d.interrupt_event_fd = int(r)
+	}
+
+	// Enable interrupt.
+	{
+		var ii *vfio_irq_info
+		if ii = &d.irq_infos[vfio_pci_msi_irq_index]; ii.count == 0 || !EnableMsi {
+			// No MSI? Choose first one.
+			for i := range d.irq_infos {
+				if d.irq_infos[i].count > 0 {
+					ii = &d.irq_infos[i]
+					break
+				}
+			}
+		}
+		if ii.count == 0 {
+			panic("no irq")
+		}
+		d.irq_index = ii.index
+		type set struct {
+			vfio_irq_set
+			data [1]int32 // event fds
+		}
+		var s set
+		s.set(unsafe.Sizeof(s), vfio_irq_set_data_eventfd|vfio_irq_set_action_trigger)
+		s.index = ii.index
+		s.start = uint32(0)
+		s.count = uint32(len(s.data))
+		s.data[0] = int32(d.interrupt_event_fd)
+		if _, err = d.ioctl(vfio_device_set_irqs, uintptr(unsafe.Pointer(&s))); err != nil {
+			return
+		}
+	}
+
+	// Listen for interrupts.
+	{
+		d.Fd = int(d.interrupt_event_fd)
+		iomux.Add(d)
+	}
+	return
+}
+
+func (d *vfio_pci_device) enableDisableInterrupts(enable bool) (err error) {
+	var s vfio_irq_set
+	action := uint(vfio_irq_set_action_mask)
+	if enable {
+		action = vfio_irq_set_action_unmask
+	}
+	s.set(unsafe.Sizeof(s), vfio_irq_set_data_none|action)
+	s.index = d.irq_index
+	s.start = 0
+	s.count = 1
+	if _, err = d.ioctl(vfio_device_set_irqs, uintptr(unsafe.Pointer(&s))); err != nil {
+		return
+	}
+	return
+}
+
 // UIO file is ready when interrupt occurs.
 func (d *vfio_pci_device) ReadReady() (err error) {
 	var b [8]byte
 	if _, err = syscall.Read(d.interrupt_event_fd, b[:]); err != nil {
 		return
 	}
+	if d.irq_index == vfio_pci_intx_irq_index {
+		err = d.enableDisableInterrupts(false)
+		if err != nil {
+			return
+		}
+	}
 	d.DriverDevice.Interrupt()
+	if d.irq_index == vfio_pci_intx_irq_index {
+		err = d.enableDisableInterrupts(true)
+		if err != nil {
+			return
+		}
+	}
 	return
 }

@@ -337,6 +337,7 @@ type BusDevice interface {
 	Close() error
 	MapResource(index uint) (res uintptr, err error)
 	UnmapResource(index uint) (err error)
+	InterruptEnable(UseMsi bool) (err error)
 }
 
 var (
