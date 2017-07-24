@@ -433,7 +433,8 @@ func (l *Loop) doExit() {
 }
 
 type Config struct {
-	LogWriter io.Writer
+	LogWriter       io.Writer
+	QuitImmediately bool
 }
 
 func (l *Loop) Run() {
@@ -451,6 +452,9 @@ func (l *Loop) Run() {
 	l.doInitNodes()
 	// Now that all initial nodes have been registered, initialize node graph.
 	l.graphInit()
+	if l.QuitImmediately {
+		l.Quit()
+	}
 	for {
 		if quit := l.doEvents(); quit {
 			break
