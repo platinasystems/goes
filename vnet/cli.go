@@ -84,5 +84,6 @@ func (m *cliMain) Exit() (err error) {
 		l := &m.listeners[i]
 		l.server.Close()
 	}
+	m.v.loop.Cli.Exit()
 	return
 }

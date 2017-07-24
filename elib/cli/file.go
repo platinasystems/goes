@@ -96,6 +96,14 @@ func (c *Main) AddFile(f iomux.FileReadWriteCloser, cf ServerConfig) {
 	x.writePrompt()
 }
 
+func (c *Main) Exit() {
+	c.FilePool.ForeachIndex(func(i uint) {
+		f := &c.Files[i]
+		f.Close()
+		c.FilePool.PutIndex(i)
+	})
+}
+
 func (c *Main) AddStdin() {
 	c.AddFile(iomux.NewFileBuf(syscall.Stdin, "stdin"), ServerConfig{EnableQuit: true})
 }

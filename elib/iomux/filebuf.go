@@ -148,9 +148,12 @@ func (s *FileBuf) Close() (err error) {
 	s.txBufLock.Lock()
 	defer s.txBufLock.Unlock()
 	Del(s)
-	err = syscall.Close(s.Fd)
-	if err != nil {
-		err = fmt.Errorf("close: %s", err)
+	switch s.Fd {
+	case syscall.Stdin, syscall.Stdout, syscall.Stderr:
+	default:
+		if err = syscall.Close(s.Fd); err != nil {
+			err = fmt.Errorf("close: %s", err)
+		}
 	}
 	s.Fd = -1
 	return
