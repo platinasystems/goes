@@ -278,6 +278,8 @@ func (d *uioPciDevice) WriteReady() error    { return errShouldNeverHappen }
 func (d *uioPciDevice) WriteAvailable() bool { return false }
 func (d *uioPciDevice) String() string       { return "pci " + d.Device.String() }
 
+func (d *uioPciDevice) InterruptEnable(EnableMsi bool) (err error) { return }
+
 // UIO file is ready when interrupt occurs.
 func (d *uioPciDevice) ReadReady() (err error) {
 	d.DriverDevice.Interrupt()
