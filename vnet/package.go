@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 
 	"fmt"
+	"os"
 )
 
 type Packager interface {
@@ -108,22 +109,49 @@ func (p *Package) configure(r Packager, in *parse.Input) (err error) {
 	return
 }
 
-func (m *packageMain) ConfigurePackages(in *parse.Input) (err error) {
+func (v *Vnet) ConfigurePackages(in *parse.Input) (err error) {
+	m := &v.packageMain
 	// Parse package configuration.
 	for !in.End() {
 		var (
 			i     uint
 			subIn parse.Input
 		)
-		if in.Parse("%v %v", m.packageByName, &i, &subIn) {
+		switch {
+		case in.Parse("%v %v", m.packageByName, &i, &subIn):
 			r := m.packages[i]
 			p := r.GetPackage()
-			err = p.configure(r, &subIn)
+			if err = p.configure(r, &subIn); err != nil {
+				return
+			}
+		case in.Parse("vnet %v", &subIn):
+			if err = v.Configure(&subIn); err != nil {
+				return
+			}
+		default:
+			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
+			return
+		}
+	}
+	return
+}
+
+func (v *Vnet) Configure(in *parse.Input) (err error) {
+	for !in.End() {
+		var logFile string
+		switch {
+		case in.Parse("log %v", &logFile):
+			var f *os.File
+			f, err = os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0644)
 			if err != nil {
 				return
 			}
-		} else {
-			return in.Error()
+			v.loop.Config.LogWriter = f
+		case in.Parse("quit"):
+			v.loop.Config.QuitImmediately = true
+		default:
+			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
+			return
 		}
 	}
 	return

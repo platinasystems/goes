@@ -90,7 +90,6 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	err = nil
 
 	// Select packages we want to run with.
-	fe1_plugin.Init(v)
 	m4 := ip4.Init(v)
 	m6 := ip6.Init(v)
 	ethernet.Init(v, m4, m6)
@@ -111,10 +110,13 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	if err = gpio.do(gpio.led_output_enable); err != nil {
 		return
 	}
-	if err = gpio.do(gpio.switch_reset); err != nil {
-		return
+	if !p.DisableGpioSwitchReset {
+		if err = gpio.do(gpio.switch_reset); err != nil {
+			return
+		}
 	}
 
+	fe1_plugin.Init(v, p)
 	fe1_plugin.AddPlatform(v, p)
 
 	return

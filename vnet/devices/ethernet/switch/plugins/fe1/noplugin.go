@@ -14,4 +14,4 @@ import (
 
 func Packages() []map[string]string                      { return fe1.Packages }
 func AddPlatform(v *vnet.Vnet, p *fe1_platform.Platform) { fe1.AddPlatform(v, p) }
-func Init(v *vnet.Vnet)                                  { fe1.Init(v) }
+func Init(v *vnet.Vnet, p *fe1_platform.Platform)        { fe1.Init(v, p) }

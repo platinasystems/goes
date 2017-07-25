@@ -12,9 +12,12 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -55,8 +58,32 @@ func (c *LoopCli) LoopExit(l *Loop) {
 	c.Main.End()
 }
 
-func (l *Loop) Logf(format string, args ...interface{})   { fmt.Fprintf(&l.Cli.Main, format, args...) }
-func (l *Loop) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(format, args...)) }
+type loggerMain struct {
+	once sync.Once
+	w    io.Writer
+	l    *log.Logger
+}
+
+func (l *Loop) loggerInit() {
+	m := &l.loggerMain
+	if l.LogWriter == nil {
+		l.LogWriter = os.Stdout
+	}
+	m.l = log.New(l.LogWriter, "", log.Lmicroseconds)
+	return
+}
+
+func (l *Loop) Logf(format string, args ...interface{}) {
+	m := &l.loggerMain
+	m.once.Do(l.loggerInit)
+	m.l.Printf(format, args...)
+}
+func (l *Loop) Logln(args ...interface{}) {
+	m := &l.loggerMain
+	m.once.Do(l.loggerInit)
+	m.l.Println(args...)
+}
+func (m *loggerMain) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(format, args...)) }
 
 type rtNode struct {
 	Name     string  `format:"%-30s"`

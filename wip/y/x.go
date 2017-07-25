@@ -45,12 +45,41 @@ func main() {
 
 	platformConfigFromEEPROM(p)
 
+	{
+		var wip_in parse.Input
+		if in.Parse("wip %v", &wip_in) {
+			cf := &p.PlatformConfig
+			for !wip_in.End() {
+				switch {
+				case wip_in.Parse("gpio-reset"):
+					cf.DisableGpioSwitchReset = false
+				case wip_in.Parse("no-gpio-reset"):
+					cf.DisableGpioSwitchReset = true
+				case wip_in.Parse("cpu-reset"):
+					cf.EnableCpuSwitchReset = true
+				case wip_in.Parse("no-cpu-reset"):
+					cf.EnableCpuSwitchReset = false
+				case wip_in.Parse("enable-msi"):
+					cf.EnableMsiInterrupt = true
+				default:
+					err = parse.ErrInput
+					return
+				}
+			}
+			// Make sure we reset switch either via gpio or cpu.
+			if cf.DisableGpioSwitchReset && !cf.EnableCpuSwitchReset {
+				cf.DisableGpioSwitchReset = false
+			}
+		}
+	}
+
 	if err = mk1.PlatformInit(v, p); err != nil {
 		return
 	}
 	if err = v.Run(&in); err != nil {
 		return
 	}
+	v.Logln("platform exit")
 	if err = mk1.PlatformExit(v, p); err != nil {
 		return
 	}

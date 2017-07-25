@@ -66,8 +66,8 @@ type subCommand struct {
 func (c *subCommand) Elts() int { return len(c.cmds) + len(c.subs) }
 
 type File struct {
-	main              *Main
-	disablePrompt     bool
+	main *Main
+	ServerConfig
 	closeAfterTxFlush bool
 	poolIndex         fileIndex
 	iomux.FileReadWriteCloser

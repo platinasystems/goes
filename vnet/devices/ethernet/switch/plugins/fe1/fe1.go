@@ -37,7 +37,7 @@ func Packages() []map[string]string {
 }
 
 func Init(v *vnet.Vnet) {
-	lookup("Init").(func(*vnet.Vnet))(v)
+	lookup("Init").(func(v *vnet.Vnet, p *fe1_platform.Platform))(v, p)
 }
 
 func AddPlatform(v *vnet.Vnet, p *fe1_platform.Platform) {

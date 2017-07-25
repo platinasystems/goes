@@ -12,12 +12,17 @@ import (
 	"sync"
 )
 
+type ServerConfig struct {
+	DisablePrompt bool
+	EnableQuit    bool
+}
+
 type Server struct {
 	main *Main
+	ServerConfig
 	socket.Server
-	socketConfig  string
-	verbose       bool
-	disablePrompt bool
+	socketConfig string
+	verbose      bool
 	// Locks client pool.
 	lock sync.Mutex
 	clientPool
@@ -62,7 +67,7 @@ func (s *Server) newClient(template *client, socketConfig string) (i uint, err e
 			return
 		}
 	}
-	c.server.main.AddFile(c, s.disablePrompt)
+	c.server.main.AddFile(c, s.ServerConfig)
 	return
 }
 
@@ -96,11 +101,9 @@ func (c *client) Close() (err error) {
 	return
 }
 
-func (c *Main) AddServer(config string, disablePrompt ...bool) (s *Server, err error) {
+func (c *Main) AddServer(config string, cf ServerConfig) (s *Server, err error) {
 	s = &Server{main: c}
-	if len(disablePrompt) > 0 {
-		s.disablePrompt = disablePrompt[0]
-	}
+	s.ServerConfig = cf
 	err = s.Config(config, socket.Listen)
 	if err != nil {
 		return

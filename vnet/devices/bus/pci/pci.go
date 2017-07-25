@@ -11,7 +11,7 @@ import (
 
 type pciDiscover struct{ vnet.Package }
 
-func (d *pciDiscover) Init() error { return pci.DiscoverDevices(pci.DefaultBus) }
+func (d *pciDiscover) Init() error { return pci.DiscoverDevices(pci.DefaultBus, d.Vnet) }
 func (d *pciDiscover) Exit() error { return pci.CloseDiscoveredDevices(pci.DefaultBus) }
 
 func Init(v *vnet.Vnet) {

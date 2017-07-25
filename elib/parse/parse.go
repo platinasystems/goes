@@ -52,6 +52,8 @@ func (in *Input) Add(args ...string) {
 	in.buf = []byte(s)
 }
 
+func (in *Input) GetBuffer() string { return string(in.buf[in.index:]) }
+
 func (in *Input) Set(b []byte) {
 	if len(in.buf) == 0 {
 		in.buf = b

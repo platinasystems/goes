@@ -213,9 +213,7 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 	// Perform 0 byte read to get error from tuntap device.
 	var b [0]byte
 	_, err = syscall.Read(intf.Fd, b[:])
-	if err != nil {
-		fmt.Println(err)
-	}
+	err = nil
 	return
 }
 
