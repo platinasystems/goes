@@ -433,8 +433,27 @@ func (l *Loop) doExit() {
 }
 
 type Config struct {
-	LogWriter       io.Writer
-	QuitImmediately bool
+	LogWriter         io.Writer
+	QuitAfterDuration float64
+}
+
+type loopQuit struct {
+	l        *Loop
+	duration float64
+	verbose  bool
+}
+
+func (l *loopQuit) String() string { return "quit" }
+func (l *loopQuit) EventAction() {
+	if l.verbose {
+		l.l.Logln("quitting after", l.duration)
+	}
+	l.l.Quit()
+}
+
+func (l *Loop) quitAfter() {
+	e := &loopQuit{l: l, verbose: true, duration: l.QuitAfterDuration}
+	l.addTimedEvent(l.getLoopEvent(e), l.QuitAfterDuration)
 }
 
 func (l *Loop) Run() {
@@ -452,8 +471,8 @@ func (l *Loop) Run() {
 	l.doInitNodes()
 	// Now that all initial nodes have been registered, initialize node graph.
 	l.graphInit()
-	if l.QuitImmediately {
-		l.Quit()
+	if l.QuitAfterDuration > 0 {
+		l.quitAfter()
 	}
 	for {
 		if quit := l.doEvents(); quit {
