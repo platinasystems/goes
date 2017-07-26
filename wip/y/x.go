@@ -81,7 +81,6 @@ func main() {
 	if err = v.Run(&in); err != nil {
 		return
 	}
-	v.Logln("platform exit")
 	if err = mk1.PlatformExit(v, p); err != nil {
 		return
 	}

@@ -452,7 +452,7 @@ func (l *loopQuit) EventAction() {
 }
 
 func (l *Loop) quitAfter() {
-	e := &loopQuit{l: l, verbose: true, duration: l.QuitAfterDuration}
+	e := &loopQuit{l: l, verbose: false, duration: l.QuitAfterDuration}
 	l.addTimedEvent(l.getLoopEvent(e), l.QuitAfterDuration)
 }
 
