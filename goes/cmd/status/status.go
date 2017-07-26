@@ -58,24 +58,6 @@ func checkForChip() error {
 	return err
 }
 
-func checkForKmod() error {
-	args := []string{"/bin/lsmod"}
-	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
-	if err != nil {
-		return err
-	}
-
-	match, err := regexp.MatchString("uio_pci_dma", string(cmdOut))
-	if err != nil {
-		return err
-	}
-
-	if !match {
-		err = fmt.Errorf("not loaded")
-	}
-	return err
-}
-
 func checkDaemons() error {
 	daemons := map[string]bool{
 		"goes-daemons": true,
@@ -190,7 +172,6 @@ func (Command) Main(args ...string) error {
 		f      func() error
 	}{
 		{"PCI", checkForChip},
-		{"Kernel module", checkForKmod},
 		{"Check daemons", checkDaemons},
 		{"Check Redis", checkRedis},
 		{"Check vnet", checkVnetdHung},
