@@ -11,6 +11,7 @@ import (
 	"github.com/platinasystems/go/elib/elog"
 
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -226,7 +227,9 @@ type Loop struct {
 	timeLastRuntimeClear   time.Time
 
 	Cli LoopCli
-	eventLoop
+	Config
+	eventMain
+	loggerMain
 }
 
 func (l *Loop) Seconds(t cpu.Time) float64 { return float64(t) * l.secsPerCycle }
@@ -429,6 +432,30 @@ func (l *Loop) doExit() {
 	}
 }
 
+type Config struct {
+	LogWriter         io.Writer
+	QuitAfterDuration float64
+}
+
+type loopQuit struct {
+	l        *Loop
+	duration float64
+	verbose  bool
+}
+
+func (l *loopQuit) String() string { return "quit" }
+func (l *loopQuit) EventAction() {
+	if l.verbose {
+		l.l.Logln("quitting after", l.duration)
+	}
+	l.l.Quit()
+}
+
+func (l *Loop) quitAfter() {
+	e := &loopQuit{l: l, verbose: false, duration: l.QuitAfterDuration}
+	l.addTimedEvent(l.getLoopEvent(e), l.QuitAfterDuration)
+}
+
 func (l *Loop) Run() {
 	elog.Enable(true)
 	go elog.PrintOnHangupSignal(os.Stderr)
@@ -437,13 +464,16 @@ func (l *Loop) Run() {
 	l.startTime = cpu.TimeNow()
 	l.timeLastRuntimeClear = time.Now()
 	l.cliInit()
-	l.eventInit()
+	l.eventMain.Init(l)
 	l.startPollers()
 	l.registrationsNeedStart = true
 	l.callInitHooks()
 	l.doInitNodes()
 	// Now that all initial nodes have been registered, initialize node graph.
 	l.graphInit()
+	if l.QuitAfterDuration > 0 {
+		l.quitAfter()
+	}
 	for {
 		if quit := l.doEvents(); quit {
 			break
@@ -569,7 +599,7 @@ func (l *Loop) RegisterNode(n Noder, format string, args ...interface{}) {
 	start := l.registrationsNeedStart
 	nOK := 0
 	if h, ok := n.(EventHandler); ok {
-		l.eventLoop.handlers = append(l.eventLoop.handlers, h)
+		l.eventMain.handlers = append(l.eventMain.handlers, h)
 		if start {
 			l.startHandler(h)
 		}

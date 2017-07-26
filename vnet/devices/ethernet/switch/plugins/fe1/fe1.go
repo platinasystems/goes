@@ -10,7 +10,7 @@ import (
 	"plugin"
 
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/ethernet"
+	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 )
 
 const FileName = "/usr/lib/goes/fe1.so"
@@ -37,11 +37,9 @@ func Packages() []map[string]string {
 }
 
 func Init(v *vnet.Vnet) {
-	lookup("Init").(func(*vnet.Vnet))(v)
+	lookup("Init").(func(v *vnet.Vnet, p *fe1_platform.Platform))(v, p)
 }
 
-func AddPlatform(v *vnet.Vnet, ver int, nmacs uint32, basea ethernet.Address,
-	init func(), leden func() error) {
-	lookup("AddPlatform").(func(*vnet.Vnet, int, uint32, ethernet.Address,
-		func(), func() error))(v, ver, nmacs, basea, init, leden)
+func AddPlatform(v *vnet.Vnet, p *fe1_platform.Platform) {
+	lookup("AddPlatform").(func(v *vnet.Vnet, p *fe1_platform.Platform))(v, p)
 }

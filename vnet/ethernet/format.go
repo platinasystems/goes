@@ -38,6 +38,43 @@ func (h *Header) Parse(in *parse.Input) {
 	}
 }
 
+type ParseHeader struct {
+	h Header
+	v []VlanHeader
+}
+
+func (h *ParseHeader) Parse(in *parse.Input) (innerType Type) {
+	h.h.Parse(in)
+	for !in.End() {
+		var vh VlanHeader
+		if in.Parse("%v", &vh) {
+			h.v = append(h.v, vh)
+		} else {
+			break
+		}
+	}
+
+	innerType = h.h.Type
+	if len(h.v) > 0 {
+		h.h.Type = h.v[0].Type
+		for i := range h.v {
+			t := innerType
+			if i+1 < len(h.v) {
+				t = h.v[i+1].Type
+			}
+			h.v[i].Type = t
+		}
+	}
+	return
+}
+func (h *ParseHeader) Sizeof() uint { return SizeofHeader + uint(len(h.v))*SizeofVlanHeader }
+func (h *ParseHeader) Write(b []byte) {
+	h.h.Write(b)
+	for i := range h.v {
+		h.v[i].Write(b[SizeofHeader+i*SizeofVlanHeader:])
+	}
+}
+
 func (h *VlanHeader) Parse(sup_in *parse.Input) {
 	var (
 		in  parse.Input
@@ -45,7 +82,11 @@ func (h *VlanHeader) Parse(sup_in *parse.Input) {
 		pri vnet.Uint16
 	)
 	if sup_in.Parse("vlan %v", &in) {
-		var tag vnet.Uint16
+		var (
+			tag vnet.Uint16
+			tp  Type
+		)
+		tp = TYPE_VLAN.FromHost()
 		for !in.End() {
 			switch {
 			case in.Parse("%v", &id):
@@ -60,10 +101,12 @@ func (h *VlanHeader) Parse(sup_in *parse.Input) {
 					panic(parse.ErrInput)
 				}
 				tag = (tag &^ (7 << 13)) | pri<<13
+			case in.Parse("tpid %v", &tp):
 			default:
 				panic(parse.ErrInput)
 			}
 		}
+		h.Type = tp
 		h.Tag = VlanTag(tag).FromHost()
 	} else {
 		panic(parse.ErrInput)
@@ -71,7 +114,11 @@ func (h *VlanHeader) Parse(sup_in *parse.Input) {
 }
 
 func (h *VlanHeader) String() (s string) {
-	return fmt.Sprintf("%s: vlan %d", h.GetType().String(), h.Tag.Id())
+	if h.Type.ToHost() != TYPE_VLAN {
+		s = h.Type.ToHost().String() + ": "
+	}
+	s += fmt.Sprintf("vlan %d", h.Tag.Id())
+	return
 }
 
 func (v *VlanTag) String() string { return fmt.Sprintf("0x%04x", vnet.Uint16(*v).ToHost()) }

@@ -14,7 +14,7 @@ import (
 const (
 	AddressBytes              = 4
 	AddressBits               = 8 * AddressBytes
-	HeaderBytes               = 20
+	SizeofHeader              = 20
 	MoreFragments HeaderFlags = 1 << 13
 	DontFragment  HeaderFlags = 1 << 14
 	Congestion    HeaderFlags = 1 << 15
@@ -106,12 +106,12 @@ func (h *Header) ComputeChecksum() vnet.Uint16 {
 	return tmp.checksum()
 }
 
-func (h *Header) Len() uint { return HeaderBytes }
+func (h *Header) Len() uint { return SizeofHeader }
 func (h *Header) Write(b []byte) {
 	h.Length.Set(uint(len(b)))
 	h.Checksum = 0
 	h.Checksum = h.checksum()
-	type t struct{ data [HeaderBytes]byte }
+	type t struct{ data [SizeofHeader]byte }
 	i := (*t)(unsafe.Pointer(h))
 	copy(b[:], i.data[:])
 }

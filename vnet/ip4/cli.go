@@ -80,7 +80,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			if table != "" && t != table {
 				continue
 			}
-			fib.foreach(func(p *Prefix, a ip.Adj) {
+			fib.reachable.foreach(func(p *Prefix, a ip.Adj) {
 				rs = append(rs, showIpFibRoute{table: ip.FibIndex(fi), prefix: *p, adj: a})
 			})
 		}
@@ -100,11 +100,16 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			initialSpace := "  "
 			line := fmt.Sprintf("%s%6d: ", initialSpace, int(r.adj)+ai)
 			ss := []string{}
-			ss = append(ss, adjs[ai].String(&m.Main))
-
+			adj_lines := adjs[ai].String(&m.Main)
 			if nh.Weight != 1 || nh.Adj != r.adj {
-				ss[0] += fmt.Sprintf(" %d-%d, %d x %d", int(r.adj)+ai, int(r.adj)+ai+int(nh.Weight)-1, nh.Weight, nh.Adj)
+				adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", int(r.adj)+ai, int(r.adj)+ai+int(nh.Weight)-1, nh.Weight, nh.Adj)
 			}
+			// Indent subsequent lines like first line if more than 1 lines.
+			for i := 1; i < len(adj_lines); i++ {
+				adj_lines[i] = fmt.Sprintf("%*s%s", len(line), "", adj_lines[i])
+			}
+			ss = append(ss, adj_lines...)
+
 			m.Main.ForeachAdjCounter(nh.Adj, ip.Adj(0), func(tag string, v vnet.CombinedCounter) {
 				if v.Packets != 0 || detail {
 					ss = append(ss, fmt.Sprintf("%s%spackets %16d", initialSpace, tag, v.Packets))

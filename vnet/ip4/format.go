@@ -36,8 +36,11 @@ func (h *Header) String() (s string) {
 	return
 }
 
+const DefaultTtl = 64
+
 func (h *Header) Parse(in *parse.Input) {
 	h.Ip_version_and_header_length = 0x45
+	h.Ttl = DefaultTtl
 	if !in.ParseLoose("%v: %v -> %v", &h.Protocol, &h.Src, &h.Dst) {
 		panic(parse.ErrInput)
 	}

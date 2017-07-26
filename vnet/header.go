@@ -5,15 +5,22 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib/parse"
+
 	"fmt"
 	"unsafe"
 )
 
+type Layer interface {
+	ParseLayer(b []byte, in *parse.Input) uint
+	FormatLayer(b []byte) []string
+}
+
 type PacketHeader interface {
-	// Number of packet bytes in this layer's payload.
+	// Number of packet bytes in this header's payload.
 	Len() uint
 
-	// Write this layer's packet data to given slice.
+	// Write this header's packet data to given slice.
 	Write([]byte)
 
 	// Return given slice as packet header type.
@@ -56,7 +63,7 @@ func ReadPacket(b []byte, args ...PacketHeader) (hs []PacketHeader) {
 	return hs
 }
 
-// Packet layer with incrementing data of given byte count.
+// Packet header with incrementing data of given byte count.
 type IncrementingPayload struct{ Count uint }
 
 func (i *IncrementingPayload) Len() uint                 { return i.Count }
@@ -70,6 +77,7 @@ func (i *IncrementingPayload) Write(b []byte) {
 }
 func (i *IncrementingPayload) Read(b []byte) PacketHeader { return i }
 
+// Header for a given fixed payload.
 type GivenPayload struct{ Payload []byte }
 
 func (i *GivenPayload) Len() uint                 { return uint(len(i.Payload)) }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !uio_pci_dma
+// +build !uio_pci_dma,!uio_pci_generic,!vfio
 
 package pci
 
@@ -10,11 +10,14 @@ type wrapperDevice struct {
 	Device
 }
 
-func NewDevice() Devicer {
-	d := &wrapperDevice{}
-	d.Devicer = d
-	return d
+type wrapperBus struct {
+	busCommon
 }
+
+var DefaultBus = &wrapperBus{}
+
+func (wrapperBus) NewDevice() BusDevice  { return &wrapperDevice{} }
+func (wrapperBus) Validate() (err error) { return }
 
 func (d *wrapperDevice) GetDevice() *Device { return &d.Device }
 func (d *wrapperDevice) Open() error        { return nil }

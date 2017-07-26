@@ -9,8 +9,8 @@ package stop
 import (
 	"fmt"
 	"os"
+	"strings"
 	"syscall"
-	"time"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
@@ -24,7 +24,7 @@ import (
 const (
 	Name    = "stop"
 	Apropos = "stop this goes machine"
-	Usage   = "stop [-stop=URL]"
+	Usage   = "stop [-stop=URL] [SIGNAL]"
 	Man     = `
 DESCRIPTION
 	Stop all embedded daemons.
@@ -82,15 +82,20 @@ func (c *Command) Main(args ...string) error {
 			return fmt.Errorf("source %s: %v", stop, err)
 		}
 	}
-	err = kill.All(syscall.SIGTERM)
-	time.Sleep(5 * time.Second)
-	if e := kill.All(syscall.SIGKILL); err == nil {
-		err = e
+	sig := syscall.SIGTERM
+	if len(args) == 1 {
+		var found bool
+		sig, found = sigByName[strings.ToUpper(args[0])]
+		if !found {
+			return fmt.Errorf("signal: %s: unknown", args[0])
+		}
 	}
+	err = kill.All(sig)
 	if t := Hook(); t != nil {
 		if err != nil {
 			err = t
 		}
+		kill.All(syscall.SIGKILL)
 	}
 	os.RemoveAll(sockfile.Dir)
 	return err
@@ -99,4 +104,42 @@ func (c *Command) Main(args ...string) error {
 func haveEtcGoesStop() bool {
 	_, err := os.Stat(EtcGoesStop)
 	return err == nil
+}
+
+var sigByName = map[string]syscall.Signal{
+	"SIGABR":    syscall.SIGABRT,
+	"SIGALRM":   syscall.SIGALRM,
+	"SIGBUS":    syscall.SIGBUS,
+	"SIGCHLD":   syscall.SIGCHLD,
+	"SIGCLD":    syscall.SIGCLD,
+	"SIGCONT":   syscall.SIGCONT,
+	"SIGFPE":    syscall.SIGFPE,
+	"SIGHUP":    syscall.SIGHUP,
+	"SIGILL":    syscall.SIGILL,
+	"SIGINT":    syscall.SIGINT,
+	"SIGIO":     syscall.SIGIO,
+	"SIGIOT":    syscall.SIGIOT,
+	"SIGKILL":   syscall.SIGKILL,
+	"SIGPIPE":   syscall.SIGPIPE,
+	"SIGPOLL":   syscall.SIGPOLL,
+	"SIGPROF":   syscall.SIGPROF,
+	"SIGPWR":    syscall.SIGPWR,
+	"SIGQUIT":   syscall.SIGQUIT,
+	"SIGSEGV":   syscall.SIGSEGV,
+	"SIGSTKFLT": syscall.SIGSTKFLT,
+	"SIGSTOP":   syscall.SIGSTOP,
+	"SIGSYS":    syscall.SIGSYS,
+	"SIGTERM":   syscall.SIGTERM,
+	"SIGTRAP":   syscall.SIGTRAP,
+	"SIGTSTP":   syscall.SIGTSTP,
+	"SIGTTIN":   syscall.SIGTTIN,
+	"SIGTTOU":   syscall.SIGTTOU,
+	"SIGUNUSED": syscall.SIGUNUSED,
+	"SIGURG":    syscall.SIGURG,
+	"SIGUSR1":   syscall.SIGUSR1,
+	"SIGUSR2":   syscall.SIGUSR2,
+	"SIGVTALRM": syscall.SIGVTALRM,
+	"SIGWINCH":  syscall.SIGWINCH,
+	"SIGXCPU":   syscall.SIGXCPU,
+	"SIGXFSZ":   syscall.SIGXFSZ,
 }

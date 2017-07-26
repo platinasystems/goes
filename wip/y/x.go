@@ -1,112 +1,31 @@
 package main
 
 import (
-	"github.com/platinasystems/fe1"
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/internal/sriovs"
+	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/devices/bus/pci"
-	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
 	"github.com/platinasystems/go/vnet/ethernet"
-	ipcli "github.com/platinasystems/go/vnet/ip/cli"
-	"github.com/platinasystems/go/vnet/ip4"
-	"github.com/platinasystems/go/vnet/ip6"
-	"github.com/platinasystems/go/vnet/pg"
-	"github.com/platinasystems/go/vnet/unix"
+	"github.com/platinasystems/go/vnet/platforms/fe1"
+	"github.com/platinasystems/go/vnet/platforms/mk1"
 
 	"fmt"
-	"net"
 	"os"
 )
 
-type platform struct {
-	vnet.Package
-	*fe1.Platform
-	sriov_mode bool
-}
-
-func (p *platform) Init() (err error) {
-	v := p.Vnet
-	p.Platform = fe1.GetPlatform(v)
-
-	if !p.sriov_mode {
-		// 2 ixge ports are used to inject packets.
-		ns := ixge.GetPortNames(v)
-		p.SingleTaggedInjectNexts = make([]uint, len(ns))
-		for i := range ns {
-			p.SingleTaggedInjectNexts[i] = v.AddNamedNext(&p.Platform.SingleTaggedPuntInjectNodes.Inject, ns[i])
-		}
+func platformConfigFromEEPROM(p *fe1.Platform) {
+	d := eeprom.Device{
+		BusIndex:   0,
+		BusAddress: 0x51,
 	}
-
-	if err = p.boardInit(); err != nil {
-		return
+	if e := d.GetInfo(); e != nil {
+		fmt.Printf("eeprom read failed: %s; using random address block", e)
+		p.BaseEthernetAddress = ethernet.RandomAddress()
+		p.NEthernetAddress = 256
+	} else {
+		p.BaseEthernetAddress = ethernet.Address(d.Fields.BaseEthernetAddress)
+		p.NEthernetAddress = d.Fields.NEthernetAddress
+		p.Version = uint(d.Fields.DeviceVersion)
 	}
-	for _, s := range p.Switches {
-		if err = p.boardPortInit(s); err != nil {
-			return
-		}
-	}
-	return
-}
-
-func newSriovs(ver int) error {
-	if ver > 0 {
-		sriovs.VfName = func(port, subport uint) string {
-			return fmt.Sprintf("eth-%d-%d", port+1, subport+1)
-		}
-	}
-	eth0, err := net.InterfaceByName("eth0")
-	if err != nil {
-		return err
-	}
-	mac := sriovs.Mac(eth0.HardwareAddr)
-	// skip over eth0, eth1, and eth2
-	mac.Plus(3)
-	sriovs.VfMac = mac.VfMac
-	return sriovs.New(vfs)
-}
-
-func delSriovs() error { return sriovs.Del(vfs) }
-
-func vlan_for_port(port, subport sriovs.Vf) (vf sriovs.Vf) {
-	// physical port number for data ports are numbered starting at 1.
-	// (phys 0 is cpu port...)
-	phys := sriovs.Vf(1)
-
-	// 4 sub-ports per port; mk1 ports are even/odd swapped.
-	phys += 4 * (port ^ 1)
-
-	phys += subport
-
-	// Vlan is 1 plus physical port number.
-	return sriovs.Vf(1 + phys)
-}
-
-// The vfs table is 0 based and is adjusted to 1 based beta and production
-// units with VfName
-var vfs = make_vfs()
-
-func make_vfs() [][]sriovs.Vf {
-	// pf0 = fe1 pipes 0 & 1; only 32 vfs.
-	// pf1 = fe1 pipes 2 & 3; only 32 vfs.
-	const (
-		n_port        = 32
-		n_sub_port    = 1
-		n_pf          = 2
-		n_port_per_pf = n_port / n_pf
-	)
-	var pfs [n_pf][n_port / n_pf]sriovs.Vf
-	for port := sriovs.Vf(0); port < n_port; port++ {
-		for subport := sriovs.Vf(0); subport < n_sub_port; subport++ {
-			vf := port<<sriovs.PortShift | subport<<sriovs.SubPortShift | vlan_for_port(port, subport)
-			pf := port / n_port_per_pf
-			i := port%n_port_per_pf + n_port_per_pf*subport
-			if i < sriovs.Vf(len(pfs[pf])) {
-				pfs[pf][i] = vf
-			}
-		}
-	}
-	return [][]sriovs.Vf{pfs[0][:], pfs[1][:]}
 }
 
 func main() {
@@ -122,41 +41,53 @@ func main() {
 	in.Add(os.Args[1:]...)
 
 	v := &vnet.Vnet{}
-	p := &platform{}
+	p := &fe1.Platform{}
 
-	fns, err := sriovs.NumvfsFns()
-	p.sriov_mode = err == nil && len(fns) > 0
-	err = nil
+	platformConfigFromEEPROM(p)
 
-	// Select packages we want to run with.
-	fe1.Init(v)
-	ethernet.Init(v)
-	ip4.Init(v)
-	ip6.Init(v)
-	if !p.sriov_mode {
-		ixge.Init(v, ixge.Config{DisableUnix: true, PuntNode: "fe1-single-tagged-punt"})
-	} else if err = newSriovs(0); err != nil {
+	{
+		var wip_in parse.Input
+		cf := &p.PlatformConfig
+
+		cf.EnableMsiInterrupt = true
+		cf.DisableGpioSwitchReset = false
+		cf.EnableCpuSwitchReset = false
+
+		if in.Parse("wip %v", &wip_in) {
+			for !wip_in.End() {
+				switch {
+				case wip_in.Parse("gpio-reset"):
+					cf.DisableGpioSwitchReset = false
+				case wip_in.Parse("no-gpio-reset"):
+					cf.DisableGpioSwitchReset = true
+				case wip_in.Parse("cpu-reset"):
+					cf.EnableCpuSwitchReset = true
+				case wip_in.Parse("no-cpu-reset"):
+					cf.EnableCpuSwitchReset = false
+				case wip_in.Parse("enable-msi"):
+					cf.EnableMsiInterrupt = true
+				case wip_in.Parse("disable-msi"):
+					cf.EnableMsiInterrupt = false
+				default:
+					err = parse.ErrInput
+					return
+				}
+			}
+			// Make sure we reset switch either via gpio or cpu.
+			// Its much safer to reset the switch via either method; so we enforce that here.
+			if cf.DisableGpioSwitchReset && !cf.EnableCpuSwitchReset {
+				cf.DisableGpioSwitchReset = false
+			}
+		}
+	}
+
+	if err = mk1.PlatformInit(v, p); err != nil {
 		return
 	}
-	pci.Init(v)
-	pg.Init(v)
-	ipcli.Init(v)
-	unix.Init(v)
-
-	v.AddPackage("platform", p)
-	p.DependsOn("pci-discovery") // after pci discovery
-	p.DependedOnBy("ip4")        // adjacencies/fib init needs to happen after fe1 init.
-	p.DependedOnBy("ip6")
-
-	err = v.Run(&in)
-	if err != nil {
-		fmt.Println(err)
+	if err = v.Run(&in); err != nil {
+		return
 	}
-
-	if p.sriov_mode {
-		err = delSriovs()
-		if err != nil {
-			fmt.Println(err)
-		}
+	if err = mk1.PlatformExit(v, p); err != nil {
+		return
 	}
 }

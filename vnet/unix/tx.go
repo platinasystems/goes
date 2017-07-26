@@ -85,7 +85,10 @@ func (v *tx_packet_vector) add_packet(n *tx_node, r *vnet.Ref, ifindex uint32) {
 	a := &v.a[i]
 	*a = raw_sockaddr_ll_template
 	a.Ifindex = int32(p.ifindex)
-	v.m[i].msg_hdr.set(a, p.iovs)
+	if i > 0 {
+		v.m[i-1].msg_hdr.Flags |= syscall.MSG_MORE
+	}
+	v.m[i].msg_hdr.set(a, p.iovs, 0)
 	v.m[i].msg_len = uint32(l)
 }
 
@@ -207,24 +210,29 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 		intf.pv = <-intf.to_tx
 	}
 	pv := intf.pv
-	n := &intf.namespace.m.tx_node
+	ns := intf.namespace
+	n := &ns.m.tx_node
 
 	n_packets, n_drops := 0, 0
 loop:
 	for i := uint(0); i < pv.n_packets; i++ {
-		pv.r[i].ValidateState(pv.buffer_pool, vnet.BufferKnownAllocated)
 		var errno syscall.Errno
-		if true {
-			_, errno = writev(intf.Fd, pv.p[i].iovs)
-		} else {
-			// sendmsg does yet not work on /dev/net/tun sockets.  ENOTSOCK
-			flags := 0
-			if i+1 < pv.n_packets {
-				// Tell kernel tun.c that we have more packets to send.
-				flags |= syscall.MSG_MORE
+		for {
+			// First try sendmsg.
+			if !ns.m.tuntap_sendmsg_recvmsg_disable {
+				// sendmsg/sendmmsg does yet not work on /dev/net/tun sockets.  ENOTSOCK
+				_, errno = sendmsg(intf.Fd, 0, &pv.m[i].msg_hdr)
+				ns.m.tuntap_sendmsg_recvmsg_disable = errno == syscall.ENOTSOCK
+				if !ns.m.tuntap_sendmsg_recvmsg_disable {
+					break
+				}
+			} else {
+				// Use writev since sendmsg failed.
+				_, errno = writev(intf.Fd, pv.p[i].iovs)
+				break
 			}
-			_, errno = sendmsg(intf.Fd, flags, &pv.m[i].msg_hdr)
 		}
+
 		switch errno {
 		case syscall.EWOULDBLOCK:
 			break loop

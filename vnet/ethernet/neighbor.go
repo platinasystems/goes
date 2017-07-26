@@ -13,6 +13,7 @@ import (
 )
 
 type ipNeighborFamily struct {
+	m              *ip.Main
 	pool           ipNeighborPool
 	indexByAddress map[ipNeighborKey]uint
 }
@@ -23,7 +24,12 @@ type ipNeighborMain struct {
 	ipNeighborFamilies [ip.NFamily]ipNeighborFamily
 }
 
-func (m *ipNeighborMain) init(v *vnet.Vnet) { m.v = v }
+func (m *ipNeighborMain) init(v *vnet.Vnet, im4, im6 *ip.Main) {
+	m.v = v
+	m.ipNeighborFamilies[ip.Ip4].m = im4
+	m.ipNeighborFamilies[ip.Ip6].m = im6
+	v.RegisterSwIfAddDelHook(m.swIfAddDel)
+}
 
 type ipNeighborKey struct {
 	Ip ip.Address
@@ -75,10 +81,9 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 		prefix.Len = 128
 	}
 	if ok {
-		ai, ok = im.GetRoute(&prefix, n.Si)
-		if ok {
-			as = im.GetAdj(ai)
-		}
+		ai, as, ok = im.GetRoute(&prefix, n.Si)
+		// Delete from map both of add and delete case.
+		// For add case we'll re-add to indexByAddress.
 		delete(nf.indexByAddress, k)
 	}
 	if isDel {
@@ -118,5 +123,31 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 		nf.indexByAddress[k] = i
 	}
 
+	return
+}
+
+func (m *ipNeighborMain) delKey(nf *ipNeighborFamily, k *ipNeighborKey) (err error) {
+	n := IpNeighbor{
+		Ip: k.Ip,
+		Si: k.Si,
+	}
+	const isDel = true
+	err = m.AddDelIpNeighbor(nf.m, &n, isDel)
+	return
+}
+
+func (m *ipNeighborMain) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
+	if isDel {
+		for fi := range m.ipNeighborFamilies {
+			nf := &m.ipNeighborFamilies[fi]
+			for k, _ := range nf.indexByAddress {
+				if k.Si == si {
+					if err = m.delKey(nf, &k); err != nil {
+						return
+					}
+				}
+			}
+		}
+	}
 	return
 }

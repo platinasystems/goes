@@ -17,28 +17,19 @@ type U8 hw.U8
 type U16 hw.U16
 type U32 hw.U32
 
-func (r *U8) Get(d *Device) uint8 {
-	return d.ReadConfigUint8((*hw.U8)(r).Offset())
-}
-func (r *U8) Set(d *Device, v uint8) {
-	d.WriteConfigUint8((*hw.U8)(r).Offset(), v)
-}
-func (r *U16) Get(d *Device) uint16 {
-	return d.ReadConfigUint16((*hw.U16)(r).Offset())
-}
-func (r *U16) Set(d *Device, v uint16) {
-	d.WriteConfigUint16((*hw.U16)(r).Offset(), v)
-}
-func (r *U32) Get(d *Device) uint32 {
-	return d.ReadConfigUint32((*hw.U32)(r).Offset())
-}
-func (r *U32) Set(d *Device, v uint32) {
-	d.WriteConfigUint32((*hw.U32)(r).Offset(), v)
-}
+func (r *U8) offset() uint  { return uint((*hw.U8)(r).Offset()) }
+func (r *U16) offset() uint { return uint((*hw.U16)(r).Offset()) }
+func (r *U32) offset() uint { return uint((*hw.U32)(r).Offset()) }
 
-func (d *Device) getRegs(o uint) unsafe.Pointer {
-	return unsafe.Pointer(hw.BaseAddress + uintptr(o))
-}
+func (r *U8) Get(d *Device) uint8      { return d.ReadConfigUint8(r.offset()) }
+func (r *U8) Set(d *Device, v uint8)   { d.WriteConfigUint8(r.offset(), v) }
+func (r *U16) Get(d *Device) uint16    { return d.ReadConfigUint16(r.offset()) }
+func (r *U16) Set(d *Device, v uint16) { d.WriteConfigUint16(r.offset(), v) }
+func (r *U32) Get(d *Device) uint32    { return d.ReadConfigUint32(r.offset()) }
+func (r *U32) Set(d *Device, v uint32) { d.WriteConfigUint32(r.offset(), v) }
+
+func (d *Device) getRegs(o uint) unsafe.Pointer { return unsafe.Pointer(hw.BaseAddress + uintptr(o)) }
+func (d *Device) GetConfig() *ConfigHeader      { return (*ConfigHeader)(d.getRegs(0)) }
 
 // Under PCI, each device has 256 bytes of configuration address space,
 // of which the first 64 bytes are standardized as follows:
@@ -85,6 +76,9 @@ func (x SoftwareInterface) String() string {
 
 type Command U16
 
+func (c *Command) Get(d *Device) Command    { return Command((*U16)(c).Get(d)) }
+func (c *Command) Set(d *Device, v Command) { (*U16)(c).Set(d, uint16(v)) }
+
 const (
 	IOEnable Command = 1 << iota
 	MemoryEnable
@@ -105,6 +99,11 @@ type Status U16
 type VendorID U16
 type VendorDeviceID U16
 
+func (r *DeviceID) Get(d *Device) (i DeviceID) {
+	i.Vendor = r.Vendor.Get(d)
+	i.Device = r.Device.Get(d)
+	return
+}
 func (r *VendorID) Get(d *Device) VendorID             { return VendorID((*U16)(r).Get(d)) }
 func (r *VendorDeviceID) Get(d *Device) VendorDeviceID { return VendorDeviceID((*U16)(r).Get(d)) }
 
@@ -116,8 +115,8 @@ type DeviceID struct {
 	Device VendorDeviceID
 }
 
-func (d *Device) VendorID() VendorID       { return d.Config.Vendor }
-func (d *Device) DeviceID() VendorDeviceID { return d.Config.Device }
+func (d *Device) VendorID() VendorID       { return d.ID.Vendor }
+func (d *Device) DeviceID() VendorDeviceID { return d.ID.Device }
 
 type BaseAddressReg U32
 
@@ -271,7 +270,6 @@ func (a BusAddress) String() string {
 
 type Resource struct {
 	Index      uint32 // index of BAR
-	BAR        [2]BaseAddressReg
 	Base, Size uint64
 	Mem        []byte
 }
@@ -280,33 +278,66 @@ func (r Resource) String() string {
 	return fmt.Sprintf("{%d: 0x%x-0x%x}", r.Index, r.Base, r.Base+r.Size-1)
 }
 
-func (d *Device) String() string { return d.Addr.String() }
+func (d *Device) String() string {
+	return fmt.Sprintf("%s %v %v", &d.Addr, d.VendorID(), d.DeviceID())
+}
 
 type Device struct {
-	Addr        BusAddress
-	Config      DeviceConfig
-	configBytes []byte
-	Resources   []Resource
+	ID        DeviceID
+	Addr      BusAddress
+	Resources []Resource
 	Driver
 	DriverDevice
-	Devicer
+	BusDevice
+}
+
+// Set bus master in pci command register.
+// Otherwise no love with device dma or msi interrupts.
+func (d *Device) SetMaster(enable bool) {
+	c := d.GetConfig()
+	v := c.Command.Get(d)
+	if enable {
+		v |= BusMasterEnable
+	} else {
+		v &^= BusMasterEnable
+	}
+	c.Command.Set(d, v)
 }
 
 // Things a driver must do.
 type Driver interface {
 	// Device matches registered devices for this driver.
-	DeviceMatch(d *Device) (i DriverDevice, err error)
+	NewDevice(d BusDevice) (i DriverDevice, err error)
 }
 
+// This a device handled by driver must do.
 type DriverDevice interface {
-	Init()
+	Init() (err error)
+	Exit() (err error)
 	Interrupt()
 }
 
-type Devicer interface {
+type busCommon struct {
+	registeredDevs []BusDevice
+}
+
+func (b *busCommon) getBusCommon() *busCommon { return b }
+
+type Bus interface {
+	getBusCommon() *busCommon
+	NewDevice() BusDevice
+	Validate() error
+}
+
+// Things a bus driver device must do.
+type BusDevice interface {
+	ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint)
 	GetDevice() *Device
 	Open() error
 	Close() error
+	MapResource(index uint) (res uintptr, err error)
+	UnmapResource(index uint) (err error)
+	InterruptEnable(UseMsi bool) (err error)
 }
 
 var (
@@ -357,19 +388,15 @@ func GetDriver(d DeviceID) Driver {
 	return drivers[d]
 }
 
-func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint, contents []byte) (done bool, err error)) (err error) {
-	o := uint(d.Config.CapabilityOffset)
-	l := uint(len(d.configBytes))
-	if o >= l {
-		return
-	}
+func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint) (done bool, err error)) (err error) {
+	r := d.GetDeviceConfig()
+	o := uint(r.CapabilityOffset.Get(d))
 	done := false
-	for o < l {
+	for {
 		var h CapabilityHeader
-		h.Capability = Capability(d.configBytes[o+0])
-		h.NextCapabilityHeader = U8(d.configBytes[o+1])
-		b := d.configBytes[o+0:] // include CapabilityHeader
-		done, err = f(&h, o, b)
+		h.Capability = Capability(d.ReadConfigUint8(o + 0))
+		h.NextCapabilityHeader = U8(d.ReadConfigUint8(o + 1))
+		done, err = f(&h, o)
 		if err != nil || done {
 			return
 		}
@@ -381,11 +408,10 @@ func (d *Device) ForeachCap(f func(h *CapabilityHeader, offset uint, contents []
 	return
 }
 
-func (d *Device) FindCap(c Capability) (b []byte, offset uint, found bool) {
-	d.ForeachCap(func(h *CapabilityHeader, o uint, contents []byte) (done bool, err error) {
+func (d *Device) FindCap(c Capability) (offset uint, found bool) {
+	d.ForeachCap(func(h *CapabilityHeader, o uint) (done bool, err error) {
 		found = h.Capability == c
 		if found {
-			b = contents
 			offset = o
 			done = true
 		}
@@ -395,7 +421,7 @@ func (d *Device) FindCap(c Capability) (b []byte, offset uint, found bool) {
 }
 
 func (d *Device) GetCap(c Capability) (p unsafe.Pointer) {
-	d.ForeachCap(func(h *CapabilityHeader, o uint, contents []byte) (done bool, err error) {
+	d.ForeachCap(func(h *CapabilityHeader, o uint) (done bool, err error) {
 		if found := h.Capability == c; found {
 			p = d.getRegs(o)
 			done = true
@@ -405,19 +431,14 @@ func (d *Device) GetCap(c Capability) (p unsafe.Pointer) {
 	return
 }
 
-func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint, contents []byte) (done bool, err error)) (err error) {
+func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint) (done bool, err error)) (err error) {
 	o := uint(0x100)
-	l := uint(len(d.configBytes))
-	if o >= l {
-		return
-	}
 	done := false
-	for o < l {
+	for {
 		var h ExtCapabilityHeader
-		h.ExtCapability = ExtCapability(d.configBytes[o+0]) | ExtCapability(d.configBytes[o+1])<<8
-		h.VersionAndNextOffset = U16(d.configBytes[o+2]) | U16(d.configBytes[o+3])<<8
-		b := d.configBytes[o+0:] // include CapabilityHeader
-		done, err = f(&h, o, b)
+		h.ExtCapability = ExtCapability(d.ReadConfigUint8(o+0)) | ExtCapability(d.ReadConfigUint8(o+1))<<8
+		h.VersionAndNextOffset = U16(d.ReadConfigUint8(o+2)) | U16(d.ReadConfigUint8(o+3))<<8
+		done, err = f(&h, o)
 		if err != nil || done {
 			return
 		}
@@ -429,11 +450,10 @@ func (d *Device) ForeachExtCap(f func(h *ExtCapabilityHeader, offset uint, conte
 	return
 }
 
-func (d *Device) FindExtCap(c ExtCapability) (b []byte, offset uint, found bool) {
-	d.ForeachExtCap(func(h *ExtCapabilityHeader, o uint, contents []byte) (done bool, err error) {
+func (d *Device) FindExtCap(c ExtCapability) (offset uint, found bool) {
+	d.ForeachExtCap(func(h *ExtCapabilityHeader, o uint) (done bool, err error) {
 		found = h.ExtCapability == c
 		if found {
-			b = contents
 			offset = o
 			done = true
 		}

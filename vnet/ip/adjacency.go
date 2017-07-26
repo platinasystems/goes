@@ -86,14 +86,21 @@ type Adjacency struct {
 	vnet.Rewrite
 }
 
-func (a *Adjacency) String(m *Main) (s string) {
-	s = a.LookupNextIndex.String()
+func (a *Adjacency) String(m *Main) (lines []string) {
+	lines = append(lines, a.LookupNextIndex.String())
 	ni := a.LookupNextIndex
 	switch {
 	case ni == LookupNextRewrite:
-		s += " " + a.Rewrite.String(m.v)
+		l := a.Rewrite.String(m.v)
+		lines[0] += " " + l[0]
+		// If only 2 lines, fit into a single line.
+		if len(l) == 2 {
+			lines[0] += " " + l[1]
+		} else {
+			lines = append(lines, l[1:]...)
+		}
 	case a.IfAddr != IfAddrNil:
-		s += " " + a.IfAddr.String(m)
+		lines[0] += " " + a.IfAddr.String(m)
 	}
 	return
 }
@@ -108,7 +115,7 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	switch a.LookupNextIndex {
 	case LookupNextRewrite:
 		if !in.Parse("%v", &a.Rewrite, m.v) {
-			panic(parse.ErrInput)
+			panic(in.Error())
 		}
 	case LookupNextLocal, LookupNextGlean:
 		var si vnet.Si

@@ -28,13 +28,14 @@ func (si *Si) ParseWithArgs(in *parse.Input, args *parse.Args) {
 		panic(parse.ErrInput)
 	}
 	// Initially get software interface from hardware interface.
-	hw := v.HwIf(hi)
+	h := v.HwIfer(hi)
+	hw := h.GetHwIf()
 	*si = hw.si
 	var (
-		id IfIndex
+		id IfId
 		ok bool
 	)
-	if in.Parse(".%d", &id) {
+	if h.ParseId(&id, in) {
 		if *si, ok = hw.subSiById[id]; !ok {
 			panic(fmt.Errorf("unkown sub interface id: %d", id))
 		}
@@ -219,6 +220,13 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	if len(cf.siMap) == 0 {
 		v.swInterfaces.ForeachIndex(func(i uint) {
 			si := Si(i)
+			// Skip unprovisioned interfaces.
+			sw := v.SwIf(si)
+			hw := v.SupHwIf(sw)
+			if hw.unprovisioned {
+				return
+			}
+			// Skip interfaces which don't match regexps.
 			if cf.re.Valid() && !cf.re.MatchString(si.Name(v)) {
 				return
 			}

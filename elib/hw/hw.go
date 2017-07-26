@@ -34,10 +34,10 @@ func CheckRegAddr(name string, got, want uint) {
 }
 
 // Memory-mapped read/write
-func LoadUint32(addr *uint32) (data uint32)
-func StoreUint32(addr *uint32, data uint32)
-func LoadUint64(addr *uint64) (data uint64)
-func StoreUint64(addr *uint64, data uint64)
+func LoadUint32(addr uintptr) (data uint32)
+func StoreUint32(addr uintptr, data uint32)
+func LoadUint64(addr uintptr) (data uint64)
+func StoreUint64(addr uintptr, data uint64)
 
 func MemoryBarrier()
 
@@ -47,9 +47,9 @@ type U16 uint16
 type U32 uint32
 
 // Byte offsets
-func (r *U8) Offset() uint  { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
-func (r *U16) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
-func (r *U32) Offset() uint { return uint(uintptr(unsafe.Pointer(r)) - BaseAddress) }
+func (r *U8) Offset() uintptr  { return uintptr(unsafe.Pointer(r)) - BaseAddress }
+func (r *U16) Offset() uintptr { return uintptr(unsafe.Pointer(r)) - BaseAddress }
+func (r *U32) Offset() uintptr { return uintptr(unsafe.Pointer(r)) - BaseAddress }
 
-func (r *U32) Get() uint32  { return LoadUint32((*uint32)(r)) }
-func (r *U32) Set(x uint32) { StoreUint32((*uint32)(r), x) }
+func (r *U32) Get(base uintptr) uint32    { return LoadUint32(base + r.Offset()) }
+func (r *U32) Set(base uintptr, x uint32) { StoreUint32(base+r.Offset(), x) }

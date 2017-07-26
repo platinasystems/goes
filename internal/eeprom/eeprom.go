@@ -200,6 +200,8 @@ func (d *Device) getInfo() {
 			f.ManufactureDate = string(v)
 		case device_version:
 			f.DeviceVersion = v[0]
+		case label_revision:
+			// ignore
 		case platform_name:
 			f.PlatformName = string(v)
 		case onie_version:

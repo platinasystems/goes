@@ -347,12 +347,12 @@ func (q *rx_dma_queue) GetRefState(f vnet.RxDmaDescriptorFlags) (s vnet.RxDmaRef
 	}
 
 	if next != rx_next_ethernet_input {
-		advance = ethernet.HeaderBytes
+		advance = ethernet.SizeofHeader
 		if f&rx_desc_is_vlan != 0 {
-			advance += ethernet.VlanHeaderBytes
+			advance += ethernet.SizeofVlanHeader
 		}
 		if f&rx_desc_is_double_vlan != 0 {
-			advance += ethernet.VlanHeaderBytes
+			advance += ethernet.SizeofVlanHeader
 		}
 	}
 

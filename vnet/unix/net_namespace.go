@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
 	"io/ioutil"
@@ -148,13 +149,14 @@ func (m *net_namespace_main) watch_dir(dir_name string, f func(dir, name string,
 }
 
 type net_namespace_interface struct {
-	name      string
-	namespace *net_namespace
-	ifindex   uint32
-	address   []byte
-	kind      netlink.InterfaceKind
-	si        vnet.Si
-	tuntap    *tuntap_interface
+	name          string
+	namespace     *net_namespace
+	ifindex       uint32
+	address       []byte
+	kind          netlink.InterfaceKind
+	si            vnet.Si
+	sup_interface *net_namespace_interface
+	tuntap        *tuntap_interface
 }
 
 type net_namespace struct {
@@ -203,6 +205,7 @@ type net_namespace_main struct {
 	namespace_pool                   net_namespace_pool
 	rx_node                          rx_node
 	tx_node                          tx_node
+	tuntap_sendmsg_recvmsg_disable   bool
 }
 
 func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {
@@ -239,6 +242,8 @@ func (e *netlinkEvent) netnsMessage(msg *netlink.NetnsMessage) (err error) {
 
 func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) (err error) {
 	if is_del {
+		ns := m.namespace_by_name[name]
+		ns.del(m)
 		delete(m.namespace_by_name, name)
 		return
 	}
@@ -265,10 +270,11 @@ func (m *netlink_main) watch_namespace_add_del(dir, name string, is_del bool) {
 			return
 		}
 	} else {
-		var ok bool
-		if _, ok = m.namespace_by_name[name]; !ok {
+		if ns, ok := m.namespace_by_name[name]; !ok {
 			m.m.v.Logf("namespace watch del: unknown namespace %s\n", name)
 			return
+		} else {
+			nsid = ns.nsid
 		}
 	}
 	err = m.add_del_nsid(name, nsid, is_del)
@@ -384,35 +390,56 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 	}
 }
 
+func (m *net_namespace_main) find_interface_with_ifindex(index uint32) (intf *net_namespace_interface) {
+	for _, ns := range m.namespace_by_name {
+		if i, ok := ns.interface_by_index[index]; ok {
+			if intf != nil {
+				panic(fmt.Errorf("interface is not uniquely identified by index %d; index exists in namespaces %s and %s",
+					index, intf.namespace.name, ns.name))
+			}
+			intf = i
+		}
+	}
+	return
+}
+
 func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *netlink.IfInfoMessage, is_del bool) {
 	ns := intf.namespace
 	sup_index := msg.Attrs[netlink.IFLA_LINK].(netlink.Uint32Attr).Uint()
 	sup_si := vnet.SiNil
 
+	// Look in same namespace as target interface; if not found look in all namespaces (ifindex had better be unique!).
 	sup_intf := ns.interface_by_index[sup_index]
-	if sup_intf != nil {
-		sup_si = sup_intf.si
-	} else {
-		sa := string(intf.address)
-		if tif, ok := m.vnet_tuntap_interface_by_address[sa]; ok {
-			sup_si = tif.si
-		} else if h, ok := m.registered_hwifer_by_address[sa]; ok {
-			sup_si = h.GetHwIf().Si()
-		}
+	if sup_intf == nil {
+		sup_intf = m.find_interface_with_ifindex(sup_index)
 	}
 
-	// Sup interface is Vnet interface?
+	sup_si = sup_intf.si
+	intf.sup_interface = sup_intf
+
+	// Sup interface not Vnet interface?
 	if sup_si == vnet.SiNil {
 		return
 	}
 
 	li := msg.Attrs[netlink.IFLA_LINKINFO].(*netlink.AttrArray)
 	ld := li.X[netlink.IFLA_INFO_DATA].(*netlink.AttrArray)
+	v := ns.m.m.v
 	if is_del {
-		ns.m.m.v.DelSwIf(intf.si)
+		v.DelSwIf(intf.si)
 	} else {
-		id := ld.X[netlink.IFLA_VLAN_ID].(netlink.Uint16Attr).Uint()
-		si := ns.m.m.v.NewSwSubInterface(sup_si, uint(id))
+		id := vnet.Uint16(ld.X[netlink.IFLA_VLAN_ID].(netlink.Uint16Attr).Uint())
+		var eid ethernet.IfId
+		if sup_si.IsSwSubInterface(v) {
+			eid = ethernet.IfId(v.SwIf(sup_si).Id(v))
+			outer, _ := eid.OuterVlan()
+			eid.Set2(outer, id)
+		} else {
+			eid.Set(id)
+		}
+		hi := v.SupHi(sup_si)
+		hw := v.HwIf(hi)
+		si := ns.m.m.v.NewSwSubInterface(hw.Si(), vnet.IfId(eid))
 		m.set_si(intf, si)
 	}
 }
@@ -576,14 +603,20 @@ func (ns *net_namespace) add(m *netlink_main) (err error) {
 }
 
 func (ns *net_namespace) del(m *netlink_main) {
+	for index, intf := range ns.interface_by_index {
+		if intf.si != vnet.SiNil {
+			m.m.v.DelSwIf(intf.si)
+		}
+		delete(ns.interface_by_index, index)
+	}
+
 	ns.m.namespace_pool.PutIndex(ns.index)
 	ns.m.namespace_pool.entries[ns.index] = nil
-	ns.index = ^uint(0)
-
+	ns.fibInit(true)
 	if ns.ns_fd > 0 {
 		syscall.Close(ns.ns_fd)
 		ns.ns_fd = -1
 	}
 	ns.netlink_socket_pair.close()
-	ns.fibInit(true)
+	ns.index = ^uint(0)
 }

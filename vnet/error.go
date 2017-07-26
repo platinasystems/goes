@@ -118,7 +118,8 @@ func (n *Node) NewError(s string) (r ErrorRef) {
 	return
 }
 
-func (r *RefOpaque) SetError(n *Node, i uint) { r.Aux = uint32(n.errorRefs[i]) }
+func (n *Node) ErrorRef(i uint) ErrorRef      { return n.errorRefs[i] }
+func (r *RefOpaque) SetError(n *Node, i uint) { r.Aux = uint32(n.ErrorRef(i)) }
 func (n *Node) SetError(r *Ref, i uint)       { r.SetError(n, i) }
 func (n *Node) CountError(i, count uint) {
 	ts := ErrorNode.getThread(0)

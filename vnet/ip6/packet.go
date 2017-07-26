@@ -13,7 +13,7 @@ import (
 
 const (
 	AddressBytes = 16
-	HeaderBytes  = 40
+	SizeofHeader = 40
 )
 
 type Address [AddressBytes]byte
@@ -27,7 +27,7 @@ type Header struct {
 	Payload_length uint16
 
 	/* Protocol for next header. */
-	Protocol uint8
+	Protocol ip.Protocol
 
 	/* Hop limit decremented by router at each hop. */
 	Ttl uint8
@@ -58,9 +58,9 @@ func (a *Address) FromUint32(i int, x uint32) {
 
 func IpAddress(a *ip.Address) *Address { return (*Address)(unsafe.Pointer(&a[0])) }
 
-func (h *Header) Len() int { return HeaderBytes }
+func (h *Header) Len() int { return SizeofHeader }
 func (h *Header) Write(b []byte) {
-	type t struct{ data [HeaderBytes]byte }
+	type t struct{ data [SizeofHeader]byte }
 	i := (*t)(unsafe.Pointer(h))
 	copy(b[:], i.data[:])
 }

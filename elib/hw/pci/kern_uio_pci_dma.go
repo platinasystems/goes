@@ -22,6 +22,8 @@ import (
 )
 
 type uioPciDmaMain struct {
+	busCommon
+
 	// /dev/uio-dma
 	uio_dma_fd int
 
@@ -152,7 +154,7 @@ func (h *uioPciDmaMain) heapInit(uioMinorDevice uint32, maxSize uint64) (err err
 
 	t := &hw.PageTable
 	var data []byte
-	t.Data, data, err = elib.RawMmap(0, uintptr(maxSize), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED,
+	t.Data, data, err = elib.MmapSlice(0, uintptr(maxSize), syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED,
 		uintptr(h.uio_dma_fd), uintptr(mmap_offset))
 	if err != nil {
 		return err
@@ -167,8 +169,6 @@ func (h *uioPciDmaMain) heapInit(uioMinorDevice uint32, maxSize uint64) (err err
 
 	return err
 }
-
-var uioPciDma = &uioPciDmaMain{}
 
 type uioPciDevice struct {
 	Device
@@ -233,13 +233,11 @@ func (d *uioPciDevice) unbind() (err error) {
 	return
 }
 
-func NewDevice() Devicer {
-	d := &uioPciDevice{}
-	d.Device.Devicer = d
-	return d
-}
+var DefaultBus = &uioPciDmaMain{}
 
-func (d *uioPciDevice) GetDevice() *Device { return &d.Device }
+func (d *uioPciDevice) GetDevice() *Device     { return &d.Device }
+func (m *uioPciDmaMain) NewDevice() BusDevice  { return &uioPciDevice{} }
+func (m *uioPciDmaMain) Validate() (err error) { return }
 
 func (d *uioPciDevice) Open() (err error) {
 	err = d.bind()
@@ -254,7 +252,7 @@ func (d *uioPciDevice) Open() (err error) {
 	}
 
 	// Initialize DMA heap once device is open.
-	m := uioPciDma
+	m := DefaultBus
 	m.once.Do(func() {
 		err = m.heapInit(d.uioMinorDevice, 64<<20)
 	})
@@ -279,6 +277,8 @@ func (d *uioPciDevice) ErrorReady() error    { return errShouldNeverHappen }
 func (d *uioPciDevice) WriteReady() error    { return errShouldNeverHappen }
 func (d *uioPciDevice) WriteAvailable() bool { return false }
 func (d *uioPciDevice) String() string       { return "pci " + d.Device.String() }
+
+func (d *uioPciDevice) InterruptEnable(EnableMsi bool) (err error) { return }
 
 // UIO file is ready when interrupt occurs.
 func (d *uioPciDevice) ReadReady() (err error) {

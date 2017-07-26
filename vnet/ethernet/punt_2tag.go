@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 
 	"sync/atomic"
+	"unsafe"
 )
 
 const (
@@ -26,35 +27,29 @@ type PuntConfig struct {
 	// Software interface and aux data to use for packet.
 	RefOpaque vnet.RefOpaque
 	// True to advance past vlan/2-vlan tags to layer 3 header.
-	AdvanceL3Header bool
+	AdvanceL3Header     bool
+	NReplaceVlanHeaders uint
+	ReplaceVlanHeaders  [2]VlanTypeAndTag
 }
 
 type punt_packet_disposition struct {
 	o            vnet.RefOpaque
 	next         uint32
 	data_advance int32
+	header_index int32
+	_            uint32 // pad
+	replace_tags [8]byte
 }
 
 //go:generate gentemplate -d Package=ethernet -id punt_packet_disposition -d PoolType=punt_packet_disposition_pool -d Type=punt_packet_disposition -d Data=dispositions github.com/platinasystems/go/elib/pool.tmpl
 
-type DoubleTaggedPuntNode struct {
-	vnet.InOutNode
-	punt_packet_disposition_pool
-}
+type DoubleTaggedPuntNode vlan_tagged_punt_node
 
 func (n *DoubleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
-	p := &n.punt_packet_disposition_pool
-	i = uint32(p.GetIndex())
-	d := &p.dispositions[i]
-	d.o = cf.RefOpaque
-	d.next = uint32(n.Vnet.AddNamedNext(n, cf.Next))
-	if cf.AdvanceL3Header {
-		d.data_advance = HeaderBytes + 2*VlanHeaderBytes
-	}
-	return
+	return (*vlan_tagged_punt_node)(n).add_disposition(cf, 2)
 }
-func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) {
-	n.punt_packet_disposition_pool.PutIndex(uint(i))
+func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) (ok bool) {
+	return (*vlan_tagged_punt_node)(n).del_disposition(i)
 }
 func PuntDispositionForTags(outer, inner VlanTag) (i uint32) {
 	return uint32(inner.ToHost()<<16) | uint32(outer.ToHost())
@@ -69,7 +64,7 @@ const sizeof_double_tag = 8
 
 func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	p0 := *(*vnet.Uint64)(r0.DataOffset(sizeof_header_no_type))
-	q0 := (*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type))
+	q0 := (*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
 
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
@@ -79,7 +74,7 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 		error0 = punt_2tag_error_not_double_tagged
 	}
 
-	di0 := PuntDispositionForTags(q0[0].g, q0[1].g)
+	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
@@ -97,10 +92,13 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 		next0 = punt_2tag_next_error
 	}
 
-	// Remove double tag.  After this call packet is untagged.
-	*(*header_no_type)(r0.DataOffset(sizeof_double_tag)) = *(*header_no_type)(r0.DataOffset(0))
+	// Possibly replace tag.
+	*(*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type)) = *(*[2]VlanTypeAndTag)(unsafe.Pointer(&d0.replace_tags[0]))
 
-	r0.Advance(sizeof_double_tag + int(d0.data_advance))
+	// Copy src and dst ethernet address.
+	*(*header_no_type)(r0.DataOffset(uint(d0.header_index))) = *(*header_no_type)(r0.DataOffset(0))
+
+	r0.Advance(int(d0.data_advance))
 
 	return
 }
@@ -108,8 +106,8 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	p0 := *(*vnet.Uint64)(r0.DataOffset(sizeof_header_no_type))
 	p1 := *(*vnet.Uint64)(r1.DataOffset(sizeof_header_no_type))
-	q0 := (*[2]type_and_tag)(r0.DataOffset(sizeof_header_no_type))
-	q1 := (*[2]type_and_tag)(r1.DataOffset(sizeof_header_no_type))
+	q0 := (*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
+	q1 := (*[2]VlanTypeAndTag)(r1.DataOffset(sizeof_header_no_type))
 
 	var t = (vnet.Uint64(TYPE_VLAN)<<48 | vnet.Uint64(TYPE_VLAN)<<16).FromHost()
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
@@ -122,8 +120,8 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 		error1 = punt_2tag_error_not_double_tagged
 	}
 
-	di0 := PuntDispositionForTags(q0[0].g, q0[1].g)
-	di1 := PuntDispositionForTags(q1[0].g, q1[1].g)
+	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
+	di1 := PuntDispositionForTags(q1[0].Tag, q1[1].Tag)
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
@@ -150,12 +148,16 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 		next1 = punt_2tag_next_error
 	}
 
-	// Remove double tag.  After this call packet is untagged.
-	*(*header_no_type)(r0.DataOffset(sizeof_double_tag)) = *(*header_no_type)(r0.DataOffset(0))
-	*(*header_no_type)(r1.DataOffset(sizeof_double_tag)) = *(*header_no_type)(r1.DataOffset(0))
+	// Possibly replace tag.
+	*(*[2]VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type)) = *(*[2]VlanTypeAndTag)(unsafe.Pointer(&d0.replace_tags[0]))
+	*(*[2]VlanTypeAndTag)(r1.DataOffset(sizeof_header_no_type)) = *(*[2]VlanTypeAndTag)(unsafe.Pointer(&d1.replace_tags[0]))
 
-	r0.Advance(sizeof_double_tag + int(d0.data_advance))
-	r1.Advance(sizeof_double_tag + int(d0.data_advance))
+	// Copy src and dst ethernet address.
+	*(*header_no_type)(r0.DataOffset(uint(d0.header_index))) = *(*header_no_type)(r0.DataOffset(0))
+	*(*header_no_type)(r1.DataOffset(uint(d1.header_index))) = *(*header_no_type)(r1.DataOffset(0))
+
+	r0.Advance(int(d0.data_advance))
+	r1.Advance(int(d1.data_advance))
 
 	return
 }

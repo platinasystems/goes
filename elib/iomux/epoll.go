@@ -131,26 +131,30 @@ func (m *Mux) Update(f Filer) {
 }
 
 func (m *Mux) do(e *epollEvent) {
+	m.poolLock.Lock()
 	fi := e.data[0]
+	f := m.files[fi]
+	m.poolLock.Unlock()
+
 	em := e.mask
 
 	// Deleted file?
-	if m.files[fi] == nil {
+	if f == nil {
 		return
 	}
 
 	if em&eventWrite != 0 {
-		if err := m.files[fi].WriteReady(); err != nil {
+		if err := f.WriteReady(); err != nil {
 			m.logError(err)
 		}
 	}
 	if em&eventRead != 0 {
-		if err := m.files[fi].ReadReady(); err != nil {
+		if err := f.ReadReady(); err != nil {
 			m.logError(err)
 		}
 	}
 	if em&eventError != 0 {
-		if err := m.files[fi].ErrorReady(); err != nil {
+		if err := f.ErrorReady(); err != nil {
 			m.logError(err)
 		}
 	}

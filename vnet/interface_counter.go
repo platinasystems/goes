@@ -292,6 +292,9 @@ func (v *Vnet) clearIfCounters() {
 
 func (m *interfaceMain) counterValidate(is_hw bool, i uint) {
 	for _, t := range m.ifThreads {
+		if t == nil {
+			continue
+		}
 		c := &t.sw
 		if is_hw {
 			c = &t.hw

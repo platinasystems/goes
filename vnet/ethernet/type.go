@@ -44,6 +44,7 @@ const (
 	TYPE_WELLFLEET_COMPRESSION   Type = 0x80FF
 	TYPE_VLAN                    Type = 0x8100
 	TYPE_VLAN_IN_VLAN            Type = 0x9100
+	TYPE_VLAN_802_1AD            Type = 0x88a8
 	TYPE_IPX                     Type = 0x8137
 	TYPE_SNMP                    Type = 0x814C
 	TYPE_CABLETRON_ISMP          Type = 0x81FD
@@ -108,6 +109,7 @@ var typeStrings = [...]string{
 	TYPE_WELLFLEET_COMPRESSION:   "WELLFLEET_COMPRESSION",
 	TYPE_VLAN:                    "VLAN",
 	TYPE_VLAN_IN_VLAN:            "VLAN_IN_VLAN",
+	TYPE_VLAN_802_1AD:            "VLAN 802.1ad",
 	TYPE_IPX:                     "IPX",
 	TYPE_SNMP:                    "SNMP",
 	TYPE_CABLETRON_ISMP:          "CABLETRON_ISMP",

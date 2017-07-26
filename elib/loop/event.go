@@ -24,7 +24,7 @@ type EventHandler interface {
 	EventHandler()
 }
 
-type eventLoop struct {
+type eventMain struct {
 	l        *Loop
 	pollers  []EventPoller
 	handlers []EventHandler
@@ -36,7 +36,7 @@ type eventLoop struct {
 	eventVec      event.ActorVec
 }
 
-func (l *eventLoop) getLoopEvent(a event.Actor) (x *loopEvent) {
+func (l *eventMain) getLoopEvent(a event.Actor) (x *loopEvent) {
 	if y := l.loopEvents.Get(); y != nil {
 		x = y.(*loopEvent)
 		*x = loopEvent{actor: a}
@@ -46,7 +46,7 @@ func (l *eventLoop) getLoopEvent(a event.Actor) (x *loopEvent) {
 	x.l = l.l
 	return
 }
-func (l *eventLoop) putLoopEvent(x *loopEvent) { l.loopEvents.Put(x) }
+func (l *eventMain) putLoopEvent(x *loopEvent) { l.loopEvents.Put(x) }
 
 type eventNode struct {
 	activateEvent
@@ -153,12 +153,12 @@ func (l *Loop) startHandler(n EventHandler) {
 	go l.eventHandler(n)
 }
 
-func (l *eventLoop) eventPoller(p EventPoller) {
+func (l *eventMain) eventPoller(p EventPoller) {
 	for {
 		p.EventPoll()
 	}
 }
-func (l *eventLoop) startPoller(n EventPoller) { go l.eventPoller(n) }
+func (l *eventMain) startPoller(n EventPoller) { go l.eventPoller(n) }
 
 func (l *Loop) doEventNoWait() (quit *quitEvent) {
 	l.now = cpu.TimeNow()
@@ -235,12 +235,12 @@ func (l *Loop) doEvents() (quitLoop bool) {
 	l.eventVec = l.eventVec[:0]
 
 	// Wait for all event handlers to become inactive.
-	l.eventLoop.Wait()
+	l.eventMain.Wait()
 
 	return
 }
 
-func (l *eventLoop) Wait() {
+func (l *eventMain) Wait() {
 	for _, h := range l.handlers {
 		c := h.GetNode()
 		for c.nActiveEvents > 0 {
@@ -250,8 +250,7 @@ func (l *eventLoop) Wait() {
 	}
 }
 
-func (p *Loop) eventInit() {
-	l := &p.eventLoop
+func (l *eventMain) Init(p *Loop) {
 	l.l = p
 	l.events = make(chan *loopEvent, eventHandlerChanDepth)
 
@@ -263,7 +262,7 @@ func (p *Loop) eventInit() {
 	}
 }
 
-func (l *eventLoop) RegisterEventPoller(p EventPoller) {
+func (l *eventMain) RegisterEventPoller(p EventPoller) {
 	l.pollers = append(l.pollers, p)
 }
 

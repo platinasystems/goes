@@ -30,7 +30,50 @@ type MemHeap struct {
 	data []byte
 }
 
-func RawMmap(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []byte, err error) {
+func munmap(a, size uintptr) (err error) {
+	const flags = syscall.MAP_SHARED | syscall.MAP_ANONYMOUS | syscall.MAP_FIXED
+	_, _, e := syscall.RawSyscall6(syscall.SYS_MMAP, a, size, syscall.PROT_NONE, flags, 0, 0)
+	if e != 0 {
+		err = fmt.Errorf("mmap PROT_NONE: %s", e)
+	}
+	return
+}
+
+func MmapSliceAligned(log2_size, log2_align uint, flags, prot uintptr) (a uintptr, b []byte, err error) {
+	const log2_page_size = 12
+	if log2_align < log2_page_size {
+		log2_align = log2_page_size
+	}
+	size := uintptr(1) << log2_size
+	align := uintptr(1) << log2_align
+	a, _, e := syscall.RawSyscall6(syscall.SYS_MMAP, 0, size+align, prot, flags, 0, 0)
+	if e != 0 {
+		err = fmt.Errorf("mmap: %s", e)
+		return
+	}
+	if align > log2_page_size {
+		a0 := a
+		a1 := (a0 + align - 1) &^ (align - 1)
+		a2 := a1 + size
+		a3 := a0 + size + align
+		if a1 > a0 {
+			if err = munmap(a0, a1-a0); err != nil {
+				return
+			}
+		}
+		if a3 > a2 {
+			if err = munmap(a2, a3-a2); err != nil {
+				return
+			}
+		}
+		a = a1
+	}
+	slice := reflect.SliceHeader{Data: a, Len: int(size), Cap: int(size)}
+	b = *(*[]byte)(unsafe.Pointer(&slice))
+	return
+}
+
+func MmapSlice(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []byte, err error) {
 	r, _, e := syscall.RawSyscall6(syscall.SYS_MMAP, addr, length, prot, flags, fd, offset)
 	if e != 0 {
 		err = fmt.Errorf("mmap: %s", e)
@@ -42,11 +85,19 @@ func RawMmap(addr, length, prot, flags, fd, offset uintptr) (a uintptr, b []byte
 	return
 }
 
+func Munmap(b []byte) (err error) {
+	_, _, e := syscall.RawSyscall(syscall.SYS_MUNMAP, uintptr(unsafe.Pointer(&b[0])), uintptr(len(b)), 0)
+	if e != 0 {
+		err = fmt.Errorf("munmap: %s", e)
+	}
+	return
+}
+
 // Init initializes heap with n bytes of mmap'ed anonymous memory.
 func (h *MemHeap) init(b []byte, n uint) {
 	if len(b) == 0 {
 		var err error
-		_, b, err = RawMmap(0, uintptr(n), syscall.PROT_READ|syscall.PROT_WRITE,
+		_, b, err = MmapSlice(0, uintptr(n), syscall.PROT_READ|syscall.PROT_WRITE,
 			syscall.MAP_PRIVATE|syscall.MAP_ANON|syscall.MAP_NORESERVE, 0, 0)
 		if err != nil {
 			err = fmt.Errorf("mmap: %s", err)

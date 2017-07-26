@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
+	"fmt"
 	"unsafe"
 )
 
@@ -149,6 +150,89 @@ type HwInterfacer interface {
 	vnet.HwInterfacer
 }
 
+type IfId vnet.IfId
+
+// 32 bit Id: 16 bit outer/inner id: 12 bit id + valid bit
+func (i IfId) inner() IfId { return i >> 16 }
+func (i IfId) outer() IfId { return i & 0xffff }
+func (i IfId) valid() bool { return i&(1<<15) != 0 }
+func (i IfId) id() (id vnet.Uint16, valid bool) {
+	valid = i.valid()
+	if valid {
+		id = vnet.Uint16(i & 0xfff)
+	}
+	return
+}
+func (i IfId) OuterVlan() (id vnet.Uint16, valid bool) { return i.outer().id() }
+func (i IfId) InnerVlan() (id vnet.Uint16, valid bool) { return i.inner().id() }
+func (i *IfId) Set(outer vnet.Uint16)                  { *i = IfId(outer) | 1<<15 }
+func (i *IfId) Set2(outer, inner vnet.Uint16)          { *i = IfId(outer) | 1<<15 | IfId(inner)<<16 | 1<<31 }
+
+func (i *Interface) LessThanId(aʹ, bʹ vnet.IfId) bool {
+	a, b := IfId(aʹ), IfId(bʹ)
+
+	// Compare outer then inner vlan.
+	{
+		ai, av := a.OuterVlan()
+		bi, bv := b.OuterVlan()
+		if av && bv && ai != bi {
+			return ai < bi
+		}
+	}
+	{
+		ai, av := a.InnerVlan()
+		bi, bv := b.InnerVlan()
+		if av && bv && ai != bi {
+			return ai < bi
+		}
+	}
+	// Vlans not valid.
+	return a < b
+}
+
+func (intf *Interface) ParseId(a *vnet.IfId, in *parse.Input) bool {
+	var (
+		i int
+		v []int
+	)
+	for !in.End() {
+		switch {
+		case in.Parse(".%d", &i) && i <= 0xfff:
+			v = append(v, i)
+		default:
+			return false
+		}
+		if len(v) > 2 {
+			break
+		}
+	}
+	switch {
+	case len(v) == 1:
+		*a = vnet.IfId(1<<15 | v[0])
+	case len(v) == 2:
+		*a = vnet.IfId(1<<15 | v[0] | 1<<31 | v[1]<<16)
+	default:
+		return false
+	}
+	return true
+}
+
+func (i *Interface) FormatId(aʹ vnet.IfId) (v string) {
+	a := IfId(aʹ)
+	oi, ov := a.OuterVlan()
+	ii, iv := a.InnerVlan()
+	if ov {
+		v += fmt.Sprintf(".%d", oi)
+	}
+	if iv {
+		v += fmt.Sprintf(".%d", ii)
+	}
+	if !iv && !ov {
+		v = fmt.Sprintf("invalid 0x%x", a)
+	}
+	return
+}
+
 // See vnet.Arper interface.
 // Dummy function to mark ethernet interfaces as supporting ARP.
 func (i *Interface) SupportsArp() {}
@@ -180,14 +264,25 @@ type rwHeader struct {
 func (hi *Interface) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.PacketType, da []byte) {
 	var h rwHeader
 	sw := v.SwIf(rw.Si)
-	sup := v.SupSwIf(sw)
 	t := rewriteTypeMap[packetType].FromHost()
-	size := uintptr(HeaderBytes)
-	if sw != sup {
-		h.Type = TYPE_VLAN.FromHost()
-		h.vlan[0].Tag = VlanTag(sw.Id(v)).FromHost()
-		h.vlan[0].Type = t
-		size += VlanHeaderBytes
+	size := uintptr(SizeofHeader)
+	id := IfId(sw.Id(v))
+	outer_id, outer_valid := id.OuterVlan()
+	inner_id, inner_valid := id.InnerVlan()
+	if outer_valid {
+		if inner_valid {
+			h.Type = TYPE_VLAN.FromHost()
+			h.vlan[0].Tag = VlanTag(outer_id).FromHost()
+			h.vlan[0].Type = h.Type
+			h.vlan[1].Tag = VlanTag(inner_id).FromHost()
+			h.vlan[1].Type = t
+			size += 2 * SizeofVlanHeader
+		} else {
+			h.Type = TYPE_VLAN.FromHost()
+			h.vlan[0].Tag = VlanTag(outer_id).FromHost()
+			h.vlan[0].Type = t
+			size += SizeofVlanHeader
+		}
 	} else {
 		h.Type = t
 	}
@@ -197,20 +292,94 @@ func (hi *Interface) SetRewrite(v *vnet.Vnet, rw *vnet.Rewrite, packetType vnet.
 		h.Dst = BroadcastAddr
 	}
 	copy(h.Src[:], hi.Address[:])
-	rw.SetData(nil)
+	rw.ResetData()
 	rw.AddData(unsafe.Pointer(&h), size)
 }
 
-func (hi *Interface) FormatRewrite(rw *vnet.Rewrite) string {
-	h := (*rwHeader)(rw.GetData())
-	return h.String()
+func (t Type) isVlan() bool {
+	switch t.ToHost() {
+	case TYPE_VLAN, TYPE_VLAN_IN_VLAN, TYPE_VLAN_802_1AD:
+		return true
+	default:
+		return false
+	}
 }
 
-func (hi *Interface) ParseRewrite(rw *vnet.Rewrite, in *parse.Input) {
-	var h Header
-	h.Parse(in)
-	rw.SetData(nil)
-	rw.AddData(unsafe.Pointer(&h), HeaderBytes)
+func (h *rwHeader) nTags() (n uint) {
+	if h.Type.isVlan() {
+		n++
+		if h.vlan[0].Type.isVlan() {
+			n++
+		}
+	}
+	return
+}
+
+func (h *rwHeader) Sizeof() uint { return SizeofHeader + h.nTags()*SizeofVlanHeader }
+func (h *rwHeader) InnerType() (t Type) {
+	t = h.Type
+	if t.isVlan() {
+		t = h.vlan[0].Type
+		if t.isVlan() {
+			t = h.vlan[1].Type
+		}
+	}
+	return
+}
+
+func (h *rwHeader) String() (s string) {
+	nTags := h.nTags()
+	if nTags == 0 {
+		return h.Header.String()
+	}
+	var tmp rwHeader
+	tmp.Header = h.Header
+	tmp.Header.Type = h.vlan[nTags-1].Type // inner type
+	tmp.vlan[0] = h.vlan[0]
+	tmp.vlan[0].Type = h.Type
+	if nTags > 1 {
+		tmp.vlan[1] = h.vlan[1]
+		tmp.vlan[1].Type = h.vlan[0].Type
+	}
+	s = tmp.Header.String()
+	for i := uint(0); i < nTags; i++ {
+		s += " " + tmp.vlan[i].String()
+	}
+	return
+}
+
+func (hi *Interface) FormatRewrite(r *vnet.Rewrite) (lines []string) {
+	h := (*rwHeader)(r.GetData())
+	b := r.Slice()
+	lines = append(lines, h.String())
+	i := h.Sizeof()
+	innerType := h.InnerType()
+	if i < uint(len(b)) {
+		m := GetMain(hi.GetVnet())
+		if l, ok := m.layerMap[innerType.ToHost()]; ok {
+			lines = append(lines, l.FormatLayer(b[i:])...)
+		} else {
+			panic(fmt.Errorf("no formatter for type %s", innerType.FromHost()))
+		}
+	}
+	return
+}
+
+func (hi *Interface) ParseRewrite(r *vnet.Rewrite, in *parse.Input) {
+	var h ParseHeader
+	innerType := h.Parse(in)
+	b := r.Data()
+	h.Write(b)
+	i := h.Sizeof()
+	if !in.End() {
+		m := GetMain(hi.GetVnet())
+		if l, ok := m.layerMap[innerType.ToHost()]; ok {
+			i += l.ParseLayer(b[i:], in)
+		} else {
+			panic(fmt.Errorf("no parser for type %s: %s", innerType.FromHost(), in))
+		}
+	}
+	r.SetData(b[:i])
 }
 
 // Block of ethernet addresses for allocation by a switch.
@@ -226,8 +395,8 @@ type AddressBlock struct {
 }
 
 func (a *Address) add(offset uint32) {
-	for i, o := 0, offset; o != 0 && i < AddressBytes; i++ {
-		j := AddressBytes - 1 - i
+	for i, o := 0, offset; o != 0 && i < SizeofAddress; i++ {
+		j := SizeofAddress - 1 - i
 		x := uint8(o)
 		y := a[j]
 		y += x
@@ -265,7 +434,7 @@ func (b *AddressBlock) Alloc() (Address, bool) {
 func (b *AddressBlock) Free(a *Address) {
 	offset := uint64(0)
 	for i := range a {
-		j := AddressBytes - 1 - i
+		j := SizeofAddress - 1 - i
 		offset += uint64(a[j]-b.Base[j]) << uint64(8*i)
 	}
 

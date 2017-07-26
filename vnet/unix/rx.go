@@ -64,7 +64,7 @@ func (n *rx_node) new_packet_vector() (v *rx_packet_vector) {
 	for i := range v.p {
 		v.p[i].rx_init(n)
 		v.a[i] = raw_sockaddr_ll_template
-		v.m[i].msg_hdr.set(&v.a[i], v.p[i].iovs)
+		v.m[i].msg_hdr.set(&v.a[i], v.p[i].iovs, 0)
 	}
 	return
 }
@@ -213,9 +213,7 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 	// Perform 0 byte read to get error from tuntap device.
 	var b [0]byte
 	_, err = syscall.Read(intf.Fd, b[:])
-	if err != nil {
-		fmt.Println(err)
-	}
+	err = nil
 	return
 }
 

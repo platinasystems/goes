@@ -66,8 +66,8 @@ type subCommand struct {
 func (c *subCommand) Elts() int { return len(c.cmds) + len(c.subs) }
 
 type File struct {
-	main              *Main
-	disablePrompt     bool
+	main *Main
+	ServerConfig
 	closeAfterTxFlush bool
 	poolIndex         fileIndex
 	iomux.FileReadWriteCloser
@@ -219,7 +219,10 @@ func (m *Main) ExecInput(w io.Writer, in *Input) (err error) {
 				err = fmt.Errorf("%s: %s `%s': %s", c.CliName(), e, in, debug.Stack())
 			}
 		}()
-		err = c.CliAction(w, in)
+		// Potentially skip leading and trailing {} in input line.
+		var line Input
+		in.Parse("%l", &line.Input)
+		err = c.CliAction(w, &line)
 	}
 	return
 }

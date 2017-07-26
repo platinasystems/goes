@@ -7,8 +7,9 @@ package pci
 // Linux PCI code
 
 import (
+	"github.com/platinasystems/go/elib"
+
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -30,18 +31,27 @@ func (d *Device) SysfsOpenFile(format string, mode int, args ...interface{}) (f 
 	return
 }
 
-func (d *Device) rw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
-	var (
-		f   *os.File
-		err error
-	)
+func (d *Device) SysfsReadHexFile(format string, mode int, args ...interface{}) (v uint, err error) {
+	var f *os.File
+	f, err = d.SysfsOpenFile(format, mode, args...)
+	if err != nil {
+		return
+	}
+	var n int
+	if n, err = fmt.Fscanf(f, "0x%x", &v); n != 1 || err != nil {
+		return
+	}
+	defer f.Close()
+	return
+}
+
+func (d *Device) ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
+	f, err := d.SysfsOpenFile("config", os.O_RDWR)
 	defer func() {
 		if err != nil {
 			panic(err)
 		}
 	}()
-
-	f, err = d.SysfsOpenFile("config", os.O_RDWR)
 	if err != nil {
 		return
 	}
@@ -68,28 +78,29 @@ func (d *Device) rw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
 }
 
 func (d *Device) ReadConfigUint32(o uint) (v uint32) {
-	v = uint32(d.rw(o, 0, 4, false))
+	v = uint32(d.BusDevice.ConfigRw(o, 0, 4, false))
 	return
 }
 func (d *Device) WriteConfigUint32(o uint, value uint32) {
-	d.rw(o, uint(value), 4, true)
+	d.BusDevice.ConfigRw(o, uint(value), 4, true)
 }
 func (d *Device) ReadConfigUint16(o uint) (v uint16) {
-	v = uint16(d.rw(o, 0, 2, false))
+	v = uint16(d.BusDevice.ConfigRw(o, 0, 2, false))
 	return
 }
 func (d *Device) WriteConfigUint16(o uint, value uint16) {
-	d.rw(o, uint(value), 2, true)
+	d.BusDevice.ConfigRw(o, uint(value), 2, true)
 }
 func (d *Device) ReadConfigUint8(o uint) (v uint8) {
-	v = uint8(d.rw(o, 0, 1, false))
+	v = uint8(d.BusDevice.ConfigRw(o, 0, 1, false))
 	return
 }
 func (d *Device) WriteConfigUint8(o uint, value uint8) {
-	d.rw(o, uint(value), 1, true)
+	d.BusDevice.ConfigRw(o, uint(value), 1, true)
 }
 
-func (d *Device) MapResource(r *Resource) (res unsafe.Pointer, err error) {
+func (d *Device) MapResource(bar uint) (res uintptr, err error) {
+	r := &d.Resources[bar]
 	var f *os.File
 	f, err = d.SysfsOpenFile("resource%d", os.O_RDWR, r.Index)
 	if err != nil {
@@ -101,19 +112,61 @@ func (d *Device) MapResource(r *Resource) (res unsafe.Pointer, err error) {
 		err = fmt.Errorf("mmap resource%d: %s", r.Index, err)
 		return
 	}
-	res = unsafe.Pointer(&r.Mem[0])
+	res = uintptr(unsafe.Pointer(&r.Mem[0]))
 	return
 }
 
-func (d *Device) UnmapResource(r *Resource) (err error) {
-	err = syscall.Munmap(r.Mem)
-	if err != nil {
-		return fmt.Errorf("munmap resource%d: %s", r.Index, err)
+func (d *Device) UnmapResource(bar uint) (err error) {
+	if d.Resources[bar].Mem != nil {
+		err = syscall.Munmap(d.Resources[bar].Mem)
+		if err != nil {
+			return fmt.Errorf("munmap resource%d: %s", bar, err)
+		}
 	}
 	return
 }
 
-func DiscoverDevices() (err error) {
+// Loop through BARs to find resources.
+func (d *Device) findResources() (err error) {
+	var f *os.File
+	if f, err = d.SysfsOpenFile("resource", os.O_RDONLY); err != nil {
+		return
+	}
+	defer f.Close()
+
+	var b []byte
+	if b, err = ioutil.ReadAll(f); err != nil {
+		return
+	}
+	r := bytes.NewReader(b)
+	i := 0
+	for r.Len() > 0 {
+		var (
+			v [3]uint64
+			n int
+		)
+		if n, err = fmt.Fscanf(r, "0x%x 0x%x 0x%x\n", &v[0], &v[1], &v[2]); n != 3 || err != nil {
+			if n != 3 {
+				err = fmt.Errorf("short read")
+			}
+			return
+		}
+		size := v[0]
+		if v[0] != 0 {
+			size = 1 + v[1] - v[0]
+		}
+		res := Resource{
+			Index: uint32(i),
+			Base:  v[0],
+			Size:  size,
+		}
+		d.Resources = append(d.Resources, res)
+		i++
+	}
+	return
+}
+
+func DiscoverDevices(bus Bus, l elib.Logger) (err error) {
 	fis, err := ioutil.ReadDir(sysBusPciPath)
 	if perr, ok := err.(*os.PathError); ok && perr.Err == syscall.ENOENT {
 		return
@@ -121,82 +174,87 @@ func DiscoverDevices() (err error) {
 	if err != nil {
 		return
 	}
+	bc := bus.getBusCommon()
+
 	for _, fi := range fis {
-		de := NewDevice()
+		de := bus.NewDevice()
 		d := de.GetDevice()
+		d.BusDevice = de
+
 		n := fi.Name()
 		if _, err = fmt.Sscanf(n, "%x:%x:%x.%x", &d.Addr.Domain, &d.Addr.Bus, &d.Addr.Slot, &d.Addr.Fn); err != nil {
 			return
 		}
 
-		var f *os.File
-		f, err = d.SysfsOpenFile("config", os.O_RDONLY)
-		if err != nil {
-			return
-		}
-		defer f.Close()
-		d.configBytes, err = ioutil.ReadAll(f)
+		var driver Driver
 
-		r := bytes.NewReader(d.configBytes)
-		binary.Read(r, binary.LittleEndian, &d.Config)
-		if d.Config.Type() != Normal {
-			continue
-		}
-
-		driver := GetDriver(d.Config.DeviceID)
-		if driver == nil {
-			continue
-		}
-
-		// Loop through BARs to find resources.
+		// See if we have a registered driver for this device.
 		{
-			i := 0
-			for i < len(d.Config.BaseAddressRegs) {
-				bar := d.Config.BaseAddressRegs[i]
-				if !bar.Valid() {
-					i++
-					continue
-				}
-				var rfi os.FileInfo
-				rfi, err = os.Stat(d.SysfsPath("resource%d", i))
-				if err != nil {
-					return
-				}
-				r := Resource{
-					Index: uint32(i),
-					Base:  uint64(bar.Addr()),
-					Size:  uint64(rfi.Size()),
-				}
-				r.BAR[0] = bar
+			var i DeviceID
+			var v [2]uint
+			v[0], err = d.SysfsReadHexFile("vendor", os.O_RDONLY)
+			if err != nil {
+				return
+			}
+			v[1], err = d.SysfsReadHexFile("device", os.O_RDONLY)
+			if err != nil {
+				return
+			}
+			i.Vendor = VendorID(v[0])
+			i.Device = VendorDeviceID(v[1])
+			d.ID = i
 
-				i++
-				is64bit := (bar>>1)&3 == 2
-				if is64bit {
-					r.BAR[1] = d.Config.BaseAddressRegs[i]
-					r.Base |= uint64(r.BAR[1]) << 32
-					i++
-				}
-
-				d.Resources = append(d.Resources, r)
+			if driver = GetDriver(i); driver == nil {
+				continue
 			}
 		}
 
-		d.Driver = driver
-		d.DriverDevice, err = driver.DeviceMatch(d)
-		if err != nil {
+		if err = d.findResources(); err != nil {
 			return
 		}
 
+		d.Driver = driver
+		if d.DriverDevice, err = driver.NewDevice(de); err != nil {
+			return
+		}
+		bc.registeredDevs = append(bc.registeredDevs, de)
+	}
+
+	// Open all registered devices.
+	for _, bd := range bc.registeredDevs {
+		if err = bd.Open(); err != nil {
+			return
+		}
+	}
+	if err = bus.Validate(); err != nil {
+		return
+	}
+
+	// Intialize all registered devices that have drivers.
+	for _, bd := range bc.registeredDevs {
+		d := bd.GetDevice()
 		if d.DriverDevice == nil {
 			continue
 		}
-
-		// Open and initialize matched device.
-		err = d.Devicer.Open()
-		if err != nil {
+		if err = d.DriverDevice.Init(); err != nil {
 			return
 		}
-		d.DriverDevice.Init()
+	}
+	return
+}
+
+func CloseDiscoveredDevices(bus Bus) (err error) {
+	bc := bus.getBusCommon()
+	for _, bd := range bc.registeredDevs {
+		d := bd.GetDevice()
+		if d.DriverDevice != nil {
+			if err = d.DriverDevice.Exit(); err != nil {
+				return
+			}
+		}
+		if err = bd.Close(); err != nil {
+			return
+		}
 	}
 	return
 }

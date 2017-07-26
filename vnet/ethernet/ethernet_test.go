@@ -16,9 +16,9 @@ func TestAddressBlock(t *testing.T) {
 	as := make([]Address, b.Count)
 	for i := range as {
 		as[i] = b.Base
-		as[i][AddressBytes-1] = uint8(i)
+		as[i][SizeofAddress-1] = uint8(i)
 		if i >= 256 {
-			as[i][AddressBytes-2] = uint8(i >> 8)
+			as[i][SizeofAddress-2] = uint8(i >> 8)
 		}
 	}
 	for i := range as {
