@@ -319,21 +319,23 @@ func (f *Fib) setReachable(p *Prefix, via *Prefix, nh *NextHop, isDel bool) {
 	f.reachable[vl][va] = x
 }
 
-func (x *mapFibResult) f0(m *Main, f *Fib, y *mapFibResult) {
-	for dst, dstMap := range y.nh {
-		delete(y.nh, dst)
-		x.nh[dst] = dstMap
+// Delete more specific reachable with less specific reachable.
+func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibResult) {
+	for dst, dstMap := range more.nh {
+		// Move all destinations from more -> less.
+		delete(more.nh, dst)
+		less.nh[dst] = dstMap
+		// Replace adjacencies: more -> less.
 		for dp, _ := range dstMap {
-			f.replaceNextHop(m, &dp, y.adj, x.adj)
+			f.replaceNextHop(m, &dp, more.adj, less.adj)
 		}
 	}
 }
 
-func (x *mapFibResult) f3(m *Main, f *Fib) {
+func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
 	si := m.GetAdjRewriteSi(x.adj)
 	for dst, dstMap := range x.nh {
 		delete(x.nh, dst)
-		x.nh[dst] = dstMap
 		for dp, dw := range dstMap {
 			nh := NextHop{
 				Address: dst,
@@ -347,36 +349,18 @@ func (x *mapFibResult) f3(m *Main, f *Fib) {
 	}
 }
 
-func (x *mapFibResult) f4(m *Main, f *Fib, p *Prefix) {
-	si := m.GetAdjRewriteSi(x.adj)
-	for dst, dstMap := range x.nh {
+func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, adj ip.Adj, more *mapFibResult) {
+	for dst, dstMap := range less.nh {
 		if dst.MatchesPrefix(p) {
-			delete(x.nh, dst)
+			delete(less.nh, dst)
 			for dp, dw := range dstMap {
-				nh := NextHop{
-					Address: dst,
-					Si:      si,
-					Weight:  dw,
-				}
 				const isDel = false
-				f.addDelUnreachable(m, &dp, &nh, isDel, false)
+				more.addDelNextHop(dp, dst, dw, isDel)
+				f.replaceNextHop(m, &dp, less.adj, adj)
 			}
 		}
 	}
-}
-
-func (r *mapFibResult) f1(m *Main, f *Fib, p *Prefix, adj ip.Adj, y *mapFibResult) {
-	for dst, dstMap := range r.nh {
-		if dst.MatchesPrefix(p) {
-			delete(r.nh, dst)
-			for dp, dw := range dstMap {
-				const isDel = false
-				y.addDelNextHop(dp, dst, dw, isDel)
-				f.replaceNextHop(m, &dp, r.adj, adj)
-			}
-		}
-	}
-	f.reachable[p.Len][p.mapFibKey()] = *y
+	f.reachable[p.Len][p.mapFibKey()] = *more
 }
 
 func (r *mapFibResult) f2(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
@@ -399,18 +383,37 @@ func (r *mapFibResult) f2(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
 	}
 }
 
+func (x *mapFibResult) f4(m *Main, f *Fib, p *Prefix) {
+	si := m.GetAdjRewriteSi(x.adj)
+	for dst, dstMap := range x.nh {
+		if dst.MatchesPrefix(p) {
+			delete(x.nh, dst)
+			for dp, dw := range dstMap {
+				nh := NextHop{
+					Address: dst,
+					Si:      si,
+					Weight:  dw,
+				}
+				const isDel = false
+				f.addDelUnreachable(m, &dp, &nh, isDel, false)
+			}
+		}
+	}
+}
+
 func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
-	pr, _ := f.reachable.get(p)
-	lr, _, ok := f.reachable.getLessSpecific(p)
+	r, _ := f.reachable.get(p)
+	// Look up less specific reachable route for prefix.
+	lr, _, lok := f.reachable.getLessSpecific(p)
 	if isDel {
-		if ok {
-			lr.f0(m, f, &pr)
+		if lok {
+			lr.replaceWithLessSpecific(m, f, &r)
 		} else {
-			pr.f3(m, f)
+			r.delReachableVia(m, f)
 		}
 	} else {
-		if ok {
-			lr.f1(m, f, p, a, &pr)
+		if lok {
+			lr.replaceWithMoreSpecific(m, f, p, a, &r)
 		}
 		if r, _, ok := f.unreachable.lookup(p.Address); ok {
 			r.f2(m, f, p, a)
@@ -421,7 +424,7 @@ func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 func (f *Fib) addDelUnreachable(m *Main, p *Prefix, nh *NextHop, isDel bool, recurse bool) (err error) {
 	nr, np, _ := f.unreachable.lookup(nh.Address)
 	if isDel && recurse {
-		nr.f3(m, f)
+		nr.delReachableVia(m, f)
 	}
 	if !isDel && recurse {
 		nr.f4(m, f, p)
@@ -587,7 +590,9 @@ type NextHop struct {
 
 func (x *NextHop) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*vnet.Vnet)
-	if !in.Parse("%v %v", &x.Si, v, &x.Address) {
+	switch {
+	case in.Parse("%v %v", &x.Si, v, &x.Address):
+	default:
 		panic(fmt.Errorf("expecting INTERFACE ADDRESS; got %s", in))
 	}
 	x.Weight = 1
