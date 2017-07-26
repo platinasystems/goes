@@ -107,8 +107,22 @@ type CapabilityHeader struct {
 		//   [27:26] slot power limit scale
 		//   [28] function level reset
 		Capabilities devCap
-		Control      pci.U16
-		Status       pci.U16
+
+		// [0] correctable ecc error reporting
+		// [1] non-fatal error reporting
+		// [2] fatal error reporting
+		// [3] unsupported request reporting enable
+		// [4] enable relaxed ordering
+		// [7:5] max payload size
+		// [8] extended tag field enable
+		// [9] phantom functions enable
+		// [10] aux power management enable
+		// [11] enable no snoop
+		// [14:12] max read request size
+		// [15] bridge configuration retry / FLR
+		Control pci.U16
+
+		Status pci.U16
 	}
 
 	Link, Slot struct {
