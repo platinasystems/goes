@@ -69,12 +69,12 @@ func (Command) Main(args ...string) error {
 		"-T": "60",
 		"-t": "30",
 	} {
-		if len(parm[k]) == 0 {
-			parm[k] = v
+		if len(parm.ByName[k]) == 0 {
+			parm.ByName[k] = v
 		}
 	}
 
-	period, err := strconv.ParseInt(parm["-t"], 0, 0)
+	period, err := strconv.ParseInt(parm.ByName["-t"], 0, 0)
 	if err != nil {
 		return fmt.Errorf("%s: invalid Period: ", err)
 	} else if period <= 0 {

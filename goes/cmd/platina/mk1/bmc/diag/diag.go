@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 )
 
@@ -48,38 +48,30 @@ EXAMPLES
 	diag prom -x86 -w crc	updates host eeprom crc field`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
-
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
 var debug, x86, writeField, delField, writeSN bool
 var argF []string
-var flagF flags.Flag
 
-type cmd struct{}
+var flagF *flags.Flags
+
+type Command struct{}
 type Diag func() error
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var diag string
-	flag, args := flags.New(args, "-debug", "-x86", "-w", "-d")
-	debug = flag["-debug"]
-	x86 = flag["-x86"]
-	writeField = flag["-w"]
-	delField = flag["-d"]
-	writeSN = flag["-wsn"]
+	flagF, args = flags.New(args, "-debug", "-x86", "-w", "-d")
+	debug = flagF.ByName["-debug"]
+	x86 = flagF.ByName["-x86"]
+	writeField = flagF.ByName["-w"]
+	delField = flagF.ByName["-d"]
+	writeSN = flagF.ByName["-wsn"]
 	argF = args
-	flagF = flag
 	//if n := len(args); n > 1 {
 	//	return fmt.Errorf("%v: unexpected", args[1:])
 	//}

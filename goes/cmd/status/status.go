@@ -13,7 +13,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 )
@@ -36,7 +35,6 @@ func New() Command { return Command{} }
 type Command struct{}
 
 func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Kind() cmd.Kind    { return cmd.DontFork }
 func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
@@ -80,6 +78,7 @@ func checkForKmod() error {
 func checkDaemons() error {
 	daemons := map[string]bool{
 		"goes-daemons": true,
+		"goes":         true,
 		"vnetd":        true,
 		"redisd":       true,
 		"qsfp":         true,
@@ -134,10 +133,13 @@ func checkDaemons() error {
 		if _, ok := daemons[daemon]; ok == true {
 			delete(daemons, daemon)
 		} else {
-			fmt.Println("map NOT found for", daemon, ok)
+			fmt.Printf("map NOT found for [%s]\n", daemon)
 		}
 	}
 	for k := range daemons {
+		if k == "goes" {
+			continue // another instance of goes
+		}
 		return fmt.Errorf("%s daemon not running", k)
 	}
 	return err

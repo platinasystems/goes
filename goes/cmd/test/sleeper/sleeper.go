@@ -64,8 +64,8 @@ func (Command) Main(args ...string) error {
 	var sec uint
 
 	parm, args := parms.New(args, "-s")
-	if len(parm["-s"]) == 0 {
-		parm["-s"] = "3"
+	if len(parm.ByName["-s"]) == 0 {
+		parm.ByName["-s"] = "3"
 	}
 
 	if len(args) == 0 {
@@ -77,7 +77,7 @@ func (Command) Main(args ...string) error {
 		msg = "yawn"
 	}
 
-	_, err := fmt.Sscan(parm["-s"], &sec)
+	_, err := fmt.Sscan(parm.ByName["-s"], &sec)
 	if err != nil {
 		return err
 	}

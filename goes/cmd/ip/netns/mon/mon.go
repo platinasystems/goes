@@ -7,7 +7,7 @@ package mon
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -40,12 +40,14 @@ func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
-	_, _, args = options.New(args)
+	opt, args := options.New(args)
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 
 	fmt.Println("FIXME", Name)
+
+	_ = opt
 
 	return nil
 }

@@ -7,7 +7,7 @@ package show
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -53,7 +53,7 @@ func (c Command) Main(args ...string) error {
 		name string
 		pid  int
 	)
-	_, _, args = options.New(args)
+	opt, args := options.New(args)
 	command := c
 	if len(command) == 0 {
 		command = "list"
@@ -90,6 +90,7 @@ func (c Command) Main(args ...string) error {
 
 	_ = name
 	_ = pid
+	_ = opt
 
 	return nil
 }

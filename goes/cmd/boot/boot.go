@@ -77,8 +77,8 @@ func (c *Command) Main(args ...string) (err error) {
 	}
 
 	timeout := time.Duration(0)
-	if parm["-t"] != "" {
-		t, err := strconv.ParseUint(parm["-t"], 10, 8)
+	if parm.ByName["-t"] != "" {
+		t, err := strconv.ParseUint(parm.ByName["-t"], 10, 8)
 		if err != nil {
 			return err
 		}

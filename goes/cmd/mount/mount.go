@@ -86,22 +86,27 @@ FILESYSTEM INDEPENDENT FLAGS
 	-no-strictatime	May skip atime updates`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args,
+func (Command) Main(args ...string) error {
+	fs, err := getFilesystems()
+	fs.flags, args = flags.New(args,
 		"--fake",
 		"-v",
 		"-a",
@@ -144,28 +149,26 @@ func (cmd) Main(args ...string) error {
 		"-no-iversion",
 		"-strictatime",
 		"-no-strictatime")
-	parm, args := parms.New(args, "-match", "-o", "-t")
-	if len(parm["-t"]) == 0 {
-		parm["-t"] = "auto"
+	fs.parms, args = parms.New(args, "-match", "-o", "-t")
+	if len(fs.parms.ByName["-t"]) == 0 {
+		fs.parms.ByName["-t"] = "auto"
 	}
 
-	fs, err := getFilesystems()
-
-	if flag["-a"] {
-		err = fs.mountall(flag, parm)
+	if fs.flags.ByName["-a"] {
+		err = fs.mountall()
 	} else {
 		switch len(args) {
 		case 0:
 			err = show()
 		case 1:
-			if flag["-p"] {
-				err = fs.mountprobe(args[0], flag, parm)
+			if fs.flags.ByName["-p"] {
+				err = fs.mountprobe(args[0])
 			} else {
-				err = fs.fstab(args[0], flag, parm)
+				err = fs.fstab(args[0])
 			}
 		case 2:
-			r := fs.mountone(parm["-t"], args[0], args[1], flag,
-				parm)
+			r := fs.mountone(fs.parms.ByName["-t"], args[0],
+				args[1])
 			r.ShowResult()
 			err = r.err
 		default:
@@ -174,10 +177,6 @@ func (cmd) Main(args ...string) error {
 	}
 	return err
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
 
 // hack around syscall incorrect definition
 const MS_NOUSER uintptr = (1 << 31)
@@ -198,6 +197,8 @@ type fsType struct {
 type filesystems struct {
 	isNoDev  map[string]bool
 	autoList []string
+	flags    *flags.Flags
+	parms    *parms.Parms
 }
 
 var translations = []struct {
@@ -248,17 +249,17 @@ type MountResult struct {
 	dev    string
 	fstype string
 	dir    string
-	flag   flags.Flag
+	flag   *flags.Flags
 }
 
 func (r *MountResult) String() string {
 	if r.err != nil {
 		return fmt.Sprintf("%s: %v", r.dev, r.err)
 	}
-	if r.flag["--fake"] {
+	if r.flag.ByName["--fake"] {
 		return fmt.Sprintf("Would mount %s type %s at %s", r.dev, r.fstype, r.dir)
 	}
-	if r.flag["-v"] {
+	if r.flag.ByName["-v"] {
 		return fmt.Sprintf("Mounted %s type %s at %s", r.dev, r.fstype, r.dir)
 	}
 	return ""
@@ -320,7 +321,7 @@ func flushMountResults(c chan *MountResult, complete, count int) {
 	}
 }
 
-func (fs *filesystems) mountall(flag flags.Flag, parm parms.Parm) error {
+func (fs *filesystems) mountall() error {
 	fstab, err := loadFstab()
 	if err != nil {
 		return err
@@ -328,7 +329,7 @@ func (fs *filesystems) mountall(flag flags.Flag, parm parms.Parm) error {
 
 	count := len(fstab)
 	cap := 1
-	if flag["-F"] {
+	if fs.flags.ByName["-F"] {
 		cap = count
 	}
 
@@ -336,7 +337,7 @@ func (fs *filesystems) mountall(flag flags.Flag, parm parms.Parm) error {
 	rchan := make(chan *MountResult, cap)
 
 	for _, x := range fstab {
-		go fs.goMountone(x.fsType, x.fsSpec, x.fsFile, flag, parm, rchan)
+		go fs.goMountone(x.fsType, x.fsSpec, x.fsFile, rchan)
 		complete += pollMountResults(rchan)
 	}
 
@@ -344,7 +345,7 @@ func (fs *filesystems) mountall(flag flags.Flag, parm parms.Parm) error {
 	return nil
 }
 
-func (fs *filesystems) mountprobe(mountpoint string, flag flags.Flag, parm parms.Parm) error {
+func (fs *filesystems) mountprobe(mountpoint string) error {
 	f, err := os.Open("/proc/partitions")
 	if err != nil {
 		return err
@@ -353,7 +354,7 @@ func (fs *filesystems) mountprobe(mountpoint string, flag flags.Flag, parm parms
 	scanner := bufio.NewScanner(f)
 	complete := 0
 	cap := 1
-	if flag["-F"] {
+	if fs.flags.ByName["-F"] {
 		cap = 100 // Arbitrary - hard to count lines
 	}
 	rchan := make(chan *MountResult, cap)
@@ -374,7 +375,8 @@ func (fs *filesystems) mountprobe(mountpoint string, flag flags.Flag, parm parms
 				return err
 			}
 		}
-		go fs.goMountone(parm["-t"], "/dev/"+fileName, mp, flag, parm, rchan)
+		go fs.goMountone(fs.parms.ByName["-t"], "/dev/"+fileName, mp,
+			rchan)
 		complete += pollMountResults(rchan)
 		lines++
 	}
@@ -383,15 +385,14 @@ func (fs *filesystems) mountprobe(mountpoint string, flag flags.Flag, parm parms
 	return nil
 }
 
-func (fs *filesystems) fstab(name string, flag flags.Flag, parm parms.Parm) error {
+func (fs *filesystems) fstab(name string) error {
 	fstab, err := loadFstab()
 	if err != nil {
 		return err
 	}
 	for _, x := range fstab {
 		if name == x.fsSpec || name == x.fsFile {
-			r := fs.mountone(x.fsType, x.fsSpec, x.fsFile,
-				flag, parm)
+			r := fs.mountone(x.fsType, x.fsSpec, x.fsFile)
 			r.ShowResult()
 			return r.err
 		}
@@ -422,9 +423,9 @@ func loadFstab() ([]fstabEntry, error) {
 	return fstab, scanner.Err()
 }
 
-func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.Parm) *MountResult {
+func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 	var flags uintptr
-	if flag["-defaults"] {
+	if fs.flags.ByName["-defaults"] {
 		//  rw, suid, dev, exec, auto, nouser, async
 		flags &^= syscall.MS_RDONLY
 		flags &^= syscall.MS_NOSUID
@@ -437,7 +438,7 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 		flags |= syscall.MS_ASYNC
 	}
 	for _, x := range translations {
-		if flag[x.name] {
+		if fs.flags.ByName[x.name] {
 			if x.set {
 				flags |= x.bits
 			} else {
@@ -445,8 +446,8 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 			}
 		}
 	}
-	if flag["--fake"] {
-		return &MountResult{nil, dev, t, dir, flag}
+	if fs.flags.ByName["--fake"] {
+		return &MountResult{nil, dev, t, dir, fs.flags}
 	}
 
 	tryTypes := []string{t}
@@ -460,16 +461,17 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 	if !nodev {
 		_, err := readSuperBlock(dev)
 		if err != nil {
-			return &MountResult{err, dev, t, dir, flag}
+			return &MountResult{err, dev, t, dir, fs.flags}
 		}
 	}
 
 	var err error
 	for _, t := range tryTypes {
 		for i := 0; i < 5; i++ {
-			err = syscall.Mount(dev, dir, t, flags, parm["-o"])
+			err = syscall.Mount(dev, dir, t, flags,
+				fs.parms.ByName["-o"])
 			if err == nil {
-				return &MountResult{err, dev, t, dir, flag}
+				return &MountResult{err, dev, t, dir, fs.flags}
 			}
 			if err == syscall.EBUSY {
 				time.Sleep(1 * time.Second)
@@ -479,11 +481,11 @@ func (fs *filesystems) mountone(t, dev, dir string, flag flags.Flag, parm parms.
 		}
 	}
 
-	return &MountResult{err, dev, t, dir, flag}
+	return &MountResult{err, dev, t, dir, fs.flags}
 }
 
-func (fs *filesystems) goMountone(t, dev, dir string, flag flags.Flag, parm parms.Parm, c chan *MountResult) {
-	c <- fs.mountone(t, dev, dir, flag, parm)
+func (fs *filesystems) goMountone(t, dev, dir string, c chan *MountResult) {
+	c <- fs.mountone(t, dev, dir)
 }
 
 func show() error {
@@ -503,15 +505,16 @@ func show() error {
 	return scanner.Err()
 }
 
-func getFilesystems() (fsPtr *filesystems, err error) {
+func getFilesystems() (*filesystems, error) {
 	f, err := os.Open(procFilesystems)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	var fs filesystems
-	fs.isNoDev = make(map[string]bool)
+	fs := &filesystems{
+		isNoDev: make(map[string]bool),
+	}
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -531,14 +534,5 @@ func getFilesystems() (fsPtr *filesystems, err error) {
 		fmt.Fprintln(os.Stderr, "scan:", procFilesystems, err)
 		return nil, err
 	}
-	return &fs, nil
+	return fs, nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

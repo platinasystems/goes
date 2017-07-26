@@ -12,8 +12,8 @@ import (
 	"sort"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -31,34 +31,37 @@ OPTIONS
 	-1	list one entry per line`
 )
 
-var PathSeparatorString = string([]byte{os.PathSeparator})
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+	PathSeparatorString = string([]byte{os.PathSeparator})
+)
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+func New() Command { return Command{} }
 
-func New() Interface { return cmd{} }
+type Command struct{}
 
-type cmd struct{}
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var err error
 	var ls func([]os.FileInfo) error
 
 	flag, args := flags.New(args, "-l", "-C", "-1")
 
 	switch {
-	case flag["-1"]:
+	case flag.ByName["-1"]:
 		ls = one
-	case flag["-l"]:
+	case flag.ByName["-l"]:
 		ls = long
-	case flag["-C"]:
+	case flag.ByName["-C"]:
 		fallthrough
 	default:
 		ls = tabulate
@@ -124,10 +127,6 @@ func (cmd) Main(args ...string) error {
 	}
 	return err
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
 
 // List one file per line.
 func one(files []os.FileInfo) error {
@@ -234,12 +233,3 @@ func tabulate(files []os.FileInfo) error {
 	}
 	return nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

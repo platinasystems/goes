@@ -11,8 +11,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 )
 
@@ -32,32 +32,41 @@ DESCRIPTION
 	Without any args, show current eeprom configuation.`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Complete(...string) []string
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd cmd) Complete(args ...string) []string {
-	a := append(cmd.flags(), cmd.parms()...)
+func (c Command) Complete(args ...string) []string {
+	var a []string
+	for _, v := range c.flags() {
+		a = append(a, v.(string))
+	}
+	for _, v := range c.parms() {
+		a = append(a, v.(string))
+	}
 	sort.Strings(a)
 	return a
 }
 
-func (cmd cmd) Main(args ...string) error {
+func (c Command) Main(args ...string) error {
 	var eeprom Eeprom
 	nargs := len(args)
-	flag, args := flags.New(args, cmd.flags()...)
-	parm, args := parms.New(args, cmd.parms()...)
+	flag, args := flags.New(args, c.flags()...)
+	parm, args := parms.New(args, c.parms()...)
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
@@ -69,12 +78,12 @@ func (cmd cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	for k, t := range flag {
+	for k, t := range flag.ByName {
 		if k != "-n" && t {
 			eeprom.Del(k[1:])
 		}
 	}
-	for k, s := range parm {
+	for k, s := range parm.ByName {
 		if len(s) == 0 {
 			continue
 		}
@@ -84,7 +93,7 @@ func (cmd cmd) Main(args ...string) error {
 
 	}
 	os.Stdout.WriteString(eeprom.String())
-	if nargs == 0 || flag["-n"] {
+	if nargs == 0 || flag.ByName["-n"] {
 		return nil
 	}
 	if !WriteEnable {
@@ -110,12 +119,8 @@ func (cmd cmd) Main(args ...string) error {
 	return err
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-func (cmd) flags() []string {
-	a := make([]string, 1+len(Types))
+func (Command) flags() []interface{} {
+	a := make([]interface{}, 1+len(Types))
 	a[0] = "-n"
 	for i, t := range Types {
 		a[1+i] = fmt.Sprint("-", t)
@@ -123,8 +128,8 @@ func (cmd) flags() []string {
 	return a
 }
 
-func (cmd) parms() []string {
-	a := make([]string, 2+len(Types))
+func (Command) parms() []interface{} {
+	a := make([]interface{}, 2+len(Types))
 	a[0] = "Onie.Data"
 	a[1] = "Onie.Version"
 	for i, t := range Types {
@@ -132,12 +137,3 @@ func (cmd) parms() []string {
 	}
 	return a
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

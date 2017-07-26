@@ -12,9 +12,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/fit"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/parms"
 )
@@ -25,21 +25,19 @@ const (
 	Usage   = "kexec [OPTIONS]..."
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
-	var err error
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-e", "-f")
 	parm, args := parms.New(args, "-c", "-i", "-k", "-l", "-x")
 
@@ -55,7 +53,7 @@ func (cmd) Main(args ...string) error {
 
 	kcstr := strings.TrimSpace(string(kc))
 
-	cmdline := parm["-c"]
+	cmdline := parm.ByName["-c"]
 	if cmdline != "" {
 		if cmdline[0] == '+' {
 			cmdline = kcstr + " " + cmdline[1:]
@@ -64,31 +62,28 @@ func (cmd) Main(args ...string) error {
 		cmdline = kcstr
 	}
 
-	if image := parm["-l"]; len(image) > 0 {
-		err = loadFit(image, parm["-x"])
+	if image := parm.ByName["-l"]; len(image) > 0 {
+		err = loadFit(image, parm.ByName["-x"])
 		if err != nil {
 			return err
 		}
 	}
 
-	if kernel := parm["-k"]; len(kernel) > 0 {
-		err = loadKernel(kernel, parm["-i"], cmdline)
+	if kernel := parm.ByName["-k"]; len(kernel) > 0 {
+		err = loadKernel(kernel, parm.ByName["-i"], cmdline)
 		if err != nil {
 			return err
 		}
 	}
 
-	if flag["-e"] || flag["-f"] {
-		if !flag["-f"] {
+	if flag.ByName["-e"] || flag.ByName["-f"] {
+		if !flag.ByName["-f"] {
 			kexec.Prepare()
 		}
 		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
 	}
 	return err
 }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
 
 func loadFit(image, x string) error {
 	b, err := ioutil.ReadFile(image)
@@ -124,8 +119,4 @@ func loadKernel(kernel, initramfs, cmdline string) error {
 	defer i.Close()
 
 	return kexec.FileLoad(k, i, cmdline, 0)
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }
