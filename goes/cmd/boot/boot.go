@@ -89,12 +89,11 @@ func (c *Command) Main(args ...string) (err error) {
 
 	done := make(chan *bootMnt, len(args))
 
-	_, cl, err := cmdline.New()
-	if err != nil {
-		return
-	}
-
 	for _, arg := range args {
+		_, cl, err := cmdline.New()
+		if err != nil {
+			return err
+		}
 		fields := strings.Split(arg, ":")
 		m := &bootMnt{}
 		m.mnt = fields[0]
