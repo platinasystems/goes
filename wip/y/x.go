@@ -47,8 +47,13 @@ func main() {
 
 	{
 		var wip_in parse.Input
+		cf := &p.PlatformConfig
+
+		cf.EnableMsiInterrupt = true
+		cf.DisableGpioSwitchReset = false
+		cf.EnableCpuSwitchReset = false
+
 		if in.Parse("wip %v", &wip_in) {
-			cf := &p.PlatformConfig
 			for !wip_in.End() {
 				switch {
 				case wip_in.Parse("gpio-reset"):
@@ -69,6 +74,7 @@ func main() {
 				}
 			}
 			// Make sure we reset switch either via gpio or cpu.
+			// Its much safer to reset the switch via either method; so we enforce that here.
 			if cf.DisableGpioSwitchReset && !cf.EnableCpuSwitchReset {
 				cf.DisableGpioSwitchReset = false
 			}
