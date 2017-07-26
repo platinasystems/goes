@@ -61,6 +61,8 @@ func main() {
 					cf.EnableCpuSwitchReset = false
 				case wip_in.Parse("enable-msi"):
 					cf.EnableMsiInterrupt = true
+				case wip_in.Parse("disable-msi"):
+					cf.EnableMsiInterrupt = false
 				default:
 					err = parse.ErrInput
 					return
