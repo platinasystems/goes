@@ -65,15 +65,12 @@ func (c *Command) Main(...string) error {
 	}
 
 	t := time.NewTicker(10 * time.Second)
-	defer t.Stop()
 	for {
 		select {
 		case <-c.stop:
 			return nil
 		case <-t.C:
 			if err = c.update(); err != nil {
-				close(c.stop)
-				return err
 			}
 		}
 	}

@@ -207,10 +207,12 @@ func (g *Goes) Main(args ...string) error {
 	if len(args) > 0 {
 		base := filepath.Base(args[0])
 		switch {
-		case strings.HasPrefix(base, "goes-") &&
-			strings.HasSuffix(base, "-installer"):
-			// e.g. ./goes-MACHINE-installer
-			args[0] = "install"
+		case g.name == "goes-installer":
+			if len(args) == 1 {
+				args[0] = "install"
+			} else {
+				args = args[1:]
+			}
 		case base == g.name:
 			// e.g. ./goes-MACHINE ...
 			fallthrough
@@ -221,13 +223,12 @@ func (g *Goes) Main(args ...string) error {
 
 	cli := g.byname["cli"]
 	cliFlags, cliArgs := flags.New(args, "-f", "-no-liner", "-x")
-	switch len(cliArgs) {
-	case 0:
+	if n := len(cliArgs); n == 0 {
 		if cli != nil {
-			if cliFlags["-no-liner"] {
+			if cliFlags.ByName["-no-liner"] {
 				cliArgs = append(cliArgs, "-no-liner")
 			}
-			if cliFlags["-x"] {
+			if cliFlags.ByName["-x"] {
 				cliArgs = append(cliArgs, "-x")
 			}
 			return cli.Main(cliArgs...)
@@ -236,25 +237,25 @@ func (g *Goes) Main(args ...string) error {
 		}
 		fmt.Println(Usage(g))
 		return nil
-	case 1:
+	} else if _, found := g.byname[args[0]]; n == 1 && !found {
+		// only check for script if args[0] isn't a command
 		buf, err := ioutil.ReadFile(cliArgs[0])
-		if cliArgs[0] == "-" || (err == nil &&
-			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes")) &&
-			utf8.Valid(buf)) {
+		if cliArgs[0] == "-" || (err == nil && utf8.Valid(buf) &&
+			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes"))) {
 			// e.g. /usr/bin/goes SCRIPT
 			if cli == nil {
 				return fmt.Errorf("has no cli")
 			}
 			for _, t := range []string{"-f", "-x"} {
-				if cliFlags[t] {
+				if cliFlags.ByName[t] {
 					cliArgs = append(cliArgs, t)
 				}
 			}
 			return cli.Main(cliArgs...)
 		}
+	} else {
+		cmd.Swap(args)
 	}
-
-	cmd.Swap(args)
 
 	if _, found := cmd.Helpers[args[0]]; found {
 		return g.byname[args[0]].Main(args[1:]...)
@@ -262,9 +263,14 @@ func (g *Goes) Main(args ...string) error {
 
 	g.Shift(args)
 
-	v := g.byname[args[0]]
-	if v == nil {
-		return fmt.Errorf("%s: command not found", args[0])
+	v, found := g.byname[args[0]]
+	if !found {
+		if v, found = g.byname[""]; !found {
+			return fmt.Errorf("%v: ambiguous or missing command",
+				args)
+		}
+		// e.g. ip -s add [default "show"]
+		args = append([]string{""}, args...)
 	}
 
 	k := cmd.WhatKind(v)
@@ -310,13 +316,21 @@ func (g *Goes) Plot(cmds ...cmd.Cmd) {
 	sort.Strings(g.Names)
 }
 
-// Shift first recognized command to args[0], so,
+// Shift the first unambiguous longest prefix match command to args[0], so,
 //
 //	OPTIONS... COMMAND [ARGS]...
 //
 // becomes
 //
 //	COMMAND OPTIONS... [ARGS]...
+//
+// e.g.
+//
+//	ip -s li
+//
+// becomes
+//
+//	ip link -s
 func (g *Goes) Shift(args []string) {
 	for i := range args {
 		if _, found := g.byname[args[i]]; found {
@@ -325,7 +339,22 @@ func (g *Goes) Shift(args []string) {
 				copy(args[1:i+1], args[:i])
 				args[0] = name
 			}
-			break
+			return
+		}
+		var matches int
+		var last string
+		for _, name := range g.Names {
+			if strings.HasPrefix(name, args[i]) {
+				last = name
+				matches++
+			}
+		}
+		if matches == 1 {
+			if i > 0 {
+				copy(args[1:i+1], args[:i])
+			}
+			args[0] = last
+			return
 		}
 	}
 }

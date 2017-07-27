@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -46,116 +46,6 @@ EXAMPLES
 	kill 123 543 2341 3453
 		Send the default signal, SIGTERM, to all those processes.`
 )
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
-
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-l")
-
-	sigByOptNumb := make(map[string]syscall.Signal)
-	for _, sig := range []syscall.Signal{
-		syscall.SIGABRT,
-		syscall.SIGALRM,
-		syscall.SIGBUS,
-		syscall.SIGCHLD,
-		syscall.SIGCLD,
-		syscall.SIGCONT,
-		syscall.SIGFPE,
-		syscall.SIGHUP,
-		syscall.SIGILL,
-		syscall.SIGINT,
-		syscall.SIGIO,
-		syscall.SIGIOT,
-		syscall.SIGKILL,
-		syscall.SIGPIPE,
-		syscall.SIGPOLL,
-		syscall.SIGPROF,
-		syscall.SIGPWR,
-		syscall.SIGQUIT,
-		syscall.SIGSEGV,
-		syscall.SIGSTKFLT,
-		syscall.SIGSTOP,
-		syscall.SIGSYS,
-		syscall.SIGTERM,
-		syscall.SIGTRAP,
-		syscall.SIGTSTP,
-		syscall.SIGTTIN,
-		syscall.SIGTTOU,
-		syscall.SIGUNUSED,
-		syscall.SIGURG,
-		syscall.SIGUSR1,
-		syscall.SIGUSR2,
-		syscall.SIGVTALRM,
-		syscall.SIGWINCH,
-		syscall.SIGXCPU,
-		syscall.SIGXFSZ,
-	} {
-		sigByOptNumb[fmt.Sprintf("-%d", sig)] = sig
-	}
-
-	if flag["-l"] {
-		if len(args) > 0 {
-			return fmt.Errorf("%v: unexpected", args)
-		}
-		fmt.Print(`
- 1) hup		 2) int		 3) quit	 4) ill		 5) trap
- 6) abrt	 7) bus		 8) fpe		 9) kill	10) usr1
-11) segv	12) usr2	13) pipe	14) alrm	15) term
-16) stkflt	17) chld	18) cont	19) stop	20) tstp
-21) ttin	22) ttou	23) urg		24) xcpu	25) xfsz
-`[1:])
-		return nil
-	}
-	if len(args) == 0 {
-		return fmt.Errorf("PID: missing")
-	}
-	sig := syscall.SIGTERM
-	if strings.HasPrefix(args[0], "-") {
-		opt := args[0]
-		args = args[1:]
-		if len(args) == 0 {
-			return fmt.Errorf("PID: missing")
-		}
-		if t, found := sigByOptName[opt]; found {
-			sig = t
-		} else if t, found := sigByOptNumb[opt]; found {
-			sig = t
-		} else {
-			return fmt.Errorf("%s: unknown", opt)
-		}
-	}
-	for _, arg := range args {
-		pid, err := strconv.ParseInt(arg, 0, 0)
-		if err != nil {
-			return err
-		}
-		proc, err := os.FindProcess(int(pid))
-		if err != nil {
-			return err
-		}
-		err = proc.Signal(sig)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
 
 var (
 	apropos = lang.Alt{
@@ -202,3 +92,104 @@ var (
 		"-xfsz":   syscall.SIGXFSZ,
 	}
 )
+
+func New() Command { return Command{} }
+
+type Command struct{}
+
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
+
+func (Command) Main(args ...string) error {
+	flag, args := flags.New(args, "-l")
+
+	sigByOptNumb := make(map[string]syscall.Signal)
+	for _, sig := range []syscall.Signal{
+		syscall.SIGABRT,
+		syscall.SIGALRM,
+		syscall.SIGBUS,
+		syscall.SIGCHLD,
+		syscall.SIGCLD,
+		syscall.SIGCONT,
+		syscall.SIGFPE,
+		syscall.SIGHUP,
+		syscall.SIGILL,
+		syscall.SIGINT,
+		syscall.SIGIO,
+		syscall.SIGIOT,
+		syscall.SIGKILL,
+		syscall.SIGPIPE,
+		syscall.SIGPOLL,
+		syscall.SIGPROF,
+		syscall.SIGPWR,
+		syscall.SIGQUIT,
+		syscall.SIGSEGV,
+		syscall.SIGSTKFLT,
+		syscall.SIGSTOP,
+		syscall.SIGSYS,
+		syscall.SIGTERM,
+		syscall.SIGTRAP,
+		syscall.SIGTSTP,
+		syscall.SIGTTIN,
+		syscall.SIGTTOU,
+		syscall.SIGUNUSED,
+		syscall.SIGURG,
+		syscall.SIGUSR1,
+		syscall.SIGUSR2,
+		syscall.SIGVTALRM,
+		syscall.SIGWINCH,
+		syscall.SIGXCPU,
+		syscall.SIGXFSZ,
+	} {
+		sigByOptNumb[fmt.Sprintf("-%d", sig)] = sig
+	}
+
+	if flag.ByName["-l"] {
+		if len(args) > 0 {
+			return fmt.Errorf("%v: unexpected", args)
+		}
+		fmt.Print(`
+ 1) hup		 2) int		 3) quit	 4) ill		 5) trap
+ 6) abrt	 7) bus		 8) fpe		 9) kill	10) usr1
+11) segv	12) usr2	13) pipe	14) alrm	15) term
+16) stkflt	17) chld	18) cont	19) stop	20) tstp
+21) ttin	22) ttou	23) urg		24) xcpu	25) xfsz
+`[1:])
+		return nil
+	}
+	if len(args) == 0 {
+		return fmt.Errorf("PID: missing")
+	}
+	sig := syscall.SIGTERM
+	if strings.HasPrefix(args[0], "-") {
+		opt := args[0]
+		args = args[1:]
+		if len(args) == 0 {
+			return fmt.Errorf("PID: missing")
+		}
+		if t, found := sigByOptName[opt]; found {
+			sig = t
+		} else if t, found := sigByOptNumb[opt]; found {
+			sig = t
+		} else {
+			return fmt.Errorf("%s: unknown", opt)
+		}
+	}
+	for _, arg := range args {
+		pid, err := strconv.ParseInt(arg, 0, 0)
+		if err != nil {
+			return err
+		}
+		proc, err := os.FindProcess(int(pid))
+		if err != nil {
+			return err
+		}
+		err = proc.Signal(sig)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

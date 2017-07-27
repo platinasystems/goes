@@ -47,8 +47,13 @@ func main() {
 
 	{
 		var wip_in parse.Input
+		cf := &p.PlatformConfig
+
+		cf.EnableMsiInterrupt = true
+		cf.DisableGpioSwitchReset = false
+		cf.EnableCpuSwitchReset = false
+
 		if in.Parse("wip %v", &wip_in) {
-			cf := &p.PlatformConfig
 			for !wip_in.End() {
 				switch {
 				case wip_in.Parse("gpio-reset"):
@@ -61,12 +66,15 @@ func main() {
 					cf.EnableCpuSwitchReset = false
 				case wip_in.Parse("enable-msi"):
 					cf.EnableMsiInterrupt = true
+				case wip_in.Parse("disable-msi"):
+					cf.EnableMsiInterrupt = false
 				default:
 					err = parse.ErrInput
 					return
 				}
 			}
 			// Make sure we reset switch either via gpio or cpu.
+			// Its much safer to reset the switch via either method; so we enforce that here.
 			if cf.DisableGpioSwitchReset && !cf.EnableCpuSwitchReset {
 				cf.DisableGpioSwitchReset = false
 			}
@@ -79,7 +87,6 @@ func main() {
 	if err = v.Run(&in); err != nil {
 		return
 	}
-	v.Logln("platform exit")
 	if err = mk1.PlatformExit(v, p); err != nil {
 		return
 	}

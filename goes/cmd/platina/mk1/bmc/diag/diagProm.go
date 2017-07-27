@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
+	"github.com/platinasystems/go/internal/log"
 )
 
 const (
@@ -72,7 +73,7 @@ func diagProm() error {
 		BusIndex: 0,
 	}
 	//select host or bmc prom
-	if !flagF["-x86"] {
+	if !flagF.ByName["-x86"] {
 		d.BusAddress = 0x55
 	} else {
 		d.BusAddress = 0x51
@@ -192,7 +193,7 @@ func diagProm() error {
 				i += 2 + tlen
 			}
 		case "pen4":
-			//write serial number to vendor extension field
+			//change pen from 2-bytes to 4-bytes
 			_, rawData := d.DumpProm()
 			for i := uint(0 + 11); i < uint(len(rawData)); {
 				tlv, tlen := rawData[i], uint(rawData[i+1])
@@ -207,7 +208,31 @@ func diagProm() error {
 				}
 				i += 2 + tlen
 			}
-
+		case "fdrev":
+			//overwrite hw revision field
+			_, rawData := d.DumpProm()
+			for i := uint(0 + 11); i < uint(len(rawData)); {
+				tlv, tlen := rawData[i], uint(rawData[i+1])
+				w := rawData[i+2 : i+2+tlen]
+				if tlv == 0xfd {
+					for x := uint(4); x < uint(len(w)); {
+						wtlv, wtlen := w[x], uint(w[x+1])
+						if wtlv == 0x52 && wtlen == 0x1 {
+							h, _ := strconv.ParseUint(v, 16, 64)
+							b := []byte{byte(h & 0xff)}
+							w[x+2] = b[0]
+							log.Print(b[0])
+							break
+						}
+						x += 2 + wtlen
+					}
+					d.DeleteField("fd")
+					d.WriteField("fd", w)
+					fmt.Printf("changed vendor extension device revision\n")
+					break
+				}
+				i += 2 + tlen
+			}
 		default:
 			//write any field with value
 			fmt.Printf("%s\n", d.WriteField(c, vByte))
@@ -300,7 +325,7 @@ func diagProm() error {
 		fmt.Printf("Invalid or insufficient arguments\n")
 	}
 
-	if flagF["-x86"] {
+	if flagF.ByName["-x86"] {
 		gpioSet("CPU_TO_MAIN_I2C_EN", false)
 	}
 	return nil

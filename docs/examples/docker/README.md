@@ -1,2 +1,2 @@
-## Using docker containers with Platina interfaces
-
+# docker-quagga
+Container running quagga - the linux routing package

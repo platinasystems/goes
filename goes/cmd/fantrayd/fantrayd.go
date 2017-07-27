@@ -109,7 +109,6 @@ func (c *Command) Main(...string) error {
 
 	holdoff := 3
 	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
 	for {
 		select {
 		case <-c.stop:
@@ -120,8 +119,7 @@ func (c *Command) Main(...string) error {
 			}
 			if holdoff == 0 {
 				if err = c.update(); err != nil {
-					close(c.stop)
-					return err
+					holdoff = 5
 				}
 			}
 		}

@@ -147,8 +147,9 @@ func (v *Vnet) Configure(in *parse.Input) (err error) {
 				return
 			}
 			v.loop.Config.LogWriter = f
+		case in.Parse("quit %f", &v.loop.Config.QuitAfterDuration):
 		case in.Parse("quit"):
-			v.loop.Config.QuitImmediately = true
+			v.loop.Config.QuitAfterDuration = 1e-6 // must be positive to enable
 		default:
 			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
 			return

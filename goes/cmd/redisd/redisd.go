@@ -90,6 +90,10 @@ type Command struct {
 }
 
 func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
+func (*Command) Man() lang.Alt     { return man }
+func (*Command) String() string    { return Name }
+func (*Command) Usage() string     { return Usage }
 
 func (c *Command) Close() error {
 	var err error
@@ -113,13 +117,11 @@ func (c *Command) Close() error {
 	return err
 }
 
-func (*Command) Kind() cmd.Kind { return cmd.Daemon }
-
 func (c *Command) Main(args ...string) error {
 	once.Do(Init)
 
 	parm, args := parms.New(args, "-port", "-set")
-	if s := parm["-port"]; len(s) > 0 {
+	if s := parm.ByName["-port"]; len(s) > 0 {
 		_, err := fmt.Sscan(s, &Port)
 		if err != nil {
 			return err
@@ -223,17 +225,13 @@ func (c *Command) Main(args ...string) error {
 	}
 	go c.gopub()
 
-	err = c.pubinit(fields.New(parm["-set"])...)
+	err = c.pubinit(fields.New(parm.ByName["-set"])...)
 	if err != nil {
 		return err
 	}
 
 	return srv.Start()
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
 
 func (c *Command) gopub() {
 	const sep = ": "

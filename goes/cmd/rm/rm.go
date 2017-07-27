@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 )
 
 const (
@@ -38,27 +38,31 @@ OPTIONS
               rm ./-v`
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
-}
+var (
+	apropos = lang.Alt{
+		lang.EnUS: Apropos,
+	}
+	man = lang.Alt{
+		lang.EnUS: Man,
+	}
+)
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-d", "-f", "-r", "-v")
 	for _, fn := range args {
 		fi, err := os.Stat(fn)
 		if err != nil {
 			if os.IsNotExist(err) {
-				if flag["-f"] {
+				if flag.ByName["-f"] {
 					continue
 				}
 			}
@@ -75,7 +79,7 @@ func (cmd) Main(args ...string) error {
 			if err = os.Remove(fn); err != nil {
 				return err
 			}
-			if flag["-v"] {
+			if flag.ByName["-v"] {
 				fmt.Println("Removed", fn)
 			}
 		}
@@ -83,17 +87,13 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-func rmdir(dn string, flag flags.Flag) error {
+func rmdir(dn string, flag *flags.Flags) error {
 	fis, err := ioutil.ReadDir(dn)
 	if err != nil {
 		return err
 	}
 	if len(fis) > 0 {
-		if !flag["-r"] {
+		if !flag.ByName["-r"] {
 			return fmt.Errorf("%s: isn't empty", dn)
 		}
 		for _, fi := range fis {
@@ -105,30 +105,21 @@ func rmdir(dn string, flag flags.Flag) error {
 				if err != nil {
 					return err
 				}
-				if flag["-v"] {
+				if flag.ByName["-v"] {
 					fmt.Println("Removed", fi.Name())
 				}
 			}
 		}
 	}
 
-	if !flag["-d"] && !flag["-r"] {
+	if !flag.ByName["-d"] && !flag.ByName["-r"] {
 		return fmt.Errorf("%s: is a directory", dn)
 	}
 	if err = os.Remove(dn); err != nil {
 		return err
 	}
-	if flag["-v"] {
+	if flag.ByName["-v"] {
 		fmt.Println("Removed", dn)
 	}
 	return nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

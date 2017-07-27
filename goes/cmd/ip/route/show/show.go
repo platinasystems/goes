@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -36,7 +35,7 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseParms = []string{
+	Parms = []interface{}{
 		"root",
 		"match",
 		"exact",
@@ -51,6 +50,8 @@ var (
 func New(s string) Command { return Command(s) }
 
 type Command string
+
+type show options.Options
 
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
@@ -67,10 +68,18 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (c Command) Main(args ...string) error {
-	var ip net.IP
+	var (
+		err error
+		ip  net.IP
+	)
 
-	ipFlag, ipParm, args := options.New(args)
-	parm, args := parms.New(args, theseParms...)
+	if args, err = options.Netns(args); err != nil {
+		return err
+	}
+
+	o, args := options.New(args)
+	show := (*show)(o)
+	args = show.Parms.More(args, Parms)
 
 	command := c
 	if len(command) == 0 {
@@ -97,10 +106,6 @@ func (c Command) Main(args ...string) error {
 	}
 
 	fmt.Println("FIXME", command)
-
-	_ = ipFlag
-	_ = ipParm
-	_ = parm
 
 	return nil
 }

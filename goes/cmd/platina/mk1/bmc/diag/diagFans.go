@@ -148,7 +148,7 @@ func diagFans() error {
 	// set fan speed and validate RPM is in expected range
 	//
 
-	hw.SetFanSpeed("high")
+	hw.SetFanSpeed("high", true)
 	time.Sleep(6 * time.Second)
 	p, err := hw.FanCount(1)
 	if err != nil {
@@ -199,7 +199,7 @@ func diagFans() error {
 	r = CheckPassU(p, fanspeedhigh_min, fanspeedhigh_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan8_high_rpm", "RPM", p, fanspeedhigh_min, fanspeedhigh_max, r, "set fan speed high, check rpm")
 
-	hw.SetFanSpeed("med")
+	hw.SetFanSpeed("med", true)
 	time.Sleep(6 * time.Second)
 	p, err = hw.FanCount(1)
 	if err != nil {
@@ -250,7 +250,7 @@ func diagFans() error {
 	r = CheckPassU(p, fanspeedmed_min, fanspeedmed_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan8_med_rpm", "RPM", p, fanspeedmed_min, fanspeedmed_max, r, "set fan speed med, check rpm")
 
-	hw.SetFanSpeed("low")
+	hw.SetFanSpeed("low", true)
 	time.Sleep(6 * time.Second)
 	p, err = hw.FanCount(1)
 	if err != nil {
@@ -300,7 +300,7 @@ func diagFans() error {
 	}
 	r = CheckPassU(p, fanspeedlow_min, fanspeedlow_max)
 	fmt.Printf("%15s|%25s|%10s|%10d|%10d|%10d|%6s|%35s\n", "fans", "fan8_low_rpm", "RPM", p, fanspeedlow_min, fanspeedlow_max, r, "set fan speed low, check rpm")
-	hw.SetFanSpeed("med")
+	hw.SetFanSpeed("med", true)
 
 	// diagTest: temp sensors
 	// check temperature sensors are in expected range

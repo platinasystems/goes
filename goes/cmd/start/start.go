@@ -106,7 +106,7 @@ func (c *Command) Main(args ...string) error {
 		return err
 	}
 
-	start := parm["-start"]
+	start := parm.ByName["-start"]
 	if len(start) == 0 {
 		if _, xerr := os.Stat("/etc/goes/start"); xerr == nil {
 			start = "/etc/goes/start"

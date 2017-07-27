@@ -7,8 +7,8 @@ package hset
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -18,25 +18,23 @@ const (
 	Usage   = "hset [-q] KEY FIELD VALUE"
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Complete(...string) []string
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Complete(args ...string) []string {
+func (Command) Complete(args ...string) []string {
 	return redis.Complete(args...)
 }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-q")
 	switch len(args) {
 	case 0:
@@ -53,15 +51,8 @@ func (cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	if !flag["-q"] {
+	if !flag.ByName["-q"] {
 		fmt.Println(i)
 	}
 	return nil
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

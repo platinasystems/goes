@@ -13,7 +13,7 @@ services:
     image: stigt/debian-quagga:latest
     privileged: true
     volumes:
-      - /home/stig/volumes/quagga/R1:/etc/quagga
+      - ./volumes/quagga/R1:/etc/quagga
     logging:
       options:
         max-size: "10m"
@@ -31,7 +31,43 @@ services:
     image: stigt/debian-quagga:latest
     privileged: true
     volumes:
-      - /home/stig/volumes/quagga/R2:/etc/quagga
+      - ./volumes/quagga/R2:/etc/quagga
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  R3:
+    container_name: R3
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R3
+    image: stigt/debian-quagga:latest
+    privileged: true
+    volumes:
+      - ./volumes/quagga/R3:/etc/quagga
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  R4:
+    container_name: R4
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R4
+    image: stigt/debian-quagga:latest
+    privileged: true
+    volumes:
+      - ./volumes/quagga/R4:/etc/quagga
     logging:
       options:
         max-size: "10m"

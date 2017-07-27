@@ -66,10 +66,10 @@ type loggerMain struct {
 
 func (l *Loop) loggerInit() {
 	m := &l.loggerMain
-	if l.LogWriter == nil {
-		l.LogWriter = os.Stdout
+	if m.w = l.LogWriter; m.w == nil {
+		m.w = os.Stdout
 	}
-	m.l = log.New(l.LogWriter, "", log.Lmicroseconds)
+	m.l = log.New(m.w, "", log.Lmicroseconds)
 	return
 }
 

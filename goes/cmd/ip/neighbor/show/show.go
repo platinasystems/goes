@@ -7,10 +7,8 @@ package show
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -30,13 +28,15 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseFlags = []string{"proxy"}
-	theseParms = []string{"to", "dev", "nud", "vrf"}
+	Flags = []interface{}{"proxy"}
+	Parms = []interface{}{"to", "dev", "nud", "vrf"}
 )
 
 func New(s string) Command { return Command(s) }
 
 type Command string
+
+type show options.Options
 
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
@@ -53,14 +53,21 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (c Command) Main(args ...string) error {
+	var err error
+
 	command := c
 	if len(command) == 0 {
 		command = "show"
 	}
 
-	ipFlag, ipParm, args := options.New(args)
-	flag, args := flags.New(args, theseFlags...)
-	parm, args := parms.New(args, theseParms...)
+	if args, err = options.Netns(args); err != nil {
+		return err
+	}
+
+	o, args := options.New(args)
+	show := (*show)(o)
+	args = show.Flags.More(args, Flags)
+	args = show.Parms.More(args, Parms)
 
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
@@ -68,9 +75,5 @@ func (c Command) Main(args ...string) error {
 
 	fmt.Println("FIXME", command)
 
-	_ = ipFlag
-	_ = ipParm
-	_ = flag
-	_ = parm
 	return nil
 }

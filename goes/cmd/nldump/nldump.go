@@ -22,33 +22,26 @@ const (
 	Usage   = "nldump [ link|addr|route|neighor|nsid ]... [NSID]..."
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Help(...string) string
-	Main(...string) error
-	String() string
-	Usage() string
+var apropos = lang.Alt{
+	lang.EnUS: Apropos,
 }
 
-func New() Interface { return cmd{} }
+func New() Command { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (cmd) Help(args ...string) string {
-	return "link | addr | route | neighor | nsid"
-}
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var (
 		groups []netlink.MulticastGroup
 		reqs   []netlink.ListenReq
 		nsids  []int
 	)
-	flag, args := flags.New(args, "-help", "-h", "--help",
-		"link", "addr", "route", "neighbor", "nsid")
-	flag.Aka("-help", "-h", "--help")
+	flag, args := flags.New(args, "link", "addr", "route", "neighbor",
+		"nsid")
 	if len(args) > 0 {
 		for _, s := range args {
 			var nsid int
@@ -62,35 +55,40 @@ func (cmd) Main(args ...string) error {
 	} else {
 		nsids = []int{netlink.DefaultNsid}
 	}
-	if flag["-help"] {
+	if flag.ByName["-help"] {
 		fmt.Println("usage:", Usage)
 		return nil
 	}
-	if len(flag) == 0 {
-		flag["link"] = true
-		flag["addr"] = true
-		flag["route"] = true
-		flag["neighbor"] = true
-		flag["nsid"] = true
+	nothing := flag.ByName["link"] == false &&
+		flag.ByName["addr"] == false &&
+		flag.ByName["route"] == false &&
+		flag.ByName["neighbor"] == false &&
+		flag.ByName["nsid"] == false
+	if nothing {
+		flag.ByName["link"] = true
+		flag.ByName["addr"] = true
+		flag.ByName["route"] = true
+		flag.ByName["neighbor"] = true
+		flag.ByName["nsid"] = true
 	}
 	sort.Ints(nsids)
-	if flag["link"] {
+	if flag.ByName["link"] {
 		groups = append(groups, netlink.LinkMulticastGroups...)
 		reqs = append(reqs, netlink.LinkListenReqs...)
 	}
-	if flag["addr"] {
+	if flag.ByName["addr"] {
 		groups = append(groups, netlink.AddrMulticastGroups...)
 		reqs = append(reqs, netlink.AddrListenReqs...)
 	}
-	if flag["route"] {
+	if flag.ByName["route"] {
 		groups = append(groups, netlink.RouteMulticastGroups...)
 		reqs = append(reqs, netlink.RouteListenReqs...)
 	}
-	if flag["neighbor"] {
+	if flag.ByName["neighbor"] {
 		groups = append(groups, netlink.NeighborMulticastGroups...)
 		reqs = append(reqs, netlink.NeighborListenReqs...)
 	}
-	if flag["nsid"] {
+	if flag.ByName["nsid"] {
 		groups = append(groups, netlink.NsidMulticastGroups...)
 		reqs = append(reqs, netlink.NsidListenReqs...)
 	}
@@ -128,11 +126,4 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 	return err
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

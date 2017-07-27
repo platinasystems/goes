@@ -7,10 +7,8 @@ package set
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/parms"
 )
 
 const (
@@ -64,10 +62,10 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
-	theseFlags = []string{
+	Flags = []interface{}{
 		"up", "down", "nomaster",
 	}
-	theseParms = []string{
+	Parms = []interface{}{
 		"dev",
 		"group",
 		"type",
@@ -91,7 +89,7 @@ var (
 		"vrf",
 		"addrgenmode",
 	}
-	theseVfParms = []string{
+	VfParms = []string{
 		"mac",
 		"vlan",
 		"qos",
@@ -111,38 +109,40 @@ func New() Command { return Command{} }
 
 type Command struct{}
 
+type set options.Options
+
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
-	ipFlag, ipParm, args := options.New(args)
-	flag, args := flags.New(args, theseFlags...)
-	parm, args := parms.New(args, theseParms...)
+	var err error
 
-	subject := parm["group"]
-	switch len(subject) {
-	case 0:
+	if args, err = options.Netns(args); err != nil {
+		return err
+	}
+
+	o, args := options.New(args)
+	set := (*set)(o)
+	args = set.Flags.More(args, Flags)
+	args = set.Parms.More(args, Parms)
+
+	if s := set.Parms.ByName["group"]; len(s) > 0 {
+		if len(args) > 0 {
+			return fmt.Errorf("%v: unexpected", args)
+		}
+		fmt.Println("FIXME set group", s)
+	} else {
 		switch len(args) {
 		case 0:
 			return fmt.Errorf("DEVICE: missing")
 		case 1:
-			subject = args[0]
+			fmt.Println("FIXME set", args[0])
 		default:
 			return fmt.Errorf("%v: unexpected", args[1:])
 		}
-	default:
-		if len(args) > 0 {
-			return fmt.Errorf("%v: unexpected", args)
-		}
 	}
-
-	fmt.Println("FIXME", Name, subject)
-
-	_ = ipFlag
-	_ = ipParm
-	_ = flag
 
 	return nil
 }

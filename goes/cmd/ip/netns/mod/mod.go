@@ -7,7 +7,7 @@ package mod
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -49,7 +49,7 @@ func (c Command) Main(args ...string) error {
 		id   int
 	)
 
-	ipFlag, _, args := options.New(args)
+	opt, args := options.New(args)
 
 	switch c {
 	case "add":
@@ -65,7 +65,7 @@ func (c Command) Main(args ...string) error {
 		switch len(args) {
 		case 0:
 			name = "-all"
-			if !ipFlag[name] {
+			if !opt.Flags.ByName[name] {
 				return fmt.Errorf("NETNSNAME: missing")
 			}
 		case 1:
