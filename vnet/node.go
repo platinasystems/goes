@@ -171,7 +171,7 @@ func (v *Vnet) RegisterInOutNode(n InOutNoder, name string, args ...interface{})
 type Vnet struct {
 	loop loop.Loop
 	hw.BufferMain
-	cliMain
+	cliMain cliMain
 	eventMain
 	interfaceMain
 	packageMain
