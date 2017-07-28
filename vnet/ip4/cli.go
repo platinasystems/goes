@@ -17,37 +17,45 @@ type fibShowUsageHook func(w cli.Writer)
 
 //go:generate gentemplate -id FibShowUsageHook -d Package=ip4 -d DepsType=fibShowUsageHookVec -d Type=fibShowUsageHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
 
-func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+type showFibConfig struct {
+	detail      bool
+	summary     bool
+	unreachable bool
+	showTable   string
+}
 
-	detail := false
-	summary := false
-	unreachable := false
-	showTable := ""
+func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	cf := showFibConfig{}
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
-			detail = true
+			cf.detail = true
 		case in.Parse("s%*ummary"):
-			summary = true
+			cf.summary = true
 		case in.Parse("un%*reachable"):
-			unreachable = true
-		case in.Parse("t%*able %s", &showTable):
+			cf.unreachable = true
+		case in.Parse("t%*able %s", &cf.showTable):
 		default:
 			err = cli.ParseError
 			return
 		}
 	}
 
-	if summary {
+	if cf.summary {
 		m.showSummary(w)
 		return
 	}
 
-	if unreachable {
-		m.showUnreachable(w, showTable)
+	if cf.unreachable {
+		m.showUnreachable(w, cf)
 		return
 	}
 
+	m.showReachable(w, cf)
+	return
+}
+
+func (m *Main) showReachable(w cli.Writer, cf showFibConfig) {
 	// Sync adjacency stats with hardware.
 	m.CallAdjSyncCounterHooks()
 
@@ -61,7 +69,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		fib := m.fibs[fi]
 		if fib != nil {
 			t := ip.FibIndex(fi).Name(&m.Main)
-			if showTable != "" && t != showTable {
+			if cf.showTable != "" && t != cf.showTable {
 				continue
 			}
 			fib.reachable.foreach(func(p *Prefix, r mapFibResult) {
@@ -79,7 +87,7 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	fmt.Fprintf(w, "%6s%30s%20s\n", "Table", "Destination", "Adjacency")
 	for ri := range rs {
 		r := &rs[ri]
-		lines := m.adjLines(r.r.adj, detail)
+		lines := m.adjLines(r.r.adj, cf.detail)
 		for i := range lines {
 			if i == 0 {
 				fmt.Fprintf(w, "%12s%30s%s\n", r.table.Name(&m.Main), &r.prefix, lines[i])
@@ -87,15 +95,13 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 				fmt.Fprintf(w, "%12s%30s%s\n", "", "", lines[i])
 			}
 		}
-		if detail {
+		if cf.detail {
 			fmt.Fprintf(w, "%s", &r.r.nh)
 		}
 	}
-
-	return
 }
 
-func (m *Main) showUnreachable(w cli.Writer, showTable string) {
+func (m *Main) showUnreachable(w cli.Writer, cf showFibConfig) {
 	type unreachable struct {
 		table ip.FibIndex
 		p     Prefix
@@ -109,7 +115,7 @@ func (m *Main) showUnreachable(w cli.Writer, showTable string) {
 			continue
 		}
 		t := ip.FibIndex(fi).Name(&m.Main)
-		if showTable != "" && t != showTable {
+		if cf.showTable != "" && t != cf.showTable {
 			continue
 		}
 		fib.unreachable.foreach(func(p *Prefix, r mapFibResult) {
