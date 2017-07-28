@@ -41,6 +41,12 @@ func (in *Input) Init(r io.Reader) {
 	}
 }
 
+func NewInput(args ...string) (in *Input) {
+	in = new(Input)
+	in.Add(args...)
+	return
+}
+
 func (in *Input) Add(args ...string) {
 	s := string(in.buf)
 	for i := range args {
