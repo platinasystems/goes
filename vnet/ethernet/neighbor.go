@@ -52,7 +52,8 @@ type ipNeighbor struct {
 
 var ErrDelUnknownNeighbor = errors.New("delete unknown neighbor")
 
-func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool) (err error) {
+func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool) (ai ip.Adj, err error) {
+	ai = ip.AdjNil
 	nf := &m.ipNeighborFamilies[im.Family]
 
 	var (
@@ -71,7 +72,6 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 	in := &nf.pool.neighbors[i]
 
 	var (
-		ai     ip.Adj
 		as     []ip.Adjacency
 		prefix ip.Prefix
 	)
@@ -95,6 +95,7 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 			im.DelAdj(ai)
 		}
 
+		ai = ip.AdjNil
 		*in = ipNeighbor{}
 	} else {
 		is_new_adj := len(as) == 0
@@ -132,7 +133,7 @@ func (m *ipNeighborMain) delKey(nf *ipNeighborFamily, k *ipNeighborKey) (err err
 		Si: k.Si,
 	}
 	const isDel = true
-	err = m.AddDelIpNeighbor(nf.m, &n, isDel)
+	_, err = m.AddDelIpNeighbor(nf.m, &n, isDel)
 	return
 }
 
