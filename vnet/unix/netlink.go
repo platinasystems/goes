@@ -532,7 +532,7 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	}
 	m4 := ip4.GetMain(e.m.v)
 	em := ethernet.GetMain(e.m.v)
-	err = em.AddDelIpNeighbor(&m4.Main, &nbr, isDel)
+	_, err = em.AddDelIpNeighbor(&m4.Main, &nbr, isDel)
 
 	// Ignore delete of unknown static Arp entry.
 	if err == ethernet.ErrDelUnknownNeighbor && isStatic {
