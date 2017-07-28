@@ -2,8 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO AUTH WGET, CERT OR EQUIV
-//TODO UPGRADE AUTOMATICALLY IF ENB., contact boot server
+//TODO AUTHENTICATE,  CERT OR EQUIV
+//TODO UPGRADE AUTOMATICALLY IF ENABLED, contact boot server
 
 package upgrade
 
@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/kexec"
@@ -30,20 +29,19 @@ const (
 	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-l]"
 	Man     = `
 DESCRIPTION
-	The upgrade command updates firmware images.
+	The upgrade command updates BMC firmware.
 
 	The default version is "LATEST".  Optionally, a version
-	number can be supplied in the form:  v0.0[.0][.0]
+	number can be supplied in the form of:  v0.0[.0][.0]
 
-	The -l flag will list available versions.
+	The -l flag lists available versions.
 
 	Images are downloaded from "downloads.platina.com",
 	or, from a user specified URL or IPv4 address.
 
 OPTIONS
-	-v [VER]          version number or hash, default is LATEST
-	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
-	-f                use FTP instead of wget/http for downloading
+	-v [VER]          version number or hash, the default is LATEST
+	-s [SERVER[/dir]] IP4 or URL, the default is downloads.platina.com
 	-l                lists available upgrade hashes`
 
 	DfltMod = 0755
@@ -78,7 +76,7 @@ func (cmd) Main(args ...string) error {
 		parm.ByName["-s"] = DfltSrv
 	}
 	if flag.ByName["-l"] {
-		if err := dispList(parm.ByName["-s"], parm.ByName["-v"]); err != nil {
+		if err := showList(parm.ByName["-s"], parm.ByName["-v"]); err != nil {
 			return err
 		}
 		return nil
@@ -104,7 +102,7 @@ var (
 )
 
 func doUpgrade(s string, v string, f bool) error {
-	err, size := getFile(s, v)
+	err, size := downloadFile(s, v)
 	if err != nil {
 		return fmt.Errorf("Error downloading: %v", err)
 	}
@@ -114,7 +112,7 @@ func doUpgrade(s string, v string, f bool) error {
 	if err := unzip(); err != nil {
 		return fmt.Errorf("Error unzipping file: %v", err)
 	}
-	if err := wrImgAll(); err != nil {
+	if err := writeImageAll(); err != nil {
 		return fmt.Errorf("Error writing flash: %v", err)
 	}
 	reboot()
@@ -140,50 +138,42 @@ func unzip() error {
 			os.MkdirAll(path, file.Mode())
 			continue
 		}
-
-		fileReader, err := file.Open()
+		r, err := file.Open()
 		if err != nil {
 			return err
 		}
-		defer fileReader.Close()
-
-		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		defer r.Close()
+		t, err := os.OpenFile(
+			path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 		if err != nil {
 			return err
 		}
-		defer targetFile.Close()
-
-		if _, err := io.Copy(targetFile, fileReader); err != nil {
+		defer t.Close()
+		if _, err := io.Copy(t, r); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func dispList(s string, v string) error {
+func showList(s string, v string) error {
 	rmFile("/LIST")
-	files := []string{
-		"http://" + s + "/" + v + "/" + "LIST",
+	urls := "http://" + s + "/" + v + "/" + Machine + Suffix
+	if err := getFile(urls, "/LIST"); err != nil {
+		return err
 	}
-	err := wgetFiles(files)
+	list, err := ioutil.ReadFile("/LIST")
 	if err != nil {
 		return err
 	}
-	l, err := ioutil.ReadFile("/LIST")
-	if err != nil {
-		return err
-	}
-	fmt.Print(string(l))
+	fmt.Print(string(list))
 	return nil
 }
 
-func getFile(s string, v string) (error, int) {
+func downloadFile(s string, v string) (error, int) {
 	rmFile(Machine + Suffix)
-	files := []string{
-		"http://" + s + "/" + v + "/" + Machine + Suffix,
-	}
-	err := wgetFiles(files)
+	urls := "http://" + s + "/" + v + "/" + Machine + Suffix
+	err := getFile(urls, Machine+Suffix)
 	if err != nil {
 		return err, 0
 	}
@@ -200,30 +190,28 @@ func getFile(s string, v string) (error, int) {
 	return nil, filesize
 }
 
-func wgetFiles(urls []string) error {
-	reqs := make([]*grab.Request, 0)
-	for _, url := range urls {
-		req, err := grab.NewRequest(url)
-		if err != nil {
-			return err
-		}
-		reqs = append(reqs, req)
-	}
-
-	successes, err := url.FetchReqs(0, reqs)
-	if successes == 0 && err != nil {
+func getFile(urls string, fn string) error {
+	r, err := url.Open(urls)
+	if err != nil {
 		return err
 	}
+	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DfltMod)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, r); err != nil {
+		return err
+	}
+	syscall.Fsync(int(os.Stdout.Fd()))
 	return nil
 }
 
 func rmFile(f string) error {
-	_, err := os.Stat(f)
-	if err != nil {
+	if _, err := os.Stat(f); err != nil {
 		return err
 	}
-
-	if err = os.Remove(f); err != nil {
+	if err := os.Remove(f); err != nil {
 		return err
 	}
 	return nil
