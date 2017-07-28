@@ -78,6 +78,8 @@ func (a *Address) Diff(b *Address) (v int) {
 	return
 }
 
+func AddressUint32(x uint32) (a Address) { a.Add(uint64(x)); return }
+
 func IpAddress(a *ip.Address) *Address { return (*Address)(unsafe.Pointer(&a[0])) }
 func (a *Address) ToIp() (v ip.Address) {
 	for i := range a {

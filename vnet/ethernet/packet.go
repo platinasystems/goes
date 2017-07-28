@@ -111,7 +111,8 @@ func (h *Header) IsUnicast() bool {
 	return !h.Dst.IsBroadcast()
 }
 
-func (a *Address) Add(x uint64) { vnet.ByteAdd(a[:], x) }
+func (a *Address) Add(x uint64)          { vnet.ByteAdd(a[:], x) }
+func AddressUint64(x uint64) (a Address) { a.Add(x); return }
 
 func (a *Address) FromUint64(x vnet.Uint64) {
 	for i := 0; i < SizeofAddress; i++ {
