@@ -96,4 +96,121 @@ $ ip add show eth-25-0
 ```
 To really show OSPF working in the container, another container is needed and a loopback cable will be connected to those interfaces.  
 
-The network to be built will be like this diagram:
+The network to be built will be like this diagram with 4 routers
+
+ ![OSPF example](https://github.com/platinasystems/go/blob/master/docs/examples/docker/ospf_example.jpeg?raw=true)
+
+For multiple containers it would be easier to create a Docker compose file that has all the parameters for all 4 containers.  The file docker-compose.yaml defines all 4 containers and the parameters to run them.  An example for router R1 looks like:
+```
+version: '3'
+services:
+  R1:
+    container_name: R1
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R1
+    image: stigt/debian-quagga:latest
+    privileged: true
+    volumes:
+      - ./volumes/quagga/R1:/etc/quagga
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  ```
+  To start all the containers is as easy as:
+  ```
+  $ docker-compose up -d
+Creating network "docker_default" with the default driver
+Creating R4 ... 
+Creating R1 ... 
+Creating R2 ... 
+Creating R3 ... 
+Creating R4
+Creating R2
+Creating R3
+Creating R2 ... done
+
+$ docker ps -a
+CONTAINER ID        IMAGE                        COMMAND                  CREATED             STATUS              PORTS                                        NAMES
+156ff8435b90        stigt/debian-quagga:latest   "/usr/bin/supervis..."   17 seconds ago      Up 15 seconds       179/tcp, 2601/tcp, 2604-2605/tcp, 5201/tcp   R1
+1e5879fd6805        stigt/debian-quagga:latest   "/usr/bin/supervis..."   17 seconds ago      Up 15 seconds       179/tcp, 2601/tcp, 2604-2605/tcp, 5201/tcp   R3
+6e4dcece2f8f        stigt/debian-quagga:latest   "/usr/bin/supervis..."   17 seconds ago      Up 15 seconds       179/tcp, 2601/tcp, 2604-2605/tcp, 5201/tcp   R2
+d883e9bebefe        stigt/debian-quagga:latest   "/usr/bin/supervis..."   17 seconds ago      Up 15 seconds       179/tcp, 2601/tcp, 2604-2605/tcp, 5201/tcp   R4
+```
+And of course to stop those 4 containers:
+```
+$ docker-compose down
+Stopping R1 ... done
+Stopping R3 ... done
+Stopping R2 ... done
+Stopping R4 ... done
+Removing R1 ... done
+Removing R3 ... done
+Removing R2 ... done
+Removing R4 ... done
+Removing network docker_default
+
+$ docker ps -a
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+```
+Previously the docker_move.sh script was used to move a single interface into a container.  There is another script called updown.sh which calls docker_move.sh with the specific parameters to match the network diagram above.  For the next example docker-compose will be used to start the 4 router containers and then updown.sh will be run to move/configure all the interfaces.
+```
+$ docker-compose up -d
+Creating network "docker_default" with the default driver
+Creating R2 ... 
+Creating R1 ... 
+Creating R4 ... 
+Creating R3 ... 
+Creating R2
+Creating R1
+Creating R4
+Creating R3 ... done
+
+$ sudo ./updown.sh up
+```
+Then enter a container and see if ospf has learned the routes to all 4 routers:
+```
+$ docker exec -it R1 bash
+root@R1:/# 
+root@R1:/# vtysh
+
+Hello, this is Quagga (version 0.99.23.1).
+Copyright 1996-2005 Kunihiro Ishiguro, et al.
+
+R1# show ip ospf neighbor 
+
+    Neighbor ID Pri State           Dead Time Address         Interface            RXmtL RqstL DBsmL
+192.168.1.1       1 Full/Backup       33.761s 192.168.120.10  eth-25-0:192.168.120.5     0     0     0
+192.168.2.4       1 Full/DR           36.083s 192.168.150.4   eth-4-0:192.168.150.5     0     0     0
+
+
+R1# show ip route ospf 
+Codes: K - kernel route, C - connected, S - static, R - RIP,
+       O - OSPF, I - IS-IS, B - BGP, A - Babel,
+       > - selected route, * - FIB route
+
+O   192.168.1.5/32 [110/10] is directly connected, dummy0, 00:02:13
+O>* 192.168.1.10/32 [110/20] via 192.168.120.10, eth-25-0, 00:01:28
+O>  192.168.2.2/32 [110/30] via 192.168.120.10, eth-25-0, 00:01:29
+                            via 192.168.150.4, eth-4-0, 00:01:29
+O>* 192.168.2.4/32 [110/20] via 192.168.150.4, eth-4-0, 00:01:31
+O>* 192.168.111.0/24 [110/20] via 192.168.150.4, eth-4-0, 00:01:31
+O   192.168.120.0/24 [110/10] is directly connected, eth-25-0, 00:02:14
+O   192.168.150.0/24 [110/10] is directly connected, eth-4-0, 00:02:13
+O>* 192.168.222.0/24 [110/20] via 192.168.120.10, eth-25-0, 00:01:29
+R1#      
+R1# ping 192.168.222.2
+PING 192.168.222.2 (192.168.222.2): 56 data bytes
+64 bytes from 192.168.222.2: icmp_seq=0 ttl=63 time=0.097 ms
+64 bytes from 192.168.222.2: icmp_seq=1 ttl=63 time=0.103 ms
+^C--- 192.168.222.2 ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.097/0.100/0.103/0.000 ms
+R1# 
+```
