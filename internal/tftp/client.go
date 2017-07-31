@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -49,22 +50,24 @@ func GetFile(host string, source string, file string) (err error, size int) {
 	return err, int(s)
 }
 
-func ReturnReadCloser(host string) (io.ReadCloser, error) {
+func GetFileRC(host string) (io.ReadCloser, error) {
 	ip := "192.168.101.142" + ":69" //FIXME parse host arg
-	file := "LIST"
-	source := "downloads/LATEST/" + file
+	source := "downloads/LATEST/LIST"
 
 	client, err := dialTFTP(ip)
 	if err != nil {
 		return nil, err
 	}
-
 	r, l, err := client.recv(source)
 	if err != nil {
 		return nil, err
 	}
-	//FIXME return ReadCloser
-	return nil, nil
+	var b bytes.Buffer
+	if _, err := r.WriteTo(&b); err != nil {
+		return nil, err
+	}
+	rc := ioutil.NopCloser(&b)
+	return rc, nil
 }
 
 func dialTFTP(addr string) (*Client, error) {
