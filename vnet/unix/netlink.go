@@ -88,7 +88,6 @@ func (p *netlink_socket_pair) NetlinkTx(request netlink.Message, wait bool) (rep
 
 type netlink_main struct {
 	loop.Node
-	net_namespace_main
 
 	m            *Main
 	eventPool    sync.Pool
@@ -227,11 +226,11 @@ func (ns *net_namespace) listen(nm *netlink_main) {
 	go nm.listener(ns)
 }
 
-func (nm *netlink_main) LoopInit(l *loop.Loop) {
-	if err := nm.namespace_init(); err != nil {
+func (m *netlink_main) LoopInit(l *loop.Loop) {
+	if err := m.m.net_namespace_main.init(); err != nil {
 		panic(err)
 	}
-	nm.watch_for_new_net_namespaces()
+	m.m.net_namespace_main.watch_for_new_net_namespaces()
 }
 
 func (nm *netlink_main) Init(m *Main) {
@@ -333,9 +332,15 @@ func (ns *net_namespace) fibInit(is_del bool) {
 	}
 	m4.SetFibNameForIndex(name, ns.fibIndexForNamespace())
 }
-func (ns *net_namespace) validateFibIndexForSi(si vnet.Si) {
+func (ns *net_namespace) validateFibIndexForSi(si vnet.Si, intf *tuntap_interface) {
 	m4 := ip4.GetMain(ns.m.m.v)
-	m4.SetFibIndexForSi(si, ns.fibIndexForNamespace())
+	fi := ns.fibIndexForNamespace()
+
+	// Tun interfaces always use default namespace.
+	if intf != nil && intf.isTun {
+		fi = 0
+	}
+	m4.SetFibIndexForSi(si, fi)
 	return
 }
 
@@ -375,7 +380,7 @@ func (e *netlinkEvent) EventAction() {
 				di.addDelDummyPuntPrefixes(m, !isUp)
 			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok {
 				if intf == nil || intf.flags_synced() {
-					e.ns.validateFibIndexForSi(si)
+					e.ns.validateFibIndexForSi(si, intf)
 					err = si.SetAdminUp(vn, isUp)
 				} else if intf.flag_sync_in_progress {
 					intf.check_flag_sync_done(v)
@@ -497,8 +502,8 @@ func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 			}
 			di.ip4Addrs[p.Address] = fi
 		}
-	} else if si, _, ok := e.ns.siForIfIndex(v.Index); ok {
-		e.ns.validateFibIndexForSi(si)
+	} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok {
+		e.ns.validateFibIndexForSi(si, intf)
 		err = m4.AddDelInterfaceAddress(si, &p, isDel)
 	}
 	return

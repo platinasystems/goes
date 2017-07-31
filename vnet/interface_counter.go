@@ -190,7 +190,7 @@ func (m *interfaceMain) foreachSwIfCounter(zero bool, si Si, f func(name string,
 }
 
 func (v *Vnet) ForeachSwIfCounter(zero bool, f func(si Si, name string, value uint64)) {
-	v.swInterfaces.Foreach(func(x swIf) {
+	v.swInterfaces.Foreach(func(x SwIf) {
 		v.foreachSwIfCounter(zero, x.si, func(name string, value uint64) {
 			f(x.si, name, value)
 		})
@@ -326,7 +326,7 @@ func (m *interfaceMain) counterInit(t *InterfaceThread) {
 		}
 	}
 
-	m.swInterfaces.Foreach(func(x swIf) {
+	m.swInterfaces.Foreach(func(x SwIf) {
 		h := m.HwIfer(m.SupHi(x.si))
 		nm := h.GetSwInterfaceCounterNames()
 		if len(nm.Single) > 0 {

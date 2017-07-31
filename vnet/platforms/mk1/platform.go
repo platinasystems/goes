@@ -101,7 +101,7 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	pci.Init(v)
 	pg.Init(v)
 	ipcli.Init(v)
-	unix.Init(v)
+	unix.Init(v, unix.Config{RxInjectNodeName: "fe1-cpu"})
 
 	gpio := pca9535_main{
 		bus_index:   0,

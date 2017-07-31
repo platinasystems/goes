@@ -251,17 +251,18 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	dt := time.Since(v.timeLastClear).Seconds()
 	alwaysReport := len(cf.siMap) > 0 || cf.re.Valid()
 	for i := range swIfs.ifs {
-		si := v.SwIf(swIfs.ifs[i])
+		si := swIfs.ifs[i]
+		sw := v.SwIf(si)
 		first := true
 		firstIf := showSwIf{
-			Name:  si.IfName(v),
-			State: si.flags.String(),
+			Name:  si.Name(v),
+			State: sw.flags.String(),
 		}
 		if cf.summary {
 			sifs = append(sifs, firstIf)
 			continue
 		}
-		v.foreachSwIfCounter(cf.detail, si.si, func(counter string, count uint64) {
+		v.foreachSwIfCounter(cf.detail, si, func(counter string, count uint64) {
 			s := showSwIf{
 				Counter: counter,
 				Count:   fmt.Sprintf("%d", count),

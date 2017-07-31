@@ -91,13 +91,19 @@ func (n *rx_node) get_rx_ref_vector() (v *rx_ref_vector) {
 
 func (n *rx_node) put_rx_ref_vector(v *rx_ref_vector) { n.rv_pool <- v }
 
-func (n *rx_node) init(v *vnet.Vnet) {
+func (n *rx_node) init(m *Main) {
+	v := m.v
+	if m.RxInjectNodeName == "" {
+		m.RxInjectNodeName = "inject"
+	}
 	n.Next = []string{
-		rx_node_next_error: "error",
+		rx_node_next_error:     "error",
+		rx_node_next_inject_ip: m.RxInjectNodeName,
 	}
 	n.Errors = []string{
 		rx_error_drop:               "drops",
 		rx_error_non_vnet_interface: "not vnet interface",
+		rx_error_tun_not_ip4_or_ip6: "expected 4 or 6 for ip version",
 	}
 	v.RegisterInputNode(n, "unix-rx")
 	n.buffer_pool = vnet.DefaultBufferPool
@@ -140,11 +146,13 @@ type rx_node_next uint32
 
 const (
 	rx_node_next_error rx_node_next = iota
+	rx_node_next_inject_ip
 )
 
 const (
 	rx_error_drop = iota
 	rx_error_non_vnet_interface
+	rx_error_tun_not_ip4_or_ip6
 )
 
 func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, i, n_bytes_in_packet, ifindex uint) {
@@ -177,12 +185,38 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 		if rx.next_for_inject != rx_node_next_error {
 			v.nexts[i] = rx.next_for_inject
 		}
+		if v.nexts[i] == rx_node_next_inject_ip {
+			if ok := add_ip_ethernet_header(&ref); !ok {
+				ref.SetError(&rx.Node, rx_error_tun_not_ip4_or_ip6)
+				v.nexts[i] = rx_node_next_error
+			}
+		}
 	} else {
 		ref.Si = vnet.SiNil
 		v.nexts[i] = rx_node_next_error
 	}
 	v.refs[i] = ref
 	v.lens[i] = uint32(n_bytes_in_packet)
+	return
+}
+
+// Add empty ethernet encapsulation for injection into switch.
+// Switch uses 0 destination ethernet address for punt ports to mean packet is layer 3 packet.
+func add_ip_ethernet_header(r *vnet.Ref) (ok bool) {
+	b := r.DataSlice()[0]
+	var h ethernet.Header
+	switch b >> 4 {
+	case 4:
+		ok = true
+		h.Type = ethernet.TYPE_IP4.FromHost()
+	case 6:
+		ok = true
+		h.Type = ethernet.TYPE_IP6.FromHost()
+	}
+	if ok {
+		r.Advance(-ethernet.SizeofHeader)
+		*(*ethernet.Header)(r.DataOffset(0)) = h
+	}
 	return
 }
 

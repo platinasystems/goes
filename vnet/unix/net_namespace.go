@@ -46,6 +46,7 @@ func (m *net_namespace_main) read_dir(dir_name string, f func(dir, name string, 
 	if fis, err = ioutil.ReadDir(dir_name); err != nil {
 		return
 	}
+	m.n_namespace_discovered_at_init = 1 + uint32(len(fis))
 	for _, fi := range fis {
 		f(dir_name, fi.Name(), false)
 	}
@@ -58,15 +59,13 @@ const (
 )
 
 func (m *netlink_main) namespace_register_nodes() {
-	nm := &m.net_namespace_main
+	nm := &m.m.net_namespace_main
 	nm.m = m.m
-	nm.rx_node.init(m.m.v)
+	nm.rx_node.init(m.m)
 	nm.tx_node.init(nm)
 }
 
-func (m *netlink_main) namespace_init() (err error) {
-	nm := &m.net_namespace_main
-
+func (nm *net_namespace_main) init() (err error) {
 	// Handcraft default name space.
 	{
 		ns := &nm.default_namespace
@@ -81,19 +80,19 @@ func (m *netlink_main) namespace_init() (err error) {
 		ns.index = nm.namespace_pool.GetIndex()
 		nm.namespace_pool.entries[ns.index] = ns
 
-		m.namespace_by_name = make(map[string]*net_namespace)
-		m.namespace_by_name[ns.name] = ns
+		nm.namespace_by_name = make(map[string]*net_namespace)
+		nm.namespace_by_name[ns.name] = ns
 
-		if err = ns.configure(-1, -1); err != nil {
+		if err = ns.netlink_socket_pair.configure(-1, -1); err != nil {
 			return
 		}
-		ns.listen(m)
+		ns.listen(&nm.m.netlink_main)
 		ns.fibInit(false)
+		nm.m.vnet_tun_main.create_tun(ns)
 	}
 
 	// Setup initial namespaces.
-	m.read_dir(netnsDir, m.watch_namespace_add_del)
-	m.n_namespace_discovered_at_init = uint32(len(nm.namespace_by_name))
+	nm.read_dir(netnsDir, nm.watch_namespace_add_del)
 	return
 }
 
@@ -111,7 +110,7 @@ func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	return
 }
 
-func (m *netlink_main) watch_for_new_net_namespaces() {
+func (m *net_namespace_main) watch_for_new_net_namespaces() {
 	go m.watch_dir(netnsDir, m.watch_namespace_add_del)
 }
 
@@ -174,6 +173,7 @@ type net_namespace struct {
 
 	mu sync.Mutex
 
+	vnet_tun_interface               *tuntap_interface
 	vnet_tuntap_interface_by_ifindex map[uint32]*tuntap_interface
 	dummy_interface_by_ifindex       map[uint32]*dummy_interface
 	si_by_ifindex                    map[uint32]vnet.Si
@@ -213,7 +213,7 @@ func (m *net_namespace_main) fd_for_path(dir, name string) (fd int, err error) {
 	return
 }
 
-func (m *netlink_main) nsid_for_path(dir, name string) (nsid int, err error) {
+func (m *net_namespace_main) nsid_for_path(dir, name string) (nsid int, err error) {
 	var fd int
 	if fd, err = m.fd_for_path(dir, name); err != nil {
 		return
@@ -240,7 +240,7 @@ func (e *netlinkEvent) netnsMessage(msg *netlink.NetnsMessage) (err error) {
 	return
 }
 
-func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) (err error) {
+func (m *net_namespace_main) add_del_nsid(name string, nsid int, is_del bool) (err error) {
 	if is_del {
 		ns := m.namespace_by_name[name]
 		ns.del(m)
@@ -259,7 +259,7 @@ func (m *netlink_main) add_del_nsid(name string, nsid int, is_del bool) (err err
 	return
 }
 
-func (m *netlink_main) watch_namespace_add_del(dir, name string, is_del bool) {
+func (m *net_namespace_main) watch_namespace_add_del(dir, name string, is_del bool) {
 	var (
 		nsid int
 		err  error
@@ -345,7 +345,11 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		}
 
 		is_tuntap := intf.kind == netlink.InterfaceKindTun
-		if tif, ok := m.vnet_tuntap_interface_by_address[string(address)]; ok && is_tuntap && ok {
+		tuntap_key := intf.name
+		if len(address) > 0 {
+			tuntap_key = string(address)
+		}
+		if tif, ok := m.vnet_tuntap_interface_by_address[tuntap_key]; is_tuntap && ok {
 			m.set_si(intf, tif.si)
 			intf.tuntap = tif
 
@@ -533,8 +537,9 @@ func (ns showNsLines) Swap(i, j int) { ns.lines[i], ns.lines[j] = ns.lines[j], n
 func (ns showNsLines) Len() int      { return len(ns.lines) }
 
 func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	nm := &m.m.net_namespace_main
 	ms := showNsLines{v: m.m.v}
-	for _, ns := range m.namespace_by_name {
+	for _, ns := range nm.namespace_by_name {
 		for _, intf := range ns.interface_by_index {
 			x := showNsLine{Namespace: ns.name, Interface: intf.name, Type: intf.kind.String(), si: vnet.SiNil}
 			if intf.tuntap != nil {
@@ -564,17 +569,16 @@ func (ns *net_namespace) allocate_sockets() (err error) {
 
 func (m *net_namespace_main) max_n_namespace() uint { return uint(len(m.namespace_by_name)) }
 
-func (ns *net_namespace) add(m *netlink_main) (err error) {
+func (ns *net_namespace) add(m *net_namespace_main) (err error) {
 	// Allocate unique index for namespace.
-	nm := &m.net_namespace_main
-	ns.index = nm.namespace_pool.GetIndex()
-	nm.namespace_pool.entries[ns.index] = ns
+	ns.index = m.namespace_pool.GetIndex()
+	m.namespace_pool.entries[ns.index] = ns
 
 	// Loop until namespace sockets are allocated.
 	time_start := time.Now()
 	var first_setns_errno syscall.Errno
 	for {
-		ns.m = nm
+		ns.m = m
 		if ns.ns_fd, err = m.fd_for_path(netnsDir, ns.name); err != nil {
 			return
 		}
@@ -597,12 +601,18 @@ func (ns *net_namespace) add(m *netlink_main) (err error) {
 		ns.ns_fd = -1
 		return
 	}
-	ns.listen(m)
+	ns.listen(&m.m.netlink_main)
 	ns.fibInit(false)
+	intf := m.m.vnet_tun_main.create_tun(ns)
+	if m.discovery_is_done() {
+		if err = intf.init(m.m); err != nil {
+			return
+		}
+	}
 	return
 }
 
-func (ns *net_namespace) del(m *netlink_main) {
+func (ns *net_namespace) del(m *net_namespace_main) {
 	for index, intf := range ns.interface_by_index {
 		if intf.si != vnet.SiNil {
 			m.m.v.DelSwIf(intf.si)

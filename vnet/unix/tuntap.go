@@ -34,6 +34,9 @@ type tuntap_interface struct {
 	name           ifreq_name
 	ifindex        uint32 // linux interface index
 
+	// Tun (ip4/ip6 header) versus tap (has ethernet header).
+	isTun bool
+
 	// Tuntap interface has been created (via TUNSETIFF ioctl).
 	created bool
 	// True when vnet/kernel interface flag sync has started.
@@ -88,6 +91,7 @@ func (i *tuntap_interface) close() {
 	}
 }
 
+// Called when interface namespace is added/deleted or when interface moves namespace.
 func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del bool) {
 	if is_del {
 		i.close()
@@ -114,7 +118,6 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 
 type tuntap_main struct {
 	// Selects whether we create tun or tap interfaces.
-	isTun      bool
 	mtuBytes   uint
 	bufferPool *vnet.BufferPool
 }
@@ -280,7 +283,11 @@ func (intf *tuntap_interface) check_flag_sync_done(msg *netlink.IfInfoMessage) {
 func (intf *tuntap_interface) setOperState() { intf.forceOperState(false) }
 func (intf *tuntap_interface) forceOperState(is_force bool) {
 	os := netlink.IF_OPER_DOWN
-	if intf.si.IsAdminUp(intf.m.v) && intf.hi.IsLinkUp(intf.m.v) {
+	linkUp := true
+	if intf.hi != vnet.HiNil {
+		linkUp = intf.hi.IsLinkUp(intf.m.v)
+	}
+	if intf.si.IsAdminUp(intf.m.v) && linkUp {
 		os = netlink.IF_OPER_UP
 	}
 	if os != intf.operState {
@@ -299,8 +306,15 @@ func (intf *tuntap_interface) forceOperState(is_force bool) {
 }
 
 func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
-	hi := m.v.SupHi(si)
-	if !m.okHi(hi) {
+	isTun := m.si_is_vnet_tun(si)
+	ok := isTun
+	hi := vnet.HiNil
+	if !isTun {
+		hi = m.v.SupHi(si)
+		ok = m.okHi(hi)
+	}
+
+	if !ok {
 		// Unknown interface punts get sent to error node.
 		m.rx_node.set_next(si, rx_node_next_error)
 		return
@@ -316,9 +330,10 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	}
 
 	intf := &tuntap_interface{
-		m:  m,
-		hi: hi,
-		si: si,
+		m:     m,
+		hi:    hi,
+		si:    si,
+		isTun: isTun,
 	}
 
 	name := si.Name(v)
@@ -328,10 +343,15 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		m.vnet_tuntap_interface_by_si = make(map[vnet.Si]*tuntap_interface)
 	}
 	m.vnet_tuntap_interface_by_si[si] = intf
+
 	if m.vnet_tuntap_interface_by_address == nil {
 		m.vnet_tuntap_interface_by_address = make(map[string]*tuntap_interface)
 	}
-	m.vnet_tuntap_interface_by_address[string(hi.GetAddress(v))] = intf
+	key := name
+	if !isTun {
+		key = string(hi.GetAddress(v))
+	}
+	m.vnet_tuntap_interface_by_address[key] = intf
 	return
 }
 
@@ -379,12 +399,10 @@ func (intf *tuntap_interface) open_sockets() (err error) {
 		}
 		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
 			err = fmt.Errorf("tuntap socket AF_PACKET: %s", err)
+			return
 		}
 		return
 	})
-	if err = syscall.SetsockoptInt(intf.provision_fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 4<<20); err != nil {
-		err = fmt.Errorf("tuntap SO_RCVBUF: %s", err)
-	}
 	return
 }
 
@@ -392,18 +410,18 @@ func (intf *tuntap_interface) open_sockets() (err error) {
 func (intf *tuntap_interface) create() (err error) {
 	r := ifreq_flags{name: intf.name}
 	r.flags = iff_no_pi
-	if intf.m.isTun {
+	if intf.isTun {
 		r.flags |= iff_tun
 	} else {
 		r.flags |= iff_tap
 	}
-	intf.created = true
 	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 		return
 	}
 	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
 		return
 	}
+	intf.created = true
 	return
 }
 
@@ -440,66 +458,94 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 
 	intf.bind()
 
-	if eifer, ok := m.v.HwIfer(intf.hi).(ethernet.HwInterfacer); ok {
-		ei := eifer.GetInterface()
-
-		// Set MTU.
-		{
-			intf.mtuBytes = ei.MaxPacketSize()
-			if intf.mtuBytes == 0 {
-				intf.mtuBytes = m.mtuBytes
-			}
-			r := ifreq_int{name: intf.name}
-			r.i = int(intf.mtuBytes)
-			if err = intf.ioctl(intf.provision_fd, ifreq_SETIFMTU, uintptr(unsafe.Pointer(&r))); err != nil {
-				return
-			}
-			intf.setMtu(m, intf.mtuBytes)
-		}
-
-		// Increase transmit queue.  Default of 500 in drivers/net/tun.c causes packet loss at high rates.
-		{
-			r := ifreq_int{name: intf.name}
-			r.i = 5000
-			if err = intf.ioctl(intf.provision_fd, ifreq_SIFTXQLEN, uintptr(unsafe.Pointer(&r))); err != nil {
-				return
-			}
-		}
-
-		// For tap interfaces, set ethernet address of interface.
-		if !m.isTun {
-			r := ifreq_sockaddr_any{name: intf.name}
-			r.sockaddr.Addr.Family = syscall.ARPHRD_ETHER
-
-			// Only set address if it changes.  If address is reset to same value, kernel will remove arps for some reason.
-			if err = intf.ioctl(intf.provision_fd, ifreq_GETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
-				err = fmt.Errorf("%s: %s", err, &ei.Address)
-				return
-			}
-			same_address := true
-			for i := range ei.Address {
-				same_address = r.sockaddr.Addr.Data[i] == int8(ei.Address[i])
-				if !same_address {
-					break
-				}
-			}
-			if !same_address {
-				for i := range ei.Address {
-					r.sockaddr.Addr.Data[i] = int8(ei.Address[i])
-				}
-				if err = intf.ioctl(intf.provision_fd, ifreq_SETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
-					err = fmt.Errorf("%s: %s", err, &ei.Address)
-					return
-				}
-			}
+	// Increase transmit queue.  Default of 500 in drivers/net/tun.c causes packet loss at high rates.
+	{
+		r := ifreq_int{name: intf.name}
+		r.i = 5000
+		if err = intf.ioctl(intf.provision_fd, ifreq_SIFTXQLEN, uintptr(unsafe.Pointer(&r))); err != nil {
+			return
 		}
 	}
 
-	// Hook up unix rx node to interface transmit node.
-	next := m.v.AddNamedNext(&m.rx_node, intf.Name())
-	m.rx_node.set_next(intf.si, rx_node_next(next))
+	if eifer, ok := intf.is_ethernet(m); ok {
+		if err = intf.configure_ethernet(m, eifer); err != nil {
+			return
+		}
+	}
+
+	// Hook up unix rx node to interface transmit node or inject for tun.
+	{
+		var next rx_node_next
+		if intf.isTun {
+			intf.set_mtu(m, m.mtuBytes)
+			next = rx_node_next_inject_ip
+		} else {
+			next = rx_node_next(m.v.AddNamedNext(&m.rx_node, intf.Name()))
+		}
+		m.rx_node.set_next(intf.si, next)
+	}
 
 	intf.start_up()
+
+	return
+}
+
+func (intf *tuntap_interface) is_ethernet(m *Main) (eifer ethernet.HwInterfacer, yes bool) {
+	if intf.hi == vnet.HiNil {
+		return
+	}
+	eifer, yes = m.v.HwIfer(intf.hi).(ethernet.HwInterfacer)
+	return
+}
+
+func (intf *tuntap_interface) set_mtu(m *Main, max_packet_size uint) (err error) {
+	if max_packet_size == 0 {
+		max_packet_size = m.mtuBytes
+	}
+	intf.mtuBytes = max_packet_size
+	r := ifreq_int{name: intf.name}
+	r.i = int(intf.mtuBytes)
+	if err = intf.ioctl(intf.provision_fd, ifreq_SETIFMTU, uintptr(unsafe.Pointer(&r))); err != nil {
+		return
+	}
+	intf.setMtu(m, intf.mtuBytes)
+	return
+}
+
+func (intf *tuntap_interface) configure_ethernet(m *Main, eifer ethernet.HwInterfacer) (err error) {
+	ei := eifer.GetInterface()
+
+	if err = intf.set_mtu(m, ei.MaxPacketSize()); err != nil {
+		return
+	}
+
+	// For tap interfaces, set ethernet address of interface.
+	{
+		r := ifreq_sockaddr_any{name: intf.name}
+		r.sockaddr.Addr.Family = syscall.ARPHRD_ETHER
+
+		// Only set address if it changes.  If address is reset to same value, kernel will remove arps for some reason.
+		if err = intf.ioctl(intf.provision_fd, ifreq_GETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
+			err = fmt.Errorf("%s: %s", err, &ei.Address)
+			return
+		}
+		same_address := true
+		for i := range ei.Address {
+			same_address = r.sockaddr.Addr.Data[i] == int8(ei.Address[i])
+			if !same_address {
+				break
+			}
+		}
+		if !same_address {
+			for i := range ei.Address {
+				r.sockaddr.Addr.Data[i] = int8(ei.Address[i])
+			}
+			if err = intf.ioctl(intf.provision_fd, ifreq_SETIFHWADDR, uintptr(unsafe.Pointer(&r))); err != nil {
+				err = fmt.Errorf("%s: %s", err, &ei.Address)
+				return
+			}
+		}
+	}
 
 	return
 }
