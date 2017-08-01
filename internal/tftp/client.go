@@ -5,12 +5,14 @@
 package tftp
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -51,14 +53,14 @@ func GetFile(host string, source string, file string) (err error, size int) {
 }
 
 func GetFileRC(host string) (io.ReadCloser, error) {
-	ip := "192.168.101.142" + ":69" //FIXME parse host arg
-	source := "downloads/LATEST/LIST"
-
+	x := strings.Split(host, ":")
+	ip := x[0] + ":69"
+	source := x[1]
 	client, err := dialTFTP(ip)
 	if err != nil {
 		return nil, err
 	}
-	r, l, err := client.recv(source)
+	r, _, err := client.recv(source)
 	if err != nil {
 		return nil, err
 	}

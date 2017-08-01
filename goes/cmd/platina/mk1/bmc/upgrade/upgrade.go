@@ -42,7 +42,8 @@ DESCRIPTION
 OPTIONS
 	-v [VER]          version number or hash, the default is LATEST
 	-s [SERVER[/dir]] IP4 or URL, the default is downloads.platina.com
-	-l                lists available upgrade hashes`
+	-t                use TFTP instead of HTTP
+	-l                shows list of available upgrade hashes`
 
 	DfltMod = 0755
 	DfltSrv = "downloads.platinasystems.com"
@@ -66,7 +67,7 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-f", "-l")
+	flag, args := flags.New(args, "-t", "-l")
 	parm, args := parms.New(args, "-v", "-s")
 
 	if len(parm.ByName["-v"]) == 0 {
@@ -76,13 +77,14 @@ func (cmd) Main(args ...string) error {
 		parm.ByName["-s"] = DfltSrv
 	}
 	if flag.ByName["-l"] {
-		if err := showList(parm.ByName["-s"], parm.ByName["-v"]); err != nil {
+		if err := showList(parm.ByName["-s"], parm.ByName["-v"],
+			flag.ByName["-t"]); err != nil {
 			return err
 		}
 		return nil
 	}
-	err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"], flag.ByName["-f"])
-	if err != nil {
+	if err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"],
+		flag.ByName["-t"]); err != nil {
 		return err
 	}
 	return nil
@@ -101,12 +103,39 @@ var (
 	}
 )
 
-func doUpgrade(s string, v string, f bool) error {
-	err, size := downloadFile(s, v)
+func showList(s string, v string, tftp bool) error {
+	f := "LIST"
+	rmFile("/" + f)
+	urls := "http://" + s + "/" + v + "/" + f
+	if tftp {
+		urls = "tftp://" + s + "/" + v + "/" + f
+	}
+	if _, err := getFile(urls, f); err != nil {
+		return err
+	}
+	l, err := ioutil.ReadFile("/" + f)
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(l))
+	return nil
+}
+
+func doUpgrade(s string, v string, tftp bool) error {
+	f := Machine + Suffix
+	rmFile("/" + f)
+	urls := "http://" + s + "/" + v + "/" + f
+	if tftp {
+		urls = "tftp://" + s + "/" + v + "/" + f
+	}
+	n, err := getFile(urls, f)
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("Error downloading: %v", err)
 	}
-	if size < 1000 {
+	if n < 1000 {
 		return fmt.Errorf("Error tar too small: %v", err)
 	}
 	if err := unzip(); err != nil {
@@ -119,10 +148,22 @@ func doUpgrade(s string, v string, f bool) error {
 	return nil
 }
 
-func reboot() error {
-	kexec.Prepare()
-	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
-	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+func getFile(urls string, fn string) (int, error) {
+	r, err := url.Open(urls)
+	if err != nil {
+		return 0, err
+	}
+	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DfltMod)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	n, err := io.Copy(f, r)
+	if err != nil {
+		return 0, err
+	}
+	syscall.Fsync(int(os.Stdout.Fd()))
+	return int(n), nil
 }
 
 func unzip() error {
@@ -156,57 +197,6 @@ func unzip() error {
 	return nil
 }
 
-func showList(s string, v string) error {
-	rmFile("/LIST")
-	urls := "http://" + s + "/" + v + "/" + Machine + Suffix
-	if err := getFile(urls, "/LIST"); err != nil {
-		return err
-	}
-	list, err := ioutil.ReadFile("/LIST")
-	if err != nil {
-		return err
-	}
-	fmt.Print(string(list))
-	return nil
-}
-
-func downloadFile(s string, v string) (error, int) {
-	rmFile(Machine + Suffix)
-	urls := "http://" + s + "/" + v + "/" + Machine + Suffix
-	err := getFile(urls, Machine+Suffix)
-	if err != nil {
-		return err, 0
-	}
-	f, err := os.Open(Machine + Suffix)
-	if err != nil {
-		return err, 0
-	}
-	defer f.Close()
-	stat, err := f.Stat()
-	if err != nil {
-		return err, 0
-	}
-	filesize := int(stat.Size())
-	return nil, filesize
-}
-
-func getFile(urls string, fn string) error {
-	r, err := url.Open(urls)
-	if err != nil {
-		return err
-	}
-	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DfltMod)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := io.Copy(f, r); err != nil {
-		return err
-	}
-	syscall.Fsync(int(os.Stdout.Fd()))
-	return nil
-}
-
 func rmFile(f string) error {
 	if _, err := os.Stat(f); err != nil {
 		return err
@@ -215,4 +205,10 @@ func rmFile(f string) error {
 		return err
 	}
 	return nil
+}
+
+func reboot() error {
+	kexec.Prepare()
+	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
+	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
