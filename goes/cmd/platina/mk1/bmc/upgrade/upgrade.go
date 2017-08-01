@@ -130,9 +130,6 @@ func doUpgrade(s string, v string, tftp bool) error {
 	}
 	n, err := getFile(urls, f)
 	if err != nil {
-		return err
-	}
-	if err != nil {
 		return fmt.Errorf("Error downloading: %v", err)
 	}
 	if n < 1000 {
