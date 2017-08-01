@@ -69,8 +69,8 @@ func NewLiner() *State {
 	return &s
 }
 
-var errTimedOut = errors.New("timeout")		// internal timeout
-var ErrTimeOut = errors.New("timed out")	// external timeout
+var errTimedOut = errors.New("timeout")  // internal timeout
+var ErrTimeOut = errors.New("timed out") // external timeout
 var ErrInternalError = errors.New("liner: internal error")
 
 func (s *State) startPrompt() {
@@ -79,9 +79,8 @@ func (s *State) startPrompt() {
 			s.defaultMode = *m.(*termios)
 			mode := s.defaultMode
 			mode.Lflag &^= isig
-			if s.timeout != 0 {
-				mode.Cc[syscall.VTIME] = uint8(s.timeout /
-					(time.Second / 10))
+			if s.timeoutEnabled {
+				mode.Cc[syscall.VTIME] = 5 // 500ms
 				mode.Cc[syscall.VMIN] = 0
 			} else {
 				mode.Cc[syscall.VTIME] = 0
@@ -104,10 +103,10 @@ func (s *State) restartPrompt() {
 			var n nexter
 			n.r, _, n.err = s.r.ReadRune()
 			if n.err == io.EOF {
-				if s.timeout != 0 {
+				if s.timeoutEnabled && time.Now().After(s.timeout) {
 					n.err = ErrTimeOut
 				} else {
-					n.err = ErrInternalError
+					continue
 				}
 			}
 			next <- n
