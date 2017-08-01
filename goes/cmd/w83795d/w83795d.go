@@ -242,7 +242,7 @@ const (
 )
 
 func fanSpeed(countHi uint8, countLo uint8) uint16 {
-	d := ((uint16(countHi) << 4) + (uint16(countLo & 0xf))) * (uint16(fanPoles / 4))
+	d := ((uint16(countHi) << 4) + (uint16(countLo&0xf0) >> 4)) * (uint16(fanPoles / 4))
 	speed := 1.35E06 / float64(d)
 	return uint16(speed)
 }
