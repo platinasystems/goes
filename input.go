@@ -192,24 +192,31 @@ func (s *State) readNext() (interface{}, error) {
 		switch code {
 		case 'A':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return up, nil
 		case 'B':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return down, nil
 		case 'C':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return right, nil
 		case 'D':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return left, nil
 		case 'F':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return end, nil
 		case 'H':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return home, nil
 		case 'Z':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return shiftTab, nil
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			num := []rune{code}
@@ -258,6 +265,7 @@ func (s *State) readNext() (interface{}, error) {
 								return rv, nil
 							}
 							s.pending = s.pending[:0] // escape code complete
+							s.timeoutEnabled = false  // function keys mean a person is there
 							if code == 'C' {
 								return wordRight, nil
 							}
@@ -271,6 +279,7 @@ func (s *State) readNext() (interface{}, error) {
 					}
 				case '~':
 					s.pending = s.pending[:0] // escape code complete
+					s.timeoutEnabled = false  // function keys mean a person is there
 					x, _ := strconv.ParseInt(string(num), 10, 32)
 					switch x {
 					case 2:
@@ -322,6 +331,8 @@ func (s *State) readNext() (interface{}, error) {
 			return nil, err
 		}
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
+
 		switch code {
 		case 'c':
 			return wordRight, nil
@@ -344,18 +355,23 @@ func (s *State) readNext() (interface{}, error) {
 		}
 	case 'b':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altB, nil
 	case 'f':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altF, nil
 	case 'n':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altN, nil
 	case 'p':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altP, nil
 	case 'y':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altY, nil
 	default:
 		rv := s.pending[0]
