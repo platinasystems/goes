@@ -181,16 +181,17 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 	}
 	if si, ok := ns.si_by_ifindex[uint32(ifindex)]; ok {
 		ref.Si = si
-		v.nexts[i] = rx_node_next(rx.next_by_si[si])
-		if rx.next_for_inject != rx_node_next_error {
-			v.nexts[i] = rx.next_for_inject
-		}
-		if v.nexts[i] == rx_node_next_inject_ip {
+		n := rx_node_next(rx.next_by_si[si])
+		if n == rx_node_next_inject_ip {
 			if ok := add_ip_ethernet_header(&ref); !ok {
 				ref.SetError(&rx.Node, rx_error_tun_not_ip4_or_ip6)
-				v.nexts[i] = rx_node_next_error
+				n = rx_node_next_error
 			}
 		}
+		if n != rx_node_next_error && rx.next_for_inject != rx_node_next_error {
+			n = rx.next_for_inject
+		}
+		v.nexts[i] = n
 	} else {
 		ref.Si = vnet.SiNil
 		v.nexts[i] = rx_node_next_error

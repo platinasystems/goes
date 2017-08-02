@@ -26,6 +26,9 @@ func (m *vnet_tun_main) init(um *Main) {
 func (m *vnet_tun_main) si_is_vnet_tun(si vnet.Si) bool {
 	return si.Kind(m.m.v) == m.SwIfKind
 }
+func IsVnetTun(v *vnet.Vnet, si vnet.Si) bool {
+	return GetMain(v).si_is_vnet_tun(si)
+}
 
 func (m *vnet_tun_main) create_tun(ns *net_namespace) (intf *tuntap_interface) {
 	si := m.m.v.NewSwIf(m.SwIfKind, vnet.IfId(ns.index))
