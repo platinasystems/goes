@@ -384,7 +384,10 @@ func (r *mapFibResult) f2(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
 }
 
 func (x *mapFibResult) f4(m *Main, f *Fib, p *Prefix) {
-	si := m.GetAdjRewriteSi(x.adj)
+	si := vnet.SiNil
+	if x.adj != ip.AdjNil {
+		si = m.GetAdjRewriteSi(x.adj)
+	}
 	for dst, dstMap := range x.nh {
 		if dst.MatchesPrefix(p) {
 			delete(x.nh, dst)
