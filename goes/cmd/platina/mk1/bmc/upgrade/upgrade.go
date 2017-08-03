@@ -26,24 +26,24 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-l]"
+	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-l] [-t]"
 	Man     = `
 DESCRIPTION
 	The upgrade command updates BMC firmware.
 
-	The default version is "LATEST".  Optionally, a version
-	number can be supplied in the form of:  v0.0[.0][.0]
+	The upgrade version is "LATEST" by default. Or, the upgrade
+	version can be specified in the form of:  v0.0[.0][.0]
 
-	The -l flag lists available versions.
+	The -l flag will list available upgrade versions.
 
 	Images are downloaded from "downloads.platina.com",
-	or, from a user specified URL or IPv4 address.
+	or from a user specified URL or IPv4 address.
 
 OPTIONS
 	-v [VER]          version number or hash, the default is LATEST
 	-s [SERVER[/dir]] IP4 or URL, the default is downloads.platina.com
 	-t                use TFTP instead of HTTP
-	-l                shows list of available upgrade hashes`
+	-l                shows list of available upgrade versions`
 
 	DfltMod = 0755
 	DfltSrv = "downloads.platinasystems.com"
@@ -133,7 +133,7 @@ func doUpgrade(s string, v string, tftp bool) error {
 		return fmt.Errorf("Error downloading: %v", err)
 	}
 	if n < 1000 {
-		return fmt.Errorf("Error tar too small: %v", err)
+		return fmt.Errorf("Error file too small: %v", err)
 	}
 	if err := unzip(); err != nil {
 		return fmt.Errorf("Error unzipping file: %v", err)

@@ -52,6 +52,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/nsid"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
 	"github.com/platinasystems/go/goes/cmd/qsfp"
@@ -160,6 +161,7 @@ func Goes() *goes.Goes {
 		toggle.New(),
 		umount.New(),
 		uninstall.New(),
+		upgrade.New(),
 		uptimed.New(),
 		vnet.New(),
 		vnetd.New(),
