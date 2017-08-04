@@ -5,16 +5,6 @@
 //TODO AUTHENTICATE,  CERT OR EQUIV
 //TODO UPGRADE AUTOMATICALLY IF ENABLED, contact boot server
 
-/* TODO
-   upgrade      -- all (same as -g -k -c), with version check
-   upgrade -g   -- goes only, with version check
-   upgrade -k   -- kernel only, with verion check
-   upgrade -c   -- coreboot only, with version check
-   upgrade -f   -- force upgrade, don't do version check
-   upgrade -v   -- version report of current versions
-   upgrade -r   -- remote version report
-*/
-
 package upgrade
 
 import (
@@ -23,9 +13,12 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 
+	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/kexec"
@@ -35,25 +28,36 @@ import (
 
 const (
 	Name    = "upgrade"
-	Apropos = "1.1 upgrade images"
-	Usage   = "1.1 upgrade [-v VER] [-s SERVER[/dir]] [-l] [-t] [-d]"
+	Apropos = "upgrade images"
+	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-t] [-l] [-r] [-a[-f]] [-g|-k|-c[-f]]"
 	Man     = `
 DESCRIPTION
 	The upgrade command updates firmware images.
 
-	The upgrade version is "LATEST" by default. Or, the upgrade
-	version can be specified in the form of:  v0.0[.0][.0]
+	The default upgrade version is "LATEST". 
+	Or specify a version using "-v", in the form v0.0[.0][.0]
 
-	The -l flag will list available upgrade versions.
+	The -l flag lists available upgrade versions.
 
-	Images are downloaded from "downloads.platina.com",
-	or from a user specified URL or IPv4 address.
+	The -r flag prints a report on version numbers.
+
+	By default, images are downloaded from "downloads.platina.com".
+	Or specify a server using "-s" followed by a URL or IPv4 address.
+
+	Upgrades only happen if the version numbers differ,
+	unless overridden with the "-f" force flag.
 
 OPTIONS
 	-v [VER]          version number or hash, default is LATEST
 	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
 	-t                use TFTP instead of HTTP
-	-l                shows list of available upgrade versions`
+	-l                shows list of available versions for upgrade
+	-r                report current versions of goes, kernel, coreboot
+	-g                upgrade goes
+	-k                upgrade kernel
+	-c                upgrade coreboot
+	-a                upgrade all
+	-f                force upgrade (ignore version check)`
 
 	DfltMod = 0755
 	DfltSrv = "downloads.platinasystems.com"
@@ -64,8 +68,8 @@ OPTIONS
 
 const (
 	GoesName     = "goes-platina-mk1-installer"
+	KernelName   = "kernel-mk1-filename"
 	CorebootName = "coreboot-platina-mk1.rom"
-	LinuxName    = "linux-mk1-filename"
 )
 
 type Interface interface {
@@ -83,7 +87,8 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-t", "-l")
+	flag, args := flags.New(args, "-t", "-l", "-f",
+		"-s", "-r", "-g", "-c", "-k", "-a")
 	parm, args := parms.New(args, "-v", "-s")
 
 	if len(parm.ByName["-v"]) == 0 {
@@ -92,6 +97,16 @@ func (cmd) Main(args ...string) error {
 	if len(parm.ByName["-s"]) == 0 {
 		parm.ByName["-s"] = DfltSrv
 	}
+	if flag.ByName["-a"] {
+		flag.ByName["-g"] = true
+		flag.ByName["-k"] = true
+		flag.ByName["-c"] = true
+	}
+	if flag.ByName["-l"] == false &&
+		flag.ByName["-r"] == false && flag.ByName["-g"] == false &&
+		flag.ByName["-k"] == false && flag.ByName["-c"] == false {
+		flag.ByName["-g"] = true
+	}
 	if flag.ByName["-l"] {
 		if err := showList(parm.ByName["-s"], parm.ByName["-v"],
 			flag.ByName["-t"]); err != nil {
@@ -99,8 +114,16 @@ func (cmd) Main(args ...string) error {
 		}
 		return nil
 	}
+	if flag.ByName["-r"] {
+		if err := reportVersions(parm.ByName["-s"], parm.ByName["-v"],
+			flag.ByName["-t"]); err != nil {
+			return err
+		}
+		return nil
+	}
 	if err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"],
-		flag.ByName["-t"]); err != nil {
+		flag.ByName["-t"], flag.ByName["-g"], flag.ByName["-k"],
+		flag.ByName["-c"], flag.ByName["-f"]); err != nil {
 		return err
 	}
 	return nil
@@ -119,17 +142,17 @@ var (
 	}
 )
 
-func showList(s string, v string, tftp bool) error {
-	f := "LIST"
-	rmFile("/" + f)
-	urls := "http://" + s + "/" + v + "/" + f
-	if tftp {
-		urls = "tftp://" + s + "/" + v + "/" + f
+func showList(s string, v string, t bool) error {
+	fn := "LIST"
+	rmFile(fn)
+	urls := "http://" + s + "/" + v + "/" + fn
+	if t {
+		urls = "tftp://" + s + "/" + v + "/" + fn
 	}
-	if _, err := getFile(urls, f); err != nil {
+	if _, err := getFile(urls, fn); err != nil {
 		return err
 	}
-	l, err := ioutil.ReadFile("/" + f)
+	l, err := ioutil.ReadFile(fn)
 	if err != nil {
 		return err
 	}
@@ -137,24 +160,140 @@ func showList(s string, v string, tftp bool) error {
 	return nil
 }
 
-func doUpgrade(s string, v string, tftp bool) error {
+func reportVersions(s string, v string, t bool) error {
+	g := getGoesVer()
+	k, err := getKernelVer()
+	if err != nil {
+		return err
+	}
+	c, err := getCorebootVer()
+	if err != nil {
+		return err
+	}
+	gr, err := getRemoteGoesVer(s, v, t)
+	if err != nil {
+		return err
+	}
+	kr, err := getRemoteKernelVer(s, v, t)
+	if err != nil {
+		return err
+	}
+	cr, err := getRemoteCorebootVer(s, v, t)
+	if err != nil {
+		return err
+	}
+	fmt.Print("\n")
+	fmt.Print("Currently running:\n")
+	fmt.Printf("    Goes version    : %s\n", g)
+	fmt.Printf("    Kernel version  : %s\n", k)
+	fmt.Printf("    Coreboot version: %s\n", c)
+	fmt.Print("\n")
+	fmt.Print("Version on server:\n")
+	fmt.Printf("    Goes version    : %s\n", gr)
+	fmt.Printf("    Kernel version  : %s\n", kr)
+	fmt.Printf("    Coreboot version: %s\n", cr)
+	fmt.Print("\n")
+	return nil
+}
+
+func doUpgrade(s string, v string, t bool, g bool, k bool,
+	c bool, f bool) error {
+	if g {
+		if err := upgradeGoes(s, v, t, f); err != nil {
+			return err
+		}
+	}
+	if k {
+		if err := upgradeKernel(s, v, t, f); err != nil {
+			return err
+		}
+	}
+	if c {
+		if err := upgradeCoreboot(s, v, t, f); err != nil {
+			return err
+		}
+	}
+
+	//reboot() and fixups //FIXME
+	return nil
+}
+
+func upgradeGoes(s string, v string, t bool, f bool) error {
+	fmt.Printf("Update goes")
+	if !f {
+		g := getGoesVer()
+		gr, err := getRemoteGoesVer(s, v, t)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("    Goes version currently:  %s\n", g)
+		fmt.Printf("    Goes version on server:  %s\n", gr)
+		if g == gr {
+			fmt.Print("    Versions match, skipping Goes upgrade\n")
+			return nil
+		}
+	} else {
+		fmt.Print("    Skipping version check")
+	}
+	fmt.Print("    Updating goes...\n")
 	return nil
 
-	f := GoesName
-	rmFile("/" + f)
-	urls := "http://" + s + "/" + v + "/" + f
-	if tftp {
-		urls = "tftp://" + s + "/" + v + "/" + f
+	fn := GoesName
+	rmFile("/" + fn)
+	urls := "http://" + s + "/" + v + "/" + fn
+	if t {
+		urls = "tftp://" + s + "/" + v + "/" + fn
 	}
-	n, err := getFile(urls, f)
+	n, err := getFile(urls, fn)
 	if err != nil {
 		return fmt.Errorf("Error downloading: %v", err)
 	}
 	if n < 1000 {
 		return fmt.Errorf("Error file too small: %v", err)
 	}
-	//RUN INSTALLER
-	//reboot()
+	//FIXME install goes
+	return nil
+}
+
+func upgradeKernel(s string, v string, t bool, f bool) error { //FIXME
+	if !f {
+		fmt.Print("checking Kernel versions...\n")
+		k, err := getKernelVer()
+		if err != nil {
+			return err
+		}
+		kr, err := getRemoteKernelVer(s, v, t)
+		if err != nil {
+			return err
+		}
+		fmt.Print("currently running Kernel version    : %s\n", k)
+		fmt.Print("server: %s, Ver %s is Kernel version    : %s\n", kr)
+		if k == kr {
+			fmt.Print("versions match, skipping Kernel upgrade\n")
+		}
+	}
+	fmt.Print("updating kernel...\n")
+	return nil
+}
+
+func upgradeCoreboot(s string, v string, t bool, f bool) error { //FIXME
+	if !f {
+		fmt.Print("checking Coreboot versions...\n")
+		c, err := getCorebootVer()
+		if err != nil {
+			return err
+		}
+		cr, err := getRemoteCorebootVer(s, v, t)
+		if err != nil {
+			return err
+		}
+		fmt.Print("currently running Coreboot version    : %s\n", c)
+		fmt.Print("server: %s, Ver %s is Coreboot version    : %s\n", cr)
+		if c == cr {
+			fmt.Print("versions match, skipping Coreboot upgrade\n")
+		}
+	}
+	fmt.Print("updating coreboot...\n")
 	return nil
 }
 
@@ -205,6 +344,65 @@ func unzip() error {
 		}
 	}
 	return nil
+}
+
+func getGoesVer() (v string) {
+	ar := "tag"
+	maps := []map[string]string{Package}
+	if Packages != nil {
+		maps = append(maps, Packages()...)
+	}
+	for _, m := range maps {
+		if ip, found := m["importpath"]; found {
+			k := strings.TrimLeft(ar, "-")
+			if val, found := m[k]; found {
+				if strings.Contains(ip, "/go") {
+					v = val
+				}
+			}
+		}
+	}
+	return v
+}
+
+func getKernelVer() (string, error) {
+	u, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(u)), nil
+}
+
+func getCorebootVer() (string, error) {
+	u, err := exec.Command("uname", "-r").Output() //FIXME
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(u)), nil
+}
+
+func getRemoteGoesVer(s string, v string, t bool) (string, error) {
+	u, err := exec.Command("uname", "-r").Output() //FIXME
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(u)), nil
+}
+
+func getRemoteKernelVer(s string, v string, t bool) (string, error) {
+	u, err := exec.Command("uname", "-r").Output() //FIXME
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(u)), nil
+}
+
+func getRemoteCorebootVer(s string, v string, t bool) (string, error) {
+	u, err := exec.Command("uname", "-r").Output() //FIXME
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(u)), nil
 }
 
 func rmFile(f string) error {
