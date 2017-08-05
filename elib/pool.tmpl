@@ -92,3 +92,10 @@ func (p * {{.PoolType}}) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p * {{.PoolType}}) Reset() {
+	p.Pool.Reset()
+	if len(p.{{.Data}}) > 0 {
+		p.{{.Data}} = p.{{.Data}}[:0]
+	}
+}
