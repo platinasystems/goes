@@ -171,6 +171,7 @@ const (
 	IFLA_INFO_XSTATS
 	IFLA_INFO_SLAVE_KIND
 	IFLA_INFO_SLAVE_DATA
+	IFLA_INFO_MAX
 )
 
 var ifLinkInfoAttrTypeNames = []string{
@@ -198,6 +199,13 @@ func (t *IfLinkInfoAttrType) Close() error {
 }
 func (t *IfLinkInfoAttrType) IthString(i int) string {
 	return elib.Stringer(ifLinkInfoAttrTypeNames, i)
+}
+
+func (msg *IfInfoMessage) GetLinkInfoData() (as *AttrArray) {
+	if li, ok := msg.Attrs[IFLA_LINKINFO].(*AttrArray); ok {
+		as, _ = li.X[IFLA_INFO_DATA].(*AttrArray)
+	}
+	return
 }
 
 type InterfaceKind int
@@ -255,12 +263,12 @@ func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
 func parse_link_info(b []byte) *AttrArray {
 	as := pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfLinkInfoAttrType()
+	as.X.Validate(uint(IFLA_INFO_MAX - 1))
 	linkKind := InterfaceKindUnknown
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfLinkInfoAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_INFO_KIND, IFLA_INFO_SLAVE_KIND:
 			// Remove trailing 0.
@@ -294,6 +302,7 @@ const (
 	IFLA_VLAN_EGRESS_QOS
 	IFLA_VLAN_INGRESS_QOS
 	IFLA_VLAN_PROTOCOL
+	IFLA_VLAN_MAX
 )
 
 var ifVlanLinkInfoDataAttrKindNames = []string{
@@ -328,11 +337,11 @@ func (t *IfVlanLinkInfoDataAttrType) IthString(i int) string {
 func parse_vlan_info(b []byte) (as *AttrArray) {
 	as = pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfVlanLinkInfoDataAttrType()
+	as.X.Validate(uint(IFLA_VLAN_MAX - 1))
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfVlanLinkInfoDataAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_VLAN_ID:
 			as.X[kind] = Uint16AttrBytes(v)
@@ -433,6 +442,7 @@ const (
 	IFLA_IPTUN_ENCAP_DPORT
 	IFLA_IPTUN_COLLECT_METADATA
 	IFLA_IPTUN_FWMARK
+	IFLA_IPTUN_MAX
 )
 
 var ifIptunLinkInfoDataAttrKindNames = []string{
@@ -482,11 +492,11 @@ func (t *IfIptunLinkInfoDataAttrType) IthString(i int) string {
 func parse_iptun_info(b []byte, linkKind InterfaceKind) (as *AttrArray) {
 	as = pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfIptunLinkInfoDataAttrType()
+	as.X.Validate(uint(IFLA_IPTUN_MAX - 1))
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfIptunLinkInfoDataAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_IPTUN_LOCAL, IFLA_IPTUN_REMOTE:
 			if linkKind == InterfaceKindIp6Tunnel {
@@ -535,6 +545,7 @@ const (
 	IFLA_GRE_COLLECT_METADATA
 	IFLA_GRE_IGNORE_DF
 	IFLA_GRE_FWMARK
+	IFLA_GRE_MAX
 )
 
 var ifGRELinkInfoDataAttrKindNames = []string{
@@ -584,11 +595,11 @@ func (t *IfGRELinkInfoDataAttrType) IthString(i int) string {
 func parse_gre_info(b []byte, linkKind InterfaceKind) (as *AttrArray) {
 	as = pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfGRELinkInfoDataAttrType()
+	as.X.Validate(uint(IFLA_GRE_MAX - 1))
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfGRELinkInfoDataAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_GRE_LOCAL, IFLA_GRE_REMOTE:
 			switch linkKind {
