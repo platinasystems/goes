@@ -148,14 +148,15 @@ func (m *net_namespace_main) watch_dir(dir_name string, f func(dir, name string,
 }
 
 type net_namespace_interface struct {
-	name          string
-	namespace     *net_namespace
-	ifindex       uint32
-	address       []byte
-	kind          netlink.InterfaceKind
-	si            vnet.Si
-	sup_interface *net_namespace_interface
-	tuntap        *tuntap_interface
+	name                 string
+	namespace            *net_namespace
+	ifindex              uint32
+	address              []byte
+	kind                 netlink.InterfaceKind
+	tunnel_metadata_mode bool
+	si                   vnet.Si
+	sup_interface        *net_namespace_interface
+	tuntap               *tuntap_interface
 }
 
 type net_namespace struct {
@@ -326,6 +327,18 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		if exists && string(intf.address) != string(address) {
 			// fixme address change
 		}
+
+		// For tunnels record if in metadata mode.
+		if as := msg.GetLinkInfoData(); as != nil {
+			switch intf.kind {
+			case netlink.InterfaceKindIp4GRE, netlink.InterfaceKindIp4GRETap,
+				netlink.InterfaceKindIp6GRE, netlink.InterfaceKindIp6GRETap:
+				intf.tunnel_metadata_mode = as.X[netlink.IFLA_GRE_COLLECT_METADATA] != nil
+			case netlink.InterfaceKindIpip, netlink.InterfaceKindIp6Tunnel:
+				intf.tunnel_metadata_mode = as.X[netlink.IFLA_IPTUN_COLLECT_METADATA] != nil
+			}
+		}
+
 		intf.address = make([]byte, len(address))
 		copy(intf.address[:], address[:])
 		if name_changed {
@@ -426,8 +439,7 @@ func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *ne
 		return
 	}
 
-	li := msg.Attrs[netlink.IFLA_LINKINFO].(*netlink.AttrArray)
-	ld := li.X[netlink.IFLA_INFO_DATA].(*netlink.AttrArray)
+	ld := msg.GetLinkInfoData()
 	v := ns.m.m.v
 	if is_del {
 		v.DelSwIf(intf.si)
