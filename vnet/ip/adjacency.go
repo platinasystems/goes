@@ -87,6 +87,10 @@ type Adjacency struct {
 	vnet.Rewrite
 }
 
+func (a *Adjacency) IsRewrite() bool { return a.LookupNextIndex == LookupNextRewrite }
+func (a *Adjacency) IsLocal() bool   { return a.LookupNextIndex == LookupNextLocal }
+func (a *Adjacency) IsGlean() bool   { return a.LookupNextIndex == LookupNextGlean }
+
 func (a *Adjacency) IfAddr() (i IfAddr) {
 	i = IfAddrNil
 	switch a.LookupNextIndex {
@@ -409,13 +413,17 @@ type multipathAdjacency struct {
 	unnormalizedNextHops nextHopBlock
 }
 
-func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacency, madjIndex uint, ok bool) {
+type AdjacencyFinalizer interface {
+	FinalizeAdjacency(a *Adjacency)
+}
+
+func (m *Main) createMpAdj(unnorm nextHopVec, af AdjacencyFinalizer) (madj *multipathAdjacency, madjIndex uint, ok bool) {
 	mp := &m.multipathMain
 	nAdj, norm := unnorm.normalizePow2(mp, &mp.cachedNextHopVec[1])
 
 	// Use unnormalized next hops to see if we've seen a block equivalent to this one before.
 	var i uint
-	if i, ok = mp.nextHopHash.Get(norm); ok || !create {
+	if i, ok = mp.nextHopHash.Get(norm); ok {
 		ai := mp.nextHopHashValues[i].adj
 		madj, madjIndex = m.mpAdjForAdj(ai, false)
 		return
@@ -428,6 +436,9 @@ func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacenc
 		nextHopAdjacency := &m.adjacencyHeap.elts[nh.Adj]
 		for w := NextHopWeight(0); w < nh.Weight; w++ {
 			as[i] = *nextHopAdjacency
+			if af != nil {
+				af.FinalizeAdjacency(&as[i])
+			}
 			as[i].NAdj = uint16(nAdj)
 			i++
 		}
@@ -452,9 +463,6 @@ func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacenc
 
 	ok = true
 	return
-}
-func (m *Main) createMpAdj(unnorm nextHopVec) (*multipathAdjacency, uint, bool) {
-	return m.getMpAdj(unnorm, true)
 }
 
 func (m *Main) GetAdjacencyUsage() elib.HeapUsage { return m.adjacencyHeap.GetUsage() }
@@ -482,7 +490,7 @@ func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
 	return
 }
 
-func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeight NextHopWeight) (newAdj Adj, ok bool) {
+func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeight NextHopWeight, af AdjacencyFinalizer) (newAdj Adj, ok bool) {
 	mm := &m.multipathMain
 	var (
 		old, new   *multipathAdjacency
@@ -540,7 +548,7 @@ func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeig
 	}
 
 	if len(t) > 0 {
-		new, _, _ = m.createMpAdj(t)
+		new, _, _ = m.createMpAdj(t, af)
 		// Fetch again since create may have moved vector.
 		if old != nil {
 			old = &mm.mpAdjVec[oldMaIndex]

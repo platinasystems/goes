@@ -106,12 +106,17 @@ func (m *mtrie) freePly(p *ply) {
 
 func (m *mtrie) Free() { m.freePly(&m.plys[0]) }
 
-func (m *mtrie) lookup(dst *Address) ip.Adj {
+func (m *mtrie) lookup(dst *Address) (a ip.Adj) {
+	a = ip.AdjMiss
+	if len(m.plys) == 0 {
+		return
+	}
 	p := &m.plys[0]
 	for i := range dst {
 		l := p.leaves[dst[i]]
 		if l.isTerminal() {
-			return l.ResultIndex()
+			a = l.ResultIndex()
+			return
 		}
 		p = m.plyForLeaf(l)
 	}
@@ -268,4 +273,9 @@ func (m *mtrie) init() {
 	if l.plyIndex() != 0 {
 		panic("root ply must be index 0")
 	}
+}
+
+func (m *mtrie) reset() {
+	m.plyPool.Reset()
+	m.defaultLeaf = emptyLeaf
 }

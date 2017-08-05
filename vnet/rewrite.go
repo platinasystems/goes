@@ -34,10 +34,9 @@ type Rewrite struct {
 }
 
 func (r *Rewrite) String(v *Vnet) (lines []string) {
-	hi := v.SupHi(r.Si)
-	h := v.HwIfer(hi)
+	swt := r.Si.GetType(v)
 	lines = append(lines, r.Si.Name(v))
-	lines = append(lines, h.FormatRewrite(r)...)
+	lines = append(lines, swt.SwInterfaceRewriteString(v, r)...)
 	return
 }
 
@@ -54,6 +53,7 @@ func (r *Rewrite) ParseWithArgs(in *parse.Input, args *parse.Args) {
 }
 
 func (r *Rewrite) Len() uint        { return uint(r.dataLen) }
+func (r *Rewrite) SetLen(l uint)    { r.dataLen = uint16(l) }
 func (r *Rewrite) SetData(d []byte) { r.dataLen = uint16(copy(r.data[:], d)) }
 func (r *Rewrite) ResetData()       { r.SetData(nil) }
 func (r *Rewrite) Data() []byte     { return r.data[:] }

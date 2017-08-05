@@ -58,9 +58,6 @@ type tuntap_interface struct {
 
 //go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
 
-func (m *Main) interface_for_si(si vnet.Si) *tuntap_interface {
-	return m.vnet_tuntap_interface_by_si[si]
-}
 func (i *tuntap_interface) Name() string   { return i.name.String() }
 func (i *tuntap_interface) String() string { return i.Name() }
 
@@ -591,15 +588,12 @@ func (m *Main) maybeChangeFlag(intf *tuntap_interface, isUp bool, flag iff_flag)
 }
 
 func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) {
-	if !m.okSi(si) || si.IsSwSubInterface(v) {
-		return
+	if intf, ok := m.vnet_tuntap_interface_by_si[si]; ok {
+		if err = m.maybeChangeFlag(intf, isUp, iff_up|iff_running); err != nil {
+			return
+		}
+		intf.setOperState()
 	}
-	intf := m.interface_for_si(si)
-	err = m.maybeChangeFlag(intf, isUp, iff_up|iff_running)
-	if err != nil {
-		return
-	}
-	intf.setOperState()
 	return
 }
 
@@ -607,12 +601,13 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if !m.okHi(hi) {
 		return
 	}
-	intf := m.interface_for_si(v.HwIf(hi).Si())
-	err = m.maybeChangeFlag(intf, isUp, iff_lower_up)
-	if err != nil {
-		return
+	si := v.HwIf(hi).Si()
+	if intf, ok := m.vnet_tuntap_interface_by_si[si]; ok {
+		if err = m.maybeChangeFlag(intf, isUp, iff_lower_up); err != nil {
+			return
+		}
+		intf.setOperState()
 	}
-	intf.setOperState()
 	return
 }
 

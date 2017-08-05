@@ -165,7 +165,15 @@ func (ns *net_namespace) msg_for_vnet_interface(msg netlink.Message) (ok bool) {
 			_, ok = ns.getDummyInterface(v.Index)
 		}
 	case *netlink.RouteMessage:
-		ok = ns.knownInterface(uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr)))
+		oif := uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr))
+		ok = ns.knownInterface(oif)
+		// Check for tunnel in metadata mode (IFLA_*_COLLECT_METADATA is set).
+		// If tunnel destination is reachable via vnet interface, then this route is also reachable.
+		if !ok && v.Attrs[netlink.RTA_ENCAP_TYPE] != nil {
+			if intf, iok := ns.interface_by_index[oif]; iok && intf.tunnel_metadata_mode {
+				ok = true
+			}
+		}
 	case *netlink.NeighborMessage:
 		ok = ns.knownInterface(v.Index)
 	case *netlink.DoneMessage, *netlink.NetnsMessage, *netlink.ErrorMessage:
@@ -330,7 +338,11 @@ func (ns *net_namespace) fibInit(is_del bool) {
 	if !is_del {
 		name = ns.name
 	}
-	m4.SetFibNameForIndex(name, ns.fibIndexForNamespace())
+	fi := ns.fibIndexForNamespace()
+	m4.SetFibNameForIndex(name, fi)
+	if is_del {
+		m4.FibReset(fi)
+	}
 }
 func (ns *net_namespace) validateFibIndexForSi(si vnet.Si, intf *tuntap_interface) {
 	m4 := ip4.GetMain(ns.m.m.v)
@@ -476,14 +488,6 @@ func ethernetAddress(t netlink.Attr) (a ethernet.Address) {
 	return
 }
 
-func (ns *net_namespace) ifAttr(t netlink.Attr) (si vnet.Si, ok bool) {
-	si = vnet.SiNil
-	if t != nil {
-		si, _, ok = ns.siForIfIndex(t.(netlink.Uint32Attr).Uint())
-	}
-	return
-}
-
 func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 	p := ip4Prefix(v.Attrs[netlink.IFA_ADDRESS], v.Prefixlen)
 	m4 := ip4.GetMain(e.m.v)
@@ -563,13 +567,14 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		e.m.v.Logf("netlink ignore route with table not main: %s\n", v)
 		return
 	}
-	si, ok := e.ns.ifAttr(v.Attrs[netlink.RTA_OIF])
-	if !ok {
-		// Ignore routes for non vnet interfaces.
-		return
-	}
-	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
 
+	oif := v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr).Uint()
+	intf, ok := e.ns.interface_by_index[oif]
+	if !ok {
+		panic("unknown interface")
+	}
+
+	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
 
 	// Check for tunnel via RTA_ENCAP_TYPE/RTA_ENCAP attributes.
@@ -577,25 +582,38 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		as := v.Attrs[netlink.RTA_ENCAP].(*netlink.AttrArray)
 		switch encap_type {
 		case netlink.LWTUNNEL_ENCAP_IP:
-			err = e.ip4_in_ip4_route(&p, as, si, isDel)
+			err = e.ip4_in_ip4_route(&p, as, intf, isDel)
 		case netlink.LWTUNNEL_ENCAP_IP6:
-			err = e.ip4_in_ip6_route(&p, as, si, isDel)
+			err = e.ip4_in_ip6_route(&p, as, intf, isDel)
 		}
 		return
 	}
 
-	nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, si)
 	m4 := ip4.GetMain(e.m.v)
-	err = m4.AddDelRouteNextHop(&p, &nh, isDel)
+	gw := v.Attrs[netlink.RTA_GATEWAY]
+	if gw != nil {
+		nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, intf.si)
+		err = m4.AddDelRouteNextHop(&p, &nh, isDel)
+	} else {
+		// Silently ignore interface routes.  FIXME?
+	}
 	return
 }
 
-func (e *netlinkEvent) ip4_in_ip4_route(p *ip4.Prefix, as *netlink.AttrArray, si vnet.Si, isDel bool) (err error) {
+func (e *netlinkEvent) ip4_in_ip4_route(p *ip4.Prefix, as *netlink.AttrArray, intf *net_namespace_interface, isDel bool) (err error) {
+	switch intf.kind {
+	case netlink.InterfaceKindIp4GRE, netlink.InterfaceKindIpip:
+	default:
+		err = fmt.Errorf("unsupported ip4 tunnel type: %v", intf.kind)
+		return
+	}
+
 	var (
-		h     ip4.Header
-		gre   gre.Header
+		nbr   ip4.Neighbor
 		flags uint16
 	)
+	h := &nbr.Header
+	h.Ip_version_and_header_length = 0x45 // v4 no options.
 	for k, a := range as.X {
 		if a == nil {
 			continue
@@ -616,26 +634,31 @@ func (e *netlinkEvent) ip4_in_ip4_route(p *ip4.Prefix, as *netlink.AttrArray, si
 		}
 	}
 
-	m4 := ip4.GetMain(e.m.v)
-
-	// Give tunnel a src address if not specified or zero.
-	if as.X[netlink.LWTUNNEL_IP_SRC] == nil || h.Src.AsUint32() == 0 {
-		ifa := m4.IfFirstAddress(si)
-		h.Src = *ip4.IpAddress(&ifa.Prefix.Address)
+	h.Protocol = ip.IP_IN_IP
+	if intf.kind == netlink.InterfaceKindIp4GRE {
+		h.Protocol = ip.GRE
 	}
 
-	h.Protocol = ip.GRE
-	h.Length = ip4.SizeofHeader
-	h.Checksum = h.ComputeChecksum()
-	gre.Type = ethernet.TYPE_IP4.FromHost()
-	fmt.Println("flags:", flags, &h, &gre)
+	if h.Protocol == ip.GRE {
+		g := gre.Header{
+			Type: ethernet.TYPE_IP4.FromHost(),
+		}
+		nbr.Payload = make([]byte, gre.SizeofHeader)
+		g.Write(nbr.Payload[:])
+	}
 
-	ai, ok := m4.GetRoute(p, si)
-	fmt.Println(ai, ok)
+	// not yet used
+	_ = flags
+
+	m4 := ip4.GetMain(e.m.v)
+	nbr.FibIndex = e.m.default_namespace.fibIndexForNamespace()
+	nbr.Weight = 1
+	nbr.LocalSi = e.ns.vnet_tun_interface.si
+	err = m4.AddDelRouteNeighbor(p, &nbr, e.ns.fibIndexForNamespace(), isDel)
 	return
 }
 
-func (e *netlinkEvent) ip4_in_ip6_route(p *ip4.Prefix, as *netlink.AttrArray, si vnet.Si, isDel bool) (err error) {
+func (e *netlinkEvent) ip4_in_ip6_route(p *ip4.Prefix, as *netlink.AttrArray, intf *net_namespace_interface, isDel bool) (err error) {
 	panic("not yet")
 	return
 }

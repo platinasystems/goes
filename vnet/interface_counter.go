@@ -327,6 +327,9 @@ func (m *interfaceMain) counterInit(t *InterfaceThread) {
 	}
 
 	m.swInterfaces.Foreach(func(x SwIf) {
+		if x.kind != SwIfKindHardware {
+			return
+		}
 		h := m.HwIfer(m.SupHi(x.si))
 		nm := h.GetSwInterfaceCounterNames()
 		if len(nm.Single) > 0 {

@@ -106,6 +106,7 @@ func (m *Main) showUnreachable(w cli.Writer, cf showFibConfig) {
 		table ip.FibIndex
 		p     Prefix
 		nh    Address
+		nhi   ip.FibIndex
 		nhw   ip.NextHopWeight
 	}
 	us := []unreachable{}
@@ -121,10 +122,12 @@ func (m *Main) showUnreachable(w cli.Writer, cf showFibConfig) {
 		fib.unreachable.foreach(func(p *Prefix, r mapFibResult) {
 			u := unreachable{table: ip.FibIndex(fi)}
 			for nh, ps := range r.nh {
-				u.nh = nh
-				for p, w := range ps {
-					u.p = p
-					u.nhw = w
+				u.nh = nh.a
+				u.nhi = nh.i
+				for p, r := range ps {
+					u.p = p.p
+					u.table = p.i
+					u.nhw = r.NextHopWeight()
 					us = append(us, u)
 				}
 			}
@@ -140,7 +143,7 @@ func (m *Main) showUnreachable(w cli.Writer, cf showFibConfig) {
 	fmt.Fprintf(w, "%6s%30s%20s\n", "Table", "Destination", "Next Hop")
 	for ui := range us {
 		u := &us[ui]
-		nhs := u.nh.String()
+		nhs := u.nh.String() + " " + u.nhi.Name(&m.Main)
 		if u.nhw != 1 {
 			nhs += fmt.Sprintf(", %d", u.nhw)
 		}

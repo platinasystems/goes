@@ -107,12 +107,20 @@ type SwInterfaceType struct {
 	SwIfKind SwIfKind
 }
 
-func (t *SwInterfaceType) GetSwInterfaceType() *SwInterfaceType    { return t }
-func (t *SwInterfaceType) SwInterfaceName(v *Vnet, s *SwIf) string { return s.builtinSwIfName(v) }
+func (t *SwInterfaceType) GetSwInterfaceType() *SwInterfaceType                                  { return t }
+func (t *SwInterfaceType) SwInterfaceName(v *Vnet, s *SwIf) string                               { return s.builtinSwIfName(v) }
+func (t *SwInterfaceType) SwInterfaceSetRewrite(rw *Rewrite, si Si, noder Noder, typ PacketType) {}
+func (t *SwInterfaceType) SwInterfaceRewriteString(v *Vnet, r *Rewrite) []string {
+	hi := v.SupHi(r.Si)
+	h := v.HwIfer(hi)
+	return h.FormatRewrite(r)
+}
 
 type swInterfaceTyper interface {
 	GetSwInterfaceType() *SwInterfaceType
 	SwInterfaceName(v *Vnet, s *SwIf) string
+	SwInterfaceSetRewrite(rw *Rewrite, si Si, noder Noder, typ PacketType)
+	SwInterfaceRewriteString(v *Vnet, rw *Rewrite) []string
 }
 
 func (i *interfaceMain) registerBuiltinSwInterfaceTypes() {
@@ -135,6 +143,9 @@ func (i *interfaceMain) RegisterSwInterfaceType(r swInterfaceTyper) {
 
 func (si Si) Kind(v *Vnet) SwIfKind {
 	return v.SwIf(si).kind
+}
+func (si Si) GetType(v *Vnet) swInterfaceTyper {
+	return v.interfaceMain.swInterfaceTypes[v.SwIf(si).kind]
 }
 
 type swIfFlag uint16
@@ -262,9 +273,12 @@ func (m *interfaceMain) SupSwIf(s *SwIf) (sup *SwIf) {
 func (m *interfaceMain) HwIfer(i Hi) HwInterfacer { return m.hwIferPool.elts[i] }
 func (m *interfaceMain) HwIf(i Hi) *HwIf          { return m.HwIfer(i).GetHwIf() }
 func (hi Hi) Si(m *Vnet) Si                       { return m.HwIf(hi).si }
-func (m *interfaceMain) SupHwIf(s *SwIf) *HwIf {
+func (m *interfaceMain) SupHwIf(s *SwIf) (h *HwIf) {
 	sup := m.SupSwIf(s)
-	return m.HwIf(Hi(sup.id))
+	if sup.kind == SwIfKindHardware {
+		h = m.HwIf(Hi(sup.id))
+	}
+	return
 }
 func (m *interfaceMain) SupHi(si Si) Hi {
 	sw := m.SwIf(si)

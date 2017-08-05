@@ -202,6 +202,29 @@ func (m *mapFib) foreach(fn func(p *Prefix, r mapFibResult)) {
 	}
 }
 
+func (m *mapFib) reset() {
+	for i := range m {
+		m[i] = nil
+	}
+}
+
+func (m *mapFib) clean(fi ip.FibIndex) {
+	for i := range m {
+		for _, r := range m[i] {
+			for dst, dstMap := range r.nh {
+				for dp := range dstMap {
+					if dp.i == fi {
+						delete(dstMap, dp)
+					}
+				}
+				if len(dstMap) == 0 {
+					delete(r.nh, dst)
+				}
+			}
+		}
+	}
+}
+
 type Fib struct {
 	index ip.FibIndex
 
@@ -284,38 +307,56 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 	return
 }
 
-type mapFibResultNextHop map[Address]map[Prefix]ip.NextHopWeight
+type NextHopper interface {
+	ip.AdjacencyFinalizer
+	NextHopFibIndex(m *Main) ip.FibIndex
+	NextHopWeight() ip.NextHopWeight
+}
 
-func (x *mapFibResult) addDelNextHop(p Prefix, a Address, w ip.NextHopWeight, isDel bool) {
+type idst struct {
+	a Address
+	i ip.FibIndex
+}
+
+type ipre struct {
+	p Prefix
+	i ip.FibIndex
+}
+
+type mapFibResultNextHop map[idst]map[ipre]NextHopper
+
+func (x *mapFibResult) addDelNextHop(m *Main, pf *Fib, p Prefix, a Address, r NextHopper, isDel bool) {
+	id := idst{a: a, i: r.NextHopFibIndex(m)}
+	ip := ipre{p: p, i: pf.index}
 	if isDel {
-		delete(x.nh[a], p)
-		if len(x.nh[a]) == 0 {
-			delete(x.nh, a)
+		delete(x.nh[id], ip)
+		if len(x.nh[id]) == 0 {
+			delete(x.nh, id)
 		}
 	} else {
 		if x.nh == nil {
-			x.nh = make(map[Address]map[Prefix]ip.NextHopWeight)
+			x.nh = make(map[idst]map[ipre]NextHopper)
 		}
-		if x.nh[a] == nil {
-			x.nh[a] = make(map[Prefix]ip.NextHopWeight)
+		if x.nh[id] == nil {
+			x.nh[id] = make(map[ipre]NextHopper)
 		}
-		x.nh[a][p] = w
+		x.nh[id][ip] = r
 	}
 }
 
 func (x *mapFibResultNextHop) String() (s string) {
 	for a, m := range *x {
 		for p, w := range m {
-			s += fmt.Sprintf("  %v %v x %d\n", &p, &a, w)
+			s += fmt.Sprintf("  %v %v x %d\n", &p, &a.a, w)
 		}
 	}
 	return
 }
 
-func (f *Fib) setReachable(p *Prefix, via *Prefix, nh *NextHop, isDel bool) {
+func (f *Fib) setReachable(m *Main, p *Prefix, pf *Fib, via *Prefix, a Address, r NextHopper, isDel bool) {
 	va, vl := via.Address.AsUint32(), via.Len
 	x := f.reachable[vl][va]
-	x.addDelNextHop(*p, nh.Address, nh.Weight, isDel)
+	x.addDelNextHop(m, pf, *p, a, r, isDel)
 	f.reachable[vl][va] = x
 }
 
@@ -327,78 +368,61 @@ func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibR
 		less.nh[dst] = dstMap
 		// Replace adjacencies: more -> less.
 		for dp, _ := range dstMap {
-			f.replaceNextHop(m, &dp, more.adj, less.adj)
+			g := m.fibByIndex(dp.i, false)
+			g.replaceNextHop(m, &dp.p, more.adj, less.adj)
 		}
 	}
 }
 
 func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
-	si := m.GetAdjRewriteSi(x.adj)
 	for dst, dstMap := range x.nh {
 		delete(x.nh, dst)
-		for dp, dw := range dstMap {
-			nh := NextHop{
-				Address: dst,
-				Si:      si,
-				Weight:  dw,
-			}
+		for dp, r := range dstMap {
+			g := m.fibByIndex(dp.i, false)
 			const isDel = true
-			f.addDelRouteNextHop(m, &dp, &nh, isDel)
-			f.addDelUnreachable(m, &dp, &nh, isDel, false)
+			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+			// Prefix is now unreachable.
+			f.addDelUnreachable(m, &dp.p, g, dst.a, r, !isDel, false)
 		}
 	}
 }
 
 func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, adj ip.Adj, more *mapFibResult) {
 	for dst, dstMap := range less.nh {
-		if dst.MatchesPrefix(p) {
+		if dst.a.MatchesPrefix(p) {
 			delete(less.nh, dst)
 			for dp, dw := range dstMap {
 				const isDel = false
-				more.addDelNextHop(dp, dst, dw, isDel)
-				f.replaceNextHop(m, &dp, less.adj, adj)
+				g := m.fibByIndex(dp.i, false)
+				more.addDelNextHop(m, g, dp.p, dst.a, dw, isDel)
+				g.replaceNextHop(m, &dp.p, less.adj, adj)
 			}
 		}
 	}
 	f.reachable[p.Len][p.mapFibKey()] = *more
 }
 
-func (r *mapFibResult) f2(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
-	si := vnet.SiNil
-	if adj != ip.AdjNil {
-		si = m.GetAdjRewriteSi(adj)
-	}
+func (r *mapFibResult) makeReachable(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
 	for dst, dstMap := range r.nh {
-		if dst.MatchesPrefix(p) {
+		if dst.a.MatchesPrefix(p) {
 			delete(r.nh, dst)
-			for dp, dw := range dstMap {
-				nh := NextHop{
-					Address: dst,
-					Si:      si,
-					Weight:  dw,
-				}
-				f.addDelRouteNextHop(m, &dp, &nh, false)
+			for dp, r := range dstMap {
+				g := m.fibByIndex(dp.i, false)
+				const isDel = false
+				g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
 			}
 		}
 	}
 }
 
-func (x *mapFibResult) f4(m *Main, f *Fib, p *Prefix) {
-	si := vnet.SiNil
-	if x.adj != ip.AdjNil {
-		si = m.GetAdjRewriteSi(x.adj)
-	}
+func (x *mapFibResult) addUnreachableVia(m *Main, f *Fib, p *Prefix) {
 	for dst, dstMap := range x.nh {
-		if dst.MatchesPrefix(p) {
+		if dst.a.MatchesPrefix(p) {
 			delete(x.nh, dst)
-			for dp, dw := range dstMap {
-				nh := NextHop{
-					Address: dst,
-					Si:      si,
-					Weight:  dw,
-				}
+			for dp, r := range dstMap {
+				g := m.fibByIndex(dp.i, false)
 				const isDel = false
-				f.addDelUnreachable(m, &dp, &nh, isDel, false)
+				f.addDelUnreachable(m, &dp.p, g, dst.a, r, isDel, false)
 			}
 		}
 	}
@@ -419,20 +443,20 @@ func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 			lr.replaceWithMoreSpecific(m, f, p, a, &r)
 		}
 		if r, _, ok := f.unreachable.lookup(p.Address); ok {
-			r.f2(m, f, p, a)
+			r.makeReachable(m, f, p, a)
 		}
 	}
 }
 
-func (f *Fib) addDelUnreachable(m *Main, p *Prefix, nh *NextHop, isDel bool, recurse bool) (err error) {
-	nr, np, _ := f.unreachable.lookup(nh.Address)
+func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHopper, isDel bool, recurse bool) (err error) {
+	nr, np, _ := f.unreachable.lookup(a)
 	if isDel && recurse {
 		nr.delReachableVia(m, f)
 	}
 	if !isDel && recurse {
-		nr.f4(m, f, p)
+		nr.addUnreachableVia(m, f, p)
 	}
-	nr.addDelNextHop(*p, nh.Address, nh.Weight, isDel)
+	nr.addDelNextHop(m, pf, *p, a, r, isDel)
 	f.unreachable.validateLen(np.Len)
 	nr.adj = ip.AdjNil
 	f.unreachable[np.Len][np.mapFibKey()] = nr
@@ -591,6 +615,10 @@ type NextHop struct {
 	Weight  ip.NextHopWeight
 }
 
+func (n *NextHop) NextHopWeight() ip.NextHopWeight     { return n.Weight }
+func (n *NextHop) NextHopFibIndex(m *Main) ip.FibIndex { return m.FibIndexForSi(n.Si) }
+func (n *NextHop) FinalizeAdjacency(a *ip.Adjacency)   {}
+
 func (x *NextHop) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*vnet.Vnet)
 	switch {
@@ -611,27 +639,29 @@ func (e *prefixError) Error() string { return e.s + ": " + e.p.String() }
 
 func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error) {
 	f := m.fibBySi(nh.Si)
-	return f.addDelRouteNextHop(m, p, nh, isDel)
+	return f.addDelRouteNextHop(m, p, nh.Address, nh, isDel)
 }
 
-func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nh *NextHop, isDel bool) (err error) {
+func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper, isDel bool) (err error) {
 	var (
 		nhAdj, oldAdj, newAdj ip.Adj
 		ok                    bool
 	)
 
-	if !isDel && nh.Address.MatchesPrefix(p) {
-		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nh.Address)
+	if !isDel && nha.MatchesPrefix(p) {
+		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nha)
 		return
 	}
 
+	nhf := m.fibByIndex(nhr.NextHopFibIndex(m), true)
+
 	var reachable_via_prefix Prefix
-	if r, np, found := f.reachable.lookup(nh.Address); found {
+	if r, np, found := nhf.reachable.lookup(nha); found {
 		nhAdj = r.adj
 		reachable_via_prefix = np
 	} else {
 		const recurse = true
-		err = f.addDelUnreachable(m, p, nh, isDel, recurse)
+		err = nhf.addDelUnreachable(m, p, f, nha, nhr, isDel, recurse)
 		return
 	}
 
@@ -643,8 +673,8 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nh *NextHop, isDel bool) (e
 
 	if oldAdj == nhAdj && isDel {
 		newAdj = ip.AdjNil
-	} else if newAdj, ok = m.AddDelNextHop(oldAdj, isDel, nhAdj, nh.Weight); !ok {
-		err = fmt.Errorf("requested next-hop %s not found in multipath", &nh.Address)
+	} else if newAdj, ok = m.AddDelNextHop(oldAdj, isDel, nhAdj, nhr.NextHopWeight(), nhr); !ok {
+		err = fmt.Errorf("requested next-hop %s not found in multipath", &nha)
 		return
 	}
 
@@ -655,7 +685,7 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nh *NextHop, isDel bool) (e
 			isFibDel = false
 		}
 		f.addDel(m, p, newAdj, isFibDel)
-		f.setReachable(p, &reachable_via_prefix, nh, isDel)
+		nhf.setReachable(m, p, f, &reachable_via_prefix, nha, nhr, isDel)
 	}
 
 	return
@@ -684,7 +714,7 @@ func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
 	}
 }
 
-func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
+func (m *Main) addDelInterfaceAddressRoutes(ia ip.IfAddr, isDel bool) {
 	ifa := m.GetIfAddr(ia)
 	si := ifa.Si
 	sw := m.Vnet.SwIf(si)
@@ -714,7 +744,9 @@ func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
 			as[0].LookupNextIndex = ip.LookupNextLocal
 			as[0].Index = uint32(ia)
 			as[0].Si = si
-			as[0].SetMaxPacketSize(hw)
+			if hw != nil {
+				as[0].SetMaxPacketSize(hw)
+			}
 			m.CallAdjAddHooks(ai)
 			addDelAdj = ai
 		}
@@ -755,7 +787,7 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 		ia, exists = m.Main.IfAddrForPrefix(&pa, si)
 		// For non-existing prefixes error will be signalled by AddDelInterfaceAddress below.
 		if exists {
-			m.addDelInterfaceRoutes(ia, isDel)
+			m.addDelInterfaceAddressRoutes(ia, isDel)
 		}
 	}
 
@@ -766,7 +798,7 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 
 	// If interface is up add interface routes.
 	if isUp && !isDel && !exists {
-		m.addDelInterfaceRoutes(ia, isDel)
+		m.addDelInterfaceAddressRoutes(ia, isDel)
 	}
 
 	// Do callbacks when new address is created or old one is deleted.
@@ -783,8 +815,26 @@ func (m *Main) swIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 	m.validateDefaultFibForSi(si)
 	m.ForeachIfAddress(si, func(ia ip.IfAddr, ifa *ip.IfAddress) (err error) {
 		isDel := !isUp
-		m.addDelInterfaceRoutes(ia, isDel)
+		m.addDelInterfaceAddressRoutes(ia, isDel)
 		return
 	})
 	return
+}
+
+func (f *Fib) Reset() {
+	f.reachable.reset()
+	f.unreachable.reset()
+	f.mtrie.reset()
+}
+
+func (m *Main) FibReset(fi ip.FibIndex) {
+	for i := range m.fibs {
+		if i != int(fi) && m.fibs[i] != nil {
+			m.fibs[i].reachable.clean(fi)
+			m.fibs[i].unreachable.clean(fi)
+		}
+	}
+
+	f := m.fibByIndex(fi, true)
+	f.Reset()
 }

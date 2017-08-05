@@ -256,6 +256,8 @@ var rewriteTypeMap = [...]Type{
 	vnet.ARP:            TYPE_ARP,
 }
 
+func (et *Type) SetPacketType(pt vnet.PacketType) { *et = rewriteTypeMap[pt].FromHost() }
+
 type rwHeader struct {
 	Header
 	vlan [2]VlanHeader
@@ -348,14 +350,16 @@ func (h *rwHeader) String() (s string) {
 	return
 }
 
-func (hi *Interface) FormatRewrite(r *vnet.Rewrite) (lines []string) {
+func (hi *Interface) FormatRewrite(r *vnet.Rewrite) []string { return FormatRewrite(hi.GetVnet(), r) }
+
+func FormatRewrite(v *vnet.Vnet, r *vnet.Rewrite) (lines []string) {
 	h := (*rwHeader)(r.GetData())
 	b := r.Slice()
 	lines = append(lines, h.String())
 	i := h.Sizeof()
 	innerType := h.InnerType()
 	if i < uint(len(b)) {
-		m := GetMain(hi.GetVnet())
+		m := GetMain(v)
 		if l, ok := m.layerMap[innerType.ToHost()]; ok {
 			lines = append(lines, l.FormatLayer(b[i:])...)
 		} else {

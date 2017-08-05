@@ -86,3 +86,10 @@ func (p *plyPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *plyPool) Reset() {
+	p.Pool.Reset()
+	if len(p.plys) > 0 {
+		p.plys = p.plys[:0]
+	}
+}
