@@ -44,6 +44,12 @@ func (m *vnet_tun_main) SwInterfaceRewriteString(v *vnet.Vnet, r *vnet.Rewrite) 
 	return ethernet.FormatRewrite(v, r)
 }
 
+// Sort interfaces by name of corresponding namespace.
+func (m *vnet_tun_main) SwInterfaceLessThan(v *vnet.Vnet, a, b *vnet.SwIf) bool {
+	nsa, nsb := m.m.namespace_pool.entries[a.GetId()], m.m.namespace_pool.entries[b.GetId()]
+	return nsa.name < nsb.name
+}
+
 func (m *vnet_tun_main) create_tun(ns *net_namespace) (intf *tuntap_interface) {
 	si := m.m.v.NewSwIf(m.SwIfKind, vnet.IfId(ns.index))
 	intf = m.m.vnet_tuntap_interface_by_si[si]
