@@ -163,7 +163,10 @@ func (i *Info) hw_is_ok(hi vnet.Hi) bool {
 	return !UnixInterfacesOnly || h.IsUnix()
 }
 
-func (i *Info) sw_is_ok(si vnet.Si) bool { return i.hw_is_ok(i.v.SupHi(si)) }
+func (i *Info) sw_is_ok(si vnet.Si) bool {
+	h := i.v.HwIferForSupSi(si)
+	return h != nil && i.hw_is_ok(h.GetHwIf().Hi())
+}
 
 func (i *Info) sw_if_add_del(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	i.sw_if_admin_up_down(v, si, false)
