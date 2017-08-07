@@ -235,6 +235,8 @@ type Fib struct {
 	mtrie
 }
 
+//go:generate gentemplate -d Package=ip4 -id Fib -d VecType=FibVec -d Type=*Fib github.com/platinasystems/go/elib/vec.tmpl
+
 // Total number of routes in FIB.
 func (f *Fib) Len() (n uint) {
 	for i := range f.reachable {
@@ -243,7 +245,6 @@ func (f *Fib) Len() (n uint) {
 	return
 }
 
-type FibAddDelHook func(i ip.FibIndex, p *Prefix, r ip.Adj, isDel bool)
 type IfAddrAddDelHook func(ia ip.IfAddr, isDel bool)
 
 //go:generate gentemplate -id FibAddDelHook -d Package=ip4 -d DepsType=FibAddDelHookVec -d Type=FibAddDelHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
@@ -251,14 +252,9 @@ type IfAddrAddDelHook func(ia ip.IfAddr, isDel bool)
 
 func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj, ok bool) {
 	if isDel {
+		// Call hooks before delete.
+		main.callFibAddDelHooks(f.index, p, r, isDel)
 		f.addDelReachable(main, p, r, isDel)
-	}
-
-	// Call hooks before unset.
-	if isDel {
-		for i := range main.fibAddDelHooks.hooks {
-			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel)
-		}
 	}
 
 	// Add/delete in map fib.
@@ -297,10 +293,7 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 
 	// Call hooks after add.
 	if !isDel {
-		for i := range main.fibAddDelHooks.hooks {
-			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel)
-		}
-
+		main.callFibAddDelHooks(f.index, p, r, isDel)
 		f.addDelReachable(main, p, r, isDel)
 	}
 
@@ -538,10 +531,16 @@ type fibMain struct {
 	ifRouteAdjIndexBySi map[vnet.Si]ip.Adj
 }
 
-//go:generate gentemplate -d Package=ip4 -id Fib -d VecType=FibVec -d Type=*Fib github.com/platinasystems/go/elib/vec.tmpl
+type FibAddDelHook func(i ip.FibIndex, p *Prefix, r ip.Adj, isDel bool)
 
 func (m *fibMain) RegisterFibAddDelHook(f FibAddDelHook, dep ...*dep.Dep) {
 	m.fibAddDelHooks.Add(f, dep...)
+}
+
+func (m *fibMain) callFibAddDelHooks(fi ip.FibIndex, p *Prefix, r ip.Adj, isDel bool) {
+	for i := range m.fibAddDelHooks.hooks {
+		m.fibAddDelHooks.Get(i)(fi, p, r, isDel)
+	}
 }
 
 func (m *Main) fibByIndex(i ip.FibIndex, create bool) (f *Fib) {
@@ -673,7 +672,7 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 
 	if oldAdj == nhAdj && isDel {
 		newAdj = ip.AdjNil
-	} else if newAdj, ok = m.AddDelNextHop(oldAdj, isDel, nhAdj, nhr.NextHopWeight(), nhr); !ok {
+	} else if newAdj, ok = m.AddDelNextHop(oldAdj, nhAdj, nhr.NextHopWeight(), nhr, isDel); !ok {
 		err = fmt.Errorf("requested next-hop %s not found in multipath", &nha)
 		return
 	}
@@ -696,6 +695,8 @@ func (f *Fib) replaceNextHop(m *Main, p *Prefix, fromNextHopAdj, toNextHopAdj ip
 		if ok = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj); !ok {
 			err = fmt.Errorf("ReplaceNextHop fails")
 		}
+		const isDel = false
+		m.callFibAddDelHooks(f.index, p, adj, isDel)
 	} else {
 		err = &prefixError{s: "replaceNextHop, unknown destination", p: *p}
 	}
