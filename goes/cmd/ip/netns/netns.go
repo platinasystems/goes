@@ -7,13 +7,15 @@ package netns
 import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd/ip/netns/add"
+	"github.com/platinasystems/go/goes/cmd/ip/netns/delete"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/exec"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/identify"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/list"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/listid"
-	"github.com/platinasystems/go/goes/cmd/ip/netns/mod"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/mon"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/pids"
+	"github.com/platinasystems/go/goes/cmd/ip/netns/set"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -26,12 +28,12 @@ const (
 	ip netns add NETNSNAME
 	ip [-all] netns delete [ NETNSNAME ]
 	ip [-all] netns exec [ NETNSNAME ] command...
-	ip netns set NETNSNAME NETNSID
 	ip netns [ list ]
 	ip netns list-id
 	ip netns identify [ PID ]
 	ip netns pids NETNSNAME
 	ip netns monitor
+	ip netns set NETNSNAME NETNSID
 	`
 )
 
@@ -44,16 +46,17 @@ func New() *goes.Goes {
 			lang.EnUS: Man,
 		})
 	g.Plot(helpers.New()...)
-	g.Plot(mod.New("add"),
-		mod.New("delete"),
-		mod.New("set"),
+	g.Plot(
+		add.New(),
+		delete.New(),
 		exec.New(),
 		identify.New(),
 		list.New(""),
 		list.New("list"),
 		listid.New(),
-		pids.New(),
 		mon.New(),
+		pids.New(),
+		set.New(),
 	)
 	return g
 }

@@ -182,8 +182,7 @@ func (sock *Sock) UntilDone(req []byte, do func([]byte)) error {
 			if e == nil || e.Errno == 0 {
 				return nil
 			}
-			return os.NewSyscallError("nack",
-				syscall.Errno(e.Errno))
+			return syscall.Errno(-e.Errno)
 		default:
 			do(b)
 		}
