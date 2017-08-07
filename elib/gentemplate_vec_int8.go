@@ -78,4 +78,10 @@ func (p *Int8Vec) ValidateLenInit(l uint, zero int8) (v *int8) {
 	return
 }
 
+func (p *Int8Vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p Int8Vec) Len() uint { return uint(len(p)) }

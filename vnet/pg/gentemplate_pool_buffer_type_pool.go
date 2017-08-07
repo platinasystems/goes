@@ -86,3 +86,10 @@ func (p *buffer_type_pool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *buffer_type_pool) Reset() {
+	p.Pool.Reset()
+	if len(p.elts) > 0 {
+		p.elts = p.elts[:0]
+	}
+}

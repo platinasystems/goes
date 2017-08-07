@@ -82,4 +82,10 @@ func (p *interfaceVec) ValidateLenInit(l uint, zero *tuntap_interface) (v **tunt
 	return
 }
 
+func (p *interfaceVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p interfaceVec) Len() uint { return uint(len(p)) }

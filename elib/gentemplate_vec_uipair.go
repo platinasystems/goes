@@ -78,4 +78,10 @@ func (p *uiPairVec) ValidateLenInit(l uint, zero uiPair) (v *uiPair) {
 	return
 }
 
+func (p *uiPairVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p uiPairVec) Len() uint { return uint(len(p)) }

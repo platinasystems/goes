@@ -78,4 +78,10 @@ func (p *StringVec) ValidateLenInit(l uint, zero string) (v *string) {
 	return
 }
 
+func (p *StringVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p StringVec) Len() uint { return uint(len(p)) }

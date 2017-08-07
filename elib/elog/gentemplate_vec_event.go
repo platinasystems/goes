@@ -82,4 +82,10 @@ func (p *EventVec) ValidateLenInit(l uint, zero Event) (v *Event) {
 	return
 }
 
+func (p *EventVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p EventVec) Len() uint { return uint(len(p)) }

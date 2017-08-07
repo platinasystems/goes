@@ -82,4 +82,10 @@ func (p *iovecVec) ValidateLenInit(l uint, zero iovec) (v *iovec) {
 	return
 }
 
+func (p *iovecVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p iovecVec) Len() uint { return uint(len(p)) }

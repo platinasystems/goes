@@ -82,4 +82,10 @@ func (p *RefVec) ValidateLenInit(l uint, zero Ref) (v *Ref) {
 	return
 }
 
+func (p *RefVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p RefVec) Len() uint { return uint(len(p)) }

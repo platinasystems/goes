@@ -82,4 +82,10 @@ func (p *nextNodeVec) ValidateLenInit(l uint, zero nextNode) (v *nextNode) {
 	return
 }
 
+func (p *nextNodeVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p nextNodeVec) Len() uint { return uint(len(p)) }

@@ -82,4 +82,10 @@ func (p *saveVec) ValidateLenInit(l uint, zero save) (v *save) {
 	return
 }
 
+func (p *saveVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p saveVec) Len() uint { return uint(len(p)) }

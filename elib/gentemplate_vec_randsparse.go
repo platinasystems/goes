@@ -78,4 +78,10 @@ func (p *randSparseVec) ValidateLenInit(l uint, zero randSparse) (v *randSparse)
 	return
 }
 
+func (p *randSparseVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p randSparseVec) Len() uint { return uint(len(p)) }

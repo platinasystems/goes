@@ -82,4 +82,10 @@ func (p *ifThreadVec) ValidateLenInit(l uint, zero *InterfaceThread) (v **Interf
 	return
 }
 
+func (p *ifThreadVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p ifThreadVec) Len() uint { return uint(len(p)) }

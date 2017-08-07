@@ -86,3 +86,10 @@ func (p *net_namespace_pool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *net_namespace_pool) Reset() {
+	p.Pool.Reset()
+	if len(p.entries) > 0 {
+		p.entries = p.entries[:0]
+	}
+}

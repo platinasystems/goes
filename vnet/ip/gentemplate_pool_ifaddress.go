@@ -86,3 +86,10 @@ func (p *ifAddressPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *ifAddressPool) Reset() {
+	p.Pool.Reset()
+	if len(p.ifAddrs) > 0 {
+		p.ifAddrs = p.ifAddrs[:0]
+	}
+}

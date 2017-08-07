@@ -86,3 +86,10 @@ func (p *timedEventPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *timedEventPool) Reset() {
+	p.Pool.Reset()
+	if len(p.events) > 0 {
+		p.events = p.events[:0]
+	}
+}

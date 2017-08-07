@@ -82,4 +82,10 @@ func (p *looperInVec) ValidateLenInit(l uint, zero LooperIn) (v *LooperIn) {
 	return
 }
 
+func (p *looperInVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p looperInVec) Len() uint { return uint(len(p)) }

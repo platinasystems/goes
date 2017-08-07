@@ -78,4 +78,10 @@ func (p *BitmapVec) ValidateLenInit(l uint, zero Bitmap) (v *Bitmap) {
 	return
 }
 
+func (p *BitmapVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p BitmapVec) Len() uint { return uint(len(p)) }

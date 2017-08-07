@@ -82,4 +82,10 @@ func (p *ActorVec) ValidateLenInit(l uint, zero Actor) (v *Actor) {
 	return
 }
 
+func (p *ActorVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p ActorVec) Len() uint { return uint(len(p)) }

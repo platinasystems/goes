@@ -78,4 +78,10 @@ func (p *randHeapObjVec) ValidateLenInit(l uint, zero randHeapObj) (v *randHeapO
 	return
 }
 
+func (p *randHeapObjVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p randHeapObjVec) Len() uint { return uint(len(p)) }

@@ -82,3 +82,10 @@ func (p *StringPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *StringPool) Reset() {
+	p.Pool.Reset()
+	if len(p.Strings) > 0 {
+		p.Strings = p.Strings[:0]
+	}
+}

@@ -82,4 +82,10 @@ func (p *CountersVec) ValidateLenInit(l uint, zero Counters) (v *Counters) {
 	return
 }
 
+func (p *CountersVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p CountersVec) Len() uint { return uint(len(p)) }

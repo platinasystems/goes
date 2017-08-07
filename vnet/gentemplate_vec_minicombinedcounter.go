@@ -82,4 +82,10 @@ func (p *miniCombinedCounterVec) ValidateLenInit(l uint, zero miniCombinedCounte
 	return
 }
 
+func (p *miniCombinedCounterVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p miniCombinedCounterVec) Len() uint { return uint(len(p)) }

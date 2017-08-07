@@ -86,3 +86,10 @@ func (p *activePollerPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *activePollerPool) Reset() {
+	p.Pool.Reset()
+	if len(p.entries) > 0 {
+		p.entries = p.entries[:0]
+	}
+}

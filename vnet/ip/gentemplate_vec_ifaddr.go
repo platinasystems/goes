@@ -82,4 +82,10 @@ func (p *IfAddrVec) ValidateLenInit(l uint, zero IfAddr) (v *IfAddr) {
 	return
 }
 
+func (p *IfAddrVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p IfAddrVec) Len() uint { return uint(len(p)) }

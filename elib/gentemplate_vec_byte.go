@@ -78,4 +78,10 @@ func (p *ByteVec) ValidateLenInit(l uint, zero byte) (v *byte) {
 	return
 }
 
+func (p *ByteVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p ByteVec) Len() uint { return uint(len(p)) }

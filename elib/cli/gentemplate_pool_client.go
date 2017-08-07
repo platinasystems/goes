@@ -86,3 +86,10 @@ func (p *clientPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *clientPool) Reset() {
+	p.Pool.Reset()
+	if len(p.clients) > 0 {
+		p.clients = p.clients[:0]
+	}
+}

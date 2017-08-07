@@ -86,3 +86,10 @@ func (p *node_pool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *node_pool) Reset() {
+	p.Pool.Reset()
+	if len(p.nodes) > 0 {
+		p.nodes = p.nodes[:0]
+	}
+}

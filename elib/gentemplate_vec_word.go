@@ -78,4 +78,10 @@ func (p *WordVec) ValidateLenInit(l uint, zero Word) (v *Word) {
 	return
 }
 
+func (p *WordVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p WordVec) Len() uint { return uint(len(p)) }

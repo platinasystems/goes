@@ -86,3 +86,10 @@ func (p *ipNeighborPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *ipNeighborPool) Reset() {
+	p.Pool.Reset()
+	if len(p.neighbors) > 0 {
+		p.neighbors = p.neighbors[:0]
+	}
+}

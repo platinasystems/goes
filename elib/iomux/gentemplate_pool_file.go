@@ -86,3 +86,10 @@ func (p *filePool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *filePool) Reset() {
+	p.Pool.Reset()
+	if len(p.files) > 0 {
+		p.files = p.files[:0]
+	}
+}

@@ -78,4 +78,10 @@ func (p *Int16Vec) ValidateLenInit(l uint, zero int16) (v *int16) {
 	return
 }
 
+func (p *Int16Vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p Int16Vec) Len() uint { return uint(len(p)) }

@@ -82,3 +82,10 @@ func (p *BitmapPool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *BitmapPool) Reset() {
+	p.Pool.Reset()
+	if len(p.bitmaps) > 0 {
+		p.bitmaps = p.bitmaps[:0]
+	}
+}

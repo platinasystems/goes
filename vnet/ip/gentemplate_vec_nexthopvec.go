@@ -82,4 +82,10 @@ func (p *nextHopVec) ValidateLenInit(l uint, zero nextHop) (v *nextHop) {
 	return
 }
 
+func (p *nextHopVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p nextHopVec) Len() uint { return uint(len(p)) }

@@ -78,4 +78,10 @@ func (p *Int64Vec) ValidateLenInit(l uint, zero int64) (v *int64) {
 	return
 }
 
+func (p *Int64Vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p Int64Vec) Len() uint { return uint(len(p)) }

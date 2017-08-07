@@ -82,4 +82,10 @@ func (p *level_vec) ValidateLenInit(l uint, zero level) (v *level) {
 	return
 }
 
+func (p *level_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p level_vec) Len() uint { return uint(len(p)) }

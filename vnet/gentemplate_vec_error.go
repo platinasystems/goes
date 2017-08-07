@@ -82,4 +82,10 @@ func (p *errVec) ValidateLenInit(l uint, zero err) (v *err) {
 	return
 }
 
+func (p *errVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p errVec) Len() uint { return uint(len(p)) }

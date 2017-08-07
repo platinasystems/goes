@@ -82,4 +82,10 @@ func (p *inject_packet_disposition_vec) ValidateLenInit(l uint, zero inject_pack
 	return
 }
 
+func (p *inject_packet_disposition_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p inject_packet_disposition_vec) Len() uint { return uint(len(p)) }

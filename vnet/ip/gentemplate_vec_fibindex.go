@@ -82,4 +82,10 @@ func (p *FibIndexVec) ValidateLenInit(l uint, zero FibIndex) (v *FibIndex) {
 	return
 }
 
+func (p *FibIndexVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p FibIndexVec) Len() uint { return uint(len(p)) }

@@ -82,4 +82,10 @@ func (p *viVec) ValidateLenInit(l uint, zero Vi) (v *Vi) {
 	return
 }
 
+func (p *viVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p viVec) Len() uint { return uint(len(p)) }

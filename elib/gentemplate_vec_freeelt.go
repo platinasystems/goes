@@ -78,4 +78,10 @@ func (p *freeEltVec) ValidateLenInit(l uint, zero freeElt) (v *freeElt) {
 	return
 }
 
+func (p *freeEltVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p freeEltVec) Len() uint { return uint(len(p)) }

@@ -82,4 +82,10 @@ func (p *tx_dma_queue_vec) ValidateLenInit(l uint, zero tx_dma_queue) (v *tx_dma
 	return
 }
 
+func (p *tx_dma_queue_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p tx_dma_queue_vec) Len() uint { return uint(len(p)) }

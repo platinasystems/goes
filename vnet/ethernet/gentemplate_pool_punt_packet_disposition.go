@@ -86,3 +86,10 @@ func (p *punt_packet_disposition_pool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *punt_packet_disposition_pool) Reset() {
+	p.Pool.Reset()
+	if len(p.dispositions) > 0 {
+		p.dispositions = p.dispositions[:0]
+	}
+}

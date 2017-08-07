@@ -86,3 +86,10 @@ func (p *shared_pair_offsets_pool) ForeachIndex(f func(i uint)) {
 		}
 	}
 }
+
+func (p *shared_pair_offsets_pool) Reset() {
+	p.Pool.Reset()
+	if len(p.elts) > 0 {
+		p.elts = p.elts[:0]
+	}
+}

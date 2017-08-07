@@ -82,4 +82,10 @@ func (p *enqueue_vec) ValidateLenInit(l uint, zero *enqueue) (v **enqueue) {
 	return
 }
 
+func (p *enqueue_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p enqueue_vec) Len() uint { return uint(len(p)) }
