@@ -32,8 +32,6 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			cf.detail = true
 		case in.Parse("s%*ummary"):
 			cf.summary = true
-		case in.Parse("un%*reachable"):
-			cf.unreachable = true
 		case in.Parse("t%*able %s", &cf.showTable):
 		default:
 			err = cli.ParseError
@@ -46,11 +44,6 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		return
 	}
 
-	if cf.unreachable {
-		m.showUnreachable(w, cf)
-		return
-	}
-
 	m.showReachable(w, cf)
 	return
 }
@@ -59,57 +52,19 @@ func (m *Main) showReachable(w cli.Writer, cf showFibConfig) {
 	// Sync adjacency stats with hardware.
 	m.CallAdjSyncCounterHooks()
 
+	type unreachable struct {
+		valid       bool
+		via         Address
+		viaFibIndex ip.FibIndex
+		weight      ip.NextHopWeight
+	}
 	type route struct {
-		table  ip.FibIndex
-		prefix Prefix
-		r      mapFibResult
+		prefixFibIndex ip.FibIndex
+		prefix         Prefix
+		r              mapFibResult
+		u              unreachable
 	}
 	rs := []route{}
-	for fi := range m.fibs {
-		fib := m.fibs[fi]
-		if fib != nil {
-			t := ip.FibIndex(fi).Name(&m.Main)
-			if cf.showTable != "" && t != cf.showTable {
-				continue
-			}
-			fib.reachable.foreach(func(p *Prefix, r mapFibResult) {
-				rs = append(rs, route{table: ip.FibIndex(fi), prefix: *p, r: r})
-			})
-		}
-	}
-	sort.Slice(rs, func(i, j int) bool {
-		if cmp := int(rs[i].table) - int(rs[j].table); cmp != 0 {
-			return cmp < 0
-		}
-		return rs[i].prefix.LessThan(&rs[j].prefix)
-	})
-
-	fmt.Fprintf(w, "%6s%30s%20s\n", "Table", "Destination", "Adjacency")
-	for ri := range rs {
-		r := &rs[ri]
-		lines := m.adjLines(r.r.adj, cf.detail)
-		for i := range lines {
-			if i == 0 {
-				fmt.Fprintf(w, "%12s%30s%s\n", r.table.Name(&m.Main), &r.prefix, lines[i])
-			} else {
-				fmt.Fprintf(w, "%12s%30s%s\n", "", "", lines[i])
-			}
-		}
-		if cf.detail {
-			fmt.Fprintf(w, "%s", &r.r.nh)
-		}
-	}
-}
-
-func (m *Main) showUnreachable(w cli.Writer, cf showFibConfig) {
-	type unreachable struct {
-		table ip.FibIndex
-		p     Prefix
-		nh    Address
-		nhi   ip.FibIndex
-		nhw   ip.NextHopWeight
-	}
-	us := []unreachable{}
 	for fi := range m.fibs {
 		fib := m.fibs[fi]
 		if fib == nil {
@@ -119,35 +74,61 @@ func (m *Main) showUnreachable(w cli.Writer, cf showFibConfig) {
 		if cf.showTable != "" && t != cf.showTable {
 			continue
 		}
+		fib.reachable.foreach(func(p *Prefix, r mapFibResult) {
+			rt := route{prefixFibIndex: ip.FibIndex(fi), prefix: *p, r: r}
+			rs = append(rs, rt)
+		})
 		fib.unreachable.foreach(func(p *Prefix, r mapFibResult) {
-			u := unreachable{table: ip.FibIndex(fi)}
+			rt := route{prefix: *p, r: r}
+			u := unreachable{
+				valid: true,
+			}
 			for nh, ps := range r.nh {
-				u.nh = nh.a
-				u.nhi = nh.i
-				for p, r := range ps {
-					u.p = p.p
-					u.table = p.i
-					u.nhw = r.NextHopWeight()
-					us = append(us, u)
+				u.via = nh.a
+				u.viaFibIndex = nh.i
+				for pi, nher := range ps {
+					rt.prefix = pi.p
+					rt.prefixFibIndex = pi.i
+					u.weight = nher.NextHopWeight()
+					rt.u = u
+					rs = append(rs, rt)
 				}
 			}
 		})
 	}
-	sort.Slice(us, func(i, j int) bool {
-		if cmp := int(us[i].table) - int(us[j].table); cmp != 0 {
+	sort.Slice(rs, func(i, j int) bool {
+		if cmp := int(rs[i].prefixFibIndex) - int(rs[j].prefixFibIndex); cmp != 0 {
 			return cmp < 0
 		}
-		return us[i].p.LessThan(&us[j].p)
+		return rs[i].prefix.LessThan(&rs[j].prefix)
 	})
 
-	fmt.Fprintf(w, "%6s%30s%20s\n", "Table", "Destination", "Next Hop")
-	for ui := range us {
-		u := &us[ui]
-		nhs := u.nh.String() + " " + u.nhi.Name(&m.Main)
-		if u.nhw != 1 {
-			nhs += fmt.Sprintf(", %d", u.nhw)
+	fmt.Fprintf(w, "%6s%30s%40s\n", "Table", "Destination", "Adjacency")
+	for ri := range rs {
+		r := &rs[ri]
+		var lines []string
+		if r.u.valid {
+			nhs := fmt.Sprintf("%10sunreachable via %v", "", &r.u.via)
+			if r.u.viaFibIndex != r.prefixFibIndex {
+				nhs += ", table " + r.u.viaFibIndex.Name(&m.Main)
+			}
+			if r.u.weight != 1 {
+				nhs += fmt.Sprintf(", weight %d", r.u.weight)
+			}
+			lines = []string{nhs}
+		} else {
+			lines = m.adjLines(r.r.adj, cf.detail)
 		}
-		fmt.Fprintf(w, "%12s%30s%20s\n", u.table.Name(&m.Main), &u.p, nhs)
+		for i := range lines {
+			if i == 0 {
+				fmt.Fprintf(w, "%12s%30s%s\n", r.prefixFibIndex.Name(&m.Main), &r.prefix, lines[i])
+			} else {
+				fmt.Fprintf(w, "%12s%30s%s\n", "", "", lines[i])
+			}
+		}
+		if cf.detail {
+			fmt.Fprintf(w, "%s", &r.r.nh)
+		}
 	}
 }
 
