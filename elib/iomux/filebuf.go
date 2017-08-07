@@ -22,10 +22,10 @@ type FileReadWriteCloser interface {
 
 type FileBuf struct {
 	File
-	name               string
-	maxReadBytes       uint
-	txBufLock          sync.Mutex
-	txBuffer, rxBuffer elib.ByteVec
+	name                 string
+	maxReadBytes         uint
+	rxBufLock, txBufLock sync.Mutex
+	txBuffer, rxBuffer   elib.ByteVec
 }
 
 func NewFileBuf(fd int, format string, args ...interface{}) *FileBuf {
@@ -38,6 +38,8 @@ func NewFileBuf(fd int, format string, args ...interface{}) *FileBuf {
 func (f *FileBuf) String() string { return f.name }
 
 func (s *FileBuf) Read(advance int) []byte {
+	s.rxBufLock.Lock()
+	defer s.rxBufLock.Unlock()
 	if advance >= len(s.rxBuffer) {
 		s.rxBuffer = s.rxBuffer[:0]
 	} else {
@@ -47,6 +49,8 @@ func (s *FileBuf) Read(advance int) []byte {
 }
 
 func (s *FileBuf) ReadReady() (err error) {
+	s.rxBufLock.Lock()
+	defer s.rxBufLock.Unlock()
 	i := len(s.rxBuffer)
 
 	if s.maxReadBytes <= 0 {
