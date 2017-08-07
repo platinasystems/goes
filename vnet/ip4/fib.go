@@ -360,9 +360,9 @@ func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibR
 		delete(more.nh, dst)
 		less.nh[dst] = dstMap
 		// Replace adjacencies: more -> less.
-		for dp, _ := range dstMap {
+		for dp, r := range dstMap {
 			g := m.fibByIndex(dp.i, false)
-			g.replaceNextHop(m, &dp.p, more.adj, less.adj)
+			g.replaceNextHop(m, &dp.p, more.adj, less.adj, r)
 		}
 	}
 }
@@ -384,11 +384,11 @@ func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, ad
 	for dst, dstMap := range less.nh {
 		if dst.a.MatchesPrefix(p) {
 			delete(less.nh, dst)
-			for dp, dw := range dstMap {
+			for dp, r := range dstMap {
 				const isDel = false
 				g := m.fibByIndex(dp.i, false)
-				more.addDelNextHop(m, g, dp.p, dst.a, dw, isDel)
-				g.replaceNextHop(m, &dp.p, less.adj, adj)
+				more.addDelNextHop(m, g, dp.p, dst.a, r, isDel)
+				g.replaceNextHop(m, &dp.p, less.adj, adj, r)
 			}
 		}
 	}
@@ -690,9 +690,9 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	return
 }
 
-func (f *Fib) replaceNextHop(m *Main, p *Prefix, fromNextHopAdj, toNextHopAdj ip.Adj) (err error) {
+func (f *Fib) replaceNextHop(m *Main, p *Prefix, fromNextHopAdj, toNextHopAdj ip.Adj, r NextHopper) (err error) {
 	if adj, ok := f.Get(p); ok {
-		if ok = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj); !ok {
+		if ok = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); !ok {
 			err = fmt.Errorf("ReplaceNextHop fails")
 		}
 		const isDel = false

@@ -406,6 +406,9 @@ type multipathAdjacency struct {
 	// Number of prefixes that point to this adjacency.
 	referenceCount uint32
 
+	// Pool index.
+	index uint
+
 	// Given next hops are saved so that control plane has a record of exactly
 	// what the RIB told it.
 	givenNextHops nextHopBlock
@@ -441,7 +444,7 @@ func (r *nextHopVec) resolve(m *Main, given nextHopVec, level uint) {
 	for i := range given {
 		g := &given[i]
 		i0 := r.Len()
-		ma, _ := m.mpAdjForAdj(g.Adj, false)
+		ma := m.mpAdjForAdj(g.Adj, false)
 		if ma != nil {
 			r.resolve(m, mp.getNextHopBlock(&ma.givenNextHops), level+1)
 		} else {
@@ -463,7 +466,7 @@ type AdjacencyFinalizer interface {
 	FinalizeAdjacency(a *Adjacency)
 }
 
-func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multipathAdjacency, madjIndex uint, ok bool) {
+func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multipathAdjacency) {
 	mp := &m.multipathMain
 
 	mp.cachedNextHopVec[1].resolve(m, given, 0)
@@ -472,10 +475,10 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 	nAdj, norm := resolved.normalizePow2(mp, &mp.cachedNextHopVec[2])
 
 	// Use given next hops to see if we've seen a block equivalent to this one before.
-	var i uint
-	if i, ok = mp.nextHopHash.Get(norm); ok {
+	i, ok := mp.nextHopHash.Get(norm)
+	if ok {
 		ai := mp.nextHopHashValues[i].adj
-		madj, madjIndex = m.mpAdjForAdj(ai, false)
+		madj = m.mpAdjForAdj(ai, false)
 		return
 	}
 
@@ -494,7 +497,7 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 		}
 	}
 
-	madj, madjIndex = m.mpAdjForAdj(ai, true)
+	madj = m.mpAdjForAdj(ai, true)
 
 	madj.adj = ai
 	madj.nAdj = uint32(nAdj)
@@ -510,33 +513,32 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 	}
 
 	m.CallAdjAddHooks(ai)
-
-	ok = true
 	return
 }
 
 func (m *Main) GetAdjacencyUsage() elib.HeapUsage { return m.adjacencyHeap.GetUsage() }
 
-func (m *adjacencyMain) mpAdjForAdj(a Adj, create bool) (ma *multipathAdjacency, maIndex uint) {
+func (m *adjacencyMain) mpAdjForAdj(a Adj, create bool) (ma *multipathAdjacency) {
 	adj := &m.adjacencyHeap.elts[a]
 	if !adj.IsRewrite() {
 		return
 	}
-	maIndex = uint(adj.Index)
+	i := uint(adj.Index)
 	mm := &m.multipathMain
 	if create {
-		maIndex = mm.mpAdjPool.GetIndex()
-		adj.Index = uint32(maIndex)
+		i = mm.mpAdjPool.GetIndex()
+		adj.Index = uint32(i)
+		mm.mpAdjPool.elts[i].index = i
 	}
-	if maIndex < mm.mpAdjPool.Len() {
-		ma = &mm.mpAdjPool.elts[maIndex]
+	if i < mm.mpAdjPool.Len() {
+		ma = &mm.mpAdjPool.elts[i]
 	}
 	return
 }
 
 func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
 	mm := &m.multipathMain
-	ma, _ := m.mpAdjForAdj(a, false)
+	ma := m.mpAdjForAdj(a, false)
 	if ma != nil && ma.nAdj > 0 {
 		nhs = mm.getNextHopBlock(&ma.resolvedNextHops)
 	} else {
@@ -548,14 +550,13 @@ func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
 func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWeight, af AdjacencyFinalizer, isDel bool) (newAdj Adj, ok bool) {
 	mm := &m.multipathMain
 	var (
-		old, new   *multipathAdjacency
-		oldMaIndex uint
-		nhs        nextHopVec
-		nnh, nhi   uint
+		old, new *multipathAdjacency
+		nhs      nextHopVec
+		nnh, nhi uint
 	)
 
 	if oldAdj != AdjNil {
-		if old, oldMaIndex = m.mpAdjForAdj(oldAdj, false); old != nil {
+		if old = m.mpAdjForAdj(oldAdj, false); old != nil {
 			nhs = mm.getNextHopBlock(&old.givenNextHops)
 			nnh = nhs.Len()
 			nhi, ok = nhs.find(nextHopAdj)
@@ -606,11 +607,22 @@ func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWe
 		nh.Weight = nextHopWeight
 	}
 
+	new = m.addDelHelper(newNhs, old, af)
+	if new != nil {
+		ok = true
+		newAdj = new.adj
+	}
+	return
+}
+
+func (m *Main) addDelHelper(newNhs nextHopVec, old *multipathAdjacency, af AdjacencyFinalizer) (new *multipathAdjacency) {
+	mm := &m.multipathMain
+
 	if len(newNhs) > 0 {
-		new, _, _ = m.createMpAdj(newNhs, af)
-		// Fetch again since create may have moved vector.
+		new = m.createMpAdj(newNhs, af)
+		// Fetch again since create may have moved multipath adjacency vector.
 		if old != nil {
-			old = &mm.mpAdjPool.elts[oldMaIndex]
+			old = &mm.mpAdjPool.elts[old.index]
 		}
 	}
 
@@ -624,10 +636,6 @@ func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWe
 	}
 	if old != nil && old.referenceCount == 0 {
 		old.free(m)
-	}
-	if new != nil {
-		ok = true
-		newAdj = new.adj
 	}
 	return
 }
@@ -652,17 +660,16 @@ func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
 	return
 }
 
-func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj) (ok bool) {
+func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af AdjacencyFinalizer) (ok bool) {
 	if fromNextHopAdj == toNextHopAdj {
 		return
 	}
 
 	mm := &m.multipathMain
-	ma, _ := m.mpAdjForAdj(ai, false)
-	unhs := mm.getNextHopBlock(&ma.givenNextHops)
-	nnhs := mm.getNextHopBlock(&ma.resolvedNextHops)
-	for i := range unhs {
-		nh := &unhs[i]
+	ma := m.mpAdjForAdj(ai, false)
+	given := mm.getNextHopBlock(&ma.givenNextHops)
+	for i := range given {
+		nh := &given[i]
 		if ok = nh.Adj == fromNextHopAdj; ok {
 			nh.Adj = toNextHopAdj
 			break
@@ -672,40 +679,7 @@ func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj) (ok bool) {
 		return
 	}
 
-	{
-		i, _ := mm.nextHopHash.Unset(nnhs)
-		mm.nextHopHashValues[i] = nextHopHashValue{
-			heapOffset: ^uint32(0),
-			adj:        AdjNil,
-		}
-	}
-
-	as := m.GetAdj(ai)
-	toAdj := m.GetAdj(toNextHopAdj)
-	sumw := 0
-	for i := range nnhs {
-		nh := &nnhs[i]
-		w := int(nh.Weight)
-		if nh.Adj == fromNextHopAdj {
-			nh.Adj = toNextHopAdj
-			for j := 0; j < w; j++ {
-				save := as[sumw+j].Index
-				as[sumw+j] = toAdj[0]
-				as[sumw+j].Index = save
-			}
-			break
-		}
-		sumw += w
-	}
-
-	{
-		i, _ := mm.nextHopHash.Set(nnhs)
-		mm.nextHopHashValues[i] = nextHopHashValue{
-			heapOffset: ma.resolvedNextHops.offset,
-			adj:        ai,
-		}
-	}
-
+	m.addDelHelper(given, ma, af)
 	return
 }
 
