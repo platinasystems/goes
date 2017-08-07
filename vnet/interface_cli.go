@@ -222,8 +222,7 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 			si := Si(i)
 			// Skip unprovisioned interfaces.
 			sw := v.SwIf(si)
-			hw := v.SupHwIf(sw)
-			if hw.unprovisioned {
+			if hw := v.SupHwIf(sw); hw != nil && hw.unprovisioned {
 				return
 			}
 			// Skip interfaces which don't match regexps.

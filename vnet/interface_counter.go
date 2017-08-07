@@ -179,13 +179,14 @@ func (m *interfaceMain) foreachSwIfCounter(zero bool, si Si, f func(name string,
 	}
 
 	// Next hardware software interface counters.
-	h := m.HwIfer(m.SupHi(si))
-	nm := h.GetSwInterfaceCounterNames()
-	for k := uint(0); k < uint(len(nm.Combined)); k++ {
-		m.doSwCombined(f, &nm, zero, k, k0+k, i)
-	}
-	for k := uint(0); k < uint(len(nm.Single)); k++ {
-		m.doSwSingle(f, &nm, zero, k, k1+k, i)
+	if h := m.HwIferForSupSi(si); h != nil {
+		nm := h.GetSwInterfaceCounterNames()
+		for k := uint(0); k < uint(len(nm.Combined)); k++ {
+			m.doSwCombined(f, &nm, zero, k, k0+k, i)
+		}
+		for k := uint(0); k < uint(len(nm.Single)); k++ {
+			m.doSwSingle(f, &nm, zero, k, k1+k, i)
+		}
 	}
 }
 

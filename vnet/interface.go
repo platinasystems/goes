@@ -115,12 +115,14 @@ func (t *SwInterfaceType) SwInterfaceRewriteString(v *Vnet, r *Rewrite) []string
 	h := v.HwIfer(hi)
 	return h.FormatRewrite(r)
 }
+func (t *SwInterfaceType) SwInterfaceLessThan(v *Vnet, a, b *SwIf) bool { return v.SwLessThan(a, b) }
 
 type swInterfaceTyper interface {
 	GetSwInterfaceType() *SwInterfaceType
 	SwInterfaceName(v *Vnet, s *SwIf) string
 	SwInterfaceSetRewrite(rw *Rewrite, si Si, noder Noder, typ PacketType)
 	SwInterfaceRewriteString(v *Vnet, rw *Rewrite) []string
+	SwInterfaceLessThan(v *Vnet, a, b *SwIf) bool
 }
 
 func (i *interfaceMain) registerBuiltinSwInterfaceTypes() {
@@ -144,8 +146,11 @@ func (i *interfaceMain) RegisterSwInterfaceType(r swInterfaceTyper) {
 func (si Si) Kind(v *Vnet) SwIfKind {
 	return v.SwIf(si).kind
 }
+func (s *SwIf) GetType(v *Vnet) swInterfaceTyper {
+	return v.interfaceMain.swInterfaceTypes[s.kind]
+}
 func (si Si) GetType(v *Vnet) swInterfaceTyper {
-	return v.interfaceMain.swInterfaceTypes[v.SwIf(si).kind]
+	return v.SwIf(si).GetType(v)
 }
 
 type swIfFlag uint16
@@ -287,10 +292,10 @@ func (m *interfaceMain) SupHi(si Si) Hi {
 	return hw.hi
 }
 
-func (m *interfaceMain) HwIferForSi(i Si) (h HwInterfacer, ok bool) {
-	sw := m.SwIf(i)
-	if ok = sw.kind == SwIfKindHardware; ok {
-		h = m.HwIfer(Hi(sw.id))
+func (m *interfaceMain) HwIferForSupSi(si Si) (h HwInterfacer) {
+	hw := m.SupHwIf(m.SwIf(si))
+	if hw != nil {
+		h = m.HwIfer(hw.hi)
 	}
 	return
 }
@@ -575,11 +580,20 @@ func (v *Vnet) HwLessThan(a, b *HwIf) bool {
 
 func (v *Vnet) SwLessThan(a, b *SwIf) bool {
 	hwa, hwb := v.SupHwIf(a), v.SupHwIf(b)
-	if hwa != hwb {
-		return v.HwLessThan(hwa, hwb)
+	if hwa != nil && hwb != nil {
+		if hwa != hwb {
+			return v.HwLessThan(hwa, hwb)
+		}
+		ha := v.HwIfer(hwa.hi)
+		return ha.LessThanId(a.id, b.id)
 	}
-	ha := v.HwIfer(hwa.hi)
-	return ha.LessThanId(a.id, b.id)
+	// Different kind?  Sort by increasing kind.
+	if a.kind != b.kind {
+		return a.kind < b.kind
+	}
+	// Same kind.
+	at := a.GetType(v)
+	return at.SwInterfaceLessThan(v, a, b)
 }
 
 // Interface can loopback at MAC or PHY.
