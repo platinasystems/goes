@@ -89,7 +89,7 @@ func (i *tuntap_interface) close() {
 }
 
 // Called when interface namespace is added/deleted or when interface moves namespace.
-func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del bool) {
+func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del bool) (err error) {
 	if is_del {
 		i.close()
 	} else {
@@ -100,17 +100,18 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 		i.namespace = ns
 		// Close sockets before re-opening in new namespace.
 		i.close()
-		if err := i.open_sockets(); err != nil {
-			panic(err)
+		if err = i.open_sockets(); err != nil {
+			return
 		}
-		if err := i.create(); err != nil {
-			panic(err)
+		if err = i.create(); err != nil {
+			return
 		}
-		if err := i.bind(); err != nil {
-			panic(err)
+		if err = i.bind(); err != nil {
+			return
 		}
 		i.start_up()
 	}
+	return
 }
 
 type tuntap_main struct {
@@ -341,12 +342,12 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	}
 	m.vnet_tuntap_interface_by_si[si] = intf
 
-	if m.vnet_tuntap_interface_by_address == nil {
-		m.vnet_tuntap_interface_by_address = make(map[string]*tuntap_interface)
-	}
 	key := name
 	if !isTun {
 		key = string(hi.GetAddress(v))
+	}
+	if m.vnet_tuntap_interface_by_address == nil {
+		m.vnet_tuntap_interface_by_address = make(map[string]*tuntap_interface)
 	}
 	m.vnet_tuntap_interface_by_address[key] = intf
 	return
