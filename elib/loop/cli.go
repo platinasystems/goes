@@ -148,7 +148,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 			if s[j].calls > 0 || show_detail {
 				state := ""
 				if j == 0 {
-					state = fmt.Sprintf("%s", n.flags)
+					state = fmt.Sprintf("%s", n.get_flags())
 				}
 				ns = append(ns, rtNode{
 					Name:     name + io,
