@@ -36,7 +36,7 @@ type Header struct {
 	Src, Dst Address
 }
 
-func (a *Address) Uint32(i int) uint32 {
+func (a *Address) Uint32(i uint) uint32 {
 	return uint32(a[4*i+3]) | uint32(a[4*i+2])<<8 | uint32(a[4*i+1])<<16 | uint32(a[4*i+0])<<24
 }
 
@@ -49,7 +49,7 @@ func (a *Address) IsZero() bool {
 	return true
 }
 
-func (a *Address) FromUint32(i int, x uint32) {
+func (a *Address) FromUint32(i uint, x uint32) {
 	a[4*i+0] = byte(x >> 24)
 	a[4*i+1] = byte(x >> 16)
 	a[4*i+2] = byte(x >> 8)
