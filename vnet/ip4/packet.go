@@ -118,3 +118,11 @@ func (h *Header) Write(b []byte) {
 	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
+
+func ParseHeader(b []byte) (h *Header, payload []byte) {
+	i := 0
+	h = (*Header)(unsafe.Pointer(&b[i]))
+	i += SizeofHeader
+	payload = b[i:]
+	return
+}

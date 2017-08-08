@@ -38,12 +38,12 @@ func (h *Header) Parse(in *parse.Input) {
 	}
 }
 
-type ParseHeader struct {
+type HeaderParser struct {
 	h Header
 	v []VlanHeader
 }
 
-func (h *ParseHeader) Parse(in *parse.Input) (innerType Type) {
+func (h *HeaderParser) Parse(in *parse.Input) (innerType Type) {
 	h.h.Parse(in)
 	for !in.End() {
 		var vh VlanHeader
@@ -67,8 +67,8 @@ func (h *ParseHeader) Parse(in *parse.Input) (innerType Type) {
 	}
 	return
 }
-func (h *ParseHeader) Sizeof() uint { return SizeofHeader + uint(len(h.v))*SizeofVlanHeader }
-func (h *ParseHeader) Write(b []byte) {
+func (h *HeaderParser) Sizeof() uint { return SizeofHeader + uint(len(h.v))*SizeofVlanHeader }
+func (h *HeaderParser) Write(b []byte) {
 	h.h.Write(b)
 	for i := range h.v {
 		h.v[i].Write(b[SizeofHeader+i*SizeofVlanHeader:])

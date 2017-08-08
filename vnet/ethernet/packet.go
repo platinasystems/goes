@@ -79,6 +79,29 @@ func (h *Header) GetPayload() unsafe.Pointer {
 	return unsafe.Pointer(uintptr(unsafe.Pointer(h)) + unsafe.Sizeof(*h))
 }
 
+func (t Type) IsVLAN() (ok bool) {
+	switch t {
+	case TYPE_VLAN, TYPE_VLAN_IN_VLAN, TYPE_VLAN_802_1AD:
+		ok = true
+	}
+	return
+}
+
+func ParseHeader(b []byte) (h *Header, vs []*VlanHeader, payloadType Type, payload []byte) {
+	i := 0
+	h = (*Header)(unsafe.Pointer(&b[i]))
+	i += SizeofHeader
+	payloadType = h.Type.FromHost()
+	for payloadType.IsVLAN() {
+		v := (*VlanHeader)(unsafe.Pointer(&b[i]))
+		vs = append(vs, v)
+		i += SizeofVlanHeader
+		payloadType = v.Type.FromHost()
+	}
+	payload = b[i:]
+	return
+}
+
 const (
 	SizeofAddress    = 6
 	SizeofHeader     = 14

@@ -370,7 +370,7 @@ func FormatRewrite(v *vnet.Vnet, r *vnet.Rewrite) (lines []string) {
 }
 
 func (hi *Interface) ParseRewrite(r *vnet.Rewrite, in *parse.Input) {
-	var h ParseHeader
+	var h HeaderParser
 	innerType := h.Parse(in)
 	b := r.Data()
 	h.Write(b)
