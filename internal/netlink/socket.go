@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -99,13 +100,14 @@ type ListenReq struct {
 }
 
 type Socket struct {
-	once sync.Once
-	fd   int
-	addr *syscall.SockaddrNetlink
-	Rx   <-chan Message
-	rx   chan<- Message
-	Tx   chan<- Message
-	tx   <-chan Message
+	closeCount uint32
+	wg         sync.WaitGroup
+	fd         int
+	addr       *syscall.SockaddrNetlink
+	Rx         <-chan Message
+	rx         chan<- Message
+	Tx         chan<- Message
+	tx         <-chan Message
 	SocketConfig
 }
 
@@ -236,6 +238,17 @@ SO_SNDBUF truncated to %d bytes; run: sysctl -w net.core.wmem_max=%d`[1:],
 		}
 	}
 
+	// Set receive timeout; otherwise gorx goroutine has no way to exit when socket is closed.
+	// No rx timeout causes gorx to leak goroutines.
+	{
+		tv := syscall.Timeval{Sec: 5}
+		err = os.NewSyscallError("setsockopt SO_RCVTIMEO",
+			syscall.SetsockoptTimeval(s.fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv))
+		if err != nil {
+			return
+		}
+	}
+
 	if !s.DontListenAllNsid {
 		err = os.NewSyscallError("setsockopt NETLINK_LISTEN_ALL_NSID",
 			syscall.SetsockoptInt(s.fd, SOL_NETLINK,
@@ -251,13 +264,12 @@ SO_SNDBUF truncated to %d bytes; run: sysctl -w net.core.wmem_max=%d`[1:],
 	return
 }
 
+func (s *Socket) IsClosed() bool { return atomic.LoadUint32(&s.closeCount) > 0 }
 func (s *Socket) Close() (err error) {
-	close(s.rx)
-	close(s.Tx)
-	if err = syscall.Close(s.fd); err != nil {
-		return
+	if s.Tx != nil {
+		close(s.Tx)
 	}
-	s.fd = -1
+	atomic.AddUint32(&s.closeCount, 1)
 	return
 }
 
@@ -332,14 +344,22 @@ func (s *Socket) gorx() {
 		return *(*int)(unsafe.Pointer(&scm.Data[0]))
 	}
 
+	s.wg.Add(1)
 	for {
 		nsid := DefaultNsid
-
+		if s.IsClosed() {
+			break
+		}
 		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, 0)
 		if err != nil {
-			if err != io.EOF && s.fd > 0 {
-				fmt.Fprintln(os.Stderr, "Recv:", err)
+			if s.IsClosed() || err == io.EOF {
+				break
 			}
+			// Re-try after timeout or interrupt unless socket was closed.
+			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
+				continue
+			}
+			fmt.Fprintln(os.Stderr, "Recv:", s.fd, err)
 			break
 		}
 
@@ -402,21 +422,24 @@ func (s *Socket) gorx() {
 			if false {
 				fmt.Print("Rx: ", msg)
 			}
-			if s.fd != -1 {
-				s.rx <- msg
-			}
+			s.rx <- msg
 		}
 	}
-	if s.fd != -1 {
-		close(s.rx)
-	}
+	close(s.rx)
 	s.rx = nil
+	s.wg.Done()
+
+	// Wait for tx routine to finish before closing file descriptor.
+	s.wg.Wait()
+	syscall.Close(s.fd)
+	s.fd = -1
 }
 
 func (s *Socket) gotx() {
 	seq := uint32(1)
 	buf := make([]byte, 4*PageSize)
 	bh := (*Header)(unsafe.Pointer(&buf[0]))
+	s.wg.Add(1)
 	for msg := range s.tx {
 		mh := msg.MsgHeader()
 		if mh.Flags == 0 {
@@ -455,4 +478,5 @@ func (s *Socket) gotx() {
 		s.rx <- e
 		msg.Close()
 	}
+	s.wg.Done()
 }
