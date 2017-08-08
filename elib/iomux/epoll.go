@@ -97,6 +97,7 @@ func (m *Mux) Add(f Filer) {
 	fi := m.filePool.GetIndex()
 	m.files[fi] = f
 	l.poolIndex = fi
+	l.added = true
 
 	e := l.event(f)
 	if err := epoll_ctl(m.fd, opAdd, fd, &e); err != nil {
@@ -109,11 +110,15 @@ func (m *Mux) Del(f Filer) {
 	m.poolLock.Lock()
 	defer m.poolLock.Unlock()
 	l := f.GetFile()
+	if !l.added {
+		return
+	}
 	if err := epoll_ctl(m.fd, opDel, l.Fd, nil); err != nil {
 		panic(fmt.Errorf("epoll_ctl: del %s", err))
 	}
 	fi := l.poolIndex
 	// Poison index.
+	l.added = false
 	l.poolIndex = ^uint(0)
 	m.filePool.PutIndex(fi)
 	m.files[fi] = nil
