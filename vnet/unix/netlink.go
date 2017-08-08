@@ -588,7 +588,15 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, intf.si)
 		err = m4.AddDelRouteNextHop(&p, &nh, isDel)
 	} else {
-		// Silently ignore interface routes.  FIXME?
+		// Record interface routes.  For now, don't install in vnet FIB.
+		if intf.si == e.ns.vnet_tun_interface.si {
+			tt := e.ns.vnet_tun_interface
+			if isDel {
+				tt.interface_routes.Unset(&p)
+			} else {
+				tt.interface_routes.Set(&p, ip.AdjPunt)
+			}
+		}
 	}
 	return
 }
@@ -644,7 +652,14 @@ func (e *netlinkEvent) ip4_in_ip4_route(p *ip4.Prefix, as *netlink.AttrArray, in
 	_ = flags
 
 	m4 := ip4.GetMain(e.m.v)
-	nbr.FibIndex = e.m.default_namespace.fibIndexForNamespace()
+
+	// By default lookup neighbor in FIB for namespace.
+	nbr.FibIndex = e.ns.fibIndexForNamespace()
+	// If destination matches interface route for vnet tun interface, then use default namespace for next hop lookup.
+	if _, _, ok := e.ns.vnet_tun_interface.interface_routes.Lookup(h.Dst); ok {
+		nbr.FibIndex = e.m.default_namespace.fibIndexForNamespace()
+	}
+
 	nbr.Weight = 1
 	nbr.LocalSi = e.ns.vnet_tun_interface.si
 	err = m4.AddDelRouteNeighbor(p, &nbr, e.ns.fibIndexForNamespace(), isDel)

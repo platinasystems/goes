@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/ip4"
 
 	"fmt"
 	"strings"
@@ -54,6 +55,7 @@ type tuntap_interface struct {
 	pv           *tx_packet_vector
 
 	suspend_saved_out *vnet.RefIn
+	interface_routes  ip4.MapFib
 }
 
 //go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
@@ -265,6 +267,9 @@ func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.
 
 // Set flags and operational state when vnet-owned tuntap interface becomes ready.
 func (intf *tuntap_interface) sync_flags() {
+	if intf.provision_fd < 0 {
+		return
+	}
 	intf.flag_sync_in_progress = true
 	if err := intf.set_flags(); err != nil {
 		panic(err)
