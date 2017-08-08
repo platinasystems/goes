@@ -20,6 +20,7 @@ ALL += goes-coreboot
 ALL += goes-platina-mk1-bmc
 ALL += goes-platina-mk1-installer
 ALL += $(if $(fe1_dir),go-wip)
+All += ip
 
 noplugin := $(if $(fe1_dir),yes,no)
 noplugin_yes:=$(filter yes,$(noplugin))
@@ -79,6 +80,9 @@ go-wip: tags=vfio foxy$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
 go-wip: gcflags=$(if $(VNET_DEBUG_yes),-N -l)
 go-wip:
 	$(gobuild) -o $@ ./wip/y
+
+ip: | package.go
+	$(gobuild) ./main/$@
 
 package.go: LICENSE PATENTS
 	go generate
