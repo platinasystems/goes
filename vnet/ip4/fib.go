@@ -103,7 +103,7 @@ type mapFibResult struct {
 }
 
 // Maps for prefixes for /0 through /32; key in network byte order.
-type mapFib [1 + 32]map[vnet.Uint32]mapFibResult
+type MapFib [1 + 32]map[vnet.Uint32]mapFibResult
 
 // Cache of prefix length network masks: entry LEN has high LEN bits set.
 // So, 10/8 has top 8 bits set.
@@ -123,13 +123,17 @@ func computeNetMasks() (r [33]vnet.Uint32) {
 func (p *Prefix) Mask() vnet.Uint32          { return netMasks[p.Len] }
 func (p *Prefix) MaskAsAddress() (a Address) { a.FromUint32(p.Mask()); return }
 func (p *Prefix) mapFibKey() vnet.Uint32     { return p.Address.AsUint32() & p.Mask() }
+func (a *Address) Mask(l uint) (v Address) {
+	v.FromUint32(a.AsUint32() & netMasks[l])
+	return
+}
 
-func (m *mapFib) validateLen(l uint32) {
+func (m *MapFib) validateLen(l uint32) {
 	if m[l] == nil {
 		m[l] = make(map[vnet.Uint32]mapFibResult)
 	}
 }
-func (m *mapFib) set(p *Prefix, newAdj ip.Adj) (oldAdj ip.Adj, ok bool) {
+func (m *MapFib) Set(p *Prefix, newAdj ip.Adj) (oldAdj ip.Adj, ok bool) {
 	l := p.Len
 	m.validateLen(l)
 	k := p.mapFibKey()
@@ -145,7 +149,7 @@ func (m *mapFib) set(p *Prefix, newAdj ip.Adj) (oldAdj ip.Adj, ok bool) {
 	return
 }
 
-func (m *mapFib) unset(p *Prefix) (oldAdj ip.Adj, ok bool) {
+func (m *MapFib) Unset(p *Prefix) (oldAdj ip.Adj, ok bool) {
 	k := p.mapFibKey()
 	var r mapFibResult
 	if r, ok = m[p.Len][k]; ok {
@@ -157,12 +161,12 @@ func (m *mapFib) unset(p *Prefix) (oldAdj ip.Adj, ok bool) {
 	return
 }
 
-func (m *mapFib) get(p *Prefix) (r mapFibResult, ok bool) {
+func (m *MapFib) Get(p *Prefix) (r mapFibResult, ok bool) {
 	r, ok = m[p.Len][p.mapFibKey()]
 	return
 }
 
-func (m *mapFib) lookup(a Address) (r mapFibResult, p Prefix, ok bool) {
+func (m *MapFib) Lookup(a Address) (r mapFibResult, p Prefix, ok bool) {
 	p = a.toPrefix()
 	for l := 32; l >= 0; l-- {
 		if m[l] == nil {
@@ -180,8 +184,21 @@ func (m *mapFib) lookup(a Address) (r mapFibResult, p Prefix, ok bool) {
 	return
 }
 
+func (f *MapFib) lookupReachable(m *Main, a Address) (r mapFibResult, p Prefix, ok bool) {
+	if r, p, ok = f.Lookup(a); ok {
+		as := m.GetAdj(r.adj)
+		// Anything that is not a Glean (e.g. matching an interface's address) is "reachable".
+		for i := range as {
+			if ok = !as[i].IsGlean(); !ok {
+				break
+			}
+		}
+	}
+	return
+}
+
 // Calls function for each more specific prefix matching given key.
-func (m *mapFib) foreachMatchingPrefix(key *Prefix, fn func(p *Prefix, r mapFibResult)) {
+func (m *MapFib) foreachMatchingPrefix(key *Prefix, fn func(p *Prefix, r mapFibResult)) {
 	p := Prefix{Address: key.Address}
 	for l := key.Len + 1; l <= 32; l++ {
 		p.Len = l
@@ -191,7 +208,7 @@ func (m *mapFib) foreachMatchingPrefix(key *Prefix, fn func(p *Prefix, r mapFibR
 	}
 }
 
-func (m *mapFib) foreach(fn func(p *Prefix, r mapFibResult)) {
+func (m *MapFib) foreach(fn func(p *Prefix, r mapFibResult)) {
 	var p Prefix
 	for l := 32; l >= 0; l-- {
 		p.Len = uint32(l)
@@ -202,13 +219,13 @@ func (m *mapFib) foreach(fn func(p *Prefix, r mapFibResult)) {
 	}
 }
 
-func (m *mapFib) reset() {
+func (m *MapFib) reset() {
 	for i := range m {
 		m[i] = nil
 	}
 }
 
-func (m *mapFib) clean(fi ip.FibIndex) {
+func (m *MapFib) clean(fi ip.FibIndex) {
 	for i := range m {
 		for _, r := range m[i] {
 			for dst, dstMap := range r.nh {
@@ -229,7 +246,7 @@ type Fib struct {
 	index ip.FibIndex
 
 	// Map-based fib for general accounting and to maintain mtrie (e.g. setLessSpecific).
-	reachable, unreachable mapFib
+	reachable, unreachable MapFib
 
 	// Mtrie for fast lookups.
 	mtrie
@@ -259,9 +276,9 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 
 	// Add/delete in map fib.
 	if isDel {
-		oldAdj, ok = f.reachable.unset(p)
+		oldAdj, ok = f.reachable.Unset(p)
 	} else {
-		oldAdj, ok = f.reachable.set(p, r)
+		oldAdj, ok = f.reachable.Set(p, r)
 	}
 
 	// Add/delete in mtrie fib.
@@ -272,7 +289,7 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 	}
 
 	s := addDelLeaf{
-		key:    p.Address,
+		key:    p.Address.Mask(uint(p.Len)),
 		keyLen: uint8(p.Len),
 		result: r,
 	}
@@ -422,7 +439,7 @@ func (x *mapFibResult) addUnreachableVia(m *Main, f *Fib, p *Prefix) {
 }
 
 func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
-	r, _ := f.reachable.get(p)
+	r, _ := f.reachable.Get(p)
 	// Look up less specific reachable route for prefix.
 	lr, _, lok := f.reachable.getLessSpecific(p)
 	if isDel {
@@ -435,14 +452,14 @@ func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 		if lok {
 			lr.replaceWithMoreSpecific(m, f, p, a, &r)
 		}
-		if r, _, ok := f.unreachable.lookup(p.Address); ok {
+		if r, _, ok := f.unreachable.Lookup(p.Address); ok {
 			r.makeReachable(m, f, p, a)
 		}
 	}
 }
 
 func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHopper, isDel bool, recurse bool) (err error) {
-	nr, np, _ := f.unreachable.lookup(a)
+	nr, np, _ := f.unreachable.Lookup(a)
 	if isDel && recurse {
 		nr.delReachableVia(m, f)
 	}
@@ -457,7 +474,7 @@ func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHo
 }
 
 // Find first less specific route matching address and insert into mtrie.
-func (f *mapFib) getLessSpecific(pʹ *Prefix) (r mapFibResult, p Prefix, ok bool) {
+func (f *MapFib) getLessSpecific(pʹ *Prefix) (r mapFibResult, p Prefix, ok bool) {
 	p = pʹ.Address.toPrefix()
 
 	// No need to consider length 0 since that's not in mtrie.
@@ -502,6 +519,10 @@ func (f *Fib) Del(m *Main, p *Prefix) (ip.Adj, bool)           { return f.addDel
 func (f *Fib) Lookup(a *Address) (r ip.Adj) {
 	r = f.mtrie.lookup(a)
 	return
+}
+func (m *Main) Lookup(a *Address, i ip.FibIndex) (r ip.Adj) {
+	f := m.fibByIndex(i, true)
+	return f.Lookup(a)
 }
 
 func (m *Main) setInterfaceAdjacency(a *ip.Adjacency, si vnet.Si, ia ip.IfAddr) {
@@ -655,7 +676,7 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	nhf := m.fibByIndex(nhr.NextHopFibIndex(m), true)
 
 	var reachable_via_prefix Prefix
-	if r, np, found := nhf.reachable.lookup(nha); found {
+	if r, np, found := nhf.reachable.lookupReachable(m, nha); found {
 		nhAdj = r.adj
 		reachable_via_prefix = np
 	} else {
