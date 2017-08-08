@@ -183,40 +183,38 @@ func (ns *net_namespace) msg_for_vnet_interface(msg netlink.Message) (ok bool) {
 	return
 }
 
-func (m *Main) addMsg(ns *net_namespace, msg netlink.Message) {
-	if msg == nil {
-		// Can happen when reading message from closed channel.
-		return
-	}
-	e := ns.getEvent(m)
-	e.ns = ns
-	e.msgs = append(e.msgs, msg)
-}
-
-func (nm *netlink_main) listener(ns *net_namespace) {
+func (m *netlink_main) listener(ns *net_namespace) {
 	// Block until next message.
 	for msg := range ns.broadcast_socket.Rx {
-		nm.m.addMsg(ns, msg)
+		e := ns.getEvent(m.m)
+		e.ns = ns
+		e.msgs = append(e.msgs, msg)
 
 		// Read any remaining messages without blocking.
 	loop:
 		for {
 			select {
 			case msg := <-ns.broadcast_socket.Rx:
-				nm.m.addMsg(ns, msg)
+				if msg == nil { // channel close
+					break loop
+				}
+				e.msgs = append(e.msgs, msg)
 			default:
 				break loop
 			}
 		}
 
 		// Add event to be handled next time through main loop.
-		ns.current_event.add()
+		e.signal()
 	}
 }
 
 func (ns *net_namespace) listen(nm *netlink_main) {
+	e := ns.getEvent(nm.m)
+	e.ns = ns
+
 	err := ns.broadcast_socket.Listen(func(msg netlink.Message) error {
-		nm.m.addMsg(ns, msg)
+		e.msgs = append(e.msgs, msg)
 		return nil
 	})
 	if err != nil {
@@ -227,10 +225,10 @@ func (ns *net_namespace) listen(nm *netlink_main) {
 	{
 		msg := netlink.NewDoneMessage()
 		msg.Type = netlink.NLMSG_DONE
-		nm.m.addMsg(ns, msg)
+		e.msgs = append(e.msgs, msg)
 	}
 
-	ns.current_event.add()
+	e.signal()
 	go nm.listener(ns)
 }
 
@@ -260,17 +258,12 @@ type netlinkEvent struct {
 func (m *netlink_main) newEvent() interface{} {
 	return &netlinkEvent{m: m.m}
 }
-
 func (ns *net_namespace) getEvent(m *Main) *netlinkEvent {
-	if ns.current_event == nil {
-		ns.current_event = m.eventPool.Get().(*netlinkEvent)
-	}
-	return ns.current_event
+	return m.eventPool.Get().(*netlinkEvent)
 }
-func (e *netlinkEvent) add() {
+func (e *netlinkEvent) signal() {
 	if len(e.msgs) > 0 {
 		e.m.v.SignalEvent(e)
-		e.ns.current_event = nil
 	}
 }
 func (e *netlinkEvent) put() {
