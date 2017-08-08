@@ -104,7 +104,7 @@ func (m *net_namespace_main) discovery_is_done() bool {
 // Called when initial netlink dump via netlink.Listen is done.
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
-	if atomic.AddUint32(&nm.n_namespace_discovery_done, 1) == nm.n_namespace_discovered_at_init {
+	if atomic.AddUint32(&nm.n_namespace_discovery_done, 1) >= nm.n_namespace_discovered_at_init {
 		err = m.netlink_discovery_done_for_all_namespaces()
 	}
 	return
@@ -184,8 +184,6 @@ type net_namespace struct {
 	netlink_socket_fds [2]int
 	netlink_socket_pair
 
-	current_event *netlinkEvent
-
 	interface_by_index map[uint32]*net_namespace_interface
 	interface_by_name  map[string]*net_namespace_interface
 }
@@ -260,31 +258,43 @@ func (m *net_namespace_main) add_del_nsid(name string, nsid int, is_del bool) (e
 	return
 }
 
-func (m *net_namespace_main) watch_namespace_add_del(dir, name string, is_del bool) {
+type add_del_namespace_event struct {
+	vnet.Event
+	m         *net_namespace_main
+	dir, name string
+	is_del    bool
+}
+
+func (e *add_del_namespace_event) String() string { return "add-del-namespace-event" }
+func (e *add_del_namespace_event) EventAction() {
 	var (
 		nsid int
 		err  error
 	)
-	if !is_del {
-		if nsid, err = m.nsid_for_path(dir, name); err != nil {
-			m.m.v.Logf("namespace watch add: %v %v\n", name, err)
+	if !e.is_del {
+		if nsid, err = e.m.nsid_for_path(e.dir, e.name); err != nil {
+			e.m.m.v.Logf("namespace watch add: %v %v\n", e.name, err)
 			return
 		}
 	} else {
-		if ns, ok := m.namespace_by_name[name]; !ok {
-			m.m.v.Logf("namespace watch del: unknown namespace %s\n", name)
+		if ns, ok := e.m.namespace_by_name[e.name]; !ok {
+			e.m.m.v.Logf("namespace watch del: unknown namespace %s\n", e.name)
 			return
 		} else {
 			nsid = ns.nsid
 		}
 	}
-	err = m.add_del_nsid(name, nsid, is_del)
+	err = e.m.add_del_nsid(e.name, nsid, e.is_del)
 	if err != nil {
-		m.m.v.Logf("namespace watch: %v %v\n", name, err)
+		e.m.m.v.Logf("namespace watch: %v %v\n", e.name, err)
 	}
 }
 
-func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) {
+func (m *net_namespace_main) watch_namespace_add_del(dir, name string, is_del bool) {
+	m.m.v.SignalEvent(&add_del_namespace_event{m: m, dir: dir, name: name, is_del: is_del})
+}
+
+func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) (err error) {
 	is_del := false
 	switch msg.Header.Type {
 	case netlink.RTM_NEWLINK:
@@ -378,7 +388,9 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 
 			// Interface moved to a new namespace?
 			if tif.namespace != ns {
-				tif.add_del_namespace(m, ns, is_del)
+				if err = tif.add_del_namespace(m, ns, is_del); err != nil {
+					return
+				}
 			}
 		}
 
@@ -405,6 +417,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		delete(ns.interface_by_index, index)
 		delete(ns.interface_by_name, name)
 	}
+	return
 }
 
 func (m *net_namespace_main) find_interface_with_ifindex(index uint32) (intf *net_namespace_interface) {
@@ -599,7 +612,7 @@ func (ns *net_namespace) add(m *net_namespace_main) (err error) {
 		if err == nil {
 			break
 		}
-		if time.Since(time_start) > 10*time.Millisecond {
+		if time.Since(time_start) > 500*time.Millisecond {
 			return
 		}
 		syscall.Close(ns.ns_fd)
@@ -628,6 +641,9 @@ func (ns *net_namespace) del(m *net_namespace_main) {
 	for index, intf := range ns.interface_by_index {
 		if intf.si != vnet.SiNil {
 			m.m.v.DelSwIf(intf.si)
+		}
+		if intf.tuntap != nil {
+			intf.tuntap.close()
 		}
 		delete(ns.interface_by_index, index)
 	}
