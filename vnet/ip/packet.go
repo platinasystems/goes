@@ -289,8 +289,8 @@ var protocolStrings = [...]string{
 	RESERVED:        "RESERVED",
 }
 
-func (p *Protocol) String() string {
-	return elib.StringerHex(protocolStrings[:], int(*p))
+func (p Protocol) String() string {
+	return elib.StringerHex(protocolStrings[:], int(p))
 }
 
 func (v Protocol) MaskedString(r vnet.MaskedStringer) (s string) {
