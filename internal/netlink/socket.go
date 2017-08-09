@@ -359,7 +359,7 @@ func (s *Socket) gorx() {
 			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
 				continue
 			}
-			fmt.Fprintln(os.Stderr, "Recv:", s.fd, err)
+			fmt.Fprintln(os.Stderr, "Recv:", err)
 			break
 		}
 
