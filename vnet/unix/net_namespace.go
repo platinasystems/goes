@@ -295,6 +295,11 @@ func (m *net_namespace_main) watch_namespace_add_del(dir, name string, is_del bo
 }
 
 func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) (err error) {
+	// Ignore message for deleted namespace.
+	if ns.ns_fd < 0 {
+		return
+	}
+
 	is_del := false
 	switch msg.Header.Type {
 	case netlink.RTM_NEWLINK:
