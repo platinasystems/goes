@@ -357,7 +357,9 @@ func (e *netlinkEvent) EventAction() {
 
 	for imsg, msg := range e.msgs {
 		if v, ok := msg.(*netlink.IfInfoMessage); ok {
-			e.ns.add_del_interface(m, v)
+			if err := e.ns.add_del_interface(m, v); err != nil {
+				m.v.Logf("namespace %s, add/del interface %s: %v\n", e.ns, v.Attrs[netlink.IFLA_IFNAME].String(), err)
+			}
 		}
 
 		if !e.ns.msg_for_vnet_interface(msg) {
