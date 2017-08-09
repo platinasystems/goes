@@ -175,7 +175,7 @@ type adjacencyMain struct {
 type adjAddDelHook func(m *Main, adj Adj, isDel bool)
 type adjSyncCounterHook func(m *Main)
 type AdjGetCounterHandler func(tag string, v vnet.CombinedCounter)
-type adjGetCounterHook func(m *Main, adj, offset Adj, f AdjGetCounterHandler)
+type adjGetCounterHook func(m *Main, adj Adj, f AdjGetCounterHandler)
 
 //go:generate gentemplate -id adjAddDelHook -d Package=ip -d DepsType=adjAddDelHookVec -d Type=adjAddDelHook -d Data=adjAddDelHooks github.com/platinasystems/go/elib/dep/dep.tmpl
 //go:generate gentemplate -id adjSyncHook -d Package=ip -d DepsType=adjSyncCounterHookVec -d Type=adjSyncCounterHook -d Data=adjSyncCounterHooks github.com/platinasystems/go/elib/dep/dep.tmpl
@@ -708,9 +708,9 @@ func (m *Main) RegisterAdjSyncCounterHook(f adjSyncCounterHook, dep ...*dep.Dep)
 	m.adjSyncCounterHookVec.Add(f, dep...)
 }
 
-func (m *Main) CallAdjGetCounterHooks(adj, offset Adj, f AdjGetCounterHandler) {
+func (m *Main) CallAdjGetCounterHooks(adj Adj, f AdjGetCounterHandler) {
 	for i := range m.adjGetCounterHooks {
-		m.adjGetCounterHookVec.Get(i)(m, adj, offset, f)
+		m.adjGetCounterHookVec.Get(i)(m, adj, f)
 	}
 }
 
@@ -753,15 +753,35 @@ func (m *adjacencyMain) clearCounter(a Adj) {
 	}
 }
 
-func (m *Main) ForeachAdjCounter(a, offset Adj, f func(tag string, v vnet.CombinedCounter)) {
+func (m *Main) ForeachAdjCounter(a Adj, f func(tag string, v vnet.CombinedCounter)) {
 	var v vnet.CombinedCounter
 	for _, t := range m.threads {
 		var u vnet.CombinedCounter
-		t.counters.Get(uint(a+offset), &u)
+		t.counters.Get(uint(a), &u)
 		v.Add(&u)
 	}
 	f("", v)
-	m.CallAdjGetCounterHooks(a, offset, f)
+	m.CallAdjGetCounterHooks(a, f)
+	return
+}
+
+func (m *adjacencyMain) EqualAdj(ai0, ai1 Adj) (same bool) {
+	a0, a1 := &m.adjacencyHeap.elts[ai0], &m.adjacencyHeap.elts[ai1]
+	ni0, ni1 := a0.LookupNextIndex, a1.LookupNextIndex
+	if ni0 != ni1 {
+		return
+	}
+	switch ni0 {
+	case LookupNextGlean:
+		if a0.Index != a1.Index {
+			return
+		}
+	case LookupNextRewrite:
+		if string(a0.Rewrite.Slice()) != string(a1.Rewrite.Slice()) {
+			return
+		}
+	}
+	same = true
 	return
 }
 

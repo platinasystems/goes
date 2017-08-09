@@ -44,11 +44,6 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 		return
 	}
 
-	m.showReachable(w, cf)
-	return
-}
-
-func (m *Main) showReachable(w cli.Writer, cf showFibConfig) {
 	// Sync adjacency stats with hardware.
 	m.CallAdjSyncCounterHooks()
 
@@ -130,20 +125,23 @@ func (m *Main) showReachable(w cli.Writer, cf showFibConfig) {
 			fmt.Fprintf(w, "%s", &r.r.nh)
 		}
 	}
+
+	return
 }
 
-func (m *Main) adjLines(adj ip.Adj, detail bool) (lines []string) {
+func (m *Main) adjLines(baseAdj ip.Adj, detail bool) (lines []string) {
 	const initialSpace = "  "
-	nhs := m.NextHopsForAdj(adj)
-	adjs := m.GetAdj(adj)
-	ai := 0
+	nhs := m.NextHopsForAdj(baseAdj)
+	adjs := m.GetAdj(baseAdj)
+	ai := ip.Adj(0)
 	for ni := range nhs {
 		nh := &nhs[ni]
-		line := fmt.Sprintf("%s%6d: ", initialSpace, int(adj)+ai)
+		adj := baseAdj + ai
+		line := fmt.Sprintf("%s%6d: ", initialSpace, adj)
 		ss := []string{}
 		adj_lines := adjs[ai].String(&m.Main)
-		if nh.Weight != 1 || nh.Adj != adj {
-			adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", int(adj)+ai, int(adj)+ai+int(nh.Weight)-1, nh.Weight, nh.Adj)
+		if nh.Weight != 1 || nh.Adj != baseAdj {
+			adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", adj, adj+ip.Adj(nh.Weight)-1, nh.Weight, nh.Adj)
 		}
 		// Indent subsequent lines like first line if more than 1 lines.
 		for i := 1; i < len(adj_lines); i++ {
@@ -151,7 +149,12 @@ func (m *Main) adjLines(adj ip.Adj, detail bool) (lines []string) {
 		}
 		ss = append(ss, adj_lines...)
 
-		m.Main.ForeachAdjCounter(nh.Adj, ip.Adj(0), func(tag string, v vnet.CombinedCounter) {
+		counterAdj := nh.Adj
+		if !m.EqualAdj(adj, nh.Adj) {
+			counterAdj = adj
+		}
+
+		m.Main.ForeachAdjCounter(counterAdj, func(tag string, v vnet.CombinedCounter) {
 			if v.Packets != 0 || detail {
 				ss = append(ss, fmt.Sprintf("%s%spackets %16d", initialSpace, tag, v.Packets))
 				ss = append(ss, fmt.Sprintf("%s%sbytes   %16d", initialSpace, tag, v.Bytes))
@@ -163,7 +166,7 @@ func (m *Main) adjLines(adj ip.Adj, detail bool) (lines []string) {
 			line = initialSpace
 		}
 
-		ai += int(nh.Weight)
+		ai += ip.Adj(nh.Weight)
 	}
 
 	return
