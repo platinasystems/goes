@@ -30,8 +30,9 @@ func WithNamespace(new_ns_fd, old_ns_fd, namespace_type int, f func() (err error
 
 	// Move to new namespace.
 	if change_ns {
-		if first_setns_errno = setns(new_ns_fd, namespace_type); first_setns_errno != 0 {
-			err = os.NewSyscallError("setns", error(first_setns_errno))
+		if e := setns(new_ns_fd, namespace_type); e != 0 {
+			err = os.NewSyscallError("setns", error(e))
+			first_setns_errno = e
 			return
 		}
 	}
