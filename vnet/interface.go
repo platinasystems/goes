@@ -256,16 +256,6 @@ func (m *Vnet) NewSwSubInterface(supSi Si, id IfId) (si Si) {
 	return
 }
 func (si Si) IsSwSubInterface(v *Vnet) bool { return v.SwIf(si).kind == SwIfKindSubInterface }
-func (si Si) Id(v *Vnet) (id IfId) {
-	s := v.SwIf(si)
-	switch s.kind {
-	case SwIfKindSubInterface:
-		id = s.id
-	case SwIfKindHardware:
-		id = v.SupHwIf(s).defaultId
-	}
-	return
-}
 
 func (m *interfaceMain) SwIf(i Si) *SwIf { return &m.swInterfaces.elts[i] }
 func (m *interfaceMain) SupSi(i Si) Si   { return m.SwIf(i).supSi }
@@ -325,6 +315,7 @@ func (i *SwIf) Id(v *Vnet) (id IfId) {
 	}
 	return
 }
+func (si Si) Id(v *Vnet) (id IfId) { return v.SwIf(si).Id(v) }
 
 func (i *SwIf) IsAdminUp() bool      { return i.flags&swIfAdminUp != 0 }
 func (si Si) IsAdminUp(v *Vnet) bool { return v.SwIf(si).IsAdminUp() }
