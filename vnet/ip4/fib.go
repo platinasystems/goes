@@ -375,6 +375,9 @@ func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibR
 	for dst, dstMap := range more.nh {
 		// Move all destinations from more -> less.
 		delete(more.nh, dst)
+		if less.nh == nil {
+			less.nh = make(map[idst]map[ipre]NextHopper)
+		}
 		less.nh[dst] = dstMap
 		// Replace adjacencies: more -> less.
 		for dp, r := range dstMap {
