@@ -39,6 +39,9 @@ func (d *dev) vnetInit() {
 	a := d.pci_dev.Addr
 	ethernet.RegisterInterface(v, d, &d.ethIfConfig, "ixge%d-%d-%d", a.Bus, a.Slot, a.Fn)
 	v.RegisterInterfaceNode(d, d.Hi(), d.Name())
+	if d.m.PuntNode != "" {
+		d.Hi().SetAdminUp(v, true)
+	}
 }
 
 func (d *dev) DriverName() string { return "ixge" }
