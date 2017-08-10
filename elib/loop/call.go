@@ -175,7 +175,7 @@ func (a *activeNode) addNext(ap *activePoller, nn *nextNode, withIndex uint) {
 
 		c, l := as.Cap(), as.Len()
 		if x >= c {
-			c = int(elib.NextResizeCap(elib.Index(x)))
+			c = int(elib.NextResizeCap(uint(x)))
 			na := reflect.MakeSlice(as.Type(), c, c)
 			reflect.Copy(na, as)
 			for j := 0; j < l; j++ {
