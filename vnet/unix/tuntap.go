@@ -233,6 +233,7 @@ var ifreq_type_names = map[ifreq_type]string{
 	ifreq_GETIFHWADDR:   "GETIFHWADDR",
 	ifreq_SETIFHWADDR:   "SETIFHWADDR",
 	ifreq_SETIFMTU:      "SETIFMTU",
+	ifreq_SIFTXQLEN:     "SIOCSIFTXQLEN",
 }
 
 func (t ifreq_type) String() string {
@@ -364,7 +365,10 @@ func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 	// Create any VNET interfaces that were not found via netlink discovery.
 	for si, intf := range m.vnet_tuntap_interface_by_si {
 		if _, ok := nm.interface_by_si[si]; !ok {
-			intf.namespace = &nm.default_namespace
+			// vnet-NS devices already have namespace set.
+			if intf.namespace == nil {
+				intf.namespace = &nm.default_namespace
+			}
 			err = intf.init(m)
 			if err != nil {
 				return

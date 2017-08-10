@@ -209,6 +209,21 @@ func (m *netlink_main) listener(ns *net_namespace) {
 	}
 }
 
+type net_namespace_netlink_listen_done_event struct {
+	vnet.Event
+	ns *net_namespace
+	m  *Main
+}
+
+func (e *net_namespace_netlink_listen_done_event) String() string {
+	return "netlink-listen-done " + e.ns.name
+}
+func (e *net_namespace_netlink_listen_done_event) EventAction() {
+	if err := e.ns.netlink_dump_done(e.m); err != nil {
+		e.m.v.Logf("%v: %v\n", e.ns, err)
+	}
+}
+
 func (ns *net_namespace) listen(nm *netlink_main) {
 	e := ns.getEvent(nm.m)
 	e.ns = ns
@@ -221,14 +236,9 @@ func (ns *net_namespace) listen(nm *netlink_main) {
 		panic(err)
 	}
 
-	// Add artificial done message to mark end of initial dump for this namespace.
-	{
-		msg := netlink.NewDoneMessage()
-		msg.Type = netlink.NLMSG_DONE
-		e.msgs = append(e.msgs, msg)
-	}
-
 	e.signal()
+	e.m.v.SignalEvent(&net_namespace_netlink_listen_done_event{ns: ns, m: nm.m})
+
 	go nm.listener(ns)
 }
 
@@ -356,9 +366,14 @@ func (e *netlinkEvent) EventAction() {
 	known := false
 
 	for imsg, msg := range e.msgs {
+		if e.ns.is_deleted() {
+			continue
+		}
+
 		if v, ok := msg.(*netlink.IfInfoMessage); ok {
 			if err := e.ns.add_del_interface(m, v); err != nil {
 				m.v.Logf("namespace %s, add/del interface %s: %v\n", e.ns, v.Attrs[netlink.IFLA_IFNAME].String(), err)
+				continue
 			}
 		}
 
@@ -367,8 +382,6 @@ func (e *netlinkEvent) EventAction() {
 			if m.verbose_netlink {
 				m.v.Logf("%s: netlink ignore %s\n", e.ns, msg)
 			}
-			// Done with message.
-			msg.Close()
 			continue
 		}
 
@@ -423,9 +436,6 @@ func (e *netlinkEvent) EventAction() {
 		case *netlink.NetnsMessage:
 			known = true
 			err = e.netnsMessage(v)
-		case *netlink.DoneMessage:
-			known = true
-			err = e.ns.netlink_dump_done(m)
 		}
 		if !known {
 			err = fmt.Errorf("unkown")
@@ -434,7 +444,10 @@ func (e *netlinkEvent) EventAction() {
 			m.v.Logf("%s: netlink %s: %s\n", e.ns, err, msg.String())
 		}
 		m.msg_stats.handled.count(msg)
-		// Return message to pools.
+	}
+
+	// Return all messages to pools.
+	for _, msg := range e.msgs {
 		msg.Close()
 	}
 	e.put()

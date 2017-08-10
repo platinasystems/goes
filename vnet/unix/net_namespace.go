@@ -46,7 +46,7 @@ func (m *net_namespace_main) read_dir(dir_name string, f func(dir, name string, 
 	if fis, err = ioutil.ReadDir(dir_name); err != nil {
 		return
 	}
-	m.n_namespace_discovered_at_init = 1 + uint32(len(fis))
+	m.n_namespace_discovered_at_init = 1 + uint32(len(fis)) // 1 extra for default namespace
 	for _, fi := range fis {
 		f(dir_name, fi.Name(), false)
 	}
@@ -104,7 +104,7 @@ func (m *net_namespace_main) discovery_is_done() bool {
 // Called when initial netlink dump via netlink.Listen is done.
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
-	if atomic.AddUint32(&nm.n_namespace_discovery_done, 1) >= nm.n_namespace_discovered_at_init {
+	if atomic.AddUint32(&nm.n_namespace_discovery_done, 1) == nm.n_namespace_discovered_at_init {
 		err = m.netlink_discovery_done_for_all_namespaces()
 	}
 	return
@@ -295,11 +295,6 @@ func (m *net_namespace_main) watch_namespace_add_del(dir, name string, is_del bo
 }
 
 func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) (err error) {
-	// Ignore message for deleted namespace.
-	if ns.ns_fd < 0 {
-		return
-	}
-
 	is_del := false
 	switch msg.Header.Type {
 	case netlink.RTM_NEWLINK:
@@ -641,6 +636,8 @@ func (ns *net_namespace) add(m *net_namespace_main) (err error) {
 	}
 	return
 }
+
+func (ns *net_namespace) is_deleted() bool { return ns.ns_fd < 0 }
 
 func (ns *net_namespace) del(m *net_namespace_main) {
 	for index, intf := range ns.interface_by_index {
