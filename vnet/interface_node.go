@@ -82,29 +82,21 @@ func (n *interfaceNode) ifOutputThread() {
 	}
 }
 
-const always_output = true
-
 func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 	n.tx = tx
 	n.freeChan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
 	n.max_tx_refs = 2 * MaxVectorLen
-	if always_output {
-		n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
-		go n.ifOutputThread()
-	}
 }
 
 func (h *HwIf) txNodeUpDown(isUp bool) {
-	if !always_output {
-		for _, hn := range h.n {
-			n := hn.GetInterfaceNode()
-			if isUp {
-				n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
-				go n.ifOutputThread()
-			} else {
-				close(n.tx_chan)
-				n.tx_chan = nil
-			}
+	for _, hn := range h.n {
+		n := hn.GetInterfaceNode()
+		if isUp {
+			n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+			go n.ifOutputThread()
+		} else {
+			close(n.tx_chan)
+			n.tx_chan = nil
 		}
 	}
 }
