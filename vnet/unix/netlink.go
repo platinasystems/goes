@@ -148,7 +148,7 @@ func (i *dummy_interface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
 func (ns *net_namespace) knownInterface(i uint32) (ok bool) {
 	_, ok = ns.getTuntapInterface(i)
 	if !ok {
-		_, ok = ns.si_by_ifindex[i]
+		_, ok = ns.si_by_ifindex.get(i)
 	}
 	return
 }
@@ -326,7 +326,7 @@ func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_int
 	if ok {
 		si = i.si
 	} else {
-		si, ok = ns.si_by_ifindex[ifIndex]
+		si, ok = ns.si_by_ifindex.get(ifIndex)
 	}
 	if !ok {
 		si = vnet.SiNil

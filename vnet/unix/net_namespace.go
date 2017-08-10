@@ -159,6 +159,32 @@ type net_namespace_interface struct {
 	tuntap               *tuntap_interface
 }
 
+func tuntap_address_key(name string, index uint) string {
+	return fmt.Sprintf("%s-%d", name, index)
+}
+
+type si_by_ifindex struct {
+	mu sync.RWMutex
+	m  map[uint32]vnet.Si
+}
+
+func (i *si_by_ifindex) set(x uint32, si vnet.Si) {
+	i.mu.Lock()
+	i.m[x] = si
+	i.mu.Unlock()
+}
+func (i *si_by_ifindex) unset(x uint32) {
+	i.mu.Lock()
+	delete(i.m, x)
+	i.mu.Unlock()
+}
+func (i *si_by_ifindex) get(x uint32) (si vnet.Si, ok bool) {
+	i.mu.RLock()
+	si, ok = i.m[x]
+	i.mu.RUnlock()
+	return
+}
+
 type net_namespace struct {
 	m *net_namespace_main
 
@@ -177,7 +203,7 @@ type net_namespace struct {
 	vnet_tun_interface               *tuntap_interface
 	vnet_tuntap_interface_by_ifindex map[uint32]*tuntap_interface
 	dummy_interface_by_ifindex       map[uint32]*dummy_interface
-	si_by_ifindex                    map[uint32]vnet.Si
+	si_by_ifindex                    si_by_ifindex
 
 	is_default bool
 
@@ -368,7 +394,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		}
 
 		is_tuntap := intf.kind == netlink.InterfaceKindTun
-		tuntap_key := intf.name
+		tuntap_key := tuntap_address_key(intf.name, ns.index)
 		if len(address) > 0 {
 			tuntap_key = string(address)
 		}
@@ -411,7 +437,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			if intf.kind == netlink.InterfaceKindVlan {
 				m.add_del_vlan(intf, msg, is_del)
 			}
-			delete(ns.si_by_ifindex, index)
+			ns.si_by_ifindex.unset(index)
 			delete(m.interface_by_si, intf.si)
 		}
 		delete(ns.interface_by_index, index)
@@ -489,10 +515,10 @@ func (m *net_namespace_main) set_si(intf *net_namespace_interface, si vnet.Si) {
 	ns := intf.namespace
 
 	// Set up ifindex to vnet Si mapping.
-	if ns.si_by_ifindex == nil {
-		ns.si_by_ifindex = make(map[uint32]vnet.Si)
+	if ns.si_by_ifindex.m == nil {
+		ns.si_by_ifindex.m = make(map[uint32]vnet.Si)
 	}
-	ns.si_by_ifindex[intf.ifindex] = si
+	ns.si_by_ifindex.set(intf.ifindex, si)
 
 	// Set up si to interface mapping.
 	if m.interface_by_si == nil {

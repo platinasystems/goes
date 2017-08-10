@@ -155,7 +155,7 @@ const (
 	rx_error_tun_not_ip4_or_ip6
 )
 
-func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, i, n_bytes_in_packet, ifindex uint) {
+func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, i, n_bytes_in_packet uint, ifindex uint32) {
 	size := rx.buffer_pool.Size
 	n_left := n_bytes_in_packet
 	var n_refs uint
@@ -176,10 +176,10 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 	ref := p.chain.Done()
 	ref.SetError(&rx.Node, rx_error_non_vnet_interface)
 	if ns.m.m.verbose_packets {
-		i := ns.interface_by_index[uint32(ifindex)]
+		i := ns.interface_by_index[ifindex]
 		ns.m.m.v.Logf("unix rx ns %s %s: %s\n", ns.name, i.name, ethernet.RefString(&ref))
 	}
-	if si, ok := ns.si_by_ifindex[uint32(ifindex)]; ok {
+	if si, ok := ns.si_by_ifindex.get(ifindex); ok {
 		ref.Si = si
 		n := rx_node_next(rx.next_by_si[si])
 		if n == rx_node_next_inject_ip {
@@ -275,7 +275,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 	for i := 0; i < n_packets; i++ {
 		p := &v.p[i]
 		m := &v.m[i]
-		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), uint(intf.ifindex))
+		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
 	}
 	elog.GenEventf("unix-rx ready %d", n_packets)
 	rx.rv_input <- rv

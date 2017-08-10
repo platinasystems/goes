@@ -348,7 +348,7 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	}
 	m.vnet_tuntap_interface_by_si[si] = intf
 
-	key := name
+	key := tuntap_address_key(name, uint(si.Id(v)))
 	if !isTun {
 		key = string(hi.GetAddress(v))
 	}

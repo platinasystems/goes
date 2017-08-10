@@ -16,10 +16,7 @@ type vnet_tun_main struct {
 	vnet.SwInterfaceType
 }
 
-func (m *vnet_tun_main) SwInterfaceName(v *vnet.Vnet, s *vnet.SwIf) string {
-	ns := m.m.net_namespace_main.namespace_pool.entries[s.GetId()]
-	return "vnet-" + ns.name
-}
+func (m *vnet_tun_main) SwInterfaceName(v *vnet.Vnet, s *vnet.SwIf) string { return "vnet" }
 
 func (m *vnet_tun_main) init(um *Main) {
 	m.m = um
