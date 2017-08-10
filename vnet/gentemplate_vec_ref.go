@@ -14,8 +14,8 @@ import (
 type RefVec []Ref
 
 func (p *RefVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]Ref, l, c)
@@ -26,9 +26,9 @@ func (p *RefVec) Resize(n uint) {
 }
 
 func (p *RefVec) validate(new_len uint, zero Ref) *Ref {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *RefVec) validate(new_len uint, zero Ref) *Ref {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *RefVec) validateSlowPath(zero Ref, c, l, lʹ elib.Index) *Ref {
+func (p *RefVec) validateSlowPath(zero Ref, c, l, lʹ uint) *Ref {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]Ref, cNext, cNext)

@@ -38,8 +38,8 @@ func (p *punt_packet_disposition_pool) IsFree(i uint) (v bool) {
 }
 
 func (p *punt_packet_disposition_pool) Resize(n uint) {
-	c := elib.Index(cap(p.dispositions))
-	l := elib.Index(len(p.dispositions) + int(n))
+	c := uint(cap(p.dispositions))
+	l := uint(len(p.dispositions) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]punt_packet_disposition, l, c)
@@ -50,15 +50,15 @@ func (p *punt_packet_disposition_pool) Resize(n uint) {
 }
 
 func (p *punt_packet_disposition_pool) Validate(i uint) {
-	c := elib.Index(cap(p.dispositions))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.dispositions))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]punt_packet_disposition, l, c)
 		copy(q, p.dispositions)
 		p.dispositions = q
 	}
-	if l > elib.Index(len(p.dispositions)) {
+	if l > uint(len(p.dispositions)) {
 		p.dispositions = p.dispositions[:l]
 	}
 }

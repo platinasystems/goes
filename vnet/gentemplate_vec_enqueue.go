@@ -14,8 +14,8 @@ import (
 type enqueue_vec []*enqueue
 
 func (p *enqueue_vec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]*enqueue, l, c)
@@ -26,9 +26,9 @@ func (p *enqueue_vec) Resize(n uint) {
 }
 
 func (p *enqueue_vec) validate(new_len uint, zero *enqueue) **enqueue {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *enqueue_vec) validate(new_len uint, zero *enqueue) **enqueue {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *enqueue_vec) validateSlowPath(zero *enqueue, c, l, lʹ elib.Index) **enqueue {
+func (p *enqueue_vec) validateSlowPath(zero *enqueue, c, l, lʹ uint) **enqueue {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]*enqueue, cNext, cNext)

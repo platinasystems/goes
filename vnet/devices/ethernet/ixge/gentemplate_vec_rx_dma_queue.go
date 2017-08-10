@@ -14,8 +14,8 @@ import (
 type rx_dma_queue_vec []rx_dma_queue
 
 func (p *rx_dma_queue_vec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]rx_dma_queue, l, c)
@@ -26,9 +26,9 @@ func (p *rx_dma_queue_vec) Resize(n uint) {
 }
 
 func (p *rx_dma_queue_vec) validate(new_len uint, zero rx_dma_queue) *rx_dma_queue {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *rx_dma_queue_vec) validate(new_len uint, zero rx_dma_queue) *rx_dma_que
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *rx_dma_queue_vec) validateSlowPath(zero rx_dma_queue, c, l, lʹ elib.Index) *rx_dma_queue {
+func (p *rx_dma_queue_vec) validateSlowPath(zero rx_dma_queue, c, l, lʹ uint) *rx_dma_queue {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]rx_dma_queue, cNext, cNext)

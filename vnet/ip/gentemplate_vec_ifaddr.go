@@ -14,8 +14,8 @@ import (
 type IfAddrVec []IfAddr
 
 func (p *IfAddrVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]IfAddr, l, c)
@@ -26,9 +26,9 @@ func (p *IfAddrVec) Resize(n uint) {
 }
 
 func (p *IfAddrVec) validate(new_len uint, zero IfAddr) *IfAddr {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *IfAddrVec) validate(new_len uint, zero IfAddr) *IfAddr {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *IfAddrVec) validateSlowPath(zero IfAddr, c, l, lʹ elib.Index) *IfAddr {
+func (p *IfAddrVec) validateSlowPath(zero IfAddr, c, l, lʹ uint) *IfAddr {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]IfAddr, cNext, cNext)

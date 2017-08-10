@@ -14,8 +14,8 @@ import (
 type inject_packet_disposition_vec []inject_packet_disposition
 
 func (p *inject_packet_disposition_vec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]inject_packet_disposition, l, c)
@@ -26,9 +26,9 @@ func (p *inject_packet_disposition_vec) Resize(n uint) {
 }
 
 func (p *inject_packet_disposition_vec) validate(new_len uint, zero inject_packet_disposition) *inject_packet_disposition {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *inject_packet_disposition_vec) validate(new_len uint, zero inject_packe
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *inject_packet_disposition_vec) validateSlowPath(zero inject_packet_disposition, c, l, lʹ elib.Index) *inject_packet_disposition {
+func (p *inject_packet_disposition_vec) validateSlowPath(zero inject_packet_disposition, c, l, lʹ uint) *inject_packet_disposition {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]inject_packet_disposition, cNext, cNext)

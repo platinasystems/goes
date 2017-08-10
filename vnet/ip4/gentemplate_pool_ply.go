@@ -38,8 +38,8 @@ func (p *plyPool) IsFree(i uint) (v bool) {
 }
 
 func (p *plyPool) Resize(n uint) {
-	c := elib.Index(cap(p.plys))
-	l := elib.Index(len(p.plys) + int(n))
+	c := uint(cap(p.plys))
+	l := uint(len(p.plys) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]ply, l, c)
@@ -50,15 +50,15 @@ func (p *plyPool) Resize(n uint) {
 }
 
 func (p *plyPool) Validate(i uint) {
-	c := elib.Index(cap(p.plys))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.plys))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]ply, l, c)
 		copy(q, p.plys)
 		p.plys = q
 	}
-	if l > elib.Index(len(p.plys)) {
+	if l > uint(len(p.plys)) {
 		p.plys = p.plys[:l]
 	}
 }

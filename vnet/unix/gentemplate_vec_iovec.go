@@ -14,8 +14,8 @@ import (
 type iovecVec []iovec
 
 func (p *iovecVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]iovec, l, c)
@@ -26,9 +26,9 @@ func (p *iovecVec) Resize(n uint) {
 }
 
 func (p *iovecVec) validate(new_len uint, zero iovec) *iovec {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *iovecVec) validate(new_len uint, zero iovec) *iovec {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *iovecVec) validateSlowPath(zero iovec, c, l, lʹ elib.Index) *iovec {
+func (p *iovecVec) validateSlowPath(zero iovec, c, l, lʹ uint) *iovec {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]iovec, cNext, cNext)

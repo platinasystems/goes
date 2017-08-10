@@ -14,8 +14,8 @@ import (
 type interfaceVec []*tuntap_interface
 
 func (p *interfaceVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]*tuntap_interface, l, c)
@@ -26,9 +26,9 @@ func (p *interfaceVec) Resize(n uint) {
 }
 
 func (p *interfaceVec) validate(new_len uint, zero *tuntap_interface) **tuntap_interface {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *interfaceVec) validate(new_len uint, zero *tuntap_interface) **tuntap_i
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *interfaceVec) validateSlowPath(zero *tuntap_interface, c, l, lʹ elib.Index) **tuntap_interface {
+func (p *interfaceVec) validateSlowPath(zero *tuntap_interface, c, l, lʹ uint) **tuntap_interface {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]*tuntap_interface, cNext, cNext)

@@ -14,8 +14,8 @@ import (
 type errVec []err
 
 func (p *errVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]err, l, c)
@@ -26,9 +26,9 @@ func (p *errVec) Resize(n uint) {
 }
 
 func (p *errVec) validate(new_len uint, zero err) *err {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *errVec) validate(new_len uint, zero err) *err {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *errVec) validateSlowPath(zero err, c, l, lʹ elib.Index) *err {
+func (p *errVec) validateSlowPath(zero err, c, l, lʹ uint) *err {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]err, cNext, cNext)

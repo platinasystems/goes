@@ -38,8 +38,8 @@ func (p *swIfPool) IsFree(i uint) (v bool) {
 }
 
 func (p *swIfPool) Resize(n uint) {
-	c := elib.Index(cap(p.elts))
-	l := elib.Index(len(p.elts) + int(n))
+	c := uint(cap(p.elts))
+	l := uint(len(p.elts) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]SwIf, l, c)
@@ -50,15 +50,15 @@ func (p *swIfPool) Resize(n uint) {
 }
 
 func (p *swIfPool) Validate(i uint) {
-	c := elib.Index(cap(p.elts))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.elts))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]SwIf, l, c)
 		copy(q, p.elts)
 		p.elts = q
 	}
-	if l > elib.Index(len(p.elts)) {
+	if l > uint(len(p.elts)) {
 		p.elts = p.elts[:l]
 	}
 }

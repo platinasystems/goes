@@ -38,8 +38,8 @@ func (p *ifAddressPool) IsFree(i uint) (v bool) {
 }
 
 func (p *ifAddressPool) Resize(n uint) {
-	c := elib.Index(cap(p.ifAddrs))
-	l := elib.Index(len(p.ifAddrs) + int(n))
+	c := uint(cap(p.ifAddrs))
+	l := uint(len(p.ifAddrs) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]IfAddress, l, c)
@@ -50,15 +50,15 @@ func (p *ifAddressPool) Resize(n uint) {
 }
 
 func (p *ifAddressPool) Validate(i uint) {
-	c := elib.Index(cap(p.ifAddrs))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.ifAddrs))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]IfAddress, l, c)
 		copy(q, p.ifAddrs)
 		p.ifAddrs = q
 	}
-	if l > elib.Index(len(p.ifAddrs)) {
+	if l > uint(len(p.ifAddrs)) {
 		p.ifAddrs = p.ifAddrs[:l]
 	}
 }

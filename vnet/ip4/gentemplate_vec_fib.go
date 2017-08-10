@@ -14,8 +14,8 @@ import (
 type FibVec []*Fib
 
 func (p *FibVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]*Fib, l, c)
@@ -26,9 +26,9 @@ func (p *FibVec) Resize(n uint) {
 }
 
 func (p *FibVec) validate(new_len uint, zero *Fib) **Fib {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *FibVec) validate(new_len uint, zero *Fib) **Fib {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *FibVec) validateSlowPath(zero *Fib, c, l, lʹ elib.Index) **Fib {
+func (p *FibVec) validateSlowPath(zero *Fib, c, l, lʹ uint) **Fib {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]*Fib, cNext, cNext)

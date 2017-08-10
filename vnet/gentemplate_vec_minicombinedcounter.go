@@ -14,8 +14,8 @@ import (
 type miniCombinedCounterVec []miniCombinedCounter
 
 func (p *miniCombinedCounterVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]miniCombinedCounter, l, c)
@@ -26,9 +26,9 @@ func (p *miniCombinedCounterVec) Resize(n uint) {
 }
 
 func (p *miniCombinedCounterVec) validate(new_len uint, zero miniCombinedCounter) *miniCombinedCounter {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *miniCombinedCounterVec) validate(new_len uint, zero miniCombinedCounter
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *miniCombinedCounterVec) validateSlowPath(zero miniCombinedCounter, c, l, lʹ elib.Index) *miniCombinedCounter {
+func (p *miniCombinedCounterVec) validateSlowPath(zero miniCombinedCounter, c, l, lʹ uint) *miniCombinedCounter {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]miniCombinedCounter, cNext, cNext)
