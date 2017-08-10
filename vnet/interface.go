@@ -46,7 +46,7 @@ type HwIf struct {
 	defaultId IfId
 	subSiById map[IfId]Si
 
-	n outputInterfaceNoder
+	n []outputInterfaceNoder
 }
 
 //go:generate gentemplate -d Package=vnet -id HwIf -d PoolType=hwIferPool -d Type=HwInterfacer -d Data=elts github.com/platinasystems/go/elib/pool.tmpl

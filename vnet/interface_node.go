@@ -59,7 +59,7 @@ func (v *Vnet) registerInterfaceNodeHelper(n outputInterfaceNoder, hi Hi) {
 	x.hi = hi
 	x.setupTx(n)
 	h := v.HwIf(hi)
-	h.n = n
+	h.n = append(h.n, n)
 }
 
 func (v *Vnet) RegisterOutputInterfaceNode(n outputInterfaceNoder, hi Hi, name string, args ...interface{}) {
@@ -95,14 +95,16 @@ func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 }
 
 func (h *HwIf) txNodeUpDown(isUp bool) {
-	n := h.n.GetInterfaceNode()
 	if !always_output {
-		if isUp {
-			n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
-			go n.ifOutputThread()
-		} else {
-			close(n.tx_chan)
-			n.tx_chan = nil
+		for _, hn := range h.n {
+			n := hn.GetInterfaceNode()
+			if isUp {
+				n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+				go n.ifOutputThread()
+			} else {
+				close(n.tx_chan)
+				n.tx_chan = nil
+			}
 		}
 	}
 }
