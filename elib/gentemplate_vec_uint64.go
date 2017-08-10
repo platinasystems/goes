@@ -10,8 +10,8 @@ package elib
 type Uint64Vec []uint64
 
 func (p *Uint64Vec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]uint64, l, c)
@@ -22,9 +22,9 @@ func (p *Uint64Vec) Resize(n uint) {
 }
 
 func (p *Uint64Vec) validate(new_len uint, zero uint64) *uint64 {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *Uint64Vec) validate(new_len uint, zero uint64) *uint64 {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *Uint64Vec) validateSlowPath(zero uint64, c, l, lʹ Index) *uint64 {
+func (p *Uint64Vec) validateSlowPath(zero uint64, c, l, lʹ uint) *uint64 {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]uint64, cNext, cNext)

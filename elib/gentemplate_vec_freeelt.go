@@ -10,8 +10,8 @@ package elib
 type freeEltVec []freeElt
 
 func (p *freeEltVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]freeElt, l, c)
@@ -22,9 +22,9 @@ func (p *freeEltVec) Resize(n uint) {
 }
 
 func (p *freeEltVec) validate(new_len uint, zero freeElt) *freeElt {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *freeEltVec) validate(new_len uint, zero freeElt) *freeElt {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *freeEltVec) validateSlowPath(zero freeElt, c, l, lʹ Index) *freeElt {
+func (p *freeEltVec) validateSlowPath(zero freeElt, c, l, lʹ uint) *freeElt {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]freeElt, cNext, cNext)

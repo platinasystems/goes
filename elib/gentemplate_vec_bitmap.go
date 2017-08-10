@@ -10,8 +10,8 @@ package elib
 type BitmapVec []Bitmap
 
 func (p *BitmapVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]Bitmap, l, c)
@@ -22,9 +22,9 @@ func (p *BitmapVec) Resize(n uint) {
 }
 
 func (p *BitmapVec) validate(new_len uint, zero Bitmap) *Bitmap {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *BitmapVec) validate(new_len uint, zero Bitmap) *Bitmap {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *BitmapVec) validateSlowPath(zero Bitmap, c, l, lʹ Index) *Bitmap {
+func (p *BitmapVec) validateSlowPath(zero Bitmap, c, l, lʹ uint) *Bitmap {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]Bitmap, cNext, cNext)

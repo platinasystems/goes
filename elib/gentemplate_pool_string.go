@@ -34,8 +34,8 @@ func (p *StringPool) IsFree(i uint) (v bool) {
 }
 
 func (p *StringPool) Resize(n uint) {
-	c := Index(cap(p.Strings))
-	l := Index(len(p.Strings) + int(n))
+	c := uint(cap(p.Strings))
+	l := uint(len(p.Strings) + int(n))
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]string, l, c)
@@ -46,15 +46,15 @@ func (p *StringPool) Resize(n uint) {
 }
 
 func (p *StringPool) Validate(i uint) {
-	c := Index(cap(p.Strings))
-	l := Index(i) + 1
+	c := uint(cap(p.Strings))
+	l := uint(i) + 1
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]string, l, c)
 		copy(q, p.Strings)
 		p.Strings = q
 	}
-	if l > Index(len(p.Strings)) {
+	if l > uint(len(p.Strings)) {
 		p.Strings = p.Strings[:l]
 	}
 }

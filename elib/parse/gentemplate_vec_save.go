@@ -14,8 +14,8 @@ import (
 type saveVec []save
 
 func (p *saveVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]save, l, c)
@@ -26,9 +26,9 @@ func (p *saveVec) Resize(n uint) {
 }
 
 func (p *saveVec) validate(new_len uint, zero save) *save {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *saveVec) validate(new_len uint, zero save) *save {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *saveVec) validateSlowPath(zero save, c, l, lʹ elib.Index) *save {
+func (p *saveVec) validateSlowPath(zero save, c, l, lʹ uint) *save {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]save, cNext, cNext)

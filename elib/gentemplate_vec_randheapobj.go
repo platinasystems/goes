@@ -10,8 +10,8 @@ package elib
 type randHeapObjVec []randHeapObj
 
 func (p *randHeapObjVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]randHeapObj, l, c)
@@ -22,9 +22,9 @@ func (p *randHeapObjVec) Resize(n uint) {
 }
 
 func (p *randHeapObjVec) validate(new_len uint, zero randHeapObj) *randHeapObj {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *randHeapObjVec) validate(new_len uint, zero randHeapObj) *randHeapObj {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *randHeapObjVec) validateSlowPath(zero randHeapObj, c, l, lʹ Index) *randHeapObj {
+func (p *randHeapObjVec) validateSlowPath(zero randHeapObj, c, l, lʹ uint) *randHeapObj {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]randHeapObj, cNext, cNext)

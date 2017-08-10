@@ -14,8 +14,8 @@ import (
 type nextNodeVec []nextNode
 
 func (p *nextNodeVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]nextNode, l, c)
@@ -26,9 +26,9 @@ func (p *nextNodeVec) Resize(n uint) {
 }
 
 func (p *nextNodeVec) validate(new_len uint, zero nextNode) *nextNode {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *nextNodeVec) validate(new_len uint, zero nextNode) *nextNode {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *nextNodeVec) validateSlowPath(zero nextNode, c, l, lʹ elib.Index) *nextNode {
+func (p *nextNodeVec) validateSlowPath(zero nextNode, c, l, lʹ uint) *nextNode {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]nextNode, cNext, cNext)

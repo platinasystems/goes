@@ -38,8 +38,8 @@ func (p *filePool) IsFree(i uint) (v bool) {
 }
 
 func (p *filePool) Resize(n uint) {
-	c := elib.Index(cap(p.files))
-	l := elib.Index(len(p.files) + int(n))
+	c := uint(cap(p.files))
+	l := uint(len(p.files) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]Filer, l, c)
@@ -50,15 +50,15 @@ func (p *filePool) Resize(n uint) {
 }
 
 func (p *filePool) Validate(i uint) {
-	c := elib.Index(cap(p.files))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.files))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]Filer, l, c)
 		copy(q, p.files)
 		p.files = q
 	}
-	if l > elib.Index(len(p.files)) {
+	if l > uint(len(p.files)) {
 		p.files = p.files[:l]
 	}
 }

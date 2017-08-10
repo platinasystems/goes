@@ -14,8 +14,8 @@ import (
 type looperInVec []LooperIn
 
 func (p *looperInVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]LooperIn, l, c)
@@ -26,9 +26,9 @@ func (p *looperInVec) Resize(n uint) {
 }
 
 func (p *looperInVec) validate(new_len uint, zero LooperIn) *LooperIn {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *looperInVec) validate(new_len uint, zero LooperIn) *LooperIn {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *looperInVec) validateSlowPath(zero LooperIn, c, l, lʹ elib.Index) *LooperIn {
+func (p *looperInVec) validateSlowPath(zero LooperIn, c, l, lʹ uint) *LooperIn {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]LooperIn, cNext, cNext)

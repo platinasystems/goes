@@ -14,8 +14,8 @@ import (
 type EventVec []Event
 
 func (p *EventVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]Event, l, c)
@@ -26,9 +26,9 @@ func (p *EventVec) Resize(n uint) {
 }
 
 func (p *EventVec) validate(new_len uint, zero Event) *Event {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *EventVec) validate(new_len uint, zero Event) *Event {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *EventVec) validateSlowPath(zero Event, c, l, lʹ elib.Index) *Event {
+func (p *EventVec) validateSlowPath(zero Event, c, l, lʹ uint) *Event {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]Event, cNext, cNext)

@@ -10,8 +10,8 @@ package elib
 type Int8Vec []int8
 
 func (p *Int8Vec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]int8, l, c)
@@ -22,9 +22,9 @@ func (p *Int8Vec) Resize(n uint) {
 }
 
 func (p *Int8Vec) validate(new_len uint, zero int8) *int8 {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *Int8Vec) validate(new_len uint, zero int8) *int8 {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *Int8Vec) validateSlowPath(zero int8, c, l, lʹ Index) *int8 {
+func (p *Int8Vec) validateSlowPath(zero int8, c, l, lʹ uint) *int8 {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]int8, cNext, cNext)

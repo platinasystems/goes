@@ -14,8 +14,8 @@ import (
 type ActorVec []Actor
 
 func (p *ActorVec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]Actor, l, c)
@@ -26,9 +26,9 @@ func (p *ActorVec) Resize(n uint) {
 }
 
 func (p *ActorVec) validate(new_len uint, zero Actor) *Actor {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -42,7 +42,7 @@ func (p *ActorVec) validate(new_len uint, zero Actor) *Actor {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *ActorVec) validateSlowPath(zero Actor, c, l, lʹ elib.Index) *Actor {
+func (p *ActorVec) validateSlowPath(zero Actor, c, l, lʹ uint) *Actor {
 	if l > c {
 		cNext := elib.NextResizeCap(l)
 		q := make([]Actor, cNext, cNext)

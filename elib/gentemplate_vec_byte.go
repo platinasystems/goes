@@ -10,8 +10,8 @@ package elib
 type ByteVec []byte
 
 func (p *ByteVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]byte, l, c)
@@ -22,9 +22,9 @@ func (p *ByteVec) Resize(n uint) {
 }
 
 func (p *ByteVec) validate(new_len uint, zero byte) *byte {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *ByteVec) validate(new_len uint, zero byte) *byte {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *ByteVec) validateSlowPath(zero byte, c, l, lʹ Index) *byte {
+func (p *ByteVec) validateSlowPath(zero byte, c, l, lʹ uint) *byte {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]byte, cNext, cNext)

@@ -10,8 +10,8 @@ package elib
 type StringVec []string
 
 func (p *StringVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]string, l, c)
@@ -22,9 +22,9 @@ func (p *StringVec) Resize(n uint) {
 }
 
 func (p *StringVec) validate(new_len uint, zero string) *string {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *StringVec) validate(new_len uint, zero string) *string {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *StringVec) validateSlowPath(zero string, c, l, lʹ Index) *string {
+func (p *StringVec) validateSlowPath(zero string, c, l, lʹ uint) *string {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]string, cNext, cNext)

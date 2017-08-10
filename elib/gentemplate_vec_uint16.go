@@ -10,8 +10,8 @@ package elib
 type Uint16Vec []uint16
 
 func (p *Uint16Vec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]uint16, l, c)
@@ -22,9 +22,9 @@ func (p *Uint16Vec) Resize(n uint) {
 }
 
 func (p *Uint16Vec) validate(new_len uint, zero uint16) *uint16 {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *Uint16Vec) validate(new_len uint, zero uint16) *uint16 {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *Uint16Vec) validateSlowPath(zero uint16, c, l, lʹ Index) *uint16 {
+func (p *Uint16Vec) validateSlowPath(zero uint16, c, l, lʹ uint) *uint16 {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]uint16, cNext, cNext)

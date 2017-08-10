@@ -10,8 +10,8 @@ package elib
 type uiPairVec []uiPair
 
 func (p *uiPairVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]uiPair, l, c)
@@ -22,9 +22,9 @@ func (p *uiPairVec) Resize(n uint) {
 }
 
 func (p *uiPairVec) validate(new_len uint, zero uiPair) *uiPair {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *uiPairVec) validate(new_len uint, zero uiPair) *uiPair {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *uiPairVec) validateSlowPath(zero uiPair, c, l, lʹ Index) *uiPair {
+func (p *uiPairVec) validateSlowPath(zero uiPair, c, l, lʹ uint) *uiPair {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]uiPair, cNext, cNext)

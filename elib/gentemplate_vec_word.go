@@ -10,8 +10,8 @@ package elib
 type WordVec []Word
 
 func (p *WordVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]Word, l, c)
@@ -22,9 +22,9 @@ func (p *WordVec) Resize(n uint) {
 }
 
 func (p *WordVec) validate(new_len uint, zero Word) *Word {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *WordVec) validate(new_len uint, zero Word) *Word {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *WordVec) validateSlowPath(zero Word, c, l, lʹ Index) *Word {
+func (p *WordVec) validateSlowPath(zero Word, c, l, lʹ uint) *Word {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]Word, cNext, cNext)

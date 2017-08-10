@@ -34,8 +34,8 @@ func (p *BitmapPool) IsFree(i uint) (v bool) {
 }
 
 func (p *BitmapPool) Resize(n uint) {
-	c := Index(cap(p.bitmaps))
-	l := Index(len(p.bitmaps) + int(n))
+	c := uint(cap(p.bitmaps))
+	l := uint(len(p.bitmaps) + int(n))
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]WordVec, l, c)
@@ -46,15 +46,15 @@ func (p *BitmapPool) Resize(n uint) {
 }
 
 func (p *BitmapPool) Validate(i uint) {
-	c := Index(cap(p.bitmaps))
-	l := Index(i) + 1
+	c := uint(cap(p.bitmaps))
+	l := uint(i) + 1
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]WordVec, l, c)
 		copy(q, p.bitmaps)
 		p.bitmaps = q
 	}
-	if l > Index(len(p.bitmaps)) {
+	if l > uint(len(p.bitmaps)) {
 		p.bitmaps = p.bitmaps[:l]
 	}
 }

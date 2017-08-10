@@ -10,8 +10,8 @@ package elib
 type fibNodeVec []fibNode
 
 func (p *fibNodeVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([]fibNode, l, c)
@@ -22,9 +22,9 @@ func (p *fibNodeVec) Resize(n uint) {
 }
 
 func (p *fibNodeVec) validate(new_len uint, zero fibNode) *fibNode {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *fibNodeVec) validate(new_len uint, zero fibNode) *fibNode {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *fibNodeVec) validateSlowPath(zero fibNode, c, l, lʹ Index) *fibNode {
+func (p *fibNodeVec) validateSlowPath(zero fibNode, c, l, lʹ uint) *fibNode {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([]fibNode, cNext, cNext)

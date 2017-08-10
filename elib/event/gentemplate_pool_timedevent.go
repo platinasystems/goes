@@ -38,8 +38,8 @@ func (p *timedEventPool) IsFree(i uint) (v bool) {
 }
 
 func (p *timedEventPool) Resize(n uint) {
-	c := elib.Index(cap(p.events))
-	l := elib.Index(len(p.events) + int(n))
+	c := uint(cap(p.events))
+	l := uint(len(p.events) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]TimedActor, l, c)
@@ -50,15 +50,15 @@ func (p *timedEventPool) Resize(n uint) {
 }
 
 func (p *timedEventPool) Validate(i uint) {
-	c := elib.Index(cap(p.events))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.events))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]TimedActor, l, c)
 		copy(q, p.events)
 		p.events = q
 	}
-	if l > elib.Index(len(p.events)) {
+	if l > uint(len(p.events)) {
 		p.events = p.events[:l]
 	}
 }
