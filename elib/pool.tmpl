@@ -44,8 +44,8 @@ func (p * {{.PoolType}}) IsFree(i uint) (v bool) {
 }
 
 func (p * {{.PoolType}}) Resize(n uint) {
-	c := {{template "elib" .Package}}Index(cap(p.{{.Data}}))
-	l := {{template "elib" .Package}}Index(len(p.{{.Data}}) + int(n))
+	c := uint(cap(p.{{.Data}}))
+	l := uint(len(p.{{.Data}}) + int(n))
 	if l > c {
 		c = {{template "elib" .Package}}NextResizeCap(l)
 		q := make([]{{.Type}}, l, c)
@@ -56,15 +56,15 @@ func (p * {{.PoolType}}) Resize(n uint) {
 }
 
 func (p * {{.PoolType}}) Validate(i uint) {
-	c := {{template "elib" .Package}}Index(cap(p.{{.Data}}))
-	l := {{template "elib" .Package}}Index(i) + 1
+	c := uint(cap(p.{{.Data}}))
+	l := uint(i) + 1
 	if l > c {
 		c = {{template "elib" .Package}}NextResizeCap(l)
 		q := make([]{{.Type}}, l, c)
 		copy(q, p.{{.Data}})
 		p.{{.Data}} = q
 	}
-	if l > {{template "elib" .Package}}Index(len(p.{{.Data}})) {
+	if l > uint(len(p.{{.Data}})) {
 		p.{{.Data}} = p.{{.Data}}[:l]
 	}
 }

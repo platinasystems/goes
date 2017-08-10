@@ -22,8 +22,8 @@ import (
 type {{.VecType}} []{{.Type}}
 
 func (p * {{.VecType}}) Resize(n uint) {
-	c := {{template "elib" .Package}}Index(cap(*p))
-	l := {{template "elib" .Package}}Index(len(*p)) + {{template "elib" .Package}}Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = {{template "elib" .Package}}NextResizeCap(l)
 		q := make([]{{.Type}}, l, c)
@@ -34,9 +34,9 @@ func (p * {{.VecType}}) Resize(n uint) {
 }
 
 func (p * {{.VecType}}) validate(new_len uint, zero {{.Type}}) *{{.Type}} {
-	c := {{template "elib" .Package}}Index(cap(*p))
-	lʹ := {{template "elib" .Package}}Index(len(*p))
-	l := {{template "elib" .Package}}Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -48,7 +48,7 @@ func (p * {{.VecType}}) validate(new_len uint, zero {{.Type}}) *{{.Type}} {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p * {{.VecType}}) validateSlowPath(zero {{.Type}}, c, l, lʹ {{template "elib" .Package}}Index) *{{.Type}} {
+func (p * {{.VecType}}) validateSlowPath(zero {{.Type}}, c, l, lʹ uint) *{{.Type}} {
 	if l > c {
 		cNext := {{template "elib" .Package}}NextResizeCap(l)
 		q := make([]{{.Type}}, cNext, cNext)
