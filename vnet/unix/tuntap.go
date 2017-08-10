@@ -341,6 +341,9 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	}
 
 	name := si.Name(v)
+	if isTun {
+		name = m.vnet_tun_main.linux_interface_name
+	}
 	copy(intf.name[:], name)
 
 	if m.vnet_tuntap_interface_by_si == nil {

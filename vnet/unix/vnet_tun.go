@@ -12,14 +12,20 @@ import (
 )
 
 type vnet_tun_main struct {
-	m *Main
+	m                    *Main
+	linux_interface_name string
 	vnet.SwInterfaceType
 }
 
-func (m *vnet_tun_main) SwInterfaceName(v *vnet.Vnet, s *vnet.SwIf) string { return "vnet" }
+// Vnet name for interface (includes namespace); linux name is always "vnet" in each namespace.
+func (m *vnet_tun_main) SwInterfaceName(v *vnet.Vnet, s *vnet.SwIf) string {
+	ns := m.m.namespace_pool.entries[s.GetId()]
+	return m.linux_interface_name + "-" + ns.name
+}
 
 func (m *vnet_tun_main) init(um *Main) {
 	m.m = um
+	m.linux_interface_name = "vnet"
 	um.v.RegisterSwInterfaceType(m)
 }
 
