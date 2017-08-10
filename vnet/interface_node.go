@@ -33,6 +33,8 @@ type interfaceNode struct {
 	tx_chan     chan *TxRefVecIn
 	free_list   []*TxRefVecIn
 
+	txDownDropError uint
+
 	freeChan chan *TxRefVecIn
 	tx       outputInterfaceNoder
 	rx       interfaceInputer
@@ -41,7 +43,6 @@ type interfaceNode struct {
 type OutputInterfaceNode struct{ interfaceNode }
 type InterfaceNode struct{ interfaceNode }
 
-func (n *interfaceNode) SetHi(hi Hi)                              { n.hi = hi }
 func (n *interfaceNode) MakeLoopIn() loop.LooperIn                { return &RefIn{} }
 func (n *interfaceNode) MakeLoopOut() loop.LooperOut              { return &RefOut{} }
 func (n *interfaceNode) LoopOutput(l *loop.Loop, i loop.LooperIn) { n.ifOutput(i.(*RefIn)) }
@@ -51,29 +52,59 @@ func (n *InterfaceNode) LoopInput(l *loop.Loop, o loop.LooperOut) {
 	n.rx.InterfaceInput(o.(*RefOut))
 }
 
-func (v *Vnet) RegisterInterfaceNode(n inputOutputInterfaceNoder, hi Hi, name string, args ...interface{}) {
+func (v *Vnet) registerInterfaceNodeHelper(n outputInterfaceNoder, hi Hi) {
 	x := n.GetInterfaceNode()
+	x.txDownDropError = uint(len(x.Errors))
+	x.Errors = append(x.Errors, "tx down drops")
 	x.hi = hi
-	x.rx = n
 	x.setupTx(n)
-	v.RegisterNode(n, name, args...)
+	h := v.HwIf(hi)
+	h.n = n
 }
 
 func (v *Vnet) RegisterOutputInterfaceNode(n outputInterfaceNoder, hi Hi, name string, args ...interface{}) {
+	v.registerInterfaceNodeHelper(n, hi)
+	v.RegisterNode(n, name, args...)
+}
+
+func (v *Vnet) RegisterInterfaceNode(n inputOutputInterfaceNoder, hi Hi, name string, args ...interface{}) {
 	x := n.GetInterfaceNode()
-	x.hi = hi
-	x.setupTx(n)
+	x.rx = n
+	v.registerInterfaceNodeHelper(n, hi)
 	v.RegisterNode(n, name, args...)
 }
 
 const tx_ref_vec_in_fifo_len = 256
 
+func (n *interfaceNode) ifOutputThread() {
+	for x := range n.tx_chan {
+		n.tx.InterfaceOutput(x)
+	}
+}
+
+const always_output = true
+
 func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 	n.tx = tx
-	n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
 	n.freeChan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
 	n.max_tx_refs = 2 * MaxVectorLen
-	go n.ifOutputThread()
+	if always_output {
+		n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+		go n.ifOutputThread()
+	}
+}
+
+func (h *HwIf) txNodeUpDown(isUp bool) {
+	n := h.n.GetInterfaceNode()
+	if !always_output {
+		if isUp {
+			n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+			go n.ifOutputThread()
+		} else {
+			close(n.tx_chan)
+			n.tx_chan = nil
+		}
+	}
 }
 
 func (n *interfaceNode) send(i *TxRefVecIn) {
@@ -140,13 +171,14 @@ func (v *Vnet) FreeTxRefIn(i *TxRefVecIn) {
 }
 func (i *TxRefVecIn) Free(v *Vnet) { v.FreeTxRefIn(i) }
 
-func (n *interfaceNode) ifOutputThread() {
-	for x := range n.tx_chan {
-		n.tx.InterfaceOutput(x)
-	}
-}
-
 func (n *interfaceNode) ifOutput(ri *RefIn) {
+	if n.tx_chan == nil {
+		l := ri.InLen()
+		n.CountError(n.txDownDropError, l)
+		ri.FreeRefs(l)
+		return
+	}
+
 	rvi := n.allocTxRefVecIn(ri)
 	n_packets_in := ri.InLen()
 

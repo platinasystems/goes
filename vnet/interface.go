@@ -24,6 +24,9 @@ type HwIf struct {
 	// Hardware link state: up or down
 	linkUp bool
 
+	// Transmit is enabled when both link and admin state are up.
+	txUp bool
+
 	// Hardware is unprovisioned.
 	// Interfaces with 4 SERDES lanes will be represented as 4 interfaces.
 	// Lanes may all be a single interface (1 provisioned 4 lane interface +
@@ -42,6 +45,8 @@ type HwIf struct {
 
 	defaultId IfId
 	subSiById map[IfId]Si
+
+	n outputInterfaceNoder
 }
 
 //go:generate gentemplate -d Package=vnet -id HwIf -d PoolType=hwIferPool -d Type=HwInterfacer -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
@@ -348,6 +353,7 @@ func (h *HwIf) SetAdminUp(isUp bool) (err error) {
 
 	s := h.vnet.SwIf(h.si)
 	err = s.SetAdminUp(h.vnet, isUp)
+	h.txUpDown()
 	return
 }
 
@@ -391,7 +397,17 @@ func (h *HwIf) SetLinkUp(v bool) (err error) {
 			return
 		}
 	}
+	h.txUpDown()
 	return
+}
+
+func (h *HwIf) txUpDown() {
+	s := h.vnet.SwIf(h.si)
+	up := s.IsAdminUp() && h.IsLinkUp()
+	if h.txUp != up {
+		h.txNodeUpDown(up)
+	}
+	h.txUp = up
 }
 
 type LinkStateEvent struct {
@@ -677,16 +693,19 @@ func (b *Bandwidth) Parse(in *parse.Input) {
 
 // Class of hardware interfaces, for example, ethernet, sonet, srp, docsis, etc.
 type HwIfClasser interface {
+	// Get/set/format interface address (e.g. mac address for ethernet).
+	GetAddress() []byte
+	SetAddress(a []byte)
+	FormatAddress() string
+	// Encapsulation rewrite string for this interface class.
+	SetRewrite(v *Vnet, r *Rewrite, t PacketType, dstAddr []byte)
+	FormatRewrite(r *Rewrite) []string
+	ParseRewrite(r *Rewrite, in *parse.Input)
+	// ID: for example VLAN tag(s) for ethernet.  32 bit number uniquely identifies sub-interface.
 	DefaultId() IfId
 	LessThanId(a, b IfId) bool
 	ParseId(a *IfId, in *parse.Input) bool
 	FormatId(a IfId) string
-	GetAddress() []byte
-	SetAddress(a []byte)
-	FormatAddress() string
-	SetRewrite(v *Vnet, r *Rewrite, t PacketType, dstAddr []byte)
-	FormatRewrite(r *Rewrite) []string
-	ParseRewrite(r *Rewrite, in *parse.Input)
 }
 
 type Devicer interface {
