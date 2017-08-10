@@ -238,17 +238,6 @@ SO_SNDBUF truncated to %d bytes; run: sysctl -w net.core.wmem_max=%d`[1:],
 		}
 	}
 
-	// Set receive timeout; otherwise gorx goroutine has no way to exit when socket is closed.
-	// No rx timeout causes gorx to leak goroutines.
-	{
-		tv := syscall.Timeval{Sec: 5}
-		err = os.NewSyscallError("setsockopt SO_RCVTIMEO",
-			syscall.SetsockoptTimeval(s.fd, syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, &tv))
-		if err != nil {
-			return
-		}
-	}
-
 	if !s.DontListenAllNsid {
 		err = os.NewSyscallError("setsockopt NETLINK_LISTEN_ALL_NSID",
 			syscall.SetsockoptInt(s.fd, SOL_NETLINK,
@@ -344,13 +333,41 @@ func (s *Socket) gorx() {
 		return *(*int)(unsafe.Pointer(&scm.Data[0]))
 	}
 
+	epollFd, err := syscall.EpollCreate1(0)
+	if err != nil {
+		panic(os.NewSyscallError("epoll_create1", err))
+	}
+	defer syscall.Close(epollFd)
+	err = syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_ADD,
+		s.fd, &syscall.EpollEvent{Events: syscall.EPOLLIN})
+	if err != nil {
+		panic(os.NewSyscallError("epoll_ctl ADD", err))
+	}
+
 	s.wg.Add(1)
 	for {
-		nsid := DefaultNsid
+		// Socket has been closed by other thread?
 		if s.IsClosed() {
 			break
 		}
-		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, 0)
+
+		// Wait for input to be ready.
+		// Need to poll since otherwise Recvmsg may block forever (even when s.fd is closed).
+		var ee [1]syscall.EpollEvent
+		if _, err := syscall.EpollWait(epollFd, ee[:], 50); err != nil {
+			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
+				continue
+			}
+			err = os.NewSyscallError("epoll_wait", err)
+			fmt.Fprintln(os.Stderr, "Recv:", err)
+			break
+		}
+		// Continue on Timeout.
+		if ee[0].Events&syscall.EPOLLIN == 0 {
+			continue
+		}
+
+		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, syscall.MSG_DONTWAIT)
 		if err != nil {
 			if s.IsClosed() || err == io.EOF {
 				break
@@ -358,11 +375,16 @@ func (s *Socket) gorx() {
 			// Re-try after timeout or interrupt unless socket was closed.
 			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
 				continue
+			} else {
+				// EINVAL can happen when socket is being closed; no need for noise in that case.
+				if e != syscall.EINVAL {
+					fmt.Fprintln(os.Stderr, "Recv:", err)
+				}
+				break
 			}
-			fmt.Fprintln(os.Stderr, "Recv:", err)
-			break
 		}
 
+		nsid := DefaultNsid
 		if noob > 0 {
 			scms, err :=
 				syscall.ParseSocketControlMessage(oob[:noob])
