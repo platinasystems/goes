@@ -268,9 +268,6 @@ func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.
 
 // Set flags and operational state when vnet-owned tuntap interface becomes ready.
 func (intf *tuntap_interface) sync_flags() {
-	if intf.provision_fd < 0 {
-		return
-	}
 	intf.flag_sync_in_progress = true
 	if err := intf.set_flags(); err != nil {
 		panic(err)
