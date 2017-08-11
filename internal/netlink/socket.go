@@ -6,10 +6,8 @@ package netlink
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -100,15 +98,17 @@ type ListenReq struct {
 }
 
 type Socket struct {
-	closeCount uint32
-	wg         sync.WaitGroup
-	fd         int
-	addr       *syscall.SockaddrNetlink
-	Rx         <-chan Message
-	rx         chan<- Message
-	Tx         chan<- Message
-	tx         <-chan Message
+	wg   sync.WaitGroup
+	fd   int
+	addr *syscall.SockaddrNetlink
+	Rx   <-chan Message
+	rx   chan<- Message
+	Tx   chan<- Message
+	tx   <-chan Message
 	SocketConfig
+
+	// Pipe which exists just for gorx to have a file descriptor to detect socket close.
+	rx_close_kludge_pipe [2]int
 }
 
 func New(groups ...MulticastGroup) (*Socket, error) {
@@ -157,18 +157,30 @@ func NewWithConfigAndFile(cf SocketConfig, fd int) (s *Socket, err error) {
 		SocketConfig: cf,
 	}
 
+	err = syscall.Pipe(s.rx_close_kludge_pipe[:])
+	if err != nil {
+		err = os.NewSyscallError("pipe rx_close_pipe", err)
+		return
+	}
+
 	defer func() {
-		if err != nil && fd > 0 {
-			syscall.Close(fd)
-			if s != nil {
-				if s.rx != nil {
-					close(s.rx)
+		if err != nil {
+			if fd > 0 {
+				syscall.Close(fd)
+				if s != nil {
+					if s.rx != nil {
+						close(s.rx)
+					}
+					if s.Tx != nil {
+						close(s.Tx)
+					}
+					s.addr = nil
+					s = nil
 				}
-				if s.Tx != nil {
-					close(s.Tx)
-				}
-				s.addr = nil
-				s = nil
+			}
+			if s.rx_close_kludge_pipe[0] > 0 {
+				syscall.Close(s.rx_close_kludge_pipe[0])
+				syscall.Close(s.rx_close_kludge_pipe[1])
 			}
 		}
 	}()
@@ -253,12 +265,14 @@ SO_SNDBUF truncated to %d bytes; run: sysctl -w net.core.wmem_max=%d`[1:],
 	return
 }
 
-func (s *Socket) IsClosed() bool { return atomic.LoadUint32(&s.closeCount) > 0 }
 func (s *Socket) Close() (err error) {
 	if s.Tx != nil {
 		close(s.Tx)
 	}
-	atomic.AddUint32(&s.closeCount, 1)
+	// Close write side of pipe and wake up sleeping gorx epoll wait.
+	// gorx will close read side of pipe.
+	syscall.Close(s.rx_close_kludge_pipe[1])
+	s.rx_close_kludge_pipe[1] = -1
 	return
 }
 
@@ -338,23 +352,31 @@ func (s *Socket) gorx() {
 		panic(os.NewSyscallError("epoll_create1", err))
 	}
 	defer syscall.Close(epollFd)
+
 	err = syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_ADD,
-		s.fd, &syscall.EpollEvent{Events: syscall.EPOLLIN})
+		s.fd, &syscall.EpollEvent{
+			Events: syscall.EPOLLIN,
+			Fd:     int32(s.fd),
+		})
 	if err != nil {
-		panic(os.NewSyscallError("epoll_ctl ADD", err))
+		panic(os.NewSyscallError("epoll_ctl add", err))
+	}
+	err = syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_ADD,
+		s.rx_close_kludge_pipe[0], &syscall.EpollEvent{
+			Events: syscall.EPOLLIN,
+			Fd:     int32(s.rx_close_kludge_pipe[0]),
+		})
+	if err != nil {
+		panic(os.NewSyscallError("epoll_ctl add rx_close_pipe", err))
 	}
 
 	s.wg.Add(1)
 	for {
-		// Socket has been closed by other thread?
-		if s.IsClosed() {
-			break
-		}
-
 		// Wait for input to be ready.
-		// Need to poll since otherwise Recvmsg may block forever (even when s.fd is closed).
+		// Need to poll since otherwise Recvmsg would block forever.
+		// Close of s.fd does not wake/unblock Recvmsg.
 		var ee [1]syscall.EpollEvent
-		if _, err := syscall.EpollWait(epollFd, ee[:], 50); err != nil {
+		if _, err := syscall.EpollWait(epollFd, ee[:], -1); err != nil {
 			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
 				continue
 			}
@@ -362,21 +384,17 @@ func (s *Socket) gorx() {
 			fmt.Fprintln(os.Stderr, "Recv:", err)
 			break
 		}
-		// Continue on Timeout.
-		if ee[0].Events&syscall.EPOLLIN == 0 {
-			continue
+		// Socket was closed?
+		if ee[0].Fd == int32(s.rx_close_kludge_pipe[0]) {
+			break
 		}
-
 		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, syscall.MSG_DONTWAIT)
 		if err != nil {
-			if s.IsClosed() || err == io.EOF {
-				break
-			}
 			// Re-try after timeout or interrupt unless socket was closed.
 			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
 				continue
 			} else {
-				// EINVAL can happen when socket is being closed; no need for noise in that case.
+				// EINVAL can happen when socket is being closed (not sure why); no need for noise in that case.
 				if e != syscall.EINVAL {
 					fmt.Fprintln(os.Stderr, "Recv:", err)
 				}
@@ -449,6 +467,11 @@ func (s *Socket) gorx() {
 	}
 	close(s.rx)
 	s.rx = nil
+
+	// Close read side of pipe (write side is closed in Close method).
+	syscall.Close(s.rx_close_kludge_pipe[0])
+	s.rx_close_kludge_pipe[0] = -1
+
 	s.wg.Done()
 
 	// Wait for tx routine to finish before closing file descriptor.
