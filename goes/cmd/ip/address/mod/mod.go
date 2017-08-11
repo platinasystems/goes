@@ -7,17 +7,17 @@ package mod
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
 )
 
 const (
 	Apropos = "network address"
 	Usage   = `
-	ip [ IP-OPTIONS ] address { add | change | del[ete] | replace }
-		IFADDR dev IFNAME [ LIFETIME ] [ CONFFLAG-LIST ]
+	ip address { add | change | delete | replace }
+		IFADDR [ dev ] IFNAME [ LIFETIME ] [ CONFFLAG-LIST ]
 
 	IFADDR := PREFIX | ADDR peer PREFIX [ broadcast ADDR ]
 		[ anycast ADDR ] [ label LABEL ] [ scope SCOPE-ID ]
@@ -32,10 +32,6 @@ const (
 
 	LFT := [ forever | SECONDS ]
 	`
-	Man = `
-SEE ALSO
-	ip man address || ip address -man
-`
 )
 
 var (
@@ -54,7 +50,7 @@ var (
 	}
 	Parms = []interface{}{
 		// IFADDR
-		"peer", "broadcast", "anycast", "label", "scope",
+		"local", "peer", "broadcast", "anycast", "label", "scope",
 		"dev",
 		// LIFETIME
 		"valid_lft", "preferred_lft",
@@ -65,69 +61,192 @@ func New(name string) Command { return Command(name) }
 
 type Command string
 
-type mod options.Options
-
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (c Command) String() string  { return string(c) }
 func (Command) Usage() string     { return Usage }
 
 func (c Command) Main(args ...string) error {
-	var (
-		err    error
-		ifaddr net.IP
-		ifnet  *net.IPNet
-	)
+	var err error
+	var ifa struct {
+		hdr   rtnl.Hdr
+		msg   rtnl.IfAddrMsg
+		attrs []rtnl.Attr
+		rsp   rtnl.Ifa
+	}
+	var local, peer net.IP
+	var ipnet *net.IPNet
 
 	if args, err = options.Netns(args); err != nil {
 		return err
 	}
 
-	o, args := options.New(args)
-	mod := (*mod)(o)
-	args = mod.Flags.More(args, Flags...)
-	args = mod.Parms.More(args, Parms...)
+	opt, args := options.New(args)
+	args = opt.Flags.More(args, Flags...)
+	args = opt.Parms.More(args, Parms...)
 
-	switch len(args) {
-	case 0:
-		err = fmt.Errorf("PREFIX: missing")
-	case 1:
-		ifaddr, ifnet, err = parsePrefixOrAddr(args[0])
-	default:
-		err = fmt.Errorf("%v: unexpected", args[1:])
+	if len(opt.Parms.ByName["local"]) == 0 {
+		if len(args) == 0 {
+			return fmt.Errorf("IFADDR: missing")
+		}
+		opt.Parms.ByName["local"] = args[0]
+		args = args[1:]
+	}
+	if len(opt.Parms.ByName["dev"]) == 0 {
+		if len(args) == 0 {
+			return fmt.Errorf("IFNAME: missing")
+		}
+		opt.Parms.ByName["dev"] = args[0]
+		args = args[1:]
+	}
+	if len(args) > 0 {
+		return fmt.Errorf("%v: unexpected", args)
 	}
 
+	if s := opt.Parms.ByName["peer"]; len(s) > 0 {
+		peer, ipnet, err = net.ParseCIDR(s)
+		if err != nil {
+			err = nil
+			peer = net.ParseIP(s)
+			if peer == nil {
+				return fmt.Errorf("peer: %q invalid prefix", s)
+			}
+		}
+		local = net.ParseIP(opt.Parms.ByName["local"])
+		if local == nil {
+			return fmt.Errorf("local: %q invalid address", s)
+		}
+	} else {
+		s = opt.Parms.ByName["local"]
+		if local, ipnet, err = net.ParseCIDR(s); err != nil {
+			return fmt.Errorf("local: %q invalid prefix", s)
+		}
+	}
+
+	if local.To4() != nil {
+		ifa.msg.Family = rtnl.AF_INET
+	} else if local.To16() != nil {
+		ifa.msg.Family = rtnl.AF_INET6
+	} else {
+		return fmt.Errorf("local: %q unsupported network", local)
+	}
+
+	addrattr := func(name string, ip net.IP, t uint16) error {
+		var ipv net.IP
+		if ip == nil {
+			return fmt.Errorf("%s: invalid address", name)
+		}
+		if ifa.msg.Family == rtnl.AF_INET {
+			ipv = ip.To4()
+		} else {
+			ipv = ip.To16()
+		}
+		if ipv == nil {
+			return fmt.Errorf("%s: %s: wrong network", name, ip)
+		}
+		ifa.attrs = append(ifa.attrs,
+			rtnl.Attr{t, rtnl.BytesAttr([]byte(ipv))})
+		return nil
+	}
+
+	if ipnet != nil {
+		ones, _ := ipnet.Mask.Size()
+		ifa.msg.Prefixlen = uint8(ones)
+	} else if ifa.msg.Family == rtnl.AF_INET {
+		ifa.msg.Prefixlen = 32
+	} else {
+		ifa.msg.Prefixlen = 128
+	}
+
+	if err = addrattr("local", local, rtnl.IFA_LOCAL); err != nil {
+		return err
+	}
+	if peer != nil {
+		err = addrattr("peer", peer, rtnl.IFA_ADDRESS)
+		if err != nil {
+			return err
+		}
+	}
+	if s := opt.Parms.ByName["broadcast"]; len(s) > 0 {
+		err = addrattr("broadcast", net.ParseIP(s), rtnl.IFA_BROADCAST)
+		if err != nil {
+			return err
+		}
+	}
+	if s := opt.Parms.ByName["anycast"]; len(s) > 0 {
+		err = addrattr("anycast", net.ParseIP(s), rtnl.IFA_ANYCAST)
+		if err != nil {
+			return err
+		}
+	}
+	if s := opt.Parms.ByName["label"]; len(s) > 0 {
+		ifa.attrs = append(ifa.attrs, rtnl.Attr{rtnl.IFA_LABEL,
+			rtnl.KstringAttr(s)})
+	}
+	if s := opt.Parms.ByName["scope"]; len(s) > 0 {
+		var found bool
+		ifa.msg.Scope, found = rtnl.RtScopeByName[s]
+		if !found {
+			return fmt.Errorf("scope: %q invalid", s)
+		}
+	} else if local.IsLoopback() {
+		ifa.msg.Scope = rtnl.RT_SCOPE_HOST
+	}
+
+	sock, err := rtnl.NewSock()
 	if err != nil {
 		return err
 	}
+	defer sock.Close()
 
-	ones, _ := ifnet.Mask.Size()
-	fmt.Print("FIXME ", c, " ", ifaddr, "/", ones, "\n")
+	sr := rtnl.NewSockReceiver(sock)
 
-	return nil
-}
-
-func parsePrefixOrAddr(s string) (net.IP, *net.IPNet, error) {
-	ifaddr, ifnet, err := net.ParseCIDR(s)
-	if err == nil {
-		return ifaddr, ifnet, err
-	}
-	slash := strings.Index(s, "/")
-	if slash < 1 {
-		return ifaddr, ifnet, err
-	}
-	err = nil
-	ifaddr = net.ParseIP(s[:slash])
-	if ifaddr == nil {
-		err = fmt.Errorf("%s: invalid", s[:slash])
-	} else if ifmask := net.ParseIP(s[slash+1:]); ifmask == nil {
-		err = fmt.Errorf("can't parse mask: %s", s[slash+1:])
-	} else {
-		mask := net.IPMask(ifmask.To4())
-		ifnet = &net.IPNet{
-			IP:   ifaddr.Mask(mask),
-			Mask: mask,
+	ifa.msg.Index = ^uint32(0)
+	if req, err := rtnl.NewMessage(
+		rtnl.Hdr{
+			Type:  rtnl.RTM_GETLINK,
+			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK,
+		},
+		rtnl.IfInfoMsg{
+			Family: rtnl.AF_UNSPEC,
+		},
+		rtnl.Attr{rtnl.IFLA_IFNAME,
+			rtnl.KstringAttr(opt.Parms.ByName["dev"])},
+	); err != nil {
+		return err
+	} else if err = sr.UntilDone(req, func(b []byte) {
+		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+			return
 		}
+		ifa.msg.Index = uint32(rtnl.IfInfoMsgPtr(b).Index)
+	}); err != nil {
+		return err
 	}
-	return ifaddr, ifnet, err
+	if ifa.msg.Index == ^uint32(0) {
+		return fmt.Errorf("%s: not found", opt.Parms.ByName["dev"])
+	}
+
+	ifa.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK
+
+	switch c {
+	case "delete", "xdelete":
+		ifa.hdr.Type = rtnl.RTM_DELADDR
+	case "add":
+		ifa.hdr.Type = rtnl.RTM_NEWADDR
+		ifa.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+	case "change":
+		ifa.hdr.Type = rtnl.RTM_NEWADDR
+		ifa.hdr.Flags |= rtnl.NLM_F_REPLACE
+	case "replace":
+		ifa.hdr.Type = rtnl.RTM_NEWADDR
+		ifa.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+	default:
+		return fmt.Errorf("%q: unknown", c)
+	}
+
+	b, err := rtnl.NewMessage(ifa.hdr, ifa.msg, ifa.attrs...)
+	if err != nil {
+		return err
+	}
+	return sr.UntilDone(b, func([]byte) {})
 }

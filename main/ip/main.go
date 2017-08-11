@@ -21,7 +21,7 @@ var Stderr io.Writer = os.Stderr
 
 func main() {
 	if err := ip.New().Main(Args...); err != nil {
-		fmt.Fprintln(Stderr, err)
+		fmt.Fprintln(Stderr, "ip:", err)
 		Exit(1)
 	}
 }

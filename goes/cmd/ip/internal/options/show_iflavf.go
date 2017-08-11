@@ -15,14 +15,28 @@ func (opt *Options) ShowIflaVf(b []byte) {
 
 	rtnl.IndexAttrByType(vf[:], b)
 
-	vfmac := rtnl.IflaVfMacPtr(&vf)
+	printflag := func(h string, t uint16) {
+		if v := rtnl.IflaVfFlagPtr(vf[t]); v != nil {
+			if v.Setting != ^uint32(0) {
+				opt.Print(h)
+				if v.Setting != 0 {
+					opt.Print("on")
+				} else {
+					opt.Print("off")
+				}
+			}
+		}
+	}
+
+	vfmac := rtnl.IflaVfMacPtr(vf[rtnl.IFLA_VF_MAC])
 	if vfmac == nil {
 		return
 	}
 	opt.Println()
 	opt.Print("    vf ", vfmac.Vf)
 	opt.Print(" MAC ", net.HardwareAddr(vfmac.Mac[:6]))
-	if vfvlan := rtnl.IflaVfVlanPtr(&vf); vfvlan != nil {
+	vfvlan := rtnl.IflaVfVlanPtr(vf[rtnl.IFLA_VF_VLAN])
+	if vfvlan != nil {
 		if vfvlan.Vlan != 0 {
 			opt.Print(", vlan ", vfvlan.Vlan)
 		}
@@ -30,12 +44,14 @@ func (opt *Options) ShowIflaVf(b []byte) {
 			opt.Print(", qos ", vfvlan.Qos)
 		}
 	}
-	if vftxrate := rtnl.IflaVfTxRatePtr(&vf); vftxrate != nil {
+	vftxrate := rtnl.IflaVfTxRatePtr(vf[rtnl.IFLA_VF_TX_RATE])
+	if vftxrate != nil {
 		if vftxrate.Rate != 0 {
 			opt.Print(", tx rate ", vftxrate.Rate, " (Mbps)")
 		}
 	}
-	if vfrate := rtnl.IflaVfRatePtr(&vf); vfrate != nil {
+	vfrate := rtnl.IflaVfRatePtr(vf[rtnl.IFLA_VF_RATE])
+	if vfrate != nil {
 		if vfrate.MaxTxRate != 0 {
 			opt.Print(", max_tx_rate ",
 				vfrate.MaxTxRate, "Mbps")
@@ -45,38 +61,17 @@ func (opt *Options) ShowIflaVf(b []byte) {
 				vfrate.MinTxRate, "Mbps")
 		}
 	}
-	if vfspoofchk := rtnl.IflaVfSpoofchkPtr(&vf); vfspoofchk != nil {
-		if vfspoofchk.Setting != ^uint32(0) {
-			opt.Print(", spoof checking ")
-			if vfspoofchk.Setting != 0 {
-				opt.Print("on")
-			} else {
-				opt.Print("off")
-			}
-		}
-	}
-	if vflinkstate := rtnl.IflaVfLinkStatePtr(&vf); vflinkstate != nil {
+	printflag(", spoof checking ", rtnl.IFLA_VF_SPOOFCHK)
+	vflinkstate := rtnl.IflaVfLinkStatePtr(vf[rtnl.IFLA_VF_LINK_STATE])
+	if vflinkstate != nil {
 		opt.Print(", link-state ")
-		s, found := map[uint32]string{
-			rtnl.IFLA_VF_LINK_STATE_AUTO:    "auto",
-			rtnl.IFLA_VF_LINK_STATE_ENABLE:  "enable",
-			rtnl.IFLA_VF_LINK_STATE_DISABLE: "disable",
-		}[vflinkstate.LinkState]
+		s, found := rtnl.IflaVfLinkStateName[vflinkstate.LinkState]
 		if !found {
 			s = "unknown"
 		}
 		opt.Print(s)
 	}
-	if vftrust := rtnl.IflaVfTrustPtr(&vf); vftrust != nil {
-		if vftrust.Setting != ^uint32(0) {
-			opt.Print(", trust ")
-			if vftrust.Setting != 0 {
-				opt.Print("on")
-			} else {
-				opt.Print("off")
-			}
-		}
-	}
+	printflag(", trust ", rtnl.IFLA_VF_TRUST)
 	if opt.Flags.ByName["-s"] && len(vf[rtnl.IFLA_VF_STATS]) > 0 {
 		var vfstats rtnl.IflaVfStats
 		rtnl.IndexAttrByType(vfstats[:], vf[rtnl.IFLA_VF_STATS])

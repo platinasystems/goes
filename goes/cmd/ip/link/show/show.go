@@ -18,13 +18,12 @@ const (
 	Name    = "show"
 	Apropos = "link attributes"
 	Usage   = `
-	ip link show [ [dev] DEVICE | group GROUP ] [ up ] [ master DEVICE ]
-		[ type ETYPE ] [ vrf NAME ]
-`
-
-	Man = `
-SEE ALSO
-	ip man link || ip link -man
+	ip [ OPTIONS ] link show
+		[ [dev] DEVICE | group GROUP ]
+		[ up ]
+		[ master DEVICE ]
+		[ type ETYPE ]
+		[ vrf NAME ]
 `
 )
 
@@ -105,6 +104,8 @@ func (Command) Main(args ...string) error {
 	}
 	defer sock.Close()
 
+	sr := rtnl.NewSockReceiver(sock)
+
 	if req, err = rtnl.NewMessage(
 		rtnl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
@@ -117,7 +118,7 @@ func (Command) Main(args ...string) error {
 	); err != nil {
 		return err
 	}
-	if err = sock.UntilDone(req, func(b []byte) {
+	if err = sr.UntilDone(req, func(b []byte) {
 		var ifla rtnl.Ifla
 		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return

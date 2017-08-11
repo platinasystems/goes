@@ -42,7 +42,7 @@ const NETNSA_UNASSIGNED_NSID int = -1
 type Netnsa [N_NETNSA][]byte
 
 func (netnsa *Netnsa) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofNetnsMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofNetnsMsg)
 	if i >= len(b) {
 		IndexAttrByType(netnsa[:], Empty)
 		return 0, nil

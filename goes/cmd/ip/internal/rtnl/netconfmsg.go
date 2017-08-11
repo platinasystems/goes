@@ -46,7 +46,7 @@ const (
 type Netconfa [N_NETCONFA][]byte
 
 func (netconfa *Netconfa) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofNetconfMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofNetconfMsg)
 	if i >= len(b) {
 		IndexAttrByType(netconfa[:], Empty)
 		return 0, nil

@@ -57,7 +57,7 @@ const RTA_MAX = N_RTA - 1
 type Rta [N_RTA][]byte
 
 func (rta *Rta) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofRtMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofRtMsg)
 	if i >= len(b) {
 		IndexAttrByType(rta[:], Empty)
 		return 0, nil

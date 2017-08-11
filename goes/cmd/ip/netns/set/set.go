@@ -92,5 +92,5 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	return sock.UntilDone(req, func(b []byte) {})
+	return rtnl.NewSockReceiver(sock).UntilDone(req, func(b []byte) {})
 }

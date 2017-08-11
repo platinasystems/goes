@@ -43,7 +43,7 @@ const IFA_MAX = N_IFA - 1
 type Ifa [N_IFA][]byte
 
 func (ifa *Ifa) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofIfAddrMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofIfAddrMsg)
 	if i >= len(b) {
 		IndexAttrByType(ifa[:], Empty)
 		return 0, nil

@@ -38,10 +38,6 @@ const (
 		ip6gretap | vti | vrf | nlmon | ipvlan | lowpan | geneve |
 		macsec }
 	`
-	Man = `
-SEE ALSO
-	ip man address || ip address -man
-`
 )
 
 var (
@@ -145,6 +141,8 @@ func (Command) Main(args ...string) error {
 	}
 	defer sock.Close()
 
+	sr := rtnl.NewSockReceiver(sock)
+
 	if req, err = rtnl.NewMessage(
 		rtnl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
@@ -156,7 +154,7 @@ func (Command) Main(args ...string) error {
 		rtnl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
 	); err != nil {
 		return err
-	} else if err = sock.UntilDone(req, func(b []byte) {
+	} else if err = sr.UntilDone(req, func(b []byte) {
 		var ifla rtnl.Ifla
 		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
@@ -203,7 +201,7 @@ func (Command) Main(args ...string) error {
 			},
 		); err != nil {
 			return err
-		} else if err = sock.UntilDone(req, func(b []byte) {
+		} else if err = sr.UntilDone(req, func(b []byte) {
 			var ifa rtnl.Ifa
 			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWADDR {
 				return

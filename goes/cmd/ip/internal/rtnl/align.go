@@ -6,8 +6,16 @@ package rtnl
 
 import "syscall"
 
-const NLMSG_ALIGNTO = syscall.NLMSG_ALIGNTO
+const (
+	PAGE  align = 4 << 10
+	NLMSG align = syscall.NLMSG_ALIGNTO
+	RTA   align = syscall.RTA_ALIGNTO
+)
 
-func Align(i int) int {
-	return (i + NLMSG_ALIGNTO - 1) & ^(NLMSG_ALIGNTO - 1)
+type align int
+
+func (to align) Align(i int) int {
+	return (i + to.Size() - 1) & ^(to.Size() - 1)
 }
+
+func (to align) Size() int { return int(to) }

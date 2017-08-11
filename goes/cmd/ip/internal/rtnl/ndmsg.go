@@ -50,7 +50,7 @@ const NDA_MAX = N_NDA - 1
 type Nda [N_NDA][]byte
 
 func (nda *Nda) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofNdMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofNdMsg)
 	if i >= len(b) {
 		IndexAttrByType(nda[:], Empty)
 		return 0, nil

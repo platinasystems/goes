@@ -6,7 +6,9 @@ package monitor
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/signal"
 	"syscall"
 	"time"
 	"unsafe"
@@ -96,7 +98,6 @@ func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
 	var err error
-	var rxer receiver
 	var handle func([]byte)
 	var save save
 	var show show
@@ -113,28 +114,6 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 
-	if fn := show.opt.Parms.ByName["file"]; len(fn) > 0 {
-		f, err := os.Open(fn)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		rxer = &file{
-			File: f,
-			buf:  make([]byte, 4<<10),
-		}
-	} else {
-		if show.ifnames, err = ifnamesByIndex(); err != nil {
-			return err
-		}
-		sock, err := rtnl.NewSock(16, groups(show.opt),
-			show.opt.Flags.ByName["all-nsid"])
-		if err != nil {
-			return err
-		}
-		defer sock.Close()
-		rxer = sock
-	}
 	if fn := show.opt.Parms.ByName["save"]; len(fn) > 0 {
 		save.File, err = os.Create(fn)
 		if err != nil {
@@ -147,17 +126,51 @@ func (Command) Main(args ...string) error {
 		show.nsid = -1
 		handle = show.Handle
 	}
-	for {
-		b, err := rxer.Recv()
+
+	if fn := show.opt.Parms.ByName["file"]; len(fn) > 0 {
+		b, err := ioutil.ReadFile(fn)
 		if err != nil {
 			return err
 		}
-		if len(b) < rtnl.SizeofHdr {
-			return syscall.ENOMSG
+		for err == nil && len(b) > rtnl.SizeofHdr {
+			var msg []byte
+			msg, b, err = rtnl.Pop(b)
+			handle(msg)
 		}
-		handle(b)
+		return err
 	}
-	return nil
+
+	if show.ifnames, err = ifnamesByIndex(); err != nil {
+		return err
+	}
+
+	sock, err := rtnl.NewSock(16, groups(show.opt),
+		show.opt.Flags.ByName["all-nsid"])
+	if err != nil {
+		return err
+	}
+	defer sock.Close()
+
+	sigch := make(chan os.Signal)
+	signal.Notify(sigch, os.Interrupt, os.Signal(syscall.SIGTERM))
+
+selectLoop:
+	for err == nil {
+		select {
+		case <-sigch:
+			break selectLoop
+		case b, opened := <-sock.RxCh:
+			if !opened {
+				break selectLoop
+			}
+			for err == nil && len(b) > rtnl.SizeofHdr {
+				var msg []byte
+				msg, b, err = rtnl.Pop(b)
+				handle(msg)
+			}
+		}
+	}
+	return err
 }
 
 func groups(opt *options.Options) uint32 {
@@ -276,6 +289,9 @@ type save struct {
 }
 
 func (save *save) Handle(b []byte) {
+	if len(b) < rtnl.SizeofHdr {
+		return
+	}
 	now := time.Now()
 	*(rtnl.HdrPtr(save.tsbuf)) = rtnl.Hdr{
 		Len:  uint32(len(save.tsbuf)),
@@ -298,6 +314,9 @@ type show struct {
 func (show *show) Handle(b []byte) {
 	const tfmt = "Mon Jan 01 15:04:05.999999999-07:00 2006"
 	var deleted bool
+	if len(b) < rtnl.SizeofHdr {
+		return
+	}
 	h := rtnl.HdrPtr(b)
 	heading := func(label string) {
 		if show.opt.Flags.ByName["-t"] {
@@ -426,21 +445,7 @@ func ifnamesByIndex() (map[int32]string, error) {
 		return nil, err
 	}
 	defer sock.Close()
-	return sock.IfNamesByIndex()
-}
-
-type receiver interface {
-	Recv(...interface{}) ([]byte, error)
-}
-
-type file struct {
-	*os.File
-	buf []byte
-}
-
-func (fr *file) Recv(_ ...interface{}) ([]byte, error) {
-	// FIXME
-	return fr.buf, nil
+	return rtnl.NewSockReceiver(sock).IfNamesByIndex()
 }
 
 const sizeofTstamp = 4 + 4

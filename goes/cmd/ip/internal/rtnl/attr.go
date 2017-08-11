@@ -10,14 +10,7 @@ import (
 	"unsafe"
 )
 
-const (
-	RTA_ALIGNTO  = syscall.RTA_ALIGNTO
-	SizeofRtAttr = syscall.SizeofRtAttr
-)
-
-func AlignAttr(i int) int {
-	return (i + RTA_ALIGNTO - 1) & ^(RTA_ALIGNTO - 1)
-}
+const SizeofRtAttr = syscall.SizeofRtAttr
 
 func ForEachAttr(b []byte, do func(uint16, []byte)) {
 	for i := 0; i <= len(b)-SizeofRtAttr; {
@@ -28,7 +21,7 @@ func ForEachAttr(b []byte, do func(uint16, []byte)) {
 			break
 		}
 		do(h.Type, b[i+SizeofRtAttr:n])
-		i = AlignAttr(n)
+		i = RTA.Align(n)
 	}
 }
 
@@ -138,9 +131,25 @@ func (attr Attr) Read(b []byte) (int, error) {
 		Len:  uint16(SizeofRtAttr + n),
 		Type: attr.Type,
 	}
-	return AlignAttr(syscall.SizeofRtAttr + n), nil
+	return RTA.Align(syscall.SizeofRtAttr + n), nil
 }
 
+type Attrs []Attr
+
+func (attrs Attrs) Read(b []byte) (int, error) {
+	var i int
+
+	for _, attr := range attrs {
+		n, err := attr.Read(b[i:])
+		if err != nil {
+			return n, err
+		}
+		i += n
+	}
+	return i, nil
+}
+
+type NilAttr struct{}
 type BytesAttr []byte
 type Int8Attr int8
 type Int16Attr int16
@@ -151,6 +160,13 @@ type Uint8Attr uint8
 type Uint16Attr uint16
 type Uint32Attr uint32
 type Uint64Attr uint64
+
+// big-endian
+type Be16Attr uint16
+type Be32Attr uint32
+type Be64Attr uint64
+
+func (v NilAttr) Read(b []byte) (int, error) { return 0, nil }
 
 func (v BytesAttr) Read(b []byte) (int, error) {
 	if len(b) < len(v) {
@@ -230,5 +246,40 @@ func (v Uint64Attr) Read(b []byte) (int, error) {
 		return 0, syscall.EOVERFLOW
 	}
 	*(*uint64)(unsafe.Pointer(&b[0])) = uint64(v)
+	return 8, nil
+}
+
+func (v Be16Attr) Read(b []byte) (int, error) {
+	if len(b) < 2 {
+		return 0, syscall.EOVERFLOW
+	}
+	b[0] = byte(v >> 8)
+	b[1] = byte(v)
+	return 2, nil
+}
+
+func (v Be32Attr) Read(b []byte) (int, error) {
+	if len(b) < 4 {
+		return 0, syscall.EOVERFLOW
+	}
+	b[0] = byte(v >> 24)
+	b[1] = byte(v >> 16)
+	b[2] = byte(v >> 8)
+	b[3] = byte(v)
+	return 4, nil
+}
+
+func (v Be64Attr) Read(b []byte) (int, error) {
+	if len(b) < 8 {
+		return 0, syscall.EOVERFLOW
+	}
+	b[0] = byte(v >> 56)
+	b[1] = byte(v >> 48)
+	b[2] = byte(v >> 40)
+	b[3] = byte(v >> 32)
+	b[4] = byte(v >> 24)
+	b[5] = byte(v >> 16)
+	b[6] = byte(v >> 8)
+	b[7] = byte(v)
 	return 8, nil
 }

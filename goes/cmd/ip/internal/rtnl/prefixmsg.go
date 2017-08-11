@@ -44,7 +44,7 @@ const PREFIX_MAX = N_PREFIX - 1
 type Prefixa [N_PREFIX][]byte
 
 func (prefixa *Prefixa) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofPrefixMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofPrefixMsg)
 	if i >= len(b) {
 		IndexAttrByType(prefixa[:], Empty)
 		return 0, nil
