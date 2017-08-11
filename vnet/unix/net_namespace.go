@@ -41,12 +41,17 @@ func decode(b []byte, i int) (e *inotify_event, name string, i_next int) {
 }
 
 func (m *net_namespace_main) read_dir(dir_name string, f func(dir, name string, is_del bool)) (err error) {
-	// Collect existing files in directory.
+	// 1 for default namespace.
+	m.n_namespace_discovered_at_init = 1
+	// Collect existing files in /var/run/netns directory.
+	// ip netns add X command creates /var/run/netns/X file which when opened becomes ns_fd.
 	var fis []os.FileInfo
 	if fis, err = ioutil.ReadDir(dir_name); err != nil {
-		return
+		if os.IsNotExist(err) {
+			err = nil
+		}
 	}
-	m.n_namespace_discovered_at_init = 1 + uint32(len(fis)) // 1 extra for default namespace
+	m.n_namespace_discovered_at_init += uint32(len(fis))
 	for _, fi := range fis {
 		f(dir_name, fi.Name(), false)
 	}
@@ -92,7 +97,7 @@ func (nm *net_namespace_main) init() (err error) {
 	}
 
 	// Setup initial namespaces.
-	nm.read_dir(netnsDir, nm.watch_namespace_add_del)
+	err = nm.read_dir(netnsDir, nm.watch_namespace_add_del)
 	return
 }
 
