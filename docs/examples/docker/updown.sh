@@ -22,8 +22,8 @@ case $1 in
 	./docker_move.sh up R1 dummy0 192.168.1.5/32
 
 	./docker_move.sh up R2 eth-24-0 192.168.120.10/24
-	./docker_move.sh up R2 eth-14-0 192.168.222.1/24
-	./docker_move.sh up R2 dummy1 192.168.1.1/32
+	./docker_move.sh up R2 eth-14-0 192.168.222.10/24
+	./docker_move.sh up R2 dummy1 192.168.1.10/32
 
 	./docker_move.sh up R3 eth-30-0 192.168.111.2/24
 	./docker_move.sh up R3 eth-15-0 192.168.222.2/24

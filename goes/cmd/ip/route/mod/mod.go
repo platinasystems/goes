@@ -144,8 +144,8 @@ func (c Command) Main(args ...string) error {
 
 	o, args := options.New(args)
 	mod := (*mod)(o)
-	args = mod.Flags.More(args, Flags)
-	args = mod.Parms.More(args, Parms)
+	args = mod.Flags.More(args, Flags...)
+	args = mod.Parms.More(args, Parms...)
 
 	if len(args) == 0 {
 		return fmt.Errorf("PREFIX: missing")

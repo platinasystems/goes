@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"strings"
 	"sync"
 	"time"
@@ -36,7 +35,8 @@ type commonState struct {
 	maxRows           int
 	shouldRestart     ShouldRestart
 	needRefresh       bool
-	timeout		  time.Duration
+	timeoutEnabled    bool
+	timeout           time.Time
 }
 
 // TabStyle is used to select how tab completions are displayed.
@@ -266,10 +266,11 @@ func (s *State) promptUnsupported(p string) (string, error) {
 // SetDuration sets the maximum duration to wait for user input. If
 // the user does not respond in the Duration, the read is aborted
 
-func (s *State) SetDuration(d time.Duration) (error) {
-	if d / (time.Second / 10) > math.MaxUint8 {
-		return fmt.Errorf("Duration %d too large", d)
-	}
-	s.timeout = d
+// Note that this should use monotonic time. It doesn't, this is
+// currently a problem in golang. I'm not going to worry about it.
+
+func (s *State) SetDuration(d time.Duration) error {
+	s.timeout = time.Now().Add(d)
+	s.timeoutEnabled = true
 	return nil
 }

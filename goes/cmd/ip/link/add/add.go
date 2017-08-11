@@ -64,7 +64,7 @@ func (Command) Main(args ...string) error {
 
 	o, args := options.New(args)
 	add := (*add)(o)
-	args = add.Parms.More(args, Parms)
+	args = add.Parms.More(args, Parms...)
 
 	fmt.Println("FIXME", Name, args)
 

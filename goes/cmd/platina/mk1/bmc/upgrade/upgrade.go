@@ -2,8 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO AUTH WGET, CERT OR EQUIV
-//TODO UPGRADE AUTOMATICALLY IF ENB., contact boot server
+//TODO AUTHENTICATE,  CERT OR EQUIV
+//TODO UPGRADE AUTOMATICALLY IF ENABLED, contact boot server
 
 package upgrade
 
@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/kexec"
@@ -27,24 +26,24 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-l]"
+	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-l] [-t]"
 	Man     = `
 DESCRIPTION
-	The upgrade command updates firmware images.
+	The upgrade command updates BMC firmware.
 
-	The default version is "LATEST".  Optionally, a version
-	number can be supplied in the form:  v0.0[.0][.0]
+	The upgrade version is "LATEST" by default. Or, the upgrade
+	version can be specified in the form of:  v0.0[.0][.0]
 
-	The -l flag will list available versions.
+	The -l flag will list available upgrade versions.
 
 	Images are downloaded from "downloads.platina.com",
-	or, from a user specified URL or IPv4 address.
+	or from a user specified URL or IPv4 address.
 
 OPTIONS
-	-v [VER]          version number or hash, default is LATEST
-	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
-	-f                use FTP instead of wget/http for downloading
-	-l                lists available upgrade hashes`
+	-v [VER]          version number or hash, the default is LATEST
+	-s [SERVER[/dir]] IP4 or URL, the default is downloads.platina.com
+	-t                use TFTP instead of HTTP
+	-l                shows list of available upgrade versions`
 
 	DfltMod = 0755
 	DfltSrv = "downloads.platinasystems.com"
@@ -68,7 +67,7 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-f", "-l")
+	flag, args := flags.New(args, "-t", "-l")
 	parm, args := parms.New(args, "-v", "-s")
 
 	if len(parm.ByName["-v"]) == 0 {
@@ -78,13 +77,14 @@ func (cmd) Main(args ...string) error {
 		parm.ByName["-s"] = DfltSrv
 	}
 	if flag.ByName["-l"] {
-		if err := dispList(parm.ByName["-s"], parm.ByName["-v"]); err != nil {
+		if err := showList(parm.ByName["-s"], parm.ByName["-v"],
+			flag.ByName["-t"]); err != nil {
 			return err
 		}
 		return nil
 	}
-	err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"], flag.ByName["-f"])
-	if err != nil {
+	if err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"],
+		flag.ByName["-t"]); err != nil {
 		return err
 	}
 	return nil
@@ -103,28 +103,64 @@ var (
 	}
 )
 
-func doUpgrade(s string, v string, f bool) error {
-	err, size := getFile(s, v)
+func showList(s string, v string, tftp bool) error {
+	f := "LIST"
+	rmFile("/" + f)
+	urls := "http://" + s + "/" + v + "/" + f
+	if tftp {
+		urls = "tftp://" + s + "/" + v + "/" + f
+	}
+	if _, err := getFile(urls, f); err != nil {
+		return err
+	}
+	l, err := ioutil.ReadFile("/" + f)
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(l))
+	return nil
+}
+
+func doUpgrade(s string, v string, tftp bool) error {
+	f := Machine + Suffix
+	rmFile("/" + f)
+	urls := "http://" + s + "/" + v + "/" + f
+	if tftp {
+		urls = "tftp://" + s + "/" + v + "/" + f
+	}
+	n, err := getFile(urls, f)
 	if err != nil {
 		return fmt.Errorf("Error downloading: %v", err)
 	}
-	if size < 1000 {
-		return fmt.Errorf("Error tar too small: %v", err)
+	if n < 1000 {
+		return fmt.Errorf("Error file too small: %v", err)
 	}
 	if err := unzip(); err != nil {
 		return fmt.Errorf("Error unzipping file: %v", err)
 	}
-	if err := wrImgAll(); err != nil {
+	if err := writeImageAll(); err != nil {
 		return fmt.Errorf("Error writing flash: %v", err)
 	}
 	reboot()
 	return nil
 }
 
-func reboot() error {
-	kexec.Prepare()
-	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
-	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+func getFile(urls string, fn string) (int, error) {
+	r, err := url.Open(urls)
+	if err != nil {
+		return 0, err
+	}
+	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DfltMod)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	n, err := io.Copy(f, r)
+	if err != nil {
+		return 0, err
+	}
+	syscall.Fsync(int(os.Stdout.Fd()))
+	return int(n), nil
 }
 
 func unzip() error {
@@ -140,91 +176,36 @@ func unzip() error {
 			os.MkdirAll(path, file.Mode())
 			continue
 		}
-
-		fileReader, err := file.Open()
+		r, err := file.Open()
 		if err != nil {
 			return err
 		}
-		defer fileReader.Close()
-
-		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		defer r.Close()
+		t, err := os.OpenFile(
+			path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 		if err != nil {
 			return err
 		}
-		defer targetFile.Close()
-
-		if _, err := io.Copy(targetFile, fileReader); err != nil {
+		defer t.Close()
+		if _, err := io.Copy(t, r); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func dispList(s string, v string) error {
-	rmFile("/LIST")
-	files := []string{
-		"http://" + s + "/" + v + "/" + "LIST",
-	}
-	err := wgetFiles(files)
-	if err != nil {
-		return err
-	}
-	l, err := ioutil.ReadFile("/LIST")
-	if err != nil {
-		return err
-	}
-	fmt.Print(string(l))
-	return nil
-}
-
-func getFile(s string, v string) (error, int) {
-	rmFile(Machine + Suffix)
-	files := []string{
-		"http://" + s + "/" + v + "/" + Machine + Suffix,
-	}
-	err := wgetFiles(files)
-	if err != nil {
-		return err, 0
-	}
-	f, err := os.Open(Machine + Suffix)
-	if err != nil {
-		return err, 0
-	}
-	defer f.Close()
-	stat, err := f.Stat()
-	if err != nil {
-		return err, 0
-	}
-	filesize := int(stat.Size())
-	return nil, filesize
-}
-
-func wgetFiles(urls []string) error {
-	reqs := make([]*grab.Request, 0)
-	for _, url := range urls {
-		req, err := grab.NewRequest(url)
-		if err != nil {
-			return err
-		}
-		reqs = append(reqs, req)
-	}
-
-	successes, err := url.FetchReqs(0, reqs)
-	if successes == 0 && err != nil {
-		return err
 	}
 	return nil
 }
 
 func rmFile(f string) error {
-	_, err := os.Stat(f)
-	if err != nil {
+	if _, err := os.Stat(f); err != nil {
 		return err
 	}
-
-	if err = os.Remove(f); err != nil {
+	if err := os.Remove(f); err != nil {
 		return err
 	}
 	return nil
+}
+
+func reboot() error {
+	kexec.Prepare()
+	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
+	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }

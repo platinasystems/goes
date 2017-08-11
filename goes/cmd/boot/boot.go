@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +23,7 @@ import (
 const (
 	Name    = "boot"
 	Apropos = "boot another operating system"
-	Usage   = "boot [-t SECONDS] [PATH]..."
+	Usage   = "boot [-t TIMEOUT] [PATH]..."
 	Man     = `
 DESCRIPTION
 	The boot command finds other operating systems to load, and chooses
@@ -35,7 +34,7 @@ DESCRIPTION
 	simplifies the process of selecting a kernel to execute.
 
 OPTIONS
-	-t	Specify a timeout in seconds`
+	-t	Specify a timeout`
 )
 
 var (
@@ -78,23 +77,21 @@ func (c *Command) Main(args ...string) (err error) {
 
 	timeout := time.Duration(0)
 	if parm.ByName["-t"] != "" {
-		t, err := strconv.ParseUint(parm.ByName["-t"], 10, 8)
+		timeout, err = time.ParseDuration(parm.ByName["-t"])
 		if err != nil {
 			return err
 		}
-		timeout = time.Duration(t) * time.Second
 	}
 
 	cnt := 0
 
 	done := make(chan *bootMnt, len(args))
 
-	_, cl, err := cmdline.New()
-	if err != nil {
-		return
-	}
-
 	for _, arg := range args {
+		_, cl, err := cmdline.New()
+		if err != nil {
+			return err
+		}
 		fields := strings.Split(arg, ":")
 		m := &bootMnt{}
 		m.mnt = fields[0]

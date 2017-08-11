@@ -6,21 +6,19 @@ package show
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"sort"
-	"strings"
 
+	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/netlink"
 )
 
 const (
 	Name    = "show"
 	Apropos = "link attributes"
 	Usage   = `
-	ip link show [ DEVICE | group GROUP ] [ up ] [ master DEVICE ]
+	ip link show [ [dev] DEVICE | group GROUP ] [ up ] [ master DEVICE ]
 		[ type ETYPE ] [ vrf NAME ]
 `
 
@@ -28,11 +26,6 @@ const (
 SEE ALSO
 	ip man link || ip link -man
 `
-)
-
-const (
-	IF_LINK_MODE_DEFAULT linkmode = iota
-	IF_LINK_MODE_DORMANT
 )
 
 var (
@@ -43,6 +36,7 @@ var (
 		"up",
 	}
 	Parms = []interface{}{
+		"dev",
 		"group",
 		"master",
 		"type",
@@ -53,22 +47,6 @@ var (
 func New(name string) Command { return Command(name) }
 
 type Command string
-
-type dev struct {
-	name  string
-	index uint
-	flags netlink.IfInfoFlags
-	addrs map[string]string
-	attrs map[string]string
-	stats netlink.LinkStats64
-}
-
-type show options.Options
-
-type newline struct{}
-type linebreak struct{}
-type linkmode uint8
-type group uint32
 
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
@@ -86,147 +64,136 @@ func (Command) Usage() string    { return Usage }
 
 func (Command) Main(args ...string) error {
 	var err error
+	var req []byte
+	var gid uint32 // default: 0
+	var newifinfos [][]byte
+	arphrd := ^uint16(0)
+	mindex := int32(-1)
 
 	if args, err = options.Netns(args); err != nil {
 		return err
 	}
 
-	o, args := options.New(args)
-	show := (*show)(o)
-	args = show.Flags.More(args, Flags)
-	args = show.Parms.More(args, Parms)
+	opt, args := options.New(args)
+	args = opt.Flags.More(args, Flags...)
+	args = opt.Parms.More(args, Parms...)
 
-	msgs, err := load()
+	if n := len(args); n == 1 {
+		opt.Parms.Set("dev", args[0])
+	} else if n > 1 {
+		return fmt.Errorf("%v: unexpected", args[1:])
+	}
+
+	if vrf := opt.Parms.ByName["vrf"]; len(vrf) > 0 {
+		// FIXME is vrf an alias for master?
+		opt.Parms.Set("master", vrf)
+	}
+	if gname := opt.Parms.ByName["group"]; len(gname) > 0 {
+		gid = group.Id(gname)
+	}
+	if name := opt.Parms.ByName["type"]; len(name) > 0 {
+		if val, found := rtnl.ArphrdByName[name]; !found {
+			return fmt.Errorf("type: %s: unknown", name)
+		} else {
+			arphrd = val
+		}
+	}
+
+	sock, err := rtnl.NewSock()
 	if err != nil {
 		return err
 	}
+	defer sock.Close()
 
-	for _, info := range msgs {
-		show.show(info)
+	if req, err = rtnl.NewMessage(
+		rtnl.Hdr{
+			Type:  rtnl.RTM_GETLINK,
+			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+		},
+		rtnl.IfInfoMsg{
+			Family: rtnl.AF_UNSPEC,
+		},
+		rtnl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
+	); err != nil {
+		return err
+	}
+	if err = sock.UntilDone(req, func(b []byte) {
+		var ifla rtnl.Ifla
+		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+			return
+		}
+		msg := rtnl.IfInfoMsgPtr(b)
+		ifla.Write(b)
+		if dev := opt.Parms.ByName["dev"]; len(dev) > 0 {
+			if dev != rtnl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
+				return
+			}
+		}
+		if arphrd != ^uint16(0) {
+			if msg.Type != arphrd {
+				return
+			}
+		}
+		if val := ifla[rtnl.IFLA_GROUP]; len(val) > 0 {
+			if gid != rtnl.Uint32(val) {
+				return
+			}
+		} else if gid != 0 {
+			return
+		}
+		if opt.Flags.ByName["up"] {
+			// FIXME what about IFF_LOWER_UP
+			const bits = rtnl.IFF_UP
+			if bits != (msg.Flags & bits) {
+				return
+			}
+		}
+		if master := opt.Parms.ByName["master"]; len(master) > 0 {
+			if master == rtnl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
+				mindex = msg.Index
+				return
+			}
+		}
+		newifinfos = append(newifinfos, b)
+	}); err != nil {
+		return err
 	}
 
+	if len(newifinfos) == 0 {
+		return fmt.Errorf("no info")
+	}
+
+	sort.Slice(newifinfos, func(i, j int) bool {
+		iIndex := rtnl.IfInfoMsgPtr(newifinfos[i]).Index
+		jIndex := rtnl.IfInfoMsgPtr(newifinfos[j]).Index
+		return iIndex < jIndex
+	})
+
+	for _, b := range newifinfos {
+		var ifla rtnl.Ifla
+		msg := rtnl.IfInfoMsgPtr(b)
+		if mindex != -1 {
+			if msg.Index != mindex {
+				continue
+			}
+		}
+		opt.ShowIfInfo(b)
+		ifla.Write(b)
+		if opt.Flags.ByName["-s"] {
+			val := ifla[rtnl.IFLA_STATS64]
+			if len(val) == 0 {
+				val = ifla[rtnl.IFLA_STATS]
+			}
+			if len(val) > 0 {
+				opt.ShowIfStats(val)
+			}
+		}
+		if val := ifla[rtnl.IFLA_VFINFO_LIST]; len(val) > 0 {
+			rtnl.ForEachVfInfo(val, func(b []byte) {
+				opt.ShowIflaVf(b)
+			})
+		}
+		fmt.Println()
+	}
 	return nil
-}
-
-/*
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
-     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-or with -details...
-     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00 promiscuity 0 addrgenmode eui64 numtxqueues 1 numrxqueues 1
-with -stats...
-    RX: bytes  packets  errors  dropped overrun mcast
-    0          0        0       0       0       0
-    TX: bytes  packets  errors  dropped carrier collsns
-    0          0        0       0       0       0
-*/
-func (show *show) show(info *netlink.IfInfoMessage) {
-	u8 := func(attr netlink.Attr) uint8 {
-		return attr.(netlink.Uint8er).Uint()
-	}
-	u32 := func(attr netlink.Attr) uint32 {
-		return attr.(netlink.Uint32er).Uint()
-	}
-	show.print(info.Index)
-	show.print(": ", info.Attrs[netlink.IFLA_IFNAME])
-	show.print(": <", info.IfInfomsg.Flags, ">")
-	show.print(" mtu ", info.Attrs[netlink.IFLA_MTU])
-	show.print(" qdisc ", info.Attrs[netlink.IFLA_QDISC])
-	show.print(" state ", info.Attrs[netlink.IFLA_OPERSTATE])
-	show.print(" mode ", linkmode(u8(info.Attrs[netlink.IFLA_LINKMODE])))
-	show.print(" group ", group(u32(info.Attrs[netlink.IFLA_GROUP])))
-	show.print(" qlen ", info.Attrs[netlink.IFLA_TXQLEN])
-	show.print(linebreak{})
-	show.print("    link/", netlink.L2IfType(info.L2IfType))
-	show.print(" ", info.Attrs[netlink.IFLA_ADDRESS])
-	show.print(" brd ", info.Attrs[netlink.IFLA_BROADCAST])
-	if show.Flags.ByName["-d"] {
-		show.print(" promiscuity ",
-			info.Attrs[netlink.IFLA_PROMISCUITY])
-		attr := info.Attrs[netlink.IFLA_INET6_ADDR_GEN_MODE]
-		if attr != nil {
-			show.print(" addrgenmode  ", attr)
-		}
-		show.print(" numtxqueues ",
-			info.Attrs[netlink.IFLA_NUM_TX_QUEUES])
-		show.print(" numrxqueues ",
-			info.Attrs[netlink.IFLA_NUM_RX_QUEUES])
-	}
-	if show.Flags.ByName["-s"] {
-		show.print(linebreak{})
-		show.print("    FIXME stats")
-	}
-	show.print(newline{})
-}
-
-func (show *show) print(args ...interface{}) {
-	for _, v := range args {
-		switch t := v.(type) {
-		case newline:
-			os.Stdout.Write([]byte{'\n'})
-		case linebreak:
-			if show.Flags.ByName["-o"] {
-				os.Stdout.Write([]byte{'\\'})
-			} else {
-				os.Stdout.Write([]byte{'\n'})
-			}
-		case []byte:
-			os.Stdout.Write(t)
-		case string:
-			os.Stdout.WriteString(t)
-		case group:
-			// FIXME lookup in /etc/iproute2/group
-			if t == 0 {
-				os.Stdout.WriteString("default")
-			} else {
-				fmt.Print(t)
-			}
-		case netlink.IfInfoFlags:
-			s := strings.Replace(t.String(), " ", "", -1)
-			os.Stdout.WriteString(strings.ToUpper(s))
-		case netlink.IfOperState:
-			os.Stdout.WriteString(strings.ToUpper(t.String()))
-		case linkmode:
-			switch t {
-			case IF_LINK_MODE_DEFAULT:
-				os.Stdout.WriteString("DEFAULT")
-			case IF_LINK_MODE_DORMANT:
-				os.Stdout.WriteString("DORMANT")
-			default:
-				fmt.Print(t)
-			}
-		case netlink.L2IfType:
-			os.Stdout.WriteString(strings.ToLower(t.String()))
-		default:
-			if method, found := v.(io.WriterTo); found {
-				method.WriteTo(os.Stdout)
-			} else {
-				fmt.Print(v)
-			}
-		}
-	}
-}
-
-func load() (info []*netlink.IfInfoMessage, err error) {
-	nl, err := netlink.New(netlink.RTNLGRP_LINK)
-	if err != nil {
-		return
-	}
-	h := func(msg netlink.Message) error {
-		switch msg.MsgType() {
-		case netlink.RTM_NEWLINK, netlink.RTM_GETLINK:
-			// FIXME what about RTM_DELLINK and RTM_SETLINK ?
-			info = append(info, msg.(*netlink.IfInfoMessage))
-		default:
-			msg.Close()
-		}
-		return nil
-	}
-	req := netlink.ListenReq{netlink.RTM_GETLINK, netlink.AF_PACKET}
-	err = nl.Listen(h, req)
-	if err == nil {
-		sort.Slice(info, func(i, j int) bool {
-			return info[i].Index < info[j].Index
-		})
-	}
-	return
 }

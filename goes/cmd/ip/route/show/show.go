@@ -7,9 +7,12 @@ package show
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/netlink"
 )
 
 const (
@@ -35,15 +38,24 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
+	Flags = []interface{}{
+		"cloned",
+		"cached",
+	}
 	Parms = []interface{}{
-		"root",
-		"match",
-		"exact",
+		"to",
+		"tos",
 		"table",
 		"vrf",
-		"proto",
-		"type",
+		"from",
+		"protocol",
 		"scope",
+		"type",
+		"dev",
+		"via",
+		"src",
+		"realm",
+		"realms",
 	}
 )
 
@@ -68,44 +80,110 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (c Command) Main(args ...string) error {
-	var (
-		err error
-		ip  net.IP
-	)
+	var err error
+	var req []byte
+	var to string
+	var prefix uint8
 
 	if args, err = options.Netns(args); err != nil {
 		return err
 	}
 
-	o, args := options.New(args)
-	show := (*show)(o)
-	args = show.Parms.More(args, Parms)
+	opt, args := options.New(args)
+	args = opt.Flags.More(args, Flags...)
+	args = opt.Parms.More(args, Parms...)
 
-	command := c
-	if len(command) == 0 {
-		command = "show"
+	if n := len(args); n == 1 {
+		opt.Parms.Set("to", args[0])
+	} else if n > 1 {
+		return fmt.Errorf("%v: unexpected", args[1:])
 	}
-	switch command {
-	case "get":
-		switch len(args) {
-		case 0:
-			return fmt.Errorf("ADDRESS: missing")
-		case 1:
-			ip = net.ParseIP(args[0])
-			if ip == nil {
-				return fmt.Errorf("%s: can't parse ADDRESS",
-					args[0])
-			}
+
+	tbl := rtnl.RT_TABLE_MAIN
+	if tname := opt.Parms.ByName["table"]; len(tname) > 0 {
+		switch tname {
+		case "all":
+			tbl = rtnl.RT_TABLE_UNSPEC
+		case "cache":
+			// FIXME
 		default:
-			return fmt.Errorf("%v: unexpected", args[1:])
+			var found bool
+			tbl, found = rtnl.RtTableByName[tname]
+			if !found {
+				_, err := fmt.Sscan(tname, &tbl)
+				if err != nil {
+					return fmt.Errorf("table: %s: unknown",
+						tname)
+				}
+			}
 		}
-	default:
-		if len(args) > 0 {
-			return fmt.Errorf("%v: unexpected", args)
+	}
+	if to = opt.Parms.ByName["to"]; len(to) > 0 {
+		slash := strings.Index(to, "/")
+		if to != "default" {
+			if slash < 0 || slash == 0 || slash == len(to)-1 {
+				return fmt.Errorf("to: %s: invalid prefix", to)
+			}
+			_, err := fmt.Sscan(to[slash+1:], &prefix)
+			if err != nil {
+				return fmt.Errorf("to: prefix: %s: %v",
+					to[slash+1:], err)
+			}
+			to = to[:slash]
 		}
 	}
 
-	fmt.Println("FIXME", command)
+	sock, err := rtnl.NewSock()
+	if err != nil {
+		return err
+	}
+	defer sock.Close()
 
+	ifnames, err := sock.IfNamesByIndex()
+	if err != nil {
+		return err
+	}
+
+	for _, af := range opt.Afs() {
+		if req, err = rtnl.NewMessage(
+			rtnl.Hdr{
+				Type:  rtnl.RTM_GETROUTE,
+				Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			},
+			rtnl.RtGenMsg{
+				Family: af,
+			},
+		); err != nil {
+			return err
+		} else if err = sock.UntilDone(req, func(b []byte) {
+			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWROUTE {
+				return
+			}
+			var rta rtnl.Rta
+			rta.Write(b)
+			msg := rtnl.RtMsgPtr(b)
+			if tbl != rtnl.RT_TABLE_UNSPEC {
+				if tbl != rtnl.Uint32(rta[netlink.RTA_TABLE]) {
+					return
+				}
+			}
+			if len(to) > 0 {
+				val := rta[rtnl.RTA_DST]
+				if len(val) == 0 {
+					if to != "default" {
+						return
+					}
+				} else if msg.Dst_len != prefix {
+					return
+				} else if net.IP(val).String() != to {
+					return
+				}
+			}
+			opt.ShowRoute(b, ifnames)
+			fmt.Println()
+		}); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
+	"github.com/platinasystems/go/internal/tftp"
 )
 
 func Open(path string) (io.ReadCloser, error) {
@@ -34,6 +35,15 @@ func Open(path string) (io.ReadCloser, error) {
 	// Handle file://... URLs
 	if u.Scheme == "file" {
 		return os.Open(u.Path)
+	}
+
+	// Handle tftp://... URLs
+	if u.Scheme == "tftp" {
+		rc, err := tftp.GetFileRC(u.Host + ":" + u.Path)
+		if err != nil {
+			return nil, err
+		}
+		return rc, nil
 	}
 
 	// Get URL from server.

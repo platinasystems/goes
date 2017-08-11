@@ -40,7 +40,7 @@ var img = []string{"ubo", "dtb", "env", "ker", "ini"}
 var off = []uint32{0x00000, 0x80000, 0xc0000, 0x100000, 0x300000}
 var siz = []uint32{0x80000, 0x40000, 0x40000, 0x200000, 0x300000}
 
-func wrImgAll() (err error) {
+func writeImageAll() (err error) {
 	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
 	if err != nil {
 		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
@@ -52,7 +52,7 @@ func wrImgAll() (err error) {
 		return err
 	}
 	for j, i := range img {
-		err := wrImg("/"+Machine+"-"+i+".bin", off[j], siz[j])
+		err := writeImage("/"+Machine+"-"+i+".bin", off[j], siz[j])
 		if err != nil {
 			return err
 		}
@@ -60,7 +60,7 @@ func wrImgAll() (err error) {
 	return nil
 }
 
-func wrImg(im string, of uint32, sz uint32) error {
+func writeImage(im string, of uint32, sz uint32) error {
 	if fi, err := os.Stat(im); !os.IsNotExist(err) {
 		if fi.Size() < 1000 {
 			fmt.Println("skipping file...", im)

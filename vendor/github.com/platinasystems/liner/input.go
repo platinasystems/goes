@@ -69,8 +69,8 @@ func NewLiner() *State {
 	return &s
 }
 
-var errTimedOut = errors.New("timeout")		// internal timeout
-var ErrTimeOut = errors.New("timed out")	// external timeout
+var errTimedOut = errors.New("timeout")  // internal timeout
+var ErrTimeOut = errors.New("timed out") // external timeout
 var ErrInternalError = errors.New("liner: internal error")
 
 func (s *State) startPrompt() {
@@ -79,9 +79,8 @@ func (s *State) startPrompt() {
 			s.defaultMode = *m.(*termios)
 			mode := s.defaultMode
 			mode.Lflag &^= isig
-			if s.timeout != 0 {
-				mode.Cc[syscall.VTIME] = uint8(s.timeout /
-					(time.Second / 10))
+			if s.timeoutEnabled {
+				mode.Cc[syscall.VTIME] = 5 // 500ms
 				mode.Cc[syscall.VMIN] = 0
 			} else {
 				mode.Cc[syscall.VTIME] = 0
@@ -104,10 +103,10 @@ func (s *State) restartPrompt() {
 			var n nexter
 			n.r, _, n.err = s.r.ReadRune()
 			if n.err == io.EOF {
-				if s.timeout != 0 {
+				if s.timeoutEnabled && time.Now().After(s.timeout) {
 					n.err = ErrTimeOut
 				} else {
-					n.err = ErrInternalError
+					continue
 				}
 			}
 			next <- n
@@ -193,24 +192,31 @@ func (s *State) readNext() (interface{}, error) {
 		switch code {
 		case 'A':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return up, nil
 		case 'B':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return down, nil
 		case 'C':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return right, nil
 		case 'D':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return left, nil
 		case 'F':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return end, nil
 		case 'H':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return home, nil
 		case 'Z':
 			s.pending = s.pending[:0] // escape code complete
+			s.timeoutEnabled = false  // function keys mean a person is there
 			return shiftTab, nil
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			num := []rune{code}
@@ -259,6 +265,7 @@ func (s *State) readNext() (interface{}, error) {
 								return rv, nil
 							}
 							s.pending = s.pending[:0] // escape code complete
+							s.timeoutEnabled = false  // function keys mean a person is there
 							if code == 'C' {
 								return wordRight, nil
 							}
@@ -272,6 +279,7 @@ func (s *State) readNext() (interface{}, error) {
 					}
 				case '~':
 					s.pending = s.pending[:0] // escape code complete
+					s.timeoutEnabled = false  // function keys mean a person is there
 					x, _ := strconv.ParseInt(string(num), 10, 32)
 					switch x {
 					case 2:
@@ -323,6 +331,8 @@ func (s *State) readNext() (interface{}, error) {
 			return nil, err
 		}
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
+
 		switch code {
 		case 'c':
 			return wordRight, nil
@@ -345,18 +355,23 @@ func (s *State) readNext() (interface{}, error) {
 		}
 	case 'b':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altB, nil
 	case 'f':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altF, nil
 	case 'n':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altN, nil
 	case 'p':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altP, nil
 	case 'y':
 		s.pending = s.pending[:0] // escape code complete
+		s.timeoutEnabled = false  // function keys mean a person is there
 		return altY, nil
 	default:
 		rv := s.pending[0]

@@ -58,24 +58,6 @@ func checkForChip() error {
 	return err
 }
 
-func checkForKmod() error {
-	args := []string{"/bin/lsmod"}
-	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
-	if err != nil {
-		return err
-	}
-
-	match, err := regexp.MatchString("uio_pci_dma", string(cmdOut))
-	if err != nil {
-		return err
-	}
-
-	if !match {
-		err = fmt.Errorf("not loaded")
-	}
-	return err
-}
-
 func checkDaemons() error {
 	daemons := map[string]bool{
 		"goes-daemons": true,
@@ -175,6 +157,27 @@ func checkVnetdHung() error {
 	return nil
 }
 
+func checkMode() (string, error) {
+	var mode string
+
+	args := []string{"/bin/lsmod"}
+	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
+	if err != nil {
+		return mode, err
+	}
+
+	match, err := regexp.MatchString("ixgbe", string(cmdOut))
+	if err != nil {
+		return mode, err
+	}
+
+	if match {
+		return "SRIOV", nil
+	} else {
+		return "TUNTAP", nil
+	}
+}
+
 func (Command) Main(args ...string) error {
 	if err := assert.Root(); err != nil {
 		return err
@@ -182,15 +185,19 @@ func (Command) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
+	mode, err := checkMode()
+	if err != nil {
+		mode = "Unknown" // shouldn't happen
+	}
 	fmt.Println("GOES status")
 	fmt.Println("======================")
+	fmt.Printf("  %-15s - %s\n", "Mode", mode)
 
 	for _, x := range []struct {
 		header string
 		f      func() error
 	}{
 		{"PCI", checkForChip},
-		{"Kernel module", checkForKmod},
 		{"Check daemons", checkDaemons},
 		{"Check Redis", checkRedis},
 		{"Check vnet", checkVnetdHung},

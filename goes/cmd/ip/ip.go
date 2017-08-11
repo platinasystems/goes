@@ -11,6 +11,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/address"
 	"github.com/platinasystems/go/goes/cmd/ip/batch"
 	"github.com/platinasystems/go/goes/cmd/ip/link"
+	"github.com/platinasystems/go/goes/cmd/ip/monitor"
 	"github.com/platinasystems/go/goes/cmd/ip/neighbor"
 	"github.com/platinasystems/go/goes/cmd/ip/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/route"
@@ -27,7 +28,7 @@ const (
 	ip [ -n NAMESPACE ] -batch [ -x | -f ] [ - | FILE ]
 	ip [ -x | -f ] [ - | FILE ]
 	
-	OBJECT := { address | link | neighbor | netns | route }
+	OBJECT := { address | link | monitor | neighbor | netns | route }
 
 	OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
 		-human[-readable] | -iec |
@@ -52,6 +53,7 @@ func New() *goes.Goes {
 	g.Plot(address.New(),
 		batch.New(),
 		link.New(),
+		monitor.New(),
 		neighbor.New(),
 		netns.New(),
 		route.New())

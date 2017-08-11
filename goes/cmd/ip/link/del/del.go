@@ -53,7 +53,7 @@ func (Command) Main(args ...string) error {
 
 	o, args := options.New(args)
 	del := (*del)(o)
-	args = del.Parms.More(args, Parms)
+	args = del.Parms.More(args, Parms...)
 
 	dev := del.Parms.ByName["dev"]
 	switch len(args) {
