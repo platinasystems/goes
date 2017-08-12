@@ -248,45 +248,51 @@ type InterfaceKind int
 
 const (
 	InterfaceKindUnknown InterfaceKind = iota
+	InterfaceKindBridge
 	InterfaceKindDummy
-	InterfaceKindTun
-	InterfaceKindVeth
-	InterfaceKindVlan
-	InterfaceKindIpip
-	InterfaceKindIp6Tunnel
 	InterfaceKindIp4GRE
 	InterfaceKindIp4GRETap
 	InterfaceKindIp6GRE
 	InterfaceKindIp6GRETap
+	InterfaceKindIp6Tunnel
+	InterfaceKindIpip
+	InterfaceKindSit
+	InterfaceKindTun
+	InterfaceKindVeth
+	InterfaceKindVlan
 )
 
 var kindStrings = [...]string{
-	InterfaceKindUnknown:   "",
+	InterfaceKindBridge:    "bridge",
 	InterfaceKindDummy:     "dummy",
-	InterfaceKindTun:       "tun",
-	InterfaceKindVeth:      "veth",
-	InterfaceKindVlan:      "vlan",
-	InterfaceKindIpip:      "ipip",
-	InterfaceKindIp6Tunnel: "ip6tnl",
 	InterfaceKindIp4GRE:    "gre",
 	InterfaceKindIp4GRETap: "gretap",
 	InterfaceKindIp6GRE:    "ip6gre",
 	InterfaceKindIp6GRETap: "ip6gretap",
+	InterfaceKindIp6Tunnel: "ip6tnl",
+	InterfaceKindIpip:      "ipip",
+	InterfaceKindSit:       "sit",
+	InterfaceKindTun:       "tun",
+	InterfaceKindUnknown:   "",
+	InterfaceKindVeth:      "veth",
+	InterfaceKindVlan:      "vlan",
 }
 
 func (k InterfaceKind) String() string { return kindStrings[k] }
 
 var kindMap = map[string]InterfaceKind{
+	"bridge":    InterfaceKindBridge,
 	"dummy":     InterfaceKindDummy,
-	"tun":       InterfaceKindTun,
-	"veth":      InterfaceKindVeth,
-	"vlan":      InterfaceKindVlan,
-	"ipip":      InterfaceKindIpip,
-	"ip6tnl":    InterfaceKindIp6Tunnel,
 	"gre":       InterfaceKindIp4GRE,
 	"gretap":    InterfaceKindIp4GRETap,
 	"ip6gre":    InterfaceKindIp6GRE,
 	"ip6gretap": InterfaceKindIp6GRETap,
+	"ip6tnl":    InterfaceKindIp6Tunnel,
+	"ipip":      InterfaceKindIpip,
+	"sit":       InterfaceKindSit,
+	"tun":       InterfaceKindTun,
+	"veth":      InterfaceKindVeth,
+	"vlan":      InterfaceKindVlan,
 }
 
 func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
