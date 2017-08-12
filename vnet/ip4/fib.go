@@ -531,13 +531,16 @@ func (m *Main) Lookup(a *Address, i ip.FibIndex) (r ip.Adj) {
 func (m *Main) setInterfaceAdjacency(a *ip.Adjacency, si vnet.Si, ia ip.IfAddr) {
 	sw := m.Vnet.SwIf(si)
 	hw := m.Vnet.SupHwIf(sw)
-	h := m.Vnet.HwIfer(hw.Hi())
+	var h vnet.HwInterfacer
+	if hw != nil {
+		h = m.Vnet.HwIfer(hw.Hi())
+	}
 
 	next := ip.LookupNextRewrite
 	noder := &m.rewriteNode
 	packetType := vnet.IP4
 
-	if _, ok := h.(vnet.Arper); ok {
+	if _, ok := h.(vnet.Arper); h == nil || ok {
 		next = ip.LookupNextGlean
 		noder = &m.arpNode
 		packetType = vnet.ARP
@@ -545,7 +548,9 @@ func (m *Main) setInterfaceAdjacency(a *ip.Adjacency, si vnet.Si, ia ip.IfAddr) 
 	}
 
 	a.LookupNextIndex = next
-	m.Vnet.SetRewrite(&a.Rewrite, si, noder, packetType, nil /* dstAdr meaning broadcast */)
+	if h != nil {
+		m.Vnet.SetRewrite(&a.Rewrite, si, noder, packetType, nil /* dstAdr meaning broadcast */)
+	}
 }
 
 type fibMain struct {
