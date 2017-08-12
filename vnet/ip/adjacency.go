@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -660,22 +661,38 @@ func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
 	return
 }
 
-func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af AdjacencyFinalizer) (ok bool) {
+var (
+	ErrNotRewrite = errors.New("replacment adjacenty is not rewrite")
+	ErrNotFound   = errors.New("adjacency not found")
+)
+
+func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af AdjacencyFinalizer) (err error) {
 	if fromNextHopAdj == toNextHopAdj {
 		return
+	}
+
+	// Adjacencies must be rewrites.
+	as := m.GetAdj(toNextHopAdj)
+	for i := range as {
+		if !as[i].IsRewrite() {
+			err = ErrNotRewrite
+			return
+		}
 	}
 
 	mm := &m.multipathMain
 	ma := m.mpAdjForAdj(ai, false)
 	given := mm.getNextHopBlock(&ma.givenNextHops)
+	found := false
 	for i := range given {
 		nh := &given[i]
-		if ok = nh.Adj == fromNextHopAdj; ok {
+		if found = nh.Adj == fromNextHopAdj; found {
 			nh.Adj = toNextHopAdj
 			break
 		}
 	}
-	if !ok {
+	if !found {
+		err = ErrNotFound
 		return
 	}
 

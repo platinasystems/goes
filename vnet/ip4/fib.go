@@ -382,7 +382,7 @@ func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibR
 		// Replace adjacencies: more -> less.
 		for dp, r := range dstMap {
 			g := m.fibByIndex(dp.i, false)
-			g.replaceNextHop(m, &dp.p, more.adj, less.adj, r)
+			g.replaceNextHop(m, &dp.p, f, more.adj, less.adj, dst.a, r)
 		}
 	}
 }
@@ -408,7 +408,7 @@ func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, ad
 				const isDel = false
 				g := m.fibByIndex(dp.i, false)
 				more.addDelNextHop(m, g, dp.p, dst.a, r, isDel)
-				g.replaceNextHop(m, &dp.p, less.adj, adj, r)
+				g.replaceNextHop(m, &dp.p, f, less.adj, adj, dst.a, r)
 			}
 		}
 	}
@@ -714,15 +714,28 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	return
 }
 
-func (f *Fib) replaceNextHop(m *Main, p *Prefix, fromNextHopAdj, toNextHopAdj ip.Adj, r NextHopper) (err error) {
-	if adj, ok := f.Get(p); ok {
-		if ok = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); !ok {
-			err = fmt.Errorf("ReplaceNextHop fails")
-		}
-		const isDel = false
-		m.callFibAddDelHooks(f.index, p, adj, isDel)
+func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNextHopAdj ip.Adj, nha Address, r NextHopper) (err error) {
+	if adj, ok := f.Get(p); !ok {
+		err = &prefixError{s: "unknown destination", p: *p}
 	} else {
-		err = &prefixError{s: "replaceNextHop, unknown destination", p: *p}
+		as := m.GetAdj(toNextHopAdj)
+		// If replacement is glean (interface route) then next hop becomes unreachable.
+		isDel := len(as) == 1 && as[0].IsGlean()
+		if isDel {
+			err = pf.addDelRouteNextHop(m, p, nha, r, isDel)
+			if err == nil {
+				err = f.addDelUnreachable(m, p, pf, nha, r, !isDel, false)
+			}
+		} else {
+			if err = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); err != nil {
+				err = fmt.Errorf("replace next hop: %v", err)
+			} else {
+				m.callFibAddDelHooks(pf.index, p, adj, isDel)
+			}
+		}
+	}
+	if err != nil {
+		panic(err)
 	}
 	return
 }
