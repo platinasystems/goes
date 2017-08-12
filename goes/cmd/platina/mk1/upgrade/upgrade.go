@@ -53,7 +53,6 @@ OPTIONS
 	DfltSrv = "downloads.platinasystems.com"
 	DfltVer = "LATEST"
 	Machine = "platina-mk1"
-	Suffix  = ".zip"
 )
 
 const (
@@ -190,11 +189,7 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 		}
 	}
 	if k {
-		_, fn, err := srvKernelVer(s, v, t)
-		if err != nil {
-			return err
-		}
-		if err := upgradeKernel(s, v, t, f, fn); err != nil {
+		if err := upgradeKernel(s, v, t, f); err != nil {
 			return err
 		}
 	}

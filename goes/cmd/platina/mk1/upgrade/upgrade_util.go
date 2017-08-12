@@ -44,14 +44,14 @@ func upgradeGoes(s string, v string, t bool, f bool) error {
 	return nil
 }
 
-func upgradeKernel(s string, v string, t bool, f bool, fn string) error {
+func upgradeKernel(s string, v string, t bool, f bool) error {
 	fmt.Printf("Update Kernel\n")
+	kr, fn, err := srvKernelVer(s, v, t)
+	if err != nil {
+		return err
+	}
 	if !f {
 		k, err := KernelVer()
-		if err != nil {
-			return err
-		}
-		kr, _, err := srvKernelVer(s, v, t)
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func KernelVer() (string, error) {
 	return strings.TrimSpace(string(u)), nil
 }
 
-func CorebootVer() (string, error) { //FIXME
+func CorebootVer() (string, error) { //FIXME not really required, can just try upgrade, will auto skip if same
 	return "no_tag", nil
 }
 
@@ -262,7 +262,7 @@ func cleanupBootDir(fn string) error {
 	ref := regexp.MustCompile("([0-9]+)[.]([0-9]+)[.]([0-9]+)")
 	x := ref.FindString(fn)
 	if len(x) == 0 {
-		return fmt.Errorf("Error version number not found. %v", fn)
+		return fmt.Errorf("Error: version number not found. %v", fn)
 	}
 	files, _ := ioutil.ReadDir("/boot")
 	for _, f := range files {
@@ -307,14 +307,14 @@ func rmFile(f string) error {
 }
 
 func activateGoes() error {
-	fmt.Print("\nACTIVATING GOES, WIll EXIT... type reset, goes\n")
+	fmt.Print("\nACTIVATING GOES, WILL EXIT... type reset, goes\n")
 	cmd := exec.Command("./" + GoesInstaller)
 	cmd.Start()
 	return nil
 }
 
 func reboot() error {
-	fmt.Print("\nWIll REBOOT in 1 minute... Please login again\n")
+	fmt.Print("\nWILL REBOOT in 1 minute... Please login again\n")
 	u, err := exec.Command("shutdown", "-r", "+1").Output()
 	fmt.Println(u)
 	if err != nil {
