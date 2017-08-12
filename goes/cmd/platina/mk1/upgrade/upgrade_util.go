@@ -44,7 +44,7 @@ func upgradeGoes(s string, v string, t bool, f bool) error {
 	return nil
 }
 
-func upgradeKernel(s string, v string, t bool, f bool, l string) error {
+func upgradeKernel(s string, v string, t bool, f bool, fn string) error {
 	fmt.Printf("Update Kernel\n")
 	if !f {
 		k, err := KernelVer()
@@ -63,7 +63,7 @@ func upgradeKernel(s string, v string, t bool, f bool, l string) error {
 		}
 	}
 
-	if err := installKernel(s, v, t, l); err != nil {
+	if err := installKernel(s, v, t, fn); err != nil {
 		return err
 	}
 	return nil
@@ -232,9 +232,12 @@ func installKernel(s string, v string, t bool, fn string) error {
 		return err
 	}
 
-	//FIXME add /boot cleanup
+	err = cleanupBootDir(fn)
+	if err != nil {
+		return err
+	}
 
-	_, err = exec.Command("grub-update").Output()
+	_, err = exec.Command("update-grub").Output()
 	if err != nil {
 		return err
 	}
@@ -244,9 +247,34 @@ func installKernel(s string, v string, t bool, fn string) error {
 }
 
 func installCoreboot(s string, v string, t bool) error {
-	//FIXME sudo /usr/local/sbin/flashrom -p internal:boardmismatch=force -l /usr/local/share/flashrom/layouts/platina-mk1.xml -i bios -w coreboot.rom -A -V
-
+	_, err := exec.Command("/usr/local/sbin/flashrom", "-p",
+		"internal:boardmismatch=force", "-l",
+		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
+		"-i", "bios", "-w", "coreboot.rom", "-A", "-V").Output()
+	if err != nil {
+		return err
+	}
 	Reboot_flag = true
+	return nil
+}
+
+func cleanupBootDir(fn string) error {
+	ref := regexp.MustCompile("([0-9]+)[.]([0-9]+)[.]([0-9]+)")
+	x := ref.FindString(fn)
+	if len(x) == 0 {
+		return fmt.Errorf("Error version number not found. %v", fn)
+	}
+	files, _ := ioutil.ReadDir("/boot")
+	for _, f := range files {
+		if !f.IsDir() {
+			if !strings.Contains(f.Name(), x) {
+				err := rmFile("/boot/" + f.Name())
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -278,7 +306,7 @@ func rmFile(f string) error {
 	return nil
 }
 
-func install() error {
+func activateGoes() error {
 	fmt.Print("\nACTIVATING GOES, WIll EXIT... type reset, goes\n")
 	cmd := exec.Command("./" + GoesInstaller)
 	cmd.Start()

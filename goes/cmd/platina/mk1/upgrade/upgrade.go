@@ -190,11 +190,11 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 		}
 	}
 	if k {
-		_, n, err := srvKernelVer(s, v, t)
+		_, fn, err := srvKernelVer(s, v, t)
 		if err != nil {
 			return err
 		}
-		if err := upgradeKernel(s, v, t, f, n); err != nil {
+		if err := upgradeKernel(s, v, t, f, fn); err != nil {
 			return err
 		}
 	}
@@ -210,7 +210,7 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 		return nil
 	}
 	if Install_flag {
-		if err := install(); err != nil {
+		if err := activateGoes(); err != nil {
 			return err
 		}
 		return nil
