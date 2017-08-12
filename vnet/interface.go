@@ -362,7 +362,8 @@ func (hi Hi) SetAdminUp(v *Vnet, isUp bool) (err error) {
 	return h.SetAdminUp(isUp)
 }
 
-func (h *HwIf) IsProvisioned() bool { return !h.unprovisioned }
+func (h *HwIf) IsProvisioned() bool      { return !h.unprovisioned }
+func (hi Hi) IsProvisioned(v *Vnet) bool { return !v.HwIf(hi).unprovisioned }
 
 func (h *HwIf) SetProvisioned(v bool) (err error) {
 	if !h.unprovisioned == v {

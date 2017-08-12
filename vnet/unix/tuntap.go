@@ -333,6 +333,9 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 	if si.IsSwSubInterface(m.v) {
 		return
 	}
+	if hi != vnet.HiNil && !hi.IsProvisioned(m.v) {
+		return
+	}
 
 	intf := &tuntap_interface{
 		m:     m,
