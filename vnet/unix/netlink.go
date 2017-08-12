@@ -526,15 +526,12 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		return
 	}
 	isDel := v.Header.Type == netlink.RTM_DELNEIGH
-	isStatic := false
 	switch v.State {
 	case netlink.NUD_NOARP, netlink.NUD_NONE:
 		// ignore these
 		return
 	case netlink.NUD_FAILED:
 		isDel = true
-	case netlink.NUD_PERMANENT:
-		isStatic = true
 	}
 	si, _, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
@@ -551,8 +548,8 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	em := ethernet.GetMain(e.m.v)
 	_, err = em.AddDelIpNeighbor(&m4.Main, &nbr, isDel)
 
-	// Ignore delete of unknown static Arp entry.
-	if err == ethernet.ErrDelUnknownNeighbor && isStatic {
+	// Ignore delete of unknown neighbor.
+	if err == ethernet.ErrDelUnknownNeighbor {
 		err = nil
 	}
 	return
