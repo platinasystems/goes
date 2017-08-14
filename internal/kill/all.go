@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // Signal all processes with /proc/self/exe -> this program.
@@ -23,6 +24,7 @@ func All(sig syscall.Signal) (err error) {
 	if err != nil {
 		return
 	}
+	var g_pids []string
 	for _, exe := range exes {
 		var pid int
 		prog, e := os.Readlink(exe)
@@ -37,11 +39,27 @@ func All(sig syscall.Signal) (err error) {
 		}
 		_, e = os.Stat(fmt.Sprint("/proc/", spid, "/stat"))
 		if e == nil {
+			g_pids = append(g_pids, exe)
 			e = syscall.Kill(pid, sig)
 			if e != nil && err == nil {
 				err = fmt.Errorf("%s %d: %v", sig, pid, e)
 			}
 		}
+
+	}
+
+	// verify that goes pids are gone
+	for _, pid := range g_pids {
+		err = func(proc string) error {
+			for j := 0; j < 60; j++ {
+				_, e := os.Stat(proc)
+				if e != nil {
+					return nil
+				}
+				time.Sleep(time.Second)
+			}
+			return fmt.Errorf("failed to kill %s", pid)
+		}(pid)
 	}
 	return
 }
