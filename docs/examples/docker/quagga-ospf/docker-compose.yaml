@@ -13,7 +13,7 @@ services:
     image: stigt/debian-quagga:latest
     privileged: true
     volumes:
-      - ./volumes/quagga/R1:/etc/quagga
+      - ./volumes/R1:/etc/quagga
     logging:
       options:
         max-size: "10m"
@@ -31,7 +31,7 @@ services:
     image: stigt/debian-quagga:latest
     privileged: true
     volumes:
-      - ./volumes/quagga/R2:/etc/quagga
+      - ./volumes/R2:/etc/quagga
     logging:
       options:
         max-size: "10m"
@@ -49,7 +49,7 @@ services:
     image: stigt/debian-quagga:latest
     privileged: true
     volumes:
-      - ./volumes/quagga/R3:/etc/quagga
+      - ./volumes/R3:/etc/quagga
     logging:
       options:
         max-size: "10m"
@@ -67,7 +67,7 @@ services:
     image: stigt/debian-quagga:latest
     privileged: true
     volumes:
-      - ./volumes/quagga/R4:/etc/quagga
+      - ./volumes/R4:/etc/quagga
     logging:
       options:
         max-size: "10m"
