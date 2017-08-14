@@ -280,8 +280,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 	elog.GenEventf("unix-rx ready %d", n_packets)
 	rx.rv_input <- rv
 	rx.active_lock.Lock()
-	atomic.AddInt32(&rx.active_count, int32(n_packets))
-	rx.Activate(true)
+	rx.Activate(atomic.AddInt32(&rx.active_count, int32(n_packets)) > 0)
 	rx.active_lock.Unlock()
 
 	// Return packet vector for reuse.
