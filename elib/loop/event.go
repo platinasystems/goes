@@ -187,25 +187,19 @@ func (l *Loop) doEventWait() (quit *quitEvent) {
 			return
 		}
 	}
-	if elog.Enabled() {
-		elog.GenEvent("waiting for event")
-	}
+	elog.GenEvent("waiting for event")
 	atomic.AddUint32(&l.waitingForEvent, 1)
 	select {
 	case e := <-l.events:
 		var ok bool
 		if quit, ok = e.actor.(*quitEvent); ok {
 			// Log quit event.
-			if elog.Enabled() {
-				elog.GenEvent("wakeup " + e.String())
-			}
+			elog.GenEvent("wakeup " + e.String())
 		} else {
 			e.EventAction()
 		}
 	case <-time.After(dt):
-		if elog.Enabled() {
-			elog.GenEvent("wakeup timeout")
-		}
+		elog.GenEvent("wakeup timeout")
 	}
 	atomic.AddUint32(&l.waitingForEvent, ^uint32(0))
 	return

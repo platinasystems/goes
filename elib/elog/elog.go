@@ -122,7 +122,7 @@ func (b *Buffer) Enable(v bool) {
 }
 
 func (b *Buffer) Enabled() bool {
-	return b.index < b.disableIndex
+	return Enabled() && b.index < b.disableIndex
 }
 
 func (b *Buffer) Clear() {
@@ -463,12 +463,18 @@ func (e *genEvent) Encode(b []byte) int { return copy(b, e.s[:]) }
 func (e *genEvent) Decode(b []byte) int { return copy(e.s[:], b) }
 
 func GenEvent(s string) {
+	if !Enabled() {
+		return
+	}
 	e := genEvent{}
 	copy(e.s[:], s)
 	e.Log()
 }
 
 func GenEventf(format string, args ...interface{}) {
+	if !Enabled() {
+		return
+	}
 	e := genEvent{}
 	Printf(e.s[:], format, args...)
 	e.Log()

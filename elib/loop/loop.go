@@ -531,9 +531,7 @@ func (l *Loop) disableInterrupts(disable bool) {
 		}
 	}
 	l.pollerStats.interruptsDisabled = disable
-	if elog.Enabled() {
-		elog.GenEventf("loop: irq disable %v", disable)
-	}
+	elog.GenEventf("loop: irq disable %v", disable)
 }
 
 func (l *Loop) doPollerStats() {
