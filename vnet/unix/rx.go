@@ -277,11 +277,13 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 		m := &v.m[i]
 		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
 	}
-	elog.GenEventf("unix-rx ready %d", n_packets)
-	rx.rv_input <- rv
-	rx.active_lock.Lock()
-	rx.Activate(atomic.AddInt32(&rx.active_count, int32(n_packets)) > 0)
-	rx.active_lock.Unlock()
+	if n_packets > 0 {
+		elog.GenEventf("unix-rx ready %d", n_packets)
+		rx.rv_input <- rv
+		rx.active_lock.Lock()
+		rx.Activate(atomic.AddInt32(&rx.active_count, int32(n_packets)) > 0)
+		rx.active_lock.Unlock()
+	}
 
 	// Return packet vector for reuse.
 	rx.put_packet_vector(v)
