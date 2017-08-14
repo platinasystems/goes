@@ -7,35 +7,16 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
-	"time"
 
-	"github.com/platinasystems/go/internal/sockfile"
-	"github.com/platinasystems/go/goes/cmd/stop"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
 )
 
 func init() {
-	stop.Hook = wait4vnet
 	vnetd.CloseHook = defaultMk1.stopHook
-}
-
-func wait4vnet() error {
-	t := time.NewTicker(time.Second)
-	defer t.Stop()
-	fn := sockfile.Path("vnetd")
-	for i := 0; i < 60; i++ {
-		<-t.C
-		_, err := os.Stat(fn)
-		if os.IsNotExist(err) {
-			return nil
-		}
-	}
-	return fmt.Errorf("vnet close timeout")
 }
 
 func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {

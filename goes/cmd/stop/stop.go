@@ -91,7 +91,7 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 	err = kill.All(sig)
-	if t := Hook(); t != nil {
+	if t := Hook(); err != nil || t != nil {
 		if err != nil {
 			err = t
 		}
