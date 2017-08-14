@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -189,7 +190,7 @@ func (l *Loop) doEventWait() (quit *quitEvent) {
 	if elog.Enabled() {
 		elog.GenEvent("waiting for event")
 	}
-	l.waitingForEvent = true
+	atomic.AddUint32(&l.waitingForEvent, 1)
 	select {
 	case e := <-l.events:
 		var ok bool
@@ -206,7 +207,7 @@ func (l *Loop) doEventWait() (quit *quitEvent) {
 			elog.GenEvent("wakeup timeout")
 		}
 	}
-	l.waitingForEvent = false
+	atomic.AddUint32(&l.waitingForEvent, ^uint32(0))
 	return
 }
 
@@ -290,7 +291,7 @@ func (e *quitEvent) EventAction()   {}
 func (l *Loop) Quit()               { l.addEvent(l.getLoopEvent(ErrQuit), true) }
 func (l *Loop) Interrupt() {
 	// Add an event to wakeup event sleep.
-	if l.waitingForEvent {
+	if atomic.LoadUint32(&l.waitingForEvent) > 0 {
 		l.addEvent(l.getLoopEvent(ErrInterrupt), false)
 	}
 }

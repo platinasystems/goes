@@ -218,7 +218,7 @@ type Loop struct {
 
 	wg sync.WaitGroup
 
-	waitingForEvent        bool
+	waitingForEvent        uint32
 	registrationsNeedStart bool
 	initialNodesRegistered bool
 	startTime              cpu.Time
