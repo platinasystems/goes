@@ -142,12 +142,12 @@ type eventFilterCache struct {
 }
 
 type eventFilterShared struct {
-	c map[uintptr]*eventFilterCache
+	mu sync.RWMutex
+	c  map[uintptr]*eventFilterCache
 }
 
 type eventFilterMain struct {
-	mu sync.RWMutex
-	m  map[string]*eventFilter
+	m map[string]*eventFilter
 }
 
 func (m *Buffer) eventDisabled(pc uintptr) (disable bool) {
@@ -188,7 +188,7 @@ func (s *eventFilterShared) pathForPc(pc uintptr) string {
 
 var ErrFilterNotFound = errors.New("event filter not found")
 
-func (m *eventFilterMain) AddDelEventFilter(matching string, enable, isDel bool) (err error) {
+func (m *Buffer) AddDelEventFilter(matching string, enable, isDel bool) (err error) {
 	var f eventFilter
 	if !isDel {
 		if f.re, err = regexp.Compile(matching); err != nil {
@@ -219,11 +219,13 @@ func AddDelEventFilter(matching string, enable, isDel bool) (err error) {
 }
 
 func (b *Buffer) ResetFilters() {
-	m := &b.eventFilterMain
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.m = nil
-	m.applyFilters()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.m = nil
+	for _, c := range b.c {
+		c.disable = false
+	}
+	b.applyFilters()
 	// Filter change clears buffer.  genEvents may have pcs cached.
 	b.Clear()
 }
