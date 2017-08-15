@@ -152,38 +152,51 @@ type eventFilterMain struct {
 
 func (m *Buffer) eventDisabled(pc uintptr) (disable bool) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
 	// First check cache.
-	if c, ok := m.c[pc]; ok {
+	c, ok := m.c[pc]
+	if ok {
 		disable = c.disable
-	} else {
-		// Miss? Scan regexps.
-		var found *eventFilter
-		path := runtime.FuncForPC(pc).Name()
-		for _, f := range m.m {
-			if ok := f.re.MatchString(path); ok {
-				found = f
-				disable = f.disable
-				break
-			}
-		}
-		if m.c == nil {
-			m.c = make(map[uintptr]*eventFilterCache)
-		}
-		c := &eventFilterCache{path: path}
-		if found != nil {
-			c.eventFilter = *found
-		}
-		m.c[pc] = c
+		m.mu.RUnlock()
+		return
 	}
+	m.mu.RUnlock()
+	// Now grab write lock.
+	m.mu.Lock()
+	// Miss? Scan regexps.
+	var found *eventFilter
+	path := runtime.FuncForPC(pc).Name()
+	for _, f := range m.m {
+		if ok := f.re.MatchString(path); ok {
+			found = f
+			disable = f.disable
+			break
+		}
+	}
+	if m.c == nil {
+		m.c = make(map[uintptr]*eventFilterCache)
+	}
+	c = &eventFilterCache{path: path}
+	if found != nil {
+		c.eventFilter = *found
+	}
+	m.c[pc] = c
+	m.mu.Unlock()
 	return
 }
 
 func (s *eventFilterShared) pathForPc(pc uintptr) string {
-	if c, ok := s.c[pc]; ok {
+	var (
+		c  *eventFilterCache
+		ok bool
+	)
+	s.mu.RLock()
+	c, ok = s.c[pc]
+	s.mu.RUnlock()
+	if ok {
 		return c.path
+	} else {
+		return fmt.Sprintf("pc 0x%x", pc)
 	}
-	return fmt.Sprintf("pc 0x%x", pc)
 }
 
 var ErrFilterNotFound = errors.New("event filter not found")
@@ -547,9 +560,9 @@ func NewView() *View { return DefaultBuffer.NewView() }
 func (v *View) Print(w io.Writer, verbose bool) {
 	type row struct {
 		Time  string `format:"%-30s"`
-		Delta string `format:"%s" align:"left" width:"9"`
 		Data  string `format:"%s" align:"left" width:"60"`
-		Path  string `format:"%s" align:"left" width:"20"`
+		Delta string `format:"%s" align:"left" width:"9"`
+		Path  string `format:"%s" align:"left" width:"30"`
 	}
 	colMap := map[string]bool{
 		"Delta": verbose,
