@@ -225,7 +225,7 @@ func addDelEventFilter(f string, isDel bool) {
 	v := true
 	if f[0] == '!' {
 		v = false
-		f = f[:1]
+		f = f[1:]
 	}
 	elog.AddDelEventFilter(f, v, isDel)
 }

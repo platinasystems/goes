@@ -145,16 +145,21 @@ func (m *eventFilterMain) EventDisabled(pc uintptr, path string) (disable bool) 
 	defer m.mu.RUnlock()
 	// First check cache.
 	if f, ok := m.c[pc]; ok {
-		disable = f.disable
+		disable = f != nil && f.disable
 	} else {
 		// Miss? Scan regexps.
+		var found *eventFilter
 		for _, f := range m.m {
 			if ok := f.re.MatchString(path); ok {
+				found = f
 				disable = f.disable
-				m.c[pc] = f
 				break
 			}
 		}
+		if m.c == nil {
+			m.c = make(map[uintptr]*eventFilter)
+		}
+		m.c[pc] = found
 	}
 	return
 }
@@ -204,7 +209,6 @@ func ResetFilters() { DefaultBuffer.ResetFilters() }
 
 func (m *eventFilterMain) applyFilters() {
 	// Invalidate cache
-	m.c = make(map[uintptr]*eventFilter)
 	eventTypesLock.Lock()
 	defer eventTypesLock.Unlock()
 	for _, t := range eventTypes {
