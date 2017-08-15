@@ -107,7 +107,7 @@ func (n *interfaceNode) send(i *TxRefVecIn) {
 }
 
 func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
-	l := n.Vnet.loop
+	l := &n.Vnet.loop
 	for {
 		// Find a place to put a vector of packets (TxRefVecIn).
 		select {
@@ -140,7 +140,6 @@ func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
 			l.Suspend(&in.In)
 		}
 	}
-	return
 }
 
 func (n *interfaceNode) newTxRefVecIn(in *RefIn, r []Ref) (i *TxRefVecIn) {
