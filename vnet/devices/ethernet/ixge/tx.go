@@ -286,6 +286,7 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 		dr := q.get_regs()
 		dr.tail_index.set(d, di)
 
+		// Need to poll to free up tx descriptors.
 		q.needs_polling = true
 		atomic.AddInt32(&d.active_count, 1)
 	}
