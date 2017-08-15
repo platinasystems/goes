@@ -303,7 +303,7 @@ func (a *eventSumState) update(msg netlink.Message, sʹ string) (s string) {
 		if a.lastCount > 1 {
 			s += fmt.Sprintf("%d ", a.lastCount)
 		}
-		s += a.lastType.String()
+		s += a.lastType.String() + "\n"
 	}
 	a.lastType = t
 	a.lastCount = 1
