@@ -70,7 +70,7 @@ func (d *dev) get_dev_id() dev_id { return dev_id(d.pci_dev.DeviceID()) }
 func (d dev_id) String() (v string) {
 	var ok bool
 	if v, ok = dev_id_names[d]; !ok {
-		v = fmt.Sprintf("unknown %04x", d)
+		v = fmt.Sprintf("unknown %04x", uint(d))
 	}
 	return
 }
