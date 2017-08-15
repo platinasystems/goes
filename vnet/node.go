@@ -5,9 +5,12 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/loop"
+
+	"fmt"
 )
 
 type Node struct {
@@ -98,6 +101,19 @@ func (q *enqueue) sync() {
 		q.o.Outs[q.x].SetLen(q.v, n)
 	}
 }
+func (q *enqueue) validate() {
+	if !elib.Debug {
+		return
+	}
+	out_len, in_len := uint(0), q.i.InLen()
+	for i := range q.o.Outs {
+		o := &q.o.Outs[i]
+		out_len += o.GetLen(q.v)
+	}
+	if out_len > in_len {
+		panic(fmt.Errorf("out len %d > in len %d", out_len, in_len))
+	}
+}
 
 func (q *enqueue) Put1(r0 *Ref, x0 uint) {
 	q.o.Outs[q.x].Refs[q.n] = *r0
@@ -153,6 +169,7 @@ func (n *InOutNode) LoopInputOutput(l *loop.Loop, i loop.LooperIn, o loop.Looper
 	q.n, q.i, q.o, q.v = 0, in, out, n.Vnet
 	n.t.NodeInput(in, out)
 	q.sync()
+	q.validate()
 }
 
 type InOutNoder interface {
