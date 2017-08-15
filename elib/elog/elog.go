@@ -608,6 +608,10 @@ func (e *genEvent) Strings() []string { return strings.Split(e.s, "\n") }
 func (e *genEvent) Encode(b []byte) int {
 	i := 0
 	i = EncodeUint64(b[i:], uint64(e.pc[0]))
+	l := len(e.s)
+	if i+l < len(b) {
+		b[i+l] = 0 // null terminate
+	}
 	i += copy(b[i:], e.s)
 	return i
 }
