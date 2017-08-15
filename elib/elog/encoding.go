@@ -256,3 +256,8 @@ func DecodeUint32(b []byte, i int) (uint32, int) {
 	x, n := binary.Uvarint(b[i:])
 	return uint32(x), i + n
 }
+func EncodeUint64(b []byte, x uint64) int { return binary.PutUvarint(b, uint64(x)) }
+func DecodeUint64(b []byte, i int) (uint64, int) {
+	x, n := binary.Uvarint(b[i:])
+	return uint64(x), i + n
+}

@@ -17,16 +17,16 @@ var eventType = &elog.EventType{
 
 func init() {
 	t := eventType
-	t.Stringer = stringer_event
+	t.Strings = stringer_event
 	t.Encode = encode_event
 	t.Decode = decode_event
 	elog.RegisterType(eventType)
 }
 
-func stringer_event(e *elog.Event) string {
+func stringer_event(t *elog.EventType, e *elog.Event) []string {
 	var x event
 	x.Decode(e.Data[:])
-	return x.String()
+	return x.Strings()
 }
 
 func encode_event(b []byte, e *elog.Event) int {

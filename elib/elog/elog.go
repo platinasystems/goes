@@ -6,6 +6,7 @@
 package elog
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
 
 	"bytes"
@@ -15,6 +16,9 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"regexp"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -22,7 +26,7 @@ import (
 )
 
 const (
-	log2EventBytes = 6
+	log2EventBytes = 7
 	EventDataBytes = 1<<log2EventBytes - (8 + 2*2)
 )
 
@@ -41,15 +45,14 @@ type EventTrack struct {
 }
 
 type EventType struct {
-	Name     string
-	Stringer func(e *Event) string
-	Decode   func(b []byte, e *Event) int
-	Encode   func(b []byte, e *Event) int
+	Name    string
+	Strings func(t *EventType, e *Event) []string
+	Decode  func(b []byte, e *Event) int
+	Encode  func(b []byte, e *Event) int
 
-	index       uint32
-	lock        sync.Mutex // protects following
-	Tags        []string
-	IndexForTag map[string]int
+	index    uint32
+	mu       sync.Mutex // protects following
+	disabled bool
 }
 
 type shared struct {
@@ -108,6 +111,7 @@ type Buffer struct {
 	// Dummy event to use when logging is disabled.
 	disabledEvent Event
 
+	eventFilterMain
 	shared
 }
 
@@ -123,6 +127,96 @@ func (b *Buffer) Enable(v bool) {
 
 func (b *Buffer) Enabled() bool {
 	return Enabled() && b.index < b.disableIndex
+}
+
+type eventFilter struct {
+	re      *regexp.Regexp
+	disable bool
+}
+
+type eventFilterMain struct {
+	mu sync.RWMutex
+	m  map[string]*eventFilter
+	c  map[uintptr]*eventFilter
+}
+
+func (m *eventFilterMain) EventDisabled(pc uintptr, path string) (disable bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	// First check cache.
+	if f, ok := m.c[pc]; ok {
+		disable = f.disable
+	} else {
+		// Miss? Scan regexps.
+		for _, f := range m.m {
+			if ok := f.re.MatchString(path); ok {
+				disable = f.disable
+				m.c[pc] = f
+				break
+			}
+		}
+	}
+	return
+}
+
+var ErrFilterNotFound = errors.New("event filter not found")
+
+func (m *eventFilterMain) AddDelEventFilter(matching string, enable, isDel bool) (err error) {
+	var f eventFilter
+	if !isDel {
+		if f.re, err = regexp.Compile(matching); err != nil {
+			return
+		}
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if isDel {
+		if _, ok := m.m[matching]; !ok {
+			err = ErrFilterNotFound
+			return
+		}
+		delete(m.m, matching)
+		return
+	}
+	f.disable = !enable
+	if m.m == nil {
+		m.m = make(map[string]*eventFilter)
+	}
+	m.m[matching] = &f
+	m.applyFilters()
+	return
+}
+
+func AddDelEventFilter(matching string, enable, isDel bool) (err error) {
+	return DefaultBuffer.AddDelEventFilter(matching, enable, isDel)
+}
+
+func (b *Buffer) ResetFilters() {
+	m := &b.eventFilterMain
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.m = nil
+	m.applyFilters()
+	// Filter change clears buffer.  genEvents may have pcs cached.
+	b.Clear()
+}
+func ResetFilters() { DefaultBuffer.ResetFilters() }
+
+func (m *eventFilterMain) applyFilters() {
+	// Invalidate cache
+	m.c = make(map[uintptr]*eventFilter)
+	eventTypesLock.Lock()
+	defer eventTypesLock.Unlock()
+	for _, t := range eventTypes {
+		disable := false
+		for _, f := range m.m {
+			if ok := f.re.MatchString(t.Name); ok {
+				disable = f.disable
+				break
+			}
+		}
+		t.disabled = disable
+	}
 }
 
 func (b *Buffer) Clear() {
@@ -145,7 +239,7 @@ func (b *Buffer) DisableAfter(n uint64) {
 }
 
 func (b *Buffer) Add(t *EventType) *Event {
-	if !b.Enabled() {
+	if !b.Enabled() || t.disabled {
 		return &b.disabledEvent
 	}
 	e := b.getEvent()
@@ -198,10 +292,10 @@ func getTypeByName(n string) (t *EventType, ok bool) {
 
 var DefaultBuffer = New(0)
 
-func Add(t *EventType) *Event { return DefaultBuffer.Add(t) }
-func Print(w io.Writer)       { DefaultBuffer.Print(w) }
-func Len() (n int)            { return DefaultBuffer.Len() }
-func Enable(v bool)           { DefaultBuffer.Enable(v) }
+func Add(t *EventType) *Event        { return DefaultBuffer.Add(t) }
+func Print(w io.Writer, detail bool) { DefaultBuffer.Print(w, detail) }
+func Len() (n int)                   { return DefaultBuffer.Len() }
+func Enable(v bool)                  { DefaultBuffer.Enable(v) }
 
 func New(log2Len uint) (b *Buffer) {
 	b = &Buffer{}
@@ -306,19 +400,23 @@ func (v *View) GetTimeBounds(tb *TimeBounds) (err error) {
 	return
 }
 
-func (e *Event) Type() *EventType { return e.getType() }
+func (e *Event) Type() *EventType  { return e.getType() }
+func (e *Event) path() string      { return e.Type().Name }
+func (e *Event) Strings() []string { t := e.getType(); return t.Strings(t, e) }
+func (e *Event) timeString(sh *shared) string {
+	return e.time(sh).Format("2006-01-02 15:04:05.000000000")
+}
 
-func (e *Event) String() string { return e.getType().Stringer(e) }
-
-func (e *Event) eventString(sh *shared) (s string) {
-	s = fmt.Sprintf("%s: %s",
-		e.time(sh).Format("2006-01-02 15:04:05.000000000"),
-		e)
+func (e *Event) eventString(sh *shared, detail bool) (s string) {
+	s = fmt.Sprintf("%s: %s", e.timeString(sh), strings.Join(e.Strings(), " "))
+	if detail {
+		s += "(" + e.getType().Name + ")"
+	}
 	return
 }
 
-func (v *View) EventString(e *Event) string   { return e.eventString(&v.shared) }
-func (b *Buffer) EventString(e *Event) string { return e.eventString(&b.shared) }
+func (v *View) EventString(e *Event) string   { return e.eventString(&v.shared, false) }
+func (b *Buffer) EventString(e *Event) string { return e.eventString(&b.shared, false) }
 
 func StringLen(b []byte) (l int) {
 	l = bytes.IndexByte(b, 0)
@@ -409,58 +507,75 @@ func (b *Buffer) NewView() (v *View) {
 
 func NewView() *View { return DefaultBuffer.NewView() }
 
-func (v *View) Print(w io.Writer) {
+func (v *View) Print(w io.Writer, verbose bool) {
+	type row struct {
+		Time  string `format:"%-30s"`
+		Delta string `format:"%-10s"`
+		Data  string `format:"%-60s"`
+		Path  string `format:"%20s" align:"center"`
+	}
+	colMap := map[string]bool{
+		"Delta": verbose,
+		"Path":  verbose,
+	}
+	rows := make([]row, 0, len(v.Events))
+	lastTime := 0.
 	for i := range v.Events {
-		fmt.Fprintln(w, v.Events[i].eventString(&v.shared))
+		e := &v.Events[i]
+		t, delta := v.ElapsedTime(e), 0.
+		if i > 0 {
+			delta = t - lastTime
+		}
+		lastTime = t
+		ls := e.Strings()
+		for j := range ls {
+			r := row{
+				Data: ls[j],
+			}
+			if j == 0 {
+				r.Time = e.timeString(&v.shared)
+				r.Delta = fmt.Sprintf("%8.6f", delta)
+				r.Path = e.path()
+			}
+			rows = append(rows, r)
+		}
 	}
+	elib.Tabulate(rows).WriteCols(w, colMap)
 }
-
-func (b *Buffer) Print(w io.Writer) { b.NewView().Print(w) }
-
-func (t *EventType) Tag(i int, sep string) (tag string) {
-	tag = ""
-	if i < len(t.Tags) {
-		tag = t.Tags[i] + sep
-	}
-	return
-}
-
-func (t *EventType) TagIndex(s string) (i int) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	l := len(t.Tags)
-	if t.IndexForTag == nil {
-		t.IndexForTag = make(map[string]int)
-	}
-	i, ok := t.IndexForTag[s]
-	if !ok {
-		i = l
-		t.IndexForTag[s] = i
-		t.Tags = append(t.Tags, s)
-	}
-	return
-}
+func (b *Buffer) Print(w io.Writer, detail bool) { b.NewView().Print(w, detail) }
 
 // Dump log on SIGUP.
-func (b *Buffer) PrintOnHangupSignal(w io.Writer) {
+func (b *Buffer) PrintOnHangupSignal(w io.Writer, detail bool) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP)
 	for {
 		<-c
 		v := b.NewView()
-		v.Print(w)
+		v.Print(w, detail)
 	}
 }
-func PrintOnHangupSignal(w io.Writer) { DefaultBuffer.PrintOnHangupSignal(w) }
+func PrintOnHangupSignal(w io.Writer, detail bool) { DefaultBuffer.PrintOnHangupSignal(w, detail) }
 
 // Generic events
 type genEvent struct {
 	s [EventDataBytes]byte
 }
 
-func (e *genEvent) String() string      { return String(e.s[:]) }
+func (e *genEvent) Strings() []string   { return []string{String(e.s[:])} }
 func (e *genEvent) Encode(b []byte) int { return copy(b, e.s[:]) }
 func (e *genEvent) Decode(b []byte) int { return copy(e.s[:], b) }
+
+func (x *genEvent) log(b *Buffer) {
+	var pcs [1]uintptr
+	if n := runtime.Callers(3, pcs[:]); n > 0 {
+		path := runtime.FuncForPC(pcs[0]).Name()
+		if b.EventDisabled(pcs[0], path) {
+			return
+		}
+	}
+	e := b.Add(genEventType)
+	x.Encode(e.Data[:])
+}
 
 func GenEvent(s string) {
 	if !Enabled() {
@@ -468,7 +583,7 @@ func GenEvent(s string) {
 	}
 	e := genEvent{}
 	copy(e.s[:], s)
-	e.Log()
+	e.log(DefaultBuffer)
 }
 
 func GenEventf(format string, args ...interface{}) {
@@ -477,7 +592,7 @@ func GenEventf(format string, args ...interface{}) {
 	}
 	e := genEvent{}
 	Printf(e.s[:], format, args...)
-	e.Log()
+	e.log(DefaultBuffer)
 }
 
 //go:generate gentemplate -d Package=elog -id genEvent -d Type=genEvent github.com/platinasystems/go/elib/elog/event.tmpl

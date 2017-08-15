@@ -201,13 +201,50 @@ func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (
 }
 
 func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	detail := false
+	for !in.End() {
+		switch {
+		case in.Parse("de%*tail"):
+			detail = true
+		default:
+			err = parse.ErrInput
+			return
+		}
+	}
 	v := elog.NewView()
-	v.Print(w)
+	v.Print(w, detail)
 	return
 }
 
 func (l *Loop) clearEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	elog.Clear()
+	return
+}
+
+func addDelEventFilter(f string, isDel bool) {
+	v := true
+	if f[0] == '!' {
+		v = false
+		f = f[:1]
+	}
+	elog.AddDelEventFilter(f, v, isDel)
+}
+
+func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	var filter string
+	for !in.End() {
+		switch {
+		case in.Parse("add %v", &filter):
+			addDelEventFilter(filter, false)
+		case in.Parse("del %v", &filter):
+			addDelEventFilter(filter, true)
+		case in.Parse("reset"):
+			elog.ResetFilters()
+		default:
+			err = parse.ErrInput
+			return
+		}
+	}
 	return
 }
 
@@ -281,6 +318,11 @@ func (l *Loop) cliInit() {
 		Name:      "clear event-log",
 		ShortHelp: "clear events in event log",
 		Action:    l.clearEventLog,
+	})
+	c.AddCommand(&cli.Command{
+		Name:      "event-log",
+		ShortHelp: "event log commands",
+		Action:    l.configEventLog,
 	})
 	c.AddCommand(&cli.Command{
 		Name:      "exec",

@@ -112,9 +112,7 @@ func (e *loopEvent) EventAction() {
 
 func (e *loopEvent) do() {
 	if elog.Enabled() {
-		le := eventElogEvent{}
-		copy(le.s[:], e.String())
-		le.Log()
+		elog.GenEvent(e.String())
 	}
 	e.actor.EventAction()
 	e.l.putLoopEvent(e)

@@ -15,16 +15,16 @@ var genEventType = &EventType{
 
 func init() {
 	t := genEventType
-	t.Stringer = stringer_genEvent
+	t.Strings = stringer_genEvent
 	t.Encode = encode_genEvent
 	t.Decode = decode_genEvent
 	RegisterType(genEventType)
 }
 
-func stringer_genEvent(e *Event) string {
+func stringer_genEvent(t *EventType, e *Event) []string {
 	var x genEvent
 	x.Decode(e.Data[:])
-	return x.String()
+	return x.Strings()
 }
 
 func encode_genEvent(b []byte, e *Event) int {

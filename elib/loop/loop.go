@@ -460,7 +460,7 @@ func (l *Loop) quitAfter() {
 
 func (l *Loop) Run() {
 	elog.Enable(true)
-	go elog.PrintOnHangupSignal(os.Stderr)
+	go elog.PrintOnHangupSignal(os.Stderr, false)
 
 	l.timerInit()
 	l.startTime = cpu.TimeNow()

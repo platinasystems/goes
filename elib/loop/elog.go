@@ -54,13 +54,13 @@ func (n *Node) pollerElog(t poller_elog_event_type, f node_flags) {
 	}
 }
 
-func (e *pollerElogEvent) String() (s string) {
-	s = "poller"
+func (e *pollerElogEvent) Strings() []string {
+	s := "poller"
 	if e.poller_index != 0xff {
 		s += fmt.Sprintf(" %d:", e.poller_index)
 	}
 	s += fmt.Sprintf(" %s %s, new flags: %s", elog.String(e.name[:]), e.event_type, node_flags(e.flags))
-	return
+	return []string{s}
 }
 func (e *pollerElogEvent) Encode(b []byte) int {
 	b = elog.PutUvarint(b, int(e.poller_index))
@@ -80,15 +80,3 @@ func (e *pollerElogEvent) Decode(b []byte) int {
 }
 
 //go:generate gentemplate -d Package=loop -id pollerElogEvent -d Type=pollerElogEvent github.com/platinasystems/go/elib/elog/event.tmpl
-
-type eventElogEvent struct {
-	s [elog.EventDataBytes]byte
-}
-
-func (e *eventElogEvent) String() string {
-	return "loop event: " + elog.String(e.s[:])
-}
-func (e *eventElogEvent) Encode(b []byte) int { return copy(b, e.s[:]) }
-func (e *eventElogEvent) Decode(b []byte) int { return copy(e.s[:], b) }
-
-//go:generate gentemplate -d Package=loop -id eventElogEvent -d Type=eventElogEvent github.com/platinasystems/go/elib/elog/event.tmpl
