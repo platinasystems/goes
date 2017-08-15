@@ -80,7 +80,6 @@ func (c *File) RxReady() (err error) {
 		// Advance read buffer.
 		c.Read(nl + 1)
 	}
-	return
 }
 
 func (c *Main) AddFile(f iomux.FileReadWriteCloser, cf ServerConfig) {
