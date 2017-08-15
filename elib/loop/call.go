@@ -369,7 +369,11 @@ func (i *In) SetLen(l *Loop, nVec uint) {
 	}
 }
 func (i *In) GetLen(l *Loop) (nVec uint) {
-	xi, o := uint(i.nextIndex), i.currentOut(l)
+	t := i.currentThread(l)
+	if t.currentNode == nil && i.len == 0 {
+		return
+	}
+	xi, o := uint(i.nextIndex), t.currentNode.out
 	nVec = uint(o.Len[xi])
 	if nVec == 0 && o.isPending.GetBit(xi) {
 		nVec = MaxVectorLen
