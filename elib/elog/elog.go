@@ -63,6 +63,8 @@ type shared struct {
 
 	// Timer tick in nanosecond units.
 	timeUnitNsec float64
+
+	eventFilterShared
 }
 
 const lockBit = 1 << 63
@@ -134,21 +136,30 @@ type eventFilter struct {
 	disable bool
 }
 
+type eventFilterCache struct {
+	eventFilter
+	path string
+}
+
+type eventFilterShared struct {
+	c map[uintptr]*eventFilterCache
+}
+
 type eventFilterMain struct {
 	mu sync.RWMutex
 	m  map[string]*eventFilter
-	c  map[uintptr]*eventFilter
 }
 
-func (m *eventFilterMain) EventDisabled(pc uintptr, path string) (disable bool) {
+func (m *Buffer) eventDisabled(pc uintptr) (disable bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	// First check cache.
-	if f, ok := m.c[pc]; ok {
-		disable = f != nil && f.disable
+	if c, ok := m.c[pc]; ok {
+		disable = c.disable
 	} else {
 		// Miss? Scan regexps.
 		var found *eventFilter
+		path := runtime.FuncForPC(pc).Name()
 		for _, f := range m.m {
 			if ok := f.re.MatchString(path); ok {
 				found = f
@@ -157,11 +168,22 @@ func (m *eventFilterMain) EventDisabled(pc uintptr, path string) (disable bool) 
 			}
 		}
 		if m.c == nil {
-			m.c = make(map[uintptr]*eventFilter)
+			m.c = make(map[uintptr]*eventFilterCache)
 		}
-		m.c[pc] = found
+		c := &eventFilterCache{path: path}
+		if found != nil {
+			c.eventFilter = *found
+		}
+		m.c[pc] = c
 	}
 	return
+}
+
+func (s *eventFilterShared) pathForPc(pc uintptr) string {
+	if c, ok := s.c[pc]; ok {
+		return c.path
+	}
+	return fmt.Sprintf("pc 0x%x", pc)
 }
 
 var ErrFilterNotFound = errors.New("event filter not found")
@@ -404,8 +426,17 @@ func (v *View) GetTimeBounds(tb *TimeBounds) (err error) {
 	return
 }
 
-func (e *Event) Type() *EventType  { return e.getType() }
-func (e *Event) path() string      { return e.Type().Name }
+func (e *Event) Type() *EventType { return e.getType() }
+func (e *Event) path(v *shared) string {
+	t := e.Type()
+	if t.index == genEventType.index {
+		var ge genEvent
+		ge.Decode(e.Data[:])
+		return v.pathForPc(ge.pc[0])
+	}
+	return e.Type().Name
+}
+
 func (e *Event) Strings() []string { t := e.getType(); return t.Strings(t, e) }
 func (e *Event) timeString(sh *shared) string {
 	return e.time(sh).Format("2006-01-02 15:04:05.000000000")
@@ -514,9 +545,9 @@ func NewView() *View { return DefaultBuffer.NewView() }
 func (v *View) Print(w io.Writer, verbose bool) {
 	type row struct {
 		Time  string `format:"%-30s"`
-		Delta string `format:"%-10s"`
-		Data  string `format:"%-60s"`
-		Path  string `format:"%20s" align:"center"`
+		Delta string `format:"%s" align:"left" width:"9"`
+		Data  string `format:"%s" align:"left" width:"60"`
+		Path  string `format:"%s" align:"left" width:"20"`
 	}
 	colMap := map[string]bool{
 		"Delta": verbose,
@@ -531,15 +562,22 @@ func (v *View) Print(w io.Writer, verbose bool) {
 			delta = t - lastTime
 		}
 		lastTime = t
-		ls := e.Strings()
-		for j := range ls {
+		lines := e.Strings()
+		for j := range lines {
+			if lines[j] == "" {
+				continue
+			}
+			indent := ""
+			if j > 0 {
+				indent = "  "
+			}
 			r := row{
-				Data: ls[j],
+				Data: indent + lines[j],
 			}
 			if j == 0 {
 				r.Time = e.timeString(&v.shared)
 				r.Delta = fmt.Sprintf("%8.6f", delta)
-				r.Path = e.path()
+				r.Path = e.path(&v.shared)
 			}
 			rows = append(rows, r)
 		}
@@ -562,18 +600,30 @@ func PrintOnHangupSignal(w io.Writer, detail bool) { DefaultBuffer.PrintOnHangup
 
 // Generic events
 type genEvent struct {
-	s [EventDataBytes]byte
+	pc [1]uintptr
+	s  string
 }
 
-func (e *genEvent) Strings() []string   { return []string{String(e.s[:])} }
-func (e *genEvent) Encode(b []byte) int { return copy(b, e.s[:]) }
-func (e *genEvent) Decode(b []byte) int { return copy(e.s[:], b) }
+func (e *genEvent) Strings() []string { return strings.Split(e.s, "\n") }
+func (e *genEvent) Encode(b []byte) int {
+	i := 0
+	i = EncodeUint64(b[i:], uint64(e.pc[0]))
+	i += copy(b[i:], e.s)
+	return i
+}
+func (e *genEvent) Decode(b []byte) int {
+	i := 0
+	var x uint64
+	x, i = DecodeUint64(b[i:], i)
+	e.pc[0] = uintptr(x)
+	l := StringLen(b[i:])
+	e.s = String(b[i:])
+	return i + l
+}
 
 func (x *genEvent) log(b *Buffer) {
-	var pcs [1]uintptr
-	if n := runtime.Callers(3, pcs[:]); n > 0 {
-		path := runtime.FuncForPC(pcs[0]).Name()
-		if b.EventDisabled(pcs[0], path) {
+	if n := runtime.Callers(3, x.pc[:]); n > 0 {
+		if b.eventDisabled(x.pc[0]) {
 			return
 		}
 	}
@@ -585,8 +635,7 @@ func GenEvent(s string) {
 	if !Enabled() {
 		return
 	}
-	e := genEvent{}
-	copy(e.s[:], s)
+	e := genEvent{s: s}
 	e.log(DefaultBuffer)
 }
 
@@ -594,8 +643,7 @@ func GenEventf(format string, args ...interface{}) {
 	if !Enabled() {
 		return
 	}
-	e := genEvent{}
-	Printf(e.s[:], format, args...)
+	e := genEvent{s: fmt.Sprintf(format, args...)}
 	e.log(DefaultBuffer)
 }
 
