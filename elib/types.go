@@ -18,3 +18,6 @@ package elib
 //go:generate gentemplate -d Package=elib -id Uint32 -d VecType=Uint32Vec -d Type=uint32 vec.tmpl
 //go:generate gentemplate -d Package=elib -id Uint16 -d VecType=Uint16Vec -d Type=uint16 vec.tmpl
 //go:generate gentemplate -d Package=elib -id Uint8  -d VecType=Uint8Vec -d Type=uint8  vec.tmpl
+
+//go:generate gentemplate -d Package=elib -id Float64 -d VecType=Float64Vec -d Type=float64 vec.tmpl
+//go:generate gentemplate -d Package=elib -id Float32 -d VecType=Float32Vec -d Type=float32 vec.tmpl
