@@ -442,14 +442,14 @@ func (v *View) GetTimeBounds(tb *TimeBounds) (err error) {
 }
 
 func (e *Event) Type() *EventType { return e.getType() }
-func (e *Event) path(v *shared) string {
+func (e *Event) path(v *shared) (string, uintptr) {
 	t := e.Type()
 	if t.index == genEventType.index {
 		var ge genEvent
 		ge.Decode(e.Data[:])
-		return v.pathForPc(ge.pc[0])
+		return v.pathForPc(ge.pc[0]), ge.pc[0]
 	}
-	return e.Type().Name
+	return t.Name, ^uintptr(t.index)
 }
 
 func (e *Event) Strings() []string { t := e.getType(); return t.Strings(t, e) }
@@ -465,8 +465,10 @@ func (e *Event) eventString(sh *shared, detail bool) (s string) {
 	return
 }
 
-func (v *View) EventString(e *Event) string   { return e.eventString(&v.shared, false) }
-func (b *Buffer) EventString(e *Event) string { return e.eventString(&b.shared, false) }
+func (v *View) EventString(e *Event) string            { return e.eventString(&v.shared, false) }
+func (b *Buffer) EventString(e *Event) string          { return e.eventString(&b.shared, false) }
+func (v *View) EventPath(e *Event) (string, uintptr)   { return e.path(&v.shared) }
+func (b *Buffer) EventPath(e *Event) (string, uintptr) { return e.path(&b.shared) }
 
 func StringLen(b []byte) (l int) {
 	l = bytes.IndexByte(b, 0)
@@ -592,7 +594,7 @@ func (v *View) Print(w io.Writer, verbose bool) {
 			if j == 0 {
 				r.Time = e.timeString(&v.shared)
 				r.Delta = fmt.Sprintf("%8.6f", delta)
-				r.Path = e.path(&v.shared)
+				r.Path, _ = e.path(&v.shared)
 			}
 			rows = append(rows, r)
 		}
