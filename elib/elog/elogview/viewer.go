@@ -103,7 +103,6 @@ func (x *ctx) roundedRect(x0, dx X2, r float64) {
 type viewer struct {
 	win        *gtk.Window
 	screen_dpi float64
-	win_dx     X2
 	da         *gtk.DrawingArea
 	eb         *gtk.EventBox
 	eb_x       X2
@@ -129,7 +128,6 @@ func View(ev *elog.View, cf Config) {
 
 	v.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	v.win.SetTitle("Event log")
-	v.win_dx = XY(float64(cf.Width), float64(cf.Height))
 	v.win.SetDefaultSize(cf.Width, cf.Height)
 	v.win.Connect("destroy", v.quit)
 	scr, _ := v.win.GetScreen()
@@ -166,25 +164,25 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	subview := false
 	t_min, t_max := t.Min, t.Max
 	switch key {
-	case KEY_Escape:
+	case gdk.KEY_Escape:
 		break
-	case KEY_q:
+	case gdk.KEY_q:
 		if v.EnableKeyboardQuit { // quit does not work via key inside vnet
 			v.quit()
 		}
-	case KEY_r:
+	case gdk.KEY_r:
 		v.ev.Reset()
-	case KEY_plus:
+	case gdk.KEY_plus:
 		dt := t.Dt * .05 // 10% smaller
 		t_min += dt
 		t_max -= dt
 		subview = true
-	case KEY_minus:
+	case gdk.KEY_minus:
 		dt := t.Dt * .05 // 10% bigger
 		t_min -= dt
 		t_max += dt
 		subview = true
-	case KEY_leftarrow, KEY_Left:
+	case gdk.KEY_leftarrow, gdk.KEY_Left:
 		dt := t.Unit
 		if state&gdk.GDK_SHIFT_MASK != 0 {
 			dt *= 10
@@ -192,7 +190,7 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 		t_min -= dt
 		t_max -= dt
 		subview = true
-	case KEY_rightarrow, KEY_Right:
+	case gdk.KEY_rightarrow, gdk.KEY_Right:
 		dt := t.Unit
 		if state&gdk.GDK_SHIFT_MASK != 0 {
 			dt *= 10
@@ -304,7 +302,7 @@ func (v *viewer) new_popup(event_index uint) (p *popup) {
 	w.SetResizable(false)
 	w.SetDecorated(false)
 	w.SetDestroyWithParent(true)
-	p.dx = v.win_dx
+	p.dx = XY(float64(v.win.GetAllocatedWidth()), float64(v.win.GetAllocatedHeight()))
 	p.x = XY(0, 0)
 	w.SetSizeRequest(int(p.dx.X()), int(p.dx.Y())) // max size of drawing area
 	w.SetTransientFor(v.win)
