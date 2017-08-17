@@ -18,6 +18,7 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -388,56 +389,46 @@ func (v *View) AbsTime(e *Event) float64 { return e.unixNano(&v.shared) }
 // Elapsed time since view start time.  (As computed in roundViewTimes.)
 func (v *View) ElapsedTime(e *Event) float64 { return e.time(&v.shared).Sub(v.Times.Start).Seconds() }
 
-func (v *View) roundViewTimes() (err error) {
-	tb := &v.Times
-	l := len(v.Events)
-	if l == 0 {
-		err = errors.New("no events in view")
-		return
+func (v *View) getViewTimes() {
+	if l := len(v.Events); l != 0 {
+		v.doViewTimes(0, l-1)
 	}
+	return
+}
 
-	t0 := v.Events[0].elapsedTime(&v.shared)
-	t1 := v.Events[l-1].elapsedTime(&v.shared)
-
+func (v *View) doViewTimes(i0, i1 int) (err error) {
+	tb := &v.Times
+	t0 := v.e[i0].elapsedTime(&v.shared)
+	t1 := v.e[i1].elapsedTime(&v.shared)
 	tUnit := float64(1)
-	mult := float64(1)
 	unitName := "sec"
 	if t1 > t0 {
 		v := math.Floor(math.Log10(t1 - t0))
-		iv := float64(0)
 		switch {
 		case v < -6:
-			iv = -9.
 			tUnit = 1e-9
 			unitName = "nsec"
 		case v < -3:
-			iv = -6.
 			tUnit = 1e-6
 			unitName = "μsec"
 		case v < 0:
-			iv = -3.
 			tUnit = 1e-3
 			unitName = "msec"
 		}
-		mult = math.Pow10(int(math.Floor(v - iv)))
 	}
 
 	// Round absolute Go start time to seconds and add difference (nanoseconds part) to times.
 	startTime := v.StartTime.Truncate(time.Second)
-	dt := 1e-9 * float64(v.StartTime.Sub(startTime))
+	dt := v.StartTime.Sub(startTime).Seconds()
 	t0 += dt
 	t1 += dt
 
-	t0 = math.Floor(t0 / tUnit)
-	t1 = math.Ceil(t1 / tUnit)
-
-	t0 = tUnit * mult * math.Floor(t0/mult)
-	t1 = tUnit * mult * math.Ceil(t1/mult)
+	t0 = tUnit * math.Floor(t0/tUnit)
+	t1 = tUnit * math.Ceil(t1/tUnit)
 
 	tb.Min = t0
 	tb.Max = t1
 	tb.Dt = t1 - t0
-	tb.Round = mult
 	tb.Unit = tUnit
 	tb.Start = startTime
 	tb.UnitName = unitName
@@ -532,12 +523,13 @@ type timeBounds struct {
 	// Starting time truncated to nearest second.
 	Start        time.Time
 	Min, Max, Dt float64
-	Unit, Round  float64
+	Unit         float64
 	UnitName     string
 }
 
 type View struct {
 	Events EventVec
+	e      EventVec
 	Times  timeBounds
 	shared
 }
@@ -558,11 +550,33 @@ func (b *Buffer) NewView() (v *View) {
 	l += copy(v.Events[l:], b.events[0:i&mask])
 	b.lockIndex(false)
 	v.Events = v.Events[:l]
-	v.roundViewTimes()
+	v.e = v.Events // save a copy for sub views
+	v.getViewTimes()
 	return
 }
 
 func NewView() *View { return DefaultBuffer.NewView() }
+
+// Make subview with only events between elapsed times t0 and t1.
+func (v *View) SubView(t0, t1 float64) {
+	l := len(v.e)
+	i0 := sort.Search(l, func(i int) bool {
+		et := v.ElapsedTime(&v.e[i])
+		return et >= t0
+	})
+	i1 := sort.Search(l, func(i int) bool {
+		et := v.ElapsedTime(&v.e[i])
+		return et > t1
+	})
+	if i1-i0 > 2 { // sub view must contain at least 2 events.
+		v.Events = v.e[i0:i1]
+		v.doViewTimes(i0, i1-1)
+	}
+}
+func (v *View) Reset() {
+	v.Events = v.e
+	v.getViewTimes()
+}
 
 func (v *View) Print(w io.Writer, verbose bool) {
 	type row struct {
