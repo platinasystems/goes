@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/sriovs"
 )
 
 const (
@@ -158,24 +159,12 @@ func checkVnetdHung() error {
 }
 
 func checkMode() (string, error) {
-	var mode string
+	fns, err := sriovs.NumvfsFns()
 
-	args := []string{"/bin/lsmod"}
-	cmdOut, err := exec.Command(args[0], args[1:]...).Output()
-	if err != nil {
-		return mode, err
-	}
-
-	match, err := regexp.MatchString("ixgbe", string(cmdOut))
-	if err != nil {
-		return mode, err
-	}
-
-	if match {
+	if err == nil && len(fns) > 0 {
 		return "SRIOV", nil
-	} else {
-		return "TUNTAP", nil
 	}
+	return "TUNTAP", nil
 }
 
 func (Command) Main(args ...string) error {
