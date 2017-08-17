@@ -679,6 +679,7 @@ func (x *genEvent) log(b *Buffer) {
 		}
 	}
 	e := b.Add(genEventType)
+	x.s = strings.TrimSpace(x.s)
 	x.Encode(e.Data[:])
 }
 
