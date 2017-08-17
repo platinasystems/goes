@@ -39,6 +39,8 @@ func (t *Time) Cycles(dt float64) {
 	*t = Time(dt * cyclesPerSec)
 }
 
+func TimeInit() { estimateOnce() }
+
 func measureCPUCyclesPerSec(wait float64) (freq float64) {
 	var t0 [2]Time
 	var t1 [2]int64

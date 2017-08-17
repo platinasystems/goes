@@ -119,6 +119,7 @@ type Buffer struct {
 }
 
 func (b *Buffer) Enable(v bool) {
+	cpu.TimeInit()
 	b.lockIndex(true)
 	b.index &= lockBit
 	b.disableIndex = 0
@@ -352,6 +353,16 @@ func New(log2Len uint) (b *Buffer) {
 	b.cpuStartTime = cpu.TimeNow()
 	b.StartTime = time.Now()
 	return
+}
+func (b *Buffer) Resize(n uint) {
+	if b.Enabled() {
+		panic("resize enabled buffer")
+	}
+	b.log2Len = elib.MaxLog2(elib.Word(n))
+	if b.log2Len < 10 {
+		b.log2Len = 10
+	}
+	b.events = make([]Event, 1<<b.log2Len)
 }
 
 func (s *shared) timeUnitNsecs() (u float64) {
