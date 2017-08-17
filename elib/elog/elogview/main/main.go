@@ -1,9 +1,8 @@
-// go build -o ~/y -tags "elog gtk_3_16" -gcflags "-N -l" github.com/platinasystems/go/wip/elogview
-
 package main
 
 import (
 	"github.com/platinasystems/go/elib/elog"
+	"github.com/platinasystems/go/elib/elog/elogview"
 
 	"flag"
 	"math/rand"
@@ -42,11 +41,16 @@ func main() {
 		time.Sleep(time.Duration(1e9 * d))
 	}
 
-	v := elog.NewView()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		elog_viewer(v, 1200, 750)
+		v := elog.NewView()
+		cf := elogview.Config{
+			Width:              1200,
+			Height:             750,
+			EnableKeyboardQuit: true,
+		}
+		elogview.View(v, cf)
 		wg.Done()
 	}()
 	wg.Wait()

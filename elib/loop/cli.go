@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/elog"
+	"github.com/platinasystems/go/elib/elog/elogview"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/elib/parse"
 
@@ -200,19 +201,34 @@ func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (
 	return
 }
 
+var elogviewWaitGroup sync.WaitGroup
+
 func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	detail := false
+	graphic := false
 	for !in.End() {
 		switch {
 		case in.Parse("de%*tail"):
 			detail = true
+		case in.Parse("gr%*aphic"):
+			graphic = true
 		default:
 			err = parse.ErrInput
 			return
 		}
 	}
 	v := elog.NewView()
-	v.Print(w, detail)
+	if graphic {
+		wg := &elogviewWaitGroup
+		wg.Wait()
+		wg.Add(1)
+		go func() {
+			elogview.View(v, elogview.Config{Width: 1200, Height: 750})
+			wg.Done()
+		}()
+	} else {
+		v.Print(w, detail)
+	}
 	return
 }
 

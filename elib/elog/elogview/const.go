@@ -1,4 +1,4 @@
-package main
+package elogview
 
 const (
 	KEY_VoidSymbol                  = 0xffffff

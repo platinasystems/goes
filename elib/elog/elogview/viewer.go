@@ -1,6 +1,4 @@
-// go build -o ~/y -tags "elog gtk_3_16" -gcflags "-N -l" github.com/platinasystems/go/wip/elogview
-
-package main
+package elogview
 
 import (
 	"github.com/gotk3/gotk3/cairo"
@@ -12,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 )
 
 // (x,y) coordinate as complex number for easy arithmetic.
@@ -113,17 +112,26 @@ type viewer struct {
 	ps         map[uint]*popup
 	ps_slice   []*popup
 	m          map[uintptr]*decoration
+	Config
 }
 
-func elog_viewer(ev *elog.View, width, height int) {
-	v := &viewer{ev: ev}
+type Config struct {
+	EnableKeyboardQuit bool
+	Width, Height      int
+}
 
-	gtk.Init(nil)
+var initOnce sync.Once
+
+func View(ev *elog.View, cf Config) {
+	v := &viewer{ev: ev, Config: cf}
+
+	initOnce.Do(func() { gtk.Init(nil) })
+
 	v.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	v.win.SetTitle("Event log")
-	v.win_dx = XY(float64(width), float64(height))
-	v.win.SetDefaultSize(width, height)
-	v.win.Connect("destroy", gtk.MainQuit)
+	v.win_dx = XY(float64(cf.Width), float64(cf.Height))
+	v.win.SetDefaultSize(cf.Width, cf.Height)
+	v.win.Connect("destroy", v.quit)
 	scr, _ := v.win.GetScreen()
 	v.screen_dpi = scr.GetResolution()
 
@@ -145,6 +153,11 @@ func elog_viewer(ev *elog.View, width, height int) {
 	gtk.Main()
 }
 
+func (v *viewer) quit() {
+	v.delete_all_popups()
+	gtk.MainQuit()
+}
+
 func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	ke := &gdk.EventKey{ev}
 	key, state := ke.KeyVal(), gdk.ModifierType(ke.State())
@@ -153,10 +166,12 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	subview := false
 	t_min, t_max := t.Min, t.Max
 	switch key {
-	case KEY_q:
-		gtk.MainQuit()
 	case KEY_Escape:
 		break
+	case KEY_q:
+		if v.EnableKeyboardQuit { // quit does not work via key inside vnet
+			v.quit()
+		}
 	case KEY_r:
 		v.ev.Reset()
 	case KEY_plus:
@@ -285,6 +300,7 @@ func (v *viewer) new_popup(event_index uint) (p *popup) {
 	p.win = w
 	w.SetResizable(false)
 	w.SetDecorated(false)
+	w.SetDestroyWithParent(true)
 	p.dx = v.win_dx
 	p.x = XY(0, 0)
 	w.SetSizeRequest(int(p.dx.X()), int(p.dx.Y())) // max size of drawing area
