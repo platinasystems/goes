@@ -5,6 +5,7 @@
 package main
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -151,6 +152,7 @@ func (n *myInterface) InterfaceOutput(in *vnet.TxRefVecIn) {
 		// Enable to test poller suspend/resume.
 		time.Sleep(1 * time.Second)
 	}
+	elog.GenEventf("%s tx %d packets", n.Name(), in.NPackets())
 	if n.n.verbose_output {
 		for i := range in.Refs {
 			fmt.Printf("%s: %x\n", n.Name(), in.Refs[i].DataSlice())
@@ -166,6 +168,7 @@ type inject_node struct {
 
 func (n *inject_node) NodeOutput(in *vnet.RefIn) {
 	l := in.InLen()
+	elog.GenEventf("%s inject %d packets", n.Name(), l)
 	for i := uint(0); i < l; i++ {
 		r := in.Refs[i]
 		fmt.Printf("%s %s: %x\n", n.Name(), r.Si.Name(n.Vnet), r.DataSlice())
