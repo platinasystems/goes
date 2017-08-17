@@ -12,18 +12,21 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
+	"sync"
 	"time"
 )
 
 // (x,y) coordinate as complex number for easy arithmetic.
 type X2 complex128
 
-func (x X2) X() float64   { return real(x) }
-func (x X2) Y() float64   { return imag(x) }
-func XY(x, y float64) X2  { return X2(complex(x, y)) }
-func XX(x float64) X2     { return XY(x, x) }
-func (x X2) Conj() X2     { return XY(real(x), -imag(x)) }
-func (x X2) Abs() float64 { return math.Hypot(x.X(), x.Y()) }
+func (x X2) X() float64    { return real(x) }
+func (x X2) Y() float64    { return imag(x) }
+func XY(x, y float64) X2   { return X2(complex(x, y)) }
+func XX(x float64) X2      { return XY(x, x) }
+func (x X2) Conj() X2      { return XY(real(x), -imag(x)) }
+func (x X2) Abs2() float64 { return real(x)*real(x) + imag(x)*imag(x) }
+func (x X2) Abs() float64  { return math.Hypot(x.X(), x.Y()) }
 
 type ctx cairo.Context
 
@@ -102,11 +105,18 @@ func (x *ctx) roundedRect(x0, dx X2, r float64) {
 }
 
 type viewer struct {
-	win *gtk.Window
-	da  *gtk.DrawingArea
-	eb  *gtk.EventBox
-	ps  map[uint]*popup
-	m   map[uintptr]*decoration
+	win        *gtk.Window
+	screen_dpi float64
+	win_dx     X2
+	da         *gtk.DrawingArea
+	eb         *gtk.EventBox
+	eb_x       X2
+	ev         *elog.View
+	des        []draw_event
+	ps         map[uint]*popup
+	ps_slice   []*popup
+	m          map[uintptr]*decoration
+	key_map    map[uint]func()
 }
 
 func main() {
@@ -125,126 +135,149 @@ func main() {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	v := &viewer{}
+	v := elog.NewView()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		elog_viewer(v, 1200, 750)
+		wg.Done()
+	}()
+	wg.Wait()
+}
 
-	// gui boilerplate
+func elog_viewer(ev *elog.View, width, height int) {
+	v := &viewer{ev: ev}
+
 	v.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	v.win.SetTitle("Event log")
-	v.win.SetDefaultSize(1200, 750)
+	v.win_dx = XY(float64(width), float64(height))
+	v.win.SetDefaultSize(width, height)
 	v.win.Connect("destroy", gtk.MainQuit)
+	scr, _ := v.win.GetScreen()
+	v.screen_dpi = scr.GetResolution()
 
 	v.eb, _ = gtk.EventBoxNew()
 	v.eb.SetCanFocus(true)
 	v.eb.SetEvents(int(gdk.KEY_PRESS_MASK | gdk.ENTER_NOTIFY_MASK | gdk.LEAVE_NOTIFY_MASK | gdk.BUTTON_PRESS_MASK))
 	v.eb.SetBorderWidth(20)
+	v.eb_x = XY(20, 20)
 	v.win.Add(v.eb)
 
 	v.da, _ = gtk.DrawingAreaNew()
 	v.eb.Add(v.da)
 
-	v.win.ShowAll()
-
 	v.da.Connect("draw", v.draw)
-	v.eb.Connect("enter_notify_event", v.eb_enter)
-	v.eb.Connect("leave_notify_event", v.eb_leave)
-	v.eb.Connect("key_press_event", v.key_press)
 	v.eb.Connect("button_press_event", v.button_press)
-	v.eb.GrabFocus()
+	v.eb.Connect("key_press_event", v.key_press)
+	v.key_map = map[uint]func(){
+		KEY_q:      func() { gtk.MainQuit() },
+		KEY_Escape: v.delete_all_popups,
+	}
+
+	v.win.ShowAll()
 	gtk.Main()
 }
 
 func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
-	keyMap := map[uint]func(){
-		KEY_q:      func() { gtk.MainQuit() },
-		KEY_Escape: v.hide_popups,
-	}
 	ke := &gdk.EventKey{ev}
-	kv := ke.KeyVal()
-	if move, found := keyMap[kv]; found {
-		move()
+	if f, ok := v.key_map[ke.KeyVal()]; ok {
+		f()
 		eb.QueueDraw()
 	}
 }
 
-func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
+func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) { v.do_button_press(e, 0) }
+func (p *popup) button_press(win *gtk.Window, e *gdk.Event)   { p.v.do_button_press(e, p.v.eb_x) }
+func (v *viewer) do_button_press(e *gdk.Event, dx X2) {
 	be := &gdk.EventButton{e}
 	bv := be.ButtonVal()
 	bx, by := be.MotionVal()
-	fmt.Println("press", bx, by, bv)
 	if bv != 1 {
 		return
 	}
-	mouse_x := XY(bx, by)
-	v.do_button_press(eb, mouse_x)
-}
-
-func (v *viewer) do_button_press(eb *gtk.EventBox, mouse_x X2) {
-	ev := elog.NewView()
-	var tb elog.TimeBounds
-	ev.GetTimeBounds(&tb)
-
-	dw := XX(margin)
-	w := XY(float64(eb.GetAllocatedWidth()), float64(eb.GetAllocatedHeight()))
-	w -= dw
-
-	t := tb.Min + tb.Dt*(mouse_x.X()-dw.X())/w.X()
-	fmt.Println("time", t)
-
-	var (
-		min_e *elog.Event
-		min_i int
-	)
-	min_dt := 1e10
-	for i := range ev.Events {
-		e := &ev.Events[i]
-		if dt := math.Abs(t - ev.Time(e).Sub(tb.Start).Seconds()); dt < min_dt {
-			min_dt = dt
-			min_e = e
-			min_i = i
+	mouse_x := XY(bx, by) - dx
+	min_i, min_ds := uint(0), 1e10
+	for i := range v.ev.Events {
+		de := &v.des[i]
+		if ds := de.min_distance(mouse_x); ds < min_ds {
+			min_ds = ds
+			min_i = uint(i)
 		}
 	}
-	if min_e != nil {
-		fmt.Println("min event", min_dt, ev.EventString(min_e))
+	// Only accept when screen distance is less than 1/2 an inch of center.
+	if min_ds < v.screen_dpi/4 {
+		// Event already displayed in popup?
+		if p, is_del := v.ps[min_i]; is_del {
+			p.del()
+		} else {
+			v.new_popup(min_i)
+		}
 	}
-	v.new_popup(ev, min_e, mouse_x, uint(min_i))
 }
 
-func (v *viewer) eb_enter(eb *gtk.EventBox, ev *gdk.Event) {
-	fmt.Println("enter", ev)
-	eb.GrabFocus()
+func (v *viewer) order_popups() {
+	if v.ps_slice != nil {
+		v.ps_slice = v.ps_slice[:0]
+	}
+	ps := v.ps_slice
+	for _, q := range v.ps {
+		ps = append(ps, q)
+	}
+	sort.Slice(ps, func(i, j int) bool {
+		pi, pj := ps[i], ps[j]
+		return pi.ei < pj.ei
+	})
+	for i := range ps {
+		p := ps[i]
+		var prev, next *popup
+		if i > 0 {
+			prev = ps[i-1]
+		}
+		if i+1 < len(ps) {
+			next = ps[i+1]
+		}
+		if p.prev != prev {
+			p.prev = prev
+			if prev != nil {
+				prev.win.QueueDraw()
+			}
+		}
+		if p.next != next {
+			p.next = next
+			if next != nil {
+				next.win.QueueDraw()
+			}
+		}
+	}
+	v.ps_slice = ps
 }
 
-func (v *viewer) eb_leave(eb *gtk.EventBox, ev *gdk.Event) {
-	fmt.Println("leave", ev)
-	v.win.GrabFocus()
-}
+const dt_prev_invalid = 1e10
 
 type popup struct {
-	vr    *viewer
-	win   *gtk.Window
-	da    *gtk.DrawingArea
-	e     *elog.Event
-	v     *elog.View
-	l     []text_line
-	x, dx X2
+	v          *viewer
+	win        *gtk.Window
+	da         *gtk.DrawingArea
+	ei         uint
+	l          []text_line
+	x, dx      X2
+	prev, next *popup
 }
 
-func (v *viewer) new_popup(ev *elog.View, e *elog.Event, mouse_x X2, event_index uint) (p *popup) {
-	// Event already displayed in popup?
-	if _, ok := v.ps[event_index]; ok {
-		return
-	}
+func (p *popup) get_event() *elog.Event      { return &p.v.ev.Events[p.ei] }
+func (p *popup) get_draw_event() *draw_event { return &p.v.des[p.ei] }
 
-	p = &popup{vr: v, v: ev, e: e}
+func (v *viewer) new_popup(event_index uint) (p *popup) {
+	p = &popup{v: v, ei: event_index}
 	w, _ := gtk.WindowNew(gtk.WINDOW_POPUP)
 	p.win = w
 	w.SetResizable(false)
 	w.SetDecorated(false)
-	p.dx = XY(400, 300)
-	p.x = mouse_x - p.dx/2                         // window is centered on mouse
+	p.dx = v.win_dx
+	p.x = XY(0, 0)
 	w.SetSizeRequest(int(p.dx.X()), int(p.dx.Y())) // max size of drawing area
 	w.SetTransientFor(v.win)
-	w.SetPosition(gtk.WIN_POS_MOUSE)
+	w.SetPosition(gtk.WIN_POS_CENTER_ON_PARENT)
 	scr, _ := w.GetScreen()
 	vis, _ := scr.GetRGBAVisual()
 	w.SetVisual(vis)
@@ -260,48 +293,45 @@ func (v *viewer) new_popup(ev *elog.View, e *elog.Event, mouse_x X2, event_index
 		v.ps = make(map[uint]*popup)
 	}
 	v.ps[event_index] = p
+	v.order_popups()
 	p.win.ShowAll()
 	return
 }
 
-func (p *popup) hide() {
+func (p *popup) del() {
 	if p.win == nil {
 		return
 	}
 	p.win.Hide()
 	p.win.Destroy()
-	v := p.vr
-	*p = popup{vr: v}
+	delete(p.v.ps, p.ei)
+	p.v.order_popups()
 }
-func (v *viewer) hide_popups() {
+func (v *viewer) delete_all_popups() {
 	for _, p := range v.ps {
-		p.hide()
+		p.del()
 	}
-	v.ps = nil
 }
 
-func (p *popup) button_press(win *gtk.Window, e *gdk.Event) {
-	be := &gdk.EventButton{e}
-	bv := be.ButtonVal()
-	bx, by := be.MotionVal()
-	fmt.Println("popup button press", bx, by, bv)
-	if bv != 1 {
-		return
-	}
-	mouse_x := p.x + XY(bx, by)
-	p.vr.do_button_press(p.vr.eb, mouse_x)
+func (p0 *popup) dt(p1 *popup) (dt float64) {
+	e0, e1 := p0.get_event(), p1.get_event()
+	return p1.v.ev.ElapsedTime(e1) - p0.v.ev.ElapsedTime(e0)
 }
 
 func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
-	lines := p.e.Strings()
-	_, pc := p.v.EventPath(p.e)
-	d, _ := p.vr.decorationForPc(pc)
+	e, de := p.get_event(), p.get_draw_event()
 
-	var tb elog.TimeBounds
-	p.v.GetTimeBounds(&tb)
-	elapsed := p.v.Time(p.e).Sub(tb.Start).Seconds()
+	lines := e.Strings()
+	_, pc := p.v.ev.EventPath(e)
+	d, _ := p.v.decorationForPc(pc)
+
+	tb := &p.v.ev.Times
+	et := p.v.ev.ElapsedTime(e)
 	lines = append(lines,
-		fmt.Sprintf("%.2f%s", elapsed/tb.Unit, tb.UnitName))
+		fmt.Sprintf("%.2f", et/tb.Unit))
+	if p.next != nil {
+		lines = append(lines, fmt.Sprintf("%.4f", p.dt(p.next)/tb.Unit))
+	}
 
 	if p.l != nil {
 		p.l = p.l[:0]
@@ -310,13 +340,11 @@ func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 		p.l = append(p.l, text_line{s: lines[i]})
 	}
 
-	w := XY(float64(da.GetAllocatedWidth()), float64(da.GetAllocatedHeight()))
-	center := w / 2
-
 	c := (*ctx)(cr)
 	cr.SetFontSize(10)
 	bbox := c.text_box(p.l)
 
+	center := de.rr_center + p.v.eb_x
 	const radius = 4
 	rr_dx := bbox + XY(2*radius, radius)
 	c.roundedRect(center-rr_dx/2, rr_dx, radius)
@@ -374,26 +402,51 @@ func (v *viewer) decorationForPc(pc uintptr) (d *decoration, ok bool) {
 	return
 }
 
+type draw_event struct {
+	visible bool
+	// Center/size of rounded rect.
+	rr_center, rr_dx X2
+}
+
+func (e *draw_event) min_distance(x X2) (ds float64) {
+	// Distance to center.
+	ds = (e.rr_center - x).Abs()
+	// Distance to 4 corners.
+	for i := 0; i < 4; i++ {
+		dx2 := e.rr_dx / 2
+		x, y := dx2.X(), dx2.Y()
+		if i&1 != 0 {
+			x = -x
+		}
+		if i&2 != 0 {
+			y = -y
+		}
+		dx2 = XY(x, y)
+		if l := (e.rr_center - dx2).Abs(); l < ds {
+			ds = l
+		}
+	}
+	return
+}
+
 const margin = 40
 
 func (v *viewer) draw(da *gtk.DrawingArea, cr *cairo.Context) {
-	ev := elog.NewView()
-	var tb elog.TimeBounds
-	ev.GetTimeBounds(&tb)
-	fmt.Printf("foo %+v\n", &tb)
-
-	c := (*ctx)(cr)
+	ev, tb := v.ev, &v.ev.Times
 
 	dw := XX(margin)
 	w := XY(float64(da.GetAllocatedWidth()), float64(da.GetAllocatedHeight()))
 	w -= dw
 
+	c := (*ctx)(cr)
+	cr.SetAntialias(cairo.ANTIALIAS_SUBPIXEL)
+
 	// Title
 	{
 		cr.SetSourceRGB(0, 0, 0)
-		x := XY(w.X()/2, 20)
+		x := XY(w.X()/2, dw.Y()/2)
 		cr.SetFontSize(18)
-		c.textf(x, text_align_center, tb.Start.Format("2006-01-02 15:04:05"))
+		c.textf(x, text_align_center, tb.Start.Format("Elog 2006-01-02 15:04:05"))
 		cr.Fill()
 	}
 
@@ -414,23 +467,26 @@ func (v *viewer) draw(da *gtk.DrawingArea, cr *cairo.Context) {
 
 		cr.SetSourceRGBA(0, 0, 0, 1)
 		cr.SetFontSize(10)
-		c.textf(dw-10i, text_align_left, "%.1f%s", t_min/t_unit, tb.UnitName)
+		c.textf(dw-10i, text_align_left, "%.0f%s", t_min/t_unit, tb.UnitName)
 		cr.Stroke()
-		c.textf(tmp-10i, text_align_right, "%.1f%s", t_max/t_unit, tb.UnitName)
+		c.textf(tmp-10i, text_align_right, "%.0f%s", t_max/t_unit, tb.UnitName)
 		cr.Stroke()
 	}
 
 	var x_last elib.Float64Vec
 
-	cr.SetAntialias(cairo.ANTIALIAS_SUBPIXEL)
+	if v.des == nil {
+		v.des = make([]draw_event, len(ev.Events))
+	}
 
 	// Draw events.
 	for i := range ev.Events {
 		e := &ev.Events[i]
-		t := ev.Time(e).Sub(tb.Start).Seconds()
+		de := &v.des[i]
+		t := ev.ElapsedTime(e)
 
 		x := XY((t-t_min)/(t_max-t_min)*w.X(), w.Y()/2)
-		if x.X() < 0 || x.X() > w.X() {
+		if de.visible = x.X() >= 0 || x.X() < w.X(); !de.visible {
 			continue
 		}
 
@@ -440,89 +496,69 @@ func (v *viewer) draw(da *gtk.DrawingArea, cr *cairo.Context) {
 
 		center := dw + x
 		radius := 4.
-		dx := XY(radius, radius)
+		cr.Save()
 		cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, d.color.a)
-		switch 3 {
-		case 3:
-			cr.Save()
-			cr.SetFontSize(9)
-			fe, te := cr.FontExtents(), cr.TextExtents(lines[0])
+		cr.SetFontSize(9)
+		fe, te := cr.FontExtents(), cr.TextExtents(lines[0])
 
-			// Choose integer Y such that text will not overlap with other text.
-			iy := uint(0)
-			for {
-				x_last.Validate(uint(iy))
-				if x_left := center.X() - te.Width/2; x_last[iy]+2*radius < x_left {
-					x_last[iy] = x_left + te.Width
-					break
-				}
-				iy++
+		// Choose integer Y such that text will not overlap with other text.
+		iy := uint(0)
+		for {
+			x_last.Validate(uint(iy))
+			if x_left := center.X() - te.Width/2; x_last[iy]+2*radius < x_left {
+				x_last[iy] = x_left + te.Width
+				break
 			}
-
-			// Avoid level 0 which will be used to plot event points.  See (A) below.
 			iy++
-
-			// Odd goes above baseline; even goes below baseline.
-			var idy int
-			if iy%2 != 0 {
-				idy = int((iy + 1) / 2)
-			} else {
-				idy = -int(iy / 2)
-			}
-
-			// Rounded rect with event text inside.
-			rr_center := center - XY(0, (fe.Height+2*radius)*float64(idy))
-			cr.SetSourceRGB(0, 0, 0)
-			tw := c.textf(rr_center, text_align_center, lines[0])
-			rr_dx := tw + XY(2*radius, radius)
-			cr.Stroke()
-			cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, d.color.a)
-			c.roundedRect(rr_center-rr_dx/2, rr_dx, radius)
-			cr.Fill()
-
-			// (A) Plot event points on event line at iy == 0 and lines between text & event line.
-			max_idy := 4
-			if idy >= -max_idy && idy <= +max_idy {
-				dot_radius := .9 * radius
-				if idy > 0 {
-					c.moveTo(rr_center + XY(0, (rr_dx/2).Y()))
-					c.lineTo(center - XY(0, dot_radius))
-				} else {
-					c.moveTo(rr_center - XY(0, (rr_dx/2).Y()))
-					c.lineTo(center + XY(0, dot_radius))
-				}
-				cr.SetOperator(cairo.OPERATOR_ATOP)
-				cr.SetLineWidth(2)
-				cr.Stroke()
-
-				cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, .75)
-				cr.MoveTo(center.X(), center.Y())
-				cr.Arc(center.X(), center.Y(), dot_radius, 0, 2*math.Pi)
-				cr.Fill()
-			}
-			cr.Restore()
-
-			// stale code
-		case 0:
-			cr.Arc(center.X(), center.Y(), radius, 0, 2*math.Pi)
-			cr.Fill()
-		case 1:
-			c.rect(center-dx, 2*dx)
-			cr.Fill()
-		case 2:
-			rx, ry := radius*.9, radius*1.2
-			cr.MoveTo(center.X()-rx, center.Y())
-			cr.LineTo(center.X(), center.Y()-ry)
-			cr.LineTo(center.X()+rx, center.Y())
-			cr.LineTo(center.X(), center.Y()+ry)
-			cr.ClosePath()
-			cr.Fill()
-		default:
-			panic("ga")
 		}
-	}
 
-	v.eb.GrabFocus()
+		// Avoid level 0 which will be used to plot event points.  See (A) below.
+		iy++
+
+		// Odd goes above baseline; even goes below baseline.
+		var idy int
+		if iy%2 != 0 {
+			idy = int((iy + 1) / 2)
+		} else {
+			idy = -int(iy / 2)
+		}
+
+		// Rounded rect with event text inside.
+		rr_center := center - XY(0, (fe.Height+2*radius)*float64(idy))
+		cr.SetSourceRGB(0, 0, 0)
+		tw := c.textf(rr_center, text_align_center, lines[0])
+		rr_dx := tw + XY(2*radius, radius)
+		cr.Stroke()
+		cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, d.color.a)
+		c.roundedRect(rr_center-rr_dx/2, rr_dx, radius)
+		cr.Fill()
+
+		// Save away
+		de.rr_center = rr_center
+		de.rr_dx = rr_dx
+
+		// (A) Plot event points on event line at iy == 0 and lines between text & event line.
+		max_idy := 4
+		if idy >= -max_idy && idy <= +max_idy {
+			dot_radius := .9 * radius
+			if idy > 0 {
+				c.moveTo(rr_center + XY(0, (rr_dx/2).Y()))
+				c.lineTo(center - XY(0, dot_radius))
+			} else {
+				c.moveTo(rr_center - XY(0, (rr_dx/2).Y()))
+				c.lineTo(center + XY(0, dot_radius))
+			}
+			cr.SetOperator(cairo.OPERATOR_ATOP)
+			cr.SetLineWidth(2)
+			cr.Stroke()
+
+			cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, .75)
+			cr.MoveTo(center.X(), center.Y())
+			cr.Arc(center.X(), center.Y(), dot_radius, 0, 2*math.Pi)
+			cr.Fill()
+		}
+		cr.Restore()
+	}
 }
 
 func (v *viewer) draw_window_transparent_background(win *gtk.Window, cr *cairo.Context) {

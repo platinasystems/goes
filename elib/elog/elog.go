@@ -369,7 +369,7 @@ func (e *Event) elapsedTime(s *shared) float64 {
 	return 1e-9 * float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsecs()
 }
 
-func (v *View) ElapsedTime(e *Event) float64   { return e.elapsedTime(&v.shared) }
+// Time elapsed from start of buffer.
 func (b *Buffer) ElapsedTime(e *Event) float64 { return e.elapsedTime(&b.shared) }
 
 // Go time.Time that event happened.
@@ -378,15 +378,18 @@ func (e *Event) time(s *shared) time.Time {
 	return s.StartTime.Add(time.Duration(nsec))
 }
 
-func (v *View) Time(e *Event) time.Time   { return e.time(&v.shared) }
-func (b *Buffer) Time(e *Event) time.Time { return e.time(&b.shared) }
-
+func (b *Buffer) Time(e *Event) time.Time   { return e.time(&b.shared) }
 func (e *Event) unixNano(s *shared) float64 { return float64(e.time(s).UnixNano()) * 1e-9 }
+func (b *Buffer) AbsTime(e *Event) float64  { return e.unixNano(&b.shared) }
 
-func (v *View) AbsTime(e *Event) float64   { return e.unixNano(&v.shared) }
-func (b *Buffer) AbsTime(e *Event) float64 { return e.unixNano(&b.shared) }
+func (v *View) Time(e *Event) time.Time  { return e.time(&v.shared) }
+func (v *View) AbsTime(e *Event) float64 { return e.unixNano(&v.shared) }
 
-func (v *View) GetTimeBounds(tb *TimeBounds) (err error) {
+// Elapsed time since view start time.  (As computed in roundViewTimes.)
+func (v *View) ElapsedTime(e *Event) float64 { return e.time(&v.shared).Sub(v.Times.Start).Seconds() }
+
+func (v *View) roundViewTimes() (err error) {
+	tb := &v.Times
 	l := len(v.Events)
 	if l == 0 {
 		err = errors.New("no events in view")
@@ -525,7 +528,7 @@ func (b *Buffer) GetEvent(index int) *Event {
 	return &b.events[(f+index)&(1<<b.log2Len-1)]
 }
 
-type TimeBounds struct {
+type timeBounds struct {
 	// Starting time truncated to nearest second.
 	Start        time.Time
 	Min, Max, Dt float64
@@ -535,6 +538,7 @@ type TimeBounds struct {
 
 type View struct {
 	Events EventVec
+	Times  timeBounds
 	shared
 }
 
@@ -554,6 +558,7 @@ func (b *Buffer) NewView() (v *View) {
 	l += copy(v.Events[l:], b.events[0:i&mask])
 	b.lockIndex(false)
 	v.Events = v.Events[:l]
+	v.roundViewTimes()
 	return
 }
 
