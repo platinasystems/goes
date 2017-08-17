@@ -31,22 +31,57 @@ func (c *ctx) cr() *cairo.Context { return (*cairo.Context)(c) }
 func (c *ctx) translate(x X2)     { c.cr().Translate(x.X(), x.Y()) }
 func (c *ctx) scale(x X2)         { c.cr().Scale(x.X(), x.Y()) }
 
-func (c *ctx) text2(x, a X2, format string, args ...interface{}) (dx X2) {
+const (
+	text_align_center = iota
+	text_align_left
+	text_align_right
+)
+
+type text_line struct {
+	s string
+	e cairo.TextExtents
+}
+
+func (c *ctx) text_box(lines []text_line) (bounding_box X2) {
 	cr := c.cr()
-	s := fmt.Sprintf(format, args...)
-	fe, te := cr.FontExtents(), cr.TextExtents(s)
-	dy := te.Height*a.Y() + te.YBearing
-	if true {
-		dy = fe.Ascent - .5*fe.Height
+	fe := cr.FontExtents()
+	max_width := float64(0)
+	for i := range lines {
+		te := cr.TextExtents(lines[i].s)
+		lines[i].e = te
+		if te.Width > max_width {
+			max_width = te.Width
+		}
 	}
-	x1 := x + XY(-te.Width*a.X()+te.XBearing, dy)
-	cr.MoveTo(x1.X(), x1.Y())
-	cr.ShowText(s)
-	dx = XY(te.Width, fe.Height)
+	bounding_box = XY(max_width, fe.Height*float64(len(lines)))
 	return
 }
-func (c *ctx) text(x X2, format string, args ...interface{}) X2 {
-	return c.text2(x, XY(.5, .5), format, args...)
+
+func (c *ctx) text(x X2, text_align int, lines ...text_line) X2 {
+	var a float64
+	switch text_align {
+	case text_align_center:
+		a = .5
+	case text_align_left:
+		a = 0
+	case text_align_right:
+		a = 1
+	}
+	cr := c.cr()
+	fe := cr.FontExtents()
+	bounding_box := c.text_box(lines)
+	y0 := fe.Ascent - .5*fe.Height*float64(len(lines))
+	for i := range lines {
+		x1 := x + XY(-bounding_box.X()*a+lines[i].e.XBearing, y0+float64(i)*fe.Height)
+		cr.MoveTo(x1.X(), x1.Y())
+		cr.ShowText(lines[i].s)
+	}
+	return bounding_box
+}
+func (c *ctx) textf(x X2, text_align int, format string, args ...interface{}) X2 {
+	var l [1]text_line
+	l[0].s = fmt.Sprintf(format, args...)
+	return c.text(x, text_align, l[:]...)
 }
 
 func (c *ctx) moveTo(x X2) { c.cr().MoveTo(x.X(), x.Y()) }
@@ -66,6 +101,14 @@ func (x *ctx) roundedRect(x0, dx X2, r float64) {
 	c.ClosePath()
 }
 
+type viewer struct {
+	win *gtk.Window
+	da  *gtk.DrawingArea
+	eb  *gtk.EventBox
+	p   popup
+	m   map[uintptr]*decoration
+}
+
 func main() {
 	a := os.Args
 	gtk.Init(&a)
@@ -82,53 +125,40 @@ func main() {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	lv := &elogViewer{}
+	v := &viewer{}
 
 	// gui boilerplate
-	lv.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
-	lv.win.SetTitle("Event log")
-	lv.win.SetDefaultSize(1200, 750)
-	lv.win.Connect("destroy", gtk.MainQuit)
+	v.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
+	v.win.SetTitle("Event log")
+	v.win.SetDefaultSize(1200, 750)
+	v.win.Connect("destroy", gtk.MainQuit)
 
-	{
-		w, _ := gtk.WindowNew(gtk.WINDOW_POPUP)
-		lv.p.win = w
-		w.SetResizable(false)
-		w.SetDecorated(false)
-		w.SetSizeRequest(150, 40)
-		w.SetTransientFor(lv.win)
-		w.SetPosition(gtk.WIN_POS_MOUSE)
+	v.do_popup()
 
-		da, _ := gtk.DrawingAreaNew()
-		lv.p.da = da
-		w.Add(da)
-	}
+	v.eb, _ = gtk.EventBoxNew()
+	v.eb.SetCanFocus(true)
+	v.eb.SetEvents(int(gdk.KEY_PRESS_MASK | gdk.ENTER_NOTIFY_MASK | gdk.LEAVE_NOTIFY_MASK | gdk.BUTTON_PRESS_MASK))
+	v.eb.SetBorderWidth(20)
+	v.win.Add(v.eb)
 
-	lv.eb, _ = gtk.EventBoxNew()
-	lv.eb.SetCanFocus(true)
-	lv.eb.SetEvents(int(gdk.KEY_PRESS_MASK | gdk.ENTER_NOTIFY_MASK | gdk.LEAVE_NOTIFY_MASK | gdk.BUTTON_PRESS_MASK))
-	lv.eb.SetBorderWidth(20)
-	lv.win.Add(lv.eb)
+	v.da, _ = gtk.DrawingAreaNew()
+	v.eb.Add(v.da)
 
-	lv.da, _ = gtk.DrawingAreaNew()
-	lv.eb.Add(lv.da)
+	v.win.ShowAll()
 
-	lv.win.ShowAll()
-
-	lv.eb.Connect("draw", lv.draw)
-	lv.eb.Connect("enter_notify_event", lv.eb_enter)
-	lv.eb.Connect("leave_notify_event", lv.eb_leave)
-	lv.eb.Connect("key_press_event", lv.key_press)
-	lv.eb.Connect("button_press_event", lv.button_press)
-	lv.p.win.Connect("button_press_event", lv.popup_button_press)
-	lv.eb.GrabFocus()
-
+	v.da.Connect("draw", v.draw)
+	v.eb.Connect("enter_notify_event", v.eb_enter)
+	v.eb.Connect("leave_notify_event", v.eb_leave)
+	v.eb.Connect("key_press_event", v.key_press)
+	v.eb.Connect("button_press_event", v.button_press)
+	v.eb.GrabFocus()
 	gtk.Main()
 }
 
-func (lv *elogViewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
+func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	keyMap := map[uint]func(){
-		KEY_q: func() { gtk.MainQuit() },
+		KEY_q:      func() { gtk.MainQuit() },
+		KEY_Escape: v.hide_popups,
 	}
 	ke := &gdk.EventKey{ev}
 	kv := ke.KeyVal()
@@ -138,7 +168,7 @@ func (lv *elogViewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	}
 }
 
-func (lv *elogViewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
+func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
 	be := &gdk.EventButton{e}
 	x, y := be.MotionVal()
 	bv := be.ButtonVal()
@@ -170,65 +200,119 @@ func (lv *elogViewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
 	if min_e != nil {
 		fmt.Println("min event", min_dt, ev.EventString(min_e))
 	}
-	lv.p.show(ev, min_e, &tb)
+	v.p.show(ev, min_e)
 }
 
-func (lv *elogViewer) popup_button_press(popup *gtk.Window, e *gdk.Event) {
-	be := &gdk.EventButton{e}
-	bv := be.ButtonVal()
-	fmt.Println("popup button press")
-	if bv == 1 {
-		lv.p.hide()
-	}
-}
-
-func (lv *elogViewer) eb_enter(eb *gtk.EventBox, ev *gdk.Event) {
+func (v *viewer) eb_enter(eb *gtk.EventBox, ev *gdk.Event) {
 	fmt.Println("enter", ev)
 	eb.GrabFocus()
 }
 
-func (lv *elogViewer) eb_leave(eb *gtk.EventBox, ev *gdk.Event) {
+func (v *viewer) eb_leave(eb *gtk.EventBox, ev *gdk.Event) {
 	fmt.Println("leave", ev)
-	lv.win.GrabFocus()
+	v.win.GrabFocus()
 }
 
 type popup struct {
+	vr  *viewer
 	win *gtk.Window
 	da  *gtk.DrawingArea
+	e   *elog.Event
+	v   *elog.View
+	l   []text_line
 }
 
-func (p *popup) show(v *elog.View, e *elog.Event, tb *elog.TimeBounds) {
-	text := ""
-	lines := e.Strings()
-	for i := range lines {
-		if text != "" {
-			text += "\n"
-		}
-		text += lines[i]
-	}
-	elapsed := v.Time(e).Sub(tb.Start).Seconds()
-	text += fmt.Sprintf("\n%.2f%s", elapsed/tb.Unit, tb.UnitName)
-	fmt.Println(text)
+func (v *viewer) do_popup() {
+	w, _ := gtk.WindowNew(gtk.WINDOW_POPUP)
+	v.p.win = w
+	w.SetResizable(false)
+	w.SetDecorated(false)
+	w.SetSizeRequest(300, 200)
+	w.SetTransientFor(v.win)
+	w.SetPosition(gtk.WIN_POS_MOUSE)
+	scr, _ := w.GetScreen()
+	vis, _ := scr.GetRGBAVisual()
+	w.SetVisual(vis)
+
+	da, _ := gtk.DrawingAreaNew()
+	v.p.da = da
+	w.Add(da)
+
+	v.p.win.Connect("button_press_event", v.popup_button_press)
+	v.p.win.Connect("draw", v.draw_window_transparent_background)
+	v.p.da.Connect("draw", v.p.draw_popup)
+	v.p.vr = v
+}
+
+func (p *popup) show(v *elog.View, e *elog.Event) {
+	p.e = e
+	p.v = v
 	p.win.ShowAll()
 }
-func (p *popup) hide() { p.win.Hide() }
+func (p *popup) hide()         { p.win.Hide() }
+func (v *viewer) hide_popups() { v.p.hide() }
 
-type elogViewer struct {
-	win *gtk.Window
-	da  *gtk.DrawingArea
-	eb  *gtk.EventBox
-	p   popup
-	m   map[uintptr]*decoration
+func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
+	lines := p.e.Strings()
+	_, pc := p.v.EventPath(p.e)
+	d, _ := p.vr.decorationForPc(pc)
+
+	var tb elog.TimeBounds
+	p.v.GetTimeBounds(&tb)
+	elapsed := p.v.Time(p.e).Sub(tb.Start).Seconds()
+	lines = append(lines,
+		fmt.Sprintf("%.2f%s", elapsed/tb.Unit, tb.UnitName))
+
+	if p.l != nil {
+		p.l = p.l[:0]
+	}
+	for i := range lines {
+		p.l = append(p.l, text_line{s: lines[i]})
+	}
+
+	w := XY(float64(da.GetAllocatedWidth()), float64(da.GetAllocatedHeight()))
+	center := w / 2
+
+	c := (*ctx)(cr)
+	cr.SetFontSize(10)
+	bbox := c.text_box(p.l)
+
+	const radius = 4
+	rr_dx := bbox + XY(2*radius, radius)
+	c.roundedRect(center-rr_dx/2, rr_dx, radius)
+	dc := d.color.lighten(.375)
+	cr.SetSourceRGBA(dc.r, dc.g, dc.b, 1)
+	cr.Fill()
+
+	cr.SetSourceRGBA(0, 0, 0, 1)
+	c.text(center-XY(bbox.X()/2, 0), text_align_left, p.l...)
+	cr.Stroke()
 }
 
-const (
-	shape_circle = iota
-	shape_square
-	shape_diamond
-	shape_text
-)
+func (v *viewer) popup_button_press(popup *gtk.Window, e *gdk.Event) {
+	be := &gdk.EventButton{e}
+	bv := be.ButtonVal()
+	fmt.Println("popup button press")
+	if bv == 1 {
+		v.p.hide()
+	}
+}
 
 type rgba struct{ r, g, b, a float64 }
+
+func (x rgba) darken(f float64) (y rgba) {
+	y.r = f * x.r
+	y.g = f * x.g
+	y.b = f * x.b
+	return
+}
+
+func (x rgba) lighten(f float64) (y rgba) {
+	y.r = 1 - f*(1-x.r)
+	y.g = 1 - f*(1-x.g)
+	y.b = 1 - f*(1-x.b)
+	return
+}
 
 var standardColors = [...]rgba{
 	rgba{r: 1},              // red
@@ -241,29 +325,27 @@ var standardColors = [...]rgba{
 
 type decoration struct {
 	color rgba
-	shape int
 }
 
-func (lv *elogViewer) decorationForPc(pc uintptr) (d *decoration, ok bool) {
-	if lv.m == nil {
-		lv.m = make(map[uintptr]*decoration)
+func (v *viewer) decorationForPc(pc uintptr) (d *decoration, ok bool) {
+	if v.m == nil {
+		v.m = make(map[uintptr]*decoration)
 	}
-	if d, ok = lv.m[pc]; !ok {
-		i := len(lv.m)
-		i0, i1 := i/len(standardColors), i%len(standardColors)
-		d = &decoration{shape: i0, color: standardColors[i1]}
-		d.shape = shape_text
+	if d, ok = v.m[pc]; !ok {
+		i := len(v.m)
+		i0 := i % len(standardColors)
+		d = &decoration{color: standardColors[i0]}
 		if d.color.a == 0 {
 			d.color.a = .2
 		}
-		lv.m[pc] = d
+		v.m[pc] = d
 	}
 	return
 }
 
 const margin = 40
 
-func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
+func (v *viewer) draw(da *gtk.DrawingArea, cr *cairo.Context) {
 	ev := elog.NewView()
 	var tb elog.TimeBounds
 	ev.GetTimeBounds(&tb)
@@ -272,7 +354,7 @@ func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
 	c := (*ctx)(cr)
 
 	dw := XX(margin)
-	w := XY(float64(eb.GetAllocatedWidth()), float64(eb.GetAllocatedHeight()))
+	w := XY(float64(da.GetAllocatedWidth()), float64(da.GetAllocatedHeight()))
 	w -= dw
 
 	// Title
@@ -280,7 +362,7 @@ func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
 		cr.SetSourceRGB(0, 0, 0)
 		x := XY(w.X()/2, 20)
 		cr.SetFontSize(18)
-		c.text(x, tb.Start.Format("2006-01-02 15:04:05"))
+		c.textf(x, text_align_center, tb.Start.Format("2006-01-02 15:04:05"))
 		cr.Fill()
 	}
 
@@ -301,9 +383,9 @@ func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
 
 		cr.SetSourceRGBA(0, 0, 0, 1)
 		cr.SetFontSize(10)
-		c.text2(dw-10i, XY(0, .5), fmt.Sprintf("%.1f%s", t_min/t_unit, tb.UnitName))
+		c.textf(dw-10i, text_align_left, "%.1f%s", t_min/t_unit, tb.UnitName)
 		cr.Stroke()
-		c.text2(tmp-10i, XY(1, .5), fmt.Sprintf("%.1f%s", t_max/t_unit, tb.UnitName))
+		c.textf(tmp-10i, text_align_right, "%.1f%s", t_max/t_unit, tb.UnitName)
 		cr.Stroke()
 	}
 
@@ -321,34 +403,21 @@ func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
 			continue
 		}
 
-		s := e.Strings()[0]
+		lines := e.Strings()
 		_, pc := ev.EventPath(e)
+		d, _ := v.decorationForPc(pc)
 
-		d, _ := lv.decorationForPc(pc)
 		center := dw + x
 		radius := 4.
 		dx := XY(radius, radius)
 		cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, d.color.a)
-		switch d.shape {
-		case shape_circle:
-			cr.Arc(center.X(), center.Y(), radius, 0, 2*math.Pi)
-			cr.Fill()
-		case shape_square:
-			c.rect(center-dx, 2*dx)
-			cr.Fill()
-		case shape_diamond:
-			rx, ry := radius*.9, radius*1.2
-			cr.MoveTo(center.X()-rx, center.Y())
-			cr.LineTo(center.X(), center.Y()-ry)
-			cr.LineTo(center.X()+rx, center.Y())
-			cr.LineTo(center.X(), center.Y()+ry)
-			cr.ClosePath()
-			cr.Fill()
-		case shape_text:
+		switch 3 {
+		case 3:
 			cr.Save()
 			cr.SetFontSize(9)
-			fe := cr.FontExtents()
-			te := cr.TextExtents(s)
+			fe, te := cr.FontExtents(), cr.TextExtents(lines[0])
+
+			// Choose integer Y such that text will not overlap with other text.
 			iy := uint(0)
 			for {
 				x_last.Validate(uint(iy))
@@ -358,23 +427,29 @@ func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
 				}
 				iy++
 			}
+
+			// Avoid level 0 which will be used to plot event points.  See (A) below.
+			iy++
+
 			// Odd goes above baseline; even goes below baseline.
 			var idy int
-			iy++
 			if iy%2 != 0 {
 				idy = int((iy + 1) / 2)
 			} else {
 				idy = -int(iy / 2)
 			}
+
+			// Rounded rect with event text inside.
 			rr_center := center - XY(0, (fe.Height+2*radius)*float64(idy))
 			cr.SetSourceRGB(0, 0, 0)
-			tw := c.text(rr_center, s)
+			tw := c.textf(rr_center, text_align_center, lines[0])
 			rr_dx := tw + XY(2*radius, radius)
 			cr.Stroke()
 			cr.SetSourceRGBA(d.color.r, d.color.g, d.color.b, d.color.a)
 			c.roundedRect(rr_center-rr_dx/2, rr_dx, radius)
 			cr.Fill()
 
+			// (A) Plot event points on event line at iy == 0 and lines between text & event line.
 			max_idy := 4
 			if idy >= -max_idy && idy <= +max_idy {
 				dot_radius := .9 * radius
@@ -396,10 +471,33 @@ func (lv *elogViewer) draw(eb *gtk.EventBox, cr *cairo.Context) {
 			}
 			cr.Restore()
 
+			// stale code
+		case 0:
+			cr.Arc(center.X(), center.Y(), radius, 0, 2*math.Pi)
+			cr.Fill()
+		case 1:
+			c.rect(center-dx, 2*dx)
+			cr.Fill()
+		case 2:
+			rx, ry := radius*.9, radius*1.2
+			cr.MoveTo(center.X()-rx, center.Y())
+			cr.LineTo(center.X(), center.Y()-ry)
+			cr.LineTo(center.X()+rx, center.Y())
+			cr.LineTo(center.X(), center.Y()+ry)
+			cr.ClosePath()
+			cr.Fill()
 		default:
 			panic("ga")
 		}
 	}
 
-	lv.eb.GrabFocus()
+	v.eb.GrabFocus()
+}
+
+func (v *viewer) draw_window_transparent_background(win *gtk.Window, cr *cairo.Context) {
+	w := XY(float64(win.GetAllocatedWidth()), float64(win.GetAllocatedHeight()))
+	c := (*ctx)(cr)
+	cr.SetOperator(cairo.OPERATOR_SOURCE)
+	c.rect(0, w)
+	cr.Fill()
 }
