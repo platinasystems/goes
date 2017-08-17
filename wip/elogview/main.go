@@ -105,7 +105,7 @@ type viewer struct {
 	win *gtk.Window
 	da  *gtk.DrawingArea
 	eb  *gtk.EventBox
-	ps  []*popup
+	ps  map[uint]*popup
 	m   map[uintptr]*decoration
 }
 
@@ -190,20 +190,23 @@ func (v *viewer) do_button_press(eb *gtk.EventBox, mouse_x X2) {
 	t := tb.Min + tb.Dt*(mouse_x.X()-dw.X())/w.X()
 	fmt.Println("time", t)
 
-	var min_e *elog.Event
+	var (
+		min_e *elog.Event
+		min_i int
+	)
 	min_dt := 1e10
 	for i := range ev.Events {
 		e := &ev.Events[i]
 		if dt := math.Abs(t - ev.Time(e).Sub(tb.Start).Seconds()); dt < min_dt {
 			min_dt = dt
 			min_e = e
+			min_i = i
 		}
 	}
 	if min_e != nil {
 		fmt.Println("min event", min_dt, ev.EventString(min_e))
 	}
-	p := v.new_popup(ev, min_e, mouse_x)
-	p.show(ev, min_e)
+	v.new_popup(ev, min_e, mouse_x, uint(min_i))
 }
 
 func (v *viewer) eb_enter(eb *gtk.EventBox, ev *gdk.Event) {
@@ -226,7 +229,12 @@ type popup struct {
 	x, dx X2
 }
 
-func (v *viewer) new_popup(ev *elog.View, e *elog.Event, mouse_x X2) (p *popup) {
+func (v *viewer) new_popup(ev *elog.View, e *elog.Event, mouse_x X2, event_index uint) (p *popup) {
+	// Event already displayed in popup?
+	if _, ok := v.ps[event_index]; ok {
+		return
+	}
+
 	p = &popup{vr: v, v: ev, e: e}
 	w, _ := gtk.WindowNew(gtk.WINDOW_POPUP)
 	p.win = w
@@ -248,15 +256,14 @@ func (v *viewer) new_popup(ev *elog.View, e *elog.Event, mouse_x X2) (p *popup) 
 	p.win.Connect("draw", v.draw_window_transparent_background)
 	p.da.Connect("draw", p.draw_popup)
 	p.win.Connect("button_press_event", p.button_press)
-	v.ps = append(v.ps, p)
+	if v.ps == nil {
+		v.ps = make(map[uint]*popup)
+	}
+	v.ps[event_index] = p
+	p.win.ShowAll()
 	return
 }
 
-func (p *popup) show(v *elog.View, e *elog.Event) {
-	p.e = e
-	p.v = v
-	p.win.ShowAll()
-}
 func (p *popup) hide() {
 	if p.win == nil {
 		return
