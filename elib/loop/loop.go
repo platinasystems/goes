@@ -154,7 +154,9 @@ func (n *Node) Activate(enable bool) (was bool) {
 			break
 		}
 	}
-	n.changeActive(enable)
+	if was != enable {
+		n.changeActive(enable)
+	}
 	return
 }
 
