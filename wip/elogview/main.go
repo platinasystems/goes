@@ -105,7 +105,7 @@ type viewer struct {
 	win *gtk.Window
 	da  *gtk.DrawingArea
 	eb  *gtk.EventBox
-	p   popup
+	ps  []*popup
 	m   map[uintptr]*decoration
 }
 
@@ -132,8 +132,6 @@ func main() {
 	v.win.SetTitle("Event log")
 	v.win.SetDefaultSize(1200, 750)
 	v.win.Connect("destroy", gtk.MainQuit)
-
-	v.do_popup()
 
 	v.eb, _ = gtk.EventBoxNew()
 	v.eb.SetCanFocus(true)
@@ -170,13 +168,17 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 
 func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
 	be := &gdk.EventButton{e}
-	x, y := be.MotionVal()
 	bv := be.ButtonVal()
-	fmt.Println("press", x, y, bv)
+	bx, by := be.MotionVal()
+	fmt.Println("press", bx, by, bv)
 	if bv != 1 {
 		return
 	}
+	mouse_x := XY(bx, by)
+	v.do_button_press(eb, mouse_x)
+}
 
+func (v *viewer) do_button_press(eb *gtk.EventBox, mouse_x X2) {
 	ev := elog.NewView()
 	var tb elog.TimeBounds
 	ev.GetTimeBounds(&tb)
@@ -185,7 +187,7 @@ func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
 	w := XY(float64(eb.GetAllocatedWidth()), float64(eb.GetAllocatedHeight()))
 	w -= dw
 
-	t := tb.Min + tb.Dt*(x-dw.X())/w.X()
+	t := tb.Min + tb.Dt*(mouse_x.X()-dw.X())/w.X()
 	fmt.Println("time", t)
 
 	var min_e *elog.Event
@@ -200,7 +202,8 @@ func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) {
 	if min_e != nil {
 		fmt.Println("min event", min_dt, ev.EventString(min_e))
 	}
-	v.p.show(ev, min_e)
+	p := v.new_popup(ev, min_e, mouse_x)
+	p.show(ev, min_e)
 }
 
 func (v *viewer) eb_enter(eb *gtk.EventBox, ev *gdk.Event) {
@@ -214,20 +217,24 @@ func (v *viewer) eb_leave(eb *gtk.EventBox, ev *gdk.Event) {
 }
 
 type popup struct {
-	vr  *viewer
-	win *gtk.Window
-	da  *gtk.DrawingArea
-	e   *elog.Event
-	v   *elog.View
-	l   []text_line
+	vr    *viewer
+	win   *gtk.Window
+	da    *gtk.DrawingArea
+	e     *elog.Event
+	v     *elog.View
+	l     []text_line
+	x, dx X2
 }
 
-func (v *viewer) do_popup() {
+func (v *viewer) new_popup(ev *elog.View, e *elog.Event, mouse_x X2) (p *popup) {
+	p = &popup{vr: v, v: ev, e: e}
 	w, _ := gtk.WindowNew(gtk.WINDOW_POPUP)
-	v.p.win = w
+	p.win = w
 	w.SetResizable(false)
 	w.SetDecorated(false)
-	w.SetSizeRequest(300, 200)
+	p.dx = XY(400, 300)
+	p.x = mouse_x - p.dx/2                         // window is centered on mouse
+	w.SetSizeRequest(int(p.dx.X()), int(p.dx.Y())) // max size of drawing area
 	w.SetTransientFor(v.win)
 	w.SetPosition(gtk.WIN_POS_MOUSE)
 	scr, _ := w.GetScreen()
@@ -235,13 +242,14 @@ func (v *viewer) do_popup() {
 	w.SetVisual(vis)
 
 	da, _ := gtk.DrawingAreaNew()
-	v.p.da = da
+	p.da = da
 	w.Add(da)
 
-	v.p.win.Connect("button_press_event", v.popup_button_press)
-	v.p.win.Connect("draw", v.draw_window_transparent_background)
-	v.p.da.Connect("draw", v.p.draw_popup)
-	v.p.vr = v
+	p.win.Connect("draw", v.draw_window_transparent_background)
+	p.da.Connect("draw", p.draw_popup)
+	p.win.Connect("button_press_event", p.button_press)
+	v.ps = append(v.ps, p)
+	return
 }
 
 func (p *popup) show(v *elog.View, e *elog.Event) {
@@ -249,8 +257,33 @@ func (p *popup) show(v *elog.View, e *elog.Event) {
 	p.v = v
 	p.win.ShowAll()
 }
-func (p *popup) hide()         { p.win.Hide() }
-func (v *viewer) hide_popups() { v.p.hide() }
+func (p *popup) hide() {
+	if p.win == nil {
+		return
+	}
+	p.win.Hide()
+	p.win.Destroy()
+	v := p.vr
+	*p = popup{vr: v}
+}
+func (v *viewer) hide_popups() {
+	for _, p := range v.ps {
+		p.hide()
+	}
+	v.ps = nil
+}
+
+func (p *popup) button_press(win *gtk.Window, e *gdk.Event) {
+	be := &gdk.EventButton{e}
+	bv := be.ButtonVal()
+	bx, by := be.MotionVal()
+	fmt.Println("popup button press", bx, by, bv)
+	if bv != 1 {
+		return
+	}
+	mouse_x := p.x + XY(bx, by)
+	p.vr.do_button_press(p.vr.eb, mouse_x)
+}
 
 func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 	lines := p.e.Strings()
@@ -287,15 +320,6 @@ func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 	cr.SetSourceRGBA(0, 0, 0, 1)
 	c.text(center-XY(bbox.X()/2, 0), text_align_left, p.l...)
 	cr.Stroke()
-}
-
-func (v *viewer) popup_button_press(popup *gtk.Window, e *gdk.Event) {
-	be := &gdk.EventButton{e}
-	bv := be.ButtonVal()
-	fmt.Println("popup button press")
-	if bv == 1 {
-		v.p.hide()
-	}
 }
 
 type rgba struct{ r, g, b, a float64 }
