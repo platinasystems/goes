@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/elog"
 
+	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -116,15 +117,21 @@ type viewer struct {
 	ps         map[uint]*popup
 	ps_slice   []*popup
 	m          map[uintptr]*decoration
-	key_map    map[uint]func()
 }
 
 func main() {
 	a := os.Args
+
 	gtk.Init(&a)
 
+	var (
+		n_events int
+	)
+	flag.IntVar(&n_events, "n-events", 10, "number of test events to add")
+	flag.Parse()
+
 	elog.Enable(true)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < n_events; i++ {
 		elog.GenEventf("red %d", i)
 		time.Sleep(1 * time.Millisecond)
 		elog.GenEventf("green %d", i)
@@ -169,21 +176,61 @@ func elog_viewer(ev *elog.View, width, height int) {
 	v.da.Connect("draw", v.draw)
 	v.eb.Connect("button_press_event", v.button_press)
 	v.eb.Connect("key_press_event", v.key_press)
-	v.key_map = map[uint]func(){
-		KEY_q:      func() { gtk.MainQuit() },
-		KEY_Escape: v.delete_all_popups,
-	}
 
 	v.win.ShowAll()
 	gtk.Main()
 }
 
+func (v *viewer) do_key(key uint, state gdk.ModifierType) {
+	t := &v.ev.Times
+	subview := false
+	t_min, t_max := t.Min, t.Max
+	switch key {
+	case KEY_q:
+		gtk.MainQuit()
+	case KEY_Escape:
+		break
+	case KEY_r:
+		v.ev.Reset()
+	case KEY_plus:
+		dt := t.Dt * .25
+		t_min += dt
+		t_max -= dt
+		subview = true
+	case KEY_minus:
+		dt := t.Dt * .5
+		t_min -= dt
+		t_max += dt
+		subview = true
+	case KEY_leftarrow, KEY_Left:
+		dt := t.Unit
+		if state&gdk.GDK_SHIFT_MASK != 0 {
+			dt *= 10
+		}
+		t_min -= dt
+		t_max -= dt
+		subview = true
+	case KEY_rightarrow, KEY_Right:
+		dt := t.Unit
+		if state&gdk.GDK_SHIFT_MASK != 0 {
+			dt *= 10
+		}
+		t_min += dt
+		t_max += dt
+		subview = true
+	default:
+		return // ignore unknown key
+	}
+	if subview {
+		v.ev.SubView(t_min, t_max)
+	}
+	v.delete_all_popups()
+	v.eb.QueueDraw()
+}
+
 func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	ke := &gdk.EventKey{ev}
-	if f, ok := v.key_map[ke.KeyVal()]; ok {
-		f()
-		eb.QueueDraw()
-	}
+	v.do_key(ke.KeyVal(), gdk.ModifierType(ke.State()))
 }
 
 func (v *viewer) button_press(eb *gtk.EventBox, e *gdk.Event) { v.do_button_press(e, 0) }
