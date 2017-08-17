@@ -226,13 +226,16 @@ func (v *viewer) do_button_press(e *gdk.Event, dx X2) {
 		if !de.visible {
 			continue
 		}
-		if ds := de.min_distance(mouse_x); ds < min_ds {
+		if ds := de.distance(mouse_x); ds < min_ds {
 			min_ds = ds
 			min_i = uint(i)
+			if ds == 0 {
+				break
+			}
 		}
 	}
-	// Only accept when screen distance is less than 1/2 an inch of center.
-	if min_ds < v.screen_dpi/4 {
+	// Only accept when screen distance is less than 1/8 an inch of center.
+	if min_ds < v.screen_dpi/8 {
 		// Event already displayed in popup?
 		if p, is_del := v.ps[min_i]; is_del {
 			p.del()
@@ -436,12 +439,28 @@ type draw_event struct {
 	rr_center, rr_dx X2
 }
 
-func (e *draw_event) min_distance(x X2) (ds float64) {
+func (t X2) inside_rect(c, r X2) bool {
+	ll, ur := c-r, c+r // lower left, upper right
+	if t.X() < ll.X() || t.X() > ur.X() {
+		return false
+	}
+	if t.Y() < ll.Y() || t.Y() > ur.Y() {
+		return false
+	}
+	return true
+}
+
+func (e *draw_event) distance(t X2) (ds float64) {
+	c := e.rr_center
+	dx2 := e.rr_dx / 2
+	if t.inside_rect(c, dx2) {
+		return
+	}
+
 	// Distance to center.
-	ds = (e.rr_center - x).Abs()
+	ds = (c - t).Abs()
 	// Distance to 4 corners.
 	for i := 0; i < 4; i++ {
-		dx2 := e.rr_dx / 2
 		x, y := dx2.X(), dx2.Y()
 		if i&1 != 0 {
 			x = -x
@@ -450,7 +469,7 @@ func (e *draw_event) min_distance(x X2) (ds float64) {
 			y = -y
 		}
 		dx2 = XY(x, y)
-		if l := (e.rr_center - dx2).Abs(); l < ds {
+		if l := (c + dx2 - t).Abs(); l < ds {
 			ds = l
 		}
 	}
