@@ -612,8 +612,11 @@ func (b *Buffer) NewView() (v *View) {
 func NewView() *View { return DefaultBuffer.NewView() }
 
 // Make subview with only events between elapsed times t0 and t1.
-func (v *View) SubView(t0, t1 float64) {
+func (v *View) SubView(t0, t1 float64) (n uint) {
 	l := len(v.e)
+	if t0 > t1 {
+		t0, t1 = t1, t0
+	}
 	i0 := sort.Search(l, func(i int) bool {
 		et := v.ElapsedTime(&v.e[i])
 		return et >= t0
@@ -624,6 +627,7 @@ func (v *View) SubView(t0, t1 float64) {
 	})
 	v.Events = v.e[i0:i1]
 	v.doViewTimes(t0, t1, true)
+	return uint(len(v.Events))
 }
 func (v *View) Reset() {
 	v.Events = v.e
