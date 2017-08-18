@@ -436,7 +436,7 @@ func (v *View) doViewTimes(t0, t1 float64, isViewTime bool) (err error) {
 		v := math.Floor(math.Log10(t1 - t0))
 		switch {
 		case v < -6:
-			unitName = "nsec"
+			unitName = "ns"
 			tUnit = 1e-9
 			switch {
 			case v < -8:
@@ -447,7 +447,7 @@ func (v *View) doViewTimes(t0, t1 float64, isViewTime bool) (err error) {
 				roundUnit = 1e-7
 			}
 		case v < -3:
-			unitName = "μsec"
+			unitName = "μs"
 			tUnit = 1e-6
 			switch {
 			case v < -5:
@@ -458,7 +458,7 @@ func (v *View) doViewTimes(t0, t1 float64, isViewTime bool) (err error) {
 				roundUnit = 1e-8
 			}
 		case v < 0:
-			unitName = "msec"
+			unitName = "ms"
 			tUnit = 1e-3
 			switch {
 			case v < -5:
