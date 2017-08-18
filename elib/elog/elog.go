@@ -60,6 +60,7 @@ type shared struct {
 	// Timestamp when log was created.
 	cpuStartTime cpu.Time
 
+	// Starting time of view.
 	StartTime time.Time
 
 	// Timer tick in nanosecond units.
@@ -262,12 +263,24 @@ func (m *eventFilterMain) applyFilters() {
 	}
 }
 
-func (b *Buffer) Clear() {
+func (b *Buffer) clear(resize uint) {
 	b.lockIndex(true)
+	if resize != 0 {
+		b.log2Len = elib.MaxLog2(elib.Word(resize))
+		if b.log2Len < minLog2Len {
+			b.log2Len = minLog2Len
+		}
+		if b.log2Len > maxLog2Len {
+			b.log2Len = maxLog2Len
+		}
+		b.events = make([]Event, 1<<b.log2Len)
+	}
 	b.index = lockBit
 	b.lockIndex(false)
 }
-func Clear() { DefaultBuffer.Clear() }
+
+func (b *Buffer) Clear() { b.clear(0) }
+func Clear()             { DefaultBuffer.Clear() }
 
 // Disable logging after specified number of events have been logged.
 // This is used as a "debug trigger" when a certain target event has occurred.
@@ -340,13 +353,18 @@ func Print(w io.Writer, detail bool) { DefaultBuffer.Print(w, detail) }
 func Len() (n int)                   { return DefaultBuffer.Len() }
 func Enable(v bool)                  { DefaultBuffer.Enable(v) }
 
+const (
+	minLog2Len = 10
+	maxLog2Len = 24 // no need to allow buffer to be too large.
+)
+
 func New(log2Len uint) (b *Buffer) {
 	b = &Buffer{}
 	switch {
-	case log2Len == 0:
-		log2Len = 10
-	case log2Len < 8:
-		log2Len = 8
+	case log2Len < minLog2Len:
+		log2Len = minLog2Len
+	case log2Len > maxLog2Len:
+		log2Len = maxLog2Len
 	}
 	b.events = make([]Event, 1<<log2Len)
 	b.log2Len = log2Len
@@ -354,16 +372,8 @@ func New(log2Len uint) (b *Buffer) {
 	b.StartTime = time.Now()
 	return
 }
-func (b *Buffer) Resize(n uint) {
-	if b.Enabled() {
-		panic("resize enabled buffer")
-	}
-	b.log2Len = elib.MaxLog2(elib.Word(n))
-	if b.log2Len < 10 {
-		b.log2Len = 10
-	}
-	b.events = make([]Event, 1<<b.log2Len)
-}
+func (b *Buffer) Resize(n uint) { b.clear(n) }
+func Resize(n uint)             { DefaultBuffer.Resize(n) }
 
 func (s *shared) timeUnitNsecs() (u float64) {
 	u = s.timeUnitNsec
@@ -401,47 +411,80 @@ func (v *View) AbsTime(e *Event) float64 { return e.unixNano(&v.shared) }
 func (v *View) ElapsedTime(e *Event) float64 { return e.time(&v.shared).Sub(v.Times.Start).Seconds() }
 
 func (v *View) getViewTimes() {
-	if l := len(v.Events); l != 0 {
-		v.doViewTimes(0, l-1)
+	if l := len(v.e); l != 0 {
+		t0 := v.e[0].elapsedTime(&v.shared)
+		t1 := v.e[l-1].elapsedTime(&v.shared)
+		v.doViewTimes(t0, t1, false)
 	}
 	return
 }
 
-func (v *View) doViewTimes(i0, i1 int) (err error) {
+func (v *View) doViewTimes(t0, t1 float64, isViewTime bool) (err error) {
 	tb := &v.Times
-	t0 := v.e[i0].elapsedTime(&v.shared)
-	t1 := v.e[i1].elapsedTime(&v.shared)
 	tUnit := float64(1)
+	roundUnit := tUnit
 	unitName := "sec"
+
+	if isViewTime {
+		// Translate view elapsed times to buffer elapsed times.
+		dt := v.StartTime.Sub(tb.Start).Seconds()
+		t0 -= dt
+		t1 -= dt
+	}
+
 	if t1 > t0 {
 		v := math.Floor(math.Log10(t1 - t0))
 		switch {
 		case v < -6:
-			tUnit = 1e-9
 			unitName = "nsec"
+			tUnit = 1e-9
+			switch {
+			case v < -8:
+				roundUnit = 1e-9
+			case v < -7:
+				roundUnit = 1e-8
+			default:
+				roundUnit = 1e-7
+			}
 		case v < -3:
-			tUnit = 1e-6
 			unitName = "μsec"
+			tUnit = 1e-6
+			switch {
+			case v < -5:
+				roundUnit = 1e-6
+			case v < -6:
+				roundUnit = 1e-7
+			default:
+				roundUnit = 1e-8
+			}
 		case v < 0:
-			tUnit = 1e-3
 			unitName = "msec"
+			tUnit = 1e-3
+			switch {
+			case v < -5:
+				roundUnit = 1e-5
+			case v < -4:
+				roundUnit = 1e-4
+			default:
+				roundUnit = 1e-3
+			}
 		}
 	}
 
-	// Round absolute Go start time to seconds and add difference (nanoseconds part) to times.
+	// Round buffer start time to seconds and add difference (nanoseconds part) to times.
 	startTime := v.StartTime.Truncate(time.Second)
 	dt := v.StartTime.Sub(startTime).Seconds()
 	t0 += dt
 	t1 += dt
 
-	t0 = tUnit * math.Floor(t0/tUnit)
-	t1 = tUnit * math.Ceil(t1/tUnit)
+	t0 = roundUnit * math.Floor(t0/roundUnit)
+	t1 = roundUnit * math.Ceil(t1/roundUnit)
 
+	tb.Start = startTime
 	tb.Min = t0
 	tb.Max = t1
 	tb.Dt = t1 - t0
 	tb.Unit = tUnit
-	tb.Start = startTime
 	tb.UnitName = unitName
 	return
 }
@@ -579,10 +622,8 @@ func (v *View) SubView(t0, t1 float64) {
 		et := v.ElapsedTime(&v.e[i])
 		return et > t1
 	})
-	if i1-i0 > 2 { // sub view must contain at least 2 events.
-		v.Events = v.e[i0:i1]
-		v.doViewTimes(i0, i1-1)
-	}
+	v.Events = v.e[i0:i1]
+	v.doViewTimes(t0, t1, true)
 }
 func (v *View) Reset() {
 	v.Events = v.e

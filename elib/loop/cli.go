@@ -247,7 +247,10 @@ func addDelEventFilter(f string, isDel bool) {
 }
 
 func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
-	var filter string
+	var (
+		filter   string
+		n_events uint
+	)
 	for !in.End() {
 		switch {
 		case in.Parse("add %v", &filter):
@@ -256,6 +259,8 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 			addDelEventFilter(filter, true)
 		case in.Parse("reset"):
 			elog.ResetFilters()
+		case in.Parse("re%*size %d", &n_events):
+			elog.Resize(n_events)
 		default:
 			err = parse.ErrInput
 			return
