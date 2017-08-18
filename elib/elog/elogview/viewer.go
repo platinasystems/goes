@@ -147,7 +147,7 @@ func View(ev *elog.View, cf Config) {
 
 	initOnce.Do(func() { gtk.Init(nil) })
 
-	v.eb_border = r2.XX(40)
+	v.eb_border = r2.XY(40, 60)
 	v.eb_dx = r2.IJ(cf.Width, cf.Height)
 
 	v.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -286,7 +286,10 @@ func (v *viewer) do_pointer(val uint) {
 	switch val {
 	case 1:
 		t0, t1 := v.x_to_time(p.xs[0].X()), v.x_to_time(p.xs[l-1].X())
-		v.ev.SubView(t0, t1)
+		save := v.ev.Times
+		if n := v.ev.SubView(t0, t1); n == 0 {
+			v.ev.SubView(save.Min, save.Max)
+		}
 		v.delete_all_popups()
 		v.eb.QueueDraw()
 	}
@@ -558,22 +561,24 @@ func (v *viewer) x_to_time(x float64) (t float64) {
 	return
 }
 
-func (c *ctx) mark_time(v *viewer, t float64, bg rgba) {
-	tb := &v.ev.Times
+func (c *ctx) time_axis(v *viewer, t float64, dx r2.V, text_align int, bg rgba, line bool, format string, args ...interface{}) {
 	dw := v.eb_border
 	w := v.eb_dx - 2*dw
 	x := r2.XY(v.time_to_x(t), dw.Y())
+	s := fmt.Sprintf(format, args...)
 
 	c.cr().SetSourceRGBA(0, 0, 0, 1)
 	c.cr().SetFontSize(10)
-	c.textf(x-10*1i, text_align_center, "%.0f%s", t/tb.Unit, tb.UnitName)
+	c.textf(x+dx, text_align, s)
 	c.cr().Stroke()
 
-	color := bg.darken(.85)
-	c.cr().SetSourceRGBA(color.RGBA())
-	c.moveTo(x)
-	c.lineTo(x + r2.XY(0, w.Y()))
-	c.cr().Stroke()
+	if line {
+		color := bg.darken(.85)
+		c.cr().SetSourceRGBA(color.RGBA())
+		c.moveTo(x)
+		c.lineTo(x + r2.XY(0, w.Y()))
+		c.cr().Stroke()
+	}
 }
 
 func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
@@ -595,8 +600,8 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	cr.Fill()
 
 	// Axes
-	c.mark_time(v, t_min, bg_color)
-	c.mark_time(v, t_max, bg_color)
+	c.time_axis(v, t_min, r2.XY(0, -10), text_align_center, bg_color, false, "%.0f%s", t_min/tb.Unit, tb.UnitName)
+	c.time_axis(v, t_max, r2.XY(0, -10), text_align_center, bg_color, false, "%.0f%s", t_max/tb.Unit, tb.UnitName)
 
 	// Pointer bounds.
 	{
@@ -611,8 +616,8 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			c.rect(r2.XY(x0, dw.Y()), r2.XY(x1-x0, w.Y()))
 			cr.Fill()
 			t0, t1 := v.x_to_time(x0), v.x_to_time(x1)
-			c.mark_time(v, t0, hilight_color)
-			c.mark_time(v, t1, hilight_color)
+			c.time_axis(v, t0, r2.XY(-5, 10), text_align_right, hilight_color, true, "%.2f", t0/tb.Unit)
+			c.time_axis(v, t1, r2.XY(+5, 10), text_align_left, hilight_color, true, "%.2f", t1/tb.Unit)
 		}
 	}
 
