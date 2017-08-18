@@ -616,8 +616,14 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			c.rect(r2.XY(x0, dw.Y()), r2.XY(x1-x0, w.Y()))
 			cr.Fill()
 			t0, t1 := v.x_to_time(x0), v.x_to_time(x1)
-			c.time_axis(v, t0, r2.XY(-5, 10), text_align_right, hilight_color, true, "%.2f", t0/tb.Unit)
-			c.time_axis(v, t1, r2.XY(+5, 10), text_align_left, hilight_color, true, "%.2f", t1/tb.Unit)
+			const dy = 10
+			c.time_axis(v, t0, r2.XY(-dy/2, dy), text_align_right, hilight_color, true, "%.2f", t0/tb.Unit)
+			c.time_axis(v, t1, r2.XY(+dy/2, dy), text_align_left, hilight_color, true, "%.2f", t1/tb.Unit)
+			if x1-x0 > 20 {
+				c.cr().SetSourceRGBA(0, 0, 0, 1)
+				c.textf(r2.XY(.5*(x0+x1), dw.Y()+dy), text_align_center, "%.2f%s", (t1-t0)/tb.Unit, tb.UnitName)
+				cr.Stroke()
+			}
 		}
 	}
 
