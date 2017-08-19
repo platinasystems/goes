@@ -21,27 +21,43 @@ func init() {
 	RegisterType(genEventType)
 }
 
-func stringer_genEvent(t *EventType, e *Event) []string {
+func stringer_genEvent(c *Context, e *Event) []string {
 	var x genEvent
-	x.Decode(e.Data[:])
-	return x.Strings()
+	x.Decode(c, e.Data[:])
+	return x.Strings(c)
 }
 
-func encode_genEvent(b []byte, e *Event) int {
+func encode_genEvent(c *Context, e *Event, b []byte) int {
 	var x genEvent
-	x.Decode(e.Data[:])
-	return x.Encode(b)
+	x.Decode(c, e.Data[:])
+	return x.Encode(c, b)
 }
 
-func decode_genEvent(b []byte, e *Event) int {
+func decode_genEvent(c *Context, e *Event, b []byte) int {
 	var x genEvent
-	x.Decode(b)
-	return x.Encode(e.Data[:])
+	x.Decode(c, b)
+	return x.Encode(c, e.Data[:])
 }
 
-func (x genEvent) Log() { x.Logb(DefaultBuffer) }
+func (x genEvent) log_genEvent(b *Buffer, r Caller) {
+	e := b.Add(genEventType, r)
+	x.Encode(b.GetContext(), e.Data[:])
+}
+
+func (x genEvent) Log() {
+	r := GetCaller(PointerToFirstArg(&x))
+	x.log_genEvent(DefaultBuffer, r)
+}
+
+func (x genEvent) Logc(r Caller) {
+	x.log_genEvent(DefaultBuffer, r)
+}
 
 func (x genEvent) Logb(b *Buffer) {
-	e := b.Add(genEventType)
-	x.Encode(e.Data[:])
+	r := GetCaller(PointerToFirstArg(&x))
+	x.log_genEvent(b, r)
+}
+
+func (x genEvent) Logbc(b *Buffer, r Caller) {
+	x.log_genEvent(b, r)
 }
