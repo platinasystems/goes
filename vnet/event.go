@@ -5,6 +5,7 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/event"
 )
 
@@ -35,21 +36,29 @@ type Eventer interface {
 	event.Actor
 }
 
-func (n *Node) SignalEvent(r Eventer) {
+func (n *Node) SignalEventp(r Eventer, p elog.PointerToFirstArg) {
 	v := n.Vnet
 	e := r.GetEvent()
 	e.n = n
-	n.AddEvent(r, &v.eventMain.eventNode)
+	n.AddEventp(r, &v.eventMain.eventNode, p)
 }
+func (n *Node) SignalEvent(r Eventer) { n.SignalEventp(r, elog.PointerToFirstArg(&n)) }
 
+func (n *Node) AddTimedEventp(r Eventer, dt float64, p elog.PointerToFirstArg) {
+	v := n.Vnet
+	e := r.GetEvent()
+	e.n = n
+	n.Node.AddTimedEventp(r, &v.eventMain.eventNode, dt, p)
+}
 func (n *Node) AddTimedEvent(r Eventer, dt float64) {
-	v := n.Vnet
-	e := r.GetEvent()
-	e.n = n
-	n.Node.AddTimedEvent(r, &v.eventMain.eventNode, dt)
+	n.AddTimedEventp(r, dt, elog.PointerToFirstArg(&n))
 }
 
-func (e *Event) Signal(r Eventer)                    { e.n.SignalEvent(r) }
-func (e *Event) AddTimedEvent(r Eventer, dt float64) { e.n.AddTimedEvent(r, dt) }
-func (v *Vnet) SignalEvent(r Eventer)                { v.eventNode.SignalEvent(r) }
-func (v *Vnet) AddTimedEvent(r Eventer, dt float64)  { v.eventNode.AddTimedEvent(r, dt) }
+func (e *Event) Signal(r Eventer) { e.n.SignalEventp(r, elog.PointerToFirstArg(&e)) }
+func (e *Event) AddTimedEvent(r Eventer, dt float64) {
+	e.n.AddTimedEventp(r, dt, elog.PointerToFirstArg(&e))
+}
+func (v *Vnet) SignalEvent(r Eventer) { v.eventNode.SignalEventp(r, elog.PointerToFirstArg(&v)) }
+func (v *Vnet) AddTimedEvent(r Eventer, dt float64) {
+	v.eventNode.AddTimedEventp(r, dt, elog.PointerToFirstArg(&v))
+}

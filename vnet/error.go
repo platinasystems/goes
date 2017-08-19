@@ -7,6 +7,7 @@ package vnet
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/loop"
 
 	"fmt"
@@ -52,6 +53,30 @@ func (n *errorNode) getThread(id uint) (t *errorThread) {
 
 const poisonErrorRef = 0xfeedface
 
+type errorEvent struct {
+	e ErrorRef
+	n uint64
+}
+
+func (e *errorEvent) Strings(x *elog.Context) []string {
+	err := ErrorNode.errs[e.e]
+	return []string{fmt.Sprintf("%s %s %d", err.nodeName, err.str, e.n)}
+}
+func (e *errorEvent) Encode(_ *elog.Context, b []byte) (i int) {
+	i += elog.EncodeUint32(b[i:], uint32(e.e))
+	i += elog.EncodeUint64(b[i:], uint64(e.n))
+	return
+}
+func (e *errorEvent) Decode(_ *elog.Context, b []byte) (i int) {
+	var x uint32
+	x, i = elog.DecodeUint32(b, i)
+	e.e = ErrorRef(x)
+	e.n, i = elog.DecodeUint64(b, i)
+	return
+}
+
+//go:generate gentemplate -d Package=vnet -id errorEvent -d Type=errorEvent github.com/platinasystems/go/elib/elog/event.tmpl
+
 func (t *errorThread) count(e ErrorRef, n uint64) {
 	if elib.Debug {
 		if e == poisonErrorRef {
@@ -59,6 +84,10 @@ func (t *errorThread) count(e ErrorRef, n uint64) {
 		}
 	}
 	t.counts[e] += n
+	if elog.Enabled() {
+		x := errorEvent{e: e, n: n}
+		x.Log()
+	}
 }
 
 func (n *errorNode) MakeLoopIn() loop.LooperIn { return &RefIn{} }
@@ -106,12 +135,12 @@ func (en *errorNode) NodeOutput(ri *RefIn) {
 }
 
 type err struct {
-	nodeIndex uint32
-	str       string
+	nodeName string
+	str      string
 }
 
 func (n *Node) NewError(s string) (r ErrorRef) {
-	e := err{nodeIndex: uint32(n.Index()), str: s}
+	e := err{nodeName: n.Name(), str: s}
 	en := ErrorNode
 	r = ErrorRef(len(en.errs))
 	en.errs = append(en.errs, e)
@@ -121,9 +150,14 @@ func (n *Node) NewError(s string) (r ErrorRef) {
 func (n *Node) ErrorRef(i uint) ErrorRef      { return n.errorRefs[i] }
 func (r *RefOpaque) SetError(n *Node, i uint) { r.Aux = uint32(n.ErrorRef(i)) }
 func (n *Node) SetError(r *Ref, i uint)       { r.SetError(n, i) }
-func (n *Node) CountError(i, count uint) {
+func (d *Node) CountError(i, count uint) {
 	ts := ErrorNode.getThread(0)
-	atomic.AddUint64(&ts.counts[n.errorRefs[i]], uint64(count))
+	e, n := d.errorRefs[i], uint64(count)
+	atomic.AddUint64(&ts.counts[e], n)
+	if elog.Enabled() {
+		x := errorEvent{e: e, n: n}
+		x.Log()
+	}
 }
 
 type errNode struct {
@@ -157,9 +191,8 @@ func (v *Vnet) showErrors(c cli.Commander, w cli.Writer, in *cli.Input) (err err
 			}
 		}
 		if c > 0 {
-			n := v.loop.DataNodes[e.nodeIndex].GetNode()
 			ns = append(ns, errNode{
-				Node:  n.Name(),
+				Node:  e.nodeName,
 				Error: e.str,
 				Count: c,
 			})
