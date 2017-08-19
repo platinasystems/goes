@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -457,17 +458,23 @@ func (p0 *popup) dt(p1 *popup) (dt float64) {
 func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 	e, de := p.get_event(), p.get_visible_event()
 
-	lines := e.Strings()
-	_, pc := p.v.ev.EventPath(e)
-	d, _ := p.v.decorationForPc(pc)
+	lines := p.v.ev.Strings(e)
 
-	tb := &p.v.ev.Times
-	et := p.v.ev.ElapsedTime(e)
-	lines = append(lines,
-		fmt.Sprintf("%.2f", et/tb.Unit))
-	if p.next != nil {
-		lines = append(lines, fmt.Sprintf("%.4f", p.dt(p.next)/tb.Unit))
+	// Indent lines after first.
+	for i := range lines {
+		lines[i] = strings.TrimSpace(lines[i])
+		if i > 0 {
+			lines[i] = "  " + strings.TrimSpace(lines[i])
+		}
 	}
+
+	ec := p.v.ev.EventCaller(e)
+	d, _ := p.v.decorationForPc(ec.PC)
+
+	sf, _ := ec.ShortPath(ec.File, 32)
+	sn, _ := ec.ShortPath(ec.Name, 32)
+	lines = append(lines, fmt.Sprintf("%s", sn))
+	lines = append(lines, fmt.Sprintf("%s: %d", sf, ec.Line))
 
 	if p.l != nil {
 		p.l = p.l[:0]
@@ -606,7 +613,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	// Pointer bounds.
 	{
 		p := &v.pointer
-		if l := len(p.xs); p.val != 0 && l >= 2 {
+		if l := len(p.xs); p.val != 0 && l >= 4 {
 			x0, x1 := p.xs[0].X(), p.xs[l-1].X()
 			if x0 > x1 {
 				x1, x0 = x0, x1
@@ -632,7 +639,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		cr.SetSourceRGB(0, 0, 0)
 		x := r2.XY(w.X()/2, dw.Y()/2)
 		cr.SetFontSize(18)
-		c.textf(x, text_align_center, "%d events, %s", len(ev.Events), tb.Start.Format("2006-01-02 15:04:05"))
+		c.textf(x, text_align_center, "%d events, %s", len(ev.Events), tb.Start.Format("2006-01-02 15:04:05:000000"))
 		cr.Fill()
 	}
 
@@ -653,8 +660,9 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			continue
 		}
 
-		lines := e.Strings()
-		_, pc := ev.EventPath(e)
+		lines := ev.Strings(e)
+		ci := ev.EventCaller(e)
+		pc := ci.PC
 		d, _ := v.decorationForPc(pc)
 
 		center := dw + x

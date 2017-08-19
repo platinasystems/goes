@@ -27,27 +27,43 @@ func init() {
 	{{template "elog" .Package}}RegisterType({{.Type}}Type)
 }
 
-func stringer_{{.Type}}(t *{{template "elog" .Package}}EventType, e *{{template "elog" .Package}}Event) []string {
+func stringer_{{.Type}}(c *{{template "elog" .Package}}Context, e *{{template "elog" .Package}}Event) []string {
 	var x {{.Type}}
-	x.Decode(e.Data[:])
-	return x.Strings()
+	x.Decode(c, e.Data[:])
+	return x.Strings(c)
 }
 
-func encode_{{.Type}}(b []byte, e *{{template "elog" .Package}}Event) int {
+func encode_{{.Type}}(c *{{template "elog" .Package}}Context, e *{{template "elog" .Package}}Event, b []byte) int {
 	var x {{.Type}}
-	x.Decode(e.Data[:])
-	return x.Encode(b)
+	x.Decode(c, e.Data[:])
+	return x.Encode(c, b)
 }
 
-func decode_{{.Type}}(b []byte, e *{{template "elog" .Package}}Event) int {
+func decode_{{.Type}}(c *{{template "elog" .Package}}Context, e *{{template "elog" .Package}}Event, b []byte) int {
 	var x {{.Type}}
-	x.Decode(b)
-	return x.Encode(e.Data[:])
+	x.Decode(c, b)
+	return x.Encode(c, e.Data[:])
 }
 
-func (x {{.Type}}) Log() { x.Logb({{template "elog" .Package}}DefaultBuffer) }
+func (x {{.Type}}) log_{{.Type}}(b *{{template "elog" .Package}}Buffer, r {{template "elog" .Package}}Caller) {
+	e := b.Add({{.Type}}Type, r)
+	x.Encode(b.GetContext(), e.Data[:])
+}
+
+func (x {{.Type}}) Log() {
+	r := {{template "elog" .Package}}GetCaller({{template "elog" .Package}}PointerToFirstArg(&x))
+	x.log_{{.Type}}({{template "elog" .Package}}DefaultBuffer, r)
+}
+
+func (x {{.Type}}) Logc(r {{template "elog" .Package}}Caller) {
+	x.log_{{.Type}}({{template "elog" .Package}}DefaultBuffer, r)
+}
 
 func (x {{.Type}}) Logb(b *{{template "elog" .Package}}Buffer) {
-	e := b.Add({{.Type}}Type)
-	x.Encode(e.Data[:])
+	r := {{template "elog" .Package}}GetCaller({{template "elog" .Package}}PointerToFirstArg(&x))
+	x.log_{{.Type}}(b, r)
+}
+
+func (x {{.Type}}) Logbc(b *{{template "elog" .Package}}Buffer, r {{template "elog" .Package}}Caller) {
+	x.log_{{.Type}}(b, r)
 }
