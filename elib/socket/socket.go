@@ -418,7 +418,7 @@ func (s *socket) elogData(f eventFlag, p []byte) (e event) {
 	return
 }
 
-func (e *event) Strings() []string {
+func (e *event) Strings(x *elog.Context) []string {
 	op := opNames[e.flags&0xf]
 	var d string
 	b := e.s[:]
@@ -431,12 +431,12 @@ func (e *event) Strings() []string {
 	return []string{fmt.Sprintf("socket #%d %s %s", fi, op, d)}
 }
 
-func (e *event) Encode(b []byte) int {
+func (e *event) Encode(x *elog.Context, b []byte) int {
 	b[0] = byte(e.flags)
 	copy(b[1:], e.s[:])
 	return 1 + len(e.s)
 }
-func (e *event) Decode(b []byte) int {
+func (e *event) Decode(x *elog.Context, b []byte) int {
 	e.flags = eventFlag(b[0])
 	copy(e.s[:], b[1:])
 	return 1 + len(e.s)
