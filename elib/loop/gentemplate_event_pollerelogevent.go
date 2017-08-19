@@ -23,27 +23,43 @@ func init() {
 	elog.RegisterType(pollerElogEventType)
 }
 
-func stringer_pollerElogEvent(t *elog.EventType, e *elog.Event) []string {
+func stringer_pollerElogEvent(c *elog.Context, e *elog.Event) []string {
 	var x pollerElogEvent
-	x.Decode(e.Data[:])
-	return x.Strings()
+	x.Decode(c, e.Data[:])
+	return x.Strings(c)
 }
 
-func encode_pollerElogEvent(b []byte, e *elog.Event) int {
+func encode_pollerElogEvent(c *elog.Context, e *elog.Event, b []byte) int {
 	var x pollerElogEvent
-	x.Decode(e.Data[:])
-	return x.Encode(b)
+	x.Decode(c, e.Data[:])
+	return x.Encode(c, b)
 }
 
-func decode_pollerElogEvent(b []byte, e *elog.Event) int {
+func decode_pollerElogEvent(c *elog.Context, e *elog.Event, b []byte) int {
 	var x pollerElogEvent
-	x.Decode(b)
-	return x.Encode(e.Data[:])
+	x.Decode(c, b)
+	return x.Encode(c, e.Data[:])
 }
 
-func (x pollerElogEvent) Log() { x.Logb(elog.DefaultBuffer) }
+func (x pollerElogEvent) log_pollerElogEvent(b *elog.Buffer, r elog.Caller) {
+	e := b.Add(pollerElogEventType, r)
+	x.Encode(b.GetContext(), e.Data[:])
+}
+
+func (x pollerElogEvent) Log() {
+	r := elog.GetCaller(elog.PointerToFirstArg(&x))
+	x.log_pollerElogEvent(elog.DefaultBuffer, r)
+}
+
+func (x pollerElogEvent) Logc(r elog.Caller) {
+	x.log_pollerElogEvent(elog.DefaultBuffer, r)
+}
 
 func (x pollerElogEvent) Logb(b *elog.Buffer) {
-	e := b.Add(pollerElogEventType)
-	x.Encode(e.Data[:])
+	r := elog.GetCaller(elog.PointerToFirstArg(&x))
+	x.log_pollerElogEvent(b, r)
+}
+
+func (x pollerElogEvent) Logbc(b *elog.Buffer, r elog.Caller) {
+	x.log_pollerElogEvent(b, r)
 }

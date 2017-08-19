@@ -23,27 +23,43 @@ func init() {
 	elog.RegisterType(eventType)
 }
 
-func stringer_event(t *elog.EventType, e *elog.Event) []string {
+func stringer_event(c *elog.Context, e *elog.Event) []string {
 	var x event
-	x.Decode(e.Data[:])
-	return x.Strings()
+	x.Decode(c, e.Data[:])
+	return x.Strings(c)
 }
 
-func encode_event(b []byte, e *elog.Event) int {
+func encode_event(c *elog.Context, e *elog.Event, b []byte) int {
 	var x event
-	x.Decode(e.Data[:])
-	return x.Encode(b)
+	x.Decode(c, e.Data[:])
+	return x.Encode(c, b)
 }
 
-func decode_event(b []byte, e *elog.Event) int {
+func decode_event(c *elog.Context, e *elog.Event, b []byte) int {
 	var x event
-	x.Decode(b)
-	return x.Encode(e.Data[:])
+	x.Decode(c, b)
+	return x.Encode(c, e.Data[:])
 }
 
-func (x event) Log() { x.Logb(elog.DefaultBuffer) }
+func (x event) log_event(b *elog.Buffer, r elog.Caller) {
+	e := b.Add(eventType, r)
+	x.Encode(b.GetContext(), e.Data[:])
+}
+
+func (x event) Log() {
+	r := elog.GetCaller(elog.PointerToFirstArg(&x))
+	x.log_event(elog.DefaultBuffer, r)
+}
+
+func (x event) Logc(r elog.Caller) {
+	x.log_event(elog.DefaultBuffer, r)
+}
 
 func (x event) Logb(b *elog.Buffer) {
-	e := b.Add(eventType)
-	x.Encode(e.Data[:])
+	r := elog.GetCaller(elog.PointerToFirstArg(&x))
+	x.log_event(b, r)
+}
+
+func (x event) Logbc(b *elog.Buffer, r elog.Caller) {
+	x.log_event(b, r)
 }
