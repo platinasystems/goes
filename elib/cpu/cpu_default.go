@@ -16,3 +16,6 @@ const Log2CacheLineBytes = 6
 func TimeNow() Time {
 	return Time(time.Now().UnixNano())
 }
+func GetCallerPC() uintptr {
+	panic("not implemented")
+}
