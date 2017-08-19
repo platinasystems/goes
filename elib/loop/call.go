@@ -7,6 +7,7 @@ package loop
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
+	"github.com/platinasystems/go/elib/elog"
 
 	"fmt"
 	"reflect"
@@ -55,6 +56,7 @@ func (s *stats) clocksPerVector() (v float64) {
 type activeNode struct {
 	// Index in activePoller.activeNodes and also loop.dataNodes.
 	index                   uint32
+	elogNodeName            uint32
 	loopInMaker             loopInMaker
 	inOutLooper             inOutLooper
 	outLooper               outLooper
@@ -299,8 +301,10 @@ func (ap *activePoller) initNodes(l *Loop) {
 	for ni := range ap.activeNodes {
 		a := &ap.activeNodes[ni]
 		n := l.DataNodes[ni]
+		node := n.GetNode()
 
 		a.index = uint32(ni)
+		a.elogNodeName = node.elogNodeName
 		if d, ok := n.(outNoder); ok {
 			a.looperOut = d.MakeLoopOut()
 			a.out = a.looperOut.GetOut()
@@ -406,6 +410,8 @@ func (n *nodeStats) update(nVec uint, tStart cpu.Time) (tNow cpu.Time) {
 	return
 }
 
+//go:generate gentemplate -d Package=loop -id callEvent -d Type=callEvent github.com/platinasystems/go/elib/elog/event.tmpl
+
 func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 	prevNode := a.currentNode
 	nVec = f.totalVectors(a)
@@ -442,6 +448,16 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 
 		// Call next node.
 		a.currentNode = next
+
+		if elog.Enabled() {
+			e := callEvent{
+				active_index: uint32(in.activeIndex),
+				node_name:    uint32(next.elogNodeName),
+				n_vectors:    uint32(nextN),
+			}
+			e.Log()
+		}
+
 		nextIn := prevNode.outIns[xi]
 		if next.inOutLooper != nil {
 			next.inOutLooper.LoopInputOutput(l, nextIn, next.looperOut)

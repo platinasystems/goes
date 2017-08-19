@@ -36,7 +36,7 @@ type eventMain struct {
 	eventVec      event.ActorVec
 }
 
-func (l *eventMain) getLoopEvent(a event.Actor) (x *loopEvent) {
+func (l *eventMain) getLoopEvent(a event.Actor, p elog.PointerToFirstArg) (x *loopEvent) {
 	if y := l.loopEvents.Get(); y != nil {
 		x = y.(*loopEvent)
 		*x = loopEvent{actor: a}
@@ -44,6 +44,7 @@ func (l *eventMain) getLoopEvent(a event.Actor) (x *loopEvent) {
 		x = &loopEvent{actor: a}
 	}
 	x.l = l.l
+	x.caller = elog.GetCaller(p)
 	return
 }
 func (l *eventMain) putLoopEvent(x *loopEvent) { l.loopEvents.Put(x) }
@@ -56,10 +57,11 @@ type eventNode struct {
 }
 
 type loopEvent struct {
-	l     *Loop
-	actor event.Actor
-	dst   *Node
-	time  cpu.Time
+	l      *Loop
+	actor  event.Actor
+	caller elog.Caller
+	dst    *Node
+	time   cpu.Time
 }
 
 func (e *loopEvent) EventTime() cpu.Time { return e.time }
@@ -84,8 +86,8 @@ func (l *Loop) addTimedEvent(le *loopEvent, dt float64) {
 }
 
 // AddEvent adds event whose action will be called on the next loop iteration.
-func (n *Node) AddEvent(e event.Actor, dst EventHandler) {
-	le := n.loop.getLoopEvent(e)
+func (n *Node) AddEventp(e event.Actor, dst EventHandler, p elog.PointerToFirstArg) {
+	le := n.loop.getLoopEvent(e, p)
 	if dst != nil {
 		le.dst = dst.GetNode()
 	}
@@ -94,10 +96,18 @@ func (n *Node) AddEvent(e event.Actor, dst EventHandler) {
 	n.loop.addEvent(le, blocking)
 }
 
-func (n *Node) AddTimedEvent(e event.Actor, dst EventHandler, dt float64) {
-	le := n.loop.getLoopEvent(e)
+// AddEvent adds event whose action will be called on the next loop iteration.
+func (n *Node) AddEvent(e event.Actor, dst EventHandler) {
+	n.AddEventp(e, dst, elog.PointerToFirstArg(&n))
+}
+
+func (n *Node) AddTimedEventp(e event.Actor, dst EventHandler, dt float64, p elog.PointerToFirstArg) {
+	le := n.loop.getLoopEvent(e, p)
 	le.dst = dst.GetNode()
 	n.loop.addTimedEvent(le, dt)
+}
+func (n *Node) AddTimedEvent(e event.Actor, dst EventHandler, dt float64) {
+	n.AddTimedEventp(e, dst, dt, elog.PointerToFirstArg(&n))
 }
 
 func (e *loopEvent) EventAction() {
@@ -111,7 +121,7 @@ func (e *loopEvent) EventAction() {
 
 func (e *loopEvent) do() {
 	if elog.Enabled() {
-		elog.GenEvent(e.String())
+		elog.GenEventc(e.String(), e.caller)
 	}
 	e.actor.EventAction()
 	e.l.putLoopEvent(e)
@@ -177,18 +187,18 @@ func (l *Loop) duration(t cpu.Time) time.Duration {
 }
 
 func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent) {
-	elog.GenEvent("event wait")
+	elog.GenEvent("loop event wait")
 	select {
 	case e := <-l.events:
 		var ok bool
 		if quit, ok = e.actor.(*quitEvent); ok {
 			// Log quit event.
-			elog.GenEvent("event wakeup " + e.String())
+			elog.GenEvent("loop event wakeup " + e.String())
 		} else {
 			e.EventAction()
 		}
 	case <-time.After(dt):
-		elog.GenEvent("event wait timeout")
+		elog.GenEvent("loop event timeout")
 	}
 	return
 }
@@ -281,7 +291,13 @@ var (
 func (e *quitEvent) String() string { return quitEventTypeStrings[e.Type] }
 func (e *quitEvent) Error() string  { return e.String() }
 func (e *quitEvent) EventAction()   {}
-func (l *Loop) Quit()               { l.addEvent(l.getLoopEvent(ErrQuit), true) }
+func (l *Loop) Quit() {
+	e := l.getLoopEvent(ErrQuit, elog.PointerToFirstArg(&l))
+	l.addEvent(e, true)
+}
 
 // Add an event to wakeup event sleep.
-func (l *Loop) Interrupt() { l.addEvent(l.getLoopEvent(ErrInterrupt), false) }
+func (l *Loop) Interrupt() {
+	e := l.getLoopEvent(ErrInterrupt, elog.PointerToFirstArg(&l))
+	l.addEvent(e, false)
+}

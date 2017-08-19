@@ -33,6 +33,7 @@ type Node struct {
 	nextNodes               nextNodeVec
 	nextIndexByNodeName     map[string]uint
 	inputStats, outputStats nodeStats
+	elogNodeName            uint32
 	eventNode
 }
 
@@ -175,7 +176,7 @@ func (e *activateEvent) String() string { return fmt.Sprintf("activate %s", e.n.
 func (n *Node) ActivateAfterTime(dt float64) {
 	if was := n.Activate(false); was {
 		n.activateEvent.n = n
-		le := n.loop.getLoopEvent(&n.activateEvent)
+		le := n.loop.getLoopEvent(&n.activateEvent, elog.PointerToFirstArg(&n))
 		n.loop.addTimedEvent(le, dt)
 	}
 }
@@ -484,7 +485,8 @@ func (l *loopQuit) EventAction() {
 
 func (l *Loop) quitAfter() {
 	e := &loopQuit{l: l, verbose: false, duration: l.QuitAfterDuration}
-	l.addTimedEvent(l.getLoopEvent(e), l.QuitAfterDuration)
+	f := l.getLoopEvent(e, elog.PointerToFirstArg(&l))
+	l.addTimedEvent(f, l.QuitAfterDuration)
 }
 
 func (l *Loop) Run() {
@@ -618,6 +620,7 @@ func (l *Loop) addDataNode(r Noder) {
 func (l *Loop) RegisterNode(n Noder, format string, args ...interface{}) {
 	x := n.GetNode()
 	x.name = fmt.Sprintf(format, args...)
+	x.elogNodeName = elog.SetString(x.name)
 	x.loop = l
 	for i := range x.Next {
 		if _, err := l.AddNamedNext(n, x.Next[i]); err != nil {
