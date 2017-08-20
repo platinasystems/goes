@@ -121,7 +121,7 @@ func (e *loopEvent) EventAction() {
 
 func (e *loopEvent) do() {
 	if elog.Enabled() {
-		elog.GenEventc(e.String(), e.caller)
+		elog.Fc(e.String(), e.caller)
 	}
 	e.actor.EventAction()
 	e.l.putLoopEvent(e)
@@ -187,18 +187,18 @@ func (l *Loop) duration(t cpu.Time) time.Duration {
 }
 
 func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent) {
-	elog.GenEvent("loop event wait")
+	elog.F("loop event wait")
 	select {
 	case e := <-l.events:
 		var ok bool
 		if quit, ok = e.actor.(*quitEvent); ok {
 			// Log quit event.
-			elog.GenEvent("loop event wakeup " + e.String())
+			elog.F("loop quit " + e.String())
 		} else {
 			e.EventAction()
 		}
 	case <-time.After(dt):
-		elog.GenEvent("loop event timeout")
+		elog.F("loop event timeout")
 	}
 	return
 }
@@ -232,7 +232,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		for i := range l.eventVec {
 			l.eventVec[i].EventAction()
 		}
-		elog.GenEventf("timed events %d expired, %d left", len(l.eventVec), l.eventPool.Elts())
+		elog.F("timed events %d expired, %d left", len(l.eventVec), l.eventPool.Elts())
 
 		l.eventVec = l.eventVec[:0]
 	}

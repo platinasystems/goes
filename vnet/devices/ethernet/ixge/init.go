@@ -5,6 +5,7 @@
 package ixge
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/hw/pci"
 	"github.com/platinasystems/go/elib/parse"
@@ -35,6 +36,7 @@ type dev struct {
 	mmaped_regs []byte
 	pci_bus_dev pci.BusDevice
 	pci_dev     *pci.Device // as returned by pci_bus_dev.GetDevice()
+	elog_name   elog.StringRef
 
 	interruptsEnabled bool
 	active_count      int32
@@ -89,6 +91,7 @@ func (m *main) NewDevice(bd pci.BusDevice) (dd pci.DriverDevice, err error) {
 	d.m = m
 	d.pci_dev = bd.GetDevice()
 	d.pci_bus_dev = bd
+	d.elog_name = elog.SetString(d.Name())
 	m.devs = append(m.devs, dr)
 	return d, nil
 }

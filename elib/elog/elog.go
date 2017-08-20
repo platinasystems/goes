@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/cpu"
 
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -68,44 +69,54 @@ type EventType struct {
 // Context for event type functions.
 type Context shared
 
-func (v *shared) GetContext() *Context        { return (*Context)(v) }
-func (v *Context) GetString(si uint32) string { return v.stringTable.Get(si) }
-func (v *Context) SetString(s string) uint32  { return v.stringTable.Set(s) }
-func (v *Context) SetStringf(format string, args ...interface{}) uint32 {
+func (v *shared) GetContext() *Context { return (*Context)(v) }
+
+type StringRef uint32
+
+const StringRefNil = StringRef(0)
+
+func (v *Context) GetString(si StringRef) string { return v.stringTable.Get(si) }
+func (v *Context) SetString(s string) StringRef  { return v.stringTable.Set(s) }
+func (v *Context) SetStringf(format string, args ...interface{}) StringRef {
 	return v.stringTable.Setf(format, args...)
 }
 
-func GetContext() *Context       { return DefaultBuffer.GetContext() }
-func GetString(si uint32) string { return DefaultBuffer.stringTable.Get(si) }
-func SetString(s string) uint32  { return DefaultBuffer.stringTable.Set(s) }
-func SetStringf(format string, args ...interface{}) uint32 {
+func GetContext() *Context          { return DefaultBuffer.GetContext() }
+func GetString(si StringRef) string { return DefaultBuffer.stringTable.Get(si) }
+func SetString(s string) StringRef  { return DefaultBuffer.stringTable.Set(s) }
+func SetStringf(format string, args ...interface{}) StringRef {
 	return DefaultBuffer.stringTable.Setf(format, args...)
 }
 
 type stringTable struct {
 	t []byte
-	m map[string]uint32
+	m map[string]StringRef
 }
 
-func (t *stringTable) Get(si uint32) (s string) {
+func (t *stringTable) Get(si StringRef) (s string) {
 	s, _ = t.get(si)
 	return
 }
-func (t *stringTable) get(si uint32) (s string, l int) {
+func (t *stringTable) get(si StringRef) (s string, l int) {
 	b := t.t[si:]
 	l = strings.IndexByte(string(b), 0)
 	s = string(b[:l])
 	return
 }
 
-func (t *stringTable) Set(s string) (si uint32) {
+func (t *stringTable) Set(s string) (si StringRef) {
 	var ok bool
 	if si, ok = t.m[s]; ok {
 		return
 	}
-	si = uint32(len(t.t))
+	si = StringRef(len(t.t))
+	if si == StringRefNil {
+		t.t = append(t.t, 0)
+		si = 1
+	}
+
 	if t.m == nil {
-		t.m = make(map[string]uint32)
+		t.m = make(map[string]StringRef)
 	}
 	t.m[s] = si
 	s += "\x00" // null terminate
@@ -113,16 +124,16 @@ func (t *stringTable) Set(s string) (si uint32) {
 	return
 }
 
-func (t *stringTable) Setf(format string, args ...interface{}) uint32 {
+func (t *stringTable) Setf(format string, args ...interface{}) StringRef {
 	return t.Set(fmt.Sprintf(format, args...))
 }
 
 func (t *stringTable) init(s string) {
 	t.t = []byte(s)
-	t.m = make(map[string]uint32)
+	t.m = make(map[string]StringRef)
 	i := 0
 	for i < len(s) {
-		si := uint32(i)
+		si := StringRef(i)
 		x, l := t.get(si)
 		t.m[x] = si
 		i += 1 + l
@@ -223,6 +234,7 @@ type eventFilter struct {
 type callerCache struct {
 	f           eventFilter
 	pc          uintptr
+	fmtIndex    StringRef
 	callerIndex uint32
 	callerInfo  CallerInfo
 }
@@ -429,16 +441,21 @@ func (b *Buffer) DisableAfter(n uint64) {
 	b.lockIndex(false)
 }
 
+func (b *Buffer) add1(t *EventType, ci uint32) (e *Event) {
+	e = b.getEvent()
+	e.timestamp = cpu.TimeNow()
+	e.callerIndex = ci
+	e.typeIndex = uint16(t.index)
+	return
+}
+
 func (b *Buffer) Add(t *EventType, c Caller) (e *Event) {
 	e = &b.disabledEvent
 	if !b.Enabled() || t.disabled {
 		return
 	}
 	if ci, disabled := b.eventDisabled(c); !disabled {
-		e = b.getEvent()
-		e.timestamp = cpu.TimeNow()
-		e.callerIndex = ci
-		e.typeIndex = uint16(t.index)
+		e = b.add1(t, ci)
 	}
 	return e
 }
@@ -901,66 +918,212 @@ func (b *Buffer) PrintOnHangupSignal(w io.Writer, detail bool) {
 }
 func PrintOnHangupSignal(w io.Writer, detail bool) { DefaultBuffer.PrintOnHangupSignal(w, detail) }
 
-// Generic events
-type genEvent struct {
-	s string
+// Generic events using fmt.Printf formatting.
+
+type fmtKind uint8
+
+const (
+	fmtEnd = iota
+	fmtBoolTrue
+	fmtBoolFalse
+	fmtUint
+	fmtInt
+	fmtFloat
+	fmtStringRef
+	fmtString
+)
+
+type fmtEvent struct {
+	format StringRef
+	args   []interface{}
 }
 
-func (e *genEvent) Strings(c *Context) []string { return strings.Split(e.s, "\n") }
-func (e *genEvent) Encode(c *Context, b []byte) int {
-	i := 0
-	l := len(e.s)
-	if i+l < len(b) {
-		b[i+l] = 0 // null terminate
+//go:generate gentemplate -d Package=elog -id fmtEvent -d Type=fmtEvent github.com/platinasystems/go/elib/elog/event.tmpl
+
+func (e *fmtEvent) Strings(c *Context) []string {
+	f := c.GetString(e.format)
+	s := fmt.Sprintf(f, e.args...)
+	return strings.Split(s, "\n")
+}
+
+func encodeInt(b []byte, i0 int, v int64) (i int) {
+	i = i0
+	b[i] = fmtInt
+	i += 1 + binary.PutVarint(b[i+1:], v)
+	return
+}
+
+func encodeUint(b []byte, i0 int, v uint64, kind int) (i int) {
+	i = i0
+	b[i] = byte(kind)
+	i += 1 + binary.PutUvarint(b[i+1:], v)
+	return
+}
+
+func (e *fmtEvent) Encode(c *Context, b []byte) (i int) {
+	i = binary.PutUvarint(b[i:], uint64(e.format))
+	for _, a := range e.args {
+		switch v := a.(type) {
+		case bool:
+			b[i] = fmtBoolFalse
+			if v {
+				b[i] = fmtBoolTrue
+			}
+			i++
+		case string:
+			l, left := len(v), len(b)
+			if l > left-1 {
+				l = left - 1
+			}
+			b[i] = byte(l)
+			copy(b[i+1:], v)
+			i += 1 + l
+		case StringRef:
+			i = encodeUint(b, i, uint64(v), fmtStringRef)
+		case int8:
+			i = encodeInt(b, i, int64(v))
+		case int16:
+			i = encodeInt(b, i, int64(v))
+		case int32:
+			i = encodeInt(b, i, int64(v))
+		case int64:
+			i = encodeInt(b, i, int64(v))
+		case int:
+			i = encodeInt(b, i, int64(v))
+		case uint8:
+			i = encodeUint(b, i, uint64(v), fmtUint)
+		case uint16:
+			i = encodeUint(b, i, uint64(v), fmtUint)
+		case uint32:
+			i = encodeUint(b, i, uint64(v), fmtUint)
+		case uint64:
+			i = encodeUint(b, i, uint64(v), fmtUint)
+		case uint:
+			i = encodeUint(b, i, uint64(v), fmtUint)
+		case float64:
+			i = encodeUint(b, i, uint64(math.Float64bits(v)), fmtFloat)
+		case float32:
+			i = encodeUint(b, i, uint64(float64(math.Float32bits(v))), fmtFloat)
+		default:
+			panic(fmt.Errorf("elog fmtEvent encode value with unknown type: %v", a))
+		}
 	}
-	i += copy(b[i:], e.s)
-	return i
-}
-func (e *genEvent) Decode(c *Context, b []byte) int {
-	i := 0
-	l := StringLen(b[i:])
-	e.s = String(b[i:])
-	return i + l
+	b[i] = fmtEnd
+	i++
+	return
 }
 
-func (x *genEvent) log(b *Buffer, c Caller) {
-	e := b.Add(genEventType, c)
-	x.s = strings.TrimSpace(x.s)
-	x.Encode(b.GetContext(), e.Data[:])
+func (e *fmtEvent) Decode(c *Context, b []byte) (i int) {
+	{
+		x, n := binary.Uvarint(b[i:])
+		i += n
+		e.format = StringRef(x)
+	}
+	for {
+		kind := b[i]
+		i++
+		if kind == fmtEnd {
+			break
+		}
+		switch kind {
+		case fmtBoolTrue, fmtBoolFalse:
+			e.args = append(e.args, b[i] == fmtBoolTrue)
+			i++
+		case fmtInt:
+			x, n := binary.Varint(b[i:])
+			i += n
+			e.args = append(e.args, x)
+		case fmtUint:
+			x, n := binary.Uvarint(b[i:])
+			i += n
+			e.args = append(e.args, x)
+		case fmtFloat:
+			x, n := binary.Uvarint(b[i:])
+			i += n
+			f := math.Float64frombits(x)
+			e.args = append(e.args, f)
+		case fmtStringRef:
+			x, n := binary.Uvarint(b[i:])
+			i += n
+			s := c.GetString(StringRef(x))
+			e.args = append(e.args, s)
+		case fmtString:
+			l := int(b[i])
+			e.args = append(e.args, string(b[i+1:i+1+l]))
+			i += 1 + l
+		default:
+			panic(fmt.Errorf("elog fmtEvent decode unknown kind: 0x%x", kind))
+		}
+	}
+	return
 }
 
-func GenEvent(s string) {
+type dataEvent struct {
+	b []byte
+}
+
+//go:generate gentemplate -d Package=elog -id dataEvent -d Type=dataEvent github.com/platinasystems/go/elib/elog/event.tmpl
+
+func (e *dataEvent) Strings(c *Context) []string {
+	return strings.Split(string(e.b), "\n")
+}
+func (e *dataEvent) Encode(c *Context, b []byte) (i int) {
+	l := len(e.b)
+	if l > EventDataBytes-1 {
+		l = EventDataBytes - 1
+	}
+	b[i] = byte(l)
+	i += copy(b[i+1:], e.b)
+	return
+}
+func (e *dataEvent) Decode(c *Context, b []byte) (i int) {
+	l := b[0]
+	e.b = b[1 : l+1]
+	i = int(1 + l)
+	return
+}
+
+func (b *Buffer) fc(c Caller, format string, args []interface{}) {
 	if !Enabled() {
 		return
 	}
-	c := GetCaller(PointerToFirstArg(&s))
-	e := genEvent{s: s}
-	e.log(DefaultBuffer, c)
-}
-
-func GenEventc(s string, c Caller) {
-	if !Enabled() {
+	if !b.Enabled() {
 		return
 	}
-	e := genEvent{s: s}
-	e.log(DefaultBuffer, c)
+	if ci, disabled := b.eventDisabled(c); !disabled {
+		et := fmtEventType
+		isFmt := len(args) > 0
+		if !isFmt {
+			et = dataEventType
+		}
+		e := b.add1(et, ci)
+		r := b.callers[ci]
+		ctx := b.GetContext()
+		if isFmt {
+			if r.fmtIndex == StringRefNil {
+				r.fmtIndex = ctx.SetString(format)
+			}
+			x := fmtEvent{format: r.fmtIndex, args: args}
+			x.Encode(ctx, e.Data[:])
+		} else {
+			x := dataEvent{b: []byte(format)}
+			x.Encode(ctx, e.Data[:])
+		}
+	}
 }
 
-func GenEventf(format string, args ...interface{}) {
-	if !Enabled() {
-		return
-	}
+func (b *Buffer) F(format string, args ...interface{}) {
 	c := GetCaller(PointerToFirstArg(&format))
-	e := genEvent{s: fmt.Sprintf(format, args...)}
-	e.log(DefaultBuffer, c)
+	b.fc(c, format, args)
+}
+func (b *Buffer) Fc(format string, c Caller, args ...interface{}) {
+	b.fc(c, format, args)
 }
 
-func GenEventfc(format string, c Caller, args ...interface{}) {
-	if !Enabled() {
-		return
-	}
-	e := genEvent{s: fmt.Sprintf(format, args...)}
-	e.log(DefaultBuffer, c)
+func F(format string, args ...interface{}) {
+	c := GetCaller(PointerToFirstArg(&format))
+	DefaultBuffer.fc(c, format, args)
 }
-
-//go:generate gentemplate -d Package=elog -id genEvent -d Type=genEvent github.com/platinasystems/go/elib/elog/event.tmpl
+func Fc(format string, c Caller, args ...interface{}) {
+	DefaultBuffer.fc(c, format, args)
+}

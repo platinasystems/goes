@@ -5,6 +5,7 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/elib/parse"
 
@@ -16,7 +17,8 @@ import (
 type HwIf struct {
 	vnet *Vnet
 
-	name string
+	name     string
+	elogName elog.StringRef
 
 	hi Hi
 	si Si
@@ -60,15 +62,17 @@ type HwInterfacer interface {
 	GetHwIf() *HwIf
 }
 
-func (h *HwIf) GetHwIf() *HwIf { return h }
-func (h *HwIf) Name() string   { return h.name }
-func (h *HwIf) Si() Si         { return h.si }
-func (h *HwIf) Hi() Hi         { return h.hi }
-func (h *HwIf) GetVnet() *Vnet { return h.vnet }
-func (h *HwIf) IsUnix() bool   { return false }
+func (h *HwIf) GetHwIf() *HwIf           { return h }
+func (h *HwIf) Name() string             { return h.name }
+func (h *HwIf) ElogName() elog.StringRef { return h.elogName }
+func (h *HwIf) Si() Si                   { return h.si }
+func (h *HwIf) Hi() Hi                   { return h.hi }
+func (h *HwIf) GetVnet() *Vnet           { return h.vnet }
+func (h *HwIf) IsUnix() bool             { return false }
 
 func (h *HwIf) SetName(v *Vnet, name string) {
 	h.name = name
+	h.elogName = elog.SetString(name)
 	v.hwIfIndexByName.Set(name, uint(h.hi))
 }
 func (v *Vnet) HwIfByName(name string) (Hi, bool) {

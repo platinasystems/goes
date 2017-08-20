@@ -56,7 +56,7 @@ func (s *stats) clocksPerVector() (v float64) {
 type activeNode struct {
 	// Index in activePoller.activeNodes and also loop.dataNodes.
 	index                   uint32
-	elogNodeName            uint32
+	elogNodeName            elog.StringRef
 	loopInMaker             loopInMaker
 	inOutLooper             inOutLooper
 	outLooper               outLooper
@@ -452,7 +452,7 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 		if elog.Enabled() {
 			e := callEvent{
 				active_index: uint32(in.activeIndex),
-				node_name:    uint32(next.elogNodeName),
+				node_name:    next.elogNodeName,
 				n_vectors:    uint32(nextN),
 			}
 			e.Log()

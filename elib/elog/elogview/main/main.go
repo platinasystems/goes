@@ -26,13 +26,13 @@ func main() {
 	for i := uint(0); i < n_events; i++ {
 		switch i % 4 {
 		case 0:
-			elog.GenEventf("red wjof owfj owjf wofjwf %d", i)
+			elog.F("red wjof owfj owjf wofjwf %d", i)
 		case 1:
-			elog.GenEventf("green %d", i)
+			elog.F("green %d", i)
 		case 2:
-			elog.GenEventf("blue %d", i)
+			elog.F("blue %d", i)
 		case 3:
-			elog.GenEventf("yellow %d", i)
+			elog.F("yellow %d", i)
 		}
 		d := delay
 		if random_delay {

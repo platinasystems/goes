@@ -39,7 +39,7 @@ type pollerElogEvent struct {
 	poller_index byte
 	event_type   poller_elog_event_type
 	flags        byte
-	node_name    uint32
+	node_name    elog.StringRef
 }
 
 func (n *Node) pollerElog(t poller_elog_event_type, f node_flags) {
@@ -80,7 +80,7 @@ func (e *pollerElogEvent) Decode(x *elog.Context, b []byte) int {
 	e.poller_index = byte(i[0])
 	e.event_type = poller_elog_event_type(i[1])
 	e.flags = byte(i[2])
-	e.node_name = uint32(i[3])
+	e.node_name = elog.StringRef(i[3])
 	return len(b)
 }
 
@@ -88,22 +88,24 @@ func (e *pollerElogEvent) Decode(x *elog.Context, b []byte) int {
 
 type callEvent struct {
 	active_index uint32
-	node_name    uint32
 	n_vectors    uint32
+	node_name    elog.StringRef
 }
 
 func (e *callEvent) Strings(x *elog.Context) []string {
 	return []string{fmt.Sprintf("loop%d %s(%d)", e.active_index, x.GetString(e.node_name), e.n_vectors)}
 }
-func (e *callEvent) Encode(x *elog.Context, b []byte) (i int) {
+func (e *callEvent) Encode(_ *elog.Context, b []byte) (i int) {
 	i += elog.EncodeUint32(b[i:], e.active_index)
-	i += elog.EncodeUint32(b[i:], e.node_name)
+	i += elog.EncodeUint32(b[i:], uint32(e.node_name))
 	i += elog.EncodeUint32(b[i:], e.n_vectors)
 	return
 }
-func (e *callEvent) Decode(x *elog.Context, b []byte) (i int) {
+func (e *callEvent) Decode(_ *elog.Context, b []byte) (i int) {
 	e.active_index, i = elog.DecodeUint32(b, i)
-	e.node_name, i = elog.DecodeUint32(b, i)
+	var x uint32
+	x, i = elog.DecodeUint32(b, i)
+	e.node_name = elog.StringRef(x)
 	e.n_vectors, i = elog.DecodeUint32(b, i)
 	return
 }
