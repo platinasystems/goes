@@ -265,7 +265,7 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 		di = 0
 	}
 
-	elog.GenEventf("%s tx %d new tail %d head %d tail %d", d.Name(), n_tx, di, head, tail)
+	elog.F("%s tx %d new tail %d head %d tail %d", d.elog_name, n_tx, di, head, tail)
 
 	// Re-start dma engine when tail advances.
 	if di != q.tail_index {
@@ -308,7 +308,7 @@ func (d *dev) tx_queue_interrupt(queue uint) {
 	if elog.Enabled() {
 		dr := q.get_regs()
 		tail := dr.tail_index.get(d)
-		elog.GenEventf("%s tx irq adv %d head %d tail %d", d.Name(), n_advance, di, tail)
+		elog.F("%s tx irq adv %d head %d tail %d", d.elog_name, n_advance, di, tail)
 	}
 
 	q.irq_sequence = d.irq_sequence

@@ -455,7 +455,7 @@ func (q *rx_dma_queue) rx_no_wrap(n_doneʹ reg, n_descriptors reg) (done rx_done
 	old_head := q.head_index
 	q.head_index = i
 
-	elog.GenEventf("%s rx head %d -> %d done %d %s", d.Name(), old_head, i, n_done, done)
+	elog.F("%s rx head %d -> %d done %d %s", d.elog_name, old_head, i, n_done, done)
 	return
 }
 
@@ -500,5 +500,5 @@ func (d *dev) rx_queue_interrupt(queue uint) {
 		atomic.AddInt32(&d.active_count, 1)
 	}
 
-	elog.GenEventf("%s rx tail to hw %d", d.Name(), q.tail_index)
+	elog.F("%s rx tail to hw %d", d.elog_name, q.tail_index)
 }

@@ -119,7 +119,7 @@ func (n *tx_node) init(m *net_namespace_main) {
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
-	elog.GenEventf("unix-tx output %d", out.InLen())
+	elog.F("unix-tx output %d", out.InLen())
 	var (
 		pv      *tx_packet_vector
 		pv_intf *tuntap_interface
@@ -157,7 +157,7 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 
 func (v *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
-	elog.GenEventf("unix-tx %d", np)
+	elog.F("unix-tx %d", np)
 	atomic.AddInt32(&intf.active_count, int32(np))
 	iomux.Update(intf)
 	for {
@@ -248,7 +248,7 @@ loop:
 	}
 	// Advance to next packet in error case.
 	np := n_packets + n_drops
-	elog.GenEventf("unix write-ready tx %d %d", n_packets, n_drops)
+	elog.F("unix write-ready tx %d %d", n_packets, n_drops)
 	pv.advance(n, intf, uint(np))
 	atomic.AddInt32(&intf.active_count, int32(-np))
 	iomux.Update(intf)

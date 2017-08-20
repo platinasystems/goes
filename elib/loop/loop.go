@@ -33,7 +33,7 @@ type Node struct {
 	nextNodes               nextNodeVec
 	nextIndexByNodeName     map[string]uint
 	inputStats, outputStats nodeStats
-	elogNodeName            uint32
+	elogNodeName            elog.StringRef
 	eventNode
 }
 
@@ -92,12 +92,13 @@ type nextNode struct {
 
 //go:generate gentemplate -d Package=loop -id nextNode -d VecType=nextNodeVec -d Type=nextNode github.com/platinasystems/go/elib/vec.tmpl
 
-func (n *Node) GetNode() *Node { return n }
-func (n *Node) Index() uint    { return n.index }
-func (n *Node) Name() string   { return n.name }
-func (n *Node) GetLoop() *Loop { return n.loop }
-func (n *Node) ThreadId() uint { return n.activePollerIndex }
-func nodeName(n Noder) string  { return n.GetNode().name }
+func (n *Node) GetNode() *Node           { return n }
+func (n *Node) Index() uint              { return n.index }
+func (n *Node) Name() string             { return n.name }
+func (n *Node) ElogName() elog.StringRef { return n.elogNodeName }
+func (n *Node) GetLoop() *Loop           { return n.loop }
+func (n *Node) ThreadId() uint           { return n.activePollerIndex }
+func nodeName(n Noder) string            { return n.GetNode().name }
 
 func (n *Node) getActivePoller(l *Loop) *activePoller {
 	return l.activePollerPool.entries[n.activePollerIndex]
@@ -562,7 +563,7 @@ func (l *Loop) disableInterrupts(disable bool) {
 		}
 	}
 	l.pollerStats.interruptsDisabled = disable
-	elog.GenEventf("loop: irq disable %v", disable)
+	elog.F("loop: irq disable %v", disable)
 }
 
 func (l *Loop) doPollerStats() {
