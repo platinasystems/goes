@@ -174,13 +174,13 @@ func NewWithConfigAndFile(cf SocketConfig, fd int) (s *Socket, err error) {
 					if s.Tx != nil {
 						close(s.Tx)
 					}
+					if s.rx_close_kludge_pipe[0] > 0 {
+						syscall.Close(s.rx_close_kludge_pipe[0])
+						syscall.Close(s.rx_close_kludge_pipe[1])
+					}
 					s.addr = nil
 					s = nil
 				}
-			}
-			if s.rx_close_kludge_pipe[0] > 0 {
-				syscall.Close(s.rx_close_kludge_pipe[0])
-				syscall.Close(s.rx_close_kludge_pipe[1])
 			}
 		}
 	}()
