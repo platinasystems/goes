@@ -563,7 +563,7 @@ func (l *Loop) disableInterrupts(disable bool) {
 		}
 	}
 	l.pollerStats.interruptsDisabled = disable
-	elog.F("loop: irq disable %v", disable)
+	elog.FBool("loop: irq disable %v", disable)
 }
 
 func (l *Loop) doPollerStats() {
