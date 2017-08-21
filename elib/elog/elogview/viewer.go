@@ -10,7 +10,6 @@ import (
 
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -122,17 +121,16 @@ func (x *ctx) roundedRect(x0, dx r2.V, r float64) {
 }
 
 type viewer struct {
-	win                  *gtk.Window
-	screen_dpi           float64
-	da                   *gtk.DrawingArea
-	eb                   *gtk.EventBox
-	eb_dx, eb_border     r2.V
-	ev                   *elog.View
-	ves                  []visible_event
-	popup_by_event_index map[uint]*popup
-	popups               []*popup
-	m                    map[uint64]*decoration
-	pointer              pointer_state
+	win              *gtk.Window
+	screen_dpi       float64
+	da               *gtk.DrawingArea
+	eb               *gtk.EventBox
+	eb_dx, eb_border r2.V
+	ev               *elog.View
+	ves              []visible_event
+	selected_events  map[uint]struct{}
+	m                map[uint64]*decoration
+	pointer          pointer_state
 	Config
 }
 
@@ -177,10 +175,7 @@ func View(ev *elog.View, cf Config) {
 	gtk.Main()
 }
 
-func (v *viewer) quit() {
-	v.delete_all_popups()
-	gtk.MainQuit()
-}
+func (v *viewer) quit() { gtk.MainQuit() }
 
 func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	ke := &gdk.EventKey{ev}
@@ -230,7 +225,6 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	if subview {
 		v.ev.SubView(t_min, t_max)
 	}
-	v.delete_all_popups()
 	v.eb.QueueDraw()
 }
 
@@ -291,7 +285,6 @@ func (v *viewer) do_pointer(val uint) {
 		if n := v.ev.SubView(t0, t1); n == 0 {
 			v.ev.SubView(save.Min, save.Max)
 		}
-		v.delete_all_popups()
 		v.eb.QueueDraw()
 	}
 }
@@ -314,151 +307,28 @@ func (v *viewer) do_button_press(e *gdk.Event) (handled bool, mouse_x r2.V, val 
 	}
 	// Only accept when screen distance is less than 1/16 an inch of center.
 	if handled = min_ds < v.screen_dpi/16; handled {
-		// Event already displayed in popup?
 		min_ei := v.ves[min_vi].ei
-		if p, is_del := v.popup_by_event_index[min_ei]; is_del {
-			p.del()
+		if v.is_selected(min_ei) {
+			delete(v.selected_events, min_ei)
 		} else {
-			v.new_popup(min_vi, min_ei)
+			if v.selected_events == nil {
+				v.selected_events = make(map[uint]struct{})
+			}
+			v.selected_events[min_ei] = struct{}{}
 		}
+		v.da.QueueDraw()
 	}
 	return
 }
 
-func (v *viewer) order_popups() {
-	if v.popups != nil {
-		v.popups = v.popups[:0]
-	}
-	ps := v.popups
-	for _, q := range v.popup_by_event_index {
-		ps = append(ps, q)
-	}
-	sort.Slice(ps, func(i, j int) bool {
-		pi, pj := ps[i], ps[j]
-		return pi.vi < pj.vi
-	})
-	for i := range ps {
-		p := ps[i]
-		var prev, next *popup
-		if i > 0 {
-			prev = ps[i-1]
-		}
-		if i+1 < len(ps) {
-			next = ps[i+1]
-		}
-		if p.prev != prev {
-			p.prev = prev
-			if prev != nil {
-				prev.win.QueueDraw()
-			}
-		}
-		if p.next != next {
-			p.next = next
-			if next != nil {
-				next.win.QueueDraw()
-			}
-		}
-	}
-	v.popups = ps
-}
-
-const dt_prev_invalid = 1e10
-
-type da_window struct {
-	win *gtk.Window
-	da  *gtk.DrawingArea
-	eb  *gtk.EventBox
-}
-
-type popup struct {
-	da_window
-	v          *viewer
-	ei, vi     uint
-	l          []text_line
-	prev, next *popup
-}
-
-func (p *popup) get_visible_event() *visible_event { return &p.v.ves[p.vi] }
-func (p *popup) get_event() *elog.Event            { return &p.v.ev.Events[p.ei] }
-
-func (v *viewer) new_da_window(d *da_window) {
-	w, _ := gtk.WindowNew(gtk.WINDOW_POPUP)
-	w.SetResizable(false)
-	w.SetDecorated(false)
-	w.SetDestroyWithParent(true)
-	w.SetSizeRequest(int(v.eb_dx.X()), int(v.eb_dx.Y())) // max size of drawing area
-	w.SetTransientFor(v.win)
-	w.SetPosition(gtk.WIN_POS_CENTER_ON_PARENT)
-	scr, _ := w.GetScreen()
-	vis, _ := scr.GetRGBAVisual()
-	w.SetVisual(vis)
-
-	eb, _ := gtk.EventBoxNew()
-	eb.SetCanFocus(true)
-	eb.SetEvents(int(gdk.KEY_PRESS_MASK |
-		gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK | gdk.POINTER_MOTION_MASK))
-	w.Add(eb)
-
-	da, _ := gtk.DrawingAreaNew()
-	eb.Add(da)
-
-	d.win = w
-	d.eb = eb
-	d.da = da
-
-	eb.SetEvents(int(gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK | gdk.POINTER_MOTION_MASK))
-	w.Connect("draw", v.draw_window_transparent_background)
-	eb.Connect("button_press_event", v.button_press)
-	eb.Connect("button_release_event", v.button_release)
-	eb.Connect("motion_notify_event", v.pointer_motion)
-	w.ShowAll()
-}
-
-func (v *viewer) draw_window_transparent_background(win *gtk.Window, cr *cairo.Context) {
-	w := r2.XY(float64(win.GetAllocatedWidth()), float64(win.GetAllocatedHeight()))
-	c := (*ctx)(cr)
-	cr.SetOperator(cairo.OPERATOR_SOURCE)
-	c.rect(0, w)
-	cr.Fill()
-}
-
-func (v *viewer) new_popup(vi, ei uint) (p *popup) {
-	p = &popup{v: v, vi: vi, ei: ei}
-	v.new_da_window(&p.da_window)
-	p.da.Connect("draw", p.draw_popup)
-	if v.popup_by_event_index == nil {
-		v.popup_by_event_index = make(map[uint]*popup)
-	}
-	v.popup_by_event_index[ei] = p
-	v.order_popups()
-	p.win.ShowAll()
+func (v *viewer) is_selected(ei uint) (ok bool) {
+	_, ok = v.selected_events[ei]
 	return
 }
 
-func (p *popup) del() {
-	if p.win == nil {
-		return
-	}
-	p.win.Hide()
-	p.win.Destroy()
-	delete(p.v.popup_by_event_index, p.ei)
-	p.v.order_popups()
-}
-func (v *viewer) delete_all_popups() {
-	for _, p := range v.popup_by_event_index {
-		p.del()
-	}
-}
-
-func (p0 *popup) dt(p1 *popup) (dt float64) {
-	e0, e1 := p0.get_event(), p1.get_event()
-	return p1.v.ev.ElapsedTime(e1) - p0.v.ev.ElapsedTime(e0)
-}
-
-func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
-	e, de := p.get_event(), p.get_visible_event()
-
-	lines := e.Strings(p.v.ev.GetContext())
+func (v *viewer) draw_selected_event(cr *cairo.Context, e *elog.Event, ve *visible_event) {
+	ev := v.ev
+	lines := e.Strings(ev.GetContext())
 
 	// Indent lines after first.
 	for i := range lines {
@@ -468,26 +338,26 @@ func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 		}
 	}
 
-	ec := p.v.ev.EventCaller(e)
-	d, _ := p.v.decorationForPc(ec.PC)
+	ec := ev.EventCaller(e)
+	d, _ := v.decorationForPc(ec.PC)
 
 	sf, _ := ec.ShortPath(ec.File, 32)
 	sn, _ := ec.ShortPath(ec.Name, 32)
 	lines = append(lines, fmt.Sprintf("%s", sn))
 	lines = append(lines, fmt.Sprintf("%s: %d", sf, ec.Line))
 
-	if p.l != nil {
-		p.l = p.l[:0]
+	if ve.l != nil {
+		ve.l = ve.l[:0]
 	}
 	for i := range lines {
-		p.l = append(p.l, text_line{s: lines[i]})
+		ve.l = append(ve.l, text_line{s: lines[i]})
 	}
 
 	c := (*ctx)(cr)
 	cr.SetFontSize(10)
-	bbox := c.text_box(p.l)
+	bbox := c.text_box(ve.l)
 
-	center := de.rr.Center
+	center := ve.rr.Center
 	const radius = 4
 	rr_dx := bbox + r2.XY(2*radius, radius)
 	c.roundedRect(center-rr_dx/2, rr_dx, radius)
@@ -496,8 +366,10 @@ func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 	cr.Fill()
 
 	cr.SetSourceRGBA(0, 0, 0, 1)
-	c.text(center-r2.XY(bbox.X()/2, 0), text_align_left, p.l...)
+	c.text(center-r2.XY(bbox.X()/2, 0), text_align_left, ve.l...)
 	cr.Stroke()
+
+	ve.rr.Size = rr_dx
 }
 
 type decoration struct {
@@ -525,6 +397,7 @@ type visible_event struct {
 	ei uint
 	// Center/size of rounded rect containing event text.
 	rr r2.Rect
+	l  []text_line
 }
 
 func (e *visible_event) distance(t r2.V) (ds float64) {
@@ -675,9 +548,9 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		iy := uint(0)
 		const iy_max = 64
 		for iy < iy_max {
-			x_last.Validate(uint(iy))
+			x_last.ValidateInit(uint(iy), -1e10)
 			if x_left := center.X() - te.Width/2; x_last[iy]+2*radius < x_left {
-				x_last[iy] = x_left + te.Width
+				x_last[iy] = center.X() + te.Width/2
 				break
 			}
 			iy++
@@ -737,5 +610,13 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 
 		// Save away for later use.
 		v.ves = append(v.ves, ve)
+	}
+
+	for i := range v.ves {
+		ve := &v.ves[i]
+		if v.is_selected(ve.ei) {
+			e := &ev.Events[ve.ei]
+			v.draw_selected_event(cr, e, ve)
+		}
 	}
 }
