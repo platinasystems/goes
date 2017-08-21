@@ -26,7 +26,7 @@ import (
 	"unsafe"
 )
 
-func (m *net_namespace_main) read_dir(dir *namespace_search_dir, f func(dir *namespace_search_dir, name string, is_del bool)) (err error) {
+func (m *net_namespace_main) read_dir(dir *namespace_search_dir, f func(dir *namespace_search_dir, name string, is_del bool, is_init bool)) (err error) {
 	// Collect existing files in /var/run/netns directory.
 	// ip netns add X command creates /var/run/netns/X file which when opened becomes ns_fd.
 	var fis []os.FileInfo
@@ -35,9 +35,8 @@ func (m *net_namespace_main) read_dir(dir *namespace_search_dir, f func(dir *nam
 			err = nil
 		}
 	}
-	m.n_namespace_discovered_at_init += uint32(len(fis))
 	for _, fi := range fis {
-		f(dir, fi.Name(), false)
+		f(dir, fi.Name(), false, true)
 	}
 	return
 }
@@ -58,7 +57,7 @@ func decode(b []byte, i int) (e *inotify_event, name string, i_next int) {
 	return
 }
 
-func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *namespace_search_dir, name string, is_del bool)) (err error) {
+func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *namespace_search_dir, name string, is_del bool, is_init bool)) (err error) {
 	var fd, n int
 
 	// Watch for new files added and existing files deleted.
@@ -73,6 +72,7 @@ func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *na
 		return
 	}
 
+	const is_init = false
 	for {
 		var buf [4096]byte
 		if n, err = syscall.Read(fd, buf[:]); err != nil {
@@ -82,9 +82,9 @@ func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *na
 			e, name, i_next := decode(buf[:], i)
 			switch {
 			case e.mask&syscall.IN_CREATE != 0:
-				f(dir, name, false)
+				f(dir, name, false, is_init)
 			case e.mask&syscall.IN_DELETE != 0:
-				f(dir, name, true)
+				f(dir, name, true, is_init)
 			}
 			i = i_next
 		}
@@ -111,14 +111,14 @@ func (d *namespace_search_dir) namespace_name(file_name string) (ns_name string)
 }
 
 var netns_search_dirs = [...]namespace_search_dir{
-	// iproute2
-	{
-		path: "/var/run/netns",
-	},
-	// docker
+	// docker: do this directory first.
 	namespace_search_dir{
 		path:   "/var/run/docker/netns",
 		prefix: "docker",
+	},
+	// iproute2
+	{
+		path: "/var/run/netns",
 	},
 }
 
@@ -151,7 +151,10 @@ func (nm *net_namespace_main) init() (err error) {
 		}
 
 		// Set nsid (if it exists) and inode (which always exists and uniquely identifies namespace).
-		ns.nsid, ns.inode = nm.nsid_for_fd(ns.ns_fd)
+		ns.nsid, ns.inode, err = nm.nsid_for_fd(ns.ns_fd)
+		if err != nil {
+			panic(err)
+		}
 		nm.namespace_by_nsid = make(map[int]*net_namespace)
 		nm.namespace_by_nsid[ns.nsid] = ns
 		nm.namespace_by_inode = make(map[uint64]*net_namespace)
@@ -298,11 +301,11 @@ func (m *net_namespace_main) nsid_for_path(elem ...string) (nsid int, inode uint
 		return
 	}
 	defer syscall.Close(fd)
-	nsid, inode = m.nsid_for_fd(fd)
+	nsid, inode, err = m.nsid_for_fd(fd)
 	return
 }
 
-func (m *net_namespace_main) nsid_for_fd(fd int) (nsid int, inode uint64) {
+func (m *net_namespace_main) nsid_for_fd(fd int) (nsid int, inode uint64, err error) {
 	var s syscall.Stat_t
 	syscall.Fstat(fd, &s)
 	inode = s.Ino
@@ -317,6 +320,8 @@ func (m *net_namespace_main) nsid_for_fd(fd int) (nsid int, inode uint64) {
 	switch v := rep.(type) {
 	case *netlink.NetnsMessage:
 		nsid = int(v.Attrs[netlink.NETNSA_NSID].(netlink.Int32Attr).Int())
+	case *netlink.ErrorMessage:
+		err = fmt.Errorf("netlink GETNSID: %v", syscall.Errno(v.Errno))
 	}
 	return
 }
@@ -363,8 +368,11 @@ func (m *net_namespace_main) foreachProcFs(f func(p *net_namespace_process)) (er
 				return
 			}
 		}
-		p.nsid, p.inode = m.nsid_for_fd(fd)
+		p.nsid, p.inode, err = m.nsid_for_fd(fd)
 		syscall.Close(fd)
+		if err != nil {
+			return
+		}
 
 		{
 			// /proc/PID/stat gives name of process.
@@ -393,6 +401,9 @@ func (m *net_namespace_main) add_del_nsid(dir *namespace_search_dir, file_name s
 
 	if is_del {
 		ns := m.namespace_by_name[name]
+		if ns == nil { // delete unknown namespace file
+			return
+		}
 		if ns.nsid != netlink.DefaultNsid {
 			delete(m.namespace_by_nsid, ns.nsid)
 		}
@@ -412,29 +423,34 @@ func (m *net_namespace_main) add_del_nsid(dir *namespace_search_dir, file_name s
 		return
 	}
 	ns = &net_namespace{name: name}
+	// Namespace may be duplicate.  (e.g. created by docker and then linked to in /var/run/netns)
+	if err = ns.add(m, dir.path, file_name); err != nil {
+		return
+	}
 	m.namespace_by_name[name] = ns
-	err = ns.add(m, dir.path, file_name)
 	return
 }
 
 type add_del_namespace_event struct {
 	vnet.Event
-	m      *net_namespace_main
-	dir    *namespace_search_dir
-	name   string
-	is_del bool
+	m       *net_namespace_main
+	dir     *namespace_search_dir
+	name    string
+	is_del  bool
+	is_init bool
 }
 
 func (e *add_del_namespace_event) String() string { return "add-del-namespace-event" }
 func (e *add_del_namespace_event) EventAction() {
-	err := e.m.add_del_nsid(e.dir, e.name, e.is_del)
-	if err != nil {
+	if err := e.m.add_del_nsid(e.dir, e.name, e.is_del); err != nil {
 		e.m.m.v.Logf("namespace watch: %v %v\n", e.name, err)
+	} else if e.is_init {
+		e.m.n_namespace_discovered_at_init++
 	}
 }
 
-func (m *net_namespace_main) watch_namespace_add_del(dir *namespace_search_dir, name string, is_del bool) {
-	m.m.v.SignalEvent(&add_del_namespace_event{m: m, dir: dir, name: name, is_del: is_del})
+func (m *net_namespace_main) watch_namespace_add_del(dir *namespace_search_dir, name string, is_del bool, is_init bool) {
+	m.m.v.SignalEvent(&add_del_namespace_event{m: m, dir: dir, name: name, is_del: is_del, is_init: is_init})
 }
 
 func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) (err error) {
@@ -804,6 +820,15 @@ func (ns *net_namespace) add(m *net_namespace_main, dir, name string) (err error
 	ns.index = m.namespace_pool.GetIndex()
 	m.namespace_pool.entries[ns.index] = ns
 
+	defer func() {
+		if err != nil {
+			if ns.ns_fd > 0 {
+				syscall.Close(ns.ns_fd)
+			}
+			m.namespace_pool.PutIndex(ns.index)
+		}
+	}()
+
 	// Loop until namespace sockets are allocated.
 	time_start := time.Now()
 	var first_setns_errno syscall.Errno
@@ -826,7 +851,17 @@ func (ns *net_namespace) add(m *net_namespace_main, dir, name string) (err error
 			time.Sleep(1 * time.Millisecond)
 		}
 	}
-	ns.nsid, ns.inode = m.nsid_for_fd(ns.ns_fd)
+	ns.nsid, ns.inode, err = m.nsid_for_fd(ns.ns_fd)
+	if err != nil {
+		return
+	}
+	// Check if namespace inode already exists.
+	// This can happen when a link is made to an existing namespace.
+	if ns1, ok := m.namespace_by_inode[ns.inode]; ok {
+		err = fmt.Errorf("namespace add %s: already exists as %s", ns.name, ns1.name)
+		return
+	}
+
 	if ns.nsid != netlink.DefaultNsid {
 		m.namespace_by_nsid[ns.nsid] = ns
 	}
