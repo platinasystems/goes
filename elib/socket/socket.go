@@ -101,10 +101,6 @@ func (s *socket) ReadReady() (err error) {
 	}
 	s.RxBuffer = s.RxBuffer[:i+n]
 
-	if elog.Enabled() {
-		s.elogData(Read, s.RxBuffer)
-	}
-
 	if n == 0 {
 		iomux.Del(s)
 		s.Close()
@@ -378,66 +374,4 @@ func SockaddrString(a syscall.Sockaddr) string {
 
 func (s *socket) String() string {
 	return fmt.Sprintf("%s -> %s", SockaddrString(s.SelfAddr), SockaddrString(s.PeerAddr))
-}
-
-// Event logging.
-type event struct {
-	flags eventFlag
-	s     [elog.EventDataBytes - 1]byte
-}
-
-//go:generate gentemplate -d Package=socket -id event -d Type=event github.com/platinasystems/go/elib/elog/event.tmpl
-
-type eventFlag uint8
-
-const (
-	// low 4 bits are op code
-	Read   eventFlag = 0
-	Write  eventFlag = 1
-	IsData eventFlag = 1 << (iota + 4)
-)
-
-var opNames = []string{
-	Read:  "read",
-	Write: "write",
-}
-
-func (s *socket) elogf(f eventFlag, format string, args ...interface{}) (e event) {
-	e = event{flags: f}
-	b := elog.PutUvarint(e.s[:], int(s.File.Index()))
-	elog.Printf(b, format, args...)
-	e.Log()
-	return
-}
-
-func (s *socket) elogData(f eventFlag, p []byte) (e event) {
-	e = event{flags: f | IsData}
-	b := elog.PutUvarint(e.s[:], int(s.File.Index()))
-	elog.PutData(b, p)
-	e.Log()
-	return
-}
-
-func (e *event) Strings(x *elog.Context) []string {
-	op := opNames[e.flags&0xf]
-	var d string
-	b := e.s[:]
-	b, fi := elog.Uvarint(b)
-	if e.flags&IsData != 0 {
-		d = elog.HexData(b)
-	} else {
-		d = elog.String(b)
-	}
-	return []string{fmt.Sprintf("socket #%d %s %s", fi, op, d)}
-}
-
-func (e *event) Encode(x *elog.Context, b []byte) int {
-	b[0] = byte(e.flags)
-	copy(b[1:], e.s[:])
-	return 1 + len(e.s)
-}
-func (e *event) Decode(x *elog.Context, b []byte) int {
-	e.flags = eventFlag(b[0])
-	copy(e.s[:], b[1:])
-	return 1 + len(e.s)
 }
