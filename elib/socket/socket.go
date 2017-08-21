@@ -6,7 +6,6 @@ package socket
 
 import (
 	"github.com/platinasystems/go/elib"
-	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
 
 	"fmt"
@@ -175,7 +174,6 @@ func (s *socket) ClientWriteReady() (newConnection bool, err error) {
 			return
 		}
 		l := len(s.txBuffer)
-		elog.F("socket write #%d %d %d %x", s.File.Index(), n, l, s.txBuffer[0:n])
 		switch {
 		case n == l:
 			s.txBuffer = s.txBuffer[:0]
