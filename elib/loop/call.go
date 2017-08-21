@@ -410,8 +410,6 @@ func (n *nodeStats) update(nVec uint, tStart cpu.Time) (tNow cpu.Time) {
 	return
 }
 
-//go:generate gentemplate -d Package=loop -id callEvent -d Type=callEvent github.com/platinasystems/go/elib/elog/event.tmpl
-
 func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 	prevNode := a.currentNode
 	nVec = f.totalVectors(a)
@@ -455,7 +453,7 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 				node_name:    next.elogNodeName,
 				n_vectors:    uint32(nextN),
 			}
-			e.Log()
+			elog.Add(&e)
 		}
 
 		nextIn := prevNode.outIns[xi]

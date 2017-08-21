@@ -17,6 +17,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
@@ -29,26 +30,31 @@ import (
 )
 
 const (
-	log2EventBytes = 7
-	EventDataBytes = 1<<log2EventBytes - (1*8 + 1*4 + 2*2)
+	log2EventBytes = 6
+	EventDataBytes = 1<<log2EventBytes - (1*8 + 1*4)
 )
 
 type Event struct {
 	// Cpu time when event was logged.
-	timestamp cpu.Time
+	timestamp uint64
 
 	// Caller index (implies PC) which uniquely identifies log caller.
 	callerIndex uint32
 
-	// Event type.
-	typeIndex uint16
-
 	// Track which can be used to separate events onto different
 	// "tracks" which can be separately viewed graphically.
-	track uint16
+	track uint32
 
 	// Opaque event data.  Type dependent.
-	Data [EventDataBytes]byte
+	// 1 or more cache lines could follow depending on callerIndex.
+	data [EventDataBytes]byte
+}
+
+type Format func(format string, args ...interface{}) string
+
+type eventData interface {
+	Format(c *Context, f Format) string
+	SetData(c *Context, p Pointer)
 }
 
 type EventTrack struct {
@@ -56,24 +62,17 @@ type EventTrack struct {
 	index uint32
 }
 
-type EventType struct {
-	Name     string
-	Strings  func(c *Context, e *Event) []string
-	Decode   func(c *Context, e *Event, b []byte) int
-	Encode   func(c *Context, e *Event, b []byte) int
-	index    uint32
-	mu       sync.Mutex // protects following
-	disabled bool
-}
-
-// Context for event type functions.
+// Context for stringers.
 type Context shared
 
 func (v *shared) GetContext() *Context { return (*Context)(v) }
 
 type StringRef uint32
 
-const StringRefNil = StringRef(0)
+const (
+	StringRefNil    = StringRef(0)
+	SizeofStringRef = unsafe.Sizeof(StringRef(0))
+)
 
 func (v *Context) GetString(si StringRef) string { return v.stringTable.Get(si) }
 func (v *Context) SetString(s string) StringRef  { return v.stringTable.Set(s) }
@@ -142,7 +141,7 @@ func (t *stringTable) init(s string) {
 
 type sharedOkToCopy struct {
 	// Timestamp when log was created.
-	cpuStartTime cpu.Time
+	cpuStartTime uint64
 
 	// Starting time of view.
 	StartTime time.Time
@@ -202,9 +201,6 @@ type Buffer struct {
 	// Buffer has space for 1<<log2Len.
 	log2Len uint
 
-	// Dummy event to use when logging is disabled.
-	disabledEvent Event
-
 	pcHashSeed uint64
 
 	eventFilterMain
@@ -212,7 +208,10 @@ type Buffer struct {
 }
 
 func (b *Buffer) Enable(v bool) {
-	cpu.TimeInit()
+	{
+		cyclesPerSec := cpu.TimeInit()
+		b.timeUnitNsec = 1e9 / cyclesPerSec
+	}
 	b.lockIndex(true)
 	b.index &= lockBit
 	b.disableIndex = 0
@@ -233,8 +232,9 @@ type eventFilter struct {
 
 type callerCache struct {
 	f           eventFilter
-	pc          uintptr
+	pc          uint64
 	fmtIndex    StringRef
+	t           reflect.Type
 	callerIndex uint32
 	callerInfo  CallerInfo
 }
@@ -242,7 +242,7 @@ type callerCache struct {
 // Event filter info shared between Buffer and View.
 type eventFilterShared struct {
 	mu         sync.RWMutex
-	callerByPC map[uintptr]*callerCache
+	callerByPC map[uint64]*callerCache
 	callers    []*callerCache
 }
 
@@ -255,7 +255,7 @@ func (dst *eventFilterShared) copyFrom(src *eventFilterShared) {
 type pcHashEntry struct {
 	disable     bool
 	callerIndex uint32
-	pc          uintptr
+	pc          uint64
 }
 
 type eventFilterMain struct {
@@ -265,39 +265,30 @@ type eventFilterMain struct {
 
 const log2HLen = 9
 
-type Caller uintptr
+type Caller struct {
+	time   uint64
+	pc     uint64
+	pcHash uint64
+}
+type Pointer unsafe.Pointer
 type PointerToFirstArg unsafe.Pointer
 
-func GetCaller(a PointerToFirstArg) (c Caller) {
+func (b *Buffer) GetCaller(a PointerToFirstArg) (c Caller) {
 	if Enabled() {
-		c = Caller(cpu.GetCallerPC(unsafe.Pointer(a)))
+		t, p, h := getPC(unsafe.Pointer(a), b.pcHashSeed)
+		c = Caller{time: t, pc: p, pcHash: h}
 	}
 	return
 }
+func GetCaller(a PointerToFirstArg) (c Caller) { return DefaultBuffer.GetCaller(a) }
 
-func rotl_31(x uint64) uint64 { return (x << 31) | (x >> (64 - 31)) }
-func (m *Buffer) pcHash(pc uintptr) uint {
-	const (
-		// Constants for multiplication: four random odd 64-bit numbers.
-		m1 = 16877499708836156737
-		m2 = 2820277070424839065
-		m3 = 9497967016996688599
-	)
-	h := uint64(pc) ^ m.pcHashSeed
-	h = rotl_31(h*m1) * m2
-	h ^= h >> 29
-	h *= m3
-	h ^= h >> 32
-	return uint(h)
-}
-
-func (m *Buffer) eventDisabled(caller Caller) (callerIndex uint32, disable bool) {
+func (m *Buffer) getCaller(caller Caller) (c *callerCache, disable bool) {
 	// Check 1st level hash.  No lock required.
-	pc := uintptr(caller)
-	pch := &m.h[m.pcHash(pc)&(1<<log2HLen-1)]
-	callerIndex = uint32(pch.callerIndex)
+	pc := caller.pc
+	pch := &m.h[caller.pcHash&(1<<log2HLen-1)]
 	disable = pch.disable
 	if pch.pc == pc {
+		c = m.callers[pch.callerIndex]
 		return
 	}
 
@@ -306,7 +297,6 @@ func (m *Buffer) eventDisabled(caller Caller) (callerIndex uint32, disable bool)
 	c, ok := m.callerByPC[pc]
 	if ok {
 		disable = c.f.disable
-		callerIndex = c.callerIndex
 		m.mu.RUnlock()
 		// Update 1st level cache. No lock required.
 		pch.pc = pc
@@ -320,7 +310,7 @@ func (m *Buffer) eventDisabled(caller Caller) (callerIndex uint32, disable bool)
 	m.mu.Lock()
 	// Miss? Scan regexps.
 	var found *eventFilter
-	path := runtime.FuncForPC(pc).Name()
+	path := runtime.FuncForPC(uintptr(pc)).Name()
 	for _, f := range m.m {
 		if ok := f.re.MatchString(path); ok {
 			found = f
@@ -329,7 +319,7 @@ func (m *Buffer) eventDisabled(caller Caller) (callerIndex uint32, disable bool)
 		}
 	}
 	if m.callerByPC == nil {
-		m.callerByPC = make(map[uintptr]*callerCache)
+		m.callerByPC = make(map[uint64]*callerCache)
 	}
 	c = &callerCache{pc: pc, callerIndex: uint32(len(m.callers))}
 	m.callers = append(m.callers, c)
@@ -369,7 +359,6 @@ func (m *Buffer) AddDelEventFilter(matching string, enable, isDel bool) (err err
 	}
 	m.m[matching] = &f
 	m.invalidateCache()
-	m.applyFilters()
 	return
 }
 
@@ -388,27 +377,10 @@ func (b *Buffer) ResetFilters() {
 		c.f.disable = false
 	}
 	b.invalidateCache()
-	b.applyFilters()
 	// Filter change clears buffer.  genEvents may have pcs cached.
 	b.Clear()
 }
 func ResetFilters() { DefaultBuffer.ResetFilters() }
-
-func (m *eventFilterMain) applyFilters() {
-	// Invalidate cache
-	eventTypesLock.Lock()
-	defer eventTypesLock.Unlock()
-	for _, t := range eventTypes {
-		disable := false
-		for _, f := range m.m {
-			if ok := f.re.MatchString(t.Name); ok {
-				disable = f.disable
-				break
-			}
-		}
-		t.disabled = disable
-	}
-}
 
 func (b *Buffer) clear(resize uint) {
 	b.lockIndex(true)
@@ -441,73 +413,40 @@ func (b *Buffer) DisableAfter(n uint64) {
 	b.lockIndex(false)
 }
 
-func (b *Buffer) add1(t *EventType, ci uint32) (e *Event) {
-	e = b.getEvent()
-	e.timestamp = cpu.TimeNow()
-	e.callerIndex = ci
-	e.typeIndex = uint16(t.index)
+func typeOf(d eventData) (t reflect.Type) {
+	t = reflect.TypeOf(d)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
 	return
 }
 
-func (b *Buffer) Add(t *EventType, c Caller) (e *Event) {
-	e = &b.disabledEvent
-	if !b.Enabled() || t.disabled {
+func (e *Event) setData(c *Context, d eventData) { d.SetData(c, Pointer(&e.data[0])) }
+func (b *Buffer) add1(d eventData, c Caller, r *callerCache) {
+	e := b.getEvent()
+	e.timestamp = c.time
+	e.callerIndex = r.callerIndex
+	r.t = typeOf(d)
+	e.setData(b.GetContext(), d)
+	return
+}
+
+func (b *Buffer) Add(d eventData, c Caller) {
+	if !b.Enabled() {
 		return
 	}
-	if ci, disabled := b.eventDisabled(c); !disabled {
-		e = b.add1(t, ci)
+	if r, disabled := b.getCaller(c); !disabled {
+		b.add1(d, c, r)
 	}
-	return e
-}
-
-var (
-	eventTypesLock sync.Mutex
-	eventTypes     []*EventType
-	typeByName     = make(map[string]*EventType)
-)
-
-func addTypeNoLock(t *EventType) {
-	t.index = uint32(len(eventTypes))
-	eventTypes = append(eventTypes, t)
-}
-
-func addType(t *EventType) {
-	eventTypesLock.Lock()
-	defer eventTypesLock.Unlock()
-	addTypeNoLock(t)
-}
-
-func getTypeByIndex(i int) *EventType {
-	eventTypesLock.Lock()
-	defer eventTypesLock.Unlock()
-	return eventTypes[i]
-}
-
-func (e *Event) getType() *EventType { return getTypeByIndex(int(e.typeIndex)) }
-
-func RegisterType(t *EventType) {
-	eventTypesLock.Lock()
-	defer eventTypesLock.Unlock()
-	if _, ok := typeByName[t.Name]; ok {
-		panic("duplicate event type name: " + t.Name)
-	}
-	typeByName[t.Name] = t
-	addTypeNoLock(t)
-}
-
-func getTypeByName(n string) (t *EventType, ok bool) {
-	eventTypesLock.Lock()
-	defer eventTypesLock.Unlock()
-	t, ok = typeByName[n]
-	return
 }
 
 var DefaultBuffer = New(0)
 
-func Add(t *EventType, c Caller) *Event { return DefaultBuffer.Add(t, c) }
-func Print(w io.Writer, detail bool)    { DefaultBuffer.Print(w, detail) }
-func Len() (n int)                      { return DefaultBuffer.Len() }
-func Enable(v bool)                     { DefaultBuffer.Enable(v) }
+func Addc(d eventData, c Caller)     { DefaultBuffer.Add(d, c) }
+func Add(d eventData)                { DefaultBuffer.Add(d, DefaultBuffer.GetCaller(PointerToFirstArg(&d))) }
+func Print(w io.Writer, detail bool) { DefaultBuffer.Print(w, detail) }
+func Len() (n int)                   { return DefaultBuffer.Len() }
+func Enable(v bool)                  { DefaultBuffer.Enable(v) }
 
 const (
 	minLog2Len = 10
@@ -524,7 +463,8 @@ func New(log2Len uint) (b *Buffer) {
 	}
 	b.events = make([]Event, 1<<log2Len)
 	b.log2Len = log2Len
-	b.cpuStartTime = cpu.TimeNow()
+	caller := b.GetCaller(PointerToFirstArg(&log2Len))
+	b.cpuStartTime = caller.time
 	b.StartTime = time.Now()
 	b.pcHashSeed = uint64(b.cpuStartTime)
 
@@ -546,20 +486,9 @@ func New(log2Len uint) (b *Buffer) {
 func (b *Buffer) Resize(n uint) { b.clear(n) }
 func Resize(n uint)             { DefaultBuffer.Resize(n) }
 
-func (s *shared) timeUnitNsecs() (u float64) {
-	u = s.timeUnitNsec
-	if u == 0 {
-		var c cpu.Time
-		c.Cycles(1 * cpu.Second)
-		s.timeUnitNsec = 1e9 / float64(c)
-		u = s.timeUnitNsec
-	}
-	return
-}
-
 // Time event happened in seconds relative to start of log.
 func (e *Event) elapsedTime(s *shared) float64 {
-	return 1e-9 * float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsecs()
+	return 1e-9 * float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsec
 }
 
 // Time elapsed from start of buffer.
@@ -567,7 +496,7 @@ func (b *Buffer) ElapsedTime(e *Event) float64 { return e.elapsedTime(&b.shared)
 
 // Go time.Time that event happened.
 func (e *Event) time(s *shared) time.Time {
-	nsec := float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsecs()
+	nsec := float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsec
 	return s.StartTime.Add(time.Duration(nsec))
 }
 
@@ -660,36 +589,41 @@ func (v *View) doViewTimes(t0, t1 float64, isViewTime bool) (err error) {
 	return
 }
 
-func (e *Event) Type() *EventType { return e.getType() }
-
 type CallerInfo struct {
-	PC    uintptr
-	Entry uintptr
+	PC    uint64
+	Entry uint64
 	Name  string
 	File  string
 	Line  int
 }
 
-func (v *shared) getCallerInfo(ci uint32) (c *CallerInfo) {
-	r := v.callers[ci]
+func (v *shared) getCallerInfo(ci uint32) (r *callerCache, c *CallerInfo) {
+	r = v.callers[ci]
 	c = &r.callerInfo
 	if c.PC == 0 {
-		pc := r.pc
+		pc := uintptr(r.pc)
 		fi := runtime.FuncForPC(pc)
-		c.PC = pc
-		c.Entry = fi.Entry()
+		c.PC = r.pc
+		c.Entry = uint64(fi.Entry())
 		c.Name = fi.Name()
 		c.File, c.Line = fi.FileLine(pc)
 	}
 	return
 }
 
-func (v *shared) addCallerInfo(c CallerInfo) {
+func (v *shared) addCallerInfo(c CallerInfo, isFmtEvent bool) {
 	pc := c.PC
 	cc := &callerCache{pc: pc, callerIndex: uint32(len(v.callers)), callerInfo: c}
+	var d eventData
+	if isFmtEvent {
+		d = &fmtEvent{}
+	} else {
+		d = &dataEvent{}
+	}
+	cc.t = typeOf(d)
 	v.callers = append(v.callers, cc)
 	if v.callerByPC == nil {
-		v.callerByPC = make(map[uintptr]*callerCache)
+		v.callerByPC = make(map[uint64]*callerCache)
 	}
 	v.callerByPC[pc] = cc
 }
@@ -724,23 +658,31 @@ func (c *CallerInfo) ShortPath(p string, max uint) (f string, overflow bool) {
 	return
 }
 
-func (s *shared) Strings(e *Event) []string { t := e.getType(); return t.Strings(s.GetContext(), e) }
+func (e *Event) format(t reflect.Type, x *Context, c Format) string {
+	v := reflect.NewAt(t, unsafe.Pointer(&e.data[0]))
+	in := []reflect.Value{reflect.ValueOf(x), reflect.ValueOf(fmt.Sprintf)}
+	out := v.MethodByName("Format").Call(in)
+	return out[0].Interface().(string)
+}
+
+func (e *Event) String(c *Context) string {
+	r := c.callers[e.callerIndex]
+	return e.format(r.t, c, fmt.Sprintf)
+}
+func (e *Event) Strings(c *Context) []string { return strings.Split(e.String(c), "\n") }
 func (e *Event) timeString(sh *shared) string {
 	return e.time(sh).Format("2006-01-02 15:04:05.000000000")
 }
 
 func (e *Event) eventString(sh *shared, detail bool) (s string) {
-	s = fmt.Sprintf("%s: %s", e.timeString(sh), strings.Join(sh.Strings(e), " "))
-	if detail {
-		s += "(" + e.getType().Name + ")"
-	}
+	s = fmt.Sprintf("%s: %s", e.timeString(sh), e.String(sh.GetContext()))
 	return
 }
 
-func (v *View) EventString(e *Event) string        { return e.eventString(&v.shared, false) }
-func (b *Buffer) EventString(e *Event) string      { return e.eventString(&b.shared, false) }
-func (v *View) EventCaller(e *Event) *CallerInfo   { return v.getCallerInfo(e.callerIndex) }
-func (b *Buffer) EventCaller(e *Event) *CallerInfo { return b.getCallerInfo(e.callerIndex) }
+func (v *View) EventString(e *Event) string            { return e.eventString(&v.shared, false) }
+func (b *Buffer) EventString(e *Event) string          { return e.eventString(&b.shared, false) }
+func (s *shared) EventCaller(e *Event) (c *CallerInfo) { _, c = s.getCallerInfo(e.callerIndex); return }
+func (b *Buffer) EventCaller(e *Event) *CallerInfo     { return b.EventCaller(e) }
 
 func StringLen(b []byte) (l int) {
 	l = bytes.IndexByte(b, 0)
@@ -881,7 +823,7 @@ func (v *View) Print(w io.Writer, verbose bool) {
 			delta = t - lastTime
 		}
 		lastTime = t
-		lines := v.Strings(e)
+		lines := e.Strings(v.GetContext())
 		for j := range lines {
 			if lines[j] == "" {
 				continue
@@ -896,7 +838,7 @@ func (v *View) Print(w io.Writer, verbose bool) {
 			if j == 0 {
 				r.Time = e.timeString(&v.shared)
 				r.Delta = fmt.Sprintf("%8.6f", delta)
-				c := v.getCallerInfo(e.callerIndex)
+				_, c := v.getCallerInfo(e.callerIndex)
 				r.Path = c.Name
 			}
 			rows = append(rows, r)
@@ -935,15 +877,22 @@ const (
 
 type fmtEvent struct {
 	format StringRef
-	args   []interface{}
+	args   [EventDataBytes - SizeofStringRef]byte
 }
 
-//go:generate gentemplate -d Package=elog -id fmtEvent -d Type=fmtEvent github.com/platinasystems/go/elib/elog/event.tmpl
-
-func (e *fmtEvent) Strings(c *Context) []string {
-	f := c.GetString(e.format)
-	s := fmt.Sprintf(f, e.args...)
-	return strings.Split(s, "\n")
+func (e *fmtEvent) SetData(c *Context, p Pointer) { *(*fmtEvent)(p) = *e }
+func (e *fmtEvent) Format(c *Context, f Format) string {
+	g := c.GetString(e.format)
+	args := e.decode(c)
+	return f(g, args...)
+}
+func fmtEventFor(c *Context, r StringRef, format string, args []interface{}) (e fmtEvent) {
+	if r == StringRefNil {
+		r = c.SetString(format)
+	}
+	e.format = r
+	e.encode(c, args)
+	return
 }
 
 func encodeInt(b []byte, i0 int, v int64) (i int) {
@@ -960,9 +909,10 @@ func encodeUint(b []byte, i0 int, v uint64, kind int) (i int) {
 	return
 }
 
-func (e *fmtEvent) Encode(c *Context, b []byte) (i int) {
+func (e *fmtEvent) encode(c *Context, args []interface{}) (i int) {
+	b := e.args[:]
 	i = binary.PutUvarint(b[i:], uint64(e.format))
-	for _, a := range e.args {
+	for _, a := range args {
 		switch v := a.(type) {
 		case bool:
 			b[i] = fmtBoolFalse
@@ -1013,12 +963,16 @@ func (e *fmtEvent) Encode(c *Context, b []byte) (i int) {
 	return
 }
 
-func (e *fmtEvent) Decode(c *Context, b []byte) (i int) {
+func (e *fmtEvent) decode(c *Context) (args []interface{}) {
+	b := e.args[:]
+	i := 0
+
 	{
 		x, n := binary.Uvarint(b[i:])
 		i += n
 		e.format = StringRef(x)
 	}
+
 	for {
 		kind := b[i]
 		i++
@@ -1027,29 +981,29 @@ func (e *fmtEvent) Decode(c *Context, b []byte) (i int) {
 		}
 		switch kind {
 		case fmtBoolTrue, fmtBoolFalse:
-			e.args = append(e.args, b[i] == fmtBoolTrue)
+			args = append(args, b[i] == fmtBoolTrue)
 			i++
 		case fmtInt:
 			x, n := binary.Varint(b[i:])
 			i += n
-			e.args = append(e.args, x)
+			args = append(args, x)
 		case fmtUint:
 			x, n := binary.Uvarint(b[i:])
 			i += n
-			e.args = append(e.args, x)
+			args = append(args, x)
 		case fmtFloat:
 			x, n := binary.Uvarint(b[i:])
 			i += n
 			f := math.Float64frombits(x)
-			e.args = append(e.args, f)
+			args = append(args, f)
 		case fmtStringRef:
 			x, n := binary.Uvarint(b[i:])
 			i += n
 			s := c.GetString(StringRef(x))
-			e.args = append(e.args, s)
+			args = append(args, s)
 		case fmtString:
 			l := int(b[i])
-			e.args = append(e.args, string(b[i+1:i+1+l]))
+			args = append(args, string(b[i+1:i+1+l]))
 			i += 1 + l
 		default:
 			panic(fmt.Errorf("elog fmtEvent decode unknown kind: 0x%x", kind))
@@ -1059,27 +1013,13 @@ func (e *fmtEvent) Decode(c *Context, b []byte) (i int) {
 }
 
 type dataEvent struct {
-	b []byte
+	b [EventDataBytes]byte
 }
 
-//go:generate gentemplate -d Package=elog -id dataEvent -d Type=dataEvent github.com/platinasystems/go/elib/elog/event.tmpl
-
-func (e *dataEvent) Strings(c *Context) []string {
-	return strings.Split(string(e.b), "\n")
-}
-func (e *dataEvent) Encode(c *Context, b []byte) (i int) {
-	l := len(e.b)
-	if l > EventDataBytes-1 {
-		l = EventDataBytes - 1
-	}
-	b[i] = byte(l)
-	i += copy(b[i+1:], e.b)
-	return
-}
-func (e *dataEvent) Decode(c *Context, b []byte) (i int) {
-	l := b[0]
-	e.b = b[1 : l+1]
-	i = int(1 + l)
+func (e *dataEvent) SetData(c *Context, p Pointer)      { *(*dataEvent)(p) = *e }
+func (e *dataEvent) Format(c *Context, f Format) string { return f(String(e.b[:])) }
+func dataEventFor(s string) (d dataEvent) {
+	copy(d.b[:], s)
 	return
 }
 
@@ -1090,30 +1030,21 @@ func (b *Buffer) fc(c Caller, format string, args []interface{}) {
 	if !b.Enabled() {
 		return
 	}
-	if ci, disabled := b.eventDisabled(c); !disabled {
-		et := fmtEventType
-		isFmt := len(args) > 0
-		if !isFmt {
-			et = dataEventType
-		}
-		e := b.add1(et, ci)
-		r := b.callers[ci]
-		ctx := b.GetContext()
-		if isFmt {
-			if r.fmtIndex == StringRefNil {
-				r.fmtIndex = ctx.SetString(format)
-			}
-			x := fmtEvent{format: r.fmtIndex, args: args}
-			x.Encode(ctx, e.Data[:])
+	if r, disabled := b.getCaller(c); !disabled {
+		if isFmt := len(args) == 0; isFmt {
+			d := dataEventFor(format)
+			b.add1(&d, c, r)
 		} else {
-			x := dataEvent{b: []byte(format)}
-			x.Encode(ctx, e.Data[:])
+			x := b.GetContext()
+			f := fmtEventFor(x, r.fmtIndex, format, args)
+			r.fmtIndex = f.format
+			b.add1(&f, c, r)
 		}
 	}
 }
 
 func (b *Buffer) F(format string, args ...interface{}) {
-	c := GetCaller(PointerToFirstArg(&format))
+	c := b.GetCaller(PointerToFirstArg(&format))
 	b.fc(c, format, args)
 }
 func (b *Buffer) Fc(format string, c Caller, args ...interface{}) {
@@ -1121,9 +1052,44 @@ func (b *Buffer) Fc(format string, c Caller, args ...interface{}) {
 }
 
 func F(format string, args ...interface{}) {
-	c := GetCaller(PointerToFirstArg(&format))
-	DefaultBuffer.fc(c, format, args)
+	b := DefaultBuffer
+	c := b.GetCaller(PointerToFirstArg(&format))
+	b.fc(c, format, args)
 }
 func Fc(format string, c Caller, args ...interface{}) {
 	DefaultBuffer.fc(c, format, args)
+}
+
+// Make it so all events are either dataEvent or fmtEvent.
+// We can't save other event types since decoder might not know about these types.
+func (e *Event) normalize(c *Context) {
+	r := c.callers[e.callerIndex]
+	switch r.t {
+	case reflect.TypeOf(fmtEvent{}), reflect.TypeOf(dataEvent{}):
+		// nothing to do: already normal.
+	default:
+		copy := *e
+		copyValid := false
+		e.format(r.t, c, func(format string, args ...interface{}) (s string) {
+			if copyValid {
+				return
+			}
+			copyValid = true
+			if len(args) == 0 {
+				d := dataEventFor(format)
+				copy.setData(c, &d)
+			} else {
+				f := fmtEventFor(c, StringRefNil, format, args)
+				copy.setData(c, &f)
+			}
+			return
+		})
+	}
+}
+
+func (v *View) normalizeEvents() {
+	c := v.GetContext()
+	for i := range v.Events {
+		v.Events[i].normalize(c)
+	}
 }

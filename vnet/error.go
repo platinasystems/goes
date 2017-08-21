@@ -58,24 +58,11 @@ type errorEvent struct {
 	n uint64
 }
 
-func (e *errorEvent) Strings(x *elog.Context) []string {
+func (e *errorEvent) Format(x *elog.Context, f elog.Format) string {
 	err := ErrorNode.errs[e.e]
-	return []string{fmt.Sprintf("%s %s %d", err.nodeName, err.str, e.n)}
+	return f("%s %s %d", err.nodeName, err.str, e.n)
 }
-func (e *errorEvent) Encode(_ *elog.Context, b []byte) (i int) {
-	i += elog.EncodeUint32(b[i:], uint32(e.e))
-	i += elog.EncodeUint64(b[i:], uint64(e.n))
-	return
-}
-func (e *errorEvent) Decode(_ *elog.Context, b []byte) (i int) {
-	var x uint32
-	x, i = elog.DecodeUint32(b, i)
-	e.e = ErrorRef(x)
-	e.n, i = elog.DecodeUint64(b, i)
-	return
-}
-
-//go:generate gentemplate -d Package=vnet -id errorEvent -d Type=errorEvent github.com/platinasystems/go/elib/elog/event.tmpl
+func (e *errorEvent) SetData(x *elog.Context, p elog.Pointer) { *(*errorEvent)(p) = *e }
 
 func (t *errorThread) count(e ErrorRef, n uint64) {
 	if elib.Debug {
@@ -86,7 +73,7 @@ func (t *errorThread) count(e ErrorRef, n uint64) {
 	t.counts[e] += n
 	if elog.Enabled() {
 		x := errorEvent{e: e, n: n}
-		x.Log()
+		elog.Add(&x)
 	}
 }
 
@@ -156,7 +143,7 @@ func (d *Node) CountError(i, count uint) {
 	atomic.AddUint64(&ts.counts[e], n)
 	if elog.Enabled() {
 		x := errorEvent{e: e, n: n}
-		x.Log()
+		elog.Add(&x)
 	}
 }
 

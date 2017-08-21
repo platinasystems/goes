@@ -39,7 +39,7 @@ func (t *Time) Cycles(dt float64) {
 	*t = Time(dt * cyclesPerSec)
 }
 
-func TimeInit() { estimateOnce() }
+func TimeInit() float64 { return estimateOnce() }
 
 func measureCPUCyclesPerSec(wait float64) (freq float64) {
 	var t0 [2]Time
@@ -57,7 +57,7 @@ func round(x, unit float64) float64 {
 	return unit * math.Floor(.5+x/unit)
 }
 
-func estimateOnce() {
+func estimateOnce() float64 {
 	cyclesOnce.Do(func() {
 		go estimateFrequency(1e-4, 1e6, 5e5)
 	})
@@ -65,6 +65,7 @@ func estimateOnce() {
 	for atomic.LoadUint32(&estimateDone) == 0 {
 		time.Sleep(10 * time.Microsecond)
 	}
+	return cyclesPerSec
 }
 
 func estimateFrequency(dt, unit, tolerance float64) {

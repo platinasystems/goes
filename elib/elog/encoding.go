@@ -6,14 +6,13 @@ package elog
 
 import (
 	"github.com/platinasystems/go/elib"
-	"github.com/platinasystems/go/elib/cpu"
 
 	"encoding/binary"
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"io"
 	"math"
+	"reflect"
 )
 
 func Uvarint(b []byte) (c []byte, i int) {
@@ -41,19 +40,38 @@ func (v *View) Restore(r io.Reader) (err error) {
 	return
 }
 
-func (e *Event) encodeData(c *Context, b []byte) int { return e.getType().Encode(c, e, b) }
-func (e *Event) decodeData(c *Context, b []byte) int { return e.getType().Decode(c, e, b) }
+func (e *Event) encodeData(b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
+	b, i = b0, i0
+	// Skip trailing zero bytes.
+	var l int
+	for l = len(e.data); l > 0 && e.data[l-1] == 0; l-- {
+	}
+	b.Validate(uint(i + 1 + l))
+	b[i] = byte(l)
+	i++
+	copy(b[i:i+l], e.data[:])
+	i += l
+	return
+}
 
-func (e *Event) encode(c *Context, b0 elib.ByteVec, eType uint16, t0 cpu.Time, i0 int) (b elib.ByteVec, t cpu.Time, i int) {
+func (e *Event) decodeData(b []byte) int {
+	i := 0
+	l := int(b[i])
+	i++
+	copy(e.data[:], b[i:i+l])
+	i += l
+	return i
+}
+
+func (e *Event) encode(c *Context, b0 elib.ByteVec, t0 uint64, i0 int) (b elib.ByteVec, t uint64, i int) {
 	b, i = b0, i0
 	b.Validate(uint(i + 1<<log2EventBytes))
 	// Encode time differences for shorter encodings.
 	t = e.timestamp
 	i += binary.PutUvarint(b[i:], uint64(t-t0))
 	i += binary.PutUvarint(b[i:], uint64(e.callerIndex))
-	i += binary.PutUvarint(b[i:], uint64(eType))
 	i += binary.PutUvarint(b[i:], uint64(e.track))
-	i += e.encodeData(c, b[i:])
+	b, i = e.encodeData(b, i)
 	return
 }
 
@@ -62,7 +80,7 @@ var (
 	errStringOverflow = errors.New("decode string overflow")
 )
 
-func (e *Event) decode(c *Context, b elib.ByteVec, typeMap elib.Uint16Vec, t0 cpu.Time, i0 int) (t cpu.Time, i int, err error) {
+func (e *Event) decode(c *Context, b elib.ByteVec, t0 uint64, i0 int) (t uint64, i int, err error) {
 	i, t = i0, t0
 	var (
 		x uint64
@@ -72,7 +90,7 @@ func (e *Event) decode(c *Context, b elib.ByteVec, typeMap elib.Uint16Vec, t0 cp
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
 	}
-	t += cpu.Time(x)
+	t += uint64(x)
 	e.timestamp = t
 	i += n
 
@@ -85,20 +103,10 @@ func (e *Event) decode(c *Context, b elib.ByteVec, typeMap elib.Uint16Vec, t0 cp
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
 	}
-	if int(x) >= len(typeMap) {
-		err = fmt.Errorf("type index out of range %d >= %d", x, len(typeMap))
-		return
-	}
-	e.typeIndex = typeMap[x]
+	e.track = uint32(x)
 	i += n
 
-	if x, n = binary.Uvarint(b[i:]); n <= 0 {
-		goto short
-	}
-	e.track = uint16(x)
-	i += n
-
-	i += e.decodeData(c, b[i:])
+	i += e.decodeData(b[i:])
 	return
 
 short:
@@ -107,6 +115,7 @@ short:
 }
 
 func encodeString(s string, b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
+	b, i = b0, i0
 	l := len(s)
 	b.Validate(uint(i + binary.MaxVarintLen64 + l))
 	i += binary.PutUvarint(b[i:], uint64(l))
@@ -134,6 +143,7 @@ func decodeString(b elib.ByteVec, i0, maxLen int) (s string, i int, err error) {
 		goto short
 	}
 	s = string(b[i : i+l])
+	i += l
 	return
 
 short:
@@ -141,8 +151,14 @@ short:
 	return
 }
 
-func (c *CallerInfo) encode(b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
-	b.Validate(uint(i + 3*binary.MaxVarintLen64))
+func (c *CallerInfo) encode(isFmtEvent bool, b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
+	b, i = b0, i0
+	b.Validate(uint(i + 1 + 3*binary.MaxVarintLen64))
+	b[i] = 0
+	if isFmtEvent {
+		b[i] = 1
+	}
+	i++
 	i += binary.PutUvarint(b[i:], uint64(c.PC))
 	i += binary.PutUvarint(b[i:], uint64(c.Entry))
 	i += binary.PutUvarint(b[i:], uint64(c.Line))
@@ -151,24 +167,27 @@ func (c *CallerInfo) encode(b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
 	return
 }
 
-func (c *CallerInfo) decode(b elib.ByteVec, i0 int) (i int, err error) {
+func (c *CallerInfo) decode(b elib.ByteVec, i0 int) (isFmtEvent bool, i int, err error) {
+	i = i0
+
+	isFmtEvent = b[i] != 0
+	i++
+
 	var (
 		x uint64
 		n int
 	)
-
-	i = i0
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
 	}
 	i += n
-	c.PC = uintptr(x)
+	c.PC = x
 
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
 	}
 	i += n
-	c.Entry = uintptr(x)
+	c.Entry = x
 
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
@@ -189,20 +208,20 @@ short:
 	return
 }
 
-func (view *View) MarshalBinary() ([]byte, error) {
+func (v *View) MarshalBinary() ([]byte, error) {
 	var b elib.ByteVec
 
 	i := 0
 	bo := binary.BigEndian
 
 	b.Validate(uint(i + 8))
-	bo.PutUint64(b[i:], math.Float64bits(view.timeUnitNsecs()))
+	bo.PutUint64(b[i:], math.Float64bits(v.timeUnitNsec))
 	i += 8
 
 	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(view.cpuStartTime))
+	i += binary.PutUvarint(b[i:], uint64(v.cpuStartTime))
 
-	d, err := view.StartTime.MarshalBinary()
+	d, err := v.StartTime.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -210,64 +229,40 @@ func (view *View) MarshalBinary() ([]byte, error) {
 	i += binary.PutUvarint(b[i:], uint64(len(d)))
 	i += copy(b[i:], d)
 
-	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(len(view.Events)))
-
-	// Map global event types to log local ones.
-	var localTypes elib.Uint16Vec
-	var globalTypes elib.Uint32Vec
-
-	typesUsed := elib.Bitmap(0)
-	for ei := range view.Events {
-		e := &view.Events[ei]
-		ti := uint(e.typeIndex)
-		if !typesUsed.Get(ti) {
-			typesUsed = typesUsed.Orx(ti)
-			globalTypes.Validate(ti)
-			globalTypes[ti] = uint32(len(localTypes))
-			localTypes = append(localTypes, e.typeIndex)
-		}
-	}
-
-	// Encode number of unique types followed by type names.
-	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(len(localTypes)))
-	for x := range localTypes {
-		t := getTypeByIndex(int(localTypes[x]))
-		b.Validate(uint(i + binary.MaxVarintLen64 + len(t.Name)))
-		i += binary.PutUvarint(b[i:], uint64(len(t.Name)))
-		i += copy(b[i:], t.Name)
-	}
-
 	// Callers
+	v.normalizeEvents()
 	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(len(view.callers)))
-	for _, r := range view.callers {
-		c := view.getCallerInfo(r.callerIndex)
-		b, i = c.encode(b, i)
+	i += binary.PutUvarint(b[i:], uint64(len(v.callers)))
+	for _, r := range v.callers {
+		r, c := v.getCallerInfo(r.callerIndex)
+		isFmtEvent := r.t == reflect.TypeOf(fmtEvent{})
+		b, i = c.encode(isFmtEvent, b, i)
 	}
 
 	// String table.
-	b, i = encodeString(string(view.stringTable.t), b, i)
+	b, i = encodeString(string(v.stringTable.t), b, i)
 
-	t := view.cpuStartTime
-	for ei := range view.Events {
-		e := &view.Events[ei]
-		b, t, i = e.encode(view.GetContext(), b, uint16(globalTypes[e.typeIndex]), t, i)
+	// Events.
+	b.Validate(uint(i + binary.MaxVarintLen64))
+	i += binary.PutUvarint(b[i:], uint64(len(v.Events)))
+	t := v.cpuStartTime
+	for ei := range v.Events {
+		e := &v.Events[ei]
+		b, t, i = e.encode(v.GetContext(), b, t, i)
 	}
 
 	return b[:i], nil
 }
 
-func (view *View) UnmarshalBinary(b []byte) (err error) {
+func (v *View) UnmarshalBinary(b []byte) (err error) {
 	i := 0
 	bo := binary.BigEndian
 
-	view.timeUnitNsec = math.Float64frombits(bo.Uint64(b[i:]))
+	v.timeUnitNsec = math.Float64frombits(bo.Uint64(b[i:]))
 	i += 8
 
 	if x, n := binary.Uvarint(b[i:]); n > 0 {
-		view.cpuStartTime = cpu.Time(x)
+		v.cpuStartTime = uint64(x)
 		i += n
 	} else {
 		return errUnderflow
@@ -279,7 +274,7 @@ func (view *View) UnmarshalBinary(b []byte) (err error) {
 		if i+timeLen > len(b) {
 			return errUnderflow
 		}
-		err = view.StartTime.UnmarshalBinary(b[i : i+timeLen])
+		err = v.StartTime.UnmarshalBinary(b[i : i+timeLen])
 		if err != nil {
 			return err
 		}
@@ -288,54 +283,18 @@ func (view *View) UnmarshalBinary(b []byte) (err error) {
 		return errUnderflow
 	}
 
-	if x, n := binary.Uvarint(b[i:]); n > 0 {
-		l := uint(x)
-		if len(view.Events) > 0 {
-			view.Events = view.Events[:0]
-		}
-		view.Events.Resize(l)
-		i += n
-	} else {
-		return errUnderflow
-	}
-
-	var typeMap elib.Uint16Vec
-
-	if x, n := binary.Uvarint(b[i:]); n > 0 {
-		typeMap.Resize(uint(x))
-		i += n
-	} else {
-		return errUnderflow
-	}
-
-	for li := range typeMap {
-		if x, n := binary.Uvarint(b[i:]); n > 0 {
-			i += n
-			nameLen := int(x)
-			if i+nameLen > len(b) {
-				return errUnderflow
-			}
-			name := string(b[i : i+nameLen])
-			i += nameLen
-			if tp, ok := getTypeByName(name); !ok {
-				return fmt.Errorf("unknown type named `%s'", name)
-			} else {
-				typeMap[li] = uint16(tp.index)
-			}
-		} else {
-			return errUnderflow
-		}
-	}
-
 	// Callers
 	if nCallers, n := binary.Uvarint(b[i:]); n > 0 {
 		i += n
 		for j := 0; j < int(nCallers); j++ {
-			var c CallerInfo
-			if i, err = c.decode(b, i); err != nil {
+			var (
+				c          CallerInfo
+				isFmtEvent bool
+			)
+			if isFmtEvent, i, err = c.decode(b, i); err != nil {
 				return
 			}
-			view.addCallerInfo(c)
+			v.addCallerInfo(c, isFmtEvent)
 		}
 	} else {
 		return errUnderflow
@@ -347,34 +306,33 @@ func (view *View) UnmarshalBinary(b []byte) (err error) {
 		if s, i, err = decodeString(b, i, 0); err != nil {
 			return
 		}
-		view.stringTable.init(s)
+		v.stringTable.init(s)
 	}
 
-	t := view.cpuStartTime
-	for ei := 0; ei < len(view.Events); ei++ {
-		e := &view.Events[ei]
-		t, i, err = e.decode(view.GetContext(), b, typeMap, t, i)
+	// Events.
+	if x, n := binary.Uvarint(b[i:]); n > 0 {
+		l := uint(x)
+		if len(v.Events) > 0 {
+			v.Events = v.Events[:0]
+		}
+		v.Events.Resize(l)
+		i += n
+	} else {
+		return errUnderflow
+	}
+	t := v.cpuStartTime
+	for ei := 0; ei < len(v.Events); ei++ {
+		e := &v.Events[ei]
+		t, i, err = e.decode(v.GetContext(), b, t, i)
 		if err != nil {
 			return
 		}
 	}
 
 	b = b[:i]
+	v.e = v.Events
+	v.getViewTimes()
 
-	return
-}
-
-func (t *EventType) MarshalBinary() ([]byte, error) {
-	return []byte(t.Name), nil
-}
-
-func (t *EventType) UnmarshalBinary(data []byte) (err error) {
-	n := string(data)
-	if rt, ok := getTypeByName(n); ok {
-		*t = *rt
-	} else {
-		err = errors.New("unknown type: " + n)
-	}
 	return
 }
 

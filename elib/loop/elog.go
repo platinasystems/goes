@@ -7,8 +7,6 @@ package loop
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/elog"
-
-	"fmt"
 )
 
 type poller_elog_event_type byte
@@ -51,40 +49,14 @@ func (n *Node) pollerElog(t poller_elog_event_type, f node_flags) {
 			flags:        byte(f),
 			node_name:    n.elogNodeName,
 		}
-		le.Logc(c)
+		elog.Addc(&le, c)
 	}
 }
 
-func (e *pollerElogEvent) Strings(x *elog.Context) (lines []string) {
-	lines = []string{
-		fmt.Sprintf("loop%d %v %s", e.poller_index, e.event_type, x.GetString(e.node_name)),
-	}
-	if e.flags != 0 {
-		lines = append(lines, "new flags: "+node_flags(e.flags).String())
-	}
-	return lines
+func (e *pollerElogEvent) Format(x *elog.Context, f elog.Format) string {
+	return f("loop%d %v %s %s", e.poller_index, e.event_type, x.GetString(e.node_name), node_flags(e.flags))
 }
-func (e *pollerElogEvent) Encode(x *elog.Context, b []byte) int {
-	b = elog.PutUvarint(b, int(e.poller_index))
-	b = elog.PutUvarint(b, int(e.event_type))
-	b = elog.PutUvarint(b, int(e.flags))
-	b = elog.PutUvarint(b, int(e.node_name))
-	return len(b)
-}
-func (e *pollerElogEvent) Decode(x *elog.Context, b []byte) int {
-	var i [4]int
-	b, i[0] = elog.Uvarint(b)
-	b, i[1] = elog.Uvarint(b)
-	b, i[2] = elog.Uvarint(b)
-	b, i[3] = elog.Uvarint(b)
-	e.poller_index = byte(i[0])
-	e.event_type = poller_elog_event_type(i[1])
-	e.flags = byte(i[2])
-	e.node_name = elog.StringRef(i[3])
-	return len(b)
-}
-
-//go:generate gentemplate -d Package=loop -id pollerElogEvent -d Type=pollerElogEvent github.com/platinasystems/go/elib/elog/event.tmpl
+func (e *pollerElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*pollerElogEvent)(p) = *e }
 
 type callEvent struct {
 	active_index uint32
@@ -92,8 +64,13 @@ type callEvent struct {
 	node_name    elog.StringRef
 }
 
+func (e *callEvent) Format(x *elog.Context, f elog.Format) string {
+	return f("loop%d %s(%d)", e.active_index, x.GetString(e.node_name), e.n_vectors)
+}
+func (e *callEvent) SetData(x *elog.Context, p elog.Pointer) { *(*callEvent)(p) = *e }
+
 func (e *callEvent) Strings(x *elog.Context) []string {
-	return []string{fmt.Sprintf("loop%d %s(%d)", e.active_index, x.GetString(e.node_name), e.n_vectors)}
+	return []string{}
 }
 func (e *callEvent) Encode(_ *elog.Context, b []byte) (i int) {
 	i += elog.EncodeUint32(b[i:], e.active_index)

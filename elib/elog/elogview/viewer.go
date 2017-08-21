@@ -131,7 +131,7 @@ type viewer struct {
 	ves                  []visible_event
 	popup_by_event_index map[uint]*popup
 	popups               []*popup
-	m                    map[uintptr]*decoration
+	m                    map[uint64]*decoration
 	pointer              pointer_state
 	Config
 }
@@ -458,7 +458,7 @@ func (p0 *popup) dt(p1 *popup) (dt float64) {
 func (p *popup) draw_popup(da *gtk.DrawingArea, cr *cairo.Context) {
 	e, de := p.get_event(), p.get_visible_event()
 
-	lines := p.v.ev.Strings(e)
+	lines := e.Strings(p.v.ev.GetContext())
 
 	// Indent lines after first.
 	for i := range lines {
@@ -504,9 +504,9 @@ type decoration struct {
 	color rgba
 }
 
-func (v *viewer) decorationForPc(pc uintptr) (d *decoration, ok bool) {
+func (v *viewer) decorationForPc(pc uint64) (d *decoration, ok bool) {
 	if v.m == nil {
-		v.m = make(map[uintptr]*decoration)
+		v.m = make(map[uint64]*decoration)
 	}
 	if d, ok = v.m[pc]; !ok {
 		i := len(v.m)
@@ -660,7 +660,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			continue
 		}
 
-		lines := ev.Strings(e)
+		lines := e.Strings(ev.GetContext())
 		ci := ev.EventCaller(e)
 		pc := ci.PC
 		d, _ := v.decorationForPc(pc)
