@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	log2EventBytes = 6
+	log2EventBytes = 7
 	EventDataBytes = 1<<log2EventBytes - (1*8 + 1*4)
 )
 
@@ -49,6 +49,8 @@ type Event struct {
 	// 1 or more cache lines could follow depending on callerIndex.
 	data [EventDataBytes]byte
 }
+
+func (e *Event) GetCaller() uint { return uint(e.callerIndex) }
 
 type Format func(format string, args ...interface{}) string
 
@@ -637,14 +639,15 @@ func (c *CallerInfo) ShortPath(p string, max uint) (f string, overflow bool) {
 	}
 
 	fs := strings.Split(p, "/")
-	i, n := uint(len(fs))-1, uint(0)
+	n_fs := uint(len(fs))
+	i, n := n_fs-1, uint(0)
 	for {
 		if f != "" {
 			f = "/" + f
 			n++
 		}
 		l := uint(len(fs[i]))
-		if overflow = n+l > max; overflow {
+		if overflow = i+1 < n_fs && n+l > max; overflow {
 			break
 		}
 		f = fs[i] + f
@@ -667,11 +670,15 @@ func (e *Event) format(t reflect.Type, x *Context, c Format) string {
 	return out[0].Interface().(string)
 }
 
-func (e *Event) String(c *Context) string {
+func (e *Event) String(c *Context) (s string) {
 	r := c.callers[e.callerIndex]
-	return e.format(r.t, c, fmt.Sprintf)
+	s = e.format(r.t, c, fmt.Sprintf)
+	s = strings.TrimSpace(s)
+	return
 }
-func (e *Event) Strings(c *Context) []string { return strings.Split(e.String(c), "\n") }
+func (e *Event) Strings(c *Context) []string {
+	return strings.Split(e.String(c), "\n")
+}
 func (e *Event) timeString(sh *shared) string {
 	return e.time(sh).Format("2006-01-02 15:04:05.000000000")
 }
@@ -1022,7 +1029,12 @@ type dataEvent struct {
 
 func (e *dataEvent) SetData(c *Context, p Pointer)      { *(*dataEvent)(p) = *e }
 func (e *dataEvent) Format(c *Context, f Format) string { return f(String(e.b[:])) }
-func (e *dataEvent) set(s string)                       { copy(e.b[:], s) }
+func (e *dataEvent) set(s string) {
+	i := copy(e.b[:], s)
+	if i < len(e.b[:]) {
+		e.b[i] = 0
+	}
+}
 
 func (b *Buffer) fmt(c Caller, format string, args []interface{}) {
 	if !Enabled() {
