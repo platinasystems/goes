@@ -177,6 +177,7 @@ func (c *CallerInfo) decode(b elib.ByteVec, i0 int) (isFmtEvent bool, i int, err
 		x uint64
 		n int
 	)
+	const maxLen = 4 << 10
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
 	}
@@ -195,7 +196,6 @@ func (c *CallerInfo) decode(b elib.ByteVec, i0 int) (isFmtEvent bool, i int, err
 	i += n
 	c.Line = int(x)
 
-	const maxLen = 4 << 10
 	c.Name, i, err = decodeString(b, i, maxLen)
 	if err != nil {
 		return
