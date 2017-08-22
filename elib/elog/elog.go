@@ -1095,6 +1095,9 @@ func (b *Buffer) FBool(format string, v bool) {
 	b.FcBool(format, c, v)
 }
 func (b *Buffer) FcBool(format string, c Caller, v bool) {
+	if !Enabled() {
+		return
+	}
 	if r, disabled := b.getCaller(c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
@@ -1121,6 +1124,9 @@ func (b *Buffer) FUint(format string, v uint64) {
 	b.FcUint(format, c, v)
 }
 func (b *Buffer) FcUint(format string, c Caller, v uint64) {
+	if !Enabled() {
+		return
+	}
 	if r, disabled := b.getCaller(c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
@@ -1143,6 +1149,9 @@ func (b *Buffer) F2Uint(format string, v0, v1 uint64) {
 	b.Fc2Uint(format, c, v0, v1)
 }
 func (b *Buffer) Fc2Uint(format string, c Caller, v0, v1 uint64) {
+	if !Enabled() {
+		return
+	}
 	if r, disabled := b.getCaller(c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
