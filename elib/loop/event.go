@@ -168,10 +168,11 @@ func (l *eventMain) eventPoller(p EventPoller) {
 }
 func (l *eventMain) startPoller(n EventPoller) { go l.eventPoller(n) }
 
-func (l *Loop) doEventNoWait() (quit *quitEvent) {
+func (l *Loop) doEventNoWait() (quit *quitEvent, didEvent bool) {
 	l.now = cpu.TimeNow()
 	select {
 	case e := <-l.events:
+		didEvent = true
 		var ok bool
 		if quit, ok = e.actor.(*quitEvent); ok {
 			return
@@ -186,10 +187,11 @@ func (l *Loop) duration(t cpu.Time) time.Duration {
 	return time.Duration(float64(int64(t-l.now)) * l.timeDurationPerCycle)
 }
 
-func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent) {
+func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent, didEvent bool) {
 	elog.S("loop event wait")
 	select {
 	case e := <-l.events:
+		didEvent = true
 		var ok bool
 		if quit, ok = e.actor.(*quitEvent); ok {
 			// Log quit event.
@@ -205,21 +207,22 @@ func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent) {
 
 func (l *Loop) doEvents() (quitLoop bool) {
 	var (
-		quit    *quitEvent
-		didWait bool
+		quit     *quitEvent
+		didWait  bool
+		didEvent bool
 	)
-	if _, didWait = l.activePollerState.setEventWait(true); didWait {
+	if _, didWait = l.activePollerState.setEventWait(); didWait {
 		l.now = cpu.TimeNow()
 		dt := time.Duration(1<<63 - 1)
 		if t, ok := l.eventPool.NextTime(); ok {
 			dt = l.duration(t)
 		}
 		if didWait = dt > 0; didWait {
-			quit = l.doEventWait(dt)
+			quit, didEvent = l.doEventWait(dt)
 		}
 	}
 	if !didWait {
-		quit = l.doEventNoWait()
+		quit, didEvent = l.doEventNoWait()
 	}
 
 	// Handle expired timed events.
@@ -228,7 +231,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		l.eventPoolLock.Lock()
 		l.eventPool.AdvanceAdd(l.now, &l.eventVec)
 		l.eventPoolLock.Unlock()
-
+		didEvent = true
 		for i := range l.eventVec {
 			l.eventVec[i].EventAction()
 		}
@@ -239,7 +242,9 @@ func (l *Loop) doEvents() (quitLoop bool) {
 	}
 
 	// Wait for all event handlers to become inactive.
-	l.eventMain.Wait()
+	if didEvent {
+		l.eventMain.Wait()
+	}
 
 	quitLoop = quit != nil && quit.Type == quitEventExit
 	return
