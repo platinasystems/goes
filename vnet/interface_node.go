@@ -5,6 +5,7 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/loop"
 )
 
@@ -101,7 +102,24 @@ func (h *HwIf) txNodeUpDown(isUp bool) {
 	}
 }
 
+type txElogEvent struct {
+	node_name elog.StringRef
+	n_refs    uint32
+}
+
+func (e *txElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*txElogEvent)(p) = *e }
+func (e *txElogEvent) Format(x *elog.Context, f elog.Format) string {
+	return f("tx %s send %d buffers", x.GetString(e.node_name), e.n_refs)
+}
+
 func (n *interfaceNode) send(i *TxRefVecIn) {
+	if elog.Enabled() {
+		e := txElogEvent{
+			node_name: n.ElogName(),
+			n_refs:    uint32(i.Len()),
+		}
+		elog.Add(&e)
+	}
 	n.cur_tx_refs += i.Len()
 	n.tx_chan <- i
 }
