@@ -593,6 +593,10 @@ func (h *I2cDev) GetFanSpeed() (string, error) {
 			if (!thCtrl && (thTemp > 55)) || (thCtrl && (thTemp > sThTemp)) {
 				//increase fan speed
 				sThTemp = thTemp
+				duty, err = h.GetFanDuty()
+				if err != nil {
+					return "auto", err
+				}
 				if duty < 0xff {
 					if duty <= 0xdf {
 						h.SetFanDuty(duty + 0x20)

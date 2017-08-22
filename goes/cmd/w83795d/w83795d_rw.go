@@ -48,8 +48,15 @@ var regsAddr = uintptr(unsafe.Pointer(&dummy))
 var clientA *rpc.Client
 var dialed int = 0
 
-func getRegsBank0() *regsBank0  { return (*regsBank0)(regsPointer) }
-func getRegsBank2() *regsBank2  { return (*regsBank2)(regsPointer) }
+func getRegsBank0() *regsBank0 {
+	clearJ()
+	return (*regsBank0)(regsPointer)
+}
+
+func getRegsBank2() *regsBank2 {
+	clearJ()
+	return (*regsBank2)(regsPointer)
+}
 func (r *reg8) offset() uint8   { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16r) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }

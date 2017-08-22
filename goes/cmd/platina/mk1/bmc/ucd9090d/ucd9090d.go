@@ -180,11 +180,7 @@ func (c *Command) update() error {
 }
 
 func (h *I2cDev) ucdInit() error {
-	//FIXME configure UCD run time clock, pending i2c block write
-	//now := time.Now()
-	//nanos := now.UnixNano()
-	//days := nanos / int64(math.Pow(10, 9)) / 60 / 60 / 24
-	//millisecs := (nanos - days*60*60*24*int64(math.Pow(10, 9))) / int64(math.Pow(10, 6))
+	//FIXME configure UCD run time clock, pending ntp
 	return nil
 }
 
@@ -214,73 +210,6 @@ func (h *I2cDev) Vout(i uint8) (float64, error) {
 	return float64(vv), nil
 }
 
-/* FIXME fucntions pending i2c block write
-func (h *I2cDev) LoggedFaults() error {
-	r := getRegs()
-
-	//Print Logged Faults
-	r.LoggedFaults.get(h, 13)
-	closeMux(h)
-	err := DoI2cRpc()
-	if err != nil {
-		return err
-	}
-	log.Printf("logged faults: 0x%x", s[1].D)
-	return nil
-}
-
-func (h *I2cDev) ClearLoggedFaults() error {
-	r := getRegs()
-	data := []byte{12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	r.LoggedFaults.set(h, data)
-	closeMux(h)
-	err := DoI2cRpc()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (h *I2cDev) ConfigLoggedFaults(i int) error {
-	r := getRegs()
-	//read misc config
-	if i == 0 {
-		r.MiscConfig.get(h, 3)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-		log.Printf("misc config: 0x%x", s[1].D)
-		return nil
-	} else if i == 1 {
-		data := []byte{2, 7, 0}
-		r.MiscConfig.set(h, data)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-		return nil
-	} else if i == 2 {
-		data := []byte{2, 0, 0}
-		r.MiscConfig.set(h, data)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-		return nil
-	} else if i == 3 {
-		r.StoreDefaultAll.set(h, 0x2a)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-*/
 func (h *I2cDev) PowerCycles() (string, error) {
 	r := getRegs()
 	r.LoggedFaultIndex.get(h)
@@ -329,6 +258,8 @@ func (h *I2cDev) PowerCycles() (string, error) {
 			}
 			if firstLog == 0 {
 				log.Printf("warning: power event detected")
+				time.Sleep(5 * time.Second)
+
 				log.Print("notice: re-init fan controller")
 				w83795d.Vdev.Bus = 0
 				w83795d.Vdev.Addr = 0x2f
