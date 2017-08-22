@@ -20,10 +20,12 @@ type ev struct {
 type color uint32
 
 var colorNames = [...]string{
-	0: "red",
-	1: "green",
-	2: "blue",
+	0: "dark blue",
+	1: "light blue",
+	2: "green",
 	3: "yellow",
+	4: "orange",
+	5: "red",
 }
 
 func (c color) String() string                             { return colorNames[c] }
@@ -66,21 +68,27 @@ func main() {
 		runtime.ReadMemStats(&ms[0])
 		var e ev
 		for i := uint64(0); i < uint64(n_events); i++ {
+			color := color(i % uint64(len(colorNames)))
 			if useFmt {
-				switch i % 4 {
+				fmt := colorNames[i] + " %d"
+				switch color {
 				case 0:
-					elog.FUint("red wjof owfj owjf wofjwf %d", i)
+					elog.FUint(fmt, i)
 				case 1:
-					elog.FUint("green %d", i)
+					elog.FUint(fmt, i)
 				case 2:
-					elog.FUint("blue %d", i)
+					elog.FUint(fmt, i)
 				case 3:
-					elog.FUint("yellow %d", i)
+					elog.FUint(fmt, i)
+				case 4:
+					elog.FUint(fmt, i)
+				case 5:
+					elog.FUint(fmt, i)
 				}
 			} else {
-				e.color = color(i % 4)
+				e.color = color
 				e.i = uint32(i)
-				switch i % 4 {
+				switch color {
 				case 0:
 					elog.Add(&e)
 				case 1:
@@ -88,6 +96,10 @@ func main() {
 				case 2:
 					elog.Add(&e)
 				case 3:
+					elog.Add(&e)
+				case 4:
+					elog.Add(&e)
+				case 5:
 					elog.Add(&e)
 				}
 			}
