@@ -586,7 +586,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		var ve visible_event
 
 		x := r2.XY((t-t_min)/(t_max-t_min)*w.X(), w.Y()/2)
-		if visible := x.X() >= 0 && x.X() < w.X(); !visible {
+		if x_visible := x.X() >= 0 && x.X() < w.X(); !x_visible {
 			continue
 		}
 
@@ -612,8 +612,8 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 
 		// Choose integer Y such that text will not overlap with other text.
 		var (
-			idy     int
-			visible bool
+			idy       int
+			y_visible bool
 		)
 		y_level := uint(0)
 		for {
@@ -628,7 +628,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 
 			// Rounded rect with event text inside.
 			ve.rr.Center = center - r2.XY(0, (fe.Height+2*radius)*float64(idy))
-			if visible = ve.rr.Center.Y() >= dw.Y() && ve.rr.Center.Y()+ve.rr.Size.Y() <= w.Y()+dw.Y(); !visible {
+			if y_visible = ve.rr.Center.Y() >= dw.Y() && ve.rr.Center.Y()+ve.rr.Size.Y() <= w.Y()+dw.Y(); !y_visible {
 				break
 			}
 
@@ -639,28 +639,26 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			}
 			y_level++
 		}
-		if !visible {
-			continue
-		}
 
 		ve.ei = uint(i)
-
-		upper_left := ve.rr.Center - ve.rr.Size/2
-		bg := d.bg.lighten(.5)
-		fg := black
-		f := .1
-		c.set_pattern(upper_left, ve.rr.Size, bg, f)
-		c.roundedRect(upper_left, ve.rr.Size, radius)
-		cr.Fill()
-		cr.SetSourceRGB(fg.RGB())
-		c.textf(ve.rr.Center, text_align_center, lines[0])
-		cr.Stroke()
+		if y_visible {
+			upper_left := ve.rr.Center - ve.rr.Size/2
+			bg := d.bg.lighten(.5)
+			fg := black
+			f := .1
+			c.set_pattern(upper_left, ve.rr.Size, bg, f)
+			c.roundedRect(upper_left, ve.rr.Size, radius)
+			cr.Fill()
+			cr.SetSourceRGB(fg.RGB())
+			c.textf(ve.rr.Center, text_align_center, lines[0])
+			cr.Stroke()
+		}
 
 		// (A) Plot event points on event line at iy == 0 and lines between text & event line.
 		{
 			cr.Save()
 			const max_idy = 6
-			show_line := idy >= -max_idy && idy <= +max_idy
+			show_line := y_visible && idy >= -max_idy && idy <= +max_idy
 			dot_radius := .9 * radius
 			if show_line {
 				if idy > 0 {
@@ -684,7 +682,9 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		}
 
 		// Save away for later use.
-		v.ves = append(v.ves, ve)
+		if y_visible {
+			v.ves = append(v.ves, ve)
+		}
 	}
 
 	// Selected events.
