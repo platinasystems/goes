@@ -244,13 +244,17 @@ func makeActivePollerState(nActive uint, eventWait bool) (s activePollerState) {
 	}
 	return
 }
-func (s *activePollerState) setEventWait(v bool) (uint, bool) {
-	old, n, w := s.get()
-	new := makeActivePollerState(n, v)
-	if !s.compare_and_swap(old, new) {
-		v = w
+func (s *activePollerState) setEventWait() (nActive uint, wait bool) {
+	var old activePollerState
+	if old, nActive, wait = s.get(); nActive == 0 {
+		wantWait := true
+		new := makeActivePollerState(nActive, wantWait)
+		if !s.compare_and_swap(old, new) {
+			return
+		}
+		wait = wantWait
 	}
-	return n, v
+	return
 }
 func (s *activePollerState) changeActive(isActive bool) (uint, bool) {
 	for {
@@ -263,7 +267,7 @@ func (s *activePollerState) changeActive(isActive bool) (uint, bool) {
 			}
 			n -= 1
 		}
-		new := makeActivePollerState(n, w)
+		new := makeActivePollerState(n, w && n == 0)
 		if s.compare_and_swap(old, new) {
 			return n, w
 		}
@@ -321,7 +325,9 @@ func (l *Loop) Resume(in *In) {
 			new &^= node_suspended
 			if p.node_flags.compare_and_swap(old, new) {
 				p.pollerElog(poller_resume, new)
-				p.changeActive(true)
+				if old&node_active == 0 {
+					p.changeActive(true)
+				}
 				break
 			}
 		}
@@ -365,7 +371,7 @@ func (l *Loop) doPollers() {
 			n.allocActivePoller(n.loop)
 		}
 		n.set_flag(node_polling, true)
-		n.pollerElog(poller_start, n.get_flags())
+		n.pollerElog(poller_wake, n.get_flags())
 		// Start poller who will be blocked waiting on fromLoop.
 		n.fromLoop <- struct{}{}
 	}
@@ -383,7 +389,7 @@ func (l *Loop) doPollers() {
 
 		<-n.toLoop
 		n.set_flag(node_polling, false)
-		n.pollerElog(poller_done, n.get_flags())
+		n.pollerElog(poller_wait, n.get_flags())
 
 		// If not active anymore we can free it now.
 		// TODO: smp races.  Disabled for now.
