@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -198,6 +199,7 @@ var initOnce sync.Once
 func View(ev *elog.View, cf Config) {
 	v := &viewer{ev: ev, Config: cf}
 
+	runtime.LockOSThread()
 	initOnce.Do(func() { gtk.Init(nil) })
 
 	v.eb_border = r2.XY(40, 60)
