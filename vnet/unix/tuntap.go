@@ -256,7 +256,7 @@ func (i *tuntap_interface) ioctl_helper(fd int, req ifreq_type, arg uintptr, is_
 		return
 	}
 	if e != 0 {
-		err = fmt.Errorf("tuntap ioctl %s: %s", req, e)
+		err = fmt.Errorf("tuntap ioctl %s %s: %s", i.name, req, e)
 	}
 	return
 }
