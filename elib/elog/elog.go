@@ -992,7 +992,7 @@ func (e *fmtEvent) decode(c *Context) (args []interface{}) {
 		}
 		switch kind {
 		case fmtBoolTrue, fmtBoolFalse:
-			args = append(args, b[i] == fmtBoolTrue)
+			args = append(args, kind == fmtBoolTrue)
 			i++
 		case fmtInt:
 			x, n := binary.Varint(b[i:])
