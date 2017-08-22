@@ -147,12 +147,33 @@ func (n *myInterface) InterfaceInput(o *vnet.RefOut) {
 	panic("ga")
 }
 
+type myElogEvent struct {
+	node_name elog.StringRef
+	is_inject bool
+	n         uint32
+}
+
+func (e *myElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*myElogEvent)(p) = *e }
+func (e *myElogEvent) Format(x *elog.Context, f elog.Format) string {
+	inject := ""
+	if e.is_inject {
+		inject = " inject"
+	}
+	return f("%s tx%s %d packets", x.GetString(e.node_name), inject, e.n)
+}
+
 func (n *myInterface) InterfaceOutput(in *vnet.TxRefVecIn) {
 	if false {
 		// Enable to test poller suspend/resume.
 		time.Sleep(1 * time.Second)
 	}
-	elog.F("%s tx %d packets", n.ElogName(), in.NPackets())
+	if elog.Enabled() {
+		e := myElogEvent{
+			node_name: n.ElogName(),
+			n:         uint32(in.NPackets()),
+		}
+		elog.Add(&e)
+	}
 	if n.n.verbose_output {
 		for i := range in.Refs {
 			fmt.Printf("%s: %x\n", n.Name(), in.Refs[i].DataSlice())
@@ -168,7 +189,14 @@ type inject_node struct {
 
 func (n *inject_node) NodeOutput(in *vnet.RefIn) {
 	l := in.InLen()
-	elog.F("%s inject %d packets", n.ElogName(), l)
+	if elog.Enabled() {
+		e := myElogEvent{
+			node_name: n.ElogName(),
+			n:         uint32(l),
+			is_inject: true,
+		}
+		elog.Add(&e)
+	}
 	for i := uint(0); i < l; i++ {
 		r := in.Refs[i]
 		fmt.Printf("%s %s: %x\n", n.Name(), r.Si.Name(n.Vnet), r.DataSlice())
