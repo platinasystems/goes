@@ -414,6 +414,15 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 	prevNode := a.currentNode
 	nVec = f.totalVectors(a)
 	a.timeNow = prevNode.inputStats.update(nVec, a.timeNow)
+	if elog.Enabled() {
+		e := callEvent{
+			active_index: uint32(a.index),
+			node_name:    prevNode.elogNodeName,
+			n_vectors:    uint32(nVec),
+			is_input:     true,
+		}
+		elog.Add(&e)
+	}
 	if nVec == 0 {
 		return
 	}
