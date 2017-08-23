@@ -52,7 +52,6 @@ func (e *pollerElogEvent) Format(x *elog.Context, f elog.Format) {
 		f("new flags: %s", node_flags(e.flags))
 	}
 }
-func (e *pollerElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*pollerElogEvent)(p) = *e }
 
 func (n *Node) pollerElog(t poller_elog_event_type, f node_flags) {
 	if elog.Enabled() {
@@ -83,4 +82,3 @@ func (e *callEvent) Format(x *elog.Context, f elog.Format) {
 		f("loop%d %s(%d)", e.active_index, n, nv)
 	}
 }
-func (e *callEvent) SetData(x *elog.Context, p elog.Pointer) { *(*callEvent)(p) = *e }

@@ -31,10 +31,10 @@ import (
 
 const (
 	log2EventBytes = 6
-	EventDataBytes = 1<<log2EventBytes - (1*8 + 1*4)
+	EventDataBytes = 1<<log2EventBytes - (1*8 + 2*4)
 )
 
-type Event struct {
+type eventHeader struct {
 	// Cpu time when event was logged.
 	timestamp uint64
 
@@ -44,6 +44,10 @@ type Event struct {
 	// Track which can be used to separate events onto different
 	// "tracks" which can be separately viewed graphically.
 	track uint32
+}
+
+type Event struct {
+	eventHeader
 
 	// Opaque event data.  Type dependent.
 	// 1 or more cache lines could follow depending on callerIndex.
@@ -51,13 +55,6 @@ type Event struct {
 }
 
 func (e *Event) GetCaller() uint { return uint(e.callerIndex) }
-
-type Format func(format string, args ...interface{})
-
-type eventData interface {
-	Format(c *Context, f Format)
-	SetData(c *Context, p Pointer)
-}
 
 type EventTrack struct {
 	Name  string
@@ -233,14 +230,16 @@ type eventFilter struct {
 }
 
 type callerCache struct {
-	f           eventFilter
-	pc          uint64
-	fmtIndex    StringRef
-	t           reflect.Type
-	callerIndex uint32
-	callerInfo  CallerInfo
-	de          dataEvent
-	fe          fmtEvent
+	f                 eventFilter
+	pc                uint64
+	fmtIndex          StringRef
+	t                 reflect.Type
+	sizeofT           uint
+	formatMethodIndex int
+	callerIndex       uint32
+	callerInfo        CallerInfo
+	de                dataEvent
+	fe                fmtEvent
 }
 
 // Event filter info shared between Buffer and View.
@@ -286,7 +285,7 @@ func (b *Buffer) GetCaller(a PointerToFirstArg) (c Caller) {
 }
 func GetCaller(a PointerToFirstArg) (c Caller) { return DefaultBuffer.GetCaller(a) }
 
-func (m *Buffer) getCaller(caller Caller) (c *callerCache, disable bool) {
+func (m *Buffer) getCaller(d eventData, isFmt bool, caller Caller) (c *callerCache, disable bool) {
 	// Check 1st level hash.  No lock required.
 	pc := caller.pc
 	pch := &m.h[caller.pcHash&(1<<log2HLen-1)]
@@ -326,6 +325,14 @@ func (m *Buffer) getCaller(caller Caller) (c *callerCache, disable bool) {
 		m.callerByPC = make(map[uint64]*callerCache)
 	}
 	c = &callerCache{pc: pc, callerIndex: uint32(len(m.callers))}
+	if d == nil {
+		if isFmt {
+			d = &c.fe
+		} else {
+			d = &c.de
+		}
+	}
+	c.initData(d)
 	m.callers = append(m.callers, c)
 	if found != nil {
 		c.f = *found
@@ -417,21 +424,60 @@ func (b *Buffer) DisableAfter(n uint64) {
 	b.lockIndex(false)
 }
 
-func typeOf(d eventData) (t reflect.Type) {
-	t = reflect.TypeOf(d)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	return
+type Format func(format string, args ...interface{})
+
+const eventDataFormatMethod = "Format"
+
+type eventData interface {
+	Format(c *Context, f Format)
 }
 
-func (e *Event) setData(c *Context, d eventData) { d.SetData(c, Pointer(&e.data[0])) }
+func (r *callerCache) initData(d eventData) {
+	pt := reflect.TypeOf(d)
+	if pt.Kind() != reflect.Ptr {
+		panic("must be pointer " + pt.Name())
+	}
+	t := pt.Elem()
+	r.t, r.sizeofT = t, uint(t.Size())
+	if m, ok := pt.MethodByName(eventDataFormatMethod); !ok {
+		panic("no " + eventDataFormatMethod + " method for " + t.Name())
+	} else {
+		r.formatMethodIndex = m.Index
+	}
+}
+
+func (e *Event) setData(d eventData, size uint) {
+	type u [EventDataBytes / 8]uint64
+	var src, dst *u
+	src = (*u)(unsafe.Pointer(reflect.ValueOf(d).Pointer()))
+	dst = (*u)(unsafe.Pointer(&e.data[0]))
+	i, n_left := 0, int(size)
+	for n_left >= 4*8 {
+		dst[i+0] = src[i+0]
+		dst[i+1] = src[i+1]
+		dst[i+2] = src[i+2]
+		dst[i+3] = src[i+3]
+		n_left -= 8 * 4
+		i += 4
+	}
+	for n_left >= 2*8 {
+		dst[i+0] = src[i+0]
+		dst[i+1] = src[i+1]
+		n_left -= 8 * 2
+		i += 2
+	}
+	for n_left > 0 {
+		dst[i+0] = src[i+0]
+		n_left -= 8 * 1
+		i += 1
+	}
+}
+
 func (b *Buffer) add1(d eventData, c Caller, r *callerCache) {
 	e := b.getEvent()
 	e.timestamp = c.time
 	e.callerIndex = r.callerIndex
-	r.t = typeOf(d)
-	e.setData(b.GetContext(), d)
+	e.setData(d, r.sizeofT)
 	return
 }
 
@@ -439,7 +485,7 @@ func (b *Buffer) Add(d eventData, c Caller) {
 	if !b.Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(c); !disabled {
+	if r, disabled := b.getCaller(d, false, c); !disabled {
 		b.add1(d, c, r)
 	}
 }
@@ -624,7 +670,7 @@ func (v *shared) addCallerInfo(c CallerInfo, isFmtEvent bool) {
 	} else {
 		d = &dataEvent{}
 	}
-	cc.t = typeOf(d)
+	cc.initData(d)
 	v.callers = append(v.callers, cc)
 	if v.callerByPC == nil {
 		v.callerByPC = make(map[uint64]*callerCache)
@@ -663,9 +709,9 @@ func (c *CallerInfo) ShortPath(p string, max uint) (f string, overflow bool) {
 	return
 }
 
-func (e *Event) format(t reflect.Type, x *Context, c Format) {
+func (e *Event) format(t reflect.Type, fmt int, x *Context, c Format) {
 	v := reflect.NewAt(t, unsafe.Pointer(&e.data[0]))
-	f := v.MethodByName("Format")
+	f := v.Method(fmt)
 	in := []reflect.Value{reflect.ValueOf(x), reflect.ValueOf(c)}
 	f.Call(in)
 }
@@ -685,7 +731,7 @@ func (l *lines) sprintf(format string, args ...interface{}) {
 func (e *Event) String(c *Context) string {
 	l := lines{}
 	r := c.callers[e.callerIndex]
-	e.format(r.t, c, l.sprintf)
+	e.format(r.t, r.formatMethodIndex, c, l.sprintf)
 	return l.s
 }
 func (e *Event) Strings(c *Context) []string {
@@ -901,25 +947,12 @@ const (
 )
 
 type fmtEvent struct {
-	format StringRef
-	args   [EventDataBytes - SizeofStringRef]byte
+	data [EventDataBytes]byte
 }
 
-func (e *fmtEvent) SetData(c *Context, p Pointer) { *(*fmtEvent)(p) = *e }
 func (e *fmtEvent) Format(c *Context, f Format) {
-	g := c.GetString(e.format)
-	args := e.decode(c)
-	f(g, args...)
-}
-func (e *fmtEvent) setFmt(c *Context, r StringRef, format string) {
-	if r == StringRefNil {
-		r = c.SetString(format)
-	}
-	e.format = r
-}
-func (e *fmtEvent) set(c *Context, r StringRef, format string, args []interface{}) {
-	e.setFmt(c, r, format)
-	e.encode(c, args)
+	format, args := e.decode(c)
+	f(format, args...)
 }
 
 func encodeInt(b []byte, i0 int, v int64) (i int) {
@@ -936,9 +969,16 @@ func encodeUint(b []byte, i0 int, v uint64, kind int) (i int) {
 	return
 }
 
-func (e *fmtEvent) encode(c *Context, args []interface{}) (i int) {
-	b := e.args[:]
-	i = binary.PutUvarint(b[i:], uint64(e.format))
+func (e *fmtEvent) encode(c *Context, r StringRef, doArgs bool, format string, args []interface{}) (f StringRef, i int) {
+	b := e.data[:]
+	f = r
+	if f == StringRefNil {
+		f = c.SetString(format)
+	}
+	i = binary.PutUvarint(b[i:], uint64(f))
+	if !doArgs {
+		return
+	}
 	for _, a := range args {
 		switch v := a.(type) {
 		case bool:
@@ -997,14 +1037,14 @@ func (e *fmtEvent) encode(c *Context, args []interface{}) (i int) {
 	return
 }
 
-func (e *fmtEvent) decode(c *Context) (args []interface{}) {
-	b := e.args[:]
+func (e *fmtEvent) decode(c *Context) (format string, args []interface{}) {
+	b := e.data[:]
 	i := 0
 
 	{
 		x, n := binary.Uvarint(b[i:])
 		i += n
-		e.format = StringRef(x)
+		format = c.GetString(StringRef(x))
 	}
 
 	for {
@@ -1049,8 +1089,7 @@ type dataEvent struct {
 	b [EventDataBytes]byte
 }
 
-func (e *dataEvent) SetData(c *Context, p Pointer) { *(*dataEvent)(p) = *e }
-func (e *dataEvent) Format(c *Context, f Format)   { f(String(e.b[:])) }
+func (e *dataEvent) Format(c *Context, f Format) { f(String(e.b[:])) }
 func (e *dataEvent) set(s string) {
 	i := copy(e.b[:], s)
 	if i < len(e.b[:]) {
@@ -1065,16 +1104,15 @@ func (b *Buffer) fmt(c Caller, format string, args []interface{}) {
 	if !b.Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(c); !disabled {
+	isFmt := len(args) != 0
+	if r, disabled := b.getCaller(nil, isFmt, c); !disabled {
 		if isFmt := len(args) == 0; isFmt {
-			d := &r.de
-			d.set(format)
-			b.add1(d, c, r)
+			r.de.set(format)
+			b.add1(&r.de, c, r)
 		} else {
 			x := b.GetContext()
 			f := &r.fe
-			f.set(x, r.fmtIndex, format, args)
-			r.fmtIndex = f.format
+			r.fmtIndex, _ = f.encode(x, r.fmtIndex, true, format, args)
 			b.add1(f, c, r)
 		}
 	}
@@ -1120,17 +1158,17 @@ func (b *Buffer) FcBool(format string, c Caller, v bool) {
 	if !Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(c); !disabled {
+	if r, disabled := b.getCaller(nil, true, c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
-		f.setFmt(x, r.fmtIndex, format)
-		r.fmtIndex = f.format
-		i := binary.PutUvarint(f.args[:], uint64(f.format))
+		var i int
+		r.fmtIndex, i = f.encode(x, r.fmtIndex, false, format, nil)
 		bv := byte(fmtBoolFalse)
 		if v {
 			bv = fmtBoolTrue
 		}
-		f.args[i] = bv
+		f.data[i] = bv
+		f.data[i+1] = fmtEnd
 		b.add1(f, c, r)
 	}
 }
@@ -1149,13 +1187,13 @@ func (b *Buffer) FcUint(format string, c Caller, v uint64) {
 	if !Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(c); !disabled {
+	if r, disabled := b.getCaller(nil, true, c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
-		f.setFmt(x, r.fmtIndex, format)
-		r.fmtIndex = f.format
-		i := binary.PutUvarint(f.args[:], uint64(f.format))
-		encodeUint(f.args[:], i, v, fmtUint)
+		var i int
+		r.fmtIndex, i = f.encode(x, r.fmtIndex, false, format, nil)
+		i = encodeUint(f.data[:], i, v, fmtUint)
+		f.data[i+1] = fmtEnd
 		b.add1(f, c, r)
 	}
 }
@@ -1174,14 +1212,14 @@ func (b *Buffer) Fc2Uint(format string, c Caller, v0, v1 uint64) {
 	if !Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(c); !disabled {
+	if r, disabled := b.getCaller(nil, true, c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
-		f.setFmt(x, r.fmtIndex, format)
-		r.fmtIndex = f.format
-		i := binary.PutUvarint(f.args[:], uint64(f.format))
-		i = encodeUint(f.args[:], i, v0, fmtUint)
-		i = encodeUint(f.args[:], i, v1, fmtUint)
+		var i int
+		r.fmtIndex, i = f.encode(x, r.fmtIndex, false, format, nil)
+		i = encodeUint(f.data[:], i, v0, fmtUint)
+		i = encodeUint(f.data[:], i, v1, fmtUint)
+		f.data[i+1] = fmtEnd
 		b.add1(f, c, r)
 	}
 }
@@ -1202,20 +1240,22 @@ func (e *Event) normalize(c *Context, nes0 []Event) (nes []Event) {
 		// nothing to do: already normal.
 		nes = append(nes, *e)
 	default:
-		e.format(r.t, c, func(format string, args ...interface{}) {
-			ne := *e
-			if len(args) == 0 {
-				var d dataEvent
-				d.set(format)
-				ne.setData(c, &d)
-			} else {
-				var f fmtEvent
-				f.set(c, StringRefNil, format, args)
-				ne.setData(c, &f)
-			}
-			nes = append(nes, ne)
-			return
-		})
+		e.format(r.t, r.formatMethodIndex, c,
+			func(format string, args ...interface{}) {
+				var ne Event
+				ne.eventHeader = e.eventHeader
+				if len(args) == 0 {
+					var d dataEvent
+					d.set(format)
+					ne.setData(&d, uint(len(format)))
+				} else {
+					var f fmtEvent
+					_, i := f.encode(c, StringRefNil, true, format, args)
+					ne.setData(&f, uint(i))
+					nes = append(nes, ne)
+					return
+				}
+			})
 	}
 	return
 }

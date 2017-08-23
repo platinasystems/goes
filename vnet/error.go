@@ -62,7 +62,6 @@ func (e *errorEvent) Format(x *elog.Context, f elog.Format) {
 	err := ErrorNode.errs[e.e]
 	f("%s %s %d", err.nodeName, err.str, e.n)
 }
-func (e *errorEvent) SetData(x *elog.Context, p elog.Pointer) { *(*errorEvent)(p) = *e }
 
 func (t *errorThread) count(e ErrorRef, n uint64) {
 	if elib.Debug {
