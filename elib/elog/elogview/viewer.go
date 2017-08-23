@@ -143,7 +143,7 @@ func (c *ctx) text(x r2.V, text_align int, lines ...text_line) r2.V {
 	bounding_box := c.text_box(lines)
 	y0 := fe.Ascent - .5*fe.Height*float64(len(lines))
 	for i := range lines {
-		x1 := x + r2.XY(-bounding_box.X()*a+lines[i].e.XBearing, y0+float64(i)*fe.Height)
+		x1 := x + r2.XY(-lines[i].e.Width*a+lines[i].e.XBearing, y0+float64(i)*fe.Height)
 		cr.MoveTo(x1.X(), x1.Y())
 		cr.ShowText(lines[i].s)
 	}
@@ -174,8 +174,9 @@ func (x *ctx) roundedRect(x0, dx r2.V, r float64) {
 
 type viewer struct {
 	win              *gtk.Window
-	box              *gtk.Box
+	vbox             *gtk.Box
 	screen_dpi       float64
+	heading_da       *gtk.DrawingArea
 	da               *gtk.DrawingArea
 	eb               *gtk.EventBox
 	eb_dx, eb_border r2.V
@@ -202,27 +203,39 @@ func View(ev *elog.View, cf Config) {
 	runtime.LockOSThread()
 	initOnce.Do(func() { gtk.Init(nil) })
 
-	v.eb_border = r2.XY(40, 60)
+	v.eb_border = r2.XY(40, 20)
 	v.eb_dx = r2.IJ(cf.Width, cf.Height)
 
 	v.win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
-	v.win.SetTitle("Event log")
+	{
+		title := "Event log"
+		if n := ev.Name(); n != "" {
+			title += " " + n
+		}
+		v.win.SetTitle(title)
+	}
 	v.win.SetDefaultSize(v.eb_dx.IJ())
 	v.win.Connect("destroy", v.quit)
 	scr, _ := v.win.GetScreen()
 	v.screen_dpi = scr.GetResolution()
 
+	v.vbox, _ = gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	v.win.Add(v.vbox)
+
+	v.heading_da, _ = gtk.DrawingAreaNew()
+	v.heading_da.SetSizeRequest(v.eb_dx.I(), 60)
+	v.heading_da.Connect("draw", v.draw_heading)
+	v.vbox.PackStart(v.heading_da, false, false, 0)
+
 	v.eb, _ = gtk.EventBoxNew()
+	v.eb.SetSizeRequest(v.eb_dx.I(), int(.9*v.eb_dx.Y()))
 	v.eb.SetCanFocus(true)
 	v.eb.SetEvents(int(gdk.KEY_PRESS_MASK |
 		gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK | gdk.POINTER_MOTION_MASK))
 
 	v.da, _ = gtk.DrawingAreaNew()
 	v.eb.Add(v.da)
-
-	v.box, _ = gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
-	v.box.PackStart(v.eb, true, true, 0)
-	v.win.Add(v.box)
+	v.vbox.PackStart(v.eb, true, true, 0)
 
 	v.da.Connect("draw", v.draw_events)
 	v.eb.Connect("button_press_event", v.button_press)
@@ -546,6 +559,25 @@ func (c *ctx) time_axis(v *viewer, t float64, dx r2.V, text_align int, bg rgb, l
 	}
 }
 
+func (v *viewer) draw_heading(da *gtk.DrawingArea, cr *cairo.Context) {
+	c := (*ctx)(cr)
+	ev, tb := v.ev, &v.ev.Times
+	w := r2.IJ(da.GetAllocatedWidth(), da.GetAllocatedHeight())
+
+	cr.SelectFontFace("Mono", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+	cr.SetFontSize(16)
+	cr.SetSourceRGB(black.RGB())
+	var l [2]text_line
+	if n := ev.Name(); len(n) > 0 {
+		l[0].s = n + ": "
+	}
+	l[0].s += fmt.Sprintf("%d events", len(ev.Events))
+	l[1].s = tb.Start.Format("2006-01-02 15:04:05:000000")
+	bbox := c.text_box(l[:])
+	c.text(r2.XY(w.X()/2, w.Y()-bbox.Y()/2), text_align_center, l[:]...)
+	cr.Stroke()
+}
+
 func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	ev, tb := v.ev, &v.ev.Times
 
@@ -564,16 +596,23 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	draw_axis_line := true
 
 	// Axes
-	c.time_axis(v, t_min, r2.XY(0, -10), text_align_center, bg_color, draw_axis_line, "%.0f%s", t_min/tb.Unit, tb.UnitName)
-	c.time_axis(v, t_max, r2.XY(0, -10), text_align_center, bg_color, draw_axis_line, "%.0f%s", t_max/tb.Unit, tb.UnitName)
+	axis_dx := r2.XY(0, -10)
+	c.time_axis(v, t_min, axis_dx, text_align_center, bg_color, draw_axis_line, "%.0f%s", t_min/tb.Unit, tb.UnitName)
+	c.time_axis(v, t_max, axis_dx, text_align_center, bg_color, draw_axis_line, "%.0f%s", t_max/tb.Unit, tb.UnitName)
 
 	// Title
-	{
+	if false {
 		cr.SetSourceRGB(0, 0, 0)
 		x := r2.XY(w.X()/2, dw.Y()/2)
 		cr.SetFontSize(18)
-		c.textf(x, text_align_center, "%d events, %s", len(ev.Events), tb.Start.Format("2006-01-02 15:04:05:000000"))
-		cr.Fill()
+		var l [2]text_line
+		if n := ev.Name(); len(n) > 0 {
+			l[0].s = n + ": "
+		}
+		l[0].s += fmt.Sprintf("%d events", len(ev.Events))
+		l[1].s = tb.Start.Format("2006-01-02 15:04:05:000000")
+		c.text(x, text_align_center, l[:]...)
+		cr.Stroke()
 	}
 
 	if v.ves != nil {
@@ -611,6 +650,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		ve.l[0].s = lines[0]
 		bbox := c.text_box(ve.l)
 		ve.rr.Size = bbox + r2.XY(4*radius, radius)
+		rr_size2 := ve.rr.Size / 2
 
 		// Choose integer Y such that text will not overlap with other text.
 		var (
@@ -630,7 +670,8 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 
 			// Rounded rect with event text inside.
 			ve.rr.Center = center - r2.XY(0, (fe.Height+2*radius)*float64(idy))
-			if y_visible = ve.rr.Center.Y() >= dw.Y() && ve.rr.Center.Y()+ve.rr.Size.Y() <= w.Y()+dw.Y(); !y_visible {
+			if y_visible = ve.rr.Center.Y()-rr_size2.Y() >= dw.Y() &&
+				ve.rr.Center.Y()+rr_size2.Y() <= w.Y()+dw.Y(); !y_visible {
 				break
 			}
 
@@ -712,11 +753,11 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			cr.Fill()
 			t0, t1 := v.x_to_time(x0), v.x_to_time(x1)
 			const dy = 10
-			c.time_axis(v, t0, r2.XY(-dy/2, dy), text_align_right, fg, true, "%.1f%s", t0/tb.Unit, tb.UnitName)
-			c.time_axis(v, t1, r2.XY(+dy/2, dy), text_align_left, fg, true, "%.1f%s", t1/tb.Unit, tb.UnitName)
+			c.time_axis(v, t0, r2.XY(-dy/2, axis_dx.Y()), text_align_right, fg, true, "%.1f%s", t0/tb.Unit, tb.UnitName)
+			c.time_axis(v, t1, r2.XY(+dy/2, axis_dx.Y()), text_align_left, fg, true, "%.1f%s", t1/tb.Unit, tb.UnitName)
 			if x1-x0 > 30 {
 				c.cr().SetSourceRGBA(0, 0, 0, 1)
-				c.textf(r2.XY(.5*(x0+x1), dw.Y()+dy), text_align_center, "%.2f%s", (t1-t0)/tb.Unit, tb.UnitName)
+				c.textf(r2.XY(.5*(x0+x1), dw.Y()+axis_dx.Y()), text_align_center, "%.2f%s", (t1-t0)/tb.Unit, tb.UnitName)
 				cr.Stroke()
 			}
 		}
@@ -825,6 +866,5 @@ func (m *filters) init(v *viewer) {
 	e.SetSizeRequest(50, 30)
 	m.entry = e
 	m.hbox.PackStart(e, false, false, 10)
-
-	v.box.PackStart(m.hbox, false, false, 0)
+	v.vbox.PackStart(m.hbox, false, false, 0)
 }

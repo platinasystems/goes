@@ -154,12 +154,12 @@ type myElogEvent struct {
 }
 
 func (e *myElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*myElogEvent)(p) = *e }
-func (e *myElogEvent) Format(x *elog.Context, f elog.Format) string {
+func (e *myElogEvent) Format(x *elog.Context, f elog.Format) {
 	inject := ""
 	if e.is_inject {
 		inject = " inject"
 	}
-	return f("%s tx%s %d packets", x.GetString(e.node_name), inject, e.n)
+	f("%s tx%s %d packets", x.GetString(e.node_name), inject, e.n)
 }
 
 func (n *myInterface) InterfaceOutput(in *vnet.TxRefVecIn) {

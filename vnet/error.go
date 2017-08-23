@@ -58,9 +58,9 @@ type errorEvent struct {
 	n uint64
 }
 
-func (e *errorEvent) Format(x *elog.Context, f elog.Format) string {
+func (e *errorEvent) Format(x *elog.Context, f elog.Format) {
 	err := ErrorNode.errs[e.e]
-	return f("%s %s %d", err.nodeName, err.str, e.n)
+	f("%s %s %d", err.nodeName, err.str, e.n)
 }
 func (e *errorEvent) SetData(x *elog.Context, p elog.Pointer) { *(*errorEvent)(p) = *e }
 

@@ -21,8 +21,12 @@ func (x V) Abs2() float64 { return x.X()*x.X() + x.Y()*x.Y() }
 func (x V) Abs() float64  { return math.Hypot(x.X(), x.Y()) }
 
 func (x V) XY() (float64, float64) { return x.X(), x.Y() }
-func (x V) UV() (uint, uint)       { return uint(x.X()), uint(x.Y()) }
-func (x V) IJ() (int, int)         { return int(x.X()), int(x.Y()) }
+func (x V) U() uint                { return uint(x.X()) }
+func (x V) V() uint                { return uint(x.Y()) }
+func (x V) UV() (uint, uint)       { return x.U(), x.V() }
+func (x V) I() int                 { return int(x.X()) }
+func (x V) J() int                 { return int(x.Y()) }
+func (x V) IJ() (int, int)         { return x.I(), x.J() }
 
 type Rect struct {
 	Center, Size V

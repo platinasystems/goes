@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	log2EventBytes = 7
+	log2EventBytes = 6
 	EventDataBytes = 1<<log2EventBytes - (1*8 + 1*4)
 )
 
@@ -52,10 +52,10 @@ type Event struct {
 
 func (e *Event) GetCaller() uint { return uint(e.callerIndex) }
 
-type Format func(format string, args ...interface{}) string
+type Format func(format string, args ...interface{})
 
 type eventData interface {
-	Format(c *Context, f Format) string
+	Format(c *Context, f Format)
 	SetData(c *Context, p Pointer)
 }
 
@@ -663,18 +663,30 @@ func (c *CallerInfo) ShortPath(p string, max uint) (f string, overflow bool) {
 	return
 }
 
-func (e *Event) format(t reflect.Type, x *Context, c Format) string {
+func (e *Event) format(t reflect.Type, x *Context, c Format) {
 	v := reflect.NewAt(t, unsafe.Pointer(&e.data[0]))
-	in := []reflect.Value{reflect.ValueOf(x), reflect.ValueOf(fmt.Sprintf)}
-	out := v.MethodByName("Format").Call(in)
-	return out[0].Interface().(string)
+	f := v.MethodByName("Format")
+	in := []reflect.Value{reflect.ValueOf(x), reflect.ValueOf(c)}
+	f.Call(in)
 }
 
-func (e *Event) String(c *Context) (s string) {
+type lines struct {
+	s string
+}
+
+func (l *lines) sprintf(format string, args ...interface{}) {
+	if l.s != "" {
+		l.s += "\n"
+	}
+	line := fmt.Sprintf(format, args...)
+	l.s += strings.TrimSpace(line)
+}
+
+func (e *Event) String(c *Context) string {
+	l := lines{}
 	r := c.callers[e.callerIndex]
-	s = e.format(r.t, c, fmt.Sprintf)
-	s = strings.TrimSpace(s)
-	return
+	e.format(r.t, c, l.sprintf)
+	return l.s
 }
 func (e *Event) Strings(c *Context) []string {
 	return strings.Split(e.String(c), "\n")
@@ -758,6 +770,7 @@ type timeBounds struct {
 
 type View struct {
 	Events EventVec
+	name   string
 	e      EventVec
 	Times  timeBounds
 	shared
@@ -788,6 +801,9 @@ func (b *Buffer) NewView() (v *View) {
 }
 
 func NewView() *View { return DefaultBuffer.NewView() }
+
+func (v *View) SetName(name string) { v.name = name }
+func (v *View) Name() string        { return v.name }
 
 // Make subview with only events between elapsed times t0 and t1.
 func (v *View) SubView(t0, t1 float64) (n uint) {
@@ -890,10 +906,10 @@ type fmtEvent struct {
 }
 
 func (e *fmtEvent) SetData(c *Context, p Pointer) { *(*fmtEvent)(p) = *e }
-func (e *fmtEvent) Format(c *Context, f Format) string {
+func (e *fmtEvent) Format(c *Context, f Format) {
 	g := c.GetString(e.format)
 	args := e.decode(c)
-	return f(g, args...)
+	f(g, args...)
 }
 func (e *fmtEvent) setFmt(c *Context, r StringRef, format string) {
 	if r == StringRefNil {
@@ -932,6 +948,8 @@ func (e *fmtEvent) encode(c *Context, args []interface{}) (i int) {
 			}
 			i++
 		case string:
+			b[i] = fmtString
+			i++
 			l, left := len(v), len(b)
 			if l > left-1 {
 				l = left - 1
@@ -966,7 +984,12 @@ func (e *fmtEvent) encode(c *Context, args []interface{}) (i int) {
 		case float32:
 			i = encodeUint(b, i, uint64(float64(math.Float32bits(v))), fmtFloat)
 		default:
-			panic(fmt.Errorf("elog fmtEvent encode value with unknown type: %v", a))
+			// Convert String() to index into string table and save for re-use.
+			if r, ok := a.(fmt.Stringer); ok {
+				i = encodeUint(b, i, uint64(c.SetString(r.String())), fmtStringRef)
+			} else {
+				panic(fmt.Errorf("elog fmtEvent encode value with unknown type: %v", a))
+			}
 		}
 	}
 	b[i] = fmtEnd
@@ -993,7 +1016,6 @@ func (e *fmtEvent) decode(c *Context) (args []interface{}) {
 		switch kind {
 		case fmtBoolTrue, fmtBoolFalse:
 			args = append(args, kind == fmtBoolTrue)
-			i++
 		case fmtInt:
 			x, n := binary.Varint(b[i:])
 			i += n
@@ -1027,8 +1049,8 @@ type dataEvent struct {
 	b [EventDataBytes]byte
 }
 
-func (e *dataEvent) SetData(c *Context, p Pointer)      { *(*dataEvent)(p) = *e }
-func (e *dataEvent) Format(c *Context, f Format) string { return f(String(e.b[:])) }
+func (e *dataEvent) SetData(c *Context, p Pointer) { *(*dataEvent)(p) = *e }
+func (e *dataEvent) Format(c *Context, f Format)   { f(String(e.b[:])) }
 func (e *dataEvent) set(s string) {
 	i := copy(e.b[:], s)
 	if i < len(e.b[:]) {
@@ -1172,36 +1194,36 @@ func Fc2Uint(f string, c Caller, v0, v1 uint64) { DefaultBuffer.Fc2Uint(f, c, v0
 
 // Make it so all events are either dataEvent or fmtEvent.
 // We can't save other event types since decoder might not know about these types.
-func (e *Event) normalize(c *Context) {
+func (e *Event) normalize(c *Context, nes0 []Event) (nes []Event) {
+	nes = nes0
 	r := c.callers[e.callerIndex]
 	switch r.t {
 	case reflect.TypeOf(fmtEvent{}), reflect.TypeOf(dataEvent{}):
 		// nothing to do: already normal.
+		nes = append(nes, *e)
 	default:
-		copy := *e
-		copyValid := false
-		e.format(r.t, c, func(format string, args ...interface{}) (s string) {
-			if copyValid {
-				return
-			}
-			copyValid = true
+		e.format(r.t, c, func(format string, args ...interface{}) {
+			ne := *e
 			if len(args) == 0 {
 				var d dataEvent
 				d.set(format)
-				copy.setData(c, &d)
+				ne.setData(c, &d)
 			} else {
 				var f fmtEvent
 				f.set(c, StringRefNil, format, args)
-				copy.setData(c, &f)
+				ne.setData(c, &f)
 			}
+			nes = append(nes, ne)
 			return
 		})
 	}
+	return
 }
 
-func (v *View) normalizeEvents() {
+func (v *View) normalizeEvents() (nes []Event) {
 	c := v.GetContext()
 	for i := range v.Events {
-		v.Events[i].normalize(c)
+		nes = v.Events[i].normalize(c, nes)
 	}
+	return
 }

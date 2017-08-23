@@ -108,8 +108,8 @@ type txElogEvent struct {
 }
 
 func (e *txElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*txElogEvent)(p) = *e }
-func (e *txElogEvent) Format(x *elog.Context, f elog.Format) string {
-	return f("tx %s send %d buffers", x.GetString(e.node_name), e.n_refs)
+func (e *txElogEvent) Format(x *elog.Context, f elog.Format) {
+	f("tx %s send %d buffers", x.GetString(e.node_name), e.n_refs)
 }
 
 func (n *interfaceNode) send(i *TxRefVecIn) {
