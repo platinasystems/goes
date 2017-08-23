@@ -268,7 +268,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	i += binary.PutUvarint(b[i:], uint64(len(v.callers)))
 	for _, r := range v.callers {
 		r, c := v.getCallerInfo(r.callerIndex)
-		isFmtEvent := r.t != reflect.TypeOf(dataEvent{})
+		isFmtEvent := r.dataType != reflect.TypeOf(dataEvent{})
 		b, i = c.encode(isFmtEvent, b, i)
 	}
 
