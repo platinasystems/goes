@@ -138,7 +138,9 @@ func (t *stringTable) init(s string) {
 	}
 }
 
-type sharedOkToCopy struct {
+func (dst *stringTable) copyFrom(src *stringTable) { dst.init(string(src.t)) }
+
+type header struct {
 	// Timestamp when log was created.
 	cpuStartTime uint64
 
@@ -147,13 +149,12 @@ type sharedOkToCopy struct {
 
 	// Timer tick in nanosecond units.
 	timeUnitNsec float64
-
-	stringTable
 }
 
 // Shared between Buffer and View.
 type shared struct {
-	sharedOkToCopy
+	header
+	stringTable
 	eventFilterShared
 }
 
@@ -238,7 +239,6 @@ type callerCache struct {
 	formatMethodIndex int
 	callerIndex       uint32
 	callerInfo        CallerInfo
-	de                dataEvent
 	fe                fmtEvent
 }
 
@@ -285,7 +285,7 @@ func (b *Buffer) GetCaller(a PointerToFirstArg) (c Caller) {
 }
 func GetCaller(a PointerToFirstArg) (c Caller) { return DefaultBuffer.GetCaller(a) }
 
-func (m *Buffer) getCaller(d eventData, isFmt bool, caller Caller) (c *callerCache, disable bool) {
+func (m *Buffer) getCaller(d eventData, caller Caller) (c *callerCache, disable bool) {
 	// Check 1st level hash.  No lock required.
 	pc := caller.pc
 	pch := &m.h[caller.pcHash&(1<<log2HLen-1)]
@@ -326,11 +326,7 @@ func (m *Buffer) getCaller(d eventData, isFmt bool, caller Caller) (c *callerCac
 	}
 	c = &callerCache{pc: pc, callerIndex: uint32(len(m.callers)), formatMethodIndex: -1}
 	if d == nil {
-		if isFmt {
-			d = &c.fe
-		} else {
-			d = &c.de
-		}
+		d = &c.fe
 	}
 	c.initDataType(d)
 	m.callers = append(m.callers, c)
@@ -443,7 +439,19 @@ func (r *callerCache) initDataType(d eventData) {
 	var x iface
 	x.tab = i0.tab // <rtype,reflect.Type>
 	x.data = dtab.data
+	r.dataType = nil
 	r.fastDataType = *(*reflect.Type)(Pointer(&x))
+}
+
+func (r *callerCache) getDataType() reflect.Type {
+	if r.dataType == nil {
+		t := r.fastDataType
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		r.dataType = t
+	}
+	return r.dataType
 }
 
 func (e *Event) setData(d eventData) {
@@ -484,7 +492,7 @@ func (b *Buffer) Add(d eventData, c Caller) {
 	if !b.Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(d, false, c); !disabled {
+	if r, disabled := b.getCaller(d, c); !disabled {
 		b.add1(d, c, r)
 	}
 }
@@ -660,16 +668,11 @@ func (v *shared) getCallerInfo(ci uint32) (r *callerCache, c *CallerInfo) {
 	return
 }
 
-func (v *shared) addCallerInfo(c CallerInfo, isFmtEvent bool) {
+func (v *shared) addCallerInfo(c CallerInfo) {
 	pc := c.PC
 	cc := &callerCache{pc: pc, callerIndex: uint32(len(v.callers)), callerInfo: c}
-	var d eventData
-	if isFmtEvent {
-		d = &fmtEvent{}
-	} else {
-		d = &dataEvent{}
-	}
-	cc.initDataType(d)
+	var d fmtEvent
+	cc.initDataType(&d)
 	v.callers = append(v.callers, cc)
 	if v.callerByPC == nil {
 		v.callerByPC = make(map[uint64]*callerCache)
@@ -709,15 +712,7 @@ func (c *CallerInfo) ShortPath(p string, max uint) (f string, overflow bool) {
 }
 
 func (e *Event) format(r *callerCache, x *Context, c Format) {
-	var t reflect.Type
-	if r.dataType == nil {
-		t = r.fastDataType
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-		r.dataType = t
-	}
-	t = r.dataType
+	t := r.getDataType()
 	v := reflect.NewAt(t, unsafe.Pointer(&e.data[0]))
 	if r.formatMethodIndex < 0 {
 		m, ok := v.Type().MethodByName(eventDataFormatMethod)
@@ -842,7 +837,8 @@ type View struct {
 func (b *Buffer) NewView() (v *View) {
 	v = &View{}
 
-	v.shared.sharedOkToCopy = b.shared.sharedOkToCopy
+	v.shared.header = b.shared.header
+	v.shared.stringTable.copyFrom(&b.shared.stringTable)
 	v.shared.eventFilterShared.copyFrom(&b.shared.eventFilterShared)
 
 	l := len(v.Events)
@@ -962,7 +958,7 @@ const (
 )
 
 type fmtEvent struct {
-	data [EventDataBytes]byte
+	b [EventDataBytes]byte
 }
 
 func (e *fmtEvent) Format(c *Context, f Format) {
@@ -985,7 +981,7 @@ func encodeUint(b []byte, i0 int, v uint64, kind int) (i int) {
 }
 
 func (e *fmtEvent) encode(c *Context, r StringRef, doArgs bool, format string, args []interface{}) (f StringRef, i int) {
-	b := e.data[:]
+	b := e.b[:]
 	f = r
 	if f == StringRefNil {
 		f = c.SetString(format)
@@ -1049,11 +1045,14 @@ func (e *fmtEvent) encode(c *Context, r StringRef, doArgs bool, format string, a
 	}
 	b[i] = fmtEnd
 	i++
+
+	e.decode(c)
+
 	return
 }
 
 func (e *fmtEvent) decode(c *Context) (format string, args []interface{}) {
-	b := e.data[:]
+	b := e.b[:]
 	i := 0
 
 	{
@@ -1100,18 +1099,6 @@ func (e *fmtEvent) decode(c *Context) (format string, args []interface{}) {
 	return
 }
 
-type dataEvent struct {
-	b [EventDataBytes]byte
-}
-
-func (e *dataEvent) Format(c *Context, f Format) { f(String(e.b[:])) }
-func (e *dataEvent) set(s string) {
-	i := copy(e.b[:], s)
-	if i < len(e.b[:]) {
-		e.b[i] = 0
-	}
-}
-
 func (b *Buffer) fmt(c Caller, format string, args []interface{}) {
 	if !Enabled() {
 		return
@@ -1119,17 +1106,11 @@ func (b *Buffer) fmt(c Caller, format string, args []interface{}) {
 	if !b.Enabled() {
 		return
 	}
-	isFmt := len(args) != 0
-	if r, disabled := b.getCaller(nil, isFmt, c); !disabled {
-		if isFmt := len(args) == 0; isFmt {
-			r.de.set(format)
-			b.add1(&r.de, c, r)
-		} else {
-			x := b.GetContext()
-			f := &r.fe
-			r.fmtIndex, _ = f.encode(x, r.fmtIndex, true, format, args)
-			b.add1(f, c, r)
-		}
+	if r, disabled := b.getCaller(nil, c); !disabled {
+		x := b.GetContext()
+		f := &r.fe
+		r.fmtIndex, _ = f.encode(x, r.fmtIndex, true, format, args)
+		b.add1(f, c, r)
 	}
 }
 
@@ -1173,7 +1154,7 @@ func (b *Buffer) FcBool(format string, c Caller, v bool) {
 	if !Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(nil, true, c); !disabled {
+	if r, disabled := b.getCaller(nil, c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
 		var i int
@@ -1182,8 +1163,8 @@ func (b *Buffer) FcBool(format string, c Caller, v bool) {
 		if v {
 			bv = fmtBoolTrue
 		}
-		f.data[i] = bv
-		f.data[i+1] = fmtEnd
+		f.b[i] = bv
+		f.b[i+1] = fmtEnd
 		b.add1(f, c, r)
 	}
 }
@@ -1202,13 +1183,13 @@ func (b *Buffer) FcUint(format string, c Caller, v uint64) {
 	if !Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(nil, true, c); !disabled {
+	if r, disabled := b.getCaller(nil, c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
 		var i int
 		r.fmtIndex, i = f.encode(x, r.fmtIndex, false, format, nil)
-		i = encodeUint(f.data[:], i, v, fmtUint)
-		f.data[i+1] = fmtEnd
+		i = encodeUint(f.b[:], i, v, fmtUint)
+		f.b[i+1] = fmtEnd
 		b.add1(f, c, r)
 	}
 }
@@ -1227,14 +1208,14 @@ func (b *Buffer) Fc2Uint(format string, c Caller, v0, v1 uint64) {
 	if !Enabled() {
 		return
 	}
-	if r, disabled := b.getCaller(nil, true, c); !disabled {
+	if r, disabled := b.getCaller(nil, c); !disabled {
 		f := &r.fe
 		x := b.GetContext()
 		var i int
 		r.fmtIndex, i = f.encode(x, r.fmtIndex, false, format, nil)
-		i = encodeUint(f.data[:], i, v0, fmtUint)
-		i = encodeUint(f.data[:], i, v1, fmtUint)
-		f.data[i+1] = fmtEnd
+		i = encodeUint(f.b[:], i, v0, fmtUint)
+		i = encodeUint(f.b[:], i, v1, fmtUint)
+		f.b[i+1] = fmtEnd
 		b.add1(f, c, r)
 	}
 }
@@ -1250,8 +1231,9 @@ func Fc2Uint(f string, c Caller, v0, v1 uint64) { DefaultBuffer.Fc2Uint(f, c, v0
 func (e *Event) normalize(c *Context, nes0 []Event) (nes []Event) {
 	nes = nes0
 	r := c.callers[e.callerIndex]
-	switch r.dataType {
-	case reflect.TypeOf(fmtEvent{}), reflect.TypeOf(dataEvent{}):
+	t := r.getDataType()
+	switch t {
+	case reflect.TypeOf(fmtEvent{}):
 		// nothing to do: already normal.
 		nes = append(nes, *e)
 	default:
@@ -1259,17 +1241,10 @@ func (e *Event) normalize(c *Context, nes0 []Event) (nes []Event) {
 			func(format string, args ...interface{}) {
 				var ne Event
 				ne.eventHeader = e.eventHeader
-				if len(args) == 0 {
-					var d dataEvent
-					d.set(format)
-					ne.setData(&d)
-				} else {
-					var f fmtEvent
-					f.encode(c, StringRefNil, true, format, args)
-					ne.setData(&f)
-					nes = append(nes, ne)
-					return
-				}
+				var f fmtEvent
+				f.encode(c, StringRefNil, true, format, args)
+				ne.setData(&f)
+				nes = append(nes, ne)
 			})
 	}
 	return

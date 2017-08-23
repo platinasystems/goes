@@ -14,6 +14,7 @@ import (
 	"math"
 	"os"
 	"reflect"
+	"unsafe"
 )
 
 func Uvarint(b []byte) (c []byte, i int) {
@@ -174,14 +175,9 @@ short:
 	return
 }
 
-func (c *CallerInfo) encode(isFmtEvent bool, b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
+func (c *CallerInfo) encode(b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
 	b, i = b0, i0
-	b.Validate(uint(i + 1 + 3*binary.MaxVarintLen64))
-	b[i] = 0
-	if isFmtEvent {
-		b[i] = 1
-	}
-	i++
+	b.Validate(uint(i + 3*binary.MaxVarintLen64))
 	i += binary.PutUvarint(b[i:], uint64(c.PC))
 	i += binary.PutUvarint(b[i:], uint64(c.Entry))
 	i += binary.PutUvarint(b[i:], uint64(c.Line))
@@ -190,11 +186,8 @@ func (c *CallerInfo) encode(isFmtEvent bool, b0 elib.ByteVec, i0 int) (b elib.By
 	return
 }
 
-func (c *CallerInfo) decode(b elib.ByteVec, i0 int) (isFmtEvent bool, i int, err error) {
+func (c *CallerInfo) decode(b elib.ByteVec, i0 int) (i int, err error) {
 	i = i0
-
-	isFmtEvent = b[i] != 0
-	i++
 
 	var (
 		x uint64
@@ -267,9 +260,8 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	b.Validate(uint(i + binary.MaxVarintLen64))
 	i += binary.PutUvarint(b[i:], uint64(len(v.callers)))
 	for _, r := range v.callers {
-		r, c := v.getCallerInfo(r.callerIndex)
-		isFmtEvent := r.dataType != reflect.TypeOf(dataEvent{})
-		b, i = c.encode(isFmtEvent, b, i)
+		_, c := v.getCallerInfo(r.callerIndex)
+		b, i = c.encode(b, i)
 	}
 
 	// String table.
@@ -282,6 +274,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	for ei := range nes {
 		e := &nes[ei]
 		b, t, i = e.encode(v.GetContext(), b, t, i)
+		v.validateEvent(e)
 	}
 
 	return b[:i], nil
@@ -330,14 +323,11 @@ func (v *View) UnmarshalBinary(b []byte) (err error) {
 	if nCallers, n := binary.Uvarint(b[i:]); n > 0 {
 		i += n
 		for j := 0; j < int(nCallers); j++ {
-			var (
-				c          CallerInfo
-				isFmtEvent bool
-			)
-			if isFmtEvent, i, err = c.decode(b, i); err != nil {
+			var c CallerInfo
+			if i, err = c.decode(b, i); err != nil {
 				return
 			}
-			v.addCallerInfo(c, isFmtEvent)
+			v.addCallerInfo(c)
 		}
 	} else {
 		return errUnderflow
@@ -367,6 +357,7 @@ func (v *View) UnmarshalBinary(b []byte) (err error) {
 	for ei := 0; ei < len(v.Events); ei++ {
 		e := &v.Events[ei]
 		t, i, err = e.decode(v.GetContext(), b, t, i)
+		v.validateEvent(e)
 		if err != nil {
 			return
 		}
@@ -388,4 +379,19 @@ func EncodeUint64(b []byte, x uint64) int { return binary.PutUvarint(b, uint64(x
 func DecodeUint64(b []byte, i int) (uint64, int) {
 	x, n := binary.Uvarint(b[i:])
 	return uint64(x), i + n
+}
+
+func (v *View) validateEvent(e *Event) {
+	if !elib.Debug {
+		return
+	}
+	r, _ := v.getCallerInfo(e.callerIndex)
+	t := reflect.TypeOf(&r.fe).Elem()
+	rv := reflect.NewAt(t, unsafe.Pointer(&e.data[0])).Interface()
+	switch ev := rv.(type) {
+	case *fmtEvent:
+		ev.decode(v.GetContext())
+	default:
+		panic("type " + t.Name())
+	}
 }
