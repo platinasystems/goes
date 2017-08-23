@@ -86,7 +86,6 @@ func main() {
 		for i := range fmts {
 			fmts[i] = colorNames[i] + " %d"
 		}
-		var e ev
 		for i := uint64(0); i < uint64(n_events); i++ {
 			color := color(i % uint64(len(colorNames)))
 			if useFmt {
@@ -106,8 +105,7 @@ func main() {
 					elog.FUint(fmt, i)
 				}
 			} else {
-				e.color = color
-				e.i = uint32(i)
+				e := ev{color: color, i: uint32(i)}
 				switch color {
 				case 0:
 					elog.Add(&e)

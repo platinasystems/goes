@@ -233,8 +233,8 @@ type callerCache struct {
 	f                 eventFilter
 	pc                uint64
 	fmtIndex          StringRef
-	t                 reflect.Type
-	sizeofT           uint
+	dataType          reflect.Type
+	fastDataType      reflect.Type
 	formatMethodIndex int
 	callerIndex       uint32
 	callerInfo        CallerInfo
@@ -324,7 +324,7 @@ func (m *Buffer) getCaller(d eventData, isFmt bool, caller Caller) (c *callerCac
 	if m.callerByPC == nil {
 		m.callerByPC = make(map[uint64]*callerCache)
 	}
-	c = &callerCache{pc: pc, callerIndex: uint32(len(m.callers))}
+	c = &callerCache{pc: pc, callerIndex: uint32(len(m.callers)), formatMethodIndex: -1}
 	if d == nil {
 		if isFmt {
 			d = &c.fe
@@ -332,7 +332,7 @@ func (m *Buffer) getCaller(d eventData, isFmt bool, caller Caller) (c *callerCac
 			d = &c.de
 		}
 	}
-	c.initData(d)
+	c.initDataType(d)
 	m.callers = append(m.callers, c)
 	if found != nil {
 		c.f = *found
@@ -432,39 +432,38 @@ type eventData interface {
 	Format(c *Context, f Format)
 }
 
-func (r *callerCache) initData(d eventData) {
-	pt := reflect.TypeOf(d)
-	if pt.Kind() != reflect.Ptr {
-		panic("must be pointer " + pt.Name())
-	}
-	t := pt.Elem()
-	r.t, r.sizeofT = t, uint(t.Size())
-	if m, ok := pt.MethodByName(eventDataFormatMethod); !ok {
-		panic("no " + eventDataFormatMethod + " method for " + t.Name())
-	} else {
-		r.formatMethodIndex = m.Index
-	}
+type iface struct{ tab, data Pointer }
+
+// Avoid reflect.TypeOf() so that d does not escape.
+func (r *callerCache) initDataType(d eventData) {
+	tint0 := reflect.TypeOf(int(0))
+	i0 := (*iface)(Pointer(&tint0))
+	di := (*iface)(Pointer(&d))
+	dtab := (*iface)(di.tab)
+	var x iface
+	x.tab = i0.tab // <rtype,reflect.Type>
+	x.data = dtab.data
+	r.fastDataType = *(*reflect.Type)(Pointer(&x))
 }
 
-func (e *Event) setData(d eventData, size uint) {
+func (e *Event) setData(d eventData) {
 	type u [EventDataBytes / 8]uint64
 	var src, dst *u
-	src = (*u)(unsafe.Pointer(reflect.ValueOf(d).Pointer()))
+	// Equivalent to:
+	//    src = (*u)(unsafe.Pointer(reflect.ValueOf(d).Pointer()))
+	// but avoids d escaping to heap.
+	src = (*u)((*iface)(Pointer(&d)).data)
 	dst = (*u)(unsafe.Pointer(&e.data[0]))
-	i, n_left := 0, int(size)
-	for n_left >= 4*8 {
+	i, n_left := 0, EventDataBytes
+	for n_left >= 6*8 {
 		dst[i+0] = src[i+0]
 		dst[i+1] = src[i+1]
 		dst[i+2] = src[i+2]
 		dst[i+3] = src[i+3]
-		n_left -= 8 * 4
-		i += 4
-	}
-	for n_left >= 2*8 {
-		dst[i+0] = src[i+0]
-		dst[i+1] = src[i+1]
-		n_left -= 8 * 2
-		i += 2
+		dst[i+4] = src[i+4]
+		dst[i+5] = src[i+5]
+		n_left -= 8 * 6
+		i += 6
 	}
 	for n_left > 0 {
 		dst[i+0] = src[i+0]
@@ -477,7 +476,7 @@ func (b *Buffer) add1(d eventData, c Caller, r *callerCache) {
 	e := b.getEvent()
 	e.timestamp = c.time
 	e.callerIndex = r.callerIndex
-	e.setData(d, r.sizeofT)
+	e.setData(d)
 	return
 }
 
@@ -670,7 +669,7 @@ func (v *shared) addCallerInfo(c CallerInfo, isFmtEvent bool) {
 	} else {
 		d = &dataEvent{}
 	}
-	cc.initData(d)
+	cc.initDataType(d)
 	v.callers = append(v.callers, cc)
 	if v.callerByPC == nil {
 		v.callerByPC = make(map[uint64]*callerCache)
@@ -709,9 +708,25 @@ func (c *CallerInfo) ShortPath(p string, max uint) (f string, overflow bool) {
 	return
 }
 
-func (e *Event) format(t reflect.Type, fmt int, x *Context, c Format) {
+func (e *Event) format(r *callerCache, x *Context, c Format) {
+	var t reflect.Type
+	if r.dataType == nil {
+		t = r.fastDataType
+		if t.Kind() == reflect.Ptr {
+			t = t.Elem()
+		}
+		r.dataType = t
+	}
+	t = r.dataType
 	v := reflect.NewAt(t, unsafe.Pointer(&e.data[0]))
-	f := v.Method(fmt)
+	if r.formatMethodIndex < 0 {
+		m, ok := v.Type().MethodByName(eventDataFormatMethod)
+		if !ok {
+			panic("no method " + eventDataFormatMethod + " " + t.Name())
+		}
+		r.formatMethodIndex = m.Index
+	}
+	f := v.Method(r.formatMethodIndex)
 	in := []reflect.Value{reflect.ValueOf(x), reflect.ValueOf(c)}
 	f.Call(in)
 }
@@ -731,7 +746,7 @@ func (l *lines) sprintf(format string, args ...interface{}) {
 func (e *Event) String(c *Context) string {
 	l := lines{}
 	r := c.callers[e.callerIndex]
-	e.format(r.t, r.formatMethodIndex, c, l.sprintf)
+	e.format(r, c, l.sprintf)
 	return l.s
 }
 func (e *Event) Strings(c *Context) []string {
@@ -1235,23 +1250,23 @@ func Fc2Uint(f string, c Caller, v0, v1 uint64) { DefaultBuffer.Fc2Uint(f, c, v0
 func (e *Event) normalize(c *Context, nes0 []Event) (nes []Event) {
 	nes = nes0
 	r := c.callers[e.callerIndex]
-	switch r.t {
+	switch r.dataType {
 	case reflect.TypeOf(fmtEvent{}), reflect.TypeOf(dataEvent{}):
 		// nothing to do: already normal.
 		nes = append(nes, *e)
 	default:
-		e.format(r.t, r.formatMethodIndex, c,
+		e.format(r, c,
 			func(format string, args ...interface{}) {
 				var ne Event
 				ne.eventHeader = e.eventHeader
 				if len(args) == 0 {
 					var d dataEvent
 					d.set(format)
-					ne.setData(&d, uint(len(format)))
+					ne.setData(&d)
 				} else {
 					var f fmtEvent
-					_, i := f.encode(c, StringRefNil, true, format, args)
-					ne.setData(&f, uint(i))
+					f.encode(c, StringRefNil, true, format, args)
+					ne.setData(&f)
 					nes = append(nes, ne)
 					return
 				}
