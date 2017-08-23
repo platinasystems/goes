@@ -12,6 +12,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"os"
 	"reflect"
 )
 
@@ -37,6 +38,28 @@ func (v *View) Save(w io.Writer) (err error) {
 func (v *View) Restore(r io.Reader) (err error) {
 	dec := gob.NewDecoder(r)
 	err = dec.Decode(v)
+	return
+}
+
+func SaveView(file string) (err error) {
+	var f *os.File
+	if f, err = os.OpenFile(file, os.O_CREATE|os.O_RDWR, 0666); err != nil {
+		return
+	}
+	defer f.Close()
+	v := NewView()
+	v.SetName(file)
+	err = v.Save(f)
+	return
+}
+
+func (v *View) Load(file string) (err error) {
+	var f *os.File
+	if f, err = os.OpenFile(file, os.O_RDONLY, 0); err != nil {
+		return
+	}
+	defer f.Close()
+	v.Restore(f)
 	return
 }
 
@@ -214,6 +237,16 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	i := 0
 	bo := binary.BigEndian
 
+	// Name
+	{
+		l := len(v.name)
+		b.Validate(uint(i + l + binary.MaxVarintLen64))
+		i += binary.PutUvarint(b[i:], uint64(l))
+		copy(b[i:], v.name)
+		i += l
+	}
+
+	// Header
 	b.Validate(uint(i + 8))
 	bo.PutUint64(b[i:], math.Float64bits(v.timeUnitNsec))
 	i += 8
@@ -230,12 +263,12 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	i += copy(b[i:], d)
 
 	// Callers
-	v.normalizeEvents()
+	nes := v.normalizeEvents()
 	b.Validate(uint(i + binary.MaxVarintLen64))
 	i += binary.PutUvarint(b[i:], uint64(len(v.callers)))
 	for _, r := range v.callers {
 		r, c := v.getCallerInfo(r.callerIndex)
-		isFmtEvent := r.t == reflect.TypeOf(fmtEvent{})
+		isFmtEvent := r.t != reflect.TypeOf(dataEvent{})
 		b, i = c.encode(isFmtEvent, b, i)
 	}
 
@@ -244,10 +277,10 @@ func (v *View) MarshalBinary() ([]byte, error) {
 
 	// Events.
 	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(len(v.Events)))
+	i += binary.PutUvarint(b[i:], uint64(len(nes)))
 	t := v.cpuStartTime
-	for ei := range v.Events {
-		e := &v.Events[ei]
+	for ei := range nes {
+		e := &nes[ei]
 		b, t, i = e.encode(v.GetContext(), b, t, i)
 	}
 
@@ -257,6 +290,16 @@ func (v *View) MarshalBinary() ([]byte, error) {
 func (v *View) UnmarshalBinary(b []byte) (err error) {
 	i := 0
 	bo := binary.BigEndian
+
+	// Name
+	if x, n := binary.Uvarint(b[i:]); n > 0 {
+		l := int(x)
+		i += n
+		v.name = string(b[i : i+l])
+		i += l
+	} else {
+		return errUnderflow
+	}
 
 	v.timeUnitNsec = math.Float64frombits(bo.Uint64(b[i:]))
 	i += 8

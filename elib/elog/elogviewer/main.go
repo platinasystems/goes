@@ -6,6 +6,7 @@ import (
 
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"runtime"
@@ -28,9 +29,9 @@ var colorNames = [...]string{
 	5: "red",
 }
 
-func (c color) String() string                             { return colorNames[c] }
-func (e *ev) SetData(x *elog.Context, p elog.Pointer)      { *(*ev)(p) = *e }
-func (e *ev) Format(x *elog.Context, f elog.Format) string { return f("%s %d", e.color.String(), e.i) }
+func (c color) String() string                        { return colorNames[c] }
+func (e *ev) SetData(x *elog.Context, p elog.Pointer) { *(*ev)(p) = *e }
+func (e *ev) Format(x *elog.Context, f elog.Format)   { f("%s %d", e.color, e.i) }
 
 func main() {
 	var (
@@ -39,25 +40,39 @@ func main() {
 		random_delay bool
 		save, load   string
 		useFmt       bool
+		dump         bool
 	)
-	flag.Float64Var(&delay, "delay", 0, "delay in seconds between events or max delay for random delays.")
-	flag.UintVar(&n_events, "events", 10, "number of test events to add")
-	flag.BoolVar(&random_delay, "random", false, "randomize delays")
+	const test_events = false
+	if test_events {
+		flag.Float64Var(&delay, "delay", 0, "delay in seconds between events or max delay for random delays.")
+		flag.UintVar(&n_events, "events", 10, "number of test events to add")
+		flag.BoolVar(&random_delay, "random", false, "randomize delays")
+		flag.StringVar(&save, "save", "", "save log to file")
+		flag.BoolVar(&useFmt, "fmt", false, "use elog.F* formatted functions")
+	}
 	flag.StringVar(&load, "load", "", "load log from file")
-	flag.StringVar(&save, "save", "", "save log to file")
-	flag.BoolVar(&useFmt, "fmt", false, "use elog.F* formatted functions")
+	flag.BoolVar(&dump, "dump", false, "dump log to stdout")
 	flag.Parse()
+
+	if as := flag.Args(); len(as) == 1 {
+		load = as[0]
+	}
+
+	if !test_events && len(load) == 0 {
+		fmt.Println("expecting event log file to load")
+		return
+	}
 
 	var v *elog.View
 
 	if load != "" {
 		if f, err := os.OpenFile(load, os.O_RDONLY, 0); err != nil {
-			panic(err)
+			log.Fatal(err)
 		} else {
 			defer f.Close()
 			var r elog.View
 			if err = r.Restore(f); err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
 			v = &r
 		}
@@ -120,16 +135,20 @@ func main() {
 			panic(err)
 		} else {
 			defer f.Close()
+			v.SetName(save)
 			if err = v.Save(f); err != nil {
 				panic(err)
 			}
 		}
 	}
-
-	cf := elogview.Config{
-		Width:              1200,
-		Height:             750,
-		EnableKeyboardQuit: true,
+	if dump {
+		v.Print(os.Stdout, false)
+	} else {
+		cf := elogview.Config{
+			Width:              1200,
+			Height:             750,
+			EnableKeyboardQuit: true,
+		}
+		elogview.View(v, cf)
 	}
-	elogview.View(v, cf)
 }
