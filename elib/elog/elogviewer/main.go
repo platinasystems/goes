@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/elog/elogview"
 
@@ -13,11 +14,6 @@ import (
 	"time"
 )
 
-type ev struct {
-	i     uint32
-	color color
-}
-
 type color uint32
 
 var colorNames = [...]string{
@@ -29,9 +25,14 @@ var colorNames = [...]string{
 	5: "red",
 }
 
-func (c color) String() string                        { return colorNames[c] }
-func (e *ev) SetData(x *elog.Context, p elog.Pointer) { *(*ev)(p) = *e }
-func (e *ev) Format(x *elog.Context, f elog.Format)   { f("%s %d", e.color, e.i) }
+func (c color) String() string { return colorNames[c] }
+
+type ev struct {
+	i     uint32
+	color color
+}
+
+func (e *ev) Format(x *elog.Context, f elog.Format) { f("%s %d", e.color, e.i) }
 
 func main() {
 	var (
@@ -42,8 +43,7 @@ func main() {
 		useFmt       bool
 		dump         bool
 	)
-	const test_events = false
-	if test_events {
+	if elib.Debug {
 		flag.Float64Var(&delay, "delay", 0, "delay in seconds between events or max delay for random delays.")
 		flag.UintVar(&n_events, "events", 10, "number of test events to add")
 		flag.BoolVar(&random_delay, "random", false, "randomize delays")
@@ -58,7 +58,7 @@ func main() {
 		load = as[0]
 	}
 
-	if !test_events && len(load) == 0 {
+	if !elib.Debug && len(load) == 0 {
 		fmt.Println("expecting event log file to load")
 		return
 	}
@@ -81,11 +81,16 @@ func main() {
 		elog.Enable(true)
 		var ms [2]runtime.MemStats
 		runtime.ReadMemStats(&ms[0])
+		nColor := len(colorNames)
+		fmts := make([]string, nColor)
+		for i := range fmts {
+			fmts[i] = colorNames[i] + " %d"
+		}
 		var e ev
 		for i := uint64(0); i < uint64(n_events); i++ {
 			color := color(i % uint64(len(colorNames)))
 			if useFmt {
-				fmt := colorNames[i] + " %d"
+				fmt := fmts[color]
 				switch color {
 				case 0:
 					elog.FUint(fmt, i)

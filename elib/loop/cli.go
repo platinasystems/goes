@@ -252,11 +252,11 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 			elog.ResetFilters()
 		case in.Parse("re%*size %d", &n_events):
 			elog.Resize(n_events)
-		case in.Parse("save %s", &s):
+		case in.Parse("s%*ave %s", &s):
 			err = elog.SaveView(s)
-		case in.Parse("dump %s", &s):
+		case in.Parse("d%*ump %s", &s):
 			var v elog.View
-			if err = v.Load(s); err != nil {
+			if err = v.Load(s); err == nil {
 				v.Print(w, false)
 			}
 		default:

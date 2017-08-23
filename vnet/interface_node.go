@@ -107,7 +107,6 @@ type txElogEvent struct {
 	n_refs    uint32
 }
 
-func (e *txElogEvent) SetData(x *elog.Context, p elog.Pointer) { *(*txElogEvent)(p) = *e }
 func (e *txElogEvent) Format(x *elog.Context, f elog.Format) {
 	f("tx %s send %d buffers", x.GetString(e.node_name), e.n_refs)
 }
