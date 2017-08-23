@@ -54,6 +54,8 @@ var (
 	thTemp         float64
 	sThTemp        float64
 
+	lastSpeed string
+
 	hostCtrl bool
 	thCtrl   bool
 
@@ -315,6 +317,8 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 }
 
 func (h *I2cDev) FanInit() error {
+	//default auto mode
+	lastSpeed = "auto"
 
 	//reset hwm to default values
 	r0 := getRegsBank0()
@@ -364,7 +368,22 @@ func (h *I2cDev) FanInit() error {
 	return nil
 }
 
+func (h *I2cDev) SetLastSpeed() error {
+	current, _ := h.GetFanSpeed()
+	if current != lastSpeed {
+		h.SetFanSpeed(lastSpeed, true)
+	}
+	return nil
+}
 func (h *I2cDev) SetFanDuty(d uint8) error {
+	for j := 1; j <= maxFanTrays; j++ {
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
+		if p != "" && !strings.Contains(p, "ok") {
+			return nil
+			break
+		}
+	}
+
 	r2 := getRegsBank2()
 	r2.BankSelect.set(h, 0x82)
 	r2.TempToFanMap1.set(h, 0x0)
@@ -382,12 +401,15 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 	r2 := getRegsBank2()
 
+	if w != "max" {
+		lastSpeed = w
+	}
 	//if not all fan trays are ok, only allow high setting
 	for j := 1; j <= maxFanTrays; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if p != "" && !strings.Contains(p, "ok") {
 			log.Print("warning: fan failure mode, speed fixed at high")
-			w = "high"
+			w = "max"
 			break
 		}
 	}
@@ -454,7 +476,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 			log.Print("notice: fan speed set to ", w)
 		}
 	//static speed settings below, set hwm to manual mode, then set static speed
-	case "high":
+	case "high", "max":
 		r2.BankSelect.set(h, 0x82)
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
@@ -465,7 +487,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 		if err != nil {
 			return err
 		}
-		log.Print("notice: fan speed set to ", w)
+		log.Print("notice: fan speed set to high")
 	case "med":
 		r2.BankSelect.set(h, 0x82)
 		r2.TempToFanMap1.set(h, 0x0)
@@ -630,7 +652,7 @@ func writeRegs() error {
 	for k, v := range WrRegVal {
 		switch WrRegFn[k] {
 		case "speed":
-			if v == "auto" || v == "high" || v == "med" || v == "low" {
+			if v == "auto" || v == "high" || v == "med" || v == "low" || v == "max" {
 				Vdev.SetFanSpeed(v, true)
 			}
 		case "temp.units.C":
@@ -643,7 +665,10 @@ func writeRegs() error {
 			if err == nil {
 				hostTempTarget = f
 			}
-
+		case "speed.return":
+			if v == "" {
+				Vdev.SetLastSpeed()
+			}
 		}
 		delete(WrRegVal, k)
 	}

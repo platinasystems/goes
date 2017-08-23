@@ -69,7 +69,6 @@ var (
 	fanLedOff    byte = 0x0
 
 	deviceVer     byte
-	saveFanSpeed  string
 	forceFanSpeed bool
 
 	once sync.Once
@@ -191,8 +190,7 @@ func (h *I2cDev) LedFpInit() error {
 
 	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(ss, &deviceVer)
-	// save initial fan speed
-	saveFanSpeed, _ = redis.Hget(redis.DefaultHash, "fan_tray.speed")
+
 	forceFanSpeed = false
 
 	r := getRegs()
@@ -308,7 +306,7 @@ func (h *I2cDev) LedStatus() error {
 				}
 				log.Print("warning: fan tray ", j+1, " failure")
 				if !forceFanSpeed {
-					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "max")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(p, "not installed") {
@@ -330,7 +328,7 @@ func (h *I2cDev) LedStatus() error {
 				}
 				log.Print("warning: fan tray ", j+1, " not installed")
 				if !forceFanSpeed {
-					redis.Hset(redis.DefaultHash, "fan_tray.speed", "high")
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "max")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(lastFanStatus[j], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
@@ -338,10 +336,6 @@ func (h *I2cDev) LedStatus() error {
 			}
 		}
 		lastFanStatus[j] = p
-	}
-
-	if allFanGood && !forceFanSpeed {
-		saveFanSpeed, _ = redis.Hget(redis.DefaultHash, "fan_tray.speed")
 	}
 
 	//if any fan tray is failed or not installed, set front panel FAN led to yellow
@@ -372,10 +366,7 @@ func (h *I2cDev) LedStatus() error {
 					return err
 				}
 				log.Print("notice: all fan trays up")
-				fanspeed, _ := redis.Hget(redis.DefaultHash, "fan_tray.speed")
-				if fanspeed != saveFanSpeed {
-					redis.Hset(redis.DefaultHash, "fan_tray.speed", saveFanSpeed)
-				}
+				redis.Hset(redis.DefaultHash, "fan_tray.speed.return", "")
 				forceFanSpeed = false
 			}
 		}

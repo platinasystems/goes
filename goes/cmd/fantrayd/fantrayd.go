@@ -292,7 +292,7 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 			w = "ok" + "." + f
 			o |= fanTrayLedGreen[i]
 		} else {
-			w = "warning check fan tray"
+			w = "low rpm detected"
 			o |= fanTrayLedYellow[i]
 		}
 	}
