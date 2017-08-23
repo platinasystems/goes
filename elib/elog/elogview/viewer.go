@@ -231,7 +231,9 @@ func View(ev *elog.View, cf Config) {
 	v.eb.SetSizeRequest(v.eb_dx.I(), int(.9*v.eb_dx.Y()))
 	v.eb.SetCanFocus(true)
 	v.eb.SetEvents(int(gdk.KEY_PRESS_MASK |
+		gdk.ENTER_NOTIFY_MASK |
 		gdk.BUTTON_PRESS_MASK | gdk.BUTTON_RELEASE_MASK | gdk.POINTER_MOTION_MASK))
+	v.eb.Connect("enter_notify_event", func() { v.eb.GrabFocus() })
 
 	v.da, _ = gtk.DrawingAreaNew()
 	v.eb.Add(v.da)
