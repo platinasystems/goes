@@ -170,6 +170,13 @@ func (nm *net_namespace_main) init() (err error) {
 	nm.n_namespace_discovered_at_init = 1
 	for i := range netns_search_dirs {
 		d := &netns_search_dirs[i]
+
+		// If not existent yet (ie on boot), create the netns search
+		// dirs so watch doesn't fail
+		if _, err := os.Stat(d.path); os.IsNotExist(err) {
+			os.MkdirAll(d.path, os.ModeDir|0755)
+		}
+
 		if err = nm.read_dir(d, nm.watch_namespace_add_del); err != nil {
 			return
 		}
