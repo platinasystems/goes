@@ -20,23 +20,26 @@ func DecodeAddress(x interface{}, address uint) (path []string, t reflect.Type) 
 		switch t.Kind() {
 		case reflect.Struct:
 			nf := t.NumField()
-			fi := sort.Search(nf, func(i int) bool {
+			var nextType reflect.Type
+			sort.Search(nf, func(i int) (ok bool) {
 				f := t.Field(i)
 				lo, hi := f.Offset, f.Offset+f.Type.Size()
+				ok = addr <= lo
 				if found := addr >= lo && addr < hi; found {
 					dot := ""
 					if len(path) > 0 {
 						dot = "."
 					}
 					path = append(path, dot+f.Name)
-					t = f.Type
+					nextType = f.Type
 					addr -= lo
 				}
-				return addr < lo
+				return
 			})
-			if fi >= nf {
-				panic(fmt.Errorf("not found %s 0x%x", t.Name(), addr))
+			if nextType == nil {
+				panic(fmt.Errorf("not found %s 0x%x %v 0x%x", t.Name(), addr, path, address))
 			}
+			t = nextType
 		case reflect.Array:
 			t = t.Elem()
 			i0, i1 := addr/t.Size(), addr%t.Size()
