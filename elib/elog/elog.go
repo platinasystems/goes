@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	log2EventBytes = 6
+	log2EventBytes = 7
 	EventDataBytes = 1<<log2EventBytes - (1*8 + 2*4)
 )
 
