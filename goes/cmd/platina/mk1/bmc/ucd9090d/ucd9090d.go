@@ -461,6 +461,31 @@ func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
 		}
 		return err
 	}
+	var a [2]int
+	var e [2]error
+	if len(WrRegRng[args.Field]) == 2 {
+		for i, v := range WrRegRng[args.Field] {
+			a[i], e[i] = strconv.Atoi(v)
+		}
+		if e[0] == nil && e[1] == nil {
+			val, err := strconv.Atoi(string(args.Value))
+			if err != nil {
+				return err
+			}
+			if val >= a[0] && val <= a[1] {
+				err := i.set(args.Field,
+					string(args.Value), false)
+				if err == nil {
+					*reply = 1
+					WrRegVal[args.Field] =
+						string(args.Value)
+				}
+				return err
+			}
+			return fmt.Errorf("Cannot hset.  Valid range is: %s",
+				WrRegRng[args.Field])
+		}
+	}
 	for _, v := range WrRegRng[args.Field] {
 		if v == string(args.Value) {
 			err := i.set(args.Field, string(args.Value), false)
@@ -471,7 +496,8 @@ func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
 			return err
 		}
 	}
-	return fmt.Errorf("Cannot hset.  Valid values are: %s", WrRegRng[args.Field])
+	return fmt.Errorf("Cannot hset.  Valid values are: %s",
+		WrRegRng[args.Field])
 }
 
 func (i *Info) set(key, value string, isReadyEvent bool) error {

@@ -47,5 +47,5 @@ func ucd9090dInit() {
 
 	ucd9090d.WrRegDv["vmon"] = "vmon"
 	ucd9090d.WrRegFn["vmon.example"] = "example"
-	ucd9090d.WrRegRng["ucd9090d.example"] = []string{"true", "false"}
+	ucd9090d.WrRegRng["vmon.example"] = []string{"1", "50"}
 }
