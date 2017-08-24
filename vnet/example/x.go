@@ -34,6 +34,7 @@ type myNode struct {
 	verbose_output        bool
 	interface_name_format string
 	interface_count       uint
+	inject_node           inject_node
 }
 
 var (
@@ -85,6 +86,7 @@ func (n *myInterface) GetHwInterfaceCounterValues(t *vnet.InterfaceThread) { ret
 
 func (n *myNode) Init() (err error) {
 	v := n.Vnet
+	v.RegisterOutputNode(&n.inject_node, "example-inject")
 	n.intfs = make([]myInterface, n.interface_count)
 	for i := range n.intfs {
 		intf := &n.intfs[i]
@@ -158,11 +160,24 @@ func (n *myInterface) InterfaceOutput(in *vnet.TxRefVecIn) {
 	n.Vnet.FreeTxRefIn(in)
 }
 
+type inject_node struct {
+	vnet.OutputNode
+}
+
+func (n *inject_node) NodeOutput(in *vnet.RefIn) {
+	l := in.InLen()
+	for i := uint(0); i < l; i++ {
+		r := in.Refs[i]
+		fmt.Printf("%s %s: %x\n", n.Name(), r.Si.Name(n.Vnet), r.DataSlice())
+	}
+	in.FreeRefs(l)
+}
+
 func main() {
 	v := &vnet.Vnet{}
 
 	// Select packages we want to run with.
-	unix.Init(v)
+	unix.Init(v, unix.Config{RxInjectNodeName: "example-inject"})
 	m4 := ip4.Init(v)
 	m6 := ip6.Init(v)
 	ethernet.Init(v, m4, m6)

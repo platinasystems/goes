@@ -82,4 +82,10 @@ func (p *pair_vec) ValidateLenInit(l uint, zero Pair) (v *Pair) {
 	return
 }
 
+func (p *pair_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p pair_vec) Len() uint { return uint(len(p)) }

@@ -7,6 +7,7 @@ package cpu
 import (
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,6 +26,7 @@ var (
 	// Ticks per second of event timer (and inverse).
 	cyclesPerSec, secsPerCycle float64
 	cyclesOnce                 sync.Once
+	estimateDone               uint32
 )
 
 func (dt Time) Seconds() float64 {
@@ -58,7 +60,7 @@ func estimateOnce() {
 		go estimateFrequency(1e-4, 1e6, 5e5)
 	})
 	// Wait until estimateFrequency is done.
-	for secsPerCycle == 0 {
+	for atomic.LoadUint32(&estimateDone) == 0 {
 		time.Sleep(10 * time.Microsecond)
 	}
 }
@@ -78,6 +80,7 @@ func estimateFrequency(dt, unit, tolerance float64) {
 
 	cyclesPerSec = round(ave, unit)
 	secsPerCycle = 1 / cyclesPerSec
+	atomic.StoreUint32(&estimateDone, 1)
 	return
 }
 

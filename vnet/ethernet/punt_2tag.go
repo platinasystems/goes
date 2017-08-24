@@ -45,16 +45,16 @@ type punt_packet_disposition struct {
 
 type DoubleTaggedPuntNode vlan_tagged_punt_node
 
-func (n *DoubleTaggedPuntNode) AddDisposition(cf PuntConfig) (i uint32) {
+func (n *DoubleTaggedPuntNode) AddDisposition(cf PuntConfig) (i PuntDisposition) {
 	return (*vlan_tagged_punt_node)(n).add_disposition(cf, 2)
 }
-func (n *DoubleTaggedPuntNode) DelDisposition(i uint32) (ok bool) {
+func (n *DoubleTaggedPuntNode) DelDisposition(i PuntDisposition) (ok bool) {
 	return (*vlan_tagged_punt_node)(n).del_disposition(i)
 }
-func PuntDispositionForTags(outer, inner VlanTag) (i uint32) {
-	return uint32(inner.ToHost()<<16) | uint32(outer.ToHost())
+func PuntDispositionForTags(outer, inner VlanTag) (i PuntDisposition) {
+	return PuntDisposition(inner.ToHost())<<16 | PuntDisposition(outer.ToHost())
 }
-func PuntTagsForDisposition(i uint32) (outer, inner VlanTag) {
+func PuntTagsForDisposition(i PuntDisposition) (outer, inner VlanTag) {
 	inner = VlanTag(i >> 16).FromHost()
 	outer = VlanTag(i).FromHost()
 	return
@@ -76,7 +76,7 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 
 	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
 
-	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
+	if di0 >= PuntDisposition(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
 		di0 = 0
 	}
@@ -123,11 +123,11 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
 	di1 := PuntDispositionForTags(q1[0].Tag, q1[1].Tag)
 
-	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
+	if di0 >= PuntDisposition(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
 		di0 = 0
 	}
-	if di1 >= uint32(n.punt_packet_disposition_pool.Len()) {
+	if di1 >= PuntDisposition(n.punt_packet_disposition_pool.Len()) {
 		error1 = punt_2tag_error_unknown_disposition
 		di1 = 0
 	}
@@ -173,7 +173,10 @@ func (n *DoubleTaggedPuntNode) Init(v *vnet.Vnet, name string) {
 		punt_2tag_error_unknown_disposition: "unknown packet disposition",
 	}
 	v.RegisterInOutNode(n, name+"-double-tagged-punt")
-	n.AddDisposition(PuntConfig{Next: "punt"})
+	d := n.AddDisposition(PuntConfig{Next: "punt"})
+	if d != 0 {
+		panic("must be zero")
+	}
 }
 
 func (n *DoubleTaggedPuntNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {

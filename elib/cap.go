@@ -4,8 +4,8 @@
 
 package elib
 
-// Vector capacities of the form 2^i + 2^j
-type Cap uint32
+// Standard vector capacities of the form 2^i + 2^j i >= j.
+type Cap uint
 
 // True if removing first set bit gives a power of 2.
 func (c Cap) IsValid() bool {
@@ -70,4 +70,4 @@ func (c Cap) NextUnit(log2Min, log2Unit Cap) (n Cap) {
 func (c Cap) Next() Cap { return c.NextUnit(3, 2) }
 
 // NextResizeCap gives next larger resizeable array capacity.
-func NextResizeCap(x Index) Index { return Index(Cap(x).Next()) }
+func NextResizeCap(x uint) uint { return uint(Cap(x).Next()) }

@@ -25,7 +25,7 @@ type Node struct {
 	loop                    *Loop
 	toLoop                  chan struct{}
 	fromLoop                chan struct{}
-	flags                   node_flags
+	node_flags              node_flags
 	activePollerIndex       uint
 	initOnce                sync.Once
 	initWg                  sync.WaitGroup
@@ -37,6 +37,8 @@ type Node struct {
 }
 
 type node_flags uint32
+
+func (n *Node) get_flags() node_flags { return node_flags(atomic.LoadUint32((*uint32)(&n.node_flags))) }
 
 const (
 	log2_node_active, node_active node_flags = iota, 1 << iota
@@ -54,21 +56,21 @@ var node_flag_strings = [...]string{
 
 func (x node_flags) String() string { return elib.FlagStringer(node_flag_strings[:], elib.Word(x)) }
 
-func (n *Node) is_active() bool    { return n.flags&node_active != 0 }
-func (n *Node) is_polling() bool   { return n.flags&node_polling != 0 }
-func (n *Node) is_suspended() bool { return n.flags&node_suspended != 0 }
-func (n *Node) is_resumed() bool   { return n.flags&node_resumed != 0 }
+func (n *Node) is_active() bool    { return n.get_flags()&node_active != 0 }
+func (n *Node) is_polling() bool   { return n.get_flags()&node_polling != 0 }
+func (n *Node) is_suspended() bool { return n.get_flags()&node_suspended != 0 }
+func (n *Node) is_resumed() bool   { return n.get_flags()&node_resumed != 0 }
 
 func (n *Node) set_flag(f node_flags, v bool) (new node_flags) {
 	for {
-		old := n.flags
+		old := n.get_flags()
 		new = old
 		if v {
 			new |= f
 		} else {
 			new &^= f
 		}
-		if n.flags.compare_and_swap(old, new) {
+		if n.node_flags.compare_and_swap(old, new) {
 			break
 		}
 	}
@@ -136,7 +138,7 @@ func (n *Node) freeActivePoller(l *Loop) {
 
 func (n *Node) Activate(enable bool) (was bool) {
 	for {
-		old := n.flags
+		old := n.get_flags()
 		was = old&node_active != 0
 		if was == enable {
 			break
@@ -147,32 +149,19 @@ func (n *Node) Activate(enable bool) (was bool) {
 		} else {
 			new &^= node_active
 		}
-		if n.flags.compare_and_swap(old, new) {
+		if n.node_flags.compare_and_swap(old, new) {
 			n.pollerElog(poller_activate, new)
 			break
 		}
 	}
-	n.changeActive(was, enable)
+	n.changeActive(enable)
 	return
 }
 
-func (n *Node) changeActive(was, is bool) {
+func (n *Node) changeActive(enable bool) {
 	l := n.loop
-	if was != is {
-		d := uint32(1)
-		if !is {
-			d = -d
-			if l.nActivePollers <= 0 {
-				// panic("negative active pollers")
-				// FIXME now sure i understand why but panic triggers...
-				d = 0
-			}
-		}
-		atomic.AddUint32(&l.nActivePollers, d)
-		if is {
-			// Interrupt event wait so that pollers may be considered.
-			l.Interrupt()
-		}
+	if _, eventWait := l.activePollerState.changeActive(enable); eventWait {
+		l.Interrupt()
 	}
 }
 
@@ -209,14 +198,13 @@ type Loop struct {
 	loopIniters []Initer
 	loopExiters []Exiter
 
-	dataPollers      []inLooper
-	activePollerPool activePollerPool
-	nActivePollers   uint32
-	pollerStats      pollerStats
+	dataPollers       []inLooper
+	activePollerState activePollerState
+	activePollerPool  activePollerPool
+	pollerStats       pollerStats
 
 	wg sync.WaitGroup
 
-	waitingForEvent        bool
 	registrationsNeedStart bool
 	initialNodesRegistered bool
 	startTime              cpu.Time
@@ -234,6 +222,50 @@ type Loop struct {
 
 func (l *Loop) Seconds(t cpu.Time) float64 { return float64(t) * l.secsPerCycle }
 
+type activePollerState uint32
+
+func (s *activePollerState) compare_and_swap(old, new activePollerState) (swapped bool) {
+	return atomic.CompareAndSwapUint32((*uint32)(s), uint32(old), uint32(new))
+}
+func (s *activePollerState) get() (x activePollerState, nActive uint, eventWait bool) {
+	x = activePollerState(atomic.LoadUint32((*uint32)(s)))
+	eventWait = x&1 != 0
+	nActive = uint(x >> 1)
+	return
+}
+func makeActivePollerState(nActive uint, eventWait bool) (s activePollerState) {
+	s = activePollerState(nActive << 1)
+	if eventWait {
+		s |= 1
+	}
+	return
+}
+func (s *activePollerState) setEventWait(v bool) (uint, bool) {
+	old, n, w := s.get()
+	new := makeActivePollerState(n, v)
+	if !s.compare_and_swap(old, new) {
+		v = w
+	}
+	return n, v
+}
+func (s *activePollerState) changeActive(isActive bool) (uint, bool) {
+	for {
+		old, n, w := s.get()
+		if isActive {
+			n += 1
+		} else {
+			if n == 0 {
+				panic("negative active count")
+			}
+			n -= 1
+		}
+		new := makeActivePollerState(n, w)
+		if s.compare_and_swap(old, new) {
+			return n, w
+		}
+	}
+}
+
 func (l *Loop) startPollers() {
 	for _, n := range l.dataPollers {
 		l.startDataPoller(n)
@@ -244,7 +276,7 @@ func (l *Loop) Suspend(in *In) (resumed bool) {
 	a := l.activePollerPool.entries[in.activeIndex]
 	p := a.pollerNode
 	for {
-		old := p.flags
+		old := p.get_flags()
 		if resumed = old&node_resumed != 0; resumed {
 			p.pollerElog(poller_suspend, old)
 			break
@@ -252,7 +284,7 @@ func (l *Loop) Suspend(in *In) (resumed bool) {
 		new := old
 		new &^= node_resumed
 		new |= node_suspended
-		if p.flags.compare_and_swap(old, new) {
+		if p.node_flags.compare_and_swap(old, new) {
 			p.pollerElog(poller_suspend, new)
 			break
 		}
@@ -274,7 +306,7 @@ func (l *Loop) Resume(in *In) {
 	a := l.activePollerPool.entries[in.activeIndex]
 	if p := a.pollerNode; p != nil {
 		for {
-			old := p.flags
+			old := p.get_flags()
 			if old&(node_active|node_suspended) == 0 {
 				p.pollerElog(poller_resume, old)
 				return
@@ -283,15 +315,12 @@ func (l *Loop) Resume(in *In) {
 			new |= node_active
 			new |= node_resumed
 			new &^= node_suspended
-			if p.flags.compare_and_swap(old, new) {
+			if p.node_flags.compare_and_swap(old, new) {
 				p.pollerElog(poller_resume, new)
-				if was, is := old&node_active != 0, new&node_active != 0; was != is {
-					p.changeActive(was, is)
-				}
+				p.changeActive(true)
 				break
 			}
 		}
-		l.Interrupt()
 	}
 }
 
@@ -332,7 +361,7 @@ func (l *Loop) doPollers() {
 			n.allocActivePoller(n.loop)
 		}
 		n.set_flag(node_polling, true)
-		n.pollerElog(poller_start, n.flags)
+		n.pollerElog(poller_start, n.get_flags())
 		// Start poller who will be blocked waiting on fromLoop.
 		n.fromLoop <- struct{}{}
 	}
@@ -350,7 +379,7 @@ func (l *Loop) doPollers() {
 
 		<-n.toLoop
 		n.set_flag(node_polling, false)
-		n.pollerElog(poller_done, n.flags)
+		n.pollerElog(poller_done, n.get_flags())
 
 		// If not active anymore we can free it now.
 		// TODO: smp races.  Disabled for now.
@@ -363,7 +392,7 @@ func (l *Loop) doPollers() {
 	}
 
 	// atomic.AddUint32(&l.nActivePollers, -uint32(nFreed))
-	if l.nActivePollers == 0 && nFreed > 0 {
+	if false {
 		l.resetPollerStats()
 	} else {
 		l.doPollerStats()
@@ -458,7 +487,7 @@ func (l *Loop) quitAfter() {
 
 func (l *Loop) Run() {
 	elog.Enable(true)
-	go elog.PrintOnHangupSignal(os.Stderr)
+	go elog.PrintOnHangupSignal(os.Stderr, false)
 
 	l.timerInit()
 	l.startTime = cpu.TimeNow()
@@ -529,9 +558,7 @@ func (l *Loop) disableInterrupts(disable bool) {
 		}
 	}
 	l.pollerStats.interruptsDisabled = disable
-	if elog.Enabled() {
-		elog.GenEventf("loop: irq disable %v", disable)
-	}
+	elog.GenEventf("loop: irq disable %v", disable)
 }
 
 func (l *Loop) doPollerStats() {

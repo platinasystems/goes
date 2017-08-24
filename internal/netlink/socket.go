@@ -6,7 +6,6 @@ package netlink
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"sync"
 	"syscall"
@@ -99,7 +98,7 @@ type ListenReq struct {
 }
 
 type Socket struct {
-	once sync.Once
+	wg   sync.WaitGroup
 	fd   int
 	addr *syscall.SockaddrNetlink
 	Rx   <-chan Message
@@ -107,6 +106,9 @@ type Socket struct {
 	Tx   chan<- Message
 	tx   <-chan Message
 	SocketConfig
+
+	// Pipe which exists just for gorx to have a file descriptor to detect socket close.
+	rx_close_kludge_pipe [2]int
 }
 
 func New(groups ...MulticastGroup) (*Socket, error) {
@@ -155,18 +157,30 @@ func NewWithConfigAndFile(cf SocketConfig, fd int) (s *Socket, err error) {
 		SocketConfig: cf,
 	}
 
+	err = syscall.Pipe(s.rx_close_kludge_pipe[:])
+	if err != nil {
+		err = os.NewSyscallError("pipe rx_close_pipe", err)
+		return
+	}
+
 	defer func() {
-		if err != nil && fd > 0 {
-			syscall.Close(fd)
-			if s != nil {
-				if s.rx != nil {
-					close(s.rx)
+		if err != nil {
+			if fd > 0 {
+				syscall.Close(fd)
+				if s != nil {
+					if s.rx != nil {
+						close(s.rx)
+					}
+					if s.Tx != nil {
+						close(s.Tx)
+					}
+					s.addr = nil
+					s = nil
 				}
-				if s.Tx != nil {
-					close(s.Tx)
-				}
-				s.addr = nil
-				s = nil
+			}
+			if s.rx_close_kludge_pipe[0] > 0 {
+				syscall.Close(s.rx_close_kludge_pipe[0])
+				syscall.Close(s.rx_close_kludge_pipe[1])
 			}
 		}
 	}()
@@ -252,12 +266,13 @@ SO_SNDBUF truncated to %d bytes; run: sysctl -w net.core.wmem_max=%d`[1:],
 }
 
 func (s *Socket) Close() (err error) {
-	close(s.rx)
-	close(s.Tx)
-	if err = syscall.Close(s.fd); err != nil {
-		return
+	if s.Tx != nil {
+		close(s.Tx)
 	}
-	s.fd = -1
+	// Close write side of pipe and wake up sleeping gorx epoll wait.
+	// gorx will close read side of pipe.
+	syscall.Close(s.rx_close_kludge_pipe[1])
+	s.rx_close_kludge_pipe[1] = -1
 	return
 }
 
@@ -332,17 +347,62 @@ func (s *Socket) gorx() {
 		return *(*int)(unsafe.Pointer(&scm.Data[0]))
 	}
 
-	for {
-		nsid := DefaultNsid
+	epollFd, err := syscall.EpollCreate1(0)
+	if err != nil {
+		panic(os.NewSyscallError("epoll_create1", err))
+	}
+	defer syscall.Close(epollFd)
 
-		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, 0)
-		if err != nil {
-			if err != io.EOF && s.fd > 0 {
-				fmt.Fprintln(os.Stderr, "Recv:", err)
+	err = syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_ADD,
+		s.fd, &syscall.EpollEvent{
+			Events: syscall.EPOLLIN,
+			Fd:     int32(s.fd),
+		})
+	if err != nil {
+		panic(os.NewSyscallError("epoll_ctl add", err))
+	}
+	err = syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_ADD,
+		s.rx_close_kludge_pipe[0], &syscall.EpollEvent{
+			Events: syscall.EPOLLIN,
+			Fd:     int32(s.rx_close_kludge_pipe[0]),
+		})
+	if err != nil {
+		panic(os.NewSyscallError("epoll_ctl add rx_close_pipe", err))
+	}
+
+	s.wg.Add(1)
+	for {
+		// Wait for input to be ready.
+		// Need to poll since otherwise Recvmsg would block forever.
+		// Close of s.fd does not wake/unblock Recvmsg.
+		var ee [1]syscall.EpollEvent
+		if _, err := syscall.EpollWait(epollFd, ee[:], -1); err != nil {
+			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
+				continue
 			}
+			err = os.NewSyscallError("epoll_wait", err)
+			fmt.Fprintln(os.Stderr, "Recv:", err)
 			break
 		}
+		// Socket was closed?
+		if ee[0].Fd == int32(s.rx_close_kludge_pipe[0]) {
+			break
+		}
+		n, noob, _, _, err := syscall.Recvmsg(s.fd, buf, oob, syscall.MSG_DONTWAIT)
+		if err != nil {
+			// Re-try after timeout or interrupt unless socket was closed.
+			if e, ok := err.(syscall.Errno); ok && e.Temporary() {
+				continue
+			} else {
+				// EINVAL can happen when socket is being closed (not sure why); no need for noise in that case.
+				if e != syscall.EINVAL {
+					fmt.Fprintln(os.Stderr, "Recv:", err)
+				}
+				break
+			}
+		}
 
+		nsid := DefaultNsid
 		if noob > 0 {
 			scms, err :=
 				syscall.ParseSocketControlMessage(oob[:noob])
@@ -402,21 +462,29 @@ func (s *Socket) gorx() {
 			if false {
 				fmt.Print("Rx: ", msg)
 			}
-			if s.fd != -1 {
-				s.rx <- msg
-			}
+			s.rx <- msg
 		}
 	}
-	if s.fd != -1 {
-		close(s.rx)
-	}
+	close(s.rx)
 	s.rx = nil
+
+	// Close read side of pipe (write side is closed in Close method).
+	syscall.Close(s.rx_close_kludge_pipe[0])
+	s.rx_close_kludge_pipe[0] = -1
+
+	s.wg.Done()
+
+	// Wait for tx routine to finish before closing file descriptor.
+	s.wg.Wait()
+	syscall.Close(s.fd)
+	s.fd = -1
 }
 
 func (s *Socket) gotx() {
 	seq := uint32(1)
 	buf := make([]byte, 4*PageSize)
 	bh := (*Header)(unsafe.Pointer(&buf[0]))
+	s.wg.Add(1)
 	for msg := range s.tx {
 		mh := msg.MsgHeader()
 		if mh.Flags == 0 {
@@ -455,4 +523,5 @@ func (s *Socket) gotx() {
 		s.rx <- e
 		msg.Close()
 	}
+	s.wg.Done()
 }

@@ -124,7 +124,7 @@ func (m *Main) validate_tree(t *tree) {
 	}
 	for k := range m.validate_all_pairs {
 		if _, ok := t.validate_pair_counts[k]; !ok {
-			panic(fmt.Errorf("pair %s vanished", &k))
+			panic(fmt.Errorf("pair %v vanished", &k))
 		}
 		delete(t.validate_pair_counts, k)
 	}
@@ -215,6 +215,6 @@ func (t *tree) dump(m *Main) {
 	d.dump(m, t)
 	sort.Sort(dump_node_sort(d))
 	for _, x := range d {
-		fmt.Printf("[%d] %s %d leafs\n", x.level, &x.key, x.n_pairs)
+		fmt.Printf("[%d] %v %d leafs\n", x.level, &x.key, x.n_pairs)
 	}
 }

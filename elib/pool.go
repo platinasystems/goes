@@ -44,6 +44,13 @@ func (p *Pool) PutIndex(i uint) (ok bool) {
 	return
 }
 
+func (p *Pool) Reset() {
+	if p.freeIndices != nil {
+		p.freeIndices = p.freeIndices[:0]
+	}
+	p.freeBitmap = p.freeBitmap.Free()
+}
+
 func (p *Pool) IsFree(i uint) (ok bool) { return p.freeBitmap.Get(i) }
 func (p *Pool) FreeLen() uint           { return uint(len(p.freeIndices)) }
 func (p *Pool) MaxLen() uint            { return p.maxLen }

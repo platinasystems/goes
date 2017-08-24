@@ -10,8 +10,8 @@ package elib
 type BitmapsVec [][]BitmapVec
 
 func (p *BitmapsVec) Resize(n uint) {
-	c := Index(cap(*p))
-	l := Index(len(*p)) + Index(n)
+	c := uint(cap(*p))
+	l := uint(len(*p)) + n
 	if l > c {
 		c = NextResizeCap(l)
 		q := make([][]BitmapVec, l, c)
@@ -22,9 +22,9 @@ func (p *BitmapsVec) Resize(n uint) {
 }
 
 func (p *BitmapsVec) validate(new_len uint, zero []BitmapVec) *[]BitmapVec {
-	c := Index(cap(*p))
-	lʹ := Index(len(*p))
-	l := Index(new_len)
+	c := uint(cap(*p))
+	lʹ := uint(len(*p))
+	l := new_len
 	if l <= c {
 		// Need to reslice to larger length?
 		if l > lʹ {
@@ -38,7 +38,7 @@ func (p *BitmapsVec) validate(new_len uint, zero []BitmapVec) *[]BitmapVec {
 	return p.validateSlowPath(zero, c, l, lʹ)
 }
 
-func (p *BitmapsVec) validateSlowPath(zero []BitmapVec, c, l, lʹ Index) *[]BitmapVec {
+func (p *BitmapsVec) validateSlowPath(zero []BitmapVec, c, l, lʹ uint) *[]BitmapVec {
 	if l > c {
 		cNext := NextResizeCap(l)
 		q := make([][]BitmapVec, cNext, cNext)
@@ -76,6 +76,12 @@ func (p *BitmapsVec) ValidateLenInit(l uint, zero []BitmapVec) (v *[]BitmapVec) 
 		v = p.validate(l, zero)
 	}
 	return
+}
+
+func (p *BitmapsVec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
 }
 
 func (p BitmapsVec) Len() uint { return uint(len(p)) }

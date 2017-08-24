@@ -17,16 +17,16 @@ var pollerElogEventType = &elog.EventType{
 
 func init() {
 	t := pollerElogEventType
-	t.Stringer = stringer_pollerElogEvent
+	t.Strings = stringer_pollerElogEvent
 	t.Encode = encode_pollerElogEvent
 	t.Decode = decode_pollerElogEvent
 	elog.RegisterType(pollerElogEventType)
 }
 
-func stringer_pollerElogEvent(e *elog.Event) string {
+func stringer_pollerElogEvent(t *elog.EventType, e *elog.Event) []string {
 	var x pollerElogEvent
 	x.Decode(e.Data[:])
-	return x.String()
+	return x.Strings()
 }
 
 func encode_pollerElogEvent(b []byte, e *elog.Event) int {

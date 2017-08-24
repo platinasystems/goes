@@ -111,9 +111,7 @@ func (e *loopEvent) EventAction() {
 
 func (e *loopEvent) do() {
 	if elog.Enabled() {
-		le := eventElogEvent{}
-		copy(le.s[:], e.String())
-		le.Log()
+		elog.GenEvent(e.String())
 	}
 	e.actor.EventAction()
 	e.l.putLoopEvent(e)
@@ -178,65 +176,61 @@ func (l *Loop) duration(t cpu.Time) time.Duration {
 	return time.Duration(float64(int64(t-l.now)) * l.timeDurationPerCycle)
 }
 
-func (l *Loop) doEventWait() (quit *quitEvent) {
-	l.now = cpu.TimeNow()
-	dt := time.Duration(1<<63 - 1)
-	if t, ok := l.eventPool.NextTime(); ok {
-		if dt = l.duration(t); dt <= 0 {
-			return
-		}
-	}
-	if elog.Enabled() {
-		elog.GenEvent("waiting for event")
-	}
-	l.waitingForEvent = true
+func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent) {
+	elog.GenEvent("event wait")
 	select {
 	case e := <-l.events:
 		var ok bool
 		if quit, ok = e.actor.(*quitEvent); ok {
 			// Log quit event.
-			if elog.Enabled() {
-				elog.GenEvent("wakeup " + e.String())
-			}
+			elog.GenEvent("event wakeup " + e.String())
 		} else {
 			e.EventAction()
 		}
 	case <-time.After(dt):
-		if elog.Enabled() {
-			elog.GenEvent("wakeup timeout")
-		}
+		elog.GenEvent("event wait timeout")
 	}
-	l.waitingForEvent = false
 	return
 }
 
 func (l *Loop) doEvents() (quitLoop bool) {
-	// Handle discrete events.
-	var quit *quitEvent
-	if l.nActivePollers > 0 {
-		quit = l.doEventNoWait()
-	} else {
-		quit = l.doEventWait()
+	var (
+		quit    *quitEvent
+		didWait bool
+	)
+	if _, didWait = l.activePollerState.setEventWait(true); didWait {
+		l.now = cpu.TimeNow()
+		dt := time.Duration(1<<63 - 1)
+		if t, ok := l.eventPool.NextTime(); ok {
+			dt = l.duration(t)
+		}
+		if didWait = dt > 0; didWait {
+			quit = l.doEventWait(dt)
+		}
 	}
-	if quit != nil {
-		quitLoop = quit.Type == quitEventExit
-		return
+	if !didWait {
+		quit = l.doEventNoWait()
 	}
 
 	// Handle expired timed events.
-	l.now = cpu.TimeNow()
-	l.eventPoolLock.Lock()
-	l.eventPool.AdvanceAdd(l.now, &l.eventVec)
-	l.eventPoolLock.Unlock()
+	if l.eventPool.Elts() != 0 {
+		l.now = cpu.TimeNow()
+		l.eventPoolLock.Lock()
+		l.eventPool.AdvanceAdd(l.now, &l.eventVec)
+		l.eventPoolLock.Unlock()
 
-	for i := range l.eventVec {
-		l.eventVec[i].EventAction()
+		for i := range l.eventVec {
+			l.eventVec[i].EventAction()
+		}
+		elog.GenEventf("timed events %d expired, %d left", len(l.eventVec), l.eventPool.Elts())
+
+		l.eventVec = l.eventVec[:0]
 	}
-	l.eventVec = l.eventVec[:0]
 
 	// Wait for all event handlers to become inactive.
 	l.eventMain.Wait()
 
+	quitLoop = quit != nil && quit.Type == quitEventExit
 	return
 }
 
@@ -288,9 +282,6 @@ func (e *quitEvent) String() string { return quitEventTypeStrings[e.Type] }
 func (e *quitEvent) Error() string  { return e.String() }
 func (e *quitEvent) EventAction()   {}
 func (l *Loop) Quit()               { l.addEvent(l.getLoopEvent(ErrQuit), true) }
-func (l *Loop) Interrupt() {
-	// Add an event to wakeup event sleep.
-	if l.waitingForEvent {
-		l.addEvent(l.getLoopEvent(ErrInterrupt), false)
-	}
-}
+
+// Add an event to wakeup event sleep.
+func (l *Loop) Interrupt() { l.addEvent(l.getLoopEvent(ErrInterrupt), false) }

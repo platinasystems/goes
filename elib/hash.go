@@ -372,7 +372,6 @@ func (h *Hash) Set(k HasherKey) (i uint, exists bool) {
 		}
 		nonEmpty = true
 	}
-	return
 }
 
 func (h *Hash) Unset(k HasherKey) (i uint, ok bool) {

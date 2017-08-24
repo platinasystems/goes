@@ -82,4 +82,10 @@ func (p *dump_node_vec) ValidateLenInit(l uint, zero dump_node) (v *dump_node) {
 	return
 }
 
+func (p *dump_node_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p dump_node_vec) Len() uint { return uint(len(p)) }

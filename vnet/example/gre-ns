@@ -1,0 +1,32 @@
+IP=/home/eliot/bin/ip
+
+function wait_for_if_to_exist {
+    while true; do
+	${IP} netns exec $1 ${IP} link show $2 >& /dev/null
+	if [ $? == 0 ]; then
+	    break
+	fi
+	sleep $3
+    done
+}
+
+if [ "$1" == "up" ]; then
+    for i in {0..1}; do
+	${IP} netns add ns$i
+    done
+    for i in {0..1}; do
+	wait_for_if_to_exist ns$i vnet .10
+    done
+    for i in {0..1}; do
+	${IP} netns exec ns$i ${IP} link set vnet up
+	${IP} netns exec ns$i ${IP} addr add 1.0.0.$i/32 dev vnet
+	${IP} netns exec ns$i ${IP} route add 1.0.0.$(($i ^ 1))/32 dev vnet
+	${IP} netns exec ns$i ${IP} link add gre-ns$i type gre external
+	${IP} netns exec ns$i ${IP} link set gre-ns$i up
+	${IP} netns exec ns$i ${IP} route add 10.0.0.$i/32 encap ip dst 1.0.0.$(($i ^ 1)) ttl 10 dev gre-ns$i
+    done;
+else
+    for i in {0..1}; do
+	${IP} netns del ns$i;
+    done;
+fi

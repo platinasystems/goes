@@ -675,7 +675,6 @@ func (n *node) random_masked_bit(m *Main) (bit uint, ok bool) {
 			mi ^= f
 		}
 	}
-	return
 }
 
 func (m *Main) random_leaf() (n, parent *node) {

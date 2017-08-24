@@ -11,7 +11,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
 
-	"errors"
 	"fmt"
 )
 
@@ -98,8 +97,13 @@ func (p *Prefix) ToIpPrefix() (i ip.Prefix) {
 	return
 }
 
+type mapFibResult struct {
+	adj ip.Adj
+	nh  mapFibResultNextHop
+}
+
 // Maps for prefixes for /0 through /32; key in network byte order.
-type mapFib [1 + 32]map[vnet.Uint32]ip.Adj
+type MapFib [1 + 32]map[vnet.Uint32]mapFibResult
 
 // Cache of prefix length network masks: entry LEN has high LEN bits set.
 // So, 10/8 has top 8 bits set.
@@ -119,24 +123,37 @@ func computeNetMasks() (r [33]vnet.Uint32) {
 func (p *Prefix) Mask() vnet.Uint32          { return netMasks[p.Len] }
 func (p *Prefix) MaskAsAddress() (a Address) { a.FromUint32(p.Mask()); return }
 func (p *Prefix) mapFibKey() vnet.Uint32     { return p.Address.AsUint32() & p.Mask() }
+func (a *Address) Mask(l uint) (v Address) {
+	v.FromUint32(a.AsUint32() & netMasks[l])
+	return
+}
 
-func (m *mapFib) set(p *Prefix, r ip.Adj) (oldAdj ip.Adj, ok bool) {
-	l := p.Len
+func (m *MapFib) validateLen(l uint32) {
 	if m[l] == nil {
-		m[l] = make(map[vnet.Uint32]ip.Adj)
+		m[l] = make(map[vnet.Uint32]mapFibResult)
 	}
+}
+func (m *MapFib) Set(p *Prefix, newAdj ip.Adj) (oldAdj ip.Adj, ok bool) {
+	l := p.Len
+	m.validateLen(l)
 	k := p.mapFibKey()
-	if oldAdj, ok = m[l][k]; !ok {
+	var r mapFibResult
+	if r, ok = m[l][k]; !ok {
 		oldAdj = ip.AdjNil
+	} else {
+		oldAdj = r.adj
 	}
 	ok = true // set never fails
+	r.adj = newAdj
 	m[l][k] = r
 	return
 }
 
-func (m *mapFib) unset(p *Prefix) (oldAdj ip.Adj, ok bool) {
+func (m *MapFib) Unset(p *Prefix) (oldAdj ip.Adj, ok bool) {
 	k := p.mapFibKey()
-	if oldAdj, ok = m[p.Len][k]; ok {
+	var r mapFibResult
+	if r, ok = m[p.Len][k]; ok {
+		oldAdj = r.adj
 		delete(m[p.Len], k)
 	} else {
 		oldAdj = ip.AdjNil
@@ -144,43 +161,83 @@ func (m *mapFib) unset(p *Prefix) (oldAdj ip.Adj, ok bool) {
 	return
 }
 
-func (m *mapFib) get(p *Prefix) (r ip.Adj, ok bool) {
+func (m *MapFib) Get(p *Prefix) (r mapFibResult, ok bool) {
 	r, ok = m[p.Len][p.mapFibKey()]
 	return
 }
 
-func (m *mapFib) lookup(a *Address) ip.Adj {
-	p := a.toPrefix()
+func (m *MapFib) Lookup(a Address) (r mapFibResult, p Prefix, ok bool) {
+	p = a.toPrefix()
 	for l := 32; l >= 0; l-- {
 		if m[l] == nil {
 			continue
 		}
 		p.SetLen(uint(l))
-		if r, ok := m[l][p.mapFibKey()]; ok {
-			return r
+		k := p.mapFibKey()
+		if r, ok = m[l][k]; ok {
+			p.Address.FromUint32(k)
+			return
 		}
 	}
-	return ip.AdjMiss
+	r = mapFibResult{adj: ip.AdjMiss}
+	p = Prefix{}
+	return
+}
+
+func (f *MapFib) lookupReachable(m *Main, a Address) (r mapFibResult, p Prefix, ok bool) {
+	if r, p, ok = f.Lookup(a); ok {
+		as := m.GetAdj(r.adj)
+		// Anything that is not a Glean (e.g. matching an interface's address) is "reachable".
+		for i := range as {
+			if ok = !as[i].IsGlean(); !ok {
+				break
+			}
+		}
+	}
+	return
 }
 
 // Calls function for each more specific prefix matching given key.
-func (m *mapFib) foreachMatchingPrefix(key *Prefix, fn func(p *Prefix, a ip.Adj)) {
+func (m *MapFib) foreachMatchingPrefix(key *Prefix, fn func(p *Prefix, r mapFibResult)) {
 	p := Prefix{Address: key.Address}
 	for l := key.Len + 1; l <= 32; l++ {
 		p.Len = l
-		if a, ok := m[l][p.mapFibKey()]; ok {
-			fn(&p, a)
+		if r, ok := m[l][p.mapFibKey()]; ok {
+			fn(&p, r)
 		}
 	}
 }
 
-func (m *mapFib) foreach(fn func(p *Prefix, a ip.Adj)) {
+func (m *MapFib) foreach(fn func(p *Prefix, r mapFibResult)) {
 	var p Prefix
 	for l := 32; l >= 0; l-- {
 		p.Len = uint32(l)
-		for k, a := range m[l] {
+		for k, r := range m[l] {
 			p.Address.FromUint32(k)
-			fn(&p, a)
+			fn(&p, r)
+		}
+	}
+}
+
+func (m *MapFib) reset() {
+	for i := range m {
+		m[i] = nil
+	}
+}
+
+func (m *MapFib) clean(fi ip.FibIndex) {
+	for i := range m {
+		for _, r := range m[i] {
+			for dst, dstMap := range r.nh {
+				for dp := range dstMap {
+					if dp.i == fi {
+						delete(dstMap, dp)
+					}
+				}
+				if len(dstMap) == 0 {
+					delete(r.nh, dst)
+				}
+			}
 		}
 	}
 }
@@ -189,42 +246,39 @@ type Fib struct {
 	index ip.FibIndex
 
 	// Map-based fib for general accounting and to maintain mtrie (e.g. setLessSpecific).
-	reachable, unreachable mapFib
+	reachable, unreachable MapFib
 
 	// Mtrie for fast lookups.
 	mtrie
-
-	remapUnreachablePrefixes []Prefix
 }
+
+//go:generate gentemplate -d Package=ip4 -id Fib -d VecType=FibVec -d Type=*Fib github.com/platinasystems/go/elib/vec.tmpl
 
 // Total number of routes in FIB.
 func (f *Fib) Len() (n uint) {
 	for i := range f.reachable {
 		n += uint(len(f.reachable[i]))
-		n += uint(len(f.unreachable[i]))
 	}
 	return
 }
 
-type FibAddDelHook func(i ip.FibIndex, p *Prefix, r ip.Adj, isDel bool, isRemap bool)
 type IfAddrAddDelHook func(ia ip.IfAddr, isDel bool)
 
 //go:generate gentemplate -id FibAddDelHook -d Package=ip4 -d DepsType=FibAddDelHookVec -d Type=FibAddDelHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
 //go:generate gentemplate -id IfAddrAddDelHook -d Package=ip4 -d DepsType=IfAddrAddDelHookVec -d Type=IfAddrAddDelHook -d Data=hooks github.com/platinasystems/go/elib/dep/dep.tmpl
 
 func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj, ok bool) {
-	// Call hooks before unset.
 	if isDel {
-		for i := range main.fibAddDelHooks.hooks {
-			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel, false)
-		}
+		// Call hooks before delete.
+		main.callFibAddDelHooks(f.index, p, r, isDel)
+		f.addDelReachable(main, p, r, isDel)
 	}
 
 	// Add/delete in map fib.
 	if isDel {
-		oldAdj, ok = f.reachable.unset(p)
+		oldAdj, ok = f.reachable.Unset(p)
 	} else {
-		oldAdj, ok = f.reachable.set(p, r)
+		oldAdj, ok = f.reachable.Set(p, r)
 	}
 
 	// Add/delete in mtrie fib.
@@ -235,7 +289,7 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 	}
 
 	s := addDelLeaf{
-		key:    p.Address,
+		key:    p.Address.Mask(uint(p.Len)),
 		keyLen: uint8(p.Len),
 		result: r,
 	}
@@ -256,87 +310,209 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 
 	// Call hooks after add.
 	if !isDel {
-		for i := range main.fibAddDelHooks.hooks {
-			main.fibAddDelHooks.Get(i)(f.index, p, r, isDel, false)
-		}
+		main.callFibAddDelHooks(f.index, p, r, isDel)
+		f.addDelReachable(main, p, r, isDel)
 	}
 
 	return
 }
 
+type NextHopper interface {
+	ip.AdjacencyFinalizer
+	NextHopFibIndex(m *Main) ip.FibIndex
+	NextHopWeight() ip.NextHopWeight
+}
+
+type idst struct {
+	a Address
+	i ip.FibIndex
+}
+
+type ipre struct {
+	p Prefix
+	i ip.FibIndex
+}
+
+type mapFibResultNextHop map[idst]map[ipre]NextHopper
+
+func (x *mapFibResult) addDelNextHop(m *Main, pf *Fib, p Prefix, a Address, r NextHopper, isDel bool) {
+	id := idst{a: a, i: r.NextHopFibIndex(m)}
+	ip := ipre{p: p, i: pf.index}
+	if isDel {
+		delete(x.nh[id], ip)
+		if len(x.nh[id]) == 0 {
+			delete(x.nh, id)
+		}
+	} else {
+		if x.nh == nil {
+			x.nh = make(map[idst]map[ipre]NextHopper)
+		}
+		if x.nh[id] == nil {
+			x.nh[id] = make(map[ipre]NextHopper)
+		}
+		x.nh[id][ip] = r
+	}
+}
+
+func (x *mapFibResultNextHop) String() (s string) {
+	for a, m := range *x {
+		for p, w := range m {
+			s += fmt.Sprintf("  %v %v x %d\n", &p, &a.a, w)
+		}
+	}
+	return
+}
+
+func (f *Fib) setReachable(m *Main, p *Prefix, pf *Fib, via *Prefix, a Address, r NextHopper, isDel bool) {
+	va, vl := via.Address.AsUint32(), via.Len
+	x := f.reachable[vl][va]
+	x.addDelNextHop(m, pf, *p, a, r, isDel)
+	f.reachable[vl][va] = x
+}
+
+// Delete more specific reachable with less specific reachable.
+func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibResult) {
+	for dst, dstMap := range more.nh {
+		// Move all destinations from more -> less.
+		delete(more.nh, dst)
+		if less.nh == nil {
+			less.nh = make(map[idst]map[ipre]NextHopper)
+		}
+		less.nh[dst] = dstMap
+		// Replace adjacencies: more -> less.
+		for dp, r := range dstMap {
+			g := m.fibByIndex(dp.i, false)
+			g.replaceNextHop(m, &dp.p, f, more.adj, less.adj, dst.a, r)
+		}
+	}
+}
+
+func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
+	for dst, dstMap := range x.nh {
+		delete(x.nh, dst)
+		for dp, r := range dstMap {
+			g := m.fibByIndex(dp.i, false)
+			const isDel = true
+			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+			// Prefix is now unreachable.
+			f.addDelUnreachable(m, &dp.p, g, dst.a, r, !isDel, false)
+		}
+	}
+}
+
+func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, adj ip.Adj, more *mapFibResult) {
+	for dst, dstMap := range less.nh {
+		if dst.a.MatchesPrefix(p) {
+			delete(less.nh, dst)
+			for dp, r := range dstMap {
+				const isDel = false
+				g := m.fibByIndex(dp.i, false)
+				more.addDelNextHop(m, g, dp.p, dst.a, r, isDel)
+				g.replaceNextHop(m, &dp.p, f, less.adj, adj, dst.a, r)
+			}
+		}
+	}
+	f.reachable[p.Len][p.mapFibKey()] = *more
+}
+
+func (r *mapFibResult) makeReachable(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
+	for dst, dstMap := range r.nh {
+		if dst.a.MatchesPrefix(p) {
+			delete(r.nh, dst)
+			for dp, r := range dstMap {
+				g := m.fibByIndex(dp.i, false)
+				const isDel = false
+				g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+			}
+		}
+	}
+}
+
+func (x *mapFibResult) addUnreachableVia(m *Main, f *Fib, p *Prefix) {
+	for dst, dstMap := range x.nh {
+		if dst.a.MatchesPrefix(p) {
+			delete(x.nh, dst)
+			for dp, r := range dstMap {
+				g := m.fibByIndex(dp.i, false)
+				const isDel = false
+				f.addDelUnreachable(m, &dp.p, g, dst.a, r, isDel, false)
+			}
+		}
+	}
+}
+
+func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
+	r, _ := f.reachable.Get(p)
+	// Look up less specific reachable route for prefix.
+	lr, _, lok := f.reachable.getLessSpecific(p)
+	if isDel {
+		if lok {
+			lr.replaceWithLessSpecific(m, f, &r)
+		} else {
+			r.delReachableVia(m, f)
+		}
+	} else {
+		if lok {
+			lr.replaceWithMoreSpecific(m, f, p, a, &r)
+		}
+		if r, _, ok := f.unreachable.Lookup(p.Address); ok {
+			r.makeReachable(m, f, p, a)
+		}
+	}
+}
+
+func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHopper, isDel bool, recurse bool) (err error) {
+	nr, np, _ := f.unreachable.Lookup(a)
+	if isDel && recurse {
+		nr.delReachableVia(m, f)
+	}
+	if !isDel && recurse {
+		nr.addUnreachableVia(m, f, p)
+	}
+	nr.addDelNextHop(m, pf, *p, a, r, isDel)
+	f.unreachable.validateLen(np.Len)
+	nr.adj = ip.AdjNil
+	f.unreachable[np.Len][np.mapFibKey()] = nr
+	return
+}
+
 // Find first less specific route matching address and insert into mtrie.
-func (f *Fib) setLessSpecific(pʹ *Prefix) (adj ip.Adj, ok bool) {
-	// Copy to avoid modifying pʹ.
-	p := pʹ.Address.toPrefix()
+func (f *MapFib) getLessSpecific(pʹ *Prefix) (r mapFibResult, p Prefix, ok bool) {
+	p = pʹ.Address.toPrefix()
 
 	// No need to consider length 0 since that's not in mtrie.
 	for l := pʹ.Len - 1; l >= 1; l-- {
-		if f.reachable[l] == nil {
+		if f[l] == nil {
 			continue
 		}
 		p.Len = l
 		k := p.mapFibKey()
-		if adj, ok = f.reachable[l][k]; ok {
-			s := addDelLeaf{
-				result: adj,
-				keyLen: uint8(l),
-			}
-			s.key.FromUint32(k)
-			s.set(&f.mtrie)
+		if r, ok = f[l][k]; ok {
 			return
 		}
 	}
 	return
 }
 
-func (f *Fib) mapFibRemapAdjacency(m *Main, from, to ip.Adj) {
-	for l := 0; l <= 32; l++ {
-		for dst, adj := range f.reachable[l] {
-			if adj == from {
-				isDel := to == ip.AdjNil
-				if isDel {
-					delete(f.reachable[l], dst)
-				} else {
-					f.reachable[l][dst] = to
-				}
-				p := Prefix{Len: uint32(l)}
-				p.Address.FromUint32(dst)
-				if isDel {
-					f.remapUnreachablePrefixes = append(f.remapUnreachablePrefixes, p)
-				}
-				for i := range m.fibAddDelHooks.hooks {
-					m.fibAddDelHooks.Get(i)(f.index, &p, to, isDel, true)
-				}
-			}
+// Find first less specific route matching address and insert into mtrie.
+func (f *Fib) setLessSpecific(pʹ *Prefix) (r mapFibResult, p Prefix, ok bool) {
+	r, p, ok = f.reachable.getLessSpecific(pʹ)
+	if ok {
+		s := addDelLeaf{
+			result: r.adj,
+			keyLen: uint8(p.Len),
 		}
+		s.key = p.Address
+		s.set(&f.mtrie)
 	}
-}
-
-func (m *Main) remapAdjacency(from, to ip.Adj) {
-	for _, f := range m.fibs {
-		if f == nil {
-			continue
-		}
-		f.mapFibRemapAdjacency(m, from, to)
-		f.mtrie.remapAdjacency(from, to)
-
-		// Insert less-specific routes into mtrie for any deleted prefixes.
-		if f.remapUnreachablePrefixes != nil {
-			for i := range f.remapUnreachablePrefixes {
-				p := &f.remapUnreachablePrefixes[i]
-				if _, found := f.setLessSpecific(p); !found {
-					f.unreachable.set(p, ip.AdjNil)
-				}
-			}
-			// Save prefix slice for next call.
-			f.remapUnreachablePrefixes = f.remapUnreachablePrefixes[:0]
-		}
-	}
+	return
 }
 
 func (f *Fib) Get(p *Prefix) (a ip.Adj, ok bool) {
-	if a, ok = f.reachable[p.Len][p.mapFibKey()]; !ok {
-		a = ip.AdjNil
+	var r mapFibResult
+	a = ip.AdjNil
+	if r, ok = f.reachable[p.Len][p.mapFibKey()]; ok {
+		a = r.adj
 	}
 	return
 }
@@ -347,25 +523,34 @@ func (f *Fib) Lookup(a *Address) (r ip.Adj) {
 	r = f.mtrie.lookup(a)
 	return
 }
+func (m *Main) Lookup(a *Address, i ip.FibIndex) (r ip.Adj) {
+	f := m.fibByIndex(i, true)
+	return f.Lookup(a)
+}
 
 func (m *Main) setInterfaceAdjacency(a *ip.Adjacency, si vnet.Si, ia ip.IfAddr) {
 	sw := m.Vnet.SwIf(si)
 	hw := m.Vnet.SupHwIf(sw)
-	h := m.Vnet.HwIfer(hw.Hi())
+	var h vnet.HwInterfacer
+	if hw != nil {
+		h = m.Vnet.HwIfer(hw.Hi())
+	}
 
 	next := ip.LookupNextRewrite
 	noder := &m.rewriteNode
 	packetType := vnet.IP4
 
-	if _, ok := h.(vnet.Arper); ok {
+	if _, ok := h.(vnet.Arper); h == nil || ok {
 		next = ip.LookupNextGlean
 		noder = &m.arpNode
 		packetType = vnet.ARP
-		a.IfAddr = ia
+		a.Index = uint32(ia)
 	}
 
 	a.LookupNextIndex = next
-	m.Vnet.SetRewrite(&a.Rewrite, si, noder, packetType, nil /* dstAdr meaning broadcast */)
+	if h != nil {
+		m.Vnet.SetRewrite(&a.Rewrite, si, noder, packetType, nil /* dstAdr meaning broadcast */)
+	}
 }
 
 type fibMain struct {
@@ -375,10 +560,16 @@ type fibMain struct {
 	ifRouteAdjIndexBySi map[vnet.Si]ip.Adj
 }
 
-//go:generate gentemplate -d Package=ip4 -id Fib -d VecType=FibVec -d Type=*Fib github.com/platinasystems/go/elib/vec.tmpl
+type FibAddDelHook func(i ip.FibIndex, p *Prefix, r ip.Adj, isDel bool)
 
 func (m *fibMain) RegisterFibAddDelHook(f FibAddDelHook, dep ...*dep.Dep) {
 	m.fibAddDelHooks.Add(f, dep...)
+}
+
+func (m *fibMain) callFibAddDelHooks(fi ip.FibIndex, p *Prefix, r ip.Adj, isDel bool) {
+	for i := range m.fibAddDelHooks.hooks {
+		m.fibAddDelHooks.Get(i)(fi, p, r, isDel)
+	}
 }
 
 func (m *Main) fibByIndex(i ip.FibIndex, create bool) (f *Fib) {
@@ -441,7 +632,7 @@ func (m *Main) addDelRoute(p *ip.Prefix, fi ip.FibIndex, newAdj ip.Adj, isDel bo
 	var ok bool
 	oldAdj, ok = f.addDel(m, &q, newAdj, isDel)
 	if !ok {
-		err = fmt.Errorf("prefix %s not found", &q)
+		err = fmt.Errorf("prefix %v not found", q)
 	}
 	return
 }
@@ -452,57 +643,66 @@ type NextHop struct {
 	Weight  ip.NextHopWeight
 }
 
+func (n *NextHop) NextHopWeight() ip.NextHopWeight     { return n.Weight }
+func (n *NextHop) NextHopFibIndex(m *Main) ip.FibIndex { return m.FibIndexForSi(n.Si) }
+func (n *NextHop) FinalizeAdjacency(a *ip.Adjacency)   {}
+
 func (x *NextHop) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*vnet.Vnet)
-	if !in.Parse("%v %v", &x.Si, v, &x.Address) {
-		panic(parse.ErrInput)
+	switch {
+	case in.Parse("%v %v", &x.Si, v, &x.Address):
+	default:
+		panic(fmt.Errorf("expecting INTERFACE ADDRESS; got %s", in))
 	}
 	x.Weight = 1
 	in.Parse("weight %d", &x.Weight)
 }
 
-var ErrNextHopNotFound = errors.New("next hop not found")
+type prefixError struct {
+	s string
+	p Prefix
+}
+
+func (e *prefixError) Error() string { return e.s + ": " + e.p.String() }
 
 func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error) {
 	f := m.fibBySi(nh.Si)
+	return f.addDelRouteNextHop(m, p, nh.Address, nh, isDel)
+}
 
+func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper, isDel bool) (err error) {
 	var (
 		nhAdj, oldAdj, newAdj ip.Adj
-		adjs                  []ip.Adjacency
 		ok                    bool
 	)
 
-	if !isDel && p.Len == 32 && p.Address.IsEqual(&nh.Address) {
-		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nh.Address)
+	if !isDel && nha.MatchesPrefix(p) {
+		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nha)
 		return
 	}
 
-	// Zero address means interface next hop.
-	if nh.Address.IsZero() && !isDel {
-		if nhAdj, ok = m.ifRouteAdjIndexBySi[nh.Si]; !ok {
-			nhAdj, adjs = m.NewAdj(1)
-			m.setInterfaceAdjacency(&adjs[0], nh.Si, ip.IfAddrNil)
-			m.CallAdjAddHooks(nhAdj)
-			if m.ifRouteAdjIndexBySi == nil {
-				m.ifRouteAdjIndexBySi = make(map[vnet.Si]ip.Adj)
-			}
-			m.ifRouteAdjIndexBySi[nh.Si] = nhAdj
-		}
+	nhf := m.fibByIndex(nhr.NextHopFibIndex(m), true)
+
+	var reachable_via_prefix Prefix
+	if r, np, found := nhf.reachable.lookupReachable(m, nha); found {
+		nhAdj = r.adj
+		reachable_via_prefix = np
 	} else {
-		if nhAdj, ok = f.Get(&Prefix{Address: nh.Address, Len: 32}); !ok {
-			err = ErrNextHopNotFound
-			return
-		}
+		const recurse = true
+		err = nhf.addDelUnreachable(m, p, f, nha, nhr, isDel, recurse)
+		return
 	}
 
 	oldAdj, ok = f.Get(p)
 	if isDel && !ok {
-		err = fmt.Errorf("unknown destination %s", p)
+		err = &prefixError{s: "unknown destination", p: *p}
 		return
 	}
 
-	if newAdj, ok = m.AddDelNextHop(oldAdj, isDel, nhAdj, nh.Weight); !ok {
-		err = fmt.Errorf("requested next-hop %s not found in multipath", &nh.Address)
+	if oldAdj == nhAdj && isDel {
+		newAdj = ip.AdjNil
+	} else if newAdj, ok = m.AddDelNextHop(oldAdj, nhAdj, nhr.NextHopWeight(), nhr, isDel); !ok {
+		err = fmt.Errorf("requested next-hop %s not found in multipath", &nha)
 		return
 	}
 
@@ -513,13 +713,40 @@ func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error
 			isFibDel = false
 		}
 		f.addDel(m, p, newAdj, isFibDel)
+		nhf.setReachable(m, p, f, &reachable_via_prefix, nha, nhr, isDel)
 	}
 
 	return
 }
 
+func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNextHopAdj ip.Adj, nha Address, r NextHopper) (err error) {
+	if adj, ok := f.Get(p); !ok {
+		err = &prefixError{s: "unknown destination", p: *p}
+	} else {
+		as := m.GetAdj(toNextHopAdj)
+		// If replacement is glean (interface route) then next hop becomes unreachable.
+		isDel := len(as) == 1 && as[0].IsGlean()
+		if isDel {
+			err = pf.addDelRouteNextHop(m, p, nha, r, isDel)
+			if err == nil {
+				err = f.addDelUnreachable(m, p, pf, nha, r, !isDel, false)
+			}
+		} else {
+			if err = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); err != nil {
+				err = fmt.Errorf("replace next hop: %v", err)
+			} else {
+				m.callFibAddDelHooks(pf.index, p, adj, isDel)
+			}
+		}
+	}
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (f *Fib) deleteMatchingRoutes(m *Main, key *Prefix) {
-	f.reachable.foreachMatchingPrefix(key, func(p *Prefix, a ip.Adj) {
+	f.reachable.foreachMatchingPrefix(key, func(p *Prefix, r mapFibResult) {
 		f.Del(m, p)
 	})
 }
@@ -530,7 +757,7 @@ func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
 	}
 }
 
-func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
+func (m *Main) addDelInterfaceAddressRoutes(ia ip.IfAddr, isDel bool) {
 	ifa := m.GetIfAddr(ia)
 	si := ifa.Si
 	sw := m.Vnet.SwIf(si)
@@ -558,9 +785,11 @@ func (m *Main) addDelInterfaceRoutes(ia ip.IfAddr, isDel bool) {
 		if !isDel {
 			ai, as := m.NewAdj(1)
 			as[0].LookupNextIndex = ip.LookupNextLocal
-			as[0].IfAddr = ia
+			as[0].Index = uint32(ia)
 			as[0].Si = si
-			as[0].SetMaxPacketSize(hw)
+			if hw != nil {
+				as[0].SetMaxPacketSize(hw)
+			}
 			m.CallAdjAddHooks(ai)
 			addDelAdj = ai
 		}
@@ -601,7 +830,7 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 		ia, exists = m.Main.IfAddrForPrefix(&pa, si)
 		// For non-existing prefixes error will be signalled by AddDelInterfaceAddress below.
 		if exists {
-			m.addDelInterfaceRoutes(ia, isDel)
+			m.addDelInterfaceAddressRoutes(ia, isDel)
 		}
 	}
 
@@ -612,7 +841,7 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 
 	// If interface is up add interface routes.
 	if isUp && !isDel && !exists {
-		m.addDelInterfaceRoutes(ia, isDel)
+		m.addDelInterfaceAddressRoutes(ia, isDel)
 	}
 
 	// Do callbacks when new address is created or old one is deleted.
@@ -629,8 +858,26 @@ func (m *Main) swIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 	m.validateDefaultFibForSi(si)
 	m.ForeachIfAddress(si, func(ia ip.IfAddr, ifa *ip.IfAddress) (err error) {
 		isDel := !isUp
-		m.addDelInterfaceRoutes(ia, isDel)
+		m.addDelInterfaceAddressRoutes(ia, isDel)
 		return
 	})
 	return
+}
+
+func (f *Fib) Reset() {
+	f.reachable.reset()
+	f.unreachable.reset()
+	f.mtrie.reset()
+}
+
+func (m *Main) FibReset(fi ip.FibIndex) {
+	for i := range m.fibs {
+		if i != int(fi) && m.fibs[i] != nil {
+			m.fibs[i].reachable.clean(fi)
+			m.fibs[i].unreachable.clean(fi)
+		}
+	}
+
+	f := m.fibByIndex(fi, true)
+	f.Reset()
 }

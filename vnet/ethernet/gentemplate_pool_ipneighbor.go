@@ -38,8 +38,8 @@ func (p *ipNeighborPool) IsFree(i uint) (v bool) {
 }
 
 func (p *ipNeighborPool) Resize(n uint) {
-	c := elib.Index(cap(p.neighbors))
-	l := elib.Index(len(p.neighbors) + int(n))
+	c := uint(cap(p.neighbors))
+	l := uint(len(p.neighbors) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]ipNeighbor, l, c)
@@ -50,15 +50,15 @@ func (p *ipNeighborPool) Resize(n uint) {
 }
 
 func (p *ipNeighborPool) Validate(i uint) {
-	c := elib.Index(cap(p.neighbors))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.neighbors))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]ipNeighbor, l, c)
 		copy(q, p.neighbors)
 		p.neighbors = q
 	}
-	if l > elib.Index(len(p.neighbors)) {
+	if l > uint(len(p.neighbors)) {
 		p.neighbors = p.neighbors[:l]
 	}
 }
@@ -84,5 +84,12 @@ func (p *ipNeighborPool) ForeachIndex(f func(i uint)) {
 		if !p.Pool.IsFree(uint(i)) {
 			f(uint(i))
 		}
+	}
+}
+
+func (p *ipNeighborPool) Reset() {
+	p.Pool.Reset()
+	if len(p.neighbors) > 0 {
+		p.neighbors = p.neighbors[:0]
 	}
 }

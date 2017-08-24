@@ -244,7 +244,6 @@ func (heap *Heap) get(sizeArg uint, size Index) (id Index, offset uint) {
 
 	if heap.maxLen != 0 && heap.len+size > heap.maxLen {
 		panic(ErrHeapOverflow)
-		return
 	}
 
 	if heap.len == 0 {

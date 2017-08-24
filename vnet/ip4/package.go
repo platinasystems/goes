@@ -26,10 +26,10 @@ func Init(v *vnet.Vnet) *ip.Main {
 		GetRoute:         m.getRoute,
 		GetRouteFibIndex: m.getRouteFibIndex,
 		AddDelRoute:      m.addDelRoute,
-		RemapAdjacency:   m.remapAdjacency,
 	}
 	m.Main.PackageInit(v, cf)
 	v.RegisterSwIfAdminUpDownHook(m.swIfAdminUpDown)
+	m.DependsOn("pg", "ethernet")
 	return &m.Main
 }
 
@@ -65,7 +65,7 @@ func (m *Main) FormatLayer(b []byte) (lines []string) {
 		if l, ok := m.GetLayer(h.Protocol); ok {
 			lines = append(lines, l.FormatLayer(b[n:])...)
 		} else {
-			panic(fmt.Errorf("no formatter for protocol %s", h.Protocol))
+			panic(fmt.Errorf("no formatter for protocol %v", h.Protocol))
 		}
 	}
 	return
@@ -80,7 +80,7 @@ func (m *Main) ParseLayer(b []byte, in *parse.Input) (n uint) {
 		if l, ok := m.GetLayer(h.Protocol); ok {
 			n += l.ParseLayer(b[n:], in)
 		} else {
-			panic(fmt.Errorf("no parser for protocol %s", h.Protocol))
+			panic(fmt.Errorf("no parser for protocol %v", h.Protocol))
 		}
 	}
 	return

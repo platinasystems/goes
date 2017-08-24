@@ -113,7 +113,7 @@ func (t *testSparse) validate(iter int) (err error) {
 		o := &t.objs[i]
 		d, ok := t.x.Get(o.sparse)
 		if ok != (o.dense != MaxIndex) {
-			err = fmt.Errorf("ok %v sparse 0x%x dense %d != %d",
+			err = fmt.Errorf("iter %d ok %v sparse 0x%x dense %d != %d",
 				iter, ok, o.sparse, o.dense, d)
 			return
 		}

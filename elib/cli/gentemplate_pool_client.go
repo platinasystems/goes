@@ -38,8 +38,8 @@ func (p *clientPool) IsFree(i uint) (v bool) {
 }
 
 func (p *clientPool) Resize(n uint) {
-	c := elib.Index(cap(p.clients))
-	l := elib.Index(len(p.clients) + int(n))
+	c := uint(cap(p.clients))
+	l := uint(len(p.clients) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]client, l, c)
@@ -50,15 +50,15 @@ func (p *clientPool) Resize(n uint) {
 }
 
 func (p *clientPool) Validate(i uint) {
-	c := elib.Index(cap(p.clients))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.clients))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]client, l, c)
 		copy(q, p.clients)
 		p.clients = q
 	}
-	if l > elib.Index(len(p.clients)) {
+	if l > uint(len(p.clients)) {
 		p.clients = p.clients[:l]
 	}
 }
@@ -84,5 +84,12 @@ func (p *clientPool) ForeachIndex(f func(i uint)) {
 		if !p.Pool.IsFree(uint(i)) {
 			f(uint(i))
 		}
+	}
+}
+
+func (p *clientPool) Reset() {
+	p.Pool.Reset()
+	if len(p.clients) > 0 {
+		p.clients = p.clients[:0]
 	}
 }

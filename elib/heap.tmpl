@@ -44,8 +44,8 @@ func (p * {{.HeapType}}) Put(offset uint) {
 }
 
 func (p * {{.HeapType}}) Validate(i uint) {
-	c := {{template "elib" .Package}}Index(cap(p.{{.Data}}))
-	l := {{template "elib" .Package}}Index(i) + 1
+	c := uint(cap(p.{{.Data}}))
+	l := uint(i) + 1
 	if l > c {
 		c = {{template "elib" .Package}}NextResizeCap(l)
 		q := make([]{{.Type}}, l, c)
@@ -55,7 +55,7 @@ func (p * {{.HeapType}}) Validate(i uint) {
 		p.{{.Data}} = q
 		p.ids = r
 	}
-	if l > {{template "elib" .Package}}Index(len(p.{{.Data}})) {
+	if l > uint(len(p.{{.Data}})) {
 		p.{{.Data}} = p.{{.Data}}[:l]
 		p.ids = p.ids[:l]
 	}

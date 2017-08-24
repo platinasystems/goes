@@ -63,24 +63,30 @@ func (f *interface_filter) run(s string, kind netlink.InterfaceKind) (ok bool) {
 
 type Main struct {
 	vnet.Package
-
-	v *vnet.Vnet
-
+	v               *vnet.Vnet
 	verbose_packets bool
 	verbose_netlink bool
 	interface_filter
-
+	net_namespace_main
 	netlink_main
 	tuntap_main
+	vnet_tun_main
+	Config
 }
 
 func GetMain(v *vnet.Vnet) *Main { return v.GetPackage(packageIndex).(*Main) }
 
-func Init(v *vnet.Vnet) {
+type Config struct {
+	RxInjectNodeName string
+}
+
+func Init(v *vnet.Vnet, cf Config) {
 	m := &Main{}
 	m.v = v
+	m.Config = cf
 	m.tuntap_main.Init(v)
 	m.netlink_main.Init(m)
+	m.vnet_tun_main.init(m)
 	packageIndex = v.AddPackage("unix", m)
 }
 
@@ -89,10 +95,6 @@ func (m *Main) Configure(in *parse.Input) {
 		var s string
 		switch {
 		case in.Parse("mtu %d", &m.mtuBytes):
-		case in.Parse("tap"):
-			m.isTun = false
-		case in.Parse("tun"):
-			m.isTun = true
 		case in.Parse("verbose-packets"):
 			m.verbose_packets = true
 		case in.Parse("verbose-netlink"):

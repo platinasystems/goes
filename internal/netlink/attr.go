@@ -207,6 +207,7 @@ const (
 	IFLA_INFO_XSTATS
 	IFLA_INFO_SLAVE_KIND
 	IFLA_INFO_SLAVE_DATA
+	IFLA_INFO_MAX
 )
 
 var ifLinkInfoAttrTypeNames = []string{
@@ -236,49 +237,62 @@ func (t *IfLinkInfoAttrType) IthString(i int) string {
 	return elib.Stringer(ifLinkInfoAttrTypeNames, i)
 }
 
+func (msg *IfInfoMessage) GetLinkInfoData() (as *AttrArray) {
+	if li, ok := msg.Attrs[IFLA_LINKINFO].(*AttrArray); ok {
+		as, _ = li.X[IFLA_INFO_DATA].(*AttrArray)
+	}
+	return
+}
+
 type InterfaceKind int
 
 const (
 	InterfaceKindUnknown InterfaceKind = iota
+	InterfaceKindBridge
 	InterfaceKindDummy
-	InterfaceKindTun
-	InterfaceKindVeth
-	InterfaceKindVlan
-	InterfaceKindIpip
-	InterfaceKindIp6Tunnel
 	InterfaceKindIp4GRE
 	InterfaceKindIp4GRETap
 	InterfaceKindIp6GRE
 	InterfaceKindIp6GRETap
+	InterfaceKindIp6Tunnel
+	InterfaceKindIpip
+	InterfaceKindSit
+	InterfaceKindTun
+	InterfaceKindVeth
+	InterfaceKindVlan
 )
 
 var kindStrings = [...]string{
-	InterfaceKindUnknown:   "",
+	InterfaceKindBridge:    "bridge",
 	InterfaceKindDummy:     "dummy",
-	InterfaceKindTun:       "tun",
-	InterfaceKindVeth:      "veth",
-	InterfaceKindVlan:      "vlan",
-	InterfaceKindIpip:      "ipip",
-	InterfaceKindIp6Tunnel: "ip6tnl",
 	InterfaceKindIp4GRE:    "gre",
 	InterfaceKindIp4GRETap: "gretap",
 	InterfaceKindIp6GRE:    "ip6gre",
 	InterfaceKindIp6GRETap: "ip6gretap",
+	InterfaceKindIp6Tunnel: "ip6tnl",
+	InterfaceKindIpip:      "ipip",
+	InterfaceKindSit:       "sit",
+	InterfaceKindTun:       "tun",
+	InterfaceKindUnknown:   "",
+	InterfaceKindVeth:      "veth",
+	InterfaceKindVlan:      "vlan",
 }
 
 func (k InterfaceKind) String() string { return kindStrings[k] }
 
 var kindMap = map[string]InterfaceKind{
+	"bridge":    InterfaceKindBridge,
 	"dummy":     InterfaceKindDummy,
-	"tun":       InterfaceKindTun,
-	"veth":      InterfaceKindVeth,
-	"vlan":      InterfaceKindVlan,
-	"ipip":      InterfaceKindIpip,
-	"ip6tnl":    InterfaceKindIp6Tunnel,
 	"gre":       InterfaceKindIp4GRE,
 	"gretap":    InterfaceKindIp4GRETap,
 	"ip6gre":    InterfaceKindIp6GRE,
 	"ip6gretap": InterfaceKindIp6GRETap,
+	"ip6tnl":    InterfaceKindIp6Tunnel,
+	"ipip":      InterfaceKindIpip,
+	"sit":       InterfaceKindSit,
+	"tun":       InterfaceKindTun,
+	"veth":      InterfaceKindVeth,
+	"vlan":      InterfaceKindVlan,
 }
 
 func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
@@ -291,12 +305,12 @@ func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
 func parse_link_info(b []byte) *AttrArray {
 	as := pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfLinkInfoAttrType()
+	as.X.Validate(uint(IFLA_INFO_MAX - 1))
 	linkKind := InterfaceKindUnknown
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfLinkInfoAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_INFO_KIND, IFLA_INFO_SLAVE_KIND:
 			// Remove trailing 0.
@@ -330,6 +344,7 @@ const (
 	IFLA_VLAN_EGRESS_QOS
 	IFLA_VLAN_INGRESS_QOS
 	IFLA_VLAN_PROTOCOL
+	IFLA_VLAN_MAX
 )
 
 var ifVlanLinkInfoDataAttrKindNames = []string{
@@ -364,11 +379,11 @@ func (t *IfVlanLinkInfoDataAttrType) IthString(i int) string {
 func parse_vlan_info(b []byte) (as *AttrArray) {
 	as = pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfVlanLinkInfoDataAttrType()
+	as.X.Validate(uint(IFLA_VLAN_MAX - 1))
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfVlanLinkInfoDataAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_VLAN_ID:
 			as.X[kind] = Uint16AttrBytes(v)
@@ -469,6 +484,7 @@ const (
 	IFLA_IPTUN_ENCAP_DPORT
 	IFLA_IPTUN_COLLECT_METADATA
 	IFLA_IPTUN_FWMARK
+	IFLA_IPTUN_MAX
 )
 
 var ifIptunLinkInfoDataAttrKindNames = []string{
@@ -518,11 +534,11 @@ func (t *IfIptunLinkInfoDataAttrType) IthString(i int) string {
 func parse_iptun_info(b []byte, linkKind InterfaceKind) (as *AttrArray) {
 	as = pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfIptunLinkInfoDataAttrType()
+	as.X.Validate(uint(IFLA_IPTUN_MAX - 1))
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfIptunLinkInfoDataAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_IPTUN_LOCAL, IFLA_IPTUN_REMOTE:
 			if linkKind == InterfaceKindIp6Tunnel {
@@ -571,6 +587,7 @@ const (
 	IFLA_GRE_COLLECT_METADATA
 	IFLA_GRE_IGNORE_DF
 	IFLA_GRE_FWMARK
+	IFLA_GRE_MAX
 )
 
 var ifGRELinkInfoDataAttrKindNames = []string{
@@ -620,11 +637,11 @@ func (t *IfGRELinkInfoDataAttrType) IthString(i int) string {
 func parse_gre_info(b []byte, linkKind InterfaceKind) (as *AttrArray) {
 	as = pool.AttrArray.Get().(*AttrArray)
 	as.Type = NewIfGRELinkInfoDataAttrType()
+	as.X.Validate(uint(IFLA_GRE_MAX - 1))
 	for i := 0; i < len(b); {
 		a, v, next := nextAttr(b, i)
 		i = next
 		kind := IfGRELinkInfoDataAttrKind(a.Kind())
-		as.X.Validate(uint(kind))
 		switch kind {
 		case IFLA_GRE_LOCAL, IFLA_GRE_REMOTE:
 			switch linkKind {
@@ -1493,4 +1510,194 @@ func (a Uint64Attr) WriteTo(w io.Writer) (int64, error) {
 	defer acc.Fini()
 	fmt.Fprint(acc, a.Uint())
 	return acc.Tuple()
+}
+
+type LwtunnelEncapType uint8
+
+const (
+	LWTUNNEL_ENCAP_NONE = iota
+	LWTUNNEL_ENCAP_MPLS
+	LWTUNNEL_ENCAP_IP
+	LWTUNNEL_ENCAP_ILA
+	LWTUNNEL_ENCAP_IP6
+	LWTUNNEL_ENCAP_SEG6
+	LWTUNNEL_ENCAP_BPF
+)
+
+var LwtunnelEncapNames = []string{
+	LWTUNNEL_ENCAP_NONE: "NONE",
+	LWTUNNEL_ENCAP_MPLS: "MPLS",
+	LWTUNNEL_ENCAP_IP:   "IP",
+	LWTUNNEL_ENCAP_ILA:  "ILA",
+	LWTUNNEL_ENCAP_IP6:  "IP6",
+	LWTUNNEL_ENCAP_SEG6: "SEG6",
+	LWTUNNEL_ENCAP_BPF:  "BPF",
+}
+
+func (x LwtunnelEncapType) attr()          {}
+func (x LwtunnelEncapType) String() string { return elib.Stringer(LwtunnelEncapNames, int(x)) }
+func (x LwtunnelEncapType) Uint() uint8    { return uint8(x) }
+func (x LwtunnelEncapType) Size() int      { return 1 }
+func (x LwtunnelEncapType) Set(v []byte)   { *(*LwtunnelEncapType)(unsafe.Pointer(&v[0])) = x }
+func (x LwtunnelEncapType) WriteTo(w io.Writer) (int64, error) {
+	acc := accumulate.New(w)
+	defer acc.Fini()
+	fmt.Fprint(acc, x.String())
+	return acc.Tuple()
+}
+
+type LwtunnelIp4AttrKind uint8
+
+const (
+	LWTUNNEL_IP_UNSPEC LwtunnelIp4AttrKind = iota
+	LWTUNNEL_IP_ID
+	LWTUNNEL_IP_DST
+	LWTUNNEL_IP_SRC
+	LWTUNNEL_IP_TTL
+	LWTUNNEL_IP_TOS
+	LWTUNNEL_IP_FLAGS
+)
+
+var LwtunnelIp4AttrKindNames = []string{
+	LWTUNNEL_IP_UNSPEC: "UNSPEC",
+	LWTUNNEL_IP_ID:     "ID",
+	LWTUNNEL_IP_DST:    "DST",
+	LWTUNNEL_IP_SRC:    "SRC",
+	LWTUNNEL_IP_TTL:    "TTL",
+	LWTUNNEL_IP_TOS:    "TOS",
+	LWTUNNEL_IP_FLAGS:  "FLAGS",
+}
+
+func (x LwtunnelIp4AttrKind) String() string { return elib.Stringer(LwtunnelIp4AttrKindNames, int(x)) }
+
+type LwtunnelIp4EncapKindAttrType Empty
+
+func NewLwtunnelIp4EncapKindAttrType() *LwtunnelIp4EncapKindAttrType {
+	return (*LwtunnelIp4EncapKindAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp4EncapKindAttrType) attrType() {}
+func (t *LwtunnelIp4EncapKindAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp4EncapKindAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp4AttrKindNames, i)
+}
+
+type LwtunnelIp4EncapAttrType Empty
+
+func NewLwtunnelIp4EncapAttrType() *LwtunnelIp4EncapAttrType {
+	return (*LwtunnelIp4EncapAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp4EncapAttrType) attrType() {}
+func (t *LwtunnelIp4EncapAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp4EncapAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp4AttrKindNames, i)
+}
+
+func parse_lwtunnel_ip4_encap(b []byte) *AttrArray {
+	as := pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewLwtunnelIp4EncapAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := LwtunnelIp4AttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case LWTUNNEL_IP_ID:
+			as.X[kind] = Uint64AttrBytes(v[:])
+		case LWTUNNEL_IP_DST, LWTUNNEL_IP_SRC:
+			as.X[kind] = NewIp4AddressBytes(v)
+		case LWTUNNEL_IP_TTL, LWTUNNEL_IP_TOS:
+			as.X[kind] = Uint8Attr(v[0])
+		case LWTUNNEL_IP_FLAGS:
+			as.X[kind] = Uint16Attr(v[0])
+		default:
+			panic("unknown ip tunnel encap kind " + kind.String())
+		}
+	}
+	return as
+}
+
+type LwtunnelIp6AttrKind uint8
+
+const (
+	LWTUNNEL_IP6_UNSPEC LwtunnelIp6AttrKind = iota
+	LWTUNNEL_IP6_ID
+	LWTUNNEL_IP6_DST
+	LWTUNNEL_IP6_SRC
+	LWTUNNEL_IP6_HOPLIMIT
+	LWTUNNEL_IP6_TC
+	LWTUNNEL_IP6_FLAGS
+)
+
+var LwtunnelIp6AttrKindNames = []string{
+	LWTUNNEL_IP6_UNSPEC:   "UNSPEC",
+	LWTUNNEL_IP6_ID:       "ID",
+	LWTUNNEL_IP6_DST:      "DST",
+	LWTUNNEL_IP6_SRC:      "SRC",
+	LWTUNNEL_IP6_HOPLIMIT: "HOP LIMIT",
+	LWTUNNEL_IP6_TC:       "TC",
+	LWTUNNEL_IP6_FLAGS:    "FLAGS",
+}
+
+func (x LwtunnelIp6AttrKind) String() string { return elib.Stringer(LwtunnelIp6AttrKindNames, int(x)) }
+
+type LwtunnelIp6EncapKindAttrType Empty
+
+func NewLwtunnelIp6EncapKindAttrType() *LwtunnelIp6EncapKindAttrType {
+	return (*LwtunnelIp6EncapKindAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp6EncapKindAttrType) attrType() {}
+func (t *LwtunnelIp6EncapKindAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp6EncapKindAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp6AttrKindNames, i)
+}
+
+type LwtunnelIp6EncapAttrType Empty
+
+func NewLwtunnelIp6EncapAttrType() *LwtunnelIp6EncapAttrType {
+	return (*LwtunnelIp6EncapAttrType)(pool.Empty.Get().(*Empty))
+}
+
+func (t *LwtunnelIp6EncapAttrType) attrType() {}
+func (t *LwtunnelIp6EncapAttrType) Close() error {
+	repool(t)
+	return nil
+}
+func (t *LwtunnelIp6EncapAttrType) IthString(i int) string {
+	return elib.Stringer(LwtunnelIp6AttrKindNames, i)
+}
+
+func parse_lwtunnel_ip6_encap(b []byte) *AttrArray {
+	as := pool.AttrArray.Get().(*AttrArray)
+	as.Type = NewLwtunnelIp6EncapAttrType()
+	for i := 0; i < len(b); {
+		a, v, next := nextAttr(b, i)
+		i = next
+		kind := LwtunnelIp6AttrKind(a.Kind())
+		as.X.Validate(uint(kind))
+		switch kind {
+		case LWTUNNEL_IP6_ID:
+			as.X[kind] = Uint64AttrBytes(v[:])
+		case LWTUNNEL_IP6_DST, LWTUNNEL_IP6_SRC:
+			as.X[kind] = NewIp6AddressBytes(v)
+		case LWTUNNEL_IP6_HOPLIMIT, LWTUNNEL_IP6_TC:
+			as.X[kind] = Uint8Attr(v[0])
+		case LWTUNNEL_IP6_FLAGS:
+			as.X[kind] = Uint16Attr(v[0])
+		default:
+			panic("unknown ip6 tunnel encap kind " + kind.String())
+		}
+	}
+	return as
 }

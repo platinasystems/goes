@@ -78,6 +78,8 @@ func (a *Address) Diff(b *Address) (v int) {
 	return
 }
 
+func AddressUint32(x uint32) (a Address) { a.Add(uint64(x)); return }
+
 func IpAddress(a *ip.Address) *Address { return (*Address)(unsafe.Pointer(&a[0])) }
 func (a *Address) ToIp() (v ip.Address) {
 	for i := range a {
@@ -116,3 +118,11 @@ func (h *Header) Write(b []byte) {
 	copy(b[:], i.data[:])
 }
 func (h *Header) Read(b []byte) vnet.PacketHeader { return (*Header)(vnet.Pointer(b)) }
+
+func ParseHeader(b []byte) (h *Header, payload []byte) {
+	i := 0
+	h = (*Header)(unsafe.Pointer(&b[i]))
+	i += SizeofHeader
+	payload = b[i:]
+	return
+}

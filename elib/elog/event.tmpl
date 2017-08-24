@@ -21,16 +21,16 @@ var {{.Type}}Type = &{{template "elog" .Package}}EventType{
 
 func init() {
 	t := {{.Type}}Type
-	t.Stringer = stringer_{{.Type}}
+	t.Strings = stringer_{{.Type}}
 	t.Encode = encode_{{.Type}}
 	t.Decode = decode_{{.Type}}
 	{{template "elog" .Package}}RegisterType({{.Type}}Type)
 }
 
-func stringer_{{.Type}}(e *{{template "elog" .Package}}Event) string {
+func stringer_{{.Type}}(t *{{template "elog" .Package}}EventType, e *{{template "elog" .Package}}Event) []string {
 	var x {{.Type}}
 	x.Decode(e.Data[:])
-	return x.String()
+	return x.Strings()
 }
 
 func encode_{{.Type}}(b []byte, e *{{template "elog" .Package}}Event) int {

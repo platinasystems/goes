@@ -26,9 +26,11 @@ type vlan_tagged_punt_node struct {
 	punt_packet_disposition_pool
 }
 
-func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i uint32) {
+type PuntDisposition uint32
+
+func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i PuntDisposition) {
 	p := &n.punt_packet_disposition_pool
-	i = uint32(p.GetIndex())
+	i = PuntDisposition(p.GetIndex())
 	d := &p.dispositions[i]
 	d.o = cf.RefOpaque
 	d.next = uint32(n.Vnet.AddNamedNext(n, cf.Next))
@@ -48,16 +50,19 @@ func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i u
 	}
 	return
 }
-func (n *vlan_tagged_punt_node) del_disposition(i uint32) (ok bool) {
+func (n *vlan_tagged_punt_node) del_disposition(i PuntDisposition) (ok bool) {
+	if i == 0 {
+		panic("delete zero disposition")
+	}
 	return n.punt_packet_disposition_pool.PutIndex(uint(i))
 }
 
 type SingleTaggedPuntNode vlan_tagged_punt_node
 
-func (n *SingleTaggedPuntNode) AddDisposition(cf PuntConfig) uint32 {
+func (n *SingleTaggedPuntNode) AddDisposition(cf PuntConfig) PuntDisposition {
 	return (*vlan_tagged_punt_node)(n).add_disposition(cf, 1)
 }
-func (n *SingleTaggedPuntNode) DelDisposition(i uint32) (ok bool) {
+func (n *SingleTaggedPuntNode) DelDisposition(i PuntDisposition) (ok bool) {
 	return (*vlan_tagged_punt_node)(n).del_disposition(i)
 }
 
@@ -176,7 +181,10 @@ func (n *SingleTaggedPuntNode) Init(v *vnet.Vnet, name string) {
 		punt_1tag_error_unknown_disposition: "unknown packet disposition",
 	}
 	v.RegisterInOutNode(n, name+"-single-tagged-punt")
-	n.AddDisposition(PuntConfig{Next: "punt"})
+	d := n.AddDisposition(PuntConfig{Next: "punt"})
+	if d != 0 {
+		panic("must be zero")
+	}
 }
 
 func (n *SingleTaggedPuntNode) NodeInput(in *vnet.RefIn, o *vnet.RefOut) {

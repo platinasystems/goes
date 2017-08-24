@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -74,23 +75,37 @@ func (n *LookupNext) Parse(in *parse.Input) {
 }
 
 type Adjacency struct {
-	// Interface address index for local/arp adjacency.
-	IfAddr
+	// Next hop after ip4-lookup.
+	LookupNextIndex LookupNext
 
 	// Number of adjecencies in block.  Greater than 1 means multipath; otherwise equal to 1.
 	NAdj uint16
 
-	// Next hop after ip4-lookup.
-	LookupNextIndex LookupNext
+	// Interface address index for local/arp adjacency.
+	// Destination index for rewrite.
+	Index uint32
 
 	vnet.Rewrite
+}
+
+func (a *Adjacency) IsRewrite() bool { return a.LookupNextIndex == LookupNextRewrite }
+func (a *Adjacency) IsLocal() bool   { return a.LookupNextIndex == LookupNextLocal }
+func (a *Adjacency) IsGlean() bool   { return a.LookupNextIndex == LookupNextGlean }
+
+func (a *Adjacency) IfAddr() (i IfAddr) {
+	i = IfAddrNil
+	switch a.LookupNextIndex {
+	case LookupNextGlean, LookupNextLocal:
+		i = IfAddr(a.Index)
+	}
+	return
 }
 
 func (a *Adjacency) String(m *Main) (lines []string) {
 	lines = append(lines, a.LookupNextIndex.String())
 	ni := a.LookupNextIndex
-	switch {
-	case ni == LookupNextRewrite:
+	switch ni {
+	case LookupNextRewrite:
 		l := a.Rewrite.String(m.v)
 		lines[0] += " " + l[0]
 		// If only 2 lines, fit into a single line.
@@ -99,8 +114,9 @@ func (a *Adjacency) String(m *Main) (lines []string) {
 		} else {
 			lines = append(lines, l[1:]...)
 		}
-	case a.IfAddr != IfAddrNil:
-		lines[0] += " " + a.IfAddr.String(m)
+	case LookupNextGlean, LookupNextLocal:
+		ifa := IfAddr(a.Index)
+		lines[0] += " " + ifa.String(m)
 	}
 	return
 }
@@ -111,7 +127,7 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 		panic(parse.ErrInput)
 	}
 	a.NAdj = 1
-	a.IfAddr = IfAddrNil
+	a.Index = ^uint32(0)
 	switch a.LookupNextIndex {
 	case LookupNextRewrite:
 		if !in.Parse("%v", &a.Rewrite, m.v) {
@@ -120,7 +136,7 @@ func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	case LookupNextLocal, LookupNextGlean:
 		var si vnet.Si
 		if in.Parse("%v", &si, m.v) {
-			a.IfAddr = m.IfFirstAddr(si)
+			a.Index = uint32(m.IfFirstAddr(si))
 		}
 	}
 }
@@ -160,7 +176,7 @@ type adjacencyMain struct {
 type adjAddDelHook func(m *Main, adj Adj, isDel bool)
 type adjSyncCounterHook func(m *Main)
 type AdjGetCounterHandler func(tag string, v vnet.CombinedCounter)
-type adjGetCounterHook func(m *Main, adj, offset Adj, f AdjGetCounterHandler)
+type adjGetCounterHook func(m *Main, adj Adj, f AdjGetCounterHandler)
 
 //go:generate gentemplate -id adjAddDelHook -d Package=ip -d DepsType=adjAddDelHookVec -d Type=adjAddDelHook -d Data=adjAddDelHooks github.com/platinasystems/go/elib/dep/dep.tmpl
 //go:generate gentemplate -id adjSyncHook -d Package=ip -d DepsType=adjSyncCounterHookVec -d Type=adjSyncCounterHook -d Data=adjSyncCounterHooks github.com/platinasystems/go/elib/dep/dep.tmpl
@@ -179,7 +195,7 @@ type nextHop struct {
 
 //go:generate gentemplate -d Package=ip -id nextHopHeap -d HeapType=nextHopHeap -d Data=elts -d Type=nextHop github.com/platinasystems/go/elib/heap.tmpl
 //go:generate gentemplate -d Package=ip -id nextHopVec -d VecType=nextHopVec -d Type=nextHop github.com/platinasystems/go/elib/vec.tmpl
-//go:generate gentemplate -d Package=ip -id multipathAdjacencyVec -d VecType=multipathAdjacencyVec -d Type=multipathAdjacency github.com/platinasystems/go/elib/vec.tmpl
+//go:generate gentemplate -d Package=ip -id multipathAdjacencyPool -d PoolType=multipathAdjacencyPool -d Type=multipathAdjacency -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
 
 type nextHopHashValue struct {
 	heapOffset uint32
@@ -187,17 +203,17 @@ type nextHopHashValue struct {
 }
 
 type multipathMain struct {
-	cachedNextHopVec [2]nextHopVec
-
 	// Expressed as max allowable fraction of traffic sent the wrong way assuming perfectly random distribution.
 	multipathErrorTolerance float64
 	nextHopHash             elib.Hash
 	nextHopHashValues       []nextHopHashValue
 
+	cachedNextHopVec [3]nextHopVec
+
 	nextHopHeap
 
 	// Indexed by heap id.  So, one element per heap block.
-	mpAdjVec multipathAdjacencyVec
+	mpAdjPool multipathAdjacencyPool
 }
 
 func (m *multipathMain) GetNextHops(i uint) []nextHop {
@@ -222,7 +238,7 @@ func (a nextHopVec) Equal(b nextHopVec) bool {
 		return false
 	} else {
 		for i := uint(0); i < la; i++ {
-			if a[i].Compare(&b[i]) != 0 {
+			if a[i].compare(&b[i]) != 0 {
 				return false
 			}
 		}
@@ -234,14 +250,7 @@ func (a nextHopVec) HashKeyEqual(h elib.Hasher, i uint) bool {
 	return a.Equal(b)
 }
 
-type nextHopSort nextHopVec
-
-func (a nextHopSort) Len() int           { return len(a) }
-func (a nextHopSort) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a nextHopSort) Less(i, j int) bool { return a[i].Compare(&a[j]) < 0 }
-
-// Order by decreasing weight and increasing adj index for equal weights.
-func (a *nextHop) Compare(b *nextHop) (cmp int) {
+func (a *nextHop) compare(b *nextHop) (cmp int) {
 	cmp = int(b.Weight) - int(a.Weight)
 	if cmp == 0 {
 		cmp = int(a.Adj) - int(b.Adj)
@@ -249,34 +258,40 @@ func (a *nextHop) Compare(b *nextHop) (cmp int) {
 	return
 }
 
-// Normalize next hops: find a power of 2 sized block of next hops within error tolerance of given raw next hops.
-func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj uint, norm nextHopVec) {
-	nRaw := raw.Len()
+func (a nextHopVec) sort() {
+	sort.Slice(a, func(i, j int) bool {
+		return a[i].compare(&a[j]) < 0
+	})
+}
 
-	if nRaw == 0 {
+// Normalize next hops: find a power of 2 sized block of next hops within error tolerance of given raw next hops.
+func (given nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj uint, norm nextHopVec) {
+	nGiven := given.Len()
+
+	if nGiven == 0 {
 		return
 	}
 
 	// Allocate enough space for 2 copies; we'll use second copy to save original weights.
 	t := *result
-	t.Validate(2*nRaw - 1)
+	t.Validate(2*nGiven - 1)
 	// Save allocation for next caller.
 	*result = t
 
-	n := nRaw
+	n := nGiven
 	nAdj = n
 	switch n {
 	case 1:
-		t[0] = raw[0]
+		t[0] = given[0]
 		t[0].Weight = 1
 		norm = t[:1]
 		return
 	case 2:
 		cmp := 0
-		if raw[0].Compare(&raw[1]) < 0 {
+		if given[0].compare(&given[1]) > 0 {
 			cmp = 1
 		}
-		t[0], t[1] = raw[cmp], raw[cmp^1]
+		t[0], t[1] = given[cmp], given[cmp^1]
 		if t[0].Weight == t[1].Weight {
 			t[0].Weight = 1
 			t[1].Weight = 1
@@ -285,8 +300,11 @@ func (raw nextHopVec) normalizePow2(m *multipathMain, result *nextHopVec) (nAdj 
 		}
 
 	default:
-		copy(t, raw)
-		sort.Sort(nextHopSort(t[0:n]))
+		copy(t, given)
+		// Order by decreasing weight and increasing adj index for equal weights.
+		sort.Slice(t[0:n], func(i, j int) bool {
+			return t[i].compare(&t[j]) < 0
+		})
 	}
 
 	// Find total weight to normalize weights.
@@ -367,8 +385,8 @@ func (m *multipathMain) freeNextHopBlock(b *nextHopBlock) {
 	b.size = ^uint32(0)
 }
 
-func (m *multipathMain) getNextHopBlock(b *nextHopBlock) []nextHop {
-	return m.nextHopHeap.Slice(uint(b.offset))
+func (m *multipathMain) getNextHopBlock(b *nextHopBlock) nextHopVec {
+	return nextHopVec(m.nextHopHeap.Slice(uint(b.offset)))
 }
 
 type nextHopBlock struct {
@@ -389,24 +407,79 @@ type multipathAdjacency struct {
 	// Number of prefixes that point to this adjacency.
 	referenceCount uint32
 
-	// Normalized next hops are used as hash keys: they are sorted by weight
-	// and weights are chosen so they add up to nAdj (with zero-weighted next hops being deleted).
-	normalizedNextHops nextHopBlock
+	// Pool index.
+	index uint
 
-	// Unnormalized next hops are saved so that control plane has a record of exactly
+	// Given next hops are saved so that control plane has a record of exactly
 	// what the RIB told it.
-	unnormalizedNextHops nextHopBlock
+	givenNextHops nextHopBlock
+
+	// Resolved next hops are used as hash keys: they are sorted by weight
+	// and weights are chosen so they add up to nAdj (with zero-weighted next hops being deleted).
+	resolvedNextHops nextHopBlock
 }
 
-func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacency, madjIndex uint, ok bool) {
-	mp := &m.multipathMain
-	nAdj, norm := unnorm.normalizePow2(mp, &mp.cachedNextHopVec[1])
+func (p *nextHopVec) sum_duplicates() {
+	var i, j, l int
+	r := *p
+	l = len(r)
+	lastAdj := AdjNil
+	for i = 0; i < l; i++ {
+		a := &r[i]
+		if i > 0 && a.Adj == lastAdj {
+			r[j].Weight += a.Weight
+		} else {
+			r[j] = *a
+			j++
+		}
+		lastAdj = a.Adj
+	}
+	*p = r[:j]
+}
 
-	// Use unnormalized next hops to see if we've seen a block equivalent to this one before.
-	var i uint
-	if i, ok = mp.nextHopHash.Get(norm); ok || !create {
+func (r *nextHopVec) resolve(m *Main, given nextHopVec, level uint) {
+	mp := &m.multipathMain
+	if level == 0 {
+		r.ResetLen()
+	}
+	for i := range given {
+		g := &given[i]
+		i0 := r.Len()
+		ma := m.mpAdjForAdj(g.Adj, false)
+		if ma != nil {
+			r.resolve(m, mp.getNextHopBlock(&ma.givenNextHops), level+1)
+		} else {
+			*r = append(*r, *g)
+		}
+		i1 := r.Len()
+		for i0 < i1 {
+			(*r)[i0].Weight *= g.Weight
+			i0++
+		}
+	}
+	if level == 0 {
+		r.sort()
+		r.sum_duplicates()
+	}
+}
+
+type AdjacencyFinalizer interface {
+	FinalizeAdjacency(a *Adjacency)
+}
+
+func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multipathAdjacency) {
+	mp := &m.multipathMain
+
+	mp.cachedNextHopVec[1].resolve(m, given, 0)
+	resolved := mp.cachedNextHopVec[1]
+
+	nAdj, norm := resolved.normalizePow2(mp, &mp.cachedNextHopVec[2])
+
+	// Use given next hops to see if we've seen a block equivalent to this one before.
+	i, ok := mp.nextHopHash.Get(norm)
+	if ok {
 		ai := mp.nextHopHashValues[i].adj
-		madj, madjIndex = m.mpAdjForAdj(ai, false)
+		madj = m.mpAdjForAdj(ai, false)
 		return
 	}
 
@@ -417,75 +490,75 @@ func (m *Main) getMpAdj(unnorm nextHopVec, create bool) (madj *multipathAdjacenc
 		nextHopAdjacency := &m.adjacencyHeap.elts[nh.Adj]
 		for w := NextHopWeight(0); w < nh.Weight; w++ {
 			as[i] = *nextHopAdjacency
+			if af != nil {
+				af.FinalizeAdjacency(&as[i])
+			}
 			as[i].NAdj = uint16(nAdj)
 			i++
 		}
 	}
 
-	madj, madjIndex = m.mpAdjForAdj(ai, true)
+	madj = m.mpAdjForAdj(ai, true)
 
 	madj.adj = ai
 	madj.nAdj = uint32(nAdj)
 	madj.referenceCount = 0 // caller will set to 1
 
-	mp.allocNextHopBlock(&madj.normalizedNextHops, norm)
-	mp.allocNextHopBlock(&madj.unnormalizedNextHops, unnorm)
+	mp.allocNextHopBlock(&madj.resolvedNextHops, norm)
+	mp.allocNextHopBlock(&madj.givenNextHops, given)
 
 	i, _ = mp.nextHopHash.Set(norm)
 	mp.nextHopHashValues[i] = nextHopHashValue{
-		heapOffset: madj.normalizedNextHops.offset,
+		heapOffset: madj.resolvedNextHops.offset,
 		adj:        ai,
 	}
 
 	m.CallAdjAddHooks(ai)
-
-	ok = true
 	return
-}
-func (m *Main) createMpAdj(unnorm nextHopVec) (*multipathAdjacency, uint, bool) {
-	return m.getMpAdj(unnorm, true)
 }
 
 func (m *Main) GetAdjacencyUsage() elib.HeapUsage { return m.adjacencyHeap.GetUsage() }
 
-func (m *adjacencyMain) mpAdjForAdj(a Adj, validate bool) (ma *multipathAdjacency, maIndex uint) {
-	maIndex = uint(m.adjacencyHeap.Id(uint(a)))
-	mm := &m.multipathMain
-	if validate {
-		mm.mpAdjVec.Validate(maIndex)
+func (m *adjacencyMain) mpAdjForAdj(a Adj, create bool) (ma *multipathAdjacency) {
+	adj := &m.adjacencyHeap.elts[a]
+	if !adj.IsRewrite() {
+		return
 	}
-	if maIndex < m.multipathMain.mpAdjVec.Len() {
-		ma = &mm.mpAdjVec[maIndex]
+	i := uint(adj.Index)
+	mm := &m.multipathMain
+	if create {
+		i = mm.mpAdjPool.GetIndex()
+		adj.Index = uint32(i)
+		mm.mpAdjPool.elts[i].index = i
+	}
+	if i < mm.mpAdjPool.Len() {
+		ma = &mm.mpAdjPool.elts[i]
 	}
 	return
 }
 
 func (m *adjacencyMain) NextHopsForAdj(a Adj) (nhs nextHopVec) {
 	mm := &m.multipathMain
-	ma, _ := m.mpAdjForAdj(a, false)
+	ma := m.mpAdjForAdj(a, false)
 	if ma != nil && ma.nAdj > 0 {
-		nhs = nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
+		nhs = mm.getNextHopBlock(&ma.resolvedNextHops)
 	} else {
 		nhs = []nextHop{{Adj: a, Weight: 1}}
 	}
 	return
 }
 
-func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeight NextHopWeight) (newAdj Adj, ok bool) {
+func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWeight, af AdjacencyFinalizer, isDel bool) (newAdj Adj, ok bool) {
 	mm := &m.multipathMain
 	var (
-		old, new   *multipathAdjacency
-		oldMaIndex uint
-		nhs        nextHopVec
-		nnh, nhi   uint
+		old, new *multipathAdjacency
+		nhs      nextHopVec
+		nnh, nhi uint
 	)
 
 	if oldAdj != AdjNil {
-		ma, mai := m.mpAdjForAdj(oldAdj, false)
-		if ma.normalizedNextHops.size > 0 {
-			old = ma
-			oldMaIndex = mai
-			nhs = nextHopVec(mm.getNextHopBlock(&old.unnormalizedNextHops))
+		if old = m.mpAdjForAdj(oldAdj, false); old != nil {
+			nhs = mm.getNextHopBlock(&old.givenNextHops)
 			nnh = nhs.Len()
 			nhi, ok = nhs.find(nextHopAdj)
 
@@ -496,14 +569,19 @@ func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeig
 		}
 	}
 
-	t := mm.cachedNextHopVec[0]
-	t.Validate(nnh)
-	mm.cachedNextHopVec[0] = t // save for next call
-	t = t[:nnh+1]
-
+	// Re-use vector for each call.
+	mm.cachedNextHopVec[0].Validate(nnh)
+	newNhs := mm.cachedNextHopVec[0]
 	newAdj = AdjNil
 	if isDel {
-		t = mm.delNextHop(nhs, t, nhi)
+		// Delete next hop at previously found index.
+		if nhi > 0 {
+			copy(newNhs[:nhi], nhs[:nhi])
+		}
+		if nhi+1 < nnh {
+			copy(newNhs[nhi:], nhs[nhi+1:])
+		}
+		newNhs = newNhs[:nnh-1]
 	} else {
 		// If next hop is already there with the same weight, we have nothing to do.
 		if nhi < nnh && nhs[nhi].Weight == nextHopWeight {
@@ -512,27 +590,40 @@ func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeig
 			return
 		}
 
+		newNhs = newNhs[:nnh+1]
+
 		// Copy old next hops to lookup key.
-		copy(t, nhs)
+		copy(newNhs, nhs)
 
 		var nh *nextHop
 		if nhi < nnh {
 			// Change weight of existing next hop.
-			nh = &t[nhi]
+			nh = &newNhs[nhi]
 		} else {
 			// Add a new next hop.
-			nh = &t[nnh]
+			nh = &newNhs[nnh]
 			nh.Adj = nextHopAdj
 		}
 		// In either case set next hop weight.
 		nh.Weight = nextHopWeight
 	}
 
-	if len(t) > 0 {
-		new, _, _ = m.createMpAdj(t)
-		// Fetch again since create may have moved vector.
+	new = m.addDelHelper(newNhs, old, af)
+	if new != nil {
+		ok = true
+		newAdj = new.adj
+	}
+	return
+}
+
+func (m *Main) addDelHelper(newNhs nextHopVec, old *multipathAdjacency, af AdjacencyFinalizer) (new *multipathAdjacency) {
+	mm := &m.multipathMain
+
+	if len(newNhs) > 0 {
+		new = m.createMpAdj(newNhs, af)
+		// Fetch again since create may have moved multipath adjacency vector.
 		if old != nil {
-			old = &mm.mpAdjVec[oldMaIndex]
+			old = &mm.mpAdjPool.elts[old.index]
 		}
 	}
 
@@ -547,10 +638,6 @@ func (m *Main) AddDelNextHop(oldAdj Adj, isDel bool, nextHopAdj Adj, nextHopWeig
 	if old != nil && old.referenceCount == 0 {
 		old.free(m)
 	}
-	if new != nil {
-		ok = true
-		newAdj = new.adj
-	}
 	return
 }
 
@@ -559,16 +646,10 @@ func (m *adjacencyMain) PoisonAdj(a Adj) {
 	elib.PointerPoison(unsafe.Pointer(&as[0]), uintptr(len(as))*unsafe.Sizeof(as[0]))
 }
 
-func (m *Main) FreeAdj(a Adj, delMultipath bool) {
-	if delMultipath {
-		m.delMultipathAdj(a)
-	}
-	m.adjacencyHeap.Put(uint(a))
-}
-
+func (m *Main) FreeAdj(a Adj) { m.adjacencyHeap.Put(uint(a)) }
 func (m *Main) DelAdj(a Adj) {
 	m.CallAdjDelHooks(a)
-	m.FreeAdj(a, true)
+	m.FreeAdj(a)
 }
 
 func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
@@ -580,52 +661,43 @@ func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
 	return
 }
 
-func (m *multipathMain) delNextHop(nhs nextHopVec, result nextHopVec, nhi uint) nextHopVec {
-	r := result
-	nnh := uint(len(nhs))
-	r.Validate(nnh)
-	if nhi > 0 {
-		copy(r[0:nhi], nhs[0:nhi])
-	}
-	if nhi+1 < nnh {
-		copy(r[nhi:], nhs[nhi+1:nnh])
-	}
-	r = r[:nnh-1]
-	return r
-}
+var (
+	ErrNotRewrite = errors.New("replacment adjacenty is not rewrite")
+	ErrNotFound   = errors.New("adjacency not found")
+)
 
-func (m *Main) delMultipathAdj(toDel Adj) {
+func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af AdjacencyFinalizer) (err error) {
+	if fromNextHopAdj == toNextHopAdj {
+		return
+	}
+
+	// Adjacencies must be rewrites.
+	as := m.GetAdj(toNextHopAdj)
+	for i := range as {
+		if !as[i].IsRewrite() {
+			err = ErrNotRewrite
+			return
+		}
+	}
+
 	mm := &m.multipathMain
-
-	for maIndex := uint(0); maIndex < uint(len(mm.mpAdjVec)); maIndex++ { // no range since len may change due to create below.
-		ma := &mm.mpAdjVec[maIndex]
-		if !ma.isValid() {
-			continue
+	ma := m.mpAdjForAdj(ai, false)
+	given := mm.getNextHopBlock(&ma.givenNextHops)
+	found := false
+	for i := range given {
+		nh := &given[i]
+		if found = nh.Adj == fromNextHopAdj; found {
+			nh.Adj = toNextHopAdj
+			break
 		}
-		nhs := nextHopVec(mm.getNextHopBlock(&ma.unnormalizedNextHops))
-		var (
-			ok  bool
-			nhi uint
-		)
-		if nhi, ok = nhs.find(toDel); !ok {
-			continue
-		}
-
-		var newMa *multipathAdjacency
-		if len(nhs) > 1 {
-			t := mm.cachedNextHopVec[0]
-			t = mm.delNextHop(nhs, t, nhi)
-			mm.cachedNextHopVec[0] = t
-			newMa, _, _ = m.createMpAdj(t)
-		}
-
-		newAdj := AdjNil
-		if newMa != nil {
-			newAdj = newMa.adj
-		}
-		m.RemapAdjacency(ma.adj, newAdj)
-		ma.free(m)
 	}
+	if !found {
+		err = ErrNotFound
+		return
+	}
+
+	m.addDelHelper(given, ma, af)
+	return
 }
 
 func (a *multipathAdjacency) invalidate()   { a.nAdj = 0 }
@@ -653,9 +725,9 @@ func (m *Main) RegisterAdjSyncCounterHook(f adjSyncCounterHook, dep ...*dep.Dep)
 	m.adjSyncCounterHookVec.Add(f, dep...)
 }
 
-func (m *Main) CallAdjGetCounterHooks(adj, offset Adj, f AdjGetCounterHandler) {
+func (m *Main) CallAdjGetCounterHooks(adj Adj, f AdjGetCounterHandler) {
 	for i := range m.adjGetCounterHooks {
-		m.adjGetCounterHookVec.Get(i)(m, adj, offset, f)
+		m.adjGetCounterHookVec.Get(i)(m, adj, f)
 	}
 }
 
@@ -667,7 +739,7 @@ func (ma *multipathAdjacency) free(m *Main) {
 	m.CallAdjDelHooks(ma.adj)
 
 	mm := &m.multipathMain
-	nhs := nextHopVec(mm.getNextHopBlock(&ma.normalizedNextHops))
+	nhs := mm.getNextHopBlock(&ma.resolvedNextHops)
 	i, ok := mm.nextHopHash.Unset(nhs)
 	if !ok {
 		panic("unknown multipath adjacency")
@@ -678,9 +750,9 @@ func (ma *multipathAdjacency) free(m *Main) {
 	}
 
 	m.PoisonAdj(ma.adj)
-	m.FreeAdj(ma.adj, ma.referenceCount == 0)
-	mm.freeNextHopBlock(&ma.unnormalizedNextHops)
-	mm.freeNextHopBlock(&ma.normalizedNextHops)
+	m.FreeAdj(ma.adj)
+	mm.freeNextHopBlock(&ma.givenNextHops)
+	mm.freeNextHopBlock(&ma.resolvedNextHops)
 
 	// Nothing to free since multipath adjacencies are indexed by adjacency index.
 
@@ -698,19 +770,46 @@ func (m *adjacencyMain) clearCounter(a Adj) {
 	}
 }
 
-func (m *Main) ForeachAdjCounter(a, offset Adj, f func(tag string, v vnet.CombinedCounter)) {
+func (m *Main) ForeachAdjCounter(a Adj, f func(tag string, v vnet.CombinedCounter)) {
 	var v vnet.CombinedCounter
 	for _, t := range m.threads {
 		var u vnet.CombinedCounter
-		t.counters.Get(uint(a+offset), &u)
+		t.counters.Get(uint(a), &u)
 		v.Add(&u)
 	}
 	f("", v)
-	m.CallAdjGetCounterHooks(a, offset, f)
+	m.CallAdjGetCounterHooks(a, f)
+	return
+}
+
+func (m *adjacencyMain) EqualAdj(ai0, ai1 Adj) (same bool) {
+	a0, a1 := &m.adjacencyHeap.elts[ai0], &m.adjacencyHeap.elts[ai1]
+	ni0, ni1 := a0.LookupNextIndex, a1.LookupNextIndex
+	if ni0 != ni1 {
+		return
+	}
+	switch ni0 {
+	case LookupNextGlean:
+		if a0.Index != a1.Index {
+			return
+		}
+	case LookupNextRewrite:
+		if string(a0.Rewrite.Slice()) != string(a1.Rewrite.Slice()) {
+			return
+		}
+	}
+	same = true
 	return
 }
 
 func (m *adjacencyMain) GetAdj(a Adj) (as []Adjacency) { return m.adjacencyHeap.Slice(uint(a)) }
+func (m *adjacencyMain) GetAdjRewriteSi(a Adj) (si vnet.Si) {
+	as := m.GetAdj(a)
+	if as[0].LookupNextIndex == LookupNextRewrite {
+		si = as[0].Rewrite.Si
+	}
+	return
+}
 
 func (m *adjacencyMain) NewAdjWithTemplate(n uint, template *Adjacency) (ai Adj, as []Adjacency) {
 	ai = Adj(m.adjacencyHeap.Get(n))
@@ -722,7 +821,7 @@ func (m *adjacencyMain) NewAdjWithTemplate(n uint, template *Adjacency) (ai Adj,
 		}
 		as[i].Si = vnet.SiNil
 		as[i].NAdj = uint16(n)
-		as[i].IfAddr = IfAddrNil
+		as[i].Index = ^uint32(0)
 		m.clearCounter(ai + Adj(i))
 	}
 	return

@@ -82,4 +82,10 @@ func (p *pair_offset_vec) ValidateLenInit(l uint, zero pair_offset) (v *pair_off
 	return
 }
 
+func (p *pair_offset_vec) ResetLen() {
+	if *p != nil {
+		*p = (*p)[:0]
+	}
+}
+
 func (p pair_offset_vec) Len() uint { return uint(len(p)) }

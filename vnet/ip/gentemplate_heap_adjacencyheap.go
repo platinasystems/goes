@@ -36,8 +36,8 @@ func (p *adjacencyHeap) Put(offset uint) {
 }
 
 func (p *adjacencyHeap) Validate(i uint) {
-	c := elib.Index(cap(p.elts))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.elts))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]Adjacency, l, c)
@@ -47,7 +47,7 @@ func (p *adjacencyHeap) Validate(i uint) {
 		p.elts = q
 		p.ids = r
 	}
-	if l > elib.Index(len(p.elts)) {
+	if l > uint(len(p.elts)) {
 		p.elts = p.elts[:l]
 		p.ids = p.ids[:l]
 	}

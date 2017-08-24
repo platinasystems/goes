@@ -22,6 +22,7 @@ type File struct {
 	Fd           int
 	disableWrite bool
 	disableRead  bool
+	added        bool
 	poolIndex    uint
 }
 

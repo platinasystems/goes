@@ -179,18 +179,19 @@ func (m *interfaceMain) foreachSwIfCounter(zero bool, si Si, f func(name string,
 	}
 
 	// Next hardware software interface counters.
-	h := m.HwIfer(m.SupHi(si))
-	nm := h.GetSwInterfaceCounterNames()
-	for k := uint(0); k < uint(len(nm.Combined)); k++ {
-		m.doSwCombined(f, &nm, zero, k, k0+k, i)
-	}
-	for k := uint(0); k < uint(len(nm.Single)); k++ {
-		m.doSwSingle(f, &nm, zero, k, k1+k, i)
+	if h := m.HwIferForSupSi(si); h != nil {
+		nm := h.GetSwInterfaceCounterNames()
+		for k := uint(0); k < uint(len(nm.Combined)); k++ {
+			m.doSwCombined(f, &nm, zero, k, k0+k, i)
+		}
+		for k := uint(0); k < uint(len(nm.Single)); k++ {
+			m.doSwSingle(f, &nm, zero, k, k1+k, i)
+		}
 	}
 }
 
 func (v *Vnet) ForeachSwIfCounter(zero bool, f func(si Si, name string, value uint64)) {
-	v.swInterfaces.Foreach(func(x swIf) {
+	v.swInterfaces.Foreach(func(x SwIf) {
 		v.foreachSwIfCounter(zero, x.si, func(name string, value uint64) {
 			f(x.si, name, value)
 		})
@@ -326,7 +327,10 @@ func (m *interfaceMain) counterInit(t *InterfaceThread) {
 		}
 	}
 
-	m.swInterfaces.Foreach(func(x swIf) {
+	m.swInterfaces.Foreach(func(x SwIf) {
+		if x.kind != SwIfKindHardware {
+			return
+		}
 		h := m.HwIfer(m.SupHi(x.si))
 		nm := h.GetSwInterfaceCounterNames()
 		if len(nm.Single) > 0 {

@@ -38,8 +38,8 @@ func (p *activePollerPool) IsFree(i uint) (v bool) {
 }
 
 func (p *activePollerPool) Resize(n uint) {
-	c := elib.Index(cap(p.entries))
-	l := elib.Index(len(p.entries) + int(n))
+	c := uint(cap(p.entries))
+	l := uint(len(p.entries) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]*activePoller, l, c)
@@ -50,15 +50,15 @@ func (p *activePollerPool) Resize(n uint) {
 }
 
 func (p *activePollerPool) Validate(i uint) {
-	c := elib.Index(cap(p.entries))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.entries))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]*activePoller, l, c)
 		copy(q, p.entries)
 		p.entries = q
 	}
-	if l > elib.Index(len(p.entries)) {
+	if l > uint(len(p.entries)) {
 		p.entries = p.entries[:l]
 	}
 }
@@ -84,5 +84,12 @@ func (p *activePollerPool) ForeachIndex(f func(i uint)) {
 		if !p.Pool.IsFree(uint(i)) {
 			f(uint(i))
 		}
+	}
+}
+
+func (p *activePollerPool) Reset() {
+	p.Pool.Reset()
+	if len(p.entries) > 0 {
+		p.entries = p.entries[:0]
 	}
 }

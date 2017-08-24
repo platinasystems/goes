@@ -6,4 +6,4 @@
 
 package elog
 
-func Enabled() bool { return DefaultBuffer.Enabled() }
+func Enabled() bool { return true }

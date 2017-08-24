@@ -41,6 +41,12 @@ func (in *Input) Init(r io.Reader) {
 	}
 }
 
+func NewInput(args ...string) (in *Input) {
+	in = new(Input)
+	in.Add(args...)
+	return
+}
+
 func (in *Input) Add(args ...string) {
 	s := string(in.buf)
 	for i := range args {
@@ -586,7 +592,6 @@ func (args *Args) SetNextInt(v uint64) {
 		ptr := val
 		if ptr.Kind() != reflect.Ptr {
 			panic(fmt.Errorf("type not a pointer: " + val.Type().String()))
-			return
 		}
 		switch e := ptr.Elem(); e.Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -675,7 +680,6 @@ func (in *Input) doPercent(verb rune, args *Args) {
 		ptr := val
 		if ptr.Kind() != reflect.Ptr {
 			panic(fmt.Errorf("type not a pointer: " + val.Type().String()))
-			return
 		}
 		switch v := ptr.Elem(); v.Kind() {
 		case reflect.Bool:

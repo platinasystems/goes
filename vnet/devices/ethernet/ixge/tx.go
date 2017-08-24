@@ -265,9 +265,7 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 		di = 0
 	}
 
-	if elog.Enabled() {
-		elog.GenEventf("%s tx %d new tail %d head %d tail %d", d.Name(), n_tx, di, head, tail)
-	}
+	elog.GenEventf("%s tx %d new tail %d head %d tail %d", d.Name(), n_tx, di, head, tail)
 
 	// Re-start dma engine when tail advances.
 	if di != q.tail_index {
@@ -288,6 +286,7 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 		dr := q.get_regs()
 		dr.tail_index.set(d, di)
 
+		// Need to poll to free up tx descriptors.
 		q.needs_polling = true
 		atomic.AddInt32(&d.active_count, 1)
 	}

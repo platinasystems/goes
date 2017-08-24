@@ -1,0 +1,19 @@
+IP=/home/eliot/bin/ip
+
+if [ "$1" == "up" ]; then
+    for i in {0..1}; do
+	${IP} link set eth-$i-0 up;
+	${IP} netns add ns$i
+	${IP} link set eth-$i-0 netns ns$i;
+	${IP} netns exec ns$i ip link set eth-$i-0 up;
+	${IP} netns exec ns$i ${IP} addr add 1.0.0.$i/31 peer 1.0.0.$i/31 dev eth-$i-0
+	# ${IP} netns exec ns$i ${IP} neigh add 1.0.0.$(($i ^ 1)) lladdr 0a:0b:0c:0d:0e:0$i dev eth-$i-0
+	${IP} netns exec ns$i ${IP} link add gre-ns$i type gre external
+	${IP} netns exec ns$i ${IP} link set gre-ns$i up
+	${IP} netns exec ns$i ${IP} route add 10.0.0.$i/32 encap ip dst 1.0.0.$(($i ^ 1)) ttl 10 dev gre-ns$i
+    done;
+else
+    for i in {0..1}; do
+	${IP} netns del ns$i;
+    done;
+fi
