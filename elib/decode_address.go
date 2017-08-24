@@ -24,7 +24,11 @@ func DecodeAddress(x interface{}, address uint) (path []string, t reflect.Type) 
 				f := t.Field(i)
 				lo, hi := f.Offset, f.Offset+f.Type.Size()
 				if found := addr >= lo && addr < hi; found {
-					path = append(path, f.Name)
+					dot := ""
+					if len(path) > 0 {
+						dot = "."
+					}
+					path = append(path, dot+f.Name)
 					t = f.Type
 					addr -= lo
 				}
