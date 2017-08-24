@@ -28,6 +28,7 @@ func w83795dInit() {
 		"fan_tray.duty":                0,
 		"hwmon.front.temp.units.C":     0,
 		"hwmon.rear.temp.units.C":      0,
+		"hwmon.target.units.C":         0,
 		"host.temp.units.C":            0,
 		"host.temp.target.units.C":     0,
 	}
@@ -36,9 +37,15 @@ func w83795dInit() {
 	w83795d.WrRegFn["fan_tray.example"] = "example"
 	w83795d.WrRegFn["fan_tray.speed"] = "speed"
 	w83795d.WrRegFn["fan_tray.speed.return"] = "speed.return"
+
 	w83795d.WrRegDv["host"] = "host"
 	w83795d.WrRegFn["host.temp.units.C"] = "temp.units.C"
 	w83795d.WrRegFn["host.temp.target.units.C"] = "temp.target.units.C"
+
+	w83795d.WrRegDv["hwmon"] = "hwmon"
+	w83795d.WrRegFn["hwmon.target.units.C"] = "target.units.C"
+
 	w83795d.WrRegRng["fan_tray.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["hwmon.target.units.C"] = []string{"0", "60"}
 	w83795d.WrRegRng["w83795d.example"] = []string{"true", "false"}
 }

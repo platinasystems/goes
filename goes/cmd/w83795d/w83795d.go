@@ -230,6 +230,16 @@ func (c *Command) update() error {
 				c.lasts[k] = v
 			}
 		}
+		if strings.Contains(k, "hwmon.target.units.C") {
+			v, err := Vdev.GetHwmTarget()
+			if err != nil {
+				return err
+			}
+			if v != c.last[k] {
+				c.pub.Print(k, ": ", v)
+				c.last[k] = v
+			}
+		}
 	}
 	return nil
 }
@@ -401,9 +411,6 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 	r2 := getRegsBank2()
 
-	if w != "max" {
-		lastSpeed = w
-	}
 	//if not all fan trays are ok, only allow high setting
 	for j := 1; j <= maxFanTrays; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
@@ -412,6 +419,12 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 			w = "max"
 			break
 		}
+	}
+
+	if w != "max" {
+		lastSpeed = w
+	} else {
+		w = "high"
 	}
 
 	switch w {
@@ -476,7 +489,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 			log.Print("notice: fan speed set to ", w)
 		}
 	//static speed settings below, set hwm to manual mode, then set static speed
-	case "high", "max":
+	case "high":
 		r2.BankSelect.set(h, 0x82)
 		r2.TempToFanMap1.set(h, 0x0)
 		r2.TempToFanMap2.set(h, 0x0)
@@ -638,6 +651,49 @@ func (h *I2cDev) GetFanSpeed() (string, error) {
 	return speed, nil
 }
 
+func (h *I2cDev) SetHwmTarget(t string) error {
+	v, err := strconv.ParseUint(t, 10, 8)
+
+	if err != nil {
+		log.Print("Unable to set target temperature, only integers up to 60 accepted")
+		return err
+	} else {
+		if v > 60 {
+			log.Print("Unable to set target temperature, only integers up to 60 accepted")
+			return nil
+		} else {
+			r2 := getRegsBank2()
+			r2.BankSelect.set(h, 0x82)
+			r2.TargetTemp1.set(h, uint8(v))
+			r2.TargetTemp2.set(h, uint8(v))
+			closeMux(h)
+			err = DoI2cRpc()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (h *I2cDev) GetHwmTarget() (uint16, error) {
+	r2 := getRegsBank2()
+	r2.BankSelect.set(h, 0x82)
+	r2.TargetTemp1.get(h)
+	r2.TargetTemp2.get(h)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return 0, err
+	}
+
+	m := uint16(0)
+	if s[3].D[0] == s[5].D[0] {
+		m = uint16(s[3].D[0])
+	}
+	return m, nil
+}
+
 func (h *I2cDev) CheckHostTemp() (string, error) {
 	v := hostTemp
 	return strconv.FormatFloat(v, 'f', 2, 64), nil
@@ -669,6 +725,8 @@ func writeRegs() error {
 			if v == "" {
 				Vdev.SetLastSpeed()
 			}
+		case "target.units.C":
+			Vdev.SetHwmTarget(v)
 		}
 		delete(WrRegVal, k)
 	}
