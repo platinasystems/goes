@@ -120,18 +120,14 @@ func KernelVer() (string, error) {
 	return strings.TrimSpace(string(u)), nil
 }
 
-func CorebootVer() (string, error) { //FIXME not really required, can just try upgrade, will auto skip if same
+func CorebootVer() (string, error) { //FIXME not really required
 	return "no_tag", nil
 }
 
 func srvGoesVer(s string, v string, t bool) (string, error) {
 	fn := GoesName
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
+
+	n, err := getFile(s, v, t, fn)
 	if err != nil {
 		return "", fmt.Errorf("Error downloading: %v", err)
 	}
@@ -156,12 +152,7 @@ func srvGoesVer(s string, v string, t bool) (string, error) {
 
 func srvKernelVer(s string, v string, t bool) (string, string, error) {
 	fn := KernelName
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
+	n, err := getFile(s, v, t, fn)
 	if err != nil {
 		return "", "", fmt.Errorf("Error downloading: %v", err)
 	}
@@ -196,12 +187,7 @@ func prVer(g string, k string, c string, sg string, sk string, sc string) {
 
 func installGoes(s string, v string, t bool) error {
 	fn := GoesInstaller
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
+	n, err := getFile(s, v, t, fn)
 	if err != nil {
 		return fmt.Errorf("    Error downloading: %v", err)
 	}
@@ -214,12 +200,7 @@ func installGoes(s string, v string, t bool) error {
 }
 
 func installKernel(s string, v string, t bool, fn string) error {
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
+	n, err := getFile(s, v, t, fn)
 	if err != nil {
 		return fmt.Errorf("    Error downloading: %v", err)
 	}
@@ -278,7 +259,12 @@ func cleanupBootDir(fn string) error {
 	return nil
 }
 
-func getFile(urls string, fn string) (int, error) {
+func getFile(s string, v string, t bool, fn string) (int, error) {
+	rmFile(fn)
+	urls := "http://" + s + "/" + v + "/" + fn
+	if t {
+		urls = "tftp://" + s + "/" + v + "/" + fn
+	}
 	r, err := url.Open(urls)
 	if err != nil {
 		return 0, err
@@ -306,13 +292,6 @@ func rmFile(f string) error {
 	return nil
 }
 
-func activateGoes() error {
-	fmt.Print("\nACTIVATING GOES, WILL EXIT... type reset, goes\n")
-	cmd := exec.Command("./" + GoesInstaller)
-	cmd.Start()
-	return nil
-}
-
 func reboot() error {
 	fmt.Print("\nWILL REBOOT in 1 minute... Please login again\n")
 	u, err := exec.Command("shutdown", "-r", "+1").Output()
@@ -320,5 +299,12 @@ func reboot() error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func activateGoes() error {
+	fmt.Print("\nACTIVATING GOES, WILL EXIT... type reset, goes\n")
+	cmd := exec.Command("./" + GoesInstaller)
+	cmd.Start()
 	return nil
 }

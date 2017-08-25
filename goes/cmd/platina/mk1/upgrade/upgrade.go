@@ -53,9 +53,7 @@ OPTIONS
 	DfltSrv = "downloads.platinasystems.com"
 	DfltVer = "LATEST"
 	Machine = "platina-mk1"
-)
 
-const (
 	//names of server files
 	GoesName      = "goes-platina-mk1"
 	GoesInstaller = "goes-platina-mk1-installer"
@@ -138,12 +136,8 @@ var Reboot_flag bool = false
 
 func showList(s string, v string, t bool) error {
 	fn := "LIST"
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	if _, err := getFile(urls, fn); err != nil {
+	_, err := getFile(s, v, t, fn)
+	if err != nil {
 		return err
 	}
 	l, err := ioutil.ReadFile(fn)

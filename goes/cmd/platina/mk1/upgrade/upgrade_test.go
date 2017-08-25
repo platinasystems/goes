@@ -13,9 +13,8 @@ func TestGetFile(t *testing.T) {
 	fn := "LIST"
 	s := DfltSrv
 	v := DfltVer
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	n, err := getFile(urls, fn)
+	tftp := false
+	n, err := getFile(s, v, tftp, fn)
 	if err != nil {
 		t.Errorf("HTTP: Error downloading: %v", err)
 		return
@@ -36,9 +35,8 @@ func TestGetFile(t *testing.T) {
 	fn = "LIST"
 	s = TFTPserver
 	v = DfltVer
-	rmFile(fn)
-	urls = "tftp://" + s + "/" + v + "/" + fn
-	n, err = getFile(urls, fn)
+	tftp = true
+	n, err = getFile(s, v, tftp, fn)
 	if err != nil {
 		t.Errorf("TFTP: Error downloading: %v", err)
 		return
