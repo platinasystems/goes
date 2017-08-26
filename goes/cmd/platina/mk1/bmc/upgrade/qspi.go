@@ -51,10 +51,32 @@ func writeImageAll() (err error) {
 	if err = infoQSPI(); err != err {
 		return err
 	}
-	for j, i := range img {
-		err := writeImage("/"+Machine+"-"+i+".bin", off[j], siz[j])
-		if err != nil {
+	for i, j := range img {
+		if err := writeImage("/"+Machine+"-"+j+".bin",
+			off[i], siz[i]); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func writeImageX(x string) (err error) {
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return err
+	}
+	defer syscall.Close(fd)
+
+	if err = infoQSPI(); err != err {
+		return err
+	}
+	for i, j := range img {
+		if j == x {
+			if err := writeImage("/"+Machine+"-"+j+".bin",
+				off[i], siz[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
