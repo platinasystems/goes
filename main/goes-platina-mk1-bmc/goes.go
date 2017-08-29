@@ -40,6 +40,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/imx6d"
 	"github.com/platinasystems/go/goes/cmd/insmod"
 	"github.com/platinasystems/go/goes/cmd/install"
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
 	"github.com/platinasystems/go/goes/cmd/kill"
@@ -52,8 +53,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/nlcounters"
 	"github.com/platinasystems/go/goes/cmd/nld"
-	"github.com/platinasystems/go/goes/cmd/nldump"
-	"github.com/platinasystems/go/goes/cmd/nsid"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
@@ -134,6 +133,7 @@ func Goes() *goes.Goes {
 		imx6d.New(),
 		insmod.New(),
 		install.New(),
+		ip.New(),
 		kexec.New(),
 		keys.New(),
 		kill.New(),
@@ -147,8 +147,6 @@ func Goes() *goes.Goes {
 		mount.New(),
 		nlcounters.New(),
 		nld.New(),
-		nldump.New(),
-		nsid.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),
