@@ -91,7 +91,7 @@ func (m *main) NewDevice(bd pci.BusDevice) (dd pci.DriverDevice, err error) {
 	d.m = m
 	d.pci_dev = bd.GetDevice()
 	d.pci_bus_dev = bd
-	d.elog_name = elog.SetString(d.Name())
+	d.elog_name = elog.SetString(d.dev_name())
 	m.devs = append(m.devs, dr)
 	return d, nil
 }

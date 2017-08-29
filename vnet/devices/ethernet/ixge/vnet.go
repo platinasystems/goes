@@ -7,6 +7,8 @@ package ixge
 import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+
+	"fmt"
 )
 
 type vnet_dev struct {
@@ -36,8 +38,7 @@ func (d *dev) vnetInit() {
 		rx_error_ip4_invalid_checksum: "invalid ip4 checksum",
 	}
 
-	a := d.pci_dev.Addr
-	ethernet.RegisterInterface(v, d, &d.ethIfConfig, "ixge%d-%d-%d", a.Bus, a.Slot, a.Fn)
+	ethernet.RegisterInterface(v, d, &d.ethIfConfig, d.dev_name())
 	v.RegisterInterfaceNode(d, d.Hi(), d.Name())
 	if d.m.PuntNode != "" {
 		d.Hi().SetAdminUp(v, true)
@@ -45,6 +46,10 @@ func (d *dev) vnetInit() {
 }
 
 func (d *dev) DriverName() string { return "ixge" }
+func (d *dev) dev_name() string {
+	a := d.pci_dev.Addr
+	return fmt.Sprintf("ixge%d-%d-%d", a.Bus, a.Slot, a.Fn)
+}
 
 func (d *dev) SetLoopback(x vnet.IfLoopbackType) (err error) {
 	const (
