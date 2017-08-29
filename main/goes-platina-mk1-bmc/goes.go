@@ -53,8 +53,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/nlcounters"
 	"github.com/platinasystems/go/goes/cmd/nld"
-	"github.com/platinasystems/go/goes/cmd/nldump"
-	"github.com/platinasystems/go/goes/cmd/nsid"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
@@ -149,8 +147,6 @@ func Goes() *goes.Goes {
 		mount.New(),
 		nlcounters.New(),
 		nld.New(),
-		nldump.New(),
-		nsid.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),
