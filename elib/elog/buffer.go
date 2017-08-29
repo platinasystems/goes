@@ -511,7 +511,7 @@ func Len() (n int)                   { return DefaultBuffer.Len() }
 func Enable(v bool)                  { DefaultBuffer.Enable(v) }
 
 const (
-	minLog2Len = 10
+	minLog2Len = 12
 	maxLog2Len = 24 // no need to allow buffer to be too large.
 )
 
