@@ -72,12 +72,6 @@ setup_dc () {
 	ln -s /proc/$dc_pid/ns/net /var/run/netns/$dc_pid
     fi
 
-    ip netns list-id | grep -q "name: $dc_pid" > /dev/null
-    if [ $? -ne 0 ]; then
-	echo "Error: docker container pid $dc_pid missing."
-	exit 1
-    fi
-
     ip link set $intf netns $dc_pid
     if [ $? -ne 0 ]; then
 	echo "Error: set netns failed."

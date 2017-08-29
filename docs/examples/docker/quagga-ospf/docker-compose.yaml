@@ -14,6 +14,7 @@ services:
     privileged: true
     volumes:
       - ./volumes/R1:/etc/quagga
+    network_mode: "none"
     logging:
       options:
         max-size: "10m"
@@ -32,6 +33,7 @@ services:
     privileged: true
     volumes:
       - ./volumes/R2:/etc/quagga
+    network_mode: "none"
     logging:
       options:
         max-size: "10m"
@@ -50,6 +52,7 @@ services:
     privileged: true
     volumes:
       - ./volumes/R3:/etc/quagga
+    network_mode: "none"
     logging:
       options:
         max-size: "10m"
@@ -68,6 +71,7 @@ services:
     privileged: true
     volumes:
       - ./volumes/R4:/etc/quagga
+    network_mode: "none"
     logging:
       options:
         max-size: "10m"
