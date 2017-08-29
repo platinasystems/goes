@@ -58,9 +58,9 @@ type errorEvent struct {
 	n uint64
 }
 
-func (e *errorEvent) Format(x *elog.Context, f elog.Format) {
+func (e *errorEvent) Elog(l *elog.Log) {
 	err := ErrorNode.errs[e.e]
-	f("%s %s %d", err.nodeName, err.str, e.n)
+	l.Logf("%s %s %d", err.nodeName, err.str, e.n)
 }
 
 func (t *errorThread) count(e ErrorRef, n uint64) {

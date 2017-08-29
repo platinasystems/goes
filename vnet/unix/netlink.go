@@ -5,6 +5,7 @@
 package unix
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
@@ -261,8 +262,8 @@ func (nm *netlink_main) Init(m *Main) {
 type netlinkEvent struct {
 	vnet.Event
 	m    *Main
-	msgs []netlink.Message
 	ns   *net_namespace
+	msgs []netlink.Message
 }
 
 func (m *netlink_main) newEvent() interface{} {
@@ -283,42 +284,88 @@ func (e *netlinkEvent) put() {
 	e.m.eventPool.Put(e)
 }
 
-type eventSumState struct {
-	lastType  netlink.MsgType
-	lastCount uint
+type msgKindCount struct {
+	kind  netlink.MsgType
+	count uint16
 }
 
-func (a *eventSumState) update(msg netlink.Message, sʹ string) (s string) {
+func (a *msgKindCount) update(msg netlink.Message, sʹ string) (s string) {
 	var t netlink.MsgType
 	s = sʹ
 	if msg != nil {
 		t = msg.MsgType()
-		if a.lastCount > 0 && t == a.lastType {
-			a.lastCount++
+		if a.count > 0 && t == a.kind {
+			a.count++
 			return
 		}
 	}
-	if a.lastCount > 0 {
+	if a.count > 0 {
 		s += " "
-		if a.lastCount > 1 {
-			s += fmt.Sprintf("%d ", a.lastCount)
+		if a.count > 1 {
+			s += fmt.Sprintf("%d ", a.count)
 		}
-		s += a.lastType.String() + "\n"
+		s += a.kind.String() + "\n"
 	}
-	a.lastType = t
-	a.lastCount = 1
+	a.kind = t
+	a.count = 1
 	return
 }
 
 func (e *netlinkEvent) String() (s string) {
 	l := len(e.msgs)
 	s = fmt.Sprintf("netlink %d:", l)
-	var st eventSumState
+	var st msgKindCount
 	for _, msg := range e.msgs {
 		s = st.update(msg, s)
 	}
 	s = st.update(nil, s)
 	return
+}
+
+type netlinkElogEvent struct {
+	numMsg       uint16
+	numKindCount uint16
+	kindCounts   [(elog.EventDataBytes - 2*2) / 4]msgKindCount
+}
+
+func (e *netlinkEvent) ElogData() elog.Logger {
+	var le netlinkElogEvent
+	le.numMsg = uint16(len(e.msgs))
+	var (
+		k msgKindCount
+		i int
+	)
+	for _, msg := range e.msgs {
+		t := msg.MsgType()
+		if t != k.kind && k.count != 0 {
+			le.kindCounts[i] = k
+			i++
+			if i >= len(le.kindCounts) {
+				break
+			}
+		}
+		if k.kind == t {
+			k.count++
+		} else {
+			k.kind = t
+			k.count = 1
+		}
+	}
+	if k.count != 0 && i+1 < len(le.kindCounts) {
+		le.kindCounts[i] = k
+		i++
+	}
+	le.numKindCount = uint16(i)
+	return &le
+}
+
+func (e *netlinkElogEvent) Elog(l *elog.Log) {
+	if e.numKindCount != 1 {
+		l.Logf("netlink %d msg", e.numMsg)
+	}
+	for i := uint16(0); i < e.numKindCount; i++ {
+		l.Logf("netlink %d %s", e.kindCounts[i].count, e.kindCounts[i].kind)
+	}
 }
 
 func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_interface, ok bool) {

@@ -107,8 +107,8 @@ type txElogEvent struct {
 	n_refs    uint32
 }
 
-func (e *txElogEvent) Format(x *elog.Context, f elog.Format) {
-	f("tx %s send %d buffers", x.GetString(e.node_name), e.n_refs)
+func (e *txElogEvent) Elog(l *elog.Log) {
+	l.Logf("tx %s send %d buffers", l.GetString(e.node_name), e.n_refs)
 }
 
 func (n *interfaceNode) send(i *TxRefVecIn) {

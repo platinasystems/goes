@@ -121,7 +121,11 @@ func (e *loopEvent) EventAction() {
 
 func (e *loopEvent) do() {
 	if elog.Enabled() {
-		elog.Sc(e.String(), e.caller)
+		if a, ok := e.actor.(elog.Data); ok {
+			elog.AddDatac(a, e.caller)
+		} else {
+			elog.Sc(e.actor.String(), e.caller)
+		}
 	}
 	e.actor.EventAction()
 	e.l.putLoopEvent(e)
@@ -235,7 +239,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		for i := range l.eventVec {
 			l.eventVec[i].EventAction()
 		}
-		elog.F2Uint("timed events %d expired, %d left",
+		elog.F2u("timed events %d expired, %d left",
 			uint64(len(l.eventVec)), uint64(l.eventPool.Elts()))
 
 		l.eventVec = l.eventVec[:0]

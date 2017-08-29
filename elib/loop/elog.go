@@ -42,14 +42,14 @@ type pollerElogEvent struct {
 	node_name    elog.StringRef
 }
 
-func (e *pollerElogEvent) Format(x *elog.Context, f elog.Format) {
+func (e *pollerElogEvent) Elog(l *elog.Log) {
 	pi := ""
 	if e.poller_index != ^uint32(0) {
 		pi = fmt.Sprintf("%d", e.poller_index)
 	}
-	f("loop%s %s %s", pi, e.event_type.String(), x.GetString(e.node_name))
+	l.Logf("loop%s %s %s", pi, e.event_type, l.GetString(e.node_name))
 	if e.flags != 0 {
-		f("new flags: %s", node_flags(e.flags))
+		l.Logf("new flags: %s", node_flags(e.flags))
 	}
 }
 
@@ -73,12 +73,12 @@ type callEvent struct {
 	node_name    elog.StringRef
 }
 
-func (e *callEvent) Format(x *elog.Context, f elog.Format) {
-	n := x.GetString(e.node_name)
+func (e *callEvent) Elog(l *elog.Log) {
+	n := l.GetString(e.node_name)
 	nv := e.n_vectors
 	if e.is_input {
-		f("loop%d %s in %d", e.active_index, n, nv)
+		l.Logf("loop%d %s in %d", e.active_index, n, nv)
 	} else {
-		f("loop%d %s(%d)", e.active_index, n, nv)
+		l.Logf("loop%d %s(%d)", e.active_index, n, nv)
 	}
 }
