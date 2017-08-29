@@ -99,7 +99,7 @@ func (d *dev) link_state_change() {
 
 func (d *dev) interrupt_dispatch(i uint) {
 	irq := interrupt(i)
-	elog.F("%s irq %d", d.elog_name, i)
+	elog.F("%s irq %s", d.elog_name, irq)
 	switch {
 	case irq < irq_n_queue:
 		d.foreach_queue_for_interrupt(vnet.Rx, irq, d.rx_queue_interrupt)
