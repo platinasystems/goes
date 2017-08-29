@@ -92,17 +92,17 @@ func main() {
 				fmt := fmts[color]
 				switch color {
 				case 0:
-					elog.FUint(fmt, i)
+					elog.F1u(fmt, i)
 				case 1:
-					elog.FUint(fmt, i)
+					elog.F1u(fmt, i)
 				case 2:
-					elog.FUint(fmt, i)
+					elog.F1u(fmt, i)
 				case 3:
-					elog.FUint(fmt, i)
+					elog.F1u(fmt, i)
 				case 4:
-					elog.FUint(fmt, i)
+					elog.F1u(fmt, i)
 				case 5:
-					elog.FUint(fmt, i)
+					elog.F1u(fmt, i)
 				}
 			} else {
 				e := ev{color: color, i: uint32(i)}
