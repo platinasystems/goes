@@ -13,8 +13,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"reflect"
-	"unsafe"
 )
 
 func Uvarint(b []byte) (c []byte, i int) {
@@ -64,38 +62,16 @@ func (v *View) Load(file string) (err error) {
 	return
 }
 
-func (e *Event) encodeData(b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
+func (e *viewEvent) encode(b0 elib.ByteVec, t0 uint64, i0 int) (b elib.ByteVec, t uint64, i int) {
 	b, i = b0, i0
-	// Skip trailing zero bytes.
-	var l int
-	for l = len(e.data); l > 0 && e.data[l-1] == 0; l-- {
-	}
-	b.Validate(uint(i + 1 + l))
-	b[i] = byte(l)
-	i++
-	copy(b[i:i+l], e.data[:])
-	i += l
-	return
-}
-
-func (e *Event) decodeData(b []byte) int {
-	i := 0
-	l := int(b[i])
-	i++
-	copy(e.data[:], b[i:i+l])
-	i += l
-	return i
-}
-
-func (e *Event) encode(c *Context, b0 elib.ByteVec, t0 uint64, i0 int) (b elib.ByteVec, t uint64, i int) {
-	b, i = b0, i0
-	b.Validate(uint(i + 1<<log2EventBytes))
+	b.Validate(uint(i + 5*binary.MaxVarintLen64))
 	// Encode time differences for shorter encodings.
 	t = e.timestamp
 	i += binary.PutUvarint(b[i:], uint64(t-t0))
 	i += binary.PutUvarint(b[i:], uint64(e.callerIndex))
-	i += binary.PutUvarint(b[i:], uint64(e.track))
-	b, i = e.encodeData(b, i)
+	i += binary.PutUvarint(b[i:], uint64(e.trackIndex))
+	i += binary.PutUvarint(b[i:], uint64(e.lo))
+	i += binary.PutUvarint(b[i:], uint64(e.hi))
 	return
 }
 
@@ -104,7 +80,7 @@ var (
 	errStringOverflow = errors.New("decode string overflow")
 )
 
-func (e *Event) decode(c *Context, b elib.ByteVec, t0 uint64, i0 int) (t uint64, i int, err error) {
+func (e *viewEvent) decode(b elib.ByteVec, t0 uint64, i0 int) (t uint64, i int, err error) {
 	i, t = i0, t0
 	var (
 		x uint64
@@ -127,10 +103,20 @@ func (e *Event) decode(c *Context, b elib.ByteVec, t0 uint64, i0 int) (t uint64,
 	if x, n = binary.Uvarint(b[i:]); n <= 0 {
 		goto short
 	}
-	e.track = uint32(x)
+	e.trackIndex = uint32(x)
 	i += n
 
-	i += e.decodeData(b[i:])
+	if x, n = binary.Uvarint(b[i:]); n <= 0 {
+		goto short
+	}
+	e.lo = uint32(x)
+	i += n
+
+	if x, n = binary.Uvarint(b[i:]); n <= 0 {
+		goto short
+	}
+	e.hi = uint32(x)
+	i += n
 	return
 
 short:
@@ -256,7 +242,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	i += copy(b[i:], d)
 
 	// Callers
-	nes := v.normalizeEvents()
+	v.convertBufferEvents()
 	b.Validate(uint(i + binary.MaxVarintLen64))
 	i += binary.PutUvarint(b[i:], uint64(len(v.callers)))
 	for _, r := range v.callers {
@@ -269,13 +255,15 @@ func (v *View) MarshalBinary() ([]byte, error) {
 
 	// Events.
 	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(len(nes)))
+	i += binary.PutUvarint(b[i:], uint64(len(v.ve)))
 	t := v.cpuStartTime
-	for ei := range nes {
-		e := &nes[ei]
-		b, t, i = e.encode(v.GetContext(), b, t, i)
-		v.validateEvent(e)
+	for ei := range v.ve {
+		e := &v.ve[ei]
+		b, t, i = e.encode(b, t, i)
 	}
+
+	// Event formats and arguments.
+	b, i = encodeString(string(v.viewEvents.b), b, i)
 
 	return b[:i], nil
 }
@@ -345,26 +333,33 @@ func (v *View) UnmarshalBinary(b []byte) (err error) {
 	// Events.
 	if x, n := binary.Uvarint(b[i:]); n > 0 {
 		l := uint(x)
-		if len(v.Events) > 0 {
-			v.Events = v.Events[:0]
+		if len(v.e) > 0 {
+			v.e = v.e[:0]
 		}
-		v.Events.Resize(l)
+		v.ve = make([]viewEvent, l)
 		i += n
 	} else {
 		return errUnderflow
 	}
 	t := v.cpuStartTime
-	for ei := 0; ei < len(v.Events); ei++ {
-		e := &v.Events[ei]
-		t, i, err = e.decode(v.GetContext(), b, t, i)
-		v.validateEvent(e)
+	for ei := 0; ei < len(v.ve); ei++ {
+		e := &v.ve[ei]
+		t, i, err = e.decode(b, t, i)
 		if err != nil {
 			return
 		}
 	}
 
+	// Event formats and arguments.
+	{
+		var s string
+		if s, i, err = decodeString(b, i, 0); err != nil {
+			return
+		}
+		v.viewEvents.b = []byte(s)
+	}
+
 	b = b[:i]
-	v.e = v.Events
 	v.getViewTimes()
 
 	return
@@ -379,19 +374,4 @@ func EncodeUint64(b []byte, x uint64) int { return binary.PutUvarint(b, uint64(x
 func DecodeUint64(b []byte, i int) (uint64, int) {
 	x, n := binary.Uvarint(b[i:])
 	return uint64(x), i + n
-}
-
-func (v *View) validateEvent(e *Event) {
-	if !elib.Debug {
-		return
-	}
-	r, _ := v.getCallerInfo(e.callerIndex)
-	t := reflect.TypeOf(&r.fe).Elem()
-	rv := reflect.NewAt(t, unsafe.Pointer(&e.data[0])).Interface()
-	switch ev := rv.(type) {
-	case *fmtEvent:
-		ev.decode(v.GetContext())
-	default:
-		panic("type " + t.Name())
-	}
 }
