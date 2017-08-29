@@ -227,7 +227,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 
 	// Header
 	b.Validate(uint(i + 8))
-	bo.PutUint64(b[i:], math.Float64bits(v.timeUnitNsec))
+	bo.PutUint64(b[i:], math.Float64bits(v.cpuTimeUnitNsec))
 	i += 8
 
 	b.Validate(uint(i + binary.MaxVarintLen64))
@@ -255,10 +255,10 @@ func (v *View) MarshalBinary() ([]byte, error) {
 
 	// Events.
 	b.Validate(uint(i + binary.MaxVarintLen64))
-	i += binary.PutUvarint(b[i:], uint64(len(v.ve)))
+	i += binary.PutUvarint(b[i:], uint64(len(v.allViewEvents)))
 	t := v.cpuStartTime
-	for ei := range v.ve {
-		e := &v.ve[ei]
+	for ei := range v.allViewEvents {
+		e := &v.allViewEvents[ei]
 		b, t, i = e.encode(b, t, i)
 	}
 
@@ -282,7 +282,7 @@ func (v *View) UnmarshalBinary(b []byte) (err error) {
 		return errUnderflow
 	}
 
-	v.timeUnitNsec = math.Float64frombits(bo.Uint64(b[i:]))
+	v.cpuTimeUnitNsec = math.Float64frombits(bo.Uint64(b[i:]))
 	i += 8
 
 	if x, n := binary.Uvarint(b[i:]); n > 0 {
@@ -333,17 +333,17 @@ func (v *View) UnmarshalBinary(b []byte) (err error) {
 	// Events.
 	if x, n := binary.Uvarint(b[i:]); n > 0 {
 		l := uint(x)
-		if len(v.e) > 0 {
-			v.e = v.e[:0]
+		if len(v.allViewEvents) > 0 {
+			v.allViewEvents = v.allViewEvents[:0]
 		}
-		v.ve = make([]viewEvent, l)
+		v.allViewEvents = make([]viewEvent, l)
 		i += n
 	} else {
 		return errUnderflow
 	}
 	t := v.cpuStartTime
-	for ei := 0; ei < len(v.ve); ei++ {
-		e := &v.ve[ei]
+	for ei := 0; ei < len(v.allViewEvents); ei++ {
+		e := &v.allViewEvents[ei]
 		t, i, err = e.decode(b, t, i)
 		if err != nil {
 			return
@@ -359,9 +359,10 @@ func (v *View) UnmarshalBinary(b []byte) (err error) {
 		v.viewEvents.b = []byte(s)
 	}
 
-	b = b[:i]
+	v.currentViewEvents = v.allViewEvents
 	v.getViewTimes()
 
+	b = b[:i]
 	return
 }
 

@@ -20,33 +20,33 @@ import (
 
 type View struct {
 	viewEvents
-	bufferEvents []bufferEvent
-	e            bufferEventVec
-	name         string
-	Times        timeBounds
+	currentBufferEvents []bufferEvent
+	allBufferEvents     bufferEventVec
+	name                string
+	Times               viewTimes
 	shared
 }
 
 func (v *View) SetName(name string) { v.name = name }
 func (v *View) Name() string        { return v.name }
 func (v *View) NumEvents() (l uint) {
-	if v.bufferEvents != nil {
-		l = uint(len(v.bufferEvents))
+	if v.currentBufferEvents != nil {
+		l = uint(len(v.currentBufferEvents))
 	} else {
-		l = uint(len(v.ve))
+		l = uint(len(v.currentViewEvents))
 	}
 	return
 }
 func (v *View) Event(i uint) (h *eventHeader) {
-	if v.bufferEvents != nil {
-		return &v.bufferEvents[i].eventHeader
+	if v.currentBufferEvents != nil {
+		return &v.currentBufferEvents[i].eventHeader
 	}
-	return &v.ve[i].eventHeader
+	return &v.currentViewEvents[i].eventHeader
 }
 func (v *View) EventLines(i uint) (s []string) {
 	l := &Log{s: &v.shared}
-	if v.bufferEvents != nil {
-		return v.bufferEvents[i].lines(l)
+	if v.currentBufferEvents != nil {
+		return v.currentBufferEvents[i].lines(l)
 	}
 	return v.viewEventLines(l, i)
 }
@@ -63,18 +63,26 @@ func (b *Buffer) NewView() (v *View) {
 	v.shared.stringTable.copyFrom(&b.shared.stringTable)
 	v.shared.eventFilterShared.copyFrom(&b.shared.eventFilterShared)
 
-	l := len(v.bufferEvents)
+	l := len(v.currentBufferEvents)
 	cap := b.Cap()
 	mask := b.capMask()
-	v.e.Resize(uint(cap))
+	v.allBufferEvents.Resize(uint(cap))
 	i := int(b.lockIndex(true))
 	if i >= cap {
-		l += copy(v.e[l:], b.events[i&mask:])
+		l += copy(v.allBufferEvents[l:], b.events[i&mask:])
 	}
-	l += copy(v.e[l:], b.events[0:i&mask])
+	l += copy(v.allBufferEvents[l:], b.events[0:i&mask])
 	b.lockIndex(false)
-	v.e = v.e[:l]
-	v.bufferEvents = v.e
+	v.allBufferEvents = v.allBufferEvents[:l]
+	v.currentBufferEvents = v.allBufferEvents
+
+	// Event ordering is not guaranteed due to GetCaller().
+	// So we sort events by time.
+	sort.Slice(v.allBufferEvents, func(i, j int) bool {
+		ei, ej := &v.allBufferEvents[i], &v.allBufferEvents[j]
+		return ei.timestamp < ej.timestamp
+	})
+
 	v.getViewTimes()
 	return
 }
@@ -83,112 +91,120 @@ func NewView() *View { return DefaultBuffer.NewView() }
 
 // Make subview with only events between elapsed times t0 and t1.
 func (v *View) SubView(t0, t1 float64) (n uint) {
-	l := len(v.e)
+	l := int(v.NumEvents())
 	if t0 > t1 {
 		t0, t1 = t1, t0
 	}
 	i0 := sort.Search(l, func(i int) bool {
-		et := v.elapsedTime(&v.e[i].eventHeader)
+		e := v.Event(uint(i))
+		et := e.ElapsedTime(v)
 		return et >= t0
 	})
 	i1 := sort.Search(l, func(i int) bool {
-		et := v.elapsedTime(&v.e[i].eventHeader)
+		e := v.Event(uint(i))
+		et := e.ElapsedTime(v)
 		return et > t1
 	})
-	v.bufferEvents = v.e[i0:i1]
-	v.doViewTimes(t0, t1, true)
-	return uint(len(v.bufferEvents))
+	if v.allBufferEvents != nil {
+		v.currentBufferEvents = v.currentBufferEvents[i0:i1]
+	} else {
+		v.currentViewEvents = v.currentViewEvents[i0:i1]
+	}
+	v.doViewTimes(t0, t1)
+	return v.NumEvents()
 }
 func (v *View) Reset() {
-	v.bufferEvents = v.e
+	v.currentBufferEvents = v.allBufferEvents
+	v.currentViewEvents = v.allViewEvents
+	v.Times.StartTime = v.StartTime.Truncate(1 * time.Second)
 	v.getViewTimes()
 }
 
-type timeBounds struct {
-	// Starting time truncated to nearest second.
-	Start        time.Time
-	Min, Max, Dt float64
-	Unit         float64
-	UnitName     string
-}
-
 func (v *View) getViewTimes() {
+	if v.Times.StartTime.IsZero() {
+		v.Times.StartTime = v.StartTime.Truncate(1 * time.Second)
+	}
 	if ne := v.NumEvents(); ne > 0 {
 		e0, e1 := v.Event(0), v.Event(ne-1)
-		t0 := e0.elapsedTime(&v.shared)
-		t1 := e1.elapsedTime(&v.shared)
-		v.doViewTimes(t0, t1, false)
+		t0 := e0.ElapsedTime(v)
+		t1 := e1.ElapsedTime(v)
+		v.doViewTimes(t0, t1)
 	}
 	return
 }
 
-func (v *View) doViewTimes(t0, t1 float64, isViewTime bool) (err error) {
-	tb := &v.Times
-	tUnit := float64(1)
-	roundUnit := tUnit
-	unitName := "sec"
+type viewTimes struct {
+	// Time of first event in view rounded down.
+	StartTime time.Time
+	// Time relative to start time rounded down/up to nearest units.
+	MinElapsed, MaxElapsed float64
+	// Interval between max - min elapsed time.
+	Dt       float64
+	Unit     float64
+	UnitName string
+}
 
-	if isViewTime {
-		// Translate view elapsed times to buffer elapsed times.
-		dt := v.StartTime.Sub(tb.Start).Seconds()
-		t0 -= dt
-		t1 -= dt
-	}
+func (v *View) doViewTimes(t0, t1 float64) {
+	t := &v.Times
 
-	if t1 > t0 {
-		v := math.Floor(math.Log10(t1 - t0))
+	var (
+		unitName          string
+		timeUnit, maxUnit float64
+	)
+
+	{
+		dt := t1 - t0
+		if dt <= 0 {
+			panic("t0 <= t1")
+		}
+		logDt := math.Floor(math.Log10(dt))
 		switch {
-		case v < -6:
+		case logDt < -6:
 			unitName = "ns"
-			tUnit = 1e-9
-			switch {
-			case v < -8:
-				roundUnit = 1e-9
-			case v < -7:
-				roundUnit = 1e-8
-			default:
-				roundUnit = 1e-7
-			}
-		case v < -3:
+			timeUnit = 1e-9
+			maxUnit = 1e3
+		case logDt < -3:
 			unitName = "μs"
-			tUnit = 1e-6
-			switch {
-			case v < -5:
-				roundUnit = 1e-6
-			case v < -6:
-				roundUnit = 1e-7
-			default:
-				roundUnit = 1e-8
-			}
-		case v < 0:
+			timeUnit = 1e-6
+			maxUnit = 1e3
+		case logDt < 0:
 			unitName = "ms"
-			tUnit = 1e-3
-			switch {
-			case v < -5:
-				roundUnit = 1e-5
-			case v < -4:
-				roundUnit = 1e-4
-			default:
-				roundUnit = 1e-3
-			}
+			timeUnit = 1e-3
+			maxUnit = 1e3
+		case dt < 60:
+			unitName = "sec"
+			timeUnit = 1
+			maxUnit = 60
+		case dt < 60*60:
+			unitName = "min"
+			timeUnit = 60
+			maxUnit = 60
+		case dt < 24*60*60:
+			unitName = "hr"
+			timeUnit = 60 * 60
+			maxUnit = 24 * 60 * 60
+		default:
+			unitName = "day"
+			timeUnit = 24 * 60 * 60
+			maxUnit = 1e3
 		}
 	}
 
-	// Round buffer start time to seconds and add difference (nanoseconds part) to times.
-	startTime := v.StartTime.Truncate(time.Duration(1e9 * tUnit))
-	dt := v.StartTime.Sub(startTime).Seconds()
-	t0 += dt
-	t1 += dt
+	t0 = timeUnit * math.Floor(t0/timeUnit)
+	t1 = timeUnit * math.Ceil(t1/timeUnit)
 
-	t0 = roundUnit * math.Floor(t0/roundUnit)
-	t1 = roundUnit * math.Ceil(t1/roundUnit)
+	if u := t0 / timeUnit; u > maxUnit {
+		dt := timeUnit * maxUnit * math.Floor(u/maxUnit)
+		t0 -= dt
+		t1 -= dt
+		t.StartTime = t.StartTime.Add(time.Duration(1e9 * dt))
+	}
 
-	tb.Start = startTime
-	tb.Min = t0
-	tb.Max = t1
-	tb.Dt = t1 - t0
-	tb.Unit = tUnit
-	tb.UnitName = unitName
+	t.MinElapsed = t0
+	t.MaxElapsed = t1
+	t.Dt = t1 - t0
+	t.Unit = timeUnit
+	t.UnitName = unitName
 	return
 }
 
@@ -258,13 +274,14 @@ type viewEvent struct {
 }
 
 type viewEvents struct {
-	ve   []viewEvent
-	b    elib.ByteVec
-	args []interface{}
+	currentViewEvents []viewEvent
+	allViewEvents     []viewEvent
+	b                 elib.ByteVec
+	args              []interface{}
 }
 
 func (v *viewEvents) viewEventLines(l *Log, ei uint) []string {
-	e := &v.ve[ei]
+	e := &v.currentViewEvents[ei]
 	b := v.b[e.lo:e.hi]
 	i := 0
 	if l.l != nil {
@@ -306,15 +323,16 @@ func (v *viewEvents) addBufferEvent(l *Log, e *bufferEvent) {
 	ve.eventHeader = e.eventHeader
 	ve.lo = uint32(lo)
 	ve.hi = uint32(i)
-	v.ve = append(v.ve, ve)
+	v.allViewEvents = append(v.allViewEvents, ve)
 }
 
 func (v *View) convertBufferEvents() {
 	l := &Log{s: &v.shared}
-	for i := range v.bufferEvents {
-		v.addBufferEvent(l, &v.bufferEvents[i])
+	for i := range v.allBufferEvents {
+		v.addBufferEvent(l, &v.allBufferEvents[i])
 	}
-	v.bufferEvents = nil
-	v.e = nil
+	v.allBufferEvents = nil
+	v.currentBufferEvents = nil
+	v.currentViewEvents = v.allViewEvents
 	return
 }
