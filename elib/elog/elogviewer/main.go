@@ -32,7 +32,7 @@ type ev struct {
 	color color
 }
 
-func (e *ev) Format(x *elog.Context, f elog.Format) { f("%s %d", e.color, e.i) }
+func (e *ev) Elog(l *elog.Log) { l.Logf("%s %d", e.color, e.i) }
 
 func main() {
 	var (

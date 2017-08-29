@@ -275,11 +275,11 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 		}
 	case gdk.KEY_BackSpace:
 		for ei, _ := range v.selected_events {
-			e := &v.ev.Events[ei]
+			e := v.ev.Event(ei)
 			if v.hidden_callers == nil {
 				v.hidden_callers = make(map[uint]struct{})
 			}
-			v.hidden_callers[e.GetCaller()] = struct{}{}
+			v.hidden_callers[e.CallerIndex()] = struct{}{}
 			delete(v.selected_events, ei)
 		}
 	case gdk.KEY_r:
@@ -417,9 +417,9 @@ func (v *viewer) is_selected(ei uint) (ok bool) {
 	return
 }
 
-func (v *viewer) draw_selected_event(cr *cairo.Context, e *elog.Event, ve *visible_event) {
+func (v *viewer) draw_selected_event(cr *cairo.Context, ei uint, ve *visible_event) {
 	ev := v.ev
-	lines := e.Strings(ev.GetContext())
+	lines := ev.EventLines(ei)
 
 	// Indent lines after first.
 	for i := range lines {
@@ -429,8 +429,8 @@ func (v *viewer) draw_selected_event(cr *cairo.Context, e *elog.Event, ve *visib
 		}
 	}
 
-	ec := ev.EventCaller(e)
-	d, _ := v.decorationForCaller(ec)
+	ec := ev.EventCaller(ei)
+	d, _ := v.decorationForEvent(ei)
 
 	sf, _ := ec.ShortPath(ec.File, 32)
 	sn, _ := ec.ShortPath(ec.Name, 32)
@@ -478,7 +478,8 @@ func (c *ctx) set_pattern(x, dx r2.V, bg rgb, f float64) {
 	c.cr().SetSource(p)
 }
 
-func (v *viewer) decorationForCaller(ci *elog.CallerInfo) (d *decoration, ok bool) {
+func (v *viewer) decorationForEvent(ei uint) (d *decoration, ok bool) {
+	ci := v.ev.EventCaller(ei)
 	pc := ci.PC
 	if v.m == nil {
 		v.m = make(map[uint64]*decoration)
@@ -573,7 +574,7 @@ func (v *viewer) draw_heading(da *gtk.DrawingArea, cr *cairo.Context) {
 	if n := ev.Name(); len(n) > 0 {
 		l[0].s = n + ": "
 	}
-	l[0].s += fmt.Sprintf("%d events", len(ev.Events))
+	l[0].s += fmt.Sprintf("%d events", ev.NumEvents())
 	l[1].s = tb.Start.Format("2006-01-02 15:04:05:000000")
 	bbox := c.text_box(l[:])
 	c.text(r2.XY(w.X()/2, w.Y()-bbox.Y()/2), text_align_center, l[:]...)
@@ -611,7 +612,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		if n := ev.Name(); len(n) > 0 {
 			l[0].s = n + ": "
 		}
-		l[0].s += fmt.Sprintf("%d events", len(ev.Events))
+		l[0].s += fmt.Sprintf("%d events", ev.NumEvents())
 		l[1].s = tb.Start.Format("2006-01-02 15:04:05:000000")
 		c.text(x, text_align_center, l[:]...)
 		cr.Stroke()
@@ -623,9 +624,9 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 
 	// Draw events.
 	var x_last elib.Float64Vec
-	for i := range ev.Events {
-		e := &ev.Events[i]
-		t := ev.ElapsedTime(e)
+	for ei := uint(0); ei < ev.NumEvents(); ei++ {
+		e := ev.Event(ei)
+		t := e.ElapsedTime(ev)
 		var ve visible_event
 
 		x := r2.XY((t-t_min)/(t_max-t_min)*w.X(), w.Y()/2)
@@ -633,13 +634,12 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			continue
 		}
 
-		if _, ok := v.hidden_callers[e.GetCaller()]; ok {
+		if _, ok := v.hidden_callers[e.CallerIndex()]; ok {
 			continue
 		}
 
-		lines := e.Strings(ev.GetContext())
-		ci := ev.EventCaller(e)
-		d, _ := v.decorationForCaller(ci)
+		lines := ev.EventLines(ei)
+		d, _ := v.decorationForEvent(ei)
 
 		center := dw + x
 		radius := 4.
@@ -685,7 +685,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 			y_level++
 		}
 
-		ve.ei = uint(i)
+		ve.ei = ei
 		if y_visible {
 			upper_left := ve.rr.Center - ve.rr.Size/2
 			bg := d.bg.lighten(.5)
@@ -736,8 +736,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	for i := range v.ves {
 		ve := &v.ves[i]
 		if v.is_selected(ve.ei) {
-			e := &ev.Events[ve.ei]
-			v.draw_selected_event(cr, e, ve)
+			v.draw_selected_event(cr, ve.ei, ve)
 		}
 	}
 
@@ -781,10 +780,10 @@ type filter struct {
 	re           *regexp.Regexp
 }
 
-func (f *filter) matchEvent(e *elog.Event) (ok bool) {
+func (f *filter) matchEvent(ei uint) (ok bool) {
 	ev := f.m.v.ev
-	ec := ev.EventCaller(e)
-	lines := e.Strings(ev.GetContext())
+	ec := ev.EventCaller(ei)
+	lines := ev.EventLines(ei)
 	if ok = f.re.MatchString(lines[0]); ok {
 		return
 	}
@@ -795,9 +794,8 @@ func (f *filter) matchEvent(e *elog.Event) (ok bool) {
 }
 func (f *filter) nMatching() (n uint) {
 	v := f.m.v
-	for i := range v.ev.Events {
-		e := &v.ev.Events[i]
-		if f.matchEvent(e) {
+	for i := uint(0); i < v.ev.NumEvents(); i++ {
+		if f.matchEvent(i) {
 			n++
 		}
 	}
