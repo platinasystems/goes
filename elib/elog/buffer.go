@@ -127,14 +127,14 @@ func (t *stringTable) init(s string) {
 func (dst *stringTable) copyFrom(src *stringTable) { dst.init(string(src.t)) }
 
 type sharedHeader struct {
-	// Timestamp when log was created.
+	// CPU timestamp when log was created.
 	cpuStartTime uint64
+
+	// CPU timer tick in nanosecond units.
+	cpuTimeUnitNsec float64
 
 	// Starting time of view.
 	StartTime time.Time
-
-	// Timer tick in nanosecond units.
-	timeUnitNsec float64
 }
 
 // Shared between Buffer and View.
@@ -197,7 +197,7 @@ type Buffer struct {
 func (b *Buffer) Enable(v bool) {
 	{
 		cyclesPerSec := cpu.TimeInit()
-		b.timeUnitNsec = 1e9 / cyclesPerSec
+		b.cpuTimeUnitNsec = 1e9 / cyclesPerSec
 	}
 	b.lockIndex(true)
 	b.index &= lockBit
@@ -548,32 +548,32 @@ func New(log2Len uint) (b *Buffer) {
 func (b *Buffer) Resize(n uint) { b.clear(n) }
 func Resize(n uint)             { DefaultBuffer.Resize(n) }
 
-// Time event happened in seconds relative to start of log.
+// Time event happened in seconds relative to start of buffer.
 func (e *eventHeader) elapsedTime(s *shared) float64 {
-	return 1e-9 * float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsec
+	return 1e-9 * float64(e.timestamp-s.cpuStartTime) * s.cpuTimeUnitNsec
 }
 
 // Time elapsed from start of buffer.
 func (s *shared) elapsedTime(e *eventHeader) float64 { return e.elapsedTime(s) }
 
 // Go time.Time that event happened.
-func (e *eventHeader) time(s *shared) time.Time {
-	nsec := float64(e.timestamp-s.cpuStartTime) * s.timeUnitNsec
+func (e *eventHeader) goTime(s *shared) time.Time {
+	nsec := float64(e.timestamp-s.cpuStartTime) * s.cpuTimeUnitNsec
 	return s.StartTime.Add(time.Duration(nsec))
 }
 
-func (s *shared) unixNano(e *eventHeader) float64 { return float64(e.time(s).UnixNano()) * 1e-9 }
+func (s *shared) unixNano(e *eventHeader) float64 { return float64(e.goTime(s).UnixNano()) * 1e-9 }
 func (s *shared) absTime(e *eventHeader) float64  { return s.unixNano(e) }
 
-func (v *View) time(e *eventHeader) time.Time  { return e.time(&v.shared) }
-func (v *View) absTime(e *eventHeader) float64 { return v.shared.unixNano(e) }
+func (v *View) goTime(e *eventHeader) time.Time { return e.goTime(&v.shared) }
+func (v *View) absTime(e *eventHeader) float64  { return v.shared.unixNano(e) }
 
-// Elapsed time since view start time.  (As computed in roundViewTimes.)
+// Elapsed time since view start time.
 func (v *View) ElapsedTime(e *eventHeader) float64 {
-	return e.time(&v.shared).Sub(v.Times.Start).Seconds()
+	return e.goTime(&v.shared).Sub(v.Times.StartTime).Seconds()
 }
 func (e *eventHeader) ElapsedTime(v *View) float64 {
-	return e.time(&v.shared).Sub(v.Times.Start).Seconds()
+	return e.goTime(&v.shared).Sub(v.Times.StartTime).Seconds()
 }
 
 type CallerInfo struct {
@@ -682,7 +682,7 @@ func (e *bufferEvent) string(l *Log) string {
 	return strings.Join(s, "\n")
 }
 func (e *eventHeader) timeString(s *shared) string {
-	return e.time(s).Format("2006-01-02 15:04:05.000000000")
+	return e.goTime(s).Format("2006-01-02 15:04:05.000000000")
 }
 func (e *bufferEvent) eventString(l *Log) (s string) {
 	s = fmt.Sprintf("%s: %s", e.timeString(l.s), e.string(l))

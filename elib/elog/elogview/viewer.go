@@ -259,7 +259,7 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 	t := &v.ev.Times
 
 	subview := false
-	t_min, t_max := t.Min, t.Max
+	t_min, t_max := t.MinElapsed, t.MaxElapsed
 	switch key {
 	case gdk.KEY_Escape:
 		for ci, _ := range v.hidden_callers {
@@ -317,6 +317,7 @@ func (v *viewer) key_press(eb *gtk.EventBox, ev *gdk.Event) {
 		v.ev.SubView(t_min, t_max)
 	}
 	v.eb.QueueDraw()
+	v.heading_da.QueueDraw()
 }
 
 type pointer_state struct {
@@ -374,9 +375,10 @@ func (v *viewer) do_pointer(val uint) {
 		t0, t1 := v.x_to_time(p.xs[0].X()), v.x_to_time(p.xs[l-1].X())
 		save := v.ev.Times
 		if n := v.ev.SubView(t0, t1); n == 0 {
-			v.ev.SubView(save.Min, save.Max)
+			v.ev.SubView(save.MinElapsed, save.MaxElapsed)
 		}
 		v.eb.QueueDraw()
+		v.heading_da.QueueDraw()
 	}
 }
 
@@ -531,14 +533,14 @@ func (v *viewer) time_to_x(t float64) (x float64) {
 	dw := v.eb_border
 	w := v.eb_dx - 2*dw
 	tb := &v.ev.Times
-	x = dw.X() + (t-tb.Min)*w.X()/tb.Dt
+	x = dw.X() + (t-tb.MinElapsed)*w.X()/tb.Dt
 	return
 }
 func (v *viewer) x_to_time(x float64) (t float64) {
 	dw := v.eb_border
 	w := v.eb_dx - 2*dw
 	tb := &v.ev.Times
-	t = tb.Min + (x-dw.X())*tb.Dt/w.X()
+	t = tb.MinElapsed + (x-dw.X())*tb.Dt/w.X()
 	return
 }
 
@@ -564,7 +566,7 @@ func (c *ctx) time_axis(v *viewer, t float64, dx r2.V, text_align int, bg rgb, l
 
 func (v *viewer) draw_heading(da *gtk.DrawingArea, cr *cairo.Context) {
 	c := (*ctx)(cr)
-	ev, tb := v.ev, &v.ev.Times
+	ev := v.ev
 	w := r2.IJ(da.GetAllocatedWidth(), da.GetAllocatedHeight())
 
 	cr.SelectFontFace("Mono", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
@@ -575,7 +577,16 @@ func (v *viewer) draw_heading(da *gtk.DrawingArea, cr *cairo.Context) {
 		l[0].s = n + ": "
 	}
 	l[0].s += fmt.Sprintf("%d events", ev.NumEvents())
-	l[1].s = tb.Start.Format("2006-01-02 15:04:05:000000")
+	tf := "2006-01-02 15:04:05"
+	switch {
+	case ev.Times.Unit < 1e-6:
+		tf += ".000000000"
+	case ev.Times.Unit < 1e-3:
+		tf += ".000000"
+	case ev.Times.Unit < 1e0:
+		tf += ".000"
+	}
+	l[1].s = ev.Times.StartTime.Format(tf)
 	bbox := c.text_box(l[:])
 	c.text(r2.XY(w.X()/2, w.Y()-bbox.Y()/2), text_align_center, l[:]...)
 	cr.Stroke()
@@ -588,7 +599,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	dw := v.eb_border
 	w := v.eb_dx - 2*dw
 
-	t_min, t_max := tb.Min, tb.Max
+	t_min, t_max := tb.MinElapsed, tb.MaxElapsed
 
 	c := (*ctx)(cr)
 	cr.SelectFontFace("Mono", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
@@ -602,21 +613,6 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 	axis_dx := r2.XY(0, -10)
 	c.time_axis(v, t_min, axis_dx, text_align_center, bg_color, draw_axis_line, "%.0f%s", t_min/tb.Unit, tb.UnitName)
 	c.time_axis(v, t_max, axis_dx, text_align_center, bg_color, draw_axis_line, "%.0f%s", t_max/tb.Unit, tb.UnitName)
-
-	// Title
-	if false {
-		cr.SetSourceRGB(0, 0, 0)
-		x := r2.XY(w.X()/2, dw.Y()/2)
-		cr.SetFontSize(18)
-		var l [2]text_line
-		if n := ev.Name(); len(n) > 0 {
-			l[0].s = n + ": "
-		}
-		l[0].s += fmt.Sprintf("%d events", ev.NumEvents())
-		l[1].s = tb.Start.Format("2006-01-02 15:04:05:000000")
-		c.text(x, text_align_center, l[:]...)
-		cr.Stroke()
-	}
 
 	if v.ves != nil {
 		v.ves = v.ves[:0]
@@ -809,6 +805,7 @@ func (f *filter) check_button_clicked(b *gtk.CheckButton, e *gdk.Event) {
 		delete(f.m.filter_by_name, f.name)
 		f.m.hbox.ShowAll()
 		f.m.v.eb.QueueDraw()
+		f.m.v.heading_da.QueueDraw()
 		return
 	}
 }
