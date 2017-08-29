@@ -235,14 +235,14 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		l.eventPoolLock.Lock()
 		l.eventPool.AdvanceAdd(l.now, &l.eventVec)
 		l.eventPoolLock.Unlock()
-		didEvent = true
-		for i := range l.eventVec {
-			l.eventVec[i].EventAction()
+		if didEvent = len(l.eventVec) > 0; didEvent {
+			for i := range l.eventVec {
+				l.eventVec[i].EventAction()
+			}
+			elog.F2u("timed events %d expired, %d left",
+				uint64(len(l.eventVec)), uint64(l.eventPool.Elts()))
+			l.eventVec = l.eventVec[:0]
 		}
-		elog.F2u("timed events %d expired, %d left",
-			uint64(len(l.eventVec)), uint64(l.eventPool.Elts()))
-
-		l.eventVec = l.eventVec[:0]
 	}
 
 	// Wait for all event handlers to become inactive.
