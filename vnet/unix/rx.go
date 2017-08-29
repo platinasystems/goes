@@ -278,7 +278,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
 	}
 	if n_packets > 0 {
-		elog.FUint("unix-rx ready %d", uint64(n_packets))
+		elog.F1u("unix-rx ready %d", uint64(n_packets))
 		rx.rv_input <- rv
 		rx.active_lock.Lock()
 		rx.Activate(atomic.AddInt32(&rx.active_count, int32(n_packets)) > 0)
@@ -349,7 +349,7 @@ loop:
 			break loop
 		}
 	}
-	elog.FUint("unix-rx input %d", uint64(n_done))
+	elog.F1u("unix-rx input %d", uint64(n_done))
 	rx.active_lock.Lock()
 	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_done)) > 0)
 	rx.active_lock.Unlock()
