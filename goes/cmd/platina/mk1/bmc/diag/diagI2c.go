@@ -114,6 +114,7 @@ func diagI2c() error {
 	result, _ = diagI2cPing(0x01, 0x51, 0x00, 1)
 	r = CheckPassB(result, false)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "cpu_to_fru_i2c_en_off", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "disable host bus, ping host eeprom")
+	time.Sleep(100 * time.Millisecond)
 	/* diagTest: i2c power cycle
 	disable i2c power and check that i2c devices cannot be accessed
 	enable i2c power and check that i2c devices can be accessed
@@ -121,14 +122,17 @@ func diagI2c() error {
 	gpioSet("P3V3_I2C_EN", false)
 	gpioSet("CPU_TO_MAIN_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
-	result, _ = diagI2cPing(0x00, 0x74, 0x00, 1)
-	r = CheckPassB(result, false)
-	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "p3v3_i2c_en_off", "-", result, i2cping_noresponse_min, i2cping_noresponse_max, r, "disable i2c power, ping main_mux0")
+	result_s, _ := diagI2cPing(0x00, 0x74, 0x00, 1)
+	r_s := CheckPassB(result, false)
+	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "p3v3_i2c_en_off", "-", result_s, i2cping_noresponse_min, i2cping_noresponse_max, r_s, "disable i2c power, ping main_mux0")
 
 	gpioSet("P3V3_I2C_EN", true)
 	time.Sleep(50 * time.Millisecond)
 	result, _ = diagI2cPing(0x00, 0x74, 0x00, 1)
 	r = CheckPassB(result, true)
+	diagI2cWriteOffsetByte(0x00, 0x74, 0x06, 0xdf)
+	time.Sleep(50 * time.Millisecond)
+	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "p3v3_i2c_en_off", "-", result_s, i2cping_noresponse_min, i2cping_noresponse_max, r_s, "disable i2c power, ping main_mux0")
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "p3v3_i2c_en_on", "-", result, i2cping_response_min, i2cping_response_max, r, "enable i2c power, ping main_mux0")
 	gpioSet("CPU_TO_MAIN_I2C_EN", false)
 

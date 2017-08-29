@@ -233,6 +233,32 @@ func diagProm() error {
 				}
 				i += 2 + tlen
 			}
+		case "fdpn":
+			//overwrite part number field
+			_, rawData := d.DumpProm()
+			for i := uint(0 + 11); i < uint(len(rawData)); {
+				tlv, tlen := rawData[i], uint(rawData[i+1])
+				w := rawData[i+2 : i+2+tlen]
+				if tlv == 0xfd {
+					for x := uint(4); x < uint(len(w)); {
+						wtlv, wtlen := w[x], uint(w[x+1])
+						if wtlv == 0x53 && wtlen == 0xe {
+							if uint(len(v)) == wtlen {
+								for y := uint(0); y < wtlen; y++ {
+									w[x+2+y] = v[y]
+								}
+							}
+							break
+						}
+						x += 2 + wtlen
+					}
+					d.DeleteField("fd")
+					d.WriteField("fd", w)
+					fmt.Printf("changed vendor extension device part number\n")
+					break
+				}
+				i += 2 + tlen
+			}
 		default:
 			//write any field with value
 			fmt.Printf("%s\n", d.WriteField(c, vByte))
