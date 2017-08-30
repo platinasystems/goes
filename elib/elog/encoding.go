@@ -124,7 +124,7 @@ short:
 	return
 }
 
-func encodeString(s string, b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
+func encodeString(b0 elib.ByteVec, i0 int, s string) (b elib.ByteVec, i int) {
 	b, i = b0, i0
 	l := len(s)
 	b.Validate(uint(i + binary.MaxVarintLen64 + l))
@@ -167,8 +167,8 @@ func (c *CallerInfo) encode(b0 elib.ByteVec, i0 int) (b elib.ByteVec, i int) {
 	i += binary.PutUvarint(b[i:], uint64(c.PC))
 	i += binary.PutUvarint(b[i:], uint64(c.Entry))
 	i += binary.PutUvarint(b[i:], uint64(c.Line))
-	b, i = encodeString(c.Name, b, i)
-	b, i = encodeString(c.File, b, i)
+	b, i = encodeString(b, i, c.Name)
+	b, i = encodeString(b, i, c.File)
 	return
 }
 
@@ -251,7 +251,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	}
 
 	// String table.
-	b, i = encodeString(string(v.stringTable.t), b, i)
+	b, i = encodeString(b, i, string(v.stringTable.t))
 
 	// Events.
 	b.Validate(uint(i + binary.MaxVarintLen64))
@@ -263,7 +263,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	}
 
 	// Event formats and arguments.
-	b, i = encodeString(string(v.viewEvents.b), b, i)
+	b, i = encodeString(b, i, string(v.viewEvents.b))
 
 	return b[:i], nil
 }

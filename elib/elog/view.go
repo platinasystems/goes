@@ -29,20 +29,43 @@ type View struct {
 
 func (v *View) SetName(name string) { v.name = name }
 func (v *View) Name() string        { return v.name }
-func (v *View) NumEvents() (l uint) {
-	if v.currentBufferEvents != nil {
-		l = uint(len(v.currentBufferEvents))
+
+func (v *View) numEvents(all bool) (l uint) {
+	if v.allBufferEvents != nil {
+		es := v.currentBufferEvents
+		if all {
+			es = v.allBufferEvents
+		}
+		l = uint(len(es))
 	} else {
-		l = uint(len(v.currentViewEvents))
+		es := v.currentViewEvents
+		if all {
+			es = v.allViewEvents
+		}
+		l = uint(len(es))
 	}
 	return
 }
-func (v *View) Event(i uint) (h *eventHeader) {
-	if v.currentBufferEvents != nil {
-		return &v.currentBufferEvents[i].eventHeader
+
+func (v *View) getEvent(i uint, all bool) (h *eventHeader) {
+	if v.allBufferEvents != nil {
+		es := v.currentBufferEvents
+		if all {
+			es = v.allBufferEvents
+		}
+		return &es[i].eventHeader
+	} else {
+		es := v.currentViewEvents
+		if all {
+			es = v.allViewEvents
+		}
+		return &es[i].eventHeader
 	}
-	return &v.currentViewEvents[i].eventHeader
 }
+
+func (v *View) NumEvents() uint           { return v.numEvents(false) }
+func (v *View) Event(i uint) *eventHeader { return v.getEvent(i, false) }
+
 func (v *View) EventLines(i uint) (s []string) {
 	l := &Log{s: &v.shared}
 	if v.currentBufferEvents != nil {
@@ -89,26 +112,33 @@ func (b *Buffer) NewView() (v *View) {
 
 func NewView() *View { return DefaultBuffer.NewView() }
 
+func (v *View) getAllEvent(i uint) (h *eventHeader) {
+	if v.allBufferEvents != nil {
+		return &v.allBufferEvents[i].eventHeader
+	}
+	return &v.allViewEvents[i].eventHeader
+}
+
 // Make subview with only events between elapsed times t0 and t1.
 func (v *View) SubView(t0, t1 float64) (n uint) {
-	l := int(v.NumEvents())
+	l := int(v.numEvents(true))
 	if t0 > t1 {
 		t0, t1 = t1, t0
 	}
 	i0 := sort.Search(l, func(i int) bool {
-		e := v.Event(uint(i))
+		e := v.getEvent(uint(i), true)
 		et := e.ElapsedTime(v)
 		return et >= t0
 	})
 	i1 := sort.Search(l, func(i int) bool {
-		e := v.Event(uint(i))
+		e := v.getEvent(uint(i), true)
 		et := e.ElapsedTime(v)
 		return et > t1
 	})
 	if v.allBufferEvents != nil {
-		v.currentBufferEvents = v.currentBufferEvents[i0:i1]
+		v.currentBufferEvents = v.allBufferEvents[i0:i1]
 	} else {
-		v.currentViewEvents = v.currentViewEvents[i0:i1]
+		v.currentViewEvents = v.allViewEvents[i0:i1]
 	}
 	v.doViewTimes(t0, t1)
 	return v.NumEvents()
@@ -193,12 +223,15 @@ func (v *View) doViewTimes(t0, t1 float64) {
 	t0 = timeUnit * math.Floor(t0/timeUnit)
 	t1 = timeUnit * math.Ceil(t1/timeUnit)
 
-	if u := t0 / timeUnit; u > maxUnit {
-		dt := timeUnit * maxUnit * math.Floor(u/maxUnit)
-		t0 -= dt
-		t1 -= dt
-		t.StartTime = t.StartTime.Add(time.Duration(1e9 * dt))
+	startTimeUnit := maxUnit * timeUnit
+	if timeUnit >= 1 {
+		startTimeUnit = 1
 	}
+	nt := t.StartTime.Add(time.Duration(t0 * 1e9)).Truncate(time.Duration(startTimeUnit * 1e9))
+	dt := nt.Sub(t.StartTime).Seconds()
+	t.StartTime = nt
+	t0 -= dt
+	t1 -= dt
 
 	t.MinElapsed = t0
 	t.MaxElapsed = t1
