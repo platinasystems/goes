@@ -166,10 +166,12 @@ func fmtEncode(s *shared, b *elib.ByteVec, i0 uint, doArgs bool, e *fmtEvent, r 
 }
 
 func (e *fmtEvent) encode(s *shared, doArgs bool, r StringRef, format string, args []interface{}) (f StringRef, i uint) {
-	if s.b != nil {
-		s.b = s.b[:0]
+	s.fmtMu.Lock()
+	defer s.fmtMu.Unlock()
+	if s.fmtBuffer != nil {
+		s.fmtBuffer = s.fmtBuffer[:0]
 	}
-	return fmtEncode(s, &s.b, 0, doArgs, e, r, format, args)
+	return fmtEncode(s, &s.fmtBuffer, 0, doArgs, e, r, format, args)
 }
 
 func (s *shared) decodeArg(b []byte, i0 int) (a interface{}, kind byte, i int) {

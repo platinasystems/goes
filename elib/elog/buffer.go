@@ -140,9 +140,12 @@ type sharedHeader struct {
 // Shared between Buffer and View.
 type shared struct {
 	sharedHeader
-	stringTable
 	eventFilterShared
-	b elib.ByteVec
+	stringTable
+	// Protects fmtBuffer and string table.
+	fmtMu sync.Mutex
+	// Saved buffer for formatting.
+	fmtBuffer elib.ByteVec
 }
 
 const lockBit = 1 << 63
