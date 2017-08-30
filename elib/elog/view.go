@@ -344,11 +344,15 @@ func (v *viewEvents) viewEventLines(l *Log, ei uint) []string {
 	return l.l
 }
 
-func (v *viewEvents) addBufferEvent(l *Log, e *bufferEvent) {
+func (v *viewEvents) convertBufferEvent(l *Log, e *bufferEvent) {
 	lo := v.b.Len()
 	i := lo
 	l.f = func(format string, args ...interface{}) {
+		i0 := i
 		_, i = fmtEncode(l.s, &v.b, i, true, nil, StringRefNil, format, args)
+		if elib.Debug {
+			fmtDecode(l.s, v.b[i0:])
+		}
 	}
 	r := l.s.callers[e.callerIndex]
 	e.format(r, l)
@@ -362,7 +366,7 @@ func (v *viewEvents) addBufferEvent(l *Log, e *bufferEvent) {
 func (v *View) convertBufferEvents() {
 	l := &Log{s: &v.shared}
 	for i := range v.allBufferEvents {
-		v.addBufferEvent(l, &v.allBufferEvents[i])
+		v.convertBufferEvent(l, &v.allBufferEvents[i])
 	}
 	v.allBufferEvents = nil
 	v.currentBufferEvents = nil
