@@ -261,15 +261,23 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 
 	nn.name = nextName
 
+	// Add next for all currently active nodes.
 	if xr != nil {
 		nn.nodeIndex = x.index
 		nn.in = xi.MakeLoopIn()
 		for i := range l.activePollerPool.entries {
-			if !l.activePollerPool.IsFree(uint(i)) {
-				if p := l.activePollerPool.entries[i]; p != nil {
-					p.activeNodes[n.index].addNext(p, nn, withIndex)
-				}
+			if l.activePollerPool.IsFree(uint(i)) {
+				continue
 			}
+			p := l.activePollerPool.entries[i]
+			if p == nil {
+				continue
+			}
+			if n.index >= uint(len(p.activeNodes)) {
+				continue
+			}
+			an := &p.activeNodes[n.index]
+			an.addNext(p, nn, withIndex)
 		}
 	}
 	return
