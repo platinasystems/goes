@@ -266,8 +266,8 @@ func (g *Goes) Main(args ...string) error {
 	v, found := g.byname[args[0]]
 	if !found {
 		if v, found = g.byname[""]; !found {
-			return fmt.Errorf("%v: ambiguous or missing command",
-				args)
+			return fmt.Errorf("%s: ambiguous or missing command",
+				args[0])
 		}
 		// e.g. ip -s add [default "show"]
 		args = append([]string{""}, args...)
