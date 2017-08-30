@@ -59,6 +59,10 @@ type Goes struct {
 	Path   []string
 }
 
+type akaer interface {
+	Aka() string
+}
+
 type completer interface {
 	Complete(...string) []string
 }
@@ -288,7 +292,13 @@ func (g *Goes) Main(args ...string) error {
 		err = nil
 	}
 	if err != nil && !k.IsDaemon() {
-		err = fmt.Errorf("%s: %v", args[0], err)
+		name := args[0]
+		if len(name) == 0 {
+			if method, found := v.(akaer); found {
+				name = fmt.Sprint("(", method.Aka(), ")")
+			}
+		}
+		err = fmt.Errorf("%s: %v", name, err)
 	}
 	return err
 }

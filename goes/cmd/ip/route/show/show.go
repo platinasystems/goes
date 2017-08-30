@@ -65,6 +65,8 @@ type Command string
 
 type show options.Options
 
+func (Command) Aka() string { return "show" }
+
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
 	if c == "show" {

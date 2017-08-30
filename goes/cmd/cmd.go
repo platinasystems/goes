@@ -56,9 +56,10 @@ type Cmd interface {
 	String() string
 	Usage() string
 	/* Optional
+	Aka() string
 	Close() error
 	Complete(...string) []string
-	Goese(*goes.Goes)
+	Goes(*goes.Goes)
 	Help(...string) string
 	Kind() Kind
 	Man() lang.Alt
