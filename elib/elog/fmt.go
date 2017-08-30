@@ -71,6 +71,7 @@ func encodeBool(b *elib.ByteVec, i0 uint, v bool) (i uint) {
 }
 
 func encodeStr(b *elib.ByteVec, i0 uint, v string) (i uint) {
+	i = i0
 	l := uint(len(v))
 	b.Validate(i + 2 + l)
 	(*b)[i] = fmtString
@@ -212,27 +213,31 @@ func (s *shared) decodeArg(b []byte, i0 int) (a interface{}, kind byte, i int) {
 	return
 }
 
-func (e *fmtEvent) decode(l *Log) (format string, args []interface{}) {
-	b := e.b[:]
-	i := 0
-
+func fmtDecode(s *shared, b []byte) (i int, format string, args []interface{}) {
+	// Decode format.
 	{
 		x, n := binary.Uvarint(b[i:])
 		i += n
-		format = l.s.GetString(StringRef(x))
+		format = s.GetString(StringRef(x))
 	}
 
+	// Decode arguments.
 	for {
 		var (
 			a    interface{}
 			kind byte
 		)
-		if a, kind, i = l.s.decodeArg(b, i); kind == fmtEnd {
+		if a, kind, i = s.decodeArg(b, i); kind == fmtEnd {
 			break
 		} else {
 			args = append(args, a)
 		}
 	}
+	return
+}
+
+func (e *fmtEvent) decode(l *Log) (format string, args []interface{}) {
+	_, format, args = fmtDecode(l.s, e.b[:])
 	return
 }
 
