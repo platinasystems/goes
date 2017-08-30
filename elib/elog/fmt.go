@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 )
 
@@ -58,23 +59,34 @@ func encodeUint(b *elib.ByteVec, i0 uint, v uint64, kind int) (i uint) {
 	return
 }
 
+func encodeBool(b *elib.ByteVec, i0 uint, v bool) (i uint) {
+	i = i0
+	b.Validate(i + 1)
+	(*b)[i] = fmtBoolFalse
+	if v {
+		(*b)[i] = fmtBoolTrue
+	}
+	i++
+	return
+}
+
+func encodeStr(b *elib.ByteVec, i0 uint, v string) (i uint) {
+	l := uint(len(v))
+	b.Validate(i + 2 + l)
+	(*b)[i] = fmtString
+	(*b)[i+1] = byte(l)
+	copy((*b)[i+2:], v)
+	i += 2 + l
+	return
+}
+
 func (s *shared) encodeArg(b *elib.ByteVec, i0 uint, a interface{}) (i uint) {
 	i = i0
 	switch v := a.(type) {
 	case bool:
-		b.Validate(i + 1)
-		(*b)[i] = fmtBoolFalse
-		if v {
-			(*b)[i] = fmtBoolTrue
-		}
-		i++
+		i = encodeBool(b, i, v)
 	case string:
-		l := uint(len(v))
-		b.Validate(i + 2 + l)
-		(*b)[i] = fmtString
-		(*b)[i+1] = byte(l)
-		copy((*b)[i+2:], v)
-		i += 2 + l
+		i = encodeStr(b, i, v)
 	case StringRef:
 		i = encodeUint(b, i, uint64(v), fmtStringRef)
 	case int8:
@@ -106,7 +118,19 @@ func (s *shared) encodeArg(b *elib.ByteVec, i0 uint, a interface{}) (i uint) {
 		if r, ok := a.(fmt.Stringer); ok {
 			i = encodeUint(b, i, uint64(s.SetString(r.String())), fmtStringRef)
 		} else {
-			panic(fmt.Errorf("elog fmtEvent encode value with unknown type: %v", a))
+			val := reflect.ValueOf(a)
+			switch val.Kind() {
+			case reflect.Bool:
+				i = encodeBool(b, i, val.Bool())
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				i = encodeInt(b, i, val.Int())
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+				i = encodeUint(b, i, val.Uint(), fmtUint)
+			case reflect.String:
+				i = encodeStr(b, i, val.String())
+			default:
+				panic(fmt.Errorf("elog fmtEvent encode value with unknown type: %v", val.Type()))
+			}
 		}
 	}
 	return
