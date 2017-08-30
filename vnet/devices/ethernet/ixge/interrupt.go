@@ -97,9 +97,19 @@ func (d *dev) link_state_change() {
 	})
 }
 
+type irq_event struct {
+	name elog.StringRef
+	irq  interrupt
+}
+
+func (e *irq_event) Elog(l *elog.Log) { l.Logf("%s irq %s", e.name, e.irq) }
+
 func (d *dev) interrupt_dispatch(i uint) {
 	irq := interrupt(i)
-	elog.F("%s irq %s", d.elog_name, irq)
+	if elog.Enabled() {
+		e := irq_event{name: d.elog_name, irq: irq}
+		elog.Add(&e)
+	}
 	switch {
 	case irq < irq_n_queue:
 		d.foreach_queue_for_interrupt(vnet.Rx, irq, d.rx_queue_interrupt)
