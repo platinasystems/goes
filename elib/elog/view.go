@@ -345,6 +345,9 @@ func (v *viewEvents) viewEventLines(l *Log, ei uint) []string {
 }
 
 func (v *viewEvents) convertBufferEvent(l *Log, e *bufferEvent) {
+	// Grab string table lock since encode may add to string table.
+	l.s.fmtMu.Lock()
+	defer l.s.fmtMu.Unlock()
 	lo := v.b.Len()
 	i := lo
 	l.f = func(format string, args ...interface{}) {
