@@ -166,6 +166,10 @@ func (a *activeNode) analyze(l *Loop, ap *activePoller) (err error) {
 func ithLooperIn(as reflect.Value, i int) LooperIn { return as.Index(i).Addr().Interface().(LooperIn) }
 
 func (a *activeNode) addNext(ap *activePoller, nn *nextNode, withIndex uint) {
+	// May be nil before initNodes has been called.
+	if a.out == nil {
+		return
+	}
 	i := nn.in
 	in := i.GetIn()
 	in.activeIndex = ap.index
@@ -261,9 +265,10 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 		nn.nodeIndex = x.index
 		nn.in = xi.MakeLoopIn()
 		for i := range l.activePollerPool.entries {
-			p := l.activePollerPool.entries[i]
-			if p != nil {
-				p.activeNodes[n.index].addNext(p, nn, withIndex)
+			if !l.activePollerPool.IsFree(uint(i)) {
+				if p := l.activePollerPool.entries[i]; p != nil {
+					p.activeNodes[n.index].addNext(p, nn, withIndex)
+				}
 			}
 		}
 	}
