@@ -40,7 +40,7 @@ const IFAL_MAX = N_IFAL - 1
 type Ifal [N_IFAL][]byte
 
 func (ifal *Ifal) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofIfAddrLblMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofIfAddrLblMsg)
 	if i >= len(b) {
 		IndexAttrByType(ifal[:], Empty)
 		return 0, nil

@@ -48,7 +48,9 @@ func New(args []string, parms ...interface{}) (*Parms, []string) {
 		ByName:  make(ByName),
 		aliases: make(Aliases),
 	}
-	args = p.More(args, parms...)
+	if len(parms) > 0 {
+		args = p.More(args, parms...)
+	}
 	return p, args
 }
 

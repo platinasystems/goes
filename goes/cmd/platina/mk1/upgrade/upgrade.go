@@ -9,20 +9,11 @@ package upgrade
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
-	"os"
-	"os/exec"
-	"regexp"
-	"strings"
-	"syscall"
 
-	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/url"
 )
 
 const (
@@ -62,10 +53,7 @@ OPTIONS
 	DfltSrv = "downloads.platinasystems.com"
 	DfltVer = "LATEST"
 	Machine = "platina-mk1"
-	Suffix  = ".zip"
-)
 
-const (
 	//names of server files
 	GoesName      = "goes-platina-mk1"
 	GoesInstaller = "goes-platina-mk1-installer"
@@ -97,6 +85,7 @@ func (cmd) Main(args ...string) error {
 	if len(parm.ByName["-s"]) == 0 {
 		parm.ByName["-s"] = DfltSrv
 	}
+
 	if flag.ByName["-a"] {
 		flag.ByName["-g"] = true
 		flag.ByName["-k"] = true
@@ -107,6 +96,7 @@ func (cmd) Main(args ...string) error {
 		flag.ByName["-k"] == false && flag.ByName["-c"] == false {
 		flag.ByName["-g"] = true
 	}
+
 	if flag.ByName["-l"] {
 		if err := showList(parm.ByName["-s"], parm.ByName["-v"],
 			flag.ByName["-t"]); err != nil {
@@ -141,17 +131,13 @@ var (
 		lang.EnUS: Man,
 	}
 )
-
-var reboot_flag bool = false
+var Install_flag bool = false
+var Reboot_flag bool = false
 
 func showList(s string, v string, t bool) error {
 	fn := "LIST"
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	if _, err := getFile(urls, fn); err != nil {
+	_, err := getFile(s, v, t, fn)
+	if err != nil {
 		return err
 	}
 	l, err := ioutil.ReadFile(fn)
@@ -163,38 +149,28 @@ func showList(s string, v string, t bool) error {
 }
 
 func reportVersions(s string, v string, t bool) error {
-	g := curGoesVer()
-	k, err := curKernelVer()
+	g := GoesVer()
+	k, err := KernelVer()
 	if err != nil {
 		return err
 	}
-	c, err := curCorebootVer()
+	c, err := CorebootVer()
 	if err != nil {
 		return err
 	}
-	gr, err := srvGoesVer(s, v, t)
+	sg, err := srvGoesVer(s, v, t)
 	if err != nil {
 		return err
 	}
-	kr, _, err := srvKernelVer(s, v, t)
+	sk, _, err := srvKernelVer(s, v, t)
 	if err != nil {
 		return err
 	}
-	cr, err := srvCorebootVer(s, v, t)
+	sc, err := srvCorebootVer(s, v, t)
 	if err != nil {
 		return err
 	}
-	fmt.Print("\n")
-	fmt.Print("Currently running:\n")
-	fmt.Printf("    Goes version    : %s\n", g)
-	fmt.Printf("    Kernel version  : %s\n", k)
-	fmt.Printf("    Coreboot version: %s\n", c)
-	fmt.Print("\n")
-	fmt.Print("Version on server:\n")
-	fmt.Printf("    Goes version    : %s\n", gr)
-	fmt.Printf("    Kernel version  : %s\n", kr)
-	fmt.Printf("    Coreboot version: %s\n", cr)
-	fmt.Print("\n")
+	prVer(g, k, c, sg, sk, sc)
 	return nil
 }
 
@@ -216,211 +192,17 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 			return err
 		}
 	}
-	if reboot_flag {
-		reboot()
-	}
-	return nil
-}
-
-func upgradeGoes(s string, v string, t bool, f bool) error {
-	fmt.Printf("Update Goes\n")
-	if !f {
-		g := curGoesVer()
-		gr, err := srvGoesVer(s, v, t)
-		if err != nil {
+	if Reboot_flag {
+		if err := reboot(); err != nil {
 			return err
 		}
-		fmt.Printf("    Goes version currently:  %s\n", g)
-		fmt.Printf("    Goes version on server:  %s\n", gr)
-		if g == gr {
-			fmt.Print("    Versions match, skipping Goes upgrade\n\n")
-			return nil
-		}
-		if len(g) == 0 || len(gr) == 0 {
-			fmt.Print("    No tag found, aborting Goes upgrade\n\n")
-			return nil
-		}
+		return nil
 	}
-
-	fn := GoesInstaller
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
-	if err != nil {
-		return fmt.Errorf("    Error downloading: %v", err)
-	}
-	if n < 1000 {
-		return fmt.Errorf("    Error file too small: %v", err)
-	}
-	//FIXME install goes
-	return nil
-}
-
-func upgradeKernel(s string, v string, t bool, f bool) error {
-	fmt.Printf("Update Kernel\n")
-	if !f {
-		k, err := curKernelVer()
-		if err != nil {
+	if Install_flag {
+		if err := activateGoes(); err != nil {
 			return err
 		}
-		kr, _, err := srvKernelVer(s, v, t)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("    Kernel version currently:  %s\n", k)
-		fmt.Printf("    Kernel version on server:  %s\n", kr)
-		if k == kr {
-			fmt.Print("    Versions match, skipping Kernel upgrade\n\n")
-			return nil
-		}
-	}
-	//FIXME install kernel
-	reboot_flag = true
-	return nil
-}
-
-func upgradeCoreboot(s string, v string, t bool, f bool) error {
-	fmt.Printf("Update Coreboot\n")
-	if !f {
-		c, err := curCorebootVer()
-		if err != nil {
-			return err
-		}
-		cr, err := srvCorebootVer(s, v, t)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("    Coreboot version currently:  %s\n", c)
-		fmt.Printf("    Coreboot version on server:  %s\n", cr)
-		if c == cr {
-			fmt.Print("    Versions match, skipping Coreboot upgrade\n\n")
-		}
-	}
-	//FIXME install coreboot
-	return nil
-}
-
-func getFile(urls string, fn string) (int, error) {
-	r, err := url.Open(urls)
-	if err != nil {
-		return 0, err
-	}
-	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DfltMod)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-	n, err := io.Copy(f, r)
-	if err != nil {
-		return 0, err
-	}
-	syscall.Fsync(int(os.Stdout.Fd()))
-	return int(n), nil
-}
-
-func curGoesVer() (v string) {
-	ar := "tag"
-	maps := []map[string]string{Package}
-	if Packages != nil {
-		maps = append(maps, Packages()...)
-	}
-	for _, m := range maps {
-		if ip, found := m["importpath"]; found {
-			k := strings.TrimLeft(ar, "-")
-			if val, found := m[k]; found {
-				if strings.Contains(ip, "/go") {
-					v = val
-				}
-			}
-		}
-	}
-	return v
-}
-
-func curKernelVer() (string, error) {
-	u, err := exec.Command("uname", "-r").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(u)), nil
-}
-
-func curCorebootVer() (string, error) { //FIXME
-	return "no_tag", nil
-}
-
-func srvGoesVer(s string, v string, t bool) (string, error) {
-	fn := GoesName
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
-	if err != nil {
-		return "", fmt.Errorf("Error downloading: %v", err)
-	}
-	if n < 1000 {
-		return "", fmt.Errorf("Error file too small: %v", err)
-	}
-	x := ""
-	a, err := ioutil.ReadFile(fn)
-	if err != nil {
-		return "", err
-	}
-	as := string(a)
-	ref := regexp.MustCompile("v([0-9])[.]([0-9])-([0-9]+)-g([0-9a-fA-F]+)")
-	x = ref.FindString(as)
-	if len(x) == 0 {
-		ree := regexp.MustCompile("v([0-9])[.]([0-9])")
-		x = ree.FindString(as)
-	}
-	//rmFile(fn) //FIXME cut
-	return x, nil
-}
-
-func srvKernelVer(s string, v string, t bool) (string, string, error) {
-	fn := KernelName
-	rmFile(fn)
-	urls := "http://" + s + "/" + v + "/" + fn
-	if t {
-		urls = "tftp://" + s + "/" + v + "/" + fn
-	}
-	n, err := getFile(urls, fn)
-	if err != nil {
-		return "", "", fmt.Errorf("Error downloading: %v", err)
-	}
-	if n < 10 {
-		return "", "", fmt.Errorf("Error file too small: %v", err)
-	}
-	a, err := ioutil.ReadFile(fn)
-	if err != nil {
-		return "", "", err
-	}
-	u := strings.Split(string(a), "\n")
-	return strings.TrimSpace(u[0]), strings.TrimSpace(u[1]), nil
-}
-
-func srvCorebootVer(s string, v string, t bool) (string, error) { //FIXME
-	return "no_tag", nil
-}
-
-func rmFile(f string) error {
-	if _, err := os.Stat(f); err != nil {
-		return err
-	}
-	if err := os.Remove(f); err != nil {
-		return err
+		return nil
 	}
 	return nil
-}
-
-func reboot() error {
-	fmt.Print("\nREBOOTING... Please log back in.\n")
-	kexec.Prepare()
-	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
-	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }

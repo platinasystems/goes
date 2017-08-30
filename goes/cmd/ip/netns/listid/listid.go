@@ -53,10 +53,13 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 	defer sock.Close()
+
+	sr := rtnl.NewSockReceiver(sock)
+
 	varRunNetns, err := ioutil.ReadDir(rtnl.VarRunNetns)
 	if err == nil {
 		for _, fi := range varRunNetns {
-			nsid, err := sock.Nsid(fi.Name())
+			nsid, err := sr.Nsid(fi.Name())
 			if err == nil && nsid >= 0 {
 				namebyid[nsid] = fi.Name()
 			}
@@ -74,7 +77,7 @@ func (Command) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	return sock.UntilDone(req, func(b []byte) {
+	return sr.UntilDone(req, func(b []byte) {
 		var netnsa rtnl.Netnsa
 		t := rtnl.HdrPtr(b).Type
 		if t != rtnl.RTM_DELNSID && t != rtnl.RTM_NEWNSID {

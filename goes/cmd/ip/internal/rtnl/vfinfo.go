@@ -4,10 +4,13 @@
 
 package rtnl
 
-import "unsafe"
+import (
+	"syscall"
+	"unsafe"
+)
 
 const (
-	IFLA_VF_INFO_UNSPEC = iota
+	IFLA_VF_INFO_UNSPEC uint16 = iota
 	IFLA_VF_INFO
 	N_IFLA_VF_INFO
 )
@@ -15,7 +18,7 @@ const (
 const IFLA_VF_INFO_MAX = N_IFLA_VF_INFO - 1
 
 const (
-	IFLA_VF_UNSPEC = iota
+	IFLA_VF_UNSPEC uint16 = iota
 	IFLA_VF_MAC
 	IFLA_VF_VLAN
 	IFLA_VF_TX_RATE
@@ -42,13 +45,25 @@ const (
 const IFLA_VF_VLAN_INFO_MAX = N_IFLA_VF_VLAN - 1
 
 const (
-	IFLA_VF_LINK_STATE_AUTO = iota
+	IFLA_VF_LINK_STATE_AUTO uint32 = iota
 	IFLA_VF_LINK_STATE_ENABLE
 	IFLA_VF_LINK_STATE_DISABLE
 	N_IFLA_VF_LINK_STATE
 )
 
 const IFLA_VF_LINK_STATE_MAX = N_IFLA_VF_LINK_STATE - 1
+
+var IflaVfLinkStateByName = map[string]uint32{
+	"auto":    IFLA_VF_LINK_STATE_AUTO,
+	"enable":  IFLA_VF_LINK_STATE_ENABLE,
+	"disable": IFLA_VF_LINK_STATE_DISABLE,
+}
+
+var IflaVfLinkStateName = map[uint32]string{
+	IFLA_VF_LINK_STATE_AUTO:    "auto",
+	IFLA_VF_LINK_STATE_ENABLE:  "enable",
+	IFLA_VF_LINK_STATE_DISABLE: "disable",
+}
 
 func ForEachVfInfo(b []byte, do func([]byte)) {
 	ForEachAttr(b, func(t uint16, val []byte) {
@@ -60,18 +75,48 @@ func ForEachVfInfo(b []byte, do func([]byte)) {
 
 type IflaVf [N_IFLA_VF][]byte
 
-const SizeofIflaVfMac = 4 + 32
+const SizeofIflaVfFlag = 4 + 4
 
-func IflaVfMacPtr(vf *IflaVf) *IflaVfMac {
-	if len(vf[IFLA_VF_MAC]) < SizeofIflaVfMac {
+type IflaVfFlag struct {
+	Vf      uint32
+	Setting uint32
+}
+
+func IflaVfFlagPtr(b []byte) *IflaVfFlag {
+	if len(b) < SizeofIflaVfFlag {
 		return nil
 	}
-	return (*IflaVfMac)(unsafe.Pointer(&vf[IFLA_VF_MAC][0]))
+	return (*IflaVfFlag)(unsafe.Pointer(&b[0]))
+}
+
+func (v IflaVfFlag) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfFlag {
+		return 0, syscall.EOVERFLOW
+	}
+	*(*IflaVfFlag)(unsafe.Pointer(&b[0])) = v
+	return SizeofIflaVfFlag, nil
+}
+
+const SizeofIflaVfMac = 4 + 32
+
+func IflaVfMacPtr(b []byte) *IflaVfMac {
+	if len(b) < SizeofIflaVfMac {
+		return nil
+	}
+	return (*IflaVfMac)(unsafe.Pointer(&b[0]))
 }
 
 type IflaVfMac struct {
 	Vf  uint32
 	Mac [32]byte
+}
+
+func (v *IflaVfMac) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfMac {
+		return 0, syscall.EOVERFLOW
+	}
+	*(*IflaVfMac)(unsafe.Pointer(&b[0])) = *v
+	return SizeofIflaVfMac, nil
 }
 
 const SizeofIflaVfVlan = 4 + 4 + 4
@@ -82,11 +127,19 @@ type IflaVfVlan struct {
 	Qos  uint32
 }
 
-func IflaVfVlanPtr(vf *IflaVf) *IflaVfVlan {
-	if len(vf[IFLA_VF_VLAN]) < SizeofIflaVfVlan {
+func IflaVfVlanPtr(b []byte) *IflaVfVlan {
+	if len(b) < SizeofIflaVfVlan {
 		return nil
 	}
-	return (*IflaVfVlan)(unsafe.Pointer(&vf[IFLA_VF_VLAN][0]))
+	return (*IflaVfVlan)(unsafe.Pointer(&b[0]))
+}
+
+func (v IflaVfVlan) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfVlan {
+		return 0, syscall.EOVERFLOW
+	}
+	*(*IflaVfVlan)(unsafe.Pointer(&b[0])) = v
+	return SizeofIflaVfVlan, nil
 }
 
 const SizeofIflaVfTxRate = 4 + 4
@@ -96,11 +149,19 @@ type IflaVfTxRate struct {
 	Rate uint32
 }
 
-func IflaVfTxRatePtr(vf *IflaVf) *IflaVfTxRate {
-	if len(vf[IFLA_VF_TX_RATE]) < SizeofIflaVfTxRate {
+func IflaVfTxRatePtr(b []byte) *IflaVfTxRate {
+	if len(b) < SizeofIflaVfTxRate {
 		return nil
 	}
-	return (*IflaVfTxRate)(unsafe.Pointer(&vf[IFLA_VF_TX_RATE][0]))
+	return (*IflaVfTxRate)(unsafe.Pointer(&b[0]))
+}
+
+func (v IflaVfTxRate) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfTxRate {
+		return 0, syscall.EOVERFLOW
+	}
+	*(*IflaVfTxRate)(unsafe.Pointer(&b[0])) = v
+	return SizeofIflaVfTxRate, nil
 }
 
 const SizeofIflaVfRate = 4 + 4 + 4
@@ -111,46 +172,19 @@ type IflaVfRate struct {
 	MaxTxRate uint32
 }
 
-func IflaVfRatePtr(vf *IflaVf) *IflaVfRate {
-	if len(vf[IFLA_VF_RATE]) < SizeofIflaVfRate {
+func IflaVfRatePtr(b []byte) *IflaVfRate {
+	if len(b) < SizeofIflaVfRate {
 		return nil
 	}
-	return (*IflaVfRate)(unsafe.Pointer(&vf[IFLA_VF_RATE][0]))
+	return (*IflaVfRate)(unsafe.Pointer(&b[0]))
 }
 
-const SizeofIflaVfSpoofchk = 4 + 4
-
-type IflaVfSpoofchk struct {
-	Vf      uint32
-	Setting uint32
-}
-
-func IflaVfSpoofchkPtr(vf *IflaVf) *IflaVfSpoofchk {
-	if len(vf[IFLA_VF_SPOOFCHK]) < SizeofIflaVfSpoofchk {
-		return nil
+func (v IflaVfRate) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfRate {
+		return 0, syscall.EOVERFLOW
 	}
-	return (*IflaVfSpoofchk)(unsafe.Pointer(&vf[IFLA_VF_SPOOFCHK][0]))
-}
-
-const SizeofIflaVfGuid = 4 + 8
-
-type IflaVfGuid struct {
-	Vf   uint32
-	Guid uint64
-}
-
-func IflaVfIbNodeGuidPtr(vf *IflaVf) *IflaVfGuid {
-	if len(vf[IFLA_VF_IB_NODE_GUID]) < SizeofIflaVfGuid {
-		return nil
-	}
-	return (*IflaVfGuid)(unsafe.Pointer(&vf[IFLA_VF_IB_NODE_GUID][0]))
-}
-
-func IflaVfIbPortGuidPtr(vf *IflaVf) *IflaVfGuid {
-	if len(vf[IFLA_VF_IB_PORT_GUID]) < SizeofIflaVfGuid {
-		return nil
-	}
-	return (*IflaVfGuid)(unsafe.Pointer(&vf[IFLA_VF_IB_PORT_GUID][0]))
+	*(*IflaVfRate)(unsafe.Pointer(&b[0])) = v
+	return SizeofIflaVfRate, nil
 }
 
 const SizeofIflaVfLinkState = 4 + 4
@@ -160,23 +194,39 @@ type IflaVfLinkState struct {
 	LinkState uint32
 }
 
-func IflaVfLinkStatePtr(vf *IflaVf) *IflaVfLinkState {
-	if len(vf[IFLA_VF_LINK_STATE]) < SizeofIflaVfLinkState {
+func IflaVfLinkStatePtr(b []byte) *IflaVfLinkState {
+	if len(b) < SizeofIflaVfLinkState {
 		return nil
 	}
-	return (*IflaVfLinkState)(unsafe.Pointer(&vf[IFLA_VF_LINK_STATE][0]))
+	return (*IflaVfLinkState)(unsafe.Pointer(&b[0]))
 }
 
-const SizeofIflaVfTrust = 4 + 4
-
-type IflaVfTrust struct {
-	Vf      uint32
-	Setting uint32
+func (v IflaVfLinkState) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfLinkState {
+		return 0, syscall.EOVERFLOW
+	}
+	*(*IflaVfLinkState)(unsafe.Pointer(&b[0])) = v
+	return SizeofIflaVfLinkState, nil
 }
 
-func IflaVfTrustPtr(vf *IflaVf) *IflaVfTrust {
-	if len(vf[IFLA_VF_TRUST]) < SizeofIflaVfTrust {
+const SizeofIflaVfGuid = 4 + 8
+
+type IflaVfGuid struct {
+	Vf   uint32
+	Guid uint64
+}
+
+func IflaVfIbGuidPtr(b []byte) *IflaVfGuid {
+	if len(b) < SizeofIflaVfGuid {
 		return nil
 	}
-	return (*IflaVfTrust)(unsafe.Pointer(&vf[IFLA_VF_TRUST][0]))
+	return (*IflaVfGuid)(unsafe.Pointer(&b[0]))
+}
+
+func (v IflaVfGuid) Read(b []byte) (int, error) {
+	if len(b) < SizeofIflaVfGuid {
+		return 0, syscall.EOVERFLOW
+	}
+	*(*IflaVfGuid)(unsafe.Pointer(&b[0])) = v
+	return SizeofIflaVfGuid, nil
 }

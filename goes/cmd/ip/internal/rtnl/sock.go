@@ -6,35 +6,47 @@ package rtnl
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"syscall"
 	"unsafe"
 )
 
 const SizeofInt = (32 << (^uint(0) >> 63)) >> 3
+const (
+	debugSockDone = false
+	debugSockGrps = false
+)
 
 var Eclosed = errors.New("already closed")
 
 // This creates cascaded channels and attendant go-routines to pack received
 // netlink messages into a page, if possible; otherwise, one per oversized
-// sized buffer. NonBlockingRecv() and [blocking]Recv() return a slice
-// reference to the next message without copy.
+// buffer.
 //
-// Usage: NewSock([depth int[, groups uint32[, allnsid bool]]])
+// Usage: NewSock([depth int[, groups uint32[, allnsid bool[,
+//	sorcvbuf[, sosndbuf] int]]]])
 // e.g.
 //	NewSock()
 //	NewSock(16)
 //	NewSock(16, RTNLGRP_NEIGH.Bit())
-//	NewSock(16, RTNLGRP_NEIGH.Bit() | RTNLGRP_IPV4_IFADDR.Bit(), true)
+//	NewSock(16, groups, true)
+//	NewSock(16, groups, false, 4 << 20)
+//	NewSock(16, groups, false, 4 << 20, 1 << 20)
 //
 //	depth	of Rx buffer channel (default, 4)
 //	groups	to listen (default, none)
 //	allnsid	listen in all identified net namespaces (default, false)
+//	sorcvbuf, sosndbuf
+//		respective receive and send socket buffer size
+//		(default, kernel config)
 func NewSock(opts ...interface{}) (*Sock, error) {
 	var allnsid bool
 	var groups uint32
 	depth := 4
+	sorcvbuf := -1
+	sosndbuf := -1
 
 	if len(opts) > 0 {
 		depth = opts[0].(int)
@@ -45,43 +57,89 @@ func NewSock(opts ...interface{}) (*Sock, error) {
 	if len(opts) > 2 {
 		allnsid = opts[2].(bool)
 	}
+	if len(opts) > 3 {
+		sorcvbuf = opts[3].(int)
+	}
+	if len(opts) > 3 {
+		sosndbuf = opts[3].(int)
+	}
 
 	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW,
 		syscall.NETLINK_ROUTE)
 	if err != nil {
 		return nil, os.NewSyscallError("socket", err)
 	}
+	defer func() {
+		if err != nil {
+			syscall.Close(fd)
+		}
+	}()
 	sa := &syscall.SockaddrNetlink{
 		Family: syscall.AF_NETLINK,
 		Groups: groups,
 	}
-	if err := syscall.Bind(fd, sa); err != nil {
-		syscall.Close(fd)
+	if err = syscall.Bind(fd, sa); err != nil {
 		return nil, os.NewSyscallError("bind", err)
 	}
 	gsa, err := syscall.Getsockname(fd)
 	if err != nil {
-		syscall.Close(fd)
 		return nil, os.NewSyscallError("getsockname", err)
 	}
-	if false { // debug
+	if debugSockGrps {
 		printRtnlGrps(gsa.(*syscall.SockaddrNetlink).Groups)
 	}
 	if allnsid {
-		err = syscall.SetsockoptInt(fd, SOL_NETLINK,
-			NETLINK_LISTEN_ALL_NSID, 1)
+		err = os.NewSyscallError("NETLINK_LISTEN_ALL_NSID",
+			syscall.SetsockoptInt(fd, SOL_NETLINK,
+				NETLINK_LISTEN_ALL_NSID, 1))
 		if err != nil {
-			syscall.Close(fd)
-			return nil, os.NewSyscallError("setsockopt", err)
+			return nil, err
 		}
 	}
+	for _, x := range []struct {
+		opt  int
+		val  int
+		name string
+	}{
+		{syscall.SO_RCVBUF, sorcvbuf, "SO_RCVBUF"},
+		{syscall.SO_SNDBUF, sosndbuf, "SO_SNDBUF"},
+	} {
+		if x.val > 0 {
+			err = os.NewSyscallError(x.name,
+				syscall.SetsockoptInt(fd, syscall.SOL_SOCKET,
+					x.opt, x.val))
+			if err != nil {
+				return nil, err
+			}
+			// Verify buffer size is at least as large.
+			var ver int
+			ver, err = syscall.GetsockoptInt(fd,
+				syscall.SOL_SOCKET, x.opt)
+			if err != nil {
+				return nil, fmt.Errorf("%s: can't verify: %v",
+					x.name, err)
+			}
+			if ver < x.val {
+				err = fmt.Errorf("%s: truncated", x.name)
+				return nil, err
+			}
+		}
+	}
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	rxch := make(chan []byte, depth)
 	sock := &Sock{
-		fd:  fd,
-		Pid: gsa.(*syscall.SockaddrNetlink).Pid,
-		rx:  make(chan []byte, depth),
-		b:   Empty,
-		sa:  sa,
+		Pid:  gsa.(*syscall.SockaddrNetlink).Pid,
+		RxCh: rxch,
+		rxch: rxch,
+		fd:   fd,
+		sa:   sa,
+		pr:   pr,
+		pw:   pw,
 
+		rxdone:  make(chan struct{}),
 		allnsid: allnsid,
 	}
 	rxrdy := make(chan struct{})
@@ -91,164 +149,67 @@ func NewSock(opts ...interface{}) (*Sock, error) {
 }
 
 type Sock struct {
-	fd      int
-	Pid     uint32
-	rx      chan []byte
-	b       []byte
-	closed  bool
+	Pid  uint32
+	RxCh <-chan []byte
+	rxch chan<- []byte
+	Err  error
+	fd   int
+	sa   *syscall.SockaddrNetlink
+	// use a pipe to signal close to gogorx
+	pr      *os.File
+	pw      *os.File
+	rxdone  chan struct{}
 	allnsid bool
-	sa      *syscall.SockaddrNetlink
-	err     error
 }
 
 func (sock *Sock) Close() error {
-	if !sock.closed {
-		sock.closed = true
-		return syscall.Close(sock.fd)
+	if sock.pw == nil {
+		return Eclosed
 	}
-	return Eclosed
-}
-
-// Recv next message buffer from channel.
-//
-// Usage: Recv([dontblock bool])
-func (sock *Sock) Recv(opts ...interface{}) ([]byte, error) {
-	var dontblock bool
-
-	if len(opts) > 0 {
-		dontblock = opts[0].(bool)
+	sock.pw.Close()
+	sock.pw = nil
+	<-sock.rxdone
+	if debugSockDone {
+		fmt.Println("rxdone")
 	}
-
-	if len(sock.b) == 0 {
-		if dontblock && len(sock.rx) == 0 {
-			return Empty, nil
-		}
-		if rxb, ok := <-sock.rx; !ok {
-			sock.b = Empty
-			return Empty, sock.err
-		} else {
-			sock.b = rxb
-		}
-	}
-	h := HdrPtr(sock.b)
-	n := Align(int(h.Len))
-	b := sock.b[:int(h.Len)]
-	if n == len(sock.b) {
-		sock.b = Empty
-	} else {
-		sock.b = sock.b[n:]
-	}
-	return b, nil
+	return nil
 }
 
 func (sock *Sock) Send(b []byte) error {
 	return syscall.Sendto(sock.fd, b, 0, sock.sa)
 }
 
-// After setting the sequence number, send the request to netlink and call the
-// given handler for each received message until DONE or ERROR.
-func (sock *Sock) UntilDone(req []byte, do func([]byte)) error {
-	seq := Seq()
-	HdrPtr(req).Seq = seq
-	if err := sock.Send(req); err != nil {
-		return err
-	}
-	for {
-		b, err := sock.Recv()
-		if err != nil {
-			return err
-		}
-		if len(b) < SizeofHdr {
-			return syscall.ENOMSG
-		}
-		h := HdrPtr(b)
-		if h == nil {
-			return Ehdr(len(b))
-		}
-		if int(h.Len) != len(b) {
-			return h.Elen()
-		}
-		if sock.Pid != h.Pid {
-			return h.Epid()
-		}
-		if seq != h.Seq {
-			return h.Eseq()
-		}
-		switch h.Type {
-		case NLMSG_DONE:
-			return nil
-		case NLMSG_ERROR:
-			e := NlmsgerrPtr(b)
-			if e == nil || e.Errno == 0 {
-				return nil
-			}
-			return os.NewSyscallError("nack",
-				syscall.Errno(e.Errno))
-		default:
-			do(b)
-		}
-	}
-	return nil
-}
-
-func (sock *Sock) IfNamesByIndex() (map[int32]string, error) {
-	ifnames := make(map[int32]string)
-	if req, err := NewMessage(
-		Hdr{
-			Type:  RTM_GETLINK,
-			Flags: NLM_F_REQUEST | NLM_F_DUMP,
-		},
-		IfInfoMsg{
-			Family: AF_UNSPEC,
-		},
-	); err != nil {
-		return nil, err
-	} else if err = sock.UntilDone(req, func(b []byte) {
-		if HdrPtr(b).Type != RTM_NEWLINK {
-			return
-		}
-		var ifla Ifla
-		ifla.Write(b)
-		msg := IfInfoMsgPtr(b)
-		if val := ifla[IFLA_IFNAME]; len(val) > 0 {
-			ifnames[msg.Index] = Kstring(val)
-		}
-	}); err != nil {
-		return nil, err
-	}
-	return ifnames, nil
-}
-
 func (sock *Sock) gorx(rdy chan<- struct{}) {
-	defer close(sock.rx)
-
 	var hbuf [SizeofHdr]byte
 	h := (*Hdr)(unsafe.Pointer(&hbuf[0]))
-	pgsz := syscall.Getpagesize()
 
-	bytes := make(chan byte, pgsz)
+	bytech := make(chan byte, PAGE.Size())
 	gogorxrdy := make(chan struct{})
-	go sock.gogorx(bytes, gogorxrdy)
-	<-gogorxrdy
-	close(rdy)
 
-	for b := make([]byte, 0, pgsz); ; {
+	go sock.gogorx(bytech, gogorxrdy)
+	<-gogorxrdy
+
+	close(rdy)
+	defer close(sock.rxdone)
+	defer close(sock.rxch)
+	if debugSockDone {
+		defer fmt.Println("gorx done")
+	}
+
+	for b := make([]byte, 0, PAGE.Size()); ; {
 		for i := range hbuf {
-			c, ok := <-bytes
-			if !ok {
+			if c, opened := <-bytech; !opened {
 				return
+			} else {
+				hbuf[i] = c
 			}
-			hbuf[i] = c
 		}
-		if false && h.Type == NLMSG_DONE {
-			return
-		}
-		n := Align(int(h.Len))
+		n := NLMSG.Align(int(h.Len))
 		if len(b)+n > cap(b) {
 			if len(b) > 0 {
-				sock.rx <- b
+				sock.rxch <- b
 			}
-			sz := pgsz
+			sz := PAGE.Size()
 			if sz < n {
 				sz = n
 			}
@@ -256,35 +217,36 @@ func (sock *Sock) gorx(rdy chan<- struct{}) {
 		}
 		b = append(b, hbuf[:]...)
 		for i := SizeofHdr; i < n; i++ {
-			c, ok := <-bytes
+			c, ok := <-bytech
 			if !ok {
 				return
 			} else if i < cap(b) {
 				b = append(b, c)
 			}
 			if len(b) == cap(b) {
-				sock.rx <- b
-				b = make([]byte, 0, pgsz)
+				sock.rxch <- b
+				b = make([]byte, 0, PAGE.Size())
 			}
 		}
-		if len(b) > 0 && len(bytes) == 0 {
-			sock.rx <- b
-			b = make([]byte, 0, pgsz)
+		if len(b) > 0 && len(bytech) == 0 {
+			sock.rxch <- b
+			b = make([]byte, 0, PAGE.Size())
 		}
 	}
 }
 
-func (sock *Sock) gogorx(ch chan<- byte, rdy chan<- struct{}) {
-	defer close(ch)
-	close(rdy)
-	pgsz := syscall.Getpagesize()
-	b := make([]byte, 32*pgsz)
-	oob := make([]byte, pgsz)
+func (sock *Sock) gogorx(bytech chan<- byte, rdy chan<- struct{}) {
+	b := make([]byte, PAGE.Size())
+	oob := make([]byte, PAGE.Size())
+
+	// When changed, the out-of-band nsid is forwarded as an internal
+	// typed, in-band message.
 	nsidbuf := make([]byte, SizeofHdr+SizeofInt)
 	*(*Hdr)(unsafe.Pointer(&nsidbuf[0])) = Hdr{
 		Len:  SizeofHdr + SizeofInt,
 		Type: NLMSG_NSID,
 	}
+	nsidptr := (*int)(unsafe.Pointer(&nsidbuf[SizeofHdr]))
 	lastnsid := -1
 	oobnsid := func(oob []byte) int {
 		scms, err := syscall.ParseSocketControlMessage(oob)
@@ -302,16 +264,57 @@ func (sock *Sock) gogorx(ch chan<- byte, rdy chan<- struct{}) {
 		}
 		return -1
 	}
+
+	close(rdy)
+	defer close(bytech)
+	if debugSockDone {
+		defer fmt.Println("gogorx done")
+	}
+	defer sock.pr.Close()
+	defer syscall.Close(sock.fd)
+
+	prfd := int(sock.pr.Fd())
+
 	for {
-		if sock.closed {
+		var n, noob int
+		var rfds syscall.FdSet
+		FD_ZERO(&rfds)
+		FD_SET(&rfds, sock.fd)
+		FD_SET(&rfds, prfd)
+		tv := syscall.Timeval{10, 0}
+		n, sock.Err = syscall.Select(prfd+1, &rfds, nil, nil, &tv)
+		if sock.Err != nil {
 			break
 		}
-		n, noob, _, _, err := syscall.Recvmsg(sock.fd, b, oob, 0)
-		if err != nil {
-			if sock.err == nil {
-				sock.err = err
-			}
+		if n == 0 {
+			continue
+		}
+		if FD_ISSET(&rfds, prfd) {
+			// Sock.Close
 			break
+		}
+		if !FD_ISSET(&rfds, sock.fd) {
+			continue
+		}
+		// peek first to see if we need to expand buffer
+		n, _, sock.Err = syscall.Recvfrom(sock.fd, b,
+			syscall.MSG_PEEK|syscall.MSG_TRUNC|syscall.MSG_DONTWAIT)
+		if sock.Err != nil {
+			break
+		}
+		if n == 0 {
+			continue
+		}
+		if n > len(b) {
+			b = make([]byte, PAGE.Align(n))
+		}
+		n, noob, _, _, sock.Err = syscall.Recvmsg(sock.fd, b, oob,
+			syscall.MSG_DONTWAIT)
+		if sock.Err != nil {
+			break
+		}
+		if n == 0 {
+			continue
 		}
 		if sock.allnsid {
 			nsid := -1
@@ -319,55 +322,19 @@ func (sock *Sock) gogorx(ch chan<- byte, rdy chan<- struct{}) {
 				nsid = oobnsid(oob[:noob])
 			}
 			if nsid != lastnsid {
-				*(*int)(unsafe.Pointer(&nsidbuf[SizeofHdr])) =
-					nsid
+				*nsidptr = nsid
 				for _, c := range nsidbuf {
-					ch <- c
+					bytech <- c
 				}
 				lastnsid = nsid
 			}
 		}
 		for _, c := range b[:n] {
-			ch <- c
+			bytech <- c
 		}
 	}
-}
-
-// Send a RTM_GETNSID request to netlink and return the response attribute.
-func (sock *Sock) Nsid(name string) (int32, error) {
-	nsid := int32(-1)
-
-	f, err := os.Open(filepath.Join(VarRunNetns, name))
-	if err != nil {
-		return -1, err
+	if sock.Err == nil || sock.Err == syscall.EINTR ||
+		sock.Err == syscall.EBADF {
+		sock.Err = io.EOF
 	}
-	defer f.Close()
-
-	req, err := NewMessage(Hdr{
-		Type:  RTM_GETNSID,
-		Flags: NLM_F_REQUEST | NLM_F_ACK,
-	}, NetnsMsg{
-		Family: AF_UNSPEC,
-	},
-		Attr{NETNSA_FD, Uint32Attr(f.Fd())},
-	)
-	if err != nil {
-		return -1, err
-	}
-
-	err = sock.UntilDone(req, func(b []byte) {
-		var netnsa Netnsa
-		if HdrPtr(b).Type != RTM_NEWNSID {
-			return
-		}
-		n, err := netnsa.Write(b)
-		if err != nil || n == 0 {
-			return
-		}
-		if val := netnsa[NETNSA_NSID]; len(val) > 0 {
-			nsid = Int32(val)
-		}
-	})
-
-	return nsid, err
 }

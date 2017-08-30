@@ -75,7 +75,7 @@ const FRA_IFNAME = FRA_IIFNAME
 type Fra [N_FRA][]byte
 
 func (fra *Fra) Write(b []byte) (int, error) {
-	i := Align(SizeofHdr + SizeofFibRuleMsg)
+	i := NLMSG.Align(SizeofHdr + SizeofFibRuleMsg)
 	if i >= len(b) {
 		IndexAttrByType(fra[:], Empty)
 		return 0, nil

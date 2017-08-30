@@ -99,6 +99,8 @@ func (Command) Main(args ...string) error {
 	}
 	defer sock.Close()
 
+	sr := rtnl.NewSockReceiver(sock)
+
 	ifnames := make(map[int32]string)
 	ifmaster := make(map[int32]int32)
 	if req, err = rtnl.NewMessage(
@@ -111,7 +113,7 @@ func (Command) Main(args ...string) error {
 		},
 	); err != nil {
 		return err
-	} else if err = sock.UntilDone(req, func(b []byte) {
+	} else if err = sr.UntilDone(req, func(b []byte) {
 		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
@@ -163,7 +165,7 @@ func (Command) Main(args ...string) error {
 			},
 		); err != nil {
 			return err
-		} else if err = sock.UntilDone(req, func(b []byte) {
+		} else if err = sr.UntilDone(req, func(b []byte) {
 			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWNEIGH {
 				return
 			}

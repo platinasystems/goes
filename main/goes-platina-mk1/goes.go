@@ -37,6 +37,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
 	"github.com/platinasystems/go/goes/cmd/install"
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
 	"github.com/platinasystems/go/goes/cmd/kill"
@@ -48,8 +49,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/nlcounters"
-	"github.com/platinasystems/go/goes/cmd/nldump"
-	"github.com/platinasystems/go/goes/cmd/nsid"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
@@ -124,6 +123,7 @@ func Goes() *goes.Goes {
 		iminfo.New(),
 		insmod.New(),
 		install.New(),
+		ip.New(),
 		kexec.New(),
 		keys.New(),
 		kill.New(),
@@ -135,8 +135,6 @@ func Goes() *goes.Goes {
 		mknod.New(),
 		mount.New(),
 		nlcounters.New(),
-		nldump.New(),
-		nsid.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),

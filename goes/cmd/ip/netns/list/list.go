@@ -61,9 +61,12 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 	defer sock.Close()
+
+	sr := rtnl.NewSockReceiver(sock)
+
 	for _, fi := range varRunNetns {
 		fmt.Print(fi.Name())
-		nsid, err := sock.Nsid(fi.Name())
+		nsid, err := sr.Nsid(fi.Name())
 		if err == nil && nsid >= 0 {
 			fmt.Print(": ", nsid)
 		}

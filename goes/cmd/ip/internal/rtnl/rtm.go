@@ -94,12 +94,12 @@ const (
 var Empty = []byte{}
 
 func NewMessage(hdr Hdr, msg io.Reader, attrs ...Attr) ([]byte, error) {
-	b := make([]byte, syscall.Getpagesize())
+	b := make([]byte, PAGE.Size())
 	nmsg, err := msg.Read(b[SizeofHdr:])
 	if err != nil {
 		return nil, err
 	}
-	n := Align(SizeofHdr + nmsg)
+	n := NLMSG.Align(SizeofHdr + nmsg)
 	na, err := ReadAllAttrs(b[n:], attrs...)
 	if err != nil {
 		return nil, err

@@ -139,7 +139,9 @@ func (c Command) Main(args ...string) error {
 	}
 	defer sock.Close()
 
-	ifnames, err := sock.IfNamesByIndex()
+	sr := rtnl.NewSockReceiver(sock)
+
+	ifnames, err := sr.IfNamesByIndex()
 	if err != nil {
 		return err
 	}
@@ -155,7 +157,7 @@ func (c Command) Main(args ...string) error {
 			},
 		); err != nil {
 			return err
-		} else if err = sock.UntilDone(req, func(b []byte) {
+		} else if err = sr.UntilDone(req, func(b []byte) {
 			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWROUTE {
 				return
 			}
