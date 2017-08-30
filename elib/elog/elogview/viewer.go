@@ -382,6 +382,13 @@ func (v *viewer) do_pointer(val uint) {
 	}
 }
 
+func (v *viewer) select_event(ei uint) {
+	if v.selected_events == nil {
+		v.selected_events = make(map[uint]struct{})
+	}
+	v.selected_events[ei] = struct{}{}
+}
+
 func (v *viewer) do_button_press(e *gdk.Event) (handled bool, mouse_x r2.V, val uint) {
 	mouse_x, val = button_event(e)
 	if val != 1 {
@@ -404,10 +411,7 @@ func (v *viewer) do_button_press(e *gdk.Event) (handled bool, mouse_x r2.V, val 
 		if v.is_selected(min_ei) {
 			delete(v.selected_events, min_ei)
 		} else {
-			if v.selected_events == nil {
-				v.selected_events = make(map[uint]struct{})
-			}
-			v.selected_events[min_ei] = struct{}{}
+			v.select_event(min_ei)
 		}
 		v.da.QueueDraw()
 	}
