@@ -35,8 +35,12 @@ func (m *net_namespace_main) read_dir(dir *namespace_search_dir, f func(dir *nam
 			err = nil
 		}
 	}
+	const (
+		is_del  = false
+		is_init = true
+	)
 	for _, fi := range fis {
-		f(dir, fi.Name(), false, true)
+		f(dir, fi.Name(), is_del, is_init)
 	}
 	return
 }
@@ -167,7 +171,7 @@ func (nm *net_namespace_main) init() (err error) {
 
 	// Setup initial namespaces.
 	// 1 for default namespace.
-	nm.n_namespace_discovered_at_init = 1
+	nm.n_init_namespace_to_discover = 1
 	for i := range netns_search_dirs {
 		d := &netns_search_dirs[i]
 		if err = nm.read_dir(d, nm.watch_namespace_add_del); err != nil {
@@ -179,13 +183,13 @@ func (nm *net_namespace_main) init() (err error) {
 
 // True when all namespaces have been discovered.
 func (m *net_namespace_main) discovery_is_done() bool {
-	return m.n_namespace_discovery_done > 0 && m.n_namespace_discovery_done >= m.n_namespace_discovered_at_init
+	return atomic.LoadInt32(&m.n_init_namespace_to_discover) == 0
 }
 
-// Called when initial netlink dump via netlink.Listen is done.
+// Called when initial netlink dump via netlink.Listen completes.
 func (ns *net_namespace) netlink_dump_done(m *Main) (err error) {
 	nm := &m.net_namespace_main
-	if atomic.AddUint32(&nm.n_namespace_discovery_done, 1) == nm.n_namespace_discovered_at_init {
+	if atomic.AddInt32(&nm.n_init_namespace_to_discover, -1) == 0 {
 		err = m.netlink_discovery_done_for_all_namespaces()
 	}
 	return
@@ -279,8 +283,6 @@ type net_namespace_main struct {
 	namespace_by_inode               map[uint64]*net_namespace
 	vnet_tuntap_interface_by_si      map[vnet.Si]*tuntap_interface
 	vnet_tuntap_interface_by_address map[string]*tuntap_interface
-	n_namespace_discovery_done       uint32
-	n_namespace_discovered_at_init   uint32
 	interface_by_si                  map[vnet.Si]*net_namespace_interface
 	registered_hwifer_by_si          map[vnet.Si]vnet.HwInterfacer
 	registered_hwifer_by_address     map[string]vnet.HwInterfacer
@@ -288,6 +290,10 @@ type net_namespace_main struct {
 	rx_node                          rx_node
 	tx_node                          tx_node
 	tuntap_sendmsg_recvmsg_disable   bool
+
+	// Number of namespaces (files in /var/run/netns/* or elsewhere) remaining to be discovered at initialization time.
+	// Zero means that all initial namespaces have been discovered.
+	n_init_namespace_to_discover int32
 }
 
 func (m *net_namespace_main) fd_for_path(elem ...string) (fd int, err error) {
@@ -321,7 +327,7 @@ func (m *net_namespace_main) nsid_for_fd(fd int) (nsid int, inode uint64, err er
 	case *netlink.NetnsMessage:
 		nsid = int(v.Attrs[netlink.NETNSA_NSID].(netlink.Int32Attr).Int())
 	case *netlink.ErrorMessage:
-		err = fmt.Errorf("netlink GETNSID: %v", syscall.Errno(v.Errno))
+		err = fmt.Errorf("netlink GETNSID: %v", syscall.Errno(-v.Errno))
 	}
 	return
 }
@@ -443,13 +449,19 @@ type add_del_namespace_event struct {
 func (e *add_del_namespace_event) String() string { return "add-del-namespace-event" }
 func (e *add_del_namespace_event) EventAction() {
 	if err := e.m.add_del_nsid(e.dir, e.name, e.is_del); err != nil {
+		if e.is_init {
+			// File is not actually a namespace so we ignore it.
+			atomic.AddInt32(&e.m.n_init_namespace_to_discover, -1)
+		}
 		e.m.m.v.Logf("namespace watch: %v %v\n", e.name, err)
-	} else if e.is_init {
-		e.m.n_namespace_discovered_at_init++
 	}
 }
 
 func (m *net_namespace_main) watch_namespace_add_del(dir *namespace_search_dir, name string, is_del bool, is_init bool) {
+	// Add to potential init time namespaces to discover.
+	if is_init {
+		atomic.AddInt32(&m.n_init_namespace_to_discover, 1)
+	}
 	m.m.v.SignalEvent(&add_del_namespace_event{m: m, dir: dir, name: name, is_del: is_del, is_init: is_init})
 }
 
