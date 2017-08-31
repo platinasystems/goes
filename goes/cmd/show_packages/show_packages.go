@@ -9,46 +9,86 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/platinasystems/go"
+	info "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/indent"
 )
 
 const (
-	Name    = "show-packages"
-	Apropos = "print package repos info"
-	Usage   = "show-packages [ -KEY ]..."
+	ShowPackagesAproposEnUS = "print package repos info"
+	LicenseAproposEnUS      = "print package license(s)"
+	VersionAproposEnUS      = "print package version(s)"
+	Usage                   = `
+	show-packages (default)
+	version
+	license
+	`
 )
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
+func New(s string) Command { return Command(s) }
+
+type Command string
+
+func (c Command) Apropos() lang.Alt {
+	aproposEnUS := ShowPackagesAproposEnUS
+	switch c {
+	case "version":
+		aproposEnUS = VersionAproposEnUS
+	case "license":
+		aproposEnUS = LicenseAproposEnUS
+	}
+	return lang.Alt{
+		lang.EnUS: aproposEnUS,
+	}
 }
 
-func New() Command { return Command{} }
+func (c Command) String() string { return string(c) }
+func (Command) Usage() string    { return Usage }
 
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
-
-func (Command) Main(args ...string) error {
-	if len(args) == 0 {
-		_, err := WriteTo(os.Stdout)
-		return err
+func (c Command) Main(args ...string) error {
+	if len(args) != 0 {
+		return fmt.Errorf("%v: unexpected", args)
 	}
-	maps := []map[string]string{Package}
-	if Packages != nil {
-		maps = append(maps, Packages()...)
-	}
-	for _, m := range maps {
-		if ip, found := m["importpath"]; found {
-			for _, arg := range args {
-				k := strings.TrimLeft(arg, "-")
-				if val, found := m[k]; found {
-					fmt.Print(ip, "[", k, "]: ", val, "\n")
+	printEither := func(alternatives ...string) {
+		w := indent.New(os.Stdout, "    ")
+		for _, m := range info.All() {
+			ip := m["importpath"]
+			if len(ip) == 0 {
+				continue
+			}
+			for _, alt := range alternatives {
+				val := m[alt]
+				if len(val) == 0 {
+					continue
 				}
+				fmt.Fprint(w, ip, ": ")
+				if strings.Contains(val, "\n") {
+					fmt.Fprintln(w, "|")
+					indent.Increase(w)
+					fmt.Fprintln(w, val)
+					indent.Decrease(w)
+				} else {
+					fmt.Fprintln(w, val)
+				}
+				break
 			}
 		}
+	}
+	switch c {
+	case "version":
+		printEither("tag", "version")
+	case "license":
+		printEither("license", "copyright")
+	case "copyright":
+		printEither("copyright", "license")
+	case "show-packages":
+		fallthrough
+	default:
+		b, err := info.Marshal()
+		if err == nil {
+			_, err = os.Stdout.Write(b)
+		}
+		return err
 	}
 	return nil
 }

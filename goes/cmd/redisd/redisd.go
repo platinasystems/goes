@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/platinasystems/go"
+	info "github.com/platinasystems/go"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
@@ -172,9 +172,11 @@ func (c *Command) Main(args ...string) error {
 		c.redisd.published[k] = make(grs.HashValue)
 	}
 
-	pkgs := new(bytes.Buffer)
-	WriteTo(pkgs)
-	c.redisd.published[redis.DefaultHash]["packages"] = pkgs.Bytes()
+	b, err := info.Marshal()
+	if err != nil {
+		return err
+	}
+	c.redisd.published[redis.DefaultHash]["packages"] = b
 
 	sfn := sockfile.Path(Name)
 	cfg := grs.DefaultConfig()
