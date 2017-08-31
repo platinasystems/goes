@@ -29,6 +29,7 @@ func (d *dev) set_queue_interrupt_mapping(rt vnet.RxTx, queue uint, irq interrup
 	b := d.queues_for_interrupt[rt][irq]
 	b = b.Set(queue)
 	d.queues_for_interrupt[rt][irq] = b
+	queueInterruptNames[irq] = fmt.Sprintf("%v %d", rt.String(), queue)
 }
 
 func (d *dev) foreach_queue_for_interrupt(rt vnet.RxTx, i interrupt, f func(queue uint)) {
@@ -78,9 +79,15 @@ var irqStrings = [...]string{
 	irq_other:             "other",
 }
 
+var queueInterruptNames = [16]string{}
+
 func (i interrupt) String() (s string) {
 	if i < irq_n_queue {
-		s = fmt.Sprintf("queue %d", i)
+		if queueInterruptNames[i] != "" {
+			s = fmt.Sprintf("queue %s", queueInterruptNames[i])
+		} else {
+			s = fmt.Sprintf("queue %d", i)
+		}
 	} else {
 		s = elib.StringerHex(irqStrings[:], int(i))
 	}
@@ -119,6 +126,27 @@ func (d *dev) interrupt_dispatch(i uint) {
 	}
 }
 
+// Atomically get and set interrupt status.
+func (d *dev) get_irq_status() (s uint32) {
+	for {
+		s = atomic.LoadUint32(&d.irq_status)
+		if atomic.CompareAndSwapUint32(&d.irq_status, s, 0) {
+			break
+		}
+	}
+	return
+}
+
+func (d *dev) set_irq_status(s uint32) {
+	for {
+		old := atomic.LoadUint32(&d.irq_status)
+		new := old | s
+		if atomic.CompareAndSwapUint32(&d.irq_status, old, new) {
+			break
+		}
+	}
+}
+
 func (d *dev) InterfaceInput(out *vnet.RefOut) {
 	if !d.interruptsEnabled {
 		for qi := range d.tx_queues {
@@ -128,31 +156,69 @@ func (d *dev) InterfaceInput(out *vnet.RefOut) {
 			d.rx_queue_interrupt(uint(qi))
 		}
 	} else {
-		// Get status and ack interrupt.
-		d.irq_sequence++
-		s := d.regs.interrupt.status_write_1_to_set.get(d)
-		if s != 0 {
-			d.regs.interrupt.status_write_1_to_clear.set(d, s)
-			d.out = out
-			elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
-		}
+		d.is_active = uint(0)
+		s := d.get_irq_status()
+		d.out = out
+		elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
 
-		// Poll any queues that need polling and have not been polled this interrupt.
-		for qi := range d.rx_queues {
-			q := &d.rx_queues[qi]
-			if q.needs_polling && q.irq_sequence != d.irq_sequence {
-				d.rx_queue_interrupt(uint(qi))
-			}
+		inc := int32(0)
+		if d.is_active == 0 {
+			inc--
 		}
-		for qi := range d.tx_queues {
-			q := &d.tx_queues[qi]
-			if q.needs_polling && q.irq_sequence != d.irq_sequence {
-				d.tx_queue_interrupt(uint(qi))
-			}
-		}
+		d.active_lock.Lock()
+		x := atomic.AddInt32(&d.active_count, -1)
+		d.Activate(x > 0)
+		d.active_lock.Unlock()
 
-		d.Activate(atomic.AddInt32(&d.active_count, -1) > 0)
+		if elog.Enabled() {
+			e := irq_elog{
+				name:   d.elog_name,
+				status: s,
+				active: x,
+			}
+			elog.Add(&e)
+		}
 	}
+}
+
+func (d *dev) Interrupt() {
+	if d.interruptsEnabled {
+		s := d.regs.interrupt.status_write_1_to_set.get(d)
+		d.regs.interrupt.status_write_1_to_clear.set(d, s)
+		d.set_irq_status(uint32(s))
+		d.active_lock.Lock()
+		x := atomic.AddInt32(&d.active_count, 1)
+		d.Activate(true)
+		d.active_lock.Unlock()
+
+		if elog.Enabled() {
+			e := irq_elog{
+				name:   d.elog_name,
+				status: uint32(s),
+				active: x,
+				is_irq: true,
+			}
+			elog.Add(&e)
+		}
+	}
+}
+
+type irq_elog struct {
+	name   elog.StringRef
+	status uint32
+	active int32
+	is_irq bool
+}
+
+func (e *irq_elog) Elog(l *elog.Log) {
+	what := "input"
+	if e.is_irq {
+		what = "interrupt"
+	}
+	l.Logf("%s %s status 0x%x active %d", e.name, what, e.status, e.active)
+	elib.Word(e.status).ForeachSetBit(func(i uint) {
+		l.Logf("%s irq %s", e.name, interrupt(i))
+	})
 }
 
 func (d *dev) InterruptEnable(enable bool) {
@@ -163,11 +229,4 @@ func (d *dev) InterruptEnable(enable bool) {
 		d.regs.interrupt.enable_write_1_to_clear.set(d, all)
 	}
 	d.interruptsEnabled = enable
-}
-
-func (d *dev) Interrupt() {
-	if d.interruptsEnabled {
-		d.Activate(true)
-		atomic.AddInt32(&d.active_count, 1)
-	}
 }

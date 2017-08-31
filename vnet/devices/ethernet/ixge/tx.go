@@ -11,7 +11,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 
 	"fmt"
-	"sync/atomic"
 	"unsafe"
 )
 
@@ -218,15 +217,21 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 	nr := reg(in.Len())
 
 	head, tail := q.head_index, q.tail_index
+
 	// Free slots are after tail and before head.
 	n_free := head - tail
 	if int32(n_free) <= 0 {
 		n_free += q.len
 	}
+	// Head == tail means empty ring so we can only fill LEN - 1 descriptors in ring.
+	if n_free == q.len {
+		n_free--
+	}
 
 	// No room?
 	if n_free < nr {
-		panic("ga")
+		// Drop and count.
+		d.CountError(uint(tx_error_ring_full_drops), uint(nr))
 		d.m.Vnet.FreeTxRefIn(in)
 		return
 	}
@@ -235,7 +240,7 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 
 	ri, n_tx := reg(0), reg(0)
 
-	// From tail (halt index) to end of ring.
+	// From tail to end of ring.
 	di := tail
 	n_end := n_free
 	if tail+n_end > q.len {
@@ -265,7 +270,17 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 		di = 0
 	}
 
-	elog.F("%s tx %d new tail %d head %d tail %d", d.elog_name, n_tx, di, head, tail)
+	if elog.Enabled() {
+		e := tx_output_elog{
+			name:     d.elog_name,
+			n_done:   n_tx,
+			head:     head,
+			old_tail: tail,
+			new_tail: di,
+		}
+		dr := q.get_regs()
+		elog.Add(&e)
+	}
 
 	// Re-start dma engine when tail advances.
 	if di != q.tail_index {
@@ -285,11 +300,18 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 
 		dr := q.get_regs()
 		dr.tail_index.set(d, di)
-
-		// Need to poll to free up tx descriptors.
-		q.needs_polling = true
-		atomic.AddInt32(&d.active_count, 1)
 	}
+}
+
+type tx_output_elog struct {
+	name               elog.StringRef
+	head               reg
+	old_tail, new_tail reg
+	n_done             reg
+}
+
+func (e *tx_output_elog) Elog(l *elog.Log) {
+	l.Logf("%s tx %d tail %d -> %d head %d", e.name, e.n_done, e.old_tail, e.new_tail, e.head)
 }
 
 func (d *dev) tx_queue_interrupt(queue uint) {
@@ -308,14 +330,29 @@ func (d *dev) tx_queue_interrupt(queue uint) {
 	if elog.Enabled() {
 		dr := q.get_regs()
 		tail := dr.tail_index.get(d)
-		elog.F("%s tx irq adv %d head %d tail %d", d.elog_name, n_advance, di, tail)
+		e := tx_advance_elog{
+			name:      d.elog_name,
+			n_advance: n_advance,
+			head:      di,
+			tail:      tail,
+		}
+		elog.Add(&e)
 	}
 
-	q.irq_sequence = d.irq_sequence
-	q.needs_polling = n_advance > 0 || q.head_index != q.tail_index
-	if q.needs_polling {
-		atomic.AddInt32(&d.active_count, 1)
+	// Remain active until tx ring is empty and we didn't advance.
+	if !(n_advance == 0 && q.head_index == q.tail_index) {
+		d.is_active += 1
 	}
 
 	q.txRing.InterruptAdvance(uint(n_advance))
+}
+
+type tx_advance_elog struct {
+	name       elog.StringRef
+	head, tail reg
+	n_advance  reg
+}
+
+func (e *tx_advance_elog) Elog(l *elog.Log) {
+	l.Logf("%s tx advance %d head %d tail %d", e.name, e.n_advance, e.head, e.tail)
 }

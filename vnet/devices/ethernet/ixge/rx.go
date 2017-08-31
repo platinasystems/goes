@@ -12,7 +12,6 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
-	"sync/atomic"
 	"unsafe"
 )
 
@@ -138,7 +137,6 @@ func (d *dev) rx_dma_enable(queue uint, enable bool) {
 
 type rx_dev struct {
 	out                    *vnet.RefOut
-	irq_sequence           uint32
 	rx_queues              rx_dma_queue_vec
 	rx_pool                vnet.BufferPool
 	rx_next_by_layer2_type [n_ethernet_type_filter]rx_next
@@ -315,6 +313,7 @@ type rx_error uint32
 const (
 	rx_error_none rx_error = iota
 	rx_error_ip4_invalid_checksum
+	tx_error_ring_full_drops
 )
 
 func (q *rx_dma_queue) GetRefState(f vnet.RxDmaDescriptorFlags) (s vnet.RxDmaRefState) {
@@ -455,7 +454,16 @@ func (q *rx_dma_queue) rx_no_wrap(n_doneʹ reg, n_descriptors reg) (done rx_done
 	old_head := q.head_index
 	q.head_index = i
 
-	elog.F("%s rx head %d -> %d done %d %s", d.elog_name, old_head, i, n_done, done)
+	if elog.Enabled() {
+		e := rx_no_wrap_elog{
+			name:      d.elog_name,
+			old_head:  old_head,
+			new_head:  i,
+			n_done:    n_done,
+			done_code: done,
+		}
+		elog.Add(&e)
+	}
 	return
 }
 
@@ -478,27 +486,50 @@ func (d *dev) rx_queue_interrupt(queue uint) {
 		}
 	}
 
-	if n_done == 0 {
-		return
-	}
-
-	// Give tail back to hardware.
-	hw.MemoryBarrier()
-
-	q.tail_index += n_done
-	if q.tail_index > q.len {
-		q.tail_index -= q.len
-	}
-	dr.tail_index.set(d, q.tail_index)
-
 	// Flush enqueue and counters.
 	q.RxDmaRing.Flush()
 
-	// Arrange to be called again if we've not processed all potential rx descriptors.
-	q.irq_sequence = d.irq_sequence
-	if q.needs_polling = done != rx_done_found_hw_owned_descriptor; q.needs_polling {
-		atomic.AddInt32(&d.active_count, 1)
+	if n_done > 0 {
+		// Give tail back to hardware.
+		hw.MemoryBarrier()
+
+		q.tail_index += n_done
+		if q.tail_index > q.len {
+			q.tail_index -= q.len
+		}
+		dr.tail_index.set(d, q.tail_index)
 	}
 
-	elog.F("%s rx tail to hw %d", d.elog_name, q.tail_index)
+	// Arrange to be called again if we've not processed all potential rx descriptors.
+	if !(n_done == 0 && done == rx_done_found_hw_owned_descriptor) {
+		d.is_active += 1
+	}
+
+	if elog.Enabled() {
+		e := rx_queue_elog{
+			name:     d.elog_name,
+			new_tail: q.tail_index,
+		}
+		elog.Add(&e)
+	}
+}
+
+type rx_no_wrap_elog struct {
+	name               elog.StringRef
+	old_head, new_head reg
+	n_done             reg
+	done_code          rx_done_code
+}
+
+func (e *rx_no_wrap_elog) Elog(l *elog.Log) {
+	l.Logf("%s rx head %d -> %d done %d %s", e.name, e.old_head, e.new_head, e.n_done, e.done_code)
+}
+
+type rx_queue_elog struct {
+	name     elog.StringRef
+	new_tail reg
+}
+
+func (e *rx_queue_elog) Elog(l *elog.Log) {
+	l.Logf("%s rx tail to hw %d", e.name, e.new_tail)
 }
