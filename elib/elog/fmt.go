@@ -59,14 +59,20 @@ func encodeUint(b *elib.ByteVec, i0 uint, v uint64, kind int) (i uint) {
 	return
 }
 
+func encodeBoolb(b []byte, i0 uint, v bool) (i uint) {
+	i = i0
+	b[i] = fmtBoolFalse
+	if v {
+		b[i] = fmtBoolTrue
+	}
+	i++
+	return
+}
+
 func encodeBool(b *elib.ByteVec, i0 uint, v bool) (i uint) {
 	i = i0
 	b.Validate(i + 1)
-	(*b)[i] = fmtBoolFalse
-	if v {
-		(*b)[i] = fmtBoolTrue
-	}
-	i++
+	i = encodeBoolb(*b, i0, v)
 	return
 }
 
@@ -301,12 +307,8 @@ func (b *Buffer) Fc1b(format string, c Caller, v bool) {
 		f := &r.fe
 		var i uint
 		r.fmtIndex, i = f.encode(&b.shared, false, r.fmtIndex, format, nil)
-		bv := byte(fmtBoolFalse)
-		if v {
-			bv = fmtBoolTrue
-		}
-		f.b[i] = bv
-		f.b[i+1] = fmtEnd
+		i = encodeBoolb(f.b[:], i, v)
+		f.b[i] = fmtEnd
 		b.add1(f, c, 0, r)
 	}
 }
@@ -330,7 +332,7 @@ func (b *Buffer) Fc1u(format string, c Caller, v uint64) {
 		var i uint
 		r.fmtIndex, i = f.encode(&b.shared, false, r.fmtIndex, format, nil)
 		i = encodeUintb(f.b[:], i, v, fmtUint)
-		f.b[i+1] = fmtEnd
+		f.b[i] = fmtEnd
 		b.add1(f, c, 0, r)
 	}
 }
@@ -355,7 +357,7 @@ func (b *Buffer) Fc2u(format string, c Caller, v0, v1 uint64) {
 		r.fmtIndex, i = f.encode(&b.shared, false, r.fmtIndex, format, nil)
 		i = encodeUintb(f.b[:], i, v0, fmtUint)
 		i = encodeUintb(f.b[:], i, v1, fmtUint)
-		f.b[i+1] = fmtEnd
+		f.b[i] = fmtEnd
 		b.add1(f, c, 0, r)
 	}
 }
