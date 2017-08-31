@@ -251,7 +251,7 @@ func (v *View) MarshalBinary() ([]byte, error) {
 	}
 
 	// String table.
-	b, i = encodeString(b, i, string(v.stringTable.t))
+	b, i = encodeString(b, i, string(v.stringTable.strings))
 
 	// Events.
 	b.Validate(uint(i + binary.MaxVarintLen64))

@@ -8,6 +8,7 @@ package elog
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
+	"github.com/platinasystems/go/elib/parse"
 
 	"bytes"
 	"errors"
@@ -73,8 +74,8 @@ func SetStringf(format string, args ...interface{}) StringRef {
 }
 
 type stringTable struct {
-	t []byte
-	m map[string]StringRef
+	strings     []byte
+	refByString map[string]StringRef
 }
 
 func (t *stringTable) Get(si StringRef) (s string) {
@@ -82,7 +83,7 @@ func (t *stringTable) Get(si StringRef) (s string) {
 	return
 }
 func (t *stringTable) get(si StringRef) (s string, l int) {
-	b := t.t[si:]
+	b := t.strings[si:]
 	l = strings.IndexByte(string(b), 0)
 	s = string(b[:l])
 	return
@@ -90,21 +91,21 @@ func (t *stringTable) get(si StringRef) (s string, l int) {
 
 func (t *stringTable) Set(s string) (si StringRef) {
 	var ok bool
-	if si, ok = t.m[s]; ok {
+	if si, ok = t.refByString[s]; ok {
 		return
 	}
-	si = StringRef(len(t.t))
+	si = StringRef(len(t.strings))
 	if si == StringRefNil {
-		t.t = append(t.t, 0)
+		t.strings = append(t.strings, 0)
 		si = 1
 	}
 
-	if t.m == nil {
-		t.m = make(map[string]StringRef)
+	if t.refByString == nil {
+		t.refByString = make(map[string]StringRef)
 	}
-	t.m[s] = si
+	t.refByString[s] = si
 	s += "\x00" // null terminate
-	t.t = append(t.t, s...)
+	t.strings = append(t.strings, s...)
 	return
 }
 
@@ -113,18 +114,18 @@ func (t *stringTable) Setf(format string, args ...interface{}) StringRef {
 }
 
 func (t *stringTable) init(s string) {
-	t.t = []byte(s)
-	t.m = make(map[string]StringRef)
+	t.strings = []byte(s)
+	t.refByString = make(map[string]StringRef)
 	i := 0
 	for i < len(s) {
 		si := StringRef(i)
 		x, l := t.get(si)
-		t.m[x] = si
+		t.refByString[x] = si
 		i += 1 + l
 	}
 }
 
-func (dst *stringTable) copyFrom(src *stringTable) { dst.init(string(src.t)) }
+func (dst *stringTable) copyFrom(src *stringTable) { dst.init(string(src.strings)) }
 
 type sharedHeader struct {
 	// CPU timestamp when log was created.
@@ -217,6 +218,8 @@ func (b *Buffer) Enabled() bool {
 
 type eventFilter struct {
 	re      *regexp.Regexp
+	count   uint32
+	index   uint32
 	disable bool
 }
 
@@ -245,15 +248,22 @@ func (dst *eventFilterShared) copyFrom(src *eventFilterShared) {
 	dst.callers = src.callers
 }
 
-type pcHashEntry struct {
+type l1CacheEntry struct {
 	disable     bool
 	callerIndex uint32
 	pc          uint64
 }
 
 type eventFilterMain struct {
-	m map[string]*eventFilter
-	h [1 << log2HLen]pcHashEntry
+	filters      []*eventFilter
+	filterByName map[string]*eventFilter
+	l1Cache      [1 << log2HLen]l1CacheEntry
+}
+
+func (m *eventFilterMain) invalidateL1Cache() {
+	for i := range m.l1Cache {
+		m.l1Cache[i] = l1CacheEntry{}
+	}
 }
 
 const log2HLen = 9
@@ -278,10 +288,11 @@ func GetCaller(a PointerToFirstArg) (c Caller) { return DefaultBuffer.GetCaller(
 func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable bool) {
 	// Check 1st level hash.  No lock required.
 	pc := caller.pc
-	pch := &m.h[caller.pcHash&(1<<log2HLen-1)]
+	pch := &m.l1Cache[caller.pcHash&(1<<log2HLen-1)]
 	disable = pch.disable
 	if pch.pc == pc {
 		c = m.callers[pch.callerIndex]
+		c.f.count++
 		return
 	}
 
@@ -290,6 +301,7 @@ func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable boo
 	c, ok := m.callerByPC[pc]
 	if ok {
 		disable = c.f.disable
+		c.f.count++
 		m.mu.RUnlock()
 		// Update 1st level cache. No lock required.
 		pch.pc = pc
@@ -301,11 +313,12 @@ func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable boo
 
 	// Now grab write lock.
 	m.mu.Lock()
-	// Miss? Scan regexps.
+
+	// Miss? Match filter regexps.
 	var found *eventFilter
-	path := runtime.FuncForPC(uintptr(pc)).Name()
-	for _, f := range m.m {
-		if ok := f.re.MatchString(path); ok {
+	name := runtime.FuncForPC(uintptr(pc)).Name()
+	for _, f := range m.filters {
+		if ok := f.re.MatchString(name); ok {
 			found = f
 			disable = f.disable
 			break
@@ -322,6 +335,7 @@ func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable boo
 	m.callers = append(m.callers, c)
 	if found != nil {
 		c.f = *found
+		c.f.count = 1
 	}
 	m.callerByPC[pc] = c
 	pch.pc = pc
@@ -333,43 +347,78 @@ func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable boo
 
 var ErrFilterNotFound = errors.New("event filter not found")
 
-func (m *Buffer) AddDelEventFilter(matching string, enable, isDel bool) (err error) {
-	var f eventFilter
+func (b *Buffer) AddDelEventFilter(matching string, isDel bool) (err error) {
+	// !EXPRESSION means enable events matching expression; otherwise we disable.
+	disable := true
+	if matching[0] == '!' {
+		disable = false
+		matching = matching[:1]
+	}
+
+	f := &eventFilter{}
 	if !isDel {
 		if f.re, err = regexp.Compile(matching); err != nil {
 			return
 		}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if isDel {
-		if _, ok := m.m[matching]; !ok {
+		if f, ok := b.filterByName[matching]; !ok {
 			err = ErrFilterNotFound
 			return
+		} else {
+			i := int(f.index)
+			for i+1 < len(b.filters) {
+				b.filters[i] = b.filters[i+1]
+				i++
+			}
+			b.filters = b.filters[:i]
+			delete(b.filterByName, matching)
 		}
-		delete(m.m, matching)
-		return
+	} else {
+		f.disable = disable
+		f.index = uint32(len(b.filters))
+		f.count = 0
+		b.filters = append(b.filters, f)
+		if b.filterByName == nil {
+			b.filterByName = make(map[string]*eventFilter)
+		}
+		b.filterByName[matching] = f
 	}
-	f.disable = !enable
-	if m.m == nil {
-		m.m = make(map[string]*eventFilter)
-	}
-	m.m[matching] = &f
-	m.invalidateCache()
+	b.invalidateCache()
 	return
 }
 
-func AddDelEventFilter(matching string, enable, isDel bool) (err error) {
-	return DefaultBuffer.AddDelEventFilter(matching, enable, isDel)
+func AddDelEventFilter(matching string, isDel bool) (err error) {
+	return DefaultBuffer.AddDelEventFilter(matching, isDel)
 }
 
 // Reset caches to initial zero state.
-func (m *eventFilterMain) invalidateCache() { *m = eventFilterMain{} }
+func (b *Buffer) invalidateCache() {
+	m := &b.eventFilterMain
+	m.invalidateL1Cache()
+
+	// Update all callers.
+	for _, c := range b.callers {
+		c.f = eventFilter{}
+		name := runtime.FuncForPC(uintptr(c.pc)).Name()
+		for _, f := range m.filters {
+			if ok := f.re.MatchString(name); ok {
+				c.f = *f
+				break
+			}
+		}
+	}
+}
 
 func (b *Buffer) ResetFilters() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.m = nil
+
+	b.filters = nil
+	b.filterByName = nil
 	for _, c := range b.callerByPC {
 		c.f.disable = false
 	}
@@ -378,6 +427,40 @@ func (b *Buffer) ResetFilters() {
 	b.Clear()
 }
 func ResetFilters() { DefaultBuffer.ResetFilters() }
+
+func (b *Buffer) updateFilterCounts() {
+	for _, c := range b.callers {
+		if c.f.re != nil {
+			x := atomic.LoadUint32(&c.f.count)
+			atomic.AddUint32(&c.f.count, -x)
+			b.filters[c.f.index].count += x
+		}
+	}
+}
+
+func (b *Buffer) PrintFilters(w io.Writer) {
+	type row struct {
+		Expression string `format:"%-30s"`
+		Disable    bool   `align:"center" width:"10"`
+		Count      uint   `align:"left" width:"16"`
+	}
+
+	b.mu.RLock()
+	b.updateFilterCounts()
+	b.mu.RUnlock()
+
+	rows := []row{}
+	for _, f := range b.filters {
+		row := row{
+			Expression: f.re.String(),
+			Disable:    f.disable,
+			Count:      uint(f.count),
+		}
+		rows = append(rows, row)
+	}
+	elib.TabulateWrite(w, rows)
+}
+func PrintFilters(w io.Writer) { DefaultBuffer.PrintFilters(w) }
 
 func (b *Buffer) clear(resize uint) {
 	b.lockIndex(true)
@@ -550,6 +633,20 @@ func New(log2Len uint) (b *Buffer) {
 }
 func (b *Buffer) Resize(n uint) { b.clear(n) }
 func Resize(n uint)             { DefaultBuffer.Resize(n) }
+
+func Configure(in *parse.Input) (err error) {
+	for !in.End() {
+		var s string
+		switch {
+		case in.Parse("f%*ilter %v", &s):
+			AddDelEventFilter(s, false)
+		default:
+			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
+			return
+		}
+	}
+	return
+}
 
 // Time event happened in seconds relative to start of buffer.
 func (e *eventHeader) elapsedTime(s *shared) float64 {
