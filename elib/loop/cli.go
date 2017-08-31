@@ -203,18 +203,35 @@ func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (
 func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	detail := false
 	graphic := false
+	matching := ""
 	for !in.End() {
 		switch {
 		case in.Parse("de%*tail"):
 			detail = true
 		case in.Parse("gr%*aphic"):
 			graphic = true
+		case in.Parse("m%*atching %v", &matching):
 		default:
 			err = parse.ErrInput
 			return
 		}
 	}
+
 	v := elog.NewView()
+	if matching != "" {
+		var eis []uint
+		if eis, err = v.EventsMatching(matching, eis); err == nil {
+			ne, te := len(eis), v.NumEvents()
+			fmt.Fprintf(w, "%d matching of total %d\n", ne, te)
+			if detail {
+				v.PrintEvents(w, eis, detail)
+			}
+		} else {
+			fmt.Fprintln(w, "bad regexp:", matching)
+		}
+		return
+	}
+
 	if graphic {
 		l.ViewEventLog(v)
 	} else {
