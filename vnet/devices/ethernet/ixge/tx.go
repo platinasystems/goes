@@ -278,7 +278,6 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 			old_tail: tail,
 			new_tail: di,
 		}
-		dr := q.get_regs()
 		elog.Add(&e)
 	}
 
