@@ -13,6 +13,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"regexp"
 	"sort"
 	"syscall"
 	"time"
@@ -241,7 +242,7 @@ func (v *View) doViewTimes(t0, t1 float64) {
 	return
 }
 
-func (v *View) Print(w io.Writer, verbose bool) {
+func (v *View) print(w io.Writer, verbose bool, filteredEvents []uint, showFilteredEvents bool) {
 	type row struct {
 		Time  string `format:"%-30s"`
 		Data  string `format:"%s" align:"left" width:"60"`
@@ -253,12 +254,19 @@ func (v *View) Print(w io.Writer, verbose bool) {
 		"Path":  verbose,
 	}
 	ne := v.NumEvents()
+	if showFilteredEvents {
+		ne = uint(len(filteredEvents))
+	}
 	rows := make([]row, 0, ne)
 	lastTime := 0.
-	for ei := uint(0); ei < ne; ei++ {
+	for i := uint(0); i < ne; i++ {
+		ei := i
+		if showFilteredEvents {
+			ei = filteredEvents[i]
+		}
 		e := v.Event(ei)
 		t, delta := v.ElapsedTime(e), 0.
-		if ei > 0 {
+		if i > 0 {
 			delta = t - lastTime
 		}
 		lastTime = t
@@ -285,7 +293,10 @@ func (v *View) Print(w io.Writer, verbose bool) {
 	}
 	elib.Tabulate(rows).WriteCols(w, colMap)
 }
-func (b *Buffer) Print(w io.Writer, detail bool) { b.NewView().Print(w, detail) }
+
+func (v *View) Print(w io.Writer, verbose bool)                  { v.print(w, verbose, nil, false) }
+func (v *View) PrintEvents(w io.Writer, es []uint, verbose bool) { v.print(w, verbose, es, true) }
+func (b *Buffer) Print(w io.Writer, detail bool)                 { b.NewView().Print(w, detail) }
 
 // Dump log on SIGUP.
 func (b *Buffer) PrintOnHangupSignal(w io.Writer, detail bool) {
@@ -298,6 +309,32 @@ func (b *Buffer) PrintOnHangupSignal(w io.Writer, detail bool) {
 	}
 }
 func PrintOnHangupSignal(w io.Writer, detail bool) { DefaultBuffer.PrintOnHangupSignal(w, detail) }
+
+func (c *CallerInfo) match(re *regexp.Regexp) bool {
+	return re.MatchString(c.Name)
+}
+
+type EventMatch struct {
+	Events []uint
+}
+
+func (v *View) EventsMatching(matching string, events0 []uint) (events []uint, err error) {
+	events = events0
+	if events != nil {
+		events = events[:0]
+	}
+	var re *regexp.Regexp
+	if re, err = regexp.Compile(matching); err != nil {
+		return
+	}
+	for i := uint(0); i < v.NumEvents(); i++ {
+		c := v.EventCaller(i)
+		if c.match(re) {
+			events = append(events, i)
+		}
+	}
+	return
+}
 
 type viewEvent struct {
 	eventHeader
