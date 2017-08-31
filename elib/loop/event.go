@@ -124,7 +124,7 @@ func (e *loopEvent) do() {
 		if a, ok := e.actor.(elog.Data); ok {
 			elog.AddDatac(a, e.caller)
 		} else {
-			elog.Sc(e.actor.String(), e.caller)
+			elog.Fc("%s", e.caller, e.actor.String())
 		}
 	}
 	e.actor.EventAction()
