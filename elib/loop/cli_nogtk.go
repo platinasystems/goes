@@ -11,5 +11,5 @@ import (
 )
 
 func (l *Loop) ViewEventLog(v *elog.View) {
-	l.Logf("event log not supported")
+	l.Logf("event log graphical viewer not supported")
 }
