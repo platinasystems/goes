@@ -26,6 +26,7 @@ const (
 	fmtFloat
 	fmtStringRef
 	fmtString
+	fmtNil
 )
 
 type fmtEvent struct {
@@ -76,6 +77,20 @@ func encodeBool(b *elib.ByteVec, i0 uint, v bool) (i uint) {
 	return
 }
 
+func encodeNilb(b []byte, i0 uint) (i uint) {
+	i = i0
+	b[i] = fmtNil
+	i++
+	return
+}
+
+func encodeNil(b *elib.ByteVec, i0 uint) (i uint) {
+	i = i0
+	b.Validate(i + 1)
+	i = encodeNilb(*b, i0)
+	return
+}
+
 func encodeStr(b *elib.ByteVec, i0 uint, v string) (i uint) {
 	i = i0
 	l := uint(len(v))
@@ -121,9 +136,13 @@ func (s *shared) encodeArg(b *elib.ByteVec, i0 uint, a interface{}) (i uint) {
 	case float32:
 		i = encodeUint(b, i, uint64(float64(math.Float32bits(v))), fmtFloat)
 	default:
-		// Convert String() to index into string table and save for re-use.
-		if r, ok := a.(fmt.Stringer); ok {
+		if a == nil {
+			i = encodeNil(b, i)
+		} else if r, ok := a.(fmt.Stringer); ok {
+			// Convert String() to index into string table and save for re-use.
 			i = encodeUint(b, i, uint64(s.SetString(r.String())), fmtStringRef)
+		} else if r, ok := a.(error); ok {
+			i = encodeUint(b, i, uint64(s.SetString(r.Error())), fmtStringRef)
 		} else {
 			val := reflect.ValueOf(a)
 			switch val.Kind() {
@@ -191,6 +210,8 @@ func (s *shared) decodeArg(b []byte, i0 int) (a interface{}, kind byte, i int) {
 	i++
 	switch kind {
 	case fmtEnd:
+	case fmtNil:
+		a = nil
 	case fmtBoolTrue, fmtBoolFalse:
 		a = kind == fmtBoolTrue
 	case fmtInt:
