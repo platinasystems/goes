@@ -203,6 +203,7 @@ func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (
 func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	detail := false
 	graphic := false
+	showFilters := false
 	matching := ""
 	for !in.End() {
 		switch {
@@ -210,6 +211,8 @@ func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 			detail = true
 		case in.Parse("gr%*aphic"):
 			graphic = true
+		case in.Parse("f%*ilter"):
+			showFilters = true
 		case in.Parse("m%*atching %v", &matching):
 		default:
 			err = parse.ErrInput
@@ -217,7 +220,13 @@ func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 		}
 	}
 
+	if showFilters {
+		elog.PrintFilters(w)
+		return
+	}
+
 	v := elog.NewView()
+
 	if matching != "" {
 		var eis []uint
 		if eis, err = v.EventsMatching(matching, eis); err == nil {
@@ -245,15 +254,6 @@ func (l *Loop) clearEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err 
 	return
 }
 
-func addDelEventFilter(f string, isDel bool) {
-	v := true
-	if f[0] == '!' {
-		v = false
-		f = f[1:]
-	}
-	elog.AddDelEventFilter(f, v, isDel)
-}
-
 func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	var (
 		s        string
@@ -261,12 +261,12 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 	)
 	for !in.End() {
 		switch {
-		case in.Parse("add %v", &s):
-			addDelEventFilter(s, false)
-		case in.Parse("del %v", &s):
-			addDelEventFilter(s, true)
-		case in.Parse("reset"):
+		case in.Parse("f%*ilter r%*eset"):
 			elog.ResetFilters()
+		case in.Parse("f%*ilter d%*elete %v", &s):
+			elog.AddDelEventFilter(s, true)
+		case in.Parse("f%*ilter a%*dd %v", &s) || in.Parse("f%*ilter %v", &s):
+			elog.AddDelEventFilter(s, false)
 		case in.Parse("re%*size %d", &n_events):
 			elog.Resize(n_events)
 		case in.Parse("s%*ave %s", &s):
