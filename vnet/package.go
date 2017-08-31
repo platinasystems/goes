@@ -7,6 +7,7 @@ package vnet
 import (
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/dep"
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/parse"
 
 	"fmt"
@@ -126,6 +127,10 @@ func (v *Vnet) ConfigurePackages(in *parse.Input) (err error) {
 			}
 		case in.Parse("vnet %v", &subIn):
 			if err = v.Configure(&subIn); err != nil {
+				return
+			}
+		case in.Parse("elog %v", &subIn):
+			if err = elog.Configure(&subIn); err != nil {
 				return
 			}
 		default:
