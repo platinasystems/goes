@@ -219,11 +219,7 @@ type net_namespace_netlink_listen_done_event struct {
 func (e *net_namespace_netlink_listen_done_event) String() string {
 	return "netlink-listen-done " + e.ns.name
 }
-func (e *net_namespace_netlink_listen_done_event) EventAction() {
-	if err := e.ns.netlink_dump_done(e.m); err != nil {
-		e.m.v.Logf("%v: %v\n", e.ns, err)
-	}
-}
+func (e *net_namespace_netlink_listen_done_event) EventAction() { e.m.namespace_discovery_done() }
 
 func (ns *net_namespace) listen(nm *netlink_main) {
 	e := ns.getEvent(nm.m)
@@ -323,13 +319,15 @@ func (e *netlinkEvent) String() (s string) {
 }
 
 type netlinkElogEvent struct {
+	nsName       elog.StringRef
 	numMsg       uint16
 	numKindCount uint16
-	kindCounts   [(elog.EventDataBytes - 2*2) / 4]msgKindCount
+	kindCounts   [(elog.EventDataBytes - 1*4 - 2*2) / 4]msgKindCount
 }
 
 func (e *netlinkEvent) ElogData() elog.Logger {
 	var le netlinkElogEvent
+	le.nsName = e.ns.elog_name
 	le.numMsg = uint16(len(e.msgs))
 	var (
 		k msgKindCount
@@ -360,11 +358,13 @@ func (e *netlinkEvent) ElogData() elog.Logger {
 }
 
 func (e *netlinkElogEvent) Elog(l *elog.Log) {
-	if e.numKindCount != 1 {
-		l.Logf("netlink %d msg", e.numMsg)
-	}
-	for i := uint16(0); i < e.numKindCount; i++ {
-		l.Logf("netlink %d %s", e.kindCounts[i].count, e.kindCounts[i].kind)
+	if e.numKindCount > 1 {
+		l.Logf("netlink %s %d msg", e.nsName, e.numMsg)
+		for i := uint16(0); i < e.numKindCount; i++ {
+			l.Logf("%d %s", e.kindCounts[i].count, e.kindCounts[i].kind)
+		}
+	} else {
+		l.Logf("netlink %s %d %s", e.nsName, e.kindCounts[0].count, e.kindCounts[0].kind)
 	}
 }
 
