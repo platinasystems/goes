@@ -8,6 +8,7 @@ package unix
 
 import (
 	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
@@ -33,6 +34,7 @@ type tuntap_interface struct {
 	hi             vnet.Hi
 	si             vnet.Si
 	name           ifreq_name
+	elog_name      elog.StringRef
 	ifindex        uint32 // linux interface index
 
 	// Tun (ip4/ip6 header) versus tap (has ethernet header).
@@ -349,6 +351,7 @@ func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 		name = m.vnet_tun_main.linux_interface_name
 	}
 	copy(intf.name[:], name)
+	intf.elog_name = elog.SetString(name)
 
 	if m.vnet_tuntap_interface_by_si == nil {
 		m.vnet_tuntap_interface_by_si = make(map[vnet.Si]*tuntap_interface)

@@ -349,7 +349,7 @@ loop:
 			break loop
 		}
 	}
-	elog.F1u("unix-rx input %d", uint64(n_done))
+	elog.F1u("unix-rx input %d packets", uint64(n_done))
 	rx.active_lock.Lock()
 	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_done)) > 0)
 	rx.active_lock.Unlock()

@@ -119,7 +119,7 @@ func (n *tx_node) init(m *net_namespace_main) {
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
-	elog.F1u("unix-tx output %d", uint64(out.InLen()))
+	elog.F1u("unix-tx output %d packets", uint64(out.InLen()))
 	var (
 		pv      *tx_packet_vector
 		pv_intf *tuntap_interface
@@ -157,9 +157,17 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 
 func (v *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
-	elog.F1u("unix-tx %d", uint64(np))
-	atomic.AddInt32(&intf.active_count, int32(np))
+	x := atomic.AddInt32(&intf.active_count, int32(np))
 	iomux.Update(intf)
+	if elog.Enabled() {
+		e := tx_elog{
+			kind:      tx_elog_start,
+			name:      intf.elog_name,
+			n_packets: uint32(np),
+			active:    x,
+		}
+		elog.Add(&e)
+	}
 	for {
 		select {
 		case intf.to_tx <- v:
@@ -194,63 +202,81 @@ func (intf *tuntap_interface) WriteAvailable() bool { return intf.active_count >
 
 func (intf *tuntap_interface) WriteReady() (err error) {
 	if intf.pv == nil {
-		intf.pv = <-intf.to_tx
+		select {
+		case intf.pv = <-intf.to_tx:
+		default:
+		}
 	}
 	pv := intf.pv
 	ns := intf.namespace
 	n := &ns.m.tx_node
 
 	n_packets, n_drops := 0, 0
-loop:
-	for i := uint(0); i < pv.n_packets; i++ {
-		var errno syscall.Errno
-		for {
-			// First try sendmsg.
-			if !ns.m.tuntap_sendmsg_recvmsg_disable {
-				// sendmsg/sendmmsg does yet not work on /dev/net/tun sockets.  ENOTSOCK
-				_, errno = sendmsg(intf.Fd, 0, &pv.m[i].msg_hdr)
-				ns.m.tuntap_sendmsg_recvmsg_disable = errno == syscall.ENOTSOCK
+	if pv != nil {
+	loop:
+		for i := uint(0); i < pv.n_packets; i++ {
+			var errno syscall.Errno
+			for {
+				// First try sendmsg.
 				if !ns.m.tuntap_sendmsg_recvmsg_disable {
+					// sendmsg/sendmmsg does yet not work on /dev/net/tun sockets.  ENOTSOCK
+					_, errno = sendmsg(intf.Fd, 0, &pv.m[i].msg_hdr)
+					ns.m.tuntap_sendmsg_recvmsg_disable = errno == syscall.ENOTSOCK
+					if !ns.m.tuntap_sendmsg_recvmsg_disable {
+						break
+					}
+				} else {
+					// Use writev since sendmsg failed.
+					_, errno = writev(intf.Fd, pv.p[i].iovs)
 					break
 				}
-			} else {
-				// Use writev since sendmsg failed.
-				_, errno = writev(intf.Fd, pv.p[i].iovs)
-				break
 			}
-		}
 
-		switch errno {
-		case syscall.EWOULDBLOCK:
-			break loop
-		case syscall.EIO:
-			// Signaled by tun.c in kernel and means that interface is down.
-			n.CountError(tx_error_interface_down, 1)
-			n_drops++
-		case syscall.EMSGSIZE:
-			n.CountError(tx_error_packet_too_large, 1)
-			n_drops++
-		default:
-			if errno != 0 {
-				err = fmt.Errorf("writev: %s", errno)
-				n.CountError(tx_error_drop, 1)
-				n_drops++
+			switch errno {
+			case syscall.EWOULDBLOCK:
 				break loop
+			case syscall.EIO:
+				// Signaled by tun.c in kernel and means that interface is down.
+				n.CountError(tx_error_interface_down, 1)
+				n_drops++
+			case syscall.EMSGSIZE:
+				n.CountError(tx_error_packet_too_large, 1)
+				n_drops++
+			default:
+				if errno != 0 {
+					err = fmt.Errorf("writev: %s", errno)
+					n.CountError(tx_error_drop, 1)
+					n_drops++
+					break loop
+				}
 			}
+			n_packets++
 		}
-		n_packets++
-	}
-	if n.m.m.verbose_packets {
-		for i := 0; i < n_packets; i++ {
-			r := &pv.r[i]
-			n.m.m.v.Logf("unix tx %s: %s\n", intf.Name(), ethernet.RefString(r))
+		if n.m.m.verbose_packets {
+			for i := 0; i < n_packets; i++ {
+				r := &pv.r[i]
+				n.m.m.v.Logf("unix tx %s: %s\n", intf.Name(), ethernet.RefString(r))
+			}
 		}
 	}
 	// Advance to next packet in error case.
 	np := n_packets + n_drops
-	elog.F2u("unix write-ready tx %d %d", uint64(n_packets), uint64(n_drops))
-	pv.advance(n, intf, uint(np))
-	atomic.AddInt32(&intf.active_count, int32(-np))
+	if np > 0 {
+		pv.advance(n, intf, uint(np))
+	}
+	x := atomic.AddInt32(&intf.active_count, int32(-np))
+
+	if elog.Enabled() {
+		e := tx_elog{
+			kind:      tx_elog_ready,
+			name:      intf.elog_name,
+			n_packets: uint32(n_packets),
+			n_drops:   uint32(n_drops),
+			active:    x,
+		}
+		elog.Add(&e)
+	}
+
 	iomux.Update(intf)
 	if out := intf.suspend_saved_out; out != nil && len(intf.to_tx) < cap(intf.to_tx)/2 {
 		intf.suspend_saved_out = nil
@@ -263,4 +289,38 @@ loop:
 		vnet.IfDrops.Add(th, intf.si, uint(n_drops))
 	}
 	return
+}
+
+const (
+	tx_elog_start = iota
+	tx_elog_ready
+)
+
+type tx_elog_kind uint32
+
+func (k tx_elog_kind) String() string {
+	switch k {
+	case tx_elog_start:
+		return "start"
+	case tx_elog_ready:
+		return "ready"
+	default:
+		return fmt.Sprintf("unknown %d", int(k))
+	}
+}
+
+type tx_elog struct {
+	name      elog.StringRef
+	n_packets uint32
+	n_drops   uint32
+	active    int32
+	kind      tx_elog_kind
+}
+
+func (e *tx_elog) Elog(l *elog.Log) {
+	if e.kind == tx_elog_ready {
+		l.Logf("unix-tx %s %s %d packets, %d drops, active %d", e.kind, e.name, e.n_packets, e.n_drops, e.active)
+	} else {
+		l.Logf("unix-tx %s %s %d packets, active %d", e.kind, e.name, e.n_packets, e.active)
+	}
 }
