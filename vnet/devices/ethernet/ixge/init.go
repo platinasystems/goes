@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 	vnetpci "github.com/platinasystems/go/vnet/devices/bus/pci"
 
+	"sync"
 	"time"
 )
 
@@ -39,7 +40,10 @@ type dev struct {
 	elog_name   elog.StringRef
 
 	interruptsEnabled bool
+	irq_status        uint32
+	active_lock       sync.Mutex
 	active_count      int32
+	is_active         uint
 
 	/* Phy index (0 or 1) and address on MDI bus. */
 	phy_index uint

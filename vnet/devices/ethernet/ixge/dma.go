@@ -109,10 +109,8 @@ type dma_queue struct {
 	index uint
 
 	// Software head/tail pointers into descriptor ring.
+	// Head == tail means that ring is empty.  So we have to be careful to not fill the ring.
 	len, head_index, tail_index reg
-
-	irq_sequence  uint32
-	needs_polling bool
 }
 
 const n_ethernet_type_filter = 8

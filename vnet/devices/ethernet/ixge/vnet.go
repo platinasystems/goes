@@ -36,6 +36,7 @@ func (d *dev) vnetInit() {
 	d.Errors = []string{
 		rx_error_none:                 "no error",
 		rx_error_ip4_invalid_checksum: "invalid ip4 checksum",
+		tx_error_ring_full_drops:      "tx ring full",
 	}
 
 	ethernet.RegisterInterface(v, d, &d.ethIfConfig, d.dev_name())
