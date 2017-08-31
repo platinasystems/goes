@@ -660,6 +660,15 @@ func (e *bufferEvent) format(r *callerCache, l *Log) {
 }
 
 func (l *Log) sprintf(format string, args ...interface{}) {
+	// Resolve any StringRef to strings in args.
+	for i := range args {
+		a := args[i]
+		switch v := a.(type) {
+		case StringRef:
+			args[i] = l.s.GetString(v)
+		}
+	}
+
 	line := fmt.Sprintf(format, args...)
 	lines := strings.Split(line, "\n")
 	for i := range lines {
