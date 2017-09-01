@@ -8,6 +8,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -16,78 +17,59 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-func upgradeX(s string, v string, t bool, x string, f bool) error {
-	fmt.Printf("Update %s\n", x)
-	if !f {
-		vr := getVer(x)
-		vs, err := getSrvVer(s, v, t, x)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("    %s version currently:  %s\n", x, vr)
-		fmt.Printf("    %s version on server:  %s\n", x, vs)
-		if vr == vs {
-			fmt.Print("    Versions match, skipping %s upgrade\n\n", x)
-			return nil
-		}
-		if len(vr) == 0 || len(vs) == 0 {
-			fmt.Print("    No tag found, aborting %s upgrade\n\n", x)
-			return nil
-		}
+func getInstalledVersions() ([]string, error) {
+	iv := make([]string, 2)
+	_, b, err := readFlash(off[5], siz[5])
+	if err != nil {
+		return nil, err
 	}
-	if err := writeImageX(x); err != nil {
-		return err
+	iv[0] = string(b[VERSION_OFF:VERSION_LEN])
+
+	_, b, err = readFlash(altoff, altsiz)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	iv[1] = string(b[VERSION_OFF:VERSION_LEN])
+	return iv, nil
 }
 
-func getVer(x string) string { //FIXME
-	switch x {
-	case "ubo":
-		return ""
-	case "dtb":
-		return ""
-	case "env":
-		return ""
-	case "ker":
-		return ""
-	case "ini":
-		return ""
+func getServerVersion(s string, v string, t bool) (string, error) {
+	fn := "LIST"
+	if _, err := getFile(s, v, t, fn); err != nil {
+		return "", err
 	}
-	return ""
+	_, err := ioutil.ReadFile(fn) //l
+	if err != nil {
+		return "", err
+	}
+	//LOOP THROUGH L for LATEST, THEN TAKE PART RIGHT OF -, CHOPPED //FIXME
+
+	return "20170901", nil
 }
 
-func getSrvVer(s string, v string, t bool, x string) (string, error) { //FIXME
-	switch x {
-	case "ubo":
-		return "", nil
-	case "dtb":
-		return "", nil
-	case "env":
-		return "", nil
-	case "ker":
-		return "", nil
-	case "ini":
-		return "", nil
-	}
-	return "", nil
+func bootFromBackup() (bool, error) { //FIXME GET QSPI from DMESG
+	return false, nil
 }
 
-func prVer(v []string, vs []string) {
+func printVersions(s string, v string, iv []string, sv string, backup bool) {
 	fmt.Print("\n")
-	fmt.Print("Currently running:\n")
-	fmt.Printf("    U-boot version     : %s\n", v[0])
-	fmt.Printf("    Device tree version: %s\n", v[1])
-	fmt.Printf("    Environment version: %s\n", v[2])
-	fmt.Printf("    Kernel version     : %s\n", v[3])
-	fmt.Printf("    Initrd/Goes version: %s\n", v[4])
+	fmt.Print("Installed versions in QSPI flash:\n")
+	if !backup {
+		fmt.Printf("  * QSPI0 version: %s\n", iv[0])
+		fmt.Printf("    QSPI1 version: %s\n", iv[1])
+		fmt.Print("\n")
+		fmt.Print("Booted from QSPI0\n")
+	} else {
+		fmt.Printf("    QSPI0 version: %s\n", iv[0])
+		fmt.Printf("  * QSPI1 version: %s\n", iv[1])
+		fmt.Print("\n")
+		fmt.Print("Booted from QSPI1\n")
+	}
 	fmt.Print("\n")
 	fmt.Print("Version on server:\n")
-	fmt.Printf("    U-boot version     : %s\n", vs[0])
-	fmt.Printf("    Device tree version: %s\n", vs[1])
-	fmt.Printf("    Environment version: %s\n", vs[2])
-	fmt.Printf("    Kernel version     : %s\n", vs[3])
-	fmt.Printf("    Initrd/Goes version: %s\n", vs[4])
+	fmt.Printf("    Requested server  : %s\n", s)
+	fmt.Printf("    Requested version : %s\n", v)
+	fmt.Printf("    Found version     : %s\n", sv)
 	fmt.Print("\n")
 }
 

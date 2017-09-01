@@ -28,17 +28,42 @@ type EraseInfo struct {
 }
 
 const (
-	MEMGETINFO = 0x80204d01 //from linux: mtd-abi.h
-	MEMERASE   = 0x40084d02
-	MEMLOCK    = 0x40084d05
-	MEMUNLOCK  = 0x40084d06
-	MEMERASE64 = 0x40104d14
-	MTDdevice  = "/dev/mtd0"
+	MEMGETINFO  = 0x80204d01 //from linux: mtd-abi.h
+	MEMERASE    = 0x40084d02
+	MEMLOCK     = 0x40084d05
+	MEMUNLOCK   = 0x40084d06
+	MEMERASE64  = 0x40104d14
+	MTDdevice   = "/dev/mtd0"
+	VERSION_OFF = 0x000
+	VERSION_LEN = 0x008
 )
 
-var img = []string{"ubo", "dtb", "env", "ker", "ini"}
-var off = []uint32{0x00000, 0x80000, 0xc0000, 0x100000, 0x300000}
-var siz = []uint32{0x80000, 0x40000, 0x40000, 0x200000, 0x300000}
+var img = []string{"ubo", "dtb", "env", "ker", "ini", "sha"} //FIXME MAP
+var off = []uint32{0x00000, 0x80000, 0xc0000, 0x100000, 0x300000, 0xfc0000}
+var siz = []uint32{0x80000, 0x40000, 0x40000, 0x200000, 0x300000, 0x40000}
+var altoff uint32 = 0xf80000
+var altsiz uint32 = 0x40000
+
+var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
+var ei = &EraseInfo{0, 0}
+var fd int = 0
+
+func readFlash(of uint32, sz uint32) (n int, b []byte, err error) {
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return 0, nil, err
+	}
+	defer syscall.Close(fd)
+
+	if err = infoQSPI(); err != err {
+		return 0, nil, err
+	}
+	if n, b, err = readQSPI(of, sz); err != nil {
+		return 0, nil, err
+	}
+	return n, b, nil
+}
 
 func writeImageAll() (err error) {
 	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
@@ -55,28 +80,6 @@ func writeImageAll() (err error) {
 		if err := writeImageVerify("/"+Machine+"-"+j+".bin",
 			off[i], siz[i], true); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-func writeImageX(x string) (err error) {
-	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
-	if err != nil {
-		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
-		return err
-	}
-	defer syscall.Close(fd)
-
-	if err = infoQSPI(); err != err {
-		return err
-	}
-	for i, j := range img {
-		if j == x {
-			if err := writeImageVerify("/"+Machine+"-"+j+".bin",
-				off[i], siz[i], true); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
@@ -112,6 +115,7 @@ func writeImageVerify(im string, of uint32, sz uint32, vf bool) error {
 					nn, sz, im, err)
 				return err
 			}
+			//TODO REPLACE WITH DEEP EQUAL
 			for i := range b {
 				if b[i] != bb[i] {
 					err = fmt.Errorf("Verify error: %s %v",
@@ -124,27 +128,6 @@ func writeImageVerify(im string, of uint32, sz uint32, vf bool) error {
 	}
 	return nil
 }
-
-func readImage(o uint32, s uint32) (n int, b []byte, err error) {
-	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
-	if err != nil {
-		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
-		return 0, nil, err
-	}
-	defer syscall.Close(fd)
-
-	if err = infoQSPI(); err != err {
-		return 0, nil, err
-	}
-	if n, b, err = readQSPI(o, s); err != nil {
-		return 0, nil, err
-	}
-	return n, b, nil
-}
-
-var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
-var ei = &EraseInfo{0, 0}
-var fd int = 0
 
 func infoQSPI() (err error) {
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd),
