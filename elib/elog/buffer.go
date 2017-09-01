@@ -184,6 +184,7 @@ type Buffer struct {
 	events []bufferEvent
 
 	// Index into circular buffer.
+	// Bit 63 is lock bit.
 	index uint64
 
 	// Disable logging when index reaches limit.
@@ -199,21 +200,22 @@ type Buffer struct {
 }
 
 func (b *Buffer) Enable(v bool) {
-	{
-		cyclesPerSec := cpu.TimeInit()
-		b.cpuTimeUnitNsec = 1e9 / cyclesPerSec
-	}
+	cyclesPerSec := cpu.TimeInit()
+	b.cpuTimeUnitNsec = 1e9 / cyclesPerSec
 	b.lockIndex(true)
 	b.index &= lockBit
 	b.disableIndex = 0
 	if v {
+		// Enable => highest possible disable index.
 		b.disableIndex = ^b.disableIndex ^ lockBit
 	}
 	b.lockIndex(false)
 }
 
+func (b *Buffer) getIndex() uint64 { return atomic.LoadUint64(&b.index) &^ lockBit }
+
 func (b *Buffer) Enabled() bool {
-	return Enabled() && b.index < b.disableIndex
+	return Enabled() && b.getIndex() < b.disableIndex
 }
 
 type eventFilter struct {
@@ -489,9 +491,10 @@ func (b *Buffer) DisableAfter(n uint64) {
 		n = 1 << (b.log2Len - 1)
 	}
 	b.lockIndex(true)
-	b.disableIndex = (b.index &^ lockBit) + n
+	b.disableIndex = b.getIndex() + n
 	b.lockIndex(false)
 }
+func DisableAfter(n uint64) { DefaultBuffer.DisableAfter(n) }
 
 const eventDataFormatMethod = "Elog"
 
