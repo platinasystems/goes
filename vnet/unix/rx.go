@@ -123,7 +123,7 @@ type rx_node struct {
 	pv_pool                chan *rx_packet_vector
 	rv_pool                chan *rx_ref_vector
 	rv_input               chan *rx_ref_vector
-	rv_pending             *rx_ref_vector
+	pending_refs           []rx_pending_ref
 	max_buffers_per_packet uint
 	active_lock            sync.Mutex
 	active_count           int32
@@ -268,21 +268,33 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 	if err != nil {
 		rx.put_packet_vector(v)
 		rx.CountError(rx_error_drop, 1)
-		return
-	}
-	rv := rx.get_rx_ref_vector()
-	rv.n_packets = uint(n_packets)
-	for i := 0; i < n_packets; i++ {
-		p := &v.p[i]
-		m := &v.m[i]
-		rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
 	}
 	if n_packets > 0 {
-		elog.F1u("unix-rx ready %d", uint64(n_packets))
+		rv := rx.get_rx_ref_vector()
+		rv.n_packets = uint(n_packets)
+		for i := 0; i < n_packets; i++ {
+			p := &v.p[i]
+			m := &v.m[i]
+			rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
+		}
 		rx.rv_input <- rv
-		rx.active_lock.Lock()
-		rx.Activate(atomic.AddInt32(&rx.active_count, int32(n_packets)) > 0)
-		rx.active_lock.Unlock()
+	}
+	rx.active_lock.Lock()
+	x := atomic.AddInt32(&rx.active_count, int32(n_packets))
+	rx.Activate(x > 0)
+	rx.active_lock.Unlock()
+
+	if elog.Enabled() {
+		e := rx_tx_elog{
+			kind:      rx_elog_ready,
+			name:      intf.elog_name,
+			n_packets: uint32(n_packets),
+			active:    x,
+		}
+		if err != nil {
+			e.n_drops = 1
+		}
+		elog.Add(&e)
 	}
 
 	// Return packet vector for reuse.
@@ -291,66 +303,90 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 	return
 }
 
-func (rx *rx_node) copy_pending(rv *rx_ref_vector, i uint) {
-	p := rx.rv_pending
-	if p == nil {
-		p = rv
+type rx_pending_ref struct {
+	ref  vnet.Ref
+	len  uint32
+	next rx_node_next
+}
+
+func (rx *rx_node) input_ref(ref vnet.Ref, len uint32, next rx_node_next,
+	o *vnet.RefOut, n_doneʹ uint) (n_done uint, out_is_full bool) {
+	n_done = n_doneʹ
+	out := &o.Outs[next]
+	out.BufferPool = rx.buffer_pool
+	l := out.GetLen(rx.Vnet)
+	if out_is_full = l == vnet.MaxVectorLen; out_is_full {
+		return
 	}
-	n := rv.n_packets
-	n_left := n - i
-	if n_left < packet_vector_max_len {
-		copy(p.refs[:n_left], rv.refs[i:])
-		copy(p.lens[:n_left], rv.lens[i:])
-		copy(p.nexts[:n_left], rv.nexts[i:])
+	if ref.Si != vnet.SiNil {
+		vnet.IfRxCounter.Add(rx.GetIfThread(), ref.Si, 1, uint(len))
 	}
-	p.n_packets = n_left
-	rx.rv_pending = p
+	out.Refs[l] = ref
+	out.SetLen(rx.Vnet, l+1)
+	n_done++
+	return
 }
 
 func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ uint) (n_done uint, out_is_full bool) {
 	n_done = n_doneʹ
 	var i uint
-	for i = 0; i < rv.n_packets; i++ {
-		out := &o.Outs[rv.nexts[i]]
-		out.BufferPool = rx.buffer_pool
-		l := out.GetLen(rx.Vnet)
-		if out_is_full = l == vnet.MaxVectorLen; out_is_full {
-			rx.copy_pending(rv, i)
+
+	// First process pending packets.
+	np := uint(len(rx.pending_refs))
+	for i = 0; i < np; i++ {
+		pr := &rx.pending_refs[i]
+		n_done, out_is_full = rx.input_ref(pr.ref, pr.len, pr.next, o, n_done)
+		if out_is_full {
+			// Re-copy pending vector.
+			copy(rx.pending_refs[:], rx.pending_refs[i:])
 			break
 		}
-		r := &rv.refs[i]
-		if r.Si != vnet.SiNil {
-			vnet.IfRxCounter.Add(rx.GetIfThread(), r.Si, 1, uint(rv.lens[i]))
-		}
-		out.Refs[l] = *r
-		out.SetLen(rx.Vnet, l+1)
-		n_done++
 	}
-	if i >= rv.n_packets {
-		if rv == rx.rv_pending { // clear pending
-			rx.rv_pending = nil
-		}
-		rx.put_rx_ref_vector(rv)
+
+	// Remove pending refs and reuse pending vector.
+	if np > 0 {
+		rx.pending_refs = rx.pending_refs[:np-i]
 	}
+
+	// Loop through given input packets.
+	for i = 0; i < rv.n_packets; i++ {
+		r, l, n := rv.refs[i], rv.lens[i], rv.nexts[i]
+		if !out_is_full {
+			n_done, out_is_full = rx.input_ref(r, l, n, o, n_done)
+		}
+		// A next node is or was full: add to pending vector.
+		if out_is_full {
+			r := rx_pending_ref{ref: r, len: l, next: n}
+			rx.pending_refs = append(rx.pending_refs, r)
+		}
+	}
+	rx.put_rx_ref_vector(rv)
 	return
 }
 
 func (rx *rx_node) NodeInput(out *vnet.RefOut) {
-	n_done, out_is_full := uint(0), false
-	if rx.rv_pending != nil {
-		n_done, out_is_full = rx.input_ref_vector(rx.rv_pending, out, n_done)
-	}
+	n_packets, out_is_full := uint(0), false
 loop:
 	for !out_is_full {
 		select {
 		case rv := <-rx.rv_input:
-			n_done, out_is_full = rx.input_ref_vector(rv, out, n_done)
+			n_packets, out_is_full = rx.input_ref_vector(rv, out, n_packets)
 		default:
 			break loop
 		}
 	}
-	elog.F1u("unix-rx input %d packets", uint64(n_done))
+
 	rx.active_lock.Lock()
-	rx.Activate(atomic.AddInt32(&rx.active_count, -int32(n_done)) > 0)
+	x := atomic.AddInt32(&rx.active_count, -int32(n_packets))
+	rx.Activate(x > 0)
 	rx.active_lock.Unlock()
+
+	if elog.Enabled() {
+		e := rx_tx_elog{
+			kind:      rx_elog_input,
+			n_packets: uint32(n_packets),
+			active:    x,
+		}
+		elog.Add(&e)
+	}
 }
