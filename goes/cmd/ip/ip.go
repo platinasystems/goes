@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/neighbor"
 	"github.com/platinasystems/go/goes/cmd/ip/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/route"
+	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -56,6 +57,9 @@ func New() *goes.Goes {
 		monitor.New(),
 		neighbor.New(),
 		netns.New(),
-		route.New())
+		route.New(),
+		show_packages.New("license"),
+		show_packages.New("version"),
+	)
 	return g
 }

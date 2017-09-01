@@ -110,7 +110,8 @@ func main() {
 				pkg.ImportPath)
 			assume_unchanged = "--no-assume-unchanged"
 		}
-		buf, err = exec.Command("git", "describe", "--tags").Output()
+		buf, err = exec.Command("git", "describe", "--tags",
+			"--dirty='").Output()
 		if err == nil && len(buf) > 0 {
 			info.Tag = string(buf[:len(buf)-1])
 		}

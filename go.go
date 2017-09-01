@@ -5,30 +5,34 @@
 package _go_
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 
-	"github.com/platinasystems/go/internal/accumulate"
 	"github.com/platinasystems/go/internal/indent"
 )
 
-// Packages returns a list of repos info
+// Returns a list of machine additions
 var Packages func() []map[string]string
 
-// Write Yaml formatted repos info
-func WriteTo(w io.Writer) (int64, error) {
-	acc := accumulate.New(indent.New(w, "    "))
-	defer acc.Fini()
-
+// Return all package info
+func All() []map[string]string {
 	maps := []map[string]string{Package}
 	if Packages != nil {
 		maps = append(maps, Packages()...)
 	}
-	for _, m := range maps {
-		fmt.Fprint(acc, m["importpath"], ":\n")
-		indent.Increase(acc)
+	return maps
+}
+
+// Yaml formatted repos info
+func Marshal() ([]byte, error) {
+	buf := &bytes.Buffer{}
+	ibuf := indent.New(buf, "    ")
+
+	for _, m := range All() {
+		fmt.Fprint(ibuf, m["importpath"], ":\n")
+		indent.Increase(ibuf)
 		keys := make([]string, 0, len(m))
 		for k := range m {
 			if k != "importpath" {
@@ -41,17 +45,17 @@ func WriteTo(w io.Writer) (int64, error) {
 			if len(s) == 0 {
 				continue
 			}
-			fmt.Fprint(acc, k, ": ")
+			fmt.Fprint(ibuf, k, ": ")
 			if strings.Contains(s, "\n") {
-				fmt.Fprint(acc, "|\n    ")
-				indent.Increase(acc)
-				fmt.Fprintln(acc, strings.TrimSpace(s))
-				indent.Decrease(acc)
+				fmt.Fprint(ibuf, "|\n    ")
+				indent.Increase(ibuf)
+				fmt.Fprintln(ibuf, strings.TrimSpace(s))
+				indent.Decrease(ibuf)
 			} else {
-				fmt.Fprintln(acc, s)
+				fmt.Fprintln(ibuf, s)
 			}
 		}
-		indent.Decrease(acc)
+		indent.Decrease(ibuf)
 	}
-	return acc.Tuple()
+	return buf.Bytes(), nil
 }

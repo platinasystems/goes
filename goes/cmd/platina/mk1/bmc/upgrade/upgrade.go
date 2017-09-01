@@ -196,7 +196,7 @@ func doUpgrade(s string, v string, t bool, u bool, d bool,
 
 	if a && f { //FIXME CUT THIS
 		if err := writeImageAll(); err != nil {
-			return fmt.Errorf("Error writing flash: %v", err)
+			return fmt.Errorf("*** UPGRADE ERROR! ***: %v", err)
 		}
 		Reboot_flag = true
 	} else { //FIXME turn into a LOOP

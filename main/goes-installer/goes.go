@@ -25,9 +25,11 @@ func Goes() *goes.Goes {
 		},
 		lang.Alt{})
 	g.Plot(helpers.New()...)
-	g.Plot(install.New(),
+	g.Plot(
+		install.New(),
 		show_commands.New(),
-		show_packages.New(),
+		show_packages.New("license"),
+		show_packages.New("version"),
 	)
 	return g
 }

@@ -33,6 +33,8 @@ func New(s string) Command { return Command(s) }
 
 type Command string
 
+func (Command) Aka() string { return "list" }
+
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
 	if c == "list" {

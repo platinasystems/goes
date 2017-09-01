@@ -40,6 +40,8 @@ func New(s string) Command { return Command(s) }
 
 type Command string
 
+func (Command) Aka() string { return "show" }
+
 func (c Command) Apropos() lang.Alt {
 	apropos := Apropos
 	if c == "show" {

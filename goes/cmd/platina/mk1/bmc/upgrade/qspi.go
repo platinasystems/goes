@@ -52,8 +52,8 @@ func writeImageAll() (err error) {
 		return err
 	}
 	for i, j := range img {
-		if err := writeImage("/"+Machine+"-"+j+".bin",
-			off[i], siz[i]); err != nil {
+		if err := writeImageVerify("/"+Machine+"-"+j+".bin",
+			off[i], siz[i], true); err != nil {
 			return err
 		}
 	}
@@ -73,8 +73,8 @@ func writeImageX(x string) (err error) {
 	}
 	for i, j := range img {
 		if j == x {
-			if err := writeImage("/"+Machine+"-"+j+".bin",
-				off[i], siz[i]); err != nil {
+			if err := writeImageVerify("/"+Machine+"-"+j+".bin",
+				off[i], siz[i], true); err != nil {
 				return err
 			}
 		}
@@ -82,7 +82,7 @@ func writeImageX(x string) (err error) {
 	return nil
 }
 
-func writeImage(im string, of uint32, sz uint32) error {
+func writeImageVerify(im string, of uint32, sz uint32, vf bool) error {
 	if fi, err := os.Stat(im); !os.IsNotExist(err) {
 		if fi.Size() < 1000 {
 			fmt.Println("skipping file...", im)
@@ -100,9 +100,46 @@ func writeImage(im string, of uint32, sz uint32) error {
 		if err != nil {
 			return err
 		}
-		//TODO add verify
+		if vf {
+			nn, bb, err := readQSPI(of, sz)
+			if err != nil {
+				err = fmt.Errorf("Read error: %s %v",
+					im, err)
+				return err
+			}
+			if nn != int(sz) {
+				err = fmt.Errorf("Size error %v!=%v: %s %v",
+					nn, sz, im, err)
+				return err
+			}
+			for i := range b {
+				if b[i] != bb[i] {
+					err = fmt.Errorf("Verify error: %s %v",
+						im, err)
+					return err
+				}
+			}
+			fmt.Println("Verify passed:", im)
+		}
 	}
 	return nil
+}
+
+func readImage(o uint32, s uint32) (n int, b []byte, err error) {
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return 0, nil, err
+	}
+	defer syscall.Close(fd)
+
+	if err = infoQSPI(); err != err {
+		return 0, nil, err
+	}
+	if n, b, err = readQSPI(o, s); err != nil {
+		return 0, nil, err
+	}
+	return n, b, nil
 }
 
 var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
@@ -131,7 +168,6 @@ func readQSPI(of uint32, sz uint32) (int, []byte, error) {
 		err = fmt.Errorf("Read error %s: %s", of, err)
 		return 0, b, err
 	}
-	fmt.Println(n, string(b))
 	return n, b, nil
 }
 
