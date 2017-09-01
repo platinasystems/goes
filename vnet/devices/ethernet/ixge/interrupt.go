@@ -98,9 +98,16 @@ func (d *dev) get_link_state() bool { return d.regs.xge_mac.link_status.get(d)&(
 
 // Signal link state change to vnet event handler.
 func (d *dev) link_state_change() {
+	isUp := d.get_link_state()
+
+	// Read and thereby clear rx mac remote fault counter on link up.
+	// Otherwise you get 1 remote fault and complaints.  Counter does not persist once link is up.
+	if isUp {
+		counters[rx_mac_remote_faults].get(d)
+	}
 	d.SignalEvent(&vnet.LinkStateEvent{
 		Hi:   d.HwIf.Hi(),
-		IsUp: d.get_link_state(),
+		IsUp: isUp,
 	})
 }
 
