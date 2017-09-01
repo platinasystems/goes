@@ -478,11 +478,15 @@ func (e *add_del_namespace_event) String() string {
 }
 func (e *add_del_namespace_event) EventAction() {
 	if err := e.m.add_del_namespace(e); err != nil {
-		if err != addNamespaceNeedRetryErr {
+		switch err {
+		case addNamespaceNeedRetryErr, addNamespaceAlreadyExistsErr:
+			// Don't log these errors since they are not fatal.
+			// They will be in the event log.
+		default:
 			e.m.m.v.Logf("namespace watch: %v %v\n", e.file_name, err)
-			if e.is_init {
-				e.m.m.namespace_discovery_done()
-			}
+		}
+		if e.is_init && err != addNamespaceNeedRetryErr {
+			e.m.m.namespace_discovery_done()
 		}
 	}
 }
@@ -856,7 +860,10 @@ func (ns *net_namespace) allocate_sockets() (err error) {
 
 func (m *net_namespace_main) max_n_namespace() uint { return uint(len(m.namespace_by_name)) }
 
-var addNamespaceNeedRetryErr = errors.New("try again later")
+var (
+	addNamespaceNeedRetryErr     = errors.New("try again later")
+	addNamespaceAlreadyExistsErr = errors.New("already exists")
+)
 
 func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) (err error) {
 	// Allocate unique index for namespace.
@@ -911,7 +918,8 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 	// Check if namespace inode already exists.
 	// This can happen when a link is made to an existing namespace.
 	if ns1, ok := m.namespace_by_inode[ns.inode]; ok {
-		err = fmt.Errorf("namespace add %s: already exists as %s", ns.name, ns1.name)
+		elog.F("net-namespace add file %s/%s already exists as %s", e.dir.path, e.file_name, ns1.name)
+		err = addNamespaceAlreadyExistsErr
 		return
 	}
 
