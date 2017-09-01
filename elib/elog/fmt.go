@@ -324,6 +324,9 @@ func (b *Buffer) Fc1b(format string, c Caller, v bool) {
 	if !Enabled() {
 		return
 	}
+	if !b.Enabled() {
+		return
+	}
 	if r, disabled := b.getCaller(nil, c); !disabled {
 		f := &r.fe
 		var i uint
@@ -348,6 +351,9 @@ func (b *Buffer) Fc1u(format string, c Caller, v uint64) {
 	if !Enabled() {
 		return
 	}
+	if !b.Enabled() {
+		return
+	}
 	if r, disabled := b.getCaller(nil, c); !disabled {
 		f := &r.fe
 		var i uint
@@ -370,6 +376,9 @@ func (b *Buffer) F2u(format string, v0, v1 uint64) {
 }
 func (b *Buffer) Fc2u(format string, c Caller, v0, v1 uint64) {
 	if !Enabled() {
+		return
+	}
+	if !b.Enabled() {
 		return
 	}
 	if r, disabled := b.getCaller(nil, c); !disabled {
