@@ -249,21 +249,18 @@ func (t ifreq_type) String() string {
 func (m *Main) okHi(hi vnet.Hi) (ok bool) { return m.v.HwIfer(hi).IsUnix() }
 func (m *Main) okSi(si vnet.Si) bool      { return m.okHi(m.v.SupHi(si)) }
 
-func (i *tuntap_interface) ioctl_helper(fd int, req ifreq_type, arg uintptr, is_set_flags_down bool) (err error) {
+func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(req), arg)
 
 	// Ignore set if flags "no such device" error on if down.
 	// This can happen when an interfaces moves to a new namespace and is harmless.
-	if is_set_flags_down && e == syscall.ENODEV {
+	if req == ifreq_SETIFFLAGS && e == syscall.ENODEV {
 		return
 	}
 	if e != 0 {
 		err = fmt.Errorf("tuntap ioctl %s %s: %s", i.name, req, e)
 	}
 	return
-}
-func (i *tuntap_interface) ioctl(fd int, req ifreq_type, arg uintptr) (err error) {
-	return i.ioctl_helper(fd, req, arg, false)
 }
 
 func (intf *tuntap_interface) flags_synced() bool { return intf.created && intf.flag_sync_done }
@@ -572,8 +569,7 @@ func (intf *tuntap_interface) set_flags() (err error) {
 		name: intf.name,
 		i:    int(intf.flags),
 	}
-	is_set_flags_down := intf.flags&iff_up == 0
-	err = intf.ioctl_helper(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)), is_set_flags_down)
+	err = intf.ioctl(intf.provision_fd, ifreq_SETIFFLAGS, uintptr(unsafe.Pointer(&r)))
 	return
 }
 
