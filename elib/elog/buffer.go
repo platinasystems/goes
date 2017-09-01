@@ -354,7 +354,7 @@ func (b *Buffer) AddDelEventFilter(matching string, isDel bool) (err error) {
 	disable := true
 	if matching[0] == '!' {
 		disable = false
-		matching = matching[:1]
+		matching = matching[1:]
 	}
 
 	f := &eventFilter{}
