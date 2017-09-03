@@ -29,7 +29,7 @@ func (d *dev) set_queue_interrupt_mapping(rt vnet.RxTx, queue uint, irq interrup
 	b := d.queues_for_interrupt[rt][irq]
 	b = b.Set(queue)
 	d.queues_for_interrupt[rt][irq] = b
-	queueInterruptNames[irq] = fmt.Sprintf("%v %d", rt.String(), queue)
+	queueInterruptNames[irq] = fmt.Sprintf("%v queue%d", rt.String(), queue)
 }
 
 func (d *dev) foreach_queue_for_interrupt(rt vnet.RxTx, i interrupt, f func(queue uint)) {
@@ -84,7 +84,7 @@ var queueInterruptNames = [16]string{}
 func (i interrupt) String() (s string) {
 	if i < irq_n_queue {
 		if queueInterruptNames[i] != "" {
-			s = fmt.Sprintf("queue %s", queueInterruptNames[i])
+			s = fmt.Sprintf("%s", queueInterruptNames[i])
 		} else {
 			s = fmt.Sprintf("queue %d", i)
 		}
