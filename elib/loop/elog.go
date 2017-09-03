@@ -17,18 +17,20 @@ const (
 	poller_wake poller_elog_event_type = iota + 1
 	poller_wait
 	poller_suspend
+	poller_abort_suspend
 	poller_resume
 	poller_resumed
 	poller_activate
 )
 
 var poller_elog_event_type_names = [...]string{
-	poller_wake:     "wake",
-	poller_wait:     "wait",
-	poller_suspend:  "suspend",
-	poller_resume:   "resume",
-	poller_resumed:  "resumed",
-	poller_activate: "activate",
+	poller_wake:          "wake",
+	poller_wait:          "wait",
+	poller_abort_suspend: "abort-suspend",
+	poller_suspend:       "suspend",
+	poller_resume:        "resume",
+	poller_resumed:       "resumed",
+	poller_activate:      "activate",
 }
 
 func (t poller_elog_event_type) String() string {
