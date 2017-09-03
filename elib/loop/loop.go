@@ -286,7 +286,7 @@ func (l *Loop) Suspend(in *In) (resumed bool) {
 	for {
 		old := p.get_flags()
 		if resumed = old&node_resumed != 0; resumed {
-			p.pollerElog(poller_suspend, old)
+			p.pollerElog(poller_abort_suspend, old)
 			break
 		}
 		new := old
