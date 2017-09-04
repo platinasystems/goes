@@ -68,6 +68,7 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
+	initQfmt()
 	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c")
 	parm, args := parms.New(args, "-v", "-s")
 	if len(parm.ByName["-v"]) == 0 {
@@ -140,11 +141,11 @@ func reportVersions(s string, v string, t bool) (err error) {
 	if err != nil {
 		return err
 	}
-	bak, err := bootFromBackup()
+	q, err := getRunningQSPI()
 	if err != nil {
 		return err
 	}
-	printVersions(s, v, iv, sv, bak)
+	printVersions(s, v, iv, sv, q)
 	return nil
 }
 
@@ -155,6 +156,23 @@ func checkChecksums() error { //TODO
 func doUpgrade(s string, v string, t bool, f bool) error {
 	fmt.Print("\n")
 	fn := ArchiveName
+
+	if !f {
+		rv, err := getRunningVersion()
+		if err != nil {
+			return err
+		}
+		sv, err := getServerVersion(s, v, t)
+		if err != nil {
+			return err
+		}
+		newer, err := isVersionNewer(rv, sv)
+		if !newer {
+			fmt.Printf("Aborting, selected version is not newer\n")
+			return nil
+		}
+	}
+
 	n, err := getFile(s, v, t, fn)
 	if err != nil {
 		return fmt.Errorf("Error downloading: %v", err)

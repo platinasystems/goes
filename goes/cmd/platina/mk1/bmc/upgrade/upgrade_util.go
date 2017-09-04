@@ -11,67 +11,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/url"
 )
-
-func getInstalledVersions() ([]string, error) {
-	iv := make([]string, 2)
-	_, b, err := readFlash(off[5], siz[5])
-	if err != nil {
-		return nil, err
-	}
-	iv[0] = string(b[VERSION_OFF:VERSION_LEN])
-
-	_, b, err = readFlash(altoff, altsiz)
-	if err != nil {
-		return nil, err
-	}
-	iv[1] = string(b[VERSION_OFF:VERSION_LEN])
-	return iv, nil
-}
-
-func getServerVersion(s string, v string, t bool) (string, error) {
-	fn := "LIST"
-	if _, err := getFile(s, v, t, fn); err != nil {
-		return "", err
-	}
-	_, err := ioutil.ReadFile(fn) //l
-	if err != nil {
-		return "", err
-	}
-	//LOOP THROUGH L for LATEST, THEN TAKE PART RIGHT OF -, CHOPPED //FIXME
-
-	return "20170901", nil
-}
-
-func bootFromBackup() (bool, error) { //FIXME GET QSPI from DMESG
-	return false, nil
-}
-
-func printVersions(s string, v string, iv []string, sv string, backup bool) {
-	fmt.Print("\n")
-	fmt.Print("Installed versions in QSPI flash:\n")
-	if !backup {
-		fmt.Printf("  * QSPI0 version: %s\n", iv[0])
-		fmt.Printf("    QSPI1 version: %s\n", iv[1])
-		fmt.Print("\n")
-		fmt.Print("Booted from QSPI0\n")
-	} else {
-		fmt.Printf("    QSPI0 version: %s\n", iv[0])
-		fmt.Printf("  * QSPI1 version: %s\n", iv[1])
-		fmt.Print("\n")
-		fmt.Print("Booted from QSPI1\n")
-	}
-	fmt.Print("\n")
-	fmt.Print("Version on server:\n")
-	fmt.Printf("    Requested server  : %s\n", s)
-	fmt.Printf("    Requested version : %s\n", v)
-	fmt.Printf("    Found version     : %s\n", sv)
-	fmt.Print("\n")
-}
 
 func getFile(s string, v string, t bool, fn string) (int, error) {
 	rmFile(fn)
@@ -141,4 +87,124 @@ func unzip() error {
 		}
 	}
 	return nil
+}
+
+func getRunningQSPI() (int, error) { //FIXME GET QSPI from DMESG
+	return 0, nil
+}
+
+func getRunningVersion() (string, error) {
+	qspi, err := getRunningQSPI()
+	if err != nil {
+		return "", err
+	}
+	if qspi == 0 {
+		_, b, err := readFlash(Qfmt["sha"].off, Qfmt["sha"].siz)
+		if err != nil {
+			return "", err
+		}
+		return string(b[VERSION_OFF:VERSION_LEN]), nil
+	}
+	_, b, err := readFlash(Qfmt["oth"].off, Qfmt["oth"].siz)
+	if err != nil {
+		return "", err
+	}
+	return string(b[VERSION_OFF:VERSION_LEN]), nil
+}
+
+func getInstalledVersions() ([]string, error) {
+	iv := make([]string, 2)
+	_, b, err := readFlash(Qfmt["sha"].off, Qfmt["sha"].siz)
+	if err != nil {
+		return nil, err
+	}
+	iv[0] = string(b[VERSION_OFF:VERSION_LEN])
+
+	_, b, err = readFlash(Qfmt["oth"].off, Qfmt["oth"].siz)
+	if err != nil {
+		return nil, err
+	}
+	iv[1] = string(b[VERSION_OFF:VERSION_LEN])
+	return iv, nil
+}
+
+func getServerVersion(s string, v string, t bool) (string, error) {
+	fn := "LIST"
+	if _, err := getFile(s, v, t, fn); err != nil {
+		return "", err
+	}
+	l, err := ioutil.ReadFile(fn)
+	if err != nil {
+		return "", err
+	}
+	sv, err := findLatestVer(l)
+	return sv, nil
+}
+
+func printVersions(s string, v string, iv []string, sv string, qspi int) {
+	fmt.Print("\n")
+	fmt.Print("Installed versions in QSPI flash:\n")
+	if qspi == 0 {
+		fmt.Printf("  * QSPI0 version: %s\n", iv[0])
+		fmt.Printf("    QSPI1 version: %s\n", iv[1])
+		fmt.Print("\n")
+		fmt.Print("Booted from QSPI0\n")
+	} else {
+		fmt.Printf("    QSPI0 version: %s\n", iv[0])
+		fmt.Printf("  * QSPI1 version: %s\n", iv[1])
+		fmt.Print("\n")
+		fmt.Print("Booted from QSPI1\n")
+	}
+	fmt.Print("\n")
+	fmt.Print("Version on server:\n")
+	fmt.Printf("    Requested server  : %s\n", s)
+	fmt.Printf("    Requested version : %s\n", v)
+	fmt.Printf("    Found version     : %s\n", sv)
+	fmt.Print("\n")
+}
+
+func findLatestVer(b []byte) (string, error) {
+	s := ""
+	latestNum := 0.01
+	latestVer := "0.01"
+	for _, j := range b {
+		if j != 10 {
+			s += string(j)
+		} else {
+			s = strings.TrimSpace(s)
+			ss := strings.Replace(s, "v", "", -1)
+			f, _ := strconv.ParseFloat(ss, 64)
+			if f > latestNum {
+				latestNum = f
+				latestVer = s
+			}
+			s = ""
+		}
+	}
+	if latestVer == "" {
+		err := fmt.Errorf("findLatestVer error")
+		return "", err
+	}
+	return latestVer, nil
+}
+
+func isVersionNewer(cur string, x string) (n bool, err error) {
+	var c float64 = 0.0
+	var f float64 = 0.0
+	cur = strings.TrimSpace(cur)
+	cur = strings.Replace(cur, "v", "", -1)
+	c, err = strconv.ParseFloat(cur, 64)
+	if err != nil {
+		c = 0.0
+	}
+	x = strings.TrimSpace(x)
+	x = strings.Replace(x, "v", "", -1)
+	f, err = strconv.ParseFloat(x, 64)
+	if err != nil {
+		f = 0.0
+	}
+	if f > c {
+		return true, nil
+	}
+	return false, nil
 }

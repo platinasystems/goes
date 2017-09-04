@@ -38,15 +38,28 @@ const (
 	VERSION_LEN = 0x008
 )
 
-var img = []string{"ubo", "dtb", "env", "ker", "ini", "sha"} //FIXME MAP
-var off = []uint32{0x00000, 0x80000, 0xc0000, 0x100000, 0x300000, 0xfc0000}
-var siz = []uint32{0x80000, 0x40000, 0x40000, 0x200000, 0x300000, 0x40000}
-var altoff uint32 = 0xf80000
-var altsiz uint32 = 0x40000
+type FlashFmt struct {
+	off uint32
+	siz uint32
+}
+
+var Qfmt = map[string]FlashFmt{}
+var img = []string{"ubo", "dtb", "env", "ker", "ini", "sha"}
 
 var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
 var ei = &EraseInfo{0, 0}
 var fd int = 0
+
+func initQfmt() {
+	Qfmt["ubo"] = FlashFmt{off: 0x000000, siz: 0x080000}
+	Qfmt["dtb"] = FlashFmt{off: 0x080000, siz: 0x040000}
+	Qfmt["env"] = FlashFmt{off: 0x0c0000, siz: 0x040000}
+	Qfmt["ker"] = FlashFmt{off: 0x100000, siz: 0x200000}
+	Qfmt["ini"] = FlashFmt{off: 0x300000, siz: 0x300000}
+	Qfmt["oth"] = FlashFmt{off: 0xf80000, siz: 0x040000}
+	Qfmt["sha"] = FlashFmt{off: 0xfc0000, siz: 0x040000}
+	return
+}
 
 func readFlash(of uint32, sz uint32) (n int, b []byte, err error) {
 	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
@@ -76,9 +89,9 @@ func writeImageAll() (err error) {
 	if err = infoQSPI(); err != err {
 		return err
 	}
-	for i, j := range img {
+	for _, j := range img {
 		if err := writeImageVerify("/"+Machine+"-"+j+".bin",
-			off[i], siz[i], true); err != nil {
+			Qfmt[j].off, Qfmt[j].siz, true); err != nil {
 			return err
 		}
 	}
