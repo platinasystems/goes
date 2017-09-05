@@ -321,6 +321,8 @@ func (l *Loop) addDataNode(r Noder) {
 	l.dataNodeByName[n.name] = r
 }
 
+func isDataPoller(n Noder) (x inLooper, ok bool) { x, ok = n.(inLooper); return }
+
 func (l *Loop) RegisterNode(n Noder, format string, args ...interface{}) {
 	x := n.GetNode()
 	x.name = fmt.Sprintf(format, args...)
@@ -346,7 +348,7 @@ func (l *Loop) RegisterNode(n Noder, format string, args ...interface{}) {
 		if _, ok := d.(inOutLooper); ok {
 			nok++
 		}
-		if q, ok := d.(inLooper); ok {
+		if q, ok := isDataPoller(d); ok {
 			l.dataPollers = append(l.dataPollers, q)
 			if start {
 				l.startDataPoller(q)

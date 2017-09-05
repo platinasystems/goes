@@ -19,6 +19,7 @@ type nodeState struct {
 	is_active       bool
 	is_suspended    bool
 	is_pending      bool
+	is_polling      bool
 	is_active_alloc bool
 }
 
@@ -35,10 +36,8 @@ func (t *nodeState) String() (s string) {
 	return
 }
 
-type nodeActivePending struct {
-	nodeIndex  uint
-	need_alloc bool
-	need_free  bool
+type nodeAllocPending struct {
+	nodeIndex uint
 }
 
 type nodeStateMain struct {
@@ -46,7 +45,7 @@ type nodeStateMain struct {
 
 	sequence uint
 
-	activePending [2][]nodeActivePending
+	activePending [2][]nodeAllocPending
 }
 
 type SuspendLimits struct {
@@ -66,6 +65,9 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 	s := &n.s
 	active := atomic.AddInt32(&s.active, da)
 	suspend := atomic.AddInt32(&s.suspend, ds)
+	if _, ok := isDataPoller(n.noder); !ok {
+		panic(fmt.Errorf("%s: not data poller", n.name))
+	}
 	if active < 0 {
 		panic(fmt.Errorf("%s: active < 0 was %d added %d", n.name, active-da, da))
 	}
@@ -91,27 +93,30 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 		n.poller_elog_a(poller_elog_suspend_activity, ds, suspend)
 	}
 	need_alloc := is_active && !was_active
-	need_free := s.is_active_alloc && !is_active && suspend == 0
-	if !s.is_pending && (need_alloc != s.is_active_alloc || need_free) {
+	if !s.is_pending && need_alloc {
 		s.is_pending = true
-		s.is_active_alloc = !s.is_active_alloc
+		s.is_active_alloc = true
 		i := m.sequence & 1
-		ap := nodeActivePending{
-			nodeIndex:  n.index,
-			need_alloc: need_alloc,
-			need_free:  need_free,
+		ap := nodeAllocPending{
+			nodeIndex: n.index,
 		}
-		n.poller_elog(poller_elog_add_pending)
+		n.poller_elog(poller_elog_alloc_pending)
 		m.activePending[i] = append(m.activePending[i], ap)
 	}
 	if was_active = s.is_active; was_active != is_active {
 		s.is_active = is_active
-		if _, eventWait := n.l.activePollerState.changeActive(is_active); eventWait {
-			n.poller_elog(poller_elog_event_wake)
-			n.l.Interrupt()
+		if is_active {
+			n.changeActive(is_active)
 		}
 	}
 	return
+}
+
+func (n *Node) changeActive(is_active bool) {
+	if _, eventWait := n.l.activePollerState.changeActive(is_active); eventWait {
+		n.poller_elog(poller_elog_event_wake)
+		n.l.Interrupt()
+	}
 }
 
 func (n *Node) AddDataActivity(i int) { n.addActivity(i, 0, nil) }
@@ -132,7 +137,7 @@ func (n *Node) Activate(enable bool) (was bool) {
 }
 func (n *Node) IsActive() bool { return n.s.is_active }
 
-func (m *nodeStateMain) advance(nodes []Noder) (pending []nodeActivePending) {
+func (m *nodeStateMain) getAllocPending(nodes []Noder) (pending []nodeAllocPending) {
 	m.mu.Lock()
 	i0 := m.sequence & 1
 	i1 := i0 ^ 1
@@ -187,6 +192,14 @@ func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspen
 		n.poller_elog(poller_elog_resumed)
 	}
 	return
+}
+func (l *Loop) AdjustSuspendActivity(in *In, ds int) {
+	a := l.activePollerPool.entries[in.activeIndex]
+	n := a.pollerNode
+	suspend := atomic.AddInt32(&n.s.suspend, int32(ds))
+	if elog.Enabled() {
+		n.poller_elog_a(poller_elog_suspend_activity, int32(ds), suspend)
+	}
 }
 
 func (l *Loop) Suspend(in *In, lim *SuspendLimits) { l.AddSuspendActivity(in, 1, lim) }
@@ -251,35 +264,52 @@ func (s *activePollerState) changeActive(isActive bool) (uint, bool) {
 	}
 }
 
-func (n *Node) getActivePoller(l *Loop) *activePoller {
-	return l.activePollerPool.entries[n.activePollerIndex]
+func (n *Node) getActivePoller() *activePoller {
+	return n.l.activePollerPool.entries[n.activePollerIndex]
 }
 
-func (n *Node) allocActivePoller(l *Loop) {
+func (n *Node) allocActivePoller() {
+	p := &n.l.activePollerPool
 	// Already allocated?
-	if !l.activePollerPool.IsFree(n.activePollerIndex) {
+	if !p.IsFree(n.activePollerIndex) {
 		return
 	}
-	i := l.activePollerPool.GetIndex()
-	a := l.activePollerPool.entries[i]
+	i := p.GetIndex()
+	a := p.entries[i]
 	if a == nil {
 		a = &activePoller{}
-		l.activePollerPool.entries[i] = a
+		p.entries[i] = a
 	}
 	a.index = uint16(i)
 	n.activePollerIndex = i
 	a.pollerNode = n
-	n.poller_elog_i(poller_elog_alloc, i)
+	n.poller_elog_i(poller_elog_alloc, i, p.Elts())
 }
 
-func (n *Node) freeActivePoller(l *Loop) {
-	a := n.getActivePoller(l)
-	a.flushNodeStats(l)
+func (n *Node) freeActivePoller() {
+	a := n.getActivePoller()
+	a.flushNodeStats(n.l)
 	a.pollerNode = nil
 	i := n.activePollerIndex
-	l.activePollerPool.PutIndex(i)
+	p := &n.l.activePollerPool
+	p.PutIndex(i)
 	n.activePollerIndex = ^uint(0)
-	n.poller_elog_i(poller_elog_free, i)
+	n.poller_elog_i(poller_elog_free, i, p.Elts())
+}
+
+func (n *Node) maybeFreeActive() {
+	m := &n.l.nodeStateMain
+	s := &n.s
+	m.mu.Lock()
+	need_free := s.is_active_alloc && s.active == 0 && s.suspend == 0
+	if need_free {
+		s.is_active_alloc = false
+		n.changeActive(false)
+	}
+	m.mu.Unlock()
+	if need_free {
+		n.freeActivePoller()
+	}
 }
 
 func (a *activePoller) flushNodeStats(l *Loop) {
@@ -307,7 +337,7 @@ func (l *Loop) dataPoll(p inLooper) {
 	c := p.GetNode()
 	for {
 		<-c.fromLoop
-		ap := c.getActivePoller(l)
+		ap := c.getActivePoller()
 		if ap.activeNodes == nil {
 			ap.initNodes(l)
 		}
@@ -325,15 +355,10 @@ func (l *Loop) dataPoll(p inLooper) {
 
 func (l *Loop) doPollers() {
 	{
-		pending := l.nodeStateMain.advance(l.DataNodes)
+		pending := l.nodeStateMain.getAllocPending(l.DataNodes)
 		for _, p := range pending {
 			n := l.DataNodes[p.nodeIndex].GetNode()
-			if p.need_alloc {
-				n.allocActivePoller(l)
-			}
-			if p.need_free {
-				n.freeActivePoller(l)
-			}
+			n.allocActivePoller()
 		}
 	}
 
@@ -342,7 +367,12 @@ func (l *Loop) doPollers() {
 			continue
 		}
 		n := l.activePollerPool.entries[i].pollerNode
+		// Only poll if active.  This may happen when waiting for suspend count to become zero.
+		if n.s.is_polling = atomic.LoadInt32(&n.s.active) > 0; !n.s.is_polling {
+			continue
+		}
 		n.poller_elog(poller_elog_poll)
+
 		// Start poller who will be blocked waiting on fromLoop.
 		n.fromLoop <- struct{}{}
 	}
@@ -353,8 +383,11 @@ func (l *Loop) doPollers() {
 			continue
 		}
 		n := l.activePollerPool.entries[i].pollerNode
-		<-n.toLoop
-		n.poller_elog(poller_elog_poll_done)
+		if n.s.is_polling {
+			<-n.toLoop
+			n.poller_elog(poller_elog_poll_done)
+		}
+		n.maybeFreeActive()
 	}
 
 	if l.activePollerPool.Elts() == 0 {
@@ -367,7 +400,7 @@ func (l *Loop) doPollers() {
 const (
 	poller_elog_alloc = iota
 	poller_elog_free
-	poller_elog_add_pending
+	poller_elog_alloc_pending
 	poller_elog_event_wake
 	poller_elog_poll
 	poller_elog_poll_done
@@ -385,8 +418,8 @@ func (k poller_elog_kind) String() string {
 		return "alloc"
 	case poller_elog_free:
 		return "free"
-	case poller_elog_add_pending:
-		return "add-pending"
+	case poller_elog_alloc_pending:
+		return "alloc-pending"
 	case poller_elog_event_wake:
 		return "event-wake"
 	case poller_elog_poll:
@@ -412,11 +445,12 @@ type poller_elog struct {
 	da, a int32
 }
 
-func (n *Node) poller_elog_i(kind poller_elog_kind, i uint) {
+func (n *Node) poller_elog_i(kind poller_elog_kind, i, elts uint) {
 	e := poller_elog{
 		name: n.elogNodeName,
 		kind: kind,
 		a:    int32(i),
+		da:   int32(elts),
 	}
 	elog.Add(&e)
 }
@@ -442,7 +476,7 @@ func (n *Node) poller_elog(kind poller_elog_kind) {
 func (e *poller_elog) Elog(l *elog.Log) {
 	switch e.kind {
 	case poller_elog_alloc, poller_elog_free:
-		l.Logf("loop %s %s %d", e.kind, e.name, e.a)
+		l.Logf("loop %s %s %d/%d", e.kind, e.name, e.a, e.da)
 	case poller_elog_data_activity, poller_elog_suspend_activity:
 		l.Logf("loop %s %s %+d %d", e.kind, e.name, e.da, e.a)
 	default:
