@@ -261,19 +261,12 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 
 	nn.name = nextName
 
-	// Add next for all currently active nodes.
+	// Add next for all active nodes (even non-nil free ones).
 	if xr != nil {
 		nn.nodeIndex = x.index
 		nn.in = xi.MakeLoopIn()
-		for i := range l.activePollerPool.entries {
-			if l.activePollerPool.IsFree(uint(i)) {
-				continue
-			}
-			p := l.activePollerPool.entries[i]
-			if p == nil {
-				continue
-			}
-			if n.index >= uint(len(p.activeNodes)) {
+		for _, p := range l.activePollerPool.entries {
+			if p == nil || n.index >= uint(len(p.activeNodes)) {
 				continue
 			}
 			an := &p.activeNodes[n.index]
@@ -421,6 +414,11 @@ func (n *nodeStats) update(nVec uint, tStart cpu.Time) (tNow cpu.Time) {
 	s.vectors += uint64(nVec)
 	s.clocks += tNow - tStart
 	return
+}
+
+func (n *Node) UpdateOuputTime(clocks cpu.Time) {
+	s := &n.outputStats.current
+	s.clocks += clocks
 }
 
 func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
