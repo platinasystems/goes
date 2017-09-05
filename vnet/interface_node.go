@@ -180,13 +180,14 @@ func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
 				// Make a new one.
 				i = &TxRefVecIn{n: n}
 			}
-			i.refInCommon = in.refInCommon
-			i.nPackets = 0
 		}
 
 		// Add MaxVectorLen for now.. we'll correct actually number later.
 		did_suspend, _ := n.AddSuspendActivity(in, MaxVectorLen)
 		if !did_suspend {
+			// Copy common fields.
+			i.refInCommon = in.refInCommon
+			i.nPackets = 0
 			return
 		}
 
@@ -232,9 +233,6 @@ func (n *interfaceNode) ifOutput(ri *RefIn) {
 
 	rvi := n.allocTxRefVecIn(ri)
 	n_packets_in := ri.InLen()
-
-	// Copy common fields.
-	rvi.refInCommon = ri.refInCommon
 
 	rvi.Refs.Validate(n_packets_in - 1)
 	rvi.Refs = rvi.Refs[:n_packets_in]
@@ -298,6 +296,8 @@ func (n *interfaceNode) ifOutput(ri *RefIn) {
 		// Send to output thread, which then calls n.tx.InterfaceOutput.
 		n.send(ri, rvi)
 	} else {
+		// Return unused ref vector to free list.
+		n.AddSuspendActivity(ri, -MaxVectorLen)
 		n.freeChan <- rvi
 	}
 }
