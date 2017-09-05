@@ -629,7 +629,7 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		t := e.ElapsedTime(ev)
 		var ve visible_event
 
-		x := r2.XY((t-t_min)/(t_max-t_min)*w.X(), w.Y()/2)
+		x := r2.XY((t-t_min)/(t_max-t_min)*w.X(), 0)
 		if x_visible := x.X() >= 0 && x.X() < w.X(); !x_visible {
 			continue
 		}
@@ -656,22 +656,16 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 
 		// Choose integer Y such that text will not overlap with other text.
 		var (
-			idy       int
 			y_visible bool
+			idy       int
 		)
 		y_level := uint(0)
 		for {
 			// Avoid level 0 which will be used to plot event points.  See (A) below.
 			idy = int(y_level + 1)
-			// Odd levels go above baseline; even go below.
-			if idy%2 != 0 {
-				idy = (idy + 1) / 2
-			} else {
-				idy = -idy / 2
-			}
 
 			// Rounded rect with event text inside.
-			ve.rr.Center = center - r2.XY(0, (fe.Height+2*radius)*float64(idy))
+			ve.rr.Center = center + r2.XY(0, (fe.Height+2*radius)*float64(idy))
 			if y_visible = ve.rr.Center.Y()-rr_size2.Y() >= dw.Y() &&
 				ve.rr.Center.Y()+rr_size2.Y() <= w.Y()+dw.Y(); !y_visible {
 				break
@@ -702,16 +696,17 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 		// (A) Plot event points on event line at iy == 0 and lines between text & event line.
 		{
 			cr.Save()
-			const max_idy = 6
-			show_line := y_visible && idy >= -max_idy && idy <= +max_idy
+			const max_idy = 12
+			show_line := y_visible && idy <= max_idy
 			dot_radius := .9 * radius
+			dot_x := r2.XY(center.X(), dw.Y())
 			if show_line {
 				if idy > 0 {
-					c.moveTo(ve.rr.Center + r2.XY(0, (ve.rr.Size/2).Y()))
-					c.lineTo(center - r2.XY(0, dot_radius))
+					c.moveTo(ve.rr.Center - r2.XY(0, (ve.rr.Size/2).Y()))
+					c.lineTo(dot_x + r2.XY(0, dot_radius))
 				} else {
 					c.moveTo(ve.rr.Center - r2.XY(0, (ve.rr.Size/2).Y()))
-					c.lineTo(center + r2.XY(0, dot_radius))
+					c.lineTo(dot_x + r2.XY(0, dot_radius))
 				}
 				cr.SetOperator(cairo.OPERATOR_OVER)
 				cr.SetSourceRGBA(d.bg.r, d.bg.g, d.bg.b, .5)
@@ -719,8 +714,8 @@ func (v *viewer) draw_events(da *gtk.DrawingArea, cr *cairo.Context) {
 				cr.Stroke()
 			}
 
-			cr.MoveTo(center.X(), center.Y())
-			cr.Arc(center.X(), center.Y(), dot_radius, 0, 2*math.Pi)
+			cr.MoveTo(dot_x.XY())
+			cr.Arc(dot_x.X(), dot_x.Y(), dot_radius, 0, 2*math.Pi)
 			cr.SetSourceRGBA(d.bg.r, d.bg.g, d.bg.b, 1)
 			cr.Fill()
 			cr.Restore()
