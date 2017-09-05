@@ -87,9 +87,7 @@ func (e *tx_descriptor) String() (s string) {
 const log2DescriptorAlignmentBytes = 7
 
 func (d *dev) tx_dma_init(queue uint) {
-	if d.tx_ring_len == 0 {
-		d.tx_ring_len = 4 * vnet.MaxVectorLen
-	}
+	d.tx_ring_len = vnet.MaxOutstandingTxRefs
 	q := d.tx_queues.Validate(queue)
 	q.d = d
 	q.index = queue

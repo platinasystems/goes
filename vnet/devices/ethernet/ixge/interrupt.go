@@ -156,76 +156,40 @@ func (d *dev) set_irq_status(s uint32) {
 
 func (d *dev) InterfaceInput(out *vnet.RefOut) {
 	if !d.interruptsEnabled {
-		for qi := range d.tx_queues {
-			d.tx_queue_interrupt(uint(qi))
-		}
-		for qi := range d.rx_queues {
-			d.rx_queue_interrupt(uint(qi))
-		}
-	} else {
-		d.is_active = uint(0)
-		s := d.get_irq_status()
-		d.out = out
-		elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
+		d.Interrupt()
+	}
+	d.is_active = uint(0)
+	s := d.get_irq_status()
+	d.out = out
+	elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
 
-		inc := int32(0)
-		if d.is_active == 0 {
-			inc--
+	inc := 0
+	if d.is_active == 0 {
+		inc--
+	}
+	d.AddDataActivity(inc)
+	if elog.Enabled() {
+		e := irq_elog{
+			name:   d.elog_name,
+			status: s,
 		}
-		d.active_lock.Lock()
-		x := atomic.AddInt32(&d.active_count, -1)
-		d.Activate(x > 0)
-		d.active_lock.Unlock()
-
-		if elog.Enabled() {
-			e := irq_elog{
-				name:   d.elog_name,
-				status: s,
-				active: x,
-			}
-			elog.Add(&e)
-		}
+		elog.Add(&e)
 	}
 }
 
 func (d *dev) Interrupt() {
-	if d.interruptsEnabled {
-		s := d.regs.interrupt.status_write_1_to_set.get(d)
-		d.regs.interrupt.status_write_1_to_clear.set(d, s)
-		d.set_irq_status(uint32(s))
-		d.active_lock.Lock()
-		x := atomic.AddInt32(&d.active_count, 1)
-		d.Activate(true)
-		d.active_lock.Unlock()
-
-		if elog.Enabled() {
-			e := irq_elog{
-				name:   d.elog_name,
-				status: uint32(s),
-				active: x,
-				is_irq: true,
-			}
-			elog.Add(&e)
+	s := d.regs.interrupt.status_write_1_to_set.get(d)
+	d.regs.interrupt.status_write_1_to_clear.set(d, s)
+	d.set_irq_status(uint32(s))
+	d.AddDataActivity(1)
+	if elog.Enabled() {
+		e := irq_elog{
+			name:   d.elog_name,
+			status: uint32(s),
+			is_irq: true,
 		}
+		elog.Add(&e)
 	}
-}
-
-type irq_elog struct {
-	name   elog.StringRef
-	status uint32
-	active int32
-	is_irq bool
-}
-
-func (e *irq_elog) Elog(l *elog.Log) {
-	what := "input"
-	if e.is_irq {
-		what = "interrupt"
-	}
-	l.Logf("%s %s status 0x%x active %d", e.name, what, e.status, e.active)
-	elib.Word(e.status).ForeachSetBit(func(i uint) {
-		l.Logf("%s irq %s", e.name, interrupt(i))
-	})
 }
 
 func (d *dev) InterruptEnable(enable bool) {
@@ -236,4 +200,21 @@ func (d *dev) InterruptEnable(enable bool) {
 		d.regs.interrupt.enable_write_1_to_clear.set(d, all)
 	}
 	d.interruptsEnabled = enable
+}
+
+type irq_elog struct {
+	name   elog.StringRef
+	status uint32
+	is_irq bool
+}
+
+func (e *irq_elog) Elog(l *elog.Log) {
+	what := "input"
+	if e.is_irq {
+		what = "interrupt"
+	}
+	l.Logf("%s %s status 0x%x", e.name, what, e.status)
+	elib.Word(e.status).ForeachSetBit(func(i uint) {
+		l.Logf("%s irq %s", e.name, interrupt(i))
+	})
 }
