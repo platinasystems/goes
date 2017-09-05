@@ -14,11 +14,12 @@ import (
 )
 
 type nodeState struct {
-	active       int32
-	suspend      int32
-	is_active    bool
-	is_suspended bool
-	is_pending   bool
+	active          int32
+	suspend         int32
+	is_active       bool
+	is_suspended    bool
+	is_pending      bool
+	is_active_alloc bool
 }
 
 func (t *nodeState) String() (s string) {
@@ -35,9 +36,9 @@ func (t *nodeState) String() (s string) {
 }
 
 type nodeActivePending struct {
-	nodeIndex    uint
-	is_active    bool
-	is_suspended bool
+	nodeIndex  uint
+	need_alloc bool
+	need_free  bool
 }
 
 type nodeStateMain struct {
@@ -89,30 +90,28 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 		s.is_suspended = did_suspend && !did_resume
 		n.poller_elog_a(poller_elog_suspend_activity, ds, suspend)
 	}
+	need_alloc := is_active && !was_active
+	need_free := s.is_active_alloc && !is_active && suspend == 0
+	if !s.is_pending && (need_alloc != s.is_active_alloc || need_free) {
+		s.is_pending = true
+		s.is_active_alloc = !s.is_active_alloc
+		i := m.sequence & 1
+		ap := nodeActivePending{
+			nodeIndex:  n.index,
+			need_alloc: need_alloc,
+			need_free:  need_free,
+		}
+		n.poller_elog(poller_elog_add_pending)
+		m.activePending[i] = append(m.activePending[i], ap)
+	}
 	if was_active = s.is_active; was_active != is_active {
 		s.is_active = is_active
-		n.addPending(m)
 		if _, eventWait := n.l.activePollerState.changeActive(is_active); eventWait {
 			n.poller_elog(poller_elog_event_wake)
 			n.l.Interrupt()
 		}
 	}
 	return
-}
-
-func (n *Node) addPending(m *nodeStateMain) {
-	s := &n.s
-	if !s.is_pending {
-		s.is_pending = true
-		i := m.sequence & 1
-		n.poller_elog(poller_elog_add_pending)
-		m.activePending[i] = append(m.activePending[i],
-			nodeActivePending{
-				nodeIndex:    n.index,
-				is_active:    s.is_active,
-				is_suspended: s.is_suspended,
-			})
-	}
 }
 
 func (n *Node) AddDataActivity(i int) { n.addActivity(i, 0, nil) }
@@ -329,9 +328,10 @@ func (l *Loop) doPollers() {
 		pending := l.nodeStateMain.advance(l.DataNodes)
 		for _, p := range pending {
 			n := l.DataNodes[p.nodeIndex].GetNode()
-			if p.is_active {
+			if p.need_alloc {
 				n.allocActivePoller(l)
-			} else if !p.is_suspended {
+			}
+			if p.need_free {
 				n.freeActivePoller(l)
 			}
 		}
