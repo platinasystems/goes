@@ -217,7 +217,7 @@ type net_namespace_netlink_listen_done_event struct {
 }
 
 func (e *net_namespace_netlink_listen_done_event) String() string {
-	return "netlink-listen-done " + e.ns.name
+	return "netlink namespace discovery: " + e.ns.name
 }
 func (e *net_namespace_netlink_listen_done_event) EventAction() { e.m.namespace_discovery_done() }
 
