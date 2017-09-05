@@ -66,10 +66,10 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 	active := atomic.AddInt32(&s.active, da)
 	suspend := atomic.AddInt32(&s.suspend, ds)
 	if active < 0 {
-		panic("active < 0")
+		panic(fmt.Errorf("%s: active < 0 was %d added %d", n.name, active-da, da))
 	}
 	if suspend < 0 {
-		panic("suspend < 0")
+		panic(fmt.Errorf("%s: suspend < 0 was %d added %d", n.name, suspend-ds, ds))
 	}
 	is_active := active > 0
 	if lim == nil {
