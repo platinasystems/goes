@@ -325,11 +325,17 @@ type rx_tx_elog struct {
 
 func (e *rx_tx_elog) Elog(l *elog.Log) {
 	switch e.kind {
-	case tx_elog_ready, tx_elog_start, rx_elog_ready:
+	case tx_elog_ready, tx_elog_start:
 		if e.n_drops != 0 {
 			l.Logf("unix %s %s %d packets, %d drops, active %d", e.kind, e.name, e.n_packets, e.n_drops, e.active)
 		} else {
 			l.Logf("unix %s %s %d packets, active %d", e.kind, e.name, e.n_packets, e.active)
+		}
+	case rx_elog_ready:
+		if e.n_drops != 0 {
+			l.Logf("unix %s %s %d packets, %d drops", e.kind, e.name, e.n_packets, e.n_drops)
+		} else {
+			l.Logf("unix %s %s %d packets", e.kind, e.name, e.n_packets)
 		}
 	case rx_elog_input:
 		l.Logf("unix %s %d packets, active %d", e.kind, e.n_packets, e.active)
