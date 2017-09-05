@@ -141,7 +141,7 @@ func reportVersions(s string, v string, t bool) (err error) {
 	if err != nil {
 		return err
 	}
-	q, err := getRunningQSPI()
+	q, err := getBootedQSPI()
 	if err != nil {
 		return err
 	}
@@ -161,6 +161,10 @@ func doUpgrade(s string, v string, t bool, f bool) error {
 		rv, err := getRunningVersion()
 		if err != nil {
 			return err
+		}
+		if len(rv) == 0 {
+			fmt.Printf("Aborting, couldn't resolve booted QSPI\n")
+			return nil
 		}
 		sv, err := getServerVersion(s, v, t)
 		if err != nil {

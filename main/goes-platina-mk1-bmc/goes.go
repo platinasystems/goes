@@ -58,6 +58,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgraded"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
@@ -164,6 +165,7 @@ func Goes() *goes.Goes {
 		slashinit.New(),
 		sleep.New(),
 		upgrade.New(),
+		upgraded.New(),
 		source.New(),
 		start.New(),
 		stop.New(),

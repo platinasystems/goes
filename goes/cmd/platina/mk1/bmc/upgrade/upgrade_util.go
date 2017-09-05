@@ -89,12 +89,22 @@ func unzip() error {
 	return nil
 }
 
-func getRunningQSPI() (int, error) { //FIXME GET QSPI from DMESG
-	return 0, nil
+func getBootedQSPI() (int, error) {
+	dat, err := ioutil.ReadFile("/tmp/qspi")
+	if err != nil {
+		return -1, err
+	}
+	if strings.Contains(string(dat), "QSPI0") {
+		return 0, nil
+	}
+	if strings.Contains(string(dat), "QSPI1") {
+		return 1, nil
+	}
+	return -1, nil
 }
 
 func getRunningVersion() (string, error) {
-	qspi, err := getRunningQSPI()
+	qspi, err := getBootedQSPI()
 	if err != nil {
 		return "", err
 	}
@@ -105,11 +115,14 @@ func getRunningVersion() (string, error) {
 		}
 		return string(b[VERSION_OFF:VERSION_LEN]), nil
 	}
-	_, b, err := readFlash(Qfmt["oth"].off, Qfmt["oth"].siz)
-	if err != nil {
-		return "", err
+	if qspi == 1 {
+		_, b, err := readFlash(Qfmt["oth"].off, Qfmt["oth"].siz)
+		if err != nil {
+			return "", err
+		}
+		return string(b[VERSION_OFF:VERSION_LEN]), nil
 	}
-	return string(b[VERSION_OFF:VERSION_LEN]), nil
+	return "", nil
 }
 
 func getInstalledVersions() ([]string, error) {
