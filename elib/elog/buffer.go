@@ -195,6 +195,8 @@ type Buffer struct {
 
 	pcHashSeed uint64
 
+	panicSaveFile string
+
 	eventFilterMain
 	shared
 }
@@ -285,7 +287,9 @@ func (b *Buffer) GetCaller(a PointerToFirstArg) (c Caller) {
 	}
 	return
 }
+
 func GetCaller(a PointerToFirstArg) (c Caller) { return DefaultBuffer.GetCaller(a) }
+func (c *Caller) SetTimeNow()                  { c.time = uint64(cpu.TimeNow()) }
 
 func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable bool) {
 	// Check 1st level hash.  No lock required.
@@ -638,15 +642,21 @@ func (b *Buffer) Resize(n uint) { b.clear(n) }
 func Resize(n uint)             { DefaultBuffer.Resize(n) }
 
 func Configure(in *parse.Input) (err error) {
+	var save string
 	for !in.End() {
 		var s string
 		switch {
 		case in.Parse("f%*ilter %v", &s):
 			AddDelEventFilter(s, false)
+		case in.Parse("panic-save %v", &save):
 		default:
 			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
 			return
 		}
+	}
+	// Save on signal 1 HUP.
+	if save != "" {
+		go SaveOnHangupSignal(save)
 	}
 	return
 }

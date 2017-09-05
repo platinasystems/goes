@@ -40,19 +40,23 @@ func (v *View) Restore(r io.Reader) (err error) {
 	return
 }
 
-func SaveView(file string) (err error) {
+func (v *View) SaveFile(file string) (err error) {
 	var f *os.File
 	if f, err = os.OpenFile(file, os.O_CREATE|os.O_RDWR, 0666); err != nil {
 		return
 	}
 	defer f.Close()
-	v := NewView()
 	v.SetName(file)
 	err = v.Save(f)
 	return
 }
 
-func (v *View) Load(file string) (err error) {
+func SaveFile(file string) error {
+	v := NewView()
+	return v.SaveFile(file)
+}
+
+func (v *View) LoadFile(file string) (err error) {
 	var f *os.File
 	if f, err = os.OpenFile(file, os.O_RDONLY, 0); err != nil {
 		return

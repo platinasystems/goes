@@ -310,6 +310,29 @@ func (b *Buffer) PrintOnHangupSignal(w io.Writer, detail bool) {
 }
 func PrintOnHangupSignal(w io.Writer, detail bool) { DefaultBuffer.PrintOnHangupSignal(w, detail) }
 
+func (b *Buffer) SaveOnHangupSignal(file string) {
+	b.panicSaveFile = file
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP)
+	for {
+		<-c
+		v := b.NewView()
+		if err := v.SaveFile(file); err != nil {
+			panic(err)
+		}
+	}
+}
+func SaveOnHangupSignal(file string) { DefaultBuffer.SaveOnHangupSignal(file) }
+
+func (b *Buffer) Panic(err interface{}) {
+	F("panic %s", err)
+	if file := b.panicSaveFile; file != "" {
+		v := b.NewView()
+		v.SaveFile(file)
+	}
+}
+func Panic(err interface{}) { DefaultBuffer.Panic(err) }
+
 func (c *CallerInfo) match(re *regexp.Regexp) bool {
 	return re.MatchString(c.Name)
 }
