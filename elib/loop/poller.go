@@ -63,6 +63,7 @@ func (n *Node) addActivity(da, ds int, lim *SuspendLimits) (was_active, did_susp
 func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, did_suspend, did_resume bool) {
 	m := &n.l.nodeStateMain
 	s := &n.s
+	// fixme atomics not necessary since we have lock
 	active := atomic.AddInt32(&s.active, da)
 	suspend := atomic.AddInt32(&s.suspend, ds)
 	if _, ok := isDataPoller(n.noder); !ok {
@@ -76,7 +77,7 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 	}
 	is_active := active > 0
 	if lim == nil {
-		n.poller_elog_a(poller_elog_data_activity, da, active)
+		n.poller_elog_ab(poller_elog_data_activity, da, active, suspend)
 	} else {
 		limit := int32(lim.Suspend)
 		if s.is_suspended {
@@ -90,7 +91,7 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 		}
 		did_resume = s.is_suspended && is_active
 		s.is_suspended = did_suspend && !did_resume
-		n.poller_elog_a(poller_elog_suspend_activity, ds, suspend)
+		n.poller_elog_ab(poller_elog_suspend_activity, ds, suspend, active)
 	}
 	need_alloc := is_active && !was_active
 	if !s.is_pending && need_alloc {
@@ -198,7 +199,8 @@ func (l *Loop) AdjustSuspendActivity(in *In, ds int) {
 	n := a.pollerNode
 	suspend := atomic.AddInt32(&n.s.suspend, int32(ds))
 	if elog.Enabled() {
-		n.poller_elog_a(poller_elog_suspend_activity, int32(ds), suspend)
+		active := atomic.LoadInt32(&n.s.active)
+		n.poller_elog_ab(poller_elog_suspend_activity, int32(ds), suspend, active)
 	}
 }
 
@@ -368,7 +370,7 @@ func (l *Loop) doPollers() {
 		}
 		n := l.activePollerPool.entries[i].pollerNode
 		// Only poll if active.  This may happen when waiting for suspend count to become zero.
-		if n.s.is_polling = atomic.LoadInt32(&n.s.active) > 0; !n.s.is_polling {
+		if n.s.is_polling = !n.s.is_suspended && atomic.LoadInt32(&n.s.active) > 0; !n.s.is_polling {
 			continue
 		}
 		n.poller_elog(poller_elog_poll)
@@ -431,18 +433,18 @@ func (k poller_elog_kind) String() string {
 	case poller_elog_resumed:
 		return "resumed"
 	case poller_elog_data_activity:
-		return "+data"
+		return "add-data"
 	case poller_elog_suspend_activity:
-		return "+suspend"
+		return "add-suspend"
 	default:
 		return fmt.Sprintf("unknown %d", int(k))
 	}
 }
 
 type poller_elog struct {
-	name  elog.StringRef
-	kind  poller_elog_kind
-	da, a int32
+	name     elog.StringRef
+	kind     poller_elog_kind
+	da, a, b int32
 }
 
 func (n *Node) poller_elog_i(kind poller_elog_kind, i, elts uint) {
@@ -455,12 +457,13 @@ func (n *Node) poller_elog_i(kind poller_elog_kind, i, elts uint) {
 	elog.Add(&e)
 }
 
-func (n *Node) poller_elog_a(kind poller_elog_kind, da, a int32) {
+func (n *Node) poller_elog_ab(kind poller_elog_kind, da, a, b int32) {
 	e := poller_elog{
 		name: n.elogNodeName,
 		kind: kind,
 		da:   da,
 		a:    a,
+		b:    b,
 	}
 	elog.Add(&e)
 }
@@ -478,7 +481,7 @@ func (e *poller_elog) Elog(l *elog.Log) {
 	case poller_elog_alloc, poller_elog_free:
 		l.Logf("loop %s %s %d/%d", e.kind, e.name, e.a, e.da)
 	case poller_elog_data_activity, poller_elog_suspend_activity:
-		l.Logf("loop %s %s %+d %d", e.kind, e.name, e.da, e.a)
+		l.Logf("loop %s %s %+d %d %d", e.kind, e.name, e.da, e.a, e.b)
 	default:
 		l.Logf("loop %s %s", e.kind, e.name)
 	}
