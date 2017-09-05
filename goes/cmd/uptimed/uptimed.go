@@ -41,9 +41,19 @@ func (c Command) Close() error {
 func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c Command) Main(...string) error {
-	if err := update(); err != nil {
+	var si syscall.Sysinfo_t
+	err := syscall.Sysinfo(&si)
+	if err != nil {
 		return err
 	}
+
+	pub, err := publisher.New()
+	if err != nil {
+		return err
+	}
+	defer pub.Close()
+
+	pub.Print("uptime: ", update())
 	t := time.NewTicker(60 * time.Second)
 	defer t.Stop()
 	for {
@@ -51,9 +61,7 @@ func (c Command) Main(...string) error {
 		case <-c:
 			return nil
 		case <-t.C:
-			if err := update(); err != nil {
-				return err
-			}
+			pub.Print("uptime: ", update())
 		}
 	}
 	return nil
@@ -62,7 +70,11 @@ func (c Command) Main(...string) error {
 func (Command) String() string { return Name }
 func (Command) Usage() string  { return Usage }
 
-func update_uptime(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
+func update() string {
+	var si syscall.Sysinfo_t
+	if err := syscall.Sysinfo(&si); err != nil {
+		return err.Error()
+	}
 	buf := new(bytes.Buffer)
 	updecades := si.Uptime / (60 * 60 * 24 * 365 * 10)
 	upyears := (si.Uptime / (60 * 60 * 24 * 365)) % 10
@@ -116,55 +128,5 @@ func update_uptime(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
 			fmt.Fprint(buf, "s")
 		}
 	}
-	pub.Print("sys.uptime: ", buf.String())
-}
-
-func update_cpu(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
-	const scale float64 = 65536.0 // magic SI_LOAD_SHIFT
-
-	for _, v := range []struct {
-		key  string
-		load uint64
-	}{
-		{"sys.cpu.load1", si.Loads[0]},
-		{"sys.cpu.load10", si.Loads[1]},
-		{"sys.cpu.load15", si.Loads[2]},
-	} {
-		fload := float64(v.load) / scale
-		pub.Print(fmt.Sprintf("%s: %2.2f", v.key, fload))
-	}
-}
-
-func update_mem(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
-	for _, v := range []struct {
-		key   string
-		value uint64
-	}{
-		{"sys.mem.total", si.Totalram},
-		{"sys.mem.free", si.Freeram},
-		{"sys.mem.shared", si.Sharedram},
-		{"sys.mem.buffer", si.Bufferram},
-	} {
-		pub.Print(fmt.Sprintf("%s: %v", v.key, v.value))
-	}
-}
-
-func update() error {
-	var si syscall.Sysinfo_t
-	err := syscall.Sysinfo(&si)
-	if err != nil {
-		return err
-	}
-
-	pub, err := publisher.New()
-	if err != nil {
-		return err
-	}
-	defer pub.Close()
-
-	update_uptime(&si, pub)
-	update_cpu(&si, pub)
-	update_mem(&si, pub)
-
-	return nil
+	return buf.String()
 }
