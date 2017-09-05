@@ -262,7 +262,6 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 		n_packets++
 	}
 	if err != nil {
-		rx.put_packet_vector(v)
 		rx.CountError(rx_error_drop, 1)
 	}
 	if n_packets > 0 {
@@ -273,6 +272,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 			m := &v.m[i]
 			rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
 		}
+		rx.AddDataActivity(int(n_packets))
 		rx.rv_input <- rv
 	}
 
@@ -287,8 +287,6 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 		}
 		elog.Add(&e)
 	}
-
-	rx.AddDataActivity(int(n_packets))
 
 	// Return packet vector for reuse.
 	rx.put_packet_vector(v)
