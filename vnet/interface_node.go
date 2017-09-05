@@ -5,8 +5,11 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/loop"
+
+	"fmt"
 )
 
 type interfaceInputer interface {
@@ -29,10 +32,8 @@ type interfaceNode struct {
 
 	hi Hi
 
-	max_tx_refs uint
-	cur_tx_refs uint
-	tx_chan     chan *TxRefVecIn
-	free_list   []*TxRefVecIn
+	tx_chan   chan *TxRefVecIn
+	free_list []*TxRefVecIn
 
 	txDownDropError uint
 
@@ -79,14 +80,32 @@ const tx_ref_vec_in_fifo_len = 256
 
 func (n *interfaceNode) ifOutputThread() {
 	for x := range n.tx_chan {
+		if elog.Enabled() {
+			e := txElogEvent{
+				kind:      tx_elog_tx,
+				node_name: n.ElogName(),
+				n_refs:    uint32(x.Len()),
+			}
+			elog.Add(&e)
+		}
+
+		t0 := cpu.TimeNow()
 		n.tx.InterfaceOutput(x)
+
+		// Add clock cycles used in output thread to node timings.
+		dt := cpu.TimeNow() - t0
+		n.UpdateOuputTime(dt)
 	}
 }
+
+// Largest number of outstanding transmit buffers before we suspend.
+const (
+	MaxOutstandingTxRefs = 4 * MaxVectorLen
+)
 
 func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 	n.tx = tx
 	n.freeChan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
-	n.max_tx_refs = 2 * MaxVectorLen
 }
 
 func (h *HwIf) txNodeUpDown(isUp bool) {
@@ -102,36 +121,54 @@ func (h *HwIf) txNodeUpDown(isUp bool) {
 	}
 }
 
+const (
+	tx_elog_send_tx = iota
+	tx_elog_tx
+)
+
+type tx_elog_kind uint32
+
+func (k tx_elog_kind) String() string {
+	switch k {
+	case tx_elog_send_tx:
+		return "send-tx"
+	case tx_elog_tx:
+		return "tx"
+	default:
+		return fmt.Sprintf("unknown %d", int(k))
+	}
+}
+
 type txElogEvent struct {
 	node_name elog.StringRef
+	kind      tx_elog_kind
 	n_refs    uint32
 }
 
 func (e *txElogEvent) Elog(l *elog.Log) {
-	l.Logf("tx %s send %d buffers", l.GetString(e.node_name), e.n_refs)
+	l.Logf("%s %s %d buffers", e.kind, l.GetString(e.node_name), e.n_refs)
 }
 
 func (n *interfaceNode) send(i *TxRefVecIn) {
+	l := i.Len()
 	if elog.Enabled() {
 		e := txElogEvent{
+			kind:      tx_elog_send_tx,
 			node_name: n.ElogName(),
-			n_refs:    uint32(i.Len()),
+			n_refs:    uint32(l),
 		}
 		elog.Add(&e)
 	}
-	n.cur_tx_refs += i.Len()
 	n.tx_chan <- i
 }
 
 func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
-	l := &n.Vnet.loop
 	for {
 		// Find a place to put a vector of packets (TxRefVecIn).
 		select {
 		case i = <-n.freeChan:
 			// Re-cycle one that output routine is done with.
 			i.FreeRefs(false)
-			n.cur_tx_refs -= i.Len()
 		default:
 			if l := len(n.free_list); l > 0 {
 				// Re-cycle one from free list.
@@ -144,18 +181,14 @@ func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
 			i.refInCommon = in.refInCommon
 			i.nPackets = 0
 		}
-		// Check that we stay within ref limit.
-		if n.cur_tx_refs+MaxVectorLen <= n.max_tx_refs {
+
+		did_suspend, _ := n.AddSuspendActivity(in, int(in.InLen()))
+		if !did_suspend {
 			return
 		}
 
-		// We're over ref limit.  Add ref back to free list.
+		// We're over ref limit.  Add ref vector back to free list.
 		n.free_list = append(n.free_list, i)
-
-		// Suspend unless another has appeared.
-		if len(n.freeChan) == 0 {
-			l.Suspend(&in.In)
-		}
 	}
 }
 
@@ -175,9 +208,14 @@ type TxRefVecIn struct {
 	n *interfaceNode
 }
 
+var suspendLimits = loop.SuspendLimits{
+	Suspend: MaxOutstandingTxRefs,
+	Resume:  1 * MaxVectorLen,
+}
+
 func (v *Vnet) FreeTxRefIn(i *TxRefVecIn) {
+	v.loop.AddSuspendActivity(&i.In, -int(i.Len()), &suspendLimits)
 	i.n.freeChan <- i
-	v.loop.Resume(&i.In)
 }
 func (i *TxRefVecIn) Free(v *Vnet) { v.FreeTxRefIn(i) }
 
