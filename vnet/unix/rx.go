@@ -11,8 +11,6 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -125,8 +123,6 @@ type rx_node struct {
 	rv_input               chan *rx_ref_vector
 	pending_refs           []rx_pending_ref
 	max_buffers_per_packet uint
-	active_lock            sync.Mutex
-	active_count           int32
 	next_for_inject        rx_node_next
 	next_by_si             elib.Uint32Vec
 }
@@ -279,23 +275,20 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 		}
 		rx.rv_input <- rv
 	}
-	rx.active_lock.Lock()
-	x := atomic.AddInt32(&rx.active_count, int32(n_packets))
-	rx.Activate(x > 0)
-	rx.active_lock.Unlock()
 
 	if elog.Enabled() {
 		e := rx_tx_elog{
 			kind:      rx_elog_ready,
 			name:      intf.elog_name,
 			n_packets: uint32(n_packets),
-			active:    x,
 		}
 		if err != nil {
 			e.n_drops = 1
 		}
 		elog.Add(&e)
 	}
+
+	rx.AddDataActivity(int(n_packets))
 
 	// Return packet vector for reuse.
 	rx.put_packet_vector(v)
@@ -376,16 +369,12 @@ loop:
 		}
 	}
 
-	rx.active_lock.Lock()
-	x := atomic.AddInt32(&rx.active_count, -int32(n_packets))
-	rx.Activate(x > 0)
-	rx.active_lock.Unlock()
+	rx.AddDataActivity(-int(n_packets))
 
 	if elog.Enabled() {
 		e := rx_tx_elog{
 			kind:      rx_elog_input,
 			n_packets: uint32(n_packets),
-			active:    x,
 		}
 		elog.Add(&e)
 	}
