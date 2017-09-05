@@ -25,31 +25,33 @@ func (s *default_stream) PacketHeaders() []vnet.PacketHeader {
 	}
 }
 
-func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+const (
+	set_limit = 1 << iota
+	set_size
+	set_rate
+	set_next
+	set_node
+	set_stream
+	set_interface
+	set_verbose
+)
+
+func (m *main) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	v := m.Vnet
 	default_stream_config := stream_config{
 		n_packets_limit: 0,
 		min_size:        64,
 		max_size:        64,
 		next:            next_error,
-		si:              n.Si(),
 	}
-	const (
-		set_limit = 1 << iota
-		set_size
-		set_rate
-		set_next
-		set_stream
-		set_interface
-		set_verbose
-	)
 	var set_what uint
 	enable, disable := true, false
-	stream_name := "no-name"
+	stream_name := ""
 	c := default_stream_config
+	c.si = m.nodes[c.node_index].Si()
 	var r Streamer
 	for !in.End() {
 		var (
-			name    string
 			x       float64
 			sub_in  parse.Input
 			comment parse.Comment
@@ -85,18 +87,19 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		case in.Parse("ve%*rbose"):
 			c.verbose = true
 			set_what |= set_verbose
-		case in.Parse("n%*ext %s", &name):
-			c.next = n.v.AddNamedNext(n, name)
+		case in.Parse("node %d", &c.node_index):
+			set_what |= set_node
+		case in.Parse("n%*ext %s", &c.next_name):
 			set_what |= set_next
 		case in.Parse("en%*able"):
 			enable = true
 		case in.Parse("dis%*able"):
 			disable = true
 		case in.Parse("na%*me %s", &stream_name):
-		case in.Parse("in%*terface %v", &c.si, n.Vnet):
+		case in.Parse("in%*terface %v", &c.si, v):
 			set_what |= set_interface
-		case in.Parse("%v %v", &n.stream_type_map, &index, &sub_in):
-			r, err = n.stream_types[index].ParseStream(&sub_in)
+		case in.Parse("%v %v", &m.stream_type_map, &index, &sub_in):
+			r, err = m.stream_types[index].ParseStream(&sub_in)
 			if err != nil {
 				return
 			}
@@ -109,21 +112,46 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		}
 	}
 
-	create := r == nil
-	if create {
-		r = n.get_stream_by_name(stream_name)
-		if create = r == nil; create {
-			r = &default_stream{}
-			n.new_stream(r, stream_name)
+	// If node was specified only apply changes to that node.
+	// Otherwise apply changes to all nodes.
+	for i := range m.nodes {
+		n := &m.nodes[i]
+		if set_what&set_node != 0 {
+			if i > 0 {
+				break
+			}
+			n = &m.nodes[c.node_index]
 		}
-	} else {
+		n.configure_streams(m, &c, w, stream_name, set_what, r)
+		n.Activate(enable && !disable)
+	}
+	return
+}
+
+func (n *node) configure_streams(m *main, c *stream_config, w cli.Writer, stream_name string, set_what uint, r Streamer) {
+	create := r != nil
+	if create {
 		n.new_stream(r, stream_name)
 	}
 
-	s := r.get_stream()
+	if r != nil {
+		r := n.get_stream_by_name(stream_name)
+		n.configure_stream(r, m, c, w, create, set_what)
+	} else {
+		n.stream_pool.Foreach(func(r Streamer) {
+			n.configure_stream(r, m, c, w, create, set_what)
+		})
+	}
+}
 
+func (n *node) configure_stream(r Streamer, m *main, c *stream_config, w cli.Writer, create bool, set_what uint) {
+	if set_what&set_next != 0 {
+		c.next = m.Vnet.AddNamedNext(n, c.next_name)
+	}
+
+	s := r.get_stream()
 	if create {
-		s.stream_config = c
+		s.stream_config = *c
 	} else {
 		if set_what&set_size != 0 {
 			s.min_size = c.min_size
@@ -173,21 +201,6 @@ func (n *node) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 		s.setData()
 		n.setData(s)
 	}
-
-	n.Activate(enable && !disable)
-	return
-}
-
-type cli_streams []cli_stream
-
-func (h cli_streams) Less(i, j int) bool { return h[i].Name < h[j].Name }
-func (h cli_streams) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-func (h cli_streams) Len() int           { return len(h) }
-
-type cli_stream struct {
-	Name  string `format:"%-30s" align:"left"`
-	Limit string `format:"%16s" align:"right"`
-	Sent  uint64 `format:"%16d" align:"right"`
 }
 
 type limit uint64
@@ -200,36 +213,48 @@ func (l limit) String() string {
 	}
 }
 
-func (n *node) show_streams(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
-	var cs cli_streams
-	n.stream_pool.Foreach(func(r Streamer) {
-		s := r.get_stream()
-		cs = append(cs, cli_stream{
-			Name:  s.name,
-			Limit: limit(s.n_packets_limit).String(),
-			Sent:  s.n_packets_sent,
+func (m *main) show_streams(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	type cli_stream struct {
+		Node  uint   `format:"%d" align:"center"`
+		Name  string `format:"%-30s" align:"left"`
+		Limit string `format:"%16s" align:"right"`
+		Sent  uint64 `format:"%16d" align:"right"`
+	}
+	cs := []cli_stream{}
+
+	sort.Slice(cs, func(i, j int) bool { return cs[i].Name < cs[j].Name })
+
+	for i := range m.nodes {
+		n := &m.nodes[i]
+		n.stream_pool.Foreach(func(r Streamer) {
+			s := r.get_stream()
+			cs = append(cs, cli_stream{
+				Node:  n.index,
+				Name:  s.name,
+				Limit: limit(s.n_packets_limit).String(),
+				Sent:  s.n_packets_sent,
+			})
 		})
-	})
-	sort.Sort(cs)
+	}
 	elib.Tabulate(cs).Write(w)
 	return
 }
 
-func (n *node) cli_init() {
+func (m *main) cli_init() {
 	cmds := []cli.Command{
 		cli.Command{
 			Name:      "packet-generator",
 			ShortHelp: "edit or create packet generator streams",
-			Action:    n.edit_streams,
+			Action:    m.edit_streams,
 		},
 		cli.Command{
 			Name:      "show packet-generator",
 			ShortHelp: "show packet generator streams",
-			Action:    n.show_streams,
+			Action:    m.show_streams,
 		},
 	}
 	for i := range cmds {
-		n.v.CliAdd(&cmds[i])
+		m.Vnet.CliAdd(&cmds[i])
 	}
 }
 
@@ -240,17 +265,15 @@ type StreamType interface {
 
 func AddStreamType(v *vnet.Vnet, name string, t StreamType) {
 	m := GetMain(v)
-	n := &m.node
-	ti := uint(len(n.stream_types))
-	n.stream_types = append(n.stream_types, t)
-	n.stream_type_map.Set(name, ti)
+	ti := uint(len(m.stream_types))
+	m.stream_types = append(m.stream_types, t)
+	m.stream_type_map.Set(name, ti)
 }
 
 func GetStreamType(v *vnet.Vnet, name string) (t StreamType) {
 	m := GetMain(v)
-	n := &m.node
 	if ti, ok := m.stream_type_map[name]; ok {
-		t = n.stream_types[ti]
+		t = m.stream_types[ti]
 	}
 	return
 }

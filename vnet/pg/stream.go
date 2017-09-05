@@ -42,6 +42,11 @@ type stream_config struct {
 
 	si vnet.Si
 
+	node_index uint
+
+	// Name for next node for this stream.
+	next_name string
+
 	// Next index relative to input node for this stream.
 	next uint
 }
