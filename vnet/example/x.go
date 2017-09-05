@@ -166,13 +166,6 @@ func (n *myInterface) InterfaceOutput(in *vnet.TxRefVecIn) {
 		// Enable to test poller suspend/resume.
 		time.Sleep(1 * time.Second)
 	}
-	if elog.Enabled() {
-		e := myElogEvent{
-			node_name: n.ElogName(),
-			n:         uint32(in.NPackets()),
-		}
-		elog.Add(&e)
-	}
 	if n.n.verbose_output {
 		for i := range in.Refs {
 			fmt.Printf("%s: %x\n", n.Name(), in.Refs[i].DataSlice())
