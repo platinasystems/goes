@@ -27,12 +27,11 @@ const (
 type node struct {
 	vnet.InterfaceNode
 	vnet.HwIf
-	v    *vnet.Vnet
-	pool vnet.BufferPool
+	v     *vnet.Vnet
+	index uint
+	pool  vnet.BufferPool
 	stream_pool
 	stream_index_by_name parse.StringMap
-	stream_type_map      parse.StringMap
-	stream_types         []StreamType
 	buffer_type_pool
 	orphan_refs vnet.RefVec
 	node_validate
@@ -53,8 +52,9 @@ type buffer_type struct {
 
 //go:generate gentemplate -d Package=pg -id buffer_type_pool -d PoolType=buffer_type_pool -d Type=buffer_type -d Data=elts github.com/platinasystems/go/elib/pool.tmpl
 
-func (n *node) init(v *vnet.Vnet) {
+func (n *node) init(v *vnet.Vnet, index uint) {
 	n.v = v
+	n.index = index
 	n.Next = []string{
 		next_error: "error",
 		next_punt:  "punt",
@@ -63,8 +63,8 @@ func (n *node) init(v *vnet.Vnet) {
 		error_none:         "packets generated",
 		tx_packets_dropped: "tx packets dropped",
 	}
-	v.RegisterHwInterface(n, "packet-generator")
-	v.RegisterInterfaceNode(n, n.Hi(), "packet-generator")
+	v.RegisterHwInterface(n, "pg%d", index)
+	v.RegisterInterfaceNode(n, n.Hi(), "pg%d", index)
 
 	// Link is always up for packet generator.
 	n.SetLinkUp(true)
