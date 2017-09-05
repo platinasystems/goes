@@ -149,7 +149,7 @@ func (e *txElogEvent) Elog(l *elog.Log) {
 	l.Logf("%s %s %d buffers", e.kind, l.GetString(e.node_name), e.n_refs)
 }
 
-func (n *interfaceNode) send(i *TxRefVecIn) {
+func (n *interfaceNode) send(ri *RefIn, i *TxRefVecIn) {
 	l := i.Len()
 	if elog.Enabled() {
 		e := txElogEvent{
@@ -159,6 +159,8 @@ func (n *interfaceNode) send(i *TxRefVecIn) {
 		}
 		elog.Add(&e)
 	}
+	// We asked for MaxVectorLen on alloc; now correct for actual number of refs sent for tx.
+	n.AdjustSuspendActivity(ri, int(l)-MaxVectorLen)
 	n.tx_chan <- i
 }
 
@@ -182,7 +184,8 @@ func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
 			i.nPackets = 0
 		}
 
-		did_suspend, _ := n.AddSuspendActivity(in, int(in.InLen()))
+		// Add MaxVectorLen for now.. we'll correct actually number later.
+		did_suspend, _ := n.AddSuspendActivity(in, MaxVectorLen)
 		if !did_suspend {
 			return
 		}
@@ -293,7 +296,7 @@ func (n *interfaceNode) ifOutput(ri *RefIn) {
 		rvi.nPackets = n_packets_rvi
 
 		// Send to output thread, which then calls n.tx.InterfaceOutput.
-		n.send(rvi)
+		n.send(ri, rvi)
 	} else {
 		n.freeChan <- rvi
 	}
@@ -345,7 +348,7 @@ func (n *interfaceNode) slowPath(
 		// Output current vector and get a new one (possibly suspending).
 		rvi.Refs = rv
 		rvi.nPackets = n_packets
-		n.send(rvi)
+		n.send(ri, rvi)
 		rvi = n.newTxRefVecIn(ri, save[:n_save])
 		rv = rvi.Refs
 		iv = n_save
