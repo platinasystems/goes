@@ -38,10 +38,10 @@ func (t poller_elog_event_type) String() string {
 }
 
 type pollerElogEvent struct {
+	node_name    elog.StringRef
 	event_type   poller_elog_event_type
 	flags        byte
 	poller_index uint32
-	node_name    elog.StringRef
 }
 
 func (e *pollerElogEvent) Elog(l *elog.Log) {
@@ -50,18 +50,14 @@ func (e *pollerElogEvent) Elog(l *elog.Log) {
 		pi = fmt.Sprintf("%d", e.poller_index)
 	}
 	l.Logf("loop%s %s %s", pi, e.event_type, l.GetString(e.node_name))
-	if e.flags != 0 {
-		l.Logf("new flags: %s", node_flags(e.flags))
-	}
 }
 
-func (n *Node) pollerElog(t poller_elog_event_type, f node_flags) {
+func (n *Node) pollerElog(t poller_elog_event_type) {
 	if elog.Enabled() {
 		c := elog.GetCaller(elog.PointerToFirstArg(&n))
 		le := pollerElogEvent{
 			event_type:   t,
 			poller_index: uint32(n.activePollerIndex),
-			flags:        byte(f),
 			node_name:    n.elogNodeName,
 		}
 		elog.Addc(&le, c)
@@ -69,10 +65,10 @@ func (n *Node) pollerElog(t poller_elog_event_type, f node_flags) {
 }
 
 type callEvent struct {
+	node_name    elog.StringRef
 	active_index uint32
 	n_vectors    uint32
 	is_input     bool
-	node_name    elog.StringRef
 }
 
 func (e *callEvent) Elog(l *elog.Log) {

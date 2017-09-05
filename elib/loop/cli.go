@@ -100,14 +100,10 @@ func (ns rtNodes) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
 func (ns rtNodes) Len() int           { return len(ns) }
 
 func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
-	colMap := map[string]bool{
-		"State": false,
-	}
 	show_detail := false
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
-			colMap["State"] = true
 			show_detail = true
 		default:
 			panic(parse.ErrInput)
@@ -148,7 +144,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 			if s[j].calls > 0 || show_detail {
 				state := ""
 				if j == 0 {
-					state = fmt.Sprintf("%s", n.get_flags())
+					state = n.s.String()
 				}
 				ns = append(ns, rtNode{
 					Name:     name + io,
@@ -179,7 +175,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 	}
 
 	sort.Sort(ns)
-	elib.Tabulate(ns).WriteCols(w, colMap)
+	elib.TabulateWrite(w, ns)
 	return
 }
 
@@ -270,10 +266,10 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 		case in.Parse("re%*size %d", &n_events):
 			elog.Resize(n_events)
 		case in.Parse("s%*ave %s", &s):
-			err = elog.SaveView(s)
+			err = elog.SaveFile(s)
 		case in.Parse("d%*ump %s", &s):
 			var v elog.View
-			if err = v.Load(s); err == nil {
+			if err = v.LoadFile(s); err == nil {
 				v.Print(w, false)
 			}
 		default:
@@ -334,7 +330,7 @@ func (l *Loop) cliInit() {
 	l.RegisterEventPoller(iomux.Default)
 	c := &l.Cli
 	c.Main.RxReady = c.rxReady
-	l.RegisterNode(c, "loop-cli")
+	l.RegisterNode(c, "cli-event")
 	c.AddCommand(&cli.Command{
 		Name:      "show runtime",
 		ShortHelp: "show main loop runtime statistics",

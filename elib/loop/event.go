@@ -51,9 +51,10 @@ func (l *eventMain) putLoopEvent(x *loopEvent) { l.loopEvents.Put(x) }
 
 type eventNode struct {
 	activateEvent
-	rxEvents      chan *loopEvent
-	nActiveEvents uint32
-	eventVec      event.ActorVec
+	sequence uint
+	rxEvents chan *loopEvent
+	eventWg  sync.WaitGroup
+	eventVec event.ActorVec
 }
 
 type loopEvent struct {
@@ -66,15 +67,11 @@ type loopEvent struct {
 
 func (e *loopEvent) EventTime() cpu.Time { return e.time }
 
-func (l *Loop) addEvent(le *loopEvent, blocking bool) {
-	if blocking {
-		l.events <- le
-	} else {
-		select {
-		case l.events <- le:
-		default:
-			l.addTimedEvent(le, 0)
-		}
+func (l *Loop) addEvent(le *loopEvent) {
+	select {
+	case l.events <- le:
+	default:
+		l.addTimedEvent(le, 0)
 	}
 }
 
@@ -87,13 +84,11 @@ func (l *Loop) addTimedEvent(le *loopEvent, dt float64) {
 
 // AddEvent adds event whose action will be called on the next loop iteration.
 func (n *Node) AddEventp(e event.Actor, dst EventHandler, p elog.PointerToFirstArg) {
-	le := n.loop.getLoopEvent(e, p)
+	le := n.l.getLoopEvent(e, p)
 	if dst != nil {
 		le.dst = dst.GetNode()
 	}
-	// Never block when polling.
-	blocking := !n.is_polling()
-	n.loop.addEvent(le, blocking)
+	n.l.addEvent(le)
 }
 
 // AddEvent adds event whose action will be called on the next loop iteration.
@@ -102,32 +97,45 @@ func (n *Node) AddEvent(e event.Actor, dst EventHandler) {
 }
 
 func (n *Node) AddTimedEventp(e event.Actor, dst EventHandler, dt float64, p elog.PointerToFirstArg) {
-	le := n.loop.getLoopEvent(e, p)
+	le := n.l.getLoopEvent(e, p)
 	le.dst = dst.GetNode()
-	n.loop.addTimedEvent(le, dt)
+	n.l.addTimedEvent(le, dt)
 }
 func (n *Node) AddTimedEvent(e event.Actor, dst EventHandler, dt float64) {
 	n.AddTimedEventp(e, dst, dt, elog.PointerToFirstArg(&n))
 }
 
 func (e *loopEvent) EventAction() {
-	if e.dst != nil {
-		e.dst.nActiveEvents++
-		e.dst.rxEvents <- e
-	} else {
-		e.do()
-	}
+	e.dst.eventWg.Add(1)
+	e.dst.rxEvents <- e
 }
 
 func (e *loopEvent) do() {
+	c := e.caller
 	if elog.Enabled() {
+		x := event_action_elog{
+			kind:     event_action_elog_start,
+			name:     e.dst.elogNodeName,
+			sequence: uint32(e.dst.sequence),
+		}
+		elog.Add(&x)
+		c.SetTimeNow()
 		if a, ok := e.actor.(elog.Data); ok {
-			elog.AddDatac(a, e.caller)
+			elog.AddDatac(a, c)
 		} else {
-			elog.Fc("%s", e.caller, e.actor.String())
+			elog.Fc("%s", c, e.actor.String())
 		}
 	}
 	e.actor.EventAction()
+	if elog.Enabled() {
+		x := event_action_elog{
+			kind:     event_action_elog_done,
+			name:     e.dst.elogNodeName,
+			sequence: uint32(e.dst.sequence),
+		}
+		elog.Add(&x)
+		e.dst.sequence++
+	}
 	e.l.putLoopEvent(e)
 }
 
@@ -150,7 +158,7 @@ func (l *Loop) eventHandler(p EventHandler) {
 	for {
 		e := <-c.rxEvents
 		l.doEvent(e)
-		c.toLoop <- struct{}{}
+		c.eventWg.Done()
 	}
 }
 
@@ -159,8 +167,6 @@ const eventHandlerChanDepth = 16 << 10
 
 func (l *Loop) startHandler(n EventHandler) {
 	c := n.GetNode()
-	c.toLoop = make(chan struct{}, 64)
-	c.fromLoop = make(chan struct{}, 1)
 	c.rxEvents = make(chan *loopEvent, eventHandlerChanDepth)
 	go l.eventHandler(n)
 }
@@ -192,7 +198,6 @@ func (l *Loop) duration(t cpu.Time) time.Duration {
 }
 
 func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent, didEvent bool) {
-	elog.S("loop event wait")
 	select {
 	case e := <-l.events:
 		didEvent = true
@@ -223,6 +228,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		}
 		if didWait = dt > 0; didWait {
 			quit, didEvent = l.doEventWait(dt)
+			l.activePollerState.clearEventWait()
 		}
 	}
 	if !didWait {
@@ -257,10 +263,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 func (l *eventMain) Wait() {
 	for _, h := range l.handlers {
 		c := h.GetNode()
-		for c.nActiveEvents > 0 {
-			c.nActiveEvents--
-			<-c.toLoop
-		}
+		c.eventWg.Wait()
 	}
 }
 
@@ -303,11 +306,39 @@ func (e *quitEvent) Error() string  { return e.String() }
 func (e *quitEvent) EventAction()   {}
 func (l *Loop) Quit() {
 	e := l.getLoopEvent(ErrQuit, elog.PointerToFirstArg(&l))
-	l.addEvent(e, true)
+	l.addEvent(e)
 }
 
 // Add an event to wakeup event sleep.
 func (l *Loop) Interrupt() {
 	e := l.getLoopEvent(ErrInterrupt, elog.PointerToFirstArg(&l))
-	l.addEvent(e, false)
+	l.addEvent(e)
+}
+
+const (
+	event_action_elog_start = iota
+	event_action_elog_done
+)
+
+type event_action_elog_kind uint32
+
+func (k event_action_elog_kind) String() string {
+	switch k {
+	case event_action_elog_start:
+		return "start"
+	case event_action_elog_done:
+		return "done"
+	default:
+		return fmt.Sprintf("unknown %d", int(k))
+	}
+}
+
+type event_action_elog struct {
+	kind     event_action_elog_kind
+	name     elog.StringRef
+	sequence uint32
+}
+
+func (e *event_action_elog) Elog(l *elog.Log) {
+	l.Logf("loop %s%d %s", e.name, e.sequence, e.kind)
 }
