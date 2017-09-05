@@ -52,8 +52,9 @@ type tuntap_interface struct {
 	mtuBytes   uint
 	mtuBuffers uint
 
-	to_tx chan *tx_packet_vector
-	pv    *tx_packet_vector
+	active_count int32
+	to_tx        chan *tx_packet_vector
+	pv           *tx_packet_vector
 
 	suspend_saved_out *vnet.RefIn
 	interface_routes  ip4.MapFib

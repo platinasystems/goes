@@ -11,6 +11,7 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 
 	"fmt"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -156,13 +157,14 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 
 func (v *tx_packet_vector) tx(n *tx_node, out *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
-	n.AddDataActivity(int(np))
+	x := atomic.AddInt32(&intf.active_count, int32(np))
 	iomux.Update(intf)
 	if elog.Enabled() {
 		e := rx_tx_elog{
 			kind:      tx_elog_start,
 			name:      intf.elog_name,
 			n_packets: uint32(np),
+			active:    x,
 		}
 		elog.Add(&e)
 	}
@@ -196,7 +198,7 @@ func (pv *tx_packet_vector) advance(n *tx_node, intf *tuntap_interface, i uint) 
 	}
 }
 
-func (intf *tuntap_interface) WriteAvailable() bool { return intf.namespace.m.tx_node.IsActive() }
+func (intf *tuntap_interface) WriteAvailable() bool { return intf.active_count > 0 }
 
 func (intf *tuntap_interface) WriteReady() (err error) {
 	if intf.pv == nil {
@@ -262,8 +264,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 	if np > 0 {
 		pv.advance(n, intf, uint(np))
 	}
-
-	n.AddDataActivity(-int(np))
+	x := atomic.AddInt32(&intf.active_count, int32(-np))
 
 	if elog.Enabled() {
 		e := rx_tx_elog{
@@ -271,6 +272,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 			name:      intf.elog_name,
 			n_packets: uint32(n_packets),
 			n_drops:   uint32(n_drops),
+			active:    x,
 		}
 		elog.Add(&e)
 	}
@@ -317,6 +319,7 @@ type rx_tx_elog struct {
 	name      elog.StringRef
 	n_packets uint32
 	n_drops   uint32
+	active    int32
 	kind      rx_tx_elog_kind
 }
 
@@ -324,11 +327,11 @@ func (e *rx_tx_elog) Elog(l *elog.Log) {
 	switch e.kind {
 	case tx_elog_ready, tx_elog_start, rx_elog_ready:
 		if e.n_drops != 0 {
-			l.Logf("unix %s %s %d packets, %d drops", e.kind, e.name, e.n_packets, e.n_drops)
+			l.Logf("unix %s %s %d packets, %d drops, active %d", e.kind, e.name, e.n_packets, e.n_drops, e.active)
 		} else {
-			l.Logf("unix %s %s %d packets", e.kind, e.name, e.n_packets)
+			l.Logf("unix %s %s %d packets, active %d", e.kind, e.name, e.n_packets, e.active)
 		}
 	case rx_elog_input:
-		l.Logf("unix %s %d packets", e.kind, e.n_packets)
+		l.Logf("unix %s %d packets, active %d", e.kind, e.n_packets, e.active)
 	}
 }
