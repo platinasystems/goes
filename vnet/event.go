@@ -20,7 +20,7 @@ type eventMain struct {
 func (v *Vnet) eventInit() {
 	n := &v.eventMain.eventNode
 	n.Vnet = v
-	v.loop.RegisterNode(n, "event-handler")
+	v.loop.RegisterNode(n, "vnet-event")
 }
 
 type Event struct {
