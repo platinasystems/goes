@@ -106,19 +106,25 @@ func (n *Node) AddTimedEvent(e event.Actor, dst EventHandler, dt float64) {
 }
 
 func (e *loopEvent) EventAction() {
-	e.dst.eventWg.Add(1)
-	e.dst.rxEvents <- e
+	if e.dst != nil {
+		e.dst.eventWg.Add(1)
+		e.dst.rxEvents <- e
+	} else {
+		e.do()
+	}
 }
 
 func (e *loopEvent) do() {
 	c := e.caller
 	if elog.Enabled() {
-		x := event_action_elog{
-			kind:     event_action_elog_start,
-			name:     e.dst.elogNodeName,
-			sequence: uint32(e.dst.sequence),
+		if e.dst != nil {
+			x := event_action_elog{
+				kind:     event_action_elog_start,
+				name:     e.dst.elogNodeName,
+				sequence: uint32(e.dst.sequence),
+			}
+			elog.Add(&x)
 		}
-		elog.Add(&x)
 		c.SetTimeNow()
 		if a, ok := e.actor.(elog.Data); ok {
 			elog.AddDatac(a, c)
@@ -128,13 +134,15 @@ func (e *loopEvent) do() {
 	}
 	e.actor.EventAction()
 	if elog.Enabled() {
-		x := event_action_elog{
-			kind:     event_action_elog_done,
-			name:     e.dst.elogNodeName,
-			sequence: uint32(e.dst.sequence),
+		if e.dst != nil {
+			x := event_action_elog{
+				kind:     event_action_elog_done,
+				name:     e.dst.elogNodeName,
+				sequence: uint32(e.dst.sequence),
+			}
+			elog.Add(&x)
+			e.dst.sequence++
 		}
-		elog.Add(&x)
-		e.dst.sequence++
 	}
 	e.l.putLoopEvent(e)
 }
