@@ -28,6 +28,7 @@ func (s *nodeStats) zero() {
 	s.current = z
 	s.lastClear = z
 }
+func (s *nodeStats) clocksSinceLastClear() cpu.Time { return s.current.clocks - s.lastClear.clocks }
 
 func (s *stats) add_helper(n *nodeStats, raw bool) {
 	c, v, d, l := n.current.calls, n.current.vectors, n.current.suspends, n.current.clocks
