@@ -18,14 +18,12 @@ import (
 const (
 	Name    = "show (default) | flush"
 	Apropos = "link address"
-	Usage   = `
-	ip neighbor { show | flush } [ proxy ] [ to PREFIX ] [ dev DEV ]
-		[ nud STATE ] [ vrf NAME ]
-	`
+	Usage   = `ip neighbor { show (default) | flush } [ proxy ]
+	[ to PREFIX ] [ dev DEV ] [ nud STATE ] [ vrf NAME ]`
 	Man = `
 SEE ALSO
 	ip man neighbor || ip neighbor -man
-`
+	man ip || ip -man`
 )
 
 var (

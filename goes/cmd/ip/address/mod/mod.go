@@ -13,26 +13,7 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Apropos = "network address"
-	Usage   = `
-	ip address { add | change | delete | replace }
-		IFADDR [ dev ] IFNAME [ LIFETIME ] [ CONFFLAG-LIST ]
-
-	IFADDR := PREFIX | ADDR peer PREFIX [ broadcast ADDR ]
-		[ anycast ADDR ] [ label LABEL ] [ scope SCOPE-ID ]
-
-	SCOPE-ID := [ host | link | global | NUMBER ]
-
-	CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
-
-	CONFFLAG := [ home | mngtmpaddr | nodad | noprefixroute | autojoin ]
-
-	LIFETIME := [ valid_lft LFT ] [ preferred_lft LFT ]
-
-	LFT := [ forever | SECONDS ]
-	`
-)
+const Apropos = "network address"
 
 var (
 	apropos = lang.Alt{
@@ -64,7 +45,25 @@ type Command string
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (c Command) String() string  { return string(c) }
-func (Command) Usage() string     { return Usage }
+func (c Command) Usage() string {
+	return fmt.Sprint("ip address ", c, ` IFADDR [ dev ] IFNAME
+	[ LIFETIME ] [ CONFFLAG-LIST ]
+
+MOD := { add | change | delete | replace }
+
+IFADDR := PREFIX | ADDR peer PREFIX [ broadcast ADDR ]
+	[ anycast ADDR ] [ label LABEL ] [ scope SCOPE-ID ]
+
+SCOPE-ID := { host | link | global | NUMBER }
+
+CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
+
+CONFFLAG := { home | mngtmpaddr | nodad | noprefixroute | autojoin }
+
+LIFETIME := [ valid_lft LFT ] [ preferred_lft LFT ]
+
+LFT := { forever | SECONDS }`)
+}
 
 func (c Command) Main(args ...string) error {
 	var err error

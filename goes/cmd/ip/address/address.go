@@ -16,10 +16,7 @@ const (
 	Name    = "address"
 	Apropos = "protocol address management"
 	Usage   = `
-	ip [ OPTIONS ] address [ COMMAND [ COMMAND_OPTIONS ]]
-
-	COMMAND := add | change | delete | replace | show (default)
-	`
+ip address [ {add|change|delete|replace|show(default)}[ OPTION... ]]`
 	Man = `
 SEE ALSO
 	ip address man COMMAND || ip address COMMAND -man

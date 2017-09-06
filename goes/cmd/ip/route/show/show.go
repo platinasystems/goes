@@ -26,12 +26,11 @@ const (
 	ip route restore
 
 	ip route get ADDRESS [ from ADDRESS iif STRING  ] [ oif STRING ]
-		[ tos TOS ] [ vrf NAME ]
-	`
+		[ tos TOS ] [ vrf NAME ]`
 	Man = `
 SEE ALSO
 	ip man route || ip route -man
-`
+	man ip || ip -man`
 )
 
 var (

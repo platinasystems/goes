@@ -23,8 +23,6 @@ const (
 	Name    = "netns"
 	Apropos = "network namespace management"
 	Usage   = `
-	ip [ OPTIONS ] netns  [ COMMAND [ ARGS ]... ]
-
 	ip netns add NETNSNAME
 	ip [-all] netns delete [ NETNSNAME ]
 	ip [-all] netns exec [ NETNSNAME ] command...
@@ -33,8 +31,7 @@ const (
 	ip netns identify [ PID ]
 	ip netns pids NETNSNAME
 	ip netns monitor
-	ip netns set NETNSNAME NETNSID
-	`
+	ip netns set NETNSNAME NETNSID`
 )
 
 func New() *goes.Goes {

@@ -16,15 +16,11 @@ const (
 	Name    = "link"
 	Apropos = "network device configuration"
 	Usage   = `
-	ip [ OPTIONS ] link [ COMMAND [ COMMAND_OPTIONS ]]
-
-	COMMAND := add | change | delete | replace | set | show (default)
-	`
+ip link [ {add|change|delete|replace|set|show(default)}[ OPTION... ]]`
 	Man = `
 SEE ALSO
 	ip link man COMMAND || ip link COMMAND -man
-	man ip || ip -man
-`
+	man ip || ip -man`
 )
 
 func New() *goes.Goes {

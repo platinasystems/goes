@@ -16,13 +16,11 @@ import (
 const (
 	Name    = "list"
 	Apropos = "list network namespaces"
-	Usage   = `
-	ip netns [ list ]
-	`
-	Man = `
+	Usage   = `ip netns [ list ]`
+	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var man = lang.Alt{

@@ -19,13 +19,11 @@ import (
 const (
 	Name    = "identify"
 	Apropos = "print name of network namespace for given PID"
-	Usage   = `
-	ip netns identify [ PID ]
-	`
-	Man = `
+	Usage   = `ip netns identify [ PID ]`
+	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var apropos = lang.Alt{

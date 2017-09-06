@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	Name    = "add | delete | replace | set"
-	Apropos = "link attributes"
 	nogroup = ^uint32(0)
+	Apropos = "link attributes"
 )
 
 var (
@@ -53,7 +52,9 @@ type Command struct {
 func (*Command) Apropos() lang.Alt { return apropos }
 func (*Command) Man() lang.Alt     { return man }
 func (c *Command) String() string  { return c.name }
-func (*Command) Usage() string     { return Usage }
+func (c *Command) Usage() string {
+	return fmt.Sprint("ip link ", c.name, ` SUBJECT [ OPTION... ]`)
+}
 
 func (c *Command) Main(args ...string) error {
 	var err error

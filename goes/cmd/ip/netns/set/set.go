@@ -17,13 +17,11 @@ import (
 const (
 	Name    = "set"
 	Apropos = "set/unset network namespace identifier"
-	Usage   = `
-	ip netns set NETNSNAME NETNSID
-	`
-	Man = `
+	Usage   = `ip netns set NETNSNAME NETNSID`
+	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var (

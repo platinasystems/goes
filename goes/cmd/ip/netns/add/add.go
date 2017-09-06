@@ -18,13 +18,11 @@ import (
 const (
 	Name    = "add"
 	Apropos = "create network namespace"
-	Usage   = `
-	ip netns add NETNSNAME
-	`
-	Man = `
+	Usage   = `ip netns add NETNSNAME`
+	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 const VarRunNetnsMode = syscall.S_IRWXU |

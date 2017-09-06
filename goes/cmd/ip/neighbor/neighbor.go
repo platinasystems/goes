@@ -15,19 +15,14 @@ import (
 const (
 	Name    = "neighbor"
 	Apropos = "neighbor/arp tables management"
-	Usage   = `
-	ip [ OPTIONS ] neighbor COMMAND [ ARGS ]
+	Usage   = `ip neighbor { show (default) | flush } [ proxy ]
+	[ to PREFIX ] [ dev DEV ] [ nud STATE ] [ vrf NAME ]
 
-	ip neighbor { add | del | change | replace }
-		{ ADDR [ lladdr LLADDR ] [ nud STATE ] | proxy ADDR }
-		[ dev DEV ]
+ip neighbor { add | del | change | replace }
+	{ ADDR [ lladdr LLADDR ] [ nud STATE ] | proxy ADDR } [ dev DEV ]
 
-	ip neighbor { show | flush } [ proxy ] [ to PREFIX ] [ dev DEV ]
-		[ nud STATE ] [ vrf NAME ]
-
-	STATE := { permanent | noarp | stale | reachable | none | incomplete |
-		delay | probe | failed }
-	`
+STATE := { permanent | noarp | stale | reachable | none | incomplete |
+	delay | probe | failed }`
 )
 
 func New() *goes.Goes {

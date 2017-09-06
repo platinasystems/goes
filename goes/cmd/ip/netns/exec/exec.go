@@ -19,11 +19,11 @@ import (
 const (
 	Name    = "exec"
 	Apropos = "network namespace"
-	Usage   = "ip [-all] netns exec [ NETNSNAME ] command..."
+	Usage   = "ip [-all] netns exec [ NETNSNAME ] COMMAND..."
 	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var (

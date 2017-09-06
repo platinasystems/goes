@@ -13,55 +13,11 @@ import (
 )
 
 const (
-	Name    = "add | append | delete | change | replace"
 	Apropos = "route table entry"
-	Usage   = `
-	ip route { add | append | change | delete | replace } ROUTE
-
-	ROUTE := NODE_SPEC [ INFO_SPEC ]
-
-	NODE_SPEC := [ TYPE ] PREFIX [ tos TOS ] [ table TABLE_ID ]
-		[ proto RTPROTO ] [ scope SCOPE ] [ metric METRIC ]
-
-	INFO_SPEC := NH OPTIONS FLAGS [ nexthop NH ] ...
-
-	NH := [ encap ENCAP ] [ via [ FAMILY ] ADDRESS ] [ dev STRING ]
-		[ weight NUMBER ] NHFLAGS
-
-	FAMILY := [ inet | inet6 | ipx | dnet | mpls | bridge | link ]
-
-	OPTIONS := FLAGS [ mtu NUMBER ] [ advmss NUMBER ] [ as [ to ] ADDRESS ]
-		rtt TIME ] [ rttvar TIME ] [ reordering NUMBER ]
-		[ window NUMBER ] [ cwnd NUMBER ] [ ssthresh REALM ]
-		[ realms REALM ] [ rto_min TIME ] [ initcwnd NUMBER ]
-		[ initrwnd NUMBER ] [ features FEATURES ] [ quickack BOOL ]
-		[ congctl NAME ] [ pref PREF ] [ expires TIME ]
-
-	TYPE := [ unicast | local | broadcast | multicast | throw | unreachable
-               | prohibit | blackhole | nat ]
-
-	TABLE_ID := [ local| main | default | all | NUMBER ]
-
-	SCOPE := [ host | link | global | NUMBER ]
-
-	NHFLAGS := [ onlink | pervasive ]
-
-	RTPROTO := [ kernel | boot | static | NUMBER ]
-
-	FEATURES := [ ecn | ]
-
-	PREF := [ low | medium | high ]
-
-	ENCAP := [ MPLS | IP ]
-
-	ENCAP_MPLS := mpls [ LABEL ]
-
-	ENCAP_IP := ip id TUNNEL_ID dst REMOTE_IP [ tos TOS ] [ ttl TTL ]
-	`
-	Man = `
+	Man     = `
 SEE ALSO
 	ip man route || ip route -man
-`
+	man ip || ip -man`
 )
 
 var (
@@ -129,7 +85,47 @@ type mod options.Options
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (c Command) String() string  { return string(c) }
-func (Command) Usage() string     { return Usage }
+func (c Command) Usage() string {
+	return fmt.Sprint("ip route ", c, ` NODE-SPEC [ INFO-SPEC ]
+
+NODE-SPEC := [ TYPE ] PREFIX [ tos TOS ] [ table TABLE-ID ]
+	[ proto RTPROTO ] [ scope SCOPE ] [ metric METRIC ]
+
+INFO-SPEC := NH OPTIONS FLAGS [ nexthop NH ] ...
+
+NH := [ encap ENCAP ] [ via [ FAMILY ] ADDRESS ] [ dev STRING ]
+	[ weight NUMBER ] [ NHFLAGS ]
+
+FAMILY := { inet | inet6 | ipx | dnet | mpls | bridge | link }
+
+OPTIONS := FLAGS [ mtu NUMBER ] [ advmss NUMBER ] [ as [ to ] ADDRESS ]
+	[ rtt TIME ] [ rttvar TIME ] [ reordering NUMBER ]
+	[ window NUMBER ] [ cwnd NUMBER ] [ ssthresh REALM ]
+	[ realms REALM ] [ rto_min TIME ] [ initcwnd NUMBER ]
+	[ initrwnd NUMBER ] [ features FEATURES ] [ quickack BOOL ]
+	[ congctl NAME ] [ pref PREF ] [ expires TIME ]
+
+TYPE := { unicast | local | broadcast | multicast | throw | unreachable |
+	prohibit | blackhole | nat }
+
+TABLE-ID := { local| main | default | all | NUMBER }
+
+SCOPE := { host | link | global | NUMBER }
+
+NHFLAGS := { onlink | pervasive }
+
+RTPROTO := { kernel | boot | static | NUMBER }
+
+FEATURES := { ecn }
+
+PREF := { low | medium | high }
+
+ENCAP := { ENCAP-MPLS | ENCAP-IP }
+
+ENCAP-MPLS := mpls [ LABEL ]
+
+ENCAP-IP := ip id TUNNEL-ID dst REMOTE-IP [ tos TOS ] [ ttl TTL ]`)
+}
 
 func (c Command) Main(args ...string) error {
 	var (

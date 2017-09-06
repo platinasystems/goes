@@ -16,28 +16,26 @@ import (
 const (
 	Name    = "show"
 	Apropos = "network address"
-	Usage   = `
-	ip address show [ [dev] DEVICE ] [ scope SCOPE-ID ] [ to PREFIX ]
-		[ FLAG-LIST ] [ label PATTERN ] [ master DEVICE ]
-		[ type TYPE ] [ vrf NAME ] [ up ] ]
+	Usage   = `ip address show [ [dev] DEVICE ] [ scope SCOPE-ID ]
+	[ to PREFIX ] [ FLAG-LIST ] [ label PATTERN ] [ master DEVICE ]
+	[ type TYPE ] [ vrf NAME ] [ up ] ]
 
-	SCOPE-ID := [ host | link | global | NUMBER ]
+SCOPE-ID := [ host | link | global | NUMBER ]
 
-	FLAG-LIST := [ FLAG-LIST ] FLAG
+FLAG-LIST := [ FLAG-LIST ] FLAG
 
-	FLAG := [ permanent | dynamic | secondary | primary | [-]tentative |
-		[-]deprecated | [-]dadfailed | temporary | CONFFLAG-LIST ]
+FLAG := [ permanent | dynamic | secondary | primary | [-]tentative |
+	[-]deprecated | [-]dadfailed | temporary | CONFFLAG-LIST ]
 
-	CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
+CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
 
-	CONFFLAG := [ home | mngtmpaddr | nodad | noprefixroute | autojoin ]
+CONFFLAG := [ home | mngtmpaddr | nodad | noprefixroute | autojoin ]
 
-	TYPE := { bridge | bridge_slave | bond | bond_slave | can | dummy |
-		hsr | ifb | ipoib | macvlan | macvtap | vcan | veth | vlan |
-		vxlan | ip6tnl | ipip | sit | gre | gretap | ip6gre |
-		ip6gretap | vti | vrf | nlmon | ipvlan | lowpan | geneve |
-		macsec }
-	`
+TYPE := { bridge | bridge_slave | bond | bond_slave | can | dummy |
+	hsr | ifb | ipoib | macvlan | macvtap | vcan | veth | vlan |
+	vxlan | ip6tnl | ipip | sit | gre | gretap | ip6gre |
+	ip6gretap | vti | vrf | nlmon | ipvlan | lowpan | geneve |
+	macsec }`
 )
 
 var (
