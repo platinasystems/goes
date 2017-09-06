@@ -12,7 +12,6 @@ if [ -z "$1" ]; then
 fi
 
 D_MOVE=../docker_move.sh
-F_NS=../find_ns.sh
 
 case $1 in
     "up")
@@ -42,27 +41,24 @@ case $1 in
 	$D_MOVE down R1 eth-25-0
 	$D_MOVE down R1 eth-4-0
 	$D_MOVE down R1 dummy0
-	R1_NS=$($F_NS R1)
 
 	$D_MOVE down R2 eth-24-0
 	$D_MOVE down R2 eth-14-0
 	$D_MOVE down R2 dummy1
-	R2_NS=$($F_NS R2)	
 
 	$D_MOVE down R3 eth-30-0
 	$D_MOVE down R3 eth-15-0
 	$D_MOVE down R3 dummy2
-	R3_NS=$($F_NS R3)	
 
 	$D_MOVE down R4 eth-31-0
 	$D_MOVE down R4 eth-5-0
 	$D_MOVE down R4 dummy3
-	R4_NS=$($F_NS R4)	
+
 	docker-compose down
-	ip netn del $R1_NS
-	ip netn del $R2_NS
-	ip netn del $R3_NS
-	ip netn del $R4_NS	
+	
+	for ns in R1 R2 R3 R4; do
+	   ip netn del $ns
+	done
 	chown -R $USER:$USER volumes
 	;;
     *)

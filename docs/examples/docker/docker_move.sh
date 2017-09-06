@@ -57,6 +57,22 @@ find_dc_pid () {
     echo $dc_pid
 }
 
+set_nsid () {
+    ns=$1
+
+    nsid=1
+    ok=0
+    # find next available nsid
+    while [ "$ok" -eq "0" ]; do
+	ip netns set $ns $nsid 2> /dev/null
+	if [ "$?" -eq 0 ]; then
+	    ok=1
+	else
+	    ((nsid++))
+	fi
+    done
+}
+
 setup_dc () {
     dc=$1
     intf=$2
@@ -68,19 +84,20 @@ setup_dc () {
 
     dc_pid=$(find_dc_pid $dc)
 
-    if [ ! -h /var/run/netns/$dc_pid ]; then
-	ln -s /proc/$dc_pid/ns/net /var/run/netns/$dc_pid
+    if [ ! -h /var/run/netns/$dc ]; then
+	ln -s /proc/$dc_pid/ns/net /var/run/netns/$dc
+	set_nsid $dc
     fi
 
-    ip link set $intf netns $dc_pid
+    ip link set $intf netns $dc
     if [ $? -ne 0 ]; then
-	echo "Error: set netns failed."
-	exit 1
+       echo "Error: set netns failed."
+       exit 1
     fi
 
-    ip netns exec $dc_pid ip link set up lo
-    ip netns exec $dc_pid ip add add 127.0.0.1/8 dev lo 2> /dev/null
-    ip netns exec $dc_pid ip link set up $intf
+    ip netns exec $dc ip link set up lo
+    ip netns exec $dc ip add add 127.0.0.1/8 dev lo 2> /dev/null
+    ip netns exec $dc ip link set up $intf
 
     if [ -z "$addr_mask" ]; then
 	return
@@ -98,10 +115,10 @@ setup_dc () {
 	    let peer_oct=lo-1
 	fi
 	peer="$fto.$peer_oct/31"
-	ip netns exec $dc_pid ip addr add $addr peer $peer dev $intf
+	ip netns exec $dc ip addr add $addr peer $peer dev $intf
 	rc=$?
     else
-	ip netns exec $dc_pid ip addr add $addr_mask dev $intf
+	ip netns exec $dc ip addr add $addr_mask dev $intf
 	rc=$?	
     fi
     if [ $rc -ne 0 ]; then
@@ -137,7 +154,6 @@ check_intf_dc () {
     dc=$1
     intf=$2
 
-    ip netns exec link show $intf &> /dev/null
     docker exec -it $dc ip link show $intf &> /dev/null
     if [ $? != 0 ]; then
 	echo "Error: interface [$intf] not found in docker container [$dc]."
@@ -156,9 +172,10 @@ up_it () {
 }
 
 kill_processes () {
-    dc_pid=$1
+    dc=$1
+    dc_pid=$2
 
-    pids=$(ip netns pid $dc_pid)
+    pids=$(ip netns pid $dc)
     for p in ${pids[@]}; do
 	if [ "$p" -eq "$dc_pid" ]; then
 	    continue   # don't kill the container
@@ -166,17 +183,17 @@ kill_processes () {
 	kill $p
 	if ( ps -p $p > /dev/null )
 	then
-	    kill -9 $p
+	    kill -9 $p 2> /dev/null
 	fi
     done
 }
 
 return_intf () {
-    dc_pid=$1
+    dc=$1
     intf=$2
 
-    ip netns exec $dc_pid ip link set down $intf
-    ip netns exec $dc_pid ip link set $intf netns 1
+    ip netns exec $dc ip link set down $intf
+    ip netns exec $dc ip link set $intf netns 1
 }
 
 down_it () {
@@ -188,9 +205,9 @@ down_it () {
     
     dc_pid=$(find_dc_pid $dc)
     
-    kill_processes $dc_pid
+    kill_processes $dc $dc_pid
 
-    return_intf $dc_pid $intf
+    return_intf $dc $intf
 }
 
 case "$1" in
