@@ -79,13 +79,16 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 	if lim == nil {
 		n.poller_elog_ab(poller_elog_data_activity, da, active, suspend)
 	} else {
-		limit := int32(lim.Suspend)
+		slimit := int32(lim.Suspend)
+		limit := slimit
 		if s.is_suspended {
 			limit = int32(lim.Resume)
 		}
 		is_active = is_active && suspend <= limit
-		if did_suspend = ds > 0 && active > 0 && suspend > limit; did_suspend {
-			// Back-up so suspend count is never above limit.
+		did_suspend = !s.is_suspended && ds > 0 && suspend > slimit
+
+		// Back-up so suspend count is never above limit.
+		if suspend > slimit {
 			atomic.AddInt32(&s.suspend, -ds)
 			suspend -= ds
 		}
@@ -93,7 +96,7 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 		s.is_suspended = did_suspend && !did_resume
 		n.poller_elog_ab(poller_elog_suspend_activity, ds, suspend, active)
 	}
-	need_alloc := is_active && !was_active
+	need_alloc := is_active && !was_active && !s.is_suspended
 	if !s.is_pending && need_alloc {
 		s.is_pending = true
 		s.is_active_alloc = true
@@ -290,7 +293,7 @@ func (n *Node) allocActivePoller() {
 
 func (n *Node) freeActivePoller() {
 	a := n.getActivePoller()
-	a.flushNodeStats(n.l)
+	a.flushActivePollerStats(n.l)
 	a.pollerNode = nil
 	i := n.activePollerIndex
 	p := &n.l.activePollerPool
@@ -314,7 +317,7 @@ func (n *Node) maybeFreeActive() {
 	}
 }
 
-func (a *activePoller) flushNodeStats(l *Loop) {
+func (a *activePoller) flushActivePollerStats(l *Loop) {
 	for i := range a.activeNodes {
 		an := &a.activeNodes[i]
 		n := l.DataNodes[an.index].GetNode()
@@ -327,15 +330,20 @@ func (a *activePoller) flushNodeStats(l *Loop) {
 	}
 }
 
-func (l *Loop) dataPoll(p inLooper) {
-	defer func() {
-		if err := recover(); err != nil {
-			if elog.Enabled() {
-				elog.Panic(err)
-			}
-			panic(err)
+func (l *Loop) flushAllNodeStats() {
+	m := &l.nodeStateMain
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p := &l.activePollerPool
+	for i := uint(0); i < p.Len(); i++ {
+		if !p.IsFree(i) {
+			p.entries[i].flushActivePollerStats(l)
 		}
-	}()
+	}
+}
+
+func (l *Loop) dataPoll(p inLooper) {
+	defer elog.Recover()
 	c := p.GetNode()
 	for {
 		<-c.fromLoop
