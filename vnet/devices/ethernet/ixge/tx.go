@@ -87,7 +87,11 @@ func (e *tx_descriptor) String() (s string) {
 const log2DescriptorAlignmentBytes = 7
 
 func (d *dev) tx_dma_init(queue uint) {
-	d.tx_ring_len = vnet.MaxOutstandingTxRefs
+	// Add 8 since head == tail means ring is empty and we want to handle
+	// up to vnet.MaxOutstandingTxRefs descriptors.
+	// Empirical tests show that 8 seems to be minimum number of descriptors to add.
+	// Likely that some chips require ring to be multiple of 8 descriptors long.
+	d.tx_ring_len = vnet.MaxOutstandingTxRefs + 8
 	q := d.tx_queues.Validate(queue)
 	q.d = d
 	q.index = queue
@@ -228,10 +232,8 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 
 	// No room?
 	if n_free < nr {
-		// Drop and count.
-		d.CountError(uint(tx_error_ring_full_drops), uint(nr))
-		d.m.Vnet.FreeTxRefIn(in)
-		return
+		// Should never happen since MaxOutstandingTxRefs should be enforced.
+		panic(fmt.Errorf("%s: tx ring full", d.Name()))
 	}
 
 	ds, rs := q.tx_desc, in.Refs
@@ -276,6 +278,10 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 			old_tail: tail,
 			new_tail: di,
 		}
+		e.count = di - head
+		if int32(e.count) < 0 {
+			e.count += q.len
+		}
 		elog.Add(&e)
 	}
 
@@ -305,10 +311,11 @@ type tx_output_elog struct {
 	head               reg
 	old_tail, new_tail reg
 	n_done             reg
+	count              reg
 }
 
 func (e *tx_output_elog) Elog(l *elog.Log) {
-	l.Logf("%s tx %d tail %d -> %d head %d", e.name, e.n_done, e.old_tail, e.new_tail, e.head)
+	l.Logf("%s tx %d tail %d -> %d head %d, count %d", e.name, e.n_done, e.old_tail, e.new_tail, e.head, e.count)
 }
 
 func (d *dev) tx_queue_interrupt(queue uint) {
@@ -333,6 +340,10 @@ func (d *dev) tx_queue_interrupt(queue uint) {
 			head:      di,
 			tail:      tail,
 		}
+		e.count = tail - di
+		if int32(e.count) < 0 {
+			e.count += q.len
+		}
 		elog.Add(&e)
 	}
 
@@ -347,9 +358,10 @@ func (d *dev) tx_queue_interrupt(queue uint) {
 type tx_advance_elog struct {
 	name       elog.StringRef
 	head, tail reg
+	count      reg
 	n_advance  reg
 }
 
 func (e *tx_advance_elog) Elog(l *elog.Log) {
-	l.Logf("%s tx advance %d head %d tail %d", e.name, e.n_advance, e.head, e.tail)
+	l.Logf("%s tx advance %d head %d tail %d count %d", e.name, e.n_advance, e.head, e.tail, e.count)
 }
