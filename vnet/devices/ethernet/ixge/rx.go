@@ -313,7 +313,6 @@ type rx_error uint32
 const (
 	rx_error_none rx_error = iota
 	rx_error_ip4_invalid_checksum
-	tx_error_ring_full_drops
 )
 
 func (q *rx_dma_queue) GetRefState(f vnet.RxDmaDescriptorFlags) (s vnet.RxDmaRefState) {
