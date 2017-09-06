@@ -197,6 +197,15 @@ func (l *Loop) quitAfter() {
 
 func (l *Loop) Run() {
 	elog.Enable(true)
+	// Save elog if thread panics.
+	defer func() {
+		if elog.Enabled() {
+			if err := recover(); err != nil {
+				elog.Panic(fmt.Errorf("Run: %v", err))
+				panic(err)
+			}
+		}
+	}()
 
 	l.timerInit()
 	l.startTime = cpu.TimeNow()
