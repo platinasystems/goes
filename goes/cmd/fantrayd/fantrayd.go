@@ -54,7 +54,11 @@ var (
 	WrRegFn  = make(map[string]string)
 	WrRegVal = make(map[string]string)
 	WrRegRng = make(map[string][]string)
+
+	fanTrayA = []string{"not installed", "not installed", "not installed", "not installed"}
 )
+
+const nFanTrays = 4
 
 type Command struct {
 	Info
@@ -269,6 +273,7 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 	if (rInputNGet & fanTrayAbsBits[i]) != 0 {
 		//fan tray is not present, turn LED off
 		w = "not installed"
+		fanTrayA[i] = "not installed"
 		o |= fanTrayLedOff[i]
 	} else {
 		//get fan tray air direction
@@ -276,6 +281,16 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 			f = "front->back"
 		} else {
 			f = "back->front"
+		}
+		fanTrayA[i] = f
+
+		mismatch := false
+		for n := 0; n < nFanTrays; n++ {
+			if fanTrayA[n] == "not installed" {
+				continue
+			} else if fanTrayA[i] != fanTrayA[n] {
+				mismatch = true
+			}
 		}
 
 		//check fan speed is above minimum
@@ -288,10 +303,13 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 
 		if s1 == "" && s2 == "" {
 			o |= fanTrayLedYellow[i]
-		} else if (r1 > minRpm) && (r2 > minRpm) {
+		} else if ((r1 > minRpm) && (r2 > minRpm)) && !mismatch {
 			w = "ok" + "." + f
 			o |= fanTrayLedGreen[i]
-		} else {
+		} else if mismatch {
+			w = "ok" + "." + f
+			o |= fanTrayLedYellow[i]
+		} else if (r1 <= minRpm) || (r2 < minRpm) {
 			w = "warning low rpm detected"
 			o |= fanTrayLedYellow[i]
 		}

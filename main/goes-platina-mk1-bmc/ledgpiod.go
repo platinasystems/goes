@@ -14,6 +14,12 @@ import (
 func init() { ledgpiod.Init = ledgpiodInit }
 
 func ledgpiodInit() {
+
+	ledgpiod.VpageByKey = map[string]uint8{
+
+		"system.fan_direction": 0,
+	}
+
 	ver := 0
 	ledgpiod.Vdev.Bus = 0
 	ledgpiod.Vdev.Addr = 0x0
