@@ -229,21 +229,21 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	}
 
 	var (
-		xr Noder
-		xi inNoder
-		x  *Node
-		ok bool
+		nextNoder Noder
+		xi        inNoder
+		x         *Node
+		ok        bool
 	)
 	if l.initialNodesRegistered {
-		if xr, ok = l.dataNodeByName[nextName]; !ok {
+		if nextNoder, ok = l.dataNodeByName[nextName]; !ok {
 			err = fmt.Errorf("add-next %s: unknown next %s", n.name, nextName)
 			return
 		}
-		if xi, ok = xr.(inNoder); !ok {
+		if xi, ok = nextNoder.(inNoder); !ok {
 			err = fmt.Errorf("add-next %s: %s is not input node", n.name, nextName)
 			return
 		}
-		x = xr.GetNode()
+		x = nextNoder.GetNode()
 	}
 
 	if nextIndex, ok = n.findNext(nextName, true); ok {
@@ -258,20 +258,19 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	}
 	nextIndex = withIndex
 	n.nextNodes.Validate(nextIndex)
-	nn := &n.nextNodes[nextIndex]
+	nextNode := &n.nextNodes[nextIndex]
 
-	nn.name = nextName
+	nextNode.name = nextName
 
 	// Add next for all active nodes (even non-nil free ones).
-	if xr != nil {
-		nn.nodeIndex = x.index
-		nn.in = xi.MakeLoopIn()
+	if nextNoder != nil {
+		nextNode.nodeIndex = x.index
+		nextNode.in = xi.MakeLoopIn()
 		for _, p := range l.activePollerPool.entries {
 			if p == nil || n.index >= uint(len(p.activeNodes)) {
 				continue
 			}
-			an := &p.activeNodes[n.index]
-			an.addNext(p, nn, withIndex)
+			p.activeNodes[n.index].addNext(p, nextNode, withIndex)
 		}
 	}
 	return
