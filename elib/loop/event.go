@@ -162,16 +162,16 @@ func (l *Loop) doEvent(e *loopEvent) {
 }
 
 func (l *Loop) eventHandler(p EventHandler) {
+	c := p.GetNode()
 	// Save elog if thread panics.
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
-				elog.Panic(err)
+				elog.Panic(fmt.Errorf("%s: %v", c.name, err))
 				panic(err)
 			}
 		}
 	}()
-	c := p.GetNode()
 	for {
 		e := <-c.rxEvents
 		l.doEvent(e)
