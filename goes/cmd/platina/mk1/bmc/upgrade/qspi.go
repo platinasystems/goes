@@ -44,7 +44,7 @@ type FlashFmt struct {
 }
 
 var Qfmt = map[string]FlashFmt{}
-var img = []string{"ubo", "dtb", "env", "ker", "ini", "sha"}
+var img = []string{"ubo", "dtb", "env", "ker", "ini", "ver"}
 
 var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
 var ei = &EraseInfo{0, 0}
@@ -56,8 +56,8 @@ func initQfmt() {
 	Qfmt["env"] = FlashFmt{off: 0x0c0000, siz: 0x040000}
 	Qfmt["ker"] = FlashFmt{off: 0x100000, siz: 0x200000}
 	Qfmt["ini"] = FlashFmt{off: 0x300000, siz: 0x300000}
-	Qfmt["oth"] = FlashFmt{off: 0xf80000, siz: 0x040000}
-	Qfmt["sha"] = FlashFmt{off: 0xfc0000, siz: 0x040000}
+	Qfmt["alt"] = FlashFmt{off: 0xf80000, siz: 0x040000}
+	Qfmt["ver"] = FlashFmt{off: 0xfc0000, siz: 0x040000}
 	return
 }
 

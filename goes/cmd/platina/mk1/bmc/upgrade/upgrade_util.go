@@ -109,14 +109,14 @@ func getRunningVersion() (string, error) {
 		return "", err
 	}
 	if qspi == 0 {
-		_, b, err := readFlash(Qfmt["sha"].off, Qfmt["sha"].siz)
+		_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 		if err != nil {
 			return "", err
 		}
 		return string(b[VERSION_OFF:VERSION_LEN]), nil
 	}
 	if qspi == 1 {
-		_, b, err := readFlash(Qfmt["oth"].off, Qfmt["oth"].siz)
+		_, b, err := readFlash(Qfmt["alt"].off, Qfmt["alt"].siz)
 		if err != nil {
 			return "", err
 		}
@@ -127,13 +127,13 @@ func getRunningVersion() (string, error) {
 
 func getInstalledVersions() ([]string, error) {
 	iv := make([]string, 2)
-	_, b, err := readFlash(Qfmt["sha"].off, Qfmt["sha"].siz)
+	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 	if err != nil {
 		return nil, err
 	}
 	iv[0] = string(b[VERSION_OFF:VERSION_LEN])
 
-	_, b, err = readFlash(Qfmt["oth"].off, Qfmt["oth"].siz)
+	_, b, err = readFlash(Qfmt["alt"].off, Qfmt["alt"].siz)
 	if err != nil {
 		return nil, err
 	}
