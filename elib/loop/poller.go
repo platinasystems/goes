@@ -96,7 +96,7 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 		s.is_suspended = did_suspend && !did_resume
 		n.poller_elog_ab(poller_elog_suspend_activity, ds, suspend, active)
 	}
-	need_alloc := is_active && !was_active && !s.is_suspended
+	need_alloc := is_active && !was_active && !s.is_active_alloc && !s.is_suspended
 	if !s.is_pending && need_alloc {
 		s.is_pending = true
 		s.is_active_alloc = true
@@ -110,13 +110,13 @@ func (n *Node) addActivityNoLock(da, ds int32, lim *SuspendLimits) (was_active, 
 	if was_active = s.is_active; was_active != is_active {
 		s.is_active = is_active
 		if is_active {
-			n.changeActive(is_active)
+			n.changeActivePollerState(is_active)
 		}
 	}
 	return
 }
 
-func (n *Node) changeActive(is_active bool) {
+func (n *Node) changeActivePollerState(is_active bool) {
 	if _, eventWait := n.l.activePollerState.changeActive(is_active); eventWait {
 		n.poller_elog(poller_elog_event_wake)
 		n.l.Interrupt()
@@ -177,10 +177,6 @@ func (n *Node) ActivateAfterTime(dt float64) {
 func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspend bool, did_resume bool) {
 	a := l.activePollerPool.entries[in.activeIndex]
 	n := a.pollerNode
-	// Node may be nil when inactive and freed but still having outstanding suspend activity.
-	if n == nil {
-		return
-	}
 	_, did_suspend, did_resume = n.addActivity(0, i, lim)
 	if did_suspend {
 		// Signal polling done to main loop.
@@ -275,9 +271,8 @@ func (n *Node) getActivePoller() *activePoller {
 
 func (n *Node) allocActivePoller() {
 	p := &n.l.activePollerPool
-	// Already allocated?
 	if !p.IsFree(n.activePollerIndex) {
-		return
+		panic("already allocated")
 	}
 	i := p.GetIndex()
 	a := p.entries[i]
@@ -309,7 +304,7 @@ func (n *Node) maybeFreeActive() {
 	need_free := s.is_active_alloc && s.active == 0 && s.suspend == 0
 	if need_free {
 		s.is_active_alloc = false
-		n.changeActive(false)
+		n.changeActivePollerState(false)
 	}
 	m.mu.Unlock()
 	if need_free {
@@ -343,16 +338,16 @@ func (l *Loop) flushAllNodeStats() {
 }
 
 func (l *Loop) dataPoll(p inLooper) {
+	c := p.GetNode()
 	// Save elog if thread panics.
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
-				elog.Panic(err)
+				elog.Panic(fmt.Errorf("%s: %v", c.name, err))
 				panic(err)
 			}
 		}
 	}()
-	c := p.GetNode()
 	for {
 		<-c.fromLoop
 		ap := c.getActivePoller()
