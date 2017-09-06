@@ -79,6 +79,15 @@ func (v *Vnet) RegisterInterfaceNode(n inputOutputInterfaceNoder, hi Hi, name st
 const tx_ref_vec_in_fifo_len = 256
 
 func (n *interfaceNode) ifOutputThread() {
+	// Save elog if thread panics.
+	defer func() {
+		if elog.Enabled() {
+			if err := recover(); err != nil {
+				elog.Panic(err)
+				panic(err)
+			}
+		}
+	}()
 	for x := range n.tx_chan {
 		if elog.Enabled() {
 			e := txElogEvent{
@@ -160,7 +169,9 @@ func (n *interfaceNode) send(ri *RefIn, i *TxRefVecIn) {
 		elog.Add(&e)
 	}
 	// We asked for MaxVectorLen on alloc; now correct for actual number of refs sent for tx.
-	n.AdjustSuspendActivity(ri, int(l)-MaxVectorLen)
+	if l < MaxVectorLen {
+		n.AdjustSuspendActivity(ri, int(l)-MaxVectorLen)
+	}
 	n.tx_chan <- i
 }
 

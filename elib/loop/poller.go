@@ -343,7 +343,15 @@ func (l *Loop) flushAllNodeStats() {
 }
 
 func (l *Loop) dataPoll(p inLooper) {
-	defer elog.Recover()
+	// Save elog if thread panics.
+	defer func() {
+		if elog.Enabled() {
+			if err := recover(); err != nil {
+				elog.Panic(err)
+				panic(err)
+			}
+		}
+	}()
 	c := p.GetNode()
 	for {
 		<-c.fromLoop
