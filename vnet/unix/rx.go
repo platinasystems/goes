@@ -264,17 +264,6 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 	if err != nil {
 		rx.CountError(rx_error_drop, 1)
 	}
-	if n_packets > 0 {
-		rv := rx.get_rx_ref_vector()
-		rv.n_packets = uint(n_packets)
-		for i := 0; i < n_packets; i++ {
-			p := &v.p[i]
-			m := &v.m[i]
-			rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
-		}
-		rx.AddDataActivity(int(n_packets))
-		rx.rv_input <- rv
-	}
 
 	if elog.Enabled() {
 		e := rx_tx_elog{
@@ -286,6 +275,18 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 			e.n_drops = 1
 		}
 		elog.Add(&e)
+	}
+
+	if n_packets > 0 {
+		rv := rx.get_rx_ref_vector()
+		rv.n_packets = uint(n_packets)
+		for i := 0; i < n_packets; i++ {
+			p := &v.p[i]
+			m := &v.m[i]
+			rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
+		}
+		rx.AddDataActivity(int(n_packets))
+		rx.rv_input <- rv
 	}
 
 	// Return packet vector for reuse.
@@ -367,8 +368,6 @@ loop:
 		}
 	}
 
-	rx.AddDataActivity(-int(n_packets))
-
 	if elog.Enabled() {
 		e := rx_tx_elog{
 			kind:      rx_elog_input,
@@ -376,4 +375,6 @@ loop:
 		}
 		elog.Add(&e)
 	}
+
+	rx.AddDataActivity(-int(n_packets))
 }
