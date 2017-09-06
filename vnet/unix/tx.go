@@ -268,7 +268,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 
 	if elog.Enabled() {
 		e := rx_tx_elog{
-			kind:      tx_elog_ready,
+			kind:      tx_elog_done,
 			name:      intf.elog_name,
 			n_packets: uint32(n_packets),
 			n_drops:   uint32(n_drops),
@@ -293,7 +293,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 
 const (
 	tx_elog_start = iota
-	tx_elog_ready
+	tx_elog_done
 	rx_elog_input
 	rx_elog_ready
 )
@@ -304,8 +304,8 @@ func (k rx_tx_elog_kind) String() string {
 	switch k {
 	case tx_elog_start:
 		return "tx start"
-	case tx_elog_ready:
-		return "tx ready"
+	case tx_elog_done:
+		return "tx done"
 	case rx_elog_input:
 		return "rx input"
 	case rx_elog_ready:
@@ -325,7 +325,7 @@ type rx_tx_elog struct {
 
 func (e *rx_tx_elog) Elog(l *elog.Log) {
 	switch e.kind {
-	case tx_elog_ready, tx_elog_start:
+	case tx_elog_done, tx_elog_start:
 		if e.n_drops != 0 {
 			l.Logf("unix %s %s %d packets, %d drops, active %d", e.kind, e.name, e.n_packets, e.n_drops, e.active)
 		} else {
@@ -337,7 +337,7 @@ func (e *rx_tx_elog) Elog(l *elog.Log) {
 		} else {
 			l.Logf("unix %s %s %d packets", e.kind, e.name, e.n_packets)
 		}
-	case rx_elog_input:
-		l.Logf("unix %s %d packets, active %d", e.kind, e.n_packets, e.active)
+	case rx_elog_input: // no interface name for input
+		l.Logf("unix %s %d packets", e.kind, e.n_packets)
 	}
 }
