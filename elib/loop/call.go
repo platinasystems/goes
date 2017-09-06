@@ -266,6 +266,8 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	if nextNoder != nil {
 		nextNode.nodeIndex = x.index
 		nextNode.in = xi.MakeLoopIn()
+		// No need for looking since we must be running in event context
+		// and data pollers are not active.
 		for _, p := range l.activePollerPool.entries {
 			if p == nil || n.index >= uint(len(p.activeNodes)) {
 				continue
