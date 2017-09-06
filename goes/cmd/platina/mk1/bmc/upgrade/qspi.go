@@ -9,7 +9,11 @@ import (
 	"io/ioutil"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
+
+	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/i2c"
 )
 
 type MTDinfo struct {
@@ -50,13 +54,14 @@ var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
 var ei = &EraseInfo{0, 0}
 var fd int = 0
 
+var sd i2c.SMBusData
+
 func initQfmt() {
 	Qfmt["ubo"] = FlashFmt{off: 0x000000, siz: 0x080000}
 	Qfmt["dtb"] = FlashFmt{off: 0x080000, siz: 0x040000}
 	Qfmt["env"] = FlashFmt{off: 0x0c0000, siz: 0x040000}
 	Qfmt["ker"] = FlashFmt{off: 0x100000, siz: 0x200000}
 	Qfmt["ini"] = FlashFmt{off: 0x300000, siz: 0x300000}
-	Qfmt["alt"] = FlashFmt{off: 0xf80000, siz: 0x040000}
 	Qfmt["ver"] = FlashFmt{off: 0xfc0000, siz: 0x040000}
 	return
 }
@@ -192,6 +197,35 @@ func eraseQSPI(of uint32, sz uint32) error {
 			err := fmt.Errorf("Erase error %s: %s", ei.start, e)
 			return err
 		}
+	}
+	return nil
+}
+
+func selectQSPI1(q bool) error {
+	if len(gpio.Pins) == 0 {
+		gpio.Init()
+	}
+
+	//i2c STOP
+	sd[0] = 0
+	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(1), 0}
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+
+	pin, found := gpio.Pins["QSPI_MUX_SEL"]
+	if found {
+		pin.SetValue(q)
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	//i2c START
+	sd[0] = 0
+	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
+	err = DoI2cRpc()
+	if err != nil {
+		return err
 	}
 	return nil
 }

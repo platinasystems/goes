@@ -69,7 +69,7 @@ func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
 	initQfmt()
-	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c")
+	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c", "-1")
 	parm, args := parms.New(args, "-v", "-s")
 	if len(parm.ByName["-v"]) == 0 {
 		parm.ByName["-v"] = DfltVer
@@ -100,7 +100,8 @@ func (cmd) Main(args ...string) error {
 	}
 
 	if err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"],
-		flag.ByName["-t"], flag.ByName["-f"]); err != nil {
+		flag.ByName["-t"], flag.ByName["-f"],
+		flag.ByName["-1"]); err != nil {
 		return err
 	}
 	return nil
@@ -153,24 +154,24 @@ func checkChecksums() error { //TODO
 	return nil
 }
 
-func doUpgrade(s string, v string, t bool, f bool) error {
+func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	fmt.Print("\n")
 	fn := ArchiveName
 
 	if !f {
-		rv, err := getRunningVersion()
+		qv, err := getQSPIversion(q)
 		if err != nil {
 			return err
 		}
-		if len(rv) == 0 {
-			fmt.Printf("Aborting, couldn't resolve booted QSPI\n")
+		if len(qv) == 0 {
+			fmt.Printf("Aborting, couldn't resolve QSPI version\n")
 			return nil
 		}
 		sv, err := getServerVersion(s, v, t)
 		if err != nil {
 			return err
 		}
-		newer, err := isVersionNewer(rv, sv)
+		newer, err := isVersionNewer(qv, sv)
 		if !newer {
 			fmt.Printf("Aborting, selected version is not newer\n")
 			return nil
@@ -188,6 +189,10 @@ func doUpgrade(s string, v string, t bool, f bool) error {
 		return fmt.Errorf("Error unzipping file: %v", err)
 	}
 
+	selectQSPI1(q)
+	if q == true {
+		fmt.Println("Upgrading QSPI1...")
+	}
 	if err := writeImageAll(); err != nil {
 		return fmt.Errorf("*** UPGRADE ERROR! ***: %v", err)
 	}

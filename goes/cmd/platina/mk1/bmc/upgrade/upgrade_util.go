@@ -103,37 +103,26 @@ func getBootedQSPI() (int, error) {
 	return -1, nil
 }
 
-func getRunningVersion() (string, error) {
-	qspi, err := getBootedQSPI()
+func getQSPIversion(q bool) (string, error) {
+	selectQSPI1(q)
+	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 	if err != nil {
 		return "", err
 	}
-	if qspi == 0 {
-		_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
-		if err != nil {
-			return "", err
-		}
-		return string(b[VERSION_OFF:VERSION_LEN]), nil
-	}
-	if qspi == 1 {
-		_, b, err := readFlash(Qfmt["alt"].off, Qfmt["alt"].siz)
-		if err != nil {
-			return "", err
-		}
-		return string(b[VERSION_OFF:VERSION_LEN]), nil
-	}
-	return "", nil
+	return string(b[VERSION_OFF:VERSION_LEN]), nil
 }
 
 func getInstalledVersions() ([]string, error) {
 	iv := make([]string, 2)
+	selectQSPI1(false)
 	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 	if err != nil {
 		return nil, err
 	}
 	iv[0] = string(b[VERSION_OFF:VERSION_LEN])
 
-	_, b, err = readFlash(Qfmt["alt"].off, Qfmt["alt"].siz)
+	selectQSPI1(true)
+	_, b, err = readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 	if err != nil {
 		return nil, err
 	}
