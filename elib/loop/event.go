@@ -366,5 +366,5 @@ type event_action_elog struct {
 }
 
 func (e *event_action_elog) Elog(l *elog.Log) {
-	l.Logf("loop %s%d %s", e.name, e.sequence, e.kind)
+	l.Logf("loop %v%d %s", e.name, e.sequence, e.kind)
 }
