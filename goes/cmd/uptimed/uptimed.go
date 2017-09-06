@@ -126,9 +126,9 @@ func update_cpu(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
 		key  string
 		load uint64
 	}{
-		{"sys.cpu.load1", si.Loads[0]},
-		{"sys.cpu.load10", si.Loads[1]},
-		{"sys.cpu.load15", si.Loads[2]},
+		{"sys.cpu.load1", uint64(si.Loads[0])},
+		{"sys.cpu.load10", uint64(si.Loads[1])},
+		{"sys.cpu.load15", uint64(si.Loads[2])},
 	} {
 		fload := float64(v.load) / scale
 		pub.Print(fmt.Sprintf("%s: %2.2f", v.key, fload))
@@ -138,12 +138,12 @@ func update_cpu(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
 func update_mem(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
 	for _, v := range []struct {
 		key   string
-		value uint64
+		value uint64 // 32 bit on bmc
 	}{
-		{"sys.mem.total", si.Totalram},
-		{"sys.mem.free", si.Freeram},
-		{"sys.mem.shared", si.Sharedram},
-		{"sys.mem.buffer", si.Bufferram},
+		{"sys.mem.total", uint64(si.Totalram)},
+		{"sys.mem.free", uint64(si.Freeram)},
+		{"sys.mem.shared", uint64(si.Sharedram)},
+		{"sys.mem.buffer", uint64(si.Bufferram)},
 	} {
 		pub.Print(fmt.Sprintf("%s: %v", v.key, v.value))
 	}
