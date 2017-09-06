@@ -336,27 +336,6 @@ func (b *Buffer) Panic(err interface{}) {
 // Panic adds error to log and saves log file (if configured).
 func Panic(err interface{}) { DefaultBuffer.Panic(err) }
 
-// Recover detects and saves log on panics.
-// Typical inserted at start of a function:
-//     func X(b *elog.Buffer) {
-//         defer b.Recover()
-//     }
-func (b *Buffer) Recover() {
-	if Enabled() && b.Enabled() {
-		if err := recover(); err != nil {
-			b.Panic(err)
-			panic(err)
-		}
-	}
-}
-
-// Recover detects and saves log on panics.
-// Typical inserted at start of a function:
-//     func X() {
-//         defer elog.Recover()
-//     }
-func Recover() { DefaultBuffer.Recover() }
-
 func (c *CallerInfo) match(re *regexp.Regexp) bool {
 	return re.MatchString(c.Name)
 }
