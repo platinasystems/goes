@@ -85,20 +85,6 @@ func (l *Loop) Logln(args ...interface{}) {
 }
 func (m *loggerMain) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(format, args...)) }
 
-type rtNode struct {
-	Name     string  `format:"%-30s"`
-	State    string  `align:"center"`
-	Calls    uint64  `format:"%16d"`
-	Vectors  uint64  `format:"%16d"`
-	Suspends uint64  `format:"%16d"`
-	Clocks   float64 `format:"%16.2f"`
-}
-type rtNodes []rtNode
-
-func (ns rtNodes) Less(i, j int) bool { return ns[i].Name < ns[j].Name }
-func (ns rtNodes) Swap(i, j int)      { ns[i], ns[j] = ns[j], ns[i] }
-func (ns rtNodes) Len() int           { return len(ns) }
-
 func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	show_detail := false
 	for !in.End() {
@@ -110,18 +96,26 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 		}
 	}
 
-	ns := rtNodes{}
+	l.flushAllNodeStats()
+
+	type node struct {
+		Name     string  `format:"%-30s"`
+		State    string  `align:"center"`
+		Calls    uint64  `format:"%16d"`
+		Vectors  uint64  `format:"%16d"`
+		Suspends uint64  `format:"%16d"`
+		Clocks   float64 `format:"%16.2f"`
+	}
+
+	ns := []node{}
+	var inputSummary stats
 	for i := range l.DataNodes {
 		n := l.DataNodes[i].GetNode()
 		var s [2]stats
 		s[0].add(&n.inputStats)
+		inputSummary.add(&n.inputStats)
+		inputSummary.clocks += n.outputStats.clocksSinceLastClear()
 		s[1].add(&n.outputStats)
-		l.activePollerPool.Foreach(func(a *activePoller) {
-			if a.activeNodes != nil {
-				s[0].add(&a.activeNodes[i].inputStats)
-				s[1].add(&a.activeNodes[i].outputStats)
-			}
-		})
 		name := n.name
 		_, isIn := n.noder.(inLooper)
 		_, isOut := n.noder.(outLooper)
@@ -146,7 +140,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 				if j == 0 {
 					state = n.s.String()
 				}
-				ns = append(ns, rtNode{
+				ns = append(ns, node{
 					Name:     name + io,
 					State:    state,
 					Calls:    s[j].calls,
@@ -159,40 +153,29 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 	}
 
 	// Summary
-	{
-		var s stats
-		l.activePollerPool.Foreach(func(a *activePoller) {
-			s.add(&a.pollerStats)
-		})
-		if s.calls > 0 {
-			dt := time.Since(l.timeLastRuntimeClear).Seconds()
-			vecsPerSec := float64(s.vectors) / dt
-			clocksPerVec := float64(s.clocks) / float64(s.vectors)
-			vecsPerCall := float64(s.vectors) / float64(s.calls)
-			fmt.Fprintf(w, "Vectors: %d, Vectors/sec: %.2e, Clocks/vector: %.2f, Vectors/call %.2f\n",
-				s.vectors, vecsPerSec, clocksPerVec, vecsPerCall)
-		}
+	if s := inputSummary; s.calls > 0 {
+		dt := time.Since(l.timeLastRuntimeClear).Seconds()
+		vecsPerSec := float64(s.vectors) / dt
+		clocksPerVec := float64(s.clocks) / float64(s.vectors)
+		vecsPerCall := float64(s.vectors) / float64(s.calls)
+		fmt.Fprintf(w, "Vectors: %d, Vectors/sec: %.2e, Clocks/vector: %.2f, Vectors/call %.2f\n",
+			s.vectors, vecsPerSec, clocksPerVec, vecsPerCall)
 	}
 
-	sort.Sort(ns)
+	sort.Slice(ns, func(i, j int) bool { return ns[i].Name < ns[j].Name })
+
 	elib.TabulateWrite(w, ns)
 	return
 }
 
 func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	l.flushAllNodeStats()
 	l.timeLastRuntimeClear = time.Now()
 	for i := range l.DataNodes {
 		n := l.DataNodes[i].GetNode()
 		n.inputStats.clear()
 		n.outputStats.clear()
 	}
-	l.activePollerPool.Foreach(func(a *activePoller) {
-		a.pollerStats.clear()
-		for j := range a.activeNodes {
-			a.activeNodes[j].inputStats.clear()
-			a.activeNodes[j].outputStats.clear()
-		}
-	})
 	return
 }
 
