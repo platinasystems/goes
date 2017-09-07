@@ -6,6 +6,8 @@ package ixge
 
 import (
 	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/hw/pci"
+	"github.com/platinasystems/go/elib/hw/pcie"
 	"github.com/platinasystems/go/vnet"
 
 	"sync"
@@ -36,7 +38,7 @@ type dma_regs struct {
 	// [13] rx/tx data write/read relaxed order
 	// [15] rx head data write relaxed order
 	// [31:24] apic id for cpu's cache.
-	dca_control reg
+	cache_control reg
 
 	head_index reg
 
@@ -65,6 +67,17 @@ type dma_regs struct {
 
 	rx_coallesce_control reg
 }
+
+const (
+	dma_cache_control_tph_rx_tx_desc_fetch                  = 1 << 0
+	dma_cache_control_tph_rx_tx_desc_writeback              = 1 << 1
+	dma_cache_control_tph_rx_head_data                      = 1 << 2
+	dma_cache_control_tph_rx_tail_data_tx_data              = 1 << 3
+	dma_cache_control_relaxed_ordering_rx_tx_desc_fetch     = 1 << 9
+	dma_cache_control_relaxed_ordering_rx_tx_desc_writeback = 1 << 11
+	dma_cache_control_relaxed_ordering_rx_tx_data           = 1 << 13
+	dma_cache_control_relaxed_ordering_rx_head_data         = 1 << 15
+)
 
 type rx_dma_regs struct {
 	dma_regs
@@ -139,4 +152,17 @@ func (q *dma_queue) start(d *dev, dr *dma_regs) {
 	// Set head/tail.
 	dr.head_index.set(d, q.head_index)
 	dr.tail_index.set(d, q.tail_index)
+}
+
+func (d *dev) dma_init() {
+	// Enable TPH if discovered.
+	if r := (*pcie.TPHRequesterHeader)(d.p.GetExtCap(pci.TPHRequester)); r != nil {
+		v := r.Control.Get(d.p)
+		v |= 1 << 8 // enable
+		r.Control.Set(d.p, v)
+		d.have_tph = true
+	}
+
+	d.tx_dma_init(0)
+	d.rx_dma_init(0)
 }

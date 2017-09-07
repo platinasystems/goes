@@ -47,7 +47,7 @@ func (d *dev) vnetInit() {
 
 func (d *dev) DriverName() string { return "ixge" }
 func (d *dev) dev_name() string {
-	a := d.pci_dev.Addr
+	a := d.p.Addr
 	return fmt.Sprintf("ixge%d-%d-%d", a.Bus, a.Slot, a.Fn)
 }
 

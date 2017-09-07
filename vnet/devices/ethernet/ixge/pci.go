@@ -65,7 +65,7 @@ const (
 
 type dev_id pci.VendorDeviceID
 
-func (d *dev) get_dev_id() dev_id { return dev_id(d.pci_dev.DeviceID()) }
+func (d *dev) get_dev_id() dev_id { return dev_id(d.p.DeviceID()) }
 
 func (d dev_id) String() (v string) {
 	var ok bool
