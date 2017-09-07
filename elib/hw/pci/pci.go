@@ -462,4 +462,15 @@ func (d *Device) FindExtCap(c ExtCapability) (offset uint, found bool) {
 	return
 }
 
+func (d *Device) GetExtCap(c ExtCapability) (p unsafe.Pointer) {
+	d.ForeachExtCap(func(h *ExtCapabilityHeader, o uint) (done bool, err error) {
+		if found := h.ExtCapability == c; found {
+			p = d.getRegs(o)
+			done = true
+		}
+		return
+	})
+	return
+}
+
 //go:generate stringer -type=Capability,ExtCapability,HeaderType

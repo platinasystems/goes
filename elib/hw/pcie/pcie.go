@@ -142,3 +142,21 @@ type CapabilityHeader struct {
 func GetCapabilityHeader(d *pci.Device) *CapabilityHeader {
 	return (*CapabilityHeader)(d.GetCap(pci.PCIE))
 }
+
+type TPHRequesterHeader struct {
+	pci.ExtCapabilityHeader
+
+	// Read-only
+	// [0] No ST mode.
+	// [1] Interrupt vector mode
+	// [2] Device specific mode
+	// [8] Extended tph requester supported
+	// [10:9] ST table location
+	// [26:16] ST table size
+	Capabilities pci.U32
+
+	// [2:0] ST mode select
+	// [8] TPH requester enable
+	// [9] Extended TPH requester enable
+	Control pci.U32
+}
