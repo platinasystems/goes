@@ -650,8 +650,7 @@ func Configure(in *parse.Input) (err error) {
 			AddDelEventFilter(s, false)
 		case in.Parse("panic-save %v", &save):
 		default:
-			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
-			return
+			in.ParseError()
 		}
 	}
 	// Save on signal 1 HUP.
