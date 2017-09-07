@@ -459,6 +459,15 @@ var ErrMatch = errors.New("input does not match format")
 
 func (in *Input) Error() error { return in.err }
 
+type Err struct {
+	err   error
+	input string
+}
+
+func (e *Err) Error() string           { return e.err.Error() + " `" + e.input + "'" }
+func (in *Input) newErr(e error) error { return &Err{err: e, input: in.String()} }
+func (in *Input) ParseError()          { panic(in.newErr(errInput)) }
+
 func (in *Input) Parse(format string, args ...interface{}) (ok bool) {
 	ok = true
 	l := len(format)
@@ -473,7 +482,7 @@ func (in *Input) Parse(format string, args ...interface{}) (ok bool) {
 		if e := recover(); e != nil {
 			ok = false
 			// Save away error and input context.
-			in.err = e.(error) // fmt.Errorf("%s: %s", e, in)
+			in.err = e.(error)
 		}
 		in.restore(ok)
 	}()
@@ -697,11 +706,11 @@ func (in *Input) doPercent(verb rune, args *Args) {
 }
 
 var (
-	ErrVerb            = errors.New("illegal verb after %")
-	ErrInt             = errors.New("expected integer")
-	ErrFloat           = errors.New("expected float")
-	ErrInput           = errors.New("invalid input")
-	ErrUnmatchedBraces = errors.New("unmatched braces")
+	errVerb            = errors.New("illegal verb after %")
+	errInt             = errors.New("expected integer")
+	errFloat           = errors.New("expected float")
+	errInput           = errors.New("invalid input")
+	errUnmatchedBraces = errors.New("unmatched braces")
 )
 
 func (in *Input) doBool(verb rune) (v bool) {
@@ -709,7 +718,7 @@ func (in *Input) doBool(verb rune) (v bool) {
 	if i := in.AtOneof("01ftFT"); i < 6 {
 		v = i%2 != 0
 	} else {
-		panic(ErrInput)
+		in.ParseError()
 	}
 	return
 }
@@ -733,10 +742,10 @@ func (in *Input) doInt(verb rune, bitSize int, signed bool) uint64 {
 	case 'x', 'X':
 		base = 16
 	default:
-		panic(ErrVerb)
+		panic(errVerb)
 	}
 	if x, ok := in.parseInt(base, bitSize, signed); !ok {
-		panic(ErrInt)
+		panic(in.newErr(errInt))
 	} else {
 		return x
 	}
@@ -746,10 +755,10 @@ func (in *Input) doFloat(verb rune) float64 {
 	switch verb {
 	case 'f':
 	default:
-		panic(ErrVerb)
+		panic(in.newErr(errVerb))
 	}
 	if x, ok := in.ParseFloat(); !ok {
-		panic(ErrFloat)
+		panic(in.newErr(errFloat))
 	} else {
 		return x
 	}
@@ -812,7 +821,7 @@ loop:
 	ok := paren == 0
 	in.restore(ok)
 	if !ok {
-		panic(ErrUnmatchedBraces)
+		panic(in.newErr(errUnmatchedBraces))
 	}
 	return
 }
@@ -826,7 +835,7 @@ func (in *Input) doString(verb rune) (s string) {
 	case 'l':
 		s = in.parseString('\n')
 	default:
-		panic(ErrVerb)
+		panic(in.newErr(errVerb))
 	}
 	return
 }
