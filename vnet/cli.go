@@ -29,7 +29,7 @@ func (l *cliListener) Parse(in *parse.Input) {
 			l.serverConfig.EnableQuit = true
 		case in.Parse("socket %s", &l.socketConfig):
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 }
@@ -59,7 +59,7 @@ func (m *cliMain) Configure(in *parse.Input) {
 		case in.Parse("stdin"):
 			m.enableStdin = true
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 }

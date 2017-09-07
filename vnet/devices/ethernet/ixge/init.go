@@ -333,7 +333,7 @@ func (m *main) Configure(in *parse.Input) {
 			c.DisableUnix = true
 		case in.Parse("punt %v", &c.PuntNode):
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 }

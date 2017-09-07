@@ -24,7 +24,7 @@ func (a *Address) Parse(in *parse.Input) {
 		a[2], a[3] = uint8(b[1]>>8), uint8(b[1])
 		a[4], a[5] = uint8(b[2]>>8), uint8(b[2])
 	default:
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
@@ -34,7 +34,7 @@ func (h *Header) String() (s string) {
 
 func (h *Header) Parse(in *parse.Input) {
 	if !in.ParseLoose("%v: %v -> %v", &h.Type, &h.Src, &h.Dst) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
@@ -91,25 +91,25 @@ func (h *VlanHeader) Parse(sup_in *parse.Input) {
 			switch {
 			case in.Parse("%v", &id):
 				if id > 0xfff {
-					panic(parse.ErrInput)
+					in.ParseError()
 				}
 				tag = (tag &^ 0xfff) | id
 			case in.Parse("cfi"):
 				tag |= 1 << 12
 			case in.Parse("pri%*ority %d", &pri):
 				if pri > 8 {
-					panic(parse.ErrInput)
+					in.ParseError()
 				}
 				tag = (tag &^ (7 << 13)) | pri<<13
 			case in.Parse("tpid %v", &tp):
 			default:
-				panic(parse.ErrInput)
+				in.ParseError()
 			}
 		}
 		h.Type = tp
 		h.Tag = VlanTag(tag).FromHost()
 	} else {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
