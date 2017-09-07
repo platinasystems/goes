@@ -9,7 +9,6 @@ import (
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
-	"github.com/platinasystems/go/elib/parse"
 
 	"fmt"
 	"io"
@@ -92,7 +91,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 		case in.Parse("d%*etail"):
 			show_detail = true
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 
@@ -192,8 +191,7 @@ func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 			showFilters = true
 		case in.Parse("m%*atching %v", &matching):
 		default:
-			err = parse.ErrInput
-			return
+			in.ParseError()
 		}
 	}
 
@@ -254,8 +252,7 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 				v.Print(w, false)
 			}
 		default:
-			err = parse.ErrInput
-			return
+			in.ParseError()
 		}
 	}
 	return
