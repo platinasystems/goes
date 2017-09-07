@@ -69,8 +69,7 @@ func main() {
 				case wip_in.Parse("disable-msi"):
 					cf.EnableMsiInterrupt = false
 				default:
-					err = parse.ErrInput
-					return
+					in.ParseError()
 				}
 			}
 			// Make sure we reset switch either via gpio or cpu.

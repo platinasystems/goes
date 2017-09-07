@@ -626,7 +626,7 @@ func (x *IfLoopbackType) Parse(in *parse.Input) {
 	case "phy":
 		*x = IfLoopbackPhy
 	default:
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 	return
 }

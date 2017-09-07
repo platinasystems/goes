@@ -6,7 +6,7 @@ import (
 
 func (h *Header) Parse(in *parse.Input) {
 	if !in.ParseLoose("%v", &h.Type) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 	return
 }

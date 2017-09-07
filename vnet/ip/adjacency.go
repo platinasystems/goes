@@ -70,7 +70,7 @@ func (n *LookupNext) Parse(in *parse.Input) {
 	case "rewrite":
 		*n = LookupNextRewrite
 	default:
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
@@ -124,7 +124,7 @@ func (a *Adjacency) String(m *Main) (lines []string) {
 func (a *Adjacency) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	m := args.Get().(*Main)
 	if !in.Parse("%v", &a.LookupNextIndex) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 	a.NAdj = 1
 	a.Index = ^uint32(0)

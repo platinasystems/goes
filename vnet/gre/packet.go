@@ -43,6 +43,6 @@ func (h *Header) Write(b []byte) {
 func (h *Header) Parse(in *parse.Input) {
 	h.VersionAndFlags = 0
 	if !in.Parse("%v", &h.Type) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }

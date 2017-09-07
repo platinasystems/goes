@@ -14,14 +14,14 @@ func (a *Address) String() string    { return fmt.Sprintf("%d.%d.%d.%d", a[0], a
 func (a *Address) HexString() string { return fmt.Sprintf("0x%x.%x.%x.%x", a[0], a[1], a[2], a[3]) }
 func (a *Address) Parse(in *parse.Input) {
 	if !in.Parse("%d.%d.%d.%d", &a[0], &a[1], &a[2], &a[3]) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
 func (p *Prefix) String() string { return fmt.Sprintf("%s/%d", &p.Address, p.Len) }
 func (p *Prefix) Parse(in *parse.Input) {
 	if !in.Parse("%v/%d", &p.Address, &p.Len) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
@@ -42,7 +42,7 @@ func (h *Header) Parse(in *parse.Input) {
 	h.Ip_version_and_header_length = 0x45
 	h.Ttl = DefaultTtl
 	if !in.ParseLoose("%v: %v -> %v", &h.Protocol, &h.Src, &h.Dst) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 loop:
 	for {

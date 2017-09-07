@@ -134,8 +134,7 @@ func (v *Vnet) ConfigurePackages(in *parse.Input) (err error) {
 				return
 			}
 		default:
-			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
-			return
+			in.ParseError()
 		}
 	}
 	return
@@ -156,8 +155,7 @@ func (v *Vnet) Configure(in *parse.Input) (err error) {
 		case in.Parse("quit"):
 			v.loop.Config.QuitAfterDuration = 1e-6 // must be positive to enable
 		default:
-			err = fmt.Errorf("%s: %s", parse.ErrInput, in)
-			return
+			in.ParseError()
 		}
 	}
 	return

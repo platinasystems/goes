@@ -93,7 +93,7 @@ var typeMap = parse.NewStringMap(typeStrings[:])
 func (t *Type) Parse(in *parse.Input) {
 	var v uint8
 	if !in.Parse("%v", typeMap, &v) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 	*t = Type(v)
 }
