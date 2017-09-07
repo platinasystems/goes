@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime/debug"
 	"strings"
 )
 
@@ -212,18 +211,24 @@ func (m *Main) lookup(in *Input) (Commander, error) {
 
 func (m *Main) ExecInput(w io.Writer, in *Input) (err error) {
 	var c Commander
-	c, err = m.lookup(in)
-	if err == nil {
-		defer func() {
-			if e := recover(); e != nil {
-				err = fmt.Errorf("%s: %s `%s': %s", c.CliName(), e, in, debug.Stack())
-			}
-		}()
-		// Potentially skip leading and trailing {} in input line.
-		var line Input
-		in.Parse("%l", &line.Input)
-		err = c.CliAction(w, &line)
+	if c, err = m.lookup(in); err != nil {
+		return
 	}
+	defer func() {
+		if e := recover(); e != nil {
+			if pe, ok := e.(*parse.Err); ok {
+				err = errors.New(c.CliName() + ": " + pe.Error())
+			} else if f, ok := e.(error); ok {
+				err = f
+			} else {
+				panic(e)
+			}
+		}
+	}()
+	// Potentially skip leading and trailing {} in input line.
+	var line Input
+	in.Parse("%l", &line.Input)
+	err = c.CliAction(w, &line)
 	return
 }
 
