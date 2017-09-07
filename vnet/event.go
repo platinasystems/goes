@@ -7,6 +7,7 @@ package vnet
 import (
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/event"
+	"github.com/platinasystems/go/elib/loop"
 )
 
 type eventNode struct{ Node }
@@ -24,6 +25,7 @@ func (v *Vnet) eventInit() {
 }
 
 type Event struct {
+	loop.Event
 	n *Node
 }
 
