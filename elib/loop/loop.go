@@ -350,7 +350,8 @@ func (l *Loop) RegisterNode(n Noder, format string, args ...interface{}) {
 	start := l.registrationsNeedStart
 	nOK := 0
 	if h, ok := n.(EventHandler); ok {
-		l.eventMain.handlers = append(l.eventMain.handlers, h)
+		l.eventHandlers = append(l.eventHandlers, h)
+		l.eventHandlerNodes = append(l.eventHandlerNodes, x)
 		if start {
 			l.startHandler(h)
 		}

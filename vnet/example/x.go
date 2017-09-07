@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/elib/elog"
+	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
@@ -31,6 +32,7 @@ type myInterface struct {
 type myNode struct {
 	intfs []myInterface
 	vnet.Package
+	loop.Node
 	isUnix                bool
 	verbose_output        bool
 	interface_name_format string
@@ -116,11 +118,11 @@ func (n *myNode) Init() (err error) {
 		if err = intf.SetAdminUp(true); err != nil {
 			return
 		}
-
-		// Enable for event test
-		if false {
-			intf.AddTimedEvent(&myEvent{}, 1)
-		}
+	}
+	// Enable for event suspend/resume test.
+	if false {
+		v.GetLoop().RegisterNode(n, "resumer-node")
+		v.SignalEvent(&myEvent{n: n, delay: 0, limit: 1000})
 	}
 	return
 }
@@ -135,7 +137,7 @@ func (n *myNode) Configure(in *parse.Input) {
 		case in.Parse("verbose"):
 			n.verbose_output = true
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 }
@@ -221,12 +223,29 @@ func main() {
 
 type myEvent struct {
 	vnet.Event
-	x int
+	n        *myNode
+	x, limit int
+	delay    float64
 }
+
+type resumer struct{ e *myEvent }
+
+func (n *myNode) EventHandler()   {}
+func (r *resumer) EventAction()   { r.e.Resume() }
+func (r *resumer) String() string { return "resumer" }
 
 func (e *myEvent) EventAction() {
 	e.x++
-	e.AddTimedEvent(e, 1)
+	if e.limit != 0 && e.x >= e.limit {
+		return
+	}
+	if e.delay != 0 {
+		e.AddTimedEvent(e, e.delay)
+	} else {
+		e.n.Vnet.SignalEvent(e)
+	}
+	e.n.Node.AddEvent(&resumer{e: e}, e.n)
+	e.Suspend()
 }
 
 func (e *myEvent) String() string { return fmt.Sprintf("my-event %d", e.x) }
