@@ -153,7 +153,7 @@ func (t *Type) Parse(in *parse.Input) {
 	case in.Parse("%v", typeMap, &v):
 	case in.Parse("%v", &v):
 	default:
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 	*t = Type(v).FromHost()
 }
