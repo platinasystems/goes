@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/hw/pci"
+	"github.com/platinasystems/go/elib/hw/pcie"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	vnetpci "github.com/platinasystems/go/vnet/devices/bus/pci"
@@ -158,6 +159,11 @@ func (d *dev) Init() (err error) {
 
 	d.d.phy_init()
 
+	// Enable TPH if its there.
+	if r := (*pcie.TPHRequesterHeader)(d.pci_dev.GetExtCap(pci.TPHRequester)); r != nil {
+		_ = r
+	}
+
 	d.tx_dma_init(0)
 	d.rx_dma_init(0)
 
@@ -193,6 +199,55 @@ func (d *dev) Init() (err error) {
 	d.counter_init()
 	d.pci_bus_dev.InterruptEnable(true)
 	return
+}
+
+func (d *dev) eeprom_read(a uint) (v uint) { return d.eeprom_rw(a, 0, true) }
+func (d *dev) eeprom_write(a, v uint)      { d.eeprom_rw(a, v, false) }
+func (d *dev) eeprom_rw(a, b uint, is_read bool) (v uint) {
+	d.software_firmware_sync(sw_fw_eeprom, 0)
+	defer d.software_firmware_sync_release(sw_fw_eeprom, 0)
+	const (
+		start = 1 << 0
+		done  = 1 << 1
+	)
+	r := d.regs
+	var x reg
+	x = start | reg(a)<<2
+	if !is_read {
+		x |= reg(b) << 16
+		r.eeprom_write.set(d, x)
+	} else {
+		r.eeprom_read.set(d, x)
+	}
+	for {
+		time.Sleep(1 * time.Millisecond)
+		if is_read {
+			x = r.eeprom_read.get(d)
+		} else {
+			x = r.eeprom_write.get(d)
+		}
+		if x&done != 0 {
+			v = uint(x) >> 16
+			return
+		}
+	}
+}
+
+func (d *dev) eeprom_flash_update() {
+	d.software_firmware_sync(sw_fw_eeprom|sw_fw_flash, 0)
+	defer d.software_firmware_sync_release(sw_fw_eeprom|sw_fw_flash, 0)
+	r := d.regs
+	const (
+		start = 1 << 23
+		done  = 1 << 26
+	)
+	r.eeprom_mode_control.or(d, start)
+	for {
+		time.Sleep(1 * time.Millisecond)
+		if v := r.eeprom_mode_control.get(d); v&done != 0 {
+			break
+		}
+	}
 }
 
 func (d *dev) Exit() (err error) {

@@ -883,14 +883,30 @@ type regs struct {
 		_                [0x10010 - 0xf650]byte
 	}
 
-	eeprom_flash_control reg
+	// [8] present
+	// [9] auto-read done
+	// [10] management auto-load done
+	// [14:11] eeprom size
+	// [15] pcie analog done
+	// [16] pcie core done
+	// [17] pcie general done
+	// [18] pcie func done
+	// [19] core done
+	// [20] core csr done
+	// [21] mac done
+	// [22] lcb done
+	// [23] flash update start
+	// [25] sector 1 valid
+	// [26] flash update done (auto clears when update starts)
+	eeprom_mode_control reg
 
 	/* [0] start
 	   [1] done
 	   [15:2] address
-	   [31:16] read data. */
-	eeprom_read     reg
-	_               [0x1001c - 0x10018]byte
+	   [31:16] read/write data. */
+	eeprom_read  reg
+	eeprom_write reg
+
 	flash_access    reg
 	_               [0x10114 - 0x10020]byte
 	flash_data      reg

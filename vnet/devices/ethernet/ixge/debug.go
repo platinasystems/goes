@@ -37,7 +37,7 @@ func init() {
 	check("fcoe_redirection", unsafe.Pointer(&r.fcoe_redirection), 0xed00)
 	check("flow_director", unsafe.Pointer(&r.flow_director), 0xee00)
 	check("pf_1", unsafe.Pointer(&r.pf_1), 0xf000)
-	check("eeprom_flash_control", unsafe.Pointer(&r.eeprom_flash_control), 0x10010)
+	check("eeprom_mode_control", unsafe.Pointer(&r.eeprom_mode_control), 0x10010)
 	check("pcie", unsafe.Pointer(&r.pcie), 0x11000)
 	check("sfp_i2c", unsafe.Pointer(&r.sfp_i2c), 0x15f58)
 }
