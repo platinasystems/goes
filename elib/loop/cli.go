@@ -109,8 +109,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 
 	ns := []node{}
 	var inputSummary stats
-	for i := range l.DataNodes {
-		n := l.DataNodes[i].GetNode()
+	for _, n := range l.nodes {
 		var s [2]stats
 		s[0].add(&n.inputStats)
 		inputSummary.add(&n.inputStats)
@@ -171,8 +170,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	l.flushAllNodeStats()
 	l.timeLastRuntimeClear = time.Now()
-	for i := range l.DataNodes {
-		n := l.DataNodes[i].GetNode()
+	for _, n := range l.nodes {
 		n.inputStats.clear()
 		n.outputStats.clear()
 	}

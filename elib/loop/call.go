@@ -11,11 +11,11 @@ import (
 
 	"fmt"
 	"reflect"
+	"sync/atomic"
 )
 
 type stats struct {
-	calls, vectors, suspends uint64
-	clocks                   cpu.Time
+	calls, vectors, suspends, clocks uint64
 }
 
 type nodeStats struct {
@@ -28,7 +28,7 @@ func (s *nodeStats) zero() {
 	s.current = z
 	s.lastClear = z
 }
-func (s *nodeStats) clocksSinceLastClear() cpu.Time { return s.current.clocks - s.lastClear.clocks }
+func (s *nodeStats) clocksSinceLastClear() uint64 { return s.current.clocks - s.lastClear.clocks }
 
 func (s *stats) add_helper(n *nodeStats, raw bool) {
 	c, v, d, l := n.current.calls, n.current.vectors, n.current.suspends, n.current.clocks
@@ -79,6 +79,9 @@ type activePoller struct {
 	pending     []pending
 
 	pollerStats nodeStats
+
+	toLoop   chan struct{}
+	fromLoop chan inLooper
 }
 
 //go:generate gentemplate -d Package=loop -id activePoller -d PoolType=activePollerPool -d Type=*activePoller -d Data=entries github.com/platinasystems/go/elib/pool.tmpl
@@ -149,7 +152,7 @@ func (a *activeNode) analyze(l *Loop, ap *activePoller) (err error) {
 		err = fmt.Errorf("data node has more than one slice input")
 		return
 	}
-	n := l.DataNodes[a.index].GetNode()
+	n := l.nodes[a.index]
 	for i := range ins {
 		nn := &n.nextNodes[i]
 		nn.in = ins[i]
@@ -176,6 +179,7 @@ func (a *activeNode) addNext(ap *activePoller, nn *nextNode, withIndex uint) {
 	in.activeIndex = ap.index
 	x := int(withIndex)
 	in.nextIndex = uint32(x)
+	in.pollerNodeIndex = ^uint32(0)
 	oi := i
 	if a.outSlice != nil {
 		as := *a.outSlice
@@ -235,7 +239,7 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 		ok        bool
 	)
 	if l.initialNodesRegistered {
-		if nextNoder, ok = l.dataNodeByName[nextName]; !ok {
+		if nextNoder, ok = l.noderByName[nextName]; !ok {
 			err = fmt.Errorf("add-next %s: unknown next %s", n.name, nextName)
 			return
 		}
@@ -291,7 +295,7 @@ func (l *Loop) AddNamedNext(thisNoder Noder, nextName string) (uint, error) {
 
 func (l *Loop) graphInit() {
 	l.initialNodesRegistered = true
-	for _, n := range l.DataNodes {
+	for _, n := range l.noders {
 		x := n.GetNode()
 		for i := range x.nextNodes {
 			if xn := &x.nextNodes[i]; len(xn.name) > 0 {
@@ -304,26 +308,24 @@ func (l *Loop) graphInit() {
 }
 
 func (ap *activePoller) initNodes(l *Loop) {
-	nNodes := uint(len(l.DataNodes))
+	nNodes := uint(len(l.noders))
 	ap.activeNodes = make([]activeNode, nNodes)
 	for ni := range ap.activeNodes {
 		a := &ap.activeNodes[ni]
-		n := l.DataNodes[ni]
-		node := n.GetNode()
-
+		r, n := l.noders[ni], l.nodes[ni]
 		a.index = uint32(ni)
-		a.elogNodeName = node.elogNodeName
-		if d, ok := n.(outNoder); ok {
+		a.elogNodeName = n.elogNodeName
+		if d, ok := r.(outNoder); ok {
 			a.looperOut = d.MakeLoopOut()
 			a.out = a.looperOut.GetOut()
 		}
-		if d, ok := n.(loopInMaker); ok {
+		if d, ok := r.(loopInMaker); ok {
 			a.loopInMaker = d
 		}
-		if d, ok := n.(inOutLooper); ok {
+		if d, ok := r.(inOutLooper); ok {
 			a.inOutLooper = d
 		}
-		if d, ok := n.(outLooper); ok {
+		if d, ok := r.(outLooper); ok {
 			a.outLooper = d
 		}
 		if err := a.analyze(l, ap); err != nil {
@@ -414,17 +416,18 @@ func (n *nodeStats) update(nVec uint, tStart cpu.Time) (tNow cpu.Time) {
 	s := &n.current
 	s.calls++
 	s.vectors += uint64(nVec)
-	s.clocks += tNow - tStart
+	s.clocks += uint64(tNow - tStart)
 	return
 }
 
 func (n *Node) UpdateOuputTime(clocks cpu.Time) {
 	s := &n.outputStats.current
-	s.clocks += clocks
+	atomic.AddUint64(&s.clocks, uint64(clocks))
 }
 
 func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 	prevNode := a.currentNode
+	pollerNodeIndex := prevNode.index
 	nVec = f.totalVectors(a)
 	a.timeNow = prevNode.inputStats.update(nVec, a.timeNow)
 	if elog.Enabled() {
@@ -461,6 +464,7 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 		in := p.in
 		in.activeIndex = uint16(a.index)
 		in.len = uint16(nextN)
+		in.pollerNodeIndex = pollerNodeIndex
 
 		// Reset this frame.
 		o.Len[xi] = 0
@@ -495,9 +499,10 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 func (o *Out) GetOut() *Out { return o }
 
 type In struct {
-	len         uint16
-	activeIndex uint16
-	nextIndex   uint32
+	len             uint16
+	activeIndex     uint16
+	nextIndex       uint32
+	pollerNodeIndex uint32
 }
 
 func (i *In) GetIn() *In          { return i }
