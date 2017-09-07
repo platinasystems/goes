@@ -57,6 +57,7 @@ type eventNode struct {
 	eventFromLoop chan struct{}
 	eventWg       sync.WaitGroup
 	eventVec      event.ActorVec
+	currentEvent  Event
 	suspended     bool
 }
 
@@ -174,8 +175,10 @@ func (l *Loop) eventHandler(p EventHandler) {
 	}()
 	for {
 		e := <-c.rxEvents
+		c.currentEvent.e = e
 		e.do()
 		c.eventWg.Done()
+		c.currentEvent.e = nil
 	}
 }
 
@@ -189,6 +192,7 @@ type EventActor interface {
 }
 
 func (e *Event) getLoopEvent() *Event { return e }
+func (n *Node) CurrentEvent() *Event  { return &n.currentEvent }
 
 func (x *Event) Suspend() {
 	if elog.Enabled() {
