@@ -23,6 +23,7 @@ func (v *Vnet) eventInit() {
 	n.Vnet = v
 	v.loop.RegisterNode(n, "vnet-event")
 }
+func (v *Vnet) CurrentEvent() *loop.Event { return v.eventNode.CurrentEvent() }
 
 type Event struct {
 	loop.Event
