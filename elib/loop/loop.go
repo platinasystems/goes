@@ -65,8 +65,9 @@ type Exiter interface {
 }
 
 type Loop struct {
-	DataNodes      []Noder
-	dataNodeByName map[string]Noder
+	noders      []Noder
+	noderByName map[string]Noder
+	nodes       []*Node
 
 	loopIniters []Initer
 	loopExiters []Exiter
@@ -103,8 +104,10 @@ func (l *Loop) startDataPoller(r inLooper) {
 	go l.dataPoll(r)
 }
 func (l *Loop) startPollers() {
-	for _, n := range l.dataPollers {
-		l.startDataPoller(n)
+	if !poll_active {
+		for _, n := range l.dataPollers {
+			l.startDataPoller(n)
+		}
 	}
 }
 
@@ -318,16 +321,17 @@ func (s *pollerStats) VectorRate() float64 {
 func (l *Loop) addDataNode(r Noder) {
 	n := r.GetNode()
 	n.noder = r
-	n.index = uint(len(l.DataNodes))
+	n.index = uint(len(l.noders))
 	n.activePollerIndex = ^uint(0)
-	l.DataNodes = append(l.DataNodes, r)
-	if l.dataNodeByName == nil {
-		l.dataNodeByName = make(map[string]Noder)
+	l.noders = append(l.noders, r)
+	l.nodes = append(l.nodes, n)
+	if l.noderByName == nil {
+		l.noderByName = make(map[string]Noder)
 	}
-	if _, ok := l.dataNodeByName[n.name]; ok {
+	if _, ok := l.noderByName[n.name]; ok {
 		panic(fmt.Errorf("%s: more than one node with this name", n.name))
 	}
-	l.dataNodeByName[n.name] = r
+	l.noderByName[n.name] = r
 }
 
 func isDataPoller(n Noder) (x inLooper, ok bool) { x, ok = n.(inLooper); return }

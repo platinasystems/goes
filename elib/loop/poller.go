@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/elib/elog"
 
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -152,7 +153,7 @@ func (n *Node) Activate(enable bool) (was bool) {
 }
 func (n *Node) IsActive() bool { return n.s.isActive() }
 
-func (m *nodeStateMain) getAllocPending(nodes []Noder) (pending []nodeAllocPending) {
+func (m *nodeStateMain) getAllocPending(l *Loop) (pending []nodeAllocPending) {
 	m.mu.Lock()
 	i0 := m.sequence & 1
 	i1 := i0 ^ 1
@@ -164,7 +165,7 @@ func (m *nodeStateMain) getAllocPending(nodes []Noder) (pending []nodeAllocPendi
 	pending = m.activePending[i0]
 	// Clear pending state while we still have lock.
 	for _, p := range pending {
-		n := nodes[p.nodeIndex].GetNode()
+		n := l.nodes[p.nodeIndex]
 		n.s.is_pending = false
 	}
 	m.sequence++
@@ -185,29 +186,41 @@ func (n *Node) ActivateAfterTime(dt float64) {
 	}
 }
 
+func (in *In) getPoller(l *Loop) (a *activePoller, n *Node) {
+	a = l.activePollerPool.entries[in.activeIndex]
+	n = l.nodes[in.pollerNodeIndex]
+	return
+}
+
 func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspend bool, did_resume bool) {
-	a := l.activePollerPool.entries[in.activeIndex]
-	n := a.pollerNode
+	a, n := in.getPoller(l)
 	_, did_suspend, did_resume = n.addActivity(0, int32(i), false, false, lim)
 	if did_suspend {
 		// Signal polling done to main loop.
 		n.inputStats.current.suspends++
-		n.toLoop <- struct{}{}
+		if poll_active {
+			a.toLoop <- struct{}{}
+		} else {
+			n.toLoop <- struct{}{}
+		}
 		n.poller_elog(poller_elog_suspended)
 		// Wait for continue (resume) signal from main loop.
 		t0 := cpu.TimeNow()
-		<-n.fromLoop
+		if poll_active {
+			<-a.fromLoop
+		} else {
+			<-n.fromLoop
+		}
 		// Don't charge node for time suspended.
 		dt := cpu.TimeNow() - t0
-		n.outputStats.current.clocks -= dt
+		n.outputStats.current.clocks -= uint64(dt)
 		n.poller_elog(poller_elog_resumed)
 	}
 	return
 }
 
 func (l *Loop) AdjustSuspendActivity(in *In, ds int) {
-	a := l.activePollerPool.entries[in.activeIndex]
-	n := a.pollerNode
+	_, n := in.getPoller(l)
 	var suspend, active int32
 	for {
 		old_state, a, s, is_alloc, is_suspended := n.s.get()
@@ -349,6 +362,11 @@ func (n *Node) allocActivePoller() {
 	n.activePollerIndex = i
 	a.pollerNode = n
 	n.poller_elog_i(poller_elog_alloc, i, p.Elts())
+	if poll_active {
+		a.fromLoop = make(chan inLooper, 1)
+		a.toLoop = make(chan struct{}, 1)
+		go a.dataPoll(n.l)
+	}
 }
 
 func (n *Node) freeActivePoller() {
@@ -360,6 +378,13 @@ func (n *Node) freeActivePoller() {
 	p.PutIndex(i)
 	n.activePollerIndex = ^uint(0)
 	n.poller_elog_i(poller_elog_free, i, p.Elts())
+	if poll_active {
+		// Shut down active poller.
+		close(a.fromLoop)
+		close(a.toLoop)
+		a.fromLoop = nil
+		a.toLoop = nil
+	}
 }
 
 func (n *Node) maybeFreeActive() {
@@ -384,7 +409,7 @@ func (n *Node) maybeFreeActive() {
 func (a *activePoller) flushActivePollerStats(l *Loop) {
 	for i := range a.activeNodes {
 		an := &a.activeNodes[i]
-		n := l.DataNodes[an.index].GetNode()
+		n := l.nodes[an.index]
 
 		n.inputStats.current.add_raw(&an.inputStats)
 		an.inputStats.zero()
@@ -403,6 +428,40 @@ func (l *Loop) flushAllNodeStats() {
 		if !p.IsFree(i) {
 			p.entries[i].flushActivePollerStats(l)
 		}
+	}
+}
+
+// FIXME make poll_active = true will be default.
+const poll_active = false
+
+func (a *activePoller) dataPoll(l *Loop) {
+	if false {
+		runtime.LockOSThread()
+	}
+
+	// Save elog if thread panics.
+	defer func() {
+		if elog.Enabled() {
+			if err := recover(); err != nil {
+				elog.Panic(fmt.Errorf("poller%d: %v", a.index, err))
+				panic(err)
+			}
+		}
+	}()
+	if a.activeNodes == nil {
+		a.initNodes(l)
+	}
+	for p := range a.fromLoop {
+		n := p.GetNode()
+		an := &a.activeNodes[n.index]
+		a.currentNode = an
+		t0 := cpu.TimeNow()
+		a.timeNow = t0
+		p.LoopInput(l, an.looperOut)
+		nVec := an.out.call(l, a)
+		a.pollerStats.update(nVec, t0)
+		l.pollerStats.update(nVec)
+		a.toLoop <- struct{}{}
 	}
 }
 
@@ -436,19 +495,19 @@ func (l *Loop) dataPoll(p inLooper) {
 }
 
 func (l *Loop) doPollers() {
-	{
-		pending := l.nodeStateMain.getAllocPending(l.DataNodes)
-		for _, p := range pending {
-			n := l.DataNodes[p.nodeIndex].GetNode()
-			n.allocActivePoller()
-		}
+	pending := l.nodeStateMain.getAllocPending(l)
+	for _, p := range pending {
+		n := l.nodes[p.nodeIndex]
+		n.allocActivePoller()
 	}
 
-	for i := uint(0); i < l.activePollerPool.Len(); i++ {
-		if l.activePollerPool.IsFree(i) {
+	p := &l.activePollerPool
+	for i := uint(0); i < p.Len(); i++ {
+		if p.IsFree(i) {
 			continue
 		}
-		n := l.activePollerPool.entries[i].pollerNode
+		a := p.entries[i]
+		n := a.pollerNode
 
 		// Only poll if active.  This may happen when waiting for suspend count to become zero.
 		if n.s.is_polling = n.s.isActive() && !n.s.isSuspended(); !n.s.is_polling {
@@ -457,17 +516,26 @@ func (l *Loop) doPollers() {
 		n.poller_elog(poller_elog_poll)
 
 		// Start poller who will be blocked waiting on fromLoop.
-		n.fromLoop <- struct{}{}
+		if poll_active {
+			a.fromLoop <- n.noder.(inLooper)
+		} else {
+			n.fromLoop <- struct{}{}
+		}
 	}
 
 	// Wait for pollers to finish.
-	for i := uint(0); i < l.activePollerPool.Len(); i++ {
-		if l.activePollerPool.IsFree(i) {
+	for i := uint(0); i < p.Len(); i++ {
+		if p.IsFree(i) {
 			continue
 		}
-		n := l.activePollerPool.entries[i].pollerNode
+		a := p.entries[i]
+		n := a.pollerNode
 		if n.s.is_polling {
-			<-n.toLoop
+			if poll_active {
+				<-a.toLoop
+			} else {
+				<-n.toLoop
+			}
 			n.poller_elog(poller_elog_poll_done)
 		}
 		n.maybeFreeActive()
