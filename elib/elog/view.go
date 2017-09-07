@@ -326,6 +326,9 @@ func SaveOnHangupSignal(file string) { DefaultBuffer.SaveOnHangupSignal(file) }
 
 // Panic adds error to log for given buffer and saves log file (if configured).
 func (b *Buffer) Panic(err interface{}) {
+	if !Enabled() {
+		return
+	}
 	F("panic %s", err)
 	if file := b.panicSaveFile; file != "" {
 		v := b.NewView()
