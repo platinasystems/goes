@@ -139,8 +139,18 @@ func (d *dev) tx_dma_init(queue uint) {
 		dr.control.set(d, v)
 	}
 
-	// Descriptor write back relaxed order.
-	dr.dca_control.or(d, 1<<11|1<<9|1<<13)
+	{
+		v := dr.cache_control.get(d)
+		v |= dma_cache_control_relaxed_ordering_rx_tx_desc_fetch |
+			dma_cache_control_relaxed_ordering_rx_tx_desc_writeback |
+			dma_cache_control_relaxed_ordering_rx_tx_data
+		if d.have_tph {
+			v |= dma_cache_control_tph_rx_tx_desc_fetch |
+				dma_cache_control_tph_rx_tx_desc_writeback |
+				dma_cache_control_tph_rx_tail_data_tx_data
+		}
+		dr.cache_control.set(d, v)
+	}
 }
 
 func (d *dev) tx_dma_enable(queue uint, enable bool) {

@@ -8,7 +8,6 @@ import (
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/hw/pci"
-	"github.com/platinasystems/go/elib/hw/pcie"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	vnetpci "github.com/platinasystems/go/vnet/devices/bus/pci"
@@ -36,12 +35,14 @@ type dev struct {
 	regs        *regs
 	mmaped_regs []byte
 	pci_bus_dev pci.BusDevice
-	pci_dev     *pci.Device // as returned by pci_bus_dev.GetDevice()
+	p           *pci.Device // as returned by pci_bus_dev.GetDevice()
 	elog_name   elog.StringRef
 
 	interruptsEnabled bool
 	irq_status        uint32
 	is_active         uint
+
+	have_tph bool
 
 	/* Phy index (0 or 1) and address on MDI bus. */
 	phy_index uint
@@ -60,7 +61,7 @@ type dever interface {
 }
 
 func (d *dev) get() *dev    { return d }
-func (d *dev) bar0() []byte { return d.pci_dev.Resources[0].Mem }
+func (d *dev) bar0() []byte { return d.p.Resources[0].Mem }
 
 var is_x540 = map[dev_id]bool{
 	dev_id_x540t:          true,
@@ -91,7 +92,7 @@ func (m *main) NewDevice(bd pci.BusDevice) (dd pci.DriverDevice, err error) {
 
 	d.d = dr
 	d.m = m
-	d.pci_dev = bd.GetDevice()
+	d.p = bd.GetDevice()
 	d.pci_bus_dev = bd
 	d.elog_name = elog.SetString(d.dev_name())
 	m.devs = append(m.devs, dr)
@@ -159,14 +160,7 @@ func (d *dev) Init() (err error) {
 
 	d.d.phy_init()
 
-	// Enable TPH if its there.
-	if r := (*pcie.TPHRequesterHeader)(d.pci_dev.GetExtCap(pci.TPHRequester)); r != nil {
-		_ = r
-	}
-
-	d.tx_dma_init(0)
-	d.rx_dma_init(0)
-
+	d.dma_init()
 	d.tx_dma_enable(0, true)
 	d.rx_dma_enable(0, true)
 

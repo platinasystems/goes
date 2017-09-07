@@ -31,7 +31,7 @@ func (d *dev_x540) put_semaphore() { d.get_put_semaphore(true) }
 
 func (d *dev_x540) phy_init() {
 	// Pci function selects unit 0 or 1.
-	d.phy_index = uint(d.pci_dev.Addr.Fn)
+	d.phy_index = uint(d.p.Addr.Fn)
 	id := d.get_dev_id()
 	switch id {
 	case dev_id_x550em_x_kr:
