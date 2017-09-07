@@ -147,15 +147,15 @@ type TPHRequesterHeader struct {
 	pci.ExtCapabilityHeader
 
 	// Read-only
-	// [0] No ST mode.
+	// [0] No steering tag mode.
 	// [1] Interrupt vector mode
 	// [2] Device specific mode
 	// [8] Extended tph requester supported
-	// [10:9] ST table location
-	// [26:16] ST table size
+	// [10:9] steering tag table location
+	// [26:16] steering tag table size
 	Capabilities pci.U32
 
-	// [2:0] ST mode select
+	// [2:0] steering tag mode select
 	// [8] TPH requester enable
 	// [9] Extended TPH requester enable
 	Control pci.U32
