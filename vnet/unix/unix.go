@@ -104,7 +104,7 @@ func (m *Main) Configure(in *parse.Input) {
 		case in.Parse("filter-reject %s", &s):
 			m.interface_filter.add(s, false)
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 }

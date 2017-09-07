@@ -85,8 +85,7 @@ func (m *pgMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 				s.AddStreamer(sub_r)
 			}
 		default:
-			err = parse.ErrInput
-			return
+			in.ParseError()
 		}
 	}
 	if err == nil {
@@ -191,8 +190,7 @@ func (m *icmpMain) ParseStream(in *parse.Input) (r pg.Streamer, err error) {
 				s.AddHeader(&icmp4.EchoRequest{})
 			}
 		default:
-			err = parse.ErrInput
-			return
+			in.ParseError()
 		}
 	}
 	if err == nil {

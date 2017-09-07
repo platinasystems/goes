@@ -25,7 +25,7 @@ const DefaultTtl = 64
 func (h *Header) Parse(in *parse.Input) {
 	h.Ttl = DefaultTtl
 	if !in.ParseLoose("%v: %v -> %v", &h.Protocol, &h.Src, &h.Dst) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 loop:
 	for {

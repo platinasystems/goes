@@ -17,7 +17,7 @@ import (
 func (hi *Hi) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*Vnet)
 	if !in.Parse("%v", v.hwIfIndexByName, hi) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
@@ -25,7 +25,7 @@ func (si *Si) ParseWithArgs(in *parse.Input, args *parse.Args) {
 	v := args.Get().(*Vnet)
 	var hi Hi
 	if !in.Parse("%v", v.hwIfIndexByName, &hi) {
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 	// Initially get software interface from hardware interface.
 	h := v.HwIfer(hi)
@@ -66,7 +66,7 @@ func (c *ifChooser) parse(in *parse.Input) {
 		c.hiMap[hi] = empty
 	case in.Parse("m%*atching %v", &c.re):
 	default:
-		panic(parse.ErrInput)
+		in.ParseError()
 	}
 }
 
@@ -181,7 +181,7 @@ func (c *showIfConfig) parse(v *Vnet, in *cli.Input, isHw bool) {
 		case in.Parse("r%*ate"):
 			c.colMap["Rate"] = true
 		default:
-			panic(parse.ErrInput)
+			in.ParseError()
 		}
 	}
 	if c.summary {
