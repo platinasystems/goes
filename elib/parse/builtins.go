@@ -20,7 +20,7 @@ func (b *Bool) Parse(in *Input) {
 	case "false", "no", "0":
 		*b = false
 	default:
-		panic(ErrInput)
+		in.ParseError()
 	}
 	return
 }
@@ -35,7 +35,7 @@ func (b *Enable) Parse(in *Input) {
 	case "disable", "no", "0":
 		*b = false
 	default:
-		panic(ErrInput)
+		in.ParseError()
 	}
 	return
 }
@@ -50,7 +50,7 @@ func (b *UpDown) Parse(in *Input) {
 	case "down", "no", "0":
 		*b = false
 	default:
-		panic(ErrInput)
+		in.ParseError()
 	}
 	return
 }
@@ -95,7 +95,8 @@ func (m StringMap) ParseWithArgs(in *Input, args *Args) {
 	if v, ok := m[text]; ok {
 		args.SetNextInt(uint64(v))
 	} else {
-		panic(ErrInput)
+		in.ParseError()
+
 	}
 	return
 }
@@ -121,5 +122,5 @@ func (x *Comment) Parse(in *Input) {
 			}
 		}
 	}
-	panic(ErrInput)
+	in.ParseError()
 }
