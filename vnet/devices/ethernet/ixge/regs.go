@@ -234,7 +234,14 @@ type regs struct {
 	dcb_packet_plane_control reg
 	_                        [0x2f00 - 0x2434]byte
 
-	rx_dma_control                 reg
+	// [2] pad small rx packets
+	// [3] 1 => dma init done
+	// [5] rsc push disable
+	// [8] tph hints auto learn cpuid
+	// [28] malicious behavior interrupt enable
+	// [29] malicious driver protection enable
+	rx_dma_control reg
+
 	pf_queue_drop_enable           reg
 	_                              [0x2f20 - 0x2f08]byte
 	rx_dma_descriptor_cache_config reg
@@ -451,8 +458,16 @@ type regs struct {
 		status     reg
 		rate_drift reg
 	}
-	_                        [0x4a80 - 0x4990]byte
-	tx_dma_control           reg
+	_ [0x4a80 - 0x4990]byte
+
+	// [0] enable
+	// [3] global double vlan mode
+	// [5] malicious driver protection enable
+	// [6] malicious driver interrupt enable
+	// [7] tph hint cpuid auto learn enable
+	// [31:16] vlan ethernet type (0x8100 default)
+	tx_dma_control reg
+
 	_                        [0x4a88 - 0x4a84]byte
 	tx_dma_tcp_flags_control [2]reg
 	_                        [0x4b00 - 0x4a90]byte
