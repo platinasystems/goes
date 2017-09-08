@@ -192,7 +192,13 @@ type EventActor interface {
 }
 
 func (e *Event) getLoopEvent() *Event { return e }
-func (n *Node) CurrentEvent() *Event  { return &n.currentEvent }
+func (n *Node) CurrentEvent() (e *Event) {
+	x := &n.currentEvent
+	if x.e != nil {
+		e = x
+	}
+	return
+}
 
 func (x *Event) Suspend() {
 	if elog.Enabled() {
