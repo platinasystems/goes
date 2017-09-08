@@ -186,6 +186,9 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 			return nil
 		}
 		sv := string(l[0:8])
+		if string(l[0:3]) == "dev" {
+			sv = "dev"
+		}
 
 		newer, err := isVersionNewer(qv, sv)
 		if !newer {

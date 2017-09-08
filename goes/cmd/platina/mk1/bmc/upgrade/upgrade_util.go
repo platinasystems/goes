@@ -114,7 +114,11 @@ func getQSPIversion(q bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b[VERSION_OFF:VERSION_LEN]), nil
+	qv := string(b[VERSION_OFF:VERSION_LEN])
+	if string(b[0:3]) == "dev" {
+		qv = "dev"
+	}
+	return qv, nil
 }
 
 func getInstalledVersions() ([]string, error) {
@@ -124,14 +128,22 @@ func getInstalledVersions() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	iv[0] = string(b[VERSION_OFF:VERSION_LEN])
+	qv := string(b[VERSION_OFF:VERSION_LEN])
+	if string(b[0:3]) == "dev" {
+		qv = "dev"
+	}
+	iv[0] = qv
 
 	selectQSPI1(true)
 	_, b, err = readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 	if err != nil {
 		return nil, err
 	}
-	iv[1] = string(b[VERSION_OFF:VERSION_LEN])
+	qv = string(b[VERSION_OFF:VERSION_LEN])
+	if string(b[0:3]) == "dev" {
+		qv = "dev"
+	}
+	iv[1] = qv
 	return iv, nil
 }
 
@@ -152,6 +164,9 @@ func getServerVersion(s string, v string, t bool) (string, error) {
 		return "", nil
 	}
 	sv := string(l[0:8])
+	if string(l[0:3]) == "dev" {
+		sv = "dev"
+	}
 	return sv, nil
 }
 
@@ -205,6 +220,9 @@ func findLatestVer(b []byte) (string, error) {
 }
 
 func isVersionNewer(cur string, x string) (n bool, err error) {
+	if cur == "dev" || x == "dev" {
+		return false, nil
+	}
 	var c float64 = 0.0
 	var f float64 = 0.0
 	cur = strings.TrimSpace(cur)
