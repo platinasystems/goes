@@ -157,10 +157,21 @@ func (q *dma_queue) start(d *dev, dr *dma_regs) {
 func (d *dev) dma_init() {
 	// Enable TPH if discovered.
 	if r := (*pcie.TPHRequesterHeader)(d.p.GetExtCap(pci.TPHRequester)); r != nil {
-		v := r.Control.Get(d.p)
-		v |= 1 << 8 // enable
-		r.Control.Set(d.p, v)
-		d.have_tph = true
+		// Need raw access: VFIO prevents writes to TPH.
+		v := r.Control.GetRaw(d.p)
+		d.have_tph = false // not working yet
+		if d.have_tph {
+			v |= 1 << 8 // enable
+		} else {
+			v &^= 3 << 8 // disable
+		}
+		r.Control.SetRaw(d.p, v)
+
+		if d.have_tph {
+			// TPH hints auto learn cpuid for both rx & tx.
+			d.regs.rx_dma_control.or(d, 1<<8)
+			d.regs.tx_dma_control.or(d, 1<<7)
+		}
 	}
 
 	d.tx_dma_init(0)
