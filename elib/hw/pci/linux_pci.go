@@ -77,6 +77,28 @@ func (d *Device) ConfigRw(offset, vʹ, nBytes uint, isWrite bool) (v uint) {
 	return
 }
 
+func (d *Device) ReadRawConfigUint32(o uint) (v uint32) {
+	v = uint32(d.ConfigRw(o, 0, 4, false))
+	return
+}
+func (d *Device) WriteRawConfigUint32(o uint, value uint32) {
+	d.ConfigRw(o, uint(value), 4, true)
+}
+func (d *Device) ReadRawConfigUint16(o uint) (v uint16) {
+	v = uint16(d.ConfigRw(o, 0, 2, false))
+	return
+}
+func (d *Device) WriteRawConfigUint16(o uint, value uint16) {
+	d.ConfigRw(o, uint(value), 2, true)
+}
+func (d *Device) ReadRawConfigUint8(o uint) (v uint8) {
+	v = uint8(d.ConfigRw(o, 0, 1, false))
+	return
+}
+func (d *Device) WriteRawConfigUint8(o uint, value uint8) {
+	d.ConfigRw(o, uint(value), 1, true)
+}
+
 func (d *Device) ReadConfigUint32(o uint) (v uint32) {
 	v = uint32(d.BusDevice.ConfigRw(o, 0, 4, false))
 	return
