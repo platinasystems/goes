@@ -48,32 +48,6 @@ func TestGetFile(t *testing.T) {
 	}
 }
 
-type findLateVer struct {
-	list   []byte
-	result string
-}
-
-var FLVtests = []findLateVer{
-	{[]byte("Available upgrades:\n  LATEST\n  v0.2\n  20170901\n  20170902\n  v0.3\n"), "20170902"},
-	{[]byte("Available upgrades:\n  LATEST\n  v0.3\n  v0.2"), "v0.3"},
-}
-
-func TestFindLatestVer(t *testing.T) {
-	for _, pair := range FLVtests {
-		v, err := findLatestVer(pair.list)
-		if err != nil {
-			t.Errorf("Error: %v", err)
-		}
-		if v != pair.result {
-			t.Error(
-				"For", pair.list,
-				"expected", pair.result,
-				"got", v,
-			)
-		}
-	}
-}
-
 type isVerNewer struct {
 	curver string
 	newver string

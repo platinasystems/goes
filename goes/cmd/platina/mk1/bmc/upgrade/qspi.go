@@ -32,14 +32,15 @@ type EraseInfo struct {
 }
 
 const (
-	MEMGETINFO  = 0x80204d01 //from linux: mtd-abi.h
-	MEMERASE    = 0x40084d02
-	MEMLOCK     = 0x40084d05
-	MEMUNLOCK   = 0x40084d06
-	MEMERASE64  = 0x40104d14
-	MTDdevice   = "/dev/mtd0"
-	VERSION_OFF = 0x000
-	VERSION_LEN = 0x008
+	MEMGETINFO     = 0x80204d01 //from linux: mtd-abi.h
+	MEMERASE       = 0x40084d02
+	MEMLOCK        = 0x40084d05
+	MEMUNLOCK      = 0x40084d06
+	MEMERASE64     = 0x40104d14
+	MTDdevice      = "/dev/mtd0"
+	VERSION_OFFSET = 0x000
+	VERSION_LEN    = 0x008
+	VERSION_DEV    = 0x003
 )
 
 type FlashFmt struct {
@@ -201,7 +202,7 @@ func eraseQSPI(of uint32, sz uint32) error {
 	return nil
 }
 
-func selectQSPI1(q bool) error {
+func selectQSPI(q bool) error {
 	if len(gpio.Pins) == 0 {
 		gpio.Init()
 	}

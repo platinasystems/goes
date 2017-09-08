@@ -27,9 +27,9 @@ DESCRIPTION
 	The default upgrade version is "LATEST". 
 	Or specify a version using "-v", in the form YYYYMMDD
 
-	The -l flag lists upgrade versions available.
+	The -l flag display version of selected server and version.
 
-	The -r flag reports version numbers.
+	The -r flag reports QSPI version numbers and booted from.
 
 	By default, images are downloaded from "downloads.platina.com".
 	Or from a server using "-s" followed by a URL or IPv4 address.
@@ -41,8 +41,8 @@ OPTIONS
 	-v [VER]          version [YYYYMMDD] or LATEST (default)
 	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
 	-t                use TFTP instead of HTTP
-	-l                shows list of available versions for upgrade
-	-r                report installed versions, booted from qspi0/1
+	-l                display version of selected server and version
+	-r                report QSPI installed versions, QSPI booted from
 	-c                check SHA-1's of flash
 	-f                force upgrade (ignore version check)`
 
@@ -80,15 +80,14 @@ func (cmd) Main(args ...string) error {
 	}
 
 	if flag.ByName["-l"] {
-		if err := showList(parm.ByName["-s"], parm.ByName["-v"],
+		if err := reportVerServer(parm.ByName["-s"], parm.ByName["-v"],
 			flag.ByName["-t"]); err != nil {
 			return err
 		}
 		return nil
 	}
 	if flag.ByName["-r"] {
-		if err := reportVersions(parm.ByName["-s"], parm.ByName["-v"],
-			flag.ByName["-t"]); err != nil {
+		if err := reportVerQSPI(); err != nil {
 			return err
 		}
 		return nil
@@ -121,25 +120,34 @@ var (
 	}
 )
 
-func showList(s string, v string, t bool) error {
-	fn := "LIST"
-	if _, err := getFile(s, v, t, fn); err != nil {
-		return err
-	}
-	l, err := ioutil.ReadFile(fn)
+func reportVerServer(s string, v string, t bool) (err error) {
+	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return err
+		return fmt.Errorf("Server error: downloading: %v", err)
 	}
-	fmt.Print(string(l))
+	if n < 1000 {
+		return fmt.Errorf("Server error: file too small: %v", err)
+	}
+	if err := unzip(); err != nil {
+		return fmt.Errorf("Server error: unzipping file: %v", err)
+	}
+	defer rmFiles()
+
+	l, err := ioutil.ReadFile(VersionName)
+	if err != nil {
+		fmt.Printf("Server error: couldn't find server version\n")
+		return nil
+	}
+	sv := string(l[VERSION_OFFSET:VERSION_LEN])
+	if string(l[VERSION_OFFSET:VERSION_DEV]) == "dev" {
+		sv = "dev"
+	}
+	printVerServer(s, v, sv)
 	return nil
 }
 
-func reportVersions(s string, v string, t bool) (err error) {
+func reportVerQSPI() (err error) {
 	iv, err := getInstalledVersions()
-	if err != nil {
-		return err
-	}
-	sv, err := getServerVersion(s, v, t)
 	if err != nil {
 		return err
 	}
@@ -147,7 +155,7 @@ func reportVersions(s string, v string, t bool) (err error) {
 	if err != nil {
 		return err
 	}
-	printVersions(s, v, iv, sv, q)
+	printVerQSPI(iv, q)
 	return nil
 }
 
@@ -160,23 +168,23 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 
 	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return fmt.Errorf("Error downloading: %v", err)
+		return fmt.Errorf("Server error: downloading: %v", err)
 	}
 	if n < 1000 {
-		return fmt.Errorf("Error file too small: %v", err)
+		return fmt.Errorf("Server error: file too small: %v", err)
 	}
 	if err := unzip(); err != nil {
-		return fmt.Errorf("Error unzipping file: %v", err)
+		return fmt.Errorf("Server error: unzipping file: %v", err)
 	}
 	defer rmFiles()
 
 	if !f {
-		qv, err := getQSPIversion(q)
+		qv, err := getVerQSPI(q)
 		if err != nil {
 			return err
 		}
 		if len(qv) == 0 {
-			fmt.Printf("Aborting, couldn't resolve QSPI version\n")
+			fmt.Printf("Aborting, couldn't find QSPI version\n")
 			return nil
 		}
 
@@ -185,19 +193,24 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 			fmt.Printf("Aborting, couldn't find server version\n")
 			return nil
 		}
-		sv := string(l[0:8])
-		if string(l[0:3]) == "dev" {
+		sv := string(l[VERSION_OFFSET:VERSION_LEN])
+		if string(l[VERSION_OFFSET:VERSION_DEV]) == "dev" {
 			sv = "dev"
 		}
-
-		newer, err := isVersionNewer(qv, sv)
-		if !newer {
-			fmt.Printf("Aborting, server version %s is not newer\n", sv)
-			return nil
+		if sv != "dev" && qv != "dev" {
+			newer, err := isVersionNewer(qv, sv)
+			if err != nil {
+				fmt.Printf("Aborting, server version error\n", sv)
+				return nil
+			}
+			if !newer {
+				fmt.Printf("Aborting, server version %s is not newer\n", sv)
+				return nil
+			}
 		}
 	}
 
-	selectQSPI1(q)
+	selectQSPI(q)
 	if q == true {
 		fmt.Println("Upgrading QSPI1...")
 	}

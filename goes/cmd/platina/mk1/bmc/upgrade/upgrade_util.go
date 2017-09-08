@@ -42,9 +42,9 @@ func getFile(s string, v string, t bool, fn string) (int, error) {
 	return int(n), nil
 }
 
-func rmFiles() error {
+func rmFiles() {
 	rmFile("platina-mk1-bmc-ver.bin")
-	return nil
+	return
 }
 
 func rmFile(f string) error {
@@ -108,14 +108,14 @@ func getBootedQSPI() (int, error) {
 	return -1, nil
 }
 
-func getQSPIversion(q bool) (string, error) {
-	selectQSPI1(q)
+func getVerQSPI(q bool) (string, error) {
+	selectQSPI(q)
 	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
 	if err != nil {
 		return "", err
 	}
-	qv := string(b[VERSION_OFF:VERSION_LEN])
-	if string(b[0:3]) == "dev" {
+	qv := string(b[VERSION_OFFSET:VERSION_LEN])
+	if string(b[VERSION_OFFSET:VERSION_DEV]) == "dev" {
 		qv = "dev"
 	}
 	return qv, nil
@@ -123,27 +123,15 @@ func getQSPIversion(q bool) (string, error) {
 
 func getInstalledVersions() ([]string, error) {
 	iv := make([]string, 2)
-	selectQSPI1(false)
-	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
+	var err error
+	iv[0], err = getVerQSPI(false)
 	if err != nil {
 		return nil, err
 	}
-	qv := string(b[VERSION_OFF:VERSION_LEN])
-	if string(b[0:3]) == "dev" {
-		qv = "dev"
-	}
-	iv[0] = qv
-
-	selectQSPI1(true)
-	_, b, err = readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
+	iv[1], err = getVerQSPI(true)
 	if err != nil {
 		return nil, err
 	}
-	qv = string(b[VERSION_OFF:VERSION_LEN])
-	if string(b[0:3]) == "dev" {
-		qv = "dev"
-	}
-	iv[1] = qv
 	return iv, nil
 }
 
@@ -163,14 +151,23 @@ func getServerVersion(s string, v string, t bool) (string, error) {
 	if err != nil {
 		return "", nil
 	}
-	sv := string(l[0:8])
-	if string(l[0:3]) == "dev" {
+	sv := string(l[VERSION_OFFSET:VERSION_LEN])
+	if string(l[VERSION_OFFSET:VERSION_DEV]) == "dev" {
 		sv = "dev"
 	}
 	return sv, nil
 }
 
-func printVersions(s string, v string, iv []string, sv string, qspi int) {
+func printVerServer(s string, v string, sv string) {
+	fmt.Print("\n")
+	fmt.Print("Version on server:\n")
+	fmt.Printf("    Requested server  : %s\n", s)
+	fmt.Printf("    Requested version : %s\n", v)
+	fmt.Printf("    Found version     : %s\n", sv)
+	fmt.Print("\n")
+}
+
+func printVerQSPI(iv []string, qspi int) {
 	fmt.Print("\n")
 	fmt.Print("Installed versions in QSPI flash:\n")
 	if qspi == 0 {
@@ -184,39 +181,7 @@ func printVersions(s string, v string, iv []string, sv string, qspi int) {
 		fmt.Print("\n")
 		fmt.Print("Booted from QSPI1\n")
 	}
-	if len(sv) > 0 {
-		fmt.Print("\n")
-		fmt.Print("Version on server:\n")
-		fmt.Printf("    Requested server  : %s\n", s)
-		fmt.Printf("    Requested version : %s\n", v)
-		fmt.Printf("    Found version     : %s\n", sv)
-	}
 	fmt.Print("\n")
-}
-
-func findLatestVer(b []byte) (string, error) {
-	s := ""
-	latestNum := 0.01
-	latestVer := "0.01"
-	for _, j := range b {
-		if j != 10 {
-			s += string(j)
-		} else {
-			s = strings.TrimSpace(s)
-			ss := strings.Replace(s, "v", "", -1)
-			f, _ := strconv.ParseFloat(ss, 64)
-			if f > latestNum {
-				latestNum = f
-				latestVer = s
-			}
-			s = ""
-		}
-	}
-	if latestVer == "" {
-		err := fmt.Errorf("findLatestVer error")
-		return "", err
-	}
-	return latestVer, nil
 }
 
 func isVersionNewer(cur string, x string) (n bool, err error) {
