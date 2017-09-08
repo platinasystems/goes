@@ -27,7 +27,7 @@ func getFile(s string, v string, t bool, fn string) (int, error) {
 	}
 	r, err := url.Open(urls)
 	if err != nil {
-		return 0, err
+		return 0, nil
 	}
 	f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DfltMod)
 	if err != nil {
@@ -132,8 +132,12 @@ func getInstalledVersions() ([]string, error) {
 
 func getServerVersion(s string, v string, t bool) (string, error) {
 	fn := "LIST"
-	if _, err := getFile(s, v, t, fn); err != nil {
+	n, err := getFile(s, v, t, fn)
+	if err != nil {
 		return "", err
+	}
+	if n == 0 {
+		return "", nil
 	}
 	l, err := ioutil.ReadFile(fn)
 	if err != nil {
@@ -157,11 +161,13 @@ func printVersions(s string, v string, iv []string, sv string, qspi int) {
 		fmt.Print("\n")
 		fmt.Print("Booted from QSPI1\n")
 	}
-	fmt.Print("\n")
-	fmt.Print("Version on server:\n")
-	fmt.Printf("    Requested server  : %s\n", s)
-	fmt.Printf("    Requested version : %s\n", v)
-	fmt.Printf("    Found version     : %s\n", sv)
+	if len(sv) > 0 {
+		fmt.Print("\n")
+		fmt.Print("Version on server:\n")
+		fmt.Printf("    Requested server  : %s\n", s)
+		fmt.Printf("    Requested version : %s\n", v)
+		fmt.Printf("    Found version     : %s\n", sv)
+	}
 	fmt.Print("\n")
 }
 
