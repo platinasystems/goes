@@ -51,6 +51,7 @@ OPTIONS
 	DfltVer     = "LATEST"
 	Machine     = "platina-mk1-bmc"
 	ArchiveName = "platina-mk1-bmc.zip"
+	VersionName = "platina-mk1-bmc-ver.bin"
 )
 
 type Interface interface {
@@ -156,7 +157,18 @@ func checkChecksums() error { //TODO
 
 func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	fmt.Print("\n")
-	fn := ArchiveName
+
+	n, err := getFile(s, v, t, ArchiveName)
+	if err != nil {
+		return fmt.Errorf("Error downloading: %v", err)
+	}
+	if n < 1000 {
+		return fmt.Errorf("Error file too small: %v", err)
+	}
+	if err := unzip(); err != nil {
+		return fmt.Errorf("Error unzipping file: %v", err)
+	}
+	defer rmFiles()
 
 	if !f {
 		qv, err := getQSPIversion(q)
@@ -167,26 +179,19 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 			fmt.Printf("Aborting, couldn't resolve QSPI version\n")
 			return nil
 		}
-		sv, err := getServerVersion(s, v, t)
+
+		l, err := ioutil.ReadFile(VersionName)
 		if err != nil {
-			return err
-		}
-		newer, err := isVersionNewer(qv, sv)
-		if !newer {
-			fmt.Printf("Aborting, selected version is not newer\n")
+			fmt.Printf("Aborting, couldn't find server version\n")
 			return nil
 		}
-	}
+		sv := string(l[0:8])
 
-	n, err := getFile(s, v, t, fn)
-	if err != nil {
-		return fmt.Errorf("Error downloading: %v", err)
-	}
-	if n < 1000 {
-		return fmt.Errorf("Error file too small: %v", err)
-	}
-	if err := unzip(); err != nil {
-		return fmt.Errorf("Error unzipping file: %v", err)
+		newer, err := isVersionNewer(qv, sv)
+		if !newer {
+			fmt.Printf("Aborting, server version %s is not newer\n", sv)
+			return nil
+		}
 	}
 
 	selectQSPI1(q)

@@ -42,6 +42,11 @@ func getFile(s string, v string, t bool, fn string) (int, error) {
 	return int(n), nil
 }
 
+func rmFiles() error {
+	rmFile("platina-mk1-bmc-ver.bin")
+	return nil
+}
+
 func rmFile(f string) error {
 	if _, err := os.Stat(f); err != nil {
 		return err
@@ -131,19 +136,22 @@ func getInstalledVersions() ([]string, error) {
 }
 
 func getServerVersion(s string, v string, t bool) (string, error) {
-	fn := "LIST"
-	n, err := getFile(s, v, t, fn)
+	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Error downloading: %v", err)
 	}
-	if n == 0 {
+	if n < 1000 {
+		return "", fmt.Errorf("Error file too small: %v", err)
+	}
+	if err := unzip(); err != nil {
+		return "", fmt.Errorf("Error unzipping file: %v", err)
+	}
+	defer rmFiles()
+	l, err := ioutil.ReadFile(VersionName)
+	if err != nil {
 		return "", nil
 	}
-	l, err := ioutil.ReadFile(fn)
-	if err != nil {
-		return "", err
-	}
-	sv, err := findLatestVer(l)
+	sv := string(l[0:8])
 	return sv, nil
 }
 
