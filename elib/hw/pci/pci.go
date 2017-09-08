@@ -28,6 +28,13 @@ func (r *U16) Set(d *Device, v uint16) { d.WriteConfigUint16(r.offset(), v) }
 func (r *U32) Get(d *Device) uint32    { return d.ReadConfigUint32(r.offset()) }
 func (r *U32) Set(d *Device, v uint32) { d.WriteConfigUint32(r.offset(), v) }
 
+func (r *U8) GetRaw(d *Device) uint8      { return d.ReadRawConfigUint8(r.offset()) }
+func (r *U8) SetRaw(d *Device, v uint8)   { d.WriteRawConfigUint8(r.offset(), v) }
+func (r *U16) GetRaw(d *Device) uint16    { return d.ReadRawConfigUint16(r.offset()) }
+func (r *U16) SetRaw(d *Device, v uint16) { d.WriteRawConfigUint16(r.offset(), v) }
+func (r *U32) GetRaw(d *Device) uint32    { return d.ReadRawConfigUint32(r.offset()) }
+func (r *U32) SetRaw(d *Device, v uint32) { d.WriteRawConfigUint32(r.offset(), v) }
+
 func (d *Device) getRegs(o uint) unsafe.Pointer { return unsafe.Pointer(hw.BaseAddress + uintptr(o)) }
 func (d *Device) GetConfig() *ConfigHeader      { return (*ConfigHeader)(d.getRegs(0)) }
 
