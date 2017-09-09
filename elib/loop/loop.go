@@ -16,13 +16,26 @@ import (
 	"time"
 )
 
+type fromToNode struct {
+	toNode, fromNode chan struct{}
+}
+
+func (x *fromToNode) init() {
+	x.fromNode = make(chan struct{}, 1)
+	x.toNode = make(chan struct{}, 1)
+}
+
+func (x *fromToNode) signalNode() { x.toNode <- struct{}{} }
+func (x *fromToNode) waitNode()   { <-x.fromNode }
+func (x *fromToNode) signalLoop() { x.fromNode <- struct{}{} }
+func (x *fromToNode) waitLoop()   { <-x.toNode }
+
 type Node struct {
 	l                       *Loop
 	name                    string
 	noder                   Noder
 	index                   uint
-	toLoop                  chan struct{}
-	fromLoop                chan struct{}
+	ft                      fromToNode
 	activePollerIndex       uint
 	initOnce                sync.Once
 	initWg                  sync.WaitGroup
@@ -31,8 +44,8 @@ type Node struct {
 	nextIndexByNodeName     map[string]uint
 	inputStats, outputStats nodeStats
 	elogNodeName            elog.StringRef
-	eventNode
-	s nodeState
+	e                       eventNode
+	s                       nodeState
 }
 
 type nextNode struct {
@@ -99,8 +112,7 @@ func (l *Loop) Seconds(t cpu.Time) float64 { return float64(t) * l.secsPerCycle 
 
 func (l *Loop) startDataPoller(r inLooper) {
 	n := r.GetNode()
-	n.toLoop = make(chan struct{}, 1)
-	n.fromLoop = make(chan struct{}, 1)
+	n.ft.init()
 	go l.dataPoll(r)
 }
 func (l *Loop) startPollers() {
@@ -117,6 +129,8 @@ func (l *Loop) timerInit() {
 	l.cyclesPerSec = float64(t)
 	l.secsPerCycle = 1 / l.cyclesPerSec
 	l.timeDurationPerCycle = l.secsPerCycle * float64(time.Second)
+	l.startTime = cpu.TimeNow()
+	l.timeLastRuntimeClear = time.Now()
 }
 
 func (l *Loop) TimeDiff(t0, t1 cpu.Time) float64 { return float64(t1-t0) * l.secsPerCycle }
@@ -211,10 +225,8 @@ func (l *Loop) Run() {
 	}()
 
 	l.timerInit()
-	l.startTime = cpu.TimeNow()
-	l.timeLastRuntimeClear = time.Now()
 	l.cliInit()
-	l.eventMain.Init(l)
+	l.eventInit(l)
 	l.startPollers()
 	l.registrationsNeedStart = true
 	l.callInitHooks()
@@ -348,53 +360,31 @@ func (l *Loop) RegisterNode(n Noder, format string, args ...interface{}) {
 	}
 
 	start := l.registrationsNeedStart
-	nOK := 0
-	if h, ok := n.(EventHandler); ok {
-		l.eventHandlers = append(l.eventHandlers, h)
-		l.eventHandlerNodes = append(l.eventHandlerNodes, x)
-		if start {
-			l.startHandler(h)
-		}
-		nOK++
-	}
 	if d, isOut := n.(outNoder); isOut {
-		nok := 0
-		if _, ok := d.(inOutLooper); ok {
-			nok++
-		}
 		if q, ok := isDataPoller(d); ok {
 			l.dataPollers = append(l.dataPollers, q)
 			if start {
 				l.startDataPoller(q)
 			}
-			nok++
-		}
-		if nok == 0 {
-			// Accept output only node.
-			nok = 1
 		}
 		l.addDataNode(n)
-		nOK += nok
 	} else if _, isIn := n.(inNoder); isIn {
 		if _, ok := n.(outLooper); ok {
 			l.addDataNode(n)
-			nOK += 1
 		} else {
 			panic(fmt.Errorf("%s: missing LoopOutput method", x.name))
 		}
+	} else {
+		l.addDataNode(n)
 	}
+
 	if p, ok := n.(Initer); ok {
 		l.loopIniters = append(l.loopIniters, p)
 		if start {
 			l.startInitNode(p)
 		}
-		nOK++
 	}
 	if p, ok := n.(Exiter); ok {
 		l.loopExiters = append(l.loopExiters, p)
-		nOK++
-	}
-	if nOK == 0 {
-		panic(fmt.Errorf("unkown node type: %T", n))
 	}
 }

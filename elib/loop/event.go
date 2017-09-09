@@ -5,12 +5,16 @@
 package loop
 
 import (
+	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/event"
 
 	"fmt"
+	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -18,60 +22,71 @@ type EventPoller interface {
 	EventPoll()
 }
 
-type EventHandler interface {
-	Noder
-	EventHandler()
-}
-
 type eventMain struct {
 	l                 *Loop
-	pollers           []EventPoller
-	eventHandlers     []EventHandler
+	eventPollers      []EventPoller
+	eventHandlers     []Noder
 	eventHandlerNodes []*Node
 
-	loopEvents    sync.Pool
-	events        chan *loopEvent
-	resumedEvents chan *loopEvent
+	activeNodes   []*Node
+	inactiveNodes []*Node
+
+	nodeEventPool sync.Pool
+	events        chan *nodeEvent
+
+	// Timed events.
+	timer         *time.Timer
+	timerCpuTime  cpu.Time
+	timerDuration time.Duration
 	eventPoolLock sync.Mutex
 	eventPool     event.Pool
 	eventVec      event.ActorVec
 }
 
-func (l *eventMain) getLoopEvent(a event.Actor, p elog.PointerToFirstArg) (x *loopEvent) {
-	if y := l.loopEvents.Get(); y != nil {
-		x = y.(*loopEvent)
-		*x = loopEvent{actor: a}
+type eventNode struct {
+	// Index in active vector if active else ^uint(0).
+	activeIndex uint
+
+	activeCount uint32
+
+	// Handler sequence to identify events in event log.
+	sequence       uint32
+	queue_sequence uint32
+
+	rxEvents chan *nodeEvent
+
+	ft fromToNode
+
+	currentEvent Event
+	s            eventNodeState
+	eventStats   nodeStats
+	activateEvent
+}
+
+func (l *eventMain) getLoopEvent(a event.Actor, p elog.PointerToFirstArg) (x *nodeEvent) {
+	if y := l.nodeEventPool.Get(); y != nil {
+		x = y.(*nodeEvent)
+		*x = nodeEvent{actor: a}
 	} else {
-		x = &loopEvent{actor: a}
+		x = &nodeEvent{actor: a}
 	}
 	x.l = l.l
 	x.caller = elog.GetCaller(p)
 	return
 }
-func (l *eventMain) putLoopEvent(x *loopEvent) { l.loopEvents.Put(x) }
+func (l *eventMain) putLoopEvent(x *nodeEvent) { l.nodeEventPool.Put(x) }
 
-type eventNode struct {
-	activateEvent
-	sequence      uint
-	rxEvents      chan *loopEvent
-	eventFromLoop chan struct{}
-	eventWg       sync.WaitGroup
-	eventVec      event.ActorVec
-	currentEvent  Event
-	suspended     bool
-}
-
-type loopEvent struct {
+type nodeEvent struct {
 	l      *Loop
+	d      *Node
 	actor  event.Actor
-	caller elog.Caller
-	dst    *Node
 	time   cpu.Time
+	caller elog.Caller
 }
 
-func (e *loopEvent) EventTime() cpu.Time { return e.time }
+func (e *nodeEvent) EventTime() cpu.Time { return e.time }
 
-func (l *Loop) addEvent(le *loopEvent) {
+func (l *Loop) addEvent(le *nodeEvent) {
 	select {
 	case l.events <- le:
 	default:
@@ -79,7 +94,7 @@ func (l *Loop) addEvent(le *loopEvent) {
 	}
 }
 
-func (l *Loop) addTimedEvent(le *loopEvent, dt float64) {
+func (l *Loop) addTimedEvent(le *nodeEvent, dt float64) {
 	le.time = cpu.TimeNow() + cpu.Time(dt*l.cyclesPerSec)
 	l.eventPoolLock.Lock()
 	defer l.eventPoolLock.Unlock()
@@ -87,54 +102,43 @@ func (l *Loop) addTimedEvent(le *loopEvent, dt float64) {
 }
 
 // AddEvent adds event whose action will be called on the next loop iteration.
-func (n *Node) AddEventp(e event.Actor, dst EventHandler, p elog.PointerToFirstArg) {
-	le := n.l.getLoopEvent(e, p)
-	if dst != nil {
-		le.dst = dst.GetNode()
-	}
-	n.l.addEvent(le)
+func (n *Node) AddEventp(a event.Actor, dst Noder, p elog.PointerToFirstArg) {
+	e := n.l.getLoopEvent(a, p)
+	e.d = dst.GetNode()
+	e.d.maybeStartEventHandler()
+	n.l.addEvent(e)
 }
 
 // AddEvent adds event whose action will be called on the next loop iteration.
-func (n *Node) AddEvent(e event.Actor, dst EventHandler) {
+func (n *Node) AddEvent(e event.Actor, dst Noder) {
 	n.AddEventp(e, dst, elog.PointerToFirstArg(&n))
 }
 
-func (n *Node) AddTimedEventp(e event.Actor, dst EventHandler, dt float64, p elog.PointerToFirstArg) {
-	le := n.l.getLoopEvent(e, p)
-	le.dst = dst.GetNode()
-	n.l.addTimedEvent(le, dt)
+func (n *Node) AddTimedEventp(a event.Actor, dst Noder, dt float64, p elog.PointerToFirstArg) {
+	e := n.l.getLoopEvent(a, p)
+	e.d = dst.GetNode()
+	e.d.maybeStartEventHandler()
+	n.l.addTimedEvent(e, dt)
 }
-func (n *Node) AddTimedEvent(e event.Actor, dst EventHandler, dt float64) {
+func (n *Node) AddTimedEvent(e event.Actor, dst Noder, dt float64) {
 	n.AddTimedEventp(e, dst, dt, elog.PointerToFirstArg(&n))
 }
 
-func (e *loopEvent) EventAction() {
-	if e.dst != nil {
-		e.dst.eventWg.Add(1)
-		e.dst.rxEvents <- e
+func (e *nodeEvent) logActor() {
+	c := e.caller
+	c.SetTimeNow()
+	if a, ok := e.actor.(elog.Data); ok {
+		elog.AddDatac(a, c)
 	} else {
-		e.do()
+		elog.Fc("%s", c, e.actor.String())
 	}
 }
 
-func (e *loopEvent) do() {
-	c := e.caller
+func (e *nodeEvent) do() {
+	d, n := e.d, &e.d.e
 	if elog.Enabled() {
-		if e.dst != nil {
-			x := event_action_elog{
-				kind:     event_action_elog_start,
-				name:     e.dst.elogNodeName,
-				sequence: uint32(e.dst.sequence),
-			}
-			elog.Add(&x)
-		}
-		c.SetTimeNow()
-		if a, ok := e.actor.(elog.Data); ok {
-			elog.AddDatac(a, c)
-		} else {
-			elog.Fc("%s", c, e.actor.String())
-		}
+		n.log(d, event_elog_action)
+		e.logActor()
 	}
 
 	if a, ok := e.actor.(EventActor); ok {
@@ -142,26 +146,18 @@ func (e *loopEvent) do() {
 		x.e = e
 	}
 
+	t0 := cpu.TimeNow()
 	e.actor.EventAction()
-
-	if elog.Enabled() {
-		if e.dst != nil {
-			x := event_action_elog{
-				kind:     event_action_elog_done,
-				name:     e.dst.elogNodeName,
-				sequence: uint32(e.dst.sequence),
-			}
-			elog.Add(&x)
-			e.dst.sequence++
-		}
-	}
+	e.d.e.eventStats.update(1, t0)
+	n.log(d, event_elog_action_done)
+	n.sequence++ // done => use next sequence
 	e.l.putLoopEvent(e)
 }
 
-func (e *loopEvent) String() string { return e.actor.String() }
+func (e *nodeEvent) String() string { return e.actor.String() }
 
-func (l *Loop) eventHandler(p EventHandler) {
-	c := p.GetNode()
+func (l *Loop) eventHandler(r Noder) {
+	d := r.GetNode()
 	// Save elog if thread panics.
 	defer func() {
 		if err := recover(); err != nil {
@@ -169,22 +165,29 @@ func (l *Loop) eventHandler(p EventHandler) {
 				l.Quit()
 				return
 			}
-			elog.Panic(fmt.Errorf("%v: %v", c.name, err))
+			elog.Panic(fmt.Errorf("%v: %v", d.name, err))
 			panic(err)
 		}
 	}()
+	n := &d.e
 	for {
-		e := <-c.rxEvents
-		c.currentEvent.e = e
+		n.log(d, event_elog_node_wait)
+		n.ft.waitLoop()
+		n.log(d, event_elog_node_wake)
+		e := <-n.rxEvents
+		n.currentEvent.e = e
 		e.do()
-		c.eventWg.Done()
-		c.currentEvent.e = nil
+		n.s.setDone()
+		n.currentEvent.e = nil
+		n.activeCount--
+		n.log(d, event_elog_node_signal_done)
+		n.ft.signalLoop()
 	}
 }
 
 // Types capable will include declare loop.Event and thereby inherit Suspend/Resume.
 type Event struct {
-	e *loopEvent
+	e *nodeEvent
 }
 
 type EventActor interface {
@@ -193,7 +196,7 @@ type EventActor interface {
 
 func (e *Event) getLoopEvent() *Event { return e }
 func (n *Node) CurrentEvent() (e *Event) {
-	x := &n.currentEvent
+	x := &n.e.currentEvent
 	if x.e != nil {
 		e = x
 	}
@@ -201,59 +204,61 @@ func (n *Node) CurrentEvent() (e *Event) {
 }
 
 func (x *Event) Suspend() {
-	if elog.Enabled() {
-		e := event_elog{
-			name:     x.e.dst.elogNodeName,
-			kind:     event_elog_suspend,
-			sequence: uint32(x.e.dst.sequence),
-		}
-		elog.Add(&e)
+	d := x.e.d
+	n := &d.e
+	if !n.isActive() {
+		panic("suspending inactive node")
 	}
-	x.e.dst.suspended = true
-	x.e.dst.eventWg.Done()
-	<-x.e.dst.eventFromLoop
-	x.e.dst.eventWg.Add(1)
-	if elog.Enabled() {
-		e := event_elog{
-			name:     x.e.dst.elogNodeName,
-			kind:     event_elog_resumed,
-			sequence: uint32(x.e.dst.sequence),
-		}
-		elog.Add(&e)
+	if was := n.s.setSuspend(true); was {
+		n.logsi(d, event_elog_suspend, n.sequence, "ignore duplicate suspend")
+		return
 	}
+	n.log(d, event_elog_suspend)
+	n.eventStats.current.suspends++
+	t0 := cpu.TimeNow()
+	n.ft.signalLoop()
+	n.ft.waitLoop()
+	// Don't charge node for time suspended.
+	dt := cpu.TimeNow() - t0
+	n.eventStats.current.clocks -= uint64(dt)
+	n.log(d, event_elog_resumed)
 }
-func (x *Event) Resume() {
-	if elog.Enabled() {
-		e := event_elog{
-			name:     x.e.dst.elogNodeName,
-			kind:     event_elog_send_resume,
-			sequence: uint32(x.e.dst.sequence),
-		}
-		elog.Add(&e)
+func (x *Event) Resume() (ok bool) {
+	d := x.e.d
+	n := &d.e
+
+	// Don't do it twice.
+	if ok, _, _ = n.s.setResume(); !ok {
+		n.logsi(d, event_elog_queue_resume, ^uint32(0), "ignore duplicate resume")
+		return
 	}
-	x.e.dst.suspended = false
-	x.e.l.resumedEvents <- x.e
+	n.log(d, event_elog_queue_resume)
+	d.l.events <- x.e
+	return
 }
-func (x *loopEvent) resume() {
-	if elog.Enabled() {
-		e := event_elog{
-			name:     x.dst.elogNodeName,
-			kind:     event_elog_suspend_wake,
-			sequence: uint32(x.dst.sequence),
-		}
-		elog.Add(&e)
-	}
-	x.dst.eventFromLoop <- struct{}{}
+func (x *nodeEvent) resume() {
+	d, n := x.d, &x.d.e
+	n.log(d, event_elog_resume_wake)
+	n.s.clearResume()
 }
 
 // If too small, events may block when there are timing mismataches between sender and receiver.
-const eventHandlerChanDepth = 16 << 10
+const eventHandlerChanDepth = 1 << 10
 
-func (l *Loop) startHandler(n EventHandler) {
-	c := n.GetNode()
-	c.rxEvents = make(chan *loopEvent, eventHandlerChanDepth)
-	c.eventFromLoop = make(chan struct{}, 1)
-	go l.eventHandler(n)
+func (n *Node) hasEventHandler() bool { return n.e.rxEvents != nil }
+func (d *Node) maybeStartEventHandler() {
+	n := &d.e
+	if n.rxEvents != nil {
+		return
+	}
+	l := d.l
+	l.eventHandlers = append(l.eventHandlers, d.noder)
+	l.eventHandlerNodes = append(l.eventHandlerNodes, d)
+	n.rxEvents = make(chan *nodeEvent, eventHandlerChanDepth)
+	n.activeIndex = ^uint(0)
+	n.ft.init()
+	elog.F("loop starting event handler %v", d.elogNodeName)
+	go l.eventHandler(d.noder)
 }
 
 func (l *eventMain) eventPoller(p EventPoller) {
@@ -270,71 +275,107 @@ func (l *eventMain) eventPoller(p EventPoller) {
 		p.EventPoll()
 	}
 }
-func (l *eventMain) startPoller(n EventPoller) { go l.eventPoller(n) }
+func (l *eventMain) startEventPoller(n EventPoller)    { go l.eventPoller(n) }
+func (l *eventMain) RegisterEventPoller(p EventPoller) { l.eventPollers = append(l.eventPollers, p) }
 
-func (l *Loop) doEventNoWait() (quit *quitEvent, didEvent bool) {
-	l.now = cpu.TimeNow()
-	select {
-	case e := <-l.resumedEvents:
-		didEvent = true
+func (e *nodeEvent) EventAction() {
+	d := e.d
+	n := &d.e
+	if elog.Enabled() {
+		n.logsi(d, event_elog_queue, n.queue_sequence, e.actor.String())
+		n.queue_sequence++
+	}
+	n.activeCount++
+	if n.activeCount == 1 {
+		d.l.eventMain.addActive(d)
+	}
+	n.rxEvents <- e
+}
+
+func (m *eventMain) doNodeEvent(e *nodeEvent) (quit *quitEvent) {
+	var ok bool
+	if quit, ok = e.actor.(*quitEvent); ok {
+		return
+	}
+	n := &e.d.e
+	if n.s.isResumed() {
+		m.addActive(e.d)
 		e.resume()
-
-	case e := <-l.events:
-		didEvent = true
-		var ok bool
-		if quit, ok = e.actor.(*quitEvent); ok {
-			return
-		}
+	} else {
 		e.EventAction()
-	default:
+	}
+	return
+}
+
+func (l *Loop) doEventNoWait() (quit *quitEvent) {
+	select {
+	default: // nothing to do
+	case e := <-l.events:
+		quit = l.doNodeEvent(e)
+	}
+	return
+}
+
+func (l *Loop) doEventWait() (quit *quitEvent) {
+	m := &l.eventMain
+	m.event_timer_elog(event_timer_elog_waiting, m.timerDuration)
+	select {
+	case e := <-l.events:
+		quit = l.doNodeEvent(e)
+	case <-m.timer.C:
+		// Log difference between time now and timer cpu time.
+		m.event_timer_elog(event_timer_elog_timeout, l.duration(m.timerCpuTime))
+		// Reset timer; caller will call m.timer.Reset with next duration.
+		m.timerCpuTime = l.now
 	}
 	return
 }
 
 func (l *Loop) duration(t cpu.Time) time.Duration {
+	l.now = cpu.TimeNow()
 	return time.Duration(float64(int64(t-l.now)) * l.timeDurationPerCycle)
 }
 
-func (l *Loop) doEventWait(dt time.Duration) (quit *quitEvent, didEvent bool) {
-	select {
-	case e := <-l.resumedEvents:
-		didEvent = true
-		e.resume()
-
-	case e := <-l.events:
-		didEvent = true
-		var ok bool
-		if quit, ok = e.actor.(*quitEvent); ok {
-			// Log quit event.
-			elog.S("loop quit " + e.String())
-		} else {
-			e.EventAction()
-		}
-	case <-time.After(dt):
-		elog.S("loop event timeout")
-	}
-	return
-}
-
 func (l *Loop) doEvents() (quitLoop bool) {
+	m := &l.eventMain
 	var (
-		quit     *quitEvent
-		didWait  bool
-		didEvent bool
+		quit    *quitEvent
+		didWait bool
 	)
-	if _, didWait = l.activePollerState.setEventWait(); didWait {
-		l.now = cpu.TimeNow()
-		dt := time.Duration(1<<63 - 1)
-		if t, ok := l.eventPool.NextTime(); ok {
-			dt = l.duration(t)
-		}
-		if didWait = dt > 0; didWait {
-			quit, didEvent = l.doEventWait(dt)
+
+	// Try waiting if we have no active nodes.
+	if len(m.activeNodes) == 0 {
+		// Try to change active poller state to event wait.
+		// This can and does return false if an active poller comes along racing with our call.
+		if _, didWait = l.activePollerState.setEventWait(); didWait {
+			// Find next event's time (!ok means there is no available event).
+			t, avail := l.eventPool.NextTime()
+
+			// Compute duration until next event.
+			var dt time.Duration
+			if avail {
+				dt = l.duration(t)
+			} else {
+				t = maxCpuTime
+				dt = maxDuration
+			}
+
+			// Reset timer if wakeup time changes.
+			if t != m.timerCpuTime {
+				if !m.timer.Stop() {
+					<-m.timer.C
+				}
+				m.timer.Reset(dt)
+				m.timerCpuTime = t
+				m.timerDuration = dt
+				m.event_timer_elog(event_timer_elog_reset, dt)
+			}
+			quit = l.doEventWait()
 			l.activePollerState.clearEventWait()
 		}
 	}
 	if !didWait {
-		quit, didEvent = l.doEventNoWait()
+		quit = l.doEventNoWait()
 	}
 
 	// Handle expired timed events.
@@ -343,56 +384,151 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		l.eventPoolLock.Lock()
 		l.eventPool.AdvanceAdd(l.now, &l.eventVec)
 		l.eventPoolLock.Unlock()
-		if didEvent = len(l.eventVec) > 0; didEvent {
+		if len(l.eventVec) > 0 {
+			if elog.Enabled() {
+				elog.F2u("loop event timer %d expired, %d queued",
+					uint64(len(l.eventVec)), uint64(l.eventPool.Elts()))
+			}
 			for i := range l.eventVec {
 				l.eventVec[i].EventAction()
 			}
-			elog.F2u("timed events %d expired, %d left",
-				uint64(len(l.eventVec)), uint64(l.eventPool.Elts()))
 			l.eventVec = l.eventVec[:0]
 		}
 	}
 
-	// Wait for all event handlers to become inactive.
-	if didEvent {
-		l.eventMain.Wait()
+	// Signal all active nodes to start.
+	for _, d := range m.activeNodes {
+		n := &d.e
+		n.log(d, event_elog_start)
+		n.ft.signalNode()
+	}
+
+	// Wait for all event active nodes to finish.
+	for _, d := range m.activeNodes {
+		n := &d.e
+		q := n.sequence
+		n.log(d, event_elog_wait)
+		n.ft.waitNode()
+		if n.activeCount == 0 || n.s.isSuspended() {
+			m.inactiveNodes = append(m.inactiveNodes, d)
+		}
+		n.logi(d, event_elog_wait_done, q)
+	}
+
+	if len(m.inactiveNodes) > 0 {
+		for _, d := range m.inactiveNodes {
+			m.delActive(d)
+		}
+		m.inactiveNodes = m.inactiveNodes[:0]
 	}
 
 	quitLoop = quit != nil && quit.Type == quitEventExit
 	return
 }
 
-func (m *eventMain) Wait() {
-	for _, n := range m.eventHandlerNodes {
-		if !n.suspended {
-			if elog.Enabled() {
-				e := event_elog{
-					name:     n.elogNodeName,
-					kind:     event_elog_wait,
-					sequence: uint32(n.sequence),
-				}
-				elog.Add(&e)
-			}
-			n.eventWg.Wait()
+func (m *eventMain) addActive(d *Node) {
+	n := &d.e
+	n.activeIndex = uint(len(m.activeNodes))
+	m.activeNodes = append(m.activeNodes, d)
+	n.logi(d, event_elog_add_active, uint32(len(m.activeNodes)))
+}
+
+func (n *eventNode) isActive() bool { return n.activeIndex != ^uint(0) }
+func (m *eventMain) delActive(d *Node) {
+	n := &d.e
+	ai := n.activeIndex
+	l := uint(len(m.activeNodes))
+	if l > 0 && ai < l-1 {
+		m.activeNodes[ai] = m.activeNodes[l-1]
+	}
+	m.activeNodes = m.activeNodes[:l-1]
+	n.activeIndex = ^uint(0)
+	n.logi(d, event_elog_del_active, uint32(len(m.activeNodes)))
+}
+
+type eventNodeState uint32
+
+func (t eventNodeState) String() (s string) {
+	if t&1 != 0 {
+		s += "suspended"
+	}
+	if t&2 != 0 {
+		s += "resumed"
+	}
+	return
+}
+
+func (s *eventNodeState) compare_and_swap(old, new eventNodeState) (swapped bool) {
+	return atomic.CompareAndSwapUint32((*uint32)(s), uint32(old), uint32(new))
+}
+func (s *eventNodeState) get() (x eventNodeState, isSuspended, isResumed bool) {
+	x = eventNodeState(atomic.LoadUint32((*uint32)(s)))
+	isSuspended = x&1 != 0
+	isResumed = x&2 != 0
+	return
+}
+func makeEventNodeState(isSuspended, isResumed bool) (s eventNodeState) {
+	if isSuspended {
+		s |= 1
+	}
+	if isResumed {
+		s |= 2
+	}
+	return
+}
+func (s *eventNodeState) setDone() { s.setSuspend(false) }
+func (s *eventNodeState) setSuspend(is bool) (was bool) {
+	for {
+		var old eventNodeState
+		old, was, _ = s.get()
+		if is == was {
+			return
+		}
+		new := makeEventNodeState(is, false)
+		if s.compare_and_swap(old, new) {
+			return
+		}
+	}
+}
+func (s *eventNodeState) isResumed() (ok bool)   { _, _, ok = s.get(); return }
+func (s *eventNodeState) isSuspended() (ok bool) { _, ok, _ = s.get(); return }
+func (s *eventNodeState) setResume() (ok, wasSuspended, wasResumed bool) {
+	var old eventNodeState
+	if old, wasSuspended, wasResumed = s.get(); wasSuspended && !wasResumed {
+		new := makeEventNodeState(false, true)
+		ok = s.compare_and_swap(old, new)
+	}
+	return
+}
+func (s *eventNodeState) clearResume() bool {
+	for {
+		old, wasSuspended, wasResumed := s.get()
+		if !wasResumed {
+			return wasResumed
+		}
+		new := makeEventNodeState(wasSuspended, false)
+		if s.compare_and_swap(old, new) {
+			return wasResumed
 		}
 	}
 }
 
-func (m *eventMain) Init(l *Loop) {
+const (
+	maxDuration = 1<<63 - 1
+	// Cpu time indicating that timer is armed with maxDuration.
+	maxCpuTime = ^cpu.Time(0)
+)
+
+func (m *eventMain) eventInit(l *Loop) {
 	m.l = l
-	m.events = make(chan *loopEvent, eventHandlerChanDepth)
-	m.resumedEvents = make(chan *loopEvent, 64)
-
-	for _, n := range l.pollers {
-		l.startPoller(n)
+	m.events = make(chan *nodeEvent, eventHandlerChanDepth)
+	m.timerCpuTime = maxCpuTime
+	m.timerDuration = maxDuration
+	m.timer = time.NewTimer(maxDuration)
+	m.event_timer_elog(event_timer_elog_reset, maxDuration)
+	for _, n := range l.eventPollers {
+		l.startEventPoller(n)
 	}
-	for _, n := range l.eventHandlers {
-		l.startHandler(n)
-	}
-}
-
-func (l *eventMain) RegisterEventPoller(p EventPoller) {
-	l.pollers = append(l.pollers, p)
 }
 
 type quitEvent struct{ Type quitEventType }
@@ -427,67 +563,167 @@ func (l *Loop) Interrupt() {
 	l.addEvent(e)
 }
 
-const (
-	event_action_elog_start = iota
-	event_action_elog_done
-)
-
-type event_action_elog_kind uint32
-
-func (k event_action_elog_kind) String() string {
-	switch k {
-	case event_action_elog_start:
-		return "start"
-	case event_action_elog_done:
-		return "done"
-	default:
-		return fmt.Sprintf("unknown %d", int(k))
+func (l *Loop) showRuntimeEvents(w cli.Writer) (err error) {
+	type event struct {
+		Name     string  `format:"%-30s"`
+		Events   uint64  `format:"%16d"`
+		Suspends uint64  `format:"%16d"`
+		Clocks   float64 `format:"%16.2f"`
 	}
-}
 
-type event_action_elog struct {
-	kind     event_action_elog_kind
-	name     elog.StringRef
-	sequence uint32
-}
+	es := []event{}
+	var inputSummary stats
+	for _, n := range l.nodes {
+		if !n.hasEventHandler() {
+			continue
+		}
+		var s stats
+		s.add(&n.e.eventStats)
+		inputSummary.add(&n.e.eventStats)
+		es = append(es, event{
+			Name:     n.name,
+			Events:   s.vectors,
+			Suspends: s.suspends,
+			Clocks:   s.clocksPerVector(),
+		})
+	}
 
-func (e *event_action_elog) Elog(l *elog.Log) {
-	l.Logf("loop %v%d %s", e.name, e.sequence, e.kind)
+	// Summary
+	if s := inputSummary; s.calls > 0 {
+		dt := time.Since(l.timeLastRuntimeClear).Seconds()
+		eventsPerSec := float64(s.vectors) / dt
+		clocksPerEvent := float64(s.clocks) / float64(s.vectors)
+		fmt.Fprintf(w, "Events: %d, Events/sec: %.2e, Clocks/event: %.2f\n",
+			s.vectors, eventsPerSec, clocksPerEvent)
+	}
+
+	sort.Slice(es, func(i, j int) bool { return es[i].Name < es[j].Name })
+	elib.TabulateWrite(w, es)
+	return
 }
 
 const (
-	event_elog_suspend = iota
-	event_elog_suspend_wake
-	event_elog_send_resume
-	event_elog_resumed
+	// Logged by main loop.
+	event_elog_queue = iota
+	event_elog_start
 	event_elog_wait
+	event_elog_wait_done
+	event_elog_add_active
+	event_elog_del_active
+	event_elog_suspend_wake
+	event_elog_resume_wake
+	// Logged by node.
+	event_elog_node_wake
+	event_elog_node_wait
+	event_elog_node_signal_done
+	event_elog_action
+	event_elog_action_done
+	event_elog_suspend
+	event_elog_resumed
+	event_elog_queue_resume
 )
 
 type event_elog_kind uint32
 
 func (k event_elog_kind) String() string {
-	switch k {
-	case event_elog_suspend:
-		return "suspend"
-	case event_elog_suspend_wake:
-		return "suspend-wake"
-	case event_elog_send_resume:
-		return "send-resume"
-	case event_elog_resumed:
-		return "resumed"
-	case event_elog_wait:
-		return "wait"
-	default:
-		return fmt.Sprintf("unknown %d", int(k))
+	t := [...]string{
+		event_elog_queue:            "queue",
+		event_elog_start:            "start",
+		event_elog_wait:             "wait",
+		event_elog_wait_done:        "wait-done",
+		event_elog_add_active:       "add-active",
+		event_elog_del_active:       "del-active",
+		event_elog_resume_wake:      "resume-wake",
+		event_elog_suspend_wake:     "suspend-wake",
+		event_elog_node_wait:        "wait",
+		event_elog_node_wake:        "wake",
+		event_elog_node_signal_done: "signal-done",
+		event_elog_action:           "action",
+		event_elog_action_done:      "action-done",
+		event_elog_suspend:          "suspend",
+		event_elog_resumed:          "resumed",
+		event_elog_queue_resume:     "queue-resume",
 	}
+	return elib.StringerHex(t[:], int(k))
 }
 
+func (n *eventNode) logsi(d *Node, kind event_elog_kind, i uint32, s string) {
+	if elog.Enabled() {
+		e := event_elog{
+			name: d.elogNodeName,
+			kind: kind,
+			i:    i,
+		}
+		copy(e.s[:], []byte(s))
+		elog.Add(&e)
+	}
+}
+func (n *eventNode) logi(d *Node, kind event_elog_kind, i uint32) { n.logsi(d, kind, i, "") }
+func (n *eventNode) log(d *Node, kind event_elog_kind)            { n.logi(d, kind, n.sequence) }
+
 type event_elog struct {
-	kind     event_elog_kind
-	name     elog.StringRef
-	sequence uint32
+	kind event_elog_kind
+	name elog.StringRef
+	i    uint32
+	s    [elog.EventDataBytes - 3*4]byte
 }
 
 func (e *event_elog) Elog(l *elog.Log) {
-	l.Logf("loop event %v%d %s", e.name, e.sequence, e.kind)
+	s := elog.String(e.s[:])
+	if s != "" {
+		s = ": " + s
+	}
+	switch e.kind {
+	case event_elog_node_wake, event_elog_node_wait,
+		event_elog_action, event_elog_action_done,
+		event_elog_suspend, event_elog_resumed, event_elog_queue_resume:
+		// Events generated by node.
+		l.Logf("loop event node %v %s %d%s", e.name, e.kind, e.i, s)
+	default:
+		switch {
+		case e.i == ^uint32(0):
+			l.Logf("loop event %v %v%s", e.kind, e.name, s)
+		case e.kind == event_elog_add_active || e.kind == event_elog_del_active:
+			l.Logf("loop event %v %v %d%s", e.kind, e.name, e.i, s)
+		default:
+			l.Logf("loop event %v %v %d%s", e.kind, e.name, e.i, s)
+		}
+	}
+}
+
+const (
+	event_timer_elog_waiting = iota
+	event_timer_elog_reset
+	event_timer_elog_timeout
+)
+
+type event_timer_elog_kind uint32
+
+func (k event_timer_elog_kind) String() string {
+	t := [...]string{
+		event_timer_elog_waiting: "waiting",
+		event_timer_elog_reset:   "reset",
+		event_timer_elog_timeout: "timeout",
+	}
+	return elib.StringerHex(t[:], int(k))
+}
+
+type event_timer_elog struct {
+	kind event_timer_elog_kind
+	dt   time.Duration
+}
+
+func (e *event_timer_elog) Elog(l *elog.Log) {
+	if e.dt == maxDuration {
+		l.Logf("loop event timer %v forever", e.kind)
+	} else {
+		l.Logf("loop event timer %v %.2e sec", e.kind, e.dt.Seconds())
+	}
+}
+
+func (m *eventMain) event_timer_elog(kind event_timer_elog_kind, dt time.Duration) {
+	if elog.Enabled() {
+		e := event_timer_elog{kind: kind, dt: dt}
+		elog.Add(&e)
+	}
 }

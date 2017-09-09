@@ -12,8 +12,6 @@ import (
 
 type eventNode struct{ Node }
 
-func (n *eventNode) EventHandler() {}
-
 type eventMain struct {
 	eventNode eventNode
 }
@@ -21,7 +19,7 @@ type eventMain struct {
 func (v *Vnet) eventInit() {
 	n := &v.eventMain.eventNode
 	n.Vnet = v
-	v.loop.RegisterNode(n, "vnet-event")
+	v.loop.RegisterNode(n, "vnet")
 }
 func (v *Vnet) CurrentEvent() *loop.Event { return v.eventNode.CurrentEvent() }
 

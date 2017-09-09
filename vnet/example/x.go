@@ -121,7 +121,7 @@ func (n *myNode) Init() (err error) {
 	}
 	// Enable for event suspend/resume test.
 	if false {
-		v.GetLoop().RegisterNode(n, "resumer-node")
+		v.GetLoop().RegisterNode(n, "resumer")
 		v.SignalEvent(&myEvent{n: n, delay: 0, limit: 1000})
 	}
 	return
@@ -226,15 +226,19 @@ type myEvent struct {
 	n        *myNode
 	x, limit int
 	delay    float64
+	r        resumer
 }
 
-type resumer struct{ e *myEvent }
+type resumer struct {
+	x int
+	e *myEvent
+}
 
-func (n *myNode) EventHandler()   {}
 func (r *resumer) EventAction()   { r.e.Resume() }
-func (r *resumer) String() string { return "resumer" }
+func (r *resumer) String() string { return fmt.Sprintf("my-event-resumer %d", r.x) }
 
 func (e *myEvent) EventAction() {
+	x := e.x
 	e.x++
 	if e.limit != 0 && e.x >= e.limit {
 		return
@@ -244,7 +248,9 @@ func (e *myEvent) EventAction() {
 	} else {
 		e.n.Vnet.SignalEvent(e)
 	}
-	e.n.Node.AddEvent(&resumer{e: e}, e.n)
+	e.r.e = e
+	e.r.x = x
+	e.n.Node.AddEvent(&e.r, e.n)
 	e.Suspend()
 }
 
