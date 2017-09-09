@@ -117,6 +117,11 @@ func getVerQSPI(q bool) (string, error) {
 	qv := string(b[VERSION_OFFSET:VERSION_LEN])
 	if string(b[VERSION_OFFSET:VERSION_DEV]) == "dev" {
 		qv = "dev"
+	} else {
+		_, err = strconv.ParseFloat(qv, 64)
+		if err != nil {
+			qv = "00000000"
+		}
 	}
 	return qv, nil
 }
@@ -186,7 +191,7 @@ func printVerQSPI(iv []string, qspi int) {
 
 func isVersionNewer(cur string, x string) (n bool, err error) {
 	if cur == "dev" || x == "dev" {
-		return false, nil
+		return true, nil
 	}
 	var c float64 = 0.0
 	var f float64 = 0.0

@@ -123,19 +123,19 @@ var (
 func reportVerServer(s string, v string, t bool) (err error) {
 	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return fmt.Errorf("Server error: downloading: %v", err)
+		return fmt.Errorf("Server unreachable\n")
 	}
 	if n < 1000 {
-		return fmt.Errorf("Server error: file too small: %v", err)
+		return fmt.Errorf("Server unreachable\n")
 	}
 	if err := unzip(); err != nil {
-		return fmt.Errorf("Server error: unzipping file: %v", err)
+		return fmt.Errorf("Server error: unzipping file: %\n", err)
 	}
 	defer rmFiles()
 
 	l, err := ioutil.ReadFile(VersionName)
 	if err != nil {
-		fmt.Printf("Server error: couldn't find server version\n")
+		fmt.Printf("Image version not found on server\n")
 		return nil
 	}
 	sv := string(l[VERSION_OFFSET:VERSION_LEN])
@@ -163,18 +163,20 @@ func checkChecksums() error { //TODO
 	return nil
 }
 
+//server unreachable
+//image not found on server
 func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	fmt.Print("\n")
 
 	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return fmt.Errorf("Server error: downloading: %v", err)
+		return fmt.Errorf("Server unreachable\n")
 	}
 	if n < 1000 {
-		return fmt.Errorf("Server error: file too small: %v", err)
+		return fmt.Errorf("Server unreachable\n")
 	}
 	if err := unzip(); err != nil {
-		return fmt.Errorf("Server error: unzipping file: %v", err)
+		return fmt.Errorf("Server error: unzipping file: %v\n", err)
 	}
 	defer rmFiles()
 
@@ -184,13 +186,15 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 			return err
 		}
 		if len(qv) == 0 {
-			fmt.Printf("Aborting, couldn't find QSPI version\n")
+			fmt.Printf("Aborting, couldn't find version in QSPI\n")
+			fmt.Printf("Use -f to force upgrade.\n")
 			return nil
 		}
 
 		l, err := ioutil.ReadFile(VersionName)
 		if err != nil {
-			fmt.Printf("Aborting, couldn't find server version\n")
+			fmt.Printf("Aborting, couldn't find version number on server\n")
+			fmt.Printf("Use -f to force upgrade.\n")
 			return nil
 		}
 		sv := string(l[VERSION_OFFSET:VERSION_LEN])
@@ -201,10 +205,12 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 			newer, err := isVersionNewer(qv, sv)
 			if err != nil {
 				fmt.Printf("Aborting, server version error\n", sv)
+				fmt.Printf("Use -f to force upgrade.\n")
 				return nil
 			}
 			if !newer {
 				fmt.Printf("Aborting, server version %s is not newer\n", sv)
+				fmt.Printf("Use -f to force upgrade.\n")
 				return nil
 			}
 		}
@@ -212,10 +218,10 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 
 	selectQSPI(q)
 	if q == true {
-		fmt.Println("Upgrading QSPI1...")
+		fmt.Println("Upgrading QSPI1...\n")
 	}
 	if err := writeImageAll(); err != nil {
-		return fmt.Errorf("*** UPGRADE ERROR! ***: %v", err)
+		return fmt.Errorf("*** UPGRADE ERROR! ***: %v\n", err)
 	}
 	if err := reboot(); err != nil {
 		return err
