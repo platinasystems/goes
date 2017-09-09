@@ -38,13 +38,11 @@ func (c *LoopCli) rxReady(f *cli.File) {
 
 func (c *fileEvent) EventAction() {
 	if err := c.RxReady(); err == cli.ErrQuit {
-		c.c.AddEvent(ErrQuit, nil)
+		c.c.AddEvent(ErrQuit, c.c)
 	}
 }
 
 func (c *fileEvent) String() string { return "rx-ready " + c.File.String() }
-
-func (c *LoopCli) EventHandler() {}
 
 func (c *LoopCli) LoopInit(l *Loop) {
 	if len(c.Main.Prompt) == 0 {
@@ -86,16 +84,27 @@ func (m *loggerMain) Fatalf(format string, args ...interface{}) { panic(fmt.Erro
 
 func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	show_detail := false
+	show_events := false
+	colMap := map[string]bool{
+		"State": false,
+	}
 	for !in.End() {
 		switch {
 		case in.Parse("d%*etail"):
+			colMap["State"] = true
 			show_detail = true
+		case in.Parse("e%*vent"):
+			show_events = true
 		default:
 			in.ParseError()
 		}
 	}
 
-	l.flushAllNodeStats()
+	l.flushAllActivePollerStats()
+
+	if show_events {
+		return l.showRuntimeEvents(w)
+	}
 
 	type node struct {
 		Name     string  `format:"%-30s"`
@@ -161,17 +170,17 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 	}
 
 	sort.Slice(ns, func(i, j int) bool { return ns[i].Name < ns[j].Name })
-
-	elib.TabulateWrite(w, ns)
+	elib.Tabulate(ns).WriteCols(w, colMap)
 	return
 }
 
 func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
-	l.flushAllNodeStats()
+	l.flushAllActivePollerStats()
 	l.timeLastRuntimeClear = time.Now()
 	for _, n := range l.nodes {
 		n.inputStats.clear()
 		n.outputStats.clear()
+		n.e.eventStats.clear()
 	}
 	return
 }
@@ -308,7 +317,7 @@ func (l *Loop) cliInit() {
 	l.RegisterEventPoller(iomux.Default)
 	c := &l.Cli
 	c.Main.RxReady = c.rxReady
-	l.RegisterNode(c, "cli-event")
+	l.RegisterNode(c, "cli")
 	c.AddCommand(&cli.Command{
 		Name:      "show runtime",
 		ShortHelp: "show main loop runtime statistics",

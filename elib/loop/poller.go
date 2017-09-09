@@ -180,8 +180,8 @@ func (e *activateEvent) String() string { return fmt.Sprintf("activate %s", e.n.
 
 func (n *Node) ActivateAfterTime(dt float64) {
 	if was := n.Activate(false); was {
-		n.activateEvent.n = n
-		le := n.l.getLoopEvent(&n.activateEvent, elog.PointerToFirstArg(&n))
+		n.e.activateEvent.n = n
+		le := n.l.getLoopEvent(&n.e.activateEvent, elog.PointerToFirstArg(&n))
 		n.l.addTimedEvent(le, dt)
 	}
 }
@@ -201,7 +201,7 @@ func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspen
 		if poll_active {
 			a.toLoop <- struct{}{}
 		} else {
-			n.toLoop <- struct{}{}
+			n.ft.signalLoop()
 		}
 		n.poller_elog(poller_elog_suspended)
 		// Wait for continue (resume) signal from main loop.
@@ -209,9 +209,10 @@ func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspen
 		if poll_active {
 			<-a.fromLoop
 		} else {
-			<-n.fromLoop
+			n.ft.waitLoop()
 		}
 		// Don't charge node for time suspended.
+		// Reduce from output side since its tx that suspends not rx.
 		dt := cpu.TimeNow() - t0
 		n.outputStats.current.clocks -= uint64(dt)
 		n.poller_elog(poller_elog_resumed)
@@ -419,7 +420,7 @@ func (a *activePoller) flushActivePollerStats(l *Loop) {
 	}
 }
 
-func (l *Loop) flushAllNodeStats() {
+func (l *Loop) flushAllActivePollerStats() {
 	m := &l.nodeStateMain
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -466,31 +467,31 @@ func (a *activePoller) dataPoll(l *Loop) {
 }
 
 func (l *Loop) dataPoll(p inLooper) {
-	c := p.GetNode()
+	n := p.GetNode()
 	// Save elog if thread panics.
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
-				elog.Panic(fmt.Errorf("%s: %v", c.name, err))
+				elog.Panic(fmt.Errorf("%s: %v", n.name, err))
 				panic(err)
 			}
 		}
 	}()
 	for {
-		<-c.fromLoop
-		ap := c.getActivePoller()
+		n.ft.waitLoop()
+		ap := n.getActivePoller()
 		if ap.activeNodes == nil {
 			ap.initNodes(l)
 		}
-		n := &ap.activeNodes[c.index]
-		ap.currentNode = n
+		an := &ap.activeNodes[n.index]
+		ap.currentNode = an
 		t0 := cpu.TimeNow()
 		ap.timeNow = t0
-		p.LoopInput(l, n.looperOut)
-		nVec := n.out.call(l, ap)
+		p.LoopInput(l, an.looperOut)
+		nVec := an.out.call(l, ap)
 		ap.pollerStats.update(nVec, t0)
 		l.pollerStats.update(nVec)
-		c.toLoop <- struct{}{}
+		n.ft.signalLoop()
 	}
 }
 
@@ -519,7 +520,7 @@ func (l *Loop) doPollers() {
 		if poll_active {
 			a.fromLoop <- n.noder.(inLooper)
 		} else {
-			n.fromLoop <- struct{}{}
+			n.ft.signalNode()
 		}
 	}
 
@@ -534,7 +535,7 @@ func (l *Loop) doPollers() {
 			if poll_active {
 				<-a.toLoop
 			} else {
-				<-n.toLoop
+				n.ft.waitNode()
 			}
 			n.poller_elog(poller_elog_poll_done)
 		}
