@@ -291,27 +291,27 @@ func (b *Buffer) GetCaller(a PointerToFirstArg) (c Caller) {
 func GetCaller(a PointerToFirstArg) (c Caller) { return DefaultBuffer.GetCaller(a) }
 func (c *Caller) SetTimeNow()                  { c.time = uint64(cpu.TimeNow()) }
 
-func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable bool) {
+func (m *Buffer) getCaller(d Logger, caller Caller) (cc *callerCache, disable bool) {
 	// Check 1st level hash.  No lock required.
 	pc := caller.pc
 	pch := &m.l1Cache[caller.pcHash&(1<<log2HLen-1)]
 	disable = pch.disable
 	if pch.pc == pc {
-		c = m.callers[pch.callerIndex]
-		c.f.count++
+		cc = m.callers[pch.callerIndex]
+		cc.f.count++
 		return
 	}
 
 	// Check 2nd level cache.
 	m.mu.RLock()
-	c, ok := m.callerByPC[pc]
+	cc, ok := m.callerByPC[pc]
 	if ok {
-		disable = c.f.disable
-		c.f.count++
+		disable = cc.f.disable
+		cc.f.count++
 		m.mu.RUnlock()
 		// Update 1st level cache. No lock required.
 		pch.pc = pc
-		pch.callerIndex = c.callerIndex
+		pch.callerIndex = cc.callerIndex
 		pch.disable = disable
 		return
 	}
@@ -320,11 +320,14 @@ func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable boo
 	// Now grab write lock.
 	m.mu.Lock()
 
+	cc = &callerCache{pc: pc, callerIndex: uint32(len(m.callers)), formatMethodIndex: -1}
+	ci := callerInfoForPC(pc)
+	cc.callerInfo = ci
+
 	// Miss? Match filter regexps.
 	var found *eventFilter
-	name := runtime.FuncForPC(uintptr(pc)).Name()
 	for _, f := range m.filters {
-		if ok := f.re.MatchString(name); ok {
+		if ok := ci.Match(f.re); ok {
 			found = f
 			disable = f.disable
 			break
@@ -333,19 +336,18 @@ func (m *Buffer) getCaller(d Logger, caller Caller) (c *callerCache, disable boo
 	if m.callerByPC == nil {
 		m.callerByPC = make(map[uint64]*callerCache)
 	}
-	c = &callerCache{pc: pc, callerIndex: uint32(len(m.callers)), formatMethodIndex: -1}
 	if d == nil {
-		d = &c.fe
+		d = &cc.fe
 	}
-	c.initDataType(d)
-	m.callers = append(m.callers, c)
+	cc.initDataType(d)
+	m.callers = append(m.callers, cc)
 	if found != nil {
-		c.f = *found
-		c.f.count = 1
+		cc.f = *found
+		cc.f.count = 1
 	}
-	m.callerByPC[pc] = c
+	m.callerByPC[pc] = cc
 	pch.pc = pc
-	pch.callerIndex = c.callerIndex
+	pch.callerIndex = cc.callerIndex
 	pch.disable = disable
 	m.mu.Unlock()
 	return
@@ -409,9 +411,9 @@ func (b *Buffer) invalidateCache() {
 	// Update all callers.
 	for _, c := range b.callers {
 		c.f = eventFilter{}
-		name := runtime.FuncForPC(uintptr(c.pc)).Name()
+		ci := &c.callerInfo
 		for _, f := range m.filters {
-			if ok := f.re.MatchString(name); ok {
+			if ci.Match(f.re) {
 				c.f = *f
 				break
 			}
@@ -689,24 +691,40 @@ func (e *eventHeader) ElapsedTime(v *View) float64 {
 }
 
 type CallerInfo struct {
-	PC    uint64
-	Entry uint64
+	// Program counter PC value for caller.
+	PC uint64
+	// Name, Entry and File, Line as returned by runtime.FuncForPC().Name() and friends.
 	Name  string
+	Entry uint64
 	File  string
 	Line  int
+	// As returned by reflect.Type.Name() etc.
+	TypeName    string
+	TypePkgPath string
+}
+
+func (c *CallerInfo) Match(re *regexp.Regexp) bool {
+	return re.MatchString(c.Name)
+}
+
+func callerInfoForPC(pc uint64) (c CallerInfo) {
+	fi := runtime.FuncForPC(uintptr(pc))
+	c.PC = pc
+	c.Entry = uint64(fi.Entry())
+	c.Name = fi.Name()
+	c.File, c.Line = fi.FileLine(uintptr(pc))
+	return
 }
 
 func (v *shared) getCallerInfo(ci uint32) (r *callerCache, c *CallerInfo) {
 	r = v.callers[ci]
 	c = &r.callerInfo
 	if c.PC == 0 {
-		pc := uintptr(r.pc)
-		fi := runtime.FuncForPC(pc)
-		c.PC = r.pc
-		c.Entry = uint64(fi.Entry())
-		c.Name = fi.Name()
-		c.File, c.Line = fi.FileLine(pc)
+		*c = callerInfoForPC(r.pc)
 	}
+	t := r.getDataType()
+	c.TypeName = t.Name()
+	c.TypePkgPath = t.PkgPath()
 	return
 }
 
