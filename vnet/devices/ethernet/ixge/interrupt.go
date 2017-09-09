@@ -66,7 +66,7 @@ var irqStrings = [...]string{
 	irq_rx_missed_packet:  "rx missed packet",
 	irq_pcie_exception:    "pcie exception",
 	irq_mailbox:           "mailbox",
-	irq_link_state_change: "link state change",
+	irq_link_state_change: "link state",
 	irq_link_security:     "link security",
 	irq_manageability:     "manageability",
 	irq_time_sync:         "time sync",
