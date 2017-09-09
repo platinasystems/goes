@@ -799,27 +799,36 @@ type regs struct {
 	}
 
 	flow_director struct {
-		/* [1:0] packet buffer allocation 0 => disabled, else 64k*2^(f-1)
-		   [3] packet buffer initialization done
-		   [4] perfetch match mode
-		   [5] report status in rss field of rx descriptors
-		   [7] report status always
-		   [14:8] drop queue
-		   [20:16] flex 2 byte packet offset (units of 2 bytes)
-		   [27:24] max linked list length
-		   [31:28] full threshold. */
+		// [1:0] packet buffer allocation 0 => disabled, else 64k*2^(f-1)
+		// [3] packet buffer initialization done
+		// [4] perfetch match mode
+		// [5] report status in rss field of rx descriptors
+		// [7] report status always
+		// [14:8] drop queue (setting queue descriptor length 0 will drop packets).
+		// [15] drop if no match
+		// [20:16] flex 2 byte packet offset (units of 2 bytes)
+		// [23:21] filter mode 0 => ip4/ip6, 1 => mac and vlan, 2 => cloud
+		// [27:24] max linked list length
+		// [31:28] full threshold.
 		control reg
 		_       [0xee0c - 0xee04]byte
 
+		// Data for filter entry:
+		//   [0:2] ip6 src[1:3]
+		//   [3] ip4 src or ip6 src word [0]
+		//   [4] ip4 dst
+		//   [5] [31:16] dst port [15:0] src port
+		//   [6] [31:16] flex, [15:0] vlan tag
+		//   [7] [14:0] hash value [15] bucket valid, [30:16] signature/index
 		data [8]reg
 
 		/* [1:0] 0 => no action, 1 => add, 2 => remove, 3 => query.
 		   [2] valid filter found by query command
-		   [3] filter update override
+		   [3] action add update (when clear for add only sets collision bit)
 		   [4] ip6 adress table
 		   [6:5] l4 protocol reserved, udp, tcp, sctp
-		   [7] is ip6
-		   [8] clear head/tail
+		   [7] is ip6 else ip4
+		   [8] clear head/tail initialization
 		   [9] packet drop action
 		   [10] matched packet generates low-latency interrupt
 		   [11] last in linked list
@@ -829,18 +838,32 @@ type regs struct {
 		   [29:24] pool. */
 		command reg
 
-		_ [0xee3c - 0xee30]byte
-		/* ip4 dst/src address, tcp ports, udp ports.
-		   set bits mean bit is ignored. */
-		ip4_masks           [4]reg
-		filter_length       reg
-		usage_stats         reg
-		failed_usage_stats  reg
-		filters_match_stats reg
-		filters_miss_stats  reg
-		_                   [0xee68 - 0xee60]byte
-		/* Lookup, signature. */
+		_ [0xee38 - 0xee30]byte
+
+		// [15:0] number of free flow director entries.
+		num_free reg
+
+		/* ip4 dst/src, tcp/udp ports (bit reversed)
+		   set bits mean bits is ignored. */
+		ip4_masks [4]reg
+
+		filter_length reg
+
+		// [15:0] number of adds clear on read
+		// [31:16] number of dels
+		usage_stats reg
+		// [7:0] adds failed clear on read
+		// [15:8] dels
+		failed_usage_stats reg
+
+		// [31:0] clear on read match/miss counts.
+		filters_n_match reg
+		filters_n_miss  reg
+		_               [0xee68 - 0xee60]byte
+
+		// Lookup, signature keys (hash seeds?)
 		hash_keys [2]reg
+
 		/* [15:0] ip6 src address 1 bit per byte
 		   [31:16] ip6 dst address. */
 		ip6_mask reg
