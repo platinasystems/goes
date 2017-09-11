@@ -244,13 +244,13 @@ func (e *myEvent) EventAction() {
 		return
 	}
 	if e.delay != 0 {
-		e.AddTimedEvent(e, e.delay)
+		e.SignalEventAfter(e, e.delay)
 	} else {
 		e.n.Vnet.SignalEvent(e)
 	}
 	e.r.e = e
 	e.r.x = x
-	e.n.Node.AddEvent(&e.r, e.n)
+	e.n.Node.SignalEvent(&e.r, e.n)
 	e.Suspend()
 }
 
