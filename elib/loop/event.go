@@ -443,6 +443,10 @@ func (l *Loop) doEvents() (quitLoop bool) {
 
 func (m *eventMain) addActive(d *Node) {
 	n := &d.e
+	if n.isActive() {
+		n.logsi(d, event_elog_add_active, n.sequence, "ignore duplicate")
+		return
+	}
 	n.activeIndex = uint(len(m.activeNodes))
 	m.activeNodes = append(m.activeNodes, d)
 	n.logi(d, event_elog_add_active, uint32(len(m.activeNodes)))
