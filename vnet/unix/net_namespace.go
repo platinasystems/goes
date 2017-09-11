@@ -459,7 +459,7 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 		if err == addNamespaceNeedRetryErr {
 			// Retry again in a bit.
 			e.add_count++
-			m.m.v.AddTimedEvent(e, 10e-3)
+			m.m.v.SignalEventAfter(e, 10e-3)
 		}
 		return
 	}
