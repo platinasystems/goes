@@ -568,9 +568,9 @@ type poller_elog_kind uint32
 func (k poller_elog_kind) String() string {
 	switch k {
 	case poller_elog_alloc:
-		return "alloc"
+		return "alloc-poller"
 	case poller_elog_free:
-		return "free"
+		return "free-poller"
 	case poller_elog_alloc_pending:
 		return "alloc-pending"
 	case poller_elog_event_wake:
