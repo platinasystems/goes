@@ -178,11 +178,11 @@ type activateEvent struct{ n *Node }
 func (e *activateEvent) EventAction()   { e.n.Activate(true) }
 func (e *activateEvent) String() string { return fmt.Sprintf("activate %s", e.n.name) }
 
-func (n *Node) ActivateAfterTime(dt float64) {
+func (n *Node) ActivateAfter(secs float64) {
 	if was := n.Activate(false); was {
 		n.e.activateEvent.n = n
 		le := n.l.getLoopEvent(&n.e.activateEvent, elog.PointerToFirstArg(&n))
-		n.l.addTimedEvent(le, dt)
+		n.l.signalEventAfter(le, secs)
 	}
 }
 
