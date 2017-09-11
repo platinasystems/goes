@@ -356,7 +356,8 @@ func (n *Node) allocActivePoller() {
 	}
 	i := p.GetIndex()
 	a := p.entries[i]
-	if a == nil {
+	create := a == nil
+	if create {
 		a = &activePoller{}
 		p.entries[i] = a
 	}
@@ -364,6 +365,9 @@ func (n *Node) allocActivePoller() {
 	n.activePollerIndex = i
 	a.pollerNode = n
 	n.poller_elog_i(poller_elog_alloc_poller, i, p.Elts())
+	if create {
+		a.initActiveNodes(n.l)
+	}
 	if poll_active {
 		a.fromLoop = make(chan inLooper, 1)
 		a.toLoop = make(chan struct{}, 1)
@@ -450,9 +454,6 @@ func (a *activePoller) dataPoll(l *Loop) {
 			}
 		}
 	}()
-	if a.activeNodes == nil {
-		a.initNodes(l)
-	}
 	for p := range a.fromLoop {
 		n := p.GetNode()
 		an := &a.activeNodes[n.index]
@@ -483,9 +484,6 @@ func (l *Loop) dataPoll(p inLooper) {
 		n.ft.waitLoop()
 		n.poller_elog(poller_elog_node_wake)
 		ap := n.getActivePoller()
-		if ap.activeNodes == nil {
-			ap.initNodes(l)
-		}
 		an := &ap.activeNodes[n.index]
 		ap.currentNode = an
 		t0 := cpu.TimeNow()
