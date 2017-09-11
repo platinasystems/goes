@@ -57,6 +57,7 @@ type nextNode struct {
 //go:generate gentemplate -d Package=loop -id nextNode -d VecType=nextNodeVec -d Type=nextNode github.com/platinasystems/go/elib/vec.tmpl
 
 func (n *Node) GetNode() *Node           { return n }
+func (n *Node) GetNoder() Noder          { return n.noder }
 func (n *Node) Index() uint              { return n.index }
 func (n *Node) Name() string             { return n.name }
 func (n *Node) ElogName() elog.StringRef { return n.elogNodeName }
@@ -101,7 +102,7 @@ type Loop struct {
 	timeDurationPerCycle   float64
 	timeLastRuntimeClear   time.Time
 
-	Cli LoopCli
+	Cli Cli
 	Config
 	eventMain
 	loggerMain
@@ -209,7 +210,7 @@ func (l *loopQuit) EventAction() {
 func (l *Loop) quitAfter() {
 	e := &loopQuit{l: l, verbose: false, duration: l.QuitAfterDuration}
 	f := l.getLoopEvent(e, elog.PointerToFirstArg(&l))
-	l.addTimedEvent(f, l.QuitAfterDuration)
+	l.signalEventAfter(f, l.QuitAfterDuration)
 }
 
 func (l *Loop) Run() {
