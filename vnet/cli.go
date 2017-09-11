@@ -66,6 +66,7 @@ func (m *cliMain) Configure(in *parse.Input) {
 
 func (m *cliMain) Init() (err error) {
 	m.v.loop.Cli.Prompt = "vnet# "
+	m.v.loop.Cli.SetEventNode(&m.v.eventMain.eventNode)
 	if m.enableStdin {
 		m.v.loop.Cli.AddStdin()
 	}
@@ -76,6 +77,7 @@ func (m *cliMain) Init() (err error) {
 			return
 		}
 	}
+	m.v.loop.Cli.Start()
 	return
 }
 
