@@ -112,6 +112,7 @@ func (a *activeNode) inType() reflect.Type {
 }
 
 func (a *activeNode) analyze(l *Loop, ap *activePoller) (err error) {
+	// Not an output node?
 	if a.looperOut == nil {
 		return
 	}
@@ -270,12 +271,9 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	if nextNoder != nil {
 		nextNode.nodeIndex = x.index
 		nextNode.in = xi.MakeLoopIn()
-		// No need for looking since we must be running in event context
+		// No need for locking since we must be running in event context
 		// and data pollers are not active.
 		for _, p := range l.activePollerPool.entries {
-			if p == nil || n.index >= uint(len(p.activeNodes)) {
-				continue
-			}
 			p.activeNodes[n.index].addNext(p, nextNode, withIndex)
 		}
 	}
@@ -307,7 +305,7 @@ func (l *Loop) graphInit() {
 	}
 }
 
-func (ap *activePoller) initNodes(l *Loop) {
+func (ap *activePoller) initActiveNodes(l *Loop) {
 	nNodes := uint(len(l.noders))
 	ap.activeNodes = make([]activeNode, nNodes)
 	for ni := range ap.activeNodes {
@@ -364,30 +362,31 @@ func (f *Out) addNext(i, next_node_index uint) {
 }
 
 // Fetch out frame for current active node.
-func (i *In) currentThread(l *Loop) *activePoller { return l.activePollerPool.entries[i.activeIndex] }
-func (i *In) currentOut(l *Loop) *Out             { return i.currentThread(l).currentNode.out }
+func (i *In) getActive(l *Loop) (a *activePoller, n *activeNode) {
+	a = l.activePollerPool.entries[i.activeIndex]
+	n = a.currentNode
+	return
+}
 
 // Set vector length for given in.
 // As vector length becomes positive, add to pending vector.
 func (i *In) SetLen(l *Loop, nVec uint) {
-	xi, a, o := uint(i.nextIndex), i.currentThread(l), i.currentOut(l)
+	a, n := i.getActive(l)
+	xi, o := uint(i.nextIndex), n.out
 	o.Len[xi] = Vi(nVec)
 	if isPending := nVec > 0; isPending && !o.isPending.SetBit(xi, isPending) {
 		a.pending = append(a.pending, pending{
 			in:            i,
 			out:           o,
-			nodeIndex:     a.currentNode.index,
+			nodeIndex:     n.index,
 			nextNodeIndex: o.nextNodes[xi],
 			nextIndex:     uint32(xi),
 		})
 	}
 }
 func (i *In) GetLen(l *Loop) (nVec uint) {
-	t := i.currentThread(l)
-	if t.currentNode == nil && i.len == 0 {
-		return
-	}
-	xi, o := uint(i.nextIndex), t.currentNode.out
+	_, n := i.getActive(l)
+	xi, o := uint(i.nextIndex), n.out
 	nVec = uint(o.Len[xi])
 	if nVec == 0 && o.isPending.GetBit(xi) {
 		nVec = MaxVectorLen
