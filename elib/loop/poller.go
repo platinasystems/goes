@@ -5,6 +5,7 @@
 package loop
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/elib/elog"
 
@@ -362,7 +363,7 @@ func (n *Node) allocActivePoller() {
 	a.index = uint16(i)
 	n.activePollerIndex = i
 	a.pollerNode = n
-	n.poller_elog_i(poller_elog_alloc, i, p.Elts())
+	n.poller_elog_i(poller_elog_alloc_poller, i, p.Elts())
 	if poll_active {
 		a.fromLoop = make(chan inLooper, 1)
 		a.toLoop = make(chan struct{}, 1)
@@ -378,7 +379,7 @@ func (n *Node) freeActivePoller() {
 	p := &n.l.activePollerPool
 	p.PutIndex(i)
 	n.activePollerIndex = ^uint(0)
-	n.poller_elog_i(poller_elog_free, i, p.Elts())
+	n.poller_elog_i(poller_elog_free_poller, i, p.Elts())
 	if poll_active {
 		// Shut down active poller.
 		close(a.fromLoop)
@@ -478,7 +479,9 @@ func (l *Loop) dataPoll(p inLooper) {
 		}
 	}()
 	for {
+		n.poller_elog(poller_elog_node_wait)
 		n.ft.waitLoop()
+		n.poller_elog(poller_elog_node_wake)
 		ap := n.getActivePoller()
 		if ap.activeNodes == nil {
 			ap.initNodes(l)
@@ -491,6 +494,7 @@ func (l *Loop) dataPoll(p inLooper) {
 		nVec := an.out.call(l, ap)
 		ap.pollerStats.update(nVec, t0)
 		l.pollerStats.update(nVec)
+		n.poller_elog(poller_elog_node_signal)
 		n.ft.signalLoop()
 	}
 }
@@ -550,8 +554,8 @@ func (l *Loop) doPollers() {
 }
 
 const (
-	poller_elog_alloc = iota
-	poller_elog_free
+	poller_elog_alloc_poller = iota
+	poller_elog_free_poller
 	poller_elog_alloc_pending
 	poller_elog_event_wake
 	poller_elog_poll
@@ -561,37 +565,31 @@ const (
 	poller_elog_data_activity
 	poller_elog_suspend_activity
 	poller_elog_adjust_suspend_activity
+	poller_elog_node_wait
+	poller_elog_node_wake
+	poller_elog_node_signal
 )
 
 type poller_elog_kind uint32
 
 func (k poller_elog_kind) String() string {
-	switch k {
-	case poller_elog_alloc:
-		return "alloc-poller"
-	case poller_elog_free:
-		return "free-poller"
-	case poller_elog_alloc_pending:
-		return "alloc-pending"
-	case poller_elog_event_wake:
-		return "event-wake"
-	case poller_elog_poll:
-		return "poll"
-	case poller_elog_poll_done:
-		return "done"
-	case poller_elog_suspended:
-		return "suspended"
-	case poller_elog_resumed:
-		return "resumed"
-	case poller_elog_data_activity:
-		return "add-data"
-	case poller_elog_suspend_activity:
-		return "add-suspend"
-	case poller_elog_adjust_suspend_activity:
-		return "adjust-suspend"
-	default:
-		return fmt.Sprintf("unknown %d", int(k))
+	t := [...]string{
+		poller_elog_alloc_poller:            "alloc-poller",
+		poller_elog_free_poller:             "free-poller",
+		poller_elog_alloc_pending:           "alloc-pending",
+		poller_elog_event_wake:              "event-wake",
+		poller_elog_poll:                    "wake-node",
+		poller_elog_poll_done:               "done",
+		poller_elog_suspended:               "suspended",
+		poller_elog_resumed:                 "resumed",
+		poller_elog_data_activity:           "add-data",
+		poller_elog_suspend_activity:        "add-suspend",
+		poller_elog_adjust_suspend_activity: "adjust-suspend",
+		poller_elog_node_wait:               "node-wait",
+		poller_elog_node_wake:               "node-awake",
+		poller_elog_node_signal:             "node-signal",
 	}
+	return elib.StringerHex(t[:], int(k))
 }
 
 type poller_elog struct {
@@ -631,9 +629,9 @@ func (n *Node) poller_elog(kind poller_elog_kind) {
 
 func (e *poller_elog) Elog(l *elog.Log) {
 	switch e.kind {
-	case poller_elog_alloc, poller_elog_free:
+	case poller_elog_alloc_poller, poller_elog_free_poller:
 		l.Logf("loop %s %v %d/%d", e.kind, e.name, e.a, e.da)
-	case poller_elog_data_activity, poller_elog_suspend_activity:
+	case poller_elog_data_activity, poller_elog_suspend_activity, poller_elog_adjust_suspend_activity:
 		l.Logf("loop %s %v %+d %d %d", e.kind, e.name, e.da, e.a, e.b)
 	default:
 		l.Logf("loop %s %v", e.kind, e.name)
