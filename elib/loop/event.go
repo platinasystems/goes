@@ -227,6 +227,11 @@ func (x *Event) Suspend() {
 	n.eventStats.current.clocks -= uint64(dt)
 	n.log(d, event_elog_resumed)
 }
+func (x *Event) IsSuspended() bool {
+	d := x.e.d
+	n := &d.e
+	return n.s.isSuspended()
+}
 
 func (x *Event) Resume() (ok bool) {
 	d := x.e.d
