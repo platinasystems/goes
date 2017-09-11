@@ -35,12 +35,12 @@ type eventMain struct {
 	events        chan *nodeEvent
 
 	// Timed events.
-	timer         *time.Timer
-	timerCpuTime  cpu.Time
-	timerDuration time.Duration
-	eventPoolLock sync.Mutex
-	eventPool     event.Pool
-	eventVec      event.ActorVec
+	timer              *time.Timer
+	timerCpuTime       cpu.Time
+	timerDuration      time.Duration
+	timedEventPoolLock sync.Mutex
+	timedEventPool     event.Pool
+	timedEventVec      event.ActorVec
 }
 
 type eventNode struct {
@@ -86,42 +86,46 @@ type nodeEvent struct {
 
 func (e *nodeEvent) EventTime() cpu.Time { return e.time }
 
-func (l *Loop) addEvent(le *nodeEvent) {
+func (l *Loop) signalEvent(le *nodeEvent) {
 	select {
 	case l.events <- le:
 	default:
-		l.addTimedEvent(le, 0)
+		l.signalEventAfter(le, 0)
 	}
 }
 
-func (l *Loop) addTimedEvent(le *nodeEvent, dt float64) {
-	le.time = cpu.TimeNow() + cpu.Time(dt*l.cyclesPerSec)
-	l.eventPoolLock.Lock()
-	defer l.eventPoolLock.Unlock()
-	l.eventPool.Add(le)
-}
-
-// AddEvent adds event whose action will be called on the next loop iteration.
-func (n *Node) AddEventp(a event.Actor, dst Noder, p elog.PointerToFirstArg) {
+// SignalEvent adds event whose action will be called on the next loop iteration.
+func (n *Node) SignalEventp(a event.Actor, dst Noder, p elog.PointerToFirstArg) {
 	e := n.l.getLoopEvent(a, p)
 	e.d = dst.GetNode()
 	e.d.maybeStartEventHandler()
-	n.l.addEvent(e)
+	n.l.signalEvent(e)
 }
 
-// AddEvent adds event whose action will be called on the next loop iteration.
-func (n *Node) AddEvent(e event.Actor, dst Noder) {
-	n.AddEventp(e, dst, elog.PointerToFirstArg(&n))
+// SignalEvent adds event whose action will be called on the next loop iteration.
+func (n *Node) SignalEvent(e event.Actor, dst Noder) {
+	n.SignalEventp(e, dst, elog.PointerToFirstArg(&n))
 }
 
-func (n *Node) AddTimedEventp(a event.Actor, dst Noder, dt float64, p elog.PointerToFirstArg) {
+func (l *Loop) signalEventAfter(le *nodeEvent, secs float64) {
+	// For first signal use current time; for re-signals use time after last signal.
+	if le.time == 0 {
+		le.time = cpu.TimeNow()
+	}
+	le.time += cpu.Time(secs * l.cyclesPerSec)
+	l.timedEventPoolLock.Lock()
+	defer l.timedEventPoolLock.Unlock()
+	l.timedEventPool.Add(le)
+}
+
+func (n *Node) SignalEventAfterp(a event.Actor, dst Noder, dt float64, p elog.PointerToFirstArg) {
 	e := n.l.getLoopEvent(a, p)
 	e.d = dst.GetNode()
 	e.d.maybeStartEventHandler()
-	n.l.addTimedEvent(e, dt)
+	n.l.signalEventAfter(e, dt)
 }
-func (n *Node) AddTimedEvent(e event.Actor, dst Noder, dt float64) {
-	n.AddTimedEventp(e, dst, dt, elog.PointerToFirstArg(&n))
+func (n *Node) SignalEventAfter(e event.Actor, dst Noder, secs float64) {
+	n.SignalEventAfterp(e, dst, secs, elog.PointerToFirstArg(&n))
 }
 
 func (e *nodeEvent) logActor() {
@@ -223,19 +227,21 @@ func (x *Event) Suspend() {
 	n.eventStats.current.clocks -= uint64(dt)
 	n.log(d, event_elog_resumed)
 }
+
 func (x *Event) Resume() (ok bool) {
 	d := x.e.d
 	n := &d.e
 
 	// Don't do it twice.
 	if ok, _, _ = n.s.setResume(); !ok {
-		n.logsi(d, event_elog_queue_resume, ^uint32(0), "ignore duplicate resume")
+		n.logsi(d, event_elog_queue_resume, n.sequence, "ignore duplicate resume")
 		return
 	}
 	n.log(d, event_elog_queue_resume)
 	d.l.events <- x.e
 	return
 }
+
 func (x *nodeEvent) resume() {
 	d, n := x.d, &x.d.e
 	n.log(d, event_elog_resume_wake)
@@ -281,6 +287,12 @@ func (l *eventMain) RegisterEventPoller(p EventPoller) { l.eventPollers = append
 func (e *nodeEvent) EventAction() {
 	d := e.d
 	n := &d.e
+
+	// Set signal time for timed events.
+	if e.time != 0 {
+		e.time = d.l.now
+	}
+
 	if elog.Enabled() {
 		n.logsi(d, event_elog_queue, n.queue_sequence, e.actor.String())
 		n.queue_sequence++
@@ -349,7 +361,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		// This can and does return false if an active poller comes along racing with our call.
 		if _, didWait = l.activePollerState.setEventWait(); didWait {
 			// Find next event's time (!ok means there is no available event).
-			t, avail := l.eventPool.NextTime()
+			t, avail := l.timedEventPool.NextTime()
 
 			// Compute duration until next event.
 			var dt time.Duration
@@ -379,20 +391,23 @@ func (l *Loop) doEvents() (quitLoop bool) {
 	}
 
 	// Handle expired timed events.
-	if l.eventPool.Elts() != 0 {
+	tp := &l.timedEventPool
+	if tp.Elts() != 0 {
 		l.now = cpu.TimeNow()
-		l.eventPoolLock.Lock()
-		l.eventPool.AdvanceAdd(l.now, &l.eventVec)
-		l.eventPoolLock.Unlock()
-		if len(l.eventVec) > 0 {
+		l.timedEventPoolLock.Lock()
+		ev := l.timedEventVec
+		tp.AdvanceAdd(l.now, &ev)
+		l.timedEventPoolLock.Unlock()
+		if len(ev) > 0 {
 			if elog.Enabled() {
 				elog.F2u("loop event timer %d expired, %d queued",
-					uint64(len(l.eventVec)), uint64(l.eventPool.Elts()))
+					uint64(len(ev)), uint64(tp.Elts()))
 			}
-			for i := range l.eventVec {
-				l.eventVec[i].EventAction()
+			for i := range ev {
+				ev[i].EventAction()
 			}
-			l.eventVec = l.eventVec[:0]
+			// Save away for next use.
+			l.timedEventVec = ev[:0]
 		}
 	}
 
@@ -554,13 +569,13 @@ func (e *quitEvent) Error() string  { return e.String() }
 func (e *quitEvent) EventAction()   {}
 func (l *Loop) Quit() {
 	e := l.getLoopEvent(ErrQuit, elog.PointerToFirstArg(&l))
-	l.addEvent(e)
+	l.signalEvent(e)
 }
 
 // Add an event to wakeup event sleep.
 func (l *Loop) Interrupt() {
 	e := l.getLoopEvent(ErrInterrupt, elog.PointerToFirstArg(&l))
-	l.addEvent(e)
+	l.signalEvent(e)
 }
 
 func (l *Loop) showRuntimeEvents(w cli.Writer) (err error) {
