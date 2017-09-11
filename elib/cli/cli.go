@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/elib/parse"
 
@@ -228,6 +229,9 @@ func (m *Main) ExecInput(w io.Writer, in *Input) (err error) {
 	// Potentially skip leading and trailing {} in input line.
 	var line Input
 	in.Parse("%l", &line.Input)
+	if elog.Enabled() {
+		elog.F("cli %s %s", c.CliName(), &line)
+	}
 	err = c.CliAction(w, &line)
 	return
 }
