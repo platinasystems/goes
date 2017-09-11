@@ -20,38 +20,43 @@ import (
 	"time"
 )
 
-type LoopCli struct {
-	Node
+type Cli struct {
+	r Noder
+	n *Node
 	cli.Main
 }
 
 func (l *Loop) CliAdd(c *cli.Command) { l.Cli.AddCommand(c) }
+func (c *Cli) SetEventNode(r Noder) {
+	c.r = r
+	c.n = r.GetNode()
+}
 
 type fileEvent struct {
-	c *LoopCli
+	c *Cli
 	*cli.File
 }
 
-func (c *LoopCli) rxReady(f *cli.File) {
-	c.AddEvent(&fileEvent{c: c, File: f}, c)
+func (c *Cli) rxReady(f *cli.File) {
+	c.n.SignalEvent(&fileEvent{c: c, File: f}, c.r)
 }
 
 func (c *fileEvent) EventAction() {
 	if err := c.RxReady(); err == cli.ErrQuit {
-		c.c.AddEvent(ErrQuit, c.c)
+		c.c.n.SignalEvent(ErrQuit, c.c.r)
 	}
 }
 
 func (c *fileEvent) String() string { return "rx-ready " + c.File.String() }
 
-func (c *LoopCli) LoopInit(l *Loop) {
+func (c *Cli) LoopInit(l *Loop) {
 	if len(c.Main.Prompt) == 0 {
 		c.Main.Prompt = "cli# "
 	}
 	c.Main.Start()
 }
 
-func (c *LoopCli) LoopExit(l *Loop) {
+func (c *Cli) LoopExit(l *Loop) {
 	c.Main.End()
 }
 
@@ -317,7 +322,6 @@ func (l *Loop) cliInit() {
 	l.RegisterEventPoller(iomux.Default)
 	c := &l.Cli
 	c.Main.RxReady = c.rxReady
-	l.RegisterNode(c, "cli")
 	c.AddCommand(&cli.Command{
 		Name:      "show runtime",
 		ShortHelp: "show main loop runtime statistics",
