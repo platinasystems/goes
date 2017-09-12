@@ -1,0 +1,127 @@
+# The tags below are ADDED to the imported (included) tasks.
+
+
+- include: required_pkgs.yml
+  tags:
+    - regression_test
+    - setup_workspace
+
+- include: check_vars.yml
+  tags:
+    - regression_test
+
+# Issue #23: vnet dies immediately when dummy0 has an ip address set (start goes after configuring dummy0).
+- include: delete_dummy0_interface.yml
+  tags:
+    - temporarily_disabled_regression_test
+    - delete_dummy0
+    - add_dummy0
+- include: add_dummy0_interface.yml
+  tags:
+    - temporarily_disabled_regression_test
+    - add_dummy0
+
+- include: apt_get_update.yml
+  tags:
+    - regression_test
+    - install_quagga
+- include: install_quagga.yml
+  tags:
+    - regression_test
+    - install_quagga
+
+- include: setup_workspace.yml
+  tags:
+    - regression_test
+    - setup_workspace
+- include: go_get_gobgp.yml
+  # This takes many minutes.
+  tags:
+    - setup_workspace
+
+############################################################################
+# Install and start goes.
+############################################################################
+- include: upload_goes_start.yml
+  tags:
+    - regression_test
+- include: install_latest_goes.yml
+  tags:
+    - regression_test
+    - install_goes
+
+- include: start_goes.yml
+  tags:
+    - regression_test
+    - start_goes
+
+############################################################################
+# Config vnet interfaces, ping test.
+############################################################################
+- include: hset_autoneg.yml
+  tags:
+    - regression_test
+    - config_autoneg
+- include: delete_ip_addresses.yml
+  tags:
+    - regression_test
+    - config_addresses
+- include: config_ip_addresses.yml
+  tags:
+    - regression_test
+    - config_addresses
+- include: ping_neighbors.yml
+  tags:
+    - regression_test
+    - ping
+
+############################################################################
+# Start gobgp
+############################################################################
+- include: gobgp.yml
+  tags:
+    - regression_test
+    - start_gobgp
+
+# Issue #26: deleting dummy ifc causes panic.
+- include: delete_dummy0_interface.yml
+  tags:
+    - temporarily_disabled_regression_test
+    - toggle_dummy0
+- include: add_dummy0_interface.yml
+  tags:
+    - temporarily_disabled_regression_test
+    - toggle_dummy0
+- include: delete_dummy0_interface.yml
+  tags:
+    - temporarily_disabled_regression_test
+    - toggle_dummy0
+- include: add_dummy0_interface.yml
+  tags:
+    - temporarily_disabled_regression_test
+    - toggle_dummy0
+
+- include: pipe_show_cmd_to_head.yml
+  tags:
+    - regression_test
+    - pipe_to_head
+
+# Final check
+- include: vnet_is_alive.yml
+  tags:
+    - regression_test
+
+#######################################################
+# Endurance tests
+
+- include: run_torture_script.yml
+  tags:
+    - temporarily_disabled_endurance_test
+
+#######################################################
+# Archived tests
+
+- include: do_autoneg_dance.yml
+  tags:
+    - archived
+

@@ -1,0 +1,15 @@
+# Check that required vars are set.
+
+- name: checking that req'd vars are set
+  fail:
+    # Custom msg doesn't actually get printed, but var checking still works.
+    msg: "custom msg"
+  failed_when: not {{ item }}
+  with_items:
+    # Var names go here.
+    - ntp_server
+
+- name: tagged foo task
+  tags:
+    - foo
+  command: /bin/true

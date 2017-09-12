@@ -1,0 +1,86 @@
+---
+- name: install quagga pkg
+  apt: name=quagga state=present
+
+- name: add ip forwarding to sysctl.conf
+  lineinfile:
+    dest=/etc/sysctl.conf
+    line="net.ipv4.conf.all.forwarding=1"
+    state=present
+    insertafter=EOF
+- name: add ip forwarding #2 to sysctl.conf
+  lineinfile:
+    dest=/etc/sysctl.conf
+    line="net.ipv4.conf.default.forwarding=1"
+    state=present
+    insertafter=EOF
+
+- name: load sysctl.conf
+  shell: sysctl -p
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+- name: copy canned quagga config files to /etc
+  shell: cp /usr/share/doc/quagga/examples/*.sample /etc/quagga/
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+- name: rename zebra.conf.sample
+  shell: mv /etc/quagga/zebra.conf.sample /etc/quagga/zebra.conf
+- name: rename vtysh.conf.sample
+  shell: mv /etc/quagga/vtysh.conf.sample /etc/quagga/vtysh.conf
+
+- name: enable zebrad in /etc/quagga/daemons
+  # Yaml requires escaping backslashes in double quotes but not in single quotes.
+  # ">" helps yaml expand this into 1 line and avoid syntax error.
+  lineinfile: >
+    dest=/etc/quagga/daemons
+    regexp='^zebra='
+    line="zebra=yes"
+
+- name: set quagga .conf files owner
+  file:
+    dest: /etc/quagga/daemons
+    owner: quagga
+    group: quagga
+    mode: 0644
+- name: set quagga .conf files owner
+  file:
+    dest: /etc/quagga/zebra.conf
+    owner: quagga
+    group: quagga
+    mode: 0644
+- name: set quagga .conf files owner
+  file:
+    dest: /etc/quagga/vtysh.conf
+    owner: quagga
+    group: quagga
+    mode: 0644
+
+# There's a bug where quagga won't start unless you stop it first, even though it's not running.
+- name: start quagga, pre-command
+  shell: service quagga stop
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+- name: start quagga
+  service:
+    name: quagga
+    state: started
+
+- name: check quagga daemon
+  shell: netstat -pln | grep quagga
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+- assert:
+    that:
+      - cmd_output.stdout | search("LISTENING.*zserv.api")
+
+

@@ -1,0 +1,14 @@
+- include_vars: "{{ item }}"
+  with_first_found:
+    # No need to specify path if varfiles are in /roles/x/vars/
+    - "{{ ansible_hostname }}.yml"
+    - default.yml
+- name: hset autoneg
+  # No need to specify path if script is in roles/x/files/
+  script: hset_autoneg.sh {{ item }}
+  register: cmd_output
+  with_items: "{{ interfaces_to_autoneg }}"
+- debug:
+    var: cmd_output
+    verbosity: 2
+

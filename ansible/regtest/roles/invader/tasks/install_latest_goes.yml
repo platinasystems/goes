@@ -1,0 +1,19 @@
+---
+- name: upload goes binary
+  copy:
+    src: /home/jenkins/workspace/go/src/github.com/platinasystems/go/goes-platina-mk1
+    dest: /root/
+    owner: root
+    group: root
+    mode: 0755
+- name: install goes
+  shell: /root/goes-platina-mk1 install
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+- name: wait for goes to start fully
+  shell: sleep 10
+
+- include: vnet_is_alive.yml

@@ -1,0 +1,9 @@
+#!/usr/bin/goes
+
+hset -q platina vnet.eth-29-0.media copper
+hset -q platina vnet.eth-29-0.speed auto
+hset -q platina vnet.eth-30-0.media copper
+hset -q platina vnet.eth-30-0.speed auto
+hset -q platina vnet.eth-31-0.media copper
+hset -q platina vnet.eth-31-0.speed auto
+

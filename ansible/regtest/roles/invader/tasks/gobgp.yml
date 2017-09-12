@@ -1,0 +1,71 @@
+---
+# Load var file <hostname>.yml
+# If it doesn't exist, load var file default.yml
+- include_vars: "{{ item }}"
+  with_first_found:
+    # No need to specify path if varfiles are in /roles/x/vars/
+    - "{{ ansible_hostname }}.yml"
+    - default.yml
+
+- name: upload .conf
+  copy:
+    src: "{{ ansible_hostname }}/gobgp.conf"
+    dest: /etc/gobgp/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: upload .service
+  copy:
+    src: gobgpd.service
+    dest: /etc/systemd/system/
+    owner: root
+    group: root
+    mode: 0644
+
+- name: systemctl
+  shell: systemctl daemon-reload
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+# Start with a clean slate.
+- name: kill gobgpd
+  # 'killall' did not kill gobgpd when it was wedged but 'systemctl stop' did kill it.
+  # This was on i17. i16 didn't see this problem.
+  #ignore_errors: yes
+  #shell: killall gobgpd
+  shell: systemctl stop gobgpd
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+# Sometimes gobgpd is wedged and 'killall' didn't work, so check it.
+- include: gobgpd_should_not_be_running.yml
+
+# /etc/systemd/system/gobgpd.service
+- name: start gobgpd
+  shell: systemctl start gobgpd
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+- name: wait
+  shell: sleep 30
+
+- name: show bgp
+  shell: /usr/local/bin/gobgp neigh
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+- assert:
+    that:
+      #- cmd_output.stdout | search("10.0.2.14 .*Establ")
+      - cmd_output.stdout | search("{{ item }} .*Establ")
+  with_items: "{{ bgp_neighbor_addresses }}"
+
+

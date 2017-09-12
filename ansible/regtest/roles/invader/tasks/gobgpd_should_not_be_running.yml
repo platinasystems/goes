@@ -1,0 +1,9 @@
+- name: check gobgpd is not running
+  shell: ps auxw | grep gobgpd
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+- assert:
+    that:
+      - "'gobgpd -f' not in cmd_output.stdout"

@@ -1,0 +1,12 @@
+---
+- name: start goes
+  shell: /usr/bin/goes restart
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+- name: wait for goes to start
+  shell: sleep 10
+
+- include: vnet_is_alive.yml

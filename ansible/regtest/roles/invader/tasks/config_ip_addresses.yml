@@ -1,0 +1,18 @@
+# Load var file <hostname>.yml
+# If it doesn't exist, load var file default.yml
+- include_vars: "{{ item }}"
+  with_first_found:
+    # No need to specify path if varfiles are in /roles/x/vars/
+    - "{{ ansible_hostname }}.yml"
+    - default.yml
+- name: config ip addresses
+  # No need to specify path if script is in roles/x/files/
+  script: config_ip_address.sh {{ item.0.interface }} {{ item.1.address_with_mask }}
+  register: cmd_output
+  with_subelements:
+    - "{{ interface_ip_addresses }}"
+    - addresses
+- debug:
+    var: cmd_output
+    verbosity: 2
+

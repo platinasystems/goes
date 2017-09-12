@@ -1,0 +1,8 @@
+---
+# Note: Try to put all group vars into this 'all' file because
+#   it is easier to find a var when a single file is involved.
+#   Vars scattered in dozens of files are NOT manageable.
+
+ntp_server: acme.example.org
+database_server: storage.example.org
+

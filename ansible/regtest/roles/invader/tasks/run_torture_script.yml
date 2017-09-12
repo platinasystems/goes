@@ -1,0 +1,6 @@
+- name: run torture script
+  script: "{{ ansible_hostname }}/torture.sh 2"
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2

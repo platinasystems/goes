@@ -1,0 +1,18 @@
+---
+# Load var file <hostname>.yml
+# If it doesn't exist, load var file default.yml
+- include_vars: "{{ item }}"
+  with_first_found:
+    # No need to specify path if varfiles are in /roles/x/vars/
+    - "{{ ansible_hostname }}.yml"
+    - default.yml
+- name: ping neighbor address
+  # If 100% packet loss, ping's return code is 1,
+  # so we don't have to assert in this playbook.
+  shell: ping -c3 {{ item }}
+  register: cmd_output
+  with_items: "{{ neighbors_addresses_to_ping }}"
+- debug:
+    var: cmd_output
+    verbosity: 2
+

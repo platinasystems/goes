@@ -1,0 +1,15 @@
+[Unit]
+Description=gobgpd
+After=network.target syslog.target
+
+[Service]
+Type=simple
+PermissionsStartOnly=yes
+User=quagga
+ExecStartPre=/sbin/setcap 'cap_net_bind_service=+ep' /usr/local/bin/gobgpd
+ExecStart=/usr/local/bin/gobgpd -f /etc/gobgp/gobgp.conf -- cpus=2
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+
+[Install]
+WantedBy=multi-user.target
