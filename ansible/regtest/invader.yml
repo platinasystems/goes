@@ -1,0 +1,19 @@
+#!/usr/bin/env ansible-playbook
+
+---
+# Invader Functional Test
+# Written in ansible v2.2
+
+# Run executable playbook:
+#   $ ./<this_file> -l i8 -e ansible_become_pass=myPass -vv
+# View tasks that will run filtered by tags:
+#   $ ./<this_file> -l i8 -e ansible_become_pass=myPass -vv --tags=move_interfaces --list-tasks
+# Run tasks filtered by tags:
+#   $ ./<this_file> -l i8 -e ansible_become_pass=myPass -vv --tags=move_interfaces
+
+- hosts: tors
+  remote_user: platina
+  #sudo: yes  (deprecated, use 'become')
+  become: yes
+  roles:
+    - invader

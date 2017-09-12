@@ -110,6 +110,7 @@
 - include: vnet_is_alive.yml
   tags:
     - regression_test
+    - check_vnet
 
 #######################################################
 # Endurance tests
