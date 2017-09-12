@@ -504,6 +504,10 @@ type In struct {
 	pollerNodeIndex uint32
 }
 
+func (i *In) String() string {
+	return fmt.Sprintf("in len %d, active %d, next %d", i.len, i.activeIndex, i.nextIndex)
+}
+
 func (i *In) GetIn() *In          { return i }
 func (i *In) InLen() uint         { return uint(i.len) }
 func (i *In) Range() (uint, uint) { return 0, i.InLen() }
