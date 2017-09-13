@@ -646,11 +646,16 @@ func Resize(n uint)             { DefaultBuffer.Resize(n) }
 func Configure(in *parse.Input) (err error) {
 	var save string
 	for !in.End() {
-		var s string
+		var (
+			s string
+			i uint
+		)
 		switch {
 		case in.Parse("f%*ilter %v", &s):
 			AddDelEventFilter(s, false)
 		case in.Parse("panic-save %v", &save):
+		case in.Parse("s%*ize %d", &i):
+			Resize(i)
 		default:
 			in.ParseError()
 		}
