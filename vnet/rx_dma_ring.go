@@ -4,6 +4,10 @@
 
 package vnet
 
+import (
+	"sync/atomic"
+)
+
 type RxDmaRing struct {
 	r        RxDmaRinger
 	v        *Vnet
@@ -266,4 +270,54 @@ func (g *RxDmaRing) Flush() {
 		g.n_next = 0
 	}
 	g.flush_interface_counters()
+}
+
+// Atomic register shadow helpers.
+
+type Reg32 uint32
+type Reg64 uint64
+
+// Atomically set 32-bit register shadow.  Typically done in interrupt routine.
+func (s *Reg32) Or(v uint32) (new uint32) {
+	for {
+		old := atomic.LoadUint32((*uint32)(s))
+		new = old | v
+		if atomic.CompareAndSwapUint32((*uint32)(s), old, new) {
+			break
+		}
+	}
+	return
+}
+
+// Atomically read and clear 32-bit status.
+func (s *Reg32) ReadClear() (v uint32) {
+	for {
+		v = atomic.LoadUint32((*uint32)(s))
+		if atomic.CompareAndSwapUint32((*uint32)(s), v, 0) {
+			break
+		}
+	}
+	return
+}
+
+// Atomically set 64-bit status.  Typically done in interrupt routine.
+func (s *Reg64) Or(v uint64) {
+	for {
+		old := atomic.LoadUint64((*uint64)(s))
+		new := old | v
+		if atomic.CompareAndSwapUint64((*uint64)(s), old, new) {
+			break
+		}
+	}
+}
+
+// Atomically read and clear 64-bit status.
+func (s *Reg64) ReadClear() (v uint64) {
+	for {
+		v = atomic.LoadUint64((*uint64)(s))
+		if atomic.CompareAndSwapUint64((*uint64)(s), v, 0) {
+			break
+		}
+	}
+	return
 }
