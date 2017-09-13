@@ -26,3 +26,9 @@ type Platform struct {
 	Init                func()
 	PlatformConfig
 }
+
+// Inject ports for fe1: allow both cpu (pcie) & 10g ixge ports for injects.
+const (
+	SingleTaggedInjectNextCpu = iota
+	SingleTaggedInjectNextFirstIxge
+)
