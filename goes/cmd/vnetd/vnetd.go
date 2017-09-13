@@ -314,7 +314,7 @@ func (p *ifStatsPoller) publish(name, counter string, value uint64) {
 	n := strings.Replace(counter, " ", "_", -1)
 	p.i.publish(name+"."+n, value)
 }
-func (p *ifStatsPoller) addEvent(dt float64) { p.i.v.AddTimedEvent(p, dt) }
+func (p *ifStatsPoller) addEvent(dt float64) { p.i.v.SignalEventAfter(p, dt) }
 func (p *ifStatsPoller) String() string {
 	return fmt.Sprintf("redis stats poller sequence %d", p.sequence)
 }
