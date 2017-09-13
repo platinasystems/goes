@@ -39,7 +39,7 @@ type dev struct {
 	elog_name   elog.StringRef
 
 	interruptsEnabled bool
-	irq_status        uint32
+	irq_status        vnet.Reg32
 	is_active         uint
 
 	have_tph bool

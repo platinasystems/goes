@@ -243,7 +243,11 @@ func (q *tx_dma_queue) output(in *vnet.TxRefVecIn) {
 	// No room?
 	if n_free < nr {
 		// Should never happen since MaxOutstandingTxRefs should be enforced.
-		panic(fmt.Errorf("%s: tx ring full", d.Name()))
+		count := tail - head
+		if int32(count) < 0 {
+			count += q.len
+		}
+		panic(fmt.Errorf("%s: tx ring full send %d head %d tail %d count %d", d.Name(), nr, head, tail, count))
 	}
 
 	ds, rs := q.tx_desc, in.Refs
