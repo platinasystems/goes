@@ -291,6 +291,10 @@ func (l *eventMain) RegisterEventPoller(p EventPoller) { l.eventPollers = append
 
 func (e *nodeEvent) EventAction() {
 	d := e.d
+	if d == nil { // this can happen with timed activateEvent.
+		e.actor.EventAction()
+		return
+	}
 	n := &d.e
 
 	// Set signal time for timed events.
