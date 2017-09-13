@@ -32,12 +32,12 @@ type myInterface struct {
 type myNode struct {
 	intfs []myInterface
 	vnet.Package
-	loop.Node
 	isUnix                bool
 	verbose_output        bool
 	interface_name_format string
 	interface_count       uint
 	inject_node           inject_node
+	eventNodes            [2]loop.Node
 }
 
 var (
@@ -121,8 +121,15 @@ func (n *myNode) Init() (err error) {
 	}
 	// Enable for event suspend/resume test.
 	if false {
-		v.GetLoop().RegisterNode(n, "resumer")
-		v.SignalEvent(&myEvent{n: n, delay: 0, limit: 1000})
+		ns, nr := &n.eventNodes[0], &n.eventNodes[1]
+		v.GetLoop().RegisterNode(ns, "signaler")
+		v.GetLoop().RegisterNode(nr, "resumer")
+		ns.SignalEvent(&myEvent{
+			ns:    ns,
+			nr:    nr,
+			delay: 0,
+			limit: 1 << 30,
+		}, ns)
 	}
 	return
 }
@@ -222,8 +229,9 @@ func main() {
 }
 
 type myEvent struct {
-	vnet.Event
-	n        *myNode
+	loop.Event
+	ns       *loop.Node
+	nr       *loop.Node
 	x, limit int
 	delay    float64
 	r        resumer
@@ -234,8 +242,10 @@ type resumer struct {
 	e *myEvent
 }
 
-func (r *resumer) EventAction()   { r.e.Resume() }
-func (r *resumer) String() string { return fmt.Sprintf("my-event-resumer %d", r.x) }
+func (r *resumer) EventAction()          { r.e.Resume() }
+func (r *resumer) String() string        { return fmt.Sprintf("my-event-resumer %d", r.x) }
+func (r *resumer) ElogData() elog.Logger { return r }
+func (r *resumer) Elog(l *elog.Log)      { l.Logf("my-event-resumer %d", r.x) }
 
 func (e *myEvent) EventAction() {
 	x := e.x
@@ -244,14 +254,16 @@ func (e *myEvent) EventAction() {
 		return
 	}
 	if e.delay != 0 {
-		e.SignalEventAfter(e, e.delay)
+		e.ns.SignalEventAfter(e, e.ns, e.delay)
 	} else {
-		e.n.Vnet.SignalEvent(e)
+		e.ns.SignalEvent(e, e.ns)
 	}
 	e.r.e = e
 	e.r.x = x
-	e.n.Node.SignalEvent(&e.r, e.n)
+	e.nr.SignalEvent(&e.r, e.nr)
 	e.Suspend()
 }
 
-func (e *myEvent) String() string { return fmt.Sprintf("my-event %d", e.x) }
+func (e *myEvent) String() string        { return fmt.Sprintf("my-event %d", e.x) }
+func (e *myEvent) ElogData() elog.Logger { return e }
+func (e *myEvent) Elog(l *elog.Log)      { l.Logf("my-event %d", e.x) }
