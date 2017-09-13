@@ -15,7 +15,8 @@ type PlatformConfig struct {
 	// Reset switch via cpu soft reset.
 	EnableCpuSwitchReset bool
 	// Enable using PCI MSI interrupt for fe1 switch.
-	EnableMsiInterrupt bool
+	EnableMsiInterrupt     bool
+	UseCpuForPuntAndInject bool
 }
 
 // Platform configuration for FE1 based systems.
