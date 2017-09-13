@@ -16,20 +16,6 @@ import (
 	"time"
 )
 
-type fromToNode struct {
-	toNode, fromNode chan struct{}
-}
-
-func (x *fromToNode) init() {
-	x.fromNode = make(chan struct{}, 1)
-	x.toNode = make(chan struct{}, 1)
-}
-
-func (x *fromToNode) signalNode() { x.toNode <- struct{}{} }
-func (x *fromToNode) waitNode()   { <-x.fromNode }
-func (x *fromToNode) signalLoop() { x.fromNode <- struct{}{} }
-func (x *fromToNode) waitLoop()   { <-x.toNode }
-
 type Node struct {
 	l                       *Loop
 	name                    string
@@ -80,8 +66,8 @@ type Exiter interface {
 
 type Loop struct {
 	noders      []Noder
-	noderByName map[string]Noder
 	nodes       []*Node
+	noderByName map[string]Noder
 
 	loopIniters []Initer
 	loopExiters []Exiter
@@ -109,6 +95,8 @@ type Loop struct {
 	nodeStateMain
 }
 
+func (l *Loop) GetNode(i uint) *Node       { return l.nodes[i] }
+func (l *Loop) GetNoder(i uint) Noder      { return l.noders[i] }
 func (l *Loop) Seconds(t cpu.Time) float64 { return float64(t) * l.secsPerCycle }
 
 func (l *Loop) startDataPoller(r inLooper) {
@@ -209,7 +197,7 @@ func (l *loopQuit) EventAction() {
 
 func (l *Loop) quitAfter() {
 	e := &loopQuit{l: l, verbose: false, duration: l.QuitAfterDuration}
-	f := l.getLoopEvent(e, elog.PointerToFirstArg(&l))
+	f := l.getLoopEvent(e, nil, elog.PointerToFirstArg(&l))
 	l.signalEventAfter(f, l.QuitAfterDuration)
 }
 

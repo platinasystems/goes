@@ -63,15 +63,16 @@ type eventNode struct {
 	activateEvent
 }
 
-func (l *eventMain) getLoopEvent(a event.Actor, p elog.PointerToFirstArg) (x *nodeEvent) {
-	if y := l.nodeEventPool.Get(); y != nil {
-		x = y.(*nodeEvent)
-		*x = nodeEvent{actor: a}
-	} else {
-		x = &nodeEvent{actor: a}
+func (l *eventMain) getLoopEvent(a event.Actor, dst Noder, p elog.PointerToFirstArg) (e *nodeEvent) {
+	e = l.nodeEventPool.Get().(*nodeEvent)
+	e.d = nil
+	e.actor = a
+	e.l = l.l
+	e.caller = elog.GetCaller(p)
+	if dst != nil {
+		e.d = dst.GetNode()
+		e.d.maybeStartEventHandler()
 	}
-	x.l = l.l
-	x.caller = elog.GetCaller(p)
 	return
 }
 func (l *eventMain) putLoopEvent(x *nodeEvent) { l.nodeEventPool.Put(x) }
@@ -96,9 +97,7 @@ func (l *Loop) signalEvent(le *nodeEvent) {
 
 // SignalEvent adds event whose action will be called on the next loop iteration.
 func (n *Node) SignalEventp(a event.Actor, dst Noder, p elog.PointerToFirstArg) {
-	e := n.l.getLoopEvent(a, p)
-	e.d = dst.GetNode()
-	e.d.maybeStartEventHandler()
+	e := n.l.getLoopEvent(a, dst, p)
 	n.l.signalEvent(e)
 }
 
@@ -119,9 +118,7 @@ func (l *Loop) signalEventAfter(le *nodeEvent, secs float64) {
 }
 
 func (n *Node) SignalEventAfterp(a event.Actor, dst Noder, dt float64, p elog.PointerToFirstArg) {
-	e := n.l.getLoopEvent(a, p)
-	e.d = dst.GetNode()
-	e.d.maybeStartEventHandler()
+	e := n.l.getLoopEvent(a, dst, p)
 	n.l.signalEventAfter(e, dt)
 }
 func (n *Node) SignalEventAfter(e event.Actor, dst Noder, secs float64) {
@@ -179,13 +176,16 @@ func (l *Loop) eventHandler(r Noder) {
 		n.ft.waitLoop()
 		n.log(d, event_elog_node_wake)
 		e := <-n.rxEvents
+		if poller_panics && e.d != d {
+			panic(fmt.Errorf("expected node %s got %s: %p %s", d.name, e.d.name, e, e.actor.String()))
+		}
 		n.currentEvent.e = e
 		e.do()
 		n.s.setDone()
 		n.currentEvent.e = nil
 		n.activeCount--
 		n.log(d, event_elog_node_signal_done)
-		n.ft.signalLoop()
+		n.ft.signalLoop(true)
 	}
 }
 
@@ -220,7 +220,7 @@ func (x *Event) Suspend() {
 	n.log(d, event_elog_suspend)
 	n.eventStats.current.suspends++
 	t0 := cpu.TimeNow()
-	n.ft.signalLoop()
+	n.ft.signalLoop(false)
 	n.ft.waitLoop()
 	// Don't charge node for time suspended.
 	dt := cpu.TimeNow() - t0
@@ -228,8 +228,12 @@ func (x *Event) Suspend() {
 	n.log(d, event_elog_resumed)
 }
 
+func (e *nodeEvent) isResume() bool { return e.actor == nil }
+func (e *nodeEvent) setResume()     { e.actor = nil }
+
 func (x *Event) Resume() (ok bool) {
-	d := x.e.d
+	e := x.e
+	d := e.d
 	n := &d.e
 
 	// Don't do it twice.
@@ -238,7 +242,8 @@ func (x *Event) Resume() (ok bool) {
 		return
 	}
 	n.log(d, event_elog_queue_resume)
-	d.l.events <- x.e
+	e.setResume()
+	d.l.events <- e
 	return
 }
 
@@ -310,7 +315,7 @@ func (m *eventMain) doNodeEvent(e *nodeEvent) (quit *quitEvent) {
 		return
 	}
 	n := &e.d.e
-	if n.s.isResumed() {
+	if n.s.isResumed() || e.isResume() {
 		m.addActive(e.d)
 		e.resume()
 	} else {
@@ -544,6 +549,7 @@ func (m *eventMain) eventInit(l *Loop) {
 	m.timerCpuTime = maxCpuTime
 	m.timerDuration = maxDuration
 	m.timer = time.NewTimer(maxDuration)
+	m.nodeEventPool.New = func() interface{} { return &nodeEvent{} }
 	m.event_timer_elog(event_timer_elog_reset, maxDuration)
 	for _, n := range l.eventPollers {
 		l.startEventPoller(n)
@@ -572,13 +578,13 @@ func (e *quitEvent) String() string { return quitEventTypeStrings[e.Type] }
 func (e *quitEvent) Error() string  { return e.String() }
 func (e *quitEvent) EventAction()   {}
 func (l *Loop) Quit() {
-	e := l.getLoopEvent(ErrQuit, elog.PointerToFirstArg(&l))
+	e := l.getLoopEvent(ErrQuit, nil, elog.PointerToFirstArg(&l))
 	l.signalEvent(e)
 }
 
 // Add an event to wakeup event sleep.
 func (l *Loop) Interrupt() {
-	e := l.getLoopEvent(ErrInterrupt, elog.PointerToFirstArg(&l))
+	e := l.getLoopEvent(ErrInterrupt, nil, elog.PointerToFirstArg(&l))
 	l.signalEvent(e)
 }
 
