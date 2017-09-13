@@ -430,11 +430,10 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 	nVec = f.totalVectors(a)
 	a.timeNow = prevNode.inputStats.update(nVec, a.timeNow)
 	if elog.Enabled() {
-		e := callEvent{
-			active_index: uint32(a.index),
-			node_name:    prevNode.elogNodeName,
-			n_vectors:    uint32(nVec),
-			is_input:     true,
+		e := call_elog{
+			name:      prevNode.elogNodeName,
+			n_vectors: uint32(nVec),
+			is_input:  true,
 		}
 		elog.Add(&e)
 	}
@@ -473,10 +472,9 @@ func (f *Out) call(l *Loop, a *activePoller) (nVec uint) {
 		a.currentNode = next
 
 		if elog.Enabled() {
-			e := callEvent{
-				active_index: uint32(in.activeIndex),
-				node_name:    next.elogNodeName,
-				n_vectors:    uint32(nextN),
+			e := call_elog{
+				name:      next.elogNodeName,
+				n_vectors: uint32(nextN),
 			}
 			elog.Add(&e)
 		}
@@ -564,4 +562,19 @@ type inOutLooper interface {
 	loopInMaker
 	loopOutMaker
 	LoopInputOutput(l *Loop, i LooperIn, o LooperOut)
+}
+
+type call_elog struct {
+	name      elog.StringRef
+	n_vectors uint32
+	is_input  bool
+}
+
+func (e *call_elog) Elog(l *elog.Log) {
+	nv := e.n_vectors
+	if e.is_input {
+		l.Logf("loop input %v %d", e.name, nv)
+	} else {
+		l.Logf("loop call %v %d", e.name, nv)
+	}
 }
