@@ -56,8 +56,7 @@ type tuntap_interface struct {
 	to_tx        chan *tx_packet_vector
 	pv           *tx_packet_vector
 
-	suspend_saved_out *vnet.RefIn
-	interface_routes  ip4.MapFib
+	interface_routes ip4.MapFib
 }
 
 //go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
@@ -452,7 +451,7 @@ func (intf *tuntap_interface) bind() (err error) {
 }
 
 func (intf *tuntap_interface) start_up() {
-	intf.to_tx = make(chan *tx_packet_vector, vnet.MaxVectorLen)
+	intf.to_tx = make(chan *tx_packet_vector, vnet.MaxOutstandingTxRefs)
 	intf.Fd = intf.dev_net_tun_fd
 	iomux.Add(intf)
 }

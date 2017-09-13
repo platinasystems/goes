@@ -267,7 +267,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 
 	if elog.Enabled() {
 		e := rx_tx_elog{
-			kind:      rx_elog_ready,
+			kind:      rx_elog_read,
 			name:      intf.elog_name,
 			n_packets: uint32(n_packets),
 		}
