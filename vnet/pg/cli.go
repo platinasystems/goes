@@ -123,7 +123,7 @@ func (m *main) edit_streams(cmder cli.Commander, w cli.Writer, in *cli.Input) (e
 			n = &m.nodes[c.node_index]
 		}
 		n.configure_streams(m, &c, w, stream_name, set_what, r)
-		n.Activate(enable && !disable)
+		n.Enable(enable && !disable)
 	}
 	return
 }
@@ -184,7 +184,6 @@ func (n *node) configure_stream(r Streamer, m *main, c *stream_config, w cli.Wri
 
 	s.last_time = cpu.TimeNow()
 	s.credit_packets = 0
-	s.n_packets_last_print = 0
 	s.w = w
 	ave_packet_bits := 8 * .5 * float64(s.min_size+s.max_size)
 	if create || set_what&set_rate != 0 {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/hw"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
@@ -27,9 +28,10 @@ const (
 type node struct {
 	vnet.InterfaceNode
 	vnet.HwIf
-	v     *vnet.Vnet
-	index uint
-	pool  vnet.BufferPool
+	v      *vnet.Vnet
+	enable bool
+	index  uint
+	pool   vnet.BufferPool
 	stream_pool
 	stream_index_by_name parse.StringMap
 	buffer_type_pool
@@ -381,6 +383,11 @@ func (n *node) n_packets_this_input(s *Stream, cap uint) (p uint, dt_next float6
 		}
 	}
 	if s.rate_packets_per_sec != 0 {
+		// Send a single packet at initial time.
+		if s.n_packets_sent == 0 {
+			p = 1
+		}
+
 		now := cpu.TimeNow()
 		dt := n.Vnet.TimeDiff(now, s.last_time)
 		s.credit_packets += dt * s.rate_packets_per_sec
@@ -393,7 +400,26 @@ func (n *node) n_packets_this_input(s *Stream, cap uint) (p uint, dt_next float6
 			dt_next = (1 - s.credit_packets) / s.rate_packets_per_sec
 		}
 	}
+	if elog.Enabled() {
+		elog.Add(&stream_elog{
+			node_name:   n.ElogName(),
+			stream_name: s.elog_name,
+			n_packets:   uint32(p),
+			dt_next:     dt_next,
+		})
+	}
 	return
+}
+
+type stream_elog struct {
+	node_name   elog.StringRef
+	stream_name elog.StringRef
+	dt_next     float64
+	n_packets   uint32
+}
+
+func (e *stream_elog) Elog(l *elog.Log) {
+	l.Logf("pg %v %v input %d next after %.2e", e.node_name, e.stream_name, e.n_packets, e.dt_next)
 }
 
 func (n *node) stream_input(o *vnet.RefOut, s *Stream) (done bool, dt float64) {
@@ -410,22 +436,15 @@ func (n *node) stream_input(o *vnet.RefOut, s *Stream) (done bool, dt float64) {
 		s.n_packets_sent += uint64(n_packets)
 	}
 	done = s.n_packets_limit != 0 && s.n_packets_sent >= s.n_packets_limit
-	if np := s.n_packets_per_print; np != 0 {
-		for s.n_packets_sent >= s.n_packets_last_print+np {
-			s.n_packets_last_print += np
-			if done {
-				s.n_packets_last_print = s.n_packets_sent
-			}
-			fmt.Fprintf(s.w, "\npacket-generator %s: %d packets", s.name, s.n_packets_last_print)
-			if done {
-				break
-			}
-		}
-	}
 	return
 }
 
 func (n *node) InterfaceInput(o *vnet.RefOut) {
+	if !n.enable {
+		n.Activate(false)
+		return
+	}
+
 	all_done := true
 	min_dt, min_dt_valid := float64(0), false
 	n.stream_pool.Foreach(func(s Streamer) {
@@ -446,6 +465,11 @@ func (n *node) InterfaceInput(o *vnet.RefOut) {
 	} else {
 		n.Activate(!all_done)
 	}
+}
+
+func (n *node) Enable(enable bool) {
+	n.enable = enable
+	n.Activate(enable)
 }
 
 func (n *node) InterfaceOutput(i *vnet.TxRefVecIn) {

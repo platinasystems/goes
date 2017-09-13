@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/cpu"
+	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
@@ -52,10 +53,11 @@ type stream_config struct {
 }
 
 type Stream struct {
-	name  string
-	index uint
-	r     Streamer
-	w     cli.Writer
+	name      string
+	elog_name elog.StringRef
+	index     uint
+	r         Streamer
+	w         cli.Writer
 
 	random_seed int64
 
@@ -65,8 +67,7 @@ type Stream struct {
 	rate_packets_per_sec float64
 	credit_packets       float64
 
-	n_packets_sent       uint64
-	n_packets_last_print uint64
+	n_packets_sent uint64
 
 	data         []byte
 	buffer_types elib.Uint32Vec
@@ -154,6 +155,7 @@ func (n *node) new_stream(r Streamer, format string, args ...interface{}) {
 	s.r = r
 	s.index = si
 	s.name = name
+	s.elog_name = elog.SetString(name)
 	return
 }
 
