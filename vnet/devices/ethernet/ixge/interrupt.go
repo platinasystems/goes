@@ -10,7 +10,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 
 	"fmt"
-	"sync/atomic"
 )
 
 func (d *dev) set_queue_interrupt_mapping(rt vnet.RxTx, queue uint, irq interrupt) {
@@ -133,33 +132,12 @@ func (d *dev) interrupt_dispatch(i uint) {
 	}
 }
 
-// Atomically get and set interrupt status.
-func (d *dev) get_irq_status() (s uint32) {
-	for {
-		s = atomic.LoadUint32(&d.irq_status)
-		if atomic.CompareAndSwapUint32(&d.irq_status, s, 0) {
-			break
-		}
-	}
-	return
-}
-
-func (d *dev) set_irq_status(s uint32) {
-	for {
-		old := atomic.LoadUint32(&d.irq_status)
-		new := old | s
-		if atomic.CompareAndSwapUint32(&d.irq_status, old, new) {
-			break
-		}
-	}
-}
-
 func (d *dev) InterfaceInput(out *vnet.RefOut) {
 	if !d.interruptsEnabled {
 		d.Interrupt()
 	}
 	d.is_active = uint(0)
-	s := d.get_irq_status()
+	s := d.irq_status.ReadClear()
 	d.out = out
 	elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
 
@@ -180,7 +158,7 @@ func (d *dev) InterfaceInput(out *vnet.RefOut) {
 func (d *dev) Interrupt() {
 	s := d.regs.interrupt.status_write_1_to_set.get(d)
 	d.regs.interrupt.status_write_1_to_clear.set(d, s)
-	d.set_irq_status(uint32(s))
+	d.irq_status.Or(uint32(s))
 	d.AddDataActivity(1)
 	if elog.Enabled() {
 		e := irq_elog{
