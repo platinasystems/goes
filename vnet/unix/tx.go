@@ -37,9 +37,8 @@ func (p *tx_packet) add_one_ref(r *vnet.Ref, iʹ, lʹ uint) (i, l uint) {
 	return i + 1, l + d
 }
 
-func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) (l uint) {
+func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) (i, l uint) {
 	p.ifindex = ifindex
-	i := uint(0)
 	for {
 		i, l = p.add_one_ref(r, i, l)
 		if r.NextValidFlag() == 0 {
@@ -53,6 +52,7 @@ func (p *tx_packet) add_ref(r *vnet.Ref, ifindex uint32) (l uint) {
 
 type tx_packet_vector struct {
 	n_packets   uint
+	n_refs      uint
 	intf        *tuntap_interface
 	ri          *vnet.RefIn
 	buffer_pool *vnet.BufferPool
@@ -69,6 +69,7 @@ func (n *tx_node) get_packet_vector(p *vnet.BufferPool, intf *tuntap_interface) 
 		v = &tx_packet_vector{}
 	}
 	v.n_packets = 0
+	v.n_refs = 0
 	v.buffer_pool = p
 	v.intf = intf
 	return
@@ -87,8 +88,9 @@ func (v *tx_packet_vector) add_packet(n *tx_node, r *vnet.Ref, intf *tuntap_inte
 	}
 
 	p := &v.p[i]
-	l := p.add_ref(r, ifindex)
+	nr, l := p.add_ref(r, ifindex)
 	v.r[i] = *r
+	v.n_refs += nr
 
 	a := &v.a[i]
 	*a = raw_sockaddr_ll_template
@@ -117,7 +119,7 @@ func (n *tx_node) init(m *net_namespace_main) {
 		tx_error_drop:              "error drops",
 	}
 	m.m.v.RegisterOutputNode(n, "punt")
-	n.pv_pool = make(chan *tx_packet_vector, 2*vnet.MaxVectorLen)
+	n.pv_pool = make(chan *tx_packet_vector, 4*vnet.MaxVectorLen)
 }
 
 func (n *tx_node) NodeOutput(out *vnet.RefIn) {
@@ -160,8 +162,10 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 func (v *tx_packet_vector) tx_queue(n *tx_node, ri *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
 	v.ri = ri
-	n.AddSuspendActivity(ri, int(np))
-	x := atomic.AddInt32(&intf.active_count, int32(np))
+	if false {
+		n.AddSuspendActivity(ri, int(v.n_refs))
+	}
+	x := atomic.AddInt32(&intf.active_refs, int32(v.n_refs))
 	iomux.Update(intf)
 	select {
 	case intf.to_tx <- v:
@@ -170,6 +174,7 @@ func (v *tx_packet_vector) tx_queue(n *tx_node, ri *vnet.RefIn) {
 				kind:      tx_elog_queue_write,
 				name:      intf.elog_name,
 				n_packets: uint32(np),
+				n_refs:    uint32(v.n_refs),
 				active:    x,
 			}
 			elog.Add(&e)
@@ -186,6 +191,7 @@ func (pv *tx_packet_vector) advance(n *tx_node, intf *tuntap_interface, i uint) 
 	n_left := np - i
 	pv.buffer_pool.FreeRefs(&pv.r[0], i, true)
 	if n_left > 0 {
+		elog.F("unix tx advance n-left %d", n_left)
 		copy(pv.a[:n_left], pv.a[i:])
 		copy(pv.m[:n_left], pv.m[i:])
 		copy(pv.r[:n_left], pv.r[i:])
@@ -200,7 +206,7 @@ func (pv *tx_packet_vector) advance(n *tx_node, intf *tuntap_interface, i uint) 
 	}
 }
 
-func (intf *tuntap_interface) WriteAvailable() bool { return intf.active_count > 0 }
+func (intf *tuntap_interface) WriteAvailable() bool { return intf.active_refs > 0 }
 func (intf *tuntap_interface) WriteReady() (err error) {
 	if intf.pv == nil {
 		intf.pv = <-intf.to_tx
@@ -209,7 +215,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 	ns := intf.namespace
 	n := &ns.m.tx_node
 
-	n_packets, n_drops := 0, 0
+	n_refs, n_packets, n_drops := uint(0), uint(0), uint(0)
 loop:
 	for i := uint(0); i < pv.n_packets; i++ {
 		var errno syscall.Errno
@@ -229,6 +235,7 @@ loop:
 			}
 		}
 
+		n_refs += pv.p[i].iovs.Len()
 		switch errno {
 		case syscall.EWOULDBLOCK:
 			break loop
@@ -246,11 +253,11 @@ loop:
 				n_drops++
 				break loop
 			}
+			n_packets++
 		}
-		n_packets++
 	}
 	if n.m.m.verbose_packets {
-		for i := 0; i < n_packets; i++ {
+		for i := uint(0); i < n_packets; i++ {
 			r := &pv.r[i]
 			n.m.m.v.Logf("unix tx %s: %s\n", intf.Name(), ethernet.RefString(r))
 		}
@@ -258,28 +265,31 @@ loop:
 	// Advance to next packet in error case.
 	np := n_packets + n_drops
 	if np > 0 {
-		pv.advance(n, intf, uint(np))
+		pv.advance(n, intf, np)
 	}
-	x := atomic.AddInt32(&intf.active_count, -int32(np))
-	n.AddSuspendActivity(pv.ri, -int(np))
-
+	x := atomic.AddInt32(&intf.active_refs, -int32(n_refs))
 	if elog.Enabled() {
 		e := rx_tx_elog{
 			kind:      tx_elog_write,
 			name:      intf.elog_name,
 			n_packets: uint32(n_packets),
+			n_refs:    uint32(n_refs),
 			n_drops:   uint32(n_drops),
 			active:    x,
 		}
 		elog.Add(&e)
 	}
+	if false {
+		n.AddSuspendActivity(pv.ri, -int(n_refs))
+	}
+
 	iomux.Update(intf)
 
 	// Count punts and drops on this interface.
 	{
 		th := n.Vnet.GetIfThread(0)
-		vnet.IfPunts.Add(th, intf.si, uint(n_packets))
-		vnet.IfDrops.Add(th, intf.si, uint(n_drops))
+		vnet.IfPunts.Add(th, intf.si, n_packets)
+		vnet.IfDrops.Add(th, intf.si, n_drops)
 	}
 	return
 }
@@ -306,6 +316,7 @@ func (k rx_tx_elog_kind) String() string {
 type rx_tx_elog struct {
 	name      elog.StringRef
 	n_packets uint32
+	n_refs    uint32
 	n_drops   uint32
 	active    int32
 	kind      rx_tx_elog_kind
@@ -315,9 +326,10 @@ func (e *rx_tx_elog) Elog(l *elog.Log) {
 	switch e.kind {
 	case tx_elog_queue_write, tx_elog_write:
 		if e.n_drops != 0 {
-			l.Logf("unix %s %s %d packets, %d drops, active %d", e.kind, e.name, e.n_packets, e.n_drops, e.active)
+			l.Logf("unix %s %s %d packets, %d refs, %d drops, active %d", e.kind, e.name,
+				e.n_packets, e.n_refs, e.n_drops, e.active)
 		} else {
-			l.Logf("unix %s %s %d packets, active %d", e.kind, e.name, e.n_packets, e.active)
+			l.Logf("unix %s %s %d packets, %d refs, active %d", e.kind, e.name, e.n_packets, e.n_refs, e.active)
 		}
 	case rx_elog_read:
 		if e.n_drops != 0 {
