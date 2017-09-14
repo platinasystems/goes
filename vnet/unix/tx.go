@@ -162,9 +162,7 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 func (v *tx_packet_vector) tx_queue(n *tx_node, ri *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
 	v.ri = ri
-	if false {
-		n.AddSuspendActivity(ri, int(v.n_refs))
-	}
+	n.AddSuspendActivity(ri, int(v.n_refs))
 	x := atomic.AddInt32(&intf.active_refs, int32(v.n_refs))
 	iomux.Update(intf)
 	select {
@@ -279,9 +277,7 @@ loop:
 		}
 		elog.Add(&e)
 	}
-	if false {
-		n.AddSuspendActivity(pv.ri, -int(n_refs))
-	}
+	n.AddSuspendActivity(pv.ri, -int(n_refs))
 
 	iomux.Update(intf)
 
