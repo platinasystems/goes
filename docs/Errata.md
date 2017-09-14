@@ -1,9 +1,9 @@
 This is a list of known problems in the latest code. This is a living document that will
 change over time as issues are resolved.
 
-1) Broken Functionality
-=======================
-Tuntap mode:
+# Broken Functionality
+
+## Tuntap mode:
 
 - punt path iperf3 issues inv4->inv5 (transmitter locks up)
 - IF_OPER status at linux tuntap not reflecting actual link-state (on bug list)
@@ -17,17 +17,16 @@ Tuntap mode:
 - tuntap gets in mode where goes restart always fails with 
 	panic: pci 0000:03:00.0 Intel 0x15ab: open /dev/vfio/13: device or resource busy
 
-SRIOV-mode:
+## SRIOV-mode:
 
 - panics on every goes start (adddelnexthop issue)
 - iperf load breaks punt-path
 - punt performance only 1 Gbps (punting through PCI)
 - Issue 78 (Donn) 
 
-2) Known panics
-===============
+# Known panics
 
-* tuntap mode: Panic in (*Fib).addDelRouteNextHop - can reproduce by putting interface admin-down in a namespace
+1. tuntap mode: Panic in (*Fib).addDelRouteNextHop - can reproduce by putting interface admin-down in a namespace
 Aug 23 12:11:41 invader1 goes.vnetd[3608]: runtime error: slice bounds out of range: goroutine 40 [running]:
 Aug 23 12:11:41 invader1 goes.vnetd[3608]: runtime/debug.Stack(0xc4211f95d0, 0xb53000, 0x1370010)
 Aug 23 12:11:41 invader1 goes.vnetd[3608]:         /usr/local/go/src/runtime/debug/stack.go:24 +0x79
@@ -59,7 +58,7 @@ Aug 23 12:11:41 invader1 goes.vnetd[3608]: github.com/platinasystems/go/vnet/uni
 Aug 23 12:11:41 invader1 goes.vnetd[3608]:         /home/stig/go/src/github.com/platinasystems/go/vnet/unix/netlink.go:431 +0x682
 Aug 23 12:11:41 invader1 goes.vnetd[3608]: github.com/platinasystems/go/elib/loop.(*loopEvent).do(0xc420715560)
 
-* tuntap mode: Panic in MapFib.getLessSpecific()
+2. tuntap mode: Panic in MapFib.getLessSpecific()
 
 Aug 23 10:24:51 invader5 goes.vnetd[1916]: panic(0xb7cac0, 0x13a2000)
 Aug 23 10:24:51 invader5 goes.vnetd[1916]:         /usr/local/go/src/runtime/panic.go:489 +0x2cf
@@ -77,7 +76,7 @@ Aug 23 10:24:51 invader5 goes.vnetd[1916]: github.com/platinasystems/go/vnet/uni
 Aug 23 10:24:51 invader5 goes.vnetd[1916]:         /home/dlobete/src/github.com/platinasystems/go/vnet/unix/netlink.go:507 +0x208
 Aug 23 10:24:51 invader5 goes.vnetd[1916]: github.com/platinasystems/go/vnet/unix.(*netlinkEvent).EventAction(0xc4201130e0)
 
-* tuntap mode: Panic in (*DmaRequest).l3_generic_interface_admin_up_down
+3. tuntap mode: Panic in (*DmaRequest).l3_generic_interface_admin_up_down
 
 Aug 24 16:14:49 invader5 goes.vnetd[741]: runtime error: index out of range: goroutine 37 [running]:
 Aug 24 16:14:49 invader5 goes.vnetd[741]: runtime/debug.Stack(0xc4205e79f0, 0xb5b4e0, 0x13796a0)
@@ -119,7 +118,7 @@ Aug 25 12:11:07 invader5 goes.vnetd[2079]:         /home/dlobete/src/github.com/
 Aug 25 12:11:07 invader5 goes.vnetd[2079]: github.com/platinasystems/go/vnet.(*SwIf).SetAdminUp(0xc4201654f0, 0xc420160000, 0xc4201bd000, 0xf, 0xc42129c380)
 Aug 25 12:11:07 invader5 goes.vnetd[2079]:         /home/dlobete/src/github.com/platinasystems/go/vnet/interface.go:335 +0xa5
 
-* tuntap mode: Panic in rx punt path running iperf3
+4. tuntap mode: Panic in rx punt path running iperf3
 Aug 31 14:22:26 invader11 goes.vnetd[1280]: panic: packet too large
 Aug 31 14:22:26 invader11 goes.vnetd[1280]: 
 Aug 31 14:22:26 invader11 goes.vnetd[1280]: goroutine 53 [running]:
@@ -148,7 +147,7 @@ Aug 31 14:22:26 invader11 goes.vnetd[1280]:         /home/stig/go/src/github.com
 xe5
 Aug 31 14:22:28 invader11 goes.vnetd[1280]: exit status 2
 
-* tuntap mode: Running iperf3 on rx punt path
+5. tuntap mode: Running iperf3 on rx punt path
 Aug 31 16:24:36 invader11 goes.vnetd[3516]: fatal error: runtime: out of memory
 Aug 31 16:24:36 invader11 goes.vnetd[3516]:
 Aug 31 16:24:36 invader11 goes.vnetd[3516]: runtime stack:
@@ -182,7 +181,7 @@ Aug 31 16:24:36 invader11 goes.vnetd[3516]:
 Aug 31 16:24:36 invader11 goes.vnetd[3516]: goroutine 10 [running]:
 Aug 31 16:24:36 invader11 goes.vnetd[3516]: runtime.systemstack_switch()
 
-* tuntap mode
+6. tuntap mode
 Sep  6 15:57:57 invader5 goes.vnetd[1217]: panic: runtime error: invalid memory address or nil pointer dereference [recovered]
 Sep  6 15:57:57 invader5 goes.vnetd[1217]:         panic: runtime error: invalid memory address or nil pointer dereference
 Sep  6 15:57:57 invader5 goes.vnetd[1217]: [signal SIGSEGV: segmentation violation code=0x1 addr=0x48 pc=0x90eadd]
@@ -207,7 +206,7 @@ Sep  6 15:57:57 invader5 goes.vnetd[1217]:         /home/dlobete/src/github.com/
 Sep  6 15:57:57 invader5 goes.vnetd[1217]: created by github.com/platinasystems/go/elib/loop.(*Loop).startDataPoller
 Sep  6 15:57:57 invader5 goes.vnetd[1217]:         /home/dlobete/src/github.com/platinasystems/go/elib/loop/loop.go:103 +0xe5
 
-* tuntap mode
+7. tuntap mode
 Sep  6 15:50:23 invader5 goes.vnetd[561]: panic: runtime error: invalid memory address or nil pointer dereference [recovered]
 Sep  6 15:50:23 invader5 goes.vnetd[561]:         panic: runtime error: invalid memory address or nil pointer dereference
 Sep  6 15:50:23 invader5 goes.vnetd[561]: [signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x935773]
@@ -228,7 +227,7 @@ Sep  6 15:50:23 invader5 goes.vnetd[561]:         /home/dlobete/src/github.com/p
 Sep  6 15:50:23 invader5 goes.vnetd[561]: created by github.com/platinasystems/go/elib/loop.(*Loop).startDataPoller
 Sep  6 15:50:23 invader5 goes.vnetd[561]:         /home/dlobete/src/github.com/platinasystems/go/elib/loop/loop.go:103 +0xe5
 
-* tuntap mode: Multipath fib problem
+8. tuntap mode: Multipath fib problem
 Sep  7 15:20:20 invader5 goes.vnetd[14181]: panic: runtime error: invalid memory address or nil pointer dereference [recovered]
 Sep  7 15:20:20 invader5 goes.vnetd[14181]:         panic: runtime error: invalid memory address or nil pointer dereference
 Sep  7 15:20:20 invader5 goes.vnetd[14181]: [signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x95e18e]
@@ -268,7 +267,7 @@ Sep  7 16:44:13 invader11 goes.vnetd[1123]:         /home/stig/go/src/github.com
 Sep  7 16:44:15 invader11 goes.vnetd[1123]: exit status 2
 
 
-* sriov mode - on initial start
+9. sriov mode - on initial start
 
 Aug 31 14:10:37 invader5 goes.vnetd[735]: panic: unknown interface: eth-1-0
 Aug 31 14:10:37 invader5 goes.vnetd[735]:
