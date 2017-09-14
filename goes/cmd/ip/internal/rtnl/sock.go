@@ -13,7 +13,6 @@ import (
 	"unsafe"
 )
 
-const SizeofInt = (32 << (^uint(0) >> 63)) >> 3
 const (
 	debugSockDone = false
 	debugSockGrps = false
