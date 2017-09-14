@@ -23,12 +23,11 @@ type Node struct {
 
 func (n *Node) GetVnetNode() *Node { return n }
 
-func (n *Node) AddSuspendActivity(i *RefIn, a int) (did_suspend, did_resume bool) {
-	return n.Vnet.loop.AddSuspendActivity(&i.In, a, &suspendLimits)
+func (n *Node) AddSuspendActivity(i *RefIn, a int) {
+	n.Vnet.loop.AddSuspendActivity(&i.In, a, &suspendLimits)
 }
-func (n *Node) AdjustSuspendActivity(i *RefIn, a int) { n.Vnet.loop.AdjustSuspendActivity(&i.In, a) }
-func (n *Node) Suspend(i *RefIn)                      { n.Vnet.loop.Suspend(&i.In, &suspendLimits) }
-func (n *Node) Resume(i *RefIn)                       { n.Vnet.loop.Resume(&i.In, &suspendLimits) }
+func (n *Node) Suspend(i *RefIn) { n.Vnet.loop.Suspend(&i.In, &suspendLimits) }
+func (n *Node) Resume(i *RefIn)  { n.Vnet.loop.Resume(&i.In, &suspendLimits) }
 
 const MaxVectorLen = loop.MaxVectorLen
 
