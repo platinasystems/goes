@@ -168,43 +168,32 @@ func (n *interfaceNode) send(ri *RefIn, i *TxRefVecIn) {
 		}
 		elog.Add(&e)
 	}
-	// We asked for MaxVectorLen on alloc; now correct for actual number of refs sent for tx.
-	if l < MaxVectorLen {
-		n.AdjustSuspendActivity(ri, int(l)-MaxVectorLen)
-	}
+
+	n.AddSuspendActivity(ri, int(l))
+
+	// Copy common fields.
+	i.refInCommon = ri.refInCommon
+
 	n.tx_chan <- i
 }
 
 func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
-	for {
-		// Find a place to put a vector of packets (TxRefVecIn).
-		select {
-		case i = <-n.freeChan:
-			// Re-cycle one that output routine is done with.
-			i.FreeRefs(false)
-		default:
-			if l := len(n.free_list); l > 0 {
-				// Re-cycle one from free list.
-				i = n.free_list[l-1]
-				n.free_list = n.free_list[:l-1]
-			} else {
-				// Make a new one.
-				i = &TxRefVecIn{n: n}
-			}
+	// Find a place to put a vector of packets (TxRefVecIn).
+	select {
+	case i = <-n.freeChan:
+		// Re-cycle one that output routine is done with.
+		i.FreeRefs(false)
+	default:
+		if l := len(n.free_list); l > 0 {
+			// Re-cycle one from free list.
+			i = n.free_list[l-1]
+			n.free_list = n.free_list[:l-1]
+		} else {
+			// Make a new one.
+			i = &TxRefVecIn{n: n}
 		}
-
-		// Add MaxVectorLen for now.. we'll correct actually number later.
-		did_suspend, _ := n.AddSuspendActivity(in, MaxVectorLen)
-		if !did_suspend {
-			// Copy common fields.
-			i.refInCommon = in.refInCommon
-			i.nPackets = 0
-			return
-		}
-
-		// We're over ref limit.  Add ref vector back to free list.
-		n.free_list = append(n.free_list, i)
 	}
+	return
 }
 
 func (n *interfaceNode) newTxRefVecIn(in *RefIn, r []Ref) (i *TxRefVecIn) {
@@ -308,7 +297,6 @@ func (n *interfaceNode) ifOutput(ri *RefIn) {
 		n.send(ri, rvi)
 	} else {
 		// Return unused ref vector to free list.
-		n.AddSuspendActivity(ri, -MaxVectorLen)
 		n.freeChan <- rvi
 	}
 }
