@@ -233,10 +233,16 @@ func (in *In) getPoller(l *Loop) (a *activePoller, n *Node) {
 	return
 }
 
-func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspend bool, did_resume bool) {
+func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) {
+	var did_suspend, did_resume bool
 	a, n := in.getPoller(l)
-	_, did_suspend, did_resume = n.addActivity(0, int32(i), false, false, lim)
-	if did_suspend {
+	// Loop until add activity succeeds.
+	for {
+		_, did_suspend, did_resume = n.addActivity(0, int32(i), false, false, lim)
+		if !did_suspend {
+			break
+		}
+
 		// Signal polling done to main loop.
 		n.inputStats.current.suspends++
 		n.poller_elog(poller_elog_suspended)
@@ -262,26 +268,6 @@ func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) (did_suspen
 		n.poller_elog(poller_elog_resume_wait)
 	}
 	return
-}
-
-func (l *Loop) AdjustSuspendActivity(in *In, ds int) {
-	_, n := in.getPoller(l)
-	var old_state, new_state nodePollerState
-	for {
-		old, a, s, state := n.s.get()
-		s += int32(ds)
-		if poller_panics && s < 0 {
-			panic(fmt.Errorf("adjust-suspend < 0 was %d added %d", s-int32(ds), ds))
-		}
-		new_state = makeNodePollerState(a, s, state)
-		if n.s.compare_and_swap(old, new_state) {
-			old_state = old
-			break
-		}
-	}
-	if elog.Enabled() {
-		n.poller_elog_state(poller_elog_adjust_suspend_activity, old_state, new_state)
-	}
 }
 
 func (l *Loop) Suspend(in *In, lim *SuspendLimits) { l.AddSuspendActivity(in, 1, lim) }
@@ -607,7 +593,6 @@ const (
 	poller_elog_resumed
 	poller_elog_data_activity
 	poller_elog_suspend_activity
-	poller_elog_adjust_suspend_activity
 	poller_elog_node_wait
 	poller_elog_node_wake
 	poller_elog_node_signal
@@ -617,22 +602,21 @@ type poller_elog_kind uint32
 
 func (k poller_elog_kind) String() string {
 	t := [...]string{
-		poller_elog_alloc_poller:            "alloc-poller",
-		poller_elog_free_poller:             "free-poller",
-		poller_elog_alloc_pending:           "alloc-pending",
-		poller_elog_event_wake:              "event-wake",
-		poller_elog_poll:                    "wake-node",
-		poller_elog_wait:                    "wait",
-		poller_elog_wait_done:               "wait-done",
-		poller_elog_suspended:               "suspended",
-		poller_elog_resume_wait:             "resume-wait",
-		poller_elog_resumed:                 "resumed",
-		poller_elog_data_activity:           "add-data",
-		poller_elog_suspend_activity:        "add-suspend",
-		poller_elog_adjust_suspend_activity: "adjust-suspend",
-		poller_elog_node_wait:               "node-wait",
-		poller_elog_node_wake:               "node-awake",
-		poller_elog_node_signal:             "node-signal",
+		poller_elog_alloc_poller:     "alloc-poller",
+		poller_elog_free_poller:      "free-poller",
+		poller_elog_alloc_pending:    "alloc-pending",
+		poller_elog_event_wake:       "event-wake",
+		poller_elog_poll:             "wake-node",
+		poller_elog_wait:             "wait",
+		poller_elog_wait_done:        "wait-done",
+		poller_elog_suspended:        "suspended",
+		poller_elog_resume_wait:      "resume-wait",
+		poller_elog_resumed:          "resumed",
+		poller_elog_data_activity:    "add-data",
+		poller_elog_suspend_activity: "add-suspend",
+		poller_elog_node_wait:        "node-wait",
+		poller_elog_node_wake:        "node-awake",
+		poller_elog_node_signal:      "node-signal",
 	}
 	return elib.StringerHex(t[:], int(k))
 }
@@ -677,7 +661,7 @@ func (e *poller_elog) Elog(l *elog.Log) {
 	switch e.kind {
 	case poller_elog_alloc_poller, poller_elog_free_poller:
 		l.Logf("loop %s %v %d/%d", e.kind, e.name, e.a, e.da)
-	case poller_elog_data_activity, poller_elog_suspend_activity, poller_elog_adjust_suspend_activity:
+	case poller_elog_data_activity, poller_elog_suspend_activity:
 		l.Logf("loop %s %v %v -> %v", e.kind, e.name, &e.old, &e.new)
 	default:
 		l.Logf("loop %s %v", e.kind, e.name)
