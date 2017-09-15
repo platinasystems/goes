@@ -82,11 +82,10 @@ setup_dc () {
 	mkdir -p /var/run/netns
     fi
 
-    dc_pid=$(find_dc_pid $dc)
-
     if [ ! -h /var/run/netns/$dc ]; then
+	dc_pid=$(find_dc_pid $dc)
 	ln -s /proc/$dc_pid/ns/net /var/run/netns/$dc
-	set_nsid $dc
+	#set_nsid $dc    # doesn't seem necessary for docker
     fi
 
     ip link set $intf netns $dc
