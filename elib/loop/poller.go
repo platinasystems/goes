@@ -431,8 +431,23 @@ func (n *Node) maybeFreeActive() {
 		if !n.s.compare_and_swap(old_state, new_state) {
 			continue
 		}
+		n.poller_elog_state(poller_elog_free_active, old_state, new_state)
 		n.freeActivePoller()
 		return
+	}
+}
+
+func (n *Node) maybeClearResume() {
+	for {
+		old_state, active, suspend, state := n.s.get()
+		if state != poller_resumed {
+			return
+		}
+		new_state := makeNodePollerState(active, suspend, poller_active)
+		if n.s.compare_and_swap(old_state, new_state) {
+			n.poller_elog_state(poller_elog_clear_resume, old_state, new_state)
+			return
+		}
 	}
 }
 
@@ -567,6 +582,7 @@ func (l *Loop) doPollers() {
 				done = n.ft.waitNode()
 			}
 			n.poller_elog(poller_elog_wait_done)
+			n.maybeClearResume()
 		}
 		if done {
 			n.maybeFreeActive()
@@ -593,6 +609,8 @@ const (
 	poller_elog_resumed
 	poller_elog_data_activity
 	poller_elog_suspend_activity
+	poller_elog_free_active
+	poller_elog_clear_resume
 	poller_elog_node_wait
 	poller_elog_node_wake
 	poller_elog_node_signal
@@ -614,6 +632,8 @@ func (k poller_elog_kind) String() string {
 		poller_elog_resumed:          "resumed",
 		poller_elog_data_activity:    "add-data",
 		poller_elog_suspend_activity: "add-suspend",
+		poller_elog_free_active:      "free-active",
+		poller_elog_clear_resume:     "clear-resume",
 		poller_elog_node_wait:        "node-wait",
 		poller_elog_node_wake:        "node-awake",
 		poller_elog_node_signal:      "node-signal",
@@ -661,7 +681,8 @@ func (e *poller_elog) Elog(l *elog.Log) {
 	switch e.kind {
 	case poller_elog_alloc_poller, poller_elog_free_poller:
 		l.Logf("loop %s %v %d/%d", e.kind, e.name, e.a, e.da)
-	case poller_elog_data_activity, poller_elog_suspend_activity:
+	case poller_elog_data_activity, poller_elog_suspend_activity,
+		poller_elog_free_active, poller_elog_clear_resume:
 		l.Logf("loop %s %v %v -> %v", e.kind, e.name, &e.old, &e.new)
 	default:
 		l.Logf("loop %s %v", e.kind, e.name)
