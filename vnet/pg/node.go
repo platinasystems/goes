@@ -419,7 +419,11 @@ type stream_elog struct {
 }
 
 func (e *stream_elog) Elog(l *elog.Log) {
-	l.Logf("pg %v %v input %d next after %.2e", e.node_name, e.stream_name, e.n_packets, e.dt_next)
+	if e.dt_next != 0 {
+		l.Logf("pg %v %v input %d next after %.2e", e.node_name, e.stream_name, e.n_packets, e.dt_next)
+	} else {
+		l.Logf("pg %v %v input %d", e.node_name, e.stream_name, e.n_packets)
+	}
 }
 
 func (n *node) stream_input(o *vnet.RefOut, s *Stream) (done bool, dt float64) {
