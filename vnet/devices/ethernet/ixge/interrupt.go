@@ -12,6 +12,7 @@ import (
 	"fmt"
 )
 
+// Defines interrupt mapping for 128 rx + 128 tx queues into 16 interrupts.
 func (d *dev) set_queue_interrupt_mapping(rt vnet.RxTx, queue uint, irq interrupt) {
 	i0, i1 := queue/2, queue%2
 	v := d.regs.interrupt.queue_mapping[i0].get(d)
@@ -24,6 +25,12 @@ func (d *dev) set_queue_interrupt_mapping(rt vnet.RxTx, queue uint, irq interrup
 	x := (valid | (reg(irq) & 0x1f)) << shift
 	v = (v &^ m) | x
 	d.regs.interrupt.queue_mapping[i0].set(d, v)
+
+	irq_mask := reg(1) << irq
+	if rt == vnet.Tx {
+		d.tx_interrupt_mask |= irq_mask
+	}
+
 	d.queues_for_interrupt[rt].Validate(uint(irq))
 	b := d.queues_for_interrupt[rt][irq]
 	b = b.Set(queue)
@@ -141,11 +148,10 @@ func (d *dev) InterfaceInput(out *vnet.RefOut) {
 	d.out = out
 	elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
 
-	inc := 0
-	if d.is_active == 0 {
-		inc--
+	if d.IsActive() && d.is_active == 0 {
+		d.AddDataActivity(-1)
 	}
-	d.AddDataActivity(inc)
+
 	if elog.Enabled() {
 		e := irq_elog{
 			name:   d.elog_name,
@@ -157,9 +163,10 @@ func (d *dev) InterfaceInput(out *vnet.RefOut) {
 
 func (d *dev) Interrupt() {
 	s := d.regs.interrupt.status_write_1_to_set.get(d)
-	d.regs.interrupt.status_write_1_to_clear.set(d, s)
-	d.irq_status.Or(uint32(s))
-	d.AddDataActivity(1)
+	d.regs.interrupt.status_write_1_to_clear.set(d, reg(s))
+	s_tx := s & d.tx_interrupt_mask
+	s_no_tx := s &^ s_tx
+
 	if elog.Enabled() {
 		e := irq_elog{
 			name:   d.elog_name,
@@ -167,6 +174,17 @@ func (d *dev) Interrupt() {
 			is_irq: true,
 		}
 		elog.Add(&e)
+	}
+
+	// Clean tx rings directly from interrupt since input node may suspend.
+	if s_tx != 0 {
+		elib.Word(s_tx).ForeachSetBit(d.interrupt_dispatch)
+	}
+
+	// Assign any other interrupts (especially rx interrupts) to input routine.
+	if s_no_tx != 0 {
+		d.irq_status.Or(uint32(s_no_tx))
+		d.AddDataActivity(1)
 	}
 }
 

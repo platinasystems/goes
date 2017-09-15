@@ -132,6 +132,7 @@ type dma_dev struct {
 	dma_config
 	rx_dev
 	tx_dev
+	tx_interrupt_mask    reg
 	queues_for_interrupt [vnet.NRxTx]elib.BitmapVec
 }
 
