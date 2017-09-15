@@ -64,7 +64,6 @@ func (f *interface_filter) run(s string, kind netlink.InterfaceKind) (ok bool) {
 type Main struct {
 	vnet.Package
 	v               *vnet.Vnet
-	verbose_packets bool
 	verbose_netlink bool
 	interface_filter
 	net_namespace_main
@@ -95,8 +94,6 @@ func (m *Main) Configure(in *parse.Input) {
 		var s string
 		switch {
 		case in.Parse("mtu %d", &m.mtuBytes):
-		case in.Parse("verbose-packets"):
-			m.verbose_packets = true
 		case in.Parse("verbose-netlink"):
 			m.verbose_netlink = true
 		case in.Parse("filter-accept %s", &s):
