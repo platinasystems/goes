@@ -45,16 +45,17 @@ func (p *rx_packet) rx_init(rx *rx_node) {
 func (p *rx_packet) rx_free(rx *rx_node) { rx.buffer_pool.FreeRefs(&p.refs[0], p.refs.Len(), false) }
 
 const (
-	packet_vector_max_len = 8
-	max_rx_packet_size    = 16 << 10
+	rx_packet_vector_max_len = 16
+	tx_packet_vector_max_len = vnet.MaxVectorLen
+	max_rx_packet_size       = 16 << 10
 )
 
 // Maximum sized packet vector.
 type rx_packet_vector struct {
 	i uint
-	a [packet_vector_max_len]syscall.RawSockaddrLinklayer
-	m [packet_vector_max_len]mmsghdr
-	p [packet_vector_max_len]rx_packet
+	a [rx_packet_vector_max_len]syscall.RawSockaddrLinklayer
+	m [rx_packet_vector_max_len]mmsghdr
+	p [rx_packet_vector_max_len]rx_packet
 }
 
 func (n *rx_node) new_packet_vector() (v *rx_packet_vector) {
@@ -171,10 +172,6 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 	p.alloc_refs(rx, n_refs)
 	ref := p.chain.Done()
 	ref.SetError(&rx.Node, rx_error_non_vnet_interface)
-	if ns.m.m.verbose_packets {
-		i := ns.interface_by_index[ifindex]
-		ns.m.m.v.Logf("unix rx ns %s %s: %s\n", ns.name, i.name, ethernet.RefString(&ref))
-	}
 	if si, ok := ns.si_by_ifindex.get(ifindex); ok {
 		ref.Si = si
 		n := rx_node_next(rx.next_by_si[si])
@@ -224,9 +221,10 @@ func (m *msghdr) ifindex() uint32 {
 
 type rx_ref_vector struct {
 	n_packets uint
-	refs      [packet_vector_max_len]vnet.Ref
-	lens      [packet_vector_max_len]uint32
-	nexts     [packet_vector_max_len]rx_node_next
+	i         uint
+	refs      [vnet.MaxVectorLen]vnet.Ref
+	lens      [vnet.MaxVectorLen]uint32
+	nexts     [vnet.MaxVectorLen]rx_node_next
 }
 
 func errorForErrno(tag string, errno syscall.Errno) (err error) {
@@ -251,47 +249,66 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 func (intf *tuntap_interface) ReadReady() (err error) {
 	rx := &intf.m.rx_node
 	v := rx.get_packet_vector()
+	rv := rx.get_rx_ref_vector()
+	n_rv := uint(0)
 	n_packets := 0
-	for i := range v.m {
-		n, errno := readv(intf.Fd, v.p[i].iovs)
-		if errno != 0 {
-			err = errorForErrno("readv", errno)
-			break
-		}
-		v.m[i].msg_len = uint32(n)
-		n_packets++
-	}
-	if err != nil {
-		rx.CountError(rx_error_drop, 1)
-	}
+	eagain := false
 
-	if elog.Enabled() {
-		e := rx_tx_elog{
-			kind:      rx_elog_read,
-			name:      intf.elog_name,
-			n_packets: uint32(n_packets),
+	for !eagain {
+		for i := range v.m {
+			n, errno := readv(intf.Fd, v.p[i].iovs)
+			if errno != 0 {
+				eagain = errno == syscall.EAGAIN
+				err = errorForErrno("readv", errno)
+				break
+			}
+			v.m[i].msg_len = uint32(n)
+			rv.rx_packet(intf.namespace, &v.p[i], rx, n_rv, uint(n), intf.ifindex)
+			n_rv++
+			if n_rv >= uint(len(rv.refs)) {
+				if elog.Enabled() {
+					e := rx_tx_elog{
+						kind:      rx_elog_read,
+						name:      intf.elog_name,
+						n_packets: uint32(n_rv),
+					}
+					elog.Add(&e)
+				}
+				rv.n_packets = n_rv
+				rx.AddDataActivity(int(n_rv))
+				rx.rv_input <- rv
+				n_rv = 0
+				rv = rx.get_rx_ref_vector()
+			}
+			n_packets++
 		}
 		if err != nil {
-			e.n_drops = 1
+			rx.CountError(rx_error_drop, 1)
+			break
 		}
-		elog.Add(&e)
 	}
-
-	if n_packets > 0 {
-		rv := rx.get_rx_ref_vector()
-		rv.n_packets = uint(n_packets)
-		for i := 0; i < n_packets; i++ {
-			p := &v.p[i]
-			m := &v.m[i]
-			rv.rx_packet(intf.namespace, p, rx, uint(i), uint(m.msg_len), intf.ifindex)
+	if n_rv > 0 {
+		if elog.Enabled() {
+			e := rx_tx_elog{
+				kind:        rx_elog_read,
+				name:        intf.elog_name,
+				n_packets:   uint32(n_packets),
+				would_block: eagain,
+			}
+			if err != nil {
+				e.n_drops = 1
+			}
+			elog.Add(&e)
 		}
-		rx.AddDataActivity(int(n_packets))
+		rv.n_packets = n_rv
+		rx.AddDataActivity(int(n_rv))
 		rx.rv_input <- rv
+	} else {
+		// Return unused ref vector.
+		rx.put_rx_ref_vector(rv)
 	}
-
 	// Return packet vector for reuse.
 	rx.put_packet_vector(v)
-
 	return
 }
 
@@ -340,19 +357,21 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 		rx.pending_refs = rx.pending_refs[:np-i]
 	}
 
-	// Loop through given input packets.
-	for i = 0; i < rv.n_packets; i++ {
-		r, l, n := rv.refs[i], rv.lens[i], rv.nexts[i]
-		if !out_is_full {
-			n_done, out_is_full = rx.input_ref(r, l, n, o, n_done)
+	if rv != nil {
+		// Loop through given input packets.
+		for i = 0; i < rv.n_packets; i++ {
+			r, l, n := rv.refs[i], rv.lens[i], rv.nexts[i]
+			if !out_is_full {
+				n_done, out_is_full = rx.input_ref(r, l, n, o, n_done)
+			}
+			// A next node is or was full: add to pending vector.
+			if out_is_full {
+				r := rx_pending_ref{ref: r, len: l, next: n}
+				rx.pending_refs = append(rx.pending_refs, r)
+			}
 		}
-		// A next node is or was full: add to pending vector.
-		if out_is_full {
-			r := rx_pending_ref{ref: r, len: l, next: n}
-			rx.pending_refs = append(rx.pending_refs, r)
-		}
+		rx.put_rx_ref_vector(rv)
 	}
-	rx.put_rx_ref_vector(rv)
 	return
 }
 
@@ -364,6 +383,9 @@ loop:
 		case rv := <-rx.rv_input:
 			n_packets, out_is_full = rx.input_ref_vector(rv, out, n_packets)
 		default:
+			if len(rx.pending_refs) > 0 {
+				n_packets, out_is_full = rx.input_ref_vector(nil, out, n_packets)
+			}
 			break loop
 		}
 	}
