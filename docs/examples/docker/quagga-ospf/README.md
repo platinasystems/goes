@@ -98,7 +98,7 @@ To really show OSPF working in the container, another container is needed and a 
 
 The network to be built will be like this diagram with 4 routers
 
- ![OSPF example](https://github.com/platinasystems/go/blob/master/docs/examples/docker/ospf_example.jpeg?raw=true)
+ ![OSPF example](https://github.com/platinasystems/go/blob/master/docs/examples/docker/quagga-ospf/ospf_example.jpeg?raw=true)
 
 For multiple containers it would be easier to create a Docker compose file that has all the parameters for all 4 containers.  The file docker-compose.yaml defines all 4 containers and the parameters to run them.  An example for router R1 looks like:
 ```
@@ -122,10 +122,10 @@ services:
       options:
         max-size: "10m"
         max-file: "2"
-  ```
+```
   To start all the containers is as easy as:
-  ```
-  $ docker-compose up -d
+```
+$ docker-compose up -d
 Creating network "docker_default" with the default driver
 Creating R4 ... 
 Creating R1 ... 
@@ -159,9 +159,9 @@ Removing network docker_default
 $ docker ps -a
 CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
 ```
-Previously the docker_move.sh script was used to move a single interface into a container.  There is another script called updown.sh which calls docker_move.sh with the specific parameters to match the network diagram above.  For the next example docker-compose will be used to start the 4 router containers and then updown.sh will be run to move/configure all the interfaces.
+Previously the docker_move.sh script was used to move a single interface into a container.  There is another script called updown.sh which calls docker_move.sh with the specific parameters to match the network diagram above and it will call docker-compose to start/stop the containers.
 ```
-$ docker-compose up -d
+$ sudo ./updown.sh up
 Creating network "docker_default" with the default driver
 Creating R2 ... 
 Creating R1 ... 
@@ -172,7 +172,6 @@ Creating R1
 Creating R4
 Creating R3 ... done
 
-$ sudo ./updown.sh up
 ```
 Then enter a container and see if ospf has learned the routes to all 4 routers:
 ```
@@ -213,4 +212,113 @@ PING 192.168.222.2 (192.168.222.2): 56 data bytes
 2 packets transmitted, 2 packets received, 0% packet loss
 round-trip min/avg/max/stddev = 0.097/0.100/0.103/0.000 ms
 R1# 
+```
+Another script in this repo is updown_vlan.sh.  This script creates 6 vlans all on the same interface so only 1 loopback cable is required to run this ospf example.  The interfaces use for the loop can easily be changed in the script.  Look for:
+```
+# A loopback cable is connected between side A and B.
+# All vlans go over this cable
+SIDE_A=eth-4-0
+SIDE_B=eth-5-0
+```
+To run:
+```
+$ sudo ./updown_vlan.sh up
+Creating R4 ... 
+Creating R1 ... 
+Creating R2 ... 
+Creating R3 ... 
+Creating R4
+Creating R3
+Creating R2
+Creating R1 ... done
+```
+Enter container R1 to see if ospf has is working:
+```
+root@invader1:~# docker exec -it R1 vtysh
+
+Hello, this is Quagga (version 0.99.23.1).
+Copyright 1996-2005 Kunihiro Ishiguro, et al.
+
+R1# show ip route
+Codes: K - kernel route, C - connected, S - static, R - RIP,
+       O - OSPF, I - IS-IS, B - BGP, A - Babel,
+       > - selected route, * - FIB route
+
+C>* 127.0.0.0/8 is directly connected, lo
+O   192.168.1.5/32 [110/10] is directly connected, dummy0, 00:07:48
+C>* 192.168.1.5/32 is directly connected, dummy0
+O>* 192.168.1.10/32 [110/20] via 192.168.120.10, eth-4-0.10, 00:06:57
+O>  192.168.2.2/32 [110/30] via 192.168.120.10, eth-4-0.10, 00:06:48
+                            via 192.168.150.4, eth-5-0.40, 00:06:48
+O>* 192.168.2.4/32 [110/20] via 192.168.150.4, eth-5-0.40, 00:06:53
+O>  192.168.50.0/24 [110/30] via 192.168.120.10, eth-4-0.10, 00:06:48
+                             via 192.168.150.4, eth-5-0.40, 00:06:48
+O>* 192.168.60.0/24 [110/20] via 192.168.150.4, eth-5-0.40, 00:06:53
+O>* 192.168.111.0/24 [110/20] via 192.168.150.4, eth-5-0.40, 00:06:53
+O   192.168.120.0/24 [110/10] is directly connected, eth-4-0.10, 00:07:48
+C>* 192.168.120.0/24 is directly connected, eth-4-0.10
+O   192.168.150.0/24 [110/10] is directly connected, eth-5-0.40, 00:07:48
+C>* 192.168.150.0/24 is directly connected, eth-5-0.40
+O>* 192.168.222.0/24 [110/20] via 192.168.120.10, eth-4-0.10, 00:06:58
+```
+In the container we only see the routing table for R1, but from goes we can see the default namespace and the 4 container's namespaces.
+```
+root@invader1:~# goes show vnet ip fib
+ Table                   Destination                               Adjacency
+     default                  10.15.0.0/24       3: glean eth-0-0
+     default                  10.15.0.1/32       4: local eth-0-0
+     default                  10.50.0.0/24       9: glean eth-21-0
+     default                  10.50.0.1/32      10: local eth-21-0
+docker-2239fb0b2a04               192.168.1.10/32      46: rewrite eth-5-0.20 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 20 46-46, 1 x 36
+docker-2239fb0b2a04                192.168.2.2/32       2: punt
+docker-2239fb0b2a04                192.168.2.4/32      44: rewrite eth-4-0.30 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 30 44-44, 1 x 31
+docker-2239fb0b2a04               192.168.50.0/24      23: glean eth-5-0.50
+docker-2239fb0b2a04               192.168.50.2/32      24: local eth-5-0.50
+docker-2239fb0b2a04               192.168.60.0/24      44: rewrite eth-4-0.30 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 30 44-44, 1 x 31
+docker-2239fb0b2a04              192.168.111.0/24      19: glean eth-4-0.30
+docker-2239fb0b2a04              192.168.111.2/32      20: local eth-4-0.30
+docker-2239fb0b2a04              192.168.111.4/32      31: rewrite eth-4-0.30 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 30
+docker-2239fb0b2a04              192.168.120.0/24      46: rewrite eth-5-0.20 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 20 46-46, 1 x 36
+docker-2239fb0b2a04              192.168.150.0/24      44: rewrite eth-4-0.30 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 30 44-44, 1 x 31
+docker-2239fb0b2a04              192.168.222.0/24      21: glean eth-5-0.20
+docker-2239fb0b2a04              192.168.222.2/32      22: local eth-5-0.20
+docker-2239fb0b2a04             192.168.222.10/32      36: rewrite eth-5-0.20 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 20
+docker-01575d264139                192.168.1.5/32      40: rewrite eth-4-0.40 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 40 40-40, 1 x 33
+docker-01575d264139                192.168.2.2/32      41: rewrite eth-5-0.30 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 30 41-41, 1 x 34
+docker-01575d264139                192.168.2.4/32       2: punt
+docker-01575d264139               192.168.50.0/24      41: rewrite eth-5-0.30 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 30 41-41, 1 x 34
+docker-01575d264139               192.168.60.0/24      29: glean eth-5-0.60
+docker-01575d264139               192.168.60.4/32      30: local eth-5-0.60
+docker-01575d264139              192.168.111.0/24      25: glean eth-5-0.30
+docker-01575d264139              192.168.111.2/32      34: rewrite eth-5-0.30 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 30
+docker-01575d264139              192.168.111.4/32      26: local eth-5-0.30
+docker-01575d264139              192.168.120.0/24      40: rewrite eth-4-0.40 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 40 40-40, 1 x 33
+docker-01575d264139              192.168.150.0/24      27: glean eth-4-0.40
+docker-01575d264139              192.168.150.4/32      28: local eth-4-0.40
+docker-01575d264139              192.168.150.5/32      33: rewrite eth-4-0.40 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 40
+docker-01575d264139              192.168.222.0/24      41: rewrite eth-5-0.30 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 30 41-41, 1 x 34
+docker-b6c09eb742d5                192.168.1.5/32      39: rewrite eth-5-0.10 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 10 39-39, 1 x 38
+docker-b6c09eb742d5               192.168.1.10/32       2: punt
+docker-b6c09eb742d5                192.168.2.2/32      45: rewrite eth-4-0.20 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 20 45-45, 1 x 35
+docker-b6c09eb742d5               192.168.50.0/24      45: rewrite eth-4-0.20 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 20 45-45, 1 x 35
+docker-b6c09eb742d5              192.168.111.0/24      45: rewrite eth-4-0.20 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 20 45-45, 1 x 35
+docker-b6c09eb742d5              192.168.120.0/24      15: glean eth-5-0.10
+docker-b6c09eb742d5              192.168.120.5/32      38: rewrite eth-5-0.10 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 10
+docker-b6c09eb742d5             192.168.120.10/32      16: local eth-5-0.10
+docker-b6c09eb742d5              192.168.150.0/24      39: rewrite eth-5-0.10 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 10 39-39, 1 x 38
+docker-b6c09eb742d5              192.168.222.0/24      17: glean eth-4-0.20
+docker-b6c09eb742d5              192.168.222.2/32      35: rewrite eth-4-0.20 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 20
+docker-b6c09eb742d5             192.168.222.10/32      18: local eth-4-0.20
+docker-21c38ca5a520                192.168.1.5/32       2: punt
+docker-21c38ca5a520               192.168.1.10/32      42: rewrite eth-4-0.10 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 10 42-42, 1 x 37
+docker-21c38ca5a520                192.168.2.4/32      43: rewrite eth-5-0.40 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 40 43-43, 1 x 32
+docker-21c38ca5a520               192.168.60.0/24      43: rewrite eth-5-0.40 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 40 43-43, 1 x 32
+docker-21c38ca5a520              192.168.111.0/24      43: rewrite eth-5-0.40 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 40 43-43, 1 x 32
+docker-21c38ca5a520              192.168.120.0/24      11: glean eth-4-0.10
+docker-21c38ca5a520              192.168.120.5/32      12: local eth-4-0.10
+docker-21c38ca5a520             192.168.120.10/32      37: rewrite eth-4-0.10 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 10
+docker-21c38ca5a520              192.168.150.0/24      13: glean eth-5-0.40
+docker-21c38ca5a520              192.168.150.4/32      32: rewrite eth-5-0.40 IP4: 02:46:8a:00:02:ae -> 02:46:8a:00:02:b2 vlan 40
+docker-21c38ca5a520              192.168.150.5/32      14: local eth-5-0.40
+docker-21c38ca5a520              192.168.222.0/24      42: rewrite eth-4-0.10 IP4: 02:46:8a:00:02:b2 -> 02:46:8a:00:02:ae vlan 10 42-42, 1 x 37
 ```
