@@ -41,6 +41,7 @@ const (
 	VERSION_OFFSET = 0x000
 	VERSION_LEN    = 0x008
 	VERSION_DEV    = 0x003
+	JSON_OFFSET    = 0x100
 )
 
 type FlashFmt struct {

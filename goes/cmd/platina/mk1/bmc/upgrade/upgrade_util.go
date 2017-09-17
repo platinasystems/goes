@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,6 +19,16 @@ import (
 	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/url"
 )
+
+type IMGINFO struct {
+	Name   string
+	Build  string
+	User   string
+	Size   string
+	Tag    string
+	Commit string
+	Chksum string
+}
 
 func getFile(s string, v string, t bool, fn string) (int, error) {
 	rmFile(fn)
@@ -106,6 +117,41 @@ func getBootedQSPI() (int, error) {
 		return 1, nil
 	}
 	return -1, nil
+}
+
+func printJSON(q bool) error {
+	selectQSPI(q)
+	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
+	if err != nil {
+		return err
+	}
+	k := 0
+	for i, j := range b {
+		if j == ']' {
+			k = i
+		}
+	}
+	if k > 0 {
+		fmt.Println("")
+		if q == false {
+			fmt.Println("QSPI0 Image Details")
+		} else {
+			fmt.Println("QSPI1 Image Details")
+		}
+		var ImgInfo [5]IMGINFO
+		json.Unmarshal(b[JSON_OFFSET:k+1], &ImgInfo)
+		for i, _ := range ImgInfo {
+			fmt.Println("    Name  : ", ImgInfo[i].Name)
+			fmt.Println("    Build : ", ImgInfo[i].Build)
+			fmt.Println("    User  : ", ImgInfo[i].User)
+			fmt.Println("    Size  : ", ImgInfo[i].Size)
+			fmt.Println("    Tag   : ", ImgInfo[i].Tag)
+			fmt.Println("    Commit: ", ImgInfo[i].Commit)
+			fmt.Println("    Chksum: ", ImgInfo[i].Chksum)
+			fmt.Println("")
+		}
+	}
+	return nil
 }
 
 func getVerQSPI(q bool) (string, error) {

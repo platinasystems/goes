@@ -87,6 +87,9 @@ func (cmd) Main(args ...string) error {
 		return nil
 	}
 	if flag.ByName["-r"] {
+		if err := reportVerQSPIdetail(); err != nil {
+			return err
+		}
 		if err := reportVerQSPI(); err != nil {
 			return err
 		}
@@ -143,6 +146,18 @@ func reportVerServer(s string, v string, t bool) (err error) {
 		sv = "dev"
 	}
 	printVerServer(s, v, sv)
+	return nil
+}
+
+func reportVerQSPIdetail() (err error) {
+	err = printJSON(false)
+	if err != nil {
+		return err
+	}
+	err = printJSON(true)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
