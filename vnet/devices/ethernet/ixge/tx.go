@@ -40,7 +40,7 @@ const (
 	tx_desc_status0_log2_is_end_of_packet   = 8 + 0
 	tx_desc_status0_is_end_of_packet        = 1 << tx_desc_status0_log2_is_end_of_packet
 	tx_desc_status0_insert_crc              = 1 << (8 + 1)
-	tx_desc_status0_log2_report_status      = (8 + 3)
+	tx_desc_status0_log2_report_status      = 8 + 3
 	tx_desc_status0_report_status           = (1 << tx_desc_status0_log2_report_status)
 	tx_desc_status0_is_advanced             = 1 << (8 + 5)
 	tx_desc_status0_vlan_enable             = 1 << (8 + 6)
@@ -134,7 +134,7 @@ func (d *dev) tx_dma_init(queue uint) {
 		v = (v &^ (0xff << 0)) | ((64 - 4) << 0)
 		// host threshold
 		v = (v &^ (0xff << 8)) | (4 << 8)
-		// writeback theshold
+		// writeback theshold (must be zero since we're using head writeback).
 		v = (v &^ (0xff << 16)) | (0 << 16)
 		dr.control.set(d, v)
 	}
