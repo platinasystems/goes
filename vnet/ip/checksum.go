@@ -71,7 +71,7 @@ func (c Checksum) AddRef(first *vnet.Ref, o_first uint) (d Checksum) {
 		if i == 0 {
 			o = o_first
 		}
-		d = d.AddBytes(r.DataOffsetSlice(o))
+		d = d.AddBytes(r.DataSliceOffset(o))
 	})
 	return
 }
