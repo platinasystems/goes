@@ -78,15 +78,16 @@ func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	p0 := (*VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
 
 	error0 := punt_1tag_error_none
-	if p0.Type != TYPE_VLAN.FromHost() {
-		error0 = punt_1tag_error_not_single_tagged
-	}
 
 	di0 := uint32(p0.Tag.ToHost())
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_1tag_error_unknown_disposition
 		di0 = 0
+	}
+
+	if p0.Type != TYPE_VLAN.FromHost() {
+		error0 = punt_1tag_error_not_single_tagged
 	}
 
 	d0 := &n.dispositions[di0]
@@ -119,12 +120,6 @@ func (n *SingleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	p1 := (*VlanTypeAndTag)(r1.DataOffset(sizeof_header_no_type))
 
 	error0, error1 := punt_1tag_error_none, punt_1tag_error_none
-	if p0.Type != TYPE_VLAN.FromHost() {
-		error0 = punt_1tag_error_not_single_tagged
-	}
-	if p1.Type != TYPE_VLAN.FromHost() {
-		error1 = punt_1tag_error_not_single_tagged
-	}
 
 	di0, di1 := uint32(p0.Tag.ToHost()), uint32(p1.Tag.ToHost())
 
@@ -138,6 +133,13 @@ func (n *SingleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	}
 
 	d0, d1 := &n.dispositions[di0], &n.dispositions[di1]
+
+	if p0.Type != TYPE_VLAN.FromHost() {
+		error0 = punt_1tag_error_not_single_tagged
+	}
+	if p1.Type != TYPE_VLAN.FromHost() {
+		error1 = punt_1tag_error_not_single_tagged
+	}
 
 	r0.RefOpaque = d0.o
 	r1.RefOpaque = d1.o
