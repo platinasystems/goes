@@ -297,7 +297,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 			e := rx_tx_elog{
 				kind:        rx_elog_read,
 				name:        intf.elog_name,
-				n_packets:   uint32(n_packets),
+				n_packets:   uint32(n_rv),
 				would_block: eagain,
 			}
 			if err != nil {
