@@ -384,28 +384,49 @@ var rx_done_code_strings = [...]string{
 
 func (c rx_done_code) String() string { return elib.Stringer(rx_done_code_strings[:], int(c)) }
 
+const elog_desc = false // true to add elogs for rx descriptors + packet data.
+
 func (q *rx_dma_queue) rx_no_wrap(n_doneʹ reg, n_descriptors reg) (done rx_done_code, n_done reg) {
 	d := q.d
 	n_left := n_descriptors
 	i := q.head_index
 	n_done = n_doneʹ
-
-	if n_left+n_done > vnet.MaxVectorLen {
-		n_left = vnet.MaxVectorLen - n_done
-		done = rx_done_vec_len
-	}
-	n_done += n_left
+	done = rx_done_not_done
 
 	ri := q.RingIndex(uint(i))
-	for n_left >= 4 {
+	for n_left >= 4 && q.MaxNext()+4 <= vnet.MaxVectorLen {
 		x0, x1, x2, x3 := q.rx_desc[i+0], q.rx_desc[i+1], q.rx_desc[i+2], q.rx_desc[i+3]
 
 		// Skip to single loop for any hardware owned descriptors found.
 		var (
 			f0, f1, f2, f3 vnet.RxDmaDescriptorFlags
-			ok             bool
+			sw_owned       bool
 		)
-		if f0, f1, f2, f3, ok = rx_dma_flags_x4(x0, x1, x2, x3); !ok {
+
+		if elog.Enabled() && elog_desc {
+			var e rx_desc_elog
+			e.kind = rx_desc_elog_x4
+			e.name = d.elog_name
+			e.index = uint16(ri.Index())
+			e.desc = x0
+			r0 := ri.NextRxRef(&q.RxDmaRing, 0)
+			copy(e.data[:], r0.DataSliceOffsetLen(0, 32))
+			elog.Add(&e)
+			e.desc = x1
+			r1 := ri.NextRxRef(&q.RxDmaRing, 1)
+			copy(e.data[:], r1.DataSliceOffsetLen(0, 32))
+			elog.Add(&e)
+			e.desc = x2
+			r2 := ri.NextRxRef(&q.RxDmaRing, 2)
+			copy(e.data[:], r2.DataSliceOffsetLen(0, 32))
+			elog.Add(&e)
+			e.desc = x3
+			r3 := ri.NextRxRef(&q.RxDmaRing, 3)
+			copy(e.data[:], r3.DataSliceOffsetLen(0, 32))
+			elog.Add(&e)
+		}
+
+		if f0, f1, f2, f3, sw_owned = rx_dma_flags_x4(x0, x1, x2, x3); !sw_owned {
 			break
 		}
 
@@ -426,14 +447,26 @@ func (q *rx_dma_queue) rx_no_wrap(n_doneʹ reg, n_descriptors reg) (done rx_done
 		ri = ri.NextRingIndex(4)
 	}
 
-	for n_left > 0 {
+	for n_left > 0 && q.MaxNext()+1 <= vnet.MaxVectorLen {
 		x0 := q.rx_desc[i+0]
 
 		var (
-			f0 vnet.RxDmaDescriptorFlags
-			ok bool
+			f0       vnet.RxDmaDescriptorFlags
+			sw_owned bool
 		)
-		if f0, ok = rx_dma_flags_x1(x0); !ok {
+
+		if elog.Enabled() && elog_desc {
+			var e rx_desc_elog
+			e.kind = rx_desc_elog_x1
+			e.name = d.elog_name
+			e.index = uint16(ri.Index())
+			e.desc = x0
+			r0 := ri.NextRxRef(&q.RxDmaRing, 0)
+			copy(e.data[:], r0.DataSliceOffsetLen(0, 32))
+			elog.Add(&e)
+		}
+
+		if f0, sw_owned = rx_dma_flags_x1(x0); !sw_owned {
 			done = rx_done_found_hw_owned_descriptor
 			break
 		}
@@ -455,7 +488,11 @@ func (q *rx_dma_queue) rx_no_wrap(n_doneʹ reg, n_descriptors reg) (done rx_done
 		i = 0
 	}
 
-	n_done -= n_left
+	if done == rx_done_not_done && q.MaxNext() == vnet.MaxVectorLen {
+		done = rx_done_vec_len
+	}
+
+	n_done += n_descriptors - n_left
 	old_head := q.head_index
 	q.head_index = i
 
@@ -482,23 +519,27 @@ func (d *dev) rx_queue_interrupt(queue uint) {
 
 	sw_head_index := q.head_index
 
-	n_done := reg(0)
-	done, n_done := q.rx_no_wrap(n_done, q.len-sw_head_index)
-	if done == rx_done_not_done {
+	n_desc_done := reg(0)
+	n_desc_end := q.len - sw_head_index
+	// Do descriptors head to end of ring.
+	done, n_desc_done := q.rx_no_wrap(n_desc_done, n_desc_end)
+	if n_desc_done == n_desc_end {
+		// Refill rx buffers when ring wraps.
 		q.RxDmaRing.WrapRefill()
-		if sw_head_index > 0 {
-			done, n_done = q.rx_no_wrap(n_done, sw_head_index)
+		// Do descriptors at start of ring.
+		if sw_head_index > 0 && done != rx_done_found_hw_owned_descriptor {
+			done, n_desc_done = q.rx_no_wrap(n_desc_done, sw_head_index)
 		}
 	}
 
 	// Flush enqueue and counters.
 	q.RxDmaRing.Flush()
 
-	if n_done > 0 {
+	if n_desc_done > 0 {
 		// Give tail back to hardware.
 		hw.MemoryBarrier()
 
-		q.tail_index += n_done
+		q.tail_index += n_desc_done
 		if q.tail_index > q.len {
 			q.tail_index -= q.len
 		}
@@ -506,7 +547,7 @@ func (d *dev) rx_queue_interrupt(queue uint) {
 	}
 
 	// Arrange to be called again if we've not processed all potential rx descriptors.
-	if !(n_done == 0 && done == rx_done_found_hw_owned_descriptor) {
+	if !(n_desc_done == 0 && done == rx_done_found_hw_owned_descriptor) {
 		d.is_active += 1
 	}
 
@@ -537,4 +578,31 @@ type rx_queue_elog struct {
 
 func (e *rx_queue_elog) Elog(l *elog.Log) {
 	l.Logf("%s rx tail to hw %d", e.name, e.new_tail)
+}
+
+type rx_desc_elog_kind uint16
+
+const (
+	rx_desc_elog_x1 = iota
+	rx_desc_elog_x4
+)
+
+func (k rx_desc_elog_kind) String() string {
+	t := [...]string{
+		rx_desc_elog_x1: "x1",
+		rx_desc_elog_x4: "x4",
+	}
+	return elib.StringerHex(t[:], int(k))
+}
+
+type rx_desc_elog struct {
+	name  elog.StringRef
+	kind  rx_desc_elog_kind
+	index uint16
+	desc  rx_from_hw_descriptor
+	data  [24]byte
+}
+
+func (e *rx_desc_elog) Elog(l *elog.Log) {
+	l.Logf("%s rx desc %v %d %v %x", e.name, e.kind, e.index, &e.desc, e.data[:])
 }
