@@ -183,6 +183,10 @@ func (n *Node) IsActive() bool {
 	_, active, _, _ := n.s.get()
 	return active > 0
 }
+func (n *Node) IsSuspended() bool {
+	_, _, _, state := n.s.get()
+	return state == poller_suspended
+}
 
 func (m *nodeStateMain) getAllocPending(l *Loop) (pending []nodeAllocPending) {
 	m.mu.Lock()
