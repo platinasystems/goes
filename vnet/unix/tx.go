@@ -285,7 +285,7 @@ func (intf *tuntap_interface) WriteReady() (err error) {
 
 	// Need to limit number of packets sent to allow ReadReady (e.g. when pinging linux).
 	// Otherwise tx queue len limit will be reached.
-	const max = 2 * vnet.MaxVectorLen
+	const max = vnet.MaxVectorLen
 
 loop:
 	for {
