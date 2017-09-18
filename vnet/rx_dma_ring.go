@@ -52,6 +52,7 @@ type rxDmaRingIndex uint
 // For even ring sequence, rx refs are even; refills are odd; vice versa for odd sequences.
 func (r *RxDmaRing) RingIndex(i uint) rxDmaRingIndex                   { return rxDmaRingIndex(2*i + (r.sequence & 1)) }
 func (i rxDmaRingIndex) NextRingIndex(n rxDmaRingIndex) rxDmaRingIndex { return i + 2*n }
+func (i rxDmaRingIndex) Index() uint                                   { return uint(i) / 2 }
 
 // Even buffer is for packet receive; odd buffer is to refill ring.
 func (i rxDmaRingIndex) RxRef(g *RxDmaRing) *Ref     { return &g.refs[i^0] }
@@ -82,9 +83,10 @@ type rxDmaRingState struct {
 
 	Out *RefOut
 
-	n_next    uint
-	n_packets uint64
-	n_bytes   uint64
+	n_next     uint
+	max_n_next uint
+	n_packets  uint64
+	n_bytes    uint64
 }
 
 type RxDmaRefState struct {
@@ -190,6 +192,7 @@ func (g *RxDmaRing) slow_path(r0 *Ref, f0 RxDmaDescriptorFlags) {
 	s.chain.Append(r0)
 
 	// If at end of packet, enqueue packet to next graph node.
+	// Otherwise, we're done.
 	if g.is_end_of_packet(f0) == 0 {
 		return
 	}
@@ -229,9 +232,13 @@ func (g *RxDmaRing) slow_path(r0 *Ref, f0 RxDmaDescriptorFlags) {
 		n_next++
 	} else {
 		n_next0 := in.InLen()
-		in.SetPoolAndLen(g.v, g.pool, n_next0+1)
+		l0 := n_next0 + 1
+		in.SetPoolAndLen(g.v, g.pool, l0)
 		in.Refs[n_next0] = ref
-		n_next0++
+		n_next0 = l0
+		if l0 > g.max_n_next {
+			g.max_n_next = n_next0
+		}
 
 		// Switch cached next after enough repeats of cache miss with same next.
 		if next0 == s.last_miss_next {
@@ -239,6 +246,9 @@ func (g *RxDmaRing) slow_path(r0 *Ref, f0 RxDmaDescriptorFlags) {
 			if s.n_last_miss_next >= 4 {
 				if n_next > 0 {
 					g.Out.Outs[next].SetPoolAndLen(g.v, g.pool, n_next)
+					if n_next > g.max_n_next {
+						g.max_n_next = n_next
+					}
 				}
 				next = next0
 				n_next = n_next0
@@ -270,6 +280,16 @@ func (g *RxDmaRing) Flush() {
 		g.n_next = 0
 	}
 	g.flush_interface_counters()
+	// Reset for future calls.
+	g.max_n_next = 0
+}
+
+func (g *RxDmaRing) MaxNext() (n uint) {
+	n = g.n_next
+	if g.max_n_next > n {
+		n = g.max_n_next
+	}
+	return
 }
 
 // Atomic register shadow helpers.
