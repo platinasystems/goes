@@ -248,13 +248,18 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 
 func (intf *tuntap_interface) ReadReady() (err error) {
 	rx := &intf.m.rx_node
-	v := rx.get_packet_vector()
-	rv := rx.get_rx_ref_vector()
 	n_rv := uint(0)
 	n_packets := 0
 	eagain := false
 
-	for !eagain {
+	if rx.IsSuspended() {
+		return
+	}
+
+	v := rx.get_packet_vector()
+	rv := rx.get_rx_ref_vector()
+
+	for !eagain && n_packets <= vnet.MaxVectorLen {
 		for i := range v.m {
 			n, errno := readv(intf.Fd, v.p[i].iovs)
 			if errno != 0 {
