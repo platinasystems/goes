@@ -154,6 +154,12 @@ func (s *shared) encodeArg(b *elib.ByteVec, i0 uint, a interface{}) (i uint) {
 				i = encodeUint(b, i, val.Uint(), fmtUint)
 			case reflect.String:
 				i = encodeStr(b, i, val.String())
+			case reflect.Slice:
+				if val.Type().Elem() != reflect.TypeOf(uint8(0)) {
+					panic(fmt.Errorf("elog fmtEvent encode value with unknown slice type: %v", val.Type()))
+				} else {
+					i = encodeStr(b, i, string(val.Bytes()))
+				}
 			default:
 				panic(fmt.Errorf("elog fmtEvent encode value with unknown type: %v", val.Type()))
 			}
