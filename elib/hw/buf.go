@@ -77,18 +77,18 @@ func refFlag4(f BufferFlag, r0, r1, r2, r3 *Ref) bool {
 	return RefFlag4(f, &r0.RefHeader, &r1.RefHeader, &r2.RefHeader, &r3.RefHeader)
 }
 
-func (r *RefHeader) DataOffsetSlice(o uint) (b []byte) {
+func (r *RefHeader) DataSliceOffsetLen(o, l uint) (b []byte) {
 	var h reflect.SliceHeader
 	h.Data = uintptr(r.DataOffset(o))
-	h.Len = int(r.dataLen) - int(o)
+	h.Len = int(l) - int(o)
 	h.Cap = h.Len
 	b = *(*[]byte)(unsafe.Pointer(&h))
 	return
 }
-func (r *RefHeader) DataSlice() (b []byte) { return r.DataOffsetSlice(0) }
-
-func (r *RefHeader) DataLen() uint     { return uint(r.dataLen) }
-func (r *RefHeader) SetDataLen(l uint) { r.dataLen = uint16(l) }
+func (r *RefHeader) DataSlice() (b []byte)             { return r.DataSliceOffsetLen(0, r.DataLen()) }
+func (r *RefHeader) DataSliceOffset(o uint) (b []byte) { return r.DataSliceOffsetLen(o, r.DataLen()) }
+func (r *RefHeader) DataLen() uint                     { return uint(r.dataLen) }
+func (r *RefHeader) SetDataLen(l uint)                 { r.dataLen = uint16(l) }
 func (r *RefHeader) Advance(i int) (oldDataOffset int) {
 	oldDataOffset = int(r.dataOffset)
 	r.dataOffset = uint16(oldDataOffset + i)
@@ -284,7 +284,7 @@ func (t *bufferTrace) TraceString(m *BufferMain) (lines []string) {
 	for i := range t.events {
 		e := &t.events[i]
 		p := m.bufferPools.elts[e.p]
-		lines = append(lines, fmt.Sprintf("  %s: %s", p.Name, e.i.TraceBuffer(int(e.e))))
+		lines = append(lines, fmt.Sprintf("  pool %s: %s", p.Name, e.i.TraceBuffer(int(e.e))))
 	}
 	return
 }
@@ -389,7 +389,7 @@ type BufferTemplate struct {
 func (t *BufferTemplate) SizeIncludingOverhead() uint { return t.sizeIncludingOverhead }
 
 var DefaultBufferTemplate = &BufferTemplate{
-	Size: 512,
+	Size: 1 << 10,
 	Ref:  Ref{RefHeader: RefHeader{dataOffset: BufferRewriteBytes}},
 }
 
