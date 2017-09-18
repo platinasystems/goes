@@ -70,15 +70,16 @@ func (n *DoubleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
 
 	error0 := punt_2tag_error_none
-	if p0&m != t {
-		error0 = punt_2tag_error_not_double_tagged
-	}
 
 	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
 
 	if di0 >= PuntDisposition(n.punt_packet_disposition_pool.Len()) {
 		error0 = punt_2tag_error_unknown_disposition
 		di0 = 0
+	}
+
+	if p0&m != t {
+		error0 = punt_2tag_error_not_double_tagged
 	}
 
 	d0 := &n.dispositions[di0]
@@ -113,12 +114,6 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	var m = (vnet.Uint64(0xffff)<<48 | vnet.Uint64(0xffff)<<16).FromHost()
 
 	error0, error1 := punt_2tag_error_none, punt_2tag_error_none
-	if p0&m != t {
-		error0 = punt_2tag_error_not_double_tagged
-	}
-	if p1&m != t {
-		error1 = punt_2tag_error_not_double_tagged
-	}
 
 	di0 := PuntDispositionForTags(q0[0].Tag, q0[1].Tag)
 	di1 := PuntDispositionForTags(q1[0].Tag, q1[1].Tag)
@@ -130,6 +125,13 @@ func (n *DoubleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	if di1 >= PuntDisposition(n.punt_packet_disposition_pool.Len()) {
 		error1 = punt_2tag_error_unknown_disposition
 		di1 = 0
+	}
+
+	if p0&m != t {
+		error0 = punt_2tag_error_not_double_tagged
+	}
+	if p1&m != t {
+		error1 = punt_2tag_error_not_double_tagged
 	}
 
 	d0, d1 := &n.dispositions[di0], &n.dispositions[di1]
