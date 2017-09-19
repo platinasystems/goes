@@ -337,7 +337,7 @@ func (l *Loop) doEventNoWait() (quit *quitEvent) {
 	return
 }
 
-func (l *Loop) doEventWait() (quit *quitEvent) {
+func (l *Loop) doEventWait() (quit *quitEvent, timeout bool) {
 	m := &l.eventMain
 	m.event_timer_elog(event_timer_elog_waiting, m.timerDuration)
 	select {
@@ -346,8 +346,8 @@ func (l *Loop) doEventWait() (quit *quitEvent) {
 	case <-m.timer.C:
 		// Log difference between time now and timer cpu time.
 		m.event_timer_elog(event_timer_elog_timeout, l.duration(m.timerCpuTime))
-		// Reset timer; caller will call m.timer.Reset with next duration.
-		m.timerCpuTime = l.now
+		m.timer.Reset(maxDuration)
+		timeout = true
 	}
 	return
 }
@@ -360,8 +360,11 @@ func (l *Loop) duration(t cpu.Time) time.Duration {
 func (l *Loop) doEvents() (quitLoop bool) {
 	m := &l.eventMain
 	var (
-		quit    *quitEvent
-		didWait bool
+		quit          *quitEvent
+		didWait       bool
+		waitTimeout   bool
+		nextTimeValid bool
+		nextTime      cpu.Time
 	)
 
 	// Try waiting if we have no active nodes.
@@ -370,28 +373,28 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		// This can and does return false if an active poller comes along racing with our call.
 		if _, didWait = l.activePollerState.setEventWait(); didWait {
 			// Find next event's time (!ok means there is no available event).
-			t, avail := l.timedEventPool.NextTime()
+			nextTime, nextTimeValid = l.timedEventPool.NextTime()
 
 			// Compute duration until next event.
 			var dt time.Duration
-			if avail {
-				dt = l.duration(t)
+			if nextTimeValid {
+				dt = l.duration(nextTime)
 			} else {
-				t = maxCpuTime
+				nextTime = maxCpuTime
 				dt = maxDuration
 			}
 
 			// Reset timer if wakeup time changes.
-			if t != m.timerCpuTime {
+			if nextTime != m.timerCpuTime {
 				if !m.timer.Stop() {
 					<-m.timer.C
 				}
 				m.timer.Reset(dt)
-				m.timerCpuTime = t
+				m.timerCpuTime = nextTime
 				m.timerDuration = dt
 				m.event_timer_elog(event_timer_elog_reset, dt)
 			}
-			quit = l.doEventWait()
+			quit, waitTimeout = l.doEventWait()
 			l.activePollerState.clearEventWait()
 		}
 	}
@@ -401,12 +404,14 @@ func (l *Loop) doEvents() (quitLoop bool) {
 
 	// Handle expired timed events.
 	tp := &l.timedEventPool
-	if tp.Elts() != 0 {
-		l.now = cpu.TimeNow()
+	if waitTimeout {
 		l.timedEventPoolLock.Lock()
 		ev := l.timedEventVec
-		tp.AdvanceAdd(l.now, &ev)
+		tp.AdvanceAdd(nextTime, &ev)
 		l.timedEventPoolLock.Unlock()
+		if poller_panics && waitTimeout && len(ev) == 0 {
+			panic("wait timeout but not events expired")
+		}
 		if len(ev) > 0 {
 			if elog.Enabled() {
 				elog.F2u("loop event timer %d expired, %d queued",
@@ -743,10 +748,15 @@ type event_timer_elog struct {
 }
 
 func (e *event_timer_elog) Elog(l *elog.Log) {
-	if e.dt == maxDuration {
-		l.Logf("loop event timer %v forever", e.kind)
-	} else {
-		l.Logf("loop event timer %v %.2e sec", e.kind, e.dt.Seconds())
+	switch e.kind {
+	case event_timer_elog_timeout:
+		l.Logf("loop event timer %v error %+.2e", e.kind, e.dt.Seconds())
+	default:
+		if e.dt == maxDuration {
+			l.Logf("loop event timer %v forever", e.kind)
+		} else {
+			l.Logf("loop event timer %v %.2e sec", e.kind, e.dt.Seconds())
+		}
 	}
 }
 

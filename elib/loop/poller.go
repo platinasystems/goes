@@ -103,7 +103,8 @@ func (n *Node) addActivity(da, ds int32,
 
 		is_active := active > 0
 		is_suspended := false
-		if lim != nil {
+		is_suspend_activity := lim != nil
+		if is_suspend_activity {
 			slimit := int32(lim.Suspend)
 			limit := slimit
 			if state == poller_suspended {
@@ -138,15 +139,16 @@ func (n *Node) addActivity(da, ds int32,
 		}
 		if elog.Enabled() {
 			kind := poller_elog_kind(poller_elog_data_activity)
-			if lim != nil {
+			if is_suspend_activity {
 				kind = poller_elog_suspend_activity
 			}
 			n.poller_elog_state(kind, old_state, new_state)
 		}
 
-		if was_active != is_active && is_active {
-			n.changeActivePollerState(is_active)
+		if was, is := old_state.needs_poll(), new_state.needs_poll(); was != is {
+			n.changeActivePollerState(is)
 		}
+
 		if !need_alloc {
 			return
 		}
@@ -168,7 +170,7 @@ func (n *Node) addActivity(da, ds int32,
 }
 
 func (n *Node) changeActivePollerState(is_active bool) {
-	if _, eventWait := n.l.activePollerState.changeActive(is_active); eventWait {
+	if _, eventWait := n.changeActive(is_active); eventWait {
 		n.poller_elog(poller_elog_event_wake)
 		n.l.Interrupt()
 	}
@@ -339,6 +341,10 @@ func (s *activePollerState) setEventWait() (nActive uint, wait bool) {
 		if !s.compare_and_swap(old, new) {
 			return
 		}
+		elog.Add(&change_active_elog{
+			old: old,
+			new: new,
+		})
 		wait = wantWait
 	}
 	return
@@ -348,27 +354,63 @@ func (s *activePollerState) clearEventWait() {
 	for wait {
 		new := makeActivePollerState(nActive, false)
 		if s.compare_and_swap(old, new) {
+			elog.Add(&change_active_elog{
+				old: old,
+				new: new,
+			})
 			break
 		}
 		old, nActive, wait = s.get()
 	}
 }
 
-func (s *activePollerState) changeActive(isActive bool) (uint, bool) {
+func (d *Node) changeActive(isActive bool) (uint, bool) {
+	s := &d.l.activePollerState
 	for {
 		old, n, w := s.get()
 		if isActive {
 			n += 1
+			// Protect mistaken against unbounded increase of active poller count.
+			if poller_panics && n > uint(len(d.l.nodes)) {
+				panic("too many active pollers")
+			}
 		} else {
-			if n == 0 {
+			if poller_panics && n == 0 {
 				panic("negative active count")
 			}
 			n -= 1
 		}
 		new := makeActivePollerState(n, w && n == 0)
 		if s.compare_and_swap(old, new) {
+			elog.Add(&change_active_elog{
+				name: d.elogNodeName,
+				old:  old,
+				new:  new,
+			})
 			return n, w
 		}
+	}
+}
+
+func (t activePollerState) String() (s string) {
+	_, n, w := t.get()
+	s = fmt.Sprintf("%d-active", n)
+	if w {
+		s += "-wait"
+	}
+	return
+}
+
+type change_active_elog struct {
+	name     elog.StringRef
+	old, new activePollerState
+}
+
+func (e *change_active_elog) Elog(l *elog.Log) {
+	if e.name != 0 {
+		l.Logf("loop state %v %v -> %v", e.name, e.old, e.new)
+	} else {
+		l.Logf("loop state %v -> %v", e.old, e.new)
 	}
 }
 
@@ -450,6 +492,9 @@ func (n *Node) maybeClearResume() {
 		new_state := makeNodePollerState(active, suspend, poller_active)
 		if n.s.compare_and_swap(old_state, new_state) {
 			n.poller_elog_state(poller_elog_clear_resume, old_state, new_state)
+			if active == 0 {
+				n.changeActive(false)
+			}
 			return
 		}
 	}
@@ -540,6 +585,11 @@ func (l *Loop) dataPoll(p inLooper) {
 	}
 }
 
+func (s *nodePollerState) needs_poll() bool {
+	_, active, _, state := s.get()
+	return (active > 0 || state == poller_resumed) && state != poller_suspended
+}
+
 func (l *Loop) doPollers() {
 	pending := l.nodeStateMain.getAllocPending(l)
 	for _, p := range pending {
@@ -555,8 +605,7 @@ func (l *Loop) doPollers() {
 		a := p.entries[i]
 		n := a.pollerNode
 
-		_, active, _, state := n.s.get()
-		n.s.is_polling = (active > 0 || state == poller_resumed) && state != poller_suspended
+		n.s.is_polling = n.s.needs_poll()
 		if !n.s.is_polling {
 			continue
 		}
