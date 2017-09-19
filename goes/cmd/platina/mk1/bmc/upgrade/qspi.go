@@ -76,7 +76,7 @@ func readFlash(of uint32, sz uint32) (n int, b []byte, err error) {
 	}
 	defer syscall.Close(fd)
 
-	if err = infoQSPI(); err != err {
+	if err = infoQSPI(); err != nil {
 		return 0, nil, err
 	}
 	if n, b, err = readQSPI(of, sz); err != nil {
@@ -93,7 +93,7 @@ func writeImageAll() (err error) {
 	}
 	defer syscall.Close(fd)
 
-	if err = infoQSPI(); err != err {
+	if err = infoQSPI(); err != nil {
 		return err
 	}
 	for _, j := range img {

@@ -96,7 +96,7 @@ func (cmd) Main(args ...string) error {
 		return nil
 	}
 	if flag.ByName["-c"] {
-		if err := checkChecksums(); err != nil {
+		if err := compareChecksums(); err != nil {
 			return err
 		}
 		return nil
@@ -174,12 +174,16 @@ func reportVerQSPI() (err error) {
 	return nil
 }
 
-func checkChecksums() error { //TODO
+func compareChecksums() (err error) {
+	if err = cmpSums(false); err != nil {
+		return err
+	}
+	if err = cmpSums(true); err != nil {
+		return err
+	}
 	return nil
 }
 
-//server unreachable
-//image not found on server
 func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	fmt.Print("\n")
 

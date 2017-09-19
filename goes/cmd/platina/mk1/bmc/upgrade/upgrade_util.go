@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"archive/zip"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -257,4 +258,85 @@ func isVersionNewer(cur string, x string) (n bool, err error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func cmpSums(q bool) (err error) {
+	var ImgInfo [5]IMGINFO
+	if q == false {
+		fmt.Println("\nComparing checksums for QSPI0")
+	} else {
+		fmt.Println("\nComparing checksums for QSPI1")
+	}
+	if err = selectQSPI(q); err != nil {
+		return err
+	}
+
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return err
+	}
+	defer syscall.Close(fd)
+	if err = infoQSPI(); err != nil {
+		return err
+	}
+	_, b, err := readFlash(Qfmt["ver"].off, Qfmt["ver"].siz)
+	if err != nil {
+		return err
+	}
+	k := 0
+	for i, j := range b {
+		if j == ']' {
+			k = i
+		}
+	}
+	if k > 0 {
+		json.Unmarshal(b[JSON_OFFSET:k+1], &ImgInfo)
+	} else {
+		fmt.Println("Version block not found, skipping check")
+		return nil
+	}
+	syscall.Close(fd)
+
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return err
+	}
+	defer syscall.Close(fd)
+	var calcSums [5]string
+	for i, j := range img {
+		if j != "ver" && j != "env" {
+			nn, bb, err := readQSPI(Qfmt[j].off, Qfmt[j].siz)
+			if err != nil {
+				err = fmt.Errorf("Read error: %s %v",
+					"ubo", err)
+				return err
+			}
+			if nn != int(Qfmt[j].siz) {
+				err = fmt.Errorf("Size error %v!=%v: %s %v",
+					0, 0, 0, err)
+				return err
+			}
+			l, err := strconv.Atoi(ImgInfo[i].Size)
+			if err != nil {
+				return err
+			}
+			h := sha1.New()
+			io.WriteString(h, string(bb[0:l]))
+			calcSums[i] = fmt.Sprintf("%x", h.Sum(nil))
+		}
+	}
+
+	chkFail := false
+	for i, _ := range ImgInfo {
+		if calcSums[i] != "" && ImgInfo[i].Chksum != calcSums[i] {
+			fmt.Println("Checksum fail: ", ImgInfo[i].Name)
+			chkFail = true
+		}
+	}
+	if chkFail == false {
+		fmt.Println("Checksums match.")
+	}
+	return nil
 }
