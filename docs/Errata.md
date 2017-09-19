@@ -5,12 +5,11 @@ change over time as issues are resolved.
 
 ## Tuntap mode:
 
+- adding /31 route breaks routing - FIB TCAM issue (can be reproduced easily - needs to be fixed)
 - IF_OPER status at linux tuntap not reflecting actual link-state (on bug list)
-- adding /31 route breaks routing (can be reproduced easily - needs to be fixed)
 - multipath adjacency handling breaks gre (Stig's 4 inv rig - 2 paths one gre the other just eth - needs to be fixed)
 - gre-tunnels: Having trouble getting a script working here. What is correct
 	config for this case? See nsgrevnet.inv[5,4].sh
-
 - panic by vnetd hangs it (not exiting)
 - tuntap gets in mode where goes restart always fails with 
 	panic: pci 0000:03:00.0 Intel 0x15ab: open /dev/vfio/13: device or resource busy
@@ -25,7 +24,7 @@ change over time as issues are resolved.
 # Known panics
 
 
-1. tuntap mode: Panic in MapFib.getLessSpecific()
+1. tuntap mode: Panic in MapFib.getLessSpecific() - not being seen at the moment
 
 Aug 23 10:24:51 invader5 goes.vnetd[1916]: panic(0xb7cac0, 0x13a2000)
 Aug 23 10:24:51 invader5 goes.vnetd[1916]:         /usr/local/go/src/runtime/panic.go:489 +0x2cf
@@ -43,7 +42,7 @@ Aug 23 10:24:51 invader5 goes.vnetd[1916]: github.com/platinasystems/go/vnet/uni
 Aug 23 10:24:51 invader5 goes.vnetd[1916]:         /home/dlobete/src/github.com/platinasystems/go/vnet/unix/netlink.go:507 +0x208
 Aug 23 10:24:51 invader5 goes.vnetd[1916]: github.com/platinasystems/go/vnet/unix.(*netlinkEvent).EventAction(0xc4201130e0)
 
-2. tuntap mode: Panic in (*DmaRequest).l3_generic_interface_admin_up_down
+2. tuntap mode: Panic in (*DmaRequest).l3_generic_interface_admin_up_down - not being seen right now
 
 Aug 24 16:14:49 invader5 goes.vnetd[741]: runtime error: index out of range: goroutine 37 [running]:
 Aug 24 16:14:49 invader5 goes.vnetd[741]: runtime/debug.Stack(0xc4205e79f0, 0xb5b4e0, 0x13796a0)
