@@ -375,10 +375,10 @@ func (d *Node) changeActive(isActive bool) (uint, bool) {
 				panic("too many active pollers")
 			}
 		} else {
-			if poller_panics && n == 0 {
-				panic("negative active count")
+			// n == 0 decrement can happen for concurrent active increment + immediate suspend.
+			if n > 0 {
+				n -= 1
 			}
-			n -= 1
 		}
 		new := makeActivePollerState(n, w && n == 0)
 		if s.compare_and_swap(old, new) {
