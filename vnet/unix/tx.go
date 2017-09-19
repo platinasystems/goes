@@ -163,8 +163,9 @@ func (v *tx_packet_vector) tx_queue(n *tx_node, ri *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
 	v.ri = ri
 	n.AddSuspendActivity(ri, int(v.n_refs))
-	atomic.AddInt32(&intf.active_refs, int32(v.n_refs))
-	iomux.Update(intf)
+	if da := int32(v.n_refs); da == atomic.AddInt32(&intf.active_refs, da) {
+		iomux.Update(intf)
+	}
 	select {
 	case intf.to_tx <- v:
 		if elog.Enabled() {
@@ -207,7 +208,7 @@ func (pv *tx_packet_vector) advance(n *tx_node, intf *tuntap_interface, i uint) 
 	return
 }
 
-func (intf *tuntap_interface) send_packet_vector() (n_packets, n_refs, n_drops uint,
+func (intf *tuntap_interface) write_packet_vector() (n_packets, n_refs, n_drops uint,
 	packet_vector_done, would_block bool, err error) {
 	ns := intf.namespace
 	n := &ns.m.tx_node
@@ -296,7 +297,7 @@ loop:
 				break loop
 			}
 		}
-		np, nr, nd, done, would_block, e := intf.send_packet_vector()
+		np, nr, nd, done, would_block, e := intf.write_packet_vector()
 		n_packets += np
 		n_refs += nr
 		n_drops += nd
@@ -305,8 +306,9 @@ loop:
 			break loop
 		}
 	}
-	atomic.AddInt32(&intf.active_refs, -int32(n_refs))
-	iomux.Update(intf)
+	if 0 == atomic.AddInt32(&intf.active_refs, -int32(n_refs)) {
+		iomux.Update(intf)
+	}
 
 	// Count punts and drops on this interface.
 	{
