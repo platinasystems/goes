@@ -164,8 +164,8 @@ func (d *dev) Init() (err error) {
 	d.tx_dma_enable(0, true)
 	d.rx_dma_enable(0, true)
 
-	d.set_queue_interrupt_mapping(vnet.Rx, 0, 0)
-	d.set_queue_interrupt_mapping(vnet.Tx, 0, 1)
+	d.set_queue_interrupt_mapping(vnet.Rx, 0, rx_queue0_irq)
+	d.set_queue_interrupt_mapping(vnet.Tx, 0, tx_queue0_irq)
 
 	// Accept all broadcast packets.
 	// Multicasts must be explicitly added to dst_ethernet_address register array.
