@@ -260,6 +260,8 @@ type InterruptEnabler interface {
 }
 
 func (l *Loop) disableInterrupts(disable bool) {
+	// FIXME disabling interrupts is broken.
+	return
 	enable := !disable
 	for _, n := range l.dataPollers {
 		if x, ok := n.(InterruptEnabler); ok {
