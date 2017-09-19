@@ -117,6 +117,11 @@ func (d *dev) link_state_change() {
 	})
 }
 
+const (
+	rx_queue0_irq = iota
+	tx_queue0_irq
+)
+
 type irq_event struct {
 	name elog.StringRef
 	irq  interrupt
@@ -146,7 +151,15 @@ func (d *dev) InterfaceInput(out *vnet.RefOut) {
 	d.is_active = uint(0)
 	s := d.irq_status.ReadClear()
 	d.out = out
+
+	// Simulate interrupt if node is active.
+	// Otherwise we might delay until the next real interrupt.
+	if d.IsActive() {
+		s |= 1 << rx_queue0_irq
+	}
+
 	elib.Word(s).ForeachSetBit(d.interrupt_dispatch)
+	d.regs.interrupt.status_write_1_to_clear.set(d, reg(s))
 
 	if d.IsActive() && d.is_active == 0 {
 		d.AddDataActivity(-1)
@@ -163,7 +176,6 @@ func (d *dev) InterfaceInput(out *vnet.RefOut) {
 
 func (d *dev) Interrupt() {
 	s := d.regs.interrupt.status_write_1_to_set.get(d)
-	d.regs.interrupt.status_write_1_to_clear.set(d, reg(s))
 	s_tx := s & d.tx_interrupt_mask
 	s_no_tx := s &^ s_tx
 
@@ -179,6 +191,7 @@ func (d *dev) Interrupt() {
 	// Clean tx rings directly from interrupt since input node may suspend.
 	if s_tx != 0 {
 		elib.Word(s_tx).ForeachSetBit(d.interrupt_dispatch)
+		d.regs.interrupt.status_write_1_to_clear.set(d, reg(s_tx))
 	}
 
 	// Assign any other interrupts (especially rx interrupts) to input routine.
