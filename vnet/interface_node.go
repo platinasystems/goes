@@ -109,7 +109,7 @@ func (n *interfaceNode) ifOutputThread() {
 
 // Largest number of outstanding transmit buffers before we suspend.
 const (
-	MaxOutstandingTxRefs = 4 * MaxVectorLen
+	MaxOutstandingTxRefs = 8 * MaxVectorLen
 )
 
 func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
@@ -214,7 +214,7 @@ type TxRefVecIn struct {
 
 var suspendLimits = loop.SuspendLimits{
 	Suspend: MaxOutstandingTxRefs,
-	Resume:  1 * MaxVectorLen,
+	Resume:  MaxOutstandingTxRefs / 2,
 }
 
 func (v *Vnet) FreeTxRefIn(i *TxRefVecIn) {
