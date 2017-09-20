@@ -19,45 +19,39 @@ import (
 const (
 	Name    = "upgrade"
 	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SRVR[/dir]] [-r] [-l] [-c] [-t] [-u -d -e -k -i -a] [-f]"
+	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-c] [-t] [-f]"
 	Man     = `
 DESCRIPTION
 	The upgrade command updates firmware images.
 
 	The default upgrade version is "LATEST". 
-	Or specify a version using "-v", in the form v0.0[.0][.0]
+	Or specify a version using "-v", in the form YYYYMMDD
 
-	The -l flag lists available upgrade versions.
+	The -l flag display version of selected server and version.
 
-	The -r flag prints a report on version numbers.
+	The -r flag reports QSPI version numbers and booted from.
 
 	By default, images are downloaded from "downloads.platina.com".
-	Or specify a server using "-s" followed by a URL or IPv4 address.
+	Or from a server using "-s" followed by a URL or IPv4 address.
 
-	Upgrades only happen if the version numbers differ,
+	Upgrade proceeds only if the selected version number is newer,
 	unless overridden with the "-f" force flag.
 
 OPTIONS
-	-v [VER]          version number or hash, default is LATEST
+	-v [VER]          version [YYYYMMDD] or LATEST (default)
 	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
 	-t                use TFTP instead of HTTP
-	-l                shows list of available versions for upgrade
-	-r                report current versions, booted from qspi0/1
-	-c                check checksums of flash
-	-u                upgrade u-boot bootloader
-	-d                upgrade DTB device tree
-	-e                upgrade environment for u-boot
-	-k                upgrade kernel
-	-i                upgrade initrd/goes
+	-l                display version of selected server and version
+	-r                report QSPI installed versions, QSPI booted from
+	-c                check SHA-1's of flash
 	-f                force upgrade (ignore version check)`
 
-	DfltMod = 0755
-	DfltSrv = "downloads.platinasystems.com"
-	DfltVer = "LATEST"
-	Machine = "platina-mk1-bmc"
-
-	//names of server files
+	DfltMod     = 0755
+	DfltSrv     = "downloads.platinasystems.com"
+	DfltVer     = "LATEST"
+	Machine     = "platina-mk1-bmc"
 	ArchiveName = "platina-mk1-bmc.zip"
+	VersionName = "platina-mk1-bmc-ver.bin"
 )
 
 type Interface interface {
@@ -75,8 +69,8 @@ type cmd struct{}
 func (cmd) Apropos() lang.Alt { return apropos }
 
 func (cmd) Main(args ...string) error {
-	flag, args := flags.New(args, "-t", "-l", "-f", "-r",
-		"-c", "-u", "-d", "-e", "k", "i", "-a")
+	initQfmt()
+	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c", "-1")
 	parm, args := parms.New(args, "-v", "-s")
 	if len(parm.ByName["-v"]) == 0 {
 		parm.ByName["-v"] = DfltVer
@@ -85,49 +79,32 @@ func (cmd) Main(args ...string) error {
 		parm.ByName["-s"] = DfltSrv
 	}
 
-	if flag.ByName["-a"] {
-		flag.ByName["-u"] = true
-		flag.ByName["-d"] = true
-		flag.ByName["-e"] = true
-		flag.ByName["-k"] = true
-		flag.ByName["-i"] = true
-	}
-	if flag.ByName["-l"] == false &&
-		flag.ByName["-r"] == false && flag.ByName["-u"] == false &&
-		flag.ByName["-d"] == false && flag.ByName["-e"] == false &&
-		flag.ByName["-k"] == false && flag.ByName["-i"] == false {
-		flag.ByName["-a"] = true
-	}
-
 	if flag.ByName["-l"] {
-		if err := showList(parm.ByName["-s"], parm.ByName["-v"],
+		if err := reportVerServer(parm.ByName["-s"], parm.ByName["-v"],
 			flag.ByName["-t"]); err != nil {
 			return err
 		}
 		return nil
 	}
 	if flag.ByName["-r"] {
-		if err := reportVersions(parm.ByName["-s"], parm.ByName["-v"],
-			flag.ByName["-t"]); err != nil {
+		if err := reportVerQSPIdetail(); err != nil {
+			return err
+		}
+		if err := reportVerQSPI(); err != nil {
 			return err
 		}
 		return nil
 	}
 	if flag.ByName["-c"] {
-		if err := checkChecksums(); err != nil {
+		if err := compareChecksums(); err != nil {
 			return err
 		}
 		return nil
 	}
 
-	//FIXME Remove on next commit
-	flag.ByName["-f"] = true
-	flag.ByName["-a"] = true
-
 	if err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"],
-		flag.ByName["-t"], flag.ByName["-u"], flag.ByName["-d"],
-		flag.ByName["-e"], flag.ByName["-k"], flag.ByName["-i"],
-		flag.ByName["-a"], flag.ByName["-f"]); err != nil {
+		flag.ByName["-t"], flag.ByName["-f"],
+		flag.ByName["-1"]); err != nil {
 		return err
 	}
 	return nil
@@ -145,93 +122,128 @@ var (
 		lang.EnUS: Man,
 	}
 )
-var Reboot_flag bool = false
 
-func showList(s string, v string, t bool) error {
-	fn := "LIST"
-	_, err := getFile(s, v, t, fn)
+func reportVerServer(s string, v string, t bool) (err error) {
+	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return err
+		return fmt.Errorf("Server unreachable\n")
 	}
-	l, err := ioutil.ReadFile(fn)
+	if n < 1000 {
+		return fmt.Errorf("Server unreachable\n")
+	}
+	if err := unzip(); err != nil {
+		return fmt.Errorf("Server error: unzipping file: %\n", err)
+	}
+	defer rmFiles()
+
+	l, err := ioutil.ReadFile(VersionName)
 	if err != nil {
-		return err
+		fmt.Printf("Image version not found on server\n")
+		return nil
 	}
-	fmt.Print(string(l))
+	sv := string(l[VERSION_OFFSET:VERSION_LEN])
+	if string(l[VERSION_OFFSET:VERSION_DEV]) == "dev" {
+		sv = "dev"
+	}
+	printVerServer(s, v, sv)
 	return nil
 }
 
-func reportVersions(s string, v string, t bool) (err error) {
-	vr := make([]string, 5, 5)
-	vs := make([]string, 5, 5)
-	for i, j := range img {
-		vr[i] = getVer(j)
-		vs[i], err = getSrvVer(s, v, t, j)
+func reportVerQSPIdetail() (err error) {
+	err = printJSON(false)
+	if err != nil {
+		return err
+	}
+	err = printJSON(true)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func reportVerQSPI() (err error) {
+	iv, err := getInstalledVersions()
+	if err != nil {
+		return err
+	}
+	q, err := getBootedQSPI()
+	if err != nil {
+		return err
+	}
+	printVerQSPI(iv, q)
+	return nil
+}
+
+func compareChecksums() (err error) {
+	if err = cmpSums(false); err != nil {
+		return err
+	}
+	if err = cmpSums(true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func doUpgrade(s string, v string, t bool, f bool, q bool) error {
+	fmt.Print("\n")
+
+	n, err := getFile(s, v, t, ArchiveName)
+	if err != nil {
+		return fmt.Errorf("Server unreachable\n")
+	}
+	if n < 1000 {
+		return fmt.Errorf("Server unreachable\n")
+	}
+	if err := unzip(); err != nil {
+		return fmt.Errorf("Server error: unzipping file: %v\n", err)
+	}
+	defer rmFiles()
+
+	if !f {
+		qv, err := getVerQSPI(q)
 		if err != nil {
 			return err
 		}
-	}
-	prVer(vr, vs)
-	return nil
-}
+		if len(qv) == 0 {
+			fmt.Printf("Aborting, couldn't find version in QSPI\n")
+			fmt.Printf("Use -f to force upgrade.\n")
+			return nil
+		}
 
-func checkChecksums() error { //FIXME
-	return nil
-}
+		l, err := ioutil.ReadFile(VersionName)
+		if err != nil {
+			fmt.Printf("Aborting, couldn't find version number on server\n")
+			fmt.Printf("Use -f to force upgrade.\n")
+			return nil
+		}
+		sv := string(l[VERSION_OFFSET:VERSION_LEN])
+		if string(l[VERSION_OFFSET:VERSION_DEV]) == "dev" {
+			sv = "dev"
+		}
+		if sv != "dev" && qv != "dev" {
+			newer, err := isVersionNewer(qv, sv)
+			if err != nil {
+				fmt.Printf("Aborting, server version error\n", sv)
+				fmt.Printf("Use -f to force upgrade.\n")
+				return nil
+			}
+			if !newer {
+				fmt.Printf("Aborting, server version %s is not newer\n", sv)
+				fmt.Printf("Use -f to force upgrade.\n")
+				return nil
+			}
+		}
+	}
 
-func doUpgrade(s string, v string, t bool, u bool, d bool,
-	e bool, k bool, i bool, a bool, f bool) error {
-	fmt.Print("\n")
-	fn := ArchiveName
-	n, err := getFile(s, v, t, fn)
-	if err != nil {
-		return fmt.Errorf("Error downloading: %v", err)
+	selectQSPI(q)
+	if q == true {
+		fmt.Println("Upgrading QSPI1...\n")
 	}
-	if n < 1000 {
-		return fmt.Errorf("Error file too small: %v", err)
+	if err := writeImageAll(); err != nil {
+		return fmt.Errorf("*** UPGRADE ERROR! ***: %v\n", err)
 	}
-	if err := unzip(); err != nil {
-		return fmt.Errorf("Error unzipping file: %v", err)
-	}
-
-	if a && f { //FIXME CUT THIS
-		if err := writeImageAll(); err != nil {
-			return fmt.Errorf("*** UPGRADE ERROR! ***: %v", err)
-		}
-		Reboot_flag = true
-	} else { //FIXME turn into a LOOP
-		if u {
-			if err := upgradeX(s, v, t, "ubo", f); err != nil {
-				return fmt.Errorf("Flash write error: %v", err)
-			}
-		}
-		if d {
-			if err := upgradeX(s, v, t, "dtb", f); err != nil {
-				return fmt.Errorf("Flash write error: %v", err)
-			}
-		}
-		if e {
-			if err := upgradeX(s, v, t, "env", f); err != nil {
-				return fmt.Errorf("Flash write error: %v", err)
-			}
-		}
-		if k {
-			if err := upgradeX(s, v, t, "ker", f); err != nil {
-				return fmt.Errorf("Flash write error: %v", err)
-			}
-		}
-		if i {
-			if err := upgradeX(s, v, t, "ini", f); err != nil {
-				return fmt.Errorf("Flash write error: %v", err)
-			}
-			Reboot_flag = true
-		}
-	}
-	if Reboot_flag {
-		if err := reboot(); err != nil {
-			return err
-		}
-		return nil
+	if err := reboot(); err != nil {
+		return err
 	}
 	return nil
 }

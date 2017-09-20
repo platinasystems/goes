@@ -23,22 +23,18 @@ const (
 	Name    = "ip"
 	Apropos = "show / manipulate routing, etc."
 	Usage   = `
-	ip [OPTION]... OBJECT COMMAND [ARG]... 
-	ip apropos [ OBJECT ]
-	ip { man | usage } OBJECT
+	ip [ OPTION... ] OBJECT COMMAND [ ARG... ]
 	ip [ -n NAMESPACE ] -batch [ -x | -f ] [ - | FILE ]
-	ip [ -x | -f ] [ - | FILE ]
 	
-	OBJECT := { address | link | monitor | neighbor | netns | route }
+OBJECT := { address | link | monitor | neighbor | netns | route }
 
-	OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
-		-human[-readable] | -iec |
-		-f[amily] { inet | inet6 | mpls | bridge | link } |
-		-4 | -6 | -B | -0 |
-		-l[oops] { maximum-addr-flush-attempts } | -br[ief] |
-		-o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
-		-rc[vbuf] [size] | -n[etns] name | -a[ll] | -c[olor] }
-	`
+OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
+	-human[-readable] | -iec |
+	-f[amily] { inet | inet6 | mpls | bridge | link } |
+	-4 | -6 | -B | -0 |
+	-l[oops] { maximum-addr-flush-attempts } | -br[ief] |
+	-o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
+	-rc[vbuf] [size] | -n[etns] name | -a[ll] | -c[olor] }`
 )
 
 func New() *goes.Goes {

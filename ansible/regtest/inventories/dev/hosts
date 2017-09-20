@@ -1,0 +1,13 @@
+[tors]
+i28 ansible_host=172.17.2.28 hostn=invader28
+i29 ansible_host=172.17.2.29 hostn=invader29
+i30 ansible_host=172.17.2.30 hostn=invader30
+i31 ansible_host=172.17.2.31 hostn=invader31
+i32 ansible_host=172.17.2.32 hostn=invader32
+i33 ansible_host=172.17.6.33 hostn=invader33
+i34 ansible_host=172.17.6.34 hostn=invader34
+i35 ansible_host=172.17.6.35 hostn=invader35
+i36 ansible_host=172.17.6.36 hostn=invader36
+i37 ansible_host=172.17.6.37 hostn=invader37
+[pktgens]
+i10 ansible_host=172.17.2.10 hostn=invader10

@@ -52,8 +52,6 @@ pipeline {
 		subject: 'GOES build ok',
 		cc: email_cc,
 		to: email_to
-	    build job: 'buildroot pipeline/buildroot',
-	        wait: false
 	}
 
 	failure {

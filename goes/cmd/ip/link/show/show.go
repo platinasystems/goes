@@ -17,14 +17,8 @@ import (
 const (
 	Name    = "show"
 	Apropos = "link attributes"
-	Usage   = `
-	ip [ OPTIONS ] link show
-		[ [dev] DEVICE | group GROUP ]
-		[ up ]
-		[ master DEVICE ]
-		[ type ETYPE ]
-		[ vrf NAME ]
-`
+	Usage   = `ip link show [ [dev] DEVICE | group GROUP ] [ up ]
+	[ master DEVICE ] [ type ETYPE ] [ vrf NAME ]`
 )
 
 var (

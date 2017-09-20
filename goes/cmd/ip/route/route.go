@@ -16,61 +16,55 @@ const (
 	Name    = "route"
 	Apropos = "routing table management"
 	Usage   = `
-	ip [ ip-OPTIONS ] route  [ COMMAND [ ARGS ]... ]
-
 	ip route [ show ]
 	ip route { show | flush } SELECTOR
-
 	ip route save SELECTOR
 	ip route restore
-
-	ip route get ADDRESS [ from ADDRESS iif STRING  ] [ oif STRING ]
+	ip route { add | del | change | append | replace } ROUTE
+	ip route get ADDRESS [ from ADDRESS iif IFNAME  ] [ oif IFNAME ]
 		[ tos TOS ] [ vrf NAME ]
 
-	ip route { add | del | change | append | replace } ROUTE
+SELECTOR := [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ]
+	[ table TABLE_ID ] [ vrf NAME ] [ proto RTPROTO ]
+	[ type TYPE ] [ scope SCOPE ]
 
-	SELECTOR := [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ]
-		[ table TABLE_ID ] [ vrf NAME ] [ proto RTPROTO ]
-		[ type TYPE ] [ scope SCOPE ]
+ROUTE := NODE_SPEC [ INFO_SPEC ]
 
-	ROUTE := NODE_SPEC [ INFO_SPEC ]
+NODE_SPEC := [ TYPE ] PREFIX [ tos TOS ] [ table TABLE_ID ]
+	[ proto RTPROTO ] [ scope SCOPE ] [ metric METRIC ]
 
-	NODE_SPEC := [ TYPE ] PREFIX [ tos TOS ] [ table TABLE_ID ]
-		[ proto RTPROTO ] [ scope SCOPE ] [ metric METRIC ]
+INFO_SPEC := NH OPTIONS [ nexthop NH ] ...
 
-	INFO_SPEC := NH OPTIONS [ nexthop NH ] ...
+NH := [ encap ENCAP ] [ via ADDRESS ] [ dev STRING ] [ weight NUMBER ]
+	NHFLAGS
 
-	NH := [ encap ENCAP ] [ via ADDRESS ] [ dev STRING ] [ weight NUMBER ]
-		NHFLAGS
+OPTIONS := [ mtu NUMBER ] [ advmss NUMBER ] [ as [ to ] ADDRESS ]
+	[ rtt TIME ] [ rttvar TIME ] [ reordering NUMBER ]
+	[ window NUMBER ] [ cwnd NUMBER ] [ ssthresh REALM ]
+	[ realms REALM ] [ rto_min TIME ] [ initcwnd NUMBER ]
+	[ initrwnd NUMBER ] [ features FEATURES ] [ quickack BOOL ]
+	[ congctl NAME ] [ pref PREF ] [ expires TIME ]
 
-	OPTIONS := [ mtu NUMBER ] [ advmss NUMBER ] [ as [ to ] ADDRESS ]
-		[ rtt TIME ] [ rttvar TIME ] [ reordering NUMBER ]
-		[ window NUMBER ] [ cwnd NUMBER ] [ ssthresh REALM ]
-		[ realms REALM ] [ rto_min TIME ] [ initcwnd NUMBER ]
-		[ initrwnd NUMBER ] [ features FEATURES ] [ quickack BOOL ]
-		[ congctl NAME ] [ pref PREF ] [ expires TIME ]
+TYPE := [ unicast | local | broadcast | multicast | throw | unreachable
+       | prohibit | blackhole | nat ]
 
-	TYPE := [ unicast | local | broadcast | multicast | throw | unreachable
-               | prohibit | blackhole | nat ]
+TABLE_ID := [ local| main | default | all | NUMBER ]
 
-	TABLE_ID := [ local| main | default | all | NUMBER ]
+SCOPE := [ host | link | global | NUMBER ]
 
-	SCOPE := [ host | link | global | NUMBER ]
+NHFLAGS := [ onlink | pervasive ]
 
-	NHFLAGS := [ onlink | pervasive ]
+RTPROTO := [ kernel | boot | static | NUMBER ]
 
-	RTPROTO := [ kernel | boot | static | NUMBER ]
+FEATURES := [ ecn | ]
 
-	FEATURES := [ ecn | ]
+PREF := [ low | medium | high ]
 
-	PREF := [ low | medium | high ]
+ENCAP := [ MPLS | IP ]
 
-	ENCAP := [ MPLS | IP ]
+ENCAP_MPLS := mpls [ LABEL ]
 
-	ENCAP_MPLS := mpls [ LABEL ]
-
-	ENCAP_IP := ip id TUNNEL_ID dst REMOTE_IP [ tos TOS ] [ ttl TTL ]
-	`
+ENCAP_IP := ip id TUNNEL_ID dst REMOTE_IP [ tos TOS ] [ ttl TTL ]`
 )
 
 func New() *goes.Goes {

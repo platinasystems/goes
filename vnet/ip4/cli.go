@@ -129,6 +129,13 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	return
 }
 
+func (m *Main) clearIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
+	// Sync adjacency stats with hardware.
+	m.CallAdjSyncCounterHooks()
+	m.Main.ClearAdjCounters()
+	return
+}
+
 func (m *Main) adjLines(baseAdj ip.Adj, detail bool) (lines []string) {
 	const initialSpace = "  "
 	nhs := m.NextHopsForAdj(baseAdj)
@@ -193,6 +200,11 @@ func (m *Main) cliInit(v *vnet.Vnet) {
 			Name:      "show ip fib",
 			ShortHelp: "show ip4 forwarding table",
 			Action:    m.showIpFib,
+		},
+		cli.Command{
+			Name:      "clear ip fib",
+			ShortHelp: "clear ip4 forwarding table statistics",
+			Action:    m.clearIpFib,
 		},
 	}
 	for i := range cmds {

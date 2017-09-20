@@ -1,0 +1,9 @@
+- name: delete/clean-up dummy0 interface
+  # If ifc doesn't exist, then script
+  # will error, so ignore_errors.
+  ignore_errors: yes
+  shell: ip link del dummy0
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2

@@ -14,11 +14,9 @@ const (
 	Name    = "-batch"
 	Apropos = "ip commands from file or stdin"
 	Usage   = `ip [-n NAMESPACE] -batch  [ -x | -f ] [ - | FILE ]`
-
-	Man = `
+	Man     = `
 SEE ALSO
-	man ip || ip -man
-`
+	man ip || ip -man`
 )
 
 var (

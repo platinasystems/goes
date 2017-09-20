@@ -1,0 +1,54 @@
+- name: check if ~/workspace/ exists
+  stat:
+    path: /home/platina/workspace/go/src
+  register: p
+- debug:
+    msg: "Path exists and is a directory"
+  when: p.stat.isdir is defined and p.stat.isdir
+- name: create ~/workspace/
+  file: path=/home/platina/workspace/go/src state=directory owner=platina group=platina mode=0755
+  when: p.stat.isdir is not defined
+
+- name: check if go/bin exists
+  stat:
+    path: /home/platina/workspace/go/bin
+  register: p
+- debug:
+    msg: "Path exists and is a directory"
+  when: p.stat.isdir is defined and p.stat.isdir
+- name: create go/bin
+  file: path=/home/platina/workspace/go/bin state=directory owner=platina group=platina mode=0755
+  when: p.stat.isdir is not defined
+
+- name: check if go/pkg exists
+  stat:
+    path: /home/platina/workspace/go/pkg
+  register: p
+- debug:
+    msg: "Path exists and is a directory"
+  when: p.stat.isdir is defined and p.stat.isdir
+- name: create go/pkg
+  file: path=/home/platina/workspace/go/pkg state=directory owner=platina group=platina mode=0755
+  when: p.stat.isdir is not defined
+
+- name: add golang line to .profile
+  lineinfile:
+    dest=/home/platina/.profile
+    line="export PATH=$PATH:/usr/local/go/bin"
+    state=present
+    insertafter=EOF
+
+- name: add golang line to .profile
+  lineinfile:
+    dest=/home/platina/.profile
+    line="export GOPATH=$HOME/workspace/go"
+    state=present
+    insertafter=EOF
+
+- name: add golang line to .profile
+  lineinfile:
+    dest=/home/platina/.profile
+    line="export PATH=$PATH:$GOPATH/bin"
+    state=present
+    insertafter=EOF
+

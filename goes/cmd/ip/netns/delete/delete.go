@@ -18,13 +18,11 @@ import (
 const (
 	Name    = "delete"
 	Apropos = "remove network namespace"
-	Usage   = `
-	ip [-all] netns delete [NETNSNAME]
-	`
-	Man = `
+	Usage   = `ip [-all] netns delete [NETNSNAME]`
+	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var (

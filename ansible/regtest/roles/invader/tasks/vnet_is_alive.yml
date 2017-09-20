@@ -1,0 +1,16 @@
+- name: check vnet aliveness
+  shell: goes vnet sh ip fib
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+- debug:
+    # This debug proves that inventories/dev/group_vars/all varsfile was loaded.
+    var: ntp_server
+    verbosity: 2
+- assert:
+    that:
+      - "'Destination' in cmd_output.stdout"
+# We don't need to check cmd_output.stderr because
+# 'check vnet aliveness' will fail when 'goes'
+# returns rc=1 (when vnet is down).

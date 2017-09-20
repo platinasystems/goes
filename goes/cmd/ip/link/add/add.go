@@ -14,21 +14,19 @@ import (
 const (
 	Name    = "add"
 	Apropos = "virtual link"
-	Usage   = `
-	ip link add [ link DEVICE ] [ name ] NAME
-		[ txqueuelen PACKETS ] [ address LLADDR ] [ broadcast LLADDR ]
-		[ mtu MTU ] [ index IDX ] [ numtxqueues QUEUE_COUNT ]
-		[ numrxqueues QUEUE_COUNT ] type TYPE [ ARGS ]
+	Usage   = `ip link add [ link DEVICE ] [ name ] NAME
+	[ txqueuelen PACKETS ] [ address LLADDR ] [ broadcast LLADDR ]
+	[ mtu MTU ] [ index IDX ] [ num{r|t}xqueues COUNT ]
+	type TYPE [ ARGS ]
 
-	TYPE := { bridge | bond | can | dummy | hsr | ifb | ipoib | macvlan |
-		macvtap | vcan | veth | vlan | vxlan | ip6tnl | ipip | sit |
-		gre | gretap | ip6gre | ip6gretap | vti | nlmon | ipvlan |
-		lowpan | geneve | vrf | macsec }
-	`
+TYPE := { bridge | bond | can | dummy | hsr | ifb | ipoib | macvlan |
+	macvtap | vcan | veth | vlan | vxlan | ip6tnl | ipip | sit |
+	gre | gretap | ip6gre | ip6gretap | vti | nlmon | ipvlan |
+	lowpan | geneve | vrf | macsec }`
 	Man = `
 SEE ALSO
 	ip man link || ip link -man
-`
+	man ip || ip -man`
 )
 
 var (

@@ -51,8 +51,14 @@ func getRegs() *regs {
 	clearJ()
 	return (*regs)(regsPointer)
 }
+func getRegsE() *regsE {
+	clearJ()
+	return (*regsE)(regsPointer)
+}
+
 func (r *reg8) offset() uint8   { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 func (r *reg8b) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
+func (r *reg32B) offset() uint8 { return uint8(uintptr(unsafe.Pointer(r)) - regsAddr) }
 func (r *reg16) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 func (r *reg16r) offset() uint8 { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 
@@ -83,6 +89,17 @@ func (r *reg8b) get(h *I2cDev, readLen byte) {
 	x++
 	data[0] = readLen
 	j[x] = I{true, i2c.Read, r.offset(), i2c.I2CBlockData, data, h.Bus, h.Addr, 0}
+	x++
+}
+
+func (r *reg32B) get(h *I2cDev) {
+	var data = [34]byte{0, 0, 0, 0}
+
+	data[0] = byte(h.MuxValue)
+	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
+	x++
+	data[0] = 33
+	j[x] = I{true, i2c.Read, r.offset(), i2c.I2CBlockData, data, h.Bus, h.AddrProm, 0}
 	x++
 }
 

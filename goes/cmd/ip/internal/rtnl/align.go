@@ -10,6 +10,7 @@ const (
 	PAGE  align = 4 << 10
 	NLMSG align = syscall.NLMSG_ALIGNTO
 	RTA   align = syscall.RTA_ALIGNTO
+	RTNH  align = syscall.RTNH_ALIGNTO
 )
 
 type align int

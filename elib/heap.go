@@ -389,3 +389,12 @@ func (heap *Heap) String() (s string) {
 	}
 	return
 }
+
+func (heap *Heap) Foreach(f func(offset, len uint)) {
+	for ei := range heap.elts {
+		e := &heap.elts[ei]
+		if !e.isFree() {
+			f(uint(e.offset), uint(heap.eltSize(e)))
+		}
+	}
+}

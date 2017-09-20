@@ -168,13 +168,7 @@ type Be64Attr uint64
 
 func (v NilAttr) Read(b []byte) (int, error) { return 0, nil }
 
-func (v BytesAttr) Read(b []byte) (int, error) {
-	if len(b) < len(v) {
-		return 0, syscall.EOVERFLOW
-	}
-	copy(b, []byte(v))
-	return len(v), nil
-}
+func (v BytesAttr) Read(b []byte) (int, error) { return cp(b, v) }
 
 func (v Int8Attr) Read(b []byte) (int, error) {
 	if len(b) < 1 {

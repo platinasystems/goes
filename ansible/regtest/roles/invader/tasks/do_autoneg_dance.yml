@@ -1,0 +1,14 @@
+- include_vars: "{{ item }}"
+  with_first_found:
+    # No need to specify path if varfiles are in /roles/x/vars/
+    - "{{ ansible_hostname }}.yml"
+    - default.yml
+- name: do autoneg dance
+  # No need to specify path if script is in roles/x/files/
+  script: do_autoneg_dance_pktgen_ifcs.sh {{ item }}
+  register: cmd_output
+  with_items: "{{ interfaces_to_autoneg }}"
+- debug:
+    var: cmd_output
+    verbosity: 2
+

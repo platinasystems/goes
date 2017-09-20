@@ -1,0 +1,17 @@
+interfaces_to_autoneg:
+  - eth-1-1
+
+interface_ip_addresses:
+  - interface: eth-2-1
+    addresses:
+      - address_with_mask: 10.0.2.16/24
+
+neighbors_addresses_to_ping:
+  - 10.0.2.14
+  - 10.0.4.14
+  - 10.0.30.14
+  - 10.0.32.14
+
+bgp_neighbor_addresses:
+  - 10.0.2.14  # invader14
+  - 10.9.1.17  # invader17

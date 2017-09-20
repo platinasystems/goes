@@ -1,0 +1,5 @@
+---
+- name: install psmisc, if needed
+  # For 'killall' cmd.
+  apt: name=psmisc state=present
+

@@ -19,13 +19,11 @@ import (
 const (
 	Name    = "pids"
 	Apropos = "list PIDS in given network namespace"
-	Usage   = `
-	ip netns pids NETNSNAME
-	`
-	Man = `
+	Usage   = `ip netns pids NETNSNAME`
+	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var apropos = lang.Alt{

@@ -14,13 +14,12 @@ import (
 const (
 	Name    = "delete"
 	Apropos = "virtual link"
-	Usage   = `
-	ip link delete { [dev] DEVICE | group GROUP } type TYPE [ ARGS ]
-	`
+	Usage   = `ip link delete { [dev] DEVICE | group GROUP }
+	[ type TYPE [ OPTION... ]]`
 	Man = `
 SEE ALSO
 	ip man link add || ip link -man
-`
+	man ip || ip -man`
 )
 
 var (

@@ -13,20 +13,11 @@ import (
 )
 
 const (
-	Name    = "add | change | delete | replace"
 	Apropos = "link address"
-	Usage   = `
-	ip neighbor { add | change | delete | replace }
-		{ ADDR [ lladdr LLADDR ] [ nud STATE ] | proxy ADDR }
-		[ dev DEV ]
-
-	STATE := { permanent | noarp | stale | reachable | none | incomplete |
-		delay | probe | failed }
-	`
-	Man = `
+	Man     = `
 SEE ALSO
 	ip man neighbor || ip neighbor -man
-`
+	man ip || ip -man`
 )
 
 var (
@@ -48,7 +39,14 @@ type mod options.Options
 func (Command) Apropos() lang.Alt { return apropos }
 func (Command) Man() lang.Alt     { return man }
 func (c Command) String() string  { return string(c) }
-func (Command) Usage() string     { return Usage }
+func (c Command) Usage() string {
+	return fmt.Sprint("ip neighbor ", c,
+		` { ADDR [ lladdr LLADDR ] [ nud STATE ] | proxy ADDR }
+	[ dev DEV ]
+
+STATE := { permanent | noarp | stale | reachable | none | incomplete |
+	delay | probe | failed }`)
+}
 
 func (c Command) Main(args ...string) error {
 	var err error

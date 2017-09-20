@@ -1,0 +1,10 @@
+---
+# Not all routers have a 'start' file, so ok to 'ignore_errors'
+- name: upload /etc/goes/start
+  ignore_errors: yes
+  copy:
+    src: "{{ ansible_hostname }}/start"
+    dest: /etc/goes/
+    owner: root
+    group: root
+    mode: 0644

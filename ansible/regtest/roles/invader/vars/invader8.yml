@@ -1,0 +1,13 @@
+interfaces_to_autoneg:
+  - eth-31-0
+
+interface_ip_addresses:
+  - interface: eth-31-0
+    addresses:
+      - address_with_mask: 192.168.155.3/24
+
+neighbors_addresses_to_ping:
+  - 192.168.155.2
+
+bgp_neighbor_addresses:
+  - 192.168.155.2

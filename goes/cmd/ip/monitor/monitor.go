@@ -25,9 +25,9 @@ const (
 	ip monitor file FILE [label]
 	ip monitor [ all | OBJECT... ] save file
 	ip monitor [ all | OBJECT... ] [label] [all-nsid] [-t | -ts]
-OBJECT := link | address | route | mroute | prefix | neigh | netconf | rule
-	| nsid
-	`
+
+OBJECT := link | address | route | mroute | prefix | neigh | netconf | rule |
+	nsid`
 	Man = `
 OPTIONS
 	file FILE
@@ -56,7 +56,7 @@ OPTIONS
 
 SEE ALSO
 	ip man monitor || ip monitor -man
-`
+	man ip || ip -man`
 )
 
 var (

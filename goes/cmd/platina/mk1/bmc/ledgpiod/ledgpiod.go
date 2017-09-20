@@ -68,11 +68,11 @@ var (
 	fanLedYellow byte = 0x6
 	fanLedOff    byte = 0x0
 
-	deviceVer     byte
-	forceFanSpeed bool
-
-	once sync.Once
-	Init = func() {}
+	deviceVer          byte
+	forceFanSpeed      bool
+	systemFanDirection string
+	once               sync.Once
+	Init               = func() {}
 
 	first int
 
@@ -137,7 +137,7 @@ func (c *Command) Main(...string) error {
 		}
 	}
 
-	t := time.NewTicker(5 * time.Second)
+	t := time.NewTicker(2 * time.Second)
 	for {
 		select {
 		case <-c.stop:
@@ -177,7 +177,18 @@ func (c *Command) update() error {
 	if err != nil {
 		return err
 	}
+
+	for k, _ := range VpageByKey {
+		if strings.Contains(k, "fan_direction") {
+			v := Vdev.CheckSystemFans()
+			if (v != "") && (v != c.lasts[k]) {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+		}
+	}
 	return nil
+
 }
 
 func (h *I2cDev) LedFpInit() error {
@@ -410,6 +421,63 @@ func (h *I2cDev) LedStatus() error {
 		}
 	}
 	return nil
+}
+
+func (h *I2cDev) CheckSystemFans() string {
+
+	mismatch := false
+	var n string
+	for j := 0; j < maxFanTrays; j++ {
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j+1))+".status")
+		var d string
+
+		if strings.Contains(p, "back->front") {
+			d = "back->front"
+		} else if strings.Contains(p, "front->back") {
+			d = "front->back"
+		}
+		if n == "" {
+			n = d
+		} else {
+			if n != d {
+				systemFanDirection = "mixed"
+				mismatch = true
+				break
+			}
+		}
+	}
+	if !mismatch {
+		for i := 0; i < maxPsu; i++ {
+			var d string
+			p, _ := redis.Hget(redis.DefaultHash, "psu"+strconv.Itoa(i+1)+".fan_direction")
+			if strings.Contains(p, "back->front") {
+				d = "back->front"
+			} else if strings.Contains(p, "front->back") {
+				d = "front->back"
+			}
+			if n == "" {
+				n = d
+			} else {
+				if n != d {
+					systemFanDirection = "mixed"
+					mismatch = true
+					break
+				}
+			}
+
+		}
+	}
+	if mismatch {
+		systemFanDirection = "mixed"
+		p, _ := redis.Hget(redis.DefaultHash, "system.fan_direction")
+		if !strings.Contains(p, "mixed") {
+			log.Print("warning: mismatching fan direction detected, check fan trays and PSUs")
+		}
+	} else {
+		systemFanDirection = n
+	}
+
+	return systemFanDirection
 }
 
 func writeRegs() error {

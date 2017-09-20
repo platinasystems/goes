@@ -5,6 +5,7 @@ type reg8b byte
 type reg16 [2]byte
 type reg16r [2]byte
 type regi16 reg16
+type reg32B [32]byte
 
 // Memory map
 // offsets are 16-bit to accomodate the mixed 8-bit 16-bit accesses
@@ -57,4 +58,8 @@ type regs struct {
 	_           byte
 	MfgMod      reg8b // 0x9a
 	_           byte
+}
+
+type regsE struct {
+	block [8]reg32B
 }

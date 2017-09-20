@@ -1,0 +1,27 @@
+---
+# Test bugfix, github issue #16, "panic: unix:/run/goes/socks/vnet -> unix:@"
+- name: vnet show cmd w/o head
+  shell: sudo goes vnet show fe1 po ph
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+# Pipe to 'head' caused vnet to die in issue #16.
+- name: vnet show cmd pipe to head
+  shell: sudo goes vnet show fe1 po ph | head
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+# Sometimes you have to do it twice to surface the bug.
+- name: vnet show cmd pipe to head
+  shell: sudo goes vnet show fe1 po ph | head
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
+
+# If bugfix is legit, then vnet should still be alive.
+- include: vnet_is_alive.yml

@@ -18,7 +18,7 @@ const (
 	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
-`
+	man ip || ip -man`
 )
 
 var (

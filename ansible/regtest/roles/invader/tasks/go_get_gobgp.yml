@@ -1,0 +1,6 @@
+- name: go get gobgp
+  script: go_get_gobgp.sh
+  register: cmd_output
+- debug:
+    var: cmd_output
+    verbosity: 2
