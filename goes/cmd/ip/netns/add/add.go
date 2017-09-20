@@ -23,6 +23,7 @@ const (
 SEE ALSO
 	ip man netns || ip netns -man
 	man ip || ip -man`
+	ProcSelfNsNet = "/proc/self/ns/net"
 )
 
 const VarRunNetnsMode = syscall.S_IRWXU |
@@ -92,22 +93,22 @@ func (Command) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	f.Close()
 
 	del := func() {
 		syscall.Unmount(fn, syscall.MNT_DETACH)
 		syscall.Unlink(fn)
 	}
 
-	if err = syscall.Unshare(syscall.CLONE_NEWNS); err != nil {
+	err = syscall.Unshare(syscall.CLONE_NEWNET)
+	if err != nil {
 		del()
 		return err
 	}
-	if err = syscall.Mount("/proc/self/ns/net", fn, "none",
-		syscall.MS_BIND, ""); err != nil {
+	err = syscall.Mount(ProcSelfNsNet, fn, "none", syscall.MS_BIND, "")
+	if err != nil {
 		del()
 		return err
 	}
-	// FIXME the new namespace includes interfaces from the default ns
 	return nil
 }
