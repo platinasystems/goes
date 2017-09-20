@@ -35,6 +35,45 @@ type Prefix struct {
 	Len uint32
 }
 
+// NewPrefix returns prefix with given length and address.
+// Address will be masked so that only length bits may be non-zero.
+func NewPrefix(l uint32, a []byte) (p Prefix) {
+	p.Len = l
+	i, n_left := 0, int(l)
+	for n_left > 0 {
+		mask := byte(0xff)
+		if n_left < 8 {
+			mask = (1<<uint(n_left) - 1) << uint(8-n_left)
+		}
+		p.Address[i] = a[i] & mask
+		i++
+		n_left -= 8
+	}
+	return
+}
+
+// Returns whether p matches q and is more specific.
+func (p *Prefix) IsMoreSpecific(q *Prefix) (ok bool) {
+	if p.Len <= q.Len {
+		return
+	}
+	// Compare masked bits up to less specific length.
+	i, n_left := 0, int(q.Len)
+	for n_left > 0 {
+		mask := byte(0xff)
+		if n_left < 8 {
+			mask = (1<<uint(n_left) - 1) << uint(8-n_left)
+		}
+		ok = p.Address[i]&mask == q.Address[i]&mask
+		if !ok {
+			return
+		}
+		i++
+		n_left -= 8
+	}
+	return
+}
+
 func (p *Prefix) String(m *Main) string {
 	return m.AddressStringer(&p.Address) + "/" + strconv.Itoa(int(p.Len))
 }
