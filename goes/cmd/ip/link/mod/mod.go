@@ -7,6 +7,8 @@ package mod
 import (
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
@@ -25,6 +27,53 @@ var (
 	}
 	man = lang.Alt{
 		lang.EnUS: Man,
+	}
+	Flags = []interface{}{
+		[]string{"up", "+up"},
+		[]string{"down", "no-up", "-up"},
+		[]string{"no-master", "-master"},
+		[]string{"arp", "+arp"},
+		[]string{"no-arp", "-arp"},
+		[]string{"dynamic", "+dynamic"},
+		[]string{"no-dynamic", "-dynamic"},
+		[]string{"multicast", "+multicast"},
+		[]string{"no-multicast", "-multicast"},
+		[]string{"allmulticast", "+allmulticast"},
+		[]string{"no-allmulticast", "-allmulticast"},
+		[]string{"promisc", "+promisc"},
+		[]string{"no-promisc", "-promisc"},
+		[]string{"trailers", "+trailers"},
+		[]string{"no-trailers", "-trailers"},
+		[]string{"carrier", "+carrier"},
+		[]string{"no-carrier", "-carrier"},
+		[]string{"protodown", "+protodown"},
+		[]string{"no-protodown", "-protodown"},
+		[]string{"no-master", "-master"},
+		[]string{"no-vrf", "-vrf"},
+	}
+	Parms = []interface{}{
+		"dev",
+		"link",
+		"index",
+		"group",
+		"addrgenmode",
+		"type",
+		"vf",
+		"name",
+		"alias",
+		"qdisc",
+		"mtu",
+		"address",
+		"master",
+		"vrf",
+		"link-netnsid",
+		"netns",
+		"mode",
+		"state",
+		[]string{"broadcast", "brd"},
+		"numrxqueues",
+		"numtxqueues",
+		[]string{"txqueuelen", "qlen", "txqlen"},
 	}
 )
 
@@ -47,6 +96,8 @@ type Command struct {
 	ifindicesByGroup map[uint32][]int32
 
 	indices []int32
+
+	netns *os.File
 }
 
 func (*Command) Apropos() lang.Alt { return apropos }
@@ -78,6 +129,9 @@ func (c *Command) Main(args ...string) error {
 	c.opt, c.args = options.New(args)
 	if err = c.parse(); err != nil {
 		return err
+	}
+	if c.netns != nil {
+		defer c.netns.Close()
 	}
 
 	c.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK
@@ -149,23 +203,9 @@ func (c *Command) parse() error {
 	var dev, link int32
 	var gid uint32
 
-	c.args = c.opt.Flags.More(c.args,
-		[]string{"up", "+up"},
-		[]string{"down", "no-up", "-up"},
-		[]string{"no-master", "-master"},
-		[]string{"arp", "+arp"},
-		[]string{"no-arp", "-arp"},
-		[]string{"dynamic", "+dynamic"},
-		[]string{"no-dynamic", "-dynamic"},
-		[]string{"multicast", "+multicast"},
-		[]string{"no-multicast", "-multicast"},
-		[]string{"allmulticast", "+allmulticast"},
-		[]string{"no-allmulticast", "-allmulticast"},
-		[]string{"promisc", "+promisc"},
-		[]string{"no-promisc", "-promisc"},
-		[]string{"trailers", "+trailers"},
-		[]string{"no-trailers", "-trailers"},
-	)
+	c.args = c.opt.Flags.More(c.args, Flags...)
+	c.args = c.opt.Parms.More(c.args, Parms...)
+
 	for _, x := range []struct {
 		set   string
 		unset string
@@ -187,14 +227,6 @@ func (c *Command) parse() error {
 			c.msg.Flags &^= x.flag
 		}
 	}
-	c.args = c.opt.Flags.More(c.args,
-		[]string{"carrier", "+carrier"},
-		[]string{"no-carrier", "-carrier"},
-		[]string{"protodown", "+protodown"},
-		[]string{"no-protodown", "-protodown"},
-		"no-master",
-		"no-vrf",
-	)
 	for _, x := range []struct {
 		set   string
 		unset string
@@ -223,8 +255,6 @@ func (c *Command) parse() error {
 				rtnl.Attr{x.t, rtnl.Int32Attr(0)})
 		}
 	}
-
-	c.args = c.opt.Parms.More(c.args, "dev", "link")
 	for _, x := range []struct {
 		name string
 		p    *int32
@@ -241,7 +271,6 @@ func (c *Command) parse() error {
 			}
 		}
 	}
-	c.args = c.opt.Parms.More(c.args, "index")
 	if s := c.opt.Parms.ByName["index"]; c.name == "add" && len(s) > 0 {
 		var ifindex int32
 		if _, err = fmt.Sscan(s, &ifindex); err != nil {
@@ -249,7 +278,6 @@ func (c *Command) parse() error {
 		}
 		c.indices = []int32{ifindex}
 	}
-	c.args = c.opt.Parms.More(c.args, "group")
 	if s := c.opt.Parms.ByName["group"]; len(s) > 0 {
 		if gid = group.Id(s); gid == nogroup {
 			return fmt.Errorf("group: %q not found", s)
@@ -257,7 +285,6 @@ func (c *Command) parse() error {
 	} else {
 		gid = nogroup
 	}
-	c.args = c.opt.Parms.More(c.args, "addrgenmode", "type", "vf")
 	for _, x := range []struct {
 		name  string
 		parse func(string) error
@@ -272,7 +299,6 @@ func (c *Command) parse() error {
 			}
 		}
 	}
-	c.args = c.opt.Parms.More(c.args, "name", "alias", "qdisc")
 	for _, x := range []struct {
 		name string
 		t    uint16
@@ -287,13 +313,11 @@ func (c *Command) parse() error {
 		}
 		c.attrs = append(c.attrs, rtnl.Attr{x.t, rtnl.KstringAttr(s)})
 	}
-	c.args = c.opt.Parms.More(c.args, "link-nsid", "mtu", "numtxqueues",
-		"numrxqueues", []string{"txqueuelen", "qlen", "txqlen"})
 	for _, x := range []struct {
 		name string
 		t    uint16
 	}{
-		{"link-nsid", rtnl.IFLA_LINK_NETNSID},
+		{"link-netnsid", rtnl.IFLA_LINK_NETNSID},
 		{"mtu", rtnl.IFLA_MTU},
 		{"numtxqueues", rtnl.IFLA_NUM_TX_QUEUES},
 		{"numrxqueues", rtnl.IFLA_NUM_RX_QUEUES},
@@ -310,8 +334,6 @@ func (c *Command) parse() error {
 		}
 		c.attrs = append(c.attrs, rtnl.Attr{x.t, rtnl.Uint32Attr(u32)})
 	}
-	c.args = c.opt.Parms.More(c.args, "address",
-		[]string{"broadcast", "brd"})
 	for _, x := range []struct {
 		name string
 		t    uint16
@@ -329,7 +351,6 @@ func (c *Command) parse() error {
 		}
 		c.attrs = append(c.attrs, rtnl.Attr{x.t, rtnl.BytesAttr(mac)})
 	}
-	c.args = c.opt.Parms.More(c.args, "master", "vrf")
 	for _, x := range []struct {
 		name string
 		t    uint16
@@ -348,19 +369,20 @@ func (c *Command) parse() error {
 		c.attrs = append(c.attrs,
 			rtnl.Attr{x.t, rtnl.Int32Attr(ifindex)})
 	}
-	c.args = c.opt.Parms.More(c.args, "netns")
 	if s := c.opt.Parms.ByName["netns"]; len(s) > 0 {
-		var nsid int32
-		if _, err := fmt.Sscan(s, &nsid); err != nil {
-			nsid, err = c.sr.Nsid(s)
-			if err != nil {
-				return fmt.Errorf("netns: %q %v", s, err)
-			}
+		var id int32
+		var t uint16
+		c.netns, err = os.Open(filepath.Join("/var/run/netns", s))
+		if err == nil {
+			t = rtnl.IFLA_NET_NS_FD
+			id = int32(c.netns.Fd())
+		} else if _, err := fmt.Sscan(s, &id); err != nil {
+			return fmt.Errorf("netns: %q %v", s, err)
+		} else {
+			t = rtnl.IFLA_NET_NS_PID
 		}
-		c.attrs = append(c.attrs,
-			rtnl.Attr{rtnl.IFLA_NET_NS_PID, rtnl.Int32Attr(nsid)})
+		c.attrs = append(c.attrs, rtnl.Attr{t, rtnl.Int32Attr(id)})
 	}
-	c.args = c.opt.Parms.More(c.args, "mode")
 	if s := c.opt.Parms.ByName["mode"]; len(s) > 0 {
 		mode, found := rtnl.IfLinkModeByName[s]
 		if !found {
@@ -369,7 +391,6 @@ func (c *Command) parse() error {
 		c.attrs = append(c.attrs,
 			rtnl.Attr{rtnl.IFLA_LINKMODE, rtnl.Uint8Attr(mode)})
 	}
-	c.args = c.opt.Parms.More(c.args, "state")
 	if s := c.opt.Parms.ByName["state"]; len(s) > 0 {
 		u8, found := rtnl.IfOperByName[s]
 		if !found {

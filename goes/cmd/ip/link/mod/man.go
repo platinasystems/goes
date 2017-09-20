@@ -83,7 +83,7 @@ OPTIONS
 		random - like stable_secret, but use random secret if no
 			/proc/sys/net/ipv6/conf/{default,DEVICE}/stable_secret
 
-	netns NAME | PID
+	netns { NAME | PID }
 		move the device to the named network namespace or to that
 		associated with the identified process.
 
