@@ -7,6 +7,7 @@
 package fspd
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"net/rpc"
@@ -192,6 +193,9 @@ func (c *Command) update() error {
 				k := "psu" + strconv.Itoa(Vdev[i].Slot) + ".eeprom"
 				c.pub.Print("delete: ", k)
 				c.lasts[k] = ""
+				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".sn"
+				c.pub.Print("delete: ", k)
+				c.lasts[k] = ""
 				k = "psu" + strconv.Itoa(Vdev[i].Slot) + ".fan_speed.units.rpm"
 				c.pub.Print("delete: ", k)
 				c.lasts[k] = ""
@@ -294,6 +298,15 @@ func (c *Command) update() error {
 					if d != c.lasts[k] {
 						c.pub.Print(k, ": ", d)
 						c.lasts[k] = d
+					}
+					sb, err := hex.DecodeString(v[0x5a:0x76])
+					sn := string(sb)
+					if err == nil {
+						k = strings.Replace(k, "fan_direction", "sn", 1)
+						if sn != c.lasts[k] {
+							c.pub.Print(k, ": ", sn)
+							c.lasts[k] = sn
+						}
 					}
 				}
 			}

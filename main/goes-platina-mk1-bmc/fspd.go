@@ -49,6 +49,7 @@ func fspdInit() {
 		"psu1.temp1.units.C":       1,
 		"psu1.temp2.units.C":       1,
 		"psu1.fan_direction":       1,
+		"psu1.sn":                  1,
 		"psu2.eeprom":              0,
 		"psu2.fan_speed.units.rpm": 0,
 		"psu2.status":              0,
@@ -63,6 +64,7 @@ func fspdInit() {
 		"psu2.temp1.units.C":       0,
 		"psu2.temp2.units.C":       0,
 		"psu2.fan_direction":       0,
+		"psu2.sn":                  0,
 	}
 
 	fspd.WrRegDv["psu1"] = "psu1"

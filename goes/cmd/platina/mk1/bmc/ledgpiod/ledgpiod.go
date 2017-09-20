@@ -436,9 +436,9 @@ func (h *I2cDev) CheckSystemFans() string {
 		} else if strings.Contains(p, "front->back") {
 			d = "front->back"
 		}
-		if n == "" {
+		if n == "" && d != "" {
 			n = d
-		} else {
+		} else if d != "" {
 			if n != d {
 				systemFanDirection = "mixed"
 				mismatch = true
@@ -455,9 +455,9 @@ func (h *I2cDev) CheckSystemFans() string {
 			} else if strings.Contains(p, "front->back") {
 				d = "front->back"
 			}
-			if n == "" {
+			if n == "" && d != "" {
 				n = d
-			} else {
+			} else if d != "" {
 				if n != d {
 					systemFanDirection = "mixed"
 					mismatch = true
@@ -474,7 +474,9 @@ func (h *I2cDev) CheckSystemFans() string {
 			log.Print("warning: mismatching fan direction detected, check fan trays and PSUs")
 		}
 	} else {
-		systemFanDirection = n
+		if n != "" {
+			systemFanDirection = n
+		}
 	}
 
 	return systemFanDirection
