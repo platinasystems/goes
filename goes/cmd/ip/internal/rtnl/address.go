@@ -64,6 +64,7 @@ type Addresser interface {
 	Bytes() []byte
 	Family() uint8
 	io.Reader
+	IsLoopback() bool
 }
 
 type mplsAddress []byte
@@ -81,3 +82,7 @@ func (ip6Address) Family() uint8  { return AF_INET6 }
 func (mpls mplsAddress) Read(b []byte) (int, error) { return cp(b, mpls) }
 func (ip4 ip4Address) Read(b []byte) (int, error)   { return cp(b, ip4) }
 func (ip6 ip6Address) Read(b []byte) (int, error)   { return cp(b, ip6) }
+
+func (mplsAddress) IsLoopback() bool    { return false }
+func (ip4 ip4Address) IsLoopback() bool { return net.IP(ip4).IsLoopback() }
+func (ip6 ip6Address) IsLoopback() bool { return net.IP(ip6).IsLoopback() }

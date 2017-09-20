@@ -6,7 +6,7 @@ package mod
 
 import (
 	"fmt"
-	"net"
+	"io"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
@@ -73,8 +73,9 @@ func (c Command) Main(args ...string) error {
 		attrs []rtnl.Attr
 		rsp   rtnl.Ifa
 	}
-	var local, peer net.IP
-	var ipnet *net.IPNet
+	addattr := func(t uint16, v io.Reader) {
+		ifa.attrs = append(ifa.attrs, rtnl.Attr{t, v})
+	}
 
 	if args, err = options.Netns(args); err != nil {
 		return err
@@ -83,6 +84,16 @@ func (c Command) Main(args ...string) error {
 	opt, args := options.New(args)
 	args = opt.Flags.More(args, Flags...)
 	args = opt.Parms.More(args, Parms...)
+
+	if s := opt.Parms.ByName["-f"]; len(s) > 0 {
+		if v, ok := rtnl.AfByName[s]; ok {
+			ifa.msg.Family = v
+		} else {
+			return fmt.Errorf("family: %q unknown", s)
+		}
+	} else {
+		ifa.msg.Family = rtnl.AF_UNSPEC
+	}
 
 	if len(opt.Parms.ByName["local"]) == 0 {
 		if len(args) == 0 {
@@ -103,79 +114,64 @@ func (c Command) Main(args ...string) error {
 	}
 
 	if s := opt.Parms.ByName["peer"]; len(s) > 0 {
-		peer, ipnet, err = net.ParseCIDR(s)
-		if err != nil {
-			err = nil
-			peer = net.ParseIP(s)
-			if peer == nil {
-				return fmt.Errorf("peer: %q invalid prefix", s)
+		if pp, err := rtnl.Prefix(s, ifa.msg.Family); err == nil {
+			if ifa.msg.Family == rtnl.AF_UNSPEC {
+				ifa.msg.Family = pp.Family()
 			}
-		}
-		local = net.ParseIP(opt.Parms.ByName["local"])
-		if local == nil {
-			return fmt.Errorf("local: %q invalid address", s)
-		}
-	} else {
-		s = opt.Parms.ByName["local"]
-		if local, ipnet, err = net.ParseCIDR(s); err != nil {
-			return fmt.Errorf("local: %q invalid prefix", s)
-		}
-	}
-
-	if local.To4() != nil {
-		ifa.msg.Family = rtnl.AF_INET
-	} else if local.To16() != nil {
-		ifa.msg.Family = rtnl.AF_INET6
-	} else {
-		return fmt.Errorf("local: %q unsupported network", local)
-	}
-
-	addrattr := func(name string, ip net.IP, t uint16) error {
-		var ipv net.IP
-		if ip == nil {
-			return fmt.Errorf("%s: invalid address", name)
-		}
-		if ifa.msg.Family == rtnl.AF_INET {
-			ipv = ip.To4()
+			ifa.msg.Prefixlen = pp.Len()
+			addattr(rtnl.IFA_ADDRESS, pp)
 		} else {
-			ipv = ip.To16()
+			pa, err := rtnl.Address(s, ifa.msg.Family)
+			if err != nil {
+				return fmt.Errorf("peer: %v", err)
+			}
+			if ifa.msg.Family == rtnl.AF_UNSPEC {
+				ifa.msg.Family = pa.Family()
+			}
+			ifa.msg.Prefixlen = map[uint8]uint8{
+				rtnl.AF_INET:  32,
+				rtnl.AF_INET6: 128,
+				rtnl.AF_MPLS:  20,
+			}[ifa.msg.Family]
+			addattr(rtnl.IFA_ADDRESS, pa)
 		}
-		if ipv == nil {
-			return fmt.Errorf("%s: %s: wrong network", name, ip)
+		la, err := rtnl.Address(opt.Parms.ByName["local"],
+			ifa.msg.Family)
+		if err != nil {
+			return fmt.Errorf("local: %v", err)
 		}
-		ifa.attrs = append(ifa.attrs,
-			rtnl.Attr{t, rtnl.BytesAttr([]byte(ipv))})
-		return nil
-	}
-
-	if ipnet != nil {
-		ones, _ := ipnet.Mask.Size()
-		ifa.msg.Prefixlen = uint8(ones)
-	} else if ifa.msg.Family == rtnl.AF_INET {
-		ifa.msg.Prefixlen = 32
+		if la.IsLoopback() {
+			ifa.msg.Scope = rtnl.RT_SCOPE_HOST
+		}
+		addattr(rtnl.IFA_LOCAL, la)
 	} else {
-		ifa.msg.Prefixlen = 128
-	}
-
-	if err = addrattr("local", local, rtnl.IFA_LOCAL); err != nil {
-		return err
-	}
-	if peer != nil {
-		err = addrattr("peer", peer, rtnl.IFA_ADDRESS)
+		lp, err := rtnl.Prefix(opt.Parms.ByName["local"],
+			ifa.msg.Family)
 		if err != nil {
-			return err
+			return fmt.Errorf("local: %v", err)
 		}
-	}
-	if s := opt.Parms.ByName["broadcast"]; len(s) > 0 {
-		err = addrattr("broadcast", net.ParseIP(s), rtnl.IFA_BROADCAST)
-		if err != nil {
-			return err
+		if ifa.msg.Family == rtnl.AF_UNSPEC {
+			ifa.msg.Family = lp.Family()
 		}
+		if lp.IsLoopback() {
+			ifa.msg.Scope = rtnl.RT_SCOPE_HOST
+		}
+		ifa.msg.Prefixlen = lp.Len()
+		addattr(rtnl.IFA_LOCAL, lp)
 	}
-	if s := opt.Parms.ByName["anycast"]; len(s) > 0 {
-		err = addrattr("anycast", net.ParseIP(s), rtnl.IFA_ANYCAST)
-		if err != nil {
-			return err
+	for _, x := range []struct {
+		name string
+		t    uint16
+	}{
+		{"broadcast", rtnl.IFA_BROADCAST},
+		{"anycast", rtnl.IFA_ANYCAST},
+	} {
+		if s := opt.Parms.ByName[x.name]; len(s) > 0 {
+			a, err := rtnl.Address(s, ifa.msg.Family)
+			if err != nil {
+				return fmt.Errorf("%s: %v", x.name, err)
+			}
+			addattr(x.t, a)
 		}
 	}
 	if s := opt.Parms.ByName["label"]; len(s) > 0 {
@@ -188,8 +184,6 @@ func (c Command) Main(args ...string) error {
 		if !found {
 			return fmt.Errorf("scope: %q invalid", s)
 		}
-	} else if local.IsLoopback() {
-		ifa.msg.Scope = rtnl.RT_SCOPE_HOST
 	}
 
 	sock, err := rtnl.NewSock()
