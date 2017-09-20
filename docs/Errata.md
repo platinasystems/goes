@@ -5,18 +5,15 @@ change over time as issues are resolved.
 
 ## Tuntap mode:
 
-- adding /31 route breaks routing - FIB TCAM issue (can be reproduced easily - needs to be fixed)
 - IF_OPER status at linux tuntap not reflecting actual link-state (on bug list)
 - multipath adjacency handling breaks gre (Stig's 4 inv rig - 2 paths one gre the other just eth - needs to be fixed)
 - gre-tunnels: Having trouble getting a script working here. What is correct
 	config for this case? See nsgrevnet.inv[5,4].sh
 - panic by vnetd hangs it (not exiting)
-- tuntap gets in mode where goes restart always fails with 
-	panic: pci 0000:03:00.0 Intel 0x15ab: open /dev/vfio/13: device or resource busy
 
 ## SRIOV-mode:
 
-- panics on every goes start (adddelnexthop issue)
+- panics on every goes start (unknown interface)
 - iperf load breaks punt-path
 - punt performance only 1 Gbps (punting through PCI)
 - Issue 78 (Donn) 
