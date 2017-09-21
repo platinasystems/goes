@@ -52,7 +52,8 @@ func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
 	var err error
-	var ls func([]os.FileInfo) error
+	var ls func([]string) error
+	var fns, dns []string
 
 	flag, args := flags.New(args, "-l", "-C", "-1")
 
@@ -67,18 +68,12 @@ func (Command) Main(args ...string) error {
 		ls = tabulate
 	}
 
-	files := make([]os.FileInfo, 0, 128)
-	dirs := make([]os.FileInfo, 0, 128)
-	defer func() {
-		files = files[:0]
-		dirs = dirs[:0]
-	}()
 	if len(args) == 0 {
-		dir, err := os.Stat(".")
+		_, err := os.Stat(".")
 		if err != nil {
 			return err
 		}
-		dirs = append(dirs, dir)
+		dns = append(dns, ".")
 	} else {
 		for _, pat := range args {
 			globs, err := filepath.Glob(pat)
@@ -93,52 +88,57 @@ func (Command) Main(args ...string) error {
 				fi, err := os.Stat(name)
 				if err == nil {
 					if fi.IsDir() {
-						dirs = append(dirs, fi)
+						dns = append(dns, name)
 					} else {
-						files = append(files, fi)
+						fns = append(fns, name)
 					}
+				} else {
+					return fmt.Errorf("%s: %v", name, err)
 				}
 			}
 		}
 	}
-	if len(files) > 0 {
-		err = ls(files)
-		if len(dirs) > 0 {
+	if len(fns) > 0 {
+		err = ls(fns)
+		if len(dns) > 0 {
 			fmt.Println()
 		}
 	}
-	shouldPrintDirName := len(dirs) > 1 || len(files) > 0
-	for i, dir := range dirs {
+	shouldPrintDirName := len(dns) > 1 || len(fns) > 0
+	for i, dn := range dns {
 		if shouldPrintDirName {
 			if i > 0 {
 				fmt.Println()
 			}
-			fmt.Print(dir.Name(), ":\n")
+			fmt.Print(dn, ":\n")
 		}
-		files = files[:0]
-		fis, err := ioutil.ReadDir(dir.Name())
+		fns = fns[:0]
+		fis, err := ioutil.ReadDir(dn)
 		if err != nil {
 			return err
 		}
 		for _, fi := range fis {
-			files = append(files, fi)
+			fns = append(fns, filepath.Join(dn, fi.Name()))
 		}
-		err = ls(files)
+		err = ls(fns)
 	}
 	return err
 }
 
 // List one file per line.
-func one(files []os.FileInfo) error {
-	for _, file := range files {
-		fmt.Println(file.Name())
+func one(names []string) error {
+	for _, name := range names {
+		fmt.Println(filepath.Base(name))
 	}
 	return nil
 }
 
-func long(files []os.FileInfo) error {
-	for _, fi := range files {
-		name := fi.Name()
+func long(names []string) error {
+	for _, name := range names {
+		fi, err := os.Stat(name)
+		if err != nil {
+			return err
+		}
 		st := fi.Sys().(*syscall.Stat_t)
 		switch st.Mode & syscall.S_IFMT {
 		case syscall.S_IFBLK, syscall.S_IFCHR:
@@ -185,18 +185,16 @@ func long(files []os.FileInfo) error {
 
 // Arrange file names in tabular form with names longer than 24 runes printed
 // first on separate lines.
-func tabulate(files []os.FileInfo) error {
-	names := make([]string, 0, len(files))
-	for i := 0; i < len(files); i++ {
-		names = append(names, files[i].Name())
+func tabulate(names []string) error {
+	for i, name := range names {
+		names[i] = filepath.Base(name)
 	}
-
 	sort.Strings(names)
 	columns := 80
 	if env := os.Getenv("COLUMNS"); len(env) > 0 {
 		fmt.Sscan(env, &columns)
-		if columns < 24 {
-			columns = 24
+		if columns < 80 {
+			columns = 80
 		}
 	}
 
