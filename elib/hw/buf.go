@@ -7,6 +7,7 @@ package hw
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
+	"github.com/platinasystems/go/elib/elog"
 
 	"fmt"
 	"math"
@@ -196,6 +197,8 @@ type BufferPool struct {
 
 	Name string
 
+	ElogName elog.StringRef
+
 	BufferTemplate
 
 	// Mutually excludes allocate and free.
@@ -262,6 +265,15 @@ func (p *BufferPool) setState(offset uint32, new BufferState) (t *bufferTrace, o
 		t.reset()
 	}
 	t.events = append(t.events, bufferEvent{p: p.index, i: new})
+	if elog.Enabled() {
+		e := bufferElog{
+			pool:   p.ElogName,
+			offset: offset,
+			old:    old,
+			new:    new,
+		}
+		elog.Add(&e)
+	}
 	return
 }
 
@@ -445,6 +457,7 @@ func (m *BufferMain) AddBufferPool(p *BufferPool) {
 		p.Name = "no-name"
 	}
 	m.Lock()
+	p.ElogName = elog.SetString(p.Name)
 	if m.PoolByName == nil {
 		m.PoolByName = make(map[string]*BufferPool)
 	}
@@ -843,4 +856,14 @@ func (c *RefChain) Validate() {
 		panic(fmt.Errorf("length mismatch; got %d != want %d", got, want))
 	}
 	c.head.Validate()
+}
+
+type bufferElog struct {
+	pool     elog.StringRef
+	offset   uint32
+	old, new BufferState
+}
+
+func (e *bufferElog) Elog(l *elog.Log) {
+	l.Logf("hw buf %v 0x%x %v -> %v", e.pool, e.offset, e.old, e.new)
 }
