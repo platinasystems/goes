@@ -59,7 +59,10 @@ func (c *Command) Close() error {
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	var err error
+	err := redis.IsReady()
+	if err != nil {
+		return err
+	}
 	c.nl, err = netlink.New(
 		netlink.RTNLGRP_LINK,
 		netlink.RTNLGRP_IPV4_IFADDR,

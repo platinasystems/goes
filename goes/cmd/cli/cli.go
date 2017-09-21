@@ -298,8 +298,9 @@ commandLoop:
 			name := sl[0]
 			if v := c.g.ByName(name); v != nil {
 				k := cmd.WhatKind(v)
-				if !k.IsInteractive() {
-					err = fmt.Errorf("%s: inoperative",
+				if k.IsDaemon() {
+					err = fmt.Errorf(
+						"use `goes-daemons start %s`",
 						name)
 					continue commandLoop
 				}

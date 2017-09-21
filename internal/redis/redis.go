@@ -45,6 +45,10 @@ func Quotes(s string) string {
 	return s
 }
 
+func IsReady() error {
+	return Hwait(DefaultHash, "redis.ready", "true", 10*time.Second)
+}
+
 // Complete redis Key and Subkey. This skips over leading '-' prefaced flags.
 func Complete(args ...string) (c []string) {
 	if len(args) != 0 && strings.HasPrefix(args[0], "-") {

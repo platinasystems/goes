@@ -109,7 +109,12 @@ func (c *Command) Main(...string) error {
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
-	var err error
+
+	err := redis.IsReady()
+	if err != nil {
+		return err
+	}
+
 	first = 1
 
 	c.stop = make(chan struct{})

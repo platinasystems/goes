@@ -14,6 +14,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -51,7 +52,11 @@ func (c *Command) Main(...string) error {
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
-	var err error
+
+	err := redis.IsReady()
+	if err != nil {
+		return err
+	}
 
 	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)

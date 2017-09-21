@@ -84,6 +84,9 @@ func (c *Command) Main(...string) error {
 	c.lastu = make(map[string]uint8)
 	c.lastsio = make(map[string]string)
 
+	if err = redis.IsReady(); err != nil {
+		return err
+	}
 	if c.pub, err = publisher.New(); err != nil {
 		return err
 	}

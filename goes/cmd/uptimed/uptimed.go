@@ -14,6 +14,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -41,7 +42,11 @@ func (c Command) Close() error {
 func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c Command) Main(...string) error {
-	if err := update(); err != nil {
+	err := redis.IsReady()
+	if err != nil {
+		return err
+	}
+	if err = update(); err != nil {
 		return err
 	}
 	t := time.NewTicker(60 * time.Second)
@@ -51,7 +56,7 @@ func (c Command) Main(...string) error {
 		case <-c:
 			return nil
 		case <-t.C:
-			if err := update(); err != nil {
+			if err = update(); err != nil {
 				return err
 			}
 		}

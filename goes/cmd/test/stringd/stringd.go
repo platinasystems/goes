@@ -44,6 +44,10 @@ func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
 func (c Command) Main(...string) error {
+	err := redis.IsReady()
+	if err != nil {
+		return err
+	}
 	pub, err := publisher.New()
 	if err != nil {
 		return err

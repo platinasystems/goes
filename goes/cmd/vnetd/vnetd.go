@@ -76,6 +76,10 @@ func (c *Command) Main(...string) error {
 		in  parse.Input
 	)
 
+	if err = redis.IsReady(); err != nil {
+		return err
+	}
+
 	// never want to block vnet
 	c.i.pub, err = publisher.New()
 	if err != nil {
