@@ -286,7 +286,7 @@ func readSuperBlock(dev string) (superBlock, error) {
 		return nil, err
 	}
 	defer f.Close()
-	fsHeader := make([]byte, 4096)
+	fsHeader := make([]byte, 0x10000)
 	_, err = f.Read(fsHeader)
 	if err != nil {
 		return nil, err
