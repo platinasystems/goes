@@ -93,11 +93,6 @@ type enqueue struct {
 	o    *RefOut
 }
 
-func (q *enqueue) put(x0 uint, r0 *Ref) {
-	q.o.Outs[x0].Dup(q.i)
-	i0 := q.o.Outs[x0].AddLen(q.v)
-	q.o.Outs[x0].Refs[i0] = *r0
-}
 func (q *enqueue) sync() {
 	l := q.o.Outs[q.x].GetLen(q.v)
 	if n := uint(q.n); n > l {
@@ -119,29 +114,79 @@ func (q *enqueue) validate() {
 	}
 }
 
+func (q *enqueue) put(r0 *Ref, x0 uint) {
+	q.o.Outs[x0].Dup(q.i)
+	i0 := q.o.Outs[x0].AddLen(q.v)
+	q.o.Outs[x0].Refs[i0] = *r0
+}
 func (q *enqueue) Put1(r0 *Ref, x0 uint) {
 	q.o.Outs[q.x].Refs[q.n] = *r0
 	q.n++
 	if uint32(x0) != q.x {
 		q.n--
-		q.put(x0, r0)
+		q.put(r0, x0)
 	}
 }
 
+func (q *enqueue) setCachedNext(x0 uint) {
+	q.sync()
+	// New cached next and count.
+	q.x = uint32(x0)
+	q.n = uint32(q.o.Outs[x0].GetLen(q.v))
+}
+
 func (q *enqueue) Put2(r0, r1 *Ref, x0, x1 uint) {
+	// Speculatively enqueue both refs to cached next.
 	n0 := q.n
-	q.o.Outs[q.x].Refs[n0+0] = *r0
+	q.o.Outs[q.x].Refs[n0+0] = *r0 // (*) see below.
 	q.o.Outs[q.x].Refs[n0+1] = *r1
 	q.n = n0 + 2
-	if same := x0 == x1; !same || uint32(x0) != q.x {
-		q.n = n0
-		q.sync()
-		q.put(x0, r0)
-		q.put(x1, r1)
-		if same {
-			q.x = uint32(x0)
-			q.n = uint32(q.o.Outs[x0].GetLen(q.v))
-		}
+
+	// Confirm speculation.
+	same, match_cache0 := x0 == x1, uint32(x0) == q.x
+	if same && match_cache0 {
+		return
+	}
+
+	// Restore cached length.
+	q.n = n0
+
+	// Put refs in correct next slots.
+	q.Put1(r0, x0)
+	q.Put1(r1, x1)
+
+	// If neither next matches cached next and both are the same, then changed cached next.
+	if same {
+		q.setCachedNext(x0)
+	}
+}
+
+func (q *enqueue) Put4(r0, r1, r2, r3 *Ref, x0, x1, x2, x3 uint) {
+	// Speculatively enqueue both refs to cached next.
+	n0, x := q.n, uint(q.x)
+	q.o.Outs[x].Refs[n0+0] = *r0
+	q.o.Outs[x].Refs[n0+1] = *r1
+	q.o.Outs[x].Refs[n0+2] = *r2
+	q.o.Outs[x].Refs[n0+3] = *r3
+	q.n = n0 + 4
+
+	// Confirm speculation.
+	if x0 == x && x0 == x1 && x2 == x3 && x0 == x2 {
+		return
+	}
+
+	// Restore cached length.
+	q.n = n0
+
+	// Put refs in correct next slots.
+	q.Put1(r0, x0)
+	q.Put1(r1, x1)
+	q.Put1(r2, x2)
+	q.Put1(r3, x3)
+
+	// If last 2 misses in cache and both are the same, then changed cached next.
+	if x2 != x && x2 == x3 {
+		q.setCachedNext(x2)
 	}
 }
 
