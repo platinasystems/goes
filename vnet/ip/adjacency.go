@@ -176,7 +176,7 @@ type adjacencyMain struct {
 type adjAddDelHook func(m *Main, adj Adj, isDel bool)
 type adjSyncCounterHook func(m *Main)
 type AdjGetCounterHandler func(tag string, v vnet.CombinedCounter)
-type adjGetCounterHook func(m *Main, adj Adj, f AdjGetCounterHandler)
+type adjGetCounterHook func(m *Main, adj Adj, f AdjGetCounterHandler, clear bool)
 
 //go:generate gentemplate -id adjAddDelHook -d Package=ip -d DepsType=adjAddDelHookVec -d Type=adjAddDelHook -d Data=adjAddDelHooks github.com/platinasystems/go/elib/dep/dep.tmpl
 //go:generate gentemplate -id adjSyncHook -d Package=ip -d DepsType=adjSyncCounterHookVec -d Type=adjSyncCounterHook -d Data=adjSyncCounterHooks github.com/platinasystems/go/elib/dep/dep.tmpl
@@ -725,9 +725,9 @@ func (m *Main) RegisterAdjSyncCounterHook(f adjSyncCounterHook, dep ...*dep.Dep)
 	m.adjSyncCounterHookVec.Add(f, dep...)
 }
 
-func (m *Main) CallAdjGetCounterHooks(adj Adj, f AdjGetCounterHandler) {
+func (m *Main) CallAdjGetCounterHooks(adj Adj, f AdjGetCounterHandler, clear bool) {
 	for i := range m.adjGetCounterHooks {
-		m.adjGetCounterHookVec.Get(i)(m, adj, f)
+		m.adjGetCounterHookVec.Get(i)(m, adj, f, clear)
 	}
 }
 
@@ -770,7 +770,18 @@ func (m *adjacencyMain) clearCounter(a Adj) {
 	}
 }
 
-func (m *Main) ForeachAdjCounter(a Adj, f func(tag string, v vnet.CombinedCounter)) {
+func (m *Main) ClearAdjCounters() {
+	for _, t := range m.threads {
+		t.counters.ClearAll()
+	}
+	f := func(tag string, v vnet.CombinedCounter) {}
+	m.adjacencyHeap.Foreach(func(o, l uint) {
+		const clear = true
+		m.CallAdjGetCounterHooks(Adj(o), f, clear)
+	})
+}
+
+func (m *Main) ForeachAdjCounter(a Adj, f AdjGetCounterHandler) {
 	var v vnet.CombinedCounter
 	for _, t := range m.threads {
 		var u vnet.CombinedCounter
@@ -778,7 +789,8 @@ func (m *Main) ForeachAdjCounter(a Adj, f func(tag string, v vnet.CombinedCounte
 		v.Add(&u)
 	}
 	f("", v)
-	m.CallAdjGetCounterHooks(a, f)
+	const clear = false
+	m.CallAdjGetCounterHooks(a, f, clear)
 	return
 }
 

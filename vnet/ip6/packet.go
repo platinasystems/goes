@@ -36,8 +36,8 @@ type Header struct {
 	Src, Dst Address
 }
 
-func (a *Address) Uint32(i uint) uint32 {
-	return uint32(a[4*i+3]) | uint32(a[4*i+2])<<8 | uint32(a[4*i+1])<<16 | uint32(a[4*i+0])<<24
+func (a *Address) AsUint32(i uint) vnet.Uint32 {
+	return vnet.Uint32(a[4*i+3]) | vnet.Uint32(a[4*i+2])<<8 | vnet.Uint32(a[4*i+1])<<16 | vnet.Uint32(a[4*i+0])<<24
 }
 
 func (a *Address) IsZero() bool {

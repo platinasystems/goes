@@ -5,18 +5,37 @@ change over time as issues are resolved.
 
 ## Tuntap mode:
 
-- adding /31 route breaks routing - FIB TCAM issue (can be reproduced easily - needs to be fixed)
+- Tear down ns script and restarting a new one that uses same namespace names causes this in syslog:
+
+Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.228761 namespace watch: ns1 netlink GETNSID: no such device
+Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.391677 namespace watch: ns2 netlink GETNSID: bad file descriptor
+Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-2-0: link is not ready
+Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.567914 namespace watch: ns3 netlink GETNSID: bad file descriptor
+Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-3-0: link is not ready
+Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.747645 namespace watch: ns4 netlink GETNSID: bad file descriptor
+
+  And no population of fib for interfaces moved into the namespaces.
+
+- Multipath routes via linux causing panic (need to add multipath to kernel config and fix vnetd netlink
+	handling of attribute RTA_MULTIPATH)
+- if vnetd is killed or has panic'd, doing "goes-platina-mk1 install" always results in:
+	"hset: read unix @->/run/goes/socks/redisd: i/o timeout" error
+
+------------------------------------ must fix line ----------------------------------------------
 - IF_OPER status at linux tuntap not reflecting actual link-state (on bug list)
 - multipath adjacency handling breaks gre (Stig's 4 inv rig - 2 paths one gre the other just eth - needs to be fixed)
+- inv5:/root/nsgreeth.sh doesn't ping - fib looks ok
+	root@invader5:/home/dlobete/src/github.com/platinasystems/go# goes vnet show err
+             Node                           Error                              Count     
+	     fe1-rx                         management duplicate               58
+	     fe1-single-tagged-punt         not single vlan tagged             110
+
 - gre-tunnels: Having trouble getting a script working here. What is correct
 	config for this case? See nsgrevnet.inv[5,4].sh
-- panic by vnetd hangs it (not exiting)
-- tuntap gets in mode where goes restart always fails with 
-	panic: pci 0000:03:00.0 Intel 0x15ab: open /dev/vfio/13: device or resource busy
 
 ## SRIOV-mode:
 
-- panics on every goes start (adddelnexthop issue)
+- panics on every goes start (unknown interface)
 - iperf load breaks punt-path
 - punt performance only 1 Gbps (punting through PCI)
 - Issue 78 (Donn) 
@@ -24,7 +43,7 @@ change over time as issues are resolved.
 # Known panics
 
 
-1. tuntap mode: Panic in MapFib.getLessSpecific() - not being seen at the moment
+1. tuntap mode: Panic in MapFib.getLessSpecific() - (Unreproducible)
 
 Aug 23 10:24:51 invader5 goes.vnetd[1916]: panic(0xb7cac0, 0x13a2000)
 Aug 23 10:24:51 invader5 goes.vnetd[1916]:         /usr/local/go/src/runtime/panic.go:489 +0x2cf
@@ -42,7 +61,7 @@ Aug 23 10:24:51 invader5 goes.vnetd[1916]: github.com/platinasystems/go/vnet/uni
 Aug 23 10:24:51 invader5 goes.vnetd[1916]:         /home/dlobete/src/github.com/platinasystems/go/vnet/unix/netlink.go:507 +0x208
 Aug 23 10:24:51 invader5 goes.vnetd[1916]: github.com/platinasystems/go/vnet/unix.(*netlinkEvent).EventAction(0xc4201130e0)
 
-2. tuntap mode: Panic in (*DmaRequest).l3_generic_interface_admin_up_down - not being seen right now
+2. tuntap mode: Panic in (*DmaRequest).l3_generic_interface_admin_up_down - (Unreproducible)
 
 Aug 24 16:14:49 invader5 goes.vnetd[741]: runtime error: index out of range: goroutine 37 [running]:
 Aug 24 16:14:49 invader5 goes.vnetd[741]: runtime/debug.Stack(0xc4205e79f0, 0xb5b4e0, 0x13796a0)

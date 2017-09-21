@@ -7,6 +7,7 @@ package vnet
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 type MaskedStringer interface {
@@ -25,7 +26,7 @@ func (x *MaskedStrings) Add(key string, v, m MaskedStringer) {
 	x.m[key] = masked_string_pair{v: v, m: m}
 }
 
-func (x *MaskedStrings) String() (s string) {
+func (x *MaskedStrings) Strings() (s []string) {
 	type t struct{ k, v string }
 	var ts []t
 	for k, v := range x.m {
@@ -33,13 +34,14 @@ func (x *MaskedStrings) String() (s string) {
 	}
 	sort.Slice(ts, func(i, j int) bool { return ts[i].k < ts[j].k })
 	for i := range ts {
-		t := &ts[i]
-		if s != "" {
-			s += ", "
-		}
-		s += t.k + ": " + t.v
+		s = append(s, ts[i].k+": "+ts[i].v)
 	}
 	return
+}
+
+func (x *MaskedStrings) String() (s string) {
+	lines := x.Strings()
+	return strings.Join(lines, ",")
 }
 
 type Bool bool

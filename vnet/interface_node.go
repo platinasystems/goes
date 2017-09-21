@@ -76,8 +76,6 @@ func (v *Vnet) RegisterInterfaceNode(n inputOutputInterfaceNoder, hi Hi, name st
 	v.RegisterNode(n, name, args...)
 }
 
-const tx_ref_vec_in_fifo_len = 256
-
 func (n *interfaceNode) ifOutputThread() {
 	// Save elog if thread panics.
 	defer func() {
@@ -114,14 +112,14 @@ const (
 
 func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 	n.tx = tx
-	n.freeChan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+	n.freeChan = make(chan *TxRefVecIn, MaxOutstandingTxRefs)
 }
 
 func (h *HwIf) txNodeUpDown(isUp bool) {
 	for _, hn := range h.n {
 		n := hn.GetInterfaceNode()
 		if isUp {
-			n.tx_chan = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+			n.tx_chan = make(chan *TxRefVecIn, MaxOutstandingTxRefs)
 			go n.ifOutputThread()
 		} else {
 			close(n.tx_chan)
@@ -369,7 +367,7 @@ type TxDmaRing struct {
 
 func (r *TxDmaRing) Init(v *Vnet) {
 	r.v = v
-	r.ToInterrupt = make(chan *TxRefVecIn, tx_ref_vec_in_fifo_len)
+	r.ToInterrupt = make(chan *TxRefVecIn, MaxOutstandingTxRefs)
 }
 
 func (r *TxDmaRing) InterruptAdvance(n uint) {
