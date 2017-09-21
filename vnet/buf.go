@@ -167,7 +167,7 @@ func (r *RefIn) AllocPoolRefs(p *BufferPool, n uint) {
 	(*hw.BufferPool)(p).AllocRefs(&r.Refs[0].RefHeader, n)
 }
 func (r *RefIn) FreePoolRefs(p *BufferPool, n uint) {
-	freeNext := true
+	const freeNext = true
 	(*hw.BufferPool)(p).FreeRefs(&r.Refs[0].RefHeader, n, freeNext)
 }
 
@@ -194,7 +194,7 @@ func (in *RefIn) SetLen(v *Vnet, new_len uint) {
 	if elib.Debug {
 		old_len := in.In.GetLen(&v.loop)
 		for i := old_len; i < new_len; i++ {
-			in.BufferPool.ValidateRef(&in.Refs[i], hw.BufferKnownAllocated)
+			in.BufferPool.ValidateRef(&in.Refs[i], BufferKnownAllocated)
 		}
 	}
 	in.In.SetLen(&v.loop, new_len)
@@ -217,8 +217,8 @@ func Get4Refs(rs []Ref, i uint) (r0, r1, r2, r3 *Ref) {
 	return
 }
 
-func (p *BufferPool) ValidateRef(r *Ref, want hw.BufferState) {
-	(*hw.BufferPool)(p).ValidateRefs((*hw.RefHeader)(&r.RefHeader), want, 1, 1)
+func (p *BufferPool) ValidateRef(r *Ref, want BufferState) {
+	(*hw.BufferPool)(p).ValidateRefs((*hw.RefHeader)(&r.RefHeader), hw.BufferState(want), 1, 1)
 }
 
 func (p *BufferPool) ValidateRefs(refs []Ref, want hw.BufferState) {
