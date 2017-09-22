@@ -38,6 +38,12 @@ func (c *msg_counts) clear() {
 	}
 }
 
+type netlink_namespace struct {
+	netlink_socket_fds [2]int
+	netlink_socket_pair
+	ip4_next_hops []ip4_next_hop
+}
+
 type netlink_socket_pair struct {
 	broadcast_socket, unicast_socket *netlink.Socket
 }
@@ -154,6 +160,28 @@ func (ns *net_namespace) knownInterface(i uint32) (ok bool) {
 	return
 }
 
+func (ns *net_namespace) route_msg_for_vnet_interface(v *netlink.RouteMessage) (intf *net_namespace_interface, ok bool) {
+	if a := v.Attrs[netlink.RTA_OIF]; a != nil {
+		intf, ok = ns.interface_by_index[a.(netlink.Uint32Attr).Uint()]
+		if !ok {
+			panic("unknown interface")
+		}
+		ok = ns.knownInterface(intf.ifindex)
+		return
+	}
+	// Check that all multipath next hops are for known interfaces.
+	if a := v.Attrs[netlink.RTA_MULTIPATH]; a != nil {
+		mp := a.(*netlink.RtaMultipath)
+		for i := range mp.NextHops {
+			nh := &mp.NextHops[i]
+			if ok = ns.knownInterface(nh.Ifindex); !ok {
+				return
+			}
+		}
+	}
+	return
+}
+
 func (ns *net_namespace) msg_for_vnet_interface(msg netlink.Message) (ok bool) {
 	ok = true
 	switch v := msg.(type) {
@@ -166,14 +194,13 @@ func (ns *net_namespace) msg_for_vnet_interface(msg netlink.Message) (ok bool) {
 			_, ok = ns.getDummyInterface(v.Index)
 		}
 	case *netlink.RouteMessage:
-		oif := uint32(v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr))
-		ok = ns.knownInterface(oif)
+		var intf *net_namespace_interface
+		intf, ok = ns.route_msg_for_vnet_interface(v)
+
 		// Check for tunnel in metadata mode (IFLA_*_COLLECT_METADATA is set).
 		// If tunnel destination is reachable via vnet interface, then this route is also reachable.
 		if !ok && v.Attrs[netlink.RTA_ENCAP_TYPE] != nil {
-			if intf, iok := ns.interface_by_index[oif]; iok && intf.tunnel_metadata_mode {
-				ok = true
-			}
+			ok = intf.tunnel_metadata_mode
 		}
 	case *netlink.NeighborMessage:
 		ok = ns.knownInterface(v.Index)
@@ -585,6 +612,7 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		// Ignore neighbors for non vnet interfaces.
 		return
 	}
+	const next_hop_weight = 1
 	nh := ip4NextHop(v.Attrs[netlink.NDA_DST], next_hop_weight, si)
 	nbr := ethernet.IpNeighbor{
 		Si:       si,
@@ -602,8 +630,58 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	return
 }
 
-// FIXME: Not sure how netlink specifies nexthop weight, so we just set all weights to equal.
-const next_hop_weight = 1
+func set_ip4_next_hop_address(a netlink.Attr, nh *ip4.NextHop) {
+	if a != nil {
+		copy(nh.Address[:], a.(*netlink.Ip4Address)[:])
+	}
+}
+
+type ip4_next_hop struct {
+	ip4.NextHop
+	attrs []netlink.Attr
+}
+
+func (ns *net_namespace) parse_ip4_next_hops(v *netlink.RouteMessage) (nhs []ip4_next_hop) {
+	if ns.ip4_next_hops != nil {
+		ns.ip4_next_hops = ns.ip4_next_hops[:0]
+	}
+	nhs = ns.ip4_next_hops
+
+	nh := ip4_next_hop{}
+	nh.Weight = 1
+	nh.attrs = v.Attrs[:]
+	nh_ok := false
+	if a := v.Attrs[netlink.RTA_OIF]; a != nil {
+		intf := ns.interface_by_index[a.(netlink.Uint32Attr).Uint()]
+		nh.Si = intf.si
+		nh_ok = true
+	}
+	set_ip4_next_hop_address(v.Attrs[netlink.RTA_GATEWAY], &nh.NextHop)
+	if nh_ok {
+		nhs = append(nhs, nh)
+	} else if a := v.Attrs[netlink.RTA_MULTIPATH]; a != nil {
+		mp := a.(*netlink.RtaMultipath)
+		for i := range mp.NextHops {
+			mnh := &mp.NextHops[i]
+			intf := ns.interface_by_index[mnh.Ifindex]
+			nh.attrs = mnh.Attrs[:]
+			nh.Si = intf.si
+			nh.Weight = ip.NextHopWeight(mnh.Hops)
+			if nh.Weight == 0 {
+				nh.Weight = 1
+			}
+			if gw := nh.attrs[netlink.RTA_GATEWAY]; gw != nil {
+				set_ip4_next_hop_address(gw, &nh.NextHop)
+			} else {
+				panic("RTA_MULTIPATH next-hop without RTA_GATEWAY")
+			}
+			nhs = append(nhs, nh)
+		}
+	}
+
+	ns.ip4_next_hops = nhs // save for next call
+	return
+}
 
 func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) (err error) {
 	switch v.Protocol {
@@ -620,40 +698,45 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		return
 	}
 
-	oif := v.Attrs[netlink.RTA_OIF].(netlink.Uint32Attr).Uint()
-	intf, ok := e.ns.interface_by_index[oif]
-	if !ok {
-		panic("unknown interface")
-	}
-
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
 
-	// Check for tunnel via RTA_ENCAP_TYPE/RTA_ENCAP attributes.
-	if encap_type, ok := v.Attrs[netlink.RTA_ENCAP_TYPE].(netlink.LwtunnelEncapType); ok {
-		as := v.Attrs[netlink.RTA_ENCAP].(*netlink.AttrArray)
-		switch encap_type {
-		case netlink.LWTUNNEL_ENCAP_IP:
-			err = e.ip4_in_ip4_route(&p, as, intf, isDel)
-		case netlink.LWTUNNEL_ENCAP_IP6:
-			err = e.ip4_in_ip6_route(&p, as, intf, isDel)
-		}
-		return
-	}
-
+	nhs := e.ns.parse_ip4_next_hops(v)
 	m4 := ip4.GetMain(e.m.v)
-	gw := v.Attrs[netlink.RTA_GATEWAY]
-	if gw != nil {
-		nh := ip4NextHop(v.Attrs[netlink.RTA_GATEWAY], next_hop_weight, intf.si)
-		err = m4.AddDelRouteNextHop(&p, &nh, isDel)
-	} else {
-		// Record interface routes.  For now, don't install in vnet FIB.
-		if intf.si == e.ns.vnet_tun_interface.si {
-			tt := e.ns.vnet_tun_interface
-			if isDel {
-				tt.interface_routes.Unset(&p)
-			} else {
-				tt.interface_routes.Set(&p, ip.AdjPunt)
+	for i := range nhs {
+		nh := &nhs[i]
+		intf := e.ns.m.interface_by_si[nh.Si]
+
+		// Check for tunnel via RTA_ENCAP_TYPE/RTA_ENCAP attributes.
+		if encap_type, ok := nh.attrs[netlink.RTA_ENCAP_TYPE].(netlink.LwtunnelEncapType); ok {
+			as := nh.attrs[netlink.RTA_ENCAP].(*netlink.AttrArray)
+			switch encap_type {
+			case netlink.LWTUNNEL_ENCAP_IP:
+				err = e.ip4_in_ip4_route(&p, as, intf, isDel)
+			case netlink.LWTUNNEL_ENCAP_IP6:
+				err = e.ip4_in_ip6_route(&p, as, intf, isDel)
+			}
+			if err != nil {
+				return
+			}
+			continue
+		}
+
+		// Otherwise its a normal next hop.
+		gw := nh.attrs[netlink.RTA_GATEWAY]
+		if gw != nil {
+			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel); err != nil {
+				return
+			}
+		} else {
+			// Record interface routes.  For now, don't install in vnet FIB.
+			if intf.si == e.ns.vnet_tun_interface.si {
+				tt := e.ns.vnet_tun_interface
+				if isDel {
+					tt.interface_routes.Unset(&p)
+				} else {
+					tt.interface_routes.Set(&p, ip.AdjPunt)
+				}
 			}
 		}
 	}
