@@ -16,31 +16,20 @@ import (
 )
 
 const (
-	nl = "\n"
-	sp = " "
-	lt = "<"
-	gt = ">"
-	lb = "["
-	rb = "]"
+	logAfn   = "dmesg-a.txt"
+	logBfn   = "dmesg-b.txt"
+	logEfn   = "dmesg-err.txt"
+	activeFn = "active.txt"
+	nl       = "\n"
+	sp       = " "
+	lt       = "<"
+	gt       = ">"
+	lb       = "["
+	rb       = "]"
 )
 
-type logFile struct {
-	Name  string
-	Size  int64
-	Exist bool
-	SeqNo int64
-}
-
-var MMCdir = "/mnt"
-var FileA = "dmesg_log0"
-var FileB = "dmesg_log1"
-var MaxSize int64 = 512 * 1024 * 1024 //512MiB
-
-var Active = logFile{Name: "", Size: 0, Exist: false}
-var Second = logFile{Name: "", Size: 0, Exist: false}
-
-func InitLogging() error {
-	exists, err := DetectMMC()
+func initLogging(c *Info) error {
+	exists, err := detectMMC()
 	if err != nil {
 		return err
 	}
@@ -49,32 +38,35 @@ func InitLogging() error {
 		return err
 	}
 
-	if err = MountMMC(); err != nil {
+	if err = mountMMC(c); err != nil {
 		return err
 	}
 
-	if err = SetActive(); err != nil {
+	if err = setActive(c); err != nil {
 		return err
 	}
 
-	if err = StartTicker(); err != nil {
+	if err = startTicker(); err != nil {
+		return err
+	}
+	status(c)
+	return nil
+}
+
+func updateLogs(c *Info) error {
+	if err = initFileInfo(c); err != nil {
+		return err
+	}
+	if err := nextBatch(); err != nil {
+		return err
+	}
+	if err := createAppend(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func UpdateMMC() error { //TODO
-	if err := SetActive(); err != nil {
-		return err
-	}
-	//GRAB LATEST DMESG BLOB
-	//CHECK LAST DMESG SEQ IN ACTIVE IF EXISTS
-	//WHEN WRITING, IF NOT EXIST, CREATE FIRST
-	//WRITE THE LATEST BLOB TO FILE
-	return nil
-}
-
-func DetectMMC() (bool, error) {
+func detectMMC() (bool, error) {
 	exists := false
 	files, err := ioutil.ReadDir("/dev")
 	if err != nil {
@@ -90,83 +82,127 @@ func DetectMMC() (bool, error) {
 	return exists, nil
 }
 
-func MountMMC() error { //TODO
+func mountMMC(c *Info) error { //TODO
+	c.active++
 	return nil
 }
 
-func SetActive() error {
-	aExist := false
-	bExist := false
-	aSize := int64(0)
-	bSize := int64(0)
-	f, err := os.Stat(MMCdir + FileA)
-	if !os.IsNotExist(err) {
-		aExist = true
-		aSize = f.Size()
+func initFileInfo(c *Info) error {
+	c.logA.Name = MMCdir + "/" + logAfn
+	c.logA.Exst = false
+	if fi, err := os.Stat(c.logA.Name); !os.IsNotExist(err) {
+		c.logA.Exst = false
+		c.logA.Size = fi.Size()
 	}
-	f, err = os.Stat(MMCdir + FileB)
-	if !os.IsNotExist(err) {
-		bExist = true
-		bSize = f.Size()
+	c.logB.Name = MMCdir + "/" + logBfn
+	c.logB.Exst = false
+	if fi, err := os.Stat(c.logB.Name); !os.IsNotExist(err) {
+		c.logB.Exst = false
+		c.logB.Size = fi.Size()
 	}
-	//CASE 1: one full, one small or doesn't exist => Active=smaller
-	if aSize >= MaxSize && bSize < MaxSize {
-		Active = logFile{Name: FileB, Size: bSize, Exist: bExist}
-		Second = logFile{Name: FileA, Size: aSize, Exist: aExist}
+	c.logE.Name = MMCdir + "/" + logEfn
+	c.logE.Exst = false
+	if fi, err := os.Stat(c.logE.Name); !os.IsNotExist(err) {
+		c.logE.Exst = false
+		c.logE.Size = fi.Size()
 	}
-	if bSize >= MaxSize && aSize < MaxSize {
-		Active = logFile{Name: FileA, Size: aSize, Exist: aExist}
-		Second = logFile{Name: FileB, Size: bSize, Exist: bExist}
+	c.actv.Name = MMCdir + "/" + activeFn
+	c.actv.Exst = false
+	if fi, err := os.Stat(c.actv.Name); !os.IsNotExist(err) {
+		c.actv.Exst = false
+		c.actv.Size = fi.Size()
 	}
-	//CASE 2: neither exist => ACTIVE=A
-	if !aExist && !bExist {
-		Active = logFile{Name: FileA, Size: aSize, Exist: aExist}
-		Second = logFile{Name: FileB, Size: bSize, Exist: bExist}
-	}
-	//CASE 3: both exist, neither full => ACTIVE=NEWER
-	if aSize < MaxSize && bSize < MaxSize { //TODO
-		Active = logFile{Name: FileA, Size: aSize, Exist: aExist}
-		Second = logFile{Name: FileB, Size: bSize, Exist: bExist}
-	}
-	//CASE 4: A exists being filled, B not exist => ACTIVE=A
-	if aExist && !bExist && aSize < MaxSize {
-		Active = logFile{Name: FileA, Size: aSize, Exist: aExist}
-		Second = logFile{Name: FileB, Size: bSize, Exist: bExist}
-	}
-	//CASE 5: B exists being filled, A not exist => ACTIVE=B
-	if bExist && !aExist && bSize < MaxSize {
-		Active = logFile{Name: FileB, Size: bSize, Exist: bExist}
-		Second = logFile{Name: FileA, Size: aSize, Exist: aExist}
-	}
-	//CASE 6: both are full, => ERASE OLDER, ACTIVE=OLDER
-	//rmFile(MMCdir + OLDER) TODO
-
-	return nil
-}
-
-func Status() error {
-	exists, err := DetectMMC()
+	c.logA.SeqN, err = latestSeqNum(c.logA.Name, c.logA.Exst)
 	if err != nil {
 		return err
 	}
-	if exists == false {
-		fmt.Println("MMC card does not exist")
-	} else {
-		fmt.Println("MMC card exists")
+	c.logB.SeqN, err = latestSeqNum(c.logB.Name, c.logB.Exst)
+	if err != nil {
+		return err
 	}
-
-	if _, err := os.Stat("/tmp/mmclog_enable"); os.IsNotExist(err) {
-		fmt.Println("Ticker disabled")
-	} else {
-		fmt.Println("Ticker enabled")
-	}
-
-	fmt.Println("Active =", MMCdir+Active.Name, ", Size =", Active.Size, ", Exists =", Active.Exist)
-	fmt.Println("Second =", MMCdir+Second.Name, ", Size =", Second.Size, ", Exists =", Second.Exist)
 	return nil
 }
 
-func LogDmesg(n int) error {
+func setActive(c *Info) error {
+	if c.actv.Exst {
+		dat, err := ioutil.ReadFile(c.actv.Name)
+		if err != nil {
+			return err
+		}
+	}
+	if !c.logB.Exst {
+		return activeA()
+	}
+	if !c.logA.Exst && c.logB.Exst {
+		return activeB()
+	}
+	x, err := latestSeqNum(c.logA.Name, c.logA.Exst)
+	if err != nil {
+		return err
+	}
+	y, err := latestSeqNum(c.logB.Name, c.logB.Exst)
+	if err != nil {
+		return err
+	}
+	if x > y {
+		return activeA()
+	} else {
+		return activeB()
+	}
+	return nil
+}
+
+func activeA(c *Info) error {
+	c.active = "A"
+	d := []byte(c.active)
+	if err := ioutil.WriteFile(c.actv, d, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func activeB(c *Info) error {
+	c.active = "B"
+	d := []byte(c.active)
+	if err := ioutil.WriteFile(c.actv, d, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func latestSeqNum(fn string, ex bool) (x int64, err error) { //TODO
+	return 0, nil
+}
+
+func startTicker() error {
+	f, err := os.Create("/tmp/mmclog_enable")
+	if err != nil {
+		return nil
+	}
+	f.Close()
+	return nil
+}
+
+func stopTicker() error {
+	if err := rmFile("/tmp/mmclog_enable"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func nextBatch() error { //TODO
+	//if just booted grab entire dmesg
+	//if 2nd time or more, only grab the new parts, maintain a last timestamp in RAM
+	return nil
+}
+
+func createAppend() error { //TODO
+	//check if buff will fit, if so write it
+	//else, erase non-active file if exists, make it active, write there
+	return nil
+}
+
+func logDmesg(n int) error {
 	if n < 1 || n > 100000 {
 		return fmt.Errorf("value must be between 1 - 100,000")
 	}
@@ -176,23 +212,7 @@ func LogDmesg(n int) error {
 	return nil
 }
 
-func StartTicker() error {
-	f, err := os.Create("/tmp/mmclog_enable")
-	if err != nil {
-		return nil
-	}
-	f.Close()
-	return nil
-}
-
-func StopTicker() error {
-	if err := rmFile("/tmp/mmclog_enable"); err != nil {
-		return err
-	}
-	return nil
-}
-
-func ListMMC() error {
+func listMMC() error {
 	files, _ := ioutil.ReadDir(MMCdir)
 	for _, f := range files {
 		fmt.Println(f.Name())
@@ -200,7 +220,7 @@ func ListMMC() error {
 	return nil
 }
 
-func GetDmesgInfo() error {
+func getDmesgInfo() error { //FIXME FIGURE THIS OUT
 	var kmsg log.Kmsg
 
 	f, err := os.Open("/dev/kmsg")
@@ -241,22 +261,6 @@ func GetDmesgInfo() error {
 
 	fo.Sync()
 
-	return nil
-}
-
-func ReadFile() error {
-	dat, err := ioutil.ReadFile("/tmp/dat2")
-	if err != nil {
-		return err
-	}
-	fmt.Print(string(dat))
-	fmt.Print(len(dat))
-	fmt.Print(dat[0])
-
-	return nil
-}
-
-func printFirstTimestamp() error {
 	return nil
 }
 
