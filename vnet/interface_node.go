@@ -106,9 +106,7 @@ func (n *interfaceNode) ifOutputThread() {
 }
 
 // Largest number of outstanding transmit buffers before we suspend.
-const (
-	MaxOutstandingTxRefs = 8 * MaxVectorLen
-)
+const MaxOutstandingTxRefs = 16 * MaxVectorLen
 
 func (n *interfaceNode) setupTx(tx outputInterfaceNoder) {
 	n.tx = tx
