@@ -48,7 +48,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mkdir"
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
-	"github.com/platinasystems/go/goes/cmd/nlcounters"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
@@ -134,7 +133,6 @@ func Goes() *goes.Goes {
 		mkdir.New(),
 		mknod.New(),
 		mount.New(),
-		nlcounters.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),

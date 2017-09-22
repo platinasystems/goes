@@ -12,7 +12,6 @@ func init() {
 		[]string{"gohellod"},
 		[]string{"gopanicd"},
 		[]string{"hellod"},
-		[]string{"nld"},
 		[]string{"panicd"},
 		[]string{"stringd"},
 		[]string{"uptimed"},

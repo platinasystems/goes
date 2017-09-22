@@ -9,7 +9,6 @@ import "github.com/platinasystems/go/goes/cmd/daemons"
 func init() {
 	daemons.Init = [][]string{
 		[]string{"redisd"},
-		[]string{"nld"},
 		[]string{"uptimed"},
 	}
 }

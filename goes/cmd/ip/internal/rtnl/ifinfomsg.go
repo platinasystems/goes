@@ -191,6 +191,32 @@ const (
 	N_link_stat
 )
 
+var IfStatNames = []string{
+	"rx-packets",
+	"tx-packets",
+	"rx-bytes",
+	"tx-bytes",
+	"rx-errors",
+	"tx-errors",
+	"rx-dropped",
+	"tx-dropped",
+	"multicast",
+	"collisions",
+	"rx-length-errors",
+	"rx-over-errors",
+	"rx-crc-errors",
+	"rx-frame-errors",
+	"rx-fifo-errors",
+	"rx-missed-errors",
+	"tx-aborted-errors",
+	"tx-carrier-errors",
+	"tx-fifo-errors",
+	"tx-heartbeat-errors",
+	"tx-window-errors",
+	"rx-compressed",
+	"tx-compressed",
+}
+
 const SizeofIfStats = N_link_stat * 4
 const SizeofIfStats64 = N_link_stat * 8
 
