@@ -30,6 +30,7 @@ var pool = struct {
 	Ip6DevConf      sync.Pool
 	IfAddrCacheInfo sync.Pool
 	RtaCacheInfo    sync.Pool
+	RtaMultipath    sync.Pool
 	NdaCacheInfo    sync.Pool
 	Bytes           sync.Pool
 	VlanFlags       sync.Pool
@@ -134,6 +135,11 @@ var pool = struct {
 			return new(RtaCacheInfo)
 		},
 	},
+	RtaMultipath: sync.Pool{
+		New: func() interface{} {
+			return new(RtaMultipath)
+		},
+	},
 	NdaCacheInfo: sync.Pool{
 		New: func() interface{} {
 			return new(NdaCacheInfo)
@@ -218,6 +224,9 @@ func repool(v interface{}) {
 	case *RtaCacheInfo:
 		*t = RtaCacheInfo{}
 		pool.RtaCacheInfo.Put(t)
+	case *RtaMultipath:
+		*t = RtaMultipath{}
+		pool.RtaMultipath.Put(t)
 	case *NdaCacheInfo:
 		*t = NdaCacheInfo{}
 		pool.NdaCacheInfo.Put(t)

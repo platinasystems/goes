@@ -1386,6 +1386,121 @@ func (a *RtaCacheInfo) WriteTo(w io.Writer) (int64, error) {
 	return acc.Tuple()
 }
 
+type RtaMultipath struct {
+	NextHops []RtNextHop
+}
+
+type rtNextHopFlag uint8
+
+const (
+	RTNH_F_DEAD       rtNextHopFlag = 1 << iota // Nexthop is dead (used by multipath)
+	RTNH_F_PERVASIVE                            // Do recursive gateway lookup
+	RTNH_F_ONLINK                               // Gateway is forced on link
+	RTNH_F_OFFLOAD                              // offloaded route
+	RTNH_F_LINKDOWN                             // carrier-down on nexthop
+	RTNH_F_UNRESOLVED                           // The entry is unresolved (ipmr)
+)
+
+func (x rtNextHopFlag) String() string {
+	var t = []string{
+		RTNH_F_DEAD:       "DEAD",
+		RTNH_F_PERVASIVE:  "PERVASIVE",
+		RTNH_F_ONLINK:     "ONLINK",
+		RTNH_F_OFFLOAD:    "OFFLOAD",
+		RTNH_F_LINKDOWN:   "LINKDOWN",
+		RTNH_F_UNRESOLVED: "UNRESOLVED",
+	}
+	return elib.FlagStringer(t, elib.Word(x))
+}
+
+type rtNextHopHeader struct {
+	Len     uint16
+	Flags   rtNextHopFlag
+	Hops    uint8
+	Ifindex uint32
+}
+
+const sizeofRtNextHopHeader = 8
+
+type RtNextHop struct {
+	rtNextHopHeader
+	Attrs [RTA_MAX]Attr
+}
+
+func NewRtaMultipathBytes(af AddressFamily, b []byte) *RtaMultipath {
+	a := pool.RtaMultipath.Get().(*RtaMultipath)
+	a.Parse(af, b)
+	return a
+}
+
+func (a *RtaMultipath) attr() {}
+
+func (a *RtaMultipath) multiline() {}
+
+func (a *RtaMultipath) Close() error {
+	repool(a)
+	return nil
+}
+func (a *RtaMultipath) Set(v []byte) {
+	panic("should never be called")
+}
+func (a *RtaMultipath) Size() int {
+	panic("should never be called")
+	return 0
+}
+func (a *RtaMultipath) String() string {
+	return StringOf(a)
+}
+func (a *RtaMultipath) Parse(af AddressFamily, b []byte) {
+	i := 0
+	for i < len(b) {
+		nh := RtNextHop{}
+		nh.rtNextHopHeader = *(*rtNextHopHeader)(unsafe.Pointer(&b[i]))
+		attr_lo := i + sizeofRtNextHopHeader
+		attr_hi := i + int(nh.Len)
+		for j := attr_lo; j < attr_hi; {
+			a, v, next := nextAttr(b, j)
+			j = next
+			k := RouteAttrKind(a.Kind())
+			switch k {
+			case RTA_DST, RTA_SRC, RTA_PREFSRC, RTA_GATEWAY:
+				nh.Attrs[k] = afAddr(af, v)
+			case RTA_TABLE, RTA_IIF, RTA_OIF, RTA_PRIORITY, RTA_FLOW:
+				nh.Attrs[k] = Uint32AttrBytes(v)
+			case RTA_ENCAP_TYPE:
+				nh.Attrs[k] = LwtunnelEncapType(v[0])
+			case RTA_ENCAP:
+				nh.Attrs[k] = StringAttrBytes(v[:])
+			case RTA_PREF:
+				nh.Attrs[k] = Uint8Attr(v[0])
+			case RTA_MARK:
+				nh.Attrs[k] = Uint32AttrBytes(v[:])
+			default:
+				panic(fmt.Errorf("%#v: unexpected attr", k))
+			}
+		}
+		a.NextHops = append(a.NextHops, nh)
+		i += attrAlignLen(int(nh.Len))
+	}
+}
+func (a *RtaMultipath) WriteTo(w io.Writer) (int64, error) {
+	acc := accumulate.New(w)
+	defer acc.Fini()
+	for i := range a.NextHops {
+		nh := &a.NextHops[i]
+		prefix := fmt.Sprintf("  %d:", i)
+		fmt.Fprintln(acc, prefix, "IFINDEX", nh.Ifindex)
+		fmt.Fprintln(acc, prefix, "FLAGS", nh.Flags)
+		fmt.Fprintln(acc, prefix, "HOPS", nh.Hops)
+		for k := range nh.Attrs {
+			if a := nh.Attrs[k]; a != nil {
+				fmt.Fprintln(acc, prefix, RouteAttrKind(k), a)
+			}
+		}
+	}
+	return acc.Tuple()
+}
+
 type StringAttr string
 
 func StringAttrBytes(b []byte) StringAttr {
