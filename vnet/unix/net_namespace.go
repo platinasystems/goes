@@ -279,8 +279,7 @@ type net_namespace struct {
 
 	is_default bool
 
-	netlink_socket_fds [2]int
-	netlink_socket_pair
+	netlink_namespace
 
 	interface_by_index map[uint32]*net_namespace_interface
 	interface_by_name  map[string]*net_namespace_interface
