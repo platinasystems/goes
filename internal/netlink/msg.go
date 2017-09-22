@@ -647,6 +647,8 @@ func (m *RouteMessage) Write(b []byte) (int, error) {
 			m.Attrs[k] = Uint8Attr(v[0])
 		case RTA_CACHEINFO:
 			m.Attrs[k] = NewRtaCacheInfoBytes(v)
+		case RTA_MULTIPATH:
+			m.Attrs[k] = NewRtaMultipathBytes(m.Family, v)
 		default:
 			if k < RTA_MAX {
 				m.Attrs[k] = NewHexStringAttrBytes(v)
