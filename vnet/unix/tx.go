@@ -161,6 +161,14 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 
 func (v *tx_packet_vector) tx_queue(n *tx_node, ri *vnet.RefIn) {
 	np, intf := v.n_packets, v.intf
+
+	if intf.Fd == -1 {
+		v.buffer_pool.FreeRefs(&v.r[0], np, true)
+		n.put_packet_vector(v)
+		n.CountError(tx_error_interface_down, np)
+		return
+	}
+
 	v.ri = ri
 	n.AddSuspendActivity(ri, int(v.n_refs))
 	if da := int32(v.n_refs); da == atomic.AddInt32(&intf.active_refs, da) {
