@@ -48,7 +48,7 @@ FSTYPE
 
 FILESYSTEM INDEPENDENT FLAGS
 	-defaults	-read-write -dev -exec -suid
-	-r		read only
+	-read-only	read only
 	-read-write
 	-suid		Obey suid and sgid bits
 	-no-suid	Ignore suid and sgid bits
@@ -113,7 +113,7 @@ func (Command) Main(args ...string) error {
 		"-F",
 		"-defaults",
 		"-p",
-		"-r",
+		"-read-only",
 		"-read-write",
 		"-suid",
 		"-no-suid",
