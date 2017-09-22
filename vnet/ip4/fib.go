@@ -184,12 +184,14 @@ func (m *MapFib) Lookup(a Address) (r mapFibResult, p Prefix, ok bool) {
 	return
 }
 
-func (f *MapFib) lookupReachable(m *Main, a Address) (r mapFibResult, p Prefix, ok bool) {
-	if r, p, ok = f.Lookup(a); ok {
+// Reachable means that all next-hop adjacencies are rewrites.
+func (f *MapFib) lookupReachable(m *Main, a Address) (r mapFibResult, p Prefix, reachable, err bool) {
+	if r, p, reachable = f.Lookup(a); reachable {
 		as := m.GetAdj(r.adj)
-		// Anything that is not a Glean (e.g. matching an interface's address) is "reachable".
 		for i := range as {
-			if ok = !as[i].IsGlean(); !ok {
+			err = as[i].IsLocal()
+			reachable = as[i].IsRewrite()
+			if !reachable {
 				break
 			}
 		}
@@ -684,7 +686,11 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	nhf := m.fibByIndex(nhr.NextHopFibIndex(m), true)
 
 	var reachable_via_prefix Prefix
-	if r, np, found := nhf.reachable.lookupReachable(m, nha); found {
+	if r, np, found, bad := nhf.reachable.lookupReachable(m, nha); found || bad {
+		if bad {
+			err = &prefixError{s: "unreachable next-hop", p: *p}
+			return
+		}
 		nhAdj = r.adj
 		reachable_via_prefix = np
 	} else {
