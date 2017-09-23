@@ -14,15 +14,15 @@ Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.567914 namespace watch: ns3
 Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-3-0: link is not ready
 Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.747645 namespace watch: ns4 netlink GETNSID: bad file descriptor
 
-  And no population of fib for interfaces moved into the namespaces.
+  And no population of fib for interfaces moved into the namespaces. All successive netlink messages dropped
 
 - Multipath routes via linux causing panic (need to add multipath to kernel config and fix vnetd netlink
-	handling of attribute RTA_MULTIPATH)
+	handling of attribute RTA_MULTIPATH) - fixed in wip branch
 - if vnetd is killed or has panic'd, doing "goes-platina-mk1 install" always results in:
 	"hset: read unix @->/run/goes/socks/redisd: i/o timeout" error
 
 ------------------------------------ must fix line ----------------------------------------------
-- IF_OPER status at linux tuntap not reflecting actual link-state (on bug list)
+- IF_OPER status at linux tuntap not reflecting actual link-state (on bug list) - addressed in wip branch
 - multipath adjacency handling breaks gre (Stig's 4 inv rig - 2 paths one gre the other just eth - needs to be fixed)
 - inv5:/root/nsgreeth.sh doesn't ping - fib looks ok
 	root@invader5:/home/dlobete/src/github.com/platinasystems/go# goes vnet show err
