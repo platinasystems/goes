@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
@@ -27,16 +29,16 @@ OPTIONS
 		quit after this number of queries
 		runs forever if total is 0 (default)
 
-	-prefix STRING
-		STRING prepended to each counter name
+	-n[etns] NAME
+		print or publish counters of links in the given namespace
+		prefaced by this name
 
 	-publish
-		Instead of print, publish counters to local redis server.
+		Instead of print, publish counters on the local redis server.
 		This should be run as a daemon, e.g.
 			goes-daemons start ip link counters -publish
 		or
-			goes-daemons start ip -netns NAME \
-				link counters -publish -prefix NAME.
+			goes-daemons start ip link counters -n NAME -publish
 `
 )
 
@@ -48,16 +50,16 @@ var (
 		lang.EnUS: Man,
 	}
 	Flags = []interface{}{"-publish"}
-	Parms = []interface{}{"-interval", "-total", "-prefix"}
+	Parms = []interface{}{"-interval", "-total", []string{"-n", "-netns"}}
 )
 
 func New() *Command { return &Command{} }
 
 type Command struct {
-	opt    *options.Options
 	byidx  map[int32][]byte
 	sr     *rtnl.SockReceiver
 	printf func(string, ...interface{}) (int, error)
+	prefix string
 }
 
 func (*Command) Apropos() lang.Alt { return apropos }
@@ -74,19 +76,27 @@ func (*Command) Help(args ...string) string {
 		return "SECONDS"
 	case args[0] == "-total":
 		return "NUMBER"
-	case args[0] == "-prefix":
-		return "PREFIX"
+	case args[0] == "-netns":
+		return "NETNS"
 	}
 	return help
 }
 
 func (c *Command) Main(args ...string) error {
-	var err error
 	var total int
 	interval := 5
 
-	if args, err = options.Netns(args); err != nil {
-		return err
+	flag, args := flags.New(args, Flags...)
+	parm, args := parms.New(args, Parms...)
+	if len(args) > 0 {
+		return fmt.Errorf("%v: unexpected", args)
+	}
+
+	if name := parm.ByName["-n"]; len(name) > 0 {
+		if err := netns.Switch(name); err != nil {
+			return err
+		}
+		c.prefix = name + "."
 	}
 
 	sock, err := rtnl.NewSock()
@@ -97,14 +107,6 @@ func (c *Command) Main(args ...string) error {
 
 	c.sr = rtnl.NewSockReceiver(sock)
 
-	c.opt, args = options.New(args)
-	args = c.opt.Flags.More(args, Flags...)
-	args = c.opt.Parms.More(args, Parms...)
-
-	if len(args) > 0 {
-		return fmt.Errorf("%v: unexpected", args)
-	}
-
 	for _, x := range []struct {
 		parm string
 		name string
@@ -113,7 +115,7 @@ func (c *Command) Main(args ...string) error {
 		{"-interval", "SECONDS", &interval},
 		{"-total", "NUMBER", &total},
 	} {
-		if s := c.opt.Parms.ByName[x.parm]; len(s) > 0 {
+		if s := parm.ByName[x.parm]; len(s) > 0 {
 			if _, err := fmt.Sscan(s, x.p); err != nil {
 				return fmt.Errorf("%s: %v", x.name, err)
 			}
@@ -124,7 +126,7 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	c.printf = fmt.Printf
-	if c.opt.Flags.ByName["-publish"] {
+	if flag.ByName["-publish"] {
 		pub, err := publisher.New()
 		if err != nil {
 			return fmt.Errorf("publisher: %v", err)
@@ -151,7 +153,6 @@ func (c *Command) Main(args ...string) error {
 }
 
 func (c *Command) counters() error {
-	prefix := c.opt.Parms.ByName["-prefix"]
 	req, err := rtnl.NewMessage(
 		rtnl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
@@ -200,13 +201,13 @@ func (c *Command) counters() error {
 				if !found || iff != lmsg.Flags&x.bit {
 					if iff != 0 {
 						c.printf("%s%s.%s: %s\n",
-							prefix,
+							c.prefix,
 							ifname,
 							x.name,
 							x.t)
 					} else if len(x.f) > 0 {
 						c.printf("%s%s.%s: %s\n",
-							prefix,
+							c.prefix,
 							ifname,
 							x.name,
 							x.f)
@@ -217,7 +218,7 @@ func (c *Command) counters() error {
 		if val := ifla[rtnl.IFLA_OPERSTATE]; len(val) > 0 {
 			if oper := uint8(val[0]); !found || oper != loper {
 				c.printf("%s%s.state: %s\n",
-					prefix,
+					c.prefix,
 					ifname,
 					rtnl.IfOperName[oper])
 			}
@@ -228,7 +229,7 @@ func (c *Command) counters() error {
 				if !found || lstats == nil ||
 					stats[i] != lstats[i] {
 					c.printf("%s%s.%s: %d\n",
-						prefix,
+						c.prefix,
 						ifname,
 						rtnl.IfStatNames[i],
 						stats[i])
