@@ -479,7 +479,7 @@ func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 				continue
 			}
 			if err == syscall.EACCES && !fs.flags.ByName["-read-write"] &&
-				flags & syscall.MS_RDONLY == 0 {
+				flags&syscall.MS_RDONLY == 0 {
 				flags |= syscall.MS_RDONLY
 				continue
 			}
