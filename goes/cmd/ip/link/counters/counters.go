@@ -6,7 +6,6 @@ package counters
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
@@ -55,10 +54,10 @@ var (
 func New() *Command { return &Command{} }
 
 type Command struct {
-	prefix string
-
-	ifinfos     [][]byte
-	lastByIndex map[int32][]byte
+	opt    *options.Options
+	byidx  map[int32][]byte
+	sr     *rtnl.SockReceiver
+	printf func(string, ...interface{}) (int, error)
 }
 
 func (*Command) Apropos() lang.Alt { return apropos }
@@ -90,15 +89,21 @@ func (c *Command) Main(args ...string) error {
 		return err
 	}
 
-	opt, args := options.New(args)
-	args = opt.Flags.More(args, Flags...)
-	args = opt.Parms.More(args, Parms...)
+	sock, err := rtnl.NewSock()
+	if err != nil {
+		return fmt.Errorf("socket: %v", err)
+	}
+	defer sock.Close()
+
+	c.sr = rtnl.NewSockReceiver(sock)
+
+	c.opt, args = options.New(args)
+	args = c.opt.Flags.More(args, Flags...)
+	args = c.opt.Parms.More(args, Parms...)
 
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-
-	publish := opt.Flags.ByName["-publish"]
 
 	for _, x := range []struct {
 		parm string
@@ -108,7 +113,7 @@ func (c *Command) Main(args ...string) error {
 		{"-interval", "SECONDS", &interval},
 		{"-total", "NUMBER", &total},
 	} {
-		if s := opt.Parms.ByName[x.parm]; len(s) > 0 {
+		if s := c.opt.Parms.ByName[x.parm]; len(s) > 0 {
 			if _, err := fmt.Sscan(s, x.p); err != nil {
 				return fmt.Errorf("%s: %v", x.name, err)
 			}
@@ -118,13 +123,22 @@ func (c *Command) Main(args ...string) error {
 		return fmt.Errorf("invalid interval")
 	}
 
-	c.prefix = opt.Parms.ByName["-prefix"]
-	c.lastByIndex = make(map[int32][]byte)
+	c.printf = fmt.Printf
+	if c.opt.Flags.ByName["-publish"] {
+		pub, err := publisher.New()
+		if err != nil {
+			return fmt.Errorf("publisher: %v", err)
+		}
+		defer pub.Close()
+		c.printf = pub.Printf
+	}
+
+	c.byidx = make(map[int32][]byte)
 
 	t := time.NewTicker(time.Duration(interval) * time.Second)
 	defer t.Stop()
 	for i := 0; ; {
-		err = c.getIfInfos(publish)
+		err = c.counters()
 		if err != nil {
 			break
 		}
@@ -136,17 +150,8 @@ func (c *Command) Main(args ...string) error {
 	return err
 }
 
-func (c *Command) getIfInfos(publish bool) error {
-	var printf func(string, ...interface{}) (int, error)
-
-	sock, err := rtnl.NewSock()
-	if err != nil {
-		return fmt.Errorf("socket: %v", err)
-	}
-	defer sock.Close()
-
-	sr := rtnl.NewSockReceiver(sock)
-
+func (c *Command) counters() error {
+	prefix := c.opt.Parms.ByName["-prefix"]
 	req, err := rtnl.NewMessage(
 		rtnl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
@@ -157,40 +162,20 @@ func (c *Command) getIfInfos(publish bool) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("request: %v", err)
+		return err
 	}
-	c.ifinfos = c.ifinfos[:0]
-	if err = sr.UntilDone(req, func(b []byte) {
-		if rtnl.HdrPtr(b).Type == rtnl.RTM_NEWLINK {
-			c.ifinfos = append(c.ifinfos, b)
-		}
-	}); err != nil {
-		return fmt.Errorf("response: %v", err)
-	}
-	sort.Slice(c.ifinfos, func(i, j int) bool {
-		iIndex := rtnl.IfInfoMsgPtr(c.ifinfos[i]).Index
-		jIndex := rtnl.IfInfoMsgPtr(c.ifinfos[j]).Index
-		return iIndex < jIndex
-	})
-	if publish {
-		pub, err := publisher.New()
-		if err != nil {
-			return fmt.Errorf("publisher: %v", err)
-		}
-		defer pub.Close()
-		printf = pub.Printf
-	} else {
-		printf = fmt.Printf
-	}
-	for _, b := range c.ifinfos {
+	return c.sr.UntilDone(req, func(b []byte) {
 		var ifla, lifla rtnl.Ifla
 		var lmsg *rtnl.IfInfoMsg
 		var loper uint8
 		var lstats *rtnl.IfStats64
+		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+			return
+		}
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
 		ifname := rtnl.Kstring(ifla[rtnl.IFLA_IFNAME])
-		lb, found := c.lastByIndex[msg.Index]
+		lb, found := c.byidx[msg.Index]
 		if found {
 			lmsg = rtnl.IfInfoMsgPtr(lb)
 			lifla.Write(lb)
@@ -214,14 +199,14 @@ func (c *Command) getIfInfos(publish bool) error {
 				iff := msg.Flags & x.bit
 				if !found || iff != lmsg.Flags&x.bit {
 					if iff != 0 {
-						printf("%s%s.%s: %s\n",
-							c.prefix,
+						c.printf("%s%s.%s: %s\n",
+							prefix,
 							ifname,
 							x.name,
 							x.t)
 					} else if len(x.f) > 0 {
-						printf("%s%s.%s: %s\n",
-							c.prefix,
+						c.printf("%s%s.%s: %s\n",
+							prefix,
 							ifname,
 							x.name,
 							x.f)
@@ -231,8 +216,9 @@ func (c *Command) getIfInfos(publish bool) error {
 		}
 		if val := ifla[rtnl.IFLA_OPERSTATE]; len(val) > 0 {
 			if oper := uint8(val[0]); !found || oper != loper {
-				printf("%s%s.state: %s\n",
-					c.prefix, ifname,
+				c.printf("%s%s.state: %s\n",
+					prefix,
+					ifname,
 					rtnl.IfOperName[oper])
 			}
 		}
@@ -241,15 +227,14 @@ func (c *Command) getIfInfos(publish bool) error {
 			for i := 0; i < rtnl.N_link_stat; i++ {
 				if !found || lstats == nil ||
 					stats[i] != lstats[i] {
-					printf("%s%s.%s: %d\n",
-						c.prefix,
+					c.printf("%s%s.%s: %d\n",
+						prefix,
 						ifname,
 						rtnl.IfStatNames[i],
 						stats[i])
 				}
 			}
 		}
-		c.lastByIndex[msg.Index] = b
-	}
-	return nil
+		c.byidx[msg.Index] = b
+	})
 }
