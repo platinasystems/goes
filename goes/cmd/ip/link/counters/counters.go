@@ -6,9 +6,11 @@ package counters
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
@@ -66,6 +68,33 @@ func (*Command) Apropos() lang.Alt { return apropos }
 func (*Command) Man() lang.Alt     { return man }
 func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Usage }
+
+func (*Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["-interval"] = options.NoComplete
+	cpv["-total"] = options.NoComplete
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"-publish",
+			"-interval",
+			"-total") {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
+}
 
 func (*Command) Help(args ...string) string {
 	help := "no help"
