@@ -18,7 +18,8 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const timeout = 500 * time.Millisecond
+const rdtimeout = 10 * time.Second
+const wrtimeout = 500 * time.Millisecond
 
 var DefaultHash = "platina"
 
@@ -122,7 +123,7 @@ func Connect() (redis.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return redis.NewConn(conn, timeout, timeout), nil
+	return redis.NewConn(conn, rdtimeout, wrtimeout), nil
 }
 
 func Get(key string) (s string, err error) {
@@ -328,7 +329,7 @@ func Subscribe(channel string) (psc redis.PubSubConn, err error) {
 	if err != nil {
 		return
 	}
-	psc = redis.PubSubConn{redis.NewConn(conn, 0, timeout)}
+	psc = redis.PubSubConn{redis.NewConn(conn, 0, wrtimeout)}
 	err = psc.Subscribe(channel)
 	if err != nil {
 		psc.Close()
