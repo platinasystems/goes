@@ -382,6 +382,8 @@ func (c *Command) pivotRoot(mountPoint string, root string, script string) {
 				":root=/dev/"+dir.Name())
 			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
 				"/boot:root=/dev/"+dir.Name())
+			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
+				"/d-i:root=/dev/"+dir.Name())
 		}
 		err = c.g.Main(bootCmd...)
 		if err == nil {
