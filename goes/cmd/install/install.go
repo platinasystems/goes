@@ -274,11 +274,15 @@ func bash_completion() error {
 	_, err = f.WriteString(`
 _goes ()
 {
-	COMPREPLY=($(goes complete ${COMP_WORDS[@]:1}))
+	if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
+		COMPREPLY=($(goes complete ${COMP_WORDS[@]:1} ''))
+	else
+		COMPREPLY=($(goes complete ${COMP_WORDS[@]:1}))
+	fi
 	return 0
 }
 
-type -p goes >/dev/null && complete -o filenames -F _goes goes
+type -p goes >/dev/null && complete -F _goes -o filenames goes
 `[1:])
 	return err
 }

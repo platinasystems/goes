@@ -22,10 +22,15 @@ DESCRIPTION
 	This may be used for bash completion of goes commands like this.
 
 	_goes() {
-		COMPREPLY=($(goes complete ${COMP_WORDS[@]}))
+		if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
+			COMPREPLY=($(goes complete ${COMP_WORDS[@]:1} ''))
+		else
+			COMPREPLY=($(goes complete ${COMP_WORDS[@]:1}))
+		fi
 		return 0
 	}
-	complete -F _goes goes`
+
+	type -p goes >/dev/null && complete -F _goes -o filenames goes`
 )
 
 var (

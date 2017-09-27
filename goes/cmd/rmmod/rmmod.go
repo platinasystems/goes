@@ -50,6 +50,7 @@ func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
 func (Command) Complete(args ...string) (c []string) {
+	n := len(args)
 	f, err := os.Open("/proc/modules")
 	if err != nil {
 		return
@@ -59,8 +60,8 @@ func (Command) Complete(args ...string) (c []string) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		x := strings.Fields(line)
-		if len(args) == 0 ||
-			strings.HasPrefix(x[0], args[len(args)-1]) {
+		if n == 0 || len(args[n-1]) == 0 ||
+			strings.HasPrefix(x[0], args[n-1]) {
 			c = append(c, x[0])
 		}
 	}
