@@ -4,7 +4,11 @@
 
 package rtnl
 
-import "syscall"
+import (
+	"sort"
+	"strings"
+	"syscall"
+)
 
 const (
 	RT_SCOPE_UNIVERSE uint8 = syscall.RT_SCOPE_UNIVERSE
@@ -29,4 +33,16 @@ var RtScopeName = map[uint8]string{
 	RT_SCOPE_LINK:     "link",
 	RT_SCOPE_HOST:     "host",
 	RT_SCOPE_NOWHERE:  "nowhere",
+}
+
+func CompleteRtScope(s string) (list []string) {
+	for k := range RtScopeByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
 }

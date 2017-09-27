@@ -7,6 +7,7 @@ package mod
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
@@ -242,4 +243,55 @@ func (c Command) Main(args ...string) error {
 		return err
 	}
 	return sr.UntilDone(b, func([]byte) {})
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["peer"] = options.NoComplete
+	cpv["broadcast"] = options.NoComplete
+	cpv["anycast"] = options.NoComplete
+	cpv["label"] = options.NoComplete
+	cpv["scope"] = rtnl.CompleteRtScope
+	cpv["valid_lft"] = completeLft
+	cpv["preferred_lft"] = completeLft
+	cpv["dev"] = options.CompleteIfName
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"peer",
+			"broadcast",
+			"anycast",
+			"label",
+			"scope",
+			"home",
+			"mngtmpaddr",
+			"nodad",
+			"noprefixroute",
+			"autojoin",
+			"valid_lft",
+			"preferred_lft",
+			"dev") {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
+}
+
+func completeLft(s string) (list []string) {
+	const forever = "forever"
+	if strings.HasPrefix("forever", s) {
+		list = []string{forever}
+	}
+	return
 }
