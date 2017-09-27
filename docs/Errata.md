@@ -7,20 +7,9 @@ change over time as issues are resolved.
 
 - Blacklist or remove ixgbe driver from kernel so tuntap mode comes up as default
 
-- Tear down ns script and restarting a new one that uses same namespace names causes this in syslog: (fixed in wip branch)
+- Multipath routes via linux when running quagga causing panic (need to add multipath to kernel config and fix vnetd netlink handling of attribute RTA_MULTIPATH); static routes via ip command do not show this - fixed in wip branch
 
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.228761 namespace watch: ns1 netlink GETNSID: no such device
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.391677 namespace watch: ns2 netlink GETNSID: bad file descriptor
-Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-2-0: link is not ready
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.567914 namespace watch: ns3 netlink GETNSID: bad file descriptor
-Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-3-0: link is not ready
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.747645 namespace watch: ns4 netlink GETNSID: bad file descriptor
-
-  And no population of fib for interfaces moved into the namespaces. All successive netlink messages dropped
-
-- Multipath routes via linux causing panic (need to add multipath to kernel config and fix vnetd netlink handling of attribute RTA_MULTIPATH) - fixed in wip branch
-
-- IF_OPER status at linux tuntap not reflecting actual link-state (on bug list) - addressed in wip branch but also causes regression that yet needs to be fixed
+- IF_OPER status at linux tuntap not reflecting actual link-state (on bug list) - addressed in wip branch but also causes regression that yet needs to be fixed (bad file descriptor from kernel)
 
 ---------------------- must fix for release 0.4 - above this line --------------------------
 
