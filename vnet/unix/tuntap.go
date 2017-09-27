@@ -115,7 +115,7 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 		if err = i.bind(); err != nil {
 			return
 		}
-		i.start_up()
+		i.maybe_start_up()
 	}
 	return
 }
@@ -431,6 +431,14 @@ func (intf *tuntap_interface) bind() (err error) {
 	return
 }
 
+func (intf *tuntap_interface) maybe_start_up() {
+	if intf.isTun || intf.hi.IsLinkUp(intf.m.v) {
+		intf.start_up()
+	} else {
+		intf.close(false)
+	}
+}
+
 func (intf *tuntap_interface) start_up() {
 	if intf.to_tx == nil {
 		intf.to_tx = make(chan *tx_packet_vector, vnet.MaxOutstandingTxRefs)
@@ -487,11 +495,7 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 		m.rx_node.set_next(intf.si, next)
 	}
 
-	if intf.isTun || intf.hi.IsLinkUp(intf.m.v) {
-		intf.start_up()
-	} else {
-		intf.close(false)
-	}
+	intf.maybe_start_up()
 
 	return
 }
