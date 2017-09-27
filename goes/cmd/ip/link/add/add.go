@@ -6,8 +6,10 @@ package add
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -67,4 +69,44 @@ func (Command) Main(args ...string) error {
 	fmt.Println("FIXME", Name, args)
 
 	return nil
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["link"] = options.CompleteIfName
+	cpv["txqueuelen"] = options.NoComplete
+	cpv["address"] = options.NoComplete
+	cpv["broadcast"] = options.NoComplete
+	cpv["mtu"] = options.NoComplete
+	cpv["idx"] = options.NoComplete
+	cpv["numrxqueues"] = options.NoComplete
+	cpv["numtxqueues"] = options.NoComplete
+	cpv["type"] = rtnl.CompleteArphrd
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"link",
+			"txqueuelen",
+			"address",
+			"broadcast",
+			"mtu",
+			"idx",
+			"numrxqueues",
+			"numtxqueues",
+			"type") {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
 }
