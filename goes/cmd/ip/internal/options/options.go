@@ -6,6 +6,7 @@ package options
 
 import (
 	"net"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -107,6 +108,19 @@ func CompleteFamily(s string) (list []string) {
 	}
 	if len(list) > 0 {
 		sort.Strings(list)
+	}
+	return
+}
+
+func CompleteFile(s string) (list []string) {
+	fns, err := filepath.Glob(s + ".*")
+	if err != nil {
+		return []string{}
+	}
+	for _, fn := range fns {
+		if len(s) == 0 || strings.HasPrefix(fn, s) {
+			list = append(list, fn)
+		}
 	}
 	return
 }
