@@ -190,3 +190,54 @@ func (c Command) Main(args ...string) error {
 	}
 	return nil
 }
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["to"] = options.NoComplete
+	cpv["tos"] = options.NoComplete
+	cpv["table"] = options.NoComplete
+	cpv["vrf"] = options.NoComplete
+	cpv["from"] = options.NoComplete
+	cpv["protocol"] = rtnl.CompleteRtProt
+	cpv["scope"] = rtnl.CompleteRtScope
+	cpv["type"] = rtnl.CompleteRtn
+	cpv["dev"] = options.CompleteIfName
+	cpv["via"] = options.NoComplete
+	cpv["src"] = options.NoComplete
+	cpv["realm"] = options.NoComplete
+	cpv["realms"] = options.NoComplete
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"cloned",
+			"cached",
+			"to",
+			"tos",
+			"table",
+			"vrf",
+			"from",
+			"protocol",
+			"scope",
+			"type",
+			"dev",
+			"via",
+			"src",
+			"realm",
+			"realms",
+		) {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
+}

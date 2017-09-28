@@ -4,6 +4,8 @@
 
 package rtnl
 
+import "strings"
+
 const (
 	RTN_UNSPEC uint8 = iota
 	RTN_UNICAST
@@ -33,4 +35,13 @@ var RtnByName = map[string]uint8{
 	"throw":       RTN_THROW,
 	"nat":         RTN_NAT,
 	"xresolve":    RTN_XRESOLVE,
+}
+
+func CompleteRtn(s string) (list []string) {
+	for k := range RtnByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	return
 }

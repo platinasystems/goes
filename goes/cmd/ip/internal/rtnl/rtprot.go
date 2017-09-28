@@ -4,7 +4,10 @@
 
 package rtnl
 
-import "syscall"
+import (
+	"strings"
+	"syscall"
+)
 
 const (
 	RTPROT_UNSPEC   uint8 = syscall.RTPROT_UNSPEC
@@ -61,4 +64,13 @@ var RtProtName = map[uint8]string{
 	RTPROT_DHCP:     "dhcp",
 	RTPROT_MROUTED:  "mrouted",
 	RTPROT_BABEL:    "babel",
+}
+
+func CompleteRtProt(s string) (list []string) {
+	for k := range RtProtByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	return
 }
