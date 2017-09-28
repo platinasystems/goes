@@ -5,6 +5,8 @@
 package rtnl
 
 import (
+	"sort"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -258,4 +260,16 @@ var In6AddrGenModeByName = map[string]uint8{
 	"none":   IN6_ADDR_GEN_MODE_NONE,
 	"stable": IN6_ADDR_GEN_MODE_STABLE_PRIVACY,
 	"random": IN6_ADDR_GEN_MODE_RANDOM,
+}
+
+func CompleteIn6AddrGenMode(s string) (list []string) {
+	for k := range In6AddrGenModeByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
 }
