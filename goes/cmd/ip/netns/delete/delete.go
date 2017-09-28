@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"syscall"
 
+	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
@@ -18,7 +20,7 @@ import (
 const (
 	Name    = "delete"
 	Apropos = "remove network namespace"
-	Usage   = `ip [-all] netns delete [NETNSNAME]`
+	Usage   = `ip netns delete [ -all | NETNSNAME ]`
 	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
@@ -68,6 +70,25 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
 	return nil
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	for _, name := range []string{
+		"-all",
+	} {
+		if strings.HasPrefix(name, larg) {
+			list = append(list, name)
+		}
+	}
+	if len(list) == 0 {
+		list = netns.CompleteName(larg)
+	}
+	return
 }
 
 func del(name string) error {
