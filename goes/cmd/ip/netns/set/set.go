@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
@@ -91,4 +92,11 @@ func (Command) Main(args ...string) error {
 	}
 
 	return rtnl.NewSockReceiver(sock).UntilDone(req, func(b []byte) {})
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	if n := len(args); n == 1 {
+		list = netns.CompleteName(args[n-1])
+	}
+	return
 }
