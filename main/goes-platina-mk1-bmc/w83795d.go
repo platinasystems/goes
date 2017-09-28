@@ -41,11 +41,13 @@ func w83795dInit() {
 	w83795d.WrRegDv["host"] = "host"
 	w83795d.WrRegFn["host.temp.units.C"] = "temp.units.C"
 	w83795d.WrRegFn["host.temp.target.units.C"] = "temp.target.units.C"
+	w83795d.WrRegFn["host.reset"] = "reset"
 
 	w83795d.WrRegDv["hwmon"] = "hwmon"
 	w83795d.WrRegFn["hwmon.target.units.C"] = "target.units.C"
 
 	w83795d.WrRegRng["fan_tray.speed"] = []string{"low", "med", "high", "auto", "max"}
 	w83795d.WrRegRng["hwmon.target.units.C"] = []string{"0", "60"}
+	w83795d.WrRegRng["host.reset"] = []string{"true"}
 	w83795d.WrRegRng["w83795d.example"] = []string{"true", "false"}
 }
