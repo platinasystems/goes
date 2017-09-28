@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
@@ -73,4 +74,14 @@ func (Command) Main(args ...string) error {
 		}
 	}
 	return nil
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	list = netns.CompleteName(larg)
+	return
 }
