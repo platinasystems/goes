@@ -18,11 +18,125 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
+const (
+	MaxImgs = 3
+	Goes    = 0
+	Kern    = 1
+	Core    = 2
+	GoesBin = "/usr/bin/goes"
+)
+
+type IMGINFO struct {
+	Name   string
+	Build  string
+	User   string
+	Size   string
+	Tag    string
+	Commit string
+	Chksum string
+}
+
+func printImageInfo() (err error) {
+	var imgInfo [MaxImgs]IMGINFO
+
+	if imgInfo[Goes], err = getGoesInfo(); err != nil {
+		return err
+	}
+	if imgInfo[Kern], err = getKernelInfo(); err != nil {
+		return err
+	}
+	if imgInfo[Core], err = getCorebootInfo(); err != nil {
+		return err
+	}
+
+	fmt.Println("")
+	fmt.Print("Currently running:\n")
+	for i, _ := range imgInfo {
+		prn("    Name   : ", imgInfo[i].Name)
+		prn("    Build  : ", imgInfo[i].Build)
+		prn("    User   : ", imgInfo[i].User)
+		prn("    Size   : ", imgInfo[i].Size)
+		prn("    Version: ", imgInfo[i].Tag)
+		prn("    Commit : ", imgInfo[i].Commit)
+		fmt.Println("")
+	}
+	return nil
+}
+
+func prn(d string, s string) {
+	if s != "" {
+		fmt.Println(d, s)
+	}
+}
+
+func getGoesInfo() (im IMGINFO, err error) {
+	im.Name = GoesName
+	im.Build = getGoesVal("generated.on")
+	im.User = getGoesVal("generated.by")
+	fi, err := os.Stat(GoesBin)
+	if err != nil {
+		return im, err
+	}
+	im.Size = fmt.Sprintf("%d", fi.Size())
+	im.Tag = getGoesVal("tag")
+	im.Commit = getGoesVal("version")
+	return im, nil
+}
+
+func getKernelInfo() (im IMGINFO, err error) {
+	im.Name, _ = getKernelVal("-s")
+	im.Build, _ = getKernelVal("-v")
+	im.User = ""
+	im.Tag, _ = getKernelVal("-r")
+	im.Commit = ""
+	im.Size = ""
+	fi, _ := os.Stat("/boot/vmlinuz-" + im.Tag)
+	if err == nil {
+		im.Size = fmt.Sprintf("%d", fi.Size())
+	}
+	return im, nil
+}
+
+func getCorebootInfo() (im IMGINFO, err error) {
+	im.Name = CorebootName
+	_, err = exec.Command("/usr/local/sbin/flashrom", "-p",
+		"internal:boardmismatch=force", "-l",
+		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
+		"-i", "bios", "-r", "cb.rom", "-A", "-V").Output()
+	if err != nil {
+		return im, err
+	}
+	a, err := ioutil.ReadFile("cb.rom")
+	if err != nil {
+		return im, err
+	}
+	temp := strings.Split(string(a), "\n")
+	for _, j := range temp {
+		if strings.Contains(j, "COREBOOT_VERSION ") {
+			x := strings.Split(j, " ")
+			im.Commit = strings.Replace(x[2], `"`, "", 2)
+		}
+		if strings.Contains(j, "COREBOOT_BUILD ") {
+			x := strings.SplitAfterN(j, " ", 3)
+			im.Build = strings.Replace(x[2], `"`, "", 2)
+		}
+	}
+	im.User = ""
+	fi, err := os.Stat("cb.rom")
+	if err != nil {
+		return im, err
+	}
+	im.Size = fmt.Sprintf("%d", fi.Size())
+	im.Tag = ""
+
+	return im, nil
+}
+
 func upgradeGoes(s string, v string, t bool, f bool) error {
 	fmt.Printf("Update Goes\n")
 	if !f {
-		g := GoesVer()
-		gr, err := srvGoesVer(s, v, t)
+		g := getGoesVer()
+		gr, err := getSrvGoesVer(s, v, t)
 		if err != nil {
 			return err
 		}
@@ -46,12 +160,12 @@ func upgradeGoes(s string, v string, t bool, f bool) error {
 
 func upgradeKernel(s string, v string, t bool, f bool) error {
 	fmt.Printf("Update Kernel\n")
-	kr, fn, err := srvKernelVer(s, v, t)
+	kr, fn, err := getSrvKernelVer(s, v, t)
 	if err != nil {
 		return err
 	}
 	if !f {
-		k, err := KernelVer()
+		k, err := getKernelVer()
 		if err != nil {
 			return err
 		}
@@ -72,11 +186,11 @@ func upgradeKernel(s string, v string, t bool, f bool) error {
 func upgradeCoreboot(s string, v string, t bool, f bool) error {
 	fmt.Printf("Update Coreboot\n")
 	if !f {
-		c, err := CorebootVer()
+		c, err := getCorebootVer()
 		if err != nil {
 			return err
 		}
-		cr, err := srvCorebootVer(s, v, t)
+		cr, err := getSrvCorebootVer(s, v, t)
 		if err != nil {
 			return err
 		}
@@ -93,7 +207,7 @@ func upgradeCoreboot(s string, v string, t bool, f bool) error {
 	return nil
 }
 
-func GoesVer() (v string) {
+func getGoesVer() (v string) {
 	ar := "tag"
 	maps := []map[string]string{Package}
 	if Packages != nil {
@@ -104,7 +218,7 @@ func GoesVer() (v string) {
 			k := strings.TrimLeft(ar, "-")
 			if val, found := m[k]; found {
 				if strings.Contains(ip, "/go") {
-					v = val
+					v = strings.Replace(val, "'", "", 1)
 				}
 			}
 		}
@@ -112,7 +226,25 @@ func GoesVer() (v string) {
 	return v
 }
 
-func KernelVer() (string, error) {
+func getGoesVal(ar string) (v string) {
+	maps := []map[string]string{Package}
+	if Packages != nil {
+		maps = append(maps, Packages()...)
+	}
+	for _, m := range maps {
+		if ip, found := m["importpath"]; found {
+			k := strings.TrimLeft(ar, "-")
+			if val, found := m[k]; found {
+				if strings.Contains(ip, "/go") {
+					v = strings.Replace(val, "'", "", 1)
+				}
+			}
+		}
+	}
+	return v
+}
+
+func getKernelVer() (string, error) {
 	u, err := exec.Command("uname", "-r").Output()
 	if err != nil {
 		return "", err
@@ -120,11 +252,19 @@ func KernelVer() (string, error) {
 	return strings.TrimSpace(string(u)), nil
 }
 
-func CorebootVer() (string, error) { //FIXME not really required
+func getKernelVal(ar string) (string, error) {
+	u, err := exec.Command("uname", ar).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(u)), nil
+}
+
+func getCorebootVer() (string, error) { //TODO
 	return "no_tag", nil
 }
 
-func srvGoesVer(s string, v string, t bool) (string, error) {
+func getSrvGoesVer(s string, v string, t bool) (string, error) {
 	fn := GoesName
 
 	n, err := getFile(s, v, t, fn)
@@ -150,7 +290,7 @@ func srvGoesVer(s string, v string, t bool) (string, error) {
 	return x, nil
 }
 
-func srvKernelVer(s string, v string, t bool) (string, string, error) {
+func getSrvKernelVer(s string, v string, t bool) (string, string, error) {
 	fn := KernelName
 	n, err := getFile(s, v, t, fn)
 	if err != nil {
@@ -167,22 +307,8 @@ func srvKernelVer(s string, v string, t bool) (string, string, error) {
 	return strings.TrimSpace(u[0]), strings.TrimSpace(u[1]), nil
 }
 
-func srvCorebootVer(s string, v string, t bool) (string, error) { //FIXME
+func getSrvCorebootVer(s string, v string, t bool) (string, error) { //TODO
 	return "no_tag", nil
-}
-
-func prVer(g string, k string, c string, sg string, sk string, sc string) {
-	fmt.Print("\n")
-	fmt.Print("Currently running:\n")
-	fmt.Printf("    Goes version    : %s\n", g)
-	fmt.Printf("    Kernel version  : %s\n", k)
-	fmt.Printf("    Coreboot version: %s\n", c)
-	fmt.Print("\n")
-	fmt.Print("Version on server:\n")
-	fmt.Printf("    Goes version    : %s\n", sg)
-	fmt.Printf("    Kernel version  : %s\n", sk)
-	fmt.Printf("    Coreboot version: %s\n", sc)
-	fmt.Print("\n")
 }
 
 func installGoes(s string, v string, t bool) error {
