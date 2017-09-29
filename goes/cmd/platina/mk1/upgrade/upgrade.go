@@ -177,7 +177,6 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 		if err := reboot(); err != nil {
 			return err
 		}
-		return nil
 	}
 	if Install_flag {
 		if err := activateGoes(); err != nil {
