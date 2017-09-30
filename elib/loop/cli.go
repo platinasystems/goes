@@ -258,6 +258,8 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 			elog.AddDelEventFilter(s, false)
 		case in.Parse("re%*size %d", &n_events):
 			elog.Resize(n_events)
+		case in.Parse("disable-after %d", &n_events):
+			elog.DisableAfter(uint64(n_events))
 		case in.Parse("s%*ave %s", &s):
 			err = elog.SaveFile(s)
 		case in.Parse("d%*ump %s", &s):
