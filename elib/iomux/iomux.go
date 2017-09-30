@@ -43,6 +43,11 @@ type Filer interface {
 	String() string
 }
 
+type AvailableReader interface {
+	// Read from is file is currently allowed.
+	ReadAvailable() bool
+}
+
 //go:generate gentemplate -d Package=iomux -id file -d Data=files -d PoolType=filePool -d Type=Filer github.com/platinasystems/go/elib/pool.tmpl
 
 var Default = &Mux{}
