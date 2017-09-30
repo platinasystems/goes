@@ -71,6 +71,7 @@ type Loop struct {
 
 	loopIniters []Initer
 	loopExiters []Exiter
+	panicErr    interface{}
 
 	dataPollers       []inLooper
 	activePollerState activePollerState
@@ -232,6 +233,9 @@ func (l *Loop) Run() {
 		l.doPollers()
 	}
 	l.doExit()
+	if l.panicErr != nil {
+		panic(l.panicErr)
+	}
 }
 
 type pollerCounts struct {

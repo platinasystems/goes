@@ -562,8 +562,10 @@ func (l *Loop) dataPoll(p inLooper) {
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
-				elog.Panic(fmt.Errorf("%s: %v", n.name, err))
-				panic(err)
+				err = fmt.Errorf("%s: %v", n.name, err)
+				elog.Panic(err)
+				l.panicErr = err
+				n.ft.signalLoop(true)
 			}
 		}
 	}()

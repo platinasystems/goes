@@ -157,6 +157,15 @@ func (e *nodeEvent) do() {
 
 func (e *nodeEvent) String() string { return e.actor.String() }
 
+func (d *Node) eventDone() {
+	n := &d.e
+	n.s.setDone()
+	n.currentEvent.e = nil
+	n.activeCount--
+	n.log(d, event_elog_node_signal_done)
+	n.ft.signalLoop(true)
+}
+
 func (l *Loop) eventHandler(r Noder) {
 	d := r.GetNode()
 	// Save elog if thread panics.
@@ -166,8 +175,10 @@ func (l *Loop) eventHandler(r Noder) {
 				l.Quit()
 				return
 			}
-			elog.Panic(fmt.Errorf("%v: %v", d.name, err))
-			panic(err)
+			err = fmt.Errorf("%v: %v", d.name, err)
+			elog.Panic(err)
+			l.panicErr = err
+			d.eventDone()
 		}
 	}()
 	n := &d.e
@@ -181,11 +192,7 @@ func (l *Loop) eventHandler(r Noder) {
 		}
 		n.currentEvent.e = e
 		e.do()
-		n.s.setDone()
-		n.currentEvent.e = nil
-		n.activeCount--
-		n.log(d, event_elog_node_signal_done)
-		n.ft.signalLoop(true)
+		d.eventDone()
 	}
 }
 
@@ -451,7 +458,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		m.inactiveNodes = m.inactiveNodes[:0]
 	}
 
-	quitLoop = quit != nil && quit.Type == quitEventExit
+	quitLoop = (quit != nil && quit.Type == quitEventExit) || l.panicErr != nil
 	return
 }
 
