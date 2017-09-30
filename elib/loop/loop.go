@@ -71,7 +71,6 @@ type Loop struct {
 
 	loopIniters []Initer
 	loopExiters []Exiter
-	panicErr    interface{}
 
 	dataPollers       []inLooper
 	activePollerState activePollerState
@@ -94,6 +93,7 @@ type Loop struct {
 	eventMain
 	loggerMain
 	nodeStateMain
+	panicMain
 }
 
 func (l *Loop) GetNode(i uint) *Node       { return l.nodes[i] }
@@ -233,7 +233,17 @@ func (l *Loop) Run() {
 		l.doPollers()
 	}
 	l.doExit()
-	if l.panicErr != nil {
+	l.doPanic()
+}
+
+type panicMain struct {
+	panicErr interface{}
+}
+
+func (l *Loop) Panic(err interface{}) { l.panicErr = err }
+func (l *Loop) isPanic() bool         { return l.panicErr != nil }
+func (l *Loop) doPanic() {
+	if l.isPanic() {
 		panic(l.panicErr)
 	}
 }

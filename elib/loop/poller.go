@@ -185,6 +185,10 @@ func (n *Node) IsActive() bool {
 	_, active, _, _ := n.s.get()
 	return active > 0
 }
+func (n *Node) ActiveCount() int {
+	_, active, _, _ := n.s.get()
+	return int(active)
+}
 func (n *Node) IsSuspended() bool {
 	_, _, _, state := n.s.get()
 	return state == poller_suspended
@@ -564,7 +568,7 @@ func (l *Loop) dataPoll(p inLooper) {
 			if err := recover(); err != nil {
 				err = fmt.Errorf("%s: %v", n.name, err)
 				elog.Panic(err)
-				l.panicErr = err
+				l.Panic(err)
 				n.ft.signalLoop(true)
 			}
 		}

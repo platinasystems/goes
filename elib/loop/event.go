@@ -177,7 +177,7 @@ func (l *Loop) eventHandler(r Noder) {
 			}
 			err = fmt.Errorf("%v: %v", d.name, err)
 			elog.Panic(err)
-			l.panicErr = err
+			l.Panic(err)
 			d.eventDone()
 		}
 	}()
@@ -458,7 +458,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		m.inactiveNodes = m.inactiveNodes[:0]
 	}
 
-	quitLoop = (quit != nil && quit.Type == quitEventExit) || l.panicErr != nil
+	quitLoop = (quit != nil && quit.Type == quitEventExit) || l.isPanic()
 	return
 }
 
