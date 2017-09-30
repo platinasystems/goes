@@ -185,10 +185,13 @@ func (v *View) doViewTimes(t0, t1 float64) {
 
 	{
 		dt := t1 - t0
-		if dt <= 0 {
-			panic("t0 <= t1")
+		if dt < 0 {
+			panic("t0 < t1")
 		}
-		logDt := math.Floor(math.Log10(dt))
+		logDt := float64(0)
+		if dt > 0 {
+			logDt = math.Floor(math.Log10(dt))
+		}
 		switch {
 		case logDt < -6:
 			unitName = "ns"
