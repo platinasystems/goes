@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/internal/redis"
 )
 
@@ -89,21 +90,6 @@ func New(vfs [][]Vf) (err error) {
 	if err != nil {
 		return
 	}
-	x := exec.Command("ip", "-batch", "-")
-	w, err := x.StdinPipe()
-	if err != nil {
-		return
-	}
-	if err = x.Start(); err != nil {
-		return
-	}
-	defer func() {
-		w.Close()
-		xerr := x.Wait()
-		if ee, found := xerr.(*exec.ExitError); found {
-			err = fmt.Errorf("ip -batch: %s", string(ee.Stderr))
-		}
-	}()
 	for pfi, pf := range pfs {
 		var virtfns Virtfns
 
@@ -134,8 +120,10 @@ func New(vfs [][]Vf) (err error) {
 				continue
 			}
 			vf := vfs[pfi][vfi]
-			_, err = fmt.Fprintln(w, "link", "set", pf.Name,
-				"vf", vfi, "mac", VfMac(), "vlan", vf.Vlan())
+			args := []string{"link", "set", pf.Name, "vf",
+				fmt.Sprint(vfi), "mac", VfMac().String(),
+				"vlan", fmt.Sprint(vf.Vlan())}
+			err = ip.New().Main(args...)
 			if err != nil {
 				return
 			}
@@ -145,19 +133,22 @@ func New(vfs [][]Vf) (err error) {
 			}
 			want := vf.String()
 			if vfname != want {
-				_, err = fmt.Fprintln(w, "link", "set", vfname,
-					"name", want)
+				args := []string{"link", "set", vfname,
+					"name", want}
+				err = ip.New().Main(args...)
 				if err != nil {
 					return
 				}
 				vfname = want
 			}
 			// bounce vf to reload its mac from the pf
-			_, err = fmt.Fprintln(w, "link", "set", vfname, "up")
+			args = []string{"link", "set", vfname, "up"}
+			err = ip.New().Main(args...)
 			if err != nil {
 				return
 			}
-			_, err = fmt.Fprintln(w, "link", "set", vfname, "down")
+			args = []string{"link", "set", vfname, "down"}
+			err = ip.New().Main(args...)
 			if err != nil {
 				return
 			}
