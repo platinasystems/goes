@@ -32,8 +32,7 @@ type interfaceNode struct {
 
 	hi Hi
 
-	tx_chan   chan *TxRefVecIn
-	free_list []*TxRefVecIn
+	tx_chan chan *TxRefVecIn
 
 	txDownDropError uint
 
@@ -178,16 +177,9 @@ func (n *interfaceNode) allocTxRefVecIn(in *RefIn) (i *TxRefVecIn) {
 	select {
 	case i = <-n.freeChan:
 		// Re-cycle one that output routine is done with.
-		i.FreeRefs(false)
 	default:
-		if l := len(n.free_list); l > 0 {
-			// Re-cycle one from free list.
-			i = n.free_list[l-1]
-			n.free_list = n.free_list[:l-1]
-		} else {
-			// Make a new one.
-			i = &TxRefVecIn{n: n}
-		}
+		// Make a new one.
+		i = &TxRefVecIn{n: n}
 	}
 	return
 }
@@ -213,9 +205,13 @@ var suspendLimits = loop.SuspendLimits{
 	Resume:  MaxOutstandingTxRefs / 2,
 }
 
+func (n *interfaceNode) freeTxRefVecIn(i *TxRefVecIn) {
+	i.FreeRefs(false)
+	i.n.freeChan <- i
+}
 func (v *Vnet) FreeTxRefIn(i *TxRefVecIn) {
 	v.loop.AddSuspendActivity(&i.In, -int(i.Len()), &suspendLimits)
-	i.n.freeChan <- i
+	i.n.freeTxRefVecIn(i)
 }
 func (i *TxRefVecIn) Free(v *Vnet) { v.FreeTxRefIn(i) }
 
@@ -293,7 +289,7 @@ func (n *interfaceNode) ifOutput(ri *RefIn) {
 		n.send(ri, rvi)
 	} else {
 		// Return unused ref vector to free list.
-		n.freeChan <- rvi
+		n.freeTxRefVecIn(rvi)
 	}
 }
 
