@@ -19,6 +19,7 @@ ALL += goes-test
 ALL += goes-coreboot
 ALL += goes-platina-mk1-bmc
 ALL += goes-platina-mc1-bmc
+ALL += goes-platina-lc1-bmc
 ALL += goes-platina-mk1-installer
 ALL += $(if $(fe1_dir),go-wip)
 All += ip
@@ -61,6 +62,12 @@ goes-platina-mc1-bmc: arch=arm
 goes-platina-mc1-bmc: tags=netgo$(diag_tag)
 goes-platina-mc1-bmc: ldflags=-d
 goes-platina-mc1-bmc: | package.go
+	$(gobuild) ./main/$@
+
+goes-platina-lc1-bmc: arch=arm
+goes-platina-lc1-bmc: tags=netgo$(diag_tag)
+goes-platina-lc1-bmc: ldflags=-d
+goes-platina-lc1-bmc: | package.go
 	$(gobuild) ./main/$@
 
 goes-platina-mk1-installer: goes-platina-mk1.zip
