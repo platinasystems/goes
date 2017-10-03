@@ -193,17 +193,20 @@ func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (
 func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	detail := false
 	graphic := false
-	showFilters := false
 	matching := ""
+	showFilters := false
+	summary := false
 	for !in.End() {
 		switch {
 		case in.Parse("de%*tail"):
 			detail = true
-		case in.Parse("gr%*aphic"):
-			graphic = true
 		case in.Parse("f%*ilter"):
 			showFilters = true
+		case in.Parse("gr%*aphic"):
+			graphic = true
 		case in.Parse("m%*atching %v", &matching):
+		case in.Parse("s%*ummary"):
+			summary = true
 		default:
 			in.ParseError()
 		}
@@ -215,6 +218,11 @@ func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 	}
 
 	v := elog.NewView()
+
+	if summary {
+		fmt.Fprintln(w, v.NumEvents(), "events in log")
+		return
+	}
 
 	if matching != "" {
 		var eis []uint
