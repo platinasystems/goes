@@ -11,7 +11,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
-	"fmt"
 	"sync/atomic"
 	"syscall"
 )
@@ -21,6 +20,30 @@ type tx_node struct {
 	m       *net_namespace_main
 	pv_pool chan *tx_packet_vector
 	p_pool  chan *tx_packet
+}
+
+type tuntap_interface_tx_node struct {
+	active_refs  int32
+	to_tx        chan *tx_packet_vector
+	to_tx_thread chan struct{}
+	pv           *tx_packet_vector
+}
+
+func (i *tuntap_interface_tx_node) tx_stop() {
+	if i.to_tx != nil {
+		close(i.to_tx)
+		i.to_tx = nil
+	}
+	if i.to_tx_thread != nil {
+		close(i.to_tx_thread)
+		i.to_tx_thread = nil
+	}
+}
+
+func (i *tuntap_interface) tx_start() {
+	i.to_tx = make(chan *tx_packet_vector, vnet.MaxOutstandingTxRefs)
+	i.to_tx_thread = make(chan struct{}, 64)
+	go i.tx_thread()
 }
 
 type tx_packet struct {
@@ -216,8 +239,7 @@ func (pv *tx_packet_vector) advance(n *tx_node, intf *tuntap_interface, i uint) 
 	return
 }
 
-func (intf *tuntap_interface) write_packet_vector() (n_packets, n_refs, n_drops uint,
-	packet_vector_done, would_block bool, err error) {
+func (intf *tuntap_interface) write_packet_vector() (n_packets, n_refs, n_drops uint, would_block bool) {
 	ns := intf.namespace
 	n := &ns.m.tx_node
 	pv := intf.pv
@@ -258,10 +280,8 @@ loop:
 			n_drops++
 		default:
 			if errno != 0 {
-				err = fmt.Errorf("writev: %s", errno)
 				n.CountError(tx_error_drop, 1)
 				n_drops++
-				break loop
 			}
 			n_packets++
 		}
@@ -283,18 +303,28 @@ loop:
 
 	// Advance to next packet in error case.
 	if n_advance := n_packets + n_drops; n_advance > 0 {
-		packet_vector_done = pv.advance(n, intf, n_advance)
+		pv.advance(n, intf, n_advance)
 	}
 	return
 }
 
 func (intf *tuntap_interface) WriteAvailable() bool { return intf.active_refs > 0 }
 func (intf *tuntap_interface) WriteReady() (err error) {
-	n_refs, n_packets, n_drops := uint(0), uint(0), uint(0)
+	select {
+	case intf.to_tx_thread <- struct{}{}:
+	default:
+	}
+	return
+}
 
-	// Need to limit number of packets sent to allow ReadReady (e.g. when pinging linux).
-	// Otherwise tx queue len limit will be reached.
-	const max = vnet.MaxVectorLen
+func (intf *tuntap_interface) tx_thread() {
+	for range intf.to_tx_thread {
+		intf.tx_write()
+	}
+}
+
+func (intf *tuntap_interface) tx_write() {
+	n_refs, n_packets, n_drops := uint(0), uint(0), uint(0)
 
 loop:
 	for {
@@ -305,17 +335,19 @@ loop:
 				break loop
 			}
 		}
-		np, nr, nd, done, would_block, e := intf.write_packet_vector()
+		np, nr, nd, would_block := intf.write_packet_vector()
 		n_packets += np
 		n_refs += nr
 		n_drops += nd
-		if !done || would_block || e != nil || n_packets >= max {
-			err = e
+		if 0 == atomic.AddInt32(&intf.active_refs, -int32(nr)) {
+			iomux.Update(intf)
+		}
+		if would_block {
 			break loop
 		}
 	}
-	if 0 == atomic.AddInt32(&intf.active_refs, -int32(n_refs)) {
-		iomux.Update(intf)
+	if n_packets == 0 {
+		return
 	}
 
 	// Count punts and drops on this interface.
@@ -348,11 +380,11 @@ func (k rx_tx_elog_kind) String() string {
 }
 
 type rx_tx_elog struct {
+	kind        rx_tx_elog_kind
 	name        elog.StringRef
 	n_packets   uint32
 	n_refs      uint32
 	n_drops     uint32
-	kind        rx_tx_elog_kind
 	would_block bool
 }
 
@@ -362,20 +394,13 @@ func (e *rx_tx_elog) Elog(l *elog.Log) {
 		blocked = " would-block"
 	}
 	switch e.kind {
-	case tx_elog_queue_write, tx_elog_write:
+	case tx_elog_queue_write, tx_elog_write, rx_elog_read:
 		if e.n_drops != 0 {
 			l.Logf("unix %s %s%s %d packets, %d refs, %d drops", e.kind, e.name, blocked,
 				e.n_packets, e.n_refs, e.n_drops)
 		} else {
 			l.Logf("unix %s %s%s %d packets, %d refs", e.kind, e.name, blocked,
 				e.n_packets, e.n_refs)
-		}
-	case rx_elog_read:
-		if e.n_drops != 0 {
-			l.Logf("unix %s %s%s %d packets, %d drops", e.kind, e.name, blocked,
-				e.n_packets, e.n_drops)
-		} else {
-			l.Logf("unix %s %s%s %d packets", e.kind, e.name, blocked, e.n_packets)
 		}
 	case rx_elog_input: // no interface name for input
 		l.Logf("unix %s %d packets", e.kind, e.n_packets)

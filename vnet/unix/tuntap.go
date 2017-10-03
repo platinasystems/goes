@@ -52,9 +52,8 @@ type tuntap_interface struct {
 	mtuBytes   uint
 	mtuBuffers uint
 
-	active_refs int32
-	to_tx       chan *tx_packet_vector
-	pv          *tx_packet_vector
+	tuntap_interface_tx_node
+	tuntap_interface_rx_node
 
 	interface_routes ip4.MapFib
 }
@@ -217,15 +216,17 @@ type ifreq_sockaddr_any struct {
 type ifreq_type int
 
 const (
-	ifreq_TUNSETIFF     ifreq_type = syscall.TUNSETIFF
-	ifreq_TUNSETPERSIST ifreq_type = syscall.TUNSETPERSIST
-	ifreq_GETIFINDEX    ifreq_type = syscall.SIOCGIFINDEX
 	ifreq_GETIFFLAGS    ifreq_type = syscall.SIOCGIFFLAGS
-	ifreq_SETIFFLAGS    ifreq_type = syscall.SIOCSIFFLAGS
 	ifreq_GETIFHWADDR   ifreq_type = syscall.SIOCGIFHWADDR
+	ifreq_GETIFINDEX    ifreq_type = syscall.SIOCGIFINDEX
+	ifreq_SETIFFLAGS    ifreq_type = syscall.SIOCSIFFLAGS
 	ifreq_SETIFHWADDR   ifreq_type = syscall.SIOCSIFHWADDR
 	ifreq_SETIFMTU      ifreq_type = syscall.SIOCSIFMTU
 	ifreq_SIFTXQLEN     ifreq_type = syscall.SIOCSIFTXQLEN
+	ifreq_TUNGETSNDBUF  ifreq_type = syscall.TUNGETSNDBUF
+	ifreq_TUNSETIFF     ifreq_type = syscall.TUNSETIFF
+	ifreq_TUNSETPERSIST ifreq_type = syscall.TUNSETPERSIST
+	ifreq_TUNSETSNDBUF  ifreq_type = syscall.TUNSETSNDBUF
 )
 
 var ifreq_type_names = map[ifreq_type]string{
@@ -435,14 +436,13 @@ func (intf *tuntap_interface) maybe_start_up() {
 	if intf.isTun || intf.hi.IsLinkUp(intf.m.v) {
 		intf.start_up()
 	} else {
+		intf.tx_stop()
 		intf.close(false)
 	}
 }
 
 func (intf *tuntap_interface) start_up() {
-	if intf.to_tx == nil {
-		intf.to_tx = make(chan *tx_packet_vector, vnet.MaxOutstandingTxRefs)
-	}
+	intf.tx_start()
 	intf.Fd = intf.dev_net_tun_fd
 	iomux.Add(intf)
 }
@@ -561,6 +561,10 @@ func (intf *tuntap_interface) configure_ethernet(m *Main, eifer ethernet.HwInter
 }
 
 func (intf *tuntap_interface) set_flags() (err error) {
+	// Interface was closed.
+	if intf.provision_fd == -1 {
+		return
+	}
 	r := ifreq_int{
 		name: intf.name,
 		i:    int(intf.flags),
