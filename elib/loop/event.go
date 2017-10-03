@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/elib/event"
 
 	"fmt"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -177,7 +178,7 @@ func (l *Loop) eventHandler(r Noder) {
 			}
 			err = fmt.Errorf("%v: %v", d.name, err)
 			elog.Panic(err)
-			l.Panic(err)
+			l.Panic(err, debug.Stack())
 			d.eventDone()
 		}
 	}()
