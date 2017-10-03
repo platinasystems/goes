@@ -7,6 +7,7 @@ package unix
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/elog"
+	"github.com/platinasystems/go/elib/iomux"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
@@ -25,12 +26,16 @@ type rx_packet struct {
 	chain vnet.RefChain
 }
 
-func (p *rx_packet) alloc_refs(rx *rx_node, n uint) {
-	rx.buffer_pool.AllocRefs(p.refs[:n])
+func (p *rx_packet) set_iovs(rx *rx_node, n uint) {
 	for i := uint(0); i < n; i++ {
 		p.iovs[i].Base = (*byte)(p.refs[i].Data())
 		p.iovs[i].Len = uint64(rx.buffer_pool.Size)
 	}
+}
+
+func (p *rx_packet) alloc_refs(rx *rx_node, n uint) {
+	rx.buffer_pool.AllocRefs(p.refs[:n])
+	p.set_iovs(rx, n)
 }
 
 func (p *rx_packet) rx_init(rx *rx_node) {
@@ -52,10 +57,31 @@ const (
 
 // Maximum sized packet vector.
 type rx_packet_vector struct {
-	i uint
-	a [rx_packet_vector_max_len]syscall.RawSockaddrLinklayer
-	m [rx_packet_vector_max_len]mmsghdr
-	p [rx_packet_vector_max_len]rx_packet
+	i             uint
+	a             [rx_packet_vector_max_len]syscall.RawSockaddrLinklayer
+	m             [rx_packet_vector_max_len]mmsghdr
+	p             [rx_packet_vector_max_len]rx_packet
+	nrefs         [rx_packet_vector_max_len]uint32
+	n_refill_refs uint
+	alloc_refs    vnet.RefVec
+}
+
+func (v *rx_packet_vector) refill_refs(rx *rx_node, n_packets uint) {
+	n := v.n_refill_refs
+	if n == 0 {
+		return
+	}
+	v.n_refill_refs = 0
+	v.alloc_refs.ValidateLen(n)
+	rx.buffer_pool.AllocRefs(v.alloc_refs[:n])
+	j := uint(0)
+	for i := uint(0); i < n_packets; i++ {
+		nr := uint(v.nrefs[i])
+		p := &v.p[i]
+		copy(p.refs[:nr], v.alloc_refs[j:])
+		p.set_iovs(rx, nr)
+		j += nr
+	}
 }
 
 func (n *rx_node) new_packet_vector() (v *rx_packet_vector) {
@@ -79,12 +105,13 @@ func (n *rx_node) get_packet_vector() (v *rx_packet_vector) {
 
 func (n *rx_node) put_packet_vector(v *rx_packet_vector) { n.pv_pool <- v }
 
-func (n *rx_node) get_rx_ref_vector() (v *rx_ref_vector) {
+func (n *rx_node) get_rx_ref_vector(intf *tuntap_interface) (v *rx_ref_vector) {
 	select {
 	case v = <-n.rv_pool:
 	default:
 		v = &rx_ref_vector{}
 	}
+	v.intf = intf
 	return
 }
 
@@ -123,9 +150,15 @@ type rx_node struct {
 	rv_pool                chan *rx_ref_vector
 	rv_input               chan *rx_ref_vector
 	pending_refs           []rx_pending_ref
+	pending_intfs          []*tuntap_interface
 	max_buffers_per_packet uint
 	next_for_inject        rx_node_next
 	next_by_si             elib.Uint32Vec
+}
+
+type tuntap_interface_rx_node struct {
+	// Interface is on pending_intfs slice.
+	is_pending bool
 }
 
 func (n *rx_node) set_next(si vnet.Si, next rx_node_next) {
@@ -152,10 +185,10 @@ const (
 	rx_error_tun_not_ip4_or_ip6
 )
 
-func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, i, n_bytes_in_packet uint, ifindex uint32) {
+func (rv *rx_ref_vector) rx_packet(rx *rx_node, ns *net_namespace, pv *rx_packet_vector, pvi, rvi, n_bytes_in_packet uint, ifindex uint32) (n_refs uint) {
 	size := rx.buffer_pool.Size
 	n_left := n_bytes_in_packet
-	var n_refs uint
+	p := &pv.p[pvi]
 	for n_refs = 0; n_left > 0; n_refs++ {
 		l := size
 		if n_left < l {
@@ -169,7 +202,8 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 		p.chain.Append(r)
 		n_left -= l
 	}
-	p.alloc_refs(rx, n_refs)
+	pv.nrefs[pvi] = uint32(n_refs)
+	pv.n_refill_refs += n_refs
 	ref := p.chain.Done()
 	ref.SetError(&rx.Node, rx_error_non_vnet_interface)
 	if si, ok := ns.si_by_ifindex.get(ifindex); ok {
@@ -184,13 +218,14 @@ func (v *rx_ref_vector) rx_packet(ns *net_namespace, p *rx_packet, rx *rx_node, 
 		if n != rx_node_next_error && rx.next_for_inject != rx_node_next_error {
 			n = rx.next_for_inject
 		}
-		v.nexts[i] = n
+		rv.nexts[rvi] = n
 	} else {
 		ref.Si = vnet.SiNil
-		v.nexts[i] = rx_node_next_error
+		rv.nexts[rvi] = rx_node_next_error
 	}
-	v.refs[i] = ref
-	v.lens[i] = uint32(n_bytes_in_packet)
+	rv.refs[rvi] = ref
+	rv.nrefs[rvi] = uint32(n_refs)
+	rv.lens[rvi] = uint32(n_bytes_in_packet)
 	return
 }
 
@@ -221,8 +256,11 @@ func (m *msghdr) ifindex() uint32 {
 
 type rx_ref_vector struct {
 	n_packets uint
-	i         uint
+	n_refs    uint
+	xi        uint
+	intf      *tuntap_interface
 	refs      [vnet.MaxVectorLen]vnet.Ref
+	nrefs     [vnet.MaxVectorLen]uint32
 	lens      [vnet.MaxVectorLen]uint32
 	nexts     [vnet.MaxVectorLen]rx_node_next
 }
@@ -246,29 +284,38 @@ func (intf *tuntap_interface) ErrorReady() (err error) {
 	return
 }
 
-func (intf *tuntap_interface) ReadReady() (err error) {
+func (intf *tuntap_interface) ReadAvailable() bool {
 	rx := &intf.m.rx_node
-	n_rv := uint(0)
-	n_packets := 0
+	return rx.ActiveCount() < vnet.MaxOutstandingTxRefs
+}
+
+func (intf *tuntap_interface) ReadReady() (err error) {
+	var n_packets, n_refs, n_rv uint
+	rx := &intf.m.rx_node
 	eagain := false
 
 	if rx.IsSuspended() {
 		return
 	}
 
-	v := rx.get_packet_vector()
-	rv := rx.get_rx_ref_vector()
+	pv := rx.get_packet_vector()
+	rv := rx.get_rx_ref_vector(intf)
 
-	for !eagain && n_packets <= vnet.MaxVectorLen {
-		for i := range v.m {
-			n, errno := readv(intf.Fd, v.p[i].iovs)
+	is_suspended := false
+	n_refs_this_ref_vector := uint(0)
+	const max_refs = vnet.MaxOutstandingTxRefs
+	for !eagain && n_refs < max_refs && !is_suspended {
+		n_packets_this_packet_vector := uint(0)
+		for pvi := range pv.m {
+			n, errno := readv(intf.Fd, pv.p[pvi].iovs)
 			if errno != 0 {
 				eagain = errno == syscall.EAGAIN
 				err = errorForErrno("readv", errno)
 				break
 			}
-			v.m[i].msg_len = uint32(n)
-			rv.rx_packet(intf.namespace, &v.p[i], rx, n_rv, uint(n), intf.ifindex)
+			pv.m[pvi].msg_len = uint32(n)
+			n_refs_this_packet := rv.rx_packet(rx, intf.namespace, pv, uint(pvi), n_rv, uint(n), intf.ifindex)
+			n_refs_this_ref_vector += n_refs_this_packet
 			n_rv++
 			if n_rv >= uint(len(rv.refs)) {
 				if elog.Enabled() {
@@ -276,17 +323,26 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 						kind:      rx_elog_read,
 						name:      intf.elog_name,
 						n_packets: uint32(n_rv),
+						n_refs:    uint32(n_refs_this_ref_vector),
 					}
 					elog.Add(&e)
 				}
 				rv.n_packets = n_rv
-				rx.AddDataActivity(int(n_rv))
+				rv.n_refs = n_refs_this_ref_vector
+				rx.AddDataActivity(int(n_refs_this_ref_vector))
 				rx.rv_input <- rv
 				n_rv = 0
-				rv = rx.get_rx_ref_vector()
+				n_refs_this_ref_vector = 0
+				rv = rx.get_rx_ref_vector(intf)
 			}
 			n_packets++
+			n_refs += n_refs_this_packet
+			n_packets_this_packet_vector++
+			if is_suspended = rx.IsSuspended(); is_suspended {
+				break
+			}
 		}
+		pv.refill_refs(rx, n_packets_this_packet_vector)
 		if err != nil {
 			rx.CountError(rx_error_drop, 1)
 			break
@@ -298,6 +354,7 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 				kind:        rx_elog_read,
 				name:        intf.elog_name,
 				n_packets:   uint32(n_rv),
+				n_refs:      uint32(n_refs_this_ref_vector),
 				would_block: eagain,
 			}
 			if err != nil {
@@ -306,26 +363,30 @@ func (intf *tuntap_interface) ReadReady() (err error) {
 			elog.Add(&e)
 		}
 		rv.n_packets = n_rv
-		rx.AddDataActivity(int(n_rv))
+		rv.n_refs = n_refs_this_ref_vector
+		rx.AddDataActivity(int(n_refs_this_ref_vector))
 		rx.rv_input <- rv
 	} else {
 		// Return unused ref vector.
 		rx.put_rx_ref_vector(rv)
 	}
 	// Return packet vector for reuse.
-	rx.put_packet_vector(v)
+	rx.put_packet_vector(pv)
+	if intf.Fd != -1 {
+		iomux.Update(intf)
+	}
 	return
 }
 
 type rx_pending_ref struct {
-	ref  vnet.Ref
-	len  uint32
-	next rx_node_next
+	intf  *tuntap_interface
+	ref   vnet.Ref
+	n_ref uint32
+	len   uint32
+	next  rx_node_next
 }
 
-func (rx *rx_node) input_ref(ref vnet.Ref, len uint32, next rx_node_next,
-	o *vnet.RefOut, n_doneʹ uint) (n_done uint, out_is_full bool) {
-	n_done = n_doneʹ
+func (rx *rx_node) input_ref(intf *tuntap_interface, ref vnet.Ref, len uint32, next rx_node_next, o *vnet.RefOut) (out_is_full bool) {
 	out := &o.Outs[next]
 	out.BufferPool = rx.buffer_pool
 	l := out.GetLen(rx.Vnet)
@@ -337,24 +398,29 @@ func (rx *rx_node) input_ref(ref vnet.Ref, len uint32, next rx_node_next,
 	}
 	out.Refs[l] = ref
 	out.SetLen(rx.Vnet, l+1)
-	n_done++
+	if !intf.is_pending {
+		intf.is_pending = true
+		rx.pending_intfs = append(rx.pending_intfs, intf)
+	}
 	return
 }
 
-func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ uint) (n_done uint, out_is_full bool) {
-	n_done = n_doneʹ
+func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_packets0, n_refs0 uint) (n_packets uint, n_refs uint, out_is_full bool) {
+	n_packets, n_refs = n_packets0, n_refs0
 	var i uint
 
 	// First process pending packets.
 	np := uint(len(rx.pending_refs))
 	for i = 0; i < np; i++ {
 		pr := &rx.pending_refs[i]
-		n_done, out_is_full = rx.input_ref(pr.ref, pr.len, pr.next, o, n_done)
+		out_is_full = rx.input_ref(pr.intf, pr.ref, pr.len, pr.next, o)
 		if out_is_full {
 			// Re-copy pending vector.
 			copy(rx.pending_refs[:], rx.pending_refs[i:])
 			break
 		}
+		n_packets++
+		n_refs += uint(pr.n_ref)
 	}
 
 	// Remove pending refs and reuse pending vector.
@@ -365,14 +431,17 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 	if rv != nil {
 		// Loop through given input packets.
 		for i = 0; i < rv.n_packets; i++ {
-			r, l, n := rv.refs[i], rv.lens[i], rv.nexts[i]
+			r, nr, l, n := rv.refs[i], rv.nrefs[i], rv.lens[i], rv.nexts[i]
 			if !out_is_full {
-				n_done, out_is_full = rx.input_ref(r, l, n, o, n_done)
+				out_is_full = rx.input_ref(rv.intf, r, l, n, o)
 			}
 			// A next node is or was full: add to pending vector.
 			if out_is_full {
-				r := rx_pending_ref{ref: r, len: l, next: n}
+				r := rx_pending_ref{intf: rv.intf, ref: r, n_ref: nr, len: l, next: n}
 				rx.pending_refs = append(rx.pending_refs, r)
+			} else {
+				n_packets++
+				n_refs += uint(nr)
 			}
 		}
 		rx.put_rx_ref_vector(rv)
@@ -381,15 +450,18 @@ func (rx *rx_node) input_ref_vector(rv *rx_ref_vector, o *vnet.RefOut, n_doneʹ 
 }
 
 func (rx *rx_node) NodeInput(out *vnet.RefOut) {
-	n_packets, out_is_full := uint(0), false
+	n_packets, n_refs, out_is_full := uint(0), uint(0), false
+	if rx.pending_intfs != nil {
+		rx.pending_intfs = rx.pending_intfs[:0]
+	}
 loop:
 	for !out_is_full {
 		select {
 		case rv := <-rx.rv_input:
-			n_packets, out_is_full = rx.input_ref_vector(rv, out, n_packets)
+			n_packets, n_refs, out_is_full = rx.input_ref_vector(rv, out, n_packets, n_refs)
 		default:
 			if len(rx.pending_refs) > 0 {
-				n_packets, out_is_full = rx.input_ref_vector(nil, out, n_packets)
+				n_packets, n_refs, out_is_full = rx.input_ref_vector(nil, out, n_packets, n_refs)
 			}
 			break loop
 		}
@@ -399,9 +471,16 @@ loop:
 		e := rx_tx_elog{
 			kind:      rx_elog_input,
 			n_packets: uint32(n_packets),
+			n_refs:    uint32(n_refs),
 		}
 		elog.Add(&e)
 	}
 
-	rx.AddDataActivity(-int(n_packets))
+	rx.AddDataActivity(-int(n_refs))
+	for _, intf := range rx.pending_intfs {
+		intf.is_pending = false
+		if intf.Fd != -1 {
+			iomux.Update(intf)
+		}
+	}
 }

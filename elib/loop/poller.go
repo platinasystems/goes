@@ -11,6 +11,7 @@ import (
 
 	"fmt"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 )
@@ -184,6 +185,10 @@ func (n *Node) Activate(enable bool) (was bool) {
 func (n *Node) IsActive() bool {
 	_, active, _, _ := n.s.get()
 	return active > 0
+}
+func (n *Node) ActiveCount() int {
+	_, active, _, _ := n.s.get()
+	return int(active)
 }
 func (n *Node) IsSuspended() bool {
 	_, _, _, state := n.s.get()
@@ -562,8 +567,10 @@ func (l *Loop) dataPoll(p inLooper) {
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
-				elog.Panic(fmt.Errorf("%s: %v", n.name, err))
-				panic(err)
+				err = fmt.Errorf("%s: %v", n.name, err)
+				elog.Panic(err)
+				l.Panic(err, debug.Stack())
+				n.ft.signalLoop(true)
 			}
 		}
 	}()

@@ -214,7 +214,9 @@ func (b *Buffer) Enable(v bool) {
 	b.lockIndex(false)
 }
 
-func (b *Buffer) getIndex() uint64 { return atomic.LoadUint64(&b.index) &^ lockBit }
+func (b *Buffer) getIndex() uint64    { return atomic.LoadUint64(&b.index) &^ lockBit }
+func (b *Buffer) GetSequence() uint64 { return b.getIndex() }
+func GetSequence() uint64             { return DefaultBuffer.getIndex() }
 
 func (b *Buffer) Enabled() bool {
 	return Enabled() && b.getIndex() < b.disableIndex
@@ -644,7 +646,10 @@ func (b *Buffer) Resize(n uint) { b.clear(n) }
 func Resize(n uint)             { DefaultBuffer.Resize(n) }
 
 func Configure(in *parse.Input) (err error) {
-	var save string
+	var (
+		save          string
+		disable_after uint64
+	)
 	for !in.End() {
 		var (
 			s string
@@ -656,9 +661,13 @@ func Configure(in *parse.Input) (err error) {
 		case in.Parse("panic-save %v", &save):
 		case in.Parse("s%*ize %d", &i):
 			Resize(i)
+		case in.Parse("disable-after %d", &disable_after):
 		default:
 			in.ParseError()
 		}
+	}
+	if disable_after != 0 {
+		DisableAfter(disable_after)
 	}
 	// Save on signal 1 HUP.
 	if save != "" {

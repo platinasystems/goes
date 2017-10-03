@@ -38,8 +38,8 @@ func (p *node_pool) IsFree(i uint) (v bool) {
 }
 
 func (p *node_pool) Resize(n uint) {
-	c := elib.Index(cap(p.nodes))
-	l := elib.Index(len(p.nodes) + int(n))
+	c := uint(cap(p.nodes))
+	l := uint(len(p.nodes) + int(n))
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]node, l, c)
@@ -50,15 +50,15 @@ func (p *node_pool) Resize(n uint) {
 }
 
 func (p *node_pool) Validate(i uint) {
-	c := elib.Index(cap(p.nodes))
-	l := elib.Index(i) + 1
+	c := uint(cap(p.nodes))
+	l := uint(i) + 1
 	if l > c {
 		c = elib.NextResizeCap(l)
 		q := make([]node, l, c)
 		copy(q, p.nodes)
 		p.nodes = q
 	}
-	if l > elib.Index(len(p.nodes)) {
+	if l > uint(len(p.nodes)) {
 		p.nodes = p.nodes[:l]
 	}
 }

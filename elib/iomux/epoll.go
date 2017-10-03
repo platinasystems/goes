@@ -73,7 +73,8 @@ func (m *Mux) maybe_epoll_create() {
 }
 
 func (l *File) event(f Filer) (e epollEvent) {
-	if !l.disableRead {
+	ra, ok := f.(AvailableReader)
+	if !l.disableRead && !ok || ra.ReadAvailable() {
 		e.mask = eventRead
 	}
 	if !l.disableWrite && f.WriteAvailable() {

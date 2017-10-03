@@ -10,48 +10,47 @@ package elib
 type WordVec []Word
 
 func (p *WordVec) Resize(n uint) {
-	c := uint(cap(*p))
-	l := uint(len(*p)) + n
-	if l > c {
-		c = NextResizeCap(l)
-		q := make([]Word, l, c)
+	old_cap := uint(cap(*p))
+	new_len := uint(len(*p)) + n
+	if new_len > old_cap {
+		new_cap := NextResizeCap(new_len)
+		q := make([]Word, new_len, new_cap)
 		copy(q, *p)
 		*p = q
 	}
-	*p = (*p)[:l]
+	*p = (*p)[:new_len]
 }
 
 func (p *WordVec) validate(new_len uint, zero Word) *Word {
-	c := uint(cap(*p))
-	lʹ := uint(len(*p))
-	l := new_len
-	if l <= c {
+	old_cap := uint(cap(*p))
+	old_len := uint(len(*p))
+	if new_len <= old_cap {
 		// Need to reslice to larger length?
-		if l > lʹ {
-			*p = (*p)[:l]
-			for i := lʹ; i < l; i++ {
+		if new_len > old_len {
+			*p = (*p)[:new_len]
+			for i := old_len; i < new_len; i++ {
 				(*p)[i] = zero
 			}
 		}
-		return &(*p)[l-1]
+		return &(*p)[new_len-1]
 	}
-	return p.validateSlowPath(zero, c, l, lʹ)
+	return p.validateSlowPath(zero, old_cap, new_len, old_len)
 }
 
-func (p *WordVec) validateSlowPath(zero Word, c, l, lʹ uint) *Word {
-	if l > c {
-		cNext := NextResizeCap(l)
-		q := make([]Word, cNext, cNext)
+func (p *WordVec) validateSlowPath(zero Word, old_cap, new_len, old_len uint) *Word {
+	if new_len > old_cap {
+		new_cap := NextResizeCap(new_len)
+		q := make([]Word, new_cap, new_cap)
 		copy(q, *p)
-		for i := c; i < cNext; i++ {
+		for i := old_len; i < new_cap; i++ {
 			q[i] = zero
 		}
-		*p = q[:l]
+		*p = q[:new_len]
 	}
-	if l > lʹ {
-		*p = (*p)[:l]
+	if new_len > old_len {
+		*p = (*p)[:new_len]
 	}
-	return &(*p)[l-1]
+	return &(*p)[new_len-1]
 }
 
 func (p *WordVec) Validate(i uint) *Word {

@@ -198,6 +198,11 @@ func (m *net_namespace_main) discovery_is_done() bool {
 
 // Called when initial netlink dump via netlink.Listen completes.
 func (m *Main) namespace_discovery_done() {
+	// Already done?
+	if m.discovery_is_done() {
+		return
+	}
+	// Mark discovery done when all initial namespaces are discovered.
 	nm := &m.net_namespace_main
 	if atomic.AddInt32(&nm.n_init_namespace_to_discover, -1) == 0 {
 		if err := m.netlink_discovery_done_for_all_namespaces(); err != nil {
@@ -900,7 +905,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 			break
 		}
 		// Timeout?
-		if time.Since(e.time_start) > 100*time.Millisecond {
+		if time.Since(e.time_start) > 5*time.Second {
 			return
 		}
 		// Need retry?
@@ -951,7 +956,7 @@ func (ns *net_namespace) del(m *net_namespace_main) {
 			m.m.v.DelSwIf(intf.si)
 		}
 		if intf.tuntap != nil {
-			intf.tuntap.close()
+			intf.tuntap.close(true)
 		}
 		delete(ns.interface_by_index, index)
 	}

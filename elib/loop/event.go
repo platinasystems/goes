@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/elib/event"
 
 	"fmt"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -157,6 +158,15 @@ func (e *nodeEvent) do() {
 
 func (e *nodeEvent) String() string { return e.actor.String() }
 
+func (d *Node) eventDone() {
+	n := &d.e
+	n.s.setDone(d)
+	n.currentEvent.e = nil
+	n.activeCount--
+	n.log(d, event_elog_node_signal_done)
+	n.ft.signalLoop(true)
+}
+
 func (l *Loop) eventHandler(r Noder) {
 	d := r.GetNode()
 	// Save elog if thread panics.
@@ -166,8 +176,10 @@ func (l *Loop) eventHandler(r Noder) {
 				l.Quit()
 				return
 			}
-			elog.Panic(fmt.Errorf("%v: %v", d.name, err))
-			panic(err)
+			err = fmt.Errorf("%v: %v", d.name, err)
+			elog.Panic(err)
+			l.Panic(err, debug.Stack())
+			d.eventDone()
 		}
 	}()
 	n := &d.e
@@ -181,11 +193,7 @@ func (l *Loop) eventHandler(r Noder) {
 		}
 		n.currentEvent.e = e
 		e.do()
-		n.s.setDone()
-		n.currentEvent.e = nil
-		n.activeCount--
-		n.log(d, event_elog_node_signal_done)
-		n.ft.signalLoop(true)
+		d.eventDone()
 	}
 }
 
@@ -213,7 +221,7 @@ func (x *Event) Suspend() {
 	if !n.isActive() {
 		panic("suspending inactive node")
 	}
-	if was := n.s.setSuspend(true); was {
+	if was := n.s.setSuspend(d, true); was {
 		n.logsi(d, event_elog_suspend, n.sequence, "ignore duplicate suspend")
 		return
 	}
@@ -237,7 +245,7 @@ func (x *Event) Resume() (ok bool) {
 	n := &d.e
 
 	// Don't do it twice.
-	if ok, _, _ = n.s.setResume(); !ok {
+	if ok, _, _ = n.s.setResume(d); !ok {
 		n.logsi(d, event_elog_queue_resume, n.sequence, "ignore duplicate resume")
 		return
 	}
@@ -250,7 +258,7 @@ func (x *Event) Resume() (ok bool) {
 func (x *nodeEvent) resume() {
 	d, n := x.d, &x.d.e
 	n.log(d, event_elog_resume_wake)
-	n.s.clearResume()
+	n.s.clearResume(d)
 }
 
 // If too small, events may block when there are timing mismataches between sender and receiver.
@@ -272,13 +280,15 @@ func (d *Node) maybeStartEventHandler() {
 	go l.eventHandler(d.noder)
 }
 
-func (l *eventMain) eventPoller(p EventPoller) {
+func (l *Loop) eventPoller(p EventPoller) {
 	// Save elog if thread panics.
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
 				elog.Panic(err)
-				panic(err)
+				err = fmt.Errorf("event-poller: %v", err)
+				elog.Panic(err)
+				l.Panic(err, debug.Stack())
 			}
 		}
 	}()
@@ -286,7 +296,7 @@ func (l *eventMain) eventPoller(p EventPoller) {
 		p.EventPoll()
 	}
 }
-func (l *eventMain) startEventPoller(n EventPoller)    { go l.eventPoller(n) }
+func (l *Loop) startEventPoller(n EventPoller)         { go l.eventPoller(n) }
 func (l *eventMain) RegisterEventPoller(p EventPoller) { l.eventPollers = append(l.eventPollers, p) }
 
 func (e *nodeEvent) EventAction() {
@@ -318,8 +328,7 @@ func (m *eventMain) doNodeEvent(e *nodeEvent) (quit *quitEvent) {
 	if quit, ok = e.actor.(*quitEvent); ok {
 		return
 	}
-	n := &e.d.e
-	if n.s.isResumed() || e.isResume() {
+	if e.isResume() {
 		m.addActive(e.d)
 		e.resume()
 	} else {
@@ -437,8 +446,9 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		n := &d.e
 		q := n.sequence
 		n.log(d, event_elog_wait)
-		n.ft.waitNode()
-		if n.activeCount == 0 || n.s.isSuspended() {
+		nodeEventDone := n.ft.waitNode()
+		// Inactivate nodes which have no more queued events or are suspended.
+		if !nodeEventDone || n.activeCount == 0 {
 			m.inactiveNodes = append(m.inactiveNodes, d)
 		}
 		n.logi(d, event_elog_wait_done, q)
@@ -451,7 +461,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		m.inactiveNodes = m.inactiveNodes[:0]
 	}
 
-	quitLoop = quit != nil && quit.Type == quitEventExit
+	quitLoop = (quit != nil && quit.Type == quitEventExit) || l.isPanic()
 	return
 }
 
@@ -488,7 +498,38 @@ func (t eventNodeState) String() (s string) {
 	if t&2 != 0 {
 		s += "resumed"
 	}
+	if s == "" {
+		s = "active"
+	}
 	return
+}
+
+const (
+	// Logged by main loop.
+	event_node_state_elog_suspend = iota
+	event_node_state_elog_set_resume
+	event_node_state_elog_clear_resume
+)
+
+type event_node_state_elog_kind uint32
+
+func (k event_node_state_elog_kind) String() string {
+	t := [...]string{
+		event_node_state_elog_suspend:      "suspend",
+		event_node_state_elog_set_resume:   "set-resume",
+		event_node_state_elog_clear_resume: "clear-resume",
+	}
+	return elib.StringerHex(t[:], int(k))
+}
+
+type event_node_state_elog struct {
+	kind     event_node_state_elog_kind
+	name     elog.StringRef
+	old, new eventNodeState
+}
+
+func (e *event_node_state_elog) Elog(l *elog.Log) {
+	l.Logf("event node state %v %v %v -> %v", e.kind, e.name, e.old, e.new)
 }
 
 func (s *eventNodeState) compare_and_swap(old, new eventNodeState) (swapped bool) {
@@ -509,8 +550,8 @@ func makeEventNodeState(isSuspended, isResumed bool) (s eventNodeState) {
 	}
 	return
 }
-func (s *eventNodeState) setDone() { s.setSuspend(false) }
-func (s *eventNodeState) setSuspend(is bool) (was bool) {
+func (s *eventNodeState) setDone(d *Node) { s.setSuspend(d, false) }
+func (s *eventNodeState) setSuspend(d *Node, is bool) (was bool) {
 	for {
 		var old eventNodeState
 		old, was, _ = s.get()
@@ -519,21 +560,37 @@ func (s *eventNodeState) setSuspend(is bool) (was bool) {
 		}
 		new := makeEventNodeState(is, false)
 		if s.compare_and_swap(old, new) {
+			if elog.Enabled() {
+				elog.Add(&event_node_state_elog{
+					kind: event_node_state_elog_suspend,
+					name: d.elogNodeName,
+					old:  old,
+					new:  new,
+				})
+			}
 			return
 		}
 	}
 }
 func (s *eventNodeState) isResumed() (ok bool)   { _, _, ok = s.get(); return }
 func (s *eventNodeState) isSuspended() (ok bool) { _, ok, _ = s.get(); return }
-func (s *eventNodeState) setResume() (ok, wasSuspended, wasResumed bool) {
+func (s *eventNodeState) setResume(d *Node) (ok, wasSuspended, wasResumed bool) {
 	var old eventNodeState
 	if old, wasSuspended, wasResumed = s.get(); wasSuspended && !wasResumed {
 		new := makeEventNodeState(false, true)
 		ok = s.compare_and_swap(old, new)
+		if ok {
+			elog.Add(&event_node_state_elog{
+				kind: event_node_state_elog_set_resume,
+				name: d.elogNodeName,
+				old:  old,
+				new:  new,
+			})
+		}
 	}
 	return
 }
-func (s *eventNodeState) clearResume() bool {
+func (s *eventNodeState) clearResume(d *Node) bool {
 	for {
 		old, wasSuspended, wasResumed := s.get()
 		if !wasResumed {
@@ -541,6 +598,12 @@ func (s *eventNodeState) clearResume() bool {
 		}
 		new := makeEventNodeState(wasSuspended, false)
 		if s.compare_and_swap(old, new) {
+			elog.Add(&event_node_state_elog{
+				kind: event_node_state_elog_clear_resume,
+				name: d.elogNodeName,
+				old:  old,
+				new:  new,
+			})
 			return wasResumed
 		}
 	}

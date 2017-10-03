@@ -52,9 +52,8 @@ type tuntap_interface struct {
 	mtuBytes   uint
 	mtuBuffers uint
 
-	active_refs int32
-	to_tx       chan *tx_packet_vector
-	pv          *tx_packet_vector
+	tuntap_interface_tx_node
+	tuntap_interface_rx_node
 
 	interface_routes ip4.MapFib
 }
@@ -77,15 +76,18 @@ func (i *tuntap_interface) setMtu(m *Main, mtu uint) {
 	}
 }
 
-func (i *tuntap_interface) close() {
+func (i *tuntap_interface) close(provision bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if i.provision_fd > 0 {
+	if provision && i.provision_fd != -1 {
 		syscall.Close(i.provision_fd)
 		i.provision_fd = -1
 	}
-	if i.dev_net_tun_fd > 0 {
-		iomux.Del(i)
+	if i.dev_net_tun_fd != -1 {
+		if i.Fd != -1 {
+			iomux.Del(i)
+		}
+		i.Fd = -1
 		syscall.Close(i.dev_net_tun_fd)
 		i.dev_net_tun_fd = -1
 	}
@@ -94,7 +96,7 @@ func (i *tuntap_interface) close() {
 // Called when interface namespace is added/deleted or when interface moves namespace.
 func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del bool) (err error) {
 	if is_del {
-		i.close()
+		i.close(true)
 	} else {
 		is_discovery := !i.created && i.namespace == nil
 		if is_discovery {
@@ -102,7 +104,7 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 		}
 		i.namespace = ns
 		// Close sockets before re-opening in new namespace.
-		i.close()
+		i.close(true)
 		if err = i.open_sockets(); err != nil {
 			return
 		}
@@ -112,7 +114,7 @@ func (i *tuntap_interface) add_del_namespace(m *Main, ns *net_namespace, is_del 
 		if err = i.bind(); err != nil {
 			return
 		}
-		i.start_up()
+		i.maybe_start_up()
 	}
 	return
 }
@@ -214,15 +216,17 @@ type ifreq_sockaddr_any struct {
 type ifreq_type int
 
 const (
-	ifreq_TUNSETIFF     ifreq_type = syscall.TUNSETIFF
-	ifreq_TUNSETPERSIST ifreq_type = syscall.TUNSETPERSIST
-	ifreq_GETIFINDEX    ifreq_type = syscall.SIOCGIFINDEX
 	ifreq_GETIFFLAGS    ifreq_type = syscall.SIOCGIFFLAGS
-	ifreq_SETIFFLAGS    ifreq_type = syscall.SIOCSIFFLAGS
 	ifreq_GETIFHWADDR   ifreq_type = syscall.SIOCGIFHWADDR
+	ifreq_GETIFINDEX    ifreq_type = syscall.SIOCGIFINDEX
+	ifreq_SETIFFLAGS    ifreq_type = syscall.SIOCSIFFLAGS
 	ifreq_SETIFHWADDR   ifreq_type = syscall.SIOCSIFHWADDR
 	ifreq_SETIFMTU      ifreq_type = syscall.SIOCSIFMTU
 	ifreq_SIFTXQLEN     ifreq_type = syscall.SIOCSIFTXQLEN
+	ifreq_TUNGETSNDBUF  ifreq_type = syscall.TUNGETSNDBUF
+	ifreq_TUNSETIFF     ifreq_type = syscall.TUNSETIFF
+	ifreq_TUNSETPERSIST ifreq_type = syscall.TUNSETPERSIST
+	ifreq_TUNSETSNDBUF  ifreq_type = syscall.TUNSETSNDBUF
 )
 
 var ifreq_type_names = map[ifreq_type]string{
@@ -274,38 +278,12 @@ func (intf *tuntap_interface) sync_flags() {
 	if err := intf.set_flags(); err != nil {
 		panic(err)
 	}
-	intf.forceOperState(true)
 }
 
 func (intf *tuntap_interface) check_flag_sync_done(msg *netlink.IfInfoMessage) {
 	ok := iff_flag(msg.IfInfomsg.Flags)&(iff_up|iff_running|iff_lower_up) == intf.flags
 	intf.flag_sync_done = ok
 	intf.flag_sync_in_progress = !ok
-}
-
-func (intf *tuntap_interface) setOperState() { intf.forceOperState(false) }
-func (intf *tuntap_interface) forceOperState(is_force bool) {
-	os := netlink.IF_OPER_DOWN
-	linkUp := true
-	if intf.hi != vnet.HiNil {
-		linkUp = intf.hi.IsLinkUp(intf.m.v)
-	}
-	if intf.si.IsAdminUp(intf.m.v) && linkUp {
-		os = netlink.IF_OPER_UP
-	}
-	if os != intf.operState {
-		if !intf.flags_synced() && !is_force {
-			return
-		}
-		intf.operState = os
-		msg := netlink.NewIfInfoMessage()
-		msg.Header.Type = netlink.RTM_SETLINK
-		msg.Header.Flags = netlink.NLM_F_REQUEST
-		msg.Index = uint32(intf.ifindex)
-		msg.L2IfType = uint16(netlink.ARPHRD_ETHER)
-		msg.Attrs[netlink.IFLA_OPERSTATE] = os
-		intf.namespace.NetlinkTx(msg, false)
-	}
 }
 
 func (m *Main) SwIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
@@ -410,9 +388,11 @@ func (intf *tuntap_interface) open_sockets() (err error) {
 			err = fmt.Errorf("tuntap open /dev/net/tun: %s", err)
 			return
 		}
-		if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
-			err = fmt.Errorf("tuntap socket AF_PACKET: %s", err)
-			return
+		if intf.provision_fd == -1 {
+			if intf.provision_fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(eth_p_all)); err != nil {
+				err = fmt.Errorf("tuntap socket AF_PACKET: %s", err)
+				return
+			}
 		}
 		return
 	})
@@ -431,10 +411,12 @@ func (intf *tuntap_interface) create() (err error) {
 	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETIFF, uintptr(unsafe.Pointer(&r))); err != nil {
 		return
 	}
-	if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
-		return
+	if !intf.created {
+		intf.created = true
+		if err = intf.ioctl(intf.dev_net_tun_fd, ifreq_TUNSETPERSIST, 1); err != nil {
+			return
+		}
 	}
-	intf.created = true
 	return
 }
 
@@ -450,17 +432,31 @@ func (intf *tuntap_interface) bind() (err error) {
 	return
 }
 
+func (intf *tuntap_interface) maybe_start_up() {
+	if intf.isTun || intf.hi.IsLinkUp(intf.m.v) {
+		intf.start_up()
+	} else {
+		intf.tx_stop()
+		intf.close(false)
+	}
+}
+
 func (intf *tuntap_interface) start_up() {
-	intf.to_tx = make(chan *tx_packet_vector, vnet.MaxOutstandingTxRefs)
+	intf.tx_start()
 	intf.Fd = intf.dev_net_tun_fd
 	iomux.Add(intf)
 }
 
 func (intf *tuntap_interface) init(m *Main) (err error) {
+	// Initial-state.
+	intf.dev_net_tun_fd = -1
+	intf.provision_fd = -1
+	intf.Fd = -1
+
 	err = intf.open_sockets()
 	defer func() {
 		if err != nil {
-			intf.close()
+			intf.close(true)
 		}
 	}()
 
@@ -472,6 +468,7 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 	intf.bind()
 
 	// Increase transmit queue.  Default of 500 in drivers/net/tun.c causes packet loss at high rates.
+	// FIXME investigate this more.  Maybe MaxOutstandingTxRefs is enough?
 	{
 		r := ifreq_int{name: intf.name}
 		r.i = 5000
@@ -498,7 +495,7 @@ func (intf *tuntap_interface) init(m *Main) (err error) {
 		m.rx_node.set_next(intf.si, next)
 	}
 
-	intf.start_up()
+	intf.maybe_start_up()
 
 	return
 }
@@ -564,6 +561,10 @@ func (intf *tuntap_interface) configure_ethernet(m *Main, eifer ethernet.HwInter
 }
 
 func (intf *tuntap_interface) set_flags() (err error) {
+	// Interface was closed.
+	if intf.provision_fd == -1 {
+		return
+	}
 	r := ifreq_int{
 		name: intf.name,
 		i:    int(intf.flags),
@@ -582,7 +583,6 @@ func (intf *tuntap_interface) get_flags() (err error) {
 	err = intf.si.SetAdminUp(intf.m.v, isUp)
 	intf.flag_sync_in_progress = false
 	intf.flag_sync_done = true
-	intf.forceOperState(true)
 	return
 }
 
@@ -607,7 +607,6 @@ func (m *Main) SwIfAdminUpDown(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) 
 		if err = m.maybeChangeFlag(intf, isUp, iff_up|iff_running); err != nil {
 			return
 		}
-		intf.setOperState()
 	}
 	return
 }
@@ -617,11 +616,16 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 		return
 	}
 	si := v.HwIf(hi).Si()
-	if intf, ok := m.vnet_tuntap_interface_by_si[si]; ok {
-		if err = m.maybeChangeFlag(intf, isUp, iff_lower_up); err != nil {
-			return
-		}
-		intf.setOperState()
+	intf, ok := m.vnet_tuntap_interface_by_si[si]
+	if !ok || !intf.created || intf.namespace == nil {
+		return
+	}
+	if isUp {
+		intf.open_sockets()
+		intf.create()
+		intf.start_up()
+	} else {
+		intf.close(false)
 	}
 	return
 }
@@ -630,7 +634,7 @@ var eth_p_all = uint16(vnet.Uint16(syscall.ETH_P_ALL).FromHost())
 
 func (m *Main) Init() (err error) {
 	// Suitable defaults for an Ethernet-like tun/tap device.
-	m.mtuBytes = 4096 + 256
+	m.mtuBytes = 9216
 
 	m.v.RegisterSwIfAddDelHook(m.SwIfAddDel)
 	m.v.RegisterSwIfAdminUpDownHook(m.SwIfAdminUpDown)

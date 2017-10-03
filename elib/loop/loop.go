@@ -11,6 +11,7 @@ import (
 
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -93,6 +94,7 @@ type Loop struct {
 	eventMain
 	loggerMain
 	nodeStateMain
+	panicMain
 }
 
 func (l *Loop) GetNode(i uint) *Node       { return l.nodes[i] }
@@ -232,6 +234,24 @@ func (l *Loop) Run() {
 		l.doPollers()
 	}
 	l.doExit()
+	l.doPanic()
+}
+
+type panicMain struct {
+	panicErr   interface{}
+	debugStack []byte
+}
+
+func (l *Loop) Panic(err interface{}, stack []byte) {
+	l.panicErr = err
+	l.debugStack = stack
+}
+func (l *Loop) isPanic() bool { return l.panicErr != nil }
+func (l *Loop) doPanic() {
+	if l.isPanic() {
+		fmt.Fprintln(os.Stderr, "panic:", l.panicErr)
+		os.Stderr.Write(l.debugStack)
+	}
 }
 
 type pollerCounts struct {

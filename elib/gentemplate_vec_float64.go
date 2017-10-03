@@ -10,48 +10,47 @@ package elib
 type Float64Vec []float64
 
 func (p *Float64Vec) Resize(n uint) {
-	c := uint(cap(*p))
-	l := uint(len(*p)) + n
-	if l > c {
-		c = NextResizeCap(l)
-		q := make([]float64, l, c)
+	old_cap := uint(cap(*p))
+	new_len := uint(len(*p)) + n
+	if new_len > old_cap {
+		new_cap := NextResizeCap(new_len)
+		q := make([]float64, new_len, new_cap)
 		copy(q, *p)
 		*p = q
 	}
-	*p = (*p)[:l]
+	*p = (*p)[:new_len]
 }
 
 func (p *Float64Vec) validate(new_len uint, zero float64) *float64 {
-	c := uint(cap(*p))
-	lʹ := uint(len(*p))
-	l := new_len
-	if l <= c {
+	old_cap := uint(cap(*p))
+	old_len := uint(len(*p))
+	if new_len <= old_cap {
 		// Need to reslice to larger length?
-		if l > lʹ {
-			*p = (*p)[:l]
-			for i := lʹ; i < l; i++ {
+		if new_len > old_len {
+			*p = (*p)[:new_len]
+			for i := old_len; i < new_len; i++ {
 				(*p)[i] = zero
 			}
 		}
-		return &(*p)[l-1]
+		return &(*p)[new_len-1]
 	}
-	return p.validateSlowPath(zero, c, l, lʹ)
+	return p.validateSlowPath(zero, old_cap, new_len, old_len)
 }
 
-func (p *Float64Vec) validateSlowPath(zero float64, c, l, lʹ uint) *float64 {
-	if l > c {
-		cNext := NextResizeCap(l)
-		q := make([]float64, cNext, cNext)
+func (p *Float64Vec) validateSlowPath(zero float64, old_cap, new_len, old_len uint) *float64 {
+	if new_len > old_cap {
+		new_cap := NextResizeCap(new_len)
+		q := make([]float64, new_cap, new_cap)
 		copy(q, *p)
-		for i := c; i < cNext; i++ {
+		for i := old_len; i < new_cap; i++ {
 			q[i] = zero
 		}
-		*p = q[:l]
+		*p = q[:new_len]
 	}
-	if l > lʹ {
-		*p = (*p)[:l]
+	if new_len > old_len {
+		*p = (*p)[:new_len]
 	}
-	return &(*p)[l-1]
+	return &(*p)[new_len-1]
 }
 
 func (p *Float64Vec) Validate(i uint) *float64 {

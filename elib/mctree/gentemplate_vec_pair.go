@@ -14,48 +14,47 @@ import (
 type pair_vec []Pair
 
 func (p *pair_vec) Resize(n uint) {
-	c := elib.Index(cap(*p))
-	l := elib.Index(len(*p)) + elib.Index(n)
-	if l > c {
-		c = elib.NextResizeCap(l)
-		q := make([]Pair, l, c)
+	old_cap := uint(cap(*p))
+	new_len := uint(len(*p)) + n
+	if new_len > old_cap {
+		new_cap := elib.NextResizeCap(new_len)
+		q := make([]Pair, new_len, new_cap)
 		copy(q, *p)
 		*p = q
 	}
-	*p = (*p)[:l]
+	*p = (*p)[:new_len]
 }
 
 func (p *pair_vec) validate(new_len uint, zero Pair) *Pair {
-	c := elib.Index(cap(*p))
-	lʹ := elib.Index(len(*p))
-	l := elib.Index(new_len)
-	if l <= c {
+	old_cap := uint(cap(*p))
+	old_len := uint(len(*p))
+	if new_len <= old_cap {
 		// Need to reslice to larger length?
-		if l > lʹ {
-			*p = (*p)[:l]
-			for i := lʹ; i < l; i++ {
+		if new_len > old_len {
+			*p = (*p)[:new_len]
+			for i := old_len; i < new_len; i++ {
 				(*p)[i] = zero
 			}
 		}
-		return &(*p)[l-1]
+		return &(*p)[new_len-1]
 	}
-	return p.validateSlowPath(zero, c, l, lʹ)
+	return p.validateSlowPath(zero, old_cap, new_len, old_len)
 }
 
-func (p *pair_vec) validateSlowPath(zero Pair, c, l, lʹ elib.Index) *Pair {
-	if l > c {
-		cNext := elib.NextResizeCap(l)
-		q := make([]Pair, cNext, cNext)
+func (p *pair_vec) validateSlowPath(zero Pair, old_cap, new_len, old_len uint) *Pair {
+	if new_len > old_cap {
+		new_cap := elib.NextResizeCap(new_len)
+		q := make([]Pair, new_cap, new_cap)
 		copy(q, *p)
-		for i := c; i < cNext; i++ {
+		for i := old_len; i < new_cap; i++ {
 			q[i] = zero
 		}
-		*p = q[:l]
+		*p = q[:new_len]
 	}
-	if l > lʹ {
-		*p = (*p)[:l]
+	if new_len > old_len {
+		*p = (*p)[:new_len]
 	}
-	return &(*p)[l-1]
+	return &(*p)[new_len-1]
 }
 
 func (p *pair_vec) Validate(i uint) *Pair {

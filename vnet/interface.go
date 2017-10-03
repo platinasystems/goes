@@ -5,6 +5,7 @@
 package vnet
 
 import (
+	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/elib/parse"
@@ -711,6 +712,7 @@ type HwIfClasser interface {
 	LessThanId(a, b IfId) bool
 	ParseId(a *IfId, in *parse.Input) bool
 	FormatId(a IfId) string
+	ConfigureHwIf(in *cli.Input) (ok bool, err error)
 }
 
 type Devicer interface {
