@@ -547,7 +547,7 @@ func (d *dev) rx_queue_interrupt(queue uint) {
 	}
 
 	// Arrange to be called again if we've not processed all potential rx descriptors.
-	if !(n_desc_done == 0 && done == rx_done_found_hw_owned_descriptor) {
+	if done != rx_done_found_hw_owned_descriptor {
 		d.is_active += 1
 	}
 
