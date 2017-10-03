@@ -14,48 +14,47 @@ import (
 type viVec []Vi
 
 func (p *viVec) Resize(n uint) {
-	c := uint(cap(*p))
-	l := uint(len(*p)) + n
-	if l > c {
-		c = elib.NextResizeCap(l)
-		q := make([]Vi, l, c)
+	old_cap := uint(cap(*p))
+	new_len := uint(len(*p)) + n
+	if new_len > old_cap {
+		new_cap := elib.NextResizeCap(new_len)
+		q := make([]Vi, new_len, new_cap)
 		copy(q, *p)
 		*p = q
 	}
-	*p = (*p)[:l]
+	*p = (*p)[:new_len]
 }
 
 func (p *viVec) validate(new_len uint, zero Vi) *Vi {
-	c := uint(cap(*p))
-	lʹ := uint(len(*p))
-	l := new_len
-	if l <= c {
+	old_cap := uint(cap(*p))
+	old_len := uint(len(*p))
+	if new_len <= old_cap {
 		// Need to reslice to larger length?
-		if l > lʹ {
-			*p = (*p)[:l]
-			for i := lʹ; i < l; i++ {
+		if new_len > old_len {
+			*p = (*p)[:new_len]
+			for i := old_len; i < new_len; i++ {
 				(*p)[i] = zero
 			}
 		}
-		return &(*p)[l-1]
+		return &(*p)[new_len-1]
 	}
-	return p.validateSlowPath(zero, c, l, lʹ)
+	return p.validateSlowPath(zero, old_cap, new_len, old_len)
 }
 
-func (p *viVec) validateSlowPath(zero Vi, c, l, lʹ uint) *Vi {
-	if l > c {
-		cNext := elib.NextResizeCap(l)
-		q := make([]Vi, cNext, cNext)
+func (p *viVec) validateSlowPath(zero Vi, old_cap, new_len, old_len uint) *Vi {
+	if new_len > old_cap {
+		new_cap := elib.NextResizeCap(new_len)
+		q := make([]Vi, new_cap, new_cap)
 		copy(q, *p)
-		for i := c; i < cNext; i++ {
+		for i := old_len; i < new_cap; i++ {
 			q[i] = zero
 		}
-		*p = q[:l]
+		*p = q[:new_len]
 	}
-	if l > lʹ {
-		*p = (*p)[:l]
+	if new_len > old_len {
+		*p = (*p)[:new_len]
 	}
-	return &(*p)[l-1]
+	return &(*p)[new_len-1]
 }
 
 func (p *viVec) Validate(i uint) *Vi {

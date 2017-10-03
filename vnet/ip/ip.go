@@ -5,6 +5,7 @@
 package ip
 
 import (
+	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/vnet"
 
 	"strconv"
@@ -17,6 +18,14 @@ const (
 	Ip6
 	NFamily
 )
+
+func (x Family) String() string {
+	t := [...]string{
+		Ip4: "ip4",
+		Ip6: "ip6",
+	}
+	return elib.StringerHex(t[:], int(x))
+}
 
 // Generic ip4/ip6 address: big enough for either.
 type Address [16]uint8

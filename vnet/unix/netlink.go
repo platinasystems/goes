@@ -164,7 +164,8 @@ func (ns *net_namespace) route_msg_for_vnet_interface(v *netlink.RouteMessage) (
 	if a := v.Attrs[netlink.RTA_OIF]; a != nil {
 		intf, ok = ns.interface_by_index[a.(netlink.Uint32Attr).Uint()]
 		if !ok {
-			panic("unknown interface")
+			ns.m.m.v.Logf("%s: route_msg_for_vnet_interface unknown interface: %v\n", ns, v)
+			return
 		}
 		ok = ns.knownInterface(intf.ifindex)
 		return

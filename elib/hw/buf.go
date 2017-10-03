@@ -501,7 +501,8 @@ func (r *RefHeader) slice(n uint) (l []Ref) {
 	return
 }
 
-func (p *BufferPool) FreeLen() uint { return uint(len(p.refs)) }
+func (p *BufferPool) FreeLen() uint     { return uint(len(p.refs)) }
+func (p *BufferPool) FreeBytes() uint64 { return uint64(p.sizeIncludingOverhead) * uint64(p.FreeLen()) }
 
 func (p *BufferPool) AllocRefs(r *RefHeader, n uint) { p.AllocRefsStride(r, n, 1) }
 func (p *BufferPool) AllocRefsStride(r *RefHeader, want, stride uint) {
@@ -511,6 +512,7 @@ func (p *BufferPool) AllocRefsStride(r *RefHeader, want, stride uint) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	got := p.FreeLen()
+	total_alloc := uint(0)
 	for got < want {
 		b := p.sizeIncludingOverhead
 		n_alloc := uint(elib.RoundPow2(elib.Word(want-got), 256))
@@ -545,8 +547,20 @@ func (p *BufferPool) AllocRefsStride(r *RefHeader, want, stride uint) {
 			}
 		}
 		got += n_alloc
+		total_alloc += n_alloc
 		// Possibly initialize/adjust newly made buffers.
 		p.InitRefs(p.refs[got-n_alloc : got])
+
+		if elog.Enabled() {
+			e := poolElog{
+				kind:     pool_elog_grow,
+				pool:     p.ElogName,
+				n:        uint32(n_alloc),
+				nk_alloc: uint32(p.DmaMemAllocBytes / 1024),
+				nk_free:  uint32(p.FreeBytes() / 1024),
+			}
+			elog.Add(&e)
+		}
 	}
 
 	refs := r.slice(want * stride)
@@ -554,6 +568,17 @@ func (p *BufferPool) AllocRefsStride(r *RefHeader, want, stride uint) {
 
 	p.refs = p.refs[:got-want]
 	p.validateSetStateRefs(refs, BufferKnownAllocated, stride)
+
+	if elog.Enabled() {
+		e := poolElog{
+			kind:     pool_elog_alloc,
+			pool:     p.ElogName,
+			n:        uint32(want),
+			nk_alloc: uint32(p.DmaMemAllocBytes / 1024),
+			nk_free:  uint32(p.FreeBytes() / 1024),
+		}
+		elog.Add(&e)
+	}
 }
 
 func (p *BufferPool) AllocCachedRefs() (r RefVec) {
@@ -720,6 +745,17 @@ func (p *BufferPool) FreeRefs(rh *RefHeader, n uint, freeNext bool) {
 	}
 
 	p.InitRefs(p.refs[initialLen:])
+
+	if elog.Enabled() {
+		e := poolElog{
+			kind:     pool_elog_free,
+			pool:     p.ElogName,
+			n:        uint32(n),
+			nk_alloc: uint32(p.DmaMemAllocBytes / 1024),
+			nk_free:  uint32(p.FreeBytes() / 1024),
+		}
+		elog.Add(&e)
+	}
 }
 
 func (r *RefHeader) String() (s string) {
@@ -866,4 +902,33 @@ type bufferElog struct {
 
 func (e *bufferElog) Elog(l *elog.Log) {
 	l.Logf("hw buf %v 0x%x %v -> %v", e.pool, e.offset, e.old, e.new)
+}
+
+const (
+	pool_elog_alloc = iota
+	pool_elog_grow
+	pool_elog_free
+)
+
+type pool_elog_kind uint32
+
+func (k pool_elog_kind) String() string {
+	t := [...]string{
+		pool_elog_alloc: "alloc",
+		pool_elog_grow:  "grow",
+		pool_elog_free:  "free",
+	}
+	return elib.StringerHex(t[:], int(k))
+}
+
+type poolElog struct {
+	pool     elog.StringRef
+	kind     pool_elog_kind
+	n        uint32
+	nk_alloc uint32
+	nk_free  uint32
+}
+
+func (e *poolElog) Elog(l *elog.Log) {
+	l.Logf("hw buf %v %v %d, %dk alloc, %dk free", e.pool, e.kind, e.n, e.nk_alloc, e.nk_free)
 }

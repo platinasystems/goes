@@ -193,17 +193,20 @@ func (l *Loop) clearRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (
 func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	detail := false
 	graphic := false
-	showFilters := false
 	matching := ""
+	showFilters := false
+	summary := false
 	for !in.End() {
 		switch {
 		case in.Parse("de%*tail"):
 			detail = true
-		case in.Parse("gr%*aphic"):
-			graphic = true
 		case in.Parse("f%*ilter"):
 			showFilters = true
+		case in.Parse("gr%*aphic"):
+			graphic = true
 		case in.Parse("m%*atching %v", &matching):
+		case in.Parse("s%*ummary"):
+			summary = true
 		default:
 			in.ParseError()
 		}
@@ -215,6 +218,11 @@ func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 	}
 
 	v := elog.NewView()
+
+	if summary {
+		fmt.Fprintln(w, v.NumEvents(), "events in log")
+		return
+	}
 
 	if matching != "" {
 		var eis []uint
@@ -258,6 +266,8 @@ func (l *Loop) configEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err
 			elog.AddDelEventFilter(s, false)
 		case in.Parse("re%*size %d", &n_events):
 			elog.Resize(n_events)
+		case in.Parse("disable-after %d", &n_events):
+			elog.DisableAfter(uint64(n_events))
 		case in.Parse("s%*ave %s", &s):
 			err = elog.SaveFile(s)
 		case in.Parse("d%*ump %s", &s):

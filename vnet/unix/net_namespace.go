@@ -951,7 +951,7 @@ func (ns *net_namespace) del(m *net_namespace_main) {
 			m.m.v.DelSwIf(intf.si)
 		}
 		if intf.tuntap != nil {
-			intf.tuntap.close()
+			intf.tuntap.close(true)
 		}
 		delete(ns.interface_by_index, index)
 	}

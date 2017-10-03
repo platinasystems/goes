@@ -561,11 +561,10 @@ func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWe
 			nhs = mm.getNextHopBlock(&old.givenNextHops)
 			nnh = nhs.Len()
 			nhi, ok = nhs.find(nextHopAdj)
-
-			// For delete next hop must be found.
-			if nhi >= nnh && isDel {
-				return
-			}
+		}
+		// For delete next hop must be found.
+		if nhi >= nnh && isDel {
+			return
 		}
 	}
 
