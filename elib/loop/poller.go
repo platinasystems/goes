@@ -11,6 +11,7 @@ import (
 
 	"fmt"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 )
@@ -568,7 +569,7 @@ func (l *Loop) dataPoll(p inLooper) {
 			if err := recover(); err != nil {
 				err = fmt.Errorf("%s: %v", n.name, err)
 				elog.Panic(err)
-				l.Panic(err)
+				l.Panic(err, debug.Stack())
 				n.ft.signalLoop(true)
 			}
 		}

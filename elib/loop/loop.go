@@ -11,6 +11,7 @@ import (
 
 	"fmt"
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -237,14 +238,19 @@ func (l *Loop) Run() {
 }
 
 type panicMain struct {
-	panicErr interface{}
+	panicErr   interface{}
+	debugStack []byte
 }
 
-func (l *Loop) Panic(err interface{}) { l.panicErr = err }
-func (l *Loop) isPanic() bool         { return l.panicErr != nil }
+func (l *Loop) Panic(err interface{}, stack []byte) {
+	l.panicErr = err
+	l.debugStack = stack
+}
+func (l *Loop) isPanic() bool { return l.panicErr != nil }
 func (l *Loop) doPanic() {
 	if l.isPanic() {
-		panic(l.panicErr)
+		fmt.Fprintln(os.Stderr, "panic:", l.panicErr)
+		os.Stderr.Write(l.debugStack)
 	}
 }
 
