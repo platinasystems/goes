@@ -2,23 +2,21 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// This is the Baseboard Management Controller of Platina's Mk1 TOR.
 package main
 
 import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/platinasystems/go/goes/cmd"
-	"github.com/platinasystems/go/goes/cmd/nlcounters"
 )
 
+var Args = os.Args
 var Exit = os.Exit
 var Stderr io.Writer = os.Stderr
 
 func main() {
-	err := cmd.New(nlcounters.New()).Main()
-	if err != nil {
+	if err := Goes().Main(Args...); err != nil {
 		fmt.Fprintln(Stderr, err)
 		Exit(1)
 	}

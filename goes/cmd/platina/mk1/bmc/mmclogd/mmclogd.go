@@ -5,6 +5,7 @@
 package mmclogd
 
 import (
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -22,13 +23,22 @@ DESCRIPTION
 	mmclog daemon`
 )
 
+type FileInfo struct {
+	Name string
+	Exst bool
+	Size int64
+	SeqN int64
+}
+
 var apropos = lang.Alt{
 	lang.EnUS: Apropos,
 }
 
 var (
-	Init = func() {}
-	once sync.Once
+	Init    = func() {}
+	once    sync.Once
+	MMCdir        = "/mnt"
+	MaxSize int64 = 512 * 1024 * 1024
 )
 
 type Command struct {
@@ -36,9 +46,12 @@ type Command struct {
 }
 
 type Info struct {
-	stop  chan struct{}
-	last  map[string]uint16
-	lasts map[string]string
+	stop   chan struct{}
+	active string
+	logA   FileInfo
+	logB   FileInfo
+	logE   FileInfo
+	actv   FileInfo
 }
 
 func New() *Command { return new(Command) }
@@ -50,7 +63,7 @@ func (*Command) Usage() string     { return Usage }
 
 func (c *Command) Main(...string) error {
 	once.Do(Init)
-	if err := InitLogging(); err != nil {
+	if err := initLogging(&c.Info); err != nil {
 		return err
 	}
 
@@ -77,7 +90,7 @@ func (c *Command) update() error {
 		return nil
 	}
 
-	if err := UpdateMMC(); err != nil {
+	if err := updateLogs(&c.Info); err != nil {
 		return err
 	}
 	return nil

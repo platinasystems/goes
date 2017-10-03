@@ -5,24 +5,15 @@ change over time as issues are resolved.
 
 ## Tuntap mode:
 
-- Tear down ns script and restarting a new one that uses same namespace names causes this in syslog:
+- Blacklist or remove ixgbe driver from kernel so tuntap mode comes up as default
 
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.228761 namespace watch: ns1 netlink GETNSID: no such device
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.391677 namespace watch: ns2 netlink GETNSID: bad file descriptor
-Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-2-0: link is not ready
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.567914 namespace watch: ns3 netlink GETNSID: bad file descriptor
-Sep 20 19:54:26 invader5 kernel: IPv6: ADDRCONF(NETDEV_UP): eth-3-0: link is not ready
-Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.747645 namespace watch: ns4 netlink GETNSID: bad file descriptor
+- Multipath routes via linux when running quagga causing panic (need to add multipath to kernel config and fix vnetd netlink handling of attribute RTA_MULTIPATH); static routes via ip command do not show this - fixed in wip branch
 
-  And no population of fib for interfaces moved into the namespaces.
+- IF_OPER status at linux tuntap not reflecting actual link-state (on bug list) - addressed in wip branch but also causes regression that yet needs to be fixed (bad file descriptor from kernel)
 
-- Multipath routes via linux causing panic (need to add multipath to kernel config and fix vnetd netlink
-	handling of attribute RTA_MULTIPATH)
-- if vnetd is killed or has panic'd, doing "goes-platina-mk1 install" always results in:
-	"hset: read unix @->/run/goes/socks/redisd: i/o timeout" error
+---------------------- must fix for release 0.4 - above this line --------------------------
 
------------------------------------- must fix line ----------------------------------------------
-- IF_OPER status at linux tuntap not reflecting actual link-state (on bug list)
+- incorporate qsfpd into vnetd so all i2c accesses are centralized and can be mutexed
 - multipath adjacency handling breaks gre (Stig's 4 inv rig - 2 paths one gre the other just eth - needs to be fixed)
 - inv5:/root/nsgreeth.sh doesn't ping - fib looks ok
 	root@invader5:/home/dlobete/src/github.com/platinasystems/go# goes vnet show err
@@ -32,6 +23,7 @@ Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.747645 namespace watch: ns4
 
 - gre-tunnels: Having trouble getting a script working here. What is correct
 	config for this case? See nsgrevnet.inv[5,4].sh
+-------------------- should be fixed after next release - above this line ---------------
 
 ## SRIOV-mode:
 
@@ -41,7 +33,7 @@ Sep 20 19:54:26 invader5 goes.vnetd[10674]: 19:54:26.747645 namespace watch: ns4
 - Issue 78 (Donn) 
 
 # Known panics
-
+All tuntap-mode panics are no longer seen. Will leave these for another week or so before deleting.
 
 1. tuntap mode: Panic in MapFib.getLessSpecific() - (Unreproducible)
 

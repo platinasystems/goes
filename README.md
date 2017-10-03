@@ -59,6 +59,8 @@ goes> help
 Then `man` any of the listed commands or `man cli` to see how to use the
 command line interface.
 
+See also [errata].
+
 ---
 
 *&copy; 2015-2016 Platina Systems, Inc. All rights reserved.
@@ -67,3 +69,4 @@ Use of this source code is governed by this BSD-style [LICENSE].*
 [LICENSE]: LICENSE
 [example]: goes/goes-example/README.md
 [platina-mk1]: goes/goes-platina-mk1/README.md
+[errata]: docs/Errata.md

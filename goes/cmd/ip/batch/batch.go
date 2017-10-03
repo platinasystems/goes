@@ -5,6 +5,10 @@
 package batch
 
 import (
+	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
@@ -48,4 +52,34 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	return c.g.Main(args...)
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	if method, found := options.CompleteParmValue[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"-x",
+			"-f",
+			"-") {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	if len(list) == 0 {
+		list, _ = filepath.Glob(larg + "*")
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
 }

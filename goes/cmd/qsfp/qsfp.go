@@ -70,10 +70,14 @@ func (c *Command) Close() error {
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
+	var err error
+	if err = redis.IsReady(); err != nil {
+		return err
+	}
+
 	once.Do(Init)
 
 	var si syscall.Sysinfo_t
-	var err error
 
 	for i := 0; i < 32; i++ {
 		portIsCopper[i] = true
@@ -84,9 +88,6 @@ func (c *Command) Main(...string) error {
 	c.lastu = make(map[string]uint8)
 	c.lastsio = make(map[string]string)
 
-	if err = redis.IsReady(); err != nil {
-		return err
-	}
 	if c.pub, err = publisher.New(); err != nil {
 		return err
 	}

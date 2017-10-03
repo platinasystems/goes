@@ -5,6 +5,7 @@
 package mk1
 
 import (
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
@@ -127,6 +128,10 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 func PlatformExit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	if p.SriovMode {
 		if err = delSriovs(); err != nil {
+			return
+		}
+		args := []string{"link", "delete", "vnet"}
+		if err = ip.New().Main(args...); err != nil {
 			return
 		}
 	}

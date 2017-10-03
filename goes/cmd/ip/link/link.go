@@ -7,6 +7,7 @@ package link
 import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd/ip/link/counters"
 	"github.com/platinasystems/go/goes/cmd/ip/link/mod"
 	"github.com/platinasystems/go/goes/cmd/ip/link/show"
 	"github.com/platinasystems/go/goes/lang"
@@ -16,7 +17,9 @@ const (
 	Name    = "link"
 	Apropos = "network device configuration"
 	Usage   = `
-ip link [ {add|change|delete|replace|set|show(default)}[ OPTION... ]]`
+ip link [ COMMAND[ OPTION... ]]
+
+COMMAND := {add | change | counters | delete | replace | set | show(default)}`
 	Man = `
 SEE ALSO
 	ip link man COMMAND || ip link COMMAND -man
@@ -32,7 +35,8 @@ func New() *goes.Goes {
 			lang.EnUS: Man,
 		})
 	g.Plot(helpers.New()...)
-	g.Plot(mod.New("add"),
+	g.Plot(counters.New(),
+		mod.New("add"),
 		mod.New("change"),
 		mod.New("delete"),
 		mod.New("replace"),

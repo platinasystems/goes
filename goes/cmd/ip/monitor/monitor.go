@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -171,6 +172,45 @@ selectLoop:
 		}
 	}
 	return err
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["file"] = options.CompleteFile
+	cpv["save"] = options.NoComplete
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"file",
+			"save",
+			"label",
+			"all-nsid",
+			"all",
+			"link",
+			"address",
+			"route",
+			"mroute",
+			"prefix",
+			"neigh",
+			"netconf",
+			"rule",
+			"nsid",
+		) {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
 }
 
 func groups(opt *options.Options) uint32 {

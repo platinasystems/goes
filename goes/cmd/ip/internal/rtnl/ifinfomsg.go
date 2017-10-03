@@ -5,6 +5,8 @@
 package rtnl
 
 import (
+	"sort"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -191,6 +193,32 @@ const (
 	N_link_stat
 )
 
+var IfStatNames = []string{
+	"rx-packets",
+	"tx-packets",
+	"rx-bytes",
+	"tx-bytes",
+	"rx-errors",
+	"tx-errors",
+	"rx-dropped",
+	"tx-dropped",
+	"multicast",
+	"collisions",
+	"rx-length-errors",
+	"rx-over-errors",
+	"rx-crc-errors",
+	"rx-frame-errors",
+	"rx-fifo-errors",
+	"rx-missed-errors",
+	"tx-aborted-errors",
+	"tx-carrier-errors",
+	"tx-fifo-errors",
+	"tx-heartbeat-errors",
+	"tx-window-errors",
+	"rx-compressed",
+	"tx-compressed",
+}
+
 const SizeofIfStats = N_link_stat * 4
 const SizeofIfStats64 = N_link_stat * 8
 
@@ -232,4 +260,16 @@ var In6AddrGenModeByName = map[string]uint8{
 	"none":   IN6_ADDR_GEN_MODE_NONE,
 	"stable": IN6_ADDR_GEN_MODE_STABLE_PRIVACY,
 	"random": IN6_ADDR_GEN_MODE_RANDOM,
+}
+
+func CompleteIn6AddrGenMode(s string) (list []string) {
+	for k := range In6AddrGenModeByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
 }

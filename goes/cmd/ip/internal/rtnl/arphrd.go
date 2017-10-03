@@ -4,7 +4,11 @@
 
 package rtnl
 
-import "syscall"
+import (
+	"sort"
+	"strings"
+	"syscall"
+)
 
 var ArphrdByName = map[string]uint16{
 	"netrom":             syscall.ARPHRD_NETROM,
@@ -120,4 +124,16 @@ var ArphrdName = map[uint16]string{
 	syscall.ARPHRD_IEEE80211_RADIOTAP: "ieee80211-radiotap",
 	syscall.ARPHRD_IEEE802154:         "ieee802154",
 	syscall.ARPHRD_IEEE802154_PHY:     "ieee802154-phy",
+}
+
+func CompleteArphrd(s string) (list []string) {
+	for k := range ArphrdByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
 }

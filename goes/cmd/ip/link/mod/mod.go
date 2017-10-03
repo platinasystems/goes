@@ -9,8 +9,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
+	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
@@ -457,4 +459,65 @@ func (c *Command) parseAddrGenMode(s string) error {
 		},
 	)
 	return nil
+}
+
+func (*Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["dev"] = options.CompleteIfName
+	cpv["link"] = options.CompleteIfName
+	cpv["group"] = group.Complete
+	cpv["name"] = options.NoComplete
+	cpv["alias"] = options.NoComplete
+	cpv["txqlen"] = options.NoComplete
+	cpv["txqueuelen"] = options.NoComplete
+	cpv["mtu"] = options.NoComplete
+	cpv["address"] = options.NoComplete
+	cpv["broadcast"] = options.NoComplete
+	cpv["brd"] = options.NoComplete
+	cpv["peer"] = options.NoComplete
+	cpv["master"] = options.CompleteIfName
+	cpv["addrgenmode"] = rtnl.CompleteIn6AddrGenMode
+	cpv["netns"] = netns.CompleteName
+	cpv["link-netnsid"] = options.NoComplete
+	cpv["type"] = rtnl.CompleteType
+	cpv["vf"] = options.NoComplete
+	cpv["xdp"] = options.NoComplete
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"dev",
+			"link",
+			"group",
+			"name",
+			"alias",
+			"txqlen",
+			"txqueuelen",
+			"mtu",
+			"address",
+			"brd",
+			"broadcast",
+			"peer",
+			"master",
+			"addrgenmode",
+			"netns",
+			"link-netnsid",
+			"type",
+			"vf",
+			"xdp",
+		) {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
 }

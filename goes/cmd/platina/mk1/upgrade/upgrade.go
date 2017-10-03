@@ -25,23 +25,23 @@ DESCRIPTION
 	The upgrade command updates firmware images.
 
 	The default upgrade version is "LATEST". 
-	Or specify a version using "-v", in the form v0.0[.0][.0]
+	Or specify a version using "-v", in the form YYYYMMDD
 
-	The -l flag lists available upgrade versions.
+	The -l flag display version of selected server and version.
 
-	The -r flag prints a report on version numbers.
+	The -r flag prints a report on current version numbers.
 
 	By default, images are downloaded from "downloads.platina.com".
-	Or specify a server using "-s" followed by a URL or IPv4 address.
+	Or from a server using "-s" followed by a URL or IPv4 address.
 
-	Upgrades only happen if the version numbers differ,
+	Upgrade proceeds only if the selected version number is newer,
 	unless overridden with the "-f" force flag.
 
 OPTIONS
-	-v [VER]          version number or hash, default is LATEST
+	-v [VER]          version [YYYYMMDD] or LATEST (default)
 	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
 	-t                use TFTP instead of HTTP
-	-l                shows list of available versions for upgrade
+	-l                display version of selected server and version
 	-r                report current versions of goes, kernel, coreboot
 	-g                upgrade goes
 	-k                upgrade kernel
@@ -55,10 +55,10 @@ OPTIONS
 	Machine = "platina-mk1"
 
 	//names of server files
-	GoesName      = "goes-platina-mk1"
+	GoesName      = "goes-platina-mk1" //includes non-compressed tag
 	GoesInstaller = "goes-platina-mk1-installer"
 	KernelName    = "linux-image-platina-mk1"
-	CorebootName  = "coreboot-platina-mk1.rom"
+	CorebootName  = "coreboot-mk1.rom"
 )
 
 type Interface interface {
@@ -105,8 +105,7 @@ func (cmd) Main(args ...string) error {
 		return nil
 	}
 	if flag.ByName["-r"] {
-		if err := reportVersions(parm.ByName["-s"], parm.ByName["-v"],
-			flag.ByName["-t"]); err != nil {
+		if err := reportVersions(); err != nil {
 			return err
 		}
 		return nil
@@ -148,29 +147,11 @@ func showList(s string, v string, t bool) error {
 	return nil
 }
 
-func reportVersions(s string, v string, t bool) error {
-	g := GoesVer()
-	k, err := KernelVer()
+func reportVersions() error {
+	err := printImageInfo()
 	if err != nil {
 		return err
 	}
-	c, err := CorebootVer()
-	if err != nil {
-		return err
-	}
-	sg, err := srvGoesVer(s, v, t)
-	if err != nil {
-		return err
-	}
-	sk, _, err := srvKernelVer(s, v, t)
-	if err != nil {
-		return err
-	}
-	sc, err := srvCorebootVer(s, v, t)
-	if err != nil {
-		return err
-	}
-	prVer(g, k, c, sg, sk, sc)
 	return nil
 }
 
@@ -196,7 +177,6 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 		if err := reboot(); err != nil {
 			return err
 		}
-		return nil
 	}
 	if Install_flag {
 		if err := activateGoes(); err != nil {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -709,6 +710,22 @@ func (h *I2cDev) GetHostTempTarget() (string, error) {
 	return strconv.FormatFloat(v, 'f', 2, 64), nil
 }
 
+func hostReset() error {
+	if len(gpio.Pins) == 0 {
+		gpio.Init()
+	}
+	log.Print("issue hard reset to host")
+	pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
+	if found {
+		pin.SetValue(false)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if found {
+		pin.SetValue(true)
+	}
+	return nil
+}
+
 func writeRegs() error {
 	for k, v := range WrRegVal {
 		switch WrRegFn[k] {
@@ -732,6 +749,10 @@ func writeRegs() error {
 			}
 		case "target.units.C":
 			Vdev.SetHwmTarget(v)
+		case "reset":
+			if v == "true" {
+				hostReset()
+			}
 		}
 		delete(WrRegVal, k)
 	}

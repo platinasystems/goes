@@ -619,6 +619,22 @@ func (c *Command) parseEncap() (io.Reader, error) {
 	return nil, fmt.Errorf("%q unknown", arg0)
 }
 
+func completeEncap(s string) (list []string) {
+	for _, encap := range []string{
+		"mpls",
+		"ip",
+		"ip6",
+		"ila",
+		"bpf",
+		"seg6",
+	} {
+		if len(s) == 0 || strings.HasPrefix(encap, s) {
+			list = append(list, encap)
+		}
+	}
+	return
+}
+
 func (c *Command) parseVia() (rtnl.Addresser, error) {
 	family := c.msg.Family
 	mia := fmt.Errorf("missing ADDRESS")
@@ -1049,4 +1065,85 @@ func (c *Command) parseEncapSeg6() (io.Reader, error) {
 // [ in PROG ] [ out PROG ] [ xmit PROG ] [ headroom SIZE ]
 func (c *Command) parseEncapBpf() (io.Reader, error) {
 	return nil, fixme
+}
+
+func (*Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["tos"] = options.NoComplete
+	cpv["table"] = options.NoComplete
+	cpv["protocol"] = rtnl.CompleteRtProt
+	cpv["scope"] = rtnl.CompleteRtScope
+	cpv["metric"] = options.NoComplete
+	cpv["encap"] = completeEncap
+	cpv["via"] = options.NoComplete
+	cpv["dev"] = options.CompleteIfName
+	cpv["weight"] = options.NoComplete
+	cpv["as"] = options.NoComplete
+	cpv["mtu"] = options.NoComplete
+	cpv["advmss"] = options.NoComplete
+	cpv["expires"] = options.NoComplete
+	cpv["reordering"] = options.NoComplete
+	cpv["window"] = options.NoComplete
+	cpv["cwnd"] = options.NoComplete
+	cpv["initcwnd"] = options.NoComplete
+	cpv["initrwnd"] = options.NoComplete
+	cpv["ssthresh"] = options.NoComplete
+	cpv["rtt"] = options.NoComplete
+	cpv["rttvar"] = options.NoComplete
+	cpv["rto_min"] = options.NoComplete
+	cpv["realms"] = options.NoComplete
+	cpv["features"] = options.NoComplete
+	cpv["quickack"] = options.NoComplete
+	cpv["congctl"] = options.NoComplete
+	cpv["pref"] = options.NoComplete
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"tos",
+			"table",
+			"protocol",
+			"scope",
+			"metric",
+			"ttl-propagate",
+			"no-ttl-propagate",
+			"encap",
+			"via",
+			"dev",
+			"weight",
+			"onlink",
+			"pervasive",
+			"as",
+			"mtu",
+			"advmss",
+			"expires",
+			"reordering",
+			"window",
+			"cwnd",
+			"initcwnd",
+			"initrwnd",
+			"ssthresh",
+			"rtt",
+			"rttvar",
+			"rto_min",
+			"realms",
+			"features",
+			"quickack",
+			"congctl",
+			"pref",
+		) {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
 }

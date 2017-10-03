@@ -7,6 +7,7 @@ package show
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
@@ -193,4 +194,35 @@ func (Command) Main(args ...string) error {
 		fmt.Println()
 	}
 	return nil
+}
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["dev"] = options.CompleteIfName
+	cpv["group"] = group.Complete
+	cpv["type"] = rtnl.CompleteType
+	cpv["vrf"] = options.NoComplete
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"dev",
+			"group",
+			"type",
+			"vrf",
+		) {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
 }

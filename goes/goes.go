@@ -97,67 +97,44 @@ func (g *Goes) Apropos() lang.Alt { return g.apropos }
 
 func (g *Goes) ByName(name string) cmd.Cmd { return g.byname[name] }
 
-func (g *Goes) Complete(args ...string) []string {
-	var ss []string
-	pat := "*"
-
-	if len(args) == 0 {
-		return g.Names
-	}
-
-	cmd.Swap(args)
-
-	if _, found := cmd.Helpers[args[0]]; found {
-		n := len(args)
-		if n == 1 {
-			return g.Names
+func (g *Goes) Complete(args ...string) (ss []string) {
+	n := len(args)
+	if n == 0 || len(args[0]) == 0 {
+		ss = g.Names
+	} else if v, found := g.byname[args[0]]; found {
+		if method, found := v.(completer); found {
+			ss = method.Complete(args[1:]...)
+		} else {
+			ss, _ = filepath.Glob(args[n-1] + "*")
 		}
-		for helper := range cmd.Helpers {
-			if strings.HasPrefix(helper, args[n-1]) {
-				ss = append(ss, helper)
-			}
+	} else if _, found := cmd.Helpers[args[0]]; found {
+		if n == 1 || len(args[n-1]) == 0 {
+			return g.Names
 		}
 		for _, name := range g.Names {
 			if strings.HasPrefix(name, args[n-1]) {
 				ss = append(ss, name)
 			}
 		}
-		sort.Strings(ss)
-		return ss
-	}
-
-	g.Shift(args)
-
-	n := len(args)
-
-	if n == 0 {
-		return g.Names
-	}
-
-	if v, found := g.byname[args[0]]; found {
-		if method, found := v.(completer); found {
-			return method.Complete(args[1:]...)
+		if len(ss) > 0 {
+			sort.Strings(ss)
 		}
-		if n > 1 {
-			pat = args[n-1] + pat
-		}
-
-		ss, _ = filepath.Glob(pat)
 	} else if n == 1 {
-		for helper := range cmd.Helpers {
-			if strings.HasPrefix(helper, args[0]) {
-				ss = append(ss, helper)
-			}
-		}
 		for _, name := range g.Names {
 			if strings.HasPrefix(name, args[0]) {
 				ss = append(ss, name)
 			}
 		}
-	} else {
-		ss, _ = filepath.Glob(args[n-1] + pat)
+		for helper := range cmd.Helpers {
+			if strings.HasPrefix(helper, args[0]) {
+				ss = append(ss, helper)
+			}
+		}
+		if len(ss) > 0 {
+			sort.Strings(ss)
+		}
 	}
-	return ss
+	return
 }
 
 // Fork returns an exec.Cmd ready to Run or Output this program with the

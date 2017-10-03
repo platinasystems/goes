@@ -9,6 +9,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 )
 
@@ -19,6 +21,21 @@ var (
 	byname map[string]uint32
 	mutex  sync.Mutex
 )
+
+func Complete(s string) (list []string) {
+	if byname == nil {
+		parse()
+	}
+	for k := range byname {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
+}
 
 func Id(name string) uint32 {
 	if byname == nil {

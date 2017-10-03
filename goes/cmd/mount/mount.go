@@ -348,6 +348,7 @@ func (fs *filesystems) mountall() error {
 func (fs *filesystems) mountprobe(mountpoint string) error {
 	f, err := os.Open("/proc/partitions")
 	if err != nil {
+		fmt.Printf("opening /proc/partitions: %s\n", err)
 		return err
 	}
 	defer f.Close()
@@ -475,6 +476,11 @@ func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 			}
 			if err == syscall.EBUSY {
 				time.Sleep(1 * time.Second)
+				continue
+			}
+			if err == syscall.EACCES && !fs.flags.ByName["-read-write"] &&
+				flags&syscall.MS_RDONLY == 0 {
+				flags |= syscall.MS_RDONLY
 				continue
 			}
 			break

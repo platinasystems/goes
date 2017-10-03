@@ -10,8 +10,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/go/goes"
@@ -133,6 +135,15 @@ func (*Command) Kind() cmd.Kind      { return cmd.DontFork }
 func (c *Command) Main(_ ...string) error {
 	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
 	goesinstaller := os.Getenv("goesinstaller")
+	goesInitDelay := os.Getenv("goesinitdelay")
+	if goesInitDelay != "" {
+		i, err := strconv.Atoi(goesInitDelay)
+		if err != nil {
+			fmt.Printf("goesInitDelay parse error: %s\n", err)
+		} else {
+			time.Sleep(time.Duration(i) * time.Second)
+		}
+	}
 	defer func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -382,6 +393,8 @@ func (c *Command) pivotRoot(mountPoint string, root string, script string) {
 				":root=/dev/"+dir.Name())
 			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
 				"/boot:root=/dev/"+dir.Name())
+			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
+				"/d-i:root=/dev/"+dir.Name())
 		}
 		err = c.g.Main(bootCmd...)
 		if err == nil {

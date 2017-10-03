@@ -5,6 +5,12 @@
 package options
 
 import (
+	"net"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 )
@@ -27,6 +33,33 @@ var (
 		[]string{"-l", "-loops"},
 		[]string{"-f", "-family"},
 		[]string{"-rc", "-rcvbuf"},
+		[]string{"-n", "-netns"},
+	}
+	CompleteParmValue = map[string]func(string) []string{
+		"-l":      NoComplete,
+		"-loops":  NoComplete,
+		"-rc":     NoComplete,
+		"-rcvbuf": NoComplete,
+		"-f":      CompleteFamily,
+		"-family": CompleteFamily,
+		"-n":      netns.CompleteName,
+		"-netns":  netns.CompleteName,
+	}
+	CompleteOptNames = []string{
+		"-human-readable",
+		"-statistics",
+		"-details",
+		"-oneline",
+		"-resolve",
+		"-all",
+		"-color",
+		"-timestamp",
+		"-tshort",
+		"-iec",
+		"-family",
+		"-loops",
+		"-rcvbuf",
+		"-netns",
 	}
 )
 
@@ -55,3 +88,57 @@ func New(args []string) (*Options, []string) {
 	}
 	return opt, args
 }
+
+func CompleteFamily(s string) (list []string) {
+	families := []string{
+		"inet",
+		"inet6",
+		"bridge",
+		"mpls",
+		"link",
+	}
+	if len(s) == 0 {
+		list = families
+	} else {
+		for _, family := range families {
+			if strings.HasPrefix(family, s) {
+				list = append(list, family)
+			}
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
+}
+
+func CompleteFile(s string) (list []string) {
+	fns, err := filepath.Glob(s + ".*")
+	if err != nil {
+		return []string{}
+	}
+	for _, fn := range fns {
+		if len(s) == 0 || strings.HasPrefix(fn, s) {
+			list = append(list, fn)
+		}
+	}
+	return
+}
+
+func CompleteIfName(s string) (list []string) {
+	itfs, err := net.Interfaces()
+	if err != nil {
+		return
+	}
+	for _, itf := range itfs {
+		if len(s) == 0 || strings.HasPrefix(itf.Name, s) {
+			list = append(list, itf.Name)
+		}
+	}
+	if len(list) > 0 {
+		sort.Strings(list)
+	}
+	return
+}
+
+func NoComplete(string) []string { return []string{} }

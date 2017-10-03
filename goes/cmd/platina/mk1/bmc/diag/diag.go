@@ -6,11 +6,8 @@ package diag
 
 import (
 	"fmt"
-	"io/ioutil"
 
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/fdt"
-	"github.com/platinasystems/go/internal/fdtgpio"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/gpio"
 )
@@ -78,24 +75,8 @@ func (Command) Main(args ...string) error {
 	if n := len(args); n != 0 {
 		diag = args[0]
 	}
-	gpio.Aliases = make(gpio.GpioAliasMap)
-	gpio.Pins = make(gpio.PinMap)
-
-	if b, err := ioutil.ReadFile("/boot/platina-mk1-bmc.dtb"); err == nil {
-		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
-		t.Parse(b)
-
-		t.MatchNode("aliases", fdtgpio.GatherAliases)
-		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
-	} else {
-		return fmt.Errorf("%s: %v", gpio.File, err)
-	}
-
-	for name, pin := range gpio.Pins {
-		err := pin.SetDirection()
-		if err != nil {
-			fmt.Printf("%s: %v\n", name, err)
-		}
+	if len(gpio.Pins) == 0 {
+		gpio.Init()
 	}
 	diags, found := map[string][]Diag{
 		"": []Diag{

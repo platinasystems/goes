@@ -279,3 +279,53 @@ func (Command) Main(args ...string) error {
 	}
 	return nil
 }
+
+func (Command) Complete(args ...string) (list []string) {
+	var larg, llarg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	if n > 1 {
+		llarg = args[n-2]
+	}
+	cpv := options.CompleteParmValue
+	cpv["dev"] = options.CompleteIfName
+	cpv["master"] = options.CompleteIfName
+	cpv["scope"] = rtnl.CompleteRtScope
+	cpv["to"] = options.NoComplete
+	cpv["label"] = options.NoComplete
+	cpv["type"] = rtnl.CompleteArphrd
+	if method, found := cpv[llarg]; found {
+		list = method(larg)
+	} else {
+		for _, name := range append(options.CompleteOptNames,
+			"dev",
+			"master",
+			"scope",
+			"to",
+			"label",
+			"type",
+			"permanent",
+			"dynamic",
+			"secondary",
+			"primary",
+			"tentative",
+			"-tentative",
+			"deprecated",
+			"-deprecated",
+			"dadfailed",
+			"-dadfailed",
+			"temporary",
+			"home",
+			"mngtmpaddr",
+			"nodad",
+			"noprefixroute",
+			"autojoin") {
+			if len(larg) == 0 || strings.HasPrefix(name, larg) {
+				list = append(list, name)
+			}
+		}
+	}
+	return
+}

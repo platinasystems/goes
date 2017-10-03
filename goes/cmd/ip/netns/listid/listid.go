@@ -16,7 +16,7 @@ import (
 const (
 	Name    = "list-id"
 	Apropos = "list network namespace identifiers"
-	Usage   = `ip netns list-id NETNSNAME`
+	Usage   = `ip netns list-id`
 	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/platinasystems/go/goes/cmd/imx6d"
 	"github.com/platinasystems/go/goes/cmd/w83795d"
+	"github.com/platinasystems/go/internal/redis"
 	"time"
 )
 
@@ -91,8 +91,8 @@ func diagFans() error {
 	r = CheckPassB(pinstate, false)
 	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "fans", "fan_status_int_l_off", "-", pinstate, active_low_on_min, active_low_on_max, r, "check interrupt is low")
 
-	diagI2cWrite1Byte(0x01, 0x72, 0x04)
 	time.Sleep(500 * time.Millisecond)
+	diagI2cWrite1Byte(0x01, 0x72, 0x04)
 	result, _ = diagI2cPing(0x01, 0x20, 0x00, 1)
 	result, _ = diagI2cPing(0x01, 0x20, 0x01, 1)
 	diagI2cWrite1Byte(0x01, 0x72, 0x00)
@@ -305,7 +305,8 @@ func diagFans() error {
 	// diagTest: temp sensors
 	// check temperature sensors are in expected range
 	//
-	f := float64(imx6d.ReadTemp())
+	fs, _ := redis.Hget(redis.DefaultHash, "bmc.temperature.units.C")
+	f, err := strconv.ParseFloat(fs, 64)
 	r = CheckPassF(f, tmon_bmc_cpu_min, tmon_bmc_cpu_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_bmc_cpu", "C", f, tmon_bmc_cpu_min, tmon_bmc_cpu_max, r, "check bmc temp sense")
 

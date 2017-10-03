@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
@@ -19,7 +20,7 @@ import (
 const (
 	Name    = "exec"
 	Apropos = "network namespace"
-	Usage   = "ip [-all] netns exec [ NETNSNAME ] COMMAND..."
+	Usage   = "ip netns exec [ -all | NETNSNAME ] COMMAND..."
 	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
@@ -92,4 +93,23 @@ func (c *Command) Main(args ...string) error {
 	x.Stdout = os.Stdout
 	x.Stderr = os.Stderr
 	return x.Run()
+}
+
+func (*Command) Complete(args ...string) (list []string) {
+	var larg string
+	n := len(args)
+	if n > 0 {
+		larg = args[n-1]
+	}
+	for _, name := range []string{
+		"-all",
+	} {
+		if strings.HasPrefix(name, larg) {
+			list = append(list, name)
+		}
+	}
+	if len(list) == 0 && n == 1 {
+		list = netns.CompleteName(larg)
+	}
+	return
 }
