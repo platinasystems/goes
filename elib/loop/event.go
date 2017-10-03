@@ -280,13 +280,15 @@ func (d *Node) maybeStartEventHandler() {
 	go l.eventHandler(d.noder)
 }
 
-func (l *eventMain) eventPoller(p EventPoller) {
+func (l *Loop) eventPoller(p EventPoller) {
 	// Save elog if thread panics.
 	defer func() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
 				elog.Panic(err)
-				panic(err)
+				err = fmt.Errorf("event-poller: %v", err)
+				elog.Panic(err)
+				l.Panic(err, debug.Stack())
 			}
 		}
 	}()
@@ -294,7 +296,7 @@ func (l *eventMain) eventPoller(p EventPoller) {
 		p.EventPoll()
 	}
 }
-func (l *eventMain) startEventPoller(n EventPoller)    { go l.eventPoller(n) }
+func (l *Loop) startEventPoller(n EventPoller)         { go l.eventPoller(n) }
 func (l *eventMain) RegisterEventPoller(p EventPoller) { l.eventPollers = append(l.eventPollers, p) }
 
 func (e *nodeEvent) EventAction() {
