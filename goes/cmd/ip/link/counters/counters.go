@@ -58,10 +58,12 @@ var (
 func New() *Command { return &Command{} }
 
 type Command struct {
-	byidx  map[int32][]byte
-	sr     *rtnl.SockReceiver
-	printf func(string, ...interface{}) (int, error)
-	prefix string
+	last    map[int32][]byte
+	ifname  map[int32]string
+	updated map[int32]bool
+	sr      *rtnl.SockReceiver
+	printf  func(string, ...interface{}) (int, error)
+	prefix  string
 }
 
 func (*Command) Apropos() lang.Alt { return apropos }
@@ -164,7 +166,9 @@ func (c *Command) Main(args ...string) error {
 		c.printf = pub.Printf
 	}
 
-	c.byidx = make(map[int32][]byte)
+	c.last = make(map[int32][]byte)
+	c.ifname = make(map[int32]string)
+	c.updated = make(map[int32]bool)
 
 	t := time.NewTicker(time.Duration(interval) * time.Second)
 	defer t.Stop()
@@ -194,7 +198,10 @@ func (c *Command) counters() error {
 	if err != nil {
 		return err
 	}
-	return c.sr.UntilDone(req, func(b []byte) {
+	for k := range c.updated {
+		c.updated[k] = false
+	}
+	err = c.sr.UntilDone(req, func(b []byte) {
 		var ifla, lifla rtnl.Ifla
 		var lmsg *rtnl.IfInfoMsg
 		var loper uint8
@@ -205,7 +212,8 @@ func (c *Command) counters() error {
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
 		ifname := rtnl.Kstring(ifla[rtnl.IFLA_IFNAME])
-		lb, found := c.byidx[msg.Index]
+		c.ifname[msg.Index] = ifname
+		lb, found := c.last[msg.Index]
 		if found {
 			lmsg = rtnl.IfInfoMsgPtr(lb)
 			lifla.Write(lb)
@@ -265,6 +273,17 @@ func (c *Command) counters() error {
 				}
 			}
 		}
-		c.byidx[msg.Index] = b
+		c.last[msg.Index] = b
+		c.updated[msg.Index] = true
 	})
+	if err != nil {
+		return err
+	}
+	for k := range c.last {
+		if !c.updated[k] {
+			c.printf("delete: %s%s\n", c.prefix, c.ifname[k])
+			delete(c.last, k)
+		}
+	}
+	return nil
 }
