@@ -27,8 +27,9 @@ func (opt *Options) ShowNeigh(b []byte, ifnames map[int32]string) {
 	} else {
 		opt.Print(msg.Index)
 	}
-	opt.Print(" lladdr ",
-		net.HardwareAddr(nda[rtnl.NDA_LLADDR][:6]))
+	if lladdr := nda[rtnl.NDA_LLADDR]; lladdr != nil {
+		opt.Print(" lladdr ", net.HardwareAddr(lladdr[:6]))
+	}
 	if opt.Flags.ByName["-s"] {
 		if val := nda[rtnl.NDA_CACHEINFO]; len(val) > 0 {
 			ci := rtnl.NdaCacheInfoPtr(val)
