@@ -221,6 +221,7 @@ func (l *Loop) showEventLog(c cli.Commander, w cli.Writer, in *cli.Input) (err e
 
 	if summary {
 		fmt.Fprintln(w, v.NumEvents(), "events in log")
+		fmt.Fprintln(w, elog.GetSequence(), "events logged")
 		return
 	}
 
