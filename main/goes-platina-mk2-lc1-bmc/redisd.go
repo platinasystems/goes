@@ -20,7 +20,7 @@ func init() {
 			platina_eeprom.MinMacs(2),
 			platina_eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
 		)
-		redisd.Machine = "platina-lc1-bmc"
+		redisd.Machine = "platina-mk2-lc1-bmc"
 		redisd.Devs = []string{"lo", "eth0"}
 		redisd.Hook = platina_eeprom.RedisdHook
 	}

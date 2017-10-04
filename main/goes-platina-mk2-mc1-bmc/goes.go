@@ -87,8 +87,8 @@ import (
 )
 
 const (
-	Name    = "goes-platina-lc1-bmc"
-	Apropos = "platina's lc1 baseboard management controller"
+	Name    = "goes-platina-mk2-mc1-bmc"
+	Apropos = "platina's mk2 mc1 baseboard management controller"
 )
 
 func Goes() *goes.Goes {

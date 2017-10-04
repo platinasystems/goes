@@ -16,7 +16,7 @@ import (
 
 func init() {
 	gpio.Init = func() {
-		gpio.File = "/boot/platina-mc1-bmc.dtb"
+		gpio.File = "/boot/platina-mk2-lc1-bmc.dtb"
 		gpio.Aliases = make(gpio.GpioAliasMap)
 		gpio.Pins = make(gpio.PinMap)
 
