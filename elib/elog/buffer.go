@@ -214,7 +214,9 @@ func (b *Buffer) Enable(v bool) {
 	b.lockIndex(false)
 }
 
-func (b *Buffer) getIndex() uint64 { return atomic.LoadUint64(&b.index) &^ lockBit }
+func (b *Buffer) getIndex() uint64    { return atomic.LoadUint64(&b.index) &^ lockBit }
+func (b *Buffer) GetSequence() uint64 { return b.getIndex() }
+func GetSequence() uint64             { return DefaultBuffer.getIndex() }
 
 func (b *Buffer) Enabled() bool {
 	return Enabled() && b.getIndex() < b.disableIndex
