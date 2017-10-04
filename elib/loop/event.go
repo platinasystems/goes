@@ -437,6 +437,9 @@ func (l *Loop) doEvents() (quitLoop bool) {
 	// Signal all active nodes to start.
 	for _, d := range m.activeNodes {
 		n := &d.e
+		if _, isSuspended, isResumed := n.s.get(); isSuspended || isResumed {
+			continue
+		}
 		n.log(d, event_elog_start)
 		n.ft.signalNode()
 	}
@@ -445,6 +448,9 @@ func (l *Loop) doEvents() (quitLoop bool) {
 	for _, d := range m.activeNodes {
 		n := &d.e
 		q := n.sequence
+		if _, _, isResumed := n.s.get(); isResumed {
+			continue
+		}
 		n.log(d, event_elog_wait)
 		n.ft.waitNode()
 		if n.activeCount == 0 || n.s.isSuspended() {
