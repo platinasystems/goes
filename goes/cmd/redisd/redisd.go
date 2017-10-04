@@ -268,7 +268,11 @@ func (c *Command) gopub() {
 			c.redisd.published[key] = hv
 		}
 		if field == "delete" {
-			delete(hv, string(value))
+			for k := range hv {
+				if strings.HasPrefix(k, string(value)) {
+					delete(hv, k)
+				}
+			}
 		} else {
 			_, found := hv[field]
 			if !found {
