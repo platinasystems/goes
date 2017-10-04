@@ -4,6 +4,8 @@
 
 package rtnl
 
+import "strings"
+
 const (
 	NUD_INCOMPLETE uint16 = 1 << iota
 	NUD_REACHABLE
@@ -28,4 +30,13 @@ var NudByName = map[string]uint16{
 	"failed":     NUD_FAILED,
 	"noarp":      NUD_NOARP,
 	"permanent":  NUD_PERMANENT,
+}
+
+func CompleteNud(s string) (list []string) {
+	for k := range NudByName {
+		if len(s) == 0 || strings.HasPrefix(k, s) {
+			list = append(list, k)
+		}
+	}
+	return
 }
