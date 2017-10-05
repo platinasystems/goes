@@ -503,6 +503,9 @@ func (t eventNodeState) String() (s string) {
 	if t&2 != 0 {
 		s += "resumed"
 	}
+	if s == "" {
+		s = "active"
+	}
 	return
 }
 
