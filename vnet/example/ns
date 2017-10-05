@@ -1,9 +1,14 @@
 if [ "$1" == "up" ]; then
     for i in {0..1}; do
 	ip netns add ns$i;
+	# disable ip6 noise
+	ip netns exec ns$i sysctl -q -w net.ipv6.conf.default.disable_ipv6=1
+	ip netns exec ns$i sysctl -q -w net.ipv6.conf.all.disable_ipv6=1
 	ip link set eth-$i-0 netns ns$i;
 	ip netns exec ns$i ip link set eth-$i-0 up;
 	ip netns exec ns$i ip addr add 10.0.0.$i/31 dev eth-$i-0;
+	# For /24 cannot use 10.0.0.0 for ns0 since that's the subnet address.
+	# ip netns exec ns$i ip addr add 10.0.0.$((i + 1))/24 dev eth-$i-0;
     done;
 else
     for i in {0..1}; do
