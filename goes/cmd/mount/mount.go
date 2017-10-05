@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
@@ -468,22 +467,17 @@ func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 
 	var err error
 	for _, t := range tryTypes {
-		for i := 0; i < 5; i++ {
-			err = syscall.Mount(dev, dir, t, flags,
+		err = syscall.Mount(dev, dir, t, flags, fs.parms.ByName["-o"])
+		if err == nil {
+			return &MountResult{err, dev, t, dir, fs.flags}
+		}
+		if err == syscall.EACCES && !fs.flags.ByName["-read-write"] &&
+			flags&syscall.MS_RDONLY == 0 {
+			err = syscall.Mount(dev, dir, t, flags|syscall.MS_RDONLY,
 				fs.parms.ByName["-o"])
 			if err == nil {
 				return &MountResult{err, dev, t, dir, fs.flags}
 			}
-			if err == syscall.EBUSY {
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			if err == syscall.EACCES && !fs.flags.ByName["-read-write"] &&
-				flags&syscall.MS_RDONLY == 0 {
-				flags |= syscall.MS_RDONLY
-				continue
-			}
-			break
 		}
 	}
 
