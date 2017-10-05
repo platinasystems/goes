@@ -23,9 +23,9 @@ import (
 //	} ]
 // }
 //
-func (c *Command) parseTypeMacVlan() error {
-	c.args = c.opt.Parms.More(c.args, "mode")
-	s := c.opt.Parms.ByName["mode"]
+func (m *mod) parseTypeMacVlan() error {
+	m.args = m.opt.Parms.More(m.args, "mode")
+	s := m.opt.Parms.ByName["mode"]
 	if len(s) == 0 {
 		return fmt.Errorf("missing mode")
 	}
@@ -39,57 +39,57 @@ func (c *Command) parseTypeMacVlan() error {
 	if !found {
 		return fmt.Errorf("mode: %q unknown", s)
 	} else {
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_MODE,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_MODE,
 			rtnl.Uint32Attr(mode)})
 	}
 	if mode == rtnl.MACVLAN_MODE_PASSTHRU {
-		c.args = c.opt.Flags.More(c.args, []string{
+		m.args = m.opt.Flags.More(m.args, []string{
 			"no-promisc", "-promisc",
 			"no-promiscuous", "-promiscuous",
 		})
-		if c.opt.Flags.ByName["no-promisc"] {
-			c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_FLAGS,
+		if m.opt.Flags.ByName["no-promisc"] {
+			m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_FLAGS,
 				rtnl.Uint16Attr(rtnl.MACVLAN_FLAG_NOPROMISC)})
 		}
 		return nil
 	} else if mode != rtnl.MACVLAN_MODE_SOURCE {
 		return nil
 	}
-	s = c.opt.Parms.ByName["macaddr"]
+	s = m.opt.Parms.ByName["macaddr"]
 	if len(s) == 0 {
 		return nil
 	}
 	switch s {
 	case "add", "del":
-		if len(c.args) == 0 {
+		if len(m.args) == 0 {
 			return fmt.Errorf("missing LLADDR")
 		}
-		mac, err := net.ParseMAC(c.args[0])
+		mac, err := net.ParseMAC(m.args[0])
 		if err != nil {
 			return fmt.Errorf("LLADDR: %q %v",
-				c.args[0], err)
+				m.args[0], err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
 			rtnl.BytesAttr(mac)})
-		c.args = c.args[1:]
+		m.args = m.args[1:]
 	case "set":
 		var macs rtnl.Attrs
-		for len(c.args) > 0 {
-			mac, err := net.ParseMAC(c.args[0])
+		for len(m.args) > 0 {
+			mac, err := net.ParseMAC(m.args[0])
 			if err != nil {
 				break
 			}
 			macs = append(macs,
 				rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
 					rtnl.BytesAttr(mac)})
-			c.args = c.args[1:]
+			m.args = m.args[1:]
 		}
 		if len(macs) == 0 {
 			return fmt.Errorf("missing LLADDR(s)")
 		}
-		c.tinfo = append(c.tinfo,
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR_DATA, macs})
-		c.args = c.args[1:]
+		m.args = m.args[1:]
 
 	case "flush":
 		// FIXME

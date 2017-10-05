@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 )
 
-func (c *Command) parseVf(s string) error {
+func (m *mod) parseVf(s string) error {
 	var attrs rtnl.Attrs
 	var vf uint32
 
@@ -19,14 +19,14 @@ func (c *Command) parseVf(s string) error {
 		return fmt.Errorf("vf: %q %v", s, err)
 	}
 
-	c.args = c.opt.Flags.More(c.args,
+	m.args = m.opt.Flags.More(m.args,
 		[]string{"spoofchk", "+spoofchk"},
 		[]string{"no-spoofchk", "-spoofchk"},
 		[]string{"query-rss", "+query-rss"},
 		[]string{"no-query-rss", "-query-rss"},
 		[]string{"trust", "+trust"},
 		[]string{"no-trust", "-trust"})
-	c.args = c.opt.Parms.More(c.args,
+	m.args = m.opt.Parms.More(m.args,
 		"mac",
 		"vlan",
 		"qos",
@@ -45,7 +45,7 @@ func (c *Command) parseVf(s string) error {
 		{"query-rss", "no-query-rss", rtnl.IFLA_VF_RSS_QUERY_EN},
 		{"trust", "no-trust", rtnl.IFLA_VF_TRUST},
 	} {
-		if c.opt.Flags.ByName[x.on] {
+		if m.opt.Flags.ByName[x.on] {
 			attrs = append(attrs,
 				rtnl.Attr{x.t,
 					rtnl.IflaVfFlag{
@@ -54,7 +54,7 @@ func (c *Command) parseVf(s string) error {
 					},
 				},
 			)
-		} else if c.opt.Flags.ByName[x.off] {
+		} else if m.opt.Flags.ByName[x.off] {
 			attrs = append(attrs,
 				rtnl.Attr{x.t,
 					rtnl.IflaVfFlag{
@@ -65,7 +65,7 @@ func (c *Command) parseVf(s string) error {
 			)
 		}
 	}
-	if s := c.opt.Parms.ByName["mac"]; len(s) > 0 {
+	if s := m.opt.Parms.ByName["mac"]; len(s) > 0 {
 		v := rtnl.IflaVfMac{
 			Vf: vf,
 		}
@@ -76,14 +76,14 @@ func (c *Command) parseVf(s string) error {
 		}
 		attrs = append(attrs, rtnl.Attr{rtnl.IFLA_VF_MAC, &v})
 	}
-	if s := c.opt.Parms.ByName["vlan"]; len(s) > 0 {
+	if s := m.opt.Parms.ByName["vlan"]; len(s) > 0 {
 		v := rtnl.IflaVfVlan{
 			Vf: vf,
 		}
 		if _, err := fmt.Sscan(s, &v.Vlan); err != nil {
 			return fmt.Errorf("vf: %d: vlan: %q %v", vf, s, err)
 		}
-		if qos := c.opt.Parms.ByName["qos"]; len(qos) > 0 {
+		if qos := m.opt.Parms.ByName["qos"]; len(qos) > 0 {
 			if _, err := fmt.Sscan(s, &v.Qos); err != nil {
 				return fmt.Errorf("vf: %d: qos: %q %v",
 					vf, qos, err)
@@ -91,7 +91,7 @@ func (c *Command) parseVf(s string) error {
 		}
 		attrs = append(attrs, rtnl.Attr{rtnl.IFLA_VF_VLAN, v})
 	}
-	if s := c.opt.Parms.ByName["rate"]; len(s) > 0 {
+	if s := m.opt.Parms.ByName["rate"]; len(s) > 0 {
 		v := rtnl.IflaVfTxRate{
 			Vf: vf,
 		}
@@ -99,7 +99,7 @@ func (c *Command) parseVf(s string) error {
 			return fmt.Errorf("vf: %d: rate: %q %v", vf, s, err)
 		}
 		attrs = append(attrs, rtnl.Attr{rtnl.IFLA_VF_TX_RATE, v})
-	} else if s := c.opt.Parms.ByName["min-tx-rate"]; len(s) > 0 {
+	} else if s := m.opt.Parms.ByName["min-tx-rate"]; len(s) > 0 {
 		v := rtnl.IflaVfRate{
 			Vf: vf,
 		}
@@ -107,14 +107,14 @@ func (c *Command) parseVf(s string) error {
 			return fmt.Errorf("vf: %d: min-tx-rate: %q %v",
 				vf, s, err)
 		}
-		if _, err := fmt.Sscan(c.opt.Parms.ByName["max-tx-rate"],
+		if _, err := fmt.Sscan(m.opt.Parms.ByName["max-tx-rate"],
 			&v.MaxTxRate); err != nil {
 			return fmt.Errorf("vf: %d: max-tx-rate: %q %v",
 				vf, s, err)
 		}
 		attrs = append(attrs, rtnl.Attr{rtnl.IFLA_VF_RATE, v})
 	}
-	if s := c.opt.Parms.ByName["link-state"]; len(s) > 0 {
+	if s := m.opt.Parms.ByName["link-state"]; len(s) > 0 {
 		ls, found := rtnl.IflaVfLinkStateByName[s]
 		if !found {
 			return fmt.Errorf("vf: %d: link-state: %q unknown",
@@ -133,7 +133,7 @@ func (c *Command) parseVf(s string) error {
 		{"node-guid", rtnl.IFLA_VF_IB_NODE_GUID},
 		{"port-guid", rtnl.IFLA_VF_IB_PORT_GUID},
 	} {
-		if s := c.opt.Parms.ByName[x.name]; len(s) > 0 {
+		if s := m.opt.Parms.ByName[x.name]; len(s) > 0 {
 			v := rtnl.IflaVfGuid{
 				Vf: vf,
 			}
@@ -144,7 +144,7 @@ func (c *Command) parseVf(s string) error {
 			attrs = append(attrs, rtnl.Attr{x.t, v})
 		}
 	}
-	c.attrs = append(c.attrs, rtnl.Attr{rtnl.IFLA_VFINFO_LIST,
+	m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_VFINFO_LIST,
 		rtnl.Attr{rtnl.IFLA_VF_INFO, attrs},
 	})
 	return nil

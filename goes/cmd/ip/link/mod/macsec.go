@@ -22,28 +22,28 @@ import (
 //	[ [no-]replay window { 0..2^32-1 } ]
 //	[ validate { strict | check | disabled } ]
 //	[ encodingsa { 0..3 } ]
-func (c *Command) parseTypeMacSec() error {
+func (m *mod) parseTypeMacSec() error {
 	var s string
 	var err error
 
-	c.args = c.opt.Parms.More(c.args,
+	m.args = m.opt.Parms.More(m.args,
 		"address", // LLADDR
 		"port",    // PORT
 		"sci",     // SCI
 	)
-	if s = c.opt.Parms.ByName["port"]; len(s) > 0 {
+	if s = m.opt.Parms.ByName["port"]; len(s) > 0 {
 		var port uint16
 		if _, err = fmt.Sscan(s, &port); err != nil {
 			return fmt.Errorf("port: %q %v", s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_PORT,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_PORT,
 			rtnl.Be16Attr(port)})
-	} else if s = c.opt.Parms.ByName["sci"]; len(s) > 0 {
+	} else if s = m.opt.Parms.ByName["sci"]; len(s) > 0 {
 		var sci uint64
 		if _, err = fmt.Sscan(s, &sci); err != nil {
 			return fmt.Errorf("sci: %q %v", s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_SCI,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_SCI,
 			rtnl.Be64Attr(sci)})
 	} else {
 		return fmt.Errorf("missing port or sci")
@@ -84,44 +84,44 @@ func (c *Command) parseTypeMacSec() error {
 			[]string{"no-replay", "-replay"},
 			rtnl.IFLA_MACSEC_REPLAY_PROTECT},
 	} {
-		c.args = c.opt.Flags.More(c.args, x.set, x.unset)
-		if c.opt.Flags.ByName[x.set[0]] {
-			c.tinfo = append(c.tinfo, rtnl.Attr{x.t,
+		m.args = m.opt.Flags.More(m.args, x.set, x.unset)
+		if m.opt.Flags.ByName[x.set[0]] {
+			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
 				rtnl.Uint8Attr(1)})
-		} else if c.opt.Flags.ByName[x.unset[0]] {
-			c.tinfo = append(c.tinfo, rtnl.Attr{x.t,
+		} else if m.opt.Flags.ByName[x.unset[0]] {
+			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
 				rtnl.Uint8Attr(0)})
 		}
 	}
-	if c.opt.Flags.ByName["replay"] {
+	if m.opt.Flags.ByName["replay"] {
 		var window uint32
-		c.args = c.opt.Parms.More(c.args, "window")
-		s = c.opt.Parms.ByName["window"]
+		m.args = m.opt.Parms.More(m.args, "window")
+		s = m.opt.Parms.ByName["window"]
 		if len(s) == 0 {
 			return fmt.Errorf("missing window")
 		}
 		if _, err := fmt.Sscan(s, &window); err != nil {
 			return fmt.Errorf("window: %q %v", s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_WINDOW,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_WINDOW,
 			rtnl.Uint32Attr(window)})
 	}
-	c.args = c.opt.Parms.More(c.args,
+	m.args = m.opt.Parms.More(m.args,
 		"cipher",   // SUITE
 		"validate", // { strict | check | disabled }
 	)
-	if s = c.opt.Parms.ByName["cipher"]; len(s) > 0 {
+	if s = m.opt.Parms.ByName["cipher"]; len(s) > 0 {
 		switch s {
 		case "default", "gcm-aes-128":
 			id := rtnl.MACSEC_DEFAULT_CIPHER_ID
-			c.tinfo = append(c.tinfo,
+			m.tinfo = append(m.tinfo,
 				rtnl.Attr{rtnl.IFLA_MACSEC_CIPHER_SUITE,
 					rtnl.Uint64Attr(id)})
 		default:
 			return fmt.Errorf("cipher: %q unknown", s)
 		}
 	}
-	if s = c.opt.Parms.ByName["validate"]; len(s) > 0 {
+	if s = m.opt.Parms.ByName["validate"]; len(s) > 0 {
 		validate, found := map[string]uint8{
 			"disabled": rtnl.MACSEC_VALIDATE_DISABLED,
 			"check":    rtnl.MACSEC_VALIDATE_CHECK,
@@ -130,7 +130,7 @@ func (c *Command) parseTypeMacSec() error {
 		if !found {
 			return fmt.Errorf("validate: %q unkown", s)
 		}
-		c.tinfo = append(c.tinfo,
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{rtnl.IFLA_MACSEC_VALIDATION,
 				rtnl.Uint8Attr(validate)})
 	}
@@ -143,15 +143,15 @@ func (c *Command) parseTypeMacSec() error {
 			rtnl.IFLA_MACSEC_ENCODING_SA},
 	} {
 		var u8 uint8
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s := c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s := m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
 	}
 	return nil
 }

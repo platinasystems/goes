@@ -45,13 +45,13 @@ import (
 //	[ nf_call_iptables NF_CALL_IPTABLES ]
 //	[ nf_call_ip6tables NF_CALL_IP6TABLES ]
 //	[ nf_call_arptables NF_CALL_ARPTABLES ]
-func (c *Command) parseTypeBridge() error {
+func (m *mod) parseTypeBridge() error {
 	var s string
 	var err error
 
-	c.args = c.opt.Flags.More(c.args, []string{"fdb-flush", "fdb_flush"})
-	if c.opt.Flags.ByName["fdb-flush"] {
-		c.attrs = append(c.attrs, rtnl.Attr{rtnl.IFLA_BR_FDB_FLUSH,
+	m.args = m.opt.Flags.More(m.args, []string{"fdb-flush", "fdb_flush"})
+	if m.opt.Flags.ByName["fdb-flush"] {
+		m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_BR_FDB_FLUSH,
 			rtnl.NilAttr{}})
 	}
 	for _, x := range []struct {
@@ -77,15 +77,15 @@ func (c *Command) parseTypeBridge() error {
 			rtnl.IFLA_BR_MCAST_STARTUP_QUERY_INTVL},
 	} {
 		var u64 uint64
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u64); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		c.attrs = append(c.attrs, rtnl.Attr{x.t,
+		m.attrs = append(m.attrs, rtnl.Attr{x.t,
 			rtnl.Uint32Attr(u64)})
 	}
 	for _, x := range []struct {
@@ -114,15 +114,15 @@ func (c *Command) parseTypeBridge() error {
 			rtnl.IFLA_BR_MCAST_STARTUP_QUERY_CNT},
 	} {
 		var u32 uint32
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		c.attrs = append(c.attrs, rtnl.Attr{x.t,
+		m.attrs = append(m.attrs, rtnl.Attr{x.t,
 			rtnl.Uint32Attr(u32)})
 	}
 	for _, x := range []struct {
@@ -139,15 +139,15 @@ func (c *Command) parseTypeBridge() error {
 			rtnl.IFLA_BR_VLAN_DEFAULT_PVID},
 	} {
 		var u16 uint16
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		c.attrs = append(c.attrs, rtnl.Attr{x.t,
+		m.attrs = append(m.attrs, rtnl.Attr{x.t,
 			rtnl.Uint16Attr(u16)})
 	}
 	for _, x := range []struct {
@@ -180,15 +180,15 @@ func (c *Command) parseTypeBridge() error {
 			rtnl.IFLA_BR_NF_CALL_ARPTABLES},
 	} {
 		var u8 uint8
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		c.attrs = append(c.attrs, rtnl.Attr{x.t,
+		m.attrs = append(m.attrs, rtnl.Attr{x.t,
 			rtnl.Uint16Attr(u8)})
 	}
 	for _, x := range []struct {
@@ -198,8 +198,8 @@ func (c *Command) parseTypeBridge() error {
 		{[]string{"group-address", "group_address"},
 			rtnl.IFLA_BR_GROUP_ADDR},
 	} {
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
@@ -207,7 +207,7 @@ func (c *Command) parseTypeBridge() error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		c.attrs = append(c.attrs, rtnl.Attr{x.t,
+		m.attrs = append(m.attrs, rtnl.Attr{x.t,
 			rtnl.BytesAttr(lladdr)})
 	}
 	return nil

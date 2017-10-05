@@ -55,9 +55,11 @@ var (
 	Parms = []interface{}{"-interval", "-total", []string{"-n", "-netns"}}
 )
 
-func New() *Command { return &Command{} }
+func New() Command { return Command{} }
 
-type Command struct {
+type Command struct{}
+
+type counters struct {
 	last    map[int32][]byte
 	ifname  map[int32]string
 	updated map[int32]bool
@@ -66,12 +68,12 @@ type Command struct {
 	prefix  string
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Man() lang.Alt     { return man }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
-func (*Command) Complete(args ...string) (list []string) {
+func (Command) Complete(args ...string) (list []string) {
 	var larg, llarg string
 	n := len(args)
 	if n > 0 {
@@ -98,7 +100,7 @@ func (*Command) Complete(args ...string) (list []string) {
 	return
 }
 
-func (*Command) Help(args ...string) string {
+func (Command) Help(args ...string) string {
 	help := "no help"
 	switch {
 	case len(args) == 0:
@@ -113,8 +115,9 @@ func (*Command) Help(args ...string) string {
 	return help
 }
 
-func (c *Command) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var total int
+	var c counters
 	interval := 5
 
 	flag, args := flags.New(args, Flags...)
@@ -185,7 +188,7 @@ func (c *Command) Main(args ...string) error {
 	return err
 }
 
-func (c *Command) counters() error {
+func (c *counters) counters() error {
 	req, err := rtnl.NewMessage(
 		rtnl.Hdr{
 			Type:  rtnl.RTM_GETLINK,

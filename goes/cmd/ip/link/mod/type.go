@@ -10,43 +10,43 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 )
 
-func (c *Command) parseType(name string) error {
-	c.tinfo = c.tinfo[:0]
+func (m *mod) parseType(name string) error {
+	m.tinfo = m.tinfo[:0]
 	kind := rtnl.Attr{rtnl.IFLA_INFO_KIND, rtnl.KstringAttr(name)}
 	dt := rtnl.IFLA_INFO_DATA
 	if strings.HasSuffix(name, "_slave") {
 		dt = rtnl.IFLA_INFO_SLAVE_DATA
 	}
 	if parse, found := map[string]func() error{
-		"vlan":      c.parseTypeVlan,
-		"vxlan":     c.parseTypeVxlan,
-		"gre":       c.parseTypeGre,
-		"gretap":    c.parseTypeGre,
-		"ip6gre":    c.parseTypeIp6Gre,
-		"ip6gretap": c.parseTypeIp6Gre,
-		"ipip":      c.parseTypeGre,
-		"sit":       c.parseTypeGre,
-		"geneve":    c.parseTypeGeneve,
-		"ipoib":     c.parseTypeIpoib,
-		"macvlan":   c.parseTypeMacVlan,
-		"macvtap":   c.parseTypeMacVlan,
-		"hsr":       c.parseTypeHsr,
-		"bridge":    c.parseTypeBridge,
-		"macsec":    c.parseTypeMacSec,
-		"vrf":       c.parseTypeVrf,
+		"vlan":      m.parseTypeVlan,
+		"vxlan":     m.parseTypeVxlan,
+		"gre":       m.parseTypeGre,
+		"gretap":    m.parseTypeGre,
+		"ip6gre":    m.parseTypeIp6Gre,
+		"ip6gretap": m.parseTypeIp6Gre,
+		"ipip":      m.parseTypeGre,
+		"sit":       m.parseTypeGre,
+		"geneve":    m.parseTypeGeneve,
+		"ipoib":     m.parseTypeIpoib,
+		"macvlan":   m.parseTypeMacVlan,
+		"macvtap":   m.parseTypeMacVlan,
+		"hsr":       m.parseTypeHsr,
+		"bridge":    m.parseTypeBridge,
+		"macsec":    m.parseTypeMacSec,
+		"vrf":       m.parseTypeVrf,
 	}[name]; found {
 		if err := parse(); err != nil {
 			return err
 		}
 	}
-	if len(c.tinfo) == 0 {
-		c.attrs = append(c.attrs, rtnl.Attr{rtnl.IFLA_LINKINFO, kind})
+	if len(m.tinfo) == 0 {
+		m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_LINKINFO, kind})
 	} else {
-		c.attrs = append(c.attrs,
+		m.attrs = append(m.attrs,
 			rtnl.Attr{rtnl.IFLA_LINKINFO,
 				rtnl.Attrs{
 					kind,
-					rtnl.Attr{dt, c.tinfo},
+					rtnl.Attr{dt, m.tinfo},
 				},
 			},
 		)

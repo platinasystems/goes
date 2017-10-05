@@ -10,8 +10,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 )
 
-func (c *Command) parseTypeIpoib() error {
-	c.args = c.opt.Parms.More(c.args,
+func (m *mod) parseTypeIpoib() error {
+	m.args = m.opt.Parms.More(m.args,
 		"pkey",
 		"mode", // { datagram | connected }
 		"umcast",
@@ -24,7 +24,7 @@ func (c *Command) parseTypeIpoib() error {
 		{"umcast", rtnl.IFLA_IPOIB_UMCAST},
 	} {
 		var u16 uint16
-		s := c.opt.Parms.ByName[x.name]
+		s := m.opt.Parms.ByName[x.name]
 		if len(s) == 0 {
 			continue
 		}
@@ -32,17 +32,17 @@ func (c *Command) parseTypeIpoib() error {
 			return fmt.Errorf("type ipoib %s: %q %v",
 				x.name, s, err)
 		}
-		c.tinfo = append(c.tinfo,
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{x.t, rtnl.Uint16Attr(u16)})
 	}
-	if s := c.opt.Parms.ByName["mode"]; len(s) > 0 {
+	if s := m.opt.Parms.ByName["mode"]; len(s) > 0 {
 		if mode, found := map[string]uint16{
 			"datagram":  rtnl.IPOIB_MODE_DATAGRAM,
 			"connected": rtnl.IPOIB_MODE_CONNECTED,
 		}[s]; !found {
 			return fmt.Errorf("type ipoib mode: %q invalid", s)
 		} else {
-			c.tinfo = append(c.tinfo,
+			m.tinfo = append(m.tinfo,
 				rtnl.Attr{rtnl.IFLA_IPOIB_MODE,
 					rtnl.Uint16Attr(mode)})
 		}

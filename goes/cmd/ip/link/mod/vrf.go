@@ -10,9 +10,9 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 )
 
-func (c *Command) parseTypeVrf() error {
-	c.args = c.opt.Parms.More(c.args, "table")
-	s := c.opt.Parms.ByName["table"]
+func (m *mod) parseTypeVrf() error {
+	m.args = m.opt.Parms.More(m.args, "table")
+	s := m.opt.Parms.ByName["table"]
 	if len(s) == 0 {
 		return nil
 	}
@@ -23,7 +23,7 @@ func (c *Command) parseTypeVrf() error {
 			return fmt.Errorf("invalid vrf table")
 		}
 	}
-	c.tinfo = append(c.tinfo,
+	m.tinfo = append(m.tinfo,
 		rtnl.Attr{rtnl.IFLA_VRF_TABLE, rtnl.Uint32Attr(tbl)})
 	return nil
 }

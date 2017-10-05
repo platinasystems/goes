@@ -36,15 +36,15 @@ import (
 //	[ [no-]external ]
 //	[ gbp ]
 //	[ gpe ]
-func (c *Command) parseTypeVxlan() error {
+func (m *mod) parseTypeVxlan() error {
 	var gaddr, laddr, raddr net.IP
 	var s string
 	var u8 uint8
 	var u16 uint16
 	var u32 uint32
 	var err error
-	c.args = c.opt.Parms.More(c.args, []string{"id", "vni"})
-	s = c.opt.Parms.ByName["id"]
+	m.args = m.opt.Parms.More(m.args, []string{"id", "vni"})
+	s = m.opt.Parms.ByName["id"]
 	if len(s) == 0 {
 		return fmt.Errorf("id: missing")
 	}
@@ -53,9 +53,9 @@ func (c *Command) parseTypeVxlan() error {
 	} else if u32 >= 1<<24 {
 		return fmt.Errorf("vni: %q %v", s, syscall.ERANGE)
 	}
-	c.tinfo = append(c.tinfo,
+	m.tinfo = append(m.tinfo,
 		rtnl.Attr{rtnl.IFLA_VXLAN_ID, rtnl.Uint32Attr(u32)})
-	c.args = c.opt.Parms.More(c.args, "group", "local", "remote")
+	m.args = m.opt.Parms.More(m.args, "group", "local", "remote")
 	for _, x := range []struct {
 		name string
 		p    *net.IP
@@ -64,7 +64,7 @@ func (c *Command) parseTypeVxlan() error {
 		{"local", &laddr},
 		{"remote", &raddr},
 	} {
-		s = c.opt.Parms.ByName[x.name]
+		s = m.opt.Parms.ByName[x.name]
 		if len(s) == 0 {
 			continue
 		}
@@ -76,11 +76,11 @@ func (c *Command) parseTypeVxlan() error {
 	for _, addr := range []net.IP{gaddr, raddr} {
 		if addr != nil {
 			if ip4 := addr.To4(); ip4 != nil {
-				c.tinfo = append(c.tinfo,
+				m.tinfo = append(m.tinfo,
 					rtnl.Attr{rtnl.IFLA_VXLAN_GROUP,
 						rtnl.BytesAttr(ip4)})
 			} else {
-				c.tinfo = append(c.tinfo,
+				m.tinfo = append(m.tinfo,
 					rtnl.Attr{rtnl.IFLA_VXLAN_GROUP6,
 						rtnl.BytesAttr(addr.To16())})
 			}
@@ -88,19 +88,19 @@ func (c *Command) parseTypeVxlan() error {
 		}
 	}
 	if ip4 := laddr.To4(); ip4 != nil {
-		c.tinfo = append(c.tinfo,
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{rtnl.IFLA_VXLAN_LOCAL, rtnl.BytesAttr(ip4)})
 	} else {
-		c.tinfo = append(c.tinfo,
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{rtnl.IFLA_VXLAN_LOCAL6,
 				rtnl.BytesAttr(laddr.To16())})
 	}
-	c.args = c.opt.Parms.More(c.args, "dev")
-	if s = c.opt.Parms.ByName["dev"]; len(s) > 0 {
-		if dev, found := c.ifindexByName[s]; !found {
+	m.args = m.opt.Parms.More(m.args, "dev")
+	if s = m.opt.Parms.ByName["dev"]; len(s) > 0 {
+		if dev, found := m.ifindexByName[s]; !found {
 			return fmt.Errorf("dev: %q not found", s)
 		} else {
-			c.tinfo = append(c.tinfo,
+			m.tinfo = append(m.tinfo,
 				rtnl.Attr{rtnl.IFLA_VXLAN_LINK,
 					rtnl.Uint32Attr(dev)})
 		}
@@ -112,23 +112,23 @@ func (c *Command) parseTypeVxlan() error {
 		{[]string{"ttl", "hoplimit"}, rtnl.IFLA_VXLAN_TTL},
 		{[]string{"tos", "dsfield"}, rtnl.IFLA_VXLAN_TOS},
 	} {
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 || s == "inherit" {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
 	}
-	c.args = c.opt.Parms.More(c.args, "flowlabel")
-	if s = c.opt.Parms.ByName["flowlabel"]; len(s) > 0 {
+	m.args = m.opt.Parms.More(m.args, "flowlabel")
+	if s = m.opt.Parms.ByName["flowlabel"]; len(s) > 0 {
 		var u32 uint32
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("flowlabel: %q %v", s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_LABEL,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_LABEL,
 			rtnl.Be32Attr(u32)})
 	}
 	for _, x := range []struct {
@@ -139,26 +139,26 @@ func (c *Command) parseTypeVxlan() error {
 		{[]string{"maxaddress"}, rtnl.IFLA_VXLAN_AGEING},
 	} {
 		var u32 uint32
-		c.args = c.opt.Parms.More(c.args, x.names)
-		s = c.opt.Parms.ByName[x.names[0]]
+		m.args = m.opt.Parms.More(m.args, x.names)
+		s = m.opt.Parms.ByName[x.names[0]]
 		if len(s) == 0 {
 			continue
 		}
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{x.t, rtnl.Uint32Attr(u32)})
+		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint32Attr(u32)})
 	}
-	c.args = c.opt.Parms.More(c.args, "dstport")
-	if s = c.opt.Parms.ByName["dstport"]; len(s) > 0 {
+	m.args = m.opt.Parms.More(m.args, "dstport")
+	if s = m.opt.Parms.ByName["dstport"]; len(s) > 0 {
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("dstport: %q %v", s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_PORT,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_PORT,
 			rtnl.Be16Attr(u16)})
 	}
-	c.args = c.opt.Parms.More(c.args, []string{"srcport", "port"})
-	if s = c.opt.Parms.ByName["srcport"]; len(s) > 0 {
+	m.args = m.opt.Parms.More(m.args, []string{"srcport", "port"})
+	if s = m.opt.Parms.ByName["srcport"]; len(s) > 0 {
 		var pr rtnl.IflaVxlanPortRange
 		colon := strings.Index(s, ":")
 		if colon < 1 {
@@ -170,7 +170,7 @@ func (c *Command) parseTypeVxlan() error {
 		if _, err = fmt.Sscan(s[colon+1:], &pr.High); err != nil {
 			return fmt.Errorf("srcport high: %q %v", s, err)
 		}
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_PORT_RANGE,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_PORT_RANGE,
 			pr})
 	}
 	for _, x := range []struct {
@@ -229,27 +229,27 @@ func (c *Command) parseTypeVxlan() error {
 			rtnl.IFLA_VXLAN_REMCSUM_TX,
 		},
 	} {
-		c.args = c.opt.Flags.More(c.args, x.set, x.unset)
-		if c.opt.Flags.ByName[x.set[0]] {
-			c.tinfo = append(c.tinfo, rtnl.Attr{x.t,
+		m.args = m.opt.Flags.More(m.args, x.set, x.unset)
+		if m.opt.Flags.ByName[x.set[0]] {
+			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
 				rtnl.Uint8Attr(1)})
-		} else if c.opt.Flags.ByName[x.set[0]] {
-			c.tinfo = append(c.tinfo, rtnl.Attr{x.t,
+		} else if m.opt.Flags.ByName[x.set[0]] {
+			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
 				rtnl.Uint8Attr(0)})
 		}
 	}
-	c.args = c.opt.Flags.More(c.args,
+	m.args = m.opt.Flags.More(m.args,
 		[]string{"external", "+external"},
 		[]string{"no-external", "-external"},
 	)
-	if c.opt.Flags.ByName["external"] {
-		c.tinfo = append(c.tinfo,
+	if m.opt.Flags.ByName["external"] {
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
 				rtnl.Uint8Attr(1)})
-		c.tinfo = append(c.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_LEARNING,
+		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_LEARNING,
 			rtnl.Uint8Attr(0)})
-	} else if c.opt.Flags.ByName["no-external"] {
-		c.tinfo = append(c.tinfo,
+	} else if m.opt.Flags.ByName["no-external"] {
+		m.tinfo = append(m.tinfo,
 			rtnl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
 				rtnl.Uint8Attr(0)})
 	}
@@ -266,9 +266,9 @@ func (c *Command) parseTypeVxlan() error {
 			rtnl.IFLA_VXLAN_GPE,
 		},
 	} {
-		c.args = c.opt.Flags.More(c.args, x.set)
-		if c.opt.Flags.ByName[x.set[0]] {
-			c.tinfo = append(c.tinfo,
+		m.args = m.opt.Flags.More(m.args, x.set)
+		if m.opt.Flags.ByName[x.set[0]] {
+			m.tinfo = append(m.tinfo,
 				rtnl.Attr{x.t, rtnl.NilAttr{}})
 		}
 	}
