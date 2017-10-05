@@ -232,6 +232,10 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 		err = fmt.Errorf("add next to unregistered node: %s", nextName)
 		return
 	}
+	if len(nextName) == 0 {
+		err = fmt.Errorf("adding nil next to node: %s", n.name)
+		return
+	}
 
 	var (
 		nextNoder Noder
