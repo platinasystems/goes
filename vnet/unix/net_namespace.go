@@ -198,6 +198,11 @@ func (m *net_namespace_main) discovery_is_done() bool {
 
 // Called when initial netlink dump via netlink.Listen completes.
 func (m *Main) namespace_discovery_done() {
+	// Already done?
+	if m.discovery_is_done() {
+		return
+	}
+	// Mark discovery done when all initial namespaces are discovered.
 	nm := &m.net_namespace_main
 	if atomic.AddInt32(&nm.n_init_namespace_to_discover, -1) == 0 {
 		if err := m.netlink_discovery_done_for_all_namespaces(); err != nil {
