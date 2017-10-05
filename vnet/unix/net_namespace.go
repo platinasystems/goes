@@ -905,7 +905,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 			break
 		}
 		// Timeout?
-		if time.Since(e.time_start) > 100*time.Millisecond {
+		if time.Since(e.time_start) > 5*time.Second {
 			return
 		}
 		// Need retry?
