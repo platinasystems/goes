@@ -75,14 +75,6 @@ func (c *Command) Main(args ...string) (err error) {
 		args = []string{"/boot"}
 	}
 
-	timeout := time.Duration(0)
-	if parm.ByName["-t"] != "" {
-		timeout, err = time.ParseDuration(parm.ByName["-t"])
-		if err != nil {
-			return err
-		}
-	}
-
 	cnt := 0
 
 	done := make(chan *bootMnt, len(args))
@@ -105,9 +97,15 @@ func (c *Command) Main(args ...string) (err error) {
 
 	line := liner.NewLiner()
 	defer line.Close()
-	err = line.SetDuration(timeout)
-	if err != nil {
-		return err
+	if parm.ByName["-t"] != "" {
+		timeout, err := time.ParseDuration(parm.ByName["-t"])
+		if err != nil {
+			return err
+		}
+		err = line.SetDuration(timeout)
+		if err != nil {
+			return err
+		}
 	}
 	line.SetCtrlCAborts(true)
 
