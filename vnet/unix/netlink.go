@@ -639,6 +639,7 @@ func set_ip4_next_hop_address(a netlink.Attr, nh *ip4.NextHop) {
 
 type ip4_next_hop struct {
 	ip4.NextHop
+	intf  *net_namespace_interface
 	attrs []netlink.Attr
 }
 
@@ -653,8 +654,8 @@ func (ns *net_namespace) parse_ip4_next_hops(v *netlink.RouteMessage) (nhs []ip4
 	nh.attrs = v.Attrs[:]
 	nh_ok := false
 	if a := v.Attrs[netlink.RTA_OIF]; a != nil {
-		intf := ns.interface_by_index[a.(netlink.Uint32Attr).Uint()]
-		nh.Si = intf.si
+		nh.intf = ns.interface_by_index[a.(netlink.Uint32Attr).Uint()]
+		nh.Si = nh.intf.si
 		nh_ok = true
 	}
 	set_ip4_next_hop_address(v.Attrs[netlink.RTA_GATEWAY], &nh.NextHop)
@@ -706,7 +707,7 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 	m4 := ip4.GetMain(e.m.v)
 	for i := range nhs {
 		nh := &nhs[i]
-		intf := e.ns.m.interface_by_si[nh.Si]
+		intf := nh.intf
 
 		// Check for tunnel via RTA_ENCAP_TYPE/RTA_ENCAP attributes.
 		if encap_type, ok := nh.attrs[netlink.RTA_ENCAP_TYPE].(netlink.LwtunnelEncapType); ok {
