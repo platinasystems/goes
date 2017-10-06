@@ -103,10 +103,6 @@ func (Command) Main(args ...string) error {
 	var save save
 	var show show
 
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
-
 	show.opt, args = options.New(args)
 	args = show.opt.Flags.More(args, Flags...)
 	args = show.opt.Parms.More(args, Parms...)

@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/batch"
 	"github.com/platinasystems/go/goes/cmd/ip/link"
 	"github.com/platinasystems/go/goes/cmd/ip/monitor"
+	"github.com/platinasystems/go/goes/cmd/ip/n"
 	"github.com/platinasystems/go/goes/cmd/ip/neighbor"
 	"github.com/platinasystems/go/goes/cmd/ip/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/route"
@@ -23,8 +24,8 @@ const (
 	Name    = "ip"
 	Apropos = "show / manipulate routing, etc."
 	Usage   = `
-	ip [ OPTION... ] OBJECT COMMAND [ ARG... ]
-	ip [ -n NAMESPACE ] -batch [ -x | -f ] [ - | FILE ]
+	ip [ -n[etns] NAME | -a[ll] ] [ OPTION... ] OBJECT COMMAND [ ARG ]...
+	ip [ -n[ntns] NAME | -a[ll] ] -batch [ -x | -f ] [ - | FILE ]
 	
 OBJECT := { address | link | monitor | neighbor | netns | route }
 
@@ -34,7 +35,7 @@ OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
 	-4 | -6 | -B | -0 |
 	-l[oops] { maximum-addr-flush-attempts } | -br[ief] |
 	-o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
-	-rc[vbuf] [size] | -n[etns] name | -a[ll] | -c[olor] }`
+	-rc[vbuf] [size] | -c[olor] }`
 )
 
 func New() *goes.Goes {
@@ -51,6 +52,8 @@ func New() *goes.Goes {
 		batch.New(),
 		link.New(),
 		monitor.New(),
+		n.New("-n"),
+		n.New("-netns"),
 		neighbor.New(),
 		netns.New(),
 		route.New(),

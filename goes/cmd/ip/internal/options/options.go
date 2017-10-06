@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 )
@@ -33,7 +32,6 @@ var (
 		[]string{"-l", "-loops"},
 		[]string{"-f", "-family"},
 		[]string{"-rc", "-rcvbuf"},
-		[]string{"-n", "-netns"},
 	}
 	CompleteParmValue = map[string]func(string) []string{
 		"-l":      NoComplete,
@@ -42,8 +40,6 @@ var (
 		"-rcvbuf": NoComplete,
 		"-f":      CompleteFamily,
 		"-family": CompleteFamily,
-		"-n":      netns.CompleteName,
-		"-netns":  netns.CompleteName,
 	}
 	CompleteOptNames = []string{
 		"-human-readable",
@@ -59,7 +55,6 @@ var (
 		"-family",
 		"-loops",
 		"-rcvbuf",
-		"-netns",
 	}
 )
 

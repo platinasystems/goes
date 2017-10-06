@@ -53,7 +53,6 @@ STATE := { permanent | noarp | stale | reachable | none | incomplete |
 }
 
 func (c Command) Main(args ...string) error {
-	var err error
 	var nd struct {
 		hdr   rtnl.Hdr
 		msg   rtnl.NdMsg
@@ -61,10 +60,6 @@ func (c Command) Main(args ...string) error {
 	}
 	addattr := func(t uint16, v io.Reader) {
 		nd.attrs = append(nd.attrs, rtnl.Attr{t, v})
-	}
-
-	if args, err = options.Netns(args); err != nil {
-		return err
 	}
 
 	nd.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK

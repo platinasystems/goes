@@ -59,16 +59,11 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (Command) Main(args ...string) error {
-	var err error
 	var req []byte
 	var gid uint32 // default: 0
 	var newifinfos [][]byte
 	arphrd := ^uint16(0)
 	mindex := int32(-1)
-
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
 
 	opt, args := options.New(args)
 	args = opt.Flags.More(args, Flags...)

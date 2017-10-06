@@ -81,14 +81,9 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (c Command) Main(args ...string) error {
-	var err error
 	var req []byte
 	var to string
 	var prefix uint8
-
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
 
 	opt, args := options.New(args)
 	args = opt.Flags.More(args, Flags...)

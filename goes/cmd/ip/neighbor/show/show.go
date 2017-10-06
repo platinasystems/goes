@@ -61,10 +61,6 @@ func (Command) Main(args ...string) error {
 	var toip net.IP
 	var toipnet *net.IPNet
 
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
-
 	opt, args := options.New(args)
 	args = opt.Flags.More(args, Flags...)
 	args = opt.Parms.More(args, Parms...)

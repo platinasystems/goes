@@ -67,7 +67,6 @@ LFT := { forever | SECONDS }`)
 }
 
 func (c Command) Main(args ...string) error {
-	var err error
 	var ifa struct {
 		hdr   rtnl.Hdr
 		msg   rtnl.IfAddrMsg
@@ -76,10 +75,6 @@ func (c Command) Main(args ...string) error {
 	}
 	addattr := func(t uint16, v io.Reader) {
 		ifa.attrs = append(ifa.attrs, rtnl.Attr{t, v})
-	}
-
-	if args, err = options.Netns(args); err != nil {
-		return err
 	}
 
 	opt, args := options.New(args)

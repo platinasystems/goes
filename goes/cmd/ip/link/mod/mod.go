@@ -112,12 +112,7 @@ func (c Command) Usage() string {
 }
 
 func (c Command) Main(args ...string) error {
-	var err error
 	m := mod{name: string(c)}
-
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
 
 	sock, err := rtnl.NewSock()
 	if err != nil {

@@ -45,12 +45,6 @@ func (*Command) String() string      { return Name }
 func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
-	var err error
-
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
-
 	return c.g.Main(args...)
 }
 

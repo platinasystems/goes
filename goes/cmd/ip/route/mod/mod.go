@@ -110,12 +110,7 @@ ENCAP-BPF := bpf [ in PROG ] [ out PROG ] [ xmit PROG ] [ headroom SIZE ]`)
 }
 
 func (c Command) Main(args ...string) error {
-	var err error
 	var m mod
-
-	if args, err = options.Netns(args); err != nil {
-		return err
-	}
 
 	m.opt, m.args = options.New(args)
 
