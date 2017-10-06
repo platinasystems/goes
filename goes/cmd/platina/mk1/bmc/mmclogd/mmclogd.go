@@ -5,13 +5,14 @@
 package mmclogd
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const (
@@ -21,6 +22,14 @@ const (
 	Man     = `
 DESCRIPTION
 	mmclog daemon`
+
+	LOGA          = "dmesg.txt"
+	LOGB          = "dmesg2.txt"
+	ENABLE        = "/tmp/mmclog_enable"
+	MAXLEN        = 4096
+	MAXMSG        = 50000
+	MAXSIZE int64 = 512 * 1024 * 1024
+	MMCDIR        = "/tmp" //FIXME /mnt once mount is working
 )
 
 type FileInfo struct {
@@ -35,10 +44,8 @@ var apropos = lang.Alt{
 }
 
 var (
-	Init    = func() {}
-	once    sync.Once
-	MMCdir        = "/mnt"
-	MaxSize int64 = 512 * 1024 * 1024
+	Init = func() {}
+	once sync.Once
 )
 
 type Command struct {
@@ -46,12 +53,13 @@ type Command struct {
 }
 
 type Info struct {
-	stop   chan struct{}
-	active string
-	logA   FileInfo
-	logB   FileInfo
-	logE   FileInfo
-	actv   FileInfo
+	mutex   sync.Mutex
+	rpc     *sockfile.RpcServer
+	pub     *publisher.Publisher
+	stop    chan struct{}
+	logA    string
+	logB    string
+	seq_end uint64
 }
 
 func New() *Command { return new(Command) }
@@ -67,7 +75,7 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	t := time.NewTicker(1 * time.Second)
+	t := time.NewTicker(15 * time.Second)
 	for {
 		select {
 		case <-c.stop:
@@ -86,7 +94,7 @@ func (c *Command) Close() error {
 }
 
 func (c *Command) update() error {
-	if _, err := os.Stat("/tmp/mmclog_enable"); os.IsNotExist(err) {
+	if _, err := os.Stat(ENABLE); os.IsNotExist(err) {
 		return nil
 	}
 

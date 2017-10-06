@@ -14,6 +14,7 @@ func init() {
 		[]string{"i2cd"},
 		[]string{"imx6d"},
 		[]string{"ledgpiod"},
+		[]string{"mmclogd"},
 		[]string{"upgraded"},
 		[]string{"uptimed"},
 		[]string{"telnetd"},

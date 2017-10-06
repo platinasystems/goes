@@ -11,24 +11,25 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/platinasystems/go/internal/log"
 )
 
 const (
-	logAfn   = "dmesg-a.txt"
-	logBfn   = "dmesg-b.txt"
-	logEfn   = "dmesg-err.txt"
-	activeFn = "active.txt"
-	nl       = "\n"
-	sp       = " "
-	lt       = "<"
-	gt       = ">"
-	lb       = "["
-	rb       = "]"
+	nl = "\n"
+	sp = " "
+	lt = "<"
+	gt = ">"
+	lb = "["
+	rb = "]"
 )
 
 func initLogging(c *Info) error {
+	c.logA = MMCDIR + "/" + LOGA
+	c.logB = MMCDIR + "/" + LOGB
+	c.seq_end = 0
+
 	exists, err := detectMMC()
 	if err != nil {
 		return err
@@ -37,30 +38,21 @@ func initLogging(c *Info) error {
 		err = fmt.Errorf("No MMC Card, log disabled: %s", err)
 		return err
 	}
-
 	if err = mountMMC(c); err != nil {
 		return err
 	}
-
-	if err = setActive(c); err != nil {
-		return err
-	}
-
 	if err = startTicker(); err != nil {
 		return err
 	}
-	status(c)
 	return nil
 }
 
-func updateLogs(c *Info) error {
-	if err = initFileInfo(c); err != nil {
+func updateLogs(c *Info) (err error) {
+	err, msg := getNewDmesg(c)
+	if err != nil {
 		return err
 	}
-	if err := nextBatch(); err != nil {
-		return err
-	}
-	if err := createAppend(); err != nil {
+	if err := createAppend(c, msg); err != nil {
 		return err
 	}
 	return nil
@@ -82,96 +74,8 @@ func detectMMC() (bool, error) {
 	return exists, nil
 }
 
-func mountMMC(c *Info) error { //TODO
-	c.active++
+func mountMMC(c *Info) error { //FIXME
 	return nil
-}
-
-func initFileInfo(c *Info) error {
-	c.logA.Name = MMCdir + "/" + logAfn
-	c.logA.Exst = false
-	if fi, err := os.Stat(c.logA.Name); !os.IsNotExist(err) {
-		c.logA.Exst = false
-		c.logA.Size = fi.Size()
-	}
-	c.logB.Name = MMCdir + "/" + logBfn
-	c.logB.Exst = false
-	if fi, err := os.Stat(c.logB.Name); !os.IsNotExist(err) {
-		c.logB.Exst = false
-		c.logB.Size = fi.Size()
-	}
-	c.logE.Name = MMCdir + "/" + logEfn
-	c.logE.Exst = false
-	if fi, err := os.Stat(c.logE.Name); !os.IsNotExist(err) {
-		c.logE.Exst = false
-		c.logE.Size = fi.Size()
-	}
-	c.actv.Name = MMCdir + "/" + activeFn
-	c.actv.Exst = false
-	if fi, err := os.Stat(c.actv.Name); !os.IsNotExist(err) {
-		c.actv.Exst = false
-		c.actv.Size = fi.Size()
-	}
-	c.logA.SeqN, err = latestSeqNum(c.logA.Name, c.logA.Exst)
-	if err != nil {
-		return err
-	}
-	c.logB.SeqN, err = latestSeqNum(c.logB.Name, c.logB.Exst)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func setActive(c *Info) error {
-	if c.actv.Exst {
-		dat, err := ioutil.ReadFile(c.actv.Name)
-		if err != nil {
-			return err
-		}
-	}
-	if !c.logB.Exst {
-		return activeA()
-	}
-	if !c.logA.Exst && c.logB.Exst {
-		return activeB()
-	}
-	x, err := latestSeqNum(c.logA.Name, c.logA.Exst)
-	if err != nil {
-		return err
-	}
-	y, err := latestSeqNum(c.logB.Name, c.logB.Exst)
-	if err != nil {
-		return err
-	}
-	if x > y {
-		return activeA()
-	} else {
-		return activeB()
-	}
-	return nil
-}
-
-func activeA(c *Info) error {
-	c.active = "A"
-	d := []byte(c.active)
-	if err := ioutil.WriteFile(c.actv, d, 0644); err != nil {
-		return err
-	}
-	return nil
-}
-
-func activeB(c *Info) error {
-	c.active = "B"
-	d := []byte(c.active)
-	if err := ioutil.WriteFile(c.actv, d, 0644); err != nil {
-		return err
-	}
-	return nil
-}
-
-func latestSeqNum(fn string, ex bool) (x int64, err error) { //TODO
-	return 0, nil
 }
 
 func startTicker() error {
@@ -190,19 +94,75 @@ func stopTicker() error {
 	return nil
 }
 
-func nextBatch() error { //TODO
-	//if just booted grab entire dmesg
-	//if 2nd time or more, only grab the new parts, maintain a last timestamp in RAM
+func getNewDmesg(c *Info) (error, []string) {
+	var kmsg log.Kmsg
+	buf := make([]byte, MAXLEN)
+	msg := make([]string, MAXMSG)
+	defer func() { msg = msg[:0] }()
+
+	f, err := os.Open("/dev/kmsg")
+	if err != nil {
+		return err, nil
+	}
+	defer f.Close()
+	if err = syscall.SetNonblock(int(f.Fd()), true); err != nil {
+		return err, nil
+	}
+
+	var si syscall.Sysinfo_t
+	if err = syscall.Sysinfo(&si); err != nil {
+		return err, nil
+	}
+	for i := 0; i < MAXMSG; i++ {
+		n, err := f.Read(buf)
+		if err != nil {
+			break
+		}
+		kmsg.Parse(buf[:n])
+		ksq := strconv.Itoa(int(kmsg.Seq))
+		now := time.Now()
+		tim := time.Time(kmsg.Stamp.Time(now, int64(si.Uptime)-1))
+		kst := fmt.Sprintln(tim)
+		kst = strings.TrimSuffix(kst, "\n")
+		if uint64(kmsg.Seq) > c.seq_end {
+			fs := ksq + sp + lb + kst + rb + sp + kmsg.Msg
+			msg[i] = fmt.Sprintln(fs)
+			c.seq_end = uint64(kmsg.Seq)
+		}
+	}
+	return nil, msg
+}
+
+func createAppend(c *Info, msg []string) error {
+	mode := os.O_CREATE | os.O_APPEND | os.O_WRONLY
+	f, err := os.OpenFile(c.logA, mode, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for i, _ := range msg {
+		_, err = f.Write([]byte(msg[i]))
+		if err != nil {
+			return err
+		}
+	}
+	f.Sync()
+	f.Close()
+	fi, err := os.Stat(c.logA)
+	if err != nil {
+		return err
+	}
+	if fi.Size() > MAXSIZE {
+		rmFile(c.logB)
+		err := os.Rename(c.logA, c.logB)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func createAppend() error { //TODO
-	//check if buff will fit, if so write it
-	//else, erase non-active file if exists, make it active, write there
-	return nil
-}
-
-func logDmesg(n int) error {
+func LogDmesg(n int) error {
 	if n < 1 || n > 100000 {
 		return fmt.Errorf("value must be between 1 - 100,000")
 	}
@@ -212,55 +172,11 @@ func logDmesg(n int) error {
 	return nil
 }
 
-func listMMC() error {
-	files, _ := ioutil.ReadDir(MMCdir)
+func listMMC(c *Info) error {
+	files, _ := ioutil.ReadDir(MMCDIR)
 	for _, f := range files {
 		fmt.Println(f.Name())
 	}
-	return nil
-}
-
-func getDmesgInfo() error { //FIXME FIGURE THIS OUT
-	var kmsg log.Kmsg
-
-	f, err := os.Open("/dev/kmsg")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if err = syscall.SetNonblock(int(f.Fd()), true); err != nil {
-		return err
-	}
-	buf := make([]byte, 4096)
-	defer func() { buf = buf[:0] }()
-	var si syscall.Sysinfo_t
-	if err = syscall.Sysinfo(&si); err != nil {
-		return err
-	}
-
-	fo, err := os.Create("/tmp/dat2")
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	//get starting seq number -- function to find out the older file
-	//get ending seq number -- to avoid dups
-	//only tack onto the end to file (no dups)
-	for i := 0; i < 400; i++ {
-		n, err := f.Read(buf)
-		if err != nil {
-			break
-		}
-		kmsg.Parse(buf[:n])
-		ksq := strconv.Itoa(int(kmsg.Seq))
-		kst := strconv.Itoa(int(kmsg.Stamp)) //convert this to time
-		fs := ksq + sp + lb + kst + rb + sp + kmsg.Msg + nl
-		_, err = fo.Write([]byte(fs))
-	}
-
-	fo.Sync()
-
 	return nil
 }
 
