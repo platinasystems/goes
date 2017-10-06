@@ -5,31 +5,20 @@
 package netns
 
 import (
-	"io/ioutil"
-	"sort"
 	"strings"
 )
 
 func CompleteName(s string) (list []string) {
-	names := func() (list []string) {
-		if dir, err := ioutil.ReadDir("/var/run/netns"); err == nil {
-			for _, fi := range dir {
-				list = append(list, fi.Name())
+	list = List()
+	if len(s) != 0 {
+		for i := 0; i < len(list); {
+			if strings.HasPrefix(list[i], s) {
+				i++
+			} else {
+				copy(list[i:len(list)], list[i+1:])
+				list = list[:len(list)-1]
 			}
 		}
-		return
-	}
-	if len(s) == 0 {
-		list = names()
-	} else {
-		for _, name := range names() {
-			if strings.HasPrefix(name, s) {
-				list = append(list, name)
-			}
-		}
-	}
-	if len(list) > 0 {
-		sort.Strings(list)
 	}
 	return
 }
