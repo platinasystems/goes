@@ -9,6 +9,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/cli"
 	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/ip/address"
+	"github.com/platinasystems/go/goes/cmd/ip/all"
 	"github.com/platinasystems/go/goes/cmd/ip/batch"
 	"github.com/platinasystems/go/goes/cmd/ip/link"
 	"github.com/platinasystems/go/goes/cmd/ip/monitor"
@@ -24,15 +25,18 @@ const (
 	Name    = "ip"
 	Apropos = "show / manipulate routing, etc."
 	Usage   = `
-	ip [ -n[etns] NAME | -a[ll] ] [ OPTION... ] OBJECT COMMAND [ ARG ]...
-	ip [ -n[ntns] NAME | -a[ll] ] -batch [ -x | -f ] [ - | FILE ]
+	ip [ NETNS ] OBJECT [ COMMAND [ FAMILY ] [ ARG ]... ]
+	ip [ NETNS ] -batch [ -x | -f ] [ - | FILE ]
 	
+NETNS := { -a[ll] | -n[etns] NAME }
+
 OBJECT := { address | link | monitor | neighbor | netns | route }
+
+FAMILY := { -f[amily] { inet | inet6 | mpls | bridge | link } |
+	{ -4 | -6 | -B | -0 } }
 
 OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
 	-human[-readable] | -iec |
-	-f[amily] { inet | inet6 | mpls | bridge | link } |
-	-4 | -6 | -B | -0 |
 	-l[oops] { maximum-addr-flush-attempts } | -br[ief] |
 	-o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
 	-rc[vbuf] [size] | -c[olor] }`
@@ -49,6 +53,8 @@ func New() *goes.Goes {
 	g.Plot(helpers.New()...)
 	g.Plot(cli.New()...)
 	g.Plot(address.New(),
+		all.New("-a"),
+		all.New("-all"),
 		batch.New(),
 		link.New(),
 		monitor.New(),

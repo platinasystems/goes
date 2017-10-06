@@ -5,8 +5,8 @@
 package exec
 
 import (
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -20,7 +20,7 @@ import (
 const (
 	Name    = "exec"
 	Apropos = "network namespace"
-	Usage   = "ip netns exec [ -all | NETNSNAME ] COMMAND..."
+	Usage   = "ip netns exec [ -a[ll] | NAME ] COMMAND [ ARGS ]..."
 	Man     = `
 SEE ALSO
 	ip man netns || ip netns -man
@@ -34,6 +34,8 @@ var (
 	man = lang.Alt{
 		lang.EnUS: Man,
 	}
+	missingCommandErr = errors.New("missing COMMAND")
+	missingNameErr    = errors.New("missing NAME")
 )
 
 func New() *Command { return new(Command) }
@@ -49,50 +51,44 @@ func (*Command) String() string      { return Name }
 func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
-	flag, args := flags.New(args, []string{"-a", "-all"})
-	if flag.ByName["-a"] {
-		if len(args) == 0 {
-			return fmt.Errorf("command: missing")
-		}
-		dir, err := ioutil.ReadDir("/var/run/netns")
+	var x *exec.Cmd
+	run := func() error {
+		x.Stdin = os.Stdin
+		x.Stdout = os.Stdout
+		x.Stderr = os.Stderr
+		err := x.Run()
 		if err != nil {
-			return err
+			err = fmt.Errorf("%v: %v", x.Args, err)
 		}
-		a := make([]string, len(args)+2)
-		a[0] = "exec"
-		for i, arg := range args {
-			a[i+2] = arg
+		return err
+	}
+	flag, args := flags.New(args, []string{"-a", "-all"})
+	if len(args) == 0 {
+		err := missingNameErr
+		if flag.ByName["-a"] {
+			err = missingCommandErr
 		}
-		for _, fi := range dir {
-			a[1] = fi.Name()
-			x := c.g.Fork(a...)
-			x.Stdin = os.Stdin
-			x.Stdout = os.Stdout
-			x.Stderr = os.Stderr
-			if err = x.Run(); err != nil {
+		return err
+	}
+	if flag.ByName["-a"] {
+		for _, name := range netns.List() {
+			x = c.g.Fork(append([]string{"exec", name}, args...)...)
+			if err := run(); err != nil {
 				return err
 			}
 		}
-		return nil
+		// now default namespace
+		x = exec.Command(args[0], args[1:]...)
+		return run()
 	}
-	if len(args) == 0 {
-		return fmt.Errorf("NETNSNAME: missing")
+	if len(args) < 2 {
+		return missingCommandErr
 	}
-	name := args[0]
-	args = args[1:]
-	if len(args) == 0 {
-		return fmt.Errorf("command: missing")
-	}
-	err := netns.Switch(name)
-	if err != nil {
+	if err := netns.Switch(args[0]); err != nil {
 		return err
 	}
-
-	x := exec.Command(args[0], args[1:]...)
-	x.Stdin = os.Stdin
-	x.Stdout = os.Stdout
-	x.Stderr = os.Stderr
-	return x.Run()
+	x = exec.Command(args[1], args[2:]...)
+	return run()
 }
 
 func (*Command) Complete(args ...string) (list []string) {
