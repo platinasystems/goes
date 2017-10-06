@@ -7,9 +7,11 @@ package ethernet
 
 import (
 	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 
+	"errors"
 	"fmt"
 	"unsafe"
 )
@@ -124,10 +126,11 @@ var phyInterfaceNames = [...]string{
 func (x PhyInterface) String() string { return elib.StringerHex(phyInterfaceNames[:], int(x)) }
 
 type InterfaceConfig struct {
-	Address       Address
-	PhyInterface  PhyInterface
-	NativeVlan    Vlan
-	Unprovisioned bool
+	Address             Address
+	PhyInterface        PhyInterface
+	NativeVlan          Vlan
+	Unprovisioned       bool
+	ErrorCorrectionType ErrorCorrectionType
 }
 
 type Interface struct {
@@ -143,10 +146,76 @@ type Interface struct {
 	loopback          vnet.IfLoopbackType
 }
 
+type ErrorCorrectionType uint8
+
+const (
+	ErrorCorrectionNone = iota
+	ErrorCorrectionCL74 // IEEE Clause 74 for 10g ethernet
+	ErrorCorrectionCL91 // IEEE Clause 91 for 100g ethernet
+)
+
+func (t *ErrorCorrectionType) Parse(in *parse.Input) {
+	switch text := in.Token(); text {
+	case "cl74", "CL74":
+		*t = ErrorCorrectionCL74
+	case "cl91", "CL91":
+		*t = ErrorCorrectionCL91
+	case "none", "NONE":
+		*t = ErrorCorrectionNone
+	default:
+		in.ParseError()
+	}
+	return
+}
+
+func (x ErrorCorrectionType) String() string {
+	t := [...]string{
+		ErrorCorrectionNone: "none",
+		ErrorCorrectionCL74: "cl74",
+		ErrorCorrectionCL91: "cl91",
+	}
+	return elib.StringerHex(t[:], int(x))
+}
+
+func SetInterfaceErrorCorrection(v *vnet.Vnet, hi vnet.Hi, et ErrorCorrectionType) (err error) {
+	h, ok := v.HwIfer(hi).(HwInterfacer)
+	if !ok {
+		err = fmt.Errorf("not ethernet interface")
+		return
+	}
+	i := h.GetInterface()
+	i.ErrorCorrectionType = et
+	err = h.SetErrorCorrection()
+	return
+}
+
 func (i *Interface) GetInterface() *Interface { return i }
+
+// Default implementation: nothing supported.
+func (i *Interface) SetErrorCorrection() (err error) {
+	if i.ErrorCorrectionType != ErrorCorrectionNone {
+		err = errors.New("not supported")
+	}
+	return
+}
+
+func (i *Interface) ConfigureHwIf(in *cli.Input) (ok bool, err error) {
+	var (
+		fec ErrorCorrectionType
+	)
+	ok = true
+	switch {
+	case in.Parse("fec %v", &fec):
+		err = SetInterfaceErrorCorrection(i.GetVnet(), i.Hi(), fec)
+	default:
+		ok = false
+	}
+	return
+}
 
 type HwInterfacer interface {
 	GetInterface() *Interface
+	SetErrorCorrection() (err error)
 	vnet.HwInterfacer
 }
 

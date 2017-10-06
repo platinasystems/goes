@@ -417,28 +417,34 @@ func (v *Vnet) setHwIf(c cli.Commander, w cli.Writer, in *cli.Input) (err error)
 		loopback IfLoopbackType
 	)
 
+	if !in.Parse("%v", &hi, v) {
+		err = fmt.Errorf("no such hardware interface")
+		return
+	}
+
+	h := v.HwIfer(hi)
+	hwif := v.HwIf(hi)
+
 	switch {
-	case in.Parse("lo%*opback %v %v", &hi, v, &loopback):
-		h := v.HwIfer(hi)
+	case in.Parse("lo%*opback %v", &loopback):
 		err = h.SetLoopback(loopback)
-	case in.Parse("li%*nk %v %v", &hi, v, &up):
+	case in.Parse("li%*nk %v", &up):
 		if elib.Debug {
-			h := v.HwIf(hi)
-			err = h.SetLinkUp(bool(up))
+			err = hwif.SetLinkUp(bool(up))
 		} else {
 			err = fmt.Errorf("not supported")
 		}
-	case in.Parse("mtu %v %d", &hi, v, &mtu):
-		h := v.HwIf(hi)
-		err = h.SetMaxPacketSize(mtu)
-	case in.Parse("p%*rovision %v %v", &hi, v, &enable):
-		h := v.HwIf(hi)
-		err = h.SetProvisioned(bool(enable))
-	case in.Parse("s%*peed %v %v", &hi, v, &bw):
-		h := v.HwIf(hi)
-		err = h.SetSpeed(bw)
+	case in.Parse("mtu %d", &mtu):
+		err = hwif.SetMaxPacketSize(mtu)
+	case in.Parse("p%*rovision %v", &enable):
+		err = hwif.SetProvisioned(bool(enable))
+	case in.Parse("s%*peed %v", &bw):
+		err = hwif.SetSpeed(bw)
 	default:
-		err = cli.ParseError
+		var ok bool
+		if ok, err = h.ConfigureHwIf(in); !ok {
+			err = cli.ParseError
+		}
 	}
 	return
 }
