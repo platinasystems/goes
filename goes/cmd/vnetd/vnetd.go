@@ -276,10 +276,14 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 }
 
 func (i *Info) initialPublish() {
-	i.v.ForeachHwIf(UnixInterfacesOnly, func(hi vnet.Hi) {
-		h := i.v.HwIf(hi)
-		i.publish(hi.Name(&i.v)+".speed", h.Speed().String())
-		i.publish(hi.Name(&i.v)+".media", h.Media())
+	v := &i.v
+	v.ForeachHwIf(UnixInterfacesOnly, func(hi vnet.Hi) {
+		h := v.HwIf(hi)
+		i.publish(hi.Name(v)+".speed", h.Speed().String())
+		i.publish(hi.Name(v)+".media", h.Media())
+		if h, ok := v.HwIfer(hi).(ethernet.HwInterfacer); ok {
+			i.publish(hi.Name(v)+".fec", h.GetInterface().ErrorCorrectionType.String())
+		}
 	})
 	i.publish("pollInterval", i.poller.pollInterval)
 }
