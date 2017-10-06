@@ -617,7 +617,7 @@ func (m *Main) HwIfLinkUpDown(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	}
 	si := v.HwIf(hi).Si()
 	intf, ok := m.vnet_tuntap_interface_by_si[si]
-	if !ok || !intf.created {
+	if !ok || !intf.created || intf.namespace == nil {
 		return
 	}
 	if isUp {

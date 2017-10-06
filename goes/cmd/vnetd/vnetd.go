@@ -23,6 +23,7 @@ import (
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/internal/sockfile"
 	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/ethernet"
 )
 
 const (
@@ -228,6 +229,7 @@ func (e *event) EventAction() {
 		enable parse.Enable
 		media  string
 		itv    float64
+		fec    ethernet.ErrorCorrectionType
 	)
 	if e.isReadyEvent {
 		e.i.pub.Print("vnet.", e.key, ": ", e.value)
@@ -235,13 +237,16 @@ func (e *event) EventAction() {
 	}
 	e.in.Init(nil)
 	e.in.Add(e.key, e.value)
+	v := &e.i.v
 	switch {
-	case e.in.Parse("%v.speed %v", &hi, &e.i.v, &bw):
-		e.err <- hi.SetSpeed(&e.i.v, bw)
-	case e.in.Parse("%v.admin %v", &si, &e.i.v, &enable):
-		e.err <- si.SetAdminUp(&e.i.v, bool(enable))
-	case e.in.Parse("%v.media %s", &hi, &e.i.v, &media):
-		e.err <- hi.SetMedia(&e.i.v, media)
+	case e.in.Parse("%v.speed %v", &hi, v, &bw):
+		e.err <- hi.SetSpeed(v, bw)
+	case e.in.Parse("%v.admin %v", &si, v, &enable):
+		e.err <- si.SetAdminUp(v, bool(enable))
+	case e.in.Parse("%v.media %s", &hi, v, &media):
+		e.err <- hi.SetMedia(v, media)
+	case e.in.Parse("%v.fec %v", &hi, v, &fec):
+		e.err <- ethernet.SetInterfaceErrorCorrection(v, hi, fec)
 	case e.in.Parse("pollInterval %f", &itv):
 		if itv < 1 {
 			e.err <- fmt.Errorf("pollInterval must be 1 second or longer")

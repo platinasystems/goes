@@ -7,6 +7,7 @@ package pg
 import (
 	"fmt"
 	"github.com/platinasystems/go/elib"
+	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/hw"
@@ -82,7 +83,8 @@ func (n *node) init(v *vnet.Vnet, index uint) {
 	v.AddBufferPool(p)
 }
 
-func (n *node) DriverName() string { return "packet-generator" }
+func (n *node) DriverName() string                               { return "packet-generator" }
+func (n *node) ConfigureHwIf(in *cli.Input) (ok bool, err error) { return }
 
 func (n *node) free_buffer_type(t *buffer_type) {
 	if l := t.free_refs.Len(); l > 0 {

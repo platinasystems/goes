@@ -446,8 +446,9 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		n := &d.e
 		q := n.sequence
 		n.log(d, event_elog_wait)
-		n.ft.waitNode()
-		if n.activeCount == 0 || n.s.isSuspended() {
+		nodeEventDone := n.ft.waitNode()
+		// Inactivate nodes which have no more queued events or are suspended.
+		if !nodeEventDone || n.activeCount == 0 {
 			m.inactiveNodes = append(m.inactiveNodes, d)
 		}
 		n.logi(d, event_elog_wait_done, q)
@@ -496,6 +497,9 @@ func (t eventNodeState) String() (s string) {
 	}
 	if t&2 != 0 {
 		s += "resumed"
+	}
+	if s == "" {
+		s = "active"
 	}
 	return
 }
