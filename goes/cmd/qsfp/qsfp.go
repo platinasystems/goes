@@ -170,6 +170,14 @@ func (c *Command) updatePresence() error {
 									portConfig += "copper "
 								}
 							}
+							if speed == "100g" {
+								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".fec", "cl91")
+								if err != nil || ret != 1 {
+									log.Print("qsfp hset error:", err, " ", ret)
+								} else {
+									portConfig += "cl91 "
+								}
+							}
 						} else if strings.Contains(v, "40G") {
 							portIsCopper[i+j*16] = false
 							if media != "fiber" {
