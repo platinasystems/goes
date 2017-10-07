@@ -29,7 +29,7 @@ DESCRIPTION
 	MAXLEN        = 4096
 	MAXMSG        = 50000
 	MAXSIZE int64 = 512 * 1024 * 1024
-	MMCDIR        = "/tmp" //FIXME /mnt once mount is working
+	MMCDIR        = "/mnt"
 )
 
 type FileInfo struct {

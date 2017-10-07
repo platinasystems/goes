@@ -30,6 +30,19 @@ func initLogging(c *Info) error {
 	c.logB = MMCDIR + "/" + LOGB
 	c.seq_end = 0
 
+	if _, err := os.Stat(MMCDIR); os.IsNotExist(err) {
+		err := os.Mkdir(MMCDIR, 0755)
+		if err != nil {
+			return fmt.Errorf("mkdir %s: %s", MMCDIR, err)
+		}
+	}
+
+	//mount /dev/mmcblk0p1 /mnt
+	err := syscall.Mount("/dev/mmcblk0p1", "/mnt", "ext4", uintptr(0), "")
+	if err != nil {
+		return err
+	}
+
 	exists, err := detectMMC()
 	if err != nil {
 		return err
