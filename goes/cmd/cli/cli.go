@@ -401,6 +401,9 @@ commandLoop:
 				fmt.Println("+", strings.Join(sl, " "))
 			}
 			x := c.g.Fork(sl...)
+			if x == nil {
+				continue
+			}
 			x.Stderr = os.Stderr
 			if i == 0 {
 				x.Stdin = in
@@ -422,12 +425,14 @@ commandLoop:
 			}
 			if i == end {
 				err = x.Wait()
+				c.g.Status = err
 			} else {
 				go func(x *exec.Cmd) {
 					err := x.Wait()
 					if err != nil {
 						fmt.Fprintln(os.Stderr, err)
 					}
+					c.g.Status = err
 					if x.Stdout != os.Stdout {
 						m, found := x.Stdout.(io.Closer)
 						if found {

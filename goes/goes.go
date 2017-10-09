@@ -33,12 +33,13 @@ const (
 	goes COMMAND [ ARGS ]...
 	goes COMMAND -[-]HELPER [ ARGS ]...
 	goes HELPER [ COMMAND ] [ ARGS ]...
-	goes [ -x ] [[ -f ][ - | SCRIPT ]]
+	goes [ -d ] [ -x ] [[ -f ][ - | SCRIPT ]]
 
 	HELPER := { apropos | complete | help | man | usage }
 	`
 	MAN = `
 OPTIONS
+	-d	debug block handling
 	-x	print command trace
 	-f	don't terminate script on error
 	-	execute standard input script
@@ -47,6 +48,29 @@ OPTIONS
 SEE ALSO
 	goes apropos [COMMAND], goes man COMMAND`
 )
+
+var blockNames = [...]string{
+	"BlockIf",
+	"BlockIfNotTaken",
+	"BlockIfThenNotTaken",
+	"BlockIfThenTaken",
+	"BlockIfElseNotTaken",
+	"BlockIfElseTaken"}
+
+type block int
+
+const (
+	BlockIf = iota
+	BlockIfNotTaken
+	BlockIfThenNotTaken
+	BlockIfThenTaken
+	BlockIfElseNotTaken
+	BlockIfElseTaken
+)
+
+func (b block) String() string {
+	return blockNames[b]
+}
 
 type Goes struct {
 	name, usage  string
@@ -59,6 +83,11 @@ type Goes struct {
 	Path   []string
 
 	Catline func(string) (string, error)
+
+	Blocks []block
+
+	Status error
+	debug  bool
 }
 
 type akaer interface {
@@ -75,6 +104,16 @@ type goeser interface {
 
 type helper interface {
 	Help(...string) string
+}
+
+func (g *Goes) NotTaken() bool {
+	if len(g.Blocks) != 0 &&
+		(g.Blocks[len(g.Blocks)-1] == BlockIfNotTaken ||
+			g.Blocks[len(g.Blocks)-1] == BlockIfThenNotTaken ||
+			g.Blocks[len(g.Blocks)-1] == BlockIfElseNotTaken) {
+		return true
+	}
+	return false
 }
 
 func New(name, usage string, apropos, man lang.Alt) *Goes {
@@ -142,6 +181,13 @@ func (g *Goes) Complete(args ...string) (ss []string) {
 // Fork returns an exec.Cmd ready to Run or Output this program with the
 // given args.
 func (g *Goes) Fork(args ...string) *exec.Cmd {
+	if g.debug {
+		fmt.Printf("F*$=%v %v %v\n", g.Status, g.Blocks, args)
+	}
+	if g.NotTaken() {
+		return nil
+	}
+
 	if g.Parent != nil && len(g.Path) == 0 {
 		// set Path of sub-goes. e.g. "ip address"
 		for p := g; p != nil; p = p.Parent {
@@ -205,7 +251,10 @@ func (g *Goes) Main(args ...string) error {
 	}
 
 	cli := g.byname["cli"]
-	cliFlags, cliArgs := flags.New(args, "-f", "-no-liner", "-x")
+	cliFlags, cliArgs := flags.New(args, "-d", "-f", "-no-liner", "-x")
+	if cliFlags.ByName["-d"] {
+		g.debug = true
+	}
 	if n := len(cliArgs); n == 0 {
 		if cli != nil {
 			if cliFlags.ByName["-no-liner"] {
@@ -214,11 +263,16 @@ func (g *Goes) Main(args ...string) error {
 			if cliFlags.ByName["-x"] {
 				cliArgs = append(cliArgs, "-x")
 			}
-			return cli.Main(cliArgs...)
+			err := cli.Main(cliArgs...)
+			g.Status = err
+			return err
 		} else if def, found := g.byname[""]; found {
-			return def.Main()
+			err := def.Main()
+			g.Status = err
+			return err
 		}
 		fmt.Println(Usage(g))
+		g.Status = nil
 		return nil
 	} else if _, found := g.byname[args[0]]; n == 1 && !found {
 		// only check for script if args[0] isn't a command
@@ -227,36 +281,52 @@ func (g *Goes) Main(args ...string) error {
 			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes"))) {
 			// e.g. /usr/bin/goes SCRIPT
 			if cli == nil {
-				return fmt.Errorf("has no cli")
+				err := fmt.Errorf("has no cli")
+				g.Status = err
+				return err
 			}
 			for _, t := range []string{"-f", "-x"} {
 				if cliFlags.ByName[t] {
 					cliArgs = append(cliArgs, t)
 				}
 			}
-			return cli.Main(cliArgs...)
+			err := cli.Main(cliArgs...)
+			g.Status = err
+			return err
 		}
 	} else {
 		cmd.Swap(args)
 	}
 
 	if _, found := cmd.Helpers[args[0]]; found {
-		return g.byname[args[0]].Main(args[1:]...)
+		err := g.byname[args[0]].Main(args[1:]...)
+		g.Status = err
+		return err
 	}
 
 	g.Shift(args)
 
+	if g.debug {
+		fmt.Printf("$=%v %v %v\n", g.Status, g.Blocks, args)
+	}
+
 	v, found := g.byname[args[0]]
 	if !found {
 		if v, found = g.byname[""]; !found {
-			return fmt.Errorf("%s: ambiguous or missing command",
+			err := fmt.Errorf("%s: ambiguous or missing command",
 				args[0])
+			g.Status = err
+			return err
 		}
 		// e.g. ip -s add [default "show"]
 		args = append([]string{""}, args...)
 	}
 
 	k := cmd.WhatKind(v)
+	if !k.IsConditional() && g.NotTaken() {
+		return nil
+	}
+
 	if k.IsDaemon() {
 		sig := make(chan os.Signal)
 		signal.Notify(sig, syscall.SIGTERM)
@@ -279,6 +349,7 @@ func (g *Goes) Main(args ...string) error {
 		}
 		err = fmt.Errorf("%s: %v", name, err)
 	}
+	g.Status = err
 	return err
 }
 

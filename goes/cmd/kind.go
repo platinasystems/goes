@@ -9,6 +9,7 @@ const (
 	Daemon
 	Hidden
 	CantPipe
+	Conditional
 )
 
 func WhatKind(v Cmd) Kind {
@@ -29,6 +30,7 @@ func (k Kind) IsDaemon() bool      { return (k & Daemon) == Daemon }
 func (k Kind) IsHidden() bool      { return (k & Hidden) == Hidden }
 func (k Kind) IsInteractive() bool { return (k & (Daemon | Hidden)) == 0 }
 func (k Kind) IsCantPipe() bool    { return (k & CantPipe) == CantPipe }
+func (k Kind) IsConditional() bool { return (k & Conditional) == Conditional }
 
 func (k Kind) String() string {
 	s := "unknown"
@@ -39,6 +41,8 @@ func (k Kind) String() string {
 		s = "daemon"
 	case Hidden:
 		s = "hidden"
+	case Conditional:
+		s = "conditional"
 	}
 	return s
 }

@@ -18,12 +18,14 @@ import (
 	"github.com/platinasystems/go/goes/cmd/dmesg"
 	"github.com/platinasystems/go/goes/cmd/echo"
 	"github.com/platinasystems/go/goes/cmd/eeprom"
+	"github.com/platinasystems/go/goes/cmd/elsecmd"
 	"github.com/platinasystems/go/goes/cmd/env"
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
 	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
+	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
@@ -36,6 +38,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/hwait"
 	"github.com/platinasystems/go/goes/cmd/i2c"
 	"github.com/platinasystems/go/goes/cmd/i2cd"
+	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
 	"github.com/platinasystems/go/goes/cmd/install"
@@ -74,6 +77,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/tempd"
+	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
@@ -108,12 +112,14 @@ func Goes() *goes.Goes {
 		dmesg.New(),
 		echo.New(),
 		eeprom.New(),
+		elsecmd.New(),
 		env.New(),
 		exec.New(),
 		exit.New(),
 		export.New(),
 		falsecmd.New(),
 		femtocom.New(),
+		ficmd.New(),
 		gpio.New(),
 		hdel.New(),
 		hdelta.New(),
@@ -125,6 +131,7 @@ func Goes() *goes.Goes {
 		hwait.New(),
 		i2c.New(),
 		i2cd.New(),
+		ifcmd.New(),
 		iminfo.New(),
 		insmod.New(),
 		install.New(),
@@ -165,6 +172,7 @@ func Goes() *goes.Goes {
 		sync.New(),
 		tempd.New(),
 		toggle.New(),
+		thencmd.New(),
 		truecmd.New(),
 		umount.New(),
 		uninstall.New(),

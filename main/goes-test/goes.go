@@ -17,12 +17,14 @@ import (
 	"github.com/platinasystems/go/goes/cmd/daemons"
 	"github.com/platinasystems/go/goes/cmd/dmesg"
 	"github.com/platinasystems/go/goes/cmd/echo"
+	"github.com/platinasystems/go/goes/cmd/elsecmd"
 	"github.com/platinasystems/go/goes/cmd/env"
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
 	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
+	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
 	"github.com/platinasystems/go/goes/cmd/helpers"
@@ -31,6 +33,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/hgetall"
 	"github.com/platinasystems/go/goes/cmd/hkeys"
 	"github.com/platinasystems/go/goes/cmd/hset"
+	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
 	"github.com/platinasystems/go/goes/cmd/install"
@@ -72,6 +75,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/test/panicd"
 	"github.com/platinasystems/go/goes/cmd/test/sleeper"
 	"github.com/platinasystems/go/goes/cmd/test/stringd"
+	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
@@ -103,12 +107,14 @@ func Goes() *goes.Goes {
 		daemons.New(),
 		dmesg.New(),
 		echo.New(),
+		elsecmd.New(),
 		env.New(),
 		exec.New(),
 		exit.New(),
 		export.New(),
 		falsecmd.New(),
 		femtocom.New(),
+		ficmd.New(),
 		gohellod.New(),
 		gopanic.New(),
 		gopanicd.New(),
@@ -120,6 +126,7 @@ func Goes() *goes.Goes {
 		hgetall.New(),
 		hkeys.New(),
 		hset.New(),
+		ifcmd.New(),
 		iminfo.New(),
 		insmod.New(),
 		install.New(),
@@ -160,6 +167,7 @@ func Goes() *goes.Goes {
 		stty.New(),
 		subscribe.New(),
 		sync.New(),
+		thencmd.New(),
 		truecmd.New(),
 		umount.New(),
 		uninstall.New(),

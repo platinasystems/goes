@@ -18,6 +18,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/dmesg"
 	"github.com/platinasystems/go/goes/cmd/echo"
 	"github.com/platinasystems/go/goes/cmd/eeprom"
+	"github.com/platinasystems/go/goes/cmd/elsecmd"
 	"github.com/platinasystems/go/goes/cmd/env"
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
@@ -26,6 +27,7 @@ import (
 	//"github.com/platinasystems/go/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	//"github.com/platinasystems/go/goes/cmd/fspd"
+	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
@@ -37,6 +39,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/hset"
 	"github.com/platinasystems/go/goes/cmd/i2c"
 	"github.com/platinasystems/go/goes/cmd/i2cd"
+	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/imx6d"
 	"github.com/platinasystems/go/goes/cmd/insmod"
@@ -80,6 +83,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/telnetd"
+	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
@@ -115,6 +119,7 @@ func Goes() *goes.Goes {
 		dmesg.New(),
 		echo.New(),
 		eeprom.New(),
+		elsecmd.New(),
 		env.New(),
 		exec.New(),
 		exit.New(),
@@ -123,6 +128,7 @@ func Goes() *goes.Goes {
 		//fantrayd.New(),
 		femtocom.New(),
 		//fspd.New(),
+		ficmd.New(),
 		gpio.New(),
 		hdel.New(),
 		hdelta.New(),
@@ -133,6 +139,7 @@ func Goes() *goes.Goes {
 		hset.New(),
 		i2c.New(),
 		i2cd.New(),
+		ifcmd.New(),
 		iminfo.New(),
 		imx6d.New(),
 		insmod.New(),
@@ -179,6 +186,8 @@ func Goes() *goes.Goes {
 		//toggle.New(),
 		truecmd.New(),
 		//ucd9090d.New(),
+		thencmd.New(),
+		truecmd.New(),
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),
