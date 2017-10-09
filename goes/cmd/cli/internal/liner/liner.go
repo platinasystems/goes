@@ -133,10 +133,12 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 		return "", fmt.Errorf("TCSETS: %v", errno)
 	}
 
+	status := l.goes.Status
 	err := l.goes.Main("resize")
 	if err != nil {
 		return "", err
 	}
+	l.goes.Status = status
 
 	state := liner.NewLiner()
 	state.SetCompleter(l.complete)
