@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
+	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
@@ -71,6 +72,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/test/panicd"
 	"github.com/platinasystems/go/goes/cmd/test/sleeper"
 	"github.com/platinasystems/go/goes/cmd/test/stringd"
+	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
@@ -105,6 +107,7 @@ func Goes() *goes.Goes {
 		exec.New(),
 		exit.New(),
 		export.New(),
+		falsecmd.New(),
 		femtocom.New(),
 		gohellod.New(),
 		gopanic.New(),
@@ -157,6 +160,7 @@ func Goes() *goes.Goes {
 		stty.New(),
 		subscribe.New(),
 		sync.New(),
+		truecmd.New(),
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),

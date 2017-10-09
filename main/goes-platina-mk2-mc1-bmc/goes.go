@@ -22,6 +22,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
+	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	"github.com/platinasystems/go/goes/cmd/fspd"
@@ -77,6 +78,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/telnetd"
+	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
@@ -115,6 +117,7 @@ func Goes() *goes.Goes {
 		exec.New(),
 		exit.New(),
 		export.New(),
+		falsecmd.New(),
 		fantrayd.New(),
 		femtocom.New(),
 		fspd.New(),
@@ -170,6 +173,7 @@ func Goes() *goes.Goes {
 		sync.New(),
 		telnetd.New(),
 		toggle.New(),
+		truecmd.New(),
 		ucd9090d.New(),
 		umount.New(),
 		uninstall.New(),

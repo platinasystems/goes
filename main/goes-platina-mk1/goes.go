@@ -22,6 +22,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
+	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
@@ -72,6 +73,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/stty"
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
+	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
@@ -109,6 +111,7 @@ func Goes() *goes.Goes {
 		exec.New(),
 		exit.New(),
 		export.New(),
+		falsecmd.New(),
 		femtocom.New(),
 		gpio.New(),
 		hdel.New(),
@@ -160,6 +163,7 @@ func Goes() *goes.Goes {
 		subscribe.New(),
 		sync.New(),
 		toggle.New(),
+		truecmd.New(),
 		umount.New(),
 		uninstall.New(),
 		upgrade.New(),
