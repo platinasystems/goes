@@ -180,6 +180,7 @@ func (c *Command) updatePresence() error {
 							}
 						} else if strings.Contains(v, "40G") {
 							portIsCopper[i+j*16] = false
+							Vdev[i+j*16].TxDisableSet(false, lp)
 							if media != "fiber" {
 								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
 								if err != nil || ret != 1 {
@@ -198,6 +199,7 @@ func (c *Command) updatePresence() error {
 							}
 						} else {
 							portIsCopper[i+j*16] = false
+							Vdev[i+j*16].TxDisableSet(false, lp)
 							if media != "fiber" {
 								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
 								if err != nil || ret != 1 {
@@ -366,6 +368,12 @@ func (c *Command) updatePresence() error {
 								c.pub.Print(k, ": ", v)
 								c.lasts[k] = v
 							}
+							v = Vdev[i+j*16].TxDisableGet()
+							k = "port-" + strconv.Itoa(lp) + ".qsfp.txDisable"
+							if v != c.lasts[k] {
+								c.pub.Print(k, ": ", v)
+								c.lasts[k] = v
+							}
 						}
 						log.Print("QSFP detected in port ", lp, ": ", typeString)
 						if portConfig != "" {
@@ -479,6 +487,7 @@ func (c *Command) updateMonitor() error {
 
 	return nil
 }
+
 func (h *I2cDev) DataReady() bool {
 	var t bool
 	r := getRegsLpage0()
@@ -495,6 +504,7 @@ func (h *I2cDev) DataReady() bool {
 
 	return t
 }
+
 func (h *I2cDev) Compliance() string {
 	r := getRegsUpage0()
 
@@ -515,6 +525,68 @@ func (h *I2cDev) Compliance() string {
 		t = extSpecComplianceValues[ecp]
 	}
 	return t
+}
+
+func (h *I2cDev) TxDisableSet(t bool, p int) {
+	var b, e bool
+
+	r := getRegsLpage0()
+	r.txDisable.get(h)
+	closeMux(h)
+	DoI2cRpc()
+	d := s[2].D[0]
+
+	if d == 0x0 {
+		b = false
+	} else {
+		b = true
+	}
+
+	if t {
+		r.txDisable.set(h, 0xf)
+		closeMux(h)
+		DoI2cRpc()
+	} else {
+		r.txDisable.set(h, 0x0)
+		closeMux(h)
+		DoI2cRpc()
+	}
+
+	r.txDisable.get(h)
+	closeMux(h)
+	DoI2cRpc()
+	d = s[2].D[0]
+
+	if d == 0x0 {
+		e = false
+	} else {
+		e = true
+	}
+
+	if e == t {
+		log.Print("Port ", strconv.Itoa(p), " Tx Disable set to ", t, ". Previous value = ", b)
+	} else {
+		log.Print("Warning: Port ", strconv.Itoa(p), "cannot set Tx Disable to ", t, ". Current vlaue = ", e)
+	}
+	return
+}
+
+func (h *I2cDev) TxDisableGet() string {
+	r := getRegsLpage0()
+	var v string
+
+	r.txDisable.get(h)
+	closeMux(h)
+	DoI2cRpc()
+	d := s[2].D[0]
+
+	if d == 0 {
+		v = "false"
+	} else {
+		v = "true"
+	}
+
+	return v
 }
 
 func (h *I2cDev) Vendor() string {

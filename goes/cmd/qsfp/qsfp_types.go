@@ -90,4 +90,5 @@ var redisFields = []string{
 	"qsfp.vcc.lowAlarmThreshold.units.V",
 	"qsfp.vcc.lowWarnThreshold.units.V",
 	"qsfp.vendor",
+	"qsfp.txDisable",
 }
