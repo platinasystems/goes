@@ -10,14 +10,14 @@ type QsfpSignal uint8
 
 const (
 	QsfpLowPowerMode QsfpSignal = iota
-	QsfpInterruptL
-	QsfpModulePresentL
-	QsfpModuleSelectL
-	QsfpResetL
+	QsfpInterruptStatus
+	QsfpModuleIsPresent
+	QsfpModuleSelected
+	QsfpResetIsActive
 	QsfpNSignal
 )
 
-type reg8 byte
+type reg8 uint8
 type reg16 [2]reg8
 type regi16 reg16
 
@@ -52,7 +52,7 @@ type monitorInterruptRegs struct {
 // Everything in network byte order.
 // Bytes 0-85 are read only; 86-128 are read/write.
 type qsfpRegs struct {
-	id SfpId
+	id Id
 
 	// [0] Data not ready.  Indicates transceiver has not yet achieved power up and monitor data is
 	// not ready.  Bit remains high until data is ready to be read at which time the device sets the bit low.
@@ -115,32 +115,43 @@ type qsfpRegs struct {
 
 // Upper memory map (page select 0)
 // Read only.
-type SfpRegs struct {
-	Id                           SfpId
-	ExtendedId                   byte
-	ConnectorType                SfpConnectorType
-	Compatibility                [8]byte
-	Encoding                     byte
-	NominalBitRate100MbitsPerSec byte
-	_                            byte
-	LinkLength                   [5]byte
-	_                            byte
-	VendorName                   [16]byte
-	_                            byte
-	VendorOui                    [3]byte
-	VendorPartNumber             [16]byte
-	VendorRevision               [4]byte
-	LaserWavelengthInNm          [2]byte
-	_                            byte
-	checksum_0_to_62             byte
-	Options                      [2]byte
-	MaxBitRateMarginPercent      byte
-	MinBitRateMarginPercent      byte
-	VendorSerialNumber           [16]byte
-	VendorDateCode               [8]byte
-	_                            [3]byte
-	checksum_63_to_94            byte
-	VendorSpecific               [32]byte
+type Eeprom struct {
+	Id            Id
+	ExtendedId    reg8
+	ConnectorType ConnectorType
+
+	// Byte 131 Compatibility[0] SfpCompliance
+	//   [0] 40G active cable xlppi
+	//   [1] 40GBASE-LR4
+	//   [2] 40GBASE-SR4
+	//   [3] 40GBASE-CR4
+	//   [4] 10GBASE-SR
+	//   [5] 10GBASE-LR
+	//   [6] 10GBASE-LRM
+	//   [7] Extended (Options[0] becomes SfpExtendedCompliance)
+	Compatibility [8]reg8
+
+	Encoding                     reg8
+	NominalBitRate100MbitsPerSec reg8
+	_                            reg8
+	LinkLength                   [5]reg8
+	_                            reg8
+	VendorName                   [16]reg8
+	_                            reg8
+	VendorOui                    [3]reg8
+	VendorPartNumber             [16]reg8
+	VendorRevision               [4]reg8
+	LaserWavelengthInNm          [2]reg8
+	_                            reg8
+	checksum_0_to_62             reg8
+	Options                      [2]reg8
+	MaxBitRateMarginPercent      reg8
+	MinBitRateMarginPercent      reg8
+	VendorSerialNumber           [16]reg8
+	VendorDateCode               [8]reg8
+	_                            [3]reg8
+	checksum_63_to_94            reg8
+	VendorSpecific               [32]reg8
 }
 
 type qsfpHighLow struct{ hi, lo reg16 }
@@ -149,16 +160,16 @@ type qsfpThreshold struct{ alarm, warning struct{ hi, lo reg16 } }
 // Upper memory map (page select 3)
 type qsfpThresholdRegs struct {
 	temperature   qsfpThreshold
-	_             [8]byte
+	_             [8]reg8
 	supplyVoltage qsfpThreshold
-	_             [176 - 152]byte
+	_             [176 - 152]reg8
 	rxPower       qsfpThreshold
 	txBiasCurrent qsfpThreshold
-	_             [226 - 192]byte
+	_             [226 - 192]reg8
 
 	// Bytes 226-255 are read/write.
-	vendorChannelControls     [14]byte
-	optionalChannelControlls  [2]byte
-	thresholdInterruptDisable [4]byte
-	_                         [256 - 246]byte
+	vendorChannelControls     [14]reg8
+	optionalChannelControlls  [2]reg8
+	thresholdInterruptDisable [4]reg8
+	_                         [256 - 246]reg8
 }
