@@ -228,7 +228,7 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	pl := pizza.New("|")
-	catline := func(prompt string) (string, error) {
+	c.g.Catline = func(prompt string) (string, error) {
 		var line string
 		for {
 			s, err := prompter.Prompt(prompt)
@@ -272,7 +272,7 @@ commandLoop:
 	pipelineLoop:
 		for {
 			var s string
-			s, err = catline(prompt)
+			s, err = c.g.Catline(prompt)
 			if err != nil {
 				continue commandLoop
 			}
@@ -349,7 +349,7 @@ commandLoop:
 				defer w.Close()
 				prompt := "<<" + fn + " "
 				for {
-					s, err := catline(prompt)
+					s, err := c.g.Catline(prompt)
 					if err != nil || s == lbl {
 						break
 					}

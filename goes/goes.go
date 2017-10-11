@@ -57,6 +57,8 @@ type Goes struct {
 
 	Parent *Goes
 	Path   []string
+
+	Catline func(string) (string, error)
 }
 
 type akaer interface {
