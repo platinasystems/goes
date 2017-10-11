@@ -119,6 +119,10 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 		}
 	}
 
+	if false {
+		qsfpInit(v, p)
+	}
+
 	fe1_plugin.Init(v, p)
 	fe1_plugin.AddPlatform(v, p)
 
@@ -143,15 +147,7 @@ type pca9535_main struct {
 }
 
 func (m *pca9535_main) do(f func(bus *i2c.Bus) error) (err error) {
-	var bus i2c.Bus
-	if err = bus.Open(m.bus_index); err != nil {
-		return
-	}
-	defer bus.Close()
-	if err = bus.ForceSlaveAddress(m.bus_address); err != nil {
-		return
-	}
-	return f(&bus)
+	return i2c.Do(m.bus_index, m.bus_address, f)
 }
 
 const (

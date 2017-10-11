@@ -5,6 +5,7 @@
 package fe1
 
 import (
+	"github.com/platinasystems/go/vnet/devices/optics/sfp"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
@@ -19,12 +20,17 @@ type PlatformConfig struct {
 	UseCpuForPuntAndInject bool
 }
 
+type SwitchPort struct {
+	Switch, Port uint8
+}
+
 // Platform configuration for FE1 based systems.
 type Platform struct {
 	Version             uint
 	BaseEthernetAddress ethernet.Address
 	NEthernetAddress    uint
 	Init                func()
+	QsfpModules         map[SwitchPort]*sfp.QsfpModule
 	PlatformConfig
 }
 
