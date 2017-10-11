@@ -14,9 +14,11 @@ fe1a_dir := $(shell go list -e -f {{.Dir}} $(fe1a_pkg))
 fe1a_gen := $(if $(fe1a_dir),$(fe1a_dir)/package.go)
 
 ALL := goes-example
+ALL += goes-example.test
 ALL += goes-example-arm
 ALL += goes-test
 ALL += goes-coreboot
+ALL += goes-platina-mk1.test
 ALL += goes-platina-mk1-bmc
 ALL += goes-platina-mk2-mc1-bmc
 ALL += goes-platina-mk2-lc1-bmc
@@ -40,11 +42,20 @@ gobuild = $(if $(arch),env GOARCH=$(arch) )go build$(if $(tags),\
 -ldflags "$(ldflags)")$(if $(V),\
 -v)
 
+gotest = $(if $(arch),env GOARCH=$(arch) )go test$(if $(tags),\
+-tags "$(tags)")$(if $(gcflags),\
+-gcflags "$(gcflags)")$(if $(ldflags),\
+-ldflags "$(ldflags)")$(if $(V),\
+-x)
+
 .PHONY: all
 all: $(ALL)
 
 goes-example: | package.go
 	$(gobuild) ./main/$@
+
+goes-example.test:
+	$(gotest) -c ./main/$(basename $@)
 
 goes-example-arm: arch=arm
 goes-example-arm: tags=netgo
@@ -79,6 +90,11 @@ goes-platina-mk1: gcflags=$(if $(VNET_DEBUG_yes),-N -l)
 goes-platina-mk1: tags=vfio$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
 goes-platina-mk1: | $(if $(noplugin_yes),$(fe1_gen) $(fe1a_gen)) package.go
 	$(gobuild) ./main/$@
+
+goes-platina-mk1.test: gcflags=$(if $(VNET_DEBUG_yes),-N -l)
+goes-platina-mk1.test: tags=vfio$(noplugin_tag)$(VNET_DEBUG_tag)$(diag_tag)
+goes-platina-mk1.test:
+	$(gotest) -c ./main/$(basename $@)
 
 goes-platina-mk1.zip: $(if $(noplugin_yes),,fe1.so) goes-platina-mk1
 	@rm -f $@
