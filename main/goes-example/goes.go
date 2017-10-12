@@ -30,6 +30,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/hgetall"
 	"github.com/platinasystems/go/goes/cmd/hkeys"
 	"github.com/platinasystems/go/goes/cmd/hset"
+	"github.com/platinasystems/go/goes/cmd/hwait"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
 	"github.com/platinasystems/go/goes/cmd/install"
@@ -105,6 +106,7 @@ func Goes() *goes.Goes {
 		hgetall.New(),
 		hkeys.New(),
 		hset.New(),
+		hwait.New(),
 		iminfo.New(),
 		insmod.New(),
 		install.New(),

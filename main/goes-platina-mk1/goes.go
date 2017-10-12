@@ -32,6 +32,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/hgetall"
 	"github.com/platinasystems/go/goes/cmd/hkeys"
 	"github.com/platinasystems/go/goes/cmd/hset"
+	"github.com/platinasystems/go/goes/cmd/hwait"
 	"github.com/platinasystems/go/goes/cmd/i2c"
 	"github.com/platinasystems/go/goes/cmd/i2cd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
@@ -117,6 +118,7 @@ func Goes() *goes.Goes {
 		hgetall.New(),
 		hkeys.New(),
 		hset.New(),
+		hwait.New(),
 		i2c.New(),
 		i2cd.New(),
 		iminfo.New(),
