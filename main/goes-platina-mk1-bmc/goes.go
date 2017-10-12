@@ -53,6 +53,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ethd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/mmclogd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
@@ -173,6 +174,7 @@ func Goes() *goes.Goes {
 		telnetd.New(),
 		toggle.New(),
 		ucd9090d.New(),
+		ethd.New(),
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),
