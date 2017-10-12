@@ -1,0 +1,77 @@
+---
+
+- hosts: spine:leaf
+  become: yes
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+
+  tasks:
+    - file:
+        path: "{{ tmp_file_path }}"
+        state: touch
+      delegate_to: 127.0.0.1
+      changed_when: False
+
+    - name: Test hget/hset operations with valid values on redis db locally
+      test_redis_valid:
+        switch_name: "{{ inventory_hostname }}"
+      register: valid_out
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ valid_out.hash_name }}"
+        start_time: "{{ valid_out.start_time }}"
+        end_time: "{{ valid_out.end_time }}"
+        hash_dict: "{{ valid_out.hash_dict }}"
+        test_result: "{{ valid_out.test_result }}"
+      delegate_to: 127.0.0.1
+
+    - lineinfile:
+        path: "{{ tmp_file_path }}"
+        line: "{{ valid_out.hash_name }}"
+      when: valid_out.test_result == 'Failed'
+      delegate_to: 127.0.0.1
+
+    - name: Test hget/hset operations with valid values on redis db remotely
+      test_redis_valid:
+        switch_name: "{{ inventory_hostname }}"
+        switch_ip: "{{ ansible_ssh_host }}"
+        remote_access: true
+      delegate_to: 127.0.0.1
+      register: valid_out_remote
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ valid_out_remote.hash_name }}"
+        start_time: "{{ valid_out_remote.start_time }}"
+        end_time: "{{ valid_out_remote.end_time }}"
+        hash_dict: "{{ valid_out_remote.hash_dict }}"
+        test_result: "{{ valid_out_remote.test_result }}"
+      delegate_to: 127.0.0.1
+
+    - lineinfile:
+        path: "{{ tmp_file_path }}"
+        line: "{{ valid_out_remote.hash_name }}"
+      when: valid_out_remote.test_result == 'Failed'
+      delegate_to: 127.0.0.1
+
+
+- hosts: server_emulator
+  become: yes
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+
+  tasks:
+    - name: Report test suite result
+      test_suite_result:
+        result_data: "{{ lookup('file', '{{ tmp_file_path }}') }}"
+      register: status
+
+    - debug: var=status
+
+    - file:
+        path: "{{ tmp_file_path }}"
+        state: absent
+      changed_when: False

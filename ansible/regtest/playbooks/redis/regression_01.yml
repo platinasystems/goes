@@ -1,0 +1,55 @@
+---
+
+- hosts: spine:leaf
+  become: yes
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+
+  tasks:
+    - file:
+        path: "{{ tmp_file_path }}"
+        state: touch
+      delegate_to: 127.0.0.1
+      changed_when: False
+
+    - name: Test hget operations on BMC processors redis db
+      test_bmc_redis:
+        switch_name: "{{ inventory_hostname }}"
+        bmc_redis_ip: "{{ bmc_redis_ip }}"
+      register: bmc_out
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ bmc_out.hash_name }}"
+        start_time: "{{ bmc_out.start_time }}"
+        end_time: "{{ bmc_out.end_time }}"
+        hash_dict: "{{ bmc_out.hash_dict }}"
+        test_result: "{{ bmc_out.test_result }}"
+      delegate_to: 127.0.0.1
+
+    - lineinfile:
+        path: "{{ tmp_file_path }}"
+        line: "{{ bmc_out.hash_name }}"
+      when: bmc_out.test_result == 'Failed'
+      delegate_to: 127.0.0.1
+
+
+- hosts: server_emulator
+  become: yes
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+
+  tasks:
+    - name: Report test suite result
+      test_suite_result:
+        result_data: "{{ lookup('file', '{{ tmp_file_path }}') }}"
+      register: status
+
+    - debug: var=status
+
+    - file:
+        path: "{{ tmp_file_path }}"
+        state: absent
+      changed_when: False
