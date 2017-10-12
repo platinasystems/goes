@@ -26,6 +26,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	"github.com/platinasystems/go/goes/cmd/ficmd"
+	"github.com/platinasystems/go/goes/cmd/function"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
 	"github.com/platinasystems/go/goes/cmd/hexists"
@@ -99,6 +100,7 @@ var Goes = &goes.Goes{
 		"false":    falsecmd.Command{},
 		"femtocom": femtocom.Command{},
 		"fi":       &ficmd.Command{},
+		"function": &function.Command{},
 		"goes-daemons": &daemons.Command{
 			Init: [][]string{
 				[]string{"redisd"},

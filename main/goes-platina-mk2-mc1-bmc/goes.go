@@ -30,6 +30,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/falsecmd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	"github.com/platinasystems/go/goes/cmd/ficmd"
+	"github.com/platinasystems/go/goes/cmd/function"
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
@@ -129,6 +130,7 @@ var Goes = &goes.Goes{
 			Gpio: gpioInit,
 		},
 		*/
+		"function": &function.Command{},
 		"goes-daemons": &daemons.Command{
 			Init: [][]string{
 				//FIXME

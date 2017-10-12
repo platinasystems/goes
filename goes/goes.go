@@ -64,6 +64,14 @@ type Goes struct {
 	parent *Goes
 
 	EnvMap map[string]string
+
+	FunctionMap map[string]Function
+}
+
+type Function struct {
+	Name       string
+	Definition []string
+	RunFun     func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error
 }
 
 func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutils.Word, func(io.Reader, io.Writer, io.Writer) error, error) {
@@ -140,6 +148,11 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			return nil
 		}
 		name := args[0]
+		// check for function invocation
+		if f, x := g.FunctionMap[name]; x {
+			return f.RunFun(stdin, stdout, stderr, isFirst, isLast)
+		}
+		// check for built in command
 		if v := g.ByName[name]; v != nil {
 			k := cmd.WhatKind(v)
 			if k.IsDaemon() {
