@@ -6,3 +6,6 @@
 /goes-*
 /ip
 /*.zip
+*#*#
+*.rej
+*.orig
