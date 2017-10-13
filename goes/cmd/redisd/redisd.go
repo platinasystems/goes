@@ -48,7 +48,10 @@ OPTIONS
 	-set FIELD=VALUE
 		initialize the default hash with the given field values`
 
-	Log = varrun.Dir + "/log/redisd"
+	Log     = varrun.Dir + "/log/redisd"
+	Sock    = sockfile.Dir + "/redisd"
+	RegSock = sockfile.Dir + "/redis-reg"
+	PubSock = sockfile.Dir + "/redis-pub"
 )
 
 var (
@@ -87,6 +90,7 @@ func New() *Command { return new(Command) }
 type Command struct {
 	pubconn *net.UnixConn
 	redisd  Redisd
+	logf    *os.File
 }
 
 func (*Command) Apropos() lang.Alt { return apropos }
@@ -113,16 +117,30 @@ func (c *Command) Close() error {
 	if c.redisd.reg != nil {
 		c.redisd.reg.Srvr.Close()
 	}
-	c.pubconn.Close()
+	if c.pubconn != nil {
+		c.pubconn.Close()
+	}
+	if c.logf != nil {
+		c.logf.Close()
+	}
+	os.Remove(Log)
+	os.Remove(Sock)
+	os.Remove(RegSock)
+	os.Remove(PubSock)
 	return err
 }
 
-func (c *Command) Main(args ...string) error {
+func (c *Command) Main(args ...string) (err error) {
 	once.Do(Init)
+	defer func() {
+		if err != nil {
+			c.Close()
+		}
+	}()
 
 	parm, args := parms.New(args, "-port", "-set")
 	if s := parm.ByName["-port"]; len(s) > 0 {
-		_, err := fmt.Sscan(s, &Port)
+		_, err = fmt.Sscan(s, &Port)
 		if err != nil {
 			return err
 		}
@@ -130,8 +148,8 @@ func (c *Command) Main(args ...string) error {
 
 	if len(args) == 0 {
 		if len(Devs) == 0 {
-			itfs, err := net.Interfaces()
-			if err == nil {
+			itfs, ierr := net.Interfaces()
+			if ierr == nil {
 				args = make([]string, len(itfs))
 				for i, itf := range itfs {
 					args[i] = itf.Name
@@ -142,27 +160,23 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 
-	err := varrun.New(sockfile.Dir)
-	if err != nil {
-		return err
+	if err = varrun.New(sockfile.Dir); err != nil {
+		return
 	}
 
-	err = varrun.New(filepath.Dir(Log))
-	if err != nil {
-		return err
+	if err = varrun.New(filepath.Dir(Log)); err != nil {
+		return
 	}
 
-	logf, err := varrun.Create(Log)
+	c.logf, err = varrun.Create(Log)
 	if err != nil {
-		return err
+		return
 	}
-	defer os.Remove(Log)
-	defer logf.Close()
 
 	if false {
 		grs.Debugf = grs.ActualDebugf
 	} else {
-		grs.Stderr = logf
+		grs.Stderr = c.logf
 	}
 
 	c.redisd.devs = make(map[string][]*grs.Server)
@@ -174,32 +188,31 @@ func (c *Command) Main(args ...string) error {
 
 	b, err := info.Marshal()
 	if err != nil {
-		return err
+		return
 	}
 	c.redisd.published[redis.DefaultHash]["packages"] = b
 
-	sfn := sockfile.Path(Name)
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
-	cfg = cfg.Host(sfn)
+	cfg = cfg.Host(Sock)
 	cfg = cfg.Handler(&c.redisd)
 
 	srv, err := grs.NewServer(cfg)
 	if err != nil {
-		return err
+		return
 	}
-	err = sockfile.Chgroup(sfn, "adm")
+	err = sockfile.Chgroup(Sock, "adm")
 	if err != nil {
-		return err
+		return
 	}
 
 	c.redisd.reg, err =
 		reg.New("redis-reg", c.redisd.assign, c.redisd.unassign)
 	if err != nil {
-		return err
+		return
 	}
 
-	c.redisd.devs[sfn] = []*grs.Server{srv}
+	c.redisd.devs[Sock] = []*grs.Server{srv}
 
 	go func(redisd *Redisd, fn string, args ...string) {
 		adm := group.Parse()["adm"].Gid()
@@ -219,20 +232,19 @@ func (c *Command) Main(args ...string) error {
 			time.Sleep(100 * time.Millisecond)
 		}
 		redisd.listen(args...)
-	}(&c.redisd, sfn, args...)
+	}(&c.redisd, Sock, args...)
 
 	c.pubconn, err = sockfile.ListenUnixgram(publisher.FileName)
 	if err != nil {
-		return err
+		return
 	}
 	go c.gopub()
 
 	err = c.pubinit(fields.New(parm.ByName["-set"])...)
-	if err != nil {
-		return err
+	if err == nil {
+		err = srv.Start()
 	}
-
-	return srv.Start()
+	return
 }
 
 func (c *Command) gopub() {
