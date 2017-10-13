@@ -160,6 +160,7 @@ func (c *Command) updatePresence() error {
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
+						speed = strings.ToLower(speed)
 						if strings.Contains(v, "-CR") {
 							portIsCopper[i+j*16] = true
 							if media != "copper" {
