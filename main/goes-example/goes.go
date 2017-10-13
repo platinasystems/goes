@@ -68,12 +68,14 @@ import (
 	"github.com/platinasystems/go/goes/cmd/stty"
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
+	"github.com/platinasystems/go/goes/cmd/testcmd"
 	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
 	"github.com/platinasystems/go/goes/cmd/wget"
+
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -153,6 +155,7 @@ func Goes() *goes.Goes {
 		stty.New(),
 		subscribe.New(),
 		sync.New(),
+		testcmd.New(),
 		thencmd.New(),
 		truecmd.New(),
 		umount.New(),

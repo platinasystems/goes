@@ -83,6 +83,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/telnetd"
+	"github.com/platinasystems/go/goes/cmd/testcmd"
 	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
@@ -183,11 +184,11 @@ func Goes() *goes.Goes {
 		subscribe.New(),
 		sync.New(),
 		telnetd.New(),
-		truecmd.New(),
-		//toggle.New(),
-		//ucd9090d.New(),
+		testcmd.New(),
 		thencmd.New(),
 		truecmd.New(),
+		//toggle.New(),
+		//ucd9090.New(),
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),

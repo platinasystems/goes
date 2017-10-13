@@ -77,6 +77,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/tempd"
+	"github.com/platinasystems/go/goes/cmd/testcmd"
 	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
@@ -171,8 +172,9 @@ func Goes() *goes.Goes {
 		subscribe.New(),
 		sync.New(),
 		tempd.New(),
-		toggle.New(),
+		testcmd.New(),
 		thencmd.New(),
+		toggle.New(),
 		truecmd.New(),
 		umount.New(),
 		uninstall.New(),
