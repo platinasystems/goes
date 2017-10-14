@@ -50,7 +50,7 @@ var GdbWait bool
 var gdb_wait int
 
 // Machines may reassign this for platform sepecific init before vnet.Run.
-var Hook = func(*Info, *vnet.Vnet) error { return nil }
+var Hook = func(func(), *vnet.Vnet) error { return nil }
 
 // Machines may reassign this for platform sepecific cleanup after vnet.Quit.
 var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
@@ -106,7 +106,7 @@ func (c *Command) Main(...string) error {
 	c.i.v.RegisterHwIfLinkUpDownHook(c.i.hw_if_link_up_down)
 	c.i.v.RegisterSwIfAddDelHook(c.i.sw_if_add_del)
 	c.i.v.RegisterSwIfAdminUpDownHook(c.i.sw_if_admin_up_down)
-	if err = Hook(&c.i, &c.i.v); err != nil {
+	if err = Hook(c.i.init, &c.i.v); err != nil {
 		return err
 	}
 
@@ -142,7 +142,7 @@ func (c *Command) Close() (err error) {
 	return
 }
 
-func (i *Info) Init() {
+func (i *Info) init() {
 	i.poller.i = i
 	i.poller.addEvent(0)
 	i.poller.pollInterval = 5 // default 5 seconds

@@ -24,8 +24,8 @@ var defaultMk1 = &mk1Main{}
 
 func init() { vnetd.Hook = defaultMk1.vnetdHook }
 
-func (p *mk1Main) vnetdHook(i *vnetd.Info, v *vnet.Vnet) error {
-	p.Init = i.Init
+func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
+	p.Init = init
 
 	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	if err != nil {
