@@ -8,22 +8,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/platinasystems/go/internal/test"
-	. "github.com/platinasystems/go/main/goes-platina-mk1"
+	. "github.com/platinasystems/go/internal/test"
+	main "github.com/platinasystems/go/main/goes-platina-mk1"
 )
 
 func Test(t *testing.T) {
-	if test.Goes {
-		test.Exec(Goes().Main)
+	if Goes {
+		Exec(main.Goes().Main)
 	}
 	t.Run("VnetReady", VnetReady)
 }
 
 func VnetReady(t *testing.T) {
-	assert := test.Assert{t}
+	assert := Assert{t}
 	assert.YoureRoot()
-	defer assert.Background("goes", "redisd").Quit(10 * time.Second)
-	assert.Ok("goes", "hwait", "platina", "redis.ready", "true", "10")
-	defer assert.Gdb("goes", "vnetd").Quit(30 * time.Second)
-	assert.Ok("goes", "hwait", "platina", "vnet.ready", "true", "30")
+	defer assert.Program(nil,
+		"goes", "redisd",
+	).Quit(10 * time.Second)
+	assert.Program(nil,
+		"goes", "hwait", "platina", "redis.ready", "true", "10",
+	).Ok()
+	defer assert.Program(nil,
+		"goes", "vnetd",
+	).Gdb().Quit(30 * time.Second)
+	assert.Program(nil,
+		"goes", "hwait", "platina", "vnet.ready", "true", "30",
+	).Ok()
 }

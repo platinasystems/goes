@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/platinasystems/go/internal/test"
-	. "github.com/platinasystems/go/main/goes-example"
+	. "github.com/platinasystems/go/internal/test"
+	main "github.com/platinasystems/go/main/goes-example"
 )
 
 func Test(t *testing.T) {
-	if test.Goes {
-		test.Exec(Goes().Main)
+	if Goes {
+		Exec(main.Goes().Main)
 	}
 	t.Run("HelloWorld", HelloWorld)
 	t.Run("Pwd", Pwd)
@@ -22,18 +22,24 @@ func Test(t *testing.T) {
 }
 
 func HelloWorld(t *testing.T) {
-	test.Assert{t}.OutputEqual("hello world\n",
-		"goes", "echo", "hello", "world")
+	Assert{t}.Program(nil,
+		"goes", "echo", "hello", "world",
+	).Output(Equal("hello world\n"))
+
 }
 
 func Pwd(t *testing.T) {
-	test.Assert{t}.OutputMatch(".*/platinasystems/go\n",
-		"goes", "pwd")
+	Assert{t}.Program(nil,
+		"goes", "pwd",
+	).Output(Match(".*/platinasystems/go\n"))
+
 }
 
 func RedisReady(t *testing.T) {
-	assert := test.Assert{t}
+	assert := Assert{t}
 	assert.YoureRoot()
-	defer assert.Background("goes", "redisd").Quit(10 * time.Second)
-	assert.Ok("goes", "hwait", "platina", "redis.ready", "true", "10")
+	defer assert.Program(nil, "goes", "redisd").Quit(10 * time.Second)
+	assert.Program(nil,
+		"goes", "hwait", "platina", "redis.ready", "true", "10",
+	).Ok()
 }
