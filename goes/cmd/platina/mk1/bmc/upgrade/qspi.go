@@ -50,7 +50,7 @@ type FlashFmt struct {
 }
 
 var Qfmt = map[string]FlashFmt{}
-var img = []string{"ubo", "dtb", "env", "ker", "ini", "ver"}
+var img = []string{"ubo", "dtb", "env", "ker", "ini", "per", "ver"}
 
 var mi = &MTDinfo{0, 0, 0, 0, 0, 0, 0}
 var ei = &EraseInfo{0, 0}
@@ -64,6 +64,7 @@ func initQfmt() {
 	Qfmt["env"] = FlashFmt{off: 0x0c0000, siz: 0x040000}
 	Qfmt["ker"] = FlashFmt{off: 0x100000, siz: 0x200000}
 	Qfmt["ini"] = FlashFmt{off: 0x300000, siz: 0x300000}
+	Qfmt["per"] = FlashFmt{off: 0xf80000, siz: 0x040000}
 	Qfmt["ver"] = FlashFmt{off: 0xfc0000, siz: 0x040000}
 	return
 }
@@ -145,6 +146,42 @@ func writeImageVerify(im string, of uint32, sz uint32, vf bool) error {
 			}
 			fmt.Println("Verify passed:", im)
 		}
+	}
+	return nil
+}
+
+func writeArrayVerify(b []byte, of uint32, sz uint32, vf bool) (err error) {
+	if len(b) != int(sz) {
+		err = fmt.Errorf("Array size doesn't match")
+		return err
+	}
+	if err = eraseQSPI(of, sz); err != nil {
+		return err
+	}
+	fmt.Println("Programming...")
+	_, err = writeQSPI(b, of)
+	if err != nil {
+		return err
+	}
+	if vf {
+		nn, bb, err := readQSPI(of, sz)
+		if err != nil {
+			err = fmt.Errorf("Read error: %v", err)
+			return err
+		}
+		if nn != int(sz) {
+			err = fmt.Errorf("Size error %v!=%v: %v",
+				nn, sz, err)
+			return err
+		}
+		//TODO REPLACE WITH DEEP EQUAL
+		for i := range b {
+			if b[i] != bb[i] {
+				err = fmt.Errorf("Verify error: %v", err)
+				return err
+			}
+		}
+		fmt.Println("Verify passed")
 	}
 	return nil
 }

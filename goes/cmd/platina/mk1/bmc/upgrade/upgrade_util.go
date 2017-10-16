@@ -31,6 +31,26 @@ type IMGINFO struct {
 	Chksum string
 }
 
+func ReadEnv(q bool) (b []byte, err error) {
+	selectQSPI(q)
+	initQfmt()
+	_, b, err = readFlash(Qfmt["env"].off, Qfmt["env"].siz)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func ReadPer(q bool) (b []byte, err error) {
+	selectQSPI(q)
+	initQfmt()
+	_, b, err = readFlash(Qfmt["per"].off, Qfmt["per"].siz)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
 func getFile(s string, v string, t bool, fn string) (int, error) {
 	rmFile(fn)
 	urls := "http://" + s + "/" + v + "/" + fn
@@ -306,7 +326,7 @@ func cmpSums(q bool) (err error) {
 	defer syscall.Close(fd)
 	var calcSums [5]string
 	for i, j := range img {
-		if j != "ver" && j != "env" {
+		if j == "ubo" || j == "dtb" || j == "ker" || j == "ini" {
 			nn, bb, err := readQSPI(Qfmt[j].off, Qfmt[j].siz)
 			if err != nil {
 				err = fmt.Errorf("Read error: %s %v",
