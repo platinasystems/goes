@@ -38,7 +38,7 @@ pipeline {
 	    steps {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
 		    echo "Building goes..."
-		    sh 'env PATH=/usr/local/go/bin:${PATH} GOPATH=/home/jenkins/workspace/go make noplugin=yes -B goes-platina-mk1-installer'
+		    sh 'env PATH=/usr/local/go/bin:${PATH} GOPATH=/home/jenkins/workspace/go make noplugin=yes -B all'
 		    sh 'docker build .'
 		}		    
 	    }
