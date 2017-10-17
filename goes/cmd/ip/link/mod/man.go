@@ -327,43 +327,41 @@ TYPE VXLAN
 		Generic Protocol extension (VXLAN- GPE)
 		Only supported with the external control plane.
 
-	GRE, IPIP, SIT Type Support
-	       For a link of types GRE/IPIP/SIT the following additional argu‐
-	       ments are supported:
+TYPE GRE, IPIP, and SIT
+	ip link add DEVICE type { gre | ipip | sit }
+		remote ADDR local ADDR
+		[ encap { fou | gue | none } ]
+		[ encap-sport { PORT | auto } ]
+		[ encap-dport PORT ]
+		[ [no-]encap-csum ]
+		[ [no-]encap-remcsum ]
 
-	       ip link add DEVICE type { gre | ipip | sit }
-	           remote ADDR local ADDR
-		       [ encap { fou | gue | none } ]
-		       [ encap-sport { PORT | auto } ]
-		       [ encap-dport PORT ]
-		       [ [no-]encap-csum ]
-		       [ [no-]encap-remcsum ]
+	remote ADDR
+		specifies the remote address of the tunnel.
 
-	               remote ADDR - specifies the remote address of the tun‐
-	               nel.
+	local ADDR
+		specifies the fixed local address for tunneled packets.  It
+		must be an address on another interface on this host.
 
-	               local ADDR - specifies the fixed local address for tun‐
-	               neled packets.  It must be an address on another inter‐
-	               face on this host.
+	encap { fou | gue | none }
+		specifies type of secondary UDP encapsulation. "fou" indicates
+		Foo-Over-UDP, "gue" indicates Generic UDP Encapsulation.
 
-	               encap { fou | gue | none } - specifies type of secondary
-	               UDP encapsulation. "fou" indicates Foo-Over-UDP, "gue"
-	               indicates Generic UDP Encapsulation.
+	encap-sport { PORT | auto }
+		specifies the source port in UDP encapsulation.  PORT indicates
+		the port by number, "auto" indicates that the port number
+		should be chosen automatically (the kernel picks a flow based
+		on the flow hash of the encapsulated packet).
 
-	               encap-sport { PORT | auto } - specifies the source port
-	               in UDP encapsulation.  PORT indicates the port by num‐
-	               ber, "auto" indicates that the port number should be
-	               chosen automatically (the kernel picks a flow based on
-	               the flow hash of the encapsulated packet).
+	[no-]encap-csum
+		specifies if UDP checksums are enabled in the secondary
+		encapsulation.
 
-	               [no-]encap-csum - specifies if UDP checksums are enabled
-	               in the secondary encapsulation.
+	[no]-encap-remcsum
+		specifies if Remote Checksum Offload is enabled.  This is only
+		applicable for Generic UDP Encapsulation.
 
-	               [no]-encap-remcsum - specifies if Remote Checksum
-		       Offload is enabled. This is only applicable for Generic
-		       UDP Encapsulation.
-
-TYPE IP6GRE/IP6GRETAP
+TYPE IP6GRE and IP6GRETAP
 	ip link add DEVICE type { ip6gre | ip6gretap } remote ADDR local ADDR
 		[ [no-]{i|o}seq ]
 		[ {i|o}key KEY | no-{i|o}key ]
