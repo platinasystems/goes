@@ -408,7 +408,10 @@ func (m *mod) parse() error {
 		default:
 			return fmt.Errorf("%v: unexpected", m.args[1:])
 		}
-		// FIXME what about link?
+		if link != 0 {
+			m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_LINK,
+				rtnl.Int32Attr(link)})
+		}
 		if len(m.indices) == 0 {
 			m.indices = []int32{0}
 		}
