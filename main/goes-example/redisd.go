@@ -9,5 +9,6 @@ import "github.com/platinasystems/go/goes/cmd/redisd"
 func init() {
 	redisd.Init = func() {
 		redisd.Machine = "example"
+		redisd.Devs = []string{"lo"}
 	}
 }
