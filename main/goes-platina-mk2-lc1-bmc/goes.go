@@ -53,8 +53,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
-	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpd"
-	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lcabsd"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpd"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lcabsd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
@@ -89,8 +89,8 @@ import (
 )
 
 const (
-	Name    = "goes-platina-mk2-mc1-bmc"
-	Apropos = "platina's mk2 mc1 baseboard management controller"
+	Name    = "goes-platina-mk2-lc1-bmc"
+	Apropos = "platina's mk2 lc1 baseboard management controller"
 )
 
 func Goes() *goes.Goes {
@@ -139,7 +139,7 @@ func Goes() *goes.Goes {
 		keys.New(),
 		kill.New(),
 		//ledgpiod.New(),
-		lcabsd.New(),
+		//lcabsd.New(),
 		ln.New(),
 		log.New(),
 		ls.New(),
@@ -150,7 +150,7 @@ func Goes() *goes.Goes {
 		ping.New(),
 		ps.New(),
 		pwd.New(),
-		qsfpd.New(),
+		//qsfpd.New(),
 		reboot.New(),
 		redisd.New(),
 		reload.New(),

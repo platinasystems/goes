@@ -81,6 +81,50 @@ func diagI2cPing(b uint8, a uint8, c uint8, count int) (bool, uint8) {
 	return true, sd[0]
 }
 
+// performs a word read to i2c device address a on bus number b, returns true if read is successful
+func diagI2cPingWord(b uint8, a uint8, c uint8, count int) (bool, uint32) {
+
+        var (
+                bus i2c.Bus
+                sd  i2c.SMBusData
+        )
+        rw := i2c.Read
+        //op := i2c.ByteData
+	op := i2c.WordData
+
+        err := bus.Open(int(b))
+        if err != nil {
+                if debug {
+                        fmt.Println(err)
+                }
+                return false, uint32((sd[1]<<8) | sd[0])
+        }
+        defer bus.Close()
+
+        err = bus.ForceSlaveAddress(int(a))
+        if err != nil {
+                if debug {
+                        fmt.Println(err)
+                }
+                return false, uint32((sd[1]<<8) | sd[0])
+        }
+        for i := 0; i < count; i++ {
+                err = bus.Do(rw, c, op, &sd)
+                if err != nil {
+                        if debug {
+                                fmt.Println(err)
+                        }
+                        return false, uint32((sd[1]<<8) | sd[0])
+                }
+                if debug {
+                        fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
+                }
+        }
+        return true, uint32((sd[1]<<8) | sd[0])
+}
+
+
+
 // write 1byte to bus b device address a (i.e. set mux channel)
 func diagI2cWrite1Byte(b uint8, a uint8, c uint8) {
 

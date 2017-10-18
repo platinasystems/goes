@@ -495,7 +495,7 @@ func diagI2cCh1Mc() {
 
         diagI2cWrite1Byte(0x00, 0x71, 0x08)
         time.Sleep(10 * time.Millisecond)
-        result, _ = diagI2cPing(0x00, 0x48, 0x00, 10)
+        result, _ = diagI2cPingWord(0x00, 0x48, 0x00, 10)
         r = CheckPassB(result, true)
         fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "i2c", "ping_intake_tmp75", "-",
                 result, i2cping_response_min, i2cping_response_max, r, "ping device 10x")

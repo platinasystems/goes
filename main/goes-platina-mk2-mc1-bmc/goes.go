@@ -22,10 +22,9 @@ import (
 	"github.com/platinasystems/go/goes/cmd/exec"
 	"github.com/platinasystems/go/goes/cmd/exit"
 	"github.com/platinasystems/go/goes/cmd/export"
-	"github.com/platinasystems/go/goes/cmd/falsecmd"
-	"github.com/platinasystems/go/goes/cmd/fantrayd"
+	//"github.com/platinasystems/go/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/goes/cmd/femtocom"
-	"github.com/platinasystems/go/goes/cmd/fspd"
+	//"github.com/platinasystems/go/goes/cmd/fspd"
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
@@ -54,11 +53,13 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpd"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lcabsd"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgraded"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
 	"github.com/platinasystems/go/goes/cmd/reboot"
@@ -78,11 +79,10 @@ import (
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/telnetd"
-	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
-	"github.com/platinasystems/go/goes/cmd/w83795d"
+	//"github.com/platinasystems/go/goes/cmd/w83795d"
 	"github.com/platinasystems/go/goes/cmd/watchdog"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
@@ -117,10 +117,9 @@ func Goes() *goes.Goes {
 		exec.New(),
 		exit.New(),
 		export.New(),
-		falsecmd.New(),
-		fantrayd.New(),
+		//fantrayd.New(),
 		femtocom.New(),
-		fspd.New(),
+		//fspd.New(),
 		gpio.New(),
 		hdel.New(),
 		hdelta.New(),
@@ -139,7 +138,8 @@ func Goes() *goes.Goes {
 		kexec.New(),
 		keys.New(),
 		kill.New(),
-		ledgpiod.New(),
+		//ledgpiod.New(),
+		//lcabsd.New(),
 		ln.New(),
 		log.New(),
 		ls.New(),
@@ -150,6 +150,7 @@ func Goes() *goes.Goes {
 		ping.New(),
 		ps.New(),
 		pwd.New(),
+		//qsfpd.New(),
 		reboot.New(),
 		redisd.New(),
 		reload.New(),
@@ -172,13 +173,12 @@ func Goes() *goes.Goes {
 		subscribe.New(),
 		sync.New(),
 		telnetd.New(),
-		toggle.New(),
-		truecmd.New(),
-		ucd9090d.New(),
+		//toggle.New(),
+		//ucd9090d.New(),
 		umount.New(),
 		uninstall.New(),
 		uptimed.New(),
-		w83795d.New(),
+		//w83795d.New(),
 		watchdog.New(),
 		wget.New(),
 	)
