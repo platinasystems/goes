@@ -5,6 +5,7 @@
 package main_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ func Test(t *testing.T) {
 	}
 	t.Run("HelloWorld", HelloWorld)
 	t.Run("Pwd", Pwd)
+	t.Run("Cat", Cat)
 	t.Run("RedisReady", RedisReady)
 }
 
@@ -32,6 +34,13 @@ func Pwd(t *testing.T) {
 	Assert{t}.Program(nil,
 		"goes", "pwd",
 	).Output(Match(".*/platinasystems/go\n"))
+
+}
+
+func Cat(t *testing.T) {
+	Assert{t}.Program(strings.NewReader("HELLO WORLD"),
+		"goes", "cat", "-",
+	).Output(Equal("HELLO WORLD"))
 
 }
 
