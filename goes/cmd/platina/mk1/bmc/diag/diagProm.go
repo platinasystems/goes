@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/log"
 )
 
@@ -28,29 +27,15 @@ const (
 	subTypeL     = 1
 
 	chassisTypeTor1 = 0x0
-	chassisType4Ch1 = 0x1
-	chassisType8Ch1 = 0x2
-	chassisType16Ch1 = 0x3
 	chassisTypeNone = 0xFF
-
 	boardTypeTor1   = 0x0
 	boardTypeBde2c  = 0x1
 	boardTypeBde4c  = 0x2
-	boardTypeBde8c  = 0x3
-	boardTypeCh1Mc1  	= 0x4
-	boardTypeCh1Lc1    	= 0x5	// 32x100
-	boardTypeCh1Mcb         = 0x6
-	boardTypeCh1Fan         = 0x7
+	boardTypebde8c  = 0x3
 
 	ppnTor1  = "900-000000-000"
 	ppnBde2c = "900-000001-000"
 	ppnBde4c = "900-000002-000"
-	ppnBde8c = "900-000003-000"
-	ppnCh1Lc1 = "900-000004-000"
-	ppnCh1Mc1 = "900-000005-000"
-	ppn16sCh1 = "900-000006-000"
-	ppn8sCh1 = "900-000007-000"
-	ppn4sCh1 = "900-000008-000"
 
 	subTypeGa    = 0xA
 	subTypeProto = 0x1
@@ -67,36 +52,13 @@ func diagProm() error {
 	bde2cVedga := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde2c, subTypeT, subTypeL, subTypeGa, ppnT, ppnL}
 	bde4cVedga := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisTypeTor1, boardTypeT, boardTypeL, boardTypeBde4c, subTypeT, subTypeL, subTypeGa, ppnT, ppnL}
 
-	mc14sCh1Vedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisType4Ch1, boardTypeT, boardTypeL, boardTypeCh1Mc1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-        lc14sCh1Vedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisType4Ch1, boardTypeT, boardTypeL, boardTypeCh1Lc1, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-        bde2c4sCh1Vedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisType4Ch1, boardTypeT, boardTypeL, boardTypeBde2c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-        bde4c4sCh1Vedp := []byte{byte(pen >> 24), byte(pen >> 16), byte(pen >> 8), byte(pen & 0xff), chassisTypeT, chassisTypeL, chassisType4Ch1, boardTypeT, boardTypeL, boardTypeBde4c, subTypeT, subTypeL, subTypeProto, ppnT, ppnL}
-
-
-
 	var vByte []byte
 
 	vf := uint(0)
 	vl := uint(0)
 
-        s, err := redis.Hget(redis.DefaultHash, "machine")
-        if err != nil {
-                log.Print("redis: ", err)
-                return err
-        } else {
-		if s == "platina-mk1-bmc" {
-			diagI2cWrite1Byte(0x00, 0x76, 0x00)
-			diagI2cWrite1Byte(0x01, 0x72, 0x00)
-		}
-		if s == "platina-mk2-mc1-bmc" {
-			diagI2cWrite1Byte(0x00, 0x71, 0x00)
-		        diagI2cWrite1Byte(0x00, 0x72, 0x00)
-			diagI2cWrite1Byte(0x01, 0x70, 0x00)
-		}
-                if s == "platina-mk2-lc1-bmc" {
-                        diagI2cWrite1Byte(0x00, 0x74, 0x00)
-                }
-	}
+	diagI2cWrite1Byte(0x00, 0x76, 0x00)
+	diagI2cWrite1Byte(0x01, 0x72, 0x00)
 
 	for i := 0; i < ppnL; i++ {
 		tor1Vedp = append(tor1Vedp, ppnTor1[i])
@@ -105,11 +67,6 @@ func diagProm() error {
 		tor1Vedga = append(tor1Vedga, ppnTor1[i])
 		bde2cVedga = append(bde2cVedga, ppnBde2c[i])
 		bde4cVedga = append(bde4cVedga, ppnBde4c[i])
-
-		mc14sCh1Vedp = append(mc14sCh1Vedp, ppnCh1Mc1[i])
-	        lc14sCh1Vedp = append(lc14sCh1Vedp, ppnCh1Lc1[i])
-		bde2c4sCh1Vedp = append(bde2c4sCh1Vedp, ppnBde2c[i])
-		bde4c4sCh1Vedp = append(bde4c4sCh1Vedp, ppnBde4c[i])
 	}
 
 	d := eeprom.Device{
@@ -214,15 +171,6 @@ func diagProm() error {
 				fmt.Printf("%s\n", d.WriteField(c, bde4cVedga))
 			case "bde2cga":
 				fmt.Printf("%s\n", d.WriteField(c, bde2cVedga))
-
-			case "mc14sch1p":
-                                fmt.Printf("%s\n", d.WriteField(c, mc14sCh1Vedp))
-			case "lc14sch1p":
-				fmt.Printf("%s\n", d.WriteField(c, lc14sCh1Vedp))
-			case "bde2c4sch1p":
-                                fmt.Printf("%s\n", d.WriteField(c, bde2c4sCh1Vedp))
-			case "bde4c4sch1p":
-                                fmt.Printf("%s\n", d.WriteField(c, bde4c4sCh1Vedp))
 			default:
 			}
 		case "vsn":

@@ -12,9 +12,9 @@ import (
 	"github.com/platinasystems/go/internal/eeprom"
 )
 
-var pm ucd9090d.I2cDev
-
 func diagPower() error {
+
+	var r string
 
 	const (
 		ucd9090dBus    = 0
@@ -22,50 +22,22 @@ func diagPower() error {
 		ucd9090dMuxBus = 0
 		ucd9090dMuxAdr = 0x76
 		ucd9090dMuxVal = 0x01
-
-		TOR1 uint8      = 0x00
-		CH1 uint8       = 0x01
-		CH1MC uint8     = 0x04
-		CH1LC uint8     = 0x05
 	)
-
-	pm = ucd9090d.I2cDev{ucd9090dBus, ucd9090dAdr, ucd9090dMuxBus, ucd9090dMuxAdr, ucd9090dMuxVal}
+	var pm = ucd9090d.I2cDev{ucd9090dBus, ucd9090dAdr, ucd9090dMuxBus, ucd9090dMuxAdr, ucd9090dMuxVal}
 
 	d := eeprom.Device{
 		BusIndex:   0,
 		BusAddress: 0x55,
 	}
-	if err:= d.GetInfo(); err != nil {
-		return err
-	}
-	if d.Fields.ChassisType == TOR1 {
-		switch d.Fields.DeviceVersion {
-		case 0xff:
-			pm.Addr = 0x7e
-		case 0x00:
-			pm.Addr = 0x7e
-		default:
-			pm.Addr = 0x34
-		}
-		if err := diagPowerTor(); err != nil {
-			return err
-		}
-	} else if (d.Fields.ChassisType == CH1) && (d.Fields.BoardType == CH1MC) {
-		pm.MuxAddr = 0x71
-		pm.MuxValue = 0x02
+	d.GetInfo()
+	switch d.Fields.DeviceVersion {
+	case 0xff:
 		pm.Addr = 0x7e
-		diagPowerCh1Mc()
-	} else if (d.Fields.ChassisType == CH1) && (d.Fields.BoardType == CH1MC) {
-		diagPowerCh1Lc()
+	case 0x00:
+		pm.Addr = 0x7e
+	default:
+		pm.Addr = 0x34
 	}
-
-	return nil
-}
-
-func diagPowerTor() error {
-
-	 var r string
-
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
 	fmt.Printf("---------------|-------------------------|----------|----------|----------|----------|------|-----------------------------------\n")
@@ -166,14 +138,6 @@ func diagPowerTor() error {
 	fmt.Printf("%15s|%25s|%10s|%10.3f|%10.3f|%10.3f|%6s|%35s\n", "power", "vmon_5v0_sb", "V", f, vmon_5v0_sb_min, vmon_5v0_sb_max, r, "check P5V_SB is +/-5% nominal")
 
 	return nil
-}
-
-func diagPowerCh1Mc() error {
-	return diagPowerTor()
-}
-
-func diagPowerCh1Lc() {
-
 }
 
 func diagLoggedFaults() error {

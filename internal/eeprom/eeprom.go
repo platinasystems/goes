@@ -218,7 +218,7 @@ func (d *Device) getInfo() {
 			f.ServiceTag = string(v)
 		case vendor_extension:
 			if (f.DeviceVersion != 0x00) && (f.DeviceVersion != 0xff) {
-				for j := uint(4); j < uint(len(v)); {
+				for j := uint(2); j < uint(len(v)); {
 					etlv, etlen := v[j], uint(v[j+1])
 					ev := v[j+2 : j+2+etlen]
 					switch etlv {
