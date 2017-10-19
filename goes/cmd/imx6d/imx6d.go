@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	Name    = "imx6d"
-	Apropos = "ARM CPU temperature daemon, publishes to redis"
-	Usage   = "imx6d"
+	Name     = "imx6d"
+	Apropos  = "ARM CPU temperature daemon, publishes to redis"
+	Usage    = "imx6d"
+	ERRORMAX = 5
 )
 
 var apropos = lang.Alt{
@@ -34,6 +35,7 @@ var (
 	Init = func() {}
 	once sync.Once
 
+	readError  int
 	VpageByKey map[string]uint8
 )
 
@@ -89,7 +91,15 @@ func (c *Command) Close() error {
 
 func (c *Command) update() error {
 	for k, _ := range VpageByKey {
-		v := ReadTemp()
+		v, err := ReadTemp()
+		if err != nil {
+			if readError < ERRORMAX {
+				readError++
+				return nil
+			}
+			return err
+		}
+		readError = 0
 		if v != c.last[k] {
 			c.pub.Print(k, ": ", v)
 			c.last[k] = v
@@ -98,10 +108,13 @@ func (c *Command) update() error {
 	return nil
 }
 
-func ReadTemp() float64 {
-	tmp, _ := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
+func ReadTemp() (float64, error) {
+	tmp, err := ioutil.ReadFile("/sys/class/thermal/thermal_zone0/temp")
+	if err != nil {
+		return 0, err
+	}
 	tmp2 := fmt.Sprintf("%.4s", string(tmp[:]))
 	tmp3, _ := strconv.Atoi(tmp2)
 	tmp4 := float64(tmp3)
-	return float64(tmp4 / 100.0)
+	return float64(tmp4 / 100.0), nil
 }
