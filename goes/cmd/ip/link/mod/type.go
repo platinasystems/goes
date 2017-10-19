@@ -24,7 +24,7 @@ func (m *mod) parseType(name string) error {
 		"gretap":    m.parseTypeGre,
 		"ip6gre":    m.parseTypeIp6Gre,
 		"ip6gretap": m.parseTypeIp6Gre,
-		"ipip":      m.parseTypeGre,
+		"ipip":      m.parseTypeIpIp,
 		"sit":       m.parseTypeGre,
 		"geneve":    m.parseTypeGeneve,
 		"ipoib":     m.parseTypeIpoib,
