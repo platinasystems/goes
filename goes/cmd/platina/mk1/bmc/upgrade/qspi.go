@@ -69,6 +69,16 @@ func initQfmt() {
 	return
 }
 
+func ReadBlk(blknam string, q bool) (b []byte, err error) {
+	selectQSPI(q)
+	initQfmt()
+	_, b, err = readFlash(Qfmt[blknam].off, Qfmt[blknam].siz)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
 func readFlash(of uint32, sz uint32) (n int, b []byte, err error) {
 	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
 	if err != nil {
@@ -84,6 +94,24 @@ func readFlash(of uint32, sz uint32) (n int, b []byte, err error) {
 		return 0, nil, err
 	}
 	return n, b, nil
+}
+
+func WriteBlk(blknam string, b []byte, q bool) (err error) {
+	selectQSPI(q)
+	initQfmt()
+	size := Qfmt[blknam].siz
+	ba := make([]byte, size)
+	for i, _ := range ba {
+		ba[i] = 0xff
+	}
+	for i, _ := range b {
+		ba[i] = b[i]
+	}
+	err = writeArrayVerify(ba, Qfmt[blknam].off, Qfmt[blknam].siz, true)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func writeImageAll() (err error) {
@@ -151,6 +179,16 @@ func writeImageVerify(im string, of uint32, sz uint32, vf bool) error {
 }
 
 func writeArrayVerify(b []byte, of uint32, sz uint32, vf bool) (err error) {
+	fd, err = syscall.Open(MTDdevice, syscall.O_RDWR, 0)
+	if err != nil {
+		err = fmt.Errorf("Open error %s: %s", MTDdevice, err)
+		return err
+	}
+	defer syscall.Close(fd)
+
+	if err = infoQSPI(); err != nil {
+		return err
+	}
 	if len(b) != int(sz) {
 		err = fmt.Errorf("Array size doesn't match")
 		return err

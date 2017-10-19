@@ -54,6 +54,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ipcfg"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/mmclogd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
@@ -137,6 +138,7 @@ func Goes() *goes.Goes {
 		insmod.New(),
 		install.New(),
 		ip.New(),
+		ipcfg.New(),
 		kexec.New(),
 		keys.New(),
 		kill.New(),
