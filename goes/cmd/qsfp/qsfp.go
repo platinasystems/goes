@@ -5,12 +5,14 @@
 package qsfp
 
 import (
+	"encoding/hex"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/log"
@@ -54,6 +56,9 @@ type I2cDev struct {
 var portLpage0 [32]lpage0
 var portUpage3 [32]upage3
 var portIsCopper [32]bool
+var maxTemp float64
+var maxTempPort string
+var bmcIpv6LinkLocalRedis string
 
 var VpageByKey map[string]uint8
 
@@ -82,6 +87,8 @@ func (c *Command) Main(...string) error {
 	for i := 0; i < 32; i++ {
 		portIsCopper[i] = true
 	}
+	maxTemp = 0
+	maxTempPort = "-1"
 	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)
 	c.lasts = make(map[string]string)
@@ -96,7 +103,7 @@ func (c *Command) Main(...string) error {
 	}
 
 	go qsfpioTicker(c)
-	t := time.NewTicker(1 * time.Second)
+	t := time.NewTicker(3 * time.Second)
 	defer t.Stop()
 	tm := time.NewTicker(500 * time.Millisecond)
 	defer tm.Stop()
@@ -389,6 +396,9 @@ func (c *Command) updatePresence() error {
 						}
 						log.Print("QSFP removed from port ", lp)
 						portIsCopper[i+j*16] = true
+						if maxTempPort == strconv.Itoa(lp) {
+							maxTempPort = "-1"
+						}
 					}
 				}
 			}
@@ -424,7 +434,7 @@ func (c *Command) updateMonitor() error {
 				if Vdev[i].DataReady() {
 					Vdev[i].DynamicBlocks(i)
 					k := "port-" + strconv.Itoa(port) + ".qsfp.temperature.units.C"
-					v := Temp(portLpage0[i].freeMonTemp)
+					v := CheckTemp(portLpage0[i].freeMonTemp, strconv.Itoa(port))
 					if v != c.lasts[k] {
 						c.pub.Print(k, ": ", v)
 						c.lasts[k] = v
@@ -749,6 +759,61 @@ func ChannelAlarms(t [3]byte, w [6]byte) [8]string {
 		v[i] = strings.Trim(v[i], ",")
 		v[i+4] = strings.Trim(v[i+4], ",")
 	}
+	return v
+}
+
+func CheckTemp(t uint16, port string) string {
+	var u float64
+	var v string
+	update := false
+
+	if (t & 0x8000) != 0 {
+		u = float64((t^0xffff)+1) / 256 * (-1)
+	} else {
+		u = float64(t) / 256
+	}
+	v = strconv.FormatFloat(u, 'f', 1, 64)
+
+	if maxTempPort == "-1" {
+		maxTemp = u
+		maxTempPort = port
+		update = true
+	} else if maxTempPort == port {
+		maxTemp = u
+		update = true
+	} else if u > maxTemp {
+		maxTemp = u
+		maxTempPort = port
+		update = true
+	}
+
+	if update {
+		if bmcIpv6LinkLocalRedis == "" {
+			m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+			if err != nil {
+				log.Print("hget error: ", err)
+			}
+			o := strings.Split(m, ":")
+			b, _ := hex.DecodeString(o[0])
+			b[0] = b[0] ^ byte(2)
+			o[0] = hex.EncodeToString(b)
+			bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
+		}
+		if bmcIpv6LinkLocalRedis != "" {
+			d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
+			if err != nil {
+				log.Print(err)
+			} else {
+				_, err := d.Do("HSET", redis.DefaultHash, "qsfp.temp.units.C", v)
+				if err != nil {
+					log.Print("hset error: ", err)
+				}
+				d.Close()
+			}
+		}
+
+	}
+
 	return v
 }
 

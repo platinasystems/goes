@@ -68,6 +68,7 @@ func checkDaemons() error {
 		"qsfp":         true,
 		"uptimed":      true,
 		"i2cd":         true,
+		"tempd":        true,
 	}
 
 	mypid := os.Getpid()

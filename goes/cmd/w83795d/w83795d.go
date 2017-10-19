@@ -52,6 +52,11 @@ var (
 	hostTemp       float64
 	sHostTemp      float64
 	hostTempTarget float64
+	hostHyst       float64
+	qsfpTemp       float64
+	sQsfpTemp      float64
+	qsfpTempTarget float64
+	qsfpHyst       float64
 	thTemp         float64
 	sThTemp        float64
 
@@ -103,9 +108,16 @@ func (c *Command) Main(...string) error {
 	first = 1
 	hostTemp = 50
 	sHostTemp = 150
-	sThTemp = 150
 	hostTempTarget = 70
+	hostHyst = 0
+
+	qsfpTemp = 50
+	sQsfpTemp = 150
+	qsfpTempTarget = 60
+	qsfpHyst = 0
+
 	hostCtrl = false
+	sThTemp = 150
 	thCtrl = false
 
 	c.stop = make(chan struct{})
@@ -228,6 +240,26 @@ func (c *Command) update() error {
 		}
 		if strings.Contains(k, "host.temp.target.units.C") {
 			v, err := Vdev.GetHostTempTarget()
+			if err != nil {
+				return err
+			}
+			if v != c.lasts[k] {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "qsfp.temp.units.C") {
+			v, err := Vdev.CheckQsfpTemp()
+			if err != nil {
+				return err
+			}
+			if v != c.lasts[k] {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+		}
+		if strings.Contains(k, "qsfp.temp.target.units.C") {
+			v, err := Vdev.GetQsfpTempTarget()
 			if err != nil {
 				return err
 			}
@@ -582,13 +614,29 @@ func (h *I2cDev) GetFanSpeed() (string, error) {
 		}
 	}
 	if hostCtrl || (!hostCtrl && speed == "auto") {
-		if (!hostCtrl && (hostTemp > hostTempTarget)) || (hostCtrl && (hostTemp > sHostTemp)) {
+		hostHot := false
+		hostHotter := false
+		hostHot = hostTemp > hostTempTarget
+		hostHotter = hostTemp > sHostTemp
+		qsfpHot := false
+		qsfpHotter := false
+		qsfpHot = qsfpTemp > qsfpTempTarget
+		qsfpHotter = qsfpTemp > sQsfpTemp
+		if (!hostCtrl && (hostHot || qsfpHot)) || (hostCtrl && (hostHotter || qsfpHotter)) {
 			var err error
 			duty, err = h.GetFanDuty()
 			if err != nil {
 				return "auto", err
 			}
-			sHostTemp = hostTemp
+			if hostHot || hostHotter {
+				hostHyst = 5
+				sHostTemp = hostTemp
+
+			}
+			if qsfpHot || qsfpHotter {
+				qsfpHyst = 5
+				sQsfpTemp = qsfpTemp
+			}
 			if duty < 0xff {
 				if duty <= 0xdf {
 					h.SetFanDuty(duty + 0x20)
@@ -601,10 +649,13 @@ func (h *I2cDev) GetFanSpeed() (string, error) {
 			if !hostCtrl {
 				hostCtrl = true
 			}
-		} else if hostCtrl && (hostTemp <= (hostTempTarget - 5)) {
+		} else if hostCtrl && (hostTemp <= (hostTempTarget - hostHyst)) && (qsfpTemp <= (qsfpTempTarget - qsfpHyst)) {
 			hostCtrl = false
 			thCtrl = false
 			sHostTemp = 150
+			hostHyst = 0
+			sQsfpTemp = 150
+			qsfpHyst = 0
 			sThTemp = 150
 			//set fan speed to thermal cruise (auto)
 			h.SetFanSpeed("auto", false)
@@ -705,8 +756,18 @@ func (h *I2cDev) CheckHostTemp() (string, error) {
 	return strconv.FormatFloat(v, 'f', 2, 64), nil
 }
 
+func (h *I2cDev) CheckQsfpTemp() (string, error) {
+	v := qsfpTemp
+	return strconv.FormatFloat(v, 'f', 2, 64), nil
+}
+
 func (h *I2cDev) GetHostTempTarget() (string, error) {
 	v := hostTempTarget
+	return strconv.FormatFloat(v, 'f', 2, 64), nil
+}
+
+func (h *I2cDev) GetQsfpTempTarget() (string, error) {
+	v := qsfpTempTarget
 	return strconv.FormatFloat(v, 'f', 2, 64), nil
 }
 
@@ -733,15 +794,26 @@ func writeRegs() error {
 			if v == "auto" || v == "high" || v == "med" || v == "low" || v == "max" {
 				Vdev.SetFanSpeed(v, true)
 			}
-		case "temp.units.C":
+		case "host.temp.units.C":
 			f, err := strconv.ParseFloat(v, 64)
 			if err == nil {
 				hostTemp = f
 			}
-		case "temp.target.units.C":
+		case "host.temp.target.units.C":
 			f, err := strconv.ParseFloat(v, 64)
 			if err == nil {
 				hostTempTarget = f
+			}
+		case "qsfp.temp.units.C":
+			f, err := strconv.ParseFloat(v, 64)
+			if err == nil {
+				qsfpTemp = f
+			}
+		case "qsfp.temp.target.units.C":
+			log.Print("write qsfp target: ", v)
+			f, err := strconv.ParseFloat(v, 64)
+			if err == nil {
+				qsfpTempTarget = f
 			}
 		case "speed.return":
 			if v == "" {

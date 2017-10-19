@@ -11,6 +11,7 @@ func init() {
 		[]string{"redisd"},
 		[]string{"i2cd"},
 		[]string{"qsfp"},
+		[]string{"tempd"},
 		[]string{"uptimed"},
 		[]string{"vnetd"},
 	}

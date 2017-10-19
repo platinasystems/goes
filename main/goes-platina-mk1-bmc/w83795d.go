@@ -31,6 +31,8 @@ func w83795dInit() {
 		"hwmon.target.units.C":         0,
 		"host.temp.units.C":            0,
 		"host.temp.target.units.C":     0,
+		"qsfp.temp.units.C":            0,
+		"qsfp.temp.target.units.C":     0,
 	}
 
 	w83795d.WrRegDv["fan_tray"] = "fan_tray"
@@ -39,9 +41,13 @@ func w83795dInit() {
 	w83795d.WrRegFn["fan_tray.speed.return"] = "speed.return"
 
 	w83795d.WrRegDv["host"] = "host"
-	w83795d.WrRegFn["host.temp.units.C"] = "temp.units.C"
-	w83795d.WrRegFn["host.temp.target.units.C"] = "temp.target.units.C"
-	w83795d.WrRegFn["host.reset"] = "reset"
+	w83795d.WrRegFn["host.temp.units.C"] = "host.temp.units.C"
+	w83795d.WrRegFn["host.temp.target.units.C"] = "host.temp.target.units.C"
+	w83795d.WrRegFn["host.reset"] = "host.reset"
+
+	w83795d.WrRegDv["qsfp"] = "qsfp"
+	w83795d.WrRegFn["qsfp.temp.units.C"] = "qsfp.temp.units.C"
+	w83795d.WrRegFn["qsfp.temp.target.units.C"] = "qsfp.temp.target.units.C"
 
 	w83795d.WrRegDv["hwmon"] = "hwmon"
 	w83795d.WrRegFn["hwmon.target.units.C"] = "target.units.C"

@@ -73,6 +73,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/stty"
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
+	"github.com/platinasystems/go/goes/cmd/tempd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
@@ -162,6 +163,7 @@ func Goes() *goes.Goes {
 		stty.New(),
 		subscribe.New(),
 		sync.New(),
+		tempd.New(),
 		toggle.New(),
 		truecmd.New(),
 		umount.New(),
