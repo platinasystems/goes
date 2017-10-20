@@ -7,7 +7,8 @@ package mod
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (m *mod) parseTypeVrf() error {
@@ -23,7 +24,7 @@ func (m *mod) parseTypeVrf() error {
 			return fmt.Errorf("invalid vrf table")
 		}
 	}
-	m.tinfo = append(m.tinfo,
-		rtnl.Attr{rtnl.IFLA_VRF_TABLE, rtnl.Uint32Attr(tbl)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VRF_TABLE,
+		nl.Uint32Attr(tbl)})
 	return nil
 }

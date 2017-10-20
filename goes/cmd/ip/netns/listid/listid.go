@@ -9,8 +9,9 @@ import (
 	"io/ioutil"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -46,27 +47,27 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args)
 	}
 	namebyid := make(map[int32]string)
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
 	varRunNetns, err := ioutil.ReadDir(rtnl.VarRunNetns)
 	if err == nil {
 		for _, fi := range varRunNetns {
-			nsid, err := sr.Nsid(fi.Name())
+			nsid, err := rtnl.Nsid(sr, fi.Name())
 			if err == nil && nsid >= 0 {
 				namebyid[nsid] = fi.Name()
 			}
 		}
 	}
-	req, err := rtnl.NewMessage(
-		rtnl.Hdr{
+	req, err := nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETNSID,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 		},
 		rtnl.RtGenMsg{
 			Family: rtnl.AF_UNSPEC,
@@ -77,7 +78,7 @@ func (Command) Main(args ...string) error {
 	}
 	return sr.UntilDone(req, func(b []byte) {
 		var netnsa rtnl.Netnsa
-		t := rtnl.HdrPtr(b).Type
+		t := nl.HdrPtr(b).Type
 		if t != rtnl.RTM_DELNSID && t != rtnl.RTM_NEWNSID {
 			return
 		}
@@ -89,7 +90,7 @@ func (Command) Main(args ...string) error {
 		}
 		nsid := int32(-1)
 		if val := netnsa[rtnl.NETNSA_NSID]; len(val) > 0 {
-			nsid = rtnl.Int32(val)
+			nsid = nl.Int32(val)
 		}
 		fmt.Print(nsid)
 		if name, found := namebyid[nsid]; found {

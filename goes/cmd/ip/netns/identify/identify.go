@@ -12,8 +12,8 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (

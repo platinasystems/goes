@@ -7,7 +7,8 @@ package mod
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type macsec
@@ -36,15 +37,15 @@ func (m *mod) parseTypeMacSec() error {
 		if _, err = fmt.Sscan(s, &port); err != nil {
 			return fmt.Errorf("port: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_PORT,
-			rtnl.Be16Attr(port)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_MACSEC_PORT,
+			nl.Be16Attr(port)})
 	} else if s = m.opt.Parms.ByName["sci"]; len(s) > 0 {
 		var sci uint64
 		if _, err = fmt.Sscan(s, &sci); err != nil {
 			return fmt.Errorf("sci: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_SCI,
-			rtnl.Be64Attr(sci)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_MACSEC_SCI,
+			nl.Be64Attr(sci)})
 	} else {
 		return fmt.Errorf("missing port or sci")
 	}
@@ -86,11 +87,11 @@ func (m *mod) parseTypeMacSec() error {
 	} {
 		m.args = m.opt.Flags.More(m.args, x.set, x.unset)
 		if m.opt.Flags.ByName[x.set[0]] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(1)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(1)})
 		} else if m.opt.Flags.ByName[x.unset[0]] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(0)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(0)})
 		}
 	}
 	if m.opt.Flags.ByName["replay"] {
@@ -103,8 +104,8 @@ func (m *mod) parseTypeMacSec() error {
 		if _, err := fmt.Sscan(s, &window); err != nil {
 			return fmt.Errorf("window: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACSEC_WINDOW,
-			rtnl.Uint32Attr(window)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_MACSEC_WINDOW,
+			nl.Uint32Attr(window)})
 	}
 	m.args = m.opt.Parms.More(m.args,
 		"cipher",   // SUITE
@@ -115,8 +116,8 @@ func (m *mod) parseTypeMacSec() error {
 		case "default", "gcm-aes-128":
 			id := rtnl.MACSEC_DEFAULT_CIPHER_ID
 			m.tinfo = append(m.tinfo,
-				rtnl.Attr{rtnl.IFLA_MACSEC_CIPHER_SUITE,
-					rtnl.Uint64Attr(id)})
+				nl.Attr{rtnl.IFLA_MACSEC_CIPHER_SUITE,
+					nl.Uint64Attr(id)})
 		default:
 			return fmt.Errorf("cipher: %q unknown", s)
 		}
@@ -130,9 +131,8 @@ func (m *mod) parseTypeMacSec() error {
 		if !found {
 			return fmt.Errorf("validate: %q unkown", s)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_MACSEC_VALIDATION,
-				rtnl.Uint8Attr(validate)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_MACSEC_VALIDATION,
+			nl.Uint8Attr(validate)})
 	}
 	for _, x := range []struct {
 		names []string
@@ -151,7 +151,7 @@ func (m *mod) parseTypeMacSec() error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.Uint8Attr(u8)})
 	}
 	return nil
 }

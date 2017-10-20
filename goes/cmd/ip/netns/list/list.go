@@ -9,8 +9,9 @@ import (
 	"io/ioutil"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -56,17 +57,17 @@ func (Command) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
 	for _, fi := range varRunNetns {
 		fmt.Print(fi.Name())
-		nsid, err := sr.Nsid(fi.Name())
+		nsid, err := rtnl.Nsid(sr, fi.Name())
 		if err == nil && nsid >= 0 {
 			fmt.Print(": ", nsid)
 		}

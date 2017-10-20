@@ -14,8 +14,9 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -88,13 +89,13 @@ type mod struct {
 	args []string
 	opt  *options.Options
 
-	sr *rtnl.SockReceiver
+	sr *nl.SockReceiver
 
-	hdr   rtnl.Hdr
+	hdr   nl.Hdr
 	msg   rtnl.IfInfoMsg
-	attrs rtnl.Attrs
+	attrs nl.Attrs
 
-	tinfo rtnl.Attrs
+	tinfo nl.Attrs
 
 	ifindexByName    map[string]int32
 	ifindicesByGroup map[uint32][]int32
@@ -114,13 +115,13 @@ func (c Command) Usage() string {
 func (c Command) Main(args ...string) error {
 	m := mod{name: string(c)}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	m.sr = rtnl.NewSockReceiver(sock)
+	m.sr = nl.NewSockReceiver(sock)
 
 	if err = m.getifindices(); err != nil {
 		return err
@@ -134,17 +135,17 @@ func (c Command) Main(args ...string) error {
 		defer m.netns.Close()
 	}
 
-	m.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK
+	m.hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK
 	m.msg.Family = rtnl.AF_UNSPEC
 	switch c {
 	case "add":
 		m.hdr.Type = rtnl.RTM_NEWLINK
-		m.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_EXCL
 	case "change", "set":
 		m.hdr.Type = rtnl.RTM_NEWLINK
 	case "replace":
 		m.hdr.Type = rtnl.RTM_NEWLINK
-		m.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_REPLACE
+		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_REPLACE
 	case "delete":
 		m.hdr.Type = rtnl.RTM_DELLINK
 	default:
@@ -153,7 +154,7 @@ func (c Command) Main(args ...string) error {
 
 	for _, ifindex := range m.indices {
 		m.msg.Index = ifindex
-		if req, err := rtnl.NewMessage(
+		if req, err := nl.NewMessage(
 			m.hdr,
 			m.msg,
 			m.attrs...,
@@ -171,10 +172,10 @@ func (m *mod) getifindices() error {
 	m.ifindexByName = make(map[string]int32)
 	m.ifindicesByGroup = make(map[uint32][]int32)
 
-	req, err := rtnl.NewMessage(
-		rtnl.Hdr{
+	req, err := nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
@@ -185,14 +186,14 @@ func (m *mod) getifindices() error {
 	}
 	return m.sr.UntilDone(req, func(b []byte) {
 		var ifla rtnl.Ifla
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
-		name := rtnl.Kstring(ifla[rtnl.IFLA_IFNAME])
+		name := nl.Kstring(ifla[rtnl.IFLA_IFNAME])
 		m.ifindexByName[name] = msg.Index
-		gid := rtnl.Uint32(ifla[rtnl.IFLA_GROUP])
+		gid := nl.Uint32(ifla[rtnl.IFLA_GROUP])
 		m.ifindicesByGroup[gid] = append(m.ifindicesByGroup[gid],
 			msg.Index)
 	})
@@ -236,11 +237,9 @@ func (m *mod) parse() error {
 		{"protodown", "no-protodown", rtnl.IFLA_PROTO_DOWN},
 	} {
 		if m.opt.Flags.ByName[x.set] {
-			m.attrs = append(m.attrs,
-				rtnl.Attr{x.t, rtnl.Uint8Attr(1)})
+			m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint8Attr(1)})
 		} else if m.opt.Flags.ByName[x.unset] {
-			m.attrs = append(m.attrs,
-				rtnl.Attr{x.t, rtnl.Uint8Attr(0)})
+			m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint8Attr(0)})
 		}
 	}
 	for _, x := range []struct {
@@ -251,8 +250,7 @@ func (m *mod) parse() error {
 		{"no-vrf", rtnl.IFLA_MASTER},
 	} {
 		if m.opt.Flags.ByName[x.name] {
-			m.attrs = append(m.attrs,
-				rtnl.Attr{x.t, rtnl.Int32Attr(0)})
+			m.attrs = append(m.attrs, nl.Attr{x.t, nl.Int32Attr(0)})
 		}
 	}
 	for _, x := range []struct {
@@ -311,7 +309,7 @@ func (m *mod) parse() error {
 		if len(s) == 0 {
 			continue
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t, rtnl.KstringAttr(s)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.KstringAttr(s)})
 	}
 	for _, x := range []struct {
 		name string
@@ -332,7 +330,7 @@ func (m *mod) parse() error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t, rtnl.Uint32Attr(u32)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint32Attr(u32)})
 	}
 	for _, x := range []struct {
 		name string
@@ -349,7 +347,7 @@ func (m *mod) parse() error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t, rtnl.BytesAttr(mac)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.BytesAttr(mac)})
 	}
 	for _, x := range []struct {
 		name string
@@ -366,8 +364,7 @@ func (m *mod) parse() error {
 		if !found {
 			return fmt.Errorf("%s: %q not found", x.name, s)
 		}
-		m.attrs = append(m.attrs,
-			rtnl.Attr{x.t, rtnl.Int32Attr(ifindex)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Int32Attr(ifindex)})
 	}
 	if s := m.opt.Parms.ByName["netns"]; len(s) > 0 {
 		var id int32
@@ -381,36 +378,36 @@ func (m *mod) parse() error {
 		} else {
 			t = rtnl.IFLA_NET_NS_PID
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{t, rtnl.Int32Attr(id)})
+		m.attrs = append(m.attrs, nl.Attr{t, nl.Int32Attr(id)})
 	}
 	if s := m.opt.Parms.ByName["mode"]; len(s) > 0 {
 		mode, found := rtnl.IfLinkModeByName[s]
 		if !found {
 			return fmt.Errorf("mode: %q unknown", s)
 		}
-		m.attrs = append(m.attrs,
-			rtnl.Attr{rtnl.IFLA_LINKMODE, rtnl.Uint8Attr(mode)})
+		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_LINKMODE,
+			nl.Uint8Attr(mode)})
 	}
 	if s := m.opt.Parms.ByName["state"]; len(s) > 0 {
 		u8, found := rtnl.IfOperByName[s]
 		if !found {
 			return fmt.Errorf("state: %q unknown", s)
 		}
-		m.attrs = append(m.attrs,
-			rtnl.Attr{rtnl.IFLA_OPERSTATE, rtnl.Uint8Attr(u8)})
+		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_OPERSTATE,
+			nl.Uint8Attr(u8)})
 	}
 	if m.name == "add" {
 		switch len(m.args) {
 		case 0:
 		case 1:
-			m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_IFNAME,
-				rtnl.KstringAttr(m.args[0])})
+			m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_IFNAME,
+				nl.KstringAttr(m.args[0])})
 		default:
 			return fmt.Errorf("%v: unexpected", m.args[1:])
 		}
 		if link != 0 {
-			m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_LINK,
-				rtnl.Int32Attr(link)})
+			m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_LINK,
+				nl.Int32Attr(link)})
 		}
 		if len(m.indices) == 0 {
 			m.indices = []int32{0}
@@ -436,8 +433,8 @@ func (m *mod) parse() error {
 			m.indices = []int32{ifindex}
 		}
 		if gid != nogroup {
-			m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_GROUP,
-				rtnl.Uint32Attr(gid)})
+			m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_GROUP,
+				nl.Uint32Attr(gid)})
 		}
 	default:
 		return fmt.Errorf("%v: unexpected", m.args[1:])
@@ -450,14 +447,13 @@ func (m *mod) parseAddrGenMode(s string) error {
 	if !found {
 		return fmt.Errorf("addrgenmode: %q unknown", s)
 	}
-	m.attrs = append(m.attrs,
-		rtnl.Attr{rtnl.IFLA_AF_SPEC,
-			rtnl.Attr{uint16(rtnl.AF_INET6),
-				rtnl.Attr{rtnl.IFLA_INET6_ADDR_GEN_MODE,
-					rtnl.Uint8Attr(mode),
-				},
+	m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_AF_SPEC,
+		nl.Attr{uint16(rtnl.AF_INET6),
+			nl.Attr{rtnl.IFLA_INET6_ADDR_GEN_MODE,
+				nl.Uint8Attr(mode),
 			},
 		},
+	},
 	)
 	return nil
 }

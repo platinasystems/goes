@@ -11,9 +11,10 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
@@ -63,7 +64,7 @@ type counters struct {
 	last    map[int32][]byte
 	ifname  map[int32]string
 	updated map[int32]bool
-	sr      *rtnl.SockReceiver
+	sr      *nl.SockReceiver
 	printf  func(string, ...interface{}) (int, error)
 	prefix  string
 }
@@ -133,13 +134,13 @@ func (Command) Main(args ...string) error {
 		c.prefix = name + "."
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return fmt.Errorf("socket: %v", err)
 	}
 	defer sock.Close()
 
-	c.sr = rtnl.NewSockReceiver(sock)
+	c.sr = nl.NewSockReceiver(sock)
 
 	for _, x := range []struct {
 		parm string
@@ -189,10 +190,10 @@ func (Command) Main(args ...string) error {
 }
 
 func (c *counters) counters() error {
-	req, err := rtnl.NewMessage(
-		rtnl.Hdr{
+	req, err := nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_MATCH,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_MATCH,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
@@ -209,12 +210,12 @@ func (c *counters) counters() error {
 		var lmsg *rtnl.IfInfoMsg
 		var loper uint8
 		var lstats *rtnl.IfStats64
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
-		ifname := rtnl.Kstring(ifla[rtnl.IFLA_IFNAME])
+		ifname := nl.Kstring(ifla[rtnl.IFLA_IFNAME])
 		c.ifname[msg.Index] = ifname
 		lb, found := c.last[msg.Index]
 		if found {

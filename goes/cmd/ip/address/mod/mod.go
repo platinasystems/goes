@@ -10,8 +10,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const Apropos = "network address"
@@ -68,13 +69,13 @@ LFT := { forever | SECONDS }`)
 
 func (c Command) Main(args ...string) error {
 	var ifa struct {
-		hdr   rtnl.Hdr
+		hdr   nl.Hdr
 		msg   rtnl.IfAddrMsg
-		attrs []rtnl.Attr
+		attrs []nl.Attr
 		rsp   rtnl.Ifa
 	}
 	addattr := func(t uint16, v io.Reader) {
-		ifa.attrs = append(ifa.attrs, rtnl.Attr{t, v})
+		ifa.attrs = append(ifa.attrs, nl.Attr{t, v})
 	}
 
 	opt, args := options.New(args)
@@ -171,8 +172,8 @@ func (c Command) Main(args ...string) error {
 		}
 	}
 	if s := opt.Parms.ByName["label"]; len(s) > 0 {
-		ifa.attrs = append(ifa.attrs, rtnl.Attr{rtnl.IFA_LABEL,
-			rtnl.KstringAttr(s)})
+		ifa.attrs = append(ifa.attrs, nl.Attr{rtnl.IFA_LABEL,
+			nl.KstringAttr(s)})
 	}
 	if s := opt.Parms.ByName["scope"]; len(s) > 0 {
 		var found bool
@@ -182,29 +183,29 @@ func (c Command) Main(args ...string) error {
 		}
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
 	ifa.msg.Index = ^uint32(0)
-	if req, err := rtnl.NewMessage(
-		rtnl.Hdr{
+	if req, err := nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_ACK,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		rtnl.Attr{rtnl.IFLA_IFNAME,
-			rtnl.KstringAttr(opt.Parms.ByName["dev"])},
+		nl.Attr{rtnl.IFLA_IFNAME,
+			nl.KstringAttr(opt.Parms.ByName["dev"])},
 	); err != nil {
 		return err
 	} else if err = sr.UntilDone(req, func(b []byte) {
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		ifa.msg.Index = uint32(rtnl.IfInfoMsgPtr(b).Index)
@@ -215,25 +216,25 @@ func (c Command) Main(args ...string) error {
 		return fmt.Errorf("%s: not found", opt.Parms.ByName["dev"])
 	}
 
-	ifa.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK
+	ifa.hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK
 
 	switch c {
 	case "delete", "xdelete":
 		ifa.hdr.Type = rtnl.RTM_DELADDR
 	case "add":
 		ifa.hdr.Type = rtnl.RTM_NEWADDR
-		ifa.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+		ifa.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_EXCL
 	case "change":
 		ifa.hdr.Type = rtnl.RTM_NEWADDR
-		ifa.hdr.Flags |= rtnl.NLM_F_REPLACE
+		ifa.hdr.Flags |= nl.NLM_F_REPLACE
 	case "replace":
 		ifa.hdr.Type = rtnl.RTM_NEWADDR
-		ifa.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+		ifa.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_EXCL
 	default:
 		return fmt.Errorf("%q: unknown", c)
 	}
 
-	b, err := rtnl.NewMessage(ifa.hdr, ifa.msg, ifa.attrs...)
+	b, err := nl.NewMessage(ifa.hdr, ifa.msg, ifa.attrs...)
 	if err != nil {
 		return err
 	}

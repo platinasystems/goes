@@ -7,7 +7,7 @@ package options
 import (
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowPrefix(b []byte, ifnames map[int32]string) {

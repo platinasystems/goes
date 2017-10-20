@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type bridge
@@ -51,8 +52,8 @@ func (m *mod) parseTypeBridge() error {
 
 	m.args = m.opt.Flags.More(m.args, []string{"fdb-flush", "fdb_flush"})
 	if m.opt.Flags.ByName["fdb-flush"] {
-		m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_BR_FDB_FLUSH,
-			rtnl.NilAttr{}})
+		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_BR_FDB_FLUSH,
+			nl.NilAttr{}})
 	}
 	for _, x := range []struct {
 		names []string
@@ -85,8 +86,7 @@ func (m *mod) parseTypeBridge() error {
 		if _, err = fmt.Sscan(s, &u64); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t,
-			rtnl.Uint32Attr(u64)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint32Attr(u64)})
 	}
 	for _, x := range []struct {
 		names []string
@@ -122,8 +122,7 @@ func (m *mod) parseTypeBridge() error {
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t,
-			rtnl.Uint32Attr(u32)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint32Attr(u32)})
 	}
 	for _, x := range []struct {
 		names []string
@@ -147,8 +146,7 @@ func (m *mod) parseTypeBridge() error {
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t,
-			rtnl.Uint16Attr(u16)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint16Attr(u16)})
 	}
 	for _, x := range []struct {
 		names []string
@@ -188,8 +186,7 @@ func (m *mod) parseTypeBridge() error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.names[0], s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t,
-			rtnl.Uint16Attr(u8)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint16Attr(u8)})
 	}
 	for _, x := range []struct {
 		names []string
@@ -207,8 +204,7 @@ func (m *mod) parseTypeBridge() error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		m.attrs = append(m.attrs, rtnl.Attr{x.t,
-			rtnl.BytesAttr(lladdr)})
+		m.attrs = append(m.attrs, nl.Attr{x.t, nl.BytesAttr(lladdr)})
 	}
 	return nil
 }

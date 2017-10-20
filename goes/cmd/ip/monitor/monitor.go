@@ -15,8 +15,9 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -117,7 +118,7 @@ func (Command) Main(args ...string) error {
 			return err
 		}
 		defer save.Close()
-		save.tsbuf = make([]byte, rtnl.SizeofHdr+sizeofTstamp)
+		save.tsbuf = make([]byte, nl.SizeofHdr+sizeofTstamp)
 		handle = save.Handle
 	} else {
 		show.nsid = -1
@@ -129,19 +130,19 @@ func (Command) Main(args ...string) error {
 		if err != nil {
 			return err
 		}
-		for err == nil && len(b) > rtnl.SizeofHdr {
+		for err == nil && len(b) > nl.SizeofHdr {
 			var msg []byte
-			msg, b, err = rtnl.Pop(b)
+			msg, b, err = nl.Pop(b)
 			handle(msg)
 		}
 		return err
 	}
 
-	if show.ifnames, err = ifnamesByIndex(); err != nil {
+	if show.ifnames, err = ifnameByIndex(); err != nil {
 		return err
 	}
 
-	sock, err := rtnl.NewSock(16, groups(show.opt),
+	sock, err := nl.NewSock(16, groups(show.opt),
 		show.opt.Flags.ByName["all-nsid"])
 	if err != nil {
 		return err
@@ -160,9 +161,9 @@ selectLoop:
 			if !opened {
 				break selectLoop
 			}
-			for err == nil && len(b) > rtnl.SizeofHdr {
+			for err == nil && len(b) > nl.SizeofHdr {
 				var msg []byte
-				msg, b, err = rtnl.Pop(b)
+				msg, b, err = nl.Pop(b)
 				handle(msg)
 			}
 		}
@@ -325,15 +326,15 @@ type save struct {
 }
 
 func (save *save) Handle(b []byte) {
-	if len(b) < rtnl.SizeofHdr {
+	if len(b) < nl.SizeofHdr {
 		return
 	}
 	now := time.Now()
-	*(rtnl.HdrPtr(save.tsbuf)) = rtnl.Hdr{
+	*(nl.HdrPtr(save.tsbuf)) = nl.Hdr{
 		Len:  uint32(len(save.tsbuf)),
-		Type: rtnl.NLMSG_TSTAMP,
+		Type: nl.NLMSG_TSTAMP,
 	}
-	*(*tstamp)(unsafe.Pointer(&save.tsbuf[rtnl.SizeofHdr])) = tstamp{
+	*(*tstamp)(unsafe.Pointer(&save.tsbuf[nl.SizeofHdr])) = tstamp{
 		secs:  uint32(now.Unix()),
 		usecs: uint32(now.UnixNano() / 1000),
 	}
@@ -350,10 +351,10 @@ type show struct {
 func (show *show) Handle(b []byte) {
 	const tfmt = "Mon Jan 01 15:04:05.999999999-07:00 2006"
 	var deleted bool
-	if len(b) < rtnl.SizeofHdr {
+	if len(b) < nl.SizeofHdr {
 		return
 	}
-	h := rtnl.HdrPtr(b)
+	h := nl.HdrPtr(b)
 	heading := func(label string) {
 		if show.opt.Flags.ByName["-t"] {
 			show.opt.Print(time.Now().Format(tfmt), "\n")
@@ -377,8 +378,8 @@ func (show *show) Handle(b []byte) {
 		}
 	}
 	switch h.Type {
-	case rtnl.NLMSG_NSID:
-		show.nsid = *(*int)(unsafe.Pointer(&b[rtnl.SizeofHdr]))
+	case nl.NLMSG_NSID:
+		show.nsid = *(*int)(unsafe.Pointer(&b[nl.SizeofHdr]))
 	case rtnl.RTM_DELROUTE:
 		deleted = true
 		fallthrough
@@ -396,8 +397,7 @@ func (show *show) Handle(b []byte) {
 		heading("LINK")
 		ifla.Write(b)
 		msg := rtnl.IfInfoMsgPtr(b)
-		show.ifnames[msg.Index] =
-			rtnl.Kstring(ifla[rtnl.IFLA_IFNAME])
+		show.ifnames[msg.Index] = nl.Kstring(ifla[rtnl.IFLA_IFNAME])
 		show.opt.ShowIfInfo(b)
 	case rtnl.RTM_DELADDR:
 		deleted = true
@@ -430,8 +430,8 @@ func (show *show) Handle(b []byte) {
 	case rtnl.RTM_NEWNETCONF:
 		heading("NETCONF")
 		show.opt.ShowNetconf(b, show.ifnames)
-	case rtnl.NLMSG_TSTAMP:
-		ts := *(*tstamp)(unsafe.Pointer(&b[rtnl.SizeofHdr]))
+	case nl.NLMSG_TSTAMP:
+		ts := *(*tstamp)(unsafe.Pointer(&b[nl.SizeofHdr]))
 		show.opt.Print("Timestamp: ", time.Unix(int64(ts.secs),
 			int64(ts.usecs*1000)))
 	case rtnl.RTM_DELNSID:
@@ -443,24 +443,24 @@ func (show *show) Handle(b []byte) {
 		var sep string
 		netnsa.Write(b)
 		if val := netnsa[rtnl.NETNSA_NSID]; len(val) > 0 {
-			show.opt.Print("nsid=", rtnl.Int32(val))
+			show.opt.Print("nsid=", nl.Int32(val))
 			sep = ", "
 		}
 		if val := netnsa[rtnl.NETNSA_PID]; len(val) > 0 {
-			show.opt.Print(sep, "pid=", rtnl.Uint32(val))
+			show.opt.Print(sep, "pid=", nl.Uint32(val))
 			sep = ", "
 		}
 		if val := netnsa[rtnl.NETNSA_FD]; len(val) > 0 {
-			show.opt.Print(sep, "fd=", rtnl.Uint32(val))
+			show.opt.Print(sep, "fd=", nl.Uint32(val))
 		}
-	case rtnl.NLMSG_NOOP:
+	case nl.NLMSG_NOOP:
 		heading("NOOP")
 		show.opt.Print("pid=", h.Pid, ", seq=", h.Seq)
-	case rtnl.NLMSG_DONE:
+	case nl.NLMSG_DONE:
 		heading("DONE")
 		show.opt.Print("pid=", h.Pid, ", seq=", h.Seq)
-	case rtnl.NLMSG_ERROR:
-		p := rtnl.NlmsgerrPtr(b)
+	case nl.NLMSG_ERROR:
+		p := nl.NlmsgerrPtr(b)
 		if p == nil || p.Errno == 0 {
 			heading("ACK")
 			show.opt.Print("pid=", h.Pid, " seq=", h.Seq)
@@ -475,13 +475,13 @@ func (show *show) Handle(b []byte) {
 	fmt.Println()
 }
 
-func ifnamesByIndex() (map[int32]string, error) {
-	sock, err := rtnl.NewSock()
+func ifnameByIndex() (map[int32]string, error) {
+	sock, err := nl.NewSock()
 	if err != nil {
 		return nil, err
 	}
 	defer sock.Close()
-	return rtnl.NewSockReceiver(sock).IfNamesByIndex()
+	return rtnl.IfNameByIndex(nl.NewSockReceiver(sock))
 }
 
 const sizeofTstamp = 4 + 4

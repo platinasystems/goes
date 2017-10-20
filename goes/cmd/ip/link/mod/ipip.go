@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type ipip
@@ -44,8 +45,8 @@ func (m *mod) parseTypeIpIp() error {
 			if ip4 := net.ParseIP(s).To4(); ip4 == nil {
 				return fmt.Errorf("%s: %q invalid", x.name, s)
 			} else {
-				m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-					rtnl.BytesAttr(ip4)})
+				m.tinfo = append(m.tinfo, nl.Attr{x.t,
+					nl.BytesAttr(ip4)})
 			}
 		}
 	}
@@ -65,8 +66,8 @@ func (m *mod) parseTypeIpIp() error {
 			if _, err := fmt.Sscan(s, &u8); err != nil {
 				return fmt.Errorf("%s: %q %v", x.name, s, err)
 			}
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(u8)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(u8)})
 		}
 	}
 	m.args = m.opt.Parms.More(m.args, "dev")
@@ -75,25 +76,24 @@ func (m *mod) parseTypeIpIp() error {
 		if !found {
 			return fmt.Errorf("dev: %q not found", s)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_IPTUN_LINK,
-			rtnl.Uint32Attr(dev)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_LINK,
+			nl.Uint32Attr(dev)})
 	}
 	m.args = m.opt.Flags.More(m.args,
 		[]string{"pmtudisc", "+pmtudisc"},
 		[]string{"no-pmtudisc", "-pmtudisc"},
 	)
 	if m.opt.Flags.ByName["pmtudisc"] {
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_IPTUN_PMTUDISC,
-			rtnl.Uint8Attr(1)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_PMTUDISC,
+			nl.Uint8Attr(1)})
 	} else if m.opt.Flags.ByName["no-pmtudisc"] {
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_IPTUN_PMTUDISC,
-			rtnl.Uint8Attr(0)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_PMTUDISC,
+			nl.Uint8Attr(0)})
 	}
 	m.args = m.opt.Flags.More(m.args, []string{"no-encap", "-encap"})
 	if m.opt.Flags.ByName["no-encap"] {
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
-				rtnl.Uint32Attr(rtnl.TUNNEL_ENCAP_NONE)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
+			nl.Uint32Attr(rtnl.TUNNEL_ENCAP_NONE)})
 	} else {
 		m.args = m.opt.Parms.More(m.args, "encap")
 		if s := m.opt.Parms.ByName["encap"]; len(s) > 0 {
@@ -105,8 +105,8 @@ func (m *mod) parseTypeIpIp() error {
 				return fmt.Errorf("encap: %q unknown", s)
 			} else {
 				m.tinfo = append(m.tinfo,
-					rtnl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
-						rtnl.Uint32Attr(encap)})
+					nl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
+						nl.Uint32Attr(encap)})
 			}
 		}
 	}
@@ -127,21 +127,21 @@ func (m *mod) parseTypeIpIp() error {
 				}
 			}
 			m.tinfo = append(m.tinfo,
-				rtnl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
-					rtnl.Be16Attr(u16)})
+				nl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
+					nl.Be16Attr(u16)})
 		}
 	}
 	m.args = m.opt.Parms.More(m.args, "mode")
 	switch s := m.opt.Parms.ByName["mode"]; s {
 	case "", "any", "anyip4", "any/ip4":
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_IPTUN_PROTO,
-			rtnl.Uint8Attr(0)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_PROTO,
+			nl.Uint8Attr(0)})
 	case "ipip", "ip4ip4", "ip4/ip4":
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_IPTUN_PROTO,
-			rtnl.Uint8Attr(rtnl.IPPROTO_IPIP)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_PROTO,
+			nl.Uint8Attr(rtnl.IPPROTO_IPIP)})
 	case "mplsip", "mplsip4", "mpls/ip4":
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_IPTUN_PROTO,
-			rtnl.Uint8Attr(rtnl.IPPROTO_MPLS)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPTUN_PROTO,
+			nl.Uint8Attr(rtnl.IPPROTO_MPLS)})
 	default:
 		return fmt.Errorf("%q: unknown encap", s)
 	}
@@ -162,7 +162,7 @@ func (m *mod) parseTypeIpIp() error {
 			encapflags &^= x.flag
 		}
 	}
-	m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_GRE_ENCAP_FLAGS,
-		rtnl.Uint16Attr(encapflags)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_ENCAP_FLAGS,
+		nl.Uint16Attr(encapflags)})
 	return nil
 }

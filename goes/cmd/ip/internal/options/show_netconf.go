@@ -4,11 +4,14 @@
 
 package options
 
-import "github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+import (
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
+)
 
 func (opt *Options) ShowNetconf(b []byte, ifnames map[int32]string) {
 	onoff := func(b []byte) string {
-		if rtnl.Uint32(b) != 0 {
+		if nl.Uint32(b) != 0 {
 			return "on"
 		}
 		return "off"
@@ -18,7 +21,7 @@ func (opt *Options) ShowNetconf(b []byte, ifnames map[int32]string) {
 	msg := rtnl.NetconfMsgPtr(b)
 	opt.Print(rtnl.AfName(msg.Family), " ")
 	if val := netconfa[rtnl.NETCONFA_IFINDEX]; len(val) > 0 {
-		switch idx := rtnl.Int32(val); idx {
+		switch idx := nl.Int32(val); idx {
 		case rtnl.NETCONFA_IFINDEX_ALL:
 			opt.Print("all ")
 		case rtnl.NETCONFA_IFINDEX_DEFAULT:
@@ -35,7 +38,7 @@ func (opt *Options) ShowNetconf(b []byte, ifnames map[int32]string) {
 		opt.Print("forwarding ", onoff(val), " ")
 	}
 	if val := netconfa[rtnl.NETCONFA_RP_FILTER]; len(val) > 0 {
-		switch rtnl.Uint32(val) {
+		switch nl.Uint32(val) {
 		case 0:
 			opt.Print("rp-filter off ")
 		case 1:

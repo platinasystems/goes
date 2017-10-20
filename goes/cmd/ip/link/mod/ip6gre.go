@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type { ip6gre | ip6gretap }
@@ -46,8 +47,8 @@ func (m *mod) parseTypeIp6Gre() error {
 			if ip4 := net.ParseIP(s).To4(); ip4 == nil {
 				return fmt.Errorf("%s: %q invalid", x.name, s)
 			} else {
-				m.tinfo = append(m.tinfo,
-					rtnl.Attr{x.t, rtnl.BytesAttr(ip4)})
+				m.tinfo = append(m.tinfo, nl.Attr{x.t,
+					nl.BytesAttr(ip4)})
 			}
 		}
 	}
@@ -83,10 +84,10 @@ func (m *mod) parseTypeIp6Gre() error {
 		if _, err := fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("key: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_IKEY, rtnl.Uint32Attr(u32)})
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_OKEY, rtnl.Uint32Attr(u32)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_IKEY,
+			nl.Uint32Attr(u32)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_OKEY,
+			nl.Uint32Attr(u32)})
 		iflags |= rtnl.GRE_KEY
 		oflags |= rtnl.GRE_KEY
 	} else {
@@ -106,8 +107,8 @@ func (m *mod) parseTypeIp6Gre() error {
 			if _, err := fmt.Sscan(s, &u32); err != nil {
 				return fmt.Errorf("%s: %q %v", x.name, s, err)
 			}
-			m.tinfo = append(m.tinfo,
-				rtnl.Attr{x.t, rtnl.Uint32Attr(u32)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint32Attr(u32)})
 			*(x.flags) |= rtnl.GRE_KEY
 		}
 	}
@@ -159,8 +160,8 @@ func (m *mod) parseTypeIp6Gre() error {
 		if !found {
 			return fmt.Errorf("dev: %q not found", s)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_LINK, rtnl.Uint32Attr(dev)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_LINK,
+			nl.Uint32Attr(dev)})
 	}
 	m.args = m.opt.Parms.More(m.args, []string{"ttl", "hoplimit"})
 	if s := m.opt.Parms.ByName["ttl"]; len(s) > 0 {
@@ -168,8 +169,8 @@ func (m *mod) parseTypeIp6Gre() error {
 		if _, err := fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("ttl: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_TTL, rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_TTL,
+			nl.Uint8Attr(u8)})
 	}
 	m.args = m.opt.Parms.More(m.args, []string{"tos", "tclass", "defiled"})
 	if s := m.opt.Parms.ByName["tos"]; len(s) > 0 {
@@ -198,9 +199,8 @@ func (m *mod) parseTypeIp6Gre() error {
 		}
 	}
 	if flowinfo != 0 {
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_FLOWINFO,
-				rtnl.Uint32Attr(flowinfo)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_FLOWINFO,
+			nl.Uint32Attr(flowinfo)})
 	}
 	m.args = m.opt.Parms.More(m.args, "dscp")
 	if s := m.opt.Parms.ByName["dscp"]; len(s) > 0 {
@@ -220,8 +220,8 @@ func (m *mod) parseTypeIp6Gre() error {
 		} else {
 			greflags &^= rtnl.IP6_TNL_F_USE_ORIG_FWMARK
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_FWMARK, rtnl.Uint32Attr(u32)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_FWMARK,
+			nl.Uint32Attr(u32)})
 	}
 	m.args = m.opt.Parms.More(m.args, "encaplimit")
 	if s := m.opt.Parms.ByName["encaplimit"]; len(s) > 0 {
@@ -233,15 +233,13 @@ func (m *mod) parseTypeIp6Gre() error {
 		} else {
 			greflags &^= rtnl.IP6_TNL_F_IGN_ENCAP_LIMIT
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_ENCAP_LIMIT,
-				rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_ENCAP_LIMIT,
+			nl.Uint8Attr(u8)})
 	}
 	m.args = m.opt.Flags.More(m.args, []string{"no-encap", "-encap"})
 	if m.opt.Flags.ByName["no-encap"] {
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GRE_ENCAP_TYPE,
-				rtnl.Uint32Attr(rtnl.TUNNEL_ENCAP_NONE)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_ENCAP_TYPE,
+			nl.Uint32Attr(rtnl.TUNNEL_ENCAP_NONE)})
 	} else {
 		m.args = m.opt.Parms.More(m.args, "encap")
 		if s := m.opt.Parms.ByName["encap"]; len(s) > 0 {
@@ -253,8 +251,8 @@ func (m *mod) parseTypeIp6Gre() error {
 				return fmt.Errorf("encap: %q unknown", s)
 			} else {
 				m.tinfo = append(m.tinfo,
-					rtnl.Attr{rtnl.IFLA_GRE_ENCAP_TYPE,
-						rtnl.Uint32Attr(encap)})
+					nl.Attr{rtnl.IFLA_GRE_ENCAP_TYPE,
+						nl.Uint32Attr(encap)})
 			}
 		}
 	}
@@ -275,8 +273,8 @@ func (m *mod) parseTypeIp6Gre() error {
 				}
 			}
 			m.tinfo = append(m.tinfo,
-				rtnl.Attr{rtnl.IFLA_GRE_ENCAP_TYPE,
-					rtnl.Be16Attr(u16)})
+				nl.Attr{rtnl.IFLA_GRE_ENCAP_TYPE,
+					nl.Be16Attr(u16)})
 		}
 	}
 	m.args = m.opt.Flags.More(m.args,
@@ -304,13 +302,13 @@ func (m *mod) parseTypeIp6Gre() error {
 			eflags &^= x.flag
 		}
 	}
-	m.tinfo = append(m.tinfo,
-		rtnl.Attr{rtnl.IFLA_GRE_IFLAGS, rtnl.Be16Attr(iflags)})
-	m.tinfo = append(m.tinfo,
-		rtnl.Attr{rtnl.IFLA_GRE_OFLAGS, rtnl.Be16Attr(oflags)})
-	m.tinfo = append(m.tinfo,
-		rtnl.Attr{rtnl.IFLA_GRE_ENCAP_FLAGS, rtnl.Uint16Attr(eflags)})
-	m.tinfo = append(m.tinfo,
-		rtnl.Attr{rtnl.IFLA_GRE_FLAGS, rtnl.Uint32Attr(greflags)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_IFLAGS,
+		nl.Be16Attr(iflags)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_OFLAGS,
+		nl.Be16Attr(oflags)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_ENCAP_FLAGS,
+		nl.Uint16Attr(eflags)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GRE_FLAGS,
+		nl.Uint32Attr(greflags)})
 	return nil
 }

@@ -11,8 +11,9 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -70,28 +71,28 @@ func (Command) Main(args ...string) error {
 	}
 	defer f.Close()
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	req, err := rtnl.NewMessage(
-		rtnl.Hdr{
+	req, err := nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_NEWNSID,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_ACK,
 		},
 		rtnl.NetnsMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		rtnl.Attr{rtnl.NETNSA_FD, rtnl.Uint32Attr(f.Fd())},
-		rtnl.Attr{rtnl.NETNSA_NSID, rtnl.Int32Attr(nsid)},
+		nl.Attr{rtnl.NETNSA_FD, nl.Uint32Attr(f.Fd())},
+		nl.Attr{rtnl.NETNSA_NSID, nl.Int32Attr(nsid)},
 	)
 	if err != nil {
 		return err
 	}
 
-	return rtnl.NewSockReceiver(sock).UntilDone(req, func(b []byte) {})
+	return nl.NewSockReceiver(sock).UntilDone(req, func(b []byte) {})
 }
 
 func (Command) Complete(args ...string) (list []string) {

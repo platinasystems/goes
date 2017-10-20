@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type macvlan mode {
@@ -39,8 +40,8 @@ func (m *mod) parseTypeMacVlan() error {
 	if !found {
 		return fmt.Errorf("mode: %q unknown", s)
 	} else {
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_MODE,
-			rtnl.Uint32Attr(mode)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_MACVLAN_MODE,
+			nl.Uint32Attr(mode)})
 	}
 	if mode == rtnl.MACVLAN_MODE_PASSTHRU {
 		m.args = m.opt.Flags.More(m.args, []string{
@@ -48,8 +49,9 @@ func (m *mod) parseTypeMacVlan() error {
 			"no-promiscuous", "-promiscuous",
 		})
 		if m.opt.Flags.ByName["no-promisc"] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_FLAGS,
-				rtnl.Uint16Attr(rtnl.MACVLAN_FLAG_NOPROMISC)})
+			m.tinfo = append(m.tinfo,
+				nl.Attr{rtnl.IFLA_MACVLAN_FLAGS,
+					nl.Uint16Attr(rtnl.MACVLAN_FLAG_NOPROMISC)})
 		}
 		return nil
 	} else if mode != rtnl.MACVLAN_MODE_SOURCE {
@@ -69,26 +71,25 @@ func (m *mod) parseTypeMacVlan() error {
 			return fmt.Errorf("LLADDR: %q %v",
 				m.args[0], err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
-			rtnl.BytesAttr(mac)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
+			nl.BytesAttr(mac)})
 		m.args = m.args[1:]
 	case "set":
-		var macs rtnl.Attrs
+		var macs nl.Attrs
 		for len(m.args) > 0 {
 			mac, err := net.ParseMAC(m.args[0])
 			if err != nil {
 				break
 			}
-			macs = append(macs,
-				rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
-					rtnl.BytesAttr(mac)})
+			macs = append(macs, nl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
+				nl.BytesAttr(mac)})
 			m.args = m.args[1:]
 		}
 		if len(macs) == 0 {
 			return fmt.Errorf("missing LLADDR(s)")
 		}
 		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_MACVLAN_MACADDR_DATA, macs})
+			nl.Attr{rtnl.IFLA_MACVLAN_MACADDR_DATA, macs})
 		m.args = m.args[1:]
 
 	case "flush":

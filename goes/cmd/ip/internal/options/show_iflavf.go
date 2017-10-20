@@ -7,13 +7,14 @@ package options
 import (
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowIflaVf(b []byte) {
 	var vf rtnl.IflaVf
 
-	rtnl.IndexAttrByType(vf[:], b)
+	nl.IndexAttrByType(vf[:], b)
 
 	printflag := func(h string, t uint16) {
 		if v := rtnl.IflaVfFlagPtr(vf[t]); v != nil {
@@ -74,7 +75,7 @@ func (opt *Options) ShowIflaVf(b []byte) {
 	printflag(", trust ", rtnl.IFLA_VF_TRUST)
 	if opt.Flags.ByName["-s"] && len(vf[rtnl.IFLA_VF_STATS]) > 0 {
 		var vfstats rtnl.IflaVfStats
-		rtnl.IndexAttrByType(vfstats[:], vf[rtnl.IFLA_VF_STATS])
+		nl.IndexAttrByType(vfstats[:], vf[rtnl.IFLA_VF_STATS])
 		opt.ShowVfStats(vfstats[:])
 	}
 }

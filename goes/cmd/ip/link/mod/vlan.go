@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (m *mod) parseTypeVlan() error {
@@ -44,9 +45,8 @@ func (m *mod) parseTypeVlan() error {
 		}
 	}
 	if iflaVlanFlags.Mask != 0 {
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
-				iflaVlanFlags})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
+			iflaVlanFlags})
 	}
 	m.args = m.opt.Parms.More(m.args,
 		"protocol",
@@ -62,9 +62,8 @@ func (m *mod) parseTypeVlan() error {
 		if !found {
 			return fmt.Errorf("protocol: %q not found", s)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
-				rtnl.Uint16Attr(proto)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
+			nl.Uint16Attr(proto)})
 	}
 	if s := m.opt.Parms.ByName["id"]; len(s) > 0 {
 		var id uint16
@@ -72,9 +71,8 @@ func (m *mod) parseTypeVlan() error {
 			return fmt.Errorf("type vlan id: %q %v",
 				s, err)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VLAN_ID,
-				rtnl.Uint16Attr(id)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VLAN_ID,
+			nl.Uint16Attr(id)})
 	}
 	for _, x := range []struct {
 		name string
@@ -100,7 +98,7 @@ func (m *mod) parseTypeVlan() error {
 			return fmt.Errorf("%s: TO: %q %v",
 				x.name, s[colon+1:], err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, qos})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, qos})
 	}
 	return nil
 }

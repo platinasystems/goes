@@ -4,7 +4,7 @@
 
 package options
 
-import "github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+import "github.com/platinasystems/go/internal/nl/rtnl"
 
 func (opt *Options) ShowIfStats(val []byte) {
 	var ifstats64 rtnl.IfStats64

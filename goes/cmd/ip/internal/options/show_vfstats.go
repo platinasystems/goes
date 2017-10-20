@@ -4,7 +4,10 @@
 
 package options
 
-import "github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+import (
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
+)
 
 func (opt *Options) ShowVfStats(vfstats [][]byte) {
 	opt.Println()
@@ -19,7 +22,7 @@ func (opt *Options) ShowVfStats(vfstats [][]byte) {
 		{8, rtnl.IFLA_VF_STATS_MULTICAST},
 		{8, rtnl.IFLA_VF_STATS_BROADCAST},
 	} {
-		opt.Nprint(x.w, Stat(rtnl.Uint64(vfstats[x.i])))
+		opt.Nprint(x.w, Stat(nl.Uint64(vfstats[x.i])))
 	}
 	opt.Println()
 	opt.Nprint(4)
@@ -31,6 +34,6 @@ func (opt *Options) ShowVfStats(vfstats [][]byte) {
 		{11, rtnl.IFLA_VF_STATS_TX_BYTES},
 		{9, rtnl.IFLA_VF_STATS_TX_PACKETS},
 	} {
-		opt.Nprint(x.w, Stat(rtnl.Uint64(vfstats[x.i])))
+		opt.Nprint(x.w, Stat(nl.Uint64(vfstats[x.i])))
 	}
 }

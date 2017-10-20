@@ -7,7 +7,8 @@ package options
 import (
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 	"github.com/platinasystems/go/internal/sysconf"
 )
 
@@ -45,7 +46,7 @@ func (opt *Options) ShowNeigh(b []byte, ifnames map[int32]string) {
 			}
 		}
 		if val := nda[rtnl.NDA_PROBES]; len(val) > 0 {
-			opt.Print(" probes ", rtnl.Uint32(val))
+			opt.Print(" probes ", nl.Uint32(val))
 		}
 	}
 	{

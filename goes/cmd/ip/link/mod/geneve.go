@@ -9,7 +9,8 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type geneve { id | vni } ID remote ADDR
@@ -37,8 +38,8 @@ func (m *mod) parseTypeGeneve() error {
 	} else if u32 >= 1<<24 {
 		return fmt.Errorf("vni: %q %v", s, syscall.ERANGE)
 	}
-	m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_GENEVE_ID,
-		rtnl.Uint32Attr(u32)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GENEVE_ID,
+		nl.Uint32Attr(u32)})
 	m.args = m.opt.Parms.More(m.args, []string{"id", "vni"})
 	s = m.opt.Parms.ByName["remote"]
 	if len(s) == 0 {
@@ -47,11 +48,11 @@ func (m *mod) parseTypeGeneve() error {
 	if addr := net.ParseIP(s); addr == nil {
 		return fmt.Errorf("remote: %q invalid", s)
 	} else if ip4 := addr.To4(); ip4 != nil {
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_GENEVE_REMOTE,
-			rtnl.BytesAttr(ip4)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GENEVE_REMOTE,
+			nl.BytesAttr(ip4)})
 	} else {
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_GENEVE_REMOTE6,
-			rtnl.BytesAttr(addr.To16())})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GENEVE_REMOTE6,
+			nl.BytesAttr(addr.To16())})
 	}
 	for _, x := range []struct {
 		names []string
@@ -68,7 +69,7 @@ func (m *mod) parseTypeGeneve() error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.Uint8Attr(u8)})
 	}
 	m.args = m.opt.Parms.More(m.args, "flowlabel")
 	if s = m.opt.Parms.ByName["flowlabel"]; len(s) > 0 {
@@ -76,16 +77,16 @@ func (m *mod) parseTypeGeneve() error {
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("flowlabel: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_GENEVE_LABEL,
-			rtnl.Be32Attr(u32)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GENEVE_LABEL,
+			nl.Be32Attr(u32)})
 	}
 	m.args = m.opt.Parms.More(m.args, "dstport")
 	if s = m.opt.Parms.ByName["dstport"]; len(s) > 0 {
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("dstport: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_GENEVE_PORT,
-			rtnl.Be16Attr(u16)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_GENEVE_PORT,
+			nl.Be16Attr(u16)})
 	}
 	m.args = m.opt.Flags.More(m.args,
 		[]string{"external", "+external"},
@@ -93,12 +94,12 @@ func (m *mod) parseTypeGeneve() error {
 	)
 	if m.opt.Flags.ByName["external"] {
 		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GENEVE_COLLECT_METADATA,
-				rtnl.Uint8Attr(1)})
+			nl.Attr{rtnl.IFLA_GENEVE_COLLECT_METADATA,
+				nl.Uint8Attr(1)})
 	} else if m.opt.Flags.ByName["no-external"] {
 		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_GENEVE_COLLECT_METADATA,
-				rtnl.Uint8Attr(0)})
+			nl.Attr{rtnl.IFLA_GENEVE_COLLECT_METADATA,
+				nl.Uint8Attr(0)})
 	}
 	for _, x := range []struct {
 		set   []string
@@ -123,11 +124,11 @@ func (m *mod) parseTypeGeneve() error {
 	} {
 		m.args = m.opt.Flags.More(m.args, x.set, x.unset)
 		if m.opt.Flags.ByName[x.set[0]] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(1)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(1)})
 		} else if m.opt.Flags.ByName[x.set[0]] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(0)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(0)})
 		}
 	}
 	return nil

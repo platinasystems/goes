@@ -7,12 +7,13 @@ package mod
 import (
 	"strings"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (m *mod) parseType(name string) error {
 	m.tinfo = m.tinfo[:0]
-	kind := rtnl.Attr{rtnl.IFLA_INFO_KIND, rtnl.KstringAttr(name)}
+	kind := nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(name)}
 	dt := rtnl.IFLA_INFO_DATA
 	if strings.HasSuffix(name, "_slave") {
 		dt = rtnl.IFLA_INFO_SLAVE_DATA
@@ -40,16 +41,10 @@ func (m *mod) parseType(name string) error {
 		}
 	}
 	if len(m.tinfo) == 0 {
-		m.attrs = append(m.attrs, rtnl.Attr{rtnl.IFLA_LINKINFO, kind})
+		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_LINKINFO, kind})
 	} else {
-		m.attrs = append(m.attrs,
-			rtnl.Attr{rtnl.IFLA_LINKINFO,
-				rtnl.Attrs{
-					kind,
-					rtnl.Attr{dt, m.tinfo},
-				},
-			},
-		)
+		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_LINKINFO,
+			nl.Attrs{kind, nl.Attr{dt, m.tinfo}}})
 	}
 	return nil
 }

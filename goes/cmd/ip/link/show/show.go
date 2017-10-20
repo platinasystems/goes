@@ -11,8 +11,9 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -90,35 +91,35 @@ func (Command) Main(args ...string) error {
 		}
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
-	if req, err = rtnl.NewMessage(
-		rtnl.Hdr{
+	if req, err = nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		rtnl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
+		nl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
 	); err != nil {
 		return err
 	}
 	if err = sr.UntilDone(req, func(b []byte) {
 		var ifla rtnl.Ifla
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
 		if dev := opt.Parms.ByName["dev"]; len(dev) > 0 {
-			if dev != rtnl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
+			if dev != nl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
 				return
 			}
 		}
@@ -128,7 +129,7 @@ func (Command) Main(args ...string) error {
 			}
 		}
 		if val := ifla[rtnl.IFLA_GROUP]; len(val) > 0 {
-			if gid != rtnl.Uint32(val) {
+			if gid != nl.Uint32(val) {
 				return
 			}
 		} else if gid != 0 {
@@ -142,7 +143,7 @@ func (Command) Main(args ...string) error {
 			}
 		}
 		if master := opt.Parms.ByName["master"]; len(master) > 0 {
-			if master == rtnl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
+			if master == nl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
 				mindex = msg.Index
 				return
 			}

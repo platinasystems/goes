@@ -9,8 +9,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -130,34 +131,34 @@ func (Command) Main(args ...string) error {
 		}
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
-	if req, err = rtnl.NewMessage(
-		rtnl.Hdr{
+	if req, err = nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		rtnl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
+		nl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
 	); err != nil {
 		return err
 	} else if err = sr.UntilDone(req, func(b []byte) {
 		var ifla rtnl.Ifla
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
 		if dev := opt.Parms.ByName["dev"]; len(dev) > 0 {
-			if dev != rtnl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
+			if dev != nl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
 				return
 			}
 		}
@@ -174,7 +175,7 @@ func (Command) Main(args ...string) error {
 			}
 		}
 		if master := opt.Parms.ByName["master"]; len(master) > 0 {
-			if master == rtnl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
+			if master == nl.Kstring(ifla[rtnl.IFLA_IFNAME]) {
 				mindex = msg.Index
 				return
 			}
@@ -186,10 +187,10 @@ func (Command) Main(args ...string) error {
 
 	ifaddrlistByIndex := make(map[uint32][][]byte)
 	for _, af := range opt.Afs() {
-		if req, err = rtnl.NewMessage(
-			rtnl.Hdr{
+		if req, err = nl.NewMessage(
+			nl.Hdr{
 				Type:  rtnl.RTM_GETADDR,
-				Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+				Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 			},
 			rtnl.RtGenMsg{
 				Family: af,
@@ -198,7 +199,7 @@ func (Command) Main(args ...string) error {
 			return err
 		} else if err = sr.UntilDone(req, func(b []byte) {
 			var ifa rtnl.Ifa
-			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWADDR {
+			if nl.HdrPtr(b).Type != rtnl.RTM_NEWADDR {
 				return
 			}
 			msg := rtnl.IfAddrMsgPtr(b)
@@ -206,7 +207,7 @@ func (Command) Main(args ...string) error {
 			if len(to) > 0 {
 				a := ifa[rtnl.IFA_ADDRESS]
 				if len(a) == 0 || msg.Prefixlen != prefix ||
-					rtnl.Kstring(a) != to {
+					nl.Kstring(a) != to {
 					return
 				}
 			}
@@ -216,7 +217,7 @@ func (Command) Main(args ...string) error {
 			if len(label) > 0 {
 				val := ifa[rtnl.IFA_LABEL]
 				if len(val) == 0 ||
-					rtnl.Kstring(val) != label {
+					nl.Kstring(val) != label {
 					return
 				}
 			}

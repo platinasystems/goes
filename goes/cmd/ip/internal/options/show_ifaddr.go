@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowIfAddr(b []byte, withCacheInfo bool) {
@@ -18,7 +19,7 @@ func (opt *Options) ShowIfAddr(b []byte, withCacheInfo bool) {
 	msg := rtnl.IfAddrMsgPtr(b)
 
 	if val := ifa[rtnl.IFA_FLAGS]; len(val) > 0 {
-		ifaf = rtnl.Uint32(val)
+		ifaf = nl.Uint32(val)
 	} else {
 		ifaf = uint32(msg.Flags)
 	}
@@ -65,7 +66,7 @@ func (opt *Options) ShowIfAddr(b []byte, withCacheInfo bool) {
 	}
 
 	if val := ifa[rtnl.IFA_LABEL]; len(val) > 0 {
-		opt.Print(" ", rtnl.Kstring(val))
+		opt.Print(" ", nl.Kstring(val))
 	}
 	if withCacheInfo {
 		ci := rtnl.IfaCacheInfoPtr(ifa[rtnl.IFA_CACHEINFO])

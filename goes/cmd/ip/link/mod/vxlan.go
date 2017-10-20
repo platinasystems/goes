@@ -10,7 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type vxlan id VNI
@@ -53,8 +54,8 @@ func (m *mod) parseTypeVxlan() error {
 	} else if u32 >= 1<<24 {
 		return fmt.Errorf("vni: %q %v", s, syscall.ERANGE)
 	}
-	m.tinfo = append(m.tinfo,
-		rtnl.Attr{rtnl.IFLA_VXLAN_ID, rtnl.Uint32Attr(u32)})
+	m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_ID,
+		nl.Uint32Attr(u32)})
 	m.args = m.opt.Parms.More(m.args, "group", "local", "remote")
 	for _, x := range []struct {
 		name string
@@ -77,32 +78,30 @@ func (m *mod) parseTypeVxlan() error {
 		if addr != nil {
 			if ip4 := addr.To4(); ip4 != nil {
 				m.tinfo = append(m.tinfo,
-					rtnl.Attr{rtnl.IFLA_VXLAN_GROUP,
-						rtnl.BytesAttr(ip4)})
+					nl.Attr{rtnl.IFLA_VXLAN_GROUP,
+						nl.BytesAttr(ip4)})
 			} else {
 				m.tinfo = append(m.tinfo,
-					rtnl.Attr{rtnl.IFLA_VXLAN_GROUP6,
-						rtnl.BytesAttr(addr.To16())})
+					nl.Attr{rtnl.IFLA_VXLAN_GROUP6,
+						nl.BytesAttr(addr.To16())})
 			}
 			break
 		}
 	}
 	if ip4 := laddr.To4(); ip4 != nil {
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VXLAN_LOCAL, rtnl.BytesAttr(ip4)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_LOCAL,
+			nl.BytesAttr(ip4)})
 	} else {
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VXLAN_LOCAL6,
-				rtnl.BytesAttr(laddr.To16())})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_LOCAL6,
+			nl.BytesAttr(laddr.To16())})
 	}
 	m.args = m.opt.Parms.More(m.args, "dev")
 	if s = m.opt.Parms.ByName["dev"]; len(s) > 0 {
 		if dev, found := m.ifindexByName[s]; !found {
 			return fmt.Errorf("dev: %q not found", s)
 		} else {
-			m.tinfo = append(m.tinfo,
-				rtnl.Attr{rtnl.IFLA_VXLAN_LINK,
-					rtnl.Uint32Attr(dev)})
+			m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_LINK,
+				nl.Uint32Attr(dev)})
 		}
 	}
 	for _, x := range []struct {
@@ -120,7 +119,7 @@ func (m *mod) parseTypeVxlan() error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.Uint8Attr(u8)})
 	}
 	m.args = m.opt.Parms.More(m.args, "flowlabel")
 	if s = m.opt.Parms.ByName["flowlabel"]; len(s) > 0 {
@@ -128,8 +127,8 @@ func (m *mod) parseTypeVxlan() error {
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("flowlabel: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_LABEL,
-			rtnl.Be32Attr(u32)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_LABEL,
+			nl.Be32Attr(u32)})
 	}
 	for _, x := range []struct {
 		names []string
@@ -147,15 +146,15 @@ func (m *mod) parseTypeVxlan() error {
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("%s: %q %v", x.names[0], s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint32Attr(u32)})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.Uint32Attr(u32)})
 	}
 	m.args = m.opt.Parms.More(m.args, "dstport")
 	if s = m.opt.Parms.ByName["dstport"]; len(s) > 0 {
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("dstport: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_PORT,
-			rtnl.Be16Attr(u16)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_PORT,
+			nl.Be16Attr(u16)})
 	}
 	m.args = m.opt.Parms.More(m.args, []string{"srcport", "port"})
 	if s = m.opt.Parms.ByName["srcport"]; len(s) > 0 {
@@ -170,7 +169,7 @@ func (m *mod) parseTypeVxlan() error {
 		if _, err = fmt.Sscan(s[colon+1:], &pr.High); err != nil {
 			return fmt.Errorf("srcport high: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_PORT_RANGE,
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_PORT_RANGE,
 			pr})
 	}
 	for _, x := range []struct {
@@ -231,11 +230,11 @@ func (m *mod) parseTypeVxlan() error {
 	} {
 		m.args = m.opt.Flags.More(m.args, x.set, x.unset)
 		if m.opt.Flags.ByName[x.set[0]] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(1)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(1)})
 		} else if m.opt.Flags.ByName[x.set[0]] {
-			m.tinfo = append(m.tinfo, rtnl.Attr{x.t,
-				rtnl.Uint8Attr(0)})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t,
+				nl.Uint8Attr(0)})
 		}
 	}
 	m.args = m.opt.Flags.More(m.args,
@@ -244,14 +243,14 @@ func (m *mod) parseTypeVxlan() error {
 	)
 	if m.opt.Flags.ByName["external"] {
 		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
-				rtnl.Uint8Attr(1)})
-		m.tinfo = append(m.tinfo, rtnl.Attr{rtnl.IFLA_VXLAN_LEARNING,
-			rtnl.Uint8Attr(0)})
+			nl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
+				nl.Uint8Attr(1)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_VXLAN_LEARNING,
+			nl.Uint8Attr(0)})
 	} else if m.opt.Flags.ByName["no-external"] {
 		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
-				rtnl.Uint8Attr(0)})
+			nl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
+				nl.Uint8Attr(0)})
 	}
 	for _, x := range []struct {
 		set []string
@@ -268,8 +267,7 @@ func (m *mod) parseTypeVxlan() error {
 	} {
 		m.args = m.opt.Flags.More(m.args, x.set)
 		if m.opt.Flags.ByName[x.set[0]] {
-			m.tinfo = append(m.tinfo,
-				rtnl.Attr{x.t, rtnl.NilAttr{}})
+			m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.NilAttr{}})
 		}
 	}
 	return nil

@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/netlink"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -129,24 +129,24 @@ func (c Command) Main(args ...string) error {
 		}
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
-	ifnames, err := sr.IfNamesByIndex()
+	ifnames, err := rtnl.IfNameByIndex(sr)
 	if err != nil {
 		return err
 	}
 
 	for _, af := range opt.Afs() {
-		if req, err = rtnl.NewMessage(
-			rtnl.Hdr{
+		if req, err = nl.NewMessage(
+			nl.Hdr{
 				Type:  rtnl.RTM_GETROUTE,
-				Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+				Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 			},
 			rtnl.RtGenMsg{
 				Family: af,
@@ -154,14 +154,14 @@ func (c Command) Main(args ...string) error {
 		); err != nil {
 			return err
 		} else if err = sr.UntilDone(req, func(b []byte) {
-			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWROUTE {
+			if nl.HdrPtr(b).Type != rtnl.RTM_NEWROUTE {
 				return
 			}
 			var rta rtnl.Rta
 			rta.Write(b)
 			msg := rtnl.RtMsgPtr(b)
 			if tbl != rtnl.RT_TABLE_UNSPEC {
-				if tbl != rtnl.Uint32(rta[netlink.RTA_TABLE]) {
+				if tbl != nl.Uint32(rta[rtnl.RTA_TABLE]) {
 					return
 				}
 			}

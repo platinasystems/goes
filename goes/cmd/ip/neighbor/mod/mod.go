@@ -11,8 +11,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -54,26 +55,26 @@ STATE := { permanent | noarp | stale | reachable | none | incomplete |
 
 func (c Command) Main(args ...string) error {
 	var nd struct {
-		hdr   rtnl.Hdr
+		hdr   nl.Hdr
 		msg   rtnl.NdMsg
-		attrs rtnl.Attrs
+		attrs nl.Attrs
 	}
 	addattr := func(t uint16, v io.Reader) {
-		nd.attrs = append(nd.attrs, rtnl.Attr{t, v})
+		nd.attrs = append(nd.attrs, nl.Attr{t, v})
 	}
 
-	nd.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK
+	nd.hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK
 
 	switch c {
 	case "add":
 		nd.hdr.Type = rtnl.RTM_NEWNEIGH
-		nd.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+		nd.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_EXCL
 	case "change":
 		nd.hdr.Type = rtnl.RTM_NEWNEIGH
-		nd.hdr.Flags |= rtnl.NLM_F_REPLACE
+		nd.hdr.Flags |= nl.NLM_F_REPLACE
 	case "replace":
 		nd.hdr.Type = rtnl.RTM_NEWNEIGH
-		nd.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_REPLACE
+		nd.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_REPLACE
 	case "delete":
 		nd.hdr.Type = rtnl.RTM_DELNEIGH
 	default:
@@ -102,7 +103,7 @@ func (c Command) Main(args ...string) error {
 			if err != nil {
 				return fmt.Errorf("lladdr: %q %v", val, err)
 			}
-			addattr(rtnl.NDA_LLADDR, rtnl.BytesAttr(mac))
+			addattr(rtnl.NDA_LLADDR, nl.BytesAttr(mac))
 		}
 		if val := opt.Parms.ByName["nud"]; len(val) > 0 {
 			if val == "all" {
@@ -133,36 +134,36 @@ func (c Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
 	if name := opt.Parms.ByName["dev"]; len(name) > 0 {
 		nd.msg.Index = int32(-1)
-		if req, err := rtnl.NewMessage(
-			rtnl.Hdr{
+		if req, err := nl.NewMessage(
+			nl.Hdr{
 				Type:  rtnl.RTM_GETLINK,
-				Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_MATCH,
+				Flags: nl.NLM_F_REQUEST | nl.NLM_F_MATCH,
 			},
 			rtnl.IfInfoMsg{
 				Family: rtnl.AF_UNSPEC,
 			},
-			rtnl.Attr{rtnl.IFLA_IFNAME, rtnl.KstringAttr(name)},
+			nl.Attr{rtnl.IFLA_IFNAME, nl.KstringAttr(name)},
 		); err != nil {
 			return err
 		} else if err = sr.UntilDone(req, func(b []byte) {
-			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+			if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 				return
 			}
 			var ifla rtnl.Ifla
 			ifla.Write(b)
 			msg := rtnl.IfInfoMsgPtr(b)
 			val := ifla[rtnl.IFLA_IFNAME]
-			if rtnl.Kstring(val) == name {
+			if nl.Kstring(val) == name {
 				nd.msg.Index = msg.Index
 			}
 		}); err != nil {
@@ -173,7 +174,7 @@ func (c Command) Main(args ...string) error {
 		}
 	}
 
-	b, err := rtnl.NewMessage(nd.hdr, nd.msg, nd.attrs...)
+	b, err := nl.NewMessage(nd.hdr, nd.msg, nd.attrs...)
 	if err != nil {
 		return err
 	}

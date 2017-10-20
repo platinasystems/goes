@@ -13,8 +13,9 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -44,11 +45,11 @@ type mod struct {
 	opt  *options.Options
 	args []string
 
-	sr *rtnl.SockReceiver
+	sr *nl.SockReceiver
 
-	hdr   rtnl.Hdr
+	hdr   nl.Hdr
 	msg   rtnl.RtMsg
-	attrs rtnl.Attrs
+	attrs nl.Attrs
 
 	ifindexByName map[string]int32
 	vrfByName     map[string]uint32
@@ -114,41 +115,41 @@ func (c Command) Main(args ...string) error {
 
 	m.opt, m.args = options.New(args)
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	m.sr = rtnl.NewSockReceiver(sock)
+	m.sr = nl.NewSockReceiver(sock)
 
 	if err = m.getifindices(); err != nil {
 		return err
 	}
 
-	m.hdr.Flags = rtnl.NLM_F_REQUEST | rtnl.NLM_F_ACK
+	m.hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK
 
 	switch c {
 	case "add":
 		m.hdr.Type = rtnl.RTM_NEWROUTE
-		m.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_EXCL
+		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_EXCL
 	case "append":
 		m.hdr.Type = rtnl.RTM_NEWROUTE
-		m.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_APPEND
+		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_APPEND
 	case "change", "set":
 		m.hdr.Type = rtnl.RTM_NEWROUTE
-		m.hdr.Flags |= rtnl.NLM_F_REPLACE
+		m.hdr.Flags |= nl.NLM_F_REPLACE
 	case "prepend":
 		m.hdr.Type = rtnl.RTM_NEWROUTE
-		m.hdr.Flags |= rtnl.NLM_F_CREATE
+		m.hdr.Flags |= nl.NLM_F_CREATE
 	case "replace":
 		m.hdr.Type = rtnl.RTM_NEWROUTE
-		m.hdr.Flags |= rtnl.NLM_F_CREATE | rtnl.NLM_F_REPLACE
+		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_REPLACE
 	case "delete":
 		m.hdr.Type = rtnl.RTM_DELROUTE
 	case "test":
 		m.hdr.Type = rtnl.RTM_NEWROUTE
-		m.hdr.Flags |= rtnl.NLM_F_EXCL
+		m.hdr.Flags |= nl.NLM_F_EXCL
 	default:
 		return fmt.Errorf("%s: unknown", c)
 	}
@@ -163,7 +164,7 @@ func (c Command) Main(args ...string) error {
 		return err
 	}
 
-	req, err := rtnl.NewMessage(m.hdr, m.msg, m.attrs...)
+	req, err := nl.NewMessage(m.hdr, m.msg, m.attrs...)
 	if err == nil {
 		err = m.sr.UntilDone(req, func([]byte) {})
 	}
@@ -252,17 +253,17 @@ func (Command) Complete(args ...string) (list []string) {
 }
 
 func (m *mod) append(t uint16, v io.Reader) {
-	m.attrs = append(m.attrs, rtnl.Attr{t, v})
+	m.attrs = append(m.attrs, nl.Attr{t, v})
 }
 
 func (m *mod) getifindices() error {
 	m.ifindexByName = make(map[string]int32)
 	m.vrfByName = make(map[string]uint32)
 
-	req, err := rtnl.NewMessage(
-		rtnl.Hdr{
+	req, err := nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
@@ -273,16 +274,16 @@ func (m *mod) getifindices() error {
 	}
 	return m.sr.UntilDone(req, func(b []byte) {
 		var ifla rtnl.Ifla
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		msg := rtnl.IfInfoMsgPtr(b)
 		ifla.Write(b)
-		name := rtnl.Kstring(ifla[rtnl.IFLA_IFNAME])
+		name := nl.Kstring(ifla[rtnl.IFLA_IFNAME])
 		m.ifindexByName[name] = msg.Index
-		if rtnl.Kstring(ifla[rtnl.IFLA_INFO_KIND]) == "vrf" {
+		if nl.Kstring(ifla[rtnl.IFLA_INFO_KIND]) == "vrf" {
 			m.vrfByName[name] =
-				rtnl.Uint32(ifla[rtnl.IFLA_VRF_TABLE])
+				nl.Uint32(ifla[rtnl.IFLA_VRF_TABLE])
 		}
 	})
 }
@@ -290,11 +291,11 @@ func (m *mod) getifindices() error {
 func (m *mod) parse() error {
 	var (
 		err     error
-		mxlock  rtnl.Uint32Attr
-		mxattrs rtnl.Attrs
+		mxlock  nl.Uint32Attr
+		mxattrs nl.Attrs
 	)
 	mxappend := func(t uint16, v io.Reader) {
-		mxattrs = append(mxattrs, rtnl.Attr{t, v})
+		mxattrs = append(mxattrs, nl.Attr{t, v})
 	}
 	if s := m.opt.Parms.ByName["-f"]; len(s) > 0 {
 		if v, ok := rtnl.AfByName[s]; ok {
@@ -367,7 +368,7 @@ func (m *mod) parse() error {
 				"priority": rtnl.RTA_PRIORITY,
 			}[arg0]
 			if v, e := m.parseNumber(); e == nil {
-				m.append(t, rtnl.Uint32Attr(v))
+				m.append(t, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
@@ -390,7 +391,7 @@ func (m *mod) parse() error {
 				m.args = m.args[1:]
 			}
 			if v, e := m.parseNumber(); e == nil {
-				mxappend(t, rtnl.Uint32Attr(v))
+				mxappend(t, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
@@ -401,7 +402,7 @@ func (m *mod) parse() error {
 			}
 			if v, e := m.parseString(); e == nil {
 				mxappend(rtnl.RTAX_CC_ALGO,
-					rtnl.KstringAttr(v))
+					nl.KstringAttr(v))
 			} else {
 				err = e
 			}
@@ -411,13 +412,13 @@ func (m *mod) parse() error {
 				m.args = m.args[1:]
 			}
 			if v, e := m.parseRtt(8); e == nil {
-				mxappend(rtnl.RTAX_RTT, rtnl.Uint32Attr(v))
+				mxappend(rtnl.RTAX_RTT, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
 		case "rto-min", "rto_min":
 			if v, e := m.parseRtt(1); e == nil {
-				mxappend(rtnl.RTAX_RTO_MIN, rtnl.Uint32Attr(v))
+				mxappend(rtnl.RTAX_RTO_MIN, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
@@ -427,12 +428,12 @@ func (m *mod) parse() error {
 				m.args = m.args[1:]
 			}
 			if v, e := m.parseRtt(4); e == nil {
-				mxappend(rtnl.RTAX_RTTVAR, rtnl.Uint32Attr(v))
+				mxappend(rtnl.RTAX_RTTVAR, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
 		case "quickack":
-			var v rtnl.Uint32Attr
+			var v nl.Uint32Attr
 			if len(m.args) > 0 {
 				if m.args[0] == "1" ||
 					m.args[0] == "t" ||
@@ -443,8 +444,7 @@ func (m *mod) parse() error {
 				err = fmt.Errorf("missing BOOLEAN")
 			}
 			if err == nil {
-				mxappend(rtnl.RTAX_QUICKACK,
-					rtnl.Uint32Attr(v))
+				mxappend(rtnl.RTAX_QUICKACK, nl.Uint32Attr(v))
 			}
 		case "features":
 			var features uint32
@@ -458,10 +458,10 @@ func (m *mod) parse() error {
 				}
 				m.args = m.args[1:]
 			}
-			mxappend(rtnl.RTAX_FEATURES, rtnl.Uint32Attr(features))
+			mxappend(rtnl.RTAX_FEATURES, nl.Uint32Attr(features))
 		case "realms":
 			if v, e := m.parseRealm(); e == nil {
-				m.append(rtnl.RTA_FLOW, rtnl.Uint32Attr(v))
+				m.append(rtnl.RTA_FLOW, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
@@ -481,13 +481,13 @@ func (m *mod) parse() error {
 			err = m.parseVrf()
 		case "dev", "oif":
 			if v, e := m.parseIfname(); e == nil {
-				m.append(rtnl.RTA_OIF, rtnl.Uint32Attr(v))
+				m.append(rtnl.RTA_OIF, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
 		case "pref", "preference":
 			if v, e := m.parsePreference(); e == nil {
-				m.append(rtnl.RTA_PREF, rtnl.Uint8Attr(v))
+				m.append(rtnl.RTA_PREF, nl.Uint8Attr(v))
 			} else {
 				err = e
 			}
@@ -498,9 +498,9 @@ func (m *mod) parse() error {
 				err = e
 			}
 		case "ttl-propagate", "+ttl-propagate":
-			m.append(rtnl.RTA_TTL_PROPAGATE, rtnl.Uint8Attr(1))
+			m.append(rtnl.RTA_TTL_PROPAGATE, nl.Uint8Attr(1))
 		case "no-ttl-propagate", "-ttl-propagate":
-			m.append(rtnl.RTA_TTL_PROPAGATE, rtnl.Uint8Attr(0))
+			m.append(rtnl.RTA_TTL_PROPAGATE, nl.Uint8Attr(0))
 		default:
 			err = fmt.Errorf("unexpected")
 		}
@@ -509,7 +509,7 @@ func (m *mod) parse() error {
 		}
 	}
 	if mxlock != 0 {
-		m.append(rtnl.RTAX_LOCK, rtnl.Uint32Attr(mxlock))
+		m.append(rtnl.RTAX_LOCK, nl.Uint32Attr(mxlock))
 	}
 	if len(mxattrs) > 0 {
 		m.append(rtnl.RTA_METRICS, mxattrs)
@@ -597,7 +597,7 @@ func (m *mod) parseTos() error {
 }
 
 func (m *mod) parseTable() error {
-	var t rtnl.Uint32Attr
+	var t nl.Uint32Attr
 	if len(m.args) == 0 {
 		return fmt.Errorf("missing RTTABLE")
 	}
@@ -625,7 +625,7 @@ func (m *mod) parseVrf() error {
 		m.msg.Table = uint8(vrf)
 	} else {
 		m.msg.Table = uint8(rtnl.RT_TABLE_UNSPEC)
-		m.append(rtnl.RTA_TABLE, rtnl.Uint32Attr(vrf))
+		m.append(rtnl.RTA_TABLE, nl.Uint32Attr(vrf))
 	}
 	m.args = m.args[1:]
 	return nil
@@ -798,7 +798,7 @@ func (m *mod) parseNextHops() (rtnl.RtnhAttrsList, error) {
 		nh  rtnl.RtnhAttrs
 	)
 	nhappend := func(t uint16, v io.Reader) {
-		nh.Attrs = append(nh.Attrs, rtnl.Attr{t, v})
+		nh.Attrs = append(nh.Attrs, nl.Attr{t, v})
 	}
 	nhs := rtnl.RtnhAttrsList{nh}
 nhloop:
@@ -845,7 +845,7 @@ nhloop:
 			nh.Rtnh.Flags |= rtnl.RTNH_F_ONLINK
 		case "realm":
 			if v, e := m.parseRealm(); e == nil {
-				nhappend(rtnl.RTA_FLOW, rtnl.Uint32Attr(v))
+				nhappend(rtnl.RTA_FLOW, nl.Uint32Attr(v))
 			} else {
 				err = e
 			}
@@ -875,7 +875,7 @@ func (m *mod) parseEncapMpls() (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	attrs := rtnl.Attrs{rtnl.Attr{rtnl.MPLS_IPTUNNEL_DST, addr}}
+	attrs := nl.Attrs{nl.Attr{rtnl.MPLS_IPTUNNEL_DST, addr}}
 	m.args = m.args[1:]
 	if len(m.args) == 0 {
 		return attrs, nil
@@ -891,17 +891,17 @@ func (m *mod) parseEncapMpls() (io.Reader, error) {
 	if _, err = fmt.Sscan(m.args[0], &ttl); err == nil {
 		return nil, fmt.Errorf("ttl: %v", err)
 	}
-	attrs = append(attrs,
-		rtnl.Attr{rtnl.MPLS_IPTUNNEL_TTL, rtnl.Uint8Attr(ttl)})
+	attrs = append(attrs, nl.Attr{rtnl.MPLS_IPTUNNEL_TTL,
+		nl.Uint8Attr(ttl)})
 	m.args = m.args[1:]
 	return attrs, nil
 }
 
 // id TUNNEL-ID dst REMOTE-IP [ tos TOS ] [ ttl TTL ]
 func (m *mod) parseEncapIp() (io.Reader, error) {
-	var attrs rtnl.Attrs
+	var attrs nl.Attrs
 	appendAttr := func(t uint16, v io.Reader) {
-		attrs = append(attrs, rtnl.Attr{t, v})
+		attrs = append(attrs, nl.Attr{t, v})
 	}
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing id")
@@ -917,7 +917,7 @@ func (m *mod) parseEncapIp() (io.Reader, error) {
 	if _, err := fmt.Sscan(m.args[0], &id); err == nil {
 		return nil, fmt.Errorf("id: %v", err)
 	}
-	appendAttr(rtnl.LWTUNNEL_IP_ID, rtnl.Uint64Attr(id))
+	appendAttr(rtnl.LWTUNNEL_IP_ID, nl.Uint64Attr(id))
 	m.args = m.args[1:]
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing dst")
@@ -947,7 +947,7 @@ func (m *mod) parseEncapIp() (io.Reader, error) {
 			if _, err := fmt.Sscan(m.args[0], &tos); err != nil {
 				return nil, fmt.Errorf("tos: %v", err)
 			}
-			appendAttr(rtnl.LWTUNNEL_IP_TOS, rtnl.Uint32Attr(tos))
+			appendAttr(rtnl.LWTUNNEL_IP_TOS, nl.Uint32Attr(tos))
 			m.args = m.args[1:]
 		case "ttl":
 			var ttl uint8
@@ -958,7 +958,7 @@ func (m *mod) parseEncapIp() (io.Reader, error) {
 			if _, err := fmt.Sscan(m.args[0], &ttl); err != nil {
 				return nil, fmt.Errorf("ttl: %v", err)
 			}
-			appendAttr(rtnl.LWTUNNEL_IP_TTL, rtnl.Uint8Attr(ttl))
+			appendAttr(rtnl.LWTUNNEL_IP_TTL, nl.Uint8Attr(ttl))
 			m.args = m.args[1:]
 		default:
 			return attrs, nil
@@ -969,9 +969,9 @@ func (m *mod) parseEncapIp() (io.Reader, error) {
 
 // id TUNNEL-ID dst REMOTE-IP [ tc TC ] [ hoplimit HOPS ]
 func (m *mod) parseEncapIp6() (io.Reader, error) {
-	var attrs rtnl.Attrs
+	var attrs nl.Attrs
 	appendAttr := func(t uint16, v io.Reader) {
-		attrs = append(attrs, rtnl.Attr{t, v})
+		attrs = append(attrs, nl.Attr{t, v})
 	}
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing id")
@@ -987,7 +987,7 @@ func (m *mod) parseEncapIp6() (io.Reader, error) {
 	if _, err := fmt.Sscan(m.args[0], &id); err == nil {
 		return nil, fmt.Errorf("id: %v", err)
 	}
-	appendAttr(rtnl.LWTUNNEL_IP6_ID, rtnl.Uint64Attr(id))
+	appendAttr(rtnl.LWTUNNEL_IP6_ID, nl.Uint64Attr(id))
 	m.args = m.args[1:]
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing dst")
@@ -1017,7 +1017,7 @@ func (m *mod) parseEncapIp6() (io.Reader, error) {
 			if _, err := fmt.Sscan(m.args[0], &tc); err != nil {
 				return nil, fmt.Errorf("tc: %v", err)
 			}
-			appendAttr(rtnl.LWTUNNEL_IP6_TC, rtnl.Uint8Attr(tc))
+			appendAttr(rtnl.LWTUNNEL_IP6_TC, nl.Uint8Attr(tc))
 			m.args = m.args[1:]
 		case "ttl":
 			var hops uint8
@@ -1029,7 +1029,7 @@ func (m *mod) parseEncapIp6() (io.Reader, error) {
 				return nil, fmt.Errorf("tops: %v", err)
 			}
 			appendAttr(rtnl.LWTUNNEL_IP6_HOPLIMIT,
-				rtnl.Uint8Attr(hops))
+				nl.Uint8Attr(hops))
 			m.args = m.args[1:]
 		default:
 			return attrs, nil
@@ -1040,9 +1040,9 @@ func (m *mod) parseEncapIp6() (io.Reader, error) {
 
 // LOCATOR [ csum-mode { adj-transport | neutral-map | no-action } ]
 func (m *mod) parseEncapIla() (io.Reader, error) {
-	var attrs rtnl.Attrs
+	var attrs nl.Attrs
 	appendAttr := func(t uint16, v io.Reader) {
-		attrs = append(attrs, rtnl.Attr{t, v})
+		attrs = append(attrs, nl.Attr{t, v})
 	}
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing LOCATOR")
@@ -1051,7 +1051,7 @@ func (m *mod) parseEncapIla() (io.Reader, error) {
 	if _, err := fmt.Sscan(m.args[0], &locator); err == nil {
 		return nil, fmt.Errorf("locator: %v", err)
 	}
-	appendAttr(rtnl.ILA_ATTR_LOCATOR, rtnl.Uint64Attr(locator))
+	appendAttr(rtnl.ILA_ATTR_LOCATOR, nl.Uint64Attr(locator))
 	m.args = m.args[1:]
 	if len(m.args) > 0 && m.args[0] == "csum-mode" {
 		m.args = m.args[1:]
@@ -1063,7 +1063,7 @@ func (m *mod) parseEncapIla() (io.Reader, error) {
 			return nil, fmt.Errorf("csum-mode: %q invalid",
 				m.args[0])
 		}
-		appendAttr(rtnl.ILA_ATTR_CSUM_MODE, rtnl.Uint8Attr(mode))
+		appendAttr(rtnl.ILA_ATTR_CSUM_MODE, nl.Uint8Attr(mode))
 		m.args = m.args[1:]
 	}
 	return attrs, nil
@@ -1138,7 +1138,7 @@ func (m *mod) parseEncapSeg6() (io.Reader, error) {
 		tlv.HmacKeyId.Store(hmac)
 	}
 
-	return rtnl.Attr{rtnl.SEG6_IPTUNNEL_SRH, rtnl.BytesAttr(b)}, nil
+	return nl.Attr{rtnl.SEG6_IPTUNNEL_SRH, nl.BytesAttr(b)}, nil
 }
 
 // [ in PROG ] [ out PROG ] [ xmit PROG ] [ headroom SIZE ]

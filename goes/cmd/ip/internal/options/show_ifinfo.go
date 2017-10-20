@@ -7,7 +7,8 @@ package options
 import (
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowIfInfo(b []byte) {
@@ -16,28 +17,28 @@ func (opt *Options) ShowIfInfo(b []byte) {
 	msg := rtnl.IfInfoMsgPtr(b)
 	opt.Print(msg.Index, ": ")
 	if val := ifla[rtnl.IFLA_IFNAME]; len(val) > 0 {
-		opt.Print(rtnl.Kstring(val), ": ")
+		opt.Print(nl.Kstring(val), ": ")
 	}
 	opt.Print("<")
 	opt.ShowIfFlags(msg.Flags)
 	opt.Print(">")
 	if val := ifla[rtnl.IFLA_MTU]; len(val) > 0 {
-		opt.Print(" mtu ", rtnl.Uint32(val))
+		opt.Print(" mtu ", nl.Uint32(val))
 	}
 	if val := ifla[rtnl.IFLA_QDISC]; len(val) > 0 {
-		opt.Print(" qdisc ", rtnl.Kstring(val))
+		opt.Print(" qdisc ", nl.Kstring(val))
 	}
 	if val := ifla[rtnl.IFLA_OPERSTATE]; len(val) > 0 {
-		opt.Print(" state ", rtnl.IfOperName[rtnl.Uint8(val)])
+		opt.Print(" state ", rtnl.IfOperName[nl.Uint8(val)])
 	}
 	if val := ifla[rtnl.IFLA_LINKMODE]; len(val) > 0 {
-		opt.Print(" mode ", rtnl.IfLinkModeName[rtnl.Uint8(val)])
+		opt.Print(" mode ", rtnl.IfLinkModeName[nl.Uint8(val)])
 	}
 	if val := ifla[rtnl.IFLA_GROUP]; len(val) > 0 {
-		opt.Print(" group ", Gid(rtnl.Uint32(val)))
+		opt.Print(" group ", Gid(nl.Uint32(val)))
 	}
 	if val := ifla[rtnl.IFLA_TXQLEN]; len(val) > 0 {
-		opt.Print(" qlen ", Gid(rtnl.Uint32(val)))
+		opt.Print(" qlen ", Gid(nl.Uint32(val)))
 	}
 	opt.Println()
 	opt.Print("    link/", rtnl.ArphrdName[msg.Type])
@@ -49,16 +50,16 @@ func (opt *Options) ShowIfInfo(b []byte) {
 	}
 	if opt.Flags.ByName["-d"] {
 		if val := ifla[rtnl.IFLA_PROMISCUITY]; len(val) > 0 {
-			opt.Print(" promiscuity ", rtnl.Uint32(val))
+			opt.Print(" promiscuity ", nl.Uint32(val))
 		}
 		if val := ifla[rtnl.IFLA_NUM_TX_QUEUES]; len(val) > 0 {
-			opt.Print(" numtxqueues ", rtnl.Uint32(val))
+			opt.Print(" numtxqueues ", nl.Uint32(val))
 		}
 		if val := ifla[rtnl.IFLA_NUM_RX_QUEUES]; len(val) > 0 {
-			opt.Print(" numrxqueues ", rtnl.Uint32(val))
+			opt.Print(" numrxqueues ", nl.Uint32(val))
 		}
 		if val := ifla[rtnl.IFLA_NUM_VF]; len(val) > 0 {
-			opt.Print(" num_vf ", rtnl.Uint32(val))
+			opt.Print(" num_vf ", nl.Uint32(val))
 		}
 	}
 }

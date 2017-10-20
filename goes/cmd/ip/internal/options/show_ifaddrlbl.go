@@ -7,7 +7,8 @@ package options
 import (
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowIfAddrLbl(b []byte, ifnames map[int32]string) {
@@ -27,6 +28,6 @@ func (opt *Options) ShowIfAddrLbl(b []byte, ifnames map[int32]string) {
 	}
 
 	if val := ifal[rtnl.IFAL_LABEL]; len(val) > 0 {
-		opt.Print(space, "label ", rtnl.Uint32(val))
+		opt.Print(space, "label ", nl.Uint32(val))
 	}
 }

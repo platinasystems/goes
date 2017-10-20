@@ -7,7 +7,8 @@ package mod
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (m *mod) parseTypeIpoib() error {
@@ -32,8 +33,7 @@ func (m *mod) parseTypeIpoib() error {
 			return fmt.Errorf("type ipoib %s: %q %v",
 				x.name, s, err)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{x.t, rtnl.Uint16Attr(u16)})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.Uint16Attr(u16)})
 	}
 	if s := m.opt.Parms.ByName["mode"]; len(s) > 0 {
 		if mode, found := map[string]uint16{
@@ -42,9 +42,8 @@ func (m *mod) parseTypeIpoib() error {
 		}[s]; !found {
 			return fmt.Errorf("type ipoib mode: %q invalid", s)
 		} else {
-			m.tinfo = append(m.tinfo,
-				rtnl.Attr{rtnl.IFLA_IPOIB_MODE,
-					rtnl.Uint16Attr(mode)})
+			m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_IPOIB_MODE,
+				nl.Uint16Attr(mode)})
 		}
 	}
 	return nil

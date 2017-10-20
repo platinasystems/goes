@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowRule(b []byte, ifnames map[int32]string) {
@@ -25,7 +26,7 @@ func (opt *Options) ShowRule(b []byte, ifnames map[int32]string) {
 	}
 
 	if val := fra[rtnl.FRA_PRIORITY]; len(val) > 0 {
-		opt.Print(rtnl.Uint32(val), ":\t")
+		opt.Print(nl.Uint32(val), ":\t")
 	} else {
 		opt.Print("0:\t")
 	}
@@ -62,8 +63,8 @@ func (opt *Options) ShowRule(b []byte, ifnames map[int32]string) {
 
 	vmark, vmask := fra[rtnl.FRA_FWMARK], fra[rtnl.FRA_FWMASK]
 	if len(vmark) > 0 || len(vmask) > 0 {
-		mark := rtnl.Uint32(vmark)
-		mask := rtnl.Uint32(vmask)
+		mark := nl.Uint32(vmark)
+		mask := nl.Uint32(vmask)
 		if len(vmask) > 0 && mask != ^uint32(0) {
 			fmt.Printf("fwmark %#x/%#x ", mark, mask)
 		} else {
@@ -72,21 +73,21 @@ func (opt *Options) ShowRule(b []byte, ifnames map[int32]string) {
 	}
 
 	if val := fra[rtnl.FRA_IFNAME]; len(val) > 0 {
-		opt.Print("iif ", rtnl.Kstring(val), " ")
+		opt.Print("iif ", nl.Kstring(val), " ")
 		if (msg.Flags & rtnl.FIB_RULE_IIF_DETACHED) != 0 {
 			opt.Print("[detatched] ")
 		}
 	}
 
 	if val := fra[rtnl.FRA_OIFNAME]; len(val) > 0 {
-		opt.Print("oif ", rtnl.Kstring(val), " ")
+		opt.Print("oif ", nl.Kstring(val), " ")
 		if (msg.Flags & rtnl.FIB_RULE_OIF_DETACHED) != 0 {
 			opt.Print("[detatched] ")
 		}
 	}
 
 	if val := fra[rtnl.FRA_L3MDEV]; len(val) > 0 {
-		if rtnl.Uint8(val) != 0 {
+		if nl.Uint8(val) != 0 {
 			opt.Print("lookup [l3mdev-table] ")
 		}
 	}
@@ -99,7 +100,7 @@ func (opt *Options) ShowRule(b []byte, ifnames map[int32]string) {
 	// FIXME table
 
 	if val := fra[rtnl.FRA_FLOW]; len(val) > 0 {
-		to := rtnl.Uint32(val)
+		to := nl.Uint32(val)
 		from := to >> 16
 		to &= 0xFFFF
 		if from != 0 {

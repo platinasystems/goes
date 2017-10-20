@@ -11,8 +11,9 @@ import (
 	"sort"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 const (
@@ -89,20 +90,20 @@ func (Command) Main(args ...string) error {
 		}
 	}
 
-	sock, err := rtnl.NewSock()
+	sock, err := nl.NewSock()
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	sr := rtnl.NewSockReceiver(sock)
+	sr := nl.NewSockReceiver(sock)
 
 	ifnames := make(map[int32]string)
 	ifmaster := make(map[int32]int32)
-	if req, err = rtnl.NewMessage(
-		rtnl.Hdr{
+	if req, err = nl.NewMessage(
+		nl.Hdr{
 			Type:  rtnl.RTM_GETLINK,
-			Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 		},
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
@@ -110,17 +111,17 @@ func (Command) Main(args ...string) error {
 	); err != nil {
 		return err
 	} else if err = sr.UntilDone(req, func(b []byte) {
-		if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
+		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
 			return
 		}
 		var ifla rtnl.Ifla
 		ifla.Write(b)
 		msg := rtnl.IfInfoMsgPtr(b)
 		if val := ifla[rtnl.IFLA_IFNAME]; len(val) > 0 {
-			ifnames[msg.Index] = rtnl.Kstring(val)
+			ifnames[msg.Index] = nl.Kstring(val)
 		}
 		if val := ifla[rtnl.IFLA_MASTER]; len(val) > 0 {
-			ifmaster[msg.Index] = rtnl.Int32(val)
+			ifmaster[msg.Index] = nl.Int32(val)
 		}
 	}); err != nil {
 		return err
@@ -151,10 +152,10 @@ func (Command) Main(args ...string) error {
 	}
 
 	for _, af := range opt.Afs() {
-		if req, err = rtnl.NewMessage(
-			rtnl.Hdr{
+		if req, err = nl.NewMessage(
+			nl.Hdr{
 				Type:  rtnl.RTM_GETNEIGH,
-				Flags: rtnl.NLM_F_REQUEST | rtnl.NLM_F_DUMP,
+				Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
 			},
 			rtnl.RtGenMsg{
 				Family: af,
@@ -162,7 +163,7 @@ func (Command) Main(args ...string) error {
 		); err != nil {
 			return err
 		} else if err = sr.UntilDone(req, func(b []byte) {
-			if rtnl.HdrPtr(b).Type != rtnl.RTM_NEWNEIGH {
+			if nl.HdrPtr(b).Type != rtnl.RTM_NEWNEIGH {
 				return
 			}
 			var nda rtnl.Nda

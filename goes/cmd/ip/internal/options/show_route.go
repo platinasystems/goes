@@ -7,7 +7,8 @@ package options
 import (
 	"net"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 func (opt *Options) ShowRoute(b []byte, ifnames map[int32]string) {
@@ -50,7 +51,7 @@ func (opt *Options) ShowRoute(b []byte, ifnames map[int32]string) {
 		opt.Print(" FIXME via ", val)
 	}
 	if val := rta[rtnl.RTA_OIF]; len(val) > 0 {
-		oif := rtnl.Int32(val)
+		oif := nl.Int32(val)
 		if name, found := ifnames[oif]; found {
 			opt.Print(" dev ", name)
 		} else {
@@ -58,7 +59,7 @@ func (opt *Options) ShowRoute(b []byte, ifnames map[int32]string) {
 		}
 	}
 	if val := rta[rtnl.RTA_TABLE]; len(val) > 0 {
-		t := rtnl.Uint32(val)
+		t := nl.Uint32(val)
 		if t != uint32(rtnl.RT_TABLE_MAIN) || detailed {
 			opt.Print(" table ", rtnl.RtTableName(t))
 		}
@@ -76,11 +77,11 @@ func (opt *Options) ShowRoute(b []byte, ifnames map[int32]string) {
 		opt.Print(" src ", net.IP(val))
 	}
 	if val := rta[rtnl.RTA_PRIORITY]; len(val) > 0 {
-		opt.Print(" metric ", rtnl.Uint32(val))
+		opt.Print(" metric ", nl.Uint32(val))
 	}
 	// FIXME RTNH_F_{DEAD,ONLINK,PERVASIVE,OFFLOAD,NOTIFY,LINKDOWN}
 	if val := rta[rtnl.RTA_MARK]; len(val) > 0 {
-		opt.Print(" mark ", rtnl.Uint32(val))
+		opt.Print(" mark ", nl.Uint32(val))
 	}
 	// FIXME RTA_FLOW
 	// FIXME CLONED?

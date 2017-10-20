@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/rtnl"
+	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
 // ip link COMMAND type hsr slave1 SLAVE1 slave2 SLAVE2
@@ -39,16 +40,15 @@ func (m *mod) parseTypeHsr() error {
 		if !found {
 			return fmt.Errorf("%s: %q not found", x.name, s)
 		}
-		m.tinfo = append(m.tinfo, rtnl.Attr{x.t, rtnl.Uint32Attr(idx)})
+		m.tinfo = append(m.tinfo, nl.Attr{x.t, nl.Uint32Attr(idx)})
 	}
 	s = m.opt.Parms.ByName["subversion"]
 	if len(s) > 0 {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("subversion: %q %v", s, err)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_HSR_MULTICAST_SPEC,
-				rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_HSR_MULTICAST_SPEC,
+			nl.Uint8Attr(u8)})
 	}
 	s = m.opt.Parms.ByName["version"]
 	if len(s) > 0 {
@@ -58,9 +58,8 @@ func (m *mod) parseTypeHsr() error {
 		if u8 > 1 {
 			return fmt.Errorf("version: %q %v", s, syscall.ERANGE)
 		}
-		m.tinfo = append(m.tinfo,
-			rtnl.Attr{rtnl.IFLA_HSR_VERSION,
-				rtnl.Uint8Attr(u8)})
+		m.tinfo = append(m.tinfo, nl.Attr{rtnl.IFLA_HSR_VERSION,
+			nl.Uint8Attr(u8)})
 	}
 	return nil
 }
