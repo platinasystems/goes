@@ -25,7 +25,7 @@ const (
 	Name    = "ip"
 	Apropos = "show / manipulate routing, etc."
 	Usage   = `
-	ip [ NETNS ] OBJECT [ COMMAND [ FAMILY ] [ ARG ]... ]
+	ip [ NETNS ] OBJECT [ COMMAND [ FAMILY ] [ OPTIONS ]... [ ARG ]... ]
 	ip [ NETNS ] -batch [ -x | -f ] [ - | FILE ]
 	
 NETNS := { -a[ll] | -n[etns] NAME }
@@ -38,7 +38,7 @@ FAMILY := { -f[amily] { inet | inet6 | mpls | bridge | link } |
 OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
 	-human[-readable] | -iec |
 	-l[oops] { maximum-addr-flush-attempts } | -br[ief] |
-	-o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
+	-o[neline] | -t[imestamp] | -ts[hort] |
 	-rc[vbuf] [size] | -c[olor] }`
 )
 
