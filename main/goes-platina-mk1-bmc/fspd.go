@@ -72,7 +72,7 @@ func fspdInit() {
 	fspd.WrRegDv["psu"] = "psu"
 	fspd.WrRegFn["psu1.example"] = "example"
 	fspd.WrRegFn["psu1.admin.state"] = "admin.state"
-	fspd.WrRegRng["psu1.admin.state"] = []string{"true", "false"}
+	fspd.WrRegRng["psu1.admin.state"] = []string{"disable", "enable"}
 	fspd.WrRegFn["psu2.example"] = "example"
 	fspd.WrRegFn["psu2.admin.state"] = "admin.state"
 	fspd.WrRegRng["psu2.admin.state"] = []string{"true", "false"}
