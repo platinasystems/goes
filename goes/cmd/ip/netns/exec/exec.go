@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/netns"
 )
 
 const (

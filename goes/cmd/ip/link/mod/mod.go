@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/ip/internal/group"
-	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/netns"
 	"github.com/platinasystems/go/internal/nl"
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )

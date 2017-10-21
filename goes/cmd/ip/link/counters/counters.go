@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd/ip/internal/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/netns"
 	"github.com/platinasystems/go/internal/nl"
 	"github.com/platinasystems/go/internal/nl/rtnl"
 	"github.com/platinasystems/go/internal/parms"
