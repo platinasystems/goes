@@ -149,7 +149,7 @@ func diagFans() error {
 	//
 
 	hw.SetFanSpeed("high", true)
-	time.Sleep(6 * time.Second)
+	time.Sleep(15 * time.Second)
 	p, err := hw.FanCount(1)
 	if err != nil {
 		return err
