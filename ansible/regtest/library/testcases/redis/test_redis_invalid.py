@@ -20,6 +20,8 @@
 
 import shlex
 
+from collections import OrderedDict
+
 from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
@@ -46,6 +48,11 @@ options:
       required: False
       type: bool
       default: False
+    log_dir_path:
+      description:
+        - Path to log directory where logs will be stored.
+      required: False
+      type: str
 """
 
 EXAMPLES = """
@@ -78,7 +85,7 @@ hash_dict:
 """
 
 RESULT_STATUS = True
-HASH_DICT = {}
+HASH_DICT = OrderedDict()
 
 
 def get_cli(module):
@@ -132,8 +139,11 @@ def execute_and_verify(module, operation, param, set_value):
     cli = get_cli(module) + cmd
     out = run_cli(module, cli)
 
-    # Store command as key and command output as value in the hash dictionary
-    HASH_DICT[cmd] = out
+    # Store command prefixed with exec time as key and
+    # command output as value in the hash dictionary
+    exec_time = run_cli(module, 'date +%Y%m%d%T')
+    key = '{}  {}'.format(exec_time, cmd)
+    HASH_DICT[key] = out
 
     # If expected error does not get thrown out,
     # update the result status to False
@@ -168,6 +178,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             switch_ip=dict(required=False, type='str'),
             remote_access=dict(required=False, type='bool', default=False),
+            log_dir_path=dict(required=False, type='str'),
         )
     )
 
@@ -181,7 +192,7 @@ def main():
     start_time = run_cli(module, 'date +%Y%m%d%T')
 
     # Create a hash name
-    test_name = 'test_redis_db_invalid_remote' if remote_access else 'test_redis_db_invalid'
+    test_name = 'redis_regression_04_remote' if remote_access else 'redis_regression_04'
     hash_name = switch_name + '-' + test_name + '-' + start_time
 
     # Perform and verify all required tests
@@ -192,6 +203,20 @@ def main():
 
     # Calculate the entire test result
     test_result = 'Passed' if RESULT_STATUS else 'Failed'
+
+    if not remote_access:
+        # Create a log file
+        log_file_path = module.params['log_dir_path']
+        log_file_path += '/regression04_' + start_time + '.log'
+        log_file = open(log_file_path, 'w')
+        for key, value in HASH_DICT.iteritems():
+            log_file.write(key)
+            log_file.write('\n')
+            log_file.write(value)
+            log_file.write('\n')
+            log_file.write('\n')
+
+        log_file.close()
 
     # Exit the module and return the required JSON.
     module.exit_json(

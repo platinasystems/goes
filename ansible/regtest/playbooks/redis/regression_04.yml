@@ -1,10 +1,11 @@
 ---
 
-- hosts: spine:leaf
+- hosts: spine
   become: yes
 
   vars:
   - tmp_file_path: /tmp/failed.txt
+  - log_dir_path: /var/log/regression/redis
 
   tasks:
     - file:
@@ -13,9 +14,14 @@
       delegate_to: 127.0.0.1
       changed_when: False
 
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
     - name: Test hset operations with invalid values on redis db locally
       test_redis_invalid:
         switch_name: "{{ inventory_hostname }}"
+        log_dir_path: "{{ log_dir_path }}"
       register: invalid_out
 
     - name: Store the test result in a hash in redis db on server emulator

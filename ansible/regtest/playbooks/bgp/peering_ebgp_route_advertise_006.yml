@@ -1,0 +1,132 @@
+---
+
+- hosts: leaf,spine
+  become: true
+  tasks:
+    - name: Take backup of Quagga.conf
+      copy:
+        src: /etc/quagga/Quagga.conf
+        dest: /etc/quagga/Quagga.conf.bck
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Add bgp config in quagga.conf
+      blockinfile:
+        path: /etc/quagga/Quagga.conf
+        insertafter: "interface lo"
+        backup: yes
+        marker: ""
+        block: |
+          !
+          router bgp 65229
+            bgp router-id 172.17.2.29
+            neighbor 10.0.3.31 remote-as 65231
+            neighbor 10.0.19.32 remote-as 65232
+            network 10.120.213.0/28
+
+#    - name: Restart quagga
+#      command: service quagga restart
+#
+#    - name: Verify bgp neighbors
+#      command: "vtysh -c 'sh ip bgp'"
+#      register: leaf0_out
+   
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Add bgp config in quagga.conf
+      blockinfile:
+        path: /etc/quagga/Quagga.conf
+        insertafter: "interface lo"
+        backup: yes
+        marker: ""
+        block: |
+          !
+          router bgp 65230
+            bgp router-id 172.17.2.30
+            neighbor 10.0.3.32 remote-as 65232
+            neighbor 10.0.19.31 remote-as 65231
+            network 208.211.234.0/24
+
+    - name: Restart quagga
+      command: service quagga restart
+
+    - name: Verify bgp neighbors
+      command: "vtysh -c 'sh ip bgp'"
+      register: leaf1_out
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Add bgp config in quagga.conf
+      blockinfile:
+        path: /etc/quagga/Quagga.conf
+        insertafter: "interface lo"
+        backup: yes
+        marker: ""
+        block: |
+          !
+          router bgp 65231
+            bgp router-id 172.17.2.31
+            neighbor 10.0.3.29 remote-as 65229
+            neighbor 10.0.19.30 remote-as 65230
+            network 209.223.243.0/24
+
+    - name: Restart quagga
+      command: service quagga restart
+
+    - name: Verify bgp neighbors
+      command: "vtysh -c 'sh ip bgp'"
+      register: spine0_out
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Add bgp config in quagga.conf
+      blockinfile:
+        path: /etc/quagga/Quagga.conf
+        insertafter: "interface lo"
+        backup: yes
+        marker: ""
+        block: |
+          !
+          router bgp 65232
+            bgp router-id 172.17.2.32
+            neighbor 10.0.3.30 remote-as 65230
+            neighbor 10.0.19.29 remote-as 65229
+            network 172.109.123.0/26
+
+    - name: Restart quagga
+      command: service quagga restart
+
+    - name: Verify bgp neighbors
+      command: "vtysh -c 'sh ip bgp'"
+      register: spine0_out
+
+
+- hosts: leaf,spine
+  become: true
+  tasks:
+    - name: Restore backup of Quagga.conf 
+      copy:
+        src: /etc/quagga/Quagga.conf.bck
+        dest: /etc/quagga/Quagga.conf
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: /etc/quagga/Quagga.conf.bck
+        state: absent
+
