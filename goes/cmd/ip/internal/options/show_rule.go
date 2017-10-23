@@ -12,7 +12,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-func (opt *Options) ShowRule(b []byte, ifnames map[int32]string) {
+func (opt *Options) ShowRule(b []byte) {
 	var fra rtnl.Fra
 	var hostlen uint8
 	fra.Write(b)

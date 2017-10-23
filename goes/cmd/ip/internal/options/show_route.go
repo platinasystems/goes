@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-func (opt *Options) ShowRoute(b []byte, ifnames map[int32]string) {
+func (opt *Options) ShowRoute(b []byte) {
 	var rta rtnl.Rta
 	rta.Write(b)
 	msg := rtnl.RtMsgPtr(b)
@@ -52,7 +52,7 @@ func (opt *Options) ShowRoute(b []byte, ifnames map[int32]string) {
 	}
 	if val := rta[rtnl.RTA_OIF]; len(val) > 0 {
 		oif := nl.Int32(val)
-		if name, found := ifnames[oif]; found {
+		if name, found := rtnl.If.NameByIndex[oif]; found {
 			opt.Print(" dev ", name)
 		} else {
 			opt.Print(" dev ", oif)

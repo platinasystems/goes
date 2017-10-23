@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-func (opt *Options) ShowIfAddrLbl(b []byte, ifnames map[int32]string) {
+func (opt *Options) ShowIfAddrLbl(b []byte) {
 	var ifal rtnl.Ifal
 	var space string
 	ifal.Write(b)
@@ -22,7 +22,7 @@ func (opt *Options) ShowIfAddrLbl(b []byte, ifnames map[int32]string) {
 		space = " "
 	}
 
-	if name, found := ifnames[int32(msg.IfIndex)]; found {
+	if name, found := rtnl.If.NameByIndex[int32(msg.IfIndex)]; found {
 		opt.Print(space, "dev ", name)
 		space = " "
 	}

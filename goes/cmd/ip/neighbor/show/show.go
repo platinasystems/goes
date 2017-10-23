@@ -98,55 +98,23 @@ func (Command) Main(args ...string) error {
 
 	sr := nl.NewSockReceiver(sock)
 
-	ifnames := make(map[int32]string)
-	ifmaster := make(map[int32]int32)
-	if req, err = nl.NewMessage(
-		nl.Hdr{
-			Type:  rtnl.RTM_GETLINK,
-			Flags: nl.NLM_F_REQUEST | nl.NLM_F_DUMP,
-		},
-		rtnl.IfInfoMsg{
-			Family: rtnl.AF_UNSPEC,
-		},
-	); err != nil {
-		return err
-	} else if err = sr.UntilDone(req, func(b []byte) {
-		if nl.HdrPtr(b).Type != rtnl.RTM_NEWLINK {
-			return
-		}
-		var ifla rtnl.Ifla
-		ifla.Write(b)
-		msg := rtnl.IfInfoMsgPtr(b)
-		if val := ifla[rtnl.IFLA_IFNAME]; len(val) > 0 {
-			ifnames[msg.Index] = nl.Kstring(val)
-		}
-		if val := ifla[rtnl.IFLA_MASTER]; len(val) > 0 {
-			ifmaster[msg.Index] = nl.Int32(val)
-		}
-	}); err != nil {
+	if err = rtnl.MakeIfMaps(sr); err != nil {
 		return err
 	}
 
 	devidx := int32(-1)
+	found := false
 	if name := opt.Parms.ByName["dev"]; len(name) > 0 {
-		for k, v := range ifnames {
-			if name == v {
-				devidx = k
-			}
-		}
-		if devidx == -1 {
+		devidx, found = rtnl.If.IndexByName[name]
+		if !found {
 			return fmt.Errorf("dev: %s: not found", name)
 		}
 	}
 
 	vrfidx := int32(-1)
 	if name := opt.Parms.ByName["vrf"]; len(name) > 0 {
-		for k, v := range ifnames {
-			if name == v {
-				vrfidx = k
-			}
-		}
-		if vrfidx == -1 {
+		vrfidx, found = rtnl.If.IndexByName[name]
+		if !found {
 			return fmt.Errorf("vrf: %s: not found", name)
 		}
 	}
@@ -203,7 +171,7 @@ func (Command) Main(args ...string) error {
 				}
 			}
 			if vrfidx != -1 {
-				midx, found := ifmaster[msg.Index]
+				midx, found := rtnl.If.Master[msg.Index]
 				if !found || midx != vrfidx {
 					return
 				}
@@ -228,7 +196,7 @@ func (Command) Main(args ...string) error {
 	})
 
 	for _, b := range newneighs {
-		opt.ShowNeigh(b, ifnames)
+		opt.ShowNeigh(b)
 		fmt.Println()
 	}
 	return nil

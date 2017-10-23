@@ -12,7 +12,7 @@ import (
 	"github.com/platinasystems/go/internal/sysconf"
 )
 
-func (opt *Options) ShowNeigh(b []byte, ifnames map[int32]string) {
+func (opt *Options) ShowNeigh(b []byte) {
 	var nda rtnl.Nda
 	nda.Write(b)
 	msg := rtnl.NdMsgPtr(b)
@@ -23,7 +23,7 @@ func (opt *Options) ShowNeigh(b []byte, ifnames map[int32]string) {
 	}
 
 	opt.Print(net.IP(dst), " dev ")
-	if name, found := ifnames[msg.Index]; found {
+	if name, found := rtnl.If.NameByIndex[msg.Index]; found {
 		opt.Print(name)
 	} else {
 		opt.Print(msg.Index)

@@ -9,7 +9,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-func (opt *Options) ShowNetconf(b []byte, ifnames map[int32]string) {
+func (opt *Options) ShowNetconf(b []byte) {
 	onoff := func(b []byte) string {
 		if nl.Uint32(b) != 0 {
 			return "on"
@@ -27,7 +27,7 @@ func (opt *Options) ShowNetconf(b []byte, ifnames map[int32]string) {
 		case rtnl.NETCONFA_IFINDEX_DEFAULT:
 			opt.Print("default ")
 		default:
-			if name, found := ifnames[idx]; found {
+			if name, found := rtnl.If.NameByIndex[idx]; found {
 				opt.Print("dev ", name)
 			} else {
 				opt.Print("dev ", idx)

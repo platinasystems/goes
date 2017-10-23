@@ -137,8 +137,7 @@ func (c Command) Main(args ...string) error {
 
 	sr := nl.NewSockReceiver(sock)
 
-	ifnames, err := rtnl.IfNameByIndex(sr)
-	if err != nil {
+	if err = rtnl.MakeIfMaps(sr); err != nil {
 		return err
 	}
 
@@ -177,7 +176,7 @@ func (c Command) Main(args ...string) error {
 					return
 				}
 			}
-			opt.ShowRoute(b, ifnames)
+			opt.ShowRoute(b)
 			fmt.Println()
 		}); err != nil {
 			return err

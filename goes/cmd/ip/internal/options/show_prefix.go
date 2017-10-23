@@ -10,7 +10,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-func (opt *Options) ShowPrefix(b []byte, ifnames map[int32]string) {
+func (opt *Options) ShowPrefix(b []byte) {
 	var prefixa rtnl.Prefixa
 	prefixa.Write(b)
 	msg := rtnl.PrefixMsgPtr(b)
@@ -26,7 +26,7 @@ func (opt *Options) ShowPrefix(b []byte, ifnames map[int32]string) {
 	if val := prefixa[rtnl.PREFIX_ADDRESS]; len(val) > 0 {
 		opt.Print("prefix ", net.IP(val), "/", msg.Len, " ")
 	}
-	if name, found := ifnames[int32(msg.IfIndex)]; found {
+	if name, found := rtnl.If.NameByIndex[int32(msg.IfIndex)]; found {
 		opt.Print("dev ", name)
 	} else {
 		opt.Print("dev ", msg.IfIndex)

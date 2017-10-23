@@ -138,7 +138,15 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	if show.ifnames, err = ifnameByIndex(); err != nil {
+	err = func() error {
+		sock, err := nl.NewSock()
+		if err != nil {
+			return err
+		}
+		defer sock.Close()
+		return rtnl.MakeIfMaps(nl.NewSockReceiver(sock))
+	}()
+	if err != nil {
 		return err
 	}
 
@@ -343,9 +351,8 @@ func (save *save) Handle(b []byte) {
 }
 
 type show struct {
-	opt     *options.Options
-	ifnames map[int32]string
-	nsid    int
+	opt  *options.Options
+	nsid int
 }
 
 func (show *show) Handle(b []byte) {
@@ -385,19 +392,21 @@ func (show *show) Handle(b []byte) {
 		fallthrough
 	case rtnl.RTM_NEWROUTE:
 		heading("ROUTE")
-		show.opt.ShowRoute(b, show.ifnames)
+		show.opt.ShowRoute(b)
 	case rtnl.RTM_DELLINK:
 		deleted = true
 		heading("LINK")
 		show.opt.ShowIfInfo(b)
 		msg := rtnl.IfInfoMsgPtr(b)
-		delete(show.ifnames, msg.Index)
+		delete(rtnl.If.IndexByName, rtnl.If.NameByIndex[msg.Index])
+		delete(rtnl.If.NameByIndex, msg.Index)
 	case rtnl.RTM_NEWLINK:
 		var ifla rtnl.Ifla
 		heading("LINK")
 		ifla.Write(b)
 		msg := rtnl.IfInfoMsgPtr(b)
-		show.ifnames[msg.Index] = nl.Kstring(ifla[rtnl.IFLA_IFNAME])
+		rtnl.If.NameByIndex[msg.Index] =
+			nl.Kstring(ifla[rtnl.IFLA_IFNAME])
 		show.opt.ShowIfInfo(b)
 	case rtnl.RTM_DELADDR:
 		deleted = true
@@ -411,25 +420,25 @@ func (show *show) Handle(b []byte) {
 		fallthrough
 	case rtnl.RTM_NEWADDRLABEL:
 		heading("ADDRLABEL")
-		show.opt.ShowIfAddrLbl(b, show.ifnames)
+		show.opt.ShowIfAddrLbl(b)
 	case rtnl.RTM_DELNEIGH:
 		deleted = true
 		fallthrough
 	case rtnl.RTM_NEWNEIGH, rtnl.RTM_GETNEIGH:
 		heading("NEIGH")
-		show.opt.ShowNeigh(b, show.ifnames)
+		show.opt.ShowNeigh(b)
 	case rtnl.RTM_NEWPREFIX:
 		heading("PREFIX")
-		show.opt.ShowPrefix(b, show.ifnames)
+		show.opt.ShowPrefix(b)
 	case rtnl.RTM_DELRULE:
 		deleted = true
 		fallthrough
 	case rtnl.RTM_NEWRULE:
 		heading("RULE")
-		show.opt.ShowRule(b, show.ifnames)
+		show.opt.ShowRule(b)
 	case rtnl.RTM_NEWNETCONF:
 		heading("NETCONF")
-		show.opt.ShowNetconf(b, show.ifnames)
+		show.opt.ShowNetconf(b)
 	case nl.NLMSG_TSTAMP:
 		ts := *(*tstamp)(unsafe.Pointer(&b[nl.SizeofHdr]))
 		show.opt.Print("Timestamp: ", time.Unix(int64(ts.secs),
@@ -473,15 +482,6 @@ func (show *show) Handle(b []byte) {
 		}
 	}
 	fmt.Println()
-}
-
-func ifnameByIndex() (map[int32]string, error) {
-	sock, err := nl.NewSock()
-	if err != nil {
-		return nil, err
-	}
-	defer sock.Close()
-	return rtnl.IfNameByIndex(nl.NewSockReceiver(sock))
 }
 
 const sizeofTstamp = 4 + 4
