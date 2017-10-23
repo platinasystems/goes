@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/ip/link/counters"
+	"github.com/platinasystems/go/goes/cmd/ip/link/delete"
 	"github.com/platinasystems/go/goes/cmd/ip/link/mod"
 	"github.com/platinasystems/go/goes/cmd/ip/link/show"
 	"github.com/platinasystems/go/goes/lang"
@@ -38,7 +39,7 @@ func New() *goes.Goes {
 	g.Plot(counters.New(),
 		mod.New("add"),
 		mod.New("change"),
-		mod.New("delete"),
+		delete.New(),
 		mod.New("replace"),
 		mod.New("set"),
 		show.New("show"),

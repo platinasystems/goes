@@ -146,8 +146,6 @@ func (c Command) Main(args ...string) error {
 	case "replace":
 		m.hdr.Type = rtnl.RTM_NEWLINK
 		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_REPLACE
-	case "delete":
-		m.hdr.Type = rtnl.RTM_DELLINK
 	default:
 		return fmt.Errorf("%s: unknown", c)
 	}
