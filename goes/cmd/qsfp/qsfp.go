@@ -790,24 +790,20 @@ func CheckTemp(t uint16, port string) string {
 	if update {
 		if bmcIpv6LinkLocalRedis == "" {
 			m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
-			if err != nil {
-				log.Print("hget error: ", err)
+			if err == nil {
+				o := strings.Split(m, ":")
+				b, _ := hex.DecodeString(o[0])
+				b[0] = b[0] ^ byte(2)
+				o[0] = hex.EncodeToString(b)
+				bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
 			}
-			o := strings.Split(m, ":")
-			b, _ := hex.DecodeString(o[0])
-			b[0] = b[0] ^ byte(2)
-			o[0] = hex.EncodeToString(b)
-			bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
 		}
 		if bmcIpv6LinkLocalRedis != "" {
 			d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
 			if err != nil {
 				log.Print(err)
 			} else {
-				_, err := d.Do("HSET", redis.DefaultHash, "qsfp.temp.units.C", v)
-				if err != nil {
-					log.Print("hset error: ", err)
-				}
+				d.Do("HSET", redis.DefaultHash, "qsfp.temp.units.C", v)
 				d.Close()
 			}
 		}

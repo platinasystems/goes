@@ -107,9 +107,52 @@ func (c *Command) update() error {
 				c.pub.Print(k, ": ", v)
 				c.lasts[k] = v
 			}
+		} else if strings.Contains(k, "bmc.redis.status") {
+			i, v := bmcStatus()
+			if v != c.lasts[k] {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+			/* FIXME placeholder for bmc eth0 address field */
+			k = "bmc.eth0.address"
+			if i != c.lasts[k] {
+				c.pub.Print(k, ": ", i)
+				c.lasts[k] = i
+			}
 		}
 	}
 	return nil
+}
+
+func bmcStatus() (string, string) {
+	var v, i string
+
+	if bmcIpv6LinkLocalRedis == "" {
+		m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+		if err != nil {
+			log.Print("hget error: ", err)
+		}
+		o := strings.Split(m, ":")
+		b, _ := hex.DecodeString(o[0])
+		b[0] = b[0] ^ byte(2)
+		o[0] = hex.EncodeToString(b)
+		bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
+	}
+	if bmcIpv6LinkLocalRedis != "" {
+		d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
+		if err != nil {
+			v = "down"
+			log.Print(err)
+		} else {
+			v = "up"
+			bmcIpv4, _ := d.Do("HGET", redis.DefaultHash, "hostname")
+			r, _ := regexp.Compile("([0-9]+).([0-9]+).([0-9]+).([0-9]+)")
+			i = r.FindString(string(bmcIpv4.([]uint8)))
+			d.Close()
+		}
+	}
+	return i, v
+
 }
 
 func cpuCoreTemp() string {
@@ -140,24 +183,20 @@ func cpuCoreTemp() string {
 	}
 	if bmcIpv6LinkLocalRedis == "" {
 		m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
-		if err != nil {
-			log.Print("hget error: ", err)
+		if err == nil {
+			o := strings.Split(m, ":")
+			b, _ := hex.DecodeString(o[0])
+			b[0] = b[0] ^ byte(2)
+			o[0] = hex.EncodeToString(b)
+			bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
 		}
-		o := strings.Split(m, ":")
-		b, _ := hex.DecodeString(o[0])
-		b[0] = b[0] ^ byte(2)
-		o[0] = hex.EncodeToString(b)
-		bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
 	}
 	if bmcIpv6LinkLocalRedis != "" {
 		d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
 		if err != nil {
 			log.Print(err)
 		} else {
-			_, err := d.Do("HSET", redis.DefaultHash, "host.temp.units.C", v)
-			if err != nil {
-				log.Print("hset error: ", err)
-			}
+			d.Do("HSET", redis.DefaultHash, "host.temp.units.C", v)
 			d.Close()
 		}
 	}

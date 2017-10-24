@@ -12,6 +12,7 @@ func init() {
 	tempd.Init = func() {
 		tempd.VpageByKey = map[string]uint8{
 			"sys.cpu.coretemp.units.C": 0,
+			"bmc.redis.status":         0,
 		}
 	}
 }
