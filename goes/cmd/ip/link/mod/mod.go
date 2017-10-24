@@ -60,7 +60,6 @@ var (
 		"index",
 		"group",
 		"addrgenmode",
-		"type",
 		"vf",
 		"name",
 		"alias",
@@ -282,7 +281,6 @@ func (m *mod) parse() error {
 		parse func(string) error
 	}{
 		{"addrgenmode", m.parseAddrGenMode},
-		{"type", m.parseType},
 		{"vf", m.parseVf},
 	} {
 		if s := m.opt.Parms.ByName[x.name]; len(s) > 0 {
@@ -478,7 +476,6 @@ func (Command) Complete(args ...string) (list []string) {
 	cpv["addrgenmode"] = rtnl.CompleteIn6AddrGenMode
 	cpv["netns"] = netns.CompleteName
 	cpv["link-netnsid"] = options.NoComplete
-	cpv["type"] = rtnl.CompleteType
 	cpv["vf"] = options.NoComplete
 	cpv["xdp"] = options.NoComplete
 	if method, found := cpv[llarg]; found {
@@ -501,7 +498,6 @@ func (Command) Complete(args ...string) (list []string) {
 			"addrgenmode",
 			"netns",
 			"link-netnsid",
-			"type",
 			"vf",
 			"xdp",
 		) {
