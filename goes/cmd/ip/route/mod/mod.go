@@ -166,7 +166,7 @@ func (c Command) Main(args ...string) error {
 
 	req, err := nl.NewMessage(m.hdr, m.msg, m.attrs...)
 	if err == nil {
-		err = m.sr.UntilDone(req, func([]byte) {})
+		err = m.sr.UntilDone(req, nl.DoNothing)
 	}
 	return err
 }

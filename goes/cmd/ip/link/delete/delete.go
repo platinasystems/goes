@@ -63,7 +63,7 @@ func (Command) Main(args ...string) error {
 	msg.Index = index
 	req, err := nl.NewMessage(hdr, msg)
 	if err == nil {
-		err = sr.UntilDone(req, func([]byte) {})
+		err = sr.UntilDone(req, nl.DoNothing)
 	}
 	return err
 }

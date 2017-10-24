@@ -92,7 +92,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	return nl.NewSockReceiver(sock).UntilDone(req, func(b []byte) {})
+	return nl.NewSockReceiver(sock).UntilDone(req, nl.DoNothing)
 }
 
 func (Command) Complete(args ...string) (list []string) {

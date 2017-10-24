@@ -138,9 +138,6 @@ func (c Command) Main(args ...string) error {
 	m.hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK
 	m.msg.Family = rtnl.AF_UNSPEC
 	switch c {
-	case "add":
-		m.hdr.Type = rtnl.RTM_NEWLINK
-		m.hdr.Flags |= nl.NLM_F_CREATE | nl.NLM_F_EXCL
 	case "change", "set":
 		m.hdr.Type = rtnl.RTM_NEWLINK
 	case "replace":
@@ -158,8 +155,7 @@ func (c Command) Main(args ...string) error {
 			m.attrs...,
 		); err != nil {
 			return err
-		} else if err = m.sr.UntilDone(req, func([]byte) {
-		}); err != nil {
+		} else if err = m.sr.UntilDone(req, nl.DoNothing); err != nil {
 			return err
 		}
 	}
