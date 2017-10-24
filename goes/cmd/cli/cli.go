@@ -183,6 +183,7 @@ func (c *Command) Main(args ...string) error {
 
 		prompter interface {
 			Prompt(string) (string, error)
+			Close()
 		}
 
 		isScript bool
@@ -214,6 +215,7 @@ func (c *Command) Main(args ...string) error {
 			prompter = notliner.New(os.Stdin, os.Stdout)
 		default:
 			prompter = liner.New(c.g)
+			defer prompter.Close()
 		}
 	case 1:
 		script, err := url.Open(args[0])
@@ -222,6 +224,7 @@ func (c *Command) Main(args ...string) error {
 		}
 		defer script.Close()
 		prompter = notliner.New(script, nil)
+		defer prompter.Close()
 		isScript = true
 	default:
 		return fmt.Errorf("%v: unexpected", args[1:])

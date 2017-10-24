@@ -21,6 +21,9 @@ func New(r io.Reader, w io.Writer) *Prompter {
 	return &Prompter{bufio.NewScanner(r), w}
 }
 
+func (p *Prompter) Close() {
+}
+
 func (p *Prompter) Prompt(prompt string) (string, error) {
 	if p.w != nil {
 		fmt.Fprint(p.w, prompt)

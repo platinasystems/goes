@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/mattn/go-isatty"
+
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/cli/internal/notliner"
 	"github.com/platinasystems/go/internal/fields"
@@ -33,6 +35,7 @@ type Liner struct {
 	}
 	fallback *notliner.Prompter
 	goes     *goes.Goes
+	s        *liner.State
 }
 
 func New(g *goes.Goes) *Liner {
@@ -41,9 +44,17 @@ func New(g *goes.Goes) *Liner {
 	l.history.lines = make([]string, 0, 1<<6)
 	if woliner {
 		l.fallback = notliner.New(os.Stdin, os.Stdout)
+	} else {
+		l.s = liner.NewLiner()
+		l.s.SetCompleter(l.complete)
+		l.s.SetHelper(l.help)
 	}
 	l.goes = g
 	return l
+}
+
+func (l *Liner) Close() {
+	l.s.Close()
 }
 
 // Returns all completions of the given command line.
@@ -104,45 +115,44 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 		return l.fallback.Prompt(prompt)
 	}
 
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-		uintptr(syscall.Stdin),
-		uintptr(syscall.TCGETS),
-		uintptr(unsafe.Pointer(&t)))
-	if errno != 0 {
-		return "", fmt.Errorf("TCGETS: %v", errno)
-	}
+	if isatty.IsTerminal(uintptr(syscall.Stdin)) {
+		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
+			uintptr(syscall.Stdin),
+			uintptr(syscall.TCGETS),
+			uintptr(unsafe.Pointer(&t)))
+		if errno != 0 {
+			return "", fmt.Errorf("TCGETS: %v", errno)
+		}
 
-	it := t
-	defer func() {
-		syscall.Syscall(syscall.SYS_IOCTL,
+		it := t
+		defer func() {
+			syscall.Syscall(syscall.SYS_IOCTL,
+				uintptr(syscall.Stdin),
+				uintptr(syscall.TCSETS),
+				uintptr(unsafe.Pointer(&it)))
+		}()
+
+		t.Iflag |= syscall.BRKINT
+		t.Iflag |= syscall.IMAXBEL
+		t.Iflag |= syscall.IUTF8
+		t.Lflag &^= syscall.IEXTEN
+
+		_, _, errno = syscall.Syscall(syscall.SYS_IOCTL,
 			uintptr(syscall.Stdin),
 			uintptr(syscall.TCSETS),
-			uintptr(unsafe.Pointer(&it)))
-	}()
+			uintptr(unsafe.Pointer(&t)))
+		if errno != 0 {
+			return "", fmt.Errorf("TCSETS: %v", errno)
+		}
 
-	t.Iflag |= syscall.BRKINT
-	t.Iflag |= syscall.IMAXBEL
-	t.Iflag |= syscall.IUTF8
-	t.Lflag &^= syscall.IEXTEN
-
-	_, _, errno = syscall.Syscall(syscall.SYS_IOCTL,
-		uintptr(syscall.Stdin),
-		uintptr(syscall.TCSETS),
-		uintptr(unsafe.Pointer(&t)))
-	if errno != 0 {
-		return "", fmt.Errorf("TCSETS: %v", errno)
+		status := l.goes.Status
+		err := l.goes.Main("resize")
+		if err != nil {
+			return "", err
+		}
+		l.goes.Status = status
 	}
 
-	status := l.goes.Status
-	err := l.goes.Main("resize")
-	if err != nil {
-		return "", err
-	}
-	l.goes.Status = status
-
-	state := liner.NewLiner()
-	state.SetCompleter(l.complete)
-	state.SetHelper(l.help)
 	if len(l.history.lines) > 0 {
 		l.history.buf.Reset()
 		if len(l.history.lines) < cap(l.history.lines) {
@@ -158,10 +168,11 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 				fmt.Fprintln(l.history.buf, l.history.lines[i])
 			}
 		}
-		state.ReadHistory(l.history.buf)
+		l.s.ReadHistory(l.history.buf)
 	}
-	line, err := state.Prompt(prompt)
-	state.Close()
+
+	line, err := l.s.Prompt(prompt)
+
 	if err == nil {
 		if len(l.history.lines) < cap(l.history.lines) {
 			l.history.lines = append(l.history.lines, line)
