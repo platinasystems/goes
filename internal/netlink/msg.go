@@ -436,12 +436,15 @@ func (m *IfInfoMessage) Write(b []byte) (int, error) {
 		case IFLA_LINKINFO:
 			m.Attrs[k] = parse_link_info(v)
 		case IFLA_MAP:
+		case IFLA_PAD:
+		case IFLA_XDP:
+		case IFLA_EVENT:
+			m.Attrs[k] = Uint32AttrBytes(v)
 		default:
 			if k < IFLA_MAX {
 				m.Attrs[k] = NewHexStringAttrBytes(v)
-			} else {
-				return n, fmt.Errorf("%#v: unknown attr", k)
 			}
+			// Ignore unknown attributes
 		}
 	}
 	return n, nil

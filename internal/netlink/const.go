@@ -972,6 +972,9 @@ const (
 	IFLA_PROTO_DOWN
 	IFLA_GSO_MAX_SEGS
 	IFLA_GSO_MAX_SIZE
+	IFLA_PAD
+	IFLA_XDP
+	IFLA_EVENT
 	IFLA_MAX
 )
 
@@ -1031,6 +1034,9 @@ var ifInfoAttrKindNames = []string{
 	IFLA_PROTO_DOWN:      "PROTO_DOWN",
 	IFLA_GSO_MAX_SEGS:    "GSO_MAX_SEGS",
 	IFLA_GSO_MAX_SIZE:    "GSO_MAX_SIZE",
+	IFLA_PAD:             "PAD",
+	IFLA_XDP:             "XDP",
+	IFLA_EVENT:           "EVENT",
 }
 
 type IfInfoAttrKind int
