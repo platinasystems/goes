@@ -5,7 +5,9 @@
 package ipcfg
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
@@ -79,11 +81,11 @@ func (cmd) Main(args ...string) (err error) {
 }
 
 func dispIP(q bool) error {
-	m, bootargs, err := getEnv(q)
+	e, bootargs, err := getEnv(q)
 	if err != nil {
 		return err
 	}
-	n := strings.SplitAfter(m[bootargs], "ip=")
+	n := strings.SplitAfter(e[bootargs], "ip=")
 	if !q {
 		fmt.Println("QSPI0:  ip=" + n[1])
 	} else {
@@ -111,24 +113,24 @@ func UpdateEnv(q bool) (err error) {
 	s := strings.Split(string(b), "\x00")
 	ip := s[0]
 	if len(string(ip)) > 500 {
-		err = fmt.Errorf("no 'ip=' in per, skipping env update")
+		err = fmt.Errorf("no 'ip=' in per blk, skipping env update")
 		return err
 	}
-	m, bootargs, err := getEnv(q)
+	e, bootargs, err := getEnv(q)
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(m[bootargs], "ip=") {
-		err = fmt.Errorf("no 'ip=' in env, skipping env update")
+	if !strings.Contains(e[bootargs], "ip=") {
+		err = fmt.Errorf("no 'ip=' in env blk, skipping env update")
 		return err
 	}
-	n := strings.SplitAfter(m[bootargs], "ip=")
+	n := strings.SplitAfter(e[bootargs], "ip=")
 	if n[1] == string(ip) {
-		err = fmt.Errorf("ip-env == ip-per, skipping env update")
+		err = fmt.Errorf("no ip change, skipping env update")
 		return err
 	}
-	m[bootargs] = n[0] + string(ip)
-	err = putEnv(m, q)
+	e[bootargs] = n[0] + string(ip)
+	err = putEnv(e, q)
 	if err != nil {
 		return err
 	}
@@ -140,9 +142,9 @@ func getEnv(q bool) (env []string, bootargs int, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	m := strings.Split(string(b[ENVCRC:ENVSIZE]), "\x00")
+	e := strings.Split(string(b[ENVCRC:ENVSIZE]), "\x00")
 	var end int
-	for j, n := range m {
+	for j, n := range e {
 		if strings.Contains(n, "bootargs") {
 			bootargs = j
 		}
@@ -151,17 +153,26 @@ func getEnv(q bool) (env []string, bootargs int, err error) {
 			break
 		}
 	}
-	return m[:end], bootargs, nil
+	return e[:end], bootargs, nil
 }
 
-func putEnv(s []string, q bool) (err error) {
-	fmt.Println("SKIP PUT ENV FOR NOW")
-	return nil
-	//calc new crc, write env //FIXME
-	//err = upgrade.WriteBlk("env", b, q)
-	//if err != nil {
-	//	return err
-	//}
+func putEnv(e []string, q bool) (err error) {
+	ee := strings.Join(e, "\x00")
+	b := make([]byte, ENVSIZE, ENVSIZE)
+	b = []byte(ee)
+	for i := len(b); i < ENVSIZE; i++ {
+		b = append(b, 0)
+	}
+
+	x := crc32.ChecksumIEEE(b[0 : ENVSIZE-ENVCRC])
+	y := make([]byte, 4)
+	binary.LittleEndian.PutUint32(y, x)
+	b = append(y[0:4], b[0:ENVSIZE-ENVCRC]...)
+
+	err = upgrade.WriteBlk("env", b[0:ENVSIZE], q)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
