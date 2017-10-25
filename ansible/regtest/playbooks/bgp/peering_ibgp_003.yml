@@ -1,6 +1,19 @@
 ---
 
-- hosts: leaf,spine
+- hosts: server_emulator
+  become: true
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+
+  tasks:
+    - file:
+        path: "{{ tmp_file_path }}"
+        state: touch
+      changed_when: False
+
+
+- hosts: leaf[1]:spine
   become: true
   tasks:
     - name: Take backup of Quagga.conf
@@ -13,22 +26,22 @@
         mode: 0644
 
 
-- hosts: leaf[0]
-  become: true
-  tasks:
-    - name: Add bgp config in quagga.conf
-      blockinfile:
-        path: /etc/quagga/Quagga.conf
-        insertafter: "interface lo"
-        backup: yes
-        marker: ""
-        block: |
-          !
-          router bgp 65200
-            bgp router-id 172.17.2.29
-            neighbor 10.0.3.31 remote-as 65200
-            neighbor 10.0.19.32 remote-as 65200
-
+#- hosts: leaf[0]
+#  become: true
+#  tasks:
+#    - name: Add bgp config in quagga.conf
+#      blockinfile:
+#        path: /etc/quagga/Quagga.conf
+#        insertafter: "interface lo"
+#        backup: yes
+#        marker: ""
+#        block: |
+#          !
+#          router bgp {{ ibgp_as }}
+#            bgp router-id {{ ansible_ssh_host }}
+#            neighbor {{ invader31_neighbour_ip }} remote-as {{ ibgp_as }}
+#            neighbor {{ invader32_bgp_ip }} remote-as {{ ibgp_as }}
+#
 #    - name: Restart quagga
 #      command: service quagga restart
 #
@@ -48,17 +61,13 @@
         marker: ""
         block: |
           !
-          router bgp 65200
-            bgp router-id 172.17.2.30
-            neighbor 10.0.3.32 remote-as 65200
-            neighbor 10.0.19.31 remote-as 65200
+          router bgp {{ ibgp_as }}
+            bgp router-id {{ ansible_ssh_host }}
+            neighbor {{ invader32_neighbour_ip }} remote-as {{ ibgp_as }}
+            neighbor {{ invader31_bgp_ip }} remote-as {{ ibgp_as }}
 
     - name: Restart quagga
       command: service quagga restart
-
-    - name: Verify bgp neighbors
-      command: "vtysh -c 'sh ip bgp neighbors'"
-      register: leaf1_out
 
 
 - hosts: spine[0]
@@ -72,17 +81,13 @@
         marker: ""
         block: |
           !
-          router bgp 65200
-            bgp router-id 172.17.2.31
-            neighbor 10.0.3.29 remote-as 65200
-            neighbor 10.0.19.30 remote-as 65200
+          router bgp {{ ibgp_as }}
+            bgp router-id {{ ansible_ssh_host }}
+            neighbor {{ invader29_neighbour_ip }} remote-as {{ ibgp_as }}
+            neighbor {{ invader30_bgp_ip }} remote-as {{ ibgp_as }}
 
     - name: Restart quagga
       command: service quagga restart
-
-    - name: Verify bgp neighbors
-      command: "vtysh -c 'sh ip bgp neighbors'"
-      register: spine0_out
 
 
 - hosts: spine[1]
@@ -96,20 +101,136 @@
         marker: ""
         block: |
           !
-          router bgp 65200
-            bgp router-id 172.17.2.32
-            neighbor 10.0.3.30 remote-as 65200
-            neighbor 10.0.19.29 remote-as 65200
+          router bgp {{ ibgp_as }}
+            bgp router-id {{ ansible_ssh_host }}
+            neighbor {{ invader30_neighbour_ip }} remote-as {{ ibgp_as }}
+            neighbor {{ invader29_bgp_ip }} remote-as {{ ibgp_as }}
 
     - name: Restart quagga
       command: service quagga restart
 
-    - name: Verify bgp neighbors
-      command: "vtysh -c 'sh ip bgp neighbors'"
+
+- hosts: leaf[1]
+  become: true
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+  - log_dir_path: /var/log/regression/bgp
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - name: Verify ibgp peering
+      test_bgp:
+        switch_name: "{{ inventory_hostname }}"
+        testcase_name: "peering_ibgp_003"
+        check_neighbors: True
+        neighbor1_ip: "{{ invader32_neighbour_ip }}"
+        neighbor1_as: "{{ ibgp_as }}"
+        neighbor2_ip: "{{ invader31_bgp_ip }}"
+        neighbor2_as: "{{ ibgp_as }}"
+        log_dir_path: "{{ log_dir_path }}"
+      register: leaf1_out
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ leaf1_out.hash_name }}"
+        start_time: "{{ leaf1_out.start_time }}"
+        end_time: "{{ leaf1_out.end_time }}"
+        hash_dict: "{{ leaf1_out.hash_dict }}"
+        test_result: "{{ leaf1_out.test_result }}"
+      delegate_to: 127.0.0.1
+
+    - lineinfile:
+        path: "{{ tmp_file_path }}"
+        line: "{{ leaf1_out.hash_name }}"
+      when: leaf1_out.test_result == 'Failed'
+      delegate_to: 127.0.0.1
+
+
+- hosts: spine[0]
+  become: true
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+  - log_dir_path: /var/log/regression/bgp
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - name: Verify ibgp peering
+      test_bgp:
+        switch_name: "{{ inventory_hostname }}"
+        testcase_name: "peering_ibgp_003"
+        check_neighbors: True
+        neighbor1_ip: "{{ invader29_neighbour_ip }}"
+        neighbor1_as: "{{ ibgp_as }}"
+        neighbor2_ip: "{{ invader30_bgp_ip }}"
+        neighbor2_as: "{{ ibgp_as }}"
+        log_dir_path: "{{ log_dir_path }}"
       register: spine0_out
 
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ spine0_out.hash_name }}"
+        start_time: "{{ spine0_out.start_time }}"
+        end_time: "{{ spine0_out.end_time }}"
+        hash_dict: "{{ spine0_out.hash_dict }}"
+        test_result: "{{ spine0_out.test_result }}"
+      delegate_to: 127.0.0.1
 
-- hosts: leaf,spine
+    - lineinfile:
+        path: "{{ tmp_file_path }}"
+        line: "{{ spine0_out.hash_name }}"
+      when: spine0_out.test_result == 'Failed'
+      delegate_to: 127.0.0.1
+
+
+- hosts: spine[1]
+  become: true
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+  - log_dir_path: /var/log/regression/bgp
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - name: Verify ibgp peering
+      test_bgp:
+        switch_name: "{{ inventory_hostname }}"
+        testcase_name: "peering_ibgp_003"
+        check_neighbors: True
+        neighbor1_ip: "{{ invader30_neighbour_ip }}"
+        neighbor1_as: "{{ ibgp_as }}"
+        neighbor2_ip: "{{ invader29_bgp_ip }}"
+        neighbor2_as: "{{ ibgp_as }}"
+        log_dir_path: "{{ log_dir_path }}"
+      register: spine1_out
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ spine1_out.hash_name }}"
+        start_time: "{{ spine1_out.start_time }}"
+        end_time: "{{ spine1_out.end_time }}"
+        hash_dict: "{{ spine1_out.hash_dict }}"
+        test_result: "{{ spine1_out.test_result }}"
+      delegate_to: 127.0.0.1
+
+    - lineinfile:
+        path: "{{ tmp_file_path }}"
+        line: "{{ spine1_out.hash_name }}"
+      when: spine1_out.test_result == 'Failed'
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf[1]:spine
   become: true
   tasks:
     - name: Restore backup of Quagga.conf 
@@ -125,4 +246,24 @@
       file:
         path: /etc/quagga/Quagga.conf.bck
         state: absent
+
+
+- hosts: server_emulator
+  become: yes
+
+  vars:
+  - tmp_file_path: /tmp/failed.txt
+
+  tasks:
+    - name: Report test suite result
+      test_suite_result:
+        result_data: "{{ lookup('file', '{{ tmp_file_path }}') }}"
+      register: status
+
+    - debug: var=status
+
+    - file:
+        path: "{{ tmp_file_path }}"
+        state: absent
+      changed_when: False
 

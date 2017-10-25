@@ -6,3 +6,24 @@
 ntp_server: acme.example.org
 database_server: storage.example.org
 
+ibgp_as: 65200
+
+invader29_bgp_ip: 10.0.19.29
+invader29_neighbour_ip: 10.0.3.29
+invader29_as: 65229
+invader29_network: 10.120.213.0/28
+
+invader30_bgp_ip: 10.0.19.30
+invader30_neighbour_ip: 10.0.3.30
+invader30_as: 65230
+invader30_network: 208.211.234.0/24
+
+invader31_bgp_ip: 10.0.19.31
+invader31_neighbour_ip: 10.0.3.31
+invader31_as: 65231
+invader31_network: 209.223.243.0/24
+
+invader32_bgp_ip: 10.0.19.32
+invader32_neighbour_ip: 10.0.3.32
+invader32_as: 65232
+invader32_network: 172.109.123.0/26
