@@ -1,0 +1,223 @@
+// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+package shellutils
+
+import (
+	"errors"
+	"io"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
+
+var errMissingEndQuote = errors.New("Unexpected EOF while looking for matching quote")
+
+// break up string into Lists, Pipelines, and command lines
+// a List is a slice of Pipelines [][]Cmdline{}
+// a Pipeline is a slice of commandlines []Cmdline{}
+// a command line is a set of arguments and a terminator
+
+// Parse calls the srcin function for command input as strings, and
+// return a pointer to a parsed command List, or an error
+func Parse(prompt string, srcin func(string) (string, error)) (*List, error) {
+	s, err := srcin(prompt)
+	if err != nil {
+		return nil, err
+	}
+	cl := List{}
+	pl := Pipeline{}
+	c := Cmdline{}
+	w := Word{}
+	inWS := true
+processRune:
+	for len(s) > 0 {
+		r, wid := utf8.DecodeRuneInString(s)
+		s = s[wid:]
+		if inWS {
+			if unicode.IsSpace(r) {
+				continue
+			}
+			if r == '#' {
+				break
+			}
+			inWS = false
+		} else {
+			if unicode.IsSpace(r) {
+				c.add(&w)
+				inWS = true
+				continue
+			}
+
+			if strings.ContainsRune("|&;()<>", r) {
+				c.add(&w)
+			}
+		}
+
+		if strings.ContainsRune("&;()<", r) {
+			w.addLiteral(string(r))
+			// hack - we know these are single-byte runes
+			if len(s) >= 1 && s[0] == byte(r) {
+				s = s[1:]
+				w.addLiteral(string(r))
+			}
+			if w.String() == ";" || w.String() == "&&" ||
+				w.String() == "||" {
+				c.Term = w
+				w = Word{}
+				pl.add(&c)
+				cl.add(&pl)
+			} else {
+				c.add(&w)
+			}
+			inWS = true
+			continue
+		}
+
+		// Check for |, |&, or ||
+		if r == '|' {
+			w.addLiteral("|")
+			if len(s) >= 1 {
+				if s[0] == '&' {
+					s = s[1:]
+					w.addLiteral("&")
+				} else {
+					if s[0] == '|' {
+						s = s[1:]
+						w.addLiteral("|")
+					}
+				}
+			}
+			c.Term = w
+			pl.add(&c)
+			if w.String() == "||" {
+				cl.add(&pl)
+			}
+			w = Word{}
+			inWS = true
+			continue
+		}
+
+		if r == '=' {
+			w.add("=", TokenEnvset)
+			continue
+		}
+
+		if r == '$' && len(s) > 0 {
+			s, err = w.parseEnv(s)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		if r == '>' {
+			w.addLiteral(">")
+			if len(s) >= 1 && s[0] == '>' {
+				s = s[1:]
+				w.addLiteral(">")
+				if len(s) >= 1 && s[0] == '>' {
+					s = s[1:]
+					w.addLiteral(">")
+					if len(s) >= 1 && s[0] == '>' {
+						s = s[1:]
+						w.addLiteral(">")
+					}
+				}
+			}
+			c.add(&w)
+			inWS = true
+			continue
+		}
+
+		if r == '\'' {
+			for {
+				for len(s) > 0 {
+					r, wid := utf8.DecodeRuneInString(s)
+					s = s[wid:]
+					if r == '\'' {
+						continue processRune
+					}
+					w.addLiteral(string(r))
+				}
+				w.addLiteral("\n")
+				s, err = srcin("> ")
+				if err != nil {
+					if err == io.EOF {
+						return nil, errMissingEndQuote
+					}
+					return nil, err
+				}
+			}
+		}
+		if r == '"' {
+			for {
+				for len(s) > 0 {
+					r, wid := utf8.DecodeRuneInString(s)
+					s = s[wid:]
+					if r == '"' {
+						continue processRune
+					}
+
+					if r == '$' && len(s) > 0 {
+						s, err = w.parseEnv(s)
+						if err != nil {
+							return nil, err
+						}
+						continue
+					}
+					if r == '\\' {
+						if len(s) == 0 {
+							s, err = srcin("> ")
+							if err != nil {
+								if err == io.EOF {
+									return nil, errMissingEndQuote
+								}
+								return nil, err
+							}
+							continue
+						}
+						r1, wid := utf8.DecodeRuneInString(s)
+						if r1 == '$' || r1 == '"' || r1 == '\\' {
+							r = r1
+							s = s[wid:]
+						}
+					}
+					w.addLiteral(string(r))
+				}
+				w.addLiteral("\n")
+				s, err = srcin("> ")
+				if err != nil {
+					if err == io.EOF {
+						return nil, errMissingEndQuote
+					}
+					return nil, err
+				}
+			}
+		}
+		if r == '\\' {
+			if len(s) > 0 {
+				r, wid := utf8.DecodeRuneInString(s)
+				s = s[wid:]
+				w.addLiteral(string(r))
+				continue
+			}
+			s, err = srcin("... ")
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		w.addLiteral(string(r))
+	}
+	if len(w.Tokens) != 0 {
+		c.add(&w)
+	}
+	if len(c.Cmds) != 0 {
+		pl.add(&c)
+	}
+	if len(pl.Cmds) != 0 {
+		cl.add(&pl)
+	}
+	return &cl, nil
+}
