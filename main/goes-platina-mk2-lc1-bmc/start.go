@@ -46,6 +46,8 @@ func init() {
 			time.Sleep(1 * time.Microsecond)
 			pin.SetValue(true)
 		}
+		ipcfg.UpdateEnv(false)
+		ipcfg.UpdateEnv(true)
 		return nil
 	}
 }

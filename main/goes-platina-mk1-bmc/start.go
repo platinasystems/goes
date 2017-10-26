@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ipcfg"
 	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
@@ -60,6 +61,8 @@ func init() {
 				pin.SetValue(false)
 			}
 		}
+		ipcfg.UpdateEnv(false)
+		ipcfg.UpdateEnv(true)
 		return nil
 	}
 }
