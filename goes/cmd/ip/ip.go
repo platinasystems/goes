@@ -11,6 +11,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/address"
 	"github.com/platinasystems/go/goes/cmd/ip/all"
 	"github.com/platinasystems/go/goes/cmd/ip/batch"
+	"github.com/platinasystems/go/goes/cmd/ip/fou"
 	"github.com/platinasystems/go/goes/cmd/ip/link"
 	"github.com/platinasystems/go/goes/cmd/ip/monitor"
 	"github.com/platinasystems/go/goes/cmd/ip/n"
@@ -30,7 +31,7 @@ const (
 	
 NETNS := { -a[ll] | -n[etns] NAME }
 
-OBJECT := { address | link | monitor | neighbor | netns | route }
+OBJECT := { address | fou | link | monitor | neighbor | netns | route }
 
 FAMILY := { -f[amily] { inet | inet6 | mpls | bridge | link } |
 	{ -4 | -6 | -B | -0 } }
@@ -56,6 +57,7 @@ func New() *goes.Goes {
 		all.New("-a"),
 		all.New("-all"),
 		batch.New(),
+		fou.New(),
 		link.New(),
 		monitor.New(),
 		n.New("-n"),
