@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
+	"regexp"
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
@@ -63,19 +64,28 @@ func (cmd) Main(args ...string) (err error) {
 		}
 		return
 	} else {
-		if err = updatePer(parm.ByName["-ip"], false); err != nil {
+		s := parm.ByName["-ip"]
+		n := "(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])"
+		r := n + "\\." + n + "\\." + n + "\\." + n + "::eth0:on"
+		x := regexp.MustCompile(r)
+		if parm.ByName["-ip"] == "dhcp" || x.MatchString(s) {
+			if err = updatePer(parm.ByName["-ip"], false); err != nil {
+				return err
+			}
+			if err = UpdateEnv(false); err != nil {
+				return err
+			}
+			if err = updatePer(parm.ByName["-ip"], true); err != nil {
+				return err
+			}
+			if err = UpdateEnv(true); err != nil {
+				return err
+			}
+			return nil
+		} else {
+			err = fmt.Errorf("invalid ip string")
 			return err
 		}
-		if err = UpdateEnv(false); err != nil {
-			return err
-		}
-		if err = updatePer(parm.ByName["-ip"], true); err != nil {
-			return err
-		}
-		if err = UpdateEnv(true); err != nil {
-			return err
-		}
-		return nil
 	}
 	return nil
 }
