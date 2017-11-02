@@ -42,6 +42,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
 	"github.com/platinasystems/go/goes/cmd/install"
+	"github.com/platinasystems/go/goes/cmd/iocmd"
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
@@ -136,6 +137,7 @@ func Goes() *goes.Goes {
 		iminfo.New(),
 		insmod.New(),
 		install.New(),
+		iocmd.New(),
 		ip.New(),
 		kexec.New(),
 		keys.New(),
