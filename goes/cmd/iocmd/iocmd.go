@@ -116,15 +116,20 @@ func io_reg_rw(write bool, addr uint64, dat uint64, wid uint64) (err error) {
 		fmt.Println("Read value =", b)
 		f.Close()
 	} else {
-		f, err := os.OpenFile("/dev/port", os.O_WRONLY, 0644)
+		b[0] = byte(dat & 0xff) //FIXME add 16, 32-bit
+		f, err := os.OpenFile("/dev/port", os.O_WRONLY, 0755)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		if n, err = f.WriteAt(b, int64(addr)); err != nil { //FIXME
+		if _, err = f.Seek(int64(addr), 0); err != nil {
 			return err
 		}
-		fmt.Println("Wrote ", n, " bytes")
+		if n, err = f.Write(b); err != nil {
+			return err
+		}
+		f.Sync()
+		fmt.Println("Wrote", n, "byte(s)")
 		f.Close()
 	}
 
