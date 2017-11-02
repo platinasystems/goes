@@ -36,7 +36,7 @@
       command: service quagga restart
 
     - pause:
-        seconds: 20
+        seconds: 50
 
 
 - hosts: spine[0]

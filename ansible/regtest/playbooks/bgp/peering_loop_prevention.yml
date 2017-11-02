@@ -92,9 +92,9 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - file:
-        path: "{{ log_file }}"
-        state: absent
+#    - file:
+#        path: "{{ log_file }}"
+#        state: absent
 
 
 - hosts: leaf:spine
