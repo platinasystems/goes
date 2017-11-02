@@ -148,15 +148,15 @@ def verify_bgp_local_pref_weight(module):
 
     failure_summary = ''
     switch_name = module.params['switch_name']
-    spine_network_list = module.params['spine_network_list'].split(',')
-    leaf_network_list = module.params['leaf_network_list'].split(',')
-
-    for network in spine_network_list + leaf_network_list:
-        if network not in out:
-            RESULT_STATUS = False
-            failure_summary += 'On Switch {} bgp route '.format(switch_name)
-            failure_summary += 'for network {} is not present '.format(network)
-            failure_summary += 'in the output of command {}\n'.format(cmd)
+    # spine_network_list = module.params['spine_network_list'].split(',')
+    # leaf_network_list = module.params['leaf_network_list'].split(',')
+    # 
+    # for network in spine_network_list + leaf_network_list:
+    #     if network not in out:
+    #         RESULT_STATUS = False
+    #         failure_summary += 'On Switch {} bgp route '.format(switch_name)
+    #         failure_summary += 'for network {} is not present '.format(network)
+    #         failure_summary += 'in the output of command {}\n'.format(cmd)
 
     local_pref = module.params['local_pref']
     weight = module.params['weight']
