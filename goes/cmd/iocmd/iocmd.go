@@ -131,7 +131,6 @@ func io_reg_rd(addr uint64, wid uint64) (err error) {
 		return err
 	}
 
-	n := 0
 	b := make([]byte, wid)
 	f, err := os.Open("/dev/port")
 	if err != nil {
