@@ -7,9 +7,9 @@ invader31 ansible_ssh_host=172.17.2.31 bmc_redis_ip=172.17.3.31 bgp_network=209.
 invader32 ansible_ssh_host=172.17.2.32 bmc_redis_ip=172.17.3.32 bgp_network=172.109.123.0/26
 
 [spine]
-invader31
-invader32
+invader31 ansible_become_pass=calsoft ansible_become_user=saptak
+invader32 ansible_become_pass=calsoft ansible_become_user=saptak
 
 [leaf]
-invader29
-invader30
+invader29 ansible_become_pass=calsoft ansible_become_user=saptak
+invader30 ansible_become_pass=calsoft ansible_become_user=saptak
