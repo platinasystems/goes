@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Store test result in redis db """
+""" Store GOES Version and Tag details in Redis """
 
 #
 # This file is part of Ansible
@@ -24,41 +24,42 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: store_result_in_redis
+module: store_goes_details
 author: Platina Systems
-short_description: Module to store test result in redis db.
+short_description: Module to get and store GOES version and tag details.
 description:
-    Module to store test result in redis db using hash on server emulator.
+    Module to get GOES version and tag details and store test
+    result in redis db using hash on server emulator.
 options:
+    switch_name:
+      description:
+        - Name of the switch on which tests will be performed.
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result.
       required: False
       type: str
-    start_time:
+    version_details:
       description:
-        - Time at which test started executing.
+        - String describing different sha versions of goes
       required: False
       type: str
-    end_time:
+    tag_details:
       description:
-        - Time at which test execution ended.
+        - String describing different tags of goes
       required: False
       type: str
-    hash_dict:
-      description:
-        - Dict containing key value pairs to store in hash.
-      required: False
-      type: dict
 """
 
 EXAMPLES = """
-- name: Store test result in redis db
-  store_result_in_redis:
-   hash_name: "{{ valid_out.hash_name }}"
-   start_time: "{{ valid_out.start_time }}"
-   end_time: "{{ valid_out.end_time }}"
-   hash_dict: "{{ valid_out.hash_dict }}"
+- name: Store GOES version and tag details in redis db
+  store_goes_details:
+    hash_name: "{{ valid_out.hash_name }}"
+    hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+    version_details: "{{ version_out.stdout }}"
+    tag_details: "{{ tag_out.stdout }}"
 """
 
 RETURN = """
@@ -104,45 +105,54 @@ def store_in_hash(module, hash_name, key, value):
     :param key: Key name in the hash.
     :param value: Value for the key.
     """
-    if key == 'result.detail' or key == 'result.status':
-        cli = get_cli()
-        cli += 'hget {0} {1}'.format(hash_name, key)
-        out = run_cli(module, cli)
-
-        value = out + value
-        cli = get_cli()
-        cli += 'hset {0} "{1}" "{2}"'.format(hash_name, key, value)
-        run_cli(module, cli)
-    else:
-        cli = get_cli()
-        cli += 'hset {0} "{1}" "{2}"'.format(hash_name, key, value)
-        run_cli(module, cli)
+    cli = get_cli()
+    cli += 'hset {0} "{1}" "{2}"'.format(hash_name, key, value)
+    run_cli(module, cli)
 
 
 def main():
     """ This section is for arguments parsing """
     module = AnsibleModule(
         argument_spec=dict(
+            switch_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
-            start_time=dict(required=False, type='str'),
-            end_time=dict(required=False, type='str'),
-            hash_dict=dict(required=False, type='dict'),
+            version_details=dict(required=False, type='str'),
+            tag_details=dict(required=False, type='str'),
         )
     )
 
-    start_time = module.params['start_time']
+    switch_name = module.params['switch_name']
     hash_name = module.params['hash_name']
+    version_details = module.params['version_details']
+    tag_details = module.params['tag_details']
 
-    # Store start time of test run in hash
-    store_in_hash(module, hash_name, 'start.time', start_time)
+    version_details = version_details.splitlines()
+    sha1 = []
+    for version in version_details:
+        sha1.append(version.split(': ')[1])
 
-    # Store end time of test run in the hash
-    end_time = module.params['end_time']
-    store_in_hash(module, hash_name, 'end.time', end_time)
+    key = '{}.version.go.sha1'.format(switch_name)
+    store_in_hash(module, hash_name, key, sha1[0])
 
-    # Store key value pairs in the hash
-    for key, value in module.params['hash_dict'].iteritems():
-        store_in_hash(module, hash_name, key, value)
+    key = '{}.version.fe1.sha1'.format(switch_name)
+    store_in_hash(module, hash_name, key, sha1[1])
+
+    key = '{}.version.firmware-fe1a.sha1'.format(switch_name)
+    store_in_hash(module, hash_name, key, sha1[2])
+
+    tag_details = tag_details.splitlines()
+    tags = []
+    for tag in tag_details:
+        tags.append(tag.split(': ')[1])
+
+    key = '{}.version.go.tag'.format(switch_name)
+    store_in_hash(module, hash_name, key, tags[0])
+
+    key = '{}.version.fe1.tag'.format(switch_name)
+    store_in_hash(module, hash_name, key, tags[1])
+
+    key = '{}.version.firmware-fe1a.tag'.format(switch_name)
+    store_in_hash(module, hash_name, key, tags[2])
 
     out_msg = 'Stored the test result in hash: {}'.format(hash_name)
 

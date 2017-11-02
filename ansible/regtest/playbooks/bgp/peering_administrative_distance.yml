@@ -1,0 +1,119 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "bgp_peering_administrative_distance_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Take backup of Quagga.conf
+      copy:
+        src: /etc/quagga/Quagga.conf
+        dest: /etc/quagga/Quagga.conf.bck
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Add bgp config in quagga.conf
+      blockinfile:
+        path: /etc/quagga/Quagga.conf
+        insertafter: "interface lo"
+        backup: yes
+        marker: ""
+        block: "{{ lookup('file', '/home/saptak/go/ansible/regtest/files/{{inventory_hostname}}/bgp_peering_administrative_distance.conf') }}"
+
+    - name: Restart quagga
+      command: service quagga restart
+
+    - pause:
+        seconds: 20
+
+
+- hosts: leaf:spine
+  become: true
+
+  vars:
+  - log_dir_path: /var/log/regression/bgp
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - name: Verify bgp peering administrative distance
+      test_bgp_administrative_distance:
+        switch_name: "{{ inventory_hostname }}"
+        spine_network_list: "{{ groups['spine'] | map('extract', hostvars, ['bgp_network']) | join(',') }}"
+        leaf_network_list: "{{ groups['leaf'] | map('extract', hostvars, ['bgp_network']) | join(',') }}"
+        spine_list: "{{ groups['spine'] }}"
+        leaf_list: "{{ groups['leaf'] }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ log_dir_path }}"
+      register: bgp_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ bgp_out.hash_dict }}"
+      delegate_to: 127.0.0.1
+
+    - shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store GOES version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restore backup of Quagga.conf 
+      copy:
+        src: /etc/quagga/Quagga.conf.bck
+        dest: /etc/quagga/Quagga.conf
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: /etc/quagga/Quagga.conf.bck
+        state: absent
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
