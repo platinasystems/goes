@@ -36,7 +36,7 @@
       command: service quagga restart
 
     - pause:
-        seconds: 30
+        seconds: 20
 
 
 - hosts: leaf:spine

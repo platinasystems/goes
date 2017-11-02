@@ -117,7 +117,10 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    out = run_cli(module, cmd)
+    if 'service quagga restart' in cmd:
+        out = None
+    else:
+        out = run_cli(module, cmd)
 
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
@@ -150,7 +153,7 @@ def verify_bgp_local_pref_weight(module):
     switch_name = module.params['switch_name']
     # spine_network_list = module.params['spine_network_list'].split(',')
     # leaf_network_list = module.params['leaf_network_list'].split(',')
-    # 
+    #
     # for network in spine_network_list + leaf_network_list:
     #     if network not in out:
     #         RESULT_STATUS = False

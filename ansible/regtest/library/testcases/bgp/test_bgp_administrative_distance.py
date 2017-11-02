@@ -118,7 +118,10 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    out = run_cli(module, cmd)
+    if 'service quagga restart' in cmd:
+        out = None
+    else:
+        out = run_cli(module, cmd)
 
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
