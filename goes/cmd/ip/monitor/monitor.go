@@ -150,7 +150,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	sock, err := nl.NewSock(16, groups(show.opt),
+	sock, err := nl.NewSock(nl.NETLINK_ROUTE, 16, groups(show.opt),
 		show.opt.Flags.ByName["all-nsid"])
 	if err != nil {
 		return err

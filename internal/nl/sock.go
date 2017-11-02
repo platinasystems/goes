@@ -15,6 +15,31 @@ import (
 	"github.com/platinasystems/go/internal/sizeof"
 )
 
+const (
+	NETLINK_ROUTE    = syscall.NETLINK_ROUTE
+	NETLINK_UNUSED   = syscall.NETLINK_UNUSED
+	NETLINK_USERSOCK = syscall.NETLINK_USERSOCK
+	NETLINK_FIREWALL = syscall.NETLINK_FIREWALL
+	// NETLINK_SOCK_DIAG      = syscall.NETLINK_SOCK_DIAG
+	NETLINK_NFLOG          = syscall.NETLINK_NFLOG
+	NETLINK_XFRM           = syscall.NETLINK_XFRM
+	NETLINK_SELINUX        = syscall.NETLINK_SELINUX
+	NETLINK_ISCSI          = syscall.NETLINK_ISCSI
+	NETLINK_AUDIT          = syscall.NETLINK_AUDIT
+	NETLINK_FIB_LOOKUP     = syscall.NETLINK_FIB_LOOKUP
+	NETLINK_CONNECTOR      = syscall.NETLINK_CONNECTOR
+	NETLINK_NETFILTER      = syscall.NETLINK_NETFILTER
+	NETLINK_IP6_FW         = syscall.NETLINK_IP6_FW
+	NETLINK_DNRTMSG        = syscall.NETLINK_DNRTMSG
+	NETLINK_KOBJECT_UEVENT = syscall.NETLINK_KOBJECT_UEVENT
+	NETLINK_GENERIC        = syscall.NETLINK_GENERIC
+	NETLINK_SCSITRANSPORT  = syscall.NETLINK_SCSITRANSPORT
+	NETLINK_ECRYPTFS       = syscall.NETLINK_ECRYPTFS
+	// NETLINK_RDMA           = syscall.NETLINK_RDMA
+	// NETLINK_CRYPTO         = syscall.NETLINK_CRYPTO
+	// NETLINK_SMC            = syscall.NETLINK_SMC
+)
+
 var Eclosed = errors.New("already closed")
 var PrintSockGrps = func(uint32) {}
 
@@ -22,16 +47,17 @@ var PrintSockGrps = func(uint32) {}
 // netlink messages into a page, if possible; otherwise, one per oversized
 // buffer.
 //
-// Usage: NewSock([depth int[, groups uint32[, allnsid bool[,
-//	sorcvbuf[, sosndbuf] int]]]])
+// Usage: NewSock([proto int[, depth int[, groups uint32[, allnsid bool[,
+//	sorcvbuf[, sosndbuf int]]]]]])
 // e.g.
 //	NewSock()
-//	NewSock(16)
-//	NewSock(16, RTNLGRP_NEIGH.Bit())
-//	NewSock(16, groups, true)
-//	NewSock(16, groups, false, 4 << 20)
-//	NewSock(16, groups, false, 4 << 20, 1 << 20)
+//	NewSock(NETLINK_ROUTE, 16)
+//	NewSock(NETLINK_GENERIC, 16, RTNLGRP_NEIGH.Bit())
+//	NewSock(NETLINK_GENERIC, 16, groups, true)
+//	NewSock(NETLINK_GENERIC, 16, groups, false, 4 << 20)
+//	NewSock(NETLINK_GENERIC, 16, groups, false, 4 << 20, 1 << 20)
 //
+//	proto	default, NETLINK_ROUTE
 //	depth	of Rx buffer channel (default, 4)
 //	groups	to listen (default, none)
 //	allnsid	listen in all identified net namespaces (default, false)
@@ -41,28 +67,31 @@ var PrintSockGrps = func(uint32) {}
 func NewSock(opts ...interface{}) (*Sock, error) {
 	var allnsid bool
 	var groups uint32
+	proto := NETLINK_ROUTE
 	depth := 4
 	sorcvbuf := -1
 	sosndbuf := -1
 
 	if len(opts) > 0 {
-		depth = opts[0].(int)
+		proto = opts[0].(int)
 	}
 	if len(opts) > 1 {
-		groups = opts[1].(uint32)
+		depth = opts[1].(int)
 	}
 	if len(opts) > 2 {
-		allnsid = opts[2].(bool)
+		groups = opts[2].(uint32)
 	}
 	if len(opts) > 3 {
-		sorcvbuf = opts[3].(int)
+		allnsid = opts[3].(bool)
 	}
-	if len(opts) > 3 {
-		sosndbuf = opts[3].(int)
+	if len(opts) > 4 {
+		sorcvbuf = opts[4].(int)
+	}
+	if len(opts) > 5 {
+		sosndbuf = opts[5].(int)
 	}
 
-	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW,
-		syscall.NETLINK_ROUTE)
+	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW, proto)
 	if err != nil {
 		return nil, os.NewSyscallError("socket", err)
 	}
