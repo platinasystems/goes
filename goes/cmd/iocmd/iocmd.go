@@ -72,8 +72,14 @@ func (cmd) Main(args ...string) (err error) {
 		w = 1
 	}
 
-	if err = io_reg_rw(flag.ByName["-w"], a, d, w); err != nil {
-		return err
+	if flag.ByName["-w"] {
+		if err = io_reg_wr(a, d, w); err != nil {
+			return err
+		}
+	} else {
+		if err = io_reg_rd(a, w); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -91,48 +97,73 @@ var (
 	}
 )
 
-func io_reg_rw(write bool, addr uint64, dat uint64, wid uint64) (err error) {
+func io_reg_wr(addr uint64, dat uint64, wid uint64) (err error) {
+	if err = setIoperm(addr); err != nil {
+		return err
+	}
+
+	n := 0
+	b := make([]byte, wid)
+	b[0] = byte(dat & 0xff) //TODO add 16/32 support
+	f, err := os.OpenFile("/dev/port", os.O_WRONLY, 0755)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err = f.Seek(int64(addr), 0); err != nil {
+		return err
+	}
+	if n, err = f.Write(b); err != nil {
+		return err
+	}
+	f.Sync()
+	fmt.Println("Wrote", n, "byte(s)")
+	f.Close()
+
+	if err = clrIoperm(addr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func io_reg_rd(addr uint64, wid uint64) (err error) {
+	if err = setIoperm(addr); err != nil {
+		return err
+	}
+
+	n := 0
+	b := make([]byte, wid)
+	f, err := os.Open("/dev/port")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err = f.Seek(int64(addr), 0); err != nil {
+		return err
+	}
+	if _, err = f.Read(b); err != nil {
+		return err
+	}
+	fmt.Println("Read value =", b) //TODO 16/32 support
+	f.Close()
+
+	if err = clrIoperm(addr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setIoperm(addr uint64) (err error) {
 	if err = syscall.Iopl(3); err != nil {
 		return err
 	}
 	if err = syscall.Ioperm(int(addr), 1, 1); err != nil {
 		return err
 	}
+	return nil
+}
 
-	n := 0
-	b := make([]byte, wid)
-	if !write {
-		f, err := os.Open("/dev/port")
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		if _, err = f.Seek(int64(addr), 0); err != nil {
-			return err
-		}
-		if _, err = f.Read(b); err != nil {
-			return err
-		}
-		fmt.Println("Read value =", b)
-		f.Close()
-	} else {
-		b[0] = byte(dat & 0xff) //FIXME add 16, 32-bit
-		f, err := os.OpenFile("/dev/port", os.O_WRONLY, 0755)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		if _, err = f.Seek(int64(addr), 0); err != nil {
-			return err
-		}
-		if n, err = f.Write(b); err != nil {
-			return err
-		}
-		f.Sync()
-		fmt.Println("Wrote", n, "byte(s)")
-		f.Close()
-	}
-
+func clrIoperm(addr uint64) (err error) {
 	if err = syscall.Ioperm(int(addr), 1, 0); err != nil {
 		return err
 	}
