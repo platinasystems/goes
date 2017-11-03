@@ -28,7 +28,6 @@
       blockinfile:
         path: /etc/quagga/Quagga.conf
         insertafter: "interface lo"
-        backup: yes
         marker: ""
         block: "{{ lookup('file', '/home/saptak/go/ansible/regtest/files/{{inventory_hostname}}/bgp_peering_administrative_distance.conf') }}"
 

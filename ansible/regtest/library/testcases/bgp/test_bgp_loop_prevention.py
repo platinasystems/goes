@@ -144,8 +144,8 @@ def verify_bgp_loop_prevention(module):
     cmd = "vtysh -c 'clear ip bgp {}'".format(spine_eth_ip)
     execute_commands(module, cmd)
 
-    # Wait for 30 secs for bgp to convergence
-    time.sleep(30)
+    # Wait for 35 secs for bgp to convergence
+    time.sleep(35)
 
     # Read the log file
     bgp_log_file = open(log_file, 'r')

@@ -28,7 +28,6 @@
       blockinfile:
         path: /etc/quagga/Quagga.conf
         insertafter: "interface lo"
-        backup: yes
         marker: ""
         block: "{{ lookup('file', '/home/saptak/go/ansible/regtest/files/{{inventory_hostname}}/bgp_peering_loop_prevention.conf') }}"
 
@@ -36,7 +35,7 @@
       command: service quagga restart
 
     - pause:
-        seconds: 20
+        seconds: 35
 
 
 - hosts: leaf[0]
@@ -92,9 +91,9 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-#    - file:
-#        path: "{{ log_file }}"
-#        state: absent
+    - file:
+        path: "{{ log_file }}"
+        state: absent
 
 
 - hosts: leaf:spine
