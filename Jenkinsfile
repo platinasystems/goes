@@ -56,7 +56,7 @@ pipeline {
 	}
 
 	failure {
-		cleanWS()
+		cleanWs()
 		mail body: "GOES build error: ${env.BUILD_URL}",
 		from: email_from,
 		replyTo: email_reply_to,
