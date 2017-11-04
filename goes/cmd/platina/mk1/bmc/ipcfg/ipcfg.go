@@ -69,19 +69,12 @@ func (cmd) Main(args ...string) (err error) {
 		r := n + "\\." + n + "\\." + n + "\\." + n + "::eth0:on"
 		x := regexp.MustCompile(r)
 		if parm.ByName["-ip"] == "dhcp" || x.MatchString(s) {
-			if err = updatePer(parm.ByName["-ip"], false); err != nil {
-				return err
+			if err = updateIP(s, false); err != nil {
+				fmt.Println(err)
 			}
-			if err = UpdateEnv(false); err != nil {
-				return err
+			if err = updateIP(s, true); err != nil {
+				fmt.Println(err)
 			}
-			if err = updatePer(parm.ByName["-ip"], true); err != nil {
-				return err
-			}
-			if err = UpdateEnv(true); err != nil {
-				return err
-			}
-			return nil
 		} else {
 			err = fmt.Errorf("invalid ip string")
 			return err
@@ -100,6 +93,16 @@ func dispIP(q bool) error {
 		fmt.Println("QSPI0:  ip=" + n[1])
 	} else {
 		fmt.Println("QSPI1:  ip=" + n[1])
+	}
+	return nil
+}
+
+func updateIP(ip string, q bool) (err error) {
+	if err = updatePer(ip, q); err != nil {
+		return err
+	}
+	if err = UpdateEnv(q); err != nil {
+		return err
 	}
 	return nil
 }
