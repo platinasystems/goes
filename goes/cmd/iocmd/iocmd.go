@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 const (
@@ -30,6 +32,9 @@ DESCRIPTION
 	    b (read byte data, default)
 	    w (read word data)
 	    l (read long data)`
+
+	sys_iopl   = 172 //amd64
+	sys_ioperm = 173 //amd64
 )
 
 type Interface interface {
@@ -153,21 +158,43 @@ func io_reg_rd(addr uint64, wid uint64) (err error) {
 }
 
 func setIoperm(addr uint64) (err error) {
-	if err = syscall.Iopl(3); err != nil {
+	m := ""
+	if m, err = redis.Hget(redis.DefaultHash, "machine"); err != nil {
 		return err
 	}
-	if err = syscall.Ioperm(int(addr), 1, 1); err != nil {
-		return err
+	if !strings.Contains(m, "bmc") {
+		level := 3
+		if _, _, errno := syscall.Syscall(sys_iopl,
+			uintptr(level), 0, 0); errno != 0 {
+			return err
+		}
+		num := 1
+		on := 1
+		if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
+			uintptr(num), uintptr(on)); errno != 0 {
+			return err
+		}
 	}
 	return nil
 }
 
 func clrIoperm(addr uint64) (err error) {
-	if err = syscall.Ioperm(int(addr), 1, 0); err != nil {
+	m := ""
+	if m, err = redis.Hget(redis.DefaultHash, "machine"); err != nil {
 		return err
 	}
-	if err = syscall.Iopl(0); err != nil {
-		return err
+	if !strings.Contains(m, "bmc") {
+		num := 1
+		on := 0
+		if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
+			uintptr(num), uintptr(on)); errno != 0 {
+			return err
+		}
+		level := 0
+		if _, _, errno := syscall.Syscall(sys_iopl,
+			uintptr(level), 0, 0); errno != 0 {
+			return err
+		}
 	}
 	return nil
 }
