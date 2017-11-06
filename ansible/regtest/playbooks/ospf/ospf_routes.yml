@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_ospf_routes_023_{{ start_time.stdout }}"
+        hash_name: "quagga_ospf_routes_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -42,7 +42,7 @@
       command: service quagga restart
 
     - pause:
-        seconds: 20
+        seconds: 30
 
 
 - hosts: leaf:spine
