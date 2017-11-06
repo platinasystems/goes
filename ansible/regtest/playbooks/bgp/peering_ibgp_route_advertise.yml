@@ -50,7 +50,7 @@
         state: directory
 
     - name: Verify bgp peering ibgp route advertise
-      test_ibgp_route_advertise:
+      test_bgp_route_advertise:
         switch_name: "{{ inventory_hostname }}"
         spine_network_list: "{{ groups['spine'] | map('extract', hostvars, ['bgp_network']) | join(',') }}"
         leaf_network_list: "{{ groups['leaf'] | map('extract', hostvars, ['bgp_network']) | join(',') }}"

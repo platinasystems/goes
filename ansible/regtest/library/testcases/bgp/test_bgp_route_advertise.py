@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify iBGP Route Advertise """
+""" Test/Verify BGP Route Advertise """
 
 #
 # This file is part of Ansible
@@ -26,7 +26,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_ibgp_route_advertise
+module: test_bgp_route_advertise
 author: Platina Systems
 short_description: Module to test and verify bgp configurations.
 description:
@@ -72,8 +72,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp peering ibgp route advertise
-  test_ibgp_route_advertise:
+- name: Verify bgp peering route advertise
+  test_bgp_route_advertise:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -132,9 +132,9 @@ def execute_commands(module, cmd):
     return out
 
 
-def verify_ibgp_route_advertise(module):
+def verify_bgp_route_advertise(module):
     """
-    Method to verify ibgp route advertise.
+    Method to verify bgp route advertise.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
@@ -197,7 +197,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_ibgp_route_advertise(module)
+    verify_bgp_route_advertise(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
