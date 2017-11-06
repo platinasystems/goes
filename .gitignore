@@ -1,6 +1,7 @@
 *~
 *.so
 *.swp
+*.test
 /*.patch
 /go-*
 /goes-*
