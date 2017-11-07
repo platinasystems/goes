@@ -78,11 +78,11 @@ func (cmd) Main(args ...string) (err error) {
 	}
 
 	if flag.ByName["-w"] {
-		if err = io_reg_wr(a, d, w); err != nil {
+		if err = Io_reg_wr(a, d, w); err != nil {
 			return err
 		}
 	} else {
-		if err = io_reg_rd(a, w); err != nil {
+		if _, err = Io_reg_rd(a, w); err != nil {
 			return err
 		}
 	}
@@ -102,7 +102,7 @@ var (
 	}
 )
 
-func io_reg_wr(addr uint64, dat uint64, wid uint64) (err error) {
+func Io_reg_wr(addr uint64, dat uint64, wid uint64) (err error) {
 	if err = setIoperm(addr); err != nil {
 		return err
 	}
@@ -131,30 +131,30 @@ func io_reg_wr(addr uint64, dat uint64, wid uint64) (err error) {
 	return nil
 }
 
-func io_reg_rd(addr uint64, wid uint64) (err error) {
+func Io_reg_rd(addr uint64, wid uint64) (b []byte, err error) {
 	if err = setIoperm(addr); err != nil {
-		return err
+		return b, err
 	}
 
-	b := make([]byte, wid)
+	b = make([]byte, wid)
 	f, err := os.Open("/dev/port")
 	if err != nil {
-		return err
+		return b, err
 	}
 	defer f.Close()
 	if _, err = f.Seek(int64(addr), 0); err != nil {
-		return err
+		return b, err
 	}
 	if _, err = f.Read(b); err != nil {
-		return err
+		return b, err
 	}
 	fmt.Println("Read value =", b) //TODO 16/32 support
 	f.Close()
 
 	if err = clrIoperm(addr); err != nil {
-		return err
+		return b, err
 	}
-	return nil
+	return b, nil
 }
 
 func setIoperm(addr uint64) (err error) {

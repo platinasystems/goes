@@ -14,9 +14,12 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/iocmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 const (
@@ -134,6 +137,35 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 			err = bus.Do(g[x].RW, g[x].RegOffset, g[x].BusSize, &data)
 			if err != nil {
 				log.Printf("Error doing I2C R/W: bus 0x%x addr 0x%x offset 0x%x data 0x%x RW %d BusSize %d delay %d", g[x].Bus, g[x].Addr, g[x].RegOffset, data[0], g[x].RW, g[x].BusSize, g[x].Delay)
+				m, _ := redis.Hget(redis.DefaultHash, "machine")
+
+				switch m {
+				case "platina-mk1":
+					d, err := iocmd.Io_reg_rd(0x603, 1)
+					if err == nil {
+						iocmd.Io_reg_wr(0x603, uint64(d[0]&0xb0), 0x1)
+						time.Sleep(10 * time.Microsecond)
+						iocmd.Io_reg_wr(0x603, uint64(d[0]|0x40), 0x1)
+					}
+				case "platina-mk1-bmc":
+					if len(gpio.Pins) == 0 {
+						gpio.Init()
+					}
+					pin, found := gpio.Pins["FRU_I2C_MUX_RST_L"]
+					if found {
+						pin.SetValue(false)
+						time.Sleep(10 * time.Microsecond)
+						pin.SetValue(true)
+					}
+
+					pin, found = gpio.Pins["MAIN_I2C_MUX_RST_L"]
+					if found {
+						pin.SetValue(false)
+						time.Sleep(10 * time.Microsecond)
+						pin.SetValue(true)
+					}
+				default:
+				}
 				return err
 			}
 			f[x].D[0] = data[0]
