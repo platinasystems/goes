@@ -52,13 +52,14 @@ OPTIONS
 	DfltMod = 0755
 	DfltSrv = "downloads.platinasystems.com"
 	DfltVer = "LATEST"
-	Machine = "platina-mk1"
+	Mach    = "mk2"
+	Machine = "platina-" + Mach
 
 	//names of server files
-	GoesName      = "goes-platina-mk1" //includes non-compressed tag
-	GoesInstaller = "goes-platina-mk1-installer"
-	KernelName    = "linux-image-platina-mk1"
-	CorebootName  = "coreboot-mk1.rom"
+	GoesName      = "goes-" + Machine //includes non-compressed tag
+	GoesInstaller = "goes-" + Machine + "-installer"
+	KernelName    = "linux-image-" + Machine
+	CorebootName  = "coreboot-" + Mach + ".rom"
 )
 
 type Interface interface {

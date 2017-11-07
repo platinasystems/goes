@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1-bmc/ucd9090d"
 	"github.com/platinasystems/go/internal/eeprom"
 )
 
@@ -23,10 +23,10 @@ func diagPower() error {
 		ucd9090dMuxAdr = 0x76
 		ucd9090dMuxVal = 0x01
 
-		TOR1 uint8      = 0x00
-		CH1 uint8       = 0x01
-		CH1MC uint8     = 0x04
-		CH1LC uint8     = 0x05
+		TOR1  uint8 = 0x00
+		CH1   uint8 = 0x01
+		CH1MC uint8 = 0x04
+		CH1LC uint8 = 0x05
 	)
 
 	pm = ucd9090d.I2cDev{ucd9090dBus, ucd9090dAdr, ucd9090dMuxBus, ucd9090dMuxAdr, ucd9090dMuxVal}
@@ -35,7 +35,7 @@ func diagPower() error {
 		BusIndex:   0,
 		BusAddress: 0x55,
 	}
-	if err:= d.GetInfo(); err != nil {
+	if err := d.GetInfo(); err != nil {
 		return err
 	}
 	if d.Fields.ChassisType == TOR1 {
@@ -64,8 +64,7 @@ func diagPower() error {
 
 func diagPowerTor() error {
 
-	 var r string
-
+	var r string
 
 	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
 	fmt.Printf("---------------|-------------------------|----------|----------|----------|----------|------|-----------------------------------\n")

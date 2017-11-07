@@ -55,7 +55,7 @@ func getFile(s string, v string, t bool, fn string) (int, error) {
 }
 
 func rmFiles() {
-	rmFile("platina-mk1-bmc-ver.bin")
+	rmFile(VersionName)
 	return
 }
 

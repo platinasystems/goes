@@ -8,7 +8,7 @@ import (
 	//"fmt"
 	//"strconv"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/mmclogd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1-bmc/mmclogd"
 	"github.com/platinasystems/go/goes/lang"
 )
 

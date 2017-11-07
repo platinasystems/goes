@@ -7,7 +7,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1-bmc/ledgpiod"
 	"github.com/platinasystems/go/internal/redis"
 )
 

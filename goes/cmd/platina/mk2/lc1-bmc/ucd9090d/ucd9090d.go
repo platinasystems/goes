@@ -17,7 +17,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/fantrayd"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1-bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/w83795d"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/log"
