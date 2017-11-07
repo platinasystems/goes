@@ -20,13 +20,15 @@ import (
 	"github.com/platinasystems/go/internal/prog"
 )
 
-var gdb, Goes bool
+var gdb, Goes, Loopback bool
 
 func init() {
 	flag.BoolVar(&gdb, "test.gdb", false,
 		"debug certain commands (e.g. vnetd)")
 	flag.BoolVar(&Goes, "test.goes", false,
 		"run goes command instead of test(s)")
+	flag.BoolVar(&Loopback, "test.loopback", false,
+		"run goes loopback test(s)")
 }
 
 // Execute given Goes().main with os.Args stripped of the goes-MACHINE.test

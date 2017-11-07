@@ -16,7 +16,10 @@ func Test(t *testing.T) {
 	if Goes {
 		Exec(main.Goes().Main)
 	}
-	t.Run("VnetReady", VnetReady)
+}
+
+func TestVnetReady(t *testing.T) {
+	VnetReady(t)
 }
 
 func VnetReady(t *testing.T) {
@@ -34,4 +37,36 @@ func VnetReady(t *testing.T) {
 	assert.Program(nil,
 		"goes", "hwait", "platina", "vnet.ready", "true", "30",
 	).Ok()
+}
+
+func TestFrrOSPF(t *testing.T) {
+	if !Loopback {
+		t.Skip("Skipping loopback test(s)")
+	}
+
+	FrrOSPF(t, "docs/examples/docker/frr-ospf/conf.yml")
+}
+
+func TestFrrOSPFVlan(t *testing.T) {
+	if !Loopback {
+		t.Skip("Skipping loopback test(s)")
+	}
+
+	FrrOSPF(t, "docs/examples/docker/frr-ospf/conf_vlan.yml")
+}
+
+func TestFrrISIS(t *testing.T) {
+	if !Loopback {
+		t.Skip("Skipping loopback test(s)")
+	}
+
+	FrrISIS(t, "docs/examples/docker/frr-isis/conf.yml")
+}
+
+func TestFrrISISVlan(t *testing.T) {
+	if !Loopback {
+		t.Skip("Skipping loopback test(s)")
+	}
+
+	FrrISIS(t, "docs/examples/docker/frr-isis/conf_vlan.yml")
 }
