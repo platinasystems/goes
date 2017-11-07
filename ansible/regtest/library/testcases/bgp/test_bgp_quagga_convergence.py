@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify Quagga BGP State Propagation """
+""" Test/Verify BGP Quagga Convergence """
 
 #
 # This file is part of Ansible
@@ -26,9 +26,9 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_quagga_bgp_state_propagation
+module: test_bgp_quagga_convergence
 author: Platina Systems
-short_description: Module to test and verify quagga bgp state propagation.
+short_description: Module to test and verify bgp quagga convergence.
 description:
     Module to test and verify bgp configurations and log the same.
 options:
@@ -42,18 +42,6 @@ options:
         - Comma separated list of all leaf bgp networks.
       required: False
       type: str
-    leaf_list:
-      description:
-        - List of all leaf switches.
-      required: False
-      type: list
-      default: []
-    route_present:
-      description:
-        - Flag to indicate if bgp route should be present in output or not.
-      required: False
-      type: bool
-      default: True
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -67,7 +55,7 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify quagga bgp state propagation
+- name: Verify bgp quagga convergence
   test_quagga_bgp_state_propagation:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
@@ -127,28 +115,19 @@ def execute_commands(module, cmd):
     return out
 
 
-def verify_quagga_bgp_state_propagation(module):
+def verify_bgp_quagga_convergence(module):
     """
-    Method to verify quagga bgp state propagation.
+    Method to verify bgp quagga convergence.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    route_present = module.params['route_present']
-    leaf_list = module.params['leaf_list']
 
-    if route_present:
-        # Get the current/running configurations
-        execute_commands(module, "vtysh -c 'sh running-config'")
+    # Get the current/running configurations
+    execute_commands(module, "vtysh -c 'sh running-config'")
 
-        # Restart and check Quagga status
-        execute_commands(module, 'service quagga restart')
-        execute_commands(module, 'service quagga status')
-    else:
-        leaf1 = leaf_list[0]
-        key = '{} ifconfig eth-19-1 down'.format(leaf1)
-        HASH_DICT[key] = None
-        key = '{} ifconfig eth-3-1 down'.format(leaf1)
-        HASH_DICT[key] = None
+    # Restart and check Quagga status
+    execute_commands(module, 'service quagga restart')
+    execute_commands(module, 'service quagga status')
 
     # Get all ip routes
     cmd = "vtysh -c 'sh ip route'"
@@ -159,19 +138,12 @@ def verify_quagga_bgp_state_propagation(module):
     leaf_network_list = module.params['leaf_network_list'].split(',')
     route = 'B>* {}'.format(leaf_network_list[0])
 
-    if route_present:
-        if route not in out:
-            RESULT_STATUS = False
-            failure_summary += 'On Switch {} bgp route '.format(switch_name)
-            failure_summary += '{} is not present '.format(route)
-            failure_summary += 'in the output of command {}\n'.format(cmd)
-    else:
-        if route in out:
-            RESULT_STATUS = False
-            failure_summary += 'On Switch {} bgp route '.format(switch_name)
-            failure_summary += '{} is present '.format(route)
-            failure_summary += 'in the output of command {} '.format(cmd)
-            failure_summary += 'even after shutting down this route\n'
+    if route in out:
+        RESULT_STATUS = False
+        failure_summary += 'On Switch {} bgp route '.format(switch_name)
+        failure_summary += '{} is present '.format(route)
+        failure_summary += 'in the output of command {} '.format(cmd)
+        failure_summary += 'even after removing this network\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -185,8 +157,6 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             leaf_network_list=dict(required=False, type='str'),
-            route_present=dict(required=False, type='bool', default=True),
-            leaf_list=dict(required=False, type='list', default=[]),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -194,16 +164,15 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_quagga_bgp_state_propagation(module)
+    verify_bgp_quagga_convergence(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
 
     # Create a log file
-    mode = 'w' if module.params['route_present'] else 'a'
     log_file_path = module.params['log_dir_path']
     log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
-    log_file = open(log_file_path, mode)
+    log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
         log_file.write('\n')

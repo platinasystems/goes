@@ -1,0 +1,15 @@
+server_emulator ansible_ssh_host=172.17.2.28
+packet_genertor ansible_ssh_host=172.17.2.10
+
+invader42 ansible_ssh_host=172.17.2.42
+invader43 ansible_ssh_host=172.17.2.43
+invader44 ansible_ssh_host=172.17.2.44
+invader45 ansible_ssh_host=172.17.2.45
+
+[spine]
+invader44
+invader45
+
+[leaf]
+invader42
+invader43
