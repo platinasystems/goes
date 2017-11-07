@@ -9,43 +9,45 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test"
 	main "github.com/platinasystems/go/main/goes-example"
 )
 
 func Test(t *testing.T) {
-	if Goes {
-		Exec(main.Goes().Main)
+	if test.Goes {
+		test.Exec(main.Goes().Main)
 	}
-	t.Run("HelloWorld", HelloWorld)
-	t.Run("Pwd", Pwd)
-	t.Run("Cat", Cat)
-	t.Run("RedisReady", RedisReady)
+	test.Suite{
+		{"hello", hello},
+		{"pwd", pwd},
+		{"cat", cat},
+		{"redis", redis},
+	}.Run(t)
 }
 
-func HelloWorld(t *testing.T) {
-	Assert{t}.Program(nil,
+func hello(t *testing.T) {
+	test.Assert{t}.Program(nil,
 		"goes", "echo", "hello", "world",
-	).Output(Equal("hello world\n"))
+	).Output(test.Equal("hello world\n"))
 
 }
 
-func Pwd(t *testing.T) {
-	Assert{t}.Program(nil,
+func pwd(t *testing.T) {
+	test.Assert{t}.Program(nil,
 		"goes", "pwd",
-	).Output(Match(".*/platinasystems/go\n"))
+	).Output(test.Match(".*/platinasystems/go\n"))
 
 }
 
-func Cat(t *testing.T) {
-	Assert{t}.Program(strings.NewReader("HELLO WORLD"),
+func cat(t *testing.T) {
+	test.Assert{t}.Program(strings.NewReader("HELLO WORLD"),
 		"goes", "cat", "-",
-	).Output(Equal("HELLO WORLD"))
+	).Output(test.Equal("HELLO WORLD"))
 
 }
 
-func RedisReady(t *testing.T) {
-	assert := Assert{t}
+func redis(t *testing.T) {
+	assert := test.Assert{t}
 	assert.YoureRoot()
 	defer assert.Program(nil, "goes", "redisd").Quit(10 * time.Second)
 	assert.Program(nil,
