@@ -136,6 +136,9 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 			data[3] = g[x].Data[3]
 			err = bus.Do(g[x].RW, g[x].RegOffset, g[x].BusSize, &data)
 			if err != nil {
+				for y := 0; y < x; y++ {
+					log.Printf("I2C R/W before Error: bus 0x%x addr 0x%x offset 0x%x data 0x%x RW %d BusSize %d delay %d", g[y].Bus, g[y].Addr, g[y].RegOffset, g[y].Data[0], g[y].RW, g[y].BusSize, g[y].Delay)
+				}
 				log.Printf("Error doing I2C R/W: bus 0x%x addr 0x%x offset 0x%x data 0x%x RW %d BusSize %d delay %d", g[x].Bus, g[x].Addr, g[x].RegOffset, data[0], g[x].RW, g[x].BusSize, g[x].Delay)
 				m, _ := redis.Hget(redis.DefaultHash, "machine")
 
