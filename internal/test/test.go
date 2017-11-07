@@ -290,3 +290,16 @@ func (gdb *Gdb) Quit(timeout time.Duration) {
 func (lb logbuf) String() string {
 	return "\n" + strings.TrimRight(lb.Buffer.String(), "\n")
 }
+
+// Suite of tests
+type Suite []struct {
+	Name string
+	Func func(*testing.T)
+}
+
+// Run test suite
+func (suite Suite) Run(t *testing.T) {
+	for _, x := range suite {
+		t.Run(x.Name, x.Func)
+	}
+}
