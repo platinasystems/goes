@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 const (
@@ -46,12 +47,9 @@ OPTIONS
 	-c                check SHA-1's of flash
 	-f                force upgrade (ignore version check)`
 
-	DfltMod     = 0755
-	DfltSrv     = "downloads.platinasystems.com"
-	DfltVer     = "LATEST"
-	Machine     = "platina-mk1-bmc"
-	ArchiveName = Machine + ".zip"
-	VersionName = Machine + "-ver.bin"
+	DfltMod = 0755
+	DfltSrv = "downloads.platinasystems.com"
+	DfltVer = "LATEST"
 )
 
 type Interface interface {
@@ -68,9 +66,20 @@ type cmd struct{}
 
 func (cmd) Apropos() lang.Alt { return apropos }
 
+var Machine string
+var ArchiveName string
+var VersionName string
+
 func (cmd) Main(args ...string) error {
+	Machine, err := redis.Hget(redis.DefaultHash, "machine")
+	if err != nil {
+		return err
+	}
+	ArchiveName = Machine + ".zip"
+	VersionName = Machine + "-ver.bin"
+
 	initQfmt()
-	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c", "-1")
+	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c", "-1", "-z")
 	parm, args := parms.New(args, "-v", "-s")
 	if len(parm.ByName["-v"]) == 0 {
 		parm.ByName["-v"] = DfltVer
@@ -104,7 +113,7 @@ func (cmd) Main(args ...string) error {
 
 	if err := doUpgrade(parm.ByName["-s"], parm.ByName["-v"],
 		flag.ByName["-t"], flag.ByName["-f"],
-		flag.ByName["-1"]); err != nil {
+		flag.ByName["-1"], flag.ByName["-z"]); err != nil {
 		return err
 	}
 	return nil
@@ -184,7 +193,7 @@ func compareChecksums() (err error) {
 	return nil
 }
 
-func doUpgrade(s string, v string, t bool, f bool, q bool) error {
+func doUpgrade(s string, v string, t bool, f bool, q bool, z bool) error {
 	fmt.Print("\n")
 
 	n, err := getFile(s, v, t, ArchiveName)
@@ -238,12 +247,16 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	selectQSPI(q)
 	if q == true {
 		fmt.Println("Upgrading QSPI1...\n")
+	} else {
+		fmt.Println("Upgrading QSPI0...\n")
 	}
 	if err := writeImageAll(); err != nil {
 		return fmt.Errorf("*** UPGRADE ERROR! ***: %v\n", err)
 	}
-	if err := reboot(); err != nil {
-		return err
+	if !z {
+		if err := reboot(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

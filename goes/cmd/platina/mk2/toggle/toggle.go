@@ -5,7 +5,6 @@
 package toggle
 
 import (
-	"strings"
 	"time"
 
 	"github.com/platinasystems/go/goes/lang"
@@ -47,7 +46,7 @@ func (cmd) Main(args ...string) error {
 	var machineBmc bool
 
 	m, _ := redis.Hget(redis.DefaultHash, "machine")
-	if strings.Contains(m, "bmc") {
+	if m == "platina-mk1-bmc" {
 		machineBmc = true
 	} else {
 		machineBmc = false
