@@ -29,7 +29,7 @@
         path: /etc/quagga/Quagga.conf
         insertafter: "interface lo"
         marker: ""
-        block: "{{ lookup('file', '/home/saptak/go/ansible/regtest/files/{{inventory_hostname}}/bgp_peering_ebgp_route_advertise.conf') }}"
+        block: "{{ lookup('file', 'files/{{inventory_hostname}}/bgp_peering_ebgp_route_advertise.conf') }}"
 
     - name: Restart quagga
       command: service quagga restart
