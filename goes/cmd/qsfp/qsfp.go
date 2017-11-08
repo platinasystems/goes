@@ -140,11 +140,14 @@ func (c *Command) updatePresence() error {
 		return nil
 	}
 
+	var buffPresent = [2]uint16{0xffff, 0xffff}
+
 	for j := 0; j < 2; j++ {
 		//when qsfp is installed or removed from a port
-		if present[j] != latestPresent[j] {
+		buffPresent[j] = latestPresent[j]
+		if present[j] != buffPresent[j] {
 			for i := 0; i < 16; i++ {
-				if (1<<uint(i))&(latestPresent[j]^present[j]) != 0 {
+				if (1<<uint(i))&(buffPresent[j]^present[j]) != 0 {
 					//physical to logical port translation
 					lp := i + j*16
 					if (lp % 2) == 0 {
@@ -152,7 +155,7 @@ func (c *Command) updatePresence() error {
 					}
 					lp += porto
 					var typeString string
-					if ((1 << uint(i)) & (latestPresent[j] ^ 0xffff)) != 0 {
+					if ((1 << uint(i)) & (buffPresent[j] ^ 0xffff)) != 0 {
 						//when qsfp is installed publish static data
 						k := "port-" + strconv.Itoa(lp) + ".qsfp.compliance"
 						v := Vdev[i+j*16].Compliance()
@@ -403,7 +406,7 @@ func (c *Command) updatePresence() error {
 				}
 			}
 		}
-		present[j] = latestPresent[j]
+		present[j] = buffPresent[j]
 	}
 
 	return nil
