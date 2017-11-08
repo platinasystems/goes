@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1-bmc/upgrade"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )

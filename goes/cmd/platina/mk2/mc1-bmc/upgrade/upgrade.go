@@ -49,9 +49,9 @@ OPTIONS
 	DfltMod     = 0755
 	DfltSrv     = "downloads.platinasystems.com"
 	DfltVer     = "LATEST"
-	Machine     = "platina-mk1-bmc"
-	ArchiveName = "platina-mk1-bmc.zip"
-	VersionName = "platina-mk1-bmc-ver.bin"
+	Machine     = "platina-mk2-mc1-bmc"
+	ArchiveName = Machine + ".zip"
+	VersionName = Machine + "-ver.bin"
 )
 
 type Interface interface {
