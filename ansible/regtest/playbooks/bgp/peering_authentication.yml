@@ -29,7 +29,7 @@
         path: /etc/quagga/Quagga.conf
         insertafter: "interface lo"
         marker: ""
-        block: "{{ lookup('file', 'files/{{inventory_hostname}}/bgp_peering_authentication.conf') }}"
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_authentication.conf') }}"
 
     - name: Restart quagga
       command: service quagga restart
@@ -52,7 +52,7 @@
     - name: Verify bgp peering authentication
       test_bgp_authentication:
         switch_name: "{{ inventory_hostname }}"
-        conf_file: "{{ lookup('file', 'files/{{inventory_hostname}}/bgp_peering_authentication.conf') }}"
+        conf_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_authentication.conf') }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ log_dir_path }}"
       register: bgp_out
