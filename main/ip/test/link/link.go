@@ -23,11 +23,10 @@ var Suite = test.Suite{
 
 var show = test.Suite{
 	{"default", func(t *testing.T) {
-		test.Assert{t}.Program(nil, "goes", "ip", "link", "show").Ok()
+		test.Assert{t}.Program(nil, "goes", "ip", "link", "show").Ok().Done()
 	}},
 	{"lo", func(t *testing.T) {
-		test.Assert{t}.Program(nil, "goes", "ip", "link", "show",
-			"lo").Ok()
+		test.Assert{t}.Program(nil, "goes", "ip", "link", "show", "lo").Ok().Done()
 	}},
 }.Run
 
@@ -45,9 +44,9 @@ func dummy(t *testing.T) {
 	assert := test.Assert{t}
 	name := fmt.Sprint("dummy", os.Getpid())
 	assert.Program(nil, "goes", "ip", "link", "add", "type", "dummy",
-		"name", name).Ok()
-	assert.Program(nil, "goes", "ip", "link", "show", name).Ok()
-	assert.Program(nil, "goes", "ip", "link", "delete", name).Ok()
+		"name", name).Ok().Done()
+	assert.Program(nil, "goes", "ip", "link", "show", name).Ok().Done()
+	assert.Program(nil, "goes", "ip", "link", "delete", name).Ok().Done()
 }
 
 func fou(t *testing.T) {
@@ -61,6 +60,6 @@ func fou(t *testing.T) {
 		"encap", "fou",
 		"encap-sport", "any",
 		"encap-dport", "7777").Ok()
-	assert.Program(nil, "goes", "ip", "link", "show", name).Ok()
-	assert.Program(nil, "goes", "ip", "link", "delete", name).Ok()
+	assert.Program(nil, "goes", "ip", "link", "show", name).Ok().Done()
+	assert.Program(nil, "goes", "ip", "link", "delete", name).Ok().Done()
 }

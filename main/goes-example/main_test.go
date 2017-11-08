@@ -28,21 +28,21 @@ func Test(t *testing.T) {
 func hello(t *testing.T) {
 	test.Assert{t}.Program(nil,
 		"goes", "echo", "hello", "world",
-	).Output(test.Equal("hello world\n"))
+	).Output("hello world\n").Done()
 
 }
 
 func pwd(t *testing.T) {
 	test.Assert{t}.Program(nil,
 		"goes", "pwd",
-	).Output(test.Match(".*/platinasystems/go\n"))
+	).Output("/.*/platinasystems/go\n/").Done()
 
 }
 
 func cat(t *testing.T) {
 	test.Assert{t}.Program(strings.NewReader("HELLO WORLD"),
 		"goes", "cat", "-",
-	).Output(test.Equal("HELLO WORLD"))
+	).Output("HELLO WORLD").Done()
 
 }
 
@@ -52,5 +52,5 @@ func redis(t *testing.T) {
 	defer assert.Program(nil, "goes", "redisd").Quit(10 * time.Second)
 	assert.Program(nil,
 		"goes", "hwait", "platina", "redis.ready", "true", "10",
-	).Ok()
+	).Ok().Done()
 }

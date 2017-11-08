@@ -31,18 +31,13 @@ func Test(t *testing.T) {
 		t.Skip("need -test.loopback yaml conf file")
 	}
 
-	err := test.CheckDocker(t)
-	if err != nil {
-		t.Skip("no docker")
-	}
-
 	defer assert.Program(nil,
 		"goes", "redisd",
-	).Quit(10 * time.Second)
+	).Quit(3 * time.Second)
 
 	assert.Program(nil,
 		"goes", "hwait", "platina", "redis.ready", "true", "10",
-	).Ok()
+	).Wait(10 * time.Second).Ok().Done()
 
 	defer assert.Program(nil,
 		"goes", "vnetd",
@@ -50,7 +45,9 @@ func Test(t *testing.T) {
 
 	assert.Program(nil,
 		"goes", "hwait", "platina", "vnet.ready", "true", "30",
-	).Ok()
+	).Wait(40 * time.Second).Ok().Done()
+
+	assert.Nil(test.CheckDocker(t))
 
 	test.Suite{
 		{"ospf", test.Suite{

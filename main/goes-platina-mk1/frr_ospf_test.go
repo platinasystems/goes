@@ -31,26 +31,26 @@ func ospfCheckL2Connectivity(t *testing.T) {
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.120.10",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.150.4",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R2",
 		"ping", "-c1", "192.168.222.2",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R3",
 		"ping", "-c1", "192.168.111.4",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "vnet", "show", "ip", "fib",
-	).Ok()
+	).Ok().Done()
 }
 
 func checkOspfRunning(t *testing.T) {
@@ -66,10 +66,10 @@ func checkOspfRunning(t *testing.T) {
 		}
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("ospfd"))
+		).Output("/ospfd/").Done()
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("zebra"))
+		).Output("/zebra/").Done()
 	}
 }
 
@@ -85,7 +85,7 @@ func checkOspfNeighbors(t *testing.T) {
 		}
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("192.168."))
+		).Output("/192.168./").Done()
 	}
 }
 
@@ -99,15 +99,15 @@ func checkOspfLearnedRoute(t *testing.T) {
 	}
 	Assert{t}.Program(nil,
 		"echo", out,
-	).Output(Match("192.168.222.0/24"))
+	).Output("/192.168.222.0/24/").Done()
 }
 
 func checkOspfConnectivityLearned(t *testing.T) {
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.222.2",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 	Assert{t}.Program(nil,
 		"goes", "vnet", "show", "ip", "fib",
-	).Ok()
+	).Ok().Done()
 }

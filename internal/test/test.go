@@ -20,7 +20,13 @@ import (
 	"github.com/platinasystems/go/internal/prog"
 )
 
-var gdb, Goes bool
+// Goes is set by -test.goes
+var Goes bool
+
+// DefaultTimeout for Program.{OK,Output,Failure,Done}
+var DefaultTimeout = 3 * time.Second
+
+var gdb bool
 
 func init() {
 	flag.BoolVar(&gdb, "test.gdb", false,
@@ -29,9 +35,11 @@ func init() {
 		"run goes command instead of test(s)")
 }
 
-// Execute given Goes().main with os.Args stripped of the goes-MACHINE.test
-// program name and any leading -test/* arguments. This exits 0 if main returns
-// nil; otherwise, it prints the error and exits 1.
+// Exec will execuute given Goes().main with os.Args stripped of the
+// goes-MACHINE.test program name and any leading -test/* arguments.
+// This exits 0 if main returns nil; otherwise, it prints the error
+// and exits 1.
+//
 // Usage:
 //
 //	func Test(t *testing.T) {
@@ -60,60 +68,43 @@ func Exec(main func(...string) error) {
 	syscall.Exit(ecode)
 }
 
-// Usage:
-//	Assert{t}.Program(NAME, ARGS...).Output(Equal(EXPECT))
-func Equal(expect string) Comparator {
-	return func(b []byte) error {
-		if s := string(b); s != expect {
-			return fmt.Errorf("%q != %q", s, expect)
-		}
-		return nil
-	}
-}
-
-// Usage:
-//	Assert{t}.Program(NAME, ARGS...).Output(Match(PATTERN))
-//	Assert{t}.Program(NAME, ARGS...).Failure(Match(PATTERN))
-func Match(pattern string) Comparator {
-	return func(b []byte) error {
-		x, err := regexp.Compile(pattern)
-		if err != nil {
-			return err
-		}
-		if !x.Match(b) {
-			return fmt.Errorf("Mismatched: %q", pattern)
-		}
-		return nil
-	}
-}
-
+// Assert wraps a testing.Test or Benchmark with several assertions.
 type Assert struct {
 	testing.TB
 }
 
+// Program wraps an exec.Cmd to provide test results
 type Program struct {
 	testing.TB
 	cmd   *exec.Cmd
 	pargs []string
 	obuf  logbuf
 	ebuf  logbuf
+	err   error
+}
+
+// Gdb facilitates Program debugging
+type Gdb struct {
+	prog *Program
+	cmd  *exec.Cmd
+}
+
+// A Quitter provides a Quit method to stop it's process within a timeout
+type Quitter interface {
+	Quit(time.Duration)
+}
+
+// Suite of tests
+type Suite []struct {
+	Name string
+	Func func(*testing.T)
 }
 
 type logbuf struct {
 	*bytes.Buffer
 }
 
-type Gdb struct {
-	prog *Program
-	cmd  *exec.Cmd
-}
-
-type Quitter interface {
-	Quit(time.Duration)
-}
-
-type Comparator func([]byte) error
-
+// Nil asserts that there is no error
 func (assert Assert) Nil(err error) {
 	assert.Helper()
 	if err != nil {
@@ -121,6 +112,7 @@ func (assert Assert) Nil(err error) {
 	}
 }
 
+// YoureRoot skips the calling test if EUID != 0
 func (assert Assert) YoureRoot() {
 	assert.Helper()
 	if os.Geteuid() != 0 {
@@ -128,20 +120,36 @@ func (assert Assert) YoureRoot() {
 	}
 }
 
-// Create and Start a Program. This replaces a "goes" program name (pn) with
-// {os.Args[0] -test.goes}, where os.Args[0] is the test program.  The test
-// program should exec the given goes command instead of the following tests
-// like this:
+// Program creates and starts an exec.Cmd. This replaces a "goes" program name
+// (pn) with {os.Args[0] -test.goes}, where os.Args[0] is the test program.
+// The test program should exec the given goes command instead of the following
+// tests like this:
 //
 //	func Test(t *testing.T) {
 //		if Goes {
 //			Exec(main.Goes().Main)
 //		}
-//		t.Run("Test1", func(t *testing.T) {
+//		Suite{
+//			{"Test1", func(t *testing.T) {
 //			...
-//		})
-//		...
+//			}},
+//			...
+//		}.Run(t)
 //	}
+//
+// A Program should always end with the Done method. The Wait, OK, Output, and
+// Failure methods return its Program so thet may used to describe all
+// assertions in one line.
+//
+// Usage:
+//	Assert{t}.Program(NAME, ARGS...).Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Done()
+//	Assert{t}.Program(NAME, ARGS...).OK().Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).OK().Done()
+//	Assert{t}.Program(NAME, ARGS...).Output(EXPECT).Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Output(EXPECT).Done()
+//	Assert{t}.Program(NAME, ARGS...).Failure(EXPECT).Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Failure(EXPECT).Done()
 func (assert Assert) Program(stdin io.Reader, pn string,
 	args ...string) *Program {
 	assert.Helper()
@@ -157,10 +165,31 @@ func (assert Assert) Program(stdin io.Reader, pn string,
 	cmd.Stdout = obuf
 	cmd.Stderr = ebuf
 	assert.Nil(cmd.Start())
-	return &Program{assert.TB, cmd, pargs, obuf, ebuf}
+	return &Program{assert.TB, cmd, pargs, obuf, ebuf, nil}
 }
 
-// With -test.gdb flag, run gdb on the Program's pid.
+// Done waits for Program to finish, if it hasn't already, logs the buffered
+// stdout and stderr, then FailNow if Failed.
+func (p *Program) Done() {
+	p.Helper()
+	if p.ebuf.Len() > 0 {
+		if p.obuf.Len() > 0 {
+			p.Log(p.pargs, p.obuf, p.ebuf)
+		} else {
+			p.Log(p.pargs, p.ebuf)
+		}
+	} else if p.obuf.Len() > 0 {
+		p.Log(p.pargs, p.obuf)
+	}
+	p.obuf.Reset()
+	p.ebuf.Reset()
+	if p.Failed() {
+		p.FailNow()
+	}
+}
+
+// Gdb Program if given a -test.gdb flag
+//
 // Usage:
 //	defer Assert{t}.Program(NAME, ARGS...).Gdb().Quit(TIMEOUT)
 func (p *Program) Gdb() Quitter {
@@ -179,106 +208,116 @@ func (p *Program) Gdb() Quitter {
 	return &Gdb{p, cmd}
 }
 
-// Send SIGTERM to Program then SIGKILL if incomplete by timeout.
+// Quit the Program with SIGTERM then SIGKILL if incomplete by TIMEOUT.
+//
 // Usage:
 //	defer Assert{t}.Program(NAME, ARGS...).Quit(TIMEOUT)
 func (p *Program) Quit(timeout time.Duration) {
 	p.Helper()
 	p.cmd.Process.Signal(syscall.SIGTERM)
 	tm := time.NewTimer(timeout)
-	done := make(chan struct{})
-	go func() {
-		p.cmd.Wait()
-		close(done)
-	}()
+	done := make(chan error)
+	go func() { done <- p.cmd.Wait() }()
 	select {
-	case <-done:
+	case err := <-done:
 		tm.Stop()
-	case <-tm.C:
-		p.cmd.Process.Kill()
-	}
-	if p.ebuf.Len() > 0 {
-		if p.obuf.Len() > 0 {
-			p.Log(p.pargs, p.obuf, p.ebuf)
-			p.obuf.Reset()
-			p.ebuf.Reset()
-		} else {
-			p.Log(p.pargs, p.ebuf)
-			p.ebuf.Reset()
-		}
-		p.Fail()
-	} else if p.obuf.Len() > 0 {
-		p.Log(p.pargs, p.obuf)
-		p.obuf.Reset()
-	}
-}
-
-// Wait for Program finish then assert there were no errors and log output.
-// Usage:
-//	Assert{t}.Program(NAME, ARGS...).Ok()
-func (p *Program) Ok() {
-	p.Helper()
-	if err := p.cmd.Wait(); p.ebuf.Len() == 0 && err != nil {
-		p.ebuf.WriteString(err.Error())
-	}
-	if p.ebuf.Len() > 0 {
-		if p.obuf.Len() > 0 {
-			p.Fatal(p.pargs, p.obuf, p.ebuf)
-		}
-		p.Fatal(p.pargs, p.ebuf)
-	}
-	if p.obuf.Len() > 0 {
-		p.Log(p.pargs, p.obuf)
-		p.obuf.Reset()
-	}
-}
-
-// Wait for Program finish then assert there were no errors and it had the
-// expected output.
-// Usage:
-//	Assert{t}.Program(NAME, ARGS...).Output(Equal(EXPECT))
-//	Assert{t}.Program(NAME, ARGS...).Output(Match(PATTERN))
-func (p *Program) Output(f Comparator) {
-	p.Helper()
-	if err := p.cmd.Wait(); p.ebuf.Len() == 0 {
-		if err == nil {
-			err = f(p.obuf.Bytes())
-		}
-		if err != nil {
+		if p.ebuf.Len() == 0 && err != nil {
 			p.ebuf.WriteString(err.Error())
 		}
+	case <-tm.C:
+		p.ebuf.WriteString("process not responding, sending SIGKILL")
+		p.cmd.Process.Kill()
 	}
-	if p.ebuf.Len() > 0 {
-		if p.obuf.Len() > 0 {
-			p.Fatal(p.pargs, p.obuf, p.ebuf)
-		}
-		p.Fatal(p.pargs, p.ebuf)
-	}
-	if p.obuf.Len() > 0 {
-		p.Log(p.pargs, p.obuf)
-		p.obuf.Reset()
-	}
+	p.Done()
 }
 
-// Wait for Program finish then assert that it had the expected error.
+// Wait asserts that Program finishes within the given timeout.
+//
 // Usage:
-//	Assert{t}.Program(NAME, ARGS...).Failure(Match(PATTERN))
-func (p *Program) Failure(f Comparator) {
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Done()
+func (p *Program) Wait(timeout time.Duration) *Program {
 	p.Helper()
-	p.cmd.Wait()
-	if p.obuf.Len() > 0 {
-		p.Log(p.pargs, p.obuf, p.ebuf)
+	if p.cmd == nil {
+		return p
+	}
+	tm := time.NewTimer(timeout)
+	done := make(chan error)
+	go func() { done <- p.cmd.Wait() }()
+	select {
+	case p.err = <-done:
+		tm.Stop()
+		if p.ebuf.Len() == 0 && p.err != nil {
+			p.ebuf.WriteString(p.err.Error())
+		}
+	case <-tm.C:
+		p.cmd.Process.Kill()
+		<-done
+		p.err = syscall.ETIME
+		p.ebuf.WriteString(p.err.Error())
+		p.Fail()
+	}
+	p.cmd = nil
+	return p
+}
+
+// Ok asserts that Program finishes w/o error.
+//
+// Usage:
+//	Assert{t}.Program(NAME, ARGS...).Ok().Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Ok().Done()
+func (p *Program) Ok() *Program {
+	p.Helper()
+	if p.Wait(DefaultTimeout); p.err != nil {
+		p.Fail()
+	}
+	return p
+}
+
+// Output asserts that Program finished Ok with the expected output.
+//
+// Usage:
+//	Assert{t}.Program(NAME, ARGS...).Output(EXPECT).Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Output(EXPECT).Done()
+func (p *Program) Output(expect string) *Program {
+	p.Helper()
+	if p.Ok(); !p.Failed() {
+		p.Expect(expect, p.obuf.Bytes())
+	}
+	return p
+}
+
+// Failure asserts that Program finish the expected error.
+//
+// Usage:
+//	Assert{t}.Program(NAME, ARGS...).Failure(EXPECT).Done()
+//	Assert{t}.Program(NAME, ARGS...).Wait(TIMEOUT).Failure(EXPECT).Done()
+func (p *Program) Failure(expect string) *Program {
+	p.Helper()
+	if p.Wait(DefaultTimeout); !p.Failed() {
+		p.Expect(expect, p.ebuf.Bytes())
+	}
+	return p
+}
+
+// Expect asserts buffer content.  If EXPECT is /PATTERN/, the output is
+// regexp matched with PATTERN; otherwise, it's an exact match.
+func (p *Program) Expect(expect string, b []byte) {
+	var match bool
+	if strings.HasPrefix(expect, "/") && strings.HasPrefix(expect, "/") {
+		expect = strings.TrimPrefix(strings.TrimSuffix(expect, "/"),
+			"/")
+		match = regexp.MustCompile(expect).Match(b)
 	} else {
-		p.Log(p.pargs, p.ebuf)
+		match = string(b) == expect
 	}
-	if err := f(p.ebuf.Bytes()); err != nil {
-		p.Fatal(p.pargs, "\n"+err.Error())
+	if !match {
+		fmt.Fprintf(p.ebuf, "mismatch %q", expect)
+		p.Fail()
 	}
-	p.obuf.Reset()
-	p.ebuf.Reset()
 }
 
 // Quit Program then wait for user to quit gdb.
+//
 // Usage:
 //	defer Assert{t}.Gdb(NAME, ARGS...).Quit(TIMEOUT)
 func (gdb *Gdb) Quit(timeout time.Duration) {
@@ -289,12 +328,6 @@ func (gdb *Gdb) Quit(timeout time.Duration) {
 // reformat log buffer for pretty print with (*testing.T).Log
 func (lb logbuf) String() string {
 	return "\n" + strings.TrimRight(lb.Buffer.String(), "\n")
-}
-
-// Suite of tests
-type Suite []struct {
-	Name string
-	Func func(*testing.T)
 }
 
 // Run test suite

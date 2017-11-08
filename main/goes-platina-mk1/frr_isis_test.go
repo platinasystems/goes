@@ -31,22 +31,22 @@ func isisCheckL2Connectivity(t *testing.T) {
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.120.10",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.150.4",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R2",
 		"ping", "-c1", "192.168.222.2",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R3",
 		"ping", "-c1", "192.168.111.4",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 }
 
 func checkIsisRunning(t *testing.T) {
@@ -63,10 +63,10 @@ func checkIsisRunning(t *testing.T) {
 		}
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("isisd"))
+		).Output("/isisd/").Done()
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("zebra"))
+		).Output("/zebra/").Done()
 	}
 }
 
@@ -83,7 +83,7 @@ func checkIsisNeighbors(t *testing.T) {
 		}
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("Area R"))
+		).Output("/Area R/").Done()
 	}
 
 	cmd = []string{"vtysh", "-c", "show isis summary"}
@@ -96,7 +96,7 @@ func checkIsisNeighbors(t *testing.T) {
 		}
 		Assert{t}.Program(nil,
 			"echo", out,
-		).Output(Match("Net: 47.0023"))
+		).Output("/Net: 47.0023/").Done()
 	}
 }
 
@@ -110,15 +110,15 @@ func checkIsisLearnedRoute(t *testing.T) {
 	}
 	Assert{t}.Program(nil,
 		"echo", out,
-	).Output(Match("192.168.222.0/24"))
+	).Output("/192.168.222.0/24/").Done()
 }
 
 func checkIsisConnectivityLearned(t *testing.T) {
 	Assert{t}.Program(nil,
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.222.2",
-	).Output(Match("1 received"))
+	).Output("/1 received/").Done()
 	Assert{t}.Program(nil,
 		"goes", "vnet", "show", "ip", "fib",
-	).Ok()
+	).Ok().Done()
 }
