@@ -106,15 +106,15 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	ipcli.Init(v)
 	unix.Init(v, unix.Config{RxInjectNodeName: "fe1-cpu"})
 
-	gpio := pca9535_main{
-		bus_index:   0,
-		bus_address: 0x74,
+	gpio := Pca9535_main{
+		Bus_index:   0,
+		Bus_address: 0x74,
 	}
-	if err = gpio.do(gpio.led_output_enable); err != nil {
+	if err = gpio.Do(gpio.Led_output_enable); err != nil {
 		return
 	}
 	if !p.DisableGpioSwitchReset {
-		if err = gpio.do(gpio.switch_reset); err != nil {
+		if err = gpio.Do(gpio.switch_reset); err != nil {
 			return
 		}
 	}
@@ -142,12 +142,12 @@ func PlatformExit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	return
 }
 
-type pca9535_main struct {
-	bus_index, bus_address int
+type Pca9535_main struct {
+	Bus_index, Bus_address int
 }
 
-func (m *pca9535_main) do(f func(bus *i2c.Bus) error) (err error) {
-	return i2c.Do(m.bus_index, m.bus_address, f)
+func (m *Pca9535_main) Do(f func(bus *i2c.Bus) error) (err error) {
+	return i2c.Do(m.Bus_index, m.Bus_address, f)
 }
 
 const (
@@ -165,23 +165,23 @@ const (
 const (
 	mk1_pca9535_pin_switch_reset = 1 << iota
 	_
-	mk1_pca9535_pin_led_output_enable
+	mk1_pca9535_pin_Led_output_enable
 )
 
 // MK1 board front panel port LED's require PCA9535 GPIO device configuration
 // to provide an output signal that allows LED operation.
-func (m *pca9535_main) led_output_enable(bus *i2c.Bus) (err error) {
+func (m *Pca9535_main) Led_output_enable(bus *i2c.Bus) (err error) {
 	var d i2c.SMBusData
 	// Set pin to output (default is input and default value is high which we assume).
 	if err = bus.Read(pca9535_reg_is_input_0, i2c.ByteData, &d); err != nil {
 		return
 	}
-	d[0] &^= mk1_pca9535_pin_led_output_enable
+	d[0] &^= mk1_pca9535_pin_Led_output_enable
 	return bus.Write(pca9535_reg_is_input_0, i2c.ByteData, &d)
 }
 
 // Hard reset switch via gpio pins on MK1 board.
-func (m *pca9535_main) switch_reset(bus *i2c.Bus) (err error) {
+func (m *Pca9535_main) switch_reset(bus *i2c.Bus) (err error) {
 	const reset_bits = mk1_pca9535_pin_switch_reset
 
 	//var val, dir i2c.SMBusData

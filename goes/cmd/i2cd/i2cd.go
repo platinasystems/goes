@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/vnet/platforms/mk1"
 )
 
 const (
@@ -150,6 +151,11 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 						time.Sleep(10 * time.Microsecond)
 						iocmd.Io_reg_wr(0x603, uint64(d[0]|0x40), 0x1)
 					}
+					gpio := mk1.Pca9535_main{
+						Bus_index:   0,
+						Bus_address: 0x74,
+					}
+					gpio.Do(gpio.Led_output_enable)
 				case "platina-mk1-bmc":
 					if len(gpio.Pins) == 0 {
 						gpio.Init()
