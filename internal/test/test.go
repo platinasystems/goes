@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2017 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -20,15 +20,13 @@ import (
 	"github.com/platinasystems/go/internal/prog"
 )
 
-var gdb, Goes, Loopback bool
+var gdb, Goes bool
 
 func init() {
 	flag.BoolVar(&gdb, "test.gdb", false,
 		"debug certain commands (e.g. vnetd)")
 	flag.BoolVar(&Goes, "test.goes", false,
 		"run goes command instead of test(s)")
-	flag.BoolVar(&Loopback, "test.loopback", false,
-		"run goes loopback test(s)")
 }
 
 // Execute given Goes().main with os.Args stripped of the goes-MACHINE.test

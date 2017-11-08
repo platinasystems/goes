@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2017 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -136,7 +136,7 @@ func LaunchContainers(t *testing.T, confFile string) (config *Config) {
 					intf.Name,
 				).Ok()
 				Assert{t}.Program(nil,
-					"ip", "link", "add", "link",
+					"goes", "ip", "link", "add", "link",
 					intf.Name, "name", newIntf, "type",
 					"vlan", "id", intf.Vlan,
 				).Ok()
@@ -158,7 +158,8 @@ func LaunchContainers(t *testing.T, confFile string) (config *Config) {
 	return
 }
 
-func DockerExecCmd(t *testing.T, ID string, config *Config, cmd []string) (out string, err error) {
+func DockerExecCmd(t *testing.T, ID string, config *Config,
+	cmd []string) (out string, err error) {
 
 	execOpts := types.ExecConfig{
 		Cmd:          cmd,
@@ -270,7 +271,8 @@ func pullImage(t *testing.T, config *Config) error {
 }
 
 func startContainer(t *testing.T, config *Config, cc *container.Config,
-	ch *container.HostConfig) (cresp container.ContainerCreateCreatedBody, err error) {
+	ch *container.HostConfig) (cresp container.ContainerCreateCreatedBody,
+	err error) {
 
 	cli := config.cli
 
@@ -346,7 +348,8 @@ func getPid(ID string) (pid string, err error) {
 	return
 }
 
-func moveIntfContainer(t *testing.T, container string, intf string, addr string) error {
+func moveIntfContainer(t *testing.T, container string, intf string,
+	addr string) error {
 
 	t.Logf("moving %v to container %v with address %v", intf, container, addr)
 

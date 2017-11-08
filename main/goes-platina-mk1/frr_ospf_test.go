@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2017 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -15,40 +15,16 @@ var ospf_config *Config
 
 func FrrOSPF(t *testing.T, confFile string) {
 
-	err := CheckDocker(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert := Assert{t}
-	assert.YoureRoot()
-	defer assert.Program(nil,
-		"goes", "redisd",
-	).Quit(10 * time.Second)
-	assert.Program(nil,
-		"goes", "hwait", "platina", "redis.ready", "true", "10",
-	).Ok()
-	defer assert.Program(nil,
-		"goes", "vnetd",
-	).Gdb().Quit(30 * time.Second)
-	assert.Program(nil,
-		"goes", "hwait", "platina", "vnet.ready", "true", "30",
-	).Ok()
-
 	ospf_config = LaunchContainers(t, confFile)
+	defer TearDownContainers(t, ospf_config)
 
-	runOspfTestCases(t)
-
-	TearDownContainers(t, ospf_config)
-}
-
-func runOspfTestCases(t *testing.T) {
-	t.Run("check L2 connectivity", ospfCheckL2Connectivity)
-	time.Sleep(1 * time.Second)
-	t.Run("check FRR running", checkOspfRunning)
-	time.Sleep(60 * time.Second) // give ospf time to converge
-	t.Run("check ospf neighbors", checkOspfNeighbors)
-	t.Run("check learned route", checkOspfLearnedRoute)
+	Suite{
+		{"l2", ospfCheckL2Connectivity},
+		{"frr", checkOspfRunning},
+		{"neighbors", checkOspfNeighbors},
+		{"routes", checkOspfLearnedRoute},
+		{"ping-learned", checkOspfConnectivityLearned},
+	}.Run(t)
 }
 
 func ospfCheckL2Connectivity(t *testing.T) {
@@ -71,10 +47,14 @@ func ospfCheckL2Connectivity(t *testing.T) {
 		"goes", "ip", "netns", "exec", "R3",
 		"ping", "-c1", "192.168.111.4",
 	).Output(Match("1 received"))
+
+	Assert{t}.Program(nil,
+		"goes", "vnet", "show", "ip", "fib",
+	).Ok()
 }
 
 func checkOspfRunning(t *testing.T) {
-
+	time.Sleep(1 * time.Second)
 	cmd := []string{"ps", "ax"}
 	for _, r := range ospf_config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
@@ -94,7 +74,7 @@ func checkOspfRunning(t *testing.T) {
 }
 
 func checkOspfNeighbors(t *testing.T) {
-
+	time.Sleep(60 * time.Second) // give ospf time to converge
 	cmd := []string{"vtysh", "-c", "show ip ospf neig"}
 	for _, r := range ospf_config.Routers {
 		out, err := DockerExecCmd(t, r.Hostname, ospf_config, cmd)
@@ -110,7 +90,6 @@ func checkOspfNeighbors(t *testing.T) {
 }
 
 func checkOspfLearnedRoute(t *testing.T) {
-
 	cmd := []string{"ip", "route", "show"}
 	out, err := DockerExecCmd(t, "R1", ospf_config, cmd)
 	if err != nil {
@@ -128,5 +107,7 @@ func checkOspfConnectivityLearned(t *testing.T) {
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.222.2",
 	).Output(Match("1 received"))
-
+	Assert{t}.Program(nil,
+		"goes", "vnet", "show", "ip", "fib",
+	).Ok()
 }

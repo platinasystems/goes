@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2017 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -15,40 +15,16 @@ var isis_config *Config
 
 func FrrISIS(t *testing.T, confFile string) {
 
-	err := CheckDocker(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert := Assert{t}
-	assert.YoureRoot()
-	defer assert.Program(nil,
-		"goes", "redisd",
-	).Quit(10 * time.Second)
-	assert.Program(nil,
-		"goes", "hwait", "platina", "redis.ready", "true", "10",
-	).Ok()
-	defer assert.Program(nil,
-		"goes", "vnetd",
-	).Gdb().Quit(30 * time.Second)
-	assert.Program(nil,
-		"goes", "hwait", "platina", "vnet.ready", "true", "30",
-	).Ok()
-
 	isis_config = LaunchContainers(t, confFile)
+	defer TearDownContainers(t, isis_config)
 
-	runIsisTestCases(t)
-
-	TearDownContainers(t, isis_config)
-}
-
-func runIsisTestCases(t *testing.T) {
-	t.Run("check L2 connectivity", isisCheckL2Connectivity)
-	time.Sleep(1 * time.Second)
-	t.Run("check FRR ISIS running", checkIsisRunning)
-	time.Sleep(60 * time.Second) // give time to converge
-	t.Run("check ISIS neighbors", checkIsisNeighbors)
-	t.Run("check ISIS learned route", checkIsisLearnedRoute)
+	Suite{
+		{"l2", isisCheckL2Connectivity},
+		{"frr", checkIsisRunning},
+		{"neighbors", checkIsisNeighbors},
+		{"routes", checkIsisLearnedRoute},
+		{"ping-learned", checkIsisConnectivityLearned},
+	}.Run(t)
 }
 
 func isisCheckL2Connectivity(t *testing.T) {
@@ -74,6 +50,7 @@ func isisCheckL2Connectivity(t *testing.T) {
 }
 
 func checkIsisRunning(t *testing.T) {
+	time.Sleep(1 * time.Second)
 
 	cmd := []string{"ps", "ax"}
 	for _, r := range isis_config.Routers {
@@ -94,6 +71,7 @@ func checkIsisRunning(t *testing.T) {
 }
 
 func checkIsisNeighbors(t *testing.T) {
+	time.Sleep(60 * time.Second) // give time to converge
 
 	cmd := []string{"vtysh", "-c", "show isis interface"}
 	for _, r := range isis_config.Routers {
@@ -123,7 +101,6 @@ func checkIsisNeighbors(t *testing.T) {
 }
 
 func checkIsisLearnedRoute(t *testing.T) {
-
 	cmd := []string{"ip", "route", "show"}
 	out, err := DockerExecCmd(t, "R1", isis_config, cmd)
 	if err != nil {
@@ -141,5 +118,7 @@ func checkIsisConnectivityLearned(t *testing.T) {
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.222.2",
 	).Output(Match("1 received"))
-
+	Assert{t}.Program(nil,
+		"goes", "vnet", "show", "ip", "fib",
+	).Ok()
 }
