@@ -65,7 +65,7 @@ func (c *Command) updateio() error {
 			}
 		}
 		v := VdevIo[i].QsfpStatus(port)
-		if v != c.lastsio[k] {
+		if v != c.lastsio[k] && v != "" {
 			c.pub.Print(k, ": ", v)
 			c.lastsio[k] = v
 		}
@@ -93,7 +93,10 @@ func (h *I2cDev) QsfpStatus(port uint8) string {
 		r.Input[0].get(h)
 		r.Input[1].get(h)
 		closeMuxio(h)
-		DoI2cRpcio()
+		err := DoI2cRpcio()
+		if err != nil {
+			return ""
+		}
 		p := uint16(sio[1].D[0])
 		p += uint16(sio[3].D[0]) << 8
 		if port == 0 && qsfpIo.Present[0] != p {
