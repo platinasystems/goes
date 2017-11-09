@@ -59,6 +59,9 @@
 - include: playbooks/ospf/ospf_administrative_distance.yml
   tags: [quagga_ospf,demo]
 
+- include: playbooks/ospf/ospf_loadbalacning.yml
+  tags: [quagga_ospf,demo]
+
 
 # ALL IPV4 TESTCASES
 
@@ -66,7 +69,7 @@
   tags: [ipv4,demo]
 
 - include: playbooks/ipv4/ipv4_routes_scale.yml
-  tags: ipv4
+  tags: [ipv4,demo]
 
 
 # ALL REDIS TESTCASES

@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify IPV4 Routes Scale """
+""" Test/Verify OSPF Load Balancing """
 
 #
 # This file is part of Ansible
@@ -19,6 +19,7 @@
 #
 
 import shlex
+import time
 
 from collections import OrderedDict
 
@@ -26,15 +27,20 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_ipv4_routes_scale
+module: test_ospf_loadbalancing
 author: Platina Systems
-short_description: Module to test and verify ipv4 routes scale.
+short_description: Module to test and verify ospf loadbalancing.
 description:
-    Module to test and verify ipv4 routes and log the same.
+    Module to test and verify ospf configurations and log the same.
 options:
     switch_name:
       description:
         - Name of the switch on which tests will be performed.
+      required: False
+      type: str
+    config_file:
+      description:
+        - OSPF configurations added in Quagga.conf file.
       required: False
       type: str
     leaf_list:
@@ -56,7 +62,7 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify ipv4 routes scale
+- name: Verify ospf loadbalancing
   test_ospf_traffic:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
@@ -108,72 +114,83 @@ def execute_commands(module, cmd):
     # command output as value in the hash dictionary
     exec_time = run_cli(module, 'date +%Y%m%d%T')
     key = '{0} {1} {2}'.format(module.params['switch_name'], exec_time, cmd)
-    
-    if 'route -n' not in cmd:
-        HASH_DICT[key] = out
+    HASH_DICT[key] = out
 
     return out
 
 
-def verify_ipv4_routes_scale(module):
+def verify_ospf_load_balancing(module):
     """
-    Method to verify ipv4 routes scale.
+    Method to verify ospf load balancing.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    switch_name = module.params['switch_name']
-    switch_id = switch_name[-2::]
-    added_routes = []
-    route_count = 0
     failure_summary = ''
+    routes_to_check = []
+    loopback_ip = None
 
-    if switch_name in module.params['leaf_list']:
-        gateway = '10.0.3.{}'.format(switch_id)
-        first_two_octet = '2.2'
-    else:
-        gateway = '10.0.7.{}'.format(switch_id)
-        first_two_octet = '1.1'
+    switch_name = module.params['switch_name']
+    leaf_list = module.params['leaf_list']
+    config_file = module.params['config_file'].splitlines()
+    is_leaf = True if switch_name in leaf_list else False
 
-    # Add 16k routes
-    for third_octet in range(0, 256):
-        if route_count < 16000:
-            for fourth_octet in range(1, 255):
-                if route_count < 16000:
-                    route_ip = first_two_octet
-                    route_ip += '.{}.{}'.format(third_octet, fourth_octet)
-                    cmd = 'route add -net {} netmask 255.255.255.255 gw {}'.format(
-                        route_ip, gateway
-                    )
-                    execute_commands(module, cmd)
-                    added_routes.append(route_ip)
-                    route_count += 1
-                else:
-                    break
-        else:
-            break
+    # Get the current/running configurations
+    execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Verify if above routes got added
-    all_routes = execute_commands(module, 'route -n')
-    for route in added_routes:
-        if route not in all_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'route {} did not get added\n'.format(route)
+    # Update eth network interfaces
+    for line in config_file:
+        line = line.strip()
+        if line.startswith('network'):
+            switch_id = switch_name[-2::]
+            address = line.split()[1]
+            address = address.split('/')[0]
+            octets = address.split('.')
+            if octets[2] == switch_id and is_leaf:
+                octets[3] = '1'
+                ip = '.'.join(octets)
+                loopback_ip = ip
+                cmd = 'ifconfig lo {} netmask 255.255.255.0'.format(ip)
+            else:
+                octets[3] = switch_id
+                ip = '.'.join(octets)
+                routes_to_check.append(ip)
+                eth = 'eth-{}-1'.format(octets[2])
+                cmd = 'ifconfig {} {} netmask 255.255.255.0'.format(eth, ip)
 
-        cmd = 'route delete -net {} netmask 255.255.255.255 gw {}'.format(
-            route, gateway
-        )
-        execute_commands(module, cmd)
+            # Run ifconfig command
+            execute_commands(module, cmd)
 
-    # Get the GOES status info
-    goes_status = execute_commands(module, 'goes status')
+    # Restart and check Quagga status
+    execute_commands(module, 'service quagga restart')
+    time.sleep(35)
+    execute_commands(module, 'service quagga status')
 
-    if 'not ok' in goes_status.lower():
-        RESULT_STATUS = False
-        failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'GOES status is NOT OK\n'
+    if is_leaf:
+        switch_ids = [leaf[-2::] for leaf in leaf_list]
+        loopback_ip_octets = loopback_ip.split('.')
+        switch_ids.remove(loopback_ip_octets[2])
+        loopback_ip_octets[2] = switch_ids.pop()
+        loopback_ip = '.'.join(loopback_ip_octets)
+
+        # Get all ospf ip routes
+        cmd = "vtysh -c 'sh ip route {}'".format(loopback_ip)
+        ospf_routes = execute_commands(module, cmd)
+
+        for route in routes_to_check:
+            route_octets = route.split('.')
+            route_octets.pop()
+            route_ip = '.'.join(route_octets)
+            if route_ip not in ospf_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'output of command {} '.format(cmd)
+                failure_summary += 'did not show correct routes\n'
+                break
 
     HASH_DICT['result.detail'] = failure_summary
+
+    # Get the GOES status info
+    execute_commands(module, 'goes status')
 
 
 def main():
@@ -181,6 +198,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
+            config_file=dict(required=False, type='str', default=''),
             leaf_list=dict(required=False, type='list', default=[]),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
@@ -189,7 +207,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_ipv4_routes_scale(module)
+    verify_ospf_load_balancing(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
