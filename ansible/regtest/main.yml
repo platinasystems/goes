@@ -1,0 +1,5 @@
+---
+
+- include: playbooks/bgp/bgp_state_propagation.yml
+
+- include: playbooks/bgp/bgp_state_propagation.yml
