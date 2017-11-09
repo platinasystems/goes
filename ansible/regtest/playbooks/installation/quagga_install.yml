@@ -1,0 +1,75 @@
+---
+ - hosts: leaf:spine
+   become: true
+   tasks:
+    - name: Quagga Installation
+      apt: name=quagga
+
+    - name: Enabling IPv4 and IPv6 Unicast Forwarding
+      shell: "{{ item }}"
+      with_items:
+       - echo "net.ipv4.conf.all.forwarding=1" | sudo tee -a /etc/sysctl.conf
+       - echo "net.ipv4.conf.default.forwarding=1" | sudo tee -a /etc/sysctl.conf
+       - sed 's/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/g' /etc/sysctl.conf | sudo tee /etc/sysctl.conf
+       - echo "net.ipv6.conf.default.forwarding=1" | sudo tee -a /etc/sysctl.conf 
+       - sudo sysctl -p
+
+    - name: Copying the configuration files
+      copy:
+         src: "/usr/share/doc/quagga/examples/{{ item }}.sample"
+         dest: "/etc/quagga/{{ item }}"
+         remote_src: true
+         mode: 0640 
+         owner: quagga
+         group: quaggavty
+      with_items:
+       - babeld.conf 
+       - bgpd.conf 
+       - isisd.conf 
+       - ospf6d.conf 
+       - ospfd.conf
+       - ripd.conf
+       - ripngd.conf
+       - vtysh.conf
+       - zebra.conf 
+
+    - name: Editing which routing protocols are to run
+      lineinfile:
+         path: /etc/quagga/daemons
+         regexp: "{{ item.regexp }}"
+         line: "{{ item.line }}"
+      with_items:
+       - {regexp: '^zebra=', line: 'zebra=yes'}
+       - {regexp: '^bgpd=', line: 'bgpd=yes'}
+       - {regexp: '^ospfd=', line: 'ospfd=yes'}
+       - {regexp: '^ospf6d=', line: 'ospf6d=no'}
+       - {regexp: '^ripd=', line: 'ripd=no'}
+       - {regexp: '^ripngd=', line: 'ripngd=no'}
+       - {regexp: '^isisd=', line: 'isisd=no'}
+       - {regexp: '^babeld=', line: 'babeld=no'}
+
+    - name: Restarting the Quagga service
+      service:
+         name: quagga
+         state: restarted
+
+    - name: Editiing telnet access and the retaining of routes
+      lineinfile:
+         path: /etc/quagga/debian.conf
+         regexp: "{{ item.regexp }}"
+         line: "{{ item.line }}"
+      with_items:
+       - {regexp: '^vtysh_enable=', line: 'vtysh_enable=yes'}
+       - {regexp: '^zebra_options=', line: 'zebra_options=" --daemon -A 127.0.0.1 -P 2601 -u quagga -g quagga"'}
+       - {regexp: '^bgpd_options=', line: 'bgpd_options=" --daemon -A 127.0.0.1 -P 2605 -u quagga -g quagga --retain -p 179"'}
+       - {regexp: '^ospfd_options=', line: 'ospfd_options=" --daemon -A 127.0.0.1 -P 2604 -u quagga -g quagga" '}
+       - {regexp: '^ospf6d_options=', line: 'ospf6d_options=" --daemon -A ::1 -P 2606 -u quagga -g quagga" '}
+       - {regexp: '^ripd_options=', line: 'ripd_options=" --daemon -A 127.0.0.1 -P 2602 -u quagga -g quagga"'}
+       - {regexp: '^ripngd_options=', line: 'ripngd_options=" --daemon -A ::1 -P 2603 -u quagga -g quagga" '}
+       - {regexp: '^isisd_options=', line: 'isisd_options=" --daemon -A 127.0.0.1 -P 2608 -u quagga -g quagga"'}
+       - {regexp: '^babeld_options=', line: 'babeld_options=" --daemon -A 127.0.0.1 -P 2609 -u quagga -g quagga"'}
+
+    - name: Restarting the Quagga service again
+      service:
+         name: quagga
+         state: restarted
