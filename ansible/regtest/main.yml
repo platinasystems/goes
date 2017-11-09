@@ -1,5 +1,82 @@
 ---
 
-- include: playbooks/bgp/bgp_state_propagation.yml
+# ALL PACKAGES INSTALLATION PLAYBOOKS
+
+- include: playbooks/installation/quagga_install.yml
+  tags: quagga
+
+
+# ALL QUAGGA BGP TESTCASES
+
+- include: playbooks/bgp/peering_ebgp.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_ibgp.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_ebgp_route_advertise.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_ibgp_route_advertise.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_authentication.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_administrative_distance.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_route_reflector.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_local_preference.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_weight.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_loop_prevention.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/bgp_quagga_convergence.yml
+  tags: [quagga_bgp,demo]
 
 - include: playbooks/bgp/bgp_state_propagation.yml
+  tags: [quagga_bgp,demo]
+
+
+# ALL QUAGGA OSPF TESTCASES
+
+- include: playbooks/ospf/ospf_basic.yml
+  tags: quagga_ospf
+
+- include: playbooks/ospf/ospf_routes.yml
+  tags: quagga_ospf
+
+- include: playbooks/ospf/ospf_traffic.yml
+  tags: [quagga_ospf,demo]
+
+- include: playbooks/ospf/ospf_administrative_distance.yml
+  tags: [quagga_ospf,demo]
+
+
+# ALL IPV4 TESTCASES
+
+- include: playbooks/ipv4/ipv4_configuration_interfaces.yml
+  tags: [ipv4,demo]
+
+- include: playbooks/ipv4/ipv4_routes_scale.yml
+  tags: ipv4
+
+
+# ALL REDIS TESTCASES
+
+- include: playbooks/redis/regression_01.yml
+  tags: redis
+
+- include: playbooks/redis/regression_03.yml
+  tags: redis
+
+- include: playbooks/redis/regression_04.yml
+  tags: redis
+
