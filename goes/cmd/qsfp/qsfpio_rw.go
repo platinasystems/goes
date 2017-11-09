@@ -119,7 +119,7 @@ func readStoppedio() byte {
 	return sio[0].D[0]
 }
 
-func DoI2cRpcio() error {
+func DoI2cRpcio() (err error) {
 	if dialedio == 0 {
 		client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1233")
 		if err != nil {
@@ -128,7 +128,7 @@ func DoI2cRpcio() error {
 		clientAio = client
 		dialedio = 1
 	}
-	err := clientAio.Call("I2cReq.ReadWrite", &jio, &sio)
+	err = clientAio.Call("I2cReq.ReadWrite", &jio, &sio)
 	if err != nil {
 		log.Print("i2cReq error:", err)
 	}
