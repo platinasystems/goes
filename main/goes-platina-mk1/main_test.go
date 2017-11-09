@@ -61,6 +61,7 @@ func Test(t *testing.T) {
 			{"eth", isisEth},
 			{"vlan", isisVlan},
 		}.Run},
+		{"net-slice", netSlice},
 	}.Run(t)
 }
 
@@ -78,4 +79,8 @@ func isisEth(t *testing.T) {
 
 func isisVlan(t *testing.T) {
 	FrrISIS(t, "docs/examples/docker/frr-isis/conf_vlan.yml")
+}
+
+func netSlice(t *testing.T) {
+	Slice(t, "docs/examples/docker/net-slice/conf_vlan.yml")
 }
