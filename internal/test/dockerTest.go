@@ -6,6 +6,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os/exec"
 	"strings"
@@ -166,6 +167,7 @@ func DockerExecCmd(t *testing.T, ID string, config *Config,
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
+		Detach:       false,
 	}
 
 	cli := config.cli
@@ -189,12 +191,27 @@ func DockerExecCmd(t *testing.T, ID string, config *Config,
 		t.Logf("Error starting exec: %v", err)
 		return
 	}
+
 	content, err := ioutil.ReadAll(hresp.Reader)
 	if err != nil {
 		t.Logf("Error reading output: %v", err)
 		return
 	}
 	out = string(content)
+
+	ei, err := cli.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		t.Logf("Error exec Inspect: %v", err)
+		return
+	}
+	if ei.Running {
+		t.Logf("exec still running", ei)
+	}
+	if ei.ExitCode != 0 {
+		err = fmt.Errorf("[%v] exit code %v", cmd, ei.ExitCode)
+		return
+	}
+
 	return
 }
 
