@@ -43,11 +43,6 @@ options:
         - OSPF configurations added in Quagga.conf file.
       required: False
       type: str
-    cmd_file:
-      description:
-        - Route add commands to be executed on switch.
-      required: False
-      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -127,15 +122,15 @@ def verify_bgp_peering_loopback(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     config_file = module.params['config_file'].splitlines()
-    cmd_file = module.params['cmd_file'].splitlines()
 
+    # Assign loopback ip
+    cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
+        switch_name[-2::]
+    )
+    execute_commands(module, cmd)
+    
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
-
-    # Run commands mentioned in cmd file to assign loopback ip
-    # and add static routes
-    for cmd in cmd_file:
-        execute_commands(module, cmd)
 
     # Restart and check Quagga status
     execute_commands(module, 'service quagga restart')
@@ -166,14 +161,9 @@ def verify_bgp_peering_loopback(module):
                 failure_summary += 'is not Established in the output of '
                 failure_summary += 'command {}\n'.format(cmd)
 
-    # Remove added static routes and revert the loopback ip
-    for line in cmd_file:
-        if 'ifconfig' in line:
-            cmd = 'ifconfig lo 127.0.0.1 netmask 255.0.0.0'
-        else:
-            cmd = line.replace('add', 'del')
-
-        execute_commands(module, cmd)
+    # Revert back the loopback ip
+    cmd = 'ifconfig lo 127.0.0.1 netmask 255.0.0.0'
+    execute_commands(module, cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -187,7 +177,6 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str', default=''),
-            cmd_file=dict(required=False, type='str', default=''),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
