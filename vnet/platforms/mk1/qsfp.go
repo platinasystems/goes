@@ -7,10 +7,16 @@ package mk1
 import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/optics/sfp"
 	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 
+	"fmt"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -21,6 +27,12 @@ const (
 	qsfp_addr           = 0x50
 	qsfp_gpio_base_addr = 0x20
 )
+
+const numPorts = 32
+
+var pub *publisher.Publisher
+var portBase int
+var firstPort bool
 
 func i2cMuxSelectPort(port uint) {
 	// Select 2 level mux.
@@ -104,16 +116,19 @@ type qsfpSignals struct {
 
 // j == 0 => abs_l + int_l
 // j == 1 => lpmode + rst_l
-func readSignals(j uint) (v [2]uint32) {
-	i2c.Do(0, mux0_addr, func(bus *i2c.Bus) (err error) {
+func readSignals(j uint) (v [2]uint32, err error) {
+	err = i2c.Do(0, mux0_addr, func(bus *i2c.Bus) (err error) {
 		var d i2c.SMBusData
 		d[0] = 1 << (4 + j)
 		err = bus.Write(0, i2c.ByteData, &d)
 		return
 	})
+	if err != nil {
+		return
+	}
 	// Read 0x20 21 22 23 to get 32 bits of status.
 	for i := 0; i < 4; i++ {
-		i2c.Do(0, qsfp_gpio_base_addr+i,
+		err = i2c.Do(0, qsfp_gpio_base_addr+i,
 			func(bus *i2c.Bus) (err error) {
 				var d i2c.SMBusData
 				err = bus.Read(0, i2c.WordData, &d)
@@ -127,19 +142,75 @@ func readSignals(j uint) (v [2]uint32) {
 const m32 = 1<<32 - 1
 
 func (s *qsfpStatus) read() {
-	v := readSignals(0)
+	v, err := readSignals(0)
+	if err != nil {
+		return
+	}
 	s.is_present = m32 &^ uint64(v[0])
 	s.interrupt_status = m32 &^ uint64(v[1])
 }
 
 func (s *qsfpSignals) read() {
 	s.qsfpStatus.read()
-	v := readSignals(1)
+	v, err := readSignals(1)
+	if err != nil {
+		return
+	}
 	s.is_low_power_mode = uint64(v[0])
 	s.is_reset_active = m32 &^ uint64(v[1])
 }
 
-func writeSignal(port uint, is_rst_l bool, value uint64) {
+func initSignals() {
+	//set all ports in reset and low power mode
+	i2c.Do(0, mux0_addr, func(bus *i2c.Bus) (err error) {
+		var d i2c.SMBusData
+		d[0] = 1 << (4 + 1)
+		err = bus.Write(0, i2c.ByteData, &d)
+		return
+	})
+	for i := 0; i < 2; i++ {
+		rstBase := qsfp_gpio_base_addr + 2 + i
+		for j := 0; j < 2; j++ {
+			i2c.Do(0, rstBase,
+				func(bus *i2c.Bus) (err error) {
+					var d i2c.SMBusData
+					d[0] = 0x0
+					reg := uint8(2 + j)
+					err = bus.Write(reg, i2c.ByteData, &d)
+					return
+				})
+			i2c.Do(0, rstBase,
+				func(bus *i2c.Bus) (err error) {
+					var d i2c.SMBusData
+					d[0] = 0x0
+					reg := uint8(6 + j)
+					err = bus.Write(reg, i2c.ByteData, &d)
+					return
+				})
+		}
+		lpBase := qsfp_gpio_base_addr + i
+		for j := 0; j < 2; j++ {
+			i2c.Do(0, lpBase,
+				func(bus *i2c.Bus) (err error) {
+					var d i2c.SMBusData
+					d[0] = 0xff
+					reg := uint8(2 + j)
+					err = bus.Write(reg, i2c.ByteData, &d)
+					return
+				})
+			i2c.Do(0, lpBase,
+				func(bus *i2c.Bus) (err error) {
+					var d i2c.SMBusData
+					d[0] = 0x0
+					reg := uint8(6 + j)
+					err = bus.Write(reg, i2c.ByteData, &d)
+					return
+				})
+		}
+	}
+}
+
+func writeSignal(port uint, is_rst_l bool, high bool) {
 	i2c.Do(0, mux0_addr, func(bus *i2c.Bus) (err error) {
 		var d i2c.SMBusData
 		d[0] = 1 << (4 + 1)
@@ -151,36 +222,292 @@ func writeSignal(port uint, is_rst_l bool, value uint64) {
 	if is_rst_l {
 		slave += 2 // 0x22 0x23 for rst_l
 	}
+
+	var rv uint8
 	i2c.Do(0, slave,
 		func(bus *i2c.Bus) (err error) {
 			var d i2c.SMBusData
-			d[0] = uint8(value >> (8 * (port / 8)))
-			reg := uint8(0)
-			if port%16 >= 8 {
-				reg = 1
+			reg := uint8(2)
+			if (port/8)%2 == 1 {
+				reg = 3
+			}
+			err = bus.Read(reg, i2c.WordData, &d)
+			rv = d[0]
+			return
+		})
+	i2c.Do(0, slave,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			if !high {
+				d[0] = rv & (0xff ^ uint8(1<<(port%8)))
+			} else {
+				d[0] = rv | uint8(1<<(port%8))
+			}
+			reg := uint8(2)
+			if (port/8)%2 == 1 {
+				reg = 3
+			}
+			err = bus.Write(reg, i2c.ByteData, &d)
+			return
+		})
+	i2c.Do(0, slave,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			reg := uint8(6)
+			if (port/8)%2 == 1 {
+				reg = 7
+			}
+			err = bus.Read(reg, i2c.WordData, &d)
+			rv = d[0]
+			return
+		})
+	i2c.Do(0, slave,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			d[0] = rv & (0xff ^ uint8(1<<(port%8)))
+			reg := uint8(6)
+			if (port/8)%2 == 1 {
+				reg = 7
 			}
 			err = bus.Write(reg, i2c.ByteData, &d)
 			return
 		})
 	return
 }
-func (s *qsfpSignals) writeLpmode(port uint) { writeSignal(port, false, s.is_low_power_mode) }
-func (s *qsfpSignals) writeReset(port uint)  { writeSignal(port, true, ^s.is_reset_active) }
 
 type qsfpState struct {
 }
 
 func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues uint64) {
+
+	// if qsfps are installed, take them out of reset and low power mode
+	if signal == sfp.QsfpModuleIsPresent && ((changedPorts & newValues) != 0) {
+		elib.Word(changedPorts).ForeachSetBit(func(i uint) {
+			port := i ^ 1 // mk1 port swapping
+			mod := &m.module_by_port[port]
+			v := newValues&(1<<i) != 0
+			if v {
+				mod.SfpReset(false)
+				mod.SfpSetLowPowerMode(false)
+			}
+		})
+	}
+
 	elib.Word(changedPorts).ForeachSetBit(func(i uint) {
 		port := i ^ 1 // mk1 port swapping
-		mod := m.module_by_port[port]
+		mod := &m.module_by_port[port]
 		v := newValues&(1<<i) != 0
 		q := &mod.q
+
 		q.SetSignal(signal, v)
+		if signal == sfp.QsfpModuleIsPresent {
+			k := "port-" + strconv.Itoa(int(port)+portBase) + ".qsfp.installed"
+			pub.Print(k, ": ", strconv.FormatBool(v))
+			// if qsfps are installed, set interface per compliance to bring dataplane up
+			if v {
+				speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
+
+				// ~800ms delay is needed for hget when Goes first starts
+				if firstPort {
+					start := time.Now()
+					for err != nil {
+						if time.Since(start) >= 1*time.Second {
+							log.Print("hget timeout: ", err)
+							break
+						}
+						speed, err = redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
+					}
+				}
+				firstPort = false
+				speed = strings.ToLower(speed)
+
+				// if qsfp is copper, set interface to copper
+				if strings.Contains(q.Ident.Compliance, "CR") {
+					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "copper")
+					// if interface is set to 100g enable cl91 FEC
+					if speed == "100g" {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
+					}
+				} else {
+					// if qsfp is not copper, set interface to fiber and disable fec
+					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
+					// set interface speed to 40g or 100g
+					if strings.Contains(q.Ident.Compliance, "40G") {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "40g")
+					} else {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
+					}
+
+				}
+			}
+		}
+	})
+
+	elib.Word(changedPorts).ForeachSetBit(func(i uint) {
+		port := i ^ 1 // mk1 port swapping
+		mod := &m.module_by_port[port]
+		v := newValues&(1<<i) != 0
+		q := &mod.q
+
+		// publish or delete qsfp fields to redis on installation or removal
+		if signal == sfp.QsfpModuleIsPresent {
+			if v {
+				// fetch and publish static identification fields
+				s := q.String()
+				log.Print("port ", port+uint(portBase), " installed: ", s)
+				for _, k := range sfp.StaticRedisFields {
+					if strings.Contains(k, "vendor") {
+						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Vendor)
+						continue
+					}
+					if strings.Contains(k, "compliance") {
+						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Compliance)
+						continue
+					}
+					if strings.Contains(k, "partnumber") {
+						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.PartNumber)
+						continue
+					}
+					if strings.Contains(k, "serialnumber") {
+						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.SerialNumber)
+						continue
+					}
+					if strings.Contains(k, ".id") {
+						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Id)
+						continue
+					}
+				}
+				// if qsfp is an optic publish static monitoring thresholds
+				if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
+					// enable laser
+					q.TxEnable(0xf, 0xf)
+
+					q.Monitoring()
+					for _, k := range sfp.StaticMonitoringRedisFields {
+						if strings.Contains(k, "temperature") {
+							if strings.Contains(k, "highAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Lo, 'f', 3, 64))
+							}
+							if strings.Contains(k, "highWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Warning.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Warning.Lo, 'f', 3, 64))
+							}
+						}
+						if strings.Contains(k, "rx.power") {
+							if strings.Contains(k, "highAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Alarm.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Alarm.Lo, 'f', 3, 64))
+							}
+							if strings.Contains(k, "highWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Warning.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Warning.Lo, 'f', 3, 64))
+							}
+						}
+						if strings.Contains(k, "tx.bias") {
+							if strings.Contains(k, "highAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Alarm.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Alarm.Lo, 'f', 3, 64))
+							}
+							if strings.Contains(k, "highWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Warning.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Warning.Lo, 'f', 3, 64))
+							}
+						}
+						if strings.Contains(k, "tx.power") {
+							if strings.Contains(k, "highAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Alarm.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Alarm.Lo, 'f', 3, 64))
+							}
+							if strings.Contains(k, "highWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Warning.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Warning.Lo, 'f', 3, 64))
+							}
+						}
+						if strings.Contains(k, "vcc") {
+							if strings.Contains(k, "highAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Alarm.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowAlarm") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Alarm.Lo, 'f', 3, 64))
+							}
+							if strings.Contains(k, "highWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Warning.Hi, 'f', 3, 64))
+							}
+							if strings.Contains(k, "lowWarn") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Warning.Lo, 'f', 3, 64))
+							}
+						}
+					}
+				}
+			} else {
+				//qsfp has been removed
+				log.Print("port ", port+uint(portBase), " removed")
+				// delete redis fields
+				for _, k := range sfp.StaticRedisFields {
+					pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
+				}
+				if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
+					for _, k := range sfp.StaticMonitoringRedisFields {
+						pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
+					}
+					for _, k := range sfp.DynamicMonitoringRedisFields {
+						pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
+					}
+				}
+				//enable reset and low power mode
+				mod.SfpReset(true)
+				mod.SfpSetLowPowerMode(true)
+			}
+		}
 	})
 }
 
 func (m *qsfpMain) poll() {
+
+	// set 0 vs 1-base port numbering based on HW version
+	var ver int
+	firstPort = true
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	if err == nil {
+		_, err = fmt.Sscan(s, &ver)
+		if err == nil && (ver == 0 || ver == 0xff) {
+			portBase = 0
+		} else {
+			portBase = 1
+		}
+	} else {
+		portBase = 1
+	}
+
+	pub, err = publisher.New()
+	if err != nil {
+		log.Print("publisher.New() error: ", err)
+	}
+
+	// publish all ports empty
+	for i := 0; i < numPorts; i++ {
+		k := "port-" + strconv.Itoa(i+portBase) + ".qsfp.installed"
+		pub.Print(k, ": ", "false")
+	}
+
 	sequence := 0
 	for {
 		old := m.current
@@ -193,6 +520,7 @@ func (m *qsfpMain) poll() {
 		new := m.current
 		// Do lpmode/reset first; presence next; interrupt status last.
 		// Presence change will have correct reset state when sequence == 0.
+		/* LPMode and Reset are output signals
 		if sequence == 0 {
 			if d := new.is_low_power_mode ^ old.is_low_power_mode; d != 0 {
 				m.signalChange(sfp.QsfpLowPowerMode, d, new.is_low_power_mode)
@@ -201,11 +529,85 @@ func (m *qsfpMain) poll() {
 				m.signalChange(sfp.QsfpResetIsActive, d, new.is_reset_active)
 			}
 		}
+		*/
 		if d := new.is_present ^ old.is_present; d != 0 {
 			m.signalChange(sfp.QsfpModuleIsPresent, d, new.is_present)
 		}
 		if d := new.interrupt_status ^ old.interrupt_status; d != 0 {
 			m.signalChange(sfp.QsfpInterruptStatus, d, new.interrupt_status)
+		}
+		// if qsfp is present and is optic poll monitoring fields every 5 seconds
+		if sequence%5 == 0 {
+			for i := 0; i < numPorts; i++ {
+				port := i ^ 1
+				mod := &m.module_by_port[port]
+				q := &mod.q
+				// if qsfp is present and is optic poll monitoring fields
+				if q.AllEepromValid {
+					if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
+						q.Monitoring()
+						for _, k := range sfp.DynamicMonitoringRedisFields {
+							if strings.Contains(k, "qsfp.temperature.units.C") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.Temperature)
+							}
+							if strings.Contains(k, "qsfp.vcc.units.V") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.Voltage)
+							}
+							if strings.Contains(k, "qsfp.rx1.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[0])
+							}
+							if strings.Contains(k, "qsfp.rx2.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[1])
+							}
+							if strings.Contains(k, "qsfp.rx3.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[2])
+							}
+							if strings.Contains(k, "qsfp.rx4.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[3])
+							}
+							if strings.Contains(k, "qsfp.tx1.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[0])
+							}
+							if strings.Contains(k, "qsfp.tx2.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[1])
+							}
+							if strings.Contains(k, "qsfp.tx3.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[2])
+							}
+							if strings.Contains(k, "qsfp.tx4.power.units.mW") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[3])
+							}
+							if strings.Contains(k, "qsfp.tx1.bias.units.mA") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[0])
+							}
+							if strings.Contains(k, "qsfp.tx2.bias.units.mA") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[1])
+							}
+							if strings.Contains(k, "qsfp.tx3.bias.units.mA") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[2])
+							}
+							if strings.Contains(k, "qsfp.tx4.bias.units.mA") {
+								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[3])
+							}
+							if strings.Contains(k, "qsfp.alarms.module") {
+								if q.Alarms.Module == "" {
+									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", "none")
+								} else {
+									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Alarms.Module)
+								}
+							}
+							if strings.Contains(k, "qsfp.alarms.channels") {
+								if q.Alarms.Channels == "" {
+									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", "none")
+								} else {
+									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Alarms.Channels)
+								}
+							}
+						}
+
+					}
+				}
+			}
 		}
 		sequence++
 		time.Sleep(1 * time.Second)
@@ -225,19 +627,17 @@ type qsfpMain struct {
 }
 
 func (q *qsfpModule) SfpReset(is_active bool) {
-	mask := uint64(1) << q.port_index
-	was_active := q.m.current.is_reset_active&mask != 0
-	if is_active != was_active {
-		q.m.current.is_reset_active ^= mask
-		q.m.current.writeReset(q.port_index)
+	if is_active {
+		writeSignal(q.port_index, true, false)
+	} else {
+		writeSignal(q.port_index, true, true)
 	}
 }
-func (q *qsfpModule) SfpSetLowPowerMode(is bool) {
-	mask := uint64(1) << q.port_index
-	was := q.m.current.is_low_power_mode&mask != 0
-	if is != was {
-		q.m.current.is_low_power_mode ^= mask
-		q.m.current.writeLpmode(q.port_index)
+func (q *qsfpModule) SfpSetLowPowerMode(is_active bool) {
+	if is_active {
+		writeSignal(q.port_index, false, true)
+	} else {
+		writeSignal(q.port_index, false, false)
 	}
 }
 func (q *qsfpModule) SfpReadWrite(offset uint, p []uint8, isWrite bool) (write_ok bool) {
@@ -264,6 +664,6 @@ func qsfpInit(v *vnet.Vnet, p *fe1_platform.Platform) {
 		sp := fe1_platform.SwitchPort{Switch: 0, Port: uint8(port)}
 		p.QsfpModules[sp] = &q.q
 	}
-
+	initSignals()
 	go m.poll()
 }

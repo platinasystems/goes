@@ -46,6 +46,9 @@ type monitorInterruptRegs struct {
 
 	// [0], [1] rx channel 0-3 tx bias current alarm status
 	channelTxBiasCurrent reg16
+
+	// [0], [1] rx channel 0-3 tx power alarm status
+	channelTxPower reg16
 }
 
 // Lower memory map.
@@ -62,12 +65,13 @@ type qsfpRegs struct {
 	// [0] [3:0] per channel latched rx loss of signal
 	//     [7:4] per channel latched tx loss of signal (optional)
 	// [1] [3:0] per channel latched tx fault
+	//     [7:4] per channel latched tx adaptive EQ fault (optional)
 	//   All else is reserved.
 	channelStatusInterrupt reg16
-	_                      [1]byte
+	channelStatusLOL       reg8
 
 	monitorInterruptStatus monitorInterruptRegs
-	_                      [9]byte
+	_                      [7]byte
 
 	// Module Monitoring Values.
 	internallyMeasured struct {
@@ -82,9 +86,10 @@ type qsfpRegs struct {
 		rxPower [QsfpNChannel]reg16
 		// unsigned 16 bit, units of 2e-6 Amps
 		txBiasCurrent [QsfpNChannel]reg16
+		txPower       [QsfpNChannel]reg16
 	}
 
-	_ [86 - 50]byte
+	_ [86 - 58]byte
 
 	// Bytes 86 through 128 are all read/write.
 
@@ -100,10 +105,7 @@ type qsfpRegs struct {
 	powerControl reg8
 
 	txApplicationSelect [4]reg8
-	_                   [2]reg8
-
-	monitorInterruptDisable monitorInterruptRegs
-	_                       [12]byte
+	_                   [21]byte
 
 	passwordEntryChange [4]reg8
 	passwordEntry       [4]reg8
@@ -159,13 +161,15 @@ type qsfpThreshold struct{ alarm, warning struct{ hi, lo reg16 } }
 
 // Upper memory map (page select 3)
 type qsfpThresholdRegs struct {
+	_             [128]reg8
 	temperature   qsfpThreshold
-	_             [8]reg8
+	_             [144 - 136]reg8
 	supplyVoltage qsfpThreshold
 	_             [176 - 152]reg8
 	rxPower       qsfpThreshold
 	txBiasCurrent qsfpThreshold
-	_             [226 - 192]reg8
+	txPower       qsfpThreshold
+	_             [226 - 200]reg8
 
 	// Bytes 226-255 are read/write.
 	vendorChannelControls     [14]reg8

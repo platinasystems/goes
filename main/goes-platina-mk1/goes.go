@@ -37,7 +37,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/hset"
 	"github.com/platinasystems/go/goes/cmd/hwait"
 	"github.com/platinasystems/go/goes/cmd/i2c"
-	"github.com/platinasystems/go/goes/cmd/i2cd"
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
@@ -59,7 +58,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
-	"github.com/platinasystems/go/goes/cmd/qsfp"
 	"github.com/platinasystems/go/goes/cmd/reboot"
 	"github.com/platinasystems/go/goes/cmd/redisd"
 	"github.com/platinasystems/go/goes/cmd/reload"
@@ -132,7 +130,6 @@ func Goes() *goes.Goes {
 		hset.New(),
 		hwait.New(),
 		i2c.New(),
-		i2cd.New(),
 		ifcmd.New(),
 		iminfo.New(),
 		insmod.New(),
@@ -152,7 +149,6 @@ func Goes() *goes.Goes {
 		ping.New(),
 		ps.New(),
 		pwd.New(),
-		qsfp.New(),
 		reboot.New(),
 		redisd.New(),
 		reload.New(),

@@ -65,9 +65,7 @@ func checkDaemons() error {
 		"goes":         true,
 		"vnetd":        true,
 		"redisd":       true,
-		"qsfp":         true,
 		"uptimed":      true,
-		"i2cd":         true,
 		"tempd":        true,
 	}
 

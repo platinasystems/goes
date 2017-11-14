@@ -208,3 +208,180 @@ func (i ExtendedCompliance) String() string {
 	}
 	return elib.Stringer(t[:], int(i))
 }
+
+type ChannelStatusInterrupt uint16
+
+func (i ChannelStatusInterrupt) String() string {
+	var t = [...]string{
+		0x0001: "L-Rx1 LOS",
+		0x0002: "L-Rx2 LOS",
+		0x0004: "L-Rx3 LOS",
+		0x0008: "L-Rx4 LOS",
+		0x0010: "L-Tx1 LOS",
+		0x0020: "L-Tx2 LOS",
+		0x0040: "L-Tx3 LOS",
+		0x0080: "L-Tx4 LOS",
+		0x0100: "L-Tx1 Fault",
+		0x0200: "L-Tx2 Fault",
+		0x0400: "L-Tx3 Fault",
+		0x0800: "L-Tx4 Fault",
+		0x1000: "L-Tx1 Adapt EQ Fault",
+		0x2000: "L-Tx2 Adapt EQ Fault",
+		0x4000: "L-Tx3 Adapt EQ Fault",
+		0x8000: "L-Tx4 Adapt EQ Fault",
+	}
+	return elib.Stringer(t[:], int(i))
+}
+
+type ModuleInterrupts uint16
+
+func (i ModuleInterrupts) String() string {
+	var t = [...]string{
+		0x0010: "L-Temp Low Warning",
+		0x0020: "L-Temp High Warning",
+		0x0040: "L-Temp Low Alarm",
+		0x0080: "L-Temp High Alarm",
+		0x1000: "L-Vcc Low Warning",
+		0x2000: "L-Vcc High Warning",
+		0x4000: "L-Vcc Low Alarm",
+		0x8000: "L-Vcc High Alarm",
+	}
+	return elib.Stringer(t[:], int(i))
+}
+
+type ChannelStatusLOL byte
+
+func (i ChannelStatusLOL) String() string {
+	var t = [...]string{
+		0x01: "L-Rx1 LOL",
+		0x02: "L-Rx2 LOL",
+		0x04: "L-Rx3 LOL",
+		0x08: "L-Rx4 LOL",
+		0x10: "L-Tx1 LOL",
+		0x20: "L-Tx2 LOL",
+		0x40: "L-Tx3 LOL",
+		0x80: "L-Tx4 LOL",
+	}
+	return elib.Stringer(t[:], int(i))
+}
+
+type ChannelRxPowerInterrupts uint16
+type ChannelTxBiasInterrupts uint16
+type ChannelTxPowerInterrupts uint16
+
+func (i ChannelRxPowerInterrupts) String() string {
+	var t = [...]string{
+		0x0001: "L-Rx2 Power Low Warning",
+		0x0002: "L-Rx2 Power High Warning",
+		0x0004: "L-Rx2 Power Low Alarm",
+		0x0008: "L-Rx2 Power High Alarm",
+		0x0010: "L-Rx1 Power Low Warning",
+		0x0020: "L-Rx1 Power High Warning",
+		0x0040: "L-Rx1 Power Low Alarm",
+		0x0080: "L-Rx1 Power High Alarm",
+		0x0100: "L-Rx4 Power Low Warning",
+		0x0200: "L-Rx4 Power High Warning",
+		0x0400: "L-Rx4 Power Low Alarm",
+		0x0800: "L-Rx4 Power High Alarm",
+		0x1000: "L-Rx3 Power Low Warning",
+		0x2000: "L-Rx3 Power High Warning",
+		0x4000: "L-Rx3 Power Low Alarm",
+		0x8000: "L-Rx3 Power High Alarm",
+	}
+	return elib.Stringer(t[:], int(i))
+}
+
+func (i ChannelTxBiasInterrupts) String() string {
+	var t = [...]string{
+		0x0001: "L-Tx2 Bias Low Warning",
+		0x0002: "L-Tx2 Bias High Warning",
+		0x0004: "L-Tx2 Bias Low Alarm",
+		0x0008: "L-Tx2 Bias High Alarm",
+		0x0010: "L-Tx1 Bias Low Warning",
+		0x0020: "L-Tx1 Bias High Warning",
+		0x0040: "L-Tx1 Bias Low Alarm",
+		0x0080: "L-Tx1 Bias High Alarm",
+		0x0100: "L-Tx4 Bias Low Warning",
+		0x0200: "L-Tx4 Bias High Warning",
+		0x0400: "L-Tx4 Bias Low Alarm",
+		0x0800: "L-Tx4 Bias High Alarm",
+		0x1000: "L-Tx3 Bias Low Warning",
+		0x2000: "L-Tx3 Bias High Warning",
+		0x4000: "L-Tx3 Bias Low Alarm",
+		0x8000: "L-Tx3 Bias High Alarm",
+	}
+	return elib.Stringer(t[:], int(i))
+}
+
+func (i ChannelTxPowerInterrupts) String() string {
+	var t = [...]string{
+		0x0001: "L-Tx2 Power Low Warning",
+		0x0002: "L-Tx2 Power High Warning",
+		0x0004: "L-Tx2 Power Low Alarm",
+		0x0008: "L-Tx2 Power High Alarm",
+		0x0010: "L-Tx1 Power Low Warning",
+		0x0020: "L-Tx1 Power High Warning",
+		0x0040: "L-Tx1 Power Low Alarm",
+		0x0080: "L-Tx1 Power High Alarm",
+		0x0100: "L-Tx4 Power Low Warning",
+		0x0200: "L-Tx4 Power High Warning",
+		0x0400: "L-Tx4 Power Low Alarm",
+		0x0800: "L-Tx4 Power High Alarm",
+		0x1000: "L-Tx3 Power Low Warning",
+		0x2000: "L-Tx3 Power High Warning",
+		0x4000: "L-Tx3 Power Low Alarm",
+		0x8000: "L-Tx3 Power High Alarm",
+	}
+	return elib.Stringer(t[:], int(i))
+}
+
+var StaticRedisFields = []string{
+	"qsfp.id",
+	"qsfp.compliance",
+	"qsfp.partnumber",
+	"qsfp.presence",
+	"qsfp.serialnumber",
+	"qsfp.vendor",
+}
+
+var StaticMonitoringRedisFields = []string{
+	"qsfp.rx.power.highAlarmThreshold.units.mW",
+	"qsfp.rx.power.highWarnThreshold.units.mW",
+	"qsfp.rx.power.lowAlarmThreshold.units.mW",
+	"qsfp.rx.power.lowWarnThreshold.units.mW",
+	"qsfp.temperature.highAlarmThreshold.units.C",
+	"qsfp.temperature.highWarnThreshold.units.C",
+	"qsfp.temperature.lowAlarmThreshold.units.C",
+	"qsfp.temperature.lowWarnThreshold.units.C",
+	"qsfp.tx.bias.highAlarmThreshold.units.mA",
+	"qsfp.tx.bias.highWarnThreshold.units.mA",
+	"qsfp.tx.bias.lowAlarmThreshold.units.mA",
+	"qsfp.tx.bias.lowWarnThreshold.units.mA",
+	"qsfp.tx.power.highAlarmThreshold.units.mW",
+	"qsfp.tx.power.highWarnThreshold.units.mW",
+	"qsfp.tx.power.lowAlarmThreshold.units.mW",
+	"qsfp.tx.power.lowWarnThreshold.units.mW",
+	"qsfp.vcc.highAlarmThreshold.units.V",
+	"qsfp.vcc.highWarnThreshold.units.V",
+	"qsfp.vcc.lowAlarmThreshold.units.V",
+	"qsfp.vcc.lowWarnThreshold.units.V",
+}
+
+var DynamicMonitoringRedisFields = []string{
+	"qsfp.alarms.module",
+	"qsfp.alarms.channels",
+	"qsfp.rx1.power.units.mW",
+	"qsfp.rx2.power.units.mW",
+	"qsfp.rx3.power.units.mW",
+	"qsfp.rx4.power.units.mW",
+	"qsfp.temperature.units.C",
+	"qsfp.vcc.units.V",
+	"qsfp.tx1.bias.units.mA",
+	"qsfp.tx1.power.units.mW",
+	"qsfp.tx2.bias.units.mA",
+	"qsfp.tx2.power.units.mW",
+	"qsfp.tx3.bias.units.mA",
+	"qsfp.tx3.power.units.mW",
+	"qsfp.tx4.bias.units.mA",
+	"qsfp.tx4.power.units.mW",
+}

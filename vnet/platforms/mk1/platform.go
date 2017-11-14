@@ -119,7 +119,7 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 		}
 	}
 
-	if false {
+	if true {
 		qsfpInit(v, p)
 	}
 
