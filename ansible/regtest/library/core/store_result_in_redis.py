@@ -104,16 +104,20 @@ def store_in_hash(module, hash_name, key, value):
     :param key: Key name in the hash.
     :param value: Value for the key.
     """
-    if key == 'result.detail' or key == 'result.status':
+    if (key == 'result.detail' or key == 'result.status' or
+            key == 'result.raw'):
         cli = get_cli()
         cli += 'hget {0} {1}'.format(hash_name, key)
-        out = run_cli(module, cli)
+        existing_value = run_cli(module, cli)
 
-        value = out + value
+        value = existing_value + value
+        if key == 'result.status':
+            value = 'Failed' if 'Failed' in value else 'Passed'
+
         cli = get_cli()
         cli += 'hset {0} "{1}" "{2}"'.format(hash_name, key, value)
         run_cli(module, cli)
-    else:
+    elif '.time' in key:
         cli = get_cli()
         cli += 'hset {0} "{1}" "{2}"'.format(hash_name, key, value)
         run_cli(module, cli)
@@ -126,19 +130,24 @@ def main():
             hash_name=dict(required=False, type='str'),
             start_time=dict(required=False, type='str'),
             end_time=dict(required=False, type='str'),
+            log_content=dict(required=False, type='str'),
             hash_dict=dict(required=False, type='dict'),
         )
     )
 
-    start_time = module.params['start_time']
     hash_name = module.params['hash_name']
 
     # Store start time of test run in hash
+    start_time = module.params['start_time']
     store_in_hash(module, hash_name, 'start.time', start_time)
 
     # Store end time of test run in the hash
     end_time = module.params['end_time']
     store_in_hash(module, hash_name, 'end.time', end_time)
+
+    # Store entire long content in hash
+    log_content = module.params['log_content']
+    store_in_hash(module, hash_name, 'result.raw', log_content)
 
     # Store key value pairs in the hash
     for key, value in module.params['hash_dict'].iteritems():

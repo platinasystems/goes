@@ -113,7 +113,10 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    out = run_cli(module, cmd)
+    if 'service quagga restart' in cmd or 'ifconfig lo' in cmd:
+        out = None
+    else:
+        out = run_cli(module, cmd)
 
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
@@ -130,7 +133,7 @@ def check_bgp_neighbors(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    failure_summary = ''
+    failure_summary = HASH_DICT.get('result.detail', '')
     switch_name = module.params['switch_name']
     config_file = module.params['config_file'].splitlines()
 
@@ -183,7 +186,6 @@ def verify_bgp_peering_interface_down(module):
 
     # Restart and check Quagga status
     execute_commands(module, 'service quagga restart')
-    time.sleep(35)
     execute_commands(module, 'service quagga status')
 
     # Check and verify BGP neighbor relationship
@@ -244,7 +246,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -257,7 +259,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':

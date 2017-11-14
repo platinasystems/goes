@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify BGP Peering Loopback """
+""" Test/Verify BGP Peering Redundancy """
 
 #
 # This file is part of Ansible
@@ -27,9 +27,9 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_bgp_peering_loopback
+module: test_bgp_peering_redundancy
 author: Platina Systems
-short_description: Module to test and verify bgp loopback config.
+short_description: Module to test and verify bgp peering redundancy.
 description:
     Module to test and verify bgp configurations and log the same.
 options:
@@ -41,6 +41,17 @@ options:
     config_file:
       description:
         - OSPF configurations added in Quagga.conf file.
+      required: False
+      type: str
+    leaf_list:
+      description:
+        - List of all leaf switches.
+      required: False
+      type: list
+      default: []
+    eth_list:
+      description:
+        - Comma separated string of eth interfaces to bring down/up.
       required: False
       type: str
     hash_name:
@@ -56,8 +67,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp peering loopback
-  test_bgp_peering_loopback:
+- name: Verify bgp peering redundancy
+  test_bgp_peering_redundancy:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -102,7 +113,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd or 'ifconfig' in cmd:
+    if 'service quagga restart' in cmd or 'ifconfig lo' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -116,28 +127,15 @@ def execute_commands(module, cmd):
     return out
 
 
-def verify_bgp_peering_loopback(module):
+def check_bgp_neighbors(module):
     """
-    Method to verify bgp peering loopback config.
+    Method to check if bgp neighbor relationship got established or not.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    failure_summary = ''
+    failure_summary = HASH_DICT.get('result.detail', '')
     switch_name = module.params['switch_name']
     config_file = module.params['config_file'].splitlines()
-
-    # Assign loopback ip
-    cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
-        switch_name[-2::]
-    )
-    execute_commands(module, cmd)
-
-    # Get the current/running configurations
-    execute_commands(module, "vtysh -c 'sh running-config'")
-
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
 
     # Get all bgp routes
     cmd = "vtysh -c 'sh ip bgp neighbors'"
@@ -163,11 +161,64 @@ def verify_bgp_peering_loopback(module):
                 failure_summary += 'is not Established in the output of '
                 failure_summary += 'command {}\n'.format(cmd)
 
-    # Revert back the loopback ip
-    cmd = 'ifconfig lo 127.0.0.1 netmask 255.0.0.0'
+    HASH_DICT['result.detail'] = failure_summary
+
+
+def verify_bgp_peering_redundancy(module):
+    """
+    Method to verify bgp peering redundancy.
+    :param module: The Ansible module to fetch input parameters.
+    """
+    global RESULT_STATUS, HASH_DICT
+    switch_name = module.params['switch_name']
+    eth_list = module.params['eth_list'].split(',')
+    leaf_list = module.params['leaf_list']
+    is_leaf = True if switch_name in leaf_list else False
+
+    # Assign loopback ip
+    cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
+        switch_name[-2::]
+    )
     execute_commands(module, cmd)
 
-    HASH_DICT['result.detail'] = failure_summary
+    # Get the current/running configurations
+    execute_commands(module, "vtysh -c 'sh running-config'")
+
+    # Restart and check Quagga status
+    execute_commands(module, 'service quagga restart')
+    execute_commands(module, 'service quagga status')
+
+    # Check and verify BGP neighbor relationship
+    check_bgp_neighbors(module)
+
+    # Bring down few eth interfaces on only leaf switches
+    if is_leaf:
+        for eth in eth_list:
+            eth = eth.strip()
+            cmd = 'ifconfig eth-{}-1 down'.format(eth)
+            execute_commands(module, cmd)
+
+    # Wait for 5 seconds
+    time.sleep(5)
+
+    # Again check and verify BGP neighbor relationship
+    check_bgp_neighbors(module)
+
+    # Bring up eth interfaces which were down
+    if is_leaf:
+        for eth in eth_list:
+            eth = eth.strip()
+            cmd = 'ifconfig eth-{}-1 up'.format(eth)
+            execute_commands(module, cmd)
+
+    # Wait for 5 seconds
+    time.sleep(5)
+
+    # Again check and verify BGP neighbor relationship
+    check_bgp_neighbors(module)
+
+    # Revert back the loopback ip
+    execute_commands(module, 'ifconfig lo 127.0.0.1 netmask 255.0.0.0')
 
     # Get the GOES status info
     execute_commands(module, 'goes status')
@@ -179,6 +230,8 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str', default=''),
+            leaf_list=dict(required=False, type='list', default=[]),
+            eth_list=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -186,7 +239,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_bgp_peering_loopback(module)
+    verify_bgp_peering_redundancy(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'

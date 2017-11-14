@@ -14,15 +14,7 @@
 
 - hosts: leaf:spine
   become: true
-
-  vars:
-  - log_dir_path: /var/log/regression/bgp
-
   tasks:
-    - file:
-        path: "{{ log_dir_path }}"
-        state: directory
-
     - name: Take backup of Quagga.conf
       copy:
         src: /etc/quagga/Quagga.conf
@@ -39,6 +31,32 @@
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_if_down.conf') }}"
 
+    - name: Assign loopback ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+
+    - name: Restart quagga service
+      service:
+        name: quagga
+        state: restarted
+
+    - name: Wait for 35 secs for bgp to establish communication
+      pause:
+        seconds: 35
+
+
+- hosts: leaf:spine
+  become: true
+  serial: 1
+
+  vars:
+  - log_dir_path: /var/log/regression/bgp
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
     - name: Verify quagga bgp peering if down
       test_bgp_peering_if_down:
         switch_name: "{{ inventory_hostname }}"
@@ -52,14 +70,24 @@
     - command: "date +%Y%m%d%T"
       register: end_time
 
+    - name: Fetch the log file
+      slurp:
+        src: "{{ bgp_out.log_file_path }}"
+      register: logs
+
     - name: Store the test result in a hash in redis db on server emulator
       store_result_in_redis:
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         start_time: "{{ hostvars['server_emulator']['start_time'] }}"
         end_time: "{{ end_time.stdout }}"
         hash_dict: "{{ bgp_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
+
+- hosts: leaf:spine
+  become: true
+  tasks:
     - name: Restore backup of Quagga.conf
       copy:
         src: /etc/quagga/Quagga.conf.bck
@@ -74,11 +102,16 @@
         path: /etc/quagga/Quagga.conf.bck
         state: absent
 
+    - name: Revert back loopback ip
+      command: "ifconfig lo 127.0.0.1 netmask 255.0.0.0"
+
     - shell: "goes hget platina package | grep version:"
       register: version_out
+      run_once: True
 
     - shell: "goes hget platina package | grep tag:"
       register: tag_out
+      run_once: True
 
     - name: Store GOES version and tag details in redis db
       store_goes_details:
@@ -87,6 +120,7 @@
         version_details: "{{ version_out.stdout }}"
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
+      run_once: True
 
     - command: "goes restart"
 

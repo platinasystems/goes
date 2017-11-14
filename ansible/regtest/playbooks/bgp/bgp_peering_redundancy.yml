@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_bgp_peering_ibgp_loopback_{{ start_time.stdout }}"
+        hash_name: "quagga_bgp_peering_redundancy_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -29,7 +29,7 @@
         path: /etc/quagga/Quagga.conf
         insertafter: "interface lo"
         marker: ""
-        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_ibgp_loopback.conf') }}"
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_redundancy.conf') }}"
 
     - name: Assign loopback ip
       assign_loopback:
@@ -57,10 +57,12 @@
         path: "{{ log_dir_path }}"
         state: directory
 
-    - name: Verify quagga bgp peering ibgp loopback
-      test_bgp_peering_loopback:
+    - name: Verify quagga bgp peering redundancy
+      test_bgp_peering_redundancy:
         switch_name: "{{ inventory_hostname }}"
-        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_ibgp_loopback.conf') }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_redundancy.conf') }}"
+        leaf_list: "{{ groups['leaf'] }}"
+        eth_list: "3,19"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ log_dir_path }}"
       register: bgp_out
