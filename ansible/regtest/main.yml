@@ -39,9 +39,21 @@
   tags: quagga_bgp
 
 - include: playbooks/bgp/bgp_quagga_convergence.yml
-  tags: [quagga_bgp,demo]
+  tags: quagga_bgp
 
 - include: playbooks/bgp/bgp_state_propagation.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/peering_ebgp_loopback.yml
+  tags: [quagga_bgp,demo]
+
+- include: playbooks/bgp/peering_ibgp_loopback.yml
+  tags: [quagga_bgp,demo]
+
+- include: playbooks/bgp/peering_if_down.yml
+  tags: [quagga_bgp,demo]
+
+- include: playbooks/bgp/bgp_peering_redundancy.yml
   tags: [quagga_bgp,demo]
 
 
@@ -54,22 +66,29 @@
   tags: quagga_ospf
 
 - include: playbooks/ospf/ospf_traffic.yml
-  tags: [quagga_ospf,demo]
+  tags: quagga_ospf
 
 - include: playbooks/ospf/ospf_administrative_distance.yml
-  tags: [quagga_ospf,demo]
+  tags: quagga_ospf
 
 - include: playbooks/ospf/ospf_loadbalacning.yml
+  tags: quagga_ospf
+
+- include: playbooks/ospf/ospf_basic_with_different_areas.yml
   tags: [quagga_ospf,demo]
+
+- include: playbooks/ospf/ospf_intervals.yml
+  tags: [quagga_ospf,demo]
+
 
 
 # ALL IPV4 TESTCASES
 
 - include: playbooks/ipv4/ipv4_configuration_interfaces.yml
-  tags: [ipv4,demo]
+  tags: ipv4
 
 - include: playbooks/ipv4/ipv4_routes_scale.yml
-  tags: [ipv4,demo]
+  tags: ipv4
 
 
 # ALL REDIS TESTCASES
