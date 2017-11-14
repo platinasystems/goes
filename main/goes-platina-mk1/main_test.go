@@ -58,6 +58,10 @@ func Test(t *testing.T) {
 			{"eth", isisEth},
 			{"vlan", isisVlan},
 		}.Run},
+		{"bgp", test.Suite{
+			{"eth", bgpEth},
+			{"vlan", bgpVlan},
+		}.Run},
 		{"net-slice", netSlice},
 	}.Run(t)
 }
@@ -76,6 +80,14 @@ func isisEth(t *testing.T) {
 
 func isisVlan(t *testing.T) {
 	FrrISIS(t, "docs/examples/docker/frr-isis/conf_vlan.yml")
+}
+
+func bgpEth(t *testing.T) {
+	FrrBGP(t, "docs/examples/docker/frr-bgp/conf.yml")
+}
+
+func bgpVlan(t *testing.T) {
+	FrrBGP(t, "docs/examples/docker/frr-bgp/conf_vlan.yml")
 }
 
 func netSlice(t *testing.T) {
