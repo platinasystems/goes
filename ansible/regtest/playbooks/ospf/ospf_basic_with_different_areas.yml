@@ -14,10 +14,6 @@
 
 - hosts: leaf[0]:spine
   become: true
-
-  vars:
-  - log_dir_path: /var/log/regression/ospf
-
   tasks:
     - name: Take backup of Quagga.conf
       copy:
@@ -35,9 +31,24 @@
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_different_areas.conf') }}"
 
-    - name: Restart quagga
-      command: service quagga restart
+    - name: Restart quagga service
+      service:
+        name: quagga
+        state: restarted
 
+    - name: Wait for 35 secs for ospf to establish communication
+      pause:
+        seconds: 35
+
+
+- hosts: leaf[0]:spine
+  become: true
+  serial: 1
+
+  vars:
+  - log_dir_path: /var/log/regression/bgp
+
+  tasks:
     - file:
         path: "{{ log_dir_path }}"
         state: directory
@@ -48,33 +59,29 @@
         leaf_list: "{{ groups['leaf'] }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ log_dir_path }}"
-      register: bgp_out
+      register: module_out
 
     - command: "date +%Y%m%d%T"
       register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
 
     - name: Store the test result in a hash in redis db on server emulator
       store_result_in_redis:
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         start_time: "{{ hostvars['server_emulator']['start_time'] }}"
         end_time: "{{ end_time.stdout }}"
-        hash_dict: "{{ bgp_out.hash_dict }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-    - shell: "goes hget platina package | grep version:"
-      register: version_out
 
-    - shell: "goes hget platina package | grep tag:"
-      register: tag_out
-
-    - name: Store GOES version and tag details in redis db
-      store_goes_details:
-        switch_name: "{{ inventory_hostname }}"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        version_details: "{{ version_out.stdout }}"
-        tag_details: "{{ tag_out.stdout }}"
-      delegate_to: 127.0.0.1
-
+- hosts: leaf[0]:spine
+  become: true
+  tasks:
     - name: Restore backup of Quagga.conf 
       copy:
         src: /etc/quagga/Quagga.conf.bck
@@ -88,6 +95,28 @@
       file:
         path: /etc/quagga/Quagga.conf.bck
         state: absent
+
+    - service:
+        name: quagga
+        state: restarted
+
+    - shell: "goes hget platina package | grep version:"
+      register: version_out
+      run_once: True
+
+    - shell: "goes hget platina package | grep tag:"
+      register: tag_out
+      run_once: True
+
+    - name: Store GOES version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+      run_once: True
+
 
 - hosts: server_emulator
   become: true

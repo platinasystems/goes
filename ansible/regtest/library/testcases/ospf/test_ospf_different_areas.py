@@ -104,7 +104,10 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    out = run_cli(module, cmd)
+    if 'service quagga restart' in cmd:
+        out = None
+    else:
+        out = run_cli(module, cmd)
 
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
@@ -131,7 +134,6 @@ def verify_ospf_with_different_areas(module):
 
     # Restart and check Quagga status
     execute_commands(module, 'service quagga restart')
-    time.sleep(35)
     execute_commands(module, 'service quagga status')
 
     # Get ospf routes
@@ -189,7 +191,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
