@@ -122,11 +122,9 @@
 
     - shell: "goes hget platina package | grep version:"
       register: version_out
-      run_once: True
 
     - shell: "goes hget platina package | grep tag:"
       register: tag_out
-      run_once: True
 
     - name: Store GOES version and tag details in redis db
       store_goes_details:
@@ -135,7 +133,6 @@
         version_details: "{{ version_out.stdout }}"
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
-      run_once: True
 
 
 - hosts: server_emulator
