@@ -321,24 +321,21 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				firstPort = false
 				speed = strings.ToLower(speed)
 
-				// if qsfp is copper, set interface to copper
-				if strings.Contains(q.Ident.Compliance, "CR") {
+				// if qsfp is copper and speed is set to 100g, set interface to copper and enable cl91 fec
+				if strings.Contains(q.Ident.Compliance, "CR") && speed == "100g" {
 					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "copper")
-					// if interface is set to 100g enable cl91 FEC
-					if speed == "100g" {
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
-					}
+					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
 				} else {
-					// if qsfp is not copper, set interface to fiber and disable fec
-					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
-					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
-					// set interface speed to 40g or 100g
-					if strings.Contains(q.Ident.Compliance, "40G") {
+					// set interface speed to 40g or 100g, media fiber, and fec off
+					if strings.Contains(q.Ident.Compliance, "40G") && !strings.Contains(q.Ident.Compliance, "CR") {
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "40g")
-					} else {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
+					} else if strings.Contains(q.Ident.Compliance, "100G") {
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
 					}
-
 				}
 			}
 		}
