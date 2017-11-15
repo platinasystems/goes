@@ -16,7 +16,7 @@ const (
 	Name    = "diag"
 	Apropos = "run diagnostics"
 	Usage   = `
-	diag [-debug] | prom [-w | -d | -x86] \
+	diag [-debug] | prom [-w | -delete | -x86] \
 		[TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]`
 	Man = `
 DESCRIPTION
@@ -35,7 +35,7 @@ OPTIONS
 		recalculates crc (vice versa with -x86)
 	TYPE VALUE
 		debug tool to write ONIE field of TYPE with VALUE
-	-d	delete flag with the following arguments
+	-delete	delete flag with the following arguments
 	TYPE	delete the first ONIE field found with TYPE
 
 EXAMPLES
@@ -62,11 +62,11 @@ func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
 	var diag string
-	flagF, args = flags.New(args, "-debug", "-x86", "-w", "-d")
+	flagF, args = flags.New(args, "-debug", "-x86", "-w", "-delete")
 	debug = flagF.ByName["-debug"]
 	x86 = flagF.ByName["-x86"]
 	writeField = flagF.ByName["-w"]
-	delField = flagF.ByName["-d"]
+	delField = flagF.ByName["-delete"]
 	writeSN = flagF.ByName["-wsn"]
 	argF = args
 	//if n := len(args); n > 1 {
