@@ -311,7 +311,7 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				if firstPort {
 					start := time.Now()
 					for err != nil {
-						if time.Since(start) >= 1*time.Second {
+						if time.Since(start) >= 2*time.Second {
 							log.Print("hget timeout: ", err)
 							break
 						}
