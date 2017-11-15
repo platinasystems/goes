@@ -9,6 +9,17 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
+type PortProvision struct {
+	Name  string
+	Lanes uint
+	Speed string
+	Count uint
+}
+
+type PortProvisionConfig struct {
+	Ports []PortProvision
+}
+
 type PlatformConfig struct {
 	SriovMode bool
 	// Reset switch via gpio hard reset pin.
@@ -18,6 +29,8 @@ type PlatformConfig struct {
 	// Enable using PCI MSI interrupt for fe1 switch.
 	EnableMsiInterrupt     bool
 	UseCpuForPuntAndInject bool
+	//Port Provisioning
+	PortConfig PortProvisionConfig
 }
 
 type SwitchPort struct {
