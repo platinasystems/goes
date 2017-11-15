@@ -91,15 +91,8 @@ func make_vfs() [][]sriovs.Vf {
 func parsePortConfig(p *fe1_platform.Platform) (err error) {
 	filename := "/etc/goes/portprovision"
 	source, err := ioutil.ReadFile(filename)
-	if err != nil {
-		// Default to 32x100G
-		p.PortConfig.Ports = append(p.PortConfig.Ports, fe1_platform.PortProvision{
-			Name:  "eth-0-0",
-			Lanes: 4,
-			Speed: "100g",
-			Count: 32,
-		})
-	} else {
+	// If no file PortConfig will be left empty and lower layers will default
+	if err == nil {
 		err = yaml.Unmarshal(source, &p.PortConfig)
 		if err != nil {
 			fmt.Println("yaml unmarshal failed", err)
