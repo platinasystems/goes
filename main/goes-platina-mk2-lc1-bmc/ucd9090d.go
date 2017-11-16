@@ -7,7 +7,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1-bmc/ucd9090d"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/lc1/bmc/ucd9090d"
 	"github.com/platinasystems/go/internal/redis"
 )
 
