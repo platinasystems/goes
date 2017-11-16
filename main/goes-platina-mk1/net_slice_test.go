@@ -5,20 +5,21 @@
 package main_test
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
-	. "github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test/docker"
 )
 
-var slice_config *Config
+var slice_config *docker.Config
 
 func Slice(t *testing.T, confFile string) {
+	slice_config = docker.LaunchContainers(t, confFile)
+	defer docker.TearDownContainers(t, slice_config)
 
-	slice_config = LaunchContainers(t, confFile)
-	defer TearDownContainers(t, slice_config)
-
-	Suite{
+	test.Suite{
 		{"l2", sliceL2Connectivity},
 		{"frr", checkSliceOspfRunning},
 		{"routes", checkSliceOspfLearnedRoute},
@@ -27,163 +28,136 @@ func Slice(t *testing.T, confFile string) {
 }
 
 func sliceL2Connectivity(t *testing.T) {
-	assert := Assert{t}
-	assert.Program(nil,
+	assert := test.Assert{t}
+
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CA-1",
-		"ping", "-c1", "10.1.0.2",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.1.0.2")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RA-1",
-		"ping", "-c1", "10.1.0.1",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.1.0.1")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RA-1",
-		"ping", "-c1", "10.2.0.3",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.2.0.3")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RA-2",
-		"ping", "-c1", "10.2.0.2",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.2.0.2")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RA-2",
-		"ping", "-c1", "10.3.0.4",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.3.0.4")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CA-2",
-		"ping", "-c1", "10.3.0.3",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.3.0.3")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CB-1",
-		"ping", "-c1", "10.1.0.2",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.1.0.2")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RB-1",
-		"ping", "-c1", "10.1.0.1",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.1.0.1")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RB-1",
-		"ping", "-c1", "10.2.0.3",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.2.0.3")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RB-2",
-		"ping", "-c1", "10.2.0.2",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.2.0.2")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "RB-2",
-		"ping", "-c1", "10.3.0.4",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.3.0.4")
 
-	assert.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CB-2",
-		"ping", "-c1", "10.3.0.3",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.3.0.3")
 
-	assert.Program(nil,
-		"goes", "vnet", "show", "ip", "fib",
-	).Ok().Done()
+	assert.Program("goes", "vnet", "show", "ip", "fib")
 }
 
 func checkSliceOspfRunning(t *testing.T) {
+	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 	cmd := []string{"ps", "ax"}
 	for _, r := range slice_config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := DockerExecCmd(t, r.Hostname, slice_config, cmd)
+		out, err := docker.ExecCmd(t, r.Hostname, slice_config, cmd)
 		if err != nil {
 			t.Logf("DockerExecCmd failed: %v", err)
 			t.Fail()
 			return
 		}
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/ospfd/").Done()
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/zebra/").Done()
+		assert.True(regexp.MustCompile(".*ospfd.*").MatchString(out))
+		assert.True(regexp.MustCompile(".*zebra.*").MatchString(out))
 	}
 }
 
 func checkSliceOspfLearnedRoute(t *testing.T) {
+	assert := test.Assert{t}
 	time.Sleep(60 * time.Second)
 
 	cmd := []string{"ip", "route", "show"}
-	out, err := DockerExecCmd(t, "CA-1", slice_config, cmd)
+	out, err := docker.ExecCmd(t, "CA-1", slice_config, cmd)
 	if err != nil {
 		t.Logf("DockerExecCmd failed: %v", err)
 		t.Fail()
 		return
 	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/10.3.0.0/24/").Done()
+	assert.True(out == "10.3.0.0/24")
 
-	out, err = DockerExecCmd(t, "CA-2", slice_config, cmd)
+	out, err = docker.ExecCmd(t, "CA-2", slice_config, cmd)
 	if err != nil {
 		t.Logf("DockerExecCmd failed: %v", err)
 		t.Fail()
 		return
 	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/10.1.0.0/24/").Done()
+	assert.True(out == "10.1.0.0/24")
 
-	out, err = DockerExecCmd(t, "CB-1", slice_config, cmd)
+	out, err = docker.ExecCmd(t, "CB-1", slice_config, cmd)
 	if err != nil {
 		t.Logf("DockerExecCmd failed: %v", err)
 		t.Fail()
 		return
 	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/10.3.0.0/24/").Done()
+	assert.True(out == "10.3.0.0/24")
 
-	out, err = DockerExecCmd(t, "CB-2", slice_config, cmd)
+	out, err = docker.ExecCmd(t, "CB-2", slice_config, cmd)
 	if err != nil {
 		t.Logf("DockerExecCmd failed: %v", err)
 		t.Fail()
 		return
 	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/10.1.0.0/24/").Done()
+	assert.True(out == "10.1.0.0/24")
 }
 
 func checkSliceOspfConnectivityLearned(t *testing.T) {
+	assert := test.Assert{t}
+
 	// In slice A ping from CA-1 to CA-2
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CA-1",
-		"ping", "-c1", "10.3.0.4",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.3.0.4")
 
 	// In slice B ping from CB-1 to CB-2
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CB-1",
-		"ping", "-c1", "10.3.0.4",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.3.0.4")
 
 	// In slice A ping from CA-2 to CA-1
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CA-2",
-		"ping", "-c1", "10.1.0.1",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.1.0.1")
 
 	// In slice B ping from CB-2 to CB-1
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "CB-2",
-		"ping", "-c1", "10.1.0.1",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "10.1.0.1")
 
-	Assert{t}.Program(nil,
-		"goes", "vnet", "show", "ip", "fib",
-	).Ok().Done()
+	assert.Program("goes", "vnet", "show", "ip", "fib")
 }

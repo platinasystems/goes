@@ -15,7 +15,7 @@ import (
 // Suite of 'ip link' tests
 var Suite = test.Suite{
 	{"default", func(t *testing.T) {
-		test.Assert{t}.Program(nil, "goes", "ip", "link").Ok()
+		test.Assert{t}.Program("goes", "ip", "link")
 	}},
 	{"show", show},
 	{"add", add},
@@ -23,10 +23,10 @@ var Suite = test.Suite{
 
 var show = test.Suite{
 	{"default", func(t *testing.T) {
-		test.Assert{t}.Program(nil, "goes", "ip", "link", "show").Ok().Done()
+		test.Assert{t}.Program("goes", "ip", "link", "show")
 	}},
 	{"lo", func(t *testing.T) {
-		test.Assert{t}.Program(nil, "goes", "ip", "link", "show", "lo").Ok().Done()
+		test.Assert{t}.Program("goes", "ip", "link", "show", "lo")
 	}},
 }.Run
 
@@ -43,23 +43,23 @@ func add(t *testing.T) {
 func dummy(t *testing.T) {
 	assert := test.Assert{t}
 	name := fmt.Sprint("dummy", os.Getpid())
-	assert.Program(nil, "goes", "ip", "link", "add", "type", "dummy",
-		"name", name).Ok().Done()
-	assert.Program(nil, "goes", "ip", "link", "show", name).Ok().Done()
-	assert.Program(nil, "goes", "ip", "link", "delete", name).Ok().Done()
+	assert.Program("goes", "ip", "link", "add", "type", "dummy",
+		"name", name)
+	assert.Program("goes", "ip", "link", "show", name)
+	assert.Program("goes", "ip", "link", "delete", name)
 }
 
 func fou(t *testing.T) {
 	assert := test.Assert{t}
 	name := fmt.Sprint("fou", os.Getpid())
-	assert.Program(nil, "goes",
+	assert.Program("goes",
 		"ip", "link", "add",
 		"type", "ipip",
 		"name", name,
 		"dev", "eth0",
 		"encap", "fou",
 		"encap-sport", "any",
-		"encap-dport", "7777").Ok()
-	assert.Program(nil, "goes", "ip", "link", "show", name).Ok().Done()
-	assert.Program(nil, "goes", "ip", "link", "delete", name).Ok().Done()
+		"encap-dport", "7777")
+	assert.Program("goes", "ip", "link", "show", name)
+	assert.Program("goes", "ip", "link", "delete", name)
 }

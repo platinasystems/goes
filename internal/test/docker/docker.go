@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package test
+package docker
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	client "docker.io/go-docker"
 	"docker.io/go-docker/api/types"
 	"docker.io/go-docker/api/types/container"
+	"github.com/platinasystems/go/internal/test"
 	"gopkg.in/yaml.v2"
 )
 
@@ -36,7 +37,7 @@ type Config struct {
 	cli *client.Client
 }
 
-func CheckDocker(t *testing.T) error {
+func Check(t *testing.T) error {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		t.Fatalf("Unable to get docker client: %v")
@@ -57,6 +58,7 @@ func CheckDocker(t *testing.T) error {
 }
 
 func LaunchContainers(t *testing.T, confFile string) (config *Config) {
+	assert := test.Assert{t}
 
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -132,22 +134,17 @@ func LaunchContainers(t *testing.T, confFile string) (config *Config) {
 		for _, intf := range router.Intfs {
 			if intf.Vlan != "" {
 				newIntf := intf.Name + "." + intf.Vlan
-				Assert{t}.Program(nil,
-					"goes", "ip", "link", "set", "up",
-					intf.Name,
-				).Ok()
-				Assert{t}.Program(nil,
-					"goes", "ip", "link", "add", "link",
-					intf.Name, "name", newIntf, "type",
-					"vlan", "id", intf.Vlan,
-				).Ok()
-				Assert{t}.Program(nil,
-					"goes", "ip", "link", "show", newIntf,
-				).Ok()
-				Assert{t}.Program(nil,
-					"goes", "ip", "link", "set", "up",
-					newIntf,
-				).Ok()
+				assert.Program("goes", "ip", "link", "set",
+					"up", intf.Name)
+				assert.Program("goes", "ip", "link", "add",
+					"link", intf.Name,
+					"name", newIntf,
+					"type", "vlan",
+					"id", intf.Vlan)
+				assert.Program("goes", "ip", "link", "show",
+					newIntf)
+				assert.Program("goes", "ip", "link", "set",
+					"up", newIntf)
 				moveIntfContainer(t, router.Hostname, newIntf,
 					intf.Address)
 			} else {
@@ -159,7 +156,7 @@ func LaunchContainers(t *testing.T, confFile string) (config *Config) {
 	return
 }
 
-func DockerExecCmd(t *testing.T, ID string, config *Config,
+func ExecCmd(t *testing.T, ID string, config *Config,
 	cmd []string) (out string, err error) {
 
 	execOpts := types.ExecConfig{
@@ -216,14 +213,14 @@ func DockerExecCmd(t *testing.T, ID string, config *Config,
 }
 
 func TearDownContainers(t *testing.T, config *Config) {
+	assert := test.Assert{t}
 	for _, r := range config.Routers {
 		for _, intf := range r.Intfs {
 			if intf.Vlan != "" {
 				newIntf := intf.Name + "." + intf.Vlan
 				moveIntfDefault(t, r.Hostname, newIntf)
-				Assert{t}.Program(nil,
-					"goes", "ip", "link", "del", newIntf,
-				).Ok()
+				assert.Program("goes", "ip", "link",
+					"del", newIntf)
 			} else {
 				moveIntfDefault(t, r.Hostname, intf.Name)
 			}
@@ -318,9 +315,7 @@ func startContainer(t *testing.T, config *Config, cc *container.Config,
 	}
 	src := "/proc/" + pid + "/ns/net"
 	dst := "/var/run/netns/" + cc.Hostname
-	Assert{t}.Program(nil,
-		"goes", "ln", "-s", src, dst,
-	).Ok()
+	test.Assert{t}.Program("goes", "ln", "-s", src, dst)
 	return
 }
 
@@ -344,9 +339,7 @@ func stopContainer(t *testing.T, config *Config, name string, ID string) error {
 		return err
 	}
 	link := "/var/run/netns/" + name
-	Assert{t}.Program(nil,
-		"rm", link,
-	)
+	test.Assert{t}.Program("rm", link)
 
 	return nil
 }
@@ -368,39 +361,31 @@ func getPid(ID string) (pid string, err error) {
 func moveIntfContainer(t *testing.T, container string, intf string,
 	addr string) error {
 
+	assert := test.Assert{t}
+
 	t.Logf("moving %v to container %v with address %v", intf, container, addr)
 
-	Assert{t}.Program(nil,
-		"goes", "ip", "link", "set", intf, "netns", container,
-	).Ok()
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "link", "set", "up", "lo",
-	).Ok()
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "link", "set", "down", intf,
-	).Ok()
+	assert.Program("goes", "ip", "link", "set", intf, "netns", container)
+	assert.Program("goes", "ip", "-n", container, "link", "set",
+		"up", "lo")
+	assert.Program("goes", "ip", "-n", container, "link", "set",
+		"down", intf)
 	// ISIS fails with default mtu 9216
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "link", "set", "mtu", "1500",
-		"dev", intf,
-	).Ok()
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "link", "set", "up", intf,
-	).Ok()
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "addr", "add", addr,
-		"dev", intf,
-	).Ok()
+	assert.Program("goes", "ip", "-n", container, "link", "set",
+		"mtu", "1500", "dev", intf)
+	assert.Program("goes", "ip", "-n", container, "link", "set",
+		"up", intf)
+	assert.Program("goes", "ip", "-n", container, "addr",
+		"add", addr, "dev", intf)
 	return nil
 }
 
 func moveIntfDefault(t *testing.T, container string, intf string) error {
 	t.Logf("moving %v from %v to default", intf, container)
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "link", "set", "down", intf,
-	).Ok()
-	Assert{t}.Program(nil,
-		"goes", "ip", "-n", container, "link", "set", intf, "netns", "1",
-	).Ok()
+	assert := test.Assert{t}
+	assert.Program("goes", "ip", "-n", container, "link", "set",
+		"down", intf)
+	assert.Program("goes", "ip", "-n", container, "link", "set",
+		intf, "netns", "1")
 	return nil
 }

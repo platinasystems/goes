@@ -5,20 +5,13 @@
 package main_test
 
 import (
-	"flag"
 	"testing"
 	"time"
 
 	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test/docker"
 	main "github.com/platinasystems/go/main/goes-platina-mk1"
 )
-
-var loopback bool
-
-func init() {
-	flag.BoolVar(&loopback, "test.loopback", false,
-		"run goes loopback tests")
-}
 
 func Test(t *testing.T) {
 	if test.Goes {
@@ -27,27 +20,17 @@ func Test(t *testing.T) {
 
 	assert := test.Assert{t}
 	assert.YoureRoot()
-	if !loopback {
-		t.Skip("need -test.loopback yaml conf file")
-	}
 
-	defer assert.Program(nil,
-		"goes", "redisd",
-	).Quit(3 * time.Second)
+	defer assert.Background("goes", "redisd").Quit()
+	assert.Program(12*time.Second, "goes", "hwait", "platina",
+		"redis.ready", "true", "10")
 
-	assert.Program(nil,
-		"goes", "hwait", "platina", "redis.ready", "true", "10",
-	).Wait(10 * time.Second).Ok().Done()
+	defer assert.Background(test.Debug{}, 30*time.Second,
+		"goes", "vnetd").Quit()
+	assert.Program(32*time.Second, "goes", "hwait", "platina",
+		"vnet.ready", "true", "30")
 
-	defer assert.Program(nil,
-		"goes", "vnetd",
-	).Gdb().Quit(30 * time.Second)
-
-	assert.Program(nil,
-		"goes", "hwait", "platina", "vnet.ready", "true", "30",
-	).Wait(40 * time.Second).Ok().Done()
-
-	assert.Nil(test.CheckDocker(t))
+	assert.Nil(docker.Check(t))
 
 	test.Suite{
 		{"ospf", test.Suite{

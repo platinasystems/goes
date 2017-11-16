@@ -5,20 +5,22 @@
 package main_test
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
-	. "github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test/docker"
 )
 
-var bgp_config *Config
+var bgp_config *docker.Config
 
 func FrrBGP(t *testing.T, confFile string) {
 
-	bgp_config = LaunchContainers(t, confFile)
-	defer TearDownContainers(t, bgp_config)
+	bgp_config = docker.LaunchContainers(t, confFile)
+	defer docker.TearDownContainers(t, bgp_config)
 
-	Suite{
+	test.Suite{
 		{"l2", bgpCheckL2Connectivity},
 		{"frr", checkBgpRunning},
 		{"neighbors", checkBgpNeighbors},
@@ -28,122 +30,85 @@ func FrrBGP(t *testing.T, confFile string) {
 }
 
 func bgpCheckL2Connectivity(t *testing.T) {
-	Assert{t}.Program(nil,
+	assert := test.Assert{t}
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.120.10",
-	).Output("/1 received/").Done()
+	)
 
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received.*"),
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.150.4",
-	).Output("/1 received/").Done()
+	)
 
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received.*"),
 		"goes", "ip", "netns", "exec", "R2",
 		"ping", "-c1", "192.168.222.2",
-	).Output("/1 received/").Done()
+	)
 
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received.*"),
 		"goes", "ip", "netns", "exec", "R3",
 		"ping", "-c1", "192.168.111.4",
-	).Output("/1 received/").Done()
+	)
 
-	Assert{t}.Program(nil,
-		"goes", "vnet", "show", "ip", "fib",
-	).Ok().Done()
+	assert.Program("goes", "vnet", "show", "ip", "fib")
 }
 
 func checkBgpRunning(t *testing.T) {
+	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 	cmd := []string{"ps", "ax"}
 	for _, r := range bgp_config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := DockerExecCmd(t, r.Hostname, bgp_config, cmd)
-		if err != nil {
-			t.Logf("DockerExecCmd failed: %v", err)
-			t.Fail()
-			return
-		}
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/bgpd/").Done()
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/zebra/").Done()
+		out, err := docker.ExecCmd(t, r.Hostname, bgp_config, cmd)
+		assert.Nil(err)
+		assert.Match(out, ".*bgpd.*")
+		assert.Match(out, ".*zebra.*")
 	}
 }
 
 func checkBgpNeighbors(t *testing.T) {
+	assert := test.Assert{t}
 	time.Sleep(60 * time.Second) // give bgp time to converge
 
 	cmd := []string{"vtysh", "-c", "show ip bgp neighbor 192.168.120.10"}
 	t.Log(cmd)
-	out, err := DockerExecCmd(t, "R1", bgp_config, cmd)
-	if err != nil {
-		t.Logf("DockerExecCmd failed: %v", err)
-		t.Fail()
-		return
-	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/state = Established/").Done()
+	out, err := docker.ExecCmd(t, "R1", bgp_config, cmd)
+	assert.Nil(err)
+	assert.Match(out, ".*state = Established.*")
 
 	cmd = []string{"vtysh", "-c", "show ip bgp neighbor 192.168.222.2"}
 	t.Log(cmd)
-	out, err = DockerExecCmd(t, "R2", bgp_config, cmd)
-	if err != nil {
-		t.Logf("DockerExecCmd failed: %v", err)
-		t.Fail()
-		return
-	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/state = Established/").Done()
+	out, err = docker.ExecCmd(t, "R2", bgp_config, cmd)
+	assert.Nil(err)
+	assert.Match(out, ".*state = Established.*")
 
 	cmd = []string{"vtysh", "-c", "show ip bgp neighbor 192.168.111.4"}
 	t.Log(cmd)
-	out, err = DockerExecCmd(t, "R3", bgp_config, cmd)
-	if err != nil {
-		t.Logf("DockerExecCmd failed: %v", err)
-		t.Fail()
-		return
-	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/state = Established/").Done()
+	out, err = docker.ExecCmd(t, "R3", bgp_config, cmd)
+	assert.Nil(err)
+	assert.Match(out, ".*state = Established.*")
 
 	cmd = []string{"vtysh", "-c", "show ip bgp neighbor 192.168.150.5"}
 	t.Log(cmd)
-	out, err = DockerExecCmd(t, "R4", bgp_config, cmd)
-	if err != nil {
-		t.Logf("DockerExecCmd failed: %v", err)
-		t.Fail()
-		return
-	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/state = Established/").Done()
+	out, err = docker.ExecCmd(t, "R4", bgp_config, cmd)
+	assert.Nil(err)
+	assert.Match(out, ".*state = Established.*")
 }
 
 func checkBgpLearnedRoute(t *testing.T) {
+	assert := test.Assert{t}
 	cmd := []string{"ip", "route", "show"}
-	out, err := DockerExecCmd(t, "R1", bgp_config, cmd)
-	if err != nil {
-		t.Logf("DockerExecCmd failed: %v", err)
-		t.Fail()
-		return
-	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/192.168.222.0/24/").Done()
+	out, err := docker.ExecCmd(t, "R1", bgp_config, cmd)
+	assert.Nil(err)
+	assert.Match(out, ".*192.168.222.0/24.*")
 }
 
 func checkBgpConnectivityLearned(t *testing.T) {
-	Assert{t}.Program(nil,
+	assert := test.Assert{t}
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.222.2",
-	).Output("/1 received/").Done()
-	Assert{t}.Program(nil,
-		"goes", "vnet", "show", "ip", "fib",
-	).Ok().Done()
+	)
+	assert.Program("goes", "vnet", "show", "ip", "fib")
 }

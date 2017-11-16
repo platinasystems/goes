@@ -5,20 +5,22 @@
 package main_test
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
-	. "github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/internal/test/docker"
 )
 
-var isis_config *Config
+var isis_config *docker.Config
 
 func FrrISIS(t *testing.T, confFile string) {
 
-	isis_config = LaunchContainers(t, confFile)
-	defer TearDownContainers(t, isis_config)
+	isis_config = docker.LaunchContainers(t, confFile)
+	defer docker.TearDownContainers(t, isis_config)
 
-	Suite{
+	test.Suite{
 		{"l2", isisCheckL2Connectivity},
 		{"frr", checkIsisRunning},
 		{"neighbors", checkIsisNeighbors},
@@ -28,97 +30,71 @@ func FrrISIS(t *testing.T, confFile string) {
 }
 
 func isisCheckL2Connectivity(t *testing.T) {
-	Assert{t}.Program(nil,
-		"goes", "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.120.10",
-	).Output("/1 received/").Done()
+	assert := test.Assert{t}
 
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.150.4",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "192.168.120.10")
 
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
+		"goes", "ip", "netns", "exec", "R1",
+		"ping", "-c1", "192.168.150.4")
+
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R2",
-		"ping", "-c1", "192.168.222.2",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "192.168.222.2")
 
-	Assert{t}.Program(nil,
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R3",
-		"ping", "-c1", "192.168.111.4",
-	).Output("/1 received/").Done()
+		"ping", "-c1", "192.168.111.4")
 }
 
 func checkIsisRunning(t *testing.T) {
+	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 
 	cmd := []string{"ps", "ax"}
 	for _, r := range isis_config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := DockerExecCmd(t, r.Hostname, isis_config, cmd)
-		if err != nil {
-			t.Logf("DockerExecCmd failed: %v", err)
-			t.Fail()
-			return
-		}
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/isisd/").Done()
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/zebra/").Done()
+		out, err := docker.ExecCmd(t, r.Hostname, isis_config, cmd)
+		assert.Nil(err)
+		assert.Match(out, ".*isisd.*")
+		assert.Match(out, ".*zebra.*")
 	}
 }
 
 func checkIsisNeighbors(t *testing.T) {
+	assert := test.Assert{t}
 	time.Sleep(60 * time.Second) // give time to converge
 
 	cmd := []string{"vtysh", "-c", "show isis interface"}
 	for _, r := range isis_config.Routers {
-		out, err := DockerExecCmd(t, r.Hostname, isis_config, cmd)
-		if err != nil {
-			t.Logf("DockerExecCmd failed: %v", err)
-			t.Fail()
-			return
-		}
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/Area R/").Done()
+		out, err := docker.ExecCmd(t, r.Hostname, isis_config, cmd)
+		assert.Nil(err)
+		assert.Match(out, "Area R.*")
 	}
 
 	cmd = []string{"vtysh", "-c", "show isis summary"}
 	for _, r := range isis_config.Routers {
-		out, err := DockerExecCmd(t, r.Hostname, isis_config, cmd)
-		if err != nil {
-			t.Logf("DockerExecCmd failed: %v", err)
-			t.Fail()
-			return
-		}
-		Assert{t}.Program(nil,
-			"echo", out,
-		).Output("/Net: 47.0023/").Done()
+		out, err := docker.ExecCmd(t, r.Hostname, isis_config, cmd)
+		assert.Nil(err)
+		assert.Match(out, ".*Net: 47.0023.*")
 	}
 }
 
 func checkIsisLearnedRoute(t *testing.T) {
-	cmd := []string{"ip", "route", "show"}
-	out, err := DockerExecCmd(t, "R1", isis_config, cmd)
-	if err != nil {
-		t.Logf("DockerExecCmd failed: %v", err)
-		t.Fail()
-		return
-	}
-	Assert{t}.Program(nil,
-		"echo", out,
-	).Output("/192.168.222.0/24/").Done()
+	assert := test.Assert{t}
+	cmd := []string{"ip", "route", "show", "192.168.222.0/24"}
+	out, err := docker.ExecCmd(t, "R1", isis_config, cmd)
+	assert.Nil(err)
+	test.Pause()
+	assert.Match(out, "192.168.222.0/24.*")
 }
 
 func checkIsisConnectivityLearned(t *testing.T) {
-	Assert{t}.Program(nil,
+	assert := test.Assert{t}
+	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.222.2",
-	).Output("/1 received/").Done()
-	Assert{t}.Program(nil,
-		"goes", "vnet", "show", "ip", "fib",
-	).Ok().Done()
+		"ping", "-c1", "192.168.222.2")
+	assert.Program("goes", "vnet", "show", "ip", "fib")
 }

@@ -5,6 +5,7 @@
 package main_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,39 +19,36 @@ func Test(t *testing.T) {
 		test.Exec(main.Goes().Main)
 	}
 	test.Suite{
-		{"hello", hello},
+		{"helloworld", helloworld},
 		{"pwd", pwd},
 		{"cat", cat},
 		{"redis", redis},
 	}.Run(t)
 }
 
-func hello(t *testing.T) {
-	test.Assert{t}.Program(nil,
-		"goes", "echo", "hello", "world",
-	).Output("hello world\n").Done()
-
+func helloworld(t *testing.T) {
+	test.Assert{t}.Program(
+		regexp.MustCompile("hello world\n"),
+		"goes", "echo", "hello", "world")
 }
 
 func pwd(t *testing.T) {
-	test.Assert{t}.Program(nil,
-		"goes", "pwd",
-	).Output("/.*/platinasystems/go\n/").Done()
-
+	test.Assert{t}.Program(
+		regexp.MustCompile(".*/platinasystems/go\n"),
+		"goes", "pwd")
 }
 
 func cat(t *testing.T) {
-	test.Assert{t}.Program(strings.NewReader("HELLO WORLD"),
-		"goes", "cat", "-",
-	).Output("HELLO WORLD").Done()
-
+	test.Assert{t}.Program(
+		strings.NewReader("HELLO WORLD"),
+		regexp.MustCompile("HELLO WORLD"),
+		"goes", "cat", "-")
 }
 
 func redis(t *testing.T) {
 	assert := test.Assert{t}
 	assert.YoureRoot()
-	defer assert.Program(nil, "goes", "redisd").Quit(10 * time.Second)
-	assert.Program(nil,
-		"goes", "hwait", "platina", "redis.ready", "true", "10",
-	).Ok().Done()
+	defer assert.Background("goes", "redisd").Quit()
+	assert.Program(12*time.Second, "goes", "hwait", "platina",
+		"redis.ready", "true", "10")
 }
