@@ -342,6 +342,7 @@ var StaticRedisFields = []string{
 	"qsfp.presence",
 	"qsfp.serialnumber",
 	"qsfp.vendor",
+	"qsfp.connectortype",
 }
 
 var StaticMonitoringRedisFields = []string{

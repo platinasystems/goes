@@ -370,8 +370,12 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.SerialNumber)
 						continue
 					}
-					if strings.Contains(k, ".id") {
+					if strings.Contains(k, "qsfp.id") {
 						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Id)
+						continue
+					}
+					if strings.Contains(k, "qsfp.connectortype") {
+						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.ConnectorType)
 						continue
 					}
 				}

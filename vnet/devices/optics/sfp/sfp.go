@@ -259,28 +259,42 @@ func (m *QsfpModule) validateCache(everything bool) {
 		}
 		// Read whole EEPROM.
 		m.AllEepromValid = true
-		p := (*[128]uint8)(unsafe.Pointer(&m.e))
-		m.a.SfpReadWrite(r.upperMemory[0].offset(), p[:], false)
-		// if qsfp is optic read static monitoring thresholds
-		if !strings.Contains(m.Ident.Compliance, "CR") && m.Ident.Compliance != "" {
-			t := getQsfpThresholdRegs()
-			if r.upperMemoryMapPageSelect.get(m) != 3 {
-				r.upperMemoryMapPageSelect.set(m, 3)
+
+		m.e.Id = Id((*reg8)(&r.id).get(m))
+		if strings.Contains(fmt.Sprintf("%v", m.e.Id), "QSFP") {
+			p := (*[128]uint8)(unsafe.Pointer(&m.e))
+			m.a.SfpReadWrite(r.upperMemory[0].offset(), p[:], false)
+			// if qsfp is optic read static monitoring thresholds
+			if !strings.Contains(m.Ident.Compliance, "CR") && m.Ident.Compliance != "" {
+				t := getQsfpThresholdRegs()
+				if r.upperMemoryMapPageSelect.get(m) != 3 {
+					r.upperMemoryMapPageSelect.set(m, 3)
+				}
+				m.Config.TemperatureInCelsius.get(m, &t.temperature, TemperatureToCelsius, true)
+				m.Config.SupplyVoltageInVolts.get(m, &t.supplyVoltage, SupplyVoltageToVolts, false)
+				m.Config.RxPowerInWatts.get(m, &t.rxPower, RxPowerToWatts, false)
+				m.Config.TxBiasCurrentInAmps.get(m, &t.txBiasCurrent, TxBiasCurrentToAmps, false)
+				m.Config.TxPowerInWatts.get(m, &t.txPower, TxPowerToWatts, false)
 			}
-			m.Config.TemperatureInCelsius.get(m, &t.temperature, TemperatureToCelsius, true)
-			m.Config.SupplyVoltageInVolts.get(m, &t.supplyVoltage, SupplyVoltageToVolts, false)
-			m.Config.RxPowerInWatts.get(m, &t.rxPower, RxPowerToWatts, false)
-			m.Config.TxBiasCurrentInAmps.get(m, &t.txBiasCurrent, TxBiasCurrentToAmps, false)
-			m.Config.TxPowerInWatts.get(m, &t.txPower, TxPowerToWatts, false)
+		} else if strings.Contains(fmt.Sprintf("%v", m.e.Id), "SFP") {
+			// if sfp use lowerpage
+			p := (*[128]uint8)(unsafe.Pointer(&m.e))
+			m.a.SfpReadWrite(0, p[:], false)
 		}
 	} else if !m.eepromDataplaneSubsetValid {
 		// For performance only read fields needed for data plane.
+
+		//if not a qsfp only read Id
+		m.e.Id = Id((*reg8)(&r.id).get(m))
+		if !strings.Contains(fmt.Sprintf("%v", m.e.Id), "QSFP") {
+			return
+		}
+
 		if r.upperMemoryMapPageSelect.get(m) != 0 {
 			r.upperMemoryMapPageSelect.set(m, 0)
 		}
 		m.eepromDataplaneSubsetValid = true
 		er := getEepromRegs()
-		m.e.Id = Id((*reg8)(&er.Id).get(m))
 		m.e.ConnectorType = ConnectorType((*reg8)(&er.ConnectorType).get(m))
 		m.e.Compatibility[0] = er.Compatibility[0].get(m)
 		if Compliance(m.e.Compatibility[0])&ComplianceExtendedValid != 0 {
@@ -332,11 +346,13 @@ func trim(r []reg8) string {
 func (m *QsfpModule) String() string {
 	m.validateCache(true)
 	e := &m.e
-	s := fmt.Sprintf("Id: %v, Compliance: %s, Vendor: %s, Part Number %s, Revision 0x%x, Serial %s, Date %s, Connector Type: %v",
+	var s string
+
+	m.Ident.Id = fmt.Sprintf("%s", e.Id)
+	s = fmt.Sprintf("Id: %s, Compliance: %s, Vendor: %s, Part Number %s, Revision 0x%x, Serial %s, Date %s, Connector Type: %v",
 		e.Id, m.Ident.Compliance, trim(e.VendorName[:]), trim(e.VendorPartNumber[:]), trim(e.VendorRevision[:]),
 		trim(e.VendorSerialNumber[:]), trim(e.VendorDateCode[:]), e.ConnectorType)
 
-	m.Ident.Id = fmt.Sprintf("Id: %v", e.Id)
 	m.Ident.Vendor = fmt.Sprintf("%s", trim(e.VendorName[:]))
 	m.Ident.PartNumber = fmt.Sprintf("%s", trim(e.VendorPartNumber[:]))
 	m.Ident.Revision = fmt.Sprintf("0%x", trim(e.VendorRevision[:]))
