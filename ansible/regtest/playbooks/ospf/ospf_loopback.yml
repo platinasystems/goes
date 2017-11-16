@@ -1,0 +1,141 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "quagga_ospf_loopback_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Take backup of ospfd.conf
+      copy:
+        src: /etc/quagga/ospfd.conf
+        dest: /etc/quagga/ospfd.conf.bck
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Add ospf config in ospfd.conf
+      blockinfile:
+        path: /etc/quagga/ospfd.conf
+        insertafter: "interface vnet"
+        marker: ""
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
+
+    - name: Assign loopback ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+
+    - name: Restart quagga service
+      service:
+        name: quagga
+        state: restarted
+
+    - name: Wait for 35 secs for bgp to establish communication
+      pause:
+        seconds: 35
+
+
+- hosts: leaf:spine
+  become: true
+  serial: 1
+
+  vars:
+  - log_dir_path: /var/log/regression/ospf
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - name: Verify quagga ospf loopback
+      test_ospf_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
+        spine_list: "{{ groups['spine'] }}"
+        leaf_list: "{{ groups['leaf'] }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ log_dir_path }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restore backup of ospfd.conf
+      copy:
+        src: /etc/quagga/ospfd.conf.bck
+        dest: /etc/quagga/ospfd.conf
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: /etc/quagga/ospfd.conf.bck
+        state: absent
+
+    - name: Revert back loopback ip
+      command: "ifconfig lo 127.0.0.1 netmask 255.0.0.0"
+
+    - service:
+        name: quagga
+        state: restarted
+
+    - shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store GOES version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+    - command: "goes restart"
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
