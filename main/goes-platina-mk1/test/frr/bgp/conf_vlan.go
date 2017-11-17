@@ -6,7 +6,7 @@ package bgp
 
 const ConfVlan = `
 image: "stigt/debian-frr:latest"
-volume: "/docs/examples/docker/frr-bgp/"
+volume: "/main/goes-platina-mk1/test/frr/bgp/"
 mapping: "/etc/frr"
 routers:
 - hostname: R1

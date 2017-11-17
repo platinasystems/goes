@@ -6,7 +6,7 @@ package ospf
 
 const Conf = `
 image: "stigt/debian-frr:latest"
-volume: "/docs/examples/docker/frr-ospf/"
+volume: "/main/goes-platina-mk1/test/frr/ospf/"
 mapping: "/etc/frr"
 routers:
 - hostname: R1

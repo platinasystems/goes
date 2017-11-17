@@ -6,7 +6,7 @@ package isis
 
 const Conf = `
 image: "stigt/debian-frr:latest"
-volume: "/docs/examples/docker/frr-isis/"
+volume: "/main/goes-platina-mk1/test/frr/isis/"
 mapping: "/etc/frr"
 routers:
 - hostname: R1

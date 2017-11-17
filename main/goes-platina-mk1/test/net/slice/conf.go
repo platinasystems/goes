@@ -6,7 +6,7 @@ package slice
 
 const Conf = `
 image: "stigt/debian-frr:latest"
-volume: "/docs/examples/docker/net-slice/"
+volume: "/main/goes-platina-mk1/test/net/slice/"
 mapping: "/etc/frr"
 routers:
 - hostname: CA-1
