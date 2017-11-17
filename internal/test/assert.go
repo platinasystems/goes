@@ -5,6 +5,7 @@
 package test
 
 import (
+	"io/ioutil"
 	"os"
 	"regexp"
 	"testing"
@@ -82,6 +83,19 @@ func (assert Assert) YoureRoot() {
 	if os.Geteuid() != 0 {
 		assert.Skip("you aren't root")
 	}
+}
+
+// Verifiy that goes isn't already running
+func (assert Assert) GoesNotRunning() {
+	assert.Helper()
+	files, err := ioutil.ReadDir("/var/run/goes/socks")
+	if err != nil {
+		return
+	}
+	if len(files) == 0 {
+		return
+	}
+	assert.Skip("Goes appears to running. Do a 'goes stop'.")
 }
 
 // Program asserts that the Program runs without error.

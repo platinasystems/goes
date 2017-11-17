@@ -20,6 +20,7 @@ func Test(t *testing.T) {
 
 	assert := test.Assert{t}
 	assert.YoureRoot()
+	assert.GoesNotRunning()
 
 	defer assert.Background("goes", "redisd").Quit()
 	assert.Program(12*time.Second, "goes", "hwait", "platina",
