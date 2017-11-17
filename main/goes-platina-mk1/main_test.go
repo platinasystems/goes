@@ -5,12 +5,19 @@
 package main_test
 
 import (
+	"bytes"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
 	main "github.com/platinasystems/go/main/goes-platina-mk1"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/bgp"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/isis"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/ospf"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/slice"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/port2port"
 )
 
 func Test(t *testing.T) {
@@ -50,30 +57,40 @@ func Test(t *testing.T) {
 	}.Run(t)
 }
 
-func ospfEth(t *testing.T) {
-	FrrOSPF(t, "docs/examples/docker/frr-ospf/conf.yml")
-}
-
-func ospfVlan(t *testing.T) {
-	FrrOSPF(t, "docs/examples/docker/frr-ospf/conf_vlan.yml")
-}
-
-func isisEth(t *testing.T) {
-	FrrISIS(t, "docs/examples/docker/frr-isis/conf.yml")
-}
-
-func isisVlan(t *testing.T) {
-	FrrISIS(t, "docs/examples/docker/frr-isis/conf_vlan.yml")
-}
-
 func bgpEth(t *testing.T) {
-	FrrBGP(t, "docs/examples/docker/frr-bgp/conf.yml")
+	bgp.Test(t, conf(t, "bgp", bgp.Conf))
 }
 
 func bgpVlan(t *testing.T) {
-	FrrBGP(t, "docs/examples/docker/frr-bgp/conf_vlan.yml")
+	bgp.Test(t, conf(t, "bgp-vlan", bgp.ConfVlan))
+}
+
+func isisEth(t *testing.T) {
+	isis.Test(t, conf(t, "isis", isis.Conf))
+}
+
+func isisVlan(t *testing.T) {
+	isis.Test(t, conf(t, "isis-vlan", isis.ConfVlan))
 }
 
 func netSlice(t *testing.T) {
-	Slice(t, "docs/examples/docker/net-slice/conf_vlan.yml")
+	slice.Test(t, conf(t, "net-slice", slice.Conf))
+}
+
+func ospfEth(t *testing.T) {
+	ospf.Test(t, conf(t, "ospf", ospf.Conf))
+}
+
+func ospfVlan(t *testing.T) {
+	ospf.Test(t, conf(t, "ospf-vlan", ospf.ConfVlan))
+}
+
+func conf(t *testing.T, name, text string) []byte {
+	assert := test.Assert{t}
+	assert.Helper()
+	tmpl, err := template.New(name).Parse(text)
+	assert.Nil(err)
+	buf := new(bytes.Buffer)
+	assert.Nil(tmpl.Execute(buf, port2port.Conf))
+	return buf.Bytes()
 }

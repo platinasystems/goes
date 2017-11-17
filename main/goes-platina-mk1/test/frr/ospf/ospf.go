@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package main_test
+package ospf
 
 import (
 	"regexp"
@@ -13,23 +13,23 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-var isis_config *docker.Config
+var config *docker.Config
 
-func FrrISIS(t *testing.T, confFile string) {
+func Test(t *testing.T, yaml []byte) {
 
-	isis_config = docker.LaunchContainers(t, confFile)
-	defer docker.TearDownContainers(t, isis_config)
+	config = docker.LaunchContainers(t, yaml)
+	defer docker.TearDownContainers(t, config)
 
 	test.Suite{
-		{"l2", isisCheckL2Connectivity},
-		{"frr", checkIsisRunning},
-		{"neighbors", checkIsisNeighbors},
-		{"routes", checkIsisLearnedRoute},
-		{"ping-learned", checkIsisConnectivityLearned},
+		{"connectivity", checkConnectivity},
+		{"frr", checkFrr},
+		{"neighbors", checkNeighbors},
+		{"routes", checkRoutes},
+		{"inter-connectivity", checkInterConnectivity},
 	}.Run(t)
 }
 
-func isisCheckL2Connectivity(t *testing.T) {
+func checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	assert.Program(regexp.MustCompile("1 received"),
@@ -47,52 +47,48 @@ func isisCheckL2Connectivity(t *testing.T) {
 	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R3",
 		"ping", "-c1", "192.168.111.4")
+
+	assert.Program("goes", "vnet", "show", "ip", "fib")
 }
 
-func checkIsisRunning(t *testing.T) {
+func checkFrr(t *testing.T) {
 	assert := test.Assert{t}
-	time.Sleep(1 * time.Second)
 
+	time.Sleep(1 * time.Second)
 	cmd := []string{"ps", "ax"}
-	for _, r := range isis_config.Routers {
+	for _, r := range config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := docker.ExecCmd(t, r.Hostname, isis_config, cmd)
+		out, err := docker.ExecCmd(t, r.Hostname, config, cmd)
 		assert.Nil(err)
-		assert.Match(out, ".*isisd.*")
+		assert.Match(out, ".*ospfd.*")
 		assert.Match(out, ".*zebra.*")
 	}
 }
 
-func checkIsisNeighbors(t *testing.T) {
+func checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
-	time.Sleep(60 * time.Second) // give time to converge
 
-	cmd := []string{"vtysh", "-c", "show isis interface"}
-	for _, r := range isis_config.Routers {
-		out, err := docker.ExecCmd(t, r.Hostname, isis_config, cmd)
+	time.Sleep(60 * time.Second) // give ospf time to converge
+	cmd := []string{"vtysh", "-c", "show ip ospf neig"}
+	for _, r := range config.Routers {
+		out, err := docker.ExecCmd(t, r.Hostname, config, cmd)
 		assert.Nil(err)
-		assert.Match(out, "Area R.*")
-	}
-
-	cmd = []string{"vtysh", "-c", "show isis summary"}
-	for _, r := range isis_config.Routers {
-		out, err := docker.ExecCmd(t, r.Hostname, isis_config, cmd)
-		assert.Nil(err)
-		assert.Match(out, ".*Net: 47.0023.*")
+		assert.Match(out, "192.168.*")
 	}
 }
 
-func checkIsisLearnedRoute(t *testing.T) {
+func checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
+
 	cmd := []string{"ip", "route", "show", "192.168.222.0/24"}
-	out, err := docker.ExecCmd(t, "R1", isis_config, cmd)
+	out, err := docker.ExecCmd(t, "R1", config, cmd)
 	assert.Nil(err)
-	test.Pause()
 	assert.Match(out, "192.168.222.0/24.*")
 }
 
-func checkIsisConnectivityLearned(t *testing.T) {
+func checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
+
 	assert.Program(regexp.MustCompile("1 received"),
 		"goes", "ip", "netns", "exec", "R1",
 		"ping", "-c1", "192.168.222.2")

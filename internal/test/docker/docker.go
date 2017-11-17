@@ -57,8 +57,9 @@ func Check(t *testing.T) error {
 	return nil
 }
 
-func LaunchContainers(t *testing.T, confFile string) (config *Config) {
+func LaunchContainers(t *testing.T, source []byte) (config *Config) {
 	assert := test.Assert{t}
+	assert.Helper()
 
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -66,17 +67,8 @@ func LaunchContainers(t *testing.T, confFile string) (config *Config) {
 		return
 	}
 
-	source, err := ioutil.ReadFile(confFile)
-	if err != nil {
-		t.Log("Failed to read [%v]: %v", confFile, err)
-		panic(err)
-	}
+	assert.Nil(yaml.Unmarshal(source, &config))
 
-	err = yaml.Unmarshal(source, &config)
-	if err != nil {
-		t.Log("Failed to unmarshal [%v]: %v", confFile, err)
-		panic(err)
-	}
 	config.cli = cli
 
 	if !isImageLocal(t, config) {
