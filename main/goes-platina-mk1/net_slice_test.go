@@ -109,7 +109,7 @@ func checkSliceOspfLearnedRoute(t *testing.T) {
 		t.Fail()
 		return
 	}
-	assert.True(out == "10.3.0.0/24")
+	assert.Match(out, "10.3.0.0/24")
 
 	out, err = docker.ExecCmd(t, "CA-2", slice_config, cmd)
 	if err != nil {
@@ -117,7 +117,7 @@ func checkSliceOspfLearnedRoute(t *testing.T) {
 		t.Fail()
 		return
 	}
-	assert.True(out == "10.1.0.0/24")
+	assert.Match(out, "10.1.0.0/24")
 
 	out, err = docker.ExecCmd(t, "CB-1", slice_config, cmd)
 	if err != nil {
@@ -125,7 +125,7 @@ func checkSliceOspfLearnedRoute(t *testing.T) {
 		t.Fail()
 		return
 	}
-	assert.True(out == "10.3.0.0/24")
+	assert.Match(out, "10.3.0.0/24")
 
 	out, err = docker.ExecCmd(t, "CB-2", slice_config, cmd)
 	if err != nil {
@@ -133,7 +133,7 @@ func checkSliceOspfLearnedRoute(t *testing.T) {
 		t.Fail()
 		return
 	}
-	assert.True(out == "10.1.0.0/24")
+	assert.Match(out, "10.1.0.0/24")
 }
 
 func checkSliceOspfConnectivityLearned(t *testing.T) {
