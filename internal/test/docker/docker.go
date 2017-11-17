@@ -183,12 +183,6 @@ func ExecCmd(t *testing.T, ID string, config *Config,
 	}
 	defer hresp.Close()
 
-	err = cli.ContainerExecStart(ctx, execResp.ID, types.ExecStartCheck{})
-	if err != nil {
-		t.Logf("Error starting exec: %v", err)
-		return
-	}
-
 	content, err := ioutil.ReadAll(hresp.Reader)
 	if err != nil {
 		t.Logf("Error reading output: %v", err)
