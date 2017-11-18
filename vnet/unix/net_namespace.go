@@ -117,13 +117,8 @@ func (d *namespace_search_dir) namespace_name(file_name string) (ns_name string)
 }
 
 var netns_search_dirs = [...]namespace_search_dir{
-	// docker: do this directory first.
-	namespace_search_dir{
-		path:   "/var/run/docker/netns",
-		prefix: "docker",
-	},
 	// iproute2
-	{
+	namespace_search_dir{
 		path: "/var/run/netns",
 	},
 }
