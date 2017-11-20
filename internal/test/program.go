@@ -27,6 +27,8 @@ func init() {
 		"debug certain commands (e.g. vnetd)")
 }
 
+var vv = flag.Bool("test.vv", false, "log test.Program output")
+
 // Timeout is the default duration on the Program Wait timer.
 const Timeout = 3 * time.Second
 
@@ -148,7 +150,9 @@ func (p *Program) End() (err error) {
 		<-done
 	}
 	if s := strings.TrimRight(p.obuf.String(), "\n"); len(s) > 0 {
-		p.tb.Log(s)
+		if err != nil || *vv {
+			p.tb.Log(s)
+		}
 	}
 	p.obuf.Reset()
 	return
