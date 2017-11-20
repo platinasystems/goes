@@ -153,7 +153,8 @@ def verify_bgp_authentication(module):
             if 'BGP state = Established' not in bgp_out:
                 RESULT_STATUS = False
                 failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp state of neighbor {} '.format(neighbor_ip)
+                failure_summary += 'bgp state of neighbor {} '.format(
+                    neighbor_ip)
                 failure_summary += 'is not Established in the output of '
                 failure_summary += 'command {}\n'.format(cmd)
 
@@ -183,7 +184,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -196,7 +197,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
