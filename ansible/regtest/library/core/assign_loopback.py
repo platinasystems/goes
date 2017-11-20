@@ -26,21 +26,37 @@ DOCUMENTATION = """
 ---
 module: assign_loopback
 author: Platina Systems
-short_description: Module to assign loopback ip.
+short_description: Module to assign loopback ip or ip to eth interface.
 description:
-    Module to assign loopback ip.
+    Module to assign loopback ip or ip to eth interface given.
 options:
     switch_name:
       description:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
+    eth:
+      description:
+        - Name of the eth interface to which ip need to be assigned.
+      required: False
+      type: str
+    revert:
+      description:
+        - Flag to indicate if ip needs to reverted or not.
+      required: False
+      type: bool
+      default: False
 """
 
 EXAMPLES = """
 - name: Assign loopback ip
   assign_loopback:
     switch_name: "{{ inventory_hostname }}"
+
+- name: Assign ip to eth-11-1 interface
+  assign_loopback:
+    switch_name: "{{ inventory_hostname }}"
+    eth: "11"
 """
 
 RETURN = """
@@ -74,16 +90,31 @@ def main():
     """ This section is for arguments parsing """
     module = AnsibleModule(
         argument_spec=dict(
-            switch_name=dict(required=False, type='str')
+            switch_name=dict(required=False, type='str'),
+            eth=dict(required=False, type='str', default=''),
+            revert=dict(required=False, type='bool', default=False)
         )
     )
 
     switch_name = module.params['switch_name']
-    ip = '192.168.{}.1'.format(switch_name[-2::])
-    cmd = 'ifconfig lo {} netmask 255.255.255.0'.format(ip)
-    run_cli(module, cmd)
+    eth = module.params['eth']
+    switch_id = switch_name[-2::]
 
-    msg = 'Assigned loopback ip {} to {}'.format(ip, switch_name)
+    if eth:
+        if module.params['revert']:
+            ip = '10.0.{}.{}'.format(eth, switch_id)
+        else:
+            ip = '192.168.{}.{}'.format(eth, switch_id)
+
+        cmd = 'ifconfig eth-{}-1 {} netmask 255.255.255.0'.format(eth, ip)
+        run_cli(module, cmd)
+        msg = 'Assigned ip {} to eth-{}-1 interface on switch {}'.format(
+            ip, eth, switch_name)
+    else:
+        ip = '192.168.{}.1'.format(switch_name[-2::])
+        cmd = 'ifconfig lo {} netmask 255.255.255.0'.format(ip)
+        run_cli(module, cmd)
+        msg = 'Assigned loopback ip {} to {}'.format(ip, switch_name)
 
     # Exit the module and return the required JSON.
     module.exit_json(
