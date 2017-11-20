@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package main_test
+package main
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
-	main "github.com/platinasystems/go/main/goes-platina-mk1"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/bgp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/isis"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/ospf"
@@ -21,9 +20,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	if test.Goes {
-		test.Exec(main.Goes().Main)
-	}
+	test.Main(main)
 
 	assert := test.Assert{t}
 	assert.YoureRoot()
@@ -42,47 +39,35 @@ func Test(t *testing.T) {
 
 	test.Suite{
 		{"ospf", test.Suite{
-			{"eth", ospfEth},
-			{"vlan", ospfVlan},
+			{"eth", func(t *testing.T) {
+				ospf.Test(t, conf(t, "ospf", ospf.Conf))
+			}},
+			{"vlan", func(t *testing.T) {
+				ospf.Test(t, conf(t, "ospf-vlan",
+					ospf.ConfVlan))
+			}},
 		}.Run},
 		{"isis", test.Suite{
-			{"eth", isisEth},
-			{"vlan", isisVlan},
+			{"eth", func(t *testing.T) {
+				isis.Test(t, conf(t, "isis", isis.Conf))
+			}},
+			{"vlan", func(t *testing.T) {
+				isis.Test(t, conf(t, "isis-vlan",
+					isis.ConfVlan))
+			}},
 		}.Run},
 		{"bgp", test.Suite{
-			{"eth", bgpEth},
-			{"vlan", bgpVlan},
+			{"eth", func(t *testing.T) {
+				bgp.Test(t, conf(t, "bgp", bgp.Conf))
+			}},
+			{"vlan", func(t *testing.T) {
+				bgp.Test(t, conf(t, "bgp-vlan", bgp.ConfVlan))
+			}},
 		}.Run},
-		{"net-slice", netSlice},
+		{"net-slice", func(t *testing.T) {
+			slice.Test(t, conf(t, "net-slice", slice.Conf))
+		}},
 	}.Run(t)
-}
-
-func bgpEth(t *testing.T) {
-	bgp.Test(t, conf(t, "bgp", bgp.Conf))
-}
-
-func bgpVlan(t *testing.T) {
-	bgp.Test(t, conf(t, "bgp-vlan", bgp.ConfVlan))
-}
-
-func isisEth(t *testing.T) {
-	isis.Test(t, conf(t, "isis", isis.Conf))
-}
-
-func isisVlan(t *testing.T) {
-	isis.Test(t, conf(t, "isis-vlan", isis.ConfVlan))
-}
-
-func netSlice(t *testing.T) {
-	slice.Test(t, conf(t, "net-slice", slice.Conf))
-}
-
-func ospfEth(t *testing.T) {
-	ospf.Test(t, conf(t, "ospf", ospf.Conf))
-}
-
-func ospfVlan(t *testing.T) {
-	ospf.Test(t, conf(t, "ospf-vlan", ospf.ConfVlan))
 }
 
 func conf(t *testing.T, name, text string) []byte {

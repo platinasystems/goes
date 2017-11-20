@@ -7,17 +7,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 )
 
-var Args = os.Args
-var Exit = os.Exit
-var Stderr io.Writer = os.Stderr
-
 func main() {
-	if err := Goes().Main(Args...); err != nil {
-		fmt.Fprintln(Stderr, err)
-		Exit(1)
+	var ecode int
+	if err := Goes().Main(os.Args...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		ecode = 1
 	}
+	os.Exit(ecode)
 }

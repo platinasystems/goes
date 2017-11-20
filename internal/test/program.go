@@ -20,13 +20,6 @@ import (
 	"github.com/platinasystems/go/internal/prog"
 )
 
-var debugger string
-
-func init() {
-	flag.StringVar(&debugger, "test.debugger", "",
-		"debug certain commands (e.g. vnetd)")
-}
-
 var vv = flag.Bool("test.vv", false, "log test.Program output")
 
 // Timeout is the default duration on the Program Wait timer.
@@ -36,29 +29,31 @@ const Timeout = 3 * time.Second
 //	-test.debugger=NAME
 type Debug struct{}
 
+// Self flags Program to run itself
+type Self struct{}
+
 // Begin a Program. This replaces "goes" with {os.Args[0] -test.goes}, where
-// os.Args[0] is the test program. A Test should exec the goes command like
-// this:
-//
-//	func Test(t *testing.T) {
-//		if Goes {
-//			Exec(main.Goes().Main)
-//		}
-//		Suite{
-//			{"Test1", func(t *testing.T) {
-//			...
-//			}},
-//			...
-//		}.Run(t)
-//	}
 //
 // The program string arguments may be preceded by one or more of these
 // type options.
 //
+//	Self	inserts []string{os.Args[0], "-test.main}" into Program args;
+//		the Test would run it's own main if said flag is set, e.g.:
+//
+//		func Test(t *testing.T) {
+//			test.Main(main)
+//			test.Suite{
+//				{"Test1", func(t *testing.T) {
+//					...
+//				}},
+//				...
+//			}.Run(t)
+//		}
+//
 //	io.Reader
 //		use the given reader as Stdin instead of the /dev/null default
 //
-//	Debug	run program through -test.debugger=NAME
+//	Debug	insert debugger program args
 //
 //	*regexp.Regexp
 //		match Stdout with compiled regex pattern
@@ -79,18 +74,14 @@ func Begin(tb testing.TB, options ...interface{}) (*Program, error) {
 	}
 	for _, opt := range options {
 		switch t := opt.(type) {
+		case Self:
+			args = append(args, prog.Name(), "-test.main")
 		case io.Reader:
 			stdin = t
 		case Debug:
-			if len(debugger) > 0 {
-				args = []string{debugger}
-			}
+			// FIXME
 		case string:
-			if t == "goes" {
-				args = append(args, prog.Name(), "-test.goes")
-			} else {
-				args = append(args, t)
-			}
+			args = append(args, t)
 		case time.Duration:
 			p.dur = t
 		case *regexp.Regexp:

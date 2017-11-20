@@ -31,54 +31,54 @@ func checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CA-1",
+		test.Self{}, "ip", "netns", "exec", "CA-1",
 		"ping", "-c1", "10.1.0.2")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RA-1",
+		test.Self{}, "ip", "netns", "exec", "RA-1",
 		"ping", "-c1", "10.1.0.1")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RA-1",
+		test.Self{}, "ip", "netns", "exec", "RA-1",
 		"ping", "-c1", "10.2.0.3")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RA-2",
+		test.Self{}, "ip", "netns", "exec", "RA-2",
 		"ping", "-c1", "10.2.0.2")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RA-2",
+		test.Self{}, "ip", "netns", "exec", "RA-2",
 		"ping", "-c1", "10.3.0.4")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CA-2",
+		test.Self{}, "ip", "netns", "exec", "CA-2",
 		"ping", "-c1", "10.3.0.3")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CB-1",
+		test.Self{}, "ip", "netns", "exec", "CB-1",
 		"ping", "-c1", "10.1.0.2")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RB-1",
+		test.Self{}, "ip", "netns", "exec", "RB-1",
 		"ping", "-c1", "10.1.0.1")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RB-1",
+		test.Self{}, "ip", "netns", "exec", "RB-1",
 		"ping", "-c1", "10.2.0.3")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RB-2",
+		test.Self{}, "ip", "netns", "exec", "RB-2",
 		"ping", "-c1", "10.2.0.2")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "RB-2",
+		test.Self{}, "ip", "netns", "exec", "RB-2",
 		"ping", "-c1", "10.3.0.4")
 
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CB-2",
+		test.Self{}, "ip", "netns", "exec", "CB-2",
 		"ping", "-c1", "10.3.0.3")
 
-	assert.Program("goes", "vnet", "show", "ip", "fib")
+	assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 }
 
 func checkFrr(t *testing.T) {
@@ -141,23 +141,23 @@ func checkInterConnectivity(t *testing.T) {
 
 	// In slice A ping from CA-1 to CA-2
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CA-1",
+		test.Self{}, "ip", "netns", "exec", "CA-1",
 		"ping", "-c1", "10.3.0.4")
 
 	// In slice B ping from CB-1 to CB-2
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CB-1",
+		test.Self{}, "ip", "netns", "exec", "CB-1",
 		"ping", "-c1", "10.3.0.4")
 
 	// In slice A ping from CA-2 to CA-1
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CA-2",
+		test.Self{}, "ip", "netns", "exec", "CA-2",
 		"ping", "-c1", "10.1.0.1")
 
 	// In slice B ping from CB-2 to CB-1
 	assert.Program(regexp.MustCompile("1 received"),
-		"goes", "ip", "netns", "exec", "CB-2",
+		test.Self{}, "ip", "netns", "exec", "CB-2",
 		"ping", "-c1", "10.1.0.1")
 
-	assert.Program("goes", "vnet", "show", "ip", "fib")
+	assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 }

@@ -2,22 +2,21 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// +build arm
+
 // This is the Baseboard Management Controller of Platina's Mk1 TOR.
 package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 )
 
-var Args = os.Args
-var Exit = os.Exit
-var Stderr io.Writer = os.Stderr
-
 func main() {
-	if err := Goes().Main(Args...); err != nil {
-		fmt.Fprintln(Stderr, err)
-		Exit(1)
+	var ecode int
+	if err := Goes().Main(os.Args...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		ecode = 1
 	}
+	os.Exit(ecode)
 }
