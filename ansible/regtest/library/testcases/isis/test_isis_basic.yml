@@ -49,6 +49,12 @@ options:
       required: False
       type: list
       default: []
+    check_neighbors:
+      description:
+        - Flag to indicate if isis neighbors to check or not.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -141,7 +147,7 @@ def verify_isis_neighbors(module):
     execute_commands(module, 'service quagga restart')
     execute_commands(module, 'service quagga status')
 
-    # Get all bgp routes
+    # Get isis neighbor info
     cmd = "vtysh -c 'sh isis neighbor'"
     isis_out = execute_commands(module, cmd)
 
@@ -165,6 +171,25 @@ def verify_isis_neighbors(module):
         failure_summary += 'On switch {} '.format(switch_name)
         failure_summary += 'isis neighbors state is not Up\n'
 
+    # Check and verify neighbor routes
+    if module.params['check_neighbors']:
+        cmd = "vtysh -c 'sh ip route'"
+        all_routes = execute_commands(module, cmd)
+
+        if all_routes.count('I>*') != 4:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'output of {} '.format(cmd)
+            failure_summary += 'is not displaying 4 isis routes\n'
+
+        for route in all_routes:
+            if 'I>*' in route:
+                if '115' not in route:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'administrative value 115 is not present'
+                    failure_summary += ' in isis route {}\n'.format(route)
+
     HASH_DICT['result.detail'] = failure_summary
 
     # Get the GOES status info
@@ -178,6 +203,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
+            check_neighbors=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

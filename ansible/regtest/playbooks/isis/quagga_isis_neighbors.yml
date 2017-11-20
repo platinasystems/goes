@@ -1,0 +1,251 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "quagga_isis_neighbors_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Take backup of isisd.conf
+      copy:
+        src: /etc/quagga/isisd.conf
+        dest: /etc/quagga/isisd.conf.bck
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Update hostname info in isisd.conf
+      replace:
+        path: /etc/quagga/isisd.conf
+        regexp: "^hostname isisd"
+        replace: "hostname {{ inventory_hostname }}"
+
+
+- hosts: leaf[0]:spine[1]
+  become: true
+  tasks:
+    - name: Assign ip to eth-21-1 interface
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "21"
+
+    - name: Assign mtu to eth-21-1 interface
+      command: "ifconfig eth-21-1 mtu 1500 up"
+
+    - name: Configure isis for eth-21-1
+      blockinfile:
+        path: /etc/quagga/isisd.conf
+        insertafter: "interface eth-21-1"
+        marker: "# {mark} foo"
+        block: |
+          ip router isis platina
+
+
+- hosts: leaf[0]:spine[0]
+  become: true
+  tasks:
+    - name: Assign ip to eth-11-1 interface
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "11"
+
+    - name: Assign mtu to eth-11-1 interface
+      command: "ifconfig eth-11-1 mtu 1500 up"
+
+    - name: Configure isis for eth-11-1
+      blockinfile:
+        path: /etc/quagga/isisd.conf
+        insertafter: "interface eth-11-1"
+        marker: "# {mark} foo"
+        block: |
+          ip router isis platina
+
+
+- hosts: leaf[1]:spine[1]
+  become: true
+  tasks:
+    - name: Assign ip to eth-5-1 interface
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "5"
+
+    - name: Assign mtu to eth-5-1 interface
+      command: "ifconfig eth-5-1 mtu 1500 up"
+
+    - name: Configure isis for eth-5-1
+      blockinfile:
+        path: /etc/quagga/isisd.conf
+        insertafter: "interface eth-5-1"
+        marker: "# {mark} foo"
+        block: |
+          ip router isis platina
+
+
+- hosts: leaf[1]:spine[0]
+  become: true
+  tasks:
+    - name: Assign ip to eth-27-1 interface
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "27"
+
+    - name: Assign mtu to eth-27-1 interface
+      command: "ifconfig eth-27-1 mtu 1500 up"
+
+    - name: Configure isis for eth-27-1
+      blockinfile:
+        path: /etc/quagga/isisd.conf
+        insertafter: "interface eth-27-1"
+        marker: "# {mark} bar"
+        block: |
+          ip router isis platina
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Add isis config in isisd.conf
+      blockinfile:
+        path: /etc/quagga/isisd.conf
+        insertafter: "interface vnet"
+        marker: ""
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_isis_basic.conf') }}"
+      
+    - name: Restart quagga
+      command: service quagga restart
+
+    - pause:
+        seconds: 35
+
+
+- hosts: leaf:spine
+  become: true
+  serial: 1
+
+  vars:
+  - log_dir_path: /var/log/regression/isis
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - name: Verify quagga isis neighbor relationship
+      test_isis_basic:
+        switch_name: "{{ inventory_hostname }}"
+        spine_list: "{{ groups['spine'] }}"
+        leaf_list: "{{ groups['leaf'] }}"
+        check_neighbors: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ log_dir_path }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restore backup of isisd.conf 
+      copy:
+        src: /etc/quagga/isisd.conf.bck
+        dest: /etc/quagga/isisd.conf
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: /etc/quagga/isisd.conf.bck
+        state: absent
+
+    - name: Revert ip of eth-11-1 interface to it's original ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "11"
+        revert: True
+
+    - name: Revert ip of eth-21-1 interface to it's original ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "21"
+        revert: True
+
+    - name: Revert ip of eth-5-1 interface to it's original ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "5"
+        revert: True
+
+    - name: Revert ip of eth-27-1 interface to it's original ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "27"
+        revert: True
+
+    - name: Revert mtu of interfaces to it's original
+      command: "ifconfig eth-{{item}}-1 mtu 9216 up"
+      with_items:
+        - "11"
+        - "21"
+        - "5"
+        - "27"
+
+    - service:
+        name: quagga
+        state: restarted
+
+    - shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store GOES version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
