@@ -45,15 +45,21 @@
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_ebgp_loopback.yml
-  tags: [quagga_bgp,demo]
+  tags: quagga_bgp
 
 - include: playbooks/bgp/peering_ibgp_loopback.yml
-  tags: [quagga_bgp,demo]
+  tags: quagga_bgp
 
 - include: playbooks/bgp/peering_if_down.yml
-  tags: [quagga_bgp,demo]
+  tags: quagga_bgp
 
 - include: playbooks/bgp/bgp_peering_redundancy.yml
+  tags: quagga_bgp
+
+- include: playbooks/bgp/quagga_bgp_peering_as_path.yml
+  tags: [quagga_bgp,demo]
+
+- include: playbooks/bgp/quagga_bgp_peering_med.yml
   tags: [quagga_bgp,demo]
 
 
@@ -75,11 +81,31 @@
   tags: quagga_ospf
 
 - include: playbooks/ospf/ospf_basic_with_different_areas.yml
-  tags: [quagga_ospf,demo]
+  tags: quagga_ospf
 
 - include: playbooks/ospf/ospf_intervals.yml
+  tags: quagga_ospf
+
+- include: playbooks/ospf/ospf_loopback.yml
   tags: [quagga_ospf,demo]
 
+
+# ALL ISIS TESTCASES
+
+- include: playbooks/isis/quagga_isis_basic.yml
+  tags: [isis,demo]
+
+- include: playbooks/isis/quagga_isis_neighbors.yml
+  tags: [isis,demo]
+
+
+# ALL ECMP TESTCASES
+
+- include: playbooks/ecmp/quagga_ecmp_loadbalancing_basic.yml
+  tags: [ecmp,demo]
+
+- include: playbooks/ecmp/quagga_ecmp_loadbalancing_paths.yml
+  tags: [ecmp,demo]
 
 
 # ALL IPV4 TESTCASES
@@ -102,3 +128,11 @@
 - include: playbooks/redis/regression_04.yml
   tags: redis
 
+
+# ALL SOFTWARE UPGRADE TESTCASES
+
+- include: playbooks/upgrade/software_upgrade_01.yml
+  tags: upgrade
+
+- include: playbooks/upgrade/software_upgrade_06.yml
+  tags: upgrade

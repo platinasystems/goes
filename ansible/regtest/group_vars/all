@@ -1,0 +1,11 @@
+---
+ansible_log_file_path: /tmp/ansible.log
+
+goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
+goes_installer_dir: '/tmp/'
+
+goes_installer_name: 'goes-platina-mk1-installer'
+goes_installer_url: '{{ goes_url_path }}{{ goes_installer_name }}'
+
+goes_coreboot_installer_name: 'coreboot-platina-mk1.rom'
+goes_coreboot_installer_url: '{{ goes_url_path }}{{ goes_coreboot_installer_name }}'
