@@ -64,9 +64,12 @@ func Test(t *testing.T) {
 				bgp.Test(t, conf(t, "bgp-vlan", bgp.ConfVlan))
 			}},
 		}.Run},
-		{"net-slice", func(t *testing.T) {
-			slice.Test(t, conf(t, "net-slice", slice.Conf))
-		}},
+		{"net-slice", test.Suite{
+			{"vlan", func(t *testing.T) {
+				slice.Test(t, conf(t, "net-slice-vlan",
+					slice.ConfVlan))
+			}},
+		}.Run},
 	}.Run(t)
 }
 
