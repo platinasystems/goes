@@ -37,7 +37,7 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    conf_file:
+    config_file:
       description:
         - BGP config which have been added into Quagga.conf on this switch.
       required: False
@@ -137,31 +137,33 @@ def verify_bgp_as_path(module):
 
     failure_summary = ''
     switch_name = module.params['switch_name']
-    conf_file = module.params['conf_file'].splitlines()
+    config_file = module.params['config_file'].splitlines()
 
-    if module.params['spine_list'].index(switch_name) == 0:
-        # Get all bgp routes
-        cmd = "vtysh -c 'sh ip bgp'"
-        bgp_out = execute_commands(module, cmd)
-
-        for line in conf_file:
-            line = line.strip()
-            if line.startswith('ip prefix-list'):
-                ip = line.split().pop()
-                if ip not in bgp_out:
-                    RESULT_STATUS = False
-                    failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'bgp route for network {} '.format(ip)
-                    failure_summary += 'is not present in the '
-                    failure_summary += 'output of command {}\n'.format(cmd)
-
-            if line.startswith('set as-path'):
-                as_path = line[-3::]
-                if as_path not in bgp_out:
-                    RESULT_STATUS = False
-                    failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'set as-path is not present in the '
-                    failure_summary += 'output of command {}\n'.format(cmd)
+    spine_list = module.params['spine_list']
+    if switch_name in spine_list:
+        if spine_list.index(switch_name) == 0:
+            # Get all bgp routes
+            cmd = "vtysh -c 'sh ip bgp'"
+            bgp_out = execute_commands(module, cmd)
+    
+            for line in config_file:
+                line = line.strip()
+                if line.startswith('ip prefix-list'):
+                    ip = line.split().pop()
+                    if ip not in bgp_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'bgp route for network {} '.format(ip)
+                        failure_summary += 'is not present in the '
+                        failure_summary += 'output of command {}\n'.format(cmd)
+    
+                if line.startswith('set as-path'):
+                    as_path = line[-3::]
+                    if as_path not in bgp_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'set as-path is not present in the '
+                        failure_summary += 'output of command {}\n'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -174,7 +176,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            conf_file=dict(required=False, type='str'),
+            config_file=dict(required=False, type='str'),
             spine_list=dict(required=False, type='list', default=[]),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),

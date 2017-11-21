@@ -55,7 +55,7 @@
     - name: Verify quagga bgp peering as path
       test_bgp_as_path:
         switch_name: "{{ inventory_hostname }}"
-        config_file: "{{ lookup('file', '../../files/{{hostvars[groups['leaf'][1]].inventory_hostname}}/quagga_bgp_peering_as_path.conf') }}"
+        config_file: "{{ lookup('file', '../../files/' + hostvars[groups['leaf'][1]].inventory_hostname + '/quagga_bgp_peering_as_path.conf') }}"
         spine_list: "{{ groups['spine'] }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ log_dir_path }}"
