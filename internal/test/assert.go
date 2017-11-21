@@ -95,7 +95,7 @@ func (assert Assert) GoesNotRunning() {
 	if len(files) == 0 {
 		return
 	}
-	assert.Skip("Goes appears to running. Do a 'goes stop'.")
+	assert.Fatal("Goes appears to running. Do a 'goes stop'.")
 }
 
 // Program asserts that the Program runs without error.
