@@ -26,13 +26,13 @@ func Test(t *testing.T) {
 	assert.YoureRoot()
 	assert.GoesNotRunning()
 
-	defer assert.Background("goes", "redisd").Quit()
-	assert.Program(12*time.Second, "goes", "hwait", "platina",
+	defer assert.Background(test.Self{}, "redisd").Quit()
+	assert.Program(12*time.Second, test.Self{}, "hwait", "platina",
 		"redis.ready", "true", "10")
 
-	defer assert.Background(test.Debug{}, 30*time.Second,
-		"goes", "vnetd").Quit()
-	assert.Program(32*time.Second, "goes", "hwait", "platina",
+	defer assert.Background(30*time.Second, test.Self{}, test.Debug{},
+		"vnetd").Quit()
+	assert.Program(32*time.Second, test.Self{}, "hwait", "platina",
 		"vnet.ready", "true", "30")
 
 	assert.Nil(docker.Check(t))
