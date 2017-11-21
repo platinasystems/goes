@@ -45,7 +45,7 @@
        - {regexp: '^ospf6d=', line: 'ospf6d=no'}
        - {regexp: '^ripd=', line: 'ripd=no'}
        - {regexp: '^ripngd=', line: 'ripngd=no'}
-       - {regexp: '^isisd=', line: 'isisd=no'}
+       - {regexp: '^isisd=', line: 'isisd=yes'}
        - {regexp: '^babeld=', line: 'babeld=no'}
 
     - name: Editing vtysh.conf File
@@ -79,4 +79,24 @@
       service:
          name: quagga
          state: restarted
+ 
+    - name: Copy vtysh running config to startup config
+      command: "vtysh -c 'copy running-config startup-config'"
 
+    - lineinfile:
+        path: /etc/quagga/bgpd.conf
+        regexp: "{{ item }}"
+        state: absent
+      with_items:
+        - "^router"
+        - "bgp router-id"
+
+    - lineinfile:
+        path: /etc/quagga/isisd.conf
+        regexp: "{{ item }}"
+        state: absent
+      with_items:
+        - "^router isis"
+        - "ip router"
+        - "net"
+        - "metric-style"
