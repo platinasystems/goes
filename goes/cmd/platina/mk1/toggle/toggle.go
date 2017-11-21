@@ -40,7 +40,50 @@ func (cmd) Man() lang.Alt     { return man }
 func (cmd) String() string    { return Name }
 func (cmd) Usage() string     { return Usage }
 
-var sd i2c.SMBusData
+const (
+	i2cGpioAddr = 0x74
+)
+
+func uartSel(cpu bool) {
+	var dir0, out0 uint8
+	i2c.Do(0, i2cGpioAddr,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			reg := uint8(6)
+			err = bus.Read(reg, i2c.WordData, &d)
+			dir0 = d[0]
+			return
+		})
+	i2c.Do(0, i2cGpioAddr,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			reg := uint8(6)
+			err = bus.Read(reg, i2c.WordData, &d)
+			out0 = d[0]
+			return
+		})
+	i2c.Do(0, i2cGpioAddr,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			d[0] = out0 | 0x20
+			reg := uint8(2)
+			err = bus.Write(reg, i2c.ByteData, &d)
+			return
+		})
+	i2c.Do(0, i2cGpioAddr,
+		func(bus *i2c.Bus) (err error) {
+			var d i2c.SMBusData
+			if cpu {
+				d[0] = dir0 | 0x20
+			} else {
+				d[0] = dir0 & 0xdf
+			}
+			reg := uint8(6)
+			err = bus.Write(reg, i2c.ByteData, &d)
+			return
+		})
+
+}
 
 func (cmd) Main(args ...string) error {
 
@@ -58,22 +101,12 @@ func (cmd) Main(args ...string) error {
 			gpio.Init()
 		}
 
-		//i2c STOP
-		sd[0] = 0
-		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(1), 0}
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
 		pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
 		if found {
 			pin.SetValue(true)
 		}
 		time.Sleep(10 * time.Millisecond)
-		x, _ := ReadByte(0, 0x74, 2)
-		WriteByte(0, 0x74, 0x2, x|0x20)
-		x, _ = ReadByte(0, 0x74, 6)
-		WriteByte(0, 0x74, 0x6, x|0x20)
+		uartSel(true)
 		if found {
 			pin.SetValue(false)
 		}
@@ -82,48 +115,8 @@ func (cmd) Main(args ...string) error {
 			pin.SetValue(true)
 		}
 		time.Sleep(10 * time.Millisecond)
-
-		//i2c START
-		sd[0] = 0
-		j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
-		err = DoI2cRpc()
-		if err != nil {
-			return err
-		}
 	} else {
-		x, _ := ReadByte(0, 0x74, 2)
-		WriteByte(0, 0x74, 0x2, x|0x20)
-		x, _ = ReadByte(0, 0x74, 6)
-		WriteByte(0, 0x74, 0x6, x^0x20)
-	}
-	return nil
-}
-
-func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
-	var (
-		sd i2c.SMBusData
-	)
-	rw := i2c.Read
-	op := i2c.ByteData
-	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
-	err := DoI2cRpc()
-	if err != nil {
-		return 0, err
-	}
-	return s[0].D[0], nil
-}
-
-func WriteByte(b uint8, a uint8, c uint8, v uint8) error {
-	var (
-		sd i2c.SMBusData
-	)
-	rw := i2c.Write
-	op := i2c.ByteData
-	sd[0] = v
-	j[0] = I{true, rw, c, op, sd, int(b), int(a), 0}
-	err := DoI2cRpc()
-	if err != nil {
-		return err
+		uartSel(false)
 	}
 	return nil
 }
