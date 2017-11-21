@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_ospf_loopback_{{ start_time.stdout }}"
+        hash_name: "quagga_ecmp_loadbalancing_basic_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -24,16 +24,32 @@
         group: root
         mode: 0644
 
+    - name: Assign loopback ip
+      assign_loopback:
+        switch_name: "{{ inventory_hostname }}"
+
+    - name: Configure cost on eth-7-1
+      blockinfile:
+        path: /etc/quagga/ospfd.conf
+        insertafter: "interface eth-7-1"
+        marker: "! eth-7-1 {mark}"
+        block: |
+          ip ospf cost 10
+
+    - name: Configure cost on eth-17-1
+      blockinfile:
+        path: /etc/quagga/ospfd.conf
+        insertafter: "interface eth-17-1"
+        marker: "! eth-17-1 {mark}"
+        block: |
+          ip ospf cost 10
+
     - name: Add ospf config in ospfd.conf
       blockinfile:
         path: /etc/quagga/ospfd.conf
         insertafter: "interface vnet"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
-
-    - name: Assign loopback ip
-      assign_loopback:
-        switch_name: "{{ inventory_hostname }}"
 
     - name: Restart quagga service
       service:
@@ -50,19 +66,19 @@
   serial: 1
 
   vars:
-  - log_dir_path: /var/log/regression/ospf
+  - log_dir_path: /var/log/regression/ecmp
 
   tasks:
     - file:
         path: "{{ log_dir_path }}"
         state: directory
 
-    - name: Verify quagga ospf loopback
-      test_ospf_loopback:
+    - name: Verify quagga ecmp load balancing basic
+      test_ospf_ecmp_basic:
         switch_name: "{{ inventory_hostname }}"
+        eth_list: "7,17"
+        cost: "10"
         config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
-        spine_list: "{{ groups['spine'] }}"
-        leaf_list: "{{ groups['leaf'] }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ log_dir_path }}"
       register: module_out

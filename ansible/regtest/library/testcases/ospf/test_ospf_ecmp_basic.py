@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify BGP Authentication """
+""" Test/Verify OSPF ECMP Basic """
 
 #
 # This file is part of Ansible
@@ -26,20 +26,30 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_bgp_authentication
+module: test_ospf_ecmp_basic
 author: Platina Systems
-short_description: Module to test and verify bgp configurations.
+short_description: Module to test and verify ospf ecmp basic config.
 description:
-    Module to test and verify bgp configurations and log the same.
+    Module to test and verify ospf configurations and log the same.
 options:
     switch_name:
       description:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
+    eth_list:
+      description:
+        - Comma separated string of eth interfaces.
+      required: False
+      type: str
+    cost:
+      description:
+        - Value of cost configured on eth interfaces.
+      required: False
+      type: str
     config_file:
       description:
-        - BGP config which have been added into Quagga.conf on this switch.
+        - OSPF configurations added in ospfd.conf file.
       required: False
       type: str
     hash_name:
@@ -55,8 +65,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp peering authentication
-  test_bgp_authentication:
+- name: Verify ospf ecmp basic
+  test_ospf_ecmp_basic:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -101,7 +111,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service quagga restart' in cmd or 'ifconfig' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -115,12 +125,21 @@ def execute_commands(module, cmd):
     return out
 
 
-def verify_bgp_authentication(module):
+def verify_ospf_ecmp_basic(module):
     """
-    Method to verify bgp authentication.
+    Method to verify ospf ecmp basic config.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
+    switch_name = module.params['switch_name']
+    cost = module.params['cost']
+
+    # Assign loopback ip
+    lo_cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
+        switch_name[-2::]
+    )
+    execute_commands(module, lo_cmd)
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
@@ -129,34 +148,41 @@ def verify_bgp_authentication(module):
     execute_commands(module, 'service quagga restart')
     execute_commands(module, 'service quagga status')
 
-    # Get all ip routes
-    cmd = "vtysh -c 'sh ip bgp neighbors'"
-    bgp_out = execute_commands(module, cmd)
+    # Verify configured cost on interfaces
+    for eth in module.params['eth_list'].split(','):
+        cmd = "vtysh -c 'sh ip ospf interface eth-{}-1'".format(eth)
+        ospf_out = execute_commands(module, cmd)
 
-    failure_summary = ''
-    switch_name = module.params['switch_name']
-    config_file = module.params['config_file'].splitlines()
+        if 'Cost: {}'.format(cost) not in ospf_out:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'cost {} is not showing up for '.format(cost)
+            failure_summary += 'eth-{}-1 interface '.format(eth)
+            failure_summary += 'in output of command {}\n'.format(cmd)
 
-    for line in config_file:
+    # Get all ospf routes
+    cmd = "vtysh -c 'sh ip route ospf'"
+    routes_out = execute_commands(module, cmd)
+
+    # Verify configured cost in ospf routes
+    for line in module.params['config_file'].splitlines():
         line = line.strip()
-        if 'neighbor' in line and 'remote-as' in line:
+        if 'network' in line and 'area' in line and '192' not in line:
             config = line.split()
-            neighbor_ip = config[1]
-            remote_as = config[3]
-            if neighbor_ip not in bgp_out or remote_as not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+            network = config[1]
 
-            if 'BGP state = Established' not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp state of neighbor {} '.format(
-                    neighbor_ip)
-                failure_summary += 'is not Established in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+            for route in routes_out.splitlines():
+                if network in route:
+                    if '/{}'.format(cost) not in route:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'cost {} is not showing up '.format(cost)
+                        failure_summary += 'for route {} '.format(route)
+                        failure_summary += 'in output of command {}\n'.format(cmd)
+
+    # Revert back the loopback ip
+    cmd = 'ifconfig lo 127.0.0.1 netmask 255.0.0.0'
+    execute_commands(module, cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -169,7 +195,9 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            config_file=dict(required=False, type='str'),
+            eth_list=dict(required=False, type='str'),
+            cost=dict(required=False, type='str'),
+            config_file=dict(required=False, type='str', default=''),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -177,7 +205,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_bgp_authentication(module)
+    verify_ospf_ecmp_basic(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
