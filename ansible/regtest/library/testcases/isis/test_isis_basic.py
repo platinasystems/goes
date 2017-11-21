@@ -175,20 +175,22 @@ def verify_isis_neighbors(module):
     if module.params['check_neighbors']:
         cmd = "vtysh -c 'sh ip route'"
         all_routes = execute_commands(module, cmd)
+        route_count = 0
 
-        if all_routes.count('I>*') != 4:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'output of {} '.format(cmd)
-            failure_summary += 'is not displaying 4 isis routes\n'
-
-        for route in all_routes:
-            if 'I>*' in route:
+        for route in all_routes.splitlines():
+            if route.startswith('I'):
+                route_count += 1
                 if '115' not in route:
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'administrative value 115 is not present'
                     failure_summary += ' in isis route {}\n'.format(route)
+
+        if route_count != 4:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'output of {} '.format(cmd)
+            failure_summary += 'is not displaying 4 isis routes\n'
 
     HASH_DICT['result.detail'] = failure_summary
 

@@ -46,7 +46,7 @@
       blockinfile:
         path: /etc/quagga/isisd.conf
         insertafter: "interface eth-21-1"
-        marker: "# {mark} foo"
+        marker: "! eth-21-1 {mark}"
         block: |
           ip router isis platina
 
@@ -66,7 +66,7 @@
       blockinfile:
         path: /etc/quagga/isisd.conf
         insertafter: "interface eth-11-1"
-        marker: "# {mark} foo"
+        marker: "! eth-11-1 {mark}"
         block: |
           ip router isis platina
 
@@ -86,7 +86,7 @@
       blockinfile:
         path: /etc/quagga/isisd.conf
         insertafter: "interface eth-5-1"
-        marker: "# {mark} foo"
+        marker: "! eth-5-1 {mark}"
         block: |
           ip router isis platina
 
@@ -106,7 +106,7 @@
       blockinfile:
         path: /etc/quagga/isisd.conf
         insertafter: "interface eth-27-1"
-        marker: "# {mark} bar"
+        marker: "! eth-27-1 {mark}"
         block: |
           ip router isis platina
 
@@ -117,7 +117,7 @@
     - name: Add isis config in isisd.conf
       blockinfile:
         path: /etc/quagga/isisd.conf
-        insertafter: "interface vnet"
+        insertafter: "interface lo"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_isis_basic.conf') }}"
       
