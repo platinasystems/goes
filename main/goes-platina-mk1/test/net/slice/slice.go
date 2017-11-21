@@ -30,6 +30,8 @@ func Test(t *testing.T, source []byte) {
 func checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
+	time.Sleep(1 * time.Second)
+
 	assert.Program(regexp.MustCompile("1 received"),
 		test.Self{}, "ip", "netns", "exec", "CA-1",
 		"ping", "-c1", "10.1.0.2")
