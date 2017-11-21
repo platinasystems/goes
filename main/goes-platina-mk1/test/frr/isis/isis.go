@@ -87,7 +87,6 @@ func checkRoutes(t *testing.T) {
 	cmd := []string{"ip", "route", "show", "192.168.222.0/24"}
 	out, err := docker.ExecCmd(t, "R1", config, cmd)
 	assert.Nil(err)
-	test.Pause()
 	assert.Match(out, "192.168.222.0/24.*")
 }
 
