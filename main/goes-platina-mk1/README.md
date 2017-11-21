@@ -15,10 +15,25 @@ Then build the unit test and run.
 $ make -B goes-platina-mk1.test
 $ sudo ./goes-platina-mk1.test -test.v		# -test.run=./SUB/TEST
 ```
+Current test cases:
+
+Test/ospf/eth
+Test/ospf/vlan
+Test/isis/eth
+Test/isis/vlan
+Test/bgp/eth
+Test/bgp/vlan
+Test/net-slice/vlan
+
+For example to run all vlan testcases:
+
+```console
+sudo ./goes-platina-mk1.test -test.vv -test.run Test/.*/vlan/.*
+```
 
 ---
 
-*&copy; 2015-2016 Platina Systems, Inc. All rights reserved.
+*&copy; 2015-2017 Platina Systems, Inc. All rights reserved.
 Use of this source code is governed by this BSD-style [LICENSE].*
 
 [LICENSE]: LICENSE
