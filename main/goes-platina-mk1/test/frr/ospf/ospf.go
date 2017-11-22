@@ -26,6 +26,7 @@ func Test(t *testing.T, yaml []byte) {
 		{"neighbors", checkNeighbors},
 		{"routes", checkRoutes},
 		{"inter-connectivity", checkInterConnectivity},
+		{"flap", checkFlap},
 	}.Run(t)
 }
 
@@ -54,7 +55,6 @@ func checkConnectivity(t *testing.T) {
 func checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 
-	time.Sleep(1 * time.Second)
 	cmd := []string{"ps", "ax"}
 	for _, r := range config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
@@ -68,29 +68,117 @@ func checkFrr(t *testing.T) {
 func checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
 
-	time.Sleep(60 * time.Second) // give ospf time to converge
-	cmd := []string{"vtysh", "-c", "show ip ospf neig"}
-	for _, r := range config.Routers {
-		out, err := docker.ExecCmd(t, r.Hostname, config, cmd)
-		assert.Nil(err)
-		assert.Match(out, "192.168.*")
+	timeout := 120
+	cmd := []string{"vtysh", "-c", "show ip ospf neighbor"}
+
+	for _, x := range []struct {
+		hostname string
+		peer     string
+	}{
+		{"R1", "192.168.120.10"},
+		{"R1", "192.168.150.4"},
+		{"R2", "192.168.120.5"},
+		{"R2", "192.168.222.2"},
+		{"R3", "192.168.222.10"},
+		{"R3", "192.168.111.4"},
+		{"R4", "192.168.111.2"},
+		{"R4", "192.168.150.5"},
+	} {
+		found := false
+		for i := timeout; i > 0; i-- {
+			out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+			assert.Nil(err)
+			if !assert.MatchNonFatal(out, x.peer) {
+				time.Sleep(1 * time.Second)
+			} else {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("No ospf neighbor found for %v", x.hostname)
+		}
 	}
 }
 
 func checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
-	cmd := []string{"ip", "route", "show", "192.168.222.0/24"}
-	out, err := docker.ExecCmd(t, "R1", config, cmd)
-	assert.Nil(err)
-	assert.Match(out, "192.168.222.0/24.*")
+	for _, x := range []struct {
+		hostname string
+		route    string
+	}{
+		{"R1", "192.168.222.0/24"},
+		{"R1", "192.168.111.0/24"},
+		{"R2", "192.168.150.0/24"},
+		{"R2", "192.168.111.0/24"},
+		{"R3", "192.168.120.0/24"},
+		{"R3", "192.168.150.0/24"},
+		{"R4", "192.168.120.0/24"},
+		{"R4", "192.168.222.0/24"},
+	} {
+		found := false
+		cmd := []string{"ip", "route", "show", x.route}
+		timeout := 120
+		for i := timeout; i > 0; i-- {
+			out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+			assert.Nil(err)
+			if !assert.MatchNonFatal(out, x.route) {
+				time.Sleep(1 * time.Second)
+			} else {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("No ospf route for %v: %v", x.hostname, x.route)
+		}
+	}
 }
 
 func checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
-	assert.Program(regexp.MustCompile("1 received"),
-		test.Self{}, "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.222.2")
-	assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+	for _, x := range []struct {
+		hostname string
+		target   string
+	}{
+		{"R1", "192.168.222.2"},
+		{"R1", "192.168.111.2"},
+		{"R2", "192.168.111.4"},
+		{"R2", "192.168.150.4"},
+		{"R3", "192.168.120.5"},
+		{"R3", "192.168.150.5"},
+		{"R4", "192.168.120.10"},
+		{"R4", "192.168.222.10"},
+	} {
+		assert.Program(regexp.MustCompile("1 received"),
+			test.Self{}, "ip", "netns", "exec", x.hostname,
+			"ping", "-c1", x.target)
+		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+	}
+}
+
+func checkFlap(t *testing.T) {
+	assert := test.Assert{t}
+
+	for _, r := range config.Routers {
+		for _, i := range r.Intfs {
+			var intf string
+			if i.Vlan != "" {
+				intf = i.Name + "." + i.Vlan
+			} else {
+				intf = i.Name
+			}
+			cmd := []string{"ip", "link", "set", "down", intf}
+			_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+			assert.Nil(err)
+			time.Sleep(1 * time.Second)
+			cmd = []string{"ip", "link", "set", "up", intf}
+			_, err = docker.ExecCmd(t, r.Hostname, config, cmd)
+			assert.Nil(err)
+			time.Sleep(1 * time.Second)
+			assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+		}
+	}
 }

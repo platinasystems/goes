@@ -61,6 +61,15 @@ func (assert Assert) Match(s, pattern string) {
 	}
 }
 
+// Match asserts string pattern match.
+func (assert Assert) MatchNonFatal(s, pattern string) bool {
+	assert.Helper()
+	if !regexp.MustCompile(pattern).MatchString(s) {
+		return false
+	}
+	return true
+}
+
 // True asserts flag.
 func (assert Assert) True(t bool) {
 	assert.Helper()
