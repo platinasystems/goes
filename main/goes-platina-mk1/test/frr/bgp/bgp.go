@@ -26,6 +26,7 @@ func Test(t *testing.T, yaml []byte) {
 		{"neighbors", checkNeighbors},
 		{"routes", checkRoutes},
 		{"inter-connectivity", checkInterConnectivity},
+		{"flap", checkFlap},
 	}.Run(t)
 }
 
@@ -69,46 +70,119 @@ func checkFrr(t *testing.T) {
 
 func checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
-	time.Sleep(60 * time.Second) // give bgp time to converge
 
-	cmd := []string{"vtysh", "-c", "show ip bgp neighbor 192.168.120.10"}
-	t.Log(cmd)
-	out, err := docker.ExecCmd(t, "R1", config, cmd)
-	assert.Nil(err)
-	assert.Match(out, ".*state = Established.*")
+	for _, x := range []struct {
+		hostname string
+		peer     string
+	}{
+		{"R1", "192.168.120.10"},
+		{"R1", "192.168.150.4"},
+		{"R2", "192.168.120.5"},
+		{"R2", "192.168.222.2"},
+		{"R3", "192.168.222.10"},
+		{"R3", "192.168.111.4"},
+		{"R4", "192.168.111.2"},
+		{"R4", "192.168.150.5"},
+	} {
+		found := false
+		timeout := 120
 
-	cmd = []string{"vtysh", "-c", "show ip bgp neighbor 192.168.222.2"}
-	t.Log(cmd)
-	out, err = docker.ExecCmd(t, "R2", config, cmd)
-	assert.Nil(err)
-	assert.Match(out, ".*state = Established.*")
-
-	cmd = []string{"vtysh", "-c", "show ip bgp neighbor 192.168.111.4"}
-	t.Log(cmd)
-	out, err = docker.ExecCmd(t, "R3", config, cmd)
-	assert.Nil(err)
-	assert.Match(out, ".*state = Established.*")
-
-	cmd = []string{"vtysh", "-c", "show ip bgp neighbor 192.168.150.5"}
-	t.Log(cmd)
-	out, err = docker.ExecCmd(t, "R4", config, cmd)
-	assert.Nil(err)
-	assert.Match(out, ".*state = Established.*")
+		cmd := "show ip bgp neighbor " + x.peer
+		vcmd := []string{"vtysh", "-c", cmd}
+		for i := timeout; i > 0; i-- {
+			out, err := docker.ExecCmd(t, x.hostname, config, vcmd)
+			assert.Nil(err)
+			if !assert.MatchNonFatal(out, ".*state = Established.*") {
+				time.Sleep(1 * time.Second)
+			} else {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("No ospf neighbor found for %v", x.hostname)
+		}
+	}
 }
 
 func checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
-	cmd := []string{"ip", "route", "show"}
-	out, err := docker.ExecCmd(t, "R1", config, cmd)
-	assert.Nil(err)
-	assert.Match(out, ".*192.168.222.0/24.*")
+
+	for _, x := range []struct {
+		hostname string
+		route    string
+	}{
+		{"R1", "192.168.222.0/24"},
+		{"R1", "192.168.111.0/24"},
+		{"R2", "192.168.150.0/24"},
+		{"R2", "192.168.111.0/24"},
+		{"R3", "192.168.120.0/24"},
+		{"R3", "192.168.150.0/24"},
+		{"R4", "192.168.120.0/24"},
+		{"R4", "192.168.222.0/24"},
+	} {
+		found := false
+		cmd := []string{"ip", "route", "show", x.route}
+		timeout := 120
+		for i := timeout; i > 0; i-- {
+			out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+			assert.Nil(err)
+			if !assert.MatchNonFatal(out, x.route) {
+				time.Sleep(1 * time.Second)
+			} else {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("No bgp route for %v: %v", x.hostname, x.route)
+		}
+	}
 }
 
 func checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
-	assert.Program(regexp.MustCompile("1 received"),
-		test.Self{}, "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.222.2",
-	)
-	assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+
+	for _, x := range []struct {
+		hostname string
+		target   string
+	}{
+		{"R1", "192.168.222.2"},
+		{"R1", "192.168.111.2"},
+		{"R2", "192.168.111.4"},
+		{"R2", "192.168.150.4"},
+		{"R3", "192.168.120.5"},
+		{"R3", "192.168.150.5"},
+		{"R4", "192.168.120.10"},
+		{"R4", "192.168.222.10"},
+	} {
+		assert.Program(regexp.MustCompile("1 received"),
+			test.Self{}, "ip", "netns", "exec", x.hostname,
+			"ping", "-c1", x.target)
+		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+	}
+}
+
+func checkFlap(t *testing.T) {
+	assert := test.Assert{t}
+
+	for _, r := range config.Routers {
+		for _, i := range r.Intfs {
+			var intf string
+			if i.Vlan != "" {
+				intf = i.Name + "." + i.Vlan
+			} else {
+				intf = i.Name
+			}
+			cmd := []string{"ip", "link", "set", "down", intf}
+			_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+			assert.Nil(err)
+			time.Sleep(1 * time.Second)
+			cmd = []string{"ip", "link", "set", "up", intf}
+			_, err = docker.ExecCmd(t, r.Hostname, config, cmd)
+			assert.Nil(err)
+			time.Sleep(1 * time.Second)
+			assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+		}
+	}
 }
