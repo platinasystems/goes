@@ -33,23 +33,23 @@ func Test(t *testing.T, yaml []byte) {
 func checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
-	assert.Program(regexp.MustCompile("1 received"),
-		test.Self{}, "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.120.10")
-
-	assert.Program(regexp.MustCompile("1 received"),
-		test.Self{}, "ip", "netns", "exec", "R1",
-		"ping", "-c1", "192.168.150.4")
-
-	assert.Program(regexp.MustCompile("1 received"),
-		test.Self{}, "ip", "netns", "exec", "R2",
-		"ping", "-c1", "192.168.222.2")
-
-	assert.Program(regexp.MustCompile("1 received"),
-		test.Self{}, "ip", "netns", "exec", "R3",
-		"ping", "-c1", "192.168.111.4")
-
-	assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+	for _, x := range []struct {
+		host   string
+		target string
+	}{
+		{"R1", "192.168.120.10"},
+		{"R1", "192.168.150.4"},
+		{"R2", "192.168.222.2"},
+		{"R2", "192.168.120.5"},
+		{"R3", "192.168.222.10"},
+		{"R3", "192.168.111.4"},
+		{"R4", "192.168.111.2"},
+		{"R4", "192.168.150.5"},
+	} {
+		assert.Program(regexp.MustCompile("1 received"),
+			test.Self{},
+			"ip", "netns", "exec", x.host, "ping", "-c1", x.target)
+	}
 }
 
 func checkFrr(t *testing.T) {
