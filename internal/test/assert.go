@@ -24,6 +24,14 @@ func (assert Assert) Nil(err error) {
 	}
 }
 
+// NonNil asserts that there is an error
+func (assert Assert) NonNil(err error) {
+	assert.Helper()
+	if err == nil {
+		assert.Fatal(err)
+	}
+}
+
 // Error asserts that an error matches the given error, string, or regex
 func (assert Assert) Error(err error, v interface{}) {
 	assert.Helper()

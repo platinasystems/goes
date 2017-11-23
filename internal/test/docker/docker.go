@@ -21,21 +21,23 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type Router struct {
+	Hostname string
+	Cmd      string
+	Intfs    []struct {
+		Name    string
+		Address string
+		Vlan    string
+	}
+	id string
+}
+
 type Config struct {
 	Image   string
 	Volume  string
 	Mapping string
-	Routers []struct {
-		Hostname string
-		Cmd      string
-		Intfs    []struct {
-			Name    string
-			Address string
-			Vlan    string
-		}
-		id string
-	}
-	cli *client.Client
+	Routers []Router
+	cli     *client.Client
 }
 
 func Check(t *testing.T) error {
@@ -146,6 +148,16 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config) {
 		}
 	}
 	time.Sleep(1 * time.Second)
+	return
+}
+
+func FindHost(config *Config, host string) (router Router, err error) {
+	for _, r := range config.Routers {
+		if r.Hostname == host {
+			router = r
+			return
+		}
+	}
 	return
 }
 
