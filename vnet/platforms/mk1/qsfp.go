@@ -5,6 +5,7 @@
 package mk1
 
 import (
+	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
@@ -14,6 +15,7 @@ import (
 	"github.com/platinasystems/go/vnet/devices/optics/sfp"
 	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,6 +35,9 @@ const numPorts = 32
 var pub *publisher.Publisher
 var portBase int
 var firstPort bool
+var maxTemp float64
+var maxTempPort string
+var bmcIpv6LinkLocalRedis string
 
 func i2cMuxSelectPort(port uint) {
 	// Select 2 level mux.
@@ -461,6 +466,9 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 			} else {
 				//qsfp has been removed
 				log.Print("port ", port+uint(portBase), " removed")
+				if maxTempPort == strconv.Itoa(int(port)) {
+					maxTempPort = "-1"
+				}
 				// delete redis fields
 				for _, k := range sfp.StaticRedisFields {
 					pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
@@ -550,6 +558,47 @@ func (m *qsfpMain) poll() {
 						for _, k := range sfp.DynamicMonitoringRedisFields {
 							if strings.Contains(k, "qsfp.temperature.units.C") {
 								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.Temperature)
+								update := false
+								u, err := strconv.ParseFloat(q.Mon.Temperature, 64)
+
+								if err == nil {
+									if maxTempPort == "-1" {
+										maxTemp = u
+										maxTempPort = strconv.Itoa(int(port))
+										update = true
+									} else if maxTempPort == strconv.Itoa(int(port)) {
+										maxTemp = u
+										update = true
+									} else if u > maxTemp || bmcIpv6LinkLocalRedis == "" {
+										maxTemp = u
+										maxTempPort = strconv.Itoa(int(port))
+										update = true
+									}
+
+									if update {
+										if bmcIpv6LinkLocalRedis == "" {
+											m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+											if err == nil {
+												o := strings.Split(m, ":")
+												b, _ := hex.DecodeString(o[0])
+												b[0] = b[0] ^ byte(2)
+												o[0] = hex.EncodeToString(b)
+												bmcIpv6LinkLocalRedis = "[fe80::" + o[0] + o[1] + ":" + o[2] + "ff:fe" + o[3] + ":" + o[4] + o[5] + "%eth0]:6379"
+											}
+										}
+										if bmcIpv6LinkLocalRedis != "" {
+											d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
+											if err != nil {
+												log.Print(err)
+											} else {
+												d.Do("HSET", redis.DefaultHash, "qsfp.temp.units.C", q.Mon.Temperature)
+												d.Close()
+											}
+										}
+
+									}
+								}
+
 							}
 							if strings.Contains(k, "qsfp.vcc.units.V") {
 								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.Voltage)
@@ -653,6 +702,9 @@ func (q *qsfpModule) SfpReadWrite(offset uint, p []uint8, isWrite bool) (write_o
 }
 
 func qsfpInit(v *vnet.Vnet, p *fe1_platform.Platform) {
+	maxTemp = 0
+	maxTempPort = "-1"
+
 	m := &qsfpMain{}
 
 	p.QsfpModules = make(map[fe1_platform.SwitchPort]*sfp.QsfpModule)
