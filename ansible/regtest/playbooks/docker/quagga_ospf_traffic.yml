@@ -1,0 +1,385 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "docker_quagga_ospf_traffic_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Pull quagga container image from dockerhub
+      command: "docker pull stigt/debian-quagga:latest"
+
+    - name: Install docker compose
+      shell: "curl -L https://github.com/docker/compose/releases/download/1.17.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose"
+
+    - name: Make docker-compose file executable
+      shell: "chmod +x /usr/local/bin/docker-compose"
+
+    - file:
+        path: "{{ docker_compose_file }}"
+        state: touch
+
+    - name: Create docker-compose file
+      lineinfile:
+        path: "{{ docker_compose_file }}"
+        line: "{{ item }}"
+      with_items:
+      - "version: '3'"
+      - "services:"
+
+    - name: Add docker_move.sh
+      copy:
+        src: ../../templates/docker_move.sh
+        dest: "~/docker_move.sh"      
+        owner: root
+        group: root
+        mode: 0755
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - R1
+      - R2
+      - R3
+      - R4
+      - R5
+      - R6
+      - R7
+      - R8
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - R1
+      - R2
+      - R3
+      - R4
+      - R5
+      - R6
+      - R7
+      - R8
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - R1
+      - R2
+      - R3
+      - R4
+      - R5
+      - R6
+      - R7
+      - R8
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - R1
+      - R2
+      - R3
+      - R4
+      - R5
+      - R6
+      - R7
+      - R8
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - R9
+      - R10
+      - R11
+      - R12
+      - R13
+      - R14
+      - R15
+      - R16
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - R9
+      - R10
+      - R11
+      - R12
+      - R13
+      - R14
+      - R15
+      - R16
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - R9
+      - R10
+      - R11
+      - R12
+      - R13
+      - R14
+      - R15
+      - R16
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - R9
+      - R10
+      - R11
+      - R12
+      - R13
+      - R14
+      - R15
+      - R16
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - R17
+      - R18
+      - R19
+      - R20
+      - R21
+      - R22
+      - R23
+      - R24
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - R17
+      - R18
+      - R19
+      - R20
+      - R21
+      - R22
+      - R23
+      - R24
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - R17
+      - R18
+      - R19
+      - R20
+      - R21
+      - R22
+      - R23
+      - R24
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - R17
+      - R18
+      - R19
+      - R20
+      - R21
+      - R22
+      - R23
+      - R24
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - R25
+      - R26
+      - R27
+      - R28
+      - R29
+      - R30
+      - R31
+      - R32
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - R25
+      - R26
+      - R27
+      - R28
+      - R29
+      - R30
+      - R31
+      - R32
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - R25
+      - R26
+      - R27
+      - R28
+      - R29
+      - R30
+      - R31
+      - R32
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - R25
+      - R26
+      - R27
+      - R28
+      - R29
+      - R30
+      - R31
+      - R32
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - R1
+      - R2
+      - R3
+      - R4
+      - R5
+      - R6
+      - R7
+      - R8
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - R9
+      - R10
+      - R11
+      - R12
+      - R13
+      - R14
+      - R15
+      - R16
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - R17
+      - R18
+      - R19
+      - R20
+      - R21
+      - R22
+      - R23
+      - R24
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - R25
+      - R26
+      - R27
+      - R28
+      - R29
+      - R30
+      - R31
+      - R32
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restart goes
+      command: "goes restart"
+

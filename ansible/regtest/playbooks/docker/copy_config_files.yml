@@ -1,0 +1,13 @@
+---
+- include_vars:
+    file: ../../group_vars/{{ inventory_hostname }}/{{ container }}
+
+- name: Copy ospfd.conf file
+  template:
+    src: ../../templates/ospfd.conf.j2
+    dest: ~/volumes/quagga/{{ container }}/ospfd.conf
+
+- name: Copy zebra.conf file
+  template:
+    src: ../../templates/zebra.conf.j2
+    dest: ~/volumes/quagga/{{ container }}/zebra.conf
