@@ -43,6 +43,7 @@ func Test(t *testing.T) {
 	assert.Nil(docker.Check(t))
 
 	test.Suite{
+		{"vnet.ready", func(*testing.T) {}},
 		{"ospf", test.Suite{
 			{"eth", func(t *testing.T) {
 				ospf.Test(t, conf(t, "ospf", ospf.Conf))
