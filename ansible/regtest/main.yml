@@ -57,10 +57,10 @@
   tags: quagga_bgp
 
 - include: playbooks/bgp/quagga_bgp_peering_as_path.yml
-  tags: [quagga_bgp,demo]
+  tags: quagga_bgp
 
 - include: playbooks/bgp/quagga_bgp_peering_med.yml
-  tags: [quagga_bgp,demo]
+  tags: quagga_bgp
 
 
 # ALL QUAGGA OSPF TESTCASES
@@ -87,25 +87,25 @@
   tags: quagga_ospf
 
 - include: playbooks/ospf/ospf_loopback.yml
-  tags: [quagga_ospf,demo]
+  tags: quagga_ospf
 
 
 # ALL ISIS TESTCASES
 
 - include: playbooks/isis/quagga_isis_basic.yml
-  tags: [isis,demo]
+  tags: isis
 
 - include: playbooks/isis/quagga_isis_neighbors.yml
-  tags: [isis,demo]
+  tags: isis
 
 
 # ALL ECMP TESTCASES
 
 - include: playbooks/ecmp/quagga_ecmp_loadbalancing_basic.yml
-  tags: [ecmp,demo]
+  tags: ecmp
 
 - include: playbooks/ecmp/quagga_ecmp_loadbalancing_paths.yml
-  tags: [ecmp,demo]
+  tags: ecmp
 
 
 # ALL IPV4 TESTCASES
@@ -134,5 +134,17 @@
 - include: playbooks/upgrade/software_upgrade_01.yml
   tags: upgrade
 
+- include: playbooks/upgrade/software_upgrade_03.yml
+  tags: [upgrade,demo]
+
+- include: playbooks/upgrade/software_upgrade_04.yml
+  tags: [upgrade,demo]
+
 - include: playbooks/upgrade/software_upgrade_06.yml
   tags: upgrade
+
+
+# ALL CONTAINERIZED TESTCASES
+
+- include: playbooks/docker/quagga_ospf_traffic.yml
+  tags: [docker,demo]
