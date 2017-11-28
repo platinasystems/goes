@@ -38,6 +38,7 @@ var firstPort bool
 var maxTemp float64
 var maxTempPort string
 var bmcIpv6LinkLocalRedis string
+var lasts = make(map[string]string)
 
 func i2cMuxSelectPort(port uint) {
 	// Select 2 level mux.
@@ -306,8 +307,13 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 
 		q.SetSignal(signal, v)
 		if signal == sfp.QsfpModuleIsPresent {
-			k := "port-" + strconv.Itoa(int(port)+portBase) + ".qsfp.installed"
-			pub.Print(k, ": ", strconv.FormatBool(v))
+			f := "port-" + strconv.Itoa(int(port)+portBase) + ".qsfp.installed"
+			s := strconv.FormatBool(v)
+			if s != lasts[f] {
+				pub.Print(f, ": ", s)
+				lasts[f] = s
+			}
+
 			// if qsfps are installed, set interface per compliance to bring dataplane up
 			if v {
 				speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
@@ -361,29 +367,55 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				// fetch and publish static identification fields
 				s := q.String()
 				log.Print("port ", port+uint(portBase), " installed: ", s)
+
 				for _, k := range sfp.StaticRedisFields {
+					f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
 					if strings.Contains(k, "vendor") {
-						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Vendor)
+						s := q.Ident.Vendor
+						if s != lasts[f] {
+							pub.Print(f, ": ", s)
+							lasts[f] = s
+						}
 						continue
 					}
 					if strings.Contains(k, "compliance") {
-						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Compliance)
+						s := q.Ident.Compliance
+						if s != lasts[f] {
+							pub.Print(f, ": ", s)
+							lasts[f] = s
+						}
 						continue
 					}
 					if strings.Contains(k, "partnumber") {
-						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.PartNumber)
+						s := q.Ident.PartNumber
+						if s != lasts[f] {
+							pub.Print(f, ": ", s)
+							lasts[f] = s
+						}
 						continue
 					}
 					if strings.Contains(k, "serialnumber") {
-						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.SerialNumber)
+						s := q.Ident.SerialNumber
+						if s != lasts[f] {
+							pub.Print(f, ": ", s)
+							lasts[f] = s
+						}
 						continue
 					}
 					if strings.Contains(k, "qsfp.id") {
-						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.Id)
+						s := q.Ident.Id
+						if s != lasts[f] {
+							pub.Print(f, ": ", s)
+							lasts[f] = s
+						}
 						continue
 					}
 					if strings.Contains(k, "qsfp.connectortype") {
-						pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Ident.ConnectorType)
+						s := q.Ident.ConnectorType
+						if s != lasts[f] {
+							pub.Print(f, ": ", s)
+							lasts[f] = s
+						}
 						continue
 					}
 				}
@@ -394,81 +426,162 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 
 					q.Monitoring()
 					for _, k := range sfp.StaticMonitoringRedisFields {
+						f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
 						if strings.Contains(k, "temperature") {
 							if strings.Contains(k, "highAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "highWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Warning.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TemperatureInCelsius.Warning.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TemperatureInCelsius.Warning.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TemperatureInCelsius.Warning.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 						}
 						if strings.Contains(k, "rx.power") {
 							if strings.Contains(k, "highAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Alarm.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.RxPowerInWatts.Alarm.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Alarm.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.RxPowerInWatts.Alarm.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "highWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Warning.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.RxPowerInWatts.Warning.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.RxPowerInWatts.Warning.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.RxPowerInWatts.Warning.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 						}
 						if strings.Contains(k, "tx.bias") {
 							if strings.Contains(k, "highAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Alarm.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Alarm.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Alarm.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Alarm.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "highWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Warning.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Warning.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Warning.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxBiasCurrentInAmps.Warning.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 						}
 						if strings.Contains(k, "tx.power") {
 							if strings.Contains(k, "highAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Alarm.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxPowerInWatts.Alarm.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Alarm.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxPowerInWatts.Alarm.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "highWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Warning.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxPowerInWatts.Warning.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.TxPowerInWatts.Warning.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.TxPowerInWatts.Warning.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 						}
 						if strings.Contains(k, "vcc") {
 							if strings.Contains(k, "highAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Alarm.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Alarm.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowAlarm") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Alarm.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Alarm.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "highWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Warning.Hi, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Warning.Hi, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "lowWarn") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Warning.Lo, 'f', 3, 64))
+								s := strconv.FormatFloat(q.Config.SupplyVoltageInVolts.Warning.Lo, 'f', 3, 64)
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 						}
 					}
 				}
 			} else {
 				//qsfp has been removed
-				log.Print("port ", port+uint(portBase), " removed")
+				log.Print("port ", port+uint(portBase), " QSFP removed")
 				if maxTempPort == strconv.Itoa(int(port)) {
 					maxTempPort = "-1"
 				}
@@ -517,7 +630,9 @@ func (m *qsfpMain) poll() {
 	// publish all ports empty
 	for i := 0; i < numPorts; i++ {
 		k := "port-" + strconv.Itoa(i+portBase) + ".qsfp.installed"
-		pub.Print(k, ": ", "false")
+		s := "false"
+		pub.Print(k, ": ", s)
+		lasts[k] = s
 	}
 
 	sequence := 0
@@ -559,8 +674,13 @@ func (m *qsfpMain) poll() {
 					if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
 						q.Monitoring()
 						for _, k := range sfp.DynamicMonitoringRedisFields {
+							f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
 							if strings.Contains(k, "qsfp.temperature.units.C") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.Temperature)
+								s := q.Mon.Temperature
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 								update := false
 								u, err := strconv.ParseFloat(q.Mon.Temperature, 64)
 
@@ -604,56 +724,114 @@ func (m *qsfpMain) poll() {
 
 							}
 							if strings.Contains(k, "qsfp.vcc.units.V") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.Voltage)
+								s := q.Mon.Voltage
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.rx1.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[0])
+								s := q.Mon.RxPower[0]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.rx2.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[1])
+								s := q.Mon.RxPower[1]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.rx3.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[2])
+								s := q.Mon.RxPower[2]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.rx4.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.RxPower[3])
+								s := q.Mon.RxPower[3]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx1.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[0])
+								s := q.Mon.TxPower[0]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx2.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[1])
+								s := q.Mon.TxPower[1]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx3.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[2])
+								s := q.Mon.TxPower[2]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx4.power.units.mW") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxPower[3])
+								s := q.Mon.TxPower[3]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx1.bias.units.mA") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[0])
+								s := q.Mon.TxBias[0]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx2.bias.units.mA") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[1])
+								s := q.Mon.TxBias[1]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx3.bias.units.mA") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[2])
+								s := q.Mon.TxBias[2]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.tx4.bias.units.mA") {
-								pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Mon.TxBias[3])
+								s := q.Mon.TxBias[3]
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
+								}
 							}
 							if strings.Contains(k, "qsfp.alarms.module") {
-								if q.Alarms.Module == "" {
-									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", "none")
-								} else {
-									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Alarms.Module)
+								s := q.Alarms.Module
+								if s == "" {
+									s = "none"
+								}
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
 								}
 							}
 							if strings.Contains(k, "qsfp.alarms.channels") {
-								if q.Alarms.Channels == "" {
-									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", "none")
-								} else {
-									pub.Print("port-"+strconv.Itoa(int(port)+portBase)+"."+k, ": ", q.Alarms.Channels)
+								s := q.Alarms.Channels
+								if s == "" {
+									s = "none"
+								}
+								if s != lasts[f] {
+									pub.Print(f, ": ", s)
+									lasts[f] = s
 								}
 							}
 						}

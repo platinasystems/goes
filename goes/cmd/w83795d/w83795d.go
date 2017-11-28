@@ -775,7 +775,7 @@ func hostReset() error {
 	if len(gpio.Pins) == 0 {
 		gpio.Init()
 	}
-	log.Print("issue hard reset to host")
+	log.Print("notice: issue hard reset to host")
 	pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
 	if found {
 		pin.SetValue(false)
@@ -810,7 +810,6 @@ func writeRegs() error {
 				qsfpTemp = f
 			}
 		case "qsfp.temp.target.units.C":
-			log.Print("write qsfp target: ", v)
 			f, err := strconv.ParseFloat(v, 64)
 			if err == nil {
 				qsfpTempTarget = f
