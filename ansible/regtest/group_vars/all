@@ -4,6 +4,8 @@ ansible_log_file_path: /tmp/ansible.log
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
 
+goes_upgrade_installer_name: 'goes-platina-mk1-installer.up'
+goes_downgrade_installer_name: 'goes-platina-mk1-installer.dw'
 goes_installer_name: 'goes-platina-mk1-installer'
 goes_installer_url: '{{ goes_url_path }}{{ goes_installer_name }}'
 
