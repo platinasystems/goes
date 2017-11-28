@@ -148,3 +148,8 @@ func (p *Program) End() (err error) {
 	p.obuf.Reset()
 	return
 }
+
+// Pid returns the program process identifier.
+func (p *Program) Pid() int {
+	return p.cmd.Process.Pid
+}
