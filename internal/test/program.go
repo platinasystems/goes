@@ -25,20 +25,13 @@ var vv = flag.Bool("test.vv", false, "log test.Program output")
 // Timeout is the default duration on the Program Wait timer.
 const Timeout = 3 * time.Second
 
-// Debug runs the Program with the test flagged debugger:
-//	-test.debugger=NAME
-type Debug struct{}
-
 // Self flags Program to run itself
 type Self struct{}
 
-// Begin a Program. This replaces "goes" with {os.Args[0] -test.goes}, where
-//
-// The program string arguments may be preceded by one or more of these
-// type options.
+// Begin a Program; type options:
 //
 //	Self	inserts []string{os.Args[0], "-test.main}" into Program args;
-//		the Test would run it's own main if said flag is set, e.g.:
+//		the Test should run it's own main if said flag is set, e.g.:
 //
 //		func Test(t *testing.T) {
 //			test.Main(main)
@@ -51,9 +44,7 @@ type Self struct{}
 //		}
 //
 //	io.Reader
-//		use the given reader as Stdin instead of the /dev/null default
-//
-//	Debug	insert debugger program args
+//		use reader as Stdin instead of the default, /dev/null
 //
 //	*regexp.Regexp
 //		match Stdout with compiled regex pattern
@@ -78,14 +69,16 @@ func Begin(tb testing.TB, options ...interface{}) (*Program, error) {
 			args = append(args, prog.Name(), "-test.main")
 		case io.Reader:
 			stdin = t
-		case Debug:
-			// FIXME
-		case string:
-			args = append(args, t)
-		case time.Duration:
-			p.dur = t
 		case *regexp.Regexp:
 			p.exp = t
+		case string:
+			args = append(args, t)
+		case []string:
+			args = append(args, t...)
+		case time.Duration:
+			p.dur = t
+		default:
+			args = append(args, fmt.Sprint(t))
 		}
 	}
 	if len(args) == 0 {

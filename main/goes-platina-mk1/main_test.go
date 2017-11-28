@@ -30,8 +30,13 @@ func Test(t *testing.T) {
 	assert.Program(12*time.Second, test.Self{}, "hwait", "platina",
 		"redis.ready", "true", "10")
 
-	defer assert.Background(30*time.Second, test.Self{}, test.Debug{},
-		"vnetd").Quit()
+	vnetd := assert.Background(30*time.Second, test.Self{}, "vnetd")
+	if gdbwait {
+		test.Pause("Attach vnet debugger to pid(", vnetd.Pid(), ");\n",
+			"with the debugger, set 'vnetd.gdb_wait'=1;\n",
+			"then press enter to continue...")
+	}
+	defer vnetd.Quit()
 	assert.Program(32*time.Second, test.Self{}, "hwait", "platina",
 		"vnet.ready", "true", "30")
 
