@@ -197,6 +197,10 @@ def upgrade_goes(module):
     # Get core boot version after upgrade
     after_upgrade_version = get_core_boot_version(module)
 
+    failure_summary += 'On switch {}, upgraded core boot version from {} to {}'.format(
+        switch_name, before_upgrade_version, after_upgrade_version
+    )
+
     HASH_DICT['result.detail'] = failure_summary
 
 
