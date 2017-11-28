@@ -98,7 +98,7 @@ func (assert Assert) False(t bool) {
 func (assert Assert) YoureRoot() {
 	assert.Helper()
 	if os.Geteuid() != 0 {
-		assert.Fatal("you aren't root")
+		assert.Skip("you aren't root")
 	}
 }
 
