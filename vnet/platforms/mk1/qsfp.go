@@ -326,11 +326,14 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				firstPort = false
 				speed = strings.ToLower(speed)
 
-				// if qsfp is copper and speed is set to 100g, set interface to copper and enable cl91 fec
-				if strings.Contains(q.Ident.Compliance, "CR") && speed == "100g" {
+				// if qsfp is copper and speed is set to 100g or 40g, set interface to copper
+				if strings.Contains(q.Ident.Compliance, "CR") && ((speed == "40g") || (speed == "100g")) {
 					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "copper")
-					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
-				} else {
+					// if speed is set to 100g, enable cl91
+					if speed == "100g" {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
+					}
+				} else if !strings.Contains(q.Ident.Compliance, "CR") {
 					// set interface speed to 40g or 100g, media fiber, and fec off
 					if strings.Contains(q.Ident.Compliance, "40G") && !strings.Contains(q.Ident.Compliance, "CR") {
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "40g")
