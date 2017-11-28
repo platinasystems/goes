@@ -81,6 +81,10 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
+	for GdbWait && gdb_wait == 0 {
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	// never want to block vnet
 	c.i.pub, err = publisher.New()
 	if err != nil {
@@ -108,10 +112,6 @@ func (c *Command) Main(...string) error {
 	c.i.v.RegisterSwIfAdminUpDownHook(c.i.sw_if_admin_up_down)
 	if err = Hook(c.i.init, &c.i.v); err != nil {
 		return err
-	}
-
-	for GdbWait && gdb_wait == 0 {
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	sfn := sockfile.Path("vnet")
