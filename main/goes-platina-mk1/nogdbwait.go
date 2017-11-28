@@ -2,8 +2,8 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// +build debug
+// +build !debug
 
 package main
 
-const gdbwait = true
+const gdbwait = false
