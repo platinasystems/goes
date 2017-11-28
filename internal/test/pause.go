@@ -6,10 +6,14 @@ package test
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 )
 
-func Pause() {
-	os.Stdout.WriteString("Pause, hit return to continue...")
+func Pause(args ...interface{}) {
+	if len(args) == 0 {
+		args = []interface{}{"Press enter to continue..."}
+	}
+	fmt.Print(args...)
 	bufio.NewReader(os.Stdin).ReadBytes('\n')
 }
