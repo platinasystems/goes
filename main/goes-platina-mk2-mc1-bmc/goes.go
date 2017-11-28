@@ -60,6 +60,7 @@ import (
 	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lcabsd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/nct7802yd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgraded"
@@ -89,7 +90,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
 	"github.com/platinasystems/go/goes/cmd/uptimed"
-	//"github.com/platinasystems/go/goes/cmd/w83795d"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/w83795d"
 	"github.com/platinasystems/go/goes/cmd/watchdog"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
@@ -158,6 +159,7 @@ func Goes() *goes.Goes {
 		mkdir.New(),
 		mknod.New(),
 		mount.New(),
+		nct7802yd.New(),
 		ping.New(),
 		ps.New(),
 		pwd.New(),

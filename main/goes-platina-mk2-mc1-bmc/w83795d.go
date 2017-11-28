@@ -4,50 +4,93 @@
 
 package main
 
-import "github.com/platinasystems/go/goes/cmd/w83795d"
+import (
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/w83795d"
+)
 
 func init() { w83795d.Init = w83795dInit }
 
 func w83795dInit() {
-	w83795d.Vdev.Bus = 0
-	w83795d.Vdev.Addr = 0x2f
-	w83795d.Vdev.MuxBus = 0
-	w83795d.Vdev.MuxAddr = 0x76
-	w83795d.Vdev.MuxValue = 0x80
 
-	w83795d.VpageByKey = map[string]uint8{
-		"fan_tray.1.1.speed.units.rpm": 1,
-		"fan_tray.1.2.speed.units.rpm": 2,
-		"fan_tray.2.1.speed.units.rpm": 3,
-		"fan_tray.2.2.speed.units.rpm": 4,
-		"fan_tray.3.1.speed.units.rpm": 5,
-		"fan_tray.3.2.speed.units.rpm": 6,
-		"fan_tray.4.1.speed.units.rpm": 7,
-		"fan_tray.4.2.speed.units.rpm": 8,
-		"fan_tray.speed":               0,
-		"fan_tray.duty":                0,
-		"hwmon.front.temp.units.C":     0,
-		"hwmon.rear.temp.units.C":      0,
-		"hwmon.target.units.C":         0,
-		"host.temp.units.C":            0,
-		"host.temp.target.units.C":     0,
-	}
+	// Bus, Addr, MuxBus, MuxAddr, MuxValue, MuxBus2, MuxAddr2, MuxValue2
+	w83795d.Vdev[0] = w83795d.I2cDev{1, 0x2f, 1, 0x70, 0x08, 1, 0x73, 0x10}
+	w83795d.Vdev[1] = w83795d.I2cDev{1, 0x2f, 1, 0x70, 0x08, 1, 0x73, 0x20}
+	w83795d.Vdev[2] = w83795d.I2cDev{1, 0x2f, 1, 0x70, 0x08, 1, 0x73, 0x40}
+	w83795d.Vdev[3] = w83795d.I2cDev{1, 0x2f, 1, 0x70, 0x08, 1, 0x73, 0x80}
+	w83795d.Vdev[4] = w83795d.I2cDev{1, 0x2f, 1, 0x70, 0x10, 1, 0x73, 0x04}
+	w83795d.Vdev[5] = w83795d.I2cDev{1, 0x2f, 1, 0x70, 0x10, 1, 0x73, 0x08}
 
-	w83795d.WrRegDv["fan_tray"] = "fan_tray"
-	w83795d.WrRegFn["fan_tray.example"] = "example"
-	w83795d.WrRegFn["fan_tray.speed"] = "speed"
-	w83795d.WrRegFn["fan_tray.speed.return"] = "speed.return"
+	// Bus, Addr, MuxBus, MuxAddr, MuxValue, MuxBus2, MuxAddr2, MuxValue2
+	w83795d.VdevIo[0] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x10}
+	w83795d.VdevIo[1] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x20}
+	w83795d.VdevIo[2] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x40}
+	w83795d.VdevIo[3] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x80}
+	w83795d.VdevIo[4] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x04}
+	w83795d.VdevIo[5] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x08}
 
-	w83795d.WrRegDv["host"] = "host"
-	w83795d.WrRegFn["host.temp.units.C"] = "temp.units.C"
-	w83795d.WrRegFn["host.temp.target.units.C"] = "temp.target.units.C"
-	w83795d.WrRegFn["host.reset"] = "reset"
+	w83795d.WrRegDv["fan_tray.1"] = "fan_tray.1"
+	w83795d.WrRegFn["fan_tray.1.example"] = "example"
+	w83795d.WrRegFn["fan_tray.1.speed"] = "speed"
+	w83795d.WrRegFn["fan_tray.1.control"] = "control"
+	w83795d.WrRegFn["fan_tray.1.speed.return"] = "speed.return"
+	w83795d.WrRegFn["fan_tray.1.hwmon.target.units.C"] = "target.units.C"
 
-	w83795d.WrRegDv["hwmon"] = "hwmon"
-	w83795d.WrRegFn["hwmon.target.units.C"] = "target.units.C"
+	w83795d.WrRegDv["fan_tray.2"] = "fan_tray.2"
+	w83795d.WrRegFn["fan_tray.2.example"] = "example"
+	w83795d.WrRegFn["fan_tray.2.speed"] = "speed"
+	w83795d.WrRegFn["fan_tray.2.control"] = "control"
+	w83795d.WrRegFn["fan_tray.2.speed.return"] = "speed.return"
+	w83795d.WrRegFn["fan_tray.2.hwmon.target.units.C"] = "target.units.C"
 
-	w83795d.WrRegRng["fan_tray.speed"] = []string{"low", "med", "high", "auto", "max"}
-	w83795d.WrRegRng["hwmon.target.units.C"] = []string{"0", "60"}
-	w83795d.WrRegRng["host.reset"] = []string{"true"}
-	w83795d.WrRegRng["w83795d.example"] = []string{"true", "false"}
+	w83795d.WrRegDv["fan_tray.3"] = "fan_tray.3"
+	w83795d.WrRegFn["fan_tray.3.example"] = "example"
+	w83795d.WrRegFn["fan_tray.3.speed"] = "speed"
+	w83795d.WrRegFn["fan_tray.3.control"] = "control"
+	w83795d.WrRegFn["fan_tray.3.speed.return"] = "speed.return"
+	w83795d.WrRegFn["fan_tray.3.hwmon.target.units.C"] = "target.units.C"
+
+	w83795d.WrRegDv["fan_tray.4"] = "fan_tray.4"
+	w83795d.WrRegFn["fan_tray.4.example"] = "example"
+	w83795d.WrRegFn["fan_tray.4.speed"] = "speed"
+	w83795d.WrRegFn["fan_tray.4.control"] = "control"
+	w83795d.WrRegFn["fan_tray.4.speed.return"] = "speed.return"
+	w83795d.WrRegFn["fan_tray.4.hwmon.target.units.C"] = "target.units.C"
+
+	w83795d.WrRegDv["fan_tray.5"] = "fan_tray.5"
+	w83795d.WrRegFn["fan_tray.5.example"] = "example"
+	w83795d.WrRegFn["fan_tray.5.speed"] = "speed"
+	w83795d.WrRegFn["fan_tray.5.control"] = "control"
+	w83795d.WrRegFn["fan_tray.5.speed.return"] = "speed.return"
+	w83795d.WrRegFn["fan_tray.5.hwmon.target.units.C"] = "target.units.C"
+
+	w83795d.WrRegDv["fan_tray.6"] = "fan_tray.6"
+	w83795d.WrRegFn["fan_tray.6.example"] = "example"
+	w83795d.WrRegFn["fan_tray.6.speed"] = "speed"
+	w83795d.WrRegFn["fan_tray.6.control"] = "control"
+	w83795d.WrRegFn["fan_tray.6.speed.return"] = "speed.return"
+	w83795d.WrRegFn["fan_tray.6.hwmon.target.units.C"] = "target.units.C"
+
+	w83795d.WrRegRng["fan_tray.1.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["fan_tray.1.control"] = []string{"local", "remote.mc1", "remote.mc2"}
+	w83795d.WrRegRng["fan_tray.1.hwmon.target.units.C"] = []string{"0", "60"}
+
+	w83795d.WrRegRng["fan_tray.2.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["fan_tray.2.control"] = []string{"local", "remote.mc1", "remote.mc2"}
+	w83795d.WrRegRng["fan_tray.2.hwmon.target.units.C"] = []string{"0", "60"}
+
+	w83795d.WrRegRng["fan_tray.3.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["fan_tray.3.control"] = []string{"local", "remote.mc1", "remote.mc2"}
+	w83795d.WrRegRng["fan_tray.3.hwmon.target.units.C"] = []string{"0", "60"}
+
+	w83795d.WrRegRng["fan_tray.4.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["fan_tray.4.control"] = []string{"local", "remote.mc1", "remote.mc2"}
+	w83795d.WrRegRng["fan_tray.4.hwmon.target.units.C"] = []string{"0", "60"}
+
+	w83795d.WrRegRng["fan_tray.5.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["fan_tray.5.control"] = []string{"local", "remote.mc1", "remote.mc2"}
+	w83795d.WrRegRng["fan_tray.5.hwmon.target.units.C"] = []string{"0", "60"}
+
+	w83795d.WrRegRng["fan_tray.6.speed"] = []string{"low", "med", "high", "auto", "max"}
+	w83795d.WrRegRng["fan_tray.6.control"] = []string{"local", "remote.mc1", "remote.mc2"}
+	w83795d.WrRegRng["fan_tray.6.hwmon.target.units.C"] = []string{"0", "60"}
 }

@@ -14,10 +14,11 @@ func init() {
 		[]string{"i2cd"},
 		[]string{"imx6d"},
 		//[]string{"ledgpiod"},
+		[]string{"nct7802yd"},
 		[]string{"upgraded"},
 		[]string{"uptimed"},
 		[]string{"telnetd"},
 		//[]string{"ucd9090d"},
-		//]string{"w83795d"},
+		//[]string{"w83795d"},
 	}
 }
