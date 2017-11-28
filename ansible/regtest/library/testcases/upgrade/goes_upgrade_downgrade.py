@@ -256,6 +256,8 @@ def main():
                                                   'upgrade')
         failure_summary += upgrade_downgrade_goes(module, downgrade_installer,
                                                   'downgrade')
+        failure_summary += upgrade_downgrade_goes(module, upgrade_installer,
+                                                  'upgrade')
     else:
         failure_summary += upgrade_downgrade_goes(module, upgrade_installer,
                                                   'upgrade')

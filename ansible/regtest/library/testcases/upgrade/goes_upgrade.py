@@ -123,6 +123,41 @@ def execute_commands(module, cmd):
     return out
 
 
+def verify_goes_status(module, switch_name):
+    """
+    Method to verify if goes status is ok or not
+    :param module: The Ansible module to fetch input parameters.
+    :param switch_name: Name of the switch.
+    :return: String describing if goes status is ok or not
+    """
+    global RESULT_STATUS
+    failure_summary = ''
+
+    # Get the GOES status info
+    goes_status = execute_commands(module, 'goes status')
+
+    if 'not ok' in goes_status.lower():
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'goes status is not ok\n'
+
+    return failure_summary
+
+
+def get_core_boot_version(module):
+    """
+    Method to get core boot version
+    :param module: The Ansible module to fetch input parameters.
+    :return: Core boot version
+    """
+    version_out = execute_commands(module, 'goes upgrade -r')
+    version_out = version_out.splitlines()
+    for line in version_out:
+        line = line.strip()
+        if 'version:' in line.lower():
+            return line.split()[1]
+
+
 def upgrade_goes(module):
     """
     Method to upgrade goes version.
@@ -133,6 +168,12 @@ def upgrade_goes(module):
     switch_name = module.params['switch_name']
     installer_dir = module.params['installer_dir']
     installer_name = module.params['installer_name']
+
+    # Verify goes status before upgrade
+    failure_summary += verify_goes_status(module, switch_name)
+
+    # Get core boot version before upgrade
+    before_upgrade_version = get_core_boot_version(module)
 
     # Upgrade goes
     if module.params['coreboot']:
@@ -150,13 +191,11 @@ def upgrade_goes(module):
             failure_summary += 'On switch {} '.format(switch_name)
             failure_summary += 'goes upgrade failed\n'
 
-    # Get the GOES status info
-    goes_status = execute_commands(module, 'goes status')
+    # Verify goes status after upgrade
+    failure_summary += verify_goes_status(module, switch_name)
 
-    if 'not ok' in goes_status.lower():
-        RESULT_STATUS = False
-        failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'goes status is not ok after the upgrade\n'
+    # Get core boot version after upgrade
+    after_upgrade_version = get_core_boot_version(module)
 
     HASH_DICT['result.detail'] = failure_summary
 
