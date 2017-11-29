@@ -49,10 +49,10 @@ func checkConnectivity(t *testing.T) {
 		{"RB-2", "10.3.0.4"},
 		{"CB-2", "10.3.0.3"},
 	} {
-		assert.Program(regexp.MustCompile("1 received"),
-			test.Self{},
-			"ip", "netns", "exec", x.hostname,
-			"ping", "-c1", x.target)
+		cmd := []string{"ping", "-c3", x.target}
+		out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+		assert.Nil(err)
+		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.hostname)
 	}
@@ -97,7 +97,7 @@ func checkRoutes(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("No ospf route for %v: %v", x.hostname, x.route)
+			t.Fatalf("No ospf route for %v: %v", x.hostname, x.route)
 		}
 	}
 }
@@ -115,10 +115,10 @@ func checkInterConnectivity(t *testing.T) {
 		{"CB-2", "10.1.0.1"}, // In slice B ping from CB-2 to CB-1
 
 	} {
-		assert.Program(regexp.MustCompile("1 received"),
-			test.Self{},
-			"ip", "netns", "exec", x.hostname, "ping", "-c1",
-			x.target)
+		cmd := []string{"ping", "-c3", x.target}
+		out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+		assert.Nil(err)
+		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.hostname)
 	}
