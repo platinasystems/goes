@@ -5,7 +5,6 @@
 package isis
 
 import (
-	"regexp"
 	"testing"
 	"time"
 
@@ -46,9 +45,10 @@ func checkConnectivity(t *testing.T) {
 		{"R4", "192.168.111.2"},
 		{"R4", "192.168.150.5"},
 	} {
-		assert.Program(regexp.MustCompile("1 received"),
-			test.Self{},
-			"ip", "netns", "exec", x.host, "ping", "-c1", x.target)
+		cmd := []string{"ping", "-c3", x.target}
+		out, err := docker.ExecCmd(t, x.host, config, cmd)
+		assert.Nil(err)
+		assert.Match(out, "[1-3] packets received")
 	}
 }
 
@@ -85,7 +85,7 @@ func checkNeighbors(t *testing.T) {
 	} {
 		cmd := "show isis neighbor " + x.peer
 		vcmd := []string{"vtysh", "-c", cmd}
-		timeout := 120
+		timeout := 60
 		found := false
 		for i := timeout; i > 0; i-- {
 			out, err := docker.ExecCmd(t, x.hostname, config, vcmd)
@@ -98,9 +98,8 @@ func checkNeighbors(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("No isis neghbor for %v: %v",
+			t.Fatalf("No isis neghbor for %v: %v",
 				x.hostname, x.peer)
-			test.Pause()
 		}
 	}
 }
@@ -124,7 +123,7 @@ func checkRoutes(t *testing.T) {
 		found := false
 		cmd := "show ip route isis"
 		vcmd := []string{"vtysh", "-c", cmd}
-		timeout := 120
+		timeout := 60
 		for i := timeout; i > 0; i-- {
 			out, err := docker.ExecCmd(t, x.hostname, config, vcmd)
 			assert.Nil(err)
@@ -136,7 +135,7 @@ func checkRoutes(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("No isis route for %v: %v", x.hostname, x.route)
+			t.Fatalf("No isis route for %v: %v", x.hostname, x.route)
 		}
 	}
 }
@@ -157,9 +156,10 @@ func checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.120.10"},
 		{"R4", "192.168.222.10"},
 	} {
-		assert.Program(regexp.MustCompile("1 received"),
-			test.Self{}, "ip", "netns", "exec", x.hostname,
-			"ping", "-c1", x.target)
+		cmd := []string{"ping", "-c3", x.target}
+		out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+		assert.Nil(err)
+		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 	}
 }
