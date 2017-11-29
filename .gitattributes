@@ -4,3 +4,6 @@
 *.ucode binary
 *.zip binary
 *.pdf binary
+*.deb binary
+*.jpeg binary
+*.jpg binary
