@@ -24,7 +24,8 @@ ALL += goes-platina-mk2-mc1-bmc
 ALL += goes-platina-mk2-lc1-bmc
 ALL += goes-platina-mk1-installer
 ALL += $(if $(fe1_dir),go-wip)
-All += ip
+ALL += ip
+ALL += ip.test
 
 noplugin := $(if $(fe1_dir),yes,no)
 noplugin_yes:=$(filter yes,$(noplugin))
@@ -114,6 +115,9 @@ go-wip:
 ip: | package.go
 	$(gobuild) ./main/$@
 
+ip.test:
+	$(gotest) -c ./main/$(basename $@)
+
 package.go: LICENSE PATENTS
 	go generate
 
@@ -130,5 +134,5 @@ $(fe1a_gen): $(fe1a_dir)/LICENSE
 
 .PHONY: clean
 clean:
-	@rm -f go-* goes-* *.so *.zip
+	@rm -f $(ALL) *.so *.zip
 	@git clean -d -f
