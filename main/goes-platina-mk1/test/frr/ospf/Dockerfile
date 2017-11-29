@@ -25,7 +25,7 @@ ADD         startup.sh /root/startup.sh
 ADD         supervisord.conf /etc/supervisord.conf
 
 # add Free Range Routing debian
-ADD frr_3.1-dev_amd64.deb /root/frr.deb
+ADD frr_3.0.2-1-debian8.1_amd64.deb /root/frr.deb
 
 # install ffr
 RUN DEBIAN_FRONTEND=noninteractive dpkg -i frr.deb
