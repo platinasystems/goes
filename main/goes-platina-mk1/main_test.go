@@ -44,6 +44,14 @@ func Test(t *testing.T) {
 
 	test.Suite{
 		{"vnet.ready", func(*testing.T) {}},
+		{"net", test.Suite{
+			{"slice", test.Suite{
+				{"vlan", func(t *testing.T) {
+					slice.Test(t, conf(t, "net-slice-vlan",
+						slice.ConfVlan))
+				}},
+			}.Run},
+		}.Run},
 		{"ospf", test.Suite{
 			{"eth", func(t *testing.T) {
 				ospf.Test(t, conf(t, "ospf", ospf.Conf))
@@ -68,12 +76,6 @@ func Test(t *testing.T) {
 			}},
 			{"vlan", func(t *testing.T) {
 				bgp.Test(t, conf(t, "bgp-vlan", bgp.ConfVlan))
-			}},
-		}.Run},
-		{"net-slice", test.Suite{
-			{"vlan", func(t *testing.T) {
-				slice.Test(t, conf(t, "net-slice-vlan",
-					slice.ConfVlan))
 			}},
 		}.Run},
 	}.Run(t)
