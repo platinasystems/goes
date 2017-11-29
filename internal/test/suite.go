@@ -15,6 +15,9 @@ type Suite []struct {
 // Run test suite
 func (suite Suite) Run(t *testing.T) {
 	for _, x := range suite {
+		if t.Failed() {
+			break
+		}
 		t.Run(x.Name, x.Func)
 	}
 }
