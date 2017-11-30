@@ -38,9 +38,6 @@ func initLogging(c *Info) error {
 		err = fmt.Errorf("No MMC Card, log disabled: %s", err)
 		return err
 	}
-	if err = mountMMC(c); err != nil {
-		return err
-	}
 	if _, err := os.Stat(MMCDIR); os.IsNotExist(err) {
 		err := os.Mkdir(MMCDIR, 0755)
 		if err != nil {
@@ -82,10 +79,6 @@ func detectMMC() (bool, error) {
 		}
 	}
 	return exists, nil
-}
-
-func mountMMC(c *Info) error { //FIXME
-	return nil
 }
 
 func startTicker() error {
