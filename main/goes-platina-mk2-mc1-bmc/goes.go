@@ -57,8 +57,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
-	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpd"
-	//"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lcabsd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpeventsd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lceventsd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/nct7802yd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
@@ -151,7 +151,7 @@ func Goes() *goes.Goes {
 		keys.New(),
 		kill.New(),
 		//ledgpiod.New(),
-		//lcabsd.New(),
+		lceventsd.New(),
 		ln.New(),
 		log.New(),
 		ls.New(),
@@ -163,7 +163,7 @@ func Goes() *goes.Goes {
 		ping.New(),
 		ps.New(),
 		pwd.New(),
-		//qsfpd.New(),
+		qsfpeventsd.New(),
 		reboot.New(),
 		redisd.New(),
 		reload.New(),

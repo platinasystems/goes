@@ -1,0 +1,16 @@
+package lceventsd
+
+type reg8 byte
+type reg8b byte
+type reg16 [2]byte
+type reg16r [2]byte
+type regi16 reg16
+
+// Memory map for PCA9539, has lcabs present signals
+type regs struct {
+        Input    [2]reg8
+        Output   [2]reg8
+        Polarity [2]reg8
+        Config   [2]reg8
+}
+
