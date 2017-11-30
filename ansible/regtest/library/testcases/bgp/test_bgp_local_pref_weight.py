@@ -58,6 +58,12 @@ options:
         - BGP route weight value.
       required: False
       type: str
+    spine_list:
+      description:
+        - List of all spine switches.
+      required: False
+      type: list
+      default: []
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -137,6 +143,9 @@ def verify_bgp_local_pref_weight(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
+    switch_name = module.params['switch_name']
+    spine_list = module.params['spine_list']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
@@ -145,37 +154,39 @@ def verify_bgp_local_pref_weight(module):
     execute_commands(module, 'service quagga restart')
     execute_commands(module, 'service quagga status')
 
-    # Get all ip bgp routes
-    cmd = "vtysh -c 'sh ip bgp'"
-    out = execute_commands(module, cmd)
+    is_spine = True if switch_name in spine_list else False
+    if is_spine:
+        if spine_list.index(switch_name) == 0:
+            # Get all ip bgp routes
+            cmd = "vtysh -c 'sh ip bgp'"
+            out = execute_commands(module, cmd)
 
-    failure_summary = ''
-    switch_name = module.params['switch_name']
-    # spine_network_list = module.params['spine_network_list'].split(',')
-    # leaf_network_list = module.params['leaf_network_list'].split(',')
-    #
-    # for network in spine_network_list + leaf_network_list:
-    #     if network not in out:
-    #         RESULT_STATUS = False
-    #         failure_summary += 'On Switch {} bgp route '.format(switch_name)
-    #         failure_summary += 'for network {} is not present '.format(network)
-    #         failure_summary += 'in the output of command {}\n'.format(cmd)
+            spine_network_list = module.params['spine_network_list'].split(',')
+            leaf_network_list = module.params['leaf_network_list'].split(',')
+            
+            for network in spine_network_list + leaf_network_list:
+                network = network.split('/')[0]
+                if network not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On Switch {} bgp route '.format(switch_name)
+                    failure_summary += 'for network {} is not present '.format(network)
+                    failure_summary += 'in the output of command {}\n'.format(cmd)
 
-    local_pref = module.params['local_pref']
-    weight = module.params['weight']
+            local_pref = module.params['local_pref']
+            weight = module.params['weight']
 
-    if local_pref:
-        value = local_pref
-        name = 'local preference'
-    else:
-        value = weight
-        name = 'weight'
+            if local_pref:
+                value = local_pref
+                name = 'local preference'
+            else:
+                value = weight
+                name = 'weight'
 
-    if value not in out:
-        RESULT_STATUS = False
-        failure_summary += 'On Switch {} {} '.format(switch_name, name)
-        failure_summary += 'value {} is not present '.format(value)
-        failure_summary += 'in the output of command {}\n'.format(cmd)
+            if value not in out:
+                RESULT_STATUS = False
+                failure_summary += 'On Switch {} {} '.format(switch_name, name)
+                failure_summary += 'value {} is not present '.format(value)
+                failure_summary += 'in the output of command {}\n'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -192,6 +203,7 @@ def main():
             leaf_network_list=dict(required=False, type='str'),
             local_pref=dict(required=False, type='str', default=''),
             weight=dict(required=False, type='str'),
+            spine_list=dict(required=False, type='list', default=[]),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -206,7 +218,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -219,7 +231,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
