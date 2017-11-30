@@ -26,17 +26,20 @@ func ledgpiodInit() {
 	ledgpiod.Vdev.MuxBus = 0x0
 	ledgpiod.Vdev.MuxAddr = 0x76
 	ledgpiod.Vdev.MuxValue = 0x2
-	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
-	_, _ = fmt.Sscan(s, &ver)
-	switch ver {
-	case 0xff:
-		ledgpiod.Vdev.Addr = 0x22
-	case 0x00:
-		ledgpiod.Vdev.Addr = 0x22
-	default:
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	if err != nil {
 		ledgpiod.Vdev.Addr = 0x75
+	} else {
+		_, _ = fmt.Sscan(s, &ver)
+		switch ver {
+		case 0xff:
+			ledgpiod.Vdev.Addr = 0x22
+		case 0x00:
+			ledgpiod.Vdev.Addr = 0x22
+		default:
+			ledgpiod.Vdev.Addr = 0x75
+		}
 	}
-
 	ledgpiod.WrRegDv["ledgpiod"] = "ledgpiod"
 	ledgpiod.WrRegFn["ledgpiod.example"] = "example"
 	ledgpiod.WrRegRng["ledgpiod.example"] = []string{"true", "false"}

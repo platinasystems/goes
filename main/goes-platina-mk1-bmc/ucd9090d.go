@@ -20,17 +20,20 @@ func ucd9090dInit() {
 	ucd9090d.Vdev.MuxBus = 0
 	ucd9090d.Vdev.MuxAddr = 0x76
 	ucd9090d.Vdev.MuxValue = 0x01
-	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
-	_, _ = fmt.Sscan(s, &ver)
-	switch ver {
-	case 0xff:
-		ucd9090d.Vdev.Addr = 0x7e
-	case 0x00:
-		ucd9090d.Vdev.Addr = 0x7e
-	default:
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	if err != nil {
 		ucd9090d.Vdev.Addr = 0x34
+	} else {
+		_, _ = fmt.Sscan(s, &ver)
+		switch ver {
+		case 0xff:
+			ucd9090d.Vdev.Addr = 0x7e
+		case 0x00:
+			ucd9090d.Vdev.Addr = 0x7e
+		default:
+			ucd9090d.Vdev.Addr = 0x34
+		}
 	}
-
 	ucd9090d.VpageByKey = map[string]uint8{
 		"vmon.5v.sb.units.V":    1,
 		"vmon.3v8.bmc.units.V":  2,
