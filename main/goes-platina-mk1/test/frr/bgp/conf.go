@@ -6,7 +6,7 @@ package bgp
 
 const Conf = `
 image: "stigt/debian-frr:latest"
-volume: "/main/goes-platina-mk1/test/frr/bgp/"
+volume: "/testdata/frr/bgp/"
 mapping: "/etc/frr"
 routers:
 - hostname: R1

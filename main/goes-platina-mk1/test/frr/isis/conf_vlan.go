@@ -6,7 +6,7 @@ package isis
 
 const ConfVlan = `
 image: "stigt/debian-frr:latest"
-volume: "/main/goes-platina-mk1/test/frr/isis/"
+volume: "/testdata/frr/isis/"
 mapping: "/etc/frr"
 routers:
 - hostname: R1

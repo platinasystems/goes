@@ -6,7 +6,7 @@ package slice
 
 const ConfVlan = `
 image: "stigt/debian-frr:latest"
-volume: "/main/goes-platina-mk1/test/net/slice/"
+volume: "/testdata/net/slice/"
 mapping: "/etc/frr"
 routers:
 - hostname: CA-1
