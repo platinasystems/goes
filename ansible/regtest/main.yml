@@ -32,7 +32,7 @@
 - include: playbooks/bgp/quagga_bgp_peering_local_preference.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/peering_weight.yml
+- include: playbooks/bgp/quagga_bgp_peering_weight.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_loop_prevention.yml
