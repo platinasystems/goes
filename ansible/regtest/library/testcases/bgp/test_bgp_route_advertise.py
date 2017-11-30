@@ -169,6 +169,7 @@ def verify_bgp_route_advertise(module):
         network_list += leaf_network_list[index]
 
     for network in network_list:
+        network = network.split('/')[0]
         if network not in out:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} bgp route '.format(switch_name)

@@ -171,6 +171,7 @@ def verify_bgp_administrative_distance(module):
         network_list += leaf_network_list
 
     for network in network_list:
+        network = network.split('/')[0]
         if network not in ip_routes:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} bgp route '.format(switch_name)
@@ -181,7 +182,9 @@ def verify_bgp_administrative_distance(module):
         route = route.strip()
         for network in network_list:
             if network in route:
-                if '20/' or '200/' not in route:
+                if '20/' or '200/' in route:
+                    pass
+                else:
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'administrative value is not present '

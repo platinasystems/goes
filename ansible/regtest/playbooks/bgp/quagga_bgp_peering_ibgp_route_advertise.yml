@@ -24,7 +24,7 @@
     - name: Add bgp config in /etc/quagga/bgpd.conf
       blockinfile:
         path: /etc/quagga/bgpd.conf
-        insertafter: "interface vnet"
+        insertafter: "log stdout"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_bgp_peering_ibgp_route_advertise.conf') }}"
 
@@ -49,7 +49,7 @@
         spine_list: "{{ groups['spine'] }}"
         leaf_list: "{{ groups['leaf'] }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ log_dir_path }}"
+        log_dir_path: "{{ bgp_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"

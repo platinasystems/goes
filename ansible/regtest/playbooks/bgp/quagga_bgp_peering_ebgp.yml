@@ -24,7 +24,7 @@
     - name: Add bgp config in /etc/quagga/bgpd.conf
       blockinfile:
         path: /etc/quagga/bgpd.conf
-        insertafter: "interface vnet"
+        insertafter: "log stdout"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_bgp_peering_ebgp.conf') }}"
 
