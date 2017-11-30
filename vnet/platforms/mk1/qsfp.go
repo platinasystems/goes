@@ -339,12 +339,21 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 					if speed == "100g" {
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
 					}
+				} else if strings.Contains(q.Ident.Compliance, "CR") && ((speed == "25g") || (speed == "10g")) {
+					for i := 0; i < 4; i++ {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".media", "copper")
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec", "none")
+					}
 				} else if !strings.Contains(q.Ident.Compliance, "CR") {
 					// set interface speed to 40g or 100g, media fiber, and fec off
-					if strings.Contains(q.Ident.Compliance, "40G") && !strings.Contains(q.Ident.Compliance, "CR") {
+					if strings.Contains(q.Ident.Compliance, "40G") {
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "40g")
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
+					} else if strings.Contains(q.Ident.Compliance, "100GBASE-SR4") {
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
 					} else if strings.Contains(q.Ident.Compliance, "100G") {
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
 						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
