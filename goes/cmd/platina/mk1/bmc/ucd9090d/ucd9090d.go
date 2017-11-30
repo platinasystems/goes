@@ -72,6 +72,7 @@ var (
 	watchdogTimeout  uint
 	watchdogSequence string
 	watchdogTimer    uint
+	watchdogExpired  bool
 )
 
 type Command struct {
@@ -109,6 +110,7 @@ func (c *Command) Main(...string) error {
 	watchdogTimer = 0
 	watchdogTimeout = 30
 	watchdogSequence = "0"
+	watchdogExpired = false
 
 	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)
@@ -229,12 +231,20 @@ func (c *Command) updateW() error {
 		c.lasts[k] = v
 	}
 
+	k = "watchdog.expired"
+	v = strconv.FormatBool(watchdogExpired)
+	if v != c.lasts[k] {
+		c.pub.Print(k, ": ", v)
+		c.lasts[k] = v
+	}
+
 	if watchdogEn {
 		if watchdogTimer < watchdogTimeout {
 			watchdogTimer++
 		}
-		if watchdogTimer == watchdogTimeout {
+		if watchdogTimer >= watchdogTimeout {
 			log.Print("warning: host watchdog timer expired; reset host; disable watchdog")
+			watchdogExpired = true
 			if len(gpio.Pins) == 0 {
 				gpio.Init()
 			}
@@ -519,6 +529,8 @@ func writeRegs() error {
 			if err == nil {
 				if !enable {
 					watchdogTimer = 0
+				} else {
+					watchdogExpired = false
 				}
 				watchdogEn = enable
 			}
