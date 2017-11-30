@@ -261,8 +261,8 @@ func isContainerRunning(t *testing.T, config *Config, name string) bool {
 	}
 
 	for _, cont := range conts {
-		for _, name := range cont.Names {
-			if name[1:] == name {
+		for _, imagename := range cont.Names {
+			if imagename[1:] == name {
 				return true
 			}
 		}
