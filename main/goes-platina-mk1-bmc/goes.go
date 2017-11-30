@@ -59,6 +59,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ipcfg"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/mmclog"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/mmclogd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
@@ -157,6 +158,7 @@ func Goes() *goes.Goes {
 		lsmod.New(),
 		mkdir.New(),
 		mknod.New(),
+		mmclog.New(),
 		mmclogd.New(),
 		mount.New(),
 		ping.New(),
