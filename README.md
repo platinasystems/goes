@@ -14,15 +14,15 @@ Alternatively, you may build `goes-platina-mk1` to plugin an existing
 To install a select MACHINE,
 
 ```console
-$ make -B goes-MACHINE
-$ sudo ./goes-MACHINE install
+$ make -C main/goes-MACHINE
+$ sudo ./main/goes-MACHINE/goes-MACHINE install
 ```
 
 Some machines also have a self extracting, compressed archive installer.
 
 ```console
-$ make -B goes-MACHINE-installer
-$ sudo ./goes-MACHINE-installer
+$ make -C goes-MACHINE
+$ sudo ./main/goes-MACHINE/goes-MACHINE-installer
 ```
 
 These are the available MACHINEs,
@@ -30,6 +30,8 @@ These are the available MACHINEs,
 - [example] \(GOARCH: amd64 or armhf)
 - [platina-mk1] \(GOARCH: amd64)
 - [platina-mk1-bmc] \(GOARCH: armhf)
+- [platina-mk2-lc1-bmc] \(GOARCH: armhf)
+- [platina-mk2-mc1-bmc] \(GOARCH: armhf)
 
 To stop and remove,
 
@@ -67,6 +69,9 @@ See also [errata].
 Use of this source code is governed by this BSD-style [LICENSE].*
 
 [LICENSE]: LICENSE
-[example]: goes/goes-example/README.md
-[platina-mk1]: goes/goes-platina-mk1/README.md
 [errata]: docs/Errata.md
+[example]: main/goes-example/README.md
+[platina-mk1]: main/goes-platina-mk1/README.md
+[platina-mk1-bmc]: main/goes-platina-mk1-bmc/README.md
+[platina-mk2-lc1-bmc]: main/goes-platina-mk2-lc1-bmc/README.md
+[platina-mk2-mc1-bmc]: main/goes-platina-mk2-mc1-bmc/README.md
