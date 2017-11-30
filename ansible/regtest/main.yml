@@ -26,7 +26,7 @@
 - include: playbooks/bgp/quagga_bgp_peering_administrative_distance.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/peering_route_reflector.yml
+- include: playbooks/bgp/quagga_bgp_peering_route_reflector.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_local_preference.yml

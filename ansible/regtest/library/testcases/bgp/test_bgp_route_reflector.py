@@ -37,24 +37,20 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    leaf1_network:
+    leaf_network_list:
       description:
-        - BGP network address of leaf1 switch.
+        - Comma separated list of all leaf bgp networks.
       required: False
       type: str
-    leaf2_network:
+    spine_list:
       description:
-        - BGP network address of leaf2 switch.
+        - List of all spine switches.
       required: False
-      type: str
-    leaf1_ip:
+      type: list
+      default: []
+    config_file:
       description:
-        - BGP interface address of leaf1 switch.
-      required: False
-      type: str
-    leaf2_ip:
-      description:
-        - BGP interface address of leaf2 switch.
+        - BGP config which have been added into /etc/quagga/bgpd.conf.
       required: False
       type: str
     hash_name:
@@ -198,10 +194,8 @@ def verify_bgp_routes(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
-    leaf1_network = module.params['leaf1_network']
-    leaf1_ip = module.params['leaf1_ip']
-    leaf2_network = module.params['leaf2_network']
-    leaf2_ip = module.params['leaf2_ip']
+    spine_list = module.params['spine_list']
+    self_network = ''
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
@@ -210,15 +204,26 @@ def verify_bgp_routes(module):
     execute_commands(module, 'service quagga restart')
     execute_commands(module, 'service quagga status')
 
-    # Verify Received from RR client
-    failure_summary += verify_rr_client(module, switch_name, leaf1_network)
-    failure_summary += verify_rr_client(module, switch_name, leaf2_network)
+    is_spine = True if switch_name in spine_list else False
+    if is_spine:
+        if spine_list.index(switch_name) == 0:
+            # Verify Received from RR client
+            for network in module.params['leaf_network_list'].split(','):
+                network = network.split('/')[0]
+                failure_summary += verify_rr_client(module, switch_name,
+                                                    network)
 
-    # Verify advertised routes
-    failure_summary += verify_advertised_routes(module, switch_name,
-                                                leaf2_network, leaf1_ip)
-    failure_summary += verify_advertised_routes(module, switch_name,
-                                                leaf1_network, leaf2_ip)
+            # Verify advertised routes
+            for line in module.params['config_file'].splitlines():
+                line = line.strip()
+                if line.startswith('network'):
+                    self_network = (line.split()[1]).split('/')[0]
+
+                if line.startswith('neighbor') and 'remote-as' not in line:
+                    ip = line.split()[1]
+                    failure_summary += verify_advertised_routes(
+                        module, switch_name, self_network, ip
+                    )
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -231,10 +236,9 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            leaf1_network=dict(required=False, type='str'),
-            leaf1_ip=dict(required=False, type='str'),
-            leaf2_network=dict(required=False, type='str'),
-            leaf2_ip=dict(required=False, type='str'),
+            leaf_network_list=dict(required=False, type='str'),
+            spine_list=dict(required=False, type='list', default=[]),
+            config_file=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -249,7 +253,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -262,7 +266,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
