@@ -23,7 +23,7 @@
 - include: playbooks/bgp/quagga_bgp_peering_authentication.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/peering_administrative_distance.yml
+- include: playbooks/bgp/quagga_bgp_peering_administrative_distance.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_route_reflector.yml

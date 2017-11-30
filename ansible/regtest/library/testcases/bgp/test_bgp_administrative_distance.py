@@ -148,7 +148,7 @@ def verify_bgp_administrative_distance(module):
 
     # Get all ip routes
     cmd = "vtysh -c 'sh ip route'"
-    out = execute_commands(module, cmd)
+    ip_routes = execute_commands(module, cmd)
 
     failure_summary = ''
     switch_name = module.params['switch_name']
@@ -171,11 +171,21 @@ def verify_bgp_administrative_distance(module):
         network_list += leaf_network_list
 
     for network in network_list:
-        if network not in out:
+        if network not in ip_routes:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} bgp route '.format(switch_name)
             failure_summary += 'for network {} is not present '.format(network)
             failure_summary += 'in the output of command {}\n'.format(cmd)
+
+    for route in ip_routes.splitlines():
+        route = route.strip()
+        for network in network_list:
+            if network in route:
+                if '20/' or '200/' not in route:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'administrative value is not present '
+                    failure_summary += 'in the bgp route {}\n'.format(route)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -206,7 +216,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -219,7 +229,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
