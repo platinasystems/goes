@@ -14,7 +14,7 @@
 - include: playbooks/bgp/quagga_bgp_peering_ibgp.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/peering_ebgp_route_advertise.yml
+- include: playbooks/bgp/quagga_bgp_peering_ebgp_route_advertise.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_ibgp_route_advertise.yml
