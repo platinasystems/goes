@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/w83795d"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -66,6 +67,11 @@ var (
 
 	first    int
 	firstLog int
+
+	watchdogEn       bool
+	watchdogTimeout  uint
+	watchdogSequence string
+	watchdogTimer    uint
 )
 
 type Command struct {
@@ -99,6 +105,11 @@ func (c *Command) Main(...string) error {
 
 	first = 1
 	firstLog = 1
+	watchdogEn = false
+	watchdogTimer = 0
+	watchdogTimeout = 30
+	watchdogSequence = "0"
+
 	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)
 	c.lasts = make(map[string]string)
@@ -125,6 +136,7 @@ func (c *Command) Main(...string) error {
 	}
 
 	t := time.NewTicker(10 * time.Second)
+	tw := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case <-c.stop:
@@ -134,7 +146,10 @@ func (c *Command) Main(...string) error {
 				if err = c.update(); err != nil {
 				}
 			}
+		case <-tw.C:
+			c.updateW()
 		}
+
 	}
 	return nil
 }
@@ -148,9 +163,6 @@ func (c *Command) update() error {
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
-	}
-	if err := writeRegs(); err != nil {
-		return err
 	}
 
 	if first == 1 {
@@ -180,6 +192,63 @@ func (c *Command) update() error {
 			}
 		}
 	}
+	return nil
+}
+
+func (c *Command) updateW() error {
+
+	if err := writeRegs(); err != nil {
+		return err
+	}
+
+	k := "watchdog.enable"
+	v := strconv.FormatBool(watchdogEn)
+	if v != c.lasts[k] {
+		c.pub.Print(k, ": ", v)
+		c.lasts[k] = v
+	}
+
+	k = "watchdog.timeout.units.seconds"
+	v = strconv.Itoa(int(watchdogTimeout))
+	if v != c.lasts[k] {
+		c.pub.Print(k, ": ", v)
+		c.lasts[k] = v
+	}
+
+	k = "watchdog.timer.units.seconds"
+	v = strconv.Itoa(int(watchdogTimer))
+	if v != c.lasts[k] {
+		c.pub.Print(k, ": ", v)
+		c.lasts[k] = v
+	}
+
+	k = "watchdog.sequence"
+	v = watchdogSequence
+	if v != c.lasts[k] {
+		c.pub.Print(k, ": ", v)
+		c.lasts[k] = v
+	}
+
+	if watchdogEn {
+		if watchdogTimer < watchdogTimeout {
+			watchdogTimer++
+		}
+		if watchdogTimer == watchdogTimeout {
+			log.Print("warning: host watchdog timer expired; reset host; disable watchdog")
+			if len(gpio.Pins) == 0 {
+				gpio.Init()
+			}
+			pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
+			if found {
+				pin.SetValue(false)
+				time.Sleep(100 * time.Millisecond)
+				pin.SetValue(true)
+				watchdogEn = false
+				watchdogTimer = 0
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -444,6 +513,31 @@ func writeRegs() error {
 		case "speed":
 			if false {
 				log.Print("test", k, v)
+			}
+		case "watchdog.enable":
+			enable, err := strconv.ParseBool(v)
+			if err == nil {
+				if !enable {
+					watchdogTimer = 0
+				}
+				watchdogEn = enable
+			}
+		case "watchdog.sequence":
+			watchdogTimer = 0
+			if watchdogEn {
+				watchdogSequence = v
+			} else {
+				k = "watchdog.sequence"
+				pub, err := publisher.New()
+				if err == nil {
+					pub.Print(k, ": ", watchdogSequence)
+				}
+			}
+		case "watchdog.timeout.units.seconds":
+			i, err := strconv.ParseInt(v, 10, 64)
+			log.Print("v: ", v, "i: ", i, "err: ", err)
+			if err == nil {
+				watchdogTimeout = uint(i)
 			}
 		}
 		delete(WrRegVal, k)

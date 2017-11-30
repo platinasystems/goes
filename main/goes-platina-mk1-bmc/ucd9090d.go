@@ -48,4 +48,12 @@ func ucd9090dInit() {
 	ucd9090d.WrRegDv["vmon"] = "vmon"
 	ucd9090d.WrRegFn["vmon.example"] = "example"
 	ucd9090d.WrRegRng["vmon.example"] = []string{"1", "50"}
+
+	ucd9090d.WrRegDv["watchdog"] = "watchdog"
+	ucd9090d.WrRegFn["watchdog.enable"] = "watchdog.enable"
+	ucd9090d.WrRegFn["watchdog.sequence"] = "watchdog.sequence"
+	ucd9090d.WrRegFn["watchdog.timeout.units.seconds"] = "watchdog.timeout.units.seconds"
+
+	ucd9090d.WrRegRng["watchdog.enable"] = []string{"false", "true"}
+	ucd9090d.WrRegRng["watchdog.host.timeout.units.seconds"] = []string{"0", "3600"}
 }
