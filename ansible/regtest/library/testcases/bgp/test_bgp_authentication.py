@@ -39,7 +39,7 @@ options:
       type: str
     config_file:
       description:
-        - BGP config which have been added into Quagga.conf on this switch.
+        - BGP config which have been added into /etc/quagga/bgpd.conf.
       required: False
       type: str
     hash_name:

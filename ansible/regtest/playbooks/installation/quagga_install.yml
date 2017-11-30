@@ -59,7 +59,7 @@
          name: quagga
          state: restarted
 
-    - name: Editiing telnet access and the retaining of routes
+    - name: Editing telnet access and the retaining of routes
       lineinfile:
          path: /etc/quagga/debian.conf
          regexp: "{{ item.regexp }}"

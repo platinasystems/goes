@@ -8,7 +8,7 @@
 
 # ALL QUAGGA BGP TESTCASES
 
-- include: playbooks/bgp/peering_ebgp.yml
+- include: playbooks/bgp/quagga_bgp_peering_ebgp.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_ibgp.yml
