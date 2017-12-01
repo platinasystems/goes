@@ -596,14 +596,20 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				}
 				// delete redis fields
 				for _, k := range sfp.StaticRedisFields {
-					pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
+					f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+					pub.Print("delete: ", f)
+					lasts[f] = ""
 				}
 				if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
 					for _, k := range sfp.StaticMonitoringRedisFields {
-						pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
+						f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+						pub.Print("delete: ", f)
+						lasts[f] = ""
 					}
 					for _, k := range sfp.DynamicMonitoringRedisFields {
-						pub.Print("delete: ", "port-"+strconv.Itoa(int(port)+portBase)+"."+k)
+						f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+						pub.Print("delete: ", f)
+						lasts[f] = ""
 					}
 				}
 				//enable reset and low power mode
