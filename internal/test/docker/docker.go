@@ -55,31 +55,31 @@ func Check(t *testing.T) error {
 	}
 	_, err = cli.Ping(context.Background())
 	if err != nil {
+		t.Fatalf("Docker ping failed: %v", err)
 		return err
 	}
 	return nil
 }
 
-func LaunchContainers(t *testing.T, source []byte) (config *Config) {
+func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 	assert := test.Assert{t}
 	assert.Helper()
 
 	cli, err := client.NewEnvClient()
 	if err != nil {
-		t.Fatalf("Unable to get docker client: %v")
+		err = fmt.Errorf("Unable to get docker client: %v")
 		return
 	}
 
-	assert.Nil(yaml.Unmarshal(source, &config))
+	config = &Config{}
+	assert.Nil(yaml.Unmarshal(source, config))
 
 	config.cli = cli
 
 	if !isImageLocal(t, config) {
 		t.Log("no local container, trying to pull from remote")
-		err := pullImage(t, config)
+		err = pullImage(t, config)
 		if err != nil {
-			t.Log(err)
-			t.Fail()
 			return
 		}
 		t.Log("Image %v pulled from remote\n", config.Image)
@@ -97,7 +97,7 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config) {
 
 	pwd, err := syscall.Getwd()
 	if err != nil {
-		t.Fatalf("Unable to find cwd: %v", err)
+		return
 	}
 	vdir := pwd + config.Volume
 
@@ -121,9 +121,10 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config) {
 		bind := vdir + "volumes/" + router.Hostname + ":" + config.Mapping
 		ch.Binds = []string{bind}
 
-		cresp, err := startContainer(t, config, cc, ch)
-		if err != nil {
-			t.Fatalf("Failed to start container %v", router.Hostname)
+		cresp, err2 := startContainer(t, config, cc, ch)
+		if err2 != nil {
+			err = err2
+			return
 		}
 		config.Routers[i].id = cresp.ID
 		for _, intf := range router.Intfs {
@@ -237,7 +238,7 @@ func isImageLocal(t *testing.T, config *Config) bool {
 	images, err := config.cli.ImageList(context.Background(),
 		types.ImageListOptions{})
 	if err != nil {
-		t.Fail()
+		t.Error("failed to get docker image list")
 		return false
 	}
 
@@ -256,7 +257,7 @@ func isContainerRunning(t *testing.T, config *Config, name string) bool {
 	conts, err := config.cli.ContainerList(context.Background(),
 		types.ContainerListOptions{All: true})
 	if err != nil {
-		t.Fail()
+		t.Error("failed to get docker container list")
 		return false
 	}
 
@@ -275,7 +276,7 @@ func pullImage(t *testing.T, config *Config) error {
 	out, err := config.cli.ImagePull(context.Background(), repo,
 		types.ImagePullOptions{})
 	if err != nil {
-		t.Fail()
+		t.Error("failed to pull remote image")
 		return err
 	}
 	defer out.Close()
@@ -287,10 +288,12 @@ func startContainer(t *testing.T, config *Config, cc *container.Config,
 	ch *container.HostConfig) (cresp container.ContainerCreateCreatedBody,
 	err error) {
 
+	assert := test.Assert{t}
 	cli := config.cli
 
 	if isContainerRunning(t, config, cc.Hostname) {
-		t.Fatalf("Container %v already running", cc.Hostname)
+		err = fmt.Errorf("Container %v already running", cc.Hostname)
+		return
 	}
 	t.Logf("Starting container %v\n", cc.Hostname)
 
@@ -298,23 +301,23 @@ func startContainer(t *testing.T, config *Config, cc *container.Config,
 
 	cresp, err = cli.ContainerCreate(ctx, cc, ch, nil, cc.Hostname)
 	if err != nil {
-		t.Logf("Error creating container: %v", err)
+		t.Errorf("Error creating container: %v", err)
 		return
 	}
 
 	err = cli.ContainerStart(ctx, cresp.ID, types.ContainerStartOptions{})
 	if err != nil {
-		t.Logf("Error starting container: %v", err)
+		t.Errorf("Error starting container: %v", err)
 		return
 	}
 
 	pid, err := getPid(cc.Hostname)
 	if err != nil {
-		t.Logf("Error getting pid for %v: %v", cc.Hostname, err)
+		t.Errorf("Error getting pid for %v: %v", cc.Hostname, err)
 	}
 	src := "/proc/" + pid + "/ns/net"
 	dst := "/var/run/netns/" + cc.Hostname
-	test.Assert{t}.Program(test.Self{}, "ln", "-s", src, dst)
+	assert.Program(test.Self{}, "ln", "-s", src, dst)
 	return
 }
 
@@ -327,14 +330,14 @@ func stopContainer(t *testing.T, config *Config, name string, ID string) error {
 
 	err := cli.ContainerStop(ctx, ID, nil)
 	if err != nil {
-		t.Logf("Error stoping %v %v: %v", name, ID, err)
+		t.Errorf("Error stoping %v %v: %v", name, ID, err)
 		return err
 	}
 
 	err = cli.ContainerRemove(ctx, ID,
 		types.ContainerRemoveOptions{RemoveVolumes: true})
 	if err != nil {
-		t.Logf("Error removing volume %v: %v", name, err)
+		t.Errorf("Error removing volume %v: %v", name, err)
 		return err
 	}
 	link := "/var/run/netns/" + name

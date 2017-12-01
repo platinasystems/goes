@@ -16,7 +16,11 @@ import (
 var config *docker.Config
 
 func Test(t *testing.T, source []byte) {
-	config = docker.LaunchContainers(t, source)
+	var err error
+	config, err = docker.LaunchContainers(t, source)
+	if err != nil {
+		t.Fatalf("Error launchContainers: %v", err)
+	}
 	defer docker.TearDownContainers(t, config)
 
 	test.Suite{
