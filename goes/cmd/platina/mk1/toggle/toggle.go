@@ -44,7 +44,7 @@ const (
 	i2cGpioAddr = 0x74
 )
 
-func uartSel(cpu bool) {
+func uartToggle() {
 	var dir0, out0 uint8
 	i2c.Do(0, i2cGpioAddr,
 		func(bus *i2c.Bus) (err error) {
@@ -73,11 +73,7 @@ func uartSel(cpu bool) {
 	i2c.Do(0, i2cGpioAddr,
 		func(bus *i2c.Bus) (err error) {
 			var d i2c.SMBusData
-			if cpu {
-				d[0] = dir0 | 0x20
-			} else {
-				d[0] = dir0 & 0xdf
-			}
+			d[0] = dir0 ^ 0x20
 			reg := uint8(6)
 			err = bus.Write(reg, i2c.ByteData, &d)
 			return
@@ -106,7 +102,7 @@ func (cmd) Main(args ...string) error {
 			pin.SetValue(true)
 		}
 		time.Sleep(10 * time.Millisecond)
-		uartSel(true)
+		uartToggle()
 		if found {
 			pin.SetValue(false)
 		}
@@ -116,7 +112,7 @@ func (cmd) Main(args ...string) error {
 		}
 		time.Sleep(10 * time.Millisecond)
 	} else {
-		uartSel(false)
+		uartToggle()
 	}
 	return nil
 }
