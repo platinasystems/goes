@@ -835,6 +835,9 @@ func (m *qsfpMain) poll() {
 									s = "none"
 								}
 								if s != lasts[f] {
+									if lasts[f] != "" && s != "none" {
+										log.Print("warning: port-" + strconv.Itoa(int(port)+portBase) + " qsfp module alarm: " + s)
+									}
 									pub.Print(f, ": ", s)
 									lasts[f] = s
 								}
@@ -845,6 +848,9 @@ func (m *qsfpMain) poll() {
 									s = "none"
 								}
 								if s != lasts[f] {
+									if lasts[f] != "" && s != "none" {
+										log.Print("warning: port-" + strconv.Itoa(int(port)+portBase) + " qsfp channel alarm: " + s)
+									}
 									pub.Print(f, ": ", s)
 									lasts[f] = s
 								}
