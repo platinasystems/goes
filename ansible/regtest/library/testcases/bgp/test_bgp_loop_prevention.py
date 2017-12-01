@@ -38,9 +38,15 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    spine_eth_ip:
+    leaf_list:
       description:
-        - Interface address of one of the spines.
+        - List of all leaf switches.
+      required: False
+      type: list
+      default: []
+    config_file:
+      description:
+        - BGP config which have been added into /etc/quagga/bgpd.conf.
       required: False
       type: str
     hash_name:
@@ -137,28 +143,42 @@ def verify_bgp_loop_prevention(module):
 
     failure_summary = ''
     switch_name = module.params['switch_name']
-    spine_eth_ip = module.params['spine_eth_ip']
     log_file = module.params['log_file']
+    leaf_list = module.params['leaf_list']
 
-    # Clear ip bgp route
-    cmd = "vtysh -c 'clear ip bgp {}'".format(spine_eth_ip)
-    execute_commands(module, cmd)
+    as_number, ip = None, None
+    is_leaf = True if switch_name in leaf_list else False
+    if is_leaf:
+        if leaf_list.index(switch_name) == 0:
+            for line in module.params['config_file'].splitlines():
+                line = line.strip()
+                if 'router' in line:
+                    as_number = line.split()[2]
+                    
+                if 'neighbor' in line:
+                    if as_number not in line:
+                        ip = line.split()[1]
 
-    # Wait for 35 secs for bgp to convergence
-    time.sleep(35)
-
-    # Read the log file
-    bgp_log_file = open(log_file, 'r')
-    out = bgp_log_file.read()
-
-    # Line to check in the log file
-    line = 'DENIED due to: as-path contains our own AS'
-
-    if line not in out:
-        RESULT_STATUS = False
-        failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'could not find bgp loop prevention details '
-        failure_summary += 'in the log file {}\n'.format(log_file)
+            if ip is not None:
+                # Clear ip bgp route
+                cmd = "vtysh -c 'clear ip bgp {}'".format(ip)
+                execute_commands(module, cmd)
+    
+                # Wait for 35 secs for bgp to convergence
+                time.sleep(35)
+    
+                # Read the log file
+                bgp_log_file = open(log_file, 'r')
+                out = bgp_log_file.read()
+    
+                # Line to check in the log file
+                line = 'DENIED due to: as-path contains our own AS'
+    
+                if line not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'could not find bgp loop prevention details '
+                    failure_summary += 'in the log file {}\n'.format(log_file)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -171,7 +191,8 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            spine_eth_ip=dict(required=False, type='str'),
+            leaf_list=dict(required=False, type='list', default=[]),
+            config_file=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_file=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
@@ -187,7 +208,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -200,7 +221,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':

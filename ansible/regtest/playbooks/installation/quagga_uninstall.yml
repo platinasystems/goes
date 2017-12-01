@@ -18,3 +18,7 @@
         autoremove: yes
         purge: yes
       ignore_errors: yes
+
+    - file:
+        path: "{{ ansible_log_file_path }}"
+        state: absent

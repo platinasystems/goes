@@ -1,6 +1,7 @@
 ---
 ansible_log_file_path: ~/ansible.log
 bgp_log_dir: /var/log/regression/bgp
+bgp_loop_prevention_log_file: /var/log/regression/bgp_loop_prevention.log
 
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
