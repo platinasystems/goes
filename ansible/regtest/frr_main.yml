@@ -2,8 +2,8 @@
 
 # FRR INSTALLATION PLAYBOOK
 
-- include: playbooks/installation/frr_install.yml
-  tags: frr
+#- include: playbooks/installation/frr_install.yml
+#  tags: frr
 
 
 # ALL FRR BGP TESTCASES
