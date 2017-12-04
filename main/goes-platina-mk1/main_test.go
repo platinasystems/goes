@@ -31,7 +31,7 @@ func Test(t *testing.T) {
 		"redis.ready", "true", "10")
 
 	vnetd := assert.Background(30*time.Second, test.Self{}, "vnetd")
-	if gdbwait {
+	if debug {
 		test.Pause("Attach vnet debugger to pid(", vnetd.Pid(), ");\n",
 			"with the debugger, set 'vnetd.gdb_wait'=1;\n",
 			"then press enter to continue...")

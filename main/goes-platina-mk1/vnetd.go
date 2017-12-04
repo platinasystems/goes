@@ -53,7 +53,7 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	p.SriovMode = err == nil && len(fns) > 0
 
 	vnetd.UnixInterfacesOnly = !p.SriovMode
-	vnetd.GdbWait = gdbwait
+	vnetd.GdbWait = debug
 
 	// Default to using MSI versus INTX for switch chip.
 	p.EnableMsiInterrupt = true
