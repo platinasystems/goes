@@ -42,6 +42,11 @@ options:
         - BGP config which have been added into /etc/quagga/bgpd.conf.
       required: False
       type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -101,7 +106,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -121,21 +126,21 @@ def verify_bgp_authentication(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
+    switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
+    config_file = module.params['config_file'].splitlines()
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     # Get all ip routes
     cmd = "vtysh -c 'sh ip bgp neighbors'"
     bgp_out = execute_commands(module, cmd)
-
-    failure_summary = ''
-    switch_name = module.params['switch_name']
-    config_file = module.params['config_file'].splitlines()
 
     for line in config_file:
         line = line.strip()
@@ -170,6 +175,7 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
