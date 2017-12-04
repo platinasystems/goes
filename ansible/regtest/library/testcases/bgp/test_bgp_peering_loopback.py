@@ -19,7 +19,6 @@
 #
 
 import shlex
-import time
 
 from collections import OrderedDict
 
@@ -40,7 +39,12 @@ options:
       type: str
     config_file:
       description:
-        - OSPF configurations added in Quagga.conf file.
+        - OSPF configurations added in bgpd.conf file.
+      required: False
+      type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
     hash_name:
@@ -102,7 +106,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd or 'ifconfig' in cmd:
+    if 'service' in cmd or 'dummy' in cmd or 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -124,10 +128,14 @@ def verify_bgp_peering_loopback(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     config_file = module.params['config_file'].splitlines()
 
-    # Assign loopback ip
-    cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
+    # Add dummy0 interface
+    execute_commands(module, 'ip link add dummy0 type dummy')
+
+    # Assign ip to this created dummy0 interface
+    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.0'.format(
         switch_name[-2::]
     )
     execute_commands(module, cmd)
@@ -135,9 +143,9 @@ def verify_bgp_peering_loopback(module):
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     # Get all bgp routes
     cmd = "vtysh -c 'sh ip bgp neighbors'"
@@ -163,10 +171,6 @@ def verify_bgp_peering_loopback(module):
                 failure_summary += 'is not Established in the output of '
                 failure_summary += 'command {}\n'.format(cmd)
 
-    # Revert back the loopback ip
-    cmd = 'ifconfig lo 127.0.0.1 netmask 255.0.0.0'
-    execute_commands(module, cmd)
-
     HASH_DICT['result.detail'] = failure_summary
 
     # Get the GOES status info
@@ -179,6 +183,7 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str', default=''),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
