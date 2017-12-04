@@ -64,6 +64,11 @@ options:
       required: False
       type: list
       default: []
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -123,7 +128,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -146,13 +151,14 @@ def verify_bgp_local_pref_weight(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     spine_list = module.params['spine_list']
+    package_name = module.params['package_name']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     is_spine = True if switch_name in spine_list else False
     if is_spine:
@@ -163,7 +169,7 @@ def verify_bgp_local_pref_weight(module):
 
             spine_network_list = module.params['spine_network_list'].split(',')
             leaf_network_list = module.params['leaf_network_list'].split(',')
-            
+
             for network in spine_network_list + leaf_network_list:
                 network = network.split('/')[0]
                 if network not in out:
@@ -204,6 +210,7 @@ def main():
             local_pref=dict(required=False, type='str', default=''),
             weight=dict(required=False, type='str'),
             spine_list=dict(required=False, type='list', default=[]),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
