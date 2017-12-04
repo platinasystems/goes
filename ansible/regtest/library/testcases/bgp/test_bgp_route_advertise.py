@@ -59,6 +59,11 @@ options:
       required: False
       type: list
       default: []
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -118,7 +123,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -138,24 +143,24 @@ def verify_bgp_route_advertise(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-
-    # Get the current/running configurations
-    execute_commands(module, "vtysh -c 'sh running-config'")
-
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
-
-    # Get all bgp routes
-    cmd = "vtysh -c 'sh ip bgp'"
-    out = execute_commands(module, cmd)
-
     failure_summary = ''
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     spine_list = module.params['spine_list']
     leaf_list = module.params['leaf_list']
     spine_network_list = module.params['spine_network_list'].split(',')
     leaf_network_list = module.params['leaf_network_list'].split(',')
+
+    # Get the current/running configurations
+    execute_commands(module, "vtysh -c 'sh running-config'")
+
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
+
+    # Get all bgp routes
+    cmd = "vtysh -c 'sh ip bgp'"
+    out = execute_commands(module, cmd)
 
     is_spine = True if switch_name in spine_list else False
 
@@ -191,6 +196,7 @@ def main():
             leaf_network_list=dict(required=False, type='str'),
             spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
