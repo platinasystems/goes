@@ -44,10 +44,10 @@
 - include: playbooks/bgp/quagga_bgp_state_propagation.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/peering_ebgp_loopback.yml
+- include: playbooks/bgp/quagga_bgp_peering_ebgp_loopback.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/peering_ibgp_loopback.yml
+- include: playbooks/bgp/quagga_bgp_peering_ibgp_loopback.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_if_down.yml
@@ -135,10 +135,10 @@
   tags: upgrade
 
 - include: playbooks/upgrade/software_upgrade_03.yml
-  tags: [upgrade,demo]
+  tags: upgrade
 
 - include: playbooks/upgrade/software_upgrade_04.yml
-  tags: [upgrade,demo]
+  tags: upgrade
 
 - include: playbooks/upgrade/software_upgrade_06.yml
   tags: upgrade
@@ -147,4 +147,4 @@
 # ALL CONTAINERIZED TESTCASES
 
 - include: playbooks/docker/quagga_ospf_traffic.yml
-  tags: [docker,demo]
+  tags: docker

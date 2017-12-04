@@ -1,0 +1,51 @@
+---
+
+# FRR INSTALLATION PLAYBOOK
+
+- include: playbooks/installation/frr_install.yml
+  tags: frr
+
+
+# ALL FRR BGP TESTCASES
+
+- include: playbooks/bgp/frr_bgp_peering_ebgp.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_ibgp.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_ebgp_route_advertise.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_ibgp_route_advertise.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_authentication.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_administrative_distance.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_route_reflector.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_local_preference.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_weight.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_loop_prevention.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_ebgp_loopback.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_peering_ibgp_loopback.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_convergence.yml
+  tags: frr_bgp
+
+- include: playbooks/bgp/frr_bgp_state_propagation.yml
+  tags: frr_bgp
