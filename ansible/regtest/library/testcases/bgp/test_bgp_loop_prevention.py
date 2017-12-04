@@ -46,7 +46,12 @@ options:
       default: []
     config_file:
       description:
-        - BGP config which have been added into /etc/quagga/bgpd.conf.
+        - BGP config which have been added.
+      required: False
+      type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
     hash_name:
@@ -113,7 +118,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -133,18 +138,18 @@ def verify_bgp_loop_prevention(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
+    switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
+    log_file = module.params['log_file']
+    leaf_list = module.params['leaf_list']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
-
-    failure_summary = ''
-    switch_name = module.params['switch_name']
-    log_file = module.params['log_file']
-    leaf_list = module.params['leaf_list']
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     as_number, ip = None, None
     is_leaf = True if switch_name in leaf_list else False
@@ -154,7 +159,7 @@ def verify_bgp_loop_prevention(module):
                 line = line.strip()
                 if 'router' in line:
                     as_number = line.split()[2]
-                    
+
                 if 'neighbor' in line:
                     if as_number not in line:
                         ip = line.split()[1]
@@ -163,18 +168,18 @@ def verify_bgp_loop_prevention(module):
                 # Clear ip bgp route
                 cmd = "vtysh -c 'clear ip bgp {}'".format(ip)
                 execute_commands(module, cmd)
-    
+
                 # Wait for 35 secs for bgp to convergence
                 time.sleep(35)
-    
+
                 # Read the log file
                 bgp_log_file = open(log_file, 'r')
                 out = bgp_log_file.read()
-    
+
                 # Line to check in the log file
-                line = 'DENIED due to: as-path contains our own AS'
-    
-                if line not in out:
+                line = 'denied due to: as-path contains our own as'
+
+                if line not in out.lower():
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'could not find bgp loop prevention details '
@@ -193,6 +198,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             leaf_list=dict(required=False, type='list', default=[]),
             config_file=dict(required=False, type='str'),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_file=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),

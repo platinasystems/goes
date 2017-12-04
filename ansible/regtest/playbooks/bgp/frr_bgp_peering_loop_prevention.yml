@@ -8,29 +8,28 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_bgp_peering_loop_prevention_{{ start_time.stdout }}"
+        hash_name: "frr_bgp_peering_loop_prevention_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of /etc/quagga/bgpd.conf
+    - name: Take backup of /etc/frr/frr.conf
       copy:
-        src: /etc/quagga/bgpd.conf
-        dest: /etc/quagga/bgpd.conf.bck
+        src: /etc/frr/frr.conf
+        dest: /etc/frr/frr.conf.bck
         remote_src: true
 
-    - name: Add bgp config in /etc/quagga/bgpd.conf
+    - name: Add bgp config in /etc/frr/frr.conf
       blockinfile:
-        path: /etc/quagga/bgpd.conf
-        insertafter: "log stdout"
+        path: /etc/frr/frr.conf
         marker: ""
         block: "{{ lookup('template', '../../files/{{inventory_hostname}}/bgp_peering_loop_prevention.conf') }}"
 
-    - name: Restart quagga
+    - name: Restart frr
       service:
-        name: quagga
+        name: frr
         state: restarted
 
     - name: Wait for few seconds for bgp to establish connection
@@ -44,15 +43,16 @@
     - file:
         path: "{{ bgp_loop_prevention_log_file }}"
         state: touch
-        owner: quagga
-        group: quaggavty
+        owner: frr
+        group: frrvty
         mode: 0640
 
-    - name: Verify quagga bgp peering loop prevention
+    - name: Verify frr bgp peering loop prevention
       test_bgp_loop_prevention:
         switch_name: "{{ inventory_hostname }}"
         leaf_list: "{{ groups['leaf'] }}"
         config_file: "{{ lookup('template', '../../files/{{inventory_hostname}}/bgp_peering_loop_prevention.conf') }}"
+        package_name: "frr"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_file: "{{ bgp_loop_prevention_log_file }}"
         log_dir_path: "{{ bgp_log_dir }}"
@@ -95,10 +95,10 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - name: Restore backup of /etc/quagga/bgpd.conf
+    - name: Restore backup of /etc/frr/frr.conf
       copy:
-        src: /etc/quagga/bgpd.conf.bck
-        dest: /etc/quagga/bgpd.conf
+        src: /etc/frr/frr.conf.bck
+        dest: /etc/frr/frr.conf
         remote_src: true
         owner: root
         group: root
@@ -106,7 +106,7 @@
 
     - name: Remove backup file
       file:
-        path: /etc/quagga/bgpd.conf.bck
+        path: /etc/frr/frr.conf.bck
         state: absent
 
 
