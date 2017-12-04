@@ -133,8 +133,11 @@ def verify_quagga_bgp_state_propagation(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
     route_present = module.params['route_present']
     leaf_list = module.params['leaf_list']
+    switch_name = module.params['switch_name']
+    leaf_network_list = module.params['leaf_network_list'].split(',')
 
     if route_present:
         # Get the current/running configurations
@@ -150,28 +153,31 @@ def verify_quagga_bgp_state_propagation(module):
         key = '{} ifconfig eth-3-1 down'.format(leaf1)
         HASH_DICT[key] = None
 
-    # Get all ip routes
-    cmd = "vtysh -c 'sh ip route'"
-    out = execute_commands(module, cmd)
+    execute_flag = True
+    is_leaf = True if switch_name in leaf_list else False
+    if is_leaf:
+        if leaf_list.index(switch_name) == 0:
+            execute_flag = False
+            
+    if execute_flag:
+        # Get all ip routes
+        cmd = "vtysh -c 'sh ip route'"
+        out = execute_commands(module, cmd)
 
-    failure_summary = ''
-    switch_name = module.params['switch_name']
-    leaf_network_list = module.params['leaf_network_list'].split(',')
-    route = 'B>* {}'.format(leaf_network_list[0])
-
-    if route_present:
-        if route not in out:
-            RESULT_STATUS = False
-            failure_summary += 'On Switch {} bgp route '.format(switch_name)
-            failure_summary += '{} is not present '.format(route)
-            failure_summary += 'in the output of command {}\n'.format(cmd)
-    else:
-        if route in out:
-            RESULT_STATUS = False
-            failure_summary += 'On Switch {} bgp route '.format(switch_name)
-            failure_summary += '{} is present '.format(route)
-            failure_summary += 'in the output of command {} '.format(cmd)
-            failure_summary += 'even after shutting down this route\n'
+        route = 'B>* {}'.format(leaf_network_list[0])
+        if route_present:
+            if route not in out:
+                RESULT_STATUS = False
+                failure_summary += 'On Switch {} bgp route '.format(switch_name)
+                failure_summary += '{} is not present '.format(route)
+                failure_summary += 'in the output of command {}\n'.format(cmd)
+        else:
+            if route in out:
+                RESULT_STATUS = False
+                failure_summary += 'On Switch {} bgp route '.format(switch_name)
+                failure_summary += '{} is present '.format(route)
+                failure_summary += 'in the output of command {} '.format(cmd)
+                failure_summary += 'even after shutting down this route\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -202,7 +208,7 @@ def main():
     # Create a log file
     mode = 'w' if module.params['route_present'] else 'a'
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, mode)
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -215,7 +221,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':

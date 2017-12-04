@@ -41,7 +41,7 @@
 - include: playbooks/bgp/quagga_bgp_convergence.yml
   tags: quagga_bgp
 
-- include: playbooks/bgp/bgp_state_propagation.yml
+- include: playbooks/bgp/quagga_bgp_state_propagation.yml
   tags: quagga_bgp
 
 - include: playbooks/bgp/peering_ebgp_loopback.yml
