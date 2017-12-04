@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify BGP Quagga Convergence """
+""" Test/Verify BGP Convergence """
 
 #
 # This file is part of Ansible
@@ -26,9 +26,9 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_bgp_quagga_convergence
+module: test_bgp_convergence
 author: Platina Systems
-short_description: Module to test and verify bgp quagga convergence.
+short_description: Module to test and verify bgp convergence.
 description:
     Module to test and verify bgp configurations and log the same.
 options:
@@ -48,6 +48,11 @@ options:
         - Comma separated list of all leaf bgp networks.
       required: False
       type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -61,8 +66,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp quagga convergence
-  test_quagga_bgp_state_propagation:
+- name: Verify bgp convergence
+  test_bgp_convergence:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -107,7 +112,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -129,29 +134,30 @@ def verify_bgp_quagga_convergence(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     leaf_list = module.params['leaf_list']
     leaf_network_list = module.params['leaf_network_list'].split(',')
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     execute_flag = True
     is_leaf = True if switch_name in leaf_list else False
     if is_leaf:
         if leaf_list.index(switch_name) == 0:
             execute_flag = False
-            
+
     if execute_flag:
         # Get all ip routes
         cmd = "vtysh -c 'sh ip route'"
         out = execute_commands(module, cmd)
-        
+
         route = 'B>* {}'.format(leaf_network_list[0])
-    
+
         if route in out:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} bgp route '.format(switch_name)
@@ -172,6 +178,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             leaf_list=dict(required=False, type='list', default=[]),
             leaf_network_list=dict(required=False, type='str'),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
