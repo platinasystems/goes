@@ -8,63 +8,45 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_ospf_loopback_{{ start_time.stdout }}"
+        hash_name: "frr_ospf_with_different_areas_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
-- hosts: leaf:spine
+- hosts: leaf[0]:spine
   become: true
   tasks:
-    - name: Take backup of ospfd.conf
+    - name: Take backup of /etc/frr/ospfd.conf
       copy:
-        src: /etc/quagga/ospfd.conf
-        dest: /etc/quagga/ospfd.conf.bck
+        src: "{{ frr_ospf_conf_file }}"
+        dest: "{{ frr_ospf_conf_file_bck }}"
         remote_src: true
-        owner: root
-        group: root
-        mode: 0644
 
-    - name: Add ospf config in ospfd.conf
+    - name: Add ospf config in /etc/frr/ospfd.conf
       blockinfile:
-        path: /etc/quagga/ospfd.conf
-        insertafter: "interface vnet"
+        path: "{{ frr_ospf_conf_file }}"
         marker: ""
-        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/ospf_with_different_areas.conf') }}"
 
-    - name: Assign loopback ip
-      assign_loopback:
-        switch_name: "{{ inventory_hostname }}"
-
-    - name: Restart quagga service
+    - name: Restart frr
       service:
-        name: quagga
+        name: frr
         state: restarted
 
-    - name: Wait for 35 secs for ospf to establish communication
+    - name: Wait for few seconds for ospf to establish connection
       pause:
         seconds: 35
 
-
-- hosts: leaf:spine
-  become: true
-  serial: 1
-
-  vars:
-  - log_dir_path: /var/log/regression/ospf
-
-  tasks:
     - file:
-        path: "{{ log_dir_path }}"
+        path: "{{ ospf_log_dir }}"
         state: directory
 
-    - name: Verify quagga ospf loopback
-      test_ospf_loopback:
+    - name: Verify frr ospf with different areas
+      test_ospf_different_areas:
         switch_name: "{{ inventory_hostname }}"
-        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
-        spine_list: "{{ groups['spine'] }}"
         leaf_list: "{{ groups['leaf'] }}"
+        package_name: "frr"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ log_dir_path }}"
+        log_dir_path: "{{ ospf_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"
@@ -84,38 +66,15 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-
-- hosts: leaf:spine
-  become: true
-  tasks:
-    - name: Restore backup of ospfd.conf
-      copy:
-        src: /etc/quagga/ospfd.conf.bck
-        dest: /etc/quagga/ospfd.conf
-        remote_src: true
-        owner: root
-        group: root
-        mode: 0644
-
-    - name: Remove backup file
-      file:
-        path: /etc/quagga/ospfd.conf.bck
-        state: absent
-
-    - name: Revert back loopback ip
-      command: "ifconfig lo 127.0.0.1 netmask 255.0.0.0"
-
-    - service:
-        name: quagga
-        state: restarted
-
-    - shell: "goes hget platina package | grep version:"
+    - name: Get goes version details
+      shell: "goes hget platina package | grep version:"
       register: version_out
 
-    - shell: "goes hget platina package | grep tag:"
+    - name: Get goes tag details
+      shell: "goes hget platina package | grep tag:"
       register: tag_out
 
-    - name: Store GOES version and tag details in redis db
+    - name: Store goes version and tag details in redis db
       store_goes_details:
         switch_name: "{{ inventory_hostname }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
@@ -123,7 +82,19 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - command: "goes restart"
+    - name: Restore backup of /etc/frr/ospfd.conf
+      copy:
+        src: "{{ frr_ospf_conf_file_bck }}"
+        dest: "{{ frr_ospf_conf_file }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: "{{ frr_ospf_conf_file_bck }}"
+        state: absent
 
 
 - hosts: server_emulator
@@ -139,3 +110,14 @@
 
     - debug:
         msg: "Failure summary: {{ result.result_detail }}"
+
+#    - name: Get playbook run details
+#      set_fact:
+#        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
+#
+#    - name: Store the ansible execution log in redis hash
+#      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
+#
+#    - file:
+#        path: "{{ ansible_log_file_path }}"
+#        state: absent

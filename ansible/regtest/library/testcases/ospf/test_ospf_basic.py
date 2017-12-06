@@ -53,6 +53,11 @@ options:
         - List of all leaf switches ip separated by comma.
       required: False
       type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -121,7 +126,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -143,14 +148,15 @@ def verify_ospf_neighbors(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     check_route = module.params['check_route']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     if check_route:
         # Get ospf routes
@@ -201,6 +207,7 @@ def main():
             spine_list=dict(required=False, type='list', default=[]),
             spine_ips=dict(required=False, type='str'),
             leaf_ips=dict(required=False, type='str'),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
             check_route=dict(required=False, type='bool', default=False),
@@ -217,7 +224,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -230,7 +237,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':

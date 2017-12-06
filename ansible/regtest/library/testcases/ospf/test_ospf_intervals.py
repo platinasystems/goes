@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify OSPF Hello a& Dead Intervals """
+""" Test/Verify OSPF Hello & Dead Intervals """
 
 #
 # This file is part of Ansible
@@ -51,6 +51,11 @@ options:
     dead_timer:
       description:
         - Value of dead timer interval.
+      required: False
+      type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
     hash_name:
@@ -112,7 +117,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -134,6 +139,7 @@ def verify_ospf_intervals(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     hello_timer = module.params['hello_timer']
     dead_timer = module.params['dead_timer']
     eth_list = module.params['eth_list'].split(',')
@@ -141,9 +147,9 @@ def verify_ospf_intervals(module):
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     # Get and verify ospf neighbor relationships
     cmd = "vtysh -c 'sh ip ospf neighbor'"
@@ -222,6 +228,7 @@ def main():
             eth_list=dict(required=False, type='str'),
             hello_timer=dict(required=False, type='str'),
             dead_timer=dict(required=False, type='str'),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

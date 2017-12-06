@@ -8,48 +8,51 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_bgp_peering_administrative_distance_{{ start_time.stdout }}"
+        hash_name: "quagga_ospf_loopback_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of /etc/quagga/bgpd.conf
+    - name: Take backup of /etc/quagga/ospfd.conf
       copy:
-        src: "{{ quagga_bgp_conf_file }}"
-        dest: "{{ quagga_bgp_conf_file_bck }}"
+        src: "{{ quagga_ospf_conf_file }}"
+        dest: "{{ quagga_ospf_conf_file_bck }}"
         remote_src: true
 
-    - name: Add bgp config in /etc/quagga/bgpd.conf
+    - name: Add ospf config in /etc/quagga/ospfd.conf
       blockinfile:
-        path: "{{ quagga_bgp_conf_file }}"
+        path: "{{ quagga_ospf_conf_file }}"
         marker: ""
-        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_administrative_distance.conf') }}"
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/ospf_loopback.conf') }}"
+
+    - name: Add dummy interface
+      add_dummy_interface:
+        switch_name: "{{ inventory_hostname }}"
 
     - name: Restart quagga
       service:
         name: quagga
         state: restarted
 
-    - name: Wait for few seconds for bgp to establish connection
+    - name: Wait for few seconds for ospf to establish connection
       pause:
         seconds: 35
 
     - file:
-        path: "{{ bgp_log_dir }}"
+        path: "{{ ospf_log_dir }}"
         state: directory
 
-    - name: Verify quagga bgp peering administrative distance
-      test_bgp_administrative_distance:
+    - name: Verify quagga ospf loopback
+      test_ospf_loopback:
         switch_name: "{{ inventory_hostname }}"
-        spine_network_list: "{{ groups['spine'] | map('extract', hostvars, ['bgp_network']) | join(',') }}"
-        leaf_network_list: "{{ groups['leaf'] | map('extract', hostvars, ['bgp_network']) | join(',') }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/ospf_loopback.conf') }}"
         spine_list: "{{ groups['spine'] }}"
         leaf_list: "{{ groups['leaf'] }}"
         package_name: "quagga"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ bgp_log_dir }}"
+        log_dir_path: "{{ ospf_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"
@@ -85,10 +88,10 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - name: Restore backup of /etc/quagga/bgpd.conf
+    - name: Restore backup of /etc/quagga/ospfd.conf
       copy:
-        src: "{{ quagga_bgp_conf_file_bck }}"
-        dest: "{{ quagga_bgp_conf_file }}"
+        src: "{{ quagga_ospf_conf_file_bck }}"
+        dest: "{{ quagga_ospf_conf_file }}"
         remote_src: true
         owner: root
         group: root
@@ -96,7 +99,7 @@
 
     - name: Remove backup file
       file:
-        path: "{{ quagga_bgp_conf_file_bck }}"
+        path: "{{ quagga_ospf_conf_file_bck }}"
         state: absent
 
 
@@ -124,3 +127,4 @@
 #    - file:
 #        path: "{{ ansible_log_file_path }}"
 #        state: absent
+
