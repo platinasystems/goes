@@ -17,14 +17,13 @@
   tasks:
     - name: Take backup of /etc/quagga/bgpd.conf
       copy:
-        src: /etc/quagga/bgpd.conf
-        dest: /etc/quagga/bgpd.conf.bck
+        src: "{{ quagga_bgp_conf_file }}"
+        dest: "{{ quagga_bgp_conf_file_bck }}"
         remote_src: true
 
     - name: Add bgp config in /etc/quagga/bgpd.conf
       blockinfile:
-        path: /etc/quagga/bgpd.conf
-        insertafter: "log stdout"
+        path: "{{ quagga_bgp_conf_file }}"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_ebgp.conf') }}"
 
@@ -85,8 +84,8 @@
 
     - name: Restore backup of /etc/quagga/bgpd.conf
       copy:
-        src: /etc/quagga/bgpd.conf.bck
-        dest: /etc/quagga/bgpd.conf
+        src: "{{ quagga_bgp_conf_file_bck }}"
+        dest: "{{ quagga_bgp_conf_file }}"
         remote_src: true
         owner: root
         group: root
@@ -94,7 +93,7 @@
 
     - name: Remove backup file
       file:
-        path: /etc/quagga/bgpd.conf.bck
+        path: "{{ quagga_bgp_conf_file_bck }}"
         state: absent
 
 
@@ -112,13 +111,13 @@
     - debug:
         msg: "Failure summary: {{ result.result_detail }}"
 
-    - name: Get playbook run details
-      set_fact:
-        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
-
-    - name: Store the ansible execution log in redis hash
-      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
-
-    - file:
-        path: "{{ ansible_log_file_path }}"
-        state: absent
+#    - name: Get playbook run details
+#      set_fact:
+#        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
+#
+#    - name: Store the ansible execution log in redis hash
+#      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
+#
+#    - file:
+#        path: "{{ ansible_log_file_path }}"
+#        state: absent

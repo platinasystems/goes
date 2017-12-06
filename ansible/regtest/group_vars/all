@@ -1,16 +1,21 @@
 ---
 ansible_log_file_path: ~/ansible.log
+
 bgp_log_dir: /var/log/regression/bgp
 bgp_loop_prevention_log_file: /var/log/regression/bgp_loop_prevention.log
 
+frr_bgp_conf_file: /etc/frr/bgpd.conf
+frr_bgp_conf_file_bck: /etc/frr/bgpd.conf.bck
+
+quagga_bgp_conf_file: /etc/quagga/bgpd.conf
+quagga_bgp_conf_file_bck: /etc/quagga/bgpd.conf.bck
+
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
-
 goes_upgrade_installer_name: 'goes-platina-mk1-installer.up'
 goes_downgrade_installer_name: 'goes-platina-mk1-installer.dw'
 goes_installer_name: 'goes-platina-mk1-installer'
 goes_installer_url: '{{ goes_url_path }}{{ goes_installer_name }}'
-
 goes_coreboot_installer_name: 'coreboot-platina-mk1.rom'
 goes_coreboot_installer_url: '{{ goes_url_path }}{{ goes_coreboot_installer_name }}'
 

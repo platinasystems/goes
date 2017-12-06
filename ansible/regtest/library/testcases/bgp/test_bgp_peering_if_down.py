@@ -40,7 +40,7 @@ options:
       type: str
     config_file:
       description:
-        - OSPF configurations added in Quagga.conf file.
+        - BGP configuration added.
       required: False
       type: str
     leaf_list:
@@ -52,6 +52,11 @@ options:
     eth_list:
       description:
         - Comma separated string of eth interfaces to bring down/up.
+      required: False
+      type: str
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
     hash_name:
@@ -113,7 +118,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd or 'ifconfig lo' in cmd:
+    if 'service' in cmd or 'dummy' in cmd or 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -171,12 +176,16 @@ def verify_bgp_peering_interface_down(module):
     """
     global RESULT_STATUS, HASH_DICT
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     eth_list = module.params['eth_list'].split(',')
     leaf_list = module.params['leaf_list']
     is_leaf = True if switch_name in leaf_list else False
 
-    # Assign loopback ip
-    cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
+    # Add dummy0 interface
+    execute_commands(module, 'ip link add dummy0 type dummy')
+
+    # Assign ip to this created dummy0 interface
+    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.0'.format(
         switch_name[-2::]
     )
     execute_commands(module, cmd)
@@ -184,9 +193,9 @@ def verify_bgp_peering_interface_down(module):
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     # Check and verify BGP neighbor relationship
     check_bgp_neighbors(module)
@@ -217,9 +226,6 @@ def verify_bgp_peering_interface_down(module):
     # Again check and verify BGP neighbor relationship
     check_bgp_neighbors(module)
 
-    # Revert back the loopback ip
-    execute_commands(module, 'ifconfig lo 127.0.0.1 netmask 255.0.0.0')
-
     # Get the GOES status info
     execute_commands(module, 'goes status')
 
@@ -232,6 +238,7 @@ def main():
             config_file=dict(required=False, type='str', default=''),
             leaf_list=dict(required=False, type='list', default=[]),
             eth_list=dict(required=False, type='str'),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

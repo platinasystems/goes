@@ -15,15 +15,15 @@
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of /etc/frr/frr.conf
+    - name: Take backup of /etc/frr/bgpd.conf
       copy:
-        src: /etc/frr/frr.conf
-        dest: /etc/frr/frr.conf.bck
+        src: "{{ frr_bgp_conf_file }}"
+        dest: "{{ frr_bgp_conf_file_bck }}"
         remote_src: true
 
-    - name: Add bgp config in /etc/frr/frr.conf
+    - name: Add bgp config in /etc/frr/bgpd.conf
       blockinfile:
-        path: /etc/frr/frr.conf
+        path: "{{ frr_bgp_conf_file }}"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_authentication.conf') }}"
 
@@ -82,10 +82,10 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - name: Restore backup of /etc/frr/frr.conf
+    - name: Restore backup of /etc/frr/bgpd.conf
       copy:
-        src: /etc/frr/frr.conf.bck
-        dest: /etc/frr/frr.conf
+        src: "{{ frr_bgp_conf_file_bck }}"
+        dest: "{{ frr_bgp_conf_file }}"
         remote_src: true
         owner: root
         group: root
@@ -93,7 +93,7 @@
 
     - name: Remove backup file
       file:
-        path: /etc/frr/frr.conf.bck
+        path: "{{ frr_bgp_conf_file_bck }}"
         state: absent
 
 

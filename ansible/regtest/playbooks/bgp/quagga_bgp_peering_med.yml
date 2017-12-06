@@ -15,18 +15,17 @@
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of bgpd.conf
+    - name: Take backup of /etc/quagga/bgpd.conf
       copy:
-        src: /etc/quagga/bgpd.conf
-        dest: /etc/quagga/bgpd.conf.bck
+        src: "{{ quagga_bgp_conf_file }}"
+        dest: "{{ quagga_bgp_conf_file_bck }}"
         remote_src: true
 
-    - name: Add bgp config in bgpd.conf
+    - name: Add bgp config in /etc/quagga/bgpd.conf
       blockinfile:
-        path: /etc/quagga/bgpd.conf
-        insertafter: "log stdout"
+        path: "{{ quagga_bgp_conf_file }}"
         marker: ""
-        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_bgp_peering_med.conf') }}"
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_med.conf') }}"
 
     - name: Restart quagga service
       service:
@@ -44,8 +43,9 @@
     - name: Verify quagga bgp peering med
       test_bgp_med:
         switch_name: "{{ inventory_hostname }}"
-        config_file: "{{ lookup('file', '../../files/' + hostvars[groups['leaf'][1]].inventory_hostname + '/quagga_bgp_peering_med.conf') }}"
+        config_file: "{{ lookup('file', '../../files/' + hostvars[groups['leaf'][1]].inventory_hostname + '/bgp_peering_med.conf') }}"
         spine_list: "{{ groups['spine'] }}"
+        package_name: "quagga"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ bgp_log_dir }}"
       register: module_out
@@ -69,8 +69,8 @@
 
     - name: Restore backup of /etc/quagga/bgpd.conf
       copy:
-        src: /etc/quagga/bgpd.conf.bck
-        dest: /etc/quagga/bgpd.conf
+        src: "{{ quagga_bgp_conf_file_bck }}"
+        dest: "{{ quagga_bgp_conf_file }}"
         remote_src: true
         owner: root
         group: root
@@ -78,7 +78,7 @@
 
     - name: Remove backup file
       file:
-        path: /etc/quagga/bgpd.conf.bck
+        path: "{{ quagga_bgp_conf_file_bck }}"
         state: absent
 
     - service:
@@ -114,13 +114,13 @@
     - debug:
         msg: "Failure summary: {{ result.result_detail }}"
 
-    - name: Get playbook run details
-      set_fact:
-        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
-
-    - name: Store the ansible execution log in redis hash
-      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
-
-    - file:
-        path: "{{ ansible_log_file_path }}"
-        state: absent
+#    - name: Get playbook run details
+#      set_fact:
+#        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
+#
+#    - name: Store the ansible execution log in redis hash
+#      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
+#
+#    - file:
+#        path: "{{ ansible_log_file_path }}"
+#        state: absent
