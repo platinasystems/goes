@@ -5,11 +5,11 @@
 package isis
 
 const ConfVlan = `
-image: "stigt/debian-frr:latest"
 volume: "/testdata/frr/isis/"
 mapping: "/etc/frr"
 routers:
 - hostname: R1
+  image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
   - name: {{index . 0 0}}
@@ -22,6 +22,7 @@ routers:
     address: 192.168.50.5/24
     vlan: 50
 - hostname: R2
+  image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
   - name: {{index . 0 1}}
@@ -34,6 +35,7 @@ routers:
     address: 192.168.60.10/24
     vlan: 60
 - hostname: R3
+  image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
   - name: {{index . 0 0}}
@@ -46,6 +48,7 @@ routers:
     address: 192.168.50.2/24
     vlan: 50
 - hostname: R4
+  image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
   - name: {{index . 0 1}}

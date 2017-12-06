@@ -22,6 +22,7 @@ import (
 )
 
 type Router struct {
+	Image    string
 	Hostname string
 	Cmd      string
 	Intfs    []struct {
@@ -33,7 +34,6 @@ type Router struct {
 }
 
 type Config struct {
-	Image   string
 	Volume  string
 	Mapping string
 	Routers []Router
@@ -76,17 +76,6 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 
 	config.cli = cli
 
-	if !isImageLocal(t, config) {
-		t.Log("no local container, trying to pull from remote")
-		err = pullImage(t, config)
-		if err != nil {
-			return
-		}
-		t.Log("Image %v pulled from remote\n", config.Image)
-	} else {
-		t.Logf("Image %v found local\n", config.Image)
-	}
-
 	path := "PATH=/usr/local/sbin"
 	path += ":/usr/local/bin"
 	path += ":/usr/sbin"
@@ -103,7 +92,6 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 
 	// Common container config
 	cc := &container.Config{}
-	cc.Image = config.Image
 	cc.Tty = true
 	cc.Env = env
 	cc.Volumes = map[string]struct{}{config.Mapping: {}}
@@ -115,6 +103,18 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 
 	// router specific cc & ch config
 	for i, router := range config.Routers {
+		if !isImageLocal(t, config.cli, router) {
+			t.Log("no local container, trying to pull from remote")
+			err = pullImage(t, config.cli, router)
+			if err != nil {
+				return
+			}
+			t.Log("Image %v pulled from remote\n", router.Image)
+		} else {
+			t.Logf("Image %v found local\n", router.Image)
+		}
+
+		cc.Image = router.Image
 		cc.Hostname = router.Hostname
 		cc.Cmd = []string{router.Cmd}
 
@@ -233,9 +233,9 @@ func TearDownContainers(t *testing.T, config *Config) {
 	config.cli.Close()
 }
 
-func isImageLocal(t *testing.T, config *Config) bool {
+func isImageLocal(t *testing.T, cli *client.Client, router Router) bool {
 
-	images, err := config.cli.ImageList(context.Background(),
+	images, err := cli.ImageList(context.Background(),
 		types.ImageListOptions{})
 	if err != nil {
 		t.Error("failed to get docker image list")
@@ -244,7 +244,7 @@ func isImageLocal(t *testing.T, config *Config) bool {
 
 	for _, i := range images {
 		for _, tag := range i.RepoTags {
-			if tag == config.Image {
+			if tag == router.Image {
 				return true
 			}
 		}
@@ -271,9 +271,9 @@ func isContainerRunning(t *testing.T, config *Config, name string) bool {
 	return false
 }
 
-func pullImage(t *testing.T, config *Config) error {
-	repo := "docker.io/library/" + config.Image
-	out, err := config.cli.ImagePull(context.Background(), repo,
+func pullImage(t *testing.T, cli *client.Client, router Router) error {
+	repo := "docker.io/library/" + router.Image
+	out, err := cli.ImagePull(context.Background(), repo,
 		types.ImagePullOptions{})
 	if err != nil {
 		t.Error("failed to pull remote image")
