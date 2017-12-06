@@ -1,0 +1,33 @@
+version: '3'
+services:
+  R1:
+    container_name: R1
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 67/udp
+      - 68/udp
+    hostname: R1
+    image: stigt/debian-dhcpc:latest
+    privileged: true
+    network_mode: "none" 
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  R2:
+    container_name: R2
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 67/udp
+      - 68/udp
+    hostname: R2
+    image: stigt/debian-dhcps:latest    
+    privileged: true
+    network_mode: "none"     
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+
