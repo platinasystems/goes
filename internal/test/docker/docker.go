@@ -7,7 +7,9 @@ package docker
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -114,7 +116,7 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 			if err != nil {
 				return
 			}
-			t.Log("Image %v pulled from remote\n", router.Image)
+			t.Logf("Image %v pulled from remote\n", router.Image)
 		} else {
 			t.Logf("Image %v found local\n", router.Image)
 		}
@@ -288,7 +290,7 @@ func pullImage(t *testing.T, cli *client.Client, router Router) error {
 		return err
 	}
 	defer out.Close()
-	// io.Copy(os.Stdout, out)
+	io.Copy(os.Stdout, out)
 	return nil
 }
 
