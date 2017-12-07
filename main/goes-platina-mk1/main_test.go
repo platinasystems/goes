@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"testing"
 	"text/template"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/port2port"
 )
 
+var testPause = flag.Bool("test.pause", false, "pause before and after suite")
+
 func Test(t *testing.T) {
 	test.Main(main)
 
@@ -26,21 +29,22 @@ func Test(t *testing.T) {
 	assert.YoureRoot()
 	assert.GoesNotRunning()
 
+	assert.Nil(docker.Check(t))
+
 	defer assert.Background(test.Self{}, "redisd").Quit()
 	assert.Program(12*time.Second, test.Self{}, "hwait", "platina",
 		"redis.ready", "true", "10")
 
 	vnetd := assert.Background(30*time.Second, test.Self{}, "vnetd")
-	if debug {
-		test.Pause("Attach vnet debugger to pid(", vnetd.Pid(), ");\n",
-			"with the debugger, set 'vnetd.gdb_wait'=1;\n",
-			"then press enter to continue...")
-	}
 	defer vnetd.Quit()
 	assert.Program(32*time.Second, test.Self{}, "hwait", "platina",
 		"vnet.ready", "true", "30")
 
-	assert.Nil(docker.Check(t))
+	if *testPause {
+		test.Pause("Attach vnet debugger to pid(", vnetd.Pid(), ");\n",
+			"then press enter to continue...")
+		defer test.Pause("complete, press enter to continue...")
+	}
 
 	test.Suite{
 		{"vnet.ready", func(*testing.T) {}},
