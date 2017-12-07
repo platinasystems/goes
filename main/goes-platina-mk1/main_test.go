@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/bgp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/isis"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/ospf"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/dhcp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/slice"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/port2port"
 )
@@ -53,6 +54,16 @@ func Test(t *testing.T) {
 				{"vlan", func(t *testing.T) {
 					slice.Test(t, conf(t, "net-slice-vlan",
 						slice.ConfVlan))
+				}},
+			}.Run},
+			{"dhcp", test.Suite{
+				{"eth", func(t *testing.T) {
+					dhcp.Test(t, conf(t, "net-dhcp-eth",
+						dhcp.Conf))
+				}},
+				{"vlan", func(t *testing.T) {
+					dhcp.Test(t, conf(t, "net-dhcp-vlan",
+						dhcp.ConfVlan))
 				}},
 			}.Run},
 		}.Run},
