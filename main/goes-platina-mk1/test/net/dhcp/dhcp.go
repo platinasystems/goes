@@ -5,7 +5,9 @@
 package dhcp
 
 import (
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
@@ -26,6 +28,7 @@ func Test(t *testing.T, yaml []byte) {
 		{"server", checkServer},
 		{"client", checkClient},
 		{"connectivity2", checkConnectivity2},
+		{"vlan_tag", checkVlanTag},
 	}.Run(t)
 }
 
@@ -94,4 +97,42 @@ func checkConnectivity2(t *testing.T) {
 		"vnet", "show", "ip", "fib", "table", "R1")
 	assert.Program(test.Self{},
 		"vnet", "show", "ip", "fib", "table", "R2")
+}
+
+func checkVlanTag(t *testing.T) {
+	assert := test.Assert{t}
+
+	t.Log("Check for invalid vlan tag") // issue #92
+
+	r1, err := docker.FindHost(config, "R1")
+	r1Intf := r1.Intfs[0]
+
+	// remove existing IP address
+	cmd := []string{"ip", "address", "flush", "dev", r1Intf.Name}
+	_, err = docker.ExecCmd(t, "R1", config, cmd)
+	assert.Nil(err)
+
+	r2, err := docker.FindHost(config, "R2")
+	r2Intf := r2.Intfs[0]
+
+	done := make(chan bool, 1)
+
+	go func(done chan bool) {
+		cmd := []string{"timeout", "10",
+			"tcpdump", "-c1", "-nvvvei", r2Intf.Name, "port", "67"}
+		out, err := docker.ExecCmd(t, "R2", config, cmd)
+		assert.Nil(err)
+		match, err := regexp.MatchString("vlan 0", out)
+		assert.Nil(err)
+		if match {
+			t.Error("Invalid vlan 0 tag found")
+		}
+		done <- true
+	}(done)
+
+	time.Sleep(1 * time.Second)
+	cmd = []string{"dhclient", "-4", "-v", r1Intf.Name}
+	_, err = docker.ExecCmd(t, "R1", config, cmd)
+	assert.Nil(err)
+	<-done
 }
