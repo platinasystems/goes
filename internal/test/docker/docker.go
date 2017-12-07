@@ -84,11 +84,6 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 	path += ":/bin"
 	env := []string{path}
 
-	pwd, err := syscall.Getwd()
-	if err != nil {
-		return
-	}
-
 	// Common container config
 	cc := &container.Config{}
 	cc.Tty = true
@@ -96,6 +91,11 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 
 	var vdir string
 	if config.Volume != "" && config.Mapping != "" {
+		var pwd string
+		pwd, err = syscall.Getwd()
+		if err != nil {
+			return
+		}
 		vdir = pwd + config.Volume
 		cc.Volumes = map[string]struct{}{config.Mapping: {}}
 	}
