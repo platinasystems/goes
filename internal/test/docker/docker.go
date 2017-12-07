@@ -88,13 +88,18 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 	if err != nil {
 		return
 	}
-	vdir := pwd + config.Volume
 
 	// Common container config
 	cc := &container.Config{}
 	cc.Tty = true
 	cc.Env = env
-	cc.Volumes = map[string]struct{}{config.Mapping: {}}
+
+	var vdir string
+	if config.Volume != "" && config.Mapping != "" {
+		vdir = pwd + config.Volume
+		cc.Volumes = map[string]struct{}{config.Mapping: {}}
+	}
+	_ = vdir // make compiler happy
 
 	// Common host config
 	ch := &container.HostConfig{}
@@ -118,8 +123,11 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 		cc.Hostname = router.Hostname
 		cc.Cmd = []string{router.Cmd}
 
-		bind := vdir + "volumes/" + router.Hostname + ":" + config.Mapping
-		ch.Binds = []string{bind}
+		if vdir != "" {
+			bind := vdir + "volumes/" + router.Hostname +
+				":" + config.Mapping
+			ch.Binds = []string{bind}
+		}
 
 		cresp, err2 := startContainer(t, config, cc, ch)
 		if err2 != nil {
