@@ -42,13 +42,6 @@ func New() *Command { return new(Command) }
 // This will include all vnet interfaces.
 var UnixInterfacesOnly bool
 
-// Wait for gdb before starting vnet.
-var GdbWait bool
-
-// In gdb issue command "p 'vnetd.gdb_wait'=1" to break out of loop and
-// start vnet.
-var gdb_wait int
-
 // Machines may reassign this for platform sepecific init before vnet.Run.
 var Hook = func(func(), *vnet.Vnet) error { return nil }
 
@@ -79,10 +72,6 @@ func (c *Command) Main(...string) error {
 
 	if err = redis.IsReady(); err != nil {
 		return err
-	}
-
-	for GdbWait && gdb_wait == 0 {
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	// never want to block vnet
