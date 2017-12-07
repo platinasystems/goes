@@ -180,7 +180,7 @@ func (c *Command) update() error {
 		if strings.Contains(k, "rpm") {
 			v, err := Vdev.FanCount(i)
 			if err != nil {
-				return err
+				continue
 			}
 			if v != c.last[k] {
 				c.pub.Print(k, ": ", v)
@@ -332,6 +332,7 @@ func (h *I2cDev) RearTemp() (string, error) {
 
 func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 	var rpm uint16
+	var t, u byte
 
 	if i > 14 {
 		panic("FanCount subscript out of range\n")
@@ -352,13 +353,27 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 		r.BankSelect.set(h, 0x80)
 		r.FanCount[i].get(h)
 		r.FractionLSB.get(h)
+		r.FanCount[i].get(h)
+		r.FractionLSB.get(h)
+		r.FanCount[i].get(h)
+		r.FractionLSB.get(h)
 		closeMux(h)
 		err := DoI2cRpc()
 		if err != nil {
 			return 0, err
 		}
-		t := uint8(s[3].D[0])
-		u := uint8(s[5].D[0])
+		c := [3]byte{s[3].D[0], s[7].D[0], s[11].D[0]}
+		l := [3]byte{s[5].D[0], s[9].D[0], s[13].D[0]}
+
+		if c[0] == c[1] && l[0] == l[1] {
+			t = c[0]
+			u = l[0]
+		} else if c[1] == c[2] && l[1] == l[2] {
+			t = c[1]
+			u = l[1]
+		} else {
+			return 0, fmt.Errorf("rpm read mismatch")
+		}
 		rpm = fanSpeed(t, u)
 	}
 	return rpm, nil
