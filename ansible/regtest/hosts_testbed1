@@ -1,5 +1,5 @@
 server_emulator ansible_ssh_host=172.17.2.28
-packet_genertor ansible_ssh_host=172.17.2.10
+packet_generator ansible_ssh_host=172.17.2.10 ansible_become_user=platina ansible_become_pass=regressi0n ansible_become_method=su
 
 invader29 ansible_ssh_host=172.17.2.29 bmc_redis_ip=172.17.3.29 bgp_network=10.120.213.0/28 ipv4_config_ip=192.168.101.29
 invader30 ansible_ssh_host=172.17.2.30 bmc_redis_ip=172.17.3.30 bgp_network=208.211.234.0/24 ipv4_config_ip=192.168.101.30
