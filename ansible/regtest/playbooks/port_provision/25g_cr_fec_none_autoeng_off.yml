@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "port_provision_100g_cr_fec_cl91_autoeng_on_{{ start_time.stdout }}"
+        hash_name: "port_provision_25g_cr_fec_none_autoeng_off_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -19,11 +19,19 @@
         path: "{{ port_provision_log_dir }}"
         state: directory
 
-    - name: Execute port provision 100g_cr_fec_cl91_autoeng_on and verify the same
+    - name: Copy port provision file
+      template:
+        src: ../../templates/25g_cr_fec_none_autoeng_off_portprovision.j2
+        dest: /etc/goes/portprovision
+
+    - name: Restart goes
+      command: "goes restart"
+
+    - name: Execute port provision 25g_cr_fec_none_autoeng_off and verify the same
       test_port_provision:
         switch_name: "{{ inventory_hostname }}"
         eth_list: "2,4,6,8,10,12,14,16"
-        speed: "auto"
+        speed: "25g"
         media: "copper"
         verify_links: False
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
@@ -51,12 +59,19 @@
 - hosts: packet_generator
   become: true
   tasks:
+    - name: Copy cint config create and delete files
+      template:
+        src: ../../templates/{{ item }}
+        dest: /home/platina/bin/{{ item }}
+      with_items:
+      - '25g_cr_fec_none_create.cint'
+      - '25g_cr_fec_none_delete.cint'
+
     - name: Execute port provision on packet generator and verify the same
       test_port_provision_packet_generator:
         switch_name: "{{ inventory_hostname }}"
         ce_list: "1,3,5,7,9,11,13,15"
-        speed: "100g"
-        autoeng: True
+        speed: "25g"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
 
@@ -80,6 +95,8 @@
       test_port_provision:
         switch_name: "{{ inventory_hostname }}"
         eth_list: "2,4,6,8,10,12,14,16"
+        speed: "25g"
+        media: "copper"
         verify_links: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
@@ -118,6 +135,10 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
+    - file:
+        path: "/etc/goes/portprovision"
+        state: absent
+
     - command: "goes restart"
 
 
@@ -128,7 +149,7 @@
       test_port_provision_packet_generator:
         switch_name: "{{ inventory_hostname }}"
         ce_list: "1,3,5,7,9,11,13,15"
-        speed: "100g"
+        speed: "25g"
         reset_config: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
@@ -144,6 +165,13 @@
         hash_dict: "{{ module_out.hash_dict }}"
         log_content: ""
       delegate_to: 127.0.0.1
+
+    - file:
+        path: "/home/platina/bin/{{ item }}"
+        state: absent
+      with_items:
+      - '25g_cr_fec_none_create.cint'
+      - '25g_cr_fec_none_delete.cint'
 
 
 - hosts: server_emulator

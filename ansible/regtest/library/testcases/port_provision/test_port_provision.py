@@ -146,45 +146,102 @@ def verify_port_provisioning(module):
     eth_list = module.params['eth_list'].split(',')
 
     for eth in eth_list:
-        if verify_links:
-            # Verify if port links are up for eth
-            cmd = 'goes hget platina vnet.eth-{}-1.link'.format(eth)
-            out = execute_commands(module, cmd)
-            if 'true' not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'port link is not up '
-                failure_summary += 'for the interface eth-{}-1\n'.format(eth)
-        else:
-            # Install given media on interfaces
-            cmd = 'goes hset platina vnet.eth-{}-1.media {}'.format(eth, media)
-            execute_commands(module, cmd)
+        if speed == '100g':
+            if verify_links:
+                # Verify if port links are up for eth
+                cmd = 'goes hget platina vnet.eth-{}-1.link'.format(eth)
+                out = execute_commands(module, cmd)
+                if 'true' not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'port link is not up '
+                    failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+            else:
+                # Install given media on interfaces
+                cmd = 'goes hset platina vnet.eth-{}-1.media {}'.format(eth, media)
+                execute_commands(module, cmd)
 
-            # Port provision interfaces to given speed
-            cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth, speed)
-            execute_commands(module, cmd)
+                # Port provision interfaces to given speed
+                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth, speed)
+                execute_commands(module, cmd)
 
-            # Bring up the interfaces
-            cmd = 'ifconfig eth-{}-1 up'.format(eth)
-            execute_commands(module, cmd)
+                # Bring up the interfaces
+                cmd = 'ifconfig eth-{}-1 up'.format(eth)
+                execute_commands(module, cmd)
 
-            # Verify interface media is set to copper
-            cmd = 'goes hget platina vnet.eth-{}-1.media'.format(eth)
-            out = execute_commands(module, cmd)
-            if 'copper' not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'interface media is not set to copper '
-                failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+                # Verify interface media is set to copper
+                cmd = 'goes hget platina vnet.eth-{}-1.media'.format(eth)
+                out = execute_commands(module, cmd)
+                if 'copper' not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'interface media is not set to copper '
+                    failure_summary += 'for the interface eth-{}-1\n'.format(eth)
 
-            # Verify speed of interfaces are set to correct value
-            cmd = 'goes hget platina vnet.eth-{}-1.speed'.format(eth)
-            out = execute_commands(module, cmd)
-            if speed not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'speed of the interface is not set to {} '.format(speed)
-                failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+                # Verify speed of interfaces are set to correct value
+                cmd = 'goes hget platina vnet.eth-{}-1.speed'.format(eth)
+                out = execute_commands(module, cmd)
+                if speed not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'speed of the interface is not set to {} '.format(speed)
+                    failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+        elif speed == '25g':
+            if verify_links:
+                for subport in range(1, 5):
+                    # Verify if port links are up for eth
+                    cmd = 'goes hget platina vnet.eth-{}-{}.link'.format(eth, subport)
+                    out = execute_commands(module, cmd)
+                    if 'true' not in out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'port link is not up '
+                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+
+                    # Verify speed of interfaces are set to correct value
+                    cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(eth, subport)
+                    out = execute_commands(module, cmd)
+                    if speed not in out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'speed of the interface is not set to {} '.format(speed)
+                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+            else:
+                for subport in range(1, 5):
+                    # Install given media on interfaces
+                    cmd = 'goes hset platina vnet.eth-{}-{}.media {}'.format(eth, subport, media)
+                    execute_commands(module, cmd)
+
+                    # Set fec to None
+                    cmd = 'goes hset platina vnet.eth-{}-{}.fec none'.format(eth, subport)
+                    execute_commands(module, cmd)
+
+                # Port provision interfaces to given speed
+                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth, speed)
+                execute_commands(module, cmd)
+
+                for subport in range(1, 5):
+                    # Bring up the interfaces
+                    cmd = 'ifconfig eth-{}-1 up'.format(eth)
+                    execute_commands(module, cmd)
+
+                    # Verify interface media is set to copper
+                    cmd = 'goes hget platina vnet.eth-{}-{}.media'.format(eth, subport)
+                    out = execute_commands(module, cmd)
+                    if 'copper' not in out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'interface media is not set to copper '
+                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+
+                    # Verify if fec is set to none
+                    cmd = 'goes hget platina vnet.eth-{}-{}.fec'.format(eth, subport)
+                    out = execute_commands(module, cmd)
+                    if 'none' not in out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'fec is not set to none '
+                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
 
     HASH_DICT['result.detail'] = failure_summary
 

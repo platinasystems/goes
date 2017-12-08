@@ -139,31 +139,70 @@ def verify_port_provisioning(module):
     ce_list = module.params['ce_list'].split(',')
     initial_cli = "python /home/platina/bin/bcm.py"
 
+    xe_list = ['3', '4', '5', '6', '10', '11', '12', '13', '17', '18', '19', '20',
+               '24', '25', '26', '27', '31', '32', '33', '34', '38', '39', '40', '41',
+               '45', '46', '47', '48', '52', '53', '54', '55']
+
     if not module.params['reset_config']:
-        if not autoeng:
-            # Port provision ce ports to given speed
+        if speed == '100g':
+            if not autoeng:
+                # Port provision ce ports to given speed
+                for ce in ce_list:
+                    cmd = "{} 'port ce{} speed={} if=cr4'".format(initial_cli, ce, speed)
+                    execute_commands(module, cmd)
+
+                # Execute cint configuration script
+                cmd = "{} 'cint 100g_cr_fec_cl91_create.cint'".format(initial_cli)
+                execute_commands(module, cmd)
+            else:
+                # Port provision ce ports to given speed
+                for ce in ce_list:
+                    cmd = "{} 'port ce{} adv={} an=1 if=cr4'".format(initial_cli, ce, speed)
+                    execute_commands(module, cmd)
+
+            # Verify if ce ports are up
             for ce in ce_list:
-                cmd = "{} 'port ce{} speed={} if=cr4'".format(initial_cli, ce, speed)
+                cmd = "{} 'ps ce{}'".format(initial_cli, ce)
+                out = execute_commands(module, cmd)
+
+                if 'up' not in out.lower():
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'ce{} port is not up\n'.format(ce)
+
+        elif speed == '25g':
+            # Install copper cable on ce ports
+            for ce in ce_list:
+                cmd = "{} 'port ce{} en=f'".format(initial_cli, ce)
+                execute_commands(module, cmd)
+
+            # Configure lanes on ce ports
+            for ce in range(1, 9):
+                cmd = "{} 'port ce{} lanes 1'".format(initial_cli, ce)
+                execute_commands(module, cmd)
+
+            # Set the speed to given speed
+            for xe in xe_list:
+                cmd = "{} 'port xe{} speed={} if=cr'".format(initial_cli, xe, speed)
                 execute_commands(module, cmd)
 
             # Execute cint configuration script
-            cmd = "{} 'cint 100G_CR_fec_cl91_create.cint'".format(initial_cli)
+            cmd = "{} 'cint 25g_cr_fec_none_create.cint'".format(initial_cli)
             execute_commands(module, cmd)
-        else:
-            # Port provision ce ports to given speed
-            for ce in ce_list:
-                cmd = "{} 'port ce{} adv={} an=1 if=cr4'".format(initial_cli, ce, speed)
+
+            for xe in xe_list:
+                cmd = "{} 'port xe{} ena=t'".format(initial_cli, xe)
                 execute_commands(module, cmd)
 
-        # Verify if ce ports are up
-        for ce in ce_list:
-            cmd = "{} 'ps ce{}'".format(initial_cli, ce)
-            out = execute_commands(module, cmd)
+            # Verify if xe ports are up
+            for xe in xe_list:
+                cmd = "{} 'ps xe{}'".format(initial_cli, xe)
+                out = execute_commands(module, cmd)
 
-            if 'up' not in out.lower():
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'ce{} port is not up\n'.format(ce)
+                if 'up' not in out.lower():
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'xe{} port is not up\n'.format(xe)
 
         # Generate traffic
         cmd = 'python /home/platina/bin/autoTest_pktDrop_by_pktSizes.py 30 31 1 10'
@@ -180,9 +219,14 @@ def verify_port_provisioning(module):
             cmd = "{} 'port ce{} speed=100000 an=0 if=cr4'".format(initial_cli, ce)
             execute_commands(module, cmd)
 
-        if not autoeng:
+        if speed == '100g':
+            if not autoeng:
+                # Delete cint configuration
+                cmd = "{} 'cint 100g_cr_fec_cl91_delete.cint'".format(initial_cli)
+                execute_commands(module, cmd)
+        elif speed == '25g':
             # Delete cint configuration
-            cmd = "{} 'cint 100G_CR_fec_cl91_delete.cint'".format(initial_cli)
+            cmd = "{} 'cint 25g_cr_fec_none_delete.cint'".format(initial_cli)
             execute_commands(module, cmd)
 
         for ce in ce_list:

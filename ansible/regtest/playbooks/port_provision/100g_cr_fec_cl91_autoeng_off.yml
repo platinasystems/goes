@@ -56,8 +56,8 @@
         src: ../../templates/{{ item }}
         dest: /home/platina/bin/{{ item }}
       with_items:
-      - '100G_CR_fec_cl91_create.cint'
-      - '100G_CR_fec_cl91_delete.cint'
+      - '100g_cr_fec_cl91_create.cint'
+      - '100g_cr_fec_cl91_delete.cint'
 
     - name: Execute port provision on packet generator and verify the same
       test_port_provision_packet_generator:
@@ -127,6 +127,8 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
+    - command: "goes restart"
+
 
 - hosts: packet_generator
   become: true
@@ -156,8 +158,8 @@
         path: "/home/platina/bin/{{ item }}"
         state: absent
       with_items:
-      - '100G_CR_fec_cl91_create.cint'
-      - '100G_CR_fec_cl91_delete.cint'
+      - '100g_cr_fec_cl91_create.cint'
+      - '100g_cr_fec_cl91_delete.cint'
 
 
 - hosts: server_emulator
