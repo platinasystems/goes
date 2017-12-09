@@ -1,0 +1,78 @@
+version: '3'
+services:
+  CA-1:
+    container_name: CA-1
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: CA-1
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes/CA-1:/etc/frr
+    network_mode: "none"      
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  RA-1:
+    container_name: RA-1
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: RA-1
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes/RA-1:/etc/frr
+    network_mode: "none"      
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  RA-2:
+    container_name: RA-2
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: RA-2
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes/RA-2:/etc/frr
+    network_mode: "none"      
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  CA-2:
+    container_name: CA-2
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: CA-2
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes/CA-2:/etc/frr
+    network_mode: "none"      
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"

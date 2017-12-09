@@ -18,6 +18,7 @@ import (
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/ospf"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/dhcp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/slice"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/static"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/port2port"
 )
 
@@ -64,6 +65,16 @@ func Test(t *testing.T) {
 				{"vlan", func(t *testing.T) {
 					dhcp.Test(t, conf(t, "net-dhcp-vlan",
 						dhcp.ConfVlan))
+				}},
+			}.Run},
+			{"static", test.Suite{
+				{"eth", func(t *testing.T) {
+					static.Test(t, conf(t, "net-static-eth",
+						static.Conf))
+				}},
+				{"vlan", func(t *testing.T) {
+					static.Test(t, conf(t, "net-static-vlan",
+						static.ConfVlan))
 				}},
 			}.Run},
 		}.Run},
