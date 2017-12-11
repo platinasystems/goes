@@ -483,11 +483,11 @@ func (f *MapFib) getLessSpecific(pʹ *Prefix) (r mapFibResult, p Prefix, ok bool
 	p = pʹ.Address.toPrefix()
 
 	// No need to consider length 0 since that's not in mtrie.
-	for l := pʹ.Len - 1; l >= 1; l-- {
+	for l := int(pʹ.Len) - 1; l >= 1; l-- {
 		if f[l] == nil {
 			continue
 		}
-		p.Len = l
+		p.Len = uint32(l)
 		k := p.mapFibKey()
 		if r, ok = f[l][k]; ok {
 			return
@@ -678,7 +678,7 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 		ok                    bool
 	)
 
-	if !isDel && nha.MatchesPrefix(p) {
+	if !isDel && nha.MatchesPrefix(p) && p.Address != AddressUint32(0) {
 		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nha)
 		return
 	}
