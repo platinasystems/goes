@@ -357,13 +357,15 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 		r.FractionLSB.get(h)
 		r.FanCount[i].get(h)
 		r.FractionLSB.get(h)
+		r.FanCount[i].get(h)
+		r.FractionLSB.get(h)
 		closeMux(h)
 		err := DoI2cRpc()
 		if err != nil {
 			return 0, err
 		}
-		c := [3]byte{s[3].D[0], s[7].D[0], s[11].D[0]}
-		l := [3]byte{s[5].D[0], s[9].D[0], s[13].D[0]}
+		c := [4]byte{s[3].D[0], s[7].D[0], s[11].D[0], s[15].D[0]}
+		l := [4]byte{s[5].D[0], s[9].D[0], s[13].D[0], s[17].D[0]}
 
 		if c[0] == c[1] && l[0] == l[1] {
 			t = c[0]
@@ -371,6 +373,9 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 		} else if c[1] == c[2] && l[1] == l[2] {
 			t = c[1]
 			u = l[1]
+		} else if c[2] == c[3] && l[2] == l[3] {
+			t = c[2]
+			u = l[2]
 		} else {
 			return 0, fmt.Errorf("rpm read mismatch")
 		}
