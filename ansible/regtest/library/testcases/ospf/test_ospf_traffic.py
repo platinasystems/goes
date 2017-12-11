@@ -134,6 +134,7 @@ def verify_ospf_traffic(module):
     routes_to_check = []
     netmask = 'netmask 255.255.255.0'
     switch_name = module.params['switch_name']
+    leaf_list = module.params['leaf_list']
     package_name = module.params['package_name']
     config_file = module.params['config_file'].splitlines()
 
@@ -171,7 +172,12 @@ def verify_ospf_traffic(module):
     time.sleep(35)
     execute_commands(module, 'service {} status'.format(package_name))
 
-    if switch_name in module.params['leaf_list']:
+    if switch_name in leaf_list:
+        third_octet = [leaf[-2::] for leaf in leaf_list]
+
+        for octet in third_octet:
+            routes_to_check.append('192.168.{}.0'.format(octet))
+
         # Get all ospf ip routes
         cmd = "vtysh -c 'sh ip route ospf'"
         ospf_routes = execute_commands(module, cmd)
