@@ -53,6 +53,11 @@ options:
         - Media of the eth interface port.
       required: False
       type: str
+    fec:
+      description:
+        - Fec of the eth interface port.
+      required: False
+      type: str
     verify_links:
       description:
         - Flag to indicate if port links need to be verified.
@@ -142,6 +147,7 @@ def verify_port_provisioning(module):
     switch_name = module.params['switch_name']
     speed = module.params['speed']
     media = module.params['media']
+    fec = module.params['fec']
     verify_links = module.params['verify_links']
     eth_list = module.params['eth_list'].split(',')
 
@@ -155,14 +161,17 @@ def verify_port_provisioning(module):
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'port link is not up '
-                    failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+                    failure_summary += 'for the interface eth-{}-1\n'.format(
+                        eth)
             else:
                 # Install given media on interfaces
-                cmd = 'goes hset platina vnet.eth-{}-1.media {}'.format(eth, media)
+                cmd = 'goes hset platina vnet.eth-{}-1.media {}'.format(eth,
+                                                                        media)
                 execute_commands(module, cmd)
 
                 # Port provision interfaces to given speed
-                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth, speed)
+                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth,
+                                                                        speed)
                 execute_commands(module, cmd)
 
                 # Bring up the interfaces
@@ -176,7 +185,8 @@ def verify_port_provisioning(module):
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'interface media is not set to copper '
-                    failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+                    failure_summary += 'for the interface eth-{}-1\n'.format(
+                        eth)
 
                 # Verify speed of interfaces are set to correct value
                 cmd = 'goes hget platina vnet.eth-{}-1.speed'.format(eth)
@@ -184,40 +194,49 @@ def verify_port_provisioning(module):
                 if speed not in out:
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'speed of the interface is not set to {} '.format(speed)
-                    failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+                    failure_summary += 'speed of the interface '
+                    failure_summary += 'is not set to {} for '.format(speed)
+                    failure_summary += 'the interface eth-{}-1\n'.format(eth)
         elif speed == '25g':
             if verify_links:
                 for subport in range(1, 5):
                     # Verify if port links are up for eth
-                    cmd = 'goes hget platina vnet.eth-{}-{}.link'.format(eth, subport)
+                    cmd = 'goes hget platina vnet.eth-{}-{}.link'.format(
+                        eth, subport)
                     out = execute_commands(module, cmd)
                     if 'true' not in out:
                         RESULT_STATUS = False
                         failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'port link is not up '
-                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+                        failure_summary += 'port link is not up for the '
+                        failure_summary += 'interface eth-{}-{}\n'.format(
+                            eth, subport)
 
                     # Verify speed of interfaces are set to correct value
-                    cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(eth, subport)
+                    cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(
+                        eth, subport)
                     out = execute_commands(module, cmd)
                     if speed not in out:
                         RESULT_STATUS = False
                         failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'speed of the interface is not set to {} '.format(speed)
-                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+                        failure_summary += 'speed of the interface '
+                        failure_summary += 'is not set to {} for '.format(speed)
+                        failure_summary += 'the interface eth-{}-{}\n'.format(
+                            eth, subport)
             else:
                 for subport in range(1, 5):
                     # Install given media on interfaces
-                    cmd = 'goes hset platina vnet.eth-{}-{}.media {}'.format(eth, subport, media)
+                    cmd = 'goes hset platina vnet.eth-{}-{}.media {}'.format(
+                        eth, subport, media)
                     execute_commands(module, cmd)
 
-                    # Set fec to None
-                    cmd = 'goes hset platina vnet.eth-{}-{}.fec none'.format(eth, subport)
+                    # Set fec
+                    cmd = 'goes hset platina vnet.eth-{}-{}.fec {}'.format(
+                        eth, subport, fec)
                     execute_commands(module, cmd)
 
                 # Port provision interfaces to given speed
-                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth, speed)
+                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth,
+                                                                        speed)
                 execute_commands(module, cmd)
 
                 for subport in range(1, 5):
@@ -226,22 +245,27 @@ def verify_port_provisioning(module):
                     execute_commands(module, cmd)
 
                     # Verify interface media is set to copper
-                    cmd = 'goes hget platina vnet.eth-{}-{}.media'.format(eth, subport)
+                    cmd = 'goes hget platina vnet.eth-{}-{}.media'.format(
+                        eth, subport)
                     out = execute_commands(module, cmd)
                     if 'copper' not in out:
                         RESULT_STATUS = False
                         failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'interface media is not set to copper '
-                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+                        failure_summary += 'interface media is not set to '
+                        failure_summary += 'copper for the interface '
+                        failure_summary += 'eth-{}-{}\n'.format(eth, subport)
 
-                    # Verify if fec is set to none
-                    cmd = 'goes hget platina vnet.eth-{}-{}.fec'.format(eth, subport)
+                    # Verify fec
+                    cmd = 'goes hget platina vnet.eth-{}-{}.fec'.format(
+                        eth, subport)
                     out = execute_commands(module, cmd)
-                    if 'none' not in out:
+                    if fec not in out:
                         RESULT_STATUS = False
                         failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'fec is not set to none '
-                        failure_summary += 'for the interface eth-{}-{}\n'.format(eth, subport)
+                        failure_summary += 'fec is not set to {} for '.format(
+                            fec)
+                        failure_summary += 'the interface eth-{}-{}\n'.format(
+                            eth, subport)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -257,6 +281,7 @@ def main():
             eth_list=dict(required=False, type='str', default=''),
             speed=dict(required=False, type='str'),
             media=dict(required=False, type='str'),
+            fec=dict(required=False, type='str'),
             verify_links=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),

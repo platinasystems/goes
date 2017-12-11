@@ -64,6 +64,7 @@
         switch_name: "{{ inventory_hostname }}"
         ce_list: "1,3,5,7,9,11,13,15"
         speed: "100g"
+        create_cint_file: "100g_cr_fec_cl91_create.cint"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
 
@@ -138,6 +139,7 @@
         switch_name: "{{ inventory_hostname }}"
         ce_list: "1,3,5,7,9,11,13,15"
         speed: "100g"
+        delete_cint_file: "100g_cr_fec_cl91_delete.cint"
         reset_config: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out

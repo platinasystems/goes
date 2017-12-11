@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "port_provision_25g_cr_fec_none_autoeng_off_{{ start_time.stdout }}"
+        hash_name: "port_provision_25g_cr_fec_cl74_autoeng_off_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -21,19 +21,19 @@
 
     - name: Copy port provision file
       template:
-        src: ../../templates/25g_cr_fec_none_autoeng_off_portprovision.j2
+        src: ../../templates/25g_cr_fec_cl74_autoeng_off_portprovision.j2
         dest: /etc/goes/portprovision
 
     - name: Restart goes
       command: "goes restart"
 
-    - name: Execute port provision 25g_cr_fec_none_autoeng_off and verify the same
+    - name: Execute port provision 25g_cr_fec_cl74_autoeng_off and verify the same
       test_port_provision:
         switch_name: "{{ inventory_hostname }}"
         eth_list: "2,4,6,8,10,12,14,16"
         speed: "25g"
         media: "copper"
-        fec: "none"
+        fec: "cl74"
         verify_links: False
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
@@ -65,15 +65,15 @@
         src: ../../templates/{{ item }}
         dest: /home/platina/bin/{{ item }}
       with_items:
-      - '25g_cr_fec_none_create.cint'
-      - '25g_cr_fec_none_delete.cint'
+      - '25g_cr_fec_cl74_create.cint'
+      - '25g_cr_fec_cl74_delete.cint'
 
     - name: Execute port provision on packet generator and verify the same
       test_port_provision_packet_generator:
         switch_name: "{{ inventory_hostname }}"
         ce_list: "1,3,5,7,9,11,13,15"
         speed: "25g"
-        create_cint_file: "25g_cr_fec_none_create.cint"
+        create_cint_file: "25g_cr_fec_cl74_create.cint"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
 
@@ -99,7 +99,7 @@
         eth_list: "2,4,6,8,10,12,14,16"
         speed: "25g"
         media: "copper"
-        fec: "none"
+        fec: "cl74"
         verify_links: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
@@ -153,7 +153,7 @@
         switch_name: "{{ inventory_hostname }}"
         ce_list: "1,3,5,7,9,11,13,15"
         speed: "25g"
-        delete_cint_file: "25g_cr_fec_none_delete.cint"
+        delete_cint_file: "25g_cr_fec_cl74_delete.cint"
         reset_config: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
@@ -174,8 +174,8 @@
         path: "/home/platina/bin/{{ item }}"
         state: absent
       with_items:
-      - '25g_cr_fec_none_create.cint'
-      - '25g_cr_fec_none_delete.cint'
+      - '25g_cr_fec_cl74_create.cint'
+      - '25g_cr_fec_cl74_delete.cint'
 
 
 - hosts: server_emulator
