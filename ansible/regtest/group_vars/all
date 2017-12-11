@@ -3,6 +3,7 @@ ansible_log_file_path: ~/ansible.log
 
 bgp_log_dir: /var/log/regression/bgp
 ospf_log_dir: /var/log/regression/ospf
+isis_log_dir: /var/log/regression/isis
 port_provision_log_dir: /var/log/regression/port_provision
 bgp_loop_prevention_log_file: /var/log/regression/bgp_loop_prevention.log
 
@@ -10,11 +11,15 @@ frr_bgp_conf_file: /etc/frr/bgpd.conf
 frr_bgp_conf_file_bck: /etc/frr/bgpd.conf.bck
 frr_ospf_conf_file: /etc/frr/ospfd.conf
 frr_ospf_conf_file_bck: /etc/frr/ospfd.conf.bck
+frr_isis_conf_file: /etc/frr/isisd.conf
+frr_isis_conf_file_bck: /etc/frr/isisd.conf.bck
 
 quagga_bgp_conf_file: /etc/quagga/bgpd.conf
 quagga_bgp_conf_file_bck: /etc/quagga/bgpd.conf.bck
 quagga_ospf_conf_file: /etc/quagga/ospfd.conf
 quagga_ospf_conf_file_bck: /etc/quagga/ospfd.conf.bck
+quagga_isis_conf_file: /etc/quagga/isisd.conf
+quagga_isis_conf_file_bck: /etc/quagga/isisd.conf.bck
 
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'

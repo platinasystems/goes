@@ -55,6 +55,11 @@ options:
       required: False
       type: bool
       default: False
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -114,7 +119,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -136,6 +141,7 @@ def verify_isis_neighbors(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     spine_list = module.params['spine_list']
     leaf_list = module.params['leaf_list']
     is_spine = True if switch_name in spine_list else False
@@ -143,9 +149,9 @@ def verify_isis_neighbors(module):
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
-    execute_commands(module, 'service quagga status')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
 
     # Get isis neighbor info
     cmd = "vtysh -c 'sh isis neighbor'"
@@ -206,6 +212,7 @@ def main():
             spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
             check_neighbors=dict(required=False, type='bool', default=False),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

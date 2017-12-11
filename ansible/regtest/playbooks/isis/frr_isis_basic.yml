@@ -8,22 +8,22 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_isis_neighbors_{{ start_time.stdout }}"
+        hash_name: "frr_isis_basic_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of /etc/quagga/isisd.conf
+    - name: Take backup of /etc/frr/isisd.conf
       copy:
-        src: "{{ quagga_isis_conf_file }}"
-        dest: "{{ quagga_isis_conf_file_bck }}"
+        src: "{{ frr_isis_conf_file }}"
+        dest: "{{ frr_isis_conf_file_bck }}"
         remote_src: true
 
     - name: Update hostname info in isisd.conf
       replace:
-        path: "{{ quagga_isis_conf_file }}"
+        path: "{{ frr_isis_conf_file }}"
         regexp: "^hostname isisd"
         replace: "hostname {{ inventory_hostname }}"
 
@@ -36,7 +36,7 @@
 
     - name: Configure isis for eth-21-1
       blockinfile:
-        path: "{{ quagga_isis_conf_file }}"
+        path: "{{ frr_isis_conf_file }}"
         insertafter: "interface eth-21-1"
         marker: "! eth-21-1 {mark}"
         block: |
@@ -51,7 +51,7 @@
 
     - name: Configure isis for eth-11-1
       blockinfile:
-        path: "{{ quagga_isis_conf_file }}"
+        path: "{{ frr_isis_conf_file }}"
         insertafter: "interface eth-11-1"
         marker: "! eth-11-1 {mark}"
         block: |
@@ -66,7 +66,7 @@
 
     - name: Configure isis for eth-5-1
       blockinfile:
-        path: "{{ quagga_isis_conf_file }}"
+        path: "{{ frr_isis_conf_file }}"
         insertafter: "interface eth-5-1"
         marker: "! eth-5-1 {mark}"
         block: |
@@ -81,7 +81,7 @@
 
     - name: Configure isis for eth-27-1
       blockinfile:
-        path: "{{ quagga_isis_conf_file }}"
+        path: "{{ frr_isis_conf_file }}"
         insertafter: "interface eth-27-1"
         marker: "! eth-27-1 {mark}"
         block: |
@@ -91,15 +91,15 @@
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Add isis config in /etc/quagga/isisd.conf
+    - name: Add isis config in /etc/frr/isisd.conf
       blockinfile:
-        path: "{{ quagga_isis_conf_file }}"
+        path: "{{ frr_isis_conf_file }}"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/isis_basic.conf') }}"
-
-    - name: Restart quagga
+      
+    - name: Restart frr
       service:
-        name: quagga
+        name: frr
         state: restarted
 
     - name: Wait for few seconds for isis to establish connection
@@ -108,15 +108,14 @@
 
     - file:
         path: "{{ isis_log_dir }}"
-        state: directory      
+        state: directory
 
-    - name: Verify quagga isis neighbor relationship
+    - name: Verify frr isis basic
       test_isis_basic:
         switch_name: "{{ inventory_hostname }}"
         spine_list: "{{ groups['spine'] }}"
         leaf_list: "{{ groups['leaf'] }}"
-        check_neighbors: True
-        package_name: "quagga"
+        package_name: "frr"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ isis_log_dir }}"
       register: module_out
@@ -160,10 +159,10 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - name: Restore backup of /etc/quagga/isisd.conf
+    - name: Restore backup of /etc/frr/isisd.conf
       copy:
-        src: "{{ quagga_isis_conf_file_bck }}"
-        dest: "{{ quagga_isis_conf_file }}"
+        src: "{{ frr_isis_conf_file_bck }}"
+        dest: "{{ frr_isis_conf_file }}"
         remote_src: true
         owner: root
         group: root
@@ -171,12 +170,13 @@
 
     - name: Remove backup file
       file:
-        path: "{{ quagga_isis_conf_file_bck }}"
+        path: "{{ frr_isis_conf_file_bck }}"
         state: absent
 
     - service:
-        name: quagga
+        name: frr
         state: restarted
+
 
 
 - hosts: server_emulator
