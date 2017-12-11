@@ -40,7 +40,7 @@ options:
       type: str
     config_file:
       description:
-        - OSPF configurations added in Quagga.conf file.
+        - OSPF configurations added.
       required: False
       type: str
     leaf_list:
@@ -49,6 +49,11 @@ options:
       required: False
       type: list
       default: []
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -66,7 +71,7 @@ EXAMPLES = """
   test_ospf_traffic:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-    log_dir_path: "{{ log_dir_path }}"
+    log_dir_path: "{{ ospf_log_dir }}"
 """
 
 RETURN = """
@@ -126,8 +131,10 @@ def verify_ospf_traffic(module):
     """
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
-    switch_name = module.params['switch_name']
     routes_to_check = []
+    netmask = 'netmask 255.255.255.0'
+    switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
     config_file = module.params['config_file'].splitlines()
 
     # Get the current/running configurations
@@ -142,23 +149,27 @@ def verify_ospf_traffic(module):
             address = address.split('/')[0]
             octets = address.split('.')
             if octets[2] == switch_id:
-                octets[3] = '1'
-                ip = '.'.join(octets)
-                routes_to_check.append(ip)
-                cmd = 'ifconfig lo {} netmask 255.255.255.0'.format(ip)
+                # Add dummy0 interface
+                execute_commands(module, 'ip link add dummy0 type dummy')
+
+                # Assign ip to this created dummy0 interface
+                cmd = 'ifconfig dummy0 192.168.{}.1 {}'.format(
+                    switch_name[-2::], netmask
+                )
+                execute_commands(module, cmd)
             else:
                 octets[3] = switch_id
                 ip = '.'.join(octets)
                 eth = 'eth-{}-1'.format(octets[2])
-                cmd = 'ifconfig {} {} netmask 255.255.255.0'.format(eth, ip)
+                cmd = 'ifconfig {} {} {}'.format(eth, ip, netmask)
 
             # Run ifconfig command
             execute_commands(module, cmd)
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
     time.sleep(35)
-    execute_commands(module, 'service quagga status')
+    execute_commands(module, 'service {} status'.format(package_name))
 
     if switch_name in module.params['leaf_list']:
         # Get all ospf ip routes
@@ -186,6 +197,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str', default=''),
             leaf_list=dict(required=False, type='list', default=[]),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -200,7 +212,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -213,7 +225,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
