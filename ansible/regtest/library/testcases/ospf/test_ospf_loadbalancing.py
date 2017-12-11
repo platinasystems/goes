@@ -40,15 +40,26 @@ options:
       type: str
     config_file:
       description:
-        - OSPF configurations added in Quagga.conf file.
+        - OSPF configurations added.
       required: False
       type: str
+    spine_list:
+      description:
+        - List of all spine switches.
+      required: False
+      type: list
+      default: []
     leaf_list:
       description:
         - List of all leaf switches.
       required: False
       type: list
       default: []
+    package_name:
+      description:
+        - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -108,7 +119,10 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    out = run_cli(module, cmd)
+    if 'dummy0' in cmd:
+        out = None
+    else:
+        out = run_cli(module, cmd)
 
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
@@ -127,65 +141,74 @@ def verify_ospf_load_balancing(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     routes_to_check = []
-    loopback_ip = None
-
+    netmask = 'netmask 255.255.255.0'
     switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
+    spine_list = module.params['spine_list']
     leaf_list = module.params['leaf_list']
     config_file = module.params['config_file'].splitlines()
     is_leaf = True if switch_name in leaf_list else False
 
+    # Add dummy0 interface
+    execute_commands(module, 'ip link add dummy0 type dummy')
+
+    # Assign ip to this created dummy0 interface
+    cmd = 'ifconfig dummy0 192.168.{}.1 {}'.format(
+        switch_name[-2::], netmask
+    )
+    execute_commands(module, cmd)
+
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
+
+    switch_id = switch_name[-2::]
 
     # Update eth network interfaces
     for line in config_file:
         line = line.strip()
         if line.startswith('network'):
-            switch_id = switch_name[-2::]
             address = line.split()[1]
             address = address.split('/')[0]
             octets = address.split('.')
-            if octets[2] == switch_id and is_leaf:
-                octets[3] = '1'
-                ip = '.'.join(octets)
-                loopback_ip = ip
-                cmd = 'ifconfig lo {} netmask 255.255.255.0'.format(ip)
+            if octets[2] == switch_id:
+                pass
             else:
                 octets[3] = switch_id
                 ip = '.'.join(octets)
-                routes_to_check.append(ip)
                 eth = 'eth-{}-1'.format(octets[2])
-                cmd = 'ifconfig {} {} netmask 255.255.255.0'.format(eth, ip)
+                routes_to_check.append(eth)
+                cmd = 'ifconfig {} {} {}'.format(eth, ip, netmask)
 
             # Run ifconfig command
             execute_commands(module, cmd)
 
-    # Restart and check Quagga status
-    execute_commands(module, 'service quagga restart')
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
     time.sleep(35)
-    execute_commands(module, 'service quagga status')
+    execute_commands(module, 'service {} status'.format(package_name))
 
     if is_leaf:
-        switch_ids = [leaf[-2::] for leaf in leaf_list]
-        loopback_ip_octets = loopback_ip.split('.')
-        switch_ids.remove(loopback_ip_octets[2])
-        loopback_ip_octets[2] = switch_ids.pop()
-        loopback_ip = '.'.join(loopback_ip_octets)
+        third_octet = [leaf[-2::] for leaf in leaf_list]
+        third_octet.remove(switch_id)
+    else:
+        third_octet = [spine[-2::] for spine in spine_list]
+        third_octet.remove(switch_id)
 
-        # Get all ospf ip routes
-        cmd = "vtysh -c 'sh ip route {}'".format(loopback_ip)
-        ospf_routes = execute_commands(module, cmd)
+    route_ip = '192.168.{}.0/24'.format(third_octet.pop())
 
-        for route in routes_to_check:
-            route_octets = route.split('.')
-            route_octets.pop()
-            route_ip = '.'.join(route_octets)
-            if route_ip not in ospf_routes:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'output of command {} '.format(cmd)
-                failure_summary += 'did not show correct routes\n'
-                break
+    # Get all ospf ip routes
+    cmd = "vtysh -c 'sh ip route {}'".format(route_ip)
+    ospf_routes = execute_commands(module, cmd)
+
+    for route in routes_to_check:
+        if route not in ospf_routes:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'output of command {} '.format(cmd)
+            failure_summary += 'did not show correct routes\n'
+
+    # Delete the dummy interface
+    execute_commands(module, 'ip link del dummy0 type dummy')
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -199,7 +222,9 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str', default=''),
+            spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
+            package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -214,7 +239,7 @@ def main():
 
     # Create a log file
     log_file_path = module.params['log_dir_path']
-    log_file_path += '/{}_'.format(module.params['hash_name']) + '.log'
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
@@ -227,7 +252,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
