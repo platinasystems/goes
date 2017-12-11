@@ -726,9 +726,7 @@ func (m *qsfpMain) poll() {
 										}
 										if bmcIpv6LinkLocalRedis != "" {
 											d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
-											if err != nil {
-												log.Print(err)
-											} else {
+											if err == nil {
 												d.Do("HSET", redis.DefaultHash, "qsfp.temp.units.C", q.Mon.Temperature)
 												d.Close()
 											}
