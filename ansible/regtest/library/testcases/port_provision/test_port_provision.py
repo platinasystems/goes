@@ -152,7 +152,7 @@ def verify_port_provisioning(module):
     eth_list = module.params['eth_list'].split(',')
 
     for eth in eth_list:
-        if speed == '100g':
+        if speed == '100g' or speed == '40g' or speed == 'auto':
             if verify_links:
                 # Verify if port links are up for eth
                 cmd = 'goes hget platina vnet.eth-{}-1.link'.format(eth)
@@ -173,6 +173,12 @@ def verify_port_provisioning(module):
                 cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth,
                                                                         speed)
                 execute_commands(module, cmd)
+
+                # Set fec
+                if fec != '':
+                    cmd = 'goes hset platina vnet.eth-{}-1.fec {}'.format(eth,
+                                                                          fec)
+                    execute_commands(module, cmd)
 
                 # Bring up the interfaces
                 cmd = 'ifconfig eth-{}-1 up'.format(eth)
@@ -241,7 +247,7 @@ def verify_port_provisioning(module):
 
                 for subport in range(1, 5):
                     # Bring up the interfaces
-                    cmd = 'ifconfig eth-{}-1 up'.format(eth)
+                    cmd = 'ifconfig eth-{}-{} up'.format(eth, subport)
                     execute_commands(module, cmd)
 
                     # Verify interface media is set to copper
@@ -281,7 +287,7 @@ def main():
             eth_list=dict(required=False, type='str', default=''),
             speed=dict(required=False, type='str'),
             media=dict(required=False, type='str'),
-            fec=dict(required=False, type='str'),
+            fec=dict(required=False, type='str', default=''),
             verify_links=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
