@@ -1,0 +1,20 @@
+
+  {{ container }}:
+    container_name: {{ container }}
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: {{ container }}
+    image: stigt/debian-quagga:latest
+    privileged: true
+    volumes:
+      - ~/volumes/quagga/{{ container }}:/etc/quagga
+    network_mode: "none"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
