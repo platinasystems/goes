@@ -123,12 +123,15 @@ func getNewDmesg(c *Info) (error, []string) {
 		}
 		kmsg.Parse(buf[:n])
 		ksq := strconv.Itoa(int(kmsg.Seq))
+
 		now := time.Now()
-		tim := time.Time(kmsg.Stamp.Time(now, int64(si.Uptime)-1))
+		tim := time.Time(kmsg.Stamp.Time(now, int64(si.Uptime)))
 		kst := fmt.Sprintln(tim)
-		kst = strings.TrimSuffix(kst, "\n")
+		ksu := strings.Split(kst, ".")
+
+		kmg := fmt.Sprint(sp, lb, kmsg.Stamp, rb, sp)
 		if uint64(kmsg.Seq) > c.seq_end {
-			fs := ksq + sp + lb + kst + rb + sp + kmsg.Msg
+			fs := ksq + sp + lb + ksu[0] + rb + kmg + kmsg.Msg
 			msg[i] = fmt.Sprintln(fs)
 			c.seq_end = uint64(kmsg.Seq)
 		}
