@@ -138,12 +138,6 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - file:
-        path: "/etc/goes/portprovision"
-        state: absent
-
-    - command: "goes restart"
-
 
 - hosts: packet_generator
   become: true
@@ -176,6 +170,18 @@
       with_items:
       - '25g_cr_fec_cl74_create.cint'
       - '25g_cr_fec_cl74_delete.cint'
+
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - file:
+        path: "/etc/goes/portprovision"
+        state: absent
+
+    - command: "goes restart"
+
 
 
 - hosts: server_emulator

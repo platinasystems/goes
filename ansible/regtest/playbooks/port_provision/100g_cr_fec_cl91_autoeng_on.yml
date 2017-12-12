@@ -118,7 +118,6 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - command: "goes restart"
 
 
 - hosts: packet_generator
@@ -144,6 +143,12 @@
         hash_dict: "{{ module_out.hash_dict }}"
         log_content: ""
       delegate_to: 127.0.0.1
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - command: "goes restart"
 
 
 - hosts: server_emulator

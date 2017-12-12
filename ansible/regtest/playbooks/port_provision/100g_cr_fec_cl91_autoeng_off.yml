@@ -128,8 +128,6 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
-    - command: "goes restart"
-
 
 - hosts: packet_generator
   become: true
@@ -162,6 +160,12 @@
       with_items:
       - '100g_cr_fec_cl91_create.cint'
       - '100g_cr_fec_cl91_delete.cint'
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - command: "goes restart"
 
 
 - hosts: server_emulator
