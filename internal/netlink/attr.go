@@ -297,7 +297,9 @@ var kindMap = map[string]InterfaceKind{
 
 func (m *IfInfoMessage) InterfaceKind() (k InterfaceKind) {
 	if a, ok := m.Attrs[IFLA_LINKINFO].(*AttrArray); ok {
-		k = kindMap[a.X[IFLA_INFO_KIND].String()]
+		if a.X[IFLA_INFO_KIND] != nil {
+			k = kindMap[a.X[IFLA_INFO_KIND].String()]
+		}
 	}
 	return
 }
