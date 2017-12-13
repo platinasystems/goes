@@ -1,0 +1,101 @@
+---
+ - hosts: leaf:spine
+   become: true
+   tasks:
+    - name: Download FRR debian package file
+      get_url:
+         url: "{{ frr_link }}"
+         dest: "/tmp/"
+         mode: 0640
+
+    - name: Install the FRR debian package file
+      apt:
+         deb: "/tmp/{{ frr_installer_name }}"
+
+    - command: "install -m 755 -o frr -g frr -d /var/log/frr"
+
+    - command: "install -m 775 -o frr -g frrvty -d /etc/frr"
+
+    - name: Copying and editing the configuration files
+      copy:
+         src: "/usr/share/doc/frr/examples/{{ item }}.sample"
+         dest: "/etc/frr/{{ item }}"
+         remote_src: true
+         mode: 0640
+         owner: frr
+         group: frr
+      with_items:
+       - bgpd.conf
+       - isisd.conf
+       - ospf6d.conf
+       - ospfd.conf
+       - ripd.conf
+       - ripngd.conf
+       - vtysh.conf
+       - zebra.conf
+       - ldpd.conf
+       - pimd.conf
+
+    - lineinfile:
+        path: /etc/frr/bgpd.conf
+        regexp: "{{ item }}"
+        state: absent
+      with_items:
+        - "^bgp"
+        - "^router"
+
+    - lineinfile:
+        path: /etc/frr/isisd.conf
+        regexp: "{{ item }}"
+        state: absent
+      with_items:
+        - "^router"
+        - "^net"
+        - "^interface"
+        - "^ip"
+
+    - lineinfile:
+        path: /etc/frr/ospfd.conf
+        regexp: "{{ item }}"
+        state: absent
+      with_items:
+        - "^router"
+
+    - name: Enabling IPv4 and IPv6 Forwarding
+      lineinfile:
+         path: /etc/sysctl.conf
+         regexp: "{{ item.regexp }}"
+         line: "{{ item.line }}"
+      with_items:
+       - {regexp: '#net.ipv4.ip_forward=1', line: 'net.ipv4.ip_forward=1'}
+       - {regexp: '#net.ipv6.conf.all.forwarding=1', line: 'net.ipv6.conf.all.forwarding=1'}
+
+    - name: Apply the new configuration
+      command: "sysctl -p"
+
+    - name: Enable/Disable Routing Protocols
+      lineinfile:
+         path: /etc/frr/daemons
+         regexp: "{{ item.regexp }}"
+         line: "{{ item.line }}"
+      with_items:
+       - {regexp: '^zebra=', line: 'zebra=yes'}
+       - {regexp: '^bgpd=', line: 'bgpd=yes'}
+       - {regexp: '^ospfd=', line: 'ospfd=yes'}
+       - {regexp: '^ospf6d=', line: 'ospf6d=no'}
+       - {regexp: '^ripd=', line: 'ripd=no'}
+       - {regexp: '^ripngd=', line: 'ripngd=no'}
+       - {regexp: '^isisd=', line: 'isisd=yes'}
+       - {regexp: '^pimd=', line: 'pimd=no'}
+       - {regexp: '^ldpd=', line: 'ldpd=no'}
+       - {regexp: '^nhrpd=', line: 'nhrpd=no'}
+       - {regexp: '^eigrpd=', line: 'eigrpd=no'}
+       - {regexp: '^babeld=', line: 'babeld=no'}
+
+    - name: Restarting the FRR service
+      service:
+         name: frr
+         state: restarted
+
+    - name: Copy vtysh running config to startup config
+      command: "vtysh -c 'copy run start'"

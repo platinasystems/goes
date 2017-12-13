@@ -1,0 +1,9 @@
+---
+ - hosts: leaf:spine
+   become: true
+   tasks:
+    - name: FRR Uninstallation
+      apt:
+        name: frr
+        state: absent
+        purge: yes
