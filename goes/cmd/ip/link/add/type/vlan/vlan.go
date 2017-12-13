@@ -19,12 +19,17 @@ const (
 	Name    = "vlan"
 	Apropos = "add a vlan virtual link"
 	Usage   = `
-ip link add type vlan link IFNAME id ID [ OPTIONS ]...`
+ip link add type vlan name IFNAME link DEVICE id ID [ OPTIONS ]...`
 	Man = `
+	name IFNAME
+
+	link DEVICE
+		physical device associated with new vlan interface
+
+	id { 0..4095 }
+
 OPTIONS
-	link IFNAME
-	id ID
-	protocol PROTOCOL
+	protocol { 802.1q (default) | 802.1ad }
 
 	ingress-qos-map FROM:TO
 		defines a mapping of VLAN header prio field to the Linux
@@ -74,7 +79,7 @@ OPTIONS
 		bond VLAN to the physical device state
 
 SEE ALSO
-	ip link add type man TYPE || ip link add type TYPE -man
+	ip link add man type || ip link add type -man
 	ip link man add || ip link add -man
 	man ip || ip -man`
 )
@@ -166,14 +171,14 @@ func (Command) Main(args ...string) error {
 	}
 	if s := opt.Parms.ByName["protocol"]; len(s) > 0 {
 		proto, found := map[string]uint16{
-			"802.1q":  0x8100,
-			"802.1ad": 0x88a8,
-		}[s]
+			"802.1q":  rtnl.ETH_P_8021Q,
+			"802.1ad": rtnl.ETH_P_8021AD,
+		}[strings.ToLower(s)]
 		if !found {
 			return fmt.Errorf("protocol: %q not found", s)
 		}
 		info = append(info, nl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
-			nl.Uint16Attr(proto)})
+			nl.Be16Attr(proto)})
 	}
 	if s := opt.Parms.ByName["id"]; len(s) > 0 {
 		var id uint16
