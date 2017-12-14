@@ -5,7 +5,6 @@
 package mmclog
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -18,12 +17,12 @@ import (
 const (
 	Name    = "mmclog"
 	Apropos = "display persistant MMC dmesg log"
-	Usage   = "mmclog [-l LINE] [-c COUNT] -2"
+	Usage   = "mmclog [-b BYTE] [-c COUNT] -2"
 	Man     = `
 DESCRIPTION
         The mmclog command displays MMC dmesg log
 
-	The -l parameter specifies starting line number.
+	The -b parameter specifies starting byte number.
 	The -c parameter specifies number of lines to display.
 	The -2 flag displays the secondary(older) dmesg log, if available.
 
@@ -31,8 +30,9 @@ DESCRIPTION
 
 	LOGA      = "/mnt/dmesg.txt"
 	LOGB      = "/mnt/dmesg2.txt"
-	DfltLine  = "0"
+	DfltByte  = "0"
 	DfltCount = "25"
+	linesize  = 160
 )
 
 type Interface interface {
@@ -63,9 +63,9 @@ var (
 
 func (cmd) Main(args ...string) (err error) {
 	flag, args := flags.New(args, "-2")
-	parm, args := parms.New(args, "-l", "-c")
-	if len(parm.ByName["-l"]) == 0 {
-		parm.ByName["-l"] = DfltLine
+	parm, args := parms.New(args, "-b", "-c")
+	if len(parm.ByName["-b"]) == 0 {
+		parm.ByName["-b"] = DfltByte
 	}
 	if len(parm.ByName["-c"]) == 0 {
 		parm.ByName["-c"] = DfltCount
@@ -78,63 +78,108 @@ func (cmd) Main(args ...string) (err error) {
 		fmt.Println("log file: ", log, "does not exist")
 		return nil
 	}
+	if err = dspSiz(log); err != nil {
+		return err
+	}
 
-	max := 0
-	line := 0
-	count := 0
-	if max, err = dspSiz(log); err != nil {
+	displ, err := strconv.Atoi(parm.ByName["-b"])
+	if err != nil {
 		return err
 	}
-	if line, err = strconv.Atoi(parm.ByName["-l"]); err != nil {
+	count, err := strconv.Atoi(parm.ByName["-c"])
+	if err != nil {
 		return err
 	}
-	if count, err = strconv.Atoi(parm.ByName["-c"]); err != nil {
-		return err
+	tail := false
+	if displ == 0 {
+		tail = true
 	}
-	if line == 0 {
-		line = max - count + 1
-	}
-	if err = dspLog(log, line, count); err != nil {
+	if err = dspLog(log, displ, count, tail); err != nil {
 		return err
 	}
 	return nil
 }
 
-func dspLog(log string, line int, count int) (err error) {
+func dspLog(log string, displ int, count int, tail bool) (err error) {
+	nomsize := count * linesize
 	f, err := os.Open(log)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	thisLine := 0
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		thisLine++
-		if thisLine >= line && thisLine < (line+count) {
-			fmt.Println(thisLine, sc.Text())
+
+	if tail {
+		fi, err := f.Stat()
+		if err != nil {
+			panic(err)
+		}
+		l := int(fi.Size()) - (count * linesize)
+		if l > 0 {
+			displ = l
+		} else {
+			displ = 0
+		}
+	}
+
+	_, err = f.Seek(int64(displ), 0)
+	if err != nil {
+		panic(err)
+	}
+
+	buf := make([]byte, nomsize)
+	n, err := f.Read(buf)
+	if err != nil {
+		panic(err)
+	}
+
+	i := 0
+	if tail {
+		c := 0
+		for j := len(buf) - 1; j > 0; j-- {
+			if string(buf[j]) == "\n" {
+				c++
+				if c == (count + 1) {
+					i = j + 1
+				}
+			}
+		}
+	}
+
+	l := 0
+	for j := i; j < n; j++ {
+		if string(buf[j]) == "\n" {
+			if i != 0 {
+				fmt.Print("byte=", displ+i, " seq#=")
+				for _, c := range buf[i:j] {
+					fmt.Printf("%c", c)
+				}
+				fmt.Println()
+			}
+			i = j + 1
+			l++
+		}
+		if !tail && l > count {
+			break
 		}
 	}
 	f.Close()
 	return nil
 }
 
-func dspSiz(logname string) (max int, err error) {
-	f, err := os.Open(logname)
+func dspSiz(log string) (err error) {
+	f, err := os.Open(log)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer f.Close()
+
 	fi, err := f.Stat()
 	if err != nil {
-		return 0, err
+		return err
 	}
-	siz := fi.Size()
-	sc := bufio.NewScanner(f)
-	cnt := 0
-	for sc.Scan() {
-		cnt++
-	}
+	logsz := fi.Size()
 	f.Close()
-	fmt.Println("\nlog: ", logname, "  size: ", siz, "  lines: ", cnt)
-	return cnt, nil
+
+	fmt.Println("\nlog: ", log, "  size: ", logsz)
+	return nil
 }
