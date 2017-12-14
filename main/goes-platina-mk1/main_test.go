@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/net"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
 )
 
 var testPause = flag.Bool("test.pause", false, "pause before and after suite")
@@ -41,6 +42,7 @@ func Test(t *testing.T) {
 
 	test.Suite{
 		{"vnet.ready", func(*testing.T) {}},
+		{"nodocker", nodocker.Suite},
 		{"docker", func(t *testing.T) {
 			err := docker.Check(t)
 			if err != nil {
