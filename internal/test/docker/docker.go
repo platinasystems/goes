@@ -228,17 +228,17 @@ func ExecCmd(t *testing.T, ID string, config *Config, cmd []string) (out string,
 }
 
 func TearDownContainers(t *testing.T, config *Config) {
-	assert := test.Assert{t}
+	cleanup := test.Cleanup{t}
 	for _, r := range config.Routers {
 		for _, intf := range r.Intfs {
 			if intf.Vlan != "" {
 				newIntf := intf.Name + "." + intf.Vlan
 				moveIntfDefault(t, r.Hostname, newIntf)
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "del", newIntf)
 			} else if strings.Contains(intf.Name, "dummy") {
 				moveIntfDefault(t, r.Hostname, intf.Name)
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "del", intf.Name)
 			} else {
 				moveIntfDefault(t, r.Hostname, intf.Name)
@@ -360,7 +360,7 @@ func stopContainer(t *testing.T, config *Config, name string, ID string) error {
 		return err
 	}
 	link := "/var/run/netns/" + name
-	test.Assert{t}.Program("rm", link)
+	test.Cleanup{t}.Program("rm", link)
 
 	return nil
 }
@@ -404,10 +404,10 @@ func moveIntfContainer(t *testing.T, container string, intf string,
 
 func moveIntfDefault(t *testing.T, container string, intf string) error {
 	t.Logf("moving %v from %v to default", intf, container)
-	assert := test.Assert{t}
-	assert.Program(test.Self{},
+	cleanup := test.Cleanup{t}
+	cleanup.Program(test.Self{},
 		"ip", "-n", container, "link", "set", "down", intf)
-	assert.Program(test.Self{},
+	cleanup.Program(test.Self{},
 		"ip", "-n", container, "link", "set", intf, "netns", "1")
 	return nil
 }
