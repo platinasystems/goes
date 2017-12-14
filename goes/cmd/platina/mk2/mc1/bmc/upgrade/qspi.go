@@ -5,9 +5,12 @@
 package upgrade
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"io/ioutil"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -42,6 +45,8 @@ const (
 	VERSION_LEN    = 0x008
 	VERSION_DEV    = 0x003
 	JSON_OFFSET    = 0x100
+	ENVSIZE        = 8192
+	ENVCRC         = 4
 )
 
 type FlashFmt struct {
@@ -301,6 +306,90 @@ func selectQSPI(q bool) error {
 	sd[0] = 0
 	j[0] = I{true, i2c.Write, 0, 0, sd, int(0x99), int(0), 0}
 	err = DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateEnv(q bool) (err error) {
+	b, err := GetPer(q)
+	s := strings.Split(string(b), "\x00")
+	ip := s[0]
+	if len(string(ip)) > 500 {
+		err = fmt.Errorf("no 'ip=' in per blk, skipping env update")
+		return err
+	}
+	e, bootargs, err := GetEnv(q)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(e[bootargs], "ip=") {
+		err = fmt.Errorf("no 'ip=' in env blk, skipping env update")
+		return err
+	}
+	n := strings.SplitAfter(e[bootargs], "ip=")
+	if n[1] == string(ip) {
+		err = fmt.Errorf("no ip change, skipping env update")
+		return err
+	}
+	e[bootargs] = n[0] + string(ip)
+	err = PutEnv(e, q)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetEnv(q bool) (env []string, bootargs int, err error) {
+	b, err := ReadBlk("env", q)
+	if err != nil {
+		return nil, 0, err
+	}
+	e := strings.Split(string(b[ENVCRC:ENVSIZE]), "\x00")
+	var end int
+	for j, n := range e {
+		if strings.Contains(n, "bootargs") {
+			bootargs = j
+		}
+		if len(n) == 0 {
+			end = j
+			break
+		}
+	}
+	return e[:end], bootargs, nil
+}
+
+func PutEnv(e []string, q bool) (err error) {
+	ee := strings.Join(e, "\x00")
+	b := make([]byte, ENVSIZE, ENVSIZE)
+	b = []byte(ee)
+	for i := len(b); i < ENVSIZE; i++ {
+		b = append(b, 0)
+	}
+
+	x := crc32.ChecksumIEEE(b[0 : ENVSIZE-ENVCRC])
+	y := make([]byte, 4)
+	binary.LittleEndian.PutUint32(y, x)
+	b = append(y[0:4], b[0:ENVSIZE-ENVCRC]...)
+
+	err = WriteBlk("env", b[0:ENVSIZE], q)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetPer(q bool) (b []byte, err error) {
+	b, err = ReadBlk("per", q)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func PutPer(b []byte, q bool) (err error) {
+	err = WriteBlk("per", b, q)
 	if err != nil {
 		return err
 	}

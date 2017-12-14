@@ -5,13 +5,11 @@
 package ipcfg
 
 import (
-	"encoding/binary"
 	"fmt"
-	"hash/crc32"
 	"regexp"
 	"strings"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/upgrade"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )
@@ -23,8 +21,6 @@ const (
 	Man     = `
 DESCRIPTION
         The ipcfg command sets bmc ip address, via bootargs ip="`
-	ENVSIZE = 8192
-	ENVCRC  = 4
 )
 
 type Interface interface {
@@ -84,7 +80,7 @@ func (cmd) Main(args ...string) (err error) {
 }
 
 func dispIP(q bool) error {
-	e, bootargs, err := getEnv(q)
+	e, bootargs, err := upgrade.GetEnv(q)
 	if err != nil {
 		return err
 	}
@@ -101,7 +97,7 @@ func updateIP(ip string, q bool) (err error) {
 	if err = updatePer(ip, q); err != nil {
 		return err
 	}
-	if err = UpdateEnv(q); err != nil {
+	if err = upgrade.UpdateEnv(q); err != nil {
 		return err
 	}
 	return nil
@@ -114,91 +110,7 @@ func updatePer(ip string, q bool) (err error) {
 		fmt.Println("Updating QSPI1 persistent block")
 	}
 	s := ip + "\x00"
-	putPer([]byte(s), q)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func UpdateEnv(q bool) (err error) {
-	b, err := getPer(q)
-	s := strings.Split(string(b), "\x00")
-	ip := s[0]
-	if len(string(ip)) > 500 {
-		err = fmt.Errorf("no 'ip=' in per blk, skipping env update")
-		return err
-	}
-	e, bootargs, err := getEnv(q)
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(e[bootargs], "ip=") {
-		err = fmt.Errorf("no 'ip=' in env blk, skipping env update")
-		return err
-	}
-	n := strings.SplitAfter(e[bootargs], "ip=")
-	if n[1] == string(ip) {
-		err = fmt.Errorf("no ip change, skipping env update")
-		return err
-	}
-	e[bootargs] = n[0] + string(ip)
-	err = putEnv(e, q)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func getEnv(q bool) (env []string, bootargs int, err error) {
-	b, err := upgrade.ReadBlk("env", q)
-	if err != nil {
-		return nil, 0, err
-	}
-	e := strings.Split(string(b[ENVCRC:ENVSIZE]), "\x00")
-	var end int
-	for j, n := range e {
-		if strings.Contains(n, "bootargs") {
-			bootargs = j
-		}
-		if len(n) == 0 {
-			end = j
-			break
-		}
-	}
-	return e[:end], bootargs, nil
-}
-
-func putEnv(e []string, q bool) (err error) {
-	ee := strings.Join(e, "\x00")
-	b := make([]byte, ENVSIZE, ENVSIZE)
-	b = []byte(ee)
-	for i := len(b); i < ENVSIZE; i++ {
-		b = append(b, 0)
-	}
-
-	x := crc32.ChecksumIEEE(b[0 : ENVSIZE-ENVCRC])
-	y := make([]byte, 4)
-	binary.LittleEndian.PutUint32(y, x)
-	b = append(y[0:4], b[0:ENVSIZE-ENVCRC]...)
-
-	err = upgrade.WriteBlk("env", b[0:ENVSIZE], q)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func getPer(q bool) (b []byte, err error) {
-	b, err = upgrade.ReadBlk("per", q)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-func putPer(b []byte, q bool) (err error) {
-	err = upgrade.WriteBlk("per", b, q)
+	upgrade.PutPer([]byte(s), q)
 	if err != nil {
 		return err
 	}
