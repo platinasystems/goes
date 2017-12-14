@@ -7,6 +7,7 @@ package ping
 import (
 	"fmt"
 	"net"
+	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/goes/lang"
@@ -49,14 +50,19 @@ func (cmd) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
+	err = syscall.ETIMEDOUT
 	pinger.AddIPAddr(da)
 	pinger.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
 		fmt.Printf("%d bytes from %s in %s\n",
 			pinger.Size, addr.String(), rtt.String())
+		err = nil
 	}
 	pinger.OnIdle = func() {}
 	fmt.Printf("PING %s (%s)\n", dest, da.String())
-	return pinger.Run()
+	if rerr := pinger.Run(); err == nil {
+		err = rerr
+	}
+	return err
 }
 
 func (cmd) Man() lang.Alt  { return man }
