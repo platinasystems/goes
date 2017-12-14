@@ -77,11 +77,11 @@ func onerouter(t *testing.T) {
 		"via", "10.1.0.3")
 
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		"ping", "-c", 3, "10.1.0.1")
+		test.Self{}, "ping", "10.1.0.1")
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		"ping", "-c", 3, "10.1.0.3")
+		test.Self{}, "ping", "10.1.0.3")
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		"ping", "-c", 3, "10.1.0.2")
+		test.Self{}, "ping", "10.1.0.2")
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		"ping", "-c", 3, "10.1.0.0")
+		test.Self{}, "ping", "10.1.0.0")
 }
