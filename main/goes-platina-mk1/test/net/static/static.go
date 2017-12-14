@@ -11,13 +11,23 @@ import (
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/conf"
 )
 
 var config *docker.Config
 
-func Test(t *testing.T, source []byte) {
+var Suite = test.Suite{
+	{"eth", func(t *testing.T) {
+		subtest(t, conf.New(t, "net-static-eth", Conf))
+	}},
+	{"vlan", func(t *testing.T) {
+		subtest(t, conf.New(t, "net-static-vlan", ConfVlan))
+	}},
+}.Run
+
+func subtest(t *testing.T, yaml []byte) {
 	var err error
-	config, err = docker.LaunchContainers(t, source)
+	config, err = docker.LaunchContainers(t, yaml)
 	if err != nil {
 		t.Fatalf("Error launchContainers: %v", err)
 	}

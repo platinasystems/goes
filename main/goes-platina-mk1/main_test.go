@@ -5,21 +5,14 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/bgp"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/isis"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr/ospf"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/dhcp"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/slice"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/net/static"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/port2port"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/net"
 )
 
 var testPause = flag.Bool("test.pause", false, "pause before and after suite")
@@ -30,8 +23,6 @@ func Test(t *testing.T) {
 	assert := test.Assert{t}
 	assert.YoureRoot()
 	assert.GoesNotRunning()
-
-	assert.Nil(docker.Check(t))
 
 	defer assert.Background(test.Self{}, "redisd").Quit()
 	assert.Program(12*time.Second, test.Self{}, "hwait", "platina",
@@ -50,69 +41,15 @@ func Test(t *testing.T) {
 
 	test.Suite{
 		{"vnet.ready", func(*testing.T) {}},
-		{"net", test.Suite{
-			{"slice", test.Suite{
-				{"vlan", func(t *testing.T) {
-					slice.Test(t, conf(t, "net-slice-vlan",
-						slice.ConfVlan))
-				}},
-			}.Run},
-			{"dhcp", test.Suite{
-				{"eth", func(t *testing.T) {
-					dhcp.Test(t, conf(t, "net-dhcp-eth",
-						dhcp.Conf))
-				}},
-				{"vlan", func(t *testing.T) {
-					dhcp.Test(t, conf(t, "net-dhcp-vlan",
-						dhcp.ConfVlan))
-				}},
-			}.Run},
-			{"static", test.Suite{
-				{"eth", func(t *testing.T) {
-					static.Test(t, conf(t, "net-static-eth",
-						static.Conf))
-				}},
-				{"vlan", func(t *testing.T) {
-					static.Test(t, conf(t, "net-static-vlan",
-						static.ConfVlan))
-				}},
-			}.Run},
-		}.Run},
-		{"ospf", test.Suite{
-			{"eth", func(t *testing.T) {
-				ospf.Test(t, conf(t, "ospf", ospf.Conf))
-			}},
-			{"vlan", func(t *testing.T) {
-				ospf.Test(t, conf(t, "ospf-vlan",
-					ospf.ConfVlan))
-			}},
-		}.Run},
-		{"isis", test.Suite{
-			{"eth", func(t *testing.T) {
-				isis.Test(t, conf(t, "isis", isis.Conf))
-			}},
-			{"vlan", func(t *testing.T) {
-				isis.Test(t, conf(t, "isis-vlan",
-					isis.ConfVlan))
-			}},
-		}.Run},
-		{"bgp", test.Suite{
-			{"eth", func(t *testing.T) {
-				bgp.Test(t, conf(t, "bgp", bgp.Conf))
-			}},
-			{"vlan", func(t *testing.T) {
-				bgp.Test(t, conf(t, "bgp-vlan", bgp.ConfVlan))
-			}},
-		}.Run},
+		{"docker", func(t *testing.T) {
+			err := docker.Check(t)
+			if err != nil {
+				t.Skip(err)
+			}
+			test.Suite{
+				{"net", net.Suite},
+				{"frr", frr.Suite},
+			}.Run(t)
+		}},
 	}.Run(t)
-}
-
-func conf(t *testing.T, name, text string) []byte {
-	assert := test.Assert{t}
-	assert.Helper()
-	tmpl, err := template.New(name).Parse(text)
-	assert.Nil(err)
-	buf := new(bytes.Buffer)
-	assert.Nil(tmpl.Execute(buf, port2port.Conf))
-	return buf.Bytes()
 }
