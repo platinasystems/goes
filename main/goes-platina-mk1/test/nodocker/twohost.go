@@ -21,14 +21,16 @@ func twohost(t *testing.T) {
 	assert.Program(test.Self{}, "ip", "netns", "add", "h2")
 	defer cleanup.Program(test.Self{}, "ip", "netns", "del", "h2")
 
-	assert.Program(test.Self{}, "ip", "link", "set",
-		port2port.Conf[0][0], "netns", "h1", "up")
+	assert.Program(test.Self{}, "ip", "link", "set", port2port.Conf[0][0],
+		"up", "netns", "h1")
 	defer cleanup.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		test.Self{}, "ip", "link", "set", port2port.Conf[0][0], "down")
-	assert.Program(test.Self{}, "ip", "link", "set",
-		port2port.Conf[0][1], "netns", "h2", "up")
+		test.Self{}, "ip", "link", "set", port2port.Conf[0][0],
+		"down", "netns", 1)
+	assert.Program(test.Self{}, "ip", "link", "set", port2port.Conf[0][1],
+		"up", "netns", "h2")
 	defer cleanup.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		test.Self{}, "ip", "link", "set", port2port.Conf[0][1], "down")
+		test.Self{}, "ip", "link", "set", port2port.Conf[0][1],
+		"down", "netns", 1)
 
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h1",
 		test.Self{}, "ip", "address", "add", "10.1.0.0/31",
