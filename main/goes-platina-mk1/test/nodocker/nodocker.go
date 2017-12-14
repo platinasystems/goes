@@ -10,4 +10,5 @@ import (
 
 var Suite = test.Suite{
 	{"twohost", twohost},
+	{"onerouter", onerouter},
 }.Run
