@@ -184,7 +184,7 @@ func compareChecksums() (err error) {
 	return nil
 }
 
-func doUpgrade(s string, v string, t bool, f bool, q bool) error {
+func doUpgrade(s string, v string, t bool, f bool, q bool) (err error) {
 	fmt.Print("\n")
 
 	n, err := getFile(s, v, t, ArchiveName)
@@ -194,7 +194,7 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	if n < 1000 {
 		return fmt.Errorf("Server unreachable\n")
 	}
-	if err := unzip(); err != nil {
+	if err = unzip(); err != nil {
 		return fmt.Errorf("Server error: unzipping file: %v\n", err)
 	}
 	defer rmFiles()
@@ -239,10 +239,12 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) error {
 	if q == true {
 		fmt.Println("Upgrading QSPI1...\n")
 	}
-	if err := writeImageAll(); err != nil {
+	if err = writeImageAll(); err != nil {
 		return fmt.Errorf("*** UPGRADE ERROR! ***: %v\n", err)
 	}
-	if err := reboot(); err != nil {
+	UpdateEnv(false)
+	UpdateEnv(true)
+	if err = reboot(); err != nil {
 		return err
 	}
 	return nil

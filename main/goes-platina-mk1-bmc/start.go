@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ipcfg"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
@@ -65,12 +65,11 @@ func init() {
 				pin.SetValue(false)
 			}
 		}
-		err := pubEth0()
-		if err != nil {
+		if err := pubEth0(); err != nil {
 			return err
 		}
-		ipcfg.UpdateEnv(false)
-		ipcfg.UpdateEnv(true)
+		upgrade.UpdateEnv(false)
+		upgrade.UpdateEnv(true)
 		return nil
 	}
 }
