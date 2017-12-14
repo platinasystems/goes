@@ -148,8 +148,8 @@ func dspLog(log string, displ int, count int, tail bool) (err error) {
 	l := 0
 	for j := i; j < n; j++ {
 		if string(buf[j]) == "\n" {
-			fmt.Print("byte=", displ+i, " seq#=")
 			if i != 0 {
+				fmt.Print("byte=", displ+i, " seq#=")
 				for _, c := range buf[i:j] {
 					fmt.Printf("%c", c)
 				}
