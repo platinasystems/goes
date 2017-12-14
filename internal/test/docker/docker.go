@@ -138,8 +138,15 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 		}
 		config.Routers[i].id = cresp.ID
 		for _, intf := range router.Intfs {
-			if intf.Vlan != "" {
-				newIntf := intf.Name + "." + intf.Vlan
+			var newIntf string = intf.Name
+			if strings.Contains(intf.Name, "dummy") {
+				assert.Program(test.Self{},
+					"ip", "link", "add", "name", newIntf,
+					"type", "dummy")
+				assert.Program(test.Self{},
+					"ip", "link", "set", "up", newIntf)
+			} else if intf.Vlan != "" {
+				newIntf = intf.Name + "." + intf.Vlan
 				assert.Program(test.Self{},
 					"ip", "link", "set", "up", intf.Name)
 				assert.Program(test.Self{},
@@ -147,15 +154,13 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 					"name", newIntf, "type", "vlan",
 					"id", intf.Vlan)
 				assert.Program(test.Self{},
-					"ip", "link", "show", newIntf)
-				assert.Program(test.Self{},
 					"ip", "link", "set", "up", newIntf)
-				moveIntfContainer(t, router.Hostname, newIntf,
-					intf.Address)
-			} else {
-				moveIntfContainer(t, router.Hostname, intf.Name,
-					intf.Address)
 			}
+			assert.Program(test.Self{},
+				"ip", "link", "show", newIntf)
+			moveIntfContainer(t, router.Hostname, newIntf,
+				intf.Address)
+
 		}
 	}
 	time.Sleep(1 * time.Second)
@@ -231,6 +236,10 @@ func TearDownContainers(t *testing.T, config *Config) {
 				moveIntfDefault(t, r.Hostname, newIntf)
 				assert.Program(test.Self{},
 					"ip", "link", "del", newIntf)
+			} else if strings.Contains(intf.Name, "dummy") {
+				moveIntfDefault(t, r.Hostname, intf.Name)
+				assert.Program(test.Self{},
+					"ip", "link", "del", intf.Name)
 			} else {
 				moveIntfDefault(t, r.Hostname, intf.Name)
 			}
@@ -385,7 +394,7 @@ func moveIntfContainer(t *testing.T, container string, intf string,
 		"ip", "-n", container, "link", "set", "down", intf)
 	// ISIS fails with default mtu 9216
 	assert.Program(test.Self{},
-		"ip", "-n", container, "link", "set", "mtu", "1500", "dev", intf)
+		"ip", "-n", container, "link", "set", "mtu", "8192", "dev", intf)
 	assert.Program(test.Self{},
 		"ip", "-n", container, "link", "set", "up", intf)
 	assert.Program(test.Self{},
