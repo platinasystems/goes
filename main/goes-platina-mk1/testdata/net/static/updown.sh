@@ -17,12 +17,17 @@ case $1 in
     "up")
 	docker-compose up -d
 
-	$D_MOVE up CA-1 eth-4-0 10.1.0.1/24	
+	ip link add dummy1 type dummy 2> /dev/null
+	ip link add dummy2 type dummy 2> /dev/null
+	
+	$D_MOVE up CA-1 eth-4-0 10.1.0.1/24
+	$D_MOVE up CA-1 dummy1  192.168.0.1/32 
 	$D_MOVE up RA-1 eth-5-0 10.1.0.2/24
 	$D_MOVE up RA-1 eth-14-0 10.2.0.2/24
 	$D_MOVE up RA-2 eth-15-0 10.2.0.3/24
 	$D_MOVE up RA-2 eth-24-0 10.3.0.3/24
 	$D_MOVE up CA-2 eth-25-0 10.3.0.4/24
+	$D_MOVE up CA-2 dummy2   192.168.0.2/32
 
 	;;
     "down")
@@ -32,6 +37,9 @@ case $1 in
 	$D_MOVE down RA-2 eth-15-0
 	$D_MOVE down RA-2 eth-24-0 
 	$D_MOVE down CA-2 eth-25-0
+
+	ip link del dummy1
+	ip link del dummy2	
 
 	docker-compose down
 	

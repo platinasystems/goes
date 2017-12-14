@@ -15,6 +15,8 @@ routers:
   - name: {{index . 0 0}}
     address: 10.1.0.1/24
     vlan: 10
+  - name: dummy0
+    address: 192.168.0.1/32
 - hostname: RA-1
   image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
@@ -42,4 +44,6 @@ routers:
   - name: {{index . 0 1}}
     address: 10.3.0.4/24
     vlan: 30
+  - name: dummy0
+    address: 192.168.0.2/32
 `

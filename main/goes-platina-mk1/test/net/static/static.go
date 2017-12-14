@@ -44,8 +44,10 @@ func checkConnectivity(t *testing.T) {
 		{"CA-1", "10.1.0.2"},
 		{"RA-1", "10.1.0.1"},
 		{"RA-1", "10.2.0.3"},
+		{"RA-1", "192.168.0.1"},
 		{"RA-2", "10.2.0.2"},
 		{"RA-2", "10.3.0.4"},
+		{"RA-2", "192.168.0.2"},
 		{"CA-2", "10.3.0.3"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
@@ -102,7 +104,9 @@ func checkInterConnectivity(t *testing.T) {
 		target   string
 	}{
 		{"CA-1", "10.3.0.4"},
+		{"CA-1", "192.168.0.2"},
 		{"CA-2", "10.1.0.1"},
+		{"CA-2", "192.168.0.1"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
 		cmd := []string{"ping", "-c3", x.target}
@@ -148,11 +152,15 @@ func checkInterConnectivity2(t *testing.T) {
 		{"CA-1", "10.1.0.2"},
 		{"RA-1", "10.1.0.1"},
 		{"RA-1", "10.2.0.3"},
+		{"RA-1", "192.168.0.1"},
 		{"RA-2", "10.2.0.2"},
 		{"RA-2", "10.3.0.4"},
+		{"RA-2", "192.168.0.2"},
 		{"CA-2", "10.3.0.3"},
 		{"CA-1", "10.3.0.4"},
+		{"CA-1", "192.168.0.2"},
 		{"CA-2", "10.1.0.1"},
+		{"CA-2", "192.168.0.1"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
 		cmd := []string{"ping", "-c3", x.target}
