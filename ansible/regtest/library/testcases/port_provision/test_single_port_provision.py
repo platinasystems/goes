@@ -19,6 +19,7 @@
 #
 
 import shlex
+import time
 
 from collections import OrderedDict
 
@@ -152,6 +153,8 @@ def verify_single_port_provisioning(module):
     verify_links = module.params['verify_links']
     eth = module.params['eth']
 
+    time.sleep(5)
+    
     if speed == '100g':
         if verify_links:
             # Verify if port links are up for eth
