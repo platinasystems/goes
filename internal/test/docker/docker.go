@@ -156,8 +156,6 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 				assert.Program(test.Self{},
 					"ip", "link", "set", "up", newIntf)
 			}
-			assert.Program(test.Self{},
-				"ip", "link", "show", newIntf)
 			moveIntfContainer(t, router.Hostname, newIntf,
 				intf.Address)
 
