@@ -13,6 +13,8 @@ frr_ospf_conf_file: /etc/frr/ospfd.conf
 frr_ospf_conf_file_bck: /etc/frr/ospfd.conf.bck
 frr_isis_conf_file: /etc/frr/isisd.conf
 frr_isis_conf_file_bck: /etc/frr/isisd.conf.bck
+frr_zebra_conf_file: /etc/frr/zebra.conf
+frr_zebra_conf_file_bck: /etc/frr/zebra.conf.bck
 
 quagga_bgp_conf_file: /etc/quagga/bgpd.conf
 quagga_bgp_conf_file_bck: /etc/quagga/bgpd.conf.bck
