@@ -1,0 +1,210 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "port_provision_100g_cwdm_fec_none_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - file:
+        path: "{{ port_provision_log_dir }}"
+        state: directory
+
+    - name: Take backup of /etc/goes/start file
+      copy:
+        src: /etc/goes/start
+        dest: /etc/goes/start.bck
+        remote_src: true
+
+    - name: Copy updated start file for this testcase
+      copy:
+        src: ../../templates/100g_cwdm_fec_none_start_file
+        dest: /etc/goes/start
+
+    - name: Restart goes
+      command: "goes restart"
+
+    - name: Verify 100g cwdm fec none
+      test_single_port_provision:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "28"
+        speed: "100g"
+        media: "copper"
+        fec: "none"
+        verify_links: False
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ port_provision_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: packet_generator
+  become: true
+  tasks:
+    - name: Copy cint config create and delete files
+      template:
+        src: ../../templates/{{ item }}
+        dest: /home/platina/bin/{{ item }}
+      with_items:
+      - '100g_cwdm_fec_none_create.cint'
+      - '100g_cwdn_fec_none_delete.cint'
+
+    - name: Execute port provision on packet generator and verify the same
+      test_single_port_provision_packet_generator:
+        switch_name: "{{ inventory_hostname }}"
+        ce: "27"
+        speed: "100g"
+        create_cint_file: "100g_cwdm_fec_none_create.cint"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: ""
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Verify if port links are up for eth interfaces
+      test_single_port_provision:
+        switch_name: "{{ inventory_hostname }}"
+        eth: "28"
+        verify_links: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ port_provision_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Get goes version details
+      shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - name: Get goes tag details
+      shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store goes version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: packet_generator
+  become: true
+  tasks:
+    - name: Reset the configuration done
+      test_single_port_provision_packet_generator:
+        switch_name: "{{ inventory_hostname }}"
+        ce: "27"
+        speed: "100g"
+        delete_cint_file: "100g_cwdm_fec_none_delete.cint"
+        reset_config: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: ""
+      delegate_to: 127.0.0.1
+
+    - file:
+        path: "/home/platina/bin/{{ item }}"
+        state: absent
+      with_items:
+      - '100g_cwdm_fec_none_create.cint'
+      - '100g_cwdm_fec_none_delete.cint'
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Restore backup of /etc/goes/start
+      copy:
+        src: /etc/goes/start.bck
+        dest: /etc/goes/start
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: /etc/goes/start.bck
+        state: absent
+
+    - command: "goes restart"
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
