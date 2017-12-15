@@ -1,0 +1,11 @@
+---
+ - hosts: leaf:spine
+   become: true
+
+   tasks:
+    - name: Bird Uninstallation
+      apt:
+        name: bird
+        state: absent
+        purge: yes
+        autoremove: yes

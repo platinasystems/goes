@@ -1,0 +1,15 @@
+---
+ - hosts: leaf:spine
+   become: true
+
+   tasks:
+     - name: Add Bird package in repository config file
+       lineinfile:
+         path: /etc/apt/sources.list
+         state: present
+         line: 'deb http://http.us.debian.org/debian/ jessie main'
+
+     - name: Install Bird
+       apt:
+         name: bird
+         update_cache: yes
