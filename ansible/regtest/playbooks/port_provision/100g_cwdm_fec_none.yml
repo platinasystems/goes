@@ -72,7 +72,7 @@
         dest: /home/platina/bin/{{ item }}
       with_items:
       - '100g_cwdm_fec_none_create.cint'
-      - '100g_cwdn_fec_none_delete.cint'
+      - '100g_cwdm_fec_none_delete.cint'
 
     - name: Execute port provision on packet generator and verify the same
       test_single_port_provision_packet_generator:

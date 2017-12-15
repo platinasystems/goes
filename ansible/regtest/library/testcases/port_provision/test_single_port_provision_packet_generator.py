@@ -155,7 +155,7 @@ def verify_single_port_provisioning(module):
             cmd = '{} port ce{} an=0'.format(initial_cli, ce)
             execute_commands(module, cmd)
 
-        # Verify if port is up with optic set to SR and autoeng no
+        # Verify if port is up
         cmd = "{} 'ps ce{}'".format(initial_cli, ce)
         ps_out = execute_commands(module, cmd)
         ps_out = ps_out.lower()
@@ -164,16 +164,6 @@ def verify_single_port_provisioning(module):
             RESULT_STATUS = False
             failure_summary += 'On switch {} '.format(switch_name)
             failure_summary += 'ce{} port is not up\n'.format(ce)
-
-        if 'sr4' not in ps_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'optic is not set to SR4\n'
-
-        if 'sw no' not in ps_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'autoeng is not set to off/no\n'
 
         # Execute cint configuration script
         cmd = "{} 'cint {}'".format(initial_cli, create_cint_file)
