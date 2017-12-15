@@ -21,6 +21,9 @@ quagga_ospf_conf_file_bck: /etc/quagga/ospfd.conf.bck
 quagga_isis_conf_file: /etc/quagga/isisd.conf
 quagga_isis_conf_file_bck: /etc/quagga/isisd.conf.bck
 
+gobgp_bgp_conf_file: /etc/gobgp/gobgpd.conf
+gobgp_bgp_conf_file_bck: /etc/gobgp/gobgpd.conf.bck
+
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
 goes_upgrade_installer_name: 'goes-platina-mk1-installer.up'
