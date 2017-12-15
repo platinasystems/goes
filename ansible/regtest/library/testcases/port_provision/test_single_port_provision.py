@@ -147,6 +147,7 @@ def verify_single_port_provisioning(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     speed = module.params['speed']
+    media = module.params['media']
     fec = module.params['fec']
     verify_links = module.params['verify_links']
     eth = module.params['eth']
@@ -162,16 +163,21 @@ def verify_single_port_provisioning(module):
                 failure_summary += 'port link is not up for '
                 failure_summary += 'eth-{}-1 interface\n'.format(eth)
         else:
-            # Verify CWDM optic
+            # Verify optic media
             cmd = 'goes hget platina qsfp.compliance'
             optic_out = execute_commands(module, cmd)
 
-            if ('port-{}.qsfp.compliance: extended 100G CWDM4'.format(eth)
-                    not in optic_out):
+            verify_str = 'port-{}.qsfp.compliance: extended '.format(eth)
+            if media == 'CWDM4':
+                verify_str += '100G CWDM4'
+            elif media == 'SR4':
+                verify_str += '100GBASE-SR4'
+
+            if verify_str not in optic_out:
                 RESULT_STATUS = False
                 failure_summary += 'On switch {} '.format(switch_name)
                 failure_summary += 'eth-{}-1 interface does not '.format(eth)
-                failure_summary += 'have CWDM4 optic installed\n'
+                failure_summary += 'have correct optic installed\n'
 
             # Verify fec is set to correct value
             cmd = 'goes hget platina vnet.eth-{}-1.fec'.format(eth)

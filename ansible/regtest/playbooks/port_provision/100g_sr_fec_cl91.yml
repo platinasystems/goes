@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "port_provision_100g_cwdm_fec_none_{{ start_time.stdout }}"
+        hash_name: "port_provision_100g_sr_fec_cl91_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -27,19 +27,19 @@
 
     - name: Copy updated start file for this testcase
       copy:
-        src: ../../templates/100g_cwdm_fec_none_start_file
+        src: ../../templates/100g_sr_fec_cl91_start_file
         dest: /etc/goes/start
 
     - name: Restart goes
       command: "goes restart"
 
-    - name: Verify 100g cwdm fec none
+    - name: Verify 100g sr fec cl91
       test_single_port_provision:
         switch_name: "{{ inventory_hostname }}"
-        eth: "28"
+        eth: "32"
         speed: "100g"
-        media: "CWDM4"
-        fec: "none"
+        media: "SR4"
+        fec: "cl91"
         verify_links: False
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
@@ -71,15 +71,15 @@
         src: ../../templates/{{ item }}
         dest: /home/platina/bin/{{ item }}
       with_items:
-      - '100g_cwdm_fec_none_create.cint'
-      - '100g_cwdm_fec_none_delete.cint'
+      - '100g_sr_fec_cl91_create.cint'
+      - '100g_sr_fec_cl91_delete.cint'
 
     - name: Execute port provision on packet generator and verify the same
       test_single_port_provision_packet_generator:
         switch_name: "{{ inventory_hostname }}"
-        ce: "27"
+        ce: "31"
         speed: "100g"
-        create_cint_file: "100g_cwdm_fec_none_create.cint"
+        create_cint_file: "100g_sr_fec_cl91_create.cint"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
 
@@ -102,7 +102,7 @@
     - name: Verify if port links are up for eth interfaces
       test_single_port_provision:
         switch_name: "{{ inventory_hostname }}"
-        eth: "28"
+        eth: "32"
         verify_links: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
@@ -148,9 +148,9 @@
     - name: Reset the configuration done
       test_single_port_provision_packet_generator:
         switch_name: "{{ inventory_hostname }}"
-        ce: "27"
+        ce: "31"
         speed: "100g"
-        delete_cint_file: "100g_cwdm_fec_none_delete.cint"
+        delete_cint_file: "100g_sr_fec_cl91_delete.cint"
         reset_config: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
@@ -171,8 +171,8 @@
         path: "/home/platina/bin/{{ item }}"
         state: absent
       with_items:
-      - '100g_cwdm_fec_none_create.cint'
-      - '100g_cwdm_fec_none_delete.cint'
+      - '100g_sr_fec_cl91_create.cint'
+      - '100g_sr_fec_cl91_delete.cint'
 
 
 - hosts: leaf[1]

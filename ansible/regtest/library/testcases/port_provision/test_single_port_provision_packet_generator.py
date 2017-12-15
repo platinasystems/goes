@@ -147,7 +147,7 @@ def verify_single_port_provisioning(module):
 
     if not module.params['reset_config']:
         if speed == '100g':
-            # Install CWDM optic
+            # Install optic media
             cmd = '{} port ce{} speed=100000 if=sr4'.format(initial_cli, ce)
             execute_commands(module, cmd)
 
