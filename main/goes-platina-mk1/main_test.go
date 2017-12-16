@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/gobgp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/net"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
 )
@@ -52,6 +53,7 @@ func Test(t *testing.T) {
 			test.Suite{
 				{"net", net.Suite},
 				{"frr", frr.Suite},
+				{"gobgp", gobgp.Suite},
 			}.Run(t)
 		}},
 	}.Run(t)
