@@ -15,6 +15,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
 )
@@ -284,9 +285,7 @@ func eraseQSPI(of uint32, sz uint32) error {
 }
 
 func selectQSPI(q bool) error {
-	if len(gpio.Pins) == 0 {
-		gpio.Init()
-	}
+	cmd.Init("gpio")
 
 	//i2c STOP
 	sd[0] = 0

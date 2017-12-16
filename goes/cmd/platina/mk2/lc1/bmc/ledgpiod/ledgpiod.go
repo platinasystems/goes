@@ -71,8 +71,6 @@ var (
 	deviceVer          byte
 	forceFanSpeed      bool
 	systemFanDirection string
-	once               sync.Once
-	Init               = func() {}
 
 	first int
 
@@ -106,7 +104,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Name }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 

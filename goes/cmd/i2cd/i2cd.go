@@ -151,9 +151,7 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 						iocmd.Io_reg_wr(0x603, uint64(d[0]|0x40), 0x1)
 					}
 				case "platina-mk1-bmc":
-					if len(gpio.Pins) == 0 {
-						gpio.Init()
-					}
+					cmd.Init("gpio")
 					pin, found := gpio.Pins["FRU_I2C_MUX_RST_L"]
 					if found {
 						pin.SetValue(false)

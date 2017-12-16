@@ -6,8 +6,6 @@ package main
 
 import "github.com/platinasystems/go/goes/cmd/redisd"
 
-func init() {
-	redisd.Init = func() {
-		redisd.Machine = "coreboot"
-	}
+func redisdInit() {
+	redisd.Machine = "coreboot"
 }

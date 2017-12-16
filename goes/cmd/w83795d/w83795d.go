@@ -45,9 +45,6 @@ type I2cDev struct {
 }
 
 var (
-	Init = func() {}
-	once sync.Once
-
 	first          int
 	hostTemp       float64
 	sHostTemp      float64
@@ -96,7 +93,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Usage }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 
@@ -792,9 +789,7 @@ func (h *I2cDev) GetQsfpTempTarget() (string, error) {
 }
 
 func hostReset() error {
-	if len(gpio.Pins) == 0 {
-		gpio.Init()
-	}
+	cmd.Init("gpio")
 	log.Print("notice: issue hard reset to host")
 	pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
 	if found {

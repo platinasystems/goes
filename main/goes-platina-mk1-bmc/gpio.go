@@ -14,22 +14,20 @@ import (
 	"github.com/platinasystems/go/internal/gpio"
 )
 
-func init() {
-	gpio.Init = func() {
-		gpio.File = "/boot/platina-mk1-bmc.dtb"
-		gpio.Aliases = make(gpio.GpioAliasMap)
-		gpio.Pins = make(gpio.PinMap)
+func gpioInit() {
+	gpio.File = "/boot/platina-mk1-bmc.dtb"
+	gpio.Aliases = make(gpio.GpioAliasMap)
+	gpio.Pins = make(gpio.PinMap)
 
-		// Parse linux.dtb to generate gpio map for this machine
-		b, err := ioutil.ReadFile(gpio.File)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v", gpio.File, err)
-			return
-		}
-		t := &fdt.Tree{Debug: false, IsLittleEndian: false}
-		t.Parse(b)
-
-		t.MatchNode("aliases", fdtgpio.GatherAliases)
-		t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
+	// Parse linux.dtb to generate gpio map for this machine
+	b, err := ioutil.ReadFile(gpio.File)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v", gpio.File, err)
+		return
 	}
+	t := &fdt.Tree{Debug: false, IsLittleEndian: false}
+	t.Parse(b)
+
+	t.MatchNode("aliases", fdtgpio.GatherAliases)
+	t.EachProperty("gpio-controller", "", fdtgpio.GatherPins)
 }

@@ -6,8 +6,6 @@ package main
 
 import "github.com/platinasystems/go/goes/cmd/fantrayd"
 
-func init() { fantrayd.Init = fantraydInit }
-
 func fantraydInit() {
 	fantrayd.Vdev.Bus = 1
 	fantrayd.Vdev.Addr = 0x20

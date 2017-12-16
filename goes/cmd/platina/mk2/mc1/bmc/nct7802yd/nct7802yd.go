@@ -7,6 +7,7 @@
 package nct7802yd
 
 import (
+	"errors"
 	"fmt"
 	"net/rpc"
 	"strconv"
@@ -14,19 +15,18 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"errors"
 
 	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/w83795d"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
 	"github.com/platinasystems/go/internal/sockfile"
-	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/w83795d"
 )
 
 const (
@@ -48,24 +48,21 @@ type I2cDev struct {
 }
 
 var (
-	Init = func() {}
-	once sync.Once
+	SlotId         int
+	MaxFanTrays    int
+	MaxFansPerTray int
 
-	SlotId		int
-	MaxFanTrays	int
-	MaxFansPerTray	int
-
-	first          	int
-	hostTemp       	float64
-	sHostTemp      	float64
-	hostTempTarget 	float64
-	hostHyst       	float64
-	qsfpTemp       	float64
-	sQsfpTemp      	float64
-	qsfpTempTarget 	float64
-	qsfpHyst       	float64
-	thTemp         	float64
-	sThTemp        	float64
+	first          int
+	hostTemp       float64
+	sHostTemp      float64
+	hostTempTarget float64
+	hostHyst       float64
+	qsfpTemp       float64
+	sQsfpTemp      float64
+	qsfpTempTarget float64
+	qsfpHyst       float64
+	thTemp         float64
+	sThTemp        float64
 
 	lastSpeed string
 
@@ -103,7 +100,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Usage }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 
@@ -180,34 +177,34 @@ func (c *Command) update() error {
 	}
 
 	if first == 1 {
-        	const (
-                	TOR1 uint8      = 0x00
-	                CH1_4S uint8    = 0x01
-        	        CH1_8S uint8    = 0x02
-                	CH1_16S uint8   = 0x03
-	                CH1MC uint8     = 0x04
-        	        CH1LC uint8     = 0x05
-	        )
-		
-        	d := eeprom.Device{
-                	BusIndex:   0,
-	                BusAddress: 0x55,
-        	}
-        	if err:= d.GetInfo(); err != nil {
-                	log.Print(err)
-        	}
+		const (
+			TOR1    uint8 = 0x00
+			CH1_4S  uint8 = 0x01
+			CH1_8S  uint8 = 0x02
+			CH1_16S uint8 = 0x03
+			CH1MC   uint8 = 0x04
+			CH1LC   uint8 = 0x05
+		)
 
-        	switch d.Fields.ChassisType {
-                case CH1_4S:
-                        MaxFanTrays = 3
-                        MaxFansPerTray = 2
-                case CH1_8S:
-                        MaxFanTrays = 3
-                        MaxFansPerTray = 3
-                case CH1_16S:
-                        MaxFanTrays = 6
-                        MaxFansPerTray = 3
-        	}
+		d := eeprom.Device{
+			BusIndex:   0,
+			BusAddress: 0x55,
+		}
+		if err := d.GetInfo(); err != nil {
+			log.Print(err)
+		}
+
+		switch d.Fields.ChassisType {
+		case CH1_4S:
+			MaxFanTrays = 3
+			MaxFansPerTray = 2
+		case CH1_8S:
+			MaxFanTrays = 3
+			MaxFansPerTray = 3
+		case CH1_16S:
+			MaxFanTrays = 6
+			MaxFansPerTray = 3
+		}
 
 		Vdev.FanInit()
 		log.Print("fan init")
@@ -215,16 +212,16 @@ func (c *Command) update() error {
 	}
 
 	for k, _ := range VpageByKey {
-                if strings.Contains(k, "fan_tray.control") {
-                        v, err := Vdev.getFanControl()
-                        if err != nil {
-                                return err
-                        }
-                        if v != c.lasts[k] {
-                                c.pub.Print(k, ": ", v)
-                                c.lasts[k] = v
-                        }
-                } 
+		if strings.Contains(k, "fan_tray.control") {
+			v, err := Vdev.getFanControl()
+			if err != nil {
+				return err
+			}
+			if v != c.lasts[k] {
+				c.pub.Print(k, ": ", v)
+				c.lasts[k] = v
+			}
+		}
 		if strings.Contains(k, "fan_tray.speed") {
 			v, err := Vdev.GetFanSpeed()
 			if err != nil {
@@ -266,16 +263,16 @@ func (c *Command) update() error {
 				c.lasts[k] = v
 			}
 		}
-                if strings.Contains(k, "hwmon.target.units.C") {
-                        v, err := Vdev.GetHwmTarget()
-                        if err != nil {
-                                return err
-                        }
-                        if v != c.last[k] {
-                                c.pub.Print(k, ": ", v)
-                                c.last[k] = v
-                        }
-                }
+		if strings.Contains(k, "hwmon.target.units.C") {
+			v, err := Vdev.GetHwmTarget()
+			if err != nil {
+				return err
+			}
+			if v != c.last[k] {
+				c.pub.Print(k, ": ", v)
+				c.last[k] = v
+			}
+		}
 		if strings.Contains(k, "host.temp.units.C") {
 			v, err := Vdev.CheckHostTemp()
 			if err != nil {
@@ -321,11 +318,11 @@ func (c *Command) update() error {
 }
 
 const (
-	fanPoles    = 4
-	tempCtrl2   = 0x5f
-	high        = 0xff
-	med         = 0x80
-	low         = 0x50
+	fanPoles  = 4
+	tempCtrl2 = 0x5f
+	high      = 0xff
+	med       = 0x80
+	low       = 0x50
 	//maxFanTrays = 4
 )
 
@@ -367,6 +364,7 @@ func (h *I2cDev) RearTemp() (string, error) {
 	v := float64(t) + ((float64(u >> 7)) * 0.25)
 	return strconv.FormatFloat(v, 'f', 3, 64), nil
 }
+
 /*
 func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 	var rpm uint16
@@ -430,7 +428,7 @@ func (h *I2cDev) FanInit() error {
 
 	//set default speed to auto
 	h.SetFanSpeed("auto", true)
-	
+
 	// MC controls all fan trays
 	h.SetFanControl("enabled")
 
@@ -476,8 +474,8 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 
 	r2 := getRegsBank0()
 	r2.BankSelect.set(h, 0x80)
-	r2.TempToFanMap1.set(h, 0x0)	// manual mode
-	r2.TempToFanMap2.set(h, 0x0)	
+	r2.TempToFanMap1.set(h, 0x0) // manual mode
+	r2.TempToFanMap2.set(h, 0x0)
 	r2.FanOutValue1.set(h, d)
 	closeMux(h)
 	err := DoI2cRpc()
@@ -488,27 +486,29 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 }
 
 func (h *I2cDev) SetFanControl(w string) error {
-        var control string
-        var vdevIo [6]w83795d.I2cDev
+	var control string
+	var vdevIo [6]w83795d.I2cDev
 
-        vdevIo[0] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x10}
-        vdevIo[1] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x20}
-        vdevIo[2] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x40}
-        vdevIo[3] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x80}
-        vdevIo[4] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x04}
-        vdevIo[5] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x08}
+	vdevIo[0] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x10}
+	vdevIo[1] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x20}
+	vdevIo[2] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x40}
+	vdevIo[3] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x80}
+	vdevIo[4] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x04}
+	vdevIo[5] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x08}
 
 	switch w {
-	case "enabled": control = "remote.mc"+ strconv.Itoa(SlotId)
-	case "disabled": control = "local"
+	case "enabled":
+		control = "remote.mc" + strconv.Itoa(SlotId)
+	case "disabled":
+		control = "local"
 	}
-        for j := 0; j < MaxFanTrays; j++ {
-               	err := vdevIo[j].SetFanControl(control) 
+	for j := 0; j < MaxFanTrays; j++ {
+		err := vdevIo[j].SetFanControl(control)
 		if err != nil {
-                        return err
-                }
-        }
-        return nil
+			return err
+		}
+	}
+	return nil
 }
 
 func (h *I2cDev) SetFanSpeed(w string, l bool) error {
@@ -572,7 +572,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 			r2.TempHyster1.set(h, 0x55)
 			r2.TempHyster2.set(h, 0x55)
 			//enable temp control of fans
-			r2.TempToFanMap1.set(h, 0x11)	//Smart-Fan mode
+			r2.TempToFanMap1.set(h, 0x11) //Smart-Fan mode
 			closeMux(h)
 			err = DoI2cRpc()
 			if err != nil {
@@ -585,7 +585,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 	//static speed settings below, set hwm to manual mode, then set static speed
 	case "high":
 		r2.BankSelect.set(h, 0x80)
-		r2.TempToFanMap1.set(h, 0x0)	//manual 
+		r2.TempToFanMap1.set(h, 0x0) //manual
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, high)
 		closeMux(h)
@@ -596,7 +596,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 		log.Print("notice: fan speed set to high")
 	case "med":
 		r2.BankSelect.set(h, 0x80)
-		r2.TempToFanMap1.set(h, 0x0)	//manual
+		r2.TempToFanMap1.set(h, 0x0) //manual
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, med)
 		closeMux(h)
@@ -607,7 +607,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 		log.Print("notice: fan speed set to ", w)
 	case "low":
 		r2.BankSelect.set(h, 0x80)
-		r2.TempToFanMap1.set(h, 0x0)	//manual
+		r2.TempToFanMap1.set(h, 0x0) //manual
 		r2.TempToFanMap2.set(h, 0x0)
 		r2.FanOutValue1.set(h, low)
 		closeMux(h)
@@ -639,18 +639,17 @@ func (h *I2cDev) GetFanDuty() (uint8, error) {
 func (h *I2cDev) getFanControl() (string, error) {
 	return "disabled", nil
 
-
 	var vdevIo [6]w83795d.I2cDev
 
 	vdevIo[0] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x10}
-        vdevIo[1] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x20}
-        vdevIo[2] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x40}
-        vdevIo[3] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x80}
-        vdevIo[4] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x04}
-        vdevIo[5] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x08} 
+	vdevIo[1] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x20}
+	vdevIo[2] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x40}
+	vdevIo[3] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x08, 1, 0x73, 0x80}
+	vdevIo[4] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x04}
+	vdevIo[5] = w83795d.I2cDev{1, 0x41, 1, 0x70, 0x10, 1, 0x73, 0x08}
 
 	m := 0
-	control := "remote.mc"+ strconv.Itoa(SlotId)
+	control := "remote.mc" + strconv.Itoa(SlotId)
 	for j := 0; j < MaxFanTrays; j++ {
 		v, err := vdevIo[j].GetFanControl()
 		if err != nil {
@@ -856,9 +855,7 @@ func (h *I2cDev) GetQsfpTempTarget() (string, error) {
 }
 
 func hostReset() error {
-	if len(gpio.Pins) == 0 {
-		gpio.Init()
-	}
+	cmd.Init("gpio")
 	log.Print("issue hard reset to host")
 	pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
 	if found {
@@ -874,7 +871,7 @@ func hostReset() error {
 func writeRegs() error {
 	for k, v := range WrRegVal {
 		switch WrRegFn[k] {
-		case "control": 
+		case "control":
 			if v == "enabled" || v == "disabled" {
 				log.Print("control", v)
 			}

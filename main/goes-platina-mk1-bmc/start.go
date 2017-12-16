@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
@@ -19,11 +20,11 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-func init() {
+func startInit() {
 	start.ConfGpioHook = func() error {
 		var deviceVer byte
 
-		gpio.Init()
+		cmd.Init("gpio")
 		pin, found := gpio.Pins["QSPI_MUX_SEL"]
 		if found {
 			r, _ := pin.Value()

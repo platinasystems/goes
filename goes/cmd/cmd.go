@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/platinasystems/go/goes/lang"
 )
@@ -16,6 +17,29 @@ var Helpers = map[string]struct{}{
 	"help":     struct{}{},
 	"man":      struct{}{},
 	"usage":    struct{}{},
+}
+
+// Machines provide this map of command initters
+var Initters map[string]func()
+
+var cmdinit struct {
+	mutex sync.Mutex
+	done  map[string]bool
+}
+
+// Commands use Init(Name) to perform the machine specific init
+func Init(name string) {
+	cmdinit.mutex.Lock()
+	defer cmdinit.mutex.Unlock()
+	if cmdinit.done == nil {
+		cmdinit.done = make(map[string]bool)
+	}
+	if !cmdinit.done[name] {
+		if init, ok := Initters[name]; ok {
+			init()
+			cmdinit.done[name] = true
+		}
+	}
 }
 
 // Swap hyphen prefaced helper flags with command, so,

@@ -70,6 +70,8 @@ func (c *Command) Main(...string) error {
 		in  parse.Input
 	)
 
+	cmd.Init(Name)
+
 	if err = redis.IsReady(); err != nil {
 		return err
 	}

@@ -8,8 +8,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/w83795d"
 )
 
-func init() { w83795d.Init = w83795dInit }
-
 func w83795dInit() {
 
 	// Bus, Addr, MuxBus, MuxAddr, MuxValue, MuxBus2, MuxAddr2, MuxValue2

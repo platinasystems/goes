@@ -6,8 +6,6 @@ package main
 
 import "github.com/platinasystems/go/goes/cmd/fspd"
 
-func init() { fspd.Init = fspdInit }
-
 func fspdInit() {
 	fspd.Vdev[0].Slot = 2
 	fspd.Vdev[0].Bus = 1

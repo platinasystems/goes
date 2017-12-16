@@ -7,9 +7,9 @@ package diag
 import (
 	"fmt"
 
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/gpio"
 )
 
 const (
@@ -75,9 +75,7 @@ func (Command) Main(args ...string) error {
 	if n := len(args); n != 0 {
 		diag = args[0]
 	}
-	if len(gpio.Pins) == 0 {
-		gpio.Init()
-	}
+	cmd.Init("gpio")
 	diags, found := map[string][]Diag{
 		"": []Diag{
 			diagI2c,

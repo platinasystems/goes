@@ -50,9 +50,6 @@ type I2cDev struct {
 }
 
 var (
-	Init = func() {}
-	once sync.Once
-
 	Vdev I2cDev
 
 	VpageByKey map[string]uint8
@@ -95,7 +92,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Name }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 
@@ -245,9 +242,7 @@ func (c *Command) updateW() error {
 		if watchdogTimer >= watchdogTimeout {
 			log.Print("warning: host watchdog timer expired; reset host; disable watchdog")
 			watchdogExpired = true
-			if len(gpio.Pins) == 0 {
-				gpio.Init()
-			}
+			cmd.Init("gpio")
 			pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
 			if found {
 				pin.SetValue(false)

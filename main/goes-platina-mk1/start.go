@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-func init() {
+func startInit() {
 	start.ConfHook = func() error {
 		return redis.Hwait(redis.DefaultHash, "vnet.ready", "true",
 			10*time.Second)

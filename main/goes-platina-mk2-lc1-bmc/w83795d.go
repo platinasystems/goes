@@ -6,8 +6,6 @@ package main
 
 import "github.com/platinasystems/go/goes/cmd/w83795d"
 
-func init() { w83795d.Init = w83795dInit }
-
 func w83795dInit() {
 	w83795d.Vdev.Bus = 0
 	w83795d.Vdev.Addr = 0x2f

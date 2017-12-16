@@ -60,6 +60,7 @@ func (c *Command) Goes(g *goes.Goes) { c.Daemons.goes = g }
 func (*Command) Kind() cmd.Kind      { return cmd.Hidden }
 
 func (c *Command) Main(args ...string) error {
+	cmd.Init(Name)
 	if len(args) == 0 {
 		return c.server()
 	}

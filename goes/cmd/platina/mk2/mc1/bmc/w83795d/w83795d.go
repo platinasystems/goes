@@ -17,9 +17,9 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
-        "github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
@@ -37,22 +37,19 @@ var apropos = lang.Alt{
 }
 
 type I2cDev struct {
-	Bus      	int
-	Addr     	int
-	MuxBus   	int
-	MuxAddr  	int
-	MuxValue 	int
-        MuxBus2  	int
-        MuxAddr2	int
-        MuxValue2	int
+	Bus       int
+	Addr      int
+	MuxBus    int
+	MuxAddr   int
+	MuxValue  int
+	MuxBus2   int
+	MuxAddr2  int
+	MuxValue2 int
 }
 
 var (
-	Init = func() {}
-	once sync.Once
-	
-	MaxFanTrays	int
-	MaxFansPerTray	int
+	MaxFanTrays    int
+	MaxFansPerTray int
 
 	first          int
 	hostTemp       float64
@@ -71,7 +68,7 @@ var (
 	hostCtrl bool
 	thCtrl   bool
 
-	Vdev [6]I2cDev
+	Vdev   [6]I2cDev
 	VdevIo [6]I2cDev
 
 	VpageByKey map[string]uint8
@@ -103,7 +100,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Usage }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 
@@ -179,34 +176,34 @@ func (c *Command) update() error {
 	}
 
 	if first == 1 {
-                const (
-                        TOR1 uint8      = 0x00
-                        CH1_4S uint8    = 0x01
-                        CH1_8S uint8    = 0x02
-                        CH1_16S uint8   = 0x03
-                        CH1MC uint8     = 0x04
-                        CH1LC uint8     = 0x05
-                )
+		const (
+			TOR1    uint8 = 0x00
+			CH1_4S  uint8 = 0x01
+			CH1_8S  uint8 = 0x02
+			CH1_16S uint8 = 0x03
+			CH1MC   uint8 = 0x04
+			CH1LC   uint8 = 0x05
+		)
 
-                d := eeprom.Device{
-                        BusIndex:   0,
-                        BusAddress: 0x55,
-                }
-                if err:= d.GetInfo(); err != nil {
-                        log.Print(err)
-                }
+		d := eeprom.Device{
+			BusIndex:   0,
+			BusAddress: 0x55,
+		}
+		if err := d.GetInfo(); err != nil {
+			log.Print(err)
+		}
 
-                switch d.Fields.ChassisType {
-                case CH1_4S:
-                        MaxFanTrays = 3
-                        MaxFansPerTray = 2
-                case CH1_8S:
-                        MaxFanTrays = 3
-                        MaxFansPerTray = 3
-                case CH1_16S:
-                        MaxFanTrays = 6
-                        MaxFansPerTray = 3
-                }
+		switch d.Fields.ChassisType {
+		case CH1_4S:
+			MaxFanTrays = 3
+			MaxFansPerTray = 2
+		case CH1_8S:
+			MaxFanTrays = 3
+			MaxFansPerTray = 3
+		case CH1_16S:
+			MaxFanTrays = 6
+			MaxFansPerTray = 3
+		}
 
 		for j := 0; j < MaxFanTrays; j++ {
 			VdevIo[j].FanIoInit()
@@ -217,7 +214,7 @@ func (c *Command) update() error {
 
 	for j := 0; j <= MaxFanTrays; j++ {
 		for m := 0; m < MaxFansPerTray; m++ {
-			k := "fan_tray." + strconv.Itoa((j+1)) + "." + strconv.Itoa((m+1)) + ".speed.units.rpm"
+			k := "fan_tray." + strconv.Itoa((j + 1)) + "." + strconv.Itoa((m + 1)) + ".speed.units.rpm"
 			v, err := Vdev[j].FanCount(uint8(j+1), uint8(m))
 			if err != nil {
 				return err
@@ -227,7 +224,7 @@ func (c *Command) update() error {
 				c.last[k] = v
 			}
 		}
-			
+
 		k := "fan_tray." + strconv.Itoa(j+1) + ".speed"
 		v, err := Vdev[j].GetFanSpeed()
 		if err != nil {
@@ -238,16 +235,15 @@ func (c *Command) update() error {
 			c.lasts[k] = v
 		}
 
-                k = "fan_tray." + strconv.Itoa(j+1) + "control"
-                v, err = Vdev[j].GetFanControl()
-                if err != nil {
-                        return err
-                }
-                if v != c.lasts[k] {
-                        c.pub.Print(k, ": ", v)
-                        c.lasts[k] = v
-                }
-
+		k = "fan_tray." + strconv.Itoa(j+1) + "control"
+		v, err = Vdev[j].GetFanControl()
+		if err != nil {
+			return err
+		}
+		if v != c.lasts[k] {
+			c.pub.Print(k, ": ", v)
+			c.lasts[k] = v
+		}
 
 		k = "fan_tray." + strconv.Itoa(j+1) + ".duty"
 		w, err := Vdev[j].GetFanDuty()
@@ -423,19 +419,18 @@ func (h *I2cDev) FanInit() error {
 }
 
 func (h *I2cDev) FanIoInit() error {
-        r := getRegsIo()
+	r := getRegsIo()
 
-        r.Output.set(h, 0x02)	//"local"
-        r.Polarity.set(h, 0x00)
-        r.Config.set(h, 0x00)
-        closeMux(h)
-        err := DoI2cRpc()
-        if err != nil {
-                return err
-        }
-        return nil
+	r.Output.set(h, 0x02) //"local"
+	r.Polarity.set(h, 0x00)
+	r.Config.set(h, 0x00)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+	return nil
 }
-
 
 func (h *I2cDev) SetLastSpeed() error {
 	current, _ := h.GetFanSpeed()
@@ -470,15 +465,15 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 
 func (h *I2cDev) SetFanControl(w string) error {
 	r2 := getRegsIo()
-        switch w {
-        case "local":
+	switch w {
+	case "local":
 		r2.Output.set(h, 0x02)
 	case "remote.mc1":
 		r2.Output.set(h, 0x01)
-        case "remote.mc2":
-                r2.Output.set(h, 0x00)
+	case "remote.mc2":
+		r2.Output.set(h, 0x00)
 
-	}    
+	}
 	closeMux(h)
 	err := DoI2cRpc()
 	if err != nil {
@@ -626,9 +621,9 @@ func (h *I2cDev) GetFanDuty() (uint8, error) {
 }
 
 func (h *I2cDev) GetFanControl() (string, error) {
-        var control string
+	var control string
 
-        r2 := getRegsIo()
+	r2 := getRegsIo()
 	r2.Input.get(h)
 	closeMux(h)
 	err := DoI2cRpc()
@@ -637,9 +632,12 @@ func (h *I2cDev) GetFanControl() (string, error) {
 	}
 	t := uint8(s[2].D[0])
 	switch t {
-	case 0x02: control = "local"
-	case 0x01: control = "remote.mc1"
-	case 0x00: control = "remote.mc2"
+	case 0x02:
+		control = "local"
+	case 0x01:
+		control = "remote.mc1"
+	case 0x00:
+		control = "remote.mc2"
 	default:
 		control = "invalid " + strconv.Itoa(int(t))
 	}
@@ -842,12 +840,12 @@ func writeRegs() error {
 					Vdev[i].SetFanSpeed(v, true)
 				}
 			}
-                case "control":
-                        if v == "local" || v == "remote.mc1" || v == "remote.mc2" {
+		case "control":
+			if v == "local" || v == "remote.mc1" || v == "remote.mc2" {
 				for i := 0; i < MaxFanTrays; i++ {
-                                	VdevIo[i].SetFanControl(v)
+					VdevIo[i].SetFanControl(v)
 				}
-                        }
+			}
 		case "speed.return":
 			if v == "" {
 				for i := 0; i < MaxFanTrays; i++ {

@@ -6,7 +6,7 @@ package main
 
 import "github.com/platinasystems/go/goes/cmd/daemons"
 
-func init() {
+func daemonsInit() {
 	daemons.Init = [][]string{
 		[]string{"redisd"},
 		[]string{"fantrayd"},

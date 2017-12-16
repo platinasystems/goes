@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd"
@@ -46,12 +45,7 @@ var (
 
 func New() Command { return Command{} }
 
-var (
-	Init = func() {}
-	once sync.Once
-
-	GpioPin string
-)
+var GpioPin string
 
 type Command struct{}
 
@@ -62,7 +56,7 @@ func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	parm, args := parms.New(args, "-T", "-t")
 	for k, v := range map[string]string{
@@ -103,9 +97,7 @@ func (Command) Main(args ...string) error {
 
 	for _ = range ticker.C {
 		if len(GpioPin) > 0 {
-			if len(gpio.Pins) == 0 {
-				gpio.Init()
-			}
+			cmd.Init("gpio")
 			pin, found := gpio.Pins[GpioPin]
 			t, err := pin.Value()
 			if found && err == nil {

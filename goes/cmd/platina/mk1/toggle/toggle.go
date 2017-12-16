@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
@@ -31,14 +32,14 @@ type Interface interface {
 	Usage() string
 }
 
-func New() Interface { return cmd{} }
+func New() Interface { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Apropos() lang.Alt { return apropos }
+func (Command) Man() lang.Alt     { return man }
+func (Command) String() string    { return Name }
+func (Command) Usage() string     { return Usage }
 
 const (
 	i2cGpioAddr = 0x74
@@ -81,7 +82,7 @@ func uartToggle() {
 
 }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 
 	var machineBmc bool
 
@@ -93,10 +94,7 @@ func (cmd) Main(args ...string) error {
 	}
 
 	if machineBmc {
-		if len(gpio.Pins) == 0 {
-			gpio.Init()
-		}
-
+		cmd.Init("gpio")
 		pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
 		if found {
 			pin.SetValue(true)

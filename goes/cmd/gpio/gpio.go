@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 )
@@ -26,14 +27,14 @@ type Interface interface {
 	Usage() string
 }
 
-func New() Interface { return cmd{} }
+func New() Interface { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
 
-func (cmd) Main(args ...string) error {
-	gpio.Init()
+func (Command) Main(args ...string) error {
+	cmd.Init(Name)
 	switch len(args) {
 	case 0: // No args?  Report all pin values.
 		names := make([]string, 0, len(gpio.Pins))
@@ -89,8 +90,8 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
+func (Command) String() string { return Name }
+func (Command) Usage() string  { return Usage }
 
 var apropos = lang.Alt{
 	lang.EnUS: Apropos,

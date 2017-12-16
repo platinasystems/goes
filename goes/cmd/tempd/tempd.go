@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -29,10 +28,6 @@ const (
 )
 
 var bmcIpv6LinkLocalRedis string
-
-var Init = func() {}
-
-var once sync.Once
 
 func New() *Command { return new(Command) }
 
@@ -57,15 +52,14 @@ func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
 	var err error
+	var si syscall.Sysinfo_t
+
+	cmd.Init(Name)
 
 	if err = redis.IsReady(); err != nil {
 		log.Print("redis not ready")
 		return err
 	}
-
-	once.Do(Init)
-
-	var si syscall.Sysinfo_t
 
 	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)

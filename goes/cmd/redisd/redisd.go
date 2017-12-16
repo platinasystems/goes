@@ -63,10 +63,6 @@ var (
 	}
 )
 
-// Machines may use Init to set redisd parameters before exec.
-var Init = func() {}
-var once sync.Once
-
 // Machines may restrict redisd listening to this list of net devices.
 // If unset, the local admin may restrict this through /etc/default/goes ARGS.
 // Otherwise, the default is all active net devices.
@@ -131,7 +127,7 @@ func (c *Command) Close() error {
 }
 
 func (c *Command) Main(args ...string) (err error) {
-	once.Do(Init)
+	cmd.Init(Name)
 	defer func() {
 		if err != nil {
 			c.Close()

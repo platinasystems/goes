@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -57,8 +58,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/diag"
-	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpeventsd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lceventsd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpeventsd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/nct7802yd"
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
@@ -102,6 +103,23 @@ const (
 )
 
 func Goes() *goes.Goes {
+	cmd.Initters = map[string]func(){
+		daemons.Name: daemonsInit,
+		// fantrayd.Name:    fantraydInit,
+		// fspd.Name:        fspdInit,
+		gpio.Name:  gpioInit,
+		imx6d.Name: imx6dInit,
+		// ledgpiod.Name:    ledgpiodInit,
+		lceventsd.Name:   lceventsdInit,
+		nct7802yd.Name:   nct7802ydInit,
+		qsfpeventsd.Name: qsfpeventsdInit,
+		redisd.Name:      redisdInit,
+		start.Name:       startInit,
+		// ucd9090d.Name:    ucd9090dInit,
+		// w83795d.Name:     w83795dInit,
+		watchdog.Name: watchdogInit,
+	}
+
 	g := goes.New(Name, "",
 		lang.Alt{
 			lang.EnUS: Apropos,

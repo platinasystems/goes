@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
-	"sync"
 	"syscall"
 	"time"
 
@@ -32,9 +31,6 @@ var apropos = lang.Alt{
 func New() *Command { return new(Command) }
 
 var (
-	Init = func() {}
-	once sync.Once
-
 	readError  int
 	VpageByKey map[string]uint8
 )
@@ -51,7 +47,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Name }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 

@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -57,6 +58,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
+	"github.com/platinasystems/go/goes/cmd/qsfp"
 	"github.com/platinasystems/go/goes/cmd/reboot"
 	"github.com/platinasystems/go/goes/cmd/redisd"
 	"github.com/platinasystems/go/goes/cmd/reload"
@@ -93,6 +95,16 @@ const (
 )
 
 func Goes() *goes.Goes {
+	cmd.Initters = map[string]func(){
+		daemons.Name: daemonsInit,
+		qsfp.Name:    qsfpInit,
+		redisd.Name:  redisdInit,
+		start.Name:   startInit,
+		tempd.Name:   tempdInit,
+		vnetd.Name:   vnetdInit,
+
+		show_packages.Name: showPackagesInit,
+	}
 	g := goes.New(Name, "",
 		lang.Alt{
 			lang.EnUS: Apropos,
@@ -147,6 +159,7 @@ func Goes() *goes.Goes {
 		ping.New(),
 		ps.New(),
 		pwd.New(),
+		qsfp.New(),
 		reboot.New(),
 		redisd.New(),
 		reload.New(),

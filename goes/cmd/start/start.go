@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/parms"
@@ -70,6 +71,8 @@ func (*Command) Apropos() lang.Alt   { return apropos }
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {
+	cmd.Init(Name)
+
 	parm, args := parms.New(args, "-start", "-stop")
 
 	err := assert.Root()

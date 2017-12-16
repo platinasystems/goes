@@ -49,9 +49,6 @@ type I2cDev struct {
 }
 
 var (
-	Init = func() {}
-	once sync.Once
-
 	Vdev I2cDev
 
 	VpageByKey map[string]uint8
@@ -88,7 +85,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Name }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 

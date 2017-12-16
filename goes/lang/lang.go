@@ -171,16 +171,17 @@ const (
 var (
 	Default = EnUS
 
-	Lang string // init by os.Getenv{"LANG"}
+	env string
 )
 
 type Alt map[string]string
 
-func init() { Lang = os.Getenv("LANG") }
-
 // If available, this returns text in the prefered language.
 func (m Alt) String() string {
-	for _, lang := range []string{Lang, Default, EnUS} {
+	if len(env) == 0 {
+		env = os.Getenv("LANG")
+	}
+	for _, lang := range []string{env, Default, EnUS} {
 		if s, found := m[lang]; found {
 			return s
 		}

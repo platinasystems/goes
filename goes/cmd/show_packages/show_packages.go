@@ -10,11 +10,14 @@ import (
 	"strings"
 
 	info "github.com/platinasystems/go"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/indent"
 )
 
 const (
+	Name = "show-packages"
+
 	ShowPackagesAproposEnUS = "print package repos info"
 	LicenseAproposEnUS      = "print package license(s)"
 	VersionAproposEnUS      = "print package version(s)"
@@ -46,6 +49,7 @@ func (c Command) String() string { return string(c) }
 func (Command) Usage() string    { return Usage }
 
 func (c Command) Main(args ...string) error {
+	cmd.Init(Name)
 	if len(args) != 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}

@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -25,9 +24,6 @@ const (
 	Apropos = "qsfp monitoring daemon, publishes to redis"
 	Usage   = "qsfp"
 )
-
-var Init = func() {}
-var once sync.Once
 
 var Vdev [32]I2cDev
 
@@ -76,13 +72,13 @@ func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
 	var err error
+	var si syscall.Sysinfo_t
+
+	cmd.Init(Name)
+
 	if err = redis.IsReady(); err != nil {
 		return err
 	}
-
-	once.Do(Init)
-
-	var si syscall.Sysinfo_t
 
 	for i := 0; i < 32; i++ {
 		portIsCopper[i] = true

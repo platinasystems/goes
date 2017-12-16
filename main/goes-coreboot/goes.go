@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -82,6 +83,9 @@ const (
 )
 
 func Goes() *goes.Goes {
+	cmd.Initters = map[string]func(){
+		"redisd": redisdInit,
+	}
 	g := goes.New(Name, "",
 		lang.Alt{
 			lang.EnUS: Apropos,

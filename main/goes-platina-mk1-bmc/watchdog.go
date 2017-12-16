@@ -6,8 +6,6 @@ package main
 
 import "github.com/platinasystems/go/goes/cmd/watchdog"
 
-func init() { watchdog.Init = watchdogInit }
-
 func watchdogInit() {
 	watchdog.GpioPin = "BMC_WDI"
 }

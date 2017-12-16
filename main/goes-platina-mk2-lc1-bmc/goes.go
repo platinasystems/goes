@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
 	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
@@ -101,6 +102,19 @@ const (
 )
 
 func Goes() *goes.Goes {
+	cmd.Initters = map[string]func(){
+		daemons.Name: daemonsInit,
+		// fantrayd.Name: fantraydInit,
+		// fspd.Name:     fspdInit,
+		gpio.Name:  gpioInit,
+		imx6d.Name: imx6dInit,
+		// ledgpiod.Name: ledgpiodInit,
+		redisd.Name: redisdInit,
+		start.Name:  startInit,
+		// ucd9090d.Name: ucd9090dInit,
+		// w83795d.Name:  w83795dInit,
+		watchdog.Name: watchdogInit,
+	}
 	g := goes.New(Name, "",
 		lang.Alt{
 			lang.EnUS: Apropos,

@@ -6,23 +6,28 @@ package main
 
 import (
 	"fmt"
+	"net"
+	"strings"
 
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
-	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
-	mk1 "github.com/platinasystems/go/vnet/platforms/mk1"
+	"github.com/platinasystems/go/vnet/platforms/fe1"
+	"github.com/platinasystems/go/vnet/platforms/mk1"
 )
 
 type mk1Main struct {
-	fe1_platform.Platform
+	fe1.Platform
 }
 
-var defaultMk1 = &mk1Main{}
-
-func init() { vnetd.Hook = defaultMk1.vnetdHook }
+func vnetdInit() {
+	p := new(mk1Main)
+	vnetd.Hook = p.vnetdHook
+	vnetd.CloseHook = p.stopHook
+}
 
 func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	p.Init = init
@@ -62,4 +67,27 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	}
 
 	return nil
+}
+
+func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
+	if p.SriovMode {
+		return mk1.PlatformExit(v, &p.Platform)
+	} else {
+		interfaces, err := net.Interfaces()
+		if err != nil {
+			return err
+		}
+		for _, dev := range interfaces {
+			if strings.HasPrefix(dev.Name, "eth-") ||
+				dev.Name == "vnet" {
+				args := []string{"link", "delete", dev.Name}
+				err = ip.New().Main(args...)
+				if err != nil {
+					fmt.Println("write err", err)
+					return err
+				}
+			}
+		}
+		return nil
+	}
 }

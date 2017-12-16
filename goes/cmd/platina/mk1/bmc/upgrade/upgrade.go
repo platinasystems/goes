@@ -62,13 +62,13 @@ type Interface interface {
 	Usage() string
 }
 
-func New() Interface { return cmd{} }
+func New() Interface { return Command{} }
 
-type cmd struct{}
+type Command struct{}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (Command) Apropos() lang.Alt { return apropos }
 
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	initQfmt()
 	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c", "-1")
 	parm, args := parms.New(args, "-v", "-s")
@@ -110,9 +110,9 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
+func (Command) Man() lang.Alt  { return man }
+func (Command) String() string { return Name }
+func (Command) Usage() string  { return Usage }
 
 var (
 	apropos = lang.Alt{

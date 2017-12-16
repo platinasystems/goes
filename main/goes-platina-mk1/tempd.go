@@ -4,15 +4,11 @@
 
 package main
 
-import (
-	"github.com/platinasystems/go/goes/cmd/tempd"
-)
+import "github.com/platinasystems/go/goes/cmd/tempd"
 
-func init() {
-	tempd.Init = func() {
-		tempd.VpageByKey = map[string]uint8{
-			"sys.cpu.coretemp.units.C": 0,
-			"bmc.redis.status":         0,
-		}
+func tempdInit() {
+	tempd.VpageByKey = map[string]uint8{
+		"sys.cpu.coretemp.units.C": 0,
+		"bmc.redis.status":         0,
 	}
 }

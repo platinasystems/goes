@@ -60,9 +60,6 @@ type I2cDev struct {
 }
 
 var (
-	Init = func() {}
-	once sync.Once
-
 	Vdev [2]I2cDev
 
 	VpageByKey map[string]uint8
@@ -98,7 +95,7 @@ func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Usage }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	cmd.Init(Name)
 
 	var si syscall.Sysinfo_t
 
@@ -1006,9 +1003,7 @@ func (h *I2cDev) Eeprom() (string, error) {
 }
 
 func (h *I2cDev) PsuStatus() string {
-	if len(gpio.Pins) == 0 {
-		gpio.Init()
-	}
+	cmd.Init("gpio")
 	pin, found := gpio.Pins[h.GpioPrsntL]
 	if !found {
 		h.Installed = 0

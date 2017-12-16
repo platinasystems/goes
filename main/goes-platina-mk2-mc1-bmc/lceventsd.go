@@ -5,13 +5,10 @@
 package main
 
 import (
-        "github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lceventsd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/lceventsd"
 )
 
-
-func init() {
-	lceventsd.Init = func() {
-                // lcabsd's io signals via pca9539 io-expander
-                lceventsd.VdevIo = lceventsd.I2cDev{0, 0x76, 0, 0x72, 0x01, 0, 0, 0}
-	}
+func lceventsdInit() {
+	// lcabsd's io signals via pca9539 io-expander
+	lceventsd.VdevIo = lceventsd.I2cDev{0, 0x76, 0, 0x72, 0x01, 0, 0, 0}
 }

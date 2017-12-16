@@ -11,8 +11,6 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-func init() { ucd9090d.Init = ucd9090dInit }
-
 func ucd9090dInit() {
 	ver := 0
 	ucd9090d.Vdev.Bus = 0

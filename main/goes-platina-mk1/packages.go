@@ -5,8 +5,10 @@
 package main
 
 import (
-	. "github.com/platinasystems/go"
+	info "github.com/platinasystems/go"
 	"github.com/platinasystems/go/vnet/devices/ethernet/switch/plugins/fe1"
 )
 
-func init() { Packages = fe1.Packages }
+func showPackagesInit() {
+	info.Packages = fe1.Packages
+}
