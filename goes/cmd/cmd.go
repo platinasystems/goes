@@ -21,24 +21,19 @@ var Helpers = map[string]struct{}{
 
 // Machines provide this map of command initters
 var Initters map[string]func()
-
-var cmdinit struct {
-	mutex sync.Mutex
-	done  map[string]bool
-}
+var initMutex sync.Mutex
+var initted map[string]bool
 
 // Commands use Init(Name) to perform the machine specific init
 func Init(name string) {
-	cmdinit.mutex.Lock()
-	defer cmdinit.mutex.Unlock()
-	if cmdinit.done == nil {
-		cmdinit.done = make(map[string]bool)
+	initMutex.Lock()
+	defer initMutex.Unlock()
+	if initted == nil {
+		initted = make(map[string]bool)
 	}
-	if !cmdinit.done[name] {
-		if init, ok := Initters[name]; ok {
-			init()
-			cmdinit.done[name] = true
-		}
+	if init, found := Initters[name]; found && !initted[name] {
+		init()
+		initted[name] = true
 	}
 }
 
