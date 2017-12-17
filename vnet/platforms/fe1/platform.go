@@ -21,7 +21,8 @@ type PortProvisionConfig struct {
 }
 
 type PlatformConfig struct {
-	SriovMode bool
+	KernelIxgbe   bool
+	KernelIxgbevf bool
 	// Reset switch via gpio hard reset pin.
 	DisableGpioSwitchReset bool
 	// Reset switch via cpu soft reset.

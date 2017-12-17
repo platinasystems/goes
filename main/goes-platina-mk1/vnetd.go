@@ -7,13 +7,13 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/sriovs"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
@@ -54,10 +54,10 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	input.SetString(s)
 	p.BaseEthernetAddress.Parse(input)
 
-	fns, err := sriovs.NumvfsFns()
-	p.SriovMode = err == nil && len(fns) > 0
+	fi, err := os.Stat("/sys/bus/pci/drivers/ixgbe")
+	p.KernelIxgbe = err == nil && fi.IsDir()
 
-	vnetd.UnixInterfacesOnly = !p.SriovMode
+	vnetd.UnixInterfacesOnly = !p.KernelIxgbe
 
 	// Default to using MSI versus INTX for switch chip.
 	p.EnableMsiInterrupt = true
@@ -70,9 +70,10 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 }
 
 func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
-	if p.SriovMode {
+	if p.KernelIxgbe {
 		return mk1.PlatformExit(v, &p.Platform)
 	} else {
+		// FIXME why isn't this done in mk1.PlatformExit?
 		interfaces, err := net.Interfaces()
 		if err != nil {
 			return err

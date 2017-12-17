@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"time"
 )
 
@@ -103,9 +104,12 @@ func parsePortConfig(p *fe1_platform.Platform) (err error) {
 }
 
 func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
-	fns, err := sriovs.NumvfsFns()
-	p.SriovMode = err == nil && len(fns) > 0
-	err = nil
+	if !p.KernelIxgbe {
+		fi, ferr := os.Stat("/sys/bus/pci/drivers/ixgbe")
+		p.KernelIxgbe = ferr == nil && fi.IsDir()
+		fi, ferr = os.Stat("/sys/bus/pci/drivers/ixgbevf")
+		p.KernelIxgbevf = ferr == nil && fi.IsDir()
+	}
 
 	// Parse port provision file
 	parsePortConfig(p)
@@ -115,8 +119,10 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	m6 := ip6.Init(v)
 	gre.Init(v)
 	ethernet.Init(v, m4, m6)
-	if !p.SriovMode {
+	if !p.KernelIxgbe {
 		ixge.Init(v, ixge.Config{DisableUnix: true, PuntNode: "fe1-single-tagged-punt"})
+	} else if !p.KernelIxgbevf {
+		// FIXME provision linux vlans?
 	} else if err = newSriovs(p.Version); err != nil {
 		return
 	}
@@ -149,14 +155,18 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 }
 
 func PlatformExit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
-	if p.SriovMode {
-		if err = delSriovs(); err != nil {
-			return
-		}
-		args := []string{"link", "delete", "vnet"}
-		if err = ip.New().Main(args...); err != nil {
-			return
-		}
+	if !p.KernelIxgbe {
+		return
+	}
+	if !p.KernelIxgbevf {
+		// FIXME should we delete eth-PORT-SUBPORT vlan
+		// interfaces or leave them up to continue forwarding
+		// until vnet reloads?
+	} else {
+		err = delSriovs()
+	}
+	if xerr := ip.New().Main("link", "delete", "vnet"); err == nil {
+		err = xerr
 	}
 	return
 }
