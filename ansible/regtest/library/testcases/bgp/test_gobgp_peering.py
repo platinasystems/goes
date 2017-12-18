@@ -47,6 +47,12 @@ options:
         - Name of the package installed (e.g. gobgpd).
       required: False
       type: str
+    check_ping:
+      description:
+        - Flag to indicate if ping should be tested or not.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -130,6 +136,7 @@ def verify_gobgp_peering(module):
     neighbor_count = 0
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
+    check_ping = module.params['check_ping']
     config_file = module.params['config_file'].splitlines()
 
     # Get the gobgp config
@@ -138,6 +145,12 @@ def verify_gobgp_peering(module):
     # Restart and check package status
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
+
+    # Advertise the routes
+    if check_ping:
+        add_route_cmd = 'gobgp global rib -a ipv4 add 192.168.{}.0/24'.format(
+            switch_name[-2::])
+        execute_commands(module, add_route_cmd)
 
     # Get gobgp neighbors
     cmd = 'gobgp nei'
@@ -156,6 +169,15 @@ def verify_gobgp_peering(module):
                 failure_summary += 'is not present in the output of '
                 failure_summary += 'command {}\n'.format(cmd)
 
+            if check_ping:
+                ping_cmd = 'ping -w 5 -c 3 {}'.format(neighbor_ip)
+                ping_out = execute_commands(module, ping_cmd)
+                if '0% packet loss' not in ping_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'From switch {} '.format(switch_name)
+                    failure_summary += 'neighbor ip {} '.format(neighbor_ip)
+                    failure_summary += 'is not getting pinged\n'
+
         if 'peer-as' in line:
             remote_as = line.split().pop()
             if remote_as not in gobgp_out:
@@ -173,6 +195,12 @@ def verify_gobgp_peering(module):
 
     HASH_DICT['result.detail'] = failure_summary
 
+    # Delete advertised routes
+    if check_ping:
+        cmd = 'gobgp global rib -a ipv4 del 192.168.{}.0/24'.format(
+            switch_name[-2::])
+        execute_commands(module, cmd)
+
     # Get the GOES status info
     execute_commands(module, 'goes status')
 
@@ -184,6 +212,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
+            check_ping=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

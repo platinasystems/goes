@@ -22,6 +22,8 @@ quagga_ospf_conf_file: /etc/quagga/ospfd.conf
 quagga_ospf_conf_file_bck: /etc/quagga/ospfd.conf.bck
 quagga_isis_conf_file: /etc/quagga/isisd.conf
 quagga_isis_conf_file_bck: /etc/quagga/isisd.conf.bck
+quagga_zebra_conf_file: /etc/quagga/zebra.conf
+quagga_zebra_conf_file_bck: /etc/quagga/zebra.conf.bck
 
 gobgp_bgp_conf_file: /etc/gobgp/gobgpd.conf
 gobgp_bgp_conf_file_bck: /etc/gobgp/gobgpd.conf.bck
