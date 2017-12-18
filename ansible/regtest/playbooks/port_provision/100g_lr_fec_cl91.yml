@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "port_provision_100g_sr_fec_cl91_{{ start_time.stdout }}"
+        hash_name: "port_provision_100g_lr_fec_cl91_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -27,18 +27,18 @@
 
     - name: Copy updated start file for this testcase
       copy:
-        src: ../../templates/100g_sr_fec_cl91_start_file
+        src: ../../templates/100g_lr_fec_cl91_start_file
         dest: /etc/goes/start
 
     - name: Restart goes
       command: "goes restart"
 
-    - name: Verify 100g sr fec cl91
+    - name: Verify 100g lr fec cl91
       test_single_port_provision:
         switch_name: "{{ inventory_hostname }}"
         eth: "32"
         speed: "100g"
-        media: "SR4"
+        media: "LR4"
         fec: "cl91"
         verify_links: False
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
@@ -71,16 +71,16 @@
         src: ../../templates/{{ item }}
         dest: /home/platina/bin/{{ item }}
       with_items:
-      - '100g_sr_fec_cl91_create.cint'
-      - '100g_sr_fec_cl91_delete.cint'
+      - '100g_lr_fec_cl91_create.cint'
+      - '100g_lr_fec_cl91_delete.cint'
 
     - name: Execute port provision on packet generator and verify the same
       test_single_port_provision_packet_generator:
         switch_name: "{{ inventory_hostname }}"
         ce: "31"
         speed: "100g"
-        media: "SR4"
-        create_cint_file: "100g_sr_fec_cl91_create.cint"
+        media: "LR4"
+        create_cint_file: "100g_lr_fec_cl91_create.cint"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
 
@@ -151,7 +151,7 @@
         switch_name: "{{ inventory_hostname }}"
         ce: "31"
         speed: "100g"
-        delete_cint_file: "100g_sr_fec_cl91_delete.cint"
+        delete_cint_file: "100g_lr_fec_cl91_delete.cint"
         reset_config: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: module_out
@@ -172,8 +172,8 @@
         path: "/home/platina/bin/{{ item }}"
         state: absent
       with_items:
-      - '100g_sr_fec_cl91_create.cint'
-      - '100g_sr_fec_cl91_delete.cint'
+      - '100g_lr_fec_cl91_create.cint'
+      - '100g_lr_fec_cl91_delete.cint'
 
 
 - hosts: leaf[1]

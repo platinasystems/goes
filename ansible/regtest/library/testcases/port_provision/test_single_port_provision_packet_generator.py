@@ -49,6 +49,11 @@ options:
         - Speed of the eth interface port.
       required: False
       type: str
+    media:
+      description:
+        - Media of the eth interface port.
+      required: False
+      type: str
     create_cint_file:
       description:
         - Name of create cint file.
@@ -140,6 +145,7 @@ def verify_single_port_provisioning(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     speed = module.params['speed']
+    media = module.params['media']
     create_cint_file = module.params['create_cint_file']
     delete_cint_file = module.params['delete_cint_file']
     ce = module.params['ce']
@@ -147,12 +153,9 @@ def verify_single_port_provisioning(module):
 
     if not module.params['reset_config']:
         if speed == '100g':
-            # Install optic media
-            cmd = '{} port ce{} speed=100000 if=sr4'.format(initial_cli, ce)
-            execute_commands(module, cmd)
-
-            # Set auto negotiation mode to no
-            cmd = '{} port ce{} an=0'.format(initial_cli, ce)
+            # Install optic media and set auto negotiation mode to no
+            cmd = '{} port ce{} speed=100000 an=0 if={}'.format(
+                initial_cli, ce, media.lower())
             execute_commands(module, cmd)
 
         # Verify if port is up
@@ -200,6 +203,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             ce=dict(required=False, type='str', default=''),
             speed=dict(required=False, type='str'),
+            media=dict(required=False, type='str'),
             fec=dict(required=False, type='str', default=''),
             create_cint_file=dict(required=False, type='str'),
             delete_cint_file=dict(required=False, type='str'),

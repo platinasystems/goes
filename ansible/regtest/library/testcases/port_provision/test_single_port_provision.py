@@ -154,7 +154,7 @@ def verify_single_port_provisioning(module):
     eth = module.params['eth']
 
     time.sleep(5)
-    
+
     if speed == '100g':
         if verify_links:
             # Verify if port links are up for eth
@@ -173,8 +173,8 @@ def verify_single_port_provisioning(module):
             verify_str = 'port-{}.qsfp.compliance: extended '.format(eth)
             if media == 'CWDM4':
                 verify_str += '100G CWDM4'
-            elif media == 'SR4':
-                verify_str += '100GBASE-SR4'
+            else:
+                verify_str += '100GBASE-{}'.format(media)
 
             if verify_str not in optic_out:
                 RESULT_STATUS = False
