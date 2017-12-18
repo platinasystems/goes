@@ -199,9 +199,17 @@ def verify_port_provisioning(module):
 
             # Set the speed to given speed
             for xe in xe_list:
-                cmd = "{} 'port xe{} speed=25000 if=cr'".format(initial_cli,
-                                                                xe,
-                                                                speed)
+                cmd = "{} 'port xe{} an=t'".format(initial_cli, xe)
+                execute_commands(module, cmd)
+
+                cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
+                execute_commands(module, cmd)
+
+                cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
+                execute_commands(module, cmd)
+
+                cmd = "{} 'port xe{} speed=25000 if=cr'".format(
+                    initial_cli, xe, speed)
                 execute_commands(module, cmd)
 
             # Execute cint configuration script
@@ -294,6 +302,23 @@ def verify_port_provisioning(module):
                 cmd = "{} 'port xe{} speed=100000 an=0 if=cr4'".format(
                     initial_cli, xe)
                 execute_commands(module, cmd)
+        elif speed == '25g':
+            port_dict = {}
+            for ce in ce_list:
+                index = ce_list.index(ce) * 4
+                port_dict[ce] = [xe_list[i] for i in range(index, index + 4)]
+
+            for ce, xe_ports in port_dict.items():
+                for xe in xe_ports:
+                    cmd = "{} 'port xe{} en=f'".format(initial_cli, xe)
+                    execute_commands(module, cmd)
+
+                cmd = "{} 'port xe{} lanes 4'".format(initial_cli, xe_ports[0])
+                execute_commands(module, cmd)
+
+                cmd = "{} 'port xe{} speed=100000 an=0 if=cr4'".format(
+                    initial_cli, xe_ports[0])
+                execute_commands(module, cmd)
         else:
             for ce in ce_list:
                 cmd = "{} 'port ce{} en=f'".format(initial_cli, ce)
@@ -302,8 +327,8 @@ def verify_port_provisioning(module):
                 cmd = "{} 'port ce{} lanes 4'".format(initial_cli, ce)
                 execute_commands(module, cmd)
 
-                cmd = "{} 'port ce{} speed=100000 an=0 if=cr4'".format(initial_cli,
-                                                                       ce)
+                cmd = "{} 'port ce{} speed=100000 an=0 if=cr4'".format(
+                    initial_cli, ce)
                 execute_commands(module, cmd)
 
         if speed == '100g' or speed == '40g':
