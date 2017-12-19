@@ -284,6 +284,47 @@ def verify_port_provisioning(module):
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'xe{} port is not up\n'.format(xe)
+        elif speed == '10g':
+            # Install copper cable and configure lanes on ce ports
+            for ce in range(1, 9):
+                cmd = "{} 'port ce{} en=f'".format(initial_cli, ce)
+                execute_commands(module, cmd)
+                cmd = "{} 'port ce{} lanes 1'".format(initial_cli, ce)
+                execute_commands(module, cmd)
+
+            if autoeng:
+                # Port provision xe ports to given speed
+                for xe in xe_list:
+                    cmd = "{} 'port xe{} adv={} an=1 if=kr'".format(
+                        initial_cli, xe, speed)
+                    execute_commands(module, cmd)
+
+                    cmd = "{} 'phy xe{} AN_X4_LD_BASE_ABIL1r FEC_REQ=3'".format(
+                        initial_cli, xe)
+                    execute_commands(module, cmd)
+            else:
+                for xe in xe_list:
+                    cmd = "{} 'port xe{} speed=10000 an=0 if=kr'".format(
+                        initial_cli, xe)
+                    execute_commands(module, cmd)
+
+                # Execute cint configuration script
+                cmd = "{} 'cint {}'".format(initial_cli, create_cint_file)
+                execute_commands(module, cmd)
+
+                for xe in xe_list:
+                    cmd = "{} 'port xe{} ena=t'".format(initial_cli, xe)
+                    execute_commands(module, cmd)
+
+            # Verify if xe ports are up
+            for xe in xe_list:
+                cmd = "{} 'ps xe{}'".format(initial_cli, xe)
+                out = execute_commands(module, cmd)
+
+                if 'up' not in out.lower():
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'xe{} port is not up\n'.format(xe)
 
         # Generate traffic
         cmd = 'python /home/platina/bin/autoTest_pktDrop_by_pktSizes.py '
@@ -302,7 +343,7 @@ def verify_port_provisioning(module):
                 cmd = "{} 'port xe{} speed=100000 an=0 if=cr4'".format(
                     initial_cli, xe)
                 execute_commands(module, cmd)
-        elif speed == '25g':
+        elif speed == '25g' or speed == '10g':
             port_dict = {}
             for ce in ce_list:
                 index = ce_list.index(ce) * 4
@@ -336,7 +377,7 @@ def verify_port_provisioning(module):
                 # Delete cint configuration
                 cmd = "{} 'cint {}'".format(initial_cli, delete_cint_file)
                 execute_commands(module, cmd)
-        elif speed == '25g':
+        elif speed == '25g' or speed == '10g':
             # Delete cint configuration
             cmd = "{} 'cint {}'".format(initial_cli, delete_cint_file)
             execute_commands(module, cmd)
