@@ -6,9 +6,11 @@ package bird
 
 import (
 	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/bird/bgp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/bird/ospf"
 )
 
 var Suite = test.Suite{
+	{"bgp", bgp.Suite},
 	{"ospf", ospf.Suite},
 }.Run

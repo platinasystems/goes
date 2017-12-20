@@ -3,7 +3,7 @@ services:
   R1:
     container_name: R1
     environment:
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root
     expose:
       - 2601/tcp
       - 179/tcp
@@ -22,7 +22,7 @@ services:
   R2:
     container_name: R2
     environment:
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root
     expose:
       - 2601/tcp
       - 179/tcp
@@ -41,7 +41,7 @@ services:
   R3:
     container_name: R3
     environment:
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root
     expose:
       - 2601/tcp
       - 179/tcp
@@ -60,7 +60,7 @@ services:
   R4:
     container_name: R4
     environment:
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root
     expose:
       - 2601/tcp
       - 179/tcp
