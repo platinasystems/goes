@@ -64,17 +64,20 @@ func Check(t *testing.T) error {
 }
 
 func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
-	assert := test.Assert{t}
-	assert.Helper()
+	cleanup := test.Cleanup{t}
+	cleanup.Helper()
 
-	cli, err := client.NewEnvClient()
-	if err != nil {
-		err = fmt.Errorf("Unable to get docker client: %v")
+	cli, xerr := client.NewEnvClient()
+	if xerr != nil {
+		err = fmt.Errorf("Unable to get docker client: %v", xerr)
 		return
 	}
 
 	config = &Config{}
-	assert.Nil(yaml.Unmarshal(source, config))
+	if xerr := yaml.Unmarshal(source, config); xerr != nil {
+		err = fmt.Errorf("Unable to unmarshal yamlclient: %v", xerr)
+		return
+	}
 
 	config.cli = cli
 
@@ -84,6 +87,7 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 	path += ":/usr/bin"
 	path += ":/sbin"
 	path += ":/bin"
+	path += ":/root"
 	env := []string{path}
 
 	// Common container config
@@ -117,8 +121,6 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 				return
 			}
 			t.Logf("Image %v pulled from remote\n", router.Image)
-		} else {
-			t.Logf("Image %v found local\n", router.Image)
 		}
 
 		cc.Image = router.Image
@@ -140,20 +142,20 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 		for _, intf := range router.Intfs {
 			var newIntf string = intf.Name
 			if strings.Contains(intf.Name, "dummy") {
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "add", "name", newIntf,
 					"type", "dummy")
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "set", "up", newIntf)
 			} else if intf.Vlan != "" {
 				newIntf = intf.Name + "." + intf.Vlan
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "set", "up", intf.Name)
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "add", "link", intf.Name,
 					"name", newIntf, "type", "vlan",
 					"id", intf.Vlan)
-				assert.Program(test.Self{},
+				cleanup.Program(test.Self{},
 					"ip", "link", "set", "up", newIntf)
 			}
 			moveIntfContainer(t, router.Hostname, newIntf,
