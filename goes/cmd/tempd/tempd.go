@@ -6,6 +6,7 @@ package tempd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -109,7 +110,7 @@ func (c *Command) update() error {
 			}
 			/* FIXME placeholder for bmc eth0 address field */
 			k = "bmc.eth0.ipv4"
-			if i != c.lasts[k] {
+			if i != "" && i != c.lasts[k] {
 				c.pub.Print(k, ": ", i)
 				c.lasts[k] = i
 			}
@@ -138,8 +139,11 @@ func bmcStatus() (string, string) {
 		} else {
 			v = "up"
 			bmcIpv4, _ := d.Do("HGET", redis.DefaultHash, "eth0.ipv4")
-			r, _ := regexp.Compile("([0-9]+).([0-9]+).([0-9]+).([0-9]+)")
-			i = r.FindString(string(bmcIpv4.([]uint8)))
+			s := fmt.Sprint(bmcIpv4)
+			if !strings.Contains(s, "ERROR") {
+				r, _ := regexp.Compile("([0-9]+).([0-9]+).([0-9]+).([0-9]+)")
+				i = r.FindString(string(bmcIpv4.([]uint8)))
+			}
 			d.Close()
 		}
 	}
