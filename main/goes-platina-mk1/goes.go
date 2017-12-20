@@ -47,6 +47,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/install"
 	"github.com/platinasystems/go/goes/cmd/iocmd"
 	"github.com/platinasystems/go/goes/cmd/ip"
+	addtype "github.com/platinasystems/go/goes/cmd/ip/link/add/type"
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
 	"github.com/platinasystems/go/goes/cmd/kill"
@@ -58,6 +59,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/iplinkadd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
@@ -227,5 +229,5 @@ func init() {
 	info.Packages = func() []map[string]string {
 		return fe1.Packages
 	}
-	// FIXME addtype.ByName["platina"] = iplinkadd.Command{}
+	addtype.Goes.ByName["platina"] = iplinkadd.Command{}
 }
