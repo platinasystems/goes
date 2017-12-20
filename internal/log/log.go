@@ -311,7 +311,7 @@ func (p *Kmsg) Parse(b []byte) {
 	} else {
 		p.Seq = Seq(0)
 	}
-	if u, err := strconv.ParseUint(string(field[2]), 0, 0); err == nil {
+	if u, err := strconv.ParseUint(string(field[2]), 10, 64); err == nil {
 		p.Stamp = Stamp(u)
 	} else {
 		p.Stamp = Stamp(0)
