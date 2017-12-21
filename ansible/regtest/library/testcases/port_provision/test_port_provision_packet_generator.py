@@ -187,13 +187,10 @@ def verify_port_provisioning(module):
                     failure_summary += 'ce{} port is not up\n'.format(ce)
 
         elif speed == '25g':
-            # Install copper cable on ce ports
-            for ce in ce_list:
+            # Install copper cable and configure lanes on ce ports
+            for ce in range(1, 9):
                 cmd = "{} 'port ce{} en=f'".format(initial_cli, ce)
                 execute_commands(module, cmd)
-
-            # Configure lanes on ce ports
-            for ce in range(1, 9):
                 cmd = "{} 'port ce{} lanes 1'".format(initial_cli, ce)
                 execute_commands(module, cmd)
 
@@ -201,10 +198,10 @@ def verify_port_provisioning(module):
             for xe in xe_list:
                 cmd = "{} 'port xe{} an=t'".format(initial_cli, xe)
                 execute_commands(module, cmd)
-
+                
                 cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
                 execute_commands(module, cmd)
-
+                
                 cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
                 execute_commands(module, cmd)
 

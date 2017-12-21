@@ -19,6 +19,17 @@
         path: "{{ port_provision_log_dir }}"
         state: directory
 
+    - name: Take backup of /etc/goes/start file
+      copy:
+        src: /etc/goes/start
+        dest: /etc/goes/start.bck
+        remote_src: true
+
+    - name: Copy updated start file for this testcase
+      copy:
+        src: ../../templates/25g_cr_fec_none_autoeng_off_start_file
+        dest: /etc/goes/start
+
     - name: Copy port provision file
       template:
         src: ../../templates/25g_cr_fec_none_autoeng_off_portprovision.j2
@@ -93,6 +104,17 @@
 - hosts: leaf[0]
   become: true
   tasks:
+    - name: Execute port provision 25g_cr_fec_none_autoeng_off and verify the same
+      test_port_provision:
+        switch_name: "{{ inventory_hostname }}"
+        eth_list: "2,4,6,8,10,12,14,16"
+        speed: "25g"
+        media: "copper"
+        fec: "none"
+        verify_links: False
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ port_provision_log_dir }}"
+
     - name: Verify if port links are up for eth interfaces
       test_port_provision:
         switch_name: "{{ inventory_hostname }}"

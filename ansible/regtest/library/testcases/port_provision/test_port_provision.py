@@ -216,35 +216,7 @@ def verify_port_provisioning(module):
                         failure_summary += 'port link is not up for the '
                         failure_summary += 'interface eth-{}-{}\n'.format(
                             eth, subport)
-
-                    # Verify speed of interfaces are set to correct value
-                    cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(
-                        eth, subport)
-                    out = execute_commands(module, cmd)
-                    if speed not in out:
-                        RESULT_STATUS = False
-                        failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'speed of the interface '
-                        failure_summary += 'is not set to {} for '.format(speed)
-                        failure_summary += 'the interface eth-{}-{}\n'.format(
-                            eth, subport)
             else:
-                for subport in range(1, 5):
-                    # Install given media on interfaces
-                    cmd = 'goes hset platina vnet.eth-{}-{}.media {}'.format(
-                        eth, subport, media)
-                    execute_commands(module, cmd)
-
-                    # Set fec
-                    cmd = 'goes hset platina vnet.eth-{}-{}.fec {}'.format(
-                        eth, subport, fec)
-                    execute_commands(module, cmd)
-
-                # Port provision interfaces to given speed
-                cmd = 'goes hset platina vnet.eth-{}-1.speed {}'.format(eth,
-                                                                        speed)
-                execute_commands(module, cmd)
-
                 for subport in range(1, 5):
                     # Bring up the interfaces
                     cmd = 'ifconfig eth-{}-{} up'.format(eth, subport)
@@ -270,6 +242,18 @@ def verify_port_provisioning(module):
                         failure_summary += 'On switch {} '.format(switch_name)
                         failure_summary += 'fec is not set to {} for '.format(
                             fec)
+                        failure_summary += 'the interface eth-{}-{}\n'.format(
+                            eth, subport)
+
+                    # Verify speed of interfaces are set to correct value
+                    cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(
+                        eth, subport)
+                    out = execute_commands(module, cmd)
+                    if speed not in out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'speed of the interface '
+                        failure_summary += 'is not set to {} for '.format(speed)
                         failure_summary += 'the interface eth-{}-{}\n'.format(
                             eth, subport)
         elif speed == '10g':
