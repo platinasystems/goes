@@ -1,0 +1,939 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "docker_quagga_ospf_traffic_subports_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Pull quagga container image from dockerhub
+      command: "docker pull stigt/debian-quagga:latest"
+
+    - name: Install docker compose
+      shell: "curl -L https://github.com/docker/compose/releases/download/1.17.0/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose"
+
+    - name: Make docker-compose file executable
+      shell: "chmod +x /usr/local/bin/docker-compose"
+
+    - file:
+        path: "{{ docker_compose_file }}"
+        state: touch
+
+    - name: Create docker-compose file
+      lineinfile:
+        path: "{{ docker_compose_file }}"
+        line: "{{ item }}"
+      with_items:
+      - "version: '3'"
+      - "services:"
+
+    - name: Add docker_move.sh
+      copy:
+        src: ../../templates/docker_move.sh
+        dest: "~/docker_move.sh"      
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: Copy port provision file
+      template:
+        src: ../../templates/quagga_ospf_traffic_subports_portprovision.j2
+        dest: /etc/goes/portprovision
+
+    - name: Restart goes
+      command: "goes restart"
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - S1
+      - S2
+      - S3
+      - S4
+      - S5
+      - S6
+      - S7
+      - S8
+      - S9
+      - S10
+      - S11
+      - S12
+      - S13
+      - S14
+      - S15
+      - S16
+      - S17
+      - S18
+      - S19
+      - S20
+      - S21
+      - S22
+      - S23
+      - S24
+      - S25
+      - S26
+      - S27
+      - S28
+      - S29
+      - S30
+      - S31
+      - S32
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - S1
+      - S2
+      - S3
+      - S4
+      - S5
+      - S6
+      - S7
+      - S8
+      - S9
+      - S10
+      - S11
+      - S12
+      - S13
+      - S14
+      - S15
+      - S16
+      - S17
+      - S18
+      - S19
+      - S20
+      - S21
+      - S22
+      - S23
+      - S24
+      - S25
+      - S26
+      - S27
+      - S28
+      - S29
+      - S30
+      - S31
+      - S32
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - S1
+      - S2
+      - S3
+      - S4
+      - S5
+      - S6
+      - S7
+      - S8
+      - S9
+      - S10
+      - S11
+      - S12
+      - S13
+      - S14
+      - S15
+      - S16
+      - S17
+      - S18
+      - S19
+      - S20
+      - S21
+      - S22
+      - S23
+      - S24
+      - S25
+      - S26
+      - S27
+      - S28
+      - S29
+      - S30
+      - S31
+      - S32
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - S1
+      - S2
+      - S3
+      - S4
+      - S5
+      - S6
+      - S7
+      - S8
+      - S9
+      - S10
+      - S11
+      - S12
+      - S13
+      - S14
+      - S15
+      - S16
+      - S17
+      - S18
+      - S19
+      - S20
+      - S21
+      - S22
+      - S23
+      - S24
+      - S25
+      - S26
+      - S27
+      - S28
+      - S29
+      - S30
+      - S31
+      - S32
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - S33
+      - S34
+      - S35
+      - S36
+      - S37
+      - S38
+      - S39
+      - S40
+      - S41
+      - S42
+      - S43
+      - S44
+      - S45
+      - S46
+      - S47
+      - S48
+      - S49
+      - S50
+      - S51
+      - S52
+      - S53
+      - S54
+      - S55
+      - S56
+      - S57
+      - S58
+      - S59
+      - S60
+      - S61
+      - S62
+      - S63
+      - S64
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - S33
+      - S34
+      - S35
+      - S36
+      - S37
+      - S38
+      - S39
+      - S40
+      - S41
+      - S42
+      - S43
+      - S44
+      - S45
+      - S46
+      - S47
+      - S48
+      - S49
+      - S50
+      - S51
+      - S52
+      - S53
+      - S54
+      - S55
+      - S56
+      - S57
+      - S58
+      - S59
+      - S60
+      - S61
+      - S62
+      - S63
+      - S64
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - S33
+      - S34
+      - S35
+      - S36
+      - S37
+      - S38
+      - S39
+      - S40
+      - S41
+      - S42
+      - S43
+      - S44
+      - S45
+      - S46
+      - S47
+      - S48
+      - S49
+      - S50
+      - S51
+      - S52
+      - S53
+      - S54
+      - S55
+      - S56
+      - S57
+      - S58
+      - S59
+      - S60
+      - S61
+      - S62
+      - S63
+      - S64
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - S33
+      - S34
+      - S35
+      - S36
+      - S37
+      - S38
+      - S39
+      - S40
+      - S41
+      - S42
+      - S43
+      - S44
+      - S45
+      - S46
+      - S47
+      - S48
+      - S49
+      - S50
+      - S51
+      - S52
+      - S53
+      - S54
+      - S55
+      - S56
+      - S57
+      - S58
+      - S59
+      - S60
+      - S61
+      - S62
+      - S63
+      - S64
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - S65
+      - S66
+      - S67
+      - S68
+      - S69
+      - S70
+      - S71
+      - S72
+      - S73
+      - S74
+      - S75
+      - S76
+      - S77
+      - S78
+      - S79
+      - S80
+      - S81
+      - S82
+      - S83
+      - S84
+      - S85
+      - S86
+      - S87
+      - S88
+      - S89
+      - S90
+      - S91
+      - S92
+      - S93
+      - S94
+      - S95
+      - S96
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - S65
+      - S66
+      - S67
+      - S68
+      - S69
+      - S70
+      - S71
+      - S72
+      - S73
+      - S74
+      - S75
+      - S76
+      - S77
+      - S78
+      - S79
+      - S80
+      - S81
+      - S82
+      - S83
+      - S84
+      - S85
+      - S86
+      - S87
+      - S88
+      - S89
+      - S90
+      - S91
+      - S92
+      - S93
+      - S94
+      - S95
+      - S96
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - S65
+      - S66
+      - S67
+      - S68
+      - S69
+      - S70
+      - S71
+      - S72
+      - S73
+      - S74
+      - S75
+      - S76
+      - S77
+      - S78
+      - S79
+      - S80
+      - S81
+      - S82
+      - S83
+      - S84
+      - S85
+      - S86
+      - S87
+      - S88
+      - S89
+      - S90
+      - S91
+      - S92
+      - S93
+      - S94
+      - S95
+      - S96
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - S65
+      - S66
+      - S67
+      - S68
+      - S69
+      - S70
+      - S71
+      - S72
+      - S73
+      - S74
+      - S75
+      - S76
+      - S77
+      - S78
+      - S79
+      - S80
+      - S81
+      - S82
+      - S83
+      - S84
+      - S85
+      - S86
+      - S87
+      - S88
+      - S89
+      - S90
+      - S91
+      - S92
+      - S93
+      - S94
+      - S95
+      - S96
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - file:
+        path: "~/volumes/quagga/{{ item }}"
+        state: directory
+      with_items:
+      - S97
+      - S98
+      - S99
+      - S100
+      - S101
+      - S102
+      - S103
+      - S104
+      - S105
+      - S106
+      - S107
+      - S108
+      - S109
+      - S110
+      - S111
+      - S112
+      - S113
+      - S114
+      - S115
+      - S116
+      - S117
+      - S118
+      - S119
+      - S120
+      - S121
+      - S122
+      - S123
+      - S124
+      - S125
+      - S126
+      - S127
+      - S128
+
+    - name: Copy ospfd.conf and zebra.conf in respective containers
+      include: copy_config_files.yml container={{ item }}
+      with_items:
+      - S97
+      - S98
+      - S99
+      - S100
+      - S101
+      - S102
+      - S103
+      - S104
+      - S105
+      - S106
+      - S107
+      - S108
+      - S109
+      - S110
+      - S111
+      - S112
+      - S113
+      - S114
+      - S115
+      - S116
+      - S117
+      - S118
+      - S119
+      - S120
+      - S121
+      - S122
+      - S123
+      - S124
+      - S125
+      - S126
+      - S127
+      - S128
+
+    - name: Add container info in docker-compose file
+      include: update_docker_compose.yml container={{ item }}
+      with_items:
+      - S97
+      - S98
+      - S99
+      - S100
+      - S101
+      - S102
+      - S103
+      - S104
+      - S105
+      - S106
+      - S107
+      - S108
+      - S109
+      - S110
+      - S111
+      - S112
+      - S113
+      - S114
+      - S115
+      - S116
+      - S117
+      - S118
+      - S119
+      - S120
+      - S121
+      - S122
+      - S123
+      - S124
+      - S125
+      - S126
+      - S127
+      - S128
+
+    - name: Run docker-compose up
+      shell: "docker-compose up -d"
+      args:
+        chdir: ~/
+
+    - name: Bring up all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'up'
+      with_items:
+      - S97
+      - S98
+      - S99
+      - S100
+      - S101
+      - S102
+      - S103
+      - S104
+      - S105
+      - S106
+      - S107
+      - S108
+      - S109
+      - S110
+      - S111
+      - S112
+      - S113
+      - S114
+      - S115
+      - S116
+      - S117
+      - S118
+      - S119
+      - S120
+      - S121
+      - S122
+      - S123
+      - S124
+      - S125
+      - S126
+      - S127
+      - S128
+
+
+- hosts: spine[1]
+  become: true
+
+  vars:
+  - container: S105
+  - log_dir_path: /var/log/regression/docker
+
+  tasks:
+    - file:
+        path: "{{ log_dir_path }}"
+        state: directory
+
+    - include_vars:
+        file: ../../group_vars/{{ inventory_hostname }}/{{ container }}
+
+    - name: Verify quagga ospf traffic inside S105 container
+      test_docker_ospf:
+        switch_name: "{{ inventory_hostname }}"     
+        container: "{{ container }}"
+        config_file: "{{ lookup('template', '../../templates/ospfd.conf.j2') }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ log_dir_path }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - S97
+      - S98
+      - S99
+      - S100
+      - S101
+      - S102
+      - S103
+      - S104
+      - S105
+      - S106
+      - S107
+      - S108
+      - S109
+      - S110
+      - S111
+      - S112
+      - S113
+      - S114
+      - S115
+      - S116
+      - S117
+      - S118
+      - S119
+      - S120
+      - S121
+      - S122
+      - S123
+      - S124
+      - S125
+      - S126
+      - S127
+      - S128
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - S65
+      - S66
+      - S67
+      - S68
+      - S69
+      - S70
+      - S71
+      - S72
+      - S73
+      - S74
+      - S75
+      - S76
+      - S77
+      - S78
+      - S79
+      - S80
+      - S81
+      - S82
+      - S83
+      - S84
+      - S85
+      - S86
+      - S87
+      - S88
+      - S89
+      - S90
+      - S91
+      - S92
+      - S93
+      - S94
+      - S95
+      - S96
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - S1
+      - S2
+      - S3
+      - S4
+      - S5
+      - S6
+      - S7
+      - S8
+      - S9
+      - S10
+      - S11
+      - S12
+      - S13
+      - S14
+      - S15
+      - S16
+      - S17
+      - S18
+      - S19
+      - S20
+      - S21
+      - S22
+      - S23
+      - S24
+      - S25
+      - S26
+      - S27
+      - S28
+      - S29
+      - S30
+      - S31
+      - S32
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Bring down all containers
+      docker_updown:
+        config_file: "{{ lookup('file', '../../group_vars/{{ inventory_hostname }}/{{ item }}') }}"
+        state: 'down'
+      with_items:
+      - S33
+      - S34
+      - S35
+      - S36
+      - S37
+      - S38
+      - S39
+      - S40
+      - S41
+      - S42
+      - S43
+      - S44
+      - S45
+      - S46
+      - S47
+      - S48
+      - S49
+      - S50
+      - S51
+      - S52
+      - S53
+      - S54
+      - S55
+      - S56
+      - S57
+      - S58
+      - S59
+      - S60
+      - S61
+      - S62
+      - S63
+      - S64
+
+    - name: Run docker-compose down
+      shell: "docker-compose down"
+      args:
+        chdir: ~/
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restart goes
+      command: "goes restart"
+
+    - shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store GOES version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"

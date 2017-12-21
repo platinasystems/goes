@@ -89,6 +89,7 @@ def main():
     d_move = '~/./docker_move.sh'
     container_name = None
     eth_list = []
+    subport = 1
     config_file = module.params['config_file'].splitlines()
 
     for line in config_file:
@@ -97,6 +98,8 @@ def main():
         elif 'interface' in line:
             eth = line.split()[1]
             eth_list.append(eth)
+        elif 'subport' in line:
+            subport = line.split()[1]
 
     container_id = container_name[1::]
     dummy_id = int(container_id) - 1
@@ -113,13 +116,14 @@ def main():
 
         # Bring up given interfaces in the docker container
         for eth in eth_list:
-            cmd = '{} up {} eth-{}-1 10.0.{}.32/24'.format(d_move, container_name,
-                                                           eth, eth)
+            cmd = '{} up {} eth-{}-{} 10.{}.{}.32/24'.format(
+                d_move, container_name, eth, subport, eth, subport)
             run_cli(module, cmd)
     else:
         # Bring down all interfaces in the docker container
         for eth in eth_list:
-            cmd = '{} down {} eth-{}-1'.format(d_move, container_name, eth)
+            cmd = '{} down {} eth-{}-{}'.format(d_move, container_name,
+                                                eth, subport)
             run_cli(module, cmd)
 
         # Bring down dummy interface

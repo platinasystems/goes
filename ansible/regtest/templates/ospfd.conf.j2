@@ -7,22 +7,22 @@ password zebra
 !
 !
 !
-interface eth-{{ interface1 }}-1
+interface eth-{{ interface1 }}-{{ subport }}
 !
-interface eth-{{ interface2 }}-1
+interface eth-{{ interface2 }}-{{ subport }}
 !
-interface eth-{{ interface3 }}-1
+interface eth-{{ interface3 }}-{{ subport }}
 !
-interface eth-{{ interface4 }}-1
+interface eth-{{ interface4 }}-{{ subport }}
 !
 router ospf
  ospf router-id {{ ansible_ssh_host }}
  log-adjacency-changes
  redistribute connected
- network 10.0.{{ interface1 }}.0/24 area 0.0.0.0
- network 10.0.{{ interface2 }}.0/24 area 0.0.0.0
- network 10.0.{{ interface3 }}.0/24 area 0.0.0.0
- network 10.0.{{ interface4 }}.0/24 area 0.0.0.0
+ network 10.{{ interface1 }}.{{ subport }}.0/24 area 0.0.0.0
+ network 10.{{ interface2 }}.{{ subport }}.0/24 area 0.0.0.0
+ network 10.{{ interface3 }}.{{ subport }}.0/24 area 0.0.0.0
+ network 10.{{ interface4 }}.{{ subport }}.0/24 area 0.0.0.0
 !
 line vty
 !
