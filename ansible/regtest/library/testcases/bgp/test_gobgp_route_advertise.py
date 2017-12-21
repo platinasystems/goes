@@ -61,6 +61,12 @@ options:
       required: False
       type: bool
       default: False
+    check_reflector:
+      description:
+        - Flag to indicate if we need to verify route reflector.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -148,6 +154,7 @@ def verify_gobgp_route_advertise(module):
     spine_list = module.params['spine_list']
     leaf_list = module.params['leaf_list']
     is_ibgp = module.params['is_ibgp']
+    check_reflector = module.params['check_reflector']
     routes_to_check = []
 
     # Get the gobgp config
@@ -166,13 +173,23 @@ def verify_gobgp_route_advertise(module):
     # Get all advertised routes
     cmd = 'gobgp global rib'
     all_routes = execute_commands(module, cmd)
+    all_routes = all_routes.lower()
 
-    if is_ibgp:
+    if is_ibgp or check_reflector:
         switch_list = leaf_list if switch_name in spine_list else spine_list
         for switch in switch_list:
             routes_to_check.append('192.168.{}.0/24'.format(switch[-2::]))
-        
+
         routes_to_check.append('192.168.{}.0/24'.format(switch_name[-2::]))
+
+        if switch_name in leaf_list:
+            if (all_routes.count('clusterlist: [192.168.0.1]') != 2 or
+                    all_routes.count('originator') != 2):
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'route reflector originator/clusterlist '
+                failure_summary += 'config is not present in '
+                failure_summary += 'output of command {}\n'.format(cmd)
     else:
         for switch in spine_list + leaf_list:
             routes_to_check.append('192.168.{}.0/24'.format(switch[-2::]))
@@ -207,6 +224,7 @@ def main():
             spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
             is_ibgp=dict(required=False, type='bool', default=False),
+            check_reflector=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
