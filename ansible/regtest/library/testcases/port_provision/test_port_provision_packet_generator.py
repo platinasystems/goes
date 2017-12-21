@@ -208,7 +208,7 @@ def verify_port_provisioning(module):
                 cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
                 execute_commands(module, cmd)
 
-                cmd = "{} 'port xe{} speed=25000 if=cr'".format(
+                cmd = "{} 'port xe{} speed=25000 an=0 if=cr'".format(
                     initial_cli, xe, speed)
                 execute_commands(module, cmd)
 
