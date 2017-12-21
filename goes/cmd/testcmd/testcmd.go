@@ -361,7 +361,7 @@ func (c cmd) parse(args []string) ([]string, bool, error) {
 }
 
 func (c cmd) Main(args ...string) error {
-	if args[len(args)-1] != "]" {
+	if len(args) < 1 || args[len(args)-1] != "]" {
 		return fmt.Errorf("missing ]")
 	}
 	args = args[0 : len(args)-1]
