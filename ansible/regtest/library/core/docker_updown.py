@@ -102,7 +102,7 @@ def main():
             subport = line.split()[1]
 
     container_id = container_name[1::]
-    dummy_id = int(container_id) - 1
+    dummy_id = int(container_id)
 
     if module.params['state'] == 'up':
         # Add dummy interface and bring it up

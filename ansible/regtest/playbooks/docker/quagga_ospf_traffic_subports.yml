@@ -906,6 +906,17 @@
 - hosts: leaf:spine
   become: true
   tasks:
+    - name: Remove portprovision and docker-compose files
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+      - "/etc/goes/portprovision"
+      - "~/docker_move.sh"
+      - "{{ docker_compose_file }}"
+
+    - command: "rm -rf ~/volumes/quagga/*"
+
     - name: Restart goes
       command: "goes restart"
 
