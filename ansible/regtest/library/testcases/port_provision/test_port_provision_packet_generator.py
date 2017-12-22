@@ -152,6 +152,7 @@ def verify_port_provisioning(module):
     autoeng = module.params['autoeng']
     ce_list = module.params['ce_list'].split(',')
     initial_cli = "python /home/platina/bin/bcm.py"
+    cint_path = '/home/platina/bin/'
 
     xe_list = ['3', '4', '5', '6', '10', '11', '12', '13', '17', '18', '19',
                '20', '24', '25', '26', '27', '31', '32', '33', '34', '38',
@@ -167,7 +168,8 @@ def verify_port_provisioning(module):
                     execute_commands(module, cmd)
 
                 # Execute cint configuration script
-                cmd = "{} 'cint {}'".format(initial_cli, create_cint_file)
+                cmd = "{} 'cint {}{}'".format(initial_cli, cint_path,
+                                              create_cint_file)
                 execute_commands(module, cmd)
             else:
                 # Port provision ce ports to given speed
@@ -198,10 +200,10 @@ def verify_port_provisioning(module):
             for xe in xe_list:
                 cmd = "{} 'port xe{} an=t'".format(initial_cli, xe)
                 execute_commands(module, cmd)
-                
+
                 cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
                 execute_commands(module, cmd)
-                
+
                 cmd = "{} 'port xe{} an=f'".format(initial_cli, xe)
                 execute_commands(module, cmd)
 
@@ -210,7 +212,8 @@ def verify_port_provisioning(module):
                 execute_commands(module, cmd)
 
             # Execute cint configuration script
-            cmd = "{} 'cint {}'".format(initial_cli, create_cint_file)
+            cmd = "{} 'cint {}{}'".format(initial_cli, cint_path,
+                                          create_cint_file)
             execute_commands(module, cmd)
 
             for xe in xe_list:
@@ -247,7 +250,8 @@ def verify_port_provisioning(module):
                         execute_commands(module, cmd)
 
                 # Execute cint configuration script
-                cmd = "{} 'cint {}'".format(initial_cli, create_cint_file)
+                cmd = "{} 'cint {}{}'".format(initial_cli, cint_path,
+                                              create_cint_file)
                 execute_commands(module, cmd)
 
                 for xe in xe_list:
@@ -306,7 +310,8 @@ def verify_port_provisioning(module):
                     execute_commands(module, cmd)
 
                 # Execute cint configuration script
-                cmd = "{} 'cint {}'".format(initial_cli, create_cint_file)
+                cmd = "{} 'cint {}{}'".format(initial_cli, cint_path,
+                                              create_cint_file)
                 execute_commands(module, cmd)
 
                 for xe in xe_list:
@@ -372,11 +377,13 @@ def verify_port_provisioning(module):
         if speed == '100g' or speed == '40g':
             if not autoeng:
                 # Delete cint configuration
-                cmd = "{} 'cint {}'".format(initial_cli, delete_cint_file)
+                cmd = "{} 'cint {}{}'".format(initial_cli, cint_path,
+                                              delete_cint_file)
                 execute_commands(module, cmd)
         elif speed == '25g' or speed == '10g':
             # Delete cint configuration
-            cmd = "{} 'cint {}'".format(initial_cli, delete_cint_file)
+            cmd = "{} 'cint {}{}'".format(initial_cli, cint_path,
+                                          delete_cint_file)
             execute_commands(module, cmd)
 
         for ce in ce_list:
