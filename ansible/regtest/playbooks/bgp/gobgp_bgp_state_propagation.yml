@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "gobgp_bgp_convergence_{{ start_time.stdout }}"
+        hash_name: "gobgp_bgp_state_propagation_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -33,81 +33,24 @@
       pause:
         seconds: 35
 
+    - name: Add advertise route
+      add_remove_route:
+        switch_name: "{{ inventory_hostname }}"
+
     - file:
         path: "{{ bgp_log_dir }}"
         state: directory
 
-    - name: Add advertised route
-      add_remove_route:
-        switch_name: "{{ inventory_hostname }}"
-
-    - pause:
-        seconds: 5
-
-
-- hosts: leaf[1]
-  become: true
-  tasks:
-    - name: Remove advertised route
-      add_remove_route:
-        switch_name: "{{ inventory_hostname }}"
-        remove: True
-
-    - pause:
-        seconds: 20
-
 
 - hosts: leaf[0]:spine
   become: true
   tasks:
-    - name: Verify gobgp convergence
+    - name: Verify gobgp state propagation
       test_gobgp_convergence:
         switch_name: "{{ inventory_hostname }}"
-        leaf: "{{ groups['leaf'][1] }}"
         package_name: "gobgpd"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ bgp_log_dir }}"
-      register: module_out
-
-    - command: "date +%Y%m%d%T"
-      register: end_time
-
-    - name: Fetch the log file
-      slurp:
-        src: "{{ module_out.log_file_path }}"
-      register: logs
-
-    - name: Store the test result in a hash in redis db on server emulator
-      store_result_in_redis:
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
-        end_time: "{{ end_time.stdout }}"
-        hash_dict: "{{ module_out.hash_dict }}"
-        log_content: "{{ logs['content'] | b64decode }}"
-      delegate_to: 127.0.0.1
-      ignore_errors: yes
-
-
-- hosts: leaf[1]
-  become: true
-  tasks:
-    - name: Add advertised route
-      add_remove_route:
-        switch_name: "{{ inventory_hostname }}"
-
-    - pause:
-        seconds: 20
-
-
-- hosts: leaf[0]:spine
-  become: true
-  tasks:
-    - name: Verify gobgp convergence
-      test_gobgp_convergence:
-        switch_name: "{{ inventory_hostname }}"
         leaf: "{{ groups['leaf'][1] }}"
         route_present: True
-        package_name: "gobgpd"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ bgp_log_dir }}"
       register: module_out
@@ -128,7 +71,95 @@
         hash_dict: "{{ module_out.hash_dict }}"
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
-      ignore_errors: yes
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Shutdown interface eth-19-1
+      command: "ifconfig eth-19-1 down"
+
+    - name: Shutdown interface eth-3-1
+      command: "ifconfig eth-3-1 down"
+
+    - name: Wait for 200 seconds for route to become unreachable
+      pause:
+        seconds: 200
+
+
+- hosts: leaf[0]:spine
+  become: true
+  tasks:
+    - name: Verify gobgp state propagation
+      test_gobgp_convergence:
+        switch_name: "{{ inventory_hostname }}"
+        package_name: "gobgpd"
+        leaf: "{{ groups['leaf'][1] }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ bgp_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Bring up interface eth-19-1
+      command: "ifconfig eth-19-1 up"
+
+    - name: Bring up interface eth-3-1
+      command: "ifconfig eth-3-1 up"
+
+    - name: Wait for 40 seconds for route to become reachable
+      pause:
+        seconds: 40
+
+
+- hosts: leaf[0]:spine
+  become: true
+  tasks:
+    - name: Verify gobgp state propagation
+      test_gobgp_convergence:
+        switch_name: "{{ inventory_hostname }}"
+        package_name: "gobgpd"
+        leaf: "{{ groups['leaf'][1] }}"
+        route_present: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ bgp_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
 
     - name: Get goes version details
       shell: "goes hget platina package | grep version:"
@@ -145,7 +176,6 @@
         version_details: "{{ version_out.stdout }}"
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
-      ignore_errors: yes
 
 
 - hosts: leaf:spine
@@ -156,13 +186,14 @@
         path: "{{ gobgp_bgp_conf_file }}"
         state: absent
 
-    - name: Remove advertised route
+    - name: Remove advertise route
       add_remove_route:
         switch_name: "{{ inventory_hostname }}"
         remove: True
 
     - name: Delete dummy interface
       command: "ip link del dummy0 type dummy"
+
 
 
 - hosts: server_emulator
