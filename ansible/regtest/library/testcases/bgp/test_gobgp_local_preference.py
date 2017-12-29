@@ -57,6 +57,12 @@ options:
         - Name of the spine node on which local pref need to be checked.
       required: False
       type: str
+    as_path:
+      description:
+        - Flag to indicate if as path value needs to be checked or not.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -142,6 +148,7 @@ def verify_gobgp_local_preference(module):
     config_file = module.params['config_file'].splitlines()
     leaf = module.params['leaf']
     spine = module.params['spine']
+    as_path = module.params['as_path']
     local_pref = '{LocalPref: 150}'
     neighbor_ip, cmd = '', ''
 
@@ -162,14 +169,21 @@ def verify_gobgp_local_preference(module):
         cmd = 'gobgp nei {} adj-out'.format(neighbor_ip)
     elif switch_name == spine:
         cmd = 'gobgp global rib'
-        
+
     if switch_name == leaf or switch_name == spine:
         out = execute_commands(module, cmd)
-        if local_pref not in out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += '{} is not present '.format(local_pref)
-            failure_summary += 'in the output of command {}\n'.format(cmd)
+        if not as_path:
+            if local_pref not in out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += '{} is not present '.format(local_pref)
+                failure_summary += 'in the output of command {}\n'.format(cmd)
+        else:
+            if '3 3 65243' not in out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'as_path is not present '
+                failure_summary += 'in the output of command {}\n'.format(cmd)
 
     # Store the failure summary in hash
     HASH_DICT['result.detail'] = failure_summary
@@ -187,6 +201,7 @@ def main():
             package_name=dict(required=False, type='str'),
             leaf=dict(required=False, type='str'),
             spine=dict(required=False, type='str'),
+            as_path=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
