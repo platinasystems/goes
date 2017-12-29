@@ -145,7 +145,7 @@ def verify_port_links(module):
     eth_list = module.params['eth_list'].split(',')
 
     for eth in eth_list:
-        if speed == '100g':
+        if speed == '100g' or speed == 'auto':
             # Verify interface media is set to correct value
             cmd = 'goes hget platina vnet.eth-{}-1.media'.format(eth)
             out = execute_commands(module, cmd)
