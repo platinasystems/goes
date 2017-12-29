@@ -193,7 +193,7 @@ def verify_port_links(module):
                 failure_summary += 'On switch {} '.format(switch_name)
                 failure_summary += 'port link is not up '
                 failure_summary += 'for the interface eth-{}-1\n'.format(eth)
-    elif speed == '10g':
+    elif speed == '10g' or speed == 'auto10g' or speed == '25g':
         third_octet = 0
         if switch_name == leaf_server:
             last_octet = '1'
@@ -217,7 +217,7 @@ def verify_port_links(module):
                 cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(
                     eth, subport)
                 out = execute_commands(module, cmd)
-                if speed not in out:
+                if out not in speed:
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
                     failure_summary += 'speed of the interface '

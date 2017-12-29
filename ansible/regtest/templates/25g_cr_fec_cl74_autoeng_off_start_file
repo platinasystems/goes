@@ -1,155 +1,155 @@
 #!/usr/bin/goes
 hset -q platina vnet.eth-1-1.media copper
-hset -q platina vnet.eth-1-1.speed auto
+hset -q platina vnet.eth-1-1.speed 25g
+hset -q platina vnet.eth-1-1.fec cl74
+
+hset -q platina vnet.eth-1-2.media copper
+hset -q platina vnet.eth-1-2.speed 25g
+hset -q platina vnet.eth-1-2.fec cl74
+
+hset -q platina vnet.eth-1-3.media copper
+hset -q platina vnet.eth-1-3.speed 25g
+hset -q platina vnet.eth-1-3.fec cl74
+
+hset -q platina vnet.eth-1-4.media copper
+hset -q platina vnet.eth-1-4.speed 25g
+hset -q platina vnet.eth-1-4.fec cl74
 
 hset -q platina vnet.eth-2-1.media copper
-hset -q platina vnet.eth-2-1.speed 25g
-hset -q platina vnet.eth-2-1.fec cl74
-
-hset -q platina vnet.eth-2-2.media copper
-hset -q platina vnet.eth-2-2.speed 25g
-hset -q platina vnet.eth-2-2.fec cl74
-
-hset -q platina vnet.eth-2-3.media copper
-hset -q platina vnet.eth-2-3.speed 25g
-hset -q platina vnet.eth-2-3.fec cl74
-
-hset -q platina vnet.eth-2-4.media copper
-hset -q platina vnet.eth-2-4.speed 25g
-hset -q platina vnet.eth-2-4.fec cl74
+hset -q platina vnet.eth-2-1.speed 100g
 
 hset -q platina vnet.eth-3-1.media copper
-hset -q platina vnet.eth-3-1.speed 100g
+hset -q platina vnet.eth-3-1.speed 25g
+hset -q platina vnet.eth-3-1.fec cl74
+
+hset -q platina vnet.eth-3-2.media copper
+hset -q platina vnet.eth-3-2.speed 25g
+hset -q platina vnet.eth-3-2.fec cl74
+
+hset -q platina vnet.eth-3-3.media copper
+hset -q platina vnet.eth-3-3.speed 25g
+hset -q platina vnet.eth-3-3.fec cl74
+
+hset -q platina vnet.eth-3-4.media copper
+hset -q platina vnet.eth-3-4.speed 25g
+hset -q platina vnet.eth-3-4.fec cl74
 
 hset -q platina vnet.eth-4-1.media copper
-hset -q platina vnet.eth-4-1.speed 25g
-hset -q platina vnet.eth-4-1.fec cl74
-
-hset -q platina vnet.eth-4-2.media copper
-hset -q platina vnet.eth-4-2.speed 25g
-hset -q platina vnet.eth-4-2.fec cl74
-
-hset -q platina vnet.eth-4-3.media copper
-hset -q platina vnet.eth-4-3.speed 25g
-hset -q platina vnet.eth-4-3.fec cl74
-
-hset -q platina vnet.eth-4-4.media copper
-hset -q platina vnet.eth-4-4.speed 25g
-hset -q platina vnet.eth-4-4.fec cl74
+hset -q platina vnet.eth-4-1.speed auto
 
 hset -q platina vnet.eth-5-1.media copper
-hset -q platina vnet.eth-5-1.speed auto
+hset -q platina vnet.eth-5-1.speed 25g
+hset -q platina vnet.eth-5-1.fec cl74
+
+hset -q platina vnet.eth-5-2.media copper
+hset -q platina vnet.eth-5-2.speed 25g
+hset -q platina vnet.eth-5-2.fec cl74
+
+hset -q platina vnet.eth-5-3.media copper
+hset -q platina vnet.eth-5-3.speed 25g
+hset -q platina vnet.eth-5-3.fec cl74
+
+hset -q platina vnet.eth-5-4.media copper
+hset -q platina vnet.eth-5-4.speed 25g
+hset -q platina vnet.eth-5-4.fec cl74
 
 hset -q platina vnet.eth-6-1.media copper
-hset -q platina vnet.eth-6-1.speed 25g
-hset -q platina vnet.eth-6-1.fec cl74
-
-hset -q platina vnet.eth-6-2.media copper
-hset -q platina vnet.eth-6-2.speed 25g
-hset -q platina vnet.eth-6-2.fec cl74
-
-hset -q platina vnet.eth-6-3.media copper
-hset -q platina vnet.eth-6-3.speed 25g
-hset -q platina vnet.eth-6-3.fec cl74
-
-hset -q platina vnet.eth-6-4.media copper
-hset -q platina vnet.eth-6-4.speed 25g
-hset -q platina vnet.eth-6-4.fec cl74
+hset -q platina vnet.eth-6-1.speed auto
 
 hset -q platina vnet.eth-7-1.media copper
-hset -q platina vnet.eth-7-1.speed 100g
+hset -q platina vnet.eth-7-1.speed 25g
+hset -q platina vnet.eth-7-1.fec cl74
+
+hset -q platina vnet.eth-7-2.media copper
+hset -q platina vnet.eth-7-2.speed 25g
+hset -q platina vnet.eth-7-2.fec cl74
+
+hset -q platina vnet.eth-7-3.media copper
+hset -q platina vnet.eth-7-3.speed 25g
+hset -q platina vnet.eth-7-3.fec cl74
+
+hset -q platina vnet.eth-7-4.media copper
+hset -q platina vnet.eth-7-4.speed 25g
+hset -q platina vnet.eth-7-4.fec cl74
 
 hset -q platina vnet.eth-8-1.media copper
-hset -q platina vnet.eth-8-1.speed 25g
-hset -q platina vnet.eth-8-1.fec cl74
-
-hset -q platina vnet.eth-8-2.media copper
-hset -q platina vnet.eth-8-2.speed 25g
-hset -q platina vnet.eth-8-2.fec cl74
-
-hset -q platina vnet.eth-8-3.media copper
-hset -q platina vnet.eth-8-3.speed 25g
-hset -q platina vnet.eth-8-3.fec cl74
-
-hset -q platina vnet.eth-8-4.media copper
-hset -q platina vnet.eth-8-4.speed 25g
-hset -q platina vnet.eth-8-4.fec cl74
+hset -q platina vnet.eth-8-1.speed auto
 
 hset -q platina vnet.eth-9-1.media copper
-hset -q platina vnet.eth-9-1.speed auto
+hset -q platina vnet.eth-9-1.speed 25g
+hset -q platina vnet.eth-9-1.fec cl74
+
+hset -q platina vnet.eth-9-2.media copper
+hset -q platina vnet.eth-9-2.speed 25g
+hset -q platina vnet.eth-9-2.fec cl74
+
+hset -q platina vnet.eth-9-3.media copper
+hset -q platina vnet.eth-9-3.speed 25g
+hset -q platina vnet.eth-9-3.fec cl74
+
+hset -q platina vnet.eth-9-4.media copper
+hset -q platina vnet.eth-9-4.speed 25g
+hset -q platina vnet.eth-9-4.fec cl74
 
 hset -q platina vnet.eth-10-1.media copper
-hset -q platina vnet.eth-10-1.speed 25g
-hset -q platina vnet.eth-10-1.fec cl74
-
-hset -q platina vnet.eth-10-2.media copper
-hset -q platina vnet.eth-10-2.speed 25g
-hset -q platina vnet.eth-10-2.fec cl74
-
-hset -q platina vnet.eth-10-3.media copper
-hset -q platina vnet.eth-10-3.speed 25g
-hset -q platina vnet.eth-10-3.fec cl74
-
-hset -q platina vnet.eth-10-4.media copper
-hset -q platina vnet.eth-10-4.speed 25g
-hset -q platina vnet.eth-10-4.fec cl74
+hset -q platina vnet.eth-10-1.speed auto
 
 hset -q platina vnet.eth-11-1.media copper
-hset -q platina vnet.eth-11-1.speed 100g
+hset -q platina vnet.eth-11-1.speed 25g
+hset -q platina vnet.eth-11-1.fec cl74
+
+hset -q platina vnet.eth-11-2.media copper
+hset -q platina vnet.eth-11-2.speed 25g
+hset -q platina vnet.eth-11-2.fec cl74
+
+hset -q platina vnet.eth-11-3.media copper
+hset -q platina vnet.eth-11-3.speed 25g
+hset -q platina vnet.eth-11-3.fec cl74
+
+hset -q platina vnet.eth-11-4.media copper
+hset -q platina vnet.eth-11-4.speed 25g
+hset -q platina vnet.eth-11-4.fec cl74
 
 hset -q platina vnet.eth-12-1.media copper
-hset -q platina vnet.eth-12-1.speed 25g
-hset -q platina vnet.eth-12-1.fec cl74
-
-hset -q platina vnet.eth-12-2.media copper
-hset -q platina vnet.eth-12-2.speed 25g
-hset -q platina vnet.eth-12-2.fec cl74
-
-hset -q platina vnet.eth-12-3.media copper
-hset -q platina vnet.eth-12-3.speed 25g
-hset -q platina vnet.eth-12-3.fec cl74
-
-hset -q platina vnet.eth-12-4.media copper
-hset -q platina vnet.eth-12-4.speed 25g
-hset -q platina vnet.eth-12-4.fec cl74
+hset -q platina vnet.eth-12-1.speed auto
 
 hset -q platina vnet.eth-13-1.media copper
-hset -q platina vnet.eth-13-1.speed auto
+hset -q platina vnet.eth-13-1.speed 25g
+hset -q platina vnet.eth-13-1.fec cl74
+
+hset -q platina vnet.eth-13-2.media copper
+hset -q platina vnet.eth-13-2.speed 25g
+hset -q platina vnet.eth-13-2.fec cl74
+
+hset -q platina vnet.eth-13-3.media copper
+hset -q platina vnet.eth-13-3.speed 25g
+hset -q platina vnet.eth-13-3.fec cl74
+
+hset -q platina vnet.eth-13-4.media copper
+hset -q platina vnet.eth-13-4.speed 25g
+hset -q platina vnet.eth-13-4.fec cl74
 
 hset -q platina vnet.eth-14-1.media copper
-hset -q platina vnet.eth-14-1.speed 25g
-hset -q platina vnet.eth-14-1.fec cl74
-
-hset -q platina vnet.eth-14-2.media copper
-hset -q platina vnet.eth-14-2.speed 25g
-hset -q platina vnet.eth-14-2.fec cl74
-
-hset -q platina vnet.eth-14-3.media copper
-hset -q platina vnet.eth-14-3.speed 25g
-hset -q platina vnet.eth-14-3.fec cl74
-
-hset -q platina vnet.eth-14-4.media copper
-hset -q platina vnet.eth-14-4.speed 25g
-hset -q platina vnet.eth-14-4.fec cl74
+hset -q platina vnet.eth-14-1.speed auto
 
 hset -q platina vnet.eth-15-1.media copper
-hset -q platina vnet.eth-15-1.speed 100g
+hset -q platina vnet.eth-15-1.speed 25g
+hset -q platina vnet.eth-15-1.fec cl74
+
+hset -q platina vnet.eth-15-2.media copper
+hset -q platina vnet.eth-15-2.speed 25g
+hset -q platina vnet.eth-15-2.fec cl74
+
+hset -q platina vnet.eth-15-3.media copper
+hset -q platina vnet.eth-15-3.speed 25g
+hset -q platina vnet.eth-15-3.fec cl74
+
+hset -q platina vnet.eth-15-4.media copper
+hset -q platina vnet.eth-15-4.speed 25g
+hset -q platina vnet.eth-15-4.fec cl74
 
 hset -q platina vnet.eth-16-1.media copper
-hset -q platina vnet.eth-16-1.speed 25g
-hset -q platina vnet.eth-16-1.fec cl74
-
-hset -q platina vnet.eth-16-2.media copper
-hset -q platina vnet.eth-16-2.speed 25g
-hset -q platina vnet.eth-16-2.fec cl74
-
-hset -q platina vnet.eth-16-3.media copper
-hset -q platina vnet.eth-16-3.speed 25g
-hset -q platina vnet.eth-16-3.fec cl74
-
-hset -q platina vnet.eth-16-4.media copper
-hset -q platina vnet.eth-16-4.speed 25g
-hset -q platina vnet.eth-16-4.fec cl74
+hset -q platina vnet.eth-16-1.speed auto
 
 hset -q platina vnet.eth-17-1.media copper
 hset -q platina vnet.eth-17-1.speed auto
