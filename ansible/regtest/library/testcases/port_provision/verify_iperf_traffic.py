@@ -52,6 +52,12 @@ options:
         - List of eth interfaces described as string.
       required: False
       type: str
+    is_subports:
+      description:
+        - Flag to indicate if subports are provisioned or not.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -134,25 +140,50 @@ def verify_traffic(module):
     switch_name = module.params['switch_name']
     leaf_server = module.params['leaf_server']
     spine_server = module.params['spine_server']
+    is_subports = module.params['is_subports']
     eth_list = module.params['eth_list'].split(',')
 
-    if switch_name == leaf_server:
-        third_octet = spine_server[-2::]
+    if not is_subports:
+        if switch_name == leaf_server:
+            third_octet = spine_server[-2::]
+        else:
+            third_octet = leaf_server[-2::]
+
+        for eth in eth_list:
+            port += 1
+            cmd = 'iperf -c 10.0.{}.{} -t 2 -p {} -P 1'.format(eth, third_octet,
+                                                               port)
+            traffic_out = execute_commands(module, cmd)
+
+            if ('Transfer' not in traffic_out and 'Bandwidth' not in traffic_out and
+                    'Bytes' not in traffic_out and 'bits/sec' not in traffic_out):
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'iperf traffic cannot be verified for '
+                failure_summary += 'eth-{}-1 using command {}\n'.format(eth, cmd)
     else:
-        third_octet = leaf_server[-2::]
+        third_octet = 0
+        if switch_name == leaf_server:
+            last_octet = '2'
+        else:
+            last_octet = '1'
 
-    for eth in eth_list:
-        port += 1
-        cmd = 'iperf -c 10.0.{}.{} -t 2 -p {} -P 1'.format(eth, third_octet,
-                                                           port)
-        traffic_out = execute_commands(module, cmd)
+        for eth in eth_list:
+            for subport in range(1, 5):
+                port += 1
+                third_octet += 1
+                cmd = 'iperf -c 192.168.{}.{} -t 2 -p {} -P 1'.format(
+                    third_octet, last_octet, port
+                )
+                out = execute_commands(module, cmd)
 
-        if ('Transfer' not in traffic_out and 'Bandwidth' not in traffic_out and
-                'Bytes' not in traffic_out and 'bits/sec' not in traffic_out):
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'iperf traffic cannot be verified for '
-            failure_summary += 'eth-{}-1 using command {}\n'.format(eth, cmd)
+                if ('Transfer' not in out and 'Bandwidth' not in out and
+                        'Bytes' not in out and 'bits/sec' not in out):
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'iperf traffic cannot be verified for '
+                    failure_summary += 'eth-{}-{} using command {}\n'.format(
+                        eth, subport, cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -168,6 +199,7 @@ def main():
             leaf_server=dict(required=False, type='str'),
             spine_server=dict(required=False, type='str'),
             eth_list=dict(required=False, type='str'),
+            is_subports=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
