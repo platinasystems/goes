@@ -164,7 +164,7 @@ def verify_port_links(module):
     else:
         last_octet = '2'
 
-    if speed == '100g' or speed == 'auto' or speed == '40g':
+    if speed == '100g' or speed == 'auto' or speed == '40g' or speed == '50g':
         subports = [1, 3] if two_lanes else [1]
 
         for eth in eth_list:

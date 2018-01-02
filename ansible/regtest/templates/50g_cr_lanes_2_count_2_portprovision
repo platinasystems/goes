@@ -1,0 +1,89 @@
+ports:
+#50g CR fec=none
+- name: eth-1-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-2-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-3-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-4-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-5-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-6-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-7-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-8-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-9-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-10-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-11-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-12-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-13-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+- name: eth-14-1
+  speed: 100g
+  lanes: 4
+  count: 1
+
+#50g CR fec=none
+- name: eth-15-1
+  speed: 50g
+  lanes: 2
+  count: 2
+
+#for rest of the interfaces
+- name: eth-16-1
+  speed: 100g
+  lanes: 4
+  count: 17

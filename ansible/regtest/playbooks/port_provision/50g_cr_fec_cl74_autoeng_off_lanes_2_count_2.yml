@@ -1,0 +1,163 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "port_provision_50g_cr_fec_cl74_autoeng_off_lanes_2_count_2_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf[1]:spine[1]
+  become: true
+  tasks:
+    - file:
+        path: "{{ port_provision_log_dir }}"
+        state: directory
+
+    - name: Take backup of /etc/goes/start file
+      copy:
+        src: /etc/goes/start
+        dest: /etc/goes/start.bck
+        remote_src: true
+
+    - name: Copy updated start file for this testcase
+      copy:
+        src: ../../templates/50g_cr_fec_cl74_autoeng_off_lanes_2_count_2_start_file
+        dest: /etc/goes/start
+
+    - name: Copy portprovision file for this testcase
+      copy:
+        src: ../../templates/50g_cr_lanes_2_count_2_portprovision
+        dest: /etc/goes/portprovision
+
+    - name: Restart goes
+      command: "goes restart"
+
+    - name: Verify media, speed and fec values
+      test_port_links:
+        switch_name: "{{ inventory_hostname }}"
+        eth_list: "1,3,5,7,9,11,13,15"
+        speed: "50g"
+        media: "copper"
+        fec: "cl74"
+        two_lanes: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ port_provision_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Copy iperf parallel server shell script
+      copy:
+        src: ../../files/iperf-parallel-servers
+        dest: ~/iperf-parallel-servers.sh
+        mode: 0755
+
+    - name: Start iperf server instances
+      shell: "~/iperf-parallel-servers.sh 16 server-report"
+
+    - name: Initiate iperf client and verify traffic
+      verify_iperf_traffic:
+        switch_name: "{{ inventory_hostname }}"
+        leaf_server: "{{ groups['leaf'][1] }}"
+        spine_server: "{{ groups['spine'][1] }}"
+        eth_list: "1,3,5,7,9,11,13,15"
+        is_subports: True
+        two_lanes: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ port_provision_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Stop iperf server instances
+      command: "pkill iperf"
+
+    - shell: "rm ~/iperf-parallel-servers.sh"
+
+    - name: Get goes version details
+      shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - name: Get goes tag details
+      shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store goes version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+    - name: Restore backup of /etc/goes/start
+      copy:
+        src: /etc/goes/start.bck
+        dest: /etc/goes/start
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: /etc/goes/start.bck
+        state: absent
+
+    - name: Remove portprovision file
+      file:
+        path: /etc/goes/portprovision
+        state: absent
+
+    - command: "goes restart"
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
