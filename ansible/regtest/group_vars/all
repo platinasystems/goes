@@ -29,6 +29,9 @@ quagga_zebra_conf_file_bck: /etc/quagga/zebra.conf.bck
 gobgp_bgp_conf_file: /etc/gobgp/gobgpd.conf
 gobgp_bgp_conf_file_bck: /etc/gobgp/gobgpd.conf.bck
 
+bird_conf_file: /etc/bird/bird.conf
+bird_conf_file_bck: /etc/bird/bird.conf.bck
+
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
 goes_upgrade_installer_name: 'goes-platina-mk1-installer.up'
