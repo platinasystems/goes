@@ -64,6 +64,12 @@ options:
         - Name of the leaf switch on which iperf server is running.
       required: False
       type: str
+    two_lanes:
+      description:
+        - Flag to indicate if two lanes are used during port provisioning.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -148,58 +154,84 @@ def verify_port_links(module):
     speed = module.params['speed']
     media = module.params['media']
     fec = module.params['fec']
+    two_lanes = module.params['two_lanes']
     leaf_server = module.params['leaf_server']
     eth_list = module.params['eth_list'].split(',')
+    third_octet = 0
+
+    if switch_name == leaf_server:
+        last_octet = '1'
+    else:
+        last_octet = '2'
 
     if speed == '100g' or speed == 'auto' or speed == '40g':
+        subports = [1, 3] if two_lanes else [1]
+
         for eth in eth_list:
-            # Verify interface media is set to correct value
-            cmd = 'goes hget platina vnet.eth-{}-1.media'.format(eth)
-            out = execute_commands(module, cmd)
-            if media not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'interface media is not set to copper '
-                failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+            for port in subports:
+                # Verify interface media is set to correct value
+                cmd = 'goes hget platina vnet.eth-{}-{}.media'.format(
+                    eth, port)
+                out = execute_commands(module, cmd)
+                if media not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'interface media is not set to copper '
+                    failure_summary += 'for the interface eth-{}-{}\n'.format(
+                        eth, port)
 
-            # Verify speed of interfaces are set to correct value
-            cmd = 'goes hget platina vnet.eth-{}-1.speed'.format(eth)
-            out = execute_commands(module, cmd)
-            if speed not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'speed of the interface '
-                failure_summary += 'is not set to {} for '.format(speed)
-                failure_summary += 'the interface eth-{}-1\n'.format(eth)
+                # Verify speed of interfaces are set to correct value
+                cmd = 'goes hget platina vnet.eth-{}-{}.speed'.format(
+                    eth, port)
+                out = execute_commands(module, cmd)
+                if speed not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'speed of the interface '
+                    failure_summary += 'is not set to {} for '.format(speed)
+                    failure_summary += 'the interface eth-{}-{}\n'.format(
+                        eth, port)
 
-            # Verify fec of interfaces are set to correct value
-            cmd = 'goes hget platina vnet.eth-{}-1.fec'.format(eth)
-            out = execute_commands(module, cmd)
-            if fec not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'fec is not set to {} for '.format(fec)
-                failure_summary += 'the interface eth-{}-1\n'.format(eth)
+                # Verify fec of interfaces are set to correct value
+                cmd = 'goes hget platina vnet.eth-{}-{}.fec'.format(
+                    eth, port)
+                out = execute_commands(module, cmd)
+                if fec not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'fec is not set to {} for '.format(fec)
+                    failure_summary += 'the interface eth-{}-{}\n'.format(
+                        eth, port)
 
-            # Bring up the interfaces
-            cmd = 'ifconfig eth-{}-1 up'.format(eth)
-            execute_commands(module, cmd)
+        if two_lanes:
+            for eth in eth_list:
+                for port in subports:
+                    third_octet += 1
+                    # Assign ip address to these interfaces
+                    cmd = 'ifconfig eth-{}-{} 192.168.{}.{} '.format(
+                        eth, port, third_octet, last_octet)
+                    cmd += 'netmask 255.255.255.0'
+                    execute_commands(module, cmd)
 
-            # Verify if port links are up for eth
-            cmd = 'goes hget platina vnet.eth-{}-1.link'.format(eth)
-            out = execute_commands(module, cmd)
-            if 'true' not in out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'port link is not up '
-                failure_summary += 'for the interface eth-{}-1\n'.format(eth)
+        for eth in eth_list:
+            for port in subports:
+                # Bring up the interfaces
+                cmd = 'ifconfig eth-{}-{} up'.format(eth, port)
+                execute_commands(module, cmd)
+
+        for eth in eth_list:
+            for port in subports:
+                # Verify if port links are up for eth
+                cmd = 'goes hget platina vnet.eth-{}-{}.link'.format(eth, port)
+                out = execute_commands(module, cmd)
+                if 'true' not in out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'port link is not up '
+                    failure_summary += 'for the interface eth-{}-{}\n'.format(
+                        eth, port)
+
     elif speed == '10g' or speed == 'auto10g' or speed == '25g':
-        third_octet = 0
-        if switch_name == leaf_server:
-            last_octet = '1'
-        else:
-            last_octet = '2'
-
         for eth in eth_list:
             for subport in range(1, 5):
                 # Verify interface media is set to correct value
@@ -281,6 +313,7 @@ def main():
             media=dict(required=False, type='str'),
             fec=dict(required=False, type='str', default=''),
             leaf_server=dict(required=False, type='str'),
+            two_lanes=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

@@ -58,6 +58,12 @@ options:
       required: False
       type: bool
       default: False
+    two_lanes:
+      description:
+        - Flag to indicate if two lanes are used during port provisioning.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -141,6 +147,7 @@ def verify_traffic(module):
     leaf_server = module.params['leaf_server']
     spine_server = module.params['spine_server']
     is_subports = module.params['is_subports']
+    two_lanes = module.params['two_lanes']
     eth_list = module.params['eth_list'].split(',')
 
     if not is_subports:
@@ -168,8 +175,9 @@ def verify_traffic(module):
         else:
             last_octet = '1'
 
+        subports = [1, 3] if two_lanes else range(1, 5)
         for eth in eth_list:
-            for subport in range(1, 5):
+            for subport in subports:
                 port += 1
                 third_octet += 1
                 cmd = 'iperf -c 192.168.{}.{} -t 2 -p {} -P 1'.format(
@@ -200,6 +208,7 @@ def main():
             spine_server=dict(required=False, type='str'),
             eth_list=dict(required=False, type='str'),
             is_subports=dict(required=False, type='bool', default=False),
+            two_lanes=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
