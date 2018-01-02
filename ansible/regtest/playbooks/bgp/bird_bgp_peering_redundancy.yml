@@ -1,0 +1,249 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "bird_bgp_peering_redundancy_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Add dummy interface
+      add_dummy_interface:
+        switch_name: "{{ inventory_hostname }}"
+
+    - name: Take backup of /etc/bird/bird.conf
+      copy:
+        src: "{{ bird_conf_file }}"
+        dest: "{{ bird_conf_file_bck }}"
+        remote_src: true
+
+    - name: Add bgp config in /etc/bird/bird.conf
+      copy:
+        src: ../../files/{{inventory_hostname}}/bird_bgp_peering_if_down.conf
+        dest: "{{ bird_conf_file }}"
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.42.0/24 gw 10.0.21.32
+      - route add -net 192.168.43.0/24 gw 10.0.7.31
+      - route add -net 192.168.42.0/24 gw 10.0.27.32
+      - route add -net 192.168.43.0/24 gw 10.0.5.31
+      - route add -net 192.168.44.0/24 gw 10.0.5.31
+      - route add -net 192.168.44.0/24 gw 10.0.7.31
+      ignore_errors: yes
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.42.0/24 gw 10.0.3.32
+      - route add -net 192.168.43.0/24 gw 10.0.19.31
+      - route add -net 192.168.42.0/24 gw 10.0.11.32
+      - route add -net 192.168.43.0/24 gw 10.0.21.31
+      - route add -net 192.168.45.0/24 gw 10.0.3.32
+      - route add -net 192.168.45.0/24 gw 10.0.11.32
+      ignore_errors: yes
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.44.0/24 gw 10.0.19.30
+      - route add -net 192.168.45.0/24 gw 10.0.7.29
+      - route add -net 192.168.44.0/24 gw 10.0.21.30
+      - route add -net 192.168.45.0/24 gw 10.0.5.29
+      - route add -net 192.168.42.0/24 gw 10.0.5.29
+      - route add -net 192.168.42.0/24 gw 10.0.7.29
+      ignore_errors: yes
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.44.0/24 gw 10.0.3.30
+      - route add -net 192.168.45.0/24 gw 10.0.21.29
+      - route add -net 192.168.44.0/24 gw 10.0.11.30
+      - route add -net 192.168.45.0/24 gw 10.0.27.29
+      - route add -net 192.168.43.0/24 gw 10.0.3.30
+      - route add -net 192.168.43.0/24 gw 10.0.11.30
+      ignore_errors: yes
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restart bird
+      service:
+        name: bird
+        state: restarted
+
+    - name: Wait for few seconds for bgp convergence
+      pause:
+        seconds: 35
+
+    - file:
+        path: "{{ bgp_log_dir }}"
+        state: directory
+
+    - name: Verify bird bgp peering redundancy
+      test_bird_peering_if_down:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/bird_bgp_peering_if_down.conf') }}"
+        package_name: "bird"
+        leaf_list: "{{ groups['leaf'] }}"
+        eth_list: "7,21,11"
+        check_ping: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ bgp_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Get goes version details
+      shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - name: Get goes tag details
+      shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store goes version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.42.0/24 gw 10.0.21.32
+      - route del -net 192.168.43.0/24 gw 10.0.7.31
+      - route del -net 192.168.42.0/24 gw 10.0.27.32
+      - route del -net 192.168.43.0/24 gw 10.0.5.31
+      - route del -net 192.168.44.0/24 gw 10.0.5.31
+      - route del -net 192.168.44.0/24 gw 10.0.7.31
+      ignore_errors: yes
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.42.0/24 gw 10.0.3.32
+      - route del -net 192.168.43.0/24 gw 10.0.19.31
+      - route del -net 192.168.42.0/24 gw 10.0.11.32
+      - route del -net 192.168.43.0/24 gw 10.0.21.31
+      - route del -net 192.168.45.0/24 gw 10.0.3.32
+      - route del -net 192.168.45.0/24 gw 10.0.11.32
+      ignore_errors: yes
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.44.0/24 gw 10.0.19.30
+      - route del -net 192.168.45.0/24 gw 10.0.7.29
+      - route del -net 192.168.44.0/24 gw 10.0.21.30
+      - route del -net 192.168.45.0/24 gw 10.0.5.29
+      - route del -net 192.168.42.0/24 gw 10.0.5.29
+      - route del -net 192.168.42.0/24 gw 10.0.7.29
+      ignore_errors: yes
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.44.0/24 gw 10.0.3.30
+      - route del -net 192.168.45.0/24 gw 10.0.21.29
+      - route del -net 192.168.44.0/24 gw 10.0.11.30
+      - route del -net 192.168.45.0/24 gw 10.0.27.29
+      - route del -net 192.168.43.0/24 gw 10.0.11.30
+      - route del -net 192.168.43.0/24 gw 10.0.3.30
+      ignore_errors: yes
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restore backup of /etc/bird/bird.conf
+      copy:
+        src: "{{ bird_conf_file_bck }}"
+        dest: "{{ bird_conf_file }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: "{{ bird_conf_file_bck }}"
+        state: absent
+
+    - name: Delete dummy interface
+      command: "ip link del dummy0 type dummy"
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
