@@ -30,6 +30,54 @@
         src: ../../files/{{inventory_hostname}}/bird_bgp_peering_ibgp_loopback.conf
         dest: "{{ bird_conf_file }}"
 
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.42.0/24 gw 10.0.21.32
+      - route add -net 192.168.43.0/24 gw 10.0.7.31
+      ignore_errors: yes
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.42.0/24 gw 10.0.3.32
+      - route add -net 192.168.43.0/24 gw 10.0.19.31
+      ignore_errors: yes
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.44.0/24 gw 10.0.19.30
+      - route add -net 192.168.45.0/24 gw 10.0.7.29
+      ignore_errors: yes
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Add static routes
+      command: "{{ item }}"
+      with_items:
+      - route add -net 192.168.44.0/24 gw 10.0.3.30
+      - route add -net 192.168.45.0/24 gw 10.0.21.29
+      ignore_errors: yes
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
     - name: Restart bird
       service:
         name: bird
@@ -85,6 +133,54 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.42.0/24 gw 10.0.21.32
+      - route del -net 192.168.43.0/24 gw 10.0.7.31
+      ignore_errors: yes
+
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.42.0/24 gw 10.0.3.32
+      - route del -net 192.168.43.0/24 gw 10.0.19.31
+      ignore_errors: yes
+
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.44.0/24 gw 10.0.19.30
+      - route del -net 192.168.45.0/24 gw 10.0.7.29
+      ignore_errors: yes
+
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Delete static routes
+      command: "{{ item }}"
+      with_items:
+      - route del -net 192.168.44.0/24 gw 10.0.3.30
+      - route del -net 192.168.45.0/24 gw 10.0.21.29
+      ignore_errors: yes
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
     - name: Restore backup of /etc/bird/bird.conf
       copy:
         src: "{{ bird_conf_file_bck }}"
