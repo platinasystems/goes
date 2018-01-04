@@ -6,7 +6,7 @@ package _type_
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/basic"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/bridge"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/geneve"
@@ -23,12 +23,15 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "type"
-	Apropos = "specify virtual link type"
-	Usage   = `
-ip link add type TYPE [[ name ] NAME ] [ OPTION ]... [ ARGS ]...`
-	Man = `
+var Goes = &goes.Goes{
+	NAME: "type",
+	USAGE: `
+ip link add type TYPE [[ name ] NAME ] [ OPTION ]... [ ARGS ]...`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "specify virtual link type",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: `
 TYPES
 	bond - Bonding device
 	bridge - Ethernet Bridge device
@@ -55,38 +58,26 @@ TYPES
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	for _, s := range basic.Types {
-		g.Plot(basic.New(s))
-	}
-	g.Plot(bridge.New())
-	g.Plot(geneve.New())
-	for _, s := range gre.Types {
-		g.Plot(gre.New(s))
-	}
-	g.Plot(hsr.New())
-	for _, s := range ip6gre.Types {
-		g.Plot(ip6gre.New(s))
-	}
-	g.Plot(ipip.New())
-	g.Plot(ipoib.New())
-	g.Plot(macsec.New())
-	for _, s := range macvlan.Types {
-		g.Plot(macvlan.New(s))
-	}
-	g.Plot(vlan.New())
-	g.Plot(vrf.New())
-	g.Plot(vxlan.New())
-	return g
+	man ip || ip -man`,
+	},
+	ByName: map[string]cmd.Cmd{
+		"bridge":    bridge.Command{},
+		"dummy":     basic.Command("dummy"),
+		"geneve":    geneve.Command{},
+		"gre":       gre.Command("gre"),
+		"gretap":    gre.Command("gretap"),
+		"hsr":       hsr.Command{},
+		"ifb":       basic.Command("ifb"),
+		"ip6gre":    ip6gre.Command("ip6gre"),
+		"ip6gretap": ip6gre.Command("ip6gretap"),
+		"ipip":      ipip.Command{},
+		"ipoib":     ipoib.Command{},
+		"macsec":    macsec.Command{},
+		"macvlan":   macvlan.Command("macvlan"),
+		"macvtap":   macvlan.Command("macvtap"),
+		"vcan":      basic.Command("vcan"),
+		"vlan":      vlan.Command{},
+		"vrf":       vrf.Command{},
+		"vxlan":     vxlan.Command{},
+	},
 }

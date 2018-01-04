@@ -9,34 +9,32 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "restart"
-	Apropos = "stop, then start this goes machine"
-	Usage   = "restart [STOP, STOP, and REDISD OPTIONS]..."
-	Man     = `
-DESCRIPTION
-	Run the goes machine stop then start commands.
-
-SEE ALSO
-	start, stop, and redisd`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() *Command { return new(Command) }
-
 type Command struct {
 	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) String() string { return "restart" }
+
+func (*Command) Usage() string {
+	return "restart [STOP, STOP, and REDISD OPTIONS]..."
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "stop, then start this goes machine",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Run the goes machine stop then start commands.
+
+SEE ALSO
+	start, stop, and redisd`,
+	}
+}
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
@@ -47,7 +45,3 @@ func (c *Command) Main(args ...string) error {
 	}
 	return c.g.Main(append([]string{"start"}, args...)...)
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }

@@ -4,69 +4,7 @@
 
 package cmd
 
-import (
-	"strings"
-	"sync"
-
-	"github.com/platinasystems/go/goes/lang"
-)
-
-var Helpers = map[string]struct{}{
-	"apropos":  struct{}{},
-	"complete": struct{}{},
-	"help":     struct{}{},
-	"man":      struct{}{},
-	"usage":    struct{}{},
-}
-
-// Machines provide this map of command initters
-var Initters map[string]func()
-var initMutex sync.Mutex
-var initted map[string]bool
-
-// Commands use Init(Name) to perform the machine specific init
-func Init(name string) {
-	initMutex.Lock()
-	defer initMutex.Unlock()
-	if initted == nil {
-		initted = make(map[string]bool)
-	}
-	if init, found := Initters[name]; found && !initted[name] {
-		init()
-		initted[name] = true
-	}
-}
-
-// Swap hyphen prefaced helper flags with command, so,
-//
-//	COMMAND -[-]HELPER [ARGS]...
-//
-// becomes
-//
-//	HELPER COMMAND [ARGS]...
-//
-// and
-//
-//	-[-]HELPER [ARGS]...
-//
-// becomes
-//
-//	HELPER [ARGS]...
-func Swap(args []string) {
-	n := len(args)
-	if n > 0 && strings.HasPrefix(args[0], "-") {
-		opt := strings.TrimLeft(args[0], "-")
-		if _, found := Helpers[opt]; found {
-			args[0] = opt
-		}
-	} else if n > 1 && strings.HasPrefix(args[1], "-") {
-		opt := strings.TrimLeft(args[1], "-")
-		if _, found := Helpers[opt]; found {
-			args[1] = args[0]
-			args[0] = opt
-		}
-	}
-}
+import "github.com/platinasystems/go/goes/lang"
 
 type Cmd interface {
 	Apropos() lang.Alt

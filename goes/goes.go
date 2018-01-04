@@ -17,7 +17,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"strings"
 	"syscall"
 	"unicode/utf8"
@@ -26,27 +25,6 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/prog"
-)
-
-const (
-	USAGE = `
-	goes COMMAND [ ARGS ]...
-	goes COMMAND -[-]HELPER [ ARGS ]...
-	goes HELPER [ COMMAND ] [ ARGS ]...
-	goes [ -d ] [ -x ] [[ -f ][ - | SCRIPT ]]
-
-	HELPER := { apropos | complete | help | man | usage }
-	`
-	MAN = `
-OPTIONS
-	-d	debug block handling
-	-x	print command trace
-	-f	don't terminate script on error
-	-	execute standard input script
-	SCRIPT	execute named script file
-
-SEE ALSO
-	goes apropos [COMMAND], goes man COMMAND`
 )
 
 var blockNames = [...]string{
@@ -72,15 +50,20 @@ func (b block) String() string {
 	return blockNames[b]
 }
 
+type akaer interface {
+	Aka() string
+}
+
+type goeser interface {
+	Goes(*Goes)
+}
+
 type Goes struct {
-	name, usage  string
-	apropos, man lang.Alt
+	// These uppercased fields may/should be assigned at instantiation
+	NAME, USAGE  string
+	APROPOS, MAN lang.Alt
 
-	byname map[string]cmd.Cmd
-	Names  []string
-
-	Parent *Goes
-	Path   []string
+	ByName map[string]cmd.Cmd
 
 	Catline func(string) (string, error)
 
@@ -88,22 +71,9 @@ type Goes struct {
 
 	Status error
 	debug  bool
-}
 
-type akaer interface {
-	Aka() string
-}
-
-type completer interface {
-	Complete(...string) []string
-}
-
-type goeser interface {
-	Goes(*Goes)
-}
-
-type helper interface {
-	Help(...string) string
+	cache  cache
+	parent *Goes
 }
 
 func (g *Goes) NotTaken() bool {
@@ -116,66 +86,20 @@ func (g *Goes) NotTaken() bool {
 	return false
 }
 
-func New(name, usage string, apropos, man lang.Alt) *Goes {
-	if len(usage) == 0 {
-		usage = strings.Replace(USAGE, "goes", name, -1)
-	}
-	if len(man) == 0 {
-		man = lang.Alt{
-			lang.EnUS: strings.Replace(MAN, "goes", name, -1),
-		}
-	}
-	return &Goes{
-		name:    name,
-		usage:   usage,
-		apropos: apropos,
-		man:     man,
-		byname:  make(map[string]cmd.Cmd),
-	}
+func Replace(s, name string) string {
+	return strings.Replace(s, "goes", name, -1)
 }
 
-func (g *Goes) Apropos() lang.Alt { return g.apropos }
-
-func (g *Goes) ByName(name string) cmd.Cmd { return g.byname[name] }
-
-func (g *Goes) Complete(args ...string) (ss []string) {
-	n := len(args)
-	if n == 0 || len(args[0]) == 0 {
-		ss = g.Names
-	} else if v, found := g.byname[args[0]]; found {
-		if method, found := v.(completer); found {
-			ss = method.Complete(args[1:]...)
-		} else {
-			ss, _ = filepath.Glob(args[n-1] + "*")
-		}
-	} else if _, found := cmd.Helpers[args[0]]; found {
-		if n == 1 || len(args[n-1]) == 0 {
-			return g.Names
-		}
-		for _, name := range g.Names {
-			if strings.HasPrefix(name, args[n-1]) {
-				ss = append(ss, name)
-			}
-		}
-		if len(ss) > 0 {
-			sort.Strings(ss)
-		}
-	} else if n == 1 {
-		for _, name := range g.Names {
-			if strings.HasPrefix(name, args[0]) {
-				ss = append(ss, name)
-			}
-		}
-		for helper := range cmd.Helpers {
-			if strings.HasPrefix(helper, args[0]) {
-				ss = append(ss, helper)
-			}
-		}
-		if len(ss) > 0 {
-			sort.Strings(ss)
-		}
+func (g *Goes) String() string {
+	name := g.NAME
+	if len(name) == 0 {
+		name = "goes"
 	}
-	return
+	return name
+}
+
+func (g *Goes) Goes(parent *Goes) {
+	g.parent = parent
 }
 
 // Fork returns an exec.Cmd ready to Run or Output this program with the
@@ -187,31 +111,10 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 	if g.NotTaken() {
 		return nil
 	}
-
-	if g.Parent != nil && len(g.Path) == 0 {
-		// set Path of sub-goes. e.g. "ip address"
-		for p := g; p != nil; p = p.Parent {
-			g.Path = append([]string{p.String()}, g.Path...)
-		}
-	}
-	a := append(g.Path, args...)
+	a := append(g.Path(), args...)
 	x := exec.Command(prog.Name(), a[1:]...)
 	x.Args[0] = a[0]
 	return x
-}
-
-func (g *Goes) Help(args ...string) string {
-	cmd.Swap(args)
-	g.Shift(args)
-	if len(args) > 0 {
-		if v, found := g.byname[args[0]]; found {
-			if method, found := v.(helper); found {
-				return method.Help(args[1:]...)
-			}
-			return Usage(v)
-		}
-	}
-	return Usage(g)
 }
 
 // Run a command in the current context.
@@ -227,22 +130,16 @@ func (g *Goes) Help(args ...string) string {
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
 func (g *Goes) Main(args ...string) error {
-	if g.Parent != nil && len(g.Path) == 0 {
-		// set Path of sub-goes. e.g. "ip address"
-		for p := g; p != nil; p = p.Parent {
-			g.Path = append([]string{p.String()}, g.Path...)
-		}
-	}
 	if len(args) > 0 {
 		base := filepath.Base(args[0])
 		switch {
-		case g.name == "goes-installer":
+		case g.NAME == "goes-installer":
 			if len(args) == 1 {
 				args[0] = "install"
 			} else {
 				args = args[1:]
 			}
-		case base == g.name:
+		case base == g.NAME:
 			// e.g. ./goes-MACHINE ...
 			fallthrough
 		case base == "goes":
@@ -250,7 +147,10 @@ func (g *Goes) Main(args ...string) error {
 		}
 	}
 
-	cli := g.byname["cli"]
+	cli, found := g.ByName["cli"]
+	if found {
+		cli.(goeser).Goes(g)
+	}
 	cliFlags, cliArgs := flags.New(args, "-d", "-f", "-no-liner", "-x")
 	if cliFlags.ByName["-d"] {
 		g.debug = true
@@ -263,63 +163,69 @@ func (g *Goes) Main(args ...string) error {
 			if cliFlags.ByName["-x"] {
 				cliArgs = append(cliArgs, "-x")
 			}
-			err := cli.Main(cliArgs...)
-			g.Status = err
-			return err
-		} else if def, found := g.byname[""]; found {
-			err := def.Main()
-			g.Status = err
-			return err
+			g.Status = cli.Main(cliArgs...)
+			return g.Status
+		} else if def, found := g.ByName[""]; found {
+			g.Status = def.Main()
+			return g.Status
 		}
 		fmt.Println(Usage(g))
 		g.Status = nil
 		return nil
-	} else if _, found := g.byname[args[0]]; n == 1 && !found {
+	} else if _, found := g.ByName[args[0]]; n == 1 && !found {
 		// only check for script if args[0] isn't a command
 		buf, err := ioutil.ReadFile(cliArgs[0])
 		if cliArgs[0] == "-" || (err == nil && utf8.Valid(buf) &&
 			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes"))) {
 			// e.g. /usr/bin/goes SCRIPT
 			if cli == nil {
-				err := fmt.Errorf("has no cli")
-				g.Status = err
-				return err
+				g.Status = fmt.Errorf("has no cli")
+				return g.Status
 			}
 			for _, t := range []string{"-f", "-x"} {
 				if cliFlags.ByName[t] {
 					cliArgs = append(cliArgs, t)
 				}
 			}
-			err := cli.Main(cliArgs...)
-			g.Status = err
-			return err
+			g.Status = cli.Main(cliArgs...)
+			return g.Status
 		}
 	} else {
-		cmd.Swap(args)
+		g.swap(args)
 	}
 
-	if _, found := cmd.Helpers[args[0]]; found {
-		err := g.byname[args[0]].Main(args[1:]...)
-		g.Status = err
-		return err
+	if builtin, found := g.Builtins()[args[0]]; found {
+		g.Status = builtin(args[1:]...)
+		return g.Status
+	} else if len(args) == 1 && strings.HasPrefix(args[0], "-") {
+		arg0 := strings.TrimLeft(args[0], "-")
+		if arg0 == "apropos" {
+			fmt.Println(g.Apropos())
+			return nil
+		} else if builtin, found := g.Builtins()[arg0]; found {
+			g.Status = builtin()
+			return g.Status
+		}
 	}
 
-	g.Shift(args)
+	g.shift(args)
 
 	if g.debug {
 		fmt.Printf("$=%v %v %v\n", g.Status, g.Blocks, args)
 	}
 
-	v, found := g.byname[args[0]]
+	v, found := g.ByName[args[0]]
 	if !found {
-		if v, found = g.byname[""]; !found {
-			err := fmt.Errorf("%s: ambiguous or missing command",
-				args[0])
-			g.Status = err
-			return err
+		if v, found = g.ByName[""]; !found {
+			g.Status =
+				fmt.Errorf("%s: ambiguous or missing command",
+					args[0])
+			return g.Status
 		}
 		// e.g. ip -s add [default "show"]
 		args = append([]string{""}, args...)
+	} else if method, found := v.(goeser); found {
+		method.Goes(g)
 	}
 
 	k := cmd.WhatKind(v)
@@ -353,30 +259,7 @@ func (g *Goes) Main(args ...string) error {
 	return err
 }
 
-func (g *Goes) Man() lang.Alt { return g.man }
-
-// Plot command by name.
-func (g *Goes) Plot(cmds ...cmd.Cmd) {
-	for _, v := range cmds {
-		name := v.String()
-		if _, found := g.byname[name]; found {
-			panic(fmt.Errorf("%s: duplicate", name))
-		}
-		g.byname[name] = v
-		if _, found := cmd.Helpers[name]; !found {
-			g.Names = append(g.Names, name)
-		}
-		if method, found := v.(goeser); found {
-			method.Goes(g)
-		}
-		if vg, found := v.(*Goes); found {
-			vg.Parent = g
-		}
-	}
-	sort.Strings(g.Names)
-}
-
-// Shift the first unambiguous longest prefix match command to args[0], so,
+// shift the first unambiguous longest prefix match command to args[0], so,
 //
 //	OPTIONS... COMMAND [ARGS]...
 //
@@ -391,9 +274,9 @@ func (g *Goes) Plot(cmds ...cmd.Cmd) {
 // becomes
 //
 //	ip link -s
-func (g *Goes) Shift(args []string) {
+func (g *Goes) shift(args []string) {
 	for i := range args {
-		if _, found := g.byname[args[i]]; found {
+		if _, found := g.ByName[args[i]]; found {
 			if i > 0 {
 				name := args[i]
 				copy(args[1:i+1], args[:i])
@@ -403,7 +286,7 @@ func (g *Goes) Shift(args []string) {
 		}
 		var matches int
 		var last string
-		for _, name := range g.Names {
+		for _, name := range g.Names() {
 			if strings.HasPrefix(name, args[i]) {
 				last = name
 				matches++
@@ -419,8 +302,36 @@ func (g *Goes) Shift(args []string) {
 	}
 }
 
-func (g *Goes) String() string { return g.name }
-func (g *Goes) Usage() string  { return g.usage }
+// swap hyphen prefaced helper flags with command, so,
+//
+//	COMMAND [-[-]]HELPER [ARGS]...
+//
+// becomes
+//
+//	HELPER COMMAND [ARGS]...
+//
+// and
+//
+//	-[-]HELPER [ARGS]...
+//
+// becomes
+//
+//	HELPER [ARGS]...
+func (g *Goes) swap(args []string) {
+	n := len(args)
+	if n > 0 && strings.HasPrefix(args[0], "-") {
+		opt := strings.TrimLeft(args[0], "-")
+		if _, found := g.Builtins()[opt]; found {
+			args[0] = opt
+		}
+	} else if n > 1 {
+		opt := strings.TrimLeft(args[1], "-")
+		if _, found := g.Builtins()[opt]; found {
+			args[1] = args[0]
+			args[0] = opt
+		}
+	}
+}
 
 func wait(v cmd.Cmd, ch chan os.Signal) {
 	for sig := range ch {
@@ -439,12 +350,4 @@ func wait(v cmd.Cmd, ch chan os.Signal) {
 		}
 		break
 	}
-}
-
-func Usage(v Usager) string {
-	return fmt.Sprint("usage:\t", strings.TrimSpace(v.Usage()))
-}
-
-type Usager interface {
-	Usage() string
 }

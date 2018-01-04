@@ -15,11 +15,59 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "kill"
-	Apropos = "signal a process"
-	Usage   = "kill [OPTION] [PID]..."
-	Man     = `
+var sigByOptName = map[string]syscall.Signal{
+	"-abrt":   syscall.SIGABRT,
+	"-alrm":   syscall.SIGALRM,
+	"-bus":    syscall.SIGBUS,
+	"-chld":   syscall.SIGCHLD,
+	"-cld":    syscall.SIGCLD,
+	"-cont":   syscall.SIGCONT,
+	"-fpe":    syscall.SIGFPE,
+	"-hup":    syscall.SIGHUP,
+	"-ill":    syscall.SIGILL,
+	"-int":    syscall.SIGINT,
+	"-io":     syscall.SIGIO,
+	"-iot":    syscall.SIGIOT,
+	"-kill":   syscall.SIGKILL,
+	"-pipe":   syscall.SIGPIPE,
+	"-poll":   syscall.SIGPOLL,
+	"-prof":   syscall.SIGPROF,
+	"-pwr":    syscall.SIGPWR,
+	"-quit":   syscall.SIGQUIT,
+	"-segv":   syscall.SIGSEGV,
+	"-stkflt": syscall.SIGSTKFLT,
+	"-stop":   syscall.SIGSTOP,
+	"-sys":    syscall.SIGSYS,
+	"-term":   syscall.SIGTERM,
+	"-trap":   syscall.SIGTRAP,
+	"-tstp":   syscall.SIGTSTP,
+	"-ttin":   syscall.SIGTTIN,
+	"-ttou":   syscall.SIGTTOU,
+	"-unused": syscall.SIGUNUSED,
+	"-urg":    syscall.SIGURG,
+	"-usr1":   syscall.SIGUSR1,
+	"-usr2":   syscall.SIGUSR2,
+	"-vtalrm": syscall.SIGVTALRM,
+	"-winch":  syscall.SIGWINCH,
+	"-xcpu":   syscall.SIGXCPU,
+	"-xfsz":   syscall.SIGXFSZ,
+}
+
+type Command struct{}
+
+func (Command) String() string { return "kill" }
+
+func (Command) Usage() string { return "kill [OPTION] [PID]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "signal a process",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	The default signal for kill is 'SIGTERM'.  Use -l to list available
 	signals.  Particularly useful signals include '-hup', '-int', '-kill',
@@ -44,63 +92,9 @@ EXAMPLES
 		Kill all processes you can kill.
 
 	kill 123 543 2341 3453
-		Send the default signal, SIGTERM, to all those processes.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+		Send the default signal, SIGTERM, to all those processes.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	sigByOptName = map[string]syscall.Signal{
-		"-abrt":   syscall.SIGABRT,
-		"-alrm":   syscall.SIGALRM,
-		"-bus":    syscall.SIGBUS,
-		"-chld":   syscall.SIGCHLD,
-		"-cld":    syscall.SIGCLD,
-		"-cont":   syscall.SIGCONT,
-		"-fpe":    syscall.SIGFPE,
-		"-hup":    syscall.SIGHUP,
-		"-ill":    syscall.SIGILL,
-		"-int":    syscall.SIGINT,
-		"-io":     syscall.SIGIO,
-		"-iot":    syscall.SIGIOT,
-		"-kill":   syscall.SIGKILL,
-		"-pipe":   syscall.SIGPIPE,
-		"-poll":   syscall.SIGPOLL,
-		"-prof":   syscall.SIGPROF,
-		"-pwr":    syscall.SIGPWR,
-		"-quit":   syscall.SIGQUIT,
-		"-segv":   syscall.SIGSEGV,
-		"-stkflt": syscall.SIGSTKFLT,
-		"-stop":   syscall.SIGSTOP,
-		"-sys":    syscall.SIGSYS,
-		"-term":   syscall.SIGTERM,
-		"-trap":   syscall.SIGTRAP,
-		"-tstp":   syscall.SIGTSTP,
-		"-ttin":   syscall.SIGTTIN,
-		"-ttou":   syscall.SIGTTOU,
-		"-unused": syscall.SIGUNUSED,
-		"-urg":    syscall.SIGURG,
-		"-usr1":   syscall.SIGUSR1,
-		"-usr2":   syscall.SIGUSR2,
-		"-vtalrm": syscall.SIGVTALRM,
-		"-winch":  syscall.SIGWINCH,
-		"-xcpu":   syscall.SIGXCPU,
-		"-xfsz":   syscall.SIGXFSZ,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-l")

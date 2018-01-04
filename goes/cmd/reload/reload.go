@@ -9,41 +9,27 @@ package reload
 import (
 	"syscall"
 
-	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/kill"
 )
 
-const (
-	Name    = "reload"
-	Apropos = "SIGHUP this goes machine"
-	Usage   = "reload"
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "reload" }
+
+func (Command) Usage() string { return "reload" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "SIGHUP this goes machine",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(...string) error {
+func (Command) Main(...string) error {
 	err := assert.Root()
 	if err != nil {
 		return err
 	}
 	return kill.All(syscall.SIGHUP)
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

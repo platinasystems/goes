@@ -20,17 +20,29 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "monitor"
-	Apropos = "print netlink messages"
-	Usage   = `
+type Command struct{}
+
+func (Command) String() string { return "monitor" }
+
+func (Command) Usage() string {
+	return `
 	ip monitor file FILE [label]
 	ip monitor [ all | OBJECT... ] save file
 	ip monitor [ all | OBJECT... ] [label] [all-nsid] [-t | -ts]
 
 OBJECT := link | address | route | mroute | prefix | neigh | netconf | rule |
 	nsid`
-	Man = `
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print netlink messages",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	file FILE
 		read netlink messages from FILE instead of socket
@@ -58,17 +70,18 @@ OPTIONS
 
 SEE ALSO
 	ip man monitor || ip monitor -man
-	man ip || ip -man`
-)
+	man ip || ip -man`,
+	}
+}
 
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{
+func (Command) Main(args ...string) error {
+	var err error
+	var handle func([]byte)
+	var save save
+	var show show
+
+	show.opt, args = options.New(args)
+	args = show.opt.Flags.More(args,
 		"all",
 		"link",
 		"address",
@@ -81,32 +94,12 @@ var (
 		"nsid",
 		"all-nsid",
 		"label",
-	}
-	Parms = []interface{}{
+	)
+	args = show.opt.Parms.More(args,
 		"file",
 		"save",
 		"dev",
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
-
-func (Command) Main(args ...string) error {
-	var err error
-	var handle func([]byte)
-	var save save
-	var show show
-
-	show.opt, args = options.New(args)
-	args = show.opt.Flags.More(args, Flags...)
-	args = show.opt.Parms.More(args, Parms...)
+	)
 
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)

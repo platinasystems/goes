@@ -13,35 +13,32 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "export"
-	Apropos = "set process configuration"
-	Usage   = "export [NAME[=VALUE]]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "export" }
+
+func (Command) Usage() string { return "export [NAME[=VALUE]]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "set process configuration",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Configure the named process environment parameter.
 
 	If no VALUE is given, NAME is reset.
 
 	If no NAMES are supplied, a list of names of all exported variables
-	is printed.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	is printed.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+}
 
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Kind() cmd.Kind    { return cmd.DontFork | cmd.CantPipe }
+func (Command) Kind() cmd.Kind { return cmd.DontFork | cmd.CantPipe }
 
 func (Command) Main(args ...string) error {
 	if len(args) == 0 {
@@ -62,7 +59,3 @@ func (Command) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (Command) Man() lang.Alt  { return man }
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }

@@ -6,39 +6,30 @@ package address
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip/address/mod"
 	"github.com/platinasystems/go/goes/cmd/ip/address/show"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "address"
-	Apropos = "protocol address management"
-	Usage   = `
-ip address [ {add|change|delete|replace|show(default)}[ OPTION... ]]`
-	Man = `
+var Goes = &goes.Goes{
+	NAME: "address",
+	USAGE: `
+ip address [ {add|change|delete|replace|show(default)}[ OPTION... ]]`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "protocol address management",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: `
 SEE ALSO
 	ip address man COMMAND || ip address COMMAND -man
-	man ip || ip -man
-`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(mod.New("add"),
-		mod.New("change"),
-		mod.New("delete"),
-		mod.New("replace"),
-		show.New("show"),
-		show.New(""),
-	)
-	return g
+	man ip || ip -man`,
+	},
+	ByName: map[string]cmd.Cmd{
+		"add":     mod.Command("add"),
+		"delete":  mod.Command("delete"),
+		"replace": mod.Command("replace"),
+		"show":    show.Command("show"),
+		"":        show.Command(""),
+	},
 }

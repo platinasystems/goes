@@ -14,12 +14,25 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "vrf"
-	Apropos = "add a Virtual Routing and Forwarding device"
-	Usage   = `
+type Command struct{}
+
+func (Command) String() string { return "vrf" }
+
+func (Command) Usage() string {
+	return `
 ip link add type vrf table TABLE`
-	Man = `
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a Virtual Routing and Forwarding device",
+	}
+
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 TABLES
 	unspec
 	compat
@@ -31,26 +44,9 @@ TABLES
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	opt, args := options.New(args)
@@ -90,7 +86,7 @@ func (Command) Main(args ...string) error {
 	}
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(Name)},
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vrf")},
 		nl.Attr{rtnl.IFLA_INFO_DATA, nl.Attrs{
 			nl.Attr{rtnl.IFLA_VRF_TABLE, nl.Uint32Attr(tbl)}},
 		},

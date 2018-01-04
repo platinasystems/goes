@@ -15,12 +15,24 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "bridge"
-	Apropos = "add a vlan virtual link"
-	Usage   = `
+type Command struct{}
+
+func (Command) String() string { return "bridge" }
+
+func (Command) Usage() string {
+	return `
 ip link add type bridge [ OPTIONS ]...`
-	Man = `
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a vlan virtual link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	fdb-flush
 	forward-delay FORWARD-DELAY
@@ -59,26 +71,9 @@ OPTIONS
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var s string

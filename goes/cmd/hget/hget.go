@@ -12,31 +12,19 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "hget"
-	Apropos = "get the value of a redis hash field"
-	Usage   = "hget KEY FIELD"
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Complete(...string) []string
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "hget" }
+
+func (Command) Usage() string { return "hget KEY FIELD" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "get the value of a redis hash field",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Complete(args ...string) []string {
-	return redis.Complete(args...)
-}
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("KEY FIELD: missing")
@@ -54,9 +42,6 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
+func (Command) Complete(args ...string) []string {
+	return redis.Complete(args...)
 }

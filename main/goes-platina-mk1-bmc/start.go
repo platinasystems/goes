@@ -11,68 +11,64 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
-	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-func startInit() {
-	start.ConfGpioHook = func() error {
-		var deviceVer byte
+func startConfGpioHook() error {
+	var deviceVer byte
 
-		cmd.Init("gpio")
-		pin, found := gpio.Pins["QSPI_MUX_SEL"]
-		if found {
-			r, _ := pin.Value()
-			if r {
-				log.Print("Booted from QSPI1")
-			} else {
-				log.Print("Booted from QSPI0")
-			}
-
+	gpioInit()
+	pin, found := gpio.Pins["QSPI_MUX_SEL"]
+	if found {
+		r, _ := pin.Value()
+		if r {
+			log.Print("Booted from QSPI1")
+		} else {
+			log.Print("Booted from QSPI0")
 		}
 
-		for name, pin := range gpio.Pins {
-			err := pin.SetDirection()
-			if err != nil {
-				fmt.Printf("%s: %v\n", name, err)
-			}
-		}
-		pin, found = gpio.Pins["FRU_I2C_MUX_RST_L"]
-		if found {
-			pin.SetValue(false)
-			time.Sleep(1 * time.Microsecond)
-			pin.SetValue(true)
-		}
-
-		pin, found = gpio.Pins["MAIN_I2C_MUX_RST_L"]
-		if found {
-			pin.SetValue(false)
-			time.Sleep(1 * time.Microsecond)
-			pin.SetValue(true)
-		}
-		redis.Hwait(redis.DefaultHash, "redis.ready", "true",
-			10*time.Second)
-
-		ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
-		_, _ = fmt.Sscan(ss, &deviceVer)
-		if deviceVer == 0x0 || deviceVer == 0xff {
-			pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
-			if found {
-				pin.SetValue(false)
-			}
-		}
-		if err := pubEth0(); err != nil {
-			return err
-		}
-		upgrade.UpdateEnv(false)
-		upgrade.UpdateEnv(true)
-		return nil
 	}
+
+	for name, pin := range gpio.Pins {
+		err := pin.SetDirection()
+		if err != nil {
+			fmt.Printf("%s: %v\n", name, err)
+		}
+	}
+	pin, found = gpio.Pins["FRU_I2C_MUX_RST_L"]
+	if found {
+		pin.SetValue(false)
+		time.Sleep(1 * time.Microsecond)
+		pin.SetValue(true)
+	}
+
+	pin, found = gpio.Pins["MAIN_I2C_MUX_RST_L"]
+	if found {
+		pin.SetValue(false)
+		time.Sleep(1 * time.Microsecond)
+		pin.SetValue(true)
+	}
+	redis.Hwait(redis.DefaultHash, "redis.ready", "true",
+		10*time.Second)
+
+	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	_, _ = fmt.Sscan(ss, &deviceVer)
+	if deviceVer == 0x0 || deviceVer == 0xff {
+		pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
+		if found {
+			pin.SetValue(false)
+		}
+	}
+	if err := pubEth0(); err != nil {
+		return err
+	}
+	upgrade.UpdateEnv(false)
+	upgrade.UpdateEnv(true)
+	return nil
 }
 
 func pubEth0() (err error) {

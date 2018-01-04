@@ -10,38 +10,32 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "if"
-	Apropos = "if COMMAND ; then COMMAND else COMMAND endif"
-	Usage   = "if COMMAND"
-	Man     = `
-DESCRIPTION
-	Conditionally executes statements in a script
-`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() cmd.Cmd {
-	return cmd.Cmd(new(Command))
-}
-
 type Command struct {
 	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
-func (*Command) Man() lang.Alt       { return man }
-func (*Command) String() string      { return Name }
-func (*Command) Usage() string       { return Usage }
-func (*Command) Kind() cmd.Kind      { return cmd.DontFork | cmd.Conditional }
+func (*Command) String() string { return "if" }
+
+func (*Command) Usage() string {
+	return "if COMMAND ; then COMMAND else COMMAND endif"
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "conditional command",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Conditionally executes statements in a script`,
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork | cmd.Conditional }
+
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {

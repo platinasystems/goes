@@ -10,6 +10,7 @@ package upgrade
 import (
 	"fmt"
 	"io/ioutil"
+	"sync"
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
@@ -17,10 +18,36 @@ import (
 )
 
 const (
-	Name    = "upgrade"
-	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-c] [-t] [-f]"
-	Man     = `
+	DfltMod     = 0755
+	DfltSrv     = "downloads.platinasystems.com"
+	DfltVer     = "LATEST"
+	Machine     = "platina-mk2-lc1-bmc"
+	ArchiveName = Machine + ".zip"
+	VersionName = Machine + "-ver.bin"
+)
+
+var command *Command
+
+type Command struct {
+	Gpio func()
+	gpio sync.Once
+}
+
+func (*Command) String() string { return "upgrade" }
+
+func (*Command) Usage() string {
+	return "upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-c] [-t] [-f]"
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "upgrade images",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	The upgrade command updates firmware images.
 
@@ -44,31 +71,12 @@ OPTIONS
 	-l                display version of selected server and version
 	-r                report QSPI installed versions, QSPI booted from
 	-c                check SHA-1's of flash
-	-f                force upgrade (ignore version check)`
-
-	DfltMod     = 0755
-	DfltSrv     = "downloads.platinasystems.com"
-	DfltVer     = "LATEST"
-	Machine     = "platina-mk2-lc1-bmc"
-	ArchiveName = Machine + ".zip"
-	VersionName = Machine + "-ver.bin"
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+	-f                force upgrade (ignore version check)`,
+	}
 }
 
-func New() Interface { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-
-func (Command) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
+	command = c
 	initQfmt()
 	flag, args := flags.New(args, "-t", "-l", "-f", "-r", "-c", "-1")
 	parm, args := parms.New(args, "-v", "-s")
@@ -109,19 +117,6 @@ func (Command) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (Command) Man() lang.Alt  { return man }
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
 
 func reportVerServer(s string, v string, t bool) (err error) {
 	n, err := getFile(s, v, t, ArchiveName)

@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd"
@@ -19,11 +20,25 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "watchdog"
-	Apropos = "periodic write to device"
-	Usage   = "watchdog [OPTION]... [DEVICE]"
-	Man     = `
+type Command struct {
+	GpioPin string
+	Init    func()
+	init    sync.Once
+}
+
+func (*Command) String() string { return "watchdog" }
+
+func (*Command) Usage() string { return "watchdog [OPTION]... [DEVICE]" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "periodic write to device",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Periodically write to the watchdog device (default /dev/watchdog).
 
@@ -31,33 +46,16 @@ OPTIONS
 	-T TIMEOUT	Reboot after TIMEOUT seconds without a watchdog write
 			(default 60)
 	-t FREQUENCY	Write frequency in seconds
-			(default 30)`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+			(default 30)`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
+
+func (c *Command) Main(args ...string) error {
+	if c.Init != nil {
+		c.init.Do(c.Init)
 	}
-)
-
-func New() Command { return Command{} }
-
-var GpioPin string
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
-
-func (Command) Main(args ...string) error {
-	cmd.Init(Name)
-
 	parm, args := parms.New(args, "-T", "-t")
 	for k, v := range map[string]string{
 		"-T": "60",
@@ -96,9 +94,8 @@ func (Command) Main(args ...string) error {
 	defer ticker.Stop()
 
 	for _ = range ticker.C {
-		if len(GpioPin) > 0 {
-			cmd.Init("gpio")
-			pin, found := gpio.Pins[GpioPin]
+		if len(c.GpioPin) > 0 {
+			pin, found := gpio.Pins[c.GpioPin]
 			t, err := pin.Value()
 			if found && err == nil {
 				pin.SetValue(!t)

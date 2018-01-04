@@ -15,43 +15,37 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "hdelta"
-	Apropos = "print the changed fields of a redis hash"
-	Usage   = "hdelta [CHANNEL]"
-	Man     = `
-DESCRIPTION
-	Print the redis hash fields that change between invocations. If the
-	field value is an int or float, this prints the difference between
-	value followed by the delta divided by the seconds since last
-	invocation. The CHANNEL parameter is the respective redis hash.`
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Close() error
-	Main(...string) error
-	String() string
-	Usage() string
+type Command struct {
+	closed bool
 }
-
-func New() Interface { return new(cmd) }
-
-type cmd bool
 
 type entry struct {
 	s string
 	t time.Time
 }
 
-func (*cmd) Apropos() lang.Alt { return apropos }
+func (*Command) String() string { return "hdelta" }
 
-func (c *cmd) Close() error {
-	*c = true
-	return nil
+func (*Command) Usage() string { return "hdelta [CHANNEL]" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print the changed fields of a redis hash",
+	}
 }
 
-func (c *cmd) Main(args ...string) error {
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Print the redis hash fields that change between invocations. If the
+	field value is an int or float, this prints the difference between
+	value followed by the delta divided by the seconds since last
+	invocation. The CHANNEL parameter is the respective redis hash.`,
+	}
+}
+
+func (c *Command) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		args = []string{redis.DefaultHash}
@@ -112,7 +106,7 @@ func (c *cmd) Main(args ...string) error {
 			old.s = s
 			old.t = now
 		case error:
-			if !*c {
+			if !c.closed {
 				err = t
 			}
 			break
@@ -121,15 +115,7 @@ func (c *cmd) Main(args ...string) error {
 	return err
 }
 
-func (*cmd) Man() lang.Alt  { return man }
-func (*cmd) String() string { return Name }
-func (*cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+func (c *Command) Close() error {
+	c.closed = true
+	return nil
+}

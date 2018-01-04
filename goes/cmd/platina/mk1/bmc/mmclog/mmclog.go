@@ -15,19 +15,6 @@ import (
 )
 
 const (
-	Name    = "mmclog"
-	Apropos = "display persistant MMC dmesg log"
-	Usage   = "mmclog [-b BYTE] [-c COUNT] -2"
-	Man     = `
-DESCRIPTION
-        The mmclog command displays MMC dmesg log
-
-	The -b parameter specifies starting byte number.
-	The -c parameter specifies number of lines to display.
-	The -2 flag displays the secondary(older) dmesg log, if available.
-
-	The default is to display the last 25 lines of the primary log.`
-
 	LOGA      = "/mnt/dmesg.txt"
 	LOGB      = "/mnt/dmesg2.txt"
 	DfltByte  = "0"
@@ -35,33 +22,33 @@ DESCRIPTION
 	linesize  = 160
 )
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+type Command struct{}
+
+func (Command) String() string { return "mmclog" }
+
+func (Command) Usage() string { return "mmclog [-b BYTE] [-c COUNT] -2" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "display persistant MMC dmesg log",
+	}
 }
 
-type cmd struct{}
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+        The mmclog command displays MMC dmesg log
 
-func New() Interface { return cmd{} }
+	The -b parameter specifies starting byte number.
+	The -c parameter specifies number of lines to display.
+	The -2 flag displays the secondary(older) dmesg log, if available.
 
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	The default is to display the last 25 lines of the primary log.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+}
 
-func (cmd) Main(args ...string) (err error) {
+func (Command) Main(args ...string) (err error) {
 	flag, args := flags.New(args, "-2")
 	parm, args := parms.New(args, "-b", "-c")
 	if len(parm.ByName["-b"]) == 0 {

@@ -6,7 +6,7 @@ package netns
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/add"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/delete"
 	"github.com/platinasystems/go/goes/cmd/ip/netns/exec"
@@ -19,10 +19,9 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "netns"
-	Apropos = "network namespace management"
-	Usage   = `
+var Goes = &goes.Goes{
+	NAME: "netns",
+	USAGE: `
 	ip netns add NETNSNAME
 	ip [-all] netns delete [ NETNSNAME ]
 	ip [-all] netns exec [ NETNSNAME ] command...
@@ -31,29 +30,23 @@ const (
 	ip netns identify [ PID ]
 	ip netns pids NETNSNAME
 	ip netns monitor
-	ip netns set NETNSNAME NETNSID`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(
-		add.New(),
-		delete.New(),
-		exec.New(),
-		identify.New(),
-		list.New(""),
-		list.New("list"),
-		listid.New(),
-		mon.New(),
-		pids.New(),
-		set.New(),
-	)
-	return g
+	ip netns set NETNSNAME NETNSID`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "network namespace management",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: Man,
+	},
+	ByName: map[string]cmd.Cmd{
+		"add":      add.Command{},
+		"delete":   delete.Command{},
+		"exec":     &exec.Command{},
+		"identify": identify.Command{},
+		"":         list.Command(""),
+		"list":     list.Command("list"),
+		"list-id":  listid.Command{},
+		"mon":      mon.Command{},
+		"pids":     pids.Command{},
+		"set":      set.Command{},
+	},
 }

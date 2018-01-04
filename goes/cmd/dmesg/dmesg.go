@@ -17,10 +17,34 @@ import (
 )
 
 const (
-	Name    = "dmesg"
-	Apropos = "print or control the kernel ring buffer"
-	Usage   = "dmesg [OPTION]..."
-	Man     = `
+	SYSLOG_ACTION_CLOSE = iota
+	SYSLOG_ACTION_OPEN
+	SYSLOG_ACTION_READ
+	SYSLOG_ACTION_READ_ALL
+	SYSLOG_ACTION_READ_CLEAR
+	SYSLOG_ACTION_CLEAR
+	SYSLOG_ACTION_CONSOLE_OFF
+	SYSLOG_ACTION_CONSOLE_ON
+	SYSLOG_ACTION_CONSOLE_LEVEL
+	SYSLOG_ACTION_SIZE_UNREAD
+	SYSLOG_ACTION_SIZE_BUFFER
+)
+
+type Command struct{}
+
+func (Command) String() string { return "dmesg" }
+
+func (Command) Usage() string { return "dmesg [OPTION]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print or control the kernel ring buffer",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	The default action is to print new kernel ring buffer messages since
 	the last command invocation.
@@ -42,40 +66,9 @@ OPTIONS
 	-u	Print userspace messages.
 	-w	Wait for new messages.
 	-x	Decode facility and level (priority) numbers.
-	-z	Reprint entire ring buffer.`
-)
-
-const (
-	SYSLOG_ACTION_CLOSE = iota
-	SYSLOG_ACTION_OPEN
-	SYSLOG_ACTION_READ
-	SYSLOG_ACTION_READ_ALL
-	SYSLOG_ACTION_READ_CLEAR
-	SYSLOG_ACTION_CLEAR
-	SYSLOG_ACTION_CONSOLE_OFF
-	SYSLOG_ACTION_CONSOLE_ON
-	SYSLOG_ACTION_CONSOLE_LEVEL
-	SYSLOG_ACTION_SIZE_UNREAD
-	SYSLOG_ACTION_SIZE_BUFFER
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-z	Reprint entire ring buffer.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	const (

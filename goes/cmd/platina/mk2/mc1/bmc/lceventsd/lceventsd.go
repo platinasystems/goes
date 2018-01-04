@@ -24,18 +24,23 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "lceventsd"
-	Apropos = "lceventsd server daemon"
-	Usage   = "lceventsd"
+const MAX_IRQ_EVENTS = 8
 
-	MAX_IRQ_EVENTS = 8
+var (
+	VdevIo I2cDev // lcabs status via pca9539
+
+	first         int
+	maxLcNumber   int
+	ChassisType   uint8
+	BoardType     uint8
+	New_present_n uint16
+	Old_present_n uint16
 )
-
-func New() *Command { return new(Command) }
 
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -65,37 +70,32 @@ type uioDev struct {
 	Count int
 }
 
-var (
-	VdevIo I2cDev // lcabs status via pca9539
+func (*Command) String() string { return "lceventsd" }
 
-	first         int
-	maxLcNumber   int
-	ChassisType   uint8
-	BoardType     uint8
-	New_present_n uint16
-	Old_present_n uint16
-)
+func (*Command) Usage() string { return "lceventsd" }
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "lceventsd server daemon",
+	}
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
+
 func (c *Command) Close() error {
 	close(c.stop)
 	return nil
 }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
 	var err error
 	var event syscall.EpollEvent
 	var revents [MAX_IRQ_EVENTS]syscall.EpollEvent // received events
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	err = redis.IsReady()
 	if err != nil {
@@ -116,7 +116,7 @@ func (c *Command) Main(...string) error {
 	}
 
 	// Setup UIO device
-	x, err := uiodevs.GetIndex(Name)
+	x, err := uiodevs.GetIndex("lceventsd")
 	if err != nil {
 		log.Print("uio device not found")
 		return err

@@ -14,30 +14,29 @@ import (
 	"github.com/tatsushid/go-fastping"
 )
 
-const (
-	Name    = "ping"
-	Apropos = "send ICMP ECHO_REQUEST to network host"
-	Usage   = "ping DESTINATION"
-	Man     = `
-DESCRIPTION
-	Send ICMP ECHO_REQUEST to given host and print ECHO_REPLY.`
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func (Command) String() string { return "ping" }
+
+func (Command) Usage() string {
+	return "ping DESTINATION"
 }
 
-func New() Interface { return cmd{} }
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "send ICMP ECHO_REQUEST to network host",
+	}
+}
 
-type cmd struct{}
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Send ICMP ECHO_REQUEST to given host and print ECHO_REPLY.`,
+	}
+}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if n := len(args); n == 0 {
 		return fmt.Errorf("DESTINATION: missing")
 	} else if n > 1 {
@@ -64,16 +63,3 @@ func (cmd) Main(args ...string) error {
 	}
 	return err
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

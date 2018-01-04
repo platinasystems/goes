@@ -27,11 +27,26 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-const (
-	Name    = "cli"
-	Apropos = "command line interpreter"
-	Usage   = "cli [-x] [-p PROMPT] [URL]"
-	Man     = `
+type Command struct {
+	Prompt string
+	g      *goes.Goes
+}
+
+func (*Command) String() string { return "cli" }
+
+func (*Command) Usage() string {
+	return "cli [-x] [-p PROMPT] [URL]"
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "command line interpreter",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	The go-es command line interpreter is an incomplete shell with just
 	this basic syntax:
@@ -143,31 +158,11 @@ PIPES
 
 		cat <<- EOF | wc -l > lines.txt
 			...
-		EOF`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+		EOF`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() []cmd.Cmd {
-	return []cmd.Cmd{new(Command), resize.New()}
 }
 
-type Command struct {
-	g *goes.Goes
-}
-
-func (*Command) Apropos() lang.Alt   { return apropos }
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Man() lang.Alt       { return man }
-func (*Command) String() string      { return Name }
-func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
 	var (
@@ -189,9 +184,13 @@ func (c *Command) Main(args ...string) error {
 		isScript bool
 	)
 
+	if c.g == nil {
+		panic("cli's goes is nil")
+	}
+
 	defer func() {
-		for _, name := range c.g.Names {
-			v := c.g.ByName(name)
+		for _, name := range c.g.Names() {
+			v := c.g.ByName[name]
 			k := cmd.WhatKind(v)
 			if k.IsDontFork() {
 				if m, found := v.(io.Closer); found {
@@ -214,6 +213,9 @@ func (c *Command) Main(args ...string) error {
 		case flag.ByName["-no-liner"]:
 			prompter = notliner.New(os.Stdin, os.Stdout)
 		default:
+			if _, found := c.g.ByName["resize"]; !found {
+				c.g.ByName["resize"] = resize.Command{}
+			}
 			prompter = liner.New(c.g)
 			defer prompter.Close()
 		}
@@ -266,10 +268,13 @@ commandLoop:
 			err = nil
 		}
 		pl.Reset()
-		prompt := fmt.Sprint(c.g, "> ")
-		if c.g.Parent == nil {
-			if hn, err := os.Hostname(); err == nil {
-				prompt = fmt.Sprint(hn, "> ")
+		prompt := c.Prompt
+		if len(prompt) == 0 {
+			prompt = fmt.Sprint(c.g, "> ")
+			if len(c.g.Path()) == 0 {
+				if hn, err := os.Hostname(); err == nil {
+					prompt = fmt.Sprint(hn, "> ")
+				}
 			}
 		}
 	pipelineLoop:
@@ -299,7 +304,7 @@ commandLoop:
 		}
 		for _, sl := range pl.Slices {
 			name := sl[0]
-			if v := c.g.ByName(name); v != nil {
+			if v := c.g.ByName[name]; v != nil {
 				k := cmd.WhatKind(v)
 				if k.IsDaemon() {
 					err = fmt.Errorf(

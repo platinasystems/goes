@@ -17,33 +17,29 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "delete"
-	Apropos = "remove network namespace"
-	Usage   = `ip netns delete [ -all | NETNSNAME ]`
-	Man     = `
-SEE ALSO
-	ip man netns || ip netns -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "delete" }
+
+func (Command) Usage() string {
+	return `ip netns delete [ -all | NETNSNAME ]`
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "remove network namespace",
+	}
+
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man netns || ip netns -man
+	man ip || ip -man`,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	opt, args := options.New(args)

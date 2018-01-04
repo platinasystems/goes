@@ -4,7 +4,8 @@
 
 // +build arm
 
-// This is the Baseboard Management Controller of Platina's Mk1 TOR.
+// This is the Baseboard Management Controller of Platina's Mk2 Management
+// Card.
 package main
 
 import (
@@ -14,7 +15,7 @@ import (
 
 func main() {
 	var ecode int
-	if err := Goes().Main(os.Args...); err != nil {
+	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1
 	}

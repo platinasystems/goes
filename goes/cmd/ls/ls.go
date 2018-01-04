@@ -16,11 +16,27 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "ls"
-	Apropos = "list directory contents"
-	Usage   = "ls [OPTION]... [FILE]..."
-	Man     = `
+var PathSeparatorString = string([]byte{os.PathSeparator})
+
+func New() Command { return Command{} }
+
+type Command struct{}
+
+func (Command) String() string { return "ls" }
+
+func (Command) Usage() string {
+	return "ls [OPTION]... [FILE]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "list directory contents",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	List information about the FILEs (the current directory by default).
 
@@ -28,27 +44,9 @@ OPTIONS
 
 	-C	list entries by columns (default)
 	-l	long listing format
-	-1	list one entry per line`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-1	list one entry per line`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	PathSeparatorString = string([]byte{os.PathSeparator})
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var err error

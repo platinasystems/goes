@@ -12,32 +12,31 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "cd"
-	Apropos = "change the current directory"
-	Usage   = "cd [- | DIRECTORY]"
-	Man     = `
-DESCRIPTION
-	Change the working directory to the given name or the last one if '-'.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() *Command { return new(Command) }
-
 type Command struct {
 	last string
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.DontFork | cmd.CantPipe }
+func (*Command) String() string { return "cd" }
+
+func (*Command) Usage() string { return "cd [- | DIRECTORY]" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "change the current directory",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Change the working directory to the given name or the last one if '-'.
+	`,
+	}
+
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork | cmd.CantPipe }
 
 func (cd *Command) Main(args ...string) error {
 	var dir string
@@ -72,7 +71,3 @@ func (cd *Command) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }

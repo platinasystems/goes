@@ -10,43 +10,27 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "sync"
-	Apropos = "flush file system buffers"
-	Usage   = "sync"
-	Man     = `
-DESCRIPTION
-	Force changed blocks to disk, update the super block.`
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func (Command) String() string { return "sync" }
+
+func (Command) Usage() string { return "sync" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "flush file system buffers",
+	}
 }
 
-func New() Interface { return cmd{} }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Force changed blocks to disk, update the super block.`,
+	}
+}
 
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	syscall.Sync()
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

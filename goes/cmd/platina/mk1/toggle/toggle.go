@@ -6,44 +6,74 @@ package toggle
 
 import (
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "toggle"
-	Apropos = "toggle console port between x86 and BMC"
-	Usage   = "toggle SECONDS"
-	Man     = `
-DESCRIPTION
-	The toggle command toggles the console port between x86 and BMC.`
-)
+const i2cGpioAddr = 0x74
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+type Command struct {
+	Init func()
+	init sync.Once
 }
 
-func New() Interface { return Command{} }
+func (*Command) String() string { return "toggle" }
 
-type Command struct{}
+func (*Command) Usage() string { return "toggle SECONDS" }
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "toggle console port between x86 and BMC",
+	}
+}
 
-const (
-	i2cGpioAddr = 0x74
-)
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	The toggle command toggles the console port between x86 and BMC.`,
+	}
+}
+
+func (c *Command) Main(args ...string) error {
+	var machineBmc bool
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
+
+	m, _ := redis.Hget(redis.DefaultHash, "machine")
+	if strings.Contains(m, "bmc") {
+		machineBmc = true
+	} else {
+		machineBmc = false
+	}
+
+	if machineBmc {
+		pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
+		if found {
+			pin.SetValue(true)
+		}
+		time.Sleep(10 * time.Millisecond)
+		uartToggle()
+		if found {
+			pin.SetValue(false)
+		}
+		pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
+		if found {
+			pin.SetValue(true)
+		}
+		time.Sleep(10 * time.Millisecond)
+	} else {
+		uartToggle()
+	}
+	return nil
+}
 
 func uartToggle() {
 	var dir0, out0 uint8
@@ -81,45 +111,3 @@ func uartToggle() {
 		})
 
 }
-
-func (Command) Main(args ...string) error {
-
-	var machineBmc bool
-
-	m, _ := redis.Hget(redis.DefaultHash, "machine")
-	if strings.Contains(m, "bmc") {
-		machineBmc = true
-	} else {
-		machineBmc = false
-	}
-
-	if machineBmc {
-		cmd.Init("gpio")
-		pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
-		if found {
-			pin.SetValue(true)
-		}
-		time.Sleep(10 * time.Millisecond)
-		uartToggle()
-		if found {
-			pin.SetValue(false)
-		}
-		pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
-		if found {
-			pin.SetValue(true)
-		}
-		time.Sleep(10 * time.Millisecond)
-	} else {
-		uartToggle()
-	}
-	return nil
-}
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

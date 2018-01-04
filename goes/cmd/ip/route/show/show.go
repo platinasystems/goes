@@ -2,6 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// ip route show (default) | flush | get | save | restore
 package show
 
 import (
@@ -15,10 +16,16 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "show (default) | flush | get | save | restore"
-	Apropos = "route table entry"
-	Usage   = `
+type Command string
+
+type show options.Options
+
+func (Command) Aka() string { return "show" }
+
+func (c Command) String() string { return string(c) }
+
+func (Command) Usage() string {
+	return `
 	ip route [ show ]
 	ip route { show | flush } SELECTOR
 
@@ -27,21 +34,35 @@ const (
 
 	ip route get ADDRESS [ from ADDRESS iif STRING  ] [ oif STRING ]
 		[ tos TOS ] [ vrf NAME ]`
-	Man = `
+}
+
+func (c Command) Apropos() lang.Alt {
+	apropos := "route table entry"
+	if c == "show" {
+		apropos += " (default)"
+	}
+	return lang.Alt{
+		lang.EnUS: apropos,
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 SEE ALSO
 	ip man route || ip route -man
-	man ip || ip -man`
-)
+	man ip || ip -man`,
+	}
+}
 
-var (
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{
-		"cloned",
-		"cached",
-	}
-	Parms = []interface{}{
+func (c Command) Main(args ...string) error {
+	var req []byte
+	var to string
+	var prefix uint8
+
+	opt, args := options.New(args)
+	args = opt.Flags.More(args, "cloned", "cached")
+	args = opt.Parms.More(args,
 		"to",
 		"tos",
 		"table",
@@ -55,39 +76,7 @@ var (
 		"src",
 		"realm",
 		"realms",
-	}
-)
-
-func New(s string) Command { return Command(s) }
-
-type Command string
-
-type show options.Options
-
-func (Command) Aka() string { return "show" }
-
-func (c Command) Apropos() lang.Alt {
-	apropos := Apropos
-	if c == "show" {
-		apropos += " (default)"
-	}
-	return lang.Alt{
-		lang.EnUS: apropos,
-	}
-}
-
-func (Command) Man() lang.Alt    { return man }
-func (c Command) String() string { return string(c) }
-func (Command) Usage() string    { return Usage }
-
-func (c Command) Main(args ...string) error {
-	var req []byte
-	var to string
-	var prefix uint8
-
-	opt, args := options.New(args)
-	args = opt.Flags.More(args, Flags...)
-	args = opt.Parms.More(args, Parms...)
+	)
 
 	if n := len(args); n == 1 {
 		opt.Parms.Set("to", args[0])

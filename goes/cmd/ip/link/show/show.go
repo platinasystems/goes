@@ -16,37 +16,19 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "show"
-	Apropos = "link attributes"
-	Usage   = `ip link show [ [dev] DEVICE | group GROUP ] [ up ]
-	[ master DEVICE ] [ type ETYPE ] [ vrf NAME ]`
-)
-
-var (
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{
-		"up",
-	}
-	Parms = []interface{}{
-		"dev",
-		"group",
-		"master",
-		"type",
-		"vrf",
-	}
-)
-
-func New(name string) Command { return Command(name) }
-
 type Command string
 
 func (Command) Aka() string { return "show" }
 
+func (c Command) String() string { return string(c) }
+
+func (Command) Usage() string {
+	return `ip link show [ [dev] DEVICE | group GROUP ] [ up ]
+	[ master DEVICE ] [ type ETYPE ] [ vrf NAME ]`
+}
+
 func (c Command) Apropos() lang.Alt {
-	apropos := Apropos
+	apropos := "link attributes"
 	if c == "show" {
 		apropos += " (default)"
 	}
@@ -55,9 +37,11 @@ func (c Command) Apropos() lang.Alt {
 	}
 }
 
-func (Command) Man() lang.Alt    { return man }
-func (c Command) String() string { return string(c) }
-func (Command) Usage() string    { return Usage }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: Man,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	var req []byte
@@ -67,8 +51,8 @@ func (Command) Main(args ...string) error {
 	mindex := int32(-1)
 
 	opt, args := options.New(args)
-	args = opt.Flags.More(args, Flags...)
-	args = opt.Parms.More(args, Parms...)
+	args = opt.Flags.More(args, "up")
+	args = opt.Parms.More(args, "dev", "group", "master", "type", "vrf")
 
 	if n := len(args); n == 1 {
 		opt.Parms.Set("dev", args[0])

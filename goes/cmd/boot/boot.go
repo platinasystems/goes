@@ -20,34 +20,6 @@ import (
 	"github.com/platinasystems/liner"
 )
 
-const (
-	Name    = "boot"
-	Apropos = "boot another operating system"
-	Usage   = "boot [-t TIMEOUT] [PATH]..."
-	Man     = `
-DESCRIPTION
-	The boot command finds other operating systems to load, and chooses
-	an appropriate one to execute.
-
-	Boot is a high level interface to the kexec command. While kexec
-	performs the actual work, boot is a higher level interface that
-	simplifies the process of selecting a kernel to execute.
-
-OPTIONS
-	-t	Specify a timeout`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() *Command { return new(Command) }
-
 type Command struct {
 	g *goes.Goes
 }
@@ -64,9 +36,37 @@ type bootMnt struct {
 	files []bootSet
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
+func (*Command) String() string { return "boot" }
+
+func (*Command) Usage() string {
+	return "boot [-t TIMEOUT] [PATH]..."
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "boot another operating system",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	The boot command finds other operating systems to load, and chooses
+	an appropriate one to execute.
+
+	Boot is a high level interface to the kexec command. While kexec
+	performs the actual work, boot is a higher level interface that
+	simplifies the process of selecting a kernel to execute.
+
+OPTIONS
+	-t	Specify a timeout`,
+	}
+}
+
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Kind() cmd.Kind      { return cmd.DontFork }
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (c *Command) Main(args ...string) (err error) {
 	parm, args := parms.New(args, "-t")
@@ -142,8 +142,6 @@ func (c *Command) Main(args ...string) (err error) {
 	return nil
 }
 
-func (*Command) Man() lang.Alt { return man }
-
 func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	files, err := ioutil.ReadDir(m.mnt)
 	if err != nil {
@@ -174,6 +172,3 @@ func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	}
 	done <- m
 }
-
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }

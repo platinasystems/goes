@@ -5,47 +5,31 @@
 package falsecmd
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "false"
-	Apropos = "Fail regardless of our ability"
-	Usage   = "false"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "false" }
+
+func (Command) Usage() string { return "false" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "Fail regardless of our ability",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
-	Fail, not matter what. This can not happen in the real world.`
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+	Fail, not matter what. This can not happen in the real world.`,
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(_ ...string) error {
-	return fmt.Errorf("exit status 1")
+func (Command) Main(_ ...string) error {
+	return errors.New("exit status 1")
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

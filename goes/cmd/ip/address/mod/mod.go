@@ -15,38 +15,10 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const Apropos = "network address"
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{
-		"home",
-		"mngtmpaddr",
-		"nodad",
-		"noprefixroute",
-		"autojoin",
-	}
-	Parms = []interface{}{
-		// IFADDR
-		"local", "peer", "broadcast", "anycast", "label", "scope",
-		"dev",
-		// LIFETIME
-		"valid_lft", "preferred_lft",
-	}
-)
-
-func New(name string) Command { return Command(name) }
-
 type Command string
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (c Command) String() string  { return string(c) }
+func (c Command) String() string { return string(c) }
+
 func (c Command) Usage() string {
 	return fmt.Sprint("ip address ", c, ` IFADDR [ dev ] IFNAME
 	[ LIFETIME ] [ CONFFLAG-LIST ]
@@ -67,6 +39,18 @@ LIFETIME := [ valid_lft LFT ] [ preferred_lft LFT ]
 LFT := { forever | SECONDS }`)
 }
 
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "network address",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: Man,
+	}
+}
+
 func (c Command) Main(args ...string) error {
 	var ifa struct {
 		hdr   nl.Hdr
@@ -79,8 +63,18 @@ func (c Command) Main(args ...string) error {
 	}
 
 	opt, args := options.New(args)
-	args = opt.Flags.More(args, Flags...)
-	args = opt.Parms.More(args, Parms...)
+	args = opt.Flags.More(args,
+		"home",
+		"mngtmpaddr",
+		"nodad",
+		"noprefixroute",
+		"autojoin")
+	args = opt.Parms.More(args,
+		// IFADDR
+		"local", "peer", "broadcast", "anycast", "label", "scope",
+		"dev",
+		// LIFETIME
+		"valid_lft", "preferred_lft")
 
 	if s := opt.Parms.ByName["-f"]; len(s) > 0 {
 		if v, ok := rtnl.AfByName[s]; ok {

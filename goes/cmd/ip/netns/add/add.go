@@ -15,40 +15,36 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "add"
-	Apropos = "create network namespace"
-	Usage   = `ip netns add NETNSNAME`
-	Man     = `
-SEE ALSO
-	ip man netns || ip netns -man
-	man ip || ip -man`
-	ProcSelfNsNet = "/proc/self/ns/net"
-)
+const procSelfNsNet = "/proc/self/ns/net"
 
-const VarRunNetnsMode = syscall.S_IRWXU |
+const varRunNetnsMode = syscall.S_IRWXU |
 	syscall.S_IRGRP |
 	syscall.S_IXGRP |
 	syscall.S_IROTH |
 	syscall.S_IXOTH
 
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "add" }
+
+func (Command) Usage() string {
+	return `ip netns add NETNSNAME`
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "create network namespace",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man netns || ip netns -man
+	man ip || ip -man`,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	var netnsname string
@@ -65,7 +61,7 @@ func (Command) Main(args ...string) error {
 	}
 
 	if _, err := os.Stat(rtnl.VarRunNetns); os.IsNotExist(err) {
-		err = syscall.Mkdir(rtnl.VarRunNetns, VarRunNetnsMode)
+		err = syscall.Mkdir(rtnl.VarRunNetns, varRunNetnsMode)
 		if err != nil {
 			return err
 		}
@@ -105,7 +101,7 @@ func (Command) Main(args ...string) error {
 		del()
 		return err
 	}
-	err = syscall.Mount(ProcSelfNsNet, fn, "none", syscall.MS_BIND, "")
+	err = syscall.Mount(procSelfNsNet, fn, "none", syscall.MS_BIND, "")
 	if err != nil {
 		del()
 		return err

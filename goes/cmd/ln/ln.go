@@ -14,16 +14,33 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "ln"
-	Apropos = "make links between files"
-	Usage   = `
+type Command struct{}
+
+type ln struct {
+	Flags *flags.Flags
+	Parms *parms.Parms
+}
+
+func (Command) String() string { return "ln" }
+
+func (Command) Usage() string {
+	return `
 	ln [OPTION]... -t DIRECTORY TARGET...
 	ln [OPTION]... -T TARGET LINK
 	ln [OPTION]... TARGET LINK
 	ln [OPTION]... TARGET... DIRECTORY
 	ln [OPTION]... TARGET`
-	Man = `
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "make links between files",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Create a link LINK or DIR/TARGET to the specified TARGET(s)
 
@@ -33,31 +50,9 @@ OPTIONS
 	-backup	Make a backup of the target (if exists) before link operation
 	-suffix SUFFIX
 		Use suffix instead of ~ when making backup files
-	-v	verbose`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-v	verbose`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-type ln struct {
-	Flags *flags.Flags
-	Parms *parms.Parms
 }
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
 
 func (Command) Main(args ...string) error {
 	var err error

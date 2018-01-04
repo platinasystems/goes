@@ -28,26 +28,6 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "ucd9090d"
-	Apropos = "ucd9090 power sequencer daemon, publishes to redis"
-	Usage   = "ucd9090d"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() *Command { return new(Command) }
-
-type I2cDev struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
-
 var (
 	Vdev I2cDev
 
@@ -67,6 +47,8 @@ var (
 
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -79,15 +61,32 @@ type Info struct {
 	lastu map[string]uint16
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Name }
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
+
+func (*Command) String() string { return "ucd9090d" }
+
+func (*Command) Usage() string { return "ucd9090d" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "ucd9090 power sequencer daemon, publishes to redis",
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	err := redis.IsReady()
 	if err != nil {

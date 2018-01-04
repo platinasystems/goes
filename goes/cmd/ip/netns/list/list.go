@@ -14,28 +14,18 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "list"
-	Apropos = "list network namespaces"
-	Usage   = `ip netns [ list ]`
-	Man     = `
-SEE ALSO
-	ip man netns || ip netns -man
-	man ip || ip -man`
-)
-
-var man = lang.Alt{
-	lang.EnUS: Man,
-}
-
-func New(s string) Command { return Command(s) }
-
 type Command string
 
 func (Command) Aka() string { return "list" }
 
+func (c Command) String() string { return string(c) }
+
+func (Command) Usage() string {
+	return `ip netns [ list ]`
+}
+
 func (c Command) Apropos() lang.Alt {
-	apropos := Apropos
+	apropos := "list network namespaces"
 	if c == "list" {
 		apropos += " (default)"
 	}
@@ -44,9 +34,14 @@ func (c Command) Apropos() lang.Alt {
 	}
 }
 
-func (Command) Man() lang.Alt    { return man }
-func (c Command) String() string { return string(c) }
-func (Command) Usage() string    { return Usage }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man netns || ip netns -man
+	man ip || ip -man`,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	_, args = options.New(args)

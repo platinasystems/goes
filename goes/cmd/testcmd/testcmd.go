@@ -17,47 +17,33 @@ import (
 )
 
 const (
-	Name    = "["
-	Apropos = "test conditions and set exit status"
-	Usage   = "[ COND ]"
-	Man     = `
-DESCRIPTION
-	Tests conditions and returns zero or non-zero exit status
-`
-)
-
-const (
 	R_OK = 4
 	W_OK = 2
 	X_OK = 1
 )
 
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	errUnexpected = fmt.Errorf("unexpected")
-)
+var errUnexpected = fmt.Errorf("unexpected")
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+type Command struct{}
+
+func (Command) String() string { return "[" }
+
+func (Command) Usage() string { return "[ COND ]" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "test conditions and set exit status",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Tests conditions and returns zero or non-zero exit status
+`,
+	}
+}
 
 func isGroupMember(gid uint32) bool {
 	if gid == uint32(syscall.Getgid()) || gid == uint32(syscall.Getegid()) {
@@ -89,7 +75,7 @@ func statWithLinks(file string) (syscall.Stat_t, error) {
 	return stats, err
 }
 
-func (c cmd) parseBinaryOpt(args []string) (bool, error) {
+func (c Command) parseBinaryOpt(args []string) (bool, error) {
 	if args[1] == "=" {
 		return args[0] == args[2], nil
 	}
@@ -164,7 +150,7 @@ func (c cmd) parseBinaryOpt(args []string) (bool, error) {
 	return false, errUnexpected
 }
 
-func (c cmd) parseUnaryOp(args []string) (bool, error) {
+func (c Command) parseUnaryOp(args []string) (bool, error) {
 	if len(args) < 2 {
 		return false, errUnexpected
 	}
@@ -294,7 +280,7 @@ func (c cmd) parseUnaryOp(args []string) (bool, error) {
 	return false, errUnexpected
 }
 
-func (c cmd) parse(args []string) ([]string, bool, error) {
+func (c Command) parse(args []string) ([]string, bool, error) {
 	fmt.Printf("%d %v\n", len(args), args)
 	if len(args) >= 4 {
 		if args[2] == "-l" {
@@ -360,7 +346,7 @@ func (c cmd) parse(args []string) ([]string, bool, error) {
 	return args[1:], false, nil
 }
 
-func (c cmd) Main(args ...string) error {
+func (c Command) Main(args ...string) error {
 	if len(args) < 1 || args[len(args)-1] != "]" {
 		return fmt.Errorf("missing ]")
 	}

@@ -18,21 +18,17 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name    = "uptimed"
-	Apropos = "record system uptime in redis"
-	Usage   = "uptimed"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return make(Command) }
-
 type Command chan struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
+func (Command) String() string { return "uptimed" }
+
+func (Command) Usage() string { return "uptimed" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "record system uptime in redis",
+	}
+}
 
 func (c Command) Close() error {
 	close(c)
@@ -63,9 +59,6 @@ func (c Command) Main(...string) error {
 	}
 	return nil
 }
-
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }
 
 func update_uptime(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
 	buf := new(bytes.Buffer)

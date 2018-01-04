@@ -82,7 +82,7 @@ func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 			if strings.HasPrefix(dev.Name, "eth-") ||
 				dev.Name == "vnet" {
 				args := []string{"link", "delete", dev.Name}
-				err = ip.New().Main(args...)
+				err = ip.Goes.Main(args...)
 				if err != nil {
 					fmt.Println("write err", err)
 					return err

@@ -16,11 +16,23 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "femtocom"
-	Apropos = "tiny serial-terminal emulation"
-	Usage   = "femtocom [OPTION]... DEVICE"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "femtocom" }
+
+func (Command) Usage() string {
+	return "femtocom [OPTION]... DEVICE"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "tiny serial-terminal emulation",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	femtocom copies console input to DEVICE and DEVICE output to the
 	console until input of "^A^X".
@@ -46,26 +58,9 @@ OPTIONS
 		Don't reset the device on exit.
 
 	-nolock
-		Don't attempt exclusive device use.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+		Don't attempt exclusive device use.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	const (

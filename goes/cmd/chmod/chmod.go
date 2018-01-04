@@ -12,30 +12,27 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "chmod"
-	Apropos = "change file mode"
-	Usage   = "chmod MODE FILE..."
-	Man     = `
-DESCRIPTION
-	Changed each FILE's mode bits to the given octal MODE.`
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func (Command) String() string { return "chmod" }
+
+func (Command) Usage() string { return "chmod MODE FILE..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "change file mode",
+	}
 }
 
-func New() Interface { return cmd{} }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Changed each FILE's mode bits to the given octal MODE.`,
+	}
+}
 
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("MODE: missing")
 	}
@@ -57,16 +54,3 @@ func (cmd) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

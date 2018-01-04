@@ -13,26 +13,19 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "stty"
-	Apropos = "print info for given or current TTY"
-	Usage   = "stty [DEVICE]"
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "stty" }
+
+func (Command) Usage() string { return "stty [DEVICE]" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print info for given or current TTY",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	dev := os.Stdin
 	if len(args) > 0 {
 		var err error
@@ -264,11 +257,4 @@ func (cmd) Main(args ...string) error {
 	}
 	fmt.Println()
 	return nil
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

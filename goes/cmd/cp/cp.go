@@ -16,39 +16,34 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-const (
-	Name    = "cp"
-	Apropos = "copy files and directories"
-	Usage   = `
+type Command struct{}
+
+func (Command) String() string { return "cp" }
+
+func (Command) Usage() string {
+	return `
 	cp [-v] -T SOURCE DESTINATION
 	cp [-v] -t DIRECTORY SOURCE...
 	cp [-v] SOURCE... DIRECTORY`
-	Man = `
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "copy files and directories",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Copy SOURCE to DEST, or multiple SOURCE(s) to DIRECTORY where
 	SOURCE, DEST and DIRECTORY may all be URLs.
 
 OPTIONS
-	-v	verbose`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-v	verbose`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	cp := func(source, dest string, verbose bool) error {

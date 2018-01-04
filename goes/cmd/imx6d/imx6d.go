@@ -17,38 +17,31 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name     = "imx6d"
-	Apropos  = "ARM CPU temperature daemon, publishes to redis"
-	Usage    = "imx6d"
-	ERRORMAX = 5
-)
+const ERRORMAX = 5
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() *Command { return new(Command) }
-
-var (
-	readError  int
-	VpageByKey map[string]uint8
-)
+var readError int
 
 type Command struct {
+	VpageByKey map[string]uint8
+
 	stop chan struct{}
 	pub  *publisher.Publisher
 	last map[string]float64
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Name }
+func (*Command) String() string { return "imx6d" }
+
+func (*Command) Usage() string { return "imx6d" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "ARM CPU temperature daemon, publishes to redis",
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
 
 	err := redis.IsReady()
@@ -86,7 +79,7 @@ func (c *Command) Close() error {
 }
 
 func (c *Command) update() error {
-	for k, _ := range VpageByKey {
+	for k, _ := range c.VpageByKey {
 		v, err := ReadTemp()
 		if err != nil {
 			if readError < ERRORMAX {

@@ -12,37 +12,32 @@ import (
 	"github.com/platinasystems/go/internal/netns"
 )
 
-const (
-	Apropos = "run ip command in namespace"
-	Man     = `
-SEE ALSO
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New(s string) *Command { return &Command{name: s} }
-
 type Command struct {
-	name string
+	Name string
 	g    *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
-func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Man() lang.Alt       { return man }
-func (c *Command) String() string    { return c.name }
+func (c *Command) String() string { return c.Name }
+
 func (c *Command) Usage() string {
-	return fmt.Sprintf("ip %s NAME OBJECT [ COMMAND [ ARGS ]...]",
-		c.name)
+	return fmt.Sprintf("ip %s NAME OBJECT [ COMMAND [ ARGS ]...]", c)
 }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "run ip command in namespace",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	man ip || ip -man`,
+	}
+}
+
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {
 	if len(args) == 0 {

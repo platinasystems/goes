@@ -6,17 +6,20 @@ package add
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	addtype "github.com/platinasystems/go/goes/cmd/ip/link/add/type"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "add"
-	Apropos = "add virtual link"
-	Usage   = `
-ip link add type TYPE [[ name ] NAME ] [ OPTION ]... [ ARGS ]...`
-	Man = `
+var Goes = &goes.Goes{
+	NAME: "add",
+	USAGE: `
+ip link add type TYPE [[ name ] NAME ] [ OPTION ]... [ ARGS ]...`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "add virtual link",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	address LLADDRESS
 	broadcast LLADDRESS
@@ -49,18 +52,9 @@ OPTIONS
 SEE ALSO
 	ip link add man type || ip link add type TYPE -man
 	ip link add type man TYPE || ip link add type TYPE -man
-	man ip || ip -man`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(addtype.New())
-	return g
+	man ip || ip -man`,
+	},
+	ByName: map[string]cmd.Cmd{
+		"type": addtype.Goes,
+	},
 }

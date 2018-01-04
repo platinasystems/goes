@@ -23,45 +23,13 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-const (
-	Name    = "/init"
-	Apropos = "bootstrap"
-	Usage   = "init"
-	Man     = `
-DESCRIPTION
-	The '/init' command that mounts and pivots to the 'goesroot' kernel
-	parameter before executing its '/sbin/init'.  The machine may reassign
-	the Hook closure to perform target specific tasks prior to the
-	'goesroot' pivot. The kernel command may include 'goes=overwrite' to
-	force copy of '/bin/goes' from the initrd to the named 'goesroot'.
-
-	If the target root is not mountable, the 'goesinstaller' parameter
-	specifies an installer/recovery system to use to repair the system. The
-	parameter to this is three comma-seperated URLs. The first is
-	mandatory, and is the kernel to load. The second is the optional
-	initramfs to load. The third is the optional FDT to load. The kernel is
-	loaded via the kexec command.`
-
-	zero = uintptr(0)
-)
-
-var (
-	Hook    = func() error { return nil }
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() *Command { return new(Command) }
+const zero = uintptr(0)
 
 func init() {
 	if os.Getpid() != 1 {
 		return
 	}
-	if os.Args[0] != Name {
+	if os.Args[0] != "/init" {
 		return
 	}
 
@@ -125,12 +93,42 @@ func init() {
 }
 
 type Command struct {
-	g *goes.Goes
+	Hook func() error
+	g    *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
+func (*Command) String() string { return "/init" }
+
+func (*Command) Usage() string { return "init" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "bootstrap",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	The '/init' command that mounts and pivots to the 'goesroot' kernel
+	parameter before executing its '/sbin/init'.  The machine may reassign
+	the Hook closure to perform target specific tasks prior to the
+	'goesroot' pivot. The kernel command may include 'goes=overwrite' to
+	force copy of '/bin/goes' from the initrd to the named 'goesroot'.
+
+	If the target root is not mountable, the 'goesinstaller' parameter
+	specifies an installer/recovery system to use to repair the system. The
+	parameter to this is three comma-seperated URLs. The first is
+	mandatory, and is the kernel to load. The second is the optional
+	initramfs to load. The third is the optional FDT to load. The kernel is
+	loaded via the kexec command.`,
+	}
+}
+
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Kind() cmd.Kind      { return cmd.DontFork }
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (c *Command) Main(_ ...string) error {
 	goesRoot := filepath.SplitList(os.Getenv("goesroot"))
@@ -163,9 +161,10 @@ func (c *Command) Main(_ ...string) error {
 			}
 		}
 	}()
-	err := Hook()
-	if err != nil {
-		panic(fmt.Errorf("Error from board hook: ", err))
+	if c.Hook != nil {
+		if err := c.Hook(); err != nil {
+			panic(fmt.Errorf("Error from board hook: ", err))
+		}
 	}
 	var root, script string
 	if len(goesRoot) >= 1 && len(goesRoot[0]) > 0 {
@@ -182,14 +181,8 @@ func (c *Command) Main(_ ...string) error {
 	c.makeTargetLinks()
 	c.mountTargetVirtualFilesystems()
 	c.runSbinInit()
-	err = c.g.Main("start")
-
-	return err
+	return c.g.Main("start")
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
 
 func (*Command) makeRootDirs(mountPoint string) {
 	for _, dir := range []struct {

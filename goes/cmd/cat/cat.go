@@ -13,11 +13,22 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-const (
-	Name    = "cat"
-	Apropos = "print concatenated files"
-	Usage   = "cat [FILE]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "cat" }
+
+func (Command) Usage() string {
+	return "cat [FILE]..."
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print concatenated files",
+	}
+}
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Concatenate FILE(s), or standard input, to standard output.
 
@@ -28,24 +39,11 @@ EXAMPLES
 		Output f's contents, then standard input, then g's contents.
 
 	cat
-		Copy standard input to standard output.`
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+		Copy standard input to standard output.`,
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if len(args) == 0 {
 		args = []string{"-"}
 	}
@@ -67,16 +65,3 @@ func (cmd) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

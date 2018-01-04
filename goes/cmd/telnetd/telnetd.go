@@ -22,24 +22,19 @@ import (
 	"github.com/platinasystems/go/internal/telnet/option"
 )
 
-const (
-	Name    = "telnetd"
-	Apropos = "telnet server daemon"
-	Usage   = "telnetd"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "telnetd" }
+
+func (Command) Usage() string { return "telnetd" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "telnet server daemon",
+	}
+}
+
+func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (Command) Main(args ...string) error {
 	ln, err := net.Listen("tcp", ":23")

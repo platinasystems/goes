@@ -15,11 +15,25 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "mkdir"
-	Apropos = "make directories"
-	Usage   = "mkdir [OPTION]... DIRECTORY..."
-	Man     = `
+const DefaultMode = 0755
+
+type Command struct{}
+
+func (Command) String() string { return "mkdir" }
+
+func (Command) Usage() string {
+	return "mkdir [OPTION]... DIRECTORY..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "make directories",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Create the DIRECTORY(ies), if they do not already exist.
 
@@ -33,28 +47,9 @@ OPTIONS
 		as needed
 
 	-v
-		print a message for each created directory`
-
-	DefaultMode = 0755
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+		print a message for each created directory`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var perm os.FileMode = DefaultMode

@@ -16,11 +16,23 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "eeprom"
-	Apropos = "show, delete or modify eeprom fields"
-	Usage   = "eeprom [-n] [-FIELD | FIELD=VALUE]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "eeprom" }
+
+func (Command) Usage() string {
+	return "eeprom [-n] [-FIELD | FIELD=VALUE]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "show, delete or modify eeprom fields",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Show, delete or modify system eeprom fields.
 
@@ -29,26 +41,9 @@ DESCRIPTION
 	-vendor-extension 
 		set, modify, or delete vendor sub-fields
 
-	Without any args, show current eeprom configuation.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	Without any args, show current eeprom configuation.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (c Command) Complete(args ...string) []string {
 	var a []string

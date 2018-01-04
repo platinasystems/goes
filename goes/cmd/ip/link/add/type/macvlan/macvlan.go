@@ -16,9 +16,23 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Apropos = "add a macvlan or macvtap link"
-	Man     = `
+type Command string
+
+func (c Command) String() string { return string(c) }
+
+func (c Command) Usage() string {
+	return fmt.Sprint("ip link add type ", c, " mode MODE [ OPTION ]...")
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a macvlan or macvtap link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 MACV TYPES
 	macvlan, macvtap
 		macvlan just creates a virtual interface, while macvtap also
@@ -59,31 +73,8 @@ MODES
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Types = []string{
-		"macvlan",
-		"macvtap",
-	}
-)
-
-func New(s string) Command { return Command(s) }
-
-type Command string
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (c Command) String() string  { return string(c) }
-func (c Command) Usage() string {
-	return fmt.Sprint("ip link add type ", c, " mode MODE [ OPTION ]...")
 }
 
 func (c Command) Main(args ...string) error {

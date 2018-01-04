@@ -6,16 +6,15 @@ package route
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip/route/mod"
 	"github.com/platinasystems/go/goes/cmd/ip/route/show"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "route"
-	Apropos = "routing table management"
-	Usage   = `
+var Goes = &goes.Goes{
+	NAME: "route",
+	USAGE: `
 	ip route [ show ]
 	ip route { show | flush } SELECTOR
 	ip route save SELECTOR
@@ -64,29 +63,24 @@ ENCAP := [ MPLS | IP ]
 
 ENCAP_MPLS := mpls [ LABEL ]
 
-ENCAP_IP := ip id TUNNEL_ID dst REMOTE_IP [ tos TOS ] [ ttl TTL ]`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(mod.New("add"),
-		mod.New("append"),
-		mod.New("change"),
-		mod.New("delete"),
-		mod.New("replace"),
-		show.New(""),
-		show.New("show"),
-		show.New("flush"),
-		show.New("get"),
-		show.New("save"),
-		show.New("restore"),
-	)
-	return g
+ENCAP_IP := ip id TUNNEL_ID dst REMOTE_IP [ tos TOS ] [ ttl TTL ]`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "routing table management",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: Man,
+	},
+	ByName: map[string]cmd.Cmd{
+		"add":     mod.Command("add"),
+		"append":  mod.Command("append"),
+		"change":  mod.Command("change"),
+		"delete":  mod.Command("delete"),
+		"replace": mod.Command("replace"),
+		"":        show.Command(""),
+		"show":    show.Command("show"),
+		"flush":   show.Command("flush"),
+		"get":     show.Command("get"),
+		"save":    show.Command("save"),
+		"restore": show.Command("restore"),
+	},
 }

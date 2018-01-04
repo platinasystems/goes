@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,17 +20,12 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name    = "qsfp"
-	Apropos = "qsfp monitoring daemon, publishes to redis"
-	Usage   = "qsfp"
-)
-
 var Vdev [32]I2cDev
 
-func New() *Command { return new(Command) }
-
 type Command struct {
+	Init func()
+	init sync.Once
+
 	stop    chan struct{}
 	pub     *publisher.Publisher
 	last    map[string]float64
@@ -61,7 +57,15 @@ var VpageByKey map[string]uint8
 var latestPresent = [2]uint16{0xffff, 0xffff}
 var present = [2]uint16{0xffff, 0xffff}
 
-func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) String() string { return "qsfp" }
+
+func (*Command) Usage() string { return "qsfp" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "qsfp monitoring daemon, publishes to redis",
+	}
+}
 
 func (c *Command) Close() error {
 	close(c.stop)
@@ -74,7 +78,9 @@ func (c *Command) Main(...string) error {
 	var err error
 	var si syscall.Sysinfo_t
 
-	cmd.Init(Name)
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	if err = redis.IsReady(); err != nil {
 		return err
@@ -122,9 +128,6 @@ func (c *Command) Main(...string) error {
 
 	return nil
 }
-
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
 
 func (c *Command) updatePresence() error {
 	stopped := readStopped()
@@ -904,8 +907,4 @@ func (h *I2cDev) StaticBlocks(port int) {
 		DoI2cRpc()
 	}
 	return
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

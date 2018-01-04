@@ -13,11 +13,25 @@ import (
 	"github.com/platinasystems/go/internal/i2c"
 )
 
-const (
-	Name    = "i2c"
-	Apropos = "read/write I2C bus devices"
-	Usage   = "i2c [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END, -CNT][/8][/16] [VALUE] [WR-DELAY-SEC]"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "i2c" }
+
+func (Command) Usage() string {
+	return `
+i2c [EEPROM][BLOCK] BUS.ADDR[.BEGIN][-END, -CNT][/8][/16] [VALUE] [WR-DELAY-SEC]
+`
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "read/write I2C bus devices",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Read/write I2C bus devices.
 
@@ -31,24 +45,11 @@ DESCRIPTION
             i2c 0.76/8             force reads at 8-bits
             i2c 0.76.0/8           force reads at 8-bits
 	    i2c 0.55.0-30/8        reads 0x0-0x30 8-bits at a time
-	    i2c 0.55.0-30/16       reads 0x0-0x30 16-bits at a time`
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+	    i2c 0.55.0-30/16       reads 0x0-0x30 16-bits at a time`,
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var (
 		sd         i2c.SMBusData
 		b, a, d, w uint8
@@ -272,10 +273,6 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
 func ReadByte(b uint8, a uint8, c uint8) (uint8, error) {
 	var (
 		sd i2c.SMBusData
@@ -326,12 +323,3 @@ func hexToByte(s string) (int, []byte) {
 	}
 	return m, arr
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

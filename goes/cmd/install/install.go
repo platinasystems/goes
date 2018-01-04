@@ -22,29 +22,24 @@ import (
 	"github.com/platinasystems/go/internal/prog"
 )
 
-const (
-	Name    = "install"
-	Apropos = "install this goes machine"
-	Usage   = "install [START, STOP and REDISD options]..."
-)
-
-// Machines may use this Hook to complete its installation.
-var Hook = func() error { return nil }
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+type Command struct {
+	// Machines may use this Hook to complete its installation.
+	Hook func() error
 }
 
-func New() Interface { return cmd{} }
+func (*Command) String() string { return "install" }
 
-type cmd struct{}
+func (*Command) Usage() string {
+	return "install [START, STOP and REDISD options]..."
+}
 
-func (cmd) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "install this goes machine",
+	}
+}
 
-func (cmd) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	err := assert.Root()
 	if err != nil {
 		return err
@@ -70,15 +65,14 @@ func (cmd) Main(args ...string) error {
 	if err = unzip(); err != nil {
 		return err
 	}
-	if err = Hook(); err != nil {
-		return err
+	if c.Hook != nil {
+		if err = c.Hook(); err != nil {
+			return err
+		}
 	}
 	return start(args...)
 
 }
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
 
 func run(args ...string) error {
 	cmd := exec.Command(prog.Install, args...)
@@ -336,8 +330,4 @@ func new_lib(sofn string, r io.Reader) error {
 		_, err = io.Copy(w, r)
 	}
 	return err
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

@@ -12,26 +12,19 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-const (
-	Name    = "wget"
-	Apropos = "a non-interactive network downloader"
-	Usage   = "wget URL..."
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "wget" }
+
+func (Command) Usage() string { return "wget URL..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "a non-interactive network downloader",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	// validate command args
 	if len(args) < 1 {
 		return fmt.Errorf("URL: missing")
@@ -53,11 +46,4 @@ func (cmd) Main(args ...string) error {
 
 	fmt.Printf("%d files successfully downloaded.\n", successes)
 	return nil
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

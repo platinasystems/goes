@@ -5,6 +5,10 @@
 package main
 
 import (
+	"time"
+
+	"github.com/platinasystems/fe1"
+	info "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
@@ -18,7 +22,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/daemons"
 	"github.com/platinasystems/go/goes/cmd/dmesg"
 	"github.com/platinasystems/go/goes/cmd/echo"
-	"github.com/platinasystems/go/goes/cmd/eeprom"
+	eepromcmd "github.com/platinasystems/go/goes/cmd/eeprom"
+	eeprom "github.com/platinasystems/go/goes/cmd/eeprom/platina_eeprom"
 	"github.com/platinasystems/go/goes/cmd/elsecmd"
 	"github.com/platinasystems/go/goes/cmd/env"
 	"github.com/platinasystems/go/goes/cmd/exec"
@@ -30,7 +35,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/gpio"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
-	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/hexists"
 	"github.com/platinasystems/go/goes/cmd/hget"
 	"github.com/platinasystems/go/goes/cmd/hgetall"
@@ -65,8 +69,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/restart"
 	"github.com/platinasystems/go/goes/cmd/rm"
 	"github.com/platinasystems/go/goes/cmd/rmmod"
-	"github.com/platinasystems/go/goes/cmd/show_commands"
-	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/cmd/slashinit"
 	"github.com/platinasystems/go/goes/cmd/sleep"
 	"github.com/platinasystems/go/goes/cmd/source"
@@ -87,111 +89,143 @@ import (
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name    = "goes-platina-mk1"
-	Apropos = "the goes machine for platina's mk1 TOR"
-)
-
-func Goes() *goes.Goes {
-	cmd.Initters = map[string]func(){
-		daemons.Name: daemonsInit,
-		qsfp.Name:    qsfpInit,
-		redisd.Name:  redisdInit,
-		start.Name:   startInit,
-		tempd.Name:   tempdInit,
-		vnetd.Name:   vnetdInit,
-
-		show_packages.Name: showPackagesInit,
-	}
-	g := goes.New(Name, "",
-		lang.Alt{
-			lang.EnUS: Apropos,
+var Goes = &goes.Goes{
+	NAME: "goes-platina-mk1",
+	APROPOS: lang.Alt{
+		lang.EnUS: "goes machine for platina's mk1 TOR",
+	},
+	ByName: map[string]cmd.Cmd{
+		"!":        bang.Command{},
+		"cli":      &cli.Command{},
+		"boot":     &boot.Command{},
+		"cat":      cat.Command{},
+		"cd":       &cd.Command{},
+		"chmod":    chmod.Command{},
+		"cp":       cp.Command{},
+		"dmesg":    dmesg.Command{},
+		"echo":     echo.Command{},
+		"eeprom":   eepromcmd.Command{},
+		"else":     &elsecmd.Command{},
+		"env":      &env.Command{},
+		"exec":     exec.Command{},
+		"exit":     exit.Command{},
+		"export":   export.Command{},
+		"false":    falsecmd.Command{},
+		"femtocom": femtocom.Command{},
+		"fi":       &ficmd.Command{},
+		"gpio":     &gpio.Command{},
+		"goes-daemons": &daemons.Command{
+			Init: [][]string{
+				[]string{"redisd"},
+				[]string{"uptimed"},
+				[]string{"tempd"},
+				[]string{"vnetd"},
+			},
 		},
-		lang.Alt{})
-	g.Plot(helpers.New()...)
-	g.Plot(cli.New()...)
-	g.Plot(bang.New(),
-		boot.New(),
-		cat.New(),
-		cd.New(),
-		chmod.New(),
-		cmdline.New(),
-		cp.New(),
-		daemons.New(),
-		dmesg.New(),
-		echo.New(),
-		eeprom.New(),
-		elsecmd.New(),
-		env.New(),
-		exec.New(),
-		exit.New(),
-		export.New(),
-		falsecmd.New(),
-		femtocom.New(),
-		ficmd.New(),
-		gpio.New(),
-		hdel.New(),
-		hdelta.New(),
-		hexists.New(),
-		hget.New(),
-		hgetall.New(),
-		hkeys.New(),
-		hset.New(),
-		hwait.New(),
-		ifcmd.New(),
-		iminfo.New(),
-		insmod.New(),
-		install.New(),
-		iocmd.New(),
-		ip.New(),
-		kexec.New(),
-		keys.New(),
-		kill.New(),
-		ln.New(),
-		log.New(),
-		ls.New(),
-		lsmod.New(),
-		mkdir.New(),
-		mknod.New(),
-		mount.New(),
-		ping.New(),
-		ps.New(),
-		pwd.New(),
-		qsfp.New(),
-		reboot.New(),
-		redisd.New(),
-		reload.New(),
-		restart.New(),
-		rm.New(),
-		rmmod.New(),
-		show_commands.New(),
-		show_packages.New(""),
-		show_packages.New("show-packages"),
-		show_packages.New("license"),
-		show_packages.New("version"),
-		slashinit.New(),
-		sleep.New(),
-		source.New(),
-		start.New(),
-		stop.New(),
-		status.New(),
-		stty.New(),
-		subscribe.New(),
-		sync.New(),
-		tempd.New(),
-		testcmd.New(),
-		thencmd.New(),
-		toggle.New(),
-		truecmd.New(),
-		umount.New(),
-		uninstall.New(),
-		upgrade.New(),
-		uptimed.New(),
-		vnet.New(),
-		vnetd.New(),
-		wget.New(),
-	)
-	return g
+		"hdel":    hdel.Command{},
+		"hdelta":  &hdelta.Command{},
+		"hexists": hexists.Command{},
+		"hget":    hget.Command{},
+		"hgetall": hgetall.Command{},
+		"hkeys":   hkeys.Command{},
+		"hset":    hset.Command{},
+		"hwait":   hwait.Command{},
+		"if":      &ifcmd.Command{},
+		"insmod":  insmod.Command{},
+		"install": &install.Command{},
+		"io":      iocmd.Command{},
+		"ip":      ip.Goes,
+		"kexec":   kexec.Command{},
+		"keys":    keys.Command{},
+		"kill":    kill.Command{},
+		"ln":      ln.Command{},
+		"log":     log.Command{},
+		"ls":      ls.Command{},
+		"lsmod":   lsmod.Command{},
+		"mkdir":   mkdir.Command{},
+		"mknod":   mknod.Command{},
+		"mount":   mount.Command{},
+		"ping":    ping.Command{},
+		"ps":      ps.Command{},
+		"pwd":     pwd.Command{},
+		"qsfp": &qsfp.Command{
+			Init: qsfpInit,
+		},
+		"reboot": reboot.Command{},
+		"redisd": &redisd.Command{
+			Devs:    []string{"lo", "eth0"},
+			Machine: "platina-mk1",
+			Hook: func(pub *publisher.Publisher) {
+				eeprom.Config(
+					eeprom.BusIndex(0),
+					eeprom.BusAddress(0x51),
+					eeprom.BusDelay(10*time.Millisecond),
+					eeprom.MinMacs(132),
+					eeprom.OUI([3]byte{0x02, 0x46, 0x8a}),
+				)
+				eeprom.RedisdHook(pub)
+			},
+		},
+		"reload":  reload.Command{},
+		"restart": &restart.Command{},
+		"rm":      rm.Command{},
+		"rmmod":   rmmod.Command{},
+		"show": &goes.Goes{
+			NAME:  "show",
+			USAGE: "show OBJECT",
+			APROPOS: lang.Alt{
+				lang.EnUS: "print stuff",
+			},
+			ByName: map[string]cmd.Cmd{
+				"cmdline":  cmdline.Command{},
+				"iminfo":   iminfo.Command{},
+				"packages": goes.ShowPackages{},
+			},
+		},
+		"slashinit": &slashinit.Command{},
+		"sleep":     sleep.Command{},
+		"source":    &source.Command{},
+		"start": &start.Command{
+			ConfHook: func() error {
+				return redis.Hwait(redis.DefaultHash,
+					"vnet.ready", "true",
+					10*time.Second)
+			},
+		},
+		"stop":      &stop.Command{},
+		"status":    status.Command{},
+		"stty":      stty.Command{},
+		"subscribe": subscribe.Command{},
+		"sync":      sync.Command{},
+		"tempd": &tempd.Command{
+			VpageByKey: map[string]uint8{
+				"sys.cpu.coretemp.units.C": 0,
+				"bmc.redis.status":         0,
+			},
+		},
+		"test":      testcmd.Command{},
+		"then":      &thencmd.Command{},
+		"toggle":    &toggle.Command{},
+		"true":      truecmd.Command{},
+		"umount":    umount.Command{},
+		"uninstall": &uninstall.Command{},
+		"upgrade":   upgrade.Command{},
+		"uptimed":   uptimed.Command(make(chan struct{})),
+		"vnet":      vnet.Command{},
+		"vnetd": &vnetd.Command{
+			Init: vnetdInit,
+		},
+		"wget": wget.Command{},
+	},
+}
+
+func init() {
+	info.Packages = func() []map[string]string {
+		return fe1.Packages
+	}
+	// FIXME addtype.ByName["platina"] = iplinkadd.Command{}
 }

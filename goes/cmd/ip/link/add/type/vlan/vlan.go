@@ -15,12 +15,24 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "vlan"
-	Apropos = "add a vlan virtual link"
-	Usage   = `
+type Command struct{}
+
+func (Command) String() string { return "vlan" }
+
+func (Command) Usage() string {
+	return `
 ip link add type vlan name IFNAME link DEVICE id ID [ OPTIONS ]...`
-	Man = `
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a vlan virtual link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 	name IFNAME
 
 	link DEVICE
@@ -81,26 +93,9 @@ OPTIONS
 SEE ALSO
 	ip link add man type || ip link add type -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var info nl.Attrs
@@ -217,7 +212,7 @@ func (Command) Main(args ...string) error {
 	}
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(Name)},
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vlan")},
 		nl.Attr{rtnl.IFLA_INFO_DATA, info},
 	}})
 	req, err := add.Message()

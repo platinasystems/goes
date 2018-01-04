@@ -81,6 +81,8 @@ var (
 
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -92,17 +94,17 @@ type Info struct {
 	lasts map[string]string
 }
 
-func New() *Command { return new(Command) }
-
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
 func (*Command) String() string    { return Name }
 func (*Command) Usage() string     { return Usage }
+func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	err := redis.IsReady()
 	if err != nil {

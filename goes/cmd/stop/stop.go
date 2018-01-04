@@ -21,11 +21,29 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "stop"
-	Apropos = "stop this goes machine"
-	Usage   = "stop [-stop=URL] [SIGNAL]"
-	Man     = `
+const EtcGoesStop = "/etc/goes/stop"
+
+type Command struct {
+	// Machines may use Hook to run something between the kill of all
+	// daemons and the removal of the socks and pids directories.
+	Hook func() error
+
+	g *goes.Goes
+}
+
+func (*Command) String() string { return "stop" }
+
+func (*Command) Usage() string { return "stop [-stop=URL] [SIGNAL]" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "stop this goes machine",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Stop all embedded daemons.
 
@@ -33,35 +51,11 @@ OPTIONS
 	-stop URL
 		Specifies the URL of the machine's stop script that's
 		sourced immediately before killing all daemons.
-		default: /etc/goes/start`
-
-	EtcGoesStop = "/etc/goes/stop"
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+		default: /etc/goes/start`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-// Machines may use Hook to run something between the kill of all daemons and
-// the removal of the socks and pids directories.
-var Hook = func() error { return nil }
-
-func New() *Command { return new(Command) }
-
-type Command struct {
-	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Man() lang.Alt       { return man }
-func (*Command) String() string      { return Name }
-func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-stop")
@@ -91,11 +85,13 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 	err = kill.All(sig)
-	if t := Hook(); err != nil || t != nil {
-		if err != nil {
-			err = t
+	if c.Hook != nil {
+		if t := c.Hook(); err != nil || t != nil {
+			if err != nil {
+				err = t
+			}
+			kill.All(syscall.SIGKILL)
 		}
-		kill.All(syscall.SIGKILL)
 	}
 	os.RemoveAll(sockfile.Dir)
 	return err

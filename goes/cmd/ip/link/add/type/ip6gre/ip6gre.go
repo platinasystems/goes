@@ -15,9 +15,23 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Apropos = "add a ip6gre[tap] virtual link"
-	Man     = `
+type Command string
+
+func (c Command) String() string { return string(c) }
+
+func (c Command) Usage() string {
+	return fmt.Sprint("ip link add type ", c, " [ OPTION ]...")
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a ip6gre[tap] virtual link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 GRE TYPES
 	ip6gre, ip6gretap
 
@@ -76,31 +90,8 @@ OPTIONS
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Types = []string{
-		"ip6gre",
-		"ip6gretap",
-	}
-)
-
-func New(s string) Command { return Command(s) }
-
-type Command string
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (c Command) String() string  { return string(c) }
-func (c Command) Usage() string {
-	return fmt.Sprint("ip link add type ", c, " [ OPTION ]...")
 }
 
 func (c Command) Main(args ...string) error {

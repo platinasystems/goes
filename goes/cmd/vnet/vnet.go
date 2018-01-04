@@ -14,37 +14,32 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "vnet"
-	Apropos = "send commands to hidden cli"
-	Usage   = "vnet COMMAND [ARG]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "vnet" }
+
+func (Command) Usage() string { return "vnet COMMAND [ARG]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "send commands to hidden cli",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Send argument to vnet cli
 
 EXAMPLES
-	vnet	"show interfaces"`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	vnet	"show interfaces"`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+}
 
-func New() Command { return Command{} }
+func (Command) Close() error { return internal.Conn.Close() }
 
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) Close() error      { return internal.Conn.Close() }
-func (Command) Kind() cmd.Kind    { return cmd.DontFork }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (Command) Main(args ...string) error {
 	if len(args) == 0 {

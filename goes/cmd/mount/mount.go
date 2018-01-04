@@ -18,11 +18,23 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "mount"
-	Apropos = "activated a filesystem"
-	Usage   = "usage [OPTION]... DEVICE [DIRECTORY]"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "mount" }
+
+func (Command) Usage() string {
+	return "usage [OPTION]... DEVICE [DIRECTORY]"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "activated a filesystem",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Mount a filesystem on a target directory.
 
@@ -82,26 +94,9 @@ FILESYSTEM INDEPENDENT FLAGS
 	-iversion	Update inode I-Version field
 	-no-iversion	Don't update inode I-Version field
 	-strictatime	Always perform atime updates
-	-no-strictatime	May skip atime updates`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-no-strictatime	May skip atime updates`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	fs, err := getFilesystems()

@@ -29,24 +29,6 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "nct7802yd"
-	Apropos = "nct7802y hardware monitoring daemon, publishes to redis"
-	Usage   = "nct7802yd"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-type I2cDev struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
-
 var (
 	SlotId         int
 	MaxFanTrays    int
@@ -77,10 +59,16 @@ var (
 	WrRegFn  = make(map[string]string)
 	WrRegVal = make(map[string]string)
 	WrRegRng = make(map[string][]string)
+
+	command *Command
 )
 
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
+	Gpio func()
+	gpio sync.Once
 }
 
 type Info struct {
@@ -92,17 +80,33 @@ type Info struct {
 	lasts map[string]string
 }
 
-func New() *Command { return new(Command) }
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) String() string { return "nct7802yd" }
+
+func (*Command) Usage() string { return "nct7802yd" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "nct7802y hardware monitoring daemon",
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
+
+	command = c
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	err := redis.IsReady()
 	if err != nil {
@@ -137,13 +141,14 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	if c.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+	if c.rpc, err = sockfile.NewRpcServer("nct7802yd"); err != nil {
 		return err
 	}
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "nct7802yd",
+			"Info")
 		if err != nil {
 			return err
 		}
@@ -855,7 +860,7 @@ func (h *I2cDev) GetQsfpTempTarget() (string, error) {
 }
 
 func hostReset() error {
-	cmd.Init("gpio")
+	command.gpio.Do(command.Gpio)
 	log.Print("issue hard reset to host")
 	pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
 	if found {

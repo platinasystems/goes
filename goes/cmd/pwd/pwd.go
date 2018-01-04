@@ -12,11 +12,23 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "pwd"
-	Apropos = "print working directory"
-	Usage   = "pwd [-L]"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "pwd" }
+
+func (Command) Usage() string {
+	return "pwd [-L]"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print working directory",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Print the full filename of the process working directory.
 
@@ -24,26 +36,9 @@ DESCRIPTION
 	    default avoids symlinks
 
 NOTE 
-	This may be different than the context directory.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	This may be different than the context directory.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-L")

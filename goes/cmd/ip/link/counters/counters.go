@@ -19,11 +19,32 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name    = "counters"
-	Apropos = "periodic print or publish link counters and state"
-	Usage   = "counters [OPTION]..."
-	Man     = `
+type Command struct{}
+
+type counters struct {
+	last    map[int32][]byte
+	ifname  map[int32]string
+	updated map[int32]bool
+	sr      *nl.SockReceiver
+	printf  func(string, ...interface{}) (int, error)
+	prefix  string
+}
+
+func (Command) String() string { return "counters" }
+
+func (Command) Usage() string {
+	return "counters [OPTION]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "periodic print or publish link counters and state",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	-interval SECONDS
 		netlink query interval (default: 5)
@@ -41,38 +62,9 @@ OPTIONS
 		This should be run as a daemon, e.g.
 			goes-daemons start ip link counters -publish
 		or
-			goes-daemons start ip link counters -n NAME -publish
-`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+			goes-daemons start ip link counters -n NAME -publish`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{"-publish"}
-	Parms = []interface{}{"-interval", "-total", []string{"-n", "-netns"}}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-type counters struct {
-	last    map[int32][]byte
-	ifname  map[int32]string
-	updated map[int32]bool
-	sr      *nl.SockReceiver
-	printf  func(string, ...interface{}) (int, error)
-	prefix  string
 }
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
 
 func (Command) Complete(args ...string) (list []string) {
 	var larg, llarg string
@@ -101,11 +93,11 @@ func (Command) Complete(args ...string) (list []string) {
 	return
 }
 
-func (Command) Help(args ...string) string {
+func (c Command) Help(args ...string) string {
 	help := "no help"
 	switch {
 	case len(args) == 0:
-		help = Usage
+		help = c.Usage()
 	case args[0] == "-interval":
 		return "SECONDS"
 	case args[0] == "-total":
@@ -121,8 +113,9 @@ func (Command) Main(args ...string) error {
 	var c counters
 	interval := 5
 
-	flag, args := flags.New(args, Flags...)
-	parm, args := parms.New(args, Parms...)
+	flag, args := flags.New(args, "-publish")
+	parm, args := parms.New(args, "-interval", "-total",
+		[]string{"-n", "-netns"})
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}

@@ -24,27 +24,16 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "goes-daemons"
-	Apropos = "start daemons and wait for their exit"
-	Usage   = "goes-daemons [OPTIONS]..."
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
+type Command struct {
+	// Machines list goes command + args for daemons that run from start,
+	// including redisd.  Note that dependent daemons should wait on a
+	// respective redis key, e.g.
+	//	redis.Hwait(redis.DefaultHash, "redis.ready", "true", TIMEOUT)
+	// or
+	//	redis.IsReady()
+	Init [][]string
+	Daemons
 }
-
-// Machines list goes command + args for daemons that run from start, including
-// redisd.  Note that dependent daemons should wait on a respective redis key,
-// e.g.
-//	redis.Hwait(redis.DefaultHash, "redis.ready", "true", TIMEOUT)
-// or
-//	redis.IsReady()
-var Init [][]string
-
-func New() *Command { return new(Command) }
-
-type Command struct{ Daemons }
 
 type Daemons struct {
 	mutex sync.Mutex
@@ -55,16 +44,27 @@ type Daemons struct {
 	cmdsByPid map[int]*exec.Cmd
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
+func (*Command) String() string { return "goes-daemons" }
+
+func (*Command) Usage() string {
+	return "goes-daemons [OPTIONS]..."
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "start daemons and wait for their exit",
+	}
+}
+
 func (c *Command) Goes(g *goes.Goes) { c.Daemons.goes = g }
-func (*Command) Kind() cmd.Kind      { return cmd.Hidden }
+
+func (*Command) Kind() cmd.Kind { return cmd.Hidden }
 
 func (c *Command) Main(args ...string) error {
-	cmd.Init(Name)
 	if len(args) == 0 {
 		return c.server()
 	}
-	cl, err := sockfile.NewRpcClient(Name)
+	cl, err := sockfile.NewRpcClient("goes-daemons")
 	if err != nil {
 		return err
 	}
@@ -102,22 +102,19 @@ func (c *Command) Main(args ...string) error {
 	return err
 }
 
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
-
 func (c *Command) server() (err error) {
 	c.Daemons.done = make(chan struct{})
 	c.Daemons.cmdsByPid = make(map[int]*exec.Cmd)
 
 	signal.Ignore(syscall.SIGTERM)
 
-	c.rpc, err = sockfile.NewRpcServer(Name)
+	c.rpc, err = sockfile.NewRpcServer("goes-daemons")
 	if err != nil {
 		return
 	}
 	defer c.rpc.Close()
 
-	for _, dargs := range Init {
+	for _, dargs := range c.Init {
 		c.Daemons.start(dargs...)
 	}
 

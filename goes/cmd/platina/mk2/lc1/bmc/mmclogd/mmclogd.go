@@ -16,13 +16,6 @@ import (
 )
 
 const (
-	Name    = "mmclogd"
-	Apropos = "mmclogd - updater for MMC dmesg logging"
-	Usage   = "mmclogd"
-	Man     = `
-DESCRIPTION
-	mmclog daemon`
-
 	LOGA          = "dmesg.txt"
 	LOGB          = "dmesg2.txt"
 	ENABLE        = "/tmp/mmclog_enable"
@@ -39,17 +32,10 @@ type FileInfo struct {
 	SeqN int64
 }
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-var (
-	Init = func() {}
-	once sync.Once
-)
-
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -62,15 +48,31 @@ type Info struct {
 	seq_end uint64
 }
 
-func New() *Command { return new(Command) }
+func (*Command) String() string { return "mmclogd" }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) Usage() string { return "mmclogd" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "mmclogd - updater for MMC dmesg logging",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	mmclog daemon`,
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
+
 	if err := initLogging(&c.Info); err != nil {
 		return err
 	}

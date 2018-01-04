@@ -26,18 +26,6 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
-const (
-	Name    = "vnetd"
-	Apropos = "FIXME"
-	Usage   = "vnetd"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() *Command { return new(Command) }
-
 // Enable publish of Non-unix (e.g. non-tuntap) interfaces.
 // This will include all vnet interfaces.
 var UnixInterfacesOnly bool
@@ -49,6 +37,9 @@ var Hook = func(func(), *vnet.Vnet) error { return nil }
 var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
 
 type Command struct {
+	Init func()
+	init sync.Once
+
 	i Info
 }
 
@@ -59,20 +50,27 @@ type Info struct {
 	pub       *publisher.Publisher
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) String() string { return "vnetd" }
+
+func (*Command) Usage() string { return "vnetd" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "FIXME",
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	var (
-		err error
-		in  parse.Input
-	)
+	var in parse.Input
 
-	cmd.Init(Name)
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
-	if err = redis.IsReady(); err != nil {
+	err := redis.IsReady()
+	if err != nil {
 		return err
 	}
 
@@ -85,13 +83,13 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.i)
 
-	sock, err := sockfile.NewRpcServer(Name)
+	sock, err := sockfile.NewRpcServer("vnetd")
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	err = redis.Assign(redis.DefaultHash+":vnet.", Name, "Info")
+	err = redis.Assign(redis.DefaultHash+":vnet.", "vnetd", "Info")
 	if err != nil {
 		return err
 	}

@@ -17,10 +17,37 @@ import (
 )
 
 const (
-	Name    = "upgrade"
-	Apropos = "upgrade images"
-	Usage   = "upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-t] [-a | -g -k -c] [-f]"
-	Man     = `
+	DfltMod = 0755
+	DfltSrv = "downloads.platinasystems.com"
+	DfltVer = "LATEST"
+	Mach    = "mk1"
+	Machine = "platina-" + Mach
+
+	//names of server files
+	GoesName      = "goes-" + Machine //includes non-compressed tag
+	GoesInstaller = "goes-" + Machine + "-installer"
+	KernelName    = "linux-image-" + Machine
+	CorebootName  = "coreboot-" + Mach + ".rom"
+)
+
+type Command struct{}
+
+func (Command) String() string { return "upgrade" }
+
+func (Command) Usage() string {
+	return `
+upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-t] [-a | -g -k -c] [-f]`
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "upgrade images",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	The upgrade command updates firmware images.
 
@@ -47,36 +74,11 @@ OPTIONS
 	-k                upgrade kernel
 	-c                upgrade coreboot
 	-a                upgrade all
-	-f                force upgrade (ignore version check)`
-
-	DfltMod = 0755
-	DfltSrv = "downloads.platinasystems.com"
-	DfltVer = "LATEST"
-	Mach    = "mk1"
-	Machine = "platina-" + Mach
-
-	//names of server files
-	GoesName      = "goes-" + Machine //includes non-compressed tag
-	GoesInstaller = "goes-" + Machine + "-installer"
-	KernelName    = "linux-image-" + Machine
-	CorebootName  = "coreboot-" + Mach + ".rom"
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+	-f                force upgrade (ignore version check)`,
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-t", "-l", "-f", "-r",
 		"-g", "-c", "-k", "-a")
 	parm, args := parms.New(args, "-v", "-s")
@@ -119,18 +121,6 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
 var Install_flag bool = false
 var Reboot_flag bool = false
 

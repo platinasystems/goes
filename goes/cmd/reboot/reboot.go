@@ -11,36 +11,22 @@ import (
 	"github.com/platinasystems/go/internal/kexec"
 )
 
-const (
-	Name    = "reboot"
-	Apropos = "reboot system"
-	Usage   = "reboot"
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "reboot" }
+
+func (Command) Usage() string { return "reboot" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		"en_US.UTF-8": "reboot system",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	kexec.Prepare()
 
 	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
 
 	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	"en_US.UTF-8": Apropos,
 }

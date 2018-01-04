@@ -7,30 +7,23 @@ package cmdline
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/cmdline"
 )
 
-const (
-	Name    = "cmdline"
-	Apropos = "parse and print /proc/cmdline variables"
-	Usage   = "cmdline [NAME]..."
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "cmdline" }
+
+func (Command) Usage() string { return "cmdline [NAME]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "parse and print /proc/cmdline variables",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	keys, m, err := cmdline.New()
 	if err != nil {
 		return err
@@ -51,11 +44,4 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 	return nil
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

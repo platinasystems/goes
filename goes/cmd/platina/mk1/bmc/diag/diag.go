@@ -6,19 +6,40 @@ package diag
 
 import (
 	"fmt"
+	"sync"
 
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "diag"
-	Apropos = "run diagnostics"
-	Usage   = `
-	diag [-debug] | prom [-w | -delete | -x86] \
-		[TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]`
-	Man = `
+var debug, x86, writeField, delField, writeSN bool
+var argF []string
+var flagF *flags.Flags
+
+type Command struct {
+	Gpio func()
+	gpio sync.Once
+}
+
+type Diag func() error
+
+func (*Command) String() string { return "diag" }
+
+func (*Command) Usage() string {
+	return `
+diag [-debug] | prom [-w | -delete | -x86] \
+	[TYPE | "crc" | "length" | "onie" | "copy" ] [VALUE]`
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "run diagnostics",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Runs diagnostic tests to validate BMC functionality and interfaces
 
@@ -42,25 +63,11 @@ EXAMPLES
 	diag prom		dumps bmc eeprom
 	diag prom -x86		dumps host eeprom
 	diag prom -w copy	copies host to bmc eeprom
-	diag prom -x86 -w crc	updates host eeprom crc field`
-)
+	diag prom -x86 -w crc	updates host eeprom crc field`,
+	}
+}
 
-func New() Command { return Command{} }
-
-var debug, x86, writeField, delField, writeSN bool
-var argF []string
-
-var flagF *flags.Flags
-
-type Command struct{}
-type Diag func() error
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
-
-func (Command) Main(args ...string) error {
+func (c *Command) Main(args ...string) error {
 	var diag string
 	flagF, args = flags.New(args, "-debug", "-x86", "-w", "-delete")
 	debug = flagF.ByName["-debug"]
@@ -75,7 +82,7 @@ func (Command) Main(args ...string) error {
 	if n := len(args); n != 0 {
 		diag = args[0]
 	}
-	cmd.Init("gpio")
+	c.gpio.Do(c.Gpio)
 	diags, found := map[string][]Diag{
 		"": []Diag{
 			diagI2c,
@@ -172,12 +179,3 @@ func diagLED() error {
 	*/
 	return nil
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

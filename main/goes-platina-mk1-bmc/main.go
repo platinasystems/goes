@@ -12,7 +12,7 @@ import (
 
 func main() {
 	var ecode int
-	if err := Goes().Main(os.Args...); err != nil {
+	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1
 	}

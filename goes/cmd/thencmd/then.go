@@ -12,41 +12,36 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "then"
-	Apropos = "if COMMAND ; then COMMAND else COMMAND endif"
-	Usage   = "then COMMAND"
-	Man     = `
-DESCRIPTION
-	Conditionally executes statements in a script
-`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() cmd.Cmd {
-	return cmd.Cmd(new(Command))
-}
+var errMissingIf = fmt.Errorf("then: missing if")
 
 type Command struct {
 	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
-func (*Command) Man() lang.Alt       { return man }
-func (*Command) String() string      { return Name }
-func (*Command) Usage() string       { return Usage }
-func (*Command) Kind() cmd.Kind      { return cmd.DontFork | cmd.Conditional }
-func (c *Command) Goes(g *goes.Goes) { c.g = g }
+func (*Command) String() string { return "then" }
 
-var errMissingIf = fmt.Errorf("then: missing if")
+func (*Command) Usage() string {
+	return "if COMMAND ; then COMMAND else COMMAND endif"
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "conditionally execute commands",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Tests conditions and returns zero or non-zero exit status
+`,
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork | cmd.Conditional }
+
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {
 	if len(c.g.Blocks) == 0 {

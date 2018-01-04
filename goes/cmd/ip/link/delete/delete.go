@@ -12,23 +12,19 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "delete"
-	Apropos = "remove virtual link"
-	Usage   = "ip link delete DEVICE"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "delete" }
+
+func (Command) Usage() string {
+	return "ip link delete DEVICE"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "remove virtual link",
+	}
+}
 
 func (Command) Main(args ...string) error {
 	var (

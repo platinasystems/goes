@@ -16,34 +16,12 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Apropos = "neighbor link address"
-	Man     = `
-SEE ALSO
-	ip man neighbor || ip neighbor -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{"proxy"}
-	Parms = []interface{}{"lladdr", "nud", "dev"}
-)
-
-func New(s string) Command { return Command(s) }
-
 type Command string
 
 type mod options.Options
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (c Command) String() string  { return string(c) }
+func (c Command) String() string { return string(c) }
+
 func (c Command) Usage() string {
 	return fmt.Sprintf(`
 ip neighbor %s { ADDR [ OPTION ]... | proxy ADDR } [ dev DEV ]
@@ -51,6 +29,21 @@ ip neighbor %s { ADDR [ OPTION ]... | proxy ADDR } [ dev DEV ]
 OPTION := [ lladdr LLADDR ] [ nud STATE ]
 STATE := { permanent | noarp | stale | reachable | none | incomplete |
 	delay | probe | failed }`[1:], c)
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "neighbor link address",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man neighbor || ip neighbor -man
+	man ip || ip -man`,
+	}
 }
 
 func (c Command) Main(args ...string) error {
@@ -82,8 +75,8 @@ func (c Command) Main(args ...string) error {
 	}
 
 	opt, args := options.New(args)
-	args = opt.Flags.More(args, Flags...)
-	args = opt.Parms.More(args, Parms...)
+	args = opt.Flags.More(args, "proxy")
+	args = opt.Parms.More(args, "lladdr", "nud", "dev")
 
 	if s := opt.Parms.ByName["-f"]; len(s) > 0 {
 		if v, ok := rtnl.AfByName[s]; ok {

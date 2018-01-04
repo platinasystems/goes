@@ -18,25 +18,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Apropos = "route table entry"
-	Man     = `
-SEE ALSO
-	ip man route || ip route -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	fixme = errors.New("FIXME")
-)
-
-func New(s string) Command { return Command(s) }
+var fixme = errors.New("FIXME")
 
 type Command string
 
@@ -55,9 +37,8 @@ type mod struct {
 	vrfByName     map[string]uint32
 }
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (c Command) String() string  { return string(c) }
+func (c Command) String() string { return string(c) }
+
 func (c Command) Usage() string {
 	return fmt.Sprint("ip route ", c, ` NODE-SPEC [ INFO-SPEC ]
 
@@ -108,6 +89,21 @@ ENCAP-ILA := LOCATOR [ csum-mode { adj-transport | neutral-map | no-action } ]
 ENCAP-SEG6 := seg6 mode [ encap | inline ] segs SEGMENTS [ hmac KEYID ]
 
 ENCAP-BPF := bpf [ in PROG ] [ out PROG ] [ xmit PROG ] [ headroom SIZE ]`)
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "route table entry",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man route || ip route -man
+	man ip || ip -man`,
+	}
 }
 
 func (c Command) Main(args ...string) error {

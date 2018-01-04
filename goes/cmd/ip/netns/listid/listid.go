@@ -14,32 +14,28 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "list-id"
-	Apropos = "list network namespace identifiers"
-	Usage   = `ip netns list-id`
-	Man     = `
-SEE ALSO
-	ip man netns || ip netns -man
-	man ip || ip -man`
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-var man = lang.Alt{
-	lang.EnUS: Man,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "list-id" }
+
+func (Command) Usage() string {
+	return `ip netns list-id`
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "list network namespace identifiers",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man netns || ip netns -man
+	man ip || ip -man`,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	_, args = options.New(args)

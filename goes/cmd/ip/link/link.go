@@ -6,7 +6,7 @@ package link
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add"
 	"github.com/platinasystems/go/goes/cmd/ip/link/counters"
 	"github.com/platinasystems/go/goes/cmd/ip/link/delete"
@@ -15,14 +15,17 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "link"
-	Apropos = "network device configuration"
-	Usage   = `
+var Goes = &goes.Goes{
+	NAME: "link",
+	USAGE: `
 ip link [ COMMAND[ OPTION... ]]
 
-COMMAND := {add | change | counters | delete | replace | set | show(default)}`
-	Man = `
+COMMAND := {add | change | counters | delete | replace | set | show(default)}`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "network device configuration",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: `
 EXAMPLES
 	ip link set dev ppp0 mtu 1400
 		Change the MTU the ppp0 device.
@@ -50,26 +53,16 @@ EXAMPLES
 
 SEE ALSO
 	ip link man COMMAND || ip link COMMAND -man
-	man ip || ip -man`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(add.New(),
-		counters.New(),
-		mod.New("change"),
-		delete.New(),
-		mod.New("replace"),
-		mod.New("set"),
-		show.New("show"),
-		show.New(""),
-	)
-	return g
+	man ip || ip -man`,
+	},
+	ByName: map[string]cmd.Cmd{
+		"add":      add.Goes,
+		"change":   mod.Command("change"),
+		"counters": counters.Command{},
+		"delete":   delete.Command{},
+		"replace":  mod.Command("replace"),
+		"set":      mod.Command("set"),
+		"show":     show.Command("show"),
+		"":         show.Command(""),
+	},
 }

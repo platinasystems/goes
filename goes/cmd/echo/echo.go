@@ -12,32 +12,29 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "echo"
-	Apropos = "print a line of text"
-	Usage   = "echo [-n] [STRING]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "echo" }
+
+func (Command) Usage() string { return "echo [-n] [STRING]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print a line of text",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Echo the STRING(s) to standard output.
 
-	-n     do not output the trailing newline`
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+	-n     do not output the trailing newline`,
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-n")
 	s := strings.Join(args, " ")
 	if flag.ByName["-n"] {
@@ -47,16 +44,3 @@ func (cmd) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

@@ -12,30 +12,27 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "exit"
-	Apropos = "exit the shell"
-	Usage   = "exit [N]"
-	Man     = `
-DESCRIPTION
-	Exit the shell, returning a status of N, if given, or 0 otherwise.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Kind() cmd.Kind    { return cmd.DontFork | cmd.CantPipe }
+func (Command) String() string { return "exit" }
+
+func (Command) Usage() string { return "exit [N]" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "exit the shell",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	Exit the shell, returning a status of N, if given, or 0 otherwise.`,
+	}
+}
+
+func (Command) Kind() cmd.Kind { return cmd.DontFork | cmd.CantPipe }
 
 func (Command) Main(args ...string) error {
 	var ecode int
@@ -49,7 +46,3 @@ func (Command) Main(args ...string) error {
 	os.Exit(ecode)
 	return nil
 }
-
-func (Command) Man() lang.Alt  { return man }
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }

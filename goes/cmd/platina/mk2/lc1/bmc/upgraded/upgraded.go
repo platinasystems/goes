@@ -18,14 +18,6 @@ import (
 )
 
 const (
-	Name    = "upgraded"
-	Apropos = "upgraded - software updater"
-	Usage   = "upgraded"
-	Man     = `
-DESCRIPTION
-	upgraded daemon`
-)
-const (
 	nl = "\n"
 	sp = " "
 	lt = "<"
@@ -34,19 +26,12 @@ const (
 	rb = "]"
 )
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-var (
-	Init = func() {}
-	once sync.Once
-)
-
 var BootedQSPI int = 3
 
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -55,15 +40,31 @@ type Info struct {
 	lasts map[string]string
 }
 
-func New() *Command { return new(Command) }
+func (*Command) String() string { return "upgraded" }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) Usage() string { return "upgraded" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "upgraded - software updater",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	upgraded daemon`,
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	once.Do(Init)
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
+
 	getBootedQSPI()
 
 	t := time.NewTicker(1 * time.Second)

@@ -14,42 +14,27 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "ipcfg"
-	Apropos = "set bmc ip address, via bootargs ip="
-	Usage   = "ipcfg [-ip]"
-	Man     = `
-DESCRIPTION
-        The ipcfg command sets bmc ip address, via bootargs ip="`
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func (Command) String() string { return "ipcfg" }
+
+func (Command) Usage() string { return "ipcfg [-ip]" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "set bmc ip address, via bootargs ip=",
+	}
 }
 
-type cmd struct{}
-
-func New() Interface { return cmd{} }
-
-func (cmd) Apropos() lang.Alt { return apropos }
-func (cmd) Man() lang.Alt     { return man }
-func (cmd) String() string    { return Name }
-func (cmd) Usage() string     { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+        The ipcfg command sets bmc ip address, via bootargs ip="`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+}
 
-func (cmd) Main(args ...string) (err error) {
+func (Command) Main(args ...string) (err error) {
 	parm, args := parms.New(args, "-ip")
 	if len(parm.ByName["-ip"]) == 0 {
 		if err = dispIP(false); err != nil {

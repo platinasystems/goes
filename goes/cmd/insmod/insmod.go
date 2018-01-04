@@ -16,33 +16,28 @@ import (
 	"github.com/platinasystems/go/internal/url"
 )
 
-const (
-	Name    = "insmod"
-	Apropos = "insert a module into the Linux Kernel"
-	Usage   = "insmod [OPTION]... FILE [NAME[=VAL[,VAL]]]..."
-	Man     = `
-OPTIONS
-	-v	verbose
-	-f	force`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "insmod" }
+
+func (Command) Usage() string {
+	return "insmod [OPTION]... FILE [NAME[=VAL[,VAL]]]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "insert a module into the Linux Kernel",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+OPTIONS
+	-v	verbose
+	-f	force`,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-f", "-v")

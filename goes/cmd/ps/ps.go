@@ -21,36 +21,31 @@ import (
 	"github.com/platinasystems/go/internal/proc"
 )
 
-const (
-	Name    = "ps"
-	Apropos = "print process state"
-	Usage   = "ps [OPTION]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "ps" }
+
+func (Command) Usage() string {
+	return "ps [OPTION]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print process state",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Print information for current processes.
 	The default list is limitted to processes on controlling TTY.
 
 	-e  Select all processes.
-	-f  Full format listing.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-f  Full format listing.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var ttynr uint

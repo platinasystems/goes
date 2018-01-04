@@ -165,7 +165,7 @@ func PlatformExit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	} else {
 		err = delSriovs()
 	}
-	if xerr := ip.New().Main("link", "delete", "vnet"); err == nil {
+	if xerr := ip.Goes.Main("link", "delete", "vnet"); err == nil {
 		err = xerr
 	}
 	return

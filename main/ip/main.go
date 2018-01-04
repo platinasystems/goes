@@ -16,7 +16,7 @@ import (
 
 func main() {
 	var ecode int
-	if err := ip.New().Main(os.Args...); err != nil {
+	if err := ip.Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, "ip:", err)
 		ecode = 1
 	}

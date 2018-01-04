@@ -14,10 +14,31 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "show"
-	Apropos = "network address"
-	Usage   = `ip address show [ [dev] DEVICE ] [ scope SCOPE-ID ]
+var (
+	Flags = []interface{}{
+		"permanent", "dynamic", "secondary", "primary",
+		"-tentative", "tentative",
+		"-deprecated", "deprecated",
+		"-dadfailed", "dadfailed",
+		"temporary",
+		"home", "mngtmpaddr", "nodad", "noprefixroute", "autojoin",
+		"up",
+	}
+	Parms = []interface{}{
+		"dev", "scope", "to", "label", "master", "type", "vrf",
+	}
+)
+
+type Command string
+
+type show options.Options
+
+func (Command) Aka() string { return "show" }
+
+func (c Command) String() string { return string(c) }
+
+func (Command) Usage() string {
+	return `ip address show [ [dev] DEVICE ] [ scope SCOPE-ID ]
 	[ to PREFIX ] [ FLAG-LIST ] [ label PATTERN ] [ master DEVICE ]
 	[ type TYPE ] [ vrf NAME ] [ up ] ]
 
@@ -37,36 +58,10 @@ TYPE := { bridge | bridge_slave | bond | bond_slave | can | dummy |
 	vxlan | ip6tnl | ipip | sit | gre | gretap | ip6gre |
 	ip6gretap | vti | vrf | nlmon | ipvlan | lowpan | geneve |
 	macsec }`
-)
-
-var (
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{
-		"permanent", "dynamic", "secondary", "primary",
-		"-tentative", "tentative",
-		"-deprecated", "deprecated",
-		"-dadfailed", "dadfailed",
-		"temporary",
-		"home", "mngtmpaddr", "nodad", "noprefixroute", "autojoin",
-		"up",
-	}
-	Parms = []interface{}{
-		"dev", "scope", "to", "label", "master", "type", "vrf",
-	}
-)
-
-func New(s string) Command { return Command(s) }
-
-type Command string
-
-type show options.Options
-
-func (Command) Aka() string { return "show" }
+}
 
 func (c Command) Apropos() lang.Alt {
-	apropos := Apropos
+	apropos := "network address"
 	if c == "show" {
 		apropos += " (default)"
 	}
@@ -75,9 +70,11 @@ func (c Command) Apropos() lang.Alt {
 	}
 }
 
-func (Command) Man() lang.Alt    { return man }
-func (c Command) String() string { return string(c) }
-func (Command) Usage() string    { return Usage }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: Man,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	var req []byte

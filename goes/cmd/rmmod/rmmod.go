@@ -16,11 +16,23 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "rmmod"
-	Apropos = "remove a module from the Linux Kernel"
-	Usage   = "rmmod [OPTION]... MODULE..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "rmmod" }
+
+func (Command) Usage() string {
+	return "rmmod [OPTION]... MODULE..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "remove a module from the Linux Kernel",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Remove the named MODULE from the Linux Kernel.
 	(MODULE must support unloading)
@@ -28,26 +40,9 @@ DESCRIPTION
 OPTIONS
 	-v	verbose
 	-f	force
-	-q	silently ignore errors`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	-q	silently ignore errors`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Complete(args ...string) (c []string) {
 	n := len(args)

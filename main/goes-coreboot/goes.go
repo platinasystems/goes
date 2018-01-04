@@ -28,12 +28,12 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
-	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/hexists"
 	"github.com/platinasystems/go/goes/cmd/hget"
 	"github.com/platinasystems/go/goes/cmd/hgetall"
 	"github.com/platinasystems/go/goes/cmd/hkeys"
 	"github.com/platinasystems/go/goes/cmd/hset"
+	"github.com/platinasystems/go/goes/cmd/hwait"
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
@@ -58,8 +58,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/restart"
 	"github.com/platinasystems/go/goes/cmd/rm"
 	"github.com/platinasystems/go/goes/cmd/rmmod"
-	"github.com/platinasystems/go/goes/cmd/show_commands"
-	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/cmd/slashinit"
 	"github.com/platinasystems/go/goes/cmd/sleep"
 	"github.com/platinasystems/go/goes/cmd/source"
@@ -73,95 +71,101 @@ import (
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/cmd/umount"
 	"github.com/platinasystems/go/goes/cmd/uninstall"
+	"github.com/platinasystems/go/goes/cmd/uptimed"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "goes-coreboot"
-	Apropos = "the coreboot goes machine"
-)
+var Goes = &goes.Goes{
+	NAME: "goes-coreboot",
+	APROPOS: lang.Alt{
+		lang.EnUS: "the coreboot goes machine",
+	},
+	ByName: map[string]cmd.Cmd{
+		"!":        bang.Command{},
+		"cli":      &cli.Command{},
+		"boot":     &boot.Command{},
+		"cat":      cat.Command{},
+		"cd":       &cd.Command{},
+		"chmod":    chmod.Command{},
+		"cp":       cp.Command{},
+		"dmesg":    dmesg.Command{},
+		"echo":     echo.Command{},
+		"else":     &elsecmd.Command{},
+		"env":      &env.Command{},
+		"exec":     exec.Command{},
+		"exit":     exit.Command{},
+		"export":   export.Command{},
+		"false":    falsecmd.Command{},
+		"femtocom": femtocom.Command{},
+		"fi":       &ficmd.Command{},
 
-func Goes() *goes.Goes {
-	cmd.Initters = map[string]func(){
-		"redisd": redisdInit,
-	}
-	g := goes.New(Name, "",
-		lang.Alt{
-			lang.EnUS: Apropos,
+		"goes-daemons": &daemons.Command{},
+
+		"hdel":    hdel.Command{},
+		"hdelta":  &hdelta.Command{},
+		"hexists": hexists.Command{},
+		"hget":    hget.Command{},
+		"hgetall": hgetall.Command{},
+		"hkeys":   hkeys.Command{},
+		"hset":    hset.Command{},
+		"hwait":   hwait.Command{},
+		"if":      &ifcmd.Command{},
+		"insmod":  insmod.Command{},
+		"install": &install.Command{},
+		"ip":      ip.Goes,
+		"kexec":   kexec.Command{},
+		"keys":    keys.Command{},
+		"kill":    kill.Command{},
+		"ln":      ln.Command{},
+		"log":     log.Command{},
+		"ls":      ls.Command{},
+		"lsmod":   lsmod.Command{},
+		"mkdir":   mkdir.Command{},
+		"mknod":   mknod.Command{},
+		"mount":   mount.Command{},
+		"ping":    ping.Command{},
+		"ps":      ps.Command{},
+		"pwd":     pwd.Command{},
+		"reboot":  reboot.Command{},
+
+		"redisd": &redisd.Command{
+			Devs:    []string{"lo"},
+			Machine: "coreboot",
 		},
-		lang.Alt{},
-	)
-	g.Plot(helpers.New()...)
-	g.Plot(cli.New()...)
-	g.Plot(bang.New(),
-		boot.New(),
-		cat.New(),
-		cd.New(),
-		chmod.New(),
-		cmdline.New(),
-		cp.New(),
-		daemons.New(),
-		dmesg.New(),
-		echo.New(),
-		elsecmd.New(),
-		env.New(),
-		exec.New(),
-		exit.New(),
-		export.New(),
-		falsecmd.New(),
-		femtocom.New(),
-		ficmd.New(),
-		hdel.New(),
-		hdelta.New(),
-		hexists.New(),
-		hget.New(),
-		hgetall.New(),
-		hkeys.New(),
-		hset.New(),
-		ifcmd.New(),
-		iminfo.New(),
-		insmod.New(),
-		install.New(),
-		ip.New(),
-		kexec.New(),
-		keys.New(),
-		kill.New(),
-		ln.New(),
-		log.New(),
-		ls.New(),
-		lsmod.New(),
-		mkdir.New(),
-		mknod.New(),
-		mount.New(),
-		ping.New(),
-		ps.New(),
-		pwd.New(),
-		reboot.New(),
-		redisd.New(),
-		reload.New(),
-		restart.New(),
-		rm.New(),
-		rmmod.New(),
-		show_commands.New(),
-		show_packages.New(""),
-		show_packages.New("show-packages"),
-		show_packages.New("license"),
-		show_packages.New("version"),
-		slashinit.New(),
-		sleep.New(),
-		source.New(),
-		start.New(),
-		stop.New(),
-		stty.New(),
-		subscribe.New(),
-		sync.New(),
-		testcmd.New(),
-		thencmd.New(),
-		truecmd.New(),
-		umount.New(),
-		uninstall.New(),
-		wget.New(),
-	)
-	return g
+
+		"reload":  reload.Command{},
+		"restart": &restart.Command{},
+		"rm":      rm.Command{},
+		"rmmod":   rmmod.Command{},
+
+		"show": &goes.Goes{
+			NAME:  "show",
+			USAGE: "show OBJECT",
+			APROPOS: lang.Alt{
+				lang.EnUS: "print stuff",
+			},
+			ByName: map[string]cmd.Cmd{
+				"cmdline":  cmdline.Command{},
+				"iminfo":   iminfo.Command{},
+				"packages": goes.ShowPackages{},
+			},
+		},
+
+		"slashinit": &slashinit.Command{},
+		"sleep":     sleep.Command{},
+		"source":    &source.Command{},
+		"start":     &start.Command{},
+		"stop":      &stop.Command{},
+		"stty":      stty.Command{},
+		"subscribe": subscribe.Command{},
+		"sync":      sync.Command{},
+		"test":      testcmd.Command{},
+		"then":      &thencmd.Command{},
+		"true":      truecmd.Command{},
+		"umount":    umount.Command{},
+		"uninstall": &uninstall.Command{},
+		"uptimed":   uptimed.Command(make(chan struct{})),
+		"wget":      wget.Command{},
+	},
 }

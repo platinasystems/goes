@@ -19,67 +19,7 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	nogroup = ^uint32(0)
-	Apropos = "link attributes"
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{
-		[]string{"up", "+up"},
-		[]string{"down", "no-up", "-up"},
-		[]string{"no-master", "-master"},
-		[]string{"arp", "+arp"},
-		[]string{"no-arp", "-arp"},
-		[]string{"dynamic", "+dynamic"},
-		[]string{"no-dynamic", "-dynamic"},
-		[]string{"multicast", "+multicast"},
-		[]string{"no-multicast", "-multicast"},
-		[]string{"allmulticast", "+allmulticast"},
-		[]string{"no-allmulticast", "-allmulticast"},
-		[]string{"promisc", "+promisc"},
-		[]string{"no-promisc", "-promisc"},
-		[]string{"trailers", "+trailers"},
-		[]string{"no-trailers", "-trailers"},
-		[]string{"carrier", "+carrier"},
-		[]string{"no-carrier", "-carrier"},
-		[]string{"protodown", "+protodown"},
-		[]string{"no-protodown", "-protodown"},
-		[]string{"no-master", "-master"},
-		[]string{"no-vrf", "-vrf"},
-	}
-	Parms = []interface{}{
-		"dev",
-		"link",
-		"index",
-		"group",
-		"addrgenmode",
-		"vf",
-		"name",
-		"alias",
-		"qdisc",
-		"mtu",
-		"address",
-		"master",
-		"vrf",
-		"link-netnsid",
-		"netns",
-		"mode",
-		"state",
-		[]string{"broadcast", "brd"},
-		"numrxqueues",
-		"numtxqueues",
-		[]string{"txqueuelen", "qlen", "txqlen"},
-	}
-)
-
-func New(s string) Command { return Command(s) }
+const nogroup = ^uint32(0)
 
 type Command string
 
@@ -104,11 +44,22 @@ type mod struct {
 	netns *os.File
 }
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (c Command) String() string  { return string(c) }
+func (c Command) String() string { return string(c) }
+
 func (c Command) Usage() string {
 	return fmt.Sprint("ip link ", c, ` SUBJECT [ OPTION... ]`)
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "link attributes",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: Man,
+	}
 }
 
 func (c Command) Main(args ...string) error {
@@ -197,8 +148,52 @@ func (m *mod) parse() error {
 	var dev, link int32
 	var gid uint32
 
-	m.args = m.opt.Flags.More(m.args, Flags...)
-	m.args = m.opt.Parms.More(m.args, Parms...)
+	m.args = m.opt.Flags.More(m.args,
+		[]string{"up", "+up"},
+		[]string{"down", "no-up", "-up"},
+		[]string{"no-master", "-master"},
+		[]string{"arp", "+arp"},
+		[]string{"no-arp", "-arp"},
+		[]string{"dynamic", "+dynamic"},
+		[]string{"no-dynamic", "-dynamic"},
+		[]string{"multicast", "+multicast"},
+		[]string{"no-multicast", "-multicast"},
+		[]string{"allmulticast", "+allmulticast"},
+		[]string{"no-allmulticast", "-allmulticast"},
+		[]string{"promisc", "+promisc"},
+		[]string{"no-promisc", "-promisc"},
+		[]string{"trailers", "+trailers"},
+		[]string{"no-trailers", "-trailers"},
+		[]string{"carrier", "+carrier"},
+		[]string{"no-carrier", "-carrier"},
+		[]string{"protodown", "+protodown"},
+		[]string{"no-protodown", "-protodown"},
+		[]string{"no-master", "-master"},
+		[]string{"no-vrf", "-vrf"},
+	)
+	m.args = m.opt.Parms.More(m.args,
+		"dev",
+		"link",
+		"index",
+		"group",
+		"addrgenmode",
+		"vf",
+		"name",
+		"alias",
+		"qdisc",
+		"mtu",
+		"address",
+		"master",
+		"vrf",
+		"link-netnsid",
+		"netns",
+		"mode",
+		"state",
+		[]string{"broadcast", "brd"},
+		"numrxqueues",
+		"numtxqueues",
+		[]string{"txqueuelen", "qlen", "txqlen"},
+	)
 
 	for _, x := range []struct {
 		set   string

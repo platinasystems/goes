@@ -11,55 +11,51 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
-	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-func startInit() {
-	start.ConfGpioHook = func() error {
-		cmd.Init("gpio")
-		pin, found := gpio.Pins["QSPI_MUX_SEL"]
-		if found {
-			r, _ := pin.Value()
-			if r {
-				log.Print("Booted from QSPI1")
-			} else {
-				log.Print("Booted from QSPI0")
-			}
-
+func startConfGpioHook() error {
+	gpioInit()
+	pin, found := gpio.Pins["QSPI_MUX_SEL"]
+	if found {
+		r, _ := pin.Value()
+		if r {
+			log.Print("Booted from QSPI1")
+		} else {
+			log.Print("Booted from QSPI0")
 		}
 
-		for name, pin := range gpio.Pins {
-			err := pin.SetDirection()
-			if err != nil {
-				fmt.Printf("%s: %v\n", name, err)
-			}
-		}
-		pin, found = gpio.Pins["LOCAL_I2C_RESET_L"]
-		if found {
-			pin.SetValue(false)
-			time.Sleep(1 * time.Microsecond)
-			pin.SetValue(true)
-		}
-
-		pin, found = gpio.Pins["FRU_I2C_RESET_L"]
-		if found {
-			pin.SetValue(false)
-			time.Sleep(1 * time.Microsecond)
-			pin.SetValue(true)
-		}
-		err := pubEth0()
-		if err != nil {
-			return err
-		}
-		upgrade.UpdateEnv(false)
-		upgrade.UpdateEnv(true)
-		return nil
 	}
+
+	for name, pin := range gpio.Pins {
+		err := pin.SetDirection()
+		if err != nil {
+			fmt.Printf("%s: %v\n", name, err)
+		}
+	}
+	pin, found = gpio.Pins["LOCAL_I2C_RESET_L"]
+	if found {
+		pin.SetValue(false)
+		time.Sleep(1 * time.Microsecond)
+		pin.SetValue(true)
+	}
+
+	pin, found = gpio.Pins["FRU_I2C_RESET_L"]
+	if found {
+		pin.SetValue(false)
+		time.Sleep(1 * time.Microsecond)
+		pin.SetValue(true)
+	}
+	err := pubEth0()
+	if err != nil {
+		return err
+	}
+	upgrade.UpdateEnv(false)
+	upgrade.UpdateEnv(true)
+	return nil
 }
 
 func pubEth0() (err error) {

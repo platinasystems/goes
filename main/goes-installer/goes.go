@@ -6,30 +6,27 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/install"
-	"github.com/platinasystems/go/goes/cmd/show_commands"
-	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "goes-installer"
-	Apropos = "a self extracting goes machine"
-)
-
-func Goes() *goes.Goes {
-	g := goes.New(Name, "",
-		lang.Alt{
-			lang.EnUS: Apropos,
+var Goes = &goes.Goes{
+	NAME: "goes-installer",
+	APROPOS: lang.Alt{
+		lang.EnUS: "a self extracting goes machine",
+	},
+	ByName: map[string]cmd.Cmd{
+		"install": &install.Command{},
+		"show": &goes.Goes{
+			NAME:  "show",
+			USAGE: "show OBJECT",
+			APROPOS: lang.Alt{
+				lang.EnUS: "print stuff",
+			},
+			ByName: map[string]cmd.Cmd{
+				"packages": goes.ShowPackages{},
+			},
 		},
-		lang.Alt{})
-	g.Plot(helpers.New()...)
-	g.Plot(
-		install.New(),
-		show_commands.New(),
-		show_packages.New("license"),
-		show_packages.New("version"),
-	)
-	return g
+	},
 }

@@ -12,26 +12,19 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "subscribe"
-	Apropos = "print messages published to the given redis channel"
-	Usage   = "subscribe CHANNEL"
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "subscribe" }
+
+func (Command) Usage() string { return "subscribe CHANNEL" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print messages published to given redis channel",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	switch len(args) {
 	case 0:
 		return fmt.Errorf("CHANNEL: missing")
@@ -59,11 +52,4 @@ func (cmd) Main(args ...string) error {
 		}
 	}
 	return err
-}
-
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

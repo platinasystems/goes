@@ -26,19 +26,15 @@ import (
 )
 
 const (
-	Name    = "qsfpeventsd"
-	Apropos = "qsfpeventsd monitoring daemon, publishes to redis"
-	Usage   = "qsfpeventsd"
-
 	QSFP_RESET_BIT  = 1 << 2
 	QSFP_LPMODE_BIT = 1 << 3
 	MAX_IRQ_EVENTS  = 32
 )
 
-func New() *Command { return new(Command) }
-
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -81,26 +77,32 @@ var (
 	Old_present_n uint8
 )
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
+func (*Command) String() string { return "qsfpeventsd" }
+
+func (*Command) Usage() string { return "qsfpeventsd" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "qsfpeventsd monitoring daemon, publishes to redis",
+	}
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
+
 func (c *Command) Close() error {
 	close(c.stop)
 	return nil
 }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
 	var err error
 	var event syscall.EpollEvent
 	var revents [MAX_IRQ_EVENTS]syscall.EpollEvent // received events
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	err = redis.IsReady()
 	if err != nil {
@@ -121,7 +123,7 @@ func (c *Command) Main(...string) error {
 	}
 
 	// Setup UIO device
-	x, err := uiodevs.GetIndex(Name)
+	x, err := uiodevs.GetIndex("qsfpeventsd")
 	if err != nil {
 		log.Print("uio device not found")
 		return err

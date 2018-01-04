@@ -8,33 +8,29 @@ package gpio
 import (
 	"fmt"
 	"sort"
+	"sync"
 
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/gpio"
 )
 
-const (
-	Name    = "gpio"
-	Apropos = "manipulate GPIO pins"
-	Usage   = "gpio PIN_NAME [VALUE]"
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+type Command struct {
+	Init func()
+	init sync.Once
 }
 
-func New() Interface { return Command{} }
+func (*Command) String() string { return "gpio" }
 
-type Command struct{}
+func (*Command) Usage() string { return "gpio PIN_NAME [VALUE]" }
 
-func (Command) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "manipulate GPIO pins",
+	}
+}
 
-func (Command) Main(args ...string) error {
-	cmd.Init(Name)
+func (c *Command) Main(args ...string) error {
+	c.init.Do(c.Init)
 	switch len(args) {
 	case 0: // No args?  Report all pin values.
 		names := make([]string, 0, len(gpio.Pins))
@@ -88,11 +84,4 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args[2:])
 	}
 	return nil
-}
-
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

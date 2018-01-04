@@ -15,11 +15,23 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "add"
-	Apropos = "add a Foo-over-UDP receive port"
-	Usage   = "ip foo add port PORT [ gue | ipproto PROTO ]"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "add" }
+
+func (Command) Usage() string {
+	return "ip foo add port PORT [ gue | ipproto PROTO ]"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a Foo-over-UDP receive port",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	port PORT
 		UDP listening port
@@ -32,26 +44,9 @@ OPTIONS
 SEE ALSO
 	ip fou man delete || ip fou delete -man
 	ip man fou || ip fou -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var attrs []nl.Attr

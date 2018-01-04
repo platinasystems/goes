@@ -123,7 +123,7 @@ func New(vfs [][]Vf) (err error) {
 			args := []string{"link", "set", pf.Name, "vf",
 				fmt.Sprint(vfi), "mac", VfMac().String(),
 				"vlan", fmt.Sprint(vf.Vlan())}
-			err = ip.New().Main(args...)
+			err = ip.Goes.Main(args...)
 			if err != nil {
 				return
 			}
@@ -135,7 +135,7 @@ func New(vfs [][]Vf) (err error) {
 			if vfname != want {
 				args := []string{"link", "set", vfname,
 					"name", want}
-				err = ip.New().Main(args...)
+				err = ip.Goes.Main(args...)
 				if err != nil {
 					return
 				}
@@ -143,12 +143,12 @@ func New(vfs [][]Vf) (err error) {
 			}
 			// bounce vf to reload its mac from the pf
 			args = []string{"link", "set", vfname, "up"}
-			err = ip.New().Main(args...)
+			err = ip.Goes.Main(args...)
 			if err != nil {
 				return
 			}
 			args = []string{"link", "set", vfname, "down"}
-			err = ip.New().Main(args...)
+			err = ip.Goes.Main(args...)
 			if err != nil {
 				return
 			}

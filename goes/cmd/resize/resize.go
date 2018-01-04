@@ -14,22 +14,18 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "resize"
-	Apropos = "Resize per ROWS, COLUMNS and [XPIXELS, YPIXELS]"
-	Usage   = "resize"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Kind() cmd.Kind    { return cmd.DontFork | cmd.CantPipe }
+func (Command) String() string { return "resize" }
+func (Command) Usage() string  { return "resize" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "Resize per ROWS, COLUMNS and [XPIXELS, YPIXELS]",
+	}
+}
+
+func (Command) Kind() cmd.Kind { return cmd.DontFork | cmd.CantPipe }
 
 func (Command) Main(args ...string) error {
 	var (
@@ -92,6 +88,3 @@ func (Command) Main(args ...string) error {
 	}
 	return err
 }
-
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }

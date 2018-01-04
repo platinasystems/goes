@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/parms"
@@ -24,11 +23,38 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "start"
-	Apropos = "start this goes machine"
-	Usage   = "start [-start=URL] [REDIS OPTIONS]..."
-	Man     = `
+func New() *Command { return new(Command) }
+
+type Command struct {
+	// Machines may use Hook to run something before redisd and other
+	// daemons.
+	Hook func() error
+
+	// Machines may use ConfHook to run something after all daemons start
+	// and before source of start command script.
+	ConfHook func() error
+
+	// GPIO init hook for machines than need it
+	ConfGpioHook func() error
+
+	g *goes.Goes
+}
+
+func (*Command) String() string { return "start" }
+
+func (*Command) Usage() string {
+	return "start [-start=URL] [REDIS OPTIONS]..."
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "start this goes machine",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Start a redis server followed by the machine and its embedded daemons.
 
@@ -39,40 +65,13 @@ OPTIONS
 		default: /etc/goes/start
 
 SEE ALSO
-	redisd`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	redisd`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-// Machines may use Hook to run something before redisd and other daemons.
-var Hook = func() error { return nil }
-
-// Machines may use ConfHook to run something after all daemons start and
-// before source of start command script.
-var ConfHook = func() error { return nil }
-
-// GPIO init hook for machines than need it
-var ConfGpioHook = func() error { return nil }
-
-func New() *Command { return new(Command) }
-
-type Command struct {
-	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {
-	cmd.Init(Name)
-
 	parm, args := parms.New(args, "-start", "-stop")
 
 	err := assert.Root()
@@ -86,9 +85,10 @@ func (c *Command) Main(args ...string) error {
 	if err == nil {
 		return fmt.Errorf("already started")
 	}
-	err = Hook()
-	if err != nil {
-		return err
+	if c.Hook != nil {
+		if err = c.Hook(); err != nil {
+			return err
+		}
 	}
 	daemons := exec.Command(prog.Name(), args...)
 	daemons.Args[0] = "goes-daemons"
@@ -116,15 +116,17 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 
-	err = ConfGpioHook()
-	if err != nil {
-		return err
+	if c.ConfGpioHook != nil {
+		if err = c.ConfGpioHook(); err != nil {
+			return err
+		}
 	}
 
 	if len(start) > 0 {
-		err = ConfHook()
-		if err != nil {
-			return err
+		if c.ConfHook != nil {
+			if err = c.ConfHook(); err != nil {
+				return err
+			}
 		}
 		err = c.g.Main("source", start)
 		if err != nil {
@@ -139,7 +141,7 @@ func (c *Command) Main(args ...string) error {
 	go daemons.Wait()
 
 	for {
-		if v := c.g.ByName("login"); v != nil {
+		if _, found := c.g.ByName["login"]; found {
 			if err = c.run("login"); err != nil {
 				fmt.Fprintln(os.Stderr, "login:", err)
 				time.Sleep(3 * time.Second)
@@ -156,10 +158,6 @@ func (c *Command) Main(args ...string) error {
 	}
 
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
 
 func (c *Command) run(args ...string) error {
 	x := c.g.Fork(args...)

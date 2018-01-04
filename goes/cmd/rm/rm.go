@@ -14,11 +14,23 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "rm"
-	Apropos = "remove files or directories"
-	Usage   = " [OPTION]... FILE..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "rm" }
+
+func (Command) Usage() string {
+	return "rm [OPTION]... FILE..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "remove files or directories",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Remove named files.  By default, it does not remove directories.
 
@@ -35,26 +47,9 @@ OPTIONS
 	starts with a '-'; for example:
 
               rm ./-f
-              rm ./-v`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+              rm ./-v`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-d", "-f", "-r", "-v")

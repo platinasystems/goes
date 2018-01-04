@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/goes/cmd"
 	//"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpeventsd"
 	"github.com/platinasystems/go/internal/gpio"
@@ -37,7 +36,7 @@ func qsfpeventsdInit() {
 	// qsfpd's internal eeprom
 	qsfpeventsd.VdevEp = qsfpeventsd.I2cDev{0, 0x50, 0, 0x71, 0x10, 0, 0, 0}
 
-	cmd.Init("gpio")
+	gpioInit()
 	pin, found := gpio.Pins["QS_MC_SLOT_ID"]
 	if found {
 		r, _ := pin.Value()

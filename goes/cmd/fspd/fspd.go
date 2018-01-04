@@ -28,17 +28,41 @@ import (
 	"github.com/platinasystems/go/internal/sockfile"
 )
 
-const (
-	Name    = "fspd"
-	Apropos = "fsp power supply daemon, publishes to redis"
-	Usage   = "fspd"
+var (
+	Vdev [2]I2cDev
+
+	VpageByKey map[string]uint8
+
+	WrRegDv  = make(map[string]string)
+	WrRegFn  = make(map[string]string)
+	WrRegVal = make(map[string]string)
+	WrRegRng = make(map[string][]string)
+
+	command *Command
 )
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
+const (
+	nFanTrays = 4
+	nPSUs     = 2
+)
+
+type Command struct {
+	Info
+	Init func()
+	init sync.Once
+	Gpio func()
+	gpio sync.Once
 }
 
-func New() *Command { return new(Command) }
+type Info struct {
+	mutex sync.Mutex
+	rpc   *sockfile.RpcServer
+	pub   *publisher.Publisher
+	stop  chan struct{}
+	last  map[string]float64
+	lasts map[string]string
+	lastu map[string]uint16
+}
 
 type I2cDev struct {
 	Slot       int
@@ -59,45 +83,23 @@ type I2cDev struct {
 	Delete     bool
 }
 
-var (
-	Vdev [2]I2cDev
+func (*Command) String() string { return "fspd" }
 
-	VpageByKey map[string]uint8
+func (*Command) Usage() string { return "fspd" }
 
-	WrRegDv  = make(map[string]string)
-	WrRegFn  = make(map[string]string)
-	WrRegVal = make(map[string]string)
-	WrRegRng = make(map[string][]string)
-)
-
-const (
-	nFanTrays = 4
-	nPSUs     = 2
-)
-
-type Command struct {
-	Info
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "fsp power supply daemon, publishes to redis",
+	}
 }
 
-type Info struct {
-	mutex sync.Mutex
-	rpc   *sockfile.RpcServer
-	pub   *publisher.Publisher
-	stop  chan struct{}
-	last  map[string]float64
-	lasts map[string]string
-	lastu map[string]uint16
-}
-
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
+
+	command = c
+	c.init.Do(c.Init)
 
 	err := redis.IsReady()
 	if err != nil {
@@ -117,13 +119,13 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	if c.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+	if c.rpc, err = sockfile.NewRpcServer("fspd"); err != nil {
 		return err
 	}
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "fspd", "Info")
 		if err != nil {
 			return err
 		}
@@ -1003,7 +1005,7 @@ func (h *I2cDev) Eeprom() (string, error) {
 }
 
 func (h *I2cDev) PsuStatus() string {
-	cmd.Init("gpio")
+	command.gpio.Do(command.Gpio)
 	pin, found := gpio.Pins[h.GpioPrsntL]
 	if !found {
 		h.Installed = 0

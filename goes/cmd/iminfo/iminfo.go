@@ -8,30 +8,23 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/platinasystems/go/internal/fit"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/fit"
 )
 
-const (
-	Name    = "iminfo"
-	Apropos = "FIXME"
-	Usage   = "iminfo"
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	String() string
-	Usage() string
+func (Command) String() string { return "iminfo" }
+
+func (Command) Usage() string { return "iminfo" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "FIXME",
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	if n := len(args); n == 0 {
 		return fmt.Errorf("DESTINATION: missing")
 	} else if n > 1 {
@@ -54,9 +47,6 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Name }
-
 func listImages(imageList []*fit.Image) {
 	for _, image := range imageList {
 		fmt.Printf(`  %s:
@@ -71,8 +61,4 @@ func listImages(imageList []*fit.Image) {
 			image.Arch, image.Os, image.Compression,
 			image.LoadAddr)
 	}
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

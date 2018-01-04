@@ -26,26 +26,6 @@ import (
 )
 
 const (
-	Name    = "ledgpiod"
-	Apropos = "FIXME"
-	Usage   = "ledgpiod"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() *Command { return new(Command) }
-
-type I2cDev struct {
-	Bus      int
-	Addr     int
-	MuxBus   int
-	MuxAddr  int
-	MuxValue int
-}
-
-const (
 	maxFanTrays = 4
 	maxPsu      = 2
 )
@@ -86,6 +66,8 @@ var (
 
 type Command struct {
 	Info
+	Init func()
+	init sync.Once
 }
 
 type Info struct {
@@ -98,15 +80,32 @@ type Info struct {
 	lastu map[string]uint16
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Name }
+type I2cDev struct {
+	Bus      int
+	Addr     int
+	MuxBus   int
+	MuxAddr  int
+	MuxValue int
+}
+
+func (*Command) String() string { return "ledgpiod" }
+
+func (*Command) Usage() string { return "ledgpiod" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "FIXME",
+	}
+}
+
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	cmd.Init(Name)
-
 	var si syscall.Sysinfo_t
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
 
 	err := redis.IsReady()
 	if err != nil {
@@ -128,13 +127,14 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	if c.rpc, err = sockfile.NewRpcServer(Name); err != nil {
+	if c.rpc, err = sockfile.NewRpcServer("ledgpiod"); err != nil {
 		return err
 	}
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(redis.DefaultHash+":"+v+".", Name, "Info")
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "ledgpiod",
+			"Info")
 		if err != nil {
 			return err
 		}

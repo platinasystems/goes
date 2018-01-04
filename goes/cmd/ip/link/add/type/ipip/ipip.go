@@ -15,11 +15,23 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "ipip"
-	Apropos = "add an ipip virtual link"
-	Usage   = "ip link add type ipip [ OPTIONS ]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "ipip" }
+
+func (Command) Usage() string {
+	return "ip link add type ipip [ OPTIONS ]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add an ipip virtual link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	remote ADDR
 	local ADDR
@@ -41,26 +53,9 @@ OPTIONS
 	}
 
 	[no-]encap-csum
-	[no-]pmtudisc ]`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	[no-]pmtudisc ]`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var info nl.Attrs
@@ -221,7 +216,7 @@ func (Command) Main(args ...string) error {
 		nl.Uint16Attr(encapflags)})
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(Name)},
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("ipip")},
 		nl.Attr{rtnl.IFLA_INFO_DATA, info},
 	}})
 	req, err := add.Message()

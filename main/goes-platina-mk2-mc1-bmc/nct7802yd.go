@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/nct7802yd"
 	"github.com/platinasystems/go/internal/gpio"
 	"strconv"
@@ -15,7 +14,7 @@ func nct7802ydInit() {
 	// Bus, Addr, MuxBus, MuxAddr, MuxValue
 	nct7802yd.Vdev = nct7802yd.I2cDev{0, 0x2c, 0, 0x71, 0x04}
 
-	cmd.Init("gpio")
+	gpioInit()
 	pin, found := gpio.Pins["QS_MC_SLOT_ID"]
 	if found {
 		r, _ := pin.Value()

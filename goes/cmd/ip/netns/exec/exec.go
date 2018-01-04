@@ -17,38 +17,37 @@ import (
 	"github.com/platinasystems/go/internal/netns"
 )
 
-const (
-	Name    = "exec"
-	Apropos = "network namespace"
-	Usage   = "ip netns exec [ -a[ll] | NAME ] COMMAND [ ARGS ]..."
-	Man     = `
-SEE ALSO
-	ip man netns || ip netns -man
-	man ip || ip -man`
-)
-
 var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
 	missingCommandErr = errors.New("missing COMMAND")
 	missingNameErr    = errors.New("missing NAME")
 )
-
-func New() *Command { return new(Command) }
 
 type Command struct {
 	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
+func (*Command) String() string { return "exec" }
+
+func (*Command) Usage() string {
+	return "ip netns exec [ -a[ll] | NAME ] COMMAND [ ARGS ]..."
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "network namespace",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man netns || ip netns -man
+	man ip || ip -man`,
+	}
+}
+
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Man() lang.Alt       { return man }
-func (*Command) String() string      { return Name }
-func (*Command) Usage() string       { return Usage }
 
 func (c *Command) Main(args ...string) error {
 	var x *exec.Cmd

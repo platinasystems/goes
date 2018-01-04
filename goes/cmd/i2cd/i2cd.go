@@ -22,33 +22,38 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "i2cd"
-	Apropos = "i2c server daemon"
-	Usage   = "i2cd"
-)
+type Command struct {
+	Gpio func()
+	gpio sync.Once
+	done chan struct{}
+}
 
-func New() Command { return make(Command) }
+func (*Command) String() string { return "i2cd" }
 
-type Command chan struct{}
+func (*Command) Usage() string { return "i2cd" }
 
-func (Command) Apropos() lang.Alt { return apropos }
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "i2c server daemon",
+	}
+}
 
-func (c Command) Close() error {
-	close(c)
+func (c *Command) Close() error {
+	close(c.done)
 	return nil
 }
 
-func (Command) Kind() cmd.Kind { return cmd.Daemon }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (c Command) Main(...string) error {
+func (c *Command) Main(...string) error {
 	var si syscall.Sysinfo_t
 	err := syscall.Sysinfo(&si)
 	if err != nil {
 		return err
 	}
 
-	i2cReq := new(I2cReq)
+	c.done = make(chan struct{})
+	i2cReq := &I2cReq{c}
 	rpc.Register(i2cReq)
 	rpc.HandleHTTP()
 	l, e := net.Listen("tcp", ":1233")
@@ -62,16 +67,13 @@ func (c Command) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-c:
+		case <-c.done:
 			return nil
 		case <-t.C:
 		}
 	}
 	return nil
 }
-
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }
 
 const MAXOPS = 30
 
@@ -90,7 +92,9 @@ type R struct {
 	E error
 }
 
-type I2cReq int
+type I2cReq struct {
+	c *Command
+}
 
 var b = [34]byte{0}
 var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0}
@@ -151,7 +155,7 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 						iocmd.Io_reg_wr(0x603, uint64(d[0]|0x40), 0x1)
 					}
 				case "platina-mk1-bmc":
-					cmd.Init("gpio")
+					t.c.gpio.Do(t.c.Gpio)
 					pin, found := gpio.Pins["FRU_I2C_MUX_RST_L"]
 					if found {
 						pin.SetValue(false)
@@ -191,8 +195,4 @@ func clearJS() {
 		j[k] = i
 		s[k] = r
 	}
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

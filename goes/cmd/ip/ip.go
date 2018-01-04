@@ -6,8 +6,8 @@ package ip
 
 import (
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/cli"
-	"github.com/platinasystems/go/goes/cmd/helpers"
 	"github.com/platinasystems/go/goes/cmd/ip/address"
 	"github.com/platinasystems/go/goes/cmd/ip/all"
 	"github.com/platinasystems/go/goes/cmd/ip/batch"
@@ -18,14 +18,12 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/neighbor"
 	"github.com/platinasystems/go/goes/cmd/ip/netns"
 	"github.com/platinasystems/go/goes/cmd/ip/route"
-	"github.com/platinasystems/go/goes/cmd/show_packages"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "ip"
-	Apropos = "show / manipulate routing, etc."
-	Usage   = `
+var Goes = &goes.Goes{
+	NAME: "ip",
+	USAGE: `
 	ip [ NETNS ] OBJECT [ COMMAND [ FAMILY ] [ OPTIONS ]... [ ARG ]... ]
 	ip [ NETNS ] -batch [ -x | -f ] [ - | FILE ]
 	
@@ -40,33 +38,26 @@ OPTION := { -s[tat[isti]cs] | -d[etails] | -r[esolve] |
 	-human[-readable] | -iec |
 	-l[oops] { maximum-addr-flush-attempts } | -br[ief] |
 	-o[neline] | -t[imestamp] | -ts[hort] |
-	-rc[vbuf] [size] | -c[olor] }`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(cli.New()...)
-	g.Plot(address.New(),
-		all.New("-a"),
-		all.New("-all"),
-		batch.New(),
-		fou.New(),
-		link.New(),
-		monitor.New(),
-		n.New("-n"),
-		n.New("-netns"),
-		neighbor.New(),
-		netns.New(),
-		route.New(),
-		show_packages.New("license"),
-		show_packages.New("version"),
-	)
-	return g
+	-rc[vbuf] [size] | -c[olor] }`,
+	APROPOS: lang.Alt{
+		lang.EnUS: "show / manipulate routing, etc.",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: Man,
+	},
+	ByName: map[string]cmd.Cmd{
+		"-a":       &all.Command{Name: "-a"},
+		"-all":     &all.Command{Name: "-all"},
+		"-batch":   &batch.Command{},
+		"-n":       &n.Command{Name: "-n"},
+		"-netns":   &n.Command{Name: "-netns"},
+		"address":  address.Goes,
+		"cli":      &cli.Command{Prompt: "ip> "},
+		"fou":      fou.Goes,
+		"link":     link.Goes,
+		"netns":    netns.Goes,
+		"monitor":  monitor.Command{},
+		"neighbor": neighbor.Goes,
+		"route":    route.Goes,
+	},
 }

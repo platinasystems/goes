@@ -15,33 +15,32 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "!"
-	Apropos = "run an external command"
-	Usage   = "! COMMAND [ARGS]... [&]"
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "!" }
+
+func (Command) Usage() string {
+	return "! COMMAND [ARGS]... [&]"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "run an external command",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Sh-bang!
 
 	Command executes in background if last argument ends with '&'.
-	The standard i/o redirections apply.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	The standard i/o redirections apply.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
+}
 
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Kind() cmd.Kind    { return cmd.DontFork }
+func (Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (Command) Main(args ...string) error {
 	var background bool
@@ -74,7 +73,3 @@ func (Command) Main(args ...string) error {
 		return cmd.Run()
 	}
 }
-
-func (Command) Man() lang.Alt  { return man }
-func (Command) String() string { return Name }
-func (Command) Usage() string  { return Usage }

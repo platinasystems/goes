@@ -14,30 +14,29 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "mknod"
-	Apropos = "make block or character special files"
-	Usage   = "mknod [OPTION]... NAME TYPE [MAJOR MINOR]"
-	Man     = `
-OPTIONS
-        -m MAJOR`
-)
+type Command struct{}
 
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+func (Command) String() string { return "mknod" }
+
+func (Command) Usage() string {
+	return "mknod [OPTION]... NAME TYPE [MAJOR MINOR]"
 }
 
-func New() Interface { return cmd{} }
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "make block or character special files",
+	}
+}
 
-type cmd struct{}
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+OPTIONS
+        -m MAJOR`,
+	}
+}
 
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) error {
+func (Command) Main(args ...string) error {
 	var filetype uint32 = 0
 	if len(args) == 0 {
 		return fmt.Errorf("FILE: missing")
@@ -89,10 +88,6 @@ func (cmd) Main(args ...string) error {
 	return nil
 }
 
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
 func flagValue(a []string, f string) uint32 {
 	for _, arg := range a {
 		if strings.Contains(arg, "-"+f+"=") {
@@ -108,12 +103,3 @@ func flagValue(a []string, f string) uint32 {
 	}
 	return 0
 }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)

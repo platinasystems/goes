@@ -19,23 +19,17 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-const (
-	Name    = "kexec"
-	Apropos = "load a new kernel for later execution"
-	Usage   = "kexec [OPTIONS]..."
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "kexec" }
+
+func (Command) Usage() string { return "kexec [OPTIONS]..." }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "load a new kernel for later execution",
+	}
+}
 
 func (Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-e", "-f")

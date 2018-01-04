@@ -34,10 +34,53 @@ import (
 )
 
 const (
-	Name    = "redisd"
-	Apropos = "a redis server"
-	Usage   = "redisd [-port PORT] [-set FIELD=VALUE]... [DEVICE]..."
-	Man     = `
+	Log     = varrun.Dir + "/log/redisd"
+	Sock    = sockfile.Dir + "/redisd"
+	RegSock = sockfile.Dir + "/redis-reg"
+	PubSock = sockfile.Dir + "/redis-pub"
+)
+
+type Command struct {
+	// Machines may restrict redisd listening to this list of net devices.
+	// If unset, the local admin may restrict this through
+	// /etc/default/goes ARGS.  Otherwise, the default is all active net
+	// devices.
+	Devs []string
+
+	// Machines may use this Hook to Print redis "[key: ]field: value"
+	// strings before any other daemons are run.
+	Hook func(*publisher.Publisher)
+
+	// A non-empty Machine is published to redis as "machine: Machine"
+	Machine string
+
+	// default: 6379
+	Port int
+
+	// Machines may override this list of published hashes.
+	// default: redis.DefaultHash
+	PublishedKeys []string
+
+	pubconn *net.UnixConn
+	redisd  Redisd
+	logf    *os.File
+}
+
+func (*Command) String() string { return "redisd" }
+
+func (*Command) Usage() string {
+	return "redisd [-port PORT] [-set FIELD=VALUE]... [DEVICE]..."
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "a redis server",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Run a redis server on the /run/goes/socks/redisd unix socket file.
 
@@ -46,54 +89,11 @@ OPTIONS
 	-port PORT
 		network port, default: 6379
 	-set FIELD=VALUE
-		initialize the default hash with the given field values`
-
-	Log     = varrun.Dir + "/log/redisd"
-	Sock    = sockfile.Dir + "/redisd"
-	RegSock = sockfile.Dir + "/redis-reg"
-	PubSock = sockfile.Dir + "/redis-pub"
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+		initialize the default hash with the given field values`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-// Machines may restrict redisd listening to this list of net devices.
-// If unset, the local admin may restrict this through /etc/default/goes ARGS.
-// Otherwise, the default is all active net devices.
-var Devs []string
-
-// Machines may use this Hook to Print redis "[key: ]field: value" strings
-// before any other daemons are run.
-var Hook = func(*publisher.Publisher) {}
-
-// A non-empty Machine is published to redis as "machine: Machine"
-var Machine string
-
-// Admins may override the redis listening port through /etc/default/goes ARGS.
-var Port = 6379
-
-// Machines may override this list of published hashes.
-var PublishedKeys = []string{redis.DefaultHash}
-
-func New() *Command { return new(Command) }
-
-type Command struct {
-	pubconn *net.UnixConn
-	redisd  Redisd
-	logf    *os.File
 }
 
-func (*Command) Apropos() lang.Alt { return apropos }
-func (*Command) Kind() cmd.Kind    { return cmd.Daemon }
-func (*Command) Man() lang.Alt     { return man }
-func (*Command) String() string    { return Name }
-func (*Command) Usage() string     { return Usage }
+func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Close() error {
 	var err error
@@ -127,7 +127,6 @@ func (c *Command) Close() error {
 }
 
 func (c *Command) Main(args ...string) (err error) {
-	cmd.Init(Name)
 	defer func() {
 		if err != nil {
 			c.Close()
@@ -136,14 +135,17 @@ func (c *Command) Main(args ...string) (err error) {
 
 	parm, args := parms.New(args, "-port", "-set")
 	if s := parm.ByName["-port"]; len(s) > 0 {
-		_, err = fmt.Sscan(s, &Port)
+		_, err = fmt.Sscan(s, &c.Port)
 		if err != nil {
 			return err
 		}
+	} else {
+		c.Port = 6379
 	}
+	c.redisd.port = c.Port
 
 	if len(args) == 0 {
-		if len(Devs) == 0 {
+		if len(c.Devs) == 0 {
 			itfs, ierr := net.Interfaces()
 			if ierr == nil {
 				args = make([]string, len(itfs))
@@ -152,7 +154,7 @@ func (c *Command) Main(args ...string) (err error) {
 				}
 			}
 		} else {
-			args = Devs
+			args = c.Devs
 		}
 	}
 
@@ -178,7 +180,10 @@ func (c *Command) Main(args ...string) (err error) {
 	c.redisd.devs = make(map[string][]*grs.Server)
 	c.redisd.sub = make(map[string]*grs.MultiChannelWriter)
 	c.redisd.published = make(grs.HashHash)
-	for _, k := range PublishedKeys {
+	if len(c.PublishedKeys) == 0 {
+		c.PublishedKeys = []string{redis.DefaultHash}
+	}
+	for _, k := range c.PublishedKeys {
 		c.redisd.published[k] = make(grs.HashValue)
 	}
 
@@ -329,8 +334,8 @@ func (c *Command) pubinit(fieldEqValues ...string) error {
 	if hostname, err := os.Hostname(); err == nil {
 		pub.Print("hostname: ", hostname)
 	}
-	if len(Machine) > 0 {
-		pub.Print("machine: ", Machine)
+	if len(c.Machine) > 0 {
+		pub.Print("machine: ", c.Machine)
 	}
 	if keys, cl, err := cmdline.New(); err == nil {
 		for _, k := range keys {
@@ -338,7 +343,9 @@ func (c *Command) pubinit(fieldEqValues ...string) error {
 		}
 	}
 
-	Hook(pub)
+	if c.Hook != nil {
+		c.Hook(pub)
+	}
 
 	for _, feqv := range fieldEqValues {
 		var field, value string
@@ -374,6 +381,8 @@ type Redisd struct {
 
 	cachedKeys    []string
 	cachedSubkeys map[string][]string
+
+	port int
 }
 
 type Assignments []*assignment
@@ -436,10 +445,10 @@ func (redisd *Redisd) listen(names ...string) {
 			if ip.IsMulticast() {
 				continue
 			}
-			id := fmt.Sprint("[", ip, "%", name, "]:", Port)
+			id := fmt.Sprint("[", ip, "%", name, "]:", redisd.port)
 			cfg := grs.DefaultConfig()
 			cfg = cfg.Handler(redisd)
-			cfg = cfg.Port(Port)
+			cfg = cfg.Port(redisd.port)
 			if ip.To4() == nil {
 				cfg = cfg.Proto("tcp6")
 				host := fmt.Sprint("[", ip, "%", name, "]")
@@ -635,7 +644,7 @@ func (redisd *Redisd) keys() []string {
 			}
 			redisd.cachedKeys = append(redisd.cachedKeys, k)
 		}
-		for _, k := range PublishedKeys {
+		for k := range redisd.published {
 			redisd.cachedKeys = append(redisd.cachedKeys, k)
 		}
 		sort.Strings(redisd.cachedKeys)

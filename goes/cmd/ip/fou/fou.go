@@ -6,17 +6,20 @@ package fou
 
 import (
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/helpers"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip/fou/add"
 	"github.com/platinasystems/go/goes/cmd/ip/fou/delete"
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "fou"
-	Apropos = "Foo-over-UDP receive port configuration"
-	Usage   = "ip foo COMMAND [ OPTION... ]"
-	Man     = `
+var Goes = &goes.Goes{
+	NAME:  "fou",
+	USAGE: "ip foo COMMAND [ OPTION... ]",
+	APROPOS: lang.Alt{
+		lang.EnUS: "Foo-over-UDP receive port configuration",
+	},
+	MAN: lang.Alt{
+		lang.EnUS: `
 COMMANDS
 	add
 	del[ete]
@@ -36,18 +39,10 @@ EXAMPLES
 
 SEE ALSO
 	ip fou man COMMAND || ip fou COMMAND -man
-	man ip || ip -man`
-)
-
-func New() *goes.Goes {
-	g := goes.New(Name, Usage,
-		lang.Alt{
-			lang.EnUS: Apropos,
-		},
-		lang.Alt{
-			lang.EnUS: Man,
-		})
-	g.Plot(helpers.New()...)
-	g.Plot(add.New(), delete.New())
-	return g
+	man ip || ip -man`,
+	},
+	ByName: map[string]cmd.Cmd{
+		"add":    add.Command{},
+		"delete": delete.Command{},
+	},
 }

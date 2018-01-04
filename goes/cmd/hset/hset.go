@@ -12,26 +12,16 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "hset"
-	Apropos = "set the string value of a redis hash field"
-	Usage   = "hset [-q] KEY FIELD VALUE"
-)
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "hset" }
 
-func (Command) Complete(args ...string) []string {
-	return redis.Complete(args...)
+func (Command) Usage() string { return "hset [-q] KEY FIELD VALUE" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "set the string value of a redis hash field",
+	}
 }
 
 func (Command) Main(args ...string) error {
@@ -55,4 +45,8 @@ func (Command) Main(args ...string) error {
 		fmt.Println(i)
 	}
 	return nil
+}
+
+func (Command) Complete(args ...string) []string {
+	return redis.Complete(args...)
 }

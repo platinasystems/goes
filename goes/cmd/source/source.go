@@ -13,33 +13,33 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 )
 
-const (
-	Name    = "source"
-	Apropos = "import command script"
-	Usage   = "source [-x] FILE"
-	Man     = `
-DESCRIPTION
-	This is equivalent to 'cli [-x] URL'.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() *Command { return new(Command) }
-
 type Command struct {
 	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
+func (*Command) String() string { return "source" }
+
+func (*Command) Usage() string {
+	return "source [-x] FILE"
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "import command script",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+DESCRIPTION
+	This is equivalent to 'cli [-x] URL'.`,
+	}
+}
+
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Kind() cmd.Kind      { return cmd.DontFork | cmd.CantPipe }
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork | cmd.CantPipe }
 
 func (c *Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-x")
@@ -56,7 +56,3 @@ func (c *Command) Main(args ...string) error {
 	}
 	return c.g.Main(args...)
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }

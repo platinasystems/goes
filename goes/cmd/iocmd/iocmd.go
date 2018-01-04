@@ -18,12 +18,29 @@ import (
 )
 
 const (
-	Name    = "iocmd"
-	Apropos = "read/write the CPU's I/O ports"
-	Usage   = "iocmd [[-r] | -w] IO-ADDRESS [-d DATA] [-m MODE]"
-	Man     = `
+	sys_iopl   = 172 //amd64
+	sys_ioperm = 173 //amd64
+)
+
+type Command struct{}
+
+func (Command) String() string { return "io" }
+
+func (Command) Usage() string {
+	return "io [[-r] | -w] IO-ADDRESS [-d DATA] [-m MODE]"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "read/write the CPU's I/O ports",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
-	The iocmd command reads and writes the CPU's I/O ports.
+	This command reads and writes the CPU's I/O ports.
 	  -r to read from ioport, default
 	  -w to write from ioport
 	     IO-ADDRESS is a hex value
@@ -31,27 +48,11 @@ DESCRIPTION
 	  -m MODE is one of:
 	    b (read byte data, default)
 	    w (read word data)
-	    l (read long data)`
-
-	sys_iopl   = 172 //amd64
-	sys_ioperm = 173 //amd64
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Main(...string) error
-	Man() lang.Alt
-	String() string
-	Usage() string
+	    l (read long data)`,
+	}
 }
 
-func New() Interface { return cmd{} }
-
-type cmd struct{}
-
-func (cmd) Apropos() lang.Alt { return apropos }
-
-func (cmd) Main(args ...string) (err error) {
+func (Command) Main(args ...string) (err error) {
 	flag, args := flags.New(args, "-r", "-w")
 	parm, args := parms.New(args, "-d", "-m")
 	if len(args) == 0 {
@@ -88,19 +89,6 @@ func (cmd) Main(args ...string) (err error) {
 	}
 	return nil
 }
-
-func (cmd) Man() lang.Alt  { return man }
-func (cmd) String() string { return Name }
-func (cmd) Usage() string  { return Usage }
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
-	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
 
 func Io_reg_wr(addr uint64, dat uint64, wid uint64) (err error) {
 	if err = setIoperm(addr); err != nil {

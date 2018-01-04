@@ -22,17 +22,11 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
-const (
-	Name    = "tempd"
-	Apropos = "temperature monitoring daemon, publishes to redis"
-	Usage   = "tempd"
-)
-
 var bmcIpv6LinkLocalRedis string
 
-func New() *Command { return new(Command) }
-
 type Command struct {
+	VpageByKey map[string]uint8
+
 	stop  chan struct{}
 	pub   *publisher.Publisher
 	last  map[string]float64
@@ -40,9 +34,15 @@ type Command struct {
 	lastu map[string]uint8
 }
 
-var VpageByKey map[string]uint8
+func (*Command) String() string { return "tempd" }
 
-func (*Command) Apropos() lang.Alt { return apropos }
+func (*Command) Usage() string { return "tempd" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "temperature monitoring daemon, publishes to redis",
+	}
+}
 
 func (c *Command) Close() error {
 	close(c.stop)
@@ -54,8 +54,6 @@ func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 func (c *Command) Main(...string) error {
 	var err error
 	var si syscall.Sysinfo_t
-
-	cmd.Init(Name)
 
 	if err = redis.IsReady(); err != nil {
 		log.Print("redis not ready")
@@ -91,11 +89,8 @@ func (c *Command) Main(...string) error {
 	return nil
 }
 
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }
-
 func (c *Command) update() error {
-	for k, _ := range VpageByKey {
+	for k, _ := range c.VpageByKey {
 		if strings.Contains(k, "coretemp") {
 			v := cpuCoreTemp()
 			if v != c.lasts[k] {
@@ -195,8 +190,4 @@ func cpuCoreTemp() string {
 		}
 	}
 	return v
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
 }

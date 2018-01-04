@@ -17,11 +17,23 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "vxlan"
-	Apropos = "add an vxlan virtual link"
-	Usage   = "ip link add type vxlan [ OPTIONS ]..."
-	Man     = `
+type Command struct{}
+
+func (Command) String() string { return "vxlan" }
+
+func (Command) Usage() string {
+	return "ip link add type vxlan [ OPTIONS ]..."
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add an vxlan virtual link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	{ id | vni } VNI
 		VXLAN Network Identifer (or VXLAN Segment Identifier)
@@ -132,26 +144,9 @@ OPTIONS
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var gaddr, laddr, raddr net.IP
@@ -387,7 +382,7 @@ func (Command) Main(args ...string) error {
 	}
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(Name)},
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vxlan")},
 		nl.Attr{rtnl.IFLA_INFO_DATA, info},
 	}})
 	req, err := add.Message()

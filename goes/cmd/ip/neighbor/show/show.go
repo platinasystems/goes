@@ -16,33 +16,20 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "show (default) | flush"
-	Apropos = "link address"
-	Usage   = `ip neighbor { show (default) | flush } [ proxy ]
-	[ to PREFIX ] [ dev DEV ] [ nud STATE ] [ vrf NAME ]`
-	Man = `
-SEE ALSO
-	ip man neighbor || ip neighbor -man
-	man ip || ip -man`
-)
-
-var (
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-	Flags = []interface{}{"proxy", "unused"}
-	Parms = []interface{}{"to", "dev", "nud", "vrf"}
-)
-
-func New(s string) Command { return Command(s) }
-
 type Command string
 
 func (Command) Aka() string { return "show" }
 
+func (c Command) String() string { return string(c) }
+
+func (Command) Usage() string {
+	return `
+ip neighbor { show (default) | flush } [ proxy ]
+	[ to PREFIX ] [ dev DEV ] [ nud STATE ] [ vrf NAME ]`
+}
+
 func (c Command) Apropos() lang.Alt {
-	apropos := Apropos
+	apropos := "link address"
 	if c == "show" {
 		apropos += " (default)"
 	}
@@ -51,9 +38,14 @@ func (c Command) Apropos() lang.Alt {
 	}
 }
 
-func (Command) Man() lang.Alt    { return man }
-func (c Command) String() string { return string(c) }
-func (Command) Usage() string    { return Usage }
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
+SEE ALSO
+	ip man neighbor || ip neighbor -man
+	man ip || ip -man`,
+	}
+}
 
 func (Command) Main(args ...string) error {
 	var err error
@@ -63,8 +55,8 @@ func (Command) Main(args ...string) error {
 	var toipnet *net.IPNet
 
 	opt, args := options.New(args)
-	args = opt.Flags.More(args, Flags...)
-	args = opt.Parms.More(args, Parms...)
+	args = opt.Flags.More(args, "proxy", "unused")
+	args = opt.Parms.More(args, "to", "dev", "nud", "vrf")
 
 	if n := len(args); n == 1 {
 		opt.Parms.Set("to", args[0])

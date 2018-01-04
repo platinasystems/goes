@@ -14,37 +14,37 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const (
-	Name    = "env"
-	Apropos = "run a program in a modified environment"
-	Usage   = "env [NAME[=VALUE... COMMAND [ARGS...]]]"
-	Man     = `
+type Command struct {
+	g *goes.Goes
+}
+
+func (*Command) String() string { return "env" }
+
+func (*Command) Usage() string {
+	return "env [NAME[=VALUE... COMMAND [ARGS...]]]"
+}
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "run a program in a modified environment",
+	}
+}
+
+func (*Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 DESCRIPTION
 	Running 'env' without any arguments prints all environment
 	variables.  Runnung 'env' with one argument prints the value of
 	the named variable.  Running this with at least one NAME=VALUE
 	argument sets each NAME to VALUE in the environment and runs
-	COMMAND.`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	COMMAND.`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() *Command { return new(Command) }
-
-type Command struct {
-	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-func (*Command) Kind() cmd.Kind      { return cmd.DontFork | cmd.CantPipe }
+
+func (*Command) Kind() cmd.Kind { return cmd.DontFork | cmd.CantPipe }
 
 func (c *Command) Main(args ...string) error {
 	switch len(args) {
@@ -67,7 +67,3 @@ func (c *Command) Main(args ...string) error {
 	}
 	return nil
 }
-
-func (*Command) Man() lang.Alt  { return man }
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }

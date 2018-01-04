@@ -12,34 +12,18 @@ import (
 	"github.com/platinasystems/go/internal/redis"
 )
 
-const (
-	Name    = "hwait"
-	Apropos = "wait until the redis hash field has given value"
-	Usage   = "hwait KEY FIELD VALUE [TIMEOUT(seconds)]"
-)
-
-type Interface interface {
-	Apropos() lang.Alt
-	Complete(...string) []string
-	Main(...string) error
-	String() string
-	Usage() string
-}
-
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-func New() Command { return Command{} }
-
 type Command struct{}
 
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+func (Command) String() string { return "hwait" }
 
-func (Command) Complete(args ...string) []string {
-	return redis.Complete(args...)
+func (Command) Usage() string {
+	return "hwait KEY FIELD VALUE [TIMEOUT(seconds)]"
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "wait until the redis hash field has given value",
+	}
 }
 
 func (Command) Main(args ...string) error {
@@ -60,4 +44,8 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args[4:])
 	}
 	return redis.Hwait(args[0], args[1], args[2], n*time.Second)
+}
+
+func (Command) Complete(args ...string) []string {
+	return redis.Complete(args...)
 }

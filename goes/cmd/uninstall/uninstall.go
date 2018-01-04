@@ -16,29 +16,28 @@ import (
 )
 
 const (
-	Name    = "uninstall"
-	Apropos = "uninstall this goes machine"
-	Usage   = "uninstall"
-
 	EtcInitdGoes       = "/etc/init.d/goes"
 	EtcDefaultGoes     = "/etc/default/goes"
 	BashCompletionGoes = "/usr/share/bash-completion/completions/goes"
 )
 
-var apropos = lang.Alt{
-	lang.EnUS: Apropos,
-}
-
-// Machines may use this Hook to complete its removal.
-var Hook = func() error { return nil }
-
-func New() *Command { return new(Command) }
-
 type Command struct {
+	// Machines may use this Hook to complete its removal.
+	Hook func() error
+
 	g *goes.Goes
 }
 
-func (*Command) Apropos() lang.Alt   { return apropos }
+func (*Command) String() string { return "uninstall" }
+
+func (*Command) Usage() string { return "uninstall" }
+
+func (*Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "uninstall this goes machine",
+	}
+}
+
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(...string) error {
@@ -47,13 +46,12 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 	exec.Command("/usr/sbin/update-rc.d", "goes", "remove").Run()
-	err = Hook()
+	if c.Hook != nil {
+		err = c.Hook()
+	}
 	syscall.Unlink(EtcInitdGoes)
 	syscall.Unlink(EtcDefaultGoes)
 	syscall.Unlink(BashCompletionGoes)
 	syscall.Unlink(prog.Install)
 	return err
 }
-
-func (*Command) String() string { return Name }
-func (*Command) Usage() string  { return Usage }

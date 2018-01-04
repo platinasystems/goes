@@ -14,12 +14,25 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-const (
-	Name    = "ipoib"
-	Apropos = "add a ipoib virtual link"
-	Usage   = `
+type Command struct{}
+
+func (Command) String() string { return "ipoib" }
+
+func (Command) Usage() string {
+	return `
 ip link add type ipoib [ OPTIONS ]...`
-	Man = `
+
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "add a ipoib virtual link",
+	}
+}
+
+func (Command) Man() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: `
 OPTIONS
 	pkey PKEY
 		IB P-Key
@@ -31,26 +44,9 @@ OPTIONS
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
 	ip link man add || ip link add -man
-	man ip || ip -man`
-)
-
-var (
-	apropos = lang.Alt{
-		lang.EnUS: Apropos,
+	man ip || ip -man`,
 	}
-	man = lang.Alt{
-		lang.EnUS: Man,
-	}
-)
-
-func New() Command { return Command{} }
-
-type Command struct{}
-
-func (Command) Apropos() lang.Alt { return apropos }
-func (Command) Man() lang.Alt     { return man }
-func (Command) String() string    { return Name }
-func (Command) Usage() string     { return Usage }
+}
 
 func (Command) Main(args ...string) error {
 	var info nl.Attrs
@@ -115,7 +111,7 @@ func (Command) Main(args ...string) error {
 	}
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(Name)},
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("ipoib")},
 		nl.Attr{rtnl.IFLA_INFO_DATA, info},
 	}})
 	req, err := add.Message()
