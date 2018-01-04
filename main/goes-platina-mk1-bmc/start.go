@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
+	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
@@ -66,8 +66,8 @@ func startConfGpioHook() error {
 	if err := pubEth0(); err != nil {
 		return err
 	}
-	upgrade.UpdateEnv(false)
-	upgrade.UpdateEnv(true)
+	//upgrade.UpdateEnv(false)
+	//upgrade.UpdateEnv(true)
 	return nil
 }
 
