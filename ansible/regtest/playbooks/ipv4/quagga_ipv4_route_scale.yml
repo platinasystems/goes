@@ -1,0 +1,122 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "quagga_ipv4_route_scale_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Take backup of /etc/network/interfaces
+      copy:
+        src: "{{ network_interfaces_file }}"
+        dest: "{{ network_interfaces_file_bck }}"
+        remote_src: true
+
+    - name: Copy static 16k routes network interfaces file
+      copy:
+        src: "../../files/{{inventory_hostname}}/static_16k_routes"
+        dest: "{{ network_interfaces_file }}"
+
+    - name: Restart goes
+      command: "goes restart"
+
+    - file:
+        path: "{{ ipv4_log_dir }}"
+        state: directory
+
+    - name: Get all linux routes
+      shell: "ip route show > /var/log/linux_routes.txt"
+
+    - name: Get all quagga routes
+      shell: "vtysh -c 'show ip route' > /var/log/quagga_routes.txt"
+
+    - name: Verify quagga ipv4 16k routes scale
+      test_ipv4_16k_routes_scale:
+        switch_name: "{{ inventory_hostname }}"
+        spine_list: "{{ groups['spine'] }}"
+        leaf_list: "{{ groups['leaf'] }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ ipv4_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Get goes version details
+      shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - name: Get goes tag details
+      shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store goes version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+    - name: Restore backup of /etc/network/interfaces
+      copy:
+        src: "{{ network_interfaces_file_bck }}"
+        dest: "{{ network_interfaces_file }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: "{{ network_interfaces_file_bck }}"
+        state: absent
+
+    - file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+      - /var/log/linux_routes.txt
+      - /var/log/quagga_routes.txt
+
+    - name: Restart goes
+      command: "goes restart"
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
+

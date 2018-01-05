@@ -4,6 +4,7 @@ ansible_log_file_path: ~/ansible.log
 bgp_log_dir: /var/log/regression/bgp
 ospf_log_dir: /var/log/regression/ospf
 isis_log_dir: /var/log/regression/isis
+ipv4_log_dir: /var/log/regression/ipv4
 port_provision_log_dir: /var/log/regression/port_provision
 bgp_loop_prevention_log_file: /var/log/regression/bgp_loop_prevention.log
 gobgp_loop_prevention_log_file: /var/log/gobgpd.dump
@@ -31,6 +32,9 @@ gobgp_bgp_conf_file_bck: /etc/gobgp/gobgpd.conf.bck
 
 bird_conf_file: /etc/bird/bird.conf
 bird_conf_file_bck: /etc/bird/bird.conf.bck
+
+network_interfaces_file: /etc/network/interfaces
+network_interfaces_file_bck: /etc/network/interfaces.bck
 
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
