@@ -53,7 +53,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
 	"github.com/platinasystems/go/goes/cmd/reboot"
-	"github.com/platinasystems/go/goes/cmd/redisd"
 	"github.com/platinasystems/go/goes/cmd/reload"
 	"github.com/platinasystems/go/goes/cmd/restart"
 	"github.com/platinasystems/go/goes/cmd/rm"
@@ -128,11 +127,6 @@ var Goes = &goes.Goes{
 		"ps":      ps.Command{},
 		"pwd":     pwd.Command{},
 		"reboot":  reboot.Command{},
-
-		"redisd": &redisd.Command{
-			Devs:    []string{"lo"},
-			Machine: "coreboot",
-		},
 
 		"reload":  reload.Command{},
 		"restart": &restart.Command{},
