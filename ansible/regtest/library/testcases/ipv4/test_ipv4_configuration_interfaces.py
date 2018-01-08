@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify IPV4 16k Routes Scale """
+""" Test/Verify IPV4 Configuration Interfaces """
 
 #
 # This file is part of Ansible
@@ -18,7 +18,6 @@
 # along with Ansible. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import mmap
 import shlex
 
 from collections import OrderedDict
@@ -27,29 +26,17 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_ipv4_16k_routes_scale
+module: test_ipv4_16k_configuration_interfaces
 author: Platina Systems
-short_description: Module to test and verify ipv4 16k routes scale.
+short_description: Module to test and verify ipv4 configuration interfaces.
 description:
-    Module to test and verify ipv4 routes and log the same.
+    Module to test and verify ipv4 configuration interfaces and log the same.
 options:
     switch_name:
       description:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    spine_list:
-      description:
-        - List of all spine switches.
-      required: False
-      type: list
-      default: []
-    leaf_list:
-      description:
-        - List of all leaf switches.
-      required: False
-      type: list
-      default: []
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -63,8 +50,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify ipv4 routes scale
-  test_ipv4_16k_routes_scale:
+- name: Verify ipv4 configuration interfaces
+  test_ipv4_configuration interfaces:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -120,58 +107,28 @@ def execute_commands(module, cmd):
     return out
 
 
-def verify_ipv4_routes_scale(module):
+def verify_ipv4_configuration_interfaces(module):
     """
-    Method to verify ipv4 routes scale.
+    Method to verify ipv4 configuration interfaces.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    switch_name = module.params['switch_name']
-    spine_list = module.params['spine_list']
-    leaf_list = module.params['leaf_list']
     failure_summary = ''
-    total_routes, routes_count = 0, 0
+    switch_name = module.params['switch_name']
+    switch_id = switch_name[-2::]
 
-    is_spine = True if switch_name in spine_list else False
+    # Get the current/running configurations
+    execute_commands(module, 'cat /etc/network/interfaces')
 
-    if is_spine:
-        if spine_list.index(switch_name) == 0:
-            octet = 2
-        else:
-            octet = 4
-    else:
-        if leaf_list.index(switch_name) == 0:
-            octet = 1
-        else:
-            octet = 3
-
-    linux_routes = open('/var/log/linux_routes.txt')
-    quagga_routes = open('/var/log/quagga_routes.txt')
-    lrs = mmap.mmap(linux_routes.fileno(), 0, access=mmap.ACCESS_READ)
-    qrs = mmap.mmap(quagga_routes.fileno(), 0, access=mmap.ACCESS_READ)
-
-    for i in range(1, 100):
-        if total_routes < 16000:
-            for j in range(1, 256):
-                if total_routes < 16000 and routes_count < 1000:
-                    route = '{}.{}.{}.{}'.format(octet, octet, i, j)
-                    if lrs.find(route) != -1 or qrs.find(route) != -1:
-                        pass
-                    else:
-                        RESULT_STATUS = False
-                        failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += '{} route is not present\n'.format(route)
-
-                    routes_count += 1
-                    total_routes += 1
-                else:
-                    routes_count = 0
-                    break
-        else:
-            break
-
-    linux_routes.close()
-    quagga_routes.close()
+    eth_list = [x for x in range(1, 32) if x % 2 != 0]
+    for eth in eth_list:
+        eth_out = execute_commands(module, 'ip addr show eth-{}-1'.format(eth))
+        if ('192.168.{}.{}'.format(eth, switch_id) not in eth_out and
+                '192.168.{}.255'.format(eth) not in eth_out):
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'eth-{}-1 interface '.format(eth)
+            failure_summary += 'is not configurable\n'
 
     # Get the GOES status info
     goes_status = execute_commands(module, 'goes status')
@@ -189,8 +146,6 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            spine_list=dict(required=False, type='list', default=[]),
-            leaf_list=dict(required=False, type='list', default=[]),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -198,7 +153,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_ipv4_routes_scale(module)
+    verify_ipv4_configuration_interfaces(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
