@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify GOBGP Loop Prevention """
+""" Test/Verify GOBGP/Bird Loop Prevention """
 
 #
 # This file is part of Ansible
@@ -27,11 +27,11 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_gobgp_loop_prevention
+module: test_gobgp_bird_loop_prevention
 author: Platina Systems
-short_description: Module to test and verify gobgp loop prevention.
+short_description: Module to test and verify gobgp/bird loop prevention.
 description:
-    Module to test and verify gobgp configurations and log the same.
+    Module to test and verify bgp configurations and log the same.
 options:
     switch_name:
       description:
@@ -56,8 +56,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify gobgp loop prevention
-  test_gobgp_loop_prevention:
+- name: Verify gobgp/bird loop prevention
+  test_gobgp_bird_loop_prevention:
     switch_name: "{{ inventory_hostname }}"
     log_file: "{{ gobgp_loop_prevention_log_file }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
@@ -109,14 +109,14 @@ def execute_commands(module, cmd):
     # command output as value in the hash dictionary
     exec_time = run_cli(module, 'date +%Y%m%d%T')
     key = '{0} {1} {2}'.format(module.params['switch_name'], exec_time, cmd)
-    HASH_DICT[key] = out
+    HASH_DICT[key] = out[:512] if len(out.encode('utf-8')) > 512 else out
 
     return out
 
 
-def verify_gobgp_loop_prevention(module):
+def verify_loop_prevention(module):
     """
-    Method to verify gobgp loop prevention.
+    Method to verify bgp loop prevention.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
@@ -152,7 +152,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_gobgp_loop_prevention(module)
+    verify_loop_prevention(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
