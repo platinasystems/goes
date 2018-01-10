@@ -119,7 +119,11 @@ func (Command) Main(args ...string) error {
 		if po == 1 {
 			subport -= 1
 		}
-		ixgbe := ixgbes[port&1]
+		ixgbe := ixgbes[0]
+		if port > 15+po {
+			ixgbe = ixgbes[1]
+		}
+
 		mac := macplus(eth0, 3+(port*4)+subport)
 		vfi := ((port >> 1) * 4) + subport
 		vf := fmt.Sprint(vfi)
