@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"sort"
@@ -697,6 +698,28 @@ func (m *net_namespace_main) interface_by_name(name string) (ns *net_namespace, 
 			break
 		}
 	}
+	if intf == nil {
+		// Hack in here for now - assuming vnet is run after linux interfaces
+		// are created go out and discover interface information and setup
+		// vnet structures.
+		// Need to cover case where interfaces are created after vnet is up.
+		netIntf, err := net.InterfaceByName(name)
+		if err == nil {
+			ns = &m.default_namespace
+			intf = &net_namespace_interface{
+				name:      name,
+				namespace: ns,
+				ifindex:   uint32(netIntf.Index),
+				address:   []byte(netIntf.HardwareAddr),
+			}
+			if ns.interface_by_index == nil {
+				ns.interface_by_index = make(map[uint32]*net_namespace_interface)
+				ns.interface_by_name = make(map[string]*net_namespace_interface)
+			}
+			ns.interface_by_name[name] = intf
+			ns.interface_by_index[intf.ifindex] = intf
+		}
+	}
 	return
 }
 
@@ -731,9 +754,10 @@ func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
 		return
 	}
 
-	ns, intf := m.interface_by_name(hw.Name())
-	if ns == nil {
-		panic("unknown interface: " + hw.Name())
+	_, intf := m.interface_by_name(hw.Name())
+	if intf == nil {
+		//panic("unknown interface: " + hw.Name())
+		return
 	}
 	m.set_si(intf, si)
 	h.SetAddress(intf.address)
