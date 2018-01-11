@@ -1,0 +1,149 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "gobgp_bgp_peering_ebgp_loopback_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Take backup of /etc/quagga/zebra.conf
+      copy:
+        src: "{{ quagga_zebra_conf_file }}"
+        dest: "{{ quagga_zebra_conf_file_bck }}"
+        remote_src: true
+
+    - name: Add dummy interface
+      add_dummy_interface:
+        switch_name: "{{ inventory_hostname }}"
+
+    - name: Add bgp config in /etc/gobgp/gobgpd.conf
+      copy:
+        src: "../../files/{{inventory_hostname}}/gobgp_peering_ebgp_loopback.conf"
+        dest: "{{ gobgp_bgp_conf_file }}"
+
+    - command: "vtysh -c 'copy run start'"
+
+    - name: Add config in /etc/quagga/zebra.conf
+      blockinfile:
+        path: "{{ quagga_zebra_conf_file }}"
+        marker: ""
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/zebra_gobgp_loopback.conf') }}"
+
+    - name: Restart quagga
+      service:
+        name: quagga
+        state: restarted
+
+    - name: Restart gobgpd
+      service:
+        name: gobgpd
+        state: restarted
+
+    - name: Wait for few seconds for bgp convergence
+      pause:
+        seconds: 35
+
+    - file:
+        path: "{{ bgp_log_dir }}"
+        state: directory
+
+    - name: Verify gobgp peering ebgp loopback
+      test_gobgp_peering:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/gobgp_peering_ebgp_loopback.conf') }}"
+        package_name: "gobgpd"
+        check_ping: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ bgp_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+    - name: Get goes version details
+      shell: "goes hget platina package | grep version:"
+      register: version_out
+
+    - name: Get goes tag details
+      shell: "goes hget platina package | grep tag:"
+      register: tag_out
+
+    - name: Store goes version and tag details in redis db
+      store_goes_details:
+        switch_name: "{{ inventory_hostname }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        version_details: "{{ version_out.stdout }}"
+        tag_details: "{{ tag_out.stdout }}"
+      delegate_to: 127.0.0.1
+
+    - name: Remove config file
+      file:
+        path: "{{ gobgp_bgp_conf_file }}"
+        state: absent
+
+    - name: Restore backup of /etc/quagga/zebra.conf
+      copy:
+        src: "{{ quagga_zebra_conf_file_bck }}"
+        dest: "{{ quagga_zebra_conf_file }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Remove backup file
+      file:
+        path: "{{ quagga_zebra_conf_file_bck }}"
+        state: absent
+
+    - name: Delete dummy interface
+      command: "ip link del dummy0 type dummy"
+
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - debug:
+        msg: "Failure summary: {{ result.result_detail }}"
+
+#    - name: Get playbook run details
+#      set_fact:
+#        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
+#
+#    - name: Store the ansible execution log in redis hash
+#      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
+#
+#    - file:
+#        path: "{{ ansible_log_file_path }}"
+#        state: absent

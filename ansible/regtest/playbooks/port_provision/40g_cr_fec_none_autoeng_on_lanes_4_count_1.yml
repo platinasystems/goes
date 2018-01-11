@@ -12,21 +12,39 @@
         start_time: "{{ start_time.stdout }}"
 
 
-- hosts: leaf[0]
+- hosts: leaf[0]:spine[0]
   become: true
   tasks:
     - file:
         path: "{{ port_provision_log_dir }}"
         state: directory
 
-    - name: Execute 40g_cr_fec_none_autoeng_on_lanes_4_count_1 and verify the same
-      test_port_provision:
+    - name: Take backup of /etc/goes/start file
+      copy:
+        src: /etc/goes/start
+        dest: /etc/goes/start.bck
+        remote_src: true
+
+    - name: Copy updated start file for this testcase
+      copy:
+        src: ../../templates/40g_cr_fec_none_autoeng_on_lanes_4_count_1_start_file
+        dest: /etc/goes/start
+
+    - name: Copy portprovision file for this testcase
+      copy:
+        src: ../../templates/40g_cr_lanes_4_count_1_portprovision
+        dest: /etc/goes/portprovision
+
+    - name: Restart goes
+      command: "goes restart"
+
+    - name: Verify media, speed and fec values
+      test_port_links:
         switch_name: "{{ inventory_hostname }}"
-        eth_list: "2,4,6,8,10,12,14,16"
+        eth_list: "1,3,5,7,9,11,13,15"
         speed: "auto"
         media: "copper"
         fec: "none"
-        verify_links: False
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
       register: module_out
@@ -48,40 +66,21 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
+    - name: Copy iperf parallel server shell script
+      copy:
+        src: ../../files/iperf-parallel-servers
+        dest: ~/iperf-parallel-servers.sh
+        mode: 0755
 
-- hosts: packet_generator
-  become: true
-  tasks:
-    - name: Execute port provision on packet generator and verify the same
-      test_port_provision_packet_generator:
+    - name: Start iperf server instances
+      shell: "~/iperf-parallel-servers.sh 8 server-report"
+
+    - name: Initiate iperf client and verify traffic
+      verify_iperf_traffic:
         switch_name: "{{ inventory_hostname }}"
-        ce_list: "1,3,5,7,9,11,13,15"
-        speed: "40g"
-        autoeng: True
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-      register: module_out
-
-    - command: "date +%Y%m%d%T"
-      register: end_time
-
-    - name: Store the test result in a hash in redis db on server emulator
-      store_result_in_redis:
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
-        end_time: "{{ end_time.stdout }}"
-        hash_dict: "{{ module_out.hash_dict }}"
-        log_content: ""
-      delegate_to: 127.0.0.1
-
-
-- hosts: leaf[0]
-  become: true
-  tasks:
-    - name: Verify if port links are up for eth interfaces
-      test_port_provision:
-        switch_name: "{{ inventory_hostname }}"
-        eth_list: "2,4,6,8,10,12,14,16"
-        verify_links: True
+        leaf_server: "{{ groups['leaf'][0] }}"
+        spine_server: "{{ groups['spine'][0] }}"
+        eth_list: "1,3,5,7,9,11,13,15"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ port_provision_log_dir }}"
       register: module_out
@@ -102,6 +101,11 @@
         hash_dict: "{{ module_out.hash_dict }}"
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
+
+    - name: Stop iperf server instances
+      command: "pkill iperf"
+
+    - shell: "rm ~/iperf-parallel-servers.sh"
 
     - name: Get goes version details
       shell: "goes hget platina package | grep version:"
@@ -119,36 +123,25 @@
         tag_details: "{{ tag_out.stdout }}"
       delegate_to: 127.0.0.1
 
+    - name: Restore backup of /etc/goes/start
+      copy:
+        src: /etc/goes/start.bck
+        dest: /etc/goes/start
+        remote_src: true
+        owner: root
+        group: root
+        mode: 0644
 
+    - name: Remove backup file
+      file:
+        path: /etc/goes/start.bck
+        state: absent
 
-- hosts: packet_generator
-  become: true
-  tasks:
-    - name: Reset the configuration done
-      test_port_provision_packet_generator:
-        switch_name: "{{ inventory_hostname }}"
-        ce_list: "1,3,5,7,9,11,13,15"
-        speed: "40g"
-        reset_config: True
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-      register: module_out
+    - name: Remove portprovision file
+      file:
+        path: /etc/goes/portprovision
+        state: absent
 
-    - command: "date +%Y%m%d%T"
-      register: end_time
-
-    - name: Store the test result in a hash in redis db on server emulator
-      store_result_in_redis:
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
-        end_time: "{{ end_time.stdout }}"
-        hash_dict: "{{ module_out.hash_dict }}"
-        log_content: ""
-      delegate_to: 127.0.0.1
-
-
-- hosts: leaf[0]
-  become: true
-  tasks:
     - command: "goes restart"
 
 
