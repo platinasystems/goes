@@ -84,7 +84,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/stty"
 	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
-	"github.com/platinasystems/go/goes/cmd/telnetd"
 	"github.com/platinasystems/go/goes/cmd/testcmd"
 	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
@@ -141,7 +140,6 @@ var Goes = &goes.Goes{
 				[]string{"mmclogd"},
 				[]string{"upgraded"},
 				[]string{"uptimed"},
-				[]string{"telnetd"},
 				[]string{"ucd9090d"},
 				[]string{"w83795d"},
 			},
@@ -229,7 +227,6 @@ var Goes = &goes.Goes{
 		"stty":      stty.Command{},
 		"subscribe": subscribe.Command{},
 		"sync":      sync.Command{},
-		"telnetd":   telnetd.Command{},
 		"test":      testcmd.Command{},
 		"then":      &thencmd.Command{},
 		"toggle": &toggle.Command{
