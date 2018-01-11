@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "bird_ospf_basic_{{ start_time.stdout }}"
+        hash_name: "bird_ospf_loopback_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -23,8 +23,57 @@
 
     - name: Add ospf config in /etc/bird/bird.conf
       copy:
-        src: ../../files/{{inventory_hostname}}/bird_ospf_basic.conf
+        src: ../../files/{{inventory_hostname}}/bird_ospf_loopback.conf
         dest: "{{ bird_conf_file }}"
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Change interface ip address
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-5-1 192.168.5.29 netmask 255.255.255.0
+      - ifconfig eth-27-1 192.168.27.29 netmask 255.255.255.0
+      ignore_errors: yes
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Change interface ip address
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-21-1 192.168.21.30 netmask 255.255.255.0
+      - ifconfig eth-11-1 192.168.11.30 netmask 255.255.255.0
+      ignore_errors: yes
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Change interface ip address
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-5-1 192.168.5.31 netmask 255.255.255.0
+      - ifconfig eth-21-1 192.168.21.31 netmask 255.255.255.0
+      ignore_errors: yes
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Change interface ip address
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-27-1 192.168.27.32 netmask 255.255.255.0
+      - ifconfig eth-11-1 192.168.11.32 netmask 255.255.255.0
+      ignore_errors: yes
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Add dummy interface
+      add_dummy_interface:
+        switch_name: "{{ inventory_hostname }}"
 
     - name: Restart bird
       service:
@@ -39,11 +88,12 @@
         path: "{{ ospf_log_dir }}"
         state: directory
 
-    - name: Verify bird ospf basic
+    - name: Verify bird ospf loopback
       test_bird_ospf_peering:
         switch_name: "{{ inventory_hostname }}"
-        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/bird_ospf_basic.conf') }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/bird_ospf_loopback.conf') }}"
         package_name: "bird"
+        check_routes: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ ospf_log_dir }}"
       register: module_out
@@ -94,6 +144,50 @@
       file:
         path: "{{ bird_conf_file_bck }}"
         state: absent
+
+    - name: Delete dummy interface
+      command: "ip link del dummy0 type dummy"
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Change interface ip address to default
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-5-1 10.0.5.29 netmask 255.255.255.0
+      - ifconfig eth-27-1 10.0.27.29 netmask 255.255.255.0
+      ignore_errors: yes
+
+- hosts: leaf[1]
+  become: true
+  tasks:
+    - name: Change interface ip address to default
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-21-1 10.0.21.30 netmask 255.255.255.0
+      - ifconfig eth-11-1 10.0.11.30 netmask 255.255.255.0
+      ignore_errors: yes
+
+- hosts: spine[0]
+  become: true
+  tasks:
+    - name: Change interface ip address to default
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-5-1 10.0.5.31 netmask 255.255.255.0
+      - ifconfig eth-21-1 10.0.21.31 netmask 255.255.255.0
+      ignore_errors: yes
+
+- hosts: spine[1]
+  become: true
+  tasks:
+    - name: Change interface ip address default
+      command: "{{ item }}"
+      with_items:
+      - ifconfig eth-27-1 10.0.27.32 netmask 255.255.255.0
+      - ifconfig eth-11-1 10.0.11.32 netmask 255.255.255.0
+      ignore_errors: yes
 
 
 - hosts: server_emulator

@@ -47,6 +47,12 @@ options:
         - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
+    check_routes:
+      description:
+        - Flag to indicate if we need to verify bird routes as well.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -126,9 +132,10 @@ def verify_bird_ospf_peering(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    failure_summary = ''
+    failure_summary, routes_out, route_cmd = '', '', ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
+    check_routes = module.params['check_routes']
     config_file = module.params['config_file'].splitlines()
 
     # Get the current/running configurations
@@ -142,6 +149,19 @@ def verify_bird_ospf_peering(module):
     cmd = 'birdc show ospf neighbor'
     ospf_out = execute_commands(module, cmd)
 
+    # Get all routes
+    if check_routes:
+        route_cmd = 'birdc show route'
+        routes_out = execute_commands(module, route_cmd)
+
+        # Verify if route for dummy interface is present or not
+        if 'dummy0' not in routes_out:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'ospf route for dummy interface '
+            failure_summary += 'is not present in the output '
+            failure_summary += 'of command {}\n'.format(route_cmd)
+
     for line in config_file:
         line = line.strip()
         if 'interface' in line and 'eth' in line:
@@ -153,6 +173,14 @@ def verify_bird_ospf_peering(module):
                 failure_summary += 'ospf neighbor for interface '
                 failure_summary += '{} is not present in the '.format(eth)
                 failure_summary += 'output of command {}\n'.format(cmd)
+
+            if check_routes:
+                if eth not in routes_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'ospf route for interface '
+                    failure_summary += '{} is not present in the '.format(eth)
+                    failure_summary += 'output of command {}\n'.format(route_cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -167,6 +195,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
+            check_routes=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
