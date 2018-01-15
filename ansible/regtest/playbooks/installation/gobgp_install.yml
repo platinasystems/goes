@@ -1,0 +1,100 @@
+---
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+   - name: Install Quagga
+     apt:
+        name: quagga
+
+   - name: Enable Zebra Protocols
+     lineinfile:
+        path: /etc/quagga/daemons
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+     with_items:
+      - {regexp: '^zebra=', line: 'zebra=yes'}
+      - {regexp: '^bgpd=', line: 'bgpd=no'}
+      - {regexp: '^ospfd=', line: 'ospfd=no'}
+      - {regexp: '^ospf6d=', line: 'ospf6d=no'}
+      - {regexp: '^ripd=', line: 'ripd=no'}
+      - {regexp: '^ripngd=', line: 'ripngd=no'}
+      - {regexp: '^isisd=', line: 'isisd=no'}
+      - {regexp: '^pimd=', line: 'pimd=no'}
+      - {regexp: '^ldpd=', line: 'ldpd=no'}
+      - {regexp: '^nhrpd=', line: 'nhrpd=no'}
+      - {regexp: '^eigrpd=', line: 'eigrpd=no'}
+      - {regexp: '^babeld=', line: 'babeld=no'}
+
+   - name: Copy vtysh.conf and zebra.conf files
+     copy:
+        src: "/usr/share/doc/quagga/examples/{{ item }}.sample"
+        dest: "/etc/quagga/{{ item }}"
+        remote_src: true
+        mode: 0640
+        owner: quagga
+        group: quaggavty
+     with_items:
+      - vtysh.conf
+      - zebra.conf
+
+   - name: Editing vtysh.conf File
+     lineinfile:
+        path: /etc/quagga/vtysh.conf
+        regexp: 'service integrated-vtysh-config'
+        line: '!service integrated-vtysh-config'
+
+   - name: Restarting the Quagga service
+     service:
+        name: quagga
+        state: restarted
+
+   - name: Download GoBGP package zip file
+     get_url:
+        url: "{{ gobgp_link }}"
+        dest: "/tmp/"
+        mode: 0640
+        validate_certs: no
+
+   - name: Unarchive GoBGP package zip file
+     unarchive:
+        src: "/tmp/{{ gobgp_installer_name }}"
+        dest: /usr/local/bin
+        remote_src: yes
+
+   - file:
+       path: /etc/systemd/system/gobgpd.service
+       state: touch
+
+   - name: Create gobgpd.service file
+     blockinfile:
+       path: /etc/systemd/system/gobgpd.service
+       block: |
+         [Unit]
+         Description=gobgpd
+         After=network.target syslog.target
+
+         [Service]
+         Type=simple
+         PermissionsStartOnly=yes
+         User=quagga
+         ExecStartPre=/sbin/setcap 'cap_net_bind_service=+ep' /usr/local/bin/gobgpd
+         ExecStart=/usr/local/bin/gobgpd -f /etc/gobgp/gobgpd.conf -- cpus=2
+         ExecReload=/bin/kill -s HUP $MAINPID
+         ExecStop=/bin/kill -s TERM $MAINPID
+
+         [Install]
+         WantedBy=multi-user.target
+
+   - file:
+       path: "{{ gobgp_dir }}"
+       state: directory
+
+   - file:
+       path: "{{ gobgp_dir }}/gobgpd.conf"
+       state: touch
+
+   - name: Restarting the gobgpd service
+     service:
+        name: gobgpd
+        state: restarted
