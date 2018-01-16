@@ -47,6 +47,12 @@ options:
         - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
+    check_different_areas:
+      description:
+        - Flag to indicate if we need to verify ospf with different areas or not.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -129,7 +135,8 @@ def verify_bird_ospf_routes(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
-    config_file = module.params['config_file'].splitlines()
+    check_different_areas = module.params['check_different_areas']
+    config_file = module.params['config_file']
 
     # Get the current/running configurations
     execute_commands(module, 'cat /etc/bird/bird.conf')
@@ -142,7 +149,7 @@ def verify_bird_ospf_routes(module):
     route_cmd = 'birdc show route'
     routes_out = execute_commands(module, route_cmd)
 
-    for line in config_file:
+    for line in config_file.splitlines():
         line = line.strip()
         if 'interface' in line and 'eth' in line:
             config = line.split()
@@ -153,6 +160,25 @@ def verify_bird_ospf_routes(module):
                 failure_summary += 'ospf route for interface '
                 failure_summary += '{} is not present in the '.format(eth)
                 failure_summary += 'output of command {}\n'.format(route_cmd)
+
+    if check_different_areas:
+        if config_file.count('area') >= 2:
+            # Get ospf topology
+            topology_cmd = 'birdc show ospf topology'
+            topology_out = execute_commands(module, topology_cmd)
+
+            # Verify different ospf areas
+            for line in config_file.splitlines():
+                line = line.strip()
+                if 'area' in line:
+                    line = line.split()
+                    area = line[0] + ' ' + line[1]
+                    if area not in topology_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += '{} is not present in '.format(area)
+                        failure_summary += 'the output of command {}\n'.format(
+                            topology_cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -167,6 +193,8 @@ def main():
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
+            check_different_areas=dict(required=False, type='bool',
+                                       default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
