@@ -324,7 +324,7 @@ readCommandLoop:
 							} else if k.IsDontFork() ||
 								name == os.Args[0] {
 								if flag.ByName["-x"] {
-									fmt.Println("+", sl)
+									fmt.Println("+ ", strings.Join(cmdline, " "))
 								}
 								err = c.g.Main(cmdline...)
 								break pipelineLoop
