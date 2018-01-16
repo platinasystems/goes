@@ -275,13 +275,12 @@ func (c Command) parseUnaryOp(args []string) (bool, error) {
 		return isatty.IsTerminal(uintptr(fd)), nil
 	}
 	if args[0] == "-z" {
-		return len(args[1]) != 0, nil
+		return len(args[1]) == 0, nil
 	}
 	return false, errUnexpected
 }
 
 func (c Command) parse(args []string) ([]string, bool, error) {
-	fmt.Printf("%d %v\n", len(args), args)
 	if len(args) >= 4 {
 		if args[2] == "-l" {
 			str := strconv.Itoa(len(args[3]))
