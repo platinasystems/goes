@@ -94,6 +94,8 @@
        path: "{{ gobgp_dir }}/gobgpd.conf"
        state: touch
 
+   - command: "systemctl daemon-reload"
+
    - name: Restarting the gobgpd service
      service:
         name: gobgpd

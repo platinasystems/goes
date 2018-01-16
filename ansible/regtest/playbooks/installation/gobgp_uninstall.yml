@@ -23,13 +23,7 @@
         name: quagga
         state: stopped
 
-   - name: Editing vtysh.conf File
-     lineinfile:
-        path: /etc/quagga/vtysh.conf
-        regexp: '!service integrated-vtysh-config'
-        line: 'service integrated-vtysh-config'
-
-   - name: Remove vtysh.conf  and zebra.conf files
+   - name: Remove vtysh.conf and zebra.conf files
      file:
         path: "/etc/quagga/{{ item }}"
         state: absent
