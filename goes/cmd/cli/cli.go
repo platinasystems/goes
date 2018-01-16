@@ -19,13 +19,16 @@ import (
 	"github.com/platinasystems/go/goes/cmd/cli/internal/notliner"
 	"github.com/platinasystems/go/goes/cmd/resize"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/fields"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/nocomment"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/pizza"
+	"github.com/platinasystems/go/internal/shellutils"
 	"github.com/platinasystems/go/internal/url"
 )
+
+type parsedCommand struct {
+	env  []string
+	args []string
+}
 
 type Command struct {
 	Prompt string
@@ -232,42 +235,17 @@ func (c *Command) Main(args ...string) error {
 		return fmt.Errorf("%v: unexpected", args[1:])
 	}
 
-	pl := pizza.New("|")
 	c.g.Catline = func(prompt string) (string, error) {
-		var line string
-		for {
-			s, err := prompter.Prompt(prompt)
-			if err != nil {
-				return "", err
-			}
-			if !strings.HasSuffix(s, "\\") {
-				return line + s, nil
-			}
-			line += s[:len(s)-1]
-			prompt = "... "
+		s, err := prompter.Prompt(prompt)
+		if err != nil {
+			return "", err
 		}
+		return s, nil
 	}
 
 	signal.Ignore(syscall.SIGINT)
-commandLoop:
+readCommandLoop:
 	for {
-		for _, c := range closers {
-			c.Close()
-		}
-		closers = closers[:0]
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			if err.Error() != "exit status 1" {
-				fmt.Fprintln(os.Stderr, err)
-			}
-			if isScript && !flag.ByName["-f"] {
-				return nil
-			}
-			err = nil
-		}
-		pl.Reset()
 		prompt := c.Prompt
 		if len(prompt) == 0 {
 			prompt = fmt.Sprint(c.g, "> ")
@@ -277,185 +255,245 @@ commandLoop:
 				}
 			}
 		}
-	pipelineLoop:
-		for {
-			var s string
-			s, err = c.g.Catline(prompt)
-			if err != nil {
-				continue commandLoop
+		cl, err := shellutils.Parse(prompt, c.g.Catline)
+		if err != nil {
+			if err == io.EOF {
+				return nil
 			}
-			s = strings.TrimLeft(s, " \t")
-			if len(s) == 0 {
-				continue pipelineLoop
+			fmt.Fprintln(os.Stderr, err)
+			if isScript && !flag.ByName["-f"] {
+				return nil
 			}
-			s = nocomment.New(s)
-			if len(s) == 0 {
-				continue pipelineLoop
-			}
-			pl.Slice(fields.New(s)...)
-			if pl.More {
-				prompt = "| "
-			} else {
-				break pipelineLoop
-			}
+			continue readCommandLoop
 		}
-		if len(pl.Slices) == 0 {
-			continue commandLoop
-		}
-		for _, sl := range pl.Slices {
-			name := sl[0]
-			if v := c.g.ByName[name]; v != nil {
-				k := cmd.WhatKind(v)
-				if k.IsDaemon() {
-					err = fmt.Errorf(
-						"use `goes-daemons start %s`",
-						name)
-					continue commandLoop
-				}
-				if len(pl.Slices) > 1 {
-					if k.IsCantPipe() {
-						err = fmt.Errorf(
-							"%s: can't pipe", name)
-						continue commandLoop
-					}
-				} else if k.IsDontFork() ||
-					name == os.Args[0] {
-					if flag.ByName["-x"] {
-						fmt.Println("+", sl)
-					}
-					err = c.g.Main(sl...)
-					continue commandLoop
-				}
-			}
-		}
-		iparm, args := parms.New(pl.Slices[0], "<", "<<", "<<-")
-		pl.Slices[0] = args
-		in = os.Stdin
-		if fn := iparm.ByName["<"]; len(fn) > 0 {
-			rc, err = url.Open(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			in = rc
-			closers = append(closers, rc)
-		} else if len(iparm.ByName["<<"]) > 0 ||
-			len(iparm.ByName["<<-"]) > 0 {
-			var trim bool
-			lbl := iparm.ByName["<<"]
-			if len(lbl) == 0 {
-				lbl = iparm.ByName["<<-"]
-				trim = true
-			}
-			var r, w *os.File
-			r, w, err = os.Pipe()
-			if err != nil {
-				continue commandLoop
-			}
-			in = r
-			closers = append(closers, r)
-			go func(w io.WriteCloser, lbl string) {
-				defer w.Close()
-				prompt := "<<" + fn + " "
+		// loop for each pipeline in command list
+		skipNext := false
+		for _, pl := range cl.Cmds {
+			term := pl.Cmds[len(pl.Cmds)-1].Term
+			if !skipNext {
+			pipelineLoop:
 				for {
-					s, err := c.g.Catline(prompt)
-					if err != nil || s == lbl {
-						break
+					plSlice := make([]parsedCommand, 0)
+					// loop for each command in pipeline
+					for _, sl := range pl.Cmds {
+						envMap, cmdline := sl.Slice(func(k string) string {
+							v, def := c.g.EnvMap[k]
+							if def {
+								return v
+							}
+							return os.Getenv(k)
+						})
+						// Add to our context environment if this command only set variables
+						if len(cmdline) == 0 {
+							if len(envMap) != 0 {
+								if c.g.EnvMap == nil {
+									c.g.EnvMap = envMap
+								} else {
+									for k, v := range envMap {
+										c.g.EnvMap[k] = v
+									}
+								}
+								c.g.Status = nil // Successfully set variables
+							}
+							break pipelineLoop
+						}
+						var envStr []string
+						if len(envMap) != 0 {
+							envStr = make([]string, 0)
+							for k, v := range envMap {
+								envStr = append(envStr, fmt.Sprintf("%s=%s", k, v))
+							}
+						}
+						plSlice = append(plSlice, parsedCommand{env: envStr, args: cmdline})
+
+						name := cmdline[0]
+						if v := c.g.ByName[name]; v != nil {
+							k := cmd.WhatKind(v)
+							if k.IsDaemon() {
+								err = fmt.Errorf(
+									"use `goes-daemons start %s`",
+									name)
+								break pipelineLoop
+							}
+							if len(pl.Cmds) > 1 {
+								if k.IsCantPipe() {
+									err = fmt.Errorf(
+										"%s: can't pipe", name)
+									break pipelineLoop
+								}
+							} else if k.IsDontFork() ||
+								name == os.Args[0] {
+								if flag.ByName["-x"] {
+									fmt.Println("+", sl)
+								}
+								err = c.g.Main(cmdline...)
+								break pipelineLoop
+							}
+						}
 					}
-					if trim {
-						s = strings.TrimLeft(s, " \t")
+					iparm, args := parms.New(plSlice[0].args, "<", "<<", "<<-")
+					plSlice[0].args = args
+					in = os.Stdin
+					if fn := iparm.ByName["<"]; len(fn) > 0 {
+						rc, err = url.Open(fn)
+						if err != nil {
+							break pipelineLoop
+						}
+						in = rc
+						closers = append(closers, rc)
+					} else if len(iparm.ByName["<<"]) > 0 ||
+						len(iparm.ByName["<<-"]) > 0 {
+						var trim bool
+						lbl := iparm.ByName["<<"]
+						if len(lbl) == 0 {
+							lbl = iparm.ByName["<<-"]
+							trim = true
+						}
+						var r, w *os.File
+						r, w, err = os.Pipe()
+						if err != nil {
+							break pipelineLoop
+						}
+						in = r
+						closers = append(closers, r)
+						go func(w io.WriteCloser, lbl string) {
+							defer w.Close()
+							prompt := "<<" + fn + " "
+							for {
+								s, err := c.g.Catline(prompt)
+								if err != nil || s == lbl {
+									break
+								}
+								if trim {
+									s = strings.TrimLeft(s, " \t")
+								}
+								fmt.Fprintln(w, s)
+							}
+						}(w, lbl)
 					}
-					fmt.Fprintln(w, s)
+
+					end := len(plSlice) - 1
+					oparm, args := parms.New(plSlice[end].args, ">", ">>", ">>>", ">>>>")
+					plSlice[end].args = args
+					out = os.Stdout
+					if fn := oparm.ByName[">"]; len(fn) > 0 {
+						wc, err = url.Create(fn)
+						if err != nil {
+							break pipelineLoop
+						}
+						out = wc
+						closers = append(closers, wc)
+					} else if fn = oparm.ByName[">>"]; len(fn) > 0 {
+						wc, err = url.Append(fn)
+						if err != nil {
+							break pipelineLoop
+						}
+						out = wc
+						closers = append(closers, wc)
+					} else if fn := oparm.ByName[">>>"]; len(fn) > 0 {
+						wc, err = url.Create(fn)
+						if err != nil {
+							break pipelineLoop
+						}
+						out = io.MultiWriter(os.Stdout, wc)
+						closers = append(closers, wc)
+					} else if fn := oparm.ByName[">>"]; len(fn) > 0 {
+						wc, err = url.Append(fn)
+						if err != nil {
+							break pipelineLoop
+						}
+						out = io.MultiWriter(os.Stdout, wc)
+						closers = append(closers, wc)
+					}
+
+					for i, sl := range plSlice {
+						if flag.ByName["-x"] {
+							fmt.Println("+", strings.Join(sl.env, " "), strings.Join(sl.args, " "))
+						}
+						x := c.g.Fork(sl.args...)
+						if x == nil {
+							continue
+						}
+						if len(sl.env) != 0 {
+							x.Env = os.Environ()
+							for _, s := range sl.env {
+								x.Env = append(x.Env, s)
+							}
+						}
+						x.Stderr = os.Stderr
+						if i == 0 {
+							x.Stdin = in
+						} else {
+							x.Stdin = pin
+						}
+						if i == end {
+							x.Stdout = out
+						} else {
+							pin, pout, err = os.Pipe()
+							if err != nil {
+								break pipelineLoop
+							}
+							x.Stdout = pout
+						}
+						if err = x.Start(); err != nil {
+							err = fmt.Errorf("child: %v: %v", x.Args, err)
+							break pipelineLoop
+						}
+						if i == end {
+							err = x.Wait()
+							c.g.Status = err
+						} else {
+							go func(x *exec.Cmd) {
+								err := x.Wait()
+								if err != nil {
+									fmt.Fprintln(os.Stderr, err)
+								}
+								c.g.Status = err
+								if x.Stdout != os.Stdout {
+									m, found := x.Stdout.(io.Closer)
+									if found {
+										m.Close()
+									}
+								}
+								if x.Stdin != os.Stdin {
+									m, found := x.Stdin.(io.Closer)
+									if found {
+										m.Close()
+									}
+								}
+							}(x)
+						}
+					} // end
+					break pipelineLoop
+				} // end pipelineLoop
+				for _, c := range closers {
+					c.Close()
 				}
-			}(w, lbl)
-		}
-
-		end := len(pl.Slices) - 1
-		oparm, args := parms.New(pl.Slices[end],
-			">", ">>", ">>>", ">>>>")
-		pl.Slices[end] = args
-		out = os.Stdout
-		if fn := oparm.ByName[">"]; len(fn) > 0 {
-			wc, err = url.Create(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = wc
-			closers = append(closers, wc)
-		} else if fn = oparm.ByName[">>"]; len(fn) > 0 {
-			wc, err = url.Append(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = wc
-			closers = append(closers, wc)
-		} else if fn := oparm.ByName[">>>"]; len(fn) > 0 {
-			wc, err = url.Create(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = io.MultiWriter(os.Stdout, wc)
-			closers = append(closers, wc)
-		} else if fn := oparm.ByName[">>"]; len(fn) > 0 {
-			wc, err = url.Append(fn)
-			if err != nil {
-				continue commandLoop
-			}
-			out = io.MultiWriter(os.Stdout, wc)
-			closers = append(closers, wc)
-		}
-
-		for i, sl := range pl.Slices {
-			if flag.ByName["-x"] {
-				fmt.Println("+", strings.Join(sl, " "))
-			}
-			x := c.g.Fork(sl...)
-			if x == nil {
-				continue
-			}
-			x.Stderr = os.Stderr
-			if i == 0 {
-				x.Stdin = in
-			} else {
-				x.Stdin = pin
-			}
-			if i == end {
-				x.Stdout = out
-			} else {
-				pin, pout, err = os.Pipe()
+				closers = closers[:0]
 				if err != nil {
-					continue commandLoop
-				}
-				x.Stdout = pout
-			}
-			if err = x.Start(); err != nil {
-				err = fmt.Errorf("child: %v: %v", x.Args, err)
-				continue commandLoop
-			}
-			if i == end {
-				err = x.Wait()
-				c.g.Status = err
-			} else {
-				go func(x *exec.Cmd) {
-					err := x.Wait()
-					if err != nil {
+					if err == io.EOF {
+						return nil
+					}
+					if err.Error() != "exit status 1" {
 						fmt.Fprintln(os.Stderr, err)
 					}
-					c.g.Status = err
-					if x.Stdout != os.Stdout {
-						m, found := x.Stdout.(io.Closer)
-						if found {
-							m.Close()
-						}
+					if isScript && !flag.ByName["-f"] {
+						return nil
 					}
-					if x.Stdin != os.Stdin {
-						m, found := x.Stdin.(io.Closer)
-						if found {
-							m.Close()
-						}
-					}
-				}(x)
+					err = nil
+				}
 			}
-		}
-	}
+			skipNext = false
+			if c.g.Status != nil {
+				if term.String() == "&&" {
+					skipNext = true
+				}
+			} else {
+				if term.String() == "||" {
+					skipNext = true
+				}
+			}
+		} // loop for each pipeline in command list
+	} // loop forever reading commands
 	return fmt.Errorf("oops, shouldn't be here")
 }

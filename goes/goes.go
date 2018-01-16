@@ -74,6 +74,8 @@ type Goes struct {
 
 	cache  cache
 	parent *Goes
+
+	EnvMap map[string]string
 }
 
 func (g *Goes) NotTaken() bool {
