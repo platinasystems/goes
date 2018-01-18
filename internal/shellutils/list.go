@@ -7,13 +7,13 @@ package shellutils
 // unconditional execution operators (; and &) or conditional
 // execution operators (|| and &&).
 type List struct {
-	Cmds []Pipeline
+	Cmds []Cmdline
 }
 
-func (ls *List) add(pl *Pipeline) {
+func (ls *List) add(cl *Cmdline) {
 	if ls.Cmds == nil {
-		ls.Cmds = make([]Pipeline, 0)
+		ls.Cmds = make([]Cmdline, 0)
 	}
-	ls.Cmds = append(ls.Cmds, *pl)
-	*pl = Pipeline{}
+	ls.Cmds = append(ls.Cmds, *cl)
+	*cl = Cmdline{}
 }

@@ -5,28 +5,29 @@
 package ifcmd
 
 import (
+	"errors"
+	"io"
+
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/shellutils"
 )
 
-type Command struct {
-	g *goes.Goes
-}
+type Command struct{}
 
-func (*Command) String() string { return "if" }
+func (Command) String() string { return "if" }
 
-func (*Command) Usage() string {
+func (Command) Usage() string {
 	return "if COMMAND ; then COMMAND else COMMAND endif"
 }
 
-func (*Command) Apropos() lang.Alt {
+func (Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: "conditional command",
 	}
 }
 
-func (*Command) Man() lang.Alt {
+func (Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
@@ -34,18 +35,112 @@ DESCRIPTION
 	}
 }
 
-func (*Command) Kind() cmd.Kind { return cmd.DontFork | cmd.Conditional }
-
-func (c *Command) Goes(g *goes.Goes) { c.g = g }
-
-func (c *Command) Main(args ...string) error {
-	if c.g.NotTaken() {
-		c.g.Blocks = append(c.g.Blocks, goes.BlockIfNotTaken)
-		return nil
+func (c Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
+	var ifList, thenList, elseList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+	curList := &ifList
+	cl := ls.Cmds[0]
+	// if <command>
+	if len(cl.Cmds) > 1 {
+		cl.Cmds = cl.Cmds[1:]
+		ls.Cmds[0] = cl
+	} else {
+		ls.Cmds = ls.Cmds[1:]
 	}
-	c.g.Blocks = append(c.g.Blocks, goes.BlockIf)
-	if len(args) == 0 {
-		return nil
+	for {
+		nextls, _, runfun, err := g.ProcessList(ls)
+		if err != nil {
+			return nil, nil, err
+		}
+		*curList = append(*curList, runfun)
+		ls = *nextls
+		for len(ls.Cmds) == 0 {
+			newls, err := shellutils.Parse("if>", g.Catline)
+			if err != nil {
+				return nil, nil, err
+			}
+			ls = *newls
+		}
+		cl := ls.Cmds[0]
+		name := cl.Cmds[0].String()
+		if name == "then" {
+			if curList != &ifList {
+				return nil, nil, errors.New("Unexpected 'then'")
+			}
+			curList = &thenList
+			if len(cl.Cmds) > 1 {
+				cl.Cmds = cl.Cmds[1:]
+				ls.Cmds[0] = cl
+			} else {
+				ls.Cmds = ls.Cmds[1:]
+			}
+		}
+		if name == "else" {
+			if curList != &thenList {
+				return nil, nil, errors.New("Unexpected 'else'")
+			}
+			curList = &elseList
+			if len(cl.Cmds) > 1 {
+				cl.Cmds = cl.Cmds[1:]
+				ls.Cmds[0] = cl
+			} else {
+				ls.Cmds = ls.Cmds[1:]
+			}
+		}
+		if name == "elif" {
+			if curList != &thenList {
+				return nil, nil, errors.New("Unexpected 'elif'")
+			}
+			newls, elifFun, err := c.Block(g, ls)
+			if err != nil {
+				return nil, nil, err
+			}
+			runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				g.Status = nil
+				return elifFun(stdin, stdout, stderr, false, false)
+			}
+			elseList = append(elseList, runfun)
+			ls = *newls
+			break
+		}
+		if name == "fi" {
+			if curList != &thenList && curList != &elseList {
+				return nil, nil, errors.New("Unexpected 'fi'")
+			}
+			if len(cl.Cmds) > 1 {
+				return nil, nil, errors.New("unexpected text after fi")
+			}
+			break
+		}
+
 	}
-	return c.g.Main(args...)
+	blockfun, err := makeBlockFunc(g, ifList, thenList, elseList)
+
+	return &ls, blockfun, err
+}
+
+func runList(pipeline []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+	for _, runent := range pipeline {
+		err := runent(stdin, stdout, stderr)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func makeBlockFunc(g *goes.Goes, ifList, thenList, elseList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
+	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+		err := runList(ifList, stdin, stdout, stderr)
+		if err == nil && g.Status == nil {
+			err = runList(thenList, stdin, stdout, stderr)
+		} else {
+			err = runList(elseList, stdin, stdout, stderr)
+		}
+		return err
+	}
+	return runfun, nil
+}
+
+func (Command) Main(args ...string) error {
+	return errors.New("internal error")
 }

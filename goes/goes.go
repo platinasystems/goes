@@ -10,6 +10,7 @@ package goes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,32 +25,21 @@ import (
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/go/internal/shellutils"
+	"github.com/platinasystems/go/internal/url"
 )
-
-var blockNames = [...]string{
-	"BlockIf",
-	"BlockIfNotTaken",
-	"BlockIfThenNotTaken",
-	"BlockIfThenTaken",
-	"BlockIfElseNotTaken",
-	"BlockIfElseTaken"}
-
-type block int
 
 const (
-	BlockIf = iota
-	BlockIfNotTaken
-	BlockIfThenNotTaken
-	BlockIfThenTaken
-	BlockIfElseNotTaken
-	BlockIfElseTaken
+	VerboseQuiet = iota
+	VerboseVerify
+	VerboseDebug
 )
 
-func (b block) String() string {
-	return blockNames[b]
+type Blocker interface {
+	Block(*Goes, shellutils.List) (*shellutils.List, func(io.Reader, io.Writer, io.Writer, bool, bool) error, error)
 }
-
 type akaer interface {
 	Aka() string
 }
@@ -67,10 +57,8 @@ type Goes struct {
 
 	Catline func(string) (string, error)
 
-	Blocks []block
-
-	Status error
-	debug  bool
+	Status    error
+	Verbosity int
 
 	cache  cache
 	parent *Goes
@@ -78,14 +66,260 @@ type Goes struct {
 	EnvMap map[string]string
 }
 
-func (g *Goes) NotTaken() bool {
-	if len(g.Blocks) != 0 &&
-		(g.Blocks[len(g.Blocks)-1] == BlockIfNotTaken ||
-			g.Blocks[len(g.Blocks)-1] == BlockIfThenNotTaken ||
-			g.Blocks[len(g.Blocks)-1] == BlockIfElseNotTaken) {
-		return true
+func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutils.Word, func(io.Reader, io.Writer, io.Writer) error, error) {
+	var (
+		closers []io.Closer
+		term    shellutils.Word
+	)
+	isLast := false
+	pipeline := make([]func(io.Reader, io.Writer, io.Writer, bool, bool) error, 0)
+	for len(ls.Cmds) != 0 && !isLast {
+		cl := ls.Cmds[0]
+		term = cl.Term
+		if term.String() != "|" {
+			isLast = true
+		}
+
+		var runfun func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error
+		name := cl.Cmds[0].String()
+		if v := g.ByName[name]; v != nil {
+			if method, found := v.(Blocker); found {
+				var (
+					newls *shellutils.List
+					err   error
+				)
+				newls, runfun, err = method.Block(g, ls)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+
+				ls = *newls
+				cl = ls.Cmds[0]
+				ls.Cmds = ls.Cmds[1:]
+				term = cl.Term
+				if term.String() != "|" {
+					isLast = true
+				}
+				pipeline = append(pipeline, runfun)
+				continue
+			}
+		}
+		runfun, err := g.ProcessCommand(cl, &closers)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		ls.Cmds = ls.Cmds[1:]
+		pipeline = append(pipeline, runfun)
 	}
-	return false
+
+	pipefun, err := g.MakePipefun(pipeline, &closers)
+	return &ls, &term, pipefun, err
+}
+
+func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
+	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+		envMap, args := cl.Slice(func(k string) string {
+			v, def := g.EnvMap[k]
+			if def {
+				return v
+			}
+			return os.Getenv(k)
+		})
+		// Add to our context environment if this command only set variables
+		if len(args) == 0 {
+			if len(envMap) != 0 {
+				if g.EnvMap == nil {
+					g.EnvMap = envMap
+				} else {
+					for k, v := range envMap {
+						g.EnvMap[k] = v
+					}
+				}
+				g.Status = nil // Successfully set variables
+			}
+			return nil
+		}
+		name := args[0]
+		if v := g.ByName[name]; v != nil {
+			k := cmd.WhatKind(v)
+			if k.IsDaemon() {
+				return fmt.Errorf(
+					"use `goes-daemons start %s`",
+					name)
+			}
+			if !isFirst || !isLast {
+				if k.IsCantPipe() {
+					return fmt.Errorf(
+						"%s: can't pipe", name)
+				}
+			} else if k.IsDontFork() ||
+				name == os.Args[0] {
+				return g.Main(args...)
+			}
+		} else {
+			return fmt.Errorf("%s: command not found", name)
+		}
+		in := stdin
+		if isFirst {
+			var iparm *parms.Parms
+			isFirst = false
+			iparm, args = parms.New(args, "<", "<<", "<<-")
+			if fn := iparm.ByName["<"]; len(fn) > 0 {
+				rc, err := url.Open(fn)
+				if err != nil {
+					return err
+				}
+				in = rc
+				*closers = append(*closers, rc)
+			} else if len(iparm.ByName["<<"]) > 0 ||
+				len(iparm.ByName["<<-"]) > 0 {
+				var trim bool
+				lbl := iparm.ByName["<<"]
+				if len(lbl) == 0 {
+					lbl = iparm.ByName["<<-"]
+					trim = true
+				}
+				r, w, err := os.Pipe()
+				if err != nil {
+					return err
+				}
+				in = r
+				*closers = append(*closers, r)
+				go func(w io.WriteCloser, lbl string) {
+					defer w.Close()
+					prompt := "<<" + fn + " "
+					for {
+						s, err := g.Catline(prompt)
+						if err != nil || s == lbl {
+							break
+						}
+						if trim {
+							s = strings.TrimLeft(s, " \t")
+						}
+						fmt.Fprintln(w, s)
+					}
+				}(w, lbl)
+			}
+		}
+		out := stdout
+		if isLast {
+			var oparm *parms.Parms
+			oparm, args = parms.New(args, ">", ">>", ">>>", ">>>>")
+			if fn := oparm.ByName[">"]; len(fn) > 0 {
+				wc, err := url.Create(fn)
+				if err != nil {
+					return err
+				}
+				out = wc
+				*closers = append(*closers, wc)
+			} else if fn = oparm.ByName[">>"]; len(fn) > 0 {
+				wc, err := url.Append(fn)
+				if err != nil {
+					return err
+				}
+				out = wc
+				*closers = append(*closers, wc)
+			} else if fn := oparm.ByName[">>>"]; len(fn) > 0 {
+				wc, err := url.Create(fn)
+				if err != nil {
+					return err
+				}
+				out = io.MultiWriter(os.Stdout, wc)
+				*closers = append(*closers, wc)
+			} else if fn := oparm.ByName[">>"]; len(fn) > 0 {
+				wc, err := url.Append(fn)
+				if err != nil {
+					return err
+				}
+				out = io.MultiWriter(os.Stdout, wc)
+				*closers = append(*closers, wc)
+			}
+		}
+		var envStr []string
+		if len(envMap) != 0 {
+			envStr = make([]string, 0)
+			for k, v := range envMap {
+				envStr = append(envStr, fmt.Sprintf("%s=%s", k, v))
+			}
+		}
+		if g.Verbosity >= VerboseVerify {
+			fmt.Println("+", strings.Join(envStr, " "), strings.Join(args, " "))
+		}
+		x := g.Fork(args...)
+		if len(envStr) != 0 {
+			x.Env = os.Environ()
+			for _, s := range envStr {
+				x.Env = append(x.Env, s)
+			}
+		}
+		x.Stdin = in
+		x.Stdout = out
+		x.Stderr = stderr
+
+		if err := x.Start(); err != nil {
+			err = fmt.Errorf("child: %v: %v", x.Args, err)
+			return err
+		}
+		if isLast {
+			err := x.Wait()
+			g.Status = err
+		} else {
+			go func(x *exec.Cmd) {
+				err := x.Wait()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+				}
+				if x.Stdout != os.Stdout {
+					m, found := x.Stdout.(io.Closer)
+					if found {
+						m.Close()
+					}
+				}
+				if x.Stdin != os.Stdin {
+					m, found := x.Stdin.(io.Closer)
+					if found {
+						m.Close()
+					}
+				}
+			}(x)
+		}
+		return nil
+	}
+	return runfun, nil
+}
+
+func (g *Goes) MakePipefun(pipeline []func(io.Reader, io.Writer, io.Writer, bool, bool) error, closers *[]io.Closer) (func(io.Reader, io.Writer, io.Writer) error, error) {
+	pipefun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		var (
+			err error
+			pin *os.File
+		)
+		defer func() {
+			for _, c := range *closers {
+				c.Close()
+			}
+		}()
+		in := stdin
+		end := len(pipeline) - 1
+		for i, runfun := range pipeline {
+			out := stdout
+			if i != end {
+				var pout *os.File
+				pin, pout, err = os.Pipe()
+				if err != nil {
+					break
+				}
+				out = pout
+			}
+			err = runfun(in, out, stderr, i == 0, i == end)
+			if err != nil {
+				break
+			}
+			in = pin
+		}
+		return err
+	}
+	return pipefun, nil
 }
 
 func Replace(s, name string) string {
@@ -107,11 +341,8 @@ func (g *Goes) Goes(parent *Goes) {
 // Fork returns an exec.Cmd ready to Run or Output this program with the
 // given args.
 func (g *Goes) Fork(args ...string) *exec.Cmd {
-	if g.debug {
-		fmt.Printf("F*$=%v %v %v\n", g.Status, g.Blocks, args)
-	}
-	if g.NotTaken() {
-		return nil
+	if g.Verbosity >= VerboseDebug {
+		fmt.Printf("F*$=%v %v\n", g.Status, args)
 	}
 	a := append(g.Path(), args...)
 	x := exec.Command(prog.Name(), a[1:]...)
@@ -154,8 +385,8 @@ func (g *Goes) Main(args ...string) error {
 		cli.(goeser).Goes(g)
 	}
 	cliFlags, cliArgs := flags.New(args, "-d", "-f", "-no-liner", "-x")
-	if cliFlags.ByName["-d"] {
-		g.debug = true
+	if cliFlags.ByName["-d"] && g.Verbosity < VerboseDebug {
+		g.Verbosity = VerboseDebug
 	}
 	if n := len(cliArgs); n == 0 {
 		if cli != nil {
@@ -212,8 +443,8 @@ func (g *Goes) Main(args ...string) error {
 
 	g.shift(args)
 
-	if g.debug {
-		fmt.Printf("$=%v %v %v\n", g.Status, g.Blocks, args)
+	if g.Verbosity >= VerboseDebug {
+		fmt.Printf("$=%v %v\n", g.Status, args)
 	}
 
 	v, found := g.ByName[args[0]]
@@ -231,10 +462,6 @@ func (g *Goes) Main(args ...string) error {
 	}
 
 	k := cmd.WhatKind(v)
-	if !k.IsConditional() && g.NotTaken() {
-		return nil
-	}
-
 	if k.IsDaemon() {
 		sig := make(chan os.Signal)
 		signal.Notify(sig, syscall.SIGTERM)
@@ -352,4 +579,87 @@ func wait(v cmd.Cmd, ch chan os.Signal) {
 		}
 		break
 	}
+}
+
+func (g *Goes) ensureTerminated(ls shellutils.List) (*shellutils.List, error) {
+	for {
+		term := ""
+		for _, cl := range ls.Cmds {
+			term = cl.Term.String()
+			if term != "||" && term != "&&" && term != "|" {
+				return &ls, nil
+			}
+		}
+		newls, err := shellutils.Parse(fmt.Sprintf("%s>>", term), g.Catline)
+		if err != nil {
+			return nil, err
+		}
+		for _, cl := range (*newls).Cmds {
+			ls.Cmds = append(ls.Cmds, cl)
+		}
+	}
+	return nil, errors.New("ensureTerminated: internal error")
+}
+
+type piperun struct {
+	f func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+	t shellutils.Word
+}
+
+func (g *Goes) ProcessList(ls shellutils.List) (*shellutils.List, *shellutils.Word, func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
+	var (
+		pipeline []piperun
+		term     shellutils.Word
+	)
+
+	newls, err := g.ensureTerminated(ls)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	ls = *newls
+	for len(ls.Cmds) != 0 {
+		nextls, term, runner, err := g.ProcessPipeline(ls)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		ls = *nextls
+		pipeline = append(pipeline, piperun{f: runner, t: *term})
+		if term.String() != "&&" && term.String() != "||" {
+			break
+		}
+	}
+
+	listfun, err := g.MakeListFunc(pipeline)
+
+	return &ls, &term, listfun, nil
+}
+
+func (g *Goes) MakeListFunc(pipeline []piperun) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
+	listfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+		var err error
+		skipNext := false
+		for _, runfun := range pipeline {
+			term := runfun.t
+			if !skipNext {
+				err = runfun.f(stdin, stdout, stderr)
+				if err != nil {
+					fmt.Fprintln(stderr, err)
+					g.Status = err
+				}
+				skipNext = false
+			}
+			if g.Status != nil {
+				if term.String() == "&&" {
+					skipNext = true
+				}
+			} else {
+				if term.String() == "||" {
+					skipNext = true
+
+				}
+			}
+		}
+		return nil
+	}
+	return listfun, nil
 }

@@ -26,7 +26,6 @@ func Parse(prompt string, srcin func(string) (string, error)) (*List, error) {
 		return nil, err
 	}
 	cl := List{}
-	pl := Pipeline{}
 	c := Cmdline{}
 	w := Word{}
 	inWS := true
@@ -65,8 +64,7 @@ processRune:
 				w.String() == "||" {
 				c.Term = w
 				w = Word{}
-				pl.add(&c)
-				cl.add(&pl)
+				cl.add(&c)
 			} else {
 				c.add(&w)
 			}
@@ -89,10 +87,7 @@ processRune:
 				}
 			}
 			c.Term = w
-			pl.add(&c)
-			if w.String() == "||" {
-				cl.add(&pl)
-			}
+			cl.add(&c)
 			w = Word{}
 			inWS = true
 			continue
@@ -214,10 +209,7 @@ processRune:
 		c.add(&w)
 	}
 	if len(c.Cmds) != 0 {
-		pl.add(&c)
-	}
-	if len(pl.Cmds) != 0 {
-		cl.add(&pl)
+		cl.add(&c)
 	}
 	return &cl, nil
 }

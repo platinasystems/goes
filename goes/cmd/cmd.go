@@ -14,6 +14,7 @@ type Cmd interface {
 	Usage() string
 	/* Optional
 	Aka() string
+	Block(*Goes, shellutils.List) (*shellutils.List, func(io.Reader, io.Writer, io.Writer, bool, bool) error, error)
 	Close() error
 	Complete(...string) []string
 	Goes(*goes.Goes)
