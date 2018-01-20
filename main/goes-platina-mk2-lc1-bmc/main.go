@@ -14,7 +14,11 @@ import (
 
 func main() {
 	var ecode int
-	if err := Goes.Main(os.Args...); err != nil {
+	args := os.Args
+	if os.Args[0] == "/init" {
+		args = os.Args[1:]
+	}
+	if err := Goes.Main(args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1
 	}
