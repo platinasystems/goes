@@ -21,6 +21,9 @@ import (
 func startConfGpioHook() error {
 	var deviceVer byte
 
+	os.Mkdir("/root", 0700)
+	os.Mkdir("/tmp", 01777)
+	os.Mkdir("/var", 0755)
 	gpioInit()
 	pin, found := gpio.Pins["QSPI_MUX_SEL"]
 	if found {
