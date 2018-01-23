@@ -46,8 +46,8 @@ goes_installer_url: '{{ goes_url_path }}{{ goes_installer_name }}'
 goes_coreboot_installer_name: 'coreboot-platina-mk1.rom'
 goes_coreboot_installer_url: '{{ goes_url_path }}{{ goes_coreboot_installer_name }}'
 
-frr_installer_name: 'frr_3.0.2-1-debian8.1_amd64.deb'
-frr_link: 'https://github.com/FRRouting/frr/releases/download/frr-3.0.2/{{ frr_installer_name }}'
+frr_installer_name: 'frr_3.0.3-1_debian8.1_amd64.deb'
+frr_link: 'https://github.com/FRRouting/frr/releases/download/frr-3.0.3/{{ frr_installer_name }}'
 
 gobgp_installer_name: 'gobgp_1.26_linux_amd64.tar.gz'
 gobgp_link: 'https://github.com/osrg/gobgp/releases/download/v1.26/{{ gobgp_installer_name }}'
