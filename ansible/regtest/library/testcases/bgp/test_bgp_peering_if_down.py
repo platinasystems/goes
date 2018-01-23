@@ -146,25 +146,33 @@ def check_bgp_neighbors(module):
     cmd = "vtysh -c 'sh ip bgp neighbors'"
     bgp_out = execute_commands(module, cmd)
 
-    for line in config_file:
-        line = line.strip()
-        if 'neighbor' in line and 'remote-as' in line:
-            config = line.split()
-            neighbor_ip = config[1]
-            remote_as = config[3]
-            if neighbor_ip not in bgp_out or remote_as not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+    if bgp_out:
+        for line in config_file:
+            line = line.strip()
+            if 'neighbor' in line and 'remote-as' in line:
+                config = line.split()
+                neighbor_ip = config[1]
+                remote_as = config[3]
+                if neighbor_ip not in bgp_out or remote_as not in bgp_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
 
-            if 'BGP state = Established' not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp state of neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not Established in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+                if 'BGP state = Established' not in bgp_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'bgp state of neighbor {} '.format(
+                        neighbor_ip)
+                    failure_summary += 'is not Established in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'bgp neighbor relationship cannot be verified '
+        failure_summary += 'because output of command {} '.format(cmd)
+        failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -185,7 +193,7 @@ def verify_bgp_peering_interface_down(module):
     execute_commands(module, 'ip link add dummy0 type dummy')
 
     # Assign ip to this created dummy0 interface
-    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.0'.format(
+    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.255'.format(
         switch_name[-2::]
     )
     execute_commands(module, cmd)
