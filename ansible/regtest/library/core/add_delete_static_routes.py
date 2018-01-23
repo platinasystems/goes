@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Add Dummy Interface """
+""" Add/Delete Static Routes """
 
 #
 # This file is part of Ansible
@@ -24,30 +24,47 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: add_dummy_interface
+module: add_delete_static_routes
 author: Platina Systems
-short_description: Module to add dummy interface.
+short_description: Module to add/delete static routes.
 description:
-    Module to add dummy interface.
+    Module to add/delete static routes for BGP.
 options:
     switch_name:
       description:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
+    config_file:
+      description:
+        - Config file describing routes info.
+      required: False
+      type: str
+    delete:
+      description:
+        - Flag to indicate if we want to add a route or delete it.
+      required: False
+      type: bool
+      default: False
 """
 
 EXAMPLES = """
-- name: Add dummy interface
-  add_dummy_interface:
+- name: Add static routes
+  add_delete_static_routes:
     switch_name: "{{ inventory_hostname }}"
+    delete: False
+
+- name: Delete static routes
+  add_delete_static_routes:
+    switch_name: "{{ inventory_hostname }}"
+    delete: True
 """
 
 RETURN = """
-msg:
-  description: String describing which dummy interface ip got assigned.
+hash_dict:
+  description: Dictionary containing key value pairs to store in hash.
   returned: always
-  type: str
+  type: dict
 """
 
 
@@ -75,21 +92,21 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
+            config_file=dict(required=False, type='str', default=''),
+            delete=dict(required=False, type='bool', default=False),
         )
     )
 
-    # Get the switch name
     switch_name = module.params['switch_name']
+    config_file = module.params['config_file'].splitlines()
+    msg = ''
 
-    # Add dummy0 interface
-    run_cli(module, 'ip link add dummy0 type dummy')
+    for line in config_file:
+        if module.params['delete']:
+            line.replace('add', 'del')
 
-    # Assign ip to this created dummy0 interface
-    ip = '192.168.{}.1'.format(switch_name[-2::])
-    cmd = 'ifconfig dummy0 {} netmask 255.255.255.255'.format(ip)
-    run_cli(module, cmd)
-    
-    msg = 'Added dummy0 interface with ip {} to {}'.format(ip, switch_name)
+        run_cli(module, line)
+        msg += "On switch {}, executed '{}'".format(switch_name, line)
 
     # Exit the module and return the required JSON.
     module.exit_json(
