@@ -151,7 +151,7 @@ var Goes = &goes.Goes{
 				"packages": goes.ShowPackages{},
 			},
 		},
-		"slashinit": &slashinit.Command{},
+		"/init":     &slashinit.Command{},
 		"sleep":     sleep.Command{},
 		"source":    &source.Command{},
 		"start":     &start.Command{},

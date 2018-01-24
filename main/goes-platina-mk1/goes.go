@@ -188,9 +188,9 @@ var Goes = &goes.Goes{
 				"packages": goes.ShowPackages{},
 			},
 		},
-		"slashinit": &slashinit.Command{},
-		"sleep":     sleep.Command{},
-		"source":    &source.Command{},
+		"/init":  &slashinit.Command{},
+		"sleep":  sleep.Command{},
+		"source": &source.Command{},
 		"start": &start.Command{
 			ConfHook: func() error {
 				return redis.Hwait(redis.DefaultHash,
