@@ -131,15 +131,14 @@ def verify_traffic(module):
     switch_list = module.params['switch_list']
     packet_size_list = module.params['packet_size_list'].split(',')
 
-    switch_id = switch_name[-2::]
     switch_list.remove(switch_name)
     neighbor_switch = switch_list[0]
-    neighbor_id = neighbor_switch[-2::]
+    
+    self_ip = '192.168.{}.1'.format(switch_name[-2::])
+    neighbor_ip = '192.168.{}.1'.format(neighbor_switch[-2::])
 
     # Verify ping
-    ping_cmd = 'ping -w 5 -c 3 -I 192.168.{}.1 192.168.{}.1'.format(
-        switch_id, neighbor_id
-    )
+    ping_cmd = 'ping -w 3 -c 3 -I {} {}'.format(self_ip, neighbor_ip)
     ping_out = execute_commands(module, ping_cmd)
     if '0% packet loss' not in ping_out:
         RESULT_STATUS = False
@@ -149,8 +148,8 @@ def verify_traffic(module):
     # Initiate iperf client and verify traffic
     for size in packet_size_list:
         port += 1
-        traffic_cmd = 'iperf -c 192.168.{}.1 -t 5 -M {} -p {} -P 1 -B 192.168.{}.1'.format(
-            neighbor_id, size, port, switch_id
+        traffic_cmd = 'iperf -c {} -t 5 -M {} -p {} -P 1 -B {}'.format(
+            neighbor_ip, size, port, self_ip
         )
         traffic_out = execute_commands(module, traffic_cmd)
 
