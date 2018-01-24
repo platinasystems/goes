@@ -1,0 +1,34 @@
+---
+
+
+- hosts: leaf:spine
+  become: true
+  ignore_errors: yes
+  tasks:
+    - name: Check quagga status
+      command: service quagga status
+      register: quagga_status
+
+    - include: quagga_uninstall.yml
+      when: "'no such file or directory' not in quagga_status.stdout|lower"
+
+    - name: Check frr status
+      command: service frr status
+      register: frr_status
+
+    - include: frr_uninstall.yml
+      when: "'no such file or directory' not in frr_status.stdout|lower"
+
+    - name: Check bird status
+      command: service bird status
+      register: bird_status
+
+    - include: bird_uninstall.yml
+      when: "'no such file or directory' not in bird_status.stdout|lower"
+
+    - name: Check gobgp status
+      command: service gobgp status
+      register: gobgp_status
+
+    - include: gobgp_uninstall.yml
+      when: "'no such file or directory' not in gobgp_status.stdout|lower"
