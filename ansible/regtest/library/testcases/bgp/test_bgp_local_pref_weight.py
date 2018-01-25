@@ -37,16 +37,6 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    spine_network_list:
-      description:
-        - Comma separated list of all spine bgp networks.
-      required: False
-      type: str
-    leaf_network_list:
-      description:
-        - Comma separated list of all leaf bgp networks.
-      required: False
-      type: str
     local_pref:
       description:
         - BGP route local preference value.
@@ -61,6 +51,12 @@ options:
     spine_list:
       description:
         - List of all spine switches.
+      required: False
+      type: list
+      default: []
+    leaf_list:
+      description:
+        - List of all leaf switches.
       required: False
       type: list
       default: []
@@ -151,6 +147,7 @@ def verify_bgp_local_pref_weight(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     spine_list = module.params['spine_list']
+    leaf_list = module.params['leaf_list']
     package_name = module.params['package_name']
 
     # Get the current/running configurations
@@ -167,32 +164,39 @@ def verify_bgp_local_pref_weight(module):
             cmd = "vtysh -c 'sh ip bgp'"
             out = execute_commands(module, cmd)
 
-            spine_network_list = module.params['spine_network_list'].split(',')
-            leaf_network_list = module.params['leaf_network_list'].split(',')
+            if out:
+                for switch in spine_list + leaf_list:
+                    network = '192.168.{}.1'.format(switch[-2::])
+                    if network not in out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On Switch {} bgp route '.format(
+                            switch_name)
+                        failure_summary += 'for network {} is not present '.format(
+                            network)
+                        failure_summary += 'in the output of command {}\n'.format(
+                            cmd)
 
-            for network in spine_network_list + leaf_network_list:
-                network = network.split('/')[0]
-                if network not in out:
+                local_pref = module.params['local_pref']
+                weight = module.params['weight']
+
+                if local_pref:
+                    value = local_pref
+                    name = 'local preference'
+                else:
+                    value = weight
+                    name = 'weight'
+
+                if value not in out:
                     RESULT_STATUS = False
-                    failure_summary += 'On Switch {} bgp route '.format(switch_name)
-                    failure_summary += 'for network {} is not present '.format(network)
+                    failure_summary += 'On Switch {} {} '.format(switch_name, name)
+                    failure_summary += 'value {} is not present '.format(value)
                     failure_summary += 'in the output of command {}\n'.format(cmd)
-
-            local_pref = module.params['local_pref']
-            weight = module.params['weight']
-
-            if local_pref:
-                value = local_pref
-                name = 'local preference'
             else:
-                value = weight
-                name = 'weight'
-
-            if value not in out:
                 RESULT_STATUS = False
-                failure_summary += 'On Switch {} {} '.format(switch_name, name)
-                failure_summary += 'value {} is not present '.format(value)
-                failure_summary += 'in the output of command {}\n'.format(cmd)
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'result cannot be verified since '
+                failure_summary += 'output of command {} '.format(cmd)
+                failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -205,11 +209,10 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            spine_network_list=dict(required=False, type='str'),
-            leaf_network_list=dict(required=False, type='str'),
             local_pref=dict(required=False, type='str', default=''),
             weight=dict(required=False, type='str'),
             spine_list=dict(required=False, type='list', default=[]),
+            leaf_list=dict(required=False, type='list', default=[]),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
