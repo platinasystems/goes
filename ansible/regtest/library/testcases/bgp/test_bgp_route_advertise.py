@@ -54,6 +54,12 @@ options:
         - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
+    is_ibgp:
+      description:
+        - Flag to indicate if ibgp config needs to be verified or ebgp.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -139,6 +145,7 @@ def verify_bgp_route_advertise(module):
     routes_to_check = []
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
+    is_ibgp = module.params['is_ibgp']
     spine_list = module.params['spine_list']
     leaf_list = module.params['leaf_list']
 
@@ -154,9 +161,12 @@ def verify_bgp_route_advertise(module):
     bgp_out = execute_commands(module, cmd)
 
     if bgp_out:
-        is_spine = True if switch_name in spine_list else False
-        switches_list = leaf_list if is_spine else spine_list
-        switches_list.append(switch_name)
+        if is_ibgp:
+            is_spine = True if switch_name in spine_list else False
+            switches_list = leaf_list if is_spine else spine_list
+            switches_list.append(switch_name)
+        else:
+            switches_list = spine_list + leaf_list
 
         for switch in switches_list:
             routes_to_check.append('192.168.{}.1/32'.format(switch[-2::]))
@@ -171,7 +181,7 @@ def verify_bgp_route_advertise(module):
     else:
         RESULT_STATUS = False
         failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'bgp administrative distance cannot be verified '
+        failure_summary += 'bgp routes cannot be verified '
         failure_summary += 'because output of command {} '.format(cmd)
         failure_summary += 'is None'
 
@@ -190,6 +200,7 @@ def main():
             spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
             package_name=dict(required=False, type='str'),
+            is_ibgp=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
