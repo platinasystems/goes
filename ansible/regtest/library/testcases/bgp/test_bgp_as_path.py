@@ -42,15 +42,14 @@ options:
         - BGP config which have been added.
       required: False
       type: str
-    spine_list:
-      description:
-        - List of all spine switches.
-      required: False
-      type: list
-      default: []
     package_name:
       description:
         - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
+    as_path_switch:
+      description:
+        - Name of the switch on which as path has been configured.
       required: False
       type: str
     hash_name:
@@ -135,6 +134,7 @@ def verify_bgp_as_path(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
+    as_path_switch = module.params['as_path_switch']
     config_file = module.params['config_file'].splitlines()
 
     # Get the current/running configurations
@@ -144,38 +144,36 @@ def verify_bgp_as_path(module):
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
 
-    spine_list = module.params['spine_list']
-    if switch_name in spine_list:
-        if spine_list.index(switch_name) == 0:
-            # Get all bgp routes
-            cmd = "vtysh -c 'sh ip bgp'"
-            bgp_out = execute_commands(module, cmd)
+    if switch_name == as_path_switch:
+        # Get all bgp routes
+        cmd = "vtysh -c 'sh ip bgp'"
+        bgp_out = execute_commands(module, cmd)
 
-            if bgp_out:
-                for line in config_file:
-                    line = line.strip()
-                    if line.startswith('ip prefix-list'):
-                        ip = line.split().pop()
-                        if ip not in bgp_out:
-                            RESULT_STATUS = False
-                            failure_summary += 'On switch {} '.format(switch_name)
-                            failure_summary += 'bgp route for network {} '.format(ip)
-                            failure_summary += 'is not present in the '
-                            failure_summary += 'output of command {}\n'.format(cmd)
+        if bgp_out:
+            for line in config_file:
+                line = line.strip()
+                if line.startswith('ip prefix-list'):
+                    ip = line.split().pop()
+                    if ip not in bgp_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'bgp route for network {} '.format(ip)
+                        failure_summary += 'is not present in the '
+                        failure_summary += 'output of command {}\n'.format(cmd)
 
-                    if line.startswith('set as-path'):
-                        as_path = line[-3::]
-                        if as_path not in bgp_out:
-                            RESULT_STATUS = False
-                            failure_summary += 'On switch {} '.format(switch_name)
-                            failure_summary += 'set as-path is not present in the '
-                            failure_summary += 'output of command {}\n'.format(cmd)
-            else:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp as path cannot be verified since '
-                failure_summary += 'output of command {} '.format(cmd)
-                failure_summary += 'is None'
+                if line.startswith('set as-path'):
+                    as_path = line[-3::]
+                    if as_path not in bgp_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'set as-path is not present in the '
+                        failure_summary += 'output of command {}\n'.format(cmd)
+        else:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'bgp as path cannot be verified since '
+            failure_summary += 'output of command {} '.format(cmd)
+            failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -189,7 +187,7 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
-            spine_list=dict(required=False, type='list', default=[]),
+            as_path_switch=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),

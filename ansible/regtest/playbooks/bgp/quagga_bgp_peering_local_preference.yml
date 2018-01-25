@@ -50,6 +50,7 @@
         leaf_list: "{{ groups['leaf'] }}"
         spine_list: "{{ groups['spine'] }}"
         local_pref: "150"
+        pref_wt_switch: "{{ groups['spine'][0] }}"
         package_name: "quagga"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ bgp_log_dir }}"

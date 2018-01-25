@@ -49,6 +49,7 @@
         switch_name: "{{ inventory_hostname }}"
         weight: "50"
         package_name: "frr"
+        pref_wt_switch: "{{ groups['spine'][0] }}"
         spine_list: "{{ groups['spine'] }}"
         leaf_list: "{{ groups['leaf'] }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"

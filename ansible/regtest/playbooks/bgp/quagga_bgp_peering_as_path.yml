@@ -48,7 +48,7 @@
       test_bgp_as_path:
         switch_name: "{{ inventory_hostname }}"
         config_file: "{{ lookup('file', '../../files/' + hostvars[groups['leaf'][1]].inventory_hostname + '/bgp_peering_as_path.conf') }}"
-        spine_list: "{{ groups['spine'] }}"
+        as_path_switch: "{{ groups['spine'][0] }}"
         package_name: "quagga"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ bgp_log_dir }}"

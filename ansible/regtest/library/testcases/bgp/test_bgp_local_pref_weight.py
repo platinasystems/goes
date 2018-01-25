@@ -48,6 +48,11 @@ options:
         - BGP route weight value.
       required: False
       type: str
+    pref_wt_switch:
+      description:
+        - Name of the switch on which local pref/weight has been configured.
+      required: False
+      type: str
     spine_list:
       description:
         - List of all spine switches.
@@ -146,6 +151,7 @@ def verify_bgp_local_pref_weight(module):
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
     switch_name = module.params['switch_name']
+    pref_wt_switch = module.params['pref_wt_switch']
     spine_list = module.params['spine_list']
     leaf_list = module.params['leaf_list']
     package_name = module.params['package_name']
@@ -157,46 +163,44 @@ def verify_bgp_local_pref_weight(module):
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
 
-    is_spine = True if switch_name in spine_list else False
-    if is_spine:
-        if spine_list.index(switch_name) == 0:
-            # Get all ip bgp routes
-            cmd = "vtysh -c 'sh ip bgp'"
-            out = execute_commands(module, cmd)
+    if switch_name == pref_wt_switch:
+        # Get all ip bgp routes
+        cmd = "vtysh -c 'sh ip bgp'"
+        out = execute_commands(module, cmd)
 
-            if out:
-                for switch in spine_list + leaf_list:
-                    network = '192.168.{}.1'.format(switch[-2::])
-                    if network not in out:
-                        RESULT_STATUS = False
-                        failure_summary += 'On Switch {} bgp route '.format(
-                            switch_name)
-                        failure_summary += 'for network {} is not present '.format(
-                            network)
-                        failure_summary += 'in the output of command {}\n'.format(
-                            cmd)
-
-                local_pref = module.params['local_pref']
-                weight = module.params['weight']
-
-                if local_pref:
-                    value = local_pref
-                    name = 'local preference'
-                else:
-                    value = weight
-                    name = 'weight'
-
-                if value not in out:
+        if out:
+            for switch in spine_list + leaf_list:
+                network = '192.168.{}.1'.format(switch[-2::])
+                if network not in out:
                     RESULT_STATUS = False
-                    failure_summary += 'On Switch {} {} '.format(switch_name, name)
-                    failure_summary += 'value {} is not present '.format(value)
-                    failure_summary += 'in the output of command {}\n'.format(cmd)
+                    failure_summary += 'On Switch {} bgp route '.format(
+                        switch_name)
+                    failure_summary += 'for network {} is not present '.format(
+                        network)
+                    failure_summary += 'in the output of command {}\n'.format(
+                        cmd)
+
+            local_pref = module.params['local_pref']
+            weight = module.params['weight']
+
+            if local_pref:
+                value = local_pref
+                name = 'local preference'
             else:
+                value = weight
+                name = 'weight'
+
+            if value not in out:
                 RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'result cannot be verified since '
-                failure_summary += 'output of command {} '.format(cmd)
-                failure_summary += 'is None'
+                failure_summary += 'On Switch {} {} '.format(switch_name, name)
+                failure_summary += 'value {} is not present '.format(value)
+                failure_summary += 'in the output of command {}\n'.format(cmd)
+        else:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'result cannot be verified since '
+            failure_summary += 'output of command {} '.format(cmd)
+            failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -211,6 +215,7 @@ def main():
             switch_name=dict(required=False, type='str'),
             local_pref=dict(required=False, type='str', default=''),
             weight=dict(required=False, type='str'),
+            pref_wt_switch=dict(required=False, type='str'),
             spine_list=dict(required=False, type='list', default=[]),
             leaf_list=dict(required=False, type='list', default=[]),
             package_name=dict(required=False, type='str'),

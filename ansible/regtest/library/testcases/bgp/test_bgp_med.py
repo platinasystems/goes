@@ -42,12 +42,11 @@ options:
         - BGP config which have been added.
       required: False
       type: str
-    spine_list:
+    med_switch:
       description:
-        - List of all spine switches.
+        - Name of the switch on which med config has been added.
       required: False
-      type: list
-      default: []
+      type: str
     package_name:
       description:
         - Name of the package installed (e.g. quagga/frr/bird).
@@ -66,8 +65,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp peering as path
-  test_bgp_authentication:
+- name: Verify bgp peering med
+  test_bgp_med:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -135,6 +134,7 @@ def verify_bgp_med(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
+    med_switch = module.params['med_switch']
     config_file = module.params['config_file'].splitlines()
 
     # Get the current/running configurations
@@ -144,13 +144,12 @@ def verify_bgp_med(module):
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
 
-    spine_list = module.params['spine_list']
-    if switch_name in spine_list:
-        if spine_list.index(switch_name) == 0:
-            # Get all bgp routes
-            cmd = "vtysh -c 'sh ip bgp'"
-            bgp_out = execute_commands(module, cmd)
+    if switch_name == med_switch:
+        # Get all bgp routes
+        cmd = "vtysh -c 'sh ip bgp'"
+        bgp_out = execute_commands(module, cmd)
 
+        if bgp_out:
             for line in config_file:
                 line = line.strip()
                 if line.startswith('ip prefix-list'):
@@ -170,6 +169,12 @@ def verify_bgp_med(module):
                         failure_summary += 'On switch {} '.format(switch_name)
                         failure_summary += 'MED value{}is not present '.format(med)
                         failure_summary += 'in output of command {}\n'.format(cmd)
+        else:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'bgp med cannot be verified since '
+            failure_summary += 'output of command {} '.format(cmd)
+            failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -183,7 +188,7 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
-            spine_list=dict(required=False, type='list', default=[]),
+            med_switch=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
