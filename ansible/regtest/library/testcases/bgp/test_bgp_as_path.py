@@ -151,24 +151,31 @@ def verify_bgp_as_path(module):
             cmd = "vtysh -c 'sh ip bgp'"
             bgp_out = execute_commands(module, cmd)
 
-            for line in config_file:
-                line = line.strip()
-                if line.startswith('ip prefix-list'):
-                    ip = line.split().pop()
-                    if ip not in bgp_out:
-                        RESULT_STATUS = False
-                        failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'bgp route for network {} '.format(ip)
-                        failure_summary += 'is not present in the '
-                        failure_summary += 'output of command {}\n'.format(cmd)
+            if bgp_out:
+                for line in config_file:
+                    line = line.strip()
+                    if line.startswith('ip prefix-list'):
+                        ip = line.split().pop()
+                        if ip not in bgp_out:
+                            RESULT_STATUS = False
+                            failure_summary += 'On switch {} '.format(switch_name)
+                            failure_summary += 'bgp route for network {} '.format(ip)
+                            failure_summary += 'is not present in the '
+                            failure_summary += 'output of command {}\n'.format(cmd)
 
-                if line.startswith('set as-path'):
-                    as_path = line[-3::]
-                    if as_path not in bgp_out:
-                        RESULT_STATUS = False
-                        failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'set as-path is not present in the '
-                        failure_summary += 'output of command {}\n'.format(cmd)
+                    if line.startswith('set as-path'):
+                        as_path = line[-3::]
+                        if as_path not in bgp_out:
+                            RESULT_STATUS = False
+                            failure_summary += 'On switch {} '.format(switch_name)
+                            failure_summary += 'set as-path is not present in the '
+                            failure_summary += 'output of command {}\n'.format(cmd)
+            else:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp as path cannot be verified since '
+                failure_summary += 'output of command {} '.format(cmd)
+                failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 
