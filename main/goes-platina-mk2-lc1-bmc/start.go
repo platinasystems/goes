@@ -17,6 +17,11 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 )
 
+const (
+	MaxEpollEvents = 32
+	KB             = 1024
+)
+
 func startConfGpioHook() error {
 	gpioInit()
 	pin, found := gpio.Pins["QSPI_MUX_SEL"]
@@ -59,32 +64,52 @@ func startConfGpioHook() error {
 }
 
 func pubEth0() (err error) {
-	var last, kmsg log.Kmsg
+	var event syscall.EpollEvent
+	var events [MaxEpollEvents]syscall.EpollEvent
+	var buf [KB]byte
+
 	f, err := os.Open("/dev/kmsg")
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	if err = syscall.SetNonblock(int(f.Fd()), true); err != nil {
+
+	fd := int(f.Fd())
+	if err = syscall.SetNonblock(fd, true); err != nil {
 		return err
 	}
-	buf := make([]byte, 4096)
-	defer func() { buf = buf[:0] }()
-	for {
-		n, err := f.Read(buf)
-		if err != nil {
-			break
-		}
-		kmsg.Parse(buf[:n])
-		if last.Seq == 0 || last.Seq < kmsg.Seq {
-			if strings.Contains(kmsg.Msg, "init.redisd") {
-				if strings.Contains(kmsg.Msg, "eth0") {
-					err := pubAddr(kmsg.Msg)
-					if err != nil {
-						return err
+	epfd, err := syscall.EpollCreate1(0)
+	if err != nil {
+		return err
+	}
+	defer syscall.Close(epfd)
+
+	event.Events = syscall.EPOLLIN
+	event.Fd = int32(fd)
+	err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event)
+	if err != nil {
+		return err
+	}
+	nevents, err := syscall.EpollWait(epfd, events[:], -1)
+	if err != nil {
+		return err
+	}
+	for ev := 0; ev < nevents; ev++ {
+		for {
+			nbytes, err := syscall.Read(int(events[ev].Fd), buf[:])
+			if nbytes > 0 {
+				x := string(buf[:nbytes])
+				if strings.Contains(x, "init.redisd") {
+					if strings.Contains(x, "eth0") {
+						er := pubAddr(x)
+						if er != nil {
+							return er
+						}
 					}
 				}
-				last.Seq = kmsg.Seq
+			}
+			if err != nil {
+				break
 			}
 		}
 	}
