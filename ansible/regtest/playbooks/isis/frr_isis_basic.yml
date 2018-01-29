@@ -27,13 +27,19 @@
         regexp: "^hostname isisd"
         replace: "hostname {{ inventory_hostname }}"
 
+    - name: Add dummy interface
+      add_dummy_interface:
+        switch_name: "{{ inventory_hostname }}"
+
+    - name: Update interface ip and mtu
+      update_eth_ip_mtu:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/update_eth_ip_mtu') }}"
+
 
 - hosts: leaf[0]:spine[1]
   become: true
   tasks:
-    - name: Assign mtu to eth-21-1 interface
-      command: "ifconfig eth-21-1 mtu 1500 up"
-
     - name: Configure isis for eth-21-1
       blockinfile:
         path: "{{ frr_isis_conf_file }}"
@@ -46,9 +52,6 @@
 - hosts: leaf[0]:spine[0]
   become: true
   tasks:
-    - name: Assign mtu to eth-11-1 interface
-      command: "ifconfig eth-11-1 mtu 1500 up"
-
     - name: Configure isis for eth-11-1
       blockinfile:
         path: "{{ frr_isis_conf_file }}"
@@ -61,9 +64,6 @@
 - hosts: leaf[1]:spine[1]
   become: true
   tasks:
-    - name: Assign mtu to eth-5-1 interface
-      command: "ifconfig eth-5-1 mtu 1500 up"
-
     - name: Configure isis for eth-5-1
       blockinfile:
         path: "{{ frr_isis_conf_file }}"
@@ -76,9 +76,6 @@
 - hosts: leaf[1]:spine[0]
   become: true
   tasks:
-    - name: Assign mtu to eth-27-1 interface
-      command: "ifconfig eth-27-1 mtu 1500 up"
-
     - name: Configure isis for eth-27-1
       blockinfile:
         path: "{{ frr_isis_conf_file }}"
@@ -102,7 +99,7 @@
         name: frr
         state: restarted
 
-    - name: Wait for few seconds for isis to establish connection
+    - name: Wait few seconds for isis to establish connection
       pause:
         seconds: 35
 
@@ -137,46 +134,32 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-    - name: Revert mtu of interfaces to it's original
-      command: "ifconfig eth-{{item}}-1 mtu 9216 up"
-      with_items:
-        - "11"
-        - "21"
-        - "5"
-        - "27"
-
-    - shell: "goes hget platina package | grep version:"
-      register: version_out
-
-    - shell: "goes hget platina package | grep tag:"
-      register: tag_out
-
-    - name: Store GOES version and tag details in redis db
-      store_goes_details:
-        switch_name: "{{ inventory_hostname }}"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        version_details: "{{ version_out.stdout }}"
-        tag_details: "{{ tag_out.stdout }}"
-      delegate_to: 127.0.0.1
+    - include: ../../playbooks/get_goes_version_and_tags.yml
 
     - name: Restore backup of /etc/frr/isisd.conf
       copy:
         src: "{{ frr_isis_conf_file_bck }}"
         dest: "{{ frr_isis_conf_file }}"
         remote_src: true
-        owner: root
-        group: root
-        mode: 0644
 
     - name: Remove backup file
       file:
         path: "{{ frr_isis_conf_file_bck }}"
         state: absent
 
-    - service:
+    - name: Update interface ip and mtu
+      update_eth_ip_mtu:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/update_eth_ip_mtu') }}"
+        revert: True
+
+    - name: Delete dummy interface
+      command: "ip link del dummy0 type dummy"
+
+    - name: Restart frr
+      service:
         name: frr
         state: restarted
-
 
 
 - hosts: server_emulator
@@ -192,14 +175,3 @@
 
     - debug:
         msg: "Failure summary: {{ result.result_detail }}"
-
-#    - name: Get playbook run details
-#      set_fact:
-#        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
-#
-#    - name: Store the ansible execution log in redis hash
-#      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
-#
-#    - file:
-#        path: "{{ ansible_log_file_path }}"
-#        state: absent

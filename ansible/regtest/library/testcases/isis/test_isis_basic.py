@@ -192,11 +192,11 @@ def verify_isis_neighbors(module):
                     failure_summary += 'administrative value 115 is not present'
                     failure_summary += ' in isis route {}\n'.format(route)
 
-        if route_count != 4:
+        if route_count < 4:
             RESULT_STATUS = False
             failure_summary += 'On switch {} '.format(switch_name)
             failure_summary += 'output of {} '.format(cmd)
-            failure_summary += 'is not displaying 4 isis routes\n'
+            failure_summary += 'is not displaying required isis routes\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
