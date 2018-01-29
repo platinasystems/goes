@@ -167,6 +167,7 @@ def verify_ospf_neighbors(module):
         if out is None or 'error' in out:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} '.format(switch_name)
+            failure_summary += 'ospf routes cannot be verified since '
             failure_summary += 'output of command {} is None\n'.format(cmd)
     else:
         # Get ospf neighbors relationships
@@ -177,6 +178,7 @@ def verify_ospf_neighbors(module):
         if out is None or 'error' in out:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} '.format(switch_name)
+            failure_summary += 'ospf neighbors cannot be verified since '
             failure_summary += 'output of command {} is None\n'.format(cmd)
         else:
             spine_list = module.params['spine_list']

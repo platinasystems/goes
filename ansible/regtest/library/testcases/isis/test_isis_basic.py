@@ -157,46 +157,56 @@ def verify_isis_neighbors(module):
     cmd = "vtysh -c 'sh isis neighbor'"
     isis_out = execute_commands(module, cmd)
 
-    if is_spine:
-        for leaf in leaf_list:
-            if isis_out.count(leaf) != 2:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'two neighbors for {} is not '.format(leaf)
-                failure_summary += 'present in the output of {}\n'.format(cmd)
-    else:
-        for spine in spine_list:
-            if isis_out.count(spine) != 2:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'two neighbors for {} is not '.format(spine)
-                failure_summary += 'present in the output of {}\n'.format(cmd)
-
-    if isis_out.count('Up') != 4:
+    if not isis_out:
         RESULT_STATUS = False
-        failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'isis neighbors state is not Up\n'
-
-    # Check and verify neighbor routes
-    if module.params['check_neighbors']:
-        cmd = "vtysh -c 'sh ip route'"
-        all_routes = execute_commands(module, cmd)
-        route_count = 0
-
-        for route in all_routes.splitlines():
-            if route.startswith('I'):
-                route_count += 1
-                if '115' not in route:
+        failure_summary += 'On Switch {} '.format(switch_name)
+        failure_summary += 'isis neighbors cannot be verified since '
+        failure_summary += 'output of command {} is None\n'.format(cmd)
+    else:
+        if is_spine:
+            for leaf in leaf_list:
+                if isis_out.count(leaf) != 2:
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'administrative value 115 is not present'
-                    failure_summary += ' in isis route {}\n'.format(route)
+                    failure_summary += 'two neighbors for {} is not '.format(
+                        leaf)
+                    failure_summary += 'present in the output of {}\n'.format(
+                        cmd)
+        else:
+            for spine in spine_list:
+                if isis_out.count(spine) != 2:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'two neighbors for {} is not '.format(
+                        spine)
+                    failure_summary += 'present in the output of {}\n'.format(
+                        cmd)
 
-        if route_count < 4:
+        if isis_out.count('Up') != 4:
             RESULT_STATUS = False
             failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'output of {} '.format(cmd)
-            failure_summary += 'is not displaying required isis routes\n'
+            failure_summary += 'isis neighbors state is not Up\n'
+
+        # Check and verify neighbor routes
+        if module.params['check_neighbors']:
+            cmd = "vtysh -c 'sh ip route'"
+            all_routes = execute_commands(module, cmd)
+            route_count = 0
+
+            for route in all_routes.splitlines():
+                if route.startswith('I'):
+                    route_count += 1
+                    if '115' not in route:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'administrative value 115 is not present'
+                        failure_summary += ' in isis route {}\n'.format(route)
+
+            if route_count < 4:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'output of {} '.format(cmd)
+                failure_summary += 'is not displaying required isis routes\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
