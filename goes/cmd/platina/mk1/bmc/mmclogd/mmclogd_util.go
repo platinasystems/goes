@@ -23,6 +23,9 @@ const (
 	gt = ">"
 	lb = "["
 	rb = "]"
+
+	MaxEpollEvents = 32
+	KB             = 1024 * 64
 )
 
 func initLogging(c *Info) error {
@@ -98,8 +101,11 @@ func stopTicker() error {
 }
 
 func getNewDmesg(c *Info) (error, []string) {
+	var event syscall.EpollEvent
+	var events [MaxEpollEvents]syscall.EpollEvent
+	var buf [KB]byte
 	var kmsg log.Kmsg
-	buf := make([]byte, MAXLEN)
+	var si syscall.Sysinfo_t
 	msg := make([]string, MAXMSG)
 	defer func() { msg = msg[:0] }()
 
@@ -108,32 +114,51 @@ func getNewDmesg(c *Info) (error, []string) {
 		return err, nil
 	}
 	defer f.Close()
-	if err = syscall.SetNonblock(int(f.Fd()), true); err != nil {
+
+	fd := int(f.Fd())
+	if err = syscall.SetNonblock(fd, true); err != nil {
 		return err, nil
 	}
-
-	var si syscall.Sysinfo_t
-	if err = syscall.Sysinfo(&si); err != nil {
+	epfd, err := syscall.EpollCreate1(0)
+	if err != nil {
 		return err, nil
 	}
-	for i := 0; i < MAXMSG; i++ {
-		n, err := f.Read(buf)
-		if err != nil {
-			break
-		}
-		kmsg.Parse(buf[:n])
-		ksq := strconv.Itoa(int(kmsg.Seq))
+	defer syscall.Close(epfd)
 
-		now := time.Now()
-		tim := time.Time(kmsg.Stamp.Time(now, int64(si.Uptime)))
-		kst := fmt.Sprintln(tim)
-		ksu := strings.Split(kst, ".")
+	event.Events = syscall.EPOLLIN
+	event.Fd = int32(fd)
+	err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event)
+	if err != nil {
+		return err, nil
+	}
+	nevents, err := syscall.EpollWait(epfd, events[:], -1)
+	if err != nil {
+		return err, nil
+	}
+	for ev := 0; ev < nevents; ev++ {
+		i := 0
+		for {
+			nbytes, err := syscall.Read(int(events[ev].Fd), buf[:])
+			if nbytes > 0 {
+				kmsg.Parse(buf[:nbytes])
+				ksq := strconv.Itoa(int(kmsg.Seq))
 
-		kmg := fmt.Sprint(sp, lb, kmsg.Stamp, rb, sp)
-		if uint64(kmsg.Seq) > c.seq_end {
-			fs := ksq + sp + lb + ksu[0] + rb + kmg + kmsg.Msg
-			msg[i] = fmt.Sprintln(fs)
-			c.seq_end = uint64(kmsg.Seq)
+				now := time.Now()
+				tim := time.Time(kmsg.Stamp.Time(now, int64(si.Uptime)))
+				kst := fmt.Sprintln(tim)
+				ksu := strings.Split(kst, ".")
+
+				kmg := fmt.Sprint(sp, lb, kmsg.Stamp, rb, sp)
+				if uint64(kmsg.Seq) > c.seq_end {
+					fs := ksq + sp + lb + ksu[0] + rb + kmg + kmsg.Msg
+					msg[i] = fmt.Sprintln(fs)
+					i++
+					c.seq_end = uint64(kmsg.Seq)
+				}
+			}
+			if err != nil {
+				break
+			}
 		}
 	}
 	return nil, msg
