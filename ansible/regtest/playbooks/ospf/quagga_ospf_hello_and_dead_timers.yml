@@ -8,17 +8,17 @@
       register: start_time
 
     - set_fact:
-        hash_name: "frr_ospf_hello_and_dead_timers_{{ start_time.stdout }}"
+        hash_name: "quagga_ospf_hello_and_dead_timers_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of /etc/frr/ospfd.conf
+    - name: Take backup of /etc/quagga/ospfd.conf
       copy:
-        src: "{{ frr_ospf_conf_file }}"
-        dest: "{{ frr_ospf_conf_file_bck }}"
+        src: "{{ quagga_ospf_conf_file }}"
+        dest: "{{ quagga_ospf_conf_file_bck }}"
         remote_src: true
 
     - name: Add dummy interface
@@ -27,7 +27,7 @@
 
     - name: Configure hello and dead time interval for eth-7-1
       blockinfile:
-        path: "{{ frr_ospf_conf_file }}"
+        path: "{{ quagga_ospf_conf_file }}"
         insertafter: "interface eth-7-1"
         marker: "! {mark} foo"
         block: |
@@ -36,22 +36,22 @@
 
     - name: Configure hello and dead time interval for eth-17-1
       blockinfile:
-        path: "{{ frr_ospf_conf_file }}"
+        path: "{{ quagga_ospf_conf_file }}"
         insertafter: "interface eth-17-1"
         marker: "! {mark} bar"
         block: |
           ip ospf dead-interval 10
           ip ospf hello-interval 5
 
-    - name: Add ospf config in /etc/frr/ospfd.conf
+    - name: Add ospf config in /etc/quagga/ospfd.conf
       blockinfile:
-        path: "{{ frr_ospf_conf_file }}"
+        path: "{{ quagga_ospf_conf_file }}"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/ospf_interval.conf') }}"
 
-    - name: Restart frr service
+    - name: Restart quagga service
       service:
-        name: frr
+        name: quagga
         state: restarted
 
     - name: Wait few secs for ospf to establish communication
@@ -62,13 +62,13 @@
         path: "{{ ospf_log_dir }}"
         state: directory
 
-    - name: Verify frr ospf hello and dead time intervals
+    - name: Verify quagga ospf hello and dead time intervals
       test_ospf_intervals:
         switch_name: "{{ inventory_hostname }}"
         eth_list: "7,17"
         hello_timer: "5"
         dead_timer: "10"
-        package_name: "frr"
+        package_name: "quagga"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ ospf_log_dir }}"
       register: module_out
@@ -92,23 +92,23 @@
 
     - include: ../../playbooks/get_goes_version_and_tags.yml
 
-    - name: Restore backup of /etc/frr/ospfd.conf
+    - name: Restore backup of /etc/quagga/ospfd.conf
       copy:
-        src: "{{ frr_ospf_conf_file_bck }}"
-        dest: "{{ frr_ospf_conf_file }}"
+        src: "{{ quagga_ospf_conf_file_bck }}"
+        dest: "{{ quagga_ospf_conf_file }}"
         remote_src: true
 
     - name: Remove backup file
       file:
-        path: "{{ frr_ospf_conf_file_bck }}"
+        path: "{{ quagga_ospf_conf_file_bck }}"
         state: absent
 
     - name: Delete dummy interface
       command: "ip link del dummy0 type dummy"
 
-    - name: Restart frr
+    - name: Restart quagga
       service:
-        name: frr
+        name: quagga
         state: restarted
 
 
