@@ -74,7 +74,7 @@ options:
 
 EXAMPLES = """
 - name: Verify ospf loadbalancing
-  test_ospf_traffic:
+  test_ospf_loadbalancing:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -153,7 +153,7 @@ def verify_ospf_load_balancing(module):
     execute_commands(module, 'ip link add dummy0 type dummy')
 
     # Assign ip to this created dummy0 interface
-    cmd = 'ifconfig dummy0 192.168.{}.1 {}'.format(
+    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.255'.format(
         switch_name[-2::], netmask
     )
     execute_commands(module, cmd)
@@ -194,7 +194,7 @@ def verify_ospf_load_balancing(module):
         third_octet = [spine[-2::] for spine in spine_list]
         third_octet.remove(switch_id)
 
-    route_ip = '192.168.{}.0/24'.format(third_octet.pop())
+    route_ip = '192.168.{}.1'.format(third_octet.pop())
 
     # Get all ospf ip routes
     cmd = "vtysh -c 'sh ip route {}'".format(route_ip)
