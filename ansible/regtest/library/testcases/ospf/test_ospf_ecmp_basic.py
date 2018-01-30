@@ -111,7 +111,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service quagga restart' in cmd or 'ifconfig' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -135,12 +135,6 @@ def verify_ospf_ecmp_basic(module):
     switch_name = module.params['switch_name']
     cost = module.params['cost']
 
-    # Assign loopback ip
-    lo_cmd = 'ifconfig lo 192.168.{}.1 netmask 255.255.255.0'.format(
-        switch_name[-2::]
-    )
-    execute_commands(module, lo_cmd)
-
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
 
@@ -153,36 +147,49 @@ def verify_ospf_ecmp_basic(module):
         cmd = "vtysh -c 'sh ip ospf interface eth-{}-1'".format(eth)
         ospf_out = execute_commands(module, cmd)
 
-        if 'Cost: {}'.format(cost) not in ospf_out:
+        if ospf_out:
+            if 'cost: {}'.format(cost) not in ospf_out.lower():
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'cost {} is not showing up for '.format(cost)
+                failure_summary += 'eth-{}-1 interface '.format(eth)
+                failure_summary += 'in output of command {}\n'.format(cmd)
+        else:
             RESULT_STATUS = False
             failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'cost {} is not showing up for '.format(cost)
-            failure_summary += 'eth-{}-1 interface '.format(eth)
-            failure_summary += 'in output of command {}\n'.format(cmd)
+            failure_summary += 'cost cannot be verified since '
+            failure_summary += 'output of command {} '.format(cmd)
+            failure_summary += 'is None\n'
 
     # Get all ospf routes
     cmd = "vtysh -c 'sh ip route ospf'"
     routes_out = execute_commands(module, cmd)
 
-    # Verify configured cost in ospf routes
-    for line in module.params['config_file'].splitlines():
-        line = line.strip()
-        if 'network' in line and 'area' in line and '192' not in line:
-            config = line.split()
-            network = config[1]
-
-            for route in routes_out.splitlines():
-                if network in route:
-                    if '/{}'.format(cost) not in route:
-                        RESULT_STATUS = False
-                        failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += 'cost {} is not showing up '.format(cost)
-                        failure_summary += 'for route {} '.format(route)
-                        failure_summary += 'in output of command {}\n'.format(cmd)
-
-    # Revert back the loopback ip
-    cmd = 'ifconfig lo 127.0.0.1 netmask 255.0.0.0'
-    execute_commands(module, cmd)
+    if routes_out:
+        # Verify configured cost in ospf routes
+        for line in module.params['config_file'].splitlines():
+            line = line.strip()
+            if 'network' in line and 'area' in line and '192' not in line:
+                config = line.split()
+                network = config[1]
+    
+                for route in routes_out.splitlines():
+                    if network in route:
+                        if '/{}'.format(cost) not in route:
+                            RESULT_STATUS = False
+                            failure_summary += 'On switch {} '.format(
+                                switch_name)
+                            failure_summary += 'cost {} is not showing up '.format(
+                                cost)
+                            failure_summary += 'for route {} '.format(route)
+                            failure_summary += 'in output of command {}\n'.format(
+                                cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'cost cannot be verified since '
+        failure_summary += 'output of command {} '.format(cmd)
+        failure_summary += 'is None\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
