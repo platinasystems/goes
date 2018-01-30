@@ -175,9 +175,10 @@ def check_bgp_neighbors(module, neighbor_ips, neighbor_as):
             failure_summary += 'command {}\n'.format(cmd)
 
         if check_ping and is_leaf:
-            ping_cmd = 'ping -w 5 -c 3 {}'.format(ip)
+            packet_count = '3'
+            ping_cmd = 'ping -w 5 -c {} {}'.format(packet_count, ip)
             ping_out = execute_commands(module, ping_cmd)
-            if '0% packet loss' not in ping_out:
+            if '{} received'.format(packet_count) not in ping_out:
                 RESULT_STATUS = False
                 failure_summary += 'From switch {} '.format(switch_name)
                 failure_summary += 'neighbor ip {} '.format(ip)

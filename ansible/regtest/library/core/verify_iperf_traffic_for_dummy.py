@@ -133,14 +133,16 @@ def verify_traffic(module):
 
     switch_list.remove(switch_name)
     neighbor_switch = switch_list[0]
-    
+
     self_ip = '192.168.{}.1'.format(switch_name[-2::])
     neighbor_ip = '192.168.{}.1'.format(neighbor_switch[-2::])
 
     # Verify ping
-    ping_cmd = 'ping -w 3 -c 3 -I {} {}'.format(self_ip, neighbor_ip)
+    packet_count = '3'
+    ping_cmd = 'ping -w 3 -c {} -I {} {}'.format(packet_count,
+                                                 self_ip, neighbor_ip)
     ping_out = execute_commands(module, ping_cmd)
-    if '0% packet loss' not in ping_out:
+    if '{} received'.format(packet_count) not in ping_out:
         RESULT_STATUS = False
         failure_summary += 'From switch {}, '.format(switch_name)
         failure_summary += '{} is not getting pinged\n'.format(neighbor_switch)

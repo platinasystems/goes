@@ -198,9 +198,12 @@ def verify_ping(module):
         leaf_list.remove(switch_name)
         self_ip = '192.168.{}.1'.format(switch_name[-2::])
         neighbor_ip = '192.168.{}.1'.format(leaf_list[0][-2::])
-        ping_cmd = 'ping -w 3 -c 3 -I {} {}'.format(self_ip, neighbor_ip)
+        packet_count = '3'
+
+        ping_cmd = 'ping -w 3 -c {} -I {} {}'.format(packet_count,
+                                                     self_ip, neighbor_ip)
         ping_out = execute_commands(module, ping_cmd)
-        if '0% packet loss' not in ping_out:
+        if '{} received'.format(packet_count) not in ping_out:
             RESULT_STATUS = False
             failure_summary += 'From switch {} '.format(switch_name)
             failure_summary += 'neighbor ip {} '.format(neighbor_ip)
