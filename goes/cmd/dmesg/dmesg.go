@@ -78,8 +78,12 @@ func (Command) Main(args ...string) error {
 		gt = ">"
 		lb = "["
 		rb = "]"
+
+		MaxEpollEvents = 32
 	)
 	var last, kmsg log.Kmsg
+	var event syscall.EpollEvent
+	var events [MaxEpollEvents]syscall.EpollEvent
 
 	flag, args := flags.New(args, "-C", "-c", "-D", "-d", "-E", "-H",
 		"-k", "-r", "-T", "-t", "-u", "-x", "-z")
@@ -97,9 +101,16 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 	defer f.Close()
-	if err = syscall.SetNonblock(int(f.Fd()), true); err != nil {
+
+	fd := int(f.Fd())
+	if err = syscall.SetNonblock(fd, true); err != nil {
 		return err
 	}
+	epfd, err := syscall.EpollCreate1(0)
+	if err != nil {
+		return err
+	}
+	defer syscall.Close(epfd)
 
 	buf := make([]byte, 4096)
 	defer func() { buf = buf[:0] }()
@@ -134,99 +145,114 @@ func (Command) Main(args ...string) error {
 	if err = syscall.Sysinfo(&si); err != nil {
 		return err
 	}
-	for {
-		n, err := f.Read(buf)
-		if err != nil {
-			break
-		}
-		kmsg.Parse(buf[:n])
 
-		if kmsg.Stamp == log.Stamp(0) ||
-			(flag.ByName["-k"] && !kmsg.IsKern()) ||
-			(flag.ByName["-u"] && kmsg.IsKern()) {
-			continue
-		}
+	event.Events = syscall.EPOLLIN
+	event.Fd = int32(fd)
+	err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event)
+	if err != nil {
+		return err
+	}
+	nevents, err := syscall.EpollWait(epfd, events[:], -1)
+	if err != nil {
+		return err
+	}
+	for ev := 0; ev < nevents; ev++ {
+		for {
+			n, err := syscall.Read(int(events[ev].Fd), buf[:])
+			if err != nil {
+				break
+			}
+			if n > 0 {
+				kmsg.Parse(buf[:n])
 
-		if last.Stamp == log.Stamp(0) {
+				if kmsg.Stamp == log.Stamp(0) ||
+					(flag.ByName["-k"] && !kmsg.IsKern()) ||
+					(flag.ByName["-u"] && kmsg.IsKern()) {
+					continue
+				}
+
+				if last.Stamp == log.Stamp(0) {
+					last.Stamp = kmsg.Stamp
+				}
+				delta := kmsg.Stamp.Delta(last.Stamp)
+				t := timeT(kmsg.Stamp.Time(now, int64(si.Uptime)))
+
+				if last.Seq == 0 || last.Seq < kmsg.Seq {
+					fac := kmsg.Pri & log.FacilityMask
+					pri := kmsg.Pri & log.PriorityMask
+					xs := fmt.Sprintf("%-8s%-8s",
+						log.LogFacilityByValue[fac]+":",
+						log.LogPriorityByValue[pri]+":")
+					switch {
+					case flag.ByName["-H"] &&
+						flag.ByName["-d"] &&
+						flag.ByName["-x"]:
+						fmt.Print(xs,
+							lb, t.H(), sp, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-H"] && flag.ByName["-d"]:
+						fmt.Print(lb, t.H(), sp, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-H"] && flag.ByName["-x"]:
+						fmt.Print(xs, sp,
+							lb, t.H(), rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-H"]:
+						fmt.Print(lb, t.H(), rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-T"] &&
+						flag.ByName["-d"] &&
+						flag.ByName["-x"]:
+						fmt.Print(xs,
+							lb, t.T(), sp, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-T"] && flag.ByName["-d"]:
+						fmt.Print(lb, t.T(), sp, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-T"] && flag.ByName["-x"]:
+						fmt.Print(xs, sp,
+							lb, t.T(), rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-T"]:
+						fmt.Print(lb, t.T(), rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-t"] &&
+						flag.ByName["-d"] &&
+						flag.ByName["-x"]:
+						fmt.Print(xs, sp,
+							lb, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-t"] && flag.ByName["-d"]:
+						fmt.Print(lb, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-t"] && flag.ByName["-x"]:
+						fmt.Print(xs, sp, kmsg.Msg, nl)
+					case flag.ByName["-t"]:
+						fmt.Print(kmsg.Msg, nl)
+					case flag.ByName["-r"]:
+						fmt.Print(lt, kmsg.Pri, gt,
+							lb, kmsg.Stamp, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-d"] && flag.ByName["-x"]:
+						fmt.Print(xs,
+							lb, kmsg.Stamp, sp, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-d"]:
+						fmt.Print(lb, kmsg.Stamp, sp, lt, delta, gt, rb,
+							sp, kmsg.Msg, nl)
+					case flag.ByName["-x"]:
+						fmt.Print(xs, sp,
+							lb, kmsg.Stamp, rb,
+							sp, kmsg.Msg, nl)
+					default:
+						fmt.Print(lb, kmsg.Stamp, rb,
+							sp, kmsg.Msg, nl)
+					}
+					last.Seq = kmsg.Seq
+				}
+			}
 			last.Stamp = kmsg.Stamp
 		}
-		delta := kmsg.Stamp.Delta(last.Stamp)
-		t := timeT(kmsg.Stamp.Time(now, int64(si.Uptime)))
-
-		if last.Seq == 0 || last.Seq < kmsg.Seq {
-			fac := kmsg.Pri & log.FacilityMask
-			pri := kmsg.Pri & log.PriorityMask
-			xs := fmt.Sprintf("%-8s%-8s",
-				log.LogFacilityByValue[fac]+":",
-				log.LogPriorityByValue[pri]+":")
-			switch {
-			case flag.ByName["-H"] &&
-				flag.ByName["-d"] &&
-				flag.ByName["-x"]:
-				fmt.Print(xs,
-					lb, t.H(), sp, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-H"] && flag.ByName["-d"]:
-				fmt.Print(lb, t.H(), sp, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-H"] && flag.ByName["-x"]:
-				fmt.Print(xs, sp,
-					lb, t.H(), rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-H"]:
-				fmt.Print(lb, t.H(), rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-T"] &&
-				flag.ByName["-d"] &&
-				flag.ByName["-x"]:
-				fmt.Print(xs,
-					lb, t.T(), sp, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-T"] && flag.ByName["-d"]:
-				fmt.Print(lb, t.T(), sp, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-T"] && flag.ByName["-x"]:
-				fmt.Print(xs, sp,
-					lb, t.T(), rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-T"]:
-				fmt.Print(lb, t.T(), rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-t"] &&
-				flag.ByName["-d"] &&
-				flag.ByName["-x"]:
-				fmt.Print(xs, sp,
-					lb, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-t"] && flag.ByName["-d"]:
-				fmt.Print(lb, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-t"] && flag.ByName["-x"]:
-				fmt.Print(xs, sp, kmsg.Msg, nl)
-			case flag.ByName["-t"]:
-				fmt.Print(kmsg.Msg, nl)
-			case flag.ByName["-r"]:
-				fmt.Print(lt, kmsg.Pri, gt,
-					lb, kmsg.Stamp, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-d"] && flag.ByName["-x"]:
-				fmt.Print(xs,
-					lb, kmsg.Stamp, sp, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-d"]:
-				fmt.Print(lb, kmsg.Stamp, sp, lt, delta, gt, rb,
-					sp, kmsg.Msg, nl)
-			case flag.ByName["-x"]:
-				fmt.Print(xs, sp,
-					lb, kmsg.Stamp, rb,
-					sp, kmsg.Msg, nl)
-			default:
-				fmt.Print(lb, kmsg.Stamp, rb,
-					sp, kmsg.Msg, nl)
-			}
-			last.Seq = kmsg.Seq
-		}
-		last.Stamp = kmsg.Stamp
 	}
 
 	if flag.ByName["-c"] {
