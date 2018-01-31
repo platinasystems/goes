@@ -13,6 +13,7 @@ import (
 
 	"sync/atomic"
 	"syscall"
+	"fmt"
 )
 
 type tx_node struct {
@@ -158,6 +159,33 @@ func (n *tx_node) NodeOutput(out *vnet.RefIn) {
 			out.BufferPool.FreeRefs(ref, 1, true)
 			n.CountError(tx_error_unknown_interface, 1)
 			continue
+		}
+
+		//Strip away outer vlan header if packet is a vlan with vlan id of 0
+		{
+			// Get the next 4 bytes after 12 bytes of src/dst ethernet address
+			p0 := (*ethernet.VlanTypeAndTag)(ref.DataOffset(12))
+			if false { //debug print
+				p1 := (*ethernet.VlanTypeAndTag)(ref.DataOffset(16))  // not really VLAN, but just want to get next 4 byte after VLAN
+				s := ""
+				if p0.Type.IsVlan() {
+					s = fmt.Sprintf(", tag=%v, inner type=%v", p0.Tag.Id(), p1.Type.FromHost())
+				}
+				fmt.Printf("punt: type=%v%s\n", p0.Type.FromHost(), s)
+				fmt.Printf("  ref.Si=%v intf=%v, ok=%t \n", ref.Si, intf, ok)
+			}
+			if p0.Type.IsVlan() && p0.Tag.Id() == 0 {
+				// Copy src/dst ethernet address
+				h0 := *(*ethernet.HeaderNoType)(ref.DataOffset(0))
+				// Move it 4 bytes forward (overwriting the 4 bytes of vlan)
+				*(*ethernet.HeaderNoType)(ref.DataOffset(4)) = h0
+				// Advance 4 bytes
+				ref.Advance(4)
+				if false { //debug print
+					p0 := (*ethernet.VlanTypeAndTag)(ref.DataOffset(12))
+					fmt.Printf("  stripped vlan 0: type=%v\n", p0.Type.FromHost())
+				}
+			}
 		}
 
 		if intf != pv_intf {

@@ -15,11 +15,23 @@ const (
 	punt_1tag_next_punt uint = iota
 	punt_1tag_next_error
 )
+
+var nextString = [...]string{
+	punt_1tag_next_punt:   "punt_1tag_next_punt",
+	punt_1tag_next_error:  "punt_1tag_next_error",
+}
+
 const (
 	punt_1tag_error_none uint = iota
 	punt_1tag_error_not_single_tagged
 	punt_1tag_error_unknown_disposition
 )
+
+var errorString = [...]string{
+	punt_1tag_error_none:                 "punt_1tag_error_none",
+	punt_1tag_error_not_single_tagged:    "punt_1tag_error_not_single_tagged",
+	punt_1tag_error_unknown_disposition:  "punt_1tag_error_unknown_disposition",
+}
 
 type vlan_tagged_punt_node struct {
 	vnet.InOutNode
@@ -48,6 +60,7 @@ func (n *vlan_tagged_punt_node) add_disposition(cf PuntConfig, n_tags uint) (i P
 		cf.ReplaceVlanHeaders[0].Write(d.replace_tags[0:])
 		cf.ReplaceVlanHeaders[1].Write(d.replace_tags[SizeofVlanHeader:])
 	}
+
 	return
 }
 func (n *vlan_tagged_punt_node) del_disposition(i PuntDisposition) (ok bool) {
@@ -72,13 +85,17 @@ type header_no_type struct {
 	dst, src Address
 }
 
+type HeaderNoType header_no_type
+
 const sizeof_header_no_type = 12
 
+// get and apply disposition 1 at a time
 func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	p0 := (*VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
 
 	error0 := punt_1tag_error_none
 
+	//get disposition index for tag
 	di0 := uint32(p0.Tag.ToHost())
 
 	if di0 >= uint32(n.punt_packet_disposition_pool.Len()) {
@@ -115,6 +132,7 @@ func (n *SingleTaggedPuntNode) punt_x1(r0 *vnet.Ref) (next0 uint) {
 	return
 }
 
+// get and apply disposition 2 at a time
 func (n *SingleTaggedPuntNode) punt_x2(r0, r1 *vnet.Ref) (next0, next1 uint) {
 	p0 := (*VlanTypeAndTag)(r0.DataOffset(sizeof_header_no_type))
 	p1 := (*VlanTypeAndTag)(r1.DataOffset(sizeof_header_no_type))

@@ -188,6 +188,11 @@ func (d *dev) Init() (err error) {
 	d.regs.xge_mac.control.or(d, 1<<2)
 	d.regs.xge_mac.rx_max_frame_size.set(d, 0xffff<<16)
 
+	//Enable pad frame < 64 byte, otherwise packets like arp may get dropped by fe1
+	//default config anyway, but make expliit
+	d.regs.xge_mac.control.or(d, 1<<10)
+	//end debug
+
 	// Enable all interrupts.
 	d.InterruptEnable(true)
 	d.counter_init()

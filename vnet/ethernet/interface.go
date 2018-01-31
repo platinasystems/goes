@@ -376,6 +376,10 @@ func (t Type) isVlan() bool {
 	}
 }
 
+func (t Type) IsVlan() bool {
+	return t.isVlan()
+}
+
 func (h *rwHeader) nTags() (n uint) {
 	if h.Type.isVlan() {
 		n++
