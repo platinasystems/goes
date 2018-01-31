@@ -528,9 +528,6 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 	}
 	index := msg.Index
 	if !is_del {
-		if false {
-			fmt.Printf("add_del_interface(): add %s to ns %s\n", name, ns.name)
-		}
 		if ns.interface_by_index == nil {
 			ns.interface_by_index = make(map[uint32]*net_namespace_interface)
 			ns.interface_by_name = make(map[string]*net_namespace_interface)
@@ -557,14 +554,16 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			// fixme address change
 		}
 
-		// For tunnels record if in metadata mode.
-		if as := msg.GetLinkInfoData(); as != nil {
-			switch intf.kind {
-			case netlink.InterfaceKindIp4GRE, netlink.InterfaceKindIp4GRETap,
-				netlink.InterfaceKindIp6GRE, netlink.InterfaceKindIp6GRETap:
-				intf.tunnel_metadata_mode = as.X[netlink.IFLA_GRE_COLLECT_METADATA] != nil
-			case netlink.InterfaceKindIpip, netlink.InterfaceKindIp6Tunnel:
-				intf.tunnel_metadata_mode = as.X[netlink.IFLA_IPTUN_COLLECT_METADATA] != nil
+		if false { //tunnels so remove
+			// For tunnels record if in metadata mode.
+			if as := msg.GetLinkInfoData(); as != nil {
+				switch intf.kind {
+				case netlink.InterfaceKindIp4GRE, netlink.InterfaceKindIp4GRETap,
+					netlink.InterfaceKindIp6GRE, netlink.InterfaceKindIp6GRETap:
+					intf.tunnel_metadata_mode = as.X[netlink.IFLA_GRE_COLLECT_METADATA] != nil
+				case netlink.InterfaceKindIpip, netlink.InterfaceKindIp6Tunnel:
+					intf.tunnel_metadata_mode = as.X[netlink.IFLA_IPTUN_COLLECT_METADATA] != nil
+				}
 			}
 		}
 
@@ -583,42 +582,41 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 
 		// Ethernet address uniquely identifies register hw interfaces.
 		if h, ok := m.registered_hwifer_by_address[string(address)]; ok {
-			if false {
-				fmt.Printf("add_del_interface4(): set_si for  %s h %s\n", name, h.GetHwIf().Name())
-			}
-			// only do this for hw platforms
+			// only do this for hw ports
 			if name == h.GetHwIf().Name() {
 				m.set_si(intf, h.GetHwIf().Si())
 			}
 		}
 
-		is_tuntap := intf.kind == netlink.InterfaceKindTun
-		tuntap_key := tuntap_address_key(intf.name, ns.index)
-		if len(address) > 0 {
-			tuntap_key = string(address)
-		}
-		if tif, ok := m.vnet_tuntap_interface_by_address[tuntap_key]; is_tuntap && ok {
-			m.set_si(intf, tif.si)
-			intf.tuntap = tif
-
-			if ns.vnet_tuntap_interface_by_ifindex == nil {
-				ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
+		// tuntap so remove
+		if false {
+			is_tuntap := intf.kind == netlink.InterfaceKindTun
+			tuntap_key := tuntap_address_key(intf.name, ns.index)
+			if len(address) > 0 {
+				tuntap_key = string(address)
 			}
-			tif.ifindex = index
-			ns.vnet_tuntap_interface_by_ifindex[tif.ifindex] = tif
+			if tif, ok := m.vnet_tuntap_interface_by_address[tuntap_key]; is_tuntap && ok {
+				m.set_si(intf, tif.si)
+				intf.tuntap = tif
 
-			if tif.created && !tif.flag_sync_done && !tif.flag_sync_in_progress {
-				tif.sync_flags()
-			}
+				if ns.vnet_tuntap_interface_by_ifindex == nil {
+					ns.vnet_tuntap_interface_by_ifindex = make(map[uint32]*tuntap_interface)
+				}
+				tif.ifindex = index
+				ns.vnet_tuntap_interface_by_ifindex[tif.ifindex] = tif
 
-			// Interface moved to a new namespace?
-			if tif.namespace != ns {
-				if err = tif.add_del_namespace(m, ns, is_del); err != nil {
-					return
+				if tif.created && !tif.flag_sync_done && !tif.flag_sync_in_progress {
+					tif.sync_flags()
+				}
+
+				// Interface moved to a new namespace?
+				if tif.namespace != ns {
+					if err = tif.add_del_namespace(m, ns, is_del); err != nil {
+						return
+					}
 				}
 			}
 		}
-
 		if !exists && intf.kind == netlink.InterfaceKindVlan {
 			err = m.add_del_vlan(intf, msg, is_del)
 		}
@@ -628,14 +626,12 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		if !ok {
 			return
 		}
-		// try this
-		if intf.kind == netlink.InterfaceKindVlan {
-			err = m.add_del_vlan(intf, msg, is_del)
-		}
 
-		if tif := intf.tuntap; tif != nil {
-			tif.add_del_namespace(m, ns, is_del)
-			tif.namespace = nil
+		if false { // tuntap so remove
+			if tif := intf.tuntap; tif != nil {
+				tif.add_del_namespace(m, ns, is_del)
+				tif.namespace = nil
+			}
 		}
 		if intf.si != vnet.SiNil {
 			if intf.kind == netlink.InterfaceKindVlan {
@@ -701,15 +697,6 @@ func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *ne
 		v.DelSwIf(intf.si)
 	} else {
 		id := vnet.Uint16(ld.X[netlink.IFLA_VLAN_ID].(netlink.Uint16Attr).Uint())
-		{
-			v1 := ns.m.m.v
-			hi := v1.SupHi(sup_si)
-			hw := v1.HwIf(hi)
-			name := msg.Attrs[netlink.IFLA_IFNAME].String()
-			if false {
-				fmt.Printf("add_del_vlan: hw %s ifname %s id %v\n", hw.Name(), name, id)
-			}
-		}
 		var eid ethernet.IfId
 		if sup_si.IsSwSubInterface(v) {
 			eid = ethernet.IfId(v.SwIf(sup_si).Id(v))
@@ -805,7 +792,9 @@ func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
 
 	_, intf := m.interface_by_name(hw.Name())
 	if intf == nil {
-		fmt.Printf("RegisterHwInterface(): interface_by_name is nil for %s\n", hw.Name())
+		if false {
+			fmt.Printf("RegisterHwInterface(): interface_by_name is nil for %s\n", hw.Name())
+		}
 		//panic("unknown interface: " + hw.Name())
 		return
 	}
@@ -887,11 +876,11 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 	}
 
 	type nsIf struct {
-		si        vnet.Si
-		Interface string `format:"%-30s"`
-		Type      string `format:"%s" align:"center"`
-		Namespace string `format:"%s" align:"center" width:"30"`
-		NSID      string `format:"%s" align:"center"`
+		Interface string  `format:"%-30s"`
+		Type      string  `format:"%s" align:"center"`
+		Namespace string  `format:"%s" align:"center" width:"30"`
+		NSID      string  `format:"%s" align:"center"`
+		Si        vnet.Si `format:"0x%x" align:"center"`
 	}
 	var ifs []nsIf
 	for _, ns := range nm.namespace_by_name {
@@ -909,10 +898,11 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 				}
 			}
 
-			x := nsIf{Namespace: ns.name, Interface: intf.name, Type: intf.kind.String(), si: vnet.SiNil}
-			if intf.tuntap != nil {
-				x.si = intf.tuntap.si
+			x := nsIf{Namespace: ns.name, Interface: intf.name, Type: intf.kind.String(), Si: vnet.SiNil}
+			if false && intf.tuntap != nil {
+				x.Si = intf.tuntap.si
 			}
+			x.Si = intf.si
 			if ns.nsid != -1 {
 				x.NSID = fmt.Sprintf("%d", ns.nsid)
 			}
@@ -922,8 +912,8 @@ func (m *netlink_main) show_net_namespaces(c cli.Commander, w cli.Writer, in *cl
 	sort.Slice(ifs, func(i, j int) bool {
 		ni, nj := &ifs[i], &ifs[j]
 		if ni.Namespace == nj.Namespace {
-			if ni.si != vnet.SiNil && nj.si != vnet.SiNil {
-				ifi, ifj := m.m.v.SwIf(ni.si), m.m.v.SwIf(nj.si)
+			if ni.Si != vnet.SiNil && nj.Si != vnet.SiNil {
+				ifi, ifj := m.m.v.SwIf(ni.Si), m.m.v.SwIf(nj.Si)
 				return m.m.v.SwLessThan(ifi, ifj)
 			}
 			return ni.Interface < nj.Interface
