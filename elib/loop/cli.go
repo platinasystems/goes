@@ -113,6 +113,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 
 	type node struct {
 		Name     string  `format:"%-30s"`
+		Index    uint    `format:"%16d "`
 		State    string  `align:"center"`
 		Calls    uint64  `format:"%16d"`
 		Vectors  uint64  `format:"%16d"`
@@ -154,6 +155,7 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 				}
 				ns = append(ns, node{
 					Name:     name + io,
+					Index:    n.index,
 					State:    state,
 					Calls:    s[j].calls,
 					Vectors:  s[j].vectors,
