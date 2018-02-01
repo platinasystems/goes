@@ -8,32 +8,32 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_bgp_peering_traffic_test_{{ start_time.stdout }}"
+        hash_name: "frr_bgp_peering_traffic_test_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of /etc/quagga/bgpd.conf
+    - name: Take backup of /etc/frr/bgpd.conf
       copy:
-        src: "{{ quagga_bgp_conf_file }}"
-        dest: "{{ quagga_bgp_conf_file_bck }}"
+        src: "{{ frr_bgp_conf_file }}"
+        dest: "{{ frr_bgp_conf_file_bck }}"
         remote_src: true
 
     - name: Add dummy interface
       add_dummy_interface:
         switch_name: "{{ inventory_hostname }}"
 
-    - name: Add bgp config in /etc/quagga/bgpd.conf
+    - name: Add bgp config in /etc/frr/bgpd.conf
       blockinfile:
-        path: "{{ quagga_bgp_conf_file }}"
+        path: "{{ frr_bgp_conf_file }}"
         marker: ""
         block: "{{ lookup('file', '../../files/{{inventory_hostname}}/bgp_peering_ebgp_route_advertise.conf') }}"
 
-    - name: Restart quagga
+    - name: Restart frr
       service:
-        name: quagga
+        name: frr
         state: restarted
 
     - name: Wait few secs for bgp to establish communication
@@ -44,12 +44,12 @@
         path: "{{ bgp_log_dir }}"
         state: directory
 
-    - name: Verify quagga bgp peering ebgp route advertise
+    - name: Verify frr bgp peering ebgp route advertise
       test_bgp_route_advertise:
         switch_name: "{{ inventory_hostname }}"
         spine_list: "{{ groups['spine'] }}"
         leaf_list: "{{ groups['leaf'] }}"
-        package_name: "quagga"
+        package_name: "frr"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ bgp_log_dir }}"
       register: module_out
@@ -138,23 +138,23 @@
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Restore backup of /etc/quagga/bgpd.conf
+    - name: Restore backup of /etc/frr/bgpd.conf
       copy:
-        src: "{{ quagga_bgp_conf_file_bck }}"
-        dest: "{{ quagga_bgp_conf_file }}"
+        src: "{{ frr_bgp_conf_file_bck }}"
+        dest: "{{ frr_bgp_conf_file }}"
         remote_src: true
 
     - name: Remove backup file
       file:
-        path: "{{ quagga_bgp_conf_file_bck }}"
+        path: "{{ frr_bgp_conf_file_bck }}"
         state: absent
 
     - name: Delete dummy interface
       command: "ip link del dummy0 type dummy"
 
-    - name: Restart quagga
+    - name: Restart frr
       service:
-        name: quagga
+        name: frr
         state: restarted
 
 
