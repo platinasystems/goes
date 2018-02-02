@@ -37,15 +37,9 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    leaf_list:
+    converge_switch:
       description:
-        - List of all leaf switches.
-      required: False
-      type: list
-      default: []
-    leaf_network_list:
-      description:
-        - Comma separated list of all leaf bgp networks.
+        - Name of the switch on which network has been converged.
       required: False
       type: str
     package_name:
@@ -135,8 +129,7 @@ def verify_bgp_quagga_convergence(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
-    leaf_list = module.params['leaf_list']
-    leaf_network_list = module.params['leaf_network_list'].split(',')
+    converge_switch = module.params['converge_switch']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
@@ -145,25 +138,25 @@ def verify_bgp_quagga_convergence(module):
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
 
-    execute_flag = True
-    is_leaf = True if switch_name in leaf_list else False
-    if is_leaf:
-        if leaf_list.index(switch_name) == 0:
-            execute_flag = False
-
-    if execute_flag:
+    if switch_name != converge_switch:
         # Get all ip routes
         cmd = "vtysh -c 'sh ip route'"
-        out = execute_commands(module, cmd)
+        routes_out = execute_commands(module, cmd)
 
-        route = 'B>* {}'.format(leaf_network_list[0])
+        if routes_out:
+            route = 'B>* 192.168.{}.1'.format(converge_switch[-2::])
 
-        if route in out:
+            if route in routes_out:
+                RESULT_STATUS = False
+                failure_summary += 'On Switch {} bgp route '.format(switch_name)
+                failure_summary += 'for network {} is present '.format(route)
+                failure_summary += 'in the output of command {} '.format(cmd)
+                failure_summary += 'even after removing this network\n'
+        else:
             RESULT_STATUS = False
-            failure_summary += 'On Switch {} bgp route '.format(switch_name)
-            failure_summary += '{} is present '.format(route)
-            failure_summary += 'in the output of command {} '.format(cmd)
-            failure_summary += 'even after removing this network\n'
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'bgp convergence cannot be verified '
+            failure_summary += 'because output of command {} is None'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -176,8 +169,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            leaf_list=dict(required=False, type='list', default=[]),
-            leaf_network_list=dict(required=False, type='str'),
+            converge_switch=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
