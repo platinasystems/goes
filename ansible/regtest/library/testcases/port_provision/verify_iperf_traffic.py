@@ -42,11 +42,18 @@ options:
         - Name of the leaf switch on which iperf server is running.
       required: False
       type: str
-    spine_server:
+    leaf_eth1_ip:
       description:
-        - Name of the spine switch on which iperf server is running.
+        - IP address of eth-1-1 interface of leaf switch.
       required: False
       type: str
+      default: ''
+    spine_eth1_ip:
+      description:
+        - IP address of eth-1-1 interface of spine switch.
+      required: False
+      type: str
+      default: ''
     eth_list:
       description:
         - List of eth interfaces described as string.
@@ -145,16 +152,17 @@ def verify_traffic(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     leaf_server = module.params['leaf_server']
-    spine_server = module.params['spine_server']
+    leaf_eth1_ip = module.params['leaf_eth1_ip']
+    spine_eth1_ip = module.params['spine_eth1_ip']
     is_subports = module.params['is_subports']
     two_lanes = module.params['two_lanes']
     eth_list = module.params['eth_list'].split(',')
 
     if not is_subports:
         if switch_name == leaf_server:
-            third_octet = spine_server[-2::]
+            third_octet = spine_eth1_ip.split('.')[3]
         else:
-            third_octet = leaf_server[-2::]
+            third_octet = leaf_eth1_ip.split('.')[3]
 
         for eth in eth_list:
             port += 1
@@ -205,7 +213,8 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             leaf_server=dict(required=False, type='str'),
-            spine_server=dict(required=False, type='str'),
+            leaf_eth1_ip=dict(required=False, type='str', default=''),
+            spine_eth1_ip=dict(required=False, type='str', default=''),
             eth_list=dict(required=False, type='str'),
             is_subports=dict(required=False, type='bool', default=False),
             two_lanes=dict(required=False, type='bool', default=False),

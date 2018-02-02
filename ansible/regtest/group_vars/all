@@ -37,6 +37,9 @@ bird_conf_file_bck: /etc/bird/bird.conf.bck
 network_interfaces_file: /etc/network/interfaces
 network_interfaces_file_bck: /etc/network/interfaces.bck
 
+goes_start_file: /etc/goes/start
+goes_start_file_bck: /etc/goes/start.bck
+
 goes_url_path: 'http://downloads.platinasystems.com/LATEST/'
 goes_installer_dir: '/tmp/'
 goes_upgrade_installer_name: 'goes-platina-mk1-installer.up'
