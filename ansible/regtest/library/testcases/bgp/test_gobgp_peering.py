@@ -157,49 +157,56 @@ def verify_neighbor_relationship(module):
     switch_name = module.params['switch_name']
     check_ping = module.params['check_ping']
     config_file = module.params['config_file'].splitlines()
+    self_ip = '192.168.{}.1'.format(switch_name[-2::])
 
     # Get gobgp neighbors
     cmd = 'gobgp nei'
     gobgp_out = execute_commands(module, cmd)
 
-    for line in config_file:
-        line = line.strip()
-        if 'neighbor-address' in line:
-            neighbor_count += 1
-            neighbor_ip = line.split().pop()
-            neighbor_ip = neighbor_ip.replace('"', '')
-            if neighbor_ip not in gobgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
-
-            if check_ping:
-                packet_count = '3'
-                ping_cmd = 'ping -w 5 -c {} {}'.format(packet_count,
-                                                       neighbor_ip)
-                ping_out = execute_commands(module, ping_cmd)
-                if '{} received'.format(packet_count) not in ping_out:
+    if gobgp_out:
+        for line in config_file:
+            line = line.strip()
+            if 'neighbor-address' in line:
+                neighbor_count += 1
+                neighbor_ip = line.split().pop()
+                neighbor_ip = neighbor_ip.replace('"', '')
+                if neighbor_ip not in gobgp_out:
                     RESULT_STATUS = False
-                    failure_summary += 'From switch {} '.format(switch_name)
-                    failure_summary += 'neighbor ip {} '.format(neighbor_ip)
-                    failure_summary += 'is not getting pinged\n'
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
 
-        if 'peer-as' in line:
-            remote_as = line.split().pop()
-            if remote_as not in gobgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'remote-as {} '.format(remote_as)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+                if check_ping:
+                    packet_count = '3'
+                    ping_cmd = 'ping -w 5 -c {} -I {} {}'.format(
+                        packet_count, self_ip, neighbor_ip)
+                    ping_out = execute_commands(module, ping_cmd)
+                    if '{} received'.format(packet_count) not in ping_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'From switch {} '.format(switch_name)
+                        failure_summary += 'neighbor ip {} '.format(neighbor_ip)
+                        failure_summary += 'is not getting pinged\n'
 
-    gobgp_out = gobgp_out.lower()
-    if gobgp_out.count('establ') != neighbor_count:
+            if 'peer-as' in line:
+                remote_as = line.split().pop()
+                if remote_as not in gobgp_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'remote-as {} '.format(remote_as)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
+
+        gobgp_out = gobgp_out.lower()
+        if gobgp_out.count('establ') != neighbor_count:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'bgp state is not established for neighbors\n'
+    else:
         RESULT_STATUS = False
         failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'bgp state is not established for neighbors\n'
+        failure_summary += 'bgp neighbors cannot be verified since \n'
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     return failure_summary
 
@@ -230,7 +237,7 @@ def verify_gobgp_peering(module):
 
     # Advertise the routes
     if check_ping or if_down:
-        add_route_cmd = 'gobgp global rib -a ipv4 add 192.168.{}.0/24'.format(
+        add_route_cmd = 'gobgp global rib -a ipv4 add 192.168.{}.1/32'.format(
             switch_name[-2::])
         execute_commands(module, add_route_cmd)
         time.sleep(2)
@@ -266,10 +273,10 @@ def verify_gobgp_peering(module):
     # Store the failure summary in hash
     HASH_DICT['result.detail'] = failure_summary
 
-    # Delete advertised routes
+    # # Delete advertised routes
     if check_ping or if_down:
         time.sleep(7)
-        cmd = 'gobgp global rib -a ipv4 del 192.168.{}.0/24'.format(
+        cmd = 'gobgp global rib -a ipv4 del 192.168.{}.1/32'.format(
             switch_name[-2::])
         execute_commands(module, cmd)
 
