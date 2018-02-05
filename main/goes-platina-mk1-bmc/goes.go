@@ -167,10 +167,12 @@ var Goes = &goes.Goes{
 		"insmod":  insmod.Command{},
 		"install": &install.Command{},
 		"ip":      ip.Goes,
-		"ipcfg":   ipcfg.Command{},
-		"kexec":   kexec.Command{},
-		"keys":    keys.Command{},
-		"kill":    kill.Command{},
+		"ipcfg": &ipcfg.Command{
+			Gpio: gpioInit,
+		},
+		"kexec": kexec.Command{},
+		"keys":  keys.Command{},
+		"kill":  kill.Command{},
 		"ledgpiod": &ledgpiod.Command{
 			Init: ledgpiodInit,
 		},

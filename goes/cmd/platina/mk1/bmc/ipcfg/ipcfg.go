@@ -8,13 +8,22 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/parms"
 )
 
-type Command struct{}
+const (
+	Machine = "platina-mk1-bmc"
+)
+
+var command *Command
+
+type Command struct {
+	Gpio func()
+	gpio sync.Once
+}
 
 func (Command) String() string { return "ipcfg" }
 
@@ -34,7 +43,9 @@ DESCRIPTION
 	}
 }
 
-func (Command) Main(args ...string) (err error) {
+func (c *Command) Main(args ...string) (err error) {
+	command = c
+	initQfmt()
 	parm, args := parms.New(args, "-ip")
 	if len(parm.ByName["-ip"]) == 0 {
 		if err = dispIP(false); err != nil {
@@ -65,7 +76,7 @@ func (Command) Main(args ...string) (err error) {
 }
 
 func dispIP(q bool) error {
-	e, bootargs, err := upgrade.GetEnv(q)
+	e, bootargs, err := GetEnv(q)
 	if err != nil {
 		return err
 	}
@@ -82,7 +93,7 @@ func updateIP(ip string, q bool) (err error) {
 	if err = updatePer(ip, q); err != nil {
 		return err
 	}
-	if err = upgrade.UpdateEnv(q); err != nil {
+	if err = UpdateEnv(q); err != nil {
 		return err
 	}
 	return nil
@@ -95,7 +106,7 @@ func updatePer(ip string, q bool) (err error) {
 		fmt.Println("Updating QSPI1 persistent block")
 	}
 	s := ip + "\x00"
-	upgrade.PutPer([]byte(s), q)
+	PutPer([]byte(s), q)
 	if err != nil {
 		return err
 	}
