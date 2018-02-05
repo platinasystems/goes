@@ -205,7 +205,7 @@ def verify_neighbor_relationship(module):
     else:
         RESULT_STATUS = False
         failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'bgp neighbors cannot be verified since \n'
+        failure_summary += 'bgp neighbors cannot be verified since '
         failure_summary += 'output of command {} is None'.format(cmd)
 
     return failure_summary
