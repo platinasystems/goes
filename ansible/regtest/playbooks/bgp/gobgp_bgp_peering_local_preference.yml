@@ -33,7 +33,7 @@
         name: gobgpd
         state: restarted
 
-    - name: Wait for few seconds for bgp convergence
+    - name: Wait few seconds for bgp convergence
       pause:
         seconds: 35
 
@@ -84,21 +84,7 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-    - name: Get goes version details
-      shell: "goes hget platina package | grep version:"
-      register: version_out
-
-    - name: Get goes tag details
-      shell: "goes hget platina package | grep tag:"
-      register: tag_out
-
-    - name: Store goes version and tag details in redis db
-      store_goes_details:
-        switch_name: "{{ inventory_hostname }}"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        version_details: "{{ version_out.stdout }}"
-        tag_details: "{{ tag_out.stdout }}"
-      delegate_to: 127.0.0.1
+    - include: ../../playbooks/get_goes_version_and_tags.yml
 
     - name: Remove config file
       file:
@@ -126,19 +112,16 @@
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: result
 
-    - debug:
+    - name: Print test case result
+      debug:
         msg: "Test case result: {{ result.result_status }}"
 
-    - debug:
+    - name: Print failure summary
+      debug:
         msg: "Failure summary: {{ result.result_detail }}"
 
-#    - name: Get playbook run details
-#      set_fact:
-#        playbook_run: "{{ lookup('file', '{{ ansible_log_file_path }}') }}"
-#
-#    - name: Store the ansible execution log in redis hash
-#      command: "redis-cli -p 9090 hset {{ hostvars['server_emulator']['hash_name'] }} 'result.playbook' '{{ playbook_run }}'"
-#
-#    - file:
-#        path: "{{ ansible_log_file_path }}"
-#        state: absent
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - include: ../../playbooks/get_goes_status.yml

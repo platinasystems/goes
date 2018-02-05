@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify BGP Peering Redundancy """
+""" Test/Verify BGP PEERING CONSISTENCY """
 
 #
 # This file is part of Ansible
@@ -19,7 +19,6 @@
 #
 
 import shlex
-import time
 
 from collections import OrderedDict
 
@@ -27,9 +26,9 @@ from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = """
 ---
-module: test_bgp_peering_redundancy
+module: test_bgp_peering_consistency
 author: Platina Systems
-short_description: Module to test and verify bgp peering redundancy.
+short_description: Module to test and verify bgp configuration.
 description:
     Module to test and verify bgp configurations and log the same.
 options:
@@ -38,25 +37,9 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    config_file:
-      description:
-        - BGP configuration configured.
-      required: False
-      type: str
     package_name:
       description:
-        - Name of the package installed (e.g. quagga/frr/bird).
-      required: False
-      type: str
-    leaf_list:
-      description:
-        - List of all leaf switches.
-      required: False
-      type: list
-      default: []
-    eth_list:
-      description:
-        - Comma separated string of eth interfaces to bring down/up.
+        - Name of the package installed (e.g. quagga/frr).
       required: False
       type: str
     hash_name:
@@ -72,8 +55,8 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp peering redundancy
-  test_bgp_peering_redundancy:
+- name: Verify bgp peering consistency
+  test_bgp_peering_consistency:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -118,7 +101,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service' in cmd or 'dummy' in cmd or 'restart' in cmd:
+    if 'service' in cmd and 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -132,63 +115,16 @@ def execute_commands(module, cmd):
     return out
 
 
-def check_bgp_neighbors(module):
+def verify_bgp_peering_consistency(module):
     """
-    Method to check if bgp neighbor relationship got established or not.
+    Method to verify bgp peering consistency.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
-    failure_summary = HASH_DICT.get('result.detail', '')
-    switch_name = module.params['switch_name']
-    config_file = module.params['config_file'].splitlines()
-
-    # Get all bgp routes
-    cmd = "vtysh -c 'sh ip bgp neighbors'"
-    bgp_out = execute_commands(module, cmd)
-
-    for line in config_file:
-        line = line.strip()
-        if 'neighbor' in line and 'remote-as' in line:
-            config = line.split()
-            neighbor_ip = config[1]
-            remote_as = config[3]
-            if neighbor_ip not in bgp_out or remote_as not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
-
-            if 'bgp state = established' not in bgp_out.lower():
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp state of neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not Established in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
-
-    HASH_DICT['result.detail'] = failure_summary
-
-
-def verify_bgp_peering_redundancy(module):
-    """
-    Method to verify bgp peering redundancy.
-    :param module: The Ansible module to fetch input parameters.
-    """
-    global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
-    eth_list = module.params['eth_list'].split(',')
-    leaf_list = module.params['leaf_list']
-    is_leaf = True if switch_name in leaf_list else False
-
-    # Add dummy0 interface
-    execute_commands(module, 'ip link add dummy0 type dummy')
-
-    # Assign ip to this created dummy0 interface
-    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.0'.format(
-        switch_name[-2::]
-    )
-    execute_commands(module, cmd)
+    values_to_check = ['10.0.1.0', 'eth-1-1']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
@@ -197,34 +133,30 @@ def verify_bgp_peering_redundancy(module):
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
 
-    # Check and verify BGP neighbor relationship
-    check_bgp_neighbors(module)
+    # Get all required routes
+    bgp_cmd = "vtysh -c 'sh ip route'"
+    route_cmd = 'route'
+    fib_cmd = 'goes vnet show ip fib'
+    bgp_routes = execute_commands(module, bgp_cmd)
+    routes = execute_commands(module, route_cmd)
+    fib_routes = execute_commands(module, fib_cmd)
 
-    # Bring down few eth interfaces on only leaf switches
-    if is_leaf:
-        for eth in eth_list:
-            eth = eth.strip()
-            cmd = 'ifconfig eth-{}-1 down'.format(eth)
-            execute_commands(module, cmd)
+    if bgp_routes and routes and fib_routes:
+        for value in values_to_check:
+            if (value not in bgp_routes and value not in routes and
+                    value not in fib_routes):
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp peering consistency for '
+                failure_summary += 'eth-1-1 interface is missing\n'
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'bgp peering consistency cannot be verified '
+        failure_summary += 'since output of one the these command is None '
+        failure_summary += '{} {} {}\n'.format(bgp_cmd, route_cmd, fib_cmd)
 
-    # Wait for 5 seconds
-    time.sleep(5)
-
-    # Again check and verify BGP neighbor relationship
-    check_bgp_neighbors(module)
-
-    # Bring up eth interfaces which were down
-    if is_leaf:
-        for eth in eth_list:
-            eth = eth.strip()
-            cmd = 'ifconfig eth-{}-1 up'.format(eth)
-            execute_commands(module, cmd)
-
-    # Wait for 5 seconds
-    time.sleep(5)
-
-    # Again check and verify BGP neighbor relationship
-    check_bgp_neighbors(module)
+    HASH_DICT['result.detail'] = failure_summary
 
     # Get the GOES status info
     execute_commands(module, 'goes status')
@@ -235,10 +167,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            config_file=dict(required=False, type='str', default=''),
             package_name=dict(required=False, type='str'),
-            leaf_list=dict(required=False, type='list', default=[]),
-            eth_list=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
@@ -246,7 +175,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_bgp_peering_redundancy(module)
+    verify_bgp_peering_consistency(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'

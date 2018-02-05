@@ -154,8 +154,8 @@ def verify_ospf_traffic(module):
                 execute_commands(module, 'ip link add dummy0 type dummy')
 
                 # Assign ip to this created dummy0 interface
-                cmd = 'ifconfig dummy0 192.168.{}.1 {}'.format(
-                    switch_name[-2::], netmask
+                cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.255'.format(
+                    switch_name[-2::]
                 )
                 execute_commands(module, cmd)
             else:
@@ -176,19 +176,41 @@ def verify_ospf_traffic(module):
         third_octet = [leaf[-2::] for leaf in leaf_list]
 
         for octet in third_octet:
-            routes_to_check.append('192.168.{}.0'.format(octet))
+            routes_to_check.append('192.168.{}.1'.format(octet))
 
         # Get all ospf ip routes
         cmd = "vtysh -c 'sh ip route ospf'"
         ospf_routes = execute_commands(module, cmd)
 
-        for route in routes_to_check:
-            if route not in ospf_routes:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'ospf route {} '.format(route)
-                failure_summary += 'is not present in the output '
-                failure_summary += 'of command {}\n'.format(cmd)
+        if ospf_routes:
+            for route in routes_to_check:
+                if route not in ospf_routes:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'ospf route {} '.format(route)
+                    failure_summary += 'is not present in the output '
+                    failure_summary += 'of command {}\n'.format(cmd)
+        else:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'ospf route cannot be verified since '
+            failure_summary += 'output of command {} is None'.format(cmd)
+
+        leaf_list.remove(switch_name)
+        neighbor_switch = leaf_list[0]
+
+        self_ip = '192.168.{}.1'.format(switch_name[-2::])
+        neighbor_ip = '192.168.{}.1'.format(neighbor_switch[-2::])
+
+        # Verify ping
+        packet_count = '3'
+        ping_cmd = 'ping -w 3 -c {} -I {} {}'.format(packet_count,
+                                                     self_ip, neighbor_ip)
+        ping_out = execute_commands(module, ping_cmd)
+        if '{} received'.format(packet_count) not in ping_out:
+            RESULT_STATUS = False
+            failure_summary += 'From switch {}, '.format(switch_name)
+            failure_summary += '{} is not getting pinged\n'.format(neighbor_switch)
 
     # Delete the dummy interface
     execute_commands(module, 'ip link del dummy0 type dummy')

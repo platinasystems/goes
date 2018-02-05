@@ -153,37 +153,43 @@ def verify_gobgp_administrative_distance(module):
     cmd = "vtysh -c 'sh ip route'"
     all_routes = execute_commands(module, cmd)
 
-    switch_list = leaf_list if switch_name in spine_list else spine_list
-    for switch in switch_list:
-        routes_to_check.append('192.168.{}.0/24'.format(switch[-2::]))
+    if all_routes:
+        switch_list = leaf_list if switch_name in spine_list else spine_list
+        for switch in switch_list:
+            routes_to_check.append('192.168.{}.1/32'.format(switch[-2::]))
 
-    routes_to_check.append('192.168.{}.0/24'.format(switch_name[-2::]))
+        routes_to_check.append('192.168.{}.1/32'.format(switch_name[-2::]))
 
-    for route in routes_to_check:
-        if route not in all_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'bgp route for network {} '.format(route)
-            failure_summary += 'is not showing up '
-            failure_summary += 'in the output of {}\n'.format(cmd)
+        for route in routes_to_check:
+            if route not in all_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp route for network {} '.format(route)
+                failure_summary += 'is not showing up '
+                failure_summary += 'in the output of {}\n'.format(cmd)
 
-    for route in all_routes.splitlines():
-        route = route.strip()
-        for network in routes_to_check:
-            if network in route:
-                if '20/' or '200/' in route:
-                    pass
-                else:
-                    RESULT_STATUS = False
-                    failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'administrative value is not present '
-                    failure_summary += 'in the bgp route {}\n'.format(route)
+        for route in all_routes.splitlines():
+            route = route.strip()
+            for network in routes_to_check:
+                if network in route:
+                    if '20/' or '200/' in route:
+                        pass
+                    else:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'administrative value is not present '
+                        failure_summary += 'in the bgp route {}\n'.format(route)
 
-                if not route.startswith('B>*'):
-                    RESULT_STATUS = False
-                    failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'bgp route {} '.format(route)
-                    failure_summary += 'does not start with B>*\n'
+                    # if not route.startswith('B>*'):
+                    #     RESULT_STATUS = False
+                    #     failure_summary += 'On switch {} '.format(switch_name)
+                    #     failure_summary += 'bgp route {} '.format(route)
+                    #     failure_summary += 'does not start with B>*\n'
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'administrative distance cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     # Store the failure summary in hash
     HASH_DICT['result.detail'] = failure_summary

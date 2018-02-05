@@ -86,7 +86,7 @@ def main():
 
     # Assign ip to this created dummy0 interface
     ip = '192.168.{}.1'.format(switch_name[-2::])
-    cmd = 'ifconfig dummy0 {} netmask 255.255.255.0'.format(ip)
+    cmd = 'ifconfig dummy0 {} netmask 255.255.255.255'.format(ip)
     run_cli(module, cmd)
     
     msg = 'Added dummy0 interface with ip {} to {}'.format(ip, switch_name)

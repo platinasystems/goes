@@ -1,37 +1,33 @@
 ---
+- name: Stop the gobgpd service
+  service:
+    name: gobgpd
+    state: stopped
 
-- hosts: leaf:spine
-  become: true
-  tasks:
-   - name: Stop the gobgpd service
-     service:
-        name: gobgpd
-        state: stopped
+- name: Remove gobgpd.conf file
+  file:
+    path: "{{ gobgp_bgp_conf_file }}"
+    state: absent
 
-   - name: Remove gobgpd.conf file
-     file:
-        path: "{{ gobgp_bgp_conf_file }}"
-        state: absent
+- name: Remove gobgpd.service file
+  file:
+    path: /etc/systemd/system/gobgpd.service
+    state: absent
 
-   - name: Remove gobgpd.service file
-     file:
-        path: /etc/systemd/system/gobgpd.service
-        state: absent
+- name: Stop the Quagga service
+  service:
+    name: quagga
+    state: stopped
 
-   - name: Stop the Quagga service
-     service:
-        name: quagga
-        state: stopped
+- name: Remove vtysh.conf and zebra.conf files
+  file:
+    path: "/etc/quagga/{{ item }}"
+    state: absent
+  with_items:
+  - vtysh.conf
+  - zebra.conf
 
-   - name: Remove vtysh.conf and zebra.conf files
-     file:
-        path: "/etc/quagga/{{ item }}"
-        state: absent
-     with_items:
-      - vtysh.conf
-      - zebra.conf
-
-   - name: Uninstall Quagga
-     apt:
-        name: quagga
-        state: absent
+- name: Uninstall Quagga
+  apt:
+    name: quagga
+    state: absent

@@ -148,7 +148,7 @@ def verify_ospf_loopback(module):
     execute_commands(module, 'ip link add dummy0 type dummy')
 
     # Assign ip to this created dummy0 interface
-    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.0'.format(
+    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.255'.format(
         switch_name[-2::]
     )
     execute_commands(module, cmd)

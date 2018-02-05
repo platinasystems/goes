@@ -1,0 +1,4 @@
+ifconfig eth-21-1 192.168.21.29 netmask 255.255.255.0
+ifconfig eth-11-1 192.168.11.29 netmask 255.255.255.0
+ifconfig eth-21-1 mtu 1500 up
+ifconfig eth-11-1 mtu 1500 up

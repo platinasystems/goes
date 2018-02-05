@@ -1,24 +1,13 @@
 ---
+- name: Stop quagga service
+  service:
+    name: quagga
+    state: stopped
 
-
- - hosts: leaf:spine
-   become: true
-   tasks:
-    - name: Stop quagga service
-      service:
-        name: quagga
-        state: stopped
-      ignore_errors: yes
-
-    - name: Quagga Uninstallation
-      apt:
-        name: quagga
-        state: absent
-        force: yes
-        autoremove: yes
-        purge: yes
-      ignore_errors: yes
-
-    - file:
-        path: "{{ ansible_log_file_path }}"
-        state: absent
+- name: Quagga Uninstallation
+  apt:
+    name: quagga
+    state: absent
+    force: yes
+    autoremove: yes
+    purge: yes

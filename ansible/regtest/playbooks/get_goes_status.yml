@@ -1,0 +1,8 @@
+---
+- name: Get goes status
+  command: goes status
+  register: goes
+
+- name: Print goes status
+  debug:
+    var: goes.stdout

@@ -1,5 +1,5 @@
 #!/usr/bin/python
-""" Test/Verify BGP Routes """
+""" Test/Verify BGP Routes Reflector """
 
 #
 # This file is part of Ansible
@@ -37,20 +37,20 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    leaf_network_list:
+    leaf_list:
       description:
-        - Comma separated list of all leaf bgp networks.
-      required: False
-      type: str
-    spine_list:
-      description:
-        - List of all spine switches.
+        - List of all leaf switches.
       required: False
       type: list
       default: []
     config_file:
       description:
-        - BGP config which have been added.
+        - BGP config which have been added into /etc/quagga/bgpd.conf.
+      required: False
+      type: str
+    reflector_switch:
+      description:
+        - Name of the switch on which route reflector config are added.
       required: False
       type: str
     package_name:
@@ -71,9 +71,10 @@ options:
 """
 
 EXAMPLES = """
-- name: Verify bgp peering routes
+- name: Verify bgp peering route reflector
   test_bgp_route_reflector:
     switch_name: "{{ inventory_hostname }}"
+    leaf_list: "{{ groups['leaf'] }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
 """
@@ -151,7 +152,7 @@ def verify_rr_client(module, switch_name, network):
         failure_summary += 'On Switch {} '.format(switch_name)
         failure_summary += 'output of command {} is None\n'.format(cmd)
     else:
-        if 'Received from a RR-client' not in out:
+        if 'received from a rr-client' not in out.lower():
             RESULT_STATUS = False
             failure_summary += 'On Switch {} '.format(switch_name)
             failure_summary += 'output of command {} '.format(cmd)
@@ -161,17 +162,17 @@ def verify_rr_client(module, switch_name, network):
     return failure_summary
 
 
-def verify_advertised_routes(module, switch_name, network, ip):
+def verify_advertised_routes(module, switch_name, ip):
     """
     Method to verify advertised routes.
     :param module: The Ansible module to fetch input parameters.
     :param switch_name: Name of the switch.
-    :param network: Network address.
     :param ip: Interface address.
     :return: Failure summary if any.
     """
     global RESULT_STATUS
     failure_summary = ''
+    self_network = '192.168.{}.1'.format(switch_name[-2::])
 
     cmd = "vtysh -c 'sh ip bgp neighbors {} advertised-routes'".format(ip)
     out = execute_commands(module, cmd)
@@ -182,25 +183,28 @@ def verify_advertised_routes(module, switch_name, network, ip):
         failure_summary += 'On Switch {} '.format(switch_name)
         failure_summary += 'output of command {} is None\n'.format(cmd)
     else:
-        if network not in out:
+        if self_network not in out:
             RESULT_STATUS = False
             failure_summary += 'On Switch {} '.format(switch_name)
-            failure_summary += 'output of command {} '.format(cmd)
-            failure_summary += 'did not display network {}\n'.format(network)
+            failure_summary += 'output of command {} did not '.format(cmd)
+            failure_summary += 'display advertised network {}\n'.format(
+                self_network
+            )
 
     return failure_summary
 
 
-def verify_bgp_routes(module):
+def verify_bgp_route_reflector(module):
     """
-    Method to verify bgp routes.
+    Method to verify bgp route reflector.
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS, HASH_DICT
     failure_summary = ''
-    self_network = ''
+    leaf_network = []
     switch_name = module.params['switch_name']
-    spine_list = module.params['spine_list']
+    leaf_list = module.params['leaf_list']
+    reflector_switch = module.params['reflector_switch']
     package_name = module.params['package_name']
     
     # Get the current/running configurations
@@ -210,26 +214,21 @@ def verify_bgp_routes(module):
     execute_commands(module, 'service {} restart'.format(package_name))
     execute_commands(module, 'service {} status'.format(package_name))
 
-    is_spine = True if switch_name in spine_list else False
-    if is_spine:
-        if spine_list.index(switch_name) == 0:
-            # Verify Received from RR client
-            for network in module.params['leaf_network_list'].split(','):
-                network = network.split('/')[0]
-                failure_summary += verify_rr_client(module, switch_name,
-                                                    network)
+    if switch_name == reflector_switch:
+        for switch in leaf_list:
+            leaf_network.append('192.168.{}.1'.format(switch[-2::]))
 
-            # Verify advertised routes
-            for line in module.params['config_file'].splitlines():
-                line = line.strip()
-                if line.startswith('network'):
-                    self_network = (line.split()[1]).split('/')[0]
+        # Verify Received from RR client
+        for network in leaf_network:
+            failure_summary += verify_rr_client(module, switch_name, network)
 
-                if line.startswith('neighbor') and 'remote-as' not in line:
-                    ip = line.split()[1]
-                    failure_summary += verify_advertised_routes(
-                        module, switch_name, self_network, ip
-                    )
+        # Verify advertised routes
+        for line in module.params['config_file'].splitlines():
+            line = line.strip()
+            if 'neighbor' in line and 'remote-as' in line:
+                ip = line.split()[1]
+                failure_summary += verify_advertised_routes(
+                    module, switch_name, ip)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -242,8 +241,8 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            leaf_network_list=dict(required=False, type='str'),
-            spine_list=dict(required=False, type='list', default=[]),
+            leaf_list=dict(required=False, type='list', default=[]),
+            reflector_switch=dict(required=False, type='str'),
             config_file=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
@@ -253,7 +252,7 @@ def main():
 
     global HASH_DICT, RESULT_STATUS
 
-    verify_bgp_routes(module)
+    verify_bgp_route_reflector(module)
 
     # Calculate the entire test result
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'

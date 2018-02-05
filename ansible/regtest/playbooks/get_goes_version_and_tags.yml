@@ -1,0 +1,16 @@
+---
+- name: Get goes version details
+  shell: "goes hget platina package | grep version:"
+  register: version_out
+
+- name: Get goes tag details
+  shell: "goes hget platina package | grep tag:"
+  register: tag_out
+
+- name: Store goes version and tag details in redis db
+  store_goes_details:
+    switch_name: "{{ inventory_hostname }}"
+    hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+    version_details: "{{ version_out.stdout }}"
+    tag_details: "{{ tag_out.stdout }}"
+  delegate_to: 127.0.0.1

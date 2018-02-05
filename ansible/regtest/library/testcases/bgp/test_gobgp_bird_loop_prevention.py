@@ -109,7 +109,11 @@ def execute_commands(module, cmd):
     # command output as value in the hash dictionary
     exec_time = run_cli(module, 'date +%Y%m%d%T')
     key = '{0} {1} {2}'.format(module.params['switch_name'], exec_time, cmd)
-    HASH_DICT[key] = out[:512] if len(out.encode('utf-8')) > 512 else out
+
+    if out:
+        HASH_DICT[key] = out[:512] if len(out.encode('utf-8')) > 512 else out
+    else:
+        HASH_DICT[key] = out
 
     return out
 
@@ -127,10 +131,16 @@ def verify_loop_prevention(module):
     cmd = 'python /var/log/print_all.py {}'.format(log_file)
     parsed_out = execute_commands(module, cmd)
 
-    if 'Marker: -- ignored --' not in parsed_out:
+    if parsed_out:
+        if 'Marker: -- ignored --' not in parsed_out:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'loop prevention message is not present\n'
+    else:
         RESULT_STATUS = False
         failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'loop prevention message is not present\n'
+        failure_summary += 'result cannot be verified since loop '
+        failure_summary += 'prevention file {} is empty'.format(log_file)
 
     # Store the failure summary in hash
     HASH_DICT['result.detail'] = failure_summary

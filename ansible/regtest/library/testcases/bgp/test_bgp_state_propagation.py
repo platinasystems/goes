@@ -19,6 +19,7 @@
 #
 
 import shlex
+import time
 
 from collections import OrderedDict
 
@@ -37,26 +38,19 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    leaf_network_list:
-      description:
-        - Comma separated list of all leaf bgp networks.
-      required: False
-      type: str
-    leaf_list:
-      description:
-        - List of all leaf switches.
-      required: False
-      type: list
-      default: []
-    route_present:
-      description:
-        - Flag to indicate if bgp route should be present in output or not.
-      required: False
-      type: bool
-      default: True
     package_name:
       description:
         - Name of the package installed (e.g. quagga/frr/bird).
+      required: False
+      type: str
+    eth_list:
+      description:
+        - Comma separated string of eth interfaces to bring down/up.
+      required: False
+      type: str
+    propagate_switch:
+      description:
+        - Name of the switch to propagate state.
       required: False
       type: str
     hash_name:
@@ -118,7 +112,7 @@ def execute_commands(module, cmd):
     """
     global HASH_DICT
 
-    if 'service' in cmd and 'restart' in cmd:
+    if 'service' in cmd or 'dummy' in cmd or 'restart' in cmd:
         out = None
     else:
         out = run_cli(module, cmd)
@@ -132,45 +126,26 @@ def execute_commands(module, cmd):
     return out
 
 
-def verify_quagga_bgp_state_propagation(module):
+def verify_bgp_routes(module, route_present):
     """
-    Method to verify quagga bgp state propagation.
+    Method to verify bgp routes
     :param module: The Ansible module to fetch input parameters.
+    :param route_present: Flag to indicate if route needs to be present or not.
+    :return: Failure summary if any.
     """
-    global RESULT_STATUS, HASH_DICT
+    global RESULT_STATUS
     failure_summary = ''
-    route_present = module.params['route_present']
-    leaf_list = module.params['leaf_list']
     switch_name = module.params['switch_name']
-    package_name = module.params['package_name']
-    leaf_network_list = module.params['leaf_network_list'].split(',')
+    propagate_switch = module.params['propagate_switch']
 
-    if route_present:
-        # Get the current/running configurations
-        execute_commands(module, "vtysh -c 'sh running-config'")
+    # Get all ip routes
+    cmd = "vtysh -c 'sh ip route'"
+    out = execute_commands(module, cmd)
 
-        # Restart and check package status
-        execute_commands(module, 'service {} restart'.format(package_name))
-        execute_commands(module, 'service {} status'.format(package_name))
-    else:
-        leaf1 = leaf_list[0]
-        key = '{} ifconfig eth-19-1 down'.format(leaf1)
-        HASH_DICT[key] = None
-        key = '{} ifconfig eth-3-1 down'.format(leaf1)
-        HASH_DICT[key] = None
+    if out:
+        network = '192.168.{}.1'.format(propagate_switch[-2::])
+        route = 'B>* {}'.format(network)
 
-    execute_flag = True
-    is_leaf = True if switch_name in leaf_list else False
-    if is_leaf:
-        if leaf_list.index(switch_name) == 0:
-            execute_flag = False
-
-    if execute_flag:
-        # Get all ip routes
-        cmd = "vtysh -c 'sh ip route'"
-        out = execute_commands(module, cmd)
-
-        route = 'B>* {}'.format(leaf_network_list[0])
         if route_present:
             if route not in out:
                 RESULT_STATUS = False
@@ -184,6 +159,76 @@ def verify_quagga_bgp_state_propagation(module):
                 failure_summary += '{} is present '.format(route)
                 failure_summary += 'in the output of command {} '.format(cmd)
                 failure_summary += 'even after shutting down this route\n'
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'bgp routes cannot be verified '
+        failure_summary += 'because output of command {} '.format(cmd)
+        failure_summary += 'is None'
+
+    return failure_summary
+
+
+def verify_quagga_bgp_state_propagation(module):
+    """
+    Method to verify quagga bgp state propagation.
+    :param module: The Ansible module to fetch input parameters.
+    """
+    global RESULT_STATUS, HASH_DICT
+    failure_summary = ''
+    switch_name = module.params['switch_name']
+    package_name = module.params['package_name']
+    propagate_switch = module.params['propagate_switch']
+    eth_list = module.params['eth_list'].split(',')
+
+    if switch_name == propagate_switch:
+        # Add dummy0 interface
+        execute_commands(module, 'ip link add dummy0 type dummy')
+
+        # Assign ip to this created dummy0 interface
+        cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.255'.format(
+            switch_name[-2::]
+        )
+        execute_commands(module, cmd)
+
+    # Get the current/running configurations
+    execute_commands(module, "vtysh -c 'sh running-config'")
+
+    # Restart and check package status
+    execute_commands(module, 'service {} restart'.format(package_name))
+    execute_commands(module, 'service {} status'.format(package_name))
+
+    # Verify bgp routes
+    if switch_name != propagate_switch:
+        failure_summary += verify_bgp_routes(module, True)
+
+    # Bring down few interfaces on propagate switch
+    if switch_name == propagate_switch:
+        for eth in eth_list:
+            eth = eth.strip()
+            cmd = 'ifconfig eth-{}-1 down'.format(eth)
+            execute_commands(module, cmd)
+
+    # Wait 200 secs for routes to become unreachable
+    time.sleep(200)
+
+    # Verify bgp routes
+    if switch_name != propagate_switch:
+        failure_summary += verify_bgp_routes(module, False)
+
+    # Bring up interfaces on propagate switch
+    if switch_name == propagate_switch:
+        for eth in eth_list:
+            eth = eth.strip()
+            cmd = 'ifconfig eth-{}-1 up'.format(eth)
+            execute_commands(module, cmd)
+
+    # Wait 60 secs for routes to become unreachable
+    time.sleep(60)
+
+    # Verify bgp routes
+    if switch_name != propagate_switch:
+        failure_summary += verify_bgp_routes(module, True)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -196,9 +241,8 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            leaf_network_list=dict(required=False, type='str'),
-            route_present=dict(required=False, type='bool', default=True),
-            leaf_list=dict(required=False, type='list', default=[]),
+            propagate_switch=dict(required=False, type='str'),
+            eth_list=dict(required=False, type='str'),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
@@ -213,10 +257,9 @@ def main():
     HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
 
     # Create a log file
-    mode = 'w' if module.params['route_present'] else 'a'
     log_file_path = module.params['log_dir_path']
     log_file_path += '/{}.log'.format(module.params['hash_name'])
-    log_file = open(log_file_path, mode)
+    log_file = open(log_file_path, 'a')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
         log_file.write('\n')

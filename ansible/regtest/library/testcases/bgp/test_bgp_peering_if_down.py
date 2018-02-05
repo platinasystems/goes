@@ -59,6 +59,12 @@ options:
         - Name of the package installed (e.g. quagga/frr/bird).
       required: False
       type: str
+    check_ping:
+      description:
+        - Flag to indicate if ping should be tested or not.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -146,25 +152,62 @@ def check_bgp_neighbors(module):
     cmd = "vtysh -c 'sh ip bgp neighbors'"
     bgp_out = execute_commands(module, cmd)
 
-    for line in config_file:
-        line = line.strip()
-        if 'neighbor' in line and 'remote-as' in line:
-            config = line.split()
-            neighbor_ip = config[1]
-            remote_as = config[3]
-            if neighbor_ip not in bgp_out or remote_as not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+    if bgp_out:
+        for line in config_file:
+            line = line.strip()
+            if 'neighbor' in line and 'remote-as' in line:
+                config = line.split()
+                neighbor_ip = config[1]
+                remote_as = config[3]
+                if neighbor_ip not in bgp_out or remote_as not in bgp_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'bgp neighbor {} '.format(neighbor_ip)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
 
-            if 'BGP state = Established' not in bgp_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'bgp state of neighbor {} '.format(neighbor_ip)
-                failure_summary += 'is not Established in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+                if 'BGP state = Established' not in bgp_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'bgp state of neighbor {} '.format(
+                        neighbor_ip)
+                    failure_summary += 'is not Established in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'bgp neighbor relationship cannot be verified '
+        failure_summary += 'because output of command {} '.format(cmd)
+        failure_summary += 'is None'
+
+    HASH_DICT['result.detail'] = failure_summary
+
+
+def verify_ping(module):
+    """
+    Method to verify ping between two switches.
+    :param module: The Ansible module to fetch input parameters.
+    """
+    global RESULT_STATUS, HASH_DICT
+    failure_summary = HASH_DICT.get('result.detail', '')
+    switch_name = module.params['switch_name']
+    leaf_list = module.params['leaf_list']
+    is_leaf = True if switch_name in leaf_list else False
+
+    if is_leaf:
+        leaf_list.remove(switch_name)
+        self_ip = '192.168.{}.1'.format(switch_name[-2::])
+        neighbor_ip = '192.168.{}.1'.format(leaf_list[0][-2::])
+        packet_count = '3'
+
+        ping_cmd = 'ping -w 3 -c {} -I {} {}'.format(packet_count,
+                                                     self_ip, neighbor_ip)
+        ping_out = execute_commands(module, ping_cmd)
+        if '{} received'.format(packet_count) not in ping_out:
+            RESULT_STATUS = False
+            failure_summary += 'From switch {} '.format(switch_name)
+            failure_summary += 'neighbor ip {} '.format(neighbor_ip)
+            failure_summary += 'is not getting pinged\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -177,6 +220,7 @@ def verify_bgp_peering_interface_down(module):
     global RESULT_STATUS, HASH_DICT
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
+    check_ping = module.params['check_ping']
     eth_list = module.params['eth_list'].split(',')
     leaf_list = module.params['leaf_list']
     is_leaf = True if switch_name in leaf_list else False
@@ -185,7 +229,7 @@ def verify_bgp_peering_interface_down(module):
     execute_commands(module, 'ip link add dummy0 type dummy')
 
     # Assign ip to this created dummy0 interface
-    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.0'.format(
+    cmd = 'ifconfig dummy0 192.168.{}.1 netmask 255.255.255.255'.format(
         switch_name[-2::]
     )
     execute_commands(module, cmd)
@@ -200,6 +244,10 @@ def verify_bgp_peering_interface_down(module):
     # Check and verify BGP neighbor relationship
     check_bgp_neighbors(module)
 
+    # Verify ping
+    if check_ping:
+        verify_ping(module)
+
     # Bring down few eth interfaces on only leaf switches
     if is_leaf:
         for eth in eth_list:
@@ -212,6 +260,10 @@ def verify_bgp_peering_interface_down(module):
 
     # Again check and verify BGP neighbor relationship
     check_bgp_neighbors(module)
+
+    # Verify ping
+    if check_ping:
+        verify_ping(module)
 
     # Bring up eth interfaces which were down
     if is_leaf:
@@ -226,6 +278,10 @@ def verify_bgp_peering_interface_down(module):
     # Again check and verify BGP neighbor relationship
     check_bgp_neighbors(module)
 
+    # Verify ping
+    if check_ping:
+        verify_ping(module)
+
     # Get the GOES status info
     execute_commands(module, 'goes status')
 
@@ -238,6 +294,7 @@ def main():
             config_file=dict(required=False, type='str', default=''),
             leaf_list=dict(required=False, type='list', default=[]),
             eth_list=dict(required=False, type='str'),
+            check_ping=dict(required=False, type='bool', default=False),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),

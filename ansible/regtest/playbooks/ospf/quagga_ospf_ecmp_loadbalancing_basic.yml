@@ -8,29 +8,26 @@
       register: start_time
 
     - set_fact:
-        hash_name: "quagga_ecmp_loadbalancing_basic_{{ start_time.stdout }}"
+        hash_name: "quagga_ospf_ecmp_loadbalancing_basic_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Take backup of ospfd.conf
+    - name: Take backup of /etc/quagga/ospfd.conf
       copy:
-        src: /etc/quagga/ospfd.conf
-        dest: /etc/quagga/ospfd.conf.bck
+        src: "{{ quagga_ospf_conf_file }}"
+        dest: "{{ quagga_ospf_conf_file_bck }}"
         remote_src: true
-        owner: root
-        group: root
-        mode: 0644
 
-    - name: Assign loopback ip
-      assign_loopback:
+    - name: Add dummy interface
+      add_dummy_interface:
         switch_name: "{{ inventory_hostname }}"
 
     - name: Configure cost on eth-7-1
       blockinfile:
-        path: /etc/quagga/ospfd.conf
+        path: "{{ quagga_ospf_conf_file }}"
         insertafter: "interface eth-7-1"
         marker: "! eth-7-1 {mark}"
         block: |
@@ -38,39 +35,29 @@
 
     - name: Configure cost on eth-17-1
       blockinfile:
-        path: /etc/quagga/ospfd.conf
+        path: "{{ quagga_ospf_conf_file }}"
         insertafter: "interface eth-17-1"
         marker: "! eth-17-1 {mark}"
         block: |
           ip ospf cost 10
 
-    - name: Add ospf config in ospfd.conf
+    - name: Add ospf config in /etc/quagga/ospfd.conf
       blockinfile:
-        path: /etc/quagga/ospfd.conf
-        insertafter: "interface vnet"
+        path: "{{ quagga_ospf_conf_file }}"
         marker: ""
-        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
+        block: "{{ lookup('file', '../../files/{{inventory_hostname}}/ospf_loopback.conf') }}"
 
     - name: Restart quagga service
       service:
         name: quagga
         state: restarted
 
-    - name: Wait for 35 secs for ospf to establish communication
+    - name: Wait few secs for ospf to establish communication
       pause:
         seconds: 35
 
-
-- hosts: leaf:spine
-  become: true
-  serial: 1
-
-  vars:
-  - log_dir_path: /var/log/regression/ecmp
-
-  tasks:
     - file:
-        path: "{{ log_dir_path }}"
+        path: "{{ ospf_log_dir }}"
         state: directory
 
     - name: Verify quagga ecmp load balancing basic
@@ -78,9 +65,9 @@
         switch_name: "{{ inventory_hostname }}"
         eth_list: "7,17"
         cost: "10"
-        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/quagga_ospf_loopback.conf') }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/ospf_loopback.conf') }}"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ log_dir_path }}"
+        log_dir_path: "{{ ospf_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"
@@ -100,46 +87,26 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
+    - include: ../../playbooks/get_goes_version_and_tags.yml
 
-- hosts: leaf:spine
-  become: true
-  tasks:
-    - name: Restore backup of ospfd.conf
+    - name: Restore backup of /etc/quagga/ospfd.conf
       copy:
-        src: /etc/quagga/ospfd.conf.bck
-        dest: /etc/quagga/ospfd.conf
+        src: "{{ quagga_ospf_conf_file_bck }}"
+        dest: "{{ quagga_ospf_conf_file }}"
         remote_src: true
-        owner: root
-        group: root
-        mode: 0644
 
     - name: Remove backup file
       file:
-        path: /etc/quagga/ospfd.conf.bck
+        path: "{{ quagga_ospf_conf_file_bck }}"
         state: absent
 
-    - name: Revert back loopback ip
-      command: "ifconfig lo 127.0.0.1 netmask 255.0.0.0"
+    - name: Delete dummy interface
+      command: "ip link del dummy0 type dummy"
 
-    - service:
+    - name: Restart quagga
+      service:
         name: quagga
         state: restarted
-
-    - shell: "goes hget platina package | grep version:"
-      register: version_out
-
-    - shell: "goes hget platina package | grep tag:"
-      register: tag_out
-
-    - name: Store GOES version and tag details in redis db
-      store_goes_details:
-        switch_name: "{{ inventory_hostname }}"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        version_details: "{{ version_out.stdout }}"
-        tag_details: "{{ tag_out.stdout }}"
-      delegate_to: 127.0.0.1
-
-    - command: "goes restart"
 
 
 - hosts: server_emulator
@@ -150,8 +117,16 @@
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: result
 
-    - debug:
+    - name: Print test case result
+      debug:
         msg: "Test case result: {{ result.result_status }}"
 
-    - debug:
+    - name: Print failure summary
+      debug:
         msg: "Failure summary: {{ result.result_detail }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - include: ../../playbooks/get_goes_status.yml

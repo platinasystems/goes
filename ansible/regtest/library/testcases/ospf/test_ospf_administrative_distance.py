@@ -143,14 +143,22 @@ def verify_ospf_administrative_distance(module):
     cmd = "vtysh -c 'sh ip route'"
     all_routes = execute_commands(module, cmd)
 
-    all_routes = all_routes.splitlines()
-    for route in all_routes:
-        if route.startswith('O'):
-            if ad_value not in route:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'AD value {} '.format(ad_value)
-                failure_summary += 'is not present in route {}\n'.format(route)
+    if all_routes:
+        all_routes = all_routes.splitlines()
+        for route in all_routes:
+            if route.startswith('O'):
+                if ad_value not in route:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'AD value {} '.format(ad_value)
+                    failure_summary += 'is not present '
+                    failure_summary += 'in route {}\n'.format(route)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'ospf administrative distance cannot be verified '
+        failure_summary += 'since output of command {} '.format(cmd)
+        failure_summary += 'is None'
 
     HASH_DICT['result.detail'] = failure_summary
 

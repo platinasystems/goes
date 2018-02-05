@@ -38,12 +38,11 @@ options:
         - Name of the switch on which tests will be performed.
       required: False
       type: str
-    leaf_list:
+    config_file:
       description:
-        - List of all leaf switches.
+        - OSPF configurations added.
       required: False
-      type: list
-      default: []
+      type: str
     package_name:
       description:
         - Name of the package installed (e.g. quagga/frr/bird).
@@ -63,7 +62,7 @@ options:
 
 EXAMPLES = """
 - name: Verify ospf with different areas
-  test_ospf_traffic:
+  test_ospf_different_areas:
     switch_name: "{{ inventory_hostname }}"
     hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
     log_dir_path: "{{ log_dir_path }}"
@@ -131,8 +130,7 @@ def verify_ospf_with_different_areas(module):
     failure_summary = ''
     switch_name = module.params['switch_name']
     package_name = module.params['package_name']
-    leaf_list = module.params['leaf_list']
-    is_leaf = True if switch_name in leaf_list else False
+    config_file = module.params['config_file']
 
     # Get the current/running configurations
     execute_commands(module, "vtysh -c 'sh running-config'")
@@ -145,17 +143,28 @@ def verify_ospf_with_different_areas(module):
     cmd = "vtysh -c 'sh ip ospf route'"
     routes = execute_commands(module, cmd)
 
-    if is_leaf:
-        if 'IA' in routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'inter-area (IA) routes are showing up '
-            failure_summary += 'for routes configured with different areas\n'
+    if routes:
+        if 'area 1' in config_file:
+            for line in config_file.splitlines():
+                line = line.strip()
+                if 'network' in line and 'area 1' in line:
+                    network = line.split()[1]
+                    if network not in routes or 'area: 0.0.0.1' not in routes:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'network {} with '.format(network)
+                        failure_summary += 'area 1 is not present in the '
+                        failure_summary += 'output of command {}\n'.format(cmd)
+        else:
+            if 'IA' not in routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'inter-area (IA) routes are not showing up\n'
     else:
-        if 'IA' not in routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'inter-area (IA) routes are not showing up\n'
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'ospf routes cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -168,7 +177,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
-            leaf_list=dict(required=False, type='list', default=[]),
+            config_file=dict(required=False, type='str', default=''),
             package_name=dict(required=False, type='str'),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
