@@ -4,6 +4,10 @@
 - include: playbooks/installation/uninstall_packages.yml
 
 
+# Restart goes
+- include: playbooks/goes_restart.yml
+
+
 # Run all port provisioning test cases
 - include: playbooks/port_provision/100g_cr_fec_cl91_autoeng_off.yml
 

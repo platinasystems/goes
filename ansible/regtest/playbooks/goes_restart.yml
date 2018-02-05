@@ -1,0 +1,8 @@
+---
+
+- hosts: leaf:spine
+  become: true
+  ignore_errors: yes
+  tasks:
+    - name: Restart goes
+      command: goes restart

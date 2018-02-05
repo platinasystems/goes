@@ -8,6 +8,10 @@
 - include: playbooks/installation/frr_install.yml
 
 
+# Restart goes
+- include: playbooks/goes_restart.yml
+
+
 # Run all frr bgp playbooks
 - include: playbooks/bgp/frr_bgp_peering_ebgp.yml
 

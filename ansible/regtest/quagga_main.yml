@@ -8,6 +8,10 @@
 - include: playbooks/installation/quagga_install.yml
 
 
+# Restart goes
+- include: playbooks/goes_restart.yml
+
+
 # Run all quagga bgp playbooks
 - include: playbooks/bgp/quagga_bgp_peering_ebgp.yml
 
