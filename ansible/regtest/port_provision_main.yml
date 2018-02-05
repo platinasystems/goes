@@ -1,0 +1,46 @@
+---
+
+# Uninstall packages stack
+- include: playbooks/installation/uninstall_packages.yml
+
+
+# Run all port provisioning test cases
+- include: playbooks/port_provision/100g_cr_fec_cl91_autoeng_off.yml
+
+- include: playbooks/port_provision/100g_cr_fec_cl91_autoeng_on.yml
+
+- include: playbooks/port_provision/10g_cr_fec_cl74_autoeng_off_lanes_1_count_4.yml
+
+- include: playbooks/port_provision/10g_cr_fec_cl74_autoeng_on_lanes_1_count_4.yml
+
+- include: playbooks/port_provision/10g_cr_fec_none_autoeng_off_lanes_1_count_4.yml
+
+- include: playbooks/port_provision/10g_cr_fec_none_autoeng_on_lanes_1_count_4.yml
+
+- include: playbooks/port_provision/25g_cr_fec_cl74_autoeng_off.yml
+
+- include: playbooks/port_provision/25g_cr_fec_none_autoeng_off.yml
+
+- include: playbooks/port_provision/40g_cr_fec_cl74_autoeng_off_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/40g_cr_fec_cl74_autoeng_off_lanes_4_count_1.yml
+
+- include: playbooks/port_provision/40g_cr_fec_cl74_autoeng_on_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/40g_cr_fec_cl74_autoeng_on_lanes_4_count_1.yml
+
+- include: playbooks/port_provision/40g_cr_fec_none_autoeng_off_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/40g_cr_fec_none_autoeng_off_lanes_4_count_1.yml
+
+- include: playbooks/port_provision/40g_cr_fec_none_autoeng_on_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/40g_cr_fec_none_autoeng_on_lanes_4_count_1.yml
+
+- include: playbooks/port_provision/50g_cr_fec_cl74_autoeng_off_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/50g_cr_fec_cl74_autoeng_on_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/50g_cr_fec_none_autoeng_off_lanes_2_count_2.yml
+
+- include: playbooks/port_provision/50g_cr_fec_none_autoeng_on_lanes_2_count_2.yml
