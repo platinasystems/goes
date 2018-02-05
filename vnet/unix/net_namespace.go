@@ -511,6 +511,10 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 	is_del := false
 	switch msg.Header.Type {
 	case netlink.RTM_NEWLINK:
+		if false {
+			fmt.Printf("add_del_interface(): newlink for %s in ns %s\n",
+				msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
+		}
 	case netlink.RTM_DELLINK:
 		is_del = true
 	default:
@@ -586,6 +590,16 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			if name == h.GetHwIf().Name() {
 				m.set_si(intf, h.GetHwIf().Si())
 			}
+		} else {
+			// Manufacture what we need for this interface.
+			// Also filter by front-panel interfaces only with registered hwifs
+			// i.e. no hits for interfaces like lo, eth1, eth2, docker..., eth-1-0.1
+			hi, found := ns.m.m.v.HwIfByName(name)
+			if found {
+				hwifer := ns.m.m.v.HwIfer(hi)
+				ns.m.RegisterHwInterface(hwifer)
+			}
+
 		}
 
 		// tuntap so remove
@@ -731,7 +745,7 @@ func (m *net_namespace_main) interface_by_name(name string) (ns *net_namespace, 
 		// Need to cover case where interfaces are created after vnet is up.
 		netIntf, err := net.InterfaceByName(name)
 		if err == nil {
-			if false {
+			{
 				fmt.Printf("interface_by_name: %s intf nil so creating context\n", name)
 			}
 			ns = &m.default_namespace
@@ -783,16 +797,20 @@ func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
 	}
 	m.registered_hwifer_by_si[si] = h
 
-	if !m.discovery_is_done() {
-		if false {
-			fmt.Printf("RegisterHwInterface(): %s discovery not done - return\n", hw.Name())
+	// Taking this check out - may mean a transient window of bogus data but
+	// at the end, data will be valid.
+	if false {
+		if !m.discovery_is_done() {
+			{
+				fmt.Printf("RegisterHwInterface(): %s discovery not done - return\n", hw.Name())
+			}
+			return
 		}
-		return
 	}
 
 	_, intf := m.interface_by_name(hw.Name())
 	if intf == nil {
-		if false {
+		{
 			fmt.Printf("RegisterHwInterface(): interface_by_name is nil for %s\n", hw.Name())
 		}
 		//panic("unknown interface: " + hw.Name())
