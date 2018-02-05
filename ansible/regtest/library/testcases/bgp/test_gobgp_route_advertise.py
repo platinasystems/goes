@@ -183,14 +183,15 @@ def verify_gobgp_route_advertise(module):
 
             routes_to_check.append('192.168.{}.1/32'.format(switch_name[-2::]))
 
-            if switch_name in leaf_list:
-                if (all_routes.count('clusterlist: [192.168.0.1]') != 2 or
-                        all_routes.count('originator') != 2):
-                    RESULT_STATUS = False
-                    failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'route reflector originator/clusterlist '
-                    failure_summary += 'config is not present in '
-                    failure_summary += 'output of command {}\n'.format(cmd)
+            if check_reflector:
+                if switch_name in leaf_list:
+                    if (all_routes.count('clusterlist: [192.168.0.1]') != 2 or
+                            all_routes.count('originator') != 2):
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'route reflector originator/'
+                        failure_summary += 'clusterlist config is not present in '
+                        failure_summary += 'output of command {}\n'.format(cmd)
         else:
             for switch in spine_list + leaf_list:
                 routes_to_check.append('192.168.{}.1/32'.format(switch[-2::]))

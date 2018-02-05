@@ -8,7 +8,7 @@
       register: start_time
 
     - set_fact:
-        hash_name: "gobgp_bgp_convergence_{{ start_time.stdout }}"
+        hash_name: "gobgp_bgp_peering_consistency_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
@@ -33,37 +33,17 @@
       pause:
         seconds: 35
 
+    - name: Add advertise route
+      add_remove_route:
+        switch_name: "{{ inventory_hostname }}"
+
     - file:
         path: "{{ bgp_log_dir }}"
         state: directory
 
-    - name: Add advertised route
-      add_remove_route:
+    - name: Verify gobgp peering consistency
+      test_bgp_peering_consistency:
         switch_name: "{{ inventory_hostname }}"
-
-    - pause:
-        seconds: 5
-
-
-- hosts: leaf[1]
-  become: true
-  tasks:
-    - name: Remove advertised route
-      add_remove_route:
-        switch_name: "{{ inventory_hostname }}"
-        remove: True
-
-    - pause:
-        seconds: 20
-
-
-- hosts: leaf[0]:spine
-  become: true
-  tasks:
-    - name: Verify gobgp convergence
-      test_gobgp_convergence:
-        switch_name: "{{ inventory_hostname }}"
-        leaf: "{{ groups['leaf'][1] }}"
         package_name: "gobgpd"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ bgp_log_dir }}"
@@ -85,55 +65,7 @@
         hash_dict: "{{ module_out.hash_dict }}"
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
-      ignore_errors: yes
 
-
-- hosts: leaf[1]
-  become: true
-  tasks:
-    - name: Add advertised route
-      add_remove_route:
-        switch_name: "{{ inventory_hostname }}"
-
-    - pause:
-        seconds: 20
-
-
-- hosts: leaf[0]:spine
-  become: true
-  tasks:
-    - name: Verify gobgp convergence
-      test_gobgp_convergence:
-        switch_name: "{{ inventory_hostname }}"
-        leaf: "{{ groups['leaf'][1] }}"
-        route_present: True
-        package_name: "gobgpd"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ bgp_log_dir }}"
-      register: module_out
-
-    - command: "date +%Y%m%d%T"
-      register: end_time
-
-    - name: Fetch the log file
-      slurp:
-        src: "{{ module_out.log_file_path }}"
-      register: logs
-
-    - name: Store the test result in a hash in redis db on server emulator
-      store_result_in_redis:
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
-        end_time: "{{ end_time.stdout }}"
-        hash_dict: "{{ module_out.hash_dict }}"
-        log_content: "{{ logs['content'] | b64decode }}"
-      delegate_to: 127.0.0.1
-      ignore_errors: yes
-
-
-- hosts: leaf:spine
-  become: true
-  tasks:
     - include: ../../playbooks/get_goes_version_and_tags.yml
 
     - name: Remove config file
@@ -141,7 +73,7 @@
         path: "{{ gobgp_bgp_conf_file }}"
         state: absent
 
-    - name: Remove advertised route
+    - name: Remove advertise route
       add_remove_route:
         switch_name: "{{ inventory_hostname }}"
         remove: True

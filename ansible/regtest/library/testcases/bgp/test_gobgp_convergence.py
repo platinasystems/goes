@@ -139,7 +139,7 @@ def verify_gobgp_convergence(module):
     leaf = module.params['leaf']
     route_present = module.params['route_present']
 
-    route = '192.168.{}.0/24'.format(leaf[-2::])
+    route = '192.168.{}.1/32'.format(leaf[-2::])
 
     # Get the gobgp config
     execute_commands(module, 'cat /etc/gobgp/gobgpd.conf')
@@ -152,18 +152,24 @@ def verify_gobgp_convergence(module):
     cmd = "vtysh -c 'sh ip route'"
     all_routes = execute_commands(module, cmd)
 
-    if route_present:
-        if route not in all_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'route to network {} '.format(route)
-            failure_summary += 'is not present even after deleting the route\n'
+    if all_routes:
+        if route_present:
+            if route not in all_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'route to network {} '.format(route)
+                failure_summary += 'is not present even after adding the route\n'
+        else:
+            if route in all_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'route to network {} '.format(route)
+                failure_summary += 'is present even after deleting the route\n'
     else:
-        if route in all_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'route to network {} '.format(route)
-            failure_summary += 'is present even after adding the route\n'
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'result cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     # Store the failure summary in hash
     HASH_DICT['result.detail'] = failure_summary

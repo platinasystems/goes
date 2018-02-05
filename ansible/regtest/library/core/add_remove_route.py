@@ -92,7 +92,7 @@ def main():
     )
 
     switch_name = module.params['switch_name']
-    ip = '192.168.{}.0/24'.format(switch_name[-2::])
+    ip = '192.168.{}.1/32'.format(switch_name[-2::])
 
     if module.params['remove']:
         cmd = 'gobgp global rib -a ipv4 del {}'.format(ip)
