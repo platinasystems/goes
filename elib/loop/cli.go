@@ -87,9 +87,21 @@ func (l *Loop) Logln(args ...interface{}) {
 }
 func (m *loggerMain) Fatalf(format string, args ...interface{}) { panic(fmt.Errorf(format, args...)) }
 
+func (l *Loop) showRuntimeNext(w cli.Writer) (err error) {
+	fmt.Fprintf(w, "%-30s %-20s %-5s %s\n", "Name", "State", "Index", "Next")
+	for _, n := range l.nodes {
+		ns := fmt.Sprintf("%v", n.Next)
+		ni := fmt.Sprintf("%v", n.nextIndexByNodeName)
+		fmt.Fprintf(w, "%-30s %-20s %-5d Next:  %s\n", n.name, n.s.String(), n.index, ns)
+		fmt.Fprintf(w, "%-30s nextIndexByNodeName: %s\n", " ", ni)
+	}
+	return
+}
+
 func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	show_detail := false
 	show_events := false
+	show_next := false
 	colMap := map[string]bool{
 		"State": false,
 	}
@@ -100,6 +112,8 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 			show_detail = true
 		case in.Parse("e%*vent"):
 			show_events = true
+		case in.Parse("n%*ext"):
+			show_next = true
 		default:
 			in.ParseError()
 		}
@@ -109,6 +123,11 @@ func (l *Loop) showRuntimeStats(c cli.Commander, w cli.Writer, in *cli.Input) (e
 
 	if show_events {
 		return l.showRuntimeEvents(w)
+	}
+
+	if show_next {
+		l.showRuntimeNext(w)
+		return
 	}
 
 	type node struct {
@@ -337,7 +356,7 @@ func (l *Loop) cliInit() {
 	c.Main.RxReady = c.rxReady
 	c.AddCommand(&cli.Command{
 		Name:      "show runtime",
-		ShortHelp: "show main loop runtime statistics",
+		ShortHelp: "show main loop runtime statistics [detail|event|next]",
 		Action:    l.showRuntimeStats,
 	})
 	c.AddCommand(&cli.Command{
