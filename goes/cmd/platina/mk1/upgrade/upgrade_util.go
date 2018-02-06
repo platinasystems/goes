@@ -198,9 +198,11 @@ func upgradeCoreboot(s string, v string, t bool, f bool) error {
 		fmt.Printf("    Coreboot version on server:  %s\n", cr)
 		if c == cr {
 			fmt.Print("    Versions match, skipping Coreboot upgrade\n\n")
+			return nil
 		}
 	}
 
+	fmt.Printf("Please wait...installing Coreboot into flash\n")
 	if err := installCoreboot(s, v, t); err != nil {
 		return err
 	}
@@ -359,6 +361,7 @@ func installCoreboot(s string, v string, t bool) error {
 		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
 		"-i", "bios", "-w", "coreboot.rom", "-A", "-V").Output()
 	if err != nil {
+		Reboot_flag = false
 		return err
 	}
 	Reboot_flag = true
