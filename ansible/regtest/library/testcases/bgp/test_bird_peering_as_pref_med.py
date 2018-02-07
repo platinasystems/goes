@@ -166,30 +166,36 @@ def verify_bird_peering(module):
         cmd = 'birdc show route all'
         routes_out = execute_commands(module, cmd)
 
-        if as_path:
-            if 'BGP.as_path: {}'.format(as_path) not in routes_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'as path value "{}" '.format(as_path)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+        if routes_out:
+            if as_path:
+                if 'BGP.as_path: {}'.format(as_path) not in routes_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'as path value "{}" '.format(as_path)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
 
-        if local_preference:
-            if 'BGP.local_pref: {}'.format(local_preference) not in routes_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'local preference value {} '.format(
-                    local_preference)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+            if local_preference:
+                if 'BGP.local_pref: {}'.format(local_preference) not in routes_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'local preference value {} '.format(
+                        local_preference)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
 
-        if med:
-            if 'BGP.med: {}'.format(med) not in routes_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'med value {} '.format(med)
-                failure_summary += 'is not present in the output of '
-                failure_summary += 'command {}\n'.format(cmd)
+            if med:
+                if 'BGP.med: {}'.format(med) not in routes_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'med value {} '.format(med)
+                    failure_summary += 'is not present in the output of '
+                    failure_summary += 'command {}\n'.format(cmd)
+        else:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'result cannot be verified since '
+            failure_summary += 'output of command {} is None'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 

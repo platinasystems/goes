@@ -154,19 +154,25 @@ def verify_bird_peering(module):
         cmd = "birdc 'show protocols all bgp{}'".format(index + 1)
         bgp_out = execute_commands(module, cmd)
 
-        if ip not in bgp_out and as_value not in bgp_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'bgp neighbor {} info '.format(ip)
-            failure_summary += 'is not present in the output of '
-            failure_summary += 'command {}\n'.format(cmd)
+        if bgp_out:
+            if ip not in bgp_out and as_value not in bgp_out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp neighbor {} info '.format(ip)
+                failure_summary += 'is not present in the output of '
+                failure_summary += 'command {}\n'.format(cmd)
 
-        if 'Established' not in bgp_out:
+            if 'Established' not in bgp_out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp state of neighbor {} '.format(ip)
+                failure_summary += 'is not Established in the output of '
+                failure_summary += 'command {}\n'.format(cmd)
+        else:
             RESULT_STATUS = False
             failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'bgp state of neighbor {} '.format(ip)
-            failure_summary += 'is not Established in the output of '
-            failure_summary += 'command {}\n'.format(cmd)
+            failure_summary += 'result cannot be verified since '
+            failure_summary += 'output of command {} is None'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 

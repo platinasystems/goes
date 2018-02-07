@@ -15,6 +15,12 @@
 - hosts: leaf:spine
   become: true
   tasks:
+    - name: Take backup of /etc/network/interfaces file
+      copy:
+        src: /etc/network/interfaces
+        dest: /etc/network/interfaces.bck
+        remote_src: true
+
     - name: Take backup of /etc/quagga/isisd.conf
       copy:
         src: "{{ quagga_isis_conf_file }}"
@@ -156,6 +162,19 @@
 
     - name: Delete dummy interface
       command: "ip link del dummy0 type dummy"
+
+    - name: Restore backup of /etc/network/interfaces
+      copy:
+        src: /etc/network/interfaces.bck
+        dest: /etc/network/interfaces
+        remote_src: true
+
+    - name: Remove backup file
+      file:
+        path: /etc/network/interfaces.bck
+        state: absent
+
+    - command: "goes restart"
 
     - name: Restart quagga
       service:

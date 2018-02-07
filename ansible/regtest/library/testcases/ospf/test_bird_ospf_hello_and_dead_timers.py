@@ -163,16 +163,23 @@ def verify_bird_ospf_timers(module):
     # Get ospf interface details
     interface_cmd = 'birdc show ospf interface'
     interface_out = execute_commands(module, interface_cmd)
-    interface_out = interface_out.lower()
-
-    # Verify hello and dead timers values
-    if ('hello timer: {}'.format(hello_timer) not in interface_out and
-            'dead timer: {}'.format(dead_timer) not in interface_out):
+    
+    if interface_out:
+        interface_out = interface_out.lower()
+    
+        # Verify hello and dead timers values
+        if ('hello timer: {}'.format(hello_timer) not in interface_out and
+                'dead timer: {}'.format(dead_timer) not in interface_out):
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'hello timer {} and '.format(hello_timer)
+            failure_summary += 'dead timer {} intervals '.format(dead_timer)
+            failure_summary += 'are not configured\n'
+    else:
         RESULT_STATUS = False
         failure_summary += 'On switch {} '.format(switch_name)
-        failure_summary += 'hello timer {} and '.format(hello_timer)
-        failure_summary += 'dead timer {} intervals '.format(dead_timer)
-        failure_summary += 'are not configured\n'
+        failure_summary += 'hello and dead timers cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(interface_cmd)
 
     for eth in eth_list:
         if 'eth-{}-1'.format(eth) in config_file:
@@ -190,12 +197,13 @@ def verify_bird_ospf_timers(module):
         cmd = 'birdc show ospf neighbor'
         ospf_out = execute_commands(module, cmd)
 
-        if eth_interface in ospf_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'ospf neighbor is showing up '
-            failure_summary += 'for {} interface '.format(eth_interface)
-            failure_summary += 'even after bringing down this interface\n'
+        if ospf_out:
+            if eth_interface in ospf_out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'ospf neighbor is showing up '
+                failure_summary += 'for {} interface '.format(eth_interface)
+                failure_summary += 'even after bringing down this interface\n'
 
         # Now, bring up the interface
         execute_commands(module, 'ifconfig {} up'.format(eth_interface))
@@ -208,12 +216,13 @@ def verify_bird_ospf_timers(module):
         cmd = 'birdc show ospf neighbor'
         ospf_out = execute_commands(module, cmd)
 
-        if eth_interface not in ospf_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'ospf neighbor is not showing up '
-            failure_summary += 'for {} interface '.format(eth_interface)
-            failure_summary += 'even after bringing up this interface\n'
+        if ospf_out:
+            if eth_interface not in ospf_out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'ospf neighbor is not showing up '
+                failure_summary += 'for {} interface '.format(eth_interface)
+                failure_summary += 'even after bringing up this interface\n'
 
     HASH_DICT['result.detail'] = failure_summary
 

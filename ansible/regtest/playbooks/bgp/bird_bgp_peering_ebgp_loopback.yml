@@ -30,60 +30,17 @@
         src: ../../files/{{inventory_hostname}}/bird_bgp_peering_ebgp_loopback.conf
         dest: "{{ bird_conf_file }}"
 
-
-- hosts: leaf[0]
-  become: true
-  tasks:
     - name: Add static routes
-      command: "{{ item }}"
-      with_items:
-      - route add -net 192.168.42.0/24 gw 10.0.21.32
-      - route add -net 192.168.43.0/24 gw 10.0.7.31
-      ignore_errors: yes
+      add_delete_static_routes:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/static_routes.conf') }}"
 
-
-- hosts: leaf[1]
-  become: true
-  tasks:
-    - name: Add static routes
-      command: "{{ item }}"
-      with_items:
-      - route add -net 192.168.42.0/24 gw 10.0.3.32
-      - route add -net 192.168.43.0/24 gw 10.0.19.31
-      ignore_errors: yes
-
-
-- hosts: spine[0]
-  become: true
-  tasks:
-    - name: Add static routes
-      command: "{{ item }}"
-      with_items:
-      - route add -net 192.168.44.0/24 gw 10.0.19.30
-      - route add -net 192.168.45.0/24 gw 10.0.7.29
-      ignore_errors: yes
-
-
-- hosts: spine[1]
-  become: true
-  tasks:
-    - name: Add static routes
-      command: "{{ item }}"
-      with_items:
-      - route add -net 192.168.44.0/24 gw 10.0.3.30
-      - route add -net 192.168.45.0/24 gw 10.0.21.29
-      ignore_errors: yes
-
-
-- hosts: leaf:spine
-  become: true
-  tasks:
     - name: Restart bird
       service:
         name: bird
         state: restarted
 
-    - name: Wait for few seconds for bgp convergence
+    - name: Wait few seconds for bgp convergence
       pause:
         seconds: 35
 
@@ -117,86 +74,32 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-    - name: Get goes version details
-      shell: "goes hget platina package | grep version:"
-      register: version_out
+    - include: ../../playbooks/get_goes_version_and_tags.yml
 
-    - name: Get goes tag details
-      shell: "goes hget platina package | grep tag:"
-      register: tag_out
-
-    - name: Store goes version and tag details in redis db
-      store_goes_details:
-        switch_name: "{{ inventory_hostname }}"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        version_details: "{{ version_out.stdout }}"
-        tag_details: "{{ tag_out.stdout }}"
-      delegate_to: 127.0.0.1
-
-
-- hosts: leaf[0]
-  become: true
-  tasks:
-    - name: Delete static routes
-      command: "{{ item }}"
-      with_items:
-      - route del -net 192.168.42.0/24 gw 10.0.21.32
-      - route del -net 192.168.43.0/24 gw 10.0.7.31
-      ignore_errors: yes
-
-
-- hosts: leaf[1]
-  become: true
-  tasks:
-    - name: Delete static routes
-      command: "{{ item }}"
-      with_items:
-      - route del -net 192.168.42.0/24 gw 10.0.3.32
-      - route del -net 192.168.43.0/24 gw 10.0.19.31
-      ignore_errors: yes
-
-
-- hosts: spine[0]
-  become: true
-  tasks:
-    - name: Delete static routes
-      command: "{{ item }}"
-      with_items:
-      - route del -net 192.168.44.0/24 gw 10.0.19.30
-      - route del -net 192.168.45.0/24 gw 10.0.7.29
-      ignore_errors: yes
-
-
-- hosts: spine[1]
-  become: true
-  tasks:
-    - name: Delete static routes
-      command: "{{ item }}"
-      with_items:
-      - route del -net 192.168.44.0/24 gw 10.0.3.30
-      - route del -net 192.168.45.0/24 gw 10.0.21.29
-      ignore_errors: yes
-
-
-- hosts: leaf:spine
-  become: true
-  tasks:
     - name: Restore backup of /etc/bird/bird.conf
       copy:
         src: "{{ bird_conf_file_bck }}"
         dest: "{{ bird_conf_file }}"
         remote_src: true
-        owner: root
-        group: root
-        mode: 0644
 
     - name: Remove backup file
       file:
         path: "{{ bird_conf_file_bck }}"
         state: absent
 
+    - name: Delete static routes
+      add_delete_static_routes:
+        switch_name: "{{ inventory_hostname }}"
+        config_file: "{{ lookup('file', '../../files/{{inventory_hostname}}/static_routes.conf') }}"
+        delete: True
+
     - name: Delete dummy interface
       command: "ip link del dummy0 type dummy"
+
+    - name: Restart bird
+      service:
+        name: bird
+        state: restarted
 
 
 - hosts: server_emulator
@@ -207,8 +110,16 @@
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: result
 
-    - debug:
+    - name: Print test case result
+      debug:
         msg: "Test case result: {{ result.result_status }}"
 
-    - debug:
+    - name: Print failure summary
+      debug:
         msg: "Failure summary: {{ result.result_detail }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - include: ../../playbooks/get_goes_status.yml

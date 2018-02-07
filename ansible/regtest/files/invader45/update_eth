@@ -1,0 +1,2 @@
+ifconfig eth-5-1 192.168.5.29 netmask 255.255.255.0
+ifconfig eth-27-1 192.168.27.29 netmask 255.255.255.0

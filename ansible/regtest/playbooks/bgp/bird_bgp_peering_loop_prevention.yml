@@ -23,14 +23,6 @@
         mode: 0640
 
 
-- hosts: spine
-  become: true
-  tasks:
-    - name: Add dummy interface
-      add_dummy_interface:
-        switch_name: "{{ inventory_hostname }}"
-
-
 - hosts: leaf:spine
   become: true
   tasks:
@@ -41,16 +33,20 @@
         remote_src: true
 
     - name: Add bgp config in /etc/bird/bird.conf
-      copy:
-        src: ../../files/{{inventory_hostname}}/bird_bgp_peering_loop_prevention.conf
+      template:
+        src: "../../files/{{inventory_hostname}}/bird_bgp_peering_loop_prevention.conf"
         dest: "{{ bird_conf_file }}"
+
+    - name: Add dummy interface
+      add_dummy_interface:
+        switch_name: "{{ inventory_hostname }}"
 
     - name: Restart bird
       service:
         name: bird
         state: restarted
 
-    - name: Wait for few seconds for bgp convergence
+    - name: Wait few seconds for bgp convergence
       pause:
         seconds: 35
 
@@ -119,42 +115,26 @@
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Get goes version details
-      shell: "goes hget platina package | grep version:"
-      register: version_out
-
-    - name: Get goes tag details
-      shell: "goes hget platina package | grep tag:"
-      register: tag_out
-
-    - name: Store goes version and tag details in redis db
-      store_goes_details:
-        switch_name: "{{ inventory_hostname }}"
-        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        version_details: "{{ version_out.stdout }}"
-        tag_details: "{{ tag_out.stdout }}"
-      delegate_to: 127.0.0.1
+    - include: ../../playbooks/get_goes_version_and_tags.yml
 
     - name: Restore backup of /etc/bird/bird.conf
       copy:
         src: "{{ bird_conf_file_bck }}"
         dest: "{{ bird_conf_file }}"
         remote_src: true
-        owner: root
-        group: root
-        mode: 0644
 
     - name: Remove backup file
       file:
         path: "{{ bird_conf_file_bck }}"
         state: absent
 
-
-- hosts: spine
-  become: true
-  tasks:
     - name: Delete dummy interface
       command: "ip link del dummy0 type dummy"
+
+    - name: Restart bird
+      service:
+        name: bird
+        state: restarted
 
 
 - hosts: server_emulator
@@ -165,8 +145,16 @@
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
       register: result
 
-    - debug:
+    - name: Print test case result
+      debug:
         msg: "Test case result: {{ result.result_status }}"
 
-    - debug:
+    - name: Print failure summary
+      debug:
         msg: "Failure summary: {{ result.result_detail }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - include: ../../playbooks/get_goes_status.yml

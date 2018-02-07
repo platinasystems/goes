@@ -8,7 +8,7 @@ ipv4_log_dir: /var/log/regression/ipv4
 port_provision_log_dir: /var/log/regression/port_provision
 bgp_loop_prevention_log_file: /var/log/regression/bgp_loop_prevention.log
 gobgp_loop_prevention_log_file: /var/log/gobgpd.dump
-bird_loop_prevention_log_file: /var/log/birddump
+bird_loop_prevention_log_file: /var/log/bird.dump
 
 frr_bgp_conf_file: /etc/frr/bgpd.conf
 frr_bgp_conf_file_bck: /etc/frr/bgpd.conf.bck

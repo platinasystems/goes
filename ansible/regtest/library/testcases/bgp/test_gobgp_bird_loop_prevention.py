@@ -132,7 +132,8 @@ def verify_loop_prevention(module):
     parsed_out = execute_commands(module, cmd)
 
     if parsed_out:
-        if 'Marker: -- ignored --' not in parsed_out:
+        if ('Marker: -- ignored --' not in parsed_out and
+                'Withdrawn Routes' not in parsed_out):
             RESULT_STATUS = False
             failure_summary += 'On switch {} '.format(switch_name)
             failure_summary += 'loop prevention message is not present\n'

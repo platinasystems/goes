@@ -149,17 +149,24 @@ def verify_bird_ospf_routes(module):
     route_cmd = 'birdc show route'
     routes_out = execute_commands(module, route_cmd)
 
-    for line in config_file.splitlines():
-        line = line.strip()
-        if 'interface' in line and 'eth' in line:
-            config = line.split()
-            eth = config[1].replace('"', '')
-            if eth not in routes_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'ospf route for interface '
-                failure_summary += '{} is not present in the '.format(eth)
-                failure_summary += 'output of command {}\n'.format(route_cmd)
+    if routes_out:
+        for line in config_file.splitlines():
+            line = line.strip()
+            if 'interface' in line and 'eth' in line:
+                config = line.split()
+                eth = config[1].replace('"', '')
+                if eth not in routes_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'ospf route for interface '
+                    failure_summary += '{} is not present in the '.format(eth)
+                    failure_summary += 'output of command {}\n'.format(
+                        route_cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'result cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(route_cmd)
 
     if check_different_areas:
         if config_file.count('area') >= 2:
@@ -167,18 +174,25 @@ def verify_bird_ospf_routes(module):
             topology_cmd = 'birdc show ospf topology'
             topology_out = execute_commands(module, topology_cmd)
 
-            # Verify different ospf areas
-            for line in config_file.splitlines():
-                line = line.strip()
-                if 'area' in line:
-                    line = line.split()
-                    area = line[0] + ' ' + line[1]
-                    if area not in topology_out:
-                        RESULT_STATUS = False
-                        failure_summary += 'On switch {} '.format(switch_name)
-                        failure_summary += '{} is not present in '.format(area)
-                        failure_summary += 'the output of command {}\n'.format(
-                            topology_cmd)
+            if topology_out:
+                # Verify different ospf areas
+                for line in config_file.splitlines():
+                    line = line.strip()
+                    if 'area' in line:
+                        line = line.split()
+                        area = line[0] + ' ' + line[1]
+                        if area not in topology_out:
+                            RESULT_STATUS = False
+                            failure_summary += 'On switch {} '.format(switch_name)
+                            failure_summary += '{} is not present in '.format(area)
+                            failure_summary += 'the output of command {}\n'.format(
+                                topology_cmd)
+            else:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'result cannot be verified since '
+                failure_summary += 'output of command {} is None'.format(
+                    topology_cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 

@@ -134,17 +134,28 @@ def verify_bird_peering_consistency(module):
     execute_commands(module, 'service {} status'.format(package_name))
 
     # Get all required routes
-    bird_routes = execute_commands(module, 'birdc show route')
-    routes = execute_commands(module, 'route')
-    fib_routes = execute_commands(module, 'goes vnet show ip fib')
+    bird_cmd = 'birdc show route'
+    route_cmd = 'route'
+    fib_cmd = 'goes vnet show ip fib'
+    
+    bird_routes = execute_commands(module, bird_cmd)
+    routes = execute_commands(module, route_cmd)
+    fib_routes = execute_commands(module, fib_cmd)
 
-    for value in values_to_check:
-        if (value not in bird_routes and value not in routes and
-                value not in fib_routes):
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'bgp peering consistency for '
-            failure_summary += 'eth-1-1 interface is missing\n'
+    if bird_routes and routes and fib_routes:
+        for value in values_to_check:
+            if (value not in bird_routes and value not in routes and
+                    value not in fib_routes):
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp peering consistency for '
+                failure_summary += 'eth-1-1 interface is missing\n'
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'bgp peering consistency cannot be verified '
+        failure_summary += 'since output of one the these command is None '
+        failure_summary += '{} {} {}\n'.format(bird_cmd, route_cmd, fib_cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
