@@ -16,19 +16,41 @@ $ make -B goes-platina-mk1.test
 $ sudo ./goes-platina-mk1.test -test.v		# -test.run=./SUB/TEST
 ```
 Current test cases:
+```
+Test/vnet.ready
 
-Test/ospf/eth
-Test/ospf/vlan
-Test/isis/eth
-Test/isis/vlan
-Test/bgp/eth
-Test/bgp/vlan
-Test/net-slice/vlan
+Test/nodocker/twohost
+Test/nodocker/onerouter
 
-For example to run all vlan testcases:
+Test/docker/net/slice/vlan
+
+Test/docker/net/dhcp/eth
+Test/docker/net/dhcp/vlan
+
+Test/docker/net/static/eth
+Test/docker/net/static/vlan
+
+Test/docker/frr/ospf/eth
+Test/docker/frr/ospf/vlan
+Test/docker/frr/isis/eth
+Test/docker/frr/isis/vlan
+Test/docker/frr/bgp/eth
+Test/docker/frr/bgp/vlan
+
+Test/docker/bird/bgp/eth
+Test/docker/bird/bgp/vlan
+Test/docker/bird/ospf/eth
+Test/docker/bird/ospf/vlan
+
+Test/docker/gobgp/ebgp/eth
+Test/docker/gobgp/ebgp/vlan
+```
+
+For example:
 
 ```console
-sudo ./goes-platina-mk1.test -test.vv -test.run Test/.*/vlan/.*
+sudo ./goes-platina-mk1.test -test.vv -test.run Test/docker/frr/ospf/eth
+sudo ./goes-platina-mk1.test -test.vv -test.run ./.*/.*/.*/vlan
 ```
 
 ---
