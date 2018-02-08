@@ -102,11 +102,6 @@ def main():
                 line = line.split()
                 line[3] = '9216'
                 line = ' '.join(line)
-            elif 'netmask' in line:
-                line = line.split()
-                eth = line[1].split('-')[1]
-                line[2] = '10.0.{}.{}'.format(eth, switch_name[-2::])
-                line = ' '.join(line)
 
         run_cli(module, line)
         msg += "On switch {}, executed '{}'".format(switch_name, line)

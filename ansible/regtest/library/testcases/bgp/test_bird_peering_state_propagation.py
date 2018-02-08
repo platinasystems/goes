@@ -158,13 +158,19 @@ def verify_routes(module, dummy_interfaces_list):
     cmd = 'birdc show route'
     all_routes = execute_commands(module, cmd)
 
-    for ip in dummy_interfaces_list:
-        if ip not in all_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'dummy interface {} '.format(ip)
-            failure_summary += 'is not present in the output '
-            failure_summary += 'of command {}\n'.format(cmd)
+    if all_routes:
+        for ip in dummy_interfaces_list:
+            if ip not in all_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'dummy interface {} '.format(ip)
+                failure_summary += 'is not present in the output '
+                failure_summary += 'of command {}\n'.format(cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'result cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     return failure_summary
 
@@ -194,7 +200,7 @@ def verify_bird_peering_state_propagation(module):
     # Get the list of dummy interfaces to verify
     switches_list = spine_list + leaf_list
     for switch in switches_list:
-        ip = '192.168.{}.0'.format(switch[-2::])
+        ip = '192.168.{}.1'.format(switch[-2::])
         dummy_interfaces_list.append(ip)
 
     if not is_convergence:
@@ -213,7 +219,7 @@ def verify_bird_peering_state_propagation(module):
         # Verify required routes are present or not
         if switch_name != propagate_switch:
             temp_list = dummy_interfaces_list
-            temp_list.remove('192.168.{}.0'.format(propagate_switch[-2::]))
+            temp_list.remove('192.168.{}.1'.format(propagate_switch[-2::]))
             failure_summary += verify_routes(module, temp_list)
 
         # Bring up interfaces on propagate switch
@@ -232,7 +238,7 @@ def verify_bird_peering_state_propagation(module):
         if not propagate_switch:
             failure_summary += verify_routes(module, dummy_interfaces_list)
         else:
-            dummy_interfaces_list.remove('192.168.{}.0'.format(
+            dummy_interfaces_list.remove('192.168.{}.1'.format(
                 propagate_switch[-2::]))
             failure_summary += verify_routes(module, dummy_interfaces_list)
 

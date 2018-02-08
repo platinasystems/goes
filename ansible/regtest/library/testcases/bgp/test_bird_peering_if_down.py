@@ -152,6 +152,7 @@ def check_bgp_neighbors(module, neighbor_ips, neighbor_as):
     check_ping = module.params['check_ping']
     leaf_list = module.params['leaf_list']
     is_leaf = True if switch_name in leaf_list else False
+    self_ip = '192.168.{}.1'.format(switch_name[-2::])
 
     for ip in neighbor_ips:
         index = neighbor_ips.index(ip)
@@ -160,29 +161,37 @@ def check_bgp_neighbors(module, neighbor_ips, neighbor_as):
         cmd = "birdc 'show protocols all bgp{}'".format(index + 1)
         bgp_out = execute_commands(module, cmd)
 
-        if ip not in bgp_out and as_value not in bgp_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'bgp neighbor {} info '.format(ip)
-            failure_summary += 'is not present in the output of '
-            failure_summary += 'command {}\n'.format(cmd)
-
-        if 'Established' not in bgp_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'bgp state of neighbor {} '.format(ip)
-            failure_summary += 'is not Established in the output of '
-            failure_summary += 'command {}\n'.format(cmd)
-
-        if check_ping and is_leaf:
-            packet_count = '3'
-            ping_cmd = 'ping -w 5 -c {} {}'.format(packet_count, ip)
-            ping_out = execute_commands(module, ping_cmd)
-            if '{} received'.format(packet_count) not in ping_out:
+        if bgp_out:
+            if ip not in bgp_out and as_value not in bgp_out:
                 RESULT_STATUS = False
-                failure_summary += 'From switch {} '.format(switch_name)
-                failure_summary += 'neighbor ip {} '.format(ip)
-                failure_summary += 'is not getting pinged\n'
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp neighbor {} info '.format(ip)
+                failure_summary += 'is not present in the output of '
+                failure_summary += 'command {}\n'.format(cmd)
+
+            if 'Established' not in bgp_out:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'bgp state of neighbor {} '.format(ip)
+                failure_summary += 'is not Established in the output of '
+                failure_summary += 'command {}\n'.format(cmd)
+
+            if check_ping and is_leaf:
+                packet_count = '3'
+                ping_cmd = 'ping -w 3 -c {} -I {} {}'.format(packet_count,
+                                                             self_ip, ip)
+                ping_out = execute_commands(module, ping_cmd)
+                if '{} received'.format(packet_count) not in ping_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'From switch {} '.format(
+                        switch_name)
+                    failure_summary += 'neighbor ip {} '.format(ip)
+                    failure_summary += 'is not getting pinged\n'
+        else:
+            RESULT_STATUS = False
+            failure_summary += 'On switch {} '.format(switch_name)
+            failure_summary += 'result cannot be verified since '
+            failure_summary += 'output of command {} is None'.format(cmd)
 
     return failure_summary
 
@@ -253,9 +262,9 @@ def verify_bird_peering_if_down(module):
     if is_leaf:
         change_interface_state(module, eth_list, leaf_list, 'up')
 
-    # Wait for 160 seconds
+    # Wait for 40 seconds
     if not check_ping:
-        time.sleep(160)
+        time.sleep(40)
 
     # Verify bgp neighbor relationship
     failure_summary += check_bgp_neighbors(module, neighbor_ips, neighbor_as)

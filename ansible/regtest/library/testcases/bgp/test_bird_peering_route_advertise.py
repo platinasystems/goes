@@ -158,29 +158,35 @@ def verify_bird_peering(module):
         switches_list = spine_list + leaf_list
     else:
         is_spine = True if switch_name in spine_list else False
-        
+
         if is_spine:
             switches_list = leaf_list
         else:
             switches_list = spine_list
-            
+
         switches_list.append(switch_name)
 
     # Get the list of dummy interfaces to verify
     for switch in switches_list:
-        ip = '192.168.{}.0'.format(switch[-2::])
+        ip = '192.168.{}.1'.format(switch[-2::])
         dummy_interfaces_list.append(ip)
 
     cmd = 'birdc show route all'
     all_routes = execute_commands(module, cmd)
 
-    for ip in dummy_interfaces_list:
-        if ip not in all_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'dummy interface {} '.format(ip)
-            failure_summary += 'is not present in the output '
-            failure_summary += 'of command {}\n'.format(cmd)
+    if all_routes:
+        for ip in dummy_interfaces_list:
+            if ip not in all_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'dummy interface {} '.format(ip)
+                failure_summary += 'is not present in the output '
+                failure_summary += 'of command {}\n'.format(cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'result cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 

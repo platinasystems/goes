@@ -65,7 +65,7 @@
 
 - include: playbooks/ospf/quagga_ospf_with_different_areas.yml
 
-- include: playbooks/ospf/quagga_ospf_loadbalacning.yml
+- include: playbooks/ospf/quagga_ospf_loadbalancing.yml
 
 - include: playbooks/ospf/quagga_ospf_hello_and_dead_timers.yml
 

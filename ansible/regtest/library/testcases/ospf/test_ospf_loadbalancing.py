@@ -200,12 +200,18 @@ def verify_ospf_load_balancing(module):
     cmd = "vtysh -c 'sh ip route {}'".format(route_ip)
     ospf_routes = execute_commands(module, cmd)
 
-    for route in routes_to_check:
-        if route not in ospf_routes:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'output of command {} '.format(cmd)
-            failure_summary += 'did not show correct routes\n'
+    if ospf_routes:
+        for route in routes_to_check:
+            if route not in ospf_routes:
+                RESULT_STATUS = False
+                failure_summary += 'On switch {} '.format(switch_name)
+                failure_summary += 'output of command {} '.format(cmd)
+                failure_summary += 'did not show correct routes\n'
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'result cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     # Delete the dummy interface
     execute_commands(module, 'ip link del dummy0 type dummy')

@@ -149,38 +149,46 @@ def verify_bird_ospf_peering(module):
     cmd = 'birdc show ospf neighbor'
     ospf_out = execute_commands(module, cmd)
 
-    # Get all routes
-    if check_routes:
-        route_cmd = 'birdc show route'
-        routes_out = execute_commands(module, route_cmd)
-
-        # Verify if route for dummy interface is present or not
-        if 'dummy0' not in routes_out:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'ospf route for dummy interface '
-            failure_summary += 'is not present in the output '
-            failure_summary += 'of command {}\n'.format(route_cmd)
-
-    for line in config_file:
-        line = line.strip()
-        if 'interface' in line and 'eth' in line:
-            config = line.split()
-            eth = config[1].replace('"', '')
-            if eth not in ospf_out:
+    if ospf_out:
+        # Get all routes
+        if check_routes:
+            route_cmd = 'birdc show route'
+            routes_out = execute_commands(module, route_cmd)
+    
+            # Verify if route for dummy interface is present or not
+            if 'dummy0' not in routes_out:
                 RESULT_STATUS = False
                 failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'ospf neighbor for interface '
-                failure_summary += '{} is not present in the '.format(eth)
-                failure_summary += 'output of command {}\n'.format(cmd)
-
-            if check_routes:
-                if eth not in routes_out:
+                failure_summary += 'ospf route for dummy interface '
+                failure_summary += 'is not present in the output '
+                failure_summary += 'of command {}\n'.format(route_cmd)
+    
+        for line in config_file:
+            line = line.strip()
+            if 'interface' in line and 'eth' in line:
+                config = line.split()
+                eth = config[1].replace('"', '')
+                if eth not in ospf_out:
                     RESULT_STATUS = False
                     failure_summary += 'On switch {} '.format(switch_name)
-                    failure_summary += 'ospf route for interface '
+                    failure_summary += 'ospf neighbor for interface '
                     failure_summary += '{} is not present in the '.format(eth)
-                    failure_summary += 'output of command {}\n'.format(route_cmd)
+                    failure_summary += 'output of command {}\n'.format(cmd)
+    
+                if check_routes:
+                    if eth not in routes_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'ospf route for interface '
+                        failure_summary += '{} is not present in the '.format(
+                            eth)
+                        failure_summary += 'output of command {}\n'.format(
+                            route_cmd)
+    else:
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'result cannot be verified since '
+        failure_summary += 'output of command {} is None'.format(cmd)
 
     HASH_DICT['result.detail'] = failure_summary
 
