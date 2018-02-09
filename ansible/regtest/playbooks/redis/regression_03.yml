@@ -1,42 +1,46 @@
 ---
 
-- hosts: spine:leaf
-  become: yes
-
-  vars:
-  - tmp_file_path: /tmp/failed.txt
-  - log_dir_path: /var/log/regression/redis
+- hosts: server_emulator
+  become: true
 
   tasks:
-    - file:
-        path: "{{ tmp_file_path }}"
-        state: touch
-      delegate_to: 127.0.0.1
-      changed_when: False
+    - command: "date +%Y%m%d%T"
+      register: start_time
 
+    - set_fact:
+        hash_name: "redis_regression_03_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf:spine
+  become: yes
+  tasks:
     - file:
-        path: "{{ log_dir_path }}"
+        path: "{{ redis_log_dir }}"
         state: directory
 
     - name: Test hget/hset operations with valid values on redis db locally
       test_redis_valid:
         switch_name: "{{ inventory_hostname }}"
-        log_dir_path: "{{ log_dir_path }}"
-      register: valid_out
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ redis_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
 
     - name: Store the test result in a hash in redis db on server emulator
       store_result_in_redis:
-        hash_name: "{{ valid_out.hash_name }}"
-        start_time: "{{ valid_out.start_time }}"
-        end_time: "{{ valid_out.end_time }}"
-        hash_dict: "{{ valid_out.hash_dict }}"
-        test_result: "{{ valid_out.test_result }}"
-      delegate_to: 127.0.0.1
-
-    - lineinfile:
-        path: "{{ tmp_file_path }}"
-        line: "{{ valid_out.hash_name }}"
-      when: valid_out.test_result == 'Failed'
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
     - name: Test hget/hset operations with valid values on redis db remotely
@@ -44,40 +48,44 @@
         switch_name: "{{ inventory_hostname }}"
         switch_ip: "{{ ansible_ssh_host }}"
         remote_access: true
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ redis_log_dir }}"
       delegate_to: 127.0.0.1
-      register: valid_out_remote
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
 
     - name: Store the test result in a hash in redis db on server emulator
       store_result_in_redis:
-        hash_name: "{{ valid_out_remote.hash_name }}"
-        start_time: "{{ valid_out_remote.start_time }}"
-        end_time: "{{ valid_out_remote.end_time }}"
-        hash_dict: "{{ valid_out_remote.hash_dict }}"
-        test_result: "{{ valid_out_remote.test_result }}"
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: ""
       delegate_to: 127.0.0.1
 
-    - lineinfile:
-        path: "{{ tmp_file_path }}"
-        line: "{{ valid_out_remote.hash_name }}"
-      when: valid_out_remote.test_result == 'Failed'
-      delegate_to: 127.0.0.1
+    - include: ../../playbooks/get_goes_version_and_tags.yml
 
 
 - hosts: server_emulator
-  become: yes
-
-  vars:
-  - tmp_file_path: /tmp/failed.txt
-
+  become: true
   tasks:
-    - name: Report test suite result
-      test_suite_result:
-        result_data: "{{ lookup('file', '{{ tmp_file_path }}') }}"
-      register: status
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
 
-    - debug: var=status
+    - name: Print test case result
+      debug:
+        msg: "Test case result: {{ result.result_status }}"
 
-    - file:
-        path: "{{ tmp_file_path }}"
-        state: absent
-      changed_when: False
+    - name: Print failure summary
+      debug:
+        msg: "Failure summary: {{ result.result_detail }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - include: ../../playbooks/get_goes_status.yml

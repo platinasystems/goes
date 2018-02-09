@@ -43,6 +43,11 @@ options:
         - IP to access BMC processor's redis db.
       required: False
       type: str
+    hash_name:
+      description:
+        - Name of the hash in which to store the result in redis.
+      required: False
+      type: str
     log_dir_path:
       description:
         - Path to log directory where logs will be stored.
@@ -52,29 +57,13 @@ options:
 
 EXAMPLES = """
 - name: Test BMC Redis db
-  test_redis_valid:
+  test_bmc_redis:
     switch_name: "{{ inventory_hostname }}"
     bmc_redis_ip: "{{ ansible_ssh_host }}"
     log_dir_path: "{{ log_dir_path }}"
 """
 
 RETURN = """
-hash_name:
-  description: Name of the hash in which to store the test result.
-  returned: always
-  type: str
-start_time:
-  description: Start time of test.
-  returned: always
-  type: str
-end_time:
-  description: End time of test.
-  returned: always
-  type: str
-test_result:
-  description: Passed/Failed.
-  returned: always
-  type: str
 hash_dict:
   description: Dictionary containing key value pairs to store in hash.
   returned: always
@@ -145,6 +134,8 @@ def execute_and_verify(module, operation, param):
     :param param: Name of the parameter.
     """
     global HASH_DICT, RESULT_STATUS
+    failure_summary = ''
+    switch_name = module.params['switch_name']
 
     cmd = '{} platina {} '.format(operation, param)
 
@@ -154,12 +145,20 @@ def execute_and_verify(module, operation, param):
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
     exec_time = run_cli(module, 'date +%Y%m%d%T')
-    key = '{}  {}'.format(exec_time, cmd)
+    key = '{0} {1} {2}'.format(switch_name, exec_time, cmd)
     HASH_DICT[key] = out
 
     # For errors, update the result status to False
-    if out is None or 'error' in out:
+    if out is None:
         RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'output of command {} is None\n'.format(cli)
+    elif 'error' in out.lower():
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'output of command {} has errors\n'.format(cli)
+
+    return failure_summary
 
 
 def test_hget_operations(module):
@@ -168,24 +167,27 @@ def test_hget_operations(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS
+    failure_summary = ''
 
     ipv6 = get_ipv6_address(module)
     ipv6 += '%eth0'
 
     parameter = 'temp {}'.format(ipv6)
-    execute_and_verify(module, 'hget', parameter)
+    failure_summary += execute_and_verify(module, 'hget', parameter)
 
     parameter = 'status {}'.format(ipv6)
-    execute_and_verify(module, 'hget', parameter)
+    failure_summary += execute_and_verify(module, 'hget', parameter)
 
     parameter = 'fan_tray {}'.format(ipv6)
-    execute_and_verify(module, 'hget', parameter)
+    failure_summary += execute_and_verify(module, 'hget', parameter)
 
     parameter = 'psu {}'.format(ipv6)
-    execute_and_verify(module, 'hget', parameter)
+    failure_summary += execute_and_verify(module, 'hget', parameter)
 
     parameter = 'vmon {}'.format(ipv6)
-    execute_and_verify(module, 'hget', parameter)
+    failure_summary += execute_and_verify(module, 'hget', parameter)
+
+    HASH_DICT['result.detail'] = failure_summary
 
 
 def main():
@@ -194,37 +196,27 @@ def main():
         argument_spec=dict(
             switch_name=dict(required=False, type='str'),
             bmc_redis_ip=dict(required=False, type='str'),
+            hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
     )
 
     global RESULT_STATUS, HASH_DICT
 
-    # Get the switch name
-    switch_name = module.params['switch_name']
-
-    # Get the start time
-    start_time = run_cli(module, 'date +%Y%m%d%T')
-
-    # Create a hash name
-    hash_name = switch_name + '-' + 'redis_regression_01' + '-' + start_time
-
     # Perform and verify all required tests
     test_hget_operations(module)
 
-    # Get the end time
-    end_time = run_cli(module, 'date +%Y%m%d%T')
-
     # Calculate the entire test result
-    test_result = 'Passed' if RESULT_STATUS else 'Failed'
+    HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
 
     # Create a log file
-    log_file_path = module.params['log_dir_path'] + '/regression01.log'
+    log_file_path = module.params['log_dir_path']
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
     log_file = open(log_file_path, 'w')
     for key, value in HASH_DICT.iteritems():
         log_file.write(key)
         log_file.write('\n')
-        log_file.write(value)
+        log_file.write(str(value))
         log_file.write('\n')
         log_file.write('\n')
 
@@ -232,11 +224,8 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_name=hash_name,
-        start_time=start_time,
-        end_time=end_time,
-        test_result=test_result,
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
 
 if __name__ == '__main__':
