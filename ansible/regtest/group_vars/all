@@ -7,6 +7,7 @@ isis_log_dir: /var/log/regression/isis
 ipv4_log_dir: /var/log/regression/ipv4
 port_provision_log_dir: /var/log/regression/port_provision
 redis_log_dir: /var/log/regression/redis
+vlan_log_dir: /var/log/regression/vlan
 
 bgp_loop_prevention_log_file: /var/log/regression/bgp_loop_prevention.log
 gobgp_loop_prevention_log_file: /var/log/gobgpd.dump
