@@ -61,6 +61,12 @@ options:
       required: False
       type: bool
       default: False
+    multiple_vlan:
+      description:
+        - Flag to indicate if multiple vlans for same interface need to be configured.
+      required: False
+      type: bool
+      default: False
     hash_name:
       description:
         - Name of the hash in which to store the result in redis.
@@ -145,8 +151,9 @@ def verify_vlan_configurations(module):
     spine_list = module.params['spine_list']
     leaf_switch = module.params['leaf_switch']
     eth_list = module.params['eth_list'].split(',')
-    third_octet = switch_name[-2::]
     arping = module.params['arping']
+    multiple_vlan = module.params['multiple_vlan']
+    third_octet = switch_name[-2::]
 
     is_leaf = True if switch_name == leaf_switch else False
 
@@ -156,24 +163,52 @@ def verify_vlan_configurations(module):
             execute_commands(module, 'ifconfig eth-{}-1 down'.format(eth))
 
     # Configure vlan interfaces and assign ip to it
-    for eth in eth_list:
-        cmd = 'ip link add link eth-{}-1 name eth-{}-1.1 type vlan id {}'.format(
-            eth, eth, eth
-        )
-        execute_commands(module, cmd)
-        execute_commands(module, 'ifconfig eth-{}-1.1 192.168.{}.{}/24'.format(
-            eth, eth, third_octet
-        ))
+    if not multiple_vlan:
+        for eth in eth_list:
+            cmd = 'ip link add link eth-{}-1 name eth-{}-1.1 type vlan id {}'.format(
+                eth, eth, eth
+            )
+            execute_commands(module, cmd)
+            execute_commands(module, 'ifconfig eth-{}-1.1 192.168.{}.{}/24'.format(
+                eth, eth, third_octet
+            ))
 
-    # Verify vlan interfaces got created with ip assigned to them
-    for eth in eth_list:
-        ip_out = execute_commands(module, 'ifconfig eth-{}-1.1'.format(eth))
-        if ip_out:
-            if '192.168.{}.{}'.format(eth, third_octet) not in ip_out:
-                RESULT_STATUS = False
-                failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'failed to configure vlan on interface '
-                failure_summary += 'eth-{}-1.1\n'.format(eth)
+        # Verify vlan interfaces got created with ip assigned to them
+        for eth in eth_list:
+            ip_out = execute_commands(module, 'ifconfig eth-{}-1.1'.format(eth))
+            if ip_out:
+                if '192.168.{}.{}'.format(eth, third_octet) not in ip_out:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'failed to configure vlan on interface '
+                    failure_summary += 'eth-{}-1.1\n'.format(eth)
+    else:
+        for eth in eth_list:
+            vlan_id = int(eth)
+            for subport in range(1, 5):
+                vlan_id += 1
+                cmd = 'ip link add link eth-{}-1 name eth-{}-1.{} type vlan id {}'.format(
+                    eth, eth, subport, vlan_id
+                )
+                execute_commands(module, cmd)
+                execute_commands(module, 'ifconfig eth-{}-1.{} 192.168.{}.{}/24'.format(
+                    eth, subport, vlan_id, third_octet
+                ))
+
+        # Verify vlan interfaces got created with ip assigned to them
+        for eth in eth_list:
+            vlan_id = int(eth)
+            for subport in range(1, 5):
+                vlan_id += 1
+                ip_out = execute_commands(module, 'ifconfig eth-{}-1.{}'.format(
+                    eth, subport
+                ))
+                if ip_out:
+                    if '192.168.{}.{}'.format(vlan_id, third_octet) not in ip_out:
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'failed to configure vlan on interface '
+                        failure_summary += 'eth-{}-1.{}\n'.format(eth, subport)
 
     # Initiate arping/ping and verify tcpdump output
     if is_leaf:
@@ -186,28 +221,54 @@ def verify_vlan_configurations(module):
                 )
                 execute_commands(module, arp_cmd)
             else:
-                ping_cmd = 'ping -c 15 192.168.{}.{}'.format(eth, last_octet)
-                execute_commands(module, ping_cmd)
+                if not multiple_vlan:
+                    ping_cmd = 'ping -c 15 192.168.{}.{}'.format(eth, last_octet)
+                    execute_commands(module, ping_cmd)
+                else:
+                    vlan_id = int(eth)
+                    for subport in range(1, 5):
+                        vlan_id += 1
+                        ping_cmd = 'ping -c 10 192.168.{}.{}'.format(vlan_id, last_octet)
+                        execute_commands(module, ping_cmd)
     else:
         # Verify if vlan tagged packets are captured in tcpdump file
         index = spine_list.index(switch_name)
         eth = eth_list[index]
         state = 'arp' if arping else 'icmp'
 
-        cmd = 'tcpdump -c 15 -net -i eth-{}-1 {}'.format(eth, state)
-        tcpdump_out = execute_commands(module, cmd)
+        if not multiple_vlan:
+            cmd = 'tcpdump -c 15 -net -i eth-{}-1 {}'.format(eth, state)
+            tcpdump_out = execute_commands(module, cmd)
 
-        if tcpdump_out:
-            if ('802.1Q (0x8100)' not in tcpdump_out or
-                    'vlan {}'.format(eth) not in tcpdump_out):
+            if tcpdump_out:
+                if ('802.1Q (0x8100)' not in tcpdump_out or
+                        'vlan {}'.format(eth) not in tcpdump_out):
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'there are no vlan tagged packets '
+                    failure_summary += 'captured for eth-{}-1\n'.format(eth)
+            else:
                 RESULT_STATUS = False
                 failure_summary += 'On switch {} '.format(switch_name)
-                failure_summary += 'there are no vlan tagged packets '
-                failure_summary += 'captured for eth-{}-1\n'.format(eth)
+                failure_summary += 'failed to capture tcpdump output\n'
         else:
-            RESULT_STATUS = False
-            failure_summary += 'On switch {} '.format(switch_name)
-            failure_summary += 'failed to capture tcpdump output\n'
+            vlan_id = int(eth)
+            for subport in range(1, 5):
+                vlan_id += 1
+                cmd = 'tcpdump -c 15 -net -i eth-{}-1 {}'.format(eth, state)
+                tcpdump_out = execute_commands(module, cmd)
+
+                if tcpdump_out:
+                    if ('802.1Q (0x8100)' not in tcpdump_out or
+                            'vlan {}'.format(vlan_id) not in tcpdump_out):
+                        RESULT_STATUS = False
+                        failure_summary += 'On switch {} '.format(switch_name)
+                        failure_summary += 'there are no vlan tagged packets '
+                        failure_summary += 'captured for eth-{}-1\n'.format(eth)
+                else:
+                    RESULT_STATUS = False
+                    failure_summary += 'On switch {} '.format(switch_name)
+                    failure_summary += 'failed to capture tcpdump output\n'
 
     HASH_DICT['result.detail'] = failure_summary
 
@@ -224,6 +285,7 @@ def main():
             leaf_switch=dict(required=False, type='str'),
             eth_list=dict(required=False, type='str'),
             arping=dict(required=False, type='bool', default=False),
+            multiple_vlan=dict(required=False, type='bool', default=False),
             hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )

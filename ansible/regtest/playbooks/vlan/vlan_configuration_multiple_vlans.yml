@@ -1,0 +1,117 @@
+---
+
+- hosts: server_emulator
+  become: true
+
+  tasks:
+    - command: "date +%Y%m%d%T"
+      register: start_time
+
+    - set_fact:
+        hash_name: "vlan_configuration_multiple_vlans_{{ start_time.stdout }}"
+        start_time: "{{ start_time.stdout }}"
+
+
+- hosts: leaf[0]:spine
+  become: yes
+  tasks:
+    - file:
+        path: "{{ vlan_log_dir }}"
+        state: directory
+
+    - name: Test vlan configuration multiple vlans
+      test_vlan_configuration:
+        switch_name: "{{ inventory_hostname }}"
+        leaf_switch: "{{ groups['leaf'][0] }}"
+        spine_list: "{{ groups['spine'] }}"
+        eth_list: "1,27"
+        multiple_vlan: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ vlan_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf[1]:spine
+  become: yes
+  tasks:
+    - file:
+        path: "{{ vlan_log_dir }}"
+        state: directory
+
+    - name: Test vlan configuration multiple vlans
+      test_vlan_configuration:
+        switch_name: "{{ inventory_hostname }}"
+        leaf_switch: "{{ groups['leaf'][1] }}"
+        spine_list: "{{ groups['spine'] }}"
+        eth_list: "19,7"
+        multiple_vlan: True
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        log_dir_path: "{{ vlan_log_dir }}"
+      register: module_out
+
+    - command: "date +%Y%m%d%T"
+      register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
+
+    - name: Store the test result in a hash in redis db on server emulator
+      store_result_in_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+        start_time: "{{ hostvars['server_emulator']['start_time'] }}"
+        end_time: "{{ end_time.stdout }}"
+        hash_dict: "{{ module_out.hash_dict }}"
+        log_content: "{{ logs['content'] | b64decode }}"
+      delegate_to: 127.0.0.1
+
+
+- hosts: leaf:spine
+  become: yes
+  tasks:
+    - include: ../../playbooks/get_goes_version_and_tags.yml
+
+    - name: Restart goes
+      command: goes restart
+
+
+- hosts: server_emulator
+  become: true
+  tasks:
+    - name: Get the test result from redis db
+      get_test_result_from_redis:
+        hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
+      register: result
+
+    - name: Print test case result
+      debug:
+        msg: "Test case result: {{ result.result_status }}"
+
+    - name: Print failure summary
+      debug:
+        msg: "Failure summary: {{ result.result_detail }}"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - include: ../../playbooks/get_goes_status.yml
+
