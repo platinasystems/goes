@@ -8,16 +8,16 @@
       register: start_time
 
     - set_fact:
-        hash_name: "vlan_configuration_arping_vlan_interfaces_and_physical_interfaces_{{ start_time.stdout }}"
+        hash_name: "vlan_configuration_lldp_vlan_interfaces_and_physical_interfaces_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
 - hosts: leaf:spine
   become: true
   tasks:
-    - name: Install arping
+    - name: Install lldpd
       apt:
-        name: arping
+        name: lldpd
         state: present
 
 
@@ -28,13 +28,13 @@
         path: "{{ vlan_log_dir }}"
         state: directory
 
-    - name: Test vlan configuration arping vlan interfaces and physical interfaces
+    - name: Test vlan configuration lldp vlan interfaces and physical interfaces
       test_vlan_configuration:
         switch_name: "{{ inventory_hostname }}"
         leaf_switch: "{{ groups['leaf'][0] }}"
         spine_list: "{{ groups['spine'] }}"
-        eth_list: "3,21"
-        arping: True
+        eth_list: "1,27"
+        lldp: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ vlan_log_dir }}"
       register: module_out
@@ -64,13 +64,13 @@
         path: "{{ vlan_log_dir }}"
         state: directory
 
-    - name: Test vlan configuration arping vlan interfaces and physical interfaces
+    - name: Test vlan configuration lldp vlan interfaces and physical interfaces
       test_vlan_configuration:
         switch_name: "{{ inventory_hostname }}"
         leaf_switch: "{{ groups['leaf'][1] }}"
         spine_list: "{{ groups['spine'] }}"
-        eth_list: "19,5"
-        arping: True
+        eth_list: "19,7"
+        lldp: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ vlan_log_dir }}"
       register: module_out
