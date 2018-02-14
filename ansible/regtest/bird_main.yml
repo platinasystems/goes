@@ -1,0 +1,64 @@
+---
+
+# Uninstall packages stack
+- include: playbooks/installation/uninstall_packages.yml
+
+
+# Install bird
+- include: playbooks/installation/bird_install.yml
+
+
+# Restart goes
+- include: playbooks/goes_restart.yml
+
+
+# Run all bird bgp playbooks
+- include: playbooks/bgp/bird_bgp_peering_ebgp.yml
+
+- include: playbooks/bgp/bird_bgp_peering_ebgp_loopback.yml
+
+- include: playbooks/bgp/bird_bgp_peering_ebgp_route_advertise.yml
+
+- include: playbooks/bgp/bird_bgp_peering_ibgp.yml
+
+- include: playbooks/bgp/bird_bgp_peering_ibgp_loopback.yml
+
+- include: playbooks/bgp/bird_bgp_peering_ibgp_route_advertise.yml
+
+- include: playbooks/bgp/bird_bgp_peering_authentication.yml
+
+- include: playbooks/bgp/bird_bgp_peering_local_preference.yml
+
+- include: playbooks/bgp/bird_bgp_peering_med.yml
+
+- include: playbooks/bgp/bird_bgp_peering_as_path.yml
+
+- include: playbooks/bgp/bird_bgp_peering_route_reflector.yml
+
+- include: playbooks/bgp/bird_bgp_peering_redundancy.yml
+
+- include: playbooks/bgp/bird_bgp_peering_consistency.yml
+
+- include: playbooks/bgp/bird_bgp_peering_if_down.yml
+
+- include: playbooks/bgp/bird_bgp_peering_loop_prevention.yml
+
+- include: playbooks/bgp/bird_bgp_peering_state_propagation.yml
+
+- include: playbooks/bgp/bird_bgp_peering_convergence.yml
+
+
+# Run all bird ospf playbooks
+- include: playbooks/ospf/bird_ospf_basic.yml
+
+- include: playbooks/ospf/bird_ospf_loopback.yml
+
+- include: playbooks/ospf/bird_ospf_with_different_areas.yml
+
+- include: playbooks/ospf/bird_ospf_loadbalancing.yml
+
+- include: playbooks/ospf/bird_ospf_hello_and_dead_timers.yml
+
+- include: playbooks/ospf/bird_ospf_routes.yml
+
+- include: playbooks/ospf/bird_ospf_traffic.yml

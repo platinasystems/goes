@@ -8,23 +8,41 @@
       register: start_time
 
     - set_fact:
-        hash_name: "redis_regression_01_{{ start_time.stdout }}"
+        hash_name: "vlan_configuration_on_transit_vlan_interfaces_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
-- hosts: spine:leaf
+- hosts: leaf:spine
   become: yes
   tasks:
+    - name: Take backup of /etc/quagga/ospfd.conf
+      copy:
+        src: "{{ quagga_ospf_conf_file }}"
+        dest: "{{ quagga_ospf_conf_file_bck }}"
+        remote_src: true
+
+    - name: Add ospf config in /etc/quagga/ospfd.conf
+      blockinfile:
+        path: "{{ quagga_ospf_conf_file }}"
+        marker: ""
+        block: |
+          router ospf
+          ospf router-id {{ ansible_ssh_host }}
+          network 192.168.3.0/24 area 0.0.0.0
+          network 192.168.21.0/24 area 0.0.0.0
+
     - file:
-        path: "{{ redis_log_dir }}"
+        path: "{{ vlan_log_dir }}"
         state: directory
 
-    - name: Test hget operations on BMC processors redis db
-      test_bmc_redis:
+    - name: Test vlan configuration on transit vlan interfaces
+      test_on_transit_vlan_configuration:
         switch_name: "{{ inventory_hostname }}"
-        bmc_redis_ip: "{{ bmc_redis_ip }}"
+        leaf_list: "{{ groups['leaf'] }}"
+        spine_list: "{{ groups['spine'] }}"
+        eth_list: "3,21"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ redis_log_dir }}"
+        log_dir_path: "{{ vlan_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"
@@ -45,6 +63,25 @@
       delegate_to: 127.0.0.1
 
     - include: ../../playbooks/get_goes_version_and_tags.yml
+
+    - name: Restore backup of /etc/quagga/ospfd.conf
+      copy:
+        src: "{{ quagga_ospf_conf_file_bck }}"
+        dest: "{{ quagga_ospf_conf_file }}"
+        remote_src: true
+
+    - name: Remove backup file
+      file:
+        path: "{{ quagga_ospf_conf_file_bck }}"
+        state: absent
+
+    - name: Restart quagga
+      service:
+        name: quagga
+        state: restarted
+
+    - name: Restart goes
+      command: goes restart
 
 
 - hosts: server_emulator
@@ -68,3 +105,4 @@
   become: true
   tasks:
     - include: ../../playbooks/get_goes_status.yml
+

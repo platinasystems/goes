@@ -94,6 +94,15 @@
       - {regexp: '^eigrpd=', line: 'eigrpd=no'}
       - {regexp: '^babeld=', line: 'babeld=no'}
 
+   - name: Disable start limit interval
+     lineinfile:
+        path: /lib/systemd/system/frr.service
+        regexp: "^StartLimitInterval="
+        line: "StartLimitInterval=0"
+
+   - name: Reload systemctl
+     command: systemctl daemon-reload
+
    - name: Restarting the FRR service
      service:
         name: frr

@@ -8,21 +8,58 @@
       register: start_time
 
     - set_fact:
-        hash_name: "redis_regression_01_{{ start_time.stdout }}"
+        hash_name: "redis_regression_02_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
-- hosts: spine:leaf
+- hosts: leaf:spine
   become: yes
   tasks:
     - file:
         path: "{{ redis_log_dir }}"
         state: directory
 
-    - name: Test hget operations on BMC processors redis db
-      test_bmc_redis:
+    - name: Take backup of /etc/goes/start file
+      copy:
+        src: "{{ goes_start_file }}"
+        dest: "{{ goes_start_file_bck }}"
+        remote_src: true
+
+    - name: Copy updated start file for this testcase
+      copy:
+        src: ../../templates/redis_regression_start_file
+        dest: /etc/goes/start
+
+    - name: Restart goes
+      command: "goes restart"
+
+    - name: Install iperf
+      apt:
+        name: iperf
+        state: present
+
+
+- hosts: spine
+  become: true
+  tasks:
+    - name: Copy iperf parallel server shell script
+      copy:
+        src: ../../files/iperf-parallel-servers
+        dest: ~/iperf-parallel-servers.sh
+        mode: 0755
+
+    - name: Start iperf server instances
+      shell: "~/iperf-parallel-servers.sh 8 server-report"
+
+
+- hosts: leaf[0]
+  become: true
+  tasks:
+    - name: Initiate iperf client, verify traffic and tx and rx packets count
+      test_redis_stats:
         switch_name: "{{ inventory_hostname }}"
-        bmc_redis_ip: "{{ bmc_redis_ip }}"
+        spine0_eth1_ip: "10.0.1.31"
+        spine1_eth1_ip: "10.0.1.32"
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
         log_dir_path: "{{ redis_log_dir }}"
       register: module_out
@@ -44,7 +81,31 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-    - include: ../../playbooks/get_goes_version_and_tags.yml
+
+- hosts: spine
+  become: true
+  tasks:
+    - name: Stop iperf server instances
+      command: "pkill iperf"
+
+    - shell: "rm ~/iperf-parallel-servers.sh"
+
+
+- hosts: leaf:spine
+  become: true
+  tasks:
+    - name: Restore backup of /etc/goes/start
+      copy:
+        src: "{{ goes_start_file_bck }}"
+        dest: "{{ goes_start_file }}"
+        remote_src: true
+
+    - name: Remove backup file
+      file:
+        path: "{{ goes_start_file_bck }}"
+        state: absent
+
+    - command: "goes restart"
 
 
 - hosts: server_emulator

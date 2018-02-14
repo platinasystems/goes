@@ -48,6 +48,11 @@ options:
       required: False
       type: bool
       default: False
+    hash_name:
+      description:
+        - Name of the hash in which to store the result in redis.
+      required: False
+      type: str
     log_dir_path:
       description:
         - Path to log directory where logs will be stored.
@@ -62,22 +67,6 @@ EXAMPLES = """
 """
 
 RETURN = """
-hash_name:
-  description: Name of the hash in which to store the test result.
-  returned: always
-  type: str
-start_time:
-  description: Start time of test.
-  returned: always
-  type: str
-end_time:
-  description: End time of test.
-  returned: always
-  type: str
-test_result:
-  description: Passed/Failed.
-  returned: always
-  type: str
 hash_dict:
   description: Dictionary containing key value pairs to store in hash.
   returned: always
@@ -130,6 +119,8 @@ def execute_and_verify(module, operation, param, set_value):
     :param set_value: Value to set to the parameter.
     """
     global HASH_DICT, RESULT_STATUS
+    failure_summary = ''
+    switch_name = module.params['switch_name']
 
     cmd = '{} platina {} '.format(operation, param)
 
@@ -142,13 +133,22 @@ def execute_and_verify(module, operation, param, set_value):
     # Store command prefixed with exec time as key and
     # command output as value in the hash dictionary
     exec_time = run_cli(module, 'date +%Y%m%d%T')
-    key = '{}  {}'.format(exec_time, cmd)
+    key = '{0} {1} {2}'.format(switch_name, exec_time, cmd)
     HASH_DICT[key] = out
 
-    # If expected error does not get thrown out,
-    # update the result status to False
-    if "ERROR can't set" not in out:
+    # For errors, update the result status to False
+    if out is None:
         RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'output of command {} is None\n'.format(cli)
+    elif "error can't set" not in out.lower():
+        # If expected error does not get thrown out,
+        # update the result status to False
+        RESULT_STATUS = False
+        failure_summary += 'On switch {} '.format(switch_name)
+        failure_summary += 'command {} should not have executed\n'.format(cli)
+        
+    return failure_summary
 
 
 def test_hset_operations_with_invalid_input(module):
@@ -157,18 +157,21 @@ def test_hset_operations_with_invalid_input(module):
     :param module: The Ansible module to fetch input parameters.
     """
     global RESULT_STATUS
+    failure_summary = ''
 
     # Set vnet.ready value to false and
     # verify if error msg gets thrown out
     set_value = 'false'
     parameter = 'vnet.ready'
-    execute_and_verify(module, 'hset', parameter, set_value)
+    failure_summary += execute_and_verify(module, 'hset', parameter, set_value)
 
     # Set vnet.packet-generator.admin value to false and
     # verify if error msg gets thrown out
     set_value = 'false'
     parameter = 'vnet.packet-generator.admin'
-    execute_and_verify(module, 'hset', parameter, set_value)
+    failure_summary += execute_and_verify(module, 'hset', parameter, set_value)
+
+    HASH_DICT['result.detail'] = failure_summary
 
 
 def main():
@@ -178,41 +181,29 @@ def main():
             switch_name=dict(required=False, type='str'),
             switch_ip=dict(required=False, type='str'),
             remote_access=dict(required=False, type='bool', default=False),
+            hash_name=dict(required=False, type='str'),
             log_dir_path=dict(required=False, type='str'),
         )
     )
 
     global RESULT_STATUS, HASH_DICT
-    remote_access = module.params['remote_access']
-
-    # Get the switch name
-    switch_name = module.params['switch_name']
-
-    # Get the start time
-    start_time = run_cli(module, 'date +%Y%m%d%T')
-
-    # Create a hash name
-    test_name = 'redis_regression_04_remote' if remote_access else 'redis_regression_04'
-    hash_name = switch_name + '-' + test_name + '-' + start_time
-
+    
     # Perform and verify all required tests
     test_hset_operations_with_invalid_input(module)
-
-    # Get the end time
-    end_time = run_cli(module, 'date +%Y%m%d%T')
-
+    
     # Calculate the entire test result
-    test_result = 'Passed' if RESULT_STATUS else 'Failed'
+    HASH_DICT['result.status'] = 'Passed' if RESULT_STATUS else 'Failed'
 
-    if not remote_access:
-        # Create a log file
-        log_file_path = module.params['log_dir_path']
-        log_file_path += '/regression04_' + start_time + '.log'
+    # Create a log file
+    log_file_path = module.params['log_dir_path']
+    log_file_path += '/{}.log'.format(module.params['hash_name'])
+
+    if not module.params['remote_access']:
         log_file = open(log_file_path, 'w')
         for key, value in HASH_DICT.iteritems():
             log_file.write(key)
             log_file.write('\n')
-            log_file.write(value)
+            log_file.write(str(value))
             log_file.write('\n')
             log_file.write('\n')
 
@@ -220,12 +211,10 @@ def main():
 
     # Exit the module and return the required JSON.
     module.exit_json(
-        hash_name=hash_name,
-        start_time=start_time,
-        end_time=end_time,
-        test_result=test_result,
-        hash_dict=HASH_DICT
+        hash_dict=HASH_DICT,
+        log_file_path=log_file_path
     )
+
 
 if __name__ == '__main__':
     main()

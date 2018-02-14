@@ -8,22 +8,26 @@
       register: start_time
 
     - set_fact:
-        hash_name: "redis_regression_03_{{ start_time.stdout }}"
+        hash_name: "vlan_configuration_multiple_vlans_{{ start_time.stdout }}"
         start_time: "{{ start_time.stdout }}"
 
 
-- hosts: leaf:spine
+- hosts: leaf[0]:spine
   become: yes
   tasks:
     - file:
-        path: "{{ redis_log_dir }}"
+        path: "{{ vlan_log_dir }}"
         state: directory
 
-    - name: Test hget/hset operations with valid values on redis db locally
-      test_redis_valid:
+    - name: Test vlan configuration multiple vlans
+      test_vlan_configuration:
         switch_name: "{{ inventory_hostname }}"
+        leaf_switch: "{{ groups['leaf'][0] }}"
+        spine_list: "{{ groups['spine'] }}"
+        eth_list: "1,27"
+        multiple_vlan: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ redis_log_dir }}"
+        log_dir_path: "{{ vlan_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"
@@ -43,18 +47,32 @@
         log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
-    - name: Test hget/hset operations with valid values on redis db remotely
-      test_redis_valid:
+
+- hosts: leaf[1]:spine
+  become: yes
+  tasks:
+    - file:
+        path: "{{ vlan_log_dir }}"
+        state: directory
+
+    - name: Test vlan configuration multiple vlans
+      test_vlan_configuration:
         switch_name: "{{ inventory_hostname }}"
-        switch_ip: "{{ ansible_ssh_host }}"
-        remote_access: true
+        leaf_switch: "{{ groups['leaf'][1] }}"
+        spine_list: "{{ groups['spine'] }}"
+        eth_list: "19,7"
+        multiple_vlan: True
         hash_name: "{{ hostvars['server_emulator']['hash_name'] }}"
-        log_dir_path: "{{ redis_log_dir }}"
-      delegate_to: 127.0.0.1
+        log_dir_path: "{{ vlan_log_dir }}"
       register: module_out
 
     - command: "date +%Y%m%d%T"
       register: end_time
+
+    - name: Fetch the log file
+      slurp:
+        src: "{{ module_out.log_file_path }}"
+      register: logs
 
     - name: Store the test result in a hash in redis db on server emulator
       store_result_in_redis:
@@ -62,10 +80,17 @@
         start_time: "{{ hostvars['server_emulator']['start_time'] }}"
         end_time: "{{ end_time.stdout }}"
         hash_dict: "{{ module_out.hash_dict }}"
-        log_content: ""
+        log_content: "{{ logs['content'] | b64decode }}"
       delegate_to: 127.0.0.1
 
+
+- hosts: leaf:spine
+  become: yes
+  tasks:
     - include: ../../playbooks/get_goes_version_and_tags.yml
+
+    - name: Restart goes
+      command: goes restart
 
 
 - hosts: server_emulator
@@ -89,3 +114,4 @@
   become: true
   tasks:
     - include: ../../playbooks/get_goes_status.yml
+
