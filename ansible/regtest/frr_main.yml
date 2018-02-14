@@ -49,8 +49,6 @@
 
 - include: playbooks/bgp/frr_bgp_state_propagation.yml
 
-- include: playbooks/bgp/frr_bgp_ecmp_loadbalancing_paths.yml
-
 - include: playbooks/bgp/frr_bgp_convergence.yml
 
 - include: playbooks/bgp/frr_bgp_traffic_test.yml
@@ -70,8 +68,6 @@
 - include: playbooks/ospf/frr_ospf_hello_and_dead_timers.yml
 
 - include: playbooks/ospf/frr_ospf_routes.yml
-
-- include: playbooks/ospf/frr_ospf_ecmp_loadbalancing_basic.yml
 
 - include: playbooks/ospf/frr_ospf_traffic.yml
 
