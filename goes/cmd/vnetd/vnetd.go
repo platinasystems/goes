@@ -43,11 +43,17 @@ type Command struct {
 	i Info
 }
 
+type infoLinuxStats struct {
+	name    string
+	devNode *os.File
+}
+
 type Info struct {
 	v         vnet.Vnet
 	eventPool sync.Pool
 	poller    ifStatsPoller
 	pub       *publisher.Publisher
+	statsMap  map[string]infoLinuxStats
 }
 
 func (*Command) String() string { return "vnetd" }
@@ -137,6 +143,21 @@ func (i *Info) init() {
 	i.poller.pollInterval = 5 // default 5 seconds
 	i.initialPublish()
 	i.set("ready", "true", true)
+
+	i.statsMap = map[string]infoLinuxStats{
+		"port_tx_total_collisions":      {"collisions", nil},
+		"port_rx_multicast_packets":     {"multicast", nil},
+		"port_rx_bytes":                 {"rx_bytes", nil},
+		"port_rx_crc_error_packets":     {"rx_crc_errors", nil},
+		"port_rx_runt_packets":          {"rx_fifo_errors", nil},
+		"port_rx_undersize_packets":     {"rx_length_errors", nil},
+		"port_rx_oversize_packets":      {"rx_over_errors", nil},
+		"port_rx_packets":               {"rx_packets", nil},
+		"port_tx_fifo_underrun_packets": {"tx_aborted_errors", nil},
+		"port_tx_bytes":                 {"tx_bytes", nil},
+		"port_tx_runt_packets":          {"tx_fifo_errors", nil},
+		"port_tx_packets":               {"tx_packets", nil},
+	}
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
@@ -317,6 +338,40 @@ func (i *Info) initialPublish() {
 
 func (i *Info) publish(key string, value interface{}) {
 	i.pub.Print("vnet.", key, ": ", value)
+
+	// Map redis key to linux stats fields
+	// and write value into device node
+	if strings.HasPrefix(key, "eth-") {
+		var oerr, err error
+		keyParts := strings.Split(key, ".")
+		portname := keyParts[0]
+		statname := keyParts[1]
+		s, exists := i.statsMap[statname]
+		if exists {
+			if s.devNode == nil {
+				s.devNode, oerr = os.OpenFile("/sys/devices/platina-mk1/"+portname+"/statistics/"+s.name, os.O_RDWR, 0755)
+				if oerr != nil {
+					return
+				}
+			}
+
+			_, err = s.devNode.Write([]byte(fmt.Sprintf("%v", value)))
+			if err != nil {
+				// assume driver may have been reloaded and original file went away so
+				// try another open and write. Close old one first.
+				s.devNode.Close()
+				s.devNode, oerr = os.OpenFile("/sys/devices/platina-mk1/"+portname+"/statistics/"+s.name, os.O_RDWR, 0755)
+				if oerr != nil {
+					fmt.Println("Open err2: Filename /sys/devices/platina-mk1/" + portname + "/statistics/" + s.name)
+					return
+				}
+				_, err = s.devNode.Write([]byte(fmt.Sprintf("%v", value)))
+				if err != nil {
+					fmt.Printf("Write error: %s got err %v\n", key, err)
+				}
+			}
+		}
+	}
 }
 
 // One per each hw/sw interface from vnet.
