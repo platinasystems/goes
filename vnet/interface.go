@@ -677,12 +677,19 @@ func (b *Bandwidth) Parse(in *parse.Input) {
 	var f float64
 
 	// Special speed code "autoneg" means auto-negotiate speed.
+	// b = 0 imply autoneg for Bandwidth
 	if in.Parse("au%*toneg") {
 		*b = 0
 		return
 	}
 
-	in.Parse("%f", &f)
+	ok := in.Parse("%f", &f)
+	if !ok {
+		//panic is gracefully handled by in.Parse as parse error; will not crash code
+		//default way to return error back to in.Parse that parse failed
+		panic(fmt.Errorf("%v not valid speed", in))
+	}
+
 	unit := Bps
 	switch {
 	case in.AtOneof("Kk") < 2:
