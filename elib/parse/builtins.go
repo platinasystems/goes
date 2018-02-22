@@ -30,9 +30,9 @@ type Enable bool
 
 func (b *Enable) Parse(in *Input) {
 	switch text := in.Token(); text {
-	case "enable", "yes", "1":
+	case "enable", "yes", "1", "true":
 		*b = true
-	case "disable", "no", "0":
+	case "disable", "no", "0", "false":
 		*b = false
 	default:
 		in.ParseError()
