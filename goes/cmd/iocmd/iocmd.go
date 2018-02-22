@@ -2,19 +2,19 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+// +build linux,amd64
+
 package iocmd
 
 import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/redis"
 )
 
 const (
@@ -146,43 +146,33 @@ func Io_reg_rd(addr uint64, wid uint64) (b []byte, err error) {
 }
 
 func setIoperm(addr uint64) (err error) {
-	m := ""
-	if m, err = redis.Hget(redis.DefaultHash, "machine"); err != nil {
+	level := 3
+	if _, _, errno := syscall.Syscall(sys_iopl,
+		uintptr(level), 0, 0); errno != 0 {
 		return err
 	}
-	if !strings.Contains(m, "bmc") {
-		level := 3
-		if _, _, errno := syscall.Syscall(sys_iopl,
-			uintptr(level), 0, 0); errno != 0 {
-			return err
-		}
-		num := 1
-		on := 1
-		if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
-			uintptr(num), uintptr(on)); errno != 0 {
-			return err
-		}
+	num := 1
+	on := 1
+	if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
+		uintptr(num), uintptr(on)); errno != 0 {
+		return err
 	}
+
 	return nil
 }
 
 func clrIoperm(addr uint64) (err error) {
-	m := ""
-	if m, err = redis.Hget(redis.DefaultHash, "machine"); err != nil {
+	num := 1
+	on := 0
+	if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
+		uintptr(num), uintptr(on)); errno != 0 {
 		return err
 	}
-	if !strings.Contains(m, "bmc") {
-		num := 1
-		on := 0
-		if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
-			uintptr(num), uintptr(on)); errno != 0 {
-			return err
-		}
-		level := 0
-		if _, _, errno := syscall.Syscall(sys_iopl,
-			uintptr(level), 0, 0); errno != 0 {
-			return err
-		}
+	level := 0
+	if _, _, errno := syscall.Syscall(sys_iopl,
+		uintptr(level), 0, 0); errno != 0 {
+		return err
+
 	}
 	return nil
 }
