@@ -5,7 +5,7 @@
 package falsecmd
 
 import (
-	"errors"
+	"os"
 
 	"github.com/platinasystems/go/goes/lang"
 )
@@ -31,5 +31,6 @@ DESCRIPTION
 }
 
 func (Command) Main(_ ...string) error {
-	return errors.New("exit status 1")
+	os.Exit(1)
+	return nil
 }
