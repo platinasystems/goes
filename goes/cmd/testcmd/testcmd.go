@@ -6,6 +6,7 @@ package testcmd
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"syscall"
 
@@ -354,6 +355,7 @@ func (c Command) Main(args ...string) error {
 	args, val, err := c.parse(args)
 
 	if err != nil {
+		os.Exit(1)
 		return err
 	}
 
@@ -361,6 +363,7 @@ func (c Command) Main(args ...string) error {
 		if val {
 			return nil
 		}
+		os.Exit(1)
 		return fmt.Errorf("false")
 	}
 
