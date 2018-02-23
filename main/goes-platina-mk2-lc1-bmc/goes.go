@@ -227,7 +227,7 @@ var Goes = &goes.Goes{
 		"stty":      stty.Command{},
 		"subscribe": subscribe.Command{},
 		"sync":      sync.Command{},
-		"test":      testcmd.Command{},
+		"[":         testcmd.Command{},
 		"then":      &thencmd.Command{},
 		/*FIXME
 		"toggle": &toggle.Command{},

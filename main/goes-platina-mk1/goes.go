@@ -209,7 +209,7 @@ var Goes = &goes.Goes{
 				"bmc.redis.status":         0,
 			},
 		},
-		"test":      testcmd.Command{},
+		"[":         testcmd.Command{},
 		"then":      &thencmd.Command{},
 		"toggle":    &toggle.Command{},
 		"true":      truecmd.Command{},

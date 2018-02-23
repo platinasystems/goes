@@ -154,7 +154,7 @@ var Goes = &goes.Goes{
 		"stty":      stty.Command{},
 		"subscribe": subscribe.Command{},
 		"sync":      sync.Command{},
-		"test":      testcmd.Command{},
+		"[":         testcmd.Command{},
 		"then":      &thencmd.Command{},
 		"true":      truecmd.Command{},
 		"umount":    umount.Command{},
