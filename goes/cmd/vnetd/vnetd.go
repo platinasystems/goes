@@ -346,7 +346,9 @@ func (i *Info) publish(key string, value interface{}) {
 			filename := filepath.Join("/sys/devices/platina-mk1", portname, devStatsName)
 			devNodeFile, err := os.OpenFile(filename, os.O_WRONLY, 0755)
 			if err != nil {
-				fmt.Printf("Open error %s\n", filename)
+				if false {
+					fmt.Printf("Open error %s\n", filename)
+				}
 				return
 			}
 
