@@ -229,13 +229,47 @@ func (e *event) EventAction() {
 	v := &e.i.v
 	switch {
 	case e.in.Parse("%v.speed %v", &hi, v, &bw):
-		e.err <- hi.SetSpeed(v, bw)
+		{
+			err := hi.SetSpeed(v, bw)
+			h := v.HwIf(hi)
+			if err == nil {
+				e.i.set(hi.Name(v)+".speed", h.Speed().String(), true)
+			}
+			e.err <- err
+		}
 	case e.in.Parse("%v.admin %v", &si, v, &enable):
-		e.err <- si.SetAdminUp(v, bool(enable))
+		{
+			err := si.SetAdminUp(v, bool(enable))
+			es := "false"
+			if bool(enable) {
+				es = "true"
+			}
+			if err == nil {
+				e.i.set(si.Name(v)+".admin", es, true)
+			}
+			e.err <- err
+		}
 	case e.in.Parse("%v.media %s", &hi, v, &media):
-		e.err <- hi.SetMedia(v, media)
+		{
+			err := hi.SetMedia(v, media)
+			h := v.HwIf(hi)
+			if err == nil {
+				e.i.set(hi.Name(v)+".media", h.Media(), true)
+			}
+			e.err <- err
+		}
 	case e.in.Parse("%v.fec %v", &hi, v, &fec):
-		e.err <- ethernet.SetInterfaceErrorCorrection(v, hi, fec)
+		{
+			err := ethernet.SetInterfaceErrorCorrection(v, hi, fec)
+			if err == nil {
+				if h, ok := v.HwIfer(hi).(ethernet.HwInterfacer); ok {
+					e.i.set(hi.Name(v)+".fec", h.GetInterface().ErrorCorrectionType.String(), true)
+				} else {
+					err = fmt.Errorf("error setting fec")
+				}
+			}
+			e.err <- err
+		}
 	case e.in.Parse("pollInterval %f", &itv):
 		if itv < 1 {
 			e.err <- fmt.Errorf("pollInterval must be 1 second or longer")
