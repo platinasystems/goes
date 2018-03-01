@@ -316,48 +316,62 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 
 			// if qsfps are installed, set interface per compliance to bring dataplane up
 			if v {
-				speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
-
 				// ~800ms delay is needed for hget when Goes first starts
 				if firstPort {
 					start := time.Now()
+					_, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
 					for err != nil {
 						if time.Since(start) >= 2*time.Second {
 							log.Print("hget timeout: ", err)
 							break
 						}
-						speed, err = redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
+						_, err = redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed")
+						//ignore this value, just used to check if redis and vnet are up
 					}
 				}
 				firstPort = false
-				speed = strings.ToLower(speed)
 
-				// if qsfp is copper and speed is set to 100g or 40g, set interface to copper
-				if strings.Contains(q.Ident.Compliance, "CR") && ((speed == "40g") || (speed == "100g")) {
-					redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "copper")
-					// if speed is set to 100g, enable cl91
-					if speed == "100g" {
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
-					}
-				} else if strings.Contains(q.Ident.Compliance, "CR") && ((speed == "25g") || (speed == "10g")) {
-					for i := 0; i < 4; i++ {
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".media", "copper")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec", "none")
-					}
-				} else if !strings.Contains(q.Ident.Compliance, "CR") {
-					// set interface speed to 40g or 100g, media fiber, and fec off
-					if strings.Contains(q.Ident.Compliance, "40G") {
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "40g")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
-					} else if strings.Contains(q.Ident.Compliance, "100GBASE-SR4") {
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
-					} else if strings.Contains(q.Ident.Compliance, "100G") {
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
-						redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
+				for i := 0; i < 4; i++ {
+					speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".speed")
+					if err != nil {
+						continue
+					} else {
+						speed = strings.ToLower(speed)
+						// if qsfp is copper, set media to copper and fec according to speed
+						if strings.Contains(q.Ident.Compliance, "CR") {
+							if (speed == "100g") {
+								//100g, cl91 needs to be enabled per ieee spec
+								//FIXME, need to inlcude 25g and 50g for TH+ only, for not defaults none or what user sets manually
+								//100g should take up all 4 lanes so setting apply to first lane only
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
+							} else if ((speed == "40g") || (speed == "20g") || (speed == "10g") || (speed == "1g")) {
+								//no FEC on these speeds
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec", "none")
+							}
+							// if not above speed, leave fec alone to what was manually configured and do not change
+
+							//set media to copper triggers link training and should be done after fec setting
+							//training will cause remote side to align phase even if tx FIR setting do not change
+							redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".media", "copper")
+						} else if (i == 0) {
+							// not copper (i.e. no "CR" in the compliance string)
+							// these optics detection are for 4-lane optical module; therefore setting apply to first lane only
+							if strings.Contains(q.Ident.Compliance, "40G") {
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "40g")
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
+							} else if strings.Contains(q.Ident.Compliance, "100GBASE-SR4") {
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
+							} else if strings.Contains(q.Ident.Compliance, "100G") {
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".speed", "100g")
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".media", "fiber")
+								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "none")
+							}
+							// if not above optics, leave speed/media/fec config alone to what was manually configured and do not change
+						}
+						// if not above then not recognized module or speed, leave speed/media/fec config alone to what was manually configured and do not change
 					}
 				}
 			}
