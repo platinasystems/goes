@@ -205,15 +205,18 @@ func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err erro
 	if i.hw_is_ok(hi) {
 		i.publish_link(hi, isUp)
 
-		// Reflect hw carrier state at linux interface
-		var isUpStr string
-		if isUp {
-			isUpStr = "up"
-		} else {
-			isUpStr = "down"
-		}
-		args := []string{"link", "set", hi.Name(v), "carrier", isUpStr}
-		ip.Goes.Main(args...)
+		// Run a go routine to not delay vnet machine
+		go func() {
+			// Reflect hw carrier state at linux interface
+			var isUpStr string
+			if isUp {
+				isUpStr = "up"
+			} else {
+				isUpStr = "down"
+			}
+			args := []string{"link", "set", hi.Name(v), "carrier", isUpStr}
+			ip.Goes.Main(args...)
+		}()
 	}
 	return
 }
