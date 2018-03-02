@@ -17,6 +17,7 @@ import (
 
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
@@ -203,6 +204,16 @@ func (i *Info) hw_if_add_del(v *vnet.Vnet, hi vnet.Hi, isDel bool) (err error) {
 func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if i.hw_is_ok(hi) {
 		i.publish_link(hi, isUp)
+
+		// Reflect hw carrier state at linux interface
+		var isUpStr string
+		if isUp {
+			isUpStr = "up"
+		} else {
+			isUpStr = "down"
+		}
+		args := []string{"link", "set", hi.Name(v), "carrier", isUpStr}
+		ip.Goes.Main(args...)
 	}
 	return
 }
