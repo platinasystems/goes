@@ -351,28 +351,32 @@ func (i *Info) publish(key string, value interface{}) {
 
 	// Map redis key to linux stats fields
 	// and write value into device node
-	if strings.HasPrefix(key, "eth-") {
-		keyParts := strings.Split(key, ".")
-		portname := keyParts[0]
-		statname := keyParts[1]
-		devStatsName, exists := i.statsMap[statname]
-		if exists {
-			filename := filepath.Join("/sys/devices/platina-mk1", portname, devStatsName)
-			devNodeFile, err := os.OpenFile(filename, os.O_WRONLY, 0755)
-			if err != nil {
-				if false {
-					fmt.Printf("Open error %s\n", filename)
+	// To avoid delaying the node-graph schedule too much
+	// break out a go routine here.
+	go func() {
+		if strings.HasPrefix(key, "eth-") {
+			keyParts := strings.Split(key, ".")
+			portname := keyParts[0]
+			statname := keyParts[1]
+			devStatsName, exists := i.statsMap[statname]
+			if exists {
+				filename := filepath.Join("/sys/devices/platina-mk1", portname, devStatsName)
+				devNodeFile, err := os.OpenFile(filename, os.O_WRONLY, 0755)
+				if err != nil {
+					if false {
+						fmt.Printf("Open error %s\n", filename)
+					}
+					return
 				}
-				return
-			}
 
-			_, err = devNodeFile.Write([]byte(fmt.Sprintf("%v", value)))
-			if err != nil {
-				fmt.Printf("Write error %s\n", filename)
+				_, err = devNodeFile.Write([]byte(fmt.Sprintf("%v", value)))
+				if err != nil {
+					fmt.Printf("Write error %s\n", filename)
+				}
+				devNodeFile.Close()
 			}
-			devNodeFile.Close()
 		}
-	}
+	}()
 }
 
 // One per each hw/sw interface from vnet.
