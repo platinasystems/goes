@@ -27,7 +27,7 @@ const (
 	GoesName      = "goes-" + Machine //includes non-compressed tag
 	GoesInstaller = "goes-" + Machine + "-installer"
 	KernelName    = "linux-image-" + Machine
-	CorebootName  = "coreboot-" + Mach + ".rom"
+	CorebootName  = "coreboot-" + Machine + ".rom"
 )
 
 type Command struct{}
@@ -52,7 +52,7 @@ DESCRIPTION
 	The upgrade command updates firmware images.
 
 	The default upgrade version is "LATEST". 
-	Or specify a version using "-v", in the form YYYYMMDD
+	Or specify a version using "-v", form YYYYMMDD or vX.X
 
 	The -l flag display version of selected server and version.
 

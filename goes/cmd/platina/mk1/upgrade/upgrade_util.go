@@ -114,6 +114,10 @@ func getCorebootInfo() (im IMGINFO, err error) {
 	for _, j := range temp {
 		if strings.Contains(j, "COREBOOT_VERSION ") {
 			x := strings.Split(j, " ")
+			im.Tag = strings.Replace(x[2], `"`, "", 2)
+		}
+		if strings.Contains(j, "COREBOOT_ORIGIN_GIT_REVISION ") {
+			x := strings.Split(j, " ")
 			im.Commit = strings.Replace(x[2], `"`, "", 2)
 		}
 		if strings.Contains(j, "COREBOOT_BUILD ") {
@@ -127,8 +131,6 @@ func getCorebootInfo() (im IMGINFO, err error) {
 		return im, err
 	}
 	im.Size = fmt.Sprintf("%d", fi.Size())
-	im.Tag = ""
-
 	return im, nil
 }
 
@@ -185,21 +187,19 @@ func upgradeKernel(s string, v string, t bool, f bool) error {
 
 func upgradeCoreboot(s string, v string, t bool, f bool) error {
 	fmt.Printf("Update Coreboot\n")
-	if !f {
-		c, err := getCorebootVer()
-		if err != nil {
-			return err
-		}
-		cr, err := getSrvCorebootVer(s, v, t)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("    Coreboot version currently:  %s\n", c)
-		fmt.Printf("    Coreboot version on server:  %s\n", cr)
-		if c == cr {
-			fmt.Print("    Versions match, skipping Coreboot upgrade\n\n")
-			return nil
-		}
+	c, err := getCorebootVer()
+	if err != nil {
+		return err
+	}
+	cr, err := getSrvCorebootVer(s, v, t)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("    Coreboot version currently:  %s\n", c)
+	fmt.Printf("    Coreboot version on server:  %s\n", cr)
+	if !f && c == cr {
+		fmt.Print("    Versions match, skipping Coreboot upgrade\n\n")
+		return nil
 	}
 
 	fmt.Printf("Please wait...installing Coreboot into flash\n")
@@ -262,13 +262,17 @@ func getKernelVal(ar string) (string, error) {
 	return strings.TrimSpace(string(u)), nil
 }
 
-func getCorebootVer() (string, error) { //TODO
-	return "no_tag", nil
+func getCorebootVer() (tag string, err error) {
+	var imgInfo IMGINFO
+	if imgInfo, err = getCorebootInfo(); err != nil {
+		return "", err
+	}
+	tag = imgInfo.Tag
+	return tag, nil
 }
 
 func getSrvGoesVer(s string, v string, t bool) (string, error) {
 	fn := GoesName
-
 	n, err := getFile(s, v, t, fn)
 	if err != nil {
 		return "", fmt.Errorf("Error downloading: %v", err)
@@ -309,8 +313,29 @@ func getSrvKernelVer(s string, v string, t bool) (string, string, error) {
 	return strings.TrimSpace(u[0]), strings.TrimSpace(u[1]), nil
 }
 
-func getSrvCorebootVer(s string, v string, t bool) (string, error) { //TODO
-	return "no_tag", nil
+func getSrvCorebootVer(s string, v string, t bool) (string, error) {
+	fn := CorebootName
+	n, err := getFile(s, v, t, fn)
+	if err != nil {
+		return "", fmt.Errorf("Error downloading: %v", err)
+	}
+	if n < 10000000 {
+		return "", fmt.Errorf("Error file too small: %v", err)
+	}
+
+	a, err := ioutil.ReadFile(CorebootName)
+	if err != nil {
+		return "", err
+	}
+	temp := strings.Split(string(a), "\n")
+	tag := ""
+	for _, j := range temp {
+		if strings.Contains(j, "COREBOOT_VERSION ") {
+			x := strings.Split(j, " ")
+			tag = strings.Replace(x[2], `"`, "", 2)
+		}
+	}
+	return tag, nil
 }
 
 func installGoes(s string, v string, t bool) error {
@@ -359,7 +384,7 @@ func installCoreboot(s string, v string, t bool) error {
 	_, err := exec.Command("/usr/local/sbin/flashrom", "-p",
 		"internal:boardmismatch=force", "-l",
 		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
-		"-i", "bios", "-w", "coreboot.rom", "-A", "-V").Output()
+		"-i", "bios", "-w", CorebootName, "-A", "-V").Output()
 	if err != nil {
 		Reboot_flag = false
 		return err
