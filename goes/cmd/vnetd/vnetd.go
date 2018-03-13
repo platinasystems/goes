@@ -196,6 +196,7 @@ type event struct {
 	in           parse.Input
 	key, value   string
 	err          chan error
+	newValue     chan string
 	isReadyEvent bool
 }
 
@@ -203,6 +204,7 @@ func (i *Info) newEvent() interface{} {
 	return &event{
 		i:   i,
 		err: make(chan error, 1),
+		newValue: make(chan string, 1),
 	}
 }
 
@@ -233,7 +235,7 @@ func (e *event) EventAction() {
 			err := hi.SetSpeed(v, bw)
 			h := v.HwIf(hi)
 			if err == nil {
-				e.i.set(hi.Name(v)+".speed", h.Speed().String(), true)
+				e.newValue <- h.Speed().String()
 			}
 			e.err <- err
 		}
@@ -245,7 +247,7 @@ func (e *event) EventAction() {
 				es = "true"
 			}
 			if err == nil {
-				e.i.set(si.Name(v)+".admin", es, true)
+				e.newValue <- es
 			}
 			e.err <- err
 		}
@@ -254,7 +256,7 @@ func (e *event) EventAction() {
 			err := hi.SetMedia(v, media)
 			h := v.HwIf(hi)
 			if err == nil {
-				e.i.set(hi.Name(v)+".media", h.Media(), true)
+				e.newValue <- h.Media()
 			}
 			e.err <- err
 		}
@@ -263,7 +265,7 @@ func (e *event) EventAction() {
 			err := ethernet.SetInterfaceErrorCorrection(v, hi, fec)
 			if err == nil {
 				if h, ok := v.HwIfer(hi).(ethernet.HwInterfacer); ok {
-					e.i.set(hi.Name(v)+".fec", h.GetInterface().ErrorCorrectionType.String(), true)
+					e.newValue <- h.GetInterface().ErrorCorrectionType.String()
 				} else {
 					err = fmt.Errorf("error setting fec")
 				}
@@ -275,6 +277,7 @@ func (e *event) EventAction() {
 			e.err <- fmt.Errorf("pollInterval must be 1 second or longer")
 		} else {
 			e.i.poller.pollInterval = itv
+			e.newValue <- fmt.Sprintf("%f", itv)
 			e.err <- nil
 		}
 	default:
@@ -293,7 +296,8 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 		return
 	}
 	if err = <-e.err; err == nil {
-		i.pub.Print("vnet.", key, ": ", value)
+		newValue := <-e.newValue
+		i.pub.Print("vnet.", key, ": ", newValue)
 	}
 	return
 }
