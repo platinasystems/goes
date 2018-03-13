@@ -341,18 +341,42 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 						if strings.Contains(q.Ident.Compliance, "CR") {
 							if (speed == "100g") {
 								//100g, cl91 needs to be enabled per ieee spec
-								//FIXME, need to inlcude 25g and 50g for TH+ only, for not defaults none or what user sets manually
 								//100g should take up all 4 lanes so setting apply to first lane only
 								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(portBase)+".fec", "cl91")
-							} else if ((speed == "40g") || (speed == "20g") || (speed == "10g") || (speed == "1g")) {
-								//no FEC on these speeds
-								redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec", "none")
+							} else {
+								fec, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec")
+								if err != nil {
+									fmt.Printf("qsfp.go signalChange error getting fec %v\n", err)
+									continue
+								}
+								fec = strings.ToLower(fec)
+								if ((speed == "40g") || (speed == "20g") || (speed == "10g")) {  //none or cl74 are valid, default to none if neither
+									if (fec != "cl74") && (fec != "none") {
+										redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec", "none")
+									}
+								}
+								if (speed == "1g") {  //only none is valid
+									if (fec != "none") {
+										redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".fec", "none")
+									}
+								}
+								//50g, 25g can accept none, cl74, or cl94(gen2 fe1 only)
 							}
-							// if not above speed, leave fec alone to what was manually configured and do not change
+							// if do not match any above, leave fec alone to what was manually configured and do not change
 
 							//set media to copper triggers link training and should be done after fec setting
 							//training will cause remote side to align phase even if tx FIR setting do not change
-							redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".media", "copper")
+							{
+								media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".media")
+								if err != nil {
+									fmt.Printf("qsfp.go signalChange error getting media %v\n", err)
+									continue
+								}
+								media = strings.ToLower(media)
+								if media != "copper" {
+									redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(int(port)+portBase)+"-"+strconv.Itoa(i+portBase)+".media", "copper")
+								}
+							}
 						} else if (i == 0) {
 							// not copper (i.e. no "CR" in the compliance string)
 							// these optics detection are for 4-lane optical module; therefore setting apply to first lane only
