@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"syscall"
 	"unsafe"
+
+	"github.com/platinasystems/go/internal/log"
 )
 
 type eventMask uint32
@@ -91,6 +93,10 @@ func (m *Mux) Add(f Filer) {
 	m.maybe_epoll_create()
 	l := f.GetFile()
 	fd := l.Fd
+	if l.Fd == -1 {
+		log.Print("epoll Add: invalid file descriptor -1")
+		return
+	}
 	if err := syscall.SetNonblock(fd, true); err != nil {
 		panic(fmt.Errorf("setnonblock: %s", err))
 	}
@@ -114,6 +120,10 @@ func (m *Mux) Del(f Filer) {
 	if !l.added {
 		return
 	}
+	if l.Fd == -1 {
+		log.Print("epoll Del: invalid file descriptor -1")
+		return
+	}
 	if err := epoll_ctl(m.fd, opDel, l.Fd, nil); err != nil {
 		panic(fmt.Errorf("epoll_ctl: del %s", err))
 	}
@@ -131,8 +141,14 @@ func (m *Mux) Update(f Filer) {
 	defer m.poolLock.Unlock()
 	l := f.GetFile()
 	e := l.event(f)
+	if l.Fd == -1 {
+		//sometime this happens when an interface goes down right before an Update takes place
+		//very small window of possibility, but in case so, just ignore and don't actually update
+		log.Print("epoll Update: invalid file descriptor -1; possibly because interface was moved or removed")
+		return
+	}
 	if err := epoll_ctl(m.fd, opMod, l.Fd, &e); err != nil {
-		panic(fmt.Errorf("epoll_ctl: mod %s", err))
+		panic(fmt.Errorf("epoll_ctl: mod %s; Fd=%v, poolIndex=%d, added=%t", err, l.Fd, l.poolIndex, l.added))
 	}
 }
 
