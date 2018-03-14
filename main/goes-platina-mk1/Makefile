@@ -7,6 +7,7 @@ reltopdir := $(shell git rev-parse --show-cdup)
 include $(reltopdir)go.mk
 include $(reltopdir)fe1.mk
 
+goes-platina-mk1-installer: tags=netgo
 goes-platina-mk1-installer: goes-platina-mk1.zip
 	$(gobuild) -ldflags -d -o $@ ../goes-installer
 	cat $< >> $@
