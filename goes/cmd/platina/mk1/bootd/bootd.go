@@ -2,37 +2,83 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// http server daemon to service 'boot' requests from muliple client devices
-// typically this will run on a single "master" ToR device
-// contains boot state machine for each client
-// accesses database of configurations stored either locally or in the cloud
-//
+// DESCRIPTION
+// 'boot controller daemon' to service 'boot' requests from muliple clients
+// typically this daemon will run on a single "master" ToR instance
+// the daemon contains boot state machine for each client
+// the daemon reads the config database stored either locally or in the cloud
+
+// DISCLAIMER
 // this is a work in progress, this will change significantly before release
 // this package must be manually added to the mk1 goes.go to be included ATM
+
+// TO DO LIST
+// TODO convert to struct
+// TODO load structs from database
+// TODO register and manage state machine index
+// TODO define state machine states
+// TODO reply via json tftp
+// TODO multiple replies
+// TODO maintain state list for each client (100 max)
+// TODO progress bar query - format with: x units, unit names, unit mac, uint cert
+// TODO add test infra
 
 package bootd
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
+
+	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/log"
 )
 
-//TODO ADD AS A DAEMON
-//TODO reply via JSON TFTP
-//TODO progress bar, x units, unit names, unit mac, uint cert
-//TODO tester
-//TODO CONVERT TO ARRAY OR SLICE OF STRUCTS
-//TODO LOAD STRUCTS FROM DATAbasE
+/////
+/////
+/////
+
+// Debug infrastructure
+///*
+type Command chan struct{}
+
+func (Command) String() string { return "bootd" }
+
+func (Command) Usage() string { return "bootd" }
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "http boot controller daemon",
+	}
+}
+
+func (c Command) Close() error {
+	close(c)
+	return nil
+}
+
+func (Command) Kind() cmd.Kind { return cmd.Daemon }
+
+func (c Command) Main(...string) error {
+	if err := startHandler(); err != nil {
+		return err
+	}
+	return nil
+}
+
+//*/
+
+/////
+/////
+/////
 
 var i = 0
 var req = []string{"aaa", "bbb", "ccc", "ddd", "eee"}
 var res = []string{"111", "222", "333", "444", "555"}
 var b = ""
 
-func bootcReply(w http.ResponseWriter, r *http.Request) {
-
+func reply(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	fmt.Println(r.Form)
 	fmt.Println("path", r.URL.Path)
@@ -49,13 +95,15 @@ func bootcReply(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("key:", k)
 		fmt.Println("val:", strings.Join(v, ""))
 	}
-	fmt.Fprintf(w, b) // send data to client side
+	log.Print("reply exit ", b)
+	fmt.Fprintf(w, b)
 }
 
-func main() {
-	http.HandleFunc("/", bootcReply)
-	err := http.ListenAndServe(":9091", nil)
+func startHandler() error {
+	http.HandleFunc("/", reply)
+	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Print("HTTP Server failed.")
 	}
+	return nil
 }
