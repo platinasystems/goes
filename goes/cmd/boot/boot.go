@@ -184,18 +184,19 @@ func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	}
 
 	for _, file := range files {
+		name := file.Name()
 		if file.Mode().IsRegular() {
-			if strings.Contains(file.Name(), "vmlinuz") {
-				if _, err := os.Stat(m.mnt + "/" + file.Name()); err == nil {
+			if strings.Contains(name, "vmlinuz") {
+				if _, err := os.Stat(m.mnt + "/" + name); err == nil {
 					for _, ird := range []string{
 						"initrd.img",
 						"initrd.gz",
 						"initrd.xz",
 						"initrd.lzma"} {
-						i := strings.Replace(file.Name(), "vmlinuz",
+						i := strings.Replace(name, "vmlinuz",
 							ird, 1)
 						if _, err := os.Stat(m.mnt + "/" + i); err == nil {
-							b := bootKernel{kernel: file.Name(), initrd: i}
+							b := bootKernel{kernel: name, initrd: i}
 							m.files = append(m.files, b)
 						}
 					}
