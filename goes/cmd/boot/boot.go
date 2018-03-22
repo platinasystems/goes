@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
@@ -34,10 +33,11 @@ type bootKernel struct {
 }
 
 type bootMnt struct {
-	mnt   string
-	cl    cmdline.Cmdline
-	err   error
-	files []bootKernel
+	mnt     string
+	cl      cmdline.Cmdline
+	err     error
+	files   []bootKernel
+	hasGrub bool
 }
 
 func (*Command) String() string { return "boot" }
@@ -69,8 +69,6 @@ OPTIONS
 }
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
-
-func (*Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (c *Command) Main(args ...string) (err error) {
 	parm, args := parms.New(args, "-t")
@@ -104,6 +102,26 @@ func (c *Command) Main(args ...string) (err error) {
 		cnt++
 	}
 
+	for i := 0; i < cnt; i++ {
+		<-done
+	}
+
+	for _, m := range c.mounts {
+		if m.hasGrub {
+			fmt.Printf("%s has grub\n", m.mnt)
+			args := []string{"grub", "-p", "/newroot"}
+			if parm.ByName["-t"] != "" {
+				args = append(args, "-t")
+				args = append(args, parm.ByName["-t"])
+			}
+			args = append(args, m.mnt+"/grub/grub.cfg")
+			err := c.g.Main(args...)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	line := liner.NewLiner()
 	defer line.Close()
 	if parm.ByName["-t"] != "" {
@@ -119,10 +137,6 @@ func (c *Command) Main(args ...string) (err error) {
 	line.SetCtrlCAborts(true)
 
 	defBoot := ""
-
-	for i := 0; i < cnt; i++ {
-		<-done
-	}
 
 	re := regexp.MustCompile("([0-9]+)\\.([0-9]+)\\.([0-9]+)-([0-9]+)")
 
@@ -185,6 +199,13 @@ func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 
 	for _, file := range files {
 		name := file.Name()
+		if file.Mode().IsDir() && name == "grub" {
+			if _, err := os.Stat(m.mnt + "/grub/grub.cfg"); err == nil {
+				m.hasGrub = true
+			}
+			continue
+		}
+
 		if file.Mode().IsRegular() {
 			if strings.Contains(name, "vmlinuz") {
 				if _, err := os.Stat(m.mnt + "/" + name); err == nil {
