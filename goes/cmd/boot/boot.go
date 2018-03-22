@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,10 +24,11 @@ import (
 )
 
 type Command struct {
-	g *goes.Goes
+	g      *goes.Goes
+	mounts []*bootMnt
 }
 
-type bootSet struct {
+type bootKernel struct {
 	kernel string
 	initrd string
 }
@@ -33,7 +37,7 @@ type bootMnt struct {
 	mnt   string
 	cl    cmdline.Cmdline
 	err   error
-	files []bootSet
+	files []bootKernel
 }
 
 func (*Command) String() string { return "boot" }
@@ -78,7 +82,11 @@ func (c *Command) Main(args ...string) (err error) {
 	cnt := 0
 
 	done := make(chan *bootMnt, len(args))
-
+	if c.mounts == nil {
+		c.mounts = make([]*bootMnt, 0)
+	} else {
+		c.mounts = c.mounts[:0]
+	}
 	for _, arg := range args {
 		_, cl, err := cmdline.New()
 		if err != nil {
@@ -91,6 +99,7 @@ func (c *Command) Main(args ...string) (err error) {
 		if len(fields) > 1 {
 			m.cl.Set(fields[1])
 		}
+		c.mounts = append(c.mounts, m)
 		go c.tryScanFiles(m, done)
 		cnt++
 	}
@@ -112,14 +121,38 @@ func (c *Command) Main(args ...string) (err error) {
 	defBoot := ""
 
 	for i := 0; i < cnt; i++ {
-		m := <-done
-		for _, file := range m.files {
-			c := fmt.Sprintf(`kexec -k %s/%s -i %s/%s -e -c "%s"`,
-				m.mnt, file.kernel, m.mnt, file.initrd, m.cl)
-			if c > defBoot {
-				defBoot = c
+		<-done
+	}
+
+	re := regexp.MustCompile("([0-9]+)\\.([0-9]+)\\.([0-9]+)-([0-9]+)")
+
+	for _, m := range c.mounts {
+		sort.Slice(m.files, func(i, j int) bool {
+			r1 := re.FindStringSubmatch(m.files[i].kernel)
+			r2 := re.FindStringSubmatch(m.files[j].kernel)
+			if len(r1) == 5 && len(r2) == 5 {
+				for k := 1; k < len(r1); k++ {
+					v1, _ := strconv.Atoi(r1[k])
+					v2, _ := strconv.Atoi(r2[k])
+					if v1 < v2 {
+						return true
+					}
+					if v1 > v2 {
+						return false
+					}
+				}
+				return false
 			}
-			line.AppendHistory(c)
+			return m.files[i].kernel < m.files[j].kernel
+		})
+	}
+
+	for _, m := range c.mounts {
+		for _, file := range m.files {
+			cl := fmt.Sprintf(`kexec -k %s/%s -i %s/%s -e -c "%s"`,
+				m.mnt, file.kernel, m.mnt, file.initrd, m.cl)
+			line.AppendHistory(cl)
+			defBoot = cl
 		}
 	}
 
@@ -162,7 +195,7 @@ func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 						i := strings.Replace(file.Name(), "vmlinuz",
 							ird, 1)
 						if _, err := os.Stat(m.mnt + "/" + i); err == nil {
-							b := bootSet{kernel: file.Name(), initrd: i}
+							b := bootKernel{kernel: file.Name(), initrd: i}
 							m.files = append(m.files, b)
 						}
 					}
