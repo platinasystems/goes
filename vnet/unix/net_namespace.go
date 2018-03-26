@@ -745,7 +745,7 @@ func (m *net_namespace_main) interface_by_name(name string) (ns *net_namespace, 
 		// Need to cover case where interfaces are created after vnet is up.
 		netIntf, err := net.InterfaceByName(name)
 		if err == nil {
-			{
+			if false {
 				fmt.Printf("interface_by_name: %s intf nil so creating context\n", name)
 			}
 			ns = &m.default_namespace
@@ -801,7 +801,7 @@ func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
 	// at the end, data will be valid.
 	if false {
 		if !m.discovery_is_done() {
-			{
+			if false {
 				fmt.Printf("RegisterHwInterface(): %s discovery not done - return\n", hw.Name())
 			}
 			return
@@ -810,7 +810,7 @@ func (m *net_namespace_main) RegisterHwInterface(h vnet.HwInterfacer) {
 
 	_, intf := m.interface_by_name(hw.Name())
 	if intf == nil {
-		{
+		if false {
 			fmt.Printf("RegisterHwInterface(): interface_by_name is nil for %s\n", hw.Name())
 		}
 		//panic("unknown interface: " + hw.Name())
