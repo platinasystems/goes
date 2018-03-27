@@ -771,8 +771,7 @@ func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNext
 			}
 		} else {
 			if err = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); err != nil {
-				//err = fmt.Errorf("replace next hop: %v", err)
-				err = fmt.Errorf("replace next hop %v from-nha %v to-nha %v: %v", adj, fromNextHopAdj, toNextHopAdj, err) //debug don
+				err = fmt.Errorf("replace next hop %v from-nha %v to-nha %v: %v", adj, fromNextHopAdj, toNextHopAdj, err)
 			} else {
 				m.callFibAddDelHooks(pf.index, p, adj, isDel)
 			}
@@ -869,12 +868,9 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 		ia, exists = m.Main.IfAddrForPrefix(&pa, si)
 		// For non-existing prefixes error will be signalled by AddDelInterfaceAddress below.
 		if exists {
-			//m.addDelInterfaceAddressRoutes(ia, isDel)
-			if true { //debug
-				// Question why this is done independently - rtnetlink should send
-				// any routes it would like deleted.
-				m.addDelInterfaceAddressRoutes(ia, isDel)
-			}
+			// Question why this is done independently - rtnetlink should send
+			// any routes it would like deleted.
+			m.addDelInterfaceAddressRoutes(ia, isDel)
 		}
 	}
 
