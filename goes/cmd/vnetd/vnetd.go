@@ -378,13 +378,17 @@ func (i *Info) gopublish() {
 				filename := filepath.Join("/sys/devices/platina-mk1", portname, devStatsName)
 				devNodeFile, err := os.OpenFile(filename, os.O_WRONLY, 0755)
 				if err != nil {
-					fmt.Printf("Open error %s\n", filename)
+					if false {
+						fmt.Printf("Open error %s\n", filename)
+					}
 					continue
 				}
 
 				_, err = devNodeFile.Write([]byte(fmt.Sprintf("%v", value)))
 				if err != nil {
-					fmt.Printf("Write error %s\n", filename)
+					if false {
+						fmt.Printf("Write error %s\n", filename)
+					}
 				}
 				devNodeFile.Close()
 			}
