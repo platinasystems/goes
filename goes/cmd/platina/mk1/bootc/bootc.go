@@ -11,41 +11,84 @@
 // this is a work in progress, this will change significantly before release
 // this package must be manually added to the mk1 goes.go to be included ATM
 
-// TO DO LIST
-//TODO get our ip and mac address, replace with getting master server address
-//TODO add test case of 100 units simultaneously asking for updates
-//TODO define normal boot up message exchange sequence
-//TODO define priming boot up message exchange sequence
+/* DESIGN NOTES
+    STATE MACHINE ON MASTER FOR TOR-X86, TOR-BMC, and non-TOR
+    ALL MESSAGING ORIGINATES ON CLIENT
+    IF KEEPALIVES STOP, MASTER CAN POSSIBLY CHOOSE TO RESET CLIENT (how? bmc?)
+    KEEPALIVES GET AN ACK or INSTRUCTIONS A A REPLY
+    POSSIBLY TUNNEL CONSOLE THROUGH BMC LIKE INTEL
+    DATABASE IS PRE-PROGRAMMED FOR ZERO TOUCH INSTALL
+    FOR NON-PLATINA EQUIP: k&i install one-of-us borgify (or--always pxe boot k&i)
+    AT INSTALL: k&i install/partition
+    AT INSTALL: deb install w/preseed
+    MASTER CAN FORCE A REBOOT AND RE-INSTALL
 
-// LIST OF KEY PIECES
-// piece (a) kernel+initrd+boot(/init) blob, (w/utilities)
-// piece (b) x509 cert
-// piece (c) boot(/init) to contact server and run script
-// piece (d) boot-controller on master tor
-// piece (e) debian isos (etc.)
-// piece (f) preseed file to answer debian install questions
-// piece (g) database holding configurations of each unit indexed by mac/cert
-// piece (h) modify debian installer to install Coreboot (ToR only?)
-// ...
-// piece (i) ansible et al
-// piece (j) cloud based dashboard
+TO DO
+    convert array to struct
+    load structs from local database file
+    register and manage state machine index, with timestamps
+    define state machine states
+    reply via json tftp
+    multiple replies on server
+    maintain state list for each client (100 max)
+    progress dashboard showing state per unit
+    pass down a goes or linux script, i.e. JSON and exec
+    add real test infra
+    add test case of 100 units simultaneously registering
+    Installing apt-gets support
 
-// HTTP MESSAGE FORMATS
-// msg format: command, client mac (xlat to numb), data
-// format:id(mac),cmd,data  cmd=progress,data=x | return:name
-// cmd register with master, "i just booted"
-// cmd "what is my next step, i am on step x"
+    CLIENT                                     MASTER
+      |                                          |
+      v                                          v
+                                              FUTURE: PRIME MASTER FROM INTERNET
+					      ASSUME PRE-PRIMED MASTER FOR NOW
 
-// MASTER SHOULD
-// grab database from local disk or cloud
-// wait for request for install instructions - and respond with blob
-// run the 'install state machine' on per unit basis
+   POWERON                                    POWERON
+   BOOT K&I FROM FLASH (OR PXE BOOT K&I)      BOOT K&I (MASTER --> so boot SDA2)
+   DETERMINE OUR MAC, IP, CERT   	      DHCP ON
+   DETERMINE LIST OF POSS. MASTER IPs	      PXE SERVER K&I ON
+					      VERIFY DEBIAN ISO
+					      READ DATABASE (from local or cloud)
+					      START HTTP SERVER (SERVES DASHBOARD TOO)
+					      INIT CLIENT ARRAY OF STRUCTS
+                                              SET ALL CLIENT STATES TO (0)
 
-// CLIENT SHOULD
-// pxe boot
-// k&i install one-of-us borgify (or--always pxe boot k&i)
-// k&i install/partition
-// deb install w/preseed
+  CLIENT HTTP contact master           --->   MASTER message rec'd (A) STATE
+           MESSAGE TYPE: REGISTER             DATABASE LOOKUP
+	   IP                                 VERIFY CERT
+	   MAC                                DB==INSTALLED?, RTN: NAME SCRIPT
+	                                      script -> boot sda2 (B) STATE
+	   MASTER IP                          ELSE NEEDS INSTALLED, (C) STATE
+	   CERT                               REPLY WITH NAME, SCRIPT
+	   MACHINE TYPE                       script -> install debian
+	   CONTEXT: K&I or REAL LINUX         IF BMC, DIFFERENT STATE MACHINE
+
+	                                      DATABASE, time of last good boot
+					      installed or not
+					      time since last keep alive
+
+					      DEB INSTALL GOOD (D) STATE (REBOOT)
+					      DEB INSTALL FAILS (0) STATE -REBOOT
+                                       <---
+           DISPLAY NAME
+	   EXECUTE SCRIPT
+	   AFTER NORMAL BOOT ->               KEEP TRACK OF LAST 10 KEEPALIVE TIMESTAMPS
+	    SEND KEEPALIVE MSG PERIODICALLY   SAVE IN DB LAST BOOT TIME, INSTALL OK
+
+
+    LIST OF KEY ELEMENTS
+    (a) boot(/init) to contact server and run script, boot sda2
+    (b) kernel+initrd+boot(/init) payload
+    (c) web based dashboard
+    (d) configuration database indexed by mac/cert (stored on local or cloud)
+    (e) boot-controller(webserver) on master tor
+    (f) debian isos (etc.) on master tor
+    (g) preseed file to answer debian install questions
+
+    (h) NEAR FUTURE: hand off to ansible and follow on steps (pre to post container)
+    (i) FUTURE: x509 cert support
+    (j) FUTURE: modify debian installer to install Coreboot (ToR only?)
+*/
 
 package bootc
 
@@ -61,12 +104,7 @@ import (
 	"github.com/platinasystems/go/internal/log"
 )
 
-/////
-/////
-/////
-
-// debug infrastructure
-///*
+// /*
 type Command struct{}
 
 func (Command) String() string { return "bootc" }
@@ -109,11 +147,7 @@ func (Command) Main(args ...string) error {
 	return nil
 }
 
-//*/
-
-/////
-/////
-/////
+// */
 
 func sendreq(c int, s string) {
 	if c == 1 {
@@ -141,4 +175,27 @@ func sendreq(c int, s string) {
 func minLines(s string, n int) string {
 	result := strings.Join(strings.Split(s, "\n")[:n], "\n")
 	return strings.Replace(result, "\r", "", -1)
+}
+
+func func1() error {
+	ourMAC := getOurMAC()
+	ourIP := getOurIP()
+	masterIP = getMasterIP(ourIP)
+	ourName, ourState, err := register(masterIP, ourIP, ourMAC)
+	if err != nil {
+		return err
+	}
+	fmt.Println(state) //TODO lookup based on numb, print string
+}
+
+func getMasterIP(ourIP string) string {
+	return "192.168.101.142" //hardcode as ourIP for testing for now //use .1 or DNS, or WWW.PRIME.COM, or HARDCODE IP Or all of the above
+}
+
+func getOurIP() string {
+	return "192.168.101.142" //hardcode for now
+}
+
+func getOurMAC() string {
+	return "00:00:00:00:00:00" //hardcode for now
 }

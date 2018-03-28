@@ -12,17 +12,6 @@
 // this is a work in progress, this will change significantly before release
 // this package must be manually added to the mk1 goes.go to be included ATM
 
-// TO DO LIST
-// TODO convert to struct
-// TODO load structs from database
-// TODO register and manage state machine index
-// TODO define state machine states
-// TODO reply via json tftp
-// TODO multiple replies
-// TODO maintain state list for each client (100 max)
-// TODO progress bar query - format with: x units, unit names, unit mac, uint cert
-// TODO add test infra
-
 package bootd
 
 import (
@@ -35,12 +24,8 @@ import (
 	"github.com/platinasystems/go/internal/log"
 )
 
-/////
-/////
-/////
-
-// Debug infrastructure
-///*
+// testing infrastructure
+// /*
 type Command chan struct{}
 
 func (Command) String() string { return "bootd" }
@@ -67,11 +52,7 @@ func (c Command) Main(...string) error {
 	return nil
 }
 
-//*/
-
-/////
-/////
-/////
+// */
 
 var i = 0
 var req = []string{"aaa", "bbb", "ccc", "ddd", "eee"}
@@ -86,7 +67,7 @@ func reply(w http.ResponseWriter, r *http.Request) {
 		b = res[0]
 	}
 	if r.URL.Path == "/"+"bbb" {
-		b = res[1]
+		b = res[1] + "\n    LINE1\n    LINE2\n\n        LINE3"
 	}
 	fmt.Println("scheme", r.URL.Scheme)
 	fmt.Println(r.Form["url_long"])
