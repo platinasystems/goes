@@ -120,6 +120,17 @@ func (q *enqueue) put(r0 *Ref, x0 uint) {
 	q.o.Outs[x0].Refs[i0] = *r0
 }
 func (q *enqueue) Put1(r0 *Ref, x0 uint) {
+	//avoid corner case panic when interface is down and removed but a transaction is in progress
+	if r0 == nil {
+		fmt.Printf("node.go: Put1, Ref pointer is nil; probably deleted\n")
+		return
+	}
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("node.go: Put1 recover(), %v\n", x)
+		}
+	}()
+	//
 	q.o.Outs[q.x].Refs[q.n] = *r0
 	q.n++
 	if uint32(x0) != q.x {
@@ -136,6 +147,13 @@ func (q *enqueue) setCachedNext(x0 uint) {
 }
 
 func (q *enqueue) Put2(r0, r1 *Ref, x0, x1 uint) {
+	//avoid corner case panic when interface is down and removed but a transaction is in progress
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("node.go: Put2 recover(), %v\n", x)
+		}
+	}()
+	//
 	// Speculatively enqueue both refs to cached next.
 	n0 := q.n
 	q.o.Outs[q.x].Refs[n0+0] = *r0 // (*) see below.
@@ -200,6 +218,19 @@ type InOutNode struct {
 
 func (n *InOutNode) GetEnqueue(in *RefIn) (q *enqueue) {
 	i := in.ThreadId()
+	{ //don't do anything if poller has been freed
+		if i == ^uint(0) {
+			fmt.Printf("node.go: GetEnqueue, ThreadId() not valid, probably deleted\n")
+			return
+		}
+	}
+	//avoid corner case panic when interface is down and removed but a transaction is in progress
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("node.go: GetEnque recover(), in.ThreadId()=%d, %v\n", in.ThreadId(), x)
+		}
+	}()
+	//
 	n.qs.Validate(i)
 	q = n.qs[i]
 	if n.qs[i] == nil {
@@ -213,6 +244,13 @@ func (n *InOutNode) GetInOutNode() *InOutNode    { return n }
 func (n *InOutNode) MakeLoopIn() loop.LooperIn   { return &RefIn{} }
 func (n *InOutNode) MakeLoopOut() loop.LooperOut { return &RefOut{} }
 func (n *InOutNode) LoopInputOutput(l *loop.Loop, i loop.LooperIn, o loop.LooperOut) {
+	//avoid corner case panic when interface is down and removed but a transaction is in progress
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("node.go: LoopInputOutput, recover(), %v\n", x)
+		}
+	}()
+	//
 	in, out := i.(*RefIn), o.(*RefOut)
 	q := n.GetEnqueue(in)
 	q.n, q.i, q.o, q.v = 0, in, out, n.Vnet

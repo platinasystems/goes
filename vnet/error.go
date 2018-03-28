@@ -87,6 +87,19 @@ func init() {
 }
 
 func (en *errorNode) NodeOutput(ri *RefIn) {
+	{ // don't do anything if ri is no longer valid
+		if ri.ThreadId() == ^uint(0) {
+			fmt.Printf("error.go: NoeOutput, ThreadId() not valid, probably deleted\n")
+			return
+		}
+	}
+	//avoid corner case panic when interface is down and removed but a transaction is in progress
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("error.go: NodeOutput recover(), ri.ThreadId()=%d, %v\n", ri.ThreadId(), x)
+		}
+	}()
+	//
 	ts := en.getThread(ri.ThreadId())
 
 	cache := ts.cache

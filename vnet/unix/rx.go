@@ -186,6 +186,13 @@ const (
 )
 
 func (rv *rx_ref_vector) rx_packet(rx *rx_node, ns *net_namespace, pv *rx_packet_vector, pvi, rvi, n_bytes_in_packet uint, ifindex uint32) (n_refs uint) {
+	//avoid corner case panic when interface is down and removed but a transaction is in progress
+	defer func() {
+		if x := recover(); x != nil {
+			fmt.Printf("rx.go: rx_packet recover(), pvi=%d, ifindex=%d, %v\n", pvi, ifindex, x)
+		}
+	}()
+	//
 	size := rx.buffer_pool.Size
 	n_left := n_bytes_in_packet
 	p := &pv.p[pvi]
