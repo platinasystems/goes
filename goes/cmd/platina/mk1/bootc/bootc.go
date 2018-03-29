@@ -88,6 +88,25 @@ TO DO
     (h) NEAR FUTURE: hand off to ansible and follow on steps (pre to post container)
     (i) FUTURE: x509 cert support
     (j) FUTURE: modify debian installer to install Coreboot (ToR only?)
+
+boot sequence
+    1. CB boots kernel+initrd with new goes "boot logic" as /init
+    2. boot logic loops through the list of possible server addresses
+        the top candidate is our DHCP address with .1 as lowest octet
+    3. register with server.  Server will supply our instructions:
+           a. hey, normal boot off of sda2
+           or
+           b. run this script
+               (typically: format sda2, install debian, install goes, reboot)
+
+    if registration fails ==>  fall through to normal boot from SDA2
+    if normal boot from SDA2 fails ==> try PXE boot
+
+units of work
+  1. CB to boot goes payload (this is done I think)
+  2. ability to run goes scripts in goes (this is done I think)
+  3. ability for initial goes to format SDA2 and install debian (does this work??)
+  4. PXE boot from CB (I think this is not done)
 */
 
 package bootc
@@ -125,7 +144,7 @@ description
 	}
 }
 
-func (Command) Main(args ...string) error {
+func (Command) Main(args ...string) (err error) {
 	if len(args) == 0 {
 		return fmt.Errorf("args: missing")
 	}
@@ -135,20 +154,66 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
 	switch c {
-	case 1: //simulate auto-boot case fixme
-		sendreq(1, args[1])
-	case 2: //manual case fixme
-		sendreq(1, args[1])
+	case 0: // pre-registration
+		if err = preRegistration(); err != nil {
+			return err
+		}
+	case 1: // registration, display json reply
+		if err = registration(); err != nil {
+			return err
+		}
+	case 2: // show server variobles
+		if err = dumpServerVars(); err != nil {
+			return err
+		}
+	case 3: // show dashboard
+		if err = showDashboard(); err != nil {
+			return err
+		}
 	default:
 		fmt.Println("no command...")
-		log.Print("no command")
 	}
-
 	return nil
 }
 
 // */
 
+//
+// "/init" in the CB kernel+initrd+goes payload
+//
+func bootSequence() (err error) {
+
+	// determine possible server addresses
+	// loop through server addresses to register with master ToR
+	//   if registration fails ==> try normal SDA2 boot
+	// server replied with script
+	//   either boot sda2
+	//   or do format, debian install, etc.
+	//   if debian install fails ==> try again, then try PXE boot
+
+}
+
+// pre-registration - get mac, ip, etc.
+func preRegister() error {
+	return nil
+}
+
+// get our name, and our script
+func register(mip, ip, mac string) (name string, script string, err error) {
+	return "", "", nil
+}
+
+// for debugging
+func dumpServerVars() error { //any browser can see this
+	return nil
+}
+
+// for debugging
+func showDashboard() error { //any browser can see this
+	return nil
+}
+
+// send request to master ToR webserver //FIXME
 func sendreq(c int, s string) {
 	if c == 1 {
 		resp, err := http.Get("http://192.168.101.142:9090/" + s)
@@ -160,7 +225,17 @@ func sendreq(c int, s string) {
 		fmt.Println(string(body))
 	}
 
-	if 1 == 2 { //post case
+	if c == 2 {
+		resp, err := http.Get("http://192.168.101.142:9090/" + "dump")
+		if err != nil {
+			panic(err)
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		fmt.Println(string(body))
+	}
+
+	if 1 == 3 { //post case
 		resp, err := http.PostForm("http://duckduckgo.com",
 			url.Values{"q": {"github"}})
 		if err != nil {
@@ -178,24 +253,25 @@ func minLines(s string, n int) string {
 }
 
 func func1() error {
-	ourMAC := getOurMAC()
-	ourIP := getOurIP()
-	masterIP = getMasterIP(ourIP)
-	ourName, ourState, err := register(masterIP, ourIP, ourMAC)
+	mac := getMAC()
+	ip := getIP()
+	masterIP := getMasterIP(ip)
+	ourName, ourState, err := register(masterIP, ip, mac)
 	if err != nil {
+		fmt.Println(ourName, ourState)
 		return err
 	}
-	fmt.Println(state) //TODO lookup based on numb, print string
+	return nil
 }
 
-func getMasterIP(ourIP string) string {
-	return "192.168.101.142" //hardcode as ourIP for testing for now //use .1 or DNS, or WWW.PRIME.COM, or HARDCODE IP Or all of the above
+func getMasterIP(ip string) string {
+	return "192.168.101.142" //hardcode as ip for testing for now //use .1 or DNS, or WWW.PRIME.COM, or HARDCODE IP Or all of the above
 }
 
-func getOurIP() string {
+func getIP() string {
 	return "192.168.101.142" //hardcode for now
 }
 
-func getOurMAC() string {
+func getMAC() string {
 	return "00:00:00:00:00:00" //hardcode for now
 }

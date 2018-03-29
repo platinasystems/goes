@@ -63,15 +63,20 @@ func reply(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	fmt.Println(r.Form)
 	fmt.Println("path", r.URL.Path)
+
 	if r.URL.Path == "/"+"aaa" {
 		b = res[0]
 	}
-	if r.URL.Path == "/"+"bbb" {
-		b = res[1] + "\n    LINE1\n    LINE2\n\n        LINE3"
+
+	if r.URL.Path == "/"+"dump" {
+		b = "\nVARIABLES"
+		b += "\n  req: " + r.URL.Path
+		b += "\n  res: " + res[1]
+		b += "\n  end"
 	}
+
 	fmt.Println("scheme", r.URL.Scheme)
 	fmt.Println(r.Form["url_long"])
-
 	for k, v := range r.Form {
 		fmt.Println("key:", k)
 		fmt.Println("val:", strings.Join(v, ""))
