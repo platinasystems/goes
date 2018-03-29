@@ -9,7 +9,6 @@ import (
 	"net/rpc"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -38,6 +37,8 @@ var Hook = func(func(), *vnet.Vnet) error { return nil }
 // Machines may reassign this for platform sepecific cleanup after vnet.Quit.
 var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
 
+var Counter = func(s string) string { return s }
+
 type Command struct {
 	Init func()
 	init sync.Once
@@ -50,7 +51,6 @@ type Info struct {
 	eventPool sync.Pool
 	poller    ifStatsPoller
 	pub       *publisher.Publisher
-	statsMap  map[string]string
 }
 
 func (*Command) String() string { return "vnetd" }
@@ -146,21 +146,6 @@ func (i *Info) init() {
 	i.poller.pollInterval = 5 // default 5 seconds
 	i.initialPublish()
 	i.set("ready", "true", true)
-
-	i.statsMap = map[string]string{
-		"port_rx_multicast_packets":     "multicast",
-		"port_rx_bytes":                 "rx_bytes",
-		"port_rx_crc_error_packets":     "rx_crc_errors",
-		"port_rx_runt_packets":          "rx_fifo_errors",
-		"port_rx_undersize_packets":     "rx_length_errors",
-		"port_rx_oversize_packets":      "rx_over_errors",
-		"port_rx_packets":               "rx_packets",
-		"port_tx_total_collisions":      "collisions",
-		"port_tx_fifo_underrun_packets": "tx_aborted_errors",
-		"port_tx_bytes":                 "tx_bytes",
-		"port_tx_runt_packets":          "tx_fifo_errors",
-		"port_tx_packets":               "tx_packets",
-	}
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
@@ -355,45 +340,6 @@ func (i *Info) initialPublish() {
 func (i *Info) gopublish() {
 	for s := range i.poller.pubch {
 		i.pub.Print("vnet.", s)
-		if false {
-			fmt.Println("gopublish: ", s)
-		}
-
-		if strings.HasPrefix(s, "eth-") {
-			colon := strings.Index(s, ":")
-			if colon < 0 {
-				fmt.Println("counter oops: ", s)
-				continue
-			}
-			value := s[colon+2:]
-			dot := strings.Index(s, ".")
-			if dot < 0 {
-				fmt.Println("counter name oops: ", s)
-				continue
-			}
-			portname := s[:dot]
-			statname := s[dot+1 : colon]
-			devStatsName, exists := i.statsMap[statname]
-			if exists {
-				filename := filepath.Join("/sys/devices/platina-mk1", portname, devStatsName)
-				devNodeFile, err := os.OpenFile(filename, os.O_WRONLY, 0755)
-				if err != nil {
-					if false {
-						fmt.Printf("Open error %s\n", filename)
-					}
-					continue
-				}
-
-				_, err = devNodeFile.Write([]byte(fmt.Sprintf("%v", value)))
-				if err != nil {
-					if false {
-						fmt.Printf("Write error %s\n", filename)
-					}
-				}
-				devNodeFile.Close()
-			}
-		}
-
 	}
 }
 
@@ -430,8 +376,7 @@ type ifStatsPoller struct {
 }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
-	r := strings.NewReplacer(" ", "_", ".", "_", "-", "_")
-	p.pubch <- fmt.Sprintf("%s.%s: %d", name, r.Replace(counter), value)
+	p.pubch <- fmt.Sprintf("%s.%s: %d", name, counter, value)
 }
 func (p *ifStatsPoller) addEvent(dt float64) { p.i.v.SignalEventAfter(p, dt) }
 func (p *ifStatsPoller) String() string {
@@ -448,11 +393,18 @@ func (p *ifStatsPoller) EventAction() {
 	// Otherwise only publish to redis when counter values change.
 	includeZeroCounters := p.sequence == 0
 
+	pubcount := func(ifname, counter string, value uint64) {
+		counter = Counter(counter)
+		if value != 0 && strings.HasPrefix(ifname, "eth-") {
+			vnet.Xeth.Set(ifname, counter, value)
+		}
+		p.publish(ifname, counter, value)
+	}
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, UnixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
 			p.hwInterfaces.Validate(uint(hi))
 			if p.hwInterfaces[hi].update(counter, value) && true {
-				p.publish(hi.Name(&p.i.v), counter, value)
+				pubcount(hi.Name(&p.i.v), counter, value)
 			}
 		})
 
@@ -460,7 +412,7 @@ func (p *ifStatsPoller) EventAction() {
 		func(si vnet.Si, counter string, value uint64) {
 			p.swInterfaces.Validate(uint(si))
 			if p.swInterfaces[si].update(counter, value) && true {
-				p.publish(si.Name(&p.i.v), counter, value)
+				pubcount(si.Name(&p.i.v), counter, value)
 			}
 		})
 

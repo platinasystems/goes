@@ -17,16 +17,52 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
+	"github.com/platinasystems/go/xeth"
 )
+
+var vnetdCounterSeparators *strings.Replacer
+
+var vnetdLinkStatTranslation = map[string]string{
+	"port-rx-multicast-packets":     "multicast",
+	"port-rx-bytes":                 "rx-bytes",
+	"port-rx-crc_error-packets":     "rx-crc-errors",
+	"port-rx-runt-packets":          "rx-fifo-errors",
+	"port-rx-undersize-packets":     "rx-length-errors",
+	"port-rx-oversize-packets":      "rx-over-errors",
+	"port-rx-packets":               "rx-packets",
+	"port-tx-total-collisions":      "collisions",
+	"port-tx-fifo-underrun-packets": "tx-aborted-errors",
+	"port-tx-bytes":                 "tx-bytes",
+	"port-tx-runt-packets":          "tx-fifo-errors",
+	"port-tx-packets":               "tx-packets",
+}
 
 type mk1Main struct {
 	fe1.Platform
 }
 
 func vnetdInit() {
+	var err error
+	// FIXME vnet shouldn't be so bursty
+	const nports = 4 * 32
+	const ncounters = 512
+	vnet.Xeth, err = xeth.New("platina-mk1", stats,
+		xeth.SizeofTxchOpt(nports*ncounters))
+	if err != nil {
+		panic(err)
+	}
 	p := new(mk1Main)
 	vnetd.Hook = p.vnetdHook
 	vnetd.CloseHook = p.stopHook
+	vnetd.Counter = func(s string) string {
+		s = vnetdCounterSeparators.Replace(s)
+		if x, found := vnetdLinkStatTranslation[s]; found {
+			s = x
+		}
+		return s
+	}
+	vnetdCounterSeparators =
+		strings.NewReplacer(" ", "-", ".", "-", "_", "-")
 }
 
 func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
