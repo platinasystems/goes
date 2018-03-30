@@ -294,7 +294,9 @@ func (m *netlink_main) newEvent() interface{} {
 	return &netlinkEvent{m: m.m}
 }
 func (ns *net_namespace) getEvent(m *Main) *netlinkEvent {
-	return m.eventPool.Get().(*netlinkEvent)
+	v := m.eventPool.Get().(*netlinkEvent)
+	*v = netlinkEvent{m: v.m}
+	return v
 }
 func (e *netlinkEvent) signal() {
 	if len(e.msgs) > 0 {

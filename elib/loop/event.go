@@ -69,6 +69,7 @@ func (l *eventMain) getLoopEvent(a event.Actor, dst Noder, p elog.PointerToFirst
 	e.d = nil
 	e.actor = a
 	e.l = l.l
+	e.time = 0
 	e.caller = elog.GetCaller(p)
 	if dst != nil {
 		e.d = dst.GetNode()
