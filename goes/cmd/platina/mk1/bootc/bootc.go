@@ -22,6 +22,7 @@
     AT INSTALL: k&i install/partition
     AT INSTALL: deb install w/preseed
     MASTER CAN FORCE A REBOOT AND RE-INSTALL
+    MASTER TO KNOW HE IS MASTER WHEN STARTING WEBSERVER (how?)
 
 TO DO
     convert array to struct
@@ -115,12 +116,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/log"
 )
 
 // /*
@@ -154,20 +152,24 @@ func (Command) Main(args ...string) (err error) {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
 	switch c {
-	case 0: // pre-registration
-		if err = preRegistration(); err != nil {
+	case 0:
+		if err = preRegister(); err != nil {
 			return err
 		}
-	case 1: // registration, display json reply
-		if err = registration(); err != nil {
+	case 1: // http
+		if err = register(); err != nil {
 			return err
 		}
-	case 2: // show server variobles
-		if err = dumpServerVars(); err != nil {
+	case 2: // http
+		if err = dumpVars(); err != nil {
 			return err
 		}
-	case 3: // show dashboard
-		if err = showDashboard(); err != nil {
+	case 3: // http
+		if err = dashboard(); err != nil {
+			return err
+		}
+	case 4: // http
+		if err = test404(); err != nil {
 			return err
 		}
 	default:
@@ -178,9 +180,7 @@ func (Command) Main(args ...string) (err error) {
 
 // */
 
-//
-// "/init" in the CB kernel+initrd+goes payload
-//
+// CB payload "/init" function
 func bootSequence() (err error) {
 
 	// determine possible server addresses
@@ -191,77 +191,77 @@ func bootSequence() (err error) {
 	//   or do format, debian install, etc.
 	//   if debian install fails ==> try again, then try PXE boot
 
+	return nil
 }
 
-// pre-registration - get mac, ip, etc.
-func preRegister() error {
+// pre-register
+func preRegister() (err error) {
+	fmt.Println("preregister...\n")
+	return nil
+	//mac := getMAC()
+	//ip := getIP()
+	//masterIP := getMasterIP(ip)
+	//ourName, ourState, err := register(masterIP, ip, mac)
+	//if err = register(masterIP, ip, mac); err != nil {
+	//	fmt.Println(ourName, ourState)
+	//	return err
+	//}
 	return nil
 }
 
 // get our name, and our script
-func register(mip, ip, mac string) (name string, script string, err error) {
-	return "", "", nil
-}
-
-// for debugging
-func dumpServerVars() error { //any browser can see this
-	return nil
-}
-
-// for debugging
-func showDashboard() error { //any browser can see this
-	return nil
-}
-
-// send request to master ToR webserver //FIXME
-func sendreq(c int, s string) {
-	if c == 1 {
-		resp, err := http.Get("http://192.168.101.142:9090/" + s)
-		if err != nil {
-			panic(err)
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		fmt.Println(string(body))
-	}
-
-	if c == 2 {
-		resp, err := http.Get("http://192.168.101.142:9090/" + "dump")
-		if err != nil {
-			panic(err)
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		fmt.Println(string(body))
-	}
-
-	if 1 == 3 { //post case
-		resp, err := http.PostForm("http://duckduckgo.com",
-			url.Values{"q": {"github"}})
-		if err != nil {
-			panic(err)
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		fmt.Println("post:\n", minLines(string(body), 3))
-	}
-}
-
-func minLines(s string, n int) string {
-	result := strings.Join(strings.Split(s, "\n")[:n], "\n")
-	return strings.Replace(result, "\r", "", -1)
-}
-
-func func1() error {
-	mac := getMAC()
-	ip := getIP()
-	masterIP := getMasterIP(ip)
-	ourName, ourState, err := register(masterIP, ip, mac)
-	if err != nil {
-		fmt.Println(ourName, ourState)
+//func register(mip, ip, mac string) (name string, script string, err error) {
+func register() (err error) {
+	s := ""
+	if s, err = sendReq("register"); err != nil {
 		return err
 	}
+	fmt.Println(s)
 	return nil
+}
+
+// for debugging
+func dumpVars() (err error) {
+	s := ""
+	if s, err = sendReq("dumpvars"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+// for debugging
+func dashboard() (err error) {
+	s := ""
+	if s, err = sendReq("dashboard"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+// for debugging
+func test404() (err error) {
+	s := ""
+	if s, err = sendReq("xxx"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+// send request to master ToR webserver //FIXME, addresses
+func sendReq(s string) (res string, err error) {
+	resp, err := http.Get("http://192.168.101.142:9090/" + s)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
 
 func getMasterIP(ip string) string {
