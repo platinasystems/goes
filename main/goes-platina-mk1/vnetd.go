@@ -13,12 +13,12 @@ import (
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
-	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
-	"github.com/platinasystems/go/internal/xeth"
 )
 
 var vnetdCounterSeparators *strings.Replacer
@@ -111,7 +111,6 @@ func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 		vnet.Xeth.Close()
 	}
 	if p.KernelIxgbe {
-		vnet.Xeth.Close()
 		return mk1.PlatformExit(v, &p.Platform)
 	} else {
 		// FIXME why isn't this done in mk1.PlatformExit?
