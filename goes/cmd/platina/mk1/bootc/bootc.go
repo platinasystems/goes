@@ -3,13 +3,9 @@
 // LICENSE file.
 
 // DESCRIPTION
-// 'boot' requestor, this will be run in parallel on muliple client devices
-// this will be run automatically from the kernel+initrd(goes) image
+// 'boot' client for auto-install - runs on each client device
+// loaded as a Coreboot payload - kernel+initrd+goes
 // kernel + initrd will be loaded by Coreboot or PXE boot
-
-// DISCLAIMER
-// this is a work in progress, this will change significantly before release
-// this package must be manually added to the mk1 goes.go to be included ATM
 
 /* DESIGN NOTES
     STATE MACHINE ON MASTER FOR TOR-X86, TOR-BMC, and non-TOR
@@ -25,18 +21,15 @@
     MASTER TO KNOW HE IS MASTER WHEN STARTING WEBSERVER (how?)
 
 TO DO
-    convert array to struct
-    load structs from local database file
     register and manage state machine index, with timestamps
     define state machine states
-    reply via json tftp
-    multiple replies on server
     maintain state list for each client (100 max)
-    progress dashboard showing state per unit
     pass down a goes or linux script, i.e. JSON and exec
     add real test infra
     add test case of 100 units simultaneously registering
     Installing apt-gets support
+    console
+    port to accept reset
 
     CLIENT                                     MASTER
       |                                          |
@@ -108,7 +101,10 @@ units of work
   2. ability to run goes scripts in goes (this is done I think)
   3. ability for initial goes to format SDA2 and install debian (does this work??)
   4. PXE boot from CB (I think this is not done)
+  5. RUN INSTALL/PRESEED
 */
+
+//TODO remove globals
 
 package bootc
 
@@ -151,25 +147,41 @@ func (Command) Main(args ...string) (err error) {
 	if err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
+	s := ""
+	mip := getMasterIP()
+
 	switch c {
-	case 0:
-		if err = preRegister(); err != nil {
+	case 1:
+		mac := getMAC()
+		ip := getIP()
+		if s, err = register(mip, mac, ip); err != nil {
 			return err
 		}
-	case 1: // http
-		if err = register(); err != nil {
+		fmt.Println(s)
+	case 2:
+		mac := getMAC2()
+		ip := getIP2()
+		if s, err = register(mip, mac, ip); err != nil {
 			return err
 		}
-	case 2: // http
-		if err = dumpVars(); err != nil {
+		fmt.Println(s)
+	case 3:
+		mac := getMAC3()
+		ip := getIP3()
+		if s, err = register(mip, mac, ip); err != nil {
 			return err
 		}
-	case 3: // http
-		if err = dashboard(); err != nil {
+		fmt.Println(s)
+	case 4:
+		if err = dumpVars(mip); err != nil {
 			return err
 		}
-	case 4: // http
-		if err = test404(); err != nil {
+	case 5:
+		if err = dashboard(mip); err != nil {
+			return err
+		}
+	case 6:
+		if err = test404(mip); err != nil {
 			return err
 		}
 	default:
@@ -180,79 +192,33 @@ func (Command) Main(args ...string) (err error) {
 
 // */
 
-// CB payload "/init" function
-func bootSequence() (err error) {
-
-	// determine possible server addresses
-	// loop through server addresses to register with master ToR
-	//   if registration fails ==> try normal SDA2 boot
-	// server replied with script
-	//   either boot sda2
-	//   or do format, debian install, etc.
-	//   if debian install fails ==> try again, then try PXE boot
-
-	return nil
-}
-
-// pre-register
-func preRegister() (err error) {
-	fmt.Println("preregister...\n")
-	return nil
-	//mac := getMAC()
-	//ip := getIP()
-	//masterIP := getMasterIP(ip)
-	//ourName, ourState, err := register(masterIP, ip, mac)
-	//if err = register(masterIP, ip, mac); err != nil {
-	//	fmt.Println(ourName, ourState)
-	//	return err
-	//}
-	return nil
-}
-
-// get our name, and our script
-//func register(mip, ip, mac string) (name string, script string, err error) {
-func register() (err error) {
-	s := ""
-	if s, err = sendReq("register"); err != nil {
+func bootSequencer() (err error) { // "init" function for Coreboot
+	mip := getMasterIP()
+	mac := getMAC()
+	ip := getIP()
+	// possibly try register 5 times with delay in between
+	if _, err = register(mip, mac, ip); err != nil {
+		// register failed: possibly try just booting sda2, forget registering
 		return err
 	}
-	fmt.Println(s)
+	// unpack script
+
+	// run script (format, install debian, etc. OR just boot)
+
+	// if debian install fails ==> try again, then try PXE boot
+
 	return nil
 }
 
-// for debugging
-func dumpVars() (err error) {
-	s := ""
-	if s, err = sendReq("dumpvars"); err != nil {
-		return err
+func register(mip string, mac string, ip string) (s string, err error) {
+	if s, err = sendReq(mip, "register "+mac+" "+ip); err != nil { // FIXME string body JSON
+		return "", err // FIXME ERROR FMT MESSAGE
 	}
-	fmt.Println(s)
-	return nil
+	return s, nil //FIXME name, script, err
 }
 
-// for debugging
-func dashboard() (err error) {
-	s := ""
-	if s, err = sendReq("dashboard"); err != nil {
-		return err
-	}
-	fmt.Println(s)
-	return nil
-}
-
-// for debugging
-func test404() (err error) {
-	s := ""
-	if s, err = sendReq("xxx"); err != nil {
-		return err
-	}
-	fmt.Println(s)
-	return nil
-}
-
-// send request to master ToR webserver //FIXME, addresses
-func sendReq(s string) (res string, err error) {
-	resp, err := http.Get("http://192.168.101.142:9090/" + s)
+func sendReq(mip string, s string) (res string, err error) {
+	resp, err := http.Get("http://" + mip + ":9090/" + s)
 	if err != nil {
 		panic(err)
 	}
@@ -264,14 +230,62 @@ func sendReq(s string) (res string, err error) {
 	return string(body), nil
 }
 
-func getMasterIP(ip string) string {
-	return "192.168.101.142" //hardcode as ip for testing for now //use .1 or DNS, or WWW.PRIME.COM, or HARDCODE IP Or all of the above
-}
-
-func getIP() string {
+func getMasterIP() string {
+	// FIXME try .1, try DNS, try URL, try hardcode list
 	return "192.168.101.142" //hardcode for now
 }
 
+func getIP() string {
+	return "192.168.101.142" // FIXME hardcode for now
+}
+
 func getMAC() string {
-	return "00:00:00:00:00:00" //hardcode for now
+	return "01:02:03:04:05:06" // FIXME hardcode for now
+}
+
+//
+// debugging functions
+//
+
+func dumpVars(mip string) (err error) { // debugging
+	s := ""
+	if s, err = sendReq(mip, "dumpvars"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+func dashboard(mip string) (err error) { // debugging
+	s := ""
+	if s, err = sendReq(mip, "dashboard"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+func test404(mip string) (err error) { // debugging
+	s := ""
+	if s, err = sendReq(mip, "xxx"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+func getIP2() string {
+	return "192.168.101.143" //hardcode for now
+}
+
+func getIP3() string {
+	return "192.168.101.144" //hardcode for now
+}
+
+func getMAC2() string {
+	return "01:02:03:04:05:07" //hardcode for now
+}
+
+func getMAC3() string {
+	return "01:02:03:04:05:08" //hardcode for now
 }
