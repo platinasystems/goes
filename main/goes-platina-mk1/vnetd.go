@@ -107,6 +107,9 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 }
 
 func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
+	if vnet.Xeth != nil {
+		vnet.Xeth.Close()
+	}
 	if p.KernelIxgbe {
 		vnet.Xeth.Close()
 		return mk1.PlatformExit(v, &p.Platform)
