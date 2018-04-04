@@ -14,10 +14,11 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
-	"github.com/platinasystems/go/xeth"
+	"github.com/platinasystems/go/internal/xeth"
 )
 
 var vnetdCounterSeparators *strings.Replacer
@@ -46,7 +47,7 @@ func vnetdInit() {
 	// FIXME vnet shouldn't be so bursty
 	const nports = 4 * 32
 	const ncounters = 512
-	vnet.Xeth, err = xeth.New("platina-mk1", stats,
+	vnet.Xeth, err = xeth.New(machine.Name, stats,
 		xeth.SizeofTxchOpt(nports*ncounters))
 	if err != nil {
 		panic(err)
@@ -68,21 +69,21 @@ func vnetdInit() {
 func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	p.Init = init
 
-	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	s, err := redis.Hget(machine.Name, "eeprom.DeviceVersion")
 	if err != nil {
 		return err
 	}
 	if _, err = fmt.Sscan(s, &p.Version); err != nil {
 		return err
 	}
-	s, err = redis.Hget(redis.DefaultHash, "eeprom.NEthernetAddress")
+	s, err = redis.Hget(machine.Name, "eeprom.NEthernetAddress")
 	if err != nil {
 		return err
 	}
 	if _, err = fmt.Sscan(s, &p.NEthernetAddress); err != nil {
 		return err
 	}
-	s, err = redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+	s, err = redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
 	if err != nil {
 		return err
 	}
@@ -107,6 +108,7 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 
 func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 	if p.KernelIxgbe {
+		vnet.Xeth.Close()
 		return mk1.PlatformExit(v, &p.Platform)
 	} else {
 		// FIXME why isn't this done in mk1.PlatformExit?

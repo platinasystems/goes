@@ -14,7 +14,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/go/internal/atsock"
 	"strings"
 )
 
@@ -29,7 +29,7 @@ func (c *conn) Connect() (err error) {
 	c.Lock()
 	defer c.Unlock()
 	if c.Conn == nil {
-		c.Conn, err = sockfile.Dial("vnet")
+		c.Conn, err = atsock.Dial("vnet")
 	}
 	return
 }

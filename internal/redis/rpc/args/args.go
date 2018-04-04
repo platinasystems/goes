@@ -6,9 +6,9 @@
 package args
 
 type Assign struct {
-	Key  string
-	File string
-	Name string
+	Key    string
+	AtSock string
+	Name   string
 }
 
 type Unassign struct {

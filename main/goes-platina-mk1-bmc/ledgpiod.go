@@ -9,6 +9,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 func ledgpiodInit() {
@@ -21,7 +22,7 @@ func ledgpiodInit() {
 	ledgpiod.Vdev.MuxBus = 0x0
 	ledgpiod.Vdev.MuxAddr = 0x76
 	ledgpiod.Vdev.MuxValue = 0x2
-	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	s, err := redis.Hget(machine.Name, "eeprom.DeviceVersion")
 	if err != nil {
 		ledgpiod.Vdev.Addr = 0x75
 	} else {

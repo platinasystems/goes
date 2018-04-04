@@ -8,20 +8,21 @@ package redis
 import (
 	"fmt"
 	"io"
+	"net"
+	"net/rpc"
 	"regexp"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 const rdtimeout = 10 * time.Second
 const wrtimeout = 500 * time.Millisecond
-
-var DefaultHash = "platina"
 
 var keyRe *regexp.Regexp
 var empty = struct{}{}
@@ -47,7 +48,7 @@ func Quotes(s string) string {
 }
 
 func IsReady() error {
-	return Hwait(DefaultHash, "redis.ready", "true", 10*time.Second)
+	return Hwait(machine.Name, "redis.ready", "true", 10*time.Second)
 }
 
 // Complete redis Key and Subkey. This skips over leading '-' prefaced flags.
@@ -97,19 +98,27 @@ func Split(key string) []string {
 	return fields
 }
 
+func NewRedisRegAtSock() (*rpc.Client, error) {
+	return atsock.NewRpcClient("redis-reg")
+}
+
+func NewRedisdAtSock() (net.Conn, error) {
+	return atsock.Dial("redisd")
+}
+
 // Assign an RPC handler for the given key.
-func Assign(key, file, name string) error {
-	cl, err := sockfile.NewRpcClient("redis-reg")
+func Assign(key, sockname, name string) error {
+	cl, err := NewRedisRegAtSock()
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("Reg.Assign", args.Assign{key, file, name}, &empty)
+	return cl.Call("Reg.Assign", args.Assign{key, sockname, name}, &empty)
 }
 
 // Unassign an RPC handler for the given key.
 func Unassign(key string) error {
-	cl, err := sockfile.NewRpcClient("redis-reg")
+	cl, err := NewRedisRegAtSock()
 	if err != nil {
 		return err
 	}
@@ -119,7 +128,7 @@ func Unassign(key string) error {
 
 // Connect to the redis file socket.
 func Connect() (redis.Conn, error) {
-	conn, err := sockfile.Dial("redisd")
+	conn, err := NewRedisdAtSock()
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +334,7 @@ func Set(key string, value interface{}) (s string, err error) {
 }
 
 func Subscribe(channel string) (psc redis.PubSubConn, err error) {
-	conn, err := sockfile.Dial("redisd")
+	conn, err := NewRedisdAtSock()
 	if err != nil {
 		return
 	}

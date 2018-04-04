@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 const (
@@ -77,7 +78,7 @@ func diagProm() error {
 	vf := uint(0)
 	vl := uint(0)
 
-	s, err := redis.Hget(redis.DefaultHash, "machine")
+	s, err := redis.Hget(machine.Name, "machine")
 	if err != nil {
 		log.Print("redis: ", err)
 		return err

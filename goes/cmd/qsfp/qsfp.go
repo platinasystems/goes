@@ -18,6 +18,7 @@ import (
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 var Vdev [32]I2cDev
@@ -134,7 +135,7 @@ func (c *Command) updatePresence() error {
 	if stopped == 1 {
 		return nil
 	}
-	ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+	ready, err := redis.Hget(machine.Name, "vnet.ready")
 	if err != nil || ready == "false" {
 		return nil
 	}
@@ -161,11 +162,11 @@ func (c *Command) updatePresence() error {
 						var portConfig string
 
 						//identify copper vs optic and set media and speed
-						media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media")
+						media, err := redis.Hget(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
-						speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed")
+						speed, err := redis.Hget(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
@@ -173,7 +174,7 @@ func (c *Command) updatePresence() error {
 						if strings.Contains(v, "-CR") {
 							portIsCopper[i+j*16] = true
 							if media != "copper" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "copper")
+								ret, err := redis.Hset(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "copper")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -181,7 +182,7 @@ func (c *Command) updatePresence() error {
 								}
 							}
 							if speed == "100g" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".fec", "cl91")
+								ret, err := redis.Hset(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".fec", "cl91")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -192,7 +193,7 @@ func (c *Command) updatePresence() error {
 							portIsCopper[i+j*16] = false
 							Vdev[i+j*16].TxDisableSet(false, lp)
 							if media != "fiber" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
+								ret, err := redis.Hset(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -200,7 +201,7 @@ func (c *Command) updatePresence() error {
 								}
 							}
 							if speed != "40g" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed", "40g")
+								ret, err := redis.Hset(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed", "40g")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -211,7 +212,7 @@ func (c *Command) updatePresence() error {
 							portIsCopper[i+j*16] = false
 							Vdev[i+j*16].TxDisableSet(false, lp)
 							if media != "fiber" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
+								ret, err := redis.Hset(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".media", "fiber")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -219,7 +220,7 @@ func (c *Command) updatePresence() error {
 								}
 							}
 							if speed != "100g" {
-								ret, err := redis.Hset(redis.DefaultHash, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed", "100g")
+								ret, err := redis.Hset(machine.Name, "vnet.eth-"+strconv.Itoa(lp)+"-"+strconv.Itoa(1+porto)+".speed", "100g")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -416,7 +417,7 @@ func (c *Command) updateMonitor() error {
 	if stopped == 1 {
 		return nil
 	}
-	ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+	ready, err := redis.Hget(machine.Name, "vnet.ready")
 	if err != nil || ready == "false" {
 		return nil
 	}
@@ -791,7 +792,7 @@ func CheckTemp(t uint16, port string) string {
 
 	if update {
 		if bmcIpv6LinkLocalRedis == "" {
-			m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+			m, err := redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
 			if err == nil {
 				o := strings.Split(m, ":")
 				b, _ := hex.DecodeString(o[0])
@@ -805,7 +806,7 @@ func CheckTemp(t uint16, port string) string {
 			if err != nil {
 				log.Print(err)
 			} else {
-				d.Do("HSET", redis.DefaultHash, "qsfp.temp.units.C", v)
+				d.Do("HSET", machine.Name, "qsfp.temp.units.C", v)
 				d.Close()
 			}
 		}

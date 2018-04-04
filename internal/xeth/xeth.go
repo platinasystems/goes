@@ -68,7 +68,7 @@ type Xeth struct {
 //				number of devices * number of stats
 func New(driver string, stats []string, opts ...interface{}) (*Xeth, error) {
 	addr, err := net.ResolveUnixAddr(netname,
-		fmt.Sprintf("@%s.xeth", driver))
+		fmt.Sprintf("@%s/xeth", driver))
 	if err != nil {
 		return nil, err
 	}

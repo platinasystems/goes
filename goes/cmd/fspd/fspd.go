@@ -19,13 +19,14 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 var (
@@ -56,7 +57,7 @@ type Command struct {
 
 type Info struct {
 	mutex sync.Mutex
-	rpc   *sockfile.RpcServer
+	rpc   *atsock.RpcServer
 	pub   *publisher.Publisher
 	stop  chan struct{}
 	last  map[string]float64
@@ -119,13 +120,13 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	if c.rpc, err = sockfile.NewRpcServer("fspd"); err != nil {
+	if c.rpc, err = atsock.NewRpcServer("fspd"); err != nil {
 		return err
 	}
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(redis.DefaultHash+":"+v+".", "fspd", "Info")
+		err = redis.Assign(machine.Name+":"+v+".", "fspd", "Info")
 		if err != nil {
 			return err
 		}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 type QsfpI2cGpioIo struct {
@@ -49,7 +50,7 @@ func (c *Command) updateio() error {
 		return nil
 	}
 	if qsfpIo.init == 1 {
-		ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+		ss, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
 		_, _ = fmt.Sscan(ss, &deviceVer)
 	}
 	port := uint8(0)

@@ -8,10 +8,13 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/platinasystems/go/internal/machine"
 )
 
 func main() {
 	var ecode int
+	machine.Name = "platina-mk1-bmc"
 	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1

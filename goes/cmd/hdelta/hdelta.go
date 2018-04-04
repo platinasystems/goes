@@ -13,6 +13,7 @@ import (
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 type Command struct {
@@ -48,7 +49,7 @@ DESCRIPTION
 func (c *Command) Main(args ...string) error {
 	switch len(args) {
 	case 0:
-		args = []string{redis.DefaultHash}
+		args = []string{machine.Name}
 	case 1:
 	default:
 		return fmt.Errorf("%v: unexpected", args[1:])

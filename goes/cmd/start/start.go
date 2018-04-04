@@ -20,7 +20,6 @@ import (
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 func New() *Command { return new(Command) }
@@ -80,10 +79,6 @@ func (c *Command) Main(args ...string) error {
 	}
 	if prog.Name() != prog.Install && prog.Base() != "init" {
 		return fmt.Errorf("use `%s start`", prog.Install)
-	}
-	_, err = os.Stat(sockfile.Path("redisd"))
-	if err == nil {
-		return fmt.Errorf("already started")
 	}
 	if c.Hook != nil {
 		if err = c.Hook(); err != nil {

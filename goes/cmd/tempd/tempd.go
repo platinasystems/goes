@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 var bmcIpv6LinkLocalRedis string
@@ -118,7 +119,7 @@ func bmcStatus() (string, string) {
 	var v, i string
 
 	if bmcIpv6LinkLocalRedis == "" {
-		m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+		m, err := redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
 		if err == nil {
 			o := strings.Split(m, ":")
 			b, _ := hex.DecodeString(o[0])
@@ -133,7 +134,7 @@ func bmcStatus() (string, string) {
 			v = "down"
 		} else {
 			v = "up"
-			bmcIpv4, _ := d.Do("HGET", redis.DefaultHash, "eth0.ipv4")
+			bmcIpv4, _ := d.Do("HGET", machine.Name, "eth0.ipv4")
 			s := fmt.Sprint(bmcIpv4)
 			if !strings.Contains(s, "ERROR") {
 				r, _ := regexp.Compile("([0-9]+).([0-9]+).([0-9]+).([0-9]+)")
@@ -173,7 +174,7 @@ func cpuCoreTemp() string {
 		return ""
 	}
 	if bmcIpv6LinkLocalRedis == "" {
-		m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
+		m, err := redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
 		if err == nil {
 			o := strings.Split(m, ":")
 			b, _ := hex.DecodeString(o[0])
@@ -185,7 +186,7 @@ func cpuCoreTemp() string {
 	if bmcIpv6LinkLocalRedis != "" {
 		d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
 		if err == nil {
-			d.Do("HSET", redis.DefaultHash, "host.temp.units.C", v)
+			d.Do("HSET", machine.Name, "host.temp.units.C", v)
 			d.Close()
 		}
 	}

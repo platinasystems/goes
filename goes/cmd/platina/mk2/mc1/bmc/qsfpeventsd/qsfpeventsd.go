@@ -19,10 +19,10 @@ import (
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/uiodevs"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const (
@@ -39,7 +39,7 @@ type Command struct {
 
 type Info struct {
 	mutex sync.Mutex
-	rpc   *sockfile.RpcServer
+	rpc   *atsock.RpcServer
 	pub   *publisher.Publisher
 	stop  chan struct{}
 	last  map[string]uint16
@@ -287,7 +287,7 @@ func (c *Command) update() error {
 	}
 
 	//*** TBD
-	//ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+	//ready, err := redis.Hget(machine.Name, "vnet.ready")
 	//if err != nil || ready == "false" {
 	//	return nil
 	//}
@@ -306,11 +306,11 @@ func (c *Command) update() error {
 
 			//*** TBD
 			/****
-			media, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+"M"+strconv.Itoa(Slotid)+".media")
+			media, err := redis.Hget(machine.Name, "vnet.eth-"+"M"+strconv.Itoa(Slotid)+".media")
 			if err != nil {
 				log.Print("qsfp hget error:", err)
 			}
-			speed, err := redis.Hget(redis.DefaultHash, "vnet.eth-"+"M"+strconv.Itoa(Slotid)+".speed")
+			speed, err := redis.Hget(machine.Name, "vnet.eth-"+"M"+strconv.Itoa(Slotid)+".speed")
 			if err != nil {
 				log.Print("qsfp hget error:", err)
 			}
@@ -320,7 +320,7 @@ func (c *Command) update() error {
 				PortIsCopper = true
 				/****
 				if media != "copper" {
-					ret, err := redis.Hset(redis.DefaultHash,
+					ret, err := redis.Hset(machine.Name,
 						"vnet.eth-"+"M"+strconv.Itoa(Slotid)+".media", "copper")
 					if err != nil || ret != 1 {
 						log.Print("qsfp hset error:", err, " ", ret)
@@ -333,7 +333,7 @@ func (c *Command) update() error {
 				PortIsCopper = false
 				/****
 				if media != "fiber" {
-					ret, err := redis.Hset(redis.DefaultHash,
+					ret, err := redis.Hset(machine.Name,
 						"vnet.eth-"+"M"+strconv.Itoa(Slotid)+".media", "fiber")
 					if err != nil || ret != 1 {
 						log.Print("qsfp hset error:", err, " ", ret)
@@ -342,7 +342,7 @@ func (c *Command) update() error {
 					}
 				}
 				if speed != "40g" {
-					ret, err := redis.Hset(redis.DefaultHash,
+					ret, err := redis.Hset(machine.Name,
 						"vnet.eth-"+"M"+strconv.Itoa(Slotid)+".speed", "40g")
 					if err != nil || ret != 1 {
 						log.Print("qsfp hset error:", err, " ", ret)
@@ -355,7 +355,7 @@ func (c *Command) update() error {
 				PortIsCopper = false
 				/****
 				if media != "fiber" {
-					ret, err := redis.Hset(redis.DefaultHash,
+					ret, err := redis.Hset(machine.Name,
 						"vnet.eth-"+"M"+strconv.Itoa(Slotid)+".media", "fiber")
 					if err != nil || ret != 1 {
 						log.Print("qsfp hset error:", err, " ", ret)
@@ -544,7 +544,7 @@ func (c *Command) updateDynamic() error {
 	}
 
 	// TBD **
-	//ready, err := redis.Hget(redis.DefaultHash, "vnet.ready")
+	//ready, err := redis.Hget(machine.Name, "vnet.ready")
 	//if err != nil || ready == "false" {
 	//        return nil
 	//}

@@ -48,7 +48,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/install"
 	"github.com/platinasystems/go/goes/cmd/iocmd"
 	"github.com/platinasystems/go/goes/cmd/ip"
-	addtype "github.com/platinasystems/go/goes/cmd/ip/link/add/type"
+	ifLinkAddType "github.com/platinasystems/go/goes/cmd/ip/link/add/type"
+	ifLinkAddTypeMachine "github.com/platinasystems/go/goes/cmd/ip/link/add/type/machine"
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
 	"github.com/platinasystems/go/goes/cmd/kill"
@@ -60,7 +61,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/iplinkadd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
@@ -94,6 +94,7 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 var Goes = &goes.Goes{
@@ -126,7 +127,7 @@ var Goes = &goes.Goes{
 			Init: [][]string{
 				[]string{"redisd"},
 				[]string{"uptimed"},
-				[]string{"tempd"},
+				// []string{"tempd"},
 				[]string{"vnetd"},
 			},
 		},
@@ -195,7 +196,7 @@ var Goes = &goes.Goes{
 		"source": &source.Command{},
 		"start": &start.Command{
 			ConfHook: func() error {
-				return redis.Hwait(redis.DefaultHash,
+				return redis.Hwait(machine.Name,
 					"vnet.ready", "true",
 					10*time.Second)
 			},
@@ -231,5 +232,6 @@ func init() {
 	info.Packages = func() []map[string]string {
 		return fe1.Packages
 	}
-	addtype.Goes.ByName["platina"] = iplinkadd.Command{}
+	ifLinkAddType.Goes.ByName[machine.Name] =
+		ifLinkAddTypeMachine.Command{}
 }

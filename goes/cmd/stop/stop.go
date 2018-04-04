@@ -18,7 +18,6 @@ import (
 	"github.com/platinasystems/go/internal/kill"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/prog"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const EtcGoesStop = "/etc/goes/stop"
@@ -93,7 +92,6 @@ func (c *Command) Main(args ...string) error {
 			kill.All(syscall.SIGKILL)
 		}
 	}
-	os.RemoveAll(sockfile.Dir)
 	return err
 }
 

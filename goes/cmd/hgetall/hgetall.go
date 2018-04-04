@@ -9,6 +9,7 @@ import (
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 type Command struct{}
@@ -26,7 +27,7 @@ func (Command) Apropos() lang.Alt {
 func (Command) Main(args ...string) error {
 	switch len(args) {
 	case 0:
-		args = []string{redis.DefaultHash}
+		args = []string{machine.Name}
 	case 1:
 	default:
 		return fmt.Errorf("%v: unexpected; use: `hget %s '%s'`",

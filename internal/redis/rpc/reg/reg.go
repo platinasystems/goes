@@ -8,13 +8,13 @@ package reg
 import (
 	netrpc "net/rpc"
 
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/redis/rpc"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 type Reg struct {
-	Srvr     *sockfile.RpcServer
+	Srvr     *atsock.RpcServer
 	assign   Assigner
 	unassign Unassigner
 }
@@ -24,7 +24,7 @@ type Unassigner func(string) error
 
 // e.g. name, "redis-reg"
 func New(name string, assign Assigner, unassign Unassigner) (*Reg, error) {
-	srvr, err := sockfile.NewRpcServer("redis-reg")
+	srvr, err := atsock.NewRpcServer(name)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func New(name string, assign Assigner, unassign Unassigner) (*Reg, error) {
 
 // Assign an RPC handler for the given redis key.
 func (reg *Reg) Assign(a args.Assign, _ *struct{}) error {
-	return reg.assign(a.Key, &rpc.Rpc{a.File, a.Name})
+	return reg.assign(a.Key, rpc.Rpc(a.Name))
 }
 
 // Assign the handler for the given redis key.

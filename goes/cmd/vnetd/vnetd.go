@@ -18,11 +18,12 @@ import (
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
@@ -89,13 +90,13 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.i)
 
-	sock, err := sockfile.NewRpcServer("vnetd")
+	sock, err := atsock.NewRpcServer("vnetd")
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	err = redis.Assign(redis.DefaultHash+":vnet.", "vnetd", "Info")
+	err = redis.Assign(machine.Name+":vnet.", "vnetd", "Info")
 	if err != nil {
 		return err
 	}
@@ -109,17 +110,8 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	sfn := sockfile.Path("vnet")
-	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s} }", sfn))
-	go func(sfn string) {
-		for {
-			_, err := os.Stat(sfn)
-			if err == nil {
-				sockfile.Chgroup(sfn, "adm")
-				break
-			}
-		}
-	}(sfn)
+	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s } }",
+		atsock.Name("vnet")))
 
 	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
 
