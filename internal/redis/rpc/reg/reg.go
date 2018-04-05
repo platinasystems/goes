@@ -35,7 +35,7 @@ func New(name string, assign Assigner, unassign Unassigner) (*Reg, error) {
 
 // Assign an RPC handler for the given redis key.
 func (reg *Reg) Assign(a args.Assign, _ *struct{}) error {
-	return reg.assign(a.Key, rpc.Rpc(a.Name))
+	return reg.assign(a.Key, &rpc.Rpc{a.AtSock, a.Name})
 }
 
 // Assign the handler for the given redis key.
