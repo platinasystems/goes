@@ -1,0 +1,78 @@
+version: '3'
+services:
+  R1:
+    container_name: R1
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R1
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes_1base/R1:/etc/frr
+    network_mode: "none"      
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  R2:
+    container_name: R2
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R2
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes_1base/R2:/etc/frr
+    network_mode: "none"            
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  R3:
+    container_name: R3
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R3
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes_1base/R3:/etc/frr
+    network_mode: "none"            
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+  R4:
+    container_name: R4
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    expose:
+      - 2601/tcp
+      - 179/tcp
+      - 5201/tcp
+      - 2605/tcp
+    hostname: R4
+    image: stigt/debian-frr:latest
+    privileged: true
+    volumes:
+      - ./volumes_1base/R4:/etc/frr
+    network_mode: "none"            
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
