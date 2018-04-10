@@ -216,8 +216,8 @@ func (n *Node) CurrentEvent() (e *Event) {
 }
 
 func (x *Event) Suspend() {
-	d := x.e.d
-	n := &d.e
+	d := x.e.d //d is the *Node for event x
+	n := &d.e  //e is the eventNode for d
 	if !n.isActive() {
 		panic("suspending inactive node")
 	}
@@ -230,6 +230,41 @@ func (x *Event) Suspend() {
 	t0 := cpu.TimeNow()
 	n.ft.signalLoop(false)
 	n.ft.waitLoop()
+	// Don't charge node for time suspended.
+	dt := cpu.TimeNow() - t0
+	n.eventStats.current.clocks -= uint64(dt)
+	n.log(d, event_elog_resumed)
+}
+
+// An eventNode has fromToNode struct, ft, which has a toNode channel (chan struct{}) and a fromNode channel (chan bool).
+// signalLoop(v bool) send v to the fromNode channel; waitNode() returns the element from fromNode.  Use signalLoop(true) to signal nodeEvent is done.
+// signalNode() sends empty struct to toNode; waitLoop() waits in infinite loop for a signal from toNode.  Use signalNode() to stop waitLoop.
+// doEvents() sends signalNode() to all active nodes
+// func (l *Loop) Run() is the infinite loop that does doEvents() continuously
+// func (l *Loop) doPollers() has has a call to signalNode()
+func (x *Event) SuspendWTimeout(t time.Duration) {
+	d := x.e.d //d is the *Node for event x, e here is the nodeEvent
+	n := &d.e  //e here is the eventNode for d
+	if false { //debug print
+		actor_name := "nil"
+		if x.e.actor != nil {
+			actor_name = x.e.actor.String()
+		}
+		fmt.Printf("SuspendWTimeout() point 1 node %s; actor %s; rxEvent ch length=%d \n", d.name, actor_name, len(n.rxEvents))
+	}
+	if !n.isActive() {
+		panic("event.go SuspendWTimeout() suspending inactive node")
+	}
+	if was := n.s.setSuspend(d, true); was {
+		n.logsi(d, event_elog_suspend, n.sequence, "ignore duplicate suspend")
+		return
+	}
+	n.log(d, event_elog_suspend)
+	n.eventStats.current.suspends++
+	t0 := cpu.TimeNow()
+	n.ft.signalLoop(false)
+	n.ft.waitLoop_with_timeout(t)
+
 	// Don't charge node for time suspended.
 	dt := cpu.TimeNow() - t0
 	n.eventStats.current.clocks -= uint64(dt)
@@ -262,7 +297,7 @@ func (x *nodeEvent) resume() {
 }
 
 // If too small, events may block when there are timing mismataches between sender and receiver.
-const eventHandlerChanDepth = 1 << 10
+const eventHandlerChanDepth = 1 << 15 //was 1 << 10 not enough; causes hang during bgp test with 8000 routes coming/going near during link flap; obversed ch depth of 5000+
 
 func (n *Node) hasEventHandler() bool { return n.e.rxEvents != nil }
 func (d *Node) maybeStartEventHandler() {

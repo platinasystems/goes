@@ -10,10 +10,12 @@ import (
 	"github.com/platinasystems/go/elib/elog"
 
 	"fmt"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type fromToNode struct {
@@ -30,6 +32,23 @@ func (x *fromToNode) signalNode()       { x.toNode <- struct{}{} }
 func (x *fromToNode) waitNode() bool    { return <-x.fromNode }
 func (x *fromToNode) signalLoop(v bool) { x.fromNode <- v }
 func (x *fromToNode) waitLoop()         { <-x.toNode }
+func (x *fromToNode) waitLoop_with_timeout(d time.Duration) {
+	start := time.Now()
+	select {
+	case <-x.toNode:
+		if false { // debug print
+			t := time.Since(start)
+			fmt.Printf("  poller.go waitLoop_with_timeout() done in %v\n", t.String())
+		}
+		return
+	case <-time.After(d):
+		//panic("  poller.go waitLoop_with_timeout() timeout")  //doesn't seem enough to exit vnet, still hangs
+		if true {
+			fmt.Printf("poller.go waitLoop_with_timeout() timeout, os.Exit(3)\n")
+			os.Exit(3)
+		}
+	}
+}
 
 type nodeState struct {
 	is_pending bool
