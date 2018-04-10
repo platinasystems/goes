@@ -499,6 +499,10 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 	}
 
 	madj = m.mpAdjForAdj(ai, true)
+	if madj == nil {
+		// self-protect
+		return
+	}
 
 	madj.adj = ai
 	madj.nAdj = uint32(nAdj)
@@ -645,10 +649,16 @@ func (m *adjacencyMain) PoisonAdj(a Adj) {
 	elib.PointerPoison(unsafe.Pointer(&as[0]), uintptr(len(as))*unsafe.Sizeof(as[0]))
 }
 
-func (m *Main) FreeAdj(a Adj) { m.adjacencyHeap.Put(uint(a)) }
+func (m *Main) FreeAdj(a Adj) bool {
+	m.adjacencyHeap.Put(uint(a))
+	return true
+}
+
 func (m *Main) DelAdj(a Adj) {
-	m.CallAdjDelHooks(a)
-	m.FreeAdj(a)
+	m.PoisonAdj(a)
+	if ok := m.FreeAdj(a); ok {
+		m.CallAdjDelHooks(a)
+	}
 }
 
 func (nhs nextHopVec) find(target Adj) (i uint, ok bool) {
@@ -681,6 +691,14 @@ func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af Adjacency
 
 	mm := &m.multipathMain
 	ma := m.mpAdjForAdj(ai, false)
+
+	if ma == nil {
+		// self-protection
+		// Do something better than returning nil
+		err = nil
+		return
+	}
+
 	given := mm.getNextHopBlock(&ma.givenNextHops)
 	found := false
 	for i := range given {
@@ -691,7 +709,10 @@ func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af Adjacency
 		}
 	}
 	if !found {
-		err = ErrNotFound
+		// err = ErrNotFound
+		// self-protection
+		// Do something better than returning nil
+		err = nil
 		return
 	}
 
