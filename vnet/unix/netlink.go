@@ -606,7 +606,9 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		// ignore these
 		return
 	case netlink.NUD_FAILED:
-		isDel = true
+		//do not delete neighbor on FAIL; matches Linux behavior
+		//isDel = true
+		return
 	}
 	si, _, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
@@ -700,11 +702,25 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		return
 	}
 
+	isReplace := false
+	switch v.Flags {
+	case netlink.NLM_F_REPLACE:
+		//Override existing
+		isReplace = true
+	case netlink.NLM_F_EXCL:
+		//Do not touch, if it exists
+	case netlink.NLM_F_CREATE:
+		//Create, if it does not exist
+	case netlink.NLM_F_APPEND:
+		//Add to end of list
+	}
+
 	p := ip4Prefix(v.Attrs[netlink.RTA_DST], v.DstLen)
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
 
 	nhs := e.ns.parse_ip4_next_hops(v)
 	m4 := ip4.GetMain(e.m.v)
+
 	for i := range nhs {
 		nh := &nhs[i]
 		intf := nh.intf
@@ -727,7 +743,7 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		// Otherwise its a normal next hop.
 		gw := nh.attrs[netlink.RTA_GATEWAY]
 		if gw != nil {
-			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel); err != nil {
+			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel, isReplace); err != nil {
 				return
 			}
 		} else {
@@ -741,6 +757,8 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 				}
 			}
 		}
+		//This flag should only be set once on first nh because it deletes any previously set nh
+		isReplace = false
 	}
 	return
 }

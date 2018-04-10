@@ -82,7 +82,8 @@ loop:
 		p := x.ip4_prefix.Add(i)
 
 		for i := range x.ip4_nhs {
-			err = m4.AddDelRouteNextHop(&p, &x.ip4_nhs[i], x.is_del)
+			//err = m4.AddDelRouteNextHop(&p, &x.ip4_nhs[i], x.is_del)
+			err = m4.AddDelRouteNextHop(&p, &x.ip4_nhs[i], x.is_del, false) //debug fyang, false is for do not erase previous
 			if err != nil {
 				return
 			}

@@ -395,9 +395,12 @@ func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
 		for dp, r := range dstMap {
 			g := m.fibByIndex(dp.i, false)
 			const isDel = true
-			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+			//Moved order of addDelRouteNextHop later to avoid infinite loop.
+			//Does have side affects of some things getting deleted earlier that what code originally intended
+			//g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
 			// Prefix is now unreachable.
 			f.addDelUnreachable(m, &dp.p, g, dst.a, r, !isDel, false)
+			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
 		}
 	}
 }
@@ -445,6 +448,7 @@ func (x *mapFibResult) addUnreachableVia(m *Main, f *Fib, p *Prefix) {
 
 func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 	r, _ := f.reachable.Get(p)
+
 	// Look up less specific reachable route for prefix.
 	lr, _, lok := f.reachable.getLessSpecific(p)
 	if isDel {
@@ -471,10 +475,13 @@ func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHo
 	if !isDel && recurse {
 		nr.addUnreachableVia(m, f, p)
 	}
-	nr.addDelNextHop(m, pf, *p, a, r, isDel)
+	//Moved order of addDelNextHop later to avoid infinite loop.
+	//Does have side affects of some things getting deleted earlier that what code originally intended
+	//nr.addDelNextHop(m, pf, *p, a, r, isDel)
 	f.unreachable.validateLen(np.Len)
 	nr.adj = ip.AdjNil
 	f.unreachable[np.Len][np.mapFibKey()] = nr
+	nr.addDelNextHop(m, pf, *p, a, r, isDel)
 	return
 }
 
@@ -519,8 +526,8 @@ func (f *Fib) Get(p *Prefix) (a ip.Adj, ok bool) {
 	return
 }
 
-func (f *Fib) Add(m *Main, p *Prefix, r ip.Adj) (ip.Adj, bool) { return f.addDel(m, p, r, true) }
-func (f *Fib) Del(m *Main, p *Prefix) (ip.Adj, bool)           { return f.addDel(m, p, ip.AdjMiss, false) }
+func (f *Fib) Add(m *Main, p *Prefix, r ip.Adj) (ip.Adj, bool) { return f.addDel(m, p, r, false) }
+func (f *Fib) Del(m *Main, p *Prefix) (ip.Adj, bool)           { return f.addDel(m, p, ip.AdjMiss, true) }
 func (f *Fib) Lookup(a *Address) (r ip.Adj) {
 	r = f.mtrie.lookup(a)
 	return
@@ -633,7 +640,9 @@ func (m *Main) addDelRoute(p *ip.Prefix, fi ip.FibIndex, newAdj ip.Adj, isDel bo
 	q := FromIp4Prefix(p)
 	var ok bool
 	oldAdj, ok = f.addDel(m, &q, newAdj, isDel)
-	if !ok {
+
+	//don't err if deleting something that has already been deleted
+	if !ok && !isDel {
 		err = fmt.Errorf("prefix %v not found", q)
 	}
 	return
@@ -667,8 +676,15 @@ type prefixError struct {
 
 func (e *prefixError) Error() string { return e.s + ": " + e.p.String() }
 
-func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool) (err error) {
+func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool, isReplace bool) (err error) {
 	f := m.fibBySi(nh.Si)
+	if isReplace {
+		//Delete existing before adding
+		//This will create potential side effect of some things getting deleted earlier than original code intended
+		forceDel := true
+		oldAdj, _ := f.Get(p)
+		f.addDel(m, p, oldAdj, forceDel)
+	}
 	return f.addDelRouteNextHop(m, p, nh.Address, nh, isDel)
 }
 
@@ -677,7 +693,6 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 		nhAdj, oldAdj, newAdj ip.Adj
 		ok                    bool
 	)
-
 	if !isDel && nha.MatchesPrefix(p) && p.Address != AddressUint32(0) {
 		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nha)
 		return
@@ -696,38 +711,55 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	} else {
 		const recurse = true
 		err = nhf.addDelUnreachable(m, p, f, nha, nhr, isDel, recurse)
+		{ //debug print
+			if err != nil {
+				fmt.Printf("err: recurse\n")
+			}
+		}
 		return
 	}
 
 	oldAdj, ok = f.Get(p)
 	if isDel && !ok {
-		err = &prefixError{s: "unknown destination", p: *p}
+		//debug print, flag but don't err if deleting
+		//err = &prefixError{s: "unknown destination", p: *p}
+		fmt.Printf("fib.go: deleteing %v unknown destination; maybe already deleted\n", p)
 		return
 	}
 
 	if oldAdj == nhAdj && isDel {
 		newAdj = ip.AdjNil
 	} else if newAdj, ok = m.AddDelNextHop(oldAdj, nhAdj, nhr.NextHopWeight(), nhr, isDel); !ok {
-		err = fmt.Errorf("requested next-hop %s not found in multipath", &nha)
+		if true { //if this is a delete, don't error (which would cause panic later); just flag
+			if !isDel {
+				err = fmt.Errorf("add route next hop: requested next-hop %s not found in multipath", &nha)
+			} else {
+				fmt.Printf("fib.go: del route next hop: requested next-hop %s not found in multipath; maybe already removed\n", &nha)
+			}
+		}
 		return
 	}
 
 	if oldAdj != newAdj {
-		// Only remove from fib on delete of final adjacency.
+		// Oriniglally only remove from fib on delete of final adjacency, but this caused some fib to never get deleted
+		// Now changed to delete immediately
 		isFibDel := isDel
 		if isFibDel && newAdj != ip.AdjNil {
-			isFibDel = false
+			//isFibDel = false
+			isFibDel = isDel
 		}
 		f.addDel(m, p, newAdj, isFibDel)
 		nhf.setReachable(m, p, f, &reachable_via_prefix, nha, nhr, isDel)
 	}
-
 	return
 }
 
 func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNextHopAdj ip.Adj, nha Address, r NextHopper) (err error) {
 	if adj, ok := f.Get(p); !ok {
-		err = &prefixError{s: "unknown destination", p: *p}
+		//debug print instead of err; next hop may be been removed earlier than originally intended but OK
+		//err = &prefixError{s: "unknown destination", p: *p}
+		fmt.Printf("fib.go: replace next hop, unknown destination, addr %v, nextHop %v, from-nha %v to-nha %v, namespace %s\n",
+			p, nha, fromNextHopAdj, toNextHopAdj, f.index.Name(&m.Main))
 	} else {
 		as := m.GetAdj(toNextHopAdj)
 		// If replacement is glean (interface route) then next hop becomes unreachable.
@@ -739,7 +771,8 @@ func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNext
 			}
 		} else {
 			if err = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); err != nil {
-				err = fmt.Errorf("replace next hop: %v", err)
+				//err = fmt.Errorf("replace next hop: %v", err)
+				err = fmt.Errorf("replace next hop %v from-nha %v to-nha %v: %v", adj, fromNextHopAdj, toNextHopAdj, err) //debug don
 			} else {
 				m.callFibAddDelHooks(pf.index, p, adj, isDel)
 			}
@@ -836,7 +869,12 @@ func (m *Main) AddDelInterfaceAddress(si vnet.Si, addr *Prefix, isDel bool) (err
 		ia, exists = m.Main.IfAddrForPrefix(&pa, si)
 		// For non-existing prefixes error will be signalled by AddDelInterfaceAddress below.
 		if exists {
-			m.addDelInterfaceAddressRoutes(ia, isDel)
+			//m.addDelInterfaceAddressRoutes(ia, isDel)
+			if true { //debug
+				// Question why this is done independently - rtnetlink should send
+				// any routes it would like deleted.
+				m.addDelInterfaceAddressRoutes(ia, isDel)
+			}
 		}
 	}
 
