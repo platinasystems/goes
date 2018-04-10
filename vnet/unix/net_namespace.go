@@ -42,6 +42,7 @@ func (m *net_namespace_main) read_dir(dir *namespace_search_dir, f func(dir *nam
 		is_init = true
 	)
 	for _, fi := range fis {
+		//fmt.Printf("discover namesapce is_del=%t, is_init=%t, %s\n", is_del, is_init, fi.Name())  //debug print
 		f(dir, fi.Name(), is_del, is_init)
 	}
 	return
@@ -88,8 +89,10 @@ func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *na
 			e, name, i_next := decode(buf[:], i)
 			switch {
 			case e.mask&syscall.IN_CREATE != 0:
+				//fmt.Printf("namespace %s created, is_init=%t\n", name, is_init) //debug print
 				f(dir, name, false, is_init)
 			case e.mask&syscall.IN_DELETE != 0:
+				//fmt.Printf("namespace %s deleted, is_init=%t\n", name, is_init)  //debug print
 				f(dir, name, true, is_init)
 			}
 			i = i_next
@@ -449,6 +452,7 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 	// If it exists set id; otherwise make a new namespace.
 	if ns, ok = m.namespace_by_name[name]; ok {
 		ns.nsid, ns.inode, err = m.nsid_for_path(e.dir.path, e.file_name)
+		//fmt.Printf("namespace add_del, already exist, %v\n", ns.name) //debug print
 		return
 	}
 	ns = &net_namespace{name: name}
@@ -456,12 +460,15 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 	if err = ns.add(m, e); err != nil {
 		elog.F("net-namespace discovery %s/%s, error %v", e.dir.path, e.file_name, err)
 		if err == addNamespaceNeedRetryErr {
+			//fmt.Printf("namespace add_del, %v  SignalEventAfter for retry\n", ns.name)
 			// Retry again in a bit.
 			e.add_count++
-			m.m.v.SignalEventAfter(e, 10e-3)
+			//m.m.v.SignalEventAfter(e, 10e-3)
+			m.m.v.SignalEventAfter(e, 50e-5) //debug: seem to work much better with quicker retries
 		}
 		return
 	}
+	//fmt.Printf("add_del_namespace %v succeeded in %d tries\n", name, e.add_count) //debug print
 	elog.F("net-namespace discovery ok %s/%s", e.dir.path, e.file_name)
 	ns.elog_name = elog.SetString(ns.name)
 	m.namespace_by_name[name] = ns
@@ -537,7 +544,9 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		} else {
 			name_changed = intf.name != name
 		}
+		//fmt.Printf("net_namespace.go add interface %s: intf=%s, ifindex=%d, name_changed=%t\n", ns.name, intf.name, index, name_changed) //debug print
 		if exists && string(intf.address) != string(address) {
+			//fmt.Printf("   fixme address changed, intf.address=%s address=%s\n", string(intf.address), string(address))
 			// fixme address change
 		}
 
@@ -891,6 +900,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 	for {
 		ns.m = m
 		if ns.ns_fd, err = m.fd_for_path(e.dir.path, e.file_name); err != nil {
+			//fmt.Printf("namespace add, %v, fd_for_path, %v\n", ns.name, err) //debug print
 			return
 		}
 		// First setns may return EINVAL until "ip netns add X" performs mount bind; so we need to retry.
@@ -898,6 +908,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 
 		// Never retry for initial namespace discovery.
 		if e.is_init && err != nil {
+			//fmt.Printf("namespace add, %v, is_init, %v\n", ns.name, err) //debug print
 			return
 		}
 		// It worked.
@@ -913,6 +924,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 			err = addNamespaceNeedRetryErr
 		}
 		// Other error.
+		//fmt.Printf("namespace add, %v, other error, %v\n", ns.name, err) //debug print
 		return
 	}
 	ns.nsid, ns.inode, err = m.nsid_for_fd(ns.ns_fd)
@@ -924,6 +936,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 	if ns1, ok := m.namespace_by_inode[ns.inode]; ok {
 		elog.F("net-namespace add file %s/%s already exists as %s", e.dir.path, e.file_name, ns1.name)
 		err = addNamespaceAlreadyExistsErr
+		//fmt.Printf("namespace add, %v, already exist, %v\n", ns.name, err) //debug print
 		return
 	}
 
@@ -935,15 +948,42 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 	if err = ns.netlink_socket_pair.configure(ns.netlink_socket_fds[0], ns.netlink_socket_fds[1]); err != nil {
 		syscall.Close(ns.ns_fd)
 		ns.ns_fd = -1
+		//fmt.Printf("namespace add, %v, netlink_socket_pair.configure, %v\n", ns.name, err) //debug print
 		return
 	}
 	ns.listen(&m.m.netlink_main)
 	ns.fibInit(false)
 	intf := m.m.vnet_tun_main.create_tun(ns)
+	//fmt.Printf("namespace add, create_tun, %s\n", ns.name) //debug print
 	if m.discovery_is_done() {
 		if err = intf.init(m.m); err != nil {
+			//retry if busy
+			s := err.Error()
+			if strings.Contains(s, "busy") {
+				//fmt.Printf("namespace add, %s init intf %v, retry later\n", ns.name, err)
+				err = addNamespaceNeedRetryErr
+			}
+			//
 			return
 		}
+		//fmt.Printf("namespace add, initialized intf %s, %s\n", intf.name, ns.name) //debug print
+	} else { //debug to check if discovery done
+		/*
+			n := atomic.LoadInt32(&m.n_init_namespace_to_discover)
+			//fmt.Printf("namespace add, discovery not done? try again: atomic.LoadInt32(&m.n_init_namespace_to_discover)=%d\n", n)
+			//shouldn't hit below as n == 0 means discovery done
+			if n == 0 {
+				if err = intf.init(m.m); err != nil {
+					s := err.Error()
+					if strings.Contains(s, "busy") {
+						//fmt.Printf("namespace add, %s init intf %v, retry later\n", ns.name, err)
+						err = addNamespaceNeedRetryErr
+					}
+					return
+				}
+				//fmt.Printf("namespace add', initialized intf %s, %s\n", intf.name, ns.name) //debug print
+			}
+		*/
 	}
 	return
 }
