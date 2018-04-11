@@ -167,6 +167,9 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 				}
 			} else if k.IsDontFork() ||
 				name == os.Args[0] {
+				if method, found := v.(goeser); found {
+					method.Goes(g)
+				}
 				return g.Main(args...)
 			}
 		} else {
