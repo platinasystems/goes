@@ -80,7 +80,7 @@ var Goes = &goes.Goes{
 		"loadfont":         loadfont.Command{},
 		"menuentry":        Menuentry,
 		"recordfail":       recordfail.Command{},
-		"search":           search.Command{},
+		"search":           &search.Command{},
 		"set":              &set.Command{},
 		"submenu":          submenu.Command{},
 		"[":                testcmd.Command{},

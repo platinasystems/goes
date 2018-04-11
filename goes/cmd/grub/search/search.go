@@ -5,9 +5,18 @@
 package search
 
 import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+
+	"github.com/platinasystems/go/internal/flags"
+	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/partitions"
 )
 
 type Command struct {
@@ -38,6 +47,44 @@ func (Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
-func (Command) Main(args ...string) error {
+func (c Command) Main(args ...string) error {
+	parm, args := parms.New(args, "--file", "--label", "--hint", "--uuid", "--set")
+	_, args = flags.New(args, "--no-floppy", "--fs-uuid")
+
+	v := parm.ByName["--set"]
+
+	if v == "" {
+		v = "root"
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("Unexpected %v\n")
+	}
+	f, err := os.Open("/proc/partitions")
+	if err != nil {
+		fmt.Printf("opening /proc/partitions: %s\n", err)
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
+		if len(fields) < 4 || fields[0] == "major" {
+			continue
+		}
+		fileName := fields[3]
+		sb, err := partitions.ReadSuperBlock("/dev/" + fileName)
+		if err == nil {
+			u, _ := sb.UUID()
+			if u.String() == args[0] {
+				if c.g.EnvMap == nil {
+					c.g.EnvMap = make(map[string]string)
+				}
+				c.g.EnvMap[v] = "/dev/" + fileName
+				return nil
+			}
+		}
+	}
 	return nil
 }
