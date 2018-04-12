@@ -35,6 +35,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/grub/set"
 	"github.com/platinasystems/go/goes/cmd/grub/submenu"
 	"github.com/platinasystems/go/goes/cmd/grub/terminal_output"
+	"github.com/platinasystems/go/goes/cmd/grub/webserver"
 
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/kexec"
@@ -117,6 +118,9 @@ func (c *Command) Main(args ...string) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Grub script returned %s\n", err)
 	}
+
+	webserver.ServeMenus(Goes) // FIXME so wrong
+
 	menlen := len(Menuentry.Menus)
 	if menlen == 0 && len(Linux.Kern) == 0 {
 		fmt.Fprintf(os.Stderr, "Grub script did not define any menus or set a kernel\n")
@@ -156,7 +160,6 @@ func (c *Command) Main(args ...string) error {
 	me := Menuentry.Menus[menuItem]
 	fmt.Printf("Running menu item #%d:\n", menuItem)
 	err = me.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
-
 	fmt.Printf("Kernel defined: %s\n", Linux.Kern)
 	fmt.Printf("Linux command: %v\n", Linux.Cmd)
 	fmt.Printf("Initrd: %v\n", Initrd.Initrd)
