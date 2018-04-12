@@ -27,6 +27,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/femtocom"
 	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/function"
+	"github.com/platinasystems/go/goes/cmd/grub"
 	"github.com/platinasystems/go/goes/cmd/hdel"
 	"github.com/platinasystems/go/goes/cmd/hdelta"
 	"github.com/platinasystems/go/goes/cmd/hexists"
@@ -107,6 +108,7 @@ var Goes = &goes.Goes{
 				[]string{"uptimed"},
 			},
 		},
+		"grub":    &grub.Command{},
 		"hdel":    hdel.Command{},
 		"hdelta":  &hdelta.Command{},
 		"hexists": hexists.Command{},
