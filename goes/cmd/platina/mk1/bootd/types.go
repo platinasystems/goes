@@ -4,7 +4,7 @@
 
 package bootd
 
-// BOOT STATES
+// BOOT STATES FIXME REWORK THIS
 const (
 	BootStateUnknown = iota
 	BootStateMachineOff
@@ -14,7 +14,7 @@ const (
 	BootStateRegistrationStart
 	BootStateRegistrationDone
 	BootStateScriptStart
-	BootStateScriptExecuting
+	BootStateScriptRunning
 	BootStateScriptDone
 	BootStateBooting
 	BootStateUp
@@ -30,7 +30,7 @@ func bootText(i int) string {
 		"Register-start",
 		"Registered",
 		"Script-sent",
-		"Script-exec",
+		"Script-run",
 		"Script-done",
 		"Booting-linux",
 		"Up",
@@ -62,16 +62,16 @@ func installText(i int) string {
 	return installStates[i]
 }
 
-// INSTALL TYPES
+// DISTROS
 const (
 	Debian = iota
 )
 
-func installTypeText(i int) string {
-	var installTypes = []string{
+func distroText(i int) string {
+	var distroTypes = []string{
 		"Debian",
 	}
-	return installTypes[i]
+	return distroTypes[i]
 }
 
 // SCRIPTS
@@ -90,7 +90,8 @@ func scriptText(i int) string {
 	return scripts[i]
 }
 
-// CLIENT MESSAGES
+//msgtype, mac, ip, slice of sda2, myip?
+// CLIENT SIDE MESSAGE REQUESTS
 const (
 	BootRequestRegister = iota
 	BootRequestDumpVars
@@ -98,13 +99,23 @@ const (
 	BootRequestKernelNotFound
 	BootRequestRebootLoop
 )
+const (
+	Register  = "register"
+	DumpVars  = "dumpvars"
+	Dashboard = "dashboard"
+)
 
-//FIXME DEFINE THIS
 type BootRequest struct {
 	Request int
 }
+type BootReply struct {
+	Reply   int
+	Binary  []byte
+	Payload []byte
+}
 
-// SERVER REPLY MESSAGES
+//msg type,reply#,error, json(name, scripttype, script,binary)
+// SERVER SIDE MESSAGE REPLIES
 const (
 	BootReplyNormal = iota
 	BootReplyRunGoesScript
@@ -112,10 +123,3 @@ const (
 	BootReplyExecKernel
 	BootReplyReflashAndReboot
 )
-
-//FIXME DEFINE THIS
-type BootReply struct {
-	Reply   int
-	Binary  []byte
-	Payload []byte
-}

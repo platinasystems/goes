@@ -3,20 +3,17 @@
 // LICENSE file.
 
 // DESCRIPTION
-// 'boot controller daemon' to service muliple client installs
-// this daemon will run on a "master" ToR and backup ToR
-// this daemon reads the config database stored locally or in the cloud
-// this daemon contains the boot state machine for each client
-// run bootd on all ToR's so they can be activated as a backup master
-// normally they would be dormant, can be activated as backup, or
-// receive a reboot or other command from the master asyncronously
+// 'boot controller daemon' to service client installs
+// this daemon will run on a "master" ToR
+// this daemon reads the config database stored in the cloud or locally
 
-//TODO TRY DIFF MACHINES INCL CLOUD
-//TODO REAL DB, WRITE DB
-//TODO CYCLE THROUGH OPTIONS
-//TODO MAKE BOOTC GO LIVE IN GOES
-//TODO JSON REPLY
-//TODO DB read from FILE CLOUD or LITERAL
+//TODO always build-in bootc and bootd.  MASTER=BOOTD CLIENT=BOOTC only 1.TRY-IT-MASTERCHECK /etc/MASTER 2.DRIVECODE run on 2 invaders
+//TODO TRY RUNNING BOOTD FROM DIFF MACHINES INCL NON-TOR
+//TODO MAKE BOOTC, BOOTD GO LIVE IN GOES WITH HARDCODED ADDRESSES - DONT COMMIT UNTIL ADDRESSING WORKED OUT
+//TODO ADD LOCATION
+//TODO REAL DB, WRITE DB, (LOCAL, CLOUD, OR LITERAL)
+//TODO CYCLE THROUGH OPTIONS FOR CONTACTING CLOUD
+//TODO ADD STATE MACHINES LOOP X TIMES
 
 package bootd
 
@@ -66,7 +63,7 @@ type Client struct {
 	installState   int
 	autoInstall    bool
 	certPresent    bool
-	installType    int
+	distroType     int
 	timeRegistered string
 	timeInstalled  string
 	installCounter int
@@ -88,6 +85,8 @@ func startHandler() (err error) {
 	return
 }
 
+var blah = "OKAY"
+
 //TODO CONFORM TO MSG TYPES
 func reply(w http.ResponseWriter, r *http.Request) {
 	var b = ""
@@ -108,6 +107,7 @@ func reply(w http.ResponseWriter, r *http.Request) {
 		}
 		b += r.URL.Path + "\n"
 		b += t + "\n"
+		b += blah + "\n"
 	case "dashboard":
 		if b, err = dashboard(); err != nil {
 			b = "error getting dashboard\n"

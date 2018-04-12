@@ -5,17 +5,42 @@
 package bootd
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
 
-//TODO CONFORM TO MSG TYPE
+// TODO
+func bootStateMachine() {
+}
+
+// TODO
+func installStateMachine() {
+}
+
+type REGINFO struct {
+	Mac string
+	IP  string
+}
+
+var RegInfo REGINFO
+
 func register(u *[]string) (s string, err error) {
-	if len(*u) < 3 {
-		return "", err
+	//if len(*u) < 3 { //CHANGE BOUNDS
+	//	return "", err
+	//}
+
+	err = json.Unmarshal([]byte((*u)[1]), &RegInfo)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+		blah = "ERROR"
 	}
-	mac := (*u)[1]
-	ClientCfg[mac].ipAddr = (*u)[2]
+	mac := RegInfo.Mac   //NEW
+	ipAddr := RegInfo.IP //NEW
+
+	//mac := (*u)[1]
+	//ClientCfg[mac].ipAddr = (*u)[2]
+	ClientCfg[mac].ipAddr = ipAddr //NEW
 	ClientCfg[mac].bootState = BootStateRegistrationDone
 	ClientCfg[mac].installState = InstallStateInProgess
 	t := time.Now()
@@ -60,7 +85,7 @@ func dashboard() (s string, err error) {
 				s += fmt.Sprintf("%-5t ", ClientCfg[i].autoInstall)
 				s += fmt.Sprintf("%-5t ", ClientCfg[i].certPresent)
 				s += fmt.Sprintf("%-12s ",
-					installTypeText(ClientCfg[i].installType))
+					distroText(ClientCfg[i].distroType))
 				s += fmt.Sprintf("%-19s ", ClientCfg[i].timeRegistered)
 				s += fmt.Sprintf("%-19s ", ClientCfg[i].timeInstalled)
 				s += fmt.Sprintf("%-5d ", ClientCfg[i].installCounter)
@@ -72,6 +97,11 @@ func dashboard() (s string, err error) {
 }
 
 func readClientCfg() (err error) {
+	// try reading from cloud
+
+	// try reading from local
+
+	// default to literal for testing
 	ClientCfg["01:02:03:04:05:06"] = &Client{
 		unit:           1,
 		name:           "Invader10",
@@ -82,7 +112,7 @@ func readClientCfg() (err error) {
 		installState:   InstallStateFactory,
 		autoInstall:    true,
 		certPresent:    false,
-		installType:    Debian,
+		distroType:     Debian,
 		timeRegistered: "0000-00-00:00:00:00",
 		timeInstalled:  "0000-00-00:00:00:00",
 		installCounter: 0,
@@ -97,7 +127,7 @@ func readClientCfg() (err error) {
 		installState:   InstallStateFactory,
 		autoInstall:    true,
 		certPresent:    false,
-		installType:    Debian,
+		distroType:     Debian,
 		timeRegistered: "0000-00-00:00:00:00",
 		timeInstalled:  "0000-00-00:00:00:00",
 		installCounter: 0,
@@ -112,7 +142,7 @@ func readClientCfg() (err error) {
 		installState:   InstallStateFactory,
 		autoInstall:    true,
 		certPresent:    false,
-		installType:    Debian,
+		distroType:     Debian,
 		timeRegistered: "0000-00-00:00:00:00",
 		timeInstalled:  "0000-00-00:00:00:00",
 		installCounter: 0,

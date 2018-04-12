@@ -3,3 +3,6 @@
 // LICENSE file.
 
 package bootd
+
+func bootScript() {
+}
