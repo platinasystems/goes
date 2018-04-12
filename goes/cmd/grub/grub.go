@@ -5,6 +5,14 @@
 package grub
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/cli"
@@ -34,6 +42,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/thencmd"
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/lang"
+
+	"github.com/platinasystems/go/internal/url"
 )
 
 type Command struct {
@@ -56,12 +66,12 @@ var Goes = &goes.Goes{
 		"function":         &function.Command{},
 		"gfxmode":          gfxmode.Command{},
 		"if":               &ifcmd.Command{},
-		"initrd":           &initrd.Command{},
+		"initrd":           Initrd,
 		"insmod":           insmod.Command{},
 		"kexec":            kexec.Command{},
-		"linux":            &linux.Command{},
+		"linux":            Linux,
 		"loadfont":         loadfont.Command{},
-		"menuentry":        &menuentry.Command{},
+		"menuentry":        Menuentry,
 		"recordfail":       recordfail.Command{},
 		"search":           search.Command{},
 		"set":              &set.Command{},
@@ -73,12 +83,84 @@ var Goes = &goes.Goes{
 	},
 }
 
+var Linux = &linux.Command{}
+
+var Initrd = &initrd.Command{}
+
+var Menuentry = &menuentry.Command{}
+
 func (c *Command) Apropos() lang.Alt {
 	return Goes.Apropos()
 }
 
 func (c *Command) Main(args ...string) error {
-	return Goes.Main(args...)
+	script, err := url.Open("/boot/grub/grub.cfg")
+	if err != nil {
+		return err
+	}
+	defer script.Close()
+
+	scanner := bufio.NewScanner(script)
+
+	Goes.Catline = func(prompt string) (string, error) {
+		if scanner.Scan() {
+			return scanner.Text(), nil
+		}
+		err := scanner.Err()
+		if err == nil {
+			err = io.EOF
+		}
+		return "", err
+	}
+
+	err = Goes.Main(args...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Grub script returned %s\n", err)
+	}
+	menlen := len(Menuentry.Menus)
+	if menlen == 0 && len(Linux.Kern) == 0 {
+		fmt.Fprintf(os.Stderr, "Grub script did not define any menus or set a kernel\n")
+	}
+
+	if len(Linux.Kern) > 0 {
+		kexec := []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
+		fmt.Printf("Execute %s? <Yes/no> ", kexec)
+		yn := ""
+		_, err := fmt.Fscanln(os.Stdin, &yn)
+		if err != nil {
+			return err
+		}
+		if yn == "" || strings.HasPrefix(yn, "Y") ||
+			strings.HasPrefix(yn, "y") {
+			err := Goes.Main(kexec...)
+			return err
+		}
+	}
+
+	if menlen == 0 {
+		return errors.New("No defined kernel or menus")
+	}
+	fmt.Printf("Menus defined: %d\n", menlen)
+	for i, me := range Menuentry.Menus {
+		fmt.Printf("[%d]   %s\n", i, me.Name)
+	}
+	fmt.Printf("Menu item [%d]? ", 0) //FIXME get the real default
+	mi := ""                          // FIXME get the real default
+	_, err = fmt.Fscanln(os.Stdin, &mi)
+	if err != nil {
+		return err
+	}
+
+	menuItem, err := strconv.Atoi(mi)
+	fmt.Printf("Running %d\n", menuItem)
+	me := Menuentry.Menus[menuItem]
+	fmt.Printf("Running menu item #%d:\n", menuItem)
+	err = me.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
+
+	fmt.Printf("Kernel defined: %s\n", Linux.Kern)
+	fmt.Printf("Linux command: %v\n", Linux.Cmd)
+	fmt.Printf("Initrd: %v\n", Initrd.Initrd)
+	return err
 }
 
 func (c *Command) String() string {
