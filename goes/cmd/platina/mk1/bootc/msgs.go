@@ -9,27 +9,32 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 )
 
-func register(mip string, mac string, ip string) (s string, err error) {
+func register(mip string, mac string, ip string) (r int, n string, err error) {
+	regReq.Mac = mac
+	regReq.IP = ip
+	jsonInfo, _ := json.Marshal(regReq)
+	s := ""
 
-	regInfo.Mac = mac
-	regInfo.IP = ip
-	jsonInfo, _ := json.Marshal(regInfo)
-
-	// TODO [1] READ the /boot directory into slice
-
-	// TODO [0] REPLACE register WITH CONSTANT
-	if s, err = sendReq(mip, "register "+string(jsonInfo)); err != nil {
-		return "", fmt.Errorf("Error contacting Master")
+	if s, err = sendReq(mip, bootd.Register+" "+string(jsonInfo)); err != nil {
+		return bootd.BootStateNotRegistered, "", fmt.Errorf("Error contacting Master")
 	}
 
-	// TODO [2] UNMARSHALL JSON BLOB, name, script, err - return these
+	err = json.Unmarshal([]byte(s), &regReq)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+	}
+	reply := regReply.Reply
+	name := regReply.TorName
+	err = regReply.Error
 
-	return s, nil
+	return reply, name, err
 }
 
-func execute() error { // TODO
+func executeScript() error {
 	return nil
 }
 
@@ -79,11 +84,11 @@ func getMasterIP() string {
 }
 
 func getIP() string {
-	return "192.168.101.142" // FIXME
+	return "192.168.101.142" // TODO
 }
 
 func getMAC() string {
-	return "01:02:03:04:05:06" // FIXME
+	return "01:02:03:04:05:06" // TODO
 }
 
 func getIP2() string {

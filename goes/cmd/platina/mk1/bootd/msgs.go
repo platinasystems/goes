@@ -10,47 +10,34 @@ import (
 	"time"
 )
 
-// TODO
-func bootStateMachine() {
-}
-
-// TODO
-func installStateMachine() {
-}
-
-type REGINFO struct {
-	Mac string
-	IP  string
-}
-
-var RegInfo REGINFO
-
 func register(u *[]string) (s string, err error) {
-	//if len(*u) < 3 { //CHANGE BOUNDS
-	//	return "", err
-	//}
+	if len(*u) < 2 {
+		return "", err
+	}
 
-	err = json.Unmarshal([]byte((*u)[1]), &RegInfo)
+	err = json.Unmarshal([]byte((*u)[1]), &regReq)
 	if err != nil {
 		fmt.Println("There was an error:", err)
-		blah = "ERROR"
 	}
-	mac := RegInfo.Mac   //NEW
-	ipAddr := RegInfo.IP //NEW
+	mac := regReq.Mac
+	ipAddr := regReq.IP
 
-	//mac := (*u)[1]
-	//ClientCfg[mac].ipAddr = (*u)[2]
-	ClientCfg[mac].ipAddr = ipAddr //NEW
-	ClientCfg[mac].bootState = BootStateRegistrationDone
-	ClientCfg[mac].installState = InstallStateInProgess
+	ClientCfg[mac].ipAddr = ipAddr
+	ClientCfg[mac].bootState = BootStateRegistered
+	ClientCfg[mac].installState = InstallStateInProgress
 	t := time.Now()
 	ClientCfg[mac].timeRegistered = fmt.Sprintf("%10s",
 		t.Format("2006-01-02 15:04:05"))
 	ClientCfg[mac].timeInstalled = fmt.Sprintf("%10s",
 		t.Format("2006-01-02 15:04:05"))
 	ClientCfg[mac].installCounter++
-	s = "script"
-	return s, nil
+
+	regReply.Reply = RegReplyFound
+	regReply.TorName = ClientCfg[mac].name
+	regReply.Error = nil
+	jsonInfo, err := json.Marshal(regReply)
+
+	return string(jsonInfo), err
 }
 
 func dumpVars() (s string, err error) {
@@ -96,10 +83,18 @@ func dashboard() (s string, err error) {
 	return s, nil
 }
 
-func readClientCfg() (err error) {
-	// try reading from cloud
+// TODO
+func bootStateMachine() {
+}
 
-	// try reading from local
+// TODO
+func installStateMachine() {
+}
+
+func readClientCfg() (err error) {
+	// try reading from cloud DB
+
+	// try reading from local DB
 
 	// default to literal for testing
 	ClientCfg["01:02:03:04:05:06"] = &Client{
@@ -108,7 +103,7 @@ func readClientCfg() (err error) {
 		machine:        "ToR MK1",
 		macAddr:        "01:02:03:04:05:06",
 		ipAddr:         "0.0.0.0",
-		bootState:      BootStateUnknown,
+		bootState:      BootStateNotRegistered,
 		installState:   InstallStateFactory,
 		autoInstall:    true,
 		certPresent:    false,
@@ -123,7 +118,7 @@ func readClientCfg() (err error) {
 		machine:        "ToR MK1",
 		macAddr:        "01:02:03:04:05:07",
 		ipAddr:         "0.0.0.0",
-		bootState:      BootStateUnknown,
+		bootState:      BootStateNotRegistered,
 		installState:   InstallStateFactory,
 		autoInstall:    true,
 		certPresent:    false,
@@ -138,7 +133,7 @@ func readClientCfg() (err error) {
 		machine:        "ToR MK1",
 		macAddr:        "01:02:03:04:05:08",
 		ipAddr:         "0.0.0.0",
-		bootState:      BootStateUnknown,
+		bootState:      BootStateNotRegistered,
 		installState:   InstallStateFactory,
 		autoInstall:    true,
 		certPresent:    false,

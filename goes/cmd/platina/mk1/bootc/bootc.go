@@ -6,18 +6,13 @@
 // 'bootc' client used for auto-install
 // runs as coreboot payload (kernel + initrd + goes)
 
-// TODO add test infra, with 100 units
-// TODO installing apt-gets support
-// TODO master to trigger client reset
-// TODO CB to boot new goes payload
-// TODO goes formats SDA2, installs debian use INSTALL/PRESEED
-
 package bootc
 
 import (
 	"fmt"
 	"strconv"
 
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -51,31 +46,31 @@ func (Command) Main(args ...string) (err error) {
 	if err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
-	s := ""
 	mip := getMasterIP()
+	name := ""
 
 	switch c {
 	case 1:
 		mac := getMAC()
 		ip := getIP()
-		if s, err = register(mip, mac, ip); err != nil {
+		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
-		fmt.Println(s)
+		fmt.Println(name)
 	case 2:
 		mac := getMAC2()
 		ip := getIP2()
-		if s, err = register(mip, mac, ip); err != nil {
+		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
-		fmt.Println(s)
+		fmt.Println(name)
 	case 3:
 		mac := getMAC3()
 		ip := getIP3()
-		if s, err = register(mip, mac, ip); err != nil {
+		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
-		fmt.Println(s)
+		fmt.Println(name)
 	case 4:
 		if err = dumpVars(mip); err != nil {
 			return err
@@ -96,18 +91,41 @@ func (Command) Main(args ...string) (err error) {
 
 //*/
 
-func boot() (err error) { // Coreboot goes "init"
+func boot() (err error) { // Coreboot "init"
 	mip := getMasterIP()
 	mac := getMAC()
 	ip := getIP()
-	// TODO [3] try register 3 times with delay in between
-	if _, err = register(mip, mac, ip); err != nil {
-		// register failed: forget master, fall into grub-equivalent
-		return err
+	reply := 0
+	//TODO [2] ADD FASTER TIMEOUT
+	reply, _, err = register(mip, mac, ip)
+	if err != nil || reply != bootd.BootStateRegistered {
+		reply, _, err = register(mip, mac, ip)
+		if err != nil || reply != bootd.BootStateRegistered {
+			return err // register failed, just fall into grub
+		}
 	}
+
+	// TODO TRY AS TEST 2 invaders
+	// TODO TRY REAL REGISTER BOLT IN
+	// TODO BOOTC, BOOTD /etc/MASTER logic
+
+	// TODO [2] REGISTER TIMEOUT
+	// TODO READ the /boot directory into slice, bootd store last known good booted image
+	// TODO [3] boot grub(GRUB TO TELL WHAT ITS BOOTING), give me your images/BOOT THIS IMAGE, ASK SCRIPT TO RUN/RUN IT
+
 	// TODO run script (format, install debian, etc. OR just boot)
 
-	// TODO if debian install fails ==> try again, PXE boot?
+	// TODO REAL DB, WRITE DB, (LOCAL, CLOUD, OR LITERAL)
+
+	// TODO if debian install fails ==> try again
+
+	// TODO bootd state machines
+	// TODO add test infra, with 100 units
+	// TODO installing apt-gets support
+	// TODO master to trigger client reset
+	// TODO CB to boot new goes payload
+	// TODO goes formats SDA2, installs debian use INSTALL/PRESEED
+	// TODO ADD LOCATION
 
 	return nil
 }

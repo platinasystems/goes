@@ -4,68 +4,115 @@
 
 package bootd
 
-// BOOT STATES FIXME REWORK THIS
 const (
-	BootStateUnknown = iota
-	BootStateMachineOff
-	BootStateCoreboot
-	BootStateCBLinux
-	BootStateCBGoes
-	BootStateRegistrationStart
-	BootStateRegistrationDone
-	BootStateScriptStart
-	BootStateScriptRunning
-	BootStateScriptDone
+	Register  = "register"
+	DumpVars  = "dumpvars"
+	Dashboard = "dashboard"
+)
+const (
+	BootStateNotRegistered = iota
+	BootStateRegistered
 	BootStateBooting
 	BootStateUp
+	BootStateInstalling
+	BootStateIntstallFailed
+	BootStateRebooting
 )
+const (
+	InstallStateFactory = iota
+	InstallStateInProgress
+	InstallStateInstalled
+	InstallStateInstallFail
+	InstallStateFactoryInProgress
+	InstallStateFactoryFailed
+)
+const (
+	Debian = iota
+)
+const (
+	RegReplyFound = iota
+	RegReplyNotFound
+)
+const (
+	ScriptBootLatest = iota
+	ScriptBootKnownGood
+	ScriptInstallDebian
+)
+const (
+	BootReplyNormal = iota
+	BootReplyRunGoesScript
+	BootReplyExecUsermode
+	BootReplyExecKernel
+	BootReplyReflashAndReboot
+)
+
+type Client struct {
+	unit           int
+	name           string
+	machine        string
+	macAddr        string
+	ipAddr         string
+	bootState      int
+	installState   int
+	autoInstall    bool
+	certPresent    bool
+	distroType     int
+	timeRegistered string
+	timeInstalled  string
+	installCounter int
+}
+
+type RegReq struct {
+	Mac string
+	IP  string
+}
+
+type RegReply struct {
+	Reply   int
+	TorName string
+	Error   error
+}
+
+type BootReq struct {
+	Images []string
+}
+
+type BootReply struct {
+	Reply      int
+	ImageName  string
+	Script     string
+	ScriptType string
+	Binary     []byte
+	Error      error
+}
+
+var ClientCfg map[string]*Client
+var regReq RegReq
+var regReply RegReply
 
 func bootText(i int) string {
 	var bootStates = []string{
-		"Unknown",
-		"Off",
-		"Coreboot",
-		"Coreboot-linux",
-		"Coreboot-goes",
-		"Register-start",
+		"Not-Registered",
 		"Registered",
-		"Script-sent",
-		"Script-run",
-		"Script-done",
-		"Booting-linux",
+		"Booting",
 		"Up",
+		"Installing",
+		"Rebooting",
 	}
 	return bootStates[i]
 }
 
-// INSTALL STATES
-const (
-	InstallStateFactory = iota
-	InstallStateInProgess
-	InstallStateCompleted
-	InstallStateFail
-	InstallStateFactoryRestoreStart
-	InstallStateFactoryRestoreDone
-	InstallStateFactoryRestoreFail
-)
-
 func installText(i int) string {
 	var installStates = []string{
 		"Factory",
-		"In-progress",
-		"Completed",
-		"Install-fail",
-		"Restore-start",
-		"Restore-done",
-		"Restore-fail",
+		"Install-in-progress",
+		"Installed",
+		"Install-failed",
+		"Restore-in-progress",
+		"Restore-failed",
 	}
 	return installStates[i]
 }
-
-// DISTROS
-const (
-	Debian = iota
-)
 
 func distroText(i int) string {
 	var distroTypes = []string{
@@ -73,13 +120,6 @@ func distroText(i int) string {
 	}
 	return distroTypes[i]
 }
-
-// SCRIPTS
-const (
-	ScriptBootLatest = iota
-	ScriptBootKnownGood
-	ScriptInstallDebian
-)
 
 func scriptText(i int) string {
 	var scripts = []string{
@@ -89,37 +129,3 @@ func scriptText(i int) string {
 	}
 	return scripts[i]
 }
-
-//msgtype, mac, ip, slice of sda2, myip?
-// CLIENT SIDE MESSAGE REQUESTS
-const (
-	BootRequestRegister = iota
-	BootRequestDumpVars
-	BootRequestDashboard
-	BootRequestKernelNotFound
-	BootRequestRebootLoop
-)
-const (
-	Register  = "register"
-	DumpVars  = "dumpvars"
-	Dashboard = "dashboard"
-)
-
-type BootRequest struct {
-	Request int
-}
-type BootReply struct {
-	Reply   int
-	Binary  []byte
-	Payload []byte
-}
-
-//msg type,reply#,error, json(name, scripttype, script,binary)
-// SERVER SIDE MESSAGE REPLIES
-const (
-	BootReplyNormal = iota
-	BootReplyRunGoesScript
-	BootReplyExecUsermode
-	BootReplyExecKernel
-	BootReplyReflashAndReboot
-)

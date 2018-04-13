@@ -4,18 +4,9 @@
 
 package bootc
 
-type RegInfo struct {
-	Mac    string
-	IP     string
-	Images []string
-}
-type RegReply struct {
-	ReplyType int
-	TorName   string
-	ImageName string
-	Script    string
-	Error     error
-}
+import (
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
+)
 
-var regInfo RegInfo
-var regReply RegReply
+var regReq bootd.RegReq
+var regReply bootd.RegReply
