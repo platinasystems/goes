@@ -309,7 +309,10 @@ func (d *Node) maybeStartEventHandler() {
 	l := d.l
 	l.eventHandlers = append(l.eventHandlers, d.noder)
 	l.eventHandlerNodes = append(l.eventHandlerNodes, d)
-	n.rxEvents = make(chan *nodeEvent, eventHandlerChanDepth)
+	// In master, this was changed to 1<<15 to make the large route
+	// test work but in this code base, it causes vnetd not to start correctly.
+	// Unsure of the root cause.
+	n.rxEvents = make(chan *nodeEvent, 1<<10 /*eventHandlerChanDepth*/)
 	n.activeIndex = ^uint(0)
 	n.ft.init()
 	elog.F("loop starting event handler %v", d.elogNodeName)
@@ -355,6 +358,9 @@ func (e *nodeEvent) EventAction() {
 	n.activeCount++
 	if n.activeCount == 1 {
 		d.l.eventMain.addActive(d)
+	}
+	if false {
+		fmt.Printf("rxEvents <- %s (%d - %d)\n", e.d.name, n.activeCount, len(n.rxEvents))
 	}
 	n.rxEvents <- e
 }
