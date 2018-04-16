@@ -226,14 +226,15 @@ func (c *Command) Main(args ...string) error {
 	if flag.ByName["-f"] && c.g.Verbosity < goes.VerboseVerify {
 		c.g.Verbosity = goes.VerboseVerify
 	}
-	c.g.Catline = func(prompt string) (string, error) {
-		s, err := prompter.Prompt(prompt)
-		if err != nil {
-			return "", err
+	if c.g.Catline == nil {
+		c.g.Catline = func(prompt string) (string, error) {
+			s, err := prompter.Prompt(prompt)
+			if err != nil {
+				return "", err
+			}
+			return s, nil
 		}
-		return s, nil
 	}
-
 	signal.Ignore(syscall.SIGINT)
 readCommandLoop:
 	for {
