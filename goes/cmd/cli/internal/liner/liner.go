@@ -44,17 +44,12 @@ func New(g *goes.Goes) *Liner {
 	l.history.lines = make([]string, 0, 1<<6)
 	if woliner {
 		l.fallback = notliner.New(os.Stdin, os.Stdout)
-	} else {
-		l.s = liner.NewLiner()
-		l.s.SetCompleter(l.complete)
-		l.s.SetHelper(l.help)
 	}
 	l.goes = g
 	return l
 }
 
 func (l *Liner) Close() {
-	l.s.Close()
 }
 
 // Returns all completions of the given command line.
@@ -110,11 +105,19 @@ func (l *Liner) help(line string) {
 }
 
 func (l *Liner) Prompt(prompt string) (string, error) {
-	var t syscall.Termios
-	if l.fallback != nil {
+	if l.fallback == nil {
+		l.s = liner.NewLiner()
+		l.s.SetCompleter(l.complete)
+		l.s.SetHelper(l.help)
+		defer func() {
+			ll := l.s
+			l.s = nil
+			ll.Close()
+		}()
+	} else {
 		return l.fallback.Prompt(prompt)
 	}
-
+	var t syscall.Termios
 	if isatty.IsTerminal(uintptr(syscall.Stdin)) {
 		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
 			uintptr(syscall.Stdin),
