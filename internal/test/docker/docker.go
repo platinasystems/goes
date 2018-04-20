@@ -392,9 +392,6 @@ func moveIntfContainer(t *testing.T, container string, intf string,
 		"ip", "-n", container, "link", "set", "up", "lo")
 	assert.Program(test.Self{},
 		"ip", "-n", container, "link", "set", "down", intf)
-	// ISIS fails with default mtu 9216
-	assert.Program(test.Self{},
-		"ip", "-n", container, "link", "set", "mtu", "8192", "dev", intf)
 	assert.Program(test.Self{},
 		"ip", "-n", container, "link", "set", "up", intf)
 	assert.Program(test.Self{},
