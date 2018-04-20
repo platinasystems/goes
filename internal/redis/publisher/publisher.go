@@ -8,18 +8,22 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/platinasystems/go/internal/accumulate"
-	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/go/internal/atsock"
 )
 
-const FileName = "redis-pub"
+const Name = "redis.pub"
+
+func AtSock() string { return atsock.Name(Name) }
 
 func New() (*Publisher, error) {
-	sock, err := sockfile.DialUnixgram(FileName)
+	a, err := net.ResolveUnixAddr("unixgram", AtSock())
 	if err != nil {
 		return nil, err
 	}
+	sock, err := net.DialUnix("unixgram", nil, a)
 	return &Publisher{
 		Accumulator: accumulate.Accumulator{
 			ReaderOrWriter: sock,

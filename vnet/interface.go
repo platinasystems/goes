@@ -253,7 +253,9 @@ func (m *Vnet) addDelSwInterface(siʹ, supSi Si, kind SwIfKind, id IfId, isDel b
 func (m *Vnet) NewSwIf(kind SwIfKind, id IfId) Si {
 	return m.addDelSwInterface(SiNil, SiNil, kind, id, false)
 }
-func (m *Vnet) DelSwIf(si Si) { m.addDelSwInterface(si, si, 0, 0, true) }
+func (m *Vnet) DelSwIf(si Si) {
+	m.addDelSwInterface(si, si, 0, 0, true)
+}
 
 func (m *Vnet) NewSwSubInterface(supSi Si, id IfId) (si Si) {
 	si = m.addDelSwInterface(SiNil, supSi, SwIfKindSubInterface, id, false)
@@ -283,6 +285,8 @@ func (m *interfaceMain) SupHwIf(s *SwIf) (h *HwIf) {
 	sup := m.SupSwIf(s)
 	if sup.kind == SwIfKindHardware {
 		h = m.HwIf(Hi(sup.id))
+	} else if sup.kind == SwIfKindSubInterface {
+		h = m.HwIf(Hi(sup.supSi))
 	}
 	return
 }

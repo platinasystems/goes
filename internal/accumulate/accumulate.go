@@ -41,6 +41,7 @@ type Accumulator struct {
 func New(v interface{}) *Accumulator {
 	acc := pool.Get().(*Accumulator)
 	runtime.SetFinalizer(acc, (*Accumulator).Fini)
+	acc.Reset()
 	acc.ReaderOrWriter = v
 	return acc
 }

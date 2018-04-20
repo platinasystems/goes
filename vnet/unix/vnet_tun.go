@@ -62,5 +62,6 @@ func (m *vnet_tun_main) create_tun(ns *net_namespace) (intf *tuntap_interface) {
 }
 
 func IsVnetTun(v *vnet.Vnet, si vnet.Si) bool {
-	return GetMain(v).si_is_vnet_tun(si)
+	return false
+	//return GetMain(v).si_is_vnet_tun(si)
 }

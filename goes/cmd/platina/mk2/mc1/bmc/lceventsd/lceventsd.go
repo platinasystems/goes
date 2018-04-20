@@ -17,11 +17,11 @@ import (
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/uiodevs"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/eeprom"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const MAX_IRQ_EVENTS = 8
@@ -45,7 +45,7 @@ type Command struct {
 
 type Info struct {
 	mutex sync.Mutex
-	rpc   *sockfile.RpcServer
+	rpc   *atsock.RpcServer
 	pub   *publisher.Publisher
 	stop  chan struct{}
 	last  map[string]uint16

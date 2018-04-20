@@ -19,9 +19,9 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/prog"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 type Command struct {
@@ -38,7 +38,7 @@ type Command struct {
 type Daemons struct {
 	mutex sync.Mutex
 	goes  *goes.Goes
-	rpc   *sockfile.RpcServer
+	rpc   *atsock.RpcServer
 	done  chan struct{}
 
 	cmdsByPid map[int]*exec.Cmd
@@ -64,7 +64,7 @@ func (c *Command) Main(args ...string) error {
 	if len(args) == 0 {
 		return c.server()
 	}
-	cl, err := sockfile.NewRpcClient("goes-daemons")
+	cl, err := atsock.NewRpcClient("daemons")
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (c *Command) server() (err error) {
 
 	signal.Ignore(syscall.SIGTERM)
 
-	c.rpc, err = sockfile.NewRpcServer("goes-daemons")
+	c.rpc, err = atsock.NewRpcServer("daemons")
 	if err != nil {
 		return
 	}

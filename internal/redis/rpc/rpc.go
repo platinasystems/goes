@@ -6,19 +6,19 @@
 package rpc
 
 import (
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 var empty = struct{}{}
 
-type Rpc struct{ File, Name string }
+type Rpc struct{ AtSock, Name string }
 
-func New(file, name string) *Rpc { return &Rpc{file, name} }
+func New(suffix, name string) *Rpc { return &Rpc{suffix, name} }
 
 func (rpc *Rpc) Del(key string, keys ...string) (int, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return 0, err
 	}
@@ -32,7 +32,7 @@ func (rpc *Rpc) Del(key string, keys ...string) (int, error) {
 }
 
 func (rpc *Rpc) Get(key string) ([]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (rpc *Rpc) Get(key string) ([]byte, error) {
 }
 
 func (rpc *Rpc) Set(key string, value []byte) error {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (rpc *Rpc) Set(key string, value []byte) error {
 }
 
 func (rpc *Rpc) Hdel(key, field string, fields ...string) (int, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return 0, err
 	}
@@ -69,7 +69,7 @@ func (rpc *Rpc) Hdel(key, field string, fields ...string) (int, error) {
 }
 
 func (rpc *Rpc) Hexists(key, field string) (int, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return 0, err
 	}
@@ -83,7 +83,7 @@ func (rpc *Rpc) Hexists(key, field string) (int, error) {
 }
 
 func (rpc *Rpc) Hget(key, field string) ([]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (rpc *Rpc) Hget(key, field string) ([]byte, error) {
 }
 
 func (rpc *Rpc) Hgetall(key string) ([][]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (rpc *Rpc) Hgetall(key string) ([][]byte, error) {
 }
 
 func (rpc *Rpc) Hkeys(key string) ([][]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (rpc *Rpc) Hkeys(key string) ([][]byte, error) {
 }
 
 func (rpc *Rpc) Hset(key, id string, value []byte) (int, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return 0, err
 	}
@@ -139,7 +139,7 @@ func (rpc *Rpc) Hset(key, id string, value []byte) (int, error) {
 }
 
 func (rpc *Rpc) Lrange(key string, start, stop int) ([][]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (rpc *Rpc) Lrange(key string, start, stop int) ([][]byte, error) {
 }
 
 func (rpc *Rpc) Lindex(key string, index int) ([]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (rpc *Rpc) Lindex(key string, index int) ([]byte, error) {
 }
 
 func (rpc *Rpc) Blpop(key string, keys ...string) ([][]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (rpc *Rpc) Blpop(key string, keys ...string) ([][]byte, error) {
 }
 
 func (rpc *Rpc) Brpop(key string, keys ...string) ([][]byte, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (rpc *Rpc) Brpop(key string, keys ...string) ([][]byte, error) {
 }
 
 func (rpc *Rpc) Lpush(key string, value []byte, values ...[]byte) (int, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return 0, err
 	}
@@ -209,7 +209,7 @@ func (rpc *Rpc) Lpush(key string, value []byte, values ...[]byte) (int, error) {
 }
 
 func (rpc *Rpc) Rpush(key string, value []byte, values ...[]byte) (int, error) {
-	cl, err := sockfile.NewRpcClient(rpc.File)
+	cl, err := atsock.NewRpcClient(rpc.AtSock)
 	if err != nil {
 		return 0, err
 	}

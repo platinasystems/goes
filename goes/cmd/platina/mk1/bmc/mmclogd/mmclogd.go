@@ -11,8 +11,8 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const (
@@ -40,7 +40,7 @@ type Command struct {
 
 type Info struct {
 	mutex   sync.Mutex
-	rpc     *sockfile.RpcServer
+	rpc     *atsock.RpcServer
 	pub     *publisher.Publisher
 	stop    chan struct{}
 	logA    string

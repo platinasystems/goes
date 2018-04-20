@@ -294,7 +294,9 @@ func (m *netlink_main) newEvent() interface{} {
 	return &netlinkEvent{m: m.m}
 }
 func (ns *net_namespace) getEvent(m *Main) *netlinkEvent {
-	return m.eventPool.Get().(*netlinkEvent)
+	v := m.eventPool.Get().(*netlinkEvent)
+	*v = netlinkEvent{m: v.m}
+	return v
 }
 func (e *netlinkEvent) signal() {
 	if len(e.msgs) > 0 {
@@ -397,14 +399,18 @@ func (e *netlinkElogEvent) Elog(l *elog.Log) {
 }
 
 func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_interface, ok bool) {
-	i, ok = ns.getTuntapInterface(ifIndex)
-	if ok {
-		si = i.si
+	if false {
+		i, ok = ns.getTuntapInterface(ifIndex)
+		if ok {
+			si = i.si
+		} else {
+			si, ok = ns.si_by_ifindex.get(ifIndex)
+		}
+		if !ok {
+			si = vnet.SiNil
+		}
 	} else {
 		si, ok = ns.si_by_ifindex.get(ifIndex)
-	}
-	if !ok {
-		si = vnet.SiNil
 	}
 	return
 }
@@ -463,6 +469,9 @@ func (e *netlinkEvent) EventAction() {
 		isLastInEvent := imsg+1 == len(e.msgs)
 		if m.verbose_netlink {
 			m.v.Logf("%s: netlink %s\n", e.ns, msg)
+		}
+		if false {
+			fmt.Printf("********* %s: netlink %s\n", e.ns, msg)
 		}
 		switch v := msg.(type) {
 		case *netlink.IfInfoMessage:

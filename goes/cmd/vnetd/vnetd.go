@@ -16,12 +16,14 @@ import (
 
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
@@ -35,6 +37,8 @@ var Hook = func(func(), *vnet.Vnet) error { return nil }
 
 // Machines may reassign this for platform sepecific cleanup after vnet.Quit.
 var CloseHook = func(*Info, *vnet.Vnet) error { return nil }
+
+var Counter = func(s string) string { return s }
 
 type Command struct {
 	Init func()
@@ -65,10 +69,6 @@ func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 func (c *Command) Main(...string) error {
 	var in parse.Input
 
-	if c.Init != nil {
-		c.init.Do(c.Init)
-	}
-
 	err := redis.IsReady()
 	if err != nil {
 		return err
@@ -81,15 +81,22 @@ func (c *Command) Main(...string) error {
 	}
 	defer c.i.pub.Close()
 
+	c.i.poller.pubch = make(chan string, 1<<16)
+	go c.i.gopublish()
+
+	if c.Init != nil {
+		c.init.Do(c.Init)
+	}
+
 	rpc.Register(&c.i)
 
-	sock, err := sockfile.NewRpcServer("vnetd")
+	sock, err := atsock.NewRpcServer("vnetd")
 	if err != nil {
 		return err
 	}
 	defer sock.Close()
 
-	err = redis.Assign(redis.DefaultHash+":vnet.", "vnetd", "Info")
+	err = redis.Assign(machine.Name+":vnet.", "vnetd", "Info")
 	if err != nil {
 		return err
 	}
@@ -103,17 +110,8 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	sfn := sockfile.Path("vnet")
-	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s} }", sfn))
-	go func(sfn string) {
-		for {
-			_, err := os.Stat(sfn)
-			if err == nil {
-				sockfile.Chgroup(sfn, "adm")
-				break
-			}
-		}
-	}(sfn)
+	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s } }",
+		atsock.Name("vnet")))
 
 	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
 
@@ -126,6 +124,9 @@ func (c *Command) Main(...string) error {
 var closeDone = make(chan error)
 
 func (c *Command) Close() (err error) {
+	if c.i.poller.pubch != nil {
+		close(c.i.poller.pubch)
+	}
 	c.i.v.Quit()
 	err = <-closeDone
 	return
@@ -169,13 +170,13 @@ func (i *Info) sw_if_add_del(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
 
 func (i *Info) sw_if_admin_up_down(v *vnet.Vnet, si vnet.Si, isUp bool) (err error) {
 	if i.sw_is_ok(si) {
-		i.publish(si.Name(v)+".admin", parse.Enable(isUp))
+		i.poller.pubch <- fmt.Sprint(si.Name(v), ".admin: ", parse.Enable(isUp))
 	}
 	return
 }
 
 func (i *Info) publish_link(hi vnet.Hi, isUp bool) {
-	i.publish(hi.Name(&i.v)+".link", parse.Enable(isUp))
+	i.poller.pubch <- fmt.Sprint(hi.Name(&i.v), ".link: ", parse.Enable(isUp))
 }
 
 func (i *Info) hw_if_add_del(v *vnet.Vnet, hi vnet.Hi, isDel bool) (err error) {
@@ -186,6 +187,19 @@ func (i *Info) hw_if_add_del(v *vnet.Vnet, hi vnet.Hi, isDel bool) (err error) {
 func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if i.hw_is_ok(hi) {
 		i.publish_link(hi, isUp)
+
+		// Run a go routine to not delay vnet machine
+		go func() {
+			// Reflect hw carrier state at linux interface
+			var isUpStr string
+			if isUp {
+				isUpStr = "up"
+			} else {
+				isUpStr = "down"
+			}
+			args := []string{"link", "set", hi.Name(v), "carrier", isUpStr}
+			ip.Goes.Main(args...)
+		}()
 	}
 	return
 }
@@ -202,8 +216,8 @@ type event struct {
 
 func (i *Info) newEvent() interface{} {
 	return &event{
-		i:   i,
-		err: make(chan error, 1),
+		i:        i,
+		err:      make(chan error, 1),
 		newValue: make(chan string, 1),
 	}
 }
@@ -223,7 +237,7 @@ func (e *event) EventAction() {
 		fec    ethernet.ErrorCorrectionType
 	)
 	if e.isReadyEvent {
-		e.i.pub.Print("vnet.", e.key, ": ", e.value)
+		e.i.poller.pubch <- fmt.Sprint(e.key, ": ", e.value)
 		return
 	}
 	e.in.Init(nil)
@@ -297,7 +311,7 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 	}
 	if err = <-e.err; err == nil {
 		newValue := <-e.newValue
-		i.pub.Print("vnet.", key, ": ", newValue)
+		i.poller.pubch <- fmt.Sprint(e.key, ": ", newValue)
 	}
 	return
 }
@@ -306,17 +320,19 @@ func (i *Info) initialPublish() {
 	v := &i.v
 	v.ForeachHwIf(UnixInterfacesOnly, func(hi vnet.Hi) {
 		h := v.HwIf(hi)
-		i.publish(hi.Name(v)+".speed", h.Speed().String())
-		i.publish(hi.Name(v)+".media", h.Media())
+		i.poller.pubch <- fmt.Sprint(hi.Name(v), ".speed: ", h.Speed().String())
+		i.poller.pubch <- fmt.Sprint(hi.Name(v), ".media: ", h.Media())
 		if h, ok := v.HwIfer(hi).(ethernet.HwInterfacer); ok {
-			i.publish(hi.Name(v)+".fec", h.GetInterface().ErrorCorrectionType.String())
+			i.poller.pubch <- fmt.Sprint(hi.Name(v), ".fec: ", h.GetInterface().ErrorCorrectionType.String())
 		}
 	})
-	i.publish("pollInterval", i.poller.pollInterval)
+	i.poller.pubch <- fmt.Sprint("pollInterval: ", i.poller.pollInterval)
 }
 
-func (i *Info) publish(key string, value interface{}) {
-	i.pub.Print("vnet.", key, ": ", value)
+func (i *Info) gopublish() {
+	for s := range i.poller.pubch {
+		i.pub.Print("vnet.", s)
+	}
 }
 
 // One per each hw/sw interface from vnet.
@@ -348,11 +364,11 @@ type ifStatsPoller struct {
 	hwInterfaces ifStatsPollerInterfaceVec
 	swInterfaces ifStatsPollerInterfaceVec
 	pollInterval float64 // pollInterval in seconds
+	pubch        chan string
 }
 
 func (p *ifStatsPoller) publish(name, counter string, value uint64) {
-	n := strings.Replace(counter, " ", "_", -1)
-	p.i.publish(name+"."+n, value)
+	p.pubch <- fmt.Sprintf("%s.%s: %d", name, counter, value)
 }
 func (p *ifStatsPoller) addEvent(dt float64) { p.i.v.SignalEventAfter(p, dt) }
 func (p *ifStatsPoller) String() string {
@@ -363,27 +379,37 @@ func (p *ifStatsPoller) EventAction() {
 	p.addEvent(p.pollInterval)
 
 	start := time.Now()
-	p.i.publish("poll.start", start.Format(time.StampMilli))
+	p.pubch <- fmt.Sprint("poll.start: ", start.Format(time.StampMilli))
 	// Publish all sw/hw interface counters even with zero values for first poll.
 	// This was all possible counters have valid values in redis.
 	// Otherwise only publish to redis when counter values change.
 	includeZeroCounters := p.sequence == 0
+
+	pubcount := func(ifname, counter string, value uint64) {
+		counter = Counter(counter)
+		if value != 0 && strings.HasPrefix(ifname, "eth-") {
+			vnet.Xeth.Set(ifname, counter, value)
+		}
+		p.publish(ifname, counter, value)
+	}
 	p.i.v.ForeachHwIfCounter(includeZeroCounters, UnixInterfacesOnly,
 		func(hi vnet.Hi, counter string, value uint64) {
 			p.hwInterfaces.Validate(uint(hi))
-			if p.hwInterfaces[hi].update(counter, value) {
-				p.publish(hi.Name(&p.i.v), counter, value)
+			if p.hwInterfaces[hi].update(counter, value) && true {
+				pubcount(hi.Name(&p.i.v), counter, value)
 			}
 		})
+
 	p.i.v.ForeachSwIfCounter(includeZeroCounters,
 		func(si vnet.Si, counter string, value uint64) {
 			p.swInterfaces.Validate(uint(si))
-			if p.swInterfaces[si].update(counter, value) {
-				p.publish(si.Name(&p.i.v), counter, value)
+			if p.swInterfaces[si].update(counter, value) && true {
+				pubcount(si.Name(&p.i.v), counter, value)
 			}
 		})
+
 	stop := time.Now()
-	p.i.publish("poll.finish", stop.Format(time.StampMilli))
+	p.pubch <- fmt.Sprint("poll.finish: ", stop.Format(time.StampMilli))
 
 	p.sequence++
 }

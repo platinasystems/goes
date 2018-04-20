@@ -10,7 +10,10 @@ import (
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/go/internal/xeth"
 )
+
+var Xeth *xeth.Xeth
 
 type RxTx int
 

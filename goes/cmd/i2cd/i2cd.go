@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/log"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 type Command struct {
@@ -144,7 +145,7 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 					log.Printf("I2C R/W before Error: bus 0x%x addr 0x%x offset 0x%x data 0x%x RW %d BusSize %d delay %d", g[y].Bus, g[y].Addr, g[y].RegOffset, g[y].Data[0], g[y].RW, g[y].BusSize, g[y].Delay)
 				}
 				log.Printf("Error doing I2C R/W: bus 0x%x addr 0x%x offset 0x%x data 0x%x RW %d BusSize %d delay %d", g[x].Bus, g[x].Addr, g[x].RegOffset, data[0], g[x].RW, g[x].BusSize, g[x].Delay)
-				m, _ := redis.Hget(redis.DefaultHash, "machine")
+				m, _ := redis.Hget(machine.Name, "machine")
 
 				switch m {
 				case "platina-mk1":

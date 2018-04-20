@@ -503,7 +503,6 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 		// self-protect
 		return
 	}
-
 	madj.adj = ai
 	madj.nAdj = uint32(nAdj)
 	madj.referenceCount = 0 // caller will set to 1
@@ -691,7 +690,6 @@ func (m *Main) ReplaceNextHop(ai, fromNextHopAdj, toNextHopAdj Adj, af Adjacency
 
 	mm := &m.multipathMain
 	ma := m.mpAdjForAdj(ai, false)
-
 	if ma == nil {
 		// self-protection
 		// Do something better than returning nil

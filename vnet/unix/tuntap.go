@@ -636,8 +636,10 @@ func (m *Main) Init() (err error) {
 	// Suitable defaults for an Ethernet-like tun/tap device.
 	m.mtuBytes = 9216
 
-	m.v.RegisterSwIfAddDelHook(m.SwIfAddDel)
-	m.v.RegisterSwIfAdminUpDownHook(m.SwIfAdminUpDown)
-	m.v.RegisterHwIfLinkUpDownHook(m.HwIfLinkUpDown)
+	if false {
+		m.v.RegisterSwIfAddDelHook(m.SwIfAddDel)
+		m.v.RegisterSwIfAdminUpDownHook(m.SwIfAdminUpDown)
+		m.v.RegisterHwIfLinkUpDownHook(m.HwIfLinkUpDown)
+	}
 	return
 }

@@ -18,6 +18,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 const DefaultNumvfs = 32
@@ -218,7 +219,7 @@ func getPfs(numpfs int) (Pfs, error) {
 
 func getNumvfs() (numvfs int, err error) {
 	numvfs = DefaultNumvfs
-	if s, _ := redis.Hget(redis.DefaultHash, "sriov.numvfs"); len(s) > 0 {
+	if s, _ := redis.Hget(machine.Name, "sriov.numvfs"); len(s) > 0 {
 		if _, err = fmt.Sscan(s, &numvfs); err != nil {
 			err = fmt.Errorf("sriov.numvfs: %v", err)
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 const i2cGpioAddr = 0x74
@@ -47,7 +48,7 @@ func (c *Command) Main(args ...string) error {
 		c.init.Do(c.Init)
 	}
 
-	m, _ := redis.Hget(redis.DefaultHash, "machine")
+	m, _ := redis.Hget(machine.Name, "machine")
 	if strings.Contains(m, "bmc") {
 		machineBmc = true
 	} else {

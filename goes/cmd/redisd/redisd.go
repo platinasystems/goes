@@ -11,33 +11,22 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	info "github.com/platinasystems/go"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
-	"github.com/platinasystems/go/internal/group"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/reg"
-	"github.com/platinasystems/go/internal/sockfile"
-	"github.com/platinasystems/go/internal/varrun"
-)
-
-const (
-	Log     = varrun.Dir + "/log/redisd"
-	Sock    = sockfile.Dir + "/redisd"
-	RegSock = sockfile.Dir + "/redis-reg"
-	PubSock = sockfile.Dir + "/redis-pub"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 type Command struct {
@@ -63,7 +52,6 @@ type Command struct {
 
 	pubconn *net.UnixConn
 	redisd  Redisd
-	logf    *os.File
 }
 
 func (*Command) String() string { return "redisd" }
@@ -116,13 +104,6 @@ func (c *Command) Close() error {
 	if c.pubconn != nil {
 		c.pubconn.Close()
 	}
-	if c.logf != nil {
-		c.logf.Close()
-	}
-	os.Remove(Log)
-	os.Remove(Sock)
-	os.Remove(RegSock)
-	os.Remove(PubSock)
 	return err
 }
 
@@ -158,30 +139,17 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	}
 
-	if err = varrun.New(sockfile.Dir); err != nil {
-		return
-	}
-
-	if err = varrun.New(filepath.Dir(Log)); err != nil {
-		return
-	}
-
-	c.logf, err = varrun.Create(Log)
-	if err != nil {
-		return
-	}
-
 	if false {
 		grs.Debugf = grs.ActualDebugf
 	} else {
-		grs.Stderr = c.logf
+		grs.Stderr = os.Stderr
 	}
 
 	c.redisd.devs = make(map[string][]*grs.Server)
 	c.redisd.sub = make(map[string]*grs.MultiChannelWriter)
 	c.redisd.published = make(grs.HashHash)
 	if len(c.PublishedKeys) == 0 {
-		c.PublishedKeys = []string{redis.DefaultHash}
+		c.PublishedKeys = []string{machine.Name}
 	}
 	for _, k := range c.PublishedKeys {
 		c.redisd.published[k] = make(grs.HashValue)
@@ -191,18 +159,15 @@ func (c *Command) Main(args ...string) (err error) {
 	if err != nil {
 		return
 	}
-	c.redisd.published[redis.DefaultHash]["packages"] = b
+	c.redisd.published[machine.Name]["packages"] = b
 
+	atMachineRedisd := atsock.Name("redisd")
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
-	cfg = cfg.Host(Sock)
+	cfg = cfg.Host(atMachineRedisd)
 	cfg = cfg.Handler(&c.redisd)
 
 	srv, err := grs.NewServer(cfg)
-	if err != nil {
-		return
-	}
-	err = sockfile.Chgroup(Sock, "adm")
 	if err != nil {
 		return
 	}
@@ -213,29 +178,13 @@ func (c *Command) Main(args ...string) (err error) {
 		return
 	}
 
-	c.redisd.devs[Sock] = []*grs.Server{srv}
+	c.redisd.devs[atMachineRedisd] = []*grs.Server{srv}
 
-	go func(redisd *Redisd, fn string, args ...string) {
-		adm := group.Parse()["adm"].Gid()
-		for i := 0; i < 30; i++ {
-			if _, err := os.Stat(fn); err == nil {
-				if adm > 0 {
-					err = os.Chown(fn, os.Geteuid(), adm)
-				}
-				if err != nil {
-					fmt.Fprint(os.Stderr, fn, ": chown: ",
-						err, "\n")
-				} else {
-					fmt.Println("listen:", fn)
-				}
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
+	go func(redisd *Redisd, args ...string) {
 		redisd.listen(args...)
-	}(&c.redisd, Sock, args...)
+	}(&c.redisd, args...)
 
-	c.pubconn, err = sockfile.ListenUnixgram(publisher.FileName)
+	c.pubconn, err = atsock.ListenUnixgram(publisher.Name)
 	if err != nil {
 		return
 	}
@@ -262,7 +211,7 @@ func (c *Command) gopub() {
 		x := bytes.Split(t, []byte(sep))
 		switch len(x) {
 		case 2:
-			key = redis.DefaultHash
+			key = machine.Name
 			field = string(x[0])
 			value = x[1]
 			fv = t

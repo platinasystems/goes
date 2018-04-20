@@ -10,11 +10,12 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd/qsfp"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/internal/machine"
 )
 
 func qsfpInit() {
 	var ver, portOffset int
-	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
+	s, err := redis.Hget(machine.Name, "eeprom.DeviceVersion")
 	if err == nil {
 		_, err = fmt.Sscan(s, &ver)
 		if err == nil && (ver == 0 || ver == 0xff) {

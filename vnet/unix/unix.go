@@ -55,7 +55,7 @@ func (f *interface_filter) run(s string, kind netlink.InterfaceKind) (ok bool) {
 		}
 	}
 	switch kind {
-	case netlink.InterfaceKindDummy, netlink.InterfaceKindTun, netlink.InterfaceKindVeth:
+	case netlink.InterfaceKindDummy, netlink.InterfaceKindTun, netlink.InterfaceKindVeth, netlink.InterfaceKindVlan:
 		ok = true
 	}
 	return
@@ -83,9 +83,13 @@ func Init(v *vnet.Vnet, cf Config) {
 	m := &Main{}
 	m.v = v
 	m.Config = cf
-	m.tuntap_main.Init(v)
+	if false {
+		m.tuntap_main.Init(v)
+	}
 	m.netlink_main.Init(m)
-	m.vnet_tun_main.init(m)
+	if false {
+		m.vnet_tun_main.init(m)
+	}
 	packageIndex = v.AddPackage("unix", m)
 }
 

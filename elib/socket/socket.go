@@ -63,7 +63,9 @@ func (s *socket) Close() (err error) {
 	if s.flags&Listen != 0 {
 		switch v := s.SelfAddr.(type) {
 		case *syscall.SockaddrUnix:
-			syscall.Unlink(v.Name)
+			if v.Name[0] != '@' {
+				syscall.Unlink(v.Name)
+			}
 		}
 	}
 
@@ -249,9 +251,9 @@ func (s *socket) bindFreePort(a []byte) (port int, err error) {
 func (s *socket) Config(cfg string, flags Flags) (err error) {
 	var sa syscall.Sockaddr
 
-	/* Anything that begins with a / is a local Unix file socket. */
+	/* Anything that begins with a / or @ is a local Unix file socket. */
 	af := syscall.AF_INET
-	if len(cfg) > 0 && cfg[0] == '/' {
+	if len(cfg) > 0 && (cfg[0] == '/' || cfg[0] == '@') {
 		sa = &syscall.SockaddrUnix{Name: cfg}
 		af = syscall.AF_UNIX
 	} else {
@@ -304,7 +306,9 @@ func (s *socket) Config(cfg string, flags Flags) (err error) {
 				needBind = false
 			}
 		case *syscall.SockaddrUnix:
-			syscall.Unlink(v.Name)
+			if v.Name[0] != '@' {
+				syscall.Unlink(v.Name)
+			}
 		default:
 			panic(v)
 		}
