@@ -28,28 +28,34 @@ import (
 	"syscall"
 )
 
-const SizeofSbHdrSetStat = SizeofSbHdr + SizeofSbSetStat
+const CacheLineSize = 64
 
 var PageSize = syscall.Getpagesize()
 
+var size = struct{ small, medium, large int }{
+	small:  64,
+	medium: PageSize,
+	large:  SizeofJumboFrame,
+}
+
 type pools struct {
-	sbSetStat, page, jumbo sync.Pool
+	small, medium, large sync.Pool
 }
 
 var Pool = pools{
-	sbSetStat: sync.Pool{
+	small: sync.Pool{
 		New: func() interface{} {
-			return make([]byte, SizeofSbHdrSetStat)
+			return make([]byte, size.small, size.small)
 		},
 	},
-	page: sync.Pool{
+	medium: sync.Pool{
 		New: func() interface{} {
-			return make([]byte, PageSize)
+			return make([]byte, size.medium, size.medium)
 		},
 	},
-	jumbo: sync.Pool{
+	large: sync.Pool{
 		New: func() interface{} {
-			return make([]byte, SizeofJumboFrame)
+			return make([]byte, size.large, size.large)
 		},
 	},
 }
@@ -57,14 +63,14 @@ var Pool = pools{
 func (p *pools) Get(n int) []byte {
 	var buf []byte
 	switch {
-	case n == SizeofSbHdrSetStat:
-		buf = p.sbSetStat.Get().([]byte)
-	case n <= PageSize:
-		buf = p.page.Get().([]byte)
-	case n < SizeofJumboFrame:
-		buf = p.jumbo.Get().([]byte)
+	case n <= size.small:
+		buf = p.small.Get().([]byte)
+	case n <= size.medium:
+		buf = p.medium.Get().([]byte)
+	case n <= size.large:
+		buf = p.large.Get().([]byte)
 	default:
-		panic("can't pool > jumbo frame")
+		panic(fmt.Errorf("can't pool %d byte buffer", n))
 	}
 	// Optimised by compiler
 	for i := range buf {
@@ -75,14 +81,12 @@ func (p *pools) Get(n int) []byte {
 
 func (p *pools) Put(buf []byte) {
 	switch cap(buf) {
-	case SizeofSbHdrSetStat:
-		p.sbSetStat.Put(buf)
-	case PageSize:
-		buf = buf[:cap(buf)]
-		p.page.Put(buf)
-	case SizeofJumboFrame:
-		buf = buf[:cap(buf)]
-		p.jumbo.Put(buf)
+	case size.small:
+		p.small.Put(buf)
+	case size.medium:
+		p.medium.Put(buf)
+	case size.large:
+		p.large.Put(buf)
 	default:
 		panic(fmt.Errorf("unexpected buf cap: %d", cap(buf)))
 	}

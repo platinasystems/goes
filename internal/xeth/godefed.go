@@ -4,22 +4,23 @@
 package xeth
 
 const (
+	IFNAMSIZ		= 0x10
 	SizeofJumboFrame	= 0x2600
-	SizeofSbHdr		= 0x10
-	SizeofSbSetStat		= 0x20
-	SbOpSetNetStat		= 0x1
-	SbOpSetEthtoolStat	= 0x2
+	SizeofMsgHdr		= 0x10
+	SizeofBreakMsg		= 0x10
+	SizeofStatMsg		= 0x30
+	SizeofEthtoolFlagsMsg	= 0x28
+	SizeofEthtoolDumpMsg	= 0x10
 )
 
-type SbHdr struct {
+type Hdr struct {
 	Z64	uint64
 	Z32	uint32
 	Z16	uint16
 	Z8	uint8
 	Op	uint8
 }
-type SbSetStat struct {
-	Ifname		[16]uint8
-	Statindex	uint64
-	Count		uint64
+type Stat struct {
+	Index	uint64
+	Count	uint64
 }

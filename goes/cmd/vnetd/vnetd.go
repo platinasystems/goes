@@ -19,11 +19,11 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/atsock"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
@@ -388,7 +388,7 @@ func (p *ifStatsPoller) EventAction() {
 	pubcount := func(ifname, counter string, value uint64) {
 		counter = Counter(counter)
 		if value != 0 && strings.HasPrefix(ifname, "eth-") {
-			vnet.Xeth.Set(ifname, counter, value)
+			vnet.Xeth.SetStat(ifname, counter, value)
 		}
 		p.publish(ifname, counter, value)
 	}

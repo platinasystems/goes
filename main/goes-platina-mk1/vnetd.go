@@ -47,7 +47,9 @@ func vnetdInit() {
 	// FIXME vnet shouldn't be so bursty
 	const nports = 4 * 32
 	const ncounters = 512
-	vnet.Xeth, err = xeth.New(machine.Name, stats,
+	xeth.EthtoolFlags = flags
+	xeth.EthtoolStats = stats
+	vnet.Xeth, err = xeth.New(machine.Name,
 		xeth.SizeofTxchOpt(nports*ncounters))
 	if err != nil {
 		panic(err)
