@@ -371,6 +371,8 @@ func (s *Socket) gorx() {
 	}
 
 	s.wg.Add(1)
+
+	var einval_retry int
 	for {
 		// Wait for input to be ready.
 		// Need to poll since otherwise Recvmsg would block forever.
@@ -395,10 +397,22 @@ func (s *Socket) gorx() {
 				continue
 			} else {
 				// EINVAL can happen when socket is being closed (not sure why); no need for noise in that case.
+				// Retry 3 times before giving up
+				einval_retry++
 				if e != syscall.EINVAL {
 					fmt.Fprintln(os.Stderr, "Recv:", err)
 				}
-				break
+				if einval_retry > 3 {
+					if false {
+						fmt.Println("gorx() EINVAL - socket closing!")
+					}
+					break
+				} else {
+					if false {
+						fmt.Println("gorx() EINVAL - retry!")
+					}
+					continue
+				}
 			}
 		}
 
