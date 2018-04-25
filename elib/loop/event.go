@@ -375,20 +375,19 @@ func (d *Node) maybeStartEventHandler() {
 	} else {
 		n.hasHandler = true
 	}
-	//Checking n.rxEvent for nil takes longer and leaves open a window where 2 evenHandlers can be started.  Use bool check above instead
-	/*
-		if n.rxEvents != nil {
-			return
-		}
-	*/
-	l := d.l
-	l.eventHandlers = append(l.eventHandlers, d.noder)
-	l.eventHandlerNodes = append(l.eventHandlerNodes, d)
-	n.rxEvents = make(chan *nodeEvent, eventHandlerChanDepth)
-	n.activeIndex = ^uint(0)
-	n.ft.init()
-	elog.F("loop starting event handler %v", d.elogNodeName)
-	go l.eventHandler(d.noder)
+	//Further ensures only 1 eventHandler can ever start per Node
+	//even if 2 events triggers maybeStartEventHandler() simultaneously and neither had a chance
+	//to assert n.hasHandler before the other reads it.
+	d.startEventHandlerOnce.Do(func() {
+		l := d.l
+		l.eventHandlers = append(l.eventHandlers, d.noder)
+		l.eventHandlerNodes = append(l.eventHandlerNodes, d)
+		n.rxEvents = make(chan *nodeEvent, eventHandlerChanDepth)
+		n.activeIndex = ^uint(0)
+		n.ft.init()
+		elog.F("loop starting event handler %v", d.elogNodeName)
+		go l.eventHandler(d.noder)
+	})
 }
 
 func (l *Loop) eventPoller(p EventPoller) {

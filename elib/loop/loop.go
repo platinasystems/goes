@@ -25,6 +25,7 @@ type Node struct {
 	ft                      fromToNode
 	activePollerIndex       uint
 	initOnce                sync.Once
+	startEventHandlerOnce   sync.Once
 	initWg                  sync.WaitGroup
 	Next                    []string
 	nextNodes               nextNodeVec
