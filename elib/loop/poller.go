@@ -28,23 +28,43 @@ func (x *fromToNode) init() {
 	x.fromNode = make(chan bool, 1)
 }
 
-func (x *fromToNode) signalNode()       { x.toNode <- struct{}{} }
-func (x *fromToNode) waitNode() bool    { return <-x.fromNode }
+func (x *fromToNode) signalNode()    { x.toNode <- struct{}{} }
+func (x *fromToNode) waitNode() bool { return <-x.fromNode }
+func (x *fromToNode) waitNode_with_timeout(d time.Duration, node_name string, actor_name string, ch_length int) bool {
+	//fmt.Printf("poller.go waitNode_with_timeout() start, node: %s, actor: %s, channel length = %d\n", node_name, actor_name, ch_length) //debug print
+	select {
+	case done := <-x.fromNode:
+		//fmt.Printf("poller.go waitNode_with_timeout() done, node: %s, actor: %s, channel length = %d\n", node_name, actor_name, ch_length)
+		return done
+	case <-time.After(d):
+		if true {
+			fmt.Printf("poller.go waitNode_with_timeout() timeout, node: %s, actor: %s, channel length = %d, os.Exit(3)\n", node_name, actor_name, ch_length)
+		}
+		if true {
+			os.Exit(3)
+		}
+	}
+	return false
+}
+
 func (x *fromToNode) signalLoop(v bool) { x.fromNode <- v }
 func (x *fromToNode) waitLoop()         { <-x.toNode }
-func (x *fromToNode) waitLoop_with_timeout(d time.Duration) {
+func (x *fromToNode) waitLoop_with_timeout(d time.Duration, node_name string, actor_name string, ch_length int) {
+	//fmt.Printf("poller.go waitLoop_with_timeout() start, node: %s, actor: %s, channel length = %d\n", node_name, actor_name, ch_length)
 	start := time.Now()
 	select {
 	case <-x.toNode:
 		if false { // debug print
 			t := time.Since(start)
-			fmt.Printf("  poller.go waitLoop_with_timeout() done in %v\n", t.String())
+			fmt.Printf("poller.go waitLoop_with_timeout() done, node: %s, actor: %s, channel length = %d, in %s\n", node_name, actor_name, ch_length, t.String())
 		}
 		return
 	case <-time.After(d):
 		//panic("  poller.go waitLoop_with_timeout() timeout")  //doesn't seem enough to exit vnet, still hangs
 		if true {
-			fmt.Printf("poller.go waitLoop_with_timeout() timeout, os.Exit(3)\n")
+			fmt.Printf("poller.go waitLoop_with_timeout() timeout, node: %s, actor: %s, channel length = %d, os.Exit(3)\n", node_name, actor_name, ch_length)
+		}
+		if true {
 			os.Exit(3)
 		}
 	}
@@ -287,6 +307,16 @@ func (l *Loop) AddSuspendActivity(in *In, i int, lim *SuspendLimits) {
 			<-a.fromLoop
 		} else {
 			n.ft.waitLoop()
+			if false { //debug print
+				actor_name := "nil"
+				t := 10 * time.Second
+				if n.CurrentEvent().e != nil {
+					if n.CurrentEvent().e.actor != nil {
+						actor_name = n.CurrentEvent().e.actor.String()
+					}
+				}
+				n.ft.waitLoop_with_timeout(t, n.name+"(AddSuspendActivity)", actor_name, len(n.e.rxEvents))
+			}
 		}
 		// Don't charge node for time suspended.
 		// Reduce from output side since its tx that suspends not rx.
@@ -596,6 +626,18 @@ func (l *Loop) dataPoll(p inLooper) {
 	for {
 		n.poller_elog(poller_elog_node_wait)
 		n.ft.waitLoop()
+		if false { //debug print
+			actor_name := "nil"
+			t := 10 * time.Second
+			if n.CurrentEvent() != nil {
+				if n.CurrentEvent().e != nil {
+					if n.CurrentEvent().e.actor != nil {
+						actor_name = n.CurrentEvent().e.actor.String()
+					}
+				}
+			}
+			n.ft.waitLoop_with_timeout(t, n.name+"(dataPoll)", actor_name, len(n.e.rxEvents))
+		}
 		n.poller_elog(poller_elog_node_wake)
 		ap := n.getActivePoller()
 		an := &ap.activeNodes[n.index]
@@ -659,6 +701,16 @@ func (l *Loop) doPollers() {
 				<-a.toLoop
 			} else {
 				done = n.ft.waitNode()
+				if false {
+					actor_name := "nil"
+					t := 3 * time.Second
+					if n.e.currentEvent.e != nil {
+						if n.e.currentEvent.e.actor != nil {
+							actor_name = n.e.currentEvent.e.actor.String()
+						}
+					}
+					done = n.ft.waitNode_with_timeout(t, n.name+"(doPollers)", actor_name, len(n.e.rxEvents))
+				}
 			}
 			n.poller_elog(poller_elog_wait_done)
 			n.maybeClearResume()

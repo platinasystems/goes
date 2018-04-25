@@ -210,7 +210,7 @@ func (l *Loop) Run() {
 		if elog.Enabled() {
 			if err := recover(); err != nil {
 				elog.Panic(fmt.Errorf("Run: %v", err))
-				panic(err)
+				panic(fmt.Errorf("loop.go Run: %v", err))
 			}
 		}
 	}()
