@@ -49,3 +49,8 @@ func (bits EthtoolFlagBits) String() string {
 	}
 	return buf.String()
 }
+
+func (bits EthtoolFlagBits) Test(bit uint) bool {
+	mask := EthtoolFlagBits(1 << bit)
+	return (bits & mask) == mask
+}

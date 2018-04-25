@@ -181,10 +181,18 @@ func (p PortProvision) PortProvisionEntry(ifname string) *PortProvisionEntry {
 	return entry
 }
 
-func (p PortProvision) PortProvisionFlags(ifname string) uint32 {
-	return uint32(p.PortProvisionEntry(ifname).Flags)
+func (p PortProvision) PortProvisionMbps(ifname string) uint32 {
+	return uint32(p.PortProvisionEntry(ifname).Speed)
 }
 
-func (p PortProvision) PortProvisionSpeed(ifname string) uint32 {
-	return uint32(p.PortProvisionEntry(ifname).Speed)
+func (p PortProvision) PortProvisionCopper(ifname string) bool {
+	return p.PortProvisionEntry(ifname).Flags.Test(CopperBit)
+}
+
+func (p PortProvision) PortProvisionFec74(ifname string) bool {
+	return p.PortProvisionEntry(ifname).Flags.Test(Fec74Bit)
+}
+
+func (p PortProvision) PortProvisionFec91(ifname string) bool {
+	return p.PortProvisionEntry(ifname).Flags.Test(Fec91Bit)
 }
