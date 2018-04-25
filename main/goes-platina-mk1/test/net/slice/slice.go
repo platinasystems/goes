@@ -245,8 +245,6 @@ func checkIsolation(t *testing.T) {
 func checkStress(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Skip() // for now even 1 second hping3 --faster hangs tx
-
 	t.Log("stress with hping3")
 
 	duration := []string{"1", "10", "30", "60"}
@@ -269,15 +267,18 @@ func checkStress(t *testing.T) {
 	}
 
 	for _, to := range duration {
+		test.Pause()
 		t.Logf("stress for %v", to)
 		cmd := []string{"timeout", to,
-			"hping3", "--icmp", "--faster", "-q", "10.3.0.4"}
+			"hping3", "--icmp", "--flood", "-q", "10.3.0.4"}
 		_, err := docker.ExecCmd(t, "CB-1", config, cmd)
-		// t.Logf("hping3 duration %v [%v] [%v]", to, out, err)
 		t.Log("verfy can still ping neighbor")
 		cmd = []string{"ping", "-c1", "10.1.0.2"}
 		_, err = docker.ExecCmd(t, "CB-1", config, cmd)
-		// t.Logf("ping check [%v] [%v]", out, err)
 		assert.Nil(err)
 	}
+	t.Log("verfy can still ping far neighbor")
+	cmd := []string{"ping", "-c1", "10.3.0.4"}
+	_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+	assert.Nil(err)
 }
