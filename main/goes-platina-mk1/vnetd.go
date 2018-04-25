@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"unsafe"
 
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/ip"
@@ -38,8 +39,16 @@ var vnetdLinkStatTranslation = map[string]string{
 	"port-tx-packets":               "tx-packets",
 }
 
+type PortProvisionEntry struct {
+	Flags xeth.EthtoolFlagBits
+	Speed xeth.Mbps
+}
+
+type PortProvision map[string]*PortProvisionEntry
+
 type mk1Main struct {
 	fe1.Platform
+	PortProvision
 }
 
 func vnetdInit() {
@@ -55,6 +64,34 @@ func vnetdInit() {
 		panic(err)
 	}
 	p := new(mk1Main)
+	p.PortProvision = make(PortProvision)
+	vnet.Xeth.EthtoolDump()
+	vnet.Xeth.UntilBreak(func(buf []byte) error {
+		ptr := unsafe.Pointer(&buf[0])
+		hdr := (*xeth.Hdr)(ptr)
+		if !hdr.IsHdr() {
+			return fmt.Errorf("invalid xeth msg: %#x", buf)
+		}
+		switch xeth.Op(hdr.Op) {
+		case xeth.XETH_ETHTOOL_FLAGS_OP:
+			msg := (*xeth.EthtoolFlagsMsg)(ptr)
+			p.PortProvisionEntry(msg.Ifname.String()).Flags =
+				msg.Flags
+		case xeth.XETH_ETHTOOL_SETTINGS_OP:
+			msg := (*xeth.EthtoolSettingsMsg)(ptr)
+			p.PortProvisionEntry(msg.Ifname.String()).Speed =
+				msg.Settings.Speed
+		default:
+			return fmt.Errorf("invalid op: %d", hdr.Op)
+		}
+		return nil
+	})
+	if true {
+		for ifname, entry := range p.PortProvision {
+			fmt.Print(ifname, ".flags: ", entry.Flags, "\n")
+			fmt.Print(ifname, ".speed: ", entry.Speed, "\n")
+		}
+	}
 	vnetd.Hook = p.vnetdHook
 	vnetd.CloseHook = p.stopHook
 	vnetd.Counter = func(s string) string {
@@ -133,4 +170,21 @@ func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 		}
 		return nil
 	}
+}
+
+func (p PortProvision) PortProvisionEntry(ifname string) *PortProvisionEntry {
+	entry, found := p[ifname]
+	if !found {
+		entry = new(PortProvisionEntry)
+		p[ifname] = entry
+	}
+	return entry
+}
+
+func (p PortProvision) PortProvisionFlags(ifname string) uint32 {
+	return uint32(p.PortProvisionEntry(ifname).Flags)
+}
+
+func (p PortProvision) PortProvisionSpeed(ifname string) uint32 {
+	return uint32(p.PortProvisionEntry(ifname).Speed)
 }

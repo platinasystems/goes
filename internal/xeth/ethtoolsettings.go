@@ -29,7 +29,7 @@ import (
 
 type EthtoolSettings struct {
 	cmd                 uint32
-	Speed               uint32
+	Speed               Mbps
 	Duplex              Duplex
 	Port                Port
 	PhyAddress          uint8
@@ -46,11 +46,7 @@ type EthtoolSettings struct {
 
 func (settings *EthtoolSettings) String() string {
 	buf := new(bytes.Buffer)
-	if settings.Speed != 0 {
-		fmt.Fprint(buf, "\n\tspeed: ", settings.Speed, "Mb/s")
-	} else {
-		fmt.Fprint(buf, "\n\tspeed: unspecified")
-	}
+	fmt.Fprint(buf, "\n\tspeed: ", settings.Speed)
 	fmt.Fprint(buf, "\n\tduplex: ", settings.Duplex)
 	fmt.Fprint(buf, "\n\tport: ", settings.Port)
 	fmt.Fprint(buf, "\n\tautoneg: ", settings.Autoneg)
