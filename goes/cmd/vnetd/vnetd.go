@@ -66,6 +66,8 @@ func (*Command) Apropos() lang.Alt {
 
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
+const chanDepth = 1 << 16
+
 func (c *Command) Main(...string) error {
 	var in parse.Input
 
@@ -81,7 +83,7 @@ func (c *Command) Main(...string) error {
 	}
 	defer c.i.pub.Close()
 
-	c.i.poller.pubch = make(chan string, 1<<16)
+	c.i.poller.pubch = make(chan string, chanDepth)
 	go c.i.gopublish()
 
 	if c.Init != nil {
@@ -138,6 +140,8 @@ func (i *Info) init() {
 	i.poller.pollInterval = 5 // default 5 seconds
 	i.initialPublish()
 	i.set("ready", "true", true)
+	i.poller.pubch <- fmt.Sprint("poll.max-channel-depth: ", chanDepth)
+
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
@@ -379,7 +383,8 @@ func (p *ifStatsPoller) EventAction() {
 	p.addEvent(p.pollInterval)
 
 	start := time.Now()
-	p.pubch <- fmt.Sprint("poll.start: ", start.Format(time.StampMilli))
+	p.pubch <- fmt.Sprint("poll.start.time: ", start.Format(time.StampMilli))
+	p.pubch <- fmt.Sprint("poll.start.channel-length: ", len(p.pubch))
 	// Publish all sw/hw interface counters even with zero values for first poll.
 	// This was all possible counters have valid values in redis.
 	// Otherwise only publish to redis when counter values change.
@@ -409,7 +414,8 @@ func (p *ifStatsPoller) EventAction() {
 		})
 
 	stop := time.Now()
-	p.pubch <- fmt.Sprint("poll.finish: ", stop.Format(time.StampMilli))
+	p.pubch <- fmt.Sprint("poll.stop.time: ", stop.Format(time.StampMilli))
+	p.pubch <- fmt.Sprint("poll.stop.channel-length: ", len(p.pubch))
 
 	p.sequence++
 }
