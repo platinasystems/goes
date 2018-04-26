@@ -393,53 +393,63 @@ func (g *Goes) Main(args ...string) error {
 		}
 	}
 
-	cli, found := g.ByName["cli"]
+	var v cmd.Cmd
+	var k cmd.Kind
+	var found bool
+	if len(args) > 0 {
+		v, found = g.ByName[args[0]]
+	}
 	if found {
-		cli.(goeser).Goes(g)
+		k = cmd.WhatKind(v)
 	}
-	cliFlags, cliArgs := flags.New(args, "-d", "-f", "-no-liner", "-x")
-	if cliFlags.ByName["-d"] && g.Verbosity < VerboseDebug {
-		g.Verbosity = VerboseDebug
-	}
-	if n := len(cliArgs); n == 0 {
-		if cli != nil {
-			if cliFlags.ByName["-no-liner"] {
-				cliArgs = append(cliArgs, "-no-liner")
-			}
-			if cliFlags.ByName["-x"] {
-				cliArgs = append(cliArgs, "-x")
-			}
-			g.Status = cli.Main(cliArgs...)
-			return g.Status
-		} else if def, found := g.ByName[""]; found {
-			g.Status = def.Main()
-			return g.Status
+	if !found || !k.IsNoCLIFlags() {
+		cli, clifound := g.ByName["cli"]
+		if clifound {
+			cli.(goeser).Goes(g)
 		}
-		fmt.Println(Usage(g))
-		g.Status = nil
-		return nil
-	} else if _, found := g.ByName[args[0]]; n == 1 && !found {
-		// only check for script if args[0] isn't a command
-		buf, err := ioutil.ReadFile(cliArgs[0])
-		if cliArgs[0] == "-" || (err == nil && utf8.Valid(buf) &&
-			bytes.HasPrefix(buf, []byte("#!/usr/bin/goes"))) {
-			// e.g. /usr/bin/goes SCRIPT
-			if cli == nil {
-				g.Status = fmt.Errorf("has no cli")
+		cliFlags, cliArgs := flags.New(args, "-d", "-f", "-no-liner", "-x")
+		if cliFlags.ByName["-d"] && g.Verbosity < VerboseDebug {
+			g.Verbosity = VerboseDebug
+		}
+		if n := len(cliArgs); n == 0 {
+			if cli != nil {
+				if cliFlags.ByName["-no-liner"] {
+					cliArgs = append(cliArgs, "-no-liner")
+				}
+				if cliFlags.ByName["-x"] {
+					cliArgs = append(cliArgs, "-x")
+				}
+				g.Status = cli.Main(cliArgs...)
+				return g.Status
+			} else if def, found := g.ByName[""]; found {
+				g.Status = def.Main()
 				return g.Status
 			}
-			for _, t := range []string{"-f", "-x"} {
-				if cliFlags.ByName[t] {
-					cliArgs = append(cliArgs, t)
+			fmt.Println(Usage(g))
+			g.Status = nil
+			return nil
+		} else if n == 1 && !found {
+			// only check for script if args[0] isn't a command
+			buf, err := ioutil.ReadFile(cliArgs[0])
+			if cliArgs[0] == "-" || (err == nil && utf8.Valid(buf) &&
+				bytes.HasPrefix(buf, []byte("#!/usr/bin/goes"))) {
+				// e.g. /usr/bin/goes SCRIPT
+				if cli == nil {
+					g.Status = fmt.Errorf("has no cli")
+					return g.Status
 				}
+				for _, t := range []string{"-f", "-x"} {
+					if cliFlags.ByName[t] {
+						cliArgs = append(cliArgs, t)
+					}
+				}
+				g.Status = cli.Main(cliArgs...)
+				return g.Status
 			}
-			g.Status = cli.Main(cliArgs...)
-			return g.Status
+		} else {
+			g.swap(args)
 		}
-	} else {
-		g.swap(args)
 	}
-
 	if builtin, found := g.Builtins()[args[0]]; found {
 		g.Status = builtin(args[1:]...)
 		return g.Status
@@ -460,7 +470,6 @@ func (g *Goes) Main(args ...string) error {
 		fmt.Printf("$=%v %v\n", g.Status, args)
 	}
 
-	v, found := g.ByName[args[0]]
 	if !found {
 		if v, found = g.ByName[""]; !found {
 			g.Status =
@@ -474,7 +483,6 @@ func (g *Goes) Main(args ...string) error {
 		method.Goes(g)
 	}
 
-	k := cmd.WhatKind(v)
 	if k.IsDaemon() {
 		sig := make(chan os.Signal)
 		signal.Notify(sig, syscall.SIGTERM)
