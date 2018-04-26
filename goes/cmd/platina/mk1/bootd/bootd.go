@@ -11,6 +11,7 @@ package bootd
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd"
@@ -46,7 +47,7 @@ func (c Command) Main(...string) error {
 
 func startHandler() (err error) {
 	ClientCfg = make(map[string]*Client)
-	if err = readClientCfg(); err != nil {
+	if err = readClientCfgDB(); err != nil {
 		return
 	}
 
@@ -72,7 +73,7 @@ func serve(w http.ResponseWriter, r *http.Request) {
 			b = "error registering\n"
 		}
 	case DumpVars:
-		if b, err = dumpVars(); err != nil {
+		if b, err = dumpvars(); err != nil {
 			b = "error dumping server variables\n"
 		}
 		b += r.URL.Path + "\n"
@@ -80,6 +81,19 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	case Dashboard:
 		if b, err = dashboard(); err != nil {
 			b = "error getting dashboard\n"
+		}
+	case NumClients:
+		if b, err = numclients(); err != nil {
+			b = "error getting number of clients\n"
+		}
+	case Clientdata:
+		if len(u) < 2 {
+			b = "error client number missing\n"
+			return
+		}
+		i, _ := strconv.Atoi(u[1])
+		if b, err = clientdata(i); err != nil {
+			b = "error getting client data\n"
 		}
 	default:
 		b = "404\n"

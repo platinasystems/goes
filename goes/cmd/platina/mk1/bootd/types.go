@@ -5,9 +5,11 @@
 package bootd
 
 const (
-	Register  = "register"
-	DumpVars  = "dumpvars"
-	Dashboard = "dashboard"
+	Register   = "register"
+	DumpVars   = "dumpvars"
+	Dashboard  = "dashboard"
+	NumClients = "numclients"
+	Clientdata = "clientdata"
 )
 const (
 	BootStateNotRegistered = iota
@@ -30,8 +32,8 @@ const (
 	Debian = iota
 )
 const (
-	RegReplyFound = iota
-	RegReplyNotFound
+	RegReplyRegistered = iota
+	RegReplyNotRegistered
 )
 const (
 	ScriptBootLatest = iota
@@ -47,19 +49,23 @@ const (
 )
 
 type Client struct {
-	unit           int
-	name           string
-	machine        string
-	macAddr        string
-	ipAddr         string
-	bootState      int
-	installState   int
-	autoInstall    bool
-	certPresent    bool
-	distroType     int
-	timeRegistered string
-	timeInstalled  string
-	installCounter int
+	Unit           int
+	Name           string
+	Machine        string
+	MacAddr        string
+	IpAddr         string
+	BootState      int
+	InstallState   int
+	AutoInstall    bool
+	CertPresent    bool
+	DistroType     int
+	TimeRegistered string
+	TimeInstalled  string
+	InstallCounter int
+}
+
+type NumClnt struct {
+	Clients int
 }
 
 type RegReq struct {
@@ -105,11 +111,11 @@ func bootText(i int) string {
 func installText(i int) string {
 	var installStates = []string{
 		"Factory",
-		"Install-in-progress",
+		"Installing",
 		"Installed",
-		"Install-failed",
-		"Restore-in-progress",
-		"Restore-failed",
+		"Install failed",
+		"Restoring",
+		"Restore failed",
 	}
 	return installStates[i]
 }

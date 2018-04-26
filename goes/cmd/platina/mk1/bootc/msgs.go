@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 )
@@ -23,6 +24,7 @@ func register(mip string, mac string, ip string) (r int, n string, err error) {
 		return bootd.BootStateNotRegistered, "", fmt.Errorf("Error contacting Master")
 	}
 
+	fmt.Println("JSON:", s)
 	err = json.Unmarshal([]byte(s), &regReq)
 	if err != nil {
 		fmt.Println("There was an error:", err)
@@ -47,7 +49,25 @@ func dashboard(mip string) (err error) {
 	return nil
 }
 
-func dumpVars(mip string) (err error) {
+func numclients(mip string) (err error) {
+	s := ""
+	if s, err = sendReq(mip, "numclients"); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+func clientdata(mip string, unit int) (err error) {
+	s := ""
+	if s, err = sendReq(mip, "clientdata "+strconv.Itoa(unit)); err != nil {
+		return err
+	}
+	fmt.Println(s)
+	return nil
+}
+
+func dumpvars(mip string) (err error) {
 	s := ""
 	if s, err = sendReq(mip, "dumpvars"); err != nil {
 		return err
@@ -84,11 +104,11 @@ func getMasterIP() string {
 }
 
 func getIP() string {
-	return "192.168.101.142" // TODO
+	return "192.168.101.142" // TODO call function
 }
 
 func getMAC() string {
-	return "01:02:03:04:05:06" // TODO
+	return "01:02:03:04:05:06" // TODO call function
 }
 
 func getIP2() string {

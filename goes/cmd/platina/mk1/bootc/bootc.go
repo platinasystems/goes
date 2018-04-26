@@ -72,7 +72,7 @@ func (Command) Main(args ...string) (err error) {
 		}
 		fmt.Println(name)
 	case 4:
-		if err = dumpVars(mip); err != nil {
+		if err = dumpvars(mip); err != nil {
 			return err
 		}
 	case 5:
@@ -80,7 +80,19 @@ func (Command) Main(args ...string) (err error) {
 			return err
 		}
 	case 6:
+		if err = numclients(mip); err != nil {
+			return err
+		}
+	case 7:
+		if err = clientdata(mip, 3); err != nil {
+			return err
+		}
+	case 8:
 		if err = test404(mip); err != nil {
+			return err
+		}
+	case 9:
+		if err = dashboard("192.168.101.129"); err != nil {
 			return err
 		}
 	default:
@@ -98,26 +110,24 @@ func boot() (err error) { // Coreboot "init"
 	reply := 0
 	//TODO [2] ADD FASTER TIMEOUT
 	reply, _, err = register(mip, mac, ip)
-	if err != nil || reply != bootd.BootStateRegistered {
+	if err != nil || reply != bootd.RegReplyRegistered {
 		reply, _, err = register(mip, mac, ip)
-		if err != nil || reply != bootd.BootStateRegistered {
-			return err // register failed, just fall into grub
+		if err != nil || reply != bootd.RegReplyRegistered {
+			return err // fall into grub
 		}
 	}
 
-	// TODO TRY AS TEST 2 invaders
-	// TODO TRY REAL REGISTER BOLT IN
-	// TODO BOOTC, BOOTD /etc/MASTER logic
+	// TODO TRY REAL REGISTER BOLT IN OF BOOTC
+
+	// TODO run install script (format, install debian, etc. OR just boot)
+	// TODO BUILD INSTALL SCRIPT IN
+	// TODO if debian install fails ==> try again
 
 	// TODO [2] REGISTER TIMEOUT
 	// TODO READ the /boot directory into slice, bootd store last known good booted image
 	// TODO [3] boot grub(GRUB TO TELL WHAT ITS BOOTING), give me your images/BOOT THIS IMAGE, ASK SCRIPT TO RUN/RUN IT
 
-	// TODO run script (format, install debian, etc. OR just boot)
-
-	// TODO REAL DB, WRITE DB, (LOCAL, CLOUD, OR LITERAL)
-
-	// TODO if debian install fails ==> try again
+	// TODO BOOTC, BOOTD /etc/MASTER logic , bootc runs if no /etc/MASTER file, bootd runsi if /etc/MASTER (filesystem is not up btw)
 
 	// TODO bootd state machines
 	// TODO add test infra, with 100 units

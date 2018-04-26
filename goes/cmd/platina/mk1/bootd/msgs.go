@@ -20,27 +20,31 @@ func register(u *[]string) (s string, err error) {
 		fmt.Println("There was an error:", err)
 	}
 	mac := regReq.Mac
-	ipAddr := regReq.IP
+	ip := regReq.IP
 
-	ClientCfg[mac].ipAddr = ipAddr
-	ClientCfg[mac].bootState = BootStateRegistered
-	ClientCfg[mac].installState = InstallStateInProgress
+	ClientCfg[mac].MacAddr = mac
+	ClientCfg[mac].IpAddr = ip
+	ClientCfg[mac].BootState = BootStateRegistered
+	ClientCfg[mac].InstallState = InstallStateInProgress
 	t := time.Now()
-	ClientCfg[mac].timeRegistered = fmt.Sprintf("%10s",
+	ClientCfg[mac].TimeRegistered = fmt.Sprintf("%10s",
 		t.Format("2006-01-02 15:04:05"))
-	ClientCfg[mac].timeInstalled = fmt.Sprintf("%10s",
+	ClientCfg[mac].TimeInstalled = fmt.Sprintf("%10s",
 		t.Format("2006-01-02 15:04:05"))
-	ClientCfg[mac].installCounter++
+	ClientCfg[mac].InstallCounter++
 
-	regReply.Reply = RegReplyFound
-	regReply.TorName = ClientCfg[mac].name
+	regReply.Reply = RegReplyRegistered
+	regReply.TorName = ClientCfg[mac].Name
 	regReply.Error = nil
 	jsonInfo, err := json.Marshal(regReply)
+	if err != nil {
+		return "404", err
+	}
 
-	return string(jsonInfo), err
+	return string(jsonInfo), nil
 }
 
-func dumpVars() (s string, err error) {
+func dumpvars() (s string, err error) {
 	s = ""
 	return s, nil
 }
@@ -59,28 +63,55 @@ func dashboard() (s string, err error) {
 	siz := len(ClientCfg)
 	for j := 1; j <= siz; j++ {
 		for i, _ := range ClientCfg {
-			if ClientCfg[i].unit == j {
-				s += fmt.Sprintf("%-4d ", ClientCfg[i].unit)
-				s += fmt.Sprintf("%-12s ", ClientCfg[i].name)
-				s += fmt.Sprintf("%-10s ", ClientCfg[i].machine)
-				s += fmt.Sprintf("%-17s ", ClientCfg[i].macAddr)
-				s += fmt.Sprintf("%-15s ", ClientCfg[i].ipAddr)
+			if ClientCfg[i].Unit == j {
+				s += fmt.Sprintf("%-4d ", ClientCfg[i].Unit)
+				s += fmt.Sprintf("%-12s ", ClientCfg[i].Name)
+				s += fmt.Sprintf("%-10s ", ClientCfg[i].Machine)
+				s += fmt.Sprintf("%-17s ", ClientCfg[i].MacAddr)
+				s += fmt.Sprintf("%-15s ", ClientCfg[i].IpAddr)
 				s += fmt.Sprintf("%-14s ",
-					bootText(ClientCfg[i].bootState))
+					bootText(ClientCfg[i].BootState))
 				s += fmt.Sprintf("%-14s ",
-					installText(ClientCfg[i].installState))
-				s += fmt.Sprintf("%-5t ", ClientCfg[i].autoInstall)
-				s += fmt.Sprintf("%-5t ", ClientCfg[i].certPresent)
+					installText(ClientCfg[i].InstallState))
+				s += fmt.Sprintf("%-5t ", ClientCfg[i].AutoInstall)
+				s += fmt.Sprintf("%-5t ", ClientCfg[i].CertPresent)
 				s += fmt.Sprintf("%-12s ",
-					distroText(ClientCfg[i].distroType))
-				s += fmt.Sprintf("%-19s ", ClientCfg[i].timeRegistered)
-				s += fmt.Sprintf("%-19s ", ClientCfg[i].timeInstalled)
-				s += fmt.Sprintf("%-5d ", ClientCfg[i].installCounter)
+					distroText(ClientCfg[i].DistroType))
+				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeRegistered)
+				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeInstalled)
+				s += fmt.Sprintf("%-5d ", ClientCfg[i].InstallCounter)
 				s += "\n"
 			}
 		}
 	}
 	return s, nil
+}
+
+func numclients() (s string, err error) {
+	var c NumClnt
+	c.Clients = len(ClientCfg)
+	jsonInfo, err := json.Marshal(c)
+	if err != nil {
+		return "404", err
+	}
+	return string(jsonInfo), nil
+}
+
+func clientdata(j int) (s string, err error) {
+	if j == 0 {
+		j = 2
+	}
+	for i, _ := range ClientCfg {
+		if ClientCfg[i].Unit == j {
+			jsonInfo, err := json.Marshal(ClientCfg[i])
+			if err != nil {
+				return "", err
+			}
+			return string(jsonInfo), nil
+		}
+	}
+	err = fmt.Errorf("client number not found: %v", err)
+	return "", nil
 }
 
 // TODO
@@ -91,56 +122,56 @@ func bootStateMachine() {
 func installStateMachine() {
 }
 
-func readClientCfg() (err error) {
-	// try reading from cloud DB
+func readClientCfgDB() (err error) {
+	// TODO try reading from cloud DB
 
-	// try reading from local DB
+	// TODO try reading from local DB
 
 	// default to literal for testing
 	ClientCfg["01:02:03:04:05:06"] = &Client{
-		unit:           1,
-		name:           "Invader10",
-		machine:        "ToR MK1",
-		macAddr:        "01:02:03:04:05:06",
-		ipAddr:         "0.0.0.0",
-		bootState:      BootStateNotRegistered,
-		installState:   InstallStateFactory,
-		autoInstall:    true,
-		certPresent:    false,
-		distroType:     Debian,
-		timeRegistered: "0000-00-00:00:00:00",
-		timeInstalled:  "0000-00-00:00:00:00",
-		installCounter: 0,
+		Unit:           1,
+		Name:           "Invader10",
+		Machine:        "ToR MK1",
+		MacAddr:        "01:02:03:04:05:06",
+		IpAddr:         "0.0.0.0",
+		BootState:      BootStateNotRegistered,
+		InstallState:   InstallStateFactory,
+		AutoInstall:    true,
+		CertPresent:    false,
+		DistroType:     Debian,
+		TimeRegistered: "0000-00-00:00:00:00",
+		TimeInstalled:  "0000-00-00:00:00:00",
+		InstallCounter: 0,
 	}
 	ClientCfg["01:02:03:04:05:07"] = &Client{
-		unit:           2,
-		name:           "Invader11",
-		machine:        "ToR MK1",
-		macAddr:        "01:02:03:04:05:07",
-		ipAddr:         "0.0.0.0",
-		bootState:      BootStateNotRegistered,
-		installState:   InstallStateFactory,
-		autoInstall:    true,
-		certPresent:    false,
-		distroType:     Debian,
-		timeRegistered: "0000-00-00:00:00:00",
-		timeInstalled:  "0000-00-00:00:00:00",
-		installCounter: 0,
+		Unit:           2,
+		Name:           "Invader11",
+		Machine:        "ToR MK1",
+		MacAddr:        "01:02:03:04:05:07",
+		IpAddr:         "0.0.0.0",
+		BootState:      BootStateNotRegistered,
+		InstallState:   InstallStateFactory,
+		AutoInstall:    true,
+		CertPresent:    false,
+		DistroType:     Debian,
+		TimeRegistered: "0000-00-00:00:00:00",
+		TimeInstalled:  "0000-00-00:00:00:00",
+		InstallCounter: 0,
 	}
 	ClientCfg["01:02:03:04:05:08"] = &Client{
-		unit:           3,
-		name:           "Invader12",
-		machine:        "ToR MK1",
-		macAddr:        "01:02:03:04:05:08",
-		ipAddr:         "0.0.0.0",
-		bootState:      BootStateNotRegistered,
-		installState:   InstallStateFactory,
-		autoInstall:    true,
-		certPresent:    false,
-		distroType:     Debian,
-		timeRegistered: "0000-00-00:00:00:00",
-		timeInstalled:  "0000-00-00:00:00:00",
-		installCounter: 0,
+		Unit:           3,
+		Name:           "Invader12",
+		Machine:        "ToR MK1",
+		MacAddr:        "01:02:03:04:05:08",
+		IpAddr:         "0.0.0.0",
+		BootState:      BootStateNotRegistered,
+		InstallState:   InstallStateFactory,
+		AutoInstall:    true,
+		CertPresent:    false,
+		DistroType:     Debian,
+		TimeRegistered: "0000-00-00:00:00:00",
+		TimeInstalled:  "0000-00-00:00:00:00",
+		InstallCounter: 0,
 	}
 	return nil
 }
