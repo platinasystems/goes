@@ -46,10 +46,6 @@ SEE ALSO
 
 func (c Command) Main(args ...string) error {
 	opt, args := options.New(args)
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
 
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -63,7 +59,7 @@ func (c Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}

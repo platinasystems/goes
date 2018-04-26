@@ -9,12 +9,20 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/platinasystems/fe1"
+	platinasystemsGo "github.com/platinasystems/go"
+	ipLinkAddType "github.com/platinasystems/go/goes/cmd/ip/link/add/type"
+	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/basic"
 	"github.com/platinasystems/go/internal/machine"
 )
 
 func main() {
 	var ecode int
 	machine.Name = "platina-mk1"
+	platinasystemsGo.Packages = func() []map[string]string {
+		return fe1.Packages
+	}
+	ipLinkAddType.Goes.ByName[machine.Name] = basic.Command("platina-mk1")
 	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1

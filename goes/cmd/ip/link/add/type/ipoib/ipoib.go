@@ -58,11 +58,6 @@ func (Command) Main(args ...string) error {
 		"umcast",
 	)
 
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
-
 	sock, err := nl.NewSock()
 	if err != nil {
 		return err
@@ -75,7 +70,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}

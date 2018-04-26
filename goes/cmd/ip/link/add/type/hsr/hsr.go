@@ -66,10 +66,6 @@ func (Command) Main(args ...string) error {
 		"subversion", // ADDR_BYTE
 		"version",    // { 0 | 1 }
 	)
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
 
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -83,7 +79,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}

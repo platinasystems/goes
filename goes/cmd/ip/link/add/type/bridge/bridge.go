@@ -124,11 +124,6 @@ func (Command) Main(args ...string) error {
 		[]string{"group-address", "group_address"},
 	)
 
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
-
 	sock, err := nl.NewSock()
 	if err != nil {
 		return err
@@ -141,7 +136,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}
@@ -266,6 +261,9 @@ func (Command) Main(args ...string) error {
 		add.Attrs = append(add.Attrs, nl.Attr{x.t,
 			nl.BytesAttr(lladdr)})
 	}
+
+	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO,
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("bridge")}})
 
 	req, err := add.Message()
 	if err == nil {

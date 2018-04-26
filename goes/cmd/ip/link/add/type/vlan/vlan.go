@@ -118,10 +118,6 @@ func (Command) Main(args ...string) error {
 		"ingress-qos-map",
 		"egress-qos-map",
 	)
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
 
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -135,7 +131,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}

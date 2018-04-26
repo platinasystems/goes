@@ -55,6 +55,13 @@ func (Command) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
+	switch len(args) {
+	case 0:
+		return fmt.Errorf("missing IFNAME")
+	case 1:
+	default:
+		return fmt.Errorf("%v: unexpected", args[1:])
+	}
 
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -68,7 +75,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}
@@ -85,6 +92,8 @@ func (Command) Main(args ...string) error {
 		}
 	}
 
+	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_IFNAME,
+		nl.KstringAttr(args[0])})
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
 		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vrf")},
 		nl.Attr{rtnl.IFLA_INFO_DATA, nl.Attrs{

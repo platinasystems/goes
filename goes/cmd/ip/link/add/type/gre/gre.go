@@ -139,10 +139,6 @@ func (c Command) Main(args ...string) error {
 		"encap-sport",
 		"encap-dport",
 	)
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
 
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -156,7 +152,7 @@ func (c Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}

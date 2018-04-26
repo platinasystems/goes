@@ -197,10 +197,6 @@ func (Command) Main(args ...string) error {
 		"dstport",
 		[]string{"srcport", "port"},
 	)
-	err := opt.OnlyName(args)
-	if err != nil {
-		return err
-	}
 
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -214,7 +210,7 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add, err := request.New(opt)
+	add, err := request.New(opt, args)
 	if err != nil {
 		return err
 	}

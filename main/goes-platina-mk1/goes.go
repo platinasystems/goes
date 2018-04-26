@@ -7,8 +7,6 @@ package main
 import (
 	"time"
 
-	"github.com/platinasystems/fe1"
-	info "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
@@ -48,8 +46,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/install"
 	"github.com/platinasystems/go/goes/cmd/iocmd"
 	"github.com/platinasystems/go/goes/cmd/ip"
-	ifLinkAddType "github.com/platinasystems/go/goes/cmd/ip/link/add/type"
-	ifLinkAddTypeMachine "github.com/platinasystems/go/goes/cmd/ip/link/add/type/machine"
 	"github.com/platinasystems/go/goes/cmd/kexec"
 	"github.com/platinasystems/go/goes/cmd/keys"
 	"github.com/platinasystems/go/goes/cmd/kill"
@@ -92,9 +88,9 @@ import (
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/machine"
 )
 
 var Goes = &goes.Goes{
@@ -226,12 +222,4 @@ var Goes = &goes.Goes{
 		},
 		"wget": wget.Command{},
 	},
-}
-
-func init() {
-	info.Packages = func() []map[string]string {
-		return fe1.Packages
-	}
-	ifLinkAddType.Goes.ByName[machine.Name] =
-		ifLinkAddTypeMachine.Command{}
 }

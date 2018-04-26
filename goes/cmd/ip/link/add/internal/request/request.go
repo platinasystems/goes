@@ -13,12 +13,28 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-func New(opt *options.Options) (*Add, error) {
+func New(opt *options.Options, args []string) (*Add, error) {
+	err := opt.OnlyName(args)
+	if err != nil {
+		return nil, err
+	}
+	ifname := opt.Parms.ByName["name"]
+	if len(args) == 1 {
+		ifname = args[0]
+	}
+	if len(ifname) == 0 {
+		return nil, fmt.Errorf("missing IFNAME")
+	}
+	if len(args) > 1 {
+		return nil, fmt.Errorf("%v: unexpected", args[1:])
+	}
 	add := new(Add)
 	add.Hdr.Type = rtnl.RTM_NEWLINK
 	add.Hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK | nl.NLM_F_CREATE |
 		nl.NLM_F_EXCL
 	add.Msg.Family = rtnl.AF_UNSPEC
+	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_IFNAME,
+		nl.KstringAttr(ifname)})
 	for _, x := range []struct {
 		name string
 		t    uint16
@@ -48,10 +64,6 @@ func New(opt *options.Options) (*Add, error) {
 		}
 		add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINK,
 			nl.Int32Attr(link)})
-	}
-	if s := opt.Parms.ByName["name"]; len(s) > 0 {
-		add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_IFNAME,
-			nl.KstringAttr(s)})
 	}
 	for _, x := range []struct {
 		name string
