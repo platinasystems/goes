@@ -54,5 +54,6 @@ func (c *Command) Main(args ...string) error {
 	} else {
 		args = []string{"cli", args[0]}
 	}
+	c.g.Catline = nil // Reset the input source
 	return c.g.Main(args...)
 }
