@@ -88,7 +88,8 @@ func dashboard() (s string, err error) {
 }
 
 func numclients() (s string, err error) {
-	var c NumClnt
+	var c NumClntReply
+
 	c.Clients = len(ClientCfg)
 	jsonInfo, err := json.Marshal(c)
 	if err != nil {

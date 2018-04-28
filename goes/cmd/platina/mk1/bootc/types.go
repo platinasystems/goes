@@ -10,3 +10,7 @@ import (
 
 var regReq bootd.RegReq
 var regReply bootd.RegReply
+var numReply bootd.NumClntReply
+var dataReply bootd.ClntDataReply
+var scriptReply bootd.ScriptReply
+var binaryReply bootd.BinaryReply

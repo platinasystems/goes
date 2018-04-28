@@ -24,8 +24,7 @@ func register(mip string, mac string, ip string) (r int, n string, err error) {
 		return bootd.BootStateNotRegistered, "", fmt.Errorf("Error contacting Master")
 	}
 
-	fmt.Println("JSON:", s)
-	err = json.Unmarshal([]byte(s), &regReq)
+	err = json.Unmarshal([]byte(s), &regReply)
 	if err != nil {
 		fmt.Println("There was an error:", err)
 	}
@@ -36,31 +35,77 @@ func register(mip string, mac string, ip string) (r int, n string, err error) {
 	return reply, name, err
 }
 
-func executeScript() error {
-	return nil
+func getnumclients(mip string) (err error) {
+	s := ""
+	if s, err = sendReq(mip, bootd.NumClients); err != nil {
+		return err
+	}
+
+	err = json.Unmarshal([]byte(s), &numReply)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+	}
+	num := numReply.Clients
+	err = numReply.Error
+	fmt.Println(num, err)
+
+	return err
+}
+
+func getclientdata(mip string, unit int) (err error) {
+	s := ""
+	if s, err = sendReq(mip, bootd.Clientdata+" "+strconv.Itoa(unit)); err != nil {
+		return err
+	}
+
+	err = json.Unmarshal([]byte(s), &dataReply)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+	}
+	dat := dataReply.Client
+	err = dataReply.Error
+	fmt.Println(dat, err)
+
+	return err
+}
+
+func getscript(mip string, name string) (err error) {
+	s := ""
+	if s, err = sendReq(mip, bootd.Script+" "+name); err != nil {
+		return err
+	}
+
+	err = json.Unmarshal([]byte(s), &scriptReply)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+	}
+	script := scriptReply.Script
+	err = scriptReply.Error
+	fmt.Println(script, err)
+
+	return err
+}
+
+func getbinary(mip string, name string) (err error) {
+	s := ""
+	if s, err = sendReq(mip, bootd.Binary+" "+name); err != nil {
+		return err
+	}
+
+	err = json.Unmarshal([]byte(s), &binaryReply)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+	}
+	bin := binaryReply.Binary
+	err = numReply.Error
+	fmt.Println(bin, err)
+
+	return err
 }
 
 func dashboard(mip string) (err error) {
 	s := ""
 	if s, err = sendReq(mip, "dashboard"); err != nil {
-		return err
-	}
-	fmt.Println(s)
-	return nil
-}
-
-func numclients(mip string) (err error) {
-	s := ""
-	if s, err = sendReq(mip, "numclients"); err != nil {
-		return err
-	}
-	fmt.Println(s)
-	return nil
-}
-
-func clientdata(mip string, unit int) (err error) {
-	s := ""
-	if s, err = sendReq(mip, "clientdata "+strconv.Itoa(unit)); err != nil {
 		return err
 	}
 	fmt.Println(s)
@@ -104,11 +149,11 @@ func getMasterIP() string {
 }
 
 func getIP() string {
-	return "192.168.101.142" // TODO call function
+	return "192.168.101.142" // TODO call getIP function
 }
 
 func getMAC() string {
-	return "01:02:03:04:05:06" // TODO call function
+	return "01:02:03:04:05:06" // TODO call getMAC function
 }
 
 func getIP2() string {

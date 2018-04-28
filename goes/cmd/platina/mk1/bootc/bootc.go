@@ -4,7 +4,7 @@
 
 // DESCRIPTION
 // 'bootc' client used for auto-install
-// runs as coreboot payload (kernel + initrd + goes)
+// runs in goes-coreboot
 
 package bootc
 
@@ -80,18 +80,30 @@ func (Command) Main(args ...string) (err error) {
 			return err
 		}
 	case 6:
-		if err = numclients(mip); err != nil {
+		if err = getnumclients(mip); err != nil {
 			return err
 		}
 	case 7:
-		if err = clientdata(mip, 3); err != nil {
+		if err = getclientdata(mip, 3); err != nil {
 			return err
 		}
 	case 8:
-		if err = test404(mip); err != nil {
+		if err = getscript(mip, "testscript"); err != nil {
 			return err
 		}
 	case 9:
+		if err = getbinary(mip, "test.bin"); err != nil {
+			return err
+		}
+	case 10: //run script
+		if err = runScript("testscript"); err != nil {
+			return err
+		}
+	case 11:
+		if err = test404(mip); err != nil {
+			return err
+		}
+	case 12:
 		if err = dashboard("192.168.101.129"); err != nil {
 			return err
 		}
@@ -117,25 +129,27 @@ func boot() (err error) { // Coreboot "init"
 		}
 	}
 
-	// TODO TRY REAL REGISTER BOLT IN OF BOOTC
-
+	// TODO TRY REAL REGISTRATION TO SERVER BOLT IN OF BOOTC TO GOES INIT
 	// TODO run install script (format, install debian, etc. OR just boot)
-	// TODO BUILD INSTALL SCRIPT IN
 	// TODO if debian install fails ==> try again
-
 	// TODO [2] REGISTER TIMEOUT
 	// TODO READ the /boot directory into slice, bootd store last known good booted image
 	// TODO [3] boot grub(GRUB TO TELL WHAT ITS BOOTING), give me your images/BOOT THIS IMAGE, ASK SCRIPT TO RUN/RUN IT
-
 	// TODO BOOTC, BOOTD /etc/MASTER logic , bootc runs if no /etc/MASTER file, bootd runsi if /etc/MASTER (filesystem is not up btw)
-
 	// TODO bootd state machines
 	// TODO add test infra, with 100 units
-	// TODO installing apt-gets support
 	// TODO master to trigger client reset
 	// TODO CB to boot new goes payload
 	// TODO goes formats SDA2, installs debian use INSTALL/PRESEED
-	// TODO ADD LOCATION
+	// TODO ADD LOCATION OF ToR -- how?
+
+	return nil
+}
+
+func runScript(name string) (err error) {
+	// TODO check if script exists
+
+	// TODO run script
 
 	return nil
 }

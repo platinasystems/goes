@@ -6,10 +6,12 @@ package bootd
 
 const (
 	Register   = "register"
+	NumClients = "getnumclients"
+	Clientdata = "getclientdata"
+	Script     = "getscript"
+	Binary     = "getbinary"
 	DumpVars   = "dumpvars"
 	Dashboard  = "dashboard"
-	NumClients = "numclients"
-	Clientdata = "clientdata"
 )
 const (
 	BootStateNotRegistered = iota
@@ -64,10 +66,6 @@ type Client struct {
 	InstallCounter int
 }
 
-type NumClnt struct {
-	Clients int
-}
-
 type RegReq struct {
 	Mac string
 	IP  string
@@ -77,6 +75,26 @@ type RegReply struct {
 	Reply   int
 	TorName string
 	Error   error
+}
+
+type NumClntReply struct {
+	Clients int
+	Error   error
+}
+
+type ClntDataReply struct {
+	Client
+	Error error
+}
+
+type ScriptReply struct {
+	Script []string
+	Error  error
+}
+
+type BinaryReply struct {
+	Binary []byte
+	Error  error
 }
 
 type BootReq struct {
