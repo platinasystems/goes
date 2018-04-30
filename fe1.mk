@@ -1,5 +1,5 @@
 #!/usr/bin/make
-# make noplugin=no|yes to force plugin enable/disable
+# make plugin=yes|no to force plugin enable/disable
 # make VNET_DEBUG=yes to enable vnet debugging checks and flags for gdb.
 
 fe1_pkg  := github.com/platinasystems/fe1
@@ -11,9 +11,10 @@ fe1a_pkg := github.com/platinasystems/firmware-fe1a
 fe1a_dir := $(shell go list -e -f {{.Dir}} $(fe1a_pkg))
 _fe1a_gen := $(if $(fe1a_dir),$(shell cd $(fe1a_dir) && go generate))
 
-noplugin := $(if $(fe1_dir),yes,no)
-noplugin_yes:=$(filter yes,$(noplugin))
-noplugin_tag:=$(if $(noplugin_yes), noplugin)
+plugin := $(if $(fe1_dir),no,yes)
+plugin_yes:=$(filter yes,$(plugin))
+plugin_tag:=$(if $(plugin_yes), plugin)
+plugin_fe1:=$(if $(plugin_yes),fe1.so)
 
 VNET_DEBUG_yes:=$(filter yes,$(VNET_DEBUG))
 VNET_DEBUG_tag:=$(if $(VNET_DEBUG_yes), debug)
