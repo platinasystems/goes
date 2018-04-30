@@ -1,5 +1,6 @@
 #!/usr/bin/make
 # make plugin=yes|no to force plugin enable/disable
+# make novfio=yes to disable vfio
 # make VNET_DEBUG=yes to enable vnet debugging checks and flags for gdb.
 
 fe1_pkg  := github.com/platinasystems/fe1
@@ -16,10 +17,13 @@ plugin_yes:=$(filter yes,$(plugin))
 plugin_tag:=$(if $(plugin_yes), plugin)
 plugin_fe1:=$(if $(plugin_yes),fe1.so)
 
+novfio_yes:=$(filter yes,$(novfio))
+novfio_tag:=$(if $(novfio_yes), novfio)
+
 VNET_DEBUG_yes:=$(filter yes,$(VNET_DEBUG))
 VNET_DEBUG_tag:=$(if $(VNET_DEBUG_yes), debug)
 
-fe1.so: tags=vfio$(VNET_DEBUG_tag)$(diag_tag)
+fe1.so: tags=$(novfio_tag)$(VNET_DEBUG_tag)$(diag_tag)
 fe1.so: $(if $(fe1_dir),| $(fe1_gen) $(fe1a_gen),$(libfe1so))
 	$(if $(fe1_dir),$(gobuild) -buildmode=plugin ./main/fe1,\
 		$(if $(libfe1so),cp $(libfe1so),touch) $@)

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !uio_pci_dma,!uio_pci_generic,!vfio
+// +build !uio_pci_dma,!uio_pci_generic,novfio
 
 package hw
 
