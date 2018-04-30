@@ -58,7 +58,7 @@ DESCRIPTION
 
 	The -r flag reports QSPI version numbers and booted from.
 
-	By default, images are downloaded from "downloads.platina.com".
+	Images are downloaded from "downloads.platinasystems.com",
 	Or from a server using "-s" followed by a URL or IPv4 address.
 
 	Upgrade proceeds only if the selected version number is newer,
@@ -66,7 +66,7 @@ DESCRIPTION
 
 OPTIONS
 	-v [VER]          version [YYYYMMDD] or LATEST (default)
-	-s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
+	-s [SERVER[/dir]] IP4 or URL, default downloads.platinasystems.com 
 	-t                use TFTP instead of HTTP
 	-l                display version of selected server and version
 	-r                report QSPI installed versions, QSPI booted from
