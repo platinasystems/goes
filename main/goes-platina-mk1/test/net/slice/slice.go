@@ -267,7 +267,6 @@ func checkStress(t *testing.T) {
 	}
 
 	for _, to := range duration {
-		test.Pause()
 		t.Logf("stress for %v", to)
 		cmd := []string{"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "10.3.0.4"}
