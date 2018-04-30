@@ -14,9 +14,11 @@ import (
 	"github.com/platinasystems/go/internal/machine"
 )
 
+const name = "example"
+
 func main() {
 	var ecode int
-	machine.Name = "example"
+	machine.Name = name
 	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1

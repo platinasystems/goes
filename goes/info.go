@@ -14,6 +14,22 @@ import (
 	"github.com/platinasystems/go/internal/indent"
 )
 
+type ShowMachine string
+
+func (name ShowMachine) String() string { return string(name) }
+func (ShowMachine) Usage() string       { return "show machine" }
+
+func (ShowMachine) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print machine name",
+	}
+}
+
+func (name ShowMachine) Main(...string) error {
+	fmt.Println(name)
+	return nil
+}
+
 type ShowPackages struct{}
 
 func (ShowPackages) String() string { return "packages" }

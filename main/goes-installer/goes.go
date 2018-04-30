@@ -12,7 +12,7 @@ import (
 )
 
 var Goes = &goes.Goes{
-	NAME: "goes-installer",
+	NAME: "goes-" + name,
 	APROPOS: lang.Alt{
 		lang.EnUS: "a self extracting goes machine",
 	},
@@ -25,6 +25,7 @@ var Goes = &goes.Goes{
 				lang.EnUS: "print stuff",
 			},
 			ByName: map[string]cmd.Cmd{
+				"machine":  goes.ShowMachine(name),
 				"packages": goes.ShowPackages{},
 			},
 		},

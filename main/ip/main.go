@@ -14,6 +14,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip"
 )
 
+const name = "ip"
+
 func main() {
 	var ecode int
 	if err := ip.Goes.Main(os.Args...); err != nil {

@@ -94,7 +94,7 @@ import (
 )
 
 var Goes = &goes.Goes{
-	NAME: "goes-platina-mk1",
+	NAME: "goes-" + name,
 	APROPOS: lang.Alt{
 		lang.EnUS: "goes machine for platina's mk1 TOR",
 	},
@@ -159,7 +159,7 @@ var Goes = &goes.Goes{
 		"reboot": reboot.Command{},
 		"redisd": &redisd.Command{
 			Devs:    []string{"lo", "eth0"},
-			Machine: "platina-mk1",
+			Machine: name,
 			Hook: func(pub *publisher.Publisher) {
 				eeprom.Config(
 					eeprom.BusIndex(0),
@@ -184,6 +184,7 @@ var Goes = &goes.Goes{
 			ByName: map[string]cmd.Cmd{
 				"cmdline":  cmdline.Command{},
 				"iminfo":   iminfo.Command{},
+				"machine":  goes.ShowMachine(name),
 				"packages": goes.ShowPackages{},
 			},
 		},

@@ -16,13 +16,15 @@ import (
 	"github.com/platinasystems/go/internal/machine"
 )
 
+const name = "platina-mk1"
+
 func main() {
 	var ecode int
-	machine.Name = "platina-mk1"
+	machine.Name = name
 	platinasystemsGo.Packages = func() []map[string]string {
 		return fe1.Packages
 	}
-	ipLinkAddType.Goes.ByName[machine.Name] = basic.Command("platina-mk1")
+	ipLinkAddType.Goes.ByName[machine.Name] = basic.Command(name)
 	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1

@@ -93,7 +93,7 @@ import (
 )
 
 var Goes = &goes.Goes{
-	NAME: "goes-platina-mk2-mc1-bmc",
+	NAME: "goes-" + name,
 	APROPOS: lang.Alt{
 		lang.EnUS: "platina's mk2 mc1 baseboard management controller",
 	},
@@ -227,6 +227,7 @@ var Goes = &goes.Goes{
 			ByName: map[string]cmd.Cmd{
 				"cmdline":  cmdline.Command{},
 				"iminfo":   iminfo.Command{},
+				"machine":  goes.ShowMachine(name),
 				"packages": goes.ShowPackages{},
 			},
 		},

@@ -79,7 +79,7 @@ import (
 )
 
 var Goes = &goes.Goes{
-	NAME: "goes-example",
+	NAME: "goes-" + name,
 	APROPOS: lang.Alt{
 		lang.EnUS: "an example goes machine",
 	},
@@ -152,6 +152,7 @@ var Goes = &goes.Goes{
 			ByName: map[string]cmd.Cmd{
 				"cmdline":  cmdline.Command{},
 				"iminfo":   iminfo.Command{},
+				"machine":  goes.ShowMachine(name),
 				"packages": goes.ShowPackages{},
 			},
 		},
