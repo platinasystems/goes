@@ -61,6 +61,7 @@ SEE ALSO
 	man ip || ip -man`,
 	},
 	ByName: map[string]cmd.Cmd{
+		"":          basic.Command(""), // implies machine.Name
 		"bridge":    bridge.Command{},
 		"dummy":     basic.Command("dummy"),
 		"geneve":    geneve.Command{},

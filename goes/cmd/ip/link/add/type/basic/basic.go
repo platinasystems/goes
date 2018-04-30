@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/internal/request"
 	"github.com/platinasystems/go/goes/lang"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/nl"
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
@@ -36,6 +37,7 @@ BASIC TYPES
 	dummy - Dummy network interface
 	ifb - Intermediate Functional Block device
 	vcan - Virtual Controller Area Network interface
+	` + machine.Name + ` - XETH virtual ethernet interface
 
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
@@ -45,6 +47,18 @@ SEE ALSO
 }
 
 func (c Command) Main(args ...string) error {
+	kind := string(c)
+	if len(kind) == 0 {
+		for i, a := range args {
+			if a == machine.Name {
+				copy(args[i:], args[i+1:])
+				args = args[:len(args)-1]
+				break
+			}
+		}
+		kind = machine.Name
+	}
+
 	opt, args := options.New(args)
 
 	sock, err := nl.NewSock()
@@ -65,7 +79,7 @@ func (c Command) Main(args ...string) error {
 	}
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO,
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(c)}})
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(kind)}})
 
 	req, err := add.Message()
 	if err == nil {
