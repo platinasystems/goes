@@ -398,9 +398,9 @@ func (g *Goes) Main(args ...string) error {
 	var found bool
 	if len(args) > 0 {
 		v, found = g.ByName[args[0]]
-	}
-	if found {
-		k = cmd.WhatKind(v)
+		if found {
+			k = cmd.WhatKind(v)
+		}
 	}
 	if !found || !k.IsNoCLIFlags() {
 		cli, clifound := g.ByName["cli"]
@@ -464,7 +464,9 @@ func (g *Goes) Main(args ...string) error {
 		}
 	}
 
-	g.shift(args)
+	if g.shift(args) {
+		v, found = g.ByName[args[0]]
+	}
 
 	if g.Verbosity >= VerboseDebug {
 		fmt.Printf("$=%v %v\n", g.Status, args)
@@ -524,7 +526,7 @@ func (g *Goes) Main(args ...string) error {
 // becomes
 //
 //	ip link -s
-func (g *Goes) shift(args []string) {
+func (g *Goes) shift(args []string) bool {
 	for i := range args {
 		if _, found := g.ByName[args[i]]; found {
 			if i > 0 {
@@ -532,7 +534,7 @@ func (g *Goes) shift(args []string) {
 				copy(args[1:i+1], args[:i])
 				args[0] = name
 			}
-			return
+			return true
 		}
 		var matches int
 		var last string
@@ -547,9 +549,10 @@ func (g *Goes) shift(args []string) {
 				copy(args[1:i+1], args[:i])
 			}
 			args[0] = last
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // swap hyphen prefaced helper flags with command, so,
