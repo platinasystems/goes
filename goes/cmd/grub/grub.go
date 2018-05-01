@@ -160,6 +160,22 @@ func (c *Command) Main(args ...string) error {
 	fmt.Printf("Kernel defined: %s\n", Linux.Kern)
 	fmt.Printf("Linux command: %v\n", Linux.Cmd)
 	fmt.Printf("Initrd: %v\n", Initrd.Initrd)
+
+	if len(Linux.Kern) > 0 {
+		kexec := []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
+		fmt.Printf("Execute %s? <Yes/no> ", kexec)
+		yn := ""
+		_, err := fmt.Fscanln(os.Stdin, &yn)
+		if err != nil {
+			return err
+		}
+		if yn == "" || strings.HasPrefix(yn, "Y") ||
+			strings.HasPrefix(yn, "y") {
+			err := Goes.Main(kexec...)
+			return err
+		}
+	}
+
 	return err
 }
 
