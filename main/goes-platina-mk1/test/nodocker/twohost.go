@@ -6,6 +6,7 @@ package nodocker
 
 import (
 	"testing"
+	"time"
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/port2port"
@@ -45,6 +46,7 @@ func twohost(t *testing.T) {
 		test.Self{}, "ip", "address", "del", "10.1.0.1/31",
 		"dev", port2port.Conf[0][1])
 
+	time.Sleep(1 * time.Second)
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h1",
 		test.Self{}, "ping", "10.1.0.1")
 	assert.Program(test.Self{}, "ip", "netns", "exec", "h2",
