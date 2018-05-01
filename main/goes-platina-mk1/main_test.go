@@ -28,12 +28,12 @@ func Test(t *testing.T) {
 	assert.GoesNotRunning()
 
 	defer assert.Background(test.Self{}, "redisd").Quit()
-	assert.Program(12*time.Second, test.Self{}, "hwait", "platina-mk1",
+	assert.Program(12*time.Second, test.Self{}, "hwait", name,
 		"redis.ready", "true", "10")
 
 	vnetd := assert.Background(30*time.Second, test.Self{}, "vnetd")
 	defer vnetd.Quit()
-	assert.Program(32*time.Second, test.Self{}, "hwait", "platina-mk1",
+	assert.Program(32*time.Second, test.Self{}, "hwait", name,
 		"vnet.ready", "true", "30")
 
 	if *testPause {
