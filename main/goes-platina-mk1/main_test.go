@@ -6,7 +6,6 @@ package main
 
 import (
 	"flag"
-	"os"
 	"testing"
 	"time"
 
@@ -59,7 +58,4 @@ func Test(t *testing.T) {
 			}.Run(t)
 		}},
 	}.Run(t)
-	if t.Failed() {
-		os.RemoveAll("/var/run/goes/socks")
-	}
 }
