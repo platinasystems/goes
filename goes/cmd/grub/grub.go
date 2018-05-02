@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -117,6 +118,10 @@ func (c *Command) Main(args ...string) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Grub script returned %s\n", err)
 	}
+
+	root := Goes.EnvMap["root"]
+	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
+
 	menlen := len(Menuentry.Menus)
 	if menlen == 0 && len(Linux.Kern) == 0 {
 		fmt.Fprintf(os.Stderr, "Grub script did not define any menus or set a kernel\n")
@@ -161,6 +166,9 @@ func (c *Command) Main(args ...string) error {
 	fmt.Printf("Linux command: %v\n", Linux.Cmd)
 	fmt.Printf("Initrd: %v\n", Initrd.Initrd)
 
+	root = Goes.EnvMap["root"]
+	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
+
 	if len(Linux.Kern) > 0 {
 		kexec := []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
 		fmt.Printf("Execute %s? <Yes/no> ", kexec)
@@ -185,4 +193,25 @@ func (c *Command) String() string {
 
 func (c *Command) Usage() string {
 	return Goes.Usage()
+}
+
+func (c *Command) GetRoot() string {
+	root := Goes.EnvMap["root"]
+	if root == "" {
+		return root
+	}
+
+	re := regexp.MustCompile(`^((hd(?P<Unit>\d+)),.*(?P<Partition>\d+))$`)
+	r := re.FindStringSubmatch(root)
+	fmt.Printf("Root regex: %v\n", r)
+	if len(r) != 5 {
+		return root
+	}
+	unit, err := strconv.Atoi(r[3])
+	if err != nil {
+		panic(err)
+	}
+	trans := "sd" + string(97+unit) + r[4]
+
+	return trans
 }
