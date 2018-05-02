@@ -1,6 +1,6 @@
 #!/usr/bin/make
 
-ALL = goes-platina-mk1 goes-platina-mk1-installer goes-platina-mk1.test go-wip
+ALL = goes-platina-mk1 goes-platina-mk1-installer goes-platina-mk1.test
 
 reltopdir := $(shell git rev-parse --show-cdup)
 
