@@ -16,7 +16,6 @@ import (
 
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/goes/cmd"
-	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/machine"
@@ -24,6 +23,7 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
+	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
@@ -190,20 +190,14 @@ func (i *Info) hw_if_add_del(v *vnet.Vnet, hi vnet.Hi, isDel bool) (err error) {
 
 func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if i.hw_is_ok(hi) {
+		var flag xeth.CarrierFlag
+		if isUp {
+			flag = xeth.XETH_CARRIER_ON
+		} else {
+			flag = xeth.XETH_CARRIER_OFF
+		}
+		vnet.Xeth.Carrier(hi.Name(v), flag)
 		i.publish_link(hi, isUp)
-
-		// Run a go routine to not delay vnet machine
-		go func() {
-			// Reflect hw carrier state at linux interface
-			var isUpStr string
-			if isUp {
-				isUpStr = "up"
-			} else {
-				isUpStr = "down"
-			}
-			args := []string{"link", "set", hi.Name(v), "carrier", isUpStr}
-			ip.Goes.Main(args...)
-		}()
 	}
 	return
 }

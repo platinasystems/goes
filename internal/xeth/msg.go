@@ -77,3 +77,13 @@ type EthtoolSettingsMsg struct {
 func (msg *EthtoolSettingsMsg) String() string {
 	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", &msg.Settings)
 }
+
+type CarrierMsg struct {
+	Hdr    Hdr
+	Ifname Ifname
+	Flag   CarrierFlag
+}
+
+func (msg *CarrierMsg) String() string {
+	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", msg.Flag)
+}

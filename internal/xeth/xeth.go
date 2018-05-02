@@ -126,6 +126,15 @@ func (xeth *Xeth) Close() error {
 	return nil
 }
 
+func (xeth *Xeth) Carrier(ifname string, flag CarrierFlag) {
+	buf := Pool.Get(SizeofStatMsg)
+	msg := (*CarrierMsg)(unsafe.Pointer(&buf[0]))
+	msg.Hdr.Op = uint8(XETH_CARRIER_OP)
+	copy(msg.Ifname[:], ifname)
+	msg.Flag = flag
+	xeth.TxCh <- buf
+}
+
 func (xeth *Xeth) EthtoolDump() {
 	buf := Pool.Get(SizeofBreakMsg)
 	msg := (*BreakMsg)(unsafe.Pointer(&buf[0]))

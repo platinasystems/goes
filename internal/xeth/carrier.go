@@ -24,34 +24,24 @@ package xeth
 
 import "fmt"
 
-type Op uint8
+type CarrierFlag uint8
 
 const (
-	XETH_BREAK_OP Op = iota
-	XETH_LINK_STAT_OP
-	XETH_ETHTOOL_STAT_OP
-	XETH_ETHTOOL_FLAGS_OP
-	XETH_ETHTOOL_SETTINGS_OP
-	XETH_ETHTOOL_DUMP_OP
-	XETH_CARRIER_OP
+	XETH_CARRIER_OFF CarrierFlag = iota
+	XETH_CARRIER_ON
 )
 
-func (op Op) String() string {
-	var ops = []string{
-		"break",
-		"link-stat",
-		"ethtool-stat",
-		"ethtool-flags",
-		"ethtool-settings",
-		"ethtool-dump",
-		"carrier",
+func (flag CarrierFlag) String() string {
+	var flags = []string{
+		"off",
+		"on",
 	}
 	var s string
-	i := int(op)
-	if i < len(ops) {
-		s = ops[i]
+	i := int(flag)
+	if i < len(flags) {
+		s = flags[i]
 	} else {
-		s = fmt.Sprint("op[", i, "]")
+		s = fmt.Sprint("flag[", i, "]")
 	}
 	return s
 }

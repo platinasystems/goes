@@ -35,13 +35,16 @@ import (
 func Main() {
 	name := filepath.Base(os.Args[0])
 	args := os.Args[1:]
-	usage := fmt.Sprint("usage:\t", name, " ", `
-	{ dump DB | set DEVICE STAT COUNT | FILE | - }...
-
+	usage := fmt.Sprint("usage:",
+		"\t", name, " carrier DEVICE CARRIER ...\n",
+		"\t", name, " dump DB ...\n",
+		"\t", name, " set DEVICE STAT COUNT | FILE | - ...\n",
+		`
+CARRIER	{ on | off }
 DB	{ ethtool | fdb }
 DEVICE	an interface name or its ifindex
 STAT	an 'ip link' or 'ethtool' statistic
-FILE,-	receive an exception frame from FILE or STDIN`[2:])
+FILE,-	receive an exception frame from FILE or STDIN`)
 	xeth, err := New(name, DialOpt(false))
 	defer func() {
 		r := recover()
@@ -65,6 +68,26 @@ FILE,-	receive an exception frame from FILE or STDIN`[2:])
 		case "help", "-help", "--help", "-h":
 			fmt.Println(usage)
 			return
+		case "carrier", "-carrier", "--carrier":
+			var flag CarrierFlag
+			switch len(args) {
+			case 1:
+				panic(fmt.Errorf("missing DEVICE\n%s", usage))
+			case 2:
+				panic(fmt.Errorf("missing CARRIER\n%s", usage))
+			}
+			switch args[2] {
+			case "on":
+				flag = XETH_CARRIER_ON
+			case "off":
+				flag = XETH_CARRIER_OFF
+			default:
+				panic(fmt.Errorf("CARRIER %q unknown\n%s",
+					args[2], usage))
+			}
+			xeth.Assert()
+			xeth.Carrier(args[1], flag)
+			args = args[3:]
 		case "dump", "-dump", "--dump":
 			if len(args) < 2 {
 				panic(fmt.Errorf("missing DB\n%s", usage))
@@ -76,8 +99,8 @@ FILE,-	receive an exception frame from FILE or STDIN`[2:])
 			case "fdb":
 				panic("FIXME")
 			default:
-				panic(fmt.Errorf("%s: uknown DB\n%s", args[1],
-					usage))
+				panic(fmt.Errorf("DB %q unknown\n%s",
+					args[1], usage))
 			}
 			if err := xeth.UntilBreak(dump); err != nil {
 				panic(err)
