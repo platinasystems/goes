@@ -141,7 +141,7 @@ func (c *Command) Main(args ...string) error {
 	root := Goes.EnvMap["root"]
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
-	ServeMenus(Goes) // FIXME so wrong
+	c.ServeMenus() // FIXME so wrong
 
 	menlen := len(Menuentry.Menus)
 	if menlen == 0 && len(Linux.Kern) == 0 {

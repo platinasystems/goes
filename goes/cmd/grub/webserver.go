@@ -11,11 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-
-	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd/grub/initrd"
-	"github.com/platinasystems/go/goes/cmd/grub/linux"
-	"github.com/platinasystems/go/goes/cmd/grub/menuentry"
 )
 
 type webserver struct {
@@ -32,9 +27,9 @@ func (ws *webserver) Write(p []byte) (n int, err error) {
 	return ret, err
 }
 
-func startHttpServer(g *goes.Goes) *http.Server {
+func (c *Command) startHttpServer() *http.Server {
 	srv := &http.Server{Addr: ":8080"}
-	m := g.ByName["menuentry"].(*menuentry.Command).Menus
+	m := Menuentry.Menus
 	for i, v := range m {
 		me := v
 		http.HandleFunc(fmt.Sprintf("/boot/%d/", i), func(w http.ResponseWriter, r *http.Request) {
@@ -45,9 +40,7 @@ func startHttpServer(g *goes.Goes) *http.Server {
 				fmt.Fprintf(w, `Menu exit status: %s
 <br>`, html.EscapeString(err.Error()))
 			} else {
-				l := g.ByName["linux"].(*linux.Command)
-				i := g.ByName["initrd"].(*initrd.Command)
-				kexec := []string{"kexec", "-k", l.Kern, "-i", i.Initrd, "-c", strings.Join(l.Cmd, " "), "-e"}
+				kexec := c.KexecCommand()
 				s := html.EscapeString(strings.Join(kexec, " "))
 				fmt.Printf("kexec command: %s\n", s)
 				fmt.Fprintf(w, `Execute <a href="kexec">%s</a><br>`, s)
@@ -56,10 +49,8 @@ func startHttpServer(g *goes.Goes) *http.Server {
 		})
 		http.HandleFunc(fmt.Sprintf("/boot/%d/kexec", i), func(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, `<html>`)
-			l := g.ByName["linux"].(*linux.Command)
-			i := g.ByName["initrd"].(*initrd.Command)
-			kexec := []string{"kexec", "-k", l.Kern, "-i", i.Initrd, "-c", strings.Join(l.Cmd, " "), "-e"}
-			err := g.Main(kexec...)
+			kexec := c.KexecCommand()
+			err := Goes.Main(kexec...)
 			if err != nil {
 				fmt.Fprintf(w, "Failed: %s<br>", html.EscapeString(err.Error()))
 			} else {
@@ -90,6 +81,6 @@ func startHttpServer(g *goes.Goes) *http.Server {
 	return srv
 }
 
-func ServeMenus(g *goes.Goes) *http.Server {
-	return startHttpServer(g)
+func (c *Command) ServeMenus() *http.Server {
+	return c.startHttpServer()
 }
