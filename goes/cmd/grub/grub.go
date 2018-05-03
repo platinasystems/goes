@@ -128,7 +128,7 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	if len(Linux.Kern) > 0 {
-		kexec := []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
+		kexec := c.KexecCommand()
 		fmt.Printf("Execute %s? <Yes/no> ", kexec)
 		yn := ""
 		_, err := fmt.Fscanln(os.Stdin, &yn)
@@ -170,7 +170,7 @@ func (c *Command) Main(args ...string) error {
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
 	if len(Linux.Kern) > 0 {
-		kexec := []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
+		kexec := c.KexecCommand()
 		fmt.Printf("Execute %s? <Yes/no> ", kexec)
 		yn := ""
 		_, err := fmt.Fscanln(os.Stdin, &yn)
@@ -214,4 +214,9 @@ func (c *Command) GetRoot() string {
 	trans := "sd" + string(97+unit) + r[4]
 
 	return trans
+}
+
+func (c *Command) KexecCommand() []string {
+	return []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
+
 }
