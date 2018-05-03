@@ -37,7 +37,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/grub/set"
 	"github.com/platinasystems/go/goes/cmd/grub/submenu"
 	"github.com/platinasystems/go/goes/cmd/grub/terminal_output"
-	"github.com/platinasystems/go/goes/cmd/grub/webserver"
 
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/kexec"
@@ -142,7 +141,7 @@ func (c *Command) Main(args ...string) error {
 	root := Goes.EnvMap["root"]
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
-	webserver.ServeMenus(Goes) // FIXME so wrong
+	ServeMenus(Goes) // FIXME so wrong
 
 	menlen := len(Menuentry.Menus)
 	if menlen == 0 && len(Linux.Kern) == 0 {
