@@ -44,10 +44,12 @@ import (
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/lang"
 
+	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/url"
 )
 
 type Command struct {
+	prefix string
 }
 
 var Goes = &goes.Goes{
@@ -95,6 +97,16 @@ func (c *Command) Apropos() lang.Alt {
 }
 
 func (c *Command) Main(args ...string) error {
+	parm, args := parms.New(args, "-p")
+	c.prefix = parm.ByName["-p"]
+	if len(c.prefix) > 0 {
+		if c.prefix[0] != '/' {
+			c.prefix = "/" + c.prefix
+		}
+		if c.prefix[len(c.prefix)-1] == '/' {
+			c.prefix = c.prefix[:len(c.prefix)-1]
+		}
+	}
 	n := "/boot/grub/grub.cfg"
 	if len(args) > 0 {
 		n = args[0]
@@ -215,7 +227,8 @@ func (c *Command) GetRoot() string {
 	if err != nil {
 		panic(err)
 	}
-	trans := "sd" + string(97+unit) + r[4]
+
+	trans := c.prefix + "/sd" + string(97+unit) + r[4]
 
 	return trans
 }
@@ -229,7 +242,8 @@ func (c *Command) KexecCommand() []string {
 	if i[0] != '/' {
 		i = "/" + i
 	}
-
+	k = c.GetRoot() + k
+	i = c.GetRoot() + i
 	return []string{"kexec", "-k", k, "-i", i, "-c", strings.Join(Linux.Cmd, " "), "-e"}
 
 }
