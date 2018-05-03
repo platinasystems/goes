@@ -95,7 +95,11 @@ func (c *Command) Apropos() lang.Alt {
 }
 
 func (c *Command) Main(args ...string) error {
-	script, err := url.Open("/boot/grub/grub.cfg")
+	n := "/boot/grub/grub.cfg"
+	if len(args) > 0 {
+		n = args[0]
+	}
+	script, err := url.Open(n)
 	if err != nil {
 		return err
 	}
@@ -114,7 +118,7 @@ func (c *Command) Main(args ...string) error {
 		return "", err
 	}
 
-	err = Goes.Main(args...)
+	err = Goes.Main()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Grub script returned %s\n", err)
 	}
