@@ -27,7 +27,7 @@ type Command struct{}
 func (Command) String() string { return "io" }
 
 func (Command) Usage() string {
-	return "io [[-r] | -w] IO-ADDRESS [-d DATA] [-m MODE]"
+	return "io [[-r] | -w] IO-ADDRESS [-D DATA] [-m MODE]"
 }
 
 func (Command) Apropos() lang.Alt {
@@ -44,7 +44,7 @@ DESCRIPTION
 	  -r to read from ioport, default
 	  -w to write from ioport
 	     IO-ADDRESS is a hex value
-	  -d DATA is a hex value
+	  -D DATA is a hex value
 	  -m MODE is one of:
 	    b (read byte data, default)
 	    w (read word data)
@@ -54,20 +54,20 @@ DESCRIPTION
 
 func (Command) Main(args ...string) (err error) {
 	flag, args := flags.New(args, "-r", "-w")
-	parm, args := parms.New(args, "-d", "-m")
+	parm, args := parms.New(args, "-D", "-m")
 	if len(args) == 0 {
 		return fmt.Errorf("IO-ADDRESS: missing")
 	}
-	if parm.ByName["-d"] == "" {
-		parm.ByName["-d"] = "0x0"
+	if parm.ByName["-D"] == "" {
+		parm.ByName["-D"] = "0x0"
 	}
 
 	var a, d, w uint64
 	if a, err = strconv.ParseUint(args[0], 0, 32); err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
-	if d, err = strconv.ParseUint(parm.ByName["-d"], 0, 32); err != nil {
-		return fmt.Errorf("%s: %v", parm.ByName["-d"], err)
+	if d, err = strconv.ParseUint(parm.ByName["-D"], 0, 32); err != nil {
+		return fmt.Errorf("%s: %v", parm.ByName["-D"], err)
 	}
 	switch parm.ByName["-m"] {
 	case "w":
