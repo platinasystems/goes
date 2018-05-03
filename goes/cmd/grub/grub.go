@@ -217,6 +217,15 @@ func (c *Command) GetRoot() string {
 }
 
 func (c *Command) KexecCommand() []string {
-	return []string{"kexec", "-k", Linux.Kern, "-i", Initrd.Initrd, "-c", strings.Join(Linux.Cmd, " "), "-e"}
+	k := Linux.Kern
+	i := Initrd.Initrd
+	if k[0] != '/' {
+		k = "/" + k
+	}
+	if i[0] != '/' {
+		i = "/" + i
+	}
+
+	return []string{"kexec", "-k", k, "-i", i, "-c", strings.Join(Linux.Cmd, " "), "-e"}
 
 }
