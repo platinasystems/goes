@@ -147,37 +147,20 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	if len(Linux.Kern) > 0 {
-		err := func() error {
-			line := liner.NewLiner()
-			defer line.Close()
-			if parm.ByName["-t"] != "" {
-				timeout, err := time.ParseDuration(parm.ByName["-t"])
-				if err != nil {
-					return err
-				}
-				err = line.SetDuration(timeout)
-				if err != nil {
-					return err
-				}
-			}
-
-			line.SetCtrlCAborts(true)
-			kexec := c.KexecCommand()
-			yn, err := line.Prompt(fmt.Sprintf("Execute %s? <Yes/no> ", kexec))
-			if err != nil {
-				return err
-			}
-			if yn == "" || strings.HasPrefix(yn, "Y") ||
-				strings.HasPrefix(yn, "y") {
-				err := Goes.Main(kexec...)
-				return err
-			}
-			return nil
-		}()
+		kexec := c.KexecCommand()
+		yn, err := c.readline(parm, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
 		if err != nil {
 			return err
 		}
+		if yn == "" || strings.HasPrefix(yn, "Y") ||
+			strings.HasPrefix(yn, "y") {
+			err := Goes.Main(kexec...)
+			return err
+		}
 
+		if err != nil {
+			return err
+		}
 	}
 
 	if menlen == 0 {
@@ -189,32 +172,13 @@ func (c *Command) Main(args ...string) error {
 	}
 	var menuItem int
 	err = func() error {
-		line := liner.NewLiner()
-		defer line.Close()
-		if parm.ByName["-t"] != "" {
-			timeout, err := time.ParseDuration(parm.ByName["-t"])
-			if err != nil {
-				return err
-			}
-			err = line.SetDuration(timeout)
-			if err != nil {
-				return err
-			}
-		}
-
-		line.SetCtrlCAborts(true)
-
 		def := Goes.EnvMap["default"]
 		if def == "" {
 			def = "0"
 		}
-		mi, err := line.Prompt(fmt.Sprintf("Menu item [%s]? ", def))
+		mi, err := c.readline(parm, fmt.Sprintf("Menu item [%s]? ", def), def)
 		if err != nil {
 			return err
-		}
-
-		if mi == "" {
-			mi = def
 		}
 		menuItem, err = strconv.Atoi(mi)
 		if err != nil {
@@ -238,34 +202,14 @@ func (c *Command) Main(args ...string) error {
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
 	if len(Linux.Kern) > 0 {
-		err := func() error {
-			line := liner.NewLiner()
-			defer line.Close()
-			if parm.ByName["-t"] != "" {
-				timeout, err := time.ParseDuration(parm.ByName["-t"])
-				if err != nil {
-					return err
-				}
-				err = line.SetDuration(timeout)
-				if err != nil {
-					return err
-				}
-			}
-
-			line.SetCtrlCAborts(true)
-			kexec := c.KexecCommand()
-			yn, err := line.Prompt(fmt.Sprintf("Execute %s? <Yes/no> ", kexec))
-			if err != nil {
-				return err
-			}
-			if yn == "" || strings.HasPrefix(yn, "Y") ||
-				strings.HasPrefix(yn, "y") {
-				err := Goes.Main(kexec...)
-				return err
-			}
-			return nil
-		}()
+		kexec := c.KexecCommand()
+		yn, err := c.readline(parm, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), strings.Join(kexec, " "))
 		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(yn, "Y") ||
+			strings.HasPrefix(yn, "y") {
+			err := Goes.Main(kexec...)
 			return err
 		}
 	}
@@ -316,4 +260,31 @@ func (c *Command) KexecCommand() []string {
 	i = c.GetRoot() + i
 	return []string{"kexec", "-k", k, "-i", i, "-c", strings.Join(Linux.Cmd, " "), "-e"}
 
+}
+
+func (c *Command) readline(parm *parms.Parms, prompt string, def string) (string, error) {
+	line := liner.NewLiner()
+	defer line.Close()
+	if parm.ByName["-t"] != "" {
+		timeout, err := time.ParseDuration(parm.ByName["-t"])
+		if err != nil {
+			return "", err
+		}
+		err = line.SetDuration(timeout)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	line.SetCtrlCAborts(true)
+
+	mi, err := line.Prompt(prompt)
+	if err != nil {
+		return "", err
+	}
+
+	if mi == "" {
+		mi = def
+	}
+	return mi, nil
 }
