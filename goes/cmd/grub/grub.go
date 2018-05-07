@@ -241,9 +241,18 @@ func (c *Command) GetRoot() string {
 		panic(err)
 	}
 
-	trans := c.prefix + "/sd" + string(97+unit) + r[4]
-
-	return trans
+	dev := "/sd" + string(97+unit) + r[4]
+	trans, err := c.findMountedFS("/dev" + dev)
+	if err != nil {
+		panic(err)
+	}
+	if trans != "" {
+		if trans != "/" {
+			return trans
+		}
+		return ""
+	}
+	return c.prefix + dev
 }
 
 func (c *Command) KexecCommand() []string {
@@ -291,4 +300,22 @@ func (c *Command) readline(parm *parms.Parms, prompt string, def string) (string
 		mi = def
 	}
 	return mi, nil
+}
+
+func (c *Command) findMountedFS(fs string) (string, error) {
+	f, err := os.Open("/proc/mounts")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if fs == fields[0] {
+			return fields[1], nil
+		}
+	}
+	return "", scanner.Err()
+
 }
