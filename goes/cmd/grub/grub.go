@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
@@ -46,6 +47,8 @@ import (
 
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/url"
+
+	"github.com/platinasystems/liner"
 )
 
 type Command struct {
@@ -97,7 +100,7 @@ func (c *Command) Apropos() lang.Alt {
 }
 
 func (c *Command) Main(args ...string) error {
-	parm, args := parms.New(args, "-p")
+	parm, args := parms.New(args, "-p", "-t")
 	c.prefix = parm.ByName["-p"]
 	if len(c.prefix) > 0 {
 		if c.prefix[0] != '/' {
@@ -144,18 +147,37 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	if len(Linux.Kern) > 0 {
-		kexec := c.KexecCommand()
-		fmt.Printf("Execute %s? <Yes/no> ", kexec)
-		yn := ""
-		_, err := fmt.Fscanln(os.Stdin, &yn)
+		err := func() error {
+			line := liner.NewLiner()
+			defer line.Close()
+			if parm.ByName["-t"] != "" {
+				timeout, err := time.ParseDuration(parm.ByName["-t"])
+				if err != nil {
+					return err
+				}
+				err = line.SetDuration(timeout)
+				if err != nil {
+					return err
+				}
+			}
+
+			line.SetCtrlCAborts(true)
+			kexec := c.KexecCommand()
+			yn, err := line.Prompt(fmt.Sprintf("Execute %s? <Yes/no> ", kexec))
+			if err != nil {
+				return err
+			}
+			if yn == "" || strings.HasPrefix(yn, "Y") ||
+				strings.HasPrefix(yn, "y") {
+				err := Goes.Main(kexec...)
+				return err
+			}
+			return nil
+		}()
 		if err != nil {
 			return err
 		}
-		if yn == "" || strings.HasPrefix(yn, "Y") ||
-			strings.HasPrefix(yn, "y") {
-			err := Goes.Main(kexec...)
-			return err
-		}
+
 	}
 
 	if menlen == 0 {
@@ -165,14 +187,39 @@ func (c *Command) Main(args ...string) error {
 	for i, me := range Menuentry.Menus {
 		fmt.Printf("[%d]   %s\n", i, me.Name)
 	}
-	fmt.Printf("Menu item [%d]? ", 0) //FIXME get the real default
-	mi := ""                          // FIXME get the real default
-	_, err = fmt.Fscanln(os.Stdin, &mi)
+	var menuItem int
+	err = func() error {
+		line := liner.NewLiner()
+		defer line.Close()
+		if parm.ByName["-t"] != "" {
+			timeout, err := time.ParseDuration(parm.ByName["-t"])
+			if err != nil {
+				return err
+			}
+			err = line.SetDuration(timeout)
+			if err != nil {
+				return err
+			}
+		}
+
+		line.SetCtrlCAborts(true)
+
+		mi, err := line.Prompt(fmt.Sprintf("Menu item [%d]? ", 0))
+		if err != nil {
+			return err
+		}
+
+		if mi != "" {
+			menuItem, err = strconv.Atoi(mi)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}()
 	if err != nil {
 		return err
 	}
-
-	menuItem, err := strconv.Atoi(mi)
 	fmt.Printf("Running %d\n", menuItem)
 	me := Menuentry.Menus[menuItem]
 	fmt.Printf("Running menu item #%d:\n", menuItem)
@@ -186,16 +233,34 @@ func (c *Command) Main(args ...string) error {
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
 	if len(Linux.Kern) > 0 {
-		kexec := c.KexecCommand()
-		fmt.Printf("Execute %s? <Yes/no> ", kexec)
-		yn := ""
-		_, err := fmt.Fscanln(os.Stdin, &yn)
+		err := func() error {
+			line := liner.NewLiner()
+			defer line.Close()
+			if parm.ByName["-t"] != "" {
+				timeout, err := time.ParseDuration(parm.ByName["-t"])
+				if err != nil {
+					return err
+				}
+				err = line.SetDuration(timeout)
+				if err != nil {
+					return err
+				}
+			}
+
+			line.SetCtrlCAborts(true)
+			kexec := c.KexecCommand()
+			yn, err := line.Prompt(fmt.Sprintf("Execute %s? <Yes/no> ", kexec))
+			if err != nil {
+				return err
+			}
+			if yn == "" || strings.HasPrefix(yn, "Y") ||
+				strings.HasPrefix(yn, "y") {
+				err := Goes.Main(kexec...)
+				return err
+			}
+			return nil
+		}()
 		if err != nil {
-			return err
-		}
-		if yn == "" || strings.HasPrefix(yn, "Y") ||
-			strings.HasPrefix(yn, "y") {
-			err := Goes.Main(kexec...)
 			return err
 		}
 	}
