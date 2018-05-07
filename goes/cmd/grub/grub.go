@@ -280,7 +280,11 @@ func (c *Command) readline(parm *parms.Parms, prompt string, def string) (string
 
 	mi, err := line.Prompt(prompt)
 	if err != nil {
-		return "", err
+		if err == liner.ErrTimeOut {
+			mi = def
+		} else {
+			return "", err
+		}
 	}
 
 	if mi == "" {
