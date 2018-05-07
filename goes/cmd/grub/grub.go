@@ -204,16 +204,21 @@ func (c *Command) Main(args ...string) error {
 
 		line.SetCtrlCAborts(true)
 
-		mi, err := line.Prompt(fmt.Sprintf("Menu item [%d]? ", 0))
+		def := Goes.EnvMap["default"]
+		if def == "" {
+			def = "0"
+		}
+		mi, err := line.Prompt(fmt.Sprintf("Menu item [%s]? ", def))
 		if err != nil {
 			return err
 		}
 
-		if mi != "" {
-			menuItem, err = strconv.Atoi(mi)
-			if err != nil {
-				return err
-			}
+		if mi == "" {
+			mi = def
+		}
+		menuItem, err = strconv.Atoi(mi)
+		if err != nil {
+			return err
 		}
 		return nil
 	}()
