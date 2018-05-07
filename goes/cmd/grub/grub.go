@@ -152,12 +152,11 @@ func (c *Command) Main(args ...string) error {
 		if err != nil {
 			return err
 		}
-		if yn == "" || strings.HasPrefix(yn, "Y") ||
+		if strings.HasPrefix(yn, "Y") ||
 			strings.HasPrefix(yn, "y") {
 			err := Goes.Main(kexec...)
 			return err
 		}
-
 		if err != nil {
 			return err
 		}
@@ -203,7 +202,7 @@ func (c *Command) Main(args ...string) error {
 
 	if len(Linux.Kern) > 0 {
 		kexec := c.KexecCommand()
-		yn, err := c.readline(parm, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), strings.Join(kexec, " "))
+		yn, err := c.readline(parm, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
 		if err != nil {
 			return err
 		}
@@ -281,7 +280,8 @@ func (c *Command) readline(parm *parms.Parms, prompt string, def string) (string
 	mi, err := line.Prompt(prompt)
 	if err != nil {
 		if err == liner.ErrTimeOut {
-			mi = def
+			mi = ""
+			fmt.Println("<timeout>")
 		} else {
 			return "", err
 		}
