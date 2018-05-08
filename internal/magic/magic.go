@@ -53,7 +53,8 @@ func IdentifyPartitionMap(sniff []byte) string {
 	if sniff[mbrMagicOffL] == mbrMagicValL &&
 		sniff[mbrMagicOffM] == mbrMagicValM &&
 		!isFatValidMedia(sniff) &&
-		!isIso9660ValidMedia(sniff) {
+		!isIso9660ValidMedia(sniff) &&
+		!(IdentifyPartition(sniff) != "") {
 		return "mbr"
 	}
 	return ""
