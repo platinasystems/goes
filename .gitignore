@@ -6,6 +6,7 @@
 *.zip
 *~
 *#*#
+/goes-*
 /*.patch
 /main/ip/ip
 /main/goes-coreboot/goes-coreboot
