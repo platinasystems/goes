@@ -114,17 +114,17 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(flag.CommandLine.Output(), "usage:", os.Args[0],
+	fmt.Fprintln(os.Stderr, "usage:", os.Args[0],
 		"[ OPTION... ] [ TARGET... ]")
-	fmt.Fprintln(flag.CommandLine.Output(), "\nOptions:")
+	fmt.Fprintln(os.Stderr, "\nOptions:")
 	flag.PrintDefaults()
-	fmt.Fprintln(flag.CommandLine.Output(), "\nDefault Targets:")
+	fmt.Fprintln(os.Stderr, "\nDefault Targets:")
 	for _, target := range defaultTargets {
-		fmt.Fprint(flag.CommandLine.Output(), "\t", target, "\n")
+		fmt.Fprint(os.Stderr, "\t", target, "\n")
 	}
-	fmt.Fprintln(flag.CommandLine.Output(), "\nAll Targets:")
+	fmt.Fprintln(os.Stderr, "\nAll Targets:")
 	for target := range make {
-		fmt.Fprint(flag.CommandLine.Output(), "\t", target, "\n")
+		fmt.Fprint(os.Stderr, "\t", target, "\n")
 	}
 }
 
