@@ -3,7 +3,6 @@
 import groovy.transform.Field
 
 @Field String email_to = 'sw@platinasystems.com'
-@Field String email_cc = 'donn@platinasystems.com'
 @Field String email_from = 'jenkins-bot@platinasystems.com'
 @Field String email_reply_to = 'no-reply@platinasystems.com'
 
