@@ -87,6 +87,51 @@ func dashboard() (s string, err error) {
 	return s, nil
 }
 
+func dashboard2() (s string, err error) { //FIXME
+	s = "\n\n"
+	s += "PLATINA MASTER ToR - BOOT MANAGER DASHBOARD\n"
+	s += "\n"
+	s += "CLIENT Details\n"
+	s += "UNIT NAME         MACHINE    MAC-ADDRESS       IP-ADDR"
+	s += "ESS        BOOT-STATE   INSTALL-STATE  AUTO  CERT  IN"
+	s += "STALL-TYPE     REGISTERED          INSTALLED       #INST\n"
+	s += "==== ============ ========== ================= ======="
+	s += "======== ============== ============== ===== ===== =="
+	s += "========== =================== =================== =====\n"
+	//siz := len(ClientCfg)
+	for j := 1; j <= 1; j++ {
+		for i, _ := range ClientCfg {
+			if ClientCfg[i].Unit == j {
+				s += fmt.Sprintf("%-4d ", ClientCfg[i].Unit)
+				s += fmt.Sprintf("%-12s ", ClientCfg[i].Name)
+				s += fmt.Sprintf("%-10s ", ClientCfg[i].Machine)
+				s += fmt.Sprintf("%-17s ", ClientCfg[i].MacAddr)
+				s += fmt.Sprintf("%-15s ", ClientCfg[i].IpAddr)
+				s += fmt.Sprintf("%-14s ",
+					bootText(ClientCfg[i].BootState))
+				s += fmt.Sprintf("%-14s ",
+					installText(ClientCfg[i].InstallState))
+				s += fmt.Sprintf("%-5t ", ClientCfg[i].AutoInstall)
+				s += fmt.Sprintf("%-5t ", ClientCfg[i].CertPresent)
+				s += fmt.Sprintf("%-12s ",
+					distroText(ClientCfg[i].DistroType))
+				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeRegistered)
+				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeInstalled)
+				s += fmt.Sprintf("%-5d ", ClientCfg[i].InstallCounter)
+				s += "\n"
+			}
+		}
+	}
+	s += "\nISO's found\n"
+	s += "============\n"
+	s += "debian-8.10.0-amd64-DVD-1.iso\n\n"
+	s += "Kernels found                Initrd's found\n"
+	s += "==========================    ============================\n"
+	s += "vmlinuz-3.16.0-4-amd64       initrd.img-3.16.0-4-amd64\n"
+	s += "vmlinuz                      initrd.gz\n\n"
+	return s, nil
+}
+
 func numclients() (s string, err error) {
 	var c NumClntReply
 

@@ -10,14 +10,32 @@ package bootc
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strconv"
+	"strings"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 	"github.com/platinasystems/go/goes/lang"
 )
 
 ///* for testing
-type Command struct{}
+func New() *Command { return new(Command) }
+
+type Command struct {
+	// Machines may use Hook to run something before redisd and other
+	// daemons.
+	Hook func() error
+
+	// Machines may use ConfHook to run something after all daemons start
+	// and before source of start command script.
+	ConfHook func() error
+
+	// GPIO init hook for machines than need it
+	ConfGpioHook func() error
+
+	g *goes.Goes
+}
 
 func (Command) String() string { return "bootc" }
 
@@ -37,33 +55,90 @@ description
 	}
 }
 
-func (Command) Main(args ...string) (err error) {
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+
+func (c *Command) Main(args ...string) (err error) {
 	if len(args) == 0 {
+		fmt.Println("enter 1 for sda1 install, 6 for normal sda6 boot")
 		return fmt.Errorf("args: missing")
 	}
 
-	c, err := strconv.ParseUint(args[0], 10, 32)
+	cm, err := strconv.ParseUint(args[0], 10, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
 	mip := getMasterIP()
 	name := ""
 
-	switch c {
-	case 1:
+	switch cm {
+	case 0:
 		mac := getMAC()
 		ip := getIP()
 		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
 		fmt.Println(name)
+	case 1:
+		dat, er := ioutil.ReadFile("/newroot/sda1/etc/fstab")
+		if er != nil {
+		}
+		dat1 := strings.Split(string(dat), "UUID=")
+		dat2 := strings.Split(dat1[2], "/")
+		dat3 := []byte(dat2[0])
+		len3 := len(dat3) - 1
+		dat4 := string(dat3[0:len3])
+		uuid := string(dat4)
+		fmt.Println(uuid)
+
+		kexc := "kexec -k /newroot/sda1/boot/vmlinuz -i /newroot/sda1/boot/initrd.gz -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
+		fmt.Println(kexc)
+
+		d1 := []byte(kexc)
+		err := ioutil.WriteFile("kexec1", d1, 0644)
+		if err != nil {
+			fmt.Println("error writing kexec1")
+		}
+
+		err = c.g.Main("source", "kexec1")
+		if err != nil {
+			return err
+		}
 	case 2:
-		mac := getMAC2()
+		dat, er := ioutil.ReadFile("/newroot/sda1/etc/fstab")
+		if er != nil {
+		}
+		dat1 := strings.Split(string(dat), "UUID=")
+		dat2 := strings.Split(dat1[2], "/")
+		dat3 := []byte(dat2[0])
+		len3 := len(dat3) - 1
+		dat4 := string(dat3[0:len3])
+		uuid := string(dat4)
+		fmt.Println(uuid)
+		//read vm
+
+		//read initrd
+
+		kexc := "kexec -k /newroot/sda1/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda1/boot/initrd.img-3.16.0-4-amd64 -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
+		fmt.Println(kexc)
+
+		d1 := []byte(kexc)
+		err := ioutil.WriteFile("kexec1", d1, 0644)
+		if err != nil {
+			fmt.Println("error writing kexec1")
+		}
+
+		err = c.g.Main("source", "kexec1")
+		if err != nil {
+			return err
+		}
+	/*	mac := getMAC2()
 		ip := getIP2()
 		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
+
 		fmt.Println(name)
+	*/
 	case 3:
 		mac := getMAC3()
 		ip := getIP3()
@@ -80,35 +155,64 @@ func (Command) Main(args ...string) (err error) {
 			return err
 		}
 	case 6:
-		if err = getnumclients(mip); err != nil {
+		dat, er := ioutil.ReadFile("/newroot/sda6/etc/fstab")
+		if er != nil {
+		}
+		dat1 := strings.Split(string(dat), "UUID=")
+		dat2 := strings.Split(dat1[2], "/")
+		dat3 := []byte(dat2[0])
+		len3 := len(dat3) - 1
+		dat4 := string(dat3[0:len3])
+		uuid := string(dat4)
+		fmt.Println(uuid)
+
+		kexc := "kexec -k /newroot/sda6/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda6/boot/initrd.img-3.16.0-4-amd64 -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
+		fmt.Println(kexc)
+
+		d1 := []byte(kexc)
+		err := ioutil.WriteFile("kexec1", d1, 0644)
+		if err != nil {
+			fmt.Println("error writing kexec1")
+		}
+
+		err = c.g.Main("source", "kexec1")
+		if err != nil {
 			return err
 		}
 	case 7:
-		if err = getclientdata(mip, 3); err != nil {
+		if err = getnumclients(mip); err != nil {
 			return err
 		}
 	case 8:
-		if err = getscript(mip, "testscript"); err != nil {
+		if err = getclientdata(mip, 3); err != nil {
 			return err
 		}
 	case 9:
+		if err = getscript(mip, "testscript"); err != nil {
+			return err
+		}
+	case 10:
 		if err = getbinary(mip, "test.bin"); err != nil {
 			return err
 		}
-	case 10: //run script
+	case 11: //run script
 		if err = runScript("testscript"); err != nil {
 			return err
 		}
-	case 11:
+	case 12:
 		if err = test404(mip); err != nil {
 			return err
 		}
-	case 12:
+	case 13:
 		if err = dashboard("192.168.101.129"); err != nil {
 			return err
 		}
+	case 14:
+		fmt.Println("kexec -k /newroot/sda1/boot/vmlinuz -i /newroot/sda1/boot/initrd.gz -c 'console=ttyS0,115200 keymap=us debian-installer/locale=en_US netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e")
+	case 15:
+		fmt.Println("kexec -k /newroot/sda1/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda1/boot/initrd.img-3.16.0-4-amd64 -c 'console=ttyS0,115200 keymap=us debian-installer/locale=en_US netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e")
 	default:
-		fmt.Println("no command...")
+		fmt.Println("enter 1 for sda1 install, 6 for normal sda6 boot")
 	}
 	return nil
 }
@@ -153,3 +257,14 @@ func runScript(name string) (err error) {
 
 	return nil
 }
+
+/*
+files, err := ioutil.ReadDir("./")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, f := range files {
+            fmt.Println(f.Name())
+    }
+*/

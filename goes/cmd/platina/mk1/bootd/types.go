@@ -12,6 +12,7 @@ const (
 	Binary     = "getbinary"
 	DumpVars   = "dumpvars"
 	Dashboard  = "dashboard"
+	Dashboard2 = "dashboard2" //FIXME
 )
 const (
 	BootStateNotRegistered = iota
