@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 )
 
+var Cfg boot.BootcConfig
 var regReq bootd.RegReq
 var regReply bootd.RegReply
 var numReply bootd.NumClntReply

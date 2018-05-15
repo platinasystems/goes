@@ -82,6 +82,10 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		if b, err = dashboard(); err != nil {
 			b = "error getting dashboard\n"
 		}
+	case Dashboard2:
+		if b, err = dashboard2(); err != nil {
+			b = "error getting dashboard\n"
+		}
 	case NumClients:
 		if b, err = numclients(); err != nil {
 			b = "error getting number of clients\n"
