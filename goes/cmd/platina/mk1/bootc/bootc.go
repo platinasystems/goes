@@ -16,9 +16,8 @@ import (
 	"github.com/platinasystems/go/goes/lang"
 )
 
-const CfgFile = "/newroot/sda1/bootc.cfg"
+const BootcCfgFile = "/newroot/sda1/bootc.cfg"
 
-///* for testing
 func New() *Command { return new(Command) }
 
 type Command struct {
@@ -70,74 +69,16 @@ func (c *Command) Main(args ...string) (err error) {
 	name := ""
 
 	switch cm {
-	case 0:
+	case 1:
 		mac := getMAC()
 		ip := getIP()
 		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
 		fmt.Println(name)
-	case 1:
-		uuid, err = readUUID("sda1")
-		if err != nil {
-			return err
-		}
-
-		kexc := "kexec -k /newroot/sda1/boot/vmlinuz -i /newroot/sda1/boot/initrd.gz -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
-		fmt.Println(kexc)
-
-		d1 := []byte(kexc)
-		err := ioutil.WriteFile("kexec1", d1, 0644)
-		if err != nil {
-			fmt.Println("error writing kexec1")
-		}
-
-		err = c.g.Main("source", "kexec1")
-		if err != nil {
-			return err
-		}
-	case 2:
-		uuid, err = readUUID("sda1")
-		if err != nil {
-			return err
-		}
-
-		//read vmlinuz name
-
-		//read initrd name
-
-		kexc := "kexec -k /newroot/sda1/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda1/boot/initrd.img-3.16.0-4-amd64 -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
-		fmt.Println(kexc)
-
-		d1 := []byte(kexc)
-		err := ioutil.WriteFile("kexec1", d1, 0644)
-		if err != nil {
-			fmt.Println("error writing kexec1")
-		}
-
-		err = c.g.Main("source", "kexec1")
-		if err != nil {
-			return err
-		}
-		/*	mac := getMAC2()
-			ip := getIP2()
-			if _, name, err = register(mip, mac, ip); err != nil {
-				return err
-			}
-
-			fmt.Println(name)
-		*/
 	case 3:
-		Bootc()
-		return // fall through to grub
-		/*
-			mac := getMAC3()
-			ip := getIP3()
-			if _, name, err = register(mip, mac, ip); err != nil {
-				return err
-			}
-			fmt.Println(name)
-		*/
+		Bootc() // if returns, fall through to grub
+		return nil
 	case 4:
 		if err = dumpvars(mip); err != nil {
 			return err
@@ -147,24 +88,6 @@ func (c *Command) Main(args ...string) (err error) {
 			return err
 		}
 	case 6:
-		uuid, err = readUUID("sda6")
-		if err != nil {
-			return err
-		}
-
-		kexc := "kexec -k /newroot/sda6/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda6/boot/initrd.img-3.16.0-4-amd64 -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
-		fmt.Println(kexc)
-
-		d1 := []byte(kexc)
-		err := ioutil.WriteFile("kexec1", d1, 0644)
-		if err != nil {
-			fmt.Println("error writing kexec1")
-		}
-
-		err = c.g.Main("source", "kexec1")
-		if err != nil {
-			return err
-		}
 	case 7:
 		if err = getnumclients(mip); err != nil {
 			return err
@@ -181,7 +104,7 @@ func (c *Command) Main(args ...string) (err error) {
 		if err = getbinary(mip, "test.bin"); err != nil {
 			return err
 		}
-	case 11: //run script
+	case 11:
 		if err = runScript("testscript"); err != nil {
 			return err
 		}
@@ -193,50 +116,8 @@ func (c *Command) Main(args ...string) (err error) {
 		if err = dashboard("192.168.101.129"); err != nil {
 			return err
 		}
-	case 14:
-		fmt.Println("kexec -k /newroot/sda1/boot/vmlinuz -i /newroot/sda1/boot/initrd.gz -c 'console=ttyS0,115200 keymap=us debian-installer/locale=en_US netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e")
-	case 15:
-		fmt.Println("kexec -k /newroot/sda1/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda1/boot/initrd.img-3.16.0-4-amd64 -c 'console=ttyS0,115200 keymap=us debian-installer/locale=en_US netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e")
 	default:
-		fmt.Println("enter 1 for sda1 install, 6 for normal sda6 boot")
 	}
-	return nil
-}
-
-//*/
-
-func boot() (err error) { // Coreboot "init"
-	mip := getMasterIP()
-	mac := getMAC()
-	ip := getIP()
-	reply := 0
-	//TODO [2] ADD FASTER TIMEOUT
-	reply, _, err = register(mip, mac, ip)
-	if err != nil || reply != bootd.RegReplyRegistered {
-		reply, _, err = register(mip, mac, ip)
-		if err != nil || reply != bootd.RegReplyRegistered {
-			return err // fall into grub
-		}
-	}
-
-	// TODO TRY REAL REGISTRATION TO SERVER BOLT IN OF BOOTC TO GOES INIT
-	// TODO run install script (format, install debian, etc. OR just boot)
-	// TODO [2] REGISTER TIMEOUT
-	// TODO READ the /boot directory into slice, bootd store last known good booted image
-	// TODO [3] boot grub(GRUB TO TELL WHAT ITS BOOTING), give me your images/BOOT THIS IMAGE, ASK SCRIPT TO RUN/RUN IT
-	// TODO BOOTC, BOOTD /etc/MASTER logic , bootc runs if no /etc/MASTER file, bootd runsi if /etc/MASTER (filesystem is not up btw)
-	// TODO bootd state machines
-	// TODO add test infra, with 100 units
-	// TODO master to trigger client reset
-
-	return nil
-}
-
-func runScript(name string) (err error) {
-	// TODO check if script exists
-
-	// TODO run script
-
 	return nil
 }
 
@@ -246,18 +127,19 @@ var kexec1 string
 var kexec6 string
 
 func Bootc() {
-	if err := readcfg(); err != nil {
+	if err := readCfg(); err != nil {
 		fmt.Println("boot.cfg - error reading configuration, run grub")
 		return
 	}
 	if contactServer() == true {
+		//FIXME
 	}
 	if cfg.grub == "grub" {
 		fmt.Println("Grub Enable == TRUE, run grub")
 		return
 	}
-	err := formStrings()
-	if err != nil {
+	if err := formStrings(); err != nil {
+		fmt.Println("error forming kexec strings, run grub")
 		return
 	}
 	if cfg.reinstall == "reinstall" {
@@ -271,42 +153,64 @@ func Bootc() {
 
 func contactServer() bool {
 	return false
+
+	mip := getMasterIP()
+	mac := getMAC()
+	ip := getIP()
+	reply := 0
+	reply, _, err = register(mip, mac, ip)
+	if err != nil || reply != bootd.RegReplyRegistered {
+		reply, _, err = register(mip, mac, ip)
+		if err != nil || reply != bootd.RegReplyRegistered {
+			return false
+		}
+	}
+	return true
 }
 
-func writecfg() error {
+func writeCfg() error {
 	Cfg.GrubEnabled = false
 	Cfg.ReInstallEnabled = false
 	Cfg.IAmMaster = false
 	Cfg.MyIpAddr = "192.168.101.129"
 	Cfg.MyIpGWay = "192.168.101.1"
 	Cfg.MyIpMask = "255.255.255.0"
-	Cfg.MasterAddresses = "slice"
+	Cfg.MasterAddresses = []string{"a", "b", "c"}
 	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
-	Cfg.ReInstallC = "ip=192.168.101.129::192.168.101.1:255.255.255.192::eth0:none"
+	Cfg.ReInstallC = "netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto"
 	Cfg.Sda6K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.Sda6I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
-	Cfg.Sda6C = "ip=192.168.101.129::192.168.101.1:255.255.255.192::eth0:none"
+	Cfg.Sda6C = "::eth0:none"
 
-	// MARSHALL
-	// WRITE
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func readcfg() error {
-	if _, err := os.Stat(CfgFile); os.IsNotExist(err) {
-		fmt.Println("bootc.cfg does not exist, run grub")
-		return
+func readCfg() error {
+	if _, err := os.Stat(BootcCfgFile); os.IsNotExist(err) {
+		fmt.Println(BootcCfgFile + " does not exist, run grub")
+		return err
 	}
-	dat, err := ioutil.ReadFile(Bootccfg)
+	dat, err := ioutil.ReadFile(BootcCfgFile)
 	if err != nil {
-		fmt.Println("error reading bootc.cfg.")
-		return "", err
+		fmt.Println("error reading " + BootcCfgFile)
+		return err
 	}
-	dat1 := strings.Split(string(dat), "\n")
-	for i, j := range dat1 {
-		fmt.Println(i, j)
+	err = json.Unmarshal([]byte(dat), &Cfg2)
+	if err != nil {
+		fmt.Println("There was an error:", err)
+		return err
 	}
-	// UNMARSHALL
+	fmt.Println(Cfg2)
+	return nil
 }
 
 func formStrings() error {
@@ -318,8 +222,26 @@ func formStrings() error {
 	if err != nil {
 		return err
 	}
-	// form kexec strings
-	// set grub bit, write file
+
+	kexec1 = "kexec -k " + Cfg.ReInstallK + " -i " + Cfg.ReInstallI + " -c "
+	kexec1 += "'root=UUID=" + uuid1 + " console=ttyS0,115200 "
+	kexec1 += Cfg.ReInstallC
+	kexec1 += "' -e"
+	kexec6 = "kexec -k " + Cfg.Sda6K + " -i " + Cfg.Sda6I + " -c "
+	kexec6 += "'root=UUID=" + uuid6 + " console=ttyS0,115200 "
+	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyIpGWay + ":" + Cfg.MyIpMask + Cfg.Sda6C
+	kexec6 += "' -e"
+
+	Cfg.GrubEnabled = true // set grub flag to avoid bootc loop
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func readUUID(string partition) (string uuid, error err) {
@@ -336,13 +258,6 @@ func readUUID(string partition) (string uuid, error err) {
 	return uuid, nil
 }
 
-/*
-files, err := ioutil.ReadDir("./")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    for _, f := range files {
-            fmt.Println(f.Name())
-    }
-*/
+func runScript(name string) (err error) {
+	return nil
+}

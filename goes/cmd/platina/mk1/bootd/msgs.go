@@ -133,10 +133,10 @@ func dashboard2() (s string, err error) { //FIXME
 }
 
 func numclients() (s string, err error) {
-	var c NumClntReply
+	var numReply NumClntReply
 
-	c.Clients = len(ClientCfg)
-	jsonInfo, err := json.Marshal(c)
+	numReply.Clients = len(ClientCfg)
+	jsonInfo, err := json.Marshal(numReply)
 	if err != nil {
 		return "404", err
 	}
