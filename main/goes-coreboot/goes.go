@@ -28,14 +28,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/function"
 	"github.com/platinasystems/go/goes/cmd/grub"
-	"github.com/platinasystems/go/goes/cmd/hdel"
-	"github.com/platinasystems/go/goes/cmd/hdelta"
-	"github.com/platinasystems/go/goes/cmd/hexists"
-	"github.com/platinasystems/go/goes/cmd/hget"
-	"github.com/platinasystems/go/goes/cmd/hgetall"
-	"github.com/platinasystems/go/goes/cmd/hkeys"
-	"github.com/platinasystems/go/goes/cmd/hset"
-	"github.com/platinasystems/go/goes/cmd/hwait"
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
@@ -65,7 +57,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/start"
 	"github.com/platinasystems/go/goes/cmd/stop"
 	"github.com/platinasystems/go/goes/cmd/stty"
-	"github.com/platinasystems/go/goes/cmd/subscribe"
 	"github.com/platinasystems/go/goes/cmd/sync"
 	"github.com/platinasystems/go/goes/cmd/testcmd"
 	"github.com/platinasystems/go/goes/cmd/thencmd"
@@ -103,14 +94,6 @@ var Goes = &goes.Goes{
 		"function":     &function.Command{},
 		"goes-daemons": &daemons.Command{},
 		"grub":         &grub.Command{},
-		"hdel":         hdel.Command{},
-		"hdelta":       &hdelta.Command{},
-		"hexists":      hexists.Command{},
-		"hget":         hget.Command{},
-		"hgetall":      hgetall.Command{},
-		"hkeys":        hkeys.Command{},
-		"hset":         hset.Command{},
-		"hwait":        hwait.Command{},
 		"if":           &ifcmd.Command{},
 		"insmod":       insmod.Command{},
 		"install":      &install.Command{},
@@ -155,7 +138,6 @@ var Goes = &goes.Goes{
 		"start":     &start.Command{},
 		"stop":      &stop.Command{},
 		"stty":      stty.Command{},
-		"subscribe": subscribe.Command{},
 		"sync":      sync.Command{},
 		"[":         testcmd.Command{},
 		"then":      &thencmd.Command{},
