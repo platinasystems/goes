@@ -50,7 +50,6 @@ pipeline {
 		from: email_from,
 		replyTo: email_reply_to,
 		subject: 'GOES build ok',
-		cc: email_cc,
 		to: email_to
 	}
 
@@ -60,7 +59,6 @@ pipeline {
 		from: email_from,
 		replyTo: email_reply_to,
 		subject: 'GOES BUILD FAILED',
-		cc: email_cc,
 		to: email_to
 	}
     }
