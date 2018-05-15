@@ -51,12 +51,30 @@ const (
 	BootReplyReflashAndReboot
 )
 
+type BootcConfig struct {
+	GrubEnabled      bool
+	ReInstallEnabled bool
+	IAmMaster        bool
+	MyIpAddr         string
+	MyIpGWay         string
+	MyIpMask         string
+	MasterAddresses  []string
+	ReInstallK       string
+	ReInstallI       string
+	ReInstallC       string
+	Sda6K            string
+	Sda6I            string
+	Sda6C            string
+}
+
 type Client struct {
 	Unit           int
 	Name           string
 	Machine        string
 	MacAddr        string
 	IpAddr         string
+	IpGWay         string
+	IpMask         string
 	BootState      int
 	InstallState   int
 	AutoInstall    bool

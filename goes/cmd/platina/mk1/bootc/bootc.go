@@ -2,15 +2,12 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// DESCRIPTION
-// 'bootc' client used for auto-install
-// runs in goes-coreboot
-
 package bootc
 
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -18,6 +15,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 	"github.com/platinasystems/go/goes/lang"
 )
+
+const CfgFile = "/newroot/sda1/bootc.cfg"
 
 ///* for testing
 func New() *Command { return new(Command) }
@@ -79,16 +78,10 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 		fmt.Println(name)
 	case 1:
-		dat, er := ioutil.ReadFile("/newroot/sda1/etc/fstab")
-		if er != nil {
+		uuid, err = readUUID("sda1")
+		if err != nil {
+			return err
 		}
-		dat1 := strings.Split(string(dat), "UUID=")
-		dat2 := strings.Split(dat1[2], "/")
-		dat3 := []byte(dat2[0])
-		len3 := len(dat3) - 1
-		dat4 := string(dat3[0:len3])
-		uuid := string(dat4)
-		fmt.Println(uuid)
 
 		kexc := "kexec -k /newroot/sda1/boot/vmlinuz -i /newroot/sda1/boot/initrd.gz -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
 		fmt.Println(kexc)
@@ -104,19 +97,14 @@ func (c *Command) Main(args ...string) (err error) {
 			return err
 		}
 	case 2:
-		dat, er := ioutil.ReadFile("/newroot/sda1/etc/fstab")
-		if er != nil {
+		uuid, err = readUUID("sda1")
+		if err != nil {
+			return err
 		}
-		dat1 := strings.Split(string(dat), "UUID=")
-		dat2 := strings.Split(dat1[2], "/")
-		dat3 := []byte(dat2[0])
-		len3 := len(dat3) - 1
-		dat4 := string(dat3[0:len3])
-		uuid := string(dat4)
-		fmt.Println(uuid)
-		//read vm
 
-		//read initrd
+		//read vmlinuz name
+
+		//read initrd name
 
 		kexc := "kexec -k /newroot/sda1/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda1/boot/initrd.img-3.16.0-4-amd64 -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
 		fmt.Println(kexc)
@@ -131,21 +119,25 @@ func (c *Command) Main(args ...string) (err error) {
 		if err != nil {
 			return err
 		}
-	/*	mac := getMAC2()
-		ip := getIP2()
-		if _, name, err = register(mip, mac, ip); err != nil {
-			return err
-		}
+		/*	mac := getMAC2()
+			ip := getIP2()
+			if _, name, err = register(mip, mac, ip); err != nil {
+				return err
+			}
 
-		fmt.Println(name)
-	*/
+			fmt.Println(name)
+		*/
 	case 3:
-		mac := getMAC3()
-		ip := getIP3()
-		if _, name, err = register(mip, mac, ip); err != nil {
-			return err
-		}
-		fmt.Println(name)
+		Bootc()
+		return // fall through to grub
+		/*
+			mac := getMAC3()
+			ip := getIP3()
+			if _, name, err = register(mip, mac, ip); err != nil {
+				return err
+			}
+			fmt.Println(name)
+		*/
 	case 4:
 		if err = dumpvars(mip); err != nil {
 			return err
@@ -155,16 +147,10 @@ func (c *Command) Main(args ...string) (err error) {
 			return err
 		}
 	case 6:
-		dat, er := ioutil.ReadFile("/newroot/sda6/etc/fstab")
-		if er != nil {
+		uuid, err = readUUID("sda6")
+		if err != nil {
+			return err
 		}
-		dat1 := strings.Split(string(dat), "UUID=")
-		dat2 := strings.Split(dat1[2], "/")
-		dat3 := []byte(dat2[0])
-		len3 := len(dat3) - 1
-		dat4 := string(dat3[0:len3])
-		uuid := string(dat4)
-		fmt.Println(uuid)
 
 		kexc := "kexec -k /newroot/sda6/boot/vmlinuz-3.16.0-4-amd64 -i /newroot/sda6/boot/initrd.img-3.16.0-4-amd64 -c 'root=UUID=" + uuid + " console=ttyS0,115200 netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto' -e"
 		fmt.Println(kexc)
@@ -235,7 +221,6 @@ func boot() (err error) { // Coreboot "init"
 
 	// TODO TRY REAL REGISTRATION TO SERVER BOLT IN OF BOOTC TO GOES INIT
 	// TODO run install script (format, install debian, etc. OR just boot)
-	// TODO if debian install fails ==> try again
 	// TODO [2] REGISTER TIMEOUT
 	// TODO READ the /boot directory into slice, bootd store last known good booted image
 	// TODO [3] boot grub(GRUB TO TELL WHAT ITS BOOTING), give me your images/BOOT THIS IMAGE, ASK SCRIPT TO RUN/RUN IT
@@ -243,9 +228,6 @@ func boot() (err error) { // Coreboot "init"
 	// TODO bootd state machines
 	// TODO add test infra, with 100 units
 	// TODO master to trigger client reset
-	// TODO CB to boot new goes payload
-	// TODO goes formats SDA2, installs debian use INSTALL/PRESEED
-	// TODO ADD LOCATION OF ToR -- how?
 
 	return nil
 }
@@ -256,6 +238,102 @@ func runScript(name string) (err error) {
 	// TODO run script
 
 	return nil
+}
+
+var uuid1 string
+var uuid6 string
+var kexec1 string
+var kexec6 string
+
+func Bootc() {
+	if err := readcfg(); err != nil {
+		fmt.Println("boot.cfg - error reading configuration, run grub")
+		return
+	}
+	if contactServer() == true {
+	}
+	if cfg.grub == "grub" {
+		fmt.Println("Grub Enable == TRUE, run grub")
+		return
+	}
+	err := formStrings()
+	if err != nil {
+		return
+	}
+	if cfg.reinstall == "reinstall" {
+		fmt.Println("Re-install == TRUE, run installer")
+		kexec(kexec1)
+	} else {
+		fmt.Println("Re-install == FALSE, boot sda6")
+		kexec(kexec6)
+	}
+}
+
+func contactServer() bool {
+	return false
+}
+
+func writecfg() error {
+	Cfg.GrubEnabled = false
+	Cfg.ReInstallEnabled = false
+	Cfg.IAmMaster = false
+	Cfg.MyIpAddr = "192.168.101.129"
+	Cfg.MyIpGWay = "192.168.101.1"
+	Cfg.MyIpMask = "255.255.255.0"
+	Cfg.MasterAddresses = "slice"
+	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
+	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
+	Cfg.ReInstallC = "ip=192.168.101.129::192.168.101.1:255.255.255.192::eth0:none"
+	Cfg.Sda6K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
+	Cfg.Sda6I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
+	Cfg.Sda6C = "ip=192.168.101.129::192.168.101.1:255.255.255.192::eth0:none"
+
+	// MARSHALL
+	// WRITE
+}
+
+func readcfg() error {
+	if _, err := os.Stat(CfgFile); os.IsNotExist(err) {
+		fmt.Println("bootc.cfg does not exist, run grub")
+		return
+	}
+	dat, err := ioutil.ReadFile(Bootccfg)
+	if err != nil {
+		fmt.Println("error reading bootc.cfg.")
+		return "", err
+	}
+	dat1 := strings.Split(string(dat), "\n")
+	for i, j := range dat1 {
+		fmt.Println(i, j)
+	}
+	// UNMARSHALL
+}
+
+func formStrings() error {
+	uuid1, err = readUUID("sda1")
+	if err != nil {
+		return err
+	}
+	uuid6, err = readUUID("sda6")
+	if err != nil {
+		return err
+	}
+	// form kexec strings
+	// set grub bit, write file
+}
+
+func readUUID(string partition) (string uuid, error err) {
+	dat, err := ioutil.ReadFile("/newroot/" + partition + "/etc/fstab")
+	if err != nil {
+		return "", err
+	}
+	dat1 := strings.Split(string(dat), "UUID=")
+	dat2 := strings.Split(dat1[2], "/")
+	dat3 := []byte(dat2[0])
+	len3 := len(dat3) - 1
+	dat4 := string(dat3[0:len3])
+	uuid := string(dat4)
+	return uuid, nil
 }
 
 /*
