@@ -16,8 +16,6 @@ import (
 
 const BootcCfgFile = "/newroot/sda1/bootc.cfg"
 
-//const BootcCfgFile = "/tmp/dat12"
-
 var uuid1 string
 var uuid6 string
 var kexec1 string
@@ -49,8 +47,8 @@ func Bootc() bool {
 		return false
 	} else {
 		fmt.Println("4. kexec strings formed correctly")
-		fmt.Println("  KEXEC1: ", kexec1)
-		fmt.Println("  KEXEC6: ", kexec6)
+		//fmt.Println("  KEXEC1: ", kexec1)
+		//fmt.Println("  KEXEC6: ", kexec6)
 	}
 	if Cfg.ReInstall == true {
 		fmt.Println("5. Re-install == TRUE, clear ReInstallBit, run installer")
@@ -67,7 +65,7 @@ func Bootc() bool {
 	return false
 }
 
-func serverAvail() bool { //FIXME
+func serverAvail() bool {
 	return false
 
 	mip := getMasterIP()
@@ -137,7 +135,7 @@ func formStrings() (err error) {
 	if err != nil {
 		return err
 	}
-	uuid6, err = readUUID("sda1")
+	uuid6, err = readUUID("sda6")
 	if err != nil {
 		return err
 	}
@@ -173,10 +171,6 @@ func preKexec(k string) error {
 	if err != nil {
 		return err
 	}
-	//err = c.g.Main("source", "kexe")
-	//if err != nil {
-	//	return err
-	//}
 	return nil
 }
 

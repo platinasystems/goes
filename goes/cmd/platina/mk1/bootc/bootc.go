@@ -30,7 +30,12 @@ type Command struct {
 
 func (Command) String() string { return "bootc" }
 
-func (Command) Usage() string { return "bootc" }
+func (Command) Usage() string {
+	return `bootc [register] [bootc] [dumpvars] [dashboard] [initcfg]\n
+	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]\n
+	[test404] [dashboard9] [setgrub] [clrgrub] [setinstall] [clrinstall]\n
+	[readcfg] [setip] [setnetmask] [setgateway] [setkernel6] [setinitrd6]`
+}
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
@@ -53,15 +58,11 @@ func (c *Command) Main(args ...string) (err error) {
 		return fmt.Errorf("args: missing")
 	}
 
-	//CUT THIS ONCE IT WORKS cm, err := strconv.ParseUint(args[0], 10, 32)
-	//if err != nil {
-	//	return fmt.Errorf("%s: %v", args[0], err)
-	//}
 	mip := getMasterIP()
 	name := ""
 
 	switch args[0] {
-	case "register": //FIXME const
+	case "register":
 		mac := getMAC()
 		ip := getIP()
 		if _, name, err = register(mip, mac, ip); err != nil {
@@ -176,7 +177,7 @@ func (c *Command) Main(args ...string) (err error) {
 			fmt.Println("boot.cfg - error writing configuration, run grub")
 			return err
 		}
-	case "setkernel":
+	case "setkernel6":
 		if err := readCfg(); err != nil {
 			fmt.Println("boot.cfg - error reading configuration, run grub")
 			return err

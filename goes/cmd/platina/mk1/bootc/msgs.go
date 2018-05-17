@@ -70,41 +70,9 @@ func getclientdata(mip string, unit int) (err error) {
 }
 func getclientdata2(mip string, unit int) (err error) {
 	return nil
-	/*
-		s := ""
-		if s, err = sendReq(mip, bootd.Clientdata2+" "+strconv.Itoa(unit)); err != nil {
-			return err
-		}
-
-		err = json.Unmarshal([]byte(s), &dataReply)
-		if err != nil {
-			fmt.Println("There was an error:", err)
-		}
-		dat := dataReply.Client
-		err = dataReply.Error
-		fmt.Println(dat, err)
-
-		return err
-	*/
 }
 func getclientdata3(mip string, unit int) (err error) {
 	return nil
-	/*
-		s := ""
-		if s, err = sendReq(mip, bootd.Clientdata3+" "+strconv.Itoa(unit)); err != nil {
-			return err
-		}
-
-		err = json.Unmarshal([]byte(s), &dataReply)
-		if err != nil {
-			fmt.Println("There was an error:", err)
-		}
-		dat := dataReply.Client
-		err = dataReply.Error
-		fmt.Println(dat, err)
-
-		return err
-	*/
 }
 
 func getscript(mip string, name string) (err error) {
