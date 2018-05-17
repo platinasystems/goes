@@ -52,19 +52,19 @@ const (
 )
 
 type BootcConfig struct {
-	GrubEnabled      bool
-	ReInstallEnabled bool
-	IAmMaster        bool
-	MyIpAddr         string
-	MyIpGWay         string
-	MyIpMask         string
-	MasterAddresses  []string
-	ReInstallK       string
-	ReInstallI       string
-	ReInstallC       string
-	Sda6K            string
-	Sda6I            string
-	Sda6C            string
+	Grub            bool
+	ReInstall       bool
+	IAmMaster       bool
+	MyIpAddr        string
+	MyGateway       string
+	MyNetmask       string
+	MasterAddresses []string
+	ReInstallK      string
+	ReInstallI      string
+	ReInstallC      string
+	Sda6K           string
+	Sda6I           string
+	Sda6C           string
 }
 
 type Client struct {

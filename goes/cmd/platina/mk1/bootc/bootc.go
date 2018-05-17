@@ -6,7 +6,6 @@ package bootc
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
@@ -49,83 +48,154 @@ description
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
-// FIXME change args to text
 func (c *Command) Main(args ...string) (err error) {
 	if len(args) == 0 {
-		fmt.Println("enter 1 for sda1 install, 6 for normal sda6 boot")
 		return fmt.Errorf("args: missing")
 	}
 
-	cm, err := strconv.ParseUint(args[0], 10, 32)
-	if err != nil {
-		return fmt.Errorf("%s: %v", args[0], err)
-	}
+	//CUT THIS ONCE IT WORKS cm, err := strconv.ParseUint(args[0], 10, 32)
+	//if err != nil {
+	//	return fmt.Errorf("%s: %v", args[0], err)
+	//}
 	mip := getMasterIP()
 	name := ""
 
-	switch cm {
-	case 1:
+	switch args[0] {
+	case "register": //FIXME const
 		mac := getMAC()
 		ip := getIP()
 		if _, name, err = register(mip, mac, ip); err != nil {
 			return err
 		}
 		fmt.Println(name)
-	case 3:
-		Bootc() // if returns, fall through to grub
-		return nil
-	case 4:
+	case "bootc":
+		if Bootc() {
+			err = c.g.Main("source", "kexe") //FIXME MOVE BACK TO logic.go
+			if err != nil {
+				return err
+			}
+			return
+		} else {
+			return // fall through to grub
+		}
+	case "dumpvars":
 		if err = dumpvars(mip); err != nil {
 			return err
 		}
-	case 5:
+	case "dashboard":
 		if err = dashboard(mip); err != nil {
 			return err
 		}
-	case 6:
-		writeCfg()
-	case 7:
+	case "initcfg":
+		initCfg()
+	case "getnumclients":
 		if err = getnumclients(mip); err != nil {
 			return err
 		}
-	case 8:
+	case "getclientdata":
 		if err = getclientdata(mip, 3); err != nil {
 			return err
 		}
-	case 9:
+	case "getscript":
 		if err = getscript(mip, "testscript"); err != nil {
 			return err
 		}
-	case 10:
+	case "getbinary":
 		if err = getbinary(mip, "test.bin"); err != nil {
 			return err
 		}
-	case 11:
+	case "testscript":
 		if err = runScript("testscript"); err != nil {
 			return err
 		}
-	case 12:
+	case "test404":
 		if err = test404(mip); err != nil {
 			return err
 		}
-	case 13:
+	case "dashboard9":
 		if err = dashboard("192.168.101.129"); err != nil {
 			return err
 		}
-	case 20:
-		setGrubBit()
-	case 21:
-		clrGrubBit()
-	case 22:
-		setReInstallBit()
-	case 23:
-		clrReInstallBit()
-	case 24:
+	case "setgrub":
 		if err := readCfg(); err != nil {
 			fmt.Println("boot.cfg - error reading configuration, run grub")
 			return err
 		}
-		fmt.Println(Cfg)
+		setGrubBit()
+	case "clrgrub":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		clrGrubBit()
+	case "setinstall":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		setReInstallBit()
+	case "clrinstall":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		clrReInstallBit()
+	case "readcfg":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		fmt.Printf("%+v\n", Cfg)
+	case "setip":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		Cfg.MyIpAddr = args[1]
+		if err := writeCfg(); err != nil {
+			fmt.Println("boot.cfg - error writing configuration, run grub")
+			return err
+		}
+	case "setnetmask":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		Cfg.MyNetmask = args[1]
+		if err := writeCfg(); err != nil {
+			fmt.Println("boot.cfg - error writing configuration, run grub")
+			return err
+		}
+	case "setgateway":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		Cfg.MyGateway = args[1]
+		if err := writeCfg(); err != nil {
+			fmt.Println("boot.cfg - error writing configuration, run grub")
+			return err
+		}
+	case "setkernel":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		Cfg.Sda6K = args[1]
+		if err := writeCfg(); err != nil {
+			fmt.Println("boot.cfg - error writing configuration, run grub")
+			return err
+		}
+	case "setinitrd6":
+		if err := readCfg(); err != nil {
+			fmt.Println("boot.cfg - error reading configuration, run grub")
+			return err
+		}
+		Cfg.Sda6I = args[1]
+		if err := writeCfg(); err != nil {
+			fmt.Println("boot.cfg - error writing configuration, run grub")
+			return err
+		}
 	default:
 	}
 	return nil

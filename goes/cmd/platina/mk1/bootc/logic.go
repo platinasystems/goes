@@ -14,18 +14,19 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 )
 
-//const BootcCfgFile = "/newroot/sda1/bootc.cfg" FIXME
-const BootcCfgFile = "/tmp/dat12"
+const BootcCfgFile = "/newroot/sda1/bootc.cfg"
+
+//const BootcCfgFile = "/tmp/dat12"
 
 var uuid1 string
 var uuid6 string
 var kexec1 string
 var kexec6 string
 
-func Bootc() {
+func Bootc() bool {
 	if err := readCfg(); err != nil {
 		fmt.Println("1. ERROR reading bootc.cfg, run grub")
-		return
+		return false
 	} else {
 		fmt.Println("1. boot.cfg read successfully")
 	}
@@ -36,16 +37,16 @@ func Bootc() {
 	}
 	if Cfg.Grub == true {
 		fmt.Println("3. GrubBit == TRUE, run grub")
-		return
+		return false
 	} else {
 		fmt.Println("3. GrubBit == FALSE, set GrubBit, run bootc")
 		if err := setGrubBit(); err != nil { // avoid bootc loop
-			return
+			return false
 		}
 	}
 	if err := formStrings(); err != nil {
 		fmt.Println("4. ERROR forming kexec strings, run grub")
-		return
+		return false
 	} else {
 		fmt.Println("4. kexec strings formed correctly")
 		fmt.Println("  KEXEC1: ", kexec1)
@@ -54,13 +55,16 @@ func Bootc() {
 	if Cfg.ReInstall == true {
 		fmt.Println("5. Re-install == TRUE, clear ReInstallBit, run installer")
 		if err := clrReInstallBit(); err != nil {
-			return
+			return false
 		}
-		doKexec(kexec1)
+		preKexec(kexec1)
+		return true
 	} else {
 		fmt.Println("5. Re-install == FALSE, boot sda6")
-		doKexec(kexec6)
+		preKexec(kexec6)
+		return true
 	}
+	return false
 }
 
 func serverAvail() bool { //FIXME
@@ -80,21 +84,28 @@ func serverAvail() bool { //FIXME
 	return true
 }
 
-func writeCfg() error {
+func initCfg() error {
 	Cfg.Grub = false
 	Cfg.ReInstall = false
 	Cfg.IAmMaster = false
 	Cfg.MyIpAddr = "192.168.101.129"
-	Cfg.MyIpGWay = "192.168.101.1"
-	Cfg.MyIpMask = "255.255.255.0"
+	Cfg.MyGateway = "192.168.101.1"
+	Cfg.MyNetmask = "255.255.255.0"
 	Cfg.MasterAddresses = []string{"198.168.101.142"}
 	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
 	Cfg.ReInstallC = "netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto"
-	Cfg.Sda6K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
-	Cfg.Sda6I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
+	Cfg.Sda6K = "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64"
+	Cfg.Sda6I = "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64"
 	Cfg.Sda6C = "::eth0:none"
+	err := writeCfg()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
+func writeCfg() error {
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -114,11 +125,10 @@ func readCfg() error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal([]byte(dat), &Cfg)
+	err = json.Unmarshal(dat, &Cfg)
 	if err != nil {
 		return err
 	}
-	fmt.Println(Cfg)
 	return nil
 }
 
@@ -134,12 +144,11 @@ func formStrings() (err error) {
 
 	kexec1 = "kexec -k " + Cfg.ReInstallK + " -i " + Cfg.ReInstallI + " -c "
 	kexec1 += "'root=UUID=" + uuid1 + " console=ttyS0,115200 "
-	kexec1 += Cfg.ReInstallC
-	kexec1 += "' -e"
+	kexec1 += Cfg.ReInstallC + "' -e"
 	kexec6 = "kexec -k " + Cfg.Sda6K + " -i " + Cfg.Sda6I + " -c "
 	kexec6 += "'root=UUID=" + uuid6 + " console=ttyS0,115200 "
-	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyIpGWay + ":" + Cfg.MyIpMask + Cfg.Sda6C
-	kexec6 += "' -e"
+	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
+	kexec6 += Cfg.Sda6C + "' -e"
 
 	return nil
 }
@@ -158,18 +167,17 @@ func readUUID(partition string) (uuid string, err error) {
 	return uuid, nil
 }
 
-func doKexec(k string) error {
-	fmt.Println(k)
+func preKexec(k string) error {
 	d1 := []byte(k)
 	err := ioutil.WriteFile("kexe", d1, 0644)
 	if err != nil {
-		fmt.Println("error writing kexe")
+		return err
 	}
-	//FIXME FOR NOW DON"T KICK OFF --  err = c.g.Main("source", "kexe")
+	//err = c.g.Main("source", "kexe")
 	//if err != nil {
 	//	return err
 	//}
-	return nil // should never get here
+	return nil
 }
 
 func setGrubBit() error {
