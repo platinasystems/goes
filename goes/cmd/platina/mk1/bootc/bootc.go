@@ -6,6 +6,7 @@ package bootc
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
@@ -32,7 +33,7 @@ func (Command) String() string { return "bootc" }
 
 func (Command) Usage() string {
 	return `
-	bootc [register] [bootc] [dumpvars] [dashboard] [initcfg]
+	bootc [register] [bootc] [dumpvars] [dashboard] [initcfg] [wipe]
 	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
 	[readcfg] [setip] [setnetmask] [setgateway] [setkernel] [setinitrd]`
@@ -151,6 +152,18 @@ func (c *Command) Main(args ...string) (err error) {
 		if err = setInitrd(args[1]); err != nil {
 			return err
 		}
+	case "wipe":
+		if len(os.Args) >= 3 && args[1] == "sda6" {
+			fmt.Println("Please wait...reinstalling debian on sda6")
+			if err = setInstall(); err != nil {
+				return err
+			}
+			reboot()
+			return
+		}
+		fmt.Println("Type: 'wipe sda6'")
+		fmt.Println("Caution: this command will re-install debian on sda6")
+		return
 	default:
 	}
 	return nil

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -84,8 +85,8 @@ func initCfg() error {
 	Cfg.MyGateway = "192.168.101.1"
 	Cfg.MyNetmask = "255.255.255.0"
 	Cfg.MasterAddresses = []string{"198.168.101.142"}
-	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
-	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
+	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz"
+	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.gz"
 	Cfg.ReInstallC = "netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto"
 	Cfg.Sda6K = "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.Sda6I = "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64"
@@ -173,6 +174,9 @@ func (c *Command) doKexec(k string) error {
 }
 
 func setSda6Count(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	i, err := strconv.Atoi(x)
 	if err != nil {
 		return err
@@ -190,6 +194,9 @@ func setSda6Count(x string) error {
 }
 
 func clrSda6Count() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.Sda6Count = 0
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -203,6 +210,9 @@ func clrSda6Count() error {
 }
 
 func decSda6Count() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	x := Cfg.Sda6Count
 	if x > 0 {
 		x--
@@ -220,6 +230,9 @@ func decSda6Count() error {
 }
 
 func setInstall() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.InstallFlag = true
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -233,6 +246,9 @@ func setInstall() error {
 }
 
 func clrInstall() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.InstallFlag = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -246,6 +262,9 @@ func clrInstall() error {
 }
 
 func setIp(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.MyIpAddr = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -259,6 +278,9 @@ func setIp(x string) error {
 }
 
 func setNetmask(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.MyNetmask = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -272,6 +294,9 @@ func setNetmask(x string) error {
 }
 
 func setGateway(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.MyGateway = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -285,6 +310,9 @@ func setGateway(x string) error {
 }
 
 func setKernel(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.Sda6K = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -298,6 +326,9 @@ func setKernel(x string) error {
 }
 
 func setInitrd(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
 	Cfg.Sda6I = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
@@ -311,5 +342,15 @@ func setInitrd(x string) error {
 }
 
 func runScript(name string) (err error) {
+	return nil
+}
+
+func reboot() error {
+	fmt.Print("\nWILL REBOOT in 1 minute... Please login again\n")
+	u, err := exec.Command("shutdown", "-r", "+1").Output()
+	fmt.Println(u)
+	if err != nil {
+		return err
+	}
 	return nil
 }
