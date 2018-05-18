@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
@@ -21,48 +22,41 @@ var uuid6 string
 var kexec1 string
 var kexec6 string
 
-func Bootc() bool {
+func (c *Command) Bootc() {
 	if err := readCfg(); err != nil {
-		fmt.Println("1. ERROR reading bootc.cfg, run grub")
-		return false
-	} else {
-		fmt.Println("1. boot.cfg read successfully")
+		fmt.Println("ERROR: couldn't read bootc.cfg => run grub")
+		return
 	}
-	if serverAvail() == true {
-		fmt.Println("2. Server available")
-	} else {
-		fmt.Println("2. Server is not available, using local bootc.cfg")
+
+	if !serverAvail() {
+		fmt.Println("INFO: server is not available, using local bootc.cfg")
 	}
-	if Cfg.Grub == true {
-		fmt.Println("3. GrubBit == TRUE, run grub")
-		return false
-	} else {
-		fmt.Println("3. GrubBit == FALSE, set GrubBit, run bootc")
-		if err := setGrubBit(); err != nil { // avoid bootc loop
-			return false
-		}
+
+	if Cfg.InstallFlag == false && Cfg.Sda6Count == 0 {
+		fmt.Println("INFO: InstallFlag is false, Sda6Count is 0 => run grub")
+		return
 	}
+
 	if err := formStrings(); err != nil {
-		fmt.Println("4. ERROR forming kexec strings, run grub")
-		return false
-	} else {
-		fmt.Println("4. kexec strings formed correctly")
-		//fmt.Println("  KEXEC1: ", kexec1)
-		//fmt.Println("  KEXEC6: ", kexec6)
+		fmt.Println("ERROR: couldn't form kexec strings => run grub")
+		return
 	}
-	if Cfg.ReInstall == true {
-		fmt.Println("5. Re-install == TRUE, clear ReInstallBit, run installer")
-		if err := clrReInstallBit(); err != nil {
-			return false
+
+	if Cfg.InstallFlag {
+		if err := clrInstall(); err != nil {
+			fmt.Println("ERROR: could not clear InstallFlag")
+			return
 		}
-		preKexec(kexec1)
-		return true
-	} else {
-		fmt.Println("5. Re-install == FALSE, boot sda6")
-		preKexec(kexec6)
-		return true
+		c.doKexec(kexec1)
 	}
-	return false
+	if Cfg.Sda6Count > 0 {
+		if err := decSda6Count(); err != nil {
+			fmt.Println("ERROR: could not decrement Sda6Count")
+			return
+		}
+		c.doKexec(kexec6)
+	}
+	return
 }
 
 func serverAvail() bool {
@@ -83,8 +77,8 @@ func serverAvail() bool {
 }
 
 func initCfg() error {
-	Cfg.Grub = false
-	Cfg.ReInstall = false
+	Cfg.InstallFlag = false
+	Cfg.Sda6Count = 5
 	Cfg.IAmMaster = false
 	Cfg.MyIpAddr = "192.168.101.129"
 	Cfg.MyGateway = "192.168.101.1"
@@ -165,17 +159,25 @@ func readUUID(partition string) (uuid string, err error) {
 	return uuid, nil
 }
 
-func preKexec(k string) error {
+func (c *Command) doKexec(k string) error {
 	d1 := []byte(k)
 	err := ioutil.WriteFile("kexe", d1, 0644)
 	if err != nil {
 		return err
 	}
+	err = c.g.Main("source", "kexe")
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func setGrubBit() error {
-	Cfg.Grub = true
+func setSda6Count(x string) error {
+	i, err := strconv.Atoi(x)
+	if err != nil {
+		return err
+	}
+	Cfg.Sda6Count = i
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -187,8 +189,8 @@ func setGrubBit() error {
 	return nil
 }
 
-func clrGrubBit() error {
-	Cfg.Grub = false
+func clrSda6Count() error {
+	Cfg.Sda6Count = 0
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -200,8 +202,12 @@ func clrGrubBit() error {
 	return nil
 }
 
-func setReInstallBit() error {
-	Cfg.ReInstall = true
+func decSda6Count() error {
+	x := Cfg.Sda6Count
+	if x > 0 {
+		x--
+	}
+	Cfg.Sda6Count = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -213,8 +219,86 @@ func setReInstallBit() error {
 	return nil
 }
 
-func clrReInstallBit() error {
-	Cfg.ReInstall = false
+func setInstall() error {
+	Cfg.InstallFlag = true
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func clrInstall() error {
+	Cfg.InstallFlag = false
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setIp(x string) error {
+	Cfg.MyIpAddr = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setNetmask(x string) error {
+	Cfg.MyNetmask = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setGateway(x string) error {
+	Cfg.MyGateway = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setKernel(x string) error {
+	Cfg.Sda6K = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setInitrd(x string) error {
+	Cfg.Sda6I = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err

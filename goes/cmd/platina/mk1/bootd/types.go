@@ -12,7 +12,7 @@ const (
 	Binary     = "getbinary"
 	DumpVars   = "dumpvars"
 	Dashboard  = "dashboard"
-	Dashboard2 = "dashboard2" //FIXME
+	Dashboard2 = "dashboard2"
 )
 const (
 	BootStateNotRegistered = iota
@@ -52,8 +52,8 @@ const (
 )
 
 type BootcConfig struct {
-	Grub            bool
-	ReInstall       bool
+	InstallFlag     bool
+	Sda6Count       int
 	IAmMaster       bool
 	MyIpAddr        string
 	MyGateway       string
