@@ -1,11 +1,19 @@
 This repos contains Platina System's open source GO projects.
 
-You'll need `platinasystems/fe1` and `platinasystems/firmware-fe1a` to compile
-`goes-platina-mk1` or `go-wip`.
+First fetch and install the goes builder,
 
 ```console
-$ git clone git@github.com:platinasystems/fe1 ../fe1
-$ git clone git@github.com:platinasystems/firmware-fe1a ../firmware-fe1a
+$ go get github.com:platinasystems/go/main/goes-build
+```
+
+You'll need `platinasystems/fe1` and `platinasystems/firmware-fe1a` to build
+`goes-platina-mk1`.
+
+```console
+$ git clone git@github.com:platinasystems/fe1 \
+	GOPATH/src/github.com/platinasystems/fe1
+$ git clone git@github.com:platinasystems/firmware-fe1a 
+	GOPATH/src/github.com/platinasystems/firmware-fe1a
 ```
 
 Alternatively, you may build `goes-platina-mk1` to plugin an existing
@@ -14,20 +22,21 @@ Alternatively, you may build `goes-platina-mk1` to plugin an existing
 To install a select MACHINE,
 
 ```console
-$ make -C main/goes-MACHINE
-$ sudo ./main/goes-MACHINE/goes-MACHINE install
+$ goes-build goes-MACHINE
+$ sudo ./goes-MACHINE install
 ```
 
 Some machines also have a self extracting, compressed archive installer.
 
 ```console
-$ make -C goes-MACHINE
-$ sudo ./main/goes-MACHINE/goes-MACHINE-installer
+$ goes-build goes-MACHINE-installer
+$ sudo ./goes-MACHINE-installer
 ```
 
-These are the available MACHINEs,
+These are the available machines,
 
 - [example] \(GOARCH: amd64 or armhf)
+- [coreboot] \(GOARCH: amd64)
 - [platina-mk1] \(GOARCH: amd64)
 - [platina-mk1-bmc] \(GOARCH: armhf)
 - [platina-mk2-lc1-bmc] \(GOARCH: armhf)
@@ -71,6 +80,7 @@ Use of this source code is governed by this BSD-style [LICENSE].*
 [LICENSE]: LICENSE
 [errata]: docs/Errata.md
 [example]: main/goes-example/README.md
+[coreboot]: main/goes-coreboot/README.md
 [platina-mk1]: main/goes-platina-mk1/README.md
 [platina-mk1-bmc]: main/goes-platina-mk1-bmc/README.md
 [platina-mk2-lc1-bmc]: main/goes-platina-mk2-lc1-bmc/README.md
