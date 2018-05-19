@@ -1,3 +1,8 @@
+// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
+// build goes machine(s)
 package main
 
 import (
@@ -15,7 +20,7 @@ import (
 )
 
 const (
-	goesExampleAmd64        = "goes-example-amd64"
+	goesExample             = "goes-example"
 	goesExampleArm          = "goes-example-arm"
 	goesCoreboot            = "goes-coreboot"
 	goesIP                  = "goes-ip"
@@ -29,7 +34,6 @@ const (
 
 	fe1so = "fe1.so"
 
-	top     = "github.com/platinasystems/go"
 	fe1     = "github.com/platinasystems/fe1"
 	mainFe1 = "github.com/platinasystems/go/main/fe1"
 
@@ -51,15 +55,20 @@ type goenv struct {
 
 var (
 	defaultTargets = []string{
-		goesExampleAmd64,
+		goesExample,
 		goesExampleArm,
 		goesCoreboot,
 		goesIP,
 		goesPlatinaMk1,
 		goesPlatinaMk1Bmc,
 	}
+	goarchFlag = flag.String("goarch", runtime.GOARCH,
+		"GOARCH of PACKAGE build")
+	goosFlag = flag.String("goos", runtime.GOOS,
+		"GOOS of PACKAGE build")
 	nFlag = flag.Bool("n", false,
 		"print 'go build' commands but do not run them.")
+	oFlag    = flag.String("o", "", "output file name of PACKAGE build")
 	tagsFlag = flag.String("tags", "", `
 debug	disable optimizer and increase vnet log
 diag	include manufacturing diagnostics with BMC
@@ -81,18 +90,31 @@ plugin	use pre-compiled proprietary packages
 		goarch: "arm",
 		goos:   "linux",
 	}
-	make = map[string]func() error{
-		goesExampleAmd64:        makeGoesExampleAmd64,
-		goesExampleArm:          makeGoesExampleArm,
-		goesCoreboot:            makeGoesCoreboot,
-		goesIP:                  makeIP,
-		goesIPTest:              makeIPTest,
+	mainPkg = map[string]string{
+		goesExample:             mainGoesExample,
+		goesExampleArm:          mainGoesExample,
+		goesCoreboot:            mainGoesCoreboot,
+		goesIP:                  mainIP,
+		goesIPTest:              mainIP,
+		goesPlatinaMk1:          mainGoesPlatinaMk1,
+		goesPlatinaMk1Test:      mainGoesPlatinaMk1,
+		goesPlatinaMk1Installer: mainGoesPlatinaMk1,
+		goesPlatinaMk1Bmc:       mainGoesPlatinaMk1Bmc,
+		goesPlatinaMk2Lc1Bmc:    mainGoesPlatinaMk2Lc1Bmc,
+		goesPlatinaMk2Mc1Bmc:    mainGoesPlatinaMk2Mc1Bmc,
+	}
+	make = map[string]func(out, name string) error{
+		goesExample:             makeHost,
+		goesExampleArm:          makeArmLinuxStatic,
+		goesCoreboot:            makeAmd64Linux,
+		goesIP:                  makeHost,
+		goesIPTest:              makeHostTest,
 		goesPlatinaMk1:          makeGoesPlatinaMk1,
-		goesPlatinaMk1Test:      makeGoesPlatinaMk1Test,
 		goesPlatinaMk1Installer: makeGoesPlatinaMk1Installer,
-		goesPlatinaMk1Bmc:       makeGoesPlatinaMk1Bmc,
-		goesPlatinaMk2Lc1Bmc:    makeGoesPlatinaMk2Lc1Bmc,
-		goesPlatinaMk2Mc1Bmc:    makeGoesPlatinaMk2Mc1Bmc,
+		goesPlatinaMk1Test:      makeAmd64LinuxTest,
+		goesPlatinaMk1Bmc:       makeArmLinuxStatic,
+		goesPlatinaMk2Lc1Bmc:    makeArmLinuxStatic,
+		goesPlatinaMk2Mc1Bmc:    makeArmLinuxStatic,
 	}
 )
 
@@ -103,19 +125,31 @@ func main() {
 	if len(targets) == 0 {
 		targets = defaultTargets
 	}
+	err := host.godo("generate", "github.com/platinasystems/go")
+	defer func() {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}()
+	if err != nil {
+		return
+	}
 	for _, target := range targets {
-		if f, found := make[target]; !found {
-			fmt.Fprintf(os.Stderr, "%q: unknown\n", target)
-			os.Exit(1)
-		} else if err := f(); err != nil {
-			os.Exit(1)
+		if f, found := make[target]; found {
+			err = f(target, mainPkg[target])
+		} else {
+			err = makePackage(target)
+		}
+		if err != nil {
+			return
 		}
 	}
 }
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage:", os.Args[0],
-		"[ OPTION... ] [ TARGET... ]")
+		"[ OPTION... ] [ TARGET... | PACKAGE ]")
 	fmt.Fprintln(os.Stderr, "\nOptions:")
 	flag.PrintDefaults()
 	fmt.Fprintln(os.Stderr, "\nDefault Targets:")
@@ -128,36 +162,37 @@ func usage() {
 	}
 }
 
-func makeGoesCoreboot() error {
-	return amd64Linux.godo("build", mainGoesCoreboot)
+func makeArmLinuxStatic(out, name string) error {
+	return armLinux.godo("build", "-o", out, "-tags", "netgo",
+		"-ldflags", "-d", name)
 }
 
-func makeGoesExampleAmd64() error {
-	return amd64Linux.godo("build", "-o", goesExampleAmd64,
-		mainGoesExample)
+func makeAmd64Linux(out, name string) error {
+	return amd64Linux.godo("build", "-o", out, name)
 }
 
-func makeGoesExampleArm() error {
-	return armLinux.godo("build", "-tags", "netgo", "-ldflags", "-d",
-		"-o", goesExampleArm, mainGoesExample)
+func makeAmd64LinuxTest(out, name string) error {
+	return amd64Linux.godo("test", "-c", "-o", out, name)
 }
 
-func makeIP() error {
-	if err := host.godo("generate", top); err != nil {
-		return err
-	}
-	return host.godo("build", "-o", goesIP, mainIP)
+func makeHost(out, name string) error {
+	return host.godo("build", "-o", out, name)
 }
 
-func makeIPTest() error {
-	return host.godo("test", "-c", "-o", goesIPTest, mainIP)
+func makeHostTest(out, name string) error {
+	return host.godo("test", "-c", "-o", out, name)
 }
 
-func makeGoesPlatinaMk1() error {
-	if err := host.godo("generate", top); err != nil {
-		return err
-	}
+func makePackage(name string) error {
 	args := []string{"build"}
+	if len(*oFlag) > 0 {
+		args = append(args, "-o", *oFlag)
+	}
+	return (&goenv{*goarchFlag, *goosFlag}).godo(append(args, name)...)
+}
+
+func makeGoesPlatinaMk1(out, name string) error {
+	args := []string{"build", "-o", out}
 	if have(fe1) {
 		if err := host.godo("generate", fe1); err != nil {
 			return err
@@ -168,21 +203,14 @@ func makeGoesPlatinaMk1() error {
 	if strings.Index(*tagsFlag, "debug") > 0 {
 		args = append(args, "-gcflags", "-N -l")
 	}
-	return amd64Linux.godo(append(args, mainGoesPlatinaMk1)...)
+	return amd64Linux.godo(append(args, name)...)
 }
 
-func makeGoesPlatinaMk1Bmc() error {
-	return armLinux.godo("build", "-tags", "netgo", "-ldflags", "-d",
-		mainGoesPlatinaMk1Bmc)
-}
-
-func makeGoesPlatinaMk1Installer() error {
-	const (
-		tinstaller = goesPlatinaMk1Installer + ".tmp"
-		tzip       = goesPlatinaMk1 + ".zip"
-	)
+func makeGoesPlatinaMk1Installer(out, name string) error {
 	var zfiles []string
-	err := makeGoesPlatinaMk1()
+	tinstaller := out + ".tmp"
+	tzip := goesPlatinaMk1 + ".zip"
+	err := makeGoesPlatinaMk1(goesPlatinaMk1, name)
 	if err != nil {
 		return err
 	}
@@ -214,32 +242,17 @@ func makeGoesPlatinaMk1Installer() error {
 	if err != nil {
 		return err
 	}
-	err = catto(goesPlatinaMk1Installer, tinstaller, tzip)
+	err = catto(out, tinstaller, tzip)
 	if err != nil {
 		return err
 	}
 	if err = rm(tinstaller, tzip); err != nil {
 		return err
 	}
-	if err = zipa(goesPlatinaMk1Installer); err != nil {
+	if err = zipa(out); err != nil {
 		return err
 	}
-	return chmodx(goesPlatinaMk1Installer)
-}
-
-func makeGoesPlatinaMk1Test() error {
-	return amd64Linux.godo("test", "-c", "-o", goesPlatinaMk1Test,
-		mainGoesPlatinaMk1)
-}
-
-func makeGoesPlatinaMk2Lc1Bmc() error {
-	return armLinux.godo("build", "-tags", "netgo", "-ldflags", "-d",
-		mainGoesPlatinaMk2Lc1Bmc)
-}
-
-func makeGoesPlatinaMk2Mc1Bmc() error {
-	return armLinux.godo("build", "-tags", "netgo", "-ldflags", "-d",
-		mainGoesPlatinaMk2Mc1Bmc)
+	return chmodx(out)
 }
 
 func (goenv *goenv) godo(args ...string) error {
