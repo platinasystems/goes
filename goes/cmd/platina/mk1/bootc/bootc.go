@@ -69,7 +69,7 @@ func (c *Command) Main(args ...string) (err error) {
 			return err
 		}
 	case "bootc":
-		c.Bootc()
+		c.bootc()
 		return nil // fall through to grub
 	case "dumpvars":
 		if err = dumpvars(mip); err != nil {

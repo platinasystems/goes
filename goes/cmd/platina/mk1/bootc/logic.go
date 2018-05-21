@@ -23,11 +23,12 @@ var uuid6 string
 var kexec1 string
 var kexec6 string
 
-func (c *Command) Bootc() {
+func Bootc() []string {
 	if err := readCfg(); err != nil {
 		fmt.Println("ERROR: couldn't read bootc.cfg => run grub")
-		return
+		return []string{""}
 	}
+	fmt.Printf("INFO: Cfg.InstallFlag = %v, Cfg.Sda6Count = %v\n", Cfg.InstallFlag, Cfg.Sda6Count)
 
 	if !serverAvail() {
 		fmt.Println("INFO: server is not available, using local bootc.cfg")
@@ -35,27 +36,35 @@ func (c *Command) Bootc() {
 
 	if Cfg.InstallFlag == false && Cfg.Sda6Count == 0 {
 		fmt.Println("INFO: InstallFlag is false, Sda6Count is 0 => run grub")
-		return
+		return []string{""}
 	}
 
 	if err := formStrings(); err != nil {
 		fmt.Println("ERROR: couldn't form kexec strings => run grub")
-		return
+		return []string{""}
 	}
 
 	if Cfg.InstallFlag {
 		if err := clrInstall(); err != nil {
 			fmt.Println("ERROR: could not clear InstallFlag")
-			return
+			return []string{""}
 		}
-		c.doKexec(kexec1)
+		return []string{"kexec", "-k", Cfg.ReInstallK, "-i", Cfg.ReInstallI, "-c", kexec1, "-e"}
 	}
 	if Cfg.Sda6Count > 0 {
 		if err := decSda6Count(); err != nil {
 			fmt.Println("ERROR: could not decrement Sda6Count")
-			return
+			return []string{""}
 		}
-		c.doKexec(kexec6)
+		return []string{"kexec", "-k", Cfg.Sda6K, "-i", Cfg.Sda6I, "-c", kexec6, "-e"}
+	}
+	return []string{""}
+}
+
+func (c *Command) bootc() {
+	if kexec := Bootc(); len(kexec) > 1 {
+		err := c.Main(kexec...)
+		fmt.Println(err)
 	}
 	return
 }
@@ -135,13 +144,10 @@ func formStrings() (err error) {
 		return err
 	}
 
-	kexec1 = "kexec -k " + Cfg.ReInstallK + " -i " + Cfg.ReInstallI + " -c "
-	kexec1 += "'root=UUID=" + uuid1 + " console=ttyS0,115200 "
-	kexec1 += Cfg.ReInstallC + "' -e"
-	kexec6 = "kexec -k " + Cfg.Sda6K + " -i " + Cfg.Sda6I + " -c "
-	kexec6 += "'root=UUID=" + uuid6 + " console=ttyS0,115200 "
+	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200 " + Cfg.ReInstallC
+	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200 "
 	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
-	kexec6 += Cfg.Sda6C + "' -e"
+	kexec6 += Cfg.Sda6C
 
 	return nil
 }
