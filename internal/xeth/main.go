@@ -38,9 +38,12 @@ func Main() {
 	usage := fmt.Sprint("usage:",
 		"\t", name, " carrier DEVICE CARRIER ...\n",
 		"\t", name, " dump DB ...\n",
-		"\t", name, " set DEVICE STAT COUNT | FILE | - ...\n",
+		"\t", name, " set DEVICE speed COUNT\n",
+		"\t", name, " set DEVICE STAT COUNT\n",
+		"\t", name, " FILE | - ...\n",
 		`
 CARRIER	{ on | off }
+COUNT	unsigned number
 DB	{ ethtool | fdb }
 DEVICE	an interface name or its ifindex
 STAT	an 'ip link' or 'ethtool' statistic
@@ -112,16 +115,22 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			case 1:
 				panic(fmt.Errorf("missing DEVICE\n%s", usage))
 			case 2:
-				panic(fmt.Errorf("missing STAT\n%s", usage))
+				panic(fmt.Errorf("missing STAT | %q\n%s",
+					"speed", usage))
 			case 3:
 				panic(fmt.Errorf("missing COUNT\n%s", usage))
 			}
 			_, err := fmt.Sscan(args[3], &count)
 			if err != nil {
-				panic(fmt.Errorf("COUNT %q %v", args[3], err))
+				panic(fmt.Errorf("COUNT %q %v",
+					args[3], err))
 			}
 			xeth.Assert()
-			err = xeth.SetStat(args[1], args[2], count)
+			if args[2] == "speed" {
+				err = xeth.Speed(args[1], count)
+			} else {
+				err = xeth.SetStat(args[1], args[2], count)
+			}
 			if err != nil {
 				panic(err)
 			}

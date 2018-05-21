@@ -11,6 +11,8 @@ const (
 	SizeofStatMsg		= 0x30
 	SizeofEthtoolFlagsMsg	= 0x28
 	SizeofEthtoolDumpMsg	= 0x10
+	SizeofCarrierMsg	= 0x28
+	SizeofSpeedMsg		= 0x28
 )
 
 type Hdr struct {

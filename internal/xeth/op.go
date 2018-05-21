@@ -34,6 +34,7 @@ const (
 	XETH_ETHTOOL_SETTINGS_OP
 	XETH_ETHTOOL_DUMP_OP
 	XETH_CARRIER_OP
+	XETH_SPEED_OP
 )
 
 func (op Op) String() string {
@@ -45,6 +46,7 @@ func (op Op) String() string {
 		"ethtool-settings",
 		"ethtool-dump",
 		"carrier",
+		"speed",
 	}
 	var s string
 	i := int(op)

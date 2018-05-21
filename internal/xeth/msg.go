@@ -87,3 +87,13 @@ type CarrierMsg struct {
 func (msg *CarrierMsg) String() string {
 	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", msg.Flag)
 }
+
+type SpeedMsg struct {
+	Hdr    Hdr
+	Ifname Ifname
+	Speed  Mbps
+}
+
+func (msg *SpeedMsg) String() string {
+	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", msg.Speed)
+}

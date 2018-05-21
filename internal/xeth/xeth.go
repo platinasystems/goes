@@ -171,6 +171,16 @@ func (xeth *Xeth) SetStat(ifname, stat string, count uint64) error {
 	return nil
 }
 
+func (xeth *Xeth) Speed(ifname string, count uint64) error {
+	buf := Pool.Get(SizeofStatMsg)
+	msg := (*SpeedMsg)(unsafe.Pointer(&buf[0]))
+	msg.Hdr.Op = uint8(XETH_SPEED_OP)
+	copy(msg.Ifname[:], ifname)
+	msg.Speed = Mbps(count)
+	xeth.TxCh <- buf
+	return nil
+}
+
 func (xeth *Xeth) UntilBreak(f func([]byte) error) error {
 	breakhdr := make([]byte, SizeofMsgHdr)
 	for buf := range xeth.RxCh {

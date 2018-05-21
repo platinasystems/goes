@@ -20,6 +20,8 @@ const (
 	SizeofStatMsg         = C.sizeof_struct_xeth_stat_msg
 	SizeofEthtoolFlagsMsg = C.sizeof_struct_xeth_ethtool_flags_msg
 	SizeofEthtoolDumpMsg  = C.sizeof_struct_xeth_ethtool_dump_msg
+	SizeofCarrierMsg      = C.sizeof_struct_xeth_carrier_msg
+	SizeofSpeedMsg        = C.sizeof_struct_xeth_speed_msg
 )
 
 type Hdr C.struct_xeth_msg_hdr
