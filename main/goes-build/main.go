@@ -124,6 +124,11 @@ func main() {
 	targets := flag.Args()
 	if len(targets) == 0 {
 		targets = defaultTargets
+	} else if targets[0] == "all" {
+		targets = targets[:0]
+		for target := range make {
+			targets = append(targets, target)
+		}
 	}
 	err := host.godo("generate", "github.com/platinasystems/go")
 	defer func() {
@@ -156,7 +161,7 @@ func usage() {
 	for _, target := range defaultTargets {
 		fmt.Fprint(os.Stderr, "\t", target, "\n")
 	}
-	fmt.Fprintln(os.Stderr, "\nAll Targets:")
+	fmt.Fprintln(os.Stderr, "\n\"all\" Targets:")
 	for target := range make {
 		fmt.Fprint(os.Stderr, "\t", target, "\n")
 	}
