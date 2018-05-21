@@ -135,10 +135,10 @@ func (xeth *Xeth) Carrier(ifname string, flag CarrierFlag) {
 	xeth.TxCh <- buf
 }
 
-func (xeth *Xeth) EthtoolDump() {
+func (xeth *Xeth) DumpIfinfo() {
 	buf := Pool.Get(SizeofBreakMsg)
 	msg := (*BreakMsg)(unsafe.Pointer(&buf[0]))
-	msg.Hdr.Op = uint8(XETH_ETHTOOL_DUMP_OP)
+	msg.Hdr.Op = uint8(XETH_DUMP_IFINFO_OP)
 	xeth.TxCh <- buf
 }
 

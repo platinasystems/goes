@@ -19,7 +19,7 @@ const (
 	SizeofBreakMsg        = C.sizeof_struct_xeth_break_msg
 	SizeofStatMsg         = C.sizeof_struct_xeth_stat_msg
 	SizeofEthtoolFlagsMsg = C.sizeof_struct_xeth_ethtool_flags_msg
-	SizeofEthtoolDumpMsg  = C.sizeof_struct_xeth_ethtool_dump_msg
+	SizeofDumpIfinfoMsg   = C.sizeof_struct_xeth_dump_ifinfo_msg
 	SizeofCarrierMsg      = C.sizeof_struct_xeth_carrier_msg
 	SizeofSpeedMsg        = C.sizeof_struct_xeth_speed_msg
 )

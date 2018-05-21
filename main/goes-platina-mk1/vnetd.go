@@ -65,7 +65,7 @@ func vnetdInit() {
 	}
 	p := new(mk1Main)
 	p.PortProvision = make(PortProvision)
-	vnet.Xeth.EthtoolDump()
+	vnet.Xeth.DumpIfinfo()
 	vnet.Xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
 		hdr := (*xeth.Hdr)(ptr)

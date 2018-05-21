@@ -44,7 +44,7 @@ func Main() {
 		`
 CARRIER	{ on | off }
 COUNT	unsigned number
-DB	{ ethtool | fdb }
+DB	{ ifinfo | fdb }
 DEVICE	an interface name or its ifindex
 STAT	an 'ip link' or 'ethtool' statistic
 FILE,-	receive an exception frame from FILE or STDIN`)
@@ -97,8 +97,8 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			}
 			xeth.Assert()
 			switch args[1] {
-			case "ethtool":
-				xeth.EthtoolDump()
+			case "ifinfo":
+				xeth.DumpIfinfo()
 			case "fdb":
 				panic("FIXME")
 			default:
