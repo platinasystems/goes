@@ -36,7 +36,8 @@ func (Command) Usage() string {
 	bootc [register] [bootc] [dumpvars] [dashboard] [initcfg] [wipe]
 	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
-	[readcfg] [setip] [setnetmask] [setgateway] [setkernel] [setinitrd]`
+	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
+	[setkernel] [setinitrd]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -125,6 +126,14 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "clrinstall":
 		if err = clrInstall(); err != nil {
+			return err
+		}
+	case "setsda1":
+		if err = setSda1Flag(); err != nil {
+			return err
+		}
+	case "clrsda1":
+		if err = clrSda1Flag(); err != nil {
 			return err
 		}
 	case "readcfg":

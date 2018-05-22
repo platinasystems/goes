@@ -14,28 +14,42 @@ import (
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
+	"github.com/platinasystems/go/internal/machine"
 )
 
-const BootcCfgFile = "/newroot/sda1/bootc.cfg"
+const (
+	CorebootCfg = "/newroot/sda1/bootc.cfg"
+	Sda1Cfg     = "/bootc.cfg"
+	Sda6Cfg     = "/mnt/bootc.cfg"
+)
 
+var BootcCfgFile string
 var uuid1 string
 var uuid6 string
+var kexec0 string
 var kexec1 string
 var kexec6 string
 
 func Bootc() []string {
+	if err := setCfgPath(); err != nil {
+		fmt.Println(err)
+		return []string{""}
+	}
+
 	if err := readCfg(); err != nil {
 		fmt.Println("ERROR: couldn't read bootc.cfg => run grub")
 		return []string{""}
 	}
-	fmt.Printf("INFO: Cfg.InstallFlag = %v, Cfg.Sda6Count = %v\n", Cfg.InstallFlag, Cfg.Sda6Count)
 
 	if !serverAvail() {
 		fmt.Println("INFO: server is not available, using local bootc.cfg")
 	}
 
-	if Cfg.InstallFlag == false && Cfg.Sda6Count == 0 {
-		fmt.Println("INFO: InstallFlag is false, Sda6Count is 0 => run grub")
+	fmt.Printf("INFO: InstallFlag = %v, Sda1Flag = %v, Sda6Count = %v\n",
+		Cfg.InstallFlag, Cfg.Sda1Flag, Cfg.Sda6Count)
+
+	if !Cfg.InstallFlag && Cfg.Sda6Count == 0 && !Cfg.Sda1Flag {
+		fmt.Println("INFO: !InstallFlag, !Sda1Flag, Sda6Count==0 => run grub")
 		return []string{""}
 	}
 
@@ -49,14 +63,26 @@ func Bootc() []string {
 			fmt.Println("ERROR: could not clear InstallFlag")
 			return []string{""}
 		}
-		return []string{"kexec", "-k", Cfg.ReInstallK, "-i", Cfg.ReInstallI, "-c", kexec1, "-e"}
+		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
+			Cfg.ReInstallI, "-c", kexec0, "-e"}
 	}
+
+	if Cfg.Sda1Flag {
+		if err := clrSda1Flag(); err != nil {
+			fmt.Println("ERROR: could not clear Sda1Flag")
+			return []string{""}
+		}
+		return []string{"kexec", "-k", Cfg.Sda1K,
+			"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
+	}
+
 	if Cfg.Sda6Count > 0 {
 		if err := decSda6Count(); err != nil {
 			fmt.Println("ERROR: could not decrement Sda6Count")
 			return []string{""}
 		}
-		return []string{"kexec", "-k", Cfg.Sda6K, "-i", Cfg.Sda6I, "-c", kexec6, "-e"}
+		return []string{"kexec", "-k", Cfg.Sda6K,
+			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 	}
 	return []string{""}
 }
@@ -88,7 +114,8 @@ func serverAvail() bool {
 
 func initCfg() error {
 	Cfg.InstallFlag = false
-	Cfg.Sda6Count = 5
+	Cfg.Sda1Flag = false
+	Cfg.Sda6Count = 3
 	Cfg.IAmMaster = false
 	Cfg.MyIpAddr = "192.168.101.129"
 	Cfg.MyGateway = "192.168.101.1"
@@ -97,12 +124,37 @@ func initCfg() error {
 	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz"
 	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.gz"
 	Cfg.ReInstallC = "netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto"
+	Cfg.Sda1K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
+	Cfg.Sda1I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
+	Cfg.Sda1C = "::eth0:none"
 	Cfg.Sda6K = "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.Sda6I = "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64"
 	Cfg.Sda6C = "::eth0:none"
 	err := writeCfg()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func setCfgPath() error {
+	context := machine.Name
+	if context == "platina-mk1" {
+		//if mk1, then df | grep sda FIXME
+		//context = "sda1"
+		context = "sda6"
+	}
+	switch context {
+	case "coreboot":
+		BootcCfgFile = CorebootCfg
+	case "sda1":
+		BootcCfgFile = Sda1Cfg
+	case "sda6":
+		BootcCfgFile = Sda6Cfg
+		//mkdir /mnt FIXME
+		//mount /dev/sda1 /mnt
+	default:
+		return fmt.Errorf("ERROR: unknown machine could not form path")
 	}
 	return nil
 }
@@ -144,7 +196,10 @@ func formStrings() (err error) {
 		return err
 	}
 
-	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200 " + Cfg.ReInstallC
+	kexec0 = "root=UUID=" + uuid1 + " console=ttyS0,115200 " + Cfg.ReInstallC
+	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200 "
+	kexec1 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
+	kexec1 += Cfg.Sda1C
 	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200 "
 	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
 	kexec6 += Cfg.Sda6C
@@ -164,19 +219,6 @@ func readUUID(partition string) (uuid string, err error) {
 	dat4 := string(dat3[0:len3])
 	uuid = string(dat4)
 	return uuid, nil
-}
-
-func (c *Command) doKexec(k string) error {
-	d1 := []byte(k)
-	err := ioutil.WriteFile("kexe", d1, 0644)
-	if err != nil {
-		return err
-	}
-	err = c.g.Main("source", "kexe")
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func setSda6Count(x string) error {
@@ -256,6 +298,38 @@ func clrInstall() error {
 		return err
 	}
 	Cfg.InstallFlag = false
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setSda1Flag() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.Sda1Flag = true
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func clrSda1Flag() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.Sda1Flag = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err

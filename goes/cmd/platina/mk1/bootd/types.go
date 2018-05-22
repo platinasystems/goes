@@ -53,6 +53,7 @@ const (
 
 type BootcConfig struct {
 	InstallFlag     bool
+	Sda1Flag        bool
 	Sda6Count       int
 	IAmMaster       bool
 	MyIpAddr        string
@@ -62,6 +63,9 @@ type BootcConfig struct {
 	ReInstallK      string
 	ReInstallI      string
 	ReInstallC      string
+	Sda1K           string
+	Sda1I           string
+	Sda1C           string
 	Sda6K           string
 	Sda6I           string
 	Sda6C           string
