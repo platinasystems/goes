@@ -31,11 +31,6 @@ var kexec1 string
 var kexec6 string
 
 func Bootc() []string {
-	if err := setCfgPath(); err != nil {
-		fmt.Println(err)
-		return []string{""}
-	}
-
 	if err := readCfg(); err != nil {
 		fmt.Println("ERROR: couldn't read bootc.cfg => run grub")
 		return []string{""}
@@ -160,6 +155,10 @@ func setCfgPath() error {
 }
 
 func writeCfg() error {
+	if err := setCfgPath(); err != nil {
+		return err
+	}
+
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -172,6 +171,10 @@ func writeCfg() error {
 }
 
 func readCfg() error {
+	if err := setCfgPath(); err != nil {
+		return err
+	}
+
 	if _, err := os.Stat(BootcCfgFile); os.IsNotExist(err) {
 		return err
 	}
