@@ -44,6 +44,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/go/goes/cmd/ps"
 	"github.com/platinasystems/go/goes/cmd/pwd"
 	"github.com/platinasystems/go/goes/cmd/reboot"
@@ -77,6 +78,7 @@ var Goes = &goes.Goes{
 		"!":            bang.Command{},
 		"cli":          &cli.Command{},
 		"boot":         &boot.Command{},
+		"bootc":        &bootc.Command{},
 		"cat":          cat.Command{},
 		"cd":           &cd.Command{},
 		"chmod":        chmod.Command{},
