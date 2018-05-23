@@ -53,7 +53,7 @@ func Bootc() []string {
 			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
 			return []string{""}
 		}
-		if err := clrBootSda1(); err != nil {
+		if err := clrSda1Flag(); err != nil {
 			fmt.Println("ERROR: could not clear BootSda1")
 			return []string{""}
 		}
@@ -236,7 +236,7 @@ func readUUID(partition string) (uuid string, err error) {
 	return uuid, nil
 }
 
-func setBootSda6Cnt(x string) error {
+func setSda6Count(x string) error {
 	if err := readCfg(); err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func setBootSda6Cnt(x string) error {
 	return nil
 }
 
-func clrBootSda6Cnt() error {
+func clrSda6Count() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func clrInstall() error {
 	return nil
 }
 
-func setBootSda1() error {
+func setSda1Flag() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func setBootSda1() error {
 	return nil
 }
 
-func clrBootSda1() error {
+func clrSda1Flag() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
