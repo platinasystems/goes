@@ -126,7 +126,9 @@ func initCfg() error {
 	Cfg.MasterAddresses = []string{"198.168.101.142"}
 	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz"
 	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.gz"
-	Cfg.ReInstallC = "netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto"
+	Cfg.ReInstallC = `netcfg/get_hostname=platina
+	netcfg/get_domain=platinasystems.com interface=auto auto
+	locale=en_US preseed/file=/hd-media/preseed.cfg`
 	Cfg.Sda1K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.Sda1I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
 	Cfg.Sda1C = "::eth0:none"
@@ -297,6 +299,7 @@ func setInstall() error {
 	Cfg.BootSda1 = true
 	Cfg.EraseSda6 = true
 	Cfg.Install = true
+	Cfg.BootSda6Cnt = 3
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
