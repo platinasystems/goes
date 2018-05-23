@@ -48,21 +48,11 @@ func Bootc() []string {
 		return []string{""}
 	}
 
-	if err := formStrings(); err != nil {
-		fmt.Println("ERROR: couldn't form kexec strings => run grub")
-		return []string{""}
-	}
-
-	if Cfg.InstallFlag {
-		if err := clrInstall(); err != nil {
-			fmt.Println("ERROR: could not clear InstallFlag")
+	if Cfg.Sda1Flag {
+		if err := formString1(); err != nil {
+			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
 			return []string{""}
 		}
-		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
-			Cfg.ReInstallI, "-c", kexec0, "-e"}
-	}
-
-	if Cfg.Sda1Flag {
 		if err := clrSda1Flag(); err != nil {
 			fmt.Println("ERROR: could not clear Sda1Flag")
 			return []string{""}
@@ -71,7 +61,24 @@ func Bootc() []string {
 			"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 	}
 
+	if Cfg.InstallFlag {
+		if err := formString1(); err != nil {
+			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
+			return []string{""}
+		}
+		if err := clrInstall(); err != nil {
+			fmt.Println("ERROR: could not clear InstallFlag")
+			return []string{""}
+		}
+		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
+			Cfg.ReInstallI, "-c", kexec0, "-e"}
+	}
+
 	if Cfg.Sda6Count > 0 {
+		if err := formString6(); err != nil {
+			fmt.Println("ERROR: couldn't form kexec6 string => run grub")
+			return []string{""}
+		}
 		if err := decSda6Count(); err != nil {
 			fmt.Println("ERROR: could not decrement Sda6Count")
 			return []string{""}
@@ -189,24 +196,26 @@ func readCfg() error {
 	return nil
 }
 
-func formStrings() (err error) {
+func formString1() (err error) {
 	uuid1, err = readUUID("sda1")
 	if err != nil {
 		return err
 	}
-	uuid6, err = readUUID("sda6")
-	if err != nil {
-		return err
-	}
-
 	kexec0 = "root=UUID=" + uuid1 + " console=ttyS0,115200 " + Cfg.ReInstallC
 	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200 "
 	kexec1 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
 	kexec1 += Cfg.Sda1C
+	return nil
+}
+
+func formString6() (err error) {
+	uuid6, err = readUUID("sda6")
+	if err != nil {
+		return err
+	}
 	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200 "
 	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
 	kexec6 += Cfg.Sda6C
-
 	return nil
 }
 
