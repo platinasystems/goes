@@ -40,47 +40,47 @@ func Bootc() []string {
 		fmt.Println("INFO: server is not available, using local bootc.cfg")
 	}
 
-	fmt.Printf("INFO: InstallFlag = %v, Sda1Flag = %v, Sda6Count = %v\n",
-		Cfg.InstallFlag, Cfg.Sda1Flag, Cfg.Sda6Count)
+	fmt.Printf("INFO: Install = %v, BootSda1 = %v, BootSda6Cnt = %v\n",
+		Cfg.Install, Cfg.BootSda1, Cfg.BootSda6Cnt)
 
-	if !Cfg.InstallFlag && Cfg.Sda6Count == 0 && !Cfg.Sda1Flag {
-		fmt.Println("INFO: !InstallFlag, !Sda1Flag, Sda6Count==0 => run grub")
+	if !Cfg.Install && Cfg.BootSda6Cnt == 0 && !Cfg.BootSda1 {
+		fmt.Println("INFO: !Install, !BootSda1, BootSda6Cnt==0 => run grub")
 		return []string{""}
 	}
 
-	if Cfg.Sda1Flag {
+	if Cfg.BootSda1 {
 		if err := formString1(); err != nil {
 			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
 			return []string{""}
 		}
-		if err := clrSda1Flag(); err != nil {
-			fmt.Println("ERROR: could not clear Sda1Flag")
+		if err := clrBootSda1(); err != nil {
+			fmt.Println("ERROR: could not clear BootSda1")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.Sda1K,
 			"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 	}
 
-	if Cfg.InstallFlag {
+	if Cfg.Install {
 		if err := formString1(); err != nil {
 			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
 			return []string{""}
 		}
 		if err := clrInstall(); err != nil {
-			fmt.Println("ERROR: could not clear InstallFlag")
+			fmt.Println("ERROR: could not clear Install")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
 			Cfg.ReInstallI, "-c", kexec0, "-e"}
 	}
 
-	if Cfg.Sda6Count > 0 {
+	if Cfg.BootSda6Cnt > 0 {
 		if err := formString6(); err != nil {
 			fmt.Println("ERROR: couldn't form kexec6 string => run grub")
 			return []string{""}
 		}
-		if err := decSda6Count(); err != nil {
-			fmt.Println("ERROR: could not decrement Sda6Count")
+		if err := decBootSda6Cnt(); err != nil {
+			fmt.Println("ERROR: could not decrement BootSda6Cnt")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.Sda6K,
@@ -115,9 +115,10 @@ func serverAvail() bool {
 }
 
 func initCfg() error {
-	Cfg.InstallFlag = false
-	Cfg.Sda1Flag = false
-	Cfg.Sda6Count = 3
+	Cfg.Install = false
+	Cfg.BootSda1 = false
+	Cfg.BootSda6Cnt = 3
+	Cfg.EraseSda6 = false
 	Cfg.IAmMaster = false
 	Cfg.MyIpAddr = "192.168.101.129"
 	Cfg.MyGateway = "192.168.101.1"
@@ -233,7 +234,7 @@ func readUUID(partition string) (uuid string, err error) {
 	return uuid, nil
 }
 
-func setSda6Count(x string) error {
+func setBootSda6Cnt(x string) error {
 	if err := readCfg(); err != nil {
 		return err
 	}
@@ -241,7 +242,7 @@ func setSda6Count(x string) error {
 	if err != nil {
 		return err
 	}
-	Cfg.Sda6Count = i
+	Cfg.BootSda6Cnt = i
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -253,11 +254,11 @@ func setSda6Count(x string) error {
 	return nil
 }
 
-func clrSda6Count() error {
+func clrBootSda6Cnt() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	Cfg.Sda6Count = 0
+	Cfg.BootSda6Cnt = 0
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -269,15 +270,15 @@ func clrSda6Count() error {
 	return nil
 }
 
-func decSda6Count() error {
+func decBootSda6Cnt() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	x := Cfg.Sda6Count
+	x := Cfg.BootSda6Cnt
 	if x > 0 {
 		x--
 	}
-	Cfg.Sda6Count = x
+	Cfg.BootSda6Cnt = x
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -293,7 +294,9 @@ func setInstall() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	Cfg.InstallFlag = true
+	Cfg.BootSda1 = true
+	Cfg.EraseSda6 = true
+	Cfg.Install = true
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -309,7 +312,9 @@ func clrInstall() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	Cfg.InstallFlag = false
+	Cfg.BootSda1 = false
+	Cfg.EraseSda6 = false
+	Cfg.Install = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -321,11 +326,11 @@ func clrInstall() error {
 	return nil
 }
 
-func setSda1Flag() error {
+func setBootSda1() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	Cfg.Sda1Flag = true
+	Cfg.BootSda1 = true
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -337,11 +342,11 @@ func setSda1Flag() error {
 	return nil
 }
 
-func clrSda1Flag() error {
+func clrBootSda1() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	Cfg.Sda1Flag = false
+	Cfg.BootSda1 = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err

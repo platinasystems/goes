@@ -52,9 +52,10 @@ const (
 )
 
 type BootcConfig struct {
-	InstallFlag     bool
-	Sda1Flag        bool
-	Sda6Count       int
+	Install         bool
+	BootSda1        bool
+	BootSda6Cnt     int
+	EraseSda6       bool
 	IAmMaster       bool
 	MyIpAddr        string
 	MyGateway       string
