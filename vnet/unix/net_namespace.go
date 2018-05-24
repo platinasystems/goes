@@ -515,6 +515,14 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			fmt.Printf("add_del_interface(): newlink for %s in ns %s\n",
 				msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
 		}
+		// If this is a new link created after goes is up - ignore it
+		// since we don't handle dynamic port-provisioning (via ethtool) yet.
+		if _, found := vnet.Ports[msg.Attrs[netlink.IFLA_IFNAME].String()]; !found &&
+			msg.InterfaceKind() != netlink.InterfaceKindVlan {
+			fmt.Printf("add_del_interface(): Interface created dynamically - ignored %s\n",
+				msg.Attrs[netlink.IFLA_IFNAME].String())
+			return
+		}
 	case netlink.RTM_DELLINK:
 		is_del = true
 	default:

@@ -20,10 +20,8 @@ import (
 	"github.com/platinasystems/go/vnet/pg"
 	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/unix"
-	"gopkg.in/yaml.v2"
 
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -89,20 +87,6 @@ func make_vfs() [][]sriovs.Vf {
 	return [][]sriovs.Vf{pfs[0][:], pfs[1][:]}
 }
 
-func parsePortConfig(p *fe1_platform.Platform) (err error) {
-	filename := "/etc/goes/portprovision"
-	source, err := ioutil.ReadFile(filename)
-	// If no file PortConfig will be left empty and lower layers will default
-	if err == nil {
-		err = yaml.Unmarshal(source, &p.PortConfig)
-		if err != nil {
-			fmt.Println("yaml unmarshal failed", err)
-			panic(err)
-		}
-	}
-	return
-}
-
 func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 	if !p.KernelIxgbe {
 		fi, ferr := os.Stat("/sys/bus/pci/drivers/ixgbe")
@@ -110,9 +94,6 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 		fi, ferr = os.Stat("/sys/bus/pci/drivers/ixgbevf")
 		p.KernelIxgbevf = ferr == nil && fi.IsDir()
 	}
-
-	// Parse port provision file
-	parsePortConfig(p)
 
 	// Select packages we want to run with.
 	m4 := ip4.Init(v)

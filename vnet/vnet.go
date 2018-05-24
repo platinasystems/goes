@@ -15,6 +15,31 @@ import (
 
 var Xeth *xeth.Xeth
 
+type PortEntry struct {
+	Flags xeth.EthtoolFlagBits
+	Speed xeth.Mbps
+}
+
+var Ports map[string]*PortEntry
+
+func SetPort(ifname string) *PortEntry {
+	if Ports == nil {
+		Ports = make(map[string]*PortEntry)
+	}
+	entry, found := Ports[ifname]
+	if !found {
+		entry = new(PortEntry)
+		Ports[ifname] = entry
+	}
+	return entry
+}
+
+var (
+	PortIsCopper = func(ifname string) bool { return false }
+	PortIsFec74  = func(ifname string) bool { return false }
+	PortIsFec91  = func(ifname string) bool { return false }
+)
+
 type RxTx int
 
 const (

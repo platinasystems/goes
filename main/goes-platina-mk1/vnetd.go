@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -20,6 +21,8 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
+
+	"gopkg.in/yaml.v2"
 )
 
 var vnetdCounterSeparators *strings.Replacer
@@ -39,16 +42,8 @@ var vnetdLinkStatTranslation = map[string]string{
 	"port-tx-packets":               "tx-packets",
 }
 
-type PortProvisionEntry struct {
-	Flags xeth.EthtoolFlagBits
-	Speed xeth.Mbps
-}
-
-type PortProvision map[string]*PortProvisionEntry
-
 type mk1Main struct {
 	fe1.Platform
-	PortProvision
 }
 
 func vnetdInit() {
@@ -63,8 +58,25 @@ func vnetdInit() {
 	if err != nil {
 		panic(err)
 	}
+	vnet.PortIsCopper = func(ifname string) bool {
+		if p, found := vnet.Ports[ifname]; found {
+			return p.Flags.Test(CopperBit)
+		}
+		return false
+	}
+	vnet.PortIsFec74 = func(ifname string) bool {
+		if p, found := vnet.Ports[ifname]; found {
+			return p.Flags.Test(Fec74Bit)
+		}
+		return false
+	}
+	vnet.PortIsFec91 = func(ifname string) bool {
+		if p, found := vnet.Ports[ifname]; found {
+			return p.Flags.Test(Fec91Bit)
+		}
+		return false
+	}
 	p := new(mk1Main)
-	p.PortProvision = make(PortProvision)
 	vnet.Xeth.DumpIfinfo()
 	vnet.Xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
@@ -75,19 +87,17 @@ func vnetdInit() {
 		switch xeth.Op(hdr.Op) {
 		case xeth.XETH_ETHTOOL_FLAGS_OP:
 			msg := (*xeth.EthtoolFlagsMsg)(ptr)
-			p.PortProvisionEntry(msg.Ifname.String()).Flags =
-				msg.Flags
+			vnet.SetPort(msg.Ifname.String()).Flags = msg.Flags
 		case xeth.XETH_ETHTOOL_SETTINGS_OP:
 			msg := (*xeth.EthtoolSettingsMsg)(ptr)
-			p.PortProvisionEntry(msg.Ifname.String()).Speed =
-				msg.Settings.Speed
+			vnet.SetPort(msg.Ifname.String()).Speed = msg.Settings.Speed
 		default:
 			return fmt.Errorf("invalid op: %d", hdr.Op)
 		}
 		return nil
 	})
 	if true {
-		for ifname, entry := range p.PortProvision {
+		for ifname, entry := range vnet.Ports {
 			fmt.Print(ifname, ".flags: ", entry.Flags, "\n")
 			fmt.Print(ifname, ".speed: ", entry.Speed, "\n")
 		}
@@ -103,6 +113,61 @@ func vnetdInit() {
 	}
 	vnetdCounterSeparators =
 		strings.NewReplacer(" ", "-", ".", "-", "_", "-")
+}
+
+func (p *mk1Main) parsePortConfig() (err error) {
+	plat := &p.Platform
+	if false { // /etc/goes/portprovision
+		filename := "/etc/goes/portprovision"
+		source, err := ioutil.ReadFile(filename)
+		// If no file PortConfig will be left empty and lower layers will default
+		if err == nil {
+			err = yaml.Unmarshal(source, &plat.PortConfig)
+			if err != nil {
+				fmt.Println("yaml unmarshal failed", err)
+				panic(err)
+			}
+			for _, p := range plat.PortConfig.Ports {
+				fmt.Printf("Provision: %s speed %s lanes %d count %d\n", p.Name, p.Speed, p.Lanes, p.Count)
+			}
+		}
+	} else { // ethtool
+		// Massage ethtool port-provision format into fe1 format
+		var pp fe1.PortProvision
+		var port, subport uint
+		for ifname, entry := range vnet.Ports {
+			pp.Name = ifname
+			fmt.Sscanf(ifname, "eth-%d-%d", &port, &subport)
+			pp.Speed = fmt.Sprintf("%dg", entry.Speed/1000)
+			// Need some more help here from ethtool to disambiguate
+			// 40G 2-lane and 40G 4-lane
+			// 20G 2-lane and 20G 1-lane
+			// others?
+			if false {
+				fmt.Printf("From ethtool: entry %v speed %v port %d subport %d\n",
+					entry, entry.Speed, port, subport)
+			}
+			pp.Count = 1
+			switch entry.Speed {
+			case 100000, 40000:
+				pp.Lanes = 4
+			case 50000:
+				pp.Lanes = 2
+			case 25000, 20000, 10000, 1000:
+				pp.Lanes = 1
+			case 0: // need to calculate autoneg defaults
+				if false {
+					pp.Lanes = 1
+				}
+				pp.Lanes = p.getDefaultLanes(port, subport)
+			}
+			if false {
+				fmt.Printf("PortConfig %s: %v\n", ifname, pp)
+			}
+			plat.PortConfig.Ports = append(plat.PortConfig.Ports, pp)
+		}
+	}
+	return
 }
 
 func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
@@ -138,6 +203,9 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	// Default to using MSI versus INTX for switch chip.
 	p.EnableMsiInterrupt = true
 
+	// Get initial config from platina-mk1
+	p.parsePortConfig()
+
 	if err = mk1.PlatformInit(v, &p.Platform); err != nil {
 		return err
 	}
@@ -172,27 +240,68 @@ func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 	}
 }
 
-func (p PortProvision) PortProvisionEntry(ifname string) *PortProvisionEntry {
-	entry, found := p[ifname]
-	if !found {
-		entry = new(PortProvisionEntry)
-		p[ifname] = entry
+func (p *mk1Main) getDefaultLanes(port, subport uint) (lanes uint) {
+	lanes = 1
+
+	// Two cases covered:
+	// * 4-lane
+	//         if first subport of port and only subport in set number of lanes should be 4
+	// * 2-lane
+	//         if first and third subports of port are present then number of lanes should be 2
+	//         Unfortunately, 2-lane autoneg doesn't work for TH but leave this code here
+	//         for possible future chipsets.
+	//
+	if p.Version == 0 { // alpha
+		numSubPorts, subportList := subportsmatchingPort(port)
+		if subport == 0 && numSubPorts == 1 {
+			lanes = 4
+		} else {
+			if subport == 0 && numSubPorts == 2 && subportList.contains(2) {
+				lanes = 2
+			}
+			if subport == 2 && numSubPorts == 2 && subportList.contains(0) {
+				lanes = 2
+			}
+			lanes = 1 // override to have some function
+		}
+	} else { // beta/production
+		numSubPorts, subportList := subportsmatchingPort(port)
+
+		if subport == 1 && numSubPorts == 1 {
+			lanes = 4
+		} else {
+			if subport == 1 && numSubPorts == 2 && subportList.contains(3) {
+				lanes = 2
+			}
+			if subport == 3 && numSubPorts == 2 && subportList.contains(1) {
+				lanes = 2
+			}
+			lanes = 1 // override to have some function
+		}
 	}
-	return entry
+	return
 }
 
-func (p PortProvision) PortProvisionMbps(ifname string) uint32 {
-	return uint32(p.PortProvisionEntry(ifname).Speed)
+type spList []uint
+
+func subportsmatchingPort(targetport uint) (numsubports uint, subportlist spList) {
+	var port, subport uint
+	subportlist = []uint{0xf, 0xf, 0xf, 0xf}
+	for ifname, _ := range vnet.Ports {
+		fmt.Sscanf(ifname, "eth-%d-%d", &port, &subport)
+		if port == targetport {
+			subportlist[numsubports] = subport
+			numsubports++
+		}
+	}
+	return
 }
 
-func (p PortProvision) PortProvisionCopper(ifname string) bool {
-	return p.PortProvisionEntry(ifname).Flags.Test(CopperBit)
-}
-
-func (p PortProvision) PortProvisionFec74(ifname string) bool {
-	return p.PortProvisionEntry(ifname).Flags.Test(Fec74Bit)
-}
-
-func (p PortProvision) PortProvisionFec91(ifname string) bool {
-	return p.PortProvisionEntry(ifname).Flags.Test(Fec91Bit)
+func (subportlist spList) contains(targetsubport uint) bool {
+	for _, subport := range subportlist {
+		if subport == targetsubport {
+			return true
+		}
+	}
+	return false
 }

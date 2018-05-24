@@ -196,7 +196,10 @@ func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err erro
 		} else {
 			flag = xeth.XETH_CARRIER_OFF
 		}
-		vnet.Xeth.Carrier(hi.Name(v), flag)
+		// Make sure interface is known to platina-mk1 driver
+		if _, found := vnet.Ports[hi.Name(v)]; found {
+			vnet.Xeth.Carrier(hi.Name(v), flag)
+		}
 		i.publish_link(hi, isUp)
 	}
 	return
@@ -387,7 +390,11 @@ func (p *ifStatsPoller) EventAction() {
 	pubcount := func(ifname, counter string, value uint64) {
 		counter = Counter(counter)
 		if value != 0 && strings.HasPrefix(ifname, "eth-") {
-			vnet.Xeth.SetStat(ifname, counter, value)
+			// Only give stats for ports that are known
+			if _, found := vnet.Ports[ifname]; found {
+				vnet.Xeth.SetStat(ifname, counter, value)
+			}
+
 		}
 		p.publish(ifname, counter, value)
 	}

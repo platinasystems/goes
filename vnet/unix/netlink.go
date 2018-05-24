@@ -164,7 +164,9 @@ func (ns *net_namespace) route_msg_for_vnet_interface(v *netlink.RouteMessage) (
 	if a := v.Attrs[netlink.RTA_OIF]; a != nil {
 		intf, ok = ns.interface_by_index[a.(netlink.Uint32Attr).Uint()]
 		if !ok {
-			ns.m.m.v.Logf("%s: route_msg_for_vnet_interface unknown interface: %v\n", ns, v)
+			if false {
+				ns.m.m.v.Logf("%s: route_msg_for_vnet_interface unknown interface: %v\n", ns, v)
+			}
 			return
 		}
 		ok = ns.knownInterface(intf.ifindex)
@@ -756,13 +758,15 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 				return
 			}
 		} else {
-			// Record interface routes.  For now, don't install in vnet FIB.
-			if intf.si == e.ns.vnet_tun_interface.si {
-				tt := e.ns.vnet_tun_interface
-				if isDel {
-					tt.interface_routes.Unset(&p)
-				} else {
-					tt.interface_routes.Set(&p, ip.AdjPunt)
+			if false { // tuntap only - causes goes-test crash of vnet
+				// Record interface routes.  For now, don't install in vnet FIB.
+				if intf.si == e.ns.vnet_tun_interface.si {
+					tt := e.ns.vnet_tun_interface
+					if isDel {
+						tt.interface_routes.Unset(&p)
+					} else {
+						tt.interface_routes.Set(&p, ip.AdjPunt)
+					}
 				}
 			}
 		}
