@@ -91,8 +91,6 @@ func vnetdInit() {
 		case xeth.XETH_ETHTOOL_SETTINGS_OP:
 			msg := (*xeth.EthtoolSettingsMsg)(ptr)
 			vnet.SetPort(msg.Ifname.String()).Speed = msg.Settings.Speed
-		default:
-			return fmt.Errorf("invalid op: %d", hdr.Op)
 		}
 		return nil
 	})
