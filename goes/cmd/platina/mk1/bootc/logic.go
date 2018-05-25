@@ -500,7 +500,7 @@ func wipe() error {
 	}
 
 	fmt.Println("Please wait...reinstalling debian on sda6")
-	if err = setInstall(); err != nil {
+	if err := setInstall(); err != nil {
 		return err
 	}
 	cmd := exec.Command("/tmp/EEOF")
