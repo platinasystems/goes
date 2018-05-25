@@ -83,6 +83,7 @@ func Bootc() []string {
 			fmt.Println("ERROR: could not decrement BootSda6Cnt")
 			return []string{""}
 		}
+		//FIXME Add copy of file from sda1 to sda6
 		return []string{"kexec", "-k", Cfg.Sda6K,
 			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 	}
@@ -126,15 +127,20 @@ func initCfg() error {
 	Cfg.MasterAddresses = []string{"198.168.101.142"}
 	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz"
 	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.gz"
-	Cfg.ReInstallC = `netcfg/get_hostname=platina
-	netcfg/get_domain=platinasystems.com interface=auto auto
-	locale=en_US preseed/file=/hd-media/preseed.cfg`
+	Cfg.ReInstallC = `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`
 	Cfg.Sda1K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.Sda1I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
 	Cfg.Sda1C = "::eth0:none"
 	Cfg.Sda6K = "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64"
 	Cfg.Sda6I = "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64"
 	Cfg.Sda6C = "::eth0:none"
+	Cfg.InitScript = false
+	Cfg.InitScriptName = "sda6-init.sh"
+	Cfg.ISO1Name = "debian-8.10.0-amd64-DVD-1.iso"
+	Cfg.ISO1Desc = "Jessie debian-8.10.0"
+	Cfg.ISO2Name = ""
+	Cfg.ISO2Desc = ""
+	Cfg.ISOlastUsed = 1
 	err := writeCfg()
 	if err != nil {
 		return err
@@ -145,10 +151,10 @@ func initCfg() error {
 func setCfgPath() error {
 	context := machine.Name
 	if context == "platina-mk1" {
-		//if mk1, then df | grep sda FIXME
-		//context = "sda1"
+		//FIXME if mk1, then df | grep sda then context "sda1"
 		context = "sda6"
 	}
+	fmt.Printf("context = %s\n", context)
 	switch context {
 	case "coreboot":
 		BootcCfgFile = CorebootCfg
@@ -156,8 +162,8 @@ func setCfgPath() error {
 		BootcCfgFile = Sda1Cfg
 	case "sda6":
 		BootcCfgFile = Sda6Cfg
-		//mkdir /mnt FIXME
-		//mount /dev/sda1 /mnt
+		//FIXME mkdir /mnt
+		//FIXME mount /dev/sda1 /mnt
 	default:
 		return fmt.Errorf("ERROR: unknown machine could not form path")
 	}
@@ -296,8 +302,6 @@ func setInstall() error {
 	if err := readCfg(); err != nil {
 		return err
 	}
-	Cfg.BootSda1 = true
-	Cfg.EraseSda6 = true
 	Cfg.Install = true
 	Cfg.BootSda6Cnt = 3
 	jsonInfo, err := json.Marshal(Cfg)
@@ -438,6 +442,75 @@ func setInitrd(x string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func setInitScriptName(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.InitScriptName = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setInitScript() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.InitScript = true
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func clrInitScript() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.InitScript = false
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func wipe() error {
+	d1 := []byte(`#!/bin/bash\necho -e "d\n6\nw\n" | /sbin/fdisk /dev/sda\n`)
+	if err := ioutil.WriteFile("/tmp/EEOF", d1, 0655); err != nil {
+		return err
+	}
+
+	fmt.Println("Please wait...reinstalling debian on sda6")
+	if err = setInstall(); err != nil {
+		return err
+	}
+	cmd := exec.Command("/tmp/EEOF")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("cmd.Run() failed with %s\n", err)
+	} else {
+		fmt.Printf("combined out:\n%s\n", string(out))
+	}
+	reboot()
 	return nil
 }
 

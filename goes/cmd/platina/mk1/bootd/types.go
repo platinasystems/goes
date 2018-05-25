@@ -70,6 +70,13 @@ type BootcConfig struct {
 	Sda6K           string
 	Sda6I           string
 	Sda6C           string
+	InitScript      bool
+	InitScriptName  string
+	ISO1Name        string
+	ISO1Desc        string
+	ISO2Name        string
+	ISO2Desc        string
+	ISOlastUsed     int
 }
 
 type Client struct {
