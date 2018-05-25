@@ -97,7 +97,7 @@ func (c *Command) Main(args ...string) error {
 			err = cl.Call(method, pid, &empty)
 		}
 	default:
-		err = fmt.Errorf("%s: unknowm", args[0])
+		err = fmt.Errorf("%s: unknown", args[0])
 	}
 	return err
 }
