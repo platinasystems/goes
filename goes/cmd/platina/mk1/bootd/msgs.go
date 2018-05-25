@@ -144,12 +144,23 @@ func numclients() (s string, err error) {
 }
 
 func clientdata(j int) (s string, err error) {
-	if j == 0 {
-		j = 2
-	}
 	for i, _ := range ClientCfg {
 		if ClientCfg[i].Unit == j {
 			jsonInfo, err := json.Marshal(ClientCfg[i])
+			if err != nil {
+				return "", err
+			}
+			return string(jsonInfo), nil
+		}
+	}
+	err = fmt.Errorf("client number not found: %v", err)
+	return "", nil
+}
+
+func clientbootdata(j int) (s string, err error) {
+	for i, _ := range ClientBootCfg {
+		if ClientCfg[i].Unit == j {
+			jsonInfo, err := json.Marshal(ClientBootCfg[i])
 			if err != nil {
 				return "", err
 			}
@@ -218,6 +229,87 @@ func readClientCfgDB() (err error) {
 		TimeRegistered: "0000-00-00:00:00:00",
 		TimeInstalled:  "0000-00-00:00:00:00",
 		InstallCounter: 0,
+	}
+	ClientBootCfg["01:02:03:04:05:06"] = &BootcConfig{
+		Install:         false,
+		BootSda1:        false,
+		BootSda6Cnt:     3,
+		EraseSda6:       false,
+		IAmMaster:       false,
+		MyIpAddr:        "192.168.101.129",
+		MyGateway:       "192.168.101.1",
+		MyNetmask:       "255.255.255.0",
+		MasterAddresses: []string{"198.168.101.142"},
+		ReInstallK:      "/newroot/sda1/boot/vmlinuz",
+		ReInstallI:      "/newroot/sda1/boot/initrd.gz",
+		ReInstallC:      `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`,
+		Sda1K:           "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64",
+		Sda1I:           "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64",
+		Sda1C:           "::eth0:none",
+		Sda6K:           "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64",
+		Sda6I:           "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64",
+		Sda6C:           "::eth0:none",
+		InitScript:      false,
+		InitScriptName:  "sda6-init.sh",
+		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
+		ISO1Desc:        "Jessie debian-8.10.0",
+		ISO2Name:        " ",
+		ISO2Desc:        " ",
+		ISOlastUsed:     1,
+	}
+	ClientBootCfg["01:02:03:04:05:07"] = &BootcConfig{
+		Install:         false,
+		BootSda1:        false,
+		BootSda6Cnt:     3,
+		EraseSda6:       false,
+		IAmMaster:       false,
+		MyIpAddr:        "192.168.101.130",
+		MyGateway:       "192.168.101.1",
+		MyNetmask:       "255.255.255.0",
+		MasterAddresses: []string{"198.168.101.142"},
+		ReInstallK:      "/newroot/sda1/boot/vmlinuz",
+		ReInstallI:      "/newroot/sda1/boot/initrd.gz",
+		ReInstallC:      `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`,
+		Sda1K:           "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64",
+		Sda1I:           "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64",
+		Sda1C:           "::eth0:none",
+		Sda6K:           "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64",
+		Sda6I:           "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64",
+		Sda6C:           "::eth0:none",
+		InitScript:      false,
+		InitScriptName:  "sda6-init.sh",
+		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
+		ISO1Desc:        "Jessie debian-8.10.0",
+		ISO2Name:        "",
+		ISO2Desc:        "",
+		ISOlastUsed:     1,
+	}
+	ClientBootCfg["01:02:03:04:05:07"] = &BootcConfig{
+		Install:         false,
+		BootSda1:        false,
+		BootSda6Cnt:     3,
+		EraseSda6:       false,
+		IAmMaster:       false,
+		MyIpAddr:        "192.168.101.131",
+		MyGateway:       "192.168.101.1",
+		MyNetmask:       "255.255.255.0",
+		MasterAddresses: []string{"198.168.101.142"},
+		ReInstallK:      "/newroot/sda1/boot/vmlinuz",
+		ReInstallI:      "/newroot/sda1/boot/initrd.gz",
+		ReInstallC:      `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`,
+		Sda1K:           "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64",
+		Sda1I:           "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64",
+		Sda1C:           "::eth0:none",
+		Sda6K:           "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64",
+		Sda6I:           "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64",
+		Sda6C:           "::eth0:none",
+		InitScript:      false,
+		InitScriptName:  "sda6-init.sh",
+		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
+		ISO1Desc:        "Jessie debian-8.10.0",
+		ISO2Name:        "",
+		ISO2Desc:        "",
+		ISOlastUsed:     1,
 	}
 	return nil
 }

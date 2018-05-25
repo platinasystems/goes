@@ -47,6 +47,7 @@ func (c Command) Main(...string) error {
 
 func startHandler() (err error) {
 	ClientCfg = make(map[string]*Client)
+	ClientBootCfg = make(map[string]*BootcConfig)
 	if err = readClientCfgDB(); err != nil {
 		return
 	}
@@ -90,7 +91,7 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		if b, err = numclients(); err != nil {
 			b = "error getting number of clients\n"
 		}
-	case Clientdata:
+	case ClientData:
 		if len(u) < 2 {
 			b = "error client number missing\n"
 			return
@@ -98,6 +99,15 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		i, _ := strconv.Atoi(u[1])
 		if b, err = clientdata(i); err != nil {
 			b = "error getting client data\n"
+		}
+	case ClientBootData:
+		if len(u) < 2 {
+			b = "error client number missing\n"
+			return
+		}
+		i, _ := strconv.Atoi(u[1])
+		if b, err = clientbootdata(i); err != nil {
+			b = "error getting client boot data\n"
 		}
 	default:
 		b = "404\n"

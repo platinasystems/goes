@@ -5,14 +5,15 @@
 package bootd
 
 const (
-	Register   = "register"
-	NumClients = "getnumclients"
-	Clientdata = "getclientdata"
-	Script     = "getscript"
-	Binary     = "getbinary"
-	DumpVars   = "dumpvars"
-	Dashboard  = "dashboard"
-	Dashboard2 = "dashboard2"
+	Register       = "register"
+	NumClients     = "getnumclients"
+	ClientData     = "getclientdata"
+	ClientBootData = "getclientbootdata"
+	Script         = "getscript"
+	Binary         = "getbinary"
+	DumpVars       = "dumpvars"
+	Dashboard      = "dashboard"
+	Dashboard2     = "dashboard2"
 )
 const (
 	BootStateNotRegistered = iota
@@ -142,6 +143,7 @@ type BootReply struct {
 }
 
 var ClientCfg map[string]*Client
+var ClientBootCfg map[string]*BootcConfig
 var regReq RegReq
 var regReply RegReply
 

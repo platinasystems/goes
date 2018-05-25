@@ -37,7 +37,8 @@ func (Command) Usage() string {
 	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
 	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
-	[setkernel] [setinitrd] [setinitscript] [clrinitscript] [initscriptname]`
+	[setkernel] [setinitrd] [setinitscript] [clrinitscript]
+	[initscriptname] [getclientbootdata]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -90,6 +91,10 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "getclientdata":
 		if err = getclientdata(mip, 3); err != nil {
+			return err
+		}
+	case "getclientbootdata":
+		if err = getclientbootdata(mip, 3); err != nil {
 			return err
 		}
 	case "getscript":
