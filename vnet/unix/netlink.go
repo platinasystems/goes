@@ -612,14 +612,16 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		return
 	}
 	isDel := v.Header.Type == netlink.RTM_DELNEIGH
-	switch v.State {
-	case netlink.NUD_NOARP, netlink.NUD_NONE:
-		// ignore these
-		return
-	case netlink.NUD_FAILED:
-		//do not delete neighbor on FAIL; matches Linux behavior
-		//isDel = true
-		return
+	if !isDel {
+		switch v.State {
+		case netlink.NUD_NOARP, netlink.NUD_NONE:
+			// ignore these
+			return
+		case netlink.NUD_FAILED:
+			//do not delete neighbor on FAIL; matches Linux behavior
+			//isDel = true
+			return
+		}
 	}
 	si, _, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
