@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
@@ -203,7 +204,12 @@ func (daemons *Daemons) Stop(pid int, reply *struct{}) error {
 	if p, found := daemons.cmdsByPid[pid]; !found {
 		err = fmt.Errorf("%d: not found", pid)
 	} else {
+		err = p.Process.Signal(syscall.SIGTERM)
+		time.Sleep(1 * time.Second)
 		err = p.Process.Kill()
+		if err.Error() == "os: process already finished" {
+			err = nil
+		}
 	}
 	return err
 }
@@ -217,7 +223,15 @@ func (daemons *Daemons) Restart(pid int, reply *struct{}) error {
 		err = fmt.Errorf("%d: not found", pid)
 	} else {
 		args := p.Args
-		if err = p.Process.Kill(); err == nil {
+		err = p.Process.Signal(syscall.SIGTERM)
+		time.Sleep(1 * time.Second)
+		err = p.Process.Kill()
+		if err.Error() == "os: process already finished" {
+			err = nil
+		}
+		if err == nil {
+			fmt.Fprintf(os.Stderr, "Calling daemons.start: %v\n",
+				args)
 			daemons.start(args...)
 		}
 	}
