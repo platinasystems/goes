@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 	"github.com/platinasystems/go/internal/machine"
@@ -21,6 +22,10 @@ const (
 	CorebootCfg = "/newroot/sda1/bootc.cfg"
 	Sda1Cfg     = "/bootc.cfg"
 	Sda6Cfg     = "/mnt/bootc.cfg"
+	Mount       = "/mnt"
+	Sda1        = "/mnt/sda1"
+	Fstype      = "ext4"
+	Zero        = uintptr(0)
 )
 
 var BootcCfgFile string
@@ -83,7 +88,9 @@ func Bootc() []string {
 			fmt.Println("ERROR: could not decrement BootSda6Cnt")
 			return []string{""}
 		}
-		//FIXME Add copy of file from sda1 to sda6
+
+		// FIXME copy script, goes, modify rclocal, script does "goes upgrade -k, -g"
+
 		return []string{"kexec", "-k", Cfg.Sda6K,
 			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 	}
@@ -151,10 +158,11 @@ func initCfg() error {
 func setCfgPath() error {
 	context := machine.Name
 	if context == "platina-mk1" {
-		//FIXME if mk1, then df | grep sda then context "sda1"
+		//FIXME sda1 or sda6?
 		context = "sda6"
 	}
 	fmt.Printf("context = %s\n", context)
+
 	switch context {
 	case "coreboot":
 		BootcCfgFile = CorebootCfg
@@ -162,8 +170,16 @@ func setCfgPath() error {
 		BootcCfgFile = Sda1Cfg
 	case "sda6":
 		BootcCfgFile = Sda6Cfg
-		//FIXME mkdir /mnt
-		//FIXME mount /dev/sda1 /mnt
+		if _, err := os.Stat(Mount); os.IsNotExist(err) {
+			err := os.Mkdir(Mount, os.FileMode(0755))
+			if err != nil {
+				fmt.Printf("Error mkdir: %v", err)
+				return err
+			}
+		}
+		if err := syscall.Mount(Sda1, Mount, Fstype, Zero, ""); err != nil {
+			fmt.Printf("Error mounting: %v", err)
+		}
 	default:
 		return fmt.Errorf("ERROR: unknown machine could not form path")
 	}
