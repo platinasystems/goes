@@ -22,78 +22,85 @@
  */
 package xeth
 
-import "fmt"
+import (
+	"fmt"
+	"net"
+	"unsafe"
+)
 
-type Err string
-
-func (err Err) Error() string  { return string(err) }
-func (err Err) String() string { return string(err) }
-
-func (hdr *Hdr) IsHdr() bool {
-	return hdr.Z64 == 0 && hdr.Z32 == 0 && hdr.Z16 == 0 && hdr.Z8 == 0
-}
-
-type BreakMsg struct {
-	Hdr
-}
-
-type StatMsg struct {
-	Hdr    Hdr
-	Ifname Ifname
-	Stat   Stat
-}
-
-func (msg *StatMsg) String() string {
-	var stat fmt.Stringer
-	op := Op(msg.Hdr.Op)
-	switch op {
-	case XETH_LINK_STAT_OP:
-		stat = LinkStat(msg.Stat.Index)
-	case XETH_ETHTOOL_STAT_OP:
-		stat = EthtoolStat(msg.Stat.Index)
-	default:
-		stat = Err("unknown")
+func IsMsg(b []byte) bool {
+	if len(b) < SizeofMsg {
+		return false
 	}
-	return fmt.Sprint(op, ": ", msg.Ifname, ": ", stat, ": ",
-		msg.Stat.Count)
+	msg := (*Msg)(unsafe.Pointer(&b[0]))
+	return msg.Z64 == 0 && msg.Z32 == 0 && msg.Z16 == 0 && msg.Z8 == 0
 }
 
-type EthtoolFlagsMsg struct {
-	Hdr    Hdr
-	Ifname Ifname
-	Flags  EthtoolFlagBits
+func (msg *MsgStat) String() string {
+	var stat string
+	kind := Kind(msg.Kind)
+	switch kind {
+	case XETH_MSG_KIND_LINK_STAT:
+		stat = LinkStat(msg.Index).String()
+	case XETH_MSG_KIND_ETHTOOL_STAT:
+		stat = EthtoolStat(msg.Index).String()
+	default:
+		stat = "unknown"
+	}
+	return fmt.Sprint(kind, " ", (*Ifname)(&msg.Ifname), " ", stat, " ",
+		msg.Count)
 }
 
-func (msg *EthtoolFlagsMsg) String() string {
-	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ": ", msg.Flags)
+func (msg *MsgEthtoolFlags) String() string {
+	return fmt.Sprint(Kind(msg.Kind), " ", (*Ifname)(&msg.Ifname), " ",
+		EthtoolFlagBits(msg.Flags))
 }
 
-type EthtoolSettingsMsg struct {
-	Hdr      Hdr
-	Ifname   Ifname
-	Settings EthtoolSettings
+func (msg *MsgEthtoolSettings) String() string {
+	return fmt.Sprint(Kind(msg.Kind), " ", (*Ifname)(&msg.Ifname),
+		"\n\tspeed: ", Mbps(msg.Speed),
+		"\n\tduplex: ", Duplex(msg.Duplex),
+		"\n\tport: ", Port(msg.Port),
+		"\n\tautoneg: ", Autoneg(msg.Autoneg),
+		"\n\tsupported:",
+		(*EthtoolLinkModeBits)(&msg.Link_modes_supported),
+		"\n\tadvertising:",
+		(*EthtoolLinkModeBits)(&msg.Link_modes_advertising),
+		"\n\tpartner:",
+		(*EthtoolLinkModeBits)(&msg.Link_modes_lp_advertising),
+	)
 }
 
-func (msg *EthtoolSettingsMsg) String() string {
-	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", &msg.Settings)
+func (msg *MsgCarrier) String() string {
+	return fmt.Sprint(Kind(msg.Kind), " ", (*Ifname)(&msg.Ifname), " ",
+		CarrierFlag(msg.Flag))
 }
 
-type CarrierMsg struct {
-	Hdr    Hdr
-	Ifname Ifname
-	Flag   CarrierFlag
+func (msg *MsgSpeed) String() string {
+	return fmt.Sprint(Kind(msg.Kind), " ", (*Ifname)(&msg.Ifname), " ",
+		Mbps(msg.Mbps))
 }
 
-func (msg *CarrierMsg) String() string {
-	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", msg.Flag)
+func (msg *MsgIfindex) String() string {
+	return fmt.Sprint(Kind(msg.Kind),
+		" ", (*Ifname)(&msg.Ifname),
+		"\n\tindex: ", msg.Ifindex,
+		"\n\tnet: ", fmt.Sprintf("%#x", msg.Net),
+	)
 }
 
-type SpeedMsg struct {
-	Hdr    Hdr
-	Ifname Ifname
-	Speed  Mbps
+func (msg *MsgIfa) String() string {
+	return fmt.Sprint(Kind(msg.Kind), " ", (*Ifname)(&msg.Ifname), " ",
+		AddressEvent(msg.Event), " ", msg.IPNet())
 }
 
-func (msg *SpeedMsg) String() string {
-	return fmt.Sprint(Op(msg.Hdr.Op), ": ", &msg.Ifname, ":", msg.Speed)
+func (msg *MsgIfa) IsAdd() bool { return Event(msg.Event) == NETDEV_UP }
+func (msg *MsgIfa) IsDel() bool { return Event(msg.Event) == NETDEV_DOWN }
+
+func (msg *MsgIfa) IPNet() *net.IPNet {
+	ipBuf := make([]byte, 4)
+	maskBuf := make([]byte, 4)
+	*(*uint32)(unsafe.Pointer(&ipBuf[0])) = msg.Address
+	*(*uint32)(unsafe.Pointer(&maskBuf[0])) = msg.Mask
+	return &net.IPNet{net.IP(ipBuf), net.IPMask(maskBuf)}
 }

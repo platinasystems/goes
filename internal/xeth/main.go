@@ -29,6 +29,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"unsafe"
 )
 
@@ -48,7 +49,7 @@ DB	{ ifinfo | fdb }
 DEVICE	an interface name or its ifindex
 STAT	an 'ip link' or 'ethtool' statistic
 FILE,-	receive an exception frame from FILE or STDIN`)
-	xeth, err := New(name, DialOpt(false))
+	xeth, err := New(strings.TrimPrefix(name, "sample-"), DialOpt(false))
 	defer func() {
 		r := recover()
 		if err := xeth.Close(); r == nil {
@@ -160,22 +161,23 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 }
 
 func dump(buf []byte) error {
-	var stringer fmt.Stringer
-	ptr := unsafe.Pointer(&buf[0])
-	hdr := (*Hdr)(ptr)
-	if !hdr.IsHdr() {
+	if !IsMsg(buf) {
 		return fmt.Errorf("invalid xeth msg: %#x", buf)
 	}
-	switch Op(hdr.Op) {
-	case XETH_LINK_STAT_OP, XETH_ETHTOOL_STAT_OP:
-		stringer = (*StatMsg)(ptr)
-	case XETH_ETHTOOL_FLAGS_OP:
-		stringer = (*EthtoolFlagsMsg)(ptr)
-	case XETH_ETHTOOL_SETTINGS_OP:
-		stringer = (*EthtoolSettingsMsg)(ptr)
+	ptr := unsafe.Pointer(&buf[0])
+	switch kind := Kind((*Msg)(ptr).Kind); kind {
+	case XETH_MSG_KIND_LINK_STAT, XETH_MSG_KIND_ETHTOOL_STAT:
+		fmt.Println((*MsgStat)(ptr))
+	case XETH_MSG_KIND_ETHTOOL_FLAGS:
+		fmt.Println((*MsgEthtoolFlags)(ptr))
+	case XETH_MSG_KIND_ETHTOOL_SETTINGS:
+		fmt.Println((*MsgEthtoolSettings)(ptr))
+	case XETH_MSG_KIND_IFINDEX:
+		fmt.Println((*MsgIfindex)(ptr))
+	case XETH_MSG_KIND_IFA:
+		fmt.Println((*MsgIfa)(ptr))
 	default:
-		return fmt.Errorf("invalid op: %d", hdr.Op)
+		fmt.Println("unexpected:", kind)
 	}
-	fmt.Println(stringer)
 	return nil
 }

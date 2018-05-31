@@ -25,7 +25,6 @@
 package xeth
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -127,18 +126,18 @@ func (xeth *Xeth) Close() error {
 }
 
 func (xeth *Xeth) Carrier(ifname string, flag CarrierFlag) {
-	buf := Pool.Get(SizeofStatMsg)
-	msg := (*CarrierMsg)(unsafe.Pointer(&buf[0]))
-	msg.Hdr.Op = uint8(XETH_CARRIER_OP)
+	buf := Pool.Get(SizeofMsgStat)
+	msg := (*MsgCarrier)(unsafe.Pointer(&buf[0]))
+	msg.Kind = uint8(XETH_MSG_KIND_CARRIER)
 	copy(msg.Ifname[:], ifname)
-	msg.Flag = flag
+	msg.Flag = uint8(flag)
 	xeth.TxCh <- buf
 }
 
 func (xeth *Xeth) DumpIfinfo() {
-	buf := Pool.Get(SizeofBreakMsg)
-	msg := (*BreakMsg)(unsafe.Pointer(&buf[0]))
-	msg.Hdr.Op = uint8(XETH_DUMP_IFINFO_OP)
+	buf := Pool.Get(SizeofMsgBreak)
+	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
+	msg.Kind = uint8(XETH_MSG_KIND_DUMP_IFINFO)
 	xeth.TxCh <- buf
 }
 
@@ -151,40 +150,44 @@ func (xeth *Xeth) ExceptionFrame(buf []byte) error {
 
 func (xeth *Xeth) SetStat(ifname, stat string, count uint64) error {
 	var statindex uint64
-	var op uint8
+	var kind uint8
 	if linkstat, found := LinkStatOf(stat); found {
-		op = uint8(XETH_LINK_STAT_OP)
+		kind = uint8(XETH_MSG_KIND_LINK_STAT)
 		statindex = uint64(linkstat)
 	} else if ethtoolstat, found := EthtoolStatOf(stat); found {
-		op = uint8(XETH_ETHTOOL_STAT_OP)
+		kind = uint8(XETH_MSG_KIND_ETHTOOL_STAT)
 		statindex = uint64(ethtoolstat)
 	} else {
 		return fmt.Errorf("%q unknown", stat)
 	}
-	buf := Pool.Get(SizeofStatMsg)
-	msg := (*StatMsg)(unsafe.Pointer(&buf[0]))
-	msg.Hdr.Op = op
+	buf := Pool.Get(SizeofMsgStat)
+	msg := (*MsgStat)(unsafe.Pointer(&buf[0]))
+	msg.Kind = kind
 	copy(msg.Ifname[:], ifname)
-	msg.Stat.Index = statindex
-	msg.Stat.Count = count
+	msg.Index = statindex
+	msg.Count = count
 	xeth.TxCh <- buf
 	return nil
 }
 
 func (xeth *Xeth) Speed(ifname string, count uint64) error {
-	buf := Pool.Get(SizeofStatMsg)
-	msg := (*SpeedMsg)(unsafe.Pointer(&buf[0]))
-	msg.Hdr.Op = uint8(XETH_SPEED_OP)
+	buf := Pool.Get(SizeofMsgSpeed)
+	msg := (*MsgSpeed)(unsafe.Pointer(&buf[0]))
+	msg.Kind = uint8(XETH_MSG_KIND_SPEED)
 	copy(msg.Ifname[:], ifname)
-	msg.Speed = Mbps(count)
+	msg.Mbps = uint32(count)
 	xeth.TxCh <- buf
 	return nil
 }
 
 func (xeth *Xeth) UntilBreak(f func([]byte) error) error {
-	breakhdr := make([]byte, SizeofMsgHdr)
 	for buf := range xeth.RxCh {
-		if bytes.Compare(buf, breakhdr) == 0 {
+		if !IsMsg(buf) {
+			Pool.Put(buf)
+			continue
+		}
+		msg := (*Msg)(unsafe.Pointer(&buf[0]))
+		if msg.Kind == uint8(XETH_MSG_KIND_BREAK) {
 			Pool.Put(buf)
 			break
 		}

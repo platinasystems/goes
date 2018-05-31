@@ -16,8 +16,10 @@ import (
 var Xeth *xeth.Xeth
 
 type PortEntry struct {
-	Flags xeth.EthtoolFlagBits
-	Speed xeth.Mbps
+	Ifindex uint64
+	Net     uint64
+	Flags   xeth.EthtoolFlagBits
+	Speed   xeth.Mbps
 }
 
 var Ports map[string]*PortEntry

@@ -80,17 +80,26 @@ func vnetdInit() {
 	vnet.Xeth.DumpIfinfo()
 	vnet.Xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
-		hdr := (*xeth.Hdr)(ptr)
-		if !hdr.IsHdr() {
+		if !xeth.IsMsg(buf) {
 			return fmt.Errorf("invalid xeth msg: %#x", buf)
 		}
-		switch xeth.Op(hdr.Op) {
-		case xeth.XETH_ETHTOOL_FLAGS_OP:
-			msg := (*xeth.EthtoolFlagsMsg)(ptr)
-			vnet.SetPort(msg.Ifname.String()).Flags = msg.Flags
-		case xeth.XETH_ETHTOOL_SETTINGS_OP:
-			msg := (*xeth.EthtoolSettingsMsg)(ptr)
-			vnet.SetPort(msg.Ifname.String()).Speed = msg.Settings.Speed
+		switch xeth.Kind((*xeth.Msg)(ptr).Kind) {
+		case xeth.XETH_MSG_KIND_ETHTOOL_FLAGS:
+			msg := (*xeth.MsgEthtoolFlags)(ptr)
+			ifname := xeth.Ifname(msg.Ifname)
+			vnet.SetPort(ifname.String()).Flags =
+				xeth.EthtoolFlagBits(msg.Flags)
+		case xeth.XETH_MSG_KIND_ETHTOOL_SETTINGS:
+			msg := (*xeth.MsgEthtoolSettings)(ptr)
+			ifname := xeth.Ifname(msg.Ifname)
+			vnet.SetPort(ifname.String()).Speed =
+				xeth.Mbps(msg.Speed)
+		case xeth.XETH_MSG_KIND_IFINDEX:
+			msg := (*xeth.MsgIfindex)(ptr)
+			ifname := xeth.Ifname(msg.Ifname)
+			pe := vnet.SetPort(ifname.String())
+			pe.Ifindex = msg.Ifindex
+			pe.Net = msg.Net
 		}
 		return nil
 	})
