@@ -136,6 +136,11 @@ func (m *netlink_main) enable_disable_log(c cli.Commander, w cli.Writer, in *cli
 		}
 	}
 	m.m.verbose_netlink = v
+	if v {
+		fmt.Fprintln(w, "netlink log to journalctl enabled")
+	} else {
+		fmt.Fprintln(w, "netlink log disabled")
+	}
 	return
 }
 
