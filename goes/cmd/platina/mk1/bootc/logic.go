@@ -532,12 +532,12 @@ func wipe() error {
 	if err := setInstall(); err != nil {
 		return err
 	}
-	defer clrInstall()
 
 	//check if sda6 present in fdisk -l //FIXME
 
 	d1 := []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
 	if err := ioutil.WriteFile("/tmp/EEOF", d1, 0755); err != nil {
+		clrInstall()
 		return err
 	}
 
@@ -545,7 +545,6 @@ func wipe() error {
 	_, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("Error: fdisk failed: %s\n", err)
-		return err
 	}
 
 	//check if actually out of fdisk -l //FIXME
