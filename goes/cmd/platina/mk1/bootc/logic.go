@@ -23,7 +23,7 @@ const (
 	Sda1Cfg     = "/bootc.cfg"
 	Sda6Cfg     = "/mnt/bootc.cfg"
 	Mount       = "/mnt"
-	Sda1        = "/mnt/sda1"
+	Sda1        = "/dev/sda1"
 	Fstype      = "ext4"
 	Zero        = uintptr(0)
 )
@@ -89,7 +89,7 @@ func Bootc() []string {
 			return []string{""}
 		}
 
-		// FIXME copy script, goes, modify rclocal, script does "goes upgrade -k, -g"
+		// FIXME LATER copy script, goes, modify rclocal, script does "goes upgrade -k, -g"
 
 		return []string{"kexec", "-k", Cfg.Sda6K,
 			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
@@ -155,11 +155,27 @@ func initCfg() error {
 	return nil
 }
 
-func setCfgPath() error {
+func setCfgName() error {
 	context := machine.Name
 	if context == "platina-mk1" {
-		//FIXME sda1 or sda6?
-		context = "sda6"
+		cmd := exec.Command("df")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return err
+		}
+		outs := strings.Split(string(out), "\n")
+		for _, m := range outs {
+			if strings.Contains(m, "/dev/sda1") {
+				break
+			}
+			if strings.Contains(m, "/dev/sda6") {
+				context = "sda6"
+				break
+			}
+		}
+		if context != "sda1" && context != "sda6" {
+			return fmt.Errorf("Error: root directory not found")
+		}
 	}
 	fmt.Printf("context = %s\n", context)
 
@@ -177,8 +193,10 @@ func setCfgPath() error {
 				return err
 			}
 		}
-		if err := syscall.Mount(Sda1, Mount, Fstype, Zero, ""); err != nil {
-			fmt.Printf("Error mounting: %v", err)
+		if _, err := os.Stat("/mnt/etc"); os.IsNotExist(err) {
+			if err := syscall.Mount(Sda1, Mount, Fstype, Zero, ""); err != nil {
+				fmt.Printf("Error mounting: %v", err)
+			}
 		}
 	default:
 		return fmt.Errorf("ERROR: unknown machine could not form path")
@@ -186,11 +204,13 @@ func setCfgPath() error {
 	return nil
 }
 
+func mountSda6() {
+}
+
 func writeCfg() error {
-	if err := setCfgPath(); err != nil {
+	if err := setCfgName(); err != nil {
 		return err
 	}
-
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -203,10 +223,9 @@ func writeCfg() error {
 }
 
 func readCfg() error {
-	if err := setCfgPath(); err != nil {
+	if err := setCfgName(); err != nil {
 		return err
 	}
-
 	if _, err := os.Stat(BootcCfgFile); os.IsNotExist(err) {
 		return err
 	}
@@ -510,22 +529,28 @@ func clrInitScript() error {
 }
 
 func wipe() error {
-	d1 := []byte(`#!/bin/bash\necho -e "d\n6\nw\n" | /sbin/fdisk /dev/sda\n`)
-	if err := ioutil.WriteFile("/tmp/EEOF", d1, 0655); err != nil {
-		return err
-	}
-
-	fmt.Println("Please wait...reinstalling debian on sda6")
 	if err := setInstall(); err != nil {
 		return err
 	}
-	cmd := exec.Command("/tmp/EEOF")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("cmd.Run() failed with %s\n", err)
-	} else {
-		fmt.Printf("combined out:\n%s\n", string(out))
+	defer clrInstall()
+
+	//check if sda6 present in fdisk -l //FIXME
+
+	d1 := []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
+	if err := ioutil.WriteFile("/tmp/EEOF", d1, 0755); err != nil {
+		return err
 	}
+
+	cmd := exec.Command("/tmp/EEOF")
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Error: fdisk failed: %s\n", err)
+		return err
+	}
+
+	//check if actually out of fdisk -l //FIXME
+
+	fmt.Println("Please wait...reinstalling linux on sda6")
 	reboot()
 	return nil
 }
