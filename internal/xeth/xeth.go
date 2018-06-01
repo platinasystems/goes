@@ -180,24 +180,21 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	return nil
 }
 
-func (xeth *Xeth) UntilBreak(f func([]byte) error) error {
+func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 	for buf := range xeth.RxCh {
-		if !IsMsg(buf) {
-			Pool.Put(buf)
-			continue
-		}
-		msg := (*Msg)(unsafe.Pointer(&buf[0]))
-		if msg.Kind == uint8(XETH_MSG_KIND_BREAK) {
+		kind := MsgKind(buf)
+		if kind == XETH_MSG_KIND_BREAK {
 			Pool.Put(buf)
 			break
+		} else if kind != XETH_MSG_KIND_INVALID {
+			err = f(buf)
 		}
-		err := f(buf)
 		Pool.Put(buf)
 		if err != nil {
-			return err
+			break
 		}
 	}
-	return nil
+	return
 }
 
 // panic if Xeth sock dial fails

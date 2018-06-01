@@ -26,6 +26,7 @@ import "fmt"
 
 type Kind uint8
 
+const XETH_MSG_KIND_INVALID = Kind(0xff)
 const (
 	XETH_MSG_KIND_BREAK Kind = iota
 	XETH_MSG_KIND_LINK_STAT
@@ -57,7 +58,7 @@ func (kind Kind) String() string {
 	if i < len(kinds) {
 		s = kinds[i]
 	} else {
-		s = fmt.Sprint("op[", i, "]")
+		s = fmt.Sprint("kind[", i, "]")
 	}
 	return s
 }

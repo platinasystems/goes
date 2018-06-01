@@ -161,23 +161,21 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 }
 
 func dump(buf []byte) error {
-	if !IsMsg(buf) {
-		return fmt.Errorf("invalid xeth msg: %#x", buf)
-	}
 	ptr := unsafe.Pointer(&buf[0])
-	switch kind := Kind((*Msg)(ptr).Kind); kind {
+	kind := MsgKind(buf)
+	stringer := fmt.Stringer(kind)
+	switch kind {
 	case XETH_MSG_KIND_LINK_STAT, XETH_MSG_KIND_ETHTOOL_STAT:
-		fmt.Println((*MsgStat)(ptr))
+		stringer = (*MsgStat)(ptr)
 	case XETH_MSG_KIND_ETHTOOL_FLAGS:
-		fmt.Println((*MsgEthtoolFlags)(ptr))
+		stringer = (*MsgEthtoolFlags)(ptr)
 	case XETH_MSG_KIND_ETHTOOL_SETTINGS:
-		fmt.Println((*MsgEthtoolSettings)(ptr))
+		stringer = (*MsgEthtoolSettings)(ptr)
 	case XETH_MSG_KIND_IFINDEX:
-		fmt.Println((*MsgIfindex)(ptr))
+		stringer = (*MsgIfindex)(ptr)
 	case XETH_MSG_KIND_IFA:
-		fmt.Println((*MsgIfa)(ptr))
-	default:
-		fmt.Println("unexpected:", kind)
+		stringer = (*MsgIfa)(ptr)
 	}
+	fmt.Println(stringer.String())
 	return nil
 }

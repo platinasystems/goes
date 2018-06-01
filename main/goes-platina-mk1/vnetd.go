@@ -80,10 +80,7 @@ func vnetdInit() {
 	vnet.Xeth.DumpIfinfo()
 	vnet.Xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
-		if !xeth.IsMsg(buf) {
-			return fmt.Errorf("invalid xeth msg: %#x", buf)
-		}
-		switch xeth.Kind((*xeth.Msg)(ptr).Kind) {
+		switch xeth.MsgKind(buf) {
 		case xeth.XETH_MSG_KIND_ETHTOOL_FLAGS:
 			msg := (*xeth.MsgEthtoolFlags)(ptr)
 			ifname := xeth.Ifname(msg.Ifname)

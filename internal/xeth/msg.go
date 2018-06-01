@@ -28,12 +28,16 @@ import (
 	"unsafe"
 )
 
-func IsMsg(b []byte) bool {
-	if len(b) < SizeofMsg {
-		return false
-	}
+func MsgKind(b []byte) Kind {
 	msg := (*Msg)(unsafe.Pointer(&b[0]))
-	return msg.Z64 == 0 && msg.Z32 == 0 && msg.Z16 == 0 && msg.Z8 == 0
+	if len(b) < SizeofMsg ||
+		msg.Z64 != 0 ||
+		msg.Z32 != 0 ||
+		msg.Z16 != 0 ||
+		msg.Z8 != 0 {
+		return XETH_MSG_KIND_INVALID
+	}
+	return Kind(msg.Kind)
 }
 
 func (msg *MsgStat) String() string {
