@@ -2,11 +2,17 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+//FIXME refactor set/clears
+//FIXME add support for 2 ISOs
+//FIXME add config from server
+//FIXME add status updates msgs to server
+
 package bootc
 
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -19,13 +25,22 @@ import (
 )
 
 const (
-	CorebootCfg = "/newroot/sda1/bootc.cfg"
-	Sda1Cfg     = "/bootc.cfg"
-	Sda6Cfg     = "/mnt/bootc.cfg"
-	Mount       = "/mnt"
-	Sda1        = "/dev/sda1"
-	Fstype      = "ext4"
-	Zero        = uintptr(0)
+	corebootCfg = "/newroot/sda1/bootc.cfg"
+	sda1Cfg     = "/bootc.cfg"
+	sda6Cfg     = "/mnt/bootc.cfg"
+	mount       = "/mnt"
+	devSda1     = "/dev/sda1"
+	devSda6     = "/dev/sda6"
+	tmpFile     = "/tmp/EEOF"
+	mntEtc      = "/mnt/etc"
+	fstype      = "ext4"
+	zero        = uintptr(0)
+	sda1        = "sda1"
+	sda6        = "sda6"
+	coreboot    = "coreboot"
+	cbSda1      = "/newroot/sda1"
+	cbSda6      = "/newroot/sda6"
+	tarFile     = "/bootstrap.tar.gz"
 )
 
 var BootcCfgFile string
@@ -37,29 +52,24 @@ var kexec6 string
 
 func Bootc() []string {
 	if err := readCfg(); err != nil {
-		fmt.Println("ERROR: couldn't read bootc.cfg => run grub")
 		return []string{""}
 	}
 
 	if !serverAvail() {
-		fmt.Println("INFO: server is not available, using local bootc.cfg")
+		fmt.Println("Info: server is not available, using local bootc.cfg")
 	}
 
-	fmt.Printf("INFO: Install = %v, BootSda1 = %v, BootSda6Cnt = %v\n",
+	fmt.Printf("Info: Install = %v, BootSda1 = %v, BootSda6Cnt = %v\n",
 		Cfg.Install, Cfg.BootSda1, Cfg.BootSda6Cnt)
-
 	if !Cfg.Install && Cfg.BootSda6Cnt == 0 && !Cfg.BootSda1 {
-		fmt.Println("INFO: !Install, !BootSda1, BootSda6Cnt==0 => run grub")
 		return []string{""}
 	}
 
 	if Cfg.BootSda1 {
-		if err := formString1(); err != nil {
-			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
+		if err := formKexec1(); err != nil {
 			return []string{""}
 		}
 		if err := clrSda1Flag(); err != nil {
-			fmt.Println("ERROR: could not clear BootSda1")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.Sda1K,
@@ -67,30 +77,36 @@ func Bootc() []string {
 	}
 
 	if Cfg.Install {
-		if err := formString1(); err != nil {
-			fmt.Println("ERROR: couldn't form kexec1 string => run grub")
+		if err := formKexec1(); err != nil {
 			return []string{""}
 		}
 		if err := clrInstall(); err != nil {
-			fmt.Println("ERROR: could not clear Install")
+			return []string{""}
+		}
+		if err := setPostInstall(); err != nil {
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
 			Cfg.ReInstallI, "-c", kexec0, "-e"}
 	}
 
+	if Cfg.PostInstall {
+		if err := clrPostInstall(); err != nil {
+			return []string{""}
+		}
+		if err := Copy(cbSda1+tarFile, cbSda6+tarFile); err != nil {
+			return []string{""}
+		}
+		// FIXME modify rclocal on sda6
+	}
+
 	if Cfg.BootSda6Cnt > 0 {
-		if err := formString6(); err != nil {
-			fmt.Println("ERROR: couldn't form kexec6 string => run grub")
+		if err := formKexec6(); err != nil {
 			return []string{""}
 		}
 		if err := decBootSda6Cnt(); err != nil {
-			fmt.Println("ERROR: could not decrement BootSda6Cnt")
 			return []string{""}
 		}
-
-		// FIXME LATER copy script, goes, modify rclocal, script does "goes upgrade -k, -g"
-
 		return []string{"kexec", "-k", Cfg.Sda6K,
 			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 	}
@@ -123,92 +139,115 @@ func serverAvail() bool {
 }
 
 func initCfg() error {
-	Cfg.Install = false
-	Cfg.BootSda1 = false
-	Cfg.BootSda6Cnt = 3
-	Cfg.EraseSda6 = false
-	Cfg.IAmMaster = false
-	Cfg.MyIpAddr = "192.168.101.129"
-	Cfg.MyGateway = "192.168.101.1"
-	Cfg.MyNetmask = "255.255.255.0"
-	Cfg.MasterAddresses = []string{"198.168.101.142"}
-	Cfg.ReInstallK = "/newroot/sda1/boot/vmlinuz"
-	Cfg.ReInstallI = "/newroot/sda1/boot/initrd.gz"
-	Cfg.ReInstallC = `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`
-	Cfg.Sda1K = "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64"
-	Cfg.Sda1I = "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64"
-	Cfg.Sda1C = "::eth0:none"
-	Cfg.Sda6K = "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64"
-	Cfg.Sda6I = "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64"
-	Cfg.Sda6C = "::eth0:none"
-	Cfg.InitScript = false
-	Cfg.InitScriptName = "sda6-init.sh"
-	Cfg.ISO1Name = "debian-8.10.0-amd64-DVD-1.iso"
-	Cfg.ISO1Desc = "Jessie debian-8.10.0"
-	Cfg.ISO2Name = ""
-	Cfg.ISO2Desc = ""
-	Cfg.ISOlastUsed = 1
-	err := writeCfg()
-	if err != nil {
+	Cfg = bootd.BootcConfig{
+		Install:         false,
+		BootSda1:        false,
+		BootSda6Cnt:     3,
+		EraseSda6:       false,
+		IAmMaster:       false,
+		MyIpAddr:        "192.168.101.129",
+		MyGateway:       "192.168.101.1",
+		MyNetmask:       "255.255.255.0",
+		MasterAddresses: []string{"198.168.101.142"},
+		ReInstallK:      "/newroot/sda1/boot/vmlinuz",
+		ReInstallI:      "/newroot/sda1/boot/initrd.gz",
+		ReInstallC:      `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`,
+		Sda1K:           "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64",
+		Sda1I:           "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64",
+		Sda1C:           "::eth0:none",
+		Sda6K:           "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64",
+		Sda6I:           "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64",
+		Sda6C:           "::eth0:none",
+		InitScript:      false,
+		InitScriptName:  "sda6-init.sh",
+		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
+		ISO1Desc:        "Jessie debian-8.10.0",
+		ISO2Name:        "",
+		ISO2Desc:        "",
+		ISOlastUsed:     1,
+		PostInstall:     false,
+	}
+	if err := writeCfg(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func setCfgName() error {
-	context := machine.Name
-	if context == "platina-mk1" {
+func getContext() (context string, err error) {
+	mach := machine.Name
+	if mach == coreboot {
+		return coreboot, nil
+	}
+	if mach == "platina-mk1" {
 		cmd := exec.Command("df")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return err
+			return "", err
 		}
 		outs := strings.Split(string(out), "\n")
 		for _, m := range outs {
-			if strings.Contains(m, "/dev/sda1") {
-				break
+			if strings.Contains(m, devSda1) {
+				return sda1, nil
 			}
-			if strings.Contains(m, "/dev/sda6") {
-				context = "sda6"
-				break
+			if strings.Contains(m, devSda6) {
+				return sda6, nil
 			}
-		}
-		if context != "sda1" && context != "sda6" {
-			return fmt.Errorf("Error: root directory not found")
 		}
 	}
-	fmt.Printf("context = %s\n", context)
+	return "", fmt.Errorf("Error: root directory not found")
+}
 
+func setBootcCfgFile() error {
+	context, err := getContext()
+	if err != nil {
+		return err
+	}
+	//BootcCfgFile = corebootCfg //FIXME
 	switch context {
-	case "coreboot":
-		BootcCfgFile = CorebootCfg
-	case "sda1":
-		BootcCfgFile = Sda1Cfg
-	case "sda6":
-		BootcCfgFile = Sda6Cfg
-		if _, err := os.Stat(Mount); os.IsNotExist(err) {
-			err := os.Mkdir(Mount, os.FileMode(0755))
+	case coreboot:
+		BootcCfgFile = corebootCfg
+	case sda1:
+		BootcCfgFile = sda1Cfg
+	case sda6:
+		BootcCfgFile = sda6Cfg
+		if _, err := os.Stat(mount); os.IsNotExist(err) {
+			err := os.Mkdir(mount, os.FileMode(0755))
 			if err != nil {
 				fmt.Printf("Error mkdir: %v", err)
 				return err
 			}
 		}
-		if _, err := os.Stat("/mnt/etc"); os.IsNotExist(err) {
-			if err := syscall.Mount(Sda1, Mount, Fstype, Zero, ""); err != nil {
+		if _, err := os.Stat(mntEtc); os.IsNotExist(err) {
+			if err := syscall.Mount(devSda1, mount, fstype, zero, ""); err != nil {
 				fmt.Printf("Error mounting: %v", err)
+				return err
 			}
 		}
 	default:
-		return fmt.Errorf("ERROR: unknown machine could not form path")
+		return fmt.Errorf("Error: unknown machine/partition")
 	}
 	return nil
 }
 
-func mountSda6() {
-}
+/*func mountSda6() error {
+	if _, err := os.Stat(mount); os.IsNotExist(err) {
+		err := os.Mkdir(mount, os.FileMode(0755))
+		if err != nil {
+			fmt.Printf("Error mkdir: %v", err)
+			return err
+		}
+	}
+	if _, err := os.Stat(mntEtc); os.IsNotExist(err) {
+		if err := syscall.Mount(devSda6, mount, fstype, zero, ""); err != nil {
+			fmt.Printf("Error mounting: %v", err)
+			return err
+		}
+	}
+	return nil
+}*/
 
 func writeCfg() error {
-	if err := setCfgName(); err != nil {
+	if err := setBootcCfgFile(); err != nil {
 		return err
 	}
 	jsonInfo, err := json.Marshal(Cfg)
@@ -223,7 +262,7 @@ func writeCfg() error {
 }
 
 func readCfg() error {
-	if err := setCfgName(); err != nil {
+	if err := setBootcCfgFile(); err != nil {
 		return err
 	}
 	if _, err := os.Stat(BootcCfgFile); os.IsNotExist(err) {
@@ -240,7 +279,7 @@ func readCfg() error {
 	return nil
 }
 
-func formString1() (err error) {
+func formKexec1() (err error) {
 	uuid1, err = readUUID("sda1")
 	if err != nil {
 		return err
@@ -252,7 +291,7 @@ func formString1() (err error) {
 	return nil
 }
 
-func formString6() (err error) {
+func formKexec6() (err error) {
 	uuid6, err = readUUID("sda6")
 	if err != nil {
 		return err
@@ -339,6 +378,7 @@ func setInstall() error {
 	}
 	Cfg.Install = true
 	Cfg.BootSda6Cnt = 3
+	Cfg.PostInstall = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -355,8 +395,40 @@ func clrInstall() error {
 		return err
 	}
 	Cfg.BootSda1 = false
-	Cfg.EraseSda6 = false
 	Cfg.Install = false
+	Cfg.PostInstall = false
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setPostInstall() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PostInstall = true
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func clrPostInstall() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PostInstall = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
@@ -529,27 +601,63 @@ func clrInitScript() error {
 }
 
 func wipe() error {
+	context, err := getContext()
+	if context != sda6 && context != sda1 {
+		return fmt.Errorf("Not booted from sda6 or sda1, can't wipe.")
+	}
+	if err := clrInstall(); err != nil {
+		return err
+	}
+
+	// make sure sda6 exists
+	d1 := []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
+	cmd := exec.Command(tmpFile)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("fdisk: %v, %v\n", out, err)
+		return err
+	}
+	outs := strings.Split(string(out), "\n")
+	n := 0
+	for _, m := range outs {
+		if strings.Contains(m, devSda6) {
+			n = 1
+		}
+	}
+	if n == 0 {
+		return fmt.Errorf("Error: /dev/sda6 not in partition table, aborting")
+	}
+
+	// delete sda6
+	d1 = []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
+	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
+		return err
+	}
+	cmd = exec.Command(tmpFile)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("fdisk: %v, %v\n", out, err)
+	}
+
+	// make sure sda6 is gone
+	d1 = []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
+	cmd = exec.Command(tmpFile)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("fdisk: %v, %v\n", out, err)
+		return err
+	}
+	outs = strings.Split(string(out), "\n")
+	for _, m := range outs {
+		if strings.Contains(m, devSda6) {
+			return fmt.Errorf("Error: /dev/sda6 not deleted, aborting wipe")
+		}
+	}
+
+	fmt.Println("\nPlease wait...reinstalling linux on sda6\n")
 	if err := setInstall(); err != nil {
 		return err
 	}
-
-	//check if sda6 present in fdisk -l //FIXME
-
-	d1 := []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
-	if err := ioutil.WriteFile("/tmp/EEOF", d1, 0755); err != nil {
-		clrInstall()
-		return err
-	}
-
-	cmd := exec.Command("/tmp/EEOF")
-	_, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Error: fdisk failed: %s\n", err)
-	}
-
-	//check if actually out of fdisk -l //FIXME
-
-	fmt.Println("Please wait...reinstalling linux on sda6")
 	reboot()
 	return nil
 }
@@ -559,11 +667,31 @@ func runScript(name string) (err error) {
 }
 
 func reboot() error {
-	fmt.Print("\nWILL REBOOT in 1 minute... Please login again\n")
-	u, err := exec.Command("shutdown", "-r", "+1").Output()
+	fmt.Print("\nWILL REBOOT NOW!!!\n")
+	u, err := exec.Command("shutdown", "-r", "now").Output()
 	fmt.Println(u)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func Copy(src string, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }

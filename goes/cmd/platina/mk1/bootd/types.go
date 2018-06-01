@@ -78,6 +78,7 @@ type BootcConfig struct {
 	ISO2Name        string
 	ISO2Desc        string
 	ISOlastUsed     int
+	PostInstall     bool
 }
 
 type Client struct {
@@ -96,6 +97,8 @@ type Client struct {
 	TimeRegistered string
 	TimeInstalled  string
 	InstallCounter int
+	LastISOname    string
+	LastISOdesc    string
 }
 
 type RegReq struct {
