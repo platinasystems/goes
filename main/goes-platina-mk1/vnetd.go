@@ -97,6 +97,15 @@ func vnetdInit() {
 			pe := vnet.SetPort(ifname.String())
 			pe.Ifindex = msg.Ifindex
 			pe.Net = msg.Net
+		case xeth.XETH_MSG_KIND_IFA:
+			msg := (*xeth.MsgIfa)(ptr)
+			ifname := xeth.Ifname(msg.Ifname)
+			pe := vnet.SetPort(ifname.String())
+			if msg.IsAdd() {
+				pe.AddIPNet(msg.IPNet())
+			} else if msg.IsDel() {
+				pe.DelIPNet(msg.IPNet())
+			}
 		}
 		return nil
 	})

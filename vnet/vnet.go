@@ -5,6 +5,8 @@
 package vnet
 
 import (
+	"net"
+
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/elib/dep"
@@ -20,6 +22,7 @@ type PortEntry struct {
 	Net     uint64
 	Flags   xeth.EthtoolFlagBits
 	Speed   xeth.Mbps
+	IPNets  []*net.IPNet
 }
 
 var Ports map[string]*PortEntry
@@ -95,3 +98,18 @@ func (v *Vnet) Run(in *parse.Input) (err error) {
 }
 
 func (v *Vnet) Quit() { v.loop.Quit() }
+
+func (pe *PortEntry) AddIPNet(ipnet *net.IPNet) {
+	pe.IPNets = append(pe.IPNets, ipnet)
+}
+
+func (pe *PortEntry) DelIPNet(ipnet *net.IPNet) {
+	for i, peipnet := range pe.IPNets {
+		if peipnet.IP.Equal(ipnet.IP) {
+			n := len(pe.IPNets) - 1
+			copy(pe.IPNets[i:], pe.IPNets[i+1:])
+			pe.IPNets = pe.IPNets[:n]
+			break
+		}
+	}
+}
