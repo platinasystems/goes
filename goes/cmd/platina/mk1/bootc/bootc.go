@@ -37,8 +37,7 @@ func (Command) Usage() string {
 	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
 	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
-	[setkernel] [setinitrd] [setinitscript] [clrinitscript]
-	[initscriptname] [getclientbootdata]`
+	[setkernel] [setinitrd] [getclientbootdata] [setpost]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -166,6 +165,10 @@ func (c *Command) Main(args ...string) (err error) {
 		if err = setInitrd(args[1]); err != nil {
 			return err
 		}
+	case "setpost":
+		if err = setPostInstall(); err != nil {
+			return err
+		}
 	case "wipe":
 		if len(os.Args) >= 3 && args[1] == "sda6" {
 			if err = wipe(); err != nil {
@@ -173,18 +176,6 @@ func (c *Command) Main(args ...string) (err error) {
 			}
 		}
 		fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
-	case "setinitscript":
-		if err = setInitScript(); err != nil {
-			return err
-		}
-	case "clrinitscript":
-		if err = clrInitScript(); err != nil {
-			return err
-		}
-	case "initscriptname":
-		if err = setInitScriptName(args[1]); err != nil {
-			return err
-		}
 	default:
 	}
 	return nil

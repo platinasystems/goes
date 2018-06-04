@@ -38,9 +38,10 @@ const (
 	sda1        = "sda1"
 	sda6        = "sda6"
 	coreboot    = "coreboot"
-	cbSda1      = "/newroot/sda1"
-	cbSda6      = "/newroot/sda6"
-	tarFile     = "/bootstrap.tar.gz"
+	cbSda1      = "/newroot/sda1/"
+	cbSda6      = "/newroot/sda6/"
+	tarFile     = "postinstall.tar.gz"
+	scriptFile  = "rc.local"
 )
 
 var BootcCfgFile string
@@ -97,7 +98,12 @@ func Bootc() []string {
 		if err := Copy(cbSda1+tarFile, cbSda6+tarFile); err != nil {
 			return []string{""}
 		}
-		// FIXME modify rclocal on sda6
+		if err := Copy(cbSda6+"etc/"+scriptFile, cbSda6+"etc/"+scriptFile+"SAVE"); err != nil {
+			return []string{""}
+		}
+		if err := Copy(cbSda1+scriptFile, cbSda6+"etc/"+scriptFile); err != nil {
+			return []string{""}
+		}
 	}
 
 	if Cfg.BootSda6Cnt > 0 {
@@ -158,8 +164,6 @@ func initCfg() error {
 		Sda6K:           "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64",
 		Sda6I:           "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64",
 		Sda6C:           "::eth0:none",
-		InitScript:      false,
-		InitScriptName:  "sda6-init.sh",
 		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
 		ISO1Desc:        "Jessie debian-8.10.0",
 		ISO2Name:        "",
@@ -202,7 +206,6 @@ func setBootcCfgFile() error {
 	if err != nil {
 		return err
 	}
-	//BootcCfgFile = corebootCfg //FIXME
 	switch context {
 	case coreboot:
 		BootcCfgFile = corebootCfg
@@ -552,54 +555,6 @@ func setInitrd(x string) error {
 	return nil
 }
 
-func setInitScriptName(x string) error {
-	if err := readCfg(); err != nil {
-		return err
-	}
-	Cfg.InitScriptName = x
-	jsonInfo, err := json.Marshal(Cfg)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func setInitScript() error {
-	if err := readCfg(); err != nil {
-		return err
-	}
-	Cfg.InitScript = true
-	jsonInfo, err := json.Marshal(Cfg)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func clrInitScript() error {
-	if err := readCfg(); err != nil {
-		return err
-	}
-	Cfg.InitScript = false
-	jsonInfo, err := json.Marshal(Cfg)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func wipe() error {
 	context, err := getContext()
 	if context != sda6 && context != sda1 {
@@ -611,6 +566,9 @@ func wipe() error {
 
 	// make sure sda6 exists
 	d1 := []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
+	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
+		return err
+	}
 	cmd := exec.Command(tmpFile)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -641,6 +599,9 @@ func wipe() error {
 
 	// make sure sda6 is gone
 	d1 = []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
+	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
+		return err
+	}
 	cmd = exec.Command(tmpFile)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
