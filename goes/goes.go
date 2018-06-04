@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unicode/utf8"
 
 	"github.com/platinasystems/go/goes/cmd"
@@ -596,6 +597,7 @@ func wait(v cmd.Cmd, ch chan os.Signal) {
 				if err := method.Close(); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 				}
+				time.Sleep(500 * time.Millisecond)
 			}
 			fmt.Println("killed")
 			os.Stdout.Sync()
