@@ -123,6 +123,7 @@ func (c *Command) server() (err error) {
 
 	for n := -1; n != 0; {
 		<-c.Daemons.done
+		time.Sleep(5 * time.Second)
 		c.Daemons.mutex.Lock()
 		n = len(c.Daemons.cmdsByPid)
 		c.Daemons.mutex.Unlock()
