@@ -3,18 +3,18 @@
 // LICENSE file.
 
 // DESCRIPTION
-// 'boot controller daemon' to service client installs
-// runs on a "master" ToR, reads local or cloud configuration DB
+// http server daemon replies to master server requests.
+// This daemon runs on every ToR under linux, does not run in coreboot.
 
 package bootd
 
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/log"
 )
@@ -46,8 +46,8 @@ func (c Command) Main(...string) error {
 }
 
 func startHandler() (err error) {
-	ClientCfg = make(map[string]*Client)
-	ClientBootCfg = make(map[string]*BootcConfig)
+	bootc.ClientCfg = make(map[string]*bootc.Client)
+	bootc.ClientBootCfg = make(map[string]*bootc.BootcConfig)
 	if err = readClientCfgDB(); err != nil {
 		return
 	}
@@ -69,45 +69,45 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	u := strings.Split(t, " ")
 
 	switch u[0] {
-	case Register:
-		if b, err = register(&u); err != nil {
-			b = "error registering\n"
+	case "wipe":
+		if b, err = wipe(); err != nil {
+			b = "error doing wipe\n"
 		}
-	case DumpVars:
-		if b, err = dumpvars(); err != nil {
-			b = "error dumping server variables\n"
+	case "getconfig":
+		if b, err = getConfig(); err != nil {
+			b = "error getting config\n"
 		}
-		b += r.URL.Path + "\n"
-		b += t + "\n"
-	case Dashboard:
-		if b, err = dashboard(); err != nil {
-			b = "error getting dashboard\n"
+	case "putconfig":
+		if b, err = putConfig(); err != nil {
+			b = "error putting config\n"
 		}
-	case Dashboard2:
-		if b, err = dashboard2(); err != nil {
-			b = "error getting dashboard\n"
+	case "getclientinfo":
+		if b, err = getClientInfo(); err != nil {
+			b = "error getting config\n"
 		}
-	case NumClients:
-		if b, err = numclients(); err != nil {
-			b = "error getting number of clients\n"
+	case "putclientinfo":
+		if b, err = putClientInfo(); err != nil {
+			b = "error putting config\n"
 		}
-	case ClientData:
-		if len(u) < 2 {
-			b = "error client number missing\n"
-			return
+	case "putiso":
+		if b, err = putIso(); err != nil {
+			b = "error storing iso\n"
 		}
-		i, _ := strconv.Atoi(u[1])
-		if b, err = clientdata(i); err != nil {
-			b = "error getting client data\n"
+	case "putpreseed":
+		if b, err = putPreseed(); err != nil {
+			b = "error storing preseed\n"
 		}
-	case ClientBootData:
-		if len(u) < 2 {
-			b = "error client number missing\n"
-			return
+	case "puttar":
+		if b, err = putTar(); err != nil {
+			b = "error storing tar file\n"
 		}
-		i, _ := strconv.Atoi(u[1])
-		if b, err = clientbootdata(i); err != nil {
-			b = "error getting client boot data\n"
+	case "putrclocal":
+		if b, err = putRcLocal(); err != nil {
+			b = "error storing rc.local\n"
+		}
+	case "reboot":
+		if b, err = reBoot(); err != nil {
+			b = "error doing reboot\n"
 		}
 	default:
 		b = "404\n"

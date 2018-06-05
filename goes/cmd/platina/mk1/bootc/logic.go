@@ -20,7 +20,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 	"github.com/platinasystems/go/internal/machine"
 )
 
@@ -135,9 +134,9 @@ func serverAvail() bool {
 	ip := getIP()
 	reply := 0
 	reply, _, err := register(mip, mac, ip)
-	if err != nil || reply != bootd.RegReplyRegistered {
+	if err != nil || reply != RegReplyRegistered {
 		reply, _, err = register(mip, mac, ip)
-		if err != nil || reply != bootd.RegReplyRegistered {
+		if err != nil || reply != RegReplyRegistered {
 			return false
 		}
 	}
@@ -145,7 +144,7 @@ func serverAvail() bool {
 }
 
 func initCfg() error {
-	Cfg = bootd.BootcConfig{
+	Cfg = BootcConfig{
 		Install:         false,
 		BootSda1:        false,
 		BootSda6Cnt:     3,

@@ -10,8 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 )
 
 func register(mip string, mac string, ip string) (r int, n string, err error) {
@@ -20,8 +18,8 @@ func register(mip string, mac string, ip string) (r int, n string, err error) {
 	jsonInfo, _ := json.Marshal(regReq)
 	s := ""
 
-	if s, err = sendReq(mip, bootd.Register+" "+string(jsonInfo)); err != nil {
-		return bootd.BootStateNotRegistered, "", fmt.Errorf("Error contacting Master")
+	if s, err = sendReq(mip, Register+" "+string(jsonInfo)); err != nil {
+		return BootStateNotRegistered, "", fmt.Errorf("Error contacting Master")
 	}
 
 	err = json.Unmarshal([]byte(s), &regReply)
@@ -37,7 +35,7 @@ func register(mip string, mac string, ip string) (r int, n string, err error) {
 
 func getnumclients(mip string) (err error) {
 	s := ""
-	if s, err = sendReq(mip, bootd.NumClients); err != nil {
+	if s, err = sendReq(mip, NumClients); err != nil {
 		return err
 	}
 
@@ -54,7 +52,7 @@ func getnumclients(mip string) (err error) {
 
 func getclientdata(mip string, unit int) (err error) {
 	s := ""
-	if s, err = sendReq(mip, bootd.ClientData+" "+strconv.Itoa(unit)); err != nil {
+	if s, err = sendReq(mip, ClientData+" "+strconv.Itoa(unit)); err != nil {
 		return err
 	}
 
@@ -77,7 +75,7 @@ func getclientdata3(mip string, unit int) (err error) {
 
 func getclientbootdata(mip string, unit int) (err error) {
 	s := ""
-	if s, err = sendReq(mip, bootd.ClientBootData+" "+strconv.Itoa(unit)); err != nil {
+	if s, err = sendReq(mip, ClientBootData+" "+strconv.Itoa(unit)); err != nil {
 		return err
 	}
 
@@ -94,7 +92,7 @@ func getclientbootdata(mip string, unit int) (err error) {
 
 func getscript(mip string, name string) (err error) {
 	s := ""
-	if s, err = sendReq(mip, bootd.Script+" "+name); err != nil {
+	if s, err = sendReq(mip, Script+" "+name); err != nil {
 		return err
 	}
 
@@ -111,7 +109,7 @@ func getscript(mip string, name string) (err error) {
 
 func getbinary(mip string, name string) (err error) {
 	s := ""
-	if s, err = sendReq(mip, bootd.Binary+" "+name); err != nil {
+	if s, err = sendReq(mip, Binary+" "+name); err != nil {
 		return err
 	}
 

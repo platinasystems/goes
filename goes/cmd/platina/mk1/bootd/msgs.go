@@ -2,181 +2,50 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
+//TODO need to mount /sda1 on a per sda1 or sda6 basis - no coreboot
+
 package bootd
 
-import (
-	"encoding/json"
-	"fmt"
-	"time"
-)
+import ()
 
-func register(u *[]string) (s string, err error) {
-	if len(*u) < 2 {
-		return "", err
-	}
-
-	err = json.Unmarshal([]byte((*u)[1]), &regReq)
-	if err != nil {
-		fmt.Println("There was an error:", err)
-	}
-	mac := regReq.Mac
-	ip := regReq.IP
-
-	ClientCfg[mac].MacAddr = mac
-	ClientCfg[mac].IpAddr = ip
-	ClientCfg[mac].BootState = BootStateRegistered
-	ClientCfg[mac].InstallState = InstallStateInProgress
-	t := time.Now()
-	ClientCfg[mac].TimeRegistered = fmt.Sprintf("%10s",
-		t.Format("2006-01-02 15:04:05"))
-	ClientCfg[mac].TimeInstalled = fmt.Sprintf("%10s",
-		t.Format("2006-01-02 15:04:05"))
-	ClientCfg[mac].InstallCounter++
-
-	regReply.Reply = RegReplyRegistered
-	regReply.TorName = ClientCfg[mac].Name
-	regReply.Error = nil
-	jsonInfo, err := json.Marshal(regReply)
-	if err != nil {
-		return "404", err
-	}
-
-	return string(jsonInfo), nil
-}
-
-func dumpvars() (s string, err error) {
-	s = ""
-	return s, nil
-}
-
-func dashboard() (s string, err error) {
-	s = "\n\n"
-	s += "PLATINA MASTER ToR - BOOT MANAGER DASHBOARD\n"
-	s += "\n"
-	s += "CLIENT STATUS\n"
-	s += "UNIT NAME         MACHINE    MAC-ADDRESS       IP-ADDR"
-	s += "ESS        BOOT-STATE   INSTALL-STATE  AUTO  CERT  IN"
-	s += "STALL-TYPE     REGISTERED          INSTALLED       #INST\n"
-	s += "==== ============ ========== ================= ======="
-	s += "======== ============== ============== ===== ===== =="
-	s += "========== =================== =================== =====\n"
-	siz := len(ClientCfg)
-	for j := 1; j <= siz; j++ {
-		for i, _ := range ClientCfg {
-			if ClientCfg[i].Unit == j {
-				s += fmt.Sprintf("%-4d ", ClientCfg[i].Unit)
-				s += fmt.Sprintf("%-12s ", ClientCfg[i].Name)
-				s += fmt.Sprintf("%-10s ", ClientCfg[i].Machine)
-				s += fmt.Sprintf("%-17s ", ClientCfg[i].MacAddr)
-				s += fmt.Sprintf("%-15s ", ClientCfg[i].IpAddr)
-				s += fmt.Sprintf("%-14s ",
-					bootText(ClientCfg[i].BootState))
-				s += fmt.Sprintf("%-14s ",
-					installText(ClientCfg[i].InstallState))
-				s += fmt.Sprintf("%-5t ", ClientCfg[i].AutoInstall)
-				s += fmt.Sprintf("%-5t ", ClientCfg[i].CertPresent)
-				s += fmt.Sprintf("%-12s ",
-					distroText(ClientCfg[i].DistroType))
-				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeRegistered)
-				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeInstalled)
-				s += fmt.Sprintf("%-5d ", ClientCfg[i].InstallCounter)
-				s += "\n"
-			}
-		}
-	}
-	return s, nil
-}
-
-func dashboard2() (s string, err error) { //FIXME
-	s = "\n\n"
-	s += "PLATINA MASTER ToR - BOOT MANAGER DASHBOARD\n"
-	s += "\n"
-	s += "CLIENT Details\n"
-	s += "UNIT NAME         MACHINE    MAC-ADDRESS       IP-ADDR"
-	s += "ESS        BOOT-STATE   INSTALL-STATE  AUTO  CERT  IN"
-	s += "STALL-TYPE     REGISTERED          INSTALLED       #INST\n"
-	s += "==== ============ ========== ================= ======="
-	s += "======== ============== ============== ===== ===== =="
-	s += "========== =================== =================== =====\n"
-	//siz := len(ClientCfg)
-	for j := 1; j <= 1; j++ {
-		for i, _ := range ClientCfg {
-			if ClientCfg[i].Unit == j {
-				s += fmt.Sprintf("%-4d ", ClientCfg[i].Unit)
-				s += fmt.Sprintf("%-12s ", ClientCfg[i].Name)
-				s += fmt.Sprintf("%-10s ", ClientCfg[i].Machine)
-				s += fmt.Sprintf("%-17s ", ClientCfg[i].MacAddr)
-				s += fmt.Sprintf("%-15s ", ClientCfg[i].IpAddr)
-				s += fmt.Sprintf("%-14s ",
-					bootText(ClientCfg[i].BootState))
-				s += fmt.Sprintf("%-14s ",
-					installText(ClientCfg[i].InstallState))
-				s += fmt.Sprintf("%-5t ", ClientCfg[i].AutoInstall)
-				s += fmt.Sprintf("%-5t ", ClientCfg[i].CertPresent)
-				s += fmt.Sprintf("%-12s ",
-					distroText(ClientCfg[i].DistroType))
-				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeRegistered)
-				s += fmt.Sprintf("%-19s ", ClientCfg[i].TimeInstalled)
-				s += fmt.Sprintf("%-5d ", ClientCfg[i].InstallCounter)
-				s += "\n"
-			}
-		}
-	}
-	s += "\nISO's found\n"
-	s += "============\n"
-	s += "debian-8.10.0-amd64-DVD-1.iso\n\n"
-	s += "Kernels found                Initrd's found\n"
-	s += "==========================    ============================\n"
-	s += "vmlinuz-3.16.0-4-amd64       initrd.img-3.16.0-4-amd64\n"
-	s += "vmlinuz                      initrd.gz\n\n"
-	return s, nil
-}
-
-func numclients() (s string, err error) {
-	var numReply NumClntReply
-
-	numReply.Clients = len(ClientCfg)
-	jsonInfo, err := json.Marshal(numReply)
-	if err != nil {
-		return "404", err
-	}
-	return string(jsonInfo), nil
-}
-
-func clientdata(j int) (s string, err error) {
-	for i, _ := range ClientCfg {
-		if ClientCfg[i].Unit == j {
-			jsonInfo, err := json.Marshal(ClientCfg[i])
-			if err != nil {
-				return "", err
-			}
-			return string(jsonInfo), nil
-		}
-	}
-	err = fmt.Errorf("client number not found: %v", err)
+func wipe() (s string, err error) {
 	return "", nil
 }
 
-func clientbootdata(j int) (s string, err error) {
-	for i, _ := range ClientBootCfg {
-		if ClientCfg[i].Unit == j {
-			jsonInfo, err := json.Marshal(ClientBootCfg[i])
-			if err != nil {
-				return "", err
-			}
-			return string(jsonInfo), nil
-		}
-	}
-	err = fmt.Errorf("client number not found: %v", err)
+func getConfig() (s string, err error) {
 	return "", nil
 }
 
-// TODO
-func bootStateMachine() {
+func putConfig() (s string, err error) {
+	return "", nil
 }
 
-// TODO
-func installStateMachine() {
+func getClientInfo() (s string, err error) {
+	return "", nil
+}
+
+func putClientInfo() (s string, err error) {
+	return "", nil
+}
+
+func putIso() (s string, err error) {
+	return "", nil
+}
+
+func putPreseed() (s string, err error) {
+	return "", nil
+}
+
+func putTar() (s string, err error) {
+	return "", nil
+}
+
+func putRcLocal() (s string, err error) {
+	return "", nil
+}
+
+func reBoot() (s string, err error) {
+	return "", nil
 }
 
 func readClientCfgDB() (err error) {
