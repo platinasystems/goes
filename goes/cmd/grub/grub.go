@@ -238,19 +238,18 @@ func (c *Command) GetRoot() string {
 		return root
 	}
 
-	re := regexp.MustCompile(`^((hd(?P<Unit>\d+)),.*(?P<Partition>\d+))$`)
-	r := re.FindStringSubmatch(root)
-	fmt.Printf("Root regex: %v\n", r)
-	if len(r) != 5 {
-		return root
+	dev := root
+	if !strings.HasPrefix(root, "/dev/") {
+		re := regexp.MustCompile(`^((hd(?P<Unit>\d+)),.*(?P<Partition>\d+))$`)
+		r := re.FindStringSubmatch(root)
+		if len(r) == 5 {
+			unit, err := strconv.Atoi(r[3])
+			if err == nil {
+				dev = "/dev/sd" + string(97+unit) + r[4]
+			}
+		}
 	}
-	unit, err := strconv.Atoi(r[3])
-	if err != nil {
-		panic(err)
-	}
-
-	dev := "/sd" + string(97+unit) + r[4]
-	trans, err := c.findMountedFS("/dev" + dev)
+	trans, err := c.findMountedFS(dev)
 	if err != nil {
 		panic(err)
 	}
