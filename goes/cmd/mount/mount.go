@@ -6,7 +6,6 @@ package mount
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -14,8 +13,8 @@ import (
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/magic"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/go/internal/partitions"
 )
 
 type Command struct{}
@@ -266,35 +265,6 @@ func (r *MountResult) ShowResult() {
 	}
 }
 
-var ErrNotFilesystem = errors.New("not a filesystem")
-
-type superBlock interface {
-}
-
-type unknownSB struct {
-}
-
-func readSuperBlock(dev string) (superBlock, error) {
-	f, err := os.Open(dev)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	fsHeader := make([]byte, 0x10000)
-	_, err = f.Read(fsHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	partitionMapType := magic.IdentifyPartitionMap(fsHeader)
-
-	if partitionMapType != "" {
-		return nil, ErrNotFilesystem
-	}
-
-	return &unknownSB{}, nil
-}
-
 func pollMountResults(c chan *MountResult) (i int) {
 	for {
 		select {
@@ -454,7 +424,7 @@ func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 	}
 
 	if !nodev {
-		_, err := readSuperBlock(dev)
+		_, err := partitions.ReadSuperBlock(dev)
 		if err != nil {
 			return &MountResult{err, dev, t, dir, fs.flags}
 		}
