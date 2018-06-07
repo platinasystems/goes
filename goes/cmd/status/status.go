@@ -66,7 +66,7 @@ func checkDaemons() error {
 		"vnetd":        true,
 		"redisd":       true,
 		"uptimed":      true,
-		"tempd":        true,
+		// "tempd":        true,
 	}
 
 	mypid := os.Getpid()
@@ -137,7 +137,7 @@ func checkDaemons() error {
 }
 
 func checkRedis() error {
-	s, err := redis.Hget("platina", "redis.ready")
+	s, err := redis.Hget("platina-mk1", "redis.ready")
 	if err != nil {
 		return err
 	}
