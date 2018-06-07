@@ -42,7 +42,7 @@ func (Command) Usage() string {
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "boot client hook to communicate with tor master",
+		lang.EnUS: "bootc provides wipe and access to bootc.cfg.",
 	}
 }
 
@@ -50,7 +50,7 @@ func (Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 description
-	the bootc command is for debugging bootc client.`,
+	bootc provides wipe and access to bootc.cfg.`,
 	}
 }
 
@@ -71,7 +71,7 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "bootc":
 		c.bootc()
-		return nil // fall through to grub
+		return nil
 	case "dumpvars":
 		if err = dumpvars(mip); err != nil {
 			return err

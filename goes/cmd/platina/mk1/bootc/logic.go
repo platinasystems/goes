@@ -6,6 +6,7 @@
 //FIXME add support for 2 ISOs
 //FIXME add config from server
 //FIXME add status updates msgs to server
+//FIXME SET SDA6 COUNTER in goes
 
 package bootc
 
@@ -52,6 +53,7 @@ var kexec6 string
 
 func Bootc() []string {
 	if err := readCfg(); err != nil {
+		fmt.Println("Exiting bootc() 1, dropping into grub...")
 		return []string{""}
 	}
 
@@ -62,14 +64,17 @@ func Bootc() []string {
 	fmt.Printf("Info: Install = %v, BootSda1 = %v, BootSda6Cnt = %v\n",
 		Cfg.Install, Cfg.BootSda1, Cfg.BootSda6Cnt)
 	if !Cfg.Install && Cfg.BootSda6Cnt == 0 && !Cfg.BootSda1 {
+		fmt.Println("Exiting bootc() 2, dropping into grub...")
 		return []string{""}
 	}
 
 	if Cfg.BootSda1 {
 		if err := formKexec1(); err != nil {
+			fmt.Println("Exiting bootc() 3, dropping into grub...")
 			return []string{""}
 		}
 		if err := clrSda1Flag(); err != nil {
+			fmt.Println("Exiting bootc() 4, dropping into grub...")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.Sda1K,
@@ -78,12 +83,15 @@ func Bootc() []string {
 
 	if Cfg.Install {
 		if err := formKexec1(); err != nil {
+			fmt.Println("Exiting bootc() 5, dropping into grub...")
 			return []string{""}
 		}
 		if err := clrInstall(); err != nil {
+			fmt.Println("Exiting bootc() 6, dropping into grub...")
 			return []string{""}
 		}
 		if err := setPostInstall(); err != nil {
+			fmt.Println("Exiting bootc() 7, dropping into grub...")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
@@ -92,29 +100,32 @@ func Bootc() []string {
 
 	if Cfg.PostInstall {
 		if err := clrPostInstall(); err != nil {
+			fmt.Println("Exiting bootc() 8, dropping into grub...")
 			return []string{""}
 		}
 		if err := Copy(cbSda1+tarFile, cbSda6+tarFile); err != nil {
-			return []string{""}
-		}
-		if err := Copy(cbSda6+"etc/"+scriptFile, cbSda6+"etc/"+scriptFile+"SAVE"); err != nil {
+			fmt.Println("Exiting bootc() 9, dropping into grub...")
 			return []string{""}
 		}
 		if err := Copy(cbSda1+scriptFile, cbSda6+"etc/"+scriptFile); err != nil {
+			fmt.Println("Exiting bootc() 10, dropping into grub...")
 			return []string{""}
 		}
 	}
 
 	if Cfg.BootSda6Cnt > 0 {
 		if err := formKexec6(); err != nil {
+			fmt.Println("Exiting bootc() 11, dropping into grub...")
 			return []string{""}
 		}
 		if err := decBootSda6Cnt(); err != nil {
+			fmt.Println("Exiting bootc() 12, dropping into grub...")
 			return []string{""}
 		}
 		return []string{"kexec", "-k", Cfg.Sda6K,
 			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 	}
+	fmt.Println("Exiting bootc() 13, dropping into grub...")
 	return []string{""}
 }
 
