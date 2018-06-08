@@ -80,23 +80,26 @@ type BootcConfig struct {
 }
 
 type Client struct {
-	Unit           int
-	Name           string
-	Machine        string
-	MacAddr        string
-	IpAddr         string
-	IpGWay         string
-	IpMask         string
-	BootState      int
-	InstallState   int
-	AutoInstall    bool
-	CertPresent    bool
-	DistroType     int
-	TimeRegistered string
-	TimeInstalled  string
-	InstallCounter int
-	LastISOname    string
-	LastISOdesc    string
+	Unit            int
+	Name            string
+	Machine         string
+	MacAddr         string
+	IpAddr          string
+	IpGWay          string
+	IpMask          string
+	BootState       int
+	InstallState    int
+	AutoInstall     bool
+	CertPresent     bool
+	DistroType      int
+	TimeRegistered  string
+	TimeInstalled   string
+	InstallCounter  int
+	LastISOname     string
+	LastISOdesc     string
+	GoesVersion     string
+	KernelVersion   string
+	CorebootVersion string
 }
 
 type RegReq struct {

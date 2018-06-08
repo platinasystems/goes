@@ -7,6 +7,7 @@
 //FIXME add config from server
 //FIXME add status updates msgs to server
 //FIXME SET SDA6 COUNTER in goes
+//FIXME UPDATE KERNEL IN bootc.cfg during upgrade -k
 
 package bootc
 
