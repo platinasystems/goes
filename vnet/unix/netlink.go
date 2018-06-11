@@ -400,20 +400,8 @@ func (e *netlinkElogEvent) Elog(l *elog.Log) {
 	}
 }
 
-func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, i *tuntap_interface, ok bool) {
-	if false {
-		i, ok = ns.getTuntapInterface(ifIndex)
-		if ok {
-			si = i.si
-		} else {
-			si, ok = ns.si_by_ifindex.get(ifIndex)
-		}
-		if !ok {
-			si = vnet.SiNil
-		}
-	} else {
-		si, ok = ns.si_by_ifindex.get(ifIndex)
-	}
+func (ns *net_namespace) siForIfIndex(ifIndex uint32) (si vnet.Si, ok bool) {
+	si, ok = ns.si_by_ifindex.get(ifIndex)
 	return
 }
 
@@ -430,14 +418,10 @@ func (ns *net_namespace) fibInit(is_del bool) {
 		m4.FibReset(fi)
 	}
 }
-func (ns *net_namespace) validateFibIndexForSi(si vnet.Si, intf *tuntap_interface) {
+func (ns *net_namespace) validateFibIndexForSi(si vnet.Si) {
 	m4 := ip4.GetMain(ns.m.m.v)
 	fi := ns.fibIndexForNamespace()
 
-	// Tun interfaces always use default namespace.
-	if intf != nil && intf.isTun {
-		fi = 0
-	}
 	m4.SetFibIndexForSi(si, fi)
 	return
 }
@@ -484,13 +468,9 @@ func (e *netlinkEvent) EventAction() {
 				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
 				di.isAdminUp = isUp
 				di.addDelDummyPuntPrefixes(m, !isUp)
-			} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok {
-				if intf == nil || intf.flags_synced() {
-					e.ns.validateFibIndexForSi(si, intf)
-					err = si.SetAdminUp(vn, isUp)
-				} else if intf.flag_sync_in_progress {
-					intf.check_flag_sync_done(v)
-				}
+			} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
+				e.ns.validateFibIndexForSi(si)
+				err = si.SetAdminUp(vn, isUp)
 			}
 		case *netlink.IfAddrMessage:
 			switch v.Family {
@@ -600,8 +580,8 @@ func (e *netlinkEvent) ip4IfaddrMsg(v *netlink.IfAddrMessage) (err error) {
 			}
 			di.ip4Addrs[p.Address] = fi
 		}
-	} else if si, intf, ok := e.ns.siForIfIndex(v.Index); ok {
-		e.ns.validateFibIndexForSi(si, intf)
+	} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
+		e.ns.validateFibIndexForSi(si)
 		err = m4.AddDelInterfaceAddress(si, &p, isDel)
 	}
 	return
@@ -623,7 +603,7 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 			return
 		}
 	}
-	si, _, ok := e.ns.siForIfIndex(v.Index)
+	si, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
 		// Ignore neighbors for non vnet interfaces.
 		return
@@ -758,18 +738,6 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		if gw != nil {
 			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel, isReplace); err != nil {
 				return
-			}
-		} else {
-			if false { // tuntap only - causes goes-test crash of vnet
-				// Record interface routes.  For now, don't install in vnet FIB.
-				if intf.si == e.ns.vnet_tun_interface.si {
-					tt := e.ns.vnet_tun_interface
-					if isDel {
-						tt.interface_routes.Unset(&p)
-					} else {
-						tt.interface_routes.Set(&p, ip.AdjPunt)
-					}
-				}
 			}
 		}
 		//This flag should only be set once on first nh because it deletes any previously set nh
