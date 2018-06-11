@@ -109,7 +109,7 @@ func (c *Command) Main(args ...string) (err error) {
 	for _, m := range c.mounts {
 		if m.hasGrub {
 			fmt.Printf("%s has grub\n", m.mnt)
-			args := []string{"grub", "-p", "/newroot"}
+			args := []string{"grub"}
 			if parm.ByName["-t"] != "" {
 				args = append(args, "-t")
 				args = append(args, parm.ByName["-t"])
