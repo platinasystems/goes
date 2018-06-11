@@ -73,6 +73,14 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		if b, err = wipe(); err != nil {
 			b = "error doing wipe\n"
 		}
+	case "client":
+		if b, err = getClientData(1); err != nil {
+			b = "error getting client data\n"
+		}
+	case "boot":
+		if b, err = getClientBootData(1); err != nil {
+			b = "error getting client boot data\n"
+		}
 	case "getconfig":
 		if b, err = getConfig(); err != nil {
 			b = "error getting config\n"
@@ -80,10 +88,6 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	case "putconfig":
 		if b, err = putConfig(); err != nil {
 			b = "error putting config\n"
-		}
-	case "getclientinfo":
-		if b, err = getClientInfo(); err != nil {
-			b = "error getting config\n"
 		}
 	case "putclientinfo":
 		if b, err = putClientInfo(); err != nil {

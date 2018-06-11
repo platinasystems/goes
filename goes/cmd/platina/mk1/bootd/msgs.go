@@ -2,13 +2,23 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO need to mount /sda1 on a per sda1 or sda6 basis - no coreboot
+//TODO need to mount /sda1 on a per sda1 or sda6 basis - but not in coreboot
 
 package bootd
 
-import ()
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
+)
 
 func wipe() (s string, err error) {
+	// TODO delete partition
+	// TODO set bootc.cfg install bit
+	// TODO reboot
+	return "Please wait... wiping disk\n", nil
 	return "", nil
 }
 
@@ -20,7 +30,33 @@ func putConfig() (s string, err error) {
 	return "", nil
 }
 
-func getClientInfo() (s string, err error) {
+func getClientData(j int) (s string, err error) {
+	readClientCfgDB()
+	for i, _ := range bootc.ClientCfg {
+		if bootc.ClientCfg[i].Unit == j {
+			jsonInfo, err := json.Marshal(bootc.ClientCfg[i])
+			if err != nil {
+				return "", err
+			}
+			return string(jsonInfo), nil
+		}
+	}
+	err = fmt.Errorf("client number not found: %v", err)
+	return "", nil
+}
+
+func getClientBootData(j int) (s string, err error) {
+	readClientCfgDB()
+	for i, _ := range bootc.ClientBootCfg {
+		if bootc.ClientCfg[i].Unit == j {
+			jsonInfo, err := json.Marshal(bootc.ClientBootCfg[i])
+			if err != nil {
+				return "", err
+			}
+			return string(jsonInfo), nil
+		}
+	}
+	err = fmt.Errorf("client number not found: %v", err)
 	return "", nil
 }
 
@@ -54,52 +90,52 @@ func readClientCfgDB() (err error) {
 	// TODO try reading from local DB
 
 	// default to literal for testing
-	ClientCfg["01:02:03:04:05:06"] = &Client{
+	bootc.ClientCfg["01:02:03:04:05:06"] = &bootc.Client{
 		Unit:           1,
 		Name:           "Invader10",
-		Machine:        "ToR MK1",
+		Machine:        "ToR-MK1",
 		MacAddr:        "01:02:03:04:05:06",
 		IpAddr:         "0.0.0.0",
-		BootState:      BootStateNotRegistered,
-		InstallState:   InstallStateFactory,
+		BootState:      bootc.BootStateNotRegistered,
+		InstallState:   bootc.InstallStateFactory,
 		AutoInstall:    true,
 		CertPresent:    false,
-		DistroType:     Debian,
+		DistroType:     bootc.Debian,
 		TimeRegistered: "0000-00-00:00:00:00",
 		TimeInstalled:  "0000-00-00:00:00:00",
 		InstallCounter: 0,
 	}
-	ClientCfg["01:02:03:04:05:07"] = &Client{
+	bootc.ClientCfg["01:02:03:04:05:07"] = &bootc.Client{
 		Unit:           2,
 		Name:           "Invader11",
-		Machine:        "ToR MK1",
+		Machine:        "ToR-MK1",
 		MacAddr:        "01:02:03:04:05:07",
 		IpAddr:         "0.0.0.0",
-		BootState:      BootStateNotRegistered,
-		InstallState:   InstallStateFactory,
+		BootState:      bootc.BootStateNotRegistered,
+		InstallState:   bootc.InstallStateFactory,
 		AutoInstall:    true,
 		CertPresent:    false,
-		DistroType:     Debian,
+		DistroType:     bootc.Debian,
 		TimeRegistered: "0000-00-00:00:00:00",
 		TimeInstalled:  "0000-00-00:00:00:00",
 		InstallCounter: 0,
 	}
-	ClientCfg["01:02:03:04:05:08"] = &Client{
+	bootc.ClientCfg["01:02:03:04:05:08"] = &bootc.Client{
 		Unit:           3,
 		Name:           "Invader12",
-		Machine:        "ToR MK1",
+		Machine:        "ToR-MK1",
 		MacAddr:        "01:02:03:04:05:08",
 		IpAddr:         "0.0.0.0",
-		BootState:      BootStateNotRegistered,
-		InstallState:   InstallStateFactory,
+		BootState:      bootc.BootStateNotRegistered,
+		InstallState:   bootc.InstallStateFactory,
 		AutoInstall:    true,
 		CertPresent:    false,
-		DistroType:     Debian,
+		DistroType:     bootc.Debian,
 		TimeRegistered: "0000-00-00:00:00:00",
 		TimeInstalled:  "0000-00-00:00:00:00",
 		InstallCounter: 0,
 	}
-	ClientBootCfg["01:02:03:04:05:06"] = &BootcConfig{
+	bootc.ClientBootCfg["01:02:03:04:05:06"] = &bootc.BootcConfig{
 		Install:         false,
 		BootSda1:        false,
 		BootSda6Cnt:     3,
@@ -124,7 +160,7 @@ func readClientCfgDB() (err error) {
 		ISO2Desc:        " ",
 		ISOlastUsed:     1,
 	}
-	ClientBootCfg["01:02:03:04:05:07"] = &BootcConfig{
+	bootc.ClientBootCfg["01:02:03:04:05:07"] = &bootc.BootcConfig{
 		Install:         false,
 		BootSda1:        false,
 		BootSda6Cnt:     3,
@@ -149,7 +185,7 @@ func readClientCfgDB() (err error) {
 		ISO2Desc:        "",
 		ISOlastUsed:     1,
 	}
-	ClientBootCfg["01:02:03:04:05:07"] = &BootcConfig{
+	bootc.ClientBootCfg["01:02:03:04:05:07"] = &bootc.BootcConfig{
 		Install:         false,
 		BootSda1:        false,
 		BootSda6Cnt:     3,
@@ -174,5 +210,17 @@ func readClientCfgDB() (err error) {
 		ISO2Desc:        "",
 		ISOlastUsed:     1,
 	}
+
+	// temp
+	mac := "01:02:03:04:05:06"
+	bootc.ClientCfg[mac].BootState = bootc.BootStateRegistered
+	bootc.ClientCfg[mac].InstallState = bootc.InstallStateInProgress
+	t := time.Now()
+	bootc.ClientCfg[mac].TimeRegistered = fmt.Sprintf("%10s",
+		t.Format("2006-01-02 15:04:05"))
+	bootc.ClientCfg[mac].TimeInstalled = fmt.Sprintf("%10s",
+		t.Format("2006-01-02 15:04:05"))
+	bootc.ClientCfg[mac].InstallCounter++
+
 	return nil
 }
