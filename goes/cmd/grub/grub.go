@@ -52,9 +52,7 @@ import (
 	"github.com/platinasystems/liner"
 )
 
-type Command struct {
-	prefix string
-}
+type Command struct{}
 
 var Goes = &goes.Goes{
 	NAME: "grub",
@@ -101,16 +99,7 @@ func (c *Command) Apropos() lang.Alt {
 }
 
 func (c *Command) Main(args ...string) error {
-	parm, args := parms.New(args, "-p", "-t")
-	c.prefix = parm.ByName["-p"]
-	if len(c.prefix) > 0 {
-		if c.prefix[0] != '/' {
-			c.prefix = "/" + c.prefix
-		}
-		if c.prefix[len(c.prefix)-1] == '/' {
-			c.prefix = c.prefix[:len(c.prefix)-1]
-		}
-	}
+	parm, args := parms.New(args, "-t")
 	n := "/boot/grub/grub.cfg"
 	if len(args) > 0 {
 		n = args[0]
@@ -259,7 +248,7 @@ func (c *Command) GetRoot() string {
 		}
 		return ""
 	}
-	return c.prefix + dev
+	return dev
 }
 
 func (c *Command) KexecCommand() []string {
