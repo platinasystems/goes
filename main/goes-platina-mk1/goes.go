@@ -58,6 +58,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
@@ -104,6 +105,7 @@ var Goes = &goes.Goes{
 		"cli":      &cli.Command{},
 		"boot":     &boot.Command{},
 		"bootc":    &bootc.Command{},
+		"bootd":    bootd.Command(make(chan struct{})),
 		"cat":      cat.Command{},
 		"cd":       &cd.Command{},
 		"chmod":    chmod.Command{},
@@ -123,6 +125,7 @@ var Goes = &goes.Goes{
 		"gpio":     &gpio.Command{},
 		"goes-daemons": &daemons.Command{
 			Init: [][]string{
+				[]string{"bootd"},
 				[]string{"redisd"},
 				[]string{"uptimed"},
 				// []string{"tempd"},
