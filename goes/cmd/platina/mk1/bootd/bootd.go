@@ -46,6 +46,7 @@ func (c Command) Main(...string) error {
 }
 
 func startHandler() (err error) {
+	bootc.ResetSda6Count()
 	bootc.ClientCfg = make(map[string]*bootc.Client)
 	bootc.ClientBootCfg = make(map[string]*bootc.BootcConfig)
 	if err = readClientCfgDB(); err != nil {

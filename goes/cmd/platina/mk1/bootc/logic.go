@@ -243,23 +243,6 @@ func setBootcCfgFile() error {
 	return nil
 }
 
-/*func mountSda6() error {
-	if _, err := os.Stat(mount); os.IsNotExist(err) {
-		err := os.Mkdir(mount, os.FileMode(0755))
-		if err != nil {
-			fmt.Printf("Error mkdir: %v", err)
-			return err
-		}
-	}
-	if _, err := os.Stat(mntEtc); os.IsNotExist(err) {
-		if err := syscall.Mount(devSda6, mount, fstype, zero, ""); err != nil {
-			fmt.Printf("Error mounting: %v", err)
-			return err
-		}
-	}
-	return nil
-}*/
-
 func writeCfg() error {
 	if err := setBootcCfgFile(); err != nil {
 		return err
@@ -328,6 +311,22 @@ func readUUID(partition string) (uuid string, err error) {
 	dat4 := string(dat3[0:len3])
 	uuid = string(dat4)
 	return uuid, nil
+}
+
+func ResetSda6Count() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.BootSda6Cnt = 3
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func setSda6Count(x string) error {
