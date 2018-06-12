@@ -566,7 +566,7 @@ func setInitrd(x string) error {
 	return nil
 }
 
-func wipe() error {
+func Wipe() error {
 	context, err := getContext()
 	if context != sda6 && context != sda1 {
 		return fmt.Errorf("Not booted from sda6 or sda1, can't wipe.")
@@ -630,7 +630,6 @@ func wipe() error {
 	if err := setInstall(); err != nil {
 		return err
 	}
-	reboot()
 	return nil
 }
 

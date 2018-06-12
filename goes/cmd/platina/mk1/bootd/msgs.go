@@ -15,11 +15,10 @@ import (
 )
 
 func wipe() (s string, err error) {
-	// TODO delete partition
-	// TODO set bootc.cfg install bit
-	// TODO reboot
-	return "Please wait... wiping disk\n", nil
-	return "", nil
+	if err := bootc.Wipe(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func getConfig() (s string, err error) {

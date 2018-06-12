@@ -171,9 +171,10 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "wipe":
 		if len(os.Args) >= 3 && args[1] == "sda6" {
-			if err = wipe(); err != nil {
+			if err = Wipe(); err != nil {
 				return err
 			}
+			reboot()
 		}
 		fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
 	default:

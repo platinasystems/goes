@@ -73,6 +73,7 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		if b, err = wipe(); err != nil {
 			b = "error doing wipe\n"
 		}
+		reboot()
 	case "client":
 		if b, err = getClientData(1); err != nil {
 			b = "error getting client data\n"
