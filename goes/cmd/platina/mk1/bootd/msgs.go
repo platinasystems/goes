@@ -9,6 +9,7 @@ package bootd
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
@@ -16,9 +17,9 @@ import (
 
 func wipe() (s string, err error) {
 	if err := bootc.Wipe(); err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return "", nil
 }
 
 func getConfig() (s string, err error) {
@@ -221,5 +222,15 @@ func readClientCfgDB() (err error) {
 		t.Format("2006-01-02 15:04:05"))
 	bootc.ClientCfg[mac].InstallCounter++
 
+	return nil
+}
+
+func reboot() error {
+	fmt.Print("\nWILL REBOOT NOW!!!\n")
+	u, err := exec.Command("shutdown", "-r", "now").Output()
+	fmt.Println(u)
+	if err != nil {
+		return err
+	}
 	return nil
 }
