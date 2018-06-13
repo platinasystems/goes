@@ -58,7 +58,7 @@ func ReadSuperBlock(dev string) (superBlock, error) {
 		return nil, ErrNotFilesystem
 	}
 
-	if partitionType == "ext234" {
+	if partitionType == "ext2" || partitionType == "ext3" || partitionType == "ext4" {
 		sb := &ext234{}
 		sb.sUUID = uuid.FromBytesOrNil(fsHeader[ext234SUUIDOff : ext234SUUIDOff+ext234SUUIDLen])
 		return sb, nil

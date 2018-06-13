@@ -1,18 +1,16 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2018 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package magic
 
+import (
+	"github.com/platinasystems/go/internal/magic/ext2"
+	"github.com/platinasystems/go/internal/magic/ext3"
+	"github.com/platinasystems/go/internal/magic/ext4"
+)
+
 const (
-	ext234SMagicOffL = 0x438
-	ext234SMagicOffM = 0x439
-	ext234SMagicValL = 0x53
-	ext234SMagicValM = 0xef
-
-	ext234SUUIDOff = 0x468
-	ext234SUUIDLen = 16
-
 	iso9660MagicOff1 = 0x8001
 	iso9660MagicOff2 = 0x8801
 	iso9660MagicOff3 = 0x9001
@@ -61,9 +59,14 @@ func IdentifyPartitionMap(sniff []byte) string {
 }
 
 func IdentifyPartition(sniff []byte) string {
-	if sniff[ext234SMagicOffL] == ext234SMagicValL &&
-		sniff[ext234SMagicOffM] == ext234SMagicValM {
-		return "ext234"
+	if ext2.Probe(sniff) {
+		return "ext2"
+	}
+	if ext3.Probe(sniff) {
+		return "ext3"
+	}
+	if ext4.Probe(sniff) {
+		return "ext4"
 	}
 	return ""
 }
