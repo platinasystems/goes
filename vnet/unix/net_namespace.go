@@ -226,11 +226,6 @@ type net_namespace_interface struct {
 	tunnel_metadata_mode bool
 	si                   vnet.Si
 	sup_interface        *net_namespace_interface
-	tuntap               *tuntap_interface
-}
-
-func tuntap_address_key(name string, index uint) string {
-	return fmt.Sprintf("%s-%d", name, index)
 }
 
 type si_by_ifindex struct {
@@ -275,10 +270,8 @@ type net_namespace struct {
 
 	mu sync.Mutex
 
-	vnet_tun_interface               *tuntap_interface
-	vnet_tuntap_interface_by_ifindex map[uint32]*tuntap_interface
-	dummy_interface_by_ifindex       map[uint32]*dummy_interface
-	si_by_ifindex                    si_by_ifindex
+	dummy_interface_by_ifindex map[uint32]*dummy_interface
+	si_by_ifindex              si_by_ifindex
 
 	is_default bool
 

@@ -52,13 +52,5 @@ type tuntap_interface struct {
 	interface_routes ip4.MapFib
 }
 
-//go:generate gentemplate -d Package=unix -id ifVec -d VecType=interfaceVec -d Type=*tuntap_interface github.com/platinasystems/go/elib/vec.tmpl
-
 func (i *tuntap_interface) Name() string   { return i.name.String() }
 func (i *tuntap_interface) String() string { return i.Name() }
-
-type tuntap_main struct {
-	// Selects whether we create tun or tap interfaces.
-	mtuBytes   uint
-	bufferPool *vnet.BufferPool
-}

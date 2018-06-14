@@ -70,8 +70,6 @@ type Main struct {
 	interface_filter
 	net_namespace_main
 	netlink_main
-	tuntap_main
-	vnet_tun_main
 	Config
 }
 
@@ -93,7 +91,6 @@ func (m *Main) Configure(in *parse.Input) {
 	for !in.End() {
 		var s string
 		switch {
-		case in.Parse("mtu %d", &m.mtuBytes):
 		case in.Parse("verbose-netlink"):
 			m.verbose_netlink = true
 		case in.Parse("filter-accept %s", &s):
@@ -170,6 +167,5 @@ func (m *Main) netlink_discovery_done_for_all_namespaces() (err error) {
 
 func (m *Main) Init() (err error) {
 	//Suitable defaults for an Ethernet-like tun/tap device.
-	m.mtuBytes = 9216
 	return
 }

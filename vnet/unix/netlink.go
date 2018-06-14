@@ -104,14 +104,6 @@ type netlink_main struct {
 	}
 }
 
-// Ignore non-tuntap interfaces (e.g. eth0).
-func (ns *net_namespace) getTuntapInterface(ifindex uint32) (intf *tuntap_interface, ok bool) {
-	ns.mu.Lock()
-	intf, ok = ns.vnet_tuntap_interface_by_ifindex[ifindex]
-	ns.mu.Unlock()
-	return
-}
-
 type dummy_interface struct {
 	isAdminUp bool
 	// Current set of ip4/ip6 addresses for dummy interface collected from netlink IfAddrMessage.
@@ -153,10 +145,7 @@ func (i *dummy_interface) addDelDummyPuntPrefixes(m *Main, isDel bool) {
 	}
 }
 func (ns *net_namespace) knownInterface(i uint32) (ok bool) {
-	_, ok = ns.getTuntapInterface(i)
-	if !ok {
-		_, ok = ns.si_by_ifindex.get(i)
-	}
+	_, ok = ns.si_by_ifindex.get(i)
 	return
 }
 
@@ -800,13 +789,7 @@ func (e *netlinkEvent) ip4_in_ip4_route(p *ip4.Prefix, as *netlink.AttrArray, in
 
 	// By default lookup neighbor in FIB for namespace.
 	nbr.FibIndex = e.ns.fibIndexForNamespace()
-	// If destination matches interface route for vnet tun interface, then use default namespace for next hop lookup.
-	if _, _, ok := e.ns.vnet_tun_interface.interface_routes.Lookup(h.Dst); ok {
-		nbr.FibIndex = e.m.default_namespace.fibIndexForNamespace()
-	}
-
 	nbr.Weight = 1
-	nbr.LocalSi = e.ns.vnet_tun_interface.si
 	err = m4.AddDelRouteNeighbor(p, &nbr, e.ns.fibIndexForNamespace(), isDel)
 	return
 }
