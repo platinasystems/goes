@@ -192,10 +192,9 @@ type fsType struct {
 }
 
 type filesystems struct {
-	isNoDev  map[string]bool
-	autoList []string
-	flags    *flags.Flags
-	parms    *parms.Parms
+	isNoDev map[string]bool
+	flags   *flags.Flags
+	parms   *parms.Parms
 }
 
 var translations = []struct {
@@ -419,34 +418,38 @@ func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 		return &MountResult{nil, dev, t, dir, fs.flags}
 	}
 
-	tryTypes := []string{t}
 	nodev := false
-	if t == "auto" {
-		tryTypes = fs.autoList
-	} else {
+	if t != "auto" {
 		nodev = fs.isNoDev[t]
 	}
 
 	if !nodev {
-		_, err := partitions.ReadSuperBlock(dev)
+		sb, err := partitions.ReadSuperBlock(dev)
 		if err != nil {
 			return &MountResult{err, dev, t, dir, fs.flags}
+		}
+		if sb != nil {
+			tProbe := sb.Kind()
+			if t != "auto" && t != tProbe {
+				fmt.Fprintf(os.Stderr, "Warning, filesystem probed as %s but mounting as %s\n",
+					tProbe, t)
+			} else {
+				t = tProbe
+			}
 		}
 	}
 
 	var err error
-	for _, t := range tryTypes {
-		err = syscall.Mount(dev, dir, t, flags, fs.parms.ByName["-o"])
+	err = syscall.Mount(dev, dir, t, flags, fs.parms.ByName["-o"])
+	if err == nil {
+		return &MountResult{err, dev, t, dir, fs.flags}
+	}
+	if err == syscall.EACCES && !fs.flags.ByName["-read-write"] &&
+		flags&syscall.MS_RDONLY == 0 {
+		err = syscall.Mount(dev, dir, t, flags|syscall.MS_RDONLY,
+			fs.parms.ByName["-o"])
 		if err == nil {
 			return &MountResult{err, dev, t, dir, fs.flags}
-		}
-		if err == syscall.EACCES && !fs.flags.ByName["-read-write"] &&
-			flags&syscall.MS_RDONLY == 0 {
-			err = syscall.Mount(dev, dir, t, flags|syscall.MS_RDONLY,
-				fs.parms.ByName["-o"])
-			if err == nil {
-				return &MountResult{err, dev, t, dir, fs.flags}
-			}
 		}
 	}
 
@@ -495,9 +498,6 @@ func getFilesystems() (*filesystems, error) {
 		}
 		line = strings.TrimSpace(line)
 		fs.isNoDev[line] = nodev
-		if !nodev {
-			fs.autoList = append(fs.autoList, line)
-		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "scan:", procFilesystems, err)
