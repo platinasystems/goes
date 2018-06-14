@@ -8,6 +8,7 @@ import (
 	"github.com/platinasystems/go/internal/magic/ext2"
 	"github.com/platinasystems/go/internal/magic/ext3"
 	"github.com/platinasystems/go/internal/magic/ext4"
+	"github.com/platinasystems/go/internal/magic/vfat"
 )
 
 const (
@@ -67,6 +68,9 @@ func IdentifyPartition(sniff []byte) string {
 	}
 	if ext4.Probe(sniff) {
 		return "ext4"
+	}
+	if vfat.Probe(sniff) {
+		return "vfat"
 	}
 	return ""
 }
