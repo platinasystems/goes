@@ -17,17 +17,24 @@ var ErrNotSupported = errors.New("filesystem feature not supported")
 
 type superBlock interface {
 	UUID() (uuid.UUID, error)
+	Kind() string
 }
 
 type unknownSB struct {
+	kind string
 }
 
 func (sb *unknownSB) UUID() (uuid.UUID, error) {
 	return uuid.Nil, ErrNotSupported
 }
 
+func (sb *unknownSB) Kind() string {
+	return sb.kind
+}
+
 type ext234 struct {
 	sUUID uuid.UUID
+	kind  string
 }
 
 const (
@@ -37,6 +44,10 @@ const (
 
 func (sb *ext234) UUID() (uuid.UUID, error) {
 	return sb.sUUID, nil
+}
+
+func (sb *ext234) Kind() string {
+	return sb.kind
 }
 
 func ReadSuperBlock(dev string) (superBlock, error) {
@@ -61,8 +72,9 @@ func ReadSuperBlock(dev string) (superBlock, error) {
 	if partitionType == "ext2" || partitionType == "ext3" || partitionType == "ext4" {
 		sb := &ext234{}
 		sb.sUUID = uuid.FromBytesOrNil(fsHeader[ext234SUUIDOff : ext234SUUIDOff+ext234SUUIDLen])
+		sb.kind = partitionType
 		return sb, nil
 	}
 
-	return &unknownSB{}, nil
+	return &unknownSB{kind: partitionType}, nil
 }
