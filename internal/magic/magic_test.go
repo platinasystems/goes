@@ -41,6 +41,10 @@ func TestExt4(t *testing.T) {
 	testFile(t, "ext4-sb.dat", "", "ext4", "")
 }
 
+func TestIso9660(t *testing.T) {
+	testFile(t, "iso9660-sb.dat", "", "iso9660", "")
+}
+
 func TestVfat(t *testing.T) {
 	testFile(t, "vfat-sb.dat", "", "vfat", "")
 }

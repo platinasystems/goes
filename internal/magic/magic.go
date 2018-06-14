@@ -8,20 +8,11 @@ import (
 	"github.com/platinasystems/go/internal/magic/ext2"
 	"github.com/platinasystems/go/internal/magic/ext3"
 	"github.com/platinasystems/go/internal/magic/ext4"
+	"github.com/platinasystems/go/internal/magic/iso9660"
 	"github.com/platinasystems/go/internal/magic/vfat"
 )
 
 const (
-	iso9660MagicOff1 = 0x8001
-	iso9660MagicOff2 = 0x8801
-	iso9660MagicOff3 = 0x9001
-
-	iso9660MagicVal1 = 'C'
-	iso9660MagicVal2 = 'D'
-	iso9660MagicVal3 = '0'
-	iso9660MagicVal4 = '0'
-	iso9660MagicVal5 = '1'
-
 	mbrMediaTypeOff = 0x15
 	mbrMagicOffL    = 0x1fe
 	mbrMagicOffM    = 0x1ff
@@ -34,25 +25,10 @@ func isFatValidMedia(sniff []byte) bool {
 		sniff[mbrMediaTypeOff] == 0xf0
 }
 
-func isIso9660ValidSignature(sniff []byte, off int) bool {
-	return sniff[off] == iso9660MagicVal1 &&
-		sniff[off+1] == iso9660MagicVal2 &&
-		sniff[off+2] == iso9660MagicVal3 &&
-		sniff[off+3] == iso9660MagicVal4 &&
-		sniff[off+4] == iso9660MagicVal5
-}
-
-func isIso9660ValidMedia(sniff []byte) bool {
-	return isIso9660ValidSignature(sniff, iso9660MagicOff1) ||
-		isIso9660ValidSignature(sniff, iso9660MagicOff2) ||
-		isIso9660ValidSignature(sniff, iso9660MagicOff3)
-}
-
 func IdentifyPartitionMap(sniff []byte) string {
 	if sniff[mbrMagicOffL] == mbrMagicValL &&
 		sniff[mbrMagicOffM] == mbrMagicValM &&
 		!isFatValidMedia(sniff) &&
-		!isIso9660ValidMedia(sniff) &&
 		!(IdentifyPartition(sniff) != "") {
 		return "mbr"
 	}
@@ -71,6 +47,9 @@ func IdentifyPartition(sniff []byte) string {
 	}
 	if vfat.Probe(sniff) {
 		return "vfat"
+	}
+	if iso9660.Probe(sniff) {
+		return "iso9660"
 	}
 	return ""
 }
