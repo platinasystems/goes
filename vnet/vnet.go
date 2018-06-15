@@ -18,11 +18,15 @@ import (
 var Xeth *xeth.Xeth
 
 type PortEntry struct {
-	Ifindex uint64
-	Net     uint64
-	Flags   xeth.EthtoolFlagBits
-	Speed   xeth.Mbps
-	IPNets  []*net.IPNet
+	Net         uint64
+	Ifindex     int32
+	Iflinkindex int32
+	Flags       xeth.EthtoolFlagBits
+	Iff         xeth.Iff
+	Vid         uint16
+	Speed       xeth.Mbps
+	Addr        [xeth.ETH_ALEN]uint8
+	IPNets      []*net.IPNet
 }
 
 var Ports map[string]*PortEntry
@@ -112,4 +116,8 @@ func (pe *PortEntry) DelIPNet(ipnet *net.IPNet) {
 			break
 		}
 	}
+}
+
+func (pe *PortEntry) HardwareAddr() net.HardwareAddr {
+	return net.HardwareAddr(pe.Addr[:])
 }

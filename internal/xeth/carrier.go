@@ -20,28 +20,32 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
 import "fmt"
 
-type CarrierFlag uint8
-
 const (
-	XETH_CARRIER_OFF CarrierFlag = iota
+	XETH_CARRIER_OFF = iota
 	XETH_CARRIER_ON
 )
+
+type CarrierFlag uint8
 
 func (flag CarrierFlag) String() string {
 	var flags = []string{
 		"off",
 		"on",
 	}
-	var s string
 	i := int(flag)
 	if i < len(flags) {
-		s = flags[i]
-	} else {
-		s = fmt.Sprint("flag[", i, "]")
+		return flags[i]
 	}
-	return s
+	return fmt.Sprint("@", i)
+}
+
+func (msg *MsgCarrier) String() string {
+	kind := Kind(msg.Kind)
+	ifname := (*Ifname)(&msg.Ifname)
+	return fmt.Sprintln(kind, ifname, CarrierFlag(msg.Flag))
 }

@@ -24,8 +24,10 @@ package xeth
 
 import "fmt"
 
-type LinkStat uint64
+type LinkStat int
+type MsgLinkStat MsgStat
 
+var LinkStatMap map[string]LinkStat
 var LinkStats = []string{
 	"rx-packets",
 	"tx-packets",
@@ -53,6 +55,17 @@ var LinkStats = []string{
 	"rx-nohandler",
 }
 
+func LinkStatOf(s string) (LinkStat, bool) {
+	if LinkStatMap == nil {
+		LinkStatMap = make(map[string]LinkStat)
+		for i, s := range LinkStats {
+			LinkStatMap[Hyphenate(s)] = LinkStat(i)
+		}
+	}
+	linkstat, found := LinkStatMap[Hyphenate(s)]
+	return linkstat, found
+}
+
 func (stat LinkStat) String() string {
 	var s string
 	i := int(stat)
@@ -64,15 +77,9 @@ func (stat LinkStat) String() string {
 	return s
 }
 
-var LinkStatMap map[string]LinkStat
-
-func LinkStatOf(s string) (LinkStat, bool) {
-	if LinkStatMap == nil {
-		LinkStatMap = make(map[string]LinkStat)
-		for i, s := range LinkStats {
-			LinkStatMap[Hyphenate(s)] = LinkStat(i)
-		}
-	}
-	linkstat, found := LinkStatMap[Hyphenate(s)]
-	return linkstat, found
+func (msg *MsgLinkStat) String() string {
+	kind := Kind(msg.Kind)
+	ifname := (*Ifname)(&msg.Ifname)
+	stat := LinkStat(msg.Index)
+	return fmt.Sprintln(kind, ifname, stat, msg.Count)
 }

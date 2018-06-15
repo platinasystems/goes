@@ -20,22 +20,26 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
+
+import "fmt"
+
+const (
+	AUTONEG_DISABLE = iota
+	AUTONEG_ENABLE
+)
 
 type Autoneg uint8
 
-const (
-	AUTONEG_DISABLE Autoneg = 0x00
-	AUTONEG_ENABLE  Autoneg = 0x01
-)
-
 func (autoneg Autoneg) String() string {
-	s, found := map[Autoneg]string{
-		AUTONEG_DISABLE: "disable",
-		AUTONEG_ENABLE:  "enable",
-	}[autoneg]
-	if !found {
-		s = "invalid"
+	var autonegs = []string{
+		"disable",
+		"enable",
 	}
-	return s
+	i := int(autoneg)
+	if i < len(autonegs) {
+		return autonegs[i]
+	}
+	return fmt.Sprint("@", i)
 }

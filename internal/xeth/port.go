@@ -22,32 +22,40 @@
  */
 package xeth
 
-type Port uint8
+import "fmt"
 
 const (
-	PORT_TP    Port = 0x00
-	PORT_AUI   Port = 0x01
-	PORT_MII   Port = 0x02
-	PORT_FIBRE Port = 0x03
-	PORT_BNC   Port = 0x04
-	PORT_DA    Port = 0x05
-	PORT_NONE  Port = 0xef
-	PORT_OTHER Port = 0xff
+	PORT_TP = iota
+	PORT_AUI
+	PORT_MII
+	PORT_FIBRE
+	PORT_BNC
+	PORT_DA
 )
 
+const (
+	PORT_NONE  = 0xef
+	PORT_OTHER = 0xff
+)
+
+type Port uint8
+
 func (port Port) String() string {
-	s, found := map[Port]string{
-		PORT_TP:    "tp",
-		PORT_AUI:   "aui",
-		PORT_MII:   "mii",
-		PORT_FIBRE: "fibre",
-		PORT_BNC:   "bnc",
-		PORT_DA:    "da",
-		PORT_NONE:  "none",
-		PORT_OTHER: "other",
-	}[port]
-	if !found {
-		s = "invalid"
+	var ports = []string{
+		"tp",
+		"aui",
+		"mii",
+		"fibre",
+		"bnc",
+		"da",
 	}
-	return s
+	i := int(port)
+	if i < len(ports) {
+		return ports[i]
+	} else if i == PORT_NONE {
+		return "none"
+	} else if i == PORT_OTHER {
+		return "other"
+	}
+	return fmt.Sprint("@", i)
 }

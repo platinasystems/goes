@@ -20,13 +20,27 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
 import "fmt"
 
-type EthtoolStat uint64
+type EthtoolStat int
+type MsgEthtoolStat MsgStat
 
 var EthtoolStats []string
+var EthtoolStatMap map[string]EthtoolStat
+
+func EthtoolStatOf(s string) (EthtoolStat, bool) {
+	if EthtoolStatMap == nil {
+		EthtoolStatMap = make(map[string]EthtoolStat)
+		for i, s := range EthtoolStats {
+			EthtoolStatMap[Hyphenate(s)] = EthtoolStat(i)
+		}
+	}
+	ethtoolstat, found := EthtoolStatMap[Hyphenate(s)]
+	return ethtoolstat, found
+}
 
 func (stat EthtoolStat) String() string {
 	var s string
@@ -39,15 +53,9 @@ func (stat EthtoolStat) String() string {
 	return s
 }
 
-var EthtoolStatMap map[string]EthtoolStat
-
-func EthtoolStatOf(s string) (EthtoolStat, bool) {
-	if EthtoolStatMap == nil {
-		EthtoolStatMap = make(map[string]EthtoolStat)
-		for i, s := range EthtoolStats {
-			EthtoolStatMap[Hyphenate(s)] = EthtoolStat(i)
-		}
-	}
-	ethtoolstat, found := EthtoolStatMap[Hyphenate(s)]
-	return ethtoolstat, found
+func (msg *MsgEthtoolStat) String() string {
+	kind := Kind(msg.Kind)
+	ifname := (*Ifname)(&msg.Ifname)
+	stat := EthtoolStat(msg.Index)
+	return fmt.Sprintln(kind, ifname, stat, msg.Count)
 }

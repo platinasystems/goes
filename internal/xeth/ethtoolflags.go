@@ -20,6 +20,7 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
 import (
@@ -53,4 +54,10 @@ func (bits EthtoolFlagBits) String() string {
 func (bits EthtoolFlagBits) Test(bit uint) bool {
 	mask := EthtoolFlagBits(1 << bit)
 	return (bits & mask) == mask
+}
+
+func (msg *MsgEthtoolFlags) String() string {
+	kind := Kind(msg.Kind)
+	ifname := (*Ifname)(&msg.Ifname)
+	return fmt.Sprintln(kind, ifname, EthtoolFlagBits(msg.Flags))
 }

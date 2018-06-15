@@ -100,8 +100,8 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			switch args[1] {
 			case "ifinfo":
 				xeth.DumpIfinfo()
-			case "fdb":
-				panic("FIXME")
+			case "fib":
+				xeth.DumpFib()
 			default:
 				panic(fmt.Errorf("DB %q unknown\n%s",
 					args[1], usage))
@@ -162,20 +162,23 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 
 func dump(buf []byte) error {
 	ptr := unsafe.Pointer(&buf[0])
-	kind := MsgKind(buf)
-	stringer := fmt.Stringer(kind)
-	switch kind {
-	case XETH_MSG_KIND_LINK_STAT, XETH_MSG_KIND_ETHTOOL_STAT:
-		stringer = (*MsgStat)(ptr)
+	switch kind := KindOf(buf); kind {
+	case XETH_MSG_KIND_LINK_STAT:
+		fmt.Print((*MsgLinkStat)(ptr))
+	case XETH_MSG_KIND_ETHTOOL_STAT:
+		fmt.Print((*MsgEthtoolStat)(ptr))
 	case XETH_MSG_KIND_ETHTOOL_FLAGS:
-		stringer = (*MsgEthtoolFlags)(ptr)
+		fmt.Print((*MsgEthtoolFlags)(ptr))
 	case XETH_MSG_KIND_ETHTOOL_SETTINGS:
-		stringer = (*MsgEthtoolSettings)(ptr)
-	case XETH_MSG_KIND_IFINDEX:
-		stringer = (*MsgIfindex)(ptr)
+		fmt.Print((*MsgEthtoolSettings)(ptr))
+	case XETH_MSG_KIND_IFINFO:
+		fmt.Print((*MsgIfinfo)(ptr))
 	case XETH_MSG_KIND_IFA:
-		stringer = (*MsgIfa)(ptr)
+		fmt.Print((*MsgIfa)(ptr))
+	case XETH_MSG_KIND_FIBENTRY:
+		fmt.Print((*MsgFibentry)(ptr))
+	default:
+		fmt.Println(kind)
 	}
-	fmt.Println(stringer.String())
 	return nil
 }

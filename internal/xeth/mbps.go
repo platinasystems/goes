@@ -20,6 +20,7 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
 import "fmt"
@@ -31,4 +32,10 @@ func (mbps Mbps) String() string {
 		return "unspecified"
 	}
 	return fmt.Sprint(uint32(mbps), "Mb/s")
+}
+
+func (msg *MsgSpeed) String() string {
+	kind := Kind(msg.Kind)
+	ifname := (*Ifname)(&msg.Ifname)
+	return fmt.Sprintln(kind, ifname, Mbps(msg.Mbps))
 }

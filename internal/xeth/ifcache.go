@@ -20,25 +20,27 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
-import "fmt"
+import "net"
 
-const (
-	DUPLEX_HALF = iota
-	DUPLEX_FULL
-)
+var ifcache map[int32]*net.Interface
 
-type Duplex uint8
-
-func (duplex Duplex) String() string {
-	var duplexs = []string{
-		"half",
-		"full",
+func InterfaceByIndex(ifindex int32) *net.Interface {
+	if ifcache == nil {
+		ifcache = make(map[int32]*net.Interface)
 	}
-	i := int(duplex)
-	if i < len(duplexs) {
-		return duplexs[i]
+	if itf, found := ifcache[ifindex]; found {
+		return itf
 	}
-	return fmt.Sprint("@", i)
+	itf, err := net.InterfaceByIndex(int(ifindex))
+	if err != nil {
+		itf = &net.Interface{
+			Index: int(ifindex),
+			Name:  "unknown",
+		}
+	}
+	ifcache[ifindex] = itf
+	return itf
 }

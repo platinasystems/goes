@@ -1,5 +1,4 @@
-/* XETH side-band channel protocol.
- * Copyright(c) 2018 Platina Systems, Inc.
+/* Copyright(c) 2018 Platina Systems, Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -26,10 +25,8 @@ package xeth
 
 import "fmt"
 
-type Event uint32
-
 const (
-	NETDEV_UP Event = 1 + iota
+	NETDEV_UP = 1 + iota
 	NETDEV_DOWN
 	NETDEV_REBOOT
 	NETDEV_CHANGE
@@ -60,9 +57,11 @@ const (
 	NETDEV_CHANGE_TX_QUEUE_LEN
 )
 
+type Event int
+
 func (event Event) String() string {
 	var events = []string{
-		"",
+		"reserved",
 		"up",
 		"down",
 		"reboot",
@@ -93,24 +92,9 @@ func (event Event) String() string {
 		"udp-tunnel-push-info",
 		"change-tx-queue-len",
 	}
-	var s string
 	i := int(event)
-	if i > 0 && i < len(events) {
-		s = events[i]
-	} else {
-		s = fmt.Sprint("event[", i, "]")
+	if i < len(events) {
+		return events[i]
 	}
-	return s
-}
-
-type AddressEvent Event
-
-func (event AddressEvent) String() string {
-	switch Event(event) {
-	case NETDEV_UP:
-		return "add"
-	case NETDEV_DOWN:
-		return "del"
-	}
-	return "invalid"
+	return fmt.Sprint("@", i)
 }

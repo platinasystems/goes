@@ -80,7 +80,7 @@ func vnetdInit() {
 	vnet.Xeth.DumpIfinfo()
 	vnet.Xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
-		switch xeth.MsgKind(buf) {
+		switch xeth.KindOf(buf) {
 		case xeth.XETH_MSG_KIND_ETHTOOL_FLAGS:
 			msg := (*xeth.MsgEthtoolFlags)(ptr)
 			ifname := xeth.Ifname(msg.Ifname)
@@ -91,20 +91,23 @@ func vnetdInit() {
 			ifname := xeth.Ifname(msg.Ifname)
 			vnet.SetPort(ifname.String()).Speed =
 				xeth.Mbps(msg.Speed)
-		case xeth.XETH_MSG_KIND_IFINDEX:
-			msg := (*xeth.MsgIfindex)(ptr)
+		case xeth.XETH_MSG_KIND_IFINFO:
+			msg := (*xeth.MsgIfinfo)(ptr)
 			ifname := xeth.Ifname(msg.Ifname)
 			pe := vnet.SetPort(ifname.String())
 			pe.Ifindex = msg.Ifindex
+			pe.Iflinkindex = msg.Iflinkindex
+			pe.Iff = xeth.Iff(msg.Flags)
+			copy(pe.Addr[:], msg.Addr[:])
 			pe.Net = msg.Net
 		case xeth.XETH_MSG_KIND_IFA:
 			msg := (*xeth.MsgIfa)(ptr)
 			ifname := xeth.Ifname(msg.Ifname)
 			pe := vnet.SetPort(ifname.String())
 			if msg.IsAdd() {
-				pe.AddIPNet(msg.IPNet())
+				pe.AddIPNet(msg.Prefix())
 			} else if msg.IsDel() {
-				pe.DelIPNet(msg.IPNet())
+				pe.DelIPNet(msg.Prefix())
 			}
 		}
 		return nil

@@ -20,25 +20,53 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
-import "fmt"
-
-const (
-	DUPLEX_HALF = iota
-	DUPLEX_FULL
+import (
+	"fmt"
+	"net"
+	"unsafe"
 )
 
-type Duplex uint8
+const (
+	IFA_ADD = NETDEV_UP
+	IFA_DEL = NETDEV_DOWN
+)
 
-func (duplex Duplex) String() string {
-	var duplexs = []string{
-		"half",
-		"full",
+type IfaEvent int
+
+func (event IfaEvent) String() string {
+	var events = []string{
+		IFA_ADD: "add",
+		IFA_DEL: "del",
 	}
-	i := int(duplex)
-	if i < len(duplexs) {
-		return duplexs[i]
+	var s string
+	i := int(event)
+	if i < len(events) {
+		s = events[i]
 	}
-	return fmt.Sprint("@", i)
+	if len(s) == 0 {
+		s = fmt.Sprint("@", i)
+	}
+	return s
+}
+
+func (ifa *MsgIfa) IsAdd() bool { return ifa.Event == IFA_ADD }
+func (ifa *MsgIfa) IsDel() bool { return ifa.Event == IFA_DEL }
+
+func (ifa *MsgIfa) Prefix() *net.IPNet {
+	ipBuf := make([]byte, 4)
+	maskBuf := make([]byte, 4)
+	*(*uint32)(unsafe.Pointer(&ipBuf[0])) = ifa.Address
+	*(*uint32)(unsafe.Pointer(&maskBuf[0])) = ifa.Mask
+	return &net.IPNet{net.IP(ipBuf), net.IPMask(maskBuf)}
+}
+
+func (ifa *MsgIfa) String() string {
+	kind := Kind(ifa.Kind)
+	ifname := (*Ifname)(&ifa.Ifname)
+	event := IfaEvent(ifa.Event)
+	prefix := ifa.Prefix()
+	return fmt.Sprintln(kind, ifname, event, prefix)
 }

@@ -20,38 +20,23 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
+
 package xeth
 
-import (
-	"bytes"
-	"fmt"
-)
+import "fmt"
 
-type EthtoolSettings struct {
-	cmd                 uint32
-	Speed               Mbps
-	Duplex              Duplex
-	Port                Port
-	PhyAddress          uint8
-	Autoneg             Autoneg
-	MdioSupport         uint8
-	EthTpMdix           uint8
-	EthTpMdixCtrl       uint8
-	LinkModeMasksNwords uint8
-	reserved            [8]uint32
-	Supported           EthtoolLinkModeBits
-	Advertising         EthtoolLinkModeBits
-	Partner             EthtoolLinkModeBits
-}
-
-func (settings *EthtoolSettings) String() string {
-	buf := new(bytes.Buffer)
-	fmt.Fprint(buf, "\n\tspeed: ", settings.Speed)
-	fmt.Fprint(buf, "\n\tduplex: ", settings.Duplex)
-	fmt.Fprint(buf, "\n\tport: ", settings.Port)
-	fmt.Fprint(buf, "\n\tautoneg: ", settings.Autoneg)
-	fmt.Fprint(buf, "\n\tsupported link modes:", &settings.Supported)
-	fmt.Fprint(buf, "\n\tadvertising link modes:", &settings.Advertising)
-	fmt.Fprint(buf, "\n\tpartner link modes:", &settings.Partner)
-	return buf.String()
+func (msg *MsgEthtoolSettings) String() string {
+	kind := Kind(msg.Kind)
+	ifname := (*Ifname)(&msg.Ifname)
+	return fmt.Sprintln(kind, " ", ifname) +
+		fmt.Sprintln("\tspeed:", Mbps(msg.Speed)) +
+		fmt.Sprintln("\tduplex:", Duplex(msg.Duplex)) +
+		fmt.Sprintln("\tport:", Port(msg.Port)) +
+		fmt.Sprintln("\tautoneg:", Autoneg(msg.Autoneg)) +
+		fmt.Sprintln("\tsupported:",
+			(*EthtoolLinkModeBits)(&msg.Link_modes_supported)) +
+		fmt.Sprintln("\tadvertising:",
+			(*EthtoolLinkModeBits)(&msg.Link_modes_advertising)) +
+		fmt.Sprintln("\tpartner:",
+			(*EthtoolLinkModeBits)(&msg.Link_modes_lp_advertising))
 }

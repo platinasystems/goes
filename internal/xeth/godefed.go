@@ -1,10 +1,11 @@
 // Created by cgo -godefs - DO NOT EDIT
-// cgo -godefs -- -I./arch/x86/include -I./arch/x86/include/generated -I./include -I./arch/x86/include/uapi -I./arch/x86/include/generated/uapi -I./include/uapi -I./include/generated/uapi -include ./include/linux/kconfig.h ./drivers/net/ethernet/xeth/go/src/xeth/godefs.go
+// cgo -godefs -- -I/home/tgrennan/src/github.com/platinasystems/linux/arch/x86/include -I./arch/x86/include/generated -I/home/tgrennan/src/github.com/platinasystems/linux/include -I./include -I/home/tgrennan/src/github.com/platinasystems/linux/arch/x86/include/uapi -I./arch/x86/include/generated/uapi -I/home/tgrennan/src/github.com/platinasystems/linux/include/uapi -I./include/generated/uapi -include /home/tgrennan/src/github.com/platinasystems/linux/include/linux/kconfig.h /home/tgrennan/src/github.com/platinasystems/linux/drivers/net/ethernet/xeth/go/src/xeth/godefs.go
 
 package xeth
 
 const (
 	IFNAMSIZ			= 0x10
+	ETH_ALEN			= 0x6
 	SizeofJumboFrame		= 0x2600
 	SizeofMsg			= 0x10
 	SizeofMsgBreak			= 0x10
@@ -14,8 +15,10 @@ const (
 	SizeofMsgDumpIfinfo		= 0x10
 	SizeofMsgCarrier		= 0x28
 	SizeofMsgSpeed			= 0x28
-	SizeofMsgIfindex		= 0x30
+	SizeofMsgIfinfo			= 0x40
 	SizeofMsgIfa			= 0x30
+	SizeofMsgFibentry		= 0x28
+	SizeofNextHop			= 0x18
 )
 
 type Msg struct {
@@ -51,14 +54,14 @@ type MsgStat struct {
 	Count	uint64
 }
 type MsgEthtoolFlags struct {
-	Z64		uint64
-	Z32		uint32
-	Z16		uint16
-	Z8		uint8
-	Kind		uint8
-	Ifname		[16]uint8
-	Flags		uint32
-	Pad_cgo_0	[4]byte
+	Z64	uint64
+	Z32	uint32
+	Z16	uint16
+	Z8	uint8
+	Kind	uint8
+	Ifname	[16]uint8
+	Flags	uint32
+	Pad	[4]uint8
 }
 type MsgEthtoolSettings struct {
 	Z64				uint64
@@ -79,47 +82,75 @@ type MsgEthtoolSettings struct {
 	Link_modes_supported		[2]uint32
 	Link_modes_advertising		[2]uint32
 	Link_modes_lp_advertising	[2]uint32
-	Pad_cgo_0			[4]byte
+	Pad				[4]uint8
 }
 type MsgCarrier struct {
-	Z64		uint64
-	Z32		uint32
-	Z16		uint16
-	Z8		uint8
-	Kind		uint8
-	Ifname		[16]uint8
-	Flag		uint8
-	Pad_cgo_0	[7]byte
-}
-type MsgSpeed struct {
-	Z64		uint64
-	Z32		uint32
-	Z16		uint16
-	Z8		uint8
-	Kind		uint8
-	Ifname		[16]uint8
-	Mbps		uint32
-	Pad_cgo_0	[4]byte
-}
-type MsgIfindex struct {
 	Z64	uint64
 	Z32	uint32
 	Z16	uint16
 	Z8	uint8
 	Kind	uint8
 	Ifname	[16]uint8
-	Ifindex	uint64
-	Net	uint64
+	Flag	uint8
+	Pad	[7]uint8
 }
-type MsgIfa struct {
+type MsgSpeed struct {
+	Z64	uint64
+	Z32	uint32
+	Z16	uint16
+	Z8	uint8
+	Kind	uint8
+	Ifname	[16]uint8
+	Mbps	uint32
+	Pad	[4]uint8
+}
+type MsgIfinfo struct {
 	Z64		uint64
 	Z32		uint32
 	Z16		uint16
 	Z8		uint8
 	Kind		uint8
 	Ifname		[16]uint8
-	Event		uint32
-	Address		uint32
-	Mask		uint32
-	Pad_cgo_0	[4]byte
+	Net		uint64
+	Ifindex		int32
+	Iflinkindex	int32
+	Flags		uint32
+	Id		uint16
+	Addr		[6]uint8
+	Pad		[4]uint8
+}
+type MsgIfa struct {
+	Z64	uint64
+	Z32	uint32
+	Z16	uint16
+	Z8	uint8
+	Kind	uint8
+	Ifname	[16]uint8
+	Event	uint32
+	Address	uint32
+	Mask	uint32
+	Pad	[4]uint8
+}
+type MsgFibentry struct {
+	Z64	uint64
+	Z32	uint32
+	Z16	uint16
+	Z8	uint8
+	Kind	uint8
+	Net	uint64
+	Address	uint32
+	Mask	uint32
+	Event	uint8
+	Nhs	uint8
+	Tos	uint8
+	Type	uint8
+	Id	uint32
+}
+type NextHop struct {
+	Ifindex	int32
+	Weight	int32
+	Flags	uint32
+	Gw	uint32
+	Scope	uint8
+	Pad	[7]uint8
 }

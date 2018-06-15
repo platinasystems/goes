@@ -134,6 +134,13 @@ func (xeth *Xeth) Carrier(ifname string, flag CarrierFlag) {
 	xeth.TxCh <- buf
 }
 
+func (xeth *Xeth) DumpFib() {
+	buf := Pool.Get(SizeofMsgBreak)
+	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
+	msg.Kind = uint8(XETH_MSG_KIND_DUMP_FIBINFO)
+	xeth.TxCh <- buf
+}
+
 func (xeth *Xeth) DumpIfinfo() {
 	buf := Pool.Get(SizeofMsgBreak)
 	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
@@ -182,11 +189,11 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 
 func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 	for buf := range xeth.RxCh {
-		kind := MsgKind(buf)
+		kind := KindOf(buf)
 		if kind == XETH_MSG_KIND_BREAK {
 			Pool.Put(buf)
 			break
-		} else if kind != XETH_MSG_KIND_INVALID {
+		} else if kind != XETH_MSG_KIND_NOT_MSG {
 			err = f(buf)
 		}
 		Pool.Put(buf)

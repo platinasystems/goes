@@ -22,23 +22,68 @@
  */
 package xeth
 
-import "fmt"
-
-const (
-	DUPLEX_HALF = iota
-	DUPLEX_FULL
+import (
+	"bytes"
+	"fmt"
 )
 
-type Duplex uint8
+type Iff uint32
 
-func (duplex Duplex) String() string {
-	var duplexs = []string{
-		"half",
-		"full",
+const (
+	IFF_UP Iff = 1 << iota
+	IFF_BROADCAST
+	IFF_DEBUG
+	IFF_LOOPBACK
+	IFF_POINTOPOINT
+	IFF_NOTRAILERS
+	IFF_RUNNING
+	IFF_NOARP
+	IFF_PROMISC
+	IFF_ALLMULTI
+	IFF_MASTER
+	IFF_SLAVE
+	IFF_MULTICAST
+	IFF_PORTSEL
+	IFF_AUTOMEDIA
+	IFF_DYNAMIC
+	IFF_LOWER_UP
+	IFF_DORMANT
+	IFF_ECHO
+)
+
+func (iff Iff) String() string {
+	var iffs = []string{
+		"up",
+		"broadcast",
+		"debug",
+		"loopback",
+		"pointopoint",
+		"notrailers",
+		"running",
+		"noarp",
+		"promisc",
+		"allmulti",
+		"master",
+		"slave",
+		"multicast",
+		"portsel",
+		"automedia",
+		"dynamic",
+		"lower_up",
+		"dormant",
+		"echo",
 	}
-	i := int(duplex)
-	if i < len(duplexs) {
-		return duplexs[i]
+	var sep string
+	if iff == 0 {
+		return "none"
 	}
-	return fmt.Sprint("@", i)
+	buf := new(bytes.Buffer)
+	for i, s := range iffs {
+		bit := Iff(1) << uint(i)
+		if iff&bit == bit {
+			fmt.Fprint(buf, sep, s)
+			sep = ", "
+		}
+	}
+	return buf.String()
 }
