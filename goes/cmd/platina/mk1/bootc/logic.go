@@ -6,8 +6,6 @@
 //FIXME add support for 2 ISOs
 //FIXME add config from server
 //FIXME add status updates msgs to server
-//FIXME SET SDA6 COUNTER in goes
-//FIXME UPDATE KERNEL IN bootc.cfg during upgrade -k
 
 package bootc
 
@@ -314,7 +312,14 @@ func readUUID(partition string) (uuid string, err error) {
 }
 
 func ResetSda6Count() error {
-	if err := readCfg(); err != nil {
+	c, err := getContext()
+	if err != nil {
+		return err
+	}
+	if c != sda6 {
+		return nil
+	}
+	if err = readCfg(); err != nil {
 		return err
 	}
 	Cfg.BootSda6Cnt = 3
@@ -559,6 +564,20 @@ func setInitrd(x string) error {
 		return err
 	}
 	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func UpdateBootcCfg(k, i string) error {
+	k = cbSda6 + "boot/" + k
+	err := setKernel(k)
+	if err != nil {
+		return err
+	}
+	i = cbSda6 + "boot/" + i
+	err = setInitrd(i)
 	if err != nil {
 		return err
 	}

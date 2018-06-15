@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	. "github.com/platinasystems/go"
+	//	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/go/internal/url"
 )
 
@@ -375,6 +376,29 @@ func installKernel(s string, v string, t bool, fn string) error {
 	if err != nil {
 		return err
 	}
+
+	files, err := ioutil.ReadDir("/boot")
+	if err != nil {
+		return err
+	}
+	k := ""
+	i := ""
+	for _, f := range files {
+		if strings.Contains(f.Name(), "vmlinuz") {
+			k = f.Name()
+			fmt.Println(k)
+		}
+	}
+	for _, f := range files {
+		if strings.Contains(f.Name(), "initrd") {
+			i = f.Name()
+			fmt.Println(i)
+		}
+	}
+
+	//if err := bootc.UpdateBootcCfg(k, i); err != nil { //FIXME activate
+	//	return err
+	//}
 
 	Reboot_flag = true
 	return nil
