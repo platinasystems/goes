@@ -71,9 +71,9 @@ func serve(w http.ResponseWriter, r *http.Request) {
 
 	switch u[0] {
 	case "wipe":
-		if b, err = wipe(); err != nil {
-			b = "error doing wipe\n"
-		}
+		//if b, err = wipe(); err != nil { // FIXME comment out for testing
+		//	b = "error doing wipe\n"
+		//}
 		reboot()
 	case "client":
 		if b, err = getClientData(1); err != nil {
