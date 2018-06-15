@@ -8,7 +8,6 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
-	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
 	"github.com/platinasystems/go/goes/cmd/cd"
 	"github.com/platinasystems/go/goes/cmd/chmod"
@@ -29,6 +28,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ficmd"
 	"github.com/platinasystems/go/goes/cmd/function"
 	"github.com/platinasystems/go/goes/cmd/grub"
+	"github.com/platinasystems/go/goes/cmd/grubd"
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/iminfo"
 	"github.com/platinasystems/go/goes/cmd/insmod"
@@ -78,7 +78,6 @@ var Goes = &goes.Goes{
 	ByName: map[string]cmd.Cmd{
 		"!":        bang.Command{},
 		"cli":      &cli.Command{},
-		"boot":     &boot.Command{},
 		"bootc":    &bootc.Command{},
 		"cat":      cat.Command{},
 		"cd":       &cd.Command{},
@@ -99,9 +98,11 @@ var Goes = &goes.Goes{
 		"goes-daemons": &daemons.Command{
 			Init: [][]string{
 				[]string{"dhcpcd"},
+				[]string{"grubd"},
 			},
 		},
 		"grub":    &grub.Command{},
+		"grubd":   &grubd.Command{},
 		"if":      &ifcmd.Command{},
 		"insmod":  insmod.Command{},
 		"install": &install.Command{},
