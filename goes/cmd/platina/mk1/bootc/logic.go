@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	corebootCfg = "/newroot/sda1/bootc.cfg"
+	corebootCfg = "/mountd/sda1/bootc.cfg"
 	sda1Cfg     = "/bootc.cfg"
 	sda6Cfg     = "/mnt/bootc.cfg"
 	mount       = "/mnt"
@@ -37,8 +37,8 @@ const (
 	sda1        = "sda1"
 	sda6        = "sda6"
 	coreboot    = "coreboot"
-	cbSda1      = "/newroot/sda1/"
-	cbSda6      = "/newroot/sda6/"
+	cbSda1      = "/mountd/sda1/"
+	cbSda6      = "/mountd/sda6/"
 	tarFile     = "postinstall.tar.gz"
 	scriptFile  = "rc.local"
 )
@@ -164,14 +164,14 @@ func initCfg() error {
 		MyGateway:       "192.168.101.1",
 		MyNetmask:       "255.255.255.0",
 		MasterAddresses: []string{"198.168.101.142"},
-		ReInstallK:      "/newroot/sda1/boot/vmlinuz",
-		ReInstallI:      "/newroot/sda1/boot/initrd.gz",
+		ReInstallK:      "/mountd/sda1/boot/vmlinuz",
+		ReInstallI:      "/mountd/sda1/boot/initrd.gz",
 		ReInstallC:      `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`,
-		Sda1K:           "/newroot/sda1/boot/vmlinuz-3.16.0-4-amd64",
-		Sda1I:           "/newroot/sda1/boot/initrd.img-3.16.0-4-amd64",
+		Sda1K:           "/mountd/sda1/boot/vmlinuz-3.16.0-4-amd64",
+		Sda1I:           "/mountd/sda1/boot/initrd.img-3.16.0-4-amd64",
 		Sda1C:           "::eth0:none",
-		Sda6K:           "/newroot/sda6/boot/vmlinuz-3.16.0-4-amd64",
-		Sda6I:           "/newroot/sda6/boot/initrd.img-3.16.0-4-amd64",
+		Sda6K:           "/mountd/sda6/boot/vmlinuz-3.16.0-4-amd64",
+		Sda6I:           "/mountd/sda6/boot/initrd.img-3.16.0-4-amd64",
 		Sda6C:           "::eth0:none",
 		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
 		ISO1Desc:        "Jessie debian-8.10.0",
@@ -298,7 +298,7 @@ func formKexec6() (err error) {
 }
 
 func readUUID(partition string) (uuid string, err error) {
-	dat, err := ioutil.ReadFile("/newroot/" + partition + "/etc/fstab")
+	dat, err := ioutil.ReadFile("/mountd/" + partition + "/etc/fstab")
 	if err != nil {
 		return "", err
 	}
