@@ -46,6 +46,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/truecmd"
 	"github.com/platinasystems/go/goes/lang"
 
+	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/url"
 
@@ -100,6 +101,8 @@ func (c *Command) Apropos() lang.Alt {
 
 func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-t")
+	flag, args := flags.New(args, "--daemon")
+
 	n := "/boot/grub/grub.cfg"
 	if len(args) > 0 {
 		n = args[0]
@@ -131,13 +134,13 @@ func (c *Command) Main(args ...string) error {
 	root := Goes.EnvMap["root"]
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
+	c.ServeMenus() // FIXME so wrong
+
 	if kexec := bootc.Bootc(); len(kexec) > 1 {
 		fmt.Printf("STRING: %v", kexec)
 		err = Goes.Main(kexec...)
 		fmt.Println(err)
 	}
-
-	c.ServeMenus() // FIXME so wrong
 
 	menlen := len(Menuentry.Menus)
 	if menlen == 0 && len(Linux.Kern) == 0 {
@@ -146,7 +149,7 @@ func (c *Command) Main(args ...string) error {
 
 	if len(Linux.Kern) > 0 {
 		kexec := c.KexecCommand()
-		yn, err := c.readline(parm, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
+		yn, err := c.readline(parm, flag, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
 		if err != nil {
 			return err
 		}
@@ -173,7 +176,7 @@ func (c *Command) Main(args ...string) error {
 		if def == "" {
 			def = "0"
 		}
-		mi, err := c.readline(parm, fmt.Sprintf("Menu item [%s]? ", def), def)
+		mi, err := c.readline(parm, flag, fmt.Sprintf("Menu item [%s]? ", def), def)
 		if err != nil {
 			return err
 		}
@@ -199,7 +202,7 @@ func (c *Command) Main(args ...string) error {
 
 	if len(Linux.Kern) > 0 {
 		kexec := c.KexecCommand()
-		yn, err := c.readline(parm, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
+		yn, err := c.readline(parm, flag, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
 		if err != nil {
 			return err
 		}
@@ -227,20 +230,27 @@ func (c *Command) GetRoot() string {
 		return root
 	}
 
-	dev := root
+	devSD := root
+	devHD := ""
+	devVD := ""
 	if !strings.HasPrefix(root, "/dev/") {
 		re := regexp.MustCompile(`^((hd(?P<Unit>\d+)),.*(?P<Partition>\d+))$`)
 		r := re.FindStringSubmatch(root)
 		if len(r) == 5 {
 			unit, err := strconv.Atoi(r[3])
 			if err == nil {
-				dev = "/dev/sd" + string(97+unit) + r[4]
+				devSD = "/dev/sd" + string(97+unit) + r[4]
+				devHD = "/dev/hd" + string(97+unit) + r[4]
+				devVD = "/dev/vd" + string(97+unit) + r[4]
 			}
 		}
 	}
-	trans, err := c.findMountedFS(dev)
-	if err != nil {
-		panic(err)
+	trans, err := c.findMountedFS(devSD)
+	if err != nil && devHD != "" {
+		trans, err = c.findMountedFS(devHD)
+		if err != nil && devVD != "" {
+			trans, err = c.findMountedFS(devVD)
+		}
 	}
 	if trans != "" {
 		if trans != "/" {
@@ -248,7 +258,7 @@ func (c *Command) GetRoot() string {
 		}
 		return ""
 	}
-	return dev
+	return devSD
 }
 
 func (c *Command) KexecCommand() []string {
@@ -266,30 +276,49 @@ func (c *Command) KexecCommand() []string {
 
 }
 
-func (c *Command) readline(parm *parms.Parms, prompt string, def string) (string, error) {
-	line := liner.NewLiner()
-	defer line.Close()
-	if parm.ByName["-t"] != "" {
-		timeout, err := time.ParseDuration(parm.ByName["-t"])
-		if err != nil {
-			return "", err
+func (c *Command) readline(parm *parms.Parms, flag *flags.Flags, prompt string, def string) (mi string, err error) {
+	var timeout time.Duration
+	tmEnv := Goes.EnvMap["timeout"]
+	if tmEnv != "" {
+		tm, err := strconv.Atoi(tmEnv)
+		if err == nil {
+			timeout = time.Duration(tm) * time.Second
 		}
-		err = line.SetDuration(timeout)
-		if err != nil {
-			return "", err
+	}
+	if timeout == 0 {
+		if parm.ByName["-t"] != "" {
+			timeout, err = time.ParseDuration(parm.ByName["-t"])
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
-	line.SetCtrlCAborts(true)
-
-	mi, err := line.Prompt(prompt)
-	if err != nil {
-		if err == liner.ErrTimeOut {
-			mi = ""
-			fmt.Println("<timeout>")
-		} else {
-			return "", err
+	if flag.ByName["--daemon"] == false {
+		line := liner.NewLiner()
+		defer line.Close()
+		line.SetCtrlCAborts(true)
+		if timeout != 0 {
+			err := line.SetDuration(timeout)
+			if err != nil {
+				return "", err
+			}
 		}
+
+		mi, err = line.Prompt(prompt)
+		if err != nil {
+			if err == liner.ErrTimeOut {
+				mi = ""
+				fmt.Println("<timeout>")
+			} else {
+				return "", err
+			}
+		}
+	} else {
+		if timeout == 0 {
+			timeout = 30 * time.Second
+		}
+		time.Sleep(timeout)
 	}
 
 	if mi == "" {
