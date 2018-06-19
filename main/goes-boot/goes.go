@@ -44,6 +44,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mkdir"
 	"github.com/platinasystems/go/goes/cmd/mknod"
 	"github.com/platinasystems/go/goes/cmd/mount"
+	"github.com/platinasystems/go/goes/cmd/mountd"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/go/goes/cmd/ps"
@@ -98,6 +99,7 @@ var Goes = &goes.Goes{
 		"goes-daemons": &daemons.Command{
 			Init: [][]string{
 				[]string{"dhcpcd"},
+				[]string{"mountd"},
 				[]string{"grubd"},
 			},
 		},
@@ -117,6 +119,7 @@ var Goes = &goes.Goes{
 		"mkdir":   mkdir.Command{},
 		"mknod":   mknod.Command{},
 		"mount":   mount.Command{},
+		"mountd":  &mountd.Command{},
 		"ping":    ping.Command{},
 		"ps":      ps.Command{},
 		"pwd":     pwd.Command{},
