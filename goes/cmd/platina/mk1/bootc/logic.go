@@ -291,8 +291,8 @@ func formKexec6() (err error) {
 	if err != nil {
 		return err
 	}
-	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200 "
-	kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
+	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200"
+	//kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
 	kexec6 += Cfg.Sda6C
 	return nil
 }
