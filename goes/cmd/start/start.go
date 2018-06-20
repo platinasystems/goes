@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ramr/go-reaper"
+
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/assert"
@@ -132,6 +134,8 @@ func (c *Command) Main(args ...string) error {
 	if os.Getpid() != 1 {
 		return nil
 	}
+
+	go reaper.Reap()
 
 	go daemons.Wait()
 
