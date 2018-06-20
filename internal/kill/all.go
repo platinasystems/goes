@@ -34,7 +34,8 @@ func All(sig syscall.Signal) (err error) {
 		spid := strings.TrimPrefix(strings.TrimSuffix(exe, "/exe"),
 			"/proc/")
 		n, e := fmt.Sscan(spid, &pid)
-		if n != 1 || e != nil || pid == thispid || pid == 0 {
+		if n != 1 || e != nil || pid == thispid || pid == 0 ||
+			pid == 1 {
 			continue
 		}
 		_, e = os.Stat(fmt.Sprint("/proc/", spid, "/stat"))
