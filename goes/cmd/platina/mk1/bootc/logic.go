@@ -2,7 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//FIXME refactor set/clears
 //FIXME add support for 2 ISOs
 //FIXME add config from server
 //FIXME add status updates msgs to server
@@ -53,6 +52,10 @@ var kexec6 string
 func Bootc() []string {
 	if err := readCfg(); err != nil {
 		fmt.Println("Error: can't read bootc.cfg, drop into grub...")
+		return []string{""}
+	}
+	if err := fixPaths(); err != nil {
+		fmt.Println("Error: can't fix paths, drop into grub...")
 		return []string{""}
 	}
 
@@ -292,7 +295,6 @@ func formKexec6() (err error) {
 		return err
 	}
 	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200"
-	//kexec6 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
 	kexec6 += Cfg.Sda6C
 	return nil
 }
@@ -652,6 +654,30 @@ func Wipe() error {
 }
 
 func runScript(name string) (err error) {
+	return nil
+}
+
+func fixPaths() error {
+	files, err := ioutil.ReadDir(cbSda6 + "boot")
+	if err != nil {
+		return err
+	}
+	k := ""
+	kn := ""
+	for _, f := range files {
+		if strings.Contains(f.Name(), "vmlinuz") {
+			fn := strings.Replace(f.Name(), ".", "", 1)
+			if fn > kn {
+				k = f.Name()
+				kn = fn
+			}
+		}
+	}
+	i := strings.Replace(k, "vmlinuz", "initrd.img", 1)
+	err = UpdateBootcCfg(k, i)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
