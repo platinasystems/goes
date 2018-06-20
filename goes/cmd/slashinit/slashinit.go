@@ -365,38 +365,6 @@ func (c *Command) pivotRoot(mountPoint string, root string, script string) {
 		}
 	}
 
-	if root == "auto" {
-		err := c.g.Main("mount", "-p", "-F", mountPoint)
-		if err != nil {
-			panic(fmt.Errorf("Error in automount: %v", err))
-		}
-		err = c.g.Main("resize")
-		bootCmd := []string{"boot"}
-		if script != "" {
-			bootCmd = append(bootCmd, "-t")
-			bootCmd = append(bootCmd, script)
-		}
-		dirs, err := ioutil.ReadDir(mountPoint)
-		if err != nil {
-			panic(fmt.Errorf("Error reading automount dir: %v",
-				err))
-		}
-		for _, dir := range dirs {
-			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
-				":root=/dev/"+dir.Name())
-			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
-				"/boot:root=/dev/"+dir.Name())
-			bootCmd = append(bootCmd, mountPoint+"/"+dir.Name()+
-				"/d-i:root=/dev/"+dir.Name())
-		}
-		err = c.g.Main(bootCmd...)
-		if err == nil {
-			panic(fmt.Errorf("Aborted"))
-		} else {
-			panic(fmt.Errorf("Error in autoboot: %v", err))
-		}
-	}
-
 	err = c.g.Main("mount", root, mountPoint)
 	if err != nil {
 		panic(fmt.Errorf("Error mounting %s on %s: %s",
