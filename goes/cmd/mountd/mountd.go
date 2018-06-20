@@ -18,26 +18,24 @@ import (
 	"github.com/platinasystems/go/internal/partitions"
 )
 
-type Command struct {
-	done chan struct{}
-}
+type Command chan struct{}
 
-func (*Command) String() string { return "mountd" }
+func (Command) String() string { return "mountd" }
 
-func (*Command) Usage() string { return "mountd" }
+func (Command) Usage() string { return "mountd" }
 
-func (*Command) Apropos() lang.Alt {
+func (Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: "mount daemon",
 	}
 }
 
-func (c *Command) Close() error {
-	close(c.done)
+func (c Command) Close() error {
+	close(c)
 	return nil
 }
 
-func (*Command) Kind() cmd.Kind { return cmd.Daemon }
+func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func mountone(dev, dir string) (err error) {
 	sb, err := partitions.ReadSuperBlock(dev)
@@ -61,7 +59,7 @@ func mountone(dev, dir string) (err error) {
 	return err
 }
 
-func (*Command) mountall(mp string) {
+func (Command) mountall(mp string) {
 	pp, err := os.Open("/proc/partitions")
 	if err != nil {
 		log.Print("opening /proc/partitions: %s\n", err)
@@ -89,7 +87,7 @@ scan:
 	}
 }
 
-func (c *Command) Main(args ...string) (err error) {
+func (c Command) Main(args ...string) (err error) {
 	mp := "/mountd"
 	if len(args) > 0 {
 		mp = args[0]
@@ -106,7 +104,7 @@ func (c *Command) Main(args ...string) (err error) {
 	for {
 		c.mountall(mp)
 		select {
-		case <-c.done:
+		case <-c:
 			return nil
 		case <-t.C:
 		}
