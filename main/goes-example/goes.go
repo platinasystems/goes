@@ -8,7 +8,6 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
-	"github.com/platinasystems/go/goes/cmd/boot"
 	"github.com/platinasystems/go/goes/cmd/cat"
 	"github.com/platinasystems/go/goes/cmd/cd"
 	"github.com/platinasystems/go/goes/cmd/chmod"
@@ -86,7 +85,6 @@ var Goes = &goes.Goes{
 	ByName: map[string]cmd.Cmd{
 		"!":        bang.Command{},
 		"cli":      &cli.Command{},
-		"boot":     &boot.Command{},
 		"cat":      cat.Command{},
 		"cd":       &cd.Command{},
 		"chmod":    chmod.Command{},
