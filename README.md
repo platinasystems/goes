@@ -36,7 +36,7 @@ $ sudo ./goes-MACHINE-installer
 These are the available machines,
 
 - [example] \(GOARCH: amd64 or armhf)
-- [coreboot] \(GOARCH: amd64)
+- [boot] \(GOARCH: amd64)
 - [platina-mk1] \(GOARCH: amd64)
 - [platina-mk1-bmc] \(GOARCH: armhf)
 - [platina-mk2-lc1-bmc] \(GOARCH: armhf)
@@ -80,7 +80,7 @@ Use of this source code is governed by this BSD-style [LICENSE].*
 [LICENSE]: LICENSE
 [errata]: docs/Errata.md
 [example]: main/goes-example/README.md
-[coreboot]: main/goes-coreboot/README.md
+[boot]: main/goes-boot/README.md
 [platina-mk1]: main/goes-platina-mk1/README.md
 [platina-mk1-bmc]: main/goes-platina-mk1-bmc/README.md
 [platina-mk2-lc1-bmc]: main/goes-platina-mk2-lc1-bmc/README.md

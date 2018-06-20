@@ -22,7 +22,7 @@ import (
 const (
 	goesExample             = "goes-example"
 	goesExampleArm          = "goes-example-arm"
-	goesCoreboot            = "goes-coreboot"
+	goesBoot                = "goes-boot"
 	goesIP                  = "goes-ip"
 	goesIPTest              = "goes-ip.test"
 	goesPlatinaMk1          = "goes-platina-mk1"
@@ -39,7 +39,7 @@ const (
 
 	mainGoesPrefix           = "github.com/platinasystems/go/main/goes-"
 	mainGoesExample          = mainGoesPrefix + "example"
-	mainGoesCoreboot         = mainGoesPrefix + "coreboot"
+	mainGoesBoot             = mainGoesPrefix + "boot"
 	mainGoesInstaller        = mainGoesPrefix + "installer"
 	mainIP                   = "github.com/platinasystems/go/main/ip"
 	mainGoesPlatinaMk1       = mainGoesPrefix + "platina-mk1"
@@ -57,7 +57,7 @@ var (
 	defaultTargets = []string{
 		goesExample,
 		goesExampleArm,
-		goesCoreboot,
+		goesBoot,
 		goesIP,
 		goesPlatinaMk1,
 		goesPlatinaMk1Bmc,
@@ -93,7 +93,7 @@ plugin	use pre-compiled proprietary packages
 	mainPkg = map[string]string{
 		goesExample:             mainGoesExample,
 		goesExampleArm:          mainGoesExample,
-		goesCoreboot:            mainGoesCoreboot,
+		goesBoot:                mainGoesBoot,
 		goesIP:                  mainIP,
 		goesIPTest:              mainIP,
 		goesPlatinaMk1:          mainGoesPlatinaMk1,
@@ -106,7 +106,7 @@ plugin	use pre-compiled proprietary packages
 	make = map[string]func(out, name string) error{
 		goesExample:             makeHost,
 		goesExampleArm:          makeArmLinuxStatic,
-		goesCoreboot:            makeAmd64Linux,
+		goesBoot:                makeAmd64Linux,
 		goesIP:                  makeHost,
 		goesIPTest:              makeHostTest,
 		goesPlatinaMk1:          makeGoesPlatinaMk1,

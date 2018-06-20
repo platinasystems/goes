@@ -9,7 +9,7 @@
 /goes-*
 /*.patch
 /main/ip/ip
-/main/goes-coreboot/goes-coreboot
+/main/goes-boot/goes-boot
 /main/goes-example/goes-example
 /main/goes-example/goes-example-arm
 /main/goes-platina-mk1/goes-platina-mk1
