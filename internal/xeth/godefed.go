@@ -117,7 +117,9 @@ type MsgIfinfo struct {
 	Flags		uint32
 	Id		uint16
 	Addr		[6]uint8
-	Pad		[4]uint8
+	Portindex	int16
+	Subportindex	int8
+	Devtype		uint8
 }
 type MsgIfa struct {
 	Z64	uint64
