@@ -50,6 +50,10 @@ var kexec1 string
 var kexec6 string
 
 func Bootc() []string {
+	if err := initCfg(); err != nil {
+		fmt.Println("Error: bootc.cfg error, drop into grub...")
+		return []string{""}
+	}
 	if err := readCfg(); err != nil {
 		fmt.Println("Error: can't read bootc.cfg, drop into grub...")
 		return []string{""}
@@ -658,6 +662,11 @@ func runScript(name string) (err error) {
 }
 
 func fixPaths() error {
+	if err := fixNewroot(); err != nil { // FIXME Temporary remove by 7/31/2018
+		fmt.Println("Error: can't fix newroot, drop into grub...")
+		return err
+	}
+
 	files, err := ioutil.ReadDir(cbSda6 + "boot")
 	if err != nil {
 		return err
@@ -675,6 +684,25 @@ func fixPaths() error {
 	}
 	i := strings.Replace(k, "vmlinuz", "initrd.img", 1)
 	err = UpdateBootcCfg(k, i)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func fixNewroot() error { // FIXME Temporary remove by 7/31/2018
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.ReInstallK = strings.Replace(Cfg.ReInstallK, "newroot", "mountd", 1)
+	Cfg.ReInstallI = strings.Replace(Cfg.ReInstallI, "newroot", "mountd", 1)
+	Cfg.Sda1K = strings.Replace(Cfg.Sda1K, "newroot", "mountd", 1)
+	Cfg.Sda1I = strings.Replace(Cfg.Sda1I, "newroot", "mountd", 1)
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
 	if err != nil {
 		return err
 	}
