@@ -97,10 +97,10 @@ func (c *Command) Main(args ...string) error {
 			diagFans,
 			diagPSU,
 			diagHost,
+			diagMem,
 			/*
 				diagNetwork,
 				diagUSB,
-				diagMem,
 				diagMFGProm,
 			*/
 		},
@@ -136,13 +136,34 @@ func (c *Command) Main(args ...string) error {
 }
 
 func diagMem() error {
+	var result bool
+	var r string
+
+
 	/* diagTest: DRAM
 	tbd: run memory diag
 	*/
 
+
+
 	/* diagTest: uSD
 	tbd: write/read/verify a file
 	*/
+	fmt.Printf("\n%15s|%25s|%10s|%10s|%10s|%10s|%6s|%35s\n", "function", "parameter", "units", "value", "min", "max", "result", "description")
+	fmt.Printf("---------------|-------------------------|----------|----------|----------|----------|------|-----------------------------------\n")
+
+	result, _ = diagDetectMMC()
+	r = CheckPassB(result, true)
+	fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "uSD", "/dev/mmcblk0", "-", result, active_high_on_min, active_high_on_max, r, "check uSD present")
+
+	// test when detected only
+	if r == "pass" {
+		result, _ = diagTestMMC()
+	        r = CheckPassB(result, true)
+		fmt.Printf("%15s|%25s|%10s|%10t|%10t|%10t|%6s|%35s\n", "uSD", "/dev/mmcblk0p1", "-", result, active_high_on_min, active_high_on_max, r, "write and read uSD")
+	}
+
+
 
 	/* diagTest: QSPI
 	tbd: likely n/a QSPI tested via SW upgrade path, need to validate dual boot if supported
