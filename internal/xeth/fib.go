@@ -123,8 +123,10 @@ func (fe *MsgFibentry) String() string {
 	kind := Kind(fe.Kind)
 	event := FibEntryEvent(fe.Event)
 	prefix := fe.Prefix()
-	ns := fmt.Sprintf("%#x", fe.Net)
-	return fmt.Sprintln(kind, event, "net", ns, prefix, fe.NextHops())
+	return fmt.Sprintln(kind, event, Rtn(fe.Type), prefix,
+		"netns", Netns(fe.Net),
+		"table", RtTable(fe.Id),
+		fe.NextHops())
 }
 
 func (nh *NextHop) IP() net.IP {

@@ -20,33 +20,58 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
-
 package xeth
 
-import (
-	"fmt"
-	"net"
+import "fmt"
+
+const (
+	RTN_UNSPEC = iota
+	// Gateway or direct route
+	RTN_UNICAST
+	// Accept locally
+	RTN_LOCAL
+	// Accept locally as broadcast, send as broadcast
+	RTN_BROADCAST
+	// Accept locally as broadcast, but send as unicast
+	RTN_ANYCAST
+	// Multicast route
+	RTN_MULTICAST
+	// Drop
+	RTN_BLACKHOLE
+	// Destination is unreachable
+	RTN_UNREACHABLE
+	// Administratively prohibited
+	RTN_PROHIBIT
+	// Not in this table
+	RTN_THROW
+	// Translate this address
+	RTN_NAT
+	// Use external resolver
+	RTN_XRESOLVE
+	__RTN_MAX
 )
 
-func (info *MsgIfinfo) HardwareAddr() net.HardwareAddr {
-	return net.HardwareAddr(info.Addr[:])
-}
+const RTN_MAX = __RTN_MAX - 1
 
-func (info *MsgIfinfo) String() string {
-	kind := Kind(info.Kind)
-	ifname := (*Ifname)(&info.Ifname)
-	iflink := InterfaceByIndex(info.Iflinkindex).Name
-	iff := Iff(info.Flags)
-	devtype := DevType(info.Devtype)
-	ns := fmt.Sprintf("%#x", info.Net)
-	return fmt.Sprint(kind, " ", ifname, "[", info.Ifindex, "]",
-		"@", iflink,
-		" <", iff, ">",
-		" id=", info.Id,
-		" addr=", info.HardwareAddr(),
-		" port=", info.Portindex,
-		" subport=", info.Subportindex,
-		" devtype=", devtype,
-		" net=", ns,
-		"\n")
+type Rtn uint8
+
+func (rtn Rtn) String() string {
+	var rtns = []string{
+		"unspec",
+		"local",
+		"broadcast",
+		"anycast",
+		"multicast",
+		"blackhole",
+		"unreachable",
+		"prohibit",
+		"throw",
+		"nat",
+		"xresolve",
+	}
+	i := int(rtn)
+	if i < len(rtns) {
+		return rtns[i]
+	}
+	return fmt.Sprint("@", i)
 }

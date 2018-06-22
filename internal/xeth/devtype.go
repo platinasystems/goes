@@ -20,33 +20,29 @@
  * sw@platina.com
  * Platina Systems, 3180 Del La Cruz Blvd, Santa Clara, CA 95054
  */
-
 package xeth
 
-import (
-	"fmt"
-	"net"
+import "fmt"
+
+const (
+	XETH_DEVTYPE_PORT = iota
+	XETH_DEVTYPE_BRIDGE
+	XETH_DEVTYPE_TAGGED_BRIDGE_PORT
+	XETH_DEVTYPE_UNTAGGED_BRIDGE_PORT
 )
 
-func (info *MsgIfinfo) HardwareAddr() net.HardwareAddr {
-	return net.HardwareAddr(info.Addr[:])
-}
+type DevType uint8
 
-func (info *MsgIfinfo) String() string {
-	kind := Kind(info.Kind)
-	ifname := (*Ifname)(&info.Ifname)
-	iflink := InterfaceByIndex(info.Iflinkindex).Name
-	iff := Iff(info.Flags)
-	devtype := DevType(info.Devtype)
-	ns := fmt.Sprintf("%#x", info.Net)
-	return fmt.Sprint(kind, " ", ifname, "[", info.Ifindex, "]",
-		"@", iflink,
-		" <", iff, ">",
-		" id=", info.Id,
-		" addr=", info.HardwareAddr(),
-		" port=", info.Portindex,
-		" subport=", info.Subportindex,
-		" devtype=", devtype,
-		" net=", ns,
-		"\n")
+func (devtype DevType) String() string {
+	var devtypes = []string{
+		"port",
+		"bridge",
+		"tagged-bridge-port",
+		"untagged-bridge-port",
+	}
+	i := int(devtype)
+	if i < len(devtypes) {
+		return devtypes[i]
+	}
+	return fmt.Sprint("@", i)
 }

@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/go/goes"
+	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/assert"
 	"github.com/platinasystems/go/internal/kill"
@@ -55,6 +56,8 @@ OPTIONS
 }
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
+
+func (c *Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-stop")
