@@ -52,7 +52,7 @@ const (
 	BootReplyReflashAndReboot
 )
 
-type BootcConfig struct {
+type BootcConfig struct { // stored as bootc.cfg, updated by server
 	Install         bool
 	BootSda1        bool
 	BootSda6Cnt     int
@@ -77,9 +77,11 @@ type BootcConfig struct {
 	ISO2Desc        string
 	ISOlastUsed     int
 	PostInstall     bool
+	ConfigVersion   int
+	PortNumber      string
 }
 
-type Client struct {
+type Client struct { // not stored, populated from server
 	Unit            int
 	Name            string
 	Machine         string
