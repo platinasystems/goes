@@ -2,9 +2,41 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//FIXME add support for 2 ISOs
-//FIXME add config from server
-//FIXME add status updates msgs to server
+// ZTP Modules
+//
+// bootc.go Module - COREBOOT and GOES
+//   provides Client REST messages to server
+//   provides state machine for executing wipe/re-install in goesboot
+//   executes Register(), receives Client struct, script
+//
+// bootd.go Daemon - GOES
+//   provides Server REST messages to respond to master
+//
+// pushd.go Daemon - GOES
+//   executes wipe request from bootd
+//   pushes boot state, install state, etc. to master
+//
+// clntd.go Daemon - COREBOOT
+//   launches Bootc() in coreboot
+//   hopefully will beat grub launch daemon
+//
+// script run infrastructure TBD
+// postInstall0 TBD
+// postIntalll1 TBD
+
+// FIXME FIX WIPE from WEB
+// FIXME REVERIFY REGISTER COMMAND
+// FIXME PURGE references to coreboot, replace with goesboot
+// FIXME add check for sda6 before updating strings, add check for sda6 before trying to boot sda6 in coreboot
+// FIXME add support for 2 ISOs
+// FIXME add config from server
+// FIXME add status updates msgs to server
+// FIXME CONFIG PORT NUMBER, remove hardcodes, auto update bootc.cfg if out of date, for new fields
+// FIXME LAUNCH SCRIPT AFTER EVERY BOOT - special case right after wipe, script is custom
+// FIXME BOOTD check works with real master
+// FIXME COMMIT NEW SERVER SIDE CODE
+// FIXME CONTACT SERVER w/o IP address
+// FIXME build standalone
 
 package bootc
 
