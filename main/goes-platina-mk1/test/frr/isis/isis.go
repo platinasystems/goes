@@ -111,7 +111,7 @@ func checkNeighbors(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Fatalf("No isis neghbor for %v: %v",
+			t.Fatalf("No isis neighbor for %v: %v",
 				x.hostname, x.peer)
 		}
 	}
