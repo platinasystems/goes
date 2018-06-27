@@ -101,7 +101,7 @@ type Client struct { // not stored, populated from server
 	LastISOdesc     string
 	GoesVersion     string
 	KernelVersion   string
-	CorebootVersion string
+	GoesBootVersion string
 }
 
 type RegReq struct {

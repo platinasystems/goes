@@ -3,8 +3,8 @@
 // LICENSE file.
 
 // DESCRIPTION
-// http server daemon replies to master server requests.
-// This daemon runs on every ToR under linux, does not run in coreboot.
+// http server daemon replies to master server requests
+// This daemon runs on every ToR under linux, does not run in goes-boot
 
 package bootd
 

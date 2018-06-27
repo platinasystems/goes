@@ -215,7 +215,7 @@ func dumpJson() {
 		LastISOdesc:     "Jessie debian-8.10.0",
 		GoesVersion:     "v0.41-49-gdd4de12",
 		KernelVersion:   "4.13.0-platina-mk1-amd64",
-		CorebootVersion: "v0.4-2-ge517297-dirty",
+		GoesBootVersion: "v0.4-2-ge517297-dirty",
 	}
 	BootcCfg = BootcConfig{
 		Install:         false,

@@ -2,8 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//TODO need to mount /sda1 on a per sda1 or sda6 basis - but not in coreboot
-
 package bootd
 
 import (
