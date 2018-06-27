@@ -7,16 +7,18 @@ package bootd
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
+	"github.com/platinasystems/go/internal/kexec"
 )
 
 func wipe() (s string, err error) {
 	if err := bootc.Wipe(); err != nil {
 		return "", err
 	}
+	reboot()
 	return "", nil
 }
 
@@ -224,11 +226,9 @@ func readClientCfgDB() (err error) {
 }
 
 func reboot() error {
-	fmt.Print("\nWILL REBOOT NOW!!!\n")
-	u, err := exec.Command("shutdown", "-r", "now").Output()
-	fmt.Println(u)
-	if err != nil {
-		return err
-	}
-	return nil
+	kexec.Prepare()
+
+	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
+
+	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
