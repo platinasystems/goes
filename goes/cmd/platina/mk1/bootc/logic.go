@@ -2,9 +2,40 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//FIXME add support for 2 ISOs
-//FIXME add config from server
-//FIXME add status updates msgs to server
+// ZTP Modules
+//
+// bootc.go Module - GOES-BOOT and GOES
+//   provides Client REST messages to server
+//   provides state machine for executing wipe/re-install in goesboot
+//   executes Register(), receives Client struct, script
+//
+// bootd.go Daemon - GOES
+//   provides Server REST messages to respond to master
+//
+// pushd.go Daemon - GOES
+//   executes wipe request from bootd
+//   pushes boot state, install state, etc. to master
+//
+// clntd.go Daemon - GOES-BOOT
+//   launches Bootc() in goes-boot
+//   hopefully will beat grub launch daemon
+//
+// script run infrastructure TBD
+// postInstall0 TBD
+// postIntalll1 TBD
+
+// FIXME FIX WIPE from WEB
+// FIXME REVERIFY REGISTER COMMAND
+// FIXME add check for sda6 before updating strings, add check for sda6 before trying to boot sda6 in goes-boot
+// FIXME add support for 2 ISOs
+// FIXME add config from server
+// FIXME add status updates msgs to server
+// FIXME CONFIG PORT NUMBER, remove hardcodes, auto update bootc.cfg if out of date, for new fields
+// FIXME LAUNCH SCRIPT AFTER EVERY BOOT - special case right after wipe, script is custom
+// FIXME BOOTD check works with real master
+// FIXME COMMIT NEW SERVER SIDE CODE
+// FIXME CONTACT SERVER w/o IP address
+// FIXME build standalone
 
 package bootc
 
@@ -23,7 +54,7 @@ import (
 )
 
 const (
-	corebootCfg = "/mountd/sda1/bootc.cfg"
+	goesBootCfg = "/mountd/sda1/bootc.cfg"
 	sda1Cfg     = "/bootc.cfg"
 	sda6Cfg     = "/mnt/bootc.cfg"
 	mount       = "/mnt"
@@ -35,7 +66,7 @@ const (
 	zero        = uintptr(0)
 	sda1        = "sda1"
 	sda6        = "sda6"
-	coreboot    = "coreboot"
+	goesBoot    = "goesboot"
 	cbSda1      = "/mountd/sda1/"
 	cbSda6      = "/mountd/sda6/"
 	tarFile     = "postinstall.tar.gz"
@@ -195,8 +226,8 @@ func initCfg() error {
 
 func getContext() (context string, err error) {
 	mach := machine.Name
-	if mach == coreboot {
-		return coreboot, nil
+	if mach == goesBoot {
+		return goesBoot, nil
 	}
 	if mach == "platina-mk1" {
 		cmd := exec.Command("df")
@@ -223,8 +254,8 @@ func setBootcCfgFile() error {
 		return err
 	}
 	switch context {
-	case coreboot:
-		BootcCfgFile = corebootCfg
+	case goesBoot:
+		BootcCfgFile = goesBootCfg
 	case sda1:
 		BootcCfgFile = sda1Cfg
 	case sda6:

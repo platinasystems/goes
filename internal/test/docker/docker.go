@@ -406,5 +406,7 @@ func moveIntfDefault(t *testing.T, container string, intf string) error {
 		"ip", "-n", container, "link", "set", "down", intf)
 	cleanup.Program(test.Self{},
 		"ip", "-n", container, "link", "set", intf, "netns", "1")
+	cleanup.Program(test.Self{},
+		"ip", "link", "set", intf, "up")
 	return nil
 }

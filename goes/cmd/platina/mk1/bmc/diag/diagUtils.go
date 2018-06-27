@@ -5,13 +5,18 @@
 package diag
 
 import (
+	"os"
 	"fmt"
+	"strings"
+	"syscall"
+	"io/ioutil"
 	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/i2c"
 	"github.com/tatsushid/go-fastping"
 	"net"
 	"time"
 )
+
 
 func diagPing(address string, count int) bool {
 
@@ -232,4 +237,66 @@ func CheckPassB(r bool, state bool) string {
 	} else {
 		return "fail"
 	}
+}
+
+
+func diagDetectMMC() (bool, error) {
+        exists := false
+        files, err := ioutil.ReadDir("/dev")
+        if err != nil {
+                return false, err
+        }
+        for _, f := range files {
+                if !f.IsDir() {
+                        if strings.Contains(f.Name(), "mmcblk0") {
+                                exists = true
+                        }
+                }
+        }
+        return exists, nil
+}
+
+func diagTestMMC() (bool, error) {
+	var gotMounted bool
+
+	gotMounted = false
+	if _, err := os.Stat("/mnt"); os.IsNotExist(err) {
+                err := os.Mkdir("/mnt", 0755)
+                if err != nil {
+                        return false, err
+                }
+        }
+
+        err := syscall.Mount("/dev/mmcblk0p1", "/mnt", "ext4", uintptr(0), "")
+        if err != nil {
+		if strings.Contains(err.Error(), "resource busy") {
+			gotMounted = false
+		} else {
+			return false, err
+		}
+	} else {
+		gotMounted = true
+	}
+
+        f, err := os.Create("/mnt/diag_test")
+	if err != nil {
+                return false, err
+        }
+        f.Close()
+
+	if _, err := os.Stat("/mnt/diag_test"); os.IsNotExist(err) {
+                return false, err
+        }
+
+	if err := os.Remove("/mnt/diag_test"); err != nil {
+                return false, err
+        }
+
+	if gotMounted == true {
+		if err := syscall.Unmount("/mnt", 0); err != nil {
+			return false, err
+		}
+	}
+
+        return true, nil
 }

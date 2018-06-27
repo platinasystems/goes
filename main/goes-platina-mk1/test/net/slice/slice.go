@@ -37,6 +37,7 @@ func subtest(t *testing.T, yaml []byte) {
 		{"inter-connectivity", checkInterConnectivity},
 		{"isolation", checkIsolation},
 		{"stress", checkStress},
+		{"stress-pci", checkStressPci},
 	}.Run(t)
 }
 
@@ -270,6 +271,47 @@ func checkStress(t *testing.T) {
 		t.Logf("stress for %v", to)
 		cmd := []string{"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "10.3.0.4"}
+		_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+		t.Log("verfy can still ping neighbor")
+		cmd = []string{"ping", "-c1", "10.1.0.2"}
+		_, err = docker.ExecCmd(t, "CB-1", config, cmd)
+		assert.Nil(err)
+	}
+	t.Log("verfy can still ping far neighbor")
+	cmd := []string{"ping", "-c1", "10.3.0.4"}
+	_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+	assert.Nil(err)
+}
+
+func checkStressPci(t *testing.T) {
+	assert := test.Assert{t}
+
+	t.Log("stress with hping3 with ttl=1")
+
+	duration := []string{"1", "10", "30", "60"}
+
+	ok := false
+	timeout := 120
+	for i := timeout; i > 0; i-- {
+		cmd := []string{"ping", "-c1", "10.3.0.4"}
+		out, _ := docker.ExecCmd(t, "CB-1", config, cmd)
+		if !assert.MatchNonFatal(out, "1 packets received") {
+			time.Sleep(1 * time.Second)
+		} else {
+			ok = true
+			t.Log("ping ok before stress")
+			break
+		}
+	}
+	if !ok {
+		t.Error("ping failing before stress test")
+	}
+
+	for _, to := range duration {
+		t.Logf("stress for %v", to)
+		cmd := []string{"timeout", to,
+			"hping3", "--icmp", "--flood", "-q", "-t", "1",
+			"10.3.0.4"}
 		_, err := docker.ExecCmd(t, "CB-1", config, cmd)
 		t.Log("verfy can still ping neighbor")
 		cmd = []string{"ping", "-c1", "10.1.0.2"}

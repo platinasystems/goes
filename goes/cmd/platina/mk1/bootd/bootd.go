@@ -3,8 +3,8 @@
 // LICENSE file.
 
 // DESCRIPTION
-// http server daemon replies to master server requests.
-// This daemon runs on every ToR under linux, does not run in coreboot.
+// http server daemon replies to master server requests
+// This daemon runs on every ToR under linux, does not run in goes-boot
 
 package bootd
 
@@ -71,10 +71,8 @@ func serve(w http.ResponseWriter, r *http.Request) {
 
 	switch u[0] {
 	case "wipe":
-		//if b, err = wipe(); err != nil { // FIXME comment out for testing
-		//	b = "error doing wipe\n"
-		//}
-		reboot()
+		go wipe()
+		b = "wipe in progress\n"
 	case "client":
 		if b, err = getClientData(1); err != nil {
 			b = "error getting client data\n"
