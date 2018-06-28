@@ -6,25 +6,25 @@ if ! [ $(id -u) = 0 ]; then
 fi
 
 testcases=("Test/vnet.ready"
-	   "Test/nodocker/twohost"
-	   "Test/nodocker/onerouter"
-	   "Test/docker/net/slice/vlan"
-	   "Test/docker/net/dhcp/eth"
-	   "Test/docker/net/dhcp/vlan"
-	   "Test/docker/net/static/eth"
-	   "Test/docker/net/static/vlan"
-	   "Test/docker/frr/ospf/eth"
-	   "Test/docker/frr/ospf/vlan"
-	   "Test/docker/frr/isis/eth"
-	   "Test/docker/frr/isis/vlan"
-	   "Test/docker/frr/bgp/eth"
-	   "Test/docker/frr/bgp/vlan"
-	   "Test/docker/bird/bgp/eth"
-	   "Test/docker/bird/bgp/vlan"
-	   "Test/docker/bird/ospf/eth"
-	   "Test/docker/bird/ospf/vlan"
-	   "Test/docker/gobgp/ebgp/eth"
-	   "Test/docker/gobgp/ebgp/vlan")
+           "Test/nodocker/twohost"
+           "Test/nodocker/onerouter"
+           "Test/docker/net/slice/vlan"
+           "Test/docker/net/dhcp/eth"
+           "Test/docker/net/dhcp/vlan"
+           "Test/docker/net/static/eth"
+           "Test/docker/net/static/vlan"
+           "Test/docker/frr/ospf/eth"
+           "Test/docker/frr/ospf/vlan"
+           "Test/docker/frr/isis/eth"
+           "Test/docker/frr/isis/vlan"
+           "Test/docker/frr/bgp/eth"
+           "Test/docker/frr/bgp/vlan"
+           "Test/docker/bird/bgp/eth"
+           "Test/docker/bird/bgp/vlan"
+           "Test/docker/bird/ospf/eth"
+           "Test/docker/bird/ospf/vlan"
+           "Test/docker/gobgp/ebgp/eth"
+           "Test/docker/gobgp/ebgp/vlan")
 
 tester=./goes-platina-mk1.test
 
@@ -44,26 +44,67 @@ fix_it() {
   docker stop CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   docker rm -v CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   ip -all netns del
+  echo
+  ./mk1_util.sh flap
+  ./mk1_util.sh isup
 }
 
-for t in ${testcases[@]}; do
+if [ "$1" == "list" ]; then
+    id=0
+    for t in ${testcases[@]}; do
+        echo $id ":" $t
+        id=$(($id+1))
+    done
+elif [ "$1" == "run" ]; then
+    test_range=${testcases[@]}
+elif [ "$1" == "run_range" ]; then
+    shift
+    start=$1
+    shift
+    stop=$1
+    shift
+    test_range=""
+    for i in $(seq $start $stop); do
+        test_range="${test_range} ${testcases[$i]}"
+    done
+else
+    echo "list | run | run_range <start end>"
+fi
+
+test_count=$(echo $test_range | wc -w)
+
+if [ $test_count != 0 ]; then
+    echo "Running $test_count tests"
+else
+    exit 0
+fi
+
+count=0
+for t in ${test_range}; do
+    count=$(($count+1))
+    printf "Running %27s " $t" ($count of $test_count) {"
     fix_it
-    if [ "$quit" -eq 1 ]; then
-	exit 0
-    fi
-    printf "Running %27s: " $t
     ${tester} -test.v -test.run=$t > /tmp/out 2>&1
+
     if [ $? == 0 ]; then
-	echo "OK"
+        echo "OK"
     else
-	log=${t//\//_}.out
-	mv /tmp/out ./$log
-	if grep -q panic ./$log; then
-	    echo "Crashed"	
-	else
-	    echo "Failed"	
-	fi
+        log=${t//\//_}.out
+        mv /tmp/out ./$log
+        if grep -q panic ./$log; then
+            echo "Crashed"
+        else
+            echo "Failed"
+        fi
+    fi
+    echo "} $t Completed"
+
+    if [ "$quit" -eq 1 ]; then
+        echo "Aborted"
+        break
     fi
 done
+
+fix_it
 
 exit 0
