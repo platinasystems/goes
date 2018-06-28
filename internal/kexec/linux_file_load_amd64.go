@@ -7,6 +7,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/platinasystems/go/internal/log"
 )
 
 func fileLoadSyscall(k *os.File, i *os.File, cmdline string, flags uintptr) (err error) {
@@ -14,9 +16,10 @@ func fileLoadSyscall(k *os.File, i *os.File, cmdline string, flags uintptr) (err
 	if err != nil {
 		return err
 	}
+	log.Printf("kexec command line", "%s", cmdline)
 	_, _, e := syscall.Syscall6(320,
-	     k.Fd(), i.Fd(), uintptr(len(cmdline)+1),
-	     uintptr(unsafe.Pointer(c)), flags, uintptr(0))
+		k.Fd(), i.Fd(), uintptr(len(cmdline)+1),
+		uintptr(unsafe.Pointer(c)), flags, uintptr(0))
 
 	err = nil
 	if e != 0 {

@@ -272,8 +272,21 @@ func (c *Command) KexecCommand() []string {
 	}
 	k = c.GetRoot() + k
 	i = c.GetRoot() + i
-	return []string{"kexec", "-k", k, "-i", i, "-c", strings.Join(Linux.Cmd, " "), "-e"}
-
+	co := false
+	for _, cmd := range Linux.Cmd {
+		if strings.HasPrefix(cmd, "console=") {
+			co = true
+			break
+		}
+	}
+	cl := strings.TrimRight(strings.Join(Linux.Cmd, " "), " ")
+	if !co {
+		if cl != "" {
+			cl = cl + " "
+		}
+		cl = cl + "console=ttyS0"
+	}
+	return []string{"kexec", "-k", k, "-i", i, "-c", cl, "-e"}
 }
 
 func (c *Command) readline(parm *parms.Parms, flag *flags.Flags, prompt string, def string) (mi string, err error) {
