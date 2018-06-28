@@ -581,18 +581,25 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 		return
 	}
 	isDel := v.Header.Type == netlink.RTM_DELNEIGH
+	si, ok := e.ns.siForIfIndex(v.Index)
+	if false { // debug print
+		fmt.Printf("netlink NEIGH isDel=%v NDA_LLADDR=%v NDA_DST=%-16v si=%-10v state=%v\n", isDel, ethernetAddress(v.Attrs[netlink.NDA_LLADDR]), v.Attrs[netlink.NDA_DST], si.Name(e.m.v), v.State)
+	}
 	if !isDel {
 		switch v.State {
 		case netlink.NUD_NOARP, netlink.NUD_NONE:
 			// ignore these
+			return
+		case netlink.NUD_INCOMPLETE, netlink.NUD_STALE, netlink.NUD_PROBE, netlink.NUD_DELAY:
+			// ignore these, too; transient state, don't add yet
 			return
 		case netlink.NUD_FAILED:
 			//do not delete neighbor on FAIL; matches Linux behavior
 			//isDel = true
 			return
 		}
+		// Only states that'll add neighbor are NUD_REACHABLE and NUD_PERMANENT
 	}
-	si, ok := e.ns.siForIfIndex(v.Index)
 	if !ok {
 		// Ignore neighbors for non vnet interfaces.
 		return
@@ -701,6 +708,9 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 	isDel := v.Header.Type == netlink.RTM_DELROUTE
 
 	nhs := e.ns.parse_ip4_next_hops(v)
+	if isReplace && false { //debug print
+		fmt.Printf("netlink NEWROUTE Flags=Replace GATEWAY=%v DST=%v\n", v.Attrs[netlink.RTA_GATEWAY], v.Attrs[netlink.RTA_DST])
+	}
 	m4 := ip4.GetMain(e.m.v)
 
 	for i := range nhs {
