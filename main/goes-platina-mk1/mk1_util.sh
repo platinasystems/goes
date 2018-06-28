@@ -3,12 +3,12 @@
 xeth_all()
 {
     for i in $(ls -1 /sys/class/net); do
-	if [ $i == "lo" ]; then
-	    continue
-	fi
-	if $(ethtool -i $i | grep -q mk1); then
-	    echo $i
-	fi
+        if [ $i == "lo" ]; then
+            continue
+        fi
+        if $(ethtool -i $i | grep -q mk1); then
+            echo $i
+        fi
     done
 }
 
@@ -20,7 +20,7 @@ xeth_range()
     shift
 
     for i in $(seq $start $stop); do
-	echo -n xeth$i" "
+        echo -n xeth$i" "
     done
 }
 
@@ -32,21 +32,21 @@ eth_range()
     shift
 
     for i in $(seq $start $stop); do
-	echo -n eth-$i-0" "
+        echo -n eth-$i-0" "
     done
 }
 
 xeth_up()
 {
     for i in $xeth_list; do
-	ip link set $i up
+        ip link set $i up
     done
 }
 
 xeth_down()
 {
     for i in $xeth_list; do
-	ip link set $i down
+        ip link set $i down
     done
 }
 
@@ -59,31 +59,41 @@ xeth_flap()
 xeth_add()
 {
     for i in $xeth_list; do
-	ip link add $i type platina-mk1
-	ip link set $i up
-	ethtool -s $i speed 100000 autoneg off
+        ip link add $i type platina-mk1
+        ip link set $i up
+        ethtool -s $i speed 100000 autoneg off
     done
 }
 
 xeth_del()
 {
     for i in $xeth_list; do
-	ip link del $i
+        ip link del $i
     done
 }
 
 xeth_show()
 {
     for i in $xeth_list; do
-	ip link show $i
+        ip link show $i
     done
 }
 
 xeth_stat()
 {
     for i in $xeth_list; do
-	echo $i
-	ethtool -S $i
+        echo $i
+        ethtool -S $i
+    done
+}
+
+xeth_to_netns()
+{
+    netns=$1
+    shift
+
+    for i in $xeth_list; do
+        ip link set $i netns $netns
     done
 }
 
@@ -128,6 +138,8 @@ if [ $cmd == "help" ]; then
     exit 0
 elif [ $cmd == "show" ]; then
     xeth_show $xeth_list
+elif [ $cmd == "showup" ]; then
+    xeth_show $xeth_list | grep -i state.up
 elif [ $cmd == "add" ]; then
     xeth_add $xeth_list
 elif [ $cmd == "del" ]; then
@@ -139,8 +151,9 @@ elif [ $cmd == "down" ]; then
 elif [ $cmd == "flap" ]; then
     xeth_flap $xeth_list
 elif [ $cmd == "isup" ]; then
-    xeth_show $xeth_list | grep -i state.up
     xeth_show $xeth_list | grep -i state.up | wc -l
 elif [ $cmd == "stat" ]; then
     xeth_stat $xeth_list | grep -v " 0$"
+elif [ $cmd == "to_netns" ]; then
+    xeth_to_netns $1 $xeth_list
 fi
