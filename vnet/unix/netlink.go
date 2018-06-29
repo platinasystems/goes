@@ -285,7 +285,7 @@ func (m *netlink_main) newEvent() interface{} {
 	return &netlinkEvent{m: m.m}
 }
 func (ns *net_namespace) getEvent(m *Main) *netlinkEvent {
-	v := m.eventPool.Get().(*netlinkEvent)
+	v := m.netlink_main.eventPool.Get().(*netlinkEvent)
 	*v = netlinkEvent{m: v.m}
 	return v
 }
@@ -298,7 +298,7 @@ func (e *netlinkEvent) put() {
 	if len(e.msgs) > 0 {
 		e.msgs = e.msgs[:0]
 	}
-	e.m.eventPool.Put(e)
+	e.m.netlink_main.eventPool.Put(e)
 }
 
 type msgKindCount struct {
@@ -427,9 +427,11 @@ func (e *netlinkEvent) EventAction() {
 		}
 
 		if v, ok := msg.(*netlink.IfInfoMessage); ok {
-			if err := e.ns.add_del_interface(m, v); err != nil {
-				m.v.Logf("namespace %s, add/del interface %s: %v\n", e.ns, v.Attrs[netlink.IFLA_IFNAME].String(), err)
-				continue
+			if !FdbOn {
+				if err := e.ns.add_del_interface(m, v); err != nil {
+					m.v.Logf("namespace %s, add/del interface %s: %v\n", e.ns, v.Attrs[netlink.IFLA_IFNAME].String(), err)
+					continue
+				}
 			}
 		}
 
@@ -451,48 +453,60 @@ func (e *netlinkEvent) EventAction() {
 		switch v := msg.(type) {
 		case *netlink.IfInfoMessage:
 			// Respect flag admin state changes from unix shell via ifconfig or "ip link" commands.
-			known = true
-			isUp := v.IfInfomsg.Flags&netlink.IFF_UP != 0
-			if di, ok := e.ns.getDummyInterface(v.Index); ok {
-				// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
-				di.isAdminUp = isUp
-				di.addDelDummyPuntPrefixes(m, !isUp)
-			} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
-				e.ns.validateFibIndexForSi(si)
-				err = si.SetAdminUp(vn, isUp)
+			if !FdbOn {
+				known = true
+				isUp := v.IfInfomsg.Flags&netlink.IFF_UP != 0
+				if di, ok := e.ns.getDummyInterface(v.Index); ok {
+					// For dummy interfaces add/delete dummy (i.e. loopback) address punts.
+					di.isAdminUp = isUp
+					di.addDelDummyPuntPrefixes(m, !isUp)
+				} else if si, ok := e.ns.siForIfIndex(v.Index); ok {
+					e.ns.validateFibIndexForSi(si)
+					err = si.SetAdminUp(vn, isUp)
+				}
 			}
 		case *netlink.IfAddrMessage:
-			switch v.Family {
-			case netlink.AF_INET:
-				known = true
-				err = e.ip4IfaddrMsg(v)
-			case netlink.AF_INET6:
-				known = true
-				err = e.ip6IfaddrMsg(v)
+			if !FdbOn {
+				switch v.Family {
+				case netlink.AF_INET:
+					known = true
+					fmt.Printf("********* ifAddrMsg %s: netlink %s\n", e.ns, msg)
+					err = e.ip4IfaddrMsg(v)
+				case netlink.AF_INET6:
+					known = true
+					err = e.ip6IfaddrMsg(v)
+				}
 			}
 		case *netlink.RouteMessage:
-			switch v.Family {
-			case netlink.AF_INET:
-				known = true
-				err = e.ip4RouteMsg(v, isLastInEvent)
-			case netlink.AF_INET6:
-				known = true
-				err = e.ip6RouteMsg(v, isLastInEvent)
+			if !FdbOn {
+				switch v.Family {
+				case netlink.AF_INET:
+					known = true
+					fmt.Printf("********* ip4RouteMsg %s: netlink %s\n", e.ns, msg)
+					err = e.ip4RouteMsg(v, isLastInEvent)
+				case netlink.AF_INET6:
+					known = true
+					err = e.ip6RouteMsg(v, isLastInEvent)
+				}
 			}
 		case *netlink.NeighborMessage:
-			switch v.Family {
-			case netlink.AF_INET:
-				known = true
-				err = e.ip4NeighborMsg(v)
-			case netlink.AF_INET6:
-				known = true
-				err = e.ip6NeighborMsg(v)
+			if !FdbOn {
+				switch v.Family {
+				case netlink.AF_INET:
+					known = true
+					err = e.ip4NeighborMsg(v)
+				case netlink.AF_INET6:
+					known = true
+					err = e.ip6NeighborMsg(v)
+				}
 			}
 		case *netlink.NetnsMessage:
-			known = true
-			err = e.netnsMessage(v)
+			if !FdbOn {
+				known = true
+				err = e.netnsMessage(v)
+			}
 		}
-		if !known {
+		if !known && !FdbOn {
 			err = fmt.Errorf("unkown")
 		}
 		if err != nil {
@@ -582,7 +596,7 @@ func (e *netlinkEvent) ip4NeighborMsg(v *netlink.NeighborMessage) (err error) {
 	}
 	isDel := v.Header.Type == netlink.RTM_DELNEIGH
 	si, ok := e.ns.siForIfIndex(v.Index)
-	if false { // debug print
+	if true { // debug print
 		fmt.Printf("netlink NEIGH isDel=%v NDA_LLADDR=%v NDA_DST=%-16v si=%-10v state=%v\n", isDel, ethernetAddress(v.Attrs[netlink.NDA_LLADDR]), v.Attrs[netlink.NDA_DST], si.Name(e.m.v), v.State)
 	}
 	if !isDel {
@@ -735,6 +749,7 @@ func (e *netlinkEvent) ip4RouteMsg(v *netlink.RouteMessage, isLastInEvent bool) 
 		// Otherwise its a normal next hop.
 		gw := nh.attrs[netlink.RTA_GATEWAY]
 		if gw != nil {
+			fmt.Printf("RouteMsg for Prefix %v adding nexthop %v\n", p, gw)
 			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel, isReplace); err != nil {
 				return
 			}

@@ -70,6 +70,7 @@ type Main struct {
 	interface_filter
 	net_namespace_main
 	netlink_main
+	FdbMain
 	Config
 }
 
@@ -84,6 +85,7 @@ func Init(v *vnet.Vnet, cf Config) {
 	m.v = v
 	m.Config = cf
 	m.netlink_main.Init(m)
+	m.FdbMain.Init(m)
 	packageIndex = v.AddPackage("unix", m)
 }
 

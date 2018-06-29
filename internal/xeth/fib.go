@@ -119,6 +119,10 @@ func (fe *MsgFibentry) Prefix() *net.IPNet {
 	return &net.IPNet{net.IP(ipBuf), net.IPMask(maskBuf)}
 }
 
+func (fe *MsgFibentry) TableId() uint32 {
+	return fe.Id
+}
+
 func (fe *MsgFibentry) String() string {
 	kind := Kind(fe.Kind)
 	event := FibEntryEvent(fe.Event)

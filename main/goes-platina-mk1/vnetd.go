@@ -22,6 +22,7 @@ import (
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
 	"github.com/platinasystems/go/vnet/platforms/mk1"
+	"github.com/platinasystems/go/vnet/unix"
 
 	"gopkg.in/yaml.v2"
 )
@@ -131,20 +132,7 @@ func vnetdInit() {
 
 			switch msg.Devtype {
 			case xeth.XETH_DEVTYPE_PORT:
-				pe := vnet.SetPort(ifname.String())
-				pe.Ifindex = msg.Ifindex
-				pe.Iflinkindex = msg.Iflinkindex
-				pe.Iff = xeth.Iff(msg.Flags)
-				copy(pe.Addr[:], msg.Addr[:])
-				pe.Net = msg.Net
-
-				pe.Portindex = msg.Portindex
-				// -1 if unspecified
-				if msg.Subportindex >= 0 {
-					pe.Subportindex = msg.Subportindex
-				}
-				pe.Vid = msg.Id // L3 port-tag
-				pe.PuntIndex = punt_index
+				err = unix.ProcessInterfaceInfo((*xeth.MsgIfinfo)(ptr), vnet.PreVnetd, nil, punt_index)
 			case xeth.XETH_DEVTYPE_BRIDGE:
 				be := vnet.SetBridge(msg.Id)
 				be.Ifindex = msg.Ifindex
@@ -167,20 +155,13 @@ func vnetdInit() {
 				fmt.Printf("XETH_MSG_KIND_IFINFO: %+v\n", *msg)
 			}
 		case xeth.XETH_MSG_KIND_IFA:
-			msg := (*xeth.MsgIfa)(ptr)
-			ifname := xeth.Ifname(msg.Ifname)
-			pe := vnet.SetPort(ifname.String())
-			if msg.IsAdd() {
-				pe.AddIPNet(msg.Prefix())
-			} else if msg.IsDel() {
-				pe.DelIPNet(msg.Prefix())
-			}
-			if vnet.LogSvi {
-				fmt.Printf("XETH_MSG_KIND_IFA: %+v\n", *msg)
-			}
+			err = unix.ProcessInterfaceAddr((*xeth.MsgIfa)(ptr), vnet.PreVnetd, nil)
+		}
+		if err != nil {
+			fmt.Println("Error processing xeth msg:", xeth.KindOf(buf), err)
 		}
 		return nil
-	})
+	}, true)
 	if err != nil {
 		panic(err)
 	}
@@ -311,6 +292,17 @@ func (p *mk1Main) parseBridgeConfig() (err error) {
 	return
 }
 
+func (p *mk1Main) parseFibConfig(v *vnet.Vnet) (err error) {
+	// Process Interface addresses that have been learned from platina xeth driver
+	// ip4IfaddrMsg(msg.Prefix, isDel)
+	// Process Route data that have been learned from platina xeth driver
+	// Since TH/Fp-ports are not initialized what could these be?
+	//for _, fe := range vnet.FdbRoutes {
+	//ip4IfaddrMsg(fe.Address, fe.Mask, isDel)
+	//}
+	return
+}
+
 func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	p.Init = init
 
@@ -344,7 +336,7 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	// Default to using MSI versus INTX for switch chip.
 	p.EnableMsiInterrupt = true
 
-	// Get initial config from platina-mk1
+	// Get initial port config from platina-mk1
 	p.parsePortConfig()
 	p.parseBridgeConfig()
 

@@ -195,7 +195,7 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	return nil
 }
 
-func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
+func (xeth *Xeth) UntilBreak(f func([]byte) error, freebuf bool) (err error) {
 	for buf := range xeth.RxCh {
 		kind := KindOf(buf)
 		if kind == XETH_MSG_KIND_BREAK {
@@ -209,7 +209,9 @@ func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 				err = f(buf)
 			}
 		}
-		Pool.Put(buf)
+		if freebuf {
+			Pool.Put(buf)
+		}
 		if err != nil {
 			break
 		}

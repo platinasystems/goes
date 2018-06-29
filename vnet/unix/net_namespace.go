@@ -13,6 +13,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -102,7 +103,8 @@ func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *na
 }
 
 const (
-	default_namespace_name = "default"
+	default_namespace_name     = "default"
+	default_namespace_name_fdb = "1"
 )
 
 type namespace_search_dir struct {
@@ -112,7 +114,7 @@ type namespace_search_dir struct {
 }
 
 func (d *namespace_search_dir) namespace_name(file_name string) (ns_name string) {
-	if d.prefix != "" {
+	if d != nil && d.prefix != "" {
 		ns_name = d.prefix + "-" + file_name
 	} else {
 		ns_name = file_name
@@ -139,7 +141,11 @@ func (nm *net_namespace_main) init() (err error) {
 	{
 		ns := &nm.default_namespace
 		ns.m = nm
-		ns.name = default_namespace_name
+		if FdbOn {
+			ns.name = default_namespace_name_fdb
+		} else {
+			ns.name = default_namespace_name
+		}
 		ns.elog_name = elog.SetString(ns.name)
 		ns.is_default = true
 		if ns.ns_fd, err = nm.fd_for_path("", "/proc/self/ns/net"); err != nil {
@@ -205,6 +211,11 @@ func (m *Main) namespace_discovery_done() {
 	if atomic.AddInt32(&nm.n_init_namespace_to_discover, -1) == 0 {
 		if err := m.netlink_discovery_done_for_all_namespaces(); err != nil {
 			m.v.Logf("namespace discovery done: %v\n", err)
+		}
+		// This is where all initial namespaces are discovered so kick off
+		// interface (and other) processing from xeth.
+		if FdbOn {
+			initVnetFromXeth(m.v)
 		}
 	}
 	return
@@ -417,6 +428,7 @@ type add_del_namespace_event struct {
 	file_name  string
 	is_del     bool
 	is_init    bool
+	is_net     bool
 	add_count  uint
 	time_start time.Time
 }
@@ -468,6 +480,35 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 	return
 }
 
+func (m *net_namespace_main) addDelNamespace(name string, isDel bool) (err error) {
+	if isDel {
+		ns := m.namespace_by_name[name]
+		if ns == nil { // delete unknown namespace file
+			return
+		}
+		ns.delNs(m)
+		delete(m.namespace_by_name, name)
+		return
+	}
+
+	var (
+		ns *net_namespace
+		ok bool
+	)
+	// If it exists set id; otherwise make a new namespace.
+	if ns, ok = m.namespace_by_name[name]; ok {
+		fmt.Println("addDelNamespace: ns already exists:", ns.name)
+		return
+	}
+	ns = &net_namespace{name: name, m: m}
+	// Namespace may be duplicate.  (e.g. created by docker and then linked to in /var/run/netns)
+	if err = ns.addNs(m); err != nil {
+		return
+	}
+	m.namespace_by_name[name] = ns
+	return
+}
+
 func (e *add_del_namespace_event) String() string {
 	what := "add"
 	if e.is_del {
@@ -490,28 +531,32 @@ func (e *add_del_namespace_event) EventAction() {
 	}
 }
 func (m *net_namespace_main) watch_namespace_add_del(dir *namespace_search_dir, file_name string, is_del bool, is_init bool) {
-	// Add to potential init time namespaces to discover.
-	if is_init {
-		atomic.AddInt32(&m.n_init_namespace_to_discover, 1)
+	if true {
+		// Add to potential init time namespaces to discover.
+		if is_init {
+			atomic.AddInt32(&m.n_init_namespace_to_discover, 1)
+		}
+		m.m.v.SignalEvent(&add_del_namespace_event{m: m, dir: dir, file_name: file_name, is_del: is_del, is_init: is_init})
 	}
-	m.m.v.SignalEvent(&add_del_namespace_event{m: m, dir: dir, file_name: file_name, is_del: is_del, is_init: is_init})
 }
 
 func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) (err error) {
 	is_del := false
 	switch msg.Header.Type {
 	case netlink.RTM_NEWLINK:
-		if false {
+		if true {
 			fmt.Printf("add_del_interface(): newlink for %s in ns %s\n",
 				msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
 		}
-		// If this is a new link created after goes is up - ignore it
-		// since we don't handle dynamic port-provisioning (via ethtool) yet.
-		if _, found := vnet.Ports[msg.Attrs[netlink.IFLA_IFNAME].String()]; !found &&
-			msg.InterfaceKind() != netlink.InterfaceKindVlan {
-			fmt.Printf("add_del_interface(): Interface created dynamically - ignored %s\n",
-				msg.Attrs[netlink.IFLA_IFNAME].String())
-			return
+		if /*!FdbOn*/ true { // FIX
+			// If this is a new link created after goes is up - ignore it
+			// since we don't handle dynamic port-provisioning (via ethtool) yet.
+			if _, found := vnet.Ports[msg.Attrs[netlink.IFLA_IFNAME].String()]; !found &&
+				msg.InterfaceKind() != netlink.InterfaceKindVlan {
+				fmt.Printf("add_del_interface(): Interface created dynamically - ignored %s (%s)\n",
+					msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
+				return
+			}
 		}
 	case netlink.RTM_DELLINK:
 		is_del = true
@@ -601,6 +646,83 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 		}
 		delete(ns.interface_by_index, index)
 		delete(ns.interface_by_name, name)
+	}
+	return
+}
+
+func (ns *net_namespace) addDelMk1Interface(m *Main, isDel bool, ifname string, ifindex uint32, address [6]byte) (err error) {
+	if !isDel {
+		if ns.interface_by_index == nil {
+			ns.interface_by_index = make(map[uint32]*net_namespace_interface)
+			ns.interface_by_name = make(map[string]*net_namespace_interface)
+		}
+		intf, exists := ns.interface_by_index[ifindex]
+		name_changed := false
+		if !exists {
+			intf = &net_namespace_interface{
+				namespace: ns,
+				name:      ifname,
+				ifindex:   ifindex,
+				kind:      0, // FIXME - how to do L3 vlans?
+				si:        vnet.SiNil,
+			}
+			ns.interface_by_index[ifindex] = intf
+			ns.interface_by_name[ifname] = intf
+		} else {
+			name_changed = intf.name != ifname
+		}
+		//fmt.Printf("net_namespace.go add interface %s: intf=%s, ifindex=%d, name_changed=%t\n", ns.name, intf.name, index, name_changed) //debug print
+		addr := address[:]
+		if exists && !bytes.Equal(intf.address, addr) {
+			// fixme address change
+		}
+
+		intf.address = make([]byte, len(address))
+		copy(intf.address[:], address[:])
+		if name_changed {
+			delete(ns.interface_by_name, ifname)
+			ns.interface_by_name[ifname] = intf
+			intf.name = ifname
+		}
+
+		// Ethernet address uniquely identifies register hw interfaces.
+		addr1 := address[:]
+		if h, ok := m.registered_hwifer_by_address[string(addr1)]; ok {
+			// only do this for hw ports
+			if ifname == h.GetHwIf().Name() {
+				m.set_si(intf, h.GetHwIf().Si())
+			}
+		} else {
+			// Manufacture what we need for this interface.
+			// Also filter by front-panel interfaces only with registered hwifs
+			// i.e. no hits for interfaces like lo, eth1, eth2, docker..., eth-1-0.1
+			hi, found := ns.m.m.v.HwIfByName(ifname)
+			if found {
+				hwifer := ns.m.m.v.HwIfer(hi)
+				ns.m.RegisterHwInterface(hwifer)
+			}
+
+		}
+
+		if !exists && intf.kind == netlink.InterfaceKindVlan {
+			// FIXME err = m.add_del_vlan(intf, msg, is_del)
+		}
+	} else {
+		intf, ok := ns.interface_by_index[ifindex]
+		// Ignore deletes of unknown interface.
+		if !ok {
+			return
+		}
+
+		if intf.si != vnet.SiNil {
+			if intf.kind == netlink.InterfaceKindVlan {
+				// FIXME m.add_del_vlan(intf, msg, isDel)
+			}
+			ns.si_by_ifindex.unset(ifindex)
+			delete(m.interface_by_si, intf.si)
+		}
+		delete(ns.interface_by_index, ifindex)
+		delete(ns.interface_by_name, ifname)
 	}
 	return
 }
@@ -939,6 +1061,7 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 	if err != nil {
 		return
 	}
+
 	// Check if namespace inode already exists.
 	// This can happen when a link is made to an existing namespace.
 	if ns1, ok := m.namespace_by_inode[ns.inode]; ok {
@@ -964,6 +1087,25 @@ func (ns *net_namespace) add(m *net_namespace_main, e *add_del_namespace_event) 
 	return
 }
 
+func (ns *net_namespace) addNs(m *net_namespace_main) (err error) {
+	// Allocate unique index for namespace.
+	ns.index = m.namespace_pool.GetIndex()
+	m.namespace_pool.entries[ns.index] = ns
+
+	defer func() {
+		if err != nil {
+			m.namespace_pool.PutIndex(ns.index)
+		}
+	}()
+
+	if _, ok := m.namespace_by_name[ns.name]; ok {
+		fmt.Printf("namespace add, %s, already exist\n", ns.name)
+		return
+	}
+	ns.fibInit(false)
+	return
+}
+
 func (ns *net_namespace) is_deleted() bool { return ns.ns_fd < 0 }
 
 func (ns *net_namespace) del(m *net_namespace_main) {
@@ -982,5 +1124,19 @@ func (ns *net_namespace) del(m *net_namespace_main) {
 		ns.ns_fd = -1
 	}
 	ns.netlink_socket_pair.close()
+	ns.index = ^uint(0)
+}
+
+func (ns *net_namespace) delNs(m *net_namespace_main) {
+	for index, intf := range ns.interface_by_index {
+		if intf.si != vnet.SiNil {
+			m.m.v.DelSwIf(intf.si)
+		}
+		delete(ns.interface_by_index, index)
+	}
+
+	ns.m.namespace_pool.PutIndex(ns.index)
+	ns.m.namespace_pool.entries[ns.index] = nil
+	ns.fibInit(true)
 	ns.index = ^uint(0)
 }

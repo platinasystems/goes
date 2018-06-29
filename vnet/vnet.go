@@ -31,6 +31,7 @@ type PortEntry struct {
 	Net          uint64
 	Ifindex      int32
 	Iflinkindex  int32 // system side eth# ifindex
+	Ifname       string
 	Flags        xeth.EthtoolFlagBits
 	Iff          xeth.Iff
 	Speed        xeth.Mbps
@@ -43,6 +44,7 @@ type PortEntry struct {
 }
 
 var Ports map[string]*PortEntry
+var PortsByIndex map[int32]*PortEntry // FIXME - driver only sends platina-mk1 type
 
 type BridgeEntry struct {
 	Net         uint64
@@ -105,6 +107,23 @@ func SetPort(ifname string) *PortEntry {
 		entry = new(PortEntry)
 		Ports[ifname] = entry
 	}
+	entry.Ifname = ifname
+	return entry
+}
+
+func SetPortByIndex(ifindex int32, ifname string) *PortEntry {
+	if PortsByIndex == nil {
+		PortsByIndex = make(map[int32]*PortEntry)
+	}
+	PortsByIndex[ifindex] = Ports[ifname]
+	return PortsByIndex[ifindex]
+}
+
+func GetPortByIndex(ifindex int32) (entry *PortEntry) {
+	if PortsByIndex == nil {
+		return nil
+	}
+	entry, _ = PortsByIndex[ifindex]
 	return entry
 }
 
@@ -186,3 +205,12 @@ func (pe *PortEntry) DelIPNet(ipnet *net.IPNet) {
 func (pe *PortEntry) HardwareAddr() net.HardwareAddr {
 	return net.HardwareAddr(pe.Addr[:])
 }
+
+type ActionType int
+
+const (
+	PreVnetd       ActionType = iota // before vnetd is started
+	ReadyVnetd                       // vnetd has declared it's ready
+	PostReadyVnetd                   // vnetd processing something initated from previous state
+	Dynamic                          // free-run case
+)

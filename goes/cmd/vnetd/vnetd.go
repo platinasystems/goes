@@ -143,7 +143,6 @@ func (i *Info) init() {
 	i.set("ready", "true", true)
 	i.poller.pubch <- fmt.Sprint("poll.max-channel-depth: ", chanDepth)
 	i.poller.pubch <- fmt.Sprint("pollInterval: ", defaultPollInterval)
-
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
