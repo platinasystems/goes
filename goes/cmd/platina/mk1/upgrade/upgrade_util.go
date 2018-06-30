@@ -37,6 +37,25 @@ type IMGINFO struct {
 	Chksum string
 }
 
+func GetVersionInfo() (vg string, vk string, vc string, err error) {
+	var imgInfo [MaxImgs]IMGINFO
+
+	if imgInfo[Goes], err = getGoesInfo(); err != nil {
+		return "", "", "", err
+	}
+	if imgInfo[Kern], err = getKernelInfo(); err != nil {
+		return "", "", "", err
+	}
+	if imgInfo[Core], err = getCorebootInfo(); err != nil {
+		return "", "", "", err
+	}
+	vg = imgInfo[Goes].Tag
+	vk = imgInfo[Kern].Tag
+	vc = imgInfo[Core].Tag
+
+	return vg, vk, vc, nil
+}
+
 func printImageInfo() (err error) {
 	var imgInfo [MaxImgs]IMGINFO
 

@@ -7,10 +7,14 @@ package bootd
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/internal/kexec"
 )
 
@@ -32,17 +36,23 @@ func putConfig() (s string, err error) {
 
 func getClientData(j int) (s string, err error) {
 	readClientCfgDB()
-	for i, _ := range bootc.ClientCfg {
-		if bootc.ClientCfg[i].Unit == j {
-			jsonInfo, err := json.Marshal(bootc.ClientCfg[i])
-			if err != nil {
-				return "", err
-			}
-			return string(jsonInfo), nil
-		}
+	i := "01:02:03:04:05:06"
+	ip := getIpAddr()
+	bootc.ClientCfg[i].IpAddr = ip
+	bootc.ClientCfg[i].Name = "i" + bootc.ClientCfg[i].IpAddr + "sjc01"
+	vg, vk, vc, err := upgrade.GetVersionInfo()
+	if err != nil {
+		return "", nil
 	}
-	err = fmt.Errorf("client number not found: %v", err)
-	return "", nil
+	bootc.ClientCfg[i].GoesVersion = vg
+	bootc.ClientCfg[i].KernelVersion = vk
+	bootc.ClientCfg[i].GoesBootVersion = vc
+
+	jsonInfo, err := json.Marshal(bootc.ClientCfg[i])
+	if err != nil {
+		return "", err
+	}
+	return string(jsonInfo), nil
 }
 
 func getClientBootData(j int) (s string, err error) {
@@ -93,7 +103,7 @@ func readClientCfgDB() (err error) {
 	bootc.ClientCfg["01:02:03:04:05:06"] = &bootc.Client{
 		Unit:           1,
 		Name:           "Invader10",
-		Machine:        "ToR-MK1",
+		Machine:        "PS-3001",
 		MacAddr:        "01:02:03:04:05:06",
 		IpAddr:         "0.0.0.0",
 		BootState:      bootc.BootStateNotRegistered,
@@ -108,7 +118,7 @@ func readClientCfgDB() (err error) {
 	bootc.ClientCfg["01:02:03:04:05:07"] = &bootc.Client{
 		Unit:           2,
 		Name:           "Invader11",
-		Machine:        "ToR-MK1",
+		Machine:        "PS-3001",
 		MacAddr:        "01:02:03:04:05:07",
 		IpAddr:         "0.0.0.0",
 		BootState:      bootc.BootStateNotRegistered,
@@ -123,7 +133,7 @@ func readClientCfgDB() (err error) {
 	bootc.ClientCfg["01:02:03:04:05:08"] = &bootc.Client{
 		Unit:           3,
 		Name:           "Invader12",
-		Machine:        "ToR-MK1",
+		Machine:        "PS-3001",
 		MacAddr:        "01:02:03:04:05:08",
 		IpAddr:         "0.0.0.0",
 		BootState:      bootc.BootStateNotRegistered,
@@ -223,6 +233,32 @@ func readClientCfgDB() (err error) {
 	bootc.ClientCfg[mac].InstallCounter++
 
 	return nil
+}
+
+func getIpAddr() string {
+	d1 := []byte("#!/bin/bash\necho -e " + `| /sbin/ip addr show dev eth0 primary`)
+	if err := ioutil.WriteFile("/tmp/tmp1", d1, 0755); err != nil {
+		return "0.0.0.0"
+	}
+	cmd := exec.Command("/tmp/tmp1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "0.0.0.0"
+	}
+	outs := strings.Split(string(out), "\n")
+	ip := "0.0.0.0"
+	for _, m := range outs {
+		if strings.Contains(m, "scope global eth0") {
+			mm := strings.Split(m, " ")
+			for n, mmm := range mm {
+				if mmm == "inet" {
+					mmmm := strings.Split(mm[n+1], "/")
+					ip = mmmm[0]
+				}
+			}
+		}
+	}
+	return ip
 }
 
 func reboot() error {
