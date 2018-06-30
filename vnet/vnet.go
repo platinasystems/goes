@@ -15,23 +15,78 @@ import (
 	"github.com/platinasystems/go/internal/xeth"
 )
 
+var LogSvi bool
+
 var Xeth *xeth.Xeth
 
+// drivers/net/ethernet/xeth/platina_mk1.c: xeth.MsgIfinfo
+// PortEntry go/main/goes-platina-mk1/vnetd.go:vnetdInit() xeth.XETH_MSG_KIND_IFINFO
+//   also BridgeEntry, BridgeMemberEntry
+// PortProvision go/main/goes-platina-mk1/vnetd.go:parsePortConfig() from entry Ports
+// BridgeProvision parseBridgeConfig() from entry Bridges,BridgeMembers
+// PortConfig fe1/platform.go:parsePortConfig() PortProvision
+// BridgeConfig parseBridgeConfig() BridgeProvision
+// Port fe1/internal/fe1a/port_init.go:PortInit()
 type PortEntry struct {
+	Net          uint64
+	Ifindex      int32
+	Iflinkindex  int32 // system side eth# ifindex
+	Flags        xeth.EthtoolFlagBits
+	Iff          xeth.Iff
+	Speed        xeth.Mbps
+	Vid          uint16 // port_vid
+	Portindex    int16
+	Subportindex int8
+	PuntIndex    uint8 // 0-based meth#, derived from Iflinkindex
+	Addr         [xeth.ETH_ALEN]uint8
+	IPNets       []*net.IPNet
+}
+
+var Ports map[string]*PortEntry
+
+type BridgeEntry struct {
 	Net         uint64
 	Ifindex     int32
-	Iflinkindex int32
-	Flags       xeth.EthtoolFlagBits
-	Iff         xeth.Iff
-	Vid         uint16
-	PortId      int16
-	DevType     xeth.DevType
-	Speed       xeth.Mbps
+	Iflinkindex int32 // system side eth# ifindex
+	PuntIndex   uint8
 	Addr        [xeth.ETH_ALEN]uint8
 	IPNets      []*net.IPNet
 }
 
-var Ports map[string]*PortEntry
+// indexed by customer vid
+var Bridges map[uint16]*BridgeEntry
+
+type BridgeMemberEntry struct {
+	Vid      uint16
+	IsTagged bool
+	PortVid  uint16
+}
+
+var BridgeMembers map[string]*BridgeMemberEntry
+
+func SetBridge(vid uint16) *BridgeEntry {
+	if Bridges == nil {
+		Bridges = make(map[uint16]*BridgeEntry)
+	}
+	entry, found := Bridges[vid]
+	if !found {
+		entry = new(BridgeEntry)
+		Bridges[vid] = entry
+	}
+	return entry
+}
+
+func SetBridgeMember(ifname string) *BridgeMemberEntry {
+	if BridgeMembers == nil {
+		BridgeMembers = make(map[string]*BridgeMemberEntry)
+	}
+	entry, found := BridgeMembers[ifname]
+	if !found {
+		entry = new(BridgeMemberEntry)
+		BridgeMembers[ifname] = entry
+	}
+	return entry
+}
 
 func SetPort(ifname string) *PortEntry {
 	if Ports == nil {

@@ -5,19 +5,39 @@
 package fe1
 
 import (
+	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet/devices/optics/sfp"
 	"github.com/platinasystems/go/vnet/ethernet"
 )
 
+// from go/main/goes-platina-mk1/vnetd.go:vnetdInit()
+// see go/vnet/vnet.go:PortEntry
 type PortProvision struct {
-	Name  string
-	Lanes uint
-	Speed string
-	Count uint
+	Name         string
+	Lanes        uint
+	Speed        string
+	Count        uint
+	Portindex    int16
+	Subportindex int8
+	PuntIndex    uint8
+	Vid          ethernet.VlanTag
 }
 
 type PortProvisionConfig struct {
 	Ports []PortProvision
+}
+
+// later may add stg here
+type BridgeProvision struct {
+	PuntIndex        uint8
+	Addr             [xeth.ETH_ALEN]uint8
+	TaggedPortVids   []ethernet.VlanTag
+	UntaggedPortVids []ethernet.VlanTag
+}
+
+// mapped by vid
+type BridgeProvisionConfig struct {
+	Bridges map[ethernet.VlanTag]*BridgeProvision
 }
 
 type PlatformConfig struct {
@@ -30,8 +50,9 @@ type PlatformConfig struct {
 	// Enable using PCI MSI interrupt for fe1 switch.
 	EnableMsiInterrupt     bool
 	UseCpuForPuntAndInject bool
-	//Port Provisioning
-	PortConfig PortProvisionConfig
+
+	PortConfig   PortProvisionConfig
+	BridgeConfig BridgeProvisionConfig
 }
 
 type SwitchPort struct {

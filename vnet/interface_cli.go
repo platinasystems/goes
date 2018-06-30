@@ -396,10 +396,19 @@ func (v *Vnet) setSwIf(c cli.Commander, w cli.Writer, in *cli.Input) (err error)
 		isUp parse.UpDown
 		si   Si
 	)
+
+	if !in.Parse("%v", &si, v) {
+		err = fmt.Errorf("no such software interface")
+		return
+	}
+
+	swif := v.SwIf(si)
+
 	switch {
-	case in.Parse("state %v %v", &si, v, &isUp):
-		s := v.SwIf(si)
-		err = s.SetAdminUp(v, bool(isUp))
+	case in.Parse("state %v", &isUp):
+		fmt.Fprintf(w, "%v state %v\n",
+			si.Name(v), isUp)
+		err = swif.SetAdminUp(v, bool(isUp))
 	default:
 		err = cli.ParseError
 	}

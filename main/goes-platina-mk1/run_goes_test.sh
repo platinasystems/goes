@@ -5,14 +5,15 @@ if ! [ $(id -u) = 0 ]; then
    exit 1
 fi
 
+# document all known issues on same line as test
 testcases=("Test/vnet.ready"
            "Test/nodocker/twohost"
            "Test/nodocker/onerouter"
-           "Test/docker/net/slice/vlan"
+           "Test/docker/net/slice/vlan" # --- FAIL: Test/docker/net/slice/vlan/stress-pci (reboot to recover)
            "Test/docker/net/dhcp/eth"
            "Test/docker/net/dhcp/vlan"
-           "Test/docker/net/static/eth"
-           "Test/docker/net/static/vlan"
+           "Test/docker/net/static/eth"  # fails if add before ping
+           "Test/docker/net/static/vlan" # fails if add before ping
            "Test/docker/frr/ospf/eth"
            "Test/docker/frr/ospf/vlan"
            "Test/docker/frr/isis/eth"
@@ -22,7 +23,7 @@ testcases=("Test/vnet.ready"
            "Test/docker/bird/bgp/eth"
            "Test/docker/bird/bgp/vlan"
            "Test/docker/bird/ospf/eth"
-           "Test/docker/bird/ospf/vlan"
+           "Test/docker/bird/ospf/vlan" # --- FAIL: Test/docker/bird/ospf/vlan/connectivity (RTA_MULTIPATH w/out gw)
            "Test/docker/gobgp/ebgp/eth"
            "Test/docker/gobgp/ebgp/vlan")
 
@@ -45,8 +46,7 @@ fix_it() {
   docker rm -v CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   ip -all netns del
   echo
-  ./mk1_util.sh flap
-  ./mk1_util.sh isup
+  ./mk1_util.sh test_init
 }
 
 if [ "$1" == "list" ]; then
@@ -55,6 +55,8 @@ if [ "$1" == "list" ]; then
         echo $id ":" $t
         id=$(($id+1))
     done
+    echo
+    grep -A 30 testcases\= $0 | grep \#
 elif [ "$1" == "run" ]; then
     test_range=${testcases[@]}
 elif [ "$1" == "run_range" ]; then
@@ -81,6 +83,7 @@ fi
 
 count=0
 for t in ${test_range}; do
+    log=${t//\//_}.out
     count=$(($count+1))
     printf "Running %27s " $t" ($count of $test_count) {"
     fix_it
@@ -88,8 +91,8 @@ for t in ${test_range}; do
 
     if [ $? == 0 ]; then
         echo "OK"
+        mv /tmp/out ./$log.OK
     else
-        log=${t//\//_}.out
         mv /tmp/out ./$log
         if grep -q panic ./$log; then
             echo "Crashed"
