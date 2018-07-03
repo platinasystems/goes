@@ -16,15 +16,10 @@
 //   executes wipe request from bootd
 //   pushes boot state, install state, etc. to master
 //
-// clntd.go Daemon - GOES-BOOT
-//   launches Bootc() in goes-boot
-//   hopefully will beat grub launch daemon
-//
 // script run infrastructure TBD
 // postInstall0 TBD
 // postIntalll1 TBD
 
-// FIXME FIX WIPE from WEB
 // FIXME REVERIFY REGISTER COMMAND
 // FIXME add check for sda6 before updating strings, add check for sda6 before trying to boot sda6 in goes-boot
 // FIXME add support for 2 ISOs
@@ -319,7 +314,6 @@ func formKexec1() (err error) {
 	}
 	kexec0 = "root=UUID=" + uuid1 + " console=ttyS0,115200 " + Cfg.ReInstallC
 	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200 "
-	kexec1 += "ip=" + Cfg.MyIpAddr + "::" + Cfg.MyGateway + ":" + Cfg.MyNetmask
 	kexec1 += Cfg.Sda1C
 	return nil
 }
