@@ -44,6 +44,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/platinasystems/go/internal/machine"
 )
@@ -61,11 +62,13 @@ const (
 	zero        = uintptr(0)
 	sda1        = "sda1"
 	sda6        = "sda6"
-	goesBoot    = "goesboot"
+	goesBoot    = "coreboot"
 	cbSda1      = "/mountd/sda1/"
 	cbSda6      = "/mountd/sda6/"
 	tarFile     = "postinstall.tar.gz"
 	scriptFile  = "rc.local"
+	waitMs      = 100
+	timeoutCnt  = 50
 )
 
 var BootcCfgFile string
@@ -76,10 +79,21 @@ var kexec1 string
 var kexec6 string
 
 func Bootc() []string {
-	if err := initCfg(); err != nil {
-		fmt.Println("Error: bootc.cfg error, drop into grub...")
-		return []string{""}
+	for i := 0; ; i++ {
+		d, err := ioutil.ReadFile("/proc/mounts")
+		if err != nil {
+			return []string{""}
+		}
+		ds := string(d)
+		if strings.Contains(ds, "sda1") && strings.Contains(ds, "sda6") {
+			break
+		}
+		time.Sleep(time.Millisecond * time.Duration(waitMs))
+		if i > timeoutCnt {
+			return []string{""}
+		}
 	}
+
 	if err := readCfg(); err != nil {
 		fmt.Println("Error: can't read bootc.cfg, drop into grub...")
 		return []string{""}
