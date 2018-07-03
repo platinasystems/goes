@@ -80,7 +80,7 @@ var Goes = &goes.Goes{
 		"recordfail":       recordfail.Command{},
 		"search":           &search.Command{},
 		"set":              &set.Command{},
-		"submenu":          submenu.Command{},
+		"submenu":          submenu.Command{M: Menuentry},
 		"[":                testcmd.Command{},
 		"terminal_output":  terminal_output.Command{},
 		"then":             &thencmd.Command{},
@@ -140,71 +140,22 @@ func (c *Command) Main(args ...string) error {
 		fmt.Fprintf(os.Stderr, "Grub script did not define any menus or set a kernel\n")
 	}
 
-	if len(Linux.Kern) > 0 {
-		kexec := c.KexecCommand()
-		yn, err := c.readline(parm, flag, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(yn, "Y") ||
-			strings.HasPrefix(yn, "y") {
-			err := Goes.Main(kexec...)
-			return err
-		}
-		if err != nil {
-			return err
-		}
+	err = c.AskKernel(parm, flag)
+	if err != nil {
+		return err
 	}
-
 	if menlen == 0 {
 		return errors.New("No defined kernel or menus")
 	}
 	fmt.Printf("Menus defined: %d\n", menlen)
-	for i, me := range Menuentry.Menus {
-		fmt.Printf("[%d]   %s\n", i, me.Name)
-	}
-	var menuItem int
-	err = func() error {
-		def := Goes.EnvMap["default"]
-		if def == "" {
-			def = "0"
-		}
-		mi, err := c.readline(parm, flag, fmt.Sprintf("Menu item [%s]? ", def), def)
-		if err != nil {
-			return err
-		}
-		menuItem, err = strconv.Atoi(mi)
-		if err != nil {
-			return err
-		}
-		return nil
-	}()
+	err = c.RunMenu(parm, flag)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Running %d\n", menuItem)
-	me := Menuentry.Menus[menuItem]
-	fmt.Printf("Running menu item #%d:\n", menuItem)
-	err = me.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
-	fmt.Printf("Kernel defined: %s\n", Linux.Kern)
-	fmt.Printf("Linux command: %v\n", Linux.Cmd)
-	fmt.Printf("Initrd: %v\n", Initrd.Initrd)
-
 	root = Goes.EnvMap["root"]
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
-	if len(Linux.Kern) > 0 {
-		kexec := c.KexecCommand()
-		yn, err := c.readline(parm, flag, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(yn, "Y") ||
-			strings.HasPrefix(yn, "y") {
-			err := Goes.Main(kexec...)
-			return err
-		}
-	}
+	err = c.AskKernel(parm, flag)
 
 	return err
 }
@@ -215,6 +166,66 @@ func (c *Command) String() string {
 
 func (c *Command) Usage() string {
 	return Goes.Usage()
+}
+
+func (c *Command) RunMenu(parm *parms.Parms, flag *flags.Flags) (err error) {
+	for len(Menuentry.Menus) != 0 {
+		for i, me := range Menuentry.Menus {
+			fmt.Printf("[%d]   %s\n", i, me.Name)
+		}
+		var menuItem int
+		err = func() error {
+			def := Goes.EnvMap["default"]
+			if def == "" {
+				def = "0"
+			}
+			mi, err := c.readline(parm, flag, fmt.Sprintf("Menu item [%s]? ", def), def)
+			if err != nil {
+				return err
+			}
+			menuItem, err = strconv.Atoi(mi)
+			if err != nil {
+				return err
+			}
+			return nil
+		}()
+		if err != nil {
+			return
+		}
+		if menuItem >= len(Menuentry.Menus) {
+			return errors.New("Menu item out of range")
+		}
+		me := Menuentry.Menus[menuItem]
+		Menuentry.Menus = Menuentry.Menus[:0]
+		err = me.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
+		fmt.Printf("Kernel defined: %s\n", Linux.Kern)
+		fmt.Printf("Linux command: %v\n", Linux.Cmd)
+		fmt.Printf("Initrd: %v\n", Initrd.Initrd)
+		err = c.AskKernel(parm, flag)
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+func (c *Command) AskKernel(parm *parms.Parms, flag *flags.Flags) (err error) {
+	if len(Linux.Kern) > 0 {
+		kexec := c.KexecCommand()
+		yn, err := c.readline(parm, flag, fmt.Sprintf("Execute %s? <Yes/no> ", kexec), "Yes")
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(yn, "Y") ||
+			strings.HasPrefix(yn, "y") {
+			err := Goes.Main(kexec...)
+			return err
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return
 }
 
 func (c *Command) GetRoot() string {
@@ -257,6 +268,9 @@ func (c *Command) GetRoot() string {
 func (c *Command) KexecCommand() []string {
 	k := Linux.Kern
 	i := Initrd.Initrd
+	if len(k) == 0 {
+		return []string{}
+	}
 	if k[0] != '/' {
 		k = "/" + k
 	}

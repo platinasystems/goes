@@ -27,12 +27,12 @@ func (ws *webserver) Write(p []byte) (n int, err error) {
 	return ret, err
 }
 
-func (c *Command) startHttpServer() *http.Server {
-	srv := &http.Server{Addr: ":8080"}
+func (c *Command) startHttpServer(path string) {
 	m := Menuentry.Menus
+	Menuentry.Menus = Menuentry.Menus[:0]
 	for i, v := range m {
 		me := v
-		http.HandleFunc(fmt.Sprintf("/boot/%d/", i), func(w http.ResponseWriter, r *http.Request) {
+		http.HandleFunc(fmt.Sprintf("/%s/%d/", path, i), func(w http.ResponseWriter, r *http.Request) {
 			ws := &webserver{w: w}
 			io.WriteString(w, `<html>`)
 			err := me.RunFun(ws, ws, ws, false, false)
@@ -41,13 +41,23 @@ func (c *Command) startHttpServer() *http.Server {
 <br>`, html.EscapeString(err.Error()))
 			} else {
 				kexec := c.KexecCommand()
-				s := html.EscapeString(strings.Join(kexec, " "))
-				fmt.Printf("kexec command: %s\n", s)
-				fmt.Fprintf(w, `Execute <a href="kexec">%s</a><br>`, s)
+				if len(kexec) > 0 {
+					s := html.EscapeString(strings.Join(kexec, " "))
+					fmt.Printf("kexec command: %s\n", s)
+					fmt.Fprintf(w, `Execute <a href="kexec">%s</a><br>`, s)
+				}
+			}
+			for j, v := range Menuentry.Menus {
+				fmt.Fprintf(w, `<a href="boot/%d/">%s</a>
+<br>
+`, j, v.Name)
 			}
 			io.WriteString(w, `</html>`)
+			if len(Menuentry.Menus) > 0 {
+				c.startHttpServer(fmt.Sprintf("%s/%d", i))
+			}
 		})
-		http.HandleFunc(fmt.Sprintf("/boot/%d/kexec", i), func(w http.ResponseWriter, r *http.Request) {
+		http.HandleFunc(fmt.Sprintf("/%s/%d/kexec", path, i), func(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, `<html>`)
 			kexec := c.KexecCommand()
 			err := Goes.Main(kexec...)
@@ -60,7 +70,7 @@ func (c *Command) startHttpServer() *http.Server {
 		})
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(fmt.Sprintf("/%s", path), func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `<html><img src=http://www.platinasystems.com/wp-content/uploads/2016/10/PLA-Logo-Final-01-1-1-300x36.png><br>`)
 		for i, v := range m {
 			fmt.Fprintf(w, `<a href="boot/%d/">%s</a>
@@ -69,18 +79,15 @@ func (c *Command) startHttpServer() *http.Server {
 		}
 		io.WriteString(w, `</html>`)
 	})
+}
 
+func (c *Command) ServeMenus() {
+	srv := &http.Server{Addr: ":8080"}
+	c.startHttpServer("boot")
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			// cannot panic, because this probably is an intentional close
 			log.Printf("Httpserver: ListenAndServe() error: %s", err)
 		}
 	}()
-
-	// returning reference so caller can call Shutdown()
-	return srv
-}
-
-func (c *Command) ServeMenus() *http.Server {
-	return c.startHttpServer()
 }
