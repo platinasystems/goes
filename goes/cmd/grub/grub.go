@@ -37,7 +37,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/grub/set"
 	"github.com/platinasystems/go/goes/cmd/grub/submenu"
 	"github.com/platinasystems/go/goes/cmd/grub/terminal_output"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 
 	"github.com/platinasystems/go/goes/cmd/ifcmd"
 	"github.com/platinasystems/go/goes/cmd/kexec"
@@ -135,12 +134,6 @@ func (c *Command) Main(args ...string) error {
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
 	c.ServeMenus() // FIXME so wrong
-
-	if kexec := bootc.Bootc(); len(kexec) > 1 {
-		fmt.Printf("STRING: %v", kexec)
-		err = Goes.Main(kexec...)
-		fmt.Println(err)
-	}
 
 	menlen := len(Menuentry.Menus)
 	if menlen == 0 && len(Linux.Kern) == 0 {
