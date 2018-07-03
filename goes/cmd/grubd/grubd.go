@@ -12,6 +12,7 @@ import (
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
+	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -79,6 +80,11 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 		for i := 0; i < cnt; i++ {
 			<-done
+		}
+
+		if kexec := bootc.Bootc(); len(kexec) > 1 {
+			err := c.g.Main(kexec...)
+			fmt.Println(err)
 		}
 
 		for _, m := range c.mounts {
