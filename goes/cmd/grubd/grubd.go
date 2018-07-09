@@ -63,6 +63,12 @@ func (c *Command) Main(args ...string) (err error) {
 	}
 	t := time.NewTicker(2 * time.Second)
 	defer t.Stop()
+
+	if kexec := bootc.Bootc(); len(kexec) > 1 {
+		err := c.g.Main(kexec...)
+		fmt.Println(err)
+	}
+
 	for {
 		dirs, err := ioutil.ReadDir(mp)
 		if err != nil {
@@ -80,11 +86,6 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 		for i := 0; i < cnt; i++ {
 			<-done
-		}
-
-		if kexec := bootc.Bootc(); len(kexec) > 1 {
-			err := c.g.Main(kexec...)
-			fmt.Println(err)
 		}
 
 		for _, m := range c.mounts {

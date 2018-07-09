@@ -2,8 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// ZTP Modules
-//
 // bootc.go Module - GOES-BOOT and GOES
 //   provides Client REST messages to server
 //   provides state machine for executing wipe/re-install in goesboot
@@ -15,13 +13,8 @@
 // pushd.go Daemon - GOES
 //   executes wipe request from bootd
 //   pushes boot state, install state, etc. to master
-//
-// script run infrastructure TBD
-// postInstall0 TBD
-// postIntalll1 TBD
 
-// FIXME REVERIFY REGISTER COMMAND
-// FIXME add check for sda6 before updating strings, add check for sda6 before trying to boot sda6 in goes-boot
+// FIXME VERIFY REGISTER COMMAND
 // FIXME add support for 2 ISOs
 // FIXME add config from server
 // FIXME add status updates msgs to server
@@ -78,20 +71,61 @@ var kexec0 string
 var kexec1 string
 var kexec6 string
 
-func Bootc() []string {
+func chkmounts() (ready bool, partitioned bool) {
 	for i := 0; ; i++ {
-		d, err := ioutil.ReadFile("/proc/mounts")
-		if err != nil {
-			return []string{""}
-		}
-		ds := string(d)
-		if strings.Contains(ds, "sda1") && strings.Contains(ds, "sda6") {
-			break
-		}
 		time.Sleep(time.Millisecond * time.Duration(waitMs))
 		if i > timeoutCnt {
+			return false, false
+		}
+
+		p, err := ioutil.ReadFile("/proc/partitions")
+		if err != nil {
+			continue
+		}
+		ps := string(p)
+		m, err := ioutil.ReadFile("/proc/mounts")
+		if err != nil {
+			continue
+		}
+		ms := string(m)
+		if err := readCfg(); err != nil {
+			continue
+		}
+
+		if !strings.Contains(ps, "sda6") {
+			if !strings.Contains(ms, "sda1") {
+				continue
+			}
+			return true, false
+		}
+
+		if strings.Contains(ps, "sda6") {
+			if strings.Contains(ms, "sda1") {
+				if strings.Contains(ms, "sda6") {
+					return true, true
+				}
+				if Cfg.Install || Cfg.BootSda1 {
+					return true, true
+				}
+			}
+		}
+	}
+}
+
+func Bootc() []string {
+	ready, part := chkmounts()
+	if !ready {
+		fmt.Println("Error: mounts are not ready, drop into grub...")
+		return []string{""}
+	}
+	if ready && !part {
+		if err := formKexec1(); err != nil {
+			fmt.Println("Error: can't form kexec string, drop into grub...")
 			return []string{""}
 		}
+		fmt.Println("1K: 1I: 1C:", "A", Cfg.Sda1K, "B", Cfg.Sda1I, "C", kexec1, "\n")
+		return []string{"kexec", "-k", Cfg.Sda1K,
+			"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 	}
 
 	if err := readCfg(); err != nil {
@@ -737,6 +771,8 @@ func fixNewroot() error { // FIXME Temporary remove by 7/31/2018
 	Cfg.ReInstallI = strings.Replace(Cfg.ReInstallI, "newroot", "mountd", 1)
 	Cfg.Sda1K = strings.Replace(Cfg.Sda1K, "newroot", "mountd", 1)
 	Cfg.Sda1I = strings.Replace(Cfg.Sda1I, "newroot", "mountd", 1)
+	Cfg.Sda6K = strings.Replace(Cfg.Sda6K, "newroot", "mountd", 1)
+	Cfg.Sda6I = strings.Replace(Cfg.Sda6I, "newroot", "mountd", 1)
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err
