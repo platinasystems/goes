@@ -133,9 +133,10 @@ func (c *Command) Main(args ...string) error {
 	root := Goes.EnvMap["root"]
 	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 
+	m := Menuentry.Menus
 	c.ServeMenus() // FIXME so wrong
 
-	menlen := len(Menuentry.Menus)
+	menlen := len(m)
 	if menlen == 0 && len(Linux.Kern) == 0 {
 		fmt.Fprintf(os.Stderr, "Grub script did not define any menus or set a kernel\n")
 	}
@@ -148,7 +149,7 @@ func (c *Command) Main(args ...string) error {
 		return errors.New("No defined kernel or menus")
 	}
 	fmt.Printf("Menus defined: %d\n", menlen)
-	err = c.RunMenu(parm, flag)
+	err = c.RunMenu(m, parm, flag)
 	if err != nil {
 		return err
 	}
@@ -168,9 +169,9 @@ func (c *Command) Usage() string {
 	return Goes.Usage()
 }
 
-func (c *Command) RunMenu(parm *parms.Parms, flag *flags.Flags) (err error) {
-	for len(Menuentry.Menus) != 0 {
-		for i, me := range Menuentry.Menus {
+func (c *Command) RunMenu(m []menuentry.Entry, parm *parms.Parms, flag *flags.Flags) (err error) {
+	for len(m) != 0 {
+		for i, me := range m {
 			fmt.Printf("[%d]   %s\n", i, me.Name)
 		}
 		var menuItem int
@@ -192,10 +193,10 @@ func (c *Command) RunMenu(parm *parms.Parms, flag *flags.Flags) (err error) {
 		if err != nil {
 			return
 		}
-		if menuItem >= len(Menuentry.Menus) {
+		if menuItem >= len(m) {
 			return errors.New("Menu item out of range")
 		}
-		me := Menuentry.Menus[menuItem]
+		me := m[menuItem]
 		Menuentry.Menus = Menuentry.Menus[:0]
 		err = me.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
 		fmt.Printf("Kernel defined: %s\n", Linux.Kern)
@@ -205,6 +206,7 @@ func (c *Command) RunMenu(parm *parms.Parms, flag *flags.Flags) (err error) {
 		if err != nil {
 			return err
 		}
+		m = Menuentry.Menus
 	}
 	return
 }
