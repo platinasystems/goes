@@ -55,6 +55,13 @@ type Xeth struct {
 	sockch chan *net.UnixConn
 }
 
+var expMsgSz = map[Kind]int{
+	XETH_MSG_KIND_ETHTOOL_FLAGS:    SizeofMsgEthtoolFlags,
+	XETH_MSG_KIND_ETHTOOL_SETTINGS: SizeofMsgEthtoolSettings,
+	XETH_MSG_KIND_IFA:              SizeofMsgIfa,
+	XETH_MSG_KIND_IFINFO:           SizeofMsgIfinfo,
+}
+
 // New(driver[, options...]]])
 // driver :: XETH driver name (e.g. "platina-mk1")
 // Options:
@@ -187,6 +194,7 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	xeth.txch <- buf
 	return nil
 }
+
 func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 	for buf := range xeth.RxCh {
 		kind := KindOf(buf)
@@ -194,7 +202,12 @@ func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 			Pool.Put(buf)
 			break
 		} else if kind != XETH_MSG_KIND_NOT_MSG {
-			err = f(buf)
+			exp, found := expMsgSz[kind]
+			if found && exp != len(buf) {
+				err = fmt.Errorf("mismatched %s", kind)
+			} else {
+				err = f(buf)
+			}
 		}
 		Pool.Put(buf)
 		if err != nil {
