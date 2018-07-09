@@ -78,7 +78,7 @@ func vnetdInit() {
 	}
 	p := new(mk1Main)
 	vnet.Xeth.DumpIfinfo()
-	vnet.Xeth.UntilBreak(func(buf []byte) error {
+	err = vnet.Xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
 		switch xeth.KindOf(buf) {
 		case xeth.XETH_MSG_KIND_ETHTOOL_FLAGS:
@@ -112,6 +112,9 @@ func vnetdInit() {
 		}
 		return nil
 	})
+	if err != nil {
+		panic(err)
+	}
 	if true {
 		for ifname, entry := range vnet.Ports {
 			fmt.Print(ifname, ".flags: ", entry.Flags, "\n")
