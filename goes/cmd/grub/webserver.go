@@ -15,6 +15,8 @@ import (
 	"github.com/platinasystems/go/goes/cmd/grub/menuentry"
 )
 
+var pageExists = make(map[string]struct{})
+
 type webserver struct {
 	w http.ResponseWriter
 }
@@ -31,6 +33,10 @@ func (ws *webserver) Write(p []byte) (n int, err error) {
 
 func (c *Command) addHandler(parent string, i int, me menuentry.Entry) {
 	path := fmt.Sprintf("%s/%d", parent, i)
+	if _, f := pageExists[path]; f {
+		return
+	}
+	pageExists[path] = struct{}{}
 	http.HandleFunc(fmt.Sprintf("/%s/", path), func(w http.ResponseWriter, r *http.Request) {
 		Menuentry.Menus = Menuentry.Menus[:0]
 		ws := &webserver{w: w}
