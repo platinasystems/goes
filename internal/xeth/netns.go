@@ -27,7 +27,7 @@ import "fmt"
 type Netns uint64
 
 func (ns Netns) String() string {
-	if ns == 0 {
+	if ns <= 1 {
 		return "default"
 	}
 	return fmt.Sprintf("%#x", uint64(ns))

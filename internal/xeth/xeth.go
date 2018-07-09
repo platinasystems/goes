@@ -50,8 +50,7 @@ type Xeth struct {
 
 	RxCh <-chan []byte
 	rxch chan<- []byte
-	TxCh chan<- []byte
-	txch <-chan []byte
+	txch chan []byte
 
 	sockch chan *net.UnixConn
 }
@@ -85,14 +84,12 @@ func New(driver string, opts ...interface{}) (*Xeth, error) {
 		}
 	}
 	rxch := make(chan []byte, sizeofRxch)
-	txch := make(chan []byte, sizeofTxch)
 	xeth := &Xeth{
 		name: driver,
 		addr: addr,
 		RxCh: rxch,
 		rxch: rxch,
-		TxCh: txch,
-		txch: txch,
+		txch: make(chan []byte, sizeofTxch),
 
 		sockch: make(chan *net.UnixConn),
 	}
@@ -117,7 +114,7 @@ func (xeth *Xeth) Close() error {
 	if xeth.sock == nil {
 		return nil
 	}
-	close(xeth.TxCh)
+	close(xeth.txch)
 	for _ = range xeth.RxCh {
 		// txgo closes sockch after sock shutdown
 		// rxgo closes rxch after sockch close
@@ -131,27 +128,31 @@ func (xeth *Xeth) Carrier(ifname string, flag CarrierFlag) {
 	msg.Kind = uint8(XETH_MSG_KIND_CARRIER)
 	copy(msg.Ifname[:], ifname)
 	msg.Flag = uint8(flag)
-	xeth.TxCh <- buf
+	xeth.txch <- buf
 }
 
 func (xeth *Xeth) DumpFib() {
 	buf := Pool.Get(SizeofMsgBreak)
 	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
 	msg.Kind = uint8(XETH_MSG_KIND_DUMP_FIBINFO)
-	xeth.TxCh <- buf
+	xeth.txch <- buf
 }
 
 func (xeth *Xeth) DumpIfinfo() {
 	buf := Pool.Get(SizeofMsgBreak)
 	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
 	msg.Kind = uint8(XETH_MSG_KIND_DUMP_IFINFO)
-	xeth.TxCh <- buf
+	xeth.txch <- buf
 }
 
 func (xeth *Xeth) ExceptionFrame(buf []byte) error {
 	b := Pool.Get(len(buf))
 	copy(b, buf)
-	xeth.TxCh <- b
+	select {
+	case xeth.txch <- b:
+	default:
+		Pool.Put(b)
+	}
 	return nil
 }
 
@@ -173,7 +174,7 @@ func (xeth *Xeth) SetStat(ifname, stat string, count uint64) error {
 	copy(msg.Ifname[:], ifname)
 	msg.Index = statindex
 	msg.Count = count
-	xeth.TxCh <- buf
+	xeth.txch <- buf
 	return nil
 }
 
@@ -183,10 +184,9 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	msg.Kind = uint8(XETH_MSG_KIND_SPEED)
 	copy(msg.Ifname[:], ifname)
 	msg.Mbps = uint32(count)
-	xeth.TxCh <- buf
+	xeth.txch <- buf
 	return nil
 }
-
 func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 	for buf := range xeth.RxCh {
 		kind := KindOf(buf)
