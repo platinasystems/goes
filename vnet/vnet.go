@@ -24,6 +24,8 @@ type PortEntry struct {
 	Flags       xeth.EthtoolFlagBits
 	Iff         xeth.Iff
 	Vid         uint16
+	PortId      int16
+	DevType     xeth.DevType
 	Speed       xeth.Mbps
 	Addr        [xeth.ETH_ALEN]uint8
 	IPNets      []*net.IPNet

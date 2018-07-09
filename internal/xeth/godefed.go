@@ -1,5 +1,5 @@
 // Created by cgo -godefs - DO NOT EDIT
-// cgo -godefs -- -I/home/tgrennan/src/github.com/platinasystems/linux/arch/x86/include -I./arch/x86/include/generated -I/home/tgrennan/src/github.com/platinasystems/linux/include -I./include -I/home/tgrennan/src/github.com/platinasystems/linux/arch/x86/include/uapi -I./arch/x86/include/generated/uapi -I/home/tgrennan/src/github.com/platinasystems/linux/include/uapi -I./include/generated/uapi -include /home/tgrennan/src/github.com/platinasystems/linux/include/linux/kconfig.h /home/tgrennan/src/github.com/platinasystems/linux/drivers/net/ethernet/xeth/go/src/xeth/godefs.go
+// cgo -godefs -- -I./arch/x86/include -I./arch/x86/include/generated -I./include -I./arch/x86/include/uapi -I./arch/x86/include/generated/uapi -I./include/uapi -I./include/generated/uapi -include ./include/linux/kconfig.h /home/tgrennan/src/github.com/platinasystems/linux/drivers/net/ethernet/xeth/go/src/xeth/godefs.go
 
 package xeth
 
@@ -15,7 +15,7 @@ const (
 	SizeofMsgDumpIfinfo		= 0x10
 	SizeofMsgCarrier		= 0x28
 	SizeofMsgSpeed			= 0x28
-	SizeofMsgIfinfo			= 0x40
+	SizeofMsgIfinfo			= 0x48
 	SizeofMsgIfa			= 0x30
 	SizeofMsgFibentry		= 0x28
 	SizeofNextHop			= 0x18
@@ -120,6 +120,8 @@ type MsgIfinfo struct {
 	Portindex	int16
 	Subportindex	int8
 	Devtype		uint8
+	Portid		int16
+	Pad		[6]uint8
 }
 type MsgIfa struct {
 	Z64	uint64

@@ -95,11 +95,14 @@ func vnetdInit() {
 			msg := (*xeth.MsgIfinfo)(ptr)
 			ifname := xeth.Ifname(msg.Ifname)
 			pe := vnet.SetPort(ifname.String())
+			pe.Net = msg.Net
 			pe.Ifindex = msg.Ifindex
 			pe.Iflinkindex = msg.Iflinkindex
 			pe.Iff = xeth.Iff(msg.Flags)
+			pe.Vid = msg.Id
+			pe.PortId = msg.Portid
+			pe.DevType = xeth.DevType(msg.Devtype)
 			copy(pe.Addr[:], msg.Addr[:])
-			pe.Net = msg.Net
 		case xeth.XETH_MSG_KIND_IFA:
 			msg := (*xeth.MsgIfa)(ptr)
 			ifname := xeth.Ifname(msg.Ifname)
