@@ -173,6 +173,8 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 				}
 				return g.Main(args...)
 			}
+		} else if builtin, found := g.Builtins()[name]; found {
+			return builtin(args[1:]...)
 		} else {
 			return fmt.Errorf("%s: command not found", name)
 		}
