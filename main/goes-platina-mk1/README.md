@@ -2,7 +2,6 @@ This is a GO Embedded System for Platina Systems' *mark 1* packet switches.
 
 To run unit tests, loopback 6 pairs for ports and edit the configuration
 as follows:
-
 ```console
 $ editor main/goes-platina-mk1/test/port2port/conf.go
 $ git update-index --assume-unchanged \
@@ -10,12 +9,23 @@ $ git update-index --assume-unchanged \
 ```
 
 Then build the unit test and run.
-
 ```console
-$ make -B goes-platina-mk1.test
-$ sudo ./goes-platina-mk1.test -test.v		# -test.run=./SUB/TEST
+$ go install github.com:platinasystems/go/main/goes-build
+$ goes-build goes-platina-mk1.test
+$ sudo ./goes-platina-mk1.test
 ```
-Current test cases:
+
+Options:
+```console
+-test.v		verbose
+-test.vv	log test.Program output
+-test.cd	change to named directory before running tests
+-test.run=Test/TEST
+		run named test instead of all
+-test.Pause	pause before and after suite
+```
+
+Current tests:
 ```
 Test/vnet.ready
 
@@ -47,7 +57,6 @@ Test/docker/gobgp/ebgp/vlan
 ```
 
 For example:
-
 ```console
 sudo ./goes-platina-mk1.test -test.vv -test.run Test/docker/frr/ospf/eth
 sudo ./goes-platina-mk1.test -test.vv -test.run ./.*/.*/.*/vlan

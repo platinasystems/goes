@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"testing"
 	"time"
 
@@ -19,8 +20,16 @@ import (
 )
 
 var testPause = flag.Bool("test.pause", false, "pause before and after suite")
+var testCD = flag.String("test.cd", ".",
+	"change to named directory before running tests")
 
 func Test(t *testing.T) {
+	if *testCD != "." {
+		if err := os.Chdir(*testCD); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	test.Main(main)
 
 	assert := test.Assert{t}
