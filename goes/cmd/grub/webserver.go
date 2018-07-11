@@ -96,6 +96,9 @@ func (c *Command) startHttpServer(path string) {
 func (c *Command) ServeMenus() {
 	srv := &http.Server{Addr: ":8080"}
 	c.startHttpServer("boot")
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "boot/", 307)
+	})
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			// cannot panic, because this probably is an intentional close
