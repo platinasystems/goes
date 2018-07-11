@@ -35,6 +35,7 @@ func subtest(t *testing.T, yaml []byte) {
 	test.Suite{
 		{"connectivity", checkConnectivity},
 		{"frr", checkFrr},
+		{"config", addIntfConf},
 		{"neighbors", checkNeighbors},
 		{"routes", checkRoutes},
 		{"inter-connectivity", checkInterConnectivity},
@@ -76,6 +77,28 @@ func checkFrr(t *testing.T) {
 		assert.Nil(err)
 		assert.Match(out, ".*isisd.*")
 		assert.Match(out, ".*zebra.*")
+	}
+}
+
+func addIntfConf(t *testing.T) {
+	assert := test.Assert{t}
+
+	for _, r := range config.Routers {
+		for _, i := range r.Intfs {
+			var intf string
+			if i.Vlan != "" {
+				intf = i.Name + "." + i.Vlan
+			} else {
+				intf = i.Name
+			}
+			ccmd := "conf t"
+			icmd := "interface " + intf
+			rcmd := "ip router isis " + r.Hostname
+			cmd := []string{"vtysh", "-c", ccmd,
+				"-c", icmd, "-c", rcmd}
+			_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+			assert.Nil(err)
+		}
 	}
 }
 
