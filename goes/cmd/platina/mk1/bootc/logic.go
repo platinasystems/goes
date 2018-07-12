@@ -19,7 +19,6 @@
 // FIXME add config from server
 // FIXME add status updates msgs to server
 // FIXME CONFIG PORT NUMBER, remove hardcodes, auto update bootc.cfg if out of date, for new fields
-// FIXME LAUNCH SCRIPT AFTER EVERY BOOT - special case right after wipe, script is custom
 // FIXME BOOTD check works with real master
 // FIXME COMMIT NEW SERVER SIDE CODE
 // FIXME CONTACT SERVER w/o IP address
@@ -71,140 +70,125 @@ var kexec0 string
 var kexec1 string
 var kexec6 string
 
-func chkmounts() (ready bool, partitioned bool) {
+func Bootc() []string {
 	for i := 0; ; i++ {
 		time.Sleep(time.Millisecond * time.Duration(waitMs))
 		if i > timeoutCnt {
-			return false, false
+			return []string{""}
 		}
-
 		p, err := ioutil.ReadFile("/proc/partitions")
 		if err != nil {
 			continue
 		}
-		ps := string(p)
+		parts := string(p)
 		m, err := ioutil.ReadFile("/proc/mounts")
 		if err != nil {
 			continue
 		}
-		ms := string(m)
+		mounts := string(m)
 		if err := readCfg(); err != nil {
 			continue
 		}
 
-		if !strings.Contains(ps, "sda6") {
-			if !strings.Contains(ms, "sda1") {
-				continue
+		// server
+		/* FIXME if !serverAvail() {
+			fmt.Println("Info: server is not available, using local bootc.cfg")
+		}*/
+
+		// sda1 utility
+		if Cfg.BootSda1 && strings.Contains(mounts, "sda1") {
+			/* FIXME if err := fixPaths(); err != nil {
+				fmt.Println("Error: can't fix paths, drop into grub...")
+				return []string{""}
+			} */
+			if err := formKexec1(); err != nil {
+				fmt.Println("Error: can't form kexec string, drop into grub...")
+				return []string{""}
 			}
-			return true, false
+			if err := clrSda1Flag(); err != nil {
+				fmt.Println("Error: can't clear sda1 flag, drop into grub...")
+				return []string{""}
+			}
+			return []string{"kexec", "-k", Cfg.Sda1K,
+				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
 
-		if strings.Contains(ps, "sda6") {
-			if strings.Contains(ms, "sda1") {
-				if strings.Contains(ms, "sda6") {
-					return true, true
-				}
-				if Cfg.Install || Cfg.BootSda1 {
-					return true, true
-				}
+		// install
+		if Cfg.Install && strings.Contains(mounts, "sda1") && !strings.Contains(parts, "sda6") {
+			/* FIXME if err := fixPaths(); err != nil {
+				fmt.Println("Error: can't fix paths, drop into grub...")
+				return []string{""}
+			} */
+			if err := formKexec1(); err != nil {
+				fmt.Println("Error: can't form install kexec, drop into grub...")
+				return []string{""}
+			}
+			if err := clrInstall(); err != nil {
+				fmt.Println("Error: can't clear install bit, drop into grub...")
+				return []string{""}
+			}
+			if err := setPostInstall(); err != nil {
+				fmt.Println("Error: can't set postinstall bit, drop into grub...")
+				return []string{""}
+			}
+			return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
+				Cfg.ReInstallI, "-c", kexec0, "-e"}
+		}
+
+		// postinstall
+		if Cfg.PostInstall && strings.Contains(mounts, sda6) && strings.Contains(mounts, sda1) {
+			if err := clrPostInstall(); err != nil {
+				fmt.Println("Error: post install copy failed, drop into grub...")
+				return []string{""}
+			}
+			// FIXME update this per new architecture
+			if err := Copy(cbSda1+tarFile, cbSda6+tarFile); err != nil {
+				fmt.Println("Error: post install copy failed, drop into grub...")
+				return []string{""}
+			}
+			if err := Copy(cbSda1+scriptFile, cbSda6+"etc/"+scriptFile); err != nil {
+				fmt.Println("Error: post install copy failed, drop into grub...")
+				return []string{""}
 			}
 		}
-	}
-}
 
-func Bootc() []string {
-	ready, part := chkmounts()
-	if !ready {
-		fmt.Println("Error: mounts are not ready, drop into grub...")
-		return []string{""}
-	}
-	if ready && !part {
-		if err := formKexec1(); err != nil {
-			fmt.Println("Error: can't form kexec string, drop into grub...")
-			return []string{""}
+		// sda6 normal
+		if Cfg.BootSda6Cnt > 0 && strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
+			/* FIXME if err := fixPaths(); err != nil {
+				fmt.Println("Error: can't fix paths, drop into grub...")
+				return []string{""}
+			} */
+			if err := formKexec6(); err != nil {
+				fmt.Println("Error: can't form sda6 kexec, drop into grub...")
+				return []string{""}
+			}
+			if err := decBootSda6Cnt(); err != nil {
+				fmt.Println("Error: can't decrement sda6cnt, drop into grub...")
+				return []string{""}
+			}
+			return []string{"kexec", "-k", Cfg.Sda6K,
+				"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 		}
-		fmt.Println("1K: 1I: 1C:", "A", Cfg.Sda1K, "B", Cfg.Sda1I, "C", kexec1, "\n")
-		return []string{"kexec", "-k", Cfg.Sda1K,
-			"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
-	}
 
-	if err := readCfg(); err != nil {
-		fmt.Println("Error: can't read bootc.cfg, drop into grub...")
-		return []string{""}
-	}
-	if err := fixPaths(); err != nil {
-		fmt.Println("Error: can't fix paths, drop into grub...")
-		return []string{""}
-	}
-
-	if !serverAvail() {
-		fmt.Println("Info: server is not available, using local bootc.cfg")
-	}
-
-	fmt.Printf("Info: Install = %v, BootSda1 = %v, BootSda6Cnt = %v\n",
-		Cfg.Install, Cfg.BootSda1, Cfg.BootSda6Cnt)
-	if !Cfg.Install && Cfg.BootSda6Cnt == 0 && !Cfg.BootSda1 {
-		fmt.Println("Error: bootc has nothing to boot, drop into grub...")
-		return []string{""}
-	}
-
-	if Cfg.BootSda1 {
-		if err := formKexec1(); err != nil {
-			fmt.Println("Error: can't form kexec string, drop into grub...")
-			return []string{""}
-		}
-		if err := clrSda1Flag(); err != nil {
-			fmt.Println("Error: can't clear sda1 flag, drop into grub...")
-			return []string{""}
-		}
-		return []string{"kexec", "-k", Cfg.Sda1K,
-			"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
-	}
-
-	if Cfg.Install {
-		if err := formKexec1(); err != nil {
-			fmt.Println("Error: can't form install kexec, drop into grub...")
-			return []string{""}
-		}
-		if err := clrInstall(); err != nil {
-			fmt.Println("Error: can't clear install bit, drop into grub...")
-			return []string{""}
-		}
-		if err := setPostInstall(); err != nil {
-			fmt.Println("Error: can't set postinstall bit, drop into grub...")
-			return []string{""}
-		}
-		return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
-			Cfg.ReInstallI, "-c", kexec0, "-e"}
-	}
-
-	if Cfg.PostInstall {
-		if err := clrPostInstall(); err != nil {
-			fmt.Println("Error: post install copy failed 1, drop into grub...")
-			return []string{""}
-		}
-		if err := Copy(cbSda1+tarFile, cbSda6+tarFile); err != nil {
-			fmt.Println("Error: post install copy failed 2, drop into grub...")
-			return []string{""}
-		}
-		if err := Copy(cbSda1+scriptFile, cbSda6+"etc/"+scriptFile); err != nil {
-			fmt.Println("Error: post install copy failed 3, drop into grub...")
-			return []string{""}
+		// non-partitioned
+		if !strings.Contains(parts, sda6) && strings.Contains(mounts, sda1) {
+			/* FIXME if err := fixPaths(); err != nil {
+				fmt.Println("Error: can't fix paths, drop into grub...")
+				return []string{""}
+			} */
+			if err := formKexec1(); err != nil {
+				fmt.Println("Error: can't form kexec string, drop into grub...")
+				return []string{""}
+			}
+			if err := clrSda1Flag(); err != nil {
+				fmt.Println("Error: can't clear sda1 flag, drop into grub...")
+				return []string{""}
+			}
+			return []string{"kexec", "-k", Cfg.Sda1K,
+				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
 	}
 
-	if Cfg.BootSda6Cnt > 0 {
-		if err := formKexec6(); err != nil {
-			fmt.Println("Error: can't form sda6 kexec, drop into grub...")
-			return []string{""}
-		}
-		if err := decBootSda6Cnt(); err != nil {
-			fmt.Println("Error: can't decrement sda6cnt, drop into grub...")
-			return []string{""}
-		}
-		return []string{"kexec", "-k", Cfg.Sda6K,
-			"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
-	}
 	fmt.Println("Error: bootc can't boot, drop into grub...")
 	return []string{""}
 }
