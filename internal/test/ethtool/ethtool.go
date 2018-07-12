@@ -24,14 +24,6 @@ func Init(assert test.Assert) {
 	err = yaml.Unmarshal(b, Map)
 	assert.Nil(err)
 	for ifname, args := range Map {
-		cmd := make([]interface{}, 4+len(args))
-		cmd[0] = 2 * time.Second
-		cmd[1] = "ethtool"
-		cmd[2] = "-s"
-		cmd[3] = ifname
-		for i, arg := range args {
-			cmd[4+i] = arg
-		}
-		assert.Program(cmd...)
+		assert.Program(2*time.Second, "ethtool", "-s", ifname, args)
 	}
 }
