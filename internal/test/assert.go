@@ -5,6 +5,7 @@
 package test
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -102,17 +103,17 @@ func (assert Assert) YoureRoot() {
 	}
 }
 
-// Verifiy that goes isn't already running
-func (assert Assert) GoesNotRunning() {
+// Verifiy that there is no listener on named Unix socket.
+func (assert Assert) NoListener(atsockname string) {
 	assert.Helper()
-	files, err := ioutil.ReadDir("/var/run/goes/socks")
+	b, err := ioutil.ReadFile("/proc/net/unix")
 	if err != nil {
 		return
 	}
-	if len(files) == 0 {
+	if bytes.Index(b, []byte(atsockname)) < 0 {
 		return
 	}
-	assert.Fatal("Goes appears to running. Do a 'goes stop'.")
+	assert.Fatal(atsockname, "in use")
 }
 
 // Program asserts that the Program runs without error.

@@ -36,7 +36,7 @@ func Test(t *testing.T) {
 
 	assert := test.Assert{t}
 	assert.YoureRoot()
-	assert.GoesNotRunning()
+	assert.NoListener("@platina-mk1/vnetd")
 	netport.Init(assert)
 	ethtool.Init(assert)
 
