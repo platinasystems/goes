@@ -18,7 +18,7 @@ var config *docker.Config
 
 var Suite = test.Suite{
 	{"vlan", func(t *testing.T) {
-		subtest(t, conf.New(t, "net-slice-vlan", ConfVlan))
+		subtest(t, conf.New(t, "testdata/net/slice/vlan/conf.yaml.tmpl"))
 	}},
 }.Run
 

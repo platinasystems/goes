@@ -12,6 +12,8 @@ import (
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
+	"github.com/platinasystems/go/internal/test/ethtool"
+	"github.com/platinasystems/go/internal/test/netport"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/bird"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/frr"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/gobgp"
@@ -35,6 +37,8 @@ func Test(t *testing.T) {
 	assert := test.Assert{t}
 	assert.YoureRoot()
 	assert.GoesNotRunning()
+	netport.Init(assert)
+	ethtool.Init(assert)
 
 	defer assert.Background(test.Self{}, "redisd").Quit()
 	assert.Program(12*time.Second, test.Self{}, "hwait", name,

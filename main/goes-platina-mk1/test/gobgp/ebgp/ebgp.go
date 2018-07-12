@@ -17,10 +17,10 @@ var config *docker.Config
 
 var Suite = test.Suite{
 	{"eth", func(t *testing.T) {
-		subtest(t, conf.New(t, "ebgp", Conf))
+		subtest(t, conf.New(t, "testdata/gobgp/ebgp/conf.yaml.tmpl"))
 	}},
 	{"vlan", func(t *testing.T) {
-		subtest(t, conf.New(t, "ebgp-vlan", ConfVlan))
+		subtest(t, conf.New(t, "testdata/gobgp/ebgp/vlan/conf.yaml.tmpl"))
 	}},
 }.Run
 

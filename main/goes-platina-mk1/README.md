@@ -3,9 +3,12 @@ This is a GO Embedded System for Platina Systems' *mark 1* packet switches.
 To run unit tests, loopback 6 pairs for ports and edit the configuration
 as follows:
 ```console
-$ editor main/goes-platina-mk1/test/port2port/conf.go
+$ editor main/goes-platina-mk1/testdata/netport.yaml
 $ git update-index --assume-unchanged \
-	main/goes-platina-mk1/test/port2port/conf.go
+	main/goes-platina-mk1/testdata/netport.yaml
+$ editor main/goes-platina-mk1/testdata/ethtool.yaml
+$ git update-index --assume-unchanged \
+	main/goes-platina-mk1/testdata/ethtool.yaml
 ```
 
 Then build the unit test and run.
