@@ -5,7 +5,7 @@ routers:
   image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
-  - name: {{index . 0 0}}
+  - name: {{index . "net0port0"}}
     address: 10.1.0.1/24
   - name: dummy0
     address: 192.168.0.1/32
@@ -13,23 +13,23 @@ routers:
   image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
-  - name: {{index . 0 1}}
+  - name: {{index . "net0port1"}}
     address: 10.1.0.2/24
-  - name: {{index . 1 0}}
+  - name: {{index . "net1port0"}}
     address: 10.2.0.2/24
 - hostname: RA-2
   image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
-  - name: {{index . 1 1}}
+  - name: {{index . "net1port1"}}
     address: 10.2.0.3/24
-  - name: {{index . 2 0}}
+  - name: {{index . "net2port0"}}
     address: 10.3.0.3/24
 - hostname: CA-2
   image: "stigt/debian-frr:latest"
   cmd: "/root/startup.sh"
   intfs:
-  - name: {{index . 2 1}}
+  - name: {{index . "net2port1"}}
     address: 10.3.0.4/24
   - name: dummy0
     address: 192.168.0.2/32
