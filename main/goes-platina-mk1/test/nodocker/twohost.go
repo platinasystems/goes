@@ -6,7 +6,6 @@ package nodocker
 
 import (
 	"testing"
-	"time"
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/netport"
@@ -14,41 +13,41 @@ import (
 
 // ping between 2 host namespaces
 func twohost(t *testing.T) {
+	ports := []struct {
+		netns  string
+		ifname string
+		ifa    string
+		peer   string
+	}{
+		{"h1", netport.Map["net0port0"], "10.1.0.0/31", "10.1.0.1"},
+		{"h2", netport.Map["net0port1"], "10.1.0.1/31", "10.1.0.0"},
+	}
+
 	assert := test.Assert{t}
 	cleanup := test.Cleanup{t}
 
-	assert.Program(test.Self{}, "ip", "netns", "add", "h1")
-	defer cleanup.Program(test.Self{}, "ip", "netns", "del", "h1")
-	assert.Program(test.Self{}, "ip", "netns", "add", "h2")
-	defer cleanup.Program(test.Self{}, "ip", "netns", "del", "h2")
-
-	assert.Program(test.Self{}, "ip", "link", "set",
-		netport.Map["net0port0"], "up", "netns", "h1")
-	defer cleanup.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		test.Self{}, "ip", "link", "set", netport.Map["net0port0"],
-		"down", "netns", 1)
-	assert.Program(test.Self{}, "ip", "link", "set",
-		netport.Map["net0port1"], "up", "netns", "h2")
-	defer cleanup.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		test.Self{}, "ip", "link", "set", netport.Map["net0port1"],
-		"down", "netns", 1)
-
-	assert.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		test.Self{}, "ip", "address", "add", "10.1.0.0/31",
-		"dev", netport.Map["net0port0"])
-	defer cleanup.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		test.Self{}, "ip", "address", "del", "10.1.0.0/31",
-		"dev", netport.Map["net0port0"])
-	assert.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		test.Self{}, "ip", "address", "add", "10.1.0.1/31",
-		"dev", netport.Map["net0port1"])
-	defer cleanup.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		test.Self{}, "ip", "address", "del", "10.1.0.1/31",
-		"dev", netport.Map["net0port1"])
-
-	time.Sleep(1 * time.Second)
-	assert.Program(test.Self{}, "ip", "netns", "exec", "h1",
-		test.Self{}, "ping", "10.1.0.1")
-	assert.Program(test.Self{}, "ip", "netns", "exec", "h2",
-		test.Self{}, "ping", "10.1.0.0")
+	for _, port := range ports {
+		assert.Program(test.Self{},
+			"ip", "netns", "add", port.netns)
+		defer cleanup.Program(test.Self{},
+			"ip", "netns", "del", port.netns)
+		assert.Program(test.Self{},
+			"ip", "link", "set", port.ifname, "up",
+			"netns", port.netns)
+		defer cleanup.Program(test.Self{},
+			"ip", "netns", "exec", port.netns, test.Self{},
+			"ip", "link", "set", port.ifname, "down", "netns", 1)
+		assert.Program(test.Self{},
+			"ip", "netns", "exec", port.netns, test.Self{},
+			"ip", "address", "add", port.ifa, "dev", port.ifname)
+		defer cleanup.Program(test.Self{},
+			"ip", "netns", "exec", port.netns, test.Self{},
+			"ip", "address", "del", port.ifa, "dev", port.ifname)
+	}
+	for _, port := range ports {
+		assert.Nil(test.Carrier(port.netns, port.ifname))
+	}
+	for _, port := range ports {
+		assert.Nil(test.Ping(port.netns, port.peer))
+	}
 }
