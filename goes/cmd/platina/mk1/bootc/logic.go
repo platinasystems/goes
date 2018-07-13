@@ -90,17 +90,16 @@ func Bootc() []string {
 			continue
 		}
 
-		// server
+		if err := fixNewroot(); err != nil {
+			fmt.Println("Error: can't fix newroot, drop into grub...")
+			return []string{""}
+		}
 		/* FIXME if !serverAvail() {
 			fmt.Println("Info: server is not available, using local bootc.cfg")
 		}*/
 
-		// sda1 utility
+		// sda1 utility mode
 		if Cfg.BootSda1 && strings.Contains(mounts, "sda1") {
-			/* FIXME if err := fixPaths(); err != nil {
-				fmt.Println("Error: can't fix paths, drop into grub...")
-				return []string{""}
-			} */
 			if err := formKexec1(); err != nil {
 				fmt.Println("Error: can't form kexec string, drop into grub...")
 				return []string{""}
@@ -115,10 +114,6 @@ func Bootc() []string {
 
 		// install
 		if Cfg.Install && strings.Contains(mounts, "sda1") && !strings.Contains(parts, "sda6") {
-			/* FIXME if err := fixPaths(); err != nil {
-				fmt.Println("Error: can't fix paths, drop into grub...")
-				return []string{""}
-			} */
 			if err := formKexec1(); err != nil {
 				fmt.Println("Error: can't form install kexec, drop into grub...")
 				return []string{""}
@@ -154,7 +149,7 @@ func Bootc() []string {
 
 		// sda6 normal
 		if Cfg.BootSda6Cnt > 0 && strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
-			/* FIXME if err := fixPaths(); err != nil {
+			/* FIXME 3 if err := fixPaths(); err != nil {
 				fmt.Println("Error: can't fix paths, drop into grub...")
 				return []string{""}
 			} */
@@ -172,10 +167,6 @@ func Bootc() []string {
 
 		// non-partitioned
 		if !strings.Contains(parts, sda6) && strings.Contains(mounts, sda1) {
-			/* FIXME if err := fixPaths(); err != nil {
-				fmt.Println("Error: can't fix paths, drop into grub...")
-				return []string{""}
-			} */
 			if err := formKexec1(); err != nil {
 				fmt.Println("Error: can't form kexec string, drop into grub...")
 				return []string{""}
@@ -718,12 +709,7 @@ func runScript(name string) (err error) {
 	return nil
 }
 
-func fixPaths() error {
-	if err := fixNewroot(); err != nil { // FIXME Temporary remove by 7/31/2018
-		fmt.Println("Error: can't fix newroot, drop into grub...")
-		return err
-	}
-
+func fixPaths() error { //FIXME Temporary remove by 7/31/2018
 	files, err := ioutil.ReadDir(cbSda6 + "boot")
 	if err != nil {
 		return err
