@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -354,6 +355,11 @@ func have(pkg string) bool {
 	return err == nil && bytes.Equal(bytes.TrimSpace(buf), []byte(fe1))
 }
 
+func mv(from, to string) error {
+	host.log("mv", from, to)
+	return os.Rename(from, to)
+}
+
 func rm(fns ...string) error {
 	host.log(append([]string{"rm"}, fns...)...)
 	for _, fn := range fns {
@@ -398,4 +404,28 @@ func zipfile(zfn string, fns []string) error {
 		r.Close()
 	}
 	return nil
+}
+
+func filterCommand(in io.Reader, out io.Writer, name string, args ...string) (cmd *exec.Cmd, err error) {
+	host.log(append([]string{name}, args...)...)
+	cmd = exec.Command(name, args...)
+	cmd.Env = os.Environ()
+	cmd.Stdin = in
+	cmd.Stdout = out
+	cmd.Stderr = os.Stderr
+	return cmd, cmd.Start()
+}
+
+func stripBinary(in string) (out []byte, err error) {
+	outfile := in + ".strip.tmp"
+	defer rm(outfile)
+	cmdline := []string{"-o", outfile, in}
+	host.log(append([]string{"strip"}, cmdline...)...)
+	cmd := exec.Command("strip", cmdline...)
+	err = cmd.Run()
+	if err != nil {
+		return
+	}
+	out, err = ioutil.ReadFile(outfile)
+	return
 }
