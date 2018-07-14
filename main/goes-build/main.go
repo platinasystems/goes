@@ -106,7 +106,7 @@ plugin	use pre-compiled proprietary packages
 	make = map[string]func(out, name string) error{
 		goesExample:             makeHost,
 		goesExampleArm:          makeArmLinuxStatic,
-		goesBoot:                makeAmd64Linux,
+		goesBoot:                makeAmd64LinuxStatic,
 		goesIP:                  makeHost,
 		goesIPTest:              makeHostTest,
 		goesPlatinaMk1:          makeGoesPlatinaMk1,
@@ -174,6 +174,10 @@ func makeArmLinuxStatic(out, name string) error {
 
 func makeAmd64Linux(out, name string) error {
 	return amd64Linux.godo("build", "-o", out, name)
+}
+
+func makeAmd64LinuxStatic(out, name string) error {
+	return amd64Linux.godo("build", "-o", out, "-tags", "netgo", name)
 }
 
 func makeAmd64LinuxTest(out, name string) error {
