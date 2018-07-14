@@ -40,6 +40,7 @@ type Config struct {
 	Mapping string
 	Routers []Router
 	cli     *client.Client
+	user    string
 }
 
 func Check(t *testing.T) error {
@@ -104,6 +105,7 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 		}
 		vdir = pwd + config.Volume
 		cc.Volumes = map[string]struct{}{config.Mapping: {}}
+		config.user = os.Getenv("SUDO_USER")
 	}
 	_ = vdir // make compiler happy
 
@@ -248,6 +250,12 @@ func TearDownContainers(t *testing.T, config *Config) {
 		if err != nil {
 			t.Logf("Error: stopping %v: %v", r.Hostname, err)
 		}
+
+	}
+	if config.user != "" {
+		user := config.user + ":" + config.user
+		cmd := []string{"chown", "-R", user, "testdata"}
+		exec.Command(cmd[0], cmd[1:]...).Run()
 	}
 	config.cli.Close()
 }
