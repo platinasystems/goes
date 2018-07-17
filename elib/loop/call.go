@@ -245,6 +245,7 @@ func (l *Loop) AddNamedNextWithIndex(nr Noder, nextName string, withIndex uint) 
 	)
 	if l.initialNodesRegistered {
 		if nextNoder, ok = l.noderByName[nextName]; !ok {
+			// Known bug, need info on repro.  May need reboot or power-cycle to recover
 			err = fmt.Errorf("add-next %s: unknown next %s", n.name, nextName)
 			return
 		}
