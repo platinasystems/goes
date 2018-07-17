@@ -8,3 +8,6 @@
 *#*#
 /goes-*
 /*.patch
+*.rom
+*.vmlinuz
+worktrees
