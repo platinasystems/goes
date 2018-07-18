@@ -42,25 +42,29 @@ import (
 )
 
 const (
-	goesBootCfg = "/mountd/sda1/bootc.cfg"
-	sda1Cfg     = "/bootc.cfg"
-	sda6Cfg     = "/mnt/bootc.cfg"
-	mount       = "/mnt"
-	devSda1     = "/dev/sda1"
-	devSda6     = "/dev/sda6"
-	tmpFile     = "/tmp/EEOF"
-	mntEtc      = "/mnt/etc"
-	fstype      = "ext4"
-	zero        = uintptr(0)
-	sda1        = "sda1"
-	sda6        = "sda6"
-	goesBoot    = "coreboot"
-	cbSda1      = "/mountd/sda1/"
-	cbSda6      = "/mountd/sda6/"
-	tarFile     = "postinstall.tar.gz"
-	scriptFile  = "rc.local"
-	waitMs      = 100
-	timeoutCnt  = 50
+	verNum       = "1.00"
+	goesBootCfg  = "/mountd/sda1/bootc.cfg"
+	sda1Cfg      = "/bootc.cfg"
+	sda6Cfg      = "/mnt/bootc.cfg"
+	goesBootPath = "/mountd/sda1/"
+	sda1Path     = "/"
+	sda6Path     = "/mnt/"
+	mount        = "/mnt"
+	devSda1      = "/dev/sda1"
+	devSda6      = "/dev/sda6"
+	tmpFile      = "/tmp/EEOF"
+	mntEtc       = "/mnt/etc"
+	fstype       = "ext4"
+	zero         = uintptr(0)
+	sda1         = "sda1"
+	sda6         = "sda6"
+	goesBoot     = "coreboot"
+	cbSda1       = "/mountd/sda1/"
+	cbSda6       = "/mountd/sda6/"
+	tarFile      = "postinstall.tar.gz"
+	scriptFile   = "rc.local"
+	waitMs       = 100
+	timeoutCnt   = 50
 )
 
 var BootcCfgFile string
@@ -69,6 +73,18 @@ var uuid6 string
 var kexec0 string
 var kexec1 string
 var kexec6 string
+
+var fileList = [...]string{
+	"debian-8.10.0-amd64-DVD-1.iso",
+	"preseed.cfg",
+	"hd-media/preseed.cfg",
+	"boot/vmlinuz",
+	"boot/initrd.gz",
+	"usr/local/sbin/flashrom",
+	"usr/local/share/flashrom/layouts",
+	"rc.local",
+	"postinstall.tar.gz",
+}
 
 func Bootc() []string {
 	for i := 0; ; i++ {
@@ -149,10 +165,10 @@ func Bootc() []string {
 
 		// sda6 normal
 		if Cfg.BootSda6Cnt > 0 && strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
-			/* FIXME 3 if err := fixPaths(); err != nil {
+			if err := fixPaths(); err != nil {
 				fmt.Println("Error: can't fix paths, drop into grub...")
 				return []string{""}
-			} */
+			}
 			if err := formKexec6(); err != nil {
 				fmt.Println("Error: can't form sda6 kexec, drop into grub...")
 				return []string{""}
@@ -182,6 +198,83 @@ func Bootc() []string {
 
 	fmt.Println("Error: bootc can't boot, drop into grub...")
 	return []string{""}
+}
+
+func checkFiles() error {
+	context, err := getContext()
+	if err != nil {
+		return err
+	}
+	path := ""
+	switch context {
+	case goesBoot:
+		fmt.Println("TEMP: goes-boot context.")
+		path = goesBootPath
+	case sda1:
+		fmt.Println("TEMP: goes sda1 context.")
+		path = sda1Path
+	case sda6:
+		fmt.Println("TEMP: goes sda6 context.")
+		path = sda6Path
+		if err := mountSda1(); err != nil {
+			fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
+			return err
+		}
+		fmt.Println("TEMP: goes sda6 mount-sda1 success.")
+	default:
+		fmt.Println("ERROR: could not determine context.")
+		return nil
+	}
+
+	good := true
+	//FIXME change names of .iso's to original.iso, latest.iso
+	for _, f := range fileList {
+		fmt.Println("Checking", path+f, "exists...")
+		if _, err := os.Stat(path + f); os.IsNotExist(err) {
+			fmt.Println("ERROR:	file", path+f, "does not exist")
+			good = false
+		}
+	}
+	// 1. check for goes running
+	// 2. check for sda6cnt == 3
+	// 3. check the sda6 k string, see it matches /boot
+	// 4. check the sda6 i string, see it matches /boot
+	if good {
+		fmt.Println("PASSED: wipe/reinstall is configured properly.")
+	} else {
+		fmt.Println("FAILED: wipe/reinstall is NOT configured properly.")
+	}
+	return nil
+}
+
+func getFiles() error {
+	context, err := getContext()
+	if err != nil {
+		return err
+	}
+	path := ""
+	switch context {
+	case goesBoot:
+		fmt.Println("TEMP: goes-boot context.")
+		path = goesBootPath
+	case sda1:
+		fmt.Println("TEMP: goes sda1 context.")
+		path = sda1Path
+	case sda6:
+		fmt.Println("TEMP: goes sda6 context.")
+		path = sda6Path
+		if err := mountSda1(); err != nil {
+			fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
+			return err
+		}
+		fmt.Println("TEMP: goes sda6 mount-sda1 success.")
+	default:
+		fmt.Println("ERROR: could not determine context.")
+		return nil
+	}
+
+	fmt.Println("TEMP: sda1 path = ", path)
+	return nil
 }
 
 func (c *Command) bootc() {
@@ -266,6 +359,23 @@ func getContext() (context string, err error) {
 	return "", fmt.Errorf("Error: root directory not found")
 }
 
+func mountSda1() error {
+	if _, err := os.Stat(mount); os.IsNotExist(err) {
+		err := os.Mkdir(mount, os.FileMode(0755))
+		if err != nil {
+			fmt.Printf("Error mkdir: %v", err)
+			return err
+		}
+	}
+	if _, err := os.Stat(mntEtc); os.IsNotExist(err) {
+		if err := syscall.Mount(devSda1, mount, fstype, zero, ""); err != nil {
+			fmt.Printf("Error mounting: %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
 func setBootcCfgFile() error {
 	context, err := getContext()
 	if err != nil {
@@ -278,18 +388,8 @@ func setBootcCfgFile() error {
 		BootcCfgFile = sda1Cfg
 	case sda6:
 		BootcCfgFile = sda6Cfg
-		if _, err := os.Stat(mount); os.IsNotExist(err) {
-			err := os.Mkdir(mount, os.FileMode(0755))
-			if err != nil {
-				fmt.Printf("Error mkdir: %v", err)
-				return err
-			}
-		}
-		if _, err := os.Stat(mntEtc); os.IsNotExist(err) {
-			if err := syscall.Mount(devSda1, mount, fstype, zero, ""); err != nil {
-				fmt.Printf("Error mounting: %v", err)
-				return err
-			}
+		if err := mountSda1(); err != nil {
+			return err
 		}
 	default:
 		return fmt.Errorf("Error: unknown machine/partition")

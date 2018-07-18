@@ -37,7 +37,8 @@ func (Command) Usage() string {
 	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
 	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
-	[setkernel] [setinitrd] [getclientbootdata] [setpost]`
+	[setkernel] [setinitrd] [getclientbootdata] [setpost] [vers]
+	[checkfiles] [getfiles]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -72,6 +73,17 @@ func (c *Command) Main(args ...string) (err error) {
 	case "bootc":
 		c.bootc()
 		return nil
+	case "vers":
+		fmt.Println(verNum)
+		return nil
+	case "checkfiles":
+		if err := checkFiles(); err != nil {
+			return nil
+		}
+	case "getfiles":
+		if err := getFiles(); err != nil {
+			return nil
+		}
 	case "dumpvars":
 		if err = dumpvars(mip); err != nil {
 			return err
