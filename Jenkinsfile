@@ -41,15 +41,14 @@ pipeline {
 						  reference: '',
 						  trackingSubmodules: true]],
 				      submoduleCfg: [],
-				      userRemoteConfigs: [[credentialsId: '570701f7-c819-4db2-bd31-a0da8a452b41',
-				      url: 'git@github.com:platinasystems/system-build.git']]])}
+				      userRemoteConfigs: [[url: 'https://github.com/platinasystems/system-build.git']]])}
 	    }
 	}
 	stage('Build') {
 	    steps {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
 		    echo "Building goes..."
-		    sh 'env PATH=/usr/local/go/bin:${PATH} GOPATH=/home/jenkins/workspace/go UPDATED_SUBMODULES=1 go run ./main/goes-build/main.go -z'
+		    sh 'env PATH=/usr/local/go/bin:${PATH} GOPATH=/home/jenkins/workspace/go go run ./main/goes-build/main.go -z'
 		}		    
 	    }
 	}
