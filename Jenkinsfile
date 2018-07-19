@@ -42,7 +42,7 @@ pipeline {
 				trackingSubmodules: true]],
 		    submoduleCfg: [],
 		    userRemoteConfigs: [[credentialsId: '570701f7-c819-4db2-bd31-a0da8a452b41',
-		    url: 'http://github.com/platinasystems/system-build']]]])}
+		    url: 'git@github.com:platinasystems/system-build.git']]]])}
 	    }
 	}
 	stage('Build') {
