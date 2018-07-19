@@ -22,6 +22,9 @@
  */
 package xeth
 
+import "fmt"
+import "strings"
+
 type Ifname [IFNAMSIZ]byte
 
 func (ifname *Ifname) String() string {
@@ -31,4 +34,43 @@ func (ifname *Ifname) String() string {
 		}
 	}
 	return string(ifname[:])
+}
+
+// all ports must have same PortPrefix so qsfp can hset
+// FIXME: remove SetPortPrefix() when mk1 only supports xeth
+var prefixIsXeth bool
+var PortPrefix string
+
+func SetPortPrefix(ifname string) {
+	var isXeth bool
+
+	if strings.HasPrefix(ifname, "xeth") {
+		isXeth = true
+	} else if strings.HasPrefix(ifname, "eth-") {
+		isXeth = false
+	} else {
+		panic(fmt.Sprintf("Invalid PortPrefix, ifname %v\n", ifname))
+	}
+
+	if len(PortPrefix) == 0 {
+		if isXeth {
+			prefixIsXeth = true
+			PortPrefix = "xeth"
+		} else {
+			prefixIsXeth = false
+			PortPrefix = "eth-"
+		}
+	} else if prefixIsXeth != isXeth {
+		panic(fmt.Sprintf("Cannot change PortPrefix, ifname %v\n", ifname))
+	}
+}
+
+func PortName(frontPanelIndex int, subPortIndex int) (ifname string) {
+
+	if prefixIsXeth && subPortIndex == 0 {
+		ifname = fmt.Sprintf("%v%v", PortPrefix, frontPanelIndex)
+	} else {
+		ifname = fmt.Sprintf("%v%v-%v", PortPrefix, frontPanelIndex, subPortIndex)
+	}
+	return
 }

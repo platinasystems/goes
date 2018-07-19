@@ -362,6 +362,7 @@ func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 		return mk1.PlatformExit(v, &p.Platform)
 	} else {
 		// FIXME why isn't this done in mk1.PlatformExit?
+		// this path only for tuntap, so eth- vs xeth names doesn't matter
 		interfaces, err := net.Interfaces()
 		if err != nil {
 			return err

@@ -89,6 +89,8 @@ func SetBridgeMember(ifname string) *BridgeMemberEntry {
 }
 
 func SetPort(ifname string) *PortEntry {
+	xeth.SetPortPrefix(ifname)
+
 	if Ports == nil {
 		Ports = make(map[string]*PortEntry)
 	}
