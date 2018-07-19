@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	ETHTOOL_LINK_MODE_10baseT_Half uint = iota
+	ETHTOOL_LINK_MODE_10baseT_Half = iota
 	ETHTOOL_LINK_MODE_10baseT_Full
 	ETHTOOL_LINK_MODE_100baseT_Half
 	ETHTOOL_LINK_MODE_100baseT_Full

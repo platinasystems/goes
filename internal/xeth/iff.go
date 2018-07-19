@@ -27,10 +27,8 @@ import (
 	"fmt"
 )
 
-type Iff uint32
-
 const (
-	IFF_UP Iff = 1 << iota
+	IFF_UP = 1 << iota
 	IFF_BROADCAST
 	IFF_DEBUG
 	IFF_LOOPBACK
@@ -50,6 +48,8 @@ const (
 	IFF_DORMANT
 	IFF_ECHO
 )
+
+type Iff uint32
 
 func (iff Iff) String() string {
 	var iffs = []string{
