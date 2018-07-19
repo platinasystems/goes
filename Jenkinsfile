@@ -37,7 +37,7 @@ pipeline {
 			branch: 'master'
 		    ])
 		    sh 'git submodule init'
-		    sh 'git submodule udpate -r'
+		    sh 'git submodule update -r'
 		}
 	    }
 	}
