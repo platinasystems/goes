@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	verNum       = "1.00"
+	verNum       = "1.01"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/mnt/bootc.cfg"
@@ -692,7 +692,39 @@ func setGateway(x string) error {
 	return nil
 }
 
-func setKernel(x string) error {
+func SetSda1K(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.Sda1K = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetSda1I(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.Sda1I = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetSda6K(x string) error {
 	if err := readCfg(); err != nil {
 		return err
 	}
@@ -708,7 +740,7 @@ func setKernel(x string) error {
 	return nil
 }
 
-func setInitrd(x string) error {
+func SetSda6I(x string) error {
 	if err := readCfg(); err != nil {
 		return err
 	}
@@ -726,12 +758,12 @@ func setInitrd(x string) error {
 
 func UpdateBootcCfg(k, i string) error {
 	k = cbSda6 + "boot/" + k
-	err := setKernel(k)
+	err := SetSda6K(k)
 	if err != nil {
 		return err
 	}
 	i = cbSda6 + "boot/" + i
-	err = setInitrd(i)
+	err = SetSda6I(i)
 	if err != nil {
 		return err
 	}

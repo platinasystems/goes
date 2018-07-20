@@ -170,11 +170,11 @@ func (c *Command) Main(args ...string) (err error) {
 			return err
 		}
 	case "setkernel":
-		if err = setKernel(args[1]); err != nil {
+		if err = SetSda6K(args[1]); err != nil {
 			return err
 		}
 	case "setinitrd":
-		if err = setInitrd(args[1]); err != nil {
+		if err = SetSda6I(args[1]); err != nil {
 			return err
 		}
 	case "setpost":
