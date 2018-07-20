@@ -177,6 +177,8 @@ func dump(buf []byte) error {
 		fmt.Print((*MsgIfa)(ptr))
 	case XETH_MSG_KIND_FIBENTRY:
 		fmt.Print((*MsgFibentry)(ptr))
+	case XETH_MSG_KIND_IFDEL:
+		fmt.Print((*MsgIfdel)(ptr))
 	default:
 		fmt.Println(kind)
 	}

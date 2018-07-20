@@ -22,8 +22,10 @@
  */
 package xeth
 
-import "fmt"
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 type Ifname [IFNAMSIZ]byte
 

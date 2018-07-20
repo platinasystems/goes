@@ -23,6 +23,7 @@ const (
 	SizeofMsgSpeed           = C.sizeof_struct_xeth_msg_speed
 	SizeofMsgIfinfo          = C.sizeof_struct_xeth_msg_ifinfo
 	SizeofMsgIfa             = C.sizeof_struct_xeth_msg_ifa
+	SizeofMsgIfdel           = C.sizeof_struct_xeth_msg_ifdel
 	SizeofMsgFibentry        = C.sizeof_struct_xeth_msg_fibentry
 	SizeofNextHop            = C.sizeof_struct_xeth_next_hop
 )
@@ -37,5 +38,6 @@ type MsgCarrier C.struct_xeth_msg_carrier
 type MsgSpeed C.struct_xeth_msg_speed
 type MsgIfinfo C.struct_xeth_msg_ifinfo
 type MsgIfa C.struct_xeth_msg_ifa
+type MsgIfdel C.struct_xeth_msg_ifdel
 type MsgFibentry C.struct_xeth_msg_fibentry
 type NextHop C.struct_xeth_next_hop
