@@ -19,11 +19,21 @@ import (
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/gobgp"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/net"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/xeth"
 )
 
 var testPause = flag.Bool("test.pause", false, "pause before and after suite")
 var testCD = flag.String("test.cd", ".",
 	"change to named directory before running tests")
+
+func TestXeth(t *testing.T) {
+	test.Main(main)
+
+	assert := test.Assert{t}
+	assert.YoureRoot()
+	assert.NoListener("@platina-mk1/vnetd")
+	t.Run("xeth", xeth.TestNames)
+}
 
 func Test(t *testing.T) {
 	if *testCD != "." {
