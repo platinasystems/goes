@@ -21,6 +21,7 @@ import (
 )
 
 var vv = flag.Bool("test.vv", false, "log test.Program output")
+var vvv = flag.Bool("test.vvv", false, "log test.Program execution")
 
 // Timeout is the default duration on the Program Wait timer.
 const Timeout = 3 * time.Second
@@ -90,6 +91,10 @@ func Begin(tb testing.TB, options ...interface{}) (*Program, error) {
 	p.cmd.Stdin = stdin
 	p.cmd.Stdout = p.obuf
 	p.cmd.Stderr = p.ebuf
+	if *vvv {
+		tb.Helper()
+		tb.Log(args)
+	}
 	return p, p.cmd.Start()
 }
 
