@@ -19,7 +19,7 @@ import (
 	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/xeth"
+	"github.com/platinasystems/go/vnet/platforms/mk1"
 )
 
 var Vdev [32]I2cDev
@@ -163,11 +163,11 @@ func (c *Command) updatePresence() error {
 						var portConfig string
 
 						//identify copper vs optic and set media and speed
-						media, err := redis.Hget(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".media")
+						media, err := redis.Hget(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".media")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
-						speed, err := redis.Hget(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".speed")
+						speed, err := redis.Hget(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".speed")
 						if err != nil {
 							log.Print("qsfp hget error:", err)
 						}
@@ -175,7 +175,7 @@ func (c *Command) updatePresence() error {
 						if strings.Contains(v, "-CR") {
 							portIsCopper[i+j*16] = true
 							if media != "copper" {
-								ret, err := redis.Hset(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".media", "copper")
+								ret, err := redis.Hset(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".media", "copper")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -183,7 +183,7 @@ func (c *Command) updatePresence() error {
 								}
 							}
 							if speed == "100g" {
-								ret, err := redis.Hset(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".fec", "cl91")
+								ret, err := redis.Hset(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".fec", "cl91")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -194,7 +194,7 @@ func (c *Command) updatePresence() error {
 							portIsCopper[i+j*16] = false
 							Vdev[i+j*16].TxDisableSet(false, lp)
 							if media != "fiber" {
-								ret, err := redis.Hset(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".media", "fiber")
+								ret, err := redis.Hset(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".media", "fiber")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -202,7 +202,7 @@ func (c *Command) updatePresence() error {
 								}
 							}
 							if speed != "40g" {
-								ret, err := redis.Hset(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".speed", "40g")
+								ret, err := redis.Hset(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".speed", "40g")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -213,7 +213,7 @@ func (c *Command) updatePresence() error {
 							portIsCopper[i+j*16] = false
 							Vdev[i+j*16].TxDisableSet(false, lp)
 							if media != "fiber" {
-								ret, err := redis.Hset(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".media", "fiber")
+								ret, err := redis.Hset(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".media", "fiber")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {
@@ -221,7 +221,7 @@ func (c *Command) updatePresence() error {
 								}
 							}
 							if speed != "100g" {
-								ret, err := redis.Hset(machine.Name, "vnet."+xeth.PortName(lp, (1+porto))+".speed", "100g")
+								ret, err := redis.Hset(machine.Name, "vnet."+mk1.PortPrefix.Name(lp, (1+porto))+".speed", "100g")
 								if err != nil || ret != 1 {
 									log.Print("qsfp hset error:", err, " ", ret)
 								} else {

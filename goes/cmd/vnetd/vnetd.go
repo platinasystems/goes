@@ -389,7 +389,7 @@ func (p *ifStatsPoller) EventAction() {
 
 	pubcount := func(ifname, counter string, value uint64) {
 		counter = Counter(counter)
-		if value != 0 && strings.HasPrefix(ifname, xeth.PortPrefix) {
+		if value != 0 && strings.HasPrefix(ifname, vnet.PortPrefixer.Get()) {
 			// Only give stats for ports that are known
 			if _, found := vnet.Ports[ifname]; found {
 				vnet.Xeth.SetStat(ifname, counter, value)
