@@ -395,12 +395,9 @@ func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
 		for dp, r := range dstMap {
 			g := m.fibByIndex(dp.i, false)
 			const isDel = true
-			//Moved order of addDelRouteNextHop later to avoid infinite loop.
-			//Does have side affects of some things getting deleted earlier that what code originally intended
-			//g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
 			// Prefix is now unreachable.
 			f.addDelUnreachable(m, &dp.p, g, dst.a, r, !isDel, false)
-			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
 		}
 	}
 }
@@ -468,6 +465,9 @@ func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 }
 
 func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHopper, isDel bool, recurse bool) (err error) {
+	//pf is the fib that f is the nexthop of
+	//a is the nexthop address from pf
+	//r is the nexthopper from pf
 	nr, np, _ := f.unreachable.Lookup(a)
 	if isDel && recurse {
 		nr.delReachableVia(m, f)
@@ -475,13 +475,10 @@ func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHo
 	if !isDel && recurse {
 		nr.addUnreachableVia(m, f, p)
 	}
-	//Moved order of addDelNextHop later to avoid infinite loop.
-	//Does have side affects of some things getting deleted earlier that what code originally intended
-	//nr.addDelNextHop(m, pf, *p, a, r, isDel)
+	nr.addDelNextHop(m, pf, *p, a, r, isDel)
 	f.unreachable.validateLen(np.Len)
 	nr.adj = ip.AdjNil
 	f.unreachable[np.Len][np.mapFibKey()] = nr
-	nr.addDelNextHop(m, pf, *p, a, r, isDel)
 	return
 }
 
