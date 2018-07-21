@@ -576,7 +576,7 @@ func (l *Loop) doEvents() (quitLoop bool) {
 		var nodeEventDone bool
 		if true {
 			actor_name := "nil"
-			t := 5 * time.Second
+			t := 30 * time.Second
 			if n.currentEvent.e != nil {
 				if n.currentEvent.e.actor != nil {
 					actor_name = n.currentEvent.e.actor.String()
