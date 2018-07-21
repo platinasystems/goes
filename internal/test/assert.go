@@ -33,7 +33,9 @@ func (assert Assert) NonNil(err error) {
 	}
 }
 
-// Error asserts that an error matches the given error, string, or regex
+// Error asserts that an error matches the given error, string, regex, or bool
+// If v is true, asserts err isn't nil;
+// otherwise, if false, asserts that it's nil.
 func (assert Assert) Error(err error, v interface{}) {
 	assert.Helper()
 	switch t := v.(type) {
@@ -48,6 +50,14 @@ func (assert Assert) Error(err error, v interface{}) {
 	case *regexp.Regexp:
 		if err == nil || !t.MatchString(err.Error()) {
 			assert.Fatalf("expected %q", t.String())
+		}
+	case bool:
+		if t {
+			if err == nil {
+				assert.Fatal("not error")
+			}
+		} else {
+			assert.Nil(err)
 		}
 	default:
 		assert.Fatal("can't match:", t)
@@ -122,6 +132,14 @@ func (assert Assert) Program(options ...interface{}) {
 	p, err := Begin(assert.TB, options...)
 	assert.Nil(err)
 	assert.Nil(p.End())
+}
+
+// ProgramErr asserts that the Program returns matches (v) error (see Error).
+func (assert Assert) ProgramErr(v interface{}, options ...interface{}) {
+	assert.Helper()
+	p, err := Begin(assert.TB, options...)
+	assert.Nil(err)
+	assert.Error(p.End(), true)
 }
 
 // Background Program after asserting that it starts without error.
