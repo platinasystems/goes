@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	verNum       = "1.01"
+	verNum       = "1.04"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/mnt/bootc.cfg"
@@ -105,14 +105,14 @@ func Bootc() []string {
 		if err := readCfg(); err != nil {
 			continue
 		}
+		if Cfg.Disable {
+			return []string{""}
+		}
 
 		if err := fixNewroot(); err != nil {
 			fmt.Println("Error: can't fix newroot, drop into grub...")
 			return []string{""}
 		}
-		/* FIXME if !serverAvail() {
-			fmt.Println("Info: server is not available, using local bootc.cfg")
-		}*/
 
 		// sda1 utility mode
 		if Cfg.BootSda1 && strings.Contains(mounts, "sda1") {
@@ -328,6 +328,7 @@ func initCfg() error {
 		ISO2Desc:        "",
 		ISOlastUsed:     1,
 		PostInstall:     false,
+		Disable:         false,
 	}
 	if err := writeCfg(); err != nil {
 		return err
@@ -601,6 +602,38 @@ func clrPostInstall() error {
 		return err
 	}
 	Cfg.PostInstall = false
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func setDisable() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.Disable = true
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func clrDisable() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.Disable = false
 	jsonInfo, err := json.Marshal(Cfg)
 	if err != nil {
 		return err

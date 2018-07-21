@@ -79,6 +79,7 @@ type BootcConfig struct { // stored as bootc.cfg, updated by server
 	PostInstall     bool
 	ConfigVersion   int
 	PortNumber      string
+	Disable         bool
 }
 
 type Client struct { // not stored, populated from server
