@@ -45,16 +45,21 @@ func TestNames(t *testing.T) {
 			"ip", "link", "del", name)
 	}
 	for _, name := range []string{
+		"eth-",
 		"eth-n-0",
 		fmt.Sprintf("eth_%d-%d", base+3, base),
 		fmt.Sprintf("eth-%d-%d", base+3, base+4),
 		fmt.Sprintf("eth-%d-%d", base+33, base),
+		"xeth",
 		fmt.Sprintf("xeth%d", base+33),
+		fmt.Sprintf("xeth%d_%d", base+3, base),
 		fmt.Sprintf("xeth%d-%d", base+3, base+4),
+		"xethbr.",
+		"xethbr.n",
+		"xethbr.0",
+		"xethbr.4095",
 	} {
-		p, err := test.Begin(t, test.Self{},
+		assert.ProgramErr(true, test.Self{},
 			"ip", "link", "add", name, "type", "platina-mk1")
-		assert.Nil(err)
-		assert.NonNil(p.End())
 	}
 }
