@@ -38,7 +38,7 @@ func (Command) Usage() string {
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
 	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
 	[setkernel] [setinitrd] [getclientbootdata] [setpost] [vers]
-	[checkfiles] [getfiles]`
+	[checkfiles] [getfiles] [setdisable] [clrdisable]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -150,6 +150,14 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "clrsda1":
 		if err = clrSda1Flag(); err != nil {
+			return err
+		}
+	case "setdisable":
+		if err = setDisable(); err != nil {
+			return err
+		}
+	case "clrdisable":
+		if err = clrDisable(); err != nil {
 			return err
 		}
 	case "readcfg":
