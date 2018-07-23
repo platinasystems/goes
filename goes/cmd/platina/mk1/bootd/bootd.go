@@ -73,6 +73,9 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	case "wipe":
 		go wipe()
 		b = "wipe in progress\n"
+	case "rebootlinux":
+		go rebootlinux()
+		b = "reboot in progress\n"
 	case "client":
 		if b, err = getClientData(1); err != nil {
 			b = "error getting client data\n"

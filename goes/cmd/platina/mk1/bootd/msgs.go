@@ -26,6 +26,15 @@ func wipe() (s string, err error) {
 	return "", nil
 }
 
+func rebootlinux() (s string, err error) {
+	var i = 0
+	for start := time.Now(); time.Since(start) < 10*time.Second; {
+		i++
+	}
+	reboot()
+	return "", nil
+}
+
 func getConfig() (s string, err error) {
 	return "", nil
 }
