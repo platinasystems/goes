@@ -417,7 +417,6 @@ func installKernel(s string, v string, t bool, fn string) error {
 		return err
 	}
 
-	Reboot_flag = true
 	return nil
 }
 
@@ -427,10 +426,8 @@ func installCoreboot(s string, v string, t bool) error {
 		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
 		"-i", "bios", "-w", CorebootName, "-A", "-V").Output()
 	if err != nil {
-		Reboot_flag = false
 		return err
 	}
-	Reboot_flag = true
 	return nil
 }
 
@@ -482,16 +479,6 @@ func rmFile(f string) error {
 		return err
 	}
 	if err := os.Remove(f); err != nil {
-		return err
-	}
-	return nil
-}
-
-func reboot() error {
-	fmt.Print("\nWILL REBOOT in 1 minute... Please login again\n")
-	u, err := exec.Command("shutdown", "-r", "+1").Output()
-	fmt.Println(u)
-	if err != nil {
 		return err
 	}
 	return nil
