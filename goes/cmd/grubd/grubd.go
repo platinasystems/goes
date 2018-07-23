@@ -61,15 +61,20 @@ func (c *Command) Main(args ...string) (err error) {
 	if c.mounts == nil {
 		c.mounts = make([]*bootMnt, 0)
 	}
-	t := time.NewTicker(2 * time.Second)
+	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
 
 	var pccDone = false
+	var i = 0 //FIXME clean up when the pcc logic is in place
 	for start := time.Now(); time.Since(start) < 10*time.Second; {
+		i++
 	}
 	if kexec := bootc.Bootc(); len(kexec) > 1 {
 		err := c.g.Main(kexec...)
 		fmt.Println(err)
+	}
+	for start := time.Now(); time.Since(start) < 10*time.Second; {
+		i++
 	}
 	pccDone = true
 

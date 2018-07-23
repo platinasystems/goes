@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	verNum       = "1.05"
+	verNum       = "1.06"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/mnt/bootc.cfg"
