@@ -6,15 +6,13 @@ package xeth
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"testing"
 
 	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/mk1"
 )
-
-var alpha = flag.Bool("test.alpha", false, "this is a zero based alpha system")
 
 func TestNames(t *testing.T) {
 	assert := test.Assert{t}
@@ -26,7 +24,7 @@ func TestNames(t *testing.T) {
 	}
 	assert.Program("modprobe", "platina-mk1")
 	base := 1
-	if *alpha {
+	if *mk1.IsAlpha {
 		base = 0
 	}
 	for _, name := range []string{

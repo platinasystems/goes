@@ -7,7 +7,6 @@ package test
 import (
 	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os/exec"
@@ -19,9 +18,6 @@ import (
 
 	"github.com/platinasystems/go/internal/prog"
 )
-
-var vv = flag.Bool("test.vv", false, "log test.Program output")
-var vvv = flag.Bool("test.vvv", false, "log test.Program execution")
 
 // Timeout is the default duration on the Program Wait timer.
 const Timeout = 3 * time.Second
@@ -91,7 +87,7 @@ func Begin(tb testing.TB, options ...interface{}) (*Program, error) {
 	p.cmd.Stdin = stdin
 	p.cmd.Stdout = p.obuf
 	p.cmd.Stderr = p.ebuf
-	if *vvv {
+	if *VVV {
 		tb.Helper()
 		tb.Log(args)
 	}
@@ -139,7 +135,7 @@ func (p *Program) End() (err error) {
 		<-done
 	}
 	if s := strings.TrimRight(p.obuf.String(), "\n"); len(s) > 0 {
-		if err != nil || *vv {
+		if err != nil || *VV {
 			p.tb.Log(s)
 		}
 	}
