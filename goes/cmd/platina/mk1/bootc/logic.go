@@ -14,16 +14,6 @@
 //   executes wipe request from bootd
 //   pushes boot state, install state, etc. to master
 
-// FIXME VERIFY REGISTER COMMAND
-// FIXME add support for 2 ISOs
-// FIXME add config from server
-// FIXME add status updates msgs to server
-// FIXME CONFIG PORT NUMBER, remove hardcodes, auto update bootc.cfg if out of date, for new fields
-// FIXME BOOTD check works with real master
-// FIXME COMMIT NEW SERVER SIDE CODE
-// FIXME CONTACT SERVER w/o IP address
-// FIXME build standalone
-
 package bootc
 
 import (
@@ -215,7 +205,7 @@ func dhcpZtpPcc() error {
 		i++
 	}
 
-	// DHCP, ZTP, PCC
+	// DHCP, ZTP, PCC - for goes-boot
 	//
 	//===========
 	// SETUP PHASE - set dhcp bits, static IP
@@ -228,6 +218,7 @@ func dhcpZtpPcc() error {
 	//
 	// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
 	//
+
 	//===========
 	// DHCP PHASE
 	//
@@ -235,6 +226,7 @@ func dhcpZtpPcc() error {
 	//
 	// ... DO DHCP
 	//
+
 	//===========
 	// ZTP PHASE
 	//
@@ -244,16 +236,25 @@ func dhcpZtpPcc() error {
 	//
 	// P30 update bootc.cfg, images, run script
 	//
+
 	//===========
 	// PCC PHASE
 	//
 	// D60 Is PCC Enabled                        --> NO, goto P50 boot sda6
 	//
-	// D70
+	// D70 INFINITE LOOP, PCC server found?      --> ESC - goes-boot shell
 	//
-	// P40
+	// P40 register with PCC, exec additional instructions from PCC
 	//
-	// P50
+	// P50 boot sda6
+
+	//===========
+	// SDA6 BOOT
+	// D80 Is PCC Enabled                        --> NO, DONE
+	//
+	// P60 check in with PCC (register)
+	//
+	// keep alives, status updates, control etc. from PCC...
 
 	return nil
 }
