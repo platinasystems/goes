@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	verNum       = "1.06"
+	verNum       = "1.07"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/mnt/bootc.cfg"
@@ -210,6 +210,11 @@ func Bootc() []string {
 }
 
 func dhcpZtpPcc() error {
+	var i = 0
+	for start := time.Now(); time.Since(start) < 10*time.Second; {
+		i++
+	}
+
 	// DHCP, ZTP, PCC
 	//
 	//===========
