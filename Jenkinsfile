@@ -47,6 +47,8 @@ pipeline {
 	stage('Build') {
 	    steps {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/go') {
+		    echo "Updating worktrees"
+		    sh 'for repo in worktrees/*/*; do (cd $repo;git fetch origin;git rebase origin/master);done'
 		    echo "Building goes..."
 		    sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} GOPATH=/home/jenkins/workspace/go go run ./main/goes-build/main.go -z'
 		}		    
