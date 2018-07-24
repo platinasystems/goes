@@ -124,6 +124,7 @@ func Bootc() []string {
 				fmt.Println("Error: can't clear sda1 flag, drop into grub...")
 				return []string{""}
 			}
+			// boot sda1 for recovery
 			return []string{"kexec", "-k", Cfg.Sda1K,
 				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
@@ -142,6 +143,7 @@ func Bootc() []string {
 				fmt.Println("Error: can't set postinstall bit, drop into grub...")
 				return []string{""}
 			}
+			// boot installer from sda1
 			return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
 				Cfg.ReInstallI, "-c", kexec0, "-e"}
 		}
@@ -163,6 +165,11 @@ func Bootc() []string {
 			}
 		}
 
+		// DHCP, ZTP, PCC
+		if err = dhcpZtpPcc(); err != nil {
+			return []string{""}
+		}
+
 		// sda6 normal
 		if Cfg.BootSda6Cnt > 0 && strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
 			if err := fixPaths(); err != nil {
@@ -177,6 +184,7 @@ func Bootc() []string {
 				fmt.Println("Error: can't decrement sda6cnt, drop into grub...")
 				return []string{""}
 			}
+			// boot sda6
 			return []string{"kexec", "-k", Cfg.Sda6K,
 				"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 		}
@@ -191,6 +199,7 @@ func Bootc() []string {
 				fmt.Println("Error: can't clear sda1 flag, drop into grub...")
 				return []string{""}
 			}
+			// boot sda1 if we are not partitioned
 			return []string{"kexec", "-k", Cfg.Sda1K,
 				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
@@ -198,6 +207,50 @@ func Bootc() []string {
 
 	fmt.Println("Error: bootc can't boot, drop into grub...")
 	return []string{""}
+}
+
+func dhcpZtpPcc() error {
+	// DHCP, ZTP, PCC
+	//
+	//===========
+	// SETUP PHASE - set dhcp bits, static IP
+	//
+	// D10 3 SEC LOOP wait for console interrupt --> YES, E10 goes-boot shell
+	//
+	// D20 static IP configured? (bootc.cfg)     --> NO,  goto D60 check if PCC enabled
+	//                                                    skip ZTP & DHCP
+	//                                                    P10 set DHCP option 55 and option 61
+	//
+	// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
+	//
+	//===========
+	// DHCP PHASE
+	//
+	// D40 INFINITE LOOP DHCP server found?      --> NO, check for ESC --> E20a shell
+	//
+	// ... DO DHCP
+	//
+	//===========
+	// ZTP PHASE
+	//
+	// D30b Is ZTP Enabled?                      --> NO, goto D60, PCC Enb check
+	//
+	// D50 INFINITE LOOP ZTP server found?       --> NO, check for ESC --> E20b shell
+	//
+	// P30 update bootc.cfg, images, run script
+	//
+	//===========
+	// PCC PHASE
+	//
+	// D60 Is PCC Enabled                        --> NO, goto P50 boot sda6
+	//
+	// D70
+	//
+	// P40
+	//
+	// P50
+
+	return nil
 }
 
 func checkFiles() error {
