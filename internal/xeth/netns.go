@@ -22,13 +22,42 @@
  */
 package xeth
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"syscall"
+)
 
 type Netns uint64
 
+var nameByInode = map[Netns]string{
+	1: "default",
+}
+
 func (ns Netns) String() string {
-	if ns <= 1 {
-		return "default"
+	name, found := nameByInode[ns]
+	if found {
+		return name
+	}
+	filepath.Walk("/run",
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if len(name) > 0 {
+				return filepath.SkipDir
+			}
+			stat := info.Sys().(*syscall.Stat_t)
+			if stat.Ino == uint64(ns) {
+				name = info.Name()
+				return filepath.SkipDir
+			}
+			return nil
+		})
+	if len(name) > 0 {
+		nameByInode[ns] = name
+		return name
 	}
 	return fmt.Sprintf("%#x", uint64(ns))
 }
