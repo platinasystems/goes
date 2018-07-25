@@ -19,8 +19,18 @@ func twohost(t *testing.T) {
 		ifa    string
 		peer   string
 	}{
-		{"h1", netport.Map["net0port0"], "10.1.0.0/31", "10.1.0.1"},
-		{"h2", netport.Map["net0port1"], "10.1.0.1/31", "10.1.0.0"},
+		{
+			netns:  "h1",
+			ifname: netport.PortByNetPort["net0port0"],
+			ifa:    "10.1.0.0/31",
+			peer:   "10.1.0.1",
+		},
+		{
+			netns:  "h2",
+			ifname: netport.PortByNetPort["net0port1"],
+			ifa:    "10.1.0.1/31",
+			peer:   "10.1.0.0",
+		},
 	}
 
 	assert := test.Assert{t}

@@ -28,7 +28,7 @@ func onerouter(t *testing.T) {
 	}{
 		{
 			netns:  "h1",
-			ifname: netport.Map["net0port0"],
+			ifname: netport.PortByNetPort["net0port0"],
 			ifa:    "10.1.0.0/31",
 			routes: []routeT{
 				{"10.1.0.2/31", "10.1.0.1"},
@@ -37,12 +37,12 @@ func onerouter(t *testing.T) {
 		},
 		{
 			netns:  "r",
-			ifname: netport.Map["net0port1"],
+			ifname: netport.PortByNetPort["net0port1"],
 			ifa:    "10.1.0.1/31",
 		},
 		{
 			netns:  "h2",
-			ifname: netport.Map["net1port0"],
+			ifname: netport.PortByNetPort["net1port0"],
 			ifa:    "10.1.0.2/31",
 			routes: []routeT{
 				{"10.1.0.0/31", "10.1.0.3"},
@@ -51,7 +51,7 @@ func onerouter(t *testing.T) {
 		},
 		{
 			netns:  "r",
-			ifname: netport.Map["net1port1"],
+			ifname: netport.PortByNetPort["net1port1"],
 			ifa:    "10.1.0.3/31",
 		},
 	}

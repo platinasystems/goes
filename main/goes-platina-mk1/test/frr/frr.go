@@ -12,7 +12,10 @@ import (
 )
 
 var Suite = test.Suite{
-	{"ospf", ospf.Suite},
-	{"isis", isis.Suite},
-	{"bgp", bgp.Suite},
-}.Run
+	Name: "frr",
+	Tests: test.Tests{
+		&bgp.Suite,
+		&isis.Suite,
+		&ospf.Suite,
+	},
+}

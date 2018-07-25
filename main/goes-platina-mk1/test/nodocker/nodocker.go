@@ -4,11 +4,12 @@
 
 package nodocker
 
-import (
-	"github.com/platinasystems/go/internal/test"
-)
+import "github.com/platinasystems/go/internal/test"
 
 var Suite = test.Suite{
-	{"twohost", twohost},
-	{"onerouter", onerouter},
-}.Run
+	Name: "nodocker",
+	Tests: test.Tests{
+		&test.UnitTest{"twohost", twohost},
+		&test.UnitTest{"onerouter", onerouter},
+	},
+}

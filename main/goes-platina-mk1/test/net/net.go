@@ -12,7 +12,10 @@ import (
 )
 
 var Suite = test.Suite{
-	{"slice", slice.Suite},
-	{"dhcp", dhcp.Suite},
-	{"static", static.Suite},
-}.Run
+	Name: "net",
+	Tests: test.Tests{
+		&slice.Suite,
+		&dhcp.Suite,
+		&static.Suite,
+	},
+}

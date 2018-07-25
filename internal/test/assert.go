@@ -9,12 +9,38 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strings"
+	"sync"
+	"syscall"
 	"testing"
 )
+
+var cdonce sync.Once
 
 // Assert wraps a testing.Test or Benchmark with several assertions.
 type Assert struct {
 	testing.TB
+}
+
+// Main runs the main function if given the "-test.main" flag.  With said flag,
+// this strip os.Args[0] and any leading -test.* options and os.Exit(0) if the
+// main returns. Otherwise, Main changes CWD to "-test.cd", if necessary, and
+// returns.
+func (assert Assert) Main(main func()) {
+	if !*IsMain {
+		if *Dir != "." {
+			cdonce.Do(func() {
+				assert.Nil(os.Chdir(*Dir))
+			})
+		}
+		return
+	}
+	os.Args = os.Args[1:]
+	for len(os.Args) > 0 && strings.HasPrefix(os.Args[0], "-test.") {
+		os.Args = os.Args[1:]
+	}
+	main()
+	syscall.Exit(0)
 }
 
 // Nil asserts that there is no error

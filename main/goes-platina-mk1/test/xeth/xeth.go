@@ -5,43 +5,24 @@
 package xeth
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"testing"
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/mk1"
 )
 
-func TestNames(t *testing.T) {
+var Suite = test.Suite{
+	Name: "xeth",
+	Tests: test.Tests{
+		&test.UnitTest{"bad-names", badNames},
+		&test.UnitTest{"good-names", goodNames},
+	},
+}
+
+func badNames(t *testing.T) {
 	assert := test.Assert{t}
-	cleanup := test.Cleanup{t}
-	b, err := ioutil.ReadFile("/proc/net/unix")
-	assert.Nil(err)
-	if bytes.Index(b, []byte("@platina-mk1/xeth")) >= 0 {
-		assert.Program("rmmod", "platina-mk1")
-	}
-	assert.Program("modprobe", "platina-mk1")
-	base := 1
-	if *mk1.IsAlpha {
-		base = 0
-	}
-	for _, name := range []string{
-		fmt.Sprintf("eth-%d-%d", base, base),
-		fmt.Sprintf("xeth%d", base+1),
-		fmt.Sprintf("xeth%d", base+2),
-		"xethbr.100",
-		"xethbr.101",
-		fmt.Sprintf("xeth%d.100u", base+1),
-		fmt.Sprintf("xeth%d.100u", base+2),
-		fmt.Sprintf("xeth%d.100t", base+2),
-	} {
-		assert.Program(test.Self{},
-			"ip", "link", "add", name, "type", "platina-mk1")
-		defer cleanup.Program(test.Self{},
-			"ip", "link", "del", name)
-	}
+	base := mk1.Base()
 	for _, name := range []string{
 		"eth-",
 		"eth-n-0",
@@ -59,5 +40,23 @@ func TestNames(t *testing.T) {
 	} {
 		assert.ProgramErr(true, test.Self{},
 			"ip", "link", "add", name, "type", "platina-mk1")
+	}
+}
+
+func goodNames(t *testing.T) {
+	assert := test.Assert{t}
+	cleanup := test.Cleanup{t}
+	base := mk1.Base()
+	for _, name := range []string{
+		"xethbr.100",
+		"xethbr.101",
+		fmt.Sprintf("xeth%d.100u", base+1),
+		fmt.Sprintf("xeth%d.100u", base+2),
+		fmt.Sprintf("xeth%d.100t", base+2),
+	} {
+		assert.Program(test.Self{},
+			"ip", "link", "add", name, "type", "platina-mk1")
+		defer cleanup.Program(test.Self{},
+			"ip", "link", "del", name)
 	}
 }

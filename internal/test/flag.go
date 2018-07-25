@@ -7,7 +7,14 @@ package test
 import "flag"
 
 var (
-	IsMain = flag.Bool("test.main", false, "run main() instead of test(s)")
-	VV     = flag.Bool("test.vv", false, "log test.Program output")
-	VVV    = flag.Bool("test.vvv", false, "log test.Program execution")
+	Dir = flag.String("test.cd", ".",
+		"change to named directory before running tests")
+	DryRun = flag.Bool("test.dryrun", false,
+		"don't run, just print test names")
+	MustPause = flag.Bool("test.pause", false,
+		"pause before and after suite")
+	IsMain = flag.Bool("test.main", false,
+		"runs main() instead of test(s)")
+	VV  = flag.Bool("test.vv", false, "log test.Program output")
+	VVV = flag.Bool("test.vvv", false, "log test.Program execution")
 )

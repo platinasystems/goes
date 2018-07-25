@@ -11,37 +11,37 @@ import (
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/conf"
 )
 
-var config *docker.Config
-
-var Suite = test.Suite{
-	{"vlan", func(t *testing.T) {
-		subtest(t, conf.New(t, "testdata/net/slice/vlan/conf.yaml.tmpl"))
-	}},
-}.Run
-
-func subtest(t *testing.T, yaml []byte) {
-	var err error
-	config, err = docker.LaunchContainers(t, yaml)
-	if err != nil {
-		t.Fatalf("Error launchContainers: %v", err)
-	}
-	defer docker.TearDownContainers(t, config)
-
-	test.Suite{
-		{"connectivity", checkConnectivity},
-		{"frr", checkFrr},
-		{"routes", checkRoutes},
-		{"inter-connectivity", checkInterConnectivity},
-		{"isolation", checkIsolation},
-		{"stress", checkStress},
-		{"stress-pci", checkStressPci},
-	}.Run(t)
+type docket struct {
+	docker.Docket
 }
 
-func checkConnectivity(t *testing.T) {
+var Suite = test.Suite{
+	Name: "slice",
+	Tests: test.Tests{
+		&docket{
+			docker.Docket{
+				Name: "vlan",
+				Tmpl: "testdata/net/slice/vlan/conf.yaml.tmpl",
+			},
+		},
+	},
+}
+
+func (d *docket) Run(t *testing.T) {
+	d.UTS(t, []test.UnitTest{
+		test.UnitTest{"connectivity", d.checkConnectivity},
+		test.UnitTest{"frr", d.checkFrr},
+		test.UnitTest{"routes", d.checkRoutes},
+		test.UnitTest{"inter-connectivity", d.checkInterConnectivity},
+		test.UnitTest{"isolation", d.checkIsolation},
+		test.UnitTest{"stress", d.checkStress},
+		test.UnitTest{"stress-pci", d.checkStressPci},
+	})
+}
+
+func (d *docket) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -61,8 +61,7 @@ func checkConnectivity(t *testing.T) {
 		{"RB-2", "10.3.0.4"},
 		{"CB-2", "10.3.0.3"},
 	} {
-		cmd := []string{"ping", "-c3", x.target}
-		out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -70,20 +69,19 @@ func checkConnectivity(t *testing.T) {
 	}
 }
 
-func checkFrr(t *testing.T) {
+func (d *docket) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
-	cmd := []string{"ps", "ax"}
-	for _, r := range config.Routers {
+	for _, r := range d.Config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.True(regexp.MustCompile(".*ospfd.*").MatchString(out))
 		assert.True(regexp.MustCompile(".*zebra.*").MatchString(out))
 	}
 }
 
-func checkRoutes(t *testing.T) {
+func (d *docket) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -96,10 +94,10 @@ func checkRoutes(t *testing.T) {
 		{"CB-2", "10.1.0.0/24"},
 	} {
 		found := false
-		cmd := []string{"ip", "route", "show", x.route}
 		timeout := 120
 		for i := timeout; i > 0; i-- {
-			out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+			out, err := d.ExecCmd(t, x.hostname,
+				"ip", "route", "show", x.route)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.route) {
 				time.Sleep(1 * time.Second)
@@ -114,7 +112,7 @@ func checkRoutes(t *testing.T) {
 	}
 }
 
-func checkInterConnectivity(t *testing.T) {
+func (d *docket) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -127,8 +125,7 @@ func checkInterConnectivity(t *testing.T) {
 		{"CB-2", "10.1.0.1"}, // In slice B ping from CB-2 to CB-1
 
 	} {
-		cmd := []string{"ping", "-c3", x.target}
-		out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -136,11 +133,11 @@ func checkInterConnectivity(t *testing.T) {
 	}
 }
 
-func checkIsolation(t *testing.T) {
+func (d *docket) checkIsolation(t *testing.T) {
 	assert := test.Assert{t}
 
 	// break slice B connectivity does not affect slice A
-	r, err := docker.FindHost(config, "RB-2")
+	r, err := docker.FindHost(d.Config, "RB-2")
 	assert.Nil(err)
 
 	for _, i := range r.Intfs {
@@ -150,8 +147,8 @@ func checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		cmd := []string{"ip", "link", "set", "down", intf}
-		_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+		_, err := d.ExecCmd(t, r.Hostname,
+			"ip", "link", "set", "down", intf)
 		assert.Nil(err)
 	}
 	// how do I do an anti match???
@@ -159,13 +156,11 @@ func checkIsolation(t *testing.T) {
 		"vnet", "show", "ip", "fib", "table", "RB-2")
 
 	t.Log("Verify that slice B is broken")
-	cmd := []string{"ping", "-c1", "10.3.0.4"}
-	_, err = docker.ExecCmd(t, "CB-1", config, cmd)
+	_, err = d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.NonNil(err)
 
 	t.Log("Verify that slice A is not affected")
-	cmd = []string{"ping", "-c1", "10.3.0.4"}
-	_, err = docker.ExecCmd(t, "CA-1", config, cmd)
+	_, err = d.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 	assert.Program(regexp.MustCompile("10.3.0.0/24"),
 		test.Self{},
@@ -179,13 +174,13 @@ func checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		cmd := []string{"ip", "link", "set", "up", intf}
-		_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+		_, err := d.ExecCmd(t, r.Hostname,
+			"ip", "link", "set", "up", intf)
 		assert.Nil(err)
 	}
 
 	// break slice A connectivity does not affect slice B
-	r, err = docker.FindHost(config, "RA-2")
+	r, err = docker.FindHost(d.Config, "RA-2")
 	assert.Nil(err)
 
 	for _, i := range r.Intfs {
@@ -195,8 +190,8 @@ func checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		cmd := []string{"ip", "link", "set", "down", intf}
-		_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+		_, err := d.ExecCmd(t, r.Hostname,
+			"ip", "link", "set", "down", intf)
 		assert.Nil(err)
 	}
 	// how do I do an anti match???
@@ -204,16 +199,14 @@ func checkIsolation(t *testing.T) {
 		"vnet", "show", "ip", "fib", "table", "RA-2")
 
 	t.Log("Verify that slice A is broken")
-	cmd = []string{"ping", "-c1", "10.3.0.4"}
-	_, err = docker.ExecCmd(t, "CA-1", config, cmd)
+	_, err = d.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
 	assert.NonNil(err)
 
 	ok := false
 	t.Log("Verify that slice B is not affected")
 	timeout := 120
 	for i := timeout; i > 0; i-- {
-		cmd = []string{"ping", "-c1", "10.3.0.4"}
-		out, _ := docker.ExecCmd(t, "CB-1", config, cmd)
+		out, _ := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 		if !assert.MatchNonFatal(out, "1 packets received") {
 			time.Sleep(1 * time.Second)
 		} else {
@@ -236,14 +229,14 @@ func checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		cmd := []string{"ip", "link", "set", "up", intf}
-		_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+		_, err := d.ExecCmd(t, r.Hostname,
+			"ip", "link", "set", "up", intf)
 		assert.Nil(err)
 	}
 
 }
 
-func checkStress(t *testing.T) {
+func (d *docket) checkStress(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("stress with hping3")
@@ -253,8 +246,7 @@ func checkStress(t *testing.T) {
 	ok := false
 	timeout := 120
 	for i := timeout; i > 0; i-- {
-		cmd := []string{"ping", "-c1", "10.3.0.4"}
-		out, _ := docker.ExecCmd(t, "CB-1", config, cmd)
+		out, _ := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 		if !assert.MatchNonFatal(out, "1 packets received") {
 			time.Sleep(1 * time.Second)
 		} else {
@@ -269,21 +261,19 @@ func checkStress(t *testing.T) {
 
 	for _, to := range duration {
 		t.Logf("stress for %v", to)
-		cmd := []string{"timeout", to,
-			"hping3", "--icmp", "--flood", "-q", "10.3.0.4"}
-		_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+		_, err := d.ExecCmd(t, "CB-1",
+			"timeout", to,
+			"hping3", "--icmp", "--flood", "-q", "10.3.0.4")
 		t.Log("verfy can still ping neighbor")
-		cmd = []string{"ping", "-c1", "10.1.0.2"}
-		_, err = docker.ExecCmd(t, "CB-1", config, cmd)
+		_, err = d.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
 	t.Log("verfy can still ping far neighbor")
-	cmd := []string{"ping", "-c1", "10.3.0.4"}
-	_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+	_, err := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 }
 
-func checkStressPci(t *testing.T) {
+func (d *docket) checkStressPci(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("stress with hping3 with ttl=1")
@@ -293,8 +283,7 @@ func checkStressPci(t *testing.T) {
 	ok := false
 	timeout := 120
 	for i := timeout; i > 0; i-- {
-		cmd := []string{"ping", "-c1", "10.3.0.4"}
-		out, _ := docker.ExecCmd(t, "CB-1", config, cmd)
+		out, _ := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 		if !assert.MatchNonFatal(out, "1 packets received") {
 			time.Sleep(1 * time.Second)
 		} else {
@@ -309,17 +298,15 @@ func checkStressPci(t *testing.T) {
 
 	for _, to := range duration {
 		t.Logf("stress for %v", to)
-		cmd := []string{"timeout", to,
+		_, err := d.ExecCmd(t, "CB-1",
+			"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "-t", "1",
-			"10.3.0.4"}
-		_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+			"10.3.0.4")
 		t.Log("verfy can still ping neighbor")
-		cmd = []string{"ping", "-c1", "10.1.0.2"}
-		_, err = docker.ExecCmd(t, "CB-1", config, cmd)
+		_, err = d.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
 	t.Log("verfy can still ping far neighbor")
-	cmd := []string{"ping", "-c1", "10.3.0.4"}
-	_, err := docker.ExecCmd(t, "CB-1", config, cmd)
+	_, err := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 }

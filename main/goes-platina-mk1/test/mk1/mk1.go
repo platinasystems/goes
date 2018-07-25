@@ -7,3 +7,11 @@ package mk1
 import "flag"
 
 var IsAlpha = flag.Bool("test.alpha", false, "this is a zero based alpha system")
+
+func Base() uint {
+	var base uint = 1
+	if *IsAlpha {
+		base = 0
+	}
+	return base
+}

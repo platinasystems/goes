@@ -10,39 +10,42 @@ import (
 
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/docker"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/conf"
 )
 
-var config *docker.Config
-
-var Suite = test.Suite{
-	{"eth", func(t *testing.T) {
-		subtest(t, conf.New(t, "testdata/frr/ospf/conf.yaml.tmpl"))
-	}},
-	{"vlan", func(t *testing.T) {
-		subtest(t, conf.New(t, "testdata/frr/ospf/vlan/conf.yaml.tmpl"))
-	}},
-}.Run
-
-func subtest(t *testing.T, yaml []byte) {
-	var err error
-	config, err = docker.LaunchContainers(t, yaml)
-	if err != nil {
-		t.Fatalf("Error launchContainers: %v", err)
-	}
-	defer docker.TearDownContainers(t, config)
-
-	test.Suite{
-		{"connectivity", checkConnectivity},
-		{"frr", checkFrr},
-		{"neighbors", checkNeighbors},
-		{"routes", checkRoutes},
-		{"inter-connectivity", checkInterConnectivity},
-		{"flap", checkFlap},
-	}.Run(t)
+type docket struct {
+	docker.Docket
 }
 
-func checkConnectivity(t *testing.T) {
+var Suite = test.Suite{
+	Name: "ospf",
+	Tests: test.Tests{
+		&docket{
+			docker.Docket{
+				Name: "eth",
+				Tmpl: "testdata/frr/ospf/conf.yaml.tmpl",
+			},
+		},
+		&docket{
+			docker.Docket{
+				Name: "vlan",
+				Tmpl: "testdata/frr/ospf/vlan/conf.yaml.tmpl",
+			},
+		},
+	},
+}
+
+func (d *docket) Run(t *testing.T) {
+	d.UTS(t, []test.UnitTest{
+		test.UnitTest{"connectivity", d.checkConnectivity},
+		test.UnitTest{"frr", d.checkFrr},
+		test.UnitTest{"neighbors", d.checkNeighbors},
+		test.UnitTest{"routes", d.checkRoutes},
+		test.UnitTest{"inter-connectivity", d.checkInterConnectivity},
+		test.UnitTest{"flap", d.checkFlap},
+	})
+}
+
+func (d *docket) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -58,31 +61,28 @@ func checkConnectivity(t *testing.T) {
 		{"R4", "192.168.111.2"},
 		{"R4", "192.168.150.5"},
 	} {
-		cmd := []string{"ping", "-c3", x.target}
-		out, err := docker.ExecCmd(t, x.host, config, cmd)
+		out, err := d.ExecCmd(t, x.host, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 	}
 }
 
-func checkFrr(t *testing.T) {
+func (d *docket) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 
-	cmd := []string{"ps", "ax"}
-	for _, r := range config.Routers {
+	for _, r := range d.Config.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*ospfd.*")
 		assert.Match(out, ".*zebra.*")
 	}
 }
 
-func checkNeighbors(t *testing.T) {
+func (d *docket) checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
 
 	timeout := 120
-	cmd := []string{"vtysh", "-c", "show ip ospf neighbor"}
 
 	for _, x := range []struct {
 		hostname string
@@ -99,7 +99,8 @@ func checkNeighbors(t *testing.T) {
 	} {
 		found := false
 		for i := timeout; i > 0; i-- {
-			out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+			out, err := d.ExecCmd(t, x.hostname,
+				"vtysh", "-c", "show ip ospf neighbor")
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.peer) {
 				time.Sleep(1 * time.Second)
@@ -114,7 +115,7 @@ func checkNeighbors(t *testing.T) {
 	}
 }
 
-func checkRoutes(t *testing.T) {
+func (d *docket) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -131,10 +132,10 @@ func checkRoutes(t *testing.T) {
 		{"R4", "192.168.222.0/24"},
 	} {
 		found := false
-		cmd := []string{"ip", "route", "show", x.route}
 		timeout := 60
 		for i := timeout; i > 0; i-- {
-			out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+			out, err := d.ExecCmd(t, x.hostname,
+				"ip", "route", "show", x.route)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.route) {
 				time.Sleep(1 * time.Second)
@@ -149,7 +150,7 @@ func checkRoutes(t *testing.T) {
 	}
 }
 
-func checkInterConnectivity(t *testing.T) {
+func (d *docket) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -165,18 +166,17 @@ func checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.120.10"},
 		{"R4", "192.168.222.10"},
 	} {
-		cmd := []string{"ping", "-c3", x.target}
-		out, err := docker.ExecCmd(t, x.hostname, config, cmd)
+		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 	}
 }
 
-func checkFlap(t *testing.T) {
+func (d *docket) checkFlap(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range config.Routers {
+	for _, r := range d.Config.Routers {
 		for _, i := range r.Intfs {
 			var intf string
 			if i.Vlan != "" {
@@ -184,12 +184,12 @@ func checkFlap(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			cmd := []string{"ip", "link", "set", "down", intf}
-			_, err := docker.ExecCmd(t, r.Hostname, config, cmd)
+			_, err := d.ExecCmd(t, r.Hostname,
+				"ip", "link", "set", "down", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
-			cmd = []string{"ip", "link", "set", "up", intf}
-			_, err = docker.ExecCmd(t, r.Hostname, config, cmd)
+			_, err = d.ExecCmd(t, r.Hostname,
+				"ip", "link", "set", "up", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
 			assert.Program(test.Self{}, "vnet", "show", "ip", "fib")

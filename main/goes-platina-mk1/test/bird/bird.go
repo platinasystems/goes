@@ -11,6 +11,9 @@ import (
 )
 
 var Suite = test.Suite{
-	{"bgp", bgp.Suite},
-	{"ospf", ospf.Suite},
-}.Run
+	Name: "bird",
+	Tests: test.Tests{
+		&bgp.Suite,
+		&ospf.Suite,
+	},
+}

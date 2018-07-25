@@ -10,5 +10,8 @@ import (
 )
 
 var Suite = test.Suite{
-	{"ebgp", ebgp.Suite},
-}.Run
+	Name: "gobgp",
+	Tests: test.Tests{
+		&ebgp.Suite,
+	},
+}
