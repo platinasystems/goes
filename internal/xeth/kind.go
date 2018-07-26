@@ -41,6 +41,7 @@ const (
 	XETH_MSG_KIND_DUMP_FIBINFO
 	XETH_MSG_KIND_FIBENTRY
 	XETH_MSG_KIND_IFDEL
+	XETH_MSG_KIND_NEIGH_UPDATE
 )
 
 const XETH_MSG_KIND_NOT_MSG = 0xff
@@ -75,6 +76,7 @@ func (kind Kind) String() string {
 		"dump-fibinfo",
 		"fib-entry",
 		"ifdel",
+		"neigh-update",
 	}
 	i := int(kind)
 	if kind == XETH_MSG_KIND_NOT_MSG {

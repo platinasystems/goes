@@ -19,6 +19,7 @@ const (
 	SizeofMsgIfa			= 0x30
 	SizeofMsgIfdel			= 0x28
 	SizeofMsgFibentry		= 0x28
+	SizeofMsgNeighUpdate		= 0x48
 	SizeofNextHop			= 0x18
 )
 
@@ -169,4 +170,20 @@ type NextHop struct {
 	Gw	uint32
 	Scope	uint8
 	Pad	[7]uint8
+}
+type MsgNeighUpdate struct {
+	Z64	uint64
+	Z32	uint32
+	Z16	uint16
+	Z8	uint8
+	Kind	uint8
+	Ifname	[16]uint8
+	Net	uint64
+	Ifindex	int32
+	Family	uint8
+	Len	uint8
+	Pad0	[2]uint8
+	Dst	[16]uint8
+	Lladdr	[6]uint8
+	Pad	[2]uint8
 }

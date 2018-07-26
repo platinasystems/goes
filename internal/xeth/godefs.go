@@ -25,6 +25,7 @@ const (
 	SizeofMsgIfa             = C.sizeof_struct_xeth_msg_ifa
 	SizeofMsgIfdel           = C.sizeof_struct_xeth_msg_ifdel
 	SizeofMsgFibentry        = C.sizeof_struct_xeth_msg_fibentry
+	SizeofMsgNeighUpdate     = C.sizeof_struct_xeth_msg_neigh_update
 	SizeofNextHop            = C.sizeof_struct_xeth_next_hop
 )
 
@@ -41,3 +42,4 @@ type MsgIfa C.struct_xeth_msg_ifa
 type MsgIfdel C.struct_xeth_msg_ifdel
 type MsgFibentry C.struct_xeth_msg_fibentry
 type NextHop C.struct_xeth_next_hop
+type MsgNeighUpdate C.struct_xeth_msg_neigh_update
