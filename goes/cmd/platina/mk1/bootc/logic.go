@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	verNum       = "1.07"
+	verNum       = "1.08"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/mnt/bootc.cfg"
@@ -129,10 +129,10 @@ func Bootc() []string {
 				fmt.Println("Error: can't clear install bit, drop into grub...")
 				return []string{""}
 			}
-			if err := setPostInstall(); err != nil {
-				fmt.Println("Error: can't set postinstall bit, drop into grub...")
-				return []string{""}
-			}
+			//TODO Comment out until post script is fixed TODO if err := setPostInstall(); err != nil {
+			//	fmt.Println("Error: can't set postinstall bit, drop into grub...")
+			//	return []string{""}
+			//}
 			// boot installer from sda1
 			return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
 				Cfg.ReInstallI, "-c", kexec0, "-e"}
@@ -206,6 +206,7 @@ func dhcpZtpPcc() error {
 	}
 
 	// DHCP, ZTP, PCC - for goes-boot
+	// 1. check prereqs, 2. do it, 3. check successful
 	//
 	//===========
 	// SETUP PHASE - set dhcp bits, static IP
@@ -252,7 +253,7 @@ func dhcpZtpPcc() error {
 	// SDA6 BOOT
 	// D80 Is PCC Enabled                        --> NO, DONE
 	//
-	// P60 check in with PCC (register)
+	// P60 check in with PCC (register) goes register
 	//
 	// keep alives, status updates, control etc. from PCC...
 
