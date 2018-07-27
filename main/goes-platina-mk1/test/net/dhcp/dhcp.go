@@ -37,11 +37,11 @@ var Suite = test.Suite{
 
 func (d *docket) Run(t *testing.T) {
 	d.UTS(t, []test.UnitTest{
-		test.UnitTest{"connectivity", d.checkConnectivity},
-		test.UnitTest{"server", d.checkServer},
-		test.UnitTest{"client", d.checkClient},
-		test.UnitTest{"connectivity2", d.checkConnectivity2},
-		test.UnitTest{"vlan-tag", d.checkVlanTag},
+		{"connectivity", d.checkConnectivity},
+		{"server", d.checkServer},
+		{"client", d.checkClient},
+		{"connectivity2", d.checkConnectivity2},
+		{"vlan-tag", d.checkVlanTag},
 	})
 }
 

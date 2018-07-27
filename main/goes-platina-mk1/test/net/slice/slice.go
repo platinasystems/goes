@@ -31,13 +31,13 @@ var Suite = test.Suite{
 
 func (d *docket) Run(t *testing.T) {
 	d.UTS(t, []test.UnitTest{
-		test.UnitTest{"connectivity", d.checkConnectivity},
-		test.UnitTest{"frr", d.checkFrr},
-		test.UnitTest{"routes", d.checkRoutes},
-		test.UnitTest{"inter-connectivity", d.checkInterConnectivity},
-		test.UnitTest{"isolation", d.checkIsolation},
-		test.UnitTest{"stress", d.checkStress},
-		test.UnitTest{"stress-pci", d.checkStressPci},
+		{"connectivity", d.checkConnectivity},
+		{"frr", d.checkFrr},
+		{"routes", d.checkRoutes},
+		{"inter-connectivity", d.checkInterConnectivity},
+		{"isolation", d.checkIsolation},
+		{"stress", d.checkStress},
+		{"stress-pci", d.checkStressPci},
 	})
 }
 
