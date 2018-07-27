@@ -42,11 +42,10 @@ func (msg *MsgNeighUpdate) CloneIP() net.IP {
 
 func (msg *MsgNeighUpdate) String() string {
 	return fmt.Sprint(Kind(msg.Kind),
+		" ", AF(msg.Family),
 		" ", net.IP(msg.Dst[:msg.Len]),
 		"@", net.HardwareAddr(msg.Lladdr[:]),
 		" netns ", Netns(msg.Net),
-		" ", Ifname(msg.Ifname),
-		"[", msg.Ifindex, "]",
-		" ", AF(msg.Family),
-	)
+		" ", (*Ifname)(&msg.Ifname),
+		"[", msg.Ifindex, "]")
 }
