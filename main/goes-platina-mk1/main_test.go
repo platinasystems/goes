@@ -59,5 +59,5 @@ var suite = test.Suite{
 }
 
 func Test(t *testing.T) {
-	suite.Run(t)
+	suite.Test(t)
 }

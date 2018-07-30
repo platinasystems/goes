@@ -13,20 +13,20 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-type docket struct {
+type dhcp struct {
 	docker.Docket
 }
 
 var Suite = test.Suite{
 	Name: "dhcp",
 	Tests: test.Tests{
-		&docket{
+		&dhcp{
 			docker.Docket{
 				Name: "eth",
 				Tmpl: "testdata/net/dhcp/conf.yaml.tmpl",
 			},
 		},
-		&docket{
+		&dhcp{
 			docker.Docket{
 				Name: "vlan",
 				Tmpl: "testdata/net/dhcp/vlan/conf.yaml.tmpl",
@@ -35,17 +35,18 @@ var Suite = test.Suite{
 	},
 }
 
-func (d *docket) Run(t *testing.T) {
-	d.UTS(t, []test.UnitTest{
-		{"connectivity", d.checkConnectivity},
-		{"server", d.checkServer},
-		{"client", d.checkClient},
-		{"connectivity2", d.checkConnectivity2},
-		{"vlan-tag", d.checkVlanTag},
-	})
+func (dhcp *dhcp) Test(t *testing.T) {
+	dhcp.Docket.Tests = test.Tests{
+		&test.Unit{"", dhcp.checkConnectivity},
+		&test.Unit{"", dhcp.checkServer},
+		&test.Unit{"", dhcp.checkClient},
+		&test.Unit{"", dhcp.checkConnectivity2},
+		&test.Unit{"", dhcp.checkVlanTag},
+	}
+	dhcp.Docket.Test(t)
 }
 
-func (d *docket) checkConnectivity(t *testing.T) {
+func (dhcp *dhcp) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -55,7 +56,7 @@ func (d *docket) checkConnectivity(t *testing.T) {
 		{"R1", "192.168.120.10"},
 		{"R2", "192.168.120.5"},
 	} {
-		out, err := d.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		out, err := dhcp.ExecCmd(t, x.host, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -63,41 +64,41 @@ func (d *docket) checkConnectivity(t *testing.T) {
 	}
 }
 
-func (d *docket) checkServer(t *testing.T) {
+func (dhcp *dhcp) checkServer(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Logf("Checking dhcp server on %v", "R2")
-	out, err := d.ExecCmd(t, "R2", "ps", "ax")
+	out, err := dhcp.ExecCmd(t, "R2", "ps", "ax")
 	assert.Nil(err)
 	assert.Match(out, ".*dhcpd.*")
 }
 
-func (d *docket) checkClient(t *testing.T) {
+func (dhcp *dhcp) checkClient(t *testing.T) {
 	assert := test.Assert{t}
 
-	r, err := docker.FindHost(d.Config, "R1")
+	r, err := docker.FindHost(dhcp.Config, "R1")
 	intf := r.Intfs[0]
 
 	// remove existing IP address
-	_, err = d.ExecCmd(t, "R1",
+	_, err = dhcp.ExecCmd(t, "R1",
 		"ip", "address", "delete", "192.168.120.5", "dev", intf.Name)
 	assert.Nil(err)
 
 	t.Log("Verify ping fails")
-	_, err = d.ExecCmd(t, "R1", "ping", "-c1", "192.168.120.10")
+	_, err = dhcp.ExecCmd(t, "R1", "ping", "-c1", "192.168.120.10")
 	assert.NonNil(err)
 
 	t.Log("Request dhcp address")
-	out, err := d.ExecCmd(t, "R1", "dhclient", "-4", "-v", intf.Name)
+	out, err := dhcp.ExecCmd(t, "R1", "dhclient", "-4", "-v", intf.Name)
 	assert.Nil(err)
 	assert.Match(out, "bound to")
 }
 
-func (d *docket) checkConnectivity2(t *testing.T) {
+func (dhcp *dhcp) checkConnectivity2(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("Check connectivity with dhcp address")
-	out, err := d.ExecCmd(t, "R1", "ping", "-c3", "192.168.120.10")
+	out, err := dhcp.ExecCmd(t, "R1", "ping", "-c3", "192.168.120.10")
 	assert.Nil(err)
 	assert.Match(out, "[1-3] packets received")
 	assert.Program(test.Self{},
@@ -106,26 +107,26 @@ func (d *docket) checkConnectivity2(t *testing.T) {
 		"vnet", "show", "ip", "fib", "table", "R2")
 }
 
-func (d *docket) checkVlanTag(t *testing.T) {
+func (dhcp *dhcp) checkVlanTag(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("Check for invalid vlan tag") // issue #92
 
-	r1, err := docker.FindHost(d.Config, "R1")
+	r1, err := docker.FindHost(dhcp.Config, "R1")
 	r1Intf := r1.Intfs[0]
 
 	// remove existing IP address
-	_, err = d.ExecCmd(t, "R1",
+	_, err = dhcp.ExecCmd(t, "R1",
 		"ip", "address", "flush", "dev", r1Intf.Name)
 	assert.Nil(err)
 
-	r2, err := docker.FindHost(d.Config, "R2")
+	r2, err := docker.FindHost(dhcp.Config, "R2")
 	r2Intf := r2.Intfs[0]
 
 	done := make(chan bool, 1)
 
 	go func(done chan bool) {
-		out, err := d.ExecCmd(t, "R2",
+		out, err := dhcp.ExecCmd(t, "R2",
 			"timeout", "10",
 			"tcpdump", "-c1", "-nvvvei", r2Intf.Name, "port", "67")
 		assert.Nil(err)
@@ -138,7 +139,7 @@ func (d *docket) checkVlanTag(t *testing.T) {
 	}(done)
 
 	time.Sleep(1 * time.Second)
-	_, err = d.ExecCmd(t, "R1", "dhclient", "-4", "-v", r1Intf.Name)
+	_, err = dhcp.ExecCmd(t, "R1", "dhclient", "-4", "-v", r1Intf.Name)
 	assert.Nil(err)
 	<-done
 }

@@ -12,20 +12,20 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-type docket struct {
+type isis struct {
 	docker.Docket
 }
 
 var Suite = test.Suite{
 	Name: "isis",
 	Tests: test.Tests{
-		&docket{
+		&isis{
 			docker.Docket{
 				Name: "eth",
 				Tmpl: "testdata/frr/isis/conf.yaml.tmpl",
 			},
 		},
-		&docket{
+		&isis{
 			docker.Docket{
 				Name: "vlan",
 				Tmpl: "testdata/frr/isis/vlan/conf.yaml.tmpl",
@@ -34,19 +34,20 @@ var Suite = test.Suite{
 	},
 }
 
-func (d *docket) Run(t *testing.T) {
-	d.UTS(t, []test.UnitTest{
-		{"connectivity", d.checkConnectivity},
-		{"frr", d.checkFrr},
-		{"config", d.addIntfConf},
-		{"neighbors", d.checkNeighbors},
-		{"routes", d.checkRoutes},
-		{"inter-connectivity", d.checkInterConnectivity},
-		{"flap", d.checkFlap},
-	})
+func (isis *isis) Test(t *testing.T) {
+	isis.Docket.Tests = test.Tests{
+		&test.Unit{"", isis.checkConnectivity},
+		&test.Unit{"", isis.checkFrr},
+		&test.Unit{"", isis.addIntfConf},
+		&test.Unit{"", isis.checkNeighbors},
+		&test.Unit{"", isis.checkRoutes},
+		&test.Unit{"", isis.checkInterConnectivity},
+		&test.Unit{"", isis.checkFlap},
+	}
+	isis.Docket.Test(t)
 }
 
-func (d *docket) checkConnectivity(t *testing.T) {
+func (isis *isis) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -62,29 +63,29 @@ func (d *docket) checkConnectivity(t *testing.T) {
 		{"R4", "192.168.111.2"},
 		{"R4", "192.168.150.5"},
 	} {
-		out, err := d.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		out, err := isis.ExecCmd(t, x.host, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 	}
 }
 
-func (d *docket) checkFrr(t *testing.T) {
+func (isis *isis) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 
-	for _, r := range d.Config.Routers {
+	for _, r := range isis.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
+		out, err := isis.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*isisd.*")
 		assert.Match(out, ".*zebra.*")
 	}
 }
 
-func (d *docket) addIntfConf(t *testing.T) {
+func (isis *isis) addIntfConf(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range d.Config.Routers {
+	for _, r := range isis.Routers {
 		for _, i := range r.Intfs {
 			var intf string
 			if i.Vlan != "" {
@@ -92,7 +93,7 @@ func (d *docket) addIntfConf(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			_, err := d.ExecCmd(t, r.Hostname,
+			_, err := isis.ExecCmd(t, r.Hostname,
 				"vtysh", "-c", "conf t",
 				"-c", "interface "+intf,
 				"-c", "ip router isis "+r.Hostname)
@@ -101,7 +102,7 @@ func (d *docket) addIntfConf(t *testing.T) {
 	}
 }
 
-func (d *docket) checkNeighbors(t *testing.T) {
+func (isis *isis) checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -121,7 +122,7 @@ func (d *docket) checkNeighbors(t *testing.T) {
 		timeout := 60
 		found := false
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := isis.ExecCmd(t, x.hostname,
 				"vtysh", "-c", "show isis neighbor "+x.peer)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.address) {
@@ -138,7 +139,7 @@ func (d *docket) checkNeighbors(t *testing.T) {
 	}
 }
 
-func (d *docket) checkRoutes(t *testing.T) {
+func (isis *isis) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -157,7 +158,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 		found := false
 		timeout := 60
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := isis.ExecCmd(t, x.hostname,
 				"vtysh", "-c", "show ip route isis")
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.route) {
@@ -173,7 +174,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 	}
 }
 
-func (d *docket) checkInterConnectivity(t *testing.T) {
+func (isis *isis) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -189,17 +190,17 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.120.10"},
 		{"R4", "192.168.222.10"},
 	} {
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := isis.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 	}
 }
 
-func (d *docket) checkFlap(t *testing.T) {
+func (isis *isis) checkFlap(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range d.Config.Routers {
+	for _, r := range isis.Routers {
 		for _, i := range r.Intfs {
 			var intf string
 			if i.Vlan != "" {
@@ -207,11 +208,11 @@ func (d *docket) checkFlap(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			_, err := d.ExecCmd(t, r.Hostname,
+			_, err := isis.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "down", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
-			_, err = d.ExecCmd(t, r.Hostname,
+			_, err = isis.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "up", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)

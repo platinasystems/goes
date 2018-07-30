@@ -13,20 +13,20 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-type docket struct {
+type static struct {
 	docker.Docket
 }
 
 var Suite = test.Suite{
 	Name: "static",
 	Tests: test.Tests{
-		&docket{
+		&static{
 			docker.Docket{
 				Name: "eth",
 				Tmpl: "testdata/net/static/conf.yaml.tmpl",
 			},
 		},
-		&docket{
+		&static{
 			docker.Docket{
 				Name: "vlan",
 				Tmpl: "testdata/net/static/conf.yaml.tmpl",
@@ -35,19 +35,19 @@ var Suite = test.Suite{
 	},
 }
 
-func (d *docket) Run(t *testing.T) {
-	d.UTS(t, []test.UnitTest{
-		{"connectivity", d.checkConnectivity},
-		{"frr", d.checkFrr},
-		{"routes", d.checkRoutes},
-		{"inter-connectivity", d.checkInterConnectivity},
-		{"flap", d.checkFlap},
-		{"inter-connectivity2", d.checkInterConnectivity2},
-		{"punt-stress", d.checkPuntStress},
-	})
+func (static *static) Test(t *testing.T) {
+	static.Docket.Tests = test.Tests{
+		&test.Unit{"", static.checkConnectivity},
+		&test.Unit{"", static.checkFrr},
+		&test.Unit{"", static.checkRoutes},
+		&test.Unit{"", static.checkInterConnectivity},
+		&test.Unit{"", static.checkFlap},
+		&test.Unit{"", static.checkInterConnectivity2},
+		&test.Unit{"", static.checkPuntStress},
+	}
 }
 
-func (d *docket) checkConnectivity(t *testing.T) {
+func (static *static) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -64,38 +64,40 @@ func (d *docket) checkConnectivity(t *testing.T) {
 		{"CA-2", "10.3.0.3"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := static.ExecCmd(t, x.hostname,
+			"ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 	}
 }
 
-func (d *docket) checkFrr(t *testing.T) {
+func (static *static) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 
-	for _, r := range d.Config.Routers {
+	for _, r := range static.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
+		out, err := static.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.True(regexp.MustCompile(".*zebra.*").MatchString(out))
 	}
 }
 
-func (d *docket) checkRoutes(t *testing.T) {
+func (static *static) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range d.Config.Routers {
+	for _, r := range static.Routers {
 
 		t.Logf("check for default route in container RIB %v",
 			r.Hostname)
-		out, err := d.ExecCmd(t, r.Hostname, "vtysh", "-c",
+		out, err := static.ExecCmd(t, r.Hostname, "vtysh", "-c",
 			"show ip route")
 		assert.Nil(err)
 		assert.Match(out, "S>\\* 0.0.0.0/0")
 
-		t.Logf("check for default route in container FIB %v", r.Hostname)
-		out, err = d.ExecCmd(t, r.Hostname, "ip", "route", "show")
+		t.Logf("check for default route in container FIB %v",
+			r.Hostname)
+		out, err = static.ExecCmd(t, r.Hostname, "ip", "route", "show")
 		assert.Nil(err)
 		assert.Match(out, "default")
 
@@ -106,7 +108,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 	}
 }
 
-func (d *docket) checkInterConnectivity(t *testing.T) {
+func (static *static) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -119,7 +121,8 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 		{"CA-2", "192.168.0.1"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := static.ExecCmd(t, x.hostname,
+			"ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -127,10 +130,10 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 	}
 }
 
-func (d *docket) checkFlap(t *testing.T) {
+func (static *static) checkFlap(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range d.Config.Routers {
+	for _, r := range static.Routers {
 		for _, i := range r.Intfs {
 			var intf string
 			if i.Vlan != "" {
@@ -138,20 +141,21 @@ func (d *docket) checkFlap(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			_, err := d.ExecCmd(t, r.Hostname,
+			_, err := static.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "down", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
-			_, err = d.ExecCmd(t, r.Hostname,
+			_, err = static.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "up", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
-			assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
+			assert.Program(test.Self{},
+				"vnet", "show", "ip", "fib")
 		}
 	}
 }
 
-func (d *docket) checkInterConnectivity2(t *testing.T) {
+func (static *static) checkInterConnectivity2(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -172,7 +176,8 @@ func (d *docket) checkInterConnectivity2(t *testing.T) {
 		{"CA-2", "192.168.0.1"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := static.ExecCmd(t, x.hostname,
+			"ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -180,7 +185,7 @@ func (d *docket) checkInterConnectivity2(t *testing.T) {
 	}
 }
 
-func (d *docket) checkPuntStress(t *testing.T) {
+func (static *static) checkPuntStress(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("Check punt stress with iperf3")
@@ -188,12 +193,12 @@ func (d *docket) checkPuntStress(t *testing.T) {
 	done := make(chan bool, 1)
 
 	go func(done chan bool) {
-		d.ExecCmd(t, "CA-2", "timeout", "15", "iperf3", "-s")
+		static.ExecCmd(t, "CA-2", "timeout", "15", "iperf3", "-s")
 		done <- true
 	}(done)
 
 	time.Sleep(1 * time.Second)
-	out, err := d.ExecCmd(t, "CA-1", "iperf3", "-c", "10.3.0.4")
+	out, err := static.ExecCmd(t, "CA-1", "iperf3", "-c", "10.3.0.4")
 
 	r, err := regexp.Compile(`([0-9\.]+)\s+Gbits/sec\s+receiver`)
 	assert.Nil(err)

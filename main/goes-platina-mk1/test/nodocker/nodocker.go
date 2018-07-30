@@ -9,7 +9,7 @@ import "github.com/platinasystems/go/internal/test"
 var Suite = test.Suite{
 	Name: "nodocker",
 	Tests: test.Tests{
-		&test.UnitTest{"twohost", twohost},
-		&test.UnitTest{"onerouter", onerouter},
+		&test.Unit{"twohost", twohost},
+		&test.Unit{"onerouter", onerouter},
 	},
 }

@@ -6,6 +6,7 @@ package docker
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"strings"
@@ -16,9 +17,10 @@ import (
 )
 
 type Docket struct {
-	Name   string
-	Tmpl   string
-	Config *Config
+	Name string
+	Tmpl string
+	*Config
+	test.Tests
 }
 
 func (d *Docket) String() string { return d.Name }
@@ -48,15 +50,17 @@ func (d *Docket) ExecCmd(t *testing.T, ID string,
 	return ExecCmd(t, ID, d.Config, cmd)
 }
 
-func (d *Docket) UTS(t *testing.T, uts []test.UnitTest) {
-	if !*test.DryRun {
+func (d *Docket) Test(t *testing.T) {
+	if *test.DryRun {
+		fmt.Println(t.Name())
+	} else {
 		defer d.Exit(t)
 		d.Init(t)
 	}
-	for _, ut := range uts {
+	for _, x := range d.Tests {
 		if t.Failed() {
 			break
 		}
-		t.Run(ut.String(), ut.Run)
+		t.Run(x.String(), x.Test)
 	}
 }

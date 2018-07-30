@@ -5,9 +5,23 @@
 package test
 
 import (
-	"os"
+	"fmt"
 	"testing"
 )
+
+type Tester interface {
+	String() string
+	Test(*testing.T)
+}
+
+type Tests []Tester
+
+type Suite struct {
+	Name string
+	Init func(*testing.T)
+	Exit func(*testing.T)
+	Tests
+}
 
 func (suite *Suite) String() string {
 	return suite.Name
@@ -25,8 +39,12 @@ func (suite *Suite) exit(t *testing.T) {
 	}
 }
 
-func (suite Suite) Run(t *testing.T) {
-	if !*DryRun {
+// The Suite's named Tests are run through testing.T.Run();
+// unnamed Tests (aka. "") are run directly.
+func (suite Suite) Test(t *testing.T) {
+	if *DryRun {
+		fmt.Println(t.Name())
+	} else {
 		defer suite.exit(t)
 		suite.init(t)
 	}
@@ -34,36 +52,25 @@ func (suite Suite) Run(t *testing.T) {
 		if t.Failed() {
 			break
 		}
-		t.Run(x.String(), x.Run)
+		if len(x.String()) > 0 {
+			t.Run(x.String(), x.Test)
+		} else {
+			x.Test(t)
+		}
 	}
 }
 
-type Tester interface {
-	String() string
-	Run(*testing.T)
-}
-
-type Tests []Tester
-
-type Suite struct {
-	Name string
-	Init func(*testing.T)
-	Exit func(*testing.T)
-	Tests
-}
-
-type UnitTest struct {
+type Unit struct {
 	Name string
 	Func func(*testing.T)
 }
 
-func (ut *UnitTest) String() string { return ut.Name }
+func (u *Unit) String() string { return u.Name }
 
-func (ut *UnitTest) Run(t *testing.T) {
-	if *DryRun {
-		os.Stdout.WriteString(t.Name())
-		os.Stdout.WriteString("\n")
-	} else {
-		ut.Func(t)
+func (u *Unit) Test(t *testing.T) {
+	if !*DryRun {
+		u.Func(t)
+	} else if len(u.Name) > 0 {
+		fmt.Println(t.Name())
 	}
 }

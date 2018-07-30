@@ -13,14 +13,14 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-type docket struct {
+type slice struct {
 	docker.Docket
 }
 
 var Suite = test.Suite{
 	Name: "slice",
 	Tests: test.Tests{
-		&docket{
+		&slice{
 			docker.Docket{
 				Name: "vlan",
 				Tmpl: "testdata/net/slice/vlan/conf.yaml.tmpl",
@@ -29,19 +29,20 @@ var Suite = test.Suite{
 	},
 }
 
-func (d *docket) Run(t *testing.T) {
-	d.UTS(t, []test.UnitTest{
-		{"connectivity", d.checkConnectivity},
-		{"frr", d.checkFrr},
-		{"routes", d.checkRoutes},
-		{"inter-connectivity", d.checkInterConnectivity},
-		{"isolation", d.checkIsolation},
-		{"stress", d.checkStress},
-		{"stress-pci", d.checkStressPci},
-	})
+func (slice *slice) Test(t *testing.T) {
+	slice.Docket.Tests = test.Tests{
+		&test.Unit{"", slice.checkConnectivity},
+		&test.Unit{"", slice.checkFrr},
+		&test.Unit{"", slice.checkRoutes},
+		&test.Unit{"", slice.checkInterConnectivity},
+		&test.Unit{"", slice.checkIsolation},
+		&test.Unit{"", slice.checkStress},
+		&test.Unit{"", slice.checkStressPci},
+	}
+	slice.Docket.Test(t)
 }
 
-func (d *docket) checkConnectivity(t *testing.T) {
+func (slice *slice) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -61,7 +62,7 @@ func (d *docket) checkConnectivity(t *testing.T) {
 		{"RB-2", "10.3.0.4"},
 		{"CB-2", "10.3.0.3"},
 	} {
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := slice.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -69,19 +70,19 @@ func (d *docket) checkConnectivity(t *testing.T) {
 	}
 }
 
-func (d *docket) checkFrr(t *testing.T) {
+func (slice *slice) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
-	for _, r := range d.Config.Routers {
+	for _, r := range slice.Routers {
 		t.Logf("Checking FRR on %v", r.Hostname)
-		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
+		out, err := slice.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.True(regexp.MustCompile(".*ospfd.*").MatchString(out))
 		assert.True(regexp.MustCompile(".*zebra.*").MatchString(out))
 	}
 }
 
-func (d *docket) checkRoutes(t *testing.T) {
+func (slice *slice) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -96,7 +97,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 		found := false
 		timeout := 120
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := slice.ExecCmd(t, x.hostname,
 				"ip", "route", "show", x.route)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.route) {
@@ -112,7 +113,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 	}
 }
 
-func (d *docket) checkInterConnectivity(t *testing.T) {
+func (slice *slice) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -125,7 +126,7 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 		{"CB-2", "10.1.0.1"}, // In slice B ping from CB-2 to CB-1
 
 	} {
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := slice.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
@@ -133,11 +134,11 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 	}
 }
 
-func (d *docket) checkIsolation(t *testing.T) {
+func (slice *slice) checkIsolation(t *testing.T) {
 	assert := test.Assert{t}
 
 	// break slice B connectivity does not affect slice A
-	r, err := docker.FindHost(d.Config, "RB-2")
+	r, err := docker.FindHost(slice.Config, "RB-2")
 	assert.Nil(err)
 
 	for _, i := range r.Intfs {
@@ -147,7 +148,7 @@ func (d *docket) checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		_, err := d.ExecCmd(t, r.Hostname,
+		_, err := slice.ExecCmd(t, r.Hostname,
 			"ip", "link", "set", "down", intf)
 		assert.Nil(err)
 	}
@@ -156,11 +157,11 @@ func (d *docket) checkIsolation(t *testing.T) {
 		"vnet", "show", "ip", "fib", "table", "RB-2")
 
 	t.Log("Verify that slice B is broken")
-	_, err = d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
+	_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.NonNil(err)
 
 	t.Log("Verify that slice A is not affected")
-	_, err = d.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
+	_, err = slice.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 	assert.Program(regexp.MustCompile("10.3.0.0/24"),
 		test.Self{},
@@ -174,13 +175,13 @@ func (d *docket) checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		_, err := d.ExecCmd(t, r.Hostname,
+		_, err := slice.ExecCmd(t, r.Hostname,
 			"ip", "link", "set", "up", intf)
 		assert.Nil(err)
 	}
 
 	// break slice A connectivity does not affect slice B
-	r, err = docker.FindHost(d.Config, "RA-2")
+	r, err = docker.FindHost(slice.Config, "RA-2")
 	assert.Nil(err)
 
 	for _, i := range r.Intfs {
@@ -190,7 +191,7 @@ func (d *docket) checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		_, err := d.ExecCmd(t, r.Hostname,
+		_, err := slice.ExecCmd(t, r.Hostname,
 			"ip", "link", "set", "down", intf)
 		assert.Nil(err)
 	}
@@ -199,14 +200,14 @@ func (d *docket) checkIsolation(t *testing.T) {
 		"vnet", "show", "ip", "fib", "table", "RA-2")
 
 	t.Log("Verify that slice A is broken")
-	_, err = d.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
+	_, err = slice.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
 	assert.NonNil(err)
 
 	ok := false
 	t.Log("Verify that slice B is not affected")
 	timeout := 120
 	for i := timeout; i > 0; i-- {
-		out, _ := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
+		out, _ := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 		if !assert.MatchNonFatal(out, "1 packets received") {
 			time.Sleep(1 * time.Second)
 		} else {
@@ -229,14 +230,14 @@ func (d *docket) checkIsolation(t *testing.T) {
 		} else {
 			intf = i.Name
 		}
-		_, err := d.ExecCmd(t, r.Hostname,
+		_, err := slice.ExecCmd(t, r.Hostname,
 			"ip", "link", "set", "up", intf)
 		assert.Nil(err)
 	}
 
 }
 
-func (d *docket) checkStress(t *testing.T) {
+func (slice *slice) checkStress(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("stress with hping3")
@@ -246,7 +247,7 @@ func (d *docket) checkStress(t *testing.T) {
 	ok := false
 	timeout := 120
 	for i := timeout; i > 0; i-- {
-		out, _ := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
+		out, _ := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 		if !assert.MatchNonFatal(out, "1 packets received") {
 			time.Sleep(1 * time.Second)
 		} else {
@@ -261,19 +262,19 @@ func (d *docket) checkStress(t *testing.T) {
 
 	for _, to := range duration {
 		t.Logf("stress for %v", to)
-		_, err := d.ExecCmd(t, "CB-1",
+		_, err := slice.ExecCmd(t, "CB-1",
 			"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "10.3.0.4")
 		t.Log("verfy can still ping neighbor")
-		_, err = d.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
+		_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
 	t.Log("verfy can still ping far neighbor")
-	_, err := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
+	_, err := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 }
 
-func (d *docket) checkStressPci(t *testing.T) {
+func (slice *slice) checkStressPci(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("stress with hping3 with ttl=1")
@@ -283,7 +284,7 @@ func (d *docket) checkStressPci(t *testing.T) {
 	ok := false
 	timeout := 120
 	for i := timeout; i > 0; i-- {
-		out, _ := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
+		out, _ := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 		if !assert.MatchNonFatal(out, "1 packets received") {
 			time.Sleep(1 * time.Second)
 		} else {
@@ -298,15 +299,15 @@ func (d *docket) checkStressPci(t *testing.T) {
 
 	for _, to := range duration {
 		t.Logf("stress for %v", to)
-		_, err := d.ExecCmd(t, "CB-1",
+		_, err := slice.ExecCmd(t, "CB-1",
 			"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "-t", "1",
 			"10.3.0.4")
 		t.Log("verfy can still ping neighbor")
-		_, err = d.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
+		_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
 	t.Log("verfy can still ping far neighbor")
-	_, err := d.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
+	_, err := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 }

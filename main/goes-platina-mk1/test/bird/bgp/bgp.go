@@ -12,20 +12,20 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-type docket struct {
+type bgp struct {
 	docker.Docket
 }
 
 var Suite = test.Suite{
 	Name: "bgp",
 	Tests: test.Tests{
-		&docket{
+		&bgp{
 			docker.Docket{
 				Name: "eth",
 				Tmpl: "testdata/bird/bgp/conf.yaml.tmpl",
 			},
 		},
-		&docket{
+		&bgp{
 			docker.Docket{
 				Name: "vlan",
 				Tmpl: "testdata/bird/bgp/vlan/conf.yaml.tmpl",
@@ -34,18 +34,19 @@ var Suite = test.Suite{
 	},
 }
 
-func (d *docket) Run(t *testing.T) {
-	d.UTS(t, []test.UnitTest{
-		{"connectivity", d.checkConnectivity},
-		{"bird", d.checkBird},
-		{"neighbors", d.checkNeighbors},
-		{"routes", d.checkRoutes},
-		{"inter-connectivity", d.checkInterConnectivity},
-		{"flap", d.checkFlap},
-	})
+func (bgp *bgp) Test(t *testing.T) {
+	bgp.Docket.Tests = test.Tests{
+		&test.Unit{"", bgp.checkConnectivity},
+		&test.Unit{"", bgp.checkBird},
+		&test.Unit{"", bgp.checkNeighbors},
+		&test.Unit{"", bgp.checkRoutes},
+		&test.Unit{"", bgp.checkInterConnectivity},
+		&test.Unit{"", bgp.checkFlap},
+	}
+	bgp.Docket.Test(t)
 }
 
-func (d *docket) checkConnectivity(t *testing.T) {
+func (bgp *bgp) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -61,24 +62,24 @@ func (d *docket) checkConnectivity(t *testing.T) {
 		{"R4", "192.168.111.2"},
 		{"R4", "192.168.150.5"},
 	} {
-		out, err := d.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		out, err := bgp.ExecCmd(t, x.host, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 	}
 }
 
-func (d *docket) checkBird(t *testing.T) {
+func (bgp *bgp) checkBird(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
-	for _, r := range d.Config.Routers {
+	for _, r := range bgp.Routers {
 		t.Logf("Checking BIRD on %v", r.Hostname)
-		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
+		out, err := bgp.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*bird.*")
 	}
 }
 
-func (d *docket) checkNeighbors(t *testing.T) {
+func (bgp *bgp) checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -98,7 +99,7 @@ func (d *docket) checkNeighbors(t *testing.T) {
 		timeout := 120
 
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := bgp.ExecCmd(t, x.hostname,
 				"birdc", "show", "protocols", "all", x.peer)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, ".*Established.*") {
@@ -114,7 +115,7 @@ func (d *docket) checkNeighbors(t *testing.T) {
 	}
 }
 
-func (d *docket) checkRoutes(t *testing.T) {
+func (bgp *bgp) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -133,7 +134,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 		found := false
 		timeout := 60
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := bgp.ExecCmd(t, x.hostname,
 				"ip", "route", "show", x.route)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.route) {
@@ -149,7 +150,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 	}
 }
 
-func (d *docket) checkInterConnectivity(t *testing.T) {
+func (bgp *bgp) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -165,7 +166,7 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.120.10"},
 		{"R4", "192.168.222.10"},
 	} {
-		out, err := d.ExecCmd(t, x.hostname,
+		out, err := bgp.ExecCmd(t, x.hostname,
 			"ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
@@ -173,10 +174,10 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 	}
 }
 
-func (d *docket) checkFlap(t *testing.T) {
+func (bgp *bgp) checkFlap(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range d.Config.Routers {
+	for _, r := range bgp.Routers {
 		for _, i := range r.Intfs {
 			var intf string
 			if i.Vlan != "" {
@@ -184,11 +185,11 @@ func (d *docket) checkFlap(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			_, err := d.ExecCmd(t, r.Hostname,
+			_, err := bgp.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "down", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
-			_, err = d.ExecCmd(t, r.Hostname,
+			_, err = bgp.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "up", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)

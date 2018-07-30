@@ -46,7 +46,7 @@ var Suite = test.Suite{
 		}
 	},
 	Tests: test.Tests{
-		&test.UnitTest{"ready", func(*testing.T) {}},
+		&test.Unit{"ready", func(*testing.T) {}},
 		&nodocker.Suite,
 		&docker.Suite,
 	},

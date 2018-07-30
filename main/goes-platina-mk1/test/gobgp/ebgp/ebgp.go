@@ -12,20 +12,20 @@ import (
 	"github.com/platinasystems/go/internal/test/docker"
 )
 
-type docket struct {
+type ebgp struct {
 	docker.Docket
 }
 
 var Suite = test.Suite{
 	Name: "ebgp",
 	Tests: test.Tests{
-		&docket{
+		&ebgp{
 			docker.Docket{
 				Name: "eth",
 				Tmpl: "testdata/gobgp/ebgp/conf.yaml.tmpl",
 			},
 		},
-		&docket{
+		&ebgp{
 			docker.Docket{
 				Name: "vlan",
 				Tmpl: "testdata/gobgp/ebgp/vlan/conf.yaml.tmpl",
@@ -34,18 +34,19 @@ var Suite = test.Suite{
 	},
 }
 
-func (d *docket) Run(t *testing.T) {
-	d.UTS(t, []test.UnitTest{
-		{"connectivity", d.checkConnectivity},
-		{"gobgp", d.checkBgp},
-		{"neighbors", d.checkNeighbors},
-		{"routes", d.checkRoutes},
-		{"inter-connectivity", d.checkInterConnectivity},
-		{"flap", d.checkFlap},
-	})
+func (ebgp *ebgp) Run(t *testing.T) {
+	ebgp.Docket.Tests = test.Tests{
+		&test.Unit{"", ebgp.checkConnectivity},
+		&test.Unit{"", ebgp.checkBgp},
+		&test.Unit{"", ebgp.checkNeighbors},
+		&test.Unit{"", ebgp.checkRoutes},
+		&test.Unit{"", ebgp.checkInterConnectivity},
+		&test.Unit{"", ebgp.checkFlap},
+	}
+	ebgp.Docket.Test(t)
 }
 
-func (d *docket) checkConnectivity(t *testing.T) {
+func (ebgp *ebgp) checkConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -65,25 +66,25 @@ func (d *docket) checkConnectivity(t *testing.T) {
 		{"R4", "192.168.222.10"},
 		{"R4", "192.168.2.4"},
 	} {
-		out, err := d.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		out, err := ebgp.ExecCmd(t, x.host, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 	}
 }
 
-func (d *docket) checkBgp(t *testing.T) {
+func (ebgp *ebgp) checkBgp(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
-	for _, r := range d.Config.Routers {
+	for _, r := range ebgp.Routers {
 		t.Logf("Checking gobgp on %v", r.Hostname)
-		out, err := d.ExecCmd(t, r.Hostname, "ps", "ax")
+		out, err := ebgp.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*gobgpd.*")
 		assert.Match(out, ".*zebra.*")
 	}
 }
 
-func (d *docket) checkNeighbors(t *testing.T) {
+func (ebgp *ebgp) checkNeighbors(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -103,7 +104,7 @@ func (d *docket) checkNeighbors(t *testing.T) {
 		timeout := 120
 
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := ebgp.ExecCmd(t, x.hostname,
 				"/root/gobgp", "neighbor", x.peer)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, ".*state = established.*") {
@@ -116,13 +117,13 @@ func (d *docket) checkNeighbors(t *testing.T) {
 		if !found {
 			t.Fatalf("No bgp peer established for %v", x.hostname)
 		}
-		_, err := d.ExecCmd(t, x.hostname,
+		_, err := ebgp.ExecCmd(t, x.hostname,
 			"/root/gobgp", "global", "rib")
 		assert.Nil(err)
 	}
 }
 
-func (d *docket) checkRoutes(t *testing.T) {
+func (ebgp *ebgp) checkRoutes(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -156,7 +157,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 		found := false
 		timeout := 60
 		for i := timeout; i > 0; i-- {
-			out, err := d.ExecCmd(t, x.hostname,
+			out, err := ebgp.ExecCmd(t, x.hostname,
 				"vtysh", "-c", "show ip route "+x.route)
 			assert.Nil(err)
 			if !assert.MatchNonFatal(out, x.route) {
@@ -172,7 +173,7 @@ func (d *docket) checkRoutes(t *testing.T) {
 	}
 }
 
-func (d *docket) checkInterConnectivity(t *testing.T) {
+func (ebgp *ebgp) checkInterConnectivity(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, x := range []struct {
@@ -207,17 +208,17 @@ func (d *docket) checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.1.10"},
 		{"R4", "192.168.2.2"},
 	} {
-		out, err := d.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		out, err := ebgp.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
 		assert.Nil(err)
 		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 	}
 }
 
-func (d *docket) checkFlap(t *testing.T) {
+func (ebgp *ebgp) checkFlap(t *testing.T) {
 	assert := test.Assert{t}
 
-	for _, r := range d.Config.Routers {
+	for _, r := range ebgp.Routers {
 		for _, i := range r.Intfs {
 			var intf string
 			if i.Vlan != "" {
@@ -225,11 +226,11 @@ func (d *docket) checkFlap(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			_, err := d.ExecCmd(t, r.Hostname,
+			_, err := ebgp.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "down", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)
-			_, err = d.ExecCmd(t, r.Hostname,
+			_, err = ebgp.ExecCmd(t, r.Hostname,
 				"ip", "link", "set", "up", intf)
 			assert.Nil(err)
 			time.Sleep(1 * time.Second)

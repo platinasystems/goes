@@ -15,8 +15,8 @@ import (
 var Suite = test.Suite{
 	Name: "xeth",
 	Tests: test.Tests{
-		&test.UnitTest{"bad-names", badNames},
-		&test.UnitTest{"good-names", goodNames},
+		&test.Unit{"bad-names", badNames},
+		&test.Unit{"good-names", goodNames},
 	},
 }
 
