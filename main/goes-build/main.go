@@ -51,7 +51,7 @@ const (
 	mainGoesPlatinaMk2Lc1Bmc = mainGoesPrefix + "platina-mk2-lc1-bmc"
 	mainGoesPlatinaMk2Mc1Bmc = mainGoesPrefix + "platina-mk2-mc1-bmc"
 
-	systemBuildSubmodules = "../system-build/src"
+	systemBuildSubmodules = "github.com/platinasystems/system-build/src"
 
 	corebootExampleAmd64        = "coreboot-example-amd64"
 	corebootExampleAmd64Config  = "example-amd64_defconfig"
@@ -196,6 +196,7 @@ plugin	use pre-compiled proprietary packages
 		goesPlatinaMk2Mc1Bmc:        makeArmLinuxStatic,
 		linuxKernelPlatinaMk2Mc1Bmc: makeArmLinuxKernel,
 	}
+	gopath = "${HOME}/go"
 )
 
 func main() {
@@ -210,6 +211,10 @@ func main() {
 			targets = append(targets, target)
 		}
 	}
+	if p, f := os.LookupEnv("GOPATH"); f {
+		gopath = p
+	}
+	fmt.Printf("GOPATH = %s\n", gopath)
 	err := host.godo("generate", "github.com/platinasystems/go")
 	defer func() {
 		if err != nil {
@@ -733,7 +738,7 @@ func configWorktree(gitpath string, repo string, machine string, config string) 
 		if err := shellCommand("mkdir -p " + dir +
 			" && cd " + dir +
 			" && p=`pwd` " +
-			" && cd ../../../" + gitpath + "/" + repo +
+			" && cd " + filepath.Join(gopath, "src", gitpath, repo) +
 			" && ( git worktree prune ; git branch -d " + machine +
 			" ; git worktree add $p || git clone . $p )" +
 			" && cd $p" +
