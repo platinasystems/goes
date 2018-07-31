@@ -66,7 +66,7 @@ xeth_add()
 }
 
 xeth_netport_add() {
-    xeth_list=$(grep -o " .eth.*" testdata/netport.yaml)
+    xeth_list=$(grep -o " .eth.*" netport.yaml)
     xeth_add
     xeth_flap $xeth_list
 }

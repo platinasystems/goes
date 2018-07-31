@@ -6,30 +6,33 @@ if ! [ $(id -u) = 0 ]; then
 fi
 
 # document all known issues on same line as test
-testcases=("Test/vnet.ready"
-           "Test/nodocker/twohost"
-           "Test/nodocker/onerouter"
-           "Test/docker/net/slice/vlan" # --- FAIL: Test/docker/net/slice/vlan/stress-pci (reboot to recover)
-           "Test/docker/net/dhcp/eth"
-           "Test/docker/net/dhcp/vlan"
-           "Test/docker/net/static/eth"  # fails if add before ping
-           "Test/docker/net/static/vlan" # fails if add before ping
-           "Test/docker/frr/ospf/eth"
-           "Test/docker/frr/ospf/vlan"
-           "Test/docker/frr/isis/eth"
-           "Test/docker/frr/isis/vlan"
-           "Test/docker/frr/bgp/eth"
-           "Test/docker/frr/bgp/vlan"
-           "Test/docker/bird/bgp/eth"
-           "Test/docker/bird/bgp/vlan"
-           "Test/docker/bird/ospf/eth"
-           "Test/docker/bird/ospf/vlan" # --- FAIL: Test/docker/bird/ospf/vlan/connectivity (RTA_MULTIPATH w/out gw)
-           "Test/docker/gobgp/ebgp/eth"
-           "Test/docker/gobgp/ebgp/vlan")
+testcases=("Test/xeth/bad-names"
+	   "Test/xeth/good-names"
+	   "Test/vnet/ready"
+	   "Test/vnet/nodocker/twohost"
+	   "Test/vnet/nodocker/onerouter"
+	   "Test/vnet/docker/bird/bgp/eth"
+	   "Test/vnet/docker/bird/bgp/vlan"
+	   "Test/vnet/docker/bird/ospf/eth"
+	   "Test/vnet/docker/bird/ospf/vlan" # --- FAIL: Test/docker/bird/ospf/vlan/connectivity (RTA_MULTIPATH w/out gw)
+	   "Test/vnet/docker/frr/bgp/eth"
+	   "Test/vnet/docker/frr/bgp/vlan"
+	   "Test/vnet/docker/frr/isis/eth"
+	   "Test/vnet/docker/frr/isis/vlan"
+	   "Test/vnet/docker/frr/ospf/eth"
+	   "Test/vnet/docker/frr/ospf/vlan"
+	   "Test/vnet/docker/gobgp/ebgp/eth"
+	   "Test/vnet/docker/gobgp/ebgp/vlan"
+	   "Test/vnet/docker/net/slice/vlan" # --- FAIL: Test/docker/net/slice/vlan/stress-pci (reboot to recover)
+	   "Test/vnet/docker/net/dhcp/eth"
+	   "Test/vnet/docker/net/dhcp/vlan"
+	   "Test/vnet/docker/net/static/eth"
+	   "Test/vnet/docker/net/static/vlan")
 
-tester=./goes-platina-mk1.test
+tester=../goes-platina-mk1.test
 
 quit=0
+fails=0
 
 sigint() {
     echo "quit after current testcase"
@@ -45,7 +48,6 @@ fix_it() {
   docker stop CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   docker rm -v CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   ip -all netns del
-  echo
   ./mk1_util.sh test_init
 }
 
@@ -85,9 +87,9 @@ count=0
 for t in ${test_range}; do
     log=${t//\//_}.out
     count=$(($count+1))
-    printf "Running %27s " $t" ($count of $test_count) {"
+    printf "Running %46s " $t" ($count of $test_count) : "
     fix_it
-    ${tester} -test.v -test.run=$t > /tmp/out 2>&1
+    ${tester} -test.cd .. -test.v -test.run=$t > /tmp/out 2>&1
 
     if [ $? == 0 ]; then
         echo "OK"
@@ -99,14 +101,16 @@ for t in ${test_range}; do
         else
             echo "Failed"
         fi
+	fails=$(($fails+1))
     fi
-    echo "} $t Completed"
 
     if [ "$quit" -eq 1 ]; then
         echo "Aborted"
         break
     fi
 done
+echo
+echo "$fails testcase(s) failed."
 
 fix_it
 
