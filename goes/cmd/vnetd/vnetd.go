@@ -135,12 +135,14 @@ func (c *Command) Close() (err error) {
 }
 
 func (i *Info) init() {
+	const defaultPollInterval = 5
 	i.poller.i = i
 	i.poller.addEvent(0)
-	i.poller.pollInterval = 5 // default 5 seconds
-	i.initialPublish()
+	i.poller.pollInterval = defaultPollInterval
+	i.pubHwIfConfig()
 	i.set("ready", "true", true)
 	i.poller.pubch <- fmt.Sprint("poll.max-channel-depth: ", chanDepth)
+	i.poller.pubch <- fmt.Sprint("pollInterval: ", defaultPollInterval)
 
 }
 
@@ -317,23 +319,51 @@ func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 	return
 }
 
-func (i *Info) initialPublish() {
-	v := &i.v
-	v.ForeachHwIf(UnixInterfacesOnly, func(hi vnet.Hi) {
-		h := v.HwIf(hi)
-		i.poller.pubch <- fmt.Sprint(hi.Name(v), ".speed: ", h.Speed().String())
-		i.poller.pubch <- fmt.Sprint(hi.Name(v), ".media: ", h.Media())
-		if h, ok := v.HwIfer(hi).(ethernet.HwInterfacer); ok {
-			i.poller.pubch <- fmt.Sprint(hi.Name(v), ".fec: ", h.GetInterface().ErrorCorrectionType.String())
-		}
-	})
-	i.poller.pubch <- fmt.Sprint("pollInterval: ", i.poller.pollInterval)
-}
-
 func (i *Info) gopublish() {
 	for s := range i.poller.pubch {
 		i.pub.Print("vnet.", s)
 	}
+}
+
+type hwIfConfig struct {
+	speed string
+	media string
+	fec   string
+}
+
+var prevHwIfConfig map[string]*hwIfConfig
+
+func (i *Info) pubHwIfConfig() {
+	v := &i.v
+	if prevHwIfConfig == nil {
+		prevHwIfConfig = make(map[string]*hwIfConfig)
+	}
+	v.ForeachHwIf(UnixInterfacesOnly, func(hi vnet.Hi) {
+		h := v.HwIf(hi)
+		ifname := hi.Name(v)
+		speed := h.Speed().String()
+		media := h.Media()
+		entry, found := prevHwIfConfig[ifname]
+		if !found {
+			entry = new(hwIfConfig)
+			prevHwIfConfig[ifname] = entry
+		}
+		if speed != prevHwIfConfig[ifname].speed {
+			prevHwIfConfig[ifname].speed = speed
+			i.poller.pubch <- fmt.Sprint(ifname, ".speed: ", speed)
+		}
+		if media != prevHwIfConfig[ifname].media {
+			prevHwIfConfig[ifname].media = media
+			i.poller.pubch <- fmt.Sprint(ifname, ".media: ", media)
+		}
+		if h, ok := v.HwIfer(hi).(ethernet.HwInterfacer); ok {
+			fec := h.GetInterface().ErrorCorrectionType.String()
+			if fec != prevHwIfConfig[ifname].fec {
+				prevHwIfConfig[ifname].fec = fec
+				i.poller.pubch <- fmt.Sprint(ifname, ".fec: ", fec)
+			}
+		}
+	})
 }
 
 // One per each hw/sw interface from vnet.
@@ -382,6 +412,9 @@ func (p *ifStatsPoller) EventAction() {
 	start := time.Now()
 	p.pubch <- fmt.Sprint("poll.start.time: ", start.Format(time.StampMilli))
 	p.pubch <- fmt.Sprint("poll.start.channel-length: ", len(p.pubch))
+
+	p.i.pubHwIfConfig()
+
 	// Publish all sw/hw interface counters even with zero values for first poll.
 	// This was all possible counters have valid values in redis.
 	// Otherwise only publish to redis when counter values change.
