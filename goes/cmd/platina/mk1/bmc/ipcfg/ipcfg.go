@@ -31,7 +31,7 @@ func (Command) Usage() string { return "ipcfg [-ip]" }
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "set bmc ip address, via bootargs ip=",
+		lang.EnUS: "set the bmc ip address, via bootargs ip=",
 	}
 }
 
@@ -39,7 +39,15 @@ func (Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
-        The ipcfg command sets bmc ip address, via bootargs ip="`,
+        The ipcfg command sets the bmc ip address.
+
+		The ip address will be updated in both QSPI0 and QSPI1.
+
+		The value is stored in the "ip" string in u-boot "bootargs"
+		environment variable.
+
+		Example:
+		ipcfg -ip 192.168.101.241::192.168.101.2:255.255.255.0::eth0:on`,
 	}
 }
 
