@@ -544,7 +544,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 	is_del := false
 	switch msg.Header.Type {
 	case netlink.RTM_NEWLINK:
-		if true {
+		if false {
 			fmt.Printf("add_del_interface(): newlink for %s in ns %s\n",
 				msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
 		}
@@ -553,8 +553,10 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			// since we don't handle dynamic port-provisioning (via ethtool) yet.
 			if _, found := vnet.Ports[msg.Attrs[netlink.IFLA_IFNAME].String()]; !found &&
 				msg.InterfaceKind() != netlink.InterfaceKindVlan {
-				fmt.Printf("add_del_interface(): Interface created dynamically - ignored %s (%s)\n",
-					msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
+				if false {
+					fmt.Printf("add_del_interface(): Interface created dynamically - ignored %s (%s)\n",
+						msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
+				}
 				return
 			}
 		}
@@ -1099,7 +1101,9 @@ func (ns *net_namespace) addNs(m *net_namespace_main) (err error) {
 	}()
 
 	if _, ok := m.namespace_by_name[ns.name]; ok {
-		fmt.Printf("namespace add, %s, already exist\n", ns.name)
+		if false {
+			fmt.Printf("namespace add, %s, already exist\n", ns.name)
+		}
 		return
 	}
 	ns.fibInit(false)

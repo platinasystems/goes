@@ -470,7 +470,9 @@ func (e *netlinkEvent) EventAction() {
 				switch v.Family {
 				case netlink.AF_INET:
 					known = true
-					fmt.Printf("********* ifAddrMsg %s: netlink %s\n", e.ns, msg)
+					if false {
+						fmt.Printf("********* ifAddrMsg %s: netlink %s\n", e.ns, msg)
+					}
 					err = e.ip4IfaddrMsg(v)
 				case netlink.AF_INET6:
 					known = true
@@ -482,7 +484,9 @@ func (e *netlinkEvent) EventAction() {
 				switch v.Family {
 				case netlink.AF_INET:
 					known = true
-					fmt.Printf("********* ip4RouteMsg %s: netlink %s\n", e.ns, msg)
+					if false {
+						fmt.Printf("********* ip4RouteMsg %s: netlink %s\n", e.ns, msg)
+					}
 					err = e.ip4RouteMsg(v, isLastInEvent)
 				case netlink.AF_INET6:
 					known = true

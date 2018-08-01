@@ -29,7 +29,7 @@ import (
 )
 
 var FdbOn bool
-var IfinfoDebug bool = true
+var IfinfoDebug bool
 var IfaddrDebug bool
 var FibentryDebug bool
 var NeighDebug bool
