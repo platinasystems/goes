@@ -420,12 +420,10 @@ func (p *mk1Main) getDefaultLanes(port, subport uint) (lanes uint) {
 type spList []uint
 
 func subportsmatchingPort(targetport uint) (numsubports uint, subportlist spList) {
-	var port, subport uint
 	subportlist = []uint{0xf, 0xf, 0xf, 0xf}
-	for ifname, _ := range vnet.Ports {
-		fmt.Sscanf(ifname, "eth-%d-%d", &port, &subport)
-		if port == targetport {
-			subportlist[numsubports] = subport
+	for _, pe := range vnet.Ports {
+		if pe.Portindex == int16(targetport) {
+			subportlist[numsubports] = uint(pe.Subportindex)
 			numsubports++
 		}
 	}
