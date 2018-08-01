@@ -16,6 +16,20 @@ type Tester interface {
 
 type Tests []Tester
 
+// Named Tests use testing.T.Run() but unnamed Tests ("") are run directly.
+func (tests Tests) Test(t *testing.T) {
+	for _, x := range tests {
+		if t.Failed() {
+			break
+		}
+		if len(x.String()) > 0 {
+			t.Run(x.String(), x.Test)
+		} else {
+			x.Test(t)
+		}
+	}
+}
+
 type Suite struct {
 	Name string
 	Init func(*testing.T)
@@ -39,8 +53,6 @@ func (suite *Suite) exit(t *testing.T) {
 	}
 }
 
-// The Suite's named Tests are run through testing.T.Run();
-// unnamed Tests (aka. "") are run directly.
 func (suite Suite) Test(t *testing.T) {
 	if *DryRun {
 		fmt.Println(t.Name())
@@ -48,16 +60,7 @@ func (suite Suite) Test(t *testing.T) {
 		defer suite.exit(t)
 		suite.init(t)
 	}
-	for _, x := range suite.Tests {
-		if t.Failed() {
-			break
-		}
-		if len(x.String()) > 0 {
-			t.Run(x.String(), x.Test)
-		} else {
-			x.Test(t)
-		}
-	}
+	suite.Tests.Test(t)
 }
 
 type Unit struct {

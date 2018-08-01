@@ -61,6 +61,10 @@ func (d *Docket) Test(t *testing.T) {
 		if t.Failed() {
 			break
 		}
-		t.Run(x.String(), x.Test)
+		if len(x.String()) > 0 {
+			t.Run(x.String(), x.Test)
+		} else {
+			x.Test(t)
+		}
 	}
 }
