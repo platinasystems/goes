@@ -57,14 +57,5 @@ func (d *Docket) Test(t *testing.T) {
 		defer d.Exit(t)
 		d.Init(t)
 	}
-	for _, x := range d.Tests {
-		if t.Failed() {
-			break
-		}
-		if len(x.String()) > 0 {
-			t.Run(x.String(), x.Test)
-		} else {
-			x.Test(t)
-		}
-	}
+	d.Tests.Test(t)
 }
