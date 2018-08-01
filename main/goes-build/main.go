@@ -214,7 +214,6 @@ func main() {
 	if p, f := os.LookupEnv("GOPATH"); f {
 		gopath = p
 	}
-	fmt.Printf("GOPATH = %s\n", gopath)
 	err := host.godo("generate", "github.com/platinasystems/go")
 	defer func() {
 		if err != nil {
