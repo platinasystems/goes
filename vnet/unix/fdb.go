@@ -635,7 +635,10 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 		pe.Vid = msg.Id
 		copy(pe.Addr[:], msg.Addr[:])
 		pe.Portindex = msg.Portindex
-		pe.Subportindex = msg.Subportindex
+		// -1 is unspecified - from driver
+		if msg.Subportindex >= 0 {
+			pe.Subportindex = msg.Subportindex
+		}
 		pe.PuntIndex = puntIndex
 		if IfinfoDebug {
 			fmt.Println("XETH_MSG_KIND_IFINFO: Prevnetd:", ifname.String(), msg.Ifindex, msg.Portindex, msg.Subportindex, msg.Devtype, msg.Id)
