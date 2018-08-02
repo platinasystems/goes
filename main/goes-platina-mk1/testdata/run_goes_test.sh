@@ -48,7 +48,7 @@ fix_it() {
   docker stop CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   docker rm -v CA-1 RA-1 RA-2 CA-2 CB-1 RB-1 RB-2 CB-2 > /dev/null 2>&1
   ip -all netns del
-  ./mk1_util.sh test_init
+  ./xeth_util.sh test_init
 }
 
 if [ "$1" == "list" ]; then
