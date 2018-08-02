@@ -58,6 +58,7 @@ type Rtn uint8
 func (rtn Rtn) String() string {
 	var rtns = []string{
 		"unspec",
+		"unicast",
 		"local",
 		"broadcast",
 		"anycast",
