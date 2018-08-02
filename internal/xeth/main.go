@@ -106,7 +106,7 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 				panic(fmt.Errorf("DB %q unknown\n%s",
 					args[1], usage))
 			}
-			if err := xeth.UntilBreak(dump, true); err != nil {
+			if err := xeth.UntilBreak(dump); err != nil {
 				panic(err)
 			}
 			args = args[2:]

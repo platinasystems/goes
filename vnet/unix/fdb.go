@@ -109,19 +109,21 @@ func initVnetFromXeth(v *vnet.Vnet) {
 	// Send events for initial dump of fib entries
 	fe := fdbm.GetEvent(vnet.Dynamic)
 	vnet.Xeth.DumpFib()
-	vnet.Xeth.UntilBreak(func(buf []byte) error {
-		ok := fe.EnqueueMsg(buf)
-		if !ok {
-			// filled event with messages so send event and start a new one
+	for buf := range vnet.Xeth.RxCh {
+		kind := xeth.KindOf(buf)
+		if kind == xeth.XETH_MSG_KIND_BREAK {
+			xeth.Pool.Put(buf)
+			break
+		}
+		if ok := fe.EnqueueMsg(buf); !ok {
+			// filled event with messages so send it and continue
 			fe.Signal()
 			fe = fdbm.GetEvent(vnet.Dynamic)
-			ok := fe.EnqueueMsg(buf)
-			if !ok {
-				panic("Initial DumpFib: Re-enqueue of msg failed")
+			if ok = fe.EnqueueMsg(buf); !ok {
+				panic("DumpFib: Re-enqueue of msg failed")
 			}
 		}
-		return nil
-	}, false)
+	}
 	fe.Signal()
 
 	// Start go routine that drains XETH socket and shuttles msgs over to vnetd loop

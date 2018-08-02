@@ -161,7 +161,7 @@ func vnetdInit() {
 			fmt.Println("Error processing xeth msg:", xeth.KindOf(buf), err)
 		}
 		return nil
-	}, true)
+	})
 	if err != nil {
 		panic(err)
 	}
