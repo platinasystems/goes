@@ -28,66 +28,63 @@ import (
 	"syscall"
 )
 
-const CacheLineSize = 64
-
 var PageSize = syscall.Getpagesize()
 
-var size = struct{ small, medium, large int }{
-	small:  64,
-	medium: PageSize,
-	large:  SizeofJumboFrame,
+type BufPool struct {
+	cap int
+	sync.Pool
 }
 
-type pools struct {
-	small, medium, large sync.Pool
-}
+type BufPools []*BufPool
 
-var Pool = pools{
-	small: sync.Pool{
+var Pool = BufPools{
+	&BufPool{64, sync.Pool{
 		New: func() interface{} {
-			return make([]byte, size.small, size.small)
+			return make([]byte, 64, 64)
 		},
-	},
-	medium: sync.Pool{
+	}},
+	&BufPool{128, sync.Pool{
 		New: func() interface{} {
-			return make([]byte, size.medium, size.medium)
+			return make([]byte, 128, 128)
 		},
-	},
-	large: sync.Pool{
+	}},
+	&BufPool{1024, sync.Pool{
 		New: func() interface{} {
-			return make([]byte, size.large, size.large)
+			return make([]byte, 1024, 1024)
 		},
-	},
+	}},
+	&BufPool{PageSize, sync.Pool{
+		New: func() interface{} {
+			return make([]byte, PageSize, PageSize)
+		},
+	}},
+	&BufPool{SizeofJumboFrame, sync.Pool{
+		New: func() interface{} {
+			return make([]byte, SizeofJumboFrame, SizeofJumboFrame)
+		},
+	}},
 }
 
-func (p *pools) Get(n int) []byte {
-	var buf []byte
-	switch {
-	case n <= size.small:
-		buf = p.small.Get().([]byte)
-	case n <= size.medium:
-		buf = p.medium.Get().([]byte)
-	case n <= size.large:
-		buf = p.large.Get().([]byte)
-	default:
-		panic(fmt.Errorf("can't pool %d byte buffer", n))
+func (pools BufPools) Get(n int) []byte {
+	for _, pool := range pools {
+		if n < pool.cap {
+			buf := pool.Get().([]byte)
+			// Optimised by compiler
+			for i := range buf {
+				buf[i] = 0
+			}
+			return buf[:n]
+		}
 	}
-	// Optimised by compiler
-	for i := range buf {
-		buf[i] = 0
-	}
-	return buf[:n]
+	panic(fmt.Errorf("no pool for %d byte buffer", n))
 }
 
-func (p *pools) Put(buf []byte) {
-	switch cap(buf) {
-	case size.small:
-		p.small.Put(buf)
-	case size.medium:
-		p.medium.Put(buf)
-	case size.large:
-		p.large.Put(buf)
-	default:
-		panic(fmt.Errorf("unexpected buf cap: %d", cap(buf)))
+func (pools BufPools) Put(buf []byte) {
+	for _, pool := range pools {
+		if cap(buf) == pool.cap {
+			pool.Put(buf)
+			return
+		}
 	}
+	panic(fmt.Errorf("no pool for %d cap buffer", cap(buf)))
 }
