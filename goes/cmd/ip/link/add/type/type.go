@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/vlan"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/vrf"
 	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/vxlan"
+	"github.com/platinasystems/go/goes/cmd/ip/link/add/type/xeth"
 	"github.com/platinasystems/go/goes/lang"
 )
 
@@ -54,6 +55,7 @@ TYPES
 	vlan - 802.1q tagged virtual LAN interface
 	vrf - Virtual Routing and Forwarding device
 	vxlan - Virtual eXtended LAN
+	xeth - ethernet multiplexor
 
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
@@ -61,7 +63,6 @@ SEE ALSO
 	man ip || ip -man`,
 	},
 	ByName: map[string]cmd.Cmd{
-		"":          basic.Command(""), // implies machine.Name
 		"bridge":    bridge.Command{},
 		"dummy":     basic.Command("dummy"),
 		"geneve":    geneve.Command{},
@@ -80,5 +81,6 @@ SEE ALSO
 		"vlan":      vlan.Command{},
 		"vrf":       vrf.Command{},
 		"vxlan":     vxlan.Command{},
+		"xeth":      xeth.Command{},
 	},
 }

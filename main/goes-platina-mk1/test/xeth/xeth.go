@@ -39,7 +39,7 @@ func badNames(t *testing.T) {
 		"xethbr.4095",
 	} {
 		assert.ProgramErr(true, test.Self{},
-			"ip", "link", "add", name, "type", "platina-mk1")
+			"ip", "link", "add", name, "type", "xeth")
 	}
 }
 
@@ -55,7 +55,7 @@ func goodNames(t *testing.T) {
 		fmt.Sprintf("xeth%d.100t", base+2),
 	} {
 		assert.Program(test.Self{},
-			"ip", "link", "add", name, "type", "platina-mk1")
+			"ip", "link", "add", name, "type", "xeth")
 		defer cleanup.Program(test.Self{},
 			"ip", "link", "del", name)
 	}

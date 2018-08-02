@@ -32,6 +32,6 @@ func Init(assert test.Assert) {
 			continue
 		}
 		assert.Program(2*time.Second, test.Self{},
-			"ip", "link", "add", port, "type", "platina-mk1")
+			"ip", "link", "add", port, "type", "xeth")
 	}
 }

@@ -72,8 +72,7 @@ var expMsgSz = map[Kind]int{
 //				number of devices * number of stats
 //	DialOpt		if false, don't dial until Assert()
 func New(driver string, opts ...interface{}) (*Xeth, error) {
-	addr, err := net.ResolveUnixAddr(netname,
-		fmt.Sprintf("@%s/xeth", driver))
+	addr, err := net.ResolveUnixAddr(netname, "@xeth")
 	if err != nil {
 		return nil, err
 	}

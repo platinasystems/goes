@@ -29,7 +29,7 @@ var suite = test.Suite{
 
 		b, err := ioutil.ReadFile("/proc/net/unix")
 		assert.Nil(err)
-		if bytes.Index(b, []byte("@platina-mk1/xeth")) >= 0 {
+		if bytes.Index(b, []byte("@xeth")) >= 0 {
 			assert.Program("rmmod", "platina-mk1")
 		}
 		modprobe := []string{"modprobe", "platina-mk1"}

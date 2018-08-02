@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package basic
+package xeth
 
 import (
 	"fmt"
@@ -14,38 +14,34 @@ import (
 	"github.com/platinasystems/go/internal/nl/rtnl"
 )
 
-type Command string
+type Command struct{}
 
-func (c Command) String() string { return string(c) }
+func (Command) String() string { return "xeth" }
 
-func (c Command) Usage() string {
-	return fmt.Sprint("ip link add type ", c,
-		` [[ name ] NAME ] [ OPTION... ]`)
+func (Command) Usage() string {
+	return fmt.Sprint("ip link add type xeth [ OPTION ]...")
 }
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "add a basic virtual link",
+		lang.EnUS: "add an ethernet multiplexor",
 	}
 }
 
 func (Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
-BASIC TYPES
-	dummy - Dummy network interface
-	ifb - Intermediate Functional Block device
-	vcan - Virtual Controller Area Network interface
+OPTIONS
+	[name] NAME
 
 SEE ALSO
-	ip link add type man TYPE || ip link add type TYPE -man
+	ip link add type man xeth || ip link add type xeth -man
 	ip link man add || ip link add -man
 	man ip || ip -man`,
 	}
 }
 
-func (c Command) Main(args ...string) error {
-	kind := string(c)
+func (Command) Main(args ...string) error {
 	opt, args := options.New(args)
 	sock, err := nl.NewSock()
 	if err != nil {
@@ -65,7 +61,7 @@ func (c Command) Main(args ...string) error {
 	}
 
 	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO,
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(kind)}})
+		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("xeth")}})
 
 	req, err := add.Message()
 	if err == nil {
