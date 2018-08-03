@@ -37,11 +37,12 @@ var Suite = test.Suite{
 
 func (dhcp *dhcp) Test(t *testing.T) {
 	dhcp.Docket.Tests = test.Tests{
-		&test.Unit{"", dhcp.checkConnectivity},
-		&test.Unit{"", dhcp.checkServer},
-		&test.Unit{"", dhcp.checkClient},
-		&test.Unit{"", dhcp.checkConnectivity2},
-		&test.Unit{"", dhcp.checkVlanTag},
+		&test.Unit{"check connectivity", dhcp.checkConnectivity},
+		&test.Unit{"check dhcp server", dhcp.checkServer},
+		&test.Unit{"check dhcp client", dhcp.checkClient},
+		&test.Unit{"check connectivity again",
+			dhcp.checkConnectivity2},
+		&test.Unit{"check vlan tag", dhcp.checkVlanTag},
 	}
 	dhcp.Docket.Test(t)
 }

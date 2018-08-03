@@ -36,12 +36,13 @@ var Suite = test.Suite{
 
 func (ospf *ospf) Run(t *testing.T) {
 	ospf.Docket.Tests = test.Tests{
-		&test.Unit{"", ospf.checkConnectivity},
-		&test.Unit{"", ospf.checkBird},
-		&test.Unit{"", ospf.checkNeighbors},
-		&test.Unit{"", ospf.checkRoutes},
-		&test.Unit{"", ospf.checkInterConnectivity},
-		&test.Unit{"", ospf.checkFlap},
+		&test.Unit{"check connectivity", ospf.checkConnectivity},
+		&test.Unit{"check bird", ospf.checkBird},
+		&test.Unit{"check neighbors", ospf.checkNeighbors},
+		&test.Unit{"check routes", ospf.checkRoutes},
+		&test.Unit{"check interconnectivity",
+			ospf.checkInterConnectivity},
+		&test.Unit{"check flap", ospf.checkFlap},
 	}
 	ospf.Docket.Test(t)
 }

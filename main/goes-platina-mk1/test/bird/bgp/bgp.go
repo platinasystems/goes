@@ -36,12 +36,13 @@ var Suite = test.Suite{
 
 func (bgp *bgp) Test(t *testing.T) {
 	bgp.Docket.Tests = test.Tests{
-		&test.Unit{"", bgp.checkConnectivity},
-		&test.Unit{"", bgp.checkBird},
-		&test.Unit{"", bgp.checkNeighbors},
-		&test.Unit{"", bgp.checkRoutes},
-		&test.Unit{"", bgp.checkInterConnectivity},
-		&test.Unit{"", bgp.checkFlap},
+		&test.Unit{"check connectivity", bgp.checkConnectivity},
+		&test.Unit{"check bird", bgp.checkBird},
+		&test.Unit{"check neighbors", bgp.checkNeighbors},
+		&test.Unit{"check routes", bgp.checkRoutes},
+		&test.Unit{"check interconnectivity",
+			bgp.checkInterConnectivity},
+		&test.Unit{"check flap", bgp.checkFlap},
 	}
 	bgp.Docket.Test(t)
 }

@@ -31,13 +31,14 @@ var Suite = test.Suite{
 
 func (slice *slice) Test(t *testing.T) {
 	slice.Docket.Tests = test.Tests{
-		&test.Unit{"", slice.checkConnectivity},
-		&test.Unit{"", slice.checkFrr},
-		&test.Unit{"", slice.checkRoutes},
-		&test.Unit{"", slice.checkInterConnectivity},
-		&test.Unit{"", slice.checkIsolation},
-		&test.Unit{"", slice.checkStress},
-		&test.Unit{"", slice.checkStressPci},
+		&test.Unit{"check connectivity", slice.checkConnectivity},
+		&test.Unit{"check FRR", slice.checkFrr},
+		&test.Unit{"check routes", slice.checkRoutes},
+		&test.Unit{"check interconnectivity",
+			slice.checkInterConnectivity},
+		&test.Unit{"check isolation", slice.checkIsolation},
+		&test.Unit{"check punt stress", slice.checkStress},
+		&test.Unit{"check pci punt stress", slice.checkStressPci},
 	}
 	slice.Docket.Test(t)
 }

@@ -37,13 +37,15 @@ var Suite = test.Suite{
 
 func (static *static) Test(t *testing.T) {
 	static.Docket.Tests = test.Tests{
-		&test.Unit{"", static.checkConnectivity},
-		&test.Unit{"", static.checkFrr},
-		&test.Unit{"", static.checkRoutes},
-		&test.Unit{"", static.checkInterConnectivity},
-		&test.Unit{"", static.checkFlap},
-		&test.Unit{"", static.checkInterConnectivity2},
-		&test.Unit{"", static.checkPuntStress},
+		&test.Unit{"check connectivity", static.checkConnectivity},
+		&test.Unit{"check FRR", static.checkFrr},
+		&test.Unit{"check routes", static.checkRoutes},
+		&test.Unit{"check interconnectivity",
+			static.checkInterConnectivity},
+		&test.Unit{"check flap", static.checkFlap},
+		&test.Unit{"check interconnectivity again",
+			static.checkInterConnectivity2},
+		&test.Unit{"check punt stress", static.checkPuntStress},
 	}
 }
 

@@ -36,13 +36,14 @@ var Suite = test.Suite{
 
 func (isis *isis) Test(t *testing.T) {
 	isis.Docket.Tests = test.Tests{
-		&test.Unit{"", isis.checkConnectivity},
-		&test.Unit{"", isis.checkFrr},
-		&test.Unit{"", isis.addIntfConf},
-		&test.Unit{"", isis.checkNeighbors},
-		&test.Unit{"", isis.checkRoutes},
-		&test.Unit{"", isis.checkInterConnectivity},
-		&test.Unit{"", isis.checkFlap},
+		&test.Unit{"check connectivity", isis.checkConnectivity},
+		&test.Unit{"check FRR", isis.checkFrr},
+		&test.Unit{"add interface config", isis.addIntfConf},
+		&test.Unit{"check neighbors", isis.checkNeighbors},
+		&test.Unit{"check routes", isis.checkRoutes},
+		&test.Unit{"check interconnectivity",
+			isis.checkInterConnectivity},
+		&test.Unit{"check flap", isis.checkFlap},
 	}
 	isis.Docket.Test(t)
 }
