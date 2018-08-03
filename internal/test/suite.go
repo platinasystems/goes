@@ -6,6 +6,7 @@ package test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -16,17 +17,12 @@ type Tester interface {
 
 type Tests []Tester
 
-// Named Tests use testing.T.Run() but unnamed Tests ("") are run directly.
 func (tests Tests) Test(t *testing.T) {
 	for _, x := range tests {
 		if t.Failed() {
 			break
 		}
-		if len(x.String()) > 0 {
-			t.Run(x.String(), x.Test)
-		} else {
-			x.Test(t)
-		}
+		t.Run(x.String(), x.Test)
 	}
 }
 
@@ -73,7 +69,7 @@ func (u *Unit) String() string { return u.Name }
 func (u *Unit) Test(t *testing.T) {
 	if !*DryRun {
 		u.Func(t)
-	} else if len(u.Name) > 0 {
+	} else if len(u.Name) > 0 && !strings.Contains(u.Name, " ") {
 		fmt.Println(t.Name())
 	}
 }
