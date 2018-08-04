@@ -128,7 +128,8 @@ xeth_br_show()
 xeth_show()
 {
     for i in $xeth_list; do
-        ip link show $i
+        #ip link show $i
+        ip addr show dev $i
     done
 }
 
@@ -152,6 +153,24 @@ xeth_to_netns()
 
     for i in $xeth_list; do
         ip link set $i netns $netns
+    done
+    ip netns exec $netns ./xeth_util.sh flap
+    ip netns exec $netns ./xeth_util.sh show
+}
+
+xeth_netns_del()
+{
+    for netns in $(ip netns); do
+      ip netns exec $netns ./xeth_util.sh del
+      ip netns del $netns
+    done
+}
+
+xeth_netns_show()
+{
+    for netns in $(ip netns); do
+      echo "netns "$netns
+      ip netns exec $netns ./xeth_util.sh show
     done
 }
 
@@ -229,4 +248,8 @@ elif [ $cmd == "stat" ]; then
     xeth_stat $xeth_list | grep -v " 0$"
 elif [ $cmd == "to_netns" ]; then
     xeth_to_netns $1 $xeth_list
+elif [ $cmd == "netns_del" ]; then
+    xeth_netns_del
+elif [ $cmd == "netns_show" ]; then
+    xeth_netns_show
 fi
