@@ -302,7 +302,7 @@ func makeAmd64CorebootRom(romfile, machine string) (err error) {
 		" -n fallback/payload -t payload -c none -r COREBOOT" +
 		" && mv " + tmprom + " " + romfile +
 		" && " + cbfstool + " " + romfile + " print"
-	if err := shellCommand(cmdline); err != nil {
+	if err := shellCommandRun(cmdline); err != nil {
 		return err
 	}
 	return
@@ -715,7 +715,7 @@ func (goenv *goenv) stripBinary(in string) (out []byte, err error) {
 	return
 }
 
-func shellCommand(cmdline string) (err error) {
+func shellCommand(cmdline string) (cmd *exec.Cmd) {
 	args := []string{"-c", cmdline}
 	if *xFlag {
 		args = append(args, "-x")
@@ -724,8 +724,29 @@ func shellCommand(cmdline string) (err error) {
 	if *nFlag {
 		return nil
 	}
-	cmd := exec.Command("sh", args...)
+	cmd = exec.Command("sh", args...)
 	cmd.Env = os.Environ()
+	return
+}
+
+func shellCommandOutput(cmdline string) (str string, err error) {
+	cmd := shellCommand(cmdline)
+	if cmd == nil {
+		return
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return
+	}
+	str = strings.Trim(string(out), "\n")
+	return
+}
+
+func shellCommandRun(cmdline string) (err error) {
+	cmd := shellCommand(cmdline)
+	if cmd == nil {
+		return
+	}
 	if *zFlag {
 		cmd.Stdout = os.Stdout
 	}
@@ -750,7 +771,7 @@ func configWorktree(repo string, machine string, config string) (workdir string,
 	}
 	workdir = filepath.Join("worktrees", repo, machine)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
-		if err := shellCommand("mkdir -p " + workdir +
+		if err := shellCommandRun("mkdir -p " + workdir +
 			" && cd " + workdir +
 			" && p=`pwd` " +
 			" && cd " + gitdir +
@@ -776,7 +797,7 @@ func (goenv *goenv) makeboot(out string, configCommand string) (err error) {
 	if !*zFlag { // quiet "Skipping submodule and Created CBFS" messages
 		cmdline += " 2>/dev/null"
 	}
-	if err := shellCommand(cmdline); err != nil {
+	if err := shellCommandRun(cmdline); err != nil {
 		return err
 	}
 	return
@@ -792,13 +813,13 @@ func (goenv *goenv) makeLinux(out string, config string) (err error) {
 	if err != nil {
 		return
 	}
-	if err := shellCommand("make -C " + dir + " " + goenv.kernelMakeTarget +
+	if err := shellCommandRun("make -C " + dir + " " + goenv.kernelMakeTarget +
 		" ARCH=" + goenv.kernelArch +
 		" CROSS_COMPILE=" + goenv.gnuPrefix); err != nil {
 		return err
 	}
 	cmdline := "cp " + dir + "/" + goenv.kernelPath + " " + out
-	if err := shellCommand(cmdline); err != nil {
+	if err := shellCommandRun(cmdline); err != nil {
 		return err
 	}
 	return
