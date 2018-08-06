@@ -38,20 +38,10 @@ const (
 
 	fe1so = "fe1.so"
 
-	fe1     = "github.com/platinasystems/fe1"
-	mainFe1 = "github.com/platinasystems/go/main/fe1"
+	fe1     = "fe1"
+	mainFe1 = "go/main/fe1"
 
-	mainGoesPrefix           = "github.com/platinasystems/go/main/goes-"
-	mainGoesExample          = mainGoesPrefix + "example"
-	mainGoesBoot             = mainGoesPrefix + "boot"
-	mainGoesInstaller        = mainGoesPrefix + "installer"
-	mainIP                   = "github.com/platinasystems/go/main/ip"
-	mainGoesPlatinaMk1       = mainGoesPrefix + "platina-mk1"
-	mainGoesPlatinaMk1Bmc    = mainGoesPrefix + "platina-mk1-bmc"
-	mainGoesPlatinaMk2Lc1Bmc = mainGoesPrefix + "platina-mk2-lc1-bmc"
-	mainGoesPlatinaMk2Mc1Bmc = mainGoesPrefix + "platina-mk2-mc1-bmc"
-
-	systemBuildSubmodules = "github.com/platinasystems/system-build/src"
+	systemBuildSubmodules = "system-build/src"
 
 	corebootExampleAmd64        = "coreboot-example-amd64"
 	corebootExampleAmd64Config  = "example-amd64_defconfig"
@@ -90,6 +80,16 @@ type goenv struct {
 }
 
 var (
+	mainGoesPrefix           string
+	mainGoesExample          string
+	mainGoesBoot             string
+	mainGoesInstaller        string
+	mainIP                   string
+	mainGoesPlatinaMk1       string
+	mainGoesPlatinaMk1Bmc    string
+	mainGoesPlatinaMk2Lc1Bmc string
+	mainGoesPlatinaMk2Mc1Bmc string
+
 	defaultTargets = []string{
 		goesExample,
 		linuxKernelExampleAmd64,
@@ -196,11 +196,34 @@ plugin	use pre-compiled proprietary packages
 		goesPlatinaMk2Mc1Bmc:        makeArmLinuxStatic,
 		linuxKernelPlatinaMk2Mc1Bmc: makeArmLinuxKernel,
 	}
-	gopath = "${HOME}/go"
+	gopath      string
+	platinaPath = "github.com/platinasystems/"
 )
 
-func main() {
+func setup() {
+	mainGoesPrefix = filepath.Join(platinaPath, "go/main/goes-")
+	mainGoesExample = mainGoesPrefix + "example"
+	mainGoesBoot = mainGoesPrefix + "boot"
+	mainGoesInstaller = mainGoesPrefix + "installer"
+	mainIP = filepath.Join(platinaPath, "go/main/ip")
+	mainGoesPlatinaMk1 = mainGoesPrefix + "platina-mk1"
+	mainGoesPlatinaMk1Bmc = mainGoesPrefix + "platina-mk1-bmc"
+	mainGoesPlatinaMk2Lc1Bmc = mainGoesPrefix + "platina-mk2-lc1-bmc"
+	mainGoesPlatinaMk2Mc1Bmc = mainGoesPrefix + "platina-mk2-mc1-bmc"
 	flag.Usage = usage
+	if p, f := os.LookupEnv("GOPATH"); f {
+		gopath = p
+	} else {
+		if p, f := os.LookupEnv("HOME"); f {
+			gopath = filepath.Join(p, "go")
+		} else {
+			gopath = "~/go"
+		}
+	}
+}
+
+func main() {
+	setup()
 	flag.Parse()
 	targets := flag.Args()
 	if len(targets) == 0 {
@@ -214,7 +237,7 @@ func main() {
 	if p, f := os.LookupEnv("GOPATH"); f {
 		gopath = p
 	}
-	err := host.godo("generate", "github.com/platinasystems/go")
+	err := host.godo("generate", filepath.Join(platinaPath, "go"))
 	defer func() {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -338,8 +361,8 @@ func makePackage(name string) error {
 
 func makeGoesPlatinaMk1(out, name string) error {
 	args := []string{"build", "-o", out}
-	if have(fe1) {
-		if err := host.godo("generate", fe1); err != nil {
+	if have(filepath.Join(platinaPath, fe1)) {
+		if err := host.godo("generate", filepath.Join(platinaPath, fe1)); err != nil {
 			return err
 		}
 	} else if strings.Index(*tagsFlag, "plugin") < 0 {
@@ -359,12 +382,12 @@ func makeGoesPlatinaMk1Installer(out, name string) error {
 	if err != nil {
 		return err
 	}
-	if have(fe1) && strings.Index(*tagsFlag, "plugin") >= 0 {
-		err = host.godo("generate", fe1)
+	if have(filepath.Join(platinaPath, fe1)) && strings.Index(*tagsFlag, "plugin") >= 0 {
+		err = host.godo("generate", filepath.Join(platinaPath, fe1))
 		if err != nil {
 			return err
 		}
-		err = amd64Linux.godo("build", "-buildmode=plugin", mainFe1)
+		err = amd64Linux.godo("build", "-buildmode=plugin", filepath.Join(platinaPath, mainFe1))
 		if err != nil {
 			return err
 		}
@@ -373,7 +396,7 @@ func makeGoesPlatinaMk1Installer(out, name string) error {
 	if err != nil {
 		return err
 	}
-	if !have(fe1) || strings.Index(*tagsFlag, "plugin") >= 0 {
+	if !have(filepath.Join(platinaPath, fe1)) || strings.Index(*tagsFlag, "plugin") >= 0 {
 		fi, fierr := os.Stat(fe1so)
 		if fierr != nil {
 			fi, fierr = os.Stat("/usr/lib/goes/" + fe1so)
@@ -627,7 +650,7 @@ func chmodx(fn string) error {
 
 func have(pkg string) bool {
 	buf, err := exec.Command("go", "list", pkg).Output()
-	return err == nil && bytes.Equal(bytes.TrimSpace(buf), []byte(fe1))
+	return err == nil && bytes.Equal(bytes.TrimSpace(buf), []byte(filepath.Join(platinaPath, fe1)))
 }
 
 func mv(from, to string) error {
@@ -731,13 +754,15 @@ func shellCommand(cmdline string) (err error) {
 	return
 }
 
-func configWorktree(gitpath string, repo string, machine string, config string) (dir string, err error) {
-	dir = "worktrees/" + repo + "/" + machine
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := shellCommand("mkdir -p " + dir +
-			" && cd " + dir +
+func configWorktree(repo string, machine string, config string) (workdir string, err error) {
+	workdir = filepath.Join("worktrees", repo, machine)
+	gitdir := filepath.Join(gopath, "src", platinaPath,
+		systemBuildSubmodules, repo)
+	if _, err := os.Stat(workdir); os.IsNotExist(err) {
+		if err := shellCommand("mkdir -p " + workdir +
+			" && cd " + workdir +
 			" && p=`pwd` " +
-			" && cd " + filepath.Join(gopath, "src", gitpath, repo) +
+			" && cd " + gitdir +
 			" && ( git worktree prune ; git branch -d " + machine +
 			" ; git worktree add $p || git clone . $p )" +
 			" && cd $p" +
@@ -750,8 +775,7 @@ func configWorktree(gitpath string, repo string, machine string, config string) 
 
 func (goenv *goenv) makeboot(out string, configCommand string) (err error) {
 	machine := strings.TrimPrefix(out, goenv.boot+"-")
-	dir, err := configWorktree(systemBuildSubmodules, goenv.boot,
-		machine, configCommand)
+	dir, err := configWorktree(goenv.boot, machine, configCommand)
 	if err != nil {
 		return
 	}
@@ -772,8 +796,7 @@ func (goenv *goenv) makeLinux(machine string, config string) (err error) {
 		" .config" +
 		" && make oldconfig ARCH=" + goenv.kernelArch
 
-	dir, err := configWorktree(systemBuildSubmodules, "linux",
-		machine, configCommand)
+	dir, err := configWorktree("linux", machine, configCommand)
 	if err != nil {
 		return
 	}
