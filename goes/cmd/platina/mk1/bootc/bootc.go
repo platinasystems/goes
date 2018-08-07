@@ -204,13 +204,13 @@ func (c *Command) Main(args ...string) (err error) {
 		postBootStatus("goes-boot:booting")
 		return nil
 	case "post1b":
-		postBootStatusita("goes-boot:operational")
+		postBootStatus("goes-boot:operational")
 		return nil
 	case "post1c":
-		postBootStatusita("goes-boot:wiping")
+		postBootStatus("goes-boot:wiping")
 		return nil
 	case "post2":
-		postGetInvaderConfig()
+		postGetInvaderCfg()
 		return nil
 	case "post3":
 		postRegister()
