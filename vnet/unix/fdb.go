@@ -23,12 +23,14 @@ import (
 	"net"
 	"reflect"
 	"strconv"
+	//"strings"
 	"sync"
 	"syscall"
 	"unsafe"
 )
 
 var FdbOn bool
+var FdbIfAddrOn bool = true
 var IfinfoDebug bool
 var IfaddrDebug bool
 var FibentryDebug bool
@@ -153,12 +155,10 @@ func (e *fdbEvent) EventAction() {
 	m := e.fm
 	vn := m.m.v
 
-	fmt.Println("fdb EventAction:", e.NumMsgs)
-
 	for i := 0; i < e.NumMsgs; i++ {
 
 		msg := e.Msgs[i]
-		if true {
+		if false {
 			fmt.Printf("********* fdb message type: %d\n", xeth.KindOf(msg))
 		}
 
@@ -332,7 +332,9 @@ func ProcessIpNeighbor(msg *xeth.MsgNeighUpdate, v *vnet.Vnet) (err error) {
 	if ns != nil {
 		si, ok := ns.siForIfIndex(uint32(msg.Ifindex))
 		if !ok {
-			fmt.Println("ProcessIpNeighbor: Can't find si in namespace", msg.Ifindex, ns.name)
+			if NeighDebug {
+				fmt.Println("ProcessIpNeighbor: Can't find si in namespace", msg.Ifindex, ns.name)
+			}
 			return
 		}
 		nbr := ethernet.IpNeighbor{
@@ -352,9 +354,84 @@ func ProcessIpNeighbor(msg *xeth.MsgNeighUpdate, v *vnet.Vnet) (err error) {
 			err = nil
 		}
 	} else {
-		fmt.Println("ProcessIpNeighbor: Can't find namespace", msg.Net)
+		if NeighDebug {
+			fmt.Println("ProcessIpNeighbor: Can't find namespace", msg.Net)
+		}
 	}
 	return
+}
+
+// Zero Gw processing covers 2 major sub-cases:
+// 1. Interface-address setting
+//    If local table entry and is a known interface of vnet i.e. front-panel then
+//    install an interface address
+// 2. Dummy interface setting
+//    If not a known interface of vnet, we assume it's a dummy and install as a punt
+//    adjacency (FIXME - need to filter routes through eth0 and others)
+func ProcessZeroGw(msg *xeth.MsgFibentry, v *vnet.Vnet, ns *net_namespace, isDel, isLocal, isMainUc bool) (err error) {
+	xethNhs := msg.NextHops()
+	pe := vnet.GetPortByIndex(xethNhs[0].Ifindex)
+	if pe != nil {
+		// Adds (local comes first followed by main-uc):
+		// If local-local route then stash /32 prefix into Port[] table
+		// If main-unicast route then lookup port in Port[] table and marry
+		// local prefix and main-unicast prefix-len to install interface-address
+		// Dels (main-uc comes first followed by local):
+		//
+		if FdbIfAddrOn {
+			return
+		}
+		m := GetMain(v)
+		ns := getNsByInode(m, pe.Net)
+		if FibentryDebug {
+			if ns != nil {
+				fmt.Println("ProcessZeroGw: Namespace found", pe.Net)
+				if isLocal {
+					fmt.Println("ProcessZeroGw: islocal", msg.Prefix(), isDel)
+				} else if isMainUc {
+					fmt.Println("ProcessZeroGw: ismainuc", msg.Prefix(), isDel)
+					//m4 := ip4.GetMain(v)
+					//ns.Ip4IfaddrMsg(m4, msg.Prefix(), uint32(xethNhs[0].Ifindex), isDel)
+				} else {
+					fmt.Println("ProcessZeroGw: Neither local or mainuc!", msg.Prefix(), isDel)
+				}
+			} else {
+				fmt.Println("ProcessZeroGw: Namespace not found", pe.Net)
+			}
+		}
+	} else {
+		// dummy processing
+		if isLocal {
+			if FibentryDebug {
+				fmt.Println("ProcessZeroGw: Dummy Processing - install punt for", msg.Prefix())
+			}
+			m4 := ip4.GetMain(v)
+			in := msg.Prefix()
+			var addr ip4.Address
+			for i := range in.IP {
+				addr[i] = in.IP[i]
+			}
+			// Filter 127.*.*.* routes
+			if addr[0] == 127 {
+				return
+			}
+			p := ip4.Prefix{Address: addr, Len: 32}
+			q := p.ToIpPrefix()
+			m4.AddDelRoute(&q, ns.fibIndexForNamespace(), ip.AdjPunt, isDel)
+		}
+	}
+	return
+}
+
+func addrIsZero(addr ip4.Address) bool {
+	var aiz bool = true
+	for _, i := range addr {
+		if i != 0 {
+			aiz = false
+			break
+		}
+	}
+	return aiz
 }
 
 // NB:
@@ -364,13 +441,28 @@ func ProcessIpNeighbor(msg *xeth.MsgNeighUpdate, v *vnet.Vnet) (err error) {
 //		(msg.Id == xeth.RT_TABLE_MAIN && msg.Type == xeth.RTN_UNICAST) {
 func ProcessFibEntry(msg *xeth.MsgFibentry, v *vnet.Vnet) (err error) {
 
-	if FibentryDebug {
+	var isLocal bool = msg.Id == xeth.RT_TABLE_LOCAL && msg.Type == xeth.RTN_LOCAL
+	var isMainUc bool = msg.Id == xeth.RT_TABLE_MAIN && msg.Type == xeth.RTN_UNICAST
+
+	if false && FibentryDebug {
 		fmt.Printf("MsgFibentry: ns net %d\n", msg.Net)
 	}
 	// fwiw netlink handling also filters RTPROT_KERNEL and RTPROT_REDIRECT
 	if msg.Type != xeth.RTN_UNICAST || msg.Id != xeth.RT_TABLE_MAIN {
-		fmt.Println("ProcessFibEntry: Msg type not unicast and table main", msg.Type, msg.Id)
-		return
+		if isLocal {
+			if FibentryDebug {
+				fmt.Printf("ProcessFibEntry-xeth.RTN_LOCAL/xeth.RT_TABLE_LOCAL: ns net %d - %v\n", msg.Net, msg)
+			}
+		} else {
+			if false {
+				fmt.Println("ProcessFibEntry: Msg type not unicast and table main", msg.Type, msg.Id, msg)
+			}
+			return
+		}
+	} else {
+		if FibentryDebug {
+			fmt.Printf("ProcessFibEntry-xeth.RTN_UNICAST/xeth.RT_TABLE_MAIN: ns net %d - %v\n", msg.Net, msg)
+		}
 	}
 
 	isDel := msg.Event == xeth.FIB_EVENT_ENTRY_DEL
@@ -388,25 +480,26 @@ func ProcessFibEntry(msg *xeth.MsgFibentry, v *vnet.Vnet) (err error) {
 			fmt.Println("ProcessFibEntry: parsed nexthops for ns", ns.name)
 		}
 
-		for _, nh := range nhs {
-			// For now process normal nexthops -
-			// do something special for tunnels later.
-			// Ignore routes with zero nexthops - these represent connected local
-			// routes that are taken care of with interface-address message processing.
-			gw := nh.Address
-			var gwIsZero bool = true
-			for _, i := range gw {
-				if i != 0 {
-					gwIsZero = false
-					break
-				}
+		// Check for dummy processing
+		xethNhs := msg.NextHops()
+		if len(xethNhs) == 1 {
+			var nhAddr ip4.Address
+			copy(nhAddr[:], xethNhs[0].IP())
+			if addrIsZero(nhAddr) {
+				ProcessZeroGw(msg, v, ns, isDel, isLocal, isMainUc)
+				return
 			}
-			if gwIsZero {
+		}
+
+		// Regular nexthop processing
+		for _, nh := range nhs {
+			if addrIsZero(nh.Address) {
+				ProcessZeroGw(msg, v, nil, isDel, isLocal, isMainUc)
 				return
 			}
 			if FibentryDebug {
 				fmt.Printf("RouteMsg for Prefix %v adding nexthop %v isDel %v isReplace %v\n",
-					p, gw, isDel, isReplace)
+					p, nh.Address, isDel, isReplace)
 			}
 			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel, isReplace); err != nil {
 				fmt.Println("AddDelRouteNextHop: returns err:", err)
@@ -425,7 +518,6 @@ func ProcessFibEntry(msg *xeth.MsgFibentry, v *vnet.Vnet) (err error) {
 }
 
 func (ns *net_namespace) Ip4IfaddrMsg(m4 *ip4.Main, ipnet *net.IPNet, ifindex uint32, isDel bool) (err error) {
-	// FIXME - need to add dummy interface processing here.
 	p := ipnetToIP4Prefix(ipnet)
 	if IfaddrDebug {
 		fmt.Printf("Ip4IfaddrMsg: %v --> %v\n", ipnet, p)
@@ -446,6 +538,9 @@ func (ns *net_namespace) Ip4IfaddrMsg(m4 *ip4.Main, ipnet *net.IPNet, ifindex ui
 
 func ProcessInterfaceAddr(msg *xeth.MsgIfa, action vnet.ActionType, v *vnet.Vnet) (err error) {
 
+	if !FdbIfAddrOn {
+		return
+	}
 	var ifname xeth.Ifname
 	switch action {
 	case vnet.PreVnetd:
@@ -493,18 +588,20 @@ func ProcessInterfaceAddr(msg *xeth.MsgIfa, action vnet.ActionType, v *vnet.Vnet
 			return
 		}
 		if FdbOn {
-			if msg.IsAdd() {
-				if IfaddrDebug {
-					fmt.Println("XETH_MSG_KIND_IFA: Add", ifname.String(),
-						msg.Event, msg.Prefix())
+			if action == vnet.Dynamic {
+				if msg.IsAdd() {
+					if IfaddrDebug {
+						fmt.Println("XETH_MSG_KIND_IFA: Add", ifname.String(),
+							msg.Event, msg.Prefix())
+					}
+					pe.AddIPNet(msg.Prefix())
+				} else if msg.IsDel() {
+					if IfaddrDebug {
+						fmt.Println("XETH_MSG_KIND_IFA: Del", ifname.String(),
+							msg.Event, msg.Prefix())
+					}
+					pe.DelIPNet(msg.Prefix())
 				}
-				pe.AddIPNet(msg.Prefix())
-			} else if msg.IsDel() {
-				if IfaddrDebug {
-					fmt.Println("XETH_MSG_KIND_IFA: Del", ifname.String(),
-						msg.Event, msg.Prefix())
-				}
-				pe.DelIPNet(msg.Prefix())
 			}
 
 			m := GetMain(v)

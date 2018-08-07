@@ -103,8 +103,7 @@ func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *na
 }
 
 const (
-	default_namespace_name     = "default"
-	default_namespace_name_fdb = "1"
+	default_namespace_name = "default"
 )
 
 type namespace_search_dir struct {
@@ -141,11 +140,7 @@ func (nm *net_namespace_main) init() (err error) {
 	{
 		ns := &nm.default_namespace
 		ns.m = nm
-		if FdbOn {
-			ns.name = default_namespace_name_fdb
-		} else {
-			ns.name = default_namespace_name
-		}
+		ns.name = default_namespace_name
 		ns.elog_name = elog.SetString(ns.name)
 		ns.is_default = true
 		if ns.ns_fd, err = nm.fd_for_path("", "/proc/self/ns/net"); err != nil {
