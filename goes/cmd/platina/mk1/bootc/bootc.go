@@ -73,6 +73,24 @@ func (c *Command) Main(args ...string) (err error) {
 	case "bootc":
 		c.bootc()
 		return nil
+	case "posta1":
+		postita("booting")
+		return nil
+	case "posta2":
+		postita("operational")
+		return nil
+	case "posta3":
+		postita("wiping")
+		return nil
+	case "postb":
+		postitb()
+		return nil
+	case "postc":
+		postitc()
+		return nil
+	case "postd":
+		postitd()
+		return nil
 	case "vers":
 		fmt.Println(verNum)
 		return nil
