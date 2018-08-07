@@ -73,24 +73,6 @@ func (c *Command) Main(args ...string) (err error) {
 	case "bootc":
 		c.bootc()
 		return nil
-	case "posta1":
-		postita("booting")
-		return nil
-	case "posta2":
-		postita("operational")
-		return nil
-	case "posta3":
-		postita("wiping")
-		return nil
-	case "postb":
-		postitb()
-		return nil
-	case "postc":
-		postitc()
-		return nil
-	case "postd":
-		postitd()
-		return nil
 	case "vers":
 		fmt.Println(verNum)
 		return nil
@@ -215,6 +197,27 @@ func (c *Command) Main(args ...string) (err error) {
 			reboot()
 		}
 		fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
+		return nil
+
+	//commands to test pcc messages
+	case "post1a":
+		postBootStatus("goes-boot:booting")
+		return nil
+	case "post1b":
+		postBootStatusita("goes-boot:operational")
+		return nil
+	case "post1c":
+		postBootStatusita("goes-boot:wiping")
+		return nil
+	case "post2":
+		postGetInvaderConfig()
+		return nil
+	case "post3":
+		postRegister()
+		return nil
+	case "post4":
+		postUnregister()
+		return nil
 	default:
 	}
 	return nil

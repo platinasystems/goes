@@ -19,12 +19,16 @@ const (
 	homeURLd string = "http://172.17.2.33:8081/register/unregister/12345678"
 )
 
-func postita(status string) {
-	fmt.Println("**** register/bootstatus ****\n")
+//call new function
+//pass SN
+//non-hardcode my address
+//non-hardcode server address
+//test mode - hardcode address, assume server is running
+//add registration to real goes (what IP address for server??)
+
+func postBootStatus(status string) {
 	v := url.Values{}
 	v.Set("msg", status)
-	//v.Set("b", "beta")
-	//v.Set("g", "10")
 
 	s := v.Encode()
 	fmt.Printf("v.Encode(): %v\n", s)
@@ -53,12 +57,9 @@ func postita(status string) {
 	fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 }
 
-func postitb() {
-	fmt.Println("**** register/invadercfg ****\n")
+func postGetInvaderCfg() {
 	v := url.Values{}
 	v.Set("msg", "/register/invadercfg/12345678")
-	//v.Set("b", "beta")
-	//v.Set("g", "10")
 
 	s := v.Encode()
 	fmt.Printf("v.Encode(): %v\n", s)
@@ -87,12 +88,9 @@ func postitb() {
 	fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 }
 
-func postitc() {
-	fmt.Println("**** register/invader ****\n")
+func postRegister() {
 	v := url.Values{}
 	v.Set("msg", "/register/invader/12345678")
-	//v.Set("b", "beta")
-	//v.Set("g", "10")
 
 	s := v.Encode()
 	fmt.Printf("v.Encode(): %v\n", s)
@@ -121,12 +119,9 @@ func postitc() {
 	fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 }
 
-func postitd() {
-	fmt.Println("**** register/unregister ****\n")
+func postUnregister() {
 	v := url.Values{}
 	v.Set("msg", "/register/unregister/12345678")
-	//v.Set("b", "beta")
-	//v.Set("g", "10")
 
 	s := v.Encode()
 	fmt.Printf("v.Encode(): %v\n", s)
