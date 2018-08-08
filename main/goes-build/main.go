@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -23,6 +24,25 @@ import (
 )
 
 const (
+	platina       = "github.com/platinasystems"
+	platinaFe1    = platina + "/fe1"
+	platinaGo     = platina + "/go"
+	platinaGoMain = platinaGo + "/main"
+
+	platinaSystemBuildSrc = platina + "/system-build/src"
+
+	platinaGoMainFe1                  = platinaGoMain + "/fe1"
+	platinaGoMainIP                   = platinaGoMain + "/ip"
+	platinaGoMainGoesPrefix           = platinaGoMain + "goes-"
+	platinaGoMainGoesExample          = platinaGoMain + "/goes-example"
+	platinaGoMainGoesBoot             = platinaGoMain + "/goes-boot"
+	platinaGoMainGoesInstaller        = platinaGoMain + "/goes-installer"
+	platinaGoMainGoesPlatinaMk1       = platinaGoMain + "/goes-platina-mk1"
+	platinaGoMainGoesPlatinaMk1Bmc    = platinaGoMainGoesPlatinaMk1 + "-bmc"
+	platinaGoMainGoesPlatinaMk2       = platinaGoMain + "/goes-platina-mk2"
+	platinaGoMainGoesPlatinaMk2Lc1Bmc = platinaGoMainGoesPlatinaMk2 + "-lc1-bmc"
+	platinaGoMainGoesPlatinaMk2Mc1Bmc = platinaGoMainGoesPlatinaMk2 + "-mc1-bmc"
+
 	goesExample             = "goes-example"
 	goesExampleArm          = "goes-example-arm"
 	goesBoot                = "goes-boot"
@@ -36,13 +56,6 @@ const (
 	goesPlatinaMk2Lc1Bmc    = "goes-platina-mk2-lc1-bmc"
 	goesPlatinaMk2Mc1Bmc    = "goes-platina-mk2-mc1-bmc"
 
-	fe1so = "fe1.so"
-
-	fe1     = "fe1"
-	mainFe1 = "go/main/fe1"
-
-	systemBuildSubmodules = "system-build/src"
-
 	corebootExampleAmd64        = "coreboot-example-amd64"
 	corebootExampleAmd64Config  = "example-amd64_defconfig"
 	corebootExampleAmd64Machine = "example-amd64"
@@ -52,20 +65,13 @@ const (
 	corebootPlatinaMk1Machine   = "platina-mk1"
 	corebootPlatinaMk1Rom       = "coreboot-platina-mk1.rom"
 
-	linuxKernelExampleAmd64     = "example-amd64"
-	linuxKernelPlatinaMk1       = "platina-mk1"
-	linuxKernelPlatinaMk1Bmc    = "platina-mk1-bmc"
-	linuxKernelPlatinaMk2Lc1Bmc = "platina-mk2-lc1-bmc"
-	linuxKernelPlatinaMk2Mc1Bmc = "platina-mk2-mc1-bmc"
+	exampleAmd64Vmlinuz     = "example-amd64.vmlinuz"
+	platinaMk1Vmlinuz       = "platina-mk1.vmlinuz"
+	platinaMk1BmcVmlinuz    = "platina-mk1-bmc.vmlinuz"
+	platinaMk2Lc1BmcVmlinuz = "platina-mk2-lc1-bmc.vmlinuz"
+	platinaMk2Mc1BmcVmlinuz = "platina-mk2-mc1-bmc.vmlinuz"
 
-	linuxConfigExampleAmd64     = "platina-example-amd64_defconfig"
-	linuxConfigPlatinaMk1       = "platina-mk1_defconfig"
-	linuxConfigPlatinaMk1Bmc    = "platina-mk1-bmc_defconfig"
-	linuxConfigPlatinaMk2Lc1Bmc = "platina-mk2-lc1-bmc_defconfig"
-	linuxConfigPlatinaMk2Mc1Bmc = "platina-mk2-mc1-bmc_defconfig"
-
-	ubootPlatinaMk1Bmc       = "u-boot-platina-mk1-bmc"
-	ubootPlatinaMk1BmcConfig = "platinamx6boards_sd_defconfig"
+	ubootPlatinaMk1Bmc = "u-boot-platina-mk1-bmc"
 )
 
 type goenv struct {
@@ -80,32 +86,22 @@ type goenv struct {
 }
 
 var (
-	mainGoesPrefix           string
-	mainGoesExample          string
-	mainGoesBoot             string
-	mainGoesInstaller        string
-	mainIP                   string
-	mainGoesPlatinaMk1       string
-	mainGoesPlatinaMk1Bmc    string
-	mainGoesPlatinaMk2Lc1Bmc string
-	mainGoesPlatinaMk2Mc1Bmc string
-
 	defaultTargets = []string{
 		goesExample,
-		linuxKernelExampleAmd64,
+		exampleAmd64Vmlinuz,
 		corebootExampleAmd64,
 		goesExampleArm,
 		goesBoot,
 		goesBootArm,
 		goesIP,
 		goesPlatinaMk1,
-		linuxKernelPlatinaMk1,
+		platinaMk1Vmlinuz,
 		corebootPlatinaMk1,
 		goesPlatinaMk1Bmc,
 		ubootPlatinaMk1Bmc,
-		linuxKernelPlatinaMk1Bmc,
-		linuxKernelPlatinaMk2Lc1Bmc,
-		linuxKernelPlatinaMk2Mc1Bmc,
+		platinaMk1BmcVmlinuz,
+		platinaMk2Lc1BmcVmlinuz,
+		platinaMk2Mc1BmcVmlinuz,
 		corebootExampleAmd64Rom,
 		corebootPlatinaMk1Rom,
 	}
@@ -149,81 +145,65 @@ plugin	use pre-compiled proprietary packages
 		boot:             "u-boot",
 	}
 	mainPkg = map[string]string{
-		goesExample:                 mainGoesExample,
-		linuxKernelExampleAmd64:     linuxConfigExampleAmd64,
-		corebootExampleAmd64:        corebootExampleAmd64Config,
-		corebootExampleAmd64Rom:     corebootExampleAmd64Machine,
-		goesExampleArm:              mainGoesExample,
-		goesBoot:                    mainGoesBoot,
-		goesBootArm:                 mainGoesBoot,
-		goesIP:                      mainIP,
-		goesIPTest:                  mainIP,
-		goesPlatinaMk1:              mainGoesPlatinaMk1,
-		linuxKernelPlatinaMk1:       linuxConfigPlatinaMk1,
-		corebootPlatinaMk1:          corebootPlatinaMk1Config,
-		corebootPlatinaMk1Rom:       corebootPlatinaMk1Machine,
-		goesPlatinaMk1Test:          mainGoesPlatinaMk1,
-		goesPlatinaMk1Installer:     mainGoesPlatinaMk1,
-		goesPlatinaMk1Bmc:           mainGoesPlatinaMk1Bmc,
-		linuxKernelPlatinaMk1Bmc:    linuxConfigPlatinaMk1Bmc,
-		ubootPlatinaMk1Bmc:          ubootPlatinaMk1BmcConfig,
-		goesPlatinaMk2Lc1Bmc:        mainGoesPlatinaMk2Lc1Bmc,
-		linuxKernelPlatinaMk2Lc1Bmc: linuxConfigPlatinaMk2Lc1Bmc,
-		goesPlatinaMk2Mc1Bmc:        mainGoesPlatinaMk2Mc1Bmc,
-		linuxKernelPlatinaMk2Mc1Bmc: linuxConfigPlatinaMk2Mc1Bmc,
+		goesExample:             platinaGoMainGoesExample,
+		exampleAmd64Vmlinuz:     "platina-example-amd64_defconfig",
+		corebootExampleAmd64:    corebootExampleAmd64Config,
+		corebootExampleAmd64Rom: corebootExampleAmd64Machine,
+		goesExampleArm:          platinaGoMainGoesExample,
+		goesBoot:                platinaGoMainGoesBoot,
+		goesBootArm:             platinaGoMainGoesBoot,
+		goesIP:                  platinaGoMainIP,
+		goesIPTest:              platinaGoMainIP,
+		goesPlatinaMk1:          platinaGoMainGoesPlatinaMk1,
+		platinaMk1Vmlinuz:       "platina-mk1_defconfig",
+		corebootPlatinaMk1:      corebootPlatinaMk1Config,
+		corebootPlatinaMk1Rom:   corebootPlatinaMk1Machine,
+		goesPlatinaMk1Test:      platinaGoMainGoesPlatinaMk1,
+		goesPlatinaMk1Installer: platinaGoMainGoesPlatinaMk1,
+		goesPlatinaMk1Bmc:       platinaGoMainGoesPlatinaMk1Bmc,
+		platinaMk1BmcVmlinuz:    "platina-mk1-bmc_defconfig",
+		ubootPlatinaMk1Bmc:      "platinamx6boards_sd_defconfig",
+		goesPlatinaMk2Lc1Bmc:    platinaGoMainGoesPlatinaMk2Lc1Bmc,
+		platinaMk2Lc1BmcVmlinuz: "platina-mk2-lc1-bmc_defconfig",
+		goesPlatinaMk2Mc1Bmc:    platinaGoMainGoesPlatinaMk2Mc1Bmc,
+		platinaMk2Mc1BmcVmlinuz: "platina-mk2-mc1-bmc_defconfig",
 	}
 	make = map[string]func(out, name string) error{
-		goesExample:                 makeHost,
-		linuxKernelExampleAmd64:     makeAmd64LinuxKernel,
-		corebootExampleAmd64:        makeAmd64Boot,
-		corebootExampleAmd64Rom:     makeAmd64CorebootRom,
-		goesExampleArm:              makeArmLinuxStatic,
-		goesBoot:                    makeAmd64LinuxInitramfs,
-		goesBootArm:                 makeArmLinuxInitramfs,
-		goesIP:                      makeHost,
-		goesIPTest:                  makeHostTest,
-		goesPlatinaMk1:              makeGoesPlatinaMk1,
-		linuxKernelPlatinaMk1:       makeAmd64LinuxKernel,
-		corebootPlatinaMk1:          makeAmd64Boot,
-		corebootPlatinaMk1Rom:       makeAmd64CorebootRom,
-		goesPlatinaMk1Installer:     makeGoesPlatinaMk1Installer,
-		goesPlatinaMk1Test:          makeAmd64LinuxTest,
-		goesPlatinaMk1Bmc:           makeArmLinuxStatic,
-		linuxKernelPlatinaMk1Bmc:    makeArmLinuxKernel,
-		ubootPlatinaMk1Bmc:          makeArmBoot,
-		goesPlatinaMk2Lc1Bmc:        makeArmLinuxStatic,
-		linuxKernelPlatinaMk2Lc1Bmc: makeArmLinuxKernel,
-		goesPlatinaMk2Mc1Bmc:        makeArmLinuxStatic,
-		linuxKernelPlatinaMk2Mc1Bmc: makeArmLinuxKernel,
+		goesExample:             makeHost,
+		exampleAmd64Vmlinuz:     makeAmd64LinuxKernel,
+		corebootExampleAmd64:    makeAmd64Boot,
+		corebootExampleAmd64Rom: makeAmd64CorebootRom,
+		goesExampleArm:          makeArmLinuxStatic,
+		goesBoot:                makeAmd64LinuxInitramfs,
+		goesBootArm:             makeArmLinuxInitramfs,
+		goesIP:                  makeHost,
+		goesIPTest:              makeHostTest,
+		goesPlatinaMk1:          makeGoesPlatinaMk1,
+		platinaMk1Vmlinuz:       makeAmd64LinuxKernel,
+		corebootPlatinaMk1:      makeAmd64Boot,
+		corebootPlatinaMk1Rom:   makeAmd64CorebootRom,
+		goesPlatinaMk1Installer: makeGoesPlatinaMk1Installer,
+		goesPlatinaMk1Test:      makeAmd64LinuxTest,
+		goesPlatinaMk1Bmc:       makeArmLinuxStatic,
+		platinaMk1BmcVmlinuz:    makeArmLinuxKernel,
+		ubootPlatinaMk1Bmc:      makeArmBoot,
+		goesPlatinaMk2Lc1Bmc:    makeArmLinuxStatic,
+		platinaMk2Lc1BmcVmlinuz: makeArmLinuxKernel,
+		goesPlatinaMk2Mc1Bmc:    makeArmLinuxStatic,
+		platinaMk2Mc1BmcVmlinuz: makeArmLinuxKernel,
 	}
-	gopath      string
-	platinaPath = "github.com/platinasystems/"
+	gopath string
 )
 
-func setup() {
-	mainGoesPrefix = filepath.Join(platinaPath, "go/main/goes-")
-	mainGoesExample = mainGoesPrefix + "example"
-	mainGoesBoot = mainGoesPrefix + "boot"
-	mainGoesInstaller = mainGoesPrefix + "installer"
-	mainIP = filepath.Join(platinaPath, "go/main/ip")
-	mainGoesPlatinaMk1 = mainGoesPrefix + "platina-mk1"
-	mainGoesPlatinaMk1Bmc = mainGoesPrefix + "platina-mk1-bmc"
-	mainGoesPlatinaMk2Lc1Bmc = mainGoesPrefix + "platina-mk2-lc1-bmc"
-	mainGoesPlatinaMk2Mc1Bmc = mainGoesPrefix + "platina-mk2-mc1-bmc"
+func init() {
 	flag.Usage = usage
-	if p, f := os.LookupEnv("GOPATH"); f {
-		gopath = p
-	} else {
-		if p, f := os.LookupEnv("HOME"); f {
-			gopath = filepath.Join(p, "go")
-		} else {
-			gopath = "~/go"
-		}
+	gopath = os.Getenv("GOPATH")
+	if len(gopath) == 0 {
+		gopath = build.Default.GOPATH
 	}
 }
 
 func main() {
-	setup()
 	flag.Parse()
 	targets := flag.Args()
 	if len(targets) == 0 {
@@ -234,10 +214,7 @@ func main() {
 			targets = append(targets, target)
 		}
 	}
-	if p, f := os.LookupEnv("GOPATH"); f {
-		gopath = p
-	}
-	err := host.godo("generate", filepath.Join(platinaPath, "go"))
+	err := host.godo("generate", platinaGo)
 	defer func() {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -361,8 +338,8 @@ func makePackage(name string) error {
 
 func makeGoesPlatinaMk1(out, name string) error {
 	args := []string{"build", "-o", out}
-	if have(filepath.Join(platinaPath, fe1)) {
-		if err := host.godo("generate", filepath.Join(platinaPath, fe1)); err != nil {
+	if have(platinaFe1) {
+		if err := host.godo("generate", platinaFe1); err != nil {
 			return err
 		}
 	} else if strings.Index(*tagsFlag, "plugin") < 0 {
@@ -382,21 +359,24 @@ func makeGoesPlatinaMk1Installer(out, name string) error {
 	if err != nil {
 		return err
 	}
-	if have(filepath.Join(platinaPath, fe1)) && strings.Index(*tagsFlag, "plugin") >= 0 {
-		err = host.godo("generate", filepath.Join(platinaPath, fe1))
+	if have(platinaFe1) && strings.Index(*tagsFlag, "plugin") >= 0 {
+		err = host.godo("generate", platinaFe1)
 		if err != nil {
 			return err
 		}
-		err = amd64Linux.godo("build", "-buildmode=plugin", filepath.Join(platinaPath, mainFe1))
+		err = amd64Linux.godo("build", "-buildmode=plugin",
+			platinaGoMainFe1)
 		if err != nil {
 			return err
 		}
 	}
-	err = amd64Linux.godo("build", "-o", tinstaller, mainGoesInstaller)
+	err = amd64Linux.godo("build", "-o", tinstaller,
+		platinaGoMainGoesInstaller)
 	if err != nil {
 		return err
 	}
-	if !have(filepath.Join(platinaPath, fe1)) || strings.Index(*tagsFlag, "plugin") >= 0 {
+	if !have(platinaFe1) || strings.Index(*tagsFlag, "plugin") >= 0 {
+		const fe1so = "fe1.so"
 		fi, fierr := os.Stat(fe1so)
 		if fierr != nil {
 			fi, fierr = os.Stat("/usr/lib/goes/" + fe1so)
@@ -650,7 +630,7 @@ func chmodx(fn string) error {
 
 func have(pkg string) bool {
 	buf, err := exec.Command("go", "list", pkg).Output()
-	return err == nil && bytes.Equal(bytes.TrimSpace(buf), []byte(filepath.Join(platinaPath, fe1)))
+	return err == nil && bytes.Equal(bytes.TrimSpace(buf), []byte(pkg))
 }
 
 func mv(from, to string) error {
@@ -755,9 +735,20 @@ func shellCommand(cmdline string) (err error) {
 }
 
 func configWorktree(repo string, machine string, config string) (workdir string, err error) {
+	var gitdir string
+	for _, dir := range []string{
+		filepath.Join(gopath, "src", platina, repo),
+		filepath.Join(gopath, "src", platinaSystemBuildSrc, repo),
+	} {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			gitdir = dir
+			break
+		}
+	}
+	if len(gitdir) == 0 {
+		return "", fmt.Errorf("can't find gitdir for %s", repo)
+	}
 	workdir = filepath.Join("worktrees", repo, machine)
-	gitdir := filepath.Join(gopath, "src", platinaPath,
-		systemBuildSubmodules, repo)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
 		if err := shellCommand("mkdir -p " + workdir +
 			" && cd " + workdir +
@@ -791,7 +782,8 @@ func (goenv *goenv) makeboot(out string, configCommand string) (err error) {
 	return
 }
 
-func (goenv *goenv) makeLinux(machine string, config string) (err error) {
+func (goenv *goenv) makeLinux(out string, config string) (err error) {
+	machine := strings.TrimSuffix(out, ".vmlinuz")
 	configCommand := "cp " + goenv.kernelConfigPath + "/" + config +
 		" .config" +
 		" && make oldconfig ARCH=" + goenv.kernelArch
@@ -805,7 +797,7 @@ func (goenv *goenv) makeLinux(machine string, config string) (err error) {
 		" CROSS_COMPILE=" + goenv.gnuPrefix); err != nil {
 		return err
 	}
-	cmdline := "cp " + dir + "/" + goenv.kernelPath + " " + machine + ".vmlinuz"
+	cmdline := "cp " + dir + "/" + goenv.kernelPath + " " + out
 	if err := shellCommand(cmdline); err != nil {
 		return err
 	}
