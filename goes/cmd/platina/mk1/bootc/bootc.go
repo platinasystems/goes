@@ -31,6 +31,7 @@ type Command struct {
 
 func (Command) String() string { return "bootc" }
 
+//TODO CLEANUP
 func (Command) Usage() string {
 	return `
 	bootc [register] [bootc] [dumpvars] [dashboard] [initcfg] [wipe]
@@ -63,8 +64,9 @@ func (c *Command) Main(args ...string) (err error) {
 	}
 	mip := getMasterIP()
 
+	//TODO Clean up these cases
 	switch args[0] {
-	case "register":
+	case "register": //TODO CUT THIS
 		mac := getMAC()
 		ip := getIP()
 		if _, _, err = register(mip, mac, ip); err != nil {
@@ -84,7 +86,7 @@ func (c *Command) Main(args ...string) (err error) {
 		if err := getFiles(); err != nil {
 			return nil
 		}
-	case "dumpvars":
+	case "dumpvars": //TODO CUT THIS
 		if err = dumpvars(mip); err != nil {
 			return err
 		}
@@ -199,24 +201,54 @@ func (c *Command) Main(args ...string) (err error) {
 		fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
 		return nil
 
-	//commands to test pcc messages
-	case "post1a":
-		postBootStatus("goes-boot:booting")
+		//commands to test pcc messages
+	case "pccinit":
+		err := pccInit()
+		if err != nil {
+			return err
+		}
 		return nil
-	case "post1b":
-		postBootStatus("goes-boot:operational")
+	case "pcc1a":
+		data, err := doPost(BSTAT, "goes-boot:booting")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
-	case "post1c":
-		postBootStatus("goes-boot:wiping")
+	case "pcc1b":
+		data, err := doPost(BSTAT, "goes-boot:operational")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
-	case "post2":
-		postGetInvaderCfg()
+	case "pcc1c":
+		data, err := doPost(BSTAT, "goes-boot:wiping")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
-	case "post3":
-		postRegister()
+	case "pcc2":
+		data, err := doPost(RDCFG, "")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
-	case "post4":
-		postUnregister()
+	case "pcc3":
+		data, err := doPost(REGIS, "")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
+		return nil
+	case "pcc4":
+		data, err := doPost(UNREG, "")
+		if err != nil {
+			return err
+		}
+		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
 	default:
 	}
