@@ -18,6 +18,7 @@ const (
 	SizeofMsgIfinfo			= 0x48
 	SizeofMsgIfa			= 0x30
 	SizeofMsgIfdel			= 0x28
+	SizeofMsgIfvid			= 0x30
 	SizeofMsgFibentry		= 0x28
 	SizeofMsgNeighUpdate		= 0x48
 	SizeofNextHop			= 0x18
@@ -147,6 +148,19 @@ type MsgIfdel struct {
 	Ifindex	int32
 	Devtype	uint8
 	Pad	[3]uint8
+}
+type MsgIfvid struct {
+	Z64	uint64
+	Z32	uint32
+	Z16	uint16
+	Z8	uint8
+	Kind	uint8
+	Ifname	[16]uint8
+	Net	uint64
+	Ifindex	int32
+	Op	uint8
+	Noop	uint8
+	Vid	uint16
 }
 type MsgFibentry struct {
 	Z64	uint64
