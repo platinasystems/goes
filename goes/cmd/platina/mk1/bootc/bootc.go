@@ -39,7 +39,8 @@ func (Command) Usage() string {
 	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
 	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
 	[setkernel] [setinitrd] [getclientbootdata] [setpost] [vers]
-	[checkfiles] [getfiles] [setdisable] [clrdisable]`
+	[checkfiles] [getfiles] [setdisable] [clrdisable] [pccinitfile]
+	[setpccenb] [clrpccenb] [setpccip] [setpccport] [setpccsn]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -162,6 +163,26 @@ func (c *Command) Main(args ...string) (err error) {
 		if err = clrDisable(); err != nil {
 			return err
 		}
+	case "setpccenb":
+		if err = setPccEnb(); err != nil {
+			return err
+		}
+	case "clrpccenb":
+		if err = clrPccEnb(); err != nil {
+			return err
+		}
+	case "pccip":
+		if err = setPccIP(args[1]); err != nil {
+			return err
+		}
+	case "pccport":
+		if err = setPccPort(args[1]); err != nil {
+			return err
+		}
+	case "pccsn":
+		if err = setPccSN(args[1]); err != nil {
+			return err
+		}
 	case "readcfg":
 		if err := readCfg(); err != nil {
 			return err
@@ -202,6 +223,12 @@ func (c *Command) Main(args ...string) (err error) {
 		return nil
 
 		//commands to test pcc messages
+	case "pccinitfile":
+		err := pccInitFile()
+		if err != nil {
+			return err
+		}
+		return nil
 	case "pccinit":
 		err := pccInit()
 		if err != nil {
@@ -209,21 +236,21 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 		return nil
 	case "pcc1a":
-		data, err := doPost(BSTAT, "goes-boot:booting")
+		data, err := doPost(BSTAT, "goes-boot.booting")
 		if err != nil {
 			return err
 		}
 		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
 	case "pcc1b":
-		data, err := doPost(BSTAT, "goes-boot:operational")
+		data, err := doPost(BSTAT, "goes-boot.operational")
 		if err != nil {
 			return err
 		}
 		fmt.Printf("read resp.Body successfully:\n%v\n", string(data))
 		return nil
 	case "pcc1c":
-		data, err := doPost(BSTAT, "goes-boot:wiping")
+		data, err := doPost(BSTAT, "goes-boot.wiping")
 		if err != nil {
 			return err
 		}

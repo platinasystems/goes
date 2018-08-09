@@ -205,7 +205,6 @@ func dhcpZtpPcc() error {
 		i++
 	}
 
-	//===========
 	// SETUP PHASE - set dhcp bits, static IP
 	//
 	// D10 3 SEC LOOP wait for console interrupt --> YES, E10 goes-boot shell
@@ -216,14 +215,12 @@ func dhcpZtpPcc() error {
 	//
 	// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
 
-	//===========
 	// DHCP PHASE
 	//
 	// D40 INFINITE LOOP DHCP server found?      --> NO, check for ESC --> E20a shell
 	//
 	// ... DO DHCP
 
-	//===========
 	// ZTP PHASE
 	//
 	// D30b Is ZTP Enabled?                      --> NO, goto D60, PCC Enb check
@@ -232,7 +229,6 @@ func dhcpZtpPcc() error {
 	//
 	// P30 set "pixie boot" bit in bootc.cfg, download images, boot them, clr pixie bit
 
-	//===========
 	// PCC PHASE
 	//
 	// D60 Is PCC Enabled                        --> NO, goto P50 boot sda6
@@ -243,7 +239,6 @@ func dhcpZtpPcc() error {
 	//
 	// P50 boot sda6
 
-	//===========
 	// SDA6 BOOT
 	// D80 Is PCC Enabled                        --> NO, DONE
 	//
@@ -704,6 +699,93 @@ func clrDisable() error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+//[setpccenb] [clrpccenb] [setpccip] [setpccport] [setpccsn]
+
+func setPccEnb() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PccEnb = true
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	pccInit()
+	return nil
+}
+
+func clrPccEnb() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PccEnb = false
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	pccInit()
+	return nil
+}
+
+func setPccIP(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PccIP = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	pccInit()
+	return nil
+}
+
+func setPccPort(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PccPort = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	pccInit()
+	return nil
+}
+
+func setPccSN(x string) error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PccSN = x
+	jsonInfo, err := json.Marshal(Cfg)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
+	if err != nil {
+		return err
+	}
+	pccInit()
 	return nil
 }
 

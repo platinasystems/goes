@@ -4,15 +4,17 @@
 
 package bootc
 
+//TODO FIX SERVER COMM
 //TODO CLEANUP function list
-//TODO add registration to real goes
+//TODO ADD REGISTRATION TO REAL GOES IF ENB
 //TODO FIX IP COMMAND IN GOESBOOT
-//TODO START coding goes-boot
+//TODO START CODING GOES-BOOT ZTP, DHCP, PCC
+
 //TODO go test
 //TODO run goes-build
 //TODO pull build server image
 //TODO build on laptop
-//TODO update document
+//TODO update ZTP document
 //TODO latest images on i28
 
 import (
@@ -24,11 +26,15 @@ import (
 )
 
 const (
-	CLASS string = "register"
-	BSTAT string = "bootstatus"
-	RDCFG string = "invadercfg"
-	REGIS string = "invader"
-	UNREG string = "unregister"
+	CLASS    string = "register"
+	BSTAT    string = "bootstatus"
+	RDCFG    string = "invadercfg"
+	REGIS    string = "invader"
+	UNREG    string = "unregister"
+	TESTENB  bool   = true
+	TESTIP   string = "192.168.101.142"
+	TESTPORT string = "8081"
+	TESTSN   string = "12345678"
 )
 
 type PCC struct {
@@ -45,22 +51,30 @@ var pcc = PCC{
 	sn:   "",
 }
 
-//TODO add new command
-func pccInit0() error {
-	//read cfg
-	pcc.enb = true
-	pcc.ip = "192.168.101.142"
-	pcc.port = "8081"
-	pcc.sn = "12345678"
-	//write cfg
+func pccInitFile() error {
+	if err := readCfg(); err != nil {
+		return err
+	}
+	Cfg.PccEnb = TESTENB
+	Cfg.PccIP = TESTIP
+	Cfg.PccPort = TESTPORT
+	Cfg.PccSN = TESTSN
+	if err := writeCfg(); err != nil {
+		pcc.enb = false
+		return err
+	}
 	return nil
 }
 
-func pccInit() error { //TODO any errors, and set enb to false...
-	pcc.enb = true             //TODO get this from bootc.cfg
-	pcc.ip = "192.168.101.142" //TODO get this from bootc.cfg
-	pcc.port = "8081"          //TODO get this from bootc.cfg
-	pcc.sn = "12345678"        //TODO get this from either bootc.cfg or EEPROM
+func pccInit() error {
+	if err := readCfg(); err != nil {
+		pcc.enb = false
+		return err
+	}
+	pcc.enb = Cfg.PccEnb
+	pcc.ip = Cfg.PccIP
+	pcc.port = Cfg.PccPort
+	pcc.sn = Cfg.PccSN
 	return nil
 }
 
