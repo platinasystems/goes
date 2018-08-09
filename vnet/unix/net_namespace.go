@@ -543,7 +543,7 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 			fmt.Printf("add_del_interface(): newlink for %s in ns %s\n",
 				msg.Attrs[netlink.IFLA_IFNAME].String(), ns.name)
 		}
-		if /*!FdbOn*/ true { // FIX
+		if !FdbOn {
 			// If this is a new link created after goes is up - ignore it
 			// since we don't handle dynamic port-provisioning (via ethtool) yet.
 			if _, found := vnet.Ports[msg.Attrs[netlink.IFLA_IFNAME].String()]; !found &&

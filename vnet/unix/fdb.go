@@ -21,9 +21,7 @@ import (
 
 	"fmt"
 	"net"
-	"reflect"
 	"strconv"
-	//"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -92,7 +90,7 @@ func (e *fdbEvent) EnqueueMsg(msg []byte) bool {
 	if e.NumMsgs+1 > MAXMSGSPEREVENT {
 		return false
 	}
-	e.Msgs[e.NumMsgs] = append(e.Msgs[e.NumMsgs], msg...)
+	e.Msgs[e.NumMsgs] = msg
 	e.NumMsgs++
 	return true
 }
@@ -136,12 +134,7 @@ func initVnetFromXeth(v *vnet.Vnet) {
 		fdbm := &m.FdbMain
 		for buf := range vnet.Xeth.RxCh {
 			fe := fdbm.GetEvent(vnet.Dynamic)
-			msgSlice := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-				Data: uintptr(unsafe.Pointer(&buf[0])),
-				Len:  xeth.PageSize,
-				Cap:  xeth.PageSize,
-			}))
-			ok := fe.EnqueueMsg(msgSlice)
+			ok := fe.EnqueueMsg(buf)
 			if !ok {
 				panic("Xeth.RxCh reader: Can't enqueue to fresh event!")
 			}
@@ -444,9 +437,6 @@ func ProcessFibEntry(msg *xeth.MsgFibentry, v *vnet.Vnet) (err error) {
 	var isLocal bool = msg.Id == xeth.RT_TABLE_LOCAL && msg.Type == xeth.RTN_LOCAL
 	var isMainUc bool = msg.Id == xeth.RT_TABLE_MAIN && msg.Type == xeth.RTN_UNICAST
 
-	if false && FibentryDebug {
-		fmt.Printf("MsgFibentry: ns net %d\n", msg.Net)
-	}
 	// fwiw netlink handling also filters RTPROT_KERNEL and RTPROT_REDIRECT
 	if msg.Type != xeth.RTN_UNICAST || msg.Id != xeth.RT_TABLE_MAIN {
 		if isLocal {
@@ -477,7 +467,7 @@ func ProcessFibEntry(msg *xeth.MsgFibentry, v *vnet.Vnet) (err error) {
 		m4 := ip4.GetMain(v)
 
 		if FibentryDebug {
-			fmt.Println("ProcessFibEntry: parsed nexthops for ns", ns.name)
+			fmt.Println("ProcessFibEntry: parsed nexthops for ns", ns.name, len(nhs))
 		}
 
 		// Check for dummy processing
@@ -568,6 +558,26 @@ func ProcessInterfaceAddr(msg *xeth.MsgIfa, action vnet.ActionType, v *vnet.Vnet
 		}
 		sendFdbEventIfAddr(v)
 
+		if false {
+			m := GetMain(v)
+			for _, pe := range vnet.Ports {
+				ns := getNsByInode(m, pe.Net)
+				if ns != nil {
+					if IfaddrDebug {
+						fmt.Println("ProcessInterfaceAddr-ReadyVnetd: Namespace found", pe.Net, pe.Ifname)
+					}
+					m4 := ip4.GetMain(v)
+					for _, peipnet := range pe.IPNets {
+						ns.Ip4IfaddrMsg(m4, peipnet, uint32(pe.Ifindex), false)
+					}
+				} else {
+					if IfaddrDebug {
+						fmt.Println("ProcessInterfaceAddr-ReadyVnetd: Namespace not found", pe.Net)
+					}
+				}
+			}
+		}
+
 	case vnet.PostReadyVnetd:
 		if IfaddrDebug {
 			fmt.Println("XETH_MSG_KIND_IFA: PostReadyVnetd Add", msg.IsAdd())
@@ -635,29 +645,23 @@ func sendFdbEventIfAddr(v *vnet.Vnet) {
 		}
 
 		for _, peipnet := range pe.IPNets {
-			msg := xeth.MsgIfa{
-				Kind:    xeth.XETH_MSG_KIND_IFA,
-				Ifname:  ifname,
-				Event:   xeth.IFA_ADD,
-				Address: ipnetToUint(peipnet, true),
-				Mask:    ipnetToUint(peipnet, false),
-			}
+			buf := xeth.Pool.Get(xeth.SizeofMsgIfa)
+			msg := (*xeth.MsgIfa)(unsafe.Pointer(&buf[0]))
+			msg.Kind = xeth.XETH_MSG_KIND_IFA
+			msg.Ifname = ifname
+			msg.Event = xeth.IFA_ADD
+			msg.Address = ipnetToUint(peipnet, true)
+			msg.Mask = ipnetToUint(peipnet, false)
 			if IfaddrDebug {
 				ifn := xeth.Ifname(msg.Ifname)
 				fmt.Println("sendFdbEventIfAddr:", ifn.String(), msg.Address, msg.Mask)
 			}
-			msgSlice := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-				Data: uintptr(unsafe.Pointer(&msg)),
-				Len:  xeth.PageSize,
-				Cap:  xeth.PageSize,
-			}))
-
-			ok := fe.EnqueueMsg(msgSlice)
+			ok := fe.EnqueueMsg(buf)
 			if !ok {
 				// filled event with messages so send event and start a new one
 				fe.Signal()
 				fe = fdbm.GetEvent(vnet.PostReadyVnetd)
-				ok := fe.EnqueueMsg(msgSlice)
+				ok := fe.EnqueueMsg(buf)
 				if !ok {
 					panic("sendFdbEventIfAddr: Re-enqueue of msg failed")
 				}
@@ -747,11 +751,29 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 		// Walk Port map and flush into vnet/fe layers the interface info we gathered
 		// at prevnetd time. Both namespace and interface creation messages sent during this processing.
 		if IfinfoDebug {
-			fmt.Println("XETH_MSG_KIND_IFINFO: ReadyVnetd Add")
+			fmt.Println("ProcessInterfaceInfo: ReadyVnetd Add")
 		}
 		maybeAddNamespaces(v, 0)
 		// Signal that all namespaces are now initialized??
-		sendFdbEventIfInfo(v)
+		if true {
+			sendFdbEventIfInfo(v)
+		} else {
+			m := GetMain(v)
+			for _, pe := range vnet.Ports {
+				ns := getNsByInode(m, pe.Net)
+				if ns != nil {
+					if IfinfoDebug {
+						fmt.Println("ProcessInterfaceInfo-ReadyVnetd: Found namespace:", ns.name, pe.Ifname)
+					}
+					ns.addDelMk1Interface(m, false, pe.Ifname,
+						uint32(pe.Ifindex), pe.Addr)
+				} else {
+					if IfinfoDebug {
+						fmt.Println("ProcessInterfaceInfo - ReadyVnetd: no namespace for:", pe.Net, pe.Ifname)
+					}
+				}
+			}
+		}
 
 	case vnet.PostReadyVnetd:
 		fallthrough
@@ -764,7 +786,6 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 		// - Addition of vlans or dummy interfaces (DO NOT SUPPORT dynamic addition of fp ports)
 		// - Need to cleanup old namespaces when no ports reference them
 		//
-		// FIXME - no way to distinguish initial port creations with dynamic attempts (ie when vnetd is up)
 		//
 		m := GetMain(v)
 		maybeAddNamespaces(v, msg.Net)
@@ -793,15 +814,15 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 				ns.addDelMk1Interface(m, false, ifname.String(),
 					uint32(msg.Ifindex), msg.Addr)
 
-				pe.Net = msg.Net
 				if IfinfoDebug {
 					fmt.Println("XETH_MSG_KIND_IFINFO-Moving", ifname.String(), pe.Net, msg.Net)
 				}
+				pe.Net = msg.Net
 			} else if msg.Net == pe.Net && action == vnet.PostReadyVnetd {
 				// Goes has restarted with interfaces already in existent namespaces,
 				// so create vnet representation of interface in this ns.
 				if IfinfoDebug {
-					fmt.Println("XETH_MSG_KIND_IFINFO - PostReadyVnetd", ifname.String(), msg.Net)
+					fmt.Println("XETH_MSG_KIND_IFINFO - msg.Net == pe.Net", ifname.String(), msg.Net)
 				}
 				ns.addDelMk1Interface(m, false, ifname.String(),
 					uint32(msg.Ifindex), msg.Addr)
@@ -818,7 +839,7 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 					} else {
 						ifname := xeth.Ifname(msg.Ifname)
 						if IfinfoDebug {
-							fmt.Printf("ProcessInterfaceInfo: %s isUp %v flags (%s)",
+							fmt.Printf("ProcessInterfaceInfo: %s isUp %v flags (%s)\n",
 								ifname.String(), isUp, xeth.Iff(msg.Flags))
 						}
 					}
@@ -827,6 +848,8 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 						ifindex, ns.name)
 				}
 			} else {
+				// NB: This is the dynamic port-creation case which our lower layers
+				// don't support yet. Driver does not send us these but here as a placeholder.
 				if action == vnet.Dynamic {
 					ifname := xeth.Ifname(msg.Ifname)
 					_, found := vnet.Ports[ifname.String()]
@@ -871,29 +894,24 @@ func sendFdbEventIfInfo(v *vnet.Vnet) {
 		if IfinfoDebug {
 			fmt.Println("sendFdbEventIfInfo:", pe.Ifname, pe)
 		}
-		msg := xeth.MsgIfinfo{
-			Kind:         xeth.XETH_MSG_KIND_IFINFO,
-			Ifname:       ifname,
-			Ifindex:      pe.Ifindex,
-			Iflinkindex:  pe.Iflinkindex,
-			Addr:         pe.Addr,
-			Net:          pe.Net,
-			Portindex:    pe.Portindex,
-			Subportindex: pe.Subportindex,
-			Flags:        uint32(pe.Iff),
-			Id:           pe.Vid,
-		}
-		msgSlice := *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-			Data: uintptr(unsafe.Pointer(&msg)),
-			Len:  xeth.PageSize,
-			Cap:  xeth.PageSize,
-		}))
-		ok := fe.EnqueueMsg(msgSlice)
+		buf := xeth.Pool.Get(xeth.SizeofMsgIfinfo)
+		msg := (*xeth.MsgIfinfo)(unsafe.Pointer(&buf[0]))
+		msg.Kind = xeth.XETH_MSG_KIND_IFINFO
+		msg.Ifname = ifname
+		msg.Ifindex = pe.Ifindex
+		msg.Iflinkindex = pe.Iflinkindex
+		msg.Addr = pe.Addr
+		msg.Net = pe.Net
+		msg.Portindex = pe.Portindex
+		msg.Subportindex = pe.Subportindex
+		msg.Flags = uint32(pe.Iff)
+		msg.Id = pe.Vid
+		ok := fe.EnqueueMsg(buf)
 		if !ok {
 			// filled event with messages so send event and start a new one
 			fe.Signal()
 			fe = fdbm.GetEvent(vnet.PostReadyVnetd)
-			ok := fe.EnqueueMsg(msgSlice)
+			ok := fe.EnqueueMsg(buf)
 			if !ok {
 				panic("sendFdbEventIfInfo: Re-enqueue of msg failed")
 			}
