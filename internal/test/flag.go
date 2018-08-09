@@ -7,8 +7,6 @@ package test
 import "flag"
 
 var (
-	Dir = flag.String("test.cd", ".",
-		"change to named directory before running tests")
 	DryRun = flag.Bool("test.dryrun", false,
 		"don't run, just print test names")
 	MustPause = flag.Bool("test.pause", false,

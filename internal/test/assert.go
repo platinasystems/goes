@@ -6,20 +6,30 @@ package test
 
 import (
 	"bytes"
+	"go/build"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 )
 
-var cdonce sync.Once
-
 // Assert wraps a testing.Test or Benchmark with several assertions.
 type Assert struct {
 	testing.TB
+}
+
+// If necessary, change to the dir of the given go package.
+func (assert Assert) Dir(name string) {
+	wd, err := os.Getwd()
+	assert.Nil(err)
+	if strings.HasSuffix(wd, name) {
+		return
+	}
+	pkg, err := build.Import(name, "", build.FindOnly)
+	assert.Nil(err)
+	assert.Nil(os.Chdir(pkg.Dir))
 }
 
 // Main runs the main function if given the "-test.main" flag.  With said flag,
@@ -28,11 +38,6 @@ type Assert struct {
 // returns.
 func (assert Assert) Main(main func()) {
 	if !*IsMain {
-		if *Dir != "." {
-			cdonce.Do(func() {
-				assert.Nil(os.Chdir(*Dir))
-			})
-		}
 		return
 	}
 	os.Args = os.Args[1:]

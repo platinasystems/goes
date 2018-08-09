@@ -15,13 +15,12 @@ Then build the unit test and run.
 ```console
 $ go install github.com:platinasystems/go/main/goes-build
 $ goes-build goes-platina-mk1.test
-$ sudo ./goes-platina-mk1.test
+$ sudo GOPATH=$GOPATH ./goes-platina-mk1.test
 ```
 
 Options:
 ```console
 -test.alpha	this is a zero based alpha system
--test.cd	change to named directory before running tests
 -test.dryrun	don't run, just print test names
 -test.main	internal flag to run given goes command
 -test.pause	enable progromatic pause to start debugger
@@ -34,9 +33,9 @@ Options:
 
 For example:
 ```console
-sudo ./goes-platina-mk1.test -test.v -test.run Test/docker/frr/ospf/eth
-sudo ./goes-platina-mk1.test -test.v -test.run Test/docker/frr/.*/eth
-sudo ./goes-platina-mk1.test -test.v -test.run Test/.*/.*/.*/vlan
+sudo GOPATH=$GOPATH ./goes-platina-mk1.test -test.run Test/docker/frr/ospf/eth
+sudo GOPATH=$GOPATH ./goes-platina-mk1.test -test.run Test/docker/frr/.*/eth
+sudo GOPATH=$GOPATH ./goes-platina-mk1.test -test.run Test/.*/.*/.*/vlan
 ```
 
 To list all tests:

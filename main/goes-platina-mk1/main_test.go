@@ -23,6 +23,7 @@ var suite = test.Suite{
 	Name: "goes-platina-mk1",
 	Init: func(t *testing.T) {
 		assert := test.Assert{t}
+		assert.Dir("github.com/platinasystems/go/main/goes-platina-mk1")
 		assert.Main(main)
 		assert.YoureRoot()
 		assert.NoListener("@platina-mk1/vnetd")
