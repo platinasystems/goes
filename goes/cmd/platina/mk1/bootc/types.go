@@ -80,6 +80,10 @@ type BootcConfig struct { // stored as bootc.cfg, updated by server
 	ConfigVersion   int
 	PortNumber      string
 	Disable         bool
+	PccEnb          bool
+	PccIP           string
+	PccPort         string
+	PccSN           string
 }
 
 type Client struct { // not stored, populated from server

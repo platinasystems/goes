@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	verNum       = "1.08"
+	verNum       = "1.09"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/mnt/bootc.cfg"
@@ -205,9 +205,6 @@ func dhcpZtpPcc() error {
 		i++
 	}
 
-	// DHCP, ZTP, PCC - for goes-boot
-	// 1. check prereqs, 2. do it, 3. check successful
-	//
 	//===========
 	// SETUP PHASE - set dhcp bits, static IP
 	//
@@ -218,7 +215,6 @@ func dhcpZtpPcc() error {
 	//                                                    P10 set DHCP option 55 and option 61
 	//
 	// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
-	//
 
 	//===========
 	// DHCP PHASE
@@ -226,7 +222,6 @@ func dhcpZtpPcc() error {
 	// D40 INFINITE LOOP DHCP server found?      --> NO, check for ESC --> E20a shell
 	//
 	// ... DO DHCP
-	//
 
 	//===========
 	// ZTP PHASE
@@ -235,8 +230,7 @@ func dhcpZtpPcc() error {
 	//
 	// D50 INFINITE LOOP ZTP server found?       --> NO, check for ESC --> E20b shell
 	//
-	// P30 update bootc.cfg, images, run script
-	//
+	// P30 set "pixie boot" bit in bootc.cfg, download images, boot them, clr pixie bit
 
 	//===========
 	// PCC PHASE
@@ -245,7 +239,7 @@ func dhcpZtpPcc() error {
 	//
 	// D70 INFINITE LOOP, PCC server found?      --> ESC - goes-boot shell
 	//
-	// P40 register with PCC, exec additional instructions from PCC
+	// P40 register with PCC
 	//
 	// P50 boot sda6
 
@@ -256,6 +250,10 @@ func dhcpZtpPcc() error {
 	// P60 check in with PCC (register) goes register
 	//
 	// keep alives, status updates, control etc. from PCC...
+	//
+	// Transparent to invader: PCC will push additional configs via ansible
+	//
+	// Transparent to invader: keep alives, status updates, control etc. from PCC
 
 	return nil
 }
@@ -389,6 +387,10 @@ func initCfg() error {
 		ISOlastUsed:     1,
 		PostInstall:     false,
 		Disable:         false,
+		PccEnb:          false,
+		PccIP:           "",
+		PccPort:         "",
+		PccSN:           "",
 	}
 	if err := writeCfg(); err != nil {
 		return err
@@ -958,7 +960,7 @@ func fixPaths() error { //FIXME Temporary remove by 7/31/2018
 	return nil
 }
 
-func fixNewroot() error { // FIXME Temporary remove by 7/31/2018
+func fixNewroot() error { // FIXME Temporary remove by 9/30/2018
 	if err := readCfg(); err != nil {
 		return err
 	}

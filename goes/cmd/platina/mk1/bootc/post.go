@@ -4,8 +4,16 @@
 
 package bootc
 
-//TODO go test
+//TODO CLEANUP function list
 //TODO add registration to real goes
+//TODO FIX IP COMMAND IN GOESBOOT
+//TODO START coding goes-boot
+//TODO go test
+//TODO run goes-build
+//TODO pull build server image
+//TODO build on laptop
+//TODO update document
+//TODO latest images on i28
 
 import (
 	"fmt"
@@ -37,12 +45,22 @@ var pcc = PCC{
 	sn:   "",
 }
 
-//FIXME remove hardcodes
-func pccInit() error {
+//TODO add new command
+func pccInit0() error {
+	//read cfg
 	pcc.enb = true
 	pcc.ip = "192.168.101.142"
 	pcc.port = "8081"
 	pcc.sn = "12345678"
+	//write cfg
+	return nil
+}
+
+func pccInit() error { //TODO any errors, and set enb to false...
+	pcc.enb = true             //TODO get this from bootc.cfg
+	pcc.ip = "192.168.101.142" //TODO get this from bootc.cfg
+	pcc.port = "8081"          //TODO get this from bootc.cfg
+	pcc.sn = "12345678"        //TODO get this from either bootc.cfg or EEPROM
 	return nil
 }
 
