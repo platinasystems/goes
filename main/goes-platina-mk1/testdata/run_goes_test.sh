@@ -51,6 +51,11 @@ fix_it() {
   ./xeth_util.sh test_init
 }
 
+if [ -z "$GOPATH" ]; then
+    echo "GOPATH not set, try 'sudo -E ./$0 $*'"
+    exit 1
+fi
+
 if [ "$1" == "list" ]; then
     id=0
     for t in ${testcases[@]}; do
@@ -64,8 +69,10 @@ elif [ "$1" == "run" ]; then
 elif [ "$1" == "run_range" ]; then
     shift
     start=$1
+    start=$(($start-1))
     shift
     stop=$1
+    stop=$(($stop-1))
     shift
     test_range=""
     for i in $(seq $start $stop); do
@@ -89,7 +96,7 @@ for t in ${test_range}; do
     count=$(($count+1))
     printf "Running %46s " $t" ($count of $test_count) : "
     fix_it
-    ${tester} -test.cd .. -test.v -test.run=$t > /tmp/out 2>&1
+    GOPATH=$GOPATH ${tester} -test.v -test.run=$t > /tmp/out 2>&1
 
     if [ $? == 0 ]; then
         echo "OK"
