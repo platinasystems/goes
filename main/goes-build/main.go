@@ -129,7 +129,7 @@ plugin	use pre-compiled proprietary packages
 		goarch:           "amd64",
 		goos:             "linux",
 		gnuPrefix:        "x86_64-linux-gnu-",
-		kernelMakeTarget: "bzImage",
+		kernelMakeTarget: "bzImage bindeb-pkg",
 		kernelPath:       "arch/x86/boot/bzImage",
 		kernelConfigPath: "arch/x86/configs",
 		kernelArch:       "x86_64",
@@ -813,9 +813,18 @@ func (goenv *goenv) makeLinux(out string, config string) (err error) {
 	if err != nil {
 		return
 	}
+	ver, err := shellCommandOutput("cd " + dir + " && git describe")
+	if err != nil {
+		return err
+	}
+	ver = strings.TrimLeft(ver, "v")
+	f := strings.Split(ver, "-")
+	id := f[0] + "-" + machine
 	if err := shellCommandRun("make -C " + dir + " " + goenv.kernelMakeTarget +
 		" ARCH=" + goenv.kernelArch +
-		" CROSS_COMPILE=" + goenv.gnuPrefix); err != nil {
+		" CROSS_COMPILE=" + goenv.gnuPrefix +
+		" KDEB_PKGVERSION=" + ver +
+		" KERNELRELEASE=" + id); err != nil {
 		return err
 	}
 	cmdline := "cp " + dir + "/" + goenv.kernelPath + " " + out
