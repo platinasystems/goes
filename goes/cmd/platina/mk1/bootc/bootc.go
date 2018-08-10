@@ -35,10 +35,10 @@ func (Command) Usage() string {
 	return `
 	bootc [vers] [readcfg] [initcfg] [wipe] [setsda1] [setsda6] [clrsda1]
 	[clrsda6] [setinstall] [clrinstall]	[setip] [setnetmask] [setgateway]
-	[setkernel] [setinitrd] [setpost] [CLRPOST]	[checkfiles] [getfiles]
+	[setkernel] [setinitrd] [setpost] [clrpost] [checkfiles] [getfiles]
 	[setdisable] [clrdisable]
-	[pccinitfile] [setpccenb] [clrpccenb] [setpccip] [setpccport]
-	[setpccsn] [pccinit] [pcc1a] [pcc1b] [pcc1c] [pcc2] [pcc3] [pcc4]`
+	[pccinitfile] [setpccenb] [clrpccenb] [setpccip] [setpccport] [setpccsn]
+	[pcc1a] [pcc1b] [pcc1c] [pcc2] [pcc3] [pcc4]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -139,6 +139,10 @@ func (c *Command) Main(args ...string) (err error) {
 		if err = setPostInstall(); err != nil {
 			return err
 		}
+	case "clrpost":
+		if err = clrPostInstall(); err != nil {
+			return err
+		}
 	case "wipe":
 		if len(os.Args) >= 3 && args[1] == "sda6" {
 			if err = Wipe(); err != nil {
@@ -176,12 +180,6 @@ func (c *Command) Main(args ...string) (err error) {
 			return err
 		}
 	//commands to test pcc messages
-	case "pccinit":
-		err := pccInit()
-		if err != nil {
-			return err
-		}
-		return nil
 	case "pcc1a":
 		data, err := doPost(BSTAT, "goes-boot.booting")
 		if err != nil {

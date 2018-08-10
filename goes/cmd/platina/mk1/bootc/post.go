@@ -4,17 +4,9 @@
 
 package bootc
 
-//TODO FIX SERVER COMM
 //TODO ADD REGISTRATION TO REAL GOES IF ENB
 //TODO FIX IP COMMAND IN GOESBOOT
 //TODO START CODING GOES-BOOT ZTP, DHCP, PCC
-
-//TODO go test
-//TODO run goes-build
-//TODO pull build server image
-//TODO build on laptop
-//TODO update ZTP document
-//TODO latest images on i28
 
 import (
 	"fmt"
@@ -78,7 +70,11 @@ func pccInit() error {
 }
 
 func doPost(cmd string, msg string) (res string, err error) {
-	pccURL := "http://" + pcc.ip + ":" + pcc.port + "/" + CLASS + "/" + cmd + "/" + pcc.sn
+	if err = pccInit(); err != nil {
+		return "", err
+	}
+	pccURL := "http://" + pcc.ip + ":" + pcc.port + "/" + CLASS +
+		"/" + cmd + "/" + pcc.sn
 	if msg == "" {
 		msg = "/" + CLASS + "/" + cmd + "/" + pcc.sn
 	}
