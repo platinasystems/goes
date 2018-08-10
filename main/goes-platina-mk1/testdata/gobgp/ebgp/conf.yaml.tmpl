@@ -25,8 +25,8 @@ routers:
   image: "stigt/gobgp:latest"
   cmd: "/root/startup.sh"
   intfs:
-  - name: {{index . "net0port1"}}
-    address: 192.168.150.2/24
+  - name: {{index . "net1port1"}}
+    address: 192.168.222.2/24
   - name: {{index . "net3port0"}}
     address: 192.168.111.2/24
   - name: dummy0
@@ -37,7 +37,7 @@ routers:
   intfs:
   - name: {{index . "net3port1"}}
     address: 192.168.111.4/24
-  - name: {{index . "net1port1"}}
-    address: 192.168.222.4/24
+  - name: {{index . "net0port1"}}
+    address: 192.168.150.4/24
   - name: dummy0
     address: 192.168.2.4/32
