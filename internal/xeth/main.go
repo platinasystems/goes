@@ -89,14 +89,12 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 				panic(fmt.Errorf("CARRIER %q unknown\n%s",
 					args[2], usage))
 			}
-			xeth.Assert()
 			xeth.Carrier(args[1], flag)
 			args = args[3:]
 		case "dump", "-dump", "--dump":
 			if len(args) < 2 {
 				panic(fmt.Errorf("missing DB\n%s", usage))
 			}
-			xeth.Assert()
 			switch args[1] {
 			case "ifinfo":
 				xeth.DumpIfinfo()
@@ -126,7 +124,6 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 				panic(fmt.Errorf("COUNT %q %v",
 					args[3], err))
 			}
-			xeth.Assert()
 			if args[2] == "speed" {
 				err = xeth.Speed(args[1], count)
 			} else {
@@ -141,7 +138,6 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			if err != nil {
 				panic(err)
 			}
-			xeth.Assert()
 			if err = xeth.ExceptionFrame(buf); err != nil {
 				panic(err)
 			}
@@ -151,7 +147,6 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			if err != nil {
 				panic(err)
 			}
-			xeth.Assert()
 			if err = xeth.ExceptionFrame(buf); err != nil {
 				panic(err)
 			}

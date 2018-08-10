@@ -39,10 +39,7 @@ type SizeofRxchOpt int
 type SizeofTxchOpt int
 type DialOpt bool
 
-// This provides a buffered interface to an XETH driver side band channel.  Set
-// and ExceptionFrame operations are queued to a channel of configurable depth.
-// A service go-routine de-queues this channel and, if necessary, dials the
-// respctive socket then starts a receive go-routine.
+// This provides a buffered interface to an XETH driver side-band socket.
 type Xeth struct {
 	name string
 	addr *net.UnixAddr
@@ -52,14 +49,18 @@ type Xeth struct {
 	rxch chan<- []byte
 	txch chan []byte
 
-	sockch chan *net.UnixConn
+	rxgone chan struct{}
+	txgone chan struct{}
 }
 
 var expMsgSz = map[Kind]int{
 	XETH_MSG_KIND_ETHTOOL_FLAGS:    SizeofMsgEthtoolFlags,
 	XETH_MSG_KIND_ETHTOOL_SETTINGS: SizeofMsgEthtoolSettings,
 	XETH_MSG_KIND_IFA:              SizeofMsgIfa,
+	XETH_MSG_KIND_IFDEL:            SizeofMsgIfdel,
 	XETH_MSG_KIND_IFINFO:           SizeofMsgIfinfo,
+	XETH_MSG_KIND_IFVID:            SizeofMsgIfvid,
+	XETH_MSG_KIND_NEIGH_UPDATE:     SizeofMsgNeighUpdate,
 }
 
 // New(driver[, options...]]])
@@ -70,47 +71,44 @@ var expMsgSz = map[Kind]int{
 //	SizeofTxchOpt	override DefaultSizeofCh for txch
 //			for maximum buffering, should be
 //				number of devices * number of stats
-//	DialOpt		if false, don't dial until Assert()
 func New(driver string, opts ...interface{}) (*Xeth, error) {
+	var sock *net.UnixConn
 	addr, err := net.ResolveUnixAddr(netname, "@xeth")
 	if err != nil {
 		return nil, err
 	}
+	for {
+		sock, err = net.DialUnix(netname, nil, addr)
+		if err == nil {
+			break
+		}
+		if !IsEAGAIN(err) {
+			return nil, err
+		}
+	}
 	sizeofTxch := DefaultSizeofCh
 	sizeofRxch := DefaultSizeofCh
-	shouldDial := true
 	for _, opt := range opts {
 		switch t := opt.(type) {
 		case SizeofRxchOpt:
 			sizeofRxch = int(t)
 		case SizeofTxchOpt:
 			sizeofTxch = int(t)
-		case DialOpt:
-			shouldDial = bool(t)
 		}
 	}
 	rxch := make(chan []byte, sizeofRxch)
 	xeth := &Xeth{
-		name: driver,
-		addr: addr,
-		RxCh: rxch,
-		rxch: rxch,
-		txch: make(chan []byte, sizeofTxch),
-
-		sockch: make(chan *net.UnixConn),
+		name:   driver,
+		addr:   addr,
+		sock:   sock,
+		RxCh:   rxch,
+		rxch:   rxch,
+		txch:   make(chan []byte, sizeofTxch),
+		rxgone: make(chan struct{}),
+		txgone: make(chan struct{}),
 	}
-	if shouldDial {
-		for {
-			err = xeth.dial()
-			if operr, ok := err.(*net.OpError); ok {
-				fmt.Println("OpError:", operr)
-				if operr.Timeout() {
-					continue
-				}
-			}
-			break
-		}
-	}
+	go xeth.rxgo()
+	go xeth.txgo()
 	return xeth, err
 }
 
@@ -121,10 +119,8 @@ func (xeth *Xeth) Close() error {
 		return nil
 	}
 	close(xeth.txch)
-	for _ = range xeth.RxCh {
-		// txgo closes sockch after sock shutdown
-		// rxgo closes rxch after sockch close
-	}
+	<-xeth.rxgone
+	<-xeth.txgone
 	return nil
 }
 
@@ -216,15 +212,6 @@ func (xeth *Xeth) UntilBreak(f func([]byte) error) (err error) {
 	return
 }
 
-// panic if Xeth sock dial fails
-func (xeth *Xeth) Assert() {
-	if xeth.sock == nil {
-		if err := xeth.dial(); err != nil {
-			panic(err)
-		}
-	}
-}
-
 func IsEAGAIN(err error) bool {
 	if operr, ok := err.(*net.OpError); ok {
 		if oserr, ok := operr.Err.(*os.SyscallError); ok {
@@ -236,49 +223,34 @@ func IsEAGAIN(err error) bool {
 	return false
 }
 
-func (xeth *Xeth) dial() error {
-	for {
-		sock, err := net.DialUnix(netname, nil, xeth.addr)
-		if err == nil {
-			xeth.sock = sock
-			break
-		}
-		if !IsEAGAIN(err) {
-			return err
-		}
-	}
-	go xeth.rxgo()
-	go xeth.txgo()
-	xeth.sockch <- xeth.sock
-	return nil
-}
-
 func (xeth *Xeth) rxgo() {
 	buf := Pool.Get(PageSize)
 	oob := Pool.Get(PageSize)
 	defer Pool.Put(buf)
 	defer Pool.Put(oob)
 	defer close(xeth.rxch)
-	for sock := range xeth.sockch {
-		for {
-			n, noob, flags, addr, err := sock.ReadMsgUnix(buf, oob)
-			_ = noob
-			_ = flags
-			_ = addr
-			if n == 0 {
-				break
-			}
-			if err != nil {
-				if xeth.sock != nil {
-					fmt.Fprint(os.Stderr, xeth.name, ": ",
-						err, "\n")
-				}
-				break
-			}
-			msg := Pool.Get(n)
-			copy(msg, buf[:n])
-			xeth.rxch <- msg
+	defer close(xeth.rxgone)
+	for {
+		if xeth.sock == nil {
+			break
 		}
+		n, noob, flags, addr, err := xeth.sock.ReadMsgUnix(buf, oob)
+		_ = noob
+		_ = flags
+		_ = addr
+		if n == 0 {
+			break
+		}
+		if err != nil {
+			if xeth.sock != nil {
+				fmt.Fprint(os.Stderr, xeth.name, ": ",
+					err, "\n")
+			}
+			break
+		}
+		msg := Pool.Get(n)
+		copy(msg, buf[:n])
+		xeth.rxch <- msg
 	}
 }
 
@@ -292,28 +264,20 @@ func (xeth *Xeth) shutdown() {
 		if f, err := xeth.sock.File(); err == nil {
 			syscall.Shutdown(int(f.Fd()), SHUT_RDWR)
 		}
-		xeth.sock.Close()
 		xeth.sock = nil
 	}
 }
 
 func (xeth *Xeth) txgo() {
-	var err error
-	defer close(xeth.sockch)
+	defer close(xeth.txgone)
 	defer xeth.shutdown()
-	oob := []byte{}
 	for buf := range xeth.txch {
-		if xeth.sock == nil {
-			xeth.sock, err = net.DialUnix(netname, nil, xeth.addr)
-			if err != nil {
-				Pool.Put(buf)
-				continue
-			}
-		}
+		var err error
+		var oob []byte
 		_, _, err = xeth.sock.WriteMsgUnix(buf, oob, nil)
 		Pool.Put(buf)
 		if err != nil {
-			xeth.shutdown()
+			break
 		}
 	}
 }
