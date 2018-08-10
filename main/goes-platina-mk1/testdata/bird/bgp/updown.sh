@@ -21,46 +21,38 @@ case $1 in
 	ip link add dummy2 type dummy 2> /dev/null
 	ip link add dummy3 type dummy 2> /dev/null
 
-	# need to force mtu as 9k default doesn't work
-	ip link set mtu 1500 dev eth-25-0
-	$D_MOVE up R1 eth-25-0 192.168.120.5/24
-	ip link set mtu 1500 dev eth-4-0	
-	$D_MOVE up R1 eth-4-0 192.168.150.5/24
+	$D_MOVE up R1 eth-1-1 192.168.120.5/24
+	$D_MOVE up R1 eth-8-1 192.168.150.5/24
 	$D_MOVE up R1 dummy0 192.168.1.5/32
 
-	ip link set mtu 1500 dev eth-24-0
-	$D_MOVE up R2 eth-24-0 192.168.120.10/24
-	ip link set mtu 1500 dev eth-14-0	
-	$D_MOVE up R2 eth-14-0 192.168.222.10/24
+	$D_MOVE up R2 eth-2-1 192.168.120.10/24
+	$D_MOVE up R2 eth-3-1 192.168.222.10/24
 	$D_MOVE up R2 dummy1 192.168.1.10/32
 
-	ip link set mtu 1500 dev eth-30-0
-	$D_MOVE up R3 eth-30-0 192.168.111.2/24
-	ip link set mtu 1500 dev eth-15-0	
-	$D_MOVE up R3 eth-15-0 192.168.222.2/24
+	$D_MOVE up R3 eth-5-1 192.168.111.2/24
+	$D_MOVE up R3 eth-4-1 192.168.222.2/24
 	$D_MOVE up R3 dummy2 192.168.2.2/32
 
-	ip link set mtu 1500 dev eth-31-0	
-	$D_MOVE up R4 eth-31-0 192.168.111.4/24
-	ip link set mtu 1500 dev eth-5-0	
-	$D_MOVE up R4 eth-5-0 192.168.150.4/24
+	$D_MOVE up R4 eth-6-1 192.168.111.4/24
+	$D_MOVE up R4 eth-7-1 192.168.150.4/24
 	$D_MOVE up R4 dummy3 192.168.2.4/32
+
 	;;
     "down")
-	$D_MOVE down R1 eth-25-0
-	$D_MOVE down R1 eth-4-0
+	$D_MOVE down R1 eth-1-1
+	$D_MOVE down R1 eth-8-1
 	$D_MOVE down R1 dummy0
 
-	$D_MOVE down R2 eth-24-0
-	$D_MOVE down R2 eth-14-0
+	$D_MOVE down R2 eth-2-1
+	$D_MOVE down R2 eth-3-1
 	$D_MOVE down R2 dummy1
 
-	$D_MOVE down R3 eth-30-0
-	$D_MOVE down R3 eth-15-0
+	$D_MOVE down R3 eth-5-1
+	$D_MOVE down R3 eth-4-1
 	$D_MOVE down R3 dummy2
 
-	$D_MOVE down R4 eth-31-0
-	$D_MOVE down R4 eth-5-0
+	$D_MOVE down R4 eth-6-1
+	$D_MOVE down R4 eth-7-1
 	$D_MOVE down R4 dummy3
 
 	docker-compose down
