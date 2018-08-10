@@ -51,16 +51,11 @@ fix_it() {
   ./xeth_util.sh test_init
 }
 
-if [ -z "$GOPATH" ]; then
-    echo "GOPATH not set, try 'sudo -E ./$0 $*'"
-    exit 1
-fi
-
 if [ "$1" == "list" ]; then
     id=0
     for t in ${testcases[@]}; do
+        id=$(($id+1))	
         echo $id ":" $t
-        id=$(($id+1))
     done
     echo
     grep -A 30 testcases\= $0 | grep \#
@@ -88,6 +83,11 @@ if [ $test_count != 0 ]; then
     echo "Running $test_count tests"
 else
     exit 0
+fi
+
+if [ -z "$GOPATH" ]; then
+    echo "GOPATH not set, try 'sudo -E ./$0 $*'"
+    exit 1
 fi
 
 count=0
