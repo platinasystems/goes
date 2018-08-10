@@ -12,8 +12,6 @@ const (
 	Script         = "getscript"
 	Binary         = "getbinary"
 	DumpVars       = "dumpvars"
-	Dashboard      = "dashboard"
-	Dashboard2     = "dashboard2"
 )
 const (
 	BootStateNotRegistered = iota

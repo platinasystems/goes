@@ -31,16 +31,14 @@ type Command struct {
 
 func (Command) String() string { return "bootc" }
 
-//TODO CLEANUP
 func (Command) Usage() string {
 	return `
-	bootc [register] [bootc] [dumpvars] [dashboard] [initcfg] [wipe]
-	[getnumclients] [getclientdata] [getscript] [getbinary] [testscript]
-	[test404] [dashboard9] [setsda6] [clrsda6] [setinstall] [clrinstall]
-	[setsda1] [clrsda1] [readcfg] [setip] [setnetmask] [setgateway]
-	[setkernel] [setinitrd] [getclientbootdata] [setpost] [vers]
-	[checkfiles] [getfiles] [setdisable] [clrdisable] [pccinitfile]
-	[setpccenb] [clrpccenb] [setpccip] [setpccport] [setpccsn]`
+	bootc [vers] [readcfg] [initcfg] [wipe] [setsda1] [setsda6] [clrsda1]
+	[clrsda6] [setinstall] [clrinstall]	[setip] [setnetmask] [setgateway]
+	[setkernel] [setinitrd] [setpost] [CLRPOST]	[checkfiles] [getfiles]
+	[setdisable] [clrdisable]
+	[pccinitfile] [setpccenb] [clrpccenb] [setpccip] [setpccport]
+	[setpccsn] [pccinit] [pcc1a] [pcc1b] [pcc1c] [pcc2] [pcc3] [pcc4]`
 }
 
 func (Command) Apropos() lang.Alt {
@@ -63,19 +61,8 @@ func (c *Command) Main(args ...string) (err error) {
 	if len(args) == 0 {
 		return fmt.Errorf("args: missing")
 	}
-	mip := getMasterIP()
 
-	//TODO Clean up these cases
 	switch args[0] {
-	case "register": //TODO CUT THIS
-		mac := getMAC()
-		ip := getIP()
-		if _, _, err = register(mip, mac, ip); err != nil {
-			return err
-		}
-	case "bootc":
-		c.bootc()
-		return nil
 	case "vers":
 		fmt.Println(verNum)
 		return nil
@@ -87,48 +74,8 @@ func (c *Command) Main(args ...string) (err error) {
 		if err := getFiles(); err != nil {
 			return nil
 		}
-	case "dumpvars": //TODO CUT THIS
-		if err = dumpvars(mip); err != nil {
-			return err
-		}
-	case "dashboard":
-		if err = dashboard(mip); err != nil {
-			return err
-		}
 	case "initcfg":
 		if err = initCfg(); err != nil {
-			return err
-		}
-	case "getnumclients":
-		if err = getnumclients(mip); err != nil {
-			return err
-		}
-	case "getclientdata":
-		if err = getclientdata(mip, 3); err != nil {
-			return err
-		}
-	case "getclientbootdata":
-		if err = getclientbootdata(mip, 3); err != nil {
-			return err
-		}
-	case "getscript":
-		if err = getscript(mip, "testscript"); err != nil {
-			return err
-		}
-	case "getbinary":
-		if err = getbinary(mip, "test.bin"); err != nil {
-			return err
-		}
-	case "testscript":
-		if err = runScript("testscript"); err != nil {
-			return err
-		}
-	case "test404":
-		if err = test404(mip); err != nil {
-			return err
-		}
-	case "dashboard9":
-		if err = dashboard("192.168.101.129"); err != nil {
 			return err
 		}
 	case "setsda6":
@@ -161,26 +108,6 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "clrdisable":
 		if err = clrDisable(); err != nil {
-			return err
-		}
-	case "setpccenb":
-		if err = setPccEnb(); err != nil {
-			return err
-		}
-	case "clrpccenb":
-		if err = clrPccEnb(); err != nil {
-			return err
-		}
-	case "pccip":
-		if err = setPccIP(args[1]); err != nil {
-			return err
-		}
-	case "pccport":
-		if err = setPccPort(args[1]); err != nil {
-			return err
-		}
-	case "pccsn":
-		if err = setPccSN(args[1]); err != nil {
 			return err
 		}
 	case "readcfg":
@@ -221,14 +148,34 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 		fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
 		return nil
-
-		//commands to test pcc messages
+	//commands to set pcc in bootc.cfg
 	case "pccinitfile":
 		err := pccInitFile()
 		if err != nil {
 			return err
 		}
 		return nil
+	case "setpccenb":
+		if err = setPccEnb(); err != nil {
+			return err
+		}
+	case "clrpccenb":
+		if err = clrPccEnb(); err != nil {
+			return err
+		}
+	case "pccip":
+		if err = setPccIP(args[1]); err != nil {
+			return err
+		}
+	case "pccport":
+		if err = setPccPort(args[1]); err != nil {
+			return err
+		}
+	case "pccsn":
+		if err = setPccSN(args[1]); err != nil {
+			return err
+		}
+	//commands to test pcc messages
 	case "pccinit":
 		err := pccInit()
 		if err != nil {

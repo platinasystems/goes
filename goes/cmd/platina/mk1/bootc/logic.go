@@ -341,17 +341,13 @@ func (c *Command) bootc() {
 func serverAvail() bool {
 	return false
 
-	mip := getMasterIP()
-	mac := getMAC()
-	ip := getIP()
-	reply := 0
-	reply, _, err := register(mip, mac, ip)
+	/*reply, _, err := register(mip, mac, ip)
 	if err != nil || reply != RegReplyRegistered {
 		reply, _, err = register(mip, mac, ip)
 		if err != nil || reply != RegReplyRegistered {
 			return false
 		}
-	}
+	} */
 	return true
 }
 
@@ -702,8 +698,6 @@ func clrDisable() error {
 	return nil
 }
 
-//[setpccenb] [clrpccenb] [setpccip] [setpccport] [setpccsn]
-
 func setPccEnb() error {
 	if err := readCfg(); err != nil {
 		return err
@@ -1011,10 +1005,6 @@ func Wipe() error {
 	if err := setInstall(); err != nil {
 		return err
 	}
-	return nil
-}
-
-func runScript(name string) (err error) {
 	return nil
 }
 
