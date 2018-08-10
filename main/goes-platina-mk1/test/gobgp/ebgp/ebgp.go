@@ -34,7 +34,7 @@ var Suite = test.Suite{
 	},
 }
 
-func (ebgp *ebgp) Run(t *testing.T) {
+func (ebgp *ebgp) Test(t *testing.T) {
 	ebgp.Docket.Tests = test.Tests{
 		&test.Unit{"check connectivity", ebgp.checkConnectivity},
 		&test.Unit{"check gobgp", ebgp.checkBgp},
