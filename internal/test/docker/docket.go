@@ -50,6 +50,10 @@ func (d *Docket) ExecCmd(t *testing.T, ID string,
 	return ExecCmd(t, ID, d.Config, cmd)
 }
 
+func (d *Docket) PingCmd(t *testing.T, ID string, target string) error {
+	return PingCmd(t, ID, d.Config, target)
+}
+
 func (d *Docket) Test(t *testing.T) {
 	if *test.DryRun {
 		fmt.Println(t.Name())

@@ -229,6 +229,69 @@ func ExecCmd(t *testing.T, ID string, config *Config, cmd []string) (out string,
 	return
 }
 
+func PingCmd(t *testing.T, ID string, config *Config, target string) error {
+
+	cmd := []string{"/bin/ping", "-c1", "-W1", target}
+	t.Logf("In PingCmd %v ", cmd)
+
+	execOpts := types.ExecConfig{
+		Cmd:          cmd,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Detach:       false,
+	}
+
+	cli := config.cli
+	ctx := context.Background()
+
+	count := 10
+	for i := 0; i < count; i++ {
+
+		execResp, err := cli.ContainerExecCreate(ctx, ID, execOpts)
+		if err != nil {
+			t.Logf("Error creating exec: %v", err)
+			return err
+		}
+
+		hresp, err := cli.ContainerExecAttach(ctx, execResp.ID,
+			execOpts)
+		if err != nil {
+			t.Logf("Error attaching exec: %v", err)
+			return err
+		}
+		defer hresp.Close()
+
+		content, err := ioutil.ReadAll(hresp.Reader)
+		if err != nil {
+			t.Logf("Error reading output: %v", err)
+			return err
+		}
+		out := string(content)
+
+		ei, err := cli.ContainerExecInspect(ctx, execResp.ID)
+		if err != nil {
+			t.Logf("Error exec Inspect: %v", err)
+			return err
+		}
+		if ei.Running {
+			t.Logf("exec still running", ei)
+			return err
+		}
+		if ei.ExitCode == 0 {
+			return nil
+		}
+		t.Logf("%v\nping count %v", out, i)
+		if ei.ExitCode != 0 {
+			t.Logf("[%v] exit code %v", cmd, ei.ExitCode)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	err := fmt.Errorf("ping timeout %v -> %v", ID, target)
+	return err
+}
+
 func TearDownContainers(t *testing.T, config *Config) {
 	cleanup := test.Cleanup{t}
 	for _, r := range config.Routers {

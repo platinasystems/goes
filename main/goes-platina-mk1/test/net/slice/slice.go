@@ -63,9 +63,8 @@ func (slice *slice) checkConnectivity(t *testing.T) {
 		{"RB-2", "10.3.0.4"},
 		{"CB-2", "10.3.0.3"},
 	} {
-		out, err := slice.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		err := slice.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.hostname)
 	}
@@ -127,9 +126,8 @@ func (slice *slice) checkInterConnectivity(t *testing.T) {
 		{"CB-2", "10.1.0.1"}, // In slice B ping from CB-2 to CB-1
 
 	} {
-		out, err := slice.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		err := slice.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.hostname)
 	}

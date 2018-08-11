@@ -43,6 +43,7 @@ func (ospf *ospf) Run(t *testing.T) {
 		&test.Unit{"check interconnectivity",
 			ospf.checkInterConnectivity},
 		&test.Unit{"check flap", ospf.checkFlap},
+		&test.Unit{"check connectivity2", ospf.checkConnectivity},
 	}
 	ospf.Docket.Test(t)
 }
@@ -63,9 +64,8 @@ func (ospf *ospf) checkConnectivity(t *testing.T) {
 		{"R4", "192.168.111.2"},
 		{"R4", "192.168.150.5"},
 	} {
-		out, err := ospf.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		err := ospf.PingCmd(t, x.host, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 	}
 }
 
@@ -167,9 +167,8 @@ func (ospf *ospf) checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.120.10"},
 		{"R4", "192.168.222.10"},
 	} {
-		out, err := ospf.ExecCmd(t, x.hostname, "ping", "-c3", x.target)
+		err := ospf.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 	}
 }

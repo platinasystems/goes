@@ -43,6 +43,7 @@ func (bgp *bgp) Test(t *testing.T) {
 		&test.Unit{"check interconnectivity",
 			bgp.checkInterConnectivity},
 		&test.Unit{"check flap", bgp.checkFlap},
+		&test.Unit{"check connectivity2", bgp.checkConnectivity},
 	}
 	bgp.Docket.Test(t)
 }
@@ -63,9 +64,8 @@ func (bgp *bgp) checkConnectivity(t *testing.T) {
 		{"R4", "192.168.111.2"},
 		{"R4", "192.168.150.5"},
 	} {
-		out, err := bgp.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		err := bgp.PingCmd(t, x.host, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 	}
 }
 
@@ -167,10 +167,8 @@ func (bgp *bgp) checkInterConnectivity(t *testing.T) {
 		{"R4", "192.168.120.10"},
 		{"R4", "192.168.222.10"},
 	} {
-		out, err := bgp.ExecCmd(t, x.hostname,
-			"ping", "-c3", x.target)
+		err := bgp.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 	}
 }

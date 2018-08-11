@@ -57,9 +57,8 @@ func (dhcp *dhcp) checkConnectivity(t *testing.T) {
 		{"R1", "192.168.120.10"},
 		{"R2", "192.168.120.5"},
 	} {
-		out, err := dhcp.ExecCmd(t, x.host, "ping", "-c3", x.target)
+		err := dhcp.PingCmd(t, x.host, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.host)
 	}
@@ -99,9 +98,8 @@ func (dhcp *dhcp) checkConnectivity2(t *testing.T) {
 	assert := test.Assert{t}
 
 	t.Log("Check connectivity with dhcp address")
-	out, err := dhcp.ExecCmd(t, "R1", "ping", "-c3", "192.168.120.10")
+	err := dhcp.PingCmd(t, "R1", "192.168.120.10")
 	assert.Nil(err)
-	assert.Match(out, "[1-3] packets received")
 	assert.Program(test.Self{},
 		"vnet", "show", "ip", "fib", "table", "R1")
 	assert.Program(test.Self{},

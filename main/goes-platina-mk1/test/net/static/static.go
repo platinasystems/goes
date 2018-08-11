@@ -66,10 +66,8 @@ func (static *static) checkConnectivity(t *testing.T) {
 		{"CA-2", "10.3.0.3"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
-		out, err := static.ExecCmd(t, x.hostname,
-			"ping", "-c3", x.target)
+		err := static.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 	}
 }
 
@@ -123,10 +121,8 @@ func (static *static) checkInterConnectivity(t *testing.T) {
 		{"CA-2", "192.168.0.1"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
-		out, err := static.ExecCmd(t, x.hostname,
-			"ping", "-c3", x.target)
+		err := static.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.hostname)
 	}
@@ -178,10 +174,8 @@ func (static *static) checkInterConnectivity2(t *testing.T) {
 		{"CA-2", "192.168.0.1"},
 	} {
 		t.Logf("ping from %v to %v", x.hostname, x.target)
-		out, err := static.ExecCmd(t, x.hostname,
-			"ping", "-c3", x.target)
+		err := static.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
-		assert.Match(out, "[1-3] packets received")
 		assert.Program(test.Self{},
 			"vnet", "show", "ip", "fib", "table", x.hostname)
 	}
