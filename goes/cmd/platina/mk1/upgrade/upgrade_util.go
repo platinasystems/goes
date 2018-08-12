@@ -33,6 +33,7 @@ type IMGINFO struct {
 	User   string
 	Size   string
 	Tag    string
+	Extra  string
 	Commit string
 	Chksum string
 }
@@ -72,12 +73,13 @@ func printImageInfo() (err error) {
 	fmt.Println("")
 	fmt.Print("Currently running:\n")
 	for i, _ := range imgInfo {
-		prn("    Name   : ", imgInfo[i].Name)
-		prn("    Build  : ", imgInfo[i].Build)
-		prn("    User   : ", imgInfo[i].User)
-		prn("    Size   : ", imgInfo[i].Size)
-		prn("    Version: ", imgInfo[i].Tag)
-		prn("    Commit : ", imgInfo[i].Commit)
+		prn("    Name     : ", imgInfo[i].Name)
+		prn("    Build    : ", imgInfo[i].Build)
+		prn("    User     : ", imgInfo[i].User)
+		prn("    Size     : ", imgInfo[i].Size)
+		prn("    Version  : ", imgInfo[i].Tag)
+		prn("    Extra Ver: ", imgInfo[i].Extra)
+		prn("    Commit   : ", imgInfo[i].Commit)
 		fmt.Println("")
 	}
 	return nil
@@ -135,6 +137,10 @@ func getCorebootInfo() (im IMGINFO, err error) {
 		if strings.Contains(j, "COREBOOT_VERSION ") {
 			x := strings.Split(j, " ")
 			im.Tag = strings.Replace(x[2], `"`, "", 2)
+		}
+		if strings.Contains(j, "COREBOOT_EXTRA_VERSION ") {
+			x := strings.Split(j, " ")
+			im.Extra = strings.Replace(x[2], `"`, "", 2)
 		}
 		if strings.Contains(j, "COREBOOT_ORIGIN_GIT_REVISION ") {
 			x := strings.Split(j, " ")
