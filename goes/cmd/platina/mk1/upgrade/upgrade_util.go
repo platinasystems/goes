@@ -33,6 +33,8 @@ type IMGINFO struct {
 	User   string
 	Size   string
 	Tag    string
+	Fe1    string
+	Fe1fw  string
 	Extra  string
 	Commit string
 	Chksum string
@@ -78,7 +80,9 @@ func printImageInfo() (err error) {
 		prn("    User     : ", imgInfo[i].User)
 		prn("    Size     : ", imgInfo[i].Size)
 		prn("    Version  : ", imgInfo[i].Tag)
-		prn("    Extra Ver: ", imgInfo[i].Extra)
+		prn("    FE1 Ver. : ", imgInfo[i].Fe1)
+		prn("    FE1 FW   : ", imgInfo[i].Fe1fw)
+		prn("    Goes Ver.: ", imgInfo[i].Extra)
 		prn("    Commit   : ", imgInfo[i].Commit)
 		fmt.Println("")
 	}
