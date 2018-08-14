@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser(description='send packets')
 parser.add_argument('-mac', '--mac', nargs="*", help='mac [intf | da | bcast | bpdu] [intf | sa]')
 parser.add_argument('-smi', '--smi', action='store_true', help='SA incr')
 parser.add_argument('-v', '--vidpri', nargs="*", help='vlan [prio]')
-parser.add_argument('-ip', '--ip', nargs="*", help='ip [dstip] [srcip] [udp | tcp | arp]')
+parser.add_argument('-ip', '--ip', nargs="*", help='ip [dstip] [srcip] [udp | tcp | arp] [<dstport [srcport]> | opcode]')
 parser.add_argument('-t', '--txintf', help='tx interface')
 parser.add_argument('-l', '--length', help='length')
 parser.add_argument('-c', '--count', help='count')
@@ -62,8 +62,13 @@ vid = 0
 dstip = ""
 srcip = "192.168.1.1"
 proto = "udp"
+opcode = 1
+dstport = 50013
+srcport = 50005
 payload = "012345678901234567890123456789012345678901234567890123456789"
 payload60 = "012345678901234567890123456789012345678901234567890123456789"
+p=Ether()
+
 length = 128
 count = 1
 txintf = ""
@@ -94,6 +99,14 @@ if args.ip:
     srcip = args.ip[1]
   if len(args.ip) > 2:
     proto = args.ip[2]
+  if len(args.ip) > 3:
+    if proto == "arp":
+      opcode = int(args.ip[3])
+    else:
+      dstport = int(args.ip[3])
+  if len(args.ip) > 4:
+      srcport = int(args.ip[4])
+
 
 if args.length:
   length = args.length
@@ -111,18 +124,18 @@ for dst_port in range(0,count):
   if dstip:
     if vid != 0:
       if proto == "udp":
-        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/IP(src=srcip,dst=dstip)/UDP(dport=50000)/payload)
+        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/IP(src=srcip,dst=dstip)/UDP(sport=srcport,dport=dstport)/payload)
       elif proto == "tcp":
-        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/IP(src=srcip,dst=dstip)/TCP(dport=50000)/payload)
+        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/IP(src=srcip,dst=dstip)/TCP(sport=srcport,dport=dstport)/payload)
       elif proto == "arp":
-        p=(Ether(src=SA, dst=DA_bcast)/Dot1Q(vlan=vid, prio=prio)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwtype=1,ptype=2048,op=1)/payload)
+        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwtype=1,ptype=2048,op=opcode)/payload)
     else:
       if proto == "udp":
-        p=(Ether(src=SA, dst=DA)/IP(src=srcip,dst=dstip)/UDP(dport=50000)/payload)
+        p=(Ether(src=SA, dst=DA)/IP(src=srcip,dst=dstip)/UDP(sport=srcport,dport=dstport)/payload)
       elif proto == "tcp":
-        p=(Ether(src=SA, dst=DA)/IP(src=srcip,dst=dstip)/TCP(dport=50000)/payload)
+        p=(Ether(src=SA, dst=DA)/IP(src=srcip,dst=dstip)/TCP(sport=srcport,dport=dstport)/payload)
       elif proto == "arp":
-        p=(Ether(src=SA, dst=DA_bcast)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwtype=1,ptype=2048,op=1)/payload)
+        p=(Ether(src=SA, dst=DA)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwtype=1,ptype=2048,op=opcode)/payload)
   else:
     if vid != 0:
       p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio, type=60)/payload60)
@@ -131,6 +144,7 @@ for dst_port in range(0,count):
 
   if len(txintf) == 0:
     print p.show(dump=True)
+    print "data=0x"+str(p).encode("HEX")
   else:
     sendp(p, iface=txintf, verbose=0)
 
