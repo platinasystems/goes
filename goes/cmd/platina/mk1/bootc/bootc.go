@@ -149,8 +149,9 @@ func (c *Command) Main(args ...string) (err error) {
 				return err
 			}
 			reboot()
+		} else {
+			fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
 		}
-		fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
 		return nil
 	//commands to set pcc in bootc.cfg
 	case "pccinitfile":
