@@ -34,7 +34,7 @@ type IMGINFO struct {
 	Size   string
 	Tag    string
 	Fe1    string
-	Fe1fw  string
+	Fe1Fw  string
 	Extra  string
 	Commit string
 	Chksum string
@@ -81,7 +81,7 @@ func printImageInfo() (err error) {
 		prn("    Size    : ", imgInfo[i].Size)
 		prn("    Version : ", imgInfo[i].Tag)
 		prn("    Fe1     : ", imgInfo[i].Fe1)
-		prn("    Fe1 FW  : ", imgInfo[i].Fe1fw)
+		prn("    Fe1Fw   : ", imgInfo[i].Fe1Fw)
 		prn("    Goes    : ", imgInfo[i].Extra)
 		prn("    Commit  : ", imgInfo[i].Commit)
 		fmt.Println("")
@@ -97,15 +97,18 @@ func prn(d string, s string) {
 
 func getGoesInfo() (im IMGINFO, err error) {
 	im.Name = GoesName
-	im.Build = getGoesVal("generated.on")
-	im.User = getGoesVal("generated.by")
+	im.Build = getGoesVal("generated.on", "/go")
+	im.User = getGoesVal("generated.by", "/go")
 	fi, err := os.Stat(GoesBin)
 	if err != nil {
 		return im, err
 	}
 	im.Size = fmt.Sprintf("%d", fi.Size())
-	im.Tag = getGoesVal("tag")
-	im.Commit = getGoesVal("version")
+	im.Tag = getGoesVal("tag", "/go")
+	im.Fe1 = getGoesVal("tag", "/fe1")
+	im.Fe1Fw = getGoesVal("tag", "firmware-fe1a")
+	i := getGoesVal("version", "/go")
+	im.Commit = i[0:7]
 	return im, nil
 }
 
@@ -167,7 +170,7 @@ func getCorebootInfo() (im IMGINFO, err error) {
 func upgradeGoes(s string, v string, t bool, f bool) error {
 	fmt.Printf("Update Goes\n")
 	if !f {
-		g := getGoesVer()
+		g := getGoesVal("tag", "/go")
 		gr, err := getSrvGoesVer(s, v, t)
 		if err != nil {
 			return err
@@ -239,8 +242,7 @@ func upgradeCoreboot(s string, v string, t bool, f bool) error {
 	return nil
 }
 
-func getGoesVer() (v string) {
-	ar := "tag"
+func getGoesVal(ar string, ir string) (v string) {
 	maps := []map[string]string{Package}
 	if Packages != nil {
 		maps = append(maps, Packages()...)
@@ -249,25 +251,7 @@ func getGoesVer() (v string) {
 		if ip, found := m["importpath"]; found {
 			k := strings.TrimLeft(ar, "-")
 			if val, found := m[k]; found {
-				if strings.Contains(ip, "/go") {
-					v = strings.Replace(val, "'", "", 1)
-				}
-			}
-		}
-	}
-	return v
-}
-
-func getGoesVal(ar string) (v string) {
-	maps := []map[string]string{Package}
-	if Packages != nil {
-		maps = append(maps, Packages()...)
-	}
-	for _, m := range maps {
-		if ip, found := m["importpath"]; found {
-			k := strings.TrimLeft(ar, "-")
-			if val, found := m[k]; found {
-				if strings.Contains(ip, "/go") {
+				if strings.Contains(ip, ir) {
 					v = strings.Replace(val, "'", "", 1)
 				}
 			}
