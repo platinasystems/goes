@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 type Tester interface {
@@ -38,23 +39,27 @@ func (suite *Suite) String() string {
 }
 
 func (suite *Suite) init(t *testing.T) {
-	if suite.Init != nil {
-		suite.Init(t)
-	}
+	begin := time.Now()
+	suite.Init(t)
+	t.Logf("\r\t%s init (%v)", t.Name(), time.Now().Sub(begin))
 }
 
 func (suite *Suite) exit(t *testing.T) {
-	if suite.Exit != nil {
-		suite.Exit(t)
-	}
+	begin := time.Now()
+	suite.Exit(t)
+	t.Logf("\r\t%s exit (%v)", t.Name(), time.Now().Sub(begin))
 }
 
 func (suite Suite) Test(t *testing.T) {
 	if *DryRun {
 		fmt.Println(t.Name())
 	} else {
-		defer suite.exit(t)
-		suite.init(t)
+		if suite.Exit != nil {
+			defer suite.exit(t)
+		}
+		if suite.Init != nil {
+			suite.init(t)
+		}
 	}
 	suite.Tests.Test(t)
 }
