@@ -31,6 +31,7 @@ type IMGINFO struct {
 	Name   string
 	Build  string
 	User   string
+	Distro string
 	Size   string
 	Tag    string
 	Fe1    string
@@ -78,6 +79,7 @@ func printImageInfo() (err error) {
 		prn("    Name    : ", imgInfo[i].Name)
 		prn("    Build   : ", imgInfo[i].Build)
 		prn("    User    : ", imgInfo[i].User)
+		prn("    Distro  : ", imgInfo[i].Distro)
 		prn("    Size    : ", imgInfo[i].Size)
 		prn("    Version : ", imgInfo[i].Tag)
 		prn("    Fe1     : ", imgInfo[i].Fe1)
@@ -115,7 +117,7 @@ func getGoesInfo() (im IMGINFO, err error) {
 func getKernelInfo() (im IMGINFO, err error) {
 	im.Name, _ = getKernelVal("-s")
 	im.Build, _ = getKernelVal("-v")
-	im.User = ""
+	im.User, im.Distro, _ = getKernelUserDistro()
 	im.Tag, _ = getKernelVal("-r")
 	im.Commit = ""
 	im.Size = ""
@@ -274,6 +276,27 @@ func getKernelVal(ar string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(u)), nil
+}
+
+func getKernelUserDistro() (user string, distro string, err error) {
+	dat, err := ioutil.ReadFile("/var/log/messages")
+	if err != nil {
+		return "a", "a", err
+	}
+	log := strings.Split(string(dat), "\n")
+	x := ""
+	for _, j := range log {
+		if strings.Contains(j, "Linux version") {
+			x = j
+		}
+	}
+	if x == "" {
+		return "b", "b", nil
+	}
+	y := strings.Split(x, "(")
+	u := strings.Split(y[1], ")")
+	d := strings.Split(y[3], ")")
+	return u[0], d[0], nil
 }
 
 func getCorebootVer() (tag string, err error) {
