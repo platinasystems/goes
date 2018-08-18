@@ -68,6 +68,8 @@ func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 const chanDepth = 1 << 16
 
+var closeDone = make(chan error)
+
 func (c *Command) Main(...string) error {
 	var in parse.Input
 
@@ -122,8 +124,6 @@ func (c *Command) Main(...string) error {
 	closeDone <- err
 	return nil
 }
-
-var closeDone = make(chan error)
 
 func (c *Command) Close() (err error) {
 	if c.i.poller.pubch != nil {
