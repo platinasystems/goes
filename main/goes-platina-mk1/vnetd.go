@@ -10,10 +10,10 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/goes/cmd/ip"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/redis"
@@ -56,8 +56,7 @@ func vnetdInit() {
 	xeth.EthtoolFlags = flags
 	xeth.EthtoolStats = stats
 	vnet.PortPrefixer = &mk1.PortPrefix
-	vnet.Xeth, err = xeth.New(machine.Name,
-		xeth.SizeofTxchOpt(nports*ncounters))
+	vnet.Xeth, err = xeth.New(machine.Name)
 
 	if err != nil {
 		panic(err)
@@ -348,31 +347,17 @@ func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 }
 
 func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
-	if vnet.Xeth != nil {
-		vnet.Xeth.Close()
+	var err error
+	if !p.KernelIxgbe {
+		return fmt.Errorf("no KernelIxgbe?")
 	}
-	if p.KernelIxgbe {
-		return mk1.PlatformExit(v, &p.Platform)
-	} else {
-		// FIXME why isn't this done in mk1.PlatformExit?
-		// this path only for tuntap, so eth- vs xeth names doesn't matter
-		interfaces, err := net.Interfaces()
-		if err != nil {
-			return err
-		}
-		for _, dev := range interfaces {
-			if strings.HasPrefix(dev.Name, "eth-") ||
-				dev.Name == "vnet" {
-				args := []string{"link", "delete", dev.Name}
-				err = ip.Goes.Main(args...)
-				if err != nil {
-					fmt.Println("write err", err)
-					return err
-				}
-			}
-		}
-		return nil
-	}
+	begin := time.Now()
+	err = mk1.PlatformExit(v, &p.Platform)
+	fmt.Printf("mk1.PlatformExit (%v)\n", time.Now().Sub(begin))
+	begin = time.Now()
+	vnet.Xeth.Close()
+	fmt.Printf("vnet.Xeth.Close (%v)\n", time.Now().Sub(begin))
+	return err
 }
 
 func (p *mk1Main) getDefaultLanes(port, subport uint) (lanes uint) {

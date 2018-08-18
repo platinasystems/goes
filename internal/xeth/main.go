@@ -30,6 +30,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unsafe"
 )
 
@@ -49,7 +50,7 @@ DB	{ ifinfo | fdb }
 DEVICE	an interface name or its ifindex
 STAT	an 'ip link' or 'ethtool' statistic
 FILE,-	receive an exception frame from FILE or STDIN`)
-	xeth, err := New(strings.TrimPrefix(name, "sample-"), DialOpt(false))
+	xeth, err := New(strings.TrimPrefix(name, "sample-"))
 	defer func() {
 		r := recover()
 		if err := xeth.Close(); r == nil {
@@ -138,7 +139,8 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			if err != nil {
 				panic(err)
 			}
-			if err = xeth.ExceptionFrame(buf); err != nil {
+			err = xeth.Tx(buf, 10*time.Millisecond)
+			if err != nil {
 				panic(err)
 			}
 			args = args[1:]
@@ -147,7 +149,8 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			if err != nil {
 				panic(err)
 			}
-			if err = xeth.ExceptionFrame(buf); err != nil {
+			err = xeth.Tx(buf, 10*time.Millisecond)
+			if err != nil {
 				panic(err)
 			}
 			args = args[1:]

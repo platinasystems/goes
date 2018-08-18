@@ -12,19 +12,21 @@
 package unix
 
 import (
+	"fmt"
+	"io"
+	"net"
+	"strconv"
+	"sync"
+	"syscall"
+	"time"
+	"unsafe"
+
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/ip"
 	"github.com/platinasystems/go/vnet/ip4"
-
-	"fmt"
-	"net"
-	"strconv"
-	"sync"
-	"syscall"
-	"unsafe"
 )
 
 var FdbOn bool
@@ -109,7 +111,11 @@ func initVnetFromXeth(v *vnet.Vnet) {
 	// Send events for initial dump of fib entries
 	fe := fdbm.GetEvent(vnet.Dynamic)
 	vnet.Xeth.DumpFib()
-	for buf := range vnet.Xeth.RxCh {
+	for {
+		buf, err := vnet.Xeth.Rx(0)
+		if err != nil {
+			panic(fmt.Errorf("xeth.Rx: %v", err))
+		}
 		kind := xeth.KindOf(buf)
 		if kind == xeth.XETH_MSG_KIND_BREAK {
 			xeth.Pool.Put(buf)
@@ -128,17 +134,38 @@ func initVnetFromXeth(v *vnet.Vnet) {
 
 	// Start go routine that drains XETH socket and shuttles msgs over to vnetd loop
 	// for subsequent processing of FIB, IFA and IFINFO updates
-	// Can optimize this so multiple messages are sent.
 	go func() {
+		const minrxto = 10 * time.Millisecond
+		const maxrxto = 320 * time.Millisecond
+		rxto := minrxto
 		m := GetMain(v)
 		fdbm := &m.FdbMain
-		for buf := range vnet.Xeth.RxCh {
+		needsignal := false
+		for {
+			buf, err := vnet.Xeth.Rx(rxto)
+			if err != nil {
+				if xeth.IsTimeout(err) {
+					if rxto <= maxrxto {
+						rxto *= 2
+					}
+					if needsignal {
+						fe.Signal()
+						needsignal = false
+					}
+					continue
+				} else if err == io.EOF {
+					break
+				}
+				panic(fmt.Errorf("xeth.Rx: %v", err))
+			} else {
+				rxto = minrxto
+			}
 			fe := fdbm.GetEvent(vnet.Dynamic)
 			ok := fe.EnqueueMsg(buf)
 			if !ok {
-				panic("Xeth.RxCh reader: Can't enqueue to fresh event!")
+				panic("Can't enqueue to fresh event!")
 			}
-			fe.Signal()
+			needsignal = true
 		}
 	}()
 }
