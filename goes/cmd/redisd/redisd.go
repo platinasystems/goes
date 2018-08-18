@@ -23,10 +23,10 @@ import (
 	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
+	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/parms"
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/reg"
-	"github.com/platinasystems/go/internal/machine"
 )
 
 type Command struct {
