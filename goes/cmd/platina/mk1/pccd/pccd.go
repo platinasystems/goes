@@ -6,7 +6,7 @@
 // http server daemon replies to master server requests
 // This daemon runs on every ToR under linux, does not run in goes-boot
 
-package bootd
+package pccd
 
 import (
 	"fmt"
@@ -21,9 +21,9 @@ import (
 
 type Command chan struct{}
 
-func (Command) String() string { return "bootd" }
+func (Command) String() string { return "pccd" }
 
-func (Command) Usage() string { return "bootd" }
+func (Command) Usage() string { return "pccd" }
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
