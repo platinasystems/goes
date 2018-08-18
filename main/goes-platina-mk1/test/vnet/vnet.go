@@ -35,14 +35,14 @@ var Suite = test.Suite{
 		}
 	},
 	Exit: func(t *testing.T) {
-		if *test.MustPause {
-			test.Pause("press enter to continue...")
+		if redisd != nil {
+			defer redisd.Quit()
 		}
 		if vnetd != nil {
-			vnetd.Quit()
+			defer vnetd.Quit()
 		}
-		if redisd != nil {
-			redisd.Quit()
+		if *test.MustPause {
+			test.Pause("press enter to continue...")
 		}
 	},
 	Tests: test.Tests{
