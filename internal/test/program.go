@@ -122,7 +122,10 @@ func (p *Program) End() (err error) {
 	select {
 	case err = <-done:
 		tm.Stop()
-		if p.ebuf.Len() > 0 {
+		if s := strings.TrimSpace(p.obuf.String()); len(s) > 0 {
+			p.tb.Log(s)
+		}
+		if s := strings.TrimSpace(p.ebuf.String()); len(s) > 0 {
 			err = errors.New(p.ebuf.String())
 			p.ebuf.Reset()
 		}
