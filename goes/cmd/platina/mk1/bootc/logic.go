@@ -32,6 +32,8 @@ import (
 )
 
 const (
+	minCoreVer   = 0.41
+	minCoreCom   = 299
 	verNum       = "1.11"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
@@ -55,6 +57,9 @@ const (
 	scriptFile   = "rc.local"
 	waitMs       = 100
 	timeoutCnt   = 50
+	Mach         = "mk1"
+	Machine      = "platina-" + Mach
+	CorebootName = "coreboot-" + Machine + ".rom"
 )
 
 var BootcCfgFile string
@@ -156,7 +161,56 @@ func Bootc() []string {
 		}
 
 		// DHCP, ZTP, PCC
-		if err = dhcpZtpPcc(); err != nil {
+		if false {
+			var i = 0
+			for start := time.Now(); time.Since(start) < 10*time.Second; {
+				i++
+			}
+
+			// SETUP PHASE - set dhcp bits, static IP
+			//
+			// D10 3 SEC LOOP wait for console interrupt --> YES, E10 goes-boot shell
+			//
+			// D20 static IP configured? (bootc.cfg)     --> NO,  goto D60 check if PCC enabled
+			//                                                    skip ZTP & DHCP
+			//                                                    P10 set DHCP option 55 and option 61
+			//
+			// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
+
+			// DHCP PHASE
+			//
+			// D40 INFINITE LOOP DHCP server found?      --> NO, check for ESC --> E20a shell
+			//
+			// ... DO DHCP
+
+			// ZTP PHASE
+			//
+			// D30b Is ZTP Enabled?                      --> NO, goto D60, PCC Enb check
+			//
+			// D50 INFINITE LOOP ZTP server found?       --> NO, check for ESC --> E20b shell
+			//
+			// P30 set "pixie boot" bit in bootc.cfg, download images, boot them, clr pixie bit
+
+			// PCC PHASE
+			//
+			// D60 Is PCC Enabled                        --> NO, goto P50 boot sda6
+			//
+			// D70 INFINITE LOOP, PCC server found?      --> ESC - goes-boot shell
+			//
+			// P40 register with PCC
+			//
+			// P50 boot sda6
+
+			// SDA6 BOOT
+			// D80 Is PCC Enabled                        --> NO, DONE
+			//
+			// P60 check in with PCC (register) goes register
+			//
+			// keep alives, status updates, control etc. from PCC...
+			//
+			// Transparent to invader: PCC will push additional configs via ansible
+			//
+			// Transparent to invader: keep alives, status updates, control etc. from PCC
 			return []string{""}
 		}
 
@@ -199,84 +253,30 @@ func Bootc() []string {
 	return []string{""}
 }
 
-func dhcpZtpPcc() error {
-	var i = 0
-	for start := time.Now(); time.Since(start) < 10*time.Second; {
-		i++
-	}
-
-	// SETUP PHASE - set dhcp bits, static IP
-	//
-	// D10 3 SEC LOOP wait for console interrupt --> YES, E10 goes-boot shell
-	//
-	// D20 static IP configured? (bootc.cfg)     --> NO,  goto D60 check if PCC enabled
-	//                                                    skip ZTP & DHCP
-	//                                                    P10 set DHCP option 55 and option 61
-	//
-	// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
-
-	// DHCP PHASE
-	//
-	// D40 INFINITE LOOP DHCP server found?      --> NO, check for ESC --> E20a shell
-	//
-	// ... DO DHCP
-
-	// ZTP PHASE
-	//
-	// D30b Is ZTP Enabled?                      --> NO, goto D60, PCC Enb check
-	//
-	// D50 INFINITE LOOP ZTP server found?       --> NO, check for ESC --> E20b shell
-	//
-	// P30 set "pixie boot" bit in bootc.cfg, download images, boot them, clr pixie bit
-
-	// PCC PHASE
-	//
-	// D60 Is PCC Enabled                        --> NO, goto P50 boot sda6
-	//
-	// D70 INFINITE LOOP, PCC server found?      --> ESC - goes-boot shell
-	//
-	// P40 register with PCC
-	//
-	// P50 boot sda6
-
-	// SDA6 BOOT
-	// D80 Is PCC Enabled                        --> NO, DONE
-	//
-	// P60 check in with PCC (register) goes register
-	//
-	// keep alives, status updates, control etc. from PCC...
-	//
-	// Transparent to invader: PCC will push additional configs via ansible
-	//
-	// Transparent to invader: keep alives, status updates, control etc. from PCC
-
-	return nil
-}
-
-func checkFiles() error {
+func checkFiles() bool {
 	context, err := getContext()
 	if err != nil {
-		return err
+		return false
 	}
 	path := ""
 	switch context {
 	case goesBoot:
-		fmt.Println("TEMP: goes-boot context.")
+		//fmt.Println("TEMP: goes-boot context.")
 		path = goesBootPath
 	case sda1:
-		fmt.Println("TEMP: goes sda1 context.")
+		//fmt.Println("TEMP: goes sda1 context.")
 		path = sda1Path
 	case sda6:
-		fmt.Println("TEMP: goes sda6 context.")
+		//fmt.Println("TEMP: goes sda6 context.")
 		path = sda6Path
 		if err := mountSda1(); err != nil {
-			fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
-			return err
+			//fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
+			return false
 		}
-		fmt.Println("TEMP: goes sda6 mount-sda1 success.")
+		//fmt.Println("TEMP: goes sda6 mount-sda1 success.")
 	default:
 		fmt.Println("ERROR: could not determine context.")
-		return nil
+		return false
 	}
 
 	good := true
@@ -294,10 +294,10 @@ func checkFiles() error {
 	// 4. check the sda6 i string, see it matches /boot
 	if good {
 		fmt.Println("PASSED: wipe/reinstall is configured properly.")
-	} else {
-		fmt.Println("FAILED: wipe/reinstall is NOT configured properly.")
+		return true
 	}
-	return nil
+	fmt.Println("FAILED: wipe/reinstall is NOT configured properly.")
+	return false
 }
 
 func getFiles() error {
@@ -305,28 +305,28 @@ func getFiles() error {
 	if err != nil {
 		return err
 	}
-	path := ""
+	//path := ""
 	switch context {
 	case goesBoot:
-		fmt.Println("TEMP: goes-boot context.")
-		path = goesBootPath
+		//fmt.Println("TEMP: goes-boot context.")
+		//path = goesBootPath
 	case sda1:
-		fmt.Println("TEMP: goes sda1 context.")
-		path = sda1Path
+		//fmt.Println("TEMP: goes sda1 context.")
+		//path = sda1Path
 	case sda6:
-		fmt.Println("TEMP: goes sda6 context.")
-		path = sda6Path
+		//fmt.Println("TEMP: goes sda6 context.")
+		//path = sda6Path
 		if err := mountSda1(); err != nil {
-			fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
+			//fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
 			return err
 		}
-		fmt.Println("TEMP: goes sda6 mount-sda1 success.")
+		//fmt.Println("TEMP: goes sda6 mount-sda1 success.")
 	default:
 		fmt.Println("ERROR: could not determine context.")
 		return nil
 	}
 
-	fmt.Println("TEMP: sda1 path = ", path)
+	//fmt.Println("TEMP: sda1 path = ", path)
 	return nil
 }
 
@@ -336,19 +336,6 @@ func (c *Command) bootc() {
 		fmt.Println(err)
 	}
 	return
-}
-
-func serverAvail() bool {
-	return false
-
-	/*reply, _, err := register(mip, mac, ip)
-	if err != nil || reply != RegReplyRegistered {
-		reply, _, err = register(mip, mac, ip)
-		if err != nil || reply != RegReplyRegistered {
-			return false
-		}
-	} */
-	return true
 }
 
 func initCfg() error {
@@ -942,6 +929,7 @@ func UpdateBootcCfg(k, i string) error {
 }
 
 func Wipe() error {
+	fmt.Println("Making sure we booted from sda1 or sda6...")
 	context, err := getContext()
 	if context != sda6 && context != sda1 {
 		return fmt.Errorf("Not booted from sda6 or sda1, can't wipe.")
@@ -950,7 +938,7 @@ func Wipe() error {
 		return err
 	}
 
-	// make sure sda6 exists
+	fmt.Println("Making sure sda6 exists...")
 	d1 := []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
 	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
 		return err
@@ -972,7 +960,40 @@ func Wipe() error {
 		return fmt.Errorf("Error: /dev/sda6 not in partition table, aborting")
 	}
 
-	// delete sda6
+	fmt.Println("Making sure sda1 has all the re-install files...")
+	if passed := checkFiles(); !passed {
+		return fmt.Errorf("Not all files exist on sda1, aborting...")
+	}
+
+	fmt.Println("Check coreboot version...")
+	var im IMGINFO
+	if im, err = getCorebootInfo(); err != nil {
+		fmt.Println("Coreboot could not be read, aborting...")
+		return err
+	}
+	if len(im.Extra) == 0 {
+		fmt.Println("Coreboot git version doesn't exist in rom, aborting")
+		return fmt.Errorf("Couldn't determine coreboot version")
+	}
+	y := strings.Split(im.Extra, "-")
+	z := strings.Split(y[0], "v")
+	w, err := strconv.Atoi(y[1])
+	if err != nil {
+		return fmt.Errorf("Couldn't determine coreboot version, aborting...")
+	}
+	v, err := strconv.ParseFloat(z[1], 64)
+	if err != nil {
+		return fmt.Errorf("Couldn't determine coreboot version, aborting...")
+	}
+	if v < minCoreVer {
+		return fmt.Errorf("Coreboot needs upgraded.")
+	}
+	if w < minCoreCom {
+		return fmt.Errorf("Coreboot needs upgraded.")
+	}
+	fmt.Printf("Coreboot version ok, ver = %d, subver = %d\n", v, w)
+
+	fmt.Println("Deleting sda6 from the partition table...")
 	d1 = []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
 	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
 		return err
@@ -983,7 +1004,7 @@ func Wipe() error {
 		fmt.Printf("fdisk: %v, %v\n", out, err)
 	}
 
-	// make sure sda6 is gone
+	fmt.Println("Verify sda6 is actually gone...")
 	d1 = []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
 	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
 		return err
@@ -1000,15 +1021,17 @@ func Wipe() error {
 			return fmt.Errorf("Error: /dev/sda6 not deleted, aborting wipe")
 		}
 	}
+	fmt.Println("Verified")
 
-	fmt.Println("\nPlease wait...reinstalling linux on sda6\n")
+	fmt.Println("Setting Install bit for coreboot...")
 	if err := setInstall(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func fixPaths() error { //FIXME Temporary remove by 7/31/2018
+func fixPaths() error { //FIXME Temporary remove by 9/30/2018
 	files, err := ioutil.ReadDir(cbSda6 + "boot")
 	if err != nil {
 		return err
@@ -1081,4 +1104,45 @@ func Copy(src string, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+func getCorebootInfo() (im IMGINFO, err error) {
+	im.Name = CorebootName
+	_, err = exec.Command("/usr/local/sbin/flashrom", "-p",
+		"internal:boardmismatch=force", "-l",
+		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
+		"-i", "bios", "-r", "cb.rom", "-A", "-V").Output()
+	if err != nil {
+		return im, err
+	}
+	a, err := ioutil.ReadFile("cb.rom")
+	if err != nil {
+		return im, err
+	}
+	temp := strings.Split(string(a), "\n")
+	for _, j := range temp {
+		if strings.Contains(j, "COREBOOT_VERSION ") {
+			x := strings.Split(j, " ")
+			im.Tag = strings.Replace(x[2], `"`, "", 2)
+		}
+		if strings.Contains(j, "COREBOOT_EXTRA_VERSION ") {
+			x := strings.Split(j, " ")
+			im.Extra = strings.Replace(x[2], `"`, "", 2)
+		}
+		if strings.Contains(j, "COREBOOT_ORIGIN_GIT_REVISION ") {
+			x := strings.Split(j, " ")
+			im.Commit = strings.Replace(x[2], `"`, "", 2)
+		}
+		if strings.Contains(j, "COREBOOT_BUILD ") {
+			x := strings.SplitAfterN(j, " ", 3)
+			im.Build = strings.Replace(x[2], `"`, "", 2)
+		}
+	}
+	im.User = ""
+	fi, err := os.Stat("cb.rom")
+	if err != nil {
+		return im, err
+	}
+	im.Size = fmt.Sprintf("%d", fi.Size())
+	return im, nil
 }

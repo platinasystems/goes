@@ -151,6 +151,20 @@ type BootReply struct {
 	Error      error
 }
 
+type IMGINFO struct {
+	Name   string
+	Build  string
+	User   string
+	Distro string
+	Size   string
+	Tag    string
+	Fe1    string
+	Fe1Fw  string
+	Extra  string
+	Commit string
+	Chksum string
+}
+
 var ClientCfg map[string]*Client
 var ClientBootCfg map[string]*BootcConfig
 

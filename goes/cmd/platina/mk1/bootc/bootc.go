@@ -67,9 +67,8 @@ func (c *Command) Main(args ...string) (err error) {
 		fmt.Println(verNum)
 		return nil
 	case "checkfiles":
-		if err := checkFiles(); err != nil {
-			return nil
-		}
+		checkFiles()
+		return nil
 	case "getfiles":
 		if err := getFiles(); err != nil {
 			return nil
