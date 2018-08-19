@@ -39,12 +39,14 @@ func (suite *Suite) String() string {
 }
 
 func (suite *Suite) init(t *testing.T) {
+	t.Helper()
 	begin := time.Now()
 	suite.Init(t)
 	t.Logf("\r\t%s init (%v)", t.Name(), time.Now().Sub(begin))
 }
 
 func (suite *Suite) exit(t *testing.T) {
+	t.Helper()
 	begin := time.Now()
 	suite.Exit(t)
 	t.Logf("\r\t%s exit (%v)", t.Name(), time.Now().Sub(begin))

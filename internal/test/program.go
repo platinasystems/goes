@@ -25,6 +25,8 @@ const Timeout = 3 * time.Second
 // Self flags Program to run itself
 type Self struct{}
 
+type Quiet struct{}
+
 // Begin a Program; type options:
 //
 //	Self	inserts []string{os.Args[0], "-test.main}" into Program args;
@@ -40,6 +42,8 @@ type Self struct{}
 //			}.Run(t)
 //		}
 //
+//	Quiet
+//		don't log output even if err is !nil
 //	io.Reader
 //		use reader as Stdin instead of the default, /dev/null
 //
@@ -64,6 +68,8 @@ func Begin(tb testing.TB, options ...interface{}) (*Program, error) {
 		switch t := opt.(type) {
 		case Self:
 			args = append(args, prog.Name(), "-test.main")
+		case Quiet:
+			p.quiet = true
 		case io.Reader:
 			stdin = t
 		case *regexp.Regexp:
@@ -96,12 +102,13 @@ func Begin(tb testing.TB, options ...interface{}) (*Program, error) {
 
 // Program is an exec.Cmd wrapper
 type Program struct {
-	cmd  *exec.Cmd
-	tb   testing.TB
-	obuf *bytes.Buffer
-	ebuf *bytes.Buffer
-	dur  time.Duration
-	exp  *regexp.Regexp
+	cmd   *exec.Cmd
+	tb    testing.TB
+	obuf  *bytes.Buffer
+	ebuf  *bytes.Buffer
+	dur   time.Duration
+	exp   *regexp.Regexp
+	quiet bool
 }
 
 // Quit will SIGTERM the Program then End and Log any error.
@@ -118,12 +125,17 @@ func (p *Program) End() (err error) {
 	p.tb.Helper()
 	tm := time.NewTimer(p.dur)
 	done := make(chan error)
+	sig := syscall.SIGTERM
 	go func() { done <- p.cmd.Wait() }()
+again:
 	select {
 	case err = <-done:
 		tm.Stop()
-		if s := strings.TrimSpace(p.obuf.String()); len(s) > 0 {
-			p.tb.Log(s)
+		if *VV {
+			s := strings.TrimSpace(p.obuf.String())
+			if len(s) > 0 {
+				p.tb.Log(s)
+			}
 		}
 		if s := strings.TrimSpace(p.ebuf.String()); len(s) > 0 {
 			err = errors.New(p.ebuf.String())
@@ -134,11 +146,17 @@ func (p *Program) End() (err error) {
 		}
 	case <-tm.C:
 		err = syscall.ETIME
-		p.cmd.Process.Kill()
-		<-done
+		if *VV || !p.quiet {
+			p.tb.Log(sig, "process", p.cmd.Process.Pid, p.cmd.Args)
+		}
+		p.cmd.Process.Signal(sig)
+		tm.Reset(3 * time.Second)
+		sig = syscall.SIGKILL
+		goto again
 	}
-	if s := strings.TrimRight(p.obuf.String(), "\n"); len(s) > 0 {
-		if err != nil || *VV {
+	if *VV || (err != nil && !p.quiet) {
+		s := strings.TrimRight(p.obuf.String(), "\n")
+		if len(s) > 0 {
 			p.tb.Log(s)
 		}
 	}

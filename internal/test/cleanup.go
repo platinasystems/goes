@@ -15,9 +15,7 @@ type Cleanup struct {
 
 // Program runs a cleanup task to its End
 func (cleanup Cleanup) Program(options ...interface{}) {
-	if !cleanup.Failed() {
-		cleanup.Helper()
-	}
+	cleanup.Helper()
 	p, err := Begin(cleanup.TB, options...)
 	if err == nil {
 		err = p.End()
