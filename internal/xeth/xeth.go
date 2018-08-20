@@ -118,7 +118,6 @@ func (xeth *Xeth) Close() error {
 	xeth.sock = nil
 	Pool.Put(xeth.rxbuf)
 	Pool.Put(xeth.rxoob)
-	fmt.Println("xeth sock closed")
 	return nil
 }
 
