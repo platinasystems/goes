@@ -133,7 +133,7 @@ func (m nodocker) hping(t *testing.T, duration time.Duration) {
 	ns := c.netns
 	gw := c.routes[0].gw
 	assert.Nil(test.Ping(ns, gw))
-	p, err := test.Begin(t, duration, test.Quiet{},
+	p, err := test.Begin(t, duration, test.Quiet{}, test.Self{},
 		"ip", "netns", "exec", ns,
 		"hping3", "--icmp", "--flood", "-q", gw)
 	assert.Nil(err)
