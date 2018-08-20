@@ -13,8 +13,8 @@ package unix
 
 import (
 	"fmt"
-	"io"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"syscall"
@@ -153,8 +153,10 @@ func initVnetFromXeth(v *vnet.Vnet) {
 						needsignal = false
 					}
 					continue
-				} else if err == io.EOF {
-					break
+				} else if e, ok := err.(*os.SyscallError); ok {
+					if e.Err.Error() == "EOF" {
+						break
+					}
 				}
 				panic(fmt.Errorf("xeth.Rx: %v", err))
 			} else {
