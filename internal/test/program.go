@@ -131,12 +131,6 @@ again:
 	select {
 	case err = <-done:
 		tm.Stop()
-		if *VV {
-			s := strings.TrimSpace(p.obuf.String())
-			if len(s) > 0 {
-				p.tb.Log(s)
-			}
-		}
 		if s := strings.TrimSpace(p.ebuf.String()); len(s) > 0 {
 			err = errors.New(p.ebuf.String())
 			p.ebuf.Reset()
