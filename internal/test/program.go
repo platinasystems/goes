@@ -148,7 +148,7 @@ again:
 		sig = syscall.SIGKILL
 		goto again
 	}
-	if *VV || (err != nil && !p.quiet) {
+	if !p.quiet && (*VV || err != nil) {
 		s := strings.TrimRight(p.obuf.String(), "\n")
 		if len(s) > 0 {
 			p.tb.Log(s)
