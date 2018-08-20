@@ -66,7 +66,7 @@ func checkDaemons() error {
 		"vnetd":        true,
 		"redisd":       true,
 		"uptimed":      true,
-		"bootd":        true,
+		"pccd":         true,
 		// "tempd":        true,
 	}
 
