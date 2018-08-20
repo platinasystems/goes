@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/lang"
@@ -51,13 +53,25 @@ func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {
 	var x *exec.Cmd
+	sigch := make(chan os.Signal)
+	signal.Notify(sigch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+	defer signal.Stop(sigch)
 	run := func() error {
 		x.Stdin = os.Stdin
 		x.Stdout = os.Stdout
 		x.Stderr = os.Stderr
-		err := x.Run()
+		err := x.Start()
 		if err != nil {
-			err = fmt.Errorf("%v: %v", x.Args, err)
+			return fmt.Errorf("%v: %v", x.Args, err)
+		}
+		done := make(chan error)
+		go func() { done <- x.Wait() }()
+	again:
+		select {
+		case err = <-done:
+		case sig := <-sigch:
+			x.Process.Signal(sig)
+			goto again
 		}
 		return err
 	}
