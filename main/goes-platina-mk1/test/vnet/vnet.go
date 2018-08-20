@@ -5,6 +5,7 @@
 package vnet
 
 import (
+	"flag"
 	"testing"
 	"time"
 
@@ -12,14 +13,18 @@ import (
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/docker"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
+	"github.com/platinasystems/go/vnet/unix"
 )
 
 var redisd, vnetd *test.Program
+
+var fdb = flag.Bool("test.fdb", false, "vnet fdb mode")
 
 var Suite = test.Suite{
 	Name: "vnet",
 	Init: func(t *testing.T) {
 		assert := test.Assert{t}
+		unix.FdbOn = *fdb
 
 		redisd = assert.Background(test.Self{}, "redisd")
 		assert.Program(12*time.Second, test.Self{},
