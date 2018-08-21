@@ -30,7 +30,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	"unsafe"
 )
 
@@ -139,20 +138,14 @@ FILE,-	receive an exception frame from FILE or STDIN`)
 			if err != nil {
 				panic(err)
 			}
-			err = xeth.Tx(buf, 10*time.Millisecond)
-			if err != nil {
-				panic(err)
-			}
+			xeth.Tx(buf)
 			args = args[1:]
 		default:
 			buf, err := ioutil.ReadFile(args[0])
 			if err != nil {
 				panic(err)
 			}
-			err = xeth.Tx(buf, 10*time.Millisecond)
-			if err != nil {
-				panic(err)
-			}
+			xeth.Tx(buf)
 			args = args[1:]
 		}
 	}

@@ -133,7 +133,7 @@ func (xeth *Xeth) Carrier(ifname string, flag CarrierFlag) error {
 	msg.Kind = uint8(XETH_MSG_KIND_CARRIER)
 	copy(msg.Ifname[:], ifname)
 	msg.Flag = uint8(flag)
-	return xeth.Tx(buf, 0)
+	return xeth.tx(buf, 0)
 }
 
 func (xeth *Xeth) DumpFib() error {
@@ -141,7 +141,7 @@ func (xeth *Xeth) DumpFib() error {
 	defer Pool.Put(buf)
 	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
 	msg.Kind = uint8(XETH_MSG_KIND_DUMP_FIBINFO)
-	return xeth.Tx(buf, 0)
+	return xeth.tx(buf, 0)
 }
 
 func (xeth *Xeth) DumpIfinfo() error {
@@ -149,7 +149,7 @@ func (xeth *Xeth) DumpIfinfo() error {
 	defer Pool.Put(buf)
 	msg := (*MsgBreak)(unsafe.Pointer(&buf[0]))
 	msg.Kind = uint8(XETH_MSG_KIND_DUMP_IFINFO)
-	return xeth.Tx(buf, 0)
+	return xeth.tx(buf, 0)
 }
 
 func (xeth *Xeth) SetStat(ifname, stat string, count uint64) error {
@@ -171,7 +171,7 @@ func (xeth *Xeth) SetStat(ifname, stat string, count uint64) error {
 	copy(msg.Ifname[:], ifname)
 	msg.Index = statindex
 	msg.Count = count
-	return xeth.Tx(buf, 10*time.Millisecond)
+	return xeth.tx(buf, 10*time.Millisecond)
 }
 
 func (xeth *Xeth) Speed(ifname string, count uint64) error {
@@ -181,10 +181,10 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	msg.Kind = uint8(XETH_MSG_KIND_SPEED)
 	copy(msg.Ifname[:], ifname)
 	msg.Mbps = uint32(count)
-	return xeth.Tx(buf, 0)
+	return xeth.tx(buf, 0)
 }
 
-func (xeth *Xeth) Tx(buf []byte, timeout time.Duration) error {
+func (xeth *Xeth) tx(buf []byte, timeout time.Duration) error {
 	var oob []byte
 	var dl time.Time
 	if timeout != time.Duration(0) {
@@ -200,7 +200,7 @@ func (xeth *Xeth) Tx(buf []byte, timeout time.Duration) error {
 
 func (xeth *Xeth) gotx() {
 	for msg := range xeth.txch {
-		err := xeth.Tx(msg, 10*time.Millisecond)
+		err := xeth.tx(msg, 10*time.Millisecond)
 		Pool.Put(msg)
 		if err != nil && !IsTimeout(err) {
 			break
@@ -208,7 +208,8 @@ func (xeth *Xeth) gotx() {
 	}
 }
 
-func (xeth *Xeth) TxQ(buf []byte) {
+// leaky bucket
+func (xeth *Xeth) Tx(buf []byte) {
 	msg := Pool.Get(len(buf))
 	copy(msg, buf)
 	select {
