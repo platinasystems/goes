@@ -109,6 +109,8 @@ var (
 		"GOARCH of PACKAGE build")
 	goosFlag = flag.String("goos", runtime.GOOS,
 		"GOOS of PACKAGE build")
+	cloneFlag = flag.Bool("clone", false,
+		"Fallback to 'git clone' if git worktree does not work.")
 	nFlag = flag.Bool("n", false,
 		"print 'go build' commands but do not run them.")
 	oFlag    = flag.String("o", "", "output file name of PACKAGE build")
@@ -771,12 +773,18 @@ func configWorktree(repo string, machine string, config string) (workdir string,
 	}
 	workdir = filepath.Join("worktrees", repo, machine)
 	if _, err := os.Stat(workdir); os.IsNotExist(err) {
+		clone := ""
+		if *cloneFlag {
+			clone = " || git clone . $p"
+		}
 		if err := shellCommandRun("mkdir -p " + workdir +
 			" && cd " + workdir +
 			" && p=`pwd` " +
 			" && cd " + gitdir +
 			" && ( git worktree prune ; git branch -d " + machine +
-			" ; git worktree add $p || git clone . $p )" +
+			" ; git worktree add $p" +
+			clone +
+			" )" +
 			" && cd $p" +
 			" && " + config); err != nil {
 			return "", err
