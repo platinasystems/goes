@@ -218,10 +218,8 @@ elif [ $cmd == "show" ]; then
 elif [ $cmd == "showup" ]; then
     xeth_show $xeth_list | grep -i state.up
 elif [ $cmd == "test_init" ]; then
-    xeth_del $xeth_list
     rmmod ${xeth_driver}
     modprobe ${xeth_driver}
-    xeth_netport_add
 elif [ $cmd == "add" ]; then
     xeth_add $xeth_list
 elif [ $cmd == "del" ]; then
