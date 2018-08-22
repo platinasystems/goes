@@ -14,11 +14,9 @@ package unix
 import (
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/platinasystems/go/elib/loop"
@@ -111,65 +109,43 @@ func initVnetFromXeth(v *vnet.Vnet) {
 	// Send events for initial dump of fib entries
 	fe := fdbm.GetEvent(vnet.Dynamic)
 	vnet.Xeth.DumpFib()
-	for {
-		buf, err := vnet.Xeth.Rx(0)
-		if err != nil {
-			panic(fmt.Errorf("xeth.Rx: %v", err))
-		}
-		kind := xeth.KindOf(buf)
-		if kind == xeth.XETH_MSG_KIND_BREAK {
-			xeth.Pool.Put(buf)
+	for msg := range vnet.Xeth.RxCh {
+		if kind := xeth.KindOf(msg); kind == xeth.XETH_MSG_KIND_BREAK {
+			xeth.Pool.Put(msg)
 			break
 		}
-		if ok := fe.EnqueueMsg(buf); !ok {
+		if ok := fe.EnqueueMsg(msg); !ok {
 			// filled event with messages so send it and continue
 			fe.Signal()
 			fe = fdbm.GetEvent(vnet.Dynamic)
-			if ok = fe.EnqueueMsg(buf); !ok {
-				panic("DumpFib: Re-enqueue of msg failed")
+			if ok = fe.EnqueueMsg(msg); !ok {
+				panic("can't enqueue initial fdb dump")
 			}
 		}
 	}
 	fe.Signal()
 
-	// Start go routine that drains XETH socket and shuttles msgs over to vnetd loop
-	// for subsequent processing of FIB, IFA and IFINFO updates
-	go func() {
-		const minrxto = 10 * time.Millisecond
-		const maxrxto = 320 * time.Millisecond
-		rxto := minrxto
-		m := GetMain(v)
-		fdbm := &m.FdbMain
-		needsignal := false
-		for {
-			buf, err := vnet.Xeth.Rx(rxto)
-			if err != nil {
-				if xeth.IsTimeout(err) {
-					if rxto <= maxrxto {
-						rxto *= 2
-					}
-					if needsignal {
-						fe.Signal()
-						needsignal = false
-					}
-					continue
-				} else if e, ok := err.(*os.SyscallError); ok {
-					if e.Err.Error() == "EOF" {
-						break
-					}
-				}
-				panic(fmt.Errorf("xeth.Rx: %v", err))
-			} else {
-				rxto = minrxto
+	// Drain XETH channel into vnet events.
+	go gofdb(v)
+}
+
+func gofdb(v *vnet.Vnet) {
+	m := GetMain(v)
+	fdbm := &m.FdbMain
+	fe := fdbm.GetEvent(vnet.Dynamic)
+	for msg := range vnet.Xeth.RxCh {
+		if ok := fe.EnqueueMsg(msg); !ok {
+			fe.Signal()
+			fe = fdbm.GetEvent(vnet.Dynamic)
+			if ok = fe.EnqueueMsg(msg); !ok {
+				panic("Can't enqueue fdb")
 			}
-			fe := fdbm.GetEvent(vnet.Dynamic)
-			ok := fe.EnqueueMsg(buf)
-			if !ok {
-				panic("Can't enqueue to fresh event!")
-			}
-			needsignal = true
 		}
-	}()
+		if len(vnet.Xeth.RxCh) == 0 {
+			fe.Signal()
+			fe = fdbm.GetEvent(vnet.Dynamic)
+		}
+	}
 }
 
 func (e *fdbEvent) EventAction() {

@@ -26,6 +26,7 @@ package xeth
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"syscall"
@@ -42,9 +43,9 @@ type Xeth struct {
 	addr *net.UnixAddr
 	sock *net.UnixConn
 
-	rxbuf []byte
-	rxoob []byte
-	txch  chan []byte
+	RxCh <-chan []byte
+	rxch chan<- []byte
+	txch chan []byte
 }
 
 var expMsgSz = map[Kind]int{
@@ -58,10 +59,12 @@ var expMsgSz = map[Kind]int{
 }
 
 func IsEAGAIN(err error) bool {
-	if operr, ok := err.(*net.OpError); ok {
-		if oserr, ok := operr.Err.(*os.SyscallError); ok {
-			if oserr.Err == syscall.EAGAIN {
-				return true
+	if err != nil {
+		if operr, ok := err.(*net.OpError); ok {
+			if oserr, ok := operr.Err.(*os.SyscallError); ok {
+				if oserr.Err == syscall.EAGAIN {
+					return true
+				}
 			}
 		}
 	}
@@ -69,8 +72,10 @@ func IsEAGAIN(err error) bool {
 }
 
 func IsTimeout(err error) bool {
-	if op, ok := err.(*net.OpError); ok {
-		return op.Timeout()
+	if err != nil {
+		if op, ok := err.(*net.OpError); ok {
+			return op.Timeout()
+		}
 	}
 	return false
 }
@@ -92,16 +97,81 @@ func New(driver string) (*Xeth, error) {
 			return nil, err
 		}
 	}
+	rxch := make(chan []byte, 4)
 	xeth := &Xeth{
-		name:  driver,
-		addr:  addr,
-		sock:  sock,
-		rxbuf: Pool.Get(PageSize),
-		rxoob: Pool.Get(PageSize),
-		txch:  make(chan []byte, 4),
+		name: driver,
+		addr: addr,
+		sock: sock,
+		RxCh: rxch,
+		rxch: rxch,
+		txch: make(chan []byte, 4),
 	}
+	go xeth.gorx()
 	go xeth.gotx()
 	return xeth, err
+}
+
+func (xeth *Xeth) gorx() {
+	const minrxto = 10 * time.Millisecond
+	const maxrxto = 320 * time.Millisecond
+	rxto := minrxto
+	rxbuf := Pool.Get(PageSize)
+	defer Pool.Put(rxbuf)
+	rxoob := Pool.Get(PageSize)
+	defer Pool.Put(rxoob)
+	defer close(xeth.rxch)
+	for xeth.sock != nil {
+		err := xeth.sock.SetReadDeadline(time.Now().Add(rxto))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "xeth set rx deadline", err)
+			break
+		}
+		n, noob, flags, addr, err :=
+			xeth.sock.ReadMsgUnix(rxbuf, rxoob)
+		_ = noob
+		_ = flags
+		_ = addr
+		if n == 0 || IsTimeout(err) {
+			if rxto < maxrxto {
+				rxto *= 2
+			}
+		} else if err == nil {
+			rxto = minrxto
+			msg := Pool.Get(n)
+			copy(msg, rxbuf[:n])
+			xeth.rxch <- msg
+		} else {
+			e, ok := err.(*os.SyscallError)
+			if !ok || e.Err.Error() != "EOF" {
+				fmt.Fprintln(os.Stderr, "xeth rx", err)
+			}
+			break
+		}
+	}
+}
+
+func (xeth *Xeth) gotx() {
+	for msg := range xeth.txch {
+		xeth.tx(msg, 10*time.Millisecond)
+		Pool.Put(msg)
+	}
+}
+
+func (xeth *Xeth) tx(buf []byte, timeout time.Duration) error {
+	var oob []byte
+	var dl time.Time
+	if xeth.sock == nil {
+		return io.EOF
+	}
+	if timeout != time.Duration(0) {
+		dl = time.Now().Add(timeout)
+	}
+	err := xeth.sock.SetWriteDeadline(dl)
+	if err != nil {
+		return err
+	}
+	_, _, err = xeth.sock.WriteMsgUnix(buf, oob, nil)
+	return err
 }
 
 func (xeth *Xeth) String() string { return xeth.name }
@@ -121,8 +191,6 @@ func (xeth *Xeth) Close() error {
 	xeth.sock.Close()
 	close(xeth.txch)
 	xeth.sock = nil
-	Pool.Put(xeth.rxbuf)
-	Pool.Put(xeth.rxoob)
 	return nil
 }
 
@@ -184,30 +252,6 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	return xeth.tx(buf, 0)
 }
 
-func (xeth *Xeth) tx(buf []byte, timeout time.Duration) error {
-	var oob []byte
-	var dl time.Time
-	if timeout != time.Duration(0) {
-		dl = time.Now().Add(timeout)
-	}
-	err := xeth.sock.SetWriteDeadline(dl)
-	if err != nil {
-		return err
-	}
-	_, _, err = xeth.sock.WriteMsgUnix(buf, oob, nil)
-	return err
-}
-
-func (xeth *Xeth) gotx() {
-	for msg := range xeth.txch {
-		err := xeth.tx(msg, 10*time.Millisecond)
-		Pool.Put(msg)
-		if err != nil && !IsTimeout(err) {
-			break
-		}
-	}
-}
-
 // leaky bucket
 func (xeth *Xeth) Tx(buf []byte) {
 	msg := Pool.Get(len(buf))
@@ -220,15 +264,11 @@ func (xeth *Xeth) Tx(buf []byte) {
 }
 
 func (xeth *Xeth) UntilBreak(f func([]byte) error) error {
-	for {
-		msg, err := xeth.Rx(0)
-		if err != nil {
-			return err
-		}
+	var err error
+	for msg := range xeth.RxCh {
 		kind := KindOf(msg)
 		if kind == XETH_MSG_KIND_BREAK {
-			Pool.Put(msg)
-			break
+			err = io.EOF
 		} else if kind != XETH_MSG_KIND_NOT_MSG {
 			exp, found := expMsgSz[kind]
 			if found && exp != len(msg) {
@@ -239,31 +279,11 @@ func (xeth *Xeth) UntilBreak(f func([]byte) error) error {
 		}
 		Pool.Put(msg)
 		if err != nil {
-			return err
+			break
 		}
 	}
-	return nil
-}
-
-// be sure to Pool.Put(msg) when done
-func (xeth *Xeth) Rx(timeout time.Duration) (msg []byte, err error) {
-	var dl time.Time
-	if timeout != time.Duration(0) {
-		dl = time.Now().Add(timeout)
+	if err == io.EOF {
+		err = nil
 	}
-	err = xeth.sock.SetReadDeadline(dl)
-	if err != nil {
-		return
-	}
-	n, noob, flags, addr, err :=
-		xeth.sock.ReadMsgUnix(xeth.rxbuf, xeth.rxoob)
-	_ = noob
-	_ = flags
-	_ = addr
-	if err != nil {
-		return
-	}
-	msg = Pool.Get(n)
-	copy(msg, xeth.rxbuf[:n])
-	return
+	return err
 }
