@@ -10,6 +10,7 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
+    "github.com/platinasystems/go/goes/cmd/biosupdate"
 	"github.com/platinasystems/go/goes/cmd/cat"
 	"github.com/platinasystems/go/goes/cmd/cd"
 	"github.com/platinasystems/go/goes/cmd/chmod"
@@ -225,5 +226,6 @@ var Goes = &goes.Goes{
 			Init: vnetdInit,
 		},
 		"wget": wget.Command{},
+        "biosupdate": biosupdate.Command{},
 	},
 }
