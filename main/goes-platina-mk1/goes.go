@@ -10,7 +10,7 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/bang"
-    "github.com/platinasystems/go/goes/cmd/biosupdate"
+	"github.com/platinasystems/go/goes/cmd/biosupdate"
 	"github.com/platinasystems/go/goes/cmd/cat"
 	"github.com/platinasystems/go/goes/cmd/cd"
 	"github.com/platinasystems/go/goes/cmd/chmod"
@@ -58,7 +58,6 @@ import (
 	"github.com/platinasystems/go/goes/cmd/mount"
 	"github.com/platinasystems/go/goes/cmd/ping"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
-	"github.com/platinasystems/go/goes/cmd/platina/mk1/pccd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/toggle"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/upgrade"
 	"github.com/platinasystems/go/goes/cmd/ps"
@@ -104,7 +103,6 @@ var Goes = &goes.Goes{
 		"!":        bang.Command{},
 		"cli":      &cli.Command{},
 		"bootc":    &bootc.Command{},
-		"pccd":     pccd.Command(make(chan struct{})),
 		"cat":      cat.Command{},
 		"cd":       &cd.Command{},
 		"chmod":    chmod.Command{},
@@ -124,7 +122,6 @@ var Goes = &goes.Goes{
 		"gpio":     &gpio.Command{},
 		"goes-daemons": &daemons.Command{
 			Init: [][]string{
-				[]string{"pccd"},
 				[]string{"redisd"},
 				[]string{"uptimed"},
 				// []string{"tempd"},
@@ -225,7 +222,7 @@ var Goes = &goes.Goes{
 		"vnetd": &vnetd.Command{
 			Init: vnetdInit,
 		},
-		"wget": wget.Command{},
-        "biosupdate": biosupdate.Command{},
+		"wget":       wget.Command{},
+		"biosupdate": biosupdate.Command{},
 	},
 }
