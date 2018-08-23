@@ -37,15 +37,15 @@ const (
 	verNum       = "1.11"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
-	sda6Cfg      = "/mnt/bootc.cfg"
+	sda6Cfg      = "/sda1/bootc.cfg"
 	goesBootPath = "/mountd/sda1/"
 	sda1Path     = "/"
-	sda6Path     = "/mnt/"
-	mount        = "/mnt"
+	sda6Path     = "/sda1/"
+	mount        = "/sda1"
 	devSda1      = "/dev/sda1"
 	devSda6      = "/dev/sda6"
 	tmpFile      = "/tmp/EEOF"
-	mntEtc       = "/mnt/etc"
+	sda1Etc      = "/sda1/etc"
 	fstype       = "ext4"
 	zero         = uintptr(0)
 	sda1         = "sda1"
@@ -408,7 +408,7 @@ func mountSda1() error {
 			return err
 		}
 	}
-	if _, err := os.Stat(mntEtc); os.IsNotExist(err) {
+	if _, err := os.Stat(sda1Etc); os.IsNotExist(err) {
 		if err := syscall.Mount(devSda1, mount, fstype, zero, ""); err != nil {
 			fmt.Printf("Error mounting: %v", err)
 			return err
