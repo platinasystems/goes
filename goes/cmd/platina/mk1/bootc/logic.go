@@ -34,7 +34,7 @@ import (
 const (
 	minCoreVer   = 0.41
 	minCoreCom   = 299
-	verNum       = "1.11"
+	verNum       = "1.12"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/sda1/bootc.cfg"
@@ -60,6 +60,7 @@ const (
 	Mach         = "mk1"
 	Machine      = "platina-" + Mach
 	CorebootName = "coreboot-" + Machine + ".rom"
+	sda6cntEnb   = false
 )
 
 var BootcCfgFile string
@@ -224,9 +225,11 @@ func Bootc() []string {
 				fmt.Println("Error: can't form sda6 kexec, drop into grub...")
 				return []string{""}
 			}
-			if err := decBootSda6Cnt(); err != nil {
-				fmt.Println("Error: can't decrement sda6cnt, drop into grub...")
-				return []string{""}
+			if sda6cntEnb {
+				if err := decBootSda6Cnt(); err != nil {
+					fmt.Println("Error: can't decrement sda6cnt, drop into grub...")
+					return []string{""}
+				}
 			}
 			// boot sda6
 			return []string{"kexec", "-k", Cfg.Sda6K,
