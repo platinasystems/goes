@@ -224,12 +224,12 @@ func (e *fdbEvent) EventAction() {
 				if !speedOk {
 					err = fmt.Errorf("speed expected 0|1000|10000|20000|25000|40000|50000|100000 got %v",
 						bw)
-					fmt.Println("SetSpeed error1:", err)
+					fmt.Println("%v SetSpeed error1:", ifname, err)
 				} else {
 					bw *= 1e6
 					err = hi.SetSpeed(vn, vnet.Bandwidth(bw))
 					if err != nil {
-						fmt.Println("SetSpeed error2:", err)
+						fmt.Println("%v SetSpeed error2:", ifname, err)
 					}
 
 				}

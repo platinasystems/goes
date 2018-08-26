@@ -226,14 +226,27 @@ func (p *mk1Main) parsePortConfig() (err error) {
 			case 25000, 20000, 10000, 1000:
 				pp.Lanes = 1
 			case 0: // need to calculate autoneg defaults
-				if false {
-					pp.Lanes = 1
-				}
 				pp.Lanes = p.getDefaultLanes(uint(pp.Portindex), uint(pp.Subportindex))
 			}
-			if false {
-				fmt.Printf("PortConfig %s: %v\n", ifname, pp)
+
+			// entry is what vnet sees; pp is what gets configured into fe1
+			// 2-lanes ports, e.g. 50g-ports, must start on subport index 0 or 2 in fe1
+			// Note number of subports per port can only be 1, 2, or 4; and first subport must start on subport index 0
+			if pp.Lanes == 2 {
+				switch entry.Subportindex {
+				case 0:
+					//OK
+				case 1:
+					//shift index for fe1
+					pp.Subportindex = 2
+				case 2:
+					//OK
+				default:
+					fmt.Printf("vnetd.go, invalid subport index %v for 2-lane port ifname %v\n", entry.Subportindex, ifname)
+
+				}
 			}
+
 			plat.PortConfig.Ports = append(plat.PortConfig.Ports, pp)
 		}
 	}
@@ -371,34 +384,19 @@ func (p *mk1Main) getDefaultLanes(port, subport uint) (lanes uint) {
 	//         Unfortunately, 2-lane autoneg doesn't work for TH but leave this code here
 	//         for possible future chipsets.
 	//
-	if p.Version == 0 { // alpha
-		numSubPorts, subportList := subportsmatchingPort(port)
-		if subport == 0 && numSubPorts == 1 {
-			lanes = 4
-		} else {
-			if subport == 0 && numSubPorts == 2 && subportList.contains(2) {
-				lanes = 2
-			}
-			if subport == 2 && numSubPorts == 2 && subportList.contains(0) {
-				lanes = 2
-			}
-			lanes = 1 // override to have some function
-		}
-	} else { // beta/production
-		numSubPorts, subportList := subportsmatchingPort(port)
 
-		if subport == 1 && numSubPorts == 1 {
-			lanes = 4
-		} else {
-			if subport == 1 && numSubPorts == 2 && subportList.contains(3) {
-				lanes = 2
-			}
-			if subport == 3 && numSubPorts == 2 && subportList.contains(1) {
-				lanes = 2
-			}
-			lanes = 1 // override to have some function
-		}
+	numSubports, _ := subportsmatchingPort(port)
+	switch numSubports {
+	case 1:
+		lanes = 4
+	case 2:
+		lanes = 2
+	case 4:
+		lanes = 1
+	default:
+		fmt.Printf("Port %v: number of subports %v unsupported\n", port, numSubports)
 	}
+
 	return
 }
 

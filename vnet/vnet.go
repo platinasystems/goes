@@ -127,6 +127,31 @@ func GetPortByIndex(ifindex int32) (entry *PortEntry) {
 	return entry
 }
 
+func GetNumSubports(ifname string) (numSubports uint) {
+	numSubports = 0
+	entry, found := Ports[ifname]
+	if !found {
+		return
+	}
+	portindex := entry.Portindex
+	for _, pe := range Ports {
+		if pe.Portindex == int16(portindex) {
+			numSubports++
+		}
+	}
+	return
+}
+
+func IfName(portindex, subportindex int) (name string) {
+	name = ""
+	for _, pe := range Ports {
+		if int(pe.Portindex) == portindex && int(pe.Subportindex) == subportindex {
+			name = pe.Ifname
+		}
+	}
+	return
+}
+
 var (
 	PortIsCopper = func(ifname string) bool { return false }
 	PortIsFec74  = func(ifname string) bool { return false }
