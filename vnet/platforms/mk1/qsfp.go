@@ -78,10 +78,7 @@ func (p *portPrefix) Set(ifname string) {
 
 func (p *portPrefix) Name(portIndex int, subPortIndex int) string {
 
-	if p.isXeth && subPortIndex == 0 {
-		return fmt.Sprintf("%v%v", p.prefix, portIndex)
-	}
-	return fmt.Sprintf("%v%v-%v", p.prefix, portIndex, subPortIndex)
+	return vnet.IfName(portIndex, subPortIndex)
 }
 
 func i2cMuxSelectPort(port uint) {
@@ -344,7 +341,7 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 	}
 
 	elib.Word(changedPorts).ForeachSetBit(func(i uint) {
-		port := i ^ 1 // mk1 port swapping
+		port := int(i ^ 1) // mk1 port swapping
 		mod := &m.module_by_port[port]
 		v := newValues&(1<<i) != 0
 		q := &mod.q
@@ -362,21 +359,27 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 			if v {
 				// ~800ms delay is needed for hget when Goes first starts
 				if firstPort {
+					ifname := PortPrefix.Name(port, 0)
 					start := time.Now()
-					_, err := redis.Hget(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".speed")
+					_, err := redis.Hget(machine.Name, "vnet."+ifname+".speed")
 					for err != nil {
 						if time.Since(start) >= 2*time.Second {
 							log.Print("hget timeout: ", err)
 							break
 						}
-						_, err = redis.Hget(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".speed")
+						_, err = redis.Hget(machine.Name, "vnet."+ifname+".speed")
 						//ignore this value, just used to check if redis and vnet are up
 					}
 				}
 				firstPort = false
 
 				for i := 0; i < 4; i++ {
-					speed, err := redis.Hget(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, i+portBase)+".speed")
+					ifname := PortPrefix.Name(port, i)
+					if ifname == "" {
+						continue
+					}
+
+					speed, err := redis.Hget(machine.Name, "vnet."+ifname+".speed")
 					if err != nil {
 						continue
 					} else {
@@ -386,9 +389,9 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 							if speed == "100g" {
 								//100g, cl91 needs to be enabled per ieee spec
 								//100g should take up all 4 lanes so setting apply to first lane only
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".fec", "cl91")
+								redis.Hset(machine.Name, "vnet."+ifname+".fec", "cl91")
 							} else {
-								fec, err := redis.Hget(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, i+portBase)+".fec")
+								fec, err := redis.Hget(machine.Name, "vnet."+ifname+".fec")
 								if err != nil {
 									fmt.Printf("qsfp.go signalChange error getting fec %v\n", err)
 									continue
@@ -396,12 +399,12 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 								fec = strings.ToLower(fec)
 								if (speed == "40g") || (speed == "20g") || (speed == "10g") { //none or cl74 are valid, default to none if neither
 									if (fec != "cl74") && (fec != "none") {
-										redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, i+portBase)+".fec", "none")
+										redis.Hset(machine.Name, "vnet."+ifname+".fec", "none")
 									}
 								}
 								if speed == "1g" { //only none is valid
 									if fec != "none" {
-										redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, i+portBase)+".fec", "none")
+										redis.Hset(machine.Name, "vnet."+ifname+".fec", "none")
 									}
 								}
 								//50g, 25g can accept none, cl74, or cl94(gen2 fe1 only)
@@ -411,31 +414,31 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 							//set media to copper triggers link training and should be done after fec setting
 							//training will cause remote side to align phase even if tx FIR setting do not change
 							{
-								media, err := redis.Hget(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, i+portBase)+".media")
+								media, err := redis.Hget(machine.Name, "vnet."+ifname+".media")
 								if err != nil {
 									fmt.Printf("qsfp.go signalChange error getting media %v\n", err)
 									continue
 								}
 								media = strings.ToLower(media)
 								if media != "copper" {
-									redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, i+portBase)+".media", "copper")
+									redis.Hset(machine.Name, "vnet."+ifname+".media", "copper")
 								}
 							}
 						} else if i == 0 {
 							// not copper (i.e. no "CR" in the compliance string)
 							// these optics detection are for 4-lane optical module; therefore setting apply to first lane only
 							if strings.Contains(q.Ident.Compliance, "40G") {
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".speed", "40g")
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".media", "fiber")
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".fec", "none")
+								redis.Hset(machine.Name, "vnet."+ifname+".speed", "40g")
+								redis.Hset(machine.Name, "vnet."+ifname+".media", "fiber")
+								redis.Hset(machine.Name, "vnet."+ifname+".fec", "none")
 							} else if strings.Contains(q.Ident.Compliance, "100GBASE-SR4") {
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".speed", "100g")
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".media", "fiber")
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".fec", "cl91")
+								redis.Hset(machine.Name, "vnet."+ifname+".speed", "100g")
+								redis.Hset(machine.Name, "vnet."+ifname+".media", "fiber")
+								redis.Hset(machine.Name, "vnet."+ifname+".fec", "cl91")
 							} else if strings.Contains(q.Ident.Compliance, "100G") {
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".speed", "100g")
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".media", "fiber")
-								redis.Hset(machine.Name, "vnet."+PortPrefix.Name(int(port)+portBase, portBase)+".fec", "none")
+								redis.Hset(machine.Name, "vnet."+ifname+".speed", "100g")
+								redis.Hset(machine.Name, "vnet."+ifname+".media", "fiber")
+								redis.Hset(machine.Name, "vnet."+ifname+".fec", "none")
 							}
 							// if not above optics, leave speed/media/fec config alone to what was manually configured and do not change
 						}
