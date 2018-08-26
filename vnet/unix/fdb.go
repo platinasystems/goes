@@ -27,7 +27,7 @@ import (
 	"github.com/platinasystems/go/vnet/ip4"
 )
 
-var FdbOn bool
+var FdbOn bool = true
 var FdbIfAddrOn bool = true
 var IfinfoDebug bool
 var IfaddrDebug bool
