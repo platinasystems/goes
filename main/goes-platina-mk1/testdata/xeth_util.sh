@@ -53,6 +53,20 @@ xeth_down()
     done
 }
 
+xeth_carrier()
+{
+    for i in $xeth_list; do
+        goes ip link set $i +carrier
+    done
+}
+
+xeth_no_carrier()
+{
+    for i in $xeth_list; do
+        goes ip link set $i -carrier
+    done
+}
+
 xeth_flap()
 {
     xeth_down $xeth_list
@@ -68,7 +82,8 @@ xeth_add()
     done
 }
 
-xeth_netport_add() {
+xeth_netport_add()
+{
     xeth_list=$(grep -o " .eth.*" netport.yaml)
     xeth_add
     xeth_flap $xeth_list
@@ -133,6 +148,14 @@ xeth_show()
     done
 }
 
+xeth_echo()
+{
+    for i in $xeth_list; do
+        echo -n $i" "
+    done
+    echo
+}
+
 xeth_isup()
 {
     xeth_show $xeth_list | grep -i state.up | wc -l
@@ -168,9 +191,26 @@ xeth_netns_del()
 
 xeth_netns_show()
 {
-    for netns in $(ip netns); do
+    for netns in $(ip netns | sort -V); do
+      echo
       echo "netns "$netns
       ip netns exec $netns ./xeth_util.sh show
+    done
+}
+
+xeth_netns_flap()
+{
+    for netns in $(ip netns); do
+      echo "netns "$netns
+      ip netns exec $netns ./xeth_util.sh flap
+    done
+}
+
+xeth_netns_carrier()
+{
+    for netns in $(ip netns); do
+      echo "netns "$netns
+      ip netns exec $netns ./xeth_util.sh carrier
     done
 }
 
@@ -196,7 +236,7 @@ elif [ $range == "eth_range" ]; then
     xeth_list=$(eth_range $start $stop)
 
 else
-    xeth_list="$(xeth_all)"
+    xeth_list="$(xeth_all | sort -V)"
 fi
 
 cmd="help"
@@ -208,18 +248,17 @@ fi
 # echo range = $xeth_list
 # echo command = $cmd
 
-
-if [ $cmd == "help" ]; then
-    grep range.*[t]hen $0 | grep -o \".*\"
-    grep cmd.*[t]hen $0 | grep -o \".*\"
-    exit 0
-elif [ $cmd == "show" ]; then
+if [ $cmd == "show" ]; then
     xeth_show $xeth_list
 elif [ $cmd == "showup" ]; then
     xeth_show $xeth_list | grep -i state.up
+elif [ $cmd == "echo" ]; then
+    xeth_echo $xeth_list
 elif [ $cmd == "test_init" ]; then
+    xeth_del $xeth_list
     rmmod ${xeth_driver}
     modprobe ${xeth_driver}
+    xeth_netport_add
 elif [ $cmd == "add" ]; then
     xeth_add $xeth_list
 elif [ $cmd == "del" ]; then
@@ -236,6 +275,8 @@ elif [ $cmd == "br_show" ]; then
     xeth_br_show $1
 elif [ $cmd == "up" ]; then
     xeth_up $xeth_list
+elif [ $cmd == "carrier" ]; then
+    xeth_carrier $xeth_list
 elif [ $cmd == "down" ]; then
     xeth_down $xeth_list
 elif [ $cmd == "flap" ]; then
@@ -250,4 +291,12 @@ elif [ $cmd == "netns_del" ]; then
     xeth_netns_del
 elif [ $cmd == "netns_show" ]; then
     xeth_netns_show
+elif [ $cmd == "netns_flap" ]; then
+    xeth_netns_flap
+elif [ $cmd == "netns_carrier" ]; then
+    xeth_netns_carrier
+else
+    # help
+    grep range.*[t]hen $0 | grep -o \".*\"
+    grep cmd.*[t]hen $0 | grep -o \".*\"
 fi
