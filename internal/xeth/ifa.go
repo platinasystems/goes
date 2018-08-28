@@ -65,7 +65,7 @@ func (ifa *MsgIfa) Prefix() *net.IPNet {
 
 func (ifa *MsgIfa) String() string {
 	kind := Kind(ifa.Kind)
-	ifname := (*Ifname)(&ifa.Ifname)
+	ifname := fmt.Sprint((*Ifname)(&ifa.Ifname), "[", ifa.Ifindex, "]")
 	event := IfaEvent(ifa.Event)
 	prefix := ifa.Prefix()
 	return fmt.Sprintln(kind, ifname, event, prefix)

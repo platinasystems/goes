@@ -25,24 +25,25 @@ package xeth
 import "fmt"
 
 const (
-	XETH_DEVTYPE_PORT = iota
-	XETH_DEVTYPE_BRIDGE
-	XETH_DEVTYPE_TAGGED_BRIDGE_PORT
-	XETH_DEVTYPE_UNTAGGED_BRIDGE_PORT
+	XETH_DEVTYPE_XETH_PORT = iota
+	XETH_DEVTYPE_XETH_BRIDGE
+)
+const (
+	XETH_DEVTYPE_LINUX_UNKNOWN = 128 + iota
+	XETH_DEVTYPE_LINUX_VLAN
 )
 
 type DevType uint8
 
-func (devtype DevType) String() string {
-	var devtypes = []string{
-		"port",
-		"bridge",
-		"tagged-bridge-port",
-		"untagged-bridge-port",
+func (dt DevType) String() string {
+	s, found := map[DevType]string{
+		XETH_DEVTYPE_XETH_PORT:     "port",
+		XETH_DEVTYPE_XETH_BRIDGE:   "bridge",
+		XETH_DEVTYPE_LINUX_UNKNOWN: "linux",
+		XETH_DEVTYPE_LINUX_VLAN:    "vlan",
+	}[dt]
+	if !found {
+		s = fmt.Sprintf("devtype[%d]", int(dt))
 	}
-	i := int(devtype)
-	if i < len(devtypes) {
-		return devtypes[i]
-	}
-	return fmt.Sprint("@", i)
+	return s
 }

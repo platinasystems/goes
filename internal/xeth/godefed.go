@@ -16,9 +16,7 @@ const (
 	SizeofMsgCarrier		= 0x28
 	SizeofMsgSpeed			= 0x28
 	SizeofMsgIfinfo			= 0x48
-	SizeofMsgIfa			= 0x30
-	SizeofMsgIfdel			= 0x28
-	SizeofMsgIfvid			= 0x30
+	SizeofMsgIfa			= 0x38
 	SizeofMsgFibentry		= 0x28
 	SizeofMsgNeighUpdate		= 0x48
 	SizeofNextHop			= 0x18
@@ -124,43 +122,22 @@ type MsgIfinfo struct {
 	Subportindex	int8
 	Devtype		uint8
 	Portid		int16
-	Pad		[6]uint8
+	Reason		uint8
+	Pad		[5]uint8
 }
 type MsgIfa struct {
-	Z64	uint64
-	Z32	uint32
-	Z16	uint16
-	Z8	uint8
-	Kind	uint8
-	Ifname	[16]uint8
-	Event	uint32
-	Address	uint32
-	Mask	uint32
-	Pad	[4]uint8
-}
-type MsgIfdel struct {
-	Z64	uint64
-	Z32	uint32
-	Z16	uint16
-	Z8	uint8
-	Kind	uint8
-	Ifname	[16]uint8
-	Ifindex	int32
-	Devtype	uint8
-	Pad	[3]uint8
-}
-type MsgIfvid struct {
-	Z64	uint64
-	Z32	uint32
-	Z16	uint16
-	Z8	uint8
-	Kind	uint8
-	Ifname	[16]uint8
-	Net	uint64
-	Ifindex	int32
-	Op	uint8
-	Noop	uint8
-	Vid	uint16
+	Z64		uint64
+	Z32		uint32
+	Z16		uint16
+	Z8		uint8
+	Kind		uint8
+	Ifname		[16]uint8
+	Event		uint32
+	Address		uint32
+	Mask		uint32
+	Ifindex		int32
+	Pad		[2]uint8
+	Pad_cgo_0	[6]byte
 }
 type MsgFibentry struct {
 	Z64	uint64

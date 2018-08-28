@@ -52,9 +52,7 @@ var expMsgSz = map[Kind]int{
 	XETH_MSG_KIND_ETHTOOL_FLAGS:    SizeofMsgEthtoolFlags,
 	XETH_MSG_KIND_ETHTOOL_SETTINGS: SizeofMsgEthtoolSettings,
 	XETH_MSG_KIND_IFA:              SizeofMsgIfa,
-	XETH_MSG_KIND_IFDEL:            SizeofMsgIfdel,
 	XETH_MSG_KIND_IFINFO:           SizeofMsgIfinfo,
-	XETH_MSG_KIND_IFVID:            SizeofMsgIfvid,
 	XETH_MSG_KIND_NEIGH_UPDATE:     SizeofMsgNeighUpdate,
 }
 
