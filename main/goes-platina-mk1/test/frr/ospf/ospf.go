@@ -36,6 +36,7 @@ var Suite = test.Suite{
 
 func (ospf *ospf) Test(t *testing.T) {
 	ospf.Docket.Tests = test.Tests{
+		&test.Unit{"check carrier", ospf.checkCarrier},
 		&test.Unit{"check connectivity", ospf.checkConnectivity},
 		&test.Unit{"check FRR", ospf.checkFrr},
 		&test.Unit{"check neighbors", ospf.checkNeighbors},
@@ -46,6 +47,23 @@ func (ospf *ospf) Test(t *testing.T) {
 		&test.Unit{"check connectivity2", ospf.checkConnectivity},
 	}
 	ospf.Docket.Test(t)
+}
+
+func (ospf *ospf) checkCarrier(t *testing.T) {
+	assert := test.Assert{t}
+
+	for _, r := range ospf.Routers {
+		for _, i := range r.Intfs {
+			var intf string
+			if i.Vlan != "" {
+				intf = i.Name + "." + i.Vlan
+			} else {
+				intf = i.Name
+			}
+			t.Logf("check carrier for %v on %v", r.Hostname, intf)
+			assert.Nil(test.Carrier(r.Hostname, intf))
+		}
+	}
 }
 
 func (ospf *ospf) checkConnectivity(t *testing.T) {
