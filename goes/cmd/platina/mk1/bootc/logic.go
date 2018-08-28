@@ -162,7 +162,7 @@ func Bootc() []string {
 		}
 
 		// DHCP, ZTP, PCC
-		if false {
+		if true {
 			var i = 0
 			for start := time.Now(); time.Since(start) < 10*time.Second; {
 				i++
@@ -212,7 +212,6 @@ func Bootc() []string {
 			// Transparent to invader: PCC will push additional configs via ansible
 			//
 			// Transparent to invader: keep alives, status updates, control etc. from PCC
-			return []string{""}
 		}
 
 		// sda6 normal
