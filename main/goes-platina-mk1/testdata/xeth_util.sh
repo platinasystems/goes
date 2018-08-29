@@ -262,10 +262,8 @@ elif [ $cmd == "showup" ]; then
 elif [ $cmd == "echo" ]; then
     xeth_echo $xeth_list
 elif [ $cmd == "test_init" ]; then
-    xeth_del $xeth_list
     rmmod ${xeth_driver}
     modprobe ${xeth_driver}
-    xeth_netport_add
 elif [ $cmd == "add" ]; then
     xeth_add $xeth_list
 elif [ $cmd == "del" ]; then
