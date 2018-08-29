@@ -197,6 +197,13 @@ xeth_netns_show()
       ip netns exec $netns ./xeth_util.sh show
     done
 }
+xeth_netns_echo()
+{
+    for netns in $(ip netns | sort -V); do
+      echo -n "netns "$netns": "
+      ip netns exec $netns ./xeth_util.sh echo
+    done
+}
 
 xeth_netns_flap()
 {
@@ -291,6 +298,11 @@ elif [ $cmd == "netns_del" ]; then
     xeth_netns_del
 elif [ $cmd == "netns_show" ]; then
     xeth_netns_show
+elif [ $cmd == "netns_showip" ]; then
+    xeth_netns_show|grep -e 'inet ' -e netns|sed -e "s/inet \(.*\) scope global \(.*\)/\2\t\1/"
+elif [ $cmd == "netns_echo" ]; then
+    echo "default: "$(xeth_echo)
+    xeth_netns_echo
 elif [ $cmd == "netns_flap" ]; then
     xeth_netns_flap
 elif [ $cmd == "netns_carrier" ]; then
