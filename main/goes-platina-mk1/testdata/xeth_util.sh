@@ -184,7 +184,9 @@ xeth_to_netns()
 xeth_netns_del()
 {
     for netns in $(ip netns); do
-      ip netns exec $netns ./xeth_util.sh del
+      for i in $(ip netns exec $netns ./xeth_util.sh echo); do
+        ip netns exec $netns ip link set $i netns 1
+      done
       ip netns del $netns
     done
 }
@@ -261,13 +263,16 @@ elif [ $cmd == "showup" ]; then
     xeth_show $xeth_list | grep -i state.up
 elif [ $cmd == "echo" ]; then
     xeth_echo $xeth_list
+elif [ $cmd == "reset" ]; then
+    # FIXME: also remove vlan interfaces
+    xeth_netns_del
+    rmmod ${xeth_driver}
+    modprobe ${xeth_driver}
 elif [ $cmd == "test_init" ]; then
     rmmod ${xeth_driver}
     modprobe ${xeth_driver}
 elif [ $cmd == "add" ]; then
     xeth_add $xeth_list
-elif [ $cmd == "del" ]; then
-    xeth_del $xeth_list
 elif [ $cmd == "br_add" ]; then
     xeth_br_add $1
 elif [ $cmd == "br_del" ]; then
@@ -297,7 +302,7 @@ elif [ $cmd == "netns_del" ]; then
 elif [ $cmd == "netns_show" ]; then
     xeth_netns_show
 elif [ $cmd == "netns_showip" ]; then
-    xeth_netns_show|grep -e 'inet ' -e netns|sed -e "s/inet \(.*\) scope global \(.*\)/\2\t\1/"
+    xeth_netns_show|grep -e 'inet ' -e '^netns'|sed -e "s/inet \(.*\) scope global \(.*\)/\2\t\1/"
 elif [ $cmd == "netns_echo" ]; then
     echo "default: "$(xeth_echo)
     xeth_netns_echo
