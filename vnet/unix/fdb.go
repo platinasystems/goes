@@ -810,11 +810,12 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 				// 2. Add ifindex to new namespace
 				nsOld := getNsByInode(m, pe.Net)
 				if nsOld == nil {
+					// old namespace already removed
 					fmt.Println("XETH_MSG_KIND_IFINFO-: Couldn't find old ns:", pe.Net)
-					return
+				} else {
+					nsOld.addDelMk1Interface(m, true, ifname.String(),
+						uint32(msg.Ifindex), msg.Addr)
 				}
-				nsOld.addDelMk1Interface(m, true, ifname.String(),
-					uint32(msg.Ifindex), msg.Addr)
 
 				ns.addDelMk1Interface(m, false, ifname.String(),
 					uint32(msg.Ifindex), msg.Addr)
