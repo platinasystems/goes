@@ -193,12 +193,42 @@ xeth_netns_del()
 
 xeth_netns_show()
 {
+    show_ip=false
+    show_route=false
+    show_vrf=false
+
+    if [ "$1" == "ip" ]; then
+      show_ip=true
+      shift
+    fi
+    if [ "$1" == "route" ]; then
+      show_route=true
+      shift
+    fi
+    if [ "$1" == "vrf" ]; then
+      show_vrf=true
+      shift
+    fi
     for netns in $(ip netns | sort -V); do
       echo
       echo "netns "$netns
-      ip netns exec $netns ./xeth_util.sh show
+      if $show_ip; then
+        ip netns exec $netns ./xeth_util.sh show | grep -e 'inet '|sed -e "s/inet \(.*\) scope global \(.*\)/\2\t\1/"
+      else
+        ip netns exec $netns ./xeth_util.sh show
+      fi
+      if $show_route; then
+        ip netns exec $netns ip route
+      fi
     done
+    if $show_vrf; then
+      echo ---
+      echo vrf
+      echo ---
+      goes vnet show fe1 l3 nodet|grep -o "^intf.*vrf[^ ]* "|sort -uV|sed -e "s/intf.//; s/vrf.//; s/\/.*//" |grep -v 0$
+    fi
 }
+
 xeth_netns_echo()
 {
     for netns in $(ip netns | sort -V); do
@@ -300,9 +330,7 @@ elif [ $cmd == "to_netns" ]; then
 elif [ $cmd == "netns_del" ]; then
     xeth_netns_del
 elif [ $cmd == "netns_show" ]; then
-    xeth_netns_show
-elif [ $cmd == "netns_showip" ]; then
-    xeth_netns_show|grep -e 'inet ' -e '^netns'|sed -e "s/inet \(.*\) scope global \(.*\)/\2\t\1/"
+    xeth_netns_show $*
 elif [ $cmd == "netns_echo" ]; then
     echo "default: "$(xeth_echo)
     xeth_netns_echo
