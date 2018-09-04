@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2018 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/platinasystems/go/internal/test"
 	"gopkg.in/yaml.v2"
@@ -28,10 +27,8 @@ func Init(assert test.Assert) {
 	for netport, port := range PortByNetPort {
 		NetPortByPort[port] = netport
 		_, err = os.Stat(filepath.Join("/sys/class/net", port))
-		if err == nil {
-			continue
+		if err != nil {
+			assert.Fatal(err)
 		}
-		assert.Program(2*time.Second, test.Self{},
-			"ip", "link", "add", port, "type", "xeth")
 	}
 }
