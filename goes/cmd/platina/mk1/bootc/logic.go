@@ -1148,3 +1148,76 @@ func getCorebootInfo() (im IMGINFO, err error) {
 	im.Size = fmt.Sprintf("%d", fi.Size())
 	return im, nil
 }
+
+func fixSda1SwapUUIC() error {
+	context, err := getContext()
+	if err != nil {
+		return fmt.Errorf("ERROR: cound not detemine context.")
+	}
+	if context != "goesBoot" {
+		return nil
+	}
+
+	fmt.Println("read sda6")
+	if _, err := os.Stat(cbSda6 + "etc/fstab"); os.IsNotExist(err) {
+		fmt.Println("ERROR:	file", path+f, "does not exist")
+		return nil
+	}
+	d6, err := ioutil.ReadFile(cbSda6 + "etc/fstab")
+	if err != nil {
+		return err
+	}
+	ds6 := strings.Split(d6, "\n")
+
+	fmt.Println("read sda1")
+	if _, err := os.Stat(cbSda1 + "etc/fstab"); os.IsNotExist(err) {
+		fmt.Println("ERROR:	file", path+f, "does not exist")
+		return fmt.Errorf("ERROR: cound not read sda1 /etc/fstab.")
+	}
+	d1, err := ioutil.ReadFile(cbSda1 + "etc/fstab")
+	if err != nil {
+		return err
+	}
+	ds1 := strings.Split(d1, "\n")
+	uuid6 = ""
+	for _, j := range ds6 {
+		if strings.Contains(j, "swap") {
+			if strings.Contains(j, "UUID") {
+				k := strings.Split(j, " ")
+				uuid6 = k[1]
+			}
+		}
+	}
+	uuid1 = ""
+	for _, j := range ds1 {
+		if strings.Contains(j, "swap") {
+			if strings.Contains(j, "UUID") {
+				k := strings.Split(j, " ")
+				uuid1 = k[1]
+			}
+		}
+	}
+	if uuid1 == "" || uuid6 == "" {
+		fmt.Println("Error: no uuids")
+		return fmt.Errorf("ERROR: no UUID for swap in /etc/fstab.")
+	}
+	fmt.Println(uuid6)
+	fmt.Println(uuid1)
+	if uuid6 == uuid1 {
+		return nil
+	}
+	for _, j := range ds1 {
+		if strings.Contains(j, "swap") {
+			if strings.Contains(j, "UUID") {
+				k := strings.Split(j, " ")
+				k[1] = uuid6
+				mm := strings.Join(k, "\n")
+				m := []byte(mm)
+				err := ioutil.WriteFile(cbSda1+"etc/fstab", m, 0644)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
