@@ -1160,25 +1160,25 @@ func fixSda1SwapUUIC() error {
 
 	fmt.Println("read sda6")
 	if _, err := os.Stat(cbSda6 + "etc/fstab"); os.IsNotExist(err) {
-		fmt.Println("ERROR:	file", path+f, "does not exist")
+		fmt.Println("ERROR:	file", cbSda6+"etc/fstab", "does not exist")
 		return nil
 	}
 	d6, err := ioutil.ReadFile(cbSda6 + "etc/fstab")
 	if err != nil {
 		return err
 	}
-	ds6 := strings.Split(d6, "\n")
+	ds6 := strings.Split(string(d6), "\n")
 
 	fmt.Println("read sda1")
 	if _, err := os.Stat(cbSda1 + "etc/fstab"); os.IsNotExist(err) {
-		fmt.Println("ERROR:	file", path+f, "does not exist")
+		fmt.Println("ERROR:	file", cbSda1+"etc/fstab", "does not exist")
 		return fmt.Errorf("ERROR: cound not read sda1 /etc/fstab.")
 	}
 	d1, err := ioutil.ReadFile(cbSda1 + "etc/fstab")
 	if err != nil {
 		return err
 	}
-	ds1 := strings.Split(d1, "\n")
+	ds1 := strings.Split(string(d1), "\n")
 	uuid6 = ""
 	for _, j := range ds6 {
 		if strings.Contains(j, "swap") {
@@ -1220,4 +1220,5 @@ func fixSda1SwapUUIC() error {
 			}
 		}
 	}
+	return nil
 }
