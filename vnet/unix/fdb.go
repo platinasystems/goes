@@ -27,8 +27,11 @@ import (
 	"github.com/platinasystems/go/vnet/ip4"
 )
 
-var FdbOn bool = false
+// Function flags
+var FdbOn bool
 var FdbIfAddrOn bool = true
+
+// Debug flags
 var IfinfoDebug bool
 var IfaddrDebug bool
 var FibentryDebug bool
@@ -281,7 +284,9 @@ func (ns *net_namespace) parseIP4NextHops(msg *xeth.MsgFibentry) (nhs []ip4_next
 	if len(xethNhs) == 1 {
 		nh.intf = ns.interface_by_index[uint32(xethNhs[0].Ifindex)]
 		if nh.intf == nil {
-			fmt.Println("parseIP4NextHops: Can't find ns-intf for ifindex", xethNhs[0].Ifindex)
+			if FibentryDebug {
+				fmt.Println("parseIP4NextHops: Can't find ns-intf for ifindex", xethNhs[0].Ifindex)
+			}
 			return
 		}
 		nh.Si = nh.intf.si
@@ -291,7 +296,9 @@ func (ns *net_namespace) parseIP4NextHops(msg *xeth.MsgFibentry) (nhs []ip4_next
 		for _, xnh := range xethNhs {
 			intf := ns.interface_by_index[uint32(xnh.Ifindex)]
 			if intf == nil {
-				fmt.Println("parseIP4NextHops: Can't find ns-intf for ifindex", xnh.Ifindex)
+				if FibentryDebug {
+					fmt.Println("parseIP4NextHops: Can't find ns-intf for ifindex", xnh.Ifindex)
+				}
 				continue
 			}
 			nh.Si = intf.si
@@ -492,9 +499,10 @@ func ProcessFibEntry(msg *xeth.MsgFibentry, v *vnet.Vnet) (err error) {
 				ProcessZeroGw(msg, v, nil, isDel, isLocal, isMainUc)
 				return
 			}
+
 			if FibentryDebug {
-				fmt.Printf("RouteMsg for Prefix %v adding nexthop %v isDel %v isReplace %v\n",
-					p, nh.Address, isDel, isReplace)
+				fmt.Printf("RouteMsg for ns %s Prefix %v adding nexthop %v isDel %v isReplace %v\n",
+					ns.name, p, nh.Address, isDel, isReplace)
 			}
 			if err = m4.AddDelRouteNextHop(&p, &nh.NextHop, isDel, isReplace); err != nil {
 				fmt.Println("AddDelRouteNextHop: returns err:", err)
@@ -758,7 +766,9 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 		if IfinfoDebug {
 			fmt.Println("ProcessInterfaceInfo: ReadyVnetd Add")
 		}
-		maybeAddNamespaces(v, 0)
+		if false {
+			maybeAddNamespaces(v, 0)
+		}
 		// Signal that all namespaces are now initialized??
 		if true {
 			sendFdbEventIfInfo(v)
@@ -785,7 +795,7 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 	case vnet.Dynamic:
 		ifname := xeth.Ifname(msg.Ifname)
 		if IfinfoDebug {
-			fmt.Println("XETH_MSG_KIND_IFINFO:", action, msg)
+			fmt.Println("XETH_MSG_KIND_IFINFO:", action, msg, ifname.String())
 		}
 		// FIXME Add support for Dynamic cases known:
 		// - Addition of vlans or dummy interfaces (DO NOT SUPPORT dynamic addition of fp ports)
@@ -793,7 +803,9 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 		//
 		//
 		m := GetMain(v)
-		maybeAddNamespaces(v, msg.Net)
+		if false {
+			maybeAddNamespaces(v, msg.Net)
+		}
 		ns := getNsByInode(m, msg.Net)
 		if ns != nil {
 			if IfinfoDebug {
