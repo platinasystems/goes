@@ -152,7 +152,7 @@ func bmcStatus() (string, string) {
 }
 
 func cpuCoreTemp() string {
-	hi := float64(-1000)
+	hi := float64(0)
 	t, err := readTemp("hwmon0", "core") // assumes lm-sensors
 	if err == nil && t > hi {
 		hi = t
@@ -161,8 +161,8 @@ func cpuCoreTemp() string {
 	if err == nil && t > hi {
 		hi = t
 	}
-	v := fmt.Sprintf("x = %.0f\n", hi/1000)
-	if v == "-1000" {
+	v := fmt.Sprintf("%.2f\n", hi/1000)
+	if v == "0" {
 		return ""
 	}
 	if bmcIpv6LinkLocalRedis == "" {
@@ -186,7 +186,7 @@ func cpuCoreTemp() string {
 }
 
 func readTemp(dir string, dev string) (h float64, err error) {
-	h = float64(-1000)
+	h = float64(0)
 	n, err := ioutil.ReadFile(hwmon + dir + "/name")
 	if err != nil {
 		return h, err
