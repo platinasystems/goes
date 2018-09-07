@@ -9,15 +9,18 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/ethtool"
 	"github.com/platinasystems/go/internal/test/netport"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/docker"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/mk1"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/vnet"
-	"github.com/platinasystems/go/main/goes-platina-mk1/test/xeth"
+	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
 )
+
+var redisdProgram, vnetdProgram *test.Program
 
 var suite = test.Suite{
 	Name: "goes-platina-mk1",
@@ -52,10 +55,38 @@ var suite = test.Suite{
 		ethtool.Init(assert)
 
 		machine.Name = name
+
+		redisdProgram = assert.Background(test.Self{},
+			"redisd")
+		assert.Program(12*time.Second, test.Self{},
+			"hwait", machine.Name, "redis.ready", "true", "10")
+
+		vnetdProgram = assert.Background(30*time.Second, test.Self{},
+			"vnetd")
+		assert.Program(32*time.Second, test.Self{},
+			"hwait", machine.Name, "vnet.ready", "true", "30")
+
+		if *test.MustPause {
+			test.Pause("Attach vnet debugger to pid(",
+				vnetdProgram.Pid(),
+				");\nthen press enter to continue...")
+		}
+	},
+	Exit: func(t *testing.T) {
+		if redisdProgram != nil {
+			defer redisdProgram.Quit()
+		}
+		if vnetdProgram != nil {
+			defer vnetdProgram.Quit()
+		}
+		if *test.MustPause {
+			test.Pause("press enter to continue...")
+		}
 	},
 	Tests: test.Tests{
-		&xeth.Suite,
-		&vnet.Suite,
+		&test.Unit{"ready", func(*testing.T) {}},
+		&nodocker.Suite,
+		&docker.Suite,
 	},
 }
 
