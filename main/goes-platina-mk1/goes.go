@@ -124,7 +124,7 @@ var Goes = &goes.Goes{
 			Init: [][]string{
 				[]string{"redisd"},
 				[]string{"uptimed"},
-				// []string{"tempd"},
+				[]string{"tempd"},
 				[]string{"vnetd"},
 			},
 		},
