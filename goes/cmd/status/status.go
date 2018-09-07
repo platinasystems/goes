@@ -67,7 +67,7 @@ func checkDaemons() error {
 		"redisd":       true,
 		"uptimed":      true,
 		// "pccd":         true,
-		// "tempd":        true,
+		"tempd": true,
 	}
 
 	mypid := os.Getpid()
