@@ -738,12 +738,14 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	}
 
 	if oldAdj != newAdj {
-		// Oriniglally only remove from fib on delete of final adjacency, but this caused some fib to never get deleted
-		// Now changed to delete immediately
+		// oldAdj != newAdj means index changed because there is now more than 1 nexthop (multiplath)
+		// or multipath members changed because of nexthop add/del
+
 		isFibDel := isDel
+		// if isDel, do not remove adjacency unless all members of the multipath adjacency have been removed
+		// when that happens newAdj will be ip.AdjNil
 		if isFibDel && newAdj != ip.AdjNil {
-			//isFibDel = false
-			isFibDel = isDel
+			isFibDel = false
 		}
 		f.addDel(m, p, newAdj, isFibDel)
 		nhf.setReachable(m, p, f, &reachable_via_prefix, nha, nhr, isDel)
