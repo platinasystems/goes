@@ -178,7 +178,8 @@ func cpuCoreTemp() string {
 	if bmcIpv6LinkLocalRedis != "" {
 		d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
 		if err == nil {
-			d.Do("HSET", machine.Name, "host.temp.units.C", v)
+			d.Do("HSET", "platina", "host.temp.units.C", v) // to support old bmc builds
+			d.Do("HSET", machine.Name+"-bmc", "host.temp.units.C", v)
 			d.Close()
 		}
 	}
