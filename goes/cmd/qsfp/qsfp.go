@@ -807,7 +807,10 @@ func CheckTemp(t uint16, port string) string {
 			if err != nil {
 				log.Print(err)
 			} else {
-				d.Do("HSET", machine.Name, "qsfp.temp.units.C", v)
+				_, err = d.Do("HSET", machine.Name+"-bmc", "qsfp.temp.units.C", v)
+				if err != nil {
+					d.Do("HSET", "platina", "qsfp.temp.units.C", v) // to support old bmc builds
+				}
 				d.Close()
 			}
 		}
