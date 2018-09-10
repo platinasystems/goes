@@ -6,28 +6,30 @@ if ! [ $(id -u) = 0 ]; then
 fi
 
 # document all known issues on same line as test
-testcases=("Test/xeth/bad-names"
-	   "Test/xeth/good-names"
-	   "Test/vnet/ready"
-	   "Test/vnet/nodocker/twohost"
-	   "Test/vnet/nodocker/onerouter"
-	   "Test/vnet/docker/bird/bgp/eth"
-	   "Test/vnet/docker/bird/bgp/vlan"
-	   "Test/vnet/docker/bird/ospf/eth"
-	   "Test/vnet/docker/bird/ospf/vlan" # --- FAIL: Test/docker/bird/ospf/vlan/connectivity (RTA_MULTIPATH w/out gw)
-	   "Test/vnet/docker/frr/bgp/eth"
-	   "Test/vnet/docker/frr/bgp/vlan"
-	   "Test/vnet/docker/frr/isis/eth"
-	   "Test/vnet/docker/frr/isis/vlan"
-	   "Test/vnet/docker/frr/ospf/eth"
-	   "Test/vnet/docker/frr/ospf/vlan"
-	   "Test/vnet/docker/gobgp/ebgp/eth"
-	   "Test/vnet/docker/gobgp/ebgp/vlan"
-	   "Test/vnet/docker/net/slice/vlan" # --- FAIL: Test/docker/net/slice/vlan/stress-pci (reboot to recover)
-	   "Test/vnet/docker/net/dhcp/eth"
-	   "Test/vnet/docker/net/dhcp/vlan"
-	   "Test/vnet/docker/net/static/eth"
-	   "Test/vnet/docker/net/static/vlan")
+testcases=("Test/ready"
+	   "Test/nodocker/ping-gateways"
+	   "Test/nodocker/ping-remotes"
+	   "Test/nodocker/hping01"
+	   "Test/nodocker/hping10"
+	   "Test/nodocker/hping30"
+	   "Test/nodocker/hping60"	   	   	   
+	   "Test/docker/bird/bgp/eth"
+	   "Test/docker/bird/bgp/vlan"
+	   "Test/docker/bird/ospf/eth"
+	   "Test/docker/bird/ospf/vlan" # --- FAIL: Test/docker/bird/ospf/vlan/connectivity (RTA_MULTIPATH w/out gw)
+	   "Test/docker/frr/bgp/eth"
+	   "Test/docker/frr/bgp/vlan"
+	   "Test/docker/frr/isis/eth"
+	   "Test/docker/frr/isis/vlan"
+	   "Test/docker/frr/ospf/eth"
+	   "Test/docker/frr/ospf/vlan"
+	   "Test/docker/gobgp/ebgp/eth"
+	   "Test/docker/gobgp/ebgp/vlan"
+	   "Test/docker/net/slice/vlan" # --- FAIL: Test/docker/net/slice/vlan/stress-pci (reboot to recover)
+	   "Test/docker/net/dhcp/eth"
+	   "Test/docker/net/dhcp/vlan"
+	   "Test/docker/net/static/eth"
+	   "Test/docker/net/static/vlan")
 
 tester=../goes-platina-mk1.test
 
