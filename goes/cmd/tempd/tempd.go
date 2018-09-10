@@ -139,9 +139,9 @@ func bmcStatus() (string, string) {
 		} else {
 			v = "up"
 			var bmcIpv4 interface{}
-			bmcIpv4, err = d.Do("HGET", "platina", "eth0.ipv4") // to support old bmc builds
+			bmcIpv4, err = d.Do("HGET", machine.Name+"-bmc", "eth0.ipv4")
 			if err != nil {
-				bmcIpv4, _ = d.Do("HGET", machine.Name+"-bmc", "eth0.ipv4")
+				bmcIpv4, _ = d.Do("HGET", "platina", "eth0.ipv4") // to support old bmc builds
 			}
 			s := fmt.Sprint(bmcIpv4)
 			if !strings.Contains(s, "ERROR") {
@@ -182,9 +182,9 @@ func cpuCoreTemp() string {
 	if bmcIpv6LinkLocalRedis != "" {
 		d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
 		if err == nil {
-			_, err = d.Do("HSET", "platina", "host.temp.units.C", v) // to support old bmc builds
+			_, err = d.Do("HSET", machine.Name+"-bmc", "host.temp.units.C", v)
 			if err != nil {
-				d.Do("HSET", machine.Name+"-bmc", "host.temp.units.C", v)
+				d.Do("HSET", "platina", "host.temp.units.C", v) // to support old bmc builds
 			}
 			d.Close()
 		}
