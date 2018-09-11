@@ -123,7 +123,6 @@ func (Command) Main(args ...string) error {
 }
 
 var Install_flag bool = false
-var Reboot_flag bool = false
 
 func showList(s string, v string, t bool) error {
 	fn := "LIST"
@@ -162,11 +161,6 @@ func doUpgrade(s string, v string, t bool, g bool, k bool,
 	}
 	if c {
 		if err := upgradeCoreboot(s, v, t, f); err != nil {
-			return err
-		}
-	}
-	if Reboot_flag {
-		if err := reboot(); err != nil {
 			return err
 		}
 	}

@@ -16,7 +16,6 @@ import (
 
 	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
-	"github.com/platinasystems/go/internal/kexec"
 	"github.com/platinasystems/go/internal/url"
 )
 
@@ -435,7 +434,6 @@ func installKernel(s string, v string, t bool, fn string) error {
 		return err
 	}
 
-	Reboot_flag = true
 	return nil
 }
 
@@ -445,10 +443,8 @@ func installCoreboot(s string, v string, t bool) error {
 		"/usr/local/share/flashrom/layouts/platina-mk1.xml",
 		"-i", "bios", "-w", CorebootName, "-A", "-V").Output()
 	if err != nil {
-		Reboot_flag = false
 		return err
 	}
-	Reboot_flag = true
 	return nil
 }
 
@@ -503,16 +499,6 @@ func rmFile(f string) error {
 		return err
 	}
 	return nil
-}
-
-func reboot() error {
-	fmt.Print("\nSYSTEM WILL REBOOT... Please login again\n")
-
-	kexec.Prepare()
-
-	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
-
-	return syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 }
 
 func activateGoes() error {
