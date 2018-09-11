@@ -250,13 +250,17 @@ func (xeth *Xeth) Speed(ifname string, count uint64) error {
 	return xeth.tx(buf, 0)
 }
 
+var SideBandTxCounter, SideBandTxDrops uint64
+
 // leaky bucket
 func (xeth *Xeth) Tx(buf []byte) {
 	msg := Pool.Get(len(buf))
 	copy(msg, buf)
 	select {
 	case xeth.txch <- msg:
+		SideBandTxCounter++
 	default:
+		SideBandTxDrops++
 		Pool.Put(msg)
 	}
 }
