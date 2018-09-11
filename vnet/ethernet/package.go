@@ -48,5 +48,6 @@ func (m *Main) Init() (err error) {
 	m.ipNeighborMain.init(v, m.m4, m.m6)
 	m.nodeInit(v)
 	m.pgMain.pgInit(v)
+	m.cliInit(v)
 	return
 }
