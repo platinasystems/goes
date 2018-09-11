@@ -128,6 +128,8 @@ func vnetdInit() {
 			}
 
 			switch msg.Devtype {
+			case xeth.XETH_DEVTYPE_LINUX_VLAN:
+				fallthrough
 			case xeth.XETH_DEVTYPE_XETH_PORT:
 				err = unix.ProcessInterfaceInfo((*xeth.MsgIfinfo)(ptr), vnet.PreVnetd, nil, punt_index)
 			case xeth.XETH_DEVTYPE_XETH_BRIDGE:
@@ -138,8 +140,6 @@ func vnetdInit() {
 				copy(be.Addr[:], msg.Addr[:])
 				be.Net = msg.Net
 			case xeth.XETH_DEVTYPE_LINUX_UNKNOWN:
-				// FIXME
-			case xeth.XETH_DEVTYPE_LINUX_VLAN:
 				// FIXME
 			}
 			/* FIXME these are deprecated...
@@ -210,6 +210,9 @@ func (p *mk1Main) parsePortConfig() (err error) {
 		// Massage ethtool port-provision format into fe1 format
 		var pp fe1.PortProvision
 		for ifname, entry := range vnet.Ports {
+			if entry.Devtype == xeth.XETH_DEVTYPE_LINUX_VLAN {
+				continue
+			}
 			pp.Name = ifname
 			pp.Portindex = entry.Portindex
 			pp.Subportindex = entry.Subportindex

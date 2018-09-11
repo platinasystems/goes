@@ -39,6 +39,7 @@ type PortEntry struct {
 	Portindex    int16
 	Subportindex int8
 	PuntIndex    uint8 // 0-based meth#, derived from Iflinkindex
+	Devtype      uint8
 	Addr         [xeth.ETH_ALEN]uint8
 	IPNets       []*net.IPNet
 }
