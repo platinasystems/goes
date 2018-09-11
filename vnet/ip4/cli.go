@@ -121,9 +121,6 @@ func (m *Main) showIpFib(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 				fmt.Fprintf(w, "%12s%30s%s\n", "", "", lines[i])
 			}
 		}
-		if cf.detail {
-			fmt.Fprintf(w, "%s", &r.r.nh)
-		}
 	}
 
 	return
@@ -148,7 +145,8 @@ func (m *Main) adjLines(baseAdj ip.Adj, detail bool) (lines []string) {
 		ss := []string{}
 		adj_lines := adjs[ai].String(&m.Main)
 		if nh.Weight != 1 || nh.Adj != baseAdj {
-			adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", adj, adj+ip.Adj(nh.Weight)-1, nh.Weight, nh.Adj)
+			// adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", adj, adj+ip.Adj(nh.Weight)-1, nh.Weight, nh.Adj)
+			adj_lines[0] += fmt.Sprintf(" adj-range %d-%d, weight %d nh-adj %d", adj, adj+ip.Adj(nh.Weight)-1, nh.Weight, nh.Adj)
 		}
 		// Indent subsequent lines like first line if more than 1 lines.
 		for i := 1; i < len(adj_lines); i++ {
@@ -162,7 +160,7 @@ func (m *Main) adjLines(baseAdj ip.Adj, detail bool) (lines []string) {
 		}
 
 		m.Main.ForeachAdjCounter(counterAdj, func(tag string, v vnet.CombinedCounter) {
-			if v.Packets != 0 || detail {
+			if v.Packets != 0 && detail {
 				ss = append(ss, fmt.Sprintf("%s%spackets %16d", initialSpace, tag, v.Packets))
 				ss = append(ss, fmt.Sprintf("%s%sbytes   %16d", initialSpace, tag, v.Bytes))
 			}
