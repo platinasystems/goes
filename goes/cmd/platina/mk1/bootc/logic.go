@@ -215,7 +215,8 @@ func Bootc() []string {
 		}
 
 		// sda6 normal
-		if Cfg.BootSda6Cnt > 0 && strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
+		if (Cfg.BootSda6Cnt > 0 || !sda6cntEnb) &&
+			strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
 			if err := fixPaths(); err != nil {
 				fmt.Println("Error: can't fix paths, drop into grub...")
 				return []string{""}
