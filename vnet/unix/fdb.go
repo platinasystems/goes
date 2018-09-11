@@ -607,7 +607,7 @@ func ProcessInterfaceAddr(msg *xeth.MsgIfa, action vnet.ActionType, v *vnet.Vnet
 			if IfaddrDebug {
 				fmt.Println("XETH_MSG_KIND_IFA :", ifname.String(), "not found!")
 			}
-			err = fmt.Errorf("Dynamic IFA - Ifname unknown:", ifname.String())
+			err = fmt.Errorf("Dynamic IFA - Ifname unknown:%v", ifname.String())
 			return
 		}
 		if FdbOn {
