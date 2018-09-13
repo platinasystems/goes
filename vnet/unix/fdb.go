@@ -32,6 +32,8 @@ var FdbOn bool
 var FdbIfAddrOn bool = true
 
 // Debug flags
+var IfETSettingDebug bool
+var IfETFlagDebug bool
 var IfinfoDebug bool
 var IfaddrDebug bool
 var FibentryDebug bool
@@ -109,6 +111,9 @@ func initVnetFromXeth(v *vnet.Vnet) {
 	// Initiate walk of PortEntry map to send IFAs
 	ProcessInterfaceAddr(nil, vnet.ReadyVnetd, v)
 
+	// Initiate walk of PortEntry map to send vnetd ethtool data
+	InitInterfaceEthtool(v)
+
 	// Send events for initial dump of fib entries
 	fe := fdbm.GetEvent(vnet.Dynamic)
 	vnet.Xeth.DumpFib()
@@ -180,7 +185,7 @@ func (e *fdbEvent) EventAction() {
 				xeth.EthtoolFlagBits(msg.Flags)
 			fec91 := vnet.PortIsFec91(ifname.String())
 			fec74 := vnet.PortIsFec74(ifname.String())
-			if false {
+			if IfETFlagDebug {
 				fmt.Printf("XETH_MSG_KIND_ETHTOOL_FLAGS: %s Fec91 %v\n",
 					ifname.String(), fec91)
 				fmt.Printf("XETH_MSG_KIND_ETHTOOL_FLAGS: %s Fec74 %v\n",
@@ -199,8 +204,15 @@ func (e *fdbEvent) EventAction() {
 			if vnet.PortIsCopper(ifname.String()) {
 				media = "copper"
 			}
+			if IfETFlagDebug {
+				fmt.Printf("XETH_MSG_KIND_ETHTOOL_FLAGS: %s copper %v\n",
+					ifname.String(), media == "copper")
+			}
 			hi, found := vn.HwIfByName(ifname.String())
 			if found {
+				if IfETFlagDebug {
+					fmt.Printf("XETH_MSG_KIND_ETHTOOL_FLAGS: Setting media %s fec %v\n", media, fec)
+				}
 				hi.SetMedia(vn, media)
 				err = ethernet.SetInterfaceErrorCorrection(vn, hi, fec)
 				if err != nil {
@@ -217,8 +229,9 @@ func (e *fdbEvent) EventAction() {
 			if found {
 				bw := float64(msg.Speed)
 				speedOk := false
-				if false {
-					fmt.Printf("xeth.XETH_MSG_KIND_ETHTOOL_SETTINGS processing speed %v\n", bw)
+				if IfETSettingDebug {
+					fmt.Printf("xeth.XETH_MSG_KIND_ETHTOOL_SETTINGS processing speed %s %v\n",
+						ifname.String(), bw)
 				}
 				switch bw {
 				case 0, 1000, 10000, 20000, 25000, 40000, 50000, 100000:
@@ -952,4 +965,71 @@ func ipnetToUint(ipnet *net.IPNet, ipNotMask bool) uint32 {
 	} else {
 		return *(*uint32)(unsafe.Pointer(&ipnet.Mask[0]))
 	}
+}
+
+func InitInterfaceEthtool(v *vnet.Vnet) {
+	sendFdbEventEthtoolSettings(v)
+	sendFdbEventEthtoolFlags(v)
+}
+
+func sendFdbEventEthtoolSettings(v *vnet.Vnet) {
+	m := GetMain(v)
+	fdbm := &m.FdbMain
+	fe := fdbm.GetEvent(vnet.PostReadyVnetd)
+	for _, pe := range vnet.Ports {
+		var ifname [16]uint8
+		copy(ifname[:], pe.Ifname)
+		if IfinfoDebug {
+			fmt.Println("sendFdbEventEthtoolSettings:", pe.Ifname, pe)
+		}
+		buf := xeth.Pool.Get(xeth.SizeofMsgEthtoolSettings)
+		msg := (*xeth.MsgEthtoolSettings)(unsafe.Pointer(&buf[0]))
+		msg.Kind = xeth.XETH_MSG_KIND_ETHTOOL_SETTINGS
+		msg.Ifname = ifname
+		msg.Speed = uint32(pe.Speed)
+		// xeth layer is cacheing the rest of this message
+		// in future can just reference that and send it along here
+		ok := fe.EnqueueMsg(buf)
+		if !ok {
+			// filled event with messages so send event and start a new one
+			fe.Signal()
+			fe = fdbm.GetEvent(vnet.PostReadyVnetd)
+			ok := fe.EnqueueMsg(buf)
+			if !ok {
+				panic("sendFdbEventEthtoolSettings: Re-enqueue of msg failed")
+			}
+		}
+	}
+	fe.Signal()
+}
+
+func sendFdbEventEthtoolFlags(v *vnet.Vnet) {
+	m := GetMain(v)
+	fdbm := &m.FdbMain
+	fe := fdbm.GetEvent(vnet.PostReadyVnetd)
+	for _, pe := range vnet.Ports {
+		var ifname [16]uint8
+		copy(ifname[:], pe.Ifname)
+		if IfinfoDebug {
+			fmt.Println("sendFdbEventEthtoolFlags:", pe.Ifname, pe)
+		}
+		buf := xeth.Pool.Get(xeth.SizeofMsgEthtoolFlags)
+		msg := (*xeth.MsgEthtoolFlags)(unsafe.Pointer(&buf[0]))
+		msg.Kind = xeth.XETH_MSG_KIND_ETHTOOL_FLAGS
+		msg.Ifname = ifname
+		msg.Flags = uint32(pe.Flags)
+		// xeth layer is cacheing the rest of this message
+		// in future can just reference that and send it along here
+		ok := fe.EnqueueMsg(buf)
+		if !ok {
+			// filled event with messages so send event and start a new one
+			fe.Signal()
+			fe = fdbm.GetEvent(vnet.PostReadyVnetd)
+			ok := fe.EnqueueMsg(buf)
+			if !ok {
+				panic("sendFdbEventEthtoolFlags: Re-enqueue of msg failed")
+			}
+		}
+	}
+	fe.Signal()
 }
