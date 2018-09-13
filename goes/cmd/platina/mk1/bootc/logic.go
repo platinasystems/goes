@@ -932,7 +932,9 @@ func UpdateBootcCfg(k, i string) error {
 }
 
 func Wipe(dryrun bool) error {
-	fmt.Println("Wipe dryrun -- does not write to disk")
+	if dryrun {
+		fmt.Println("Start wipe dryrun.  Does not write to disk.")
+	}
 	fmt.Println("Making sure we booted from sda1 or sda6...")
 	context, err := getContext()
 	if context != sda6 && context != sda1 {
