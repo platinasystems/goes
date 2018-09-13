@@ -225,7 +225,7 @@ xeth_netns_show()
       echo ---
       echo vrf
       echo ---
-      goes vnet show fe1 l3 nodet|grep -o "^intf.*vrf[^ ]* "|sort -uV|sed -e "s/intf.//; s/vrf.//; s/\/.*//" |grep -v 0$
+      goes vnet show fe1 l3 |grep -o " intf.xeth.*vrf[^ ]* " |sort -uV|sed -e "s/intf.//; s/vrf.//; s/\/.*//" |grep -v 0$
     fi
 }
 
