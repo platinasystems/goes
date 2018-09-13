@@ -931,14 +931,17 @@ func UpdateBootcCfg(k, i string) error {
 	return nil
 }
 
-func Wipe() error {
+func Wipe(dryrun bool) error {
+	fmt.Println("Wipe dryrun -- does not write to disk")
 	fmt.Println("Making sure we booted from sda1 or sda6...")
 	context, err := getContext()
 	if context != sda6 && context != sda1 {
 		return fmt.Errorf("Not booted from sda6 or sda1, can't wipe.")
 	}
-	if err := clrInstall(); err != nil {
-		return err
+	if !dryrun {
+		if err := clrInstall(); err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("Making sure sda6 exists...")
@@ -991,46 +994,55 @@ func Wipe() error {
 	if v < minCoreVer {
 		return fmt.Errorf("Coreboot needs upgraded.")
 	}
-	if w < minCoreCom {
+	if v == minCoreVer && w < minCoreCom {
 		return fmt.Errorf("Coreboot needs upgraded.")
 	}
 	fmt.Printf("Coreboot version ok, ver = %d, subver = %d\n", v, w)
 
-	fmt.Println("Deleting sda6 from the partition table...")
-	d1 = []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
-	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
-		return err
-	}
-	cmd = exec.Command(tmpFile)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("fdisk: %v, %v\n", out, err)
-	}
-
-	fmt.Println("Verify sda6 is actually gone...")
-	d1 = []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
-	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
-		return err
-	}
-	cmd = exec.Command(tmpFile)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("fdisk: %v, %v\n", out, err)
-		return err
-	}
-	outs = strings.Split(string(out), "\n")
-	for _, m := range outs {
-		if strings.Contains(m, devSda6) {
-			return fmt.Errorf("Error: /dev/sda6 not deleted, aborting wipe")
+	if !dryrun {
+		fmt.Println("Deleting sda6 from the partition table...")
+		d1 = []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
+		if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
+			return err
+		}
+		cmd = exec.Command(tmpFile)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("fdisk: %v, %v\n", out, err)
 		}
 	}
-	fmt.Println("Verified")
 
-	fmt.Println("Setting Install bit for coreboot...")
-	if err := setInstall(); err != nil {
-		return err
+	if !dryrun {
+		fmt.Println("Verify sda6 is actually gone...")
+		d1 = []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
+		if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
+			return err
+		}
+		cmd = exec.Command(tmpFile)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("fdisk: %v, %v\n", out, err)
+			return err
+		}
+		outs = strings.Split(string(out), "\n")
+		for _, m := range outs {
+			if strings.Contains(m, devSda6) {
+				return fmt.Errorf("Error: /dev/sda6 not deleted, aborting wipe")
+			}
+		}
+		fmt.Println("Verified")
 	}
 
+	if !dryrun {
+		fmt.Println("Setting Install bit for coreboot...")
+		if err := setInstall(); err != nil {
+			return err
+		}
+	}
+
+	if dryrun {
+		fmt.Println("Wipe dryrun passed...")
+	}
 	return nil
 }
 

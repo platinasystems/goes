@@ -36,7 +36,7 @@ func (Command) Usage() string {
 	bootc [vers] [readcfg] [initcfg] [wipe] [setsda1] [setsda6] [clrsda1]
 	[clrsda6] [setinstall] [clrinstall]	[setip] [setnetmask] [setgateway]
 	[setkernel] [setinitrd] [setpost] [clrpost] [checkfiles] [getfiles]
-	[setdisable] [clrdisable]
+	[setdisable] [clrdisable] [wipedryrun]
 	[pccinitfile] [setpccenb] [clrpccenb] [setpccip] [setpccport] [setpccsn]
 	[pcc1a] [pcc1b] [pcc1c] [pcc2] [pcc3] [pcc4]`
 }
@@ -144,12 +144,22 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 	case "wipe":
 		if len(os.Args) >= 3 && args[1] == "sda6" {
-			if err = Wipe(); err != nil {
+			if err = Wipe(false); err != nil {
 				return err
 			}
 			reboot()
 		} else {
 			fmt.Println("Type: 'bootc wipe sda6' to re-install debian on sda6")
+		}
+		return nil
+	//commands to set pcc in bootc.cfg
+	case "wipedryrun":
+		if len(os.Args) >= 3 && args[1] == "sda6" {
+			if err = Wipe(true); err != nil {
+				return err
+			}
+		} else {
+			fmt.Println("Type: 'bootc wipedryrun sda6' to re-install debian on sda6")
 		}
 		return nil
 	//commands to set pcc in bootc.cfg
