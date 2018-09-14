@@ -38,7 +38,15 @@ func (slice *slice) Test(t *testing.T) {
 			slice.checkInterConnectivity},
 		&test.Unit{"check isolation", slice.checkIsolation},
 		&test.Unit{"check punt stress", slice.checkStress},
+		&test.Unit{"check connectivity2", slice.checkConnectivity},
+		&test.Unit{"check routes2", slice.checkRoutes},
+		&test.Unit{"check interconnectivity2",
+			slice.checkInterConnectivity},
 		&test.Unit{"check pci punt stress", slice.checkStressPci},
+		&test.Unit{"check connectivity3", slice.checkConnectivity},
+		&test.Unit{"check routes3", slice.checkRoutes},
+		&test.Unit{"check interconnectivity3",
+			slice.checkInterConnectivity},
 	}
 	slice.Docket.Test(t)
 }
@@ -268,9 +276,6 @@ func (slice *slice) checkStress(t *testing.T) {
 		_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
-	t.Log("verfy can still ping far neighbor")
-	_, err := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
-	assert.Nil(err)
 }
 
 func (slice *slice) checkStressPci(t *testing.T) {
@@ -306,7 +311,4 @@ func (slice *slice) checkStressPci(t *testing.T) {
 		_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
-	t.Log("verfy can still ping far neighbor")
-	_, err := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
-	assert.Nil(err)
 }
