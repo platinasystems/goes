@@ -74,7 +74,6 @@ OPTIONS
 	-k                upgrade kernel
 	-c                upgrade coreboot
 	-a                upgrade all
-	-1                upgrade QSPI1(recovery QSPI), default is QSPI0
 	-f                force upgrade (ignore version check)`,
 	}
 }
