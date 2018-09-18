@@ -13,6 +13,7 @@ import (
 )
 
 var Map map[string][]string
+var Map2 map[string][]string
 
 func Init(assert test.Assert) {
 	assert.Helper()
@@ -25,5 +26,17 @@ func Init(assert test.Assert) {
 	assert.Nil(err)
 	for ifname, args := range Map {
 		assert.Program(2*time.Second, "ethtool", "-s", ifname, args)
+	}
+
+	//take care of priv-flags
+	Map2 = make(map[string][]string)
+	b, err = ioutil.ReadFile("testdata/ethtool_priv_flags.yaml")
+	if err != nil {
+		return
+	}
+	err = yaml.Unmarshal(b, Map2)
+	assert.Nil(err)
+	for ifname, args := range Map2 {
+		assert.Program(2*time.Second, "ethtool", "--set-priv-flags", ifname, args)
 	}
 }
