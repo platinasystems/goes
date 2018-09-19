@@ -464,7 +464,9 @@ func readCfg() error {
 		return err
 	}
 	if _, err := os.Stat(BootcCfgFile); os.IsNotExist(err) {
-		return err
+		if err = initCfg(); err != nil {
+			return err
+		}
 	}
 	dat, err := ioutil.ReadFile(BootcCfgFile)
 	if err != nil {
@@ -922,13 +924,11 @@ func SetSda6I(x string) error {
 
 func UpdateBootcCfg(k, i string) error {
 	k = cbSda6 + "boot/" + k
-	err := SetSda6K(k)
-	if err != nil {
+	if err := SetSda6K(k); err != nil {
 		return err
 	}
 	i = cbSda6 + "boot/" + i
-	err = SetSda6I(i)
-	if err != nil {
+	if err := SetSda6I(i); err != nil {
 		return err
 	}
 	return nil
