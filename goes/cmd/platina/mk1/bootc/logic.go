@@ -1,4 +1,3 @@
-// Copyright © 2015-2018 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -34,7 +33,7 @@ import (
 const (
 	minCoreVer   = 0.41
 	minCoreCom   = 299
-	verNum       = "1.12"
+	verNum       = "1.13"
 	goesBootCfg  = "/mountd/sda1/bootc.cfg"
 	sda1Cfg      = "/bootc.cfg"
 	sda6Cfg      = "/sda1/bootc.cfg"
@@ -65,7 +64,9 @@ const (
 
 var BootcCfgFile string
 var uuid1 string
+var uuid1w string
 var uuid6 string
+var uuid6w string
 var kexec0 string
 var kexec1 string
 var kexec6 string
@@ -104,6 +105,8 @@ func Bootc() []string {
 		if Cfg.Disable {
 			return []string{""}
 		}
+
+		fixSda1Swap()
 
 		if err := fixNewroot(); err != nil {
 			fmt.Println("Error: can't fix newroot, drop into grub...")
@@ -1164,16 +1167,15 @@ func getCorebootInfo() (im IMGINFO, err error) {
 	return im, nil
 }
 
-func fixSda1SwapUUIC() error {
+func fixSda1Swap() error {
 	context, err := getContext()
 	if err != nil {
 		return fmt.Errorf("ERROR: cound not detemine context.")
 	}
-	if context != "goesBoot" {
+	if context != goesBoot {
 		return nil
 	}
 
-	fmt.Println("read sda6")
 	if _, err := os.Stat(cbSda6 + "etc/fstab"); os.IsNotExist(err) {
 		fmt.Println("ERROR:	file", cbSda6+"etc/fstab", "does not exist")
 		return nil
@@ -1184,7 +1186,6 @@ func fixSda1SwapUUIC() error {
 	}
 	ds6 := strings.Split(string(d6), "\n")
 
-	fmt.Println("read sda1")
 	if _, err := os.Stat(cbSda1 + "etc/fstab"); os.IsNotExist(err) {
 		fmt.Println("ERROR:	file", cbSda1+"etc/fstab", "does not exist")
 		return fmt.Errorf("ERROR: cound not read sda1 /etc/fstab.")
@@ -1195,20 +1196,26 @@ func fixSda1SwapUUIC() error {
 	}
 	ds1 := strings.Split(string(d1), "\n")
 	uuid6 = ""
+	uuid6w = ""
 	for _, j := range ds6 {
 		if strings.Contains(j, "swap") {
 			if strings.Contains(j, "UUID") {
 				k := strings.Split(j, " ")
-				uuid6 = k[1]
+				kk := strings.Split(k[0], "=")
+				uuid6 = kk[1]
+				uuid6w = j
 			}
 		}
 	}
 	uuid1 = ""
+	uuid1w = ""
 	for _, j := range ds1 {
 		if strings.Contains(j, "swap") {
 			if strings.Contains(j, "UUID") {
 				k := strings.Split(j, " ")
-				uuid1 = k[1]
+				kk := strings.Split(k[0], "=")
+				uuid1 = kk[1]
+				uuid1w = j
 			}
 		}
 	}
@@ -1216,24 +1223,21 @@ func fixSda1SwapUUIC() error {
 		fmt.Println("Error: no uuids")
 		return fmt.Errorf("ERROR: no UUID for swap in /etc/fstab.")
 	}
-	fmt.Println(uuid6)
-	fmt.Println(uuid1)
 	if uuid6 == uuid1 {
 		return nil
 	}
-	for _, j := range ds1 {
+	for i, j := range ds1 {
 		if strings.Contains(j, "swap") {
 			if strings.Contains(j, "UUID") {
-				k := strings.Split(j, " ")
-				k[1] = uuid6
-				mm := strings.Join(k, "\n")
-				m := []byte(mm)
-				err := ioutil.WriteFile(cbSda1+"etc/fstab", m, 0644)
-				if err != nil {
-					return err
-				}
+				ds1[i] = uuid6w
 			}
 		}
+	}
+	mm := strings.Join(ds1, "\n")
+	m := []byte(mm)
+	err = ioutil.WriteFile(cbSda1+"etc/fstab", m, 0644)
+	if err != nil {
+		return err
 	}
 	return nil
 }
