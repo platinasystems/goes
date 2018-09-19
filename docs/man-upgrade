@@ -1,0 +1,42 @@
+platina@invader:~$ sudo goes
+invader> man upgrade
+NAME
+        upgrade - upgrade images
+
+SYNOPSIS
+        upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-t] [-a | -g -k -c] [-f]
+
+DESCRIPTION
+        The upgrade command updates firmware images.
+
+        The default upgrade version is "LATEST".
+        Or specify a version using "-v", form YYYYMMDD or vX.X
+
+        The -l flag display version of selected server and version.
+
+        The -r flag prints a report on current version numbers.
+
+        Images are downloaded from "downloads.platinasystems.com",
+        Or from a server using "-s" followed by a URL or IPv4 address.
+
+        Upgrade proceeds only if the selected version number is newer,
+        unless overridden with the "-f" force flag.
+
+OPTIONS
+        -v [VER]          version [YYYYMMDD] or LATEST (default)
+        -s [SERVER[/dir]] IP4 or URL, default downloads.platinasystems.com
+        -t                use TFTP instead of HTTP
+        -l                display version of selected server and version
+        -r                report current versions of goes, kernel, coreboot
+        -g                upgrade goes
+        -k                upgrade kernel
+        -c                upgrade coreboot
+        -a                upgrade all
+        -f                force upgrade (ignore version check)
+        
+invader> upgrade help
+usage:  upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-t] [-a | -g -k -c] [-f]
+
+note:
+1) version(VER) is actually a directory under SERVER(url);
+2) "sudo goes upgrade..." can be run directly.
