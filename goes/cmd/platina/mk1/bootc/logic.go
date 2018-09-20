@@ -97,15 +97,15 @@ func Bootc() []string {
 		m, err := ioutil.ReadFile("/proc/mounts")
 		if err != nil {
 			continue
+		}
+		mounts := string(m)
+		if err := readCfg(); err != nil {
+			continue
 		} else {
 			if err := writeCfg(); err != nil { // updates bootc format
 				fmt.Println("Error: writing bootc.cfg, drop into grub...\n")
 				return []string{""}
 			}
-		}
-		mounts := string(m)
-		if err := readCfg(); err != nil {
-			continue
 		}
 		if Cfg.Disable {
 			return []string{""}
