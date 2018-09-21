@@ -67,4 +67,11 @@ edit linux-image-platina-mk1, update the two lines:
      v4.13-139-gace1518-platina-mk1-amd64
      linux-image-platina-mk1-4.13.0.deb
 
+the downloads/TEST directory will end up have six (6) files in it:
 
+     coreboot-platina-mk1.rom
+     goes-platina-mk1
+     goes-platina-mk1-installer
+     linux-image-platina-mk1
+     linux-image-platina-mk1-4.13.0.deb
+     platina-mk1-bmc.zip
