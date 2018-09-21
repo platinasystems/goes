@@ -1,10 +1,12 @@
-#INSTRUCTIONS_BMC_UPGRADE
-#7/31/2018
+# PLATINA SYSTEMS CORPORATION
+---
+## INSTRUCTIONS FOR UPGRADING VERY OLD BMC
+## 7/31/2018
 
-##PROCEDURE 1 - Upgrading a very old bmc to latest code.
+## PROCEDURE 1 - Upgrading a very old bmc to latest code.
 
-Note:  Very old bmc code has *no* "upgrade" command, u-boot has to be used to upgrade.
-Note:  This procedure is for a unit we have in the lab, i.e., we have the console port, access to tftp server.
+Instructions for a BMC with goes that has NO "upgrade" command.  u-boot will be used to upgrade.
+This procedure is for a unit we have in the lab, i.e., we have the console port, access to tftp server.
 
 Set WD so we don't reboot
 => run wd
@@ -53,7 +55,7 @@ DONE
 ---
 ---
 ---
-#PROCEDURE 2 - Convert from Gen 1 to Gen 2 "upgrade" command
+## PROCEDURE 2 - Convert from Gen 1 to Gen 2 "upgrade" command
 
 upgrading PURE remotely, in the event they have generation 1 upgrade format (tar file)
 convert them to generation 2 upgrade format (zip file)
