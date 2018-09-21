@@ -52,18 +52,19 @@
 ---
 ## Putting the images in downloads/TEST, downloads/LATEST, etc.
 
-1. scp files to /var/www/html/downloads/TEST
-a. platina-mk1-bmc.zip
-b. coreboot-platina-mk1.rom
-c. linux-image-4.13.0-platina-mk1_4.13-135-gf5d1b0298af7_amd64.deb
-d. goes-platina-mk1-installer
-e. goes-platina-mk1
+scp files to /var/www/html/downloads/TEST:
 
-2. rename linux-image-4.13.0-platina-mk1_4.13-135-gf5d1b0298af7_amd64.deb to linux-image-platina-mk1-4.13.0.deb
+     platina-mk1-bmc.zip
+     coreboot-platina-mk1.rom
+     linux-image-4.13.0-platina-mk1_4.13-135-gf5d1b0298af7_amd64.deb
+     goes-platina-mk1-installer
+     goes-platina-mk1
 
-3. edit linux-image-platina-mk1, update the two lines
-this file contains two lines:
-v4.13-139-gace1518-platina-mk1-amd64
-linux-image-platina-mk1-4.13.0.deb
+rename linux-image-4.13.0-platina-mk1_4.13-135-gf5d1b0298af7_amd64.deb to linux-image-platina-mk1-4.13.0.deb
+
+edit linux-image-platina-mk1, update the two lines:
+
+     v4.13-139-gace1518-platina-mk1-amd64
+     linux-image-platina-mk1-4.13.0.deb
 
 
