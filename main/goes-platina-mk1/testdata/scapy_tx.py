@@ -46,7 +46,8 @@ parser.add_argument('-mac', '--mac', nargs="*", help='mac [intf | da | bcast | b
 parser.add_argument('-smi', '--smi', action='store_true', help='SA incr')
 parser.add_argument('-v', '--vidpri', nargs="*", help='vlan [prio]')
 parser.add_argument('-ip', '--ip', nargs="*", help='ip [dstip] [srcip] [udp | tcp | arp] [<dstport [srcport]> | opcode]')
-parser.add_argument('-t', '--txintf', help='tx interface')
+parser.add_argument('-i', '--txintf', help='tx interface')
+parser.add_argument('-d', '--dump', action='store_true', help='dump packet and data=')
 parser.add_argument('-l', '--length', help='length')
 parser.add_argument('-c', '--count', help='count')
 
@@ -56,6 +57,7 @@ args = parser.parse_args()
 DA = "00:00:ee:00:00:0d"
 DA_bcast = "ff:ff:ff:ff:ff:ff"
 DA_bpdu = "01:80:c2:00:00:00"
+DA_zero = "00:00:00:00:00:00"
 SA = "00:00:ee:00:00:05"
 prio = 0
 vid = 0
@@ -102,6 +104,11 @@ if args.ip:
   if len(args.ip) > 3:
     if proto == "arp":
       opcode = int(args.ip[3])
+      if opcode & 1:
+        # req
+        DA_arp = DA_zero
+      else:
+        DA_arp = DA
     else:
       dstport = int(args.ip[3])
   if len(args.ip) > 4:
@@ -111,11 +118,11 @@ if args.ip:
 if args.length:
   length = args.length
 
-if args.count:
-  count = int(args.count)
-
-if args.txintf:
-  txintf = args.txintf
+if not args.dump:
+  if args.count:
+    count = int(args.count)
+  if args.txintf:
+    txintf = args.txintf
 
 if args.smi:
   smi = 1
@@ -128,14 +135,14 @@ for dst_port in range(0,count):
       elif proto == "tcp":
         p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/IP(src=srcip,dst=dstip)/TCP(sport=srcport,dport=dstport)/payload)
       elif proto == "arp":
-        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwtype=1,ptype=2048,op=opcode)/payload)
+        p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwdst=DA_arp,hwtype=1,ptype=2048,op=opcode)/payload)
     else:
       if proto == "udp":
         p=(Ether(src=SA, dst=DA)/IP(src=srcip,dst=dstip)/UDP(sport=srcport,dport=dstport)/payload)
       elif proto == "tcp":
         p=(Ether(src=SA, dst=DA)/IP(src=srcip,dst=dstip)/TCP(sport=srcport,dport=dstport)/payload)
       elif proto == "arp":
-        p=(Ether(src=SA, dst=DA)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwtype=1,ptype=2048,op=opcode)/payload)
+        p=(Ether(src=SA, dst=DA)/ARP(psrc=srcip,pdst=dstip,hwsrc=SA,hwdst=DA_arp,hwtype=1,ptype=2048,op=opcode)/payload)
   else:
     if vid != 0:
       p=(Ether(src=SA, dst=DA)/Dot1Q(vlan=vid, prio=prio, type=60)/payload60)
