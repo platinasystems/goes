@@ -71,6 +71,7 @@ OPTIONS
 	-l                display version of selected server and version
 	-r                report QSPI installed versions, QSPI booted from
 	-c                check SHA-1's of flash
+	-1                upgrade QSPI1(recovery QSPI), default is QSPI0
 	-f                force upgrade (ignore version check)`,
 	}
 }
