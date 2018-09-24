@@ -1,17 +1,17 @@
-#Platina Software Update Process
+##Platina Software Update Process
 
-## Using GoES upgrade
+### Using GoES upgrade
 
-### Upgrade Coreboot, Linux Kernel, GoES
+I) Upgrade Coreboot, Linux Kernel, GoES
 ---
 sudo goes upgrade -c -v LATEST -s downloads.platinasystems.com
 sudo goes upgrade -k -v LATEST -s downloads.platinasystems.com
 sudo goes upgrade -g -v LATEST -s downloads.platinasystems.com
 sudo goes upgrade -a -v LATEST -s downloads.platinasystems.com
 ---
-### Upgrade BMC
+II) Upgrade BMC
 ---
-####Getting to the BMC
+1) Getting to the BMC
 The BMC can be accessed via the front panel console port. Be default, the console port is set to the
 x86 processor’s console instead of the BMC’s
 To switch to BMC console:
@@ -23,7 +23,7 @@ To switch back to x86 console:
 - At the BMC console prompt, enter “toggle”
 - The console has switched to x86 at this point. Hit return to see the Linux prompt.
 
-####General Upgrade Process
+2)General Upgrade Process
 
 From BMC console CLI:
 - Enter:
@@ -45,11 +45,8 @@ http://downloads.platinasystems.com/ to look for the files.
 To see a list of software revisions available for upgrade on http://downloads.platinasystems.com/,
 enter 'upgrade -l':
 
-Should anything happen during the upgrade process that results in a corrupted image that cannot be
-booted, a watchdog timer will time out and boot the BMC from QSPI1 instead. The timeout may
-take up to 2 minutes. Once booted from QSPI1, user can upgrade QSPI0 again via CLI.
 ---
 
-## Manual upgrade
+### Manual upgrade
 ---
 ---
