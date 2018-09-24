@@ -41,6 +41,5 @@ enter 'upgrade -l':
 
 ---
 
-### Manual upgrade
----
----
+## Manual upgrade
+
