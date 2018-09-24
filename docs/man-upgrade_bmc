@@ -1,0 +1,37 @@
+From console access -
+
+sudo goes toggle
+
+> man upgrade
+NAME
+        upgrade - upgrade images
+
+SYNOPSIS
+        upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-c] [-t] [-f]
+
+DESCRIPTION
+        The upgrade command updates firmware images.
+
+        The default upgrade version is "LATEST".
+        Or specify a version using "-v", in the form YYYYMMDD
+
+        The -l flag display version of selected server and version.
+
+        The -r flag reports QSPI version numbers and booted from.
+
+        By default, images are downloaded from "downloads.platina.com".
+        Or from a server using "-s" followed by a URL or IPv4 address.
+
+        Upgrade proceeds only if the selected version number is newer,
+        unless overridden with the "-f" force flag.
+
+OPTIONS
+        -v [VER]          version [YYYYMMDD] or LATEST (default)
+        -s [SERVER[/dir]] IP4 or URL, default is downloads.platina.com
+        -t                use TFTP instead of HTTP
+        -l                display version of selected server and version
+        -r                report QSPI installed versions, QSPI booted from
+        -c                check SHA-1's of flash
+        -f                force upgrade (ignore version check)
+> upgrade --help
+usage:  upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-c] [-t] [-f]
