@@ -1,8 +1,19 @@
-Platina PSW-3001-32C BMC Software Upgrade Process
-Updated 6/21/2017
-Getting to the BMC
+#Platina Software Update Process
+
+## Using GoES upgrade
+
+### Upgrade Coreboot, Linux Kernel, GoES
+---
+sudo goes upgrade -c -v LATEST -s downloads.platinasystems.com
+sudo goes upgrade -k -v LATEST -s downloads.platinasystems.com
+sudo goes upgrade -g -v LATEST -s downloads.platinasystems.com
+sudo goes upgrade -a -v LATEST -s downloads.platinasystems.com
+---
+### Upgrade BMC
+---
+####Getting to the BMC
 The BMC can be accessed via the front panel console port. Be default, the console port is set to the
-x86 processor’s console instead of the BMC.’s
+x86 processor’s console instead of the BMC’s
 To switch to BMC console:
 - At the x86 console Linux prompt, assuming GOES is running already, enter “goes toggle”
 - The console has switched to BMC at this point. Hit return to see the BMC CLI prompt, which
@@ -11,97 +22,34 @@ should look something like:
 To switch back to x86 console:
 - At the BMC console prompt, enter “toggle”
 - The console has switched to x86 at this point. Hit return to see the Linux prompt.
-General Upgrade Process
-The physical components involved in the BMC software upgrade are illustrated in Figure 1.
-Figure 1. Block diagram of the components involved in BMC software upgrade
-The image itself is stored in the QSPI flash, of which there are 2. QSPI1 has a default image installed
-at the factory and is not expected to be modified in the field, though it can be upgraded via uboot if
-necessary. QSPI0 stores the latest image and is always the location that BMC boots from first. The
-image at QSPI0 can be upgraded at any time via a single line command from the BMC command line
-interface (CLI). The upgrade command will automatically reboot the BMC to install the new image.
+
+####General Upgrade Process
+
 From BMC console CLI:
 - Enter:
 upgrade -v LATEST -s downloads.platinasystems.com
 This will automatically go to http://downloads.platinasystems.com/LATEST/ to wget the zip file
 platina-mk1-bmc.zip, install, and reboot the BMC to complete the upgrade. Reboot of BMC will not
 affect the x86.
+
 ‘LATEST’ can be replaced by any version control string (e.g. 'v0.2').
+
 'downloads.platinasystems.com' can be replaced by any server http or IP address reachable via
 network that supports wget (e.g. 192.168.101.127).
 Example: 'upgrade -v v0.2 -s 192.168.101.127' will go to 192.168.101.127/v0.2/ to wget the zip file
 platina-mk1-bmc.zip.
+
 By default if the -s option is left out, upgrade command will go to
 http://downloads.platinasystems.com/ to look for the files.
+
 To see a list of software revisions available for upgrade on http://downloads.platinasystems.com/,
 enter 'upgrade -l':
+
 Should anything happen during the upgrade process that results in a corrupted image that cannot be
 booted, a watchdog timer will time out and boot the BMC from QSPI1 instead. The timeout may
 take up to 2 minutes. Once booted from QSPI1, user can upgrade QSPI0 again via CLI.
+---
 
-Platina PSW-3001-32C Coreboot Software Upgrade Process
-Updated 6/21/2017
-Instead of BIOS/GRUB/Onie, Platina PSW-3001-32C uses a custom Coreboot to boot the box and
-load Linux. Platina Coreboot loads much faster than BIOS, and is more flexible and secure than
-ONIE. More security features on Platina Coreboot are in the works.
-General Coreboot Upgrade Process
-Coreboot image is stored in a separate code flash as part of the x86 CPU complex. Follow the
-procedure below to upgrade Coreboot software.
-From the Linux prompt:
-- Get the coreboot image.
-wget http://downloads.platinasystems.com/LATEST/coreboot-platina-mk1.rom
-- Load the software into flash (this is a single line of command)
-sudo /usr/local/sbin/flashrom -p internal -l /usr/local/share/flashrom/layouts/platinamk1.xml
--i bios -w ./coreboot-platina-mk1.rom -A -V
-(./coreboot-platina-mk1.rom can be replaced by wherever the file was downloaded
-to)
-- Reboot. The system will automatically boot into Linux. Coreboot is upgraded at this point
-Done
-
-Platina PSW-3001-32C GOES Software Upgrade Process
-Updated 6/21/2017
-GOES is a user space application that can be upgraded at anytime in seconds. This document
-describes the simplest way to upgrade code from a binary. For instructions on how to compile GOES
-from source, visit https://github.com/platinasystems/go
-General Upgrade process
-From the Linux prompt:
-- Download, make executable, and install
-wget http://downloads.platinasystems.com/LATEST/goes-platina-mk1-installer
-chmod 755 goes-platina-mk1-installer
-sudo ./goes-platina-mk1-installer
-- New rev of GOES is running at this point. Verify status by entering
-goes status
-and look for the following:
-GOES status
-======================
- PCI - OK
- Kernel module - OK
- Check daemons:
- goes-daemons - OK
- redisd - OK
- i2cd - OK
- uptimed - OK
- vnetd - OK
- qsfp - OK
- Check Redis - OK
- Check vnet - OK
-Done
-
-Platina PSW-3001-32C Kernel Upgrade Instrution
-Updated 6/22/2017
-Platina GOES works on kernel 4.11 and newer. There are two Platina specific mods that are
-currently required for GOES. These mods will be removed in later revision of GOES so that GOES can
-work on standard kernel.
-Upgrading the Linux kernel
-From the Linux prompt:
-- Download the kernel and install
-wget http://downloads.platinasystems.com/LATEST/linux-image-platina-mk1-4.11.0.deb
-sudo dpkg -i linux-image-platina-mk1-4.11.0.deb
-- Clean up the boot directory and reboot
-sudo rm *4.9.8*
-(and other old kernels that may be there)
-sudo update-grub
-(not necessary, but good housekeeping)
-sudo reboot -f
-After reboot, Linux will be at the new kernel revision. Check with command 'uname -r'.
-Done. 
-
+## Manual upgrade
+---
+---
