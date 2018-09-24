@@ -1,8 +1,9 @@
 From console access -
 
-sudo goes toggle
+platina@invader:~$ sudo goes
+invader> sudo goes toggle
 
-> man upgrade
+invader> man upgrade
 NAME
         upgrade - upgrade images
 
@@ -33,5 +34,5 @@ OPTIONS
         -r                report QSPI installed versions, QSPI booted from
         -c                check SHA-1's of flash
         -f                force upgrade (ignore version check)
-> upgrade --help
+invader> upgrade --help
 usage:  upgrade [-v VER] [-s SERVER[/dir]] [-r] [-l] [-c] [-t] [-f]
