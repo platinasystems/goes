@@ -1,30 +1,24 @@
-##Platina Software Update Process
-
-### Using GoES upgrade
-
-I) Upgrade Coreboot, Linux Kernel, GoES
+# Platina Software Update Process
+## Using GoES upgrade
+### Upgrade Coreboot, Linux Kernel, GoES
 ---
-sudo goes upgrade -c -v LATEST -s downloads.platinasystems.com
-sudo goes upgrade -k -v LATEST -s downloads.platinasystems.com
-sudo goes upgrade -g -v LATEST -s downloads.platinasystems.com
-sudo goes upgrade -a -v LATEST -s downloads.platinasystems.com
+ - sudo goes upgrade -c -v LATEST -s downloads.platinasystems.com
+ - sudo goes upgrade -k -v LATEST -s downloads.platinasystems.com
+ - sudo goes upgrade -g -v LATEST -s downloads.platinasystems.com
+ - sudo goes upgrade -a -v LATEST -s downloads.platinasystems.com
 ---
-II) Upgrade BMC
+### Upgrade BMC
 ---
-1) Getting to the BMC
-The BMC can be accessed via the front panel console port. Be default, the console port is set to the
-x86 processor’s console instead of the BMC’s
+#### Getting to the BMC
+The BMC can be accessed via the front panel console port. Be default, the console port is set to the x86 processor’s console instead of the BMC’s
 To switch to BMC console:
-- At the x86 console Linux prompt, assuming GOES is running already, enter “goes toggle”
-- The console has switched to BMC at this point. Hit return to see the BMC CLI prompt, which
-should look something like:
+- At the x86 console Linux prompt, assuming GoES is running already, enter “sudo goes toggle”
+- The console has switched to BMC at this point. Hit return to see the BMC CLI prompt, which should look something like:
 192.168.101.211>
-To switch back to x86 console:
-- At the BMC console prompt, enter “toggle”
-- The console has switched to x86 at this point. Hit return to see the Linux prompt.
+-To switch back to x86 console:
+ At the BMC console prompt, enter “toggle”. The console has switched to x86 at this point. Hit return to see the Linux prompt.
 
-2)General Upgrade Process
-
+#### General Upgrade Process
 From BMC console CLI:
 - Enter:
 upgrade -v LATEST -s downloads.platinasystems.com
