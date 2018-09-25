@@ -977,6 +977,9 @@ func sendFdbEventEthtoolSettings(v *vnet.Vnet) {
 	fdbm := &m.FdbMain
 	fe := fdbm.GetEvent(vnet.PostReadyVnetd)
 	for _, pe := range vnet.Ports {
+		if pe.Devtype != xeth.XETH_DEVTYPE_XETH_PORT {
+			continue
+		}
 		var ifname [16]uint8
 		copy(ifname[:], pe.Ifname)
 		if IfinfoDebug {
@@ -1008,6 +1011,9 @@ func sendFdbEventEthtoolFlags(v *vnet.Vnet) {
 	fdbm := &m.FdbMain
 	fe := fdbm.GetEvent(vnet.PostReadyVnetd)
 	for _, pe := range vnet.Ports {
+		if pe.Devtype != xeth.XETH_DEVTYPE_XETH_PORT {
+			continue
+		}
 		var ifname [16]uint8
 		copy(ifname[:], pe.Ifname)
 		if IfinfoDebug {
