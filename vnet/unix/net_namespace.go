@@ -10,9 +10,9 @@ import (
 	"github.com/platinasystems/go/elib/elog"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/internal/netlink"
-	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/xeth"
 
 	"bytes"
 	"errors"

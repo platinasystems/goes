@@ -5,9 +5,9 @@
 package fe1
 
 import (
-	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet/devices/optics/sfp"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/xeth"
 )
 
 // from go/main/goes-platina-mk1/vnetd.go:vnetdInit()

@@ -8,7 +8,7 @@ import (
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/cli"
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/internal/xeth"
+	"github.com/platinasystems/xeth"
 
 	"fmt"
 	"sort"
@@ -285,15 +285,17 @@ func (v *Vnet) showSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err erro
 	} else {
 		fmt.Fprintln(w, "All counters are zero")
 	}
-	fmt.Fprintf(w, "sideband%34v%-30v%16v\n", "", "to-cpu packets", xeth.SideBandTxCounter)
-	fmt.Fprintf(w, "sideband%34v%-30v%16v\n", "", "to-cpu dropped packets", xeth.SideBandTxDrops)
+	fmt.Fprintf(w, "sideband%34v%-30v%16v\n", "", "to-cpu packets",
+		xeth.Count.Tx.Sent)
+	fmt.Fprintf(w, "sideband%34v%-30v%16v\n", "", "to-cpu dropped packets",
+		xeth.Count.Tx.Dropped)
 	return
 }
 
 func (v *Vnet) clearSwIfs(c cli.Commander, w cli.Writer, in *cli.Input) (err error) {
 	v.clearIfCounters()
-	xeth.SideBandTxCounter = 0
-	xeth.SideBandTxDrops = 0
+	xeth.Count.Tx.Sent = 0
+	xeth.Count.Tx.Dropped = 0
 	return
 }
 

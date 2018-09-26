@@ -23,9 +23,9 @@ import (
 	"github.com/platinasystems/go/internal/redis/publisher"
 	"github.com/platinasystems/go/internal/redis/rpc/args"
 	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/xeth"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/xeth"
 )
 
 // Enable publish of Non-unix (e.g. non-tuntap) interfaces.
@@ -191,15 +191,14 @@ func (i *Info) hw_if_add_del(v *vnet.Vnet, hi vnet.Hi, isDel bool) (err error) {
 
 func (i *Info) hw_if_link_up_down(v *vnet.Vnet, hi vnet.Hi, isUp bool) (err error) {
 	if i.hw_is_ok(hi) {
-		var flag xeth.CarrierFlag
+		var flag uint8 = xeth.XETH_CARRIER_OFF
 		if isUp {
 			flag = xeth.XETH_CARRIER_ON
-		} else {
-			flag = xeth.XETH_CARRIER_OFF
 		}
 		// Make sure interface is known to platina-mk1 driver
 		if _, found := vnet.Ports[hi.Name(v)]; found {
-			vnet.Xeth.Carrier(hi.Name(v), flag)
+			index := xeth.Interface.Named(hi.Name(v)).Ifinfo.Index
+			xeth.Carrier(index, flag)
 		}
 		i.publish_link(hi, isUp)
 	}
@@ -421,10 +420,12 @@ func (p *ifStatsPoller) EventAction() {
 
 	pubcount := func(ifname, counter string, value uint64) {
 		counter = Counter(counter)
-		if value != 0 && strings.HasPrefix(ifname, vnet.PortPrefixer.Get()) {
+		if value != 0 && strings.HasPrefix(ifname, "xeth") {
 			// Only give stats for ports that are known
 			if _, found := vnet.Ports[ifname]; found {
-				vnet.Xeth.SetStat(ifname, counter, value)
+				xethif := xeth.Interface.Named(ifname)
+				ifindex := xethif.Ifinfo.Index
+				xeth.SetStat(ifindex, counter, value)
 			}
 
 		}

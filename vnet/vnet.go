@@ -12,12 +12,10 @@ import (
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/loop"
 	"github.com/platinasystems/go/elib/parse"
-	"github.com/platinasystems/go/internal/xeth"
+	"github.com/platinasystems/xeth"
 )
 
 var LogSvi bool
-
-var Xeth *xeth.Xeth
 
 // drivers/net/ethernet/xeth/platina_mk1.c: xeth.MsgIfinfo
 // PortEntry go/main/goes-platina-mk1/vnetd.go:vnetdInit() xeth.XETH_MSG_KIND_IFINFO
@@ -32,8 +30,8 @@ type PortEntry struct {
 	Ifindex      int32
 	Iflinkindex  int32 // system side eth# ifindex
 	Ifname       string
-	Flags        xeth.EthtoolFlagBits
-	Iff          xeth.Iff
+	Flags        xeth.EthtoolPrivFlags
+	Iff          net.Flags
 	Speed        xeth.Mbps
 	Vid          uint16 // port_vid
 	Portindex    int16
