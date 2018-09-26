@@ -66,11 +66,7 @@ var suite = test.Suite{
 		assert.Program(32*time.Second, test.Self{},
 			"hwait", machine.Name, "vnet.ready", "true", "30")
 
-		if *test.MustPause {
-			test.Pause("Attach vnet debugger to pid(",
-				vnetdProgram.Pid(),
-				");\nthen press enter to continue...")
-		}
+		test.Pause("attach vnet debugger to pid ", vnetdProgram.Pid())
 	},
 	Exit: func(t *testing.T) {
 		if redisdProgram != nil {
@@ -79,9 +75,7 @@ var suite = test.Suite{
 		if vnetdProgram != nil {
 			defer vnetdProgram.Quit()
 		}
-		if *test.MustPause {
-			test.Pause("press enter to continue...")
-		}
+		test.Pause("tests complete")
 	},
 	Tests: test.Tests{
 		&test.Unit{"ready", func(*testing.T) {}},

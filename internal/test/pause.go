@@ -11,9 +11,13 @@ import (
 )
 
 func Pause(args ...interface{}) {
-	if len(args) == 0 {
-		args = []interface{}{"Press enter to continue..."}
+	if !*MustPause {
+		return
 	}
-	fmt.Print(args...)
+	if len(args) > 0 {
+		fmt.Print(args...)
+		fmt.Print("; ")
+	}
+	fmt.Print("press enter to continue...")
 	bufio.NewReader(os.Stdin).ReadBytes('\n')
 }
