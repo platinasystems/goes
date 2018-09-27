@@ -3,7 +3,7 @@ This repos contains Platina System's open source GO projects.
 First fetch and install the goes builder,
 
 ```console
-$ go get github.com:platinasystems/go/main/goes-build
+$ go get github.com/platinasystems/go/main/goes-build
 ```
 
 You'll need `platinasystems/fe1` and `platinasystems/firmware-fe1a` to build
