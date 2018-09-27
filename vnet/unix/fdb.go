@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -209,7 +210,10 @@ func (e *fdbEvent) EventAction() {
 				xeth.Mbps(msg.Speed)
 			hi, found := vn.HwIfByName(ifname)
 			if found {
-				bw := float64(msg.Speed)
+				var bw float64
+				if msg.Autoneg == 0 {
+					bw = float64(msg.Speed)
+				}
 				speedOk := false
 				dbgfdb.IfETSetting.Log(ifname, "setting speed", bw)
 				switch bw {
@@ -688,6 +692,19 @@ func makePortEntry(msg *xeth.MsgIfinfo, puntIndex uint8) (pe *vnet.PortEntry) {
 	return
 }
 
+func isSpecialDevtype(msg *xeth.MsgIfinfo) bool {
+	if msg.Devtype == xeth.XETH_DEVTYPE_LINUX_VLAN ||
+		msg.Devtype == xeth.XETH_DEVTYPE_XETH_BRIDGE {
+		return true
+	}
+	// Hack until driver sends correct devtype - REMOVE
+	ifname := xeth.Ifname(msg.Ifname)
+	if strings.Contains(ifname.String(), "xethbr") {
+		return true
+	}
+	return false
+}
+
 func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.Vnet, puntIndex uint8) (err error) {
 	if msg == nil {
 		sendFdbEventIfInfo(v)
@@ -878,6 +895,7 @@ func sendFdbEventEthtoolSettings(v *vnet.Vnet) {
 		msg.Kind = xeth.XETH_MSG_KIND_ETHTOOL_SETTINGS
 		msg.Ifindex = ifindex
 		msg.Speed = uint32(pe.Speed)
+		msg.Autoneg = pe.Autoneg
 		// xeth layer is cacheing the rest of this message
 		// in future can just reference that and send it along here
 		ok := fe.EnqueueMsg(buf)

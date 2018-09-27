@@ -108,6 +108,8 @@ const (
 	SwIfKindHardware
 	// Sub interface (e.g. vlan) of hardware interface.
 	SwIfKindSubInterface
+	// Sw interface for a bridge
+	SwBridgeInterface
 
 	nBuiltinSwIfKind
 
@@ -327,10 +329,17 @@ func (m *interfaceMain) HwIferForSupSi(si Si) (h HwInterfacer) {
 
 func (s *SwIf) builtinSwIfName(vn *Vnet) (v string) {
 	hw := vn.SupHwIf(s)
-	v = hw.name
+	if hw != nil {
+		v = hw.name
+	}
 	if s.kind != SwIfKindHardware {
-		h := vn.HwIfer(hw.hi)
-		v += h.FormatId(s.id)
+		if s.kind == SwBridgeInterface {
+			v = "xethbr"
+			v += fmt.Sprintf(".%d", s.id)
+		} else {
+			h := vn.HwIfer(hw.hi)
+			v += h.FormatId(s.id)
+		}
 	}
 	return
 }
@@ -351,6 +360,10 @@ func (i *SwIf) Id(v *Vnet) (id IfId) {
 	return
 }
 func (si Si) Id(v *Vnet) (id IfId) { return v.SwIf(si).Id(v) }
+func (si Si) SetId(v *Vnet, id IfId) {
+	swi := v.SwIf(si)
+	swi.id = id
+}
 
 func (i *SwIf) IsAdminUp() bool      { return i.flags&swIfAdminUp != 0 }
 func (si Si) IsAdminUp(v *Vnet) bool { return v.SwIf(si).IsAdminUp() }
@@ -512,11 +525,12 @@ func (h *HwIf) SetLoopback(v IfLoopbackType) (err error) {
 	return
 }
 func (h *HwIf) GetSwInterfaceCounterNames() (nm InterfaceCounterNames) { return }
-func (h *HwIf) DefaultId() IfId                                        { return 0 }
-func (h *HwIf) LessThanId(a, b IfId) bool                              { return IfIndex(a) < IfIndex(b) }
-func (h *HwIf) ParseId(a *IfId, in *parse.Input) bool                  { return in.Parse(".%d", a) }
-func (h *HwIf) FormatId(a IfId) string                                 { return fmt.Sprintf(".%d", a) }
-func (a *HwIf) LessThan(b HwInterfacer) bool                           { return a.hi < b.GetHwIf().hi }
+
+func (h *HwIf) DefaultId() IfId                       { return 0 }
+func (h *HwIf) LessThanId(a, b IfId) bool             { return IfIndex(a) < IfIndex(b) }
+func (h *HwIf) ParseId(a *IfId, in *parse.Input) bool { return in.Parse(".%d", a) }
+func (h *HwIf) FormatId(a IfId) string                { return fmt.Sprintf(".%d", a) }
+func (a *HwIf) LessThan(b HwInterfacer) bool          { return a.hi < b.GetHwIf().hi }
 
 type interfaceMain struct {
 	hwIferPool       hwIferPool
@@ -759,6 +773,7 @@ type Devicer interface {
 	GetHwInterfaceCounterNames() InterfaceCounterNames
 	GetSwInterfaceCounterNames() InterfaceCounterNames
 	GetHwInterfaceCounterValues(t *InterfaceThread)
+	GetHwInterfaceFinalSpeed() (s Bandwidth)
 }
 
 type SwIfAddDelHook func(v *Vnet, si Si, isDel bool) error

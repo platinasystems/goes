@@ -452,5 +452,25 @@ func (p *ifStatsPoller) EventAction() {
 	p.pubch <- fmt.Sprint("poll.stop.time: ", stop.Format(time.StampMilli))
 	p.pubch <- fmt.Sprint("poll.stop.channel-length: ", len(p.pubch))
 
+	p.i.v.ForeachHwIf(false, func(hi vnet.Hi) {
+		h := p.i.v.HwIfer(hi)
+		hw := p.i.v.HwIf(hi)
+		// FIXME how to filter these in a better way?
+		if strings.Contains(hw.Name(), "fe1-") ||
+			strings.Contains(hw.Name(), "pg") ||
+			strings.Contains(hw.Name(), "meth") {
+			return
+		}
+
+		if hw.IsLinkUp() {
+			sp := h.GetHwInterfaceFinalSpeed()
+			// Send speed message to driver so ethtool can see it
+			vnet.Xeth.Speed(hw.Name(), uint64(sp/1e6))
+			if false {
+				fmt.Println("FinalSpeed:", hw.Name(), sp, uint64(sp/1e6))
+			}
+		}
+	})
+
 	p.sequence++
 }

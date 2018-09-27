@@ -176,6 +176,7 @@ func (n *node) del_stream(r Streamer) {
 func (n *node) GetHwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
 func (n *node) GetSwInterfaceCounterNames() (nm vnet.InterfaceCounterNames)                      { return }
 func (n *node) GetHwInterfaceCounterValues(t *vnet.InterfaceThread)                              {}
+func (n *node) GetHwInterfaceFinalSpeed() (s vnet.Bandwidth)                                     { return }
 func (n *node) GetAddress() (a []byte)                                                           { return }
 func (n *node) SetAddress(a []byte)                                                              {}
 func (n *node) FormatAddress() (s string)                                                        { return }

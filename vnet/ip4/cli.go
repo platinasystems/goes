@@ -143,7 +143,7 @@ func (m *Main) adjLines(baseAdj ip.Adj, detail bool) (lines []string) {
 		adj := baseAdj + ai
 		line := fmt.Sprintf("%s%6d: ", initialSpace, adj)
 		ss := []string{}
-		adj_lines := adjs[ai].String(&m.Main)
+		adj_lines := adjs[ai].String(&m.Main) // problem here if no hwif and no hwif.name
 		if nh.Weight != 1 || nh.Adj != baseAdj {
 			// adj_lines[0] += fmt.Sprintf(" %d-%d, %d x %d", adj, adj+ip.Adj(nh.Weight)-1, nh.Weight, nh.Adj)
 			adj_lines[0] += fmt.Sprintf(" adj-range %d-%d, weight %d nh-adj %d", adj, adj+ip.Adj(nh.Weight)-1, nh.Weight, nh.Adj)

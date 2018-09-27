@@ -73,3 +73,7 @@ func (d *dev) SetLoopback(x vnet.IfLoopbackType) (err error) {
 func (d *dev) ValidateSpeed(speed vnet.Bandwidth) (err error) {
 	return
 }
+
+func (d *dev) GetHwInterfaceFinalSpeed() (s vnet.Bandwidth) {
+	return
+}

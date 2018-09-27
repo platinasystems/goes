@@ -695,6 +695,7 @@ func (ns *net_namespace) addDelMk1Interface(m *Main, isDel bool, ifname string, 
 				m.set_si(intf, h.GetHwIf().Si())
 			}
 		} else {
+			// goes-start with existent namespaces case.
 			// Manufacture what we need for this interface.
 			// Also filter by front-panel interfaces only with registered hwifs
 			// i.e. no hits for interfaces like lo, eth1, eth2, docker..., eth-1-0.1
@@ -703,11 +704,18 @@ func (ns *net_namespace) addDelMk1Interface(m *Main, isDel bool, ifname string, 
 				hwifer := ns.m.m.v.HwIfer(hi)
 				ns.m.RegisterHwInterface(hwifer)
 			}
-
 		}
 
 		if !exists && devtype == xeth.XETH_DEVTYPE_LINUX_VLAN {
 			m.addDelVlan(intf, iflinkindex, vlanid, isDel)
+		}
+		if !exists && devtype == xeth.XETH_DEVTYPE_XETH_BRIDGE {
+			si := ns.m.m.v.NewSwIf(vnet.SwBridgeInterface, vnet.IfId(ifindex))
+			m.set_si(intf, si)
+			si.SetId(m.v, vnet.IfId(vlanid))
+			if IfinfoDebug {
+				fmt.Println("addDelMk1Interface: Add xeth.XETH_DEVTYPE_XETH_BRIDGE", ifname, vlanid, ifindex, si, intf)
+			}
 		}
 	} else {
 		intf, ok := ns.interface_by_index[ifindex]
@@ -720,6 +728,13 @@ func (ns *net_namespace) addDelMk1Interface(m *Main, isDel bool, ifname string, 
 			if devtype == xeth.XETH_DEVTYPE_LINUX_VLAN {
 				m.addDelVlan(intf, iflinkindex, vlanid, isDel)
 			}
+			if devtype == xeth.XETH_DEVTYPE_XETH_BRIDGE {
+				if IfinfoDebug {
+					fmt.Println("addDelMk1Interface: Del xeth.XETH_DEVTYPE_XETH_BRIDGE", ifname, vlanid)
+				}
+				ns.m.m.v.DelSwIf(intf.si)
+			}
+
 			ns.si_by_ifindex.unset(ifindex)
 			delete(m.interface_by_si, intf.si)
 		}

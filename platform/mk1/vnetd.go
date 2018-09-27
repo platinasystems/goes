@@ -127,15 +127,10 @@ func vnetdInit() {
 			switch msg.Devtype {
 			case xeth.XETH_DEVTYPE_LINUX_VLAN:
 				fallthrough
+			case xeth.XETH_DEVTYPE_XETH_BRIDGE:
+				fallthrough
 			case xeth.XETH_DEVTYPE_XETH_PORT:
 				err = unix.ProcessInterfaceInfo((*xeth.MsgIfinfo)(ptr), vnet.PreVnetd, nil, punt_index)
-			case xeth.XETH_DEVTYPE_XETH_BRIDGE:
-				be := vnet.SetBridge(msg.Id)
-				be.Ifindex = msg.Ifindex
-				be.Iflinkindex = msg.Iflinkindex
-				be.PuntIndex = punt_index
-				copy(be.Addr[:], msg.Addr[:])
-				be.Net = msg.Net
 			case xeth.XETH_DEVTYPE_LINUX_UNKNOWN:
 				// FIXME
 			}

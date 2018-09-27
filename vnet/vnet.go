@@ -35,6 +35,7 @@ type PortEntry struct {
 	Flags        xeth.EthtoolPrivFlags
 	Iff          net.Flags
 	Speed        xeth.Mbps
+	Autoneg      uint8
 	Vid          uint16 // port_vid
 	Portindex    int16
 	Subportindex int8
