@@ -5,13 +5,14 @@
 package ip4
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ip"
-
-	"fmt"
 )
 
 type Prefix struct {
@@ -107,24 +108,27 @@ type MapFib [1 + 32]map[vnet.Uint32]mapFibResult
 
 // Cache of prefix length network masks: entry LEN has high LEN bits set.
 // So, 10/8 has top 8 bits set.
-var netMasks = computeNetMasks()
+var computeNetMasksOnce sync.Once
+var computedNetMasks [33]vnet.Uint32
 
-func computeNetMasks() (r [33]vnet.Uint32) {
-	for i := range netMasks {
-		m := ^vnet.Uint32(0)
-		if i < 32 {
-			m = vnet.Uint32(1<<uint(i)-1) << uint(32-i)
+func netMask(i uint) vnet.Uint32 {
+	computeNetMasksOnce.Do(func() {
+		for i := range computedNetMasks {
+			m := ^vnet.Uint32(0)
+			if i < 32 {
+				m = vnet.Uint32(1<<uint(i)-1) << uint(32-i)
+			}
+			computedNetMasks[i] = vnet.Uint32(m).FromHost()
 		}
-		r[i] = vnet.Uint32(m).FromHost()
-	}
-	return
+	})
+	return computedNetMasks[i]
 }
 
-func (p *Prefix) Mask() vnet.Uint32          { return netMasks[p.Len] }
+func (p *Prefix) Mask() vnet.Uint32          { return netMask(uint(p.Len)) }
 func (p *Prefix) MaskAsAddress() (a Address) { a.FromUint32(p.Mask()); return }
 func (p *Prefix) mapFibKey() vnet.Uint32     { return p.Address.AsUint32() & p.Mask() }
 func (a *Address) Mask(l uint) (v Address) {
-	v.FromUint32(a.AsUint32() & netMasks[l])
+	v.FromUint32(a.AsUint32() & netMask(l))
 	return
 }
 
