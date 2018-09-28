@@ -28,7 +28,7 @@ import (
 )
 
 // Function flags
-var FdbOn bool
+var FdbOn bool = true
 var FdbIfAddrOn bool = true
 
 // Debug flags
