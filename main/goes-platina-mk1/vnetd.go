@@ -55,7 +55,6 @@ func vnetdInit() {
 	const ncounters = 512
 	xeth.EthtoolPrivFlagNames = flags
 	xeth.EthtoolStatNames = stats
-	vnet.PortPrefixer = &mk1.PortPrefix
 	err = xeth.Start(machine.Name)
 
 	if err != nil {

@@ -420,8 +420,9 @@ func (p *ifStatsPoller) EventAction() {
 
 	pubcount := func(ifname, counter string, value uint64) {
 		counter = Counter(counter)
-		if value != 0 && strings.HasPrefix(ifname, "xeth") {
-			// Only give stats for ports that are known
+		entry := xeth.Interface.Named(ifname)
+		if value != 0 && entry != nil &&
+			entry.DevType == xeth.XETH_DEVTYPE_XETH_PORT {
 			if _, found := vnet.Ports[ifname]; found {
 				xethif := xeth.Interface.Named(ifname)
 				ifindex := xethif.Ifinfo.Index

@@ -5,6 +5,16 @@
 package mk1
 
 import (
+	"encoding/hex"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/elib"
 	"github.com/platinasystems/go/internal/i2c"
@@ -15,13 +25,6 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/optics/sfp"
 	fe1_platform "github.com/platinasystems/go/vnet/platforms/fe1"
-
-	"encoding/hex"
-	"fmt"
-	"strconv"
-	"strings"
-	"syscall"
-	"time"
 )
 
 const (
@@ -29,56 +32,75 @@ const (
 	mux1_addr           = 0x71
 	qsfp_addr           = 0x50
 	qsfp_gpio_base_addr = 0x20
+	numPorts            = 32
+
+	alphaParameter     = "/sys/module/platina_mk1/parameters/alpha"
+	provisionParameter = "/sys/module/platina_mk1/parameters/provision"
 )
 
-const numPorts = 32
-
 var pub *publisher.Publisher
-var portBase int
 var firstPort bool
 var maxTemp float64
 var maxTempPort string
 var bmcIpv6LinkLocalRedis string
 var lasts = make(map[string]string)
 
-// all ports must have same PortPrefix so qsfp can hset
-// FIXME: remove SetPortPrefix() when mk1 only supports xeth
-type portPrefix struct {
-	isXeth bool
-	prefix string
+var cachedPortBase struct {
+	once sync.Once
+	val  int
 }
 
-var PortPrefix portPrefix
-
-func (p *portPrefix) Get() string { return p.prefix }
-
-func (p *portPrefix) Set(ifname string) {
-	var isXeth bool
-
-	if strings.HasPrefix(ifname, "xeth") {
-		isXeth = true
-	} else if strings.HasPrefix(ifname, "eth-") {
-		isXeth = false
-	} else {
-		panic(fmt.Errorf("Invalid port prefix, %s\n", ifname))
-	}
-
-	if len(p.prefix) == 0 {
-		if isXeth {
-			p.isXeth = true
-			p.prefix = "xeth"
+func PortBase() int {
+	cachedPortBase.once.Do(func() {
+		cachedPortBase.val = 1
+		if f, err := os.Open(alphaParameter); err == nil {
+			fmt.Fscan(f, &cachedPortBase.val)
+			if cachedPortBase.val > 1 {
+				cachedPortBase.val = 1
+			}
+			f.Close()
 		} else {
-			p.isXeth = false
-			p.prefix = "eth-"
+			s, err := redis.Hget(machine.Name,
+				"eeprom.DeviceVersion")
+			if err == nil {
+				var ver int
+				_, err = fmt.Sscan(s, &ver)
+				if err == nil && (ver == 0 || ver == 0xff) {
+					cachedPortBase.val = 0
+				}
+			}
 		}
-	} else if p.isXeth != isXeth {
-		panic(fmt.Errorf("Cannot change port prefix, %s\n", ifname))
-	}
+	})
+	return cachedPortBase.val
 }
 
-func (p *portPrefix) Name(portIndex int, subPortIndex int) string {
+var cachedProvision struct {
+	once sync.Once
+	val  [numPorts]int
+}
 
-	return vnet.IfName(portIndex, subPortIndex)
+func Provision(i int) int {
+	cachedProvision.once.Do(func() {
+		buf, err := ioutil.ReadFile(provisionParameter)
+		if err == nil {
+			for i, s := range strings.Split(string(buf), ",") {
+				fmt.Sscan(s, &cachedProvision.val[i])
+			}
+		}
+	})
+	if i < numPorts {
+		return cachedProvision.val[i]
+	}
+	return 0
+}
+
+// set 0 vs 1-base port numbering based on HW version
+// use xethPORT-SUBPORT instead of xethPORT if provision[PORT] > 0
+func IfnameOf(port, subport int) string {
+	if Provision(port) == 0 {
+		return fmt.Sprint("xeth", port+PortBase())
+	}
+	return fmt.Sprint("xeth", port+PortBase(), "-", subport+PortBase())
 }
 
 func i2cMuxSelectPort(port uint) {
@@ -348,7 +370,7 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 
 		q.SetSignal(signal, v)
 		if signal == sfp.QsfpModuleIsPresent {
-			f := "port-" + strconv.Itoa(int(port)+portBase) + ".qsfp.installed"
+			f := "port-" + strconv.Itoa(int(port)+PortBase()) + ".qsfp.installed"
 			s := strconv.FormatBool(v)
 			if s != lasts[f] {
 				pub.Print(f, ": ", s)
@@ -359,7 +381,7 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 			if v {
 				// ~800ms delay is needed for hget when Goes first starts
 				if firstPort {
-					ifname := PortPrefix.Name(port, 0)
+					ifname := IfnameOf(port, 0)
 					start := time.Now()
 					_, err := redis.Hget(machine.Name, "vnet."+ifname+".speed")
 					for err != nil {
@@ -374,7 +396,7 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				firstPort = false
 
 				for i := 0; i < 4; i++ {
-					ifname := PortPrefix.Name(port, i)
+					ifname := IfnameOf(port, i)
 					if ifname == "" {
 						continue
 					}
@@ -460,10 +482,10 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 			if v {
 				// fetch and publish static identification fields
 				s := q.String()
-				log.Print("port ", port+uint(portBase), " installed: ", s)
+				log.Print("port ", port+uint(PortBase()), " installed: ", s)
 
 				for _, k := range sfp.StaticRedisFields {
-					f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+					f := "port-" + strconv.Itoa(int(port)+PortBase()) + "." + k
 					if strings.Contains(k, "vendor") {
 						s := q.Ident.Vendor
 						if s != lasts[f] {
@@ -520,7 +542,7 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 
 					q.Monitoring()
 					for _, k := range sfp.StaticMonitoringRedisFields {
-						f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+						f := "port-" + strconv.Itoa(int(port)+PortBase()) + "." + k
 						if strings.Contains(k, "temperature") {
 							if strings.Contains(k, "highAlarm") {
 								s := strconv.FormatFloat(q.Config.TemperatureInCelsius.Alarm.Hi, 'f', 3, 64)
@@ -675,24 +697,24 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 				}
 			} else {
 				//qsfp has been removed
-				log.Print("port ", port+uint(portBase), " QSFP removed")
+				log.Print("port ", port+uint(PortBase()), " QSFP removed")
 				if maxTempPort == strconv.Itoa(int(port)) {
 					maxTempPort = "-1"
 				}
 				// delete redis fields
 				for _, k := range sfp.StaticRedisFields {
-					f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+					f := "port-" + strconv.Itoa(int(port)+PortBase()) + "." + k
 					pub.Print("delete: ", f)
 					lasts[f] = ""
 				}
 				if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
 					for _, k := range sfp.StaticMonitoringRedisFields {
-						f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+						f := "port-" + strconv.Itoa(int(port)+PortBase()) + "." + k
 						pub.Print("delete: ", f)
 						lasts[f] = ""
 					}
 					for _, k := range sfp.DynamicMonitoringRedisFields {
-						f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+						f := "port-" + strconv.Itoa(int(port)+PortBase()) + "." + k
 						pub.Print("delete: ", f)
 						lasts[f] = ""
 					}
@@ -706,22 +728,8 @@ func (m *qsfpMain) signalChange(signal sfp.QsfpSignal, changedPorts, newValues u
 }
 
 func (m *qsfpMain) poll() {
-
-	// set 0 vs 1-base port numbering based on HW version
-	var ver int
+	var err error
 	firstPort = true
-	s, err := redis.Hget(machine.Name, "eeprom.DeviceVersion")
-	if err == nil {
-		_, err = fmt.Sscan(s, &ver)
-		if err == nil && (ver == 0 || ver == 0xff) {
-			portBase = 0
-		} else {
-			portBase = 1
-		}
-	} else {
-		portBase = 1
-	}
-
 	pub, err = publisher.New()
 	if err != nil {
 		log.Print("publisher.New() error: ", err)
@@ -729,7 +737,7 @@ func (m *qsfpMain) poll() {
 
 	// publish all ports empty
 	for i := 0; i < numPorts; i++ {
-		k := "port-" + strconv.Itoa(i+portBase) + ".qsfp.installed"
+		k := "port-" + strconv.Itoa(i+PortBase()) + ".qsfp.installed"
 		s := "false"
 		pub.Print(k, ": ", s)
 		lasts[k] = s
@@ -774,7 +782,7 @@ func (m *qsfpMain) poll() {
 					if !strings.Contains(q.Ident.Compliance, "CR") && q.Ident.Compliance != "" {
 						q.Monitoring()
 						for _, k := range sfp.DynamicMonitoringRedisFields {
-							f := "port-" + strconv.Itoa(int(port)+portBase) + "." + k
+							f := "port-" + strconv.Itoa(int(port)+PortBase()) + "." + k
 							if strings.Contains(k, "qsfp.temperature.units.C") {
 								s := q.Mon.Temperature
 								if s != lasts[f] {
@@ -919,7 +927,7 @@ func (m *qsfpMain) poll() {
 								}
 								if s != lasts[f] {
 									if lasts[f] != "" && s != "none" {
-										log.Print("warning: port-" + strconv.Itoa(int(port)+portBase) + " qsfp module alarm: " + s)
+										log.Print("warning: port-" + strconv.Itoa(int(port)+PortBase()) + " qsfp module alarm: " + s)
 									}
 									pub.Print(f, ": ", s)
 									lasts[f] = s
@@ -932,7 +940,7 @@ func (m *qsfpMain) poll() {
 								}
 								if s != lasts[f] {
 									if lasts[f] != "" && s != "none" {
-										log.Print("warning: port-" + strconv.Itoa(int(port)+portBase) + " qsfp channel alarm: " + s)
+										log.Print("warning: port-" + strconv.Itoa(int(port)+PortBase()) + " qsfp channel alarm: " + s)
 									}
 									pub.Print(f, ": ", s)
 									lasts[f] = s

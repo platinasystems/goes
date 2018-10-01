@@ -89,15 +89,7 @@ func SetBridgeMember(ifname string) *BridgeMemberEntry {
 	return entry
 }
 
-var PortPrefixer interface {
-	Get() string
-	Set(string)
-	Name(portIndex, subPortIndex int) string
-}
-
 func SetPort(ifname string) *PortEntry {
-	PortPrefixer.Set(ifname)
-
 	if Ports == nil {
 		Ports = make(map[string]*PortEntry)
 	}
