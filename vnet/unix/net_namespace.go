@@ -429,6 +429,7 @@ type add_del_namespace_event struct {
 	time_start time.Time
 }
 
+//used by fdb
 func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err error) {
 	name := e.dir.namespace_name(e.file_name)
 
@@ -791,6 +792,7 @@ func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *ne
 	return
 }
 
+//this is used in fdb mode
 func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifindex int32, vlanid uint16, isDel bool) (err error) {
 
 	if IfinfoDebug {
@@ -1157,7 +1159,8 @@ func (ns *net_namespace) is_deleted() bool { return ns.ns_fd < 0 }
 
 func (ns *net_namespace) del(m *net_namespace_main) {
 	for index, intf := range ns.interface_by_index {
-		if intf.si != vnet.SiNil {
+		//do not delete hardware interface; platina-mk1 kernel driver will send seperate message to add it back to default ns
+		if intf.si != vnet.SiNil && intf.si.Kind(m.m.v) != vnet.SwIfKindHardware {
 			m.m.v.DelSwIf(intf.si)
 		}
 		delete(ns.interface_by_index, index)

@@ -12,6 +12,7 @@ import (
 
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -115,6 +116,22 @@ const (
 
 type SwInterfaceType struct {
 	SwIfKind SwIfKind
+}
+
+func (k SwIfKind) String() string {
+	switch k {
+	case SwIfKindInvalid:
+		return "SwIfKindInvalid"
+	case SwIfKindHardware:
+		return "SwIfKindHardware"
+	case SwIfKindSubInterface:
+		return "SwIfKindSubInterface"
+	case nBuiltinSwIfKind:
+		return "nBuiltinSwIfKind"
+	default:
+		return strconv.Itoa(int(k))
+
+	}
 }
 
 func (t *SwInterfaceType) GetSwInterfaceType() *SwInterfaceType                                  { return t }
@@ -239,6 +256,10 @@ func (m *Vnet) addDelSwInterface(siʹ, supSi Si, kind SwIfKind, id IfId, isDel b
 	}
 
 	if isDel {
+		s := m.SwIf(si)
+		if s.kind == SwIfKindHardware {
+			panic(fmt.Sprintf("%v %v is a supSi kind %v, cannot delete\n", si, si.Name(m), s.kind))
+		}
 		if s := m.SwIf(si); s.kind == SwIfKindSubInterface {
 			h := m.SupHwIf(s)
 			delete(h.subSiById, s.id)
