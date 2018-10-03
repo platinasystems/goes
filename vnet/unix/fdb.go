@@ -879,23 +879,14 @@ func ProcessInterfaceInfo(msg *xeth.MsgIfinfo, action vnet.ActionType, v *vnet.V
 				// Process admin-state flags
 				if si, ok := ns.siForIfIndex(ifindex); ok {
 					ns.validateFibIndexForSi(si)
-					isUp := net.Flags(msg.Flags)&net.FlagUp == net.FlagUp
-					switch msg.Devtype {
-					case xeth.XETH_DEVTYPE_XETH_PORT:
-						err = si.SetAdminUp(v, isUp)
-					case xeth.XETH_DEVTYPE_LINUX_UNKNOWN,
-						xeth.XETH_DEVTYPE_LINUX_VLAN:
-						err = si.SetAdminUp(v, true)
-					default:
-						err = fmt.Errorf("unexpected devtype %v @ %d", xeth.DevType(msg.Devtype), msg.Ifindex)
-					}
+					flags := net.Flags(msg.Flags)
+					isUp := flags&net.FlagUp == net.FlagUp
+					err = si.SetAdminUp(v, isUp)
 					if err != nil {
 						fmt.Println("ProcessInterfaceInfo: admin up/down", err)
-					} else {
-						if IfinfoDebug {
-							fmt.Printf("ProcessInterfaceInfo: %q isUp %v flags (%s)\n",
-								ifname, isUp, net.Flags(msg.Flags))
-						}
+					} else if IfinfoDebug {
+						fmt.Printf("ProcessInterfaceInfo: %q %s\n",
+							ifname, flags)
 					}
 				} else {
 					fmt.Printf("ProcessInterfaceInfo: admin up/down: Can't get si! %q[%d] %s\n",
