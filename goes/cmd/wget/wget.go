@@ -32,7 +32,7 @@ func (Command) Main(args ...string) error {
 
 	reqs := make([]*grab.Request, 0)
 	for _, url := range args {
-		req, err := grab.NewRequest(url)
+		req, err := grab.NewRequest(".", url)
 		if err != nil {
 			return err
 		}
