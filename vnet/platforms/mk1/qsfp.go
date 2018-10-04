@@ -45,20 +45,24 @@ var maxTempPort string
 var bmcIpv6LinkLocalRedis string
 var lasts = make(map[string]string)
 
-var cachedPortBase struct {
-	once sync.Once
-	val  int
+var cached struct {
+	base, provision struct {
+		once sync.Once
+		val  interface{}
+	}
 }
 
 func PortBase() int {
-	cachedPortBase.once.Do(func() {
-		cachedPortBase.val = 1
+	cached.base.once.Do(func() {
+		base := 1
 		if f, err := os.Open(alphaParameter); err == nil {
-			fmt.Fscan(f, &cachedPortBase.val)
-			if cachedPortBase.val > 1 {
-				cachedPortBase.val = 1
-			}
+			fmt.Fscan(f, &base)
 			f.Close()
+			if base > 1 {
+				base = 1
+			} else if base < 0 {
+				base = 0
+			}
 		} else {
 			s, err := redis.Hget(machine.Name,
 				"eeprom.DeviceVersion")
@@ -66,30 +70,30 @@ func PortBase() int {
 				var ver int
 				_, err = fmt.Sscan(s, &ver)
 				if err == nil && (ver == 0 || ver == 0xff) {
-					cachedPortBase.val = 0
+					base = 0
 				}
 			}
 		}
+		cached.base.val = base
 	})
-	return cachedPortBase.val
-}
-
-var cachedProvision struct {
-	once sync.Once
-	val  [numPorts]int
+	return cached.base.val.(int)
 }
 
 func Provision(i int) int {
-	cachedProvision.once.Do(func() {
+	cached.provision.once.Do(func() {
+		provision := make([]int, numPorts)
 		buf, err := ioutil.ReadFile(provisionParameter)
 		if err == nil {
 			for i, s := range strings.Split(string(buf), ",") {
-				fmt.Sscan(s, &cachedProvision.val[i])
+				if i < numPorts {
+					fmt.Sscan(s, &provision[i])
+				}
 			}
 		}
+		cached.provision.val = provision
 	})
 	if i < numPorts {
-		return cachedProvision.val[i]
+		return cached.provision.val.([]int)[i]
 	}
 	return 0
 }

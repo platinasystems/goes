@@ -106,22 +106,32 @@ type mapFibResult struct {
 // Maps for prefixes for /0 through /32; key in network byte order.
 type MapFib [1 + 32]map[vnet.Uint32]mapFibResult
 
+var cached struct {
+	masks struct {
+		once sync.Once
+		val  interface{}
+	}
+}
+
 // Cache of prefix length network masks: entry LEN has high LEN bits set.
 // So, 10/8 has top 8 bits set.
-var computeNetMasksOnce sync.Once
-var computedNetMasks [33]vnet.Uint32
-
 func netMask(i uint) vnet.Uint32 {
-	computeNetMasksOnce.Do(func() {
-		for i := range computedNetMasks {
+	const nmasks = 33
+	cached.masks.once.Do(func() {
+		masks := make([]vnet.Uint32, nmasks)
+		for i := range masks {
 			m := ^vnet.Uint32(0)
 			if i < 32 {
 				m = vnet.Uint32(1<<uint(i)-1) << uint(32-i)
 			}
-			computedNetMasks[i] = vnet.Uint32(m).FromHost()
+			masks[i] = vnet.Uint32(m).FromHost()
 		}
+		cached.masks.val = masks
 	})
-	return computedNetMasks[i]
+	if i < nmasks {
+		return cached.masks.val.([]vnet.Uint32)[i]
+	}
+	return 0
 }
 
 func (p *Prefix) Mask() vnet.Uint32          { return netMask(uint(p.Len)) }
