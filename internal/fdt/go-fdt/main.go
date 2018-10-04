@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/platinasystems/goes/fdt"
+	"github.com/platinasystems/go/internal/fdt"
 
 	"fmt"
 	"io/ioutil"
