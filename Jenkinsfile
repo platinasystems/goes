@@ -45,6 +45,9 @@ pipeline {
 		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/xeth') {
 		    git url: 'https://github.com/platinasystems/xeth.git'
 		}
+		dir('/home/jenkins/workspace/go/src/github.com/platinasystems/dbg') {
+		    git url: 'https://github.com/platinasystems/dbg.git'
+		}
 	    }
 	}
 	stage('Build') {
