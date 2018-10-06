@@ -411,7 +411,9 @@ func (redisd *Redisd) listen(names ...string) {
 			} else {
 				srvs = append(srvs, srv)
 				go srv.Start()
-				fmt.Println("listen:", id)
+				if false {
+					fmt.Println("listen:", id)
+				}
 			}
 		}
 		redisd.devs[name] = srvs
