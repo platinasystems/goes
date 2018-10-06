@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/unix/internal/dbgfdb"
 	"github.com/platinasystems/xeth"
 
 	"bytes"
@@ -794,10 +795,8 @@ func (m *net_namespace_main) add_del_vlan(intf *net_namespace_interface, msg *ne
 
 //this is used in fdb mode
 func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifindex int32, vlanid uint16, isDel bool) (err error) {
+	dbgfdb.Ns.Log(addDel(isDel), supifindex, vlanid)
 
-	if IfinfoDebug {
-		fmt.Println("addDelVlan():", supifindex, vlanid, isDel)
-	}
 	ns := intf.namespace
 	sup_index := uint32(supifindex)
 	sup_si := vnet.SiNil
@@ -808,7 +807,7 @@ func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifinde
 		sup_intf = m.find_interface_with_ifindex(sup_index)
 	}
 	if sup_intf == nil {
-		err = fmt.Errorf("sup interface not found")
+		err = dbgfdb.Ns.Log(fmt.Errorf("sup interface not found"))
 		return
 	}
 
