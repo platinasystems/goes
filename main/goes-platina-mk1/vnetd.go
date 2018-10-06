@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/go/main/goes-platina-mk1/internal/dbgmk1"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"
@@ -91,7 +92,8 @@ func vnetdInit() {
 	xeth.DumpIfinfo()
 	err = xeth.UntilBreak(func(buf []byte) error {
 		ptr := unsafe.Pointer(&buf[0])
-		switch xeth.KindOf(buf) {
+		kind := xeth.KindOf(buf)
+		switch kind {
 		case xeth.XETH_MSG_KIND_ETHTOOL_FLAGS:
 			msg := (*xeth.MsgEthtoolFlags)(ptr)
 			xethif := xeth.Interface.Indexed(msg.Ifindex)
@@ -99,10 +101,7 @@ func vnetdInit() {
 			entry, found := vnet.Ports[ifname]
 			if found {
 				entry.Flags = xeth.EthtoolPrivFlags(msg.Flags)
-			}
-			if vnet.LogSvi {
-				fmt.Printf("XETH_MSG_KIND_ETHTOOL_FLAGS: found:%v %+v\n",
-					found, *msg)
+				dbgmk1.Svi.Log(ifname, entry.Flags)
 			}
 		case xeth.XETH_MSG_KIND_ETHTOOL_SETTINGS:
 			msg := (*xeth.MsgEthtoolSettings)(ptr)
@@ -111,10 +110,7 @@ func vnetdInit() {
 			entry, found := vnet.Ports[ifname]
 			if found {
 				entry.Speed = xeth.Mbps(msg.Speed)
-			}
-			if vnet.LogSvi {
-				fmt.Printf("XETH_MSG_KIND_ETHTOOL_SETTINGS: found:%v %+v\n",
-					found, *msg)
+				dbgmk1.Svi.Log(ifname, entry.Speed)
 			}
 		case xeth.XETH_MSG_KIND_IFINFO:
 			var punt_index uint8
@@ -158,25 +154,18 @@ func vnetdInit() {
 				brm.PortVid = uint16(msg.Portid)
 			}
 			*/
-			if vnet.LogSvi {
-				fmt.Printf("XETH_MSG_KIND_IFINFO: %+v\n", *msg)
-			}
 		case xeth.XETH_MSG_KIND_IFA:
 			err = unix.ProcessInterfaceAddr((*xeth.MsgIfa)(ptr), vnet.PreVnetd, nil)
 		}
-		if err != nil {
-			fmt.Println("Error processing xeth msg:", xeth.KindOf(buf), err)
-		}
+		dbgmk1.Svi.Log(err)
 		return nil
 	})
 	if err != nil {
 		panic(err)
 	}
-	if vnet.LogSvi {
-		for ifname, entry := range vnet.Ports {
-			fmt.Print(ifname, ".flags: ", entry.Flags, "\n")
-			fmt.Print(ifname, ".speed: ", entry.Speed, "\n")
-		}
+	for ifname, entry := range vnet.Ports {
+		dbgmk1.Svi.Log(ifname, "flags", entry.Flags)
+		dbgmk1.Svi.Log(ifname, "speed", entry.Speed)
 	}
 	vnetd.Hook = p.vnetdHook
 	vnetd.CloseHook = p.stopHook
@@ -200,11 +189,14 @@ func (p *mk1Main) parsePortConfig() (err error) {
 		if err == nil {
 			err = yaml.Unmarshal(source, &plat.PortConfig)
 			if err != nil {
-				fmt.Println("yaml unmarshal failed", err)
+				dbgmk1.Svi.Log(err)
 				panic(err)
 			}
 			for _, p := range plat.PortConfig.Ports {
-				fmt.Printf("Provision: %s speed %s lanes %d count %d\n", p.Name, p.Speed, p.Lanes, p.Count)
+				dbgmk1.Svi.Log("Provision", p.Name,
+					"speed", p.Speed,
+					"lanes", p.Lanes,
+					"count", p.Count)
 			}
 		}
 	} else { // ethtool
@@ -224,10 +216,8 @@ func (p *mk1Main) parsePortConfig() (err error) {
 			// 40G 2-lane and 40G 4-lane
 			// 20G 2-lane and 20G 1-lane
 			// others?
-			if vnet.LogSvi {
-				fmt.Printf("From ethtool: name %v entry %+v pp %+v\n",
-					ifname, entry, pp)
-			}
+			dbgmk1.Svi.Logf("From ethtool: name %v entry %+v pp %+v",
+				ifname, entry, pp)
 			pp.Count = 1
 			switch entry.Speed {
 			case 100000, 40000:
@@ -253,7 +243,9 @@ func (p *mk1Main) parsePortConfig() (err error) {
 				case 2:
 					//OK
 				default:
-					fmt.Printf("vnetd.go, invalid subport index %v for 2-lane port ifname %v\n", entry.Subportindex, ifname)
+					dbgmk1.Vnetd.Log(ifname,
+						"has invalid subport index",
+						entry.Subportindex)
 
 				}
 			}
@@ -280,9 +272,7 @@ func (p *mk1Main) parseBridgeConfig() (err error) {
 		}
 		bp.PuntIndex = entry.PuntIndex
 		bp.Addr = entry.Addr
-		if vnet.LogSvi {
-			fmt.Printf("parse bridge %v\n", vid)
-		}
+		dbgmk1.Svi.Log("parse bridge", vid)
 	}
 
 	// for each bridgemember entry, add to pbm or ubm of matching bridge config
@@ -298,18 +288,12 @@ func (p *mk1Main) parseBridgeConfig() (err error) {
 					append(bp.UntaggedPortVids,
 						ethernet.VlanTag(entry.PortVid))
 			}
-			if vnet.LogSvi {
-				fmt.Printf("bridgemember %v added to vlan %v\n",
-					ifname,
-					entry.Vid)
-				fmt.Printf("bridgemember %+v\n", bp)
-			}
+			dbgmk1.Svi.Log("bridgemember", ifname,
+				"added to vlan", entry.Vid)
+			dbgmk1.Svi.Logf("bridgemember %+v", bp)
 		} else {
-			if vnet.LogSvi {
-				fmt.Printf("bridgemember %v ignored, vlan %v not found\n",
-					ifname,
-					entry.Vid)
-			}
+			dbgmk1.Svi.Log("bridgemember", ifname, "ignored, vlan",
+				entry.Vid, "not found")
 		}
 	}
 	return
@@ -377,10 +361,10 @@ func (p *mk1Main) stopHook(i *vnetd.Info, v *vnet.Vnet) error {
 	}
 	begin := time.Now()
 	err = mk1.PlatformExit(v, &p.Platform)
-	fmt.Printf("mk1.PlatformExit (%v)\n", time.Now().Sub(begin))
+	dbgmk1.Vnetd.Log("stopped in", time.Now().Sub(begin))
 	begin = time.Now()
 	xeth.Stop()
-	fmt.Printf("xeth.Close (%v)\n", time.Now().Sub(begin))
+	dbgmk1.Vnetd.Log("xeth closeed in", time.Now().Sub(begin))
 	return err
 }
 
@@ -405,7 +389,8 @@ func (p *mk1Main) getDefaultLanes(port, subport uint) (lanes uint) {
 	case 4:
 		lanes = 1
 	default:
-		fmt.Printf("Port %v: number of subports %v unsupported\n", port, numSubports)
+		dbgmk1.Vnetd.Log("port", port, "has invalid subports:",
+			numSubports)
 	}
 
 	return
