@@ -595,14 +595,12 @@ func (g *Goes) swap(args []string) {
 func wait(v cmd.Cmd, ch chan os.Signal) {
 	for sig := range ch {
 		if sig == syscall.SIGTERM {
-			fmt.Println("sigterm")
 			if method, found := v.(io.Closer); found {
 				if err := method.Close(); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 				}
 				time.Sleep(500 * time.Millisecond)
 			}
-			fmt.Println("killed")
 			os.Stdout.Sync()
 			os.Stderr.Sync()
 			os.Stdout.Close()
