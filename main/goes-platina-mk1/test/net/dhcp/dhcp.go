@@ -67,7 +67,7 @@ func (dhcp *dhcp) checkConnectivity(t *testing.T) {
 func (dhcp *dhcp) checkServer(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Logf("Checking dhcp server on %v", "R2")
+	assert.Comment("Checking dhcp server on", "R2")
 	out, err := dhcp.ExecCmd(t, "R2", "ps", "ax")
 	assert.Nil(err)
 	assert.Match(out, ".*dhcpd.*")
@@ -84,11 +84,11 @@ func (dhcp *dhcp) checkClient(t *testing.T) {
 		"ip", "address", "delete", "192.168.120.5", "dev", intf.Name)
 	assert.Nil(err)
 
-	t.Log("Verify ping fails")
+	assert.Comment("Verify ping fails")
 	_, err = dhcp.ExecCmd(t, "R1", "ping", "-c1", "192.168.120.10")
 	assert.NonNil(err)
 
-	t.Log("Request dhcp address")
+	assert.Comment("Request dhcp address")
 	out, err := dhcp.ExecCmd(t, "R1", "dhclient", "-4", "-v", intf.Name)
 	assert.Nil(err)
 	assert.Match(out, "bound to")
@@ -97,7 +97,7 @@ func (dhcp *dhcp) checkClient(t *testing.T) {
 func (dhcp *dhcp) checkConnectivity2(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Log("Check connectivity with dhcp address")
+	assert.Comment("Check connectivity with dhcp address")
 	err := dhcp.PingCmd(t, "R1", "192.168.120.10")
 	assert.Nil(err)
 	assert.Program(test.Self{},
@@ -109,7 +109,7 @@ func (dhcp *dhcp) checkConnectivity2(t *testing.T) {
 func (dhcp *dhcp) checkVlanTag(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Log("Check for invalid vlan tag") // issue #92
+	assert.Comment("Check for invalid vlan tag") // issue #92
 
 	r1, err := docker.FindHost(dhcp.Config, "R1")
 	r1Intf := r1.Intfs[0]

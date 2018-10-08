@@ -73,7 +73,7 @@ func (ospf *ospf) checkBird(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, r := range ospf.Routers {
-		t.Logf("Checking BIRD on %v", r.Hostname)
+		assert.Comment("Checking BIRD on", r.Hostname)
 		out, err := ospf.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*bird.*")

@@ -20,6 +20,22 @@ type Assert struct {
 	testing.TB
 }
 
+// Log args if -test.vv
+func (assert Assert) Comment(args ...interface{}) {
+	assert.Helper()
+	if *VV {
+		assert.Log(args...)
+	}
+}
+
+// Format args if -test.vv
+func (assert Assert) Commentf(format string, args ...interface{}) {
+	assert.Helper()
+	if *VV {
+		assert.Logf(format, args...)
+	}
+}
+
 // If necessary, change to the dir of the given go package.
 func (assert Assert) Dir(name string) {
 	wd, err := os.Getwd()

@@ -65,7 +65,7 @@ func (static *static) checkConnectivity(t *testing.T) {
 		{"RA-2", "192.168.0.2"},
 		{"CA-2", "10.3.0.3"},
 	} {
-		t.Logf("ping from %v to %v", x.hostname, x.target)
+		assert.Comment("ping from", x.hostname, "to", x.target)
 		err := static.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
 	}
@@ -76,7 +76,7 @@ func (static *static) checkFrr(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	for _, r := range static.Routers {
-		t.Logf("Checking FRR on %v", r.Hostname)
+		assert.Comment("Checking FRR on", r.Hostname)
 		out, err := static.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.True(regexp.MustCompile(".*zebra.*").MatchString(out))
@@ -88,20 +88,21 @@ func (static *static) checkRoutes(t *testing.T) {
 
 	for _, r := range static.Routers {
 
-		t.Logf("check for default route in container RIB %v",
+		assert.Comment("check for default route in container RIB",
 			r.Hostname)
 		out, err := static.ExecCmd(t, r.Hostname, "vtysh", "-c",
 			"show ip route")
 		assert.Nil(err)
 		assert.Match(out, "S>\\* 0.0.0.0/0")
 
-		t.Logf("check for default route in container FIB %v",
+		assert.Comment("check for default route in container FIB",
 			r.Hostname)
 		out, err = static.ExecCmd(t, r.Hostname, "ip", "route", "show")
 		assert.Nil(err)
 		assert.Match(out, "default")
 
-		t.Logf("check for default route in goes fib %v", r.Hostname)
+		assert.Comment("check for default route in goes fib",
+			r.Hostname)
 		assert.Program(regexp.MustCompile("0.0.0.0/0"),
 			test.Self{},
 			"vnet", "show", "ip", "fib", "table", r.Hostname)
@@ -120,7 +121,7 @@ func (static *static) checkInterConnectivity(t *testing.T) {
 		{"CA-2", "10.1.0.1"},
 		{"CA-2", "192.168.0.1"},
 	} {
-		t.Logf("ping from %v to %v", x.hostname, x.target)
+		assert.Comment("ping from", x.hostname, "to", x.target)
 		err := static.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
 		assert.Program(test.Self{},
@@ -173,7 +174,7 @@ func (static *static) checkInterConnectivity2(t *testing.T) {
 		{"CA-2", "10.1.0.1"},
 		{"CA-2", "192.168.0.1"},
 	} {
-		t.Logf("ping from %v to %v", x.hostname, x.target)
+		assert.Comment("ping from", x.hostname, "to", x.target)
 		err := static.PingCmd(t, x.hostname, x.target)
 		assert.Nil(err)
 		assert.Program(test.Self{},
@@ -184,7 +185,7 @@ func (static *static) checkInterConnectivity2(t *testing.T) {
 func (static *static) checkPuntStress(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Log("Check punt stress with iperf3")
+	assert.Comment("Check punt stress with iperf3")
 
 	done := make(chan bool, 1)
 
@@ -200,9 +201,9 @@ func (static *static) checkPuntStress(t *testing.T) {
 	assert.Nil(err)
 	result := r.FindStringSubmatch(out)
 	if len(result) == 2 {
-		t.Logf("iperf3 - %v Gbits/sec", result[1])
+		assert.Comment("iperf3 -", result[1], "Gbits/sec")
 	} else {
-		t.Logf("iperf3 regex failed to find rate [%v]", out)
+		assert.Commentf("iperf3 regex failed to find rate [%v]", out)
 	}
 	<-done
 }

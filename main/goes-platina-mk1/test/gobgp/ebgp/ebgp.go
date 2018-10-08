@@ -79,7 +79,7 @@ func (ebgp *ebgp) checkBgp(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 	for _, r := range ebgp.Routers {
-		t.Logf("Checking gobgp on %v", r.Hostname)
+		assert.Comment("Checking gobgp on", r.Hostname)
 		out, err := ebgp.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*gobgpd.*")

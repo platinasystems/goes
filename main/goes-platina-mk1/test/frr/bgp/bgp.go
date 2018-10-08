@@ -73,7 +73,7 @@ func (bgp *bgp) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 	for _, r := range bgp.Routers {
-		t.Logf("Checking FRR on %v", r.Hostname)
+		assert.Comment("Checking FRR on", r.Hostname)
 		out, err := bgp.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*bgpd.*")

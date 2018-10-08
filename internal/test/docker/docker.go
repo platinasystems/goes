@@ -51,7 +51,7 @@ func Check(t *testing.T) error {
 	}
 
 	ver := cli.ClientVersion()
-	t.Logf("Docker client version %v", ver)
+	Comment(t, "Docker client version", ver)
 	_, err = cli.Info(context.Background())
 	if err != nil {
 		return err
@@ -62,6 +62,22 @@ func Check(t *testing.T) error {
 		return err
 	}
 	return nil
+}
+
+// Log args if -test.vv
+func Comment(t *testing.T, args ...interface{}) {
+	t.Helper()
+	if *test.VV {
+		t.Log(args...)
+	}
+}
+
+// Format args if -test.vv
+func Commentf(t *testing.T, format string, args ...interface{}) {
+	t.Helper()
+	if *test.VV {
+		t.Logf(format, args...)
+	}
 }
 
 func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
@@ -117,12 +133,12 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 	// router specific cc & ch config
 	for i, router := range config.Routers {
 		if !isImageLocal(t, config.cli, router) {
-			t.Log("no local container, trying to pull from remote")
+			Comment(t, "no local container, trying to pull  remote")
 			err = pullImage(t, config.cli, router)
 			if err != nil {
 				return
 			}
-			t.Logf("Image %v pulled from remote\n", router.Image)
+			Comment(t, router.Image, "pulled from remote")
 		}
 
 		cc.Image = router.Image
@@ -232,7 +248,7 @@ func ExecCmd(t *testing.T, ID string, config *Config, cmd []string) (out string,
 func PingCmd(t *testing.T, ID string, config *Config, target string) error {
 
 	cmd := []string{"/bin/ping", "-c1", "-W1", target}
-	t.Logf("In PingCmd %v ", cmd)
+	Comment(t, "In PingCmd", cmd)
 
 	execOpts := types.ExecConfig{
 		Cmd:          cmd,
@@ -281,9 +297,9 @@ func PingCmd(t *testing.T, ID string, config *Config, target string) error {
 		if ei.ExitCode == 0 {
 			return nil
 		}
-		t.Logf("%v\nping count %v", out, i)
+		Commentf(t, "%v\nping count %v", out, i)
 		if ei.ExitCode != 0 {
-			t.Logf("[%v] exit code %v", cmd, ei.ExitCode)
+			Commentf(t, "[%v] exit code %v", cmd, ei.ExitCode)
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -385,7 +401,7 @@ func startContainer(t *testing.T, config *Config, cc *container.Config,
 		err = fmt.Errorf("Container %v already running", cc.Hostname)
 		return
 	}
-	t.Logf("Starting container %v\n", cc.Hostname)
+	Comment(t, "Starting container", cc.Hostname)
 
 	ctx := context.Background()
 
@@ -412,8 +428,7 @@ func startContainer(t *testing.T, config *Config, cc *container.Config,
 }
 
 func stopContainer(t *testing.T, config *Config, name string, ID string) error {
-
-	t.Logf("Stopping container %v", name)
+	Comment(t, "Stopping container", name)
 
 	cli := config.cli
 	ctx := context.Background()
@@ -455,7 +470,8 @@ func moveIntfContainer(t *testing.T, container string, intf string,
 
 	assert := test.Assert{t}
 
-	t.Logf("moving %v to container %v with address %v", intf, container, addr)
+	Comment(t, "moving", intf, "to container", container,
+		"with address", addr)
 
 	assert.Program(test.Self{},
 		"ip", "link", "set", intf, "netns", container)
@@ -471,7 +487,7 @@ func moveIntfContainer(t *testing.T, container string, intf string,
 }
 
 func moveIntfDefault(t *testing.T, container string, intf string) error {
-	t.Logf("moving %v from %v to default", intf, container)
+	Comment(t, "moving", intf, "from", container, "to default")
 	cleanup := test.Cleanup{t}
 	cleanup.Program(test.Self{},
 		"ip", "-n", container, "link", "set", "down", intf)

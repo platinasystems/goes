@@ -82,7 +82,7 @@ func (slice *slice) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
 	for _, r := range slice.Routers {
-		t.Logf("Checking FRR on %v", r.Hostname)
+		assert.Comment("Checking FRR on", r.Hostname)
 		out, err := slice.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.True(regexp.MustCompile(".*ospfd.*").MatchString(out))
@@ -163,11 +163,11 @@ func (slice *slice) checkIsolation(t *testing.T) {
 	assert.Program(test.Self{},
 		"vnet", "show", "ip", "fib", "table", "RB-2")
 
-	t.Log("Verify that slice B is broken")
+	assert.Comment("Verify that slice B is broken")
 	_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
 	assert.NonNil(err)
 
-	t.Log("Verify that slice A is not affected")
+	assert.Comment("Verify that slice A is not affected")
 	_, err = slice.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
 	assert.Nil(err)
 	assert.Program(regexp.MustCompile("10.3.0.0/24"),
@@ -206,12 +206,12 @@ func (slice *slice) checkIsolation(t *testing.T) {
 	assert.Program(test.Self{},
 		"vnet", "show", "ip", "fib", "table", "RA-2")
 
-	t.Log("Verify that slice A is broken")
+	assert.Comment("Verify that slice A is broken")
 	_, err = slice.ExecCmd(t, "CA-1", "ping", "-c1", "10.3.0.4")
 	assert.NonNil(err)
 
 	ok := false
-	t.Log("Verify that slice B is not affected")
+	assert.Comment("Verify that slice B is not affected")
 	timeout := 120
 	for i := timeout; i > 0; i-- {
 		out, _ := slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.3.0.4")
@@ -247,7 +247,7 @@ func (slice *slice) checkIsolation(t *testing.T) {
 func (slice *slice) checkStress(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Log("stress with hping3")
+	assert.Comment("stress with hping3")
 
 	duration := []string{"1", "10", "30", "60"}
 
@@ -259,7 +259,7 @@ func (slice *slice) checkStress(t *testing.T) {
 			time.Sleep(1 * time.Second)
 		} else {
 			ok = true
-			t.Log("ping ok before stress")
+			assert.Comment("ping ok before stress")
 			break
 		}
 	}
@@ -268,11 +268,11 @@ func (slice *slice) checkStress(t *testing.T) {
 	}
 
 	for _, to := range duration {
-		t.Logf("stress for %v", to)
+		assert.Comment("stress for", to)
 		_, err := slice.ExecCmd(t, "CB-1",
 			"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "10.3.0.4")
-		t.Log("verfy can still ping neighbor")
+		assert.Comment("verfy can still ping neighbor")
 		_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}
@@ -281,7 +281,7 @@ func (slice *slice) checkStress(t *testing.T) {
 func (slice *slice) checkStressPci(t *testing.T) {
 	assert := test.Assert{t}
 
-	t.Log("stress with hping3 with ttl=1")
+	assert.Comment("stress with hping3 with ttl=1")
 
 	duration := []string{"1", "10", "30", "60"}
 
@@ -293,7 +293,7 @@ func (slice *slice) checkStressPci(t *testing.T) {
 			time.Sleep(1 * time.Second)
 		} else {
 			ok = true
-			t.Log("ping ok before stress")
+			assert.Comment("ping ok before stress")
 			break
 		}
 	}
@@ -302,12 +302,12 @@ func (slice *slice) checkStressPci(t *testing.T) {
 	}
 
 	for _, to := range duration {
-		t.Logf("stress for %v", to)
+		assert.Comment("stress for", to)
 		_, err := slice.ExecCmd(t, "CB-1",
 			"timeout", to,
 			"hping3", "--icmp", "--flood", "-q", "-t", "1",
 			"10.3.0.4")
-		t.Log("verfy can still ping neighbor")
+		assert.Comment("verfy can still ping neighbor")
 		_, err = slice.ExecCmd(t, "CB-1", "ping", "-c1", "10.1.0.2")
 		assert.Nil(err)
 	}

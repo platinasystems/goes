@@ -60,7 +60,8 @@ func (ospf *ospf) checkCarrier(t *testing.T) {
 			} else {
 				intf = i.Name
 			}
-			t.Logf("check carrier for %v on %v", r.Hostname, intf)
+			assert.Comment("check carrier for", r.Hostname,
+				"on", intf)
 			assert.Nil(test.Carrier(r.Hostname, intf))
 		}
 	}
@@ -91,7 +92,7 @@ func (ospf *ospf) checkFrr(t *testing.T) {
 	assert := test.Assert{t}
 
 	for _, r := range ospf.Routers {
-		t.Logf("Checking FRR on %v", r.Hostname)
+		assert.Comment("Checking FRR on", r.Hostname)
 		out, err := ospf.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*ospfd.*")

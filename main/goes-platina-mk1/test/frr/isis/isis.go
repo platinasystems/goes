@@ -75,7 +75,7 @@ func (isis *isis) checkFrr(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	for _, r := range isis.Routers {
-		t.Logf("Checking FRR on %v", r.Hostname)
+		assert.Comment("Checking FRR on", r.Hostname)
 		out, err := isis.ExecCmd(t, r.Hostname, "ps", "ax")
 		assert.Nil(err)
 		assert.Match(out, ".*isisd.*")
