@@ -34,6 +34,22 @@ type Suite struct {
 	Tests
 }
 
+// Log args if -test.vv
+func (suite *Suite) Comment(t *testing.T, args ...interface{}) {
+	t.Helper()
+	if *VV {
+		t.Log(args...)
+	}
+}
+
+// Format args if -test.vv
+func (suite *Suite) Commentf(t *testing.T, format string, args ...interface{}) {
+	t.Helper()
+	if *VV {
+		t.Logf(format, args...)
+	}
+}
+
 func (suite *Suite) String() string {
 	return suite.Name
 }
@@ -42,14 +58,14 @@ func (suite *Suite) init(t *testing.T) {
 	t.Helper()
 	begin := time.Now()
 	suite.Init(t)
-	t.Logf("\r\t%s init (%v)", t.Name(), time.Now().Sub(begin))
+	suite.Commentf(t, "%s.Init (%v)", t.Name(), time.Now().Sub(begin))
 }
 
 func (suite *Suite) exit(t *testing.T) {
 	t.Helper()
 	begin := time.Now()
 	suite.Exit(t)
-	t.Logf("\r\t%s exit (%v)", t.Name(), time.Now().Sub(begin))
+	suite.Commentf(t, "%s.Exit (%v)", t.Name(), time.Now().Sub(begin))
 }
 
 func (suite Suite) Test(t *testing.T) {
