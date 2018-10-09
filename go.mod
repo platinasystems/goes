@@ -20,7 +20,7 @@ require (
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/pkg/errors v0.8.0
 	github.com/platinasystems/dbg v0.0.0-20181005210558-dd78b3b550ae
-	github.com/platinasystems/fe1 v0.0.0-20181003232120-0f0c46f48cf3
+	github.com/platinasystems/fe1 v0.0.0-20181008201145-b9b2baf7159a
 	github.com/platinasystems/firmware-fe1a v0.0.0-20170616152047-60f39141fbbf
 	github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
