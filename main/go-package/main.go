@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const gopkgpath = "github.com/platinasystems/go/main/go-package"
+const gopkgpath = "./main/go-package"
 const Tmpl = `// DO NOT EDIT! Instead, "go generate {{.Pkg.ImportPath}}".
 package {{.Pkg.Name}}
 
@@ -48,12 +48,12 @@ type Info struct {
 }
 
 func main() {
-	defer func() {
-		if x := recover(); x != nil {
-			fmt.Fprintln(Stderr, x)
-			Exit(1)
-		}
-	}()
+	//	defer func() {
+	//		if x := recover(); x != nil {
+	//			fmt.Fprintln(Stderr, x)
+	//			Exit(1)
+	//		}
+	//	}()
 	useremail := "no.one@no.where"
 	buf, err := exec.Command("git", "config", "--get",
 		"user.email").Output()
@@ -62,7 +62,7 @@ func main() {
 	}
 	generatedBy := useremail
 	generatedOn := time.Now().UTC().String()
-	gopkg, err := build.Import(gopkgpath, "", 0)
+	gopkg, err := build.ImportDir(gopkgpath, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -74,17 +74,11 @@ func main() {
 		Args = append(Args, ".")
 	}
 	for _, path := range Args[1:] {
-		var srcdir, assume_unchanged string
+		var assume_unchanged string
 		info := new(Info)
 		info.Generated.By = generatedBy
 		info.Generated.On = generatedOn
-		if build.IsLocalImport(path) {
-			srcdir, err = os.Getwd()
-			if err != nil {
-				panic(err)
-			}
-		}
-		pkg, err := build.Import(path, srcdir, 0)
+		pkg, err := build.ImportDir(path, 0)
 		if err != nil {
 			panic(err)
 		}
