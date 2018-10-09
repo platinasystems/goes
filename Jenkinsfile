@@ -29,7 +29,7 @@ pipeline {
 			branch: 'master'
 		    ])
 		}
-		dir(system-build') {
+		dir('system-build') {
 		    checkout([$class: 'GitSCM',
          	    		      branches: [[name: '*/master']],
          	    		      doGenerateSubmoduleConfigurations: false,
@@ -40,7 +40,8 @@ pipeline {
 						  reference: '',
 						  trackingSubmodules: true]],
 				      submoduleCfg: [],
-				      userRemoteConfigs: [[url: 'https://github.com/platinasystems/system-build.git']]])}
+				      userRemoteConfigs: [[url: 'https://github.com/platinasystems/system-build.git']]])
+		}
 		dir('xeth') {
 		    git url: 'https://github.com/platinasystems/xeth.git'
 		}
