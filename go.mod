@@ -24,7 +24,7 @@ require (
 	github.com/platinasystems/firmware-fe1a v0.0.0-20170616152047-60f39141fbbf
 	github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
-	github.com/platinasystems/xeth v0.0.0-20181001190642-d2eeb6598b11
+	github.com/platinasystems/xeth v0.0.0-20181006224750-1932336091db
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e

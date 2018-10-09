@@ -45,6 +45,8 @@ github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d h1:jVkqqhZKx8
 github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d/go.mod h1:5N7zNCEtHP1s5kK6pVgaFwtzEleCreRubeHBnE4rGso=
 github.com/platinasystems/xeth v0.0.0-20181001190642-d2eeb6598b11 h1:R1qLLbyneQGhDvc4LzDg4hrsMepFeVXO4FTySsMwnis=
 github.com/platinasystems/xeth v0.0.0-20181001190642-d2eeb6598b11/go.mod h1:MokUskjwMrKdnZ08SVlEh9dkQreCHtPPEMFA81kdahI=
+github.com/platinasystems/xeth v0.0.0-20181006224750-1932336091db h1:AlqYqCzNUm+sCETxHw3XCbv35ALq7ZhgTTQGHB5C+6I=
+github.com/platinasystems/xeth v0.0.0-20181006224750-1932336091db/go.mod h1:MokUskjwMrKdnZ08SVlEh9dkQreCHtPPEMFA81kdahI=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff h1:kXSTJRId8WwwqEfN0iQtzQu+jof2jTguzP2y12ULXvc=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff/go.mod h1:DFg2AhfQCvkJwRKUfsycOSSZELGBA9gt46ne3SOecJM=
 github.com/satori/go.uuid v1.2.0 h1:0uYX9dsZ2yD7q2RtLRtPSdGDWzjeM3TbMJP9utgA0ww=
