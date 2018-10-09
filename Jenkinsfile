@@ -2,7 +2,7 @@
 
 import groovy.transform.Field
 
-@Field String email_to = 'sw@platinasystems.com'
+@Field String email_to = 'kph@platinasystems.com'
 @Field String email_from = 'jenkins-bot@platinasystems.com'
 @Field String email_reply_to = 'no-reply@platinasystems.com'
 
@@ -54,9 +54,9 @@ pipeline {
 	    steps {
 		dir('go') {
 		    echo "Updating worktrees"
-		    sh 'set -x;for repo in worktrees/*/*; do [ -d "$repo" ] && (cd $repo;git fetch origin;git reset --hard HEAD;git rebase origin/master);done'
+		    sh 'set -x;for repo in worktrees/*/*; do echo $repo; [ -d "$repo" ] && (cd $repo;git fetch origin;git reset --hard HEAD;git rebase origin/master);done'
 		    echo "Building goes..."
-		    sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -z'
+		    sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
 		}		    
 	    }
 	}
