@@ -36,7 +36,7 @@ func Packages() []map[string]string {
 	return lookup("Packages").(func() []map[string]string)()
 }
 
-func Init(v *vnet.Vnet) {
+func Init(v *vnet.Vnet, p *fe1_platform.Platform) {
 	lookup("Init").(func(v *vnet.Vnet, p *fe1_platform.Platform))(v, p)
 }
 
