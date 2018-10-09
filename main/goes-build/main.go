@@ -10,7 +10,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -24,8 +23,8 @@ import (
 )
 
 const (
-	platina       = "github.com/platinasystems"
-	platinaFe1    = platina + "/fe1"
+	platina       = ".."
+	platinaFe1    = platina + "fe1"
 	platinaGo     = platina + "/go"
 	platinaGoMain = platinaGo + "/main"
 
@@ -194,15 +193,10 @@ plugin	use pre-compiled proprietary packages
 		goesPlatinaMk2Mc1Bmc:    makeArmLinuxStatic,
 		platinaMk2Mc1BmcVmlinuz: makeArmLinuxKernel,
 	}
-	gopath string
 )
 
 func init() {
 	flag.Usage = usage
-	gopath = os.Getenv("GOPATH")
-	if len(gopath) == 0 {
-		gopath = build.Default.GOPATH
-	}
 }
 
 func main() {
@@ -760,11 +754,17 @@ func shellCommandRun(cmdline string) (err error) {
 func configWorktree(repo string, machine string, config string) (workdir string, err error) {
 	var gitdir string
 	for _, dir := range []string{
-		filepath.Join(gopath, "src", platina, repo),
-		filepath.Join(gopath, "src", platinaSystemBuildSrc, repo),
+		filepath.Join(platina, repo),
+		filepath.Join(platina, "src", repo),
+		filepath.Join(platinaSystemBuildSrc, repo),
 	} {
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
-			gitdir = dir
+			var err error
+			gitdir, err = filepath.Abs(dir)
+			if err != nil {
+				return "", fmt.Errorf("Can't make %s absolute: %s",
+					dir, err)
+			}
 			break
 		}
 	}
