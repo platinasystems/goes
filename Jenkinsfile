@@ -36,7 +36,7 @@ pipeline {
 		    echo "Updating worktrees"
 		    sh 'set -x;env;pwd;[ -d worktrees ] && for repo in worktrees/*/*; do echo $repo; [ -d "$repo" ] && (cd $repo;git fetch origin;git reset --hard HEAD;git rebase origin/master);done || true'
 		    echo "Setting git config"
-		    sh 'git config --global url.git@github.com.insteadOf \"https://github.com/\"
+		    sh 'git config --global url.git@github.com.insteadOf \"https://github.com/\"'
 echo "Building goes..."
 		    sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
 		}		    
