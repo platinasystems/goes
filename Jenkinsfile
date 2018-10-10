@@ -43,7 +43,9 @@ pipeline {
 		    echo "Setting git config"
 		    sh 'git config --global url.git@github.com:.insteadOf \"https://github.com/\"'
 echo "Building goes..."
-		    sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
+		    sshagent(credentials: ['570701f7-c819-4db2-bd31-a0da8a452b41']) {
+		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
+			}
 		}		    
 	    }
 	}
