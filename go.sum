@@ -48,6 +48,8 @@ github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d h1:jVkqqhZKx8
 github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d/go.mod h1:5N7zNCEtHP1s5kK6pVgaFwtzEleCreRubeHBnE4rGso=
 github.com/platinasystems/xeth v0.0.0-20181006224750-1932336091db h1:AlqYqCzNUm+sCETxHw3XCbv35ALq7ZhgTTQGHB5C+6I=
 github.com/platinasystems/xeth v0.0.0-20181006224750-1932336091db/go.mod h1:MokUskjwMrKdnZ08SVlEh9dkQreCHtPPEMFA81kdahI=
+github.com/platinasystems/xeth v0.0.0-20181010000040-d9ed5089fdd0 h1:Jo+BYZRIUfTP9tgElahzcTY8bNXVkxljDs1HXfpORYs=
+github.com/platinasystems/xeth v0.0.0-20181010000040-d9ed5089fdd0/go.mod h1:MokUskjwMrKdnZ08SVlEh9dkQreCHtPPEMFA81kdahI=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff h1:kXSTJRId8WwwqEfN0iQtzQu+jof2jTguzP2y12ULXvc=
