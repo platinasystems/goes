@@ -13,11 +13,16 @@ pipeline {
 	    steps {
 		echo "Running build #${env.BUILD_ID} on ${env.JENKINS_URL}"
 		dir('go') {
-		    git url: 'https://github.com/platinasystems/go.git'
+		    git([
+			url: 'git@github.com:platinasystems/go.git',
+			credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
+			branch: 'master'
+			])
 		}
 		dir('system-build') {
 		    checkout([$class: 'GitSCM',
          	    		      branches: [[name: '*/master']],
+				      credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
          	    		      doGenerateSubmoduleConfigurations: false,
 	 	    		      extensions: [[$class: 'SubmoduleOption',
 		    		      		  disableSubmodules: false,
