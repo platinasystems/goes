@@ -1,4 +1,4 @@
-# Platina Software Update Process
+# Platina Software Update Guide
 ## Using GoES upgrade
 ### Upgrade Coreboot, Linux Kernel, GoES
 ---
