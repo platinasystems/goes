@@ -110,7 +110,9 @@ func getGoesInfo() (im IMGINFO, err error) {
 	im.Fe1 = getGoesVal("tag", "/fe1")
 	im.Fe1Fw = getGoesVal("tag", "firmware-fe1a")
 	i := getGoesVal("version", "/go")
-	im.Commit = i[0:7]
+	if len(i) >= 8 {
+		im.Commit = i[0:7]
+	}
 	return im, nil
 }
 
