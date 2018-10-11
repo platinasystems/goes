@@ -72,6 +72,3 @@ enter 'upgrade -l':
 - wget http://downloads.platinasystems.com/LATEST/goes-platina-mk1-installer
 - chmod +x goes-platina-mk1-installer
 - ./goes-platina-mk1-installer
-
-### Upgrade BMC
-https://github.com/platinasystems/go/blob/master/docs/upgrading-veryold-bmc.md
