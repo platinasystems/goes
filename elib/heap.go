@@ -336,6 +336,11 @@ func (heap *Heap) GetAligned(sizeArg, log2Alignment uint) (id Index, offset uint
 	return
 }
 
+func (heap *Heap) IsFree(ei Index) bool {
+	e := &heap.elts[ei]
+	return e.isFree()
+}
+
 func (heap *Heap) Put(ei Index) {
 	e := &heap.elts[ei]
 

@@ -15,7 +15,9 @@ import (
 	"github.com/platinasystems/xeth"
 )
 
+//Debug Flags
 var LogSvi bool
+var AdjDebug bool
 
 // drivers/net/ethernet/xeth/platina_mk1.c: xeth.MsgIfinfo
 // PortEntry go/main/goes-platina-mk1/vnetd.go:vnetdInit() xeth.XETH_MSG_KIND_IFINFO

@@ -28,7 +28,7 @@ type {{.HeapType}} struct {
 func (p * {{.HeapType}}) GetAligned(size, log2Alignment uint) (offset uint) {
 	l := uint(len(p.{{.Data}}))
 	id, offset := p.Heap.GetAligned(size, log2Alignment)
-	if offset >= l {
+	if offset+size >= l {
 		p.Validate(offset + size - 1)
 	}
 	for i := uint(0); i < size; i++ {
@@ -41,6 +41,10 @@ func (p * {{.HeapType}}) Get(size uint) uint { return p.GetAligned(size, 0) }
 
 func (p * {{.HeapType}}) Put(offset uint) {
 	p.Heap.Put(p.Id(offset))
+}
+
+func (p * {{.HeapType}}) IsFree(offset uint) bool {
+       return p.Heap.IsFree(p.Id(offset))
 }
 
 func (p * {{.HeapType}}) Validate(i uint) {
@@ -67,5 +71,8 @@ func (p *{{.HeapType}}) Id(offset uint) {{template "elib" .Package}}Index {
 
 func (p *{{.HeapType}}) Slice(offset uint) []{{.Type}} {
 	l := p.Len(p.Id(offset))
+       if (offset + l) > uint(len(p.elts)) {
+               p.Validate(offset + l - 1)
+       }
 	return p.{{.Data}}[offset:offset+l]
 }

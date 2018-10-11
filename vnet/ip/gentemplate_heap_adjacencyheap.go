@@ -20,7 +20,7 @@ type adjacencyHeap struct {
 func (p *adjacencyHeap) GetAligned(size, log2Alignment uint) (offset uint) {
 	l := uint(len(p.elts))
 	id, offset := p.Heap.GetAligned(size, log2Alignment)
-	if offset >= l {
+	if offset+size >= l {
 		p.Validate(offset + size - 1)
 	}
 	for i := uint(0); i < size; i++ {
@@ -33,6 +33,10 @@ func (p *adjacencyHeap) Get(size uint) uint { return p.GetAligned(size, 0) }
 
 func (p *adjacencyHeap) Put(offset uint) {
 	p.Heap.Put(p.Id(offset))
+}
+
+func (p *adjacencyHeap) IsFree(offset uint) bool {
+	return p.Heap.IsFree(p.Id(offset))
 }
 
 func (p *adjacencyHeap) Validate(i uint) {
@@ -59,5 +63,8 @@ func (p *adjacencyHeap) Id(offset uint) elib.Index {
 
 func (p *adjacencyHeap) Slice(offset uint) []Adjacency {
 	l := p.Len(p.Id(offset))
+	if (offset + l) > uint(len(p.elts)) {
+		p.Validate(offset + l - 1)
+	}
 	return p.elts[offset : offset+l]
 }

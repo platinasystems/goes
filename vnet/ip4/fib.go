@@ -64,6 +64,10 @@ func (a *Address) toPrefix() (p Prefix) {
 	return
 }
 
+func (p *Prefix) Matches(q *Prefix) bool {
+	return p.Address.AsUint32()&p.Mask() == q.Address.AsUint32()&q.Mask()
+}
+
 func (p *Prefix) IsEqual(q *Prefix) bool { return p.Len == q.Len && p.Address.IsEqual(&q.Address) }
 
 func (p *Prefix) LessThan(q *Prefix) bool {
@@ -137,6 +141,13 @@ func netMask(i uint) vnet.Uint32 {
 func (p *Prefix) Mask() vnet.Uint32          { return netMask(uint(p.Len)) }
 func (p *Prefix) MaskAsAddress() (a Address) { a.FromUint32(p.Mask()); return }
 func (p *Prefix) mapFibKey() vnet.Uint32     { return p.Address.AsUint32() & p.Mask() }
+func (p *Prefix) ApplyMask() (q *Prefix) {
+	pm := Prefix{}
+	pm.Address.FromUint32(p.Address.AsUint32() & p.Mask())
+	pm.Len = p.Len
+	q = &pm
+	return
+}
 func (a *Address) Mask(l uint) (v Address) {
 	v.FromUint32(a.AsUint32() & netMask(l))
 	return
@@ -285,6 +296,9 @@ type IfAddrAddDelHook func(ia ip.IfAddr, isDel bool)
 
 func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj, ok bool) {
 	if isDel {
+		if vnet.AdjDebug {
+			fmt.Printf("fib.go addDel %v prefix %v adj %v delete: call fe1 hooks, addDelReachable\n", f.index.Name(&main.Main), p.String(), r)
+		}
 		// Call hooks before delete.
 		main.callFibAddDelHooks(f.index, p, r, isDel)
 		f.addDelReachable(main, p, r, isDel)
@@ -326,6 +340,9 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 
 	// Call hooks after add.
 	if !isDel {
+		if vnet.AdjDebug {
+			fmt.Printf("fib.go addDel %v prefix %v adj %v add: call fe1 hooks, addDelReachable\n", f.index.Name(&main.Main), p.String(), r)
+		}
 		main.callFibAddDelHooks(f.index, p, r, isDel)
 		f.addDelReachable(main, p, r, isDel)
 	}
@@ -349,11 +366,16 @@ type ipre struct {
 	i ip.FibIndex
 }
 
+// idst is the destination or nh address and namespace
+// ipre is the prefix that has idst as its nh
 type mapFibResultNextHop map[idst]map[ipre]NextHopper
 
 func (x *mapFibResult) addDelNextHop(m *Main, pf *Fib, p Prefix, a Address, r NextHopper, isDel bool) {
 	id := idst{a: a, i: r.NextHopFibIndex(m)}
 	ip := ipre{p: p, i: pf.index}
+	if vnet.AdjDebug {
+		fmt.Printf("fib.go addDelNextHop isDel %v id %v ip %v: before %v\n", isDel, id, ip, x)
+	}
 	if isDel {
 		delete(x.nh[id], ip)
 		if len(x.nh[id]) == 0 {
@@ -367,6 +389,9 @@ func (x *mapFibResult) addDelNextHop(m *Main, pf *Fib, p Prefix, a Address, r Ne
 			x.nh[id] = make(map[ipre]NextHopper)
 		}
 		x.nh[id][ip] = r
+	}
+	if vnet.AdjDebug {
+		fmt.Printf("fib.go addDelNextHop: after %v\n", x)
 	}
 }
 
@@ -384,9 +409,11 @@ func (f *Fib) setReachable(m *Main, p *Prefix, pf *Fib, via *Prefix, a Address, 
 	x := f.reachable[vl][va]
 	x.addDelNextHop(m, pf, *p, a, r, isDel)
 	f.reachable[vl][va] = x
+	if vnet.AdjDebug {
+		fmt.Printf("fib.go setReachable isDel %v prefix %v via %v nha %v adj %v, new mapFibResult %v\n", isDel, p.String(), via.String(), a, x.adj, x)
+	}
 }
 
-// Delete more specific reachable with less specific reachable.
 func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibResult) {
 	for dst, dstMap := range more.nh {
 		// Move all destinations from more -> less.
@@ -404,15 +431,53 @@ func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibR
 }
 
 func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
+	// x is the mapFibResult from reachable (i.e. x is the reachable MapFib)
+	// delReachableVia will traverse the map and remove x's address from all the prefixes that uses it as its nexthop address, and add them to unreachable
+	// This is also called from addDelUnreachable (i.e. x is the unreachable MapFib) when doing recursive delete; not sure what the purpose is...
+	if vnet.AdjDebug {
+		fmt.Printf("fib.go delReachableVia adj %v IsMpAdj %v mapFibResult before: %v\n", x.adj, m.IsMpAdj(x.adj), x)
+	}
 	for dst, dstMap := range x.nh {
-		delete(x.nh, dst)
+		// dstMap is map of prefixes that uses dst as its nh
+		// For each of them, remove nh from prefix and add to unreachable
 		for dp, r := range dstMap {
 			g := m.fibByIndex(dp.i, false)
 			const isDel = true
-			g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
-			// Prefix is now unreachable.
+			ai, ok := g.Get(&dp.p) // Get gets from g.reachable
+			if !ok || ai == ip.AdjNil || ai == ip.AdjMiss {
+				return
+			}
+			if m.IsMpAdj(ai) {
+				// ai is a mpAdj, use addDelRouteNextHop to delete
+				// for mpAdj, addDelRouteNextHop will remove dst from x.nh's map as part of the cleanup and accounting
+				// if len(x.nh) ends up 0 after, it will remove x.nh
+				g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+			} else {
+				// ai is either local, glean, or adjacency from neighbor
+				// use addDel directly to delete adjacency
+				as := m.GetAdj(ai)
+				adjType := "no adjacency found at that adj index"
+				if len(as) > 0 {
+					adjType = as[0].LookupNextIndex.String()
+					// addDel will not remove dst from x.nh's map automatically
+					g.addDel(m, &dp.p, ai, true)
+				} else {
+					fmt.Printf("DEBUG: fib.go delReachableVia: attempt to remove nh %v from prefix %v but unexpected old adjacency %v type %v",
+						dst.a, dp.p.String(), ai, adjType)
+				}
+			}
+			// Prefix is now unreachable, add to unreachable, no recurse
 			f.addDelUnreachable(m, &dp.p, g, dst.a, r, !isDel, false)
 		}
+		// Verify that x.nh[id] is not already deleted as part of the cleanup; and if not, delete it
+		if x.nh[dst] != nil {
+			// delete the etry from x's map
+			delete(x.nh, dst)
+		}
+	}
+
+	if vnet.AdjDebug {
+		fmt.Printf("fib.go delReachableVia adj %v IsMpAdj %v mapFibResult after: %v\n", x.adj, m.IsMpAdj(x.adj), x)
 	}
 }
 
@@ -432,19 +497,43 @@ func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, ad
 }
 
 func (r *mapFibResult) makeReachable(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
+	// r is a mapFibResult from unreachable that we will move to reachable here
 	for dst, dstMap := range r.nh {
+		// find the destination address from r that matches with prefix p
 		if dst.a.MatchesPrefix(p) {
+			// delete the entry from r's map
 			delete(r.nh, dst)
+			// dstMap is map of prefixes that has dst as their nh but was not acctually added to the fib table because nh was unreachable
+			// For each that match prefix p, actually add nh (i.e. dst.a) to prefix via addDelRouteNextHop which makes nh reachable
 			for dp, r := range dstMap {
 				g := m.fibByIndex(dp.i, false)
 				const isDel = false
-				g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+				if vnet.AdjDebug {
+					fmt.Printf("fib.go call addDelRouteNextHop prefix %v add nh %v from makeReachable\n",
+						dp.p.String(), dst.a)
+				}
+				// Don't add nh to glean or local
+				// FIXME, what to do instead? ignore and print now
+				ai, _ := g.Get(&dp.p) // Get gets from g.reachable
+				if ai == ip.AdjNil || ai == ip.AdjMiss || m.IsMpAdj(ai) {
+					g.addDelRouteNextHop(m, &dp.p, dst.a, r, isDel)
+				} else if vnet.AdjDebug {
+					as := m.GetAdj(ai)
+					adjType := "no adjacency found at that adj index"
+					if len(as) > 0 {
+						adjType = as[0].LookupNextIndex.String()
+					}
+					fmt.Printf("fib.go makeReachable: ignore adding nh %v to prefix %v which has has non MpAdj %v of type %v",
+						dst.a, dp.p.String(), ai, adjType)
+				}
 			}
 		}
 	}
 }
 
 func (x *mapFibResult) addUnreachableVia(m *Main, f *Fib, p *Prefix) {
+	// don't know how this is used in conjunction with recursive addDelUnreachable
+	// seems like if there is a match, it would delete the entry, but then just add it back?
 	for dst, dstMap := range x.nh {
 		if dst.a.MatchesPrefix(p) {
 			delete(x.nh, dst)
@@ -460,20 +549,41 @@ func (x *mapFibResult) addUnreachableVia(m *Main, f *Fib, p *Prefix) {
 func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 	r, _ := f.reachable.Get(p)
 
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("fib.go addDelReachable delete: %v %v adj %v IsMpAdj %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a))
+		} else {
+			fmt.Printf("fib.go addDelReachable add: %v %v adj %v IsMpAdj %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a))
+		}
+	}
 	// Look up less specific reachable route for prefix.
 	lr, _, lok := f.reachable.getLessSpecific(p)
 	if isDel {
 		if lok {
+			fmt.Printf("fib.go addDelReachable delete: %v %v adj %v replaceWithLessSpecific lr %v r %v\n",
+				f.index.Name(&m.Main), p.String(), a, lr, r)
 			lr.replaceWithLessSpecific(m, f, &r)
 		} else {
+			fmt.Printf("fib.go addDelReachable delete: %v %v adj %v delReachableVia r %v\n",
+				f.index.Name(&m.Main), p.String(), a, r)
 			r.delReachableVia(m, f)
 		}
 	} else {
 		if lok {
+			fmt.Printf("fib.go addDelReachable add: %v %v adj %v replaceWithMoreSpecific lr %v r %v\n",
+				f.index.Name(&m.Main), p.String(), a, lr, r)
 			lr.replaceWithMoreSpecific(m, f, p, a, &r)
 		}
 		if r, _, ok := f.unreachable.Lookup(p.Address); ok {
+			fmt.Printf("fib.go addDelReachable add: %v %v adj %v makeReachable\n", f.index.Name(&m.Main), p.String(), a)
 			r.makeReachable(m, f, p, a)
+		}
+	}
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("fib.go addDelReachable delete: %v %v adj %v IsMpAdj %v finished: r %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a), r)
+		} else {
+			fmt.Printf("fib.go addDelReachable add: %v %v adj %v IsMpAdj %v finished: r %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a), r)
 		}
 	}
 }
@@ -484,7 +594,10 @@ func (f *Fib) addDelUnreachable(m *Main, p *Prefix, pf *Fib, a Address, r NextHo
 	//r is the nexthopper from pf
 	nr, np, _ := f.unreachable.Lookup(a)
 	if isDel && recurse {
-		nr.delReachableVia(m, f)
+		// don't recurse on delete for now; can get into infinite loop sometimes
+		/*
+			nr.delReachableVia(m, f)
+		*/
 	}
 	if !isDel && recurse {
 		nr.addUnreachableVia(m, f, p)
@@ -530,7 +643,7 @@ func (f *Fib) setLessSpecific(pʹ *Prefix) (r mapFibResult, p Prefix, ok bool) {
 
 func (f *Fib) Get(p *Prefix) (a ip.Adj, ok bool) {
 	var r mapFibResult
-	a = ip.AdjNil
+	// a = 0 is AdjMiss if not found in reachable
 	if r, ok = f.reachable[p.Len][p.mapFibKey()]; ok {
 		a = r.adj
 	}
@@ -645,16 +758,31 @@ func (m *Main) getRouteFibIndex(p *ip.Prefix, fi ip.FibIndex) (ai ip.Adj, ok boo
 	return
 }
 
-func (m *Main) addDelRoute(p *ip.Prefix, fi ip.FibIndex, newAdj ip.Adj, isDel bool) (oldAdj ip.Adj, err error) {
+// used by neighbor message to add/del route, e.g. from succesfull arp
+func (m *Main) addDelRoute(p *ip.Prefix, fi ip.FibIndex, baseAdj ip.Adj, isDel bool) (oldAdj ip.Adj, err error) {
 	createFib := !isDel
 	f := m.fibByIndex(fi, createFib)
 	q := FromIp4Prefix(p)
 	var ok bool
-	oldAdj, ok = f.addDel(m, &q, newAdj, isDel)
+
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("fib.go addDelRoute delete %v adj %v\n", q.Address.String(), baseAdj.String())
+		} else {
+			fmt.Printf("fib.go addDelRoute add %v adj %v\n", q.Address.String(), baseAdj.String())
+		}
+	}
+
+	//addDel the route to/from fib
+	oldAdj, ok = f.addDel(m, &q, baseAdj, isDel)
 
 	//don't err if deleting something that has already been deleted
-	if !ok && !isDel {
-		err = fmt.Errorf("prefix %v not found", q)
+	if !ok {
+		if isDel {
+			fmt.Printf("DEBUG: fib.go addDelRoute delete prefix %v not fount", q.String())
+		} else {
+			err = fmt.Errorf("fib.go addDelRoute add prefix %v error addDel", q.String())
+		}
 	}
 	return
 }
@@ -687,14 +815,82 @@ type prefixError struct {
 
 func (e *prefixError) Error() string { return e.s + ": " + e.p.String() }
 
+func (x *mapFibResult) delNhFromMatchingPrefix(m *Main, f *Fib, p *Prefix) {
+	// x is the mapFibResult from reachable or unreachable
+	// delReachableVia will traverse the map and remove x's address from prefix p if p uses x.nh.a as a nexthop address
+	for id, dstmap := range x.nh {
+		for ip, nhr := range dstmap {
+			if p.Matches(&ip.p) && ip.i == f.index {
+				if vnet.AdjDebug {
+					fmt.Printf("fib.go call addDelRouteNextHop delete %v prefix %v nexthop %v nhAdj %v from delAllRouteNextHops\n",
+						f.index.Name(&m.Main), p.String(), id.a, x.adj)
+				}
+				// for mpAdj, addDelRouteNextHop will take care of removing ip from dstmap as part of the cleanup and accounting?
+				f.addDelRouteNextHop(m, p, id.a, nhr, true)
+			}
+		}
+	}
+}
+
+// properly delete all nexthops in the adj
+func (m *Main) delAllRouteNextHops(f *Fib, p *Prefix) {
+	oldAdj, _ := f.Get(p)
+	if oldAdj == ip.AdjNil || oldAdj == ip.AdjMiss || !m.IsMpAdj(oldAdj) {
+		// Nothing to delete if AdjNil or AdjMiss
+		// None mpAdj deletes are handled elsewhere, no concept of deleteAll there
+		return
+	}
+	if vnet.AdjDebug {
+		fmt.Printf("fib.go delAllRouteNextHops from %v %v\n", f.index.Name(&m.Main), p.String())
+	}
+	// find all nh from reachable that has p in its map; only need to look into length 32
+	for _, r := range f.reachable[32] {
+		r.delNhFromMatchingPrefix(m, f, p)
+	}
+	// find all nh from unreachable that has p in its map; only need to look into length 32
+	for _, r := range f.unreachable[32] {
+		r.delNhFromMatchingPrefix(m, f, p)
+	}
+}
+
 func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool, isReplace bool) (err error) {
 	f := m.fibBySi(nh.Si)
-	if isReplace {
-		//Delete existing before adding
-		//This will create potential side effect of some things getting deleted earlier than original code intended
-		forceDel := true
-		oldAdj, _ := f.Get(p)
-		f.addDel(m, p, oldAdj, forceDel)
+	oldAdj, _ := f.Get(p)
+
+	if oldAdj != ip.AdjNil && oldAdj != ip.AdjMiss && !m.IsMpAdj(oldAdj) {
+		// oldAdj is probably a glean or local, don't add or remove nh
+		if vnet.AdjDebug {
+			as := m.GetAdj(oldAdj)
+			adjType := "no adjacency found at that adj index"
+			if len(as) > 0 {
+				adjType = as[0].LookupNextIndex.String()
+			}
+			if isDel {
+				fmt.Printf("fib.go AddDelRouteNextHop isReplace %v: ignore deleting nh %v from prefix %v which has has non MpAdj %v of type %v\n",
+					isReplace, nh.Address, p.String(), oldAdj, adjType)
+			} else {
+				fmt.Printf("fib.go AddDelRouteNextHop isReplace %v: ignore adding nh %v to prefix %v which has has non MpAdj %v of type %v\n",
+					isReplace, nh.Address, p.String(), oldAdj, adjType)
+			}
+		}
+		return
+	}
+
+	if isReplace { // Delete prefix and cleanup its adjacencies before add
+		if vnet.AdjDebug {
+			fmt.Printf("fib.go Replace: delete %v and clean up old adjacency oldAdj %v\n", p.String(), oldAdj.String())
+		}
+		// Do a proper cleanup and delete of old next hops
+		m.delAllRouteNextHops(f, p)
+	}
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("fib.go call addDelRouteNextHop %v prefix %v oldAdj %v delete %v from AddDelRouteNextHop\n",
+				f.index.Name(&m.Main), p.String(), oldAdj, nh.Address)
+		} else {
+			fmt.Printf("fib.go call addDelRouteNextHop %v prefix %v oldAdj %v add nh %v from AddDelRouteNextHop\n",
+				f.index.Name(&m.Main), p.String(), oldAdj, nh.Address)
+		}
 	}
 	return f.addDelRouteNextHop(m, p, nh.Address, nh, isDel)
 }
@@ -705,7 +901,7 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 		ok                    bool
 	)
 	if !isDel && nha.MatchesPrefix(p) && p.Address != AddressUint32(0) {
-		err = fmt.Errorf("prefix %s matches next-hop %s", p, &nha)
+		err = fmt.Errorf("fib.go addDelRouteNextHop add: prefix %s matches next-hop %s", p, &nha)
 		return
 	}
 
@@ -720,11 +916,14 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 		nhAdj = r.adj
 		reachable_via_prefix = np
 	} else {
+		// not sure what's the purpose of recurse....
+		// seems like it is trying to handle if the prefix that uses nha as next hop is in a different fib table, e.g. if f != nhf?
+		// If they are the same, we could end up with multipe add or multiple del to same entry?
 		const recurse = true
 		err = nhf.addDelUnreachable(m, p, f, nha, nhr, isDel, recurse)
 		{ //debug print
 			if err != nil {
-				fmt.Printf("err: recurse\n")
+				fmt.Printf("fib.go addDelUnreachable err: recurse\n")
 			}
 		}
 		return
@@ -740,15 +939,29 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 
 	if oldAdj == nhAdj && isDel {
 		newAdj = ip.AdjNil
-	} else if newAdj, ok = m.AddDelNextHop(oldAdj, nhAdj, nhr.NextHopWeight(), nhr, isDel); !ok {
+	} else if newAdj, ok = m.AddDelNextHop(oldAdj, nhAdj, nhr.NextHopWeight(), nhr, isDel); !ok { //for nhr NextHopper argument here, only AdjacencyFinalizer is used
 		if true { //if this is a delete, don't error (which would cause panic later); just flag
 			if !isDel {
-				err = fmt.Errorf("add route next hop: requested next-hop %s not found in multipath", &nha)
+				err = fmt.Errorf("fib.go addDelRouteNextHop add: %v %v, AddDelextHop !ok, oldAdj %v, nhAdj %v\n",
+					f.index.Name(&m.Main), p.String(), oldAdj, nhAdj)
 			} else {
-				fmt.Printf("fib.go: del route next hop: requested next-hop %s not found in multipath; maybe already removed\n", &nha)
+				// This is legit.  Could get a message to remove a nexthop that is no longer the next hop of this prefix.
+				// Example:  2 routes to a prefix, one via a rewrite next hop, one via glean.  Not consider a multipath, but it is effectively that.
+				// vnet will choose one of the 2 to populate the TCAM depending on the order the add messages come in.  If the delete rewrite nexthop come in
+				// and vnet had populated the glean as its nexthop, then AddDelNextHop will return !ok as the rewrite nhAdj is not there.
+				fmt.Printf("fib.go addDelRouteNextHop delete: %v %v, AddDelextHop !ok, oldAdj %v, nhAdj %v, likely because %v was not its nh which is OK\n",
+					f.index.Name(&m.Main), p.String(), oldAdj, nhAdj, nhAdj)
 			}
 		}
 		return
+	}
+
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("fib.go addDelRouteNextHop delete: prefix %v,  oldAdj %v, newAdj %v\n", p.String(), oldAdj.String(), newAdj.String())
+		} else {
+			fmt.Printf("fib.go addDelRouteNextHop add: prefix %v, oldAdj %v, newAdj %v\n", p.String(), oldAdj.String(), newAdj.String())
+		}
 	}
 
 	if oldAdj != newAdj {
@@ -757,7 +970,8 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 
 		isFibDel := isDel
 		// if isDel, do not remove adjacency unless all members of the multipath adjacency have been removed
-		// when that happens newAdj will be ip.AdjNil
+		// instead, update fib table with newAdj
+		// when all member os the multipath are removed, newAdj will be ip.AdjNil
 		if isFibDel && newAdj != ip.AdjNil {
 			isFibDel = false
 		}
@@ -767,22 +981,33 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	return
 }
 
+// This is used by replaceWithLessSpecific and replaceWithMoreSpecific only
 func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNextHopAdj ip.Adj, nha Address, r NextHopper) (err error) {
 	if adj, ok := f.Get(p); !ok {
-		//debug print instead of err; next hop may be been removed earlier than originally intended but OK
+		//debug print instead of err; may be OK
 		//err = &prefixError{s: "unknown destination", p: *p}
-		fmt.Printf("fib.go: replace next hop, unknown destination, addr %v, nextHop %v, from-nha %v to-nha %v, namespace %s\n",
+		fmt.Printf("fib.go: replaceNextHop, unknown destination, addr %v, nextHop %v, from-nha %v to-nha %v, namespace %s\n",
 			p, nha, fromNextHopAdj, toNextHopAdj, f.index.Name(&m.Main))
 	} else {
+		if vnet.AdjDebug {
+			fmt.Printf("fib.go replaceNextHop: prefix %v from adj %v to adj %v, nha %v\n",
+				p.String(), fromNextHopAdj, toNextHopAdj, nha)
+		}
 		as := m.GetAdj(toNextHopAdj)
 		// If replacement is glean (interface route) then next hop becomes unreachable.
+		// Assume glean already exist so no need to explicity add here?
 		isDel := len(as) == 1 && as[0].IsGlean()
 		if isDel {
+			if vnet.AdjDebug {
+				fmt.Printf("fib.go call addDelRouteNextHop prefix %v delete nh %v from replaceNextHop\n",
+					p.String(), nha)
+			}
 			err = pf.addDelRouteNextHop(m, p, nha, r, isDel)
 			if err == nil {
 				err = f.addDelUnreachable(m, p, pf, nha, r, !isDel, false)
 			}
 		} else {
+			// Adjacencies in the toNextHopAj must be rewrites for ReplaceNextHop
 			if err = m.ReplaceNextHop(adj, fromNextHopAdj, toNextHopAdj, r); err != nil {
 				err = fmt.Errorf("replace next hop %v from-nha %v to-nha %v: %v", adj, fromNextHopAdj, toNextHopAdj, err)
 			} else {
@@ -802,9 +1027,53 @@ func (f *Fib) deleteMatchingRoutes(m *Main, key *Prefix) {
 	})
 }
 
+//used for local or glean fib adjacencies
 func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
-	if oldAdj, ok := f.addDel(m, p, r, isDel); ok && oldAdj != ip.AdjNil {
-		m.DelAdj(oldAdj)
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("fib.go addDelReplace delete %v %v adj %v\n", f.index.Name(&m.Main), p.String(), r.String())
+		} else {
+			if m.IsMpAdj(r) {
+				panic(fmt.Errorf("fib.go addDelReplace %v adding a multipath adj %v to glean or local fib %v!\n",
+					f.index.Name(&m.Main), r.String(), p.String()))
+			} else {
+				fmt.Printf("fib.go addDelReplace add %v %v adj %v\n", f.index.Name(&m.Main), p.String(), r.String())
+			}
+		}
+	}
+
+	oldAdj, _ := f.Get(p)
+	// If oldAdj is a mpAdj, then need to do a cleanup and delete before adding the replacement adj
+	if m.IsMpAdj(oldAdj) {
+		// if add, clean up first by deleting oldAdj before adding
+		// if delete, r argument is AdjNil or AdjMiss, so use oldAdj to delete here
+		if vnet.AdjDebug {
+			fmt.Printf("fib.go addDelReplace %v %v %v: first delete old adjacency %v IsMpAdj %v\n",
+				f.index.Name(&m.Main), p.String(), r.String(), oldAdj, m.IsMpAdj(oldAdj))
+		}
+		// First delete all its next hops; this maintains the proper adjacency tracking
+		// prefixes in fib, i.e. MapFib, are indexed by mapFibKey which has the mask applied
+		// apply mask for the delAllRouteNextHops argument
+		q := p.ApplyMask()
+		m.delAllRouteNextHops(f, q)
+
+		// This uses the original prefix
+		if !isDel {
+			// addDel new adjacency
+			f.addDel(m, p, r, isDel)
+		}
+	} else {
+		if oldAdj, ok := f.addDel(m, p, r, isDel); ok && oldAdj != ip.AdjNil && oldAdj != ip.AdjMiss && oldAdj != r {
+			// oldAdj should not return as a mpAdj
+			if m.IsMpAdj(oldAdj) {
+				fmt.Printf("DEBUG: fib.go addDelReplace isDel %v %v %v adj %v:  addDel returned an oldAdj %v that is a mpAdj",
+					isDel, f.index.Name(&m.Main), p.String(), r, oldAdj)
+				return
+			}
+			if !m.IsAdjFree(oldAdj) {
+				m.DelAdj(oldAdj)
+			}
+		}
 	}
 }
 

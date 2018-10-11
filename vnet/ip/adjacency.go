@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"unsafe"
 )
 
@@ -151,6 +152,21 @@ const (
 	AdjPunt Adj = 2
 	AdjNil  Adj = (^Adj(0) - 1) // so AdjNil + 1 is non-zero for remaps.
 )
+
+func (a Adj) String() string {
+	switch a {
+	case AdjMiss:
+		return "0(AdjMiss)"
+	case AdjDrop:
+		return "1(AdjDrop)"
+	case AdjPunt:
+		return "2(AdjPunt)"
+	case AdjNil:
+		return "AdjNil"
+	default:
+		return strconv.Itoa(int(a))
+	}
+}
 
 //go:generate gentemplate -d Package=ip -id adjacencyHeap -d HeapType=adjacencyHeap -d Data=elts -d Type=Adjacency github.com/platinasystems/go/elib/heap.tmpl
 
@@ -475,11 +491,31 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 
 	nAdj, norm := resolved.normalizePow2(mp, &mp.cachedNextHopVec[2])
 
+	if vnet.AdjDebug {
+		fmt.Printf("adjacency.go createMpAdj: given nhs:%v\n", given.listNhs(m))
+		fmt.Printf("adjacency.go createMpAdj: resolved nhs:%v\n", resolved.listNhs(m))
+		fmt.Printf("adjacency.go createMpAdj: normalized nhs:%v\n", norm.listNhs(m))
+	}
 	// Use given next hops to see if we've seen a block equivalent to this one before.
 	i, ok := mp.nextHopHash.Get(norm)
 	if ok {
 		ai := mp.nextHopHashValues[i].adj
 		madj = m.mpAdjForAdj(ai, false)
+		if madj != nil {
+			if vnet.AdjDebug {
+				fmt.Printf("adjacency.go createMpAdj: reuse existing block, adj %v\n", madj.adj.String())
+				m.checkMpAdj(madj.adj)
+			}
+		} else {
+			// Shouldn't get to this point.
+			// If there is a block matching the resolved nhs, but it's not a mpAdj...
+			// usually means there is some leftover block that didn't get cleaned up
+			// like if a mpAdj was deleted before calling free(m *Main).
+			if vnet.AdjDebug {
+				panic(fmt.Errorf("DEBUG: adjacency.go createMpAdj: found existing block, but it is not mpAdj, ai %v\n", ai))
+			}
+			fmt.Printf("DEBUG: adjacency.go createMpAdj: found existing block, but it is not mpAdj, ai %v\n", ai)
+		}
 		return
 	}
 
@@ -517,12 +553,63 @@ func (m *Main) createMpAdj(given nextHopVec, af AdjacencyFinalizer) (madj *multi
 	}
 
 	m.CallAdjAddHooks(ai)
+	if vnet.AdjDebug {
+		fmt.Printf("adjacency.go createMpAdj: create new block, adj %v\n", madj.adj.String())
+		m.checkMpAdj(madj.adj)
+	}
 	return
+}
+
+func (m *Main) checkMpAdj(mpAdj Adj) {
+	//very all nh.adj of madj are not themselves multipath
+	nhs := m.NextHopsForAdj(mpAdj)
+	fail := false
+	for nhi := range nhs {
+		nh := &nhs[nhi]
+		if m.IsMpAdj(nh.Adj) {
+			fmt.Printf("adjacency.go checkMpAdj: fail nhi %v of multipathAdj %v is also a multipath!\n", nh.Adj, mpAdj)
+			fail = true
+		}
+	}
+	if fail {
+		panic(fmt.Errorf("checkMpAdj: multipathAdj %v did not resolve properly\n", mpAdj))
+	}
+}
+
+func (nhs nextHopVec) listNhs(m *Main) string {
+	s := ""
+	for nhi := range nhs {
+		nh := &nhs[nhi]
+		if m.IsMpAdj(nh.Adj) {
+			s += fmt.Sprintf(" %v(mpAdj) weight %v;", nh.Adj, nh.Weight)
+		} else {
+			s += fmt.Sprintf(" %v weight %v;", nh.Adj, nh.Weight)
+		}
+	}
+	return s
 }
 
 func (m *Main) GetAdjacencyUsage() elib.HeapUsage { return m.adjacencyHeap.GetUsage() }
 
+func (m *Main) IsMpAdj(a Adj) bool {
+	if a == AdjNil {
+		return false
+	}
+	ma := m.mpAdjForAdj(a, false)
+	if ma == nil {
+		return false
+	}
+	if !ma.isValid() {
+		return false
+	}
+	return true
+}
+
 func (m *adjacencyMain) mpAdjForAdj(a Adj, create bool) (ma *multipathAdjacency) {
+	if int(a) >= len(m.adjacencyHeap.elts) {
+		fmt.Printf("adjacency.go mpAdjForAdj: index out of range adj %v\n", a.String())
+		return
+	}
 	adj := &m.adjacencyHeap.elts[a]
 	if !adj.IsRewrite() {
 		return
@@ -559,23 +646,40 @@ func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWe
 		nnh, nhi uint
 	)
 
-	if oldAdj != AdjNil {
+	if oldAdj != AdjNil && oldAdj != AdjMiss {
 		if old = m.mpAdjForAdj(oldAdj, false); old != nil {
-			nhs = mm.getNextHopBlock(&old.givenNextHops)
-			nnh = nhs.Len()
-			nhi, ok = nhs.find(nextHopAdj)
+			if old.isValid() { //when a ma is returned to pool it is invalid instead of nil
+				nhs = mm.getNextHopBlock(&old.givenNextHops)
+				nnh = nhs.Len()
+				nhi, ok = nhs.find(nextHopAdj)
+				if isDel && !ok && vnet.AdjDebug {
+					fmt.Printf("DEBUG: adjacency.go AddDelNextHop delete old is valid, but failed to find nhAdj %v from oldAdj %v\n", nextHopAdj, oldAdj)
+				}
+			}
+		} else {
+			if vnet.AdjDebug {
+				panic(fmt.Errorf("adjacency.go AddDelNextHop isDel %v nhAdj %v from %v IsMpAdj %v", isDel, nextHopAdj, oldAdj, m.IsMpAdj(oldAdj)))
+			}
 		}
-		// For delete next hop must be found.
-		if nhi >= nnh && isDel {
-			return
+	}
+	// For delete next hop must be found.
+	if nhi >= nnh && isDel {
+		if vnet.AdjDebug {
+			fmt.Printf("adjacency.go AddDelNextHop delete failed to find nhAdj %v from oldAdj %v\n", nextHopAdj, oldAdj)
 		}
+		return
 	}
 
 	// Re-use vector for each call.
+	// nnh is 0 or is number of nh in oldAdj
+	// nhi is 0 or is index of nh in oldAdj's nhs
 	mm.cachedNextHopVec[0].Validate(nnh)
 	newNhs := mm.cachedNextHopVec[0]
 	newAdj = AdjNil
 	if isDel {
+		if vnet.AdjDebug {
+			fmt.Printf("adjacency.go AddDelNextHop delete adj %v from %v oldNhs:%v ... \n", nextHopAdj, oldAdj, nhs.listNhs(m))
+		}
 		// Delete next hop at previously found index.
 		if nhi > 0 {
 			copy(newNhs[:nhi], nhs[:nhi])
@@ -608,12 +712,38 @@ func (m *Main) AddDelNextHop(oldAdj Adj, nextHopAdj Adj, nextHopWeight NextHopWe
 		}
 		// In either case set next hop weight.
 		nh.Weight = nextHopWeight
+		if vnet.AdjDebug {
+			fmt.Printf("adjacency.go AddDelNextHop add adj %v to %v oldNhs:%v, nnh %v, newNhs before resolve %v ... \n",
+				nextHopAdj, oldAdj, nhs.listNhs(m), nnh, newNhs.listNhs(m))
+		}
 	}
 
 	new = m.addDelHelper(newNhs, old, af)
 	if new != nil {
 		ok = true
 		newAdj = new.adj
+	}
+	if vnet.AdjDebug {
+		if isDel {
+			fmt.Printf("adjacency.go AddDelNextHop delete adj %v from %v, newAdj %v;", nextHopAdj.String(), oldAdj.String(), newAdj.String())
+		} else {
+			fmt.Printf("adjacency.go AddDelNextHop add adj %v to %v newAdj %v;", nextHopAdj.String(), oldAdj.String(), newAdj.String())
+		}
+		if newAdj != AdjNil {
+			resolved_nhs := m.NextHopsForAdj(newAdj)
+			fmt.Printf(" resolved adj:")
+			for _, nh := range resolved_nhs {
+				if m.IsMpAdj(nh.Adj) {
+					fmt.Printf(" %v(isMpAdj!!)", nh.Adj)
+				} else {
+					fmt.Printf(" %v", nh.Adj)
+				}
+			}
+		}
+		fmt.Printf("\n")
+		if isDel && !ok {
+			fmt.Printf("adjacency.go AddDelNextHop delete failed new_is_nil=%v", new == nil)
+		}
 	}
 	return
 }
@@ -632,9 +762,15 @@ func (m *Main) addDelHelper(newNhs nextHopVec, old *multipathAdjacency, af Adjac
 	if new != old {
 		if old != nil {
 			old.referenceCount--
+			if vnet.AdjDebug {
+				fmt.Printf("adjacency.go multipathAdj %v referenceCount-- %v\n", old.adj, old.referenceCount)
+			}
 		}
 		if new != nil {
 			new.referenceCount++
+			if vnet.AdjDebug {
+				fmt.Printf("adjacency.go multipathAdj %v referenceCount++ %v\n", new.adj, new.referenceCount)
+			}
 		}
 	}
 	if old != nil && old.referenceCount == 0 {
@@ -648,15 +784,38 @@ func (m *adjacencyMain) PoisonAdj(a Adj) {
 	elib.PointerPoison(unsafe.Pointer(&as[0]), uintptr(len(as))*unsafe.Sizeof(as[0]))
 }
 
+func (m *Main) IsAdjFree(a Adj) bool {
+	return m.adjacencyHeap.IsFree(uint(a))
+}
+
 func (m *Main) FreeAdj(a Adj) bool {
-	m.adjacencyHeap.Put(uint(a))
+	// FreeAdj just puts index back into adjacencyHeap
+	// If a is a mpAdj, should call free(m *Main) which includes cleaning up all the other stuff associated with a
+	if vnet.AdjDebug {
+		// by the time FreeAdj is call, a should have been poisoned, and IsMpAdj should be false
+		fmt.Printf("adjacency.go FreeAdj %v IsMpAdj %v\n", a.String(), m.IsMpAdj(a))
+	}
+	if !m.adjacencyHeap.IsFree(uint(a)) {
+		m.adjacencyHeap.Put(uint(a))
+	}
 	return true
 }
 
 func (m *Main) DelAdj(a Adj) {
-	m.PoisonAdj(a)
-	if ok := m.FreeAdj(a); ok {
-		m.CallAdjDelHooks(a)
+	if vnet.AdjDebug {
+		fmt.Printf("adjacency.go DelAdj: %v IsMpAdj %v\n", a, m.IsMpAdj(a))
+	}
+	if ma := m.mpAdjForAdj(a, false); ma != nil {
+		// use free, which calls CallAdjDelHooks and cleans up rest of mpAdj
+		ma.free(m)
+	} else {
+		m.PoisonAdj(a)
+		if ok := m.FreeAdj(a); ok {
+			if vnet.AdjDebug {
+				fmt.Printf("adjacency.go DelAdj: CallAdjDelHooks(%v)\n", a)
+			}
+			m.CallAdjDelHooks(a)
+		}
 	}
 }
 
@@ -754,6 +913,9 @@ func (m *Main) RegisterAdjGetCounterHook(f adjGetCounterHook, dep ...*dep.Dep) {
 }
 
 func (ma *multipathAdjacency) free(m *Main) {
+	if vnet.AdjDebug {
+		fmt.Printf("adjacency.go multipathAdjacency free: %v CallAdjDelHooks(%v)\n", ma.adj, ma.adj)
+	}
 	m.CallAdjDelHooks(ma.adj)
 
 	mm := &m.multipathMain

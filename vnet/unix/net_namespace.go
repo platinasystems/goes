@@ -46,7 +46,6 @@ func (m *net_namespace_main) read_dir(dir *namespace_search_dir, f func(dir *nam
 		is_init = true
 	)
 	for _, fi := range fis {
-		//fmt.Printf("discover namesapce is_del=%t, is_init=%t, %s\n", is_del, is_init, fi.Name())  //debug print
 		f(dir, fi.Name(), is_del, is_init)
 	}
 	return
@@ -93,10 +92,8 @@ func (m *net_namespace_main) watch_dir(dir *namespace_search_dir, f func(dir *na
 			e, name, i_next := decode(buf[:], i)
 			switch {
 			case e.mask&syscall.IN_CREATE != 0:
-				//fmt.Printf("namespace %s created, is_init=%t\n", name, is_init) //debug print
 				f(dir, name, false, is_init)
 			case e.mask&syscall.IN_DELETE != 0:
-				//fmt.Printf("namespace %s deleted, is_init=%t\n", name, is_init)  //debug print
 				f(dir, name, true, is_init)
 			}
 			i = i_next
@@ -435,6 +432,9 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 	name := e.dir.namespace_name(e.file_name)
 
 	if e.is_del {
+		if vnet.AdjDebug {
+			fmt.Printf("delete_namespace %v\n", name)
+		}
 		ns := m.namespace_by_name[name]
 		if ns == nil { // delete unknown namespace file
 			return
@@ -446,6 +446,9 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 		ns.del(m)
 		delete(m.namespace_by_name, name)
 		return
+	}
+	if vnet.AdjDebug {
+		fmt.Printf("add_namespace %v\n", name)
 	}
 
 	var (
@@ -471,7 +474,6 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 		}
 		return
 	}
-	//fmt.Printf("add_del_namespace %v succeeded in %d tries\n", name, e.add_count) //debug print
 	elog.F("net-namespace discovery ok %s/%s", e.dir.path, e.file_name)
 	ns.elog_name = elog.SetString(ns.name)
 	m.namespace_by_name[name] = ns
@@ -651,6 +653,10 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 }
 
 func (ns *net_namespace) addDelMk1Interface(m *Main, isDel bool, ifname string, ifindex uint32, address [6]byte, devtype uint8, iflinkindex int32, vlanid uint16) (err error) {
+	if vnet.AdjDebug {
+		fmt.Printf("%v addDelMk1Interface: isDel %v ifname %v ifindex %v address %v devtype %v iflinkindex %v vlanid %v\n",
+			ns.name, isDel, ifname, ifindex, address, devtype, iflinkindex, vlanid)
+	}
 	if !isDel {
 		if ns.interface_by_index == nil {
 			ns.interface_by_index = make(map[uint32]*net_namespace_interface)
@@ -834,6 +840,9 @@ func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifinde
 		hi := v.SupHi(sup_si)
 		hw := v.HwIf(hi)
 		si := ns.m.m.v.NewSwSubInterface(hw.Si(), vnet.IfId(eid))
+		if vnet.AdjDebug {
+			fmt.Printf("addVlan: sup_si %v sup_si.IsSwSub %v, IfId %v, vlanId %v, si %v\n", sup_si, sup_si.IsSwSubInterface(v), vnet.IfId(eid), vlanid, si)
+		}
 		m.set_si(intf, si)
 	}
 	return
@@ -883,9 +892,6 @@ func (m *net_namespace_main) set_si(intf *net_namespace_interface, si vnet.Si) {
 	// Set up ifindex to vnet Si mapping.
 	if ns.si_by_ifindex.m == nil {
 		ns.si_by_ifindex.m = make(map[uint32]vnet.Si)
-	}
-	if false {
-		fmt.Printf("set_si: ns %s ifindex %d si %d\n", ns.name, intf.ifindex, si)
 	}
 	ns.si_by_ifindex.set(intf.ifindex, si)
 
