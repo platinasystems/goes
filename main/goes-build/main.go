@@ -7,7 +7,6 @@ package main
 
 import (
 	"archive/zip"
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -24,7 +23,7 @@ import (
 
 const (
 	platina       = ".."
-	platinaFe1    = platina + "fe1"
+	platinaFe1    = platina + "/fe1"
 	platinaGo     = platina + "/go"
 	platinaGoMain = platinaGo + "/main"
 
@@ -210,24 +209,18 @@ func main() {
 			targets = append(targets, target)
 		}
 	}
-	err := host.godo("generate", platinaGo)
-	defer func() {
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-	}()
-	if err != nil {
-		return
+	if err := host.godoindir(platinaGo, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/go"); err != nil {
+		panic(err)
 	}
 	for _, target := range targets {
+		var err error
 		if f, found := make[target]; found {
 			err = f(target, mainPkg[target])
 		} else {
 			err = makePackage(target)
 		}
 		if err != nil {
-			return
+			panic(err)
 		}
 	}
 }
@@ -333,18 +326,30 @@ func makePackage(name string) error {
 }
 
 func makeGoesPlatinaMk1(out, name string) error {
+	plugin := false
 	args := []string{"build", "-o", out}
-	if have(platinaFe1) {
-		if err := host.godo("generate", platinaFe1); err != nil {
-			return err
-		}
-	} else if strings.Index(*tagsFlag, "plugin") < 0 {
+	if strings.Index(*tagsFlag, "plugin") >= 0 {
 		args = append(args, "-tags", "plugin")
+		plugin = true
 	}
-	if strings.Index(*tagsFlag, "debug") > 0 {
+	if strings.Index(*tagsFlag, "debug") >= 0 {
 		args = append(args, "-gcflags", "-N -l")
 	}
-	return amd64Linux.godo(append(args, name)...)
+	if err := host.godoindir(platinaFe1, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/fe1"); err != nil {
+		return err
+	}
+	err := amd64Linux.godo(append(args, name)...)
+	if err != nil {
+		return err
+	}
+	if plugin {
+		err = amd64Linux.godoindir(platinaGoMainFe1, "build", "-buildmode=plugin",
+			".")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func makeGoesPlatinaMk1Installer(out, name string) error {
@@ -355,33 +360,20 @@ func makeGoesPlatinaMk1Installer(out, name string) error {
 	if err != nil {
 		return err
 	}
-	if have(platinaFe1) && strings.Index(*tagsFlag, "plugin") >= 0 {
-		err = host.godo("generate", platinaFe1)
-		if err != nil {
-			return err
-		}
-		err = amd64Linux.godo("build", "-buildmode=plugin",
-			platinaGoMainFe1)
-		if err != nil {
-			return err
-		}
-	}
 	err = amd64Linux.godo("build", "-o", tinstaller,
 		platinaGoMainGoesInstaller)
 	if err != nil {
 		return err
 	}
-	if !have(platinaFe1) || strings.Index(*tagsFlag, "plugin") >= 0 {
+	if strings.Index(*tagsFlag, "plugin") >= 0 {
 		const fe1so = "fe1.so"
-		fi, fierr := os.Stat(fe1so)
+		fi, fierr := os.Stat(platinaGoMainFe1 + "/" + fe1so)
 		if fierr != nil {
-			fi, fierr = os.Stat("/usr/lib/goes/" + fe1so)
-			if fierr != nil {
-				return fmt.Errorf("can't find " + fe1so)
-			}
+			return fmt.Errorf("can't find " + platinaGoMainFe1 + "/" + fe1so)
 		}
 		zfiles = append(zfiles, fi.Name())
 	}
+
 	err = zipfile(tzip, append(zfiles, goesPlatinaMk1))
 	if err != nil {
 		return err
@@ -539,7 +531,7 @@ func mkfileFromHostCpio(w *cpio.Writer, tname string, mode os.FileMode, hname st
 	return mkfileFromSliceCpio(w, tname, mode, hname, data)
 }
 
-func (goenv *goenv) godo(args ...string) error {
+func (goenv *goenv) godoindir(dir string, args ...string) error {
 	if len(*tagsFlag) > 0 {
 		done := false
 		for i, arg := range args {
@@ -564,6 +556,7 @@ func (goenv *goenv) godo(args ...string) error {
 		args = append([]string{args[0], "-x"}, args[1:]...)
 	}
 	cmd := exec.Command("go", args...)
+	cmd.Dir = dir
 	cmd.Env = os.Environ()
 	if goenv.goarch != runtime.GOARCH {
 		cmd.Env = append(cmd.Env, fmt.Sprint("GOARCH=", goenv.goarch))
@@ -575,6 +568,10 @@ func (goenv *goenv) godo(args ...string) error {
 	cmd.Stderr = os.Stdout
 	goenv.log(cmd.Args...)
 	return cmd.Run()
+}
+
+func (goenv *goenv) godo(args ...string) error {
+	return goenv.godoindir("", args...)
 }
 
 func (goenv *goenv) log(args ...string) {
@@ -622,11 +619,6 @@ func chmodx(fn string) error {
 	}
 	return os.Chmod(fn, fi.Mode()|
 		os.FileMode(syscall.S_IXUSR|syscall.S_IXGRP|syscall.S_IXOTH))
-}
-
-func have(pkg string) bool {
-	buf, err := exec.Command("go", "list", pkg).Output()
-	return err == nil && bytes.Equal(bytes.TrimSpace(buf), []byte(pkg))
 }
 
 func mv(from, to string) error {
