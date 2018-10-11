@@ -42,6 +42,7 @@ github.com/platinasystems/fe1 v0.0.0-20181008201145-b9b2baf7159a h1:TQmykONHbhK3
 github.com/platinasystems/fe1 v0.0.0-20181008201145-b9b2baf7159a/go.mod h1:uZ+cXtmF9NgYcALl4nXMCHCXeE5MbgPcZf5eEV3PKyI=
 github.com/platinasystems/firmware-fe1a v0.0.0-20170616152047-60f39141fbbf h1:WgSYaHmZ+MR4zJJ32Wf+T33TgzbqeIvqGW0QDbkQFBA=
 github.com/platinasystems/firmware-fe1a v0.0.0-20170616152047-60f39141fbbf/go.mod h1:F0KAFwctbk1FB557q7m6atg3aQgyHj9NmAle2KswM6E=
+github.com/platinasystems/go v0.0.0-20181011011039-90c571c632a1/go.mod h1:KsHCW8CohWb6V0m7AlJMu28fKp4w1V5eqW5dLQx0Cyg=
 github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8 h1:g/xRUhEichcPkHc9od8pSW5nnc/j58VrGS2GKs7YtAM=
 github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8/go.mod h1:/GXF5FQty+9BTtfCsfFuD4/pHf/b2cN3f3Ic0nLagQw=
 github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d h1:jVkqqhZKx8eAb94QYDajS9KOh5B/rOAx34H7DDZGrEo=
@@ -62,6 +63,8 @@ github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e h1:nt2877sKf
 github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e/go.mod h1:B4+Kq1u5FlULTjFSM707Q6e/cOHFv0z/6QRoxubDIQ8=
 golang.org/x/net v0.0.0-20181004194319-68fc911561ed h1:I/REEzHOaFBzlimCr4aoxCQY/gZkX+QCakxUXRInmwg=
 golang.org/x/net v0.0.0-20181004194319-68fc911561ed/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
+golang.org/x/net v0.0.0-20181011144130-49bb7cea24b1 h1:Y/KGZSOdz/2r0WJ9Mkmz6NJBusp0kiNx1Cn82lzJQ6w=
+golang.org/x/net v0.0.0-20181011144130-49bb7cea24b1/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/sys v0.0.0-20181004145325-8469e314837c h1:SJ7JoQNVl3mC7EWkkONgBWgCno8LcABIJwFMkWBC+EY=
 golang.org/x/sys v0.0.0-20181004145325-8469e314837c/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
