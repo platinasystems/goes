@@ -1,6 +1,6 @@
-// +build dbgadj dbgadj.adj
+// +build dbgvnet dbgvnet.adj
 
-package dbgadj
+package dbgvnet
 
 import "github.com/platinasystems/dbg"
 

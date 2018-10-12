@@ -12,7 +12,7 @@ import (
 	"github.com/platinasystems/go/elib/dep"
 	"github.com/platinasystems/go/elib/parse"
 	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/internal/dbgadj"
+	"github.com/platinasystems/go/vnet/internal/dbgvnet"
 	"github.com/platinasystems/go/vnet/ip"
 )
 
@@ -297,7 +297,7 @@ type IfAddrAddDelHook func(ia ip.IfAddr, isDel bool)
 
 func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj, ok bool) {
 	if isDel {
-		dbgadj.Adj.Logf("%v prefix %v adj %v delete: call fe1 hooks, addDelReachable\n", f.index.Name(&main.Main), p.String(), r)
+		dbgvnet.Adj.Logf("%v prefix %v adj %v delete: call fe1 hooks, addDelReachable\n", f.index.Name(&main.Main), p.String(), r)
 		// Call hooks before delete.
 		main.callFibAddDelHooks(f.index, p, r, isDel)
 		f.addDelReachable(main, p, r, isDel)
@@ -339,7 +339,7 @@ func (f *Fib) addDel(main *Main, p *Prefix, r ip.Adj, isDel bool) (oldAdj ip.Adj
 
 	// Call hooks after add.
 	if !isDel {
-		dbgadj.Adj.Logf("%v prefix %v adj %v add: call fe1 hooks, addDelReachable\n", f.index.Name(&main.Main), p.String(), r)
+		dbgvnet.Adj.Logf("%v prefix %v adj %v add: call fe1 hooks, addDelReachable\n", f.index.Name(&main.Main), p.String(), r)
 		main.callFibAddDelHooks(f.index, p, r, isDel)
 		f.addDelReachable(main, p, r, isDel)
 	}
@@ -371,7 +371,7 @@ func (x *mapFibResult) addDelNextHop(m *Main, pf *Fib, p Prefix, a Address, r Ne
 	id := idst{a: a, i: r.NextHopFibIndex(m)}
 	ip := ipre{p: p, i: pf.index}
 
-	dbgadj.Adj.Logf("isDel %v id %v ip %v: before %v\n", isDel, id, ip, x)
+	dbgvnet.Adj.Logf("isDel %v id %v ip %v: before %v\n", isDel, id, ip, x)
 
 	if isDel {
 		delete(x.nh[id], ip)
@@ -388,7 +388,7 @@ func (x *mapFibResult) addDelNextHop(m *Main, pf *Fib, p Prefix, a Address, r Ne
 		x.nh[id][ip] = r
 	}
 
-	dbgadj.Adj.Logf("after %v\n", x)
+	dbgvnet.Adj.Logf("after %v\n", x)
 }
 
 func (x *mapFibResultNextHop) String() (s string) {
@@ -405,7 +405,7 @@ func (f *Fib) setReachable(m *Main, p *Prefix, pf *Fib, via *Prefix, a Address, 
 	x := f.reachable[vl][va]
 	x.addDelNextHop(m, pf, *p, a, r, isDel)
 	f.reachable[vl][va] = x
-	dbgadj.Adj.Logf("isDel %v prefix %v via %v nha %v adj %v, new mapFibResult %v\n", isDel, p.String(), via.String(), a, x.adj, x)
+	dbgvnet.Adj.Logf("isDel %v prefix %v via %v nha %v adj %v, new mapFibResult %v\n", isDel, p.String(), via.String(), a, x.adj, x)
 }
 
 func (less *mapFibResult) replaceWithLessSpecific(m *Main, f *Fib, more *mapFibResult) {
@@ -428,7 +428,7 @@ func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
 	// x is the mapFibResult from reachable (i.e. x is the reachable MapFib)
 	// delReachableVia will traverse the map and remove x's address from all the prefixes that uses it as its nexthop address, and add them to unreachable
 	// This is also called from addDelUnreachable (i.e. x is the unreachable MapFib) when doing recursive delete; not sure what the purpose is...
-	dbgadj.Adj.Logf("adj %v IsMpAdj %v mapFibResult before: %v\n", x.adj, m.IsMpAdj(x.adj), x)
+	dbgvnet.Adj.Logf("adj %v IsMpAdj %v mapFibResult before: %v\n", x.adj, m.IsMpAdj(x.adj), x)
 
 	for dst, dstMap := range x.nh {
 		// dstMap is map of prefixes that uses dst as its nh
@@ -469,7 +469,7 @@ func (x *mapFibResult) delReachableVia(m *Main, f *Fib) {
 		}
 	}
 
-	dbgadj.Adj.Logf("adj %v IsMpAdj %v mapFibResult after: %v\n", x.adj, m.IsMpAdj(x.adj), x)
+	dbgvnet.Adj.Logf("adj %v IsMpAdj %v mapFibResult after: %v\n", x.adj, m.IsMpAdj(x.adj), x)
 }
 
 func (less *mapFibResult) replaceWithMoreSpecific(m *Main, f *Fib, p *Prefix, adj ip.Adj, more *mapFibResult) {
@@ -500,7 +500,7 @@ func (r *mapFibResult) makeReachable(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
 				g := m.fibByIndex(dp.i, false)
 				const isDel = false
 
-				dbgadj.Adj.Logf("call addDelRouteNextHop prefix %v add nh %v from makeReachable\n",
+				dbgvnet.Adj.Logf("call addDelRouteNextHop prefix %v add nh %v from makeReachable\n",
 					dp.p.String(), dst.a)
 
 				// Don't add nh to glean or local
@@ -514,7 +514,7 @@ func (r *mapFibResult) makeReachable(m *Main, f *Fib, p *Prefix, adj ip.Adj) {
 					if len(as) > 0 {
 						adjType = as[0].LookupNextIndex.String()
 					}
-					dbgadj.Adj.Logf("ignore adding nh %v to prefix %v which has has non MpAdj %v of type %v",
+					dbgvnet.Adj.Logf("ignore adding nh %v to prefix %v which has has non MpAdj %v of type %v",
 						dst.a, dp.p.String(), ai, adjType)
 				}
 			}
@@ -541,38 +541,38 @@ func (f *Fib) addDelReachable(m *Main, p *Prefix, a ip.Adj, isDel bool) {
 	r, _ := f.reachable.Get(p)
 
 	if isDel {
-		dbgadj.Adj.Logf("delete: %v %v adj %v IsMpAdj %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a))
+		dbgvnet.Adj.Logf("delete: %v %v adj %v IsMpAdj %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a))
 	} else {
-		dbgadj.Adj.Logf("add: %v %v adj %v IsMpAdj %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a))
+		dbgvnet.Adj.Logf("add: %v %v adj %v IsMpAdj %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a))
 	}
 
 	// Look up less specific reachable route for prefix.
 	lr, _, lok := f.reachable.getLessSpecific(p)
 	if isDel {
 		if lok {
-			dbgadj.Adj.Logf("delete: %v %v adj %v replaceWithLessSpecific lr %v r %v\n",
+			dbgvnet.Adj.Logf("delete: %v %v adj %v replaceWithLessSpecific lr %v r %v\n",
 				f.index.Name(&m.Main), p.String(), a, lr, r)
 			lr.replaceWithLessSpecific(m, f, &r)
 		} else {
-			dbgadj.Adj.Logf("delete: %v %v adj %v delReachableVia r %v\n",
+			dbgvnet.Adj.Logf("delete: %v %v adj %v delReachableVia r %v\n",
 				f.index.Name(&m.Main), p.String(), a, r)
 			r.delReachableVia(m, f)
 		}
 	} else {
 		if lok {
-			dbgadj.Adj.Logf("add: %v %v adj %v replaceWithMoreSpecific lr %v r %v\n",
+			dbgvnet.Adj.Logf("add: %v %v adj %v replaceWithMoreSpecific lr %v r %v\n",
 				f.index.Name(&m.Main), p.String(), a, lr, r)
 			lr.replaceWithMoreSpecific(m, f, p, a, &r)
 		}
 		if r, _, ok := f.unreachable.Lookup(p.Address); ok {
-			dbgadj.Adj.Logf("add: %v %v adj %v makeReachable\n", f.index.Name(&m.Main), p.String(), a)
+			dbgvnet.Adj.Logf("add: %v %v adj %v makeReachable\n", f.index.Name(&m.Main), p.String(), a)
 			r.makeReachable(m, f, p, a)
 		}
 	}
 	if isDel {
-		dbgadj.Adj.Logf("delete: %v %v adj %v IsMpAdj %v finished: r %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a), r)
+		dbgvnet.Adj.Logf("delete: %v %v adj %v IsMpAdj %v finished: r %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a), r)
 	} else {
-		dbgadj.Adj.Logf("add: %v %v adj %v IsMpAdj %v finished: r %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a), r)
+		dbgvnet.Adj.Logf("add: %v %v adj %v IsMpAdj %v finished: r %v\n", f.index.Name(&m.Main), p.String(), a, m.IsMpAdj(a), r)
 	}
 }
 
@@ -754,9 +754,9 @@ func (m *Main) addDelRoute(p *ip.Prefix, fi ip.FibIndex, baseAdj ip.Adj, isDel b
 	var ok bool
 
 	if isDel {
-		dbgadj.Adj.Logf("addDelRoute delete %v adj %v\n", q.Address.String(), baseAdj.String())
+		dbgvnet.Adj.Logf("addDelRoute delete %v adj %v\n", q.Address.String(), baseAdj.String())
 	} else {
-		dbgadj.Adj.Logf("addDelRoute add %v adj %v\n", q.Address.String(), baseAdj.String())
+		dbgvnet.Adj.Logf("addDelRoute add %v adj %v\n", q.Address.String(), baseAdj.String())
 	}
 
 	//addDel the route to/from fib
@@ -807,7 +807,7 @@ func (x *mapFibResult) delNhFromMatchingPrefix(m *Main, f *Fib, p *Prefix) {
 	for id, dstmap := range x.nh {
 		for ip, nhr := range dstmap {
 			if p.Matches(&ip.p) && ip.i == f.index {
-				dbgadj.Adj.Logf("call addDelRouteNextHop delete %v prefix %v nexthop %v nhAdj %v from delAllRouteNextHops\n",
+				dbgvnet.Adj.Logf("call addDelRouteNextHop delete %v prefix %v nexthop %v nhAdj %v from delAllRouteNextHops\n",
 					f.index.Name(&m.Main), p.String(), id.a, x.adj)
 				// for mpAdj, addDelRouteNextHop will take care of removing ip from dstmap as part of the cleanup and accounting?
 				f.addDelRouteNextHop(m, p, id.a, nhr, true)
@@ -825,7 +825,7 @@ func (m *Main) delAllRouteNextHops(f *Fib, p *Prefix) {
 		return
 	}
 
-	dbgadj.Adj.Logf("from %v %v\n", f.index.Name(&m.Main), p.String())
+	dbgvnet.Adj.Logf("from %v %v\n", f.index.Name(&m.Main), p.String())
 
 	// find all nh from reachable that has p in its map; only need to look into length 32
 	for _, r := range f.reachable[32] {
@@ -850,10 +850,10 @@ func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool, isReplace 
 				adjType = as[0].LookupNextIndex.String()
 			}
 			if isDel {
-				dbgadj.Adj.Logf("isReplace %v: ignore deleting nh %v from prefix %v which has has non MpAdj %v of type %v\n",
+				dbgvnet.Adj.Logf("isReplace %v: ignore deleting nh %v from prefix %v which has has non MpAdj %v of type %v\n",
 					isReplace, nh.Address, p.String(), oldAdj, adjType)
 			} else {
-				dbgadj.Adj.Logf("isReplace %v: ignore adding nh %v to prefix %v which has has non MpAdj %v of type %v\n",
+				dbgvnet.Adj.Logf("isReplace %v: ignore adding nh %v to prefix %v which has has non MpAdj %v of type %v\n",
 					isReplace, nh.Address, p.String(), oldAdj, adjType)
 			}
 		}
@@ -861,15 +861,15 @@ func (m *Main) AddDelRouteNextHop(p *Prefix, nh *NextHop, isDel bool, isReplace 
 	}
 
 	if isReplace { // Delete prefix and cleanup its adjacencies before add
-		dbgadj.Adj.Logf("Replace: delete %v and clean up old adjacency oldAdj %v\n", p.String(), oldAdj.String())
+		dbgvnet.Adj.Logf("Replace: delete %v and clean up old adjacency oldAdj %v\n", p.String(), oldAdj.String())
 		// Do a proper cleanup and delete of old next hops
 		m.delAllRouteNextHops(f, p)
 	}
 	if isDel {
-		dbgadj.Adj.Logf("call addDelRouteNextHop %v prefix %v oldAdj %v delete %v from AddDelRouteNextHop\n",
+		dbgvnet.Adj.Logf("call addDelRouteNextHop %v prefix %v oldAdj %v delete %v from AddDelRouteNextHop\n",
 			f.index.Name(&m.Main), p.String(), oldAdj, nh.Address)
 	} else {
-		dbgadj.Adj.Logf("call addDelRouteNextHop %v prefix %v oldAdj %v add nh %v from AddDelRouteNextHop\n",
+		dbgvnet.Adj.Logf("call addDelRouteNextHop %v prefix %v oldAdj %v add nh %v from AddDelRouteNextHop\n",
 			f.index.Name(&m.Main), p.String(), oldAdj, nh.Address)
 	}
 	return f.addDelRouteNextHop(m, p, nh.Address, nh, isDel)
@@ -937,9 +937,9 @@ func (f *Fib) addDelRouteNextHop(m *Main, p *Prefix, nha Address, nhr NextHopper
 	}
 
 	if isDel {
-		dbgadj.Adj.Logf("delete: prefix %v,  oldAdj %v, newAdj %v\n", p.String(), oldAdj.String(), newAdj.String())
+		dbgvnet.Adj.Logf("delete: prefix %v,  oldAdj %v, newAdj %v\n", p.String(), oldAdj.String(), newAdj.String())
 	} else {
-		dbgadj.Adj.Logf("add: prefix %v, oldAdj %v, newAdj %v\n", p.String(), oldAdj.String(), newAdj.String())
+		dbgvnet.Adj.Logf("add: prefix %v, oldAdj %v, newAdj %v\n", p.String(), oldAdj.String(), newAdj.String())
 	}
 
 	if oldAdj != newAdj {
@@ -968,7 +968,7 @@ func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNext
 			p, nha, fromNextHopAdj, toNextHopAdj, f.index.Name(&m.Main))
 	} else {
 
-		dbgadj.Adj.Logf("prefix %v from adj %v to adj %v, nha %v\n",
+		dbgvnet.Adj.Logf("prefix %v from adj %v to adj %v, nha %v\n",
 			p.String(), fromNextHopAdj, toNextHopAdj, nha)
 
 		as := m.GetAdj(toNextHopAdj)
@@ -976,7 +976,7 @@ func (f *Fib) replaceNextHop(m *Main, p *Prefix, pf *Fib, fromNextHopAdj, toNext
 		// Assume glean already exist so no need to explicity add here?
 		isDel := len(as) == 1 && as[0].IsGlean()
 		if isDel {
-			dbgadj.Adj.Logf("call addDelRouteNextHop prefix %v delete nh %v from replaceNextHop\n",
+			dbgvnet.Adj.Logf("call addDelRouteNextHop prefix %v delete nh %v from replaceNextHop\n",
 				p.String(), nha)
 			err = pf.addDelRouteNextHop(m, p, nha, r, isDel)
 			if err == nil {
@@ -1007,13 +1007,13 @@ func (f *Fib) deleteMatchingRoutes(m *Main, key *Prefix) {
 func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
 	if vnet.AdjDebug {
 		if isDel {
-			dbgadj.Adj.Logf("delete %v %v adj %v\n", f.index.Name(&m.Main), p.String(), r.String())
+			dbgvnet.Adj.Logf("delete %v %v adj %v\n", f.index.Name(&m.Main), p.String(), r.String())
 		} else {
 			if m.IsMpAdj(r) {
 				panic(fmt.Errorf("%v adding a multipath adj %v to glean or local fib %v!\n",
 					f.index.Name(&m.Main), r.String(), p.String()))
 			} else {
-				dbgadj.Adj.Logf("add %v %v adj %v\n", f.index.Name(&m.Main), p.String(), r.String())
+				dbgvnet.Adj.Logf("add %v %v adj %v\n", f.index.Name(&m.Main), p.String(), r.String())
 			}
 		}
 	}
@@ -1023,7 +1023,7 @@ func (f *Fib) addDelReplace(m *Main, p *Prefix, r ip.Adj, isDel bool) {
 	if m.IsMpAdj(oldAdj) {
 		// if add, clean up first by deleting oldAdj before adding
 		// if delete, r argument is AdjNil or AdjMiss, so use oldAdj to delete here
-		dbgadj.Adj.Logf("%v %v %v: first delete old adjacency %v IsMpAdj %v\n",
+		dbgvnet.Adj.Logf("%v %v %v: first delete old adjacency %v IsMpAdj %v\n",
 			f.index.Name(&m.Main), p.String(), r.String(), oldAdj, m.IsMpAdj(oldAdj))
 		// First delete all its next hops; this maintains the proper adjacency tracking
 		// prefixes in fib, i.e. MapFib, are indexed by mapFibKey which has the mask applied

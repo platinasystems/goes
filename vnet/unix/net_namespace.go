@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/go/internal/netlink"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/go/vnet/internal/dbgvnet"
 	"github.com/platinasystems/go/vnet/unix/internal/dbgfdb"
 	"github.com/platinasystems/xeth"
 
@@ -432,9 +433,7 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 	name := e.dir.namespace_name(e.file_name)
 
 	if e.is_del {
-		if vnet.AdjDebug {
-			fmt.Printf("delete_namespace %v\n", name)
-		}
+		dbgvnet.Adj.Logf("delete_namespace %v\n", name)
 		ns := m.namespace_by_name[name]
 		if ns == nil { // delete unknown namespace file
 			return
@@ -447,9 +446,7 @@ func (m *net_namespace_main) add_del_namespace(e *add_del_namespace_event) (err 
 		delete(m.namespace_by_name, name)
 		return
 	}
-	if vnet.AdjDebug {
-		fmt.Printf("add_namespace %v\n", name)
-	}
+	dbgvnet.Adj.Logf("add_namespace %v\n", name)
 
 	var (
 		ns *net_namespace
@@ -653,10 +650,9 @@ func (ns *net_namespace) add_del_interface(m *Main, msg *netlink.IfInfoMessage) 
 }
 
 func (ns *net_namespace) addDelMk1Interface(m *Main, isDel bool, ifname string, ifindex uint32, address [6]byte, devtype uint8, iflinkindex int32, vlanid uint16) (err error) {
-	if vnet.AdjDebug {
-		fmt.Printf("%v addDelMk1Interface: isDel %v ifname %v ifindex %v address %v devtype %v iflinkindex %v vlanid %v\n",
-			ns.name, isDel, ifname, ifindex, address, devtype, iflinkindex, vlanid)
-	}
+	dbgvnet.Adj.Logf("ns %v isDel %v ifname %v ifindex %v address %v devtype %v iflinkindex %v vlanid %v\n",
+		ns.name, isDel, ifname, ifindex, address, devtype, iflinkindex, vlanid)
+
 	if !isDel {
 		if ns.interface_by_index == nil {
 			ns.interface_by_index = make(map[uint32]*net_namespace_interface)
@@ -827,6 +823,7 @@ func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifinde
 
 	v := ns.m.m.v
 	if isDel {
+		dbgvnet.Adj.Logf("ns %v delete si %v\n", ns.name, intf.si)
 		v.DelSwIf(intf.si)
 	} else {
 		id := vnet.Uint16(vlanid)
@@ -840,9 +837,8 @@ func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifinde
 		hi := v.SupHi(sup_si)
 		hw := v.HwIf(hi)
 		si := ns.m.m.v.NewSwSubInterface(hw.Si(), vnet.IfId(eid))
-		if vnet.AdjDebug {
-			fmt.Printf("addVlan: sup_si %v sup_si.IsSwSub %v, IfId %v, vlanId %v, si %v\n", sup_si, sup_si.IsSwSubInterface(v), vnet.IfId(eid), vlanid, si)
-		}
+
+		dbgvnet.Adj.Logf("ns %v add sup_si %v sup_si.IsSwSub %v, IfId %v, vlanId %v, si %v\n", ns.name, sup_si, sup_si.IsSwSubInterface(v), vnet.IfId(eid), vlanid, si)
 		m.set_si(intf, si)
 	}
 	return
