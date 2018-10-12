@@ -29,7 +29,7 @@ const (
 
 	platinaSystemBuildSrc = platina + "/system-build/src"
 
-	platinaGoMainFe1                  = platinaGoMain + "/fe1"
+	platinaGoMainFe1                  = "../fe1/main/fe1"
 	platinaGoMainIP                   = platinaGoMain + "/ip"
 	platinaGoMainGoesPrefix           = platinaGoMain + "goes-"
 	platinaGoMainGoesExample          = platinaGoMain + "/goes-example"
