@@ -7,10 +7,10 @@ package ethernet
 import (
 	"github.com/platinasystems/go/elib/cpu"
 	"github.com/platinasystems/go/vnet"
+	"github.com/platinasystems/go/vnet/internal/dbgadj"
 	"github.com/platinasystems/go/vnet/ip"
 
 	"errors"
-	"fmt"
 )
 
 type ipNeighborFamily struct {
@@ -89,9 +89,7 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 	}
 	if isDel {
 		if len(as) > 0 {
-			if vnet.AdjDebug {
-				fmt.Printf("neighbor.go call AddDelRoute to delete %v adj %v from %v\n", prefix.Address, ai.String(), n.Si.Name(m.v))
-			}
+			dbgadj.Adj.Logf("call AddDelRoute to delete %v adj %v from %v\n", prefix.Address, ai.String(), n.Si.Name(m.v))
 			if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
 				return
 			}
@@ -113,9 +111,7 @@ func (m *ipNeighborMain) AddDelIpNeighbor(im *ip.Main, n *IpNeighbor, isDel bool
 			im.CallAdjAddHooks(ai)
 		}
 
-		if vnet.AdjDebug {
-			fmt.Printf("neighbor.go call AddDelRoute to add %v adj %v to %v\n", prefix.Address, ai.String(), n.Si.Name(m.v))
-		}
+		dbgadj.Adj.Logf("call AddDelRoute to add %v adj %v to %v\n", prefix.Address, ai.String(), n.Si.Name(m.v))
 		if _, err = im.AddDelRoute(&prefix, im.FibIndexForSi(n.Si), ai, isDel); err != nil {
 			return
 		}
