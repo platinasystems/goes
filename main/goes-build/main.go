@@ -329,7 +329,6 @@ func makeGoesPlatinaMk1(out, name string) error {
 	plugin := false
 	args := []string{"build", "-o", out}
 	if strings.Index(*tagsFlag, "plugin") >= 0 {
-		args = append(args, "-tags", "plugin")
 		plugin = true
 	}
 	if strings.Index(*tagsFlag, "debug") >= 0 {
@@ -343,8 +342,8 @@ func makeGoesPlatinaMk1(out, name string) error {
 		return err
 	}
 	if plugin {
-		err = amd64Linux.godoindir(platinaGoMainFe1, "build", "-buildmode=plugin",
-			".")
+		err = amd64Linux.godo("build", "-o", "fe1.so", "-buildmode=plugin",
+			platinaGoMainFe1+"/main.go")
 		if err != nil {
 			return err
 		}
@@ -367,9 +366,9 @@ func makeGoesPlatinaMk1Installer(out, name string) error {
 	}
 	if strings.Index(*tagsFlag, "plugin") >= 0 {
 		const fe1so = "fe1.so"
-		fi, fierr := os.Stat(platinaGoMainFe1 + "/" + fe1so)
+		fi, fierr := os.Stat(fe1so)
 		if fierr != nil {
-			return fmt.Errorf("can't find " + platinaGoMainFe1 + "/" + fe1so)
+			return fmt.Errorf("can't find " + fe1so)
 		}
 		zfiles = append(zfiles, fi.Name())
 	}
