@@ -6,7 +6,10 @@ require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
 	github.com/d2g/dhcp4client v0.0.0-20180622102533-b7a004ff1a09
+	github.com/docker/distribution v2.7.0-rc.0.0.20181002220433-1cb4180b1a5b+incompatible
+	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/garyburd/redigo v1.6.0
+	github.com/gogo/protobuf v1.1.1 // indirect
 	github.com/gotk3/gotk3 v0.0.0-20180905040958-020531a77b59
 	github.com/jpillora/backoff v0.0.0-20170918002102-8eab2debe79d
 	github.com/kr/pty v1.1.3
@@ -20,6 +23,7 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	golang.org/x/net v0.0.0-20181011144130-49bb7cea24b1 // indirect
+	golang.org/x/sys v0.0.0-20181011152604-fa43e7bc11ba // indirect
 	gopkg.in/yaml.v2 v2.2.1
 )
 
