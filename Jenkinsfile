@@ -53,7 +53,7 @@ echo "Building goes..."
 		    sshagent(credentials: ['570701f7-c819-4db2-bd31-a0da8a452b41']) {
 		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
 		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z goes-platina-mk1.test'
-		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z -tags=plugin goes-installer'
+		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z -tags=plugin goes-platina-mk1-installer'
 			}
 		}		    
 	    }
