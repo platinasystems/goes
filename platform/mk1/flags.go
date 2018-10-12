@@ -1,6 +1,6 @@
 // Created by gen-platina-mk1-flags -- DO NOT EDIT
 
-package main
+package mk1
 
 const (
 	CopperBit uint = iota

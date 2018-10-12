@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package main
+package mk1
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/main/goes-platina-mk1/internal/dbgmk1"
+	"github.com/platinasystems/go/platform/mk1/internal/dbgmk1"
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/platforms/fe1"

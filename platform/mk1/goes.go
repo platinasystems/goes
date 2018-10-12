@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package main
+package mk1
 
 import (
 	"time"
@@ -95,7 +95,7 @@ import (
 )
 
 var Goes = &goes.Goes{
-	NAME: "goes-" + name,
+	NAME: "goes-" + machine.Name,
 	APROPOS: lang.Alt{
 		lang.EnUS: "goes machine for platina's mk1 TOR",
 	},
@@ -160,7 +160,7 @@ var Goes = &goes.Goes{
 		"reboot": reboot.Command{},
 		"redisd": &redisd.Command{
 			Devs:    []string{"lo", "eth0"},
-			Machine: name,
+			Machine: machine.Name,
 			Hook: func(pub *publisher.Publisher) {
 				eeprom.Config(
 					eeprom.BusIndex(0),
@@ -185,7 +185,7 @@ var Goes = &goes.Goes{
 			ByName: map[string]cmd.Cmd{
 				"cmdline":  cmdline.Command{},
 				"iminfo":   iminfo.Command{},
-				"machine":  goes.ShowMachine(name),
+				"machine":  goes.ShowMachine(machine.Name),
 				"packages": goes.ShowPackages{},
 			},
 		},

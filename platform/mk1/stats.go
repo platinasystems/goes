@@ -1,6 +1,6 @@
 // Created by gen-platina-mk1-stats -- DO NOT EDIT
 
-package main
+package mk1
 
 var stats = []string{
 	"mmu-multicast-tx-cos0-drop-bytes",

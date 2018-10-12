@@ -2,15 +2,15 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package main
+package mk1
 
 import (
 	"fmt"
 	"strconv"
 
 	"github.com/platinasystems/go/goes/cmd/qsfp"
-	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/go/internal/redis"
 )
 
 func qsfpInit() {
