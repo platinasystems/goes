@@ -6,7 +6,7 @@ require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
 	github.com/d2g/dhcp4client v0.0.0-20180622102533-b7a004ff1a09
-	github.com/docker/distribution v2.7.0-rc.0.0.20181002220433-1cb4180b1a5b+incompatible
+	github.com/docker/distribution v2.7.0-rc.0.0.20181002220433-1cb4180b1a5b+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/garyburd/redigo v1.6.0
 	github.com/gogo/protobuf v1.1.1 // indirect
