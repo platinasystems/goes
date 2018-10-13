@@ -823,7 +823,7 @@ func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifinde
 
 	v := ns.m.m.v
 	if isDel {
-		dbgvnet.Adj.Logf("ns %v delete si %v\n", ns.name, intf.si)
+		dbgvnet.Adj.Logf("ns %v delete si %v\n", ns.name, intf.si.Name(v))
 		v.DelSwIf(intf.si)
 	} else {
 		id := vnet.Uint16(vlanid)
@@ -838,7 +838,7 @@ func (m *net_namespace_main) addDelVlan(intf *net_namespace_interface, supifinde
 		hw := v.HwIf(hi)
 		si := ns.m.m.v.NewSwSubInterface(hw.Si(), vnet.IfId(eid))
 
-		dbgvnet.Adj.Logf("ns %v add sup_si %v sup_si.IsSwSub %v, IfId %v, vlanId %v, si %v\n", ns.name, sup_si, sup_si.IsSwSubInterface(v), vnet.IfId(eid), vlanid, si)
+		dbgvnet.Adj.Logf("ns %v add sup_si %v sup_si.IsSwSub %v, IfId %v, vlanId %v, si %v\n", ns.name, sup_si, sup_si.IsSwSubInterface(v), vnet.IfId(eid), vlanid, si.Name(v))
 		m.set_si(intf, si)
 	}
 	return
@@ -1161,8 +1161,15 @@ func (ns *net_namespace) is_deleted() bool { return ns.ns_fd < 0 }
 func (ns *net_namespace) del(m *net_namespace_main) {
 	for index, intf := range ns.interface_by_index {
 		//do not delete hardware interface; platina-mk1 kernel driver will send seperate message to add it back to default ns
-		if intf.si != vnet.SiNil && intf.si.Kind(m.m.v) != vnet.SwIfKindHardware {
-			m.m.v.DelSwIf(intf.si)
+		if intf.si != vnet.SiNil {
+			if intf.si.Kind(m.m.v) == vnet.SwIfKindHardware {
+				// Admin down instead of delete; admin down triggers clean up of neighbors
+				// Cleanup must be done before name space is deleted
+				intf.si.SetAdminUp(m.m.v, false)
+			} else {
+				// Delete SwIf, which includes an admin down
+				m.m.v.DelSwIf(intf.si)
+			}
 		}
 		delete(ns.interface_by_index, index)
 	}

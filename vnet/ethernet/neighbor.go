@@ -30,6 +30,7 @@ func (m *ipNeighborMain) init(v *vnet.Vnet, im4, im6 *ip.Main) {
 	m.ipNeighborFamilies[ip.Ip4].m = im4
 	m.ipNeighborFamilies[ip.Ip6].m = im6
 	v.RegisterSwIfAddDelHook(m.swIfAddDel)
+	v.RegisterSwIfAdminUpDownHook(m.swIfAdminUpDown)
 }
 
 type ipNeighborKey struct {
@@ -138,6 +139,10 @@ func (m *ipNeighborMain) delKey(nf *ipNeighborFamily, k *ipNeighborKey) (err err
 	const isDel = true
 	_, err = m.AddDelIpNeighbor(nf.m, &n, isDel)
 	return
+}
+
+func (m *ipNeighborMain) swIfAdminUpDown(v *vnet.Vnet, si vnet.Si, up bool) (err error) {
+	return m.swIfAddDel(v, si, !up)
 }
 
 func (m *ipNeighborMain) swIfAddDel(v *vnet.Vnet, si vnet.Si, isDel bool) (err error) {
