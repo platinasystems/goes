@@ -30,6 +30,7 @@ func NoAdjacency(t *testing.T) (err error) {
 	num := len(rewrites)
 	if num > 0 {
 		fmt.Printf("number of rewrites not zero\n")
+		fail = true
 		if *VV {
 			for i := range rewrites {
 				fmt.Printf("%v\n", rewrites[i])
@@ -63,7 +64,7 @@ func NoAdjacency(t *testing.T) (err error) {
 		}
 	}
 	if fail {
-		err = fmt.Errorf("unexpected entries in goes vnet show fe1 l3")
+		err = fmt.Errorf("unexpected entries in adjacency or l3 table")
 		Pause("No adjacency test Failed\n")
 	}
 	return err
