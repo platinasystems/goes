@@ -157,6 +157,7 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 			return
 		}
 		config.Routers[i].id = cresp.ID
+		time.Sleep(2 * time.Second) // wait time for routing daemon to come up before adding interfaces
 		for _, intf := range router.Intfs {
 			var newIntf string = intf.Name
 			if strings.Contains(intf.Name, "dummy") {

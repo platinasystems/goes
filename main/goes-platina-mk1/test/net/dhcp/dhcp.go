@@ -5,6 +5,7 @@
 package dhcp
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 	"time"
@@ -68,9 +69,28 @@ func (dhcp *dhcp) checkServer(t *testing.T) {
 	assert := test.Assert{t}
 
 	assert.Comment("Checking dhcp server on", "R2")
+	time.Sleep(1 * time.Second)
 	out, err := dhcp.ExecCmd(t, "R2", "ps", "ax")
 	assert.Nil(err)
-	assert.Match(out, ".*dhcpd.*")
+	//assert.Match(out, ".*dhcpd.*")
+	timeout := 5
+	found := false
+	for i := timeout; i > 0; i-- {
+		if !assert.MatchNonFatal(out, ".*dhcpd.*") {
+			if *test.VV {
+				fmt.Printf("check R2 ps ax, no match on dhcpd, %v retries left\n", i-1)
+				fmt.Printf("%v\n", out)
+			}
+			time.Sleep(2 * time.Second)
+			out, err = dhcp.ExecCmd(t, "R2", "ps", "ax")
+			continue
+		}
+		found = true
+	}
+	if !found {
+		test.Pause("dhcpd not found")
+		assert.Nil(fmt.Errorf("check dhcpd failed\n"))
+	}
 }
 
 func (dhcp *dhcp) checkClient(t *testing.T) {
