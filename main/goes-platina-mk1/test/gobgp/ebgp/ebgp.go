@@ -5,6 +5,7 @@
 package ebgp
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ func (ebgp *ebgp) Test(t *testing.T) {
 		&test.Unit{"check interconnectivity",
 			ebgp.checkInterConnectivity},
 		&test.Unit{"check flap", ebgp.checkFlap},
+		&test.Unit{"check admin down", ebgp.adminDown},
 	}
 	ebgp.Docket.Test(t)
 }
@@ -78,12 +80,43 @@ func (ebgp *ebgp) checkConnectivity(t *testing.T) {
 func (ebgp *ebgp) checkBgp(t *testing.T) {
 	assert := test.Assert{t}
 	time.Sleep(1 * time.Second)
+	fail := false
 	for _, r := range ebgp.Routers {
 		assert.Comment("Checking gobgp on", r.Hostname)
 		out, err := ebgp.ExecCmd(t, r.Hostname, "ps", "ax")
+		t.Logf("%v", out)
 		assert.Nil(err)
-		assert.Match(out, ".*gobgpd.*")
-		assert.Match(out, ".*zebra.*")
+		//assert.Match(out, ".*gobgpd.*")
+		//assert.Match(out, ".*zebra.*")
+		timeout := 5 //for some reason, R4 gobpg takes longer to come up sometimes
+		found := false
+		for i := timeout; i > 0; i-- {
+			if !assert.MatchNonFatal(out, ".*gobgpd.*") {
+				if *test.VV {
+					fmt.Printf("%v ps ax, no match on gobgpd, %v retries left\n", r.Hostname, i-1)
+					fmt.Printf("%v\n", out)
+				}
+				time.Sleep(2 * time.Second)
+				out, err = ebgp.ExecCmd(t, r.Hostname, "ps", "ax")
+				continue
+			}
+			if !assert.MatchNonFatal(out, ".*zebra.*") {
+				if *test.VV {
+					fmt.Printf("%v ps ax, no match on zebra, %v retries left\n", r.Hostname, i-1)
+					fmt.Printf("%v\n", out)
+				}
+				out, err = ebgp.ExecCmd(t, r.Hostname, "ps", "ax")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			found = true
+		}
+		if !found {
+			fail = true
+		}
+	}
+	if fail {
+		assert.Nil(fmt.Errorf("check gobgpd and zebra failed\n"))
 	}
 }
 
@@ -244,4 +277,26 @@ func (ebgp *ebgp) checkFlap(t *testing.T) {
 			assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 		}
 	}
+}
+
+func (ebgp *ebgp) adminDown(t *testing.T) {
+	assert := test.Assert{t}
+
+	num_intf := 0
+	for _, r := range ebgp.Routers {
+		for _, i := range r.Intfs {
+			var intf string
+			if i.Vlan != "" {
+				intf = i.Name + "." + i.Vlan
+			} else {
+				intf = i.Name
+			}
+			_, err := ebgp.ExecCmd(t, r.Hostname,
+				"ip", "link", "set", "down", intf)
+			assert.Nil(err)
+			num_intf++
+		}
+	}
+	err := test.NoAdjacency(t)
+	assert.Nil(err)
 }

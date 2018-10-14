@@ -8,6 +8,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
+	"testing"
 )
 
 func Pause(args ...interface{}) {
@@ -20,4 +22,13 @@ func Pause(args ...interface{}) {
 	}
 	fmt.Print("press enter to continue...")
 	bufio.NewReader(os.Stdin).ReadBytes('\n')
+}
+
+func PauseQuit(t *testing.T) {
+	assert := Assert{t}
+	fmt.Println("Press enter to continue, Q+enter to quit")
+	buf, _ := bufio.NewReader(os.Stdin).ReadBytes('\n')
+	if strings.ContainsAny(string(buf[:]), "Q") {
+		assert.Fatal("quitting")
+	}
 }

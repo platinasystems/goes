@@ -45,6 +45,7 @@ func (isis *isis) Test(t *testing.T) {
 			isis.checkInterConnectivity},
 		&test.Unit{"check flap", isis.checkFlap},
 		&test.Unit{"check connectivity2", isis.checkConnectivity},
+		&test.Unit{"check admin down", isis.adminDown},
 	}
 	isis.Docket.Test(t)
 }
@@ -219,4 +220,26 @@ func (isis *isis) checkFlap(t *testing.T) {
 			assert.Program(test.Self{}, "vnet", "show", "ip", "fib")
 		}
 	}
+}
+
+func (isis *isis) adminDown(t *testing.T) {
+	assert := test.Assert{t}
+
+	num_intf := 0
+	for _, r := range isis.Routers {
+		for _, i := range r.Intfs {
+			var intf string
+			if i.Vlan != "" {
+				intf = i.Name + "." + i.Vlan
+			} else {
+				intf = i.Name
+			}
+			_, err := isis.ExecCmd(t, r.Hostname,
+				"ip", "link", "set", "down", intf)
+			assert.Nil(err)
+			num_intf++
+		}
+	}
+	err := test.NoAdjacency(t)
+	assert.Nil(err)
 }
