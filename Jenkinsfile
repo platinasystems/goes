@@ -52,16 +52,15 @@ pipeline {
 	stage('Build') {
 	    steps {
 		dir('go') {
-		    echo "Updating worktrees"
-		    sh 'set -x;env;pwd;[ -d worktrees ] && for repo in worktrees/*/*; do echo $repo; [ -d "$repo" ] && (cd $repo;git fetch origin;git reset --hard HEAD;git rebase origin/master);done || true'
-		    echo "Setting git config"
-		    sh 'git config --global url.git@github.com:.insteadOf \"https://github.com/\"'
-echo "Building goes..."
 		    sshagent(credentials: ['570701f7-c819-4db2-bd31-a0da8a452b41']) {
-		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
-		    	sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z goes-platina-mk1.test'
-			}
-		}		    
+			echo "Updating worktrees"sh 'set -x;env;pwd;[ -d worktrees ] && for repo in worktrees/*/*; do echo $repo; [ -d "$repo" ] && (cd $repo;git fetch origin;git reset --hard HEAD;git rebase origin/master);done || true'
+			echo "Setting git config"
+			sh 'git config --global url.git@github.com:.insteadOf \"https://github.com/\"'
+			echo "Building goes..."
+			sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
+			sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z goes-platina-mk1.test'
+		    }
+		}
 	    }
 	}
     }
