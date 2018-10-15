@@ -28,3 +28,5 @@ require (
 )
 
 replace github.com/platinasystems/fe1 => ../fe1
+
+replace github.com/platinasystems/firmware-fe1a => ../firmware-fe1a
