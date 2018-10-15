@@ -22,10 +22,11 @@ import (
 )
 
 const (
-	platina       = ".."
-	platinaFe1    = platina + "/fe1"
-	platinaGo     = platina + "/go"
-	platinaGoMain = platinaGo + "/main"
+	platina            = ".."
+	platinaFe1         = platina + "/fe1"
+	platinaFe1Firmware = platina + "/firmware-fe1a"
+	platinaGo          = platina + "/go"
+	platinaGoMain      = platinaGo + "/main"
 
 	platinaSystemBuildSrc = platina + "/system-build/src"
 
@@ -335,6 +336,9 @@ func makeGoesPlatinaMk1(out, name string) error {
 		args = append(args, "-gcflags", "-N -l")
 	}
 	if err := host.godoindir(platinaFe1, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/fe1"); err != nil {
+		return err
+	}
+	if err := host.godoindir(platinaFe1Firmware, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/firmware-fe1a"); err != nil {
 		return err
 	}
 	err := amd64Linux.godo(append(args, name)...)
