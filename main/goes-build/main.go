@@ -30,7 +30,7 @@ const (
 
 	platinaSystemBuildSrc = platina + "/system-build/src"
 
-	platinaGoMainFe1                  = "../fe1/main/fe1"
+	platinaGoMainFe1                  = platina + "/fe1/main/fe1/main.go"
 	platinaGoMainIP                   = platinaGoMain + "/ip"
 	platinaGoMainGoesPrefix           = platinaGoMain + "goes-"
 	platinaGoMainGoesExample          = platinaGoMain + "/goes-example"
@@ -116,7 +116,6 @@ var (
 	tagsFlag = flag.String("tags", "", `
 debug	disable optimizer and increase vnet log
 diag	include manufacturing diagnostics with BMC
-plugin	use pre-compiled proprietary packages
 `)
 	xFlag = flag.Bool("x", false, "print 'go build' commands.")
 	vFlag = flag.Bool("v", false,
@@ -210,7 +209,8 @@ func main() {
 			targets = append(targets, target)
 		}
 	}
-	if err := host.godoindir(platinaGo, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/go"); err != nil {
+	if err := host.godoindir(platinaGo, "run", "../go/main/go-package/main.go", "../go", ".",
+		"github.com/platinasystems/go"); err != nil {
 		panic(err)
 	}
 	for _, target := range targets {
@@ -327,30 +327,26 @@ func makePackage(name string) error {
 }
 
 func makeGoesPlatinaMk1(out, name string) error {
-	plugin := false
-	args := []string{"build", "-o", out}
-	if strings.Index(*tagsFlag, "plugin") >= 0 {
-		plugin = true
-	}
+	args := []string{}
 	if strings.Index(*tagsFlag, "debug") >= 0 {
 		args = append(args, "-gcflags", "-N -l")
 	}
-	if err := host.godoindir(platinaFe1, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/fe1"); err != nil {
+	if err := host.godoindir(platinaFe1, "run", "../go/main/go-package/main.go", "../go", ".",
+		"github.com/platinasystems/fe1"); err != nil {
 		return err
 	}
-	if err := host.godoindir(platinaFe1Firmware, "run", "../go/main/go-package/main.go", "../go", ".", "github.com/platinasystems/firmware-fe1a"); err != nil {
+	if err := host.godoindir(platinaFe1Firmware, "run", "../go/main/go-package/main.go", "../go",
+		".", "github.com/platinasystems/firmware-fe1a"); err != nil {
 		return err
 	}
-	err := amd64Linux.godo(append(args, name)...)
+	err := amd64Linux.godo(append(append([]string{"build", "-o", out}, args...), name)...)
 	if err != nil {
 		return err
 	}
-	if plugin {
-		err = amd64Linux.godo("build", "-o", "fe1.so", "-buildmode=plugin",
-			platinaGoMainFe1+"/main.go")
-		if err != nil {
-			return err
-		}
+	err = amd64Linux.godo(append(append([]string{"build", "-o", "fe1.so",
+		"-buildmode=plugin"}, args...), platinaGoMainFe1)...)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -368,14 +364,12 @@ func makeGoesPlatinaMk1Installer(out, name string) error {
 	if err != nil {
 		return err
 	}
-	if strings.Index(*tagsFlag, "plugin") >= 0 {
-		const fe1so = "fe1.so"
-		fi, fierr := os.Stat(fe1so)
-		if fierr != nil {
-			return fmt.Errorf("can't find " + fe1so)
-		}
-		zfiles = append(zfiles, fi.Name())
+	const fe1so = "fe1.so"
+	fi, fierr := os.Stat(fe1so)
+	if fierr != nil {
+		return fmt.Errorf("can't find " + fe1so)
 	}
+	zfiles = append(zfiles, fi.Name())
 
 	err = zipfile(tzip, append(zfiles, goesPlatinaMk1))
 	if err != nil {

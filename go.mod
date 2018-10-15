@@ -15,7 +15,7 @@ require (
 	github.com/kr/pty v1.1.3
 	github.com/mattn/go-isatty v0.0.4
 	github.com/platinasystems/dbg v0.0.0-20181005210558-dd78b3b550ae
-	github.com/platinasystems/fe1 v0.0.0-20181008201145-b9b2baf7159a
+	github.com/platinasystems/fe1 v0.0.0-20181015162134-a2cbf0365b2b // indirect
 	github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
 	github.com/platinasystems/xeth v0.0.0-20181010000040-d9ed5089fdd0
