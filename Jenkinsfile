@@ -26,6 +26,13 @@ pipeline {
 			branch: 'master'
 			])
 		}
+		dir('firmware-fe1a') {
+		    git([
+			url: 'git@github.com:platinasystems/firmware-fe1a.git',
+			credentialsId: "570701f7-c819-4db2-bd31-a0da8a452b41",
+			branch: 'master'
+			])
+		}
 		dir('system-build') {
 		    checkout([$class: 'GitSCM',
          	    		      branches: [[name: '*/master']],
