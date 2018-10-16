@@ -465,9 +465,11 @@ func (p *ifStatsPoller) EventAction() {
 		if hw.IsLinkUp() {
 			sp := h.GetHwInterfaceFinalSpeed()
 			// Send speed message to driver so ethtool can see it
-			vnet.Xeth.Speed(hw.Name(), uint64(sp/1e6))
+			xethif := xeth.Interface.Named(hw.Name())
+			ifindex := xethif.Ifinfo.Index
+			xeth.Speed(int(ifindex), uint64(sp/1e6))
 			if false {
-				fmt.Println("FinalSpeed:", hw.Name(), sp, uint64(sp/1e6))
+				fmt.Println("FinalSpeed:", hw.Name(), ifindex, sp, uint64(sp/1e6))
 			}
 		}
 	})
