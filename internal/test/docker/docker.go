@@ -158,6 +158,10 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 		}
 		config.Routers[i].id = cresp.ID
 		time.Sleep(2 * time.Second) // wait time for routing daemon to come up before adding interfaces
+
+		// set rp_filter off, need to do this again per interface later as well
+		cleanup.Program(test.Self{}, "ip", "netns", "exec", router.Hostname, "sysctl", "-w", "net/ipv4/conf/all/rp_filter=0")
+
 		for _, intf := range router.Intfs {
 			var newIntf string = intf.Name
 			if strings.Contains(intf.Name, "dummy") {
@@ -179,7 +183,7 @@ func LaunchContainers(t *testing.T, source []byte) (config *Config, err error) {
 			}
 			moveIntfContainer(t, router.Hostname, newIntf,
 				intf.Address)
-
+			cleanup.Program(test.Self{}, "ip", "netns", "exec", router.Hostname, "sysctl", "-w", "net/ipv4/conf/"+newIntf+"/rp_filter=0")
 		}
 	}
 	time.Sleep(1 * time.Second)
