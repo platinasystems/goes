@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/internal/proc"
 )
 
@@ -38,10 +37,12 @@ func (redisd *Redisd) Info(secs ...string) ([]byte, error) {
 	for i, sec := range secs {
 		f, found := map[string]func(io.Writer){
 			"server": func(w io.Writer) {
+				/*FIXME
 				fmt.Fprint(w, "redis_git_sha1: ",
 					Package["version"], "\r\n")
 				fmt.Fprint(w, "redis_git_dirty: ",
 					len(Package["diff"]) > 0, "\r\n")
+				*/
 				fmt.Fprint(w, "os: ",
 					runtime.GOOS, "\r\n")
 				fmt.Fprint(w, "arch_bits: ",

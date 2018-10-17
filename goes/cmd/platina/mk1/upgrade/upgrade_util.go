@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall"
 
-	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/go/internal/url"
 )
@@ -247,6 +246,7 @@ func upgradeCoreboot(s string, v string, t bool, f bool) error {
 }
 
 func getGoesVal(ar string, ir string) (v string) {
+	/*FIXME
 	maps := []map[string]string{Package}
 	if Packages != nil {
 		maps = append(maps, Packages()...)
@@ -262,6 +262,8 @@ func getGoesVal(ar string, ir string) (v string) {
 		}
 	}
 	return v
+	*/
+	return "FIXME"
 }
 
 func getKernelVer() (string, error) {

@@ -1,14 +1,7 @@
-// DO NOT EDIT! Instead, "go generate github.com/platinasystems/go".
-package _go_
+package goes
 
-//go:generate go run ./main/go-package/main.go
-
-var Package = map[string]string{
-	"importpath": "github.com/platinasystems/go",
-	"generated.by": "tgrennan@platinasystems.com",
-	"generated.on": "2017-05-10 18:30:54.596579136 +0000 UTC",
-	"version": "FIXME with go generate github.com/platinasystems/go",
-	"license": `Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+const License = `
+Copyright © 2015-G2016 Platina Systems, Inc. All rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
@@ -305,33 +298,4 @@ PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGES.
 
                      END OF TERMS AND CONDITIONS
-`,
-	"patents": `Additional IP Rights Grant (Patents)
-
-"The Project" means the contents of this CLI source code repository.
-
-"The Author" means the Project originator, Platina Systems, Inc.
-
-"This implementation" means the copyrightable works distributed by the
-Author as part of the Project.
-
-The Author hereby grants to You a perpetual, worldwide, non-exclusive,
-no-charge, royalty-free, irrevocable (except as stated in this section)
-patent license to make, have made, use, offer to sell, sell, import,
-transfer and otherwise run, modify and propagate the contents of this
-implementation of the Project, where such license applies only to those
-patent claims, both currently owned or controlled by the Author and
-acquired in the future, licensable by the Author that are necessarily
-infringed by this implementation of the Project.  This grant does not
-include claims that would be infringed only as a consequence of further
-modification of this implementation.  If you or your agent or exclusive
-licensee institute or order or agree to the institution of patent
-litigation against any entity (including a cross-claim or counterclaim
-in a lawsuit) alleging that this implementation of the Project or any
-code incorporated within this implementation of the Project constitutes
-direct or contributory patent infringement, or inducement of patent
-infringement, then any patent rights granted to you under this License
-for this implementation of the Project shall terminate as of the date
-such litigation is filed.
-`,
-}
+`

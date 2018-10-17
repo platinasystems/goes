@@ -6,13 +6,14 @@ package goes
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	info "github.com/platinasystems/go"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/indent"
 )
+
+var Info struct {
+	Licenses, Patents, Versions func() map[string]string
+}
 
 type ShowMachine string
 
@@ -30,63 +31,43 @@ func (name ShowMachine) Main(...string) error {
 	return nil
 }
 
-type ShowPackages struct{}
-
-func (ShowPackages) String() string { return "packages" }
-
-func (ShowPackages) Usage() string { return "show packages" }
-
-func (ShowPackages) Apropos() lang.Alt {
-	return lang.Alt{
-		lang.EnUS: "print machine's package info",
-	}
-}
-
-func (ShowPackages) Main(...string) error {
-	b, err := info.Marshal()
-	if err == nil {
-		_, err = os.Stdout.Write(b)
-	}
-	return err
-}
-
-func (*Goes) copyright(_ ...string) error {
-	printEither("copyright", "license")
-	return nil
+func (g *Goes) copyright(_ ...string) error {
+	return g.license()
 }
 
 func (*Goes) license(_ ...string) error {
-	printEither("license", "copyright")
+	marshal(Info.Licenses)
+	return nil
+}
+
+func (*Goes) patents(_ ...string) error {
+	marshal(Info.Patents)
 	return nil
 }
 
 func (*Goes) version(_ ...string) error {
-	printEither("tag", "version")
+	marshal(Info.Versions)
 	return nil
 }
 
-func printEither(alternatives ...string) {
-	w := indent.New(os.Stdout, "    ")
-	for _, m := range info.All() {
-		ip := m["importpath"]
-		if len(ip) == 0 {
-			continue
-		}
-		for _, alt := range alternatives {
-			val := m[alt]
-			if len(val) == 0 {
-				continue
+func marshal(f func() map[string]string) {
+	var sep string
+	if f == nil {
+		return
+	}
+	m := f()
+	for k, v := range m {
+		s := strings.TrimSpace(v)
+		if len(m) == 1 {
+			fmt.Println(s)
+		} else if !strings.ContainsRune(s, '\n') {
+			fmt.Print(sep, k, ": ", s, "\n")
+		} else {
+			fmt.Print(sep, k, ": |\n")
+			for _, l := range strings.Split(s, "\n") {
+				fmt.Print("  ", l, "\n")
 			}
-			fmt.Fprint(w, ip, ": ")
-			if strings.Contains(val, "\n") {
-				fmt.Fprintln(w, "|")
-				indent.Increase(w)
-				fmt.Fprintln(w, val)
-				indent.Decrease(w)
-			} else {
-				fmt.Fprintln(w, val)
-			}
-			break
+			sep = "\n"
 		}
 	}
 }

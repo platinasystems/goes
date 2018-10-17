@@ -30,7 +30,6 @@ const (
 
 	platinaSystemBuildSrc = platina + "/system-build/src"
 
-	platinaGoMainFe1                  = platina + "/fe1/main/fe1/main.go"
 	platinaGoMainIP                   = platinaGoMain + "/ip"
 	platinaGoMainGoesPrefix           = platinaGoMain + "goes-"
 	platinaGoMainGoesExample          = platinaGoMain + "/goes-example"
@@ -209,10 +208,6 @@ func main() {
 			targets = append(targets, target)
 		}
 	}
-	if err := host.godoindir(platinaGo, "run", "../go/main/go-package/main.go", "../go", ".",
-		"github.com/platinasystems/go"); err != nil {
-		panic(err)
-	}
 	for _, target := range targets {
 		var err error
 		if f, found := make[target]; found {
@@ -331,24 +326,7 @@ func makeGoesPlatinaMk1(out, name string) error {
 	if strings.Index(*tagsFlag, "debug") >= 0 {
 		args = append(args, "-gcflags", "-N -l")
 	}
-	if err := host.godoindir(platinaFe1, "run", "../go/main/go-package/main.go", "../go", ".",
-		"github.com/platinasystems/fe1"); err != nil {
-		return err
-	}
-	if err := host.godoindir(platinaFe1Firmware, "run", "../go/main/go-package/main.go", "../go",
-		".", "github.com/platinasystems/firmware-fe1a"); err != nil {
-		return err
-	}
-	err := amd64Linux.godo(append(append([]string{"build", "-o", out}, args...), name)...)
-	if err != nil {
-		return err
-	}
-	err = amd64Linux.godo(append(append([]string{"build", "-o", "fe1.so",
-		"-buildmode=plugin"}, args...), platinaGoMainFe1)...)
-	if err != nil {
-		return err
-	}
-	return nil
+	return amd64Linux.godo(append(append([]string{"build", "-o", out}, args...), name)...)
 }
 
 func makeGoesPlatinaMk1Installer(out, name string) error {

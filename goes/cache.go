@@ -28,6 +28,7 @@ func (g *Goes) Builtins() map[string]func(...string) error {
 			"help":      g.help,
 			"license":   g.license,
 			"man":       g.man,
+			"patents":   g.patents,
 			"usage":     g.usage,
 			"version":   g.version,
 		}

@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/go/vnet"
 	"github.com/platinasystems/go/vnet/devices/bus/pci"
 	"github.com/platinasystems/go/vnet/devices/ethernet/ixge"
-	fe1_plugin "github.com/platinasystems/go/vnet/devices/ethernet/switch/plugins/fe1"
+	fe1 "github.com/platinasystems/go/vnet/devices/ethernet/switch/fe1"
 	"github.com/platinasystems/go/vnet/ethernet"
 	"github.com/platinasystems/go/vnet/gre"
 	ipcli "github.com/platinasystems/go/vnet/ip/cli"
@@ -129,8 +129,8 @@ func PlatformInit(v *vnet.Vnet, p *fe1_platform.Platform) (err error) {
 		qsfpInit(v, p)
 	}
 
-	fe1_plugin.Init(v, p)
-	fe1_plugin.AddPlatform(v, p)
+	fe1.Init(v, p)
+	fe1.AddPlatform(v, p)
 
 	return
 }

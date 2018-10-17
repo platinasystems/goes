@@ -16,7 +16,6 @@ import (
 	"strings"
 	"sync"
 
-	info "github.com/platinasystems/go"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
@@ -155,11 +154,13 @@ func (c *Command) Main(args ...string) (err error) {
 		c.redisd.published[k] = make(grs.HashValue)
 	}
 
+	/*FIXME publish goes.Info.Versions
 	b, err := info.Marshal()
 	if err != nil {
 		return
 	}
 	c.redisd.published[machine.Name]["packages"] = b
+	*/
 
 	atMachineRedisd := atsock.Name("redisd")
 	cfg := grs.DefaultConfig()
