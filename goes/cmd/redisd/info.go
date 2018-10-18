@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/internal/proc"
 )
 
@@ -34,45 +35,48 @@ func (redisd *Redisd) Info(secs ...string) ([]byte, error) {
 		}
 	}
 
+	funcs := map[string]func(io.Writer){
+		"server": func(w io.Writer) {
+			var versions map[string]string
+			if goes.Info.Versions != nil {
+				versions = goes.Info.Versions()
+			}
+			for k, v := range versions {
+				if len(versions) == 1 {
+					fmt.Fprint(w, "version: ", v, "\r\n")
+				} else {
+					fmt.Fprint(w, "version.", k, ": ", v,
+						"\r\n")
+				}
+			}
+			fmt.Fprint(w, "os: ", runtime.GOOS, "\r\n")
+			fmt.Fprint(w, "arch_bits: ", SizeofInt*8, "\r\n")
+			fmt.Fprint(w, "process_id: ", stat.Pid, "\r\n")
+			s := time.Now().Sub(stat.StartTime).Seconds()
+			fmt.Fprint(w, "uptime_in_seconds: ", math.Floor(s+.5), "\r\n")
+			fmt.Fprint(w, "uptime_in_days: ",
+				math.Floor((s/(60*60*24))+.5),
+				"\r\n")
+		},
+		"memory": func(w io.Writer) {
+			fmt.Fprint(w, "used_memory: ",
+				stat.Vsize, "\r\n")
+			fmt.Fprint(w, "used_memory_rss: ",
+				stat.Rss, "\r\n")
+		},
+		"cpu": func(w io.Writer) {
+			fmt.Fprint(w, "used_cpu_sys: ",
+				stat.Stime, "\r\n")
+			fmt.Fprint(w, "used_cpu_user: ",
+				stat.Utime, "\r\n")
+			fmt.Fprint(w, "used_cpu_sys_children: ",
+				stat.Cstime, "\r\n")
+			fmt.Fprint(w, "used_cpu_user_children: ",
+				stat.Cutime, "\r\n")
+		},
+	}
 	for i, sec := range secs {
-		f, found := map[string]func(io.Writer){
-			"server": func(w io.Writer) {
-				/*FIXME
-				fmt.Fprint(w, "redis_git_sha1: ",
-					Package["version"], "\r\n")
-				fmt.Fprint(w, "redis_git_dirty: ",
-					len(Package["diff"]) > 0, "\r\n")
-				*/
-				fmt.Fprint(w, "os: ",
-					runtime.GOOS, "\r\n")
-				fmt.Fprint(w, "arch_bits: ",
-					SizeofInt*8, "\r\n")
-				fmt.Fprint(w, "process_id: ",
-					stat.Pid, "\r\n")
-				s := time.Now().Sub(stat.StartTime).Seconds()
-				fmt.Fprint(w, "uptime_in_seconds: ",
-					math.Floor(s+.5), "\r\n")
-				fmt.Fprint(w, "uptime_in_days: ",
-					math.Floor((s/(60*60*24))+.5),
-					"\r\n")
-			},
-			"memory": func(w io.Writer) {
-				fmt.Fprint(w, "used_memory: ",
-					stat.Vsize, "\r\n")
-				fmt.Fprint(w, "used_memory_rss: ",
-					stat.Rss, "\r\n")
-			},
-			"cpu": func(w io.Writer) {
-				fmt.Fprint(w, "used_cpu_sys: ",
-					stat.Stime, "\r\n")
-				fmt.Fprint(w, "used_cpu_user: ",
-					stat.Utime, "\r\n")
-				fmt.Fprint(w, "used_cpu_sys_children: ",
-					stat.Cstime, "\r\n")
-				fmt.Fprint(w, "used_cpu_user_children: ",
-					stat.Cutime, "\r\n")
-			},
-		}[sec]
+		f, found := funcs[sec]
 		if !found {
 			err = fmt.Errorf("%s: unavailable", sec)
 			break
