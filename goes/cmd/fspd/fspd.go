@@ -17,16 +17,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/args"
+	"github.com/platinasystems/redis/rpc/reply"
 )
 
 var (
@@ -126,7 +125,7 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(machine.Name+":"+v+".", "fspd", "Info")
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "fspd", "Info")
 		if err != nil {
 			return err
 		}

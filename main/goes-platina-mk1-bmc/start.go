@@ -13,10 +13,9 @@ import (
 
 	//"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/upgrade"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
 )
 
 const (
@@ -59,10 +58,10 @@ func startConfGpioHook() error {
 		pin.SetValue(true)
 	}
 
-	redis.Hwait(machine.Name, "redis.ready", "true",
+	redis.Hwait(redis.DefaultHash, "redis.ready", "true",
 		10*time.Second)
 
-	ss, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(ss, &deviceVer)
 	if deviceVer == 0x0 || deviceVer == 0xff {
 		pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]

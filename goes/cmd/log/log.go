@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/log"
 )
 
 type Command struct{}

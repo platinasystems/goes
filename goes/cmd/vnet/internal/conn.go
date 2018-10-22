@@ -14,7 +14,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/atsock"
+	"github.com/platinasystems/atsock"
 	"strings"
 )
 

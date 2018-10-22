@@ -7,10 +7,10 @@ package mk1
 import (
 	"os"
 
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/redis"
 )
 
 func Start(name string) (err error) {
-	machine.Name = name
+	redis.DefaultHash = name
 	return Goes.Main(os.Args...)
 }

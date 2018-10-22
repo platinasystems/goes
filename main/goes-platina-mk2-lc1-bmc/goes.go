@@ -85,7 +85,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/watchdog"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/redis/publisher"
 )
 
 var Goes = &goes.Goes{

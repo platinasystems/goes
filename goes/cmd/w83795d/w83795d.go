@@ -15,16 +15,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/args"
+	"github.com/platinasystems/redis/rpc/reply"
 )
 
 var (
@@ -135,7 +134,7 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(machine.Name+":"+v+".", "w83795d", "Info")
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "w83795d", "Info")
 		if err != nil {
 			return err
 		}
@@ -338,7 +337,7 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 
 	n := i/2 + 1
 	w := "fan_tray." + strconv.Itoa(int(n)) + ".status"
-	p, _ := redis.Hget(machine.Name, w)
+	p, _ := redis.Hget(redis.DefaultHash, w)
 
 	//set fan speed to max and return 0 rpm if fan tray is not present or failed
 	if strings.Contains(p, "not installed") {
@@ -442,7 +441,7 @@ func (h *I2cDev) SetLastSpeed() error {
 }
 func (h *I2cDev) SetFanDuty(d uint8) error {
 	for j := 1; j <= maxFanTrays; j++ {
-		p, _ := redis.Hget(machine.Name, "fan_tray."+strconv.Itoa(int(j))+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if p != "" && !strings.Contains(p, "ok") {
 			return nil
 			break
@@ -468,7 +467,7 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 
 	//if not all fan trays are ok, only allow high setting
 	for j := 1; j <= maxFanTrays; j++ {
-		p, _ := redis.Hget(machine.Name, "fan_tray."+strconv.Itoa(int(j))+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if p != "" && !strings.Contains(p, "ok") {
 			log.Print("warning: fan failure mode, speed fixed at high")
 			w = "max"

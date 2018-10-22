@@ -15,19 +15,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/fantrayd"
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ledgpiod"
 	"github.com/platinasystems/go/goes/cmd/w83795d"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/args"
+	"github.com/platinasystems/redis/rpc/reply"
 )
 
 var (
@@ -130,7 +129,7 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(machine.Name+":"+v+".", "ucd9090d", "Info")
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "ucd9090d", "Info")
 		if err != nil {
 			return err
 		}
@@ -358,7 +357,7 @@ func (h *I2cDev) PowerCycles() (string, error) {
 
 				log.Print("notice: re-init front panel LEDs")
 				ver := 0
-				s, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+				s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 				_, _ = fmt.Sscan(s, &ver)
 				if ver == 0 || ver == 0xff {
 					ledgpiod.Vdev.Addr = 0x22

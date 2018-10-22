@@ -9,8 +9,7 @@ import (
 
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/redis"
 )
 
 type Command struct{}
@@ -42,7 +41,7 @@ func (Command) Main(args ...string) error {
 		v := psc.Receive()
 		switch t := v.(type) {
 		case redigo.Message:
-			if t.Channel == machine.Name {
+			if t.Channel == redis.DefaultHash {
 				fmt.Println(string(t.Data))
 			} else {
 				fmt.Printf("%s <- %q\n", t.Channel, t.Data)

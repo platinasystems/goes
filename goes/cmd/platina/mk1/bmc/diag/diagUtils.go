@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"io/ioutil"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/i2c"
 	"github.com/tatsushid/go-fastping"
 	"net"
 	"time"

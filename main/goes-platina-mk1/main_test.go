@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/internal/test/ethtool"
 	"github.com/platinasystems/go/internal/test/netport"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/docker"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/mk1"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
+	"github.com/platinasystems/redis"
 )
 
 var redisdProgram, vnetdProgram *test.Program
@@ -54,17 +54,17 @@ var suite = test.Suite{
 		netport.Init(assert)
 		ethtool.Init(assert)
 
-		machine.Name = name
+		redis.DefaultHash = name
 
 		redisdProgram = assert.Background(test.Self{},
 			"redisd")
 		assert.Program(12*time.Second, test.Self{},
-			"hwait", machine.Name, "redis.ready", "true", "10")
+			"hwait", redis.DefaultHash, "redis.ready", "true", "10")
 
 		vnetdProgram = assert.Background(30*time.Second, test.Self{},
 			"vnetd")
 		assert.Program(32*time.Second, test.Self{},
-			"hwait", machine.Name, "vnet.ready", "true", "30")
+			"hwait", redis.DefaultHash, "vnet.ready", "true", "30")
 
 		test.Pause("attach vnet debugger to pid ", vnetdProgram.Pid())
 	},

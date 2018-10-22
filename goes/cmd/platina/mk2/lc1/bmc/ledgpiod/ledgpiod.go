@@ -14,16 +14,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/args"
+	"github.com/platinasystems/redis/rpc/reply"
 )
 
 const (
@@ -134,7 +133,7 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(machine.Name+":"+v+".", "ledgpiod",
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "ledgpiod",
 			"Info")
 		if err != nil {
 			return err
@@ -203,7 +202,7 @@ func (h *I2cDev) LedFpInit() error {
 		pin.SetValue(true)
 	}
 
-	ss, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(ss, &deviceVer)
 
 	forceFanSpeed = false
@@ -250,7 +249,7 @@ func (h *I2cDev) LedFpInit() error {
 
 func (h *I2cDev) LedFpReinit() error {
 
-	ss, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	ss, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(ss, &deviceVer)
 	r := getRegs()
 
@@ -295,7 +294,7 @@ func (h *I2cDev) LedStatus() error {
 	allFanGood := true
 	fanStatChange := false
 	for j := 0; j < maxFanTrays; j++ {
-		p, _ := redis.Hget(machine.Name, "fan_tray."+strconv.Itoa(int(j+1))+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j+1))+".status")
 		if !strings.Contains(p, "ok") {
 			allFanGood = false
 		}
@@ -321,7 +320,7 @@ func (h *I2cDev) LedStatus() error {
 				}
 				log.Print("warning: fan tray ", j+1, " failure")
 				if !forceFanSpeed {
-					redis.Hset(machine.Name, "fan_tray.speed", "max")
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "max")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(p, "not installed") {
@@ -343,7 +342,7 @@ func (h *I2cDev) LedStatus() error {
 				}
 				log.Print("warning: fan tray ", j+1, " not installed")
 				if !forceFanSpeed {
-					redis.Hset(machine.Name, "fan_tray.speed", "max")
+					redis.Hset(redis.DefaultHash, "fan_tray.speed", "max")
 					forceFanSpeed = true
 				}
 			} else if strings.Contains(lastFanStatus[j], "not installed") && (strings.Contains(p, "warning") || strings.Contains(p, "ok")) {
@@ -381,7 +380,7 @@ func (h *I2cDev) LedStatus() error {
 					return err
 				}
 				log.Print("notice: all fan trays up")
-				redis.Hset(machine.Name, "fan_tray.speed.return", "")
+				redis.Hset(redis.DefaultHash, "fan_tray.speed.return", "")
 				forceFanSpeed = false
 			}
 		}
@@ -389,7 +388,7 @@ func (h *I2cDev) LedStatus() error {
 	}
 
 	for j := 0; j < maxPsu; j++ {
-		p, _ := redis.Hget(machine.Name, "psu"+strconv.Itoa(j+1)+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "psu"+strconv.Itoa(j+1)+".status")
 		if lastPsuStatus[j] != p {
 			r.Output[0].get(h)
 			r.Config[0].get(h)
@@ -432,7 +431,7 @@ func (h *I2cDev) CheckSystemFans() string {
 	mismatch := false
 	var n string
 	for j := 0; j < maxFanTrays; j++ {
-		p, _ := redis.Hget(machine.Name, "fan_tray."+strconv.Itoa(int(j+1))+".status")
+		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j+1))+".status")
 		var d string
 
 		if strings.Contains(p, "back->front") {
@@ -453,7 +452,7 @@ func (h *I2cDev) CheckSystemFans() string {
 	if !mismatch {
 		for i := 0; i < maxPsu; i++ {
 			var d string
-			p, _ := redis.Hget(machine.Name, "psu"+strconv.Itoa(i+1)+".fan_direction")
+			p, _ := redis.Hget(redis.DefaultHash, "psu"+strconv.Itoa(i+1)+".fan_direction")
 			if strings.Contains(p, "back->front") {
 				d = "back->front"
 			} else if strings.Contains(p, "front->back") {
@@ -473,7 +472,7 @@ func (h *I2cDev) CheckSystemFans() string {
 	}
 	if mismatch {
 		systemFanDirection = "mixed"
-		p, _ := redis.Hget(machine.Name, "system.fan_direction")
+		p, _ := redis.Hget(redis.DefaultHash, "system.fan_direction")
 		if !strings.Contains(p, "mixed") {
 			log.Print("warning: mismatching fan direction detected, check fan trays and PSUs")
 		}

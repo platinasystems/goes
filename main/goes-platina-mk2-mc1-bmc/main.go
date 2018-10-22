@@ -12,14 +12,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/redis"
 )
 
 const name = "platina-mk2-mc1"
 
 func main() {
 	var ecode int
-	machine.Name = name
+	redis.DefaultHash = name
 	if err := Goes.Main(os.Args...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		ecode = 1

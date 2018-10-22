@@ -12,15 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/args"
+	"github.com/platinasystems/redis/rpc/reply"
 )
 
 var (
@@ -106,7 +105,7 @@ func (c *Command) Main(...string) error {
 
 	rpc.Register(&c.Info)
 	for _, v := range WrRegDv {
-		err = redis.Assign(machine.Name+":"+v+".", "fantrayd",
+		err = redis.Assign(redis.DefaultHash+":"+v+".", "fantrayd",
 			"Info")
 		if err != nil {
 			return err
@@ -177,7 +176,7 @@ func (h *I2cDev) FanTrayLedInit() error {
 	r := getRegs()
 
 	deviceVer = 0x1
-	s, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(s, &deviceVer)
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
@@ -204,7 +203,7 @@ func (h *I2cDev) FanTrayLedReinit() error {
 	r := getRegs()
 
 	deviceVer := 0
-	s, _ := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	s, _ := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	_, _ = fmt.Sscan(s, &deviceVer)
 	if deviceVer == 0xff || deviceVer == 0x00 {
 		fanTrayLedGreen = []uint8{0x10, 0x01, 0x10, 0x01}
@@ -298,8 +297,8 @@ func (h *I2cDev) FanTrayStatus(i uint8) (string, error) {
 		//check fan speed is above minimum
 		f1 := "fan_tray." + strconv.Itoa(int(i+1)) + ".1.speed.units.rpm"
 		f2 := "fan_tray." + strconv.Itoa(int(i+1)) + ".2.speed.units.rpm"
-		s1, _ := redis.Hget(machine.Name, f1)
-		s2, _ := redis.Hget(machine.Name, f2)
+		s1, _ := redis.Hget(redis.DefaultHash, f1)
+		s2, _ := redis.Hget(redis.DefaultHash, f2)
 		r1, _ := strconv.ParseInt(s1, 10, 64)
 		r2, _ := strconv.ParseInt(s2, 10, 64)
 

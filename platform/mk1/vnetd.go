@@ -13,16 +13,15 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/elib/parse"
 	"github.com/platinasystems/go/goes/cmd/vnetd"
-	"github.com/platinasystems/go/internal/machine"
-	"github.com/platinasystems/go/internal/redis"
 	"github.com/platinasystems/go/platform/mk1/internal/dbgmk1"
-	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/ethernet"
-	"github.com/platinasystems/go/vnet/platforms/fe1"
-	"github.com/platinasystems/go/vnet/platforms/mk1"
-	"github.com/platinasystems/go/vnet/unix"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/vnet"
+	"github.com/platinasystems/vnet/ethernet"
+	"github.com/platinasystems/vnet/platforms/fe1"
+	"github.com/platinasystems/vnet/platforms/mk1"
+	"github.com/platinasystems/vnet/unix"
 	"github.com/platinasystems/xeth"
 
 	"gopkg.in/yaml.v2"
@@ -56,7 +55,7 @@ func vnetdInit() {
 	const ncounters = 512
 	xeth.EthtoolPrivFlagNames = flags
 	xeth.EthtoolStatNames = stats
-	err = xeth.Start(machine.Name)
+	err = xeth.Start(redis.DefaultHash)
 
 	if err != nil {
 		panic(err)
@@ -308,21 +307,21 @@ func (p *mk1Main) parseFibConfig(v *vnet.Vnet) (err error) {
 func (p *mk1Main) vnetdHook(init func(), v *vnet.Vnet) error {
 	p.Init = init
 
-	s, err := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	if err != nil {
 		return err
 	}
 	if _, err = fmt.Sscan(s, &p.Version); err != nil {
 		return err
 	}
-	s, err = redis.Hget(machine.Name, "eeprom.NEthernetAddress")
+	s, err = redis.Hget(redis.DefaultHash, "eeprom.NEthernetAddress")
 	if err != nil {
 		return err
 	}
 	if _, err = fmt.Sscan(s, &p.NEthernetAddress); err != nil {
 		return err
 	}
-	s, err = redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
+	s, err = redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
 	if err != nil {
 		return err
 	}

@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/i2c"
+	"github.com/platinasystems/log"
 )
 
 var clientA *rpc.Client

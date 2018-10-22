@@ -9,7 +9,7 @@ import (
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/flags"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/redis"
 )
 
 type Command struct{}

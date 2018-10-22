@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/log"
 )
 
 const (

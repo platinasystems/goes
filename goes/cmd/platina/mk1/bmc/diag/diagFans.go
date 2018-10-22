@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/cmd/w83795d"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/redis"
 )
 
 func diagFans() error {
@@ -306,7 +305,7 @@ func diagFans() error {
 	// diagTest: temp sensors
 	// check temperature sensors are in expected range
 	//
-	fs, _ := redis.Hget(machine.Name, "bmc.temperature.units.C")
+	fs, _ := redis.Hget(redis.DefaultHash, "bmc.temperature.units.C")
 	f, err := strconv.ParseFloat(fs, 64)
 	r = CheckPassF(f, tmon_bmc_cpu_min, tmon_bmc_cpu_max)
 	fmt.Printf("%15s|%25s|%10s|%10.2f|%10.2f|%10.2f|%6s|%35s\n", "fans", "tmon_bmc_cpu", "C", f, tmon_bmc_cpu_min, tmon_bmc_cpu_max, r, "check bmc temp sense")

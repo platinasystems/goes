@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	"github.com/platinasystems/go/goes/cmd/w83795d"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/redis"
 	"time"
 )
 

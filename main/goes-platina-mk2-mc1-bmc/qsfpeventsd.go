@@ -5,10 +5,10 @@
 package main
 
 import (
-	//"github.com/platinasystems/go/internal/redis"
+	//"github.com/platinasystems/redis"
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/qsfpeventsd"
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/log"
 )
 
 func qsfpeventsdInit() {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
-	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/atsock"
+	"github.com/platinasystems/redis/publisher"
 )
 
 const (

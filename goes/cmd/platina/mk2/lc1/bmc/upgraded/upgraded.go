@@ -14,7 +14,7 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/log"
 )
 
 const (

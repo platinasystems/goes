@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/log"
 )
 
 const (

@@ -8,7 +8,7 @@ package biosupdate
 
 import (
 	"fmt"
-	"github.com/platinasystems/go/elib/hw"
+	"github.com/platinasystems/elib/hw"
 	"io/ioutil"
 	"os"
 	"syscall"

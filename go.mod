@@ -18,9 +18,15 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/pkg/errors v0.8.0 // indirect
-	github.com/platinasystems/dbg v0.0.0-20181005210558-dd78b3b550ae
+	github.com/platinasystems/atsock v0.0.0-20181019220955-c4cc7ae24dbf
+	github.com/platinasystems/dbg v0.0.0-20181012183359-440db521da7f
+	github.com/platinasystems/elib v0.0.0-20181020233022-05b3cafd162e
 	github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8
+	github.com/platinasystems/i2c v0.0.0-20181019213407-8214913e67af
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
+	github.com/platinasystems/log v0.0.0-20181019191631-6c3b2ed28252
+	github.com/platinasystems/redis v0.0.0-20181022194819-47dc1dbf4623
+	github.com/platinasystems/vnet v0.0.0-20181022195906-30b95e90506f
 	github.com/platinasystems/xeth v0.0.0-20181010000040-d9ed5089fdd0
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
@@ -29,5 +35,3 @@ require (
 	golang.org/x/sys v0.0.0-20181011152604-fa43e7bc11ba // indirect
 	gopkg.in/yaml.v2 v2.2.1
 )
-
-replace github.com/platinasystems/firmware-fe1a => ../firmware-fe1a

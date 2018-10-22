@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/i2c"
 )
 
 type Command struct{}

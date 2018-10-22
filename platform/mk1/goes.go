@@ -89,13 +89,12 @@ import (
 	"github.com/platinasystems/go/goes/cmd/vnetd"
 	"github.com/platinasystems/go/goes/cmd/wget"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/machine"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
 )
 
 var Goes = &goes.Goes{
-	NAME: "goes-" + machine.Name,
+	NAME: "goes-" + redis.DefaultHash,
 	APROPOS: lang.Alt{
 		lang.EnUS: "goes machine for platina's mk1 TOR",
 	},
@@ -160,7 +159,7 @@ var Goes = &goes.Goes{
 		"reboot": reboot.Command{},
 		"redisd": &redisd.Command{
 			Devs:    []string{"lo", "eth0"},
-			Machine: machine.Name,
+			Machine: redis.DefaultHash,
 			Hook: func(pub *publisher.Publisher) {
 				eeprom.Config(
 					eeprom.BusIndex(0),
@@ -185,7 +184,7 @@ var Goes = &goes.Goes{
 			ByName: map[string]cmd.Cmd{
 				"cmdline": cmdline.Command{},
 				"iminfo":  iminfo.Command{},
-				"machine": goes.ShowMachine(machine.Name),
+				"machine": goes.ShowMachine(redis.DefaultHash),
 			},
 		},
 		"/init":  &slashinit.Command{},
@@ -193,7 +192,7 @@ var Goes = &goes.Goes{
 		"source": &source.Command{},
 		"start": &start.Command{
 			ConfHook: func() error {
-				return redis.Hwait(machine.Name,
+				return redis.Hwait(redis.DefaultHash,
 					"vnet.ready", "true",
 					10*time.Second)
 			},

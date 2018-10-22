@@ -16,7 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/go/internal/gpio"
-	"github.com/platinasystems/go/internal/i2c"
+	"github.com/platinasystems/i2c"
 )
 
 type MTDinfo struct {

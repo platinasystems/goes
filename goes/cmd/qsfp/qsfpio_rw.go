@@ -8,8 +8,8 @@ import (
 	"net/rpc"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/i2c"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/i2c"
+	"github.com/platinasystems/log"
 )
 
 var bio = [34]byte{0}

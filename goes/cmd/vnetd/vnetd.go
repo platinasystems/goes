@@ -14,17 +14,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/elib/parse"
+	"github.com/platinasystems/atsock"
+	"github.com/platinasystems/elib/parse"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
-	"github.com/platinasystems/go/internal/machine"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/args"
-	"github.com/platinasystems/go/internal/redis/rpc/reply"
-	"github.com/platinasystems/go/vnet"
-	"github.com/platinasystems/go/vnet/ethernet"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/args"
+	"github.com/platinasystems/redis/rpc/reply"
+	"github.com/platinasystems/vnet"
+	"github.com/platinasystems/vnet/ethernet"
 	"github.com/platinasystems/xeth"
 )
 
@@ -100,7 +99,7 @@ func (c *Command) Main(...string) error {
 	}
 	defer sock.Close()
 
-	err = redis.Assign(machine.Name+":vnet.", "vnetd", "Info")
+	err = redis.Assign(redis.DefaultHash+":vnet.", "vnetd", "Info")
 	if err != nil {
 		return err
 	}
@@ -114,8 +113,7 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	in.SetString(fmt.Sprintf("cli { listen { no-prompt socket %s } }",
-		atsock.Name("vnet")))
+	in.SetString("cli { listen { no-prompt socket @vnet } }")
 
 	signal.Notify(make(chan os.Signal, 1), syscall.SIGPIPE)
 
@@ -384,7 +382,7 @@ func (i *ifStatsPollerInterface) update(counter string, value uint64) (updated b
 	return
 }
 
-//go:generate gentemplate -d Package=vnetd -id ifStatsPollerInterface -d VecType=ifStatsPollerInterfaceVec -d Type=ifStatsPollerInterface github.com/platinasystems/go/elib/vec.tmpl
+//go:generate gentemplate -d Package=vnetd -id ifStatsPollerInterface -d VecType=ifStatsPollerInterfaceVec -d Type=ifStatsPollerInterface github.com/platinasystems/elib/vec.tmpl
 
 type ifStatsPoller struct {
 	vnet.Event

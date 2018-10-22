@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/redis"
 )
 
 const (
@@ -388,7 +388,7 @@ func initCfg() error {
 }
 
 func getContext() (context string, err error) {
-	mach := machine.Name
+	mach := redis.DefaultHash
 	if mach == goesBoot {
 		return goesBoot, nil
 	}

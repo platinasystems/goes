@@ -15,8 +15,7 @@ import (
 
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/assert"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/sriovs"
+	"github.com/platinasystems/redis"
 )
 
 const (
@@ -158,15 +157,6 @@ func checkVnetdHung() error {
 	return nil
 }
 
-func checkMode() (string, error) {
-	fns, err := sriovs.NumvfsFns()
-
-	if err == nil && len(fns) > 0 {
-		return "SRIOV", nil
-	}
-	return "TUNTAP", nil
-}
-
 func (Command) Main(args ...string) error {
 	if err := assert.Root(); err != nil {
 		return err
@@ -174,13 +164,9 @@ func (Command) Main(args ...string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("%v: unexpected", args)
 	}
-	mode, err := checkMode()
-	if err != nil {
-		mode = "Unknown" // shouldn't happen
-	}
 	fmt.Println("GOES status")
 	fmt.Println("======================")
-	fmt.Printf("  %-15s - %s\n", "Mode", mode)
+	fmt.Printf("  %-15s - %s\n", "Mode", "XETH")
 
 	for _, x := range []struct {
 		header string

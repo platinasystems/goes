@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/go/internal/flags"
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/redis"
+	"github.com/platinasystems/redis"
 )
 
 const Name = "ipmigod"

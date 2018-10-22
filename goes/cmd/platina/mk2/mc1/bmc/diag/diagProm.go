@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/log"
 )
 
 const (

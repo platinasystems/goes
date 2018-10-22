@@ -16,16 +16,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/platinasystems/atsock"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/atsock"
 	"github.com/platinasystems/go/internal/cmdline"
 	"github.com/platinasystems/go/internal/fields"
-	"github.com/platinasystems/go/internal/machine"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/redis/publisher"
-	"github.com/platinasystems/go/internal/redis/rpc/reg"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
+	"github.com/platinasystems/redis/rpc/reg"
 )
 
 type Command struct {
@@ -148,7 +148,7 @@ func (c *Command) Main(args ...string) (err error) {
 	c.redisd.sub = make(map[string]*grs.MultiChannelWriter)
 	c.redisd.published = make(grs.HashHash)
 	if len(c.PublishedKeys) == 0 {
-		c.PublishedKeys = []string{machine.Name}
+		c.PublishedKeys = []string{redis.DefaultHash}
 	}
 	for _, k := range c.PublishedKeys {
 		c.redisd.published[k] = make(grs.HashValue)
@@ -159,13 +159,12 @@ func (c *Command) Main(args ...string) (err error) {
 	if err != nil {
 		return
 	}
-	c.redisd.published[machine.Name]["packages"] = b
+	c.redisd.published[redis.DefaultHash]["packages"] = b
 	*/
 
-	atMachineRedisd := atsock.Name("redisd")
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
-	cfg = cfg.Host(atMachineRedisd)
+	cfg = cfg.Host("@redisd")
 	cfg = cfg.Handler(&c.redisd)
 
 	srv, err := grs.NewServer(cfg)
@@ -173,19 +172,14 @@ func (c *Command) Main(args ...string) (err error) {
 		return
 	}
 
-	c.redisd.reg, err =
-		reg.New("redis-reg", c.redisd.assign, c.redisd.unassign)
+	c.redisd.devs["@redisd"] = []*grs.Server{srv}
+
+	c.redisd.reg, err = reg.New(c.redisd.assign, c.redisd.unassign)
 	if err != nil {
 		return
 	}
 
-	c.redisd.devs[atMachineRedisd] = []*grs.Server{srv}
-
-	go func(redisd *Redisd, args ...string) {
-		redisd.listen(args...)
-	}(&c.redisd, args...)
-
-	c.pubconn, err = atsock.ListenUnixgram(publisher.Name)
+	c.pubconn, err = atsock.ListenUnixgram("redis.pub")
 	if err != nil {
 		return
 	}
@@ -194,7 +188,13 @@ func (c *Command) Main(args ...string) (err error) {
 	err = c.pubinit(fields.New(parm.ByName["-set"])...)
 	if err == nil {
 		err = srv.Start()
+		if err == nil {
+			go func(redisd *Redisd, args ...string) {
+				redisd.listen(args...)
+			}(&c.redisd, args...)
+		}
 	}
+
 	return
 }
 
@@ -212,7 +212,7 @@ func (c *Command) gopub() {
 		x := bytes.Split(t, []byte(sep))
 		switch len(x) {
 		case 2:
-			key = machine.Name
+			key = redis.DefaultHash
 			field = string(x[0])
 			value = x[1]
 			fv = t

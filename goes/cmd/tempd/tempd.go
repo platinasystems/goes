@@ -17,10 +17,9 @@ import (
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/log"
-	"github.com/platinasystems/go/internal/machine"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/log"
+	"github.com/platinasystems/redis"
+	"github.com/platinasystems/redis/publisher"
 )
 
 const (
@@ -123,7 +122,7 @@ func bmcStatus() (string, string) {
 	var v, i string
 
 	if bmcIpv6LinkLocalRedis == "" {
-		m, err := redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
+		m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
 		if err == nil {
 			o := strings.Split(m, ":")
 			b, _ := hex.DecodeString(o[0])
@@ -139,7 +138,7 @@ func bmcStatus() (string, string) {
 		} else {
 			v = "up"
 			var bmcIpv4 interface{}
-			bmcIpv4, err = d.Do("HGET", machine.Name+"-bmc", "eth0.ipv4")
+			bmcIpv4, err = d.Do("HGET", redis.DefaultHash+"-bmc", "eth0.ipv4")
 			if err != nil {
 				bmcIpv4, _ = d.Do("HGET", "platina", "eth0.ipv4") // to support old bmc builds
 			}
@@ -170,7 +169,7 @@ func cpuCoreTemp() string {
 		return ""
 	}
 	if bmcIpv6LinkLocalRedis == "" {
-		m, err := redis.Hget(machine.Name, "eeprom.BaseEthernetAddress")
+		m, err := redis.Hget(redis.DefaultHash, "eeprom.BaseEthernetAddress")
 		if err == nil {
 			o := strings.Split(m, ":")
 			b, _ := hex.DecodeString(o[0])
@@ -182,7 +181,7 @@ func cpuCoreTemp() string {
 	if bmcIpv6LinkLocalRedis != "" {
 		d, err := redigo.Dial("tcp", bmcIpv6LinkLocalRedis)
 		if err == nil {
-			_, err = d.Do("HSET", machine.Name+"-bmc", "host.temp.units.C", v)
+			_, err = d.Do("HSET", redis.DefaultHash+"-bmc", "host.temp.units.C", v)
 			if err != nil {
 				d.Do("HSET", "platina", "host.temp.units.C", v) // to support old bmc builds
 			}

@@ -16,7 +16,7 @@ import (
 	"github.com/platinasystems/go/internal/nl"
 	"github.com/platinasystems/go/internal/nl/rtnl"
 	"github.com/platinasystems/go/internal/parms"
-	"github.com/platinasystems/go/internal/redis/publisher"
+	"github.com/platinasystems/redis/publisher"
 )
 
 type Command struct{}

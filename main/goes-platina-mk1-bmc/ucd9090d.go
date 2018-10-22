@@ -8,8 +8,7 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/go/goes/cmd/platina/mk1/bmc/ucd9090d"
-	"github.com/platinasystems/go/internal/redis"
-	"github.com/platinasystems/go/internal/machine"
+	"github.com/platinasystems/redis"
 )
 
 func ucd9090dInit() {
@@ -19,7 +18,7 @@ func ucd9090dInit() {
 	ucd9090d.Vdev.MuxBus = 0
 	ucd9090d.Vdev.MuxAddr = 0x76
 	ucd9090d.Vdev.MuxValue = 0x01
-	s, err := redis.Hget(machine.Name, "eeprom.DeviceVersion")
+	s, err := redis.Hget(redis.DefaultHash, "eeprom.DeviceVersion")
 	if err != nil {
 		ucd9090d.Vdev.Addr = 0x34
 	} else {
