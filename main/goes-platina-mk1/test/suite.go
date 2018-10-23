@@ -17,16 +17,15 @@ import (
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/docker"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/mk1"
 	"github.com/platinasystems/go/main/goes-platina-mk1/test/nodocker"
-	"github.com/platinasystems/redis"
 )
 
 const TestDir = "github.com/platinasystems/go/main/goes-platina-mk1"
 
 var redisdProgram, vnetdProgram *test.Program
 
-func Suite(Machine string, main func(), t *testing.T) {
+func Suite(main func(), t *testing.T) {
 	test.Suite{
-		Name: Machine,
+		Name: "goes-platina-mk1",
 		Init: func(t *testing.T) {
 			assert := test.Assert{t}
 			assert.Dir(TestDir)
@@ -57,17 +56,15 @@ func Suite(Machine string, main func(), t *testing.T) {
 			netport.Init(assert)
 			ethtool.Init(assert)
 
-			redis.DefaultHash = Machine
-
 			redisdProgram = assert.Background(test.Self{},
 				"redisd")
 			assert.Program(12*time.Second, test.Self{},
-				"hwait", redis.DefaultHash, "redis.ready", "true", "10")
+				"hwait", "platina-mk1", "redis.ready", "true", "10")
 
 			vnetdProgram = assert.Background(30*time.Second, test.Self{},
 				"vnetd")
 			assert.Program(32*time.Second, test.Self{},
-				"hwait", redis.DefaultHash, "vnet.ready", "true", "30")
+				"hwait", "platina-mk1", "vnet.ready", "true", "30")
 
 			test.Pause("attach vnet debugger to pid ", vnetdProgram.Pid())
 		},

@@ -5,12 +5,16 @@
 package mk1
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/platinasystems/redis"
 )
 
-func Start(name string) (err error) {
-	redis.DefaultHash = name
-	return Goes.Main(os.Args...)
+func Main() {
+	redis.DefaultHash = "platina-mk1"
+	if err := Goes.Main(os.Args...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
