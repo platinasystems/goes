@@ -33,7 +33,7 @@ type config struct {
 type nodocker map[string]*config
 
 var Suite = test.Suite{
-	Name: "netns interface",
+	Name: "netns_interface",
 	Tests: test.Tests{
 		&nodocker{
 			"net0port0": &config{
@@ -50,7 +50,7 @@ var Suite = test.Suite{
 	},
 }
 
-func (nodocker) String() string { return "nodocker" }
+func (nodocker) String() string { return "eth" }
 
 func (m nodocker) Test(t *testing.T) {
 	assert := test.Assert{t}
@@ -75,7 +75,7 @@ func (m nodocker) Test(t *testing.T) {
 	test.Tests{
 		&test.Unit{"ping neighbor", m.pingNeighbor},
 		&test.Unit{"check neighbor", m.checkNeighbor},
-		&test.Unit{"delete Netns", m.delNetns},
+		&test.Unit{"delete netns", m.delNetns},
 		&test.Unit{"check no neighbor", m.checkNoNeighbor},
 	}.Test(t)
 }

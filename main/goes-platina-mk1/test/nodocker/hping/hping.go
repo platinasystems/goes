@@ -61,7 +61,7 @@ var Suite = test.Suite{
 	},
 }
 
-func (nodocker) String() string { return "nodocker" }
+func (nodocker) String() string { return "eth" }
 
 func (m nodocker) Test(t *testing.T) {
 	assert := test.Assert{t}
