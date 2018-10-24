@@ -18,16 +18,16 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/pkg/errors v0.8.0 // indirect
-	github.com/platinasystems/atsock v0.0.0-20181019220955-c4cc7ae24dbf
-	github.com/platinasystems/dbg v0.0.0-20181012183359-440db521da7f
-	github.com/platinasystems/elib v0.0.0-20181020233022-05b3cafd162e
+	github.com/platinasystems/atsock v1.1.0
+	github.com/platinasystems/dbg v1.1.0
+	github.com/platinasystems/elib v1.1.0
 	github.com/platinasystems/go-redis-server v0.0.0-20170607003434-2aae595273b8
-	github.com/platinasystems/i2c v0.0.0-20181019213407-8214913e67af
+	github.com/platinasystems/i2c v1.1.0
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
-	github.com/platinasystems/log v0.0.0-20181019191631-6c3b2ed28252
-	github.com/platinasystems/redis v0.0.0-20181022194819-47dc1dbf4623
-	github.com/platinasystems/vnet v0.0.0-20181022195906-30b95e90506f
-	github.com/platinasystems/xeth v0.0.0-20181010000040-d9ed5089fdd0
+	github.com/platinasystems/log v1.1.0
+	github.com/platinasystems/redis v1.1.0
+	github.com/platinasystems/vnet v1.1.0
+	github.com/platinasystems/xeth v1.1.0
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
