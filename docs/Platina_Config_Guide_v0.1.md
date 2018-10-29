@@ -1,4 +1,4 @@
-**Platina PSW-3001-32C Trial Configuration Guide\
+**Platina PSW-3001-32C Configuration Guide\
 Last Update 10/10/2018**
 
 **Quick Start Guide**
@@ -15,7 +15,7 @@ The PSW-3001-32C is a 32x100GE switch with hardware forwarding up to
 a separate BMC ARM processor with 2GB of DRAM and 2GB of uSD. The high
 level block diagram is as follows:
 
-![](./image1.png){width="3.473611111111111in"
+![](./ConfigGuide_image1.png){width="3.473611111111111in"
 height="2.8270833333333334in"}
 
 **BMC Processor**
@@ -210,79 +210,79 @@ Each time GOES starts up, it will read the network configuration file
 
 Following is the example network config file:
 
-*\# This file describes the network interfaces available on your system
+*\# This file describes the network interfaces available on your system*
 
-\# and how to activate them. For more information, see interfaces(5).
+*\# and how to activate them. For more information, see interfaces(5).*
 
-source /etc/network/interfaces.d/\*
+*source /etc/network/interfaces.d/\**
 
-*\# The loopback network interface
+*\# The loopback network interface*
 
-auto lo
+*auto lo*
 
-iface lo inet loopback
+*iface lo inet loopback*
 
-\# The primary network interface
+*\# The primary network interface*
 
-allow-hotplug eth0
+*allow-hotplug eth0*
 
-\#iface eth0 inet dhcp
+*\#iface eth0 inet dhcp*
 
-auto eth0
+*auto eth0*
 
-iface eth0 inet static
+*iface eth0 inet static*
 
-address 172.17.2.47
+*address 172.17.2.47*
 
-netmask 255.255.254.0
+*netmask 255.255.254.0*
 
-gateway 172.17.2.1
+*gateway 172.17.2.1*
 
-dns-nameservers 8.8.8.8 8.8.4.4
+*dns-nameservers 8.8.8.8 8.8.4.4*
 
-auto xeth1-1
+*auto xeth1-1*
 
-iface xeth1-1 inet static
+*iface xeth1-1 inet static*
 
-address 10.1.1.47
+*address 10.1.1.47*
 
-netmask 255.255.255.0
+*netmask 255.255.255.0*
 
-pre-up ip link set \$IFACE up
+*pre-up ip link set \$IFACE up*
 
-pre-up ethtool -s \$IFACE speed 10000 autoneg off
+*pre-up ethtool -s \$IFACE speed 10000 autoneg off*
 
-pre-up ethtool --set-priv-flags \$IFACE copper on
+*pre-up ethtool --set-priv-flags \$IFACE copper on*
 
-pre-up ethtool --set-priv-flags \$IFACE fec74 on
+*pre-up ethtool --set-priv-flags \$IFACE fec74 on*
 
-pre-up ethtool --set-priv-flags \$IFACE fec91 off
+*pre-up ethtool --set-priv-flags \$IFACE fec91 off*
 
-post-down ip link set \$IFACE down
+*post-down ip link set \$IFACE down*
 
-allow-vnet xeth1-1
+*allow-vnet xeth1-1*
 
-auto xeth1-2
+*auto xeth1-2*
 
-iface xeth1-2 inet static
+*iface xeth1-2 inet static*
 
-address 10.1.2.47
+*address 10.1.2.47*
 
-netmask 255.255.255.0
+*netmask 255.255.255.0*
 
-pre-up ip link set \$IFACE up
+*pre-up ip link set \$IFACE up*
 
-pre-up ethtool -s \$IFACE speed 10000 autoneg off
+*pre-up ethtool -s \$IFACE speed 10000 autoneg off*
 
-pre-up ethtool --set-priv-flags \$IFACE copper on
+*pre-up ethtool --set-priv-flags \$IFACE copper on*
 
-pre-up ethtool --set-priv-flags \$IFACE fec74 on
+*pre-up ethtool --set-priv-flags \$IFACE fec74 on*
 
-pre-up ethtool --set-priv-flags \$IFACE fec91 off
+*pre-up ethtool --set-priv-flags \$IFACE fec91 off*
 
-post-down ip link set \$IFACE down
+*post-down ip link set \$IFACE down*
 
-allow-vnet xeth1-2*
+*allow-vnet xeth1-2*
 
 In the example above, ethtool cmds are executed to set speed,media,fec
 for each interface.
@@ -1175,122 +1175,122 @@ platina temp
 
 *hwmon.front.temp.units.C: 49.000*
 
-*hwmon.rear.temp.units.C: 54.000
+*hwmon.rear.temp.units.C: 54.000*
 
-psu1.temp1.units.C: 33.375
+*psu1.temp1.units.C: 33.375*
 
-psu1.temp2.units.C: 37.812*
+*psu1.temp2.units.C: 37.812*
 
 Fan and PSU status
 
 root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
 platina status
 
-*fan\_tray.1.status: ok.front-&gt;back
+*fan\_tray.1.status: ok.front-&gt;back*
 
-fan\_tray.2.status: ok.front-&gt;back
+*fan\_tray.2.status: ok.front-&gt;back*
 
-fan\_tray.3.status: ok.front-&gt;back
+*fan\_tray.3.status: ok.front-&gt;back*
 
-fan\_tray.4.status: ok.front-&gt;back
+*fan\_tray.4.status: ok.front-&gt;back*
 
-psu1.status: powered\_on
+*psu1.status: powered\_on*
 
-psu2.status: not\_installed*
+*psu2.status: not\_installed*
 
 Fan Speed
 
 root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
 platina fan\_tray
 
-*fan\_tray.1.1.speed.units.rpm: 7031
+*fan\_tray.1.1.speed.units.rpm: 7031*
 
-fan\_tray.1.2.speed.units.rpm: 7031
+*fan\_tray.1.2.speed.units.rpm: 7031*
 
-fan\_tray.1.status: ok.front-&gt;back
+*fan\_tray.1.status: ok.front-&gt;back*
 
-fan\_tray.2.1.speed.units.rpm: 7031
+*fan\_tray.2.1.speed.units.rpm: 7031*
 
-fan\_tray.2.2.speed.units.rpm: 6490
+*fan\_tray.2.2.speed.units.rpm: 6490*
 
-fan\_tray.2.status: ok.front-&gt;back
+*fan\_tray.2.status: ok.front-&gt;back*
 
-fan\_tray.3.1.speed.units.rpm: 7031
+*fan\_tray.3.1.speed.units.rpm: 7031*
 
-fan\_tray.3.2.speed.units.rpm: 7031
+*fan\_tray.3.2.speed.units.rpm: 7031*
 
-fan\_tray.3.status: ok.front-&gt;back
+*fan\_tray.3.status: ok.front-&gt;back*
 
-fan\_tray.4.1.speed.units.rpm: 7031
+*fan\_tray.4.1.speed.units.rpm: 7031*
 
-fan\_tray.4.2.speed.units.rpm: 6490
+*fan\_tray.4.2.speed.units.rpm: 6490*
 
-fan\_tray.4.status: ok.front-&gt;back
+*fan\_tray.4.status: ok.front-&gt;back*
 
-fan\_tray.duty: 0x4d
+*fan\_tray.duty: 0x4d*
 
-fan\_tray.speed: auto*
+*fan\_tray.speed: auto*
 
 PSU Information
 
 root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
 platina psu
 
-*psu1.admin.state: enabled
+*psu1.admin.state: enabled*
 
-psu1.eeprom:
-01000000010900f5010819c54757202020cb47572d4352505335353020ca58585858585858585858c3585846ce5053555134303030303037475720c0c0c10000000000000000002f00021822c42602390319052823b036504620672f3f0c1f94c20000001f01020d09e701b0047404ec047800e803c8af01820d274982b0047404ec0478000000b80b2020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020
+*psu1.eeprom:*
+*01000000010900f5010819c54757202020cb47572d4352505335353020ca58585858585858585858c3585846ce5053555134303030303037475720c0c0c10000000000000000002f00021822c42602390319052823b036504620672f3f0c1f94c20000001f01020d09e701b0047404ec047800e803c8af01820d274982b0047404ec0478000000b80b2020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020*
 
-psu1.fan\_speed.units.rpm: 4020
+*psu1.fan\_speed.units.rpm: 4020*
 
-psu1.i\_out.units.A: 10.688
+*psu1.i\_out.units.A: 10.688*
 
-psu1.mfg\_id: Great Wall
+*psu1.mfg\_id: Great Wall*
 
-psu1.mfg\_model: CRPS550
+*psu1.mfg\_model: CRPS550*
 
-psu1.p\_in.units.W: 141.000
+*psu1.p\_in.units.W: 141.000*
 
-psu1.p\_out.units.W: 129.000
+*psu1.p\_out.units.W: 129.000*
 
-psu1.status: powered\_on
+*psu1.status: powered\_on*
 
-psu1.temp1.units.C: 33.375
+*psu1.temp1.units.C: 33.375*
 
-psu1.temp2.units.C: 37.812
+*psu1.temp2.units.C: 37.812*
 
-psu1.v\_in.units.V: 117.000
+*psu1.v\_in.units.V: 117.000*
 
-psu1.v\_out.units.V: 12.047
+*psu1.v\_out.units.V: 12.047*
 
-psu2.admin.state: enabled
+*psu2.admin.state: enabled*
 
-psu2.status: not\_installed*
+*psu2.status: not\_installed*
 
 Power Monitor Information
 
 root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
 platina vmon
 
-*vmon.1v0.tha.units.V: 1.041
+*vmon.1v0.tha.units.V: 1.041*
 
-vmon.1v0.thc.units.V: 1.014
+*vmon.1v0.thc.units.V: 1.014*
 
-vmon.1v2.ethx.units.V: 1.187
+*vmon.1v2.ethx.units.V: 1.187*
 
-vmon.1v25.sys.units.V: 1.24
+*vmon.1v25.sys.units.V: 1.24*
 
-vmon.1v8.sys.units.V: 1.805
+*vmon.1v8.sys.units.V: 1.805*
 
-vmon.3v3.bmc.units.V: 3.28
+*vmon.3v3.bmc.units.V: 3.28*
 
-vmon.3v3.sb.units.V: 3.344
+*vmon.3v3.sb.units.V: 3.344*
 
-vmon.3v3.sys.units.V: 3.298
+*vmon.3v3.sys.units.V: 3.298*
 
-vmon.3v8.bmc.units.V: 3.826
+*vmon.3v8.bmc.units.V: 3.826*
 
-vmon.5v.sb.units.V: 4.926
+*vmon.5v.sb.units.V: 4.926*
 
-vmon.poweroff.events:
-1970-01-01T23:30:34Z.1970-01-01T23:32:28Z.1970-01-01T23:40:17Z.1970-01-01T23:50:54Z.1970-01-01T23:52:04Z*
+*vmon.poweroff.events:*
+*1970-01-01T23:30:34Z.1970-01-01T23:32:28Z.1970-01-01T23:40:17Z.1970-01-01T23:50:54Z.1970-01-01T23:52:04Z*
