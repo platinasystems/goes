@@ -15,8 +15,7 @@ The PSW-3001-32C is a 32x100GE switch with hardware forwarding up to
 a separate BMC ARM processor with 2GB of DRAM and 2GB of uSD. The high
 level block diagram is as follows:
 
-![](./ConfigGuide_image1.png){width="3.473611111111111in"
-height="2.8270833333333334in"}
+![](./ConfigGuide_image1.png)
 
 **BMC Processor**
 
