@@ -207,9 +207,10 @@ Following is the example network config file:
     # This file describes the network interfaces available on your system*
     # and how to activate them. For more information, see interfaces(5).
 
-    source /etc/network/interfaces.d/\*
+    source /etc/network/interfaces.d/*
 
     # The loopback network interface
+
     auto lo
     iface lo inet loopback
 
@@ -229,42 +230,25 @@ Following is the example network config file:
     iface xeth1-1 inet static
     address 10.1.1.47
     netmask 255.255.255.0
+    pre-up ip link set $IFACE up
+    pre-up ethtool -s $IFACE speed 10000 autoneg off
+    pre-up ethtool --set-priv-flags $IFACE copper on
+    pre-up ethtool --set-priv-flags $IFACE fec74 on
+    pre-up ethtool --set-priv-flags \$IFACE fec91 off
+    post-down ip link set \$IFACE down
+    allow-vnet xeth1-1
 
-    *pre-up ip link set \$IFACE up*
-
-    *pre-up ethtool -s \$IFACE speed 10000 autoneg off*
-
-    *pre-up ethtool --set-priv-flags \$IFACE copper on*
-
-    *pre-up ethtool --set-priv-flags \$IFACE fec74 on*
-
-    *pre-up ethtool --set-priv-flags \$IFACE fec91 off*
-
-    *post-down ip link set \$IFACE down*
-
-    *allow-vnet xeth1-1*
-
-    *auto xeth1-2*
-
-    *iface xeth1-2 inet static*
-
-    *address 10.1.2.47*
-
-    *netmask 255.255.255.0*
-
-    *pre-up ip link set \$IFACE up*
-
-    *pre-up ethtool -s \$IFACE speed 10000 autoneg off*
-
-    *pre-up ethtool --set-priv-flags \$IFACE copper on*
-
-    *pre-up ethtool --set-priv-flags \$IFACE fec74 on*
-
-    *pre-up ethtool --set-priv-flags \$IFACE fec91 off*
-
-    *post-down ip link set \$IFACE down*
-
-    *allow-vnet xeth1-2*
+    auto xeth1-2
+    iface xeth1-2 inet static
+    address 10.1.2.47
+    netmask 255.255.255.0
+    pre-up ip link set $IFACE up
+    pre-up ethtool -s $IFACE speed 10000 autoneg off
+    pre-up ethtool --set-priv-flags \$IFACE copper on
+    pre-up ethtool --set-priv-flags \$IFACE fec74 on
+    pre-up ethtool --set-priv-flags \$IFACE fec91 off
+    post-down ip link set \$IFACE down
+    allow-vnet xeth1-2
 
 In the example above, ethtool cmds are executed to set speed,media,fec
 for each interface.
@@ -314,7 +298,7 @@ When using redis-cli, it is recommended to connect using the --raw
 parameter so that newline characters between the multiple fields are
 parsed properly. For example:
 
-    redis-cli --raw -h &lt;ipv4\_address&gt; hget platina-mk1 xeth1
+    redis-cli --raw -h <ipv4_address> hget platina-mk1 xeth1
 
 **Fields that can be set in Platina’s Redis:**
 
@@ -334,12 +318,12 @@ Example:
 
     hset platina-mk1 vnet.xeth1.media copper
 
-    hget platina-mk1 vnet.xeth1.media\
+    hget platina-mk1 vnet.xeth1.media
     copper
 
 **Speed**\
 Each QSFP port supports 1GE, 10GE, 20GE, 25GE, 40GE, 50GE, and 100GE
-speeds, either in single port mode or breakout port mode. In the trial
+speeds, either in single port mode or breakout port mode. In this
 version, only 10GE, 25GE, 40GE, 50GE and 100GE modes are supported. If a
 speed is specified, the port will be fixed at that speed. If set to
 “auto” (applicable only if port is in copper media mode), the port will
@@ -347,19 +331,16 @@ negotiate with neighbor switch to establish the speed.
 
 Example:
 
-sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
-autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes
-start
 
-    hget platina-mk1 xeth1.speed\
-auto
+    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
 
-sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
-speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3
-&& sudo goes start
+    hget platina-mk1 xeth1.speed
+    auto
 
-hget platina-mk1 xeth1.speed\
-100g
+    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
+
+    hget platina-mk1 xeth1.speed
+    100g
 
 **Stats Counter Update Interval**
 
@@ -373,10 +354,10 @@ To change the Redis counter update interval.
 
 Example:
 
-hset platina-mk1 vnet.pollInterval 1
+    hset platina-mk1 vnet.pollInterval 1
 
-hget platina-mk1 vnet.pollInterval 1\
-vnet.pollInterval: 1
+    hget platina-mk1 vnet.pollInterval 1
+    vnet.pollInterval: 1
 
 **Read-only Redis Fields**
 
@@ -391,13 +372,10 @@ from which the GOES binary is built.
 
 Example
 
-hget platina-mk1 packages|grep "version: "
-
-*version: 10a3277079f775e342e48b739dd64921b22e1f6f*
-
-*version: 6dbc2b8ffebed236ce5cc8e821815cbb25cc3525*
-
-*version: 60f39141fbbf78ddb2260dba74c68f2789374f18*
+    hget platina-mk1 packages|grep "version: "
+    version: 10a3277079f775e342e48b739dd64921b22e1f6f
+    version: 6dbc2b8ffebed236ce5cc8e821815cbb25cc3525
+    version: 60f39141fbbf78ddb2260dba74c68f2789374f18
 
 **Physical link state (as reported by switch ASIC)**\
 vnet.\[interface\].link indicates the physical link state as reported by
@@ -406,8 +384,8 @@ down.
 
 Example:
 
-goes hget platina-mk1 vnet.xeth3.link\
-*false*
+    goes hget platina-mk1 vnet.xeth3.link
+    false
 
 **Linux Packet/Byte counters**\
 Deprecated from redis
@@ -418,22 +396,15 @@ only. Packets that are locally received and forwarded in ASIC are not
 included in the Linux interface counter. To get the ASIC level interface
 counters, use vnet.\[interface\].port redis commands instead.
 
-ip -s link show xeth12
+    ip -s link show xeth12
 
-*16: xeth12@eth2: &lt;BROADCAST,MULTICAST,UP,LOWER\_UP&gt; mtu 1500
-qdisc noqueue state UP mode DEFAULT group default qlen 1000*
+    16: xeth12@eth2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 50:18:4c:00:11:87 brd ff:ff:ff:ff:ff:ff
+    RX: bytes packets errors dropped overrun mcast
+    1120240923480 1054840793 0 0 0 10
+    TX: bytes packets errors dropped carrier collsns
+    1966 15 0 0 0 0
 
-*link/ether 50:18:4c:00:11:87 brd ff:ff:ff:ff:ff:ff*
-
-*RX: bytes packets errors dropped overrun mcast*
-
-*1120240923480 1054840793 0 0 0 10*
-
-*TX: bytes packets errors dropped carrier collsns*
-
-*1966 15 0 0 0 0*
-
-*mahesh@invader47:\~\$*
 
 **Port Counters**\
 vnet.\[interface\].port… are counters that reflect the interface
@@ -445,7 +416,7 @@ the corresponding front panel ports.
 Example: (assume launching from switches local prompt; otherwise hget
 each field 1 at a time)
 
-goes hget platina-mk1 vnet.xeth9.port
+    goes hget platina-mk1 vnet.xeth9.port
 
 *vnet.xeth9.port-rx-1024-to-1518-byte-packets: 1445258343*
 
@@ -645,7 +616,7 @@ priority 1 queue.
 
 Example:
 
-goes hget platina-mk1 vnet.xeth9.mmu
+    goes hget platina-mk1 vnet.xeth9.mmu
 
 *vnet.xeth9.mmu-multicast-tx-cos0-drop-bytes: 0*
 
@@ -750,7 +721,7 @@ multicast packet counters on queue 0
 
 Example:
 
-goes hget platina-mk1 vnet.xeth9.rx-pipe
+    goes hget platina-mk1 vnet.xeth9.rx-pipe
 
 *vnet.xeth9.rx-pipe-debug-6: 0*
 
@@ -940,14 +911,15 @@ goes hget platina-mk1 vnet.xeth9.rx-pipe
 
 *vnet.xeth9.tx-pipe-vlan-tagged-packets: 0*
 
-**fe1 counters\
-**fe1 counters captures counters not associated with any front panel
+**fe1 counters**
+
+fe1 counters captures counters not associated with any front panel
 interface. Examples are loopback port and cpu ports as seen back the
 switch ASIC.
 
 Example:
 
-goes hget platina-mk1 fe1|grep cos0
+    goes hget platina-mk1 fe1|grep cos0
 
 *vnet.fe1-cpu.bst-tx-queue-cos0-count: 0*
 
@@ -1049,19 +1021,21 @@ goes hget platina-mk1 fe1|grep cos0
 
 *vnet.fe1-pipe3-loopback.tx-pipe-unicast-queue-cos0-packets: 0*
 
-**Eth0 stats\
-**Eth0 is the RJ45 management ethernet port that goes straight from the
+**Eth0 stats**
+
+Eth0 is the RJ45 management ethernet port that goes straight from the
 CPU to/from the front panel RJ45. All the eth0 stats are available in
 Linux.
 
-**EEPROM contents**\
+**EEPROM contents**
+
 These Redis fields show the content of the EEPROM that includes
 manufacturing information on the specific hardware unit such as the part
 number and serial number.
 
 Example:
 
-goes hget platina eeprom
+    goes hget platina eeprom
 
 *eeprom.BaseEthernetAddress: 6c:ec:5a:07:cb:54*
 
@@ -1122,11 +1096,9 @@ and IPv6 link local address.
 By default the BMC eth0 IPv4 address is 192.168.101.100. To connect from
 the switch’s Linux CLI:
 
-root@platina:\~\# redis-cli -h 192.168.101.100
-
-*192.168.101.100:6379&gt; hget platina machine*
-
-*"platina-mk1-bmc"*
+    root@platina:~# redis-cli -h 192.168.101.100
+    192.168.101.100:6379> hget platina machine*
+    "platina-mk1-bmc"
 
 **Connecting via IPv6 Link Local**
 
@@ -1135,25 +1107,21 @@ BMC eth0 MAC address. The BMC eth0 MAC address is simply the base MAC
 address of the system which can be retrieved from the switch’s Linux
 CLI:
 
-root@platina:\~\# goes hget platina eeprom.BaseEthernetAddress
-
-*50:18:4c:00:13:04*
+    root@platina:~# goes hget platina eeprom.BaseEthernetAddress
+    50:18:4c:00:13:04
 
 Convert *50:18:4c:00:13:04* MAC address to IPv6 link local:
 fe80::5218:4cff:fe00:1304 and connect to BMC redis:
 
-root@platina:\~\# redis-cli -h fe80::5218:4cff:fe00:1304%eth0
-
-*\[fe80::5218:4cff:fe00:1304%eth0\]:6379&gt; hget platina machine*
-
-*"platina-mk1-bmc" *
+    root@platina:~# redis-cli -h fe80::5218:4cff:fe00:1304%eth0
+    [fe80::5218:4cff:fe00:1304%eth0]:6379> hget platina machine*
+    "platina-mk1-bmc"
 
 **Notable BMC Redis Fields**
 
 Temperature status
 
-root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
-platina temp
+    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina temp
 
 *bmc.temperature.units.C: 37.01*
 
@@ -1167,8 +1135,7 @@ platina temp
 
 Fan and PSU status
 
-root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
-platina status
+    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina status
 
 *fan\_tray.1.status: ok.front-&gt;back*
 
@@ -1184,8 +1151,7 @@ platina status
 
 Fan Speed
 
-root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
-platina fan\_tray
+    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina fan_tray
 
 *fan\_tray.1.1.speed.units.rpm: 7031*
 
@@ -1215,10 +1181,9 @@ platina fan\_tray
 
 *fan\_tray.speed: auto*
 
-PSU Information
+**PSU Information**
 
-root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
-platina psu
+    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina psu
 
 *psu1.admin.state: enabled*
 
@@ -1251,10 +1216,9 @@ platina psu
 
 *psu2.status: not\_installed*
 
-Power Monitor Information
+**Power Monitor Information**
 
-root@platina:\~\# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget
-platina vmon
+    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina vmon
 
 *vmon.1v0.tha.units.V: 1.041*
 
