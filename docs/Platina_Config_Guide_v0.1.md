@@ -56,7 +56,7 @@ Once installed, GOES will startup automatically on reboot going forward.
 
 You can verify GOES is running properly by entering
 
-  goes status
+    goes status
 
 and look for the following:
 
@@ -76,15 +76,15 @@ and look for the following:
 
 To uninstall goes, enter:
 
-  sudo goes uninstall
+    sudo goes uninstall
 
 To stop goes without doing a full uninstall enter:
 
-  sudo goes stop
+    sudo goes stop
 
 To start up goes again, enter:
 
-  sudo goes start
+    sudo goes start
 
 Each stop/start will reset all ASIC configuration/memory and reinitialize ASIC.
 
@@ -125,9 +125,13 @@ assume the user is invoking from the switch’s Linux CLI.
 
 To see a list of all parameters in this Redis database, enter:
 
-From Linux CLI: goes hgetall platina-mk1
+From Linux CLI:
 
-From a Redis client: hgetall platina-mk1
+    goes hgetall platina-mk1
+
+From a Redis client:
+
+    hgetall platina-mk1
 
 “platina-mk1” is the hash for which all of the unit’s configurations and
 stats are stored under. The field/value associated with platina-mk1
@@ -137,13 +141,13 @@ You can view just a particular set of fields using hget. For example to
 get all configuration/stats associated with front panel port xeth1,
 enter:
 
-goes hget platina-mk1 xeth1
+    goes hget platina-mk1 xeth1
 
 Redis database is updated every 5 seconds by default for stats counters.
 The update interval for the switch ASIC stats can be changed. For
 example, to change the interval to 1 second enter:
 
-goes hset platina-mk1 vnet.pollInterval 1
+    goes hset platina-mk1 vnet.pollInterval 1
 
 Included in the GOES Redis interface is a convenience command hdelta.
 hdelta returns only the non-zero differences from the last Redis update
@@ -151,7 +155,7 @@ and includes rate calculation if applicable. hdelta runs continuously
 until stopped by ctrl-c. hdelta is not a standard Redis command and must
 be invoked with the following command via CLI.
 
-goes hdelta
+    goes hdelta
 
 Since the commands above are invoked at the standard Linux command line
 prompt, ‘grep’ or other Linux tools can be used to further filter the
@@ -160,7 +164,7 @@ output.
 **QSFP28 Ports**
 
 Once GOES is installed and running, all front panel ports will show up
-as normal eth interfaces in Linux. By default they are xeth1-1, xeth2, …
+as normal eth interfaces in Linux. By default they are xeth1, xeth2, …
 , xeth32. The format is
 xeth&lt;port\_number&gt;-&lt;sub-port\_number&gt; where port\_number
 corresponds to the 32 front panel ports and sub-port\_number corresponds
@@ -177,7 +181,7 @@ and media type, can be done via the ethtool.
 To set the media type and speed on xeth1 to copper (i.e. DAC cable) and
 100g fixed speed for example, enter
 
-goes hset platina-mk1 vnet.xeth1.media copper
+    goes hset platina-mk1 vnet.xeth1.media copper
 
 sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3
@@ -185,9 +189,7 @@ speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3
 
 To set the speed to autoneg enter
 
-sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
-autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes
-start
+    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
 
 ***Note: In this version, media copper must be set before speed in order
 for link training and receive equalization to work optimally.***
@@ -206,79 +208,79 @@ Each time GOES starts up, it will read the network configuration file
 
 Following is the example network config file:
 
-*\# This file describes the network interfaces available on your system*
+    *\# This file describes the network interfaces available on your system*
 
-*\# and how to activate them. For more information, see interfaces(5).*
+    *\# and how to activate them. For more information, see interfaces(5).*
 
-*source /etc/network/interfaces.d/\**
+    *source /etc/network/interfaces.d/\**
 
-*\# The loopback network interface*
+    *\# The loopback network interface*
 
-*auto lo*
+    *auto lo*
 
-*iface lo inet loopback*
+    *iface lo inet loopback*
 
-*\# The primary network interface*
+    *\# The primary network interface*
 
-*allow-hotplug eth0*
+    *allow-hotplug eth0*
 
-*\#iface eth0 inet dhcp*
+    *\#iface eth0 inet dhcp*
 
-*auto eth0*
+    *auto eth0*
 
-*iface eth0 inet static*
+    *iface eth0 inet static*
 
-*address 172.17.2.47*
+    *address 172.17.2.47*
 
-*netmask 255.255.254.0*
+    *netmask 255.255.254.0*
 
-*gateway 172.17.2.1*
+    *gateway 172.17.2.1*
 
-*dns-nameservers 8.8.8.8 8.8.4.4*
+    *dns-nameservers 8.8.8.8 8.8.4.4*
 
-*auto xeth1-1*
+    *auto xeth1-1*
 
-*iface xeth1-1 inet static*
+    *iface xeth1-1 inet static*
 
-*address 10.1.1.47*
+    *address 10.1.1.47*
 
-*netmask 255.255.255.0*
+    *netmask 255.255.255.0*
 
-*pre-up ip link set \$IFACE up*
+    *pre-up ip link set \$IFACE up*
 
-*pre-up ethtool -s \$IFACE speed 10000 autoneg off*
+    *pre-up ethtool -s \$IFACE speed 10000 autoneg off*
 
-*pre-up ethtool --set-priv-flags \$IFACE copper on*
+    *pre-up ethtool --set-priv-flags \$IFACE copper on*
 
-*pre-up ethtool --set-priv-flags \$IFACE fec74 on*
+    *pre-up ethtool --set-priv-flags \$IFACE fec74 on*
 
-*pre-up ethtool --set-priv-flags \$IFACE fec91 off*
+    *pre-up ethtool --set-priv-flags \$IFACE fec91 off*
 
-*post-down ip link set \$IFACE down*
+    *post-down ip link set \$IFACE down*
 
-*allow-vnet xeth1-1*
+    *allow-vnet xeth1-1*
 
-*auto xeth1-2*
+    *auto xeth1-2*
 
-*iface xeth1-2 inet static*
+    *iface xeth1-2 inet static*
 
-*address 10.1.2.47*
+    *address 10.1.2.47*
 
-*netmask 255.255.255.0*
+    *netmask 255.255.255.0*
 
-*pre-up ip link set \$IFACE up*
+    *pre-up ip link set \$IFACE up*
 
-*pre-up ethtool -s \$IFACE speed 10000 autoneg off*
+    *pre-up ethtool -s \$IFACE speed 10000 autoneg off*
 
-*pre-up ethtool --set-priv-flags \$IFACE copper on*
+    *pre-up ethtool --set-priv-flags \$IFACE copper on*
 
-*pre-up ethtool --set-priv-flags \$IFACE fec74 on*
+    *pre-up ethtool --set-priv-flags \$IFACE fec74 on*
 
-*pre-up ethtool --set-priv-flags \$IFACE fec91 off*
+    *pre-up ethtool --set-priv-flags \$IFACE fec91 off*
 
-*post-down ip link set \$IFACE down*
+    *post-down ip link set \$IFACE down*
 
-*allow-vnet xeth1-2*
+    *allow-vnet xeth1-2*
 
 In the example above, ethtool cmds are executed to set speed,media,fec
 for each interface.
@@ -292,7 +294,7 @@ ASIC. All FIB/RIB can be obtained directly from Linux or the BGP stack.
 
 To get the FIB from the ASIC for verification, enter:
 
-goes vnet show ip fib
+    goes vnet show ip fib
 
 **List of Known Issues**
 
@@ -311,22 +313,24 @@ Any question or to report new issues, please email
 The examples in the appendix show standard Redis commands. When directly
 on the switch’s Linux CLI, add “goes” in front of the Redis command.
 
-From Redis-client:\
-hgetall platina-mk1
+From Redis-client:
 
-From switch Linux prompt:\
-goes hgetall platina-mk1
+    hgetall platina-mk1
+
+From switch Linux prompt:
+
+    goes hgetall platina-mk1
 
 To get multiple field names that contain a specific string, use hget
 platina-mk1 &lt;string&gt;, for example:
 
-goes hget platina-mk1 xeth1
+    goes hget platina-mk1 xeth1
 
 When using redis-cli, it is recommended to connect using the --raw
 parameter so that newline characters between the multiple fields are
 parsed properly. For example:
 
-redis-cli --raw -h &lt;ipv4\_address&gt; hget platina-mk1 xeth1
+    redis-cli --raw -h &lt;ipv4\_address&gt; hget platina-mk1 xeth1
 
 **Fields that can be set in Platina’s Redis:**
 
@@ -344,10 +348,10 @@ is only available in copper mode.
 
 Example:
 
-hset platina-mk1 vnet.xeth1.media copper
+    hset platina-mk1 vnet.xeth1.media copper
 
-hget platina-mk1 vnet.xeth1.media\
-copper
+    hget platina-mk1 vnet.xeth1.media\
+    copper
 
 **Speed**\
 Each QSFP port supports 1GE, 10GE, 20GE, 25GE, 40GE, 50GE, and 100GE
@@ -363,7 +367,7 @@ sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
 autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes
 start
 
-hget platina-mk1 xeth1.speed\
+    hget platina-mk1 xeth1.speed\
 auto
 
 sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
