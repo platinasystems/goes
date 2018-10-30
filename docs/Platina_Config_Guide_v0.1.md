@@ -165,13 +165,13 @@ output.
 
 Once GOES is installed and running, all front panel ports will show up
 as normal eth interfaces in Linux. By default they are xeth1, xeth2, …
-, xeth32. The format is
-xeth&lt;port\_number&gt;-&lt;sub-port\_number&gt; where port\_number
-corresponds to the 32 front panel ports and sub-port\_number corresponds
+,xeth32. The format is
+`xeth&lt;port\_number&gt;-&lt;sub-port\_number&gt;` where `port\_number`
+corresponds to the 32 front panel ports and `sub-port\_number` corresponds
 to optionally configured breakout ports within each port.
 
 All 32 QSFP28 eth interfaces can be configured via Linux using standard
-Linux methods, e.g. ifconfig, ip addr, /etc/network/interfaces, etc.
+Linux methods, e.g. ip link, ip addr, /etc/network/interfaces, etc.
 
 Interface configurations not available in Linux, such as interface speed
 and media type, can be done via the ethtool.
@@ -182,10 +182,7 @@ To set the media type and speed on xeth1 to copper (i.e. DAC cable) and
 100g fixed speed for example, enter
 
     goes hset platina-mk1 vnet.xeth1.media copper
-
-sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1
-speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3
-&& sudo goes start
+    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
 
 To set the speed to autoneg enter
 
@@ -194,8 +191,7 @@ To set the speed to autoneg enter
 ***Note: In this version, media copper must be set before speed in order
 for link training and receive equalization to work optimally.***
 
-***Note:*** ***speed options supported are auto, 100g,*** ***50g,***
-***40g, 25g, 10g.***
+***Note: Speed options supported are auto, 100g, 50g, 40g, 25g, 10g.***
 
 The settings do not persist across goes stop/start or reboot. To
 configure permanently, add the configuration in /etc/network/interfaces
@@ -208,43 +204,31 @@ Each time GOES starts up, it will read the network configuration file
 
 Following is the example network config file:
 
-    *\# This file describes the network interfaces available on your system*
+    # This file describes the network interfaces available on your system*
+    # and how to activate them. For more information, see interfaces(5).
 
-    *\# and how to activate them. For more information, see interfaces(5).*
+    source /etc/network/interfaces.d/\*
 
-    *source /etc/network/interfaces.d/\**
+    # The loopback network interface
+    auto lo
+    iface lo inet loopback
 
-    *\# The loopback network interface*
+    # The primary network interface*
 
-    *auto lo*
+    allow-hotplug eth0
+    #iface eth0 inet dhcp
 
-    *iface lo inet loopback*
+    auto eth0
+    iface eth0 inet static
+    address 172.17.2.47
+    netmask 255.255.254.0
+    gateway 172.17.2.1
+    dns-nameservers 8.8.8.8 8.8.4.4
 
-    *\# The primary network interface*
-
-    *allow-hotplug eth0*
-
-    *\#iface eth0 inet dhcp*
-
-    *auto eth0*
-
-    *iface eth0 inet static*
-
-    *address 172.17.2.47*
-
-    *netmask 255.255.254.0*
-
-    *gateway 172.17.2.1*
-
-    *dns-nameservers 8.8.8.8 8.8.4.4*
-
-    *auto xeth1-1*
-
-    *iface xeth1-1 inet static*
-
-    *address 10.1.1.47*
-
-    *netmask 255.255.255.0*
+    auto xeth1-1
+    iface xeth1-1 inet static
+    address 10.1.1.47
+    netmask 255.255.255.0
 
     *pre-up ip link set \$IFACE up*
 
