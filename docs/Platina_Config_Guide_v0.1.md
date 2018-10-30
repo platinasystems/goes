@@ -40,13 +40,6 @@ new apps, etc.
 
 By default eth0 is the RJ45 Management Ethernet port on the front panel.
 
-***Note: In this version, Platina has made the following kernel
-modifications.***
-
-***- uio\_pci\_dma: for accessing PCI devices from userspace***
-
-***These modifications will be removed in later revision of the SW.***
-
 **Platina GOES Service**
 
 Platina software, GOES, is a user space application that runs in Linux.
@@ -61,35 +54,33 @@ The ‘install’ command will install GOES at /usr/bin/goes, by default.
 
 Once installed, GOES will startup automatically on reboot going forward.
 
-You can verify GOES is running properly by entering\
-goes status\
+You can verify GOES is running properly by entering
+
+goes status
+
 and look for the following:
 
 *GOES status*
-
 *======================*
-
-*Mode - SRIOV*
-
+*Mode - XETH*
 *PCI - OK*
-
 *Check daemons - OK*
-
 *Check Redis - OK*
-
 *Check vnet - OK*
 
-To uninstall goes, enter:\
+To uninstall goes, enter:
+
 sudo goes uninstall
 
-To stop goes without doing a full uninstall enter:\
-sudo goes stop\
-\
-To start up goes again, enter:\
+To stop goes without doing a full uninstall enter:
+
+sudo goes stop
+
+To start up goes again, enter:
+
 sudo goes start
 
-Each stop/start will reset all ASIC configuration/memory and
-reinitialize ASIC.
+Each stop/start will reset all ASIC configuration/memory and reinitialize ASIC.
 
 GOES is an open source project developed by Platina. To see the source
 code, visit
