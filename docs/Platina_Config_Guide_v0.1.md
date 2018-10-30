@@ -56,29 +56,35 @@ Once installed, GOES will startup automatically on reboot going forward.
 
 You can verify GOES is running properly by entering
 
-goes status
+  goes status
 
 and look for the following:
 
 *GOES status*
+
 *======================*
+
 *Mode - XETH*
+
 *PCI - OK*
+
 *Check daemons - OK*
+
 *Check Redis - OK*
+
 *Check vnet - OK*
 
 To uninstall goes, enter:
 
-sudo goes uninstall
+  sudo goes uninstall
 
 To stop goes without doing a full uninstall enter:
 
-sudo goes stop
+  sudo goes stop
 
 To start up goes again, enter:
 
-sudo goes start
+  sudo goes start
 
 Each stop/start will reset all ASIC configuration/memory and reinitialize ASIC.
 
