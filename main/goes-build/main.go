@@ -92,7 +92,7 @@ var (
 		goesBoot,
 		goesBootArm,
 		goesIP,
-		goesPlatinaMk1,
+		//goesPlatinaMk1,
 		platinaMk1Vmlinuz,
 		corebootPlatinaMk1,
 		goesPlatinaMk1Bmc,
