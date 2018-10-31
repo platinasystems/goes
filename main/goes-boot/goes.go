@@ -137,10 +137,9 @@ var Goes = &goes.Goes{
 				lang.EnUS: "print stuff",
 			},
 			ByName: map[string]cmd.Cmd{
-				"cmdline":  cmdline.Command{},
-				"iminfo":   iminfo.Command{},
-				"machine":  goes.ShowMachine(name),
-				"packages": goes.ShowPackages{},
+				"cmdline": cmdline.Command{},
+				"iminfo":  iminfo.Command{},
+				"machine": goes.ShowMachine(name),
 			},
 		},
 
