@@ -36,26 +36,35 @@ func (g *Goes) copyright(_ ...string) error {
 }
 
 func (*Goes) license(_ ...string) error {
-	marshal(Info.Licenses)
+	m := info(Info.Licenses)
+	m["goes"] = License
+	marshal(m)
 	return nil
 }
 
 func (*Goes) patents(_ ...string) error {
-	marshal(Info.Patents)
+	m := info(Info.Patents)
+	m["goes"] = Patents
+	marshal(m)
 	return nil
 }
 
 func (*Goes) version(_ ...string) error {
-	marshal(Info.Versions)
+	m := info(Info.Versions)
+	m["goes"] = Version
+	marshal(m)
 	return nil
 }
 
-func marshal(f func() map[string]string) {
-	var sep string
-	if f == nil {
-		return
+func info(f func() map[string]string) map[string]string {
+	if f != nil {
+		return f()
 	}
-	m := f()
+	return make(map[string]string)
+}
+
+func marshal(m map[string]string) {
+	var sep string
 	for k, v := range m {
 		s := strings.TrimSpace(v)
 		if len(m) == 1 {
