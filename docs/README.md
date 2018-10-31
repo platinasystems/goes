@@ -8,7 +8,7 @@ Use of this source code is governed by this BSD-style [LICENSE].*
 [LICENSE]: ../LICENSE
 
 ## Customer-facing documents
-These are the documents that we are maintaining for the customer-facing Wiki.
+These are the documents that we are maintaining for the customer-facing Wiki (SM - 10/31/18)
 1. Platina Config Guide (Status: Under final review)
 2. Platina Software Update Process (Status: Under final review)
 3. Release Notes (Status: Not yet created. Pending green light on Release v1.1)
