@@ -186,14 +186,15 @@ func (c *Command) Main(args ...string) (err error) {
 	go c.gopub()
 
 	err = c.pubinit(fields.New(parm.ByName["-set"])...)
-	if err == nil {
-		err = srv.Start()
-		if err == nil {
-			go func(redisd *Redisd, args ...string) {
-				redisd.listen(args...)
-			}(&c.redisd, args...)
-		}
+	if err != nil {
+		return
 	}
+
+	go func(redisd *Redisd, args ...string) {
+		redisd.listen(args...)
+	}(&c.redisd, args...)
+
+	err = srv.Start()
 
 	return
 }
