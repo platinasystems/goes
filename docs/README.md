@@ -16,4 +16,4 @@ These are the documents that we are maintaining for the customer-facing Wiki (SM
 5. Method of Procedure (Status: Under development)
 
 ## Where do customers find these documents
-[[https://github.com/platinasystems/go/wiki]]
+[https://github.com/platinasystems/go/wiki]
