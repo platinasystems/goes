@@ -25,6 +25,8 @@ import (
 	"github.com/platinasystems/vnet"
 	"github.com/platinasystems/vnet/ethernet"
 	"github.com/platinasystems/xeth"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"regexp"
 )
 
 // Enable publish of Non-unix (e.g. non-tuntap) interfaces.
@@ -50,7 +52,9 @@ type Info struct {
 	v         vnet.Vnet
 	eventPool sync.Pool
 	poller    ifStatsPoller
+	fastPoller    fastIfStatsPoller
 	pub       *publisher.Publisher
+	producer	*kafka.Producer
 }
 
 func (*Command) String() string { return "vnetd" }
@@ -85,7 +89,9 @@ func (c *Command) Main(...string) error {
 	defer c.i.pub.Close()
 
 	c.i.poller.pubch = make(chan string, chanDepth)
+	c.i.fastPoller.pubch = make(chan string)
 	go c.i.gopublish()
+	go c.i.gopublishHf()
 
 	if c.Init != nil {
 		c.init.Do(c.Init)
@@ -127,20 +133,32 @@ func (c *Command) Close() (err error) {
 	if c.i.poller.pubch != nil {
 		close(c.i.poller.pubch)
 	}
+	if c.i.fastPoller.pubch != nil {
+		close(c.i.fastPoller.pubch)
+	}
 	c.i.v.Quit()
 	err = <-closeDone
 	return
 }
 
 func (i *Info) init() {
-	const defaultPollInterval = 5
+	const (
+		defaultPollInterval = 5
+		defaultFastPollIntervalMilliSec = 200
+	)
 	i.poller.i = i
+	i.fastPoller.i = i
 	i.poller.addEvent(0)
+	i.fastPoller.pollInterval = defaultFastPollIntervalMilliSec
+	i.fastPoller.addEvent(0)
 	i.poller.pollInterval = defaultPollInterval
+	i.fastPoller.hostname,_ = os.Hostname()
 	i.pubHwIfConfig()
 	i.set("ready", "true", true)
 	i.poller.pubch <- fmt.Sprint("poll.max-channel-depth: ", chanDepth)
 	i.poller.pubch <- fmt.Sprint("pollInterval: ", defaultPollInterval)
+	i.poller.pubch <- fmt.Sprint("pollInterval.msec: ", defaultFastPollIntervalMilliSec)
+	i.poller.pubch <- fmt.Sprint("kafka-broker: ","")
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
@@ -234,6 +252,7 @@ func (e *event) EventAction() {
 		media  string
 		itv    float64
 		fec    ethernet.ErrorCorrectionType
+		addr   string
 	)
 	if e.isReadyEvent {
 		e.i.poller.pubch <- fmt.Sprint(e.key, ": ", e.value)
@@ -293,12 +312,49 @@ func (e *event) EventAction() {
 			e.newValue <- fmt.Sprintf("%f", itv)
 			e.err <- nil
 		}
+	case e.in.Parse("pollInterval.msec %f", &itv):
+		if itv < 1 {
+			e.err <- fmt.Errorf("pollInterval.msec must be 1 millisecond or longer")
+		} else {
+			e.i.fastPoller.pollInterval = itv
+			e.newValue <- fmt.Sprintf("%f", itv)
+			e.err <- nil
+		}
+	case e.in.Parse("kafka-broker %s", &addr):
+		e.i.initProducer(addr)
+		e.newValue <- fmt.Sprintf("%s", addr)
+		e.err <- nil
 	default:
 		e.err <- fmt.Errorf("can't set %s to %v", e.key, e.value)
 	}
 	e.i.eventPool.Put(e)
 }
 
+func (i *Info) initProducer(broker string){
+	var err error
+	if i.producer != nil {
+		i.producer.Close()
+	}
+	i.producer,err = kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": broker})
+	if err != nil {
+		fmt.Errorf("error while creating producer: %v",err)
+	}else {
+		go func() {
+			for e := range i.producer.Events() {
+				switch ev := e.(type) {
+				case *kafka.Message:
+					m := ev
+					if m.TopicPartition.Error != nil {
+						fmt.Errorf("Delivery of msg to topic %s [%d] at offset %v failed: %v \n",
+							*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset,m.TopicPartition.Error)
+					}
+				default:
+					fmt.Printf("Ignored event: %s\n", ev)
+				}
+			}
+		}()
+	}
+}
 func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 	e := i.eventPool.Get().(*event)
 	e.key = key
@@ -320,7 +376,16 @@ func (i *Info) gopublish() {
 		i.pub.Print("vnet.", s)
 	}
 }
-
+func (i *Info) gopublishHf() {
+	topic := "hf-counters"
+	for s := range i.fastPoller.pubch {
+		i.producer.ProduceChannel() <- &kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+			Value:          []byte(s),
+		}
+		i.fastPoller.msgCount++
+	}
+}
 type hwIfConfig struct {
 	speed string
 	media string
@@ -365,6 +430,7 @@ func (i *Info) pubHwIfConfig() {
 // One per each hw/sw interface from vnet.
 type ifStatsPollerInterface struct {
 	lastValues map[string]uint64
+	hfLastValues map[string]uint64
 }
 
 func (i *ifStatsPollerInterface) update(counter string, value uint64) (updated bool) {
@@ -381,7 +447,28 @@ func (i *ifStatsPollerInterface) update(counter string, value uint64) (updated b
 	}
 	return
 }
-
+func (i *ifStatsPollerInterface) updateHf(counter string, value uint64) (delta uint64,updated bool) {
+	if i.hfLastValues == nil {
+		i.hfLastValues = make(map[string]uint64)
+	}
+	portregex := regexp.MustCompile(`(packets|bytes) *`)
+	if v, ok := i.hfLastValues[counter]; ok {
+		if updated = v != value; updated {
+			i.hfLastValues[counter] = value
+			if portregex.MatchString(counter){
+				if value > v {
+					delta = value - v
+				}
+			}else {
+				delta = value
+			}
+		}
+	} else {
+		updated = true
+		i.hfLastValues[counter] = value
+	}
+	return
+}
 //go:generate gentemplate -d Package=vnetd -id ifStatsPollerInterface -d VecType=ifStatsPollerInterfaceVec -d Type=ifStatsPollerInterface github.com/platinasystems/elib/vec.tmpl
 
 type ifStatsPoller struct {
@@ -472,5 +559,47 @@ func (p *ifStatsPoller) EventAction() {
 		}
 	})
 
+	p.sequence++
+}
+
+type fastIfStatsPoller struct {
+	vnet.Event
+	i            *Info
+	sequence     uint
+	hwInterfaces ifStatsPollerInterfaceVec
+	swInterfaces ifStatsPollerInterfaceVec
+	pollInterval float64 // pollInterval in milliseconds
+	pubch        chan string
+	msgCount     uint64
+	hostname     string
+}
+
+func (p *fastIfStatsPoller) publish(data map[string]string) {
+	for k,v := range data {
+		p.pubch <- fmt.Sprintf("%s,%d,%s,%s",p.hostname,time.Now().UnixNano()/1000000,k,v)
+	}
+}
+func (p *fastIfStatsPoller) addEvent(dt float64) { p.i.v.SignalEventAfter(p, dt) }
+func (p *fastIfStatsPoller) String() string {
+	return fmt.Sprintf("redis stats poller sequence %d", p.sequence)
+}
+func (p *fastIfStatsPoller) EventAction() {
+	// Schedule next event in 200 milliseconds; do before fetching counters so that time interval is accurate.
+	p.addEvent(p.pollInterval / 1000)
+
+	// Publish all sw/hw interface counters even with zero values for first poll.
+	// This was all possible counters have valid values in redis.
+	// Otherwise only publish to redis when counter values change.
+	var c = make(map[string]string)
+	p.i.v.ForeachHighFreqHwIfCounter(true, UnixInterfacesOnly,
+		func(hi vnet.Hi, counter string, value uint64) {
+			ifname := hi.Name(&p.i.v)
+			p.hwInterfaces.Validate(uint(hi))
+			delta, _ := p.hwInterfaces[hi].updateHf(counter, value)
+			c[ifname] = c[ifname] + fmt.Sprint(delta) + ","
+		})
+	if p.i.producer != nil{
+		p.publish(c)
+	}
 	p.sequence++
 }
