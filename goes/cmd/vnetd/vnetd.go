@@ -25,7 +25,7 @@ import (
 	"github.com/platinasystems/vnet"
 	"github.com/platinasystems/vnet/ethernet"
 	"github.com/platinasystems/xeth"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	// "github.com/confluentinc/confluent-kafka-go/kafka"
 	"regexp"
 )
 
@@ -54,7 +54,7 @@ type Info struct {
 	poller    ifStatsPoller
 	fastPoller    fastIfStatsPoller
 	pub       *publisher.Publisher
-	producer	*kafka.Producer
+	// producer	*kafka.Producer
 }
 
 func (*Command) String() string { return "vnetd" }
@@ -91,7 +91,7 @@ func (c *Command) Main(...string) error {
 	c.i.poller.pubch = make(chan string, chanDepth)
 	c.i.fastPoller.pubch = make(chan string)
 	go c.i.gopublish()
-	go c.i.gopublishHf()
+	// go c.i.gopublishHf()
 
 	if c.Init != nil {
 		c.init.Do(c.Init)
@@ -321,7 +321,7 @@ func (e *event) EventAction() {
 			e.err <- nil
 		}
 	case e.in.Parse("kafka-broker %s", &addr):
-		e.i.initProducer(addr)
+		//e.i.initProducer(addr)
 		e.newValue <- fmt.Sprintf("%s", addr)
 		e.err <- nil
 	default:
@@ -330,31 +330,31 @@ func (e *event) EventAction() {
 	e.i.eventPool.Put(e)
 }
 
-func (i *Info) initProducer(broker string){
-	var err error
-	if i.producer != nil {
-		i.producer.Close()
-	}
-	i.producer,err = kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": broker})
-	if err != nil {
-		fmt.Errorf("error while creating producer: %v",err)
-	}else {
-		go func() {
-			for e := range i.producer.Events() {
-				switch ev := e.(type) {
-				case *kafka.Message:
-					m := ev
-					if m.TopicPartition.Error != nil {
-						fmt.Errorf("Delivery of msg to topic %s [%d] at offset %v failed: %v \n",
-							*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset,m.TopicPartition.Error)
-					}
-				default:
-					fmt.Printf("Ignored event: %s\n", ev)
-				}
-			}
-		}()
-	}
-}
+// func (i *Info) initProducer(broker string){
+// 	var err error
+// 	if i.producer != nil {
+// 		i.producer.Close()
+// 	}
+// 	i.producer,err = kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": broker})
+// 	if err != nil {
+// 		fmt.Errorf("error while creating producer: %v",err)
+// 	}else {
+// 		go func() {
+// 			for e := range i.producer.Events() {
+// 				switch ev := e.(type) {
+// 				case *kafka.Message:
+// 					m := ev
+// 					if m.TopicPartition.Error != nil {
+// 						fmt.Errorf("Delivery of msg to topic %s [%d] at offset %v failed: %v \n",
+// 							*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset,m.TopicPartition.Error)
+// 					}
+// 				default:
+// 					fmt.Printf("Ignored event: %s\n", ev)
+// 				}
+// 			}
+// 		}()
+// 	}
+// }
 func (i *Info) set(key, value string, isReadyEvent bool) (err error) {
 	e := i.eventPool.Get().(*event)
 	e.key = key
@@ -376,16 +376,16 @@ func (i *Info) gopublish() {
 		i.pub.Print("vnet.", s)
 	}
 }
-func (i *Info) gopublishHf() {
-	topic := "hf-counters"
-	for s := range i.fastPoller.pubch {
-		i.producer.ProduceChannel() <- &kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Value:          []byte(s),
-		}
-		i.fastPoller.msgCount++
-	}
-}
+//func (i *Info) gopublishHf() {
+//	topic := "hf-counters"
+//	for s := range i.fastPoller.pubch {
+//		i.producer.ProduceChannel() <- &kafka.Message{
+//			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+//			Value:          []byte(s),
+//		}
+//		i.fastPoller.msgCount++
+//	}
+//}
 type hwIfConfig struct {
 	speed string
 	media string
@@ -585,7 +585,7 @@ func (p *fastIfStatsPoller) String() string {
 }
 func (p *fastIfStatsPoller) EventAction() {
 	// Schedule next event in 200 milliseconds; do before fetching counters so that time interval is accurate.
-	p.addEvent(p.pollInterval / 1000)
+	//p.addEvent(p.pollInterval / 1000)
 
 	// Publish all sw/hw interface counters even with zero values for first poll.
 	// This was all possible counters have valid values in redis.
@@ -598,8 +598,8 @@ func (p *fastIfStatsPoller) EventAction() {
 			delta, _ := p.hwInterfaces[hi].updateHf(counter, value)
 			c[ifname] = c[ifname] + fmt.Sprint(delta) + ","
 		})
-	if p.i.producer != nil{
-		p.publish(c)
-	}
+	//if p.i.producer != nil{
+	//	p.publish(c)
+	//}
 	p.sequence++
 }
