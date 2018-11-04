@@ -1,7 +1,5 @@
 # Platina GoES Command Line Guide
 
-# Platina Systems
-
 ## Version-0.1
 
 *Date-3 Novemeber 2018*
