@@ -1,21 +1,21 @@
-#Platina GoES Command Line Guide
+# Platina GoES Command Line Guide
 
-#Platina Systems
+# Platina Systems
 
-##Version-0.1
+## Version-0.1
 
 *Date-3 Novemeber 2018*
 
-##Chapter 1
+## Chapter 1
 
-###Overview
+### Overview
 
 This document explains the commands to be used in Linux, coreboot & BMC
 consoles respectively
 
-##Chapter 2
+## Chapter 2
 
-###Linux Commands
+### Linux Commands
 
 **2.1 GoES Commands**
 
