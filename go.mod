@@ -8,5 +8,5 @@ require (
 	github.com/platinasystems/log v1.1.0
 	github.com/platinasystems/redis v1.1.0
 	github.com/platinasystems/vnet v1.1.0
-	github.com/platinasystems/xeth v1.1.0
+	github.com/platinasystems/xeth v1.1.1
 )
