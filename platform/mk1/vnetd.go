@@ -126,28 +126,13 @@ func vnetdInit() {
 			switch msg.Devtype {
 			case xeth.XETH_DEVTYPE_LINUX_VLAN:
 				fallthrough
-			case xeth.XETH_DEVTYPE_XETH_BRIDGE:
+			case xeth.XETH_DEVTYPE_LINUX_BRIDGE:
 				fallthrough
 			case xeth.XETH_DEVTYPE_XETH_PORT:
 				err = unix.ProcessInterfaceInfo((*xeth.MsgIfinfo)(ptr), vnet.PreVnetd, nil, punt_index)
 			case xeth.XETH_DEVTYPE_LINUX_UNKNOWN:
 				// FIXME
 			}
-			/* FIXME these are deprecated...
-			ifname := xeth.Ifname(msg.Ifname)
-			switch msg.Devtype {
-			case xeth.XETH_DEVTYPE_UNTAGGED_BRIDGE_PORT:
-				brm := vnet.SetBridgeMember(ifname.String())
-				brm.Vid = msg.Id
-				brm.IsTagged = false
-				brm.PortVid = uint16(msg.Portid)
-			case xeth.XETH_DEVTYPE_TAGGED_BRIDGE_PORT:
-				brm := vnet.SetBridgeMember(ifname.String())
-				brm.Vid = msg.Id // customer vlan
-				brm.IsTagged = true
-				brm.PortVid = uint16(msg.Portid)
-			}
-			*/
 		case xeth.XETH_MSG_KIND_IFA:
 			err = unix.ProcessInterfaceAddr((*xeth.MsgIfa)(ptr), vnet.PreVnetd, nil)
 		}
@@ -197,7 +182,7 @@ func (p *mk1Main) parsePortConfig() (err error) {
 		// Massage ethtool port-provision format into fe1 format
 		var pp fe1.PortProvision
 		for ifname, entry := range vnet.Ports {
-			if entry.Devtype == xeth.XETH_DEVTYPE_LINUX_VLAN {
+			if entry.Devtype >= xeth.XETH_DEVTYPE_LINUX_UNKNOWN {
 				continue
 			}
 			pp.Name = ifname
