@@ -1,6 +1,32 @@
 # Platina Systems Corporation
 ### RELEASE NOTES
-##### Future releases will be named by date, YYYYMMDD, ex. __20170820__
+##### Future releases will be named vX.Y.Z
+---
+### Release: v1.1.0 - Enhanced Functionality in Goes
+#### New Features
+  - MK1 X86 - Upgraded Link configuration, Enhanced Stability.
+
+#### Description
+  - Link Configuration
+    - __ethtool__ is used for link configuration
+    - Interface names for front panel ports are called '__xeth?__', for example, xeth1, xeth2...xeth32.
+    - When ports are broken out into seprate lanes, Sub interfaces are called '__xethX-Y__', for example xeth1-1, xeth1-4,...,xeth32-1.. xeth-32-4
+    - Supported Link Speeds
+      - 100G - Interface names are xethX, where X = 1 .. 32
+      - 50G  - Interface names are xethX-1,xethX-3, where X = 1 .. 32 
+      - 40G  - Interface names are xethX, where X = 1 .. 32
+      - 25G  - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
+      - 10G  - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4 
+      - 1G   - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
+    - Each individual port can be configured independently.
+  - Routing and Protocol Support
+    - Open Source routing stacks are supported. E.g. FRR, Quagga, GoBGP, Bird etc.
+  - Network Slicing, VRF support
+    - Network slicing and VRF are supported with linux namespaces.
+ #### Compatible Versions
+   - MK1 X86 (Goes) - v1.1.0
+   - Coreboot -
+   - Kernel -
 ---
 ### Release:  __20170910__ - BMC only, upgrade improvements
 #### New Features
