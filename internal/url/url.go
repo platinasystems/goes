@@ -159,13 +159,13 @@ func FetchReqs(parallel int, reqs []*grab.Request) (successes int, err error) {
 					//Link request to response
 					resp.Request.Tag = resp
 					// print final result
-					if err := resp.Err(); err != nil {
-						fmt.Fprintf(os.Stderr, "Error downloading %s: %v\n", resp.Request.URL(), err)
+					if resp.Error != nil {
+						fmt.Fprintf(os.Stderr, "Error downloading %s: %v\n", resp.Request.URL(), resp.Error)
 						if firstErr == nil {
-							firstErr = err
+							firstErr = resp.Error
 						}
 					} else {
-						fmt.Printf("Finished %s %d / %d bytes (%d%%)\n", resp.Filename, resp.BytesComplete(), resp.Size, int(100*resp.Progress()))
+						fmt.Printf("Finished %s %d / %d bytes (%d%%)\n", resp.Filename, resp.BytesTransferred(), resp.Size, int(100*resp.Progress()))
 						successes++
 					}
 
@@ -180,7 +180,7 @@ func FetchReqs(parallel int, reqs []*grab.Request) (successes int, err error) {
 			for _, resp := range responses {
 				if resp != nil {
 					inProgress++
-					fmt.Printf("Downloading %s %d / %d bytes (%d%%)\033[K\n", resp.Filename, resp.BytesComplete(), resp.Size, int(100*resp.Progress()))
+					fmt.Printf("Downloading %s %d / %d bytes (%d%%)\033[K\n", resp.Filename, resp.BytesTransferred(), resp.Size, int(100*resp.Progress()))
 				}
 			}
 		}

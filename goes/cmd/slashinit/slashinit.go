@@ -440,7 +440,7 @@ func (c *Command) installer(params []string) error {
 
 	reqs := make([]*grab.Request, 0)
 
-	req, err := grab.NewRequest(".", params[0])
+	req, err := grab.NewRequest(params[0])
 	if err != nil {
 		return err
 	}
@@ -448,7 +448,7 @@ func (c *Command) installer(params []string) error {
 	reqs = append(reqs, req)
 
 	if len(params) >= 2 && len(params[1]) > 0 {
-		req, err := grab.NewRequest(".", params[1])
+		req, err := grab.NewRequest(params[1])
 		if err != nil {
 			return err
 		}
@@ -457,7 +457,7 @@ func (c *Command) installer(params []string) error {
 	}
 
 	if len(params) >= 3 && len(params[2]) > 0 {
-		req, err := grab.NewRequest(".", params[2])
+		req, err := grab.NewRequest(params[2])
 		if err != nil {
 			return err
 		}
