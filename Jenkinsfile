@@ -59,7 +59,6 @@ pipeline {
 			sh 'git config --global url.git@github.com:.insteadOf \"https://github.com/\"'
 			echo "Building goes..."
 			sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z'
-			sh 'env PATH=/usr/local/go/bin:/usr/local/x-tools/arm-unknown-linux-gnueabi/bin:${PATH} go run ./main/goes-build/main.go -x -v -z goes-platina-mk1.test'
 		    }
 		}
 	    }
