@@ -8,12 +8,13 @@ package biosupdate
 
 import (
 	"fmt"
-	"github.com/platinasystems/elib/hw"
 	"io/ioutil"
 	"os"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/platinasystems/memio"
 )
 
 var sysBusPciPath string = "/sys/bus/pci/devices"
@@ -80,22 +81,22 @@ func (p *Programmer) CurrentSPINum() uint    { return p.currentSPINum }
 
 func (p *Programmer) spiBarReadReg32(offset uintptr) uint32 {
 	//	return *(*uint32)(unsafe.Pointer(uintptr(p.spibar)+offset))
-	return hw.LoadUint32(uintptr(p.spibar) + offset)
+	return memio.LoadUint32(uintptr(p.spibar) + offset)
 }
 
 func (p *Programmer) spiBarReadReg16(offset uintptr) uint16 {
 	//	return *(*uint16)(unsafe.Pointer(uintptr(p.spibar)+offset))
-	return hw.LoadUint16(uintptr(p.spibar) + offset)
+	return memio.LoadUint16(uintptr(p.spibar) + offset)
 }
 
 func (p *Programmer) spiBarWriteReg32(offset uintptr, d uint32) {
 	//	*(*uint32)(unsafe.Pointer(uintptr(p.spibar)+offset)) = d
-	hw.StoreUint32(uintptr(p.spibar)+offset, d)
+	memio.StoreUint32(uintptr(p.spibar)+offset, d)
 }
 
 func (p *Programmer) spiBarWriteReg16(offset uintptr, d uint16) {
 	//	*(*uint16)(unsafe.Pointer(uintptr(p.spibar)+offset)) = d
-	hw.StoreUint16(uintptr(p.spibar)+offset, d)
+	memio.StoreUint16(uintptr(p.spibar)+offset, d)
 }
 
 func ichFregBase(flreg uint32) uint32 {
@@ -576,7 +577,7 @@ func GetSelectedSPI() (spinum uint, err error) {
 		return
 	}
 
-	if b & 0x80 == 0 {
+	if b&0x80 == 0 {
 		spinum = 0
 	} else {
 		spinum = 1
