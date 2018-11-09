@@ -8,7 +8,4 @@
 *#*#
 /goes-*
 /*.patch
-*.rom
-*.vmlinuz
-worktrees
 platina-mk1.ko
