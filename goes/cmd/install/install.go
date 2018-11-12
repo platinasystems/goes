@@ -293,7 +293,9 @@ func unzip() error {
 			}
 			if strings.HasPrefix(f.Name, "goes-") {
 				err = new_bin(r)
-			} else if strings.HasSuffix(f.Name, ".so") {
+			} else if strings.HasSuffix(f.Name, ".ko") {
+				err = new_mod(f.Name, r)
+			} else {
 				err = new_lib(f.Name, r)
 			}
 			r.Close()
@@ -315,19 +317,25 @@ func new_bin(r io.Reader) error {
 	return err
 }
 
-func new_lib(sofn string, r io.Reader) error {
+func new_lib(fn string, r io.Reader) error {
 	const libdir = "/usr/lib/goes"
 	err := os.MkdirAll(libdir, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
-	fullname := filepath.Join(libdir, sofn)
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	mode := os.FileMode(0644)
-	w, err := os.OpenFile(fullname, flags, mode)
+	mode := os.FileMode(0755)
+	if strings.HasSuffix(fn, ".so") {
+		mode = os.FileMode(0644)
+	}
+	w, err := os.OpenFile(filepath.Join(libdir, fn), flags, mode)
 	if err == nil {
 		defer w.Close()
 		_, err = io.Copy(w, r)
 	}
 	return err
+}
+
+func new_mod(fn string, r io.Reader) error {
+	return fmt.Errorf("FIXME install %s; then depmod", fn)
 }
