@@ -28,7 +28,10 @@ func All(sig syscall.Signal) (err error) {
 	for _, exe := range exes {
 		var pid int
 		prog, e := os.Readlink(exe)
-		if e != nil || prog != thisprog {
+		if e != nil {
+			continue
+		}
+		if prog != thisprog && filepath.Dir(prog) != "/usr/lib/goes" {
 			continue
 		}
 		spid := strings.TrimPrefix(strings.TrimSuffix(exe, "/exe"),
