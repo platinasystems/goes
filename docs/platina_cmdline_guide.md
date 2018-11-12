@@ -9,9 +9,9 @@
 
 This document is the beginning of a command line reference for the Platina device. This is currently an internal reference and doesn't contain content for end users.
 
-##2.1 GoES Commands
+## 2.1 GoES Commands
 
-###2.1.1 goes help
+### 2.1.1 goes help
 
 #### Command
 
@@ -38,7 +38,7 @@ the actual commands like "goes hget, goes vnet" that can start with
     
      HELPER := { apropos | complete | help | man | usage }
 
-###2.1.2 goes man
+### 2.1.2 goes man
 
 #### Command
 
@@ -80,7 +80,7 @@ the actual commands like "goes hget, goes vnet" that can start with
     
      goes apropos [COMMAND], goes man COMMAND
     
-###2.1.3 goes usage
+### 2.1.3 goes usage
 
 #### Command
 
@@ -101,7 +101,7 @@ the actual commands like "goes hget, goes vnet" that can start with
      HELPER := { apropos | complete | help | man | usage }
     
 
-##2.2 goes apropos
+## 2.2 goes apropos
 
 #### Command
 
@@ -305,7 +305,7 @@ bootc bootc provides wipe and access to bootc.cfg.
     
      wget a non-interactive network downloader
 
-###2.2.1 goes !
+### 2.2.1 goes !
 
 #### Command
 
@@ -325,7 +325,7 @@ bootc bootc provides wipe and access to bootc.cfg.
 
     > goes !
 
-###2.2.2 goes /init
+### 2.2.2 goes /init
 
 #### Command
 
@@ -365,7 +365,7 @@ bootc bootc provides wipe and access to bootc.cfg.
 
     > goes /init 6
 
-###2.2.3 goes [
+### 2.2.3 goes [
 
 #### Command
 
@@ -385,7 +385,7 @@ bootc bootc provides wipe and access to bootc.cfg.
 
     > goes [
 
-###2.2.4 goes bootc
+### 2.2.4 goes bootc
 
 #### Command
 
@@ -420,7 +420,7 @@ bootc bootc provides wipe and access to bootc.cfg.
 
     > goes bootc
 
-###2.2.5 goes bootd
+### 2.2.5 goes bootd
 
 #### Command
 
@@ -440,7 +440,7 @@ bootc bootc provides wipe and access to bootc.cfg.
 
     > goes bootd
 
-###2.2.6 goes cat 
+### 2.2.6 goes cat 
 
 #### Command
 
@@ -499,7 +499,7 @@ bootc bootc provides wipe and access to bootc.cfg.
     
     >
 
-###2.2.7 goes cd
+### 2.2.7 goes cd
 
 #### Command
 
@@ -521,7 +521,7 @@ Changes the current directory. (to the directory mentioned)
     
      (not working)
 
-###2.2.8 goes chmod
+### 2.2.8 goes chmod
 
 #### Command
 
@@ -554,7 +554,7 @@ There are different mode-file options available
     
      -r----x--x 1 root root 585 Jul 20 04:28 subuid
 
-###2.2.9 goes cli
+### 2.2.9 goes cli
 
 #### Command
 
@@ -576,7 +576,7 @@ There are different mode-file options available
     
      invader44>
 
-###2.2.10 goes cp
+### 2.2.10 goes cp
 
 #### Command
 
@@ -611,7 +611,7 @@ used with this command, which include:
     
      testfile.txt testfile55.txt
 
-###2.2.11 goes dmesg
+### 2.2.11 goes dmesg
 
 #### Command
 
@@ -717,7 +717,7 @@ There are different options for this command:
      [0240352.565607] docker0: port 1(veth772b426) entered forwarding
      state
     
-###2.2.12 goes echo
+### 2.2.12 goes echo
 
 #### Command
 
@@ -745,7 +745,7 @@ Print a line of text
     
     > goes echo -n "Platina Systems"
     
-###2.2.13 goes eeprom
+### 2.2.13 goes eeprom
 
 #### Command
 
@@ -765,7 +765,7 @@ Show, delete or modify eeprom fields.
 
     > goes eeprom 
 
-###2.2.14 goes else
+### 2.2.14 goes else
 
 #### Command
 
@@ -785,7 +785,7 @@ Show, delete or modify eeprom fields.
 
     > goes else 
 
-###2.2.15 goes env
+### 2.2.15 goes env
 
 #### Command
 
@@ -805,7 +805,7 @@ Run a program in a modified environment.
 
     > goes env
 
-###2.2.16 goes exec
+### 2.2.16 goes exec
 
 #### Command
 
@@ -825,7 +825,7 @@ Execute a file.
 
     > goes exec
 
-###2.2.17 goes exit
+### 2.2.17 goes exit
 
 #### Command
 
@@ -845,7 +845,7 @@ Used to exit the shell.
 
     > goes exit
 
-###2.2.18 goes export
+### 2.2.18 goes export
 
 #### Command
 
@@ -863,7 +863,7 @@ Sets the process configuration.
 
     > goes export
 
-###2.2.19 goes false
+### 2.2.19 goes false
 
 #### Command
 
@@ -881,7 +881,7 @@ Returns failure.
 
     > goes false
 
-###2.2.20 goes femtocom
+### 2.2.20 goes femtocom
 
 #### Command
 
@@ -899,7 +899,7 @@ Tiny serial-terminal emulation.
 
     > goes femtocom
 
-###2.2.21 goes fi
+### 2.2.21 goes fi
 
 #### Command
 
@@ -919,7 +919,7 @@ End of if command block.
 
     > goes fi
 
-###2.2.22 goes function
+### 2.2.22 goes function
 
 #### Command
 
@@ -939,7 +939,7 @@ Function name { definition }
 
     > goes function
 
-###2.2.23 goes goes-daemons
+### 2.2.23 goes goes-daemons
 
 #### Command
 
@@ -959,7 +959,7 @@ Start daemons and wait for their exit.
 
     > goes goes-daemons
 
-###2.2.24 goes gpio
+### 2.2.24 goes gpio
 
 #### Command
 
@@ -977,7 +977,7 @@ Manipulate GPIO pins.
 
     > goes gpio
 
-###2.2.25 goes hdel
+### 2.2.25 goes hdel
 
 #### Command
 
@@ -997,7 +997,7 @@ Delete one or more redis hash fields.
 
     > goes hdel
 
-###2.2.26 goes hdelta
+### 2.2.26 goes hdelta
 
 #### Command
 
@@ -1015,7 +1015,7 @@ Print the changed fields of a redis hash.
 
     > goes hdelta
 
-###2.2.27 goes hexists
+### 2.2.27 goes hexists
 
 #### Command
 
@@ -1033,7 +1033,7 @@ Print the changed fields of a redis hash.
 
     > goes hexists
 
-###2.2.28 goes hget
+### 2.2.28 goes hget
 
 #### Command
 
@@ -1051,7 +1051,7 @@ Get the value of a redis hash field.
 
     > goes hget
 
-###2.2.29 goes hgetall
+### 2.2.29 goes hgetall
 
 #### Command
 
@@ -1069,7 +1069,7 @@ Get all the field value of a redis hash.
 
     > goes hgetall
 
-###2.2.30 goes hkeys
+### 2.2.30 goes hkeys
 
 #### Command
 
@@ -1089,7 +1089,7 @@ Get all the fields in a redis hash.
 
     > goes hkeys
 
-###2.2.31 goes hset
+### 2.2.31 goes hset
 
 #### Command
 
@@ -1109,7 +1109,7 @@ Set the string value of a redis hash field.
 
     > goes hset
 
-###2.2.32 goes hwait
+### 2.2.32 goes hwait
 
 #### Command
 
@@ -1129,7 +1129,7 @@ Waits until the redis hash field has given value.
 
     > goes hwait
 
-###2.2.33 goes if
+### 2.2.33 goes if
 
 #### Command
 
@@ -1147,7 +1147,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes if
 
-###2.2.34 goes insmod
+### 2.2.34 goes insmod
 
 #### Command
 
@@ -1165,7 +1165,7 @@ Insert a module into the Linux Kernel.
 
     > goes insmod
 
-###2.2.35 goes install
+### 2.2.35 goes install
 
 #### Command
 
@@ -1183,7 +1183,7 @@ Install this goes machine.
 
     > goes install
 
-###2.2.36 goes io
+### 2.2.36 goes io
 
 #### Command
 
@@ -1201,7 +1201,7 @@ Read/write the CPU's I/O ports.
 
     > goes io
 
-###2.2.37 goes ip
+### 2.2.37 goes ip
 
 #### Command
 
@@ -1246,7 +1246,7 @@ Show / manipulate routing, IP information etc..
 
     > goes ip
 
-###2.2.38 goes kexec
+### 2.2.38 goes kexec
 
 #### Command
 
@@ -1266,7 +1266,7 @@ Show / manipulate routing, IP information etc..
 
     > goes kexec
 
-###2.2.39 goes keys
+### 2.2.39 goes keys
 
 #### Command
 
@@ -1284,7 +1284,7 @@ Find all redis keys matching the given pattern.
 
     > goes keys
 
-###2.2.40 goes kill
+### 2.2.40 goes kill
 
 #### Command
 
@@ -1304,7 +1304,7 @@ Signal a process.
 
     > goes kill
 
-###2.2.41 goes ln
+### 2.2.41 goes ln
 
 #### Command
 
@@ -1330,7 +1330,7 @@ Make links between files.
 
     > goes ln
 
-###2.2.42 goes log
+### 2.2.42 goes log
 
 #### Command
 
@@ -1350,7 +1350,7 @@ Print text to /dev/kmsg.
 
     > goes log
 
-###2.2.43 goes ls
+### 2.2.43 goes ls
 
 #### Command
 
@@ -1390,7 +1390,7 @@ List directory contents.
     
     >
 
-###2.2.44 goes lsmod
+### 2.2.44 goes lsmod
 
 #### Command
 
@@ -1473,7 +1473,7 @@ ipt_MASQUERADE,nf_nat_masquerade_ipv4,nf_conntrack_netlink,nf_conntrack_ipv4,nf_
     
     >
 
-###2.2.45 goes mkdir
+### 2.2.45 goes mkdir
 
 #### Command
 
@@ -1516,7 +1516,7 @@ coreboot-platina-mk1.rom goes-platina-mk1-installer
     
     >
 
-###2.2.46 goes mknod
+### 2.2.46 goes mknod
 
 #### Command
 
@@ -1536,7 +1536,7 @@ Make block or character special files.
 
     > goes mknod
 
-###2.2.47 goes mount
+### 2.2.47 goes mount
 
 #### Command
 
@@ -1556,7 +1556,7 @@ Make block or character special files.
 
     > goes mount 
 
-###2.2.48 goes ping
+### 2.2.48 goes ping
 
 #### Command
 
@@ -1582,7 +1582,7 @@ Make block or character special files.
     
     >
 
-###2.2.49 goes ps
+### 2.2.49 goes ps
 
 #### Command
 
@@ -1612,7 +1612,7 @@ Make block or character special files.
     
     >
 
-###2.2.50 goes pwd
+### 2.2.50 goes pwd
 
 #### Command
 
@@ -1636,7 +1636,7 @@ Make block or character special files.
     
     >
 
-###2.2.51 goes qsfp
+### 2.2.51 goes qsfp
 
 #### Command
 
@@ -1656,7 +1656,7 @@ Make block or character special files.
 
     > goes qsfp
 
-###2.2.52 goes reboot
+### 2.2.52 goes reboot
 
 #### Command
 
@@ -1676,7 +1676,7 @@ Make block or character special files.
 
     > goes reboot
 
-###2.2.53 goes redisd
+### 2.2.53 goes redisd
 
 #### Command
 
@@ -1700,7 +1700,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
     
     >
 
-###2.2.54 goes reload
+### 2.2.54 goes reload
 
 #### Command
 
@@ -1720,7 +1720,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes reload
 
-###2.2.55 goes restart
+### 2.2.55 goes restart
 
 #### Command
 
@@ -1742,7 +1742,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
     
     >
 
-###2.2.56 goes rm
+### 2.2.56 goes rm
 
 #### Command
 
@@ -1814,7 +1814,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
     
     >
 
-###2.2.57 goes rmmod
+### 2.2.57 goes rmmod
 
 #### Command
 
@@ -1834,7 +1834,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes rmmod
 
-###2.2.58 goes show
+### 2.2.58 goes show
 
 #### Command
 
@@ -1854,7 +1854,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes show
 
-###2.2.59 goes sleep
+### 2.2.59 goes sleep
 
 #### Command
 
@@ -1874,7 +1874,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes sleep
 
-###2.2.60 goes source
+### 2.2.60 goes source
 
 #### Command
 
@@ -1894,7 +1894,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes source
 
-###2.2.61 goes start
+### 2.2.61 goes start
 
 #### Command
 
@@ -1914,7 +1914,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes start
 
-###2.2.62 goes status
+### 2.2.62 goes status
 
 #### Command
 
@@ -1950,7 +1950,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
     
      root@invader29:~#
 
-###2.2.63 goes stop
+### 2.2.63 goes stop
 
 #### Command
 
@@ -1970,7 +1970,7 @@ listen unix @platina-mk1/redisd: bind: address already in use
 
     > goes stop
 
-###2.2.64 goes stty
+### 2.2.64 goes stty
 
 #### Command
 
@@ -2010,7 +2010,7 @@ isig icanon iexten echo echoe echok -echonl -noflsh -xcase -tostop
     
     >
 
-###2.2.65 goes subscribe
+### 2.2.65 goes subscribe
 
 #### Command
 
@@ -2030,7 +2030,7 @@ Print messages published to given redis channel.
 
     > goes subscribe
 
-###2.2.66 goes sync
+### 2.2.66 goes sync
 
 #### Command
 
@@ -2050,7 +2050,7 @@ Print messages published to given redis channel.
 
     > goes sync
 
-###2.2.67 goes tempd
+### 2.2.67 goes tempd
 
 #### Command
 
@@ -2070,7 +2070,7 @@ Temperature monitoring daemon, publishes to redis.
 
     > goes tempd
 
-###2.2.68 goes then
+### 2.2.68 goes then
 
 #### Command
 
@@ -2090,7 +2090,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes then
 
-###2.2.69 goes toggle
+### 2.2.69 goes toggle
 
 #### Command
 
@@ -2110,7 +2110,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes toggle
 
-###2.2.70 goes true
+### 2.2.70 goes true
 
 #### Command
 
@@ -2130,7 +2130,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes true
 
-###2.2.71 goes umount
+### 2.2.71 goes umount
 
 #### Command
 
@@ -2150,7 +2150,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes umount
 
-###2.2.72 goes uninstall
+### 2.2.72 goes uninstall
 
 #### Command
 
@@ -2170,7 +2170,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes uninstall
 
-###2.2.73 goes upgrade
+### 2.2.73 goes upgrade
 
 #### Command
 
@@ -2191,7 +2191,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes upgrade
 
-###2.2.74 goes uptimed
+### 2.2.74 goes uptimed
 
 #### Command
 
@@ -2211,7 +2211,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes uptimed
 
-###2.2.75 goes vnet
+### 2.2.75 goes vnet
 
 #### Command
 
@@ -2231,7 +2231,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
 
     > goes vnet
 
-###2.2.75.1 goes vnet show event-log
+### 2.2.75.1 goes vnet show event-log
 
 #### Command
 
@@ -2247,7 +2247,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
     
     >
 
-###2.2.75.2 goes vnet show buffers
+### 2.2.75.2 goes vnet show buffers
 
 #### Command
 
@@ -2273,7 +2273,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
     
     >
 
-###2.2.75.3 goes vnet show errors
+### 2.2.75.3 goes vnet show errors
 
 #### Command
 
@@ -2295,7 +2295,7 @@ usage: if COMMAND ; then COMMAND else COMMAND endif
     
     >
 
-###2.2.75.4 goes vnet show fe1 adj
+### 2.2.75.4 goes vnet show fe1 adj
 
 #### Command
 
@@ -2334,7 +2334,7 @@ software 0 2 used nil unicast meth-1 false false ... 1 l3_unicast
     
     >
 
-###2.2.75.5 goes vnet show fe1 debug-events
+### 2.2.75.5 goes vnet show fe1 debug-events
 
 #### Command
 
@@ -2352,7 +2352,7 @@ software 0 2 used nil unicast meth-1 false false ... 1 l3_unicast
     
     >
 
-###2.2.75.6 goes vnet show fe1 eye-summary
+### 2.2.75.6 goes vnet show fe1 eye-summary
 
 #### Command
 
@@ -2394,7 +2394,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.7 goes vnet show fe1 eyescan
+### 2.2.75.7 goes vnet show fe1 eyescan
 
 #### Command
 
@@ -2430,7 +2430,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.8 goes vnet show fe1 interrupt
+### 2.2.75.8 goes vnet show fe1 interrupt
 
 #### Command
 
@@ -2464,7 +2464,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.9 goes vnet show fe1 l2
+### 2.2.75.9 goes vnet show fe1 l2
 
 #### Command
 
@@ -2480,7 +2480,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.10 goes vnet show fe1 temperature
+### 2.2.75.10 goes vnet show fe1 temperature
 
 #### Command
 
@@ -2512,7 +2512,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.11 goes vnet show fe1 switches
+### 2.2.75.11 goes vnet show fe1 switches
 
 #### Command
 
@@ -2530,7 +2530,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.12 goes vnet show fe1 phy event-log
+### 2.2.75.12 goes vnet show fe1 phy event-log
 
 #### Command
 
@@ -2574,7 +2574,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.13 goes vnet show fe1 pipe-counters
+### 2.2.75.13 goes vnet show fe1 pipe-counters
 
 #### Command
 
@@ -2632,7 +2632,7 @@ Port Lane Horizontal/Vertical Raw Left/Lower Raw Right/Upper
     
     >
 
-###2.2.75.14 goes vnet show fe1 port-status mac
+### 2.2.75.14 goes vnet show fe1 port-status mac
 
 #### Command
 
@@ -2665,7 +2665,7 @@ Name Link Up Signal Detect Pmd Lock RemoteF Eq Link Down LocalF Eq
     
     >
 
-###2.2.75.15 goes vnet show fe1 port-status phy
+### 2.2.75.15 goes vnet show fe1 port-status phy
 
 #### Command
 
@@ -2795,7 +2795,7 @@ tx_low_power_idle_received : false false false false
     
     >
 
-###2.2.75.16 goes vnet show fe1 serdes-param
+### 2.2.75.16 goes vnet show fe1 serdes-param
 
 #### Command
 
@@ -2844,7 +2844,7 @@ Name Lane Main Pre Post1 Post2 Post3 Amplitude Drive sdk TxDis pmd
     
     >
 
-###2.2.75.17 goes vnet show fe1 l3-interface
+### 2.2.75.17 goes vnet show fe1 l3-interface
 
 #### Command
 
@@ -3061,7 +3061,7 @@ software_intf:eth-1-1 tunnel:no tunnel is_tx_punt:true if_index:2
     
     >
 
-###2.2.75.18 goes vnet show fe1 port-map
+### 2.2.75.18 goes vnet show fe1 port-map
 
 #### Command
 
@@ -3155,7 +3155,7 @@ software_intf:eth-1-1 tunnel:no tunnel is_tx_punt:true if_index:2
     
     >
 
-###2.2.75.19 goes vnet show fe1 port-table
+### 2.2.75.19 goes vnet show fe1 port-table
 
 #### Command
 
@@ -3183,7 +3183,7 @@ tag_action_idx:0 ovid:14 ivid:0 trust:false use_ivid:false
     
     >
 
-###2.2.75.20 goes vnet show fe1 prefix-pool
+### 2.2.75.20 goes vnet show fe1 prefix-pool
 
 #### Command
 
@@ -3433,7 +3433,7 @@ Show ip46-prefix counter pool entries for all pipes.
     
     >
 
-###2.2.75.21 goes vnet show fe1 station-tcam
+### 2.2.75.21 goes vnet show fe1 station-tcam
 
 #### Command
 
@@ -3523,7 +3523,7 @@ EthernetAddress:[0 0 0 0 0 0]} mask:{LogicalPort:{isTrunk:false
     
     >
 
-###2.2.75.22 goes vnet show fe1 tcam
+### 2.2.75.22 goes vnet show fe1 tcam
 
 #### Command
 
@@ -3643,7 +3643,7 @@ pipe_num prefix_index prefix_len n_half_entries base_index
     
     >
 
-###2.2.75.23 goes vnet show fe1 tx-pipe-buffer
+### 2.2.75.23 goes vnet show fe1 tx-pipe-buffer
 
 #### Command
 
@@ -3689,7 +3689,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.24 goes vnet show fe1 visibility
+### 2.2.75.24 goes vnet show fe1 visibility
 
 #### Command
 
@@ -3713,7 +3713,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.25 goes vnet show fe1 vlan
+### 2.2.75.25 goes vnet show fe1 vlan
 
 #### Command
 
@@ -3789,7 +3789,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.26 goes vnet show hardware-interfaces
+### 2.2.75.26 goes vnet show hardware-interfaces
 
 #### Command
 
@@ -3885,7 +3885,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.27 goes vnet show interfaces
+### 2.2.75.27 goes vnet show interfaces
 
 #### Command
 
@@ -3939,7 +3939,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.28 goes vnet show ip fib
+### 2.2.75.28 goes vnet show ip fib
 
 #### Command
 
@@ -3995,7 +3995,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.29 goes vnet show netlink namespaces
+### 2.2.75.29 goes vnet show netlink namespaces
 
 #### Command
 
@@ -4077,7 +4077,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.30 goes vnet show netlink summary
+### 2.2.75.30 goes vnet show netlink summary
 
 #### Command
 
@@ -4105,7 +4105,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.31 goes vnet show runtime
+### 2.2.75.31 goes vnet show runtime
 
 #### Command
 
@@ -4152,7 +4152,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.32 goes vnet show packet-generator
+### 2.2.75.32 goes vnet show packet-generator
 
 #### Command
 
@@ -4170,7 +4170,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.33 goes vnet clear errors
+### 2.2.75.33 goes vnet clear errors
 
 #### Command
 
@@ -4186,7 +4186,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.34 goes vnet clear event-log
+### 2.2.75.34 goes vnet clear event-log
 
 #### Command
 
@@ -4202,7 +4202,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.35 goes vnet clear fe1 interrupt
+### 2.2.75.35 goes vnet clear fe1 interrupt
 
 #### Command
 
@@ -4218,7 +4218,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.36 goes vnet clear fe1 pipe-counters
+### 2.2.75.36 goes vnet clear fe1 pipe-counters
 
 #### Command
 
@@ -4234,7 +4234,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.37 goes vnet clear interfaces
+### 2.2.75.37 goes vnet clear interfaces
 
 #### Command
 
@@ -4250,7 +4250,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.38 goes vnet clear ip fib
+### 2.2.75.38 goes vnet clear ip fib
 
 #### Command
 
@@ -4266,7 +4266,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.39 goes vnet clear netlink summary
+### 2.2.75.39 goes vnet clear netlink summary
 
 #### Command
 
@@ -4282,7 +4282,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.40 goes vnet clear runtime
+### 2.2.75.40 goes vnet clear runtime
 
 #### Command
 
@@ -4298,7 +4298,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.41 goes vnet event-log
+### 2.2.75.41 goes vnet event-log
 
 #### Command
 
@@ -4314,7 +4314,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.42 goes vnet exec
+### 2.2.75.42 goes vnet exec
 
 #### Command
 
@@ -4330,7 +4330,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.43 goes vnet fe1 activate mirror
+### 2.2.75.43 goes vnet fe1 activate mirror
 
 #### Command
 
@@ -4346,7 +4346,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.44 goes vnet fe1 deactivate mirror
+### 2.2.75.44 goes vnet fe1 deactivate mirror
 
 #### Command
 
@@ -4362,7 +4362,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.45 goes vnet fe1 delete mirror
+### 2.2.75.45 goes vnet fe1 delete mirror
 
 #### Command
 
@@ -4378,7 +4378,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.46 goes vnet fe1 disable sflow
+### 2.2.75.46 goes vnet fe1 disable sflow
 
 #### Command
 
@@ -4394,7 +4394,7 @@ mmu_cell_req_outstanding buffer_port_enable buffer_soft_reset
     
     >
 
-###2.2.75.47 goes vnet fe1 enable ingress mirroring
+### 2.2.75.47 goes vnet fe1 enable ingress mirroring
 
 #### Command
 
@@ -4411,7 +4411,7 @@ Fe1 enables ingress mirroring session <mirror-session> source
     
     >
 
-###2.2.75.48 goes vnet fe1 enable sflow 
+### 2.2.75.48 goes vnet fe1 enable sflow 
 
 #### Command
 
@@ -4428,7 +4428,7 @@ Fe1 enables sflow source<ingress if name> cpu <true/false> mirror
     
     >
 
-###2.2.75.49 goes vnet fe1 get sflow counters
+### 2.2.75.49 goes vnet fe1 get sflow counters
 
 #### Command
 
@@ -4444,7 +4444,7 @@ Fe1 enables sflow source<ingress if name> cpu <true/false> mirror
     
     >
 
-###2.2.75.50 goes vnet fe1 set mirror encapsulation
+### 2.2.75.50 goes vnet fe1 set mirror encapsulation
 
 #### Command
 
@@ -4461,7 +4461,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.51 goes vnet fe1 set sflow default 
+### 2.2.75.51 goes vnet fe1 set sflow default 
 
 #### Command
 
@@ -4477,7 +4477,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.52 goes vnet fe1 set sflow target
+### 2.2.75.52 goes vnet fe1 set sflow target
 
 #### Command
 
@@ -4493,7 +4493,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.53 goes vnet fe1 show mirror
+### 2.2.75.53 goes vnet fe1 show mirror
 
 #### Command
 
@@ -4509,7 +4509,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.54 goes vnet fe1 show sflow details
+### 2.2.75.54 goes vnet fe1 show sflow details
 
 #### Command
 
@@ -4525,7 +4525,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.55 goes vnet i2c scan
+### 2.2.75.55 goes vnet i2c scan
 
 #### Command
 
@@ -4541,7 +4541,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.56 goes vnet ip interface
+### 2.2.75.56 goes vnet ip interface
 
 #### Command
 
@@ -4557,7 +4557,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.57 goes vnet ip route
+### 2.2.75.57 goes vnet ip route
 
 #### Command
 
@@ -4573,7 +4573,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.58 goes vnet netlink log
+### 2.2.75.58 goes vnet netlink log
 
 #### Command
 
@@ -4589,7 +4589,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.59 goes vnet netlink route
+### 2.2.75.59 goes vnet netlink route
 
 #### Command
 
@@ -4605,7 +4605,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.60 goes vnet packet-generator
+### 2.2.75.60 goes vnet packet-generator
 
 #### Command
 
@@ -4621,7 +4621,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.61 goes vnet set fe1 l_train_restart
+### 2.2.75.61 goes vnet set fe1 l_train_restart
 
 #### Command
 
@@ -4637,7 +4637,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.62 goes vnet set fe1 pmd_restart
+### 2.2.75.62 goes vnet set fe1 pmd_restart
 
 #### Command
 
@@ -4653,7 +4653,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.63 goes vnet set fe1 port-config
+### 2.2.75.63 goes vnet set fe1 port-config
 
 #### Command
 
@@ -4669,7 +4669,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.64 goes vnet set fe1 reset_port
+### 2.2.75.64 goes vnet set fe1 reset_port
 
 #### Command
 
@@ -4685,7 +4685,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.65 goes vnet set fe1 serdes-param
+### 2.2.75.65 goes vnet set fe1 serdes-param
 
 #### Command
 
@@ -4702,7 +4702,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.66 goes vnet set hardware-interface
+### 2.2.75.66 goes vnet set hardware-interface
 
 #### Command
 
@@ -4718,7 +4718,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.75.67 goes vnet set interface
+### 2.2.75.67 goes vnet set interface
 
 #### Command
 
@@ -4734,7 +4734,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###2.2.76 goes vnetd
+### 2.2.76 goes vnetd
 
 #### Command
 
@@ -4754,7 +4754,7 @@ Fe1 sets mirror encapsulation session<session-name>
 
     > goes vnetd
 
-###2.2.77 goes wget
+### 2.2.77 goes wget
 
 #### Command
 
@@ -4775,9 +4775,9 @@ Fe1 sets mirror encapsulation session<session-name>
     > goes wget
 
 
-##4.1 Redis hget commands
+## 4.1 Redis hget commands
 
-###4.1.1 bmc.temperature
+### 4.1.1 bmc.temperature
 
 #### Command
 
@@ -4798,7 +4798,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.2 cmdline.console
+### 4.1.2 cmdline.console
 
 #### Command
 
@@ -4818,7 +4818,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.3 cmdline.init
+### 4.1.3 cmdline.init
 
 #### Command
 
@@ -4838,7 +4838,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.4 cmdline.initrd
+### 4.1.4 cmdline.initrd
 
 #### Command
 
@@ -4858,7 +4858,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.5 cmdline.ip
+### 4.1.5 cmdline.ip
 
 #### Command
 
@@ -4878,7 +4878,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.6 cmdline.mem
+### 4.1.6 cmdline.mem
 
 #### Command
 
@@ -4898,7 +4898,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.7 cmdline.quiet
+### 4.1.7 cmdline.quiet
 
 #### Command
 
@@ -4918,7 +4918,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.8 cmdline.root
+### 4.1.8 cmdline.root
 
 #### Command
 
@@ -4938,7 +4938,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.9 cmdline.rootfstype 
+### 4.1.9 cmdline.rootfstype 
 
 #### Command
 
@@ -4958,7 +4958,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.10 cmdline.rootwait
+### 4.1.10 cmdline.rootwait
 
 #### Command
 
@@ -4978,7 +4978,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.11 cmdline.rw
+### 4.1.11 cmdline.rw
 
 #### Command
 
@@ -4998,7 +4998,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.12 cmdline.start
+### 4.1.12 cmdline.start
 
 #### Command
 
@@ -5018,7 +5018,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.13 eeprom.BaseEthernetAddress
+### 4.1.13 eeprom.BaseEthernetAddress
 
 #### Command
 
@@ -5038,7 +5038,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.14 eeprom.Crc
+### 4.1.14 eeprom.Crc
 
 #### Command
 
@@ -5058,7 +5058,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.15 eeprom.DeviceVersion
+### 4.1.15 eeprom.DeviceVersion
 
 #### Command
 
@@ -5078,7 +5078,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.16 eeprom.ManufactureDate
+### 4.1.16 eeprom.ManufactureDate
 
 #### Command
 
@@ -5098,7 +5098,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.17 eeprom.NEthernetAddress
+### 4.1.17 eeprom.NEthernetAddress
 
 #### Command
 
@@ -5118,7 +5118,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.18 eeprom.Onie.Data
+### 4.1.18 eeprom.Onie.Data
 
 #### Command
 
@@ -5138,7 +5138,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.19 eeprom.Onie.Version
+### 4.1.19 eeprom.Onie.Version
 
 #### Command
 
@@ -5158,7 +5158,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.20 eeprom.PartNumber
+### 4.1.20 eeprom.PartNumber
 
 #### Command
 
@@ -5178,7 +5178,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.21 eeprom.PlatformName
+### 4.1.21 eeprom.PlatformName
 
 #### Command
 
@@ -5198,7 +5198,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.22 eeprom.SerialNumber
+### 4.1.22 eeprom.SerialNumber
 
 #### Command
 
@@ -5218,7 +5218,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.23 eeprom.Vendor
+### 4.1.23 eeprom.Vendor
 
 #### Command
 
@@ -5238,7 +5238,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.24 eeprom.VendorExtension
+### 4.1.24 eeprom.VendorExtension
 
 #### Command
 
@@ -5258,7 +5258,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.25 fan_tray.1.1.speed.units.rpm
+### 4.1.25 fan_tray.1.1.speed.units.rpm
 
 #### Command
 
@@ -5278,7 +5278,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.26 fan_tray.1.2.speed.units.rpm
+### 4.1.26 fan_tray.1.2.speed.units.rpm
 
 #### Command
 
@@ -5298,7 +5298,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.27 fan_tray.1.status
+### 4.1.27 fan_tray.1.status
 
 #### Command
 
@@ -5318,7 +5318,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.28 fan_tray.2.1.speed.units.rpm
+### 4.1.28 fan_tray.2.1.speed.units.rpm
 
 #### Command
 
@@ -5338,7 +5338,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.29 fan_tray.2.2.speed.units.rpm
+### 4.1.29 fan_tray.2.2.speed.units.rpm
 
 #### Command
 
@@ -5358,7 +5358,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.30 fan_tray.2.status
+### 4.1.30 fan_tray.2.status
 
 #### Command
 
@@ -5378,7 +5378,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.31 fan_tray.3.1.speed.units.rpm
+### 4.1.31 fan_tray.3.1.speed.units.rpm
 
 #### Command
 
@@ -5398,7 +5398,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.32 fan_tray.3.2.speed.units.rpm
+### 4.1.32 fan_tray.3.2.speed.units.rpm
 
 #### Command
 
@@ -5418,7 +5418,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.33 fan_tray.3.status
+### 4.1.33 fan_tray.3.status
 
 #### Command
 
@@ -5438,7 +5438,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.34 fan_tray.4.1.speed.units.rpm
+### 4.1.34 fan_tray.4.1.speed.units.rpm
 
 #### Command
 
@@ -5458,7 +5458,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.35 fan_tray.4.2.speed.units.rpm
+### 4.1.35 fan_tray.4.2.speed.units.rpm
 
 #### Command
 
@@ -5478,7 +5478,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.36 fan_tray.4.status
+### 4.1.36 fan_tray.4.status
 
 #### Command
 
@@ -5498,7 +5498,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.37 fan_tray.duty
+### 4.1.37 fan_tray.duty
 
 #### Command
 
@@ -5518,7 +5518,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.38 fan_tray.speed
+### 4.1.38 fan_tray.speed
 
 #### Command
 
@@ -5538,7 +5538,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.39 host.temp.target.units.C
+### 4.1.39 host.temp.target.units.C
 
 #### Command
 
@@ -5558,7 +5558,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.40 host.temp.units.C
+### 4.1.40 host.temp.units.C
 
 #### Command
 
@@ -5578,7 +5578,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.41 hostname
+### 4.1.41 hostname
 
 #### Command
 
@@ -5598,7 +5598,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.42 hwmon.front.temp.units.C
+### 4.1.42 hwmon.front.temp.units.C
 
 #### Command
 
@@ -5618,7 +5618,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.43 hwmon.rear.temp.units.C
+### 4.1.43 hwmon.rear.temp.units.C
 
 #### Command
 
@@ -5638,7 +5638,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.44 hwmon.target.units.C
+### 4.1.44 hwmon.target.units.C
 
 #### Command
 
@@ -5658,7 +5658,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.45 machine
+### 4.1.45 machine
 
 #### Command
 
@@ -5677,7 +5677,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.46 psu.powercycle
+### 4.1.46 psu.powercycle
 
 #### Command
 
@@ -5697,7 +5697,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.47 psu1.admin.state
+### 4.1.47 psu1.admin.state
 
 #### Command
 
@@ -5717,7 +5717,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.48 psu1.eeprom
+### 4.1.48 psu1.eeprom
 
 #### Command
 
@@ -5737,7 +5737,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.49 psu1.fan_direction
+### 4.1.49 psu1.fan_direction
 
 #### Command
 
@@ -5757,7 +5757,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.50 psu1.fan_speed.units.rpm
+### 4.1.50 psu1.fan_speed.units.rpm
 
 #### Command
 
@@ -5777,7 +5777,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.51 psu1.i_out.units.A
+### 4.1.51 psu1.i_out.units.A
 
 #### Command
 
@@ -5797,7 +5797,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.52 psu1.mfg_id
+### 4.1.52 psu1.mfg_id
 
 #### Command
 
@@ -5817,7 +5817,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.53 psu1.mfg_model
+### 4.1.53 psu1.mfg_model
 
 #### Command
 
@@ -5837,7 +5837,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.54 psu1.p_in.units.W
+### 4.1.54 psu1.p_in.units.W
 
 #### Command
 
@@ -5857,7 +5857,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.55 psu1.p_out.units.W
+### 4.1.55 psu1.p_out.units.W
 
 #### Command
 
@@ -5877,7 +5877,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.56 psu1.sn
+### 4.1.56 psu1.sn
 
 #### Command
 
@@ -5896,7 +5896,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.57 psu1.status
+### 4.1.57 psu1.status
 
 #### Command
 
@@ -5916,7 +5916,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.58 psu1.temp1.units.C
+### 4.1.58 psu1.temp1.units.C
 
 #### Command
 
@@ -5936,7 +5936,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.59 psu1.temp2.units.C
+### 4.1.59 psu1.temp2.units.C
 
 #### Command
 
@@ -5956,7 +5956,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.60 psu1.v_in.units.V
+### 4.1.60 psu1.v_in.units.V
 
 #### Command
 
@@ -5976,7 +5976,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.61 psu1.v_out.units.V
+### 4.1.61 psu1.v_out.units.V
 
 #### Command
 
@@ -5996,7 +5996,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.62 psu2.admin.state
+### 4.1.62 psu2.admin.state
 
 #### Command
 
@@ -6016,7 +6016,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.63 psu2.eeprom
+### 4.1.63 psu2.eeprom
 
 #### Command
 
@@ -6038,7 +6038,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.64 psu2.fan_direction
+### 4.1.64 psu2.fan_direction
 
 #### Command
 
@@ -6058,7 +6058,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.65 psu2.fan_speed.units.rpm
+### 4.1.65 psu2.fan_speed.units.rpm
 
 #### Command
 
@@ -6078,7 +6078,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.66 psu2.i_out.units.A
+### 4.1.66 psu2.i_out.units.A
 
 #### Command
 
@@ -6098,7 +6098,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.67 psu2.mfg_id
+### 4.1.67 psu2.mfg_id
 
 #### Command
 
@@ -6118,7 +6118,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.68 psu2.mfg_model
+### 4.1.68 psu2.mfg_model
 
 #### Command
 
@@ -6138,7 +6138,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.69 psu2.p_in.units.W
+### 4.1.69 psu2.p_in.units.W
 
 #### Command
 
@@ -6158,7 +6158,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.70 psu2.p_out.units.W
+### 4.1.70 psu2.p_out.units.W
 
 #### Command
 
@@ -6178,7 +6178,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.71 psu2.sn
+### 4.1.71 psu2.sn
 
 #### Command
 
@@ -6197,7 +6197,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.72 psu2.status
+### 4.1.72 psu2.status
 
 #### Command
 
@@ -6217,7 +6217,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.73 psu2.temp1.units.C
+### 4.1.73 psu2.temp1.units.C
 
 #### Command
 
@@ -6237,7 +6237,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.74 psu2.temp2.units.C
+### 4.1.74 psu2.temp2.units.C
 
 #### Command
 
@@ -6257,7 +6257,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.75 psu2.v_in.units.V
+### 4.1.75 psu2.v_in.units.V
 
 #### Command
 
@@ -6277,7 +6277,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.76 psu2.v_out.units.V
+### 4.1.76 psu2.v_out.units.V
 
 #### Command
 
@@ -6297,7 +6297,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.77 redis.ready
+### 4.1.77 redis.ready
 
 #### Command
 
@@ -6317,7 +6317,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.78 sys.cpu.load1
+### 4.1.78 sys.cpu.load1
 
 #### Command
 
@@ -6337,7 +6337,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.79 sys.cpu.load10
+### 4.1.79 sys.cpu.load10
 
 #### Command
 
@@ -6357,7 +6357,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.80 sys.cpu.load15
+### 4.1.80 sys.cpu.load15
 
 #### Command
 
@@ -6377,7 +6377,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.81 sys.mem.buffer
+### 4.1.81 sys.mem.buffer
 
 #### Command
 
@@ -6397,7 +6397,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.82 sys.mem.free
+### 4.1.82 sys.mem.free
 
 #### Command
 
@@ -6438,7 +6438,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.84 sys.mem.total
+### 4.1.84 sys.mem.total
 
 #### Command
 
@@ -6458,7 +6458,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.85 sys.uptime
+### 4.1.85 sys.uptime
 
 #### Command
 
@@ -6478,7 +6478,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.86 system.fan_direction
+### 4.1.86 system.fan_direction
 
 #### Command
 
@@ -6498,7 +6498,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.87 vmon.1v0.tha.units.V
+### 4.1.87 vmon.1v0.tha.units.V
 
 #### Command
 
@@ -6518,7 +6518,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.88 vmon.1v0.thc.units.V
+### 4.1.88 vmon.1v0.thc.units.V
 
 #### Command
 
@@ -6538,7 +6538,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.89 vmon.1v2.ethx.units.V
+### 4.1.89 vmon.1v2.ethx.units.V
 
 #### Command
 
@@ -6558,7 +6558,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.90 vmon.1v25.sys.units.V
+### 4.1.90 vmon.1v25.sys.units.V
 
 #### Command
 
@@ -6578,7 +6578,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.91 vmon.1v8.sys.units.V
+### 4.1.91 vmon.1v8.sys.units.V
 
 #### Command
 
@@ -6598,7 +6598,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.92 vmon.3v3.bmc.units.V
+### 4.1.92 vmon.3v3.bmc.units.V
 
 #### Command
 
@@ -6618,7 +6618,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.93 vmon.3v3.sb.units.V
+### 4.1.93 vmon.3v3.sb.units.V
 
 #### Command
 
@@ -6638,7 +6638,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.94 vmon.3v3.sys.units.V
+### 4.1.94 vmon.3v3.sys.units.V
 
 #### Command
 
@@ -6658,7 +6658,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.95 vmon.3v8.bmc.units.V
+### 4.1.95 vmon.3v8.bmc.units.V
 
 #### Command
 
@@ -6678,7 +6678,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.96 vmon.5v.sb.units.V
+### 4.1.96 vmon.5v.sb.units.V
 
 #### Command
 
@@ -6698,7 +6698,7 @@ Fe1 sets mirror encapsulation session<session-name>
     
     >
 
-###4.1.97 vmon.poweroff.events
+### 4.1.97 vmon.poweroff.events
 
 #### Command
 
