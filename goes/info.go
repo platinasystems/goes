@@ -6,14 +6,9 @@ package goes
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/platinasystems/go/goes/lang"
 )
-
-var Info struct {
-	Licenses, Patents, Versions func() map[string]string
-}
 
 type ShowMachine string
 
@@ -31,52 +26,60 @@ func (name ShowMachine) Main(...string) error {
 	return nil
 }
 
-func (g *Goes) copyright(_ ...string) error {
-	return g.license()
+func (g *Goes) copyright(args ...string) error {
+	return g.license(args...)
 }
 
-func (*Goes) license(_ ...string) error {
-	m := info(Info.Licenses)
-	m["goes"] = License
-	marshal(m)
-	return nil
-}
-
-func (*Goes) patents(_ ...string) error {
-	m := info(Info.Patents)
-	m["goes"] = Patents
-	marshal(m)
-	return nil
-}
-
-func (*Goes) version(_ ...string) error {
-	m := info(Info.Versions)
-	m["goes"] = Version
-	marshal(m)
-	return nil
-}
-
-func info(f func() map[string]string) map[string]string {
-	if f != nil {
-		return f()
+func (g *Goes) license(args ...string) error {
+	type licenser interface {
+		License() error
 	}
-	return make(map[string]string)
-}
-
-func marshal(m map[string]string) {
-	var sep string
-	for k, v := range m {
-		s := strings.TrimSpace(v)
-		if len(m) == 1 {
-			fmt.Println(s)
-		} else if !strings.ContainsRune(s, '\n') {
-			fmt.Print(sep, k, ": ", s, "\n")
-		} else {
-			fmt.Print(sep, k, ": |\n")
-			for _, l := range strings.Split(s, "\n") {
-				fmt.Print("  ", l, "\n")
+	f := func() error {
+		fmt.Println(License)
+		return nil
+	}
+	if len(args) > 0 {
+		if v, found := g.ByName[args[0]]; found {
+			if method, found := v.(licenser); found {
+				f = method.License
 			}
-			sep = "\n"
 		}
 	}
+	return f()
+}
+
+func (g *Goes) patents(args ...string) error {
+	type patentser interface {
+		Patents() error
+	}
+	f := func() error {
+		fmt.Println(Patents)
+		return nil
+	}
+	if len(args) > 0 {
+		if v, found := g.ByName[args[0]]; found {
+			if method, found := v.(patentser); found {
+				f = method.Patents
+			}
+		}
+	}
+	return f()
+}
+
+func (g *Goes) version(args ...string) error {
+	type versioner interface {
+		Version() error
+	}
+	f := func() error {
+		fmt.Println(Version)
+		return nil
+	}
+	if len(args) > 0 {
+		if v, found := g.ByName[args[0]]; found {
+			if method, found := v.(versioner); found {
+				f = method.Version
+			}
+		}
+	}
+	return f()
 }

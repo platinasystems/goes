@@ -37,18 +37,7 @@ func (redisd *Redisd) Info(secs ...string) ([]byte, error) {
 
 	funcs := map[string]func(io.Writer){
 		"server": func(w io.Writer) {
-			var versions map[string]string
-			if goes.Info.Versions != nil {
-				versions = goes.Info.Versions()
-			}
-			for k, v := range versions {
-				if len(versions) == 1 {
-					fmt.Fprint(w, "version: ", v, "\r\n")
-				} else {
-					fmt.Fprint(w, "version.", k, ": ", v,
-						"\r\n")
-				}
-			}
+			fmt.Fprint(w, "version: ", goes.Version, "\r\n")
 			fmt.Fprint(w, "os: ", runtime.GOOS, "\r\n")
 			fmt.Fprint(w, "arch_bits: ", SizeofInt*8, "\r\n")
 			fmt.Fprint(w, "process_id: ", stat.Pid, "\r\n")
