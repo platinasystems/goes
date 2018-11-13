@@ -208,7 +208,7 @@ To set the speed to autoneg enter
 ***Note: In this version, media copper must be set before speed in order
 for link training and receive equalization to work optimally.***
 
-***Note: Speed options supported are auto, 100g, 50g, 40g, 25g, 10g.***
+***Note: Speed options supported are auto, 100g, 50g, 40g, 25g, 10g and 1g.***
 
 The settings do not persist across goes stop/start or reboot. To
 configure permanently, add the configuration in /etc/network/interfaces
