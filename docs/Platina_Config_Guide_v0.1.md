@@ -166,8 +166,8 @@ output.
 Once GOES is installed and running, all front panel ports will show up
 as normal eth interfaces in Linux. By default they are xeth1, xeth2, …
 ,xeth32. The format is
-`xeth&lt;port\_number&gt;-&lt;sub-port\_number&gt;` where `port\_number`
-corresponds to the 32 front panel ports and `sub-port\_number` corresponds
+`xeth<port_number>-<sub-port_number>` where `port_number`
+corresponds to the 32 front panel ports and `sub-port_number` corresponds
 to optionally configured breakout ports within each port.
 
 All 32 QSFP28 eth interfaces can be configured via Linux using standard
@@ -176,13 +176,30 @@ Linux methods, e.g. ip link, ip addr, /etc/network/interfaces, etc.
 Interface configurations not available in Linux, such as interface speed
 and media type, can be done via the ethtool.
 
+When ports are broken out into seprate lanes, Sub interfaces are called '__xethX-Y__', for example xeth1-1, xeth1-4,...,xeth32-1.. xeth-32-4
+
+    - Supported Link Speeds
+      - 100G - Interface names are xethX, where X = 1 .. 32
+      - 50G  - Interface names are xethX-1,xethX-3, where X = 1 .. 32
+      - 40G  - Interface names are xethX, where X = 1 .. 32
+      - 25G  - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
+      - 10G  - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
+      - 1G   - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
+    - Each individual port can be configured independently.
+
+In order to breakout ports into multiple lanes, the file `/etc/modprobe.d/goesd-platina-mk1-modprobe.conf` needs to be updated as follows:
+
+    - Add/Update the `options` line
+    - Each of the numbers correspond to the number of lanes starting with exth1 to xeth32.
+    - E.g.: options platina-mk1 provision=1,1,4,1,4,1,2,1,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+    -     The above creates interfaces: xeth1, xeth2, xeth3-1, xeth3-2 .. xeth3-4, xeth4, xeth5-1 .. xeth5-4, xeth6, xeth7-1, xeth7-3, xeth8, xeth9-1 .. xeth9-4,....xeth32
+    
 **Set Media Type and Speed**
 
 To set the media type and speed on xeth1 to copper (i.e. DAC cable) and
 100g fixed speed for example, enter
 
-    goes hset platina-mk1 vnet.xeth1.media copper
-    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
+    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool --set-priv-flags xeth1 copper on && sudo ethtool -s xeth1 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
 
 To set the speed to autoneg enter
 
@@ -255,7 +272,7 @@ for each interface.
 
 **BGP**
 
-The trial unit does not come pre-installed with BGP. Any BGP protocol
+The trial unit does not come pre-installed with BGP. Any Open Source BGP protocol
 stack can be installed directly onto Linux as if installing on a server.
 The GOES daemon will handle any translation between the Linux kernel and
 ASIC. All FIB/RIB can be obtained directly from Linux or the BGP stack.
@@ -306,42 +323,6 @@ Most of the fields in the Platina Redis are read-only, but some can be
 set. If a set is successful, Redis will return an integer 1. Otherwise
 Redis will return an error message.
 
-**Media Type**\
-Each port can be configured as copper or fiber mode. Copper mode is for
-QSFP28 media such as direct attach cable (DAC) where the switch ASIC
-serdes is driving the line directly. Fiber mode is for all other QSFP28
-optical pluggable modules where ASIC serdes interacts typically with a
-CDR at the local QSFP28 module. 100GE autoneg function and link training
-is only available in copper mode.
-
-Example:
-
-    hset platina-mk1 vnet.xeth1.media copper
-
-    hget platina-mk1 vnet.xeth1.media
-    copper
-
-**Speed**\
-Each QSFP port supports 1GE, 10GE, 20GE, 25GE, 40GE, 50GE, and 100GE
-speeds, either in single port mode or breakout port mode. In this
-version, only 10GE, 25GE, 40GE, 50GE and 100GE modes are supported. If a
-speed is specified, the port will be fixed at that speed. If set to
-“auto” (applicable only if port is in copper media mode), the port will
-negotiate with neighbor switch to establish the speed.
-
-Example:
-
-
-    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
-
-    hget platina-mk1 xeth1.speed
-    auto
-
-    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
-
-    hget platina-mk1 xeth1.speed
-    100g
-
 **Stats Counter Update Interval**
 
 Stats counters such as transmit/receive packet counters, packet drops,
@@ -388,12 +369,10 @@ Example:
     false
 
 **Linux Packet/Byte counters**\
-Deprecated from redis
 
 The Linux interface counter (e.g. via ip link or ifconfig) counts
-packets that have been sent/receive from/to the ASIC to/from the CPU
-only. Packets that are locally received and forwarded in ASIC are not
-included in the Linux interface counter. To get the ASIC level interface
+packets that have been sent/received on each ASIC interface. 
+To get the detailed ASIC level interface
 counters, use vnet.\[interface\].port redis commands instead.
 
     ip -s link show xeth12
@@ -410,7 +389,7 @@ counters, use vnet.\[interface\].port redis commands instead.
 vnet.\[interface\].port… are counters that reflect the interface
 counters as reported by the switch ASIC. These counters count the number
 of packets/bytes that are coming in or going out of the switch ASIC’s,
-as well as counters for various types of recognized packet types, for
+as well as counters for various types of recognized packet types and any errors/drops encountered for
 the corresponding front panel ports.
 
 Example: (assume launching from switches local prompt; otherwise hget
