@@ -19,8 +19,9 @@
       - 10G  - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4 
       - 1G   - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
     - Each individual port can be configured independently.
+    - Please refer to [Platina Config Guide](https://github.com/platinasystems/go/docs/Platina_Config_Guide_v0.1.md) for breakout configuration and persistence. 
   - Routing and Protocol Support
-    - Open Source routing stacks are supported. E.g. FRR, Quagga, GoBGP, Bird etc.
+    - Open Source routing stacks are supported. E.g. FRR, Quagga, GoBGP, Bird.
   - Network Slicing, VRF support
     - Network slicing and VRF are supported with linux namespaces.
  #### Compatible Versions
