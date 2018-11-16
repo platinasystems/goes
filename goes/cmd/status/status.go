@@ -60,13 +60,13 @@ func checkForChip() error {
 
 func checkDaemons() error {
 	daemons := map[string]bool{
-		"goes-daemons": true,
-		"goes":         true,
-		"vnetd":        true,
-		"redisd":       true,
-		"uptimed":      true,
+		"goes-daemons":     true,
+		"goes":             true,
+		"vnet-platina-mk1": true,
+		"redisd":           true,
+		"uptimed":          true,
+		"tempd":            true,
 		// "pccd":         true,
-		"tempd": true,
 	}
 
 	mypid := os.Getpid()
@@ -76,7 +76,15 @@ func checkDaemons() error {
 	if err != nil {
 		return err
 	}
-	pids := strings.Split(string(cmdOut), "\n")
+
+	//vnet-platina-mk1 is not a child of goes anymore
+	args = []string{"/bin/ps", "-C", "vnet-platina-mk1", "-o", "pid="}
+	cmdOut2, err2 := exec.Command(args[0], args[1:]...).Output()
+	if err2 != nil {
+		return err2
+	}
+
+	pids := strings.Split(string(cmdOut)+string(cmdOut2), "\n")
 
 	for _, pid := range pids {
 		if pid == "" {
