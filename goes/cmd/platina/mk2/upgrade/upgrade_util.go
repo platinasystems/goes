@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall"
 
-	. "github.com/platinasystems/go"
 	"github.com/platinasystems/go/internal/url"
 )
 
