@@ -14,8 +14,8 @@ These are the documents that we are maintaining for the customer-facing Wiki (SM
 3. **Release Notes** - Converging on Release v1.1. Need to bundle together *GoES-BMC*, *GoES-boot*, the kernel module *platina-mk1*, *GoES* within the Platina build process. We need to validate that we can complete a build from scratch. (*Status: Gopal will finalize new version.*)
 4. **Platina GoES User Guide** - This is a new user-facing document that has to be composed. (*Status: Establish requirements. *)
 
-5. Platina Command Line Guide - Detailed description for all available commands. (*Status: Matt has taken a clean-up pass and we will turn this into internal-facing document only. See markdown cheatsheet here: https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet *)
-6. Method of Procedure - Provides detailed steps to unbox & install HW and describes configuration steps to setup access to the box. (*Status: First version is for Limelight.*)
+5. **Platina Command Line Guide** - Detailed description for all available commands. (*Status: Matt has taken a clean-up pass and we will turn this into internal-facing document only. See markdown cheatsheet here: https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet *)
+6. **Method of Procedure** - Provides detailed steps to unbox & install HW and describes configuration steps to setup access to the box. (*Status: First version is for Limelight.*)
 
 ## Where do customers find these documents
 https://github.com/platinasystems/go/wiki
