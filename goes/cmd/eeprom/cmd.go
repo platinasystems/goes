@@ -16,7 +16,9 @@ import (
 	"github.com/platinasystems/go/internal/parms"
 )
 
-type Command struct{}
+type Command struct {
+	Config func()
+}
 
 func (Command) String() string { return "eeprom" }
 
@@ -59,6 +61,9 @@ func (c Command) Complete(args ...string) []string {
 
 func (c Command) Main(args ...string) error {
 	var eeprom Eeprom
+	if c.Config != nil {
+		c.Config()
+	}
 	nargs := len(args)
 	flag, args := flags.New(args, c.flags()...)
 	parm, args := parms.New(args, c.parms()...)
