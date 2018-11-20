@@ -4,10 +4,10 @@
 package kexec
 
 import (
-	"github.com/platinasystems/go/internal/fdt"
 	"fmt"
-	"io/ioutil"
+	"github.com/platinasystems/fdt"
 	"github.com/platinasystems/go/internal/memmap"
+	"io/ioutil"
 	"os"
 	"syscall"
 )
@@ -40,7 +40,7 @@ func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err e
 	if err != nil {
 		return err
 	}
-	segments, err = fileAddSegment(segments, i, kBase + 0x2000000)
+	segments, err = fileAddSegment(segments, i, kBase+0x2000000)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err e
 	if t != nil {
 		chosen := t.RootNode.Children["chosen"]
 		if chosen == nil {
-			chosen = &fdt.Node{ Name: "chosen", Depth: 1}
+			chosen = &fdt.Node{Name: "chosen", Depth: 1}
 			t.RootNode.Children["chosen"] = chosen
 		}
 		//need 64 bit support - parsing for #address-cells
@@ -58,7 +58,7 @@ func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err e
 		}
 		chosen.Properties["bootargs"] = []byte(cmdline + "\x00")
 		fdt := t.FlattenTreeToSlice()
-		segments = SliceAddSegment(segments, &fdt, kBase + 0x1000000)
+		segments = SliceAddSegment(segments, &fdt, kBase+0x1000000)
 	}
 	err = SegmentLoad(uint64(kBase), &segments, 0)
 	return err

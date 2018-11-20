@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/go/internal/fdt"
+	"github.com/platinasystems/fdt"
 )
 
 type Fit struct {

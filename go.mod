@@ -10,6 +10,7 @@ require (
 	github.com/mattn/go-isatty v0.0.4
 	github.com/platinasystems/atsock v1.1.0
 	github.com/platinasystems/dbg v1.1.0
+	github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82
 	github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73
 	github.com/platinasystems/i2c v1.1.0
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
