@@ -7,7 +7,7 @@ package pin
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 )
 
 type Value struct {

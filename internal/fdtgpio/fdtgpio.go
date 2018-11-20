@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/platinasystems/fdt"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 )
 
 // Build map of gpio pins for this gpio controller

@@ -6,7 +6,7 @@ package main
 
 import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/nct7802yd"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 	"strconv"
 )
 

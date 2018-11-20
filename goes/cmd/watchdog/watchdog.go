@@ -16,8 +16,8 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/gpio"
 	"github.com/platinasystems/go/internal/parms"
+	"github.com/platinasystems/gpio"
 )
 
 type Command struct {

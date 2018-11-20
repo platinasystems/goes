@@ -16,7 +16,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/cmd/iocmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"

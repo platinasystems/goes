@@ -16,13 +16,13 @@ import (
 
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/go/internal/sockfile"
+	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"
 	"github.com/platinasystems/redis/publisher"
 	"github.com/platinasystems/redis/rpc/args"
 	"github.com/platinasystems/redis/rpc/reply"
-	"github.com/platinasystems/go/internal/sockfile"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/redis"
 )

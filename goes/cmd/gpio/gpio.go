@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 )
 
 type Command struct {

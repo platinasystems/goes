@@ -11,7 +11,7 @@ import (
 
 	"github.com/platinasystems/fdt"
 	"github.com/platinasystems/go/internal/fdtgpio"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 )
 
 func gpioInit() {

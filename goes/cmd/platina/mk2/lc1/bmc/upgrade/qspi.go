@@ -15,7 +15,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/i2c"
 )
 

@@ -5,18 +5,17 @@
 package diag
 
 import (
-	"os"
 	"fmt"
-	"strings"
-	"syscall"
-	"io/ioutil"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/i2c"
 	"github.com/tatsushid/go-fastping"
+	"io/ioutil"
 	"net"
+	"os"
+	"strings"
+	"syscall"
 	"time"
 )
-
 
 func diagPing(address string, count int) bool {
 
@@ -89,46 +88,44 @@ func diagI2cPing(b uint8, a uint8, c uint8, count int) (bool, uint8) {
 // performs a word read to i2c device address a on bus number b, returns true if read is successful
 func diagI2cPingWord(b uint8, a uint8, c uint8, count int) (bool, uint32) {
 
-        var (
-                bus i2c.Bus
-                sd  i2c.SMBusData
-        )
-        rw := i2c.Read
-        //op := i2c.ByteData
+	var (
+		bus i2c.Bus
+		sd  i2c.SMBusData
+	)
+	rw := i2c.Read
+	//op := i2c.ByteData
 	op := i2c.WordData
 
-        err := bus.Open(int(b))
-        if err != nil {
-                if debug {
-                        fmt.Println(err)
-                }
-                return false, uint32((sd[1]<<8) | sd[0])
-        }
-        defer bus.Close()
+	err := bus.Open(int(b))
+	if err != nil {
+		if debug {
+			fmt.Println(err)
+		}
+		return false, uint32((sd[1] << 8) | sd[0])
+	}
+	defer bus.Close()
 
-        err = bus.ForceSlaveAddress(int(a))
-        if err != nil {
-                if debug {
-                        fmt.Println(err)
-                }
-                return false, uint32((sd[1]<<8) | sd[0])
-        }
-        for i := 0; i < count; i++ {
-                err = bus.Do(rw, c, op, &sd)
-                if err != nil {
-                        if debug {
-                                fmt.Println(err)
-                        }
-                        return false, uint32((sd[1]<<8) | sd[0])
-                }
-                if debug {
-                        fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
-                }
-        }
-        return true, uint32((sd[1]<<8) | sd[0])
+	err = bus.ForceSlaveAddress(int(a))
+	if err != nil {
+		if debug {
+			fmt.Println(err)
+		}
+		return false, uint32((sd[1] << 8) | sd[0])
+	}
+	for i := 0; i < count; i++ {
+		err = bus.Do(rw, c, op, &sd)
+		if err != nil {
+			if debug {
+				fmt.Println(err)
+			}
+			return false, uint32((sd[1] << 8) | sd[0])
+		}
+		if debug {
+			fmt.Printf("%x.%02x.%02x = %02x\n", b, a, c, sd[0])
+		}
+	}
+	return true, uint32((sd[1] << 8) | sd[0])
 }
-
-
 
 // write 1byte to bus b device address a (i.e. set mux channel)
 func diagI2cWrite1Byte(b uint8, a uint8, c uint8) {
@@ -239,21 +236,20 @@ func CheckPassB(r bool, state bool) string {
 	}
 }
 
-
 func diagDetectMMC() (bool, error) {
-        exists := false
-        files, err := ioutil.ReadDir("/dev")
-        if err != nil {
-                return false, err
-        }
-        for _, f := range files {
-                if !f.IsDir() {
-                        if strings.Contains(f.Name(), "mmcblk0") {
-                                exists = true
-                        }
-                }
-        }
-        return exists, nil
+	exists := false
+	files, err := ioutil.ReadDir("/dev")
+	if err != nil {
+		return false, err
+	}
+	for _, f := range files {
+		if !f.IsDir() {
+			if strings.Contains(f.Name(), "mmcblk0") {
+				exists = true
+			}
+		}
+	}
+	return exists, nil
 }
 
 func diagTestMMC() (bool, error) {
@@ -261,14 +257,14 @@ func diagTestMMC() (bool, error) {
 
 	gotMounted = false
 	if _, err := os.Stat("/mnt"); os.IsNotExist(err) {
-                err := os.Mkdir("/mnt", 0755)
-                if err != nil {
-                        return false, err
-                }
-        }
+		err := os.Mkdir("/mnt", 0755)
+		if err != nil {
+			return false, err
+		}
+	}
 
-        err := syscall.Mount("/dev/mmcblk0p1", "/mnt", "ext4", uintptr(0), "")
-        if err != nil {
+	err := syscall.Mount("/dev/mmcblk0p1", "/mnt", "ext4", uintptr(0), "")
+	if err != nil {
 		if strings.Contains(err.Error(), "resource busy") {
 			gotMounted = false
 		} else {
@@ -278,19 +274,19 @@ func diagTestMMC() (bool, error) {
 		gotMounted = true
 	}
 
-        f, err := os.Create("/mnt/diag_test")
+	f, err := os.Create("/mnt/diag_test")
 	if err != nil {
-                return false, err
-        }
-        f.Close()
+		return false, err
+	}
+	f.Close()
 
 	if _, err := os.Stat("/mnt/diag_test"); os.IsNotExist(err) {
-                return false, err
-        }
+		return false, err
+	}
 
 	if err := os.Remove("/mnt/diag_test"); err != nil {
-                return false, err
-        }
+		return false, err
+	}
 
 	if gotMounted == true {
 		if err := syscall.Unmount("/mnt", 0); err != nil {
@@ -298,5 +294,5 @@ func diagTestMMC() (bool, error) {
 		}
 	}
 
-        return true, nil
+	return true, nil
 }

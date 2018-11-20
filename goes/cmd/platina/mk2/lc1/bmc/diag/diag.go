@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/go/internal/flags"
 )
 
 var debug, x86, writeField, delField, writeSN bool

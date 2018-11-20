@@ -21,7 +21,7 @@ import (
 	"github.com/platinasystems/go/goes/cmd/platina/mk2/mc1/bmc/w83795d"
 	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/go/internal/eeprom"
-	"github.com/platinasystems/go/internal/gpio"
+	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"
 	"github.com/platinasystems/redis/publisher"
