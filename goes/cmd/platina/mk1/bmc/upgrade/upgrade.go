@@ -122,10 +122,10 @@ func (c *Command) Main(args ...string) error {
 func reportVerServer(s string, v string, t bool) (err error) {
 	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return fmt.Errorf("Server unreachable\n")
+		return fmt.Errorf("Error reading %s: %s\n", ArchiveName, err)
 	}
 	if n < 1000 {
-		return fmt.Errorf("Server unreachable\n")
+		return fmt.Errorf("File %s %d bytes\n", ArchiveName, n)
 	}
 	if err := unzip(); err != nil {
 		return fmt.Errorf("Server error: unzipping file: %\n", err)
@@ -185,10 +185,10 @@ func doUpgrade(s string, v string, t bool, f bool, q bool) (err error) {
 
 	n, err := getFile(s, v, t, ArchiveName)
 	if err != nil {
-		return fmt.Errorf("Server unreachable\n")
+		return fmt.Errorf("Error reading %s: %s\n", ArchiveName, err)
 	}
 	if n < 1000 {
-		return fmt.Errorf("Server unreachable\n")
+		return fmt.Errorf("File %s %d bytes\n", ArchiveName, n)
 	}
 	if err = unzip(); err != nil {
 		return fmt.Errorf("Server error: unzipping file: %v\n", err)
