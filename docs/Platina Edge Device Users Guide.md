@@ -1,5 +1,6 @@
 
 <a name="contents"/>
+
 # Table of Contents
 
 1. [ Table of Contents](#tableofcontents)
@@ -56,7 +57,9 @@
 
 
 <a name="installation"/>
+
 # Installation
+
 ## Unpacking Platina Edge Device
 
 The package includes the following items:
@@ -84,8 +87,11 @@ This procedure is used to rack mount the Platina switch to a rack. It requires t
 ![](images/03-box.png)
 
 <a name="administration"/>
+
 # Administration
+
 <a name="quickstartguide"/>
+
 ## Quick Start Guide
 
 Please refer to the quick start guide included with the unit for
@@ -93,6 +99,7 @@ hardware package/unpackage instructions, MAC addresses, port labeling,
 field replaceable unit labeling, and other general instructions.
 
 <a name="generalarchitecture"/>
+
 ## General Architecture
 
 The PSW-3001-32C is a 32x100GE switch with hardware forwarding up to
@@ -104,6 +111,7 @@ level block diagram is as follows:
 ![](images/ConfigGuide_image1.png)
 
 <a name="bmcprocessor"/>
+
 ### BMC Processor
 
 BMC processor controls the PSU, board voltage rails, fan speed, and
@@ -112,6 +120,7 @@ on the BMC. Everything, including temperature and fan speed, is
 automated.
 
 <a name="intelprocessor"/>
+
 ### Intel Processor
 
 After power up, the RJ45 console serial should default to Intel CPU
@@ -119,6 +128,7 @@ console. The prompt is the Linux prompt. Everything needed for using,
 configuring, and monitoring the unit can be done from here.
 
 <a name="linux"/>
+
 ### Linux
 
 Linux is the operating system for PSW-3001-32C. The unit is pre-loaded
@@ -130,6 +140,7 @@ new apps, etc.
 By default eth0 is the RJ45 Management Ethernet port on the front panel.
 
 <a name="platinagoesservice"/>
+
 ### Platina GOES Service
 
 Platina software, GOES, is a user space application that runs in Linux.
@@ -189,6 +200,7 @@ repository, email
 [*support@platinasystems.com*](mailto:support@platinasystems.com).
 
 <a name="adminprivilege"/>
+
 ## Admin Privilege
 
 Running goes start/stop/install/uninstall require superuser privilege in
@@ -201,6 +213,7 @@ be added to the ‘adm’ group if goes command access is required,
 otherwise goes commands will need to be invoked with sudo.
 
 <a name="redisdatabaseinterface"/>
+
 ## Redis Database/Interface
 
 GOES includes a Redis server daemon. Any configuration and stats not
@@ -254,6 +267,7 @@ prompt, ‘grep’ or other Linux tools can be used to further filter the
 output.
 
 <a name="qsfp28ports"/>
+
 ## QSFP28 Ports
 
 Once GOES is installed and running, all front panel ports will show up
@@ -288,6 +302,7 @@ In order to breakout ports into multiple lanes, the file `/etc/modprobe.d/goesd-
     -     The above creates interfaces: xeth1, xeth2, xeth3-1, xeth3-2 .. xeth3-4, xeth4, xeth5-1 .. xeth5-4, xeth6, xeth7-1, xeth7-3, xeth8, xeth9-1 .. xeth9-4,....xeth32
     
 <a name="setmediatypeandspeed"/>
+
 ## Set Media Type and Speed
 
 To set the media type and speed on xeth1 to copper (i.e. DAC cable) and
@@ -309,6 +324,7 @@ configure permanently, add the configuration in /etc/network/interfaces
 as described below.
 
 <a name="persistentconfiguration"/>
+
 ## Persistent Configuration
 
 Each time GOES starts up, it will read the network configuration file
@@ -366,6 +382,7 @@ In the example above, ethtool cmds are executed to set speed,media,fec
 for each interface.
 
 <a name="bgp"/>
+
 ## BGP
 
 The trial unit does not come pre-installed with BGP. Any Open Source BGP protocol
@@ -378,6 +395,7 @@ To get the FIB from the ASIC for verification, enter:
     goes vnet show ip fib
 
 <a name="appendix1redisfieldsguide"/>
+
 ## Appendix 1: Redis Fields Guide
 
 The examples in the appendix show standard Redis commands. When directly
@@ -403,6 +421,7 @@ parsed properly. For example:
     redis-cli --raw -h <ipv4_address> hget platina-mk1 xeth1
 
 <a name="fieldsthatcanbesetinplatinasredis"/>
+
 ### Fields that can be set in Platina’s Redis:
 
 Most of the fields in the Platina Redis are read-only, but some can be
@@ -410,6 +429,7 @@ set. If a set is successful, Redis will return an integer 1. Otherwise
 Redis will return an error message.
 
 <a name="statscounterupdateinterval"/>
+
 ### Stats Counter Update Interval
 
 Stats counters such as transmit/receive packet counters, packet drops,
@@ -428,12 +448,14 @@ Example:
     vnet.pollInterval: 1
 
 <a name="readonlyredisfields"/>
+
 ### Read-only Redis Fields
 
 These fields are read only. Attempts to set them will return error
 messages.
 
 ### Packages
+
 Packages shows the software version numbers of GOES. These version
 numbers match the github commit/versions in
 [*https://github.com/platinasystems*](https://github.com/platinasystems)
@@ -447,6 +469,7 @@ Example
     version: 60f39141fbbf78ddb2260dba74c68f2789374f18
 
 ### Physical link state (as reported by switch ASIC)
+
 vnet.\[interface\].link indicates the physical link state as reported by
 the switch ASIC. The value is “true” if link is up, “false” if link is
 down.
@@ -474,6 +497,7 @@ counters, use vnet.\[interface\].port redis commands instead.
 
 
 ### Port Counters
+
 vnet.\[interface\].port… are counters that reflect the interface
 counters as reported by the switch ASIC. These counters count the number
 of packets/bytes that are coming in or going out of the switch ASIC’s,
@@ -672,6 +696,7 @@ each field 1 at a time)
 *vnet.xeth9.port-tx-unicast-packets: 0*
 
 ### Interface MMU Counters
+
 vnet.\[interface\].mmu… are counters that reflect drops at the switch
 ASICs memory management unit (MMU). This is applicable to the Broadcom
 Tomahawk switch ASIC that employs the MMU to manage/switch traffic
@@ -778,6 +803,7 @@ Example:
 *vnet.xeth9.mmu-wred-queue-sc-drop-packets: 0*
 
 ### Interface Pipe Counters
+
 vnet.\[interface\].rx-pipe… and vnet.\[interface\].tx-pipe… are counters
 that reflect counters at the switch ASICs packet processing pipelines.
 The rx-pipe… reflect counters for the ingress pipeline, and tx-pipe…
@@ -979,6 +1005,7 @@ Example:
 *vnet.xeth9.tx-pipe-vlan-tagged-packets: 0*
 
 <a name="fe1counters"/>
+
 ### fe1 counters
 
 fe1 counters captures counters not associated with any front panel
@@ -1090,6 +1117,7 @@ Example:
 *vnet.fe1-pipe3-loopback.tx-pipe-unicast-queue-cos0-packets: 0*
 
 <a name="eth0stats"/>
+
 ### Eth0 stats
 
 Eth0 is the RJ45 management ethernet port that goes straight from the
@@ -1097,6 +1125,7 @@ CPU to/from the front panel RJ45. All the eth0 stats are available in
 Linux.
 
 <a name="eepromcontents"/>
+
 ### EEPROM contents
 
 These Redis fields show the content of the EEPROM that includes
@@ -1147,6 +1176,7 @@ Example:
 "\\xbceP\\x01\\x00Q\\x01\\x02R\\x01\\x01S\\x0e900-000000-002T\\vHB1N645000NT\\vHB2N645000WT\\vHB4N645000M*"
 
 <a name="appendix2bmcredis"/>
+
 ## Appendix 2: BMC Redis
 
 The BMC runs a separate Redis server that provides configuration and
@@ -1163,6 +1193,7 @@ The BMC Redis server listens on port 6379 of the BMC’s eth0 IPv4 address
 and IPv6 link local address.
 
 <a name="connectingviaipv4"/>
+
 ### Connecting via IPv4
 
 By default the BMC eth0 IPv4 address is 192.168.101.100. To connect from
@@ -1173,6 +1204,7 @@ the switch’s Linux CLI:
     "platina-mk1-bmc"
 
 <a name="connectingviaipv6linklocal"/>
+
 ### Connecting via IPv6 Link Local
 
 The BMC eth0 IPv6 link local address can be directly translated from the
@@ -1191,6 +1223,7 @@ fe80::5218:4cff:fe00:1304 and connect to BMC redis:
     "platina-mk1-bmc"
 
 <a name="notablebmcredisfields"/>
+
 ### Notable BMC Redis Fields
 
 Temperature status
@@ -1256,6 +1289,7 @@ Fan Speed
 *fan\_tray.speed: auto*
 
 <a name="psuinformation"/>
+
 ### PSU Information
 
     root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina psu
@@ -1292,6 +1326,7 @@ Fan Speed
 *psu2.status: not\_installed*
 
 <a name="powermonitorinformation"/>
+
 ### Power Monitor Information
 
     root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina vmon
@@ -1320,9 +1355,11 @@ Fan Speed
 *1970-01-01T23:30:34Z.1970-01-01T23:32:28Z.1970-01-01T23:40:17Z.1970-01-01T23:50:54Z.1970-01-01T23:52:04Z*
 
 <a name="updates"/>
+
 # Software and Firmware Updates
 
 <a name="using-goes-upgrade"/>
+
 ## Using GoES upgrade (recommended)
 
 ### Upgrading Coreboot
@@ -1360,7 +1397,9 @@ This will automatically retrieve the upgrade file (platina-mk1-bmc.zip) from htt
 ---
 
 ## Manual upgrade (not recommended)
+
 ### Download the flash ROM and Coreboot images
+
 To retrieve the flash ROM, execute the following Linux commands:
 
 ```
@@ -1377,12 +1416,14 @@ wget http://downloads.platinasystems.com/LATEST/coreboot-platina-mk1.rom
 ```
 
 ### Install Coreboot
+
 To update the boot loader, execute the following Linux commands on the host:
 ```
 /usr/local/share/flashrom/layouts/platina-mk1.xml -i bios -w coreboot-platina-mk1.rom -A -V
 ```
 
 ### Update the Linux Kernel
+
 To update the Linux kernel, execute the following Linux commands on the host:
 ```
 sudo bash
@@ -1391,6 +1432,7 @@ dpkg -i linux-image-platina-mk1-4.13.0.deb
 ```
 
 ### Update GoES
+
 To update the Platina GoES binary, execute the following Linux commands on the host:
 ```
 sudo bash
@@ -1402,6 +1444,7 @@ chmod +x goes-platina-mk1-installer
 ## Additional Information
 
 ### Getting to the BMC Console
+
 The RS-232 port on the front of the appliance is used to drive the system console of the Platina appliance _and_ the console of the Baseboard Management Controller (BMC). This section demonstrates how to toggle between the BMC console and the system console.
 
 To switch to BMC console:
