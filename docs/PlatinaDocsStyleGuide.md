@@ -11,6 +11,14 @@ For better or for worse, documentation is currently published in GitHub Format M
 1. *Platina Appliance Head* or *Platina Appliance Head Device* refers to the whole packaged Platina ToR switch device.
 1. *GOES* refers to the GOES software package/service. The use of *GoES* is deprecated. Use `goes` when referring specifically to the command used on the command line.
 
+## Network addresses
+
+IPv4 addresses from the lab should not be present in public documentation. Instead, use addresses from the IANA TEST-NET-[123] ranges documented in [RFC5737](https://tools.ietf.org/html/rfc5737). Specifically these ranges:
+
+1. TEST-NET-1: 192.0.2.0/24
+1. TEST-NET-2: 198.51.100.0/24
+1. TEST-NET-3: 203.0.113.0/24
+
 ## Markdown
 
 ### Headings
