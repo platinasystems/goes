@@ -40,17 +40,17 @@
       1. [ PSU Information](#psuinformation)
       1. [ Power Monitor Information](#powermonitorinformation)
 1. [ Software and Firmware Updates](#softwareandfirmwareupdates)
-   1. [ Using GoES upgrade (recommended)](#usinggoesupgraderecommended)
+   1. [ Using GOES upgrade (recommended)](#usinggoesupgraderecommended)
       1. [ Upgrading Coreboot](#upgradingcoreboot)
       1. [ Upgrading Linux Kernel](#upgradinglinuxkernel)
-      1. [ Upgrading GoES](#upgradinggoes)
-      1. [ Upgrading Coreboot, Linux Kernel, and GoES in one command](#upgradingcorebootlinuxkernelandgoesinonecommand)
+      1. [ Upgrading GOES](#upgradinggoes)
+      1. [ Upgrading Coreboot, Linux Kernel, and GOES in one command](#upgradingcorebootlinuxkernelandgoesinonecommand)
       1. [ Updating the BMC Firmware](#updatingthebmcfirmware)
    1. [ Manual upgrade (not recommended)](#manualupgradenotrecommended)
       1. [ Download the flash ROM and Coreboot images](#downloadtheflashromandcorebootimages)
       1. [ Install Coreboot](#installcoreboot)
       1. [ Update the Linux Kernel](#updatethelinuxkernel)
-      1. [ Update GoES](#updategoes)
+      1. [ Update GOES](#updategoes)
    1. [ Additional Information](#additionalinformation)
       1. [ Getting to the BMC Console](#gettingtothebmcconsole)
 1. [ Support](#support)
@@ -62,10 +62,10 @@
 
 ## Unpacking Platina Edge Device
 
-The package includes the following items:
- * 1 Platina switch with model number matching the packing slip
+The shipped package includes the following items:
+ * 1 Platina Appliance Head Device with model number matching the packing slip
  * 2 AC power cords
- * 1 console cable with RJ45 to DB9 adapter
+ * 1 console cable with RJ45 to DB9 adapter for use when connecting the console direct to a laptop or other host.
  * 1 rack mount ear kit
  * 1 footpad kit
 
@@ -73,15 +73,15 @@ The package includes the following items:
 
 ## Rack-mounting Platina Edge Device
 
-This procedure is used to rack mount the Platina switch to a rack. It requires two people. Refer to the pictures below for the procedure. If Platina switch will be free-standing on a bench, then this procedure can be skipped and the footpad kit can be installed for bench use.
+This procedure is used to rack mount the Platina Appliance Head Device to a rack. It requires two people. Refer to the pictures below for the procedure. If Platina Appliance Head Device will be free-standing on a bench, then this procedure can be skipped and the footpad kit can be installed for bench use.
 
 ![](images/02-box.png)
 
 1. Install the front rack mount ear kit, as shown in the first picture above.
 2. Install the rear mount kit, as shown in second picture above if the rack is a 4-post rack. These brackets are not required if the rack is a 2-post rack.
-3. Install the switch in the rack. One person should lift the switch into the rack to align the front rack brackets with the marked holes. A second person should secure the switch in the rack using four rack-mounting screws (not provided).
+3. Install the device in the rack. One person should lift the device into the rack to align the front rack brackets with the marked holes. A second person should secure the device in the rack using four rack-mounting screws (not provided).
 4. If using the rear brackets, slide in the second portion and adjust until holes are align. Secure in place using rack-mounting screws (not provided).
-5. Connect AC power to Platina switch.
+5. Connect AC power to Platina Appliance Head Device.
 6. Verify basic switch operation by checking the status of the switch status LEDs. When operating normally the LEDs should be green.
 
 ![](images/03-box.png)
@@ -102,8 +102,8 @@ field replaceable unit labeling, and other general instructions.
 
 ## General Architecture
 
-The PSW-3001-32C is a 32x100GE switch with hardware forwarding up to
-3.2Tbps via the Broadcom Tomahawk ASIC. Built into the switch is a
+The PSW-3001-32C contains a 32x100GE switch with hardware forwarding up to
+3.2Tbps via the Broadcom Tomahawk ASIC. Built into the device is a
 4-core Intel Broadwell DE CPU with 16GB RAM and 128GB SSD. There is also
 a separate BMC ARM processor with 2GB of DRAM and 2GB of uSD. The high
 level block diagram is as follows:
@@ -123,19 +123,27 @@ automated.
 
 ### Intel Processor
 
-After power up, the RJ45 console serial should default to Intel CPU
+After power up, the RS-232 serial console defaults to Intel CPU
 console. The prompt is the Linux prompt. Everything needed for using,
 configuring, and monitoring the unit can be done from here.
+
+It is possible to switch the RS-232 serial console to between the x86 and 
+the BMC consoles. This is described below in a section titled 
+[ Getting to the BMC Console](#gettingtothebmcconsole).
 
 <a name="linux"/>
 
 ### Linux
 
-Linux is the operating system for PSW-3001-32C. The unit is pre-loaded
+Linux is the operating system installed on the PSW-3001-32C. The unit is
+pre-loaded
 with stock Debian Jessie and kernel version 4.13.0. The admin account is
-“root”; password “platina”. All standard Linux command and usage applies
-as is, including configuration of Ethernet interfaces, installation of
-new apps, etc.
+“root”; password “platina”. This password should be changed before bringing
+the device up on the network.
+
+Standard Linux commands and utilities can generally be expected to behave as 
+with any Linux distribution. Enhancements to certain functionality is
+documented elsewhere within this guide.
 
 By default eth0 is the RJ45 Management Ethernet port on the front panel.
 
@@ -143,15 +151,17 @@ By default eth0 is the RJ45 Management Ethernet port on the front panel.
 
 ### Platina GOES Service
 
-Platina software, GOES, is a user space application that runs in Linux.
-A copy of the GOES binary is at\
-/root/goes-platina-mk1
+GOES, the core Platina service, is a user space application that runs on Linux.
+A copy of the GOES binary is at:
 
-GOES is pre-installed on each switch. To manually install GOES (i.e. SW
-upgrade/downgrade, re-install) enter the following command:\
-sudo /root/goes-platina-mk1 install
+    /root/goes-platina-mk1
 
-The ‘install’ command will install GOES at /usr/bin/goes, by default.
+GOES is pre-installed on each device. To manually install GOES (i.e. SW
+upgrade/downgrade, re-install) enter the following command:
+
+    sudo /root/goes-platina-mk1 install
+
+The ‘install’ command will install GOES at /usr/bin/goes by default.
 
 Once installed, GOES will startup automatically on reboot going forward.
 
@@ -159,21 +169,15 @@ You can verify GOES is running properly by entering
 
     goes status
 
-and look for the following:
+which gives the following output on success:
 
-*GOES status*
-
-*======================*
-
-*Mode - XETH*
-
-*PCI - OK*
-
-*Check daemons - OK*
-
-*Check Redis - OK*
-
-*Check vnet - OK*
+    GOES status
+    ======================
+    Mode - XETH
+    PCI - OK
+    Check daemons - OK
+    Check Redis - OK
+    Check vnet - OK
 
 To uninstall goes, enter:
 
@@ -187,30 +191,24 @@ To start up goes again, enter:
 
     sudo goes start
 
-Each stop/start will reset all ASIC configuration/memory and reinitialize ASIC.
+Each stop/start will reset all ASIC configuration/memory and reinitialize the ASIC. This may result in a short disruption to network forwarding.
 
-GOES is an open source project developed by Platina. To see the source
-code, visit
+GOES is an open source project developed by Platina. The source code is available at [https://github.com/platinasystems/go](https://github.com/platinasystems/go).
 
-[*https://github.com/platinasystems/go*](https://github.com/platinasystems/go)
-
-There is an addition private repository needed to compile the source. To
+There is an additional private repository needed to compile the source. To
 inquire if you meet the license requirement to access the private
 repository, email
-[*support@platinasystems.com*](mailto:support@platinasystems.com).
+[support@platinasystems.com](mailto:support@platinasystems.com).
 
 <a name="adminprivilege"/>
 
 ## Admin Privilege
 
-Running goes start/stop/install/uninstall require superuser privilege in
-Linux. The Quick Start guide includes default password for root access
-preconfigured on the unit.
+Running goes start/stop/install/uninstall requires superuser privilege.
+The Quick Start guide includes default password for root access preconfigured on the unit.
 
-For other ‘goes…’ commands, it is sufficient to be just part of the
-‘adm’ group to be able to execute the command. A new user account should
-be added to the ‘adm’ group if goes command access is required,
-otherwise goes commands will need to be invoked with sudo.
+For other goes commands, it is sufficient to be a member of the 
+*adm* group to be able to execute the command.
 
 <a name="redisdatabaseinterface"/>
 
@@ -220,13 +218,13 @@ GOES includes a Redis server daemon. Any configuration and stats not
 normally associated with Linux can be found in this Redis database. The
 GOES Redis server is a standard Redis server listening on port 6379 of
 the loopback interface and eth0. The database can be accessed remotely
-anywhere via standard Redis-client and Redis-cli using the IP address of
-eth0.
+anywhere via standard Redis-client and Redis-cli using the management IP
+address.
 
 To invoke Redis commands directly from the Linux CLI, precede the Redis
 command with “goes”, otherwise standard Redis command format should be
 used from a Redis client. In this guide, the command examples will
-assume the user is invoking from the switch’s Linux CLI.
+assume the user is invoking from the device’s Linux CLI.
 
 To see a list of all parameters in this Redis database, enter:
 
@@ -270,20 +268,21 @@ output.
 
 ## QSFP28 Ports
 
-Once GOES is installed and running, all front panel ports will show up
-as normal eth interfaces in Linux. By default they are xeth1, xeth2, …
-,xeth32. The format is
-`xeth<port_number>-<sub-port_number>` where `port_number`
-corresponds to the 32 front panel ports and `sub-port_number` corresponds
-to optionally configured breakout ports within each port.
+Once GOES is installed and running, all front panel ports are presented
+as normal Linux network interfaces and can be manipulated using standard
+Linux tools, such as ifup, ifdown, iproute2 and ethtool.
 
-All 32 QSFP28 eth interfaces can be configured via Linux using standard
-Linux methods, e.g. ip link, ip addr, /etc/network/interfaces, etc.
+Interface speed, media type and other lower-level functionality may be
+configured using ethtool.
 
-Interface configurations not available in Linux, such as interface speed
-and media type, can be done via the ethtool.
+The default naming convention for the ports is *xeth* followed by the front
+panel port number (ie, 1-32). For example, the interface *xeth12* corresponds
+to the front panel port labeled *12* on the Appliance Head Device.
 
-When ports are broken out into seprate lanes, Sub interfaces are called '__xethX-Y__', for example xeth1-1, xeth1-4,...,xeth32-1.. xeth-32-4
+In cases where the front panel port is split into lanes, each lane will be
+presented as a separate network interface. For example, if port 12 is split
+into 4x10GbE lanes, the corresponding interface names will be *xeth12-1*,
+*xeth12-2*, *xeth12-3* and *xeth12-4*.
 
     - Supported Link Speeds
       - 100G - Interface names are xethX, where X = 1 .. 32
@@ -294,30 +293,54 @@ When ports are broken out into seprate lanes, Sub interfaces are called '__xethX
       - 1G   - Interface names are xethX-Y, where X = 1 .. 32, Y = 1 .. 4
     - Each individual port can be configured independently.
 
-In order to breakout ports into multiple lanes, the file `/etc/modprobe.d/goesd-platina-mk1-modprobe.conf` needs to be updated as follows:
+In order to break out ports into multiple lanes, modify the file
+`/etc/modprobe.d/goesd-platina-mk1-modprobe.conf` per these steps:
 
-    - Add/Update the `options` line
-    - Each of the numbers correspond to the number of lanes starting with exth1 to xeth32.
-    - E.g.: options platina-mk1 provision=1,1,4,1,4,1,2,1,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
-    -     The above creates interfaces: xeth1, xeth2, xeth3-1, xeth3-2 .. xeth3-4, xeth4, xeth5-1 .. xeth5-4, xeth6, xeth7-1, xeth7-3, xeth8, xeth9-1 .. xeth9-4,....xeth32
+1. Modify (or add) an options statement to set the *provision* module parameter for the *platina-mk1* module:
+    1. There should be one comma-separated integer for each front panel port.
+    1. Each integer represents the number of lanes to split each port into, where valid values are 1, 2 or 4.
+    1. For example, so keep all ports a single lane except ports 3, 5 and 9, which we want as four lanes, and port 7 as two lanes, the line in the file would look like this: `options platina-mk1 provision=1,1,4,1,4,1,2,1,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1`
+1. Remove and re-insert the platina-mk1 module:
+    1. `modprobe -r platina-mk1`
+    1. `modprobe platina-mk1`
+1. Restart GOES:
+    1. `sudo goes stop`
+    1. `sudo goes start`
+
+The above example will result in the Linux network interfaces interfaces: xeth1, xeth2, xeth3-1, xeth3-2 .. xeth3-4, xeth4, xeth5-1 .. xeth5-4, xeth6, xeth7-1, xeth7-3, xeth8, xeth9-1 .. xeth9-4,....xeth32.
+
+While reloading the kernel module and restarting GOES, there may be some
+brief disruption to network forwarding.
+
+*Note: When GOES is started, the interfaces are assigned MAC addresses 
+incrementally from the built-in base MAC address. When changing a port's lane
+configuration, it is possible that the MAC addresses for each interface may
+be renumbered.*
+
     
 <a name="setmediatypeandspeed"/>
 
 ## Set Media Type and Speed
 
-To set the media type and speed on xeth1 to copper (i.e. DAC cable) and
-100g fixed speed for example, enter
+The standard Linux *ethtool* tool may be used to set various low-level parameters, including the media type and link speed. To set the media type to copper,
+and the link speed to 100GbE, follow these steps:
 
-    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool --set-priv-flags xeth1 copper on && sudo ethtool -s xeth1 speed 100000 autoneg off && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
+1. `sudo goes stop`
+1. `sudo ethtool --set-priv-flags xeth1 copper on`
+1. `sudo ethtool -s xeth1 speed 100000 autoneg off`
+1. `sudo goes start`
 
-To set the speed to autoneg enter
+To have the speed autonegotiated, use the following:
 
-    sudo goes stop && sudo ip link set xeth1 up && sudo ethtool -s xeth1 autoneg on && sudo ifconfig xeth1 10.0.1.47/24 && sleep 3 && sudo goes start
+1. `sudo goes stop`
+1. `sudo ethtool --set-priv-flags xeth1 copper on`
+1. `sudo ethtool -s xeth1 autoneg on`
+1. `sudo goes start`
 
-***Note: In this version, media copper must be set before speed in order
-for link training and receive equalization to work optimally.***
+*Note: At the time of writing, the media type should be set before setting
+link speed autonegotiation.*
 
-***Note: Speed options supported are auto, 100g, 50g, 40g, 25g, 10g and 1g.***
+*Note: Supported link speeds are auto, 100g, 50g, 40g, 25g, 10g and 1g.*
 
 The settings do not persist across goes stop/start or reboot. To
 configure permanently, add the configuration in /etc/network/interfaces
@@ -399,13 +422,13 @@ To get the FIB from the ASIC for verification, enter:
 ## Appendix 1: Redis Fields Guide
 
 The examples in the appendix show standard Redis commands. When directly
-on the switch’s Linux CLI, add “goes” in front of the Redis command.
+on the device’s Linux CLI, add “goes” in front of the Redis command.
 
 From Redis-client:
 
     hgetall platina-mk1
 
-From switch Linux prompt:
+From device Linux prompt:
 
     goes hgetall platina-mk1
 
@@ -500,200 +523,21 @@ counters, use vnet.\[interface\].port redis commands instead.
 
 vnet.\[interface\].port… are counters that reflect the interface
 counters as reported by the switch ASIC. These counters count the number
-of packets/bytes that are coming in or going out of the switch ASIC’s,
+of packets/bytes that are coming in or going out of the switch ASIC,
 as well as counters for various types of recognized packet types and any errors/drops encountered for
 the corresponding front panel ports.
 
-Example: (assume launching from switches local prompt; otherwise hget
+Example: (assume launching from devices local prompt; otherwise hget
 each field 1 at a time)
 
     goes hget platina-mk1 vnet.xeth9.port
-
-*vnet.xeth9.port-rx-1024-to-1518-byte-packets: 1445258343*
-
-*vnet.xeth9.port-rx-128-to-255-byte-packets: 0*
-
-*vnet.xeth9.port-rx-1519-to-1522-byte-vlan-packets: 0*
-
-*vnet.xeth9.port-rx-1519-to-2047-byte-packets: 0*
-
-*vnet.xeth9.port-rx-1tag-vlan-packets: 0*
-
-*vnet.xeth9.port-rx-2048-to-4096-byte-packets: 0*
-
-*vnet.xeth9.port-rx-256-to-511-byte-packets: 0*
-
-*vnet.xeth9.port-rx-2tag-vlan-packets: 0*
-
-*vnet.xeth9.port-rx-4096-to-9216-byte-packets: 0*
-
-*vnet.xeth9.port-rx-512-to-1023-byte-packets: 0*
-
-*vnet.xeth9.port-rx-64-byte-packets: 0*
-
-*vnet.xeth9.port-rx-65-to-127-byte-packets: 0*
-
-*vnet.xeth9.port-rx-802-3-length-error-packets: 0*
-
-*vnet.xeth9.port-rx-9217-to-16383-byte-packets: 0*
-
-*vnet.xeth9.port-rx-alignment-error-packets: 0*
-
-*vnet.xeth9.port-rx-broadcast-packets: 0*
-
-*vnet.xeth9.port-rx-code-error-packets: 0*
-
-*vnet.xeth9.port-rx-control-packets: 0*
-
-*vnet.xeth9.port-rx-crc-error-packets: 0*
-
-*vnet.xeth9.port-rx-eee-lpi-duration: 0*
-
-*vnet.xeth9.port-rx-eee-lpi-events: 0*
-
-*vnet.xeth9.port-rx-false-carrier-events: 0*
-
-*vnet.xeth9.port-rx-flow-control-packets: 0*
-
-*vnet.xeth9.port-rx-fragment-packets: 0*
-
-*vnet.xeth9.port-rx-good-packets: 1445258427*
-
-*vnet.xeth9.port-rx-jabber-packets: 0*
-
-*vnet.xeth9.port-rx-mac-sec-crc-matched-packets: 0*
-
-*vnet.xeth9.port-rx-mtu-check-error-packets: 0*
-
-*vnet.xeth9.port-rx-pfc-packets: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-0: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-1: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-2: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-3: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-4: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-5: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-6: 0*
-
-*vnet.xeth9.port-rx-pfc-priority-7: 0*
-
-*vnet.xeth9.port-rx-promiscuous-packets: 1445258414*
-
-*vnet.xeth9.port-rx-runt-bytes: 0*
-
-*vnet.xeth9.port-rx-src-address-not-unicast-packets: 0*
-
-*vnet.xeth9.port-rx-truncated-packets: 0*
-
-*vnet.xeth9.port-rx-unicast-packets: 1445258362*
-
-*vnet.xeth9.port-rx-unsupported-dst-address-control-packets: 0*
-
-*vnet.xeth9.port-rx-unsupported-opcode-control-packets: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-0: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-1: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-2: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-3: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-4: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-5: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-6: 0*
-
-*vnet.xeth9.port-rx-xon-to-xoff-priority-7: 0*
-
-*vnet.xeth9.port-tx-1024-to-1518-byte-packets: 0*
-
-*vnet.xeth9.port-tx-128-to-255-byte-packets: 2*
-
-*vnet.xeth9.port-tx-1519-to-1522-byte-vlan-packets: 0*
-
-*vnet.xeth9.port-tx-1519-to-2047-byte-packets: 0*
-
-*vnet.xeth9.port-tx-1tag-vlan-packets: 0*
-
-*vnet.xeth9.port-tx-2048-to-4096-byte-packets: 0*
-
-*vnet.xeth9.port-tx-256-to-511-byte-packets: 0*
-
-*vnet.xeth9.port-tx-2tag-vlan-packets: 0*
-
-*vnet.xeth9.port-tx-4096-to-9216-byte-packets: 0*
-
-*vnet.xeth9.port-tx-512-to-1023-byte-packets: 0*
-
-*vnet.xeth9.port-tx-64-byte-packets: 0*
-
-*vnet.xeth9.port-tx-65-to-127-byte-packets: 0*
-
-*vnet.xeth9.port-tx-9217-to-16383-byte-packets: 0*
-
-*vnet.xeth9.port-tx-broadcast-packets: 0*
-
-*vnet.xeth9.port-tx-control-packets: 0*
-
-*vnet.xeth9.port-tx-eee-lpi-duration: 0*
-
-*vnet.xeth9.port-tx-eee-lpi-events: 0*
-
-*vnet.xeth9.port-tx-excessive-collision-packets: 0*
-
-*vnet.xeth9.port-tx-fcs-errors: 0*
-
-*vnet.xeth9.port-tx-flow-control-packets: 0*
-
-*vnet.xeth9.port-tx-fragments: 0*
-
-*vnet.xeth9.port-tx-good-packets: 2*
-
-*vnet.xeth9.port-tx-jabber-packets: 0*
-
-*vnet.xeth9.port-tx-late-collision-packets: 0*
-
-*vnet.xeth9.port-tx-multicast-packets: 2*
-
-*vnet.xeth9.port-tx-multiple-collision-packets: 0*
-
-*vnet.xeth9.port-tx-multiple-deferral-packets: 0*
-
-*vnet.xeth9.port-tx-oversize: 0*
-
-*vnet.xeth9.port-tx-pfc-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-0-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-1-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-2-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-3-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-4-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-5-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-6-packets: 0*
-
-*vnet.xeth9.port-tx-pfc-priority-7-packets: 0*
-
-*vnet.xeth9.port-tx-single-collision-packets: 0*
-
-*vnet.xeth9.port-tx-single-deferral-packets: 0*
-
-*vnet.xeth9.port-tx-system-error-packets: 0*
-
-*vnet.xeth9.port-tx-unicast-packets: 0*
+    
+    vnet.xeth9.port-rx-1024-to-1518-byte-packets: 1445258343
+    vnet.xeth9.port-rx-128-to-255-byte-packets: 0
+    vnet.xeth9.port-rx-1519-to-1522-byte-vlan-packets: 0
+    vnet.xeth9.port-rx-1519-to-2047-byte-packets: 0
+    vnet.xeth9.port-rx-1tag-vlan-packets: 0
+    ...
 
 ### Interface MMU Counters
 
@@ -709,98 +553,12 @@ priority 1 queue.
 Example:
 
     goes hget platina-mk1 vnet.xeth9.mmu
-
-*vnet.xeth9.mmu-multicast-tx-cos0-drop-bytes: 0*
-
-*vnet.xeth9.mmu-multicast-tx-cos0-drop-packets: 0*
-
-*vnet.xeth9.mmu-multicast-tx-cos1-drop-bytes: 0*
-
-*vnet.xeth9.mmu-multicast-tx-cos1-drop-packets: 0*
-
-*.*
-
-*.*
-
-*.*
-
-*vnet.xeth9.mmu-multicast-tx-cos7-drop-bytes: 0*
-
-*vnet.xeth9.mmu-multicast-tx-cos7-drop-packets: 0*
-
-*vnet.xeth9.mmu-multicast-tx-qm-drop-bytes: 0*
-
-*vnet.xeth9.mmu-multicast-tx-qm-drop-packets: 0*
-
-*vnet.xeth9.mmu-multicast-tx-sc-drop-bytes: 0*
-
-*vnet.xeth9.mmu-multicast-tx-sc-drop-packets: 0*
-
-*vnet.xeth9.mmu-rx-threshold-drop-bytes: 0*
-
-*vnet.xeth9.mmu-rx-threshold-drop-packets: 0*
-
-*vnet.xeth9.mmu-tx-cpu-cos-0-drop-bytes: 0*
-
-*vnet.xeth9.mmu-tx-cpu-cos-0-drop-packets: 0*
-
-*vnet.xeth9.mmu-tx-cpu-cos-1-drop-bytes: 0*
-
-*vnet.xeth9.mmu-tx-cpu-cos-1-drop-packets: 0*
-
-*.*
-
-*.*
-
-*.*
-
-*vnet.xeth9.mmu-tx-cpu-cos-47-drop-bytes: 0*
-
-*vnet.xeth9.mmu-tx-cpu-cos-47-drop-packets: 0*
-
-*vnet.xeth9.mmu-unicast-tx-cos0-drop-bytes: 0*
-
-*vnet.xeth9.mmu-unicast-tx-cos0-drop-packets: 0*
-
-*vnet.xeth9.mmu-unicast-tx-cos1-drop-bytes: 0*
-
-*.*
-
-*.*
-
-*.*
-
-*vnet.xeth9.mmu-unicast-tx-cos7-drop-bytes: 0*
-
-*vnet.xeth9.mmu-unicast-tx-cos7-drop-packets: 0*
-
-*vnet.xeth9.mmu-unicast-tx-qm-drop-bytes: 0*
-
-*vnet.xeth9.mmu-unicast-tx-qm-drop-packets: 0*
-
-*vnet.xeth9.mmu-unicast-tx-sc-drop-bytes: 0*
-
-*vnet.xeth9.mmu-unicast-tx-sc-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos0-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos1-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos2-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos3-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos4-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos5-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos6-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-cos7-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-qm-drop-packets: 0*
-
-*vnet.xeth9.mmu-wred-queue-sc-drop-packets: 0*
+    
+    vnet.xeth9.mmu-multicast-tx-cos0-drop-bytes: 0
+    vnet.xeth9.mmu-multicast-tx-cos0-drop-packets: 0
+    vnet.xeth9.mmu-multicast-tx-cos1-drop-bytes: 0
+    vnet.xeth9.mmu-multicast-tx-cos1-drop-packets: 0
+    ...
 
 ### Interface Pipe Counters
 
@@ -815,194 +573,13 @@ multicast packet counters on queue 0
 Example:
 
     goes hget platina-mk1 vnet.xeth9.rx-pipe
-
-*vnet.xeth9.rx-pipe-debug-6: 0*
-
-*vnet.xeth9.rx-pipe-debug-7: 0*
-
-*vnet.xeth9.rx-pipe-debug-8: 0*
-
-*vnet.xeth9.rx-pipe-dst-discard-drops: 0*
-
-*vnet.xeth9.rx-pipe-ecn-counter: 0*
-
-*vnet.xeth9.rx-pipe-hi-gig-broadcast-packets: 0*
-
-*vnet.xeth9.rx-pipe-hi-gig-control-packets: 0*
-
-*vnet.xeth9.rx-pipe-hi-gig-l2-multicast-packets: 0*
-
-*vnet.xeth9.rx-pipe-hi-gig-l3-multicast-packets: 0*
-
-*vnet.xeth9.rx-pipe-hi-gig-unknown-opcode-packets: 0*
-
-*vnet.xeth9.rx-pipe-ibp-discard-cbp-full-drops: 0*
-
-*vnet.xeth9.rx-pipe-ip4-header-errors: 0*
-
-*vnet.xeth9.rx-pipe-ip4-l3-drops: 0*
-
-*vnet.xeth9.rx-pipe-ip4-l3-packets: 0*
-
-*vnet.xeth9.rx-pipe-ip4-routed-multicast-packets: 0*
-
-*vnet.xeth9.rx-pipe-ip6-header-errors: 0*
-
-*vnet.xeth9.rx-pipe-ip6-l3-drops: 0*
-
-*vnet.xeth9.rx-pipe-ip6-l3-packets: 0*
-
-*vnet.xeth9.rx-pipe-ip6-routed-multicast-packets: 0*
-
-*vnet.xeth9.rx-pipe-l3-interface-bytes: 0*
-
-*vnet.xeth9.rx-pipe-l3-interface-packets: 0*
-
-*vnet.xeth9.rx-pipe-multicast-drops: 0*
-
-*vnet.xeth9.rx-pipe-niv-forwarding-error-drops: 0*
-
-*vnet.xeth9.rx-pipe-niv-frame-error-drops: 0*
-
-*vnet.xeth9.rx-pipe-port-table-bytes: 0*
-
-*vnet.xeth9.rx-pipe-port-table-packets: 0*
-
-*vnet.xeth9.rx-pipe-rxf-drops: 0*
-
-*vnet.xeth9.rx-pipe-spanning-tree-state-not-forwarding-drops: 0*
-
-*vnet.xeth9.rx-pipe-trill-non-trill-drops: 0*
-
-*vnet.xeth9.rx-pipe-trill-packets: 0*
-
-*vnet.xeth9.rx-pipe-trill-trill-drops: 0*
-
-*vnet.xeth9.rx-pipe-tunnel-error-packets: 0*
-
-*vnet.xeth9.rx-pipe-tunnel-packets: 0*
-
-*vnet.xeth9.rx-pipe-unicast-packets: 0*
-
-*vnet.xeth9.rx-pipe-unknown-vlan-drops: 0*
-
-*vnet.xeth9.rx-pipe-vlan-tagged-packets: 0*
-
-*vnet.xeth9.rx-pipe-zero-port-bitmap-drops: 0*
-
-*goes hget platina-mk1 vnet.xeth9.tx-pipe*
-
-*vnet.xeth9.tx-pipe-cpu-0x10-bytes: 0*
-
-*vnet.xeth9.tx-pipe-cpu-0x10-packets: 0*
-
-*.*
-
-*.*
-
-*.*
-
-*vnet.xeth9.tx-pipe-cpu-0x2f-bytes: 0*
-
-*vnet.xeth9.tx-pipe-cpu-0x2f-packets: 0*
-
-*vnet.xeth9.tx-pipe-cpu-error-bytes: 0*
-
-*vnet.xeth9.tx-pipe-cpu-error-packets: 0*
-
-*vnet.xeth9.tx-pipe-cpu-punt-1tag-bytes: 0*
-
-*vnet.xeth9.tx-pipe-cpu-punt-1tag-packets: 0*
-
-*vnet.xeth9.tx-pipe-cpu-punt-bytes: 0*
-
-*vnet.xeth9.tx-pipe-cpu-punt-packets: 0*
-
-*vnet.xeth9.tx-pipe-cpu-vlan-redirect-bytes: 0*
-
-*vnet.xeth9.tx-pipe-cpu-vlan-redirect-packets: 0*
-
-*vnet.xeth9.tx-pipe-debug-a: 0*
-
-*vnet.xeth9.tx-pipe-debug-b: 0*
-
-*vnet.xeth9.tx-pipe-ecn-errors: 0*
-
-*vnet.xeth9.tx-pipe-invalid-vlan-drops: 0*
-
-*vnet.xeth9.tx-pipe-ip-length-check-drops: 0*
-
-*vnet.xeth9.tx-pipe-ip4-unicast-aged-and-dropped-packets: 0*
-
-*vnet.xeth9.tx-pipe-ip4-unicast-packets: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-cos0-bytes: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-cos0-packets: 0*
-
-*.*
-
-*.*
-
-*.*
-
-*vnet.xeth9.tx-pipe-multicast-queue-cos7-bytes: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-cos7-packets: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-qm-bytes: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-qm-packets: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-sc-bytes: 0*
-
-*vnet.xeth9.tx-pipe-multicast-queue-sc-packets: 0*
-
-*vnet.xeth9.tx-pipe-packet-aged-drops: 0*
-
-*vnet.xeth9.tx-pipe-packets-dropped: 0*
-
-*vnet.xeth9.tx-pipe-port-table-bytes: 300*
-
-*vnet.xeth9.tx-pipe-port-table-packets: 2*
-
-*vnet.xeth9.tx-pipe-purge-cell-error-drops: 0*
-
-*vnet.xeth9.tx-pipe-spanning-tree-state-not-forwarding-drops: 0*
-
-*vnet.xeth9.tx-pipe-trill-access-port-drops: 0*
-
-*vnet.xeth9.tx-pipe-trill-non-trill-drops: 0*
-
-*vnet.xeth9.tx-pipe-trill-packets: 0*
-
-*vnet.xeth9.tx-pipe-tunnel-error-packets: 0*
-
-*vnet.xeth9.tx-pipe-tunnel-packets: 0*
-
-*vnet.xeth9.tx-pipe-unicast-queue-cos0-bytes: 300*
-
-*vnet.xeth9.tx-pipe-unicast-queue-cos0-packets: 2*
-
-*.*
-
-*.*
-
-*.*
-
-*vnet.xeth9.tx-pipe-unicast-queue-cos7-bytes: 0*
-
-*vnet.xeth9.tx-pipe-unicast-queue-cos7-packets: 0*
-
-*vnet.xeth9.tx-pipe-unicast-queue-qm-bytes: 0*
-
-*vnet.xeth9.tx-pipe-unicast-queue-qm-packets: 0*
-
-*vnet.xeth9.tx-pipe-unicast-queue-sc-bytes: 0*
-
-*vnet.xeth9.tx-pipe-unicast-queue-sc-packets: 0*
-
-*vnet.xeth9.tx-pipe-vlan-tagged-packets: 0*
+    
+    vnet.xeth9.rx-pipe-debug-6: 0
+    vnet.xeth9.rx-pipe-debug-7: 0
+    vnet.xeth9.rx-pipe-debug-8: 0
+    vnet.xeth9.rx-pipe-dst-discard-drops: 0
+    vnet.xeth9.rx-pipe-ecn-counter: 0
+    ...
 
 <a name="fe1counters"/>
 
@@ -1015,106 +592,13 @@ switch ASIC.
 Example:
 
     goes hget platina-mk1 fe1|grep cos0
-
-*vnet.fe1-cpu.bst-tx-queue-cos0-count: 0*
-
-*vnet.fe1-cpu.mmu-multicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-cpu.mmu-multicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-cpu.mmu-unicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-cpu.mmu-unicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-cpu.mmu-wred-queue-cos0-drop-packets: 0*
-
-*vnet.fe1-cpu.tx-pipe-multicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-cpu.tx-pipe-multicast-queue-cos0-packets: 0*
-
-*vnet.fe1-cpu.tx-pipe-unicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-cpu.tx-pipe-unicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe0-loopback.bst-tx-queue-cos0-count: 0*
-
-*vnet.fe1-pipe0-loopback.mmu-multicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe0-loopback.mmu-multicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe0-loopback.mmu-unicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe0-loopback.mmu-unicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe0-loopback.mmu-wred-queue-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe0-loopback.tx-pipe-multicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe0-loopback.tx-pipe-multicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe0-loopback.tx-pipe-unicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe0-loopback.tx-pipe-unicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe1-loopback.bst-tx-queue-cos0-count: 0*
-
-*vnet.fe1-pipe1-loopback.mmu-multicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe1-loopback.mmu-multicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe1-loopback.mmu-unicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe1-loopback.mmu-unicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe1-loopback.mmu-wred-queue-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe1-loopback.tx-pipe-multicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe1-loopback.tx-pipe-multicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe1-loopback.tx-pipe-unicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe1-loopback.tx-pipe-unicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe2-loopback.bst-tx-queue-cos0-count: 0*
-
-*vnet.fe1-pipe2-loopback.mmu-multicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe2-loopback.mmu-multicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe2-loopback.mmu-unicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe2-loopback.mmu-unicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe2-loopback.mmu-wred-queue-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe2-loopback.tx-pipe-multicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe2-loopback.tx-pipe-multicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe2-loopback.tx-pipe-unicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe2-loopback.tx-pipe-unicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe3-loopback.bst-tx-queue-cos0-count: 0*
-
-*vnet.fe1-pipe3-loopback.mmu-multicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe3-loopback.mmu-multicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe3-loopback.mmu-unicast-tx-cos0-drop-bytes: 0*
-
-*vnet.fe1-pipe3-loopback.mmu-unicast-tx-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe3-loopback.mmu-wred-queue-cos0-drop-packets: 0*
-
-*vnet.fe1-pipe3-loopback.tx-pipe-multicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe3-loopback.tx-pipe-multicast-queue-cos0-packets: 0*
-
-*vnet.fe1-pipe3-loopback.tx-pipe-unicast-queue-cos0-bytes: 0*
-
-*vnet.fe1-pipe3-loopback.tx-pipe-unicast-queue-cos0-packets: 0*
+    
+    vnet.fe1-cpu.bst-tx-queue-cos0-count: 0
+    vnet.fe1-cpu.mmu-multicast-tx-cos0-drop-bytes: 0
+    vnet.fe1-cpu.mmu-multicast-tx-cos0-drop-packets: 0
+    vnet.fe1-cpu.mmu-unicast-tx-cos0-drop-bytes: 0
+    vnet.fe1-cpu.mmu-unicast-tx-cos0-drop-packets: 0
+    ...
 
 <a name="eth0stats"/>
 
@@ -1135,45 +619,13 @@ number and serial number.
 Example:
 
     goes hget platina eeprom
-
-*eeprom.BaseEthernetAddress: 6c:ec:5a:07:cb:54*
-
-*eeprom.CountryCode: 86*
-
-*eeprom.Crc: 0x4bc3c14e*
-
-*eeprom.DeviceVersion: 0x02*
-
-*eeprom.DiagVersion: DIAG\_TOR1\_1.1.1*
-
-*eeprom.LabelRevision: 0x00*
-
-*eeprom.ManufactureDate: 2016/12/02 15:45:45*
-
-*eeprom.Manufacturer: Platina*
-
-*eeprom.NEthernetAddress: 134*
-
-*eeprom.Onie.Data: "TlvInfo\\x00" 0x546c76496e666f00*
-
-*eeprom.Onie.Version: 0x01*
-
-*eeprom.OnieVersion: 2015.11*
-
-*eeprom.PartNumber: BT77O759.00*
-
-*eeprom.PlatformName: Intel-DE\_Platina*
-
-*eeprom.ProductName: TOR1*
-
-*eeprom.SerialNumber: HAY16B7B0000B*
-
-*eeprom.ServiceTag: Empty*
-
-*eeprom.Vendor: Platina*
-
-*eeprom.VendorExtension:
-"\\xbceP\\x01\\x00Q\\x01\\x02R\\x01\\x01S\\x0e900-000000-002T\\vHB1N645000NT\\vHB2N645000WT\\vHB4N645000M*"
+    
+    eeprom.BaseEthernetAddress: 6c:ec:5a:07:cb:54
+    eeprom.CountryCode: 86
+    eeprom.Crc: 0x4bc3c14e
+    eeprom.DeviceVersion: 0x02
+    eeprom.DiagVersion: DIAG\_TOR1\_1.1.1
+    ...
 
 <a name="appendix2bmcredis"/>
 
@@ -1184,9 +636,9 @@ status of the hardware platform including power supplies, fan trays, and
 environmental monitoring.
 
 Accessing the BMC redis server should be done via Redis client. For
-convenience, the redis-tools package is pre-installed in the switch’s
+convenience, the redis-tools package is pre-installed in the device’s
 Linux (“sudo apt-get install redis-tools”) and includes the redis-cli
-command that can be used to access the BMC redis from the switch’s Linux
+command that can be used to access the BMC redis from the device’s Linux
 CLI.
 
 The BMC Redis server listens on port 6379 of the BMC’s eth0 IPv4 address
@@ -1197,7 +649,7 @@ and IPv6 link local address.
 ### Connecting via IPv4
 
 By default the BMC eth0 IPv4 address is 192.168.101.100. To connect from
-the switch’s Linux CLI:
+the device’s Linux CLI:
 
     root@platina:~# redis-cli -h 192.168.101.100
     192.168.101.100:6379> hget platina machine*
@@ -1209,7 +661,7 @@ the switch’s Linux CLI:
 
 The BMC eth0 IPv6 link local address can be directly translated from the
 BMC eth0 MAC address. The BMC eth0 MAC address is simply the base MAC
-address of the system which can be retrieved from the switch’s Linux
+address of the system which can be retrieved from the device’s Linux
 CLI:
 
     root@platina:~# goes hget platina eeprom.BaseEthernetAddress
@@ -1228,131 +680,85 @@ fe80::5218:4cff:fe00:1304 and connect to BMC redis:
 
 Temperature status
 
-    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina temp
+    redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina temp
 
-*bmc.temperature.units.C: 37.01*
-
-*hwmon.front.temp.units.C: 49.000*
-
-*hwmon.rear.temp.units.C: 54.000*
-
-*psu1.temp1.units.C: 33.375*
-
-*psu1.temp2.units.C: 37.812*
+    bmc.temperature.units.C: 37.01
+    hwmon.front.temp.units.C: 49.000
+    hwmon.rear.temp.units.C: 54.000
+    psu1.temp1.units.C: 33.375
+    psu1.temp2.units.C: 37.812
 
 Fan and PSU status
 
-    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina status
-
-*fan\_tray.1.status: ok.front-&gt;back*
-
-*fan\_tray.2.status: ok.front-&gt;back*
-
-*fan\_tray.3.status: ok.front-&gt;back*
-
-*fan\_tray.4.status: ok.front-&gt;back*
-
-*psu1.status: powered\_on*
-
-*psu2.status: not\_installed*
+    redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina status
+    
+    fan\_tray.1.status: ok.front-&gt;back
+    fan\_tray.2.status: ok.front-&gt;back
+    fan\_tray.3.status: ok.front-&gt;back
+    fan\_tray.4.status: ok.front-&gt;back
+    psu1.status: powered\_on
+    psu2.status: not\_installed
 
 Fan Speed
 
-    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina fan_tray
-
-*fan\_tray.1.1.speed.units.rpm: 7031*
-
-*fan\_tray.1.2.speed.units.rpm: 7031*
-
-*fan\_tray.1.status: ok.front-&gt;back*
-
-*fan\_tray.2.1.speed.units.rpm: 7031*
-
-*fan\_tray.2.2.speed.units.rpm: 6490*
-
-*fan\_tray.2.status: ok.front-&gt;back*
-
-*fan\_tray.3.1.speed.units.rpm: 7031*
-
-*fan\_tray.3.2.speed.units.rpm: 7031*
-
-*fan\_tray.3.status: ok.front-&gt;back*
-
-*fan\_tray.4.1.speed.units.rpm: 7031*
-
-*fan\_tray.4.2.speed.units.rpm: 6490*
-
-*fan\_tray.4.status: ok.front-&gt;back*
-
-*fan\_tray.duty: 0x4d*
-
-*fan\_tray.speed: auto*
+    redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina fan_tray
+    
+    fan\_tray.1.1.speed.units.rpm: 7031
+    fan\_tray.1.2.speed.units.rpm: 7031
+    fan\_tray.1.status: ok.front-&gt;back
+    fan\_tray.2.1.speed.units.rpm: 7031
+    fan\_tray.2.2.speed.units.rpm: 6490
+    fan\_tray.2.status: ok.front-&gt;back
+    fan\_tray.3.1.speed.units.rpm: 7031
+    fan\_tray.3.2.speed.units.rpm: 7031
+    fan\_tray.3.status: ok.front-&gt;back
+    fan\_tray.4.1.speed.units.rpm: 7031
+    fan\_tray.4.2.speed.units.rpm: 6490
+    fan\_tray.4.status: ok.front-&gt;back
+    fan\_tray.duty: 0x4d
+    fan\_tray.speed: auto
 
 <a name="psuinformation"/>
 
 ### PSU Information
 
-    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina psu
+    redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina psu
 
-*psu1.admin.state: enabled*
-
-*psu1.eeprom:*
-*01000000010900f5010819c54757202020cb47572d4352505335353020ca58585858585858585858c3585846ce5053555134303030303037475720c0c0c10000000000000000002f00021822c42602390319052823b036504620672f3f0c1f94c20000001f01020d09e701b0047404ec047800e803c8af01820d274982b0047404ec0478000000b80b2020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020*
-
-*psu1.fan\_speed.units.rpm: 4020*
-
-*psu1.i\_out.units.A: 10.688*
-
-*psu1.mfg\_id: Great Wall*
-
-*psu1.mfg\_model: CRPS550*
-
-*psu1.p\_in.units.W: 141.000*
-
-*psu1.p\_out.units.W: 129.000*
-
-*psu1.status: powered\_on*
-
-*psu1.temp1.units.C: 33.375*
-
-*psu1.temp2.units.C: 37.812*
-
-*psu1.v\_in.units.V: 117.000*
-
-*psu1.v\_out.units.V: 12.047*
-
-*psu2.admin.state: enabled*
-
-*psu2.status: not\_installed*
+    psu1.admin.state: enabled
+    psu1.eeprom:
+    01000000010900f5010819c54757202020cb47572d4352505335353020ca58585858585...
+    psu1.fan\_speed.units.rpm: 4020
+    psu1.i\_out.units.A: 10.688
+    psu1.mfg\_id: Great Wall
+    psu1.mfg\_model: CRPS550
+    psu1.p\_in.units.W: 141.000
+    psu1.p\_out.units.W: 129.000
+    psu1.status: powered\_on
+    psu1.temp1.units.C: 33.375
+    psu1.temp2.units.C: 37.812
+    psu1.v\_in.units.V: 117.000
+    psu1.v\_out.units.V: 12.047
+    psu2.admin.state: enabled
+    psu2.status: not\_installed
 
 <a name="powermonitorinformation"/>
 
 ### Power Monitor Information
 
-    root@platina:~# redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina vmon
-
-*vmon.1v0.tha.units.V: 1.041*
-
-*vmon.1v0.thc.units.V: 1.014*
-
-*vmon.1v2.ethx.units.V: 1.187*
-
-*vmon.1v25.sys.units.V: 1.24*
-
-*vmon.1v8.sys.units.V: 1.805*
-
-*vmon.3v3.bmc.units.V: 3.28*
-
-*vmon.3v3.sb.units.V: 3.344*
-
-*vmon.3v3.sys.units.V: 3.298*
-
-*vmon.3v8.bmc.units.V: 3.826*
-
-*vmon.5v.sb.units.V: 4.926*
-
-*vmon.poweroff.events:*
-*1970-01-01T23:30:34Z.1970-01-01T23:32:28Z.1970-01-01T23:40:17Z.1970-01-01T23:50:54Z.1970-01-01T23:52:04Z*
+    redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina vmon
+    
+    vmon.1v0.tha.units.V: 1.041
+    vmon.1v0.thc.units.V: 1.014
+    vmon.1v2.ethx.units.V: 1.187
+    vmon.1v25.sys.units.V: 1.24
+    vmon.1v8.sys.units.V: 1.805
+    vmon.3v3.bmc.units.V: 3.28
+    vmon.3v3.sb.units.V: 3.344
+    vmon.3v3.sys.units.V: 3.298
+    vmon.3v8.bmc.units.V: 3.826
+    vmon.5v.sb.units.V: 4.926
+    vmon.poweroff.events:
+    1970-01-01T23:30:34Z.1970-01-01T23:32:28Z.1970-01-01T23:40:17Z.1970-01-01T23:50:54Z.1970-01-01T23:52:04Z
 
 <a name="updates"/>
 
@@ -1360,7 +766,7 @@ Fan Speed
 
 <a name="using-goes-upgrade"/>
 
-## Using GoES upgrade (recommended)
+## Using GOES upgrade (recommended)
 
 ### Upgrading Coreboot
 
@@ -1370,18 +776,18 @@ Fan Speed
 
     sudo goes upgrade -k -v LATEST -s downloads.platinasystems.com
 
-### Upgrading GoES
+### Upgrading GOES
 
     sudo goes upgrade -g -v LATEST -s downloads.platinasystems.com
 
-### Upgrading Coreboot, Linux Kernel, and GoES in one command
+### Upgrading Coreboot, Linux Kernel, and GOES in one command
 
     sudo goes upgrade -a -v LATEST -s downloads.platinasystems.com
 
 ### Updating the BMC Firmware
 
 ---
-You must upgrade the BMC using the GoES shell on the BMC console. It cannot be upgraded using the system GoES shell. For instructions on how to connect to the BMC console, see the section below titled _Getting to the BMC Console_.
+You must upgrade the BMC using the GOES shell on the BMC console. It cannot be upgraded using the system GOES shell. For instructions on how to connect to the BMC console, see the section below titled _Getting to the BMC Console_.
 
 From BMC console CLI, execute the command:
 
@@ -1392,7 +798,7 @@ This will automatically retrieve the upgrade file (platina-mk1-bmc.zip) from htt
 - _LATEST_ above may be replaced by any version control string (e.g. 'v0.2').
 - _downloads.platinasystems.com_ above may be replaced with any reachable HTTP server hostname or IP address. For example: `upgrade -v v0.2 -s 192.168.101.127` will retrieve the URL http://192.168.101.127/v0.2/platina-mk1-bmc.zip.
 - If the -s option is not specified, the default URL (http://downloads.platinasystems.com/) is used to retrieve the update file.
-- To see a list of software revisions available through http://downloads.platinasystems.com/ execute the GoES command `upgrade -l`
+- To see a list of software revisions available through http://downloads.platinasystems.com/ execute the GOES command `upgrade -l`
 
 ---
 
@@ -1431,9 +837,9 @@ wget http://downloads.platinasystems.com/LATEST/linux-image-platina-mk1-4.13.0.d
 dpkg -i linux-image-platina-mk1-4.13.0.deb
 ```
 
-### Update GoES
+### Update GOES
 
-To update the Platina GoES binary, execute the following Linux commands on the host:
+To update the Platina GOES binary, execute the following Linux commands on the host:
 ```
 sudo bash
 wget http://downloads.platinasystems.com/LATEST/goes-platina-mk1-installer
@@ -1458,7 +864,7 @@ To switch to BMC console:
 
 To switch back to x86 console:
 
-- At the BMC console prompt, execute the `toggle` GoES command.
+- At the BMC console prompt, execute the `toggle` GOES command.
 - Hit return to display the Linux prompt on the system console
 
 # Support
