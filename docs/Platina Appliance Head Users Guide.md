@@ -692,31 +692,31 @@ Fan and PSU status
 
     redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina status
     
-    fan\_tray.1.status: ok.front-&gt;back
-    fan\_tray.2.status: ok.front-&gt;back
-    fan\_tray.3.status: ok.front-&gt;back
-    fan\_tray.4.status: ok.front-&gt;back
-    psu1.status: powered\_on
-    psu2.status: not\_installed
+    fan_tray.1.status: ok.front-&gt;back
+    fan_tray.2.status: ok.front-&gt;back
+    fan_tray.3.status: ok.front-&gt;back
+    fan_tray.4.status: ok.front-&gt;back
+    psu1.status: powered_on
+    psu2.status: not_installed
 
 Fan Speed
 
     redis-cli --raw -h fe80::5218:4cff:fe00:1304%eth0 hget platina fan_tray
     
-    fan\_tray.1.1.speed.units.rpm: 7031
-    fan\_tray.1.2.speed.units.rpm: 7031
-    fan\_tray.1.status: ok.front-&gt;back
-    fan\_tray.2.1.speed.units.rpm: 7031
-    fan\_tray.2.2.speed.units.rpm: 6490
-    fan\_tray.2.status: ok.front-&gt;back
-    fan\_tray.3.1.speed.units.rpm: 7031
-    fan\_tray.3.2.speed.units.rpm: 7031
-    fan\_tray.3.status: ok.front-&gt;back
-    fan\_tray.4.1.speed.units.rpm: 7031
-    fan\_tray.4.2.speed.units.rpm: 6490
-    fan\_tray.4.status: ok.front-&gt;back
-    fan\_tray.duty: 0x4d
-    fan\_tray.speed: auto
+    fan_tray.1.1.speed.units.rpm: 7031
+    fan_tray.1.2.speed.units.rpm: 7031
+    fan_tray.1.status: ok.front-&gt;back
+    fan_tray.2.1.speed.units.rpm: 7031
+    fan_tray.2.2.speed.units.rpm: 6490
+    fan_tray.2.status: ok.front-&gt;back
+    fan_tray.3.1.speed.units.rpm: 7031
+    fan_tray.3.2.speed.units.rpm: 7031
+    fan_tray.3.status: ok.front-&gt;back
+    fan_tray.4.1.speed.units.rpm: 7031
+    fan_tray.4.2.speed.units.rpm: 6490
+    fan_tray.4.status: ok.front-&gt;back
+    fan_tray.duty: 0x4d
+    fan_tray.speed: auto
 
 <a name="psuinformation"/>
 
@@ -727,19 +727,19 @@ Fan Speed
     psu1.admin.state: enabled
     psu1.eeprom:
     01000000010900f5010819c54757202020cb47572d4352505335353020ca58585858585...
-    psu1.fan\_speed.units.rpm: 4020
-    psu1.i\_out.units.A: 10.688
-    psu1.mfg\_id: Great Wall
-    psu1.mfg\_model: CRPS550
-    psu1.p\_in.units.W: 141.000
-    psu1.p\_out.units.W: 129.000
-    psu1.status: powered\_on
+    psu1.fan_speed.units.rpm: 4020
+    psu1.i_out.units.A: 10.688
+    psu1.mfg_id: Great Wall
+    psu1.mfg_model: CRPS550
+    psu1.p_in.units.W: 141.000
+    psu1.p_out.units.W: 129.000
+    psu1.status: powered_on
     psu1.temp1.units.C: 33.375
     psu1.temp2.units.C: 37.812
-    psu1.v\_in.units.V: 117.000
-    psu1.v\_out.units.V: 12.047
+    psu1.v_in.units.V: 117.000
+    psu1.v_out.units.V: 12.047
     psu2.admin.state: enabled
-    psu2.status: not\_installed
+    psu2.status: not_installed
 
 <a name="powermonitorinformation"/>
 
