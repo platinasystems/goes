@@ -624,7 +624,7 @@ Example:
     eeprom.CountryCode: 86
     eeprom.Crc: 0x4bc3c14e
     eeprom.DeviceVersion: 0x02
-    eeprom.DiagVersion: DIAG\_TOR1\_1.1.1
+    eeprom.DiagVersion: DIAG_TOR1_1.1.1
     ...
 
 <a name="appendix2bmcredis"/>
