@@ -7,8 +7,8 @@ package main
 import (
 	"testing"
 
-	"github.com/platinasystems/go/internal/test"
 	"github.com/platinasystems/go/main/ip/test/link"
+	"github.com/platinasystems/go/test"
 )
 
 func Test(t *testing.T) {

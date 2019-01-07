@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/test"
 )
 
 // Suite of 'ip link' tests

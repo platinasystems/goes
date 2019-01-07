@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/test"
 	"gopkg.in/yaml.v2"
 )
 

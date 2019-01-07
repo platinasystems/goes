@@ -19,7 +19,7 @@ import (
 	client "docker.io/go-docker"
 	"docker.io/go-docker/api/types"
 	"docker.io/go-docker/api/types/container"
-	"github.com/platinasystems/go/internal/test"
+	"github.com/platinasystems/go/test"
 	"gopkg.in/yaml.v2"
 )
 
