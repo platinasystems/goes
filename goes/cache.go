@@ -22,15 +22,11 @@ func (g *Goes) Builtins() map[string]func(...string) error {
 		g.cache.Lock()
 		defer g.cache.Unlock()
 		g.cache.builtins = map[string]func(...string) error{
-			"apropos":   g.apropos,
-			"complete":  g.complete,
-			"copyright": g.copyright,
-			"help":      g.help,
-			"license":   g.license,
-			"man":       g.man,
-			"patents":   g.patents,
-			"usage":     g.usage,
-			"version":   g.version,
+			"apropos":  g.apropos,
+			"complete": g.complete,
+			"help":     g.help,
+			"man":      g.man,
+			"usage":    g.usage,
 		}
 	}
 	return g.cache.builtins
