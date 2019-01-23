@@ -382,6 +382,9 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
 func (g *Goes) Main(args ...string) error {
+	if len(args) > 0 && args[0] == "/proc/self/exe" {
+		args = args[1:]
+	}
 	if len(args) > 0 {
 		base := filepath.Base(args[0])
 		switch {
