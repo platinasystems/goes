@@ -61,7 +61,10 @@ github.com/platinasystems/log v0.0.0-20181019191631-6c3b2ed28252 h1:nE1v/LGhdYJ3
 github.com/platinasystems/log v0.0.0-20181019191631-6c3b2ed28252/go.mod h1:5Wjp9vxMfkZGWz2Ep3ghzsfarcs9MMfiE2RzKwseyKQ=
 github.com/platinasystems/log v1.1.0 h1:hjWJskNV5QC36B+fz9rIyZjMztXZeRnOCypoSALlsm4=
 github.com/platinasystems/log v1.1.0/go.mod h1:5Wjp9vxMfkZGWz2Ep3ghzsfarcs9MMfiE2RzKwseyKQ=
+github.com/platinasystems/log v1.2.0 h1:+pg8/eJBlbv1WGzKrazgICJX0yF3/jY9gtj6udGmsMQ=
 github.com/platinasystems/log v1.2.0/go.mod h1:5Wjp9vxMfkZGWz2Ep3ghzsfarcs9MMfiE2RzKwseyKQ=
+github.com/platinasystems/log v1.2.1 h1:a43xeRp+KouaPlVTfOdeI2vNj755PBf8ovKEAMT8o5w=
+github.com/platinasystems/log v1.2.1/go.mod h1:5Wjp9vxMfkZGWz2Ep3ghzsfarcs9MMfiE2RzKwseyKQ=
 github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57 h1:aXCGfZLnvW0ffPXgYB4yJumQGDvq2z8e8vxlVnGVdy8=
 github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57/go.mod h1:5432a+C/LwmCPg543MFUCCzgTaEpAURrTC01os0/8k8=
 github.com/platinasystems/redis v0.0.0-20181019221245-e5d0abe14605 h1:iTZG/CdHZ2h5/Hahg9RjK5a7uKNsPKQK05wdvfsKqYo=
