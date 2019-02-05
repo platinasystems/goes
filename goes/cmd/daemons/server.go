@@ -7,7 +7,6 @@ package daemons
 import (
 	"net/rpc"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/goes/cmd"
 	"github.com/platinasystems/go/goes/lang"
-	"github.com/platinasystems/log"
 )
 
 type Server struct {
@@ -49,8 +47,7 @@ func (*Server) Kind() cmd.Kind { return cmd.Hidden }
 func (c *Server) Main(args ...string) error {
 	var err error
 
-	c.Daemons.done = make(chan struct{})
-	c.Daemons.cmdsByPid = make(map[int]*exec.Cmd)
+	c.Daemons.init()
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGTERM)
@@ -73,12 +70,9 @@ func (c *Server) Main(args ...string) error {
 		case <-c.Daemons.done:
 			// delay for rpc Stop reply
 			time.Sleep(100 * time.Millisecond)
-			log.Print("daemon", "info", "done")
 			return nil
 		case <-sig:
-			log.Print("daemon", "info", "stopping")
 			c.Daemons.Stop([]int{}, &empty)
 		}
 	}
-
 }

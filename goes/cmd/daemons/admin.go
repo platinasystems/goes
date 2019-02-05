@@ -21,6 +21,7 @@ var Admin = &goes.Goes{
 		lang.EnUS: "daemon admin",
 	},
 	ByName: map[string]cmd.Cmd{
+		"log":     Log{},
 		"restart": Restart{},
 		"start":   Start{},
 		"status":  Status{},
@@ -30,12 +31,38 @@ var Admin = &goes.Goes{
 
 var empty = struct{}{}
 
+type Log struct{}
 type Restart struct{}
 type Status struct{}
 type Start struct{}
 type Stop struct{}
 
-func (Restart) String() string { return "status" }
+func (Log) String() string { return "log" }
+
+func (Log) Usage() string {
+	return "daemon log [TEXT]..."
+}
+
+func (Log) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "append and show daemon log",
+	}
+}
+
+func (Log) Main(args ...string) error {
+	var s string
+	cl, err := atsock.NewRpcClient(sockname)
+	if err != nil {
+		return err
+	}
+	defer cl.Close()
+	if err = cl.Call("Daemons.Log", args, &s); err == nil {
+		os.Stdout.WriteString(s)
+	}
+	return err
+}
+
+func (Restart) String() string { return "restart" }
 
 func (Restart) Usage() string {
 	return "daemon restart [PID]..."

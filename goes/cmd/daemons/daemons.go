@@ -28,12 +28,21 @@ type Daemons struct {
 	rpc   *atsock.RpcServer
 	done  chan struct{}
 	pids  []int
+	log   daemonLog
 
 	cmdsByPid map[int]*exec.Cmd
 	stopping  bool
 }
 
-func (daemons *Daemons) start(args ...string) {
+func (d *Daemons) init() {
+	d.done = make(chan struct{})
+	d.cmdsByPid = make(map[int]*exec.Cmd)
+	d.log.init()
+	log.Tee(&d.log)
+
+}
+
+func (d *Daemons) start(args ...string) {
 	rout, wout, err := os.Pipe()
 	defer func(cs string) {
 		if err != nil {
@@ -47,7 +56,7 @@ func (daemons *Daemons) start(args ...string) {
 	if err != nil {
 		return
 	}
-	p := daemons.goes.Fork(args...)
+	p := d.goes.Fork(args...)
 	p.Stdin = nil
 	p.Stdout = wout
 	p.Stderr = werr
@@ -56,15 +65,15 @@ func (daemons *Daemons) start(args ...string) {
 		"PATH=" + prog.Path(),
 		"TERM=linux",
 	}
-	err = p.Start()
-	if err != nil {
+	if err = p.Start(); err != nil {
 		return
 	}
+	log.Print("daemon", "info", "running ", p.Process.Pid, " ", args)
 	id := fmt.Sprintf("%s.%s[%d]", prog.Base(), args[0], p.Process.Pid)
-	daemons.mutex.Lock()
-	daemons.pids = append(daemons.pids, p.Process.Pid)
-	daemons.cmdsByPid[p.Process.Pid] = p
-	daemons.mutex.Unlock()
+	d.mutex.Lock()
+	d.pids = append(d.pids, p.Process.Pid)
+	d.cmdsByPid[p.Process.Pid] = p
+	d.mutex.Unlock()
 	go log.LinesFrom(rout, id, "info")
 	go log.LinesFrom(rerr, id, "err")
 	go func(p *exec.Cmd, wout, werr *os.File, args ...string) {
@@ -73,10 +82,10 @@ func (daemons *Daemons) start(args ...string) {
 		} else {
 			fmt.Fprintln(wout, "done")
 		}
-		if daemons.cmd(p.Process.Pid) != nil {
+		if d.cmd(p.Process.Pid) != nil {
 			fmt.Fprintln(werr, "restart")
-			daemons.del(p.Process.Pid)
-			defer daemons.start(args...)
+			d.del(p.Process.Pid)
+			defer d.start(args...)
 		}
 		wout.Sync()
 		werr.Sync()
@@ -85,104 +94,114 @@ func (daemons *Daemons) start(args ...string) {
 	}(p, wout, werr, args...)
 }
 
-func (daemons *Daemons) List(args struct{}, reply *string) error {
-	daemons.mutex.Lock()
-	defer daemons.mutex.Unlock()
+func (d *Daemons) List(args struct{}, reply *string) error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 	buf := &bytes.Buffer{}
-	for _, pid := range daemons.pids {
-		p := daemons.cmdsByPid[pid]
+	for _, pid := range d.pids {
+		p := d.cmdsByPid[pid]
 		fmt.Fprintf(buf, "%d: %v\n", pid, p.Args)
 	}
 	*reply = buf.String()
 	return nil
 }
 
-func (daemons *Daemons) Start(args []string, reply *struct{}) error {
-	daemons.start(args...)
+func (d *Daemons) Log(args []string, reply *string) error {
+	if len(args) > 0 {
+		vargs := make([]interface{}, len(args))
+		for i, arg := range args {
+			vargs[i] = arg
+		}
+		log.Print(vargs...)
+	}
+	*reply = d.log.String()
 	return nil
 }
 
-func (daemons *Daemons) Stop(pids []int, reply *struct{}) error {
-	if len(pids) == 0 {
-		daemons.mutex.Lock()
-		if daemons.stopping {
-			daemons.mutex.Unlock()
-			return syscall.EBUSY
-		}
-		daemons.stopping = true
-		defer func() {
-			log.Print("daemon", "info", "signalling done")
-			close(daemons.done)
-		}()
-		// stop all in reverse order
-		pids = make([]int, len(daemons.pids))
-		for i, pid := range daemons.pids {
-			pids[len(pids)-i-1] = pid
-		}
-		daemons.mutex.Unlock()
-	}
-	return daemons.stop(pids)
+func (d *Daemons) Start(args []string, reply *struct{}) error {
+	d.start(args...)
+	return nil
 }
 
-func (daemons *Daemons) Restart(pids []int, reply *struct{}) error {
+func (d *Daemons) Stop(pids []int, reply *struct{}) error {
+	if len(pids) == 0 {
+		d.mutex.Lock()
+		if d.stopping {
+			d.mutex.Unlock()
+			return syscall.EBUSY
+		}
+		d.stopping = true
+		log.Print("daemon", "info", "stopping")
+		defer close(d.done)
+		// stop all in reverse order
+		pids = make([]int, len(d.pids))
+		for i, pid := range d.pids {
+			pids[len(pids)-i-1] = pid
+		}
+		d.mutex.Unlock()
+	}
+	return d.stop(pids)
+}
+
+func (d *Daemons) Restart(pids []int, reply *struct{}) error {
 	var pargs [][]string
-	daemons.mutex.Lock()
+	d.mutex.Lock()
 	if len(pids) == 0 {
 		// stop all in reverse order
-		pids = make([]int, len(daemons.pids))
-		for i, pid := range daemons.pids {
+		pids = make([]int, len(d.pids))
+		for i, pid := range d.pids {
 			pids[len(pids)-i-1] = pid
 		}
 		// but restart in original order
 		pargs = make([][]string, len(pids))
-		for i, pid := range daemons.pids {
-			p := daemons.cmdsByPid[pid]
+		for i, pid := range d.pids {
+			p := d.cmdsByPid[pid]
 			pargs[i] = make([]string, len(p.Args))
 			copy(pargs[i], p.Args)
 		}
 	} else {
 		pargs = make([][]string, len(pids))
 		for i, pid := range pids {
-			p := daemons.cmdsByPid[pid]
+			p := d.cmdsByPid[pid]
 			pargs[i] = make([]string, len(p.Args))
 			copy(pargs[i], p.Args)
 		}
 	}
-	daemons.mutex.Unlock()
-	if err := daemons.stop(pids); err != nil {
+	d.mutex.Unlock()
+	if err := d.stop(pids); err != nil {
 		return err
 	}
 	for _, args := range pargs {
 		log.Print("daemon", "info", "restarting: ", args)
-		daemons.start(args...)
+		d.start(args...)
 	}
 	return nil
 }
 
-func (daemons *Daemons) cmd(pid int) *exec.Cmd {
-	daemons.mutex.Lock()
-	defer daemons.mutex.Unlock()
-	return daemons.cmdsByPid[pid]
+func (d *Daemons) cmd(pid int) *exec.Cmd {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.cmdsByPid[pid]
 }
 
-func (daemons *Daemons) del(pid int) {
-	daemons.mutex.Lock()
-	defer daemons.mutex.Unlock()
-	delete(daemons.cmdsByPid, pid)
-	for i, entry := range daemons.pids {
+func (d *Daemons) del(pid int) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	delete(d.cmdsByPid, pid)
+	for i, entry := range d.pids {
 		if pid == entry {
-			n := copy(daemons.pids[i:], daemons.pids[i+1:])
-			daemons.pids = daemons.pids[:i+n]
+			n := copy(d.pids[i:], d.pids[i+1:])
+			d.pids = d.pids[:i+n]
 			break
 		}
 	}
 }
 
-func (daemons *Daemons) stop(pids []int) error {
+func (d *Daemons) stop(pids []int) error {
 	for _, pid := range pids {
-		if p := daemons.cmd(pid); p != nil {
+		if p := d.cmd(pid); p != nil {
 			log.Print("daemon", "info", "stopping: ", p.Args)
-			daemons.del(pid)
+			d.del(pid)
 			p.Process.Signal(syscall.SIGTERM)
 		} else {
 			return fmt.Errorf("%d: not found", pid)
