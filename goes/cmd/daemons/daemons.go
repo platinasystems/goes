@@ -2,145 +2,53 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// Package daemons starts redisd followed by all other configured daemons.
 package daemons
 
 import (
 	"bytes"
 	"fmt"
-	"net/rpc"
 	"os"
 	"os/exec"
-	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/goes"
-	"github.com/platinasystems/go/goes/cmd"
-	"github.com/platinasystems/go/goes/lang"
 	"github.com/platinasystems/atsock"
-	"github.com/platinasystems/log"
+	"github.com/platinasystems/go/goes"
 	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/log"
 )
 
-type Command struct {
-	// Machines list goes command + args for daemons that run from start,
-	// including redisd.  Note that dependent daemons should wait on a
-	// respective redis key, e.g.
-	//	redis.Hwait(redis.DefaultHash, "redis.ready", "true", TIMEOUT)
-	// or
-	//	redis.IsReady()
-	Init [][]string
-	Daemons
-}
+const sockname = "goes-daemons"
 
 type Daemons struct {
 	mutex sync.Mutex
 	goes  *goes.Goes
 	rpc   *atsock.RpcServer
 	done  chan struct{}
+	pids  []int
+	log   daemonLog
 
 	cmdsByPid map[int]*exec.Cmd
+	stopping  bool
 }
 
-func (*Command) String() string { return "goes-daemons" }
+func (d *Daemons) init() {
+	d.done = make(chan struct{})
+	d.cmdsByPid = make(map[int]*exec.Cmd)
+	d.log.init()
+	log.Tee(&d.log)
 
-func (*Command) Usage() string {
-	return "goes-daemons [OPTIONS]..."
 }
 
-func (*Command) Apropos() lang.Alt {
-	return lang.Alt{
-		lang.EnUS: "start daemons and wait for their exit",
-	}
-}
-
-func (c *Command) Goes(g *goes.Goes) { c.Daemons.goes = g }
-
-func (*Command) Kind() cmd.Kind { return cmd.Hidden }
-
-func (c *Command) Main(args ...string) error {
-	if len(args) == 0 {
-		return c.server()
-	}
-	cl, err := atsock.NewRpcClient("daemons")
-	if err != nil {
-		return err
-	}
-	defer cl.Close()
-	empty := struct{}{}
-	switch args[0] {
-	case "list":
-		var s string
-		err = cl.Call("Daemons.List", struct{}{}, &s)
-		if err == nil {
-			os.Stdout.WriteString(s)
-		}
-	case "start":
-		if len(args) < 2 {
-			err = fmt.Errorf("missing COMMAND [ARG]...")
-		} else {
-			err = cl.Call("Daemons.Start", args[1:], &empty)
-		}
-	case "stop", "restart":
-		var pid int
-		if len(args) < 2 {
-			err = fmt.Errorf("missing PID")
-		} else if len(args) > 2 {
-			err = fmt.Errorf("%v: unexpected", args[2:])
-		} else if _, err = fmt.Sscan(args[1], &pid); err == nil {
-			method := map[string]string{
-				"stop":    "Daemons.Stop",
-				"restart": "Daemons.Restart",
-			}[args[0]]
-			err = cl.Call(method, pid, &empty)
-		}
-	default:
-		err = fmt.Errorf("%s: unknown", args[0])
-	}
-	return err
-}
-
-func (c *Command) server() (err error) {
-	c.Daemons.done = make(chan struct{})
-	c.Daemons.cmdsByPid = make(map[int]*exec.Cmd)
-
-	signal.Ignore(syscall.SIGTERM)
-
-	c.rpc, err = atsock.NewRpcServer("daemons")
-	if err != nil {
-		return
-	}
-	defer c.rpc.Close()
-
-	for _, dargs := range c.Init {
-		c.Daemons.start(dargs...)
-	}
-
-	rpc.Register(&c.Daemons)
-
-	for n := -1; n != 0; {
-		<-c.Daemons.done
-		time.Sleep(5 * time.Second)
-		c.Daemons.mutex.Lock()
-		n = len(c.Daemons.cmdsByPid)
-		c.Daemons.mutex.Unlock()
-	}
-
-	log.Print("daemon", "info", "done")
-	return
-}
-
-func (daemons *Daemons) start(args ...string) {
-	cs := strings.Join(args, " ")
+func (d *Daemons) start(args ...string) {
 	rout, wout, err := os.Pipe()
-	defer func() {
+	defer func(cs string) {
 		if err != nil {
 			log.Print("daemon", "err", cs, ": ", err)
 		}
-	}()
+	}(strings.Join(args, " "))
 	if err != nil {
 		return
 	}
@@ -148,7 +56,7 @@ func (daemons *Daemons) start(args ...string) {
 	if err != nil {
 		return
 	}
-	p := daemons.goes.Fork(args...)
+	p := d.goes.Fork(args...)
 	p.Stdin = nil
 	p.Stdout = wout
 	p.Stderr = werr
@@ -157,84 +65,162 @@ func (daemons *Daemons) start(args ...string) {
 		"PATH=" + prog.Path(),
 		"TERM=linux",
 	}
-	err = p.Start()
-	if err != nil {
+	if err = p.Start(); err != nil {
 		return
 	}
+	log.Print("daemon", "info", "running ", p.Process.Pid, " ", args)
 	id := fmt.Sprintf("%s.%s[%d]", prog.Base(), args[0], p.Process.Pid)
-	daemons.mutex.Lock()
-	daemons.cmdsByPid[p.Process.Pid] = p
-	daemons.mutex.Unlock()
+	d.mutex.Lock()
+	d.pids = append(d.pids, p.Process.Pid)
+	d.cmdsByPid[p.Process.Pid] = p
+	d.mutex.Unlock()
 	go log.LinesFrom(rout, id, "info")
 	go log.LinesFrom(rerr, id, "err")
-	go func(p *exec.Cmd, wout, werr *os.File) {
+	go func(p *exec.Cmd, wout, werr *os.File, args ...string) {
 		if err := p.Wait(); err != nil {
 			fmt.Fprintln(werr, err)
 		} else {
 			fmt.Fprintln(wout, "done")
 		}
+		if d.cmd(p.Process.Pid) != nil {
+			fmt.Fprintln(werr, "restart")
+			d.del(p.Process.Pid)
+			defer d.start(args...)
+		}
 		wout.Sync()
 		werr.Sync()
 		wout.Close()
 		werr.Close()
-		daemons.mutex.Lock()
-		delete(daemons.cmdsByPid, p.Process.Pid)
-		daemons.mutex.Unlock()
-		daemons.done <- struct{}{}
-	}(p, wout, werr)
+	}(p, wout, werr, args...)
 }
 
-func (daemons *Daemons) List(args struct{}, reply *string) error {
+func (d *Daemons) List(args struct{}, reply *string) error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 	buf := &bytes.Buffer{}
-	for k, v := range daemons.cmdsByPid {
-		fmt.Fprintf(buf, "%d: %v\n", k, v.Args)
+	for _, pid := range d.pids {
+		p := d.cmdsByPid[pid]
+		fmt.Fprintf(buf, "%d: %v\n", pid, p.Args)
 	}
 	*reply = buf.String()
 	return nil
 }
 
-func (daemons *Daemons) Start(args []string, reply *struct{}) error {
-	daemons.start(args...)
+func (d *Daemons) Log(args []string, reply *string) error {
+	if len(args) > 0 {
+		vargs := make([]interface{}, len(args))
+		for i, arg := range args {
+			vargs[i] = arg
+		}
+		log.Print(vargs...)
+	}
+	*reply = d.log.String()
 	return nil
 }
 
-func (daemons *Daemons) Stop(pid int, reply *struct{}) error {
-	daemons.mutex.Lock()
-	defer daemons.mutex.Unlock()
-	var err error
-	if p, found := daemons.cmdsByPid[pid]; !found {
-		err = fmt.Errorf("%d: not found", pid)
-	} else {
-		err = p.Process.Signal(syscall.SIGTERM)
-		time.Sleep(1 * time.Second)
-		err = p.Process.Kill()
-		if err.Error() == "os: process already finished" {
-			err = nil
-		}
-	}
-	return err
+func (d *Daemons) Start(args []string, reply *struct{}) error {
+	d.start(args...)
+	return nil
 }
 
-func (daemons *Daemons) Restart(pid int, reply *struct{}) error {
-	var err error
-	daemons.mutex.Lock()
-	p, found := daemons.cmdsByPid[pid]
-	daemons.mutex.Unlock()
-	if !found {
-		err = fmt.Errorf("%d: not found", pid)
-	} else {
-		args := p.Args
-		err = p.Process.Signal(syscall.SIGTERM)
-		time.Sleep(1 * time.Second)
-		err = p.Process.Kill()
-		if err.Error() == "os: process already finished" {
-			err = nil
+func (d *Daemons) Stop(pids []int, reply *struct{}) error {
+	if len(pids) == 0 {
+		d.mutex.Lock()
+		if d.stopping {
+			d.mutex.Unlock()
+			return syscall.EBUSY
 		}
-		if err == nil {
-			fmt.Fprintf(os.Stderr, "Calling daemons.start: %v\n",
-				args)
-			daemons.start(args...)
+		d.stopping = true
+		log.Print("daemon", "info", "stopping")
+		defer close(d.done)
+		// stop all in reverse order
+		pids = make([]int, len(d.pids))
+		for i, pid := range d.pids {
+			pids[len(pids)-i-1] = pid
+		}
+		d.mutex.Unlock()
+	}
+	return d.stop(pids)
+}
+
+func (d *Daemons) Restart(pids []int, reply *struct{}) error {
+	var pargs [][]string
+	d.mutex.Lock()
+	if len(pids) == 0 {
+		// stop all in reverse order
+		pids = make([]int, len(d.pids))
+		for i, pid := range d.pids {
+			pids[len(pids)-i-1] = pid
+		}
+		// but restart in original order
+		pargs = make([][]string, len(pids))
+		for i, pid := range d.pids {
+			p := d.cmdsByPid[pid]
+			pargs[i] = make([]string, len(p.Args))
+			copy(pargs[i], p.Args)
+		}
+	} else {
+		pargs = make([][]string, len(pids))
+		for i, pid := range pids {
+			p := d.cmdsByPid[pid]
+			pargs[i] = make([]string, len(p.Args))
+			copy(pargs[i], p.Args)
 		}
 	}
-	return err
+	d.mutex.Unlock()
+	if err := d.stop(pids); err != nil {
+		return err
+	}
+	for _, args := range pargs {
+		log.Print("daemon", "info", "restarting: ", args)
+		d.start(args...)
+	}
+	return nil
+}
+
+func (d *Daemons) cmd(pid int) *exec.Cmd {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.cmdsByPid[pid]
+}
+
+func (d *Daemons) del(pid int) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	delete(d.cmdsByPid, pid)
+	for i, entry := range d.pids {
+		if pid == entry {
+			n := copy(d.pids[i:], d.pids[i+1:])
+			d.pids = d.pids[:i+n]
+			break
+		}
+	}
+}
+
+func (d *Daemons) stop(pids []int) error {
+	for _, pid := range pids {
+		if p := d.cmd(pid); p != nil {
+			log.Print("daemon", "info", "stopping: ", p.Args)
+			d.del(pid)
+			p.Process.Signal(syscall.SIGTERM)
+		} else {
+			return fmt.Errorf("%d: not found", pid)
+		}
+	}
+	have := func(dn string) bool {
+		_, err := os.Stat(dn)
+		return err == nil
+	}
+	for _, pid := range pids {
+		procdn := fmt.Sprint("/proc/", pid)
+		for t := 100 * time.Millisecond; have(procdn); t *= 2 {
+			if t > 3*time.Second {
+				log.Print("daemon", "info", "killing: ", pid)
+				syscall.Kill(pid, syscall.SIGKILL)
+			} else {
+				time.Sleep(t)
+			}
+		}
+	}
+	return nil
 }
