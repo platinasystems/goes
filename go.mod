@@ -17,7 +17,7 @@ require (
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
 	github.com/platinasystems/log v1.2.1
 	github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57
-	github.com/platinasystems/redis v1.1.0
+	github.com/platinasystems/redis v1.2.0
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e

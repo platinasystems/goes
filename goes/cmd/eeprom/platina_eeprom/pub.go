@@ -16,45 +16,45 @@ import (
 )
 
 func RedisdHook(pub *publisher.Publisher) {
-	buf, err := readbytes()
-	if pub.Error(err) != nil {
-		return
-	}
-
 	var p eeprom.Eeprom
 
+	buf, err := readbytes()
+	if err != nil {
+		panic(err)
+	}
+
 	_, err = p.Write(buf)
-	if pub.Error(err) != nil {
-		return
+	if err != nil {
+		panic(err)
 	}
 
 	for _, s := range strings.Split(p.String(), "\n") {
 		if len(s) > 0 {
-			pub.WriteString(s)
+			pub.Write([]byte(s))
 		}
 	}
 
 	if config.minMacs > 0 {
 		v, found := p.Tlv[eeprom.NEthernetAddressType]
 		if !found {
-			pub.Error(fmt.Errorf("eeprom: %s: not found",
-				eeprom.NEthernetAddressType))
+			fmt.Printf("eeprom: %s: not found",
+				eeprom.NEthernetAddressType)
 		} else if n := int(*v.(*eeprom.Dec16)); n < config.minMacs {
-			pub.Error(fmt.Errorf("%d < %d MAC addresses",
-				n, config.minMacs))
+			fmt.Printf("%d < %d MAC addresses",
+				n, config.minMacs)
 		}
 	}
 
 	if !bytes.Equal(config.oui[:], []byte{0, 0, 0}) {
 		ev, found := p.Tlv[eeprom.BaseEthernetAddressType]
 		if !found {
-			pub.Error(fmt.Errorf("eeprom: %s: not found",
-				eeprom.BaseEthernetAddressType.String()))
+			fmt.Printf("eeprom: %s: not found",
+				eeprom.BaseEthernetAddressType.String())
 		} else {
 			// all non-blank MAC addresses are allowed
 			ea := ev.(eeprom.EthernetAddress)
 			if bytes.Equal(ea[:], []byte{0, 0, 0, 0, 0, 0}) {
-				pub.Error(fmt.Errorf("eeprom: zero MAC BASE"))
+				fmt.Printf("eeprom: zero MAC BASE")
 			}
 		}
 	}
