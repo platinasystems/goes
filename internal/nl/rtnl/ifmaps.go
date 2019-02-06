@@ -4,7 +4,7 @@
 
 package rtnl
 
-import "github.com/platinasystems/go/internal/nl"
+import "github.com/platinasystems/goes/internal/nl"
 
 var If struct {
 	NameByIndex  map[int32]string

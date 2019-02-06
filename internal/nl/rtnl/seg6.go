@@ -5,8 +5,8 @@
 package rtnl
 
 import (
-	"github.com/platinasystems/go/internal/nl"
-	"github.com/platinasystems/go/internal/sizeof"
+	"github.com/platinasystems/goes/internal/nl"
+	"github.com/platinasystems/goes/internal/sizeof"
 )
 
 const (

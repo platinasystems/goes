@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/safe"
+	"github.com/platinasystems/goes/internal/safe"
 )
 
 const SizeofRtAttr = syscall.SizeofRtAttr

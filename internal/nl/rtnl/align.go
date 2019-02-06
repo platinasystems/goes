@@ -7,7 +7,7 @@ package rtnl
 import (
 	"syscall"
 
-	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/goes/internal/nl"
 )
 
 const RTA = nl.NLATTR

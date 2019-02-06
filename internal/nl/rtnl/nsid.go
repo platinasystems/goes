@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/goes/internal/nl"
 )
 
 // Send a RTM_GETNSID request to netlink and return the response attribute.

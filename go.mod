@@ -1,13 +1,21 @@
-module github.com/platinasystems/go
+module github.com/platinasystems/goes
 
 require (
+	docker.io/go-docker v1.0.0
 	github.com/cavaliercoder/grab v1.0.0
 	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
 	github.com/d2g/dhcp4client v0.0.0-20180622102533-b7a004ff1a09
+	github.com/docker/distribution v2.7.1+incompatible // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-units v0.3.3 // indirect
 	github.com/garyburd/redigo v1.6.0
+	github.com/gogo/protobuf v1.2.0 // indirect
 	github.com/jpillora/backoff v0.0.0-20180909062703-3050d21c67d7
 	github.com/kr/pty v1.1.3
 	github.com/mattn/go-isatty v0.0.4
+	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
+	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/platinasystems/atsock v1.1.0
 	github.com/platinasystems/dbg v1.1.0
 	github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82
@@ -23,4 +31,5 @@ require (
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	golang.org/x/net v0.0.0-20181108082009-03003ca0c849 // indirect
 	golang.org/x/sys v0.0.0-20181107165924-66b7b1311ac8 // indirect
+	gopkg.in/yaml.v2 v2.2.2
 )

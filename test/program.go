@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/goes/internal/prog"
 )
 
 // Timeout is the default duration on the Program Wait timer.

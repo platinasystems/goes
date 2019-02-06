@@ -8,7 +8,7 @@ package fit
 import (
 	"fmt"
 
-	"github.com/platinasystems/go/internal/kexec"
+	"github.com/platinasystems/goes/internal/kexec"
 )
 
 func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {

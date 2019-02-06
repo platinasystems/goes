@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/goes/internal/prog"
 )
 
 // Assert ping response to given address w/in 3sec.

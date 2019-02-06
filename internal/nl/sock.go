@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/sizeof"
+	"github.com/platinasystems/goes/internal/sizeof"
 )
 
 const (

@@ -7,8 +7,8 @@ package rtnl
 import (
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/nl"
-	"github.com/platinasystems/go/internal/sizeof"
+	"github.com/platinasystems/goes/internal/nl"
+	"github.com/platinasystems/goes/internal/sizeof"
 )
 
 const SizeofIfAddrLblMsg = (4 * sizeof.Byte) + (4 * sizeof.Long)

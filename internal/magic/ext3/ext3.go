@@ -5,7 +5,7 @@
 package ext3
 
 import (
-	"github.com/platinasystems/go/internal/magic/ext"
+	"github.com/platinasystems/goes/internal/magic/ext"
 )
 
 func Probe(s []byte) bool {

@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/platinasystems/go/test"
+	"github.com/platinasystems/goes/test"
 	"gopkg.in/yaml.v2"
 )
 

@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/go/internal/sysconf"
+	"github.com/platinasystems/goes/internal/sysconf"
 )
 
 // Linux /proc/<PID|"self">/stat

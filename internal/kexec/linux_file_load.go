@@ -6,7 +6,7 @@ package kexec
 import (
 	"fmt"
 	"github.com/platinasystems/fdt"
-	"github.com/platinasystems/go/internal/memmap"
+	"github.com/platinasystems/goes/internal/memmap"
 	"io/ioutil"
 	"os"
 	"syscall"

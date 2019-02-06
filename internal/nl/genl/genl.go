@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/nl"
-	"github.com/platinasystems/go/internal/sizeof"
+	"github.com/platinasystems/goes/internal/nl"
+	"github.com/platinasystems/goes/internal/sizeof"
 )
 
 const GENL_NAMSIZ = 16 // length of family name

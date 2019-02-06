@@ -7,7 +7,7 @@ package rtnl
 import (
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/goes/internal/nl"
 )
 
 const VarRunNetns = "/var/run/netns"

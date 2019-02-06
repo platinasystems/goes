@@ -5,12 +5,12 @@
 package magic
 
 import (
-	"github.com/platinasystems/go/internal/magic/ext2"
-	"github.com/platinasystems/go/internal/magic/ext3"
-	"github.com/platinasystems/go/internal/magic/ext4"
-	"github.com/platinasystems/go/internal/magic/iso9660"
-	"github.com/platinasystems/go/internal/magic/mbr"
-	"github.com/platinasystems/go/internal/magic/vfat"
+	"github.com/platinasystems/goes/internal/magic/ext2"
+	"github.com/platinasystems/goes/internal/magic/ext3"
+	"github.com/platinasystems/goes/internal/magic/ext4"
+	"github.com/platinasystems/goes/internal/magic/iso9660"
+	"github.com/platinasystems/goes/internal/magic/mbr"
+	"github.com/platinasystems/goes/internal/magic/vfat"
 )
 
 func IdentifyPartitionMap(sniff []byte) string {

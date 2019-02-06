@@ -10,7 +10,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/platinasystems/go/internal/safe"
+	"github.com/platinasystems/goes/internal/safe"
 )
 
 // Parse a string as address of the given family, or, if family is AF_UNSPEC,

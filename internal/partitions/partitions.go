@@ -8,7 +8,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/platinasystems/go/internal/magic"
+	"github.com/platinasystems/goes/internal/magic"
 	"github.com/satori/go.uuid"
 )
 

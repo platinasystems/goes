@@ -7,7 +7,7 @@ package rtnl
 import (
 	"unsafe"
 
-	"github.com/platinasystems/go/internal/nl"
+	"github.com/platinasystems/goes/internal/nl"
 )
 
 const SizeofFibRuleMsg = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 4

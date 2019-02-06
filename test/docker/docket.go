@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/platinasystems/go/test"
-	"github.com/platinasystems/go/test/netport"
+	"github.com/platinasystems/goes/test"
+	"github.com/platinasystems/goes/test/netport"
 )
 
 type Docket struct {

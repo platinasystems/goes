@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/platinasystems/go/internal/prog"
+	"github.com/platinasystems/goes/internal/prog"
 )
 
 // Assert that named interface has carrier w/in 3sec.
