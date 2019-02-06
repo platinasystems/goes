@@ -315,8 +315,8 @@ func (c *Command) pubinit(fieldEqValues ...string) error {
 		pub.Print(field, ": ", value)
 	}
 
-	pub.Print("redis.ready: true")
-	return pub.Error()
+	_, err = pub.Print("redis.ready: true")
+	return err
 }
 
 type Redisd struct {
