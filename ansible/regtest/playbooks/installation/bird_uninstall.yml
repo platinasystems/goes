@@ -1,7 +1,0 @@
----
-- name: Bird Uninstallation
-  apt:
-    name: bird
-    state: absent
-    purge: yes
-    autoremove: yes
