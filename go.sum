@@ -79,6 +79,8 @@ github.com/platinasystems/redis v0.0.0-20181022194819-47dc1dbf4623 h1:i5BOdwsFo1
 github.com/platinasystems/redis v0.0.0-20181022194819-47dc1dbf4623/go.mod h1:lyuhkHpfn6y21/nMn7H6pbBuPk1D8pflwsatn4OIl8M=
 github.com/platinasystems/redis v1.1.0 h1:LjQDzR4Y3oZ21a2k+JQjhw2SpdYXwhbJa80JjkLvzJc=
 github.com/platinasystems/redis v1.1.0/go.mod h1:lyuhkHpfn6y21/nMn7H6pbBuPk1D8pflwsatn4OIl8M=
+github.com/platinasystems/redis v1.2.0 h1:Pyoc4Jkl/CfQn44XxpBB4ND4ciU4T9cSfp3xmCaJG+A=
+github.com/platinasystems/redis v1.2.0/go.mod h1:lyuhkHpfn6y21/nMn7H6pbBuPk1D8pflwsatn4OIl8M=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff h1:kXSTJRId8WwwqEfN0iQtzQu+jof2jTguzP2y12ULXvc=
