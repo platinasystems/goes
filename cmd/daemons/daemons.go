@@ -20,7 +20,10 @@ import (
 	"github.com/platinasystems/log"
 )
 
-const sockname = "goes-daemons"
+const (
+	sockname    = "goes-daemons"
+	maxRestarts = 1
+)
 
 type Daemons struct {
 	mutex sync.Mutex
@@ -42,7 +45,7 @@ func (d *Daemons) init() {
 
 }
 
-func (d *Daemons) start(args ...string) {
+func (d *Daemons) start(restarts int, args ...string) {
 	rout, wout, err := os.Pipe()
 	defer func(cs string) {
 		if err != nil {
@@ -83,9 +86,13 @@ func (d *Daemons) start(args ...string) {
 			fmt.Fprintln(wout, "done")
 		}
 		if d.cmd(p.Process.Pid) != nil {
-			fmt.Fprintln(werr, "restart")
 			d.del(p.Process.Pid)
-			defer d.start(args...)
+			if restarts == maxRestarts {
+				fmt.Fprintln(werr, "to many restarts")
+			} else {
+				fmt.Fprintln(werr, "restart")
+				defer d.start(restarts+1, args...)
+			}
 		}
 		wout.Sync()
 		werr.Sync()
@@ -119,7 +126,7 @@ func (d *Daemons) Log(args []string, reply *string) error {
 }
 
 func (d *Daemons) Start(args []string, reply *struct{}) error {
-	d.start(args...)
+	d.start(0, args...)
 	return nil
 }
 
@@ -173,7 +180,7 @@ func (d *Daemons) Restart(pids []int, reply *struct{}) error {
 	}
 	for _, args := range pargs {
 		log.Print("daemon", "info", "restarting: ", args)
-		d.start(args...)
+		d.start(0, args...)
 	}
 	return nil
 }

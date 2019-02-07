@@ -60,7 +60,7 @@ func (c *Server) Main(args ...string) error {
 	defer c.rpc.Close()
 
 	for _, dargs := range c.Init {
-		c.Daemons.start(dargs...)
+		c.Daemons.start(0, dargs...)
 	}
 
 	rpc.Register(&c.Daemons)
