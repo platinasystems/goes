@@ -64,27 +64,38 @@ func Address(s string, family uint8) (Addresser, error) {
 
 type Addresser interface {
 	Bytes() []byte
+	ByteLen() int
 	Family() uint8
 	io.Reader
 	IsLoopback() bool
 }
 
+type emptyAddress uint8
 type mplsAddress []byte
 type ip4Address net.IP
 type ip6Address net.IP
 
+func (emptyAddress) Bytes() []byte     { return []byte{} }
 func (mpls mplsAddress) Bytes() []byte { return mpls }
 func (ip4 ip4Address) Bytes() []byte   { return ip4 }
 func (ip6 ip6Address) Bytes() []byte   { return ip6 }
 
-func (mplsAddress) Family() uint8 { return AF_MPLS }
-func (ip4Address) Family() uint8  { return AF_INET }
-func (ip6Address) Family() uint8  { return AF_INET6 }
+func (emptyAddress) ByteLen() int { return 0 }
+func (mplsAddress) ByteLen() int  { return 4 }
+func (ip4Address) ByteLen() int   { return 4 }
+func (ip6Address) ByteLen() int   { return 16 }
 
+func (af emptyAddress) Family() uint8 { return uint8(af) }
+func (mplsAddress) Family() uint8     { return AF_MPLS }
+func (ip4Address) Family() uint8      { return AF_INET }
+func (ip6Address) Family() uint8      { return AF_INET6 }
+
+func (emptyAddress) Read(b []byte) (int, error)     { return 0, io.EOF }
 func (mpls mplsAddress) Read(b []byte) (int, error) { return safe.Cp(b, mpls) }
 func (ip4 ip4Address) Read(b []byte) (int, error)   { return safe.Cp(b, ip4) }
 func (ip6 ip6Address) Read(b []byte) (int, error)   { return safe.Cp(b, ip6) }
 
+func (emptyAddress) IsLoopback() bool   { return false }
 func (mplsAddress) IsLoopback() bool    { return false }
 func (ip4 ip4Address) IsLoopback() bool { return net.IP(ip4).IsLoopback() }
 func (ip6 ip6Address) IsLoopback() bool { return net.IP(ip6).IsLoopback() }

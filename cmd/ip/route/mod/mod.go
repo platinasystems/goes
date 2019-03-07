@@ -13,9 +13,9 @@ import (
 	"unsafe"
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 var fixme = errors.New("FIXME")
@@ -157,14 +157,16 @@ func (c Command) Main(args ...string) error {
 	}
 
 	if err = m.parse(); err != nil {
-		return err
+		return fmt.Errorf("parse error: %v", err)
 	}
-
 	req, err := nl.NewMessage(m.hdr, m.msg, m.attrs...)
-	if err == nil {
-		err = m.sr.UntilDone(req, nl.DoNothing)
+	if err != nil {
+		return fmt.Errorf("rtnl message error: %v", err)
 	}
-	return err
+	if err = m.sr.UntilDone(req, nl.DoNothing); err != nil {
+		return fmt.Errorf("nack: %v", err)
+	}
+	return nil
 }
 
 func (Command) Complete(args ...string) (list []string) {
@@ -293,13 +295,16 @@ func (m *mod) parse() error {
 	mxappend := func(t uint16, v io.Reader) {
 		mxattrs = append(mxattrs, nl.Attr{t, v})
 	}
-	if s := m.opt.Parms.ByName["-f"]; len(s) > 0 {
-		if v, ok := rtnl.AfByName[s]; ok {
-			m.msg.Family = v
-		} else {
-			return fmt.Errorf("family: %q unknown", s)
-		}
+	familyopt := m.opt.Parms.ByName["-f"]
+	if len(familyopt) == 0 {
+		familyopt = "inet"
 	}
+	if v, ok := rtnl.AfByName[familyopt]; ok {
+		m.msg.Family = v
+	} else {
+		return fmt.Errorf("family: %q unknown", familyopt)
+	}
+
 	if len(m.args) > 0 {
 		if v, ok := rtnl.RtnByName[m.args[0]]; ok {
 			m.msg.Type = v
@@ -313,7 +318,9 @@ func (m *mod) parse() error {
 	}
 	m.msg.Family = prefix.Family()
 	m.msg.Dst_len = prefix.Len()
-	m.append(rtnl.RTA_DST, prefix)
+	if prefix.ByteLen() > 0 {
+		m.append(rtnl.RTA_DST, prefix)
+	}
 	m.msg.Scope = rtnl.RT_SCOPE_UNIVERSE
 
 	for err == nil && len(m.args) > 0 {

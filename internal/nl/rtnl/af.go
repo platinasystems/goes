@@ -5,7 +5,7 @@
 package rtnl
 
 const (
-	AF_UNSPEC uint8 = iota
+	AF_UNSPEC = iota
 	AF_UNIX
 	AF_INET
 	AF_AX25

@@ -15,12 +15,12 @@ func Prefix(s string, family uint8) (Prefixer, error) {
 	if s == "default" || s == "any" || s == "all" {
 		switch family {
 		case AF_INET:
-			return ip4Prefix{ip4Address{}, 32}, nil
+			return emptyPrefix{AF_INET}, nil
 		case AF_INET6:
-			return ip6Prefix{ip6Address{}, 128}, nil
+			return emptyPrefix{AF_INET6}, nil
 		default:
-			return nil, fmt.Errorf("prefix: %q: disallowed w/ %s",
-				s, AfName(family))
+			return nil, fmt.Errorf("prefix %q unsupported by "+
+				"%s family", s, AfName(family))
 		}
 	}
 	switch family {
@@ -56,8 +56,12 @@ func Prefix(s string, family uint8) (Prefixer, error) {
 
 type Prefixer interface {
 	Addresser
-	Len() uint8
+	Len() uint8 // bits
 }
+
+type emptyPrefix struct{ emptyAddress }
+
+func (emptyPrefix) Len() uint8 { return 0 }
 
 type mplsPrefix struct{ mplsAddress }
 
