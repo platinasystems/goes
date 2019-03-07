@@ -13,10 +13,10 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/internal/group"
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/netns"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 const nogroup = ^uint32(0)
@@ -151,7 +151,6 @@ func (m *mod) parse() error {
 	m.args = m.opt.Flags.More(m.args,
 		[]string{"up", "+up"},
 		[]string{"down", "no-up", "-up"},
-		[]string{"no-master", "-master"},
 		[]string{"arp", "+arp"},
 		[]string{"no-arp", "-arp"},
 		[]string{"dynamic", "+dynamic"},
@@ -168,7 +167,7 @@ func (m *mod) parse() error {
 		[]string{"no-carrier", "-carrier"},
 		[]string{"protodown", "+protodown"},
 		[]string{"no-protodown", "-protodown"},
-		[]string{"no-master", "-master"},
+		[]string{"no-master", "nomaster", "-master"},
 		[]string{"no-vrf", "-vrf"},
 	)
 	m.args = m.opt.Parms.More(m.args,
