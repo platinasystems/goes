@@ -16,9 +16,9 @@ import (
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/internal/url"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/log"
-	"github.com/platinasystems/goes/internal/url"
 )
 
 const zero = uintptr(0)
@@ -91,8 +91,9 @@ func init() {
 }
 
 type Command struct {
-	Hook func() error
-	g    *goes.Goes
+	Hook   func() error
+	FsHook func() error
+	g      *goes.Goes
 }
 
 func (*Command) String() string { return "/init" }
@@ -153,7 +154,7 @@ func (c *Command) Main(_ ...string) error {
 	}()
 	if c.Hook != nil {
 		if err := c.Hook(); err != nil {
-			panic(fmt.Errorf("Error from board hook: ", err))
+			log.Print("Error from board hook", err)
 		}
 	}
 	var root, script string
@@ -170,6 +171,11 @@ func (c *Command) Main(_ ...string) error {
 	c.makeTargetDirs()
 	c.makeTargetLinks()
 	c.mountTargetVirtualFilesystems()
+	if c.FsHook != nil {
+		if err := c.FsHook(); err != nil {
+			log.Print("Error from filesystem hook", err)
+		}
+	}
 	c.runSbinInit()
 	return c.g.Main("start")
 }

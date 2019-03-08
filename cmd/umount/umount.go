@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -82,13 +82,26 @@ func (umount *umount) all() error {
 	if err = scanner.Err(); err != nil {
 		return err
 	}
+	systemDir := map[string]struct{}{
+		"/":        {},
+		"/tmp":     {},
+		"/proc":    {},
+		"/dev":     {},
+		"/dev/pts": {},
+		"/sys":     {},
+		"/run":     {},
+	}
+
 	for i := len(targets) - 1; i >= 0; i-- {
-		if targets[i] == "/" && i != 0 {
-			continue
-		}
-		terr := umount.one(targets[i])
-		if terr != nil && err == nil {
-			err = terr
+		if _, x := systemDir[targets[i]]; !x {
+			terr := umount.one(targets[i])
+			if terr != nil {
+				fmt.Printf("Error unmounting %s: %s\n", targets[i],
+					terr)
+				if err == nil {
+					err = terr
+				}
+			}
 		}
 	}
 	return err
