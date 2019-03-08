@@ -11,10 +11,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/flags"
 	"github.com/platinasystems/goes/internal/parms"
 	"github.com/platinasystems/goes/internal/partitions"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -424,17 +424,19 @@ func (fs *filesystems) mountone(t, dev, dir string) *MountResult {
 	}
 
 	if !nodev {
-		sb, err := partitions.ReadSuperBlock(dev)
-		if err != nil {
-			return &MountResult{err, dev, t, dir, fs.flags}
-		}
-		if sb != nil {
-			tProbe := sb.Kind()
-			if t != "auto" && t != tProbe {
-				fmt.Fprintf(os.Stderr, "Warning, filesystem probed as %s but mounting as %s\n",
-					tProbe, t)
-			} else {
-				t = tProbe
+		if stat, err := os.Stat(dev); err == nil && !stat.IsDir() {
+			sb, err := partitions.ReadSuperBlock(dev)
+			if err != nil {
+				return &MountResult{err, dev, t, dir, fs.flags}
+			}
+			if sb != nil {
+				tProbe := sb.Kind()
+				if t != "auto" && t != tProbe {
+					fmt.Fprintf(os.Stderr, "Warning, filesystem probed as %s but mounting as %s\n",
+						tProbe, t)
+				} else {
+					t = tProbe
+				}
 			}
 		}
 	}
