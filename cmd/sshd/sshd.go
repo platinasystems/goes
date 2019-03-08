@@ -9,6 +9,7 @@ package sshd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"syscall"
@@ -21,11 +22,16 @@ import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/log"
+
+	gossh "golang.org/x/crypto/ssh"
 )
 
 type Command struct {
-	g    *goes.Goes
-	done chan struct{}
+	g        *goes.Goes
+	done     chan struct{}
+	Addr     string
+	FailSafe bool
 }
 
 func (*Command) String() string { return "sshd" }
@@ -52,9 +58,27 @@ func setWinsize(f *os.File, w, h int) {
 		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
 }
 
-func (c *Command) Main(args ...string) error {
-	ssh.Handle(func(s ssh.Session) {
-		cmd := exec.Command("/proc/self/exe", "cli")
+func (c *Command) Main(args ...string) (err error) {
+	err = makeId(false)
+	if err != nil {
+		return err
+	}
+	c.done = make(chan struct{})
+
+	srv := &ssh.Server{
+		Addr: ":22",
+	}
+	if c.Addr != "" {
+		srv.Addr = c.Addr
+	}
+
+	srv.Handle(func(s ssh.Session) {
+		cmdline := s.Command()
+		if len(cmdline) == 0 {
+			cmdline = []string{"cli"}
+		}
+		cmd := exec.Command("/proc/self/exe", cmdline[1:]...)
+		cmd.Args[0] = cmdline[0]
 		ptyReq, winCh, isPty := s.Pty()
 		if isPty {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
@@ -72,11 +96,59 @@ func (c *Command) Main(args ...string) error {
 			}()
 			io.Copy(s, f) // stdout
 		} else {
-			io.WriteString(s, "No PTY requested.\n")
-			s.Exit(1)
+			cmd.Stdin = s // blocks exit - do not know why
+			cmd.Stdout = s
+			cmd.Stderr = s.Stderr()
+			err := cmd.Start()
+			if err != nil {
+				fmt.Printf("cmd.Start() returns %s\n", err)
+				s.Exit(1)
+			}
+			err = cmd.Wait()
+			log.Print("sshd wait exited ", err)
+			if err == nil {
+				s.Exit(0)
+			} else {
+				s.Exit(1)
+			}
 		}
 	})
 
-	err := ssh.ListenAndServe(":2222", nil)
+	err = srv.SetOption(ssh.PublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+		// check permissions on authorized_keys
+		authKeys, err := ioutil.ReadFile("/etc/goes/sshd/authorized_keys")
+		if err != nil {
+			fmt.Printf("Error reading authorized keys: %s\n", err)
+			return c.FailSafe
+		}
+		for len(authKeys) > 0 {
+			authKey, _, _, rest, err := gossh.ParseAuthorizedKey(authKeys)
+			if err != nil {
+				fmt.Printf("Error parsing authorized_keys: %s\n", err)
+				return false
+			}
+			if ssh.KeysEqual(authKey, key) {
+				return true
+			}
+			authKeys = rest
+		}
+		return false // No matching key found
+	}))
+
+	err = srv.SetOption(ssh.HostKeyFile("/etc/goes/sshd/id_rsa"))
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		_ = srv.ListenAndServe()
+	}()
+
+	for {
+		select {
+		case <-c.done:
+			return nil
+		}
+	}
 	return err
 }

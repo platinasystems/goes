@@ -10,34 +10,59 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"log"
+	"os"
 )
 
-func main() {
-	savePrivateFileTo := "./id_rsa_test"
-	savePublicFileTo := "./id_rsa_test.pub"
+func makeId(override bool) (err error) {
+	goesDir := "/etc/goes"
+	if _, err := os.Stat(goesDir); os.IsNotExist(err) {
+		err = os.Mkdir(goesDir, os.FileMode(0555))
+		if err != nil {
+			return err
+		}
+	}
+	keyDir := "/etc/goes/sshd"
+	if _, err := os.Stat(keyDir); os.IsNotExist(err) {
+		err = os.Mkdir(keyDir, os.FileMode(0600))
+		if err != nil {
+			return err
+		}
+	}
+
+	savePrivateFileTo := keyDir + "/id_rsa"
+	savePublicFileTo := keyDir + "/id_rsa.pub"
 	bitSize := 4096
+
+	if !override {
+		if _, err := os.Stat(savePrivateFileTo); err == nil {
+			if _, err := os.Stat(savePublicFileTo); err == nil {
+				return nil
+			}
+		}
+	}
 
 	privateKey, err := generatePrivateKey(bitSize)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 
 	publicKeyBytes, err := generatePublicKey(&privateKey.PublicKey)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 
 	privateKeyBytes := encodePrivateKeyToPEM(privateKey)
 
 	err = writeKeyToFile(privateKeyBytes, savePrivateFileTo)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
 
 	err = writeKeyToFile([]byte(publicKeyBytes), savePublicFileTo)
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
+	return nil
 }
 
 // generatePrivateKey creates a RSA Private Key of specified byte size
