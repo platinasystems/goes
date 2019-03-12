@@ -82,13 +82,13 @@ type I struct {
 	RW        i2c.RW
 	RegOffset uint8
 	BusSize   i2c.SMBusSize
-	Data      [34]byte
+	Data      [i2c.BlockMax]byte
 	Bus       int
 	Addr      int
 	Delay     int
 }
 type R struct {
-	D [34]byte
+	D [i2c.BlockMax]byte
 	E error
 }
 
@@ -96,7 +96,7 @@ type I2cReq struct {
 	c *Command
 }
 
-var b = [34]byte{0}
+var b = [i2c.BlockMax]byte{0}
 var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0}
 var j [MAXOPS]I
 var r = R{b, nil}
@@ -176,7 +176,7 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 			f[x].D[0] = data[0]
 			f[x].D[1] = data[1]
 			if g[x].BusSize == i2c.I2CBlockData {
-				for y := 2; y < 34; y++ {
+				for y := 2; y < i2c.BlockMax; y++ {
 					f[x].D[y] = data[y]
 				}
 			}
