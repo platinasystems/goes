@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/gpio"
+	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"
 	"github.com/platinasystems/redis/publisher"
@@ -997,7 +998,7 @@ func (h *I2cDev) Eeprom() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		for k := 1; k < 33; k++ {
+		for k := 1; k < i2c.BlockMax; k++ {
 			v += fmt.Sprintf("%02x", s[1].D[k])
 		}
 	}

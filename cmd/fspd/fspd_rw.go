@@ -20,19 +20,19 @@ type I struct {
 	RW        i2c.RW
 	RegOffset uint8
 	BusSize   i2c.SMBusSize
-	Data      [34]byte
+	Data      [i2c.BlockMax]byte
 	Bus       int
 	Addr      int
 	Delay     int
 }
 type R struct {
-	D [34]byte
+	D [i2c.BlockMax]byte
 	E error
 }
 
 type I2cReq int
 
-var b = [34]byte{0}
+var b = [i2c.BlockMax]byte{0}
 var i = I{false, i2c.RW(0), 0, 0, b, 0, 0, 0}
 var j [MAXOPS]I
 var r = R{b, nil}
@@ -63,7 +63,7 @@ func (r *reg16) offset() uint8  { return uint8((uintptr(unsafe.Pointer(r)) - reg
 func (r *reg16r) offset() uint8 { return uint8((uintptr(unsafe.Pointer(r)) - regsAddr) >> 1) }
 
 func closeMux(h *I2cDev) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(0)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -72,7 +72,7 @@ func closeMux(h *I2cDev) {
 }
 
 func (r *reg8) get(h *I2cDev) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -82,7 +82,7 @@ func (r *reg8) get(h *I2cDev) {
 }
 
 func (r *reg8b) get(h *I2cDev, readLen byte) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -93,18 +93,18 @@ func (r *reg8b) get(h *I2cDev, readLen byte) {
 }
 
 func (r *reg32B) get(h *I2cDev) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
 	x++
-	data[0] = 33
+	data[0] = i2c.BlockMax
 	j[x] = I{true, i2c.Read, r.offset(), i2c.I2CBlockData, data, h.Bus, h.AddrProm, 0}
 	x++
 }
 
 func (r *reg16) get(h *I2cDev) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -114,7 +114,7 @@ func (r *reg16) get(h *I2cDev) {
 }
 
 func (r *reg16r) get(h *I2cDev) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -124,7 +124,7 @@ func (r *reg16r) get(h *I2cDev) {
 }
 
 func (r *reg8) set(h *I2cDev, v uint8) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -135,7 +135,7 @@ func (r *reg8) set(h *I2cDev, v uint8) {
 }
 
 func (r *reg16) set(h *I2cDev, v uint16) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -147,7 +147,7 @@ func (r *reg16) set(h *I2cDev, v uint16) {
 }
 
 func (r *reg16r) set(h *I2cDev, v uint16) {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 
 	data[0] = byte(h.MuxValue)
 	j[x] = I{true, i2c.Write, 0, i2c.ByteData, data, h.MuxBus, h.MuxAddr, 5}
@@ -166,7 +166,7 @@ func clearJ() {
 }
 
 func readStopped() byte {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 	j[0] = I{true, i2c.Write, 0, i2c.ByteData, data, int(0x98), int(0), 0}
 	err := DoI2cRpc()
 	if err != nil {
@@ -176,7 +176,7 @@ func readStopped() byte {
 }
 
 func stopI2c() error {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 	j[0] = I{true, i2c.Write, 0, 0, data, int(0x99), int(1), 0}
 	err := DoI2cRpc()
 	if err != nil {
@@ -186,7 +186,7 @@ func stopI2c() error {
 }
 
 func startI2c() error {
-	var data = [34]byte{0, 0, 0, 0}
+	var data = [i2c.BlockMax]byte{0, 0, 0, 0}
 	j[0] = I{true, i2c.Write, 0, 0, data, int(0x99), int(0), 0}
 	err := DoI2cRpc()
 	if err != nil {
