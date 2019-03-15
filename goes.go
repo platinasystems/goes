@@ -23,13 +23,13 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/platinasystems/goes/cmd"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/flags"
-	"github.com/platinasystems/parms"
+	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/parms"
 )
 
 const (
@@ -416,8 +416,8 @@ func (g *Goes) Main(args ...string) error {
 		if clifound {
 			cli.(goeser).Goes(g)
 		}
-		cliFlags, cliArgs := flags.New(args, "-d", "-f", "-no-liner", "-x")
-		if cliFlags.ByName["-d"] && g.Verbosity < VerboseDebug {
+		cliFlags, cliArgs := flags.New(args, "-debug", "-f", "-no-liner", "-x")
+		if cliFlags.ByName["-debug"] && g.Verbosity < VerboseDebug {
 			g.Verbosity = VerboseDebug
 		}
 		if n := len(cliArgs); n == 0 {
