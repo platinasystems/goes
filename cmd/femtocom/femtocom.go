@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/flags"
+	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/parms"
 )
 
@@ -118,9 +118,9 @@ func (Command) Main(args ...string) error {
 		"odd":  syscall.PARENB | syscall.PARODD,
 		"even": syscall.PARENB,
 		"none": 0,
-	}[parm.ByName["-partity"]]
+	}[parm.ByName["-parity"]]
 	if !found {
-		return fmt.Errorf("%s: invalid parity", parm.ByName["-partity"])
+		return fmt.Errorf("%s: invalid parity", parm.ByName["-parity"])
 	}
 
 	if len(parm.ByName["-databits"]) == 0 {
@@ -131,9 +131,9 @@ func (Command) Main(args ...string) error {
 		"6": syscall.CS6,
 		"7": syscall.CS7,
 		"8": syscall.CS8,
-	}[parm.ByName["-databites"]]
+	}[parm.ByName["-databits"]]
 	if !found {
-		return fmt.Errorf("%s: invalid databits", parm.ByName["-databites"])
+		return fmt.Errorf("%s: invalid databits", parm.ByName["-databits"])
 	}
 
 	if len(parm.ByName["-stopbits"]) == 0 {
