@@ -9,8 +9,8 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -22,11 +22,6 @@ func (Command) Usage() string {
 }
 
 func (Command) Man() lang.Alt {
-	return lang.Alt{
-		lang.EnUS: "print concatenated files",
-	}
-}
-func (Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
@@ -40,6 +35,11 @@ EXAMPLES
 
 	cat
 		Copy standard input to standard output.`,
+	}
+}
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print concatenated files",
 	}
 }
 

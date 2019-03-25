@@ -18,20 +18,20 @@ type Command struct{}
 
 func (Command) Man() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "convert mac addresss to IPv6 link-local",
+		lang.EnUS: `
+DESCRIPTION
+        Convert a 6 byte MAC address to an IPv6 link-local.
+
+        Without any args, show the base MAC address plus link-local.
+
+        <mac>    Convert the MAC address isIPv6 link-local.`,
 	}
 }
 func (Command) String() string { return "mac-ll" }
 func (Command) Usage() string  { return "mac-ll <mac>" }
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: `
-DESCRIPTION 
-        Convert a 6 byte MAC address to an IPv6 link-local.
-
-        Without any args, show the base MAC address plus link-local.
-
-        <mac>    Convert the MAC address isIPv6 link-local.`,
+		lang.EnUS: "convert mac addresss to IPv6 link-local",
 	}
 }
 
