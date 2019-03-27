@@ -19,7 +19,7 @@ import (
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/internal/shellutils"
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 )
 
 type parsedCommand struct {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 )
 
 type Command struct{}

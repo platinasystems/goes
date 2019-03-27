@@ -47,7 +47,7 @@ import (
 
 	"github.com/platinasystems/flags"
 	"github.com/platinasystems/parms"
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 
 	"github.com/platinasystems/liner"
 )

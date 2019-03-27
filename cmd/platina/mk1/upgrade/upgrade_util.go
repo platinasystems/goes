@@ -15,7 +15,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/goes/cmd/platina/mk1/bootc"
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 )
 
 const (

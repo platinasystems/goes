@@ -18,7 +18,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/goes/internal/kexec"
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 )
 
 type IMGINFO struct {

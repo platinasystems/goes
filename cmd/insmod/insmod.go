@@ -13,7 +13,7 @@ import (
 
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/flags"
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 )
 
 type Command struct{}

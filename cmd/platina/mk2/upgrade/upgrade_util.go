@@ -14,7 +14,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/internal/url"
+	"github.com/platinasystems/url"
 )
 
 const (
