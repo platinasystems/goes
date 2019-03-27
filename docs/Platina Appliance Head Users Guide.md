@@ -761,11 +761,14 @@ Fan Speed
 
 ### Upgrading GOES-Boot
 
+GOES-boot is a secure Linux-based boot program that replaces tradition BIOS.  To upgrade:
 ```
 sudo bash
 wget http://downloads.platinasystems.com/LATEST/coreboot-platina-mk1.rom
 /usr/local/sbin/flashrom -p internal:boardmismatch=force -l /usr/local/share/flashrom/layouts/platina-mk1.xml -i bios -r coreboot-platina-mk1.rom -A -V
 ```
+#### Protip:
+New goes-boot is now written into the flash.  It will take effect on next reboot.
 
 ### Upgrading Linux Kernel
 
@@ -775,12 +778,44 @@ wget http://downloads.platinasystems.com/LATEST/linux-image-platina-mk1-4.13.0.d
 dpkg -i linux-image-platina-mk1-4.13.0.deb
 ```
 
+#### Protip:
+A reboot is required for new kernel to take effect.
+
+As best practice, it is a good idea to remove old unused kernels using dpkg --purge command.
+
+Included in the kerenl is a platina kernel driver platina-mk1.  It should be loaded automatically on boot and can be verified using 'lsmod' command.  If it is not installed:
+1.  Check '/etc/modules-load.d/goesd-platina-mk1-modules.conf' and make sure it includes "platna-mk1".
+Example of a '/etc/modules-load.d/goesd-platina-mk1-modules.conf' config file:
+```
+# goes-mk1-modules.conf: kernel modules to load at boot time.                                                                                                                                                       
+#                                                                                                                                                                                                                   
+# This file contains the names of kernel modules that should be loaded                                                                                                                                              
+# at boot time, one per line. Lines beginning with "#" are ignored.                                                                                                                                                 
+#                                                                                                                                                                                                                   
+# load the i2c_i801 and platina-mk1 drivers                                                                                                                                                                         
+i2c_i801
+platina-mk1
+```
+2.  You can also manually load the kernel module
+```
+sudo modprobe platina-mk1
+```
+
 ### Upgrading GOES
 
 ```
 sudo bash
 wget http://downloads.platinasystems.com/LATEST/goes-platina-mk1
 ./goes-platina-mk1 install
+```
+#### Protip:
+GOES will read in /etc/goes/start bash file on start, and /etc/goes/stop bash file on stop.  The files can include any command available from the goes shell.  Any Linux command can also be included by prefacing command with '!'
+
+Below is an example of a /etc/goes/start file that will ifdown and ifup all the interfaces in /etc/network/interfaces that are tagged with "allow-vnet" on start.
+```
+#!/usr/bin/goes
+! ifdown -a --allow vnet
+! ifup -a --allow vnet
 ```
 
 ### Updating the BMC Firmware
