@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/lang"
 )
 

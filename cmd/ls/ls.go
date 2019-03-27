@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 )
 
 var PathSeparatorString = string([]byte{os.PathSeparator})

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 )
 
 type Command struct{}

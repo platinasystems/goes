@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/log"
-	"github.com/platinasystems/goes/internal/parms"
+	"github.com/platinasystems/parms"
 )
 
 const (

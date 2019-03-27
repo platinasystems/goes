@@ -8,9 +8,9 @@ package ipmigod
 import (
 	"strconv"
 
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/internal/parms"
+	"github.com/platinasystems/parms"
 	"github.com/platinasystems/redis"
 )
 

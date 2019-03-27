@@ -25,8 +25,8 @@ import (
 
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
-	"github.com/platinasystems/goes/internal/parms"
+	"github.com/platinasystems/flags"
+	"github.com/platinasystems/parms"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/internal/url"

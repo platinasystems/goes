@@ -17,7 +17,7 @@ import (
 	"github.com/platinasystems/goes/cmd/cli/internal/notliner"
 	"github.com/platinasystems/goes/cmd/resize"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/internal/url"
 )

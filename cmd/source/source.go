@@ -10,7 +10,7 @@ import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 )
 
 type Command struct {

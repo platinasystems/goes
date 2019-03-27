@@ -11,11 +11,11 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/flags"
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/internal/netns"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
-	"github.com/platinasystems/goes/internal/parms"
+	"github.com/platinasystems/parms"
 	"github.com/platinasystems/redis/publisher"
 )
 

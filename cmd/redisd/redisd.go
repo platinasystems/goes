@@ -21,7 +21,7 @@ import (
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/internal/cmdline"
 	"github.com/platinasystems/goes/internal/fields"
-	"github.com/platinasystems/goes/internal/parms"
+	"github.com/platinasystems/parms"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/redis"
 	"github.com/platinasystems/redis/publisher"
