@@ -759,9 +759,10 @@ Fan Speed
 
 # Software and Firmware Updates
 
-### Upgrading Coreboot
+### Upgrading GOES-Boot
 
 ```
+sudo bash
 wget http://downloads.platinasystems.com/LATEST/coreboot-platina-mk1.rom
 /usr/local/sbin/flashrom -p internal:boardmismatch=force -l /usr/local/share/flashrom/layouts/platina-mk1.xml -i bios -r coreboot-platina-mk1.rom -A -V
 ```
