@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/platinasystems/goes/internal/parms"
 	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/parms"
 
 	"github.com/platinasystems/ubi"
 )
