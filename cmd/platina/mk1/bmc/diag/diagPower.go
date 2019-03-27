@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/cmd/platina/mk1/bmc/ucd9090d"
-	"github.com/platinasystems/goes/internal/eeprom"
+	"github.com/platinasystems/eeprom"
 )
 
 var pm ucd9090d.I2cDev

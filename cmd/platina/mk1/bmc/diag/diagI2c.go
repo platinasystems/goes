@@ -9,7 +9,7 @@ import (
 	"net/rpc"
 	"time"
 
-	"github.com/platinasystems/goes/internal/eeprom"
+	"github.com/platinasystems/eeprom"
 	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/log"
 )

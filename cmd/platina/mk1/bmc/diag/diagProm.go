@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/platinasystems/goes/internal/eeprom"
+	"github.com/platinasystems/eeprom"
 	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"
 )

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/platinasystems/goes/internal/eeprom"
+	"github.com/platinasystems/eeprom"
 )
 
 func diagHost() error {
