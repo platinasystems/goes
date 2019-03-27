@@ -105,6 +105,8 @@ github.com/platinasystems/redis v1.2.0/go.mod h1:lyuhkHpfn6y21/nMn7H6pbBuPk1D8pf
 github.com/platinasystems/tftp v1.0.0 h1:wUv+nFUwntLddYGa3Y5Zr3TUQ4rtQXGebG0ZOutVyIw=
 github.com/platinasystems/tftp v1.0.0/go.mod h1:RUhAd8ADNPAQmoiSbjo4aDFAOBjz7kC1FkDAmuEd9J0=
 github.com/platinasystems/ubi v0.0.1/go.mod h1:CaWlufzEkyJ+hYSyu8/8pwY+9JYZZh8/1XRyfTU8EuU=
+github.com/platinasystems/url v1.0.0 h1:T2GuEIydvkZCpbU4DlTVyRdYoM5gn9MQNRGOObDg574=
+github.com/platinasystems/url v1.0.0/go.mod h1:tjHiLHUR+Jasu091bzwk/SAHkgEuO8ohYmi4XTszV2Y=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff h1:kXSTJRId8WwwqEfN0iQtzQu+jof2jTguzP2y12ULXvc=

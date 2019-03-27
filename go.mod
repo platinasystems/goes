@@ -30,6 +30,7 @@ require (
 	github.com/platinasystems/redis v1.2.0
 	github.com/platinasystems/tftp v1.0.0
 	github.com/platinasystems/ubi v0.0.1
+	github.com/platinasystems/url v1.0.0
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
