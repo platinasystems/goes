@@ -28,6 +28,7 @@ require (
 	github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57
 	github.com/platinasystems/parms v1.0.0
 	github.com/platinasystems/redis v1.2.0
+	github.com/platinasystems/tftp v1.0.0
 	github.com/platinasystems/ubi v0.0.1
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0

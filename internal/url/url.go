@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/cavaliercoder/grab"
-	"github.com/platinasystems/goes/internal/tftp"
+	"github.com/platinasystems/tftp"
 )
 
 func Open(path string) (io.ReadCloser, error) {
