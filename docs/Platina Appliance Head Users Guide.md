@@ -765,7 +765,7 @@ GOES-boot is a secure Linux-based boot program that replaces tradition BIOS.  To
 ```
 sudo bash
 wget http://downloads.platinasystems.com/LATEST/coreboot-platina-mk1.rom
-/usr/local/sbin/flashrom -p internal:boardmismatch=force -l /usr/local/share/flashrom/layouts/platina-mk1.xml -i bios -r coreboot-platina-mk1.rom -A -V
+/usr/local/sbin/flashrom -p internal:boardmismatch=force -l /usr/local/share/flashrom/layouts/platina-mk1.xml -i bios -w coreboot-platina-mk1.rom -A -V
 ```
 #### Protip:
 New goes-boot is now written into the flash.  It will take effect on next reboot.
