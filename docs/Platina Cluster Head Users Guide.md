@@ -806,6 +806,7 @@ sudo modprobe platina-mk1
 ```
 sudo bash
 wget http://downloads.platinasystems.com/LATEST/goes-platina-mk1
+chmod 755 goes-platina-mk1
 ./goes-platina-mk1 install
 ```
 #### Protip:
