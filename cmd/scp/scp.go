@@ -49,7 +49,6 @@ OPTIONS
 }
 
 func (Command) Main(args ...string) error {
-	log.Print(args)
 	flag, args := flags.New(args, "-d", "-f", "-p", "-r", "-t")
 	i := 0
 	if flag.ByName["-f"] {
@@ -171,18 +170,13 @@ func sinkMode(flag *flags.Flags, exists, isDir bool, r *bufio.Reader, p string) 
 	dirStack := make([]string, 0)
 	var atime, mtime time.Time
 	fmt.Printf("\x00")
-	log.Print("Hi!")
 	s := bufio.NewScanner(r)
-	log.Print("You!")
 	for s.Scan() {
-		log.Print("Got something from scanner")
 		c := s.Text()
-		log.Print(c)
 		switch c[0] {
 		case 'C':
 			// Cmmmm <length> <filename>
 			f := strings.SplitN(c[1:], " ", 3)
-			log.Print(f)
 			m, err := strconv.ParseUint(f[0], 0, 32)
 			if err != nil {
 				return err
@@ -207,24 +201,24 @@ func sinkMode(flag *flags.Flags, exists, isDir bool, r *bufio.Reader, p string) 
 			} else {
 				fn = p
 			}
-			log.Print("Path ", p, "Opening ", fn)
 			err = ioutil.WriteFile(fn, b, os.FileMode(m))
 			if err != nil {
+				log.Print("error writing ", fn, ": ", err)
 				return err
 			}
 			if flag.ByName["-p"] {
 				err = os.Chtimes(fn, atime, mtime)
 				if err != nil {
+					log.Print("error setting times ", fn, ": ", err)
 					return err
 				}
 			}
 			fmt.Printf("\x00")
-			log.Print("Success!")
+			log.Print("successfully wrote ", fn)
 
 		case 'D':
 			// Dmmmm <length-ignore> <dirname>
 			f := strings.SplitN(c[1:], " ", 3)
-			log.Print(f)
 			m, err := strconv.ParseUint(f[0], 0, 32)
 			if err != nil {
 				return err
@@ -275,13 +269,11 @@ func sinkMode(flag *flags.Flags, exists, isDir bool, r *bufio.Reader, p string) 
 			}
 			mtime = time.Unix(int64(mtimeSec), int64(mtimeUsec)*1000)
 			atime = time.Unix(int64(atimeSec), int64(atimeUsec)*1000)
-			log.Print("T command times ", mtime, " ", atime)
 			fmt.Printf("\x00")
 
 		default:
 			return fmt.Errorf("Unknown command %s", c)
 		}
 	}
-	log.Print("Done!")
 	return nil
 }
