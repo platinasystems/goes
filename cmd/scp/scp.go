@@ -85,7 +85,7 @@ func (Command) Main(args ...string) error {
 		}
 	} else {
 		exists = true
-		if (flag.ByName["-d"] || flag.ByName["-r"]) && s.IsDir() {
+		if s.IsDir() {
 			isDir = true
 		} else if !s.Mode().IsRegular() {
 			return fmt.Errorf("%s: is not a regular file", p)
