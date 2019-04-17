@@ -489,8 +489,8 @@ func formKexec1() (err error) {
 	if err != nil {
 		return err
 	}
-	kexec0 = "root=UUID=" + uuid1 + " console=ttyS0,115200 " + Cfg.ReInstallC
-	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200 "
+	kexec0 = "root=UUID=" + uuid1 + " console=ttyS0,115200n8 " + Cfg.ReInstallC
+	kexec1 = "root=UUID=" + uuid1 + " console=ttyS0,115200n8 "
 	kexec1 += Cfg.Sda1C
 	return nil
 }
@@ -500,7 +500,7 @@ func formKexec6() (err error) {
 	if err != nil {
 		return err
 	}
-	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200"
+	kexec6 = "root=UUID=" + uuid6 + " console=ttyS0,115200n8 "
 	kexec6 += Cfg.Sda6C
 	return nil
 }

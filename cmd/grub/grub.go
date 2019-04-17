@@ -293,7 +293,7 @@ func (c *Command) KexecCommand() []string {
 		if cl != "" {
 			cl = cl + " "
 		}
-		cl = cl + "console=ttyS0"
+		cl = cl + "console=ttyS0,115200n8"
 	}
 	return []string{"kexec", "-k", k, "-i", i, "-c", cl, "-e"}
 }
