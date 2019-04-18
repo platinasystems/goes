@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"net/rpc"
 
+	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/redis"
 	"github.com/platinasystems/redis/publisher"
 	"github.com/platinasystems/redis/rpc/args"
 	"github.com/platinasystems/redis/rpc/reply"
-	"github.com/platinasystems/goes/internal/sockfile"
 )
 
 const (
@@ -60,7 +60,7 @@ func (c Command) Main(...string) error {
 	}
 	rpc.Register(stringd)
 
-	sock, err := sockfile.NewRpcServer(Name)
+	sock, err := atsock.NewRpcServer(Name)
 	if err != nil {
 		return err
 	}
