@@ -57,6 +57,7 @@ const (
 )
 
 func diagProm() error {
+	var hostBusAddr int
 	var c, v string
 
 	//ONIE vendor exention fields
@@ -112,12 +113,28 @@ func diagProm() error {
 
 	d := eeprom.Device{
 		BusIndex: 0,
+		BusAddress: 0x55,
 	}
+	if err := d.GetInfo(); err != nil {
+		return err
+	}
+	switch d.Fields.DeviceVersion {
+		case 0xff: hostBusAddr = 0x51	//alpha
+		case 0x00: hostBusAddr = 0x51	//alpha
+		case 0x01: hostBusAddr = 0x51	//beta
+		case 0x02: hostBusAddr = 0x51	//reserved for alpha rework
+		case 0x03: hostBusAddr = 0x51	//reserved for beta rework
+		case 0x0a: hostBusAddr = 0x51	//pvt
+		case 0x0b: hostBusAddr = 0x51	//pvt2
+		case 0x0c: hostBusAddr = 0x53	//pvt2 w/ uart&i2c rework
+		default: hostBusAddr = 0x53
+	}
+
 	//select host or bmc prom
 	if !flagF.ByName["-x86"] {
 		d.BusAddress = 0x55
 	} else {
-		d.BusAddress = 0x51
+		d.BusAddress = hostBusAddr
 		gpioSet("CPU_TO_MAIN_I2C_EN", true)
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -331,7 +348,8 @@ func diagProm() error {
 			//copy host prom to bmc prom and update vendor extension field
 			var rawData []byte
 			if !x86 {
-				d.BusAddress = 0x51
+				//d.BusAddress = 0x51
+				d.BusAddress = hostBusAddr
 				gpioSet("CPU_TO_MAIN_I2C_EN", true)
 				time.Sleep(10 * time.Millisecond)
 				_, rawData = d.DumpProm()
@@ -341,7 +359,8 @@ func diagProm() error {
 			} else {
 				d.BusAddress = 0x55
 				_, rawData = d.DumpProm()
-				d.BusAddress = 0x51
+				//d.BusAddress = 0x51
+				d.BusAddress = hostBusAddr
 				gpioSet("CPU_TO_MAIN_I2C_EN", true)
 				time.Sleep(10 * time.Millisecond)
 			}
