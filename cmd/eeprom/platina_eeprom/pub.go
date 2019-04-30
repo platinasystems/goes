@@ -63,16 +63,27 @@ func RedisdHook(pub *publisher.Publisher) {
 func readbytes() ([]byte, error) {
 	// eeprom reads are called early, by redis hook in start
 	// i2cd is not up in start, so direct i2c calls are used
-	bus, err := i2c.New(config.bus.index, config.bus.address)
+	var (
+		bus  *i2c.Bus
+		err  error
+		lbuf []byte
+	)
+	// Try possible addresses one by one
+	for _, address := range config.bus.addresses {
+		fmt.Printf("try eeprom address 0x%x...", address)
+		if bus, err = i2c.New(config.bus.index, address); err == nil {
+			if lbuf, err = bus.ReadBlock(eeprom.LenOffset, 2, config.bus.delay); err == nil {
+				fmt.Printf("success\n")
+				break
+			}
+		}
+		fmt.Printf("%v\n", err)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("eeprom: bus open: %v", err)
+		return nil, fmt.Errorf("eeprom: %v", err)
 	}
 	defer bus.Close()
 
-	lbuf, err := bus.ReadBlock(eeprom.LenOffset, 2, config.bus.delay)
-	if err != nil {
-		return nil, fmt.Errorf("eeprom: Read DataLen: %v", err)
-	}
 	n := eeprom.HeaderSz + int(binary.BigEndian.Uint16(lbuf))
 	buf, err := bus.ReadBlock(0, n, config.bus.delay)
 	if err != nil {

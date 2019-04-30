@@ -12,16 +12,16 @@ import (
 
 var config struct {
 	bus struct {
-		index   int
-		address int
-		delay   time.Duration
+		index     int
+		addresses []int
+		delay     time.Duration
 	}
 	minMacs int
 	oui     [3]byte
 }
 
 type BusIndex int
-type BusAddress int
+type BusAddresses []int
 type BusDelay time.Duration
 type MinMacs int
 type OUI [3]byte
@@ -31,8 +31,9 @@ func Config(args ...interface{}) {
 		switch t := arg.(type) {
 		case BusIndex:
 			config.bus.index = int(t)
-		case BusAddress:
-			config.bus.address = int(t)
+		case BusAddresses:
+			// list of possible addresses to reach eeprom
+			config.bus.addresses = append([]int(nil), []int(t)...)
 		case BusDelay:
 			config.bus.delay = time.Duration(t)
 		case MinMacs:
