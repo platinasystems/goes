@@ -9,16 +9,15 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"syscall"
 
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/cmd/cli/internal/liner"
 	"github.com/platinasystems/goes/cmd/cli/internal/notliner"
 	"github.com/platinasystems/goes/cmd/resize"
-	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/internal/shellutils"
+	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/url"
 )
 
@@ -179,6 +178,9 @@ func (c *Command) Main(args ...string) error {
 		panic("cli's goes is nil")
 	}
 
+	csig := make(chan os.Signal, 1)
+	signal.Notify(csig, os.Interrupt)
+
 	defer func() {
 		for _, name := range c.g.Names() {
 			v := c.g.ByName[name]
@@ -235,9 +237,13 @@ func (c *Command) Main(args ...string) error {
 			return s, nil
 		}
 	}
-	signal.Ignore(syscall.SIGINT)
 readCommandLoop:
 	for {
+		select {
+		case <-csig:
+			fmt.Println("\nCommand interrupted")
+		default:
+		}
 		prompt := c.Prompt
 		if len(prompt) == 0 {
 			prompt = fmt.Sprint(c.g, "> ")

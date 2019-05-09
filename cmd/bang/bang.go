@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
-	"syscall"
 
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
@@ -68,8 +66,6 @@ func (Command) Main(args ...string) error {
 		}()
 		return nil
 	} else {
-		signal.Ignore(syscall.SIGINT)
-		// FIXME how to kill subprocess with SIGINT
 		return cmd.Run()
 	}
 }
