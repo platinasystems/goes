@@ -7,7 +7,6 @@ package slashinit
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,9 +15,9 @@ import (
 	"github.com/cavaliercoder/grab"
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
-	"github.com/platinasystems/url"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/log"
+	"github.com/platinasystems/url"
 )
 
 const zero = uintptr(0)
@@ -70,21 +69,14 @@ func init() {
 			}
 		}
 	}
-	consoles, err := ioutil.ReadFile("/sys/devices/virtual/tty/console/active")
-	if err != nil {
-		log.Print("err", "open", "/sys/devices/virtual/tty/console/active", err)
-	} else {
-		consoleList := strings.Fields(string(consoles))
-		console := "/dev/" + consoleList[len(consoleList)-1]
-		for fd := 0; fd <= 2; fd++ {
-			err := syscall.Close(fd)
-			if err != nil {
-				log.Print("err", "console close", ":", err)
-			}
-			_, err = syscall.Open(console, syscall.O_RDWR, 0)
-			if err != nil {
-				log.Print("err", "console reopen", ":", err)
-			}
+	for fd := 0; fd <= 2; fd++ {
+		err := syscall.Close(fd)
+		if err != nil {
+			log.Print("err", "console close", ":", err)
+		}
+		_, err = syscall.Open("/dev/kmsg", syscall.O_RDWR, 0)
+		if err != nil {
+			log.Print("err", "console reopen", ":", err)
 		}
 	}
 
