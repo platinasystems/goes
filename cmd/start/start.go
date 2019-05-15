@@ -9,22 +9,18 @@ package start
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
 
 	"github.com/ramr/go-reaper"
 
 	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/assert"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/goes/internal/prog"
+	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/parms"
 )
-
-func New() *Command { return new(Command) }
 
 type Command struct {
 	// Machines may use Hook to run something before redisd and other
@@ -39,6 +35,9 @@ type Command struct {
 	ConfGpioHook func() error
 
 	g *goes.Goes
+
+	// Gettys is the list of ttys to start getty on
+	Gettys []string
 }
 
 func (*Command) String() string { return "start" }
@@ -139,30 +138,39 @@ func (c *Command) Main(args ...string) error {
 
 	go daemons.Wait()
 
-	for {
-		if _, found := c.g.ByName["login"]; found {
-			if err = c.run("login"); err != nil {
-				fmt.Fprintln(os.Stderr, "login:", err)
-				time.Sleep(3 * time.Second)
-				continue
+	for _, getty := range c.Gettys {
+		go func(getty string) {
+			for {
+				ttyFd, err := syscall.Open(getty, syscall.O_RDWR, 0)
+				if err != nil {
+					fmt.Fprintf(os.Stderr,
+						"%s: error opening tty %s for getty: %s\n",
+						prog.Base(), getty, err)
+					return
+				}
+				ttyFile := os.NewFile(uintptr(ttyFd), getty)
+				shell := exec.Command("/proc/self/exe")
+				shell.Args[0] = "cli"
+				shell.SysProcAttr = &syscall.SysProcAttr{
+					Setsid:  true,
+					Setctty: true,
+					Ctty:    ttyFd,
+					Pgid:    0,
+				}
+				shell.Stdin = ttyFile
+				shell.Stdout = ttyFile
+				shell.Stderr = ttyFile
+				err = shell.Run()
+				if err != nil {
+					fmt.Fprintf(os.Stderr,
+						"%s: error from cli: %s\n",
+						prog.Base(), err)
+				}
+				_ = syscall.Close(ttyFd)
 			}
-		}
-		err = c.run("cli")
-		if err == io.EOF {
-			err = nil
-		}
-		if err != nil {
-			fmt.Fprint(os.Stderr, prog.Base(), ": ", err, "\n")
-		}
+		}(getty)
 	}
-
-}
-
-func (c *Command) run(args ...string) error {
-	x := c.g.Fork(args...)
-	x.Stdin = os.Stdin
-	x.Stdout = os.Stdout
-	x.Stderr = os.Stderr
-	x.Dir = "/"
-	return x.Run()
+	// A real init would listen for SIGTERM etc. Some day.
+	select {}
+	return nil // not reached
 }
