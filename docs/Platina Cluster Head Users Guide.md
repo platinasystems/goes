@@ -809,6 +809,13 @@ wget http://downloads.platinasystems.com/LATEST/goes-platina-mk1
 chmod 755 goes-platina-mk1
 ./goes-platina-mk1 install
 ```
+goes v1.2.1 and newer require Linux iproute2 version iproute2-ss161212 or newer. On Debian 9(stretch), iproute2-ss161212 is the latest version.  On Debian 8(jessie), upgrade iproute2:
+```
+wget http://http.us.debian.org/debian/pool/main/i/iproute2/iproute2_4.9.0-1+deb9u1_amd64.deb 
+apt-get install libelf1
+dpkg -i iproute2_4.9.0-1+deb9u1_amd64.deb
+```
+
 #### Protip:
 GOES will read in /etc/goes/start bash file on start, and /etc/goes/stop bash file on stop.  The files can include any command available from the goes shell.  Any Linux command can also be included by prefacing command with '!'
 
