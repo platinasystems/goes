@@ -28,8 +28,8 @@ github.com/platinasystems/atsock v0.0.0-20181019220955-c4cc7ae24dbf h1:ChH/cr79N
 github.com/platinasystems/atsock v0.0.0-20181019220955-c4cc7ae24dbf/go.mod h1:1XAb4yaMVNH9PDa7Q4sZmDqHoHSrzUfnGImUuSMpx5U=
 github.com/platinasystems/atsock v1.1.0 h1:+h8ismKClv31tIEOTZQhBMdDJALQhF3vDKjK2Y8H7mU=
 github.com/platinasystems/atsock v1.1.0/go.mod h1:1XAb4yaMVNH9PDa7Q4sZmDqHoHSrzUfnGImUuSMpx5U=
-github.com/platinasystems/eeprom v1.0.0 h1:k/uFuOnWaO0uycBq+qiS6IT5ZUA8utj3ChRPp6q1vkU=
-github.com/platinasystems/eeprom v1.0.0/go.mod h1:J5rWlxG4HFDqq5o1KE4n942Se7BwXDADl6H+r9OfX1I=
+github.com/platinasystems/buildinfo v1.1.0 h1:LFlyBxsfwYyP7bhGb0rCV63pEWIsjvAC+1AlHo7A6iQ=
+github.com/platinasystems/buildinfo v1.1.0/go.mod h1:VO8oKwJRCwPKxkqaLjkMxPHLAoe5i+9hmlFZ2x3RFik=
 github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82 h1:8oJRu+rE44Ch++W09gJNzvKeR+xlt5d341anN9mwdvw=
 github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82/go.mod h1:WM0Ssx33gkNWXu07exXBEh0E4VXtPXpYulmmkZHK2qM=
 github.com/platinasystems/flags v1.0.0 h1:M+WtvQjx+ta36d908PDVUvamKnJR2ZXYkUx7OM+lhcg=
@@ -40,11 +40,13 @@ github.com/platinasystems/gpio v0.0.0-20181120172958-aa9a44e83566 h1:K+WxE4dE01A
 github.com/platinasystems/gpio v0.0.0-20181120172958-aa9a44e83566/go.mod h1:UsR1pB6U/S7Ql6RDrF/S6rMJqWOiZu3H2mKQeEe4v7U=
 github.com/platinasystems/i2c v1.2.0 h1:H1BgNrz4s15AcR6Y4WxZS+eMgX00pu8ZoLfVHb5VoIw=
 github.com/platinasystems/i2c v1.2.0/go.mod h1:Yj5hRxt+HXbW1rXv9aTtxUNZsegDjeWerUPY5BIjDVM=
+github.com/platinasystems/ldp v0.0.2 h1:pSqelqQiHOpIcNpgpNYRgV4BhVCUqTrrQSLHk7Lbhlw=
 github.com/platinasystems/ldp v0.0.2/go.mod h1:5FioI0SgC7RQZOtJRvnXqrInH0D4U2Pn/6M2rT+5Tj0=
 github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d h1:jVkqqhZKx8eAb94QYDajS9KOh5B/rOAx34H7DDZGrEo=
 github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d/go.mod h1:5N7zNCEtHP1s5kK6pVgaFwtzEleCreRubeHBnE4rGso=
 github.com/platinasystems/log v1.2.1 h1:a43xeRp+KouaPlVTfOdeI2vNj755PBf8ovKEAMT8o5w=
 github.com/platinasystems/log v1.2.1/go.mod h1:5Wjp9vxMfkZGWz2Ep3ghzsfarcs9MMfiE2RzKwseyKQ=
+github.com/platinasystems/loopback v0.0.2 h1:iv7rWbJUx5YrB93/kPrMcbJ3qWZ+XZAszLD4yb73eSM=
 github.com/platinasystems/loopback v0.0.2/go.mod h1:L363iEtOA7dYJkxGa0b81/0hiSY34/H084Kben/DDRA=
 github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57 h1:aXCGfZLnvW0ffPXgYB4yJumQGDvq2z8e8vxlVnGVdy8=
 github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57/go.mod h1:5432a+C/LwmCPg543MFUCCzgTaEpAURrTC01os0/8k8=

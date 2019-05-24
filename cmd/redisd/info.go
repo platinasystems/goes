@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes"
+	"github.com/platinasystems/buildinfo"
 	"github.com/platinasystems/goes/internal/proc"
 )
 
@@ -37,12 +37,14 @@ func (redisd *Redisd) Info(secs ...string) ([]byte, error) {
 
 	funcs := map[string]func(io.Writer){
 		"server": func(w io.Writer) {
-			fmt.Fprint(w, "version: ", goes.Version, "\r\n")
+			fmt.Fprint(w, "version: ",
+				buildinfo.New().Version(), "\r\n")
 			fmt.Fprint(w, "os: ", runtime.GOOS, "\r\n")
 			fmt.Fprint(w, "arch_bits: ", SizeofInt*8, "\r\n")
 			fmt.Fprint(w, "process_id: ", stat.Pid, "\r\n")
 			s := time.Now().Sub(stat.StartTime).Seconds()
-			fmt.Fprint(w, "uptime_in_seconds: ", math.Floor(s+.5), "\r\n")
+			fmt.Fprint(w, "uptime_in_seconds: ",
+				math.Floor(s+.5), "\r\n")
 			fmt.Fprint(w, "uptime_in_days: ",
 				math.Floor((s/(60*60*24))+.5),
 				"\r\n")
