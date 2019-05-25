@@ -7,8 +7,8 @@ package buildid
 import (
 	"fmt"
 
+	"github.com/platinasystems/buildid"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/buildid"
 )
 
 type Command struct{}
@@ -46,10 +46,9 @@ func (Command) Main(args ...string) error {
 			return err
 		}
 		if len(args) > 1 {
-			fmt.Printf("%s: %s\n", fn, s)
-		} else {
-			fmt.Println(s)
+			fmt.Print(fn, ": ")
 		}
+		fmt.Println(s)
 	}
 	return nil
 }

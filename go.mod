@@ -14,6 +14,7 @@ require (
 	github.com/mattn/go-isatty v0.0.4
 	github.com/paypal/gatt v0.0.0-20151011220935-4ae819d591cf // indirect
 	github.com/platinasystems/atsock v1.1.0
+	github.com/platinasystems/buildid v1.0.0
 	github.com/platinasystems/buildinfo v1.1.0
 	github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82
 	github.com/platinasystems/flags v1.0.0
