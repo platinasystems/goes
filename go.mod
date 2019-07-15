@@ -12,7 +12,6 @@ require (
 	github.com/jpillora/backoff v0.0.0-20180909062703-3050d21c67d7
 	github.com/kr/pty v1.1.3
 	github.com/mattn/go-isatty v0.0.4
-	github.com/paypal/gatt v0.0.0-20151011220935-4ae819d591cf // indirect
 	github.com/platinasystems/atsock v1.1.0
 	github.com/platinasystems/buildid v1.0.0
 	github.com/platinasystems/buildinfo v1.1.0
@@ -26,9 +25,10 @@ require (
 	github.com/platinasystems/log v1.2.1
 	github.com/platinasystems/loopback v0.0.2
 	github.com/platinasystems/memio v0.0.0-20181109233200-08a432045d57
+	github.com/platinasystems/nvram v1.0.0
 	github.com/platinasystems/parms v1.0.0
 	github.com/platinasystems/redis v1.2.0
-	github.com/platinasystems/ubi v0.0.1
+	github.com/platinasystems/ubi v0.0.2
 	github.com/platinasystems/url v1.0.0
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0

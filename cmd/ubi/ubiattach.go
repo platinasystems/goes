@@ -71,12 +71,6 @@ func (c AttachCommand) Main(args ...string) (err error) {
 		}
 	}
 
-	u, err := ubi.Open()
-	if err != nil {
-		return
-	}
-	defer u.Close()
-
-	err = u.Attach(int32(ubiUnit), int32(mtdUnit), 0, 0)
+	err = ubi.Attach(int32(ubiUnit), int32(mtdUnit), 0, 0)
 	return err
 }

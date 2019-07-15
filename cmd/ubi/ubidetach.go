@@ -58,12 +58,7 @@ func (c DetachCommand) Main(args ...string) (err error) {
 			return fmt.Errorf("Error parsing %s: %s\n", us, err)
 		}
 	}
-	u, err := ubi.Open()
-	if err != nil {
-		return
-	}
-	defer u.Close()
 
-	err = u.Detach(int32(unit))
+	err = ubi.Detach(int32(unit))
 	return err
 }
