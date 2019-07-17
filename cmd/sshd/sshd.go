@@ -23,6 +23,7 @@ import (
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/log"
+	"github.com/platinasystems/ssh_key_helper"
 
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -59,7 +60,21 @@ func setWinsize(f *os.File, w, h int) {
 }
 
 func (c *Command) Main(args ...string) (err error) {
-	err = makeId(false)
+	goesDir := "/etc/goes"
+	if _, err := os.Stat(goesDir); os.IsNotExist(err) {
+		err = os.Mkdir(goesDir, os.FileMode(0555))
+		if err != nil {
+			return err
+		}
+	}
+	keyDir := "/etc/goes/sshd"
+	if _, err := os.Stat(keyDir); os.IsNotExist(err) {
+		err = os.Mkdir(keyDir, os.FileMode(0600))
+		if err != nil {
+			return err
+		}
+	}
+	err = ssh_key_helper.MakeRSAKeyPair("/etc/goes/sshd/id_rsa", false)
 	if err != nil {
 		return err
 	}
