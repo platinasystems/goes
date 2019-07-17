@@ -159,7 +159,7 @@ func (c *Command) Main(args ...string) error {
 	if e != 0 {
 		return e
 	}
-	mac := net.HardwareAddr(dev.ifrNewname[2:7])
+	mac := net.HardwareAddr(dev.ifrNewname[2:8])
 
 	fmt.Printf("Got %s\n", mac)
 
