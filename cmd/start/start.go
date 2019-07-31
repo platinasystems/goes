@@ -43,7 +43,7 @@ type Command struct {
 func (*Command) String() string { return "start" }
 
 func (*Command) Usage() string {
-	return "start [-start=URL] [REDIS OPTIONS]..."
+	return "start [-start=URL] [-init=URL] [REDIS OPTIONS]..."
 }
 
 func (*Command) Apropos() lang.Alt {
@@ -59,6 +59,11 @@ DESCRIPTION
 	Start a redis server followed by the machine and its embedded daemons.
 
 OPTIONS
+	-init URL
+		Specifies the URL of the machine's configuration script that's
+		sourced immediately before start of all daemons.
+		default: /etc/goes/init
+
 	-start URL
 		Specifies the URL of the machine's configuration script that's
 		sourced immediately after start of all daemons.
@@ -72,7 +77,7 @@ SEE ALSO
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) error {
-	parm, args := parms.New(args, "-start", "-stop")
+	parm, args := parms.New(args, "-start", "-stop", "init")
 
 	err := assert.Root()
 	if err != nil {
@@ -81,11 +86,24 @@ func (c *Command) Main(args ...string) error {
 	if prog.Name() != prog.Install && prog.Base() != "init" {
 		return fmt.Errorf("use `%s start`", prog.Install)
 	}
+	init := parm.ByName["-init"]
+	if len(init) == 0 {
+		if _, xerr := os.Stat("/etc/goes/init"); xerr == nil {
+			init = "/etc/goes/init"
+		}
+	}
+	if len(init) > 0 {
+		err = c.g.Main("source", init)
+		if err != nil {
+			return fmt.Errorf("Error in source init: %s", err)
+		}
+	}
 	if c.Hook != nil {
 		if err = c.Hook(); err != nil {
 			return err
 		}
 	}
+
 	daemons := exec.Command(prog.Name(), args...)
 	daemons.Args[0] = "goes-daemons"
 	daemons.Stdin = nil
