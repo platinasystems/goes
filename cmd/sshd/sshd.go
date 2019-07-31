@@ -133,9 +133,17 @@ func (c *Command) Main(args ...string) (err error) {
 		// check permissions on authorized_keys
 		authKeys, err := ioutil.ReadFile("/etc/goes/sshd/authorized_keys")
 		if err != nil {
-			fmt.Printf("Error reading authorized keys: %s\n", err)
-			return c.FailSafe
+			if !os.IsNotExist(err) {
+				fmt.Printf("Error reading authorized keys: %s\n", err)
+				return c.FailSafe
+			}
+			authKeys, err = ioutil.ReadFile("/etc/goes/sshd/authorized_keys.default")
+			if err != nil {
+				fmt.Printf("Error reading authorized keys.default: %s\n", err)
+				return c.FailSafe
+			}
 		}
+
 		for len(authKeys) > 0 {
 			authKey, _, _, rest, err := gossh.ParseAuthorizedKey(authKeys)
 			if err != nil {
