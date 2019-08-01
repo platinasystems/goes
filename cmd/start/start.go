@@ -20,7 +20,13 @@ import (
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/parms"
+	"github.com/platinasystems/term"
 )
+
+type TtyCon struct {
+	Tty  string
+	Baud int
+}
 
 type Command struct {
 	// Machines may use Hook to run something before redisd and other
@@ -37,7 +43,7 @@ type Command struct {
 	g *goes.Goes
 
 	// Gettys is the list of ttys to start getty on
-	Gettys []string
+	Gettys []TtyCon
 }
 
 func (*Command) String() string { return "start" }
@@ -157,22 +163,23 @@ func (c *Command) Main(args ...string) error {
 	go daemons.Wait()
 
 	for _, getty := range c.Gettys {
-		go func(getty string) {
+		go func(getty TtyCon) {
 			for {
-				ttyFd, err := syscall.Open(getty, syscall.O_RDWR, 0)
+				tty, err := term.Open(getty.Tty,
+					term.Speed(getty.Baud))
 				if err != nil {
 					fmt.Fprintf(os.Stderr,
 						"%s: error opening tty %s for getty: %s\n",
-						prog.Base(), getty, err)
+						prog.Base(), getty.Tty, err)
 					return
 				}
-				ttyFile := os.NewFile(uintptr(ttyFd), getty)
+				ttyFile := os.NewFile(tty.Fd(), getty.Tty)
 				shell := exec.Command("/proc/self/exe")
 				shell.Args[0] = "cli"
 				shell.SysProcAttr = &syscall.SysProcAttr{
 					Setsid:  true,
 					Setctty: true,
-					Ctty:    ttyFd,
+					Ctty:    int(tty.Fd()),
 					Pgid:    0,
 				}
 				shell.Stdin = ttyFile
@@ -184,7 +191,7 @@ func (c *Command) Main(args ...string) error {
 						"%s: error from cli: %s\n",
 						prog.Base(), err)
 				}
-				_ = syscall.Close(ttyFd)
+				_ = tty.Close()
 			}
 		}(getty)
 	}
