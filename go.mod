@@ -20,6 +20,7 @@ require (
 	github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73
 	github.com/platinasystems/gpio v0.0.0-20181120172958-aa9a44e83566
 	github.com/platinasystems/i2c v1.2.0
+	github.com/platinasystems/ioport v0.0.1
 	github.com/platinasystems/ldp v0.0.2
 	github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d
 	github.com/platinasystems/log v1.2.1

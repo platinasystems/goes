@@ -8,18 +8,12 @@ package iocmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
-	"syscall"
 
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/flags"
+	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/ioport"
 	"github.com/platinasystems/parms"
-)
-
-const (
-	sys_iopl   = 172 //amd64
-	sys_ioperm = 173 //amd64
 )
 
 type Command struct{}
@@ -44,17 +38,13 @@ DESCRIPTION
 	  -r to read from ioport, default
 	  -w to write from ioport
 	     IO-ADDRESS is a hex value
-	  -D DATA is a hex value
-	  -m MODE is one of:
-	    b (read byte data, default)
-	    w (read word data)
-	    l (read long data)`,
+	  -D DATA is a hex value`,
 	}
 }
 
 func (Command) Main(args ...string) (err error) {
 	flag, args := flags.New(args, "-r", "-w")
-	parm, args := parms.New(args, "-D", "-m")
+	parm, args := parms.New(args, "-D")
 	if len(args) == 0 {
 		return fmt.Errorf("IO-ADDRESS: missing")
 	}
@@ -62,117 +52,25 @@ func (Command) Main(args ...string) (err error) {
 		parm.ByName["-D"] = "0x0"
 	}
 
-	var a, d, w uint64
-	if a, err = strconv.ParseUint(args[0], 0, 32); err != nil {
+	var a, d uint64
+
+	if a, err = strconv.ParseUint(args[0], 0, 16); err != nil {
 		return fmt.Errorf("%s: %v", args[0], err)
 	}
-	if d, err = strconv.ParseUint(parm.ByName["-D"], 0, 32); err != nil {
+	if d, err = strconv.ParseUint(parm.ByName["-D"], 0, 8); err != nil {
 		return fmt.Errorf("%s: %v", parm.ByName["-D"], err)
-	}
-	switch parm.ByName["-m"] {
-	case "w":
-		w = 2
-	case "l":
-		w = 4
-	default:
-		w = 1
 	}
 
 	if flag.ByName["-w"] {
-		if err = Io_reg_wr(a, d, w); err != nil {
+		if err = ioport.Outb(uint16(a), byte(d)); err != nil {
 			return err
 		}
 	} else {
-		if _, err = Io_reg_rd(a, w); err != nil {
+		b := byte(0)
+		if b, err = ioport.Inb(uint16(a)); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func Io_reg_wr(addr uint64, dat uint64, wid uint64) (err error) {
-	if err = setIoperm(addr); err != nil {
-		return err
-	}
-
-	n := 0
-	b := make([]byte, wid)
-	b[0] = byte(dat & 0xff) //TODO add 16/32 support
-	f, err := os.OpenFile("/dev/port", os.O_WRONLY, 0755)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err = f.Seek(int64(addr), 0); err != nil {
-		return err
-	}
-	if n, err = f.Write(b); err != nil {
-		return err
-	}
-	f.Sync()
-	fmt.Println("Wrote", n, "byte(s)")
-	f.Close()
-
-	if err = clrIoperm(addr); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Io_reg_rd(addr uint64, wid uint64) (b []byte, err error) {
-	if err = setIoperm(addr); err != nil {
-		return b, err
-	}
-
-	b = make([]byte, wid)
-	f, err := os.Open("/dev/port")
-	if err != nil {
-		return b, err
-	}
-	defer f.Close()
-	if _, err = f.Seek(int64(addr), 0); err != nil {
-		return b, err
-	}
-	if _, err = f.Read(b); err != nil {
-		return b, err
-	}
-	fmt.Println("Read value =", b) //TODO 16/32 support
-	f.Close()
-
-	if err = clrIoperm(addr); err != nil {
-		return b, err
-	}
-	return b, nil
-}
-
-func setIoperm(addr uint64) (err error) {
-	level := 3
-	if _, _, errno := syscall.Syscall(sys_iopl,
-		uintptr(level), 0, 0); errno != 0 {
-		return err
-	}
-	num := 1
-	on := 1
-	if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
-		uintptr(num), uintptr(on)); errno != 0 {
-		return err
-	}
-
-	return nil
-}
-
-func clrIoperm(addr uint64) (err error) {
-	num := 1
-	on := 0
-	if _, _, errno := syscall.Syscall(sys_ioperm, uintptr(addr),
-		uintptr(num), uintptr(on)); errno != 0 {
-		return err
-	}
-	level := 0
-	if _, _, errno := syscall.Syscall(sys_iopl,
-		uintptr(level), 0, 0); errno != 0 {
-		return err
-
+		fmt.Printf("%x: %x\n", a, b)
 	}
 	return nil
 }

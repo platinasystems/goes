@@ -44,6 +44,8 @@ github.com/platinasystems/gpio v0.0.0-20181120172958-aa9a44e83566 h1:K+WxE4dE01A
 github.com/platinasystems/gpio v0.0.0-20181120172958-aa9a44e83566/go.mod h1:UsR1pB6U/S7Ql6RDrF/S6rMJqWOiZu3H2mKQeEe4v7U=
 github.com/platinasystems/i2c v1.2.0 h1:H1BgNrz4s15AcR6Y4WxZS+eMgX00pu8ZoLfVHb5VoIw=
 github.com/platinasystems/i2c v1.2.0/go.mod h1:Yj5hRxt+HXbW1rXv9aTtxUNZsegDjeWerUPY5BIjDVM=
+github.com/platinasystems/ioport v0.0.1 h1:YIrQV/oix3ENpzxi3Atw0UxW2JV21OhPR2VbJ6LUC3M=
+github.com/platinasystems/ioport v0.0.1/go.mod h1:hfzDUTcaOvxYi0bwMY50WVOenxuO9GQu1k55K9nkXTg=
 github.com/platinasystems/ldp v0.0.2 h1:pSqelqQiHOpIcNpgpNYRgV4BhVCUqTrrQSLHk7Lbhlw=
 github.com/platinasystems/ldp v0.0.2/go.mod h1:5FioI0SgC7RQZOtJRvnXqrInH0D4U2Pn/6M2rT+5Tj0=
 github.com/platinasystems/liner v0.0.0-20170801164932-8dd8fbd0e16d h1:jVkqqhZKx8eAb94QYDajS9KOh5B/rOAx34H7DDZGrEo=
