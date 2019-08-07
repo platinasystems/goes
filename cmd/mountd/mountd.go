@@ -6,6 +6,7 @@ package mountd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,10 +14,12 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/internal/partitions"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/log"
-	"github.com/platinasystems/goes/internal/partitions"
 )
+
+var ErrUnknownPartition = errors.New("Unable to determine partition type")
 
 type Command chan struct{}
 
@@ -47,7 +50,7 @@ func mountone(dev, dir string) (err error) {
 		t = sb.Kind()
 	}
 	if t == "" {
-		return fmt.Errorf("Unable to determine type of block device on %s", dev)
+		return ErrUnknownPartition
 	}
 	err = syscall.Mount(dev, dir, t, 0, "")
 	if err == nil {
@@ -81,7 +84,10 @@ scan:
 			if err != nil {
 				fmt.Println("mkdir", mpd, "err:", err)
 			} else {
-				_ = mountone("/dev/"+fileName, mpd)
+				err := mountone("/dev/"+fileName, mpd)
+				if err != nil && err != ErrUnknownPartition {
+					fmt.Println("mount", mpd, "err:", err)
+				}
 			}
 		}
 	}
