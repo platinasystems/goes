@@ -40,7 +40,33 @@ func (c Command) Close() error {
 
 func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (Command) mountone(dev, dir string) (err error) {
+func (Command) mountMap(mountFile string) (mm map[string]string, err error) {
+	f, err := os.Open(mountFile)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if strings.HasPrefix(fields[0], "/dev/") {
+			if mm == nil {
+				mm = make(map[string]string)
+			}
+			if mm[fields[0]] == "" {
+				mm[fields[0]] = fields[1]
+			}
+		}
+	}
+	return mm, scanner.Err()
+}
+
+func (Command) mountone(mm map[string]string, dev, dir string) (err error) {
+	mp := mm[dev]
+	if mp != "" {
+		return syscall.Mount(mp, dir, "", uintptr(syscall.MS_BIND), "")
+	}
 	sb, err := partitions.ReadSuperBlock(dev)
 	if err != nil {
 		return err
@@ -63,6 +89,11 @@ func (Command) mountone(dev, dir string) (err error) {
 }
 
 func (c Command) mountall(mp string) {
+	mm, err := c.mountMap("/proc/mounts")
+	if err != nil {
+		log.Printf("reading /proc/mounts: %s\n", err)
+		return
+	}
 	pp, err := os.Open("/proc/partitions")
 	if err != nil {
 		log.Printf("opening /proc/partitions: %s", err)
@@ -84,7 +115,7 @@ scan:
 			if err != nil {
 				fmt.Println("mkdir", mpd, "err:", err)
 			} else {
-				err := c.mountone("/dev/"+fileName, mpd)
+				err := c.mountone(mm, "/dev/"+fileName, mpd)
 				if err != nil && err != ErrUnknownPartition {
 					fmt.Println("mount", mpd, "err:", err)
 				}
