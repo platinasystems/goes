@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/cmd"
-	"github.com/platinasystems/goes/cmd/iocmd"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/i2c"
+	"github.com/platinasystems/ioport"
 	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"
 )
@@ -148,11 +148,11 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 
 				switch m {
 				case "platina-mk1":
-					d, err := iocmd.Io_reg_rd(0x603, 1)
+					d, err := ioport.Inb(0x603)
 					if err == nil {
-						iocmd.Io_reg_wr(0x603, uint64(d[0]&0xb0), 0x1)
+						ioport.Outb(0x603, d&0xb0)
 						time.Sleep(10 * time.Microsecond)
-						iocmd.Io_reg_wr(0x603, uint64(d[0]|0x40), 0x1)
+						ioport.Outb(0x603, d|0x40)
 					}
 				case "platina-mk1-bmc":
 					t.c.gpio.Do(t.c.Gpio)
