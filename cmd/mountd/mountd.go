@@ -40,7 +40,7 @@ func (c Command) Close() error {
 
 func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func mountone(dev, dir string) (err error) {
+func (Command) mountone(dev, dir string) (err error) {
 	sb, err := partitions.ReadSuperBlock(dev)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func mountone(dev, dir string) (err error) {
 	return err
 }
 
-func (Command) mountall(mp string) {
+func (c Command) mountall(mp string) {
 	pp, err := os.Open("/proc/partitions")
 	if err != nil {
 		log.Printf("opening /proc/partitions: %s", err)
@@ -84,7 +84,7 @@ scan:
 			if err != nil {
 				fmt.Println("mkdir", mpd, "err:", err)
 			} else {
-				err := mountone("/dev/"+fileName, mpd)
+				err := c.mountone("/dev/"+fileName, mpd)
 				if err != nil && err != ErrUnknownPartition {
 					fmt.Println("mount", mpd, "err:", err)
 				}
