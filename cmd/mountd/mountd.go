@@ -65,7 +65,7 @@ func mountone(dev, dir string) (err error) {
 func (Command) mountall(mp string) {
 	pp, err := os.Open("/proc/partitions")
 	if err != nil {
-		log.Print("opening /proc/partitions: %s\n", err)
+		log.Printf("opening /proc/partitions: %s", err)
 		return
 	}
 	defer pp.Close()
