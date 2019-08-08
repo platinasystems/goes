@@ -37,7 +37,7 @@ type Daemons struct {
 }
 
 func sockname() string {
-	return "goes-daemons"
+	return prog.Base() + "-daemons"
 }
 
 func (d *Daemons) init() {

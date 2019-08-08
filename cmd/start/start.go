@@ -89,9 +89,6 @@ func (c *Command) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	if prog.Name() != prog.Install && prog.Base() != "init" {
-		return fmt.Errorf("use `%s start`", prog.Install)
-	}
 	init := parm.ByName["-init"]
 	if len(init) == 0 {
 		if _, xerr := os.Stat("/etc/goes/init"); xerr == nil {
@@ -110,7 +107,7 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 
-	daemons := exec.Command(prog.Name(), args...)
+	daemons := exec.Command("/proc/self/exe", args...)
 	daemons.Args[0] = "goes-daemons"
 	daemons.Stdin = nil
 	daemons.Stdout = nil

@@ -14,11 +14,10 @@ import (
 
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/assert"
 	"github.com/platinasystems/goes/internal/kill"
+	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/parms"
-	"github.com/platinasystems/goes/internal/prog"
 )
 
 const EtcGoesStop = "/etc/goes/stop"
@@ -64,9 +63,6 @@ func (c *Command) Main(args ...string) error {
 	err := assert.Root()
 	if err != nil {
 		return err
-	}
-	if prog.Name() != prog.Install && prog.Base() != "init" {
-		return fmt.Errorf("use `%s stop`", prog.Install)
 	}
 	stop := parm.ByName["-stop"]
 	if len(stop) == 0 && haveEtcGoesStop() {
