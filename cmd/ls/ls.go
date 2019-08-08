@@ -12,8 +12,8 @@ import (
 	"sort"
 	"syscall"
 
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/flags"
+	"github.com/platinasystems/goes/lang"
 )
 
 var PathSeparatorString = string([]byte{os.PathSeparator})
@@ -133,7 +133,7 @@ func one(names []string) error {
 
 func long(names []string) error {
 	for _, name := range names {
-		fi, err := os.Stat(name)
+		fi, err := os.Lstat(name)
 		if err != nil {
 			return err
 		}
