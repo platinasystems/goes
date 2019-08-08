@@ -21,7 +21,6 @@ import (
 )
 
 const (
-	sockname    = "goes-daemons"
 	maxRestarts = 1
 )
 
@@ -35,6 +34,10 @@ type Daemons struct {
 
 	cmdsByPid map[int]*exec.Cmd
 	stopping  bool
+}
+
+func sockname() string {
+	return "goes-daemons"
 }
 
 func (d *Daemons) init() {

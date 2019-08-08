@@ -51,7 +51,7 @@ func (Log) Apropos() lang.Alt {
 
 func (Log) Main(args ...string) error {
 	var s string
-	cl, err := atsock.NewRpcClient(sockname)
+	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (Restart) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	cl, err := atsock.NewRpcClient(sockname)
+	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (Start) Main(args ...string) error {
 	if len(args) < 0 {
 		return fmt.Errorf("missing DAEMON [ARG]...")
 	}
-	cl, err := atsock.NewRpcClient(sockname)
+	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (Status) Apropos() lang.Alt {
 
 func (Status) Main(args ...string) error {
 	var s string
-	cl, err := atsock.NewRpcClient(sockname)
+	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (Stop) Main(args ...string) error {
 	if err != nil {
 		return err
 	}
-	cl, err := atsock.NewRpcClient(sockname)
+	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}

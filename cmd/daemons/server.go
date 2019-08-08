@@ -53,7 +53,7 @@ func (c *Server) Main(args ...string) error {
 	signal.Notify(sig, syscall.SIGTERM)
 	defer signal.Stop(sig)
 
-	c.rpc, err = atsock.NewRpcServer(sockname)
+	c.rpc, err = atsock.NewRpcServer(sockname())
 	if err != nil {
 		return err
 	}
