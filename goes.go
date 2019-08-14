@@ -27,9 +27,9 @@ import (
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
-	"github.com/platinasystems/url"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/parms"
+	"github.com/platinasystems/url"
 )
 
 const (
@@ -411,7 +411,7 @@ func (g *Goes) Main(args ...string) error {
 			k = cmd.WhatKind(v)
 		}
 	}
-	if !found || !k.IsNoCLIFlags() {
+	if !found {
 		cli, clifound := g.ByName["cli"]
 		if clifound {
 			cli.(goeser).Goes(g)
@@ -437,7 +437,7 @@ func (g *Goes) Main(args ...string) error {
 			fmt.Println(Usage(g))
 			g.Status = nil
 			return nil
-		} else if n == 1 && !found {
+		} else if n == 1 {
 			// only check for script if args[0] isn't a command
 			buf, err := ioutil.ReadFile(cliArgs[0])
 			if cliArgs[0] == "-" || (err == nil && utf8.Valid(buf) &&
@@ -455,6 +455,7 @@ func (g *Goes) Main(args ...string) error {
 				g.Status = cli.Main(cliArgs...)
 				return g.Status
 			}
+			args = cliArgs
 		} else {
 			g.swap(args)
 		}

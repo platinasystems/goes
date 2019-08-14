@@ -14,7 +14,6 @@ import (
 
 	"github.com/mattn/go-isatty"
 
-	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
 )
 
@@ -37,8 +36,6 @@ func (Command) Apropos() lang.Alt {
 		lang.EnUS: "test conditions and set exit status",
 	}
 }
-
-func (Command) Kind() cmd.Kind { return cmd.NoCLIFlags }
 
 func (Command) Man() lang.Alt {
 	return lang.Alt{

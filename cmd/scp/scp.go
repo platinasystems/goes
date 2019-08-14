@@ -17,14 +17,11 @@ import (
 	"time"
 
 	"github.com/platinasystems/flags"
-	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/log"
 )
 
 type Command struct{}
-
-func (Command) Kind() cmd.Kind { return cmd.NoCLIFlags }
 
 func (Command) String() string { return "scp" }
 
