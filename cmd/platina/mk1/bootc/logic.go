@@ -49,7 +49,7 @@ const (
 	zero         = uintptr(0)
 	sda1         = "sda1"
 	sda6         = "sda6"
-	goesBoot     = "coreboot"
+	goesBoot     = "goes-boot"
 	cbSda1       = "/mountd/sda1/"
 	cbSda6       = "/mountd/sda6/"
 	tarFile      = "postinstall.tar.gz"
@@ -84,9 +84,11 @@ var fileList = [...]string{
 }
 
 func Bootc() []string {
+	fmt.Println("In bootc")
 	for i := 0; ; i++ {
 		time.Sleep(time.Millisecond * time.Duration(waitMs))
 		if i > timeoutCnt {
+			fmt.Println("timeout")
 			return []string{""}
 		}
 		p, err := ioutil.ReadFile("/proc/partitions")
@@ -100,6 +102,7 @@ func Bootc() []string {
 		}
 		mounts := string(m)
 		if err := readCfg(); err != nil {
+			fmt.Println("Error in readCfg", err)
 			continue
 		} else {
 			if err := writeCfg(); err != nil { // updates bootc format
@@ -108,6 +111,7 @@ func Bootc() []string {
 			}
 		}
 		if Cfg.Disable {
+			fmt.Println("Exiting Cfg.Disable")
 			return []string{""}
 		}
 
@@ -129,6 +133,7 @@ func Bootc() []string {
 				return []string{""}
 			}
 			// boot sda1 for recovery
+			fmt.Println("Boot sda1 for recovery")
 			return []string{"kexec", "-k", Cfg.Sda1K,
 				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
@@ -148,6 +153,7 @@ func Bootc() []string {
 			//	return []string{""}
 			//}
 			// boot installer from sda1
+			fmt.Println("boot installer from sda1")
 			return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
 				Cfg.ReInstallI, "-c", kexec0, "-e"}
 		}
@@ -240,6 +246,7 @@ func Bootc() []string {
 				}
 			}
 			// boot sda6
+			fmt.Println("boot sda6")
 			return []string{"kexec", "-k", Cfg.Sda6K,
 				"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 		}
@@ -255,6 +262,7 @@ func Bootc() []string {
 				return []string{""}
 			}
 			// boot sda1 if we are not partitioned
+			fmt.Println("boot sda1 not partitioned")
 			return []string{"kexec", "-k", Cfg.Sda1K,
 				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
@@ -365,10 +373,10 @@ func initCfg() error {
 		ReInstallC:      `netcfg/get_hostname=platina netcfg/get_domain=platinasystems.com interface=auto auto locale=en_US preseed/file=/hd-media/preseed.cfg`,
 		Sda1K:           "/mountd/sda1/boot/vmlinuz-3.16.0-4-amd64",
 		Sda1I:           "/mountd/sda1/boot/initrd.img-3.16.0-4-amd64",
-		Sda1C:           "::eth0:none",
+		Sda1C:           "",
 		Sda6K:           "/mountd/sda6/boot/vmlinuz-3.16.0-4-amd64",
 		Sda6I:           "/mountd/sda6/boot/initrd.img-3.16.0-4-amd64",
-		Sda6C:           "::eth0:none",
+		Sda6C:           "",
 		ISO1Name:        "debian-8.10.0-amd64-DVD-1.iso",
 		ISO1Desc:        "Jessie debian-8.10.0",
 		ISO2Name:        "",
