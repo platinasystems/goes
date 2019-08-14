@@ -85,8 +85,13 @@ scan:
 				fmt.Println("mkdir", mpd, "err:", err)
 			} else {
 				err := c.mountone("/dev/"+fileName, mpd)
-				if err != nil && err != ErrUnknownPartition {
-					fmt.Println("mount", mpd, "err:", err)
+				if err == nil {
+					fmt.Println("Mounted", "/dev/"+fileName,
+						mpd)
+				} else {
+					if err != ErrUnknownPartition {
+						fmt.Println("mount", mpd, "err:", err)
+					}
 				}
 			}
 		}
