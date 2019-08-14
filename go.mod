@@ -16,7 +16,7 @@ require (
 	github.com/platinasystems/buildid v1.0.0
 	github.com/platinasystems/buildinfo v1.1.0
 	github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82
-	github.com/platinasystems/flags v1.0.0
+	github.com/platinasystems/flags v1.0.1
 	github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73
 	github.com/platinasystems/gpio v0.0.0-20181120172958-aa9a44e83566
 	github.com/platinasystems/i2c v1.2.0
