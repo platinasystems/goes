@@ -183,7 +183,12 @@ func (c *Command) Main(args ...string) error {
 				shell.Stdout = ttyFile
 				shell.Stderr = ttyFile
 				err = shell.Run()
-				if err != nil {
+				if err == nil {
+					fmt.Fprintf(os.Stderr,
+						"%s: started cli on %s@%d\n",
+						prog.Base, getty.Tty,
+						getty.Baud)
+				} else {
 					fmt.Fprintf(os.Stderr,
 						"%s: error from cli: %s\n",
 						prog.Base(), err)
