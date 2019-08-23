@@ -50,7 +50,7 @@ func (c *Command) Main(args ...string) error {
 		if args[0] == "default" {
 			// Set pin directions.
 			for name, pin := range gpio.Pins {
-				err := pin.SetDirection()
+				err := pin.SetDefault()
 				if err != nil {
 					fmt.Printf("%s: %v\n", name, err)
 				}
