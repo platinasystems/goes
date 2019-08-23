@@ -186,7 +186,7 @@ func (c *Command) Main(args ...string) error {
 				if err == nil {
 					fmt.Fprintf(os.Stderr,
 						"%s: started cli on %s@%d\n",
-						prog.Base, getty.Tty,
+						prog.Base(), getty.Tty,
 						getty.Baud)
 				} else {
 					fmt.Fprintf(os.Stderr,
