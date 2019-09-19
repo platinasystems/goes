@@ -790,7 +790,7 @@ func (h *I2cDev) GetQsfpTempTarget() (string, error) {
 func hostReset() error {
 	// FIXME cmd.Init("gpio")
 	log.Print("notice: issue hard reset to host")
-	pin, found := gpio.Pins["BMC_TO_HOST_RST_L"]
+	pin, found := gpio.FindPin("BMC_TO_HOST_RST_L")
 	if found {
 		pin.SetValue(false)
 	}

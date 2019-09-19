@@ -18,7 +18,7 @@ require (
 	github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82
 	github.com/platinasystems/flags v1.0.1
 	github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73
-	github.com/platinasystems/gpio v1.2.0
+	github.com/platinasystems/gpio v1.3.0
 	github.com/platinasystems/i2c v1.2.0
 	github.com/platinasystems/ioport v0.0.1
 	github.com/platinasystems/ldp v0.0.2

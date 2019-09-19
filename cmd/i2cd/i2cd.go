@@ -23,8 +23,6 @@ import (
 )
 
 type Command struct {
-	Gpio func()
-	gpio sync.Once
 	done chan struct{}
 }
 
@@ -155,15 +153,14 @@ func (t *I2cReq) ReadWrite(g *[MAXOPS]I, f *[MAXOPS]R) error {
 						ioport.Outb(0x603, d|0x40)
 					}
 				case "platina-mk1-bmc":
-					t.c.gpio.Do(t.c.Gpio)
-					pin, found := gpio.Pins["FRU_I2C_MUX_RST_L"]
+					pin, found := gpio.FindPin("FRU_I2C_MUX_RST_L")
 					if found {
 						pin.SetValue(false)
 						time.Sleep(10 * time.Microsecond)
 						pin.SetValue(true)
 					}
 
-					pin, found = gpio.Pins["MAIN_I2C_MUX_RST_L"]
+					pin, found = gpio.FindPin("MAIN_I2C_MUX_RST_L")
 					if found {
 						pin.SetValue(false)
 						time.Sleep(10 * time.Microsecond)

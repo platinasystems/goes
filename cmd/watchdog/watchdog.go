@@ -11,19 +11,16 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/gpio"
+	"github.com/platinasystems/parms"
 )
 
 type Command struct {
 	GpioPin string
-	Init    func()
-	init    sync.Once
 }
 
 func (*Command) String() string { return "watchdog" }
@@ -53,9 +50,6 @@ OPTIONS
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(args ...string) error {
-	if c.Init != nil {
-		c.init.Do(c.Init)
-	}
 	parm, args := parms.New(args, "-T", "-t")
 	for k, v := range map[string]string{
 		"-T": "60",
@@ -95,7 +89,7 @@ func (c *Command) Main(args ...string) error {
 
 	for _ = range ticker.C {
 		if len(c.GpioPin) > 0 {
-			pin, found := gpio.Pins[c.GpioPin]
+			pin, found := gpio.FindPin(c.GpioPin)
 			t, err := pin.Value()
 			if found && err == nil {
 				pin.SetValue(!t)
