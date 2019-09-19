@@ -54,8 +54,6 @@ func (c *Command) Goes(g *goes.Goes) { c.g = g }
 func (*Command) Kind() cmd.Kind { return cmd.DontFork }
 
 func (c *Command) Main(_ ...string) error {
-	fmt.Printf("in /slashinit\n")
-
 	c.mountVirtualFilesystems()
 	c.makeStdioLinks()
 	c.redirectStdioKmsg()
