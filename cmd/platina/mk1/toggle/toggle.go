@@ -5,14 +5,10 @@
 package toggle
 
 import (
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/gpio"
 	"github.com/platinasystems/i2c"
-	"github.com/platinasystems/redis"
 )
 
 const i2cGpioAddr = 0x74
@@ -41,37 +37,12 @@ DESCRIPTION
 }
 
 func (c *Command) Main(args ...string) error {
-	var machineBmc bool
-
 	if c.Init != nil {
 		c.init.Do(c.Init)
 	}
 
-	m, _ := redis.Hget(redis.DefaultHash, "machine")
-	if strings.Contains(m, "bmc") {
-		machineBmc = true
-	} else {
-		machineBmc = false
-	}
+	uartToggle()
 
-	if machineBmc {
-		pin, found := gpio.Pins["CPU_TO_MAIN_I2C_EN"]
-		if found {
-			pin.SetValue(true)
-		}
-		time.Sleep(10 * time.Millisecond)
-		uartToggle()
-		if found {
-			pin.SetValue(false)
-		}
-		pin, found = gpio.Pins["FP_BTN_UARTSEL_EN_L"]
-		if found {
-			pin.SetValue(true)
-		}
-		time.Sleep(10 * time.Millisecond)
-	} else {
-		uartToggle()
-	}
 	return nil
 }
 
