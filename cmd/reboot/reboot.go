@@ -5,6 +5,8 @@
 package reboot
 
 import (
+	"errors"
+	"fmt"
 	"syscall"
 
 	"github.com/platinasystems/goes"
@@ -28,10 +30,14 @@ func (Command) Apropos() lang.Alt {
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
-func (c *Command) Main(args ...string) error {
+func (c *Command) Main(args ...string) (err error) {
 	kexec.Prepare()
 
-	c.g.Main("umount", "-a")
+	err = c.g.Main("umount", "-a")
+	if err != nil {
+		fmt.Printf("Error unmounting all drives: %s\n", err)
+		return errors.New("To force, use umount -a -f and try again")
+	}
 
 	_ = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
 
