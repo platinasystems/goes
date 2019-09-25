@@ -100,7 +100,7 @@ func (Start) Apropos() lang.Alt {
 }
 
 func (Start) Main(args ...string) error {
-	if len(args) < 0 {
+	if len(args) < 1 {
 		return fmt.Errorf("missing DAEMON [ARG]...")
 	}
 	cl, err := atsock.NewRpcClient(sockname())
