@@ -49,6 +49,9 @@ func (d *Daemons) init() {
 }
 
 func (d *Daemons) start(restarts int, args ...string) {
+	if len(args) < 1 {
+		return
+	}
 	rout, wout, err := os.Pipe()
 	defer func(cs string) {
 		if err != nil {
