@@ -72,7 +72,7 @@ var kexec1 string
 var kexec6 string
 
 var fileList = [...]string{
-	"debian-8.10.0-amd64-DVD-1.iso",
+	"debian-9.11.0-amd64-DVD-1.iso",
 	"preseed.cfg",
 	"hd-media/preseed.cfg",
 	"boot/vmlinuz",
@@ -1002,10 +1002,10 @@ func Wipe(dryrun bool) error {
 	y := strings.Split(im.Extra, "-")
 	z := strings.Split(y[0], "v")
 	w, err := strconv.Atoi(y[1])
-	if err != nil {
+	if err != nil || len(z) == 0 {
 		return fmt.Errorf("Couldn't determine coreboot version, aborting...")
 	}
-	v, err := strconv.ParseFloat(z[1], 64)
+	v, err := strconv.ParseFloat(z[len(z)-1], 64)
 	if err != nil {
 		return fmt.Errorf("Couldn't determine coreboot version, aborting...")
 	}
