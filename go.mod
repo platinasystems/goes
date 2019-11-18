@@ -32,10 +32,12 @@ require (
 	github.com/platinasystems/ssh_key_helper v0.0.1
 	github.com/platinasystems/term v0.0.0-20190801203457-969603cfd238
 	github.com/platinasystems/ubi v0.0.2
-	github.com/platinasystems/url v1.0.0
+	github.com/platinasystems/url v1.1.0
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 // indirect
 )
+
+go 1.13

@@ -70,8 +70,8 @@ github.com/platinasystems/tftp v1.0.0 h1:wUv+nFUwntLddYGa3Y5Zr3TUQ4rtQXGebG0ZOut
 github.com/platinasystems/tftp v1.0.0/go.mod h1:RUhAd8ADNPAQmoiSbjo4aDFAOBjz7kC1FkDAmuEd9J0=
 github.com/platinasystems/ubi v0.0.2 h1:J9swZ9UM26RPhgcakacb1bozkEzEtkcoJ38KBA0VhxI=
 github.com/platinasystems/ubi v0.0.2/go.mod h1:owxkur4yGan4QJryDtjAWr4fj/BDCXQ/x9KqID9T1y0=
-github.com/platinasystems/url v1.0.0 h1:T2GuEIydvkZCpbU4DlTVyRdYoM5gn9MQNRGOObDg574=
-github.com/platinasystems/url v1.0.0/go.mod h1:tjHiLHUR+Jasu091bzwk/SAHkgEuO8ohYmi4XTszV2Y=
+github.com/platinasystems/url v1.1.0 h1:WApbRs4iwxmDM5tTH4KQcyssRqPV99iqW4dLoKofgrc=
+github.com/platinasystems/url v1.1.0/go.mod h1:tjHiLHUR+Jasu091bzwk/SAHkgEuO8ohYmi4XTszV2Y=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff h1:kXSTJRId8WwwqEfN0iQtzQu+jof2jTguzP2y12ULXvc=
 github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff/go.mod h1:DFg2AhfQCvkJwRKUfsycOSSZELGBA9gt46ne3SOecJM=
 github.com/satori/go.uuid v1.2.0 h1:0uYX9dsZ2yD7q2RtLRtPSdGDWzjeM3TbMJP9utgA0ww=
