@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/internal/kexec"
 	"github.com/platinasystems/goes/lang"
@@ -31,9 +32,18 @@ func (Command) Apropos() lang.Alt {
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) Main(args ...string) (err error) {
-	kexec.Prepare()
+	flag, args := flags.New(args, "-f")
 
-	err = c.g.Main("umount", "-a")
+	if len(args) > 0 {
+		return fmt.Errorf("Unexpected %v", args)
+	}
+
+	if !flag.ByName["-f"] {
+		kexec.Prepare()
+		err = c.g.Main("umount", "-a")
+	} else {
+		err = c.g.Main("umount", "-a", "-f")
+	}
 	if err != nil {
 		fmt.Printf("Error unmounting all drives: %s\n", err)
 		return errors.New("To force, use umount -a -f and try again")
