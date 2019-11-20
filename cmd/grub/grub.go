@@ -73,7 +73,7 @@ var Goes = &goes.Goes{
 		"if":               &ifcmd.Command{},
 		"initrd":           Initrd,
 		"insmod":           insmod.Command{},
-		"kexec":            kexec.Command{},
+		"kexec":            &kexec.Command{},
 		"linux":            Linux,
 		"loadfont":         loadfont.Command{},
 		"menuentry":        Menuentry,

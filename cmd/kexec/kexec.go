@@ -10,16 +10,18 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"syscall"
 
-	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/goes/internal/fit"
 	"github.com/platinasystems/flags"
+	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/internal/fit"
 	"github.com/platinasystems/goes/internal/kexec"
+	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/parms"
 )
 
-type Command struct{}
+type Command struct {
+	g *goes.Goes
+}
 
 func (Command) String() string { return "kexec" }
 
@@ -31,7 +33,9 @@ func (Command) Apropos() lang.Alt {
 	}
 }
 
-func (Command) Main(args ...string) error {
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
+
+func (c *Command) Main(args ...string) error {
 	flag, args := flags.New(args, "-e", "-f")
 	parm, args := parms.New(args, "-c", "-i", "-k", "-l", "-x")
 
@@ -72,9 +76,10 @@ func (Command) Main(args ...string) error {
 
 	if flag.ByName["-e"] || flag.ByName["-f"] {
 		if !flag.ByName["-f"] {
-			kexec.Prepare()
+			err = c.g.Main("reboot")
+		} else {
+			err = c.g.Main("reboot", "-f")
 		}
-		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_KEXEC)
 	}
 	return err
 }
