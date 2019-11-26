@@ -115,7 +115,10 @@ func Bootc() []string {
 			return []string{""}
 		}
 
-		fixSda1Swap()
+		if err := fixSda1Swap(); err != nil {
+			fmt.Println("Error: can't fix sda1swap, drop into grub...")
+			return []string{""}
+		}
 
 		if err := fixNewroot(); err != nil {
 			fmt.Println("Error: can't fix newroot, drop into grub...")
@@ -173,59 +176,6 @@ func Bootc() []string {
 				fmt.Println("Error: post install copy failed, drop into grub...")
 				return []string{""}
 			}
-		}
-
-		// DHCP, ZTP, PCC
-		if true {
-			var i = 0
-			for start := time.Now(); time.Since(start) < 10*time.Second; {
-				i++
-			}
-
-			// SETUP PHASE - set dhcp bits, static IP
-			//
-			// D10 3 SEC LOOP wait for console interrupt --> YES, E10 goes-boot shell
-			//
-			// D20 static IP configured? (bootc.cfg)     --> NO,  goto D60 check if PCC enabled
-			//                                                    skip ZTP & DHCP
-			//                                                    P10 set DHCP option 55 and option 61
-			//
-			// D30a Is ZTP Enabled?                      --> YES, P20 set Option 43 (ZTP script)
-
-			// DHCP PHASE
-			//
-			// D40 INFINITE LOOP DHCP server found?      --> NO, check for ESC --> E20a shell
-			//
-			// ... DO DHCP
-
-			// ZTP PHASE
-			//
-			// D30b Is ZTP Enabled?                      --> NO, goto D60, PCC Enb check
-			//
-			// D50 INFINITE LOOP ZTP server found?       --> NO, check for ESC --> E20b shell
-			//
-			// P30 set "pixie boot" bit in bootc.cfg, download images, boot them, clr pixie bit
-
-			// PCC PHASE
-			//
-			// D60 Is PCC Enabled                        --> NO, goto P50 boot sda6
-			//
-			// D70 INFINITE LOOP, PCC server found?      --> ESC - goes-boot shell
-			//
-			// P40 register with PCC
-			//
-			// P50 boot sda6
-
-			// SDA6 BOOT
-			// D80 Is PCC Enabled                        --> NO, DONE
-			//
-			// P60 check in with PCC (register) goes register
-			//
-			// keep alives, status updates, control etc. from PCC...
-			//
-			// Transparent to invader: PCC will push additional configs via ansible
-			//
-			// Transparent to invader: keep alives, status updates, control etc. from PCC
 		}
 
 		// sda6 normal
@@ -1189,9 +1139,8 @@ func fixSda1Swap() error {
 		return nil
 	}
 
-	if _, err := os.Stat(cbSda6 + "etc/fstab"); os.IsNotExist(err) {
-		fmt.Println("ERROR:	file", cbSda6+"etc/fstab", "does not exist")
-		return nil
+	if _, err := os.Stat(cbSda6 + "etc/fstab"); err != nil {
+		return fmt.Errorf("Error reading %s: %w", cbSda6+"etc/fstab", err)
 	}
 	d6, err := ioutil.ReadFile(cbSda6 + "etc/fstab")
 	if err != nil {
@@ -1200,8 +1149,7 @@ func fixSda1Swap() error {
 	ds6 := strings.Split(string(d6), "\n")
 
 	if _, err := os.Stat(cbSda1 + "etc/fstab"); os.IsNotExist(err) {
-		fmt.Println("ERROR:	file", cbSda1+"etc/fstab", "does not exist")
-		return fmt.Errorf("ERROR: cound not read sda1 /etc/fstab.")
+		return fmt.Errorf("Error reading %s: %w", cbSda1+"etc/fstab", err)
 	}
 	d1, err := ioutil.ReadFile(cbSda1 + "etc/fstab")
 	if err != nil {
