@@ -39,7 +39,6 @@ import (
 	"github.com/platinasystems/goes/cmd/grub/terminal_output"
 
 	"github.com/platinasystems/goes/cmd/ifcmd"
-	"github.com/platinasystems/goes/cmd/kexec"
 	"github.com/platinasystems/goes/cmd/testcmd"
 	"github.com/platinasystems/goes/cmd/thencmd"
 	"github.com/platinasystems/goes/cmd/truecmd"
@@ -52,7 +51,9 @@ import (
 	"github.com/platinasystems/liner"
 )
 
-type Command struct{}
+type Command struct {
+	g *goes.Goes
+}
 
 var Goes = &goes.Goes{
 	NAME: "grub",
@@ -73,7 +74,6 @@ var Goes = &goes.Goes{
 		"if":               &ifcmd.Command{},
 		"initrd":           Initrd,
 		"insmod":           insmod.Command{},
-		"kexec":            &kexec.Command{},
 		"linux":            Linux,
 		"loadfont":         loadfont.Command{},
 		"menuentry":        Menuentry,
@@ -97,6 +97,8 @@ var Menuentry = &menuentry.Command{}
 func (c *Command) Apropos() lang.Alt {
 	return Goes.Apropos()
 }
+
+func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) runScript(n string) (err error) {
 	script, err := url.Open(n)
@@ -227,7 +229,7 @@ func (c *Command) AskKernel(parm *parms.Parms, flag *flags.Flags) (err error) {
 		}
 		if strings.HasPrefix(yn, "Y") ||
 			strings.HasPrefix(yn, "y") {
-			err := Goes.Main(kexec...)
+			err := c.g.Main(kexec...)
 			return err
 		}
 		if err != nil {
