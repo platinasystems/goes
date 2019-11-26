@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/platinasystems/goes"
@@ -24,6 +25,7 @@ type Command struct {
 
 type bootMnt struct {
 	mnt     string
+	dir     string
 	err     error
 	hasGrub bool
 }
@@ -50,7 +52,6 @@ func (c *Command) Goes(g *goes.Goes) { c.g = g }
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(args ...string) (err error) {
-
 	mp := "/mountd"
 	if len(args) > 0 {
 		mp = args[0]
@@ -78,7 +79,10 @@ func (c *Command) Main(args ...string) (err error) {
 		c.mounts = c.mounts[:0]
 		for _, dir := range dirs {
 			for _, sd := range []string{"", "/boot", "/d-i"} {
-				m := &bootMnt{mnt: mp + "/" + dir.Name() + sd}
+				m := &bootMnt{
+					mnt: filepath.Join(mp, dir.Name()),
+					dir: sd,
+				}
 				c.mounts = append(c.mounts, m)
 				go c.tryScanFiles(m, done)
 				cnt++
@@ -91,7 +95,8 @@ func (c *Command) Main(args ...string) (err error) {
 		for _, m := range c.mounts {
 			if m.hasGrub {
 				args := []string{"grub", "--daemon"}
-				args = append(args, m.mnt+"/grub/grub.cfg")
+				args = append(args, m.mnt,
+					filepath.Join(m.dir, "grub/grub.cfg"))
 				fmt.Printf("%v\n", args)
 				x := c.g.Fork(args...)
 				x.Stdin = os.Stdin
@@ -114,7 +119,7 @@ func (c *Command) Main(args ...string) (err error) {
 }
 
 func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
-	files, err := ioutil.ReadDir(m.mnt)
+	files, err := ioutil.ReadDir(filepath.Join(m.mnt, m.dir))
 	if err != nil {
 		m.err = err
 		done <- m
@@ -124,7 +129,8 @@ func (*Command) tryScanFiles(m *bootMnt, done chan *bootMnt) {
 	for _, file := range files {
 		name := file.Name()
 		if file.Mode().IsDir() && name == "grub" {
-			if _, err := os.Stat(m.mnt + "/grub/grub.cfg"); err == nil {
+			if _, err := os.Stat(filepath.Join(m.mnt,
+				m.dir, "grub/grub.cfg")); err == nil {
 				m.hasGrub = true
 			} else {
 				fmt.Printf("os.stat err %s\n", err)

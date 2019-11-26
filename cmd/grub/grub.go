@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,7 +53,8 @@ import (
 )
 
 type Command struct {
-	g *goes.Goes
+	g    *goes.Goes
+	root string
 }
 
 var Goes = &goes.Goes{
@@ -101,9 +103,10 @@ func (c *Command) Apropos() lang.Alt {
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) runScript(n string) (err error) {
-	script, err := url.Open(n)
+	fn := filepath.Join(c.root, n)
+	script, err := url.Open(fn)
 	if err != nil {
-		return fmt.Errorf("Error opening %s: %w", n, err)
+		return fmt.Errorf("Error opening %s: %w", fn, err)
 	}
 	defer script.Close()
 
@@ -126,13 +129,18 @@ func (c *Command) runScript(n string) (err error) {
 	}
 	return
 }
+
 func (c *Command) Main(args ...string) (err error) {
 	parm, args := parms.New(args, "-t")
 	flag, args := flags.New(args, "--daemon")
 
-	n := "/boot/grub/grub.cfg"
+	c.root = "/boot"
 	if len(args) > 0 {
-		n = args[0]
+		c.root = args[0]
+	}
+	n := "/grub/grub.cfg"
+	if len(args) > 1 {
+		n = args[1]
 	}
 
 	if err := c.runScript(n); err != nil {
@@ -242,7 +250,7 @@ func (c *Command) AskKernel(parm *parms.Parms, flag *flags.Flags) (err error) {
 func (c *Command) GetRoot() string {
 	root := Goes.EnvMap["root"]
 	if root == "" {
-		return root
+		return c.root
 	}
 
 	devSD := root
