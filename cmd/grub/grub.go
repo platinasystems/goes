@@ -98,17 +98,10 @@ func (c *Command) Apropos() lang.Alt {
 	return Goes.Apropos()
 }
 
-func (c *Command) Main(args ...string) error {
-	parm, args := parms.New(args, "-t")
-	flag, args := flags.New(args, "--daemon")
-
-	n := "/boot/grub/grub.cfg"
-	if len(args) > 0 {
-		n = args[0]
-	}
+func (c *Command) runScript(n string) (err error) {
 	script, err := url.Open(n)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error opening %s: %w", n, err)
 	}
 	defer script.Close()
 
@@ -127,7 +120,21 @@ func (c *Command) Main(args ...string) error {
 
 	err = Goes.Main()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Grub script returned %s\n", err)
+		return fmt.Errorf("Error from grub script: %w", err)
+	}
+	return
+}
+func (c *Command) Main(args ...string) (err error) {
+	parm, args := parms.New(args, "-t")
+	flag, args := flags.New(args, "--daemon")
+
+	n := "/boot/grub/grub.cfg"
+	if len(args) > 0 {
+		n = args[0]
+	}
+
+	if err := c.runScript(n); err != nil {
+		return err
 	}
 
 	root := Goes.EnvMap["root"]
