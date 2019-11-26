@@ -64,47 +64,43 @@ func (c *Command) Main(args ...string) (err error) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
 
-	var pccDone = false
 	if kexec := bootc.Bootc(); len(kexec) > 1 {
 		err := c.g.Main(kexec...)
 		fmt.Println(err)
 	}
-	pccDone = true
 
 	for {
-		if pccDone {
-			dirs, err := ioutil.ReadDir(mp)
-			if err != nil {
-				fmt.Printf("Error reading %s dir: %s", mp, err)
+		dirs, err := ioutil.ReadDir(mp)
+		if err != nil {
+			fmt.Printf("Error reading %s dir: %s", mp, err)
+		}
+		cnt := 0
+		c.mounts = c.mounts[:0]
+		for _, dir := range dirs {
+			for _, sd := range []string{"", "/boot", "/d-i"} {
+				m := &bootMnt{mnt: mp + "/" + dir.Name() + sd}
+				c.mounts = append(c.mounts, m)
+				go c.tryScanFiles(m, done)
+				cnt++
 			}
-			cnt := 0
-			c.mounts = c.mounts[:0]
-			for _, dir := range dirs {
-				for _, sd := range []string{"", "/boot", "/d-i"} {
-					m := &bootMnt{mnt: mp + "/" + dir.Name() + sd}
-					c.mounts = append(c.mounts, m)
-					go c.tryScanFiles(m, done)
-					cnt++
-				}
-			}
-			for i := 0; i < cnt; i++ {
-				<-done
-			}
+		}
+		for i := 0; i < cnt; i++ {
+			<-done
+		}
 
-			for _, m := range c.mounts {
-				if m.hasGrub {
-					args := []string{"grub", "--daemon"}
-					args = append(args, m.mnt+"/grub/grub.cfg")
-					fmt.Printf("%v\n", args)
-					x := c.g.Fork(args...)
-					x.Stdin = os.Stdin
-					x.Stdout = os.Stdout
-					x.Stderr = os.Stderr
-					x.Dir = "/"
-					err := x.Run()
-					if err != nil {
-						fmt.Printf("grub returned %s\n", err)
-					}
+		for _, m := range c.mounts {
+			if m.hasGrub {
+				args := []string{"grub", "--daemon"}
+				args = append(args, m.mnt+"/grub/grub.cfg")
+				fmt.Printf("%v\n", args)
+				x := c.g.Fork(args...)
+				x.Stdin = os.Stdin
+				x.Stdout = os.Stdout
+				x.Stderr = os.Stderr
+				x.Dir = "/"
+				err := x.Run()
+				if err != nil {
+					fmt.Printf("grub returned %s\n", err)
 				}
 			}
 		}
