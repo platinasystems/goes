@@ -7,14 +7,15 @@ package menuentry
 import (
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/platinasystems/goes"
 
 	"github.com/platinasystems/goes/lang"
 
 	"github.com/platinasystems/flags"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/goes/internal/shellutils"
+	"github.com/platinasystems/parms"
 )
 
 type Entry struct {
@@ -53,17 +54,19 @@ func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, fun
 		return nil, nil, errors.New("Menuentry: unexpected end of line")
 	}
 
-	name := cl.Cmds[1].String()
-	cl.Cmds = cl.Cmds[2:]
-	args := make([]string, 0)
 	foundBrace := false
+	cl.Cmds = cl.Cmds[1:]
+	args := make([]string, 0)
 
-	for len(cl.Cmds) > 0 {
+	for len(cl.Cmds) > 0 && !foundBrace {
 		cmd := cl.Cmds[0].String()
 		cl.Cmds = cl.Cmds[1:]
-		if cmd == "{" {
+		if strings.HasSuffix(cmd, "{") {
 			foundBrace = true
-			break
+			cmd = cmd[:len(cmd)-1]
+			if len(cmd) == 0 {
+				break
+			}
 		}
 		args = append(args, cmd)
 	}
@@ -75,6 +78,11 @@ func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, fun
 	_, args = parms.New(args, "--class", "--users", "--hotkey", "--id")
 	_, args = flags.New(args, "--unrestricted")
 
+	if len(args) < 1 {
+		return nil, nil, errors.New("menuentry: missing menu name")
+	}
+
+	name := args[0]
 	//	fmt.Printf("menuentry: name: %v, parm: %v, flags: %v, args: %v\n",
 	//		name, parm, flags, args)
 
