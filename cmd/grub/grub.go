@@ -26,10 +26,9 @@ import (
 	"github.com/platinasystems/goes/cmd/function"
 	"github.com/platinasystems/goes/cmd/grub/initrd"
 	"github.com/platinasystems/goes/cmd/grub/linux"
-	"github.com/platinasystems/goes/cmd/grub/menuentry"
+	"github.com/platinasystems/goes/cmd/grub/menu"
 	"github.com/platinasystems/goes/cmd/grub/search"
 	"github.com/platinasystems/goes/cmd/grub/set"
-	"github.com/platinasystems/goes/cmd/grub/submenu"
 
 	"github.com/platinasystems/goes/cmd/ifcmd"
 	"github.com/platinasystems/goes/cmd/nop"
@@ -62,7 +61,7 @@ var Goes = &goes.Goes{
 		"background_color": nop.Command{C: "background_color"},
 		"background_image": nop.Command{C: "background_image"},
 		"clear":            nop.Command{C: "clear"},
-		"cli":              &cli.Command{},
+		"cli":              Cli,
 		"echo":             echo.Command{},
 		"else":             &elsecmd.Command{},
 		"export":           nop.Command{C: "export"},
@@ -75,12 +74,12 @@ var Goes = &goes.Goes{
 		"insmod":           nop.Command{C: "insmod"},
 		"linux":            Linux,
 		"loadfont":         nop.Command{C: "loadfont"},
-		"menuentry":        Menuentry,
+		"menuentry":        menuEntry,
 		"play":             nop.Command{C: "play"},
 		"recordfail":       nop.Command{C: "recordfail"},
 		"search":           &search.Command{},
 		"set":              &set.Command{},
-		"submenu":          submenu.Command{M: Menuentry},
+		"submenu":          subMenu,
 		"[":                testcmd.Command{},
 		"terminal_output":  nop.Command{C: "terminal_output"},
 		"then":             &thencmd.Command{},
@@ -88,11 +87,13 @@ var Goes = &goes.Goes{
 	},
 }
 
+var Cli = &cli.Command{}
+
 var Linux = &linux.Command{}
 
 var Initrd = &initrd.Command{}
 
-var Menuentry = &menuentry.Command{}
+var menuEntry, subMenu = menu.New()
 
 func (c *Command) Apropos() lang.Alt {
 	return Goes.Apropos()
@@ -146,7 +147,7 @@ func (c *Command) runScript(n string) (err error) {
 
 func (c *Command) Main(args ...string) (err error) {
 	parm, args := parms.New(args, "-t")
-	flag, args := flags.New(args, "--daemon")
+	flag, args := flags.New(args, "--daemon", "--webserver")
 
 	c.root = "/boot"
 	if len(args) > 0 {
@@ -155,6 +156,11 @@ func (c *Command) Main(args ...string) (err error) {
 	n := "/grub/grub.cfg"
 	if len(args) > 1 {
 		n = args[1]
+	}
+
+	if flag.ByName["--webserver"] {
+		c.ServeMenus(n)
+		return
 	}
 
 	if err := c.runScript(n); err != nil {
@@ -166,10 +172,9 @@ func (c *Command) Main(args ...string) (err error) {
 		fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
 	}
 
-	m := Menuentry.Menus
-	c.ServeMenus() // FIXME so wrong
+	m := menuEntry.R.RootMenu
 
-	menlen := len(m)
+	menlen := len(*m.Entries)
 	if menlen == 0 && len(Linux.Kern) == 0 {
 		return ErrNoDefinedKernelOrMenus
 	}
@@ -202,11 +207,9 @@ func (c *Command) Usage() string {
 	return Goes.Usage()
 }
 
-func (c *Command) RunMenu(m []menuentry.Entry, parm *parms.Parms, flag *flags.Flags) (err error) {
-	for len(m) != 0 {
-		for i, me := range m {
-			fmt.Printf("[%d]   %s\n", i, me.Name)
-		}
+func (c *Command) RunMenu(m *menu.Menu, parm *parms.Parms, flag *flags.Flags) (err error) {
+	for m != nil {
+		fmt.Print(m.NumberedMenu())
 		var menuItem int
 		err = func() error {
 			def := Goes.EnvMap["default"]
@@ -226,12 +229,10 @@ func (c *Command) RunMenu(m []menuentry.Entry, parm *parms.Parms, flag *flags.Fl
 		if err != nil {
 			return
 		}
-		if menuItem >= len(m) {
-			return errors.New("Menu item out of range")
+		m, err = m.RunMenu(menuItem, os.Stdin, os.Stdout, os.Stderr)
+		if err != nil {
+			return err
 		}
-		me := m[menuItem]
-		Menuentry.Menus = Menuentry.Menus[:0]
-		err = me.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
 		fmt.Printf("Kernel defined: %s\n", Linux.Kern)
 		fmt.Printf("Linux command: %v\n", Linux.Cmd)
 		fmt.Printf("Initrd: %v\n", Initrd.Initrd)
@@ -239,7 +240,6 @@ func (c *Command) RunMenu(m []menuentry.Entry, parm *parms.Parms, flag *flags.Fl
 		if err != nil {
 			return err
 		}
-		m = Menuentry.Menus
 	}
 	return
 }

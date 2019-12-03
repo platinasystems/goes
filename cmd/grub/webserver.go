@@ -10,9 +10,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 
-	"github.com/platinasystems/goes/cmd/grub/menuentry"
+	"github.com/platinasystems/goes/cmd/grub/menu"
 )
 
 var pageExists = make(map[string]struct{})
@@ -31,78 +33,108 @@ func (ws *webserver) Write(p []byte) (n int, err error) {
 	return ret, err
 }
 
-func (c *Command) addHandler(parent string, i int, me menuentry.Entry) {
-	path := fmt.Sprintf("%s/%d", parent, i)
-	if _, f := pageExists[path]; f {
-		return
-	}
-	pageExists[path] = struct{}{}
-	http.HandleFunc(fmt.Sprintf("/%s/", path), func(w http.ResponseWriter, r *http.Request) {
-		Menuentry.Menus = Menuentry.Menus[:0]
-		ws := &webserver{w: w}
-		io.WriteString(w, `<html>`)
-		err := me.RunFun(ws, ws, ws, false, false)
-		if err != nil {
-			fmt.Fprintf(w, `Menu exit status: %s
-<br>`, html.EscapeString(err.Error()))
-		} else {
-			kexec := c.KexecCommand()
-			if len(kexec) > 0 {
-				s := html.EscapeString(strings.Join(kexec, " "))
-				fmt.Printf("kexec command: %s\n", s)
-				fmt.Fprintf(w, `Execute <a href="kexec">%s</a><br>`, s)
-			}
-		}
-		for j, v := range Menuentry.Menus {
-			fmt.Fprintf(w, `<a href="%d/">%s</a>
-<br>
-`, j, v.Name)
-			c.addHandler(path, j, v)
-		}
-		io.WriteString(w, `</html>`)
-	})
-	http.HandleFunc(fmt.Sprintf("/%s/kexec", path), func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `<html>`)
-		kexec := c.KexecCommand()
-		err := Goes.Main(kexec...)
+func (c *Command) serveKexecMenu(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, `<html>`)
+	kexec := c.KexecCommand()
+	if len(kexec) == 0 {
+		fmt.Fprintf(w, "No kernel defined, did you bookmark this URL?<br>")
+	} else {
+		err := c.g.Main(kexec...)
 		if err != nil {
 			fmt.Fprintf(w, "Failed: %s<br>", html.EscapeString(err.Error()))
 		} else {
 			io.WriteString(w, "Success, so how do you see this?")
 		}
-		io.WriteString(w, `</html>`)
-	})
-}
-
-func (c *Command) startHttpServer(path string) {
-	m := Menuentry.Menus
-	Menuentry.Menus = Menuentry.Menus[:0]
-	for i, v := range m {
-		c.addHandler(path, i, v)
-
 	}
-
-	http.HandleFunc(fmt.Sprintf("/%s/", path), func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `<html><img src=http://www.platinasystems.com/wp-content/uploads/2016/10/PLA-Logo-Final-01-1-1-300x36.png><br>`)
-		for i, v := range m {
-			fmt.Fprintf(w, `<a href="%d/">%s</a>
-<br>
-`, i, v.Name)
-		}
-		io.WriteString(w, `</html>`)
-	})
+	io.WriteString(w, `</html>`)
 }
 
-func (c *Command) ServeMenus() {
-	srv := &http.Server{Addr: ":8080"}
-	c.startHttpServer("boot")
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "boot/", 307)
-	})
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			// cannot panic, because this probably is an intentional close
-			log.Printf("Httpserver: ListenAndServe() error: %s", err)
+func (c *Command) menuHtml(w http.ResponseWriter, m *menu.Menu, parent []int) {
+	mp := ""
+	sep := "?"
+	for _, i := range parent {
+		mp = mp + sep + "m=" + strconv.Itoa(i)
+		sep = "&"
+	}
+	if m != nil {
+		for i, v := range *(m.Entries) {
+			fmt.Fprintf(w, `<a href="%s%sm=%d">%s</a>
+<br>
+`, mp, sep, i, v.Name)
 		}
-	}()
+	}
+	k := c.KexecCommand()
+	if len(k) > 0 {
+		fmt.Fprintf(w, `<br><a href="kexec">Kexec command: %v</a><br>`, k)
+	}
+}
+
+//		io.WriteString(w, `<html><img src=http://www.platinasystems.com/wp-content/uploads/2016/10/PLA-Logo-Final-01-1-1-300x36.png><br>`)
+
+func (c *Command) serveRootMenu(n string, w http.ResponseWriter, r *http.Request) {
+	ws := &webserver{w: w}
+	Cli.Stdin = ws
+	Cli.Stdout = ws
+	Cli.Stderr = ws
+
+	io.WriteString(w, `<html>`)
+	menuPath := r.URL.Query()["m"]
+	if menuPath == nil {
+		menuEntry.Reset()
+		if err := c.runScript(n); err != nil {
+			fmt.Fprintf(w, "Script returned error: %s<br>",
+				html.EscapeString(err.Error()))
+		} else {
+			c.menuHtml(w, menuEntry.R.RootMenu, nil)
+		}
+	} else {
+		mp := make([]int, len(menuPath))
+		err := error(nil)
+		for i := 0; i < len(menuPath); i++ {
+			mp[i], err = strconv.Atoi(menuPath[i])
+			if err != nil {
+				break
+			}
+		}
+		if err != nil {
+			fmt.Fprintf(w, "Error parsing menu path: %s</br>",
+				html.EscapeString(err.Error()))
+		} else {
+			e, err := menuEntry.FindEntry(mp...)
+			if err != nil {
+				fmt.Fprintf(w, "Error finding menu path %v: %s</br>",
+					mp, err)
+			} else {
+				if err := e.RunFun(ws, ws, ws, false, false); err != nil {
+					fmt.Fprintf(w, "Menu returned error: %s</br>",
+						html.EscapeString(err.Error()))
+				} else {
+					c.menuHtml(w, e.Submenu, mp)
+				}
+			}
+		}
+	}
+	io.WriteString(w, `</html>`)
+}
+
+func (c *Command) ServeMenus(n string) {
+	srv := &http.Server{Addr: ":8080"}
+	mutex := &sync.Mutex{}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		if r.URL.Path == "/" {
+			c.serveRootMenu(n, w, r)
+			return
+		}
+		if r.URL.Path == "/kexec" {
+			c.serveKexecMenu(w, r)
+			return
+		}
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+	})
+	if err := srv.ListenAndServe(); err != nil {
+		// cannot panic, because this probably is an intentional close
+		log.Printf("Httpserver: ListenAndServe() error: %s", err)
+	}
 }
