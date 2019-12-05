@@ -24,22 +24,15 @@ import (
 	"github.com/platinasystems/goes/cmd/falsecmd"
 	"github.com/platinasystems/goes/cmd/ficmd"
 	"github.com/platinasystems/goes/cmd/function"
-	"github.com/platinasystems/goes/cmd/grub/background_color"
-	"github.com/platinasystems/goes/cmd/grub/clear"
-	"github.com/platinasystems/goes/cmd/grub/export"
-	"github.com/platinasystems/goes/cmd/grub/gfxmode"
 	"github.com/platinasystems/goes/cmd/grub/initrd"
-	"github.com/platinasystems/goes/cmd/grub/insmod"
 	"github.com/platinasystems/goes/cmd/grub/linux"
-	"github.com/platinasystems/goes/cmd/grub/loadfont"
 	"github.com/platinasystems/goes/cmd/grub/menuentry"
-	"github.com/platinasystems/goes/cmd/grub/recordfail"
 	"github.com/platinasystems/goes/cmd/grub/search"
 	"github.com/platinasystems/goes/cmd/grub/set"
 	"github.com/platinasystems/goes/cmd/grub/submenu"
-	"github.com/platinasystems/goes/cmd/grub/terminal_output"
 
 	"github.com/platinasystems/goes/cmd/ifcmd"
+	"github.com/platinasystems/goes/cmd/nop"
 	"github.com/platinasystems/goes/cmd/testcmd"
 	"github.com/platinasystems/goes/cmd/thencmd"
 	"github.com/platinasystems/goes/cmd/truecmd"
@@ -65,28 +58,30 @@ var Goes = &goes.Goes{
 		lang.EnUS: "execute a grub configuration file",
 	},
 	ByName: map[string]cmd.Cmd{
-		"background_color": background_color.Command{},
-		"clear":            clear.Command{},
+		"background_color": nop.Command{C: "background_color"},
+		"background_image": nop.Command{C: "background_image"},
+		"clear":            nop.Command{C: "clear"},
 		"cli":              &cli.Command{},
 		"echo":             echo.Command{},
 		"else":             &elsecmd.Command{},
-		"export":           export.Command{},
+		"export":           nop.Command{C: "export"},
 		"false":            falsecmd.Command{},
 		"fi":               &ficmd.Command{},
 		"function":         &function.Command{},
-		"gfxmode":          gfxmode.Command{},
+		"gfxmode":          nop.Command{C: "gfxmode"},
 		"if":               &ifcmd.Command{},
 		"initrd":           Initrd,
-		"insmod":           insmod.Command{},
+		"insmod":           nop.Command{C: "insmod"},
 		"linux":            Linux,
-		"loadfont":         loadfont.Command{},
+		"loadfont":         nop.Command{C: "loadfont"},
 		"menuentry":        Menuentry,
-		"recordfail":       recordfail.Command{},
+		"play":             nop.Command{C: "play"},
+		"recordfail":       nop.Command{C: "recordfail"},
 		"search":           &search.Command{},
 		"set":              &set.Command{},
 		"submenu":          submenu.Command{M: Menuentry},
 		"[":                testcmd.Command{},
-		"terminal_output":  terminal_output.Command{},
+		"terminal_output":  nop.Command{C: "terminal_output"},
 		"then":             &thencmd.Command{},
 		"true":             truecmd.Command{},
 	},
