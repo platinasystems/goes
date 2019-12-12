@@ -49,10 +49,18 @@ func ExampleDefaultCommand() {
 	fmt.Println(c)
 	fmt.Println(c.Usage())
 	fmt.Println(c.Apropos())
+	fmt.Println(c.Man())
+	fmt.Println(c.Kind())
 	// Output:
 	// nop
 	// nop ...
 	// do nothing
+	//
+	// DESCRIPTION
+	//	The nop command does nothing. It is intended for use in
+	//	scripts.
+	// don't fork
+
 }
 
 func TestXyzzyCommand(t *testing.T) {
@@ -65,8 +73,15 @@ func ExampleXyzzyCommand() {
 	fmt.Println(c)
 	fmt.Println(c.Usage())
 	fmt.Println(c.Apropos())
+	fmt.Println(c.Man())
+	fmt.Println(c.Kind())
 	// Output:
 	// xyzzy
 	// xyzzy ...
 	// do nothing
+	//
+	// DESCRIPTION
+	//	The xyzzy command does nothing. It is intended for use in
+	//	scripts.
+	// don't fork
 }
