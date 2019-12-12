@@ -32,7 +32,7 @@ require (
 	github.com/platinasystems/ssh_key_helper v0.0.1
 	github.com/platinasystems/term v0.0.0-20190801203457-969603cfd238
 	github.com/platinasystems/ubi v0.0.2
-	github.com/platinasystems/url v1.1.0
+	github.com/platinasystems/url v1.1.1
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
