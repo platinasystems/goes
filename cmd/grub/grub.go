@@ -57,6 +57,8 @@ type Command struct {
 	root string
 }
 
+var ErrNoDefinedKernelOrMenus = errors.New("No defined kernel or menus")
+
 var Goes = &goes.Goes{
 	NAME: "grub",
 	APROPOS: lang.Alt{
@@ -155,17 +157,14 @@ func (c *Command) Main(args ...string) (err error) {
 
 	menlen := len(m)
 	if menlen == 0 && len(Linux.Kern) == 0 {
-		fmt.Fprintf(os.Stderr, "Grub script did not define any menus or set a kernel\n")
+		return ErrNoDefinedKernelOrMenus
 	}
 
 	err = c.AskKernel(parm, flag)
 	if err != nil {
 		return err
 	}
-	if menlen == 0 {
-		return errors.New("No defined kernel or menus")
-	}
-	fmt.Printf("Menus defined: %d\n", menlen)
+
 	err = c.RunMenu(m, parm, flag)
 	if err != nil {
 		return err
