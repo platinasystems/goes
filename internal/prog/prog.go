@@ -9,6 +9,7 @@ package prog
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var Install = "/usr/bin/goes"
@@ -23,6 +24,10 @@ func Base() string {
 
 func Name() string {
 	if len(name) == 0 {
+		a := os.Args[0]
+		if strings.HasSuffix(a, ".test") {
+			panic("Can't find our name under tests")
+		}
 		var err error
 		name, err = os.Readlink("/proc/self/exe")
 		if err != nil {
