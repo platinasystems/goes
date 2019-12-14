@@ -111,7 +111,11 @@ func (c *Command) runScript(n string) (err error) {
 
 	Goes.Catline = func(prompt string) (string, error) {
 		if scanner.Scan() {
-			return scanner.Text(), nil
+			t := scanner.Text()
+			if c.g.Verbosity >= goes.VerboseDebug {
+				fmt.Println("+", t)
+			}
+			return t, nil
 		}
 		err := scanner.Err()
 		if err == nil {
@@ -144,8 +148,10 @@ func (c *Command) Main(args ...string) (err error) {
 		return err
 	}
 
-	root := Goes.EnvMap["root"]
-	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
+	if c.g.Verbosity >= goes.VerboseDebug {
+		root := Goes.EnvMap["root"]
+		fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
+	}
 
 	m := Menuentry.Menus
 	c.ServeMenus() // FIXME so wrong
@@ -164,8 +170,11 @@ func (c *Command) Main(args ...string) (err error) {
 	if err != nil {
 		return err
 	}
-	root = Goes.EnvMap["root"]
-	fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
+
+	if c.g.Verbosity >= goes.VerboseDebug {
+		root := Goes.EnvMap["root"]
+		fmt.Printf("Root is %s translated %s\n", root, c.GetRoot())
+	}
 
 	err = c.AskKernel(parm, flag)
 
