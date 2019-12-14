@@ -67,6 +67,8 @@ type Goes struct {
 	EnvMap map[string]string
 
 	FunctionMap map[string]Function
+
+	inTest bool
 }
 
 type Function struct {
@@ -166,7 +168,7 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 					return fmt.Errorf(
 						"%s: can't pipe", name)
 				}
-			} else if k.IsDontFork() ||
+			} else if k.IsDontFork() || g.inTest ||
 				name == os.Args[0] {
 				if method, found := v.(goeser); found {
 					method.Goes(g)
@@ -382,6 +384,9 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
 func (g *Goes) Main(args ...string) error {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		g.inTest = true
+	}
 	if len(args) > 0 && args[0] == "/proc/self/exe" {
 		args = args[1:]
 	}
