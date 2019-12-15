@@ -5,9 +5,16 @@
 package nop
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/platinasystems/flags"
+
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/lang"
 )
+
+var ErrorForced = errors.New("Forced error")
 
 type Command struct {
 	C string
@@ -39,6 +46,11 @@ DESCRIPTION
 
 func (Command) Kind() cmd.Kind { return cmd.DontFork }
 
-func (Command) Main(args ...string) error {
-	return nil
+func (c Command) Main(args ...string) (err error) {
+	opt := "--force-error"
+	flag, args := flags.New(args, opt)
+	if flag.ByName[opt] {
+		err = fmt.Errorf("%s: %w(%s)", c.String(), ErrorForced, opt)
+	}
+	return
 }
