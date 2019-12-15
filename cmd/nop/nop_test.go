@@ -12,7 +12,7 @@ import (
 func (c Command) testCmdWithArgs(t *testing.T, args ...string) {
 	err := c.Main(args...)
 	if err != nil {
-		t.Errorf("%s main(%v) failed: %w", c.String(), err, args)
+		t.Errorf("%s main(%v) failed: %s", c.String(), args, err)
 	}
 }
 
