@@ -18,6 +18,8 @@ import (
 	"github.com/platinasystems/parms"
 )
 
+var InternalError = errors.New("internal error")
+
 type Entry struct {
 	Name   string
 	RunFun func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error
@@ -30,24 +32,32 @@ type Command struct {
 func (Command) String() string { return "menuentry" }
 
 func (Command) Usage() string {
-	return "NOP"
+	return "menuentry [options] [name] { script ... }"
 }
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "NOP",
+		lang.EnUS: "define a menu item",
 	}
 }
 
 func (c *Command) Man() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: Man,
+		lang.EnUS: `
+DESCRIPTION
+	Define a menu item.
+
+	Options and names are currently ignored. They do not return
+	errors for compatibility with existing grub scripts.
+
+	The menu itself is a script which will be run when the menu
+	item is selected.`,
 	}
 }
 
-const Man = "NOP command for script compatibility\n"
-
-func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
+func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List,
+	func(stdin io.Reader, stdout io.Writer, stderr io.Writer,
+		isFirst bool, isLast bool) error, error) {
 	cl := ls.Cmds[0]
 	// menuentry name [option...] { definition ... ; }
 	if len(cl.Cmds) < 2 {
@@ -137,5 +147,5 @@ func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, fun
 }
 
 func (Command) Main(args ...string) error {
-	return errors.New("internal error")
+	return InternalError
 }
