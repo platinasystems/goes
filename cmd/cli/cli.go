@@ -5,6 +5,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,8 +28,13 @@ type parsedCommand struct {
 }
 
 type Command struct {
-	Prompt string
-	g      *goes.Goes
+	Prompt       string
+	g            *goes.Goes
+	promptString string
+	prompter     interface {
+		Prompt(string) (string, error)
+		Close()
+	}
 }
 
 func (*Command) String() string { return "cli" }
@@ -102,7 +108,7 @@ QUOTATION
 		echo 'hello "beautiful world"'
 
 SPECIAL CHARACTERS
-	The command may encode these special characters.
+.	The command may encode these special characters.
 
 		\a   U+0007 alert or bell
 		\b   U+0008 backspace
@@ -163,14 +169,26 @@ PIPES
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
+func (c *Command) Read(p []byte) (n int, err error) {
+	s, err := c.prompter.Prompt(c.promptString)
+	if err != nil {
+		return
+	}
+	n = copy(p, s)
+	if len(s) > len(p) {
+		err = errors.New("input too long")
+	}
+	return
+}
+
+func (c *Command) Write(p []byte) (n int, err error) {
+	c.promptString = string(p)
+	return len(c.promptString), nil
+}
+
 func (c *Command) Main(args ...string) error {
 	var (
-		err error
-
-		prompter interface {
-			Prompt(string) (string, error)
-			Close()
-		}
+		err      error
 		isScript bool
 	)
 
@@ -201,16 +219,16 @@ func (c *Command) Main(args ...string) error {
 	case 0:
 		switch {
 		case flag.ByName["-"]:
-			prompter = notliner.New(os.Stdin, nil)
+			c.prompter = notliner.New(os.Stdin, nil)
 			isScript = true
 		case flag.ByName["-no-liner"]:
-			prompter = notliner.New(os.Stdin, os.Stdout)
+			c.prompter = notliner.New(os.Stdin, os.Stdout)
 		default:
 			if _, found := c.g.ByName["resize"]; !found {
 				c.g.ByName["resize"] = resize.Command{}
 			}
-			prompter = liner.New(c.g)
-			defer prompter.Close()
+			c.prompter = liner.New(c.g)
+			defer c.prompter.Close()
 		}
 	case 1:
 		script, err := url.Open(args[0])
@@ -218,8 +236,8 @@ func (c *Command) Main(args ...string) error {
 			return err
 		}
 		defer script.Close()
-		prompter = notliner.New(script, nil)
-		defer prompter.Close()
+		c.prompter = notliner.New(script, nil)
+		defer c.prompter.Close()
 		isScript = true
 	default:
 		return fmt.Errorf("%v: unexpected", args[1:])
@@ -229,13 +247,7 @@ func (c *Command) Main(args ...string) error {
 		c.g.Verbosity = goes.VerboseVerify
 	}
 	if c.g.Catline == nil {
-		c.g.Catline = func(prompt string) (string, error) {
-			s, err := prompter.Prompt(prompt)
-			if err != nil {
-				return "", err
-			}
-			return s, nil
-		}
+		c.g.Catline = c
 	}
 readCommandLoop:
 	for {

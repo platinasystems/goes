@@ -12,23 +12,37 @@ import (
 	"testing"
 )
 
-func testSlice(script []string) (*List, error) {
-	calls := 0
+type ts struct {
+	line   int
+	script []string
+}
 
-	ls, err := Parse(">", func(prompt string) (string, error) {
-		if calls < len(script) {
-			s := script[calls]
-			calls += 1
-			return s, nil
-		}
-		return "", errors.New("parser asked for too much input")
-	})
+func (t *ts) Write(p []byte) (n int, err error) {
+	return n, nil
+}
+
+func (t *ts) Read(p []byte) (n int, err error) {
+	if t.line >= len(t.script) {
+		return 0, errors.New("parser asked for too much input")
+	}
+	s := t.script[t.line]
+	t.line += 1
+	n = copy(p, []byte(s))
+	if len(s) > len(p) {
+		err = errors.New("input too long")
+	}
+	return
+}
+
+func testSlice(script []string) (*List, error) {
+	t := &ts{script: script}
+	ls, err := Parse(">", t)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if calls != len(script) {
+	if t.line != len(script) {
 		err := errors.New("parser did not consume all input")
 		return nil, err
 	}

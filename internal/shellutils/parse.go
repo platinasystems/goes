@@ -13,6 +13,14 @@ import (
 
 var errMissingEndQuote = errors.New("Unexpected EOF while looking for matching quote")
 
+func srcin(i io.ReadWriter, prompt string) (s string, err error) {
+	i.Write([]byte(prompt))
+	buf := make([]byte, 1024)
+	n, err := i.Read(buf)
+	s = string(buf[0:n])
+	return
+}
+
 // break up string into Lists, Pipelines, and command lines
 // a List is a slice of Pipelines [][]Cmdline{}
 // a Pipeline is a slice of commandlines []Cmdline{}
@@ -20,8 +28,8 @@ var errMissingEndQuote = errors.New("Unexpected EOF while looking for matching q
 
 // Parse calls the srcin function for command input as strings, and
 // return a pointer to a parsed command List, or an error
-func Parse(prompt string, srcin func(string) (string, error)) (*List, error) {
-	s, err := srcin(prompt)
+func Parse(prompt string, i io.ReadWriter) (*List, error) {
+	s, err := srcin(i, prompt)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +144,7 @@ processRune:
 					w.addLiteral(string(r))
 				}
 				w.addLiteral("\n")
-				s, err = srcin("> ")
+				s, err = srcin(i, "> ")
 				if err != nil {
 					if err == io.EOF {
 						return nil, errMissingEndQuote
@@ -163,7 +171,7 @@ processRune:
 					}
 					if r == '\\' {
 						if len(s) == 0 {
-							s, err = srcin("> ")
+							s, err = srcin(i, "> ")
 							if err != nil {
 								if err == io.EOF {
 									return nil, errMissingEndQuote
@@ -181,7 +189,7 @@ processRune:
 					w.addLiteral(string(r))
 				}
 				w.addLiteral("\n")
-				s, err = srcin("> ")
+				s, err = srcin(i, "> ")
 				if err != nil {
 					if err == io.EOF {
 						return nil, errMissingEndQuote
@@ -197,7 +205,7 @@ processRune:
 				w.addLiteral(string(r))
 				continue
 			}
-			s, err = srcin("... ")
+			s, err = srcin(i, "... ")
 			if err != nil {
 				return nil, err
 			}

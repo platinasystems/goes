@@ -46,8 +46,9 @@ import (
 )
 
 type Command struct {
-	g    *goes.Goes
-	root string
+	g       *goes.Goes
+	root    string
+	scanner *bufio.Scanner
 }
 
 var ErrNoDefinedKernelOrMenus = errors.New("No defined kernel or menus")
@@ -99,6 +100,29 @@ func (c *Command) Apropos() lang.Alt {
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
+func (c *Command) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
+
+func (c *Command) Read(p []byte) (n int, err error) {
+	if c.scanner.Scan() {
+		t := c.scanner.Text()
+		if c.g.Verbosity >= goes.VerboseDebug {
+			fmt.Println("+", t)
+		}
+		n = copy(p, []byte(t))
+		if len(t) > len(p) {
+			err = errors.New("input too long")
+		}
+		return
+	}
+	err = c.scanner.Err()
+	if err == nil {
+		err = io.EOF
+	}
+	return 0, err
+}
+
 func (c *Command) runScript(n string) (err error) {
 	if n != "-" {
 		fn := filepath.Join(c.root, n)
@@ -108,22 +132,10 @@ func (c *Command) runScript(n string) (err error) {
 		}
 		defer script.Close()
 
-		scanner := bufio.NewScanner(script)
+		c.scanner = bufio.NewScanner(script)
 
-		Goes.Catline = func(prompt string) (string, error) {
-			if scanner.Scan() {
-				t := scanner.Text()
-				if c.g.Verbosity >= goes.VerboseDebug {
-					fmt.Println("+", t)
-				}
-				return t, nil
-			}
-			err := scanner.Err()
-			if err == nil {
-				err = io.EOF
-			}
-			return "", err
-		}
+		Goes.Catline = c
+
 	}
 	err = Goes.Main()
 	if err != nil {

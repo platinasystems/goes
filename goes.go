@@ -56,7 +56,7 @@ type Goes struct {
 
 	ByName map[string]cmd.Cmd
 
-	Catline func(string) (string, error)
+	Catline io.ReadWriter
 
 	Status    error
 	Verbosity int
@@ -210,7 +210,10 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 					defer w.Close()
 					prompt := "<<" + fn + " "
 					for {
-						s, err := g.Catline(prompt)
+						g.Catline.Write([]byte(prompt))
+						buf := make([]byte, 1024)
+						n, err := g.Catline.Read(buf)
+						s := string(buf[0:n])
 						if err != nil || s == lbl {
 							break
 						}
