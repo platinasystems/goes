@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/platinasystems/flags"
-	"github.com/platinasystems/nvram"
 	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/nvram"
 	"github.com/platinasystems/parms"
 )
 
@@ -112,7 +112,7 @@ func (Command) ShowParamterValues(args ...interface{}) (err error) {
 			return
 		}
 		if len(items) == 0 {
-			err = fmt.Errorf("CMOS entry enum id %d has no values.",
+			err = fmt.Errorf("CMOS entry %s enum id %d has no values.",
 				e.Name(), e.ConfigId())
 			return
 		}
@@ -121,7 +121,7 @@ func (Command) ShowParamterValues(args ...interface{}) (err error) {
 		}
 	case nvram.CMOSEntryHex:
 		fmt.Printf("Parameter %s requires a %d-bit unsigned integer.\n",
-			e.Name, e.Length())
+			e.Name(), e.Length())
 	case nvram.CMOSEntryReserved:
 		fmt.Printf("Parameter %s is reserved.\n", e.Name())
 	default:
@@ -346,4 +346,3 @@ func (c Command) Main(args ...string) (err error) {
 	}
 	return
 }
-

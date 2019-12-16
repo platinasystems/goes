@@ -106,7 +106,7 @@ func Bootc() []string {
 			continue
 		} else {
 			if err := writeCfg(); err != nil { // updates bootc format
-				fmt.Println("Error: writing bootc.cfg, drop into grub...\n")
+				fmt.Println("Error: writing bootc.cfg, drop into grub...")
 				return []string{""}
 			}
 		}
@@ -965,7 +965,7 @@ func Wipe(dryrun bool) error {
 	if v == minCoreVer && w < minCoreCom {
 		return fmt.Errorf("Coreboot needs upgraded.")
 	}
-	fmt.Printf("Coreboot version ok, ver = %d, subver = %d\n", v, w)
+	fmt.Printf("Coreboot version ok, ver = %f, subver = %d\n", v, w)
 
 	if !dryrun {
 		fmt.Println("Deleting sda6 from the partition table...")

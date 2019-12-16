@@ -1,3 +1,5 @@
+// +build +brokenTests
+
 package upgrade
 
 import (

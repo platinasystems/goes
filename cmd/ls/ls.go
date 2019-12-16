@@ -165,7 +165,7 @@ func long(names []string) error {
 			if err == nil {
 				fmt.Printf("\n")
 			} else {
-				fmt.Printf(": %v\n", name, err)
+				fmt.Printf("%s: %s\n", name, err)
 			}
 		default:
 			fmt.Printf("%12s %2d %4d %4d %10d %s %s\n",

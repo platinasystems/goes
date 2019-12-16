@@ -36,17 +36,15 @@ func testSlice(script []string) (*List, error) {
 }
 
 func (ls *List) print() {
-	for _, pl := range ls.Cmds {
-		for _, sl := range pl.Cmds {
-			_, cmdline := sl.Slice(os.Getenv)
-			term := sl.Term.String()
-			if term == "" {
-				term = "\n"
-			} else {
-				term = " " + term + " "
-			}
-			fmt.Print(strings.Join(cmdline, " "), term)
+	for _, sl := range ls.Cmds {
+		_, cmdline := sl.Slice(os.Getenv)
+		term := sl.Term.String()
+		if term == "" {
+			term = "\n"
+		} else {
+			term = " " + term + " "
 		}
+		fmt.Print(strings.Join(cmdline, " "), term)
 	}
 }
 

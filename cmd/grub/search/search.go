@@ -15,8 +15,8 @@ import (
 	"github.com/platinasystems/goes/lang"
 
 	"github.com/platinasystems/flags"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/goes/internal/partitions"
+	"github.com/platinasystems/parms"
 )
 
 type Command struct {
@@ -57,7 +57,7 @@ func (c Command) Main(args ...string) error {
 		v = "root"
 	}
 	if len(args) != 1 {
-		return fmt.Errorf("Unexpected %v\n")
+		return fmt.Errorf("Unexpected %v\n", args)
 	}
 	f, err := os.Open("/proc/partitions")
 	if err != nil {

@@ -125,7 +125,7 @@ func (Command) Main(args ...string) error {
 		return fmt.Errorf("%s: invalid BUS.ADDR[.REG]: %v", args[0], err)
 	}
 	if w != 0 && w != 8 && w != 16 {
-		return fmt.Errorf("%v: invalid R/W width")
+		return fmt.Errorf("%s: invalid R/W width %d", args[0], w)
 	}
 
 	if dValid {
