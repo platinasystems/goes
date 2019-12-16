@@ -8,28 +8,11 @@ import groovy.transform.Field
 
 pipeline {
     agent any
-    environment {
-	GOPATH = "$WORKSPACE/go-pkg"
-	HOME = "$WORKSPACE"
-    }
     stages {
-	stage('Checkout') {
-	    steps {
-		echo "Running build #${env.BUILD_ID} on ${env.JENKINS_URL} GOPATH ${GOPATH}"
-		dir('goes') {
-		    git([
-			url: 'https://github.com/platinasystems/goes.git',
-			branch: 'master'
-		    ])
-		}
-	    }
-	}
 	stage('Build') {
 	    steps {
-		dir('goes') {
-		    echo "Building goes..."
-		    sh 'set +x; export PATH=/usr/local/go/bin:${PATH}; for package in `find . -type d -print` ; do ls $package/*.go > /dev/null 2>&1 && { echo "Working on" $package ; { ls $package/*_test.go > /dev/null 2>&1 && { go test -v $package || exit; } } ; { go build  -v -buildmode=archive $package || exit; } } || echo "Skipping" $package;done'
-		}
+		echo "Building goes..."
+		sh 'set +x; export PATH=/usr/local/go/bin:${PATH}; for package in `find . -type d -print` ; do ls $package/*.go > /dev/null 2>&1 && { echo "Working on" $package ; { ls $package/*_test.go > /dev/null 2>&1 && { go test -v $package || exit; } } ; { go build  -v -buildmode=archive $package || exit; } } || echo "Skipping" $package;done'
 	    }
 	}
     }
