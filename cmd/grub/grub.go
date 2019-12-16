@@ -100,30 +100,31 @@ func (c *Command) Apropos() lang.Alt {
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (c *Command) runScript(n string) (err error) {
-	fn := filepath.Join(c.root, n)
-	script, err := url.Open(fn)
-	if err != nil {
-		return fmt.Errorf("Error opening %s: %w", fn, err)
-	}
-	defer script.Close()
+	if n != "-" {
+		fn := filepath.Join(c.root, n)
+		script, err := url.Open(fn)
+		if err != nil {
+			return fmt.Errorf("Error opening %s: %w", fn, err)
+		}
+		defer script.Close()
 
-	scanner := bufio.NewScanner(script)
+		scanner := bufio.NewScanner(script)
 
-	Goes.Catline = func(prompt string) (string, error) {
-		if scanner.Scan() {
-			t := scanner.Text()
-			if c.g.Verbosity >= goes.VerboseDebug {
-				fmt.Println("+", t)
+		Goes.Catline = func(prompt string) (string, error) {
+			if scanner.Scan() {
+				t := scanner.Text()
+				if c.g.Verbosity >= goes.VerboseDebug {
+					fmt.Println("+", t)
+				}
+				return t, nil
 			}
-			return t, nil
+			err := scanner.Err()
+			if err == nil {
+				err = io.EOF
+			}
+			return "", err
 		}
-		err := scanner.Err()
-		if err == nil {
-			err = io.EOF
-		}
-		return "", err
 	}
-
 	err = Goes.Main()
 	if err != nil {
 		return fmt.Errorf("Error from grub script: %w", err)
