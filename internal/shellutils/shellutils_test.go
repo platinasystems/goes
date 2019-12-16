@@ -109,3 +109,7 @@ func TestDoublequote(t *testing.T) {
 
 	cmd.print()
 }
+
+func TestFail(t *testing.T) {
+	t.Error(errors.New("Faceplant into rock!"))
+}
