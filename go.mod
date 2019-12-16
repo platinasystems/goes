@@ -15,7 +15,7 @@ require (
 	github.com/platinasystems/atsock v1.1.0
 	github.com/platinasystems/buildid v1.0.0
 	github.com/platinasystems/buildinfo v1.1.0
-	github.com/platinasystems/fdt v0.0.0-20181004054827-3416b99a7d82
+	github.com/platinasystems/fdt v1.0.1
 	github.com/platinasystems/flags v1.0.1
 	github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73
 	github.com/platinasystems/gpio v1.3.0
@@ -36,7 +36,8 @@ require (
 	github.com/ramr/go-reaper v0.0.0-20170814234526-35f6a64e44ff
 	github.com/satori/go.uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
-	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 // indirect
 )
 
