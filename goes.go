@@ -517,9 +517,6 @@ func (g *Goes) Main(args ...string) error {
 	}
 
 	err := v.Main(args[1:]...)
-	if err == io.EOF {
-		err = nil
-	}
 	if err != nil && !k.IsDaemon() {
 		name := args[0]
 		if len(name) == 0 {
@@ -527,7 +524,7 @@ func (g *Goes) Main(args ...string) error {
 				name = fmt.Sprint("(", method.Aka(), ")")
 			}
 		}
-		err = fmt.Errorf("%s: %v", name, err)
+		err = fmt.Errorf("%s: %w", name, err)
 	}
 	g.Status = err
 	return err
@@ -677,7 +674,7 @@ func (g *Goes) ProcessList(ls shellutils.List) (*shellutils.List, *shellutils.Wo
 
 	listfun, err := g.MakeListFunc(pipeline)
 
-	return &ls, &term, listfun, nil
+	return &ls, &term, listfun, err
 }
 
 func (g *Goes) MakeListFunc(pipeline []piperun) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
@@ -705,7 +702,7 @@ func (g *Goes) MakeListFunc(pipeline []piperun) (func(stdin io.Reader, stdout io
 				}
 			}
 		}
-		return nil
+		return err
 	}
 	return listfun, nil
 }
