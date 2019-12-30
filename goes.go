@@ -389,9 +389,13 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 func (g *Goes) Main(args ...string) error {
 	if strings.HasSuffix(os.Args[0], ".test") {
 		g.inTest = true
-	}
-	if len(args) > 0 && args[0] == "/proc/self/exe" {
-		args = args[1:]
+	} else if len(args) > 0 {
+		if strings.HasSuffix(args[0], "__debug_bin") {
+			g.inTest = true
+			args = args[1:]
+		} else if args[0] == "/proc/self/exe" {
+			args = args[1:]
+		}
 	}
 	if len(args) > 0 {
 		base := filepath.Base(args[0])
