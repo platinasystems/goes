@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-var errMissingEndQuote = errors.New("Unexpected EOF while looking for matching quote")
+var ErrMissingEndQuote = errors.New("Unexpected EOF while looking for matching quote")
 
 func srcin(i io.ReadWriter, prompt string) (s string, err error) {
 	i.Write([]byte(prompt))
@@ -147,7 +147,7 @@ processRune:
 				s, err = srcin(i, "> ")
 				if err != nil {
 					if err == io.EOF {
-						return nil, errMissingEndQuote
+						return nil, ErrMissingEndQuote
 					}
 					return nil, err
 				}
@@ -174,7 +174,7 @@ processRune:
 							s, err = srcin(i, "> ")
 							if err != nil {
 								if err == io.EOF {
-									return nil, errMissingEndQuote
+									return nil, ErrMissingEndQuote
 								}
 								return nil, err
 							}
@@ -192,7 +192,7 @@ processRune:
 				s, err = srcin(i, "> ")
 				if err != nil {
 					if err == io.EOF {
-						return nil, errMissingEndQuote
+						return nil, ErrMissingEndQuote
 					}
 					return nil, err
 				}
