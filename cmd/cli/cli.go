@@ -278,9 +278,6 @@ readCommandLoop:
 		}
 		err = c.runList(*cl, flag, isScript)
 		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
 			return err
 		}
 	}
@@ -300,10 +297,11 @@ func (c *Command) runList(ls shellutils.List, flag *flags.Flags, isScript bool) 
 			if err.Error() != "exit status 1" {
 				fmt.Fprintln(os.Stderr, err)
 			}
-			if isScript && !flag.ByName["-f"] {
-				return nil
+			if isScript && flag.ByName["-f"] {
+				err = nil
+			} else {
+				return err
 			}
-			err = nil
 		}
 		if newls != nil {
 			ls = *newls
