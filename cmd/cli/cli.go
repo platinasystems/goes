@@ -35,6 +35,8 @@ type Command struct {
 		Prompt(string) (string, error)
 		Close()
 	}
+	Stdin          io.Reader
+	Stdout, Stderr io.Writer
 }
 
 func (*Command) String() string { return "cli" }
@@ -196,6 +198,15 @@ func (c *Command) Main(args ...string) error {
 		panic("cli's goes is nil")
 	}
 
+	if c.Stdin == nil {
+		c.Stdin = os.Stdin
+	}
+	if c.Stdout == nil {
+		c.Stdout = os.Stdout
+	}
+	if c.Stderr == nil {
+		c.Stderr = os.Stderr
+	}
 	csig := make(chan os.Signal, 1)
 	signal.Notify(csig, os.Interrupt)
 
@@ -219,10 +230,10 @@ func (c *Command) Main(args ...string) error {
 	case 0:
 		switch {
 		case flag.ByName["-"]:
-			c.prompter = notliner.New(os.Stdin, nil)
+			c.prompter = notliner.New(c.Stdin, nil)
 			isScript = true
 		case flag.ByName["-no-liner"]:
-			c.prompter = notliner.New(os.Stdin, os.Stdout)
+			c.prompter = notliner.New(c.Stdin, c.Stdout)
 		default:
 			if _, found := c.g.ByName["resize"]; !found {
 				c.g.ByName["resize"] = resize.Command{}
@@ -270,7 +281,7 @@ readCommandLoop:
 			if err == io.EOF {
 				return nil
 			}
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(c.Stderr, err)
 			if isScript && !flag.ByName["-f"] {
 				return nil
 			}
@@ -288,14 +299,14 @@ func (c *Command) runList(ls shellutils.List, flag *flags.Flags, isScript bool) 
 	for len(ls.Cmds) != 0 {
 		newls, _, runner, err := c.g.ProcessList(ls)
 		if err == nil {
-			err = runner(os.Stdin, os.Stdout, os.Stderr)
+			err = runner(c.Stdin, c.Stdout, c.Stderr)
 		}
 		if err != nil {
 			if err == io.EOF {
 				return err
 			}
 			if err.Error() != "exit status 1" {
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(c.Stderr, err)
 			}
 			if isScript && flag.ByName["-f"] {
 				err = nil
