@@ -305,9 +305,6 @@ func (c *Command) runList(ls shellutils.List, flag *flags.Flags, isScript bool) 
 			if err == io.EOF {
 				return err
 			}
-			if err.Error() != "exit status 1" {
-				fmt.Fprintln(c.Stderr, err)
-			}
 			if isScript && flag.ByName["-f"] {
 				err = nil
 			} else {

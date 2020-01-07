@@ -721,7 +721,6 @@ func (g *Goes) MakeListFunc(pipeline []piperun) (func(stdin io.Reader, stdout io
 			if !skipNext {
 				err = runfun.f(stdin, stdout, stderr)
 				if err != nil {
-					fmt.Fprintln(stderr, err)
 					g.Status = err
 				}
 				skipNext = false
