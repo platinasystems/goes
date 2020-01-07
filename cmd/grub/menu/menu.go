@@ -39,7 +39,7 @@ type Menu struct {
 
 type Entry struct {
 	Name    string
-	RunFun  func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error
+	RunFun  func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 	Submenu *Menu
 }
 
@@ -125,8 +125,7 @@ DESCRIPTION
 }
 
 func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List,
-	func(stdin io.Reader, stdout io.Writer, stderr io.Writer,
-		isFirst bool, isLast bool) error, error) {
+	func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
 	cl := ls.Cmds[0]
 	// menuentry name [option...] { definition ... ; }
 	if len(cl.Cmds) < 2 {
@@ -207,7 +206,7 @@ func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List,
 	if c.Nesting {
 		e.Submenu = sm
 	}
-	e.RunFun = func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+	e.RunFun = func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		if c.Nesting {
 			saved := c.R.CurrentMenu
 			c.R.CurrentMenu = sm
@@ -224,7 +223,7 @@ func (c *Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List,
 		return nil
 	}
 
-	deffun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+	deffun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		m := c.R.CurrentMenu
 		*m.Entries = append(*m.Entries, e)
 
@@ -291,5 +290,5 @@ func (m *Menu) RunMenu(i int,
 		return nil, ErrMenuOutOfRange
 	}
 	me := (*m.Entries)[i]
-	return me.Submenu, me.RunFun(stdin, stdout, stderr, false, false)
+	return me.Submenu, me.RunFun(stdin, stdout, stderr)
 }

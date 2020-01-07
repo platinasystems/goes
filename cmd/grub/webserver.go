@@ -105,7 +105,7 @@ func (c *Command) serveRootMenu(n string, w http.ResponseWriter, r *http.Request
 				fmt.Fprintf(w, "Error finding menu path %v: %s</br>",
 					mp, err)
 			} else {
-				if err := e.RunFun(ws, ws, ws, false, false); err != nil {
+				if err := e.RunFun(ws, ws, ws); err != nil {
 					fmt.Fprintf(w, "Menu returned error: %s</br>",
 						html.EscapeString(err.Error()))
 				} else {

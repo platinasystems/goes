@@ -39,7 +39,7 @@ const (
 )
 
 type Blocker interface {
-	Block(*Goes, shellutils.List) (*shellutils.List, func(io.Reader, io.Writer, io.Writer, bool, bool) error, error)
+	Block(*Goes, shellutils.List) (*shellutils.List, func(io.Reader, io.Writer, io.Writer) error, error)
 }
 type akaer interface {
 	Aka() string
@@ -74,7 +74,7 @@ type Goes struct {
 type Function struct {
 	Name       string
 	Definition []string
-	RunFun     func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error
+	RunFun     func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 }
 
 func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutils.Word, func(io.Reader, io.Writer, io.Writer) error, error) {
@@ -83,7 +83,7 @@ func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutil
 		term    shellutils.Word
 	)
 	isLast := false
-	pipeline := make([]func(io.Reader, io.Writer, io.Writer, bool, bool) error, 0)
+	pipeline := make([]func(io.Reader, io.Writer, io.Writer) error, 0)
 	for len(ls.Cmds) != 0 && !isLast {
 		cl := ls.Cmds[0]
 		term = cl.Term
@@ -91,7 +91,7 @@ func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutil
 			isLast = true
 		}
 
-		var runfun func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error
+		var runfun func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 		name := cl.Cmds[0].String()
 		if v := g.ByName[name]; v != nil {
 			if method, found := v.(Blocker); found {
@@ -127,8 +127,43 @@ func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutil
 	return &ls, &term, pipefun, err
 }
 
-func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
-	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+func (g *Goes) isStdinRedirected(stdin io.Reader) bool {
+	if f, ok := stdin.(*os.File); ok {
+		if f == os.Stdin {
+			return false
+		}
+		return true
+	}
+	return true
+}
+
+func (g *Goes) isStdoutRedirected(stdout io.Writer) bool {
+	if f, ok := stdout.(*os.File); ok {
+		if f == os.Stdout {
+			return false
+		}
+		return true
+	}
+	return true
+}
+
+func (g *Goes) isStderrRedirected(stderr io.Writer) bool {
+	if f, ok := stderr.(*os.File); ok {
+		if f == os.Stderr {
+			return false
+		}
+		return true
+	}
+	return true
+}
+
+func (g *Goes) isRedirected(stdin io.Reader, stdout io.Writer, stderr io.Writer) bool {
+	return g.isStdinRedirected(stdin) || g.isStdoutRedirected(stdout) ||
+		g.isStderrRedirected(stderr)
+}
+
+func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
+	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		envMap, args := cl.Slice(func(k string) string {
 			v, def := g.EnvMap[k]
 			if def {
@@ -152,8 +187,9 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 		}
 		name := args[0]
 		// check for function invocation
+
 		if f, x := g.FunctionMap[name]; x {
-			return f.RunFun(stdin, stdout, stderr, isFirst, isLast)
+			return f.RunFun(stdin, stdout, stderr)
 		}
 		// check for built in command
 		if v := g.ByName[name]; v != nil {
@@ -163,12 +199,12 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 					"use `goes-daemons start %s`",
 					name)
 			}
-			if !isFirst || !isLast {
+			if g.isRedirected(stdin, stdout, stderr) {
 				if k.IsCantPipe() {
-					return fmt.Errorf(
-						"%s: can't pipe", name)
+					return fmt.Errorf("%s: can't pipe", name)
 				}
-			} else if k.IsDontFork() || g.inTest ||
+			}
+			if k.IsDontFork() || g.inTest ||
 				name == os.Args[0] {
 				if method, found := v.(goeser); found {
 					method.Goes(g)
@@ -181,9 +217,8 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			return fmt.Errorf("%s: command not found", name)
 		}
 		in := stdin
-		if isFirst {
+		if !g.isStdinRedirected(stdin) {
 			var iparm *parms.Parms
-			isFirst = false
 			iparm, args = parms.New(args, "<", "<<", "<<-")
 			if fn := iparm.ByName["<"]; len(fn) > 0 {
 				rc, err := url.Open(fn)
@@ -226,7 +261,7 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			}
 		}
 		out := stdout
-		if isLast {
+		if !g.isStdoutRedirected(stdout) {
 			var oparm *parms.Parms
 			oparm, args = parms.New(args, ">", ">>", ">>>", ">>>>")
 			if fn := oparm.ByName[">"]; len(fn) > 0 {
@@ -284,7 +319,7 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			err = fmt.Errorf("child: %v: %v", x.Args, err)
 			return err
 		}
-		if isLast {
+		if g.isStdoutRedirected(stdout) { // fixme not a pipe
 			err := x.Wait()
 			g.Status = err
 		} else {
@@ -312,7 +347,7 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 	return runfun, nil
 }
 
-func (g *Goes) MakePipefun(pipeline []func(io.Reader, io.Writer, io.Writer, bool, bool) error, closers *[]io.Closer) (func(io.Reader, io.Writer, io.Writer) error, error) {
+func (g *Goes) MakePipefun(pipeline []func(io.Reader, io.Writer, io.Writer) error, closers *[]io.Closer) (func(io.Reader, io.Writer, io.Writer) error, error) {
 	pipefun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		var (
 			err error
@@ -335,7 +370,7 @@ func (g *Goes) MakePipefun(pipeline []func(io.Reader, io.Writer, io.Writer, bool
 				}
 				out = pout
 			}
-			err = runfun(in, out, stderr, i == 0, i == end)
+			err = runfun(in, out, stderr)
 			if err != nil {
 				break
 			}

@@ -136,7 +136,7 @@ func TestScript(t *testing.T) {
 		t.Errorf("FindEntry(2,0) returned %s expecting %s",
 			err, ErrMenuNotFound)
 	}
-	err = e2.RunFun(os.Stdin, os.Stdout, os.Stderr, false, false)
+	err = e2.RunFun(os.Stdin, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Errorf("FindEntry(2).RunFun returned %s", err)
 	}

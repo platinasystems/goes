@@ -41,7 +41,7 @@ func (Command) Man() lang.Alt     { return man }
 func (Command) String() string    { return Name }
 func (Command) Usage() string     { return Usage }
 
-func (Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
+func (Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
 	cl := ls.Cmds[0]
 	// function name { definition ... ; }
 	if len(cl.Cmds) < 2 {
@@ -98,7 +98,7 @@ func (Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(s
 
 	}
 
-	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		for _, runent := range funList {
 			err := runent(stdin, stdout, stderr)
 			if err != nil {
@@ -109,7 +109,7 @@ func (Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(s
 	}
 	f := goes.Function{Name: name, RunFun: runfun}
 
-	deffun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+	deffun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		if g.FunctionMap == nil {
 			g.FunctionMap = make(map[string]goes.Function, 0)
 		}

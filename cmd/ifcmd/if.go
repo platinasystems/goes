@@ -9,8 +9,8 @@ import (
 	"io"
 
 	"github.com/platinasystems/goes"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/shellutils"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -35,7 +35,7 @@ DESCRIPTION
 	}
 }
 
-func (c Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
+func (c Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
 	var ifList, thenList, elseList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 	curList := &ifList
 	cl := ls.Cmds[0]
@@ -96,7 +96,7 @@ func (c Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func
 			}
 			runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 				g.Status = nil
-				return elifFun(stdin, stdout, stderr, false, false)
+				return elifFun(stdin, stdout, stderr)
 			}
 			elseList = append(elseList, runfun)
 			ls = *newls
@@ -128,8 +128,8 @@ func runList(pipeline []func(stdin io.Reader, stdout io.Writer, stderr io.Writer
 	return nil
 }
 
-func makeBlockFunc(g *goes.Goes, ifList, thenList, elseList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error, error) {
-	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer, isFirst bool, isLast bool) error {
+func makeBlockFunc(g *goes.Goes, ifList, thenList, elseList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
+	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		err := runList(ifList, stdin, stdout, stderr)
 		if err == nil && g.Status == nil {
 			err = runList(thenList, stdin, stdout, stderr)
