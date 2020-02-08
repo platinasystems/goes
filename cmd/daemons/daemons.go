@@ -1,4 +1,4 @@
-// Copyright 2016-2016 Platina Systems, Inc. All rights reserved.
+// Copyright 2016-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -18,10 +18,6 @@ import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/log"
-)
-
-const (
-	maxRestarts = 1
 )
 
 type Daemons struct {
@@ -93,7 +89,7 @@ func (d *Daemons) start(restarts int, args ...string) {
 		}
 		if d.cmd(p.Process.Pid) != nil {
 			d.del(p.Process.Pid)
-			if restarts == maxRestarts {
+			if restarts == RestartLimit {
 				fmt.Fprintln(werr, "to many restarts")
 			} else {
 				fmt.Fprintln(werr, "restart")
