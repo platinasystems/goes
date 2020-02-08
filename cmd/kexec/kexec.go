@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -23,11 +23,11 @@ type Command struct {
 	g *goes.Goes
 }
 
-func (Command) String() string { return "kexec" }
+func (*Command) String() string { return "kexec" }
 
-func (Command) Usage() string { return "kexec [OPTIONS]..." }
+func (*Command) Usage() string { return "kexec [OPTIONS]..." }
 
-func (Command) Apropos() lang.Alt {
+func (*Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: "load a new kernel for later execution",
 	}
