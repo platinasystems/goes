@@ -319,7 +319,7 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			err = fmt.Errorf("child: %v: %v", x.Args, err)
 			return err
 		}
-		if g.isStdoutRedirected(stdout) { // fixme not a pipe
+		if !g.isStdoutRedirected(stdout) { // fixme not a pipe
 			err := x.Wait()
 			g.Status = err
 		} else {
