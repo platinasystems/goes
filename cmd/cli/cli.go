@@ -289,7 +289,7 @@ readCommandLoop:
 		}
 		err = c.runList(*cl, flag, isScript)
 		if err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, err)
 		}
 	}
 }
