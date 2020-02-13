@@ -1,4 +1,4 @@
-// Copyright © 2015-2018 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -13,7 +13,6 @@ import (
 
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
-	"github.com/platinasystems/goes/cmd/platina/mk1/bootc"
 	"github.com/platinasystems/goes/lang"
 )
 
@@ -65,7 +64,7 @@ func (c *Command) Main(args ...string) (err error) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
 
-	if kexec := bootc.Bootc(); len(kexec) > 1 {
+	if kexec := bootc(); len(kexec) > 1 {
 		err := c.g.Main(kexec...)
 		fmt.Println(err)
 	}
