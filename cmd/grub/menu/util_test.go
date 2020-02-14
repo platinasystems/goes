@@ -96,7 +96,7 @@ func testCmdWithArgs(c cmd.Cmd, t *testing.T,
 
 func testScriptNoArgs(s1 *ts, t *testing.T) {
 	_, _, g := newgoes(s1)
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if !errors.Is(err, ErrMenuUnexpectedEOL) {
 		if err == nil {
 			t.Errorf("Got no error, expected %s",
@@ -110,7 +110,7 @@ func testScriptNoArgs(s1 *ts, t *testing.T) {
 
 func testScriptNoOpenBrace(s1 *ts, t *testing.T) {
 	_, _, g := newgoes(s1)
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if !errors.Is(err, ErrMenuMissingOpenBrace) {
 		if err == nil {
 			t.Errorf("Got no error, expected %s",
@@ -124,7 +124,7 @@ func testScriptNoOpenBrace(s1 *ts, t *testing.T) {
 
 func testScriptMissingMenuName(s1 *ts, t *testing.T) {
 	_, _, g := newgoes(s1)
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if !errors.Is(err, ErrMenuMissingName) {
 		if err == nil {
 			t.Errorf("Got no error, expected %s",
@@ -138,7 +138,7 @@ func testScriptMissingMenuName(s1 *ts, t *testing.T) {
 
 func testScriptUnexpectedText(s1 *ts, t *testing.T) {
 	_, _, g := newgoes(s1)
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if !errors.Is(err, ErrMenuUnexpectedText) {
 		if err == nil {
 			t.Errorf("Got no error, expected %s",
@@ -152,7 +152,7 @@ func testScriptUnexpectedText(s1 *ts, t *testing.T) {
 
 func testScriptNestedMenus(s1 *ts, t *testing.T, nesting bool) {
 	_, _, g := newgoes(s1)
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if nesting {
 		if err != nil {
 			t.Errorf("Unexpected error %s", err)

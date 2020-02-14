@@ -84,7 +84,7 @@ func TestScript(t *testing.T) {
 		},
 	})
 
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if err != nil {
 		t.Errorf("Main returned %s", err)
 	}
@@ -175,7 +175,7 @@ func TestScriptIncomplete(t *testing.T) {
 			"testpoint",
 		},
 	})
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if !errors.Is(err, io.EOF) {
 		if err == nil {
 			t.Errorf("Incomplete script returned no error")
@@ -190,7 +190,7 @@ func TestOneline(t *testing.T) {
 			"menuentry menu0 { testpoint; }",
 		},
 	})
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if err != nil {
 		t.Errorf("Oneline script returned %s", err)
 	}
@@ -204,7 +204,7 @@ func TestErrorInMenu(t *testing.T) {
 			"}",
 		},
 	})
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if err != nil {
 		t.Errorf("TestErrorInMenu script returned %s", err)
 	}
@@ -242,7 +242,7 @@ func TestUnterminatedString(t *testing.T) {
 			`testpoint "unterminated quoted string`,
 		},
 	})
-	err := g.Main("test", "cli")
+	err := g.Main("test", "cli", "-")
 	if !errors.Is(err, shellutils.ErrMissingEndQuote) {
 		if err == nil {
 			t.Errorf("Got success expecting %s",
