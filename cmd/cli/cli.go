@@ -289,7 +289,11 @@ readCommandLoop:
 		}
 		err = c.runList(*cl, flag, isScript)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			if isScript && !flag.ByName["-f"] {
+				return err
+			} else {
+				fmt.Fprintln(os.Stderr, err)
+			}
 		}
 	}
 }
@@ -302,14 +306,7 @@ func (c *Command) runList(ls shellutils.List, flag *flags.Flags, isScript bool) 
 			err = runner(c.Stdin, c.Stdout, c.Stderr)
 		}
 		if err != nil {
-			if err == io.EOF {
-				return err
-			}
-			if isScript && flag.ByName["-f"] {
-				err = nil
-			} else {
-				return err
-			}
+			return err
 		}
 		if newls != nil {
 			ls = *newls
