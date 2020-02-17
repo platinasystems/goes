@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// +build !bootrom
+// +build bootrom
 
 package link
 
@@ -10,7 +10,6 @@ import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/cmd/ip/link/add"
-	"github.com/platinasystems/goes/cmd/ip/link/counters"
 	"github.com/platinasystems/goes/cmd/ip/link/delete"
 	"github.com/platinasystems/goes/cmd/ip/link/mod"
 	"github.com/platinasystems/goes/cmd/ip/link/show"
@@ -22,7 +21,7 @@ var Goes = &goes.Goes{
 	USAGE: `
 ip link [ COMMAND[ OPTION... ]]
 
-COMMAND := {add | change | counters | delete | replace | set | show(default)}`,
+COMMAND := {add | change | delete | replace | set | show(default)}`,
 	APROPOS: lang.Alt{
 		lang.EnUS: "network device configuration",
 	},
@@ -58,13 +57,12 @@ SEE ALSO
 	man ip || ip -man`,
 	},
 	ByName: map[string]cmd.Cmd{
-		"add":      add.Goes,
-		"change":   mod.Command("change"),
-		"counters": counters.Command{},
-		"delete":   delete.Command{},
-		"replace":  mod.Command("replace"),
-		"set":      mod.Command("set"),
-		"show":     show.Command("show"),
-		"":         show.Command(""),
+		"add":     add.Goes,
+		"change":  mod.Command("change"),
+		"delete":  delete.Command{},
+		"replace": mod.Command("replace"),
+		"set":     mod.Command("set"),
+		"show":    show.Command("show"),
+		"":        show.Command(""),
 	},
 }
