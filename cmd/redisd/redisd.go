@@ -15,14 +15,15 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/platinasystems/atsock"
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/internal/cmdline"
 	"github.com/platinasystems/goes/internal/fields"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/parms"
 	"github.com/platinasystems/redis"
 	"github.com/platinasystems/redis/publisher"
 	"github.com/platinasystems/redis/rpc/reg"
@@ -86,9 +87,10 @@ func (c *Command) Close() error {
 	var err error
 	c.redisd.mutex.Lock()
 	defer c.redisd.mutex.Unlock()
+	close(c.redisd.done)
 	for k, srvs := range c.redisd.devs {
 		for i, srv := range srvs {
-			xerr := srv.Close()
+			xerr := srv.server.Close()
 			if err == nil {
 				err = xerr
 			}
@@ -112,6 +114,8 @@ func (c *Command) Main(args ...string) (err error) {
 			c.Close()
 		}
 	}()
+
+	c.redisd.done = make(chan struct{})
 
 	parm, args := parms.New(args, "-port", "-set")
 	if s := parm.ByName["-port"]; len(s) > 0 {
@@ -144,7 +148,7 @@ func (c *Command) Main(args ...string) (err error) {
 		grs.Stderr = os.Stderr
 	}
 
-	c.redisd.devs = make(map[string][]*grs.Server)
+	c.redisd.devs = make(map[string][]*Server)
 	c.redisd.sub = make(map[string]*grs.MultiChannelWriter)
 	c.redisd.published = make(grs.HashHash)
 	if len(c.PublishedKeys) == 0 {
@@ -172,7 +176,7 @@ func (c *Command) Main(args ...string) (err error) {
 		return
 	}
 
-	c.redisd.devs["@redisd"] = []*grs.Server{srv}
+	c.redisd.devs["@redisd"] = []*Server{{server: srv}}
 
 	c.redisd.reg, err = reg.New(c.redisd.assign, c.redisd.unassign)
 	if err != nil {
@@ -319,9 +323,14 @@ func (c *Command) pubinit(fieldEqValues ...string) error {
 	return err
 }
 
+type Server struct {
+	addr   string
+	server *grs.Server
+}
+
 type Redisd struct {
 	mutex sync.Mutex
-	devs  map[string][]*grs.Server
+	devs  map[string][]*Server
 	sub   map[string]*grs.MultiChannelWriter
 
 	reg *reg.Reg
@@ -334,6 +343,8 @@ type Redisd struct {
 	cachedSubkeys map[string][]string
 
 	port int
+
+	done chan struct{}
 }
 
 type Assignments []*assignment
@@ -362,63 +373,125 @@ func (redisd *Redisd) unassign(key string) error {
 	return nil
 }
 
-func (redisd *Redisd) listen(names ...string) {
-	for _, name := range names {
-		dev, err := net.InterfaceByName(name)
+func (redisd *Redisd) findServerOnInterface(name string, addr string) (found bool, index int) {
+	for i, srv := range redisd.devs[name] {
+		if srv.addr == addr {
+			return true, i
+		}
+	}
+	return false, 0
+}
+
+func (redisd *Redisd) listenOnInterface(name string) {
+	redisd.mutex.Lock()
+	defer redisd.mutex.Unlock()
+
+	ok := true
+	dev, err := net.InterfaceByName(name)
+	if err != nil {
+		fmt.Fprint(os.Stderr, name, ": ", err, "\n")
+		ok = false
+	}
+
+	if ok && ((dev.Flags & net.FlagUp) != net.FlagUp) {
+		fmt.Fprint(os.Stderr, name, ": down\n")
+		ok = false
+	}
+
+	var addrs []net.Addr
+	if ok {
+		addrs, err = dev.Addrs()
 		if err != nil {
 			fmt.Fprint(os.Stderr, name, ": ", err, "\n")
-			continue
+			ok = false
+		} else {
+			if len(addrs) == 0 {
+				fmt.Fprint(os.Stderr, name,
+					": no address or isn't up\n")
+				ok = false
+			}
 		}
-		if (dev.Flags & net.FlagUp) != net.FlagUp {
-			fmt.Fprint(os.Stderr, name, ": down\n")
-			continue
-		}
-		addrs, err := dev.Addrs()
-		if err != nil {
-			fmt.Fprint(os.Stderr, name, ": ", err, "\n")
-			continue
-		}
-		if len(addrs) == 0 {
-			fmt.Fprint(os.Stderr, name,
-				": no address or isn't up\n")
-			continue
-		}
+	}
 
-		srvs := make([]*grs.Server, 0, 2)
+	srvs := make([]*Server, 0, len(redisd.devs[name])+2)
 
+devloop:
+	for i, srv := range redisd.devs[name] {
 		for _, addr := range addrs {
-			ip, _, err := net.ParseCIDR(addr.String())
-			if err != nil {
-				fmt.Fprint(os.Stderr, addr, ": CIDR: ",
-					err, "\n")
-				continue
-			}
-			if ip.IsMulticast() {
-				continue
-			}
-			id := fmt.Sprint("[", ip, "%", name, "]:", redisd.port)
-			cfg := grs.DefaultConfig()
-			cfg = cfg.Handler(redisd)
-			cfg = cfg.Port(redisd.port)
-			if ip.To4() == nil {
-				cfg = cfg.Proto("tcp6")
-				host := fmt.Sprint("[", ip, "%", name, "]")
-				cfg = cfg.Host(host)
-			} else {
-				cfg = cfg.Host(ip.String())
-			}
-			srv, err := grs.NewServer(cfg)
-			if err != nil {
-				fmt.Fprint(os.Stderr, id, ": ", err, "\n")
-			} else {
+			if srv.addr == addr.String() {
 				srvs = append(srvs, srv)
-				go srv.Start()
-				if false {
-					fmt.Println("listen:", id)
-				}
+				continue devloop
 			}
 		}
-		redisd.devs[name] = srvs
+		if true {
+			fmt.Fprint(os.Stderr, srv.addr, ": removed from ",
+				name)
+		}
+		srv.server.Close()
+		redisd.devs[name][i] = nil
+	}
+
+	for _, addr := range addrs {
+		ip, _, err := net.ParseCIDR(addr.String())
+		if err != nil {
+			fmt.Fprint(os.Stderr, addr, ": CIDR: ",
+				err, "\n")
+			continue
+		}
+		if ip.IsMulticast() {
+			continue
+		}
+		if found, _ := redisd.findServerOnInterface(name, addr.String()); found {
+			if false {
+				fmt.Fprint(os.Stderr, addr, ": already up on: ",
+					name, "\n")
+			}
+			continue
+		}
+		id := fmt.Sprint("[", ip, "%", name, "]:", redisd.port)
+		cfg := grs.DefaultConfig()
+		cfg = cfg.Handler(redisd)
+		cfg = cfg.Port(redisd.port)
+		if ip.To4() == nil {
+			cfg = cfg.Proto("tcp6")
+			host := fmt.Sprint("[", ip, "%", name, "]")
+			cfg = cfg.Host(host)
+		} else {
+			cfg = cfg.Host(ip.String())
+		}
+		srv, err := grs.NewServer(cfg)
+		if err != nil {
+			fmt.Fprint(os.Stderr, id, ": ", err, "\n")
+		} else {
+			srvs = append(srvs, &Server{server: srv,
+				addr: addr.String()})
+			go srv.Start()
+			if true {
+				fmt.Println("listen:", id)
+			}
+		}
+	}
+	redisd.devs[name] = srvs
+}
+
+func (redisd *Redisd) listen(names ...string) {
+	for {
+		for _, name := range names {
+			redisd.listenOnInterface(name)
+		}
+		if !func() bool {
+			t := time.NewTicker(10 * time.Second)
+			defer t.Stop()
+
+			select {
+			case <-redisd.done:
+				return false
+			case <-t.C:
+				return true
+			}
+		}() {
+			return
+		}
 	}
 }
 
