@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/rpc"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/platinasystems/goes/cmd"
@@ -44,12 +43,6 @@ func (c *Command) Close() error {
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
 func (c *Command) Main(...string) error {
-	var si syscall.Sysinfo_t
-	err := syscall.Sysinfo(&si)
-	if err != nil {
-		return err
-	}
-
 	c.done = make(chan struct{})
 	i2cReq := &I2cReq{c}
 	rpc.Register(i2cReq)
@@ -61,13 +54,10 @@ func (c *Command) Main(...string) error {
 	log.Print("listen OKAY")
 	go http.Serve(l, nil)
 
-	t := time.NewTicker(20 * time.Millisecond)
-	defer t.Stop()
 	for {
 		select {
 		case <-c.done:
 			return nil
-		case <-t.C:
 		}
 	}
 	return nil
