@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -173,7 +173,7 @@ func (f *Fit) parseConfiguration(whichconf string) (err error) {
 }
 
 func Parse(b []byte) (f *Fit) {
-	fit := Fit{}
+	fit := Fit{Debug: false}
 	f = &fit
 	f.fdt = &fdt.Tree{Debug: false, IsLittleEndian: false}
 	err := f.fdt.Parse(b)
@@ -206,8 +206,13 @@ func Parse(b []byte) (f *Fit) {
 		entry := f.fdt.PropUint32Slice(image.Properties["entry"])
 
 		if len(load) != 0 {
+			ent := ""
+			if len(entry) != 0 {
+				ent = fmt.Sprintf("entry=%x ", entry[0])
+			}
 			if f.Debug {
-				fmt.Printf("image %s: load=%x entry=%x len=%x\n", image.Name, load[0], entry[0], len(i.Data))
+				fmt.Printf("image %s: load=%x %slen=%x\n",
+					image.Name, load[0], ent, len(i.Data))
 			}
 			i.LoadAddr = uint64(load[0]) // fixme #address-cells
 		}
@@ -220,7 +225,7 @@ func Parse(b []byte) (f *Fit) {
 	f.DefaultConfig = f.fdt.PropString(f.getProperty(conf, "default"))
 
 	for _, c := range conf.Children {
-		if c.Name == "conf" || strings.HasPrefix(c.Name, "conf@") {
+		if strings.HasPrefix(c.Name, "conf") {
 			err := f.parseConfiguration(c.Name)
 			if err != nil {
 				panic(err)
