@@ -94,9 +94,15 @@ func loadFit(image, x string) error {
 
 	if len(x) == 0 {
 		x = fit.DefaultConfig
+		if len(x) == 0 {
+			return fmt.Errorf("No default image, use the -x option")
+		}
 	}
 	config := fit.Configs[x]
 
+	if config == nil {
+		return fmt.Errorf("Configuration %s not found", x)
+	}
 	return fit.KexecLoadConfig(config, 0x0)
 }
 
