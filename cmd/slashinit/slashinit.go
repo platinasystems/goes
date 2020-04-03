@@ -67,7 +67,7 @@ func (c *Command) Main(_ ...string) error {
 	c.makeTargetLinks()
 	if c.FsHook != nil {
 		if err := c.FsHook(); err != nil {
-			log.Print("Error from filesystem hook", err)
+			log.Print("Error from filesystem hook: ", err)
 		}
 	}
 	fmt.Printf("starting start\n")
