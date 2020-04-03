@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"crypto/sha1"
+	"crypto/sha256"
 	"fmt"
 	"hash/crc32"
 	"strings"
@@ -78,6 +79,21 @@ func (f *Fit) validateHash(n *fdt.Node, i *Image) (err error) {
 		return
 	}
 
+	if algostr == "sha256" {
+		shasum := sha256.Sum256(i.Data)
+		shaslice := shasum[:]
+		if !bytes.Equal(value, shaslice) {
+			if f.Debug {
+				fmt.Printf("error, calculated %v!\n", shaslice)
+			}
+			return fmt.Errorf("sha256 incorrect, expected %v! calculated %v!\n", value, shaslice)
+		}
+		if f.Debug {
+			fmt.Print("OK!\n")
+		}
+		return
+	}
+
 	if algostr == "crc32" {
 		propsum := f.fdt.PropUint32(value)
 		calcsum := crc32.ChecksumIEEE(i.Data)
@@ -116,7 +132,7 @@ func (f *Fit) validateHash(n *fdt.Node, i *Image) (err error) {
 
 func (f *Fit) validateHashes(n *fdt.Node, i *Image) (err error) {
 	for _, c := range n.Children {
-		if c.Name == "hash" || strings.HasPrefix(c.Name, "hash@") {
+		if strings.HasPrefix(c.Name, "hash") {
 			err = f.validateHash(c, i)
 			if err != nil {
 				return err
