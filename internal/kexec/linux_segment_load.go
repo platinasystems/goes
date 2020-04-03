@@ -4,6 +4,7 @@
 package kexec
 
 import (
+	"fmt"
 	"syscall"
 	"unsafe"
 )
@@ -15,7 +16,12 @@ type KexecSegment struct {
 	Memsz uint
 }
 
-func SliceAddSegment(s []KexecSegment, b *[]byte, a uintptr) ([]KexecSegment) {
+func (s KexecSegment) String() string {
+	return fmt.Sprintf("Buf@x Bufsize=%x Mem=%x Memsz=%x", s.Buf, s.Bufsz,
+		s.Mem, s.Memsz)
+}
+
+func SliceAddSegment(s []KexecSegment, b *[]byte, a uintptr) []KexecSegment {
 	var ks KexecSegment
 	ks.Buf = &(*b)[0]
 	bufsz := uint(len(*b))
