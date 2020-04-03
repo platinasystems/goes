@@ -12,18 +12,7 @@ import (
 	"syscall"
 )
 
-func fileAddSegment(s []KexecSegment, f *os.File, a uintptr) ([]KexecSegment, error) {
-	if f != nil {
-		dat, err := ioutil.ReadAll(f)
-		if err != nil {
-			return nil, err
-		}
-		return SliceAddSegment(s, &dat, a), nil
-	}
-	return s, nil
-}
-
-func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err error) {
+func LoadSlices(kdat, idat []byte, cmdline string, flags uintptr) (err error) {
 	m, err := memmap.FileToMap("/proc/iomem")
 	if err != nil {
 		return err
@@ -36,14 +25,10 @@ func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err e
 	kBase := kCode.Ranges[0].Start
 	segments := make([]KexecSegment, 0, 3)
 
-	segments, err = fileAddSegment(segments, k, kBase)
-	if err != nil {
-		return err
-	}
-	segments, err = fileAddSegment(segments, i, kBase+0x2000000)
-	if err != nil {
-		return err
-	}
+	segments = SliceAddSegment(segments, &kdat, kBase)
+
+	segments = SliceAddSegment(segments, &idat, kBase+0x2000000)
+
 	t := fdt.DefaultTree()
 	if t != nil {
 		chosen := t.RootNode.Children["chosen"]
@@ -52,7 +37,7 @@ func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err e
 			t.RootNode.Children["chosen"] = chosen
 		}
 		//need 64 bit support - parsing for #address-cells
-		if i != nil {
+		if idat != nil {
 			chosen.Properties["linux,initrd-start"] = t.PropUint32ToSlice(uint32(segments[1].Mem))
 			chosen.Properties["linux,initrd-end"] = t.PropUint32ToSlice(uint32(segments[1].Mem) + uint32(segments[1].Bufsz) + 1)
 		}
@@ -67,7 +52,18 @@ func fileLoadFiles(k *os.File, i *os.File, cmdline string, flags uintptr) (err e
 func FileLoad(k *os.File, i *os.File, cmdline string, flags uintptr) (err error) {
 	err = fileLoadSyscall(k, i, cmdline, flags)
 	if err == syscall.ENOSYS {
-		err = fileLoadFiles(k, i, cmdline, flags)
+		kdat, err := ioutil.ReadAll(k)
+		if err != nil {
+			return fmt.Errorf("Opening kernel %s: %w", k, err)
+		}
+		idat := []byte{}
+		if i != nil {
+			idat, err = ioutil.ReadAll(i)
+			if err != nil {
+				return fmt.Errorf("Opening initramfs %s: %w", i, err)
+			}
+		}
+		return LoadSlices(kdat, idat, cmdline, flags)
 	}
 	return err
 }

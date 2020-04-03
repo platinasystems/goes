@@ -61,7 +61,7 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	if image := parm.ByName["-l"]; len(image) > 0 {
-		err = loadFit(image, parm.ByName["-x"])
+		err = loadFit(image, parm.ByName["-x"], cmdline)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (c *Command) Main(args ...string) error {
 	return err
 }
 
-func loadFit(image, x string) error {
+func loadFit(image, x, cmdline string) error {
 	b, err := ioutil.ReadFile(image)
 	if err != nil {
 		return err
@@ -98,12 +98,13 @@ func loadFit(image, x string) error {
 			return fmt.Errorf("No default image, use the -x option")
 		}
 	}
+
 	config := fit.Configs[x]
 
 	if config == nil {
 		return fmt.Errorf("Configuration %s not found", x)
 	}
-	return fit.KexecLoadConfig(config, 0x0)
+	return fit.KexecLoadConfig(config, cmdline)
 }
 
 func loadKernel(kernel, initramfs, cmdline string) error {

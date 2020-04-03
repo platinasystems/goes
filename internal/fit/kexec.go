@@ -6,22 +6,22 @@
 package fit
 
 import (
-	"fmt"
-
 	"github.com/platinasystems/goes/internal/kexec"
 )
 
-func (f *Fit) KexecLoadConfig(conf *Config, offset uintptr) (err error) {
-	segments := make([]kexec.KexecSegment, 0, len(conf.ImageList))
+func (f *Fit) KexecLoadConfig(conf *Config, cmdline string) (err error) {
+	kdat := []byte{}
+	idat := []byte{}
 
 	for _, image := range conf.ImageList {
-		segments = kexec.SliceAddSegment(segments, &image.Data,
-			uintptr(image.LoadAddr)+offset)
-	}
-	if f.Debug {
-		fmt.Printf("Segments: %+v\n", segments)
-	}
-	err = kexec.SegmentLoad(conf.BaseAddr, &segments, uintptr(0))
+		if image.Type == "kernel" {
+			kdat = image.Data
+		}
 
-	return
+		if image.Type == "ramdisk" {
+			idat = image.Data
+		}
+	}
+
+	return kexec.LoadSlices(kdat, idat, cmdline, 0)
 }
