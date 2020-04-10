@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,6 +7,7 @@
 package w83795d
 
 import (
+	"errors"
 	"fmt"
 	"net/rpc"
 	"strconv"
@@ -27,31 +28,34 @@ import (
 )
 
 var (
-	first          int
-	hostTemp       float64
-	sHostTemp      float64
-	hostTempTarget float64
-	hostHyst       float64
-	qsfpTemp       float64
-	sQsfpTemp      float64
-	qsfpTempTarget float64
-	qsfpHyst       float64
-	thTemp         float64
-	sThTemp        float64
+	pollInterval time.Duration = 30
 
-	lastSpeed string
+	hostTemp       uint8 = 50
+	hostTempTarget uint8 = 70
+	qsfpTemp       uint8 = 50
+	qsfpTempTarget uint8 = 60
+	hwmTarget      uint8
 
-	hostCtrl bool
-	thCtrl   bool
+	configuredSpeed string
+
+	hostCtrl           bool
+	dutyAtThermalEvent int
+	dutyIncrement      int
+
+	fanDutyIncrement int   = 0x20
+	hysteresis       uint8 = 5
+
+	thTempTarget uint8 = 55
+
+	setSpeed     bool
+	setHwmTarget bool
+	hostReset    bool
 
 	Vdev I2cDev
 
 	VpageByKey map[string]uint8
 
-	WrRegDv  = make(map[string]string)
-	WrRegFn  = make(map[string]string)
-	WrRegVal = make(map[string]string)
-	WrRegRng = make(map[string][]string)
+	WrRegDv = make(map[string]string)
 )
 
 type Command struct {
@@ -101,21 +105,6 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	first = 1
-	hostTemp = 50
-	sHostTemp = 150
-	hostTempTarget = 70
-	hostHyst = 0
-
-	qsfpTemp = 50
-	sQsfpTemp = 150
-	qsfpTempTarget = 60
-	qsfpHyst = 0
-
-	hostCtrl = false
-	sThTemp = 150
-	thCtrl = false
-
 	c.stop = make(chan struct{})
 	c.last = make(map[string]uint16)
 	c.lasts = make(map[string]string)
@@ -140,7 +129,9 @@ func (c *Command) Main(...string) error {
 		}
 	}
 
-	t := time.NewTicker(10 * time.Second)
+	Vdev.FanInit()
+
+	t := time.NewTicker(pollInterval * time.Second)
 	for {
 		select {
 		case <-c.stop:
@@ -159,19 +150,32 @@ func (c *Command) Close() error {
 }
 
 func (c *Command) update() error {
+	c.Info.mutex.Lock()
+	defer c.Info.mutex.Unlock()
+
 	stopped := readStopped()
 	if stopped == 1 {
 		return nil
 	}
-	if err := writeRegs(); err != nil {
-		return err
+
+	if setSpeed {
+		Vdev.SetConfiguredSpeed()
+		setSpeed = false
 	}
 
-	if first == 1 {
-		Vdev.FanInit()
-		first = 0
+	if setHwmTarget {
+		Vdev.SetHwmTarget()
+		setHwmTarget = false
 	}
 
+	if hostReset {
+		doHostReset()
+		hostReset = false
+	}
+
+	if err := Vdev.PollThermal(); err != nil {
+		log.Print("PollThermal: Err: ", err)
+	}
 	for k, i := range VpageByKey {
 		if strings.Contains(k, "rpm") {
 			v, err := Vdev.FanCount(i)
@@ -184,9 +188,9 @@ func (c *Command) update() error {
 			}
 		}
 		if strings.Contains(k, "fan_tray.speed") {
-			v, err := Vdev.GetFanSpeed()
-			if err != nil {
-				return err
+			v := configuredSpeed
+			if hostCtrl {
+				v = "thermal_override"
 			}
 			if v != c.lasts[k] {
 				c.pub.Print(k, ": ", v)
@@ -225,40 +229,28 @@ func (c *Command) update() error {
 			}
 		}
 		if strings.Contains(k, "host.temp.units.C") {
-			v, err := Vdev.CheckHostTemp()
-			if err != nil {
-				return err
-			}
+			v := Vdev.CheckHostTemp()
 			if v != c.lasts[k] {
 				c.pub.Print(k, ": ", v)
 				c.lasts[k] = v
 			}
 		}
 		if strings.Contains(k, "host.temp.target.units.C") {
-			v, err := Vdev.GetHostTempTarget()
-			if err != nil {
-				return err
-			}
+			v := Vdev.GetHostTempTarget()
 			if v != c.lasts[k] {
 				c.pub.Print(k, ": ", v)
 				c.lasts[k] = v
 			}
 		}
 		if strings.Contains(k, "qsfp.temp.units.C") {
-			v, err := Vdev.CheckQsfpTemp()
-			if err != nil {
-				return err
-			}
+			v := Vdev.CheckQsfpTemp()
 			if v != c.lasts[k] {
 				c.pub.Print(k, ": ", v)
 				c.lasts[k] = v
 			}
 		}
 		if strings.Contains(k, "qsfp.temp.target.units.C") {
-			v, err := Vdev.GetQsfpTempTarget()
-			if err != nil {
-				return err
-			}
+			v := Vdev.GetQsfpTempTarget()
 			if v != c.lasts[k] {
 				c.pub.Print(k, ": ", v)
 				c.lasts[k] = v
@@ -382,7 +374,7 @@ func (h *I2cDev) FanCount(i uint8) (uint16, error) {
 
 func (h *I2cDev) FanInit() error {
 	//default auto mode
-	lastSpeed = "auto"
+	configuredSpeed = "auto"
 
 	//reset hwm to default values
 	r0 := getRegsBank0()
@@ -408,7 +400,7 @@ func (h *I2cDev) FanInit() error {
 	}
 
 	//set default speed to auto
-	h.SetFanSpeed("auto", true)
+	h.SetConfiguredSpeed()
 
 	//enable temperature monitoring
 	r0.BankSelect.set(h, 0x80)
@@ -432,13 +424,14 @@ func (h *I2cDev) FanInit() error {
 	return nil
 }
 
-func (h *I2cDev) SetLastSpeed() error {
+func (h *I2cDev) SetConfiguredSpeed() error {
 	current, _ := h.GetFanSpeed()
-	if current != lastSpeed {
-		h.SetFanSpeed(lastSpeed, true)
+	if current != configuredSpeed {
+		h.SetFanSpeed(configuredSpeed)
 	}
 	return nil
 }
+
 func (h *I2cDev) SetFanDuty(d uint8) error {
 	for j := 1; j <= maxFanTrays; j++ {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
@@ -459,10 +452,11 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func (h *I2cDev) SetFanSpeed(w string, l bool) error {
+func (h *I2cDev) SetFanSpeed(w string) error {
 	r2 := getRegsBank2()
 
 	//if not all fan trays are ok, only allow high setting
@@ -470,15 +464,9 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if p != "" && !strings.Contains(p, "ok") {
 			log.Print("warning: fan failure mode, speed fixed at high")
-			w = "max"
+			w = "high"
 			break
 		}
-	}
-
-	if w != "max" {
-		lastSpeed = w
-	} else {
-		w = "high"
 	}
 
 	switch w {
@@ -539,49 +527,20 @@ func (h *I2cDev) SetFanSpeed(w string, l bool) error {
 				return err
 			}
 		}
-		if l {
-			log.Print("notice: fan speed set to ", w)
-		}
+
 	//static speed settings below, set hwm to manual mode, then set static speed
 	case "high":
-		r2.BankSelect.set(h, 0x82)
-		r2.TempToFanMap1.set(h, 0x0)
-		r2.TempToFanMap2.set(h, 0x0)
-		r2.FanOutValue1.set(h, high)
-		r2.FanOutValue2.set(h, high)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-		log.Print("notice: fan speed set to high")
+		h.SetFanDuty(high)
+
 	case "med":
-		r2.BankSelect.set(h, 0x82)
-		r2.TempToFanMap1.set(h, 0x0)
-		r2.TempToFanMap2.set(h, 0x0)
-		r2.FanOutValue1.set(h, med)
-		r2.FanOutValue2.set(h, med)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-		log.Print("notice: fan speed set to ", w)
+		h.SetFanDuty(med)
+
 	case "low":
-		r2.BankSelect.set(h, 0x82)
-		r2.TempToFanMap1.set(h, 0x0)
-		r2.TempToFanMap2.set(h, 0x0)
-		r2.FanOutValue1.set(h, low)
-		r2.FanOutValue2.set(h, low)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return err
-		}
-		log.Print("notice: fan speed set to ", w)
+		h.SetFanDuty(low)
 	default:
 	}
 
+	log.Print("notice: fan speed set to ", w)
 	return nil
 }
 
@@ -601,151 +560,110 @@ func (h *I2cDev) GetFanDuty() (uint8, error) {
 }
 
 func (h *I2cDev) GetFanSpeed() (string, error) {
-	var speed string
-	var duty uint8
 	r2 := getRegsBank2()
 
-	if !hostCtrl {
-		r2.BankSelect.set(h, 0x82)
-		r2.TempToFanMap1.get(h)
-		r2.FanOutValue1.get(h)
-		closeMux(h)
-		err := DoI2cRpc()
-		if err != nil {
-			return "error", err
-		}
-		t := uint8(s[3].D[0])
-		m := uint8(s[5].D[0])
-
-		if t == 0xff {
-			speed = "auto"
-		} else if m == high {
-			speed = "high"
-		} else if m == med {
-			speed = "med"
-		} else if m == low {
-			speed = "low"
-		} else {
-			speed = "invalid " + strconv.Itoa(int(m))
-		}
+	r2.BankSelect.set(h, 0x82)
+	r2.TempToFanMap1.get(h)
+	r2.FanOutValue1.get(h)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return "error", err
 	}
-	if hostCtrl || (!hostCtrl && speed == "auto") {
-		hostHot := false
-		hostHotter := false
-		hostHot = hostTemp > hostTempTarget
-		hostHotter = hostTemp > sHostTemp
-		qsfpHot := false
-		qsfpHotter := false
-		qsfpHot = qsfpTemp > qsfpTempTarget
-		qsfpHotter = qsfpTemp > sQsfpTemp
-		if (!hostCtrl && (hostHot || qsfpHot)) || (hostCtrl && (hostHotter || qsfpHotter)) {
-			var err error
-			duty, err = h.GetFanDuty()
-			if err != nil {
-				return "auto", err
-			}
-			if hostHot || hostHotter {
-				hostHyst = 5
-				sHostTemp = hostTemp
+	t := uint8(s[3].D[0])
+	m := uint8(s[5].D[0])
 
-			}
-			if qsfpHot || qsfpHotter {
-				qsfpHyst = 5
-				sQsfpTemp = qsfpTemp
-			}
-			if duty < 0xff {
-				if duty <= 0xdf {
-					h.SetFanDuty(duty + 0x20)
-				} else {
-					h.SetFanDuty(0xff)
-				}
-			} else {
-			}
-
-			if !hostCtrl {
-				hostCtrl = true
-			}
-		} else if hostCtrl && (hostTemp <= (hostTempTarget - hostHyst)) && (qsfpTemp <= (qsfpTempTarget - qsfpHyst)) {
-			hostCtrl = false
-			thCtrl = false
-			sHostTemp = 150
-			hostHyst = 0
-			sQsfpTemp = 150
-			qsfpHyst = 0
-			sThTemp = 150
-			//set fan speed to thermal cruise (auto)
-			h.SetFanSpeed("auto", false)
-		}
-		if hostCtrl {
-			ft, err := h.FrontTemp()
-			if err != nil {
-				return "auto", err
-			}
-			f, err := strconv.ParseFloat(ft, 64)
-			if err != nil {
-				return "auto", err
-			}
-			rt, err := h.RearTemp()
-			if err != nil {
-				return "auto", err
-			}
-			r, err := strconv.ParseFloat(rt, 64)
-			if err != nil {
-				return "auto", err
-			}
-			if r > f {
-				thTemp = r
-			} else {
-				thTemp = f
-			}
-			if (!thCtrl && (thTemp > 55)) || (thCtrl && (thTemp > sThTemp)) {
-				//increase fan speed
-				sThTemp = thTemp
-				duty, err = h.GetFanDuty()
-				if err != nil {
-					return "auto", err
-				}
-				if duty < 0xff {
-					if duty <= 0xdf {
-						h.SetFanDuty(duty + 0x20)
-					} else {
-						h.SetFanDuty(0xff)
-					}
-				} else {
-				}
-				if !thCtrl {
-					thCtrl = true
-				}
-			}
-		}
+	if t == 0xff {
 		return "auto", nil
 	}
 
-	return speed, nil
+	switch m {
+	case high:
+		return "high", nil
+	case med:
+		return "med", nil
+	case low:
+		return "low", nil
+	}
+	return "invalid " + strconv.Itoa(int(m)), nil
 }
 
-func (h *I2cDev) SetHwmTarget(t string) error {
-	v, err := strconv.ParseUint(t, 10, 8)
+func (h *I2cDev) PollThermal() error {
+	hostHot := hostTemp >= hostTempTarget
+	qsfpHot := qsfpTemp >= qsfpTempTarget
 
+	ft, err := h.FrontTemp()
 	if err != nil {
-		log.Print("Unable to set target temperature, only integers up to 60 accepted")
 		return err
-	} else {
-		if v > 60 {
-			log.Print("Unable to set target temperature, only integers up to 60 accepted")
-			return nil
-		} else {
-			r2 := getRegsBank2()
-			r2.BankSelect.set(h, 0x82)
-			r2.TargetTemp1.set(h, uint8(v))
-			r2.TargetTemp2.set(h, uint8(v))
-			closeMux(h)
-			err = DoI2cRpc()
+	}
+	f, err := strconv.ParseFloat(ft, 64)
+	if err != nil {
+		return err
+	}
+	rt, err := h.RearTemp()
+	if err != nil {
+		return err
+	}
+	r, err := strconv.ParseFloat(rt, 64)
+	if err != nil {
+		return err
+	}
+
+	thTemp := uint8(f)
+	if r > f {
+		thTemp = uint8(r)
+	}
+	thHot := thTemp > thTemp
+
+	if hostHot || qsfpHot || thHot {
+		if !hostCtrl {
+			d, err := h.GetFanDuty()
 			if err != nil {
 				return err
 			}
+			dutyAtThermalEvent = int(d)
+			dutyIncrement = 0
+			hostCtrl = true
+		}
+		dutyIncrement += fanDutyIncrement
+		if dutyAtThermalEvent+dutyIncrement > 0xff {
+			dutyIncrement = 0xff - dutyAtThermalEvent
+		}
+
+		h.SetFanDuty(uint8(dutyAtThermalEvent + dutyIncrement))
+		log.Print("thermal event: fan duty set to ",
+			dutyAtThermalEvent+dutyIncrement,
+			" (duty increment) ", dutyIncrement)
+	}
+
+	if hostCtrl && (hostTemp < (hostTempTarget - hysteresis)) &&
+		(qsfpTemp < (qsfpTempTarget - hysteresis)) &&
+		(thTemp < thTempTarget-hysteresis) {
+		dutyIncrement -= fanDutyIncrement
+		if dutyIncrement > 0 {
+			h.SetFanDuty(uint8(dutyAtThermalEvent + dutyIncrement))
+			log.Print("thermal resolving: fan duty set to ",
+				dutyAtThermalEvent+dutyIncrement,
+				" (duty increment) ", dutyIncrement)
+		} else {
+			hostCtrl = false
+			h.SetConfiguredSpeed()
 		}
 	}
+	return nil
+}
+
+func (h *I2cDev) SetHwmTarget() error {
+	r2 := getRegsBank2()
+	r2.BankSelect.set(h, 0x82)
+	r2.TargetTemp1.set(h, hwmTarget)
+	r2.TargetTemp2.set(h, hwmTarget)
+	closeMux(h)
+	err := DoI2cRpc()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -767,27 +685,23 @@ func (h *I2cDev) GetHwmTarget() (uint16, error) {
 	return m, nil
 }
 
-func (h *I2cDev) CheckHostTemp() (string, error) {
-	v := hostTemp
-	return strconv.FormatFloat(v, 'f', 2, 64), nil
+func (h *I2cDev) CheckHostTemp() string {
+	return fmt.Sprintf("%d", hostTemp)
 }
 
-func (h *I2cDev) CheckQsfpTemp() (string, error) {
-	v := qsfpTemp
-	return strconv.FormatFloat(v, 'f', 2, 64), nil
+func (h *I2cDev) CheckQsfpTemp() string {
+	return fmt.Sprintf("%d", qsfpTemp)
 }
 
-func (h *I2cDev) GetHostTempTarget() (string, error) {
-	v := hostTempTarget
-	return strconv.FormatFloat(v, 'f', 2, 64), nil
+func (h *I2cDev) GetHostTempTarget() string {
+	return fmt.Sprintf("%d", hostTempTarget)
 }
 
-func (h *I2cDev) GetQsfpTempTarget() (string, error) {
-	v := qsfpTempTarget
-	return strconv.FormatFloat(v, 'f', 2, 64), nil
+func (h *I2cDev) GetQsfpTempTarget() string {
+	return fmt.Sprintf("%d", qsfpTempTarget)
 }
 
-func hostReset() error {
+func doHostReset() error {
 	// FIXME cmd.Init("gpio")
 	log.Print("notice: issue hard reset to host")
 	pin, found := gpio.FindPin("BMC_TO_HOST_RST_L")
@@ -801,100 +715,91 @@ func hostReset() error {
 	return nil
 }
 
-func writeRegs() error {
-	for k, v := range WrRegVal {
-		switch WrRegFn[k] {
-		case "speed":
-			if v == "auto" || v == "high" || v == "med" || v == "low" || v == "max" {
-				Vdev.SetFanSpeed(v, true)
-			}
-		case "host.temp.units.C":
-			f, err := strconv.ParseFloat(v, 64)
-			if err == nil {
-				hostTemp = f
-			}
-		case "host.temp.target.units.C":
-			f, err := strconv.ParseFloat(v, 64)
-			if err == nil {
-				hostTempTarget = f
-			}
-		case "qsfp.temp.units.C":
-			f, err := strconv.ParseFloat(v, 64)
-			if err == nil {
-				qsfpTemp = f
-			}
-		case "qsfp.temp.target.units.C":
-			f, err := strconv.ParseFloat(v, 64)
-			if err == nil {
-				qsfpTempTarget = f
-			}
-		case "speed.return":
-			if v == "" {
-				Vdev.SetLastSpeed()
-			}
-		case "target.units.C":
-			Vdev.SetHwmTarget(v)
-		case "reset":
-			if v == "true" {
-				hostReset()
-			}
-		}
-		delete(WrRegVal, k)
+func parseTemp(t string, low uint8, high uint8) (uint8, error) {
+	f, err := strconv.ParseFloat(t, 64)
+	if err != nil {
+		return high, err
 	}
-	return nil
+	if f < float64(low) || f > float64(high) {
+		return high, fmt.Errorf("Temperature must between %d and %d",
+			low, high)
+	}
+	return uint8(f), nil
 }
 
 func (i *Info) Hset(args args.Hset, reply *reply.Hset) error {
-	_, p := WrRegFn[args.Field]
-	if !p {
-		return fmt.Errorf("cannot hset: %s", args.Field)
-	}
-	_, q := WrRegRng[args.Field]
-	if !q {
-		err := i.set(args.Field, string(args.Value), false)
-		if err == nil {
-			*reply = 1
-			WrRegVal[args.Field] = string(args.Value)
+	i.mutex.Lock()
+	defer i.mutex.Unlock()
+	v := string(args.Value)
+	v = strings.TrimRight(v, "\n") // Be conservative in what we accept
+
+	switch args.Field {
+	case "fan_tray.speed":
+		if v == "auto" || v == "high" || v == "med" || v == "low" || v == "max" {
+			configuredSpeed = v
+			setSpeed = true
+		} else {
+			return errors.New("Invalid speed")
 		}
-		return err
-	}
-	var a [2]int
-	var e [2]error
-	if len(WrRegRng[args.Field]) == 2 {
-		for i, v := range WrRegRng[args.Field] {
-			a[i], e[i] = strconv.Atoi(v)
-		}
-		if e[0] == nil && e[1] == nil {
-			val, err := strconv.Atoi(string(args.Value))
-			if err != nil {
-				return err
-			}
-			if val >= a[0] && val <= a[1] {
-				err := i.set(args.Field,
-					string(args.Value), false)
-				if err == nil {
-					*reply = 1
-					WrRegVal[args.Field] =
-						string(args.Value)
-				}
-				return err
-			}
-			return fmt.Errorf("Cannot hset.  Valid range is: %s",
-				WrRegRng[args.Field])
-		}
-	}
-	for _, v := range WrRegRng[args.Field] {
-		if v == string(args.Value) {
-			err := i.set(args.Field, string(args.Value), false)
-			if err == nil {
-				*reply = 1
-				WrRegVal[args.Field] = string(args.Value)
-			}
+	case "host.temp.units.C":
+		f, err := parseTemp(v, 0, 255)
+		if err != nil {
 			return err
 		}
+		hostTemp = f
+
+	case "host.temp.target.units.C":
+		f, err := parseTemp(v, 25, 85)
+		if err != nil {
+			return err
+		}
+		hostTempTarget = f
+
+	case "qsfp.temp.units.C":
+		f, err := parseTemp(v, 0, 255)
+		if err != nil {
+			return err
+		}
+		qsfpTemp = f
+
+	case "qsfp.temp.target.units.C":
+		f, err := parseTemp(v, 25, 85)
+		if err != nil {
+			return err
+		}
+		qsfpTempTarget = f
+
+	case "fan_tray.speed.return":
+		if v == "" {
+			setSpeed = true
+		}
+
+	case "hwmon.target.units.C":
+		t, err := parseTemp(v, 25, 85)
+		if err != nil {
+			return err
+		}
+
+		if t > 60 {
+			return errors.New("Only integers up to 60 accepted")
+		}
+		hwmTarget = t
+		setHwmTarget = true
+
+	case "host.reset":
+		if v == "true" {
+			hostReset = true
+		}
+	default:
+		return fmt.Errorf("Don't know how to set %s", args.Field)
 	}
-	return fmt.Errorf("Cannot hset.  Valid values are: %s",
-		WrRegRng[args.Field])
+
+	err := i.set(args.Field, v, false)
+	if err == nil {
+		*reply = 1
+	}
+	return err
+
 }
 
 func (i *Info) set(key, value string, isReadyEvent bool) error {
