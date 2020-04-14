@@ -7,7 +7,7 @@ package version
 import (
 	"fmt"
 
-	"github.com/platinasystems/buildinfo"
+	"github.com/platinasystems/goes/internal/buildinfo"
 	"github.com/platinasystems/goes/lang"
 )
 

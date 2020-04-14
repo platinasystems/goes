@@ -30,8 +30,6 @@ github.com/platinasystems/atsock v0.0.0-20181019220955-c4cc7ae24dbf h1:ChH/cr79N
 github.com/platinasystems/atsock v0.0.0-20181019220955-c4cc7ae24dbf/go.mod h1:1XAb4yaMVNH9PDa7Q4sZmDqHoHSrzUfnGImUuSMpx5U=
 github.com/platinasystems/atsock v1.1.0 h1:+h8ismKClv31tIEOTZQhBMdDJALQhF3vDKjK2Y8H7mU=
 github.com/platinasystems/atsock v1.1.0/go.mod h1:1XAb4yaMVNH9PDa7Q4sZmDqHoHSrzUfnGImUuSMpx5U=
-github.com/platinasystems/buildinfo v1.1.0 h1:LFlyBxsfwYyP7bhGb0rCV63pEWIsjvAC+1AlHo7A6iQ=
-github.com/platinasystems/buildinfo v1.1.0/go.mod h1:VO8oKwJRCwPKxkqaLjkMxPHLAoe5i+9hmlFZ2x3RFik=
 github.com/platinasystems/fdt v1.0.1 h1:JwL/wuYhiU9zE43TTOhX0lsLIaj3Uf5zTf3undY/SkA=
 github.com/platinasystems/fdt v1.0.1/go.mod h1:WSVWH9RpIVY1dEmMk2u6ewQceD2bfFdLVN68cSixbnY=
 github.com/platinasystems/flags v1.0.1 h1:YhuXr+LuV7l9fErXWPS0O1PynaRtDoo0vV/WoXtp4fU=

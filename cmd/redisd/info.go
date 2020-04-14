@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/buildinfo"
+	"github.com/platinasystems/goes/internal/buildinfo"
 	"github.com/platinasystems/goes/internal/proc"
 )
 
