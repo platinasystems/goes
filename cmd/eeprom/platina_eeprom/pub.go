@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/cmd/eeprom"
+	"github.com/platinasystems/goes/external/redis/publisher"
 	"github.com/platinasystems/i2c"
-	"github.com/platinasystems/redis/publisher"
 )
 
 func RedisdHook(pub *publisher.Publisher) {

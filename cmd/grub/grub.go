@@ -1,4 +1,4 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -29,16 +29,15 @@ import (
 	"github.com/platinasystems/goes/cmd/grub/menu"
 	"github.com/platinasystems/goes/cmd/grub/search"
 	"github.com/platinasystems/goes/cmd/grub/set"
-
 	"github.com/platinasystems/goes/cmd/ifcmd"
 	"github.com/platinasystems/goes/cmd/nop"
 	"github.com/platinasystems/goes/cmd/testcmd"
 	"github.com/platinasystems/goes/cmd/thencmd"
 	"github.com/platinasystems/goes/cmd/truecmd"
+	"github.com/platinasystems/goes/external/flags"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/lang"
 
-	"github.com/platinasystems/flags"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/url"
 
 	"github.com/platinasystems/liner"

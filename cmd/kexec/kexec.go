@@ -11,12 +11,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/external/flags"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/internal/fit"
 	"github.com/platinasystems/goes/internal/kexec"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 )
 
 type Command struct {

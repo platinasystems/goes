@@ -16,10 +16,10 @@ import (
 	"github.com/ramr/go-reaper"
 
 	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/internal/assert"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/term"
 )
 

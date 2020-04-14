@@ -1,4 +1,4 @@
-// Copyright © 2019 Platina Systems, Inc. All rights reserved.
+// Copyright © 2019-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -8,9 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/platinasystems/flags"
-
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/lang"
 )
 

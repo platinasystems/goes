@@ -1,4 +1,4 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -13,9 +13,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/lang"
+	"github.com/platinasystems/goes/external/redis"
 	"github.com/platinasystems/goes/internal/assert"
-	"github.com/platinasystems/redis"
+	"github.com/platinasystems/goes/lang"
 )
 
 const (

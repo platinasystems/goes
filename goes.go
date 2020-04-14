@@ -1,4 +1,4 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -23,12 +23,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/flags"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/url"
 )
 

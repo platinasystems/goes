@@ -1,4 +1,4 @@
-// Copyright © 2019 Platina Systems, Inc. All rights reserved.
+// Copyright © 2019-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/flags"
+	"github.com/platinasystems/goes/external/flags"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/lang"
 	pldp "github.com/platinasystems/ldp"
 	"github.com/platinasystems/loopback"
-	"github.com/platinasystems/parms"
 )
 
 type Command struct{}

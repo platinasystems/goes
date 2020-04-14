@@ -1,4 +1,4 @@
-// Copyright 2016-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2016-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -14,10 +14,10 @@ import (
 
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/internal/assert"
 	"github.com/platinasystems/goes/internal/kill"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 )
 
 const EtcGoesStop = "/etc/goes/stop"

@@ -3,7 +3,6 @@
 // LICENSE file.
 
 // Package w83795d provides access to the H/W Monitor chip
-
 package w83795d
 
 import (
@@ -16,15 +15,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/atsock"
+	"github.com/platinasystems/goes/external/log"
+	"github.com/platinasystems/goes/external/redis"
+	"github.com/platinasystems/goes/external/redis/publisher"
+	"github.com/platinasystems/goes/external/redis/rpc/args"
+	"github.com/platinasystems/goes/external/redis/rpc/reply"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/gpio"
-	"github.com/platinasystems/log"
-	"github.com/platinasystems/redis"
-	"github.com/platinasystems/redis/publisher"
-	"github.com/platinasystems/redis/rpc/args"
-	"github.com/platinasystems/redis/rpc/reply"
 )
 
 var (
@@ -281,7 +280,7 @@ const (
 
 func fanSpeed(countHi uint8, countLo uint8) uint16 {
 	d := ((uint16(countHi) << 4) + uint16(countLo>>4)) * (uint16(fanPoles / 4))
-	speed := 1.35E06 / float64(d)
+	speed := 1.35e06 / float64(d)
 	return uint16(speed)
 }
 

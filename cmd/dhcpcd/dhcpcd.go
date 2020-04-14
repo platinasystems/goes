@@ -24,8 +24,8 @@ import (
 
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 )
 
 type Command struct {

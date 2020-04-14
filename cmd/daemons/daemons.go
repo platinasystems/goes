@@ -14,10 +14,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/atsock"
 	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/external/atsock"
+	"github.com/platinasystems/goes/external/log"
 	"github.com/platinasystems/goes/internal/prog"
-	"github.com/platinasystems/log"
 )
 
 type Daemons struct {

@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/log"
+	"github.com/platinasystems/goes/external/log"
 )
 
 func fileLoadSyscall(k *os.File, i *os.File, cmdline string, flags uintptr) (err error) {

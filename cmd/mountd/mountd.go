@@ -1,4 +1,4 @@
-// Copyright © 2018 Platina Systems, Inc. All rights reserved.
+// Copyright © 2018-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/log"
 	"github.com/platinasystems/goes/internal/partitions"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/log"
 )
 
 var ErrUnknownPartition = errors.New("Unable to determine partition type")
