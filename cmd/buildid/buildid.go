@@ -1,4 +1,4 @@
-// Copyright © 2019 Platina Systems, Inc. All rights reserved.
+// Copyright © 2019-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -6,8 +6,9 @@ package buildid
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/platinasystems/buildid"
+	"github.com/platinasystems/goes/internal/buildid"
 	"github.com/platinasystems/goes/lang"
 )
 
@@ -38,7 +39,11 @@ SEE ALSO
 
 func (Command) Main(args ...string) error {
 	if len(args) == 0 {
-		args = []string{"/proc/self/exe"}
+		self, err := os.Readlink("/proc/self/exe")
+		if err != nil {
+			return err
+		}
+		args = []string{self}
 	}
 	for _, fn := range args {
 		s, err := buildid.New(fn)

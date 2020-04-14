@@ -13,7 +13,6 @@ require (
 	github.com/kr/pty v1.1.3
 	github.com/mattn/go-isatty v0.0.4
 	github.com/platinasystems/atsock v1.1.0
-	github.com/platinasystems/buildid v1.0.0
 	github.com/platinasystems/buildinfo v1.1.0
 	github.com/platinasystems/fdt v1.0.1
 	github.com/platinasystems/flags v1.0.1
