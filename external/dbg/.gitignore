@@ -1,0 +1,7 @@
+*~
+*#*#
+*.orig
+*.patch
+*.rej
+*.swp
+*.test
