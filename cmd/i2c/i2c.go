@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/platinasystems/goes/external/i2c"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/i2c"
 )
 
 type Command struct{}

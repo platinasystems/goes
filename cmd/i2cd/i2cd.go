@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/i2c"
 	"github.com/platinasystems/goes/external/log"
 	"github.com/platinasystems/goes/external/redis"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/gpio"
-	"github.com/platinasystems/i2c"
 	"github.com/platinasystems/ioport"
 )
 

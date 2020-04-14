@@ -7,8 +7,8 @@ package toggle
 import (
 	"sync"
 
+	"github.com/platinasystems/goes/external/i2c"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/i2c"
 )
 
 const i2cGpioAddr = 0x74

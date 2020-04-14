@@ -30,8 +30,6 @@ github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73 h1:
 github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73/go.mod h1:/GXF5FQty+9BTtfCsfFuD4/pHf/b2cN3f3Ic0nLagQw=
 github.com/platinasystems/gpio v1.3.0 h1:qUgphUA7igZo6nfB7QQHamJwgKZqArF+EB6pWVcCXUE=
 github.com/platinasystems/gpio v1.3.0/go.mod h1:UsR1pB6U/S7Ql6RDrF/S6rMJqWOiZu3H2mKQeEe4v7U=
-github.com/platinasystems/i2c v1.2.0 h1:H1BgNrz4s15AcR6Y4WxZS+eMgX00pu8ZoLfVHb5VoIw=
-github.com/platinasystems/i2c v1.2.0/go.mod h1:Yj5hRxt+HXbW1rXv9aTtxUNZsegDjeWerUPY5BIjDVM=
 github.com/platinasystems/ioport v0.0.1 h1:YIrQV/oix3ENpzxi3Atw0UxW2JV21OhPR2VbJ6LUC3M=
 github.com/platinasystems/ioport v0.0.1/go.mod h1:hfzDUTcaOvxYi0bwMY50WVOenxuO9GQu1k55K9nkXTg=
 github.com/platinasystems/ldp v0.0.2 h1:pSqelqQiHOpIcNpgpNYRgV4BhVCUqTrrQSLHk7Lbhlw=

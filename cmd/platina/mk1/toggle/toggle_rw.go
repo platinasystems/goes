@@ -9,8 +9,8 @@ import (
 	"net/rpc"
 	"unsafe"
 
+	"github.com/platinasystems/goes/external/i2c"
 	"github.com/platinasystems/goes/external/log"
-	"github.com/platinasystems/i2c"
 )
 
 const MAXOPS = 30

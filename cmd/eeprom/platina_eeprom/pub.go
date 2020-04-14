@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/cmd/eeprom"
+	"github.com/platinasystems/goes/external/i2c"
 	"github.com/platinasystems/goes/external/redis/publisher"
-	"github.com/platinasystems/i2c"
 )
 
 func RedisdHook(pub *publisher.Publisher) {
