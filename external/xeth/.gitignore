@@ -1,0 +1,8 @@
+*~
+*#*#
+*.orig
+*.patch
+*.rej
+*.swp
+*.test
+/_obj/
