@@ -50,6 +50,9 @@ func (xid Xid) RxIP4Add(addr, mask uint32) *DevAddIPNet {
 
 func (xid Xid) RxIP4Del(addr, mask uint32) *DevDelIPNet {
 	l := LinkOf(xid)
+	if l == nil {
+		return nil
+	}
 	ip := net.IP(make([]byte, net.IPv4len, net.IPv4len))
 	*(*uint32)(unsafe.Pointer(&ip[0])) = addr
 	nets := l.IPNets()
@@ -86,6 +89,9 @@ func (xid Xid) RxIP6Add(addr []byte, len int) *DevAddIPNet {
 
 func (xid Xid) RxIP6Del(addr []byte) *DevDelIPNet {
 	l := LinkOf(xid)
+	if l == nil {
+		return nil
+	}
 	ip := net.IP(addr)
 	nets := l.IPNets()
 	for i, entry := range nets {
