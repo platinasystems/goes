@@ -26,6 +26,7 @@ import (
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/external/parms"
+	"github.com/platinasystems/goes/external/semaphore"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/lang"
@@ -37,6 +38,9 @@ const (
 	VerboseVerify
 	VerboseDebug
 )
+
+// each go-routine must quit when Stop.Semaphore is closed
+var Stop = semaphore.NewOneTime()
 
 type Blocker interface {
 	Block(*Goes, shellutils.List) (*shellutils.List,
@@ -645,20 +649,34 @@ func (g *Goes) swap(args []string) {
 
 func wait(v cmd.Cmd, ch chan os.Signal) {
 	for sig := range ch {
-		if sig == syscall.SIGTERM {
+		Stop.Signal()
+		switch sig {
+		case syscall.SIGABRT:
+			// v.Main() finished so just return here
+			return
+		case syscall.SIGTERM:
 			if method, found := v.(io.Closer); found {
 				if err := method.Close(); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 				}
-				time.Sleep(500 * time.Millisecond)
 			}
-			os.Stdout.Sync()
-			os.Stderr.Sync()
-			os.Stdout.Close()
-			os.Stderr.Close()
-			os.Exit(0)
+			t := time.NewTimer(2 * time.Second)
+			select {
+			case <-ch:
+				// v.Main() finished
+				if !t.Stop() {
+					<-t.C
+				}
+				return
+			case <-t.C:
+				// v.Main() didn't finish
+				os.Stdout.Sync()
+				os.Stderr.Sync()
+				os.Stdout.Close()
+				os.Stderr.Close()
+				os.Exit(0)
+			}
 		}
-		break
 	}
 }
 
