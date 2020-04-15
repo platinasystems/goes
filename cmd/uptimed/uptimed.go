@@ -12,13 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/redis"
 	"github.com/platinasystems/goes/external/redis/publisher"
 	"github.com/platinasystems/goes/lang"
 )
 
-type Command chan struct{}
+type Command struct{}
 
 func (Command) String() string { return "uptimed" }
 
@@ -30,14 +31,9 @@ func (Command) Apropos() lang.Alt {
 	}
 }
 
-func (c Command) Close() error {
-	close(c)
-	return nil
-}
-
 func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (c Command) Main(...string) error {
+func (Command) Main(...string) error {
 	err := redis.IsReady()
 	if err != nil {
 		return err
@@ -49,7 +45,7 @@ func (c Command) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-c:
+		case <-goes.Stop.Semaphore:
 			return nil
 		case <-t.C:
 			if err = update(); err != nil {
@@ -57,7 +53,6 @@ func (c Command) Main(...string) error {
 			}
 		}
 	}
-	return nil
 }
 
 func update_uptime(si *syscall.Sysinfo_t, pub *publisher.Publisher) {
