@@ -39,8 +39,11 @@ const (
 )
 
 type Blocker interface {
-	Block(*Goes, shellutils.List) (*shellutils.List, func(io.Reader, io.Writer, io.Writer) error, error)
+	Block(*Goes, shellutils.List) (*shellutils.List,
+		func(io.Reader, io.Writer, io.Writer) error,
+		error)
 }
+
 type akaer interface {
 	Aka() string
 }
