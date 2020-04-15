@@ -22,12 +22,13 @@ func TestSemaphore(t *testing.T) {
 	}
 }
 
-func TestStop(t *testing.T) {
+func TestOneTime(t *testing.T) {
+	ot := NewOneTime()
 	go func() {
-		Stop.Signal()
-		Stop.Signal()
+		ot.Signal()
+		ot.Signal()
 	}()
-	for i := 1; Stop.Wait(); i++ {
+	for i := 1; ot.Wait(); i++ {
 		if i > 1 {
 			t.Fatal(i)
 		}

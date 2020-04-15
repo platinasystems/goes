@@ -15,8 +15,10 @@ type OneTime struct {
 	sync.Once
 }
 
-var Stop = OneTime{
-	Semaphore: make(Semaphore),
+func NewOneTime() *OneTime {
+	return &OneTime{
+		Semaphore: make(Semaphore),
+	}
 }
 
 func (ch Semaphore) Signal() {
