@@ -559,7 +559,7 @@ func (g *Goes) Main(args ...string) error {
 				name = fmt.Sprint("(", method.Aka(), ")")
 			}
 		}
-		err = fmt.Errorf("%s: %w", name, err)
+		err = fmt.Errorf("%s: %v", name, err)
 	}
 	g.Status = err
 	return err
