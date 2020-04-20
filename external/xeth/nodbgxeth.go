@@ -1,4 +1,4 @@
-// Copyright © 2018-2019 Platina Systems, Inc. All rights reserved.
+// Copyright © 2018-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,8 @@
 package xeth
 
 import "fmt"
+
+const Dbg = NoDbg
 
 func (bits EthtoolLinkModeBits) Format(f fmt.State, c rune) {
 	fmt.Fprint(f, "0b")

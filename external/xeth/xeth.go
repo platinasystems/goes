@@ -4,41 +4,50 @@
 
 // This package provides a sideband control interface to an XETH driver.
 // Usage,
-//	var wg sync.WaitGroup
-//	defer wg.Wait()
-//	stopch := make(chan struct{})
-//	defer close(stopch)
-//	task, err := xeth.Start(&wg, stopch)
+//	task, err := xeth.Start()
 //	if err {
 //		panic(err)
 //	}
 //	task.DumpIfInfo()
-//	for buf := range task.RxCh {
-//		if xeth.Class(buf) == xeth.ClassBreak {
-//			break
+//	for t = true; t; {
+//		select {
+//		case <-goes.Stop:
+//			return
+//		case buf := <-task.RxCh:
+//			if t = xeth.Class(buf) != xeth.ClassBreak; t {
+//				msg := xeth.Parse(buf)
+//				...
+//				xeth.Pool(msg)
+//			}
 //		}
-//		msg := xeth.Parse(buf)
-//		...
-//		xeth.Pool(msg)
 //	}
 //	...
 //	task.DumpFib()
-//	for buf := range task.RxCh {
-//		if xeth.Class(buf) == xeth.ClassBreak {
-//			break
+//	for t := true; t; {
+//		select {
+//		case <-goes.Stop:
+//			return
+//		case buf := <-task.RxCh:
+//			if t = xeth.Class(buf) != xeth.ClassBreak; t {
+//				msg := xeth.Parse(buf)
+//				...
+//				xeth.Pool(msg)
+//			}
 //		}
-//		msg := xeth.Parse(buf)
-//		...
-//		xeth.Pool(msg)
 //	}
 //	...
+//	goes.WG.Add(1)
 //	go func() {
-//		wg.Add(1)
-//		defer wg.Done()
-//		for buf := range task.RxCh {
-//			msg := xeth.Parse(buf)
-//			...
-//			xeth.Pool(msg)
+//		defer goes.WG.Done()
+//		for {
+//			select {
+//			case <-goes.Stop:
+//				return
+//			case buf := <-task.RxCh:
+//				msg := xeth.Parse(buf)
+//				...
+//				xeth.Pool(msg)
+//			}
 //		}
 //	}()
 //	...
@@ -48,11 +57,11 @@ import (
 	"io"
 	"net"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 	"unsafe"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/external/xeth/internal"
 )
 
@@ -96,10 +105,6 @@ var (
 type Task struct {
 	RxCh <-chan Buffer // cloned msgs received from driver
 
-	wg *sync.WaitGroup
-
-	stopch <-chan struct{}
-
 	sock *net.UnixConn
 
 	loch chan<- buffer // low priority, leaky-bucket tx channel
@@ -113,7 +118,7 @@ type Task struct {
 }
 
 // Connect @xeth socket and run channel service routines.
-func Start(wg *sync.WaitGroup, stopch <-chan struct{}) (task *Task, err error) {
+func Start() (task *Task, err error) {
 	xethif, err := net.InterfaceByName("xeth")
 	if err != nil {
 		return
@@ -143,13 +148,11 @@ func Start(wg *sync.WaitGroup, stopch <-chan struct{}) (task *Task, err error) {
 	rxch := make(chan Buffer, 1024)
 
 	task = &Task{
-		RxCh:   rxch,
-		wg:     wg,
-		stopch: stopch,
-		sock:   atsock,
-		loch:   loch,
-		hich:   hich,
-		fd:     muxfd,
+		RxCh: rxch,
+		sock: atsock,
+		loch: loch,
+		hich: hich,
+		fd:   muxfd,
 		fda: syscall.SockaddrLinklayer{
 			Protocol: syscall.ETH_P_ARP,
 			Ifindex:  xethif.Index,
@@ -157,12 +160,10 @@ func Start(wg *sync.WaitGroup, stopch <-chan struct{}) (task *Task, err error) {
 		},
 	}
 
-	task.wg.Add(1)
-	go task.goClose()
-	task.wg.Add(1)
+	goes.WG.Add(3)
 	go task.goRx(rxch)
-	task.wg.Add(1)
 	go task.goTx(loch, hich)
+	go task.goClose()
 
 	return
 }
@@ -357,8 +358,10 @@ func (task *Task) SetSpeed(xid Xid, mbps uint32) {
 
 // Wait for stop signal then shutdown and close socket
 func (task *Task) goClose() {
-	defer task.wg.Done()
-	<-task.stopch
+	defer goes.WG.Done()
+
+	<-goes.Stop
+
 	if task.sock == nil {
 		return
 	}
@@ -373,6 +376,8 @@ func (task *Task) goClose() {
 }
 
 func (task *Task) goRx(rxch chan<- Buffer) {
+	defer goes.WG.Done()
+
 	const minrxto = 10 * time.Millisecond
 	const maxrxto = 320 * time.Millisecond
 
@@ -386,12 +391,11 @@ func (task *Task) goRx(rxch chan<- Buffer) {
 		rxbuf = rxbuf[:0]
 		rxoob = rxoob[:0]
 		close(rxch)
-		task.wg.Done()
 	}()
 
 	for {
 		select {
-		case <-task.stopch:
+		case <-goes.Stop:
 			return
 		default:
 		}
@@ -404,7 +408,7 @@ func (task *Task) goRx(rxch chan<- Buffer) {
 		_ = flags
 		_ = addr
 		select {
-		case <-task.stopch:
+		case <-goes.Stop:
 			return
 		default:
 		}
@@ -429,11 +433,10 @@ func (task *Task) goRx(rxch chan<- Buffer) {
 }
 
 func (task *Task) goTx(loch, hich <-chan buffer) {
-	defer task.wg.Done()
-
+	defer goes.WG.Done()
 	for task.txErr == nil {
 		select {
-		case <-task.stopch:
+		case <-goes.Stop:
 			return
 		case buf, ok := <-hich:
 			if ok {

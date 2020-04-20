@@ -40,6 +40,7 @@ Use style variables to selectively enable output,
 package dbg
 
 import (
+	"bytes"
 	"fmt"
 	"go/build"
 	"io"
@@ -114,14 +115,11 @@ func (style Style) log(format string, _ interface{}, args ...interface{}) error 
 	if style == NoOp {
 		return err
 	}
-	w, ok := writer.Load().(io.Writer)
-	if !ok || w == nil {
-		w = os.Stdout
-	}
+	buf := new(bytes.Buffer)
 	if style > Plain {
 		pc, file, line, ok := runtime.Caller(skip)
 		if !ok {
-			fmt.Fprintf(w, "pc[%#x] ", pc)
+			fmt.Fprintf(buf, "pc[%#x] ", pc)
 		} else {
 			switch style {
 			case FileLine:
@@ -129,19 +127,24 @@ func (style Style) log(format string, _ interface{}, args ...interface{}) error 
 				if err != nil || relfile[0] == '.' {
 					relfile = relgopath(file)
 				}
-				fmt.Fprint(w, relfile, ":", line, ": ")
+				fmt.Fprint(buf, relfile, ":", line, ": ")
 			case Func:
 				name := runtime.FuncForPC(pc).Name()
-				fmt.Fprint(w, name, "() ")
+				fmt.Fprint(buf, name, "() ")
 			}
 		}
 	}
 	if len(format) > 0 {
-		fmt.Fprintf(w, format, args...)
-		fmt.Fprintln(w)
+		fmt.Fprintf(buf, format, args...)
+		fmt.Fprintln(buf)
 	} else {
-		fmt.Fprintln(w, args...)
+		fmt.Fprintln(buf, args...)
 	}
+	w, ok := writer.Load().(io.Writer)
+	if !ok || w == nil {
+		w = os.Stdout
+	}
+	w.Write(buf.Bytes())
 	return err
 }
 

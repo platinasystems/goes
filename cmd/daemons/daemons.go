@@ -90,7 +90,9 @@ func (d *Daemons) start(restarts int, args ...string) {
 		if d.cmd(p.Process.Pid) != nil {
 			d.del(p.Process.Pid)
 			if restarts == RestartLimit {
-				fmt.Fprintln(werr, "to many restarts")
+				if RestartLimit != 0 {
+					fmt.Fprintln(werr, "to many restarts")
+				}
 			} else {
 				fmt.Fprintln(werr, "restart")
 				defer d.start(restarts+1, args...)
@@ -207,29 +209,46 @@ func (d *Daemons) del(pid int) {
 }
 
 func (d *Daemons) stop(pids []int) error {
+	procdns := make(map[int]string)
 	for _, pid := range pids {
 		if p := d.cmd(pid); p != nil {
+			procdns[pid] = fmt.Sprint("/proc/", pid)
 			log.Print("daemon", "info", "stopping: ", p.Args)
 			d.del(pid)
 			p.Process.Signal(syscall.SIGTERM)
-		} else {
-			return fmt.Errorf("%d: not found", pid)
 		}
 	}
-	have := func(dn string) bool {
-		_, err := os.Stat(dn)
-		return err == nil
-	}
-	for _, pid := range pids {
-		procdn := fmt.Sprint("/proc/", pid)
-		for t := 100 * time.Millisecond; have(procdn); t *= 2 {
-			if t > 3*time.Second {
-				log.Print("daemon", "info", "killing: ", pid)
-				syscall.Kill(pid, syscall.SIGKILL)
-			} else {
-				time.Sleep(t)
+	const (
+		period = 100 * time.Millisecond
+		limit  = 5 * time.Second
+	)
+	for t := time.Duration(0); t < limit; t += period {
+		for pid, procdn := range procdns {
+			if _, err := os.Stat(procdn); os.IsNotExist(err) {
+				delete(procdns, pid)
 			}
 		}
+		if len(procdns) == 0 {
+			return nil
+		}
+		time.Sleep(period)
+	}
+	for pid := range procdns {
+		syscall.Kill(pid, syscall.SIGKILL)
+	}
+	for t := time.Duration(0); t < limit; t += period {
+		for pid, procdn := range procdns {
+			if _, err := os.Stat(procdn); os.IsNotExist(err) {
+				delete(procdns, pid)
+			}
+		}
+		if len(procdns) == 0 {
+			return nil
+		}
+		time.Sleep(period)
+	}
+	for pid, _ := range procdns {
+		return fmt.Errorf("%d won't die", pid)
 	}
 	return nil
 }

@@ -45,7 +45,7 @@ func (Command) Main(...string) error {
 	defer t.Stop()
 	for {
 		select {
-		case <-goes.Stop.Semaphore:
+		case <-goes.Stop:
 			return nil
 		case <-t.C:
 			if err = update(); err != nil {

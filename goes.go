@@ -19,14 +19,13 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
-	"time"
 	"unicode/utf8"
 
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/external/parms"
-	"github.com/platinasystems/goes/external/semaphore"
 	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/lang"
@@ -38,9 +37,6 @@ const (
 	VerboseVerify
 	VerboseDebug
 )
-
-// each go-routine must quit when Stop.Semaphore is closed
-var Stop = semaphore.NewOneTime()
 
 type Blocker interface {
 	Block(*Goes, shellutils.List) (*shellutils.List,
@@ -83,6 +79,28 @@ type Function struct {
 	Definition []string
 	RunFun     func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 }
+
+/*
+All goes go-routines should add them selves to the WG WaitGroup and quit on
+Stop likw this,
+
+	goes.WG.Add(1)
+	go func() {
+		defer goes.WG.Done()
+		for {
+			select {
+			case <-goes.Stop:
+				return
+			default:
+				...
+			}
+		}
+	}
+*/
+var (
+	Stop chan struct{}
+	WG   sync.WaitGroup
+)
 
 func (g *Goes) ProcessPipeline(ls shellutils.List) (*shellutils.List, *shellutils.Word, func(io.Reader, io.Writer, io.Writer) error, error) {
 	var (
@@ -248,7 +266,9 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 				}
 				in = r
 				*closers = append(*closers, r)
+				WG.Add(1)
 				go func(w io.WriteCloser, lbl string) {
+					defer WG.Done()
 					defer w.Close()
 					prompt := "<<" + fn + " "
 					for {
@@ -330,7 +350,9 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			err := x.Wait()
 			g.Status = err
 		} else {
+			WG.Add(1)
 			go func(x *exec.Cmd) {
+				defer WG.Done()
 				err := x.Wait()
 				if err != nil {
 					fmt.Fprintln(os.Stderr, err)
@@ -429,6 +451,7 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 // If the command is a daemon, this fork exec's itself twice to disassociate
 // the daemon from the tty and initiating process.
 func (g *Goes) Main(args ...string) error {
+	Stop = make(chan struct{})
 	if strings.HasSuffix(os.Args[0], ".test") {
 		g.inTest = true
 	} else if len(args) > 0 {
@@ -551,11 +574,29 @@ func (g *Goes) Main(args ...string) error {
 
 	if k.IsDaemon() {
 		sig := make(chan os.Signal)
+		quit := make(chan struct{})
 		signal.Notify(sig, syscall.SIGTERM)
-		defer func(sig chan os.Signal) {
-			sig <- syscall.SIGABRT
-		}(sig)
-		go wait(v, sig)
+		WG.Add(1)
+		go func() {
+			defer WG.Done()
+			select {
+			case <-quit:
+			case t := <-sig:
+				fmt.Println(t)
+				if t == syscall.SIGTERM {
+					close(Stop)
+					method, found := v.(io.Closer)
+					if found {
+						method.Close()
+					}
+				}
+			}
+			signal.Stop(sig)
+		}()
+		err := v.Main(args[1:]...)
+		close(quit)
+		WG.Wait()
+		return err
 	}
 
 	err := v.Main(args[1:]...)
@@ -569,6 +610,7 @@ func (g *Goes) Main(args ...string) error {
 		err = fmt.Errorf("%s: %v", name, err)
 	}
 	g.Status = err
+
 	return err
 }
 
@@ -643,39 +685,6 @@ func (g *Goes) swap(args []string) {
 		if _, found := g.Builtins()[opt]; found {
 			args[1] = args[0]
 			args[0] = opt
-		}
-	}
-}
-
-func wait(v cmd.Cmd, ch chan os.Signal) {
-	for sig := range ch {
-		Stop.Signal()
-		switch sig {
-		case syscall.SIGABRT:
-			// v.Main() finished so just return here
-			return
-		case syscall.SIGTERM:
-			if method, found := v.(io.Closer); found {
-				if err := method.Close(); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-				}
-			}
-			t := time.NewTimer(2 * time.Second)
-			select {
-			case <-ch:
-				// v.Main() finished
-				if !t.Stop() {
-					<-t.C
-				}
-				return
-			case <-t.C:
-				// v.Main() didn't finish
-				os.Stdout.Sync()
-				os.Stderr.Sync()
-				os.Stdout.Close()
-				os.Stderr.Close()
-				os.Exit(0)
-			}
 		}
 	}
 }

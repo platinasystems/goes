@@ -15,9 +15,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/atsock"
 	"github.com/platinasystems/goes/external/parms"
@@ -83,44 +83,10 @@ OPTIONS
 
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (c *Command) Close() error {
-	var err error
-	c.redisd.mutex.Lock()
-	defer c.redisd.mutex.Unlock()
-	close(c.redisd.done)
-	for k, srvs := range c.redisd.devs {
-		for i, srv := range srvs {
-			xerr := srv.server.Close()
-			if err == nil {
-				err = xerr
-			}
-			srvs[i] = nil
-		}
-		c.redisd.devs[k] = c.redisd.devs[k][:0]
-		delete(c.redisd.devs, k)
-	}
-	if c.redisd.reg != nil {
-		c.redisd.reg.Srvr.Close()
-	}
-	if c.pubconn != nil {
-		c.pubconn.Close()
-	}
-	return err
-}
-
-func (c *Command) Main(args ...string) (err error) {
-	defer func() {
-		if err != nil {
-			c.Close()
-		}
-	}()
-
-	c.redisd.done = make(chan struct{})
-
+func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-port", "-set")
 	if s := parm.ByName["-port"]; len(s) > 0 {
-		_, err = fmt.Sscan(s, &c.Port)
-		if err != nil {
+		if _, err := fmt.Sscan(s, &c.Port); err != nil {
 			return err
 		}
 	} else {
@@ -158,14 +124,6 @@ func (c *Command) Main(args ...string) (err error) {
 		c.redisd.published[k] = make(grs.HashValue)
 	}
 
-	/*FIXME publish goes.Info.Versions
-	b, err := info.Marshal()
-	if err != nil {
-		return
-	}
-	c.redisd.published[redis.DefaultHash]["packages"] = b
-	*/
-
 	cfg := grs.DefaultConfig()
 	cfg = cfg.Proto("unix")
 	cfg = cfg.Host("@redisd")
@@ -173,34 +131,71 @@ func (c *Command) Main(args ...string) (err error) {
 
 	srv, err := grs.NewServer(cfg)
 	if err != nil {
-		return
+		return err
 	}
 
 	c.redisd.devs["@redisd"] = []*Server{{server: srv}}
 
 	c.redisd.reg, err = reg.New(c.redisd.assign, c.redisd.unassign)
 	if err != nil {
-		return
+		return err
 	}
 
 	c.pubconn, err = atsock.ListenUnixgram("redis.pub")
 	if err != nil {
-		return
+		return err
 	}
-	go c.gopub()
+	goes.WG.Add(1)
+	go func() {
+		defer goes.WG.Done()
+		c.gopub()
+	}()
 
 	err = c.pubinit(fields.New(parm.ByName["-set"])...)
 	if err != nil {
-		return
+		return err
 	}
 
+	goes.WG.Add(1)
+	go func() {
+		defer goes.WG.Done()
+		srv.Start()
+	}()
+
+	goes.WG.Add(1)
 	go func(redisd *Redisd, args ...string) {
-		redisd.listen(args...)
+		defer goes.WG.Done()
+		for _, name := range args {
+			select {
+			case <-goes.Stop:
+				return
+			default:
+				redisd.listenOnInterface(name)
+			}
+		}
 	}(&c.redisd, args...)
 
-	err = srv.Start()
+	<-goes.Stop
 
-	return
+	if c.redisd.reg != nil {
+		c.redisd.reg.Srvr.Close()
+	}
+	if c.pubconn != nil {
+		c.pubconn.Close()
+	}
+
+	c.redisd.mutex.Lock()
+	for k, srvs := range c.redisd.devs {
+		for i, srv := range srvs {
+			srv.server.Close()
+			srvs[i] = nil
+		}
+		c.redisd.devs[k] = c.redisd.devs[k][:0]
+		delete(c.redisd.devs, k)
+	}
+	c.redisd.mutex.Unlock()
+
+	return nil
 }
 
 func (c *Command) gopub() {
@@ -343,8 +338,6 @@ type Redisd struct {
 	cachedSubkeys map[string][]string
 
 	port int
-
-	done chan struct{}
 }
 
 type Assignments []*assignment
@@ -465,34 +458,17 @@ devloop:
 		} else {
 			srvs = append(srvs, &Server{server: srv,
 				addr: addr.String()})
-			go srv.Start()
+			goes.WG.Add(1)
+			go func() {
+				defer goes.WG.Done()
+				srv.Start()
+			}()
 			if true {
 				fmt.Println("listen:", id)
 			}
 		}
 	}
 	redisd.devs[name] = srvs
-}
-
-func (redisd *Redisd) listen(names ...string) {
-	for {
-		for _, name := range names {
-			redisd.listenOnInterface(name)
-		}
-		if !func() bool {
-			t := time.NewTicker(10 * time.Second)
-			defer t.Stop()
-
-			select {
-			case <-redisd.done:
-				return false
-			case <-t.C:
-				return true
-			}
-		}() {
-			return
-		}
-	}
 }
 
 func (redisd *Redisd) flushKeyCache() {
