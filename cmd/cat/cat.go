@@ -23,11 +23,6 @@ func (Command) Usage() string {
 
 func (Command) Man() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "print concatenated files",
-	}
-}
-func (Command) Apropos() lang.Alt {
-	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
 	Concatenate FILE(s), or standard input, to standard output.
@@ -40,6 +35,12 @@ EXAMPLES
 
 	cat
 		Copy standard input to standard output.`,
+	}
+}
+
+func (Command) Apropos() lang.Alt {
+	return lang.Alt{
+		lang.EnUS: "print concatenated files",
 	}
 }
 
