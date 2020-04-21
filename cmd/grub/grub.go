@@ -309,11 +309,13 @@ func (c *Command) KexecCommand() []string {
 	if k[0] != '/' {
 		k = "/" + k
 	}
-	if i[0] != '/' {
-		i = "/" + i
-	}
 	k = c.GetRoot() + k
-	i = c.GetRoot() + i
+	if len(i) > 0 {
+		if i[0] != '/' {
+			i = "/" + i
+		}
+		i = c.GetRoot() + i
+	}
 	co := false
 	for _, cmd := range Linux.Cmd {
 		if strings.HasPrefix(cmd, "console=") {
@@ -328,7 +330,11 @@ func (c *Command) KexecCommand() []string {
 		}
 		cl = cl + "console=ttyS0,115200n8"
 	}
-	return []string{"kexec", "-k", k, "-i", i, "-c", cl, "-e"}
+	kcl := []string{"kexec", "-k", k, "-c", cl, "-e"}
+	if len(i) > 0 {
+		kcl = append(kcl, "-i", i)
+	}
+	return kcl
 }
 
 func (c *Command) readline(parm *parms.Parms, flag *flags.Flags, prompt string, def string) (mi string, err error) {
