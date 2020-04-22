@@ -484,7 +484,10 @@ func (task *Task) tx(buf buffer, timeout time.Duration) error {
 		if kind(buf) == internal.MsgKindCarrier {
 			msg := (*internal.MsgCarrier)(buf.pointer())
 			xid := Xid(msg.Xid)
-			LinkOf(xid).LinkUp(msg.Flag == internal.CarrierOn)
+			l := LinkOf(xid)
+			if l != nil {
+				l.LinkUp(msg.Flag == internal.CarrierOn)
+			}
 		}
 	}
 	return err
