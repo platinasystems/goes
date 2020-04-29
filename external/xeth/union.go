@@ -10,6 +10,9 @@ type DevQuit struct{ Lower, Upper Xid }
 func (lower Xid) join(upper Xid) *DevJoin {
 	lowerl := LinkOf(lower)
 	upperl := LinkOf(upper)
+	if lowerl == nil || upperl == nil {
+		return nil
+	}
 	lowerl.Uppers(upper.List(lowerl.Uppers()))
 	upperl.Lowers(lower.List(upperl.Lowers()))
 	return &DevJoin{lower, upper}
@@ -18,6 +21,9 @@ func (lower Xid) join(upper Xid) *DevJoin {
 func (lower Xid) quit(upper Xid) *DevQuit {
 	lowerl := LinkOf(lower)
 	upperl := LinkOf(upper)
+	if lowerl == nil || upperl == nil {
+		return nil
+	}
 	lowerl.Uppers(upper.Delist(lowerl.Uppers()))
 	upperl.Lowers(lower.Delist(upperl.Lowers()))
 	return &DevQuit{lower, upper}
