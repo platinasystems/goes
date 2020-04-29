@@ -265,10 +265,9 @@ func Parse(buf Buffer) interface{} {
 		case internal.IfInfoReasonDown:
 			return xid.RxDown()
 		case internal.IfInfoReasonReg:
-			netns := NetNs(msg.Net)
-			return xid.RxReg(netns)
+			return xid.RxReg(NetNs(msg.Net), msg.Ifindex)
 		case internal.IfInfoReasonUnreg:
-			return xid.RxUnreg()
+			return xid.RxUnreg(msg.Ifindex)
 		}
 	case internal.MsgKindNeighUpdate:
 		msg := (*internal.MsgNeighUpdate)(buf.pointer())

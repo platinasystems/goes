@@ -65,30 +65,23 @@ func (xid Xid) RxDown() DevDown {
 	return down
 }
 
-func (xid Xid) RxReg(netns NetNs) DevReg {
+func (xid Xid) RxReg(netns NetNs, ifindex int32) DevReg {
 	reg := DevReg(xid)
 	if l := LinkOf(xid); l != nil {
-		ifindex := l.IfInfoIfIndex()
-		if netns != DefaultNetNs {
-			DefaultNetNs.Xid(ifindex, 0)
-			netns.Xid(ifindex, xid)
-			l.IfInfoNetNs(netns)
-		} else {
-			DefaultNetNs.Xid(ifindex, xid)
-			l.IfInfoNetNs(DefaultNetNs)
-		}
+		l.IfInfoNetNs().Xid(l.IfInfoIfIndex(), 0)
+		l.IfInfoNetNs(netns)
+		l.IfInfoIfIndex(ifindex)
 	}
+	netns.Xid(ifindex, xid)
 	return reg
 }
 
-func (xid Xid) RxUnreg() (unreg DevUnreg) {
+func (xid Xid) RxUnreg(newIfindex int32) (unreg DevUnreg) {
 	unreg = DevUnreg(xid)
-	if l := expectLinkOf(xid, "netns-reg"); l != nil {
-		ifindex := l.IfInfoIfIndex()
-		oldns := l.IfInfoNetNs()
-		oldns.Xid(ifindex, 0)
-		DefaultNetNs.Xid(ifindex, xid)
+	if l := expectLinkOf(xid, "RxUnreg"); l != nil {
+		l.IfInfoNetNs().Xid(l.IfInfoIfIndex(), 0)
 		l.IfInfoNetNs(DefaultNetNs)
+		l.IfInfoIfIndex(newIfindex)
 	}
 	return unreg
 }
