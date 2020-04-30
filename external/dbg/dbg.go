@@ -143,6 +143,7 @@ func (style Style) log(format string, _ interface{}, args ...interface{}) error 
 	w, ok := writer.Load().(io.Writer)
 	if !ok || w == nil {
 		w = os.Stdout
+		defer os.Stdout.Sync()
 	}
 	w.Write(buf.Bytes())
 	return err
