@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -138,7 +139,31 @@ func (ns NetNs) Neighbors(f func(neigh *Neighbor) bool) {
 func (ns NetNs) Path() string {
 	attrs := ns.attrs()
 	if len(attrs.path) > 0 {
-		return attrs.path
+		if attrs.path == "default" {
+			return attrs.path
+		}
+		// check if path is still valid
+		if attrs.path != "unknown" {
+			if strings.Contains(attrs.path, "/run/netns") {
+				if info, err := os.Stat(attrs.path); err == nil && info.Sys() != nil {
+					stat := info.Sys().(*syscall.Stat_t)
+					if stat.Ino == uint64(ns) {
+						return attrs.path
+					}
+				}
+			} else {
+				path := filepath.Join("/proc/", attrs.path, "ns/net")
+				if _, err := os.Stat(path); err == nil {
+					if ln, err := os.Readlink(path); err == nil {
+						if strings.Contains(ln, strconv.Itoa(int(ns))) {
+							return attrs.path
+						}
+					}
+				}
+			}
+		}
+		// path no longer valid; reset
+		attrs.path = ""
 	}
 	if ns == DefaultNetNs {
 		attrs.path = "default"
@@ -154,7 +179,7 @@ func (ns NetNs) Path() string {
 			}
 			stat := info.Sys().(*syscall.Stat_t)
 			if stat.Ino == uint64(ns) {
-				attrs.path = filepath.Join(path, info.Name())
+				attrs.path = path
 				return filepath.SkipDir
 			}
 			return nil
