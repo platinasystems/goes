@@ -65,6 +65,7 @@ func (c *Command) Main(args ...string) (err error) {
 	defer t.Stop()
 
 	if kexec := bootc(); len(kexec) > 1 {
+		time.Sleep(5 * time.Second) // Allow user to type STOP in UI
 		err := c.g.Main(kexec...)
 		fmt.Println(err)
 	}
