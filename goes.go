@@ -591,11 +591,11 @@ func (g *Goes) Main(args ...string) error {
 					}
 				}
 			}
-			signal.Stop(sig)
 		}()
 		err := v.Main(args[1:]...)
 		close(quit)
 		WG.Wait()
+		signal.Stop(sig)
 		return err
 	}
 
