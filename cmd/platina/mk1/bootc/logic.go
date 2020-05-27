@@ -116,16 +116,6 @@ func Bootc() []string {
 			return []string{""}
 		}
 
-		if err := fixSda1Swap(); err != nil {
-			log.Print("Error: can't fix sda1swap, drop into grub...")
-			return []string{""}
-		}
-
-		if err := fixNewroot(); err != nil {
-			log.Print("Error: can't fix newroot, drop into grub...")
-			return []string{""}
-		}
-
 		// sda1 utility mode
 		if Cfg.BootSda1 && strings.Contains(mounts, "sda1") {
 			if err := formKexec1(); err != nil {
@@ -1039,27 +1029,6 @@ func fixPaths() error { //FIXME Temporary remove by 9/30/2018
 	return nil
 }
 
-func fixNewroot() error { // FIXME Temporary remove by 9/30/2018
-	if err := readCfg(); err != nil {
-		return err
-	}
-	Cfg.ReInstallK = strings.Replace(Cfg.ReInstallK, "newroot", "mountd", 1)
-	Cfg.ReInstallI = strings.Replace(Cfg.ReInstallI, "newroot", "mountd", 1)
-	Cfg.Sda1K = strings.Replace(Cfg.Sda1K, "newroot", "mountd", 1)
-	Cfg.Sda1I = strings.Replace(Cfg.Sda1I, "newroot", "mountd", 1)
-	Cfg.Sda6K = strings.Replace(Cfg.Sda6K, "newroot", "mountd", 1)
-	Cfg.Sda6I = strings.Replace(Cfg.Sda6I, "newroot", "mountd", 1)
-	jsonInfo, err := json.Marshal(Cfg)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(BootcCfgFile, jsonInfo, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func reboot() error {
 	log.Print("\nWILL REBOOT NOW!!!\n")
 	u, err := exec.Command("shutdown", "-r", "now").Output()
@@ -1129,77 +1098,4 @@ func getCorebootInfo() (im IMGINFO, err error) {
 	}
 	im.Size = fmt.Sprintf("%d", fi.Size())
 	return im, nil
-}
-
-func fixSda1Swap() error {
-	context, err := getContext()
-	if err != nil {
-		return fmt.Errorf("ERROR: cound not detemine context.")
-	}
-	if context != goesBoot {
-		return nil
-	}
-
-	if _, err := os.Stat(cbSda6 + "etc/fstab"); err != nil {
-		return fmt.Errorf("Error reading %s: %w", cbSda6+"etc/fstab", err)
-	}
-	d6, err := ioutil.ReadFile(cbSda6 + "etc/fstab")
-	if err != nil {
-		return err
-	}
-	ds6 := strings.Split(string(d6), "\n")
-
-	if _, err := os.Stat(cbSda1 + "etc/fstab"); os.IsNotExist(err) {
-		return fmt.Errorf("Error reading %s: %w", cbSda1+"etc/fstab", err)
-	}
-	d1, err := ioutil.ReadFile(cbSda1 + "etc/fstab")
-	if err != nil {
-		return err
-	}
-	ds1 := strings.Split(string(d1), "\n")
-	uuid6 = ""
-	uuid6w = ""
-	for _, j := range ds6 {
-		if strings.Contains(j, "swap") {
-			if strings.Contains(j, "UUID") {
-				k := strings.Split(j, " ")
-				kk := strings.Split(k[0], "=")
-				uuid6 = kk[1]
-				uuid6w = j
-			}
-		}
-	}
-	uuid1 = ""
-	uuid1w = ""
-	for _, j := range ds1 {
-		if strings.Contains(j, "swap") {
-			if strings.Contains(j, "UUID") {
-				k := strings.Split(j, " ")
-				kk := strings.Split(k[0], "=")
-				uuid1 = kk[1]
-				uuid1w = j
-			}
-		}
-	}
-	if uuid1 == "" || uuid6 == "" {
-		log.Print("Error: no uuids")
-		return fmt.Errorf("ERROR: no UUID for swap in /etc/fstab.")
-	}
-	if uuid6 == uuid1 {
-		return nil
-	}
-	for i, j := range ds1 {
-		if strings.Contains(j, "swap") {
-			if strings.Contains(j, "UUID") {
-				ds1[i] = uuid6w
-			}
-		}
-	}
-	mm := strings.Join(ds1, "\n")
-	m := []byte(mm)
-	err = ioutil.WriteFile(cbSda1+"etc/fstab", m, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
 }
