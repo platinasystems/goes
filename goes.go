@@ -82,7 +82,7 @@ type Function struct {
 
 /*
 All goes go-routines should add them selves to the WG WaitGroup and quit on
-Stop likw this,
+Stop like this,
 
 	goes.WG.Add(1)
 	go func() {
