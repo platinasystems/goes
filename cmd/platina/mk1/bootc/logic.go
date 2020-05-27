@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/log"
 	"github.com/platinasystems/redis"
 )
 
@@ -84,11 +85,11 @@ var fileList = [...]string{
 }
 
 func Bootc() []string {
-	fmt.Println("In bootc")
+	log.Print("In bootc")
 	for i := 0; ; i++ {
 		time.Sleep(time.Millisecond * time.Duration(waitMs))
 		if i > timeoutCnt {
-			fmt.Println("timeout")
+			log.Print("timeout")
 			return []string{""}
 		}
 		p, err := ioutil.ReadFile("/proc/partitions")
@@ -102,41 +103,41 @@ func Bootc() []string {
 		}
 		mounts := string(m)
 		if err := readCfg(); err != nil {
-			fmt.Println("Error in readCfg", err)
+			log.Print("Error in readCfg", err)
 			continue
 		} else {
 			if err := writeCfg(); err != nil { // updates bootc format
-				fmt.Println("Error: writing bootc.cfg, drop into grub...")
+				log.Print("Error: writing bootc.cfg, drop into grub...")
 				return []string{""}
 			}
 		}
 		if Cfg.Disable {
-			fmt.Println("Exiting Cfg.Disable")
+			log.Print("Exiting Cfg.Disable")
 			return []string{""}
 		}
 
 		if err := fixSda1Swap(); err != nil {
-			fmt.Println("Error: can't fix sda1swap, drop into grub...")
+			log.Print("Error: can't fix sda1swap, drop into grub...")
 			return []string{""}
 		}
 
 		if err := fixNewroot(); err != nil {
-			fmt.Println("Error: can't fix newroot, drop into grub...")
+			log.Print("Error: can't fix newroot, drop into grub...")
 			return []string{""}
 		}
 
 		// sda1 utility mode
 		if Cfg.BootSda1 && strings.Contains(mounts, "sda1") {
 			if err := formKexec1(); err != nil {
-				fmt.Println("Error: can't form kexec string, drop into grub...")
+				log.Print("Error: can't form kexec string, drop into grub...")
 				return []string{""}
 			}
 			if err := clrSda1Flag(); err != nil {
-				fmt.Println("Error: can't clear sda1 flag, drop into grub...")
+				log.Print("Error: can't clear sda1 flag, drop into grub...")
 				return []string{""}
 			}
 			// boot sda1 for recovery
-			fmt.Println("Boot sda1 for recovery")
+			log.Print("Boot sda1 for recovery")
 			return []string{"kexec", "-k", Cfg.Sda1K,
 				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
@@ -144,19 +145,19 @@ func Bootc() []string {
 		// install
 		if Cfg.Install && strings.Contains(mounts, "sda1") && !strings.Contains(parts, "sda6") {
 			if err := formKexec1(); err != nil {
-				fmt.Println("Error: can't form install kexec, drop into grub...")
+				log.Print("Error: can't form install kexec, drop into grub...")
 				return []string{""}
 			}
 			if err := clrInstall(); err != nil {
-				fmt.Println("Error: can't clear install bit, drop into grub...")
+				log.Print("Error: can't clear install bit, drop into grub...")
 				return []string{""}
 			}
 			//TODO Comment out until post script is fixed TODO if err := setPostInstall(); err != nil {
-			//	fmt.Println("Error: can't set postinstall bit, drop into grub...")
+			//	log.Print("Error: can't set postinstall bit, drop into grub...")
 			//	return []string{""}
 			//}
 			// boot installer from sda1
-			fmt.Println("boot installer from sda1")
+			log.Print("boot installer from sda1")
 			return []string{"kexec", "-k", Cfg.ReInstallK, "-i",
 				Cfg.ReInstallI, "-c", kexec0, "-e"}
 		}
@@ -164,16 +165,16 @@ func Bootc() []string {
 		// postinstall
 		if Cfg.PostInstall && strings.Contains(mounts, sda6) && strings.Contains(mounts, sda1) {
 			if err := clrPostInstall(); err != nil {
-				fmt.Println("Error: post install copy failed, drop into grub...")
+				log.Print("Error: post install copy failed, drop into grub...")
 				return []string{""}
 			}
 			// FIXME update this per new architecture
 			if err := Copy(cbSda1+tarFile, cbSda6+tarFile); err != nil {
-				fmt.Println("Error: post install copy failed, drop into grub...")
+				log.Print("Error: post install copy failed, drop into grub...")
 				return []string{""}
 			}
 			if err := Copy(cbSda1+scriptFile, cbSda6+"etc/"+scriptFile); err != nil {
-				fmt.Println("Error: post install copy failed, drop into grub...")
+				log.Print("Error: post install copy failed, drop into grub...")
 				return []string{""}
 			}
 		}
@@ -182,21 +183,21 @@ func Bootc() []string {
 		if (Cfg.BootSda6Cnt > 0 || !sda6cntEnb) &&
 			strings.Contains(parts, sda6) && strings.Contains(mounts, sda6) {
 			if err := fixPaths(); err != nil {
-				fmt.Println("Error: can't fix paths, drop into grub...")
+				log.Print("Error: can't fix paths, drop into grub...")
 				return []string{""}
 			}
 			if err := formKexec6(); err != nil {
-				fmt.Println("Error: can't form sda6 kexec, drop into grub...")
+				log.Print("Error: can't form sda6 kexec, drop into grub...")
 				return []string{""}
 			}
 			if sda6cntEnb {
 				if err := decBootSda6Cnt(); err != nil {
-					fmt.Println("Error: can't decrement sda6cnt, drop into grub...")
+					log.Print("Error: can't decrement sda6cnt, drop into grub...")
 					return []string{""}
 				}
 			}
 			// boot sda6
-			fmt.Println("boot sda6")
+			log.Print("boot sda6")
 			return []string{"kexec", "-k", Cfg.Sda6K,
 				"-i", Cfg.Sda6I, "-c", kexec6, "-e"}
 		}
@@ -204,21 +205,21 @@ func Bootc() []string {
 		// non-partitioned
 		if !strings.Contains(parts, sda6) && strings.Contains(mounts, sda1) {
 			if err := formKexec1(); err != nil {
-				fmt.Println("Error: can't form kexec string, drop into grub...")
+				log.Print("Error: can't form kexec string, drop into grub...")
 				return []string{""}
 			}
 			if err := clrSda1Flag(); err != nil {
-				fmt.Println("Error: can't clear sda1 flag, drop into grub...")
+				log.Print("Error: can't clear sda1 flag, drop into grub...")
 				return []string{""}
 			}
 			// boot sda1 if we are not partitioned
-			fmt.Println("boot sda1 not partitioned")
+			log.Print("boot sda1 not partitioned")
 			return []string{"kexec", "-k", Cfg.Sda1K,
 				"-i", Cfg.Sda1I, "-c", kexec1, "-e"}
 		}
 	}
 
-	fmt.Println("Error: bootc can't boot, drop into grub...")
+	log.Print("Error: bootc can't boot, drop into grub...")
 	return []string{""}
 }
 
@@ -230,30 +231,30 @@ func checkFiles() bool {
 	path := ""
 	switch context {
 	case goesBoot:
-		//fmt.Println("TEMP: goes-boot context.")
+		//log.Print("TEMP: goes-boot context.")
 		path = goesBootPath
 	case sda1:
-		//fmt.Println("TEMP: goes sda1 context.")
+		//log.Print("TEMP: goes sda1 context.")
 		path = sda1Path
 	case sda6:
-		//fmt.Println("TEMP: goes sda6 context.")
+		//log.Print("TEMP: goes sda6 context.")
 		path = sda6Path
 		if err := mountSda1(); err != nil {
-			//fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
+			//log.Print("TEMP: goes sda6 mount-sda1 fail.")
 			return false
 		}
-		//fmt.Println("TEMP: goes sda6 mount-sda1 success.")
+		//log.Print("TEMP: goes sda6 mount-sda1 success.")
 	default:
-		fmt.Println("ERROR: could not determine context.")
+		log.Print("ERROR: could not determine context.")
 		return false
 	}
 
 	good := true
 	//FIXME change names of .iso's to original.iso, latest.iso
 	for _, f := range fileList {
-		fmt.Println("Checking", path+f, "exists...")
+		log.Print("Checking", path+f, "exists...")
 		if _, err := os.Stat(path + f); os.IsNotExist(err) {
-			fmt.Println("ERROR:	file", path+f, "does not exist")
+			log.Print("ERROR:	file", path+f, "does not exist")
 			good = false
 		}
 	}
@@ -262,10 +263,10 @@ func checkFiles() bool {
 	// 3. check the sda6 k string, see it matches /boot
 	// 4. check the sda6 i string, see it matches /boot
 	if good {
-		fmt.Println("PASSED: wipe/reinstall is configured properly.")
+		log.Print("PASSED: wipe/reinstall is configured properly.")
 		return true
 	}
-	fmt.Println("FAILED: wipe/reinstall is NOT configured properly.")
+	log.Print("FAILED: wipe/reinstall is NOT configured properly.")
 	return false
 }
 
@@ -277,32 +278,32 @@ func getFiles() error {
 	//path := ""
 	switch context {
 	case goesBoot:
-		//fmt.Println("TEMP: goes-boot context.")
+		//log.Print("TEMP: goes-boot context.")
 		//path = goesBootPath
 	case sda1:
-		//fmt.Println("TEMP: goes sda1 context.")
+		//log.Print("TEMP: goes sda1 context.")
 		//path = sda1Path
 	case sda6:
-		//fmt.Println("TEMP: goes sda6 context.")
+		//log.Print("TEMP: goes sda6 context.")
 		//path = sda6Path
 		if err := mountSda1(); err != nil {
-			//fmt.Println("TEMP: goes sda6 mount-sda1 fail.")
+			//log.Print("TEMP: goes sda6 mount-sda1 fail.")
 			return err
 		}
-		//fmt.Println("TEMP: goes sda6 mount-sda1 success.")
+		//log.Print("TEMP: goes sda6 mount-sda1 success.")
 	default:
-		fmt.Println("ERROR: could not determine context.")
+		log.Print("ERROR: could not determine context.")
 		return nil
 	}
 
-	//fmt.Println("TEMP: sda1 path = ", path)
+	//log.Print("TEMP: sda1 path = ", path)
 	return nil
 }
 
 func (c *Command) bootc() {
 	if kexec := Bootc(); len(kexec) > 1 {
 		err := c.Main(kexec...)
-		fmt.Println(err)
+		log.Print(err)
 	}
 	return
 }
@@ -373,13 +374,13 @@ func mountSda1() error {
 	if _, err := os.Stat(mount); os.IsNotExist(err) {
 		err := os.Mkdir(mount, os.FileMode(0755))
 		if err != nil {
-			fmt.Printf("Error mkdir: %v", err)
+			log.Print("Error mkdir:", err)
 			return err
 		}
 	}
 	if _, err := os.Stat(sda1Etc); os.IsNotExist(err) {
 		if err := syscall.Mount(devSda1, mount, fstype, zero, ""); err != nil {
-			fmt.Printf("Error mounting: %v", err)
+			log.Print("Error mounting: ", err)
 			return err
 		}
 	}
@@ -899,9 +900,9 @@ func UpdateBootcCfg(k, i string) error {
 
 func Wipe(dryrun bool) error {
 	if dryrun {
-		fmt.Println("Start wipe dryrun.  Does not write to disk.")
+		log.Print("Start wipe dryrun.  Does not write to disk.")
 	}
-	fmt.Println("Making sure we booted from sda1 or sda6...")
+	log.Print("Making sure we booted from sda1 or sda6...")
 	context, err := getContext()
 	if context != sda6 && context != sda1 {
 		return fmt.Errorf("Not booted from sda6 or sda1, can't wipe.")
@@ -912,7 +913,7 @@ func Wipe(dryrun bool) error {
 		}
 	}
 
-	fmt.Println("Making sure sda6 exists...")
+	log.Print("Making sure sda6 exists...")
 	d1 := []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
 	if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
 		return err
@@ -920,7 +921,7 @@ func Wipe(dryrun bool) error {
 	cmd := exec.Command(tmpFile)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("fdisk: %v, %v\n", out, err)
+		log.Print("fdisk: ", out, err)
 		return err
 	}
 	outs := strings.Split(string(out), "\n")
@@ -934,19 +935,19 @@ func Wipe(dryrun bool) error {
 		return fmt.Errorf("Error: /dev/sda6 not in partition table, aborting")
 	}
 
-	fmt.Println("Making sure sda1 has all the re-install files...")
+	log.Print("Making sure sda1 has all the re-install files...")
 	if passed := checkFiles(); !passed {
 		return fmt.Errorf("Not all files exist on sda1, aborting...")
 	}
 
-	fmt.Println("Check coreboot version...")
+	log.Print("Check coreboot version...")
 	var im IMGINFO
 	if im, err = getCorebootInfo(); err != nil {
-		fmt.Println("Coreboot could not be read, aborting...")
+		log.Print("Coreboot could not be read, aborting...")
 		return err
 	}
 	if len(im.Extra) == 0 {
-		fmt.Println("Coreboot git version doesn't exist in rom, aborting")
+		log.Print("Coreboot git version doesn't exist in rom, aborting")
 		return fmt.Errorf("Couldn't determine coreboot version")
 	}
 	y := strings.Split(im.Extra, "-")
@@ -965,10 +966,10 @@ func Wipe(dryrun bool) error {
 	if v == minCoreVer && w < minCoreCom {
 		return fmt.Errorf("Coreboot needs upgraded.")
 	}
-	fmt.Printf("Coreboot version ok, ver = %f, subver = %d\n", v, w)
+	log.Print("Coreboot version ok, ver = ", v, "subver = ", w)
 
 	if !dryrun {
-		fmt.Println("Deleting sda6 from the partition table...")
+		log.Print("Deleting sda6 from the partition table...")
 		d1 = []byte("#!/bin/bash\necho -e " + `"d\n6\nw\n"` + " | /sbin/fdisk /dev/sda\n")
 		if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
 			return err
@@ -976,12 +977,12 @@ func Wipe(dryrun bool) error {
 		cmd = exec.Command(tmpFile)
 		out, err = cmd.CombinedOutput()
 		if err != nil {
-			fmt.Printf("fdisk: %v, %v\n", out, err)
+			log.Print("fdisk: ", out, err)
 		}
 	}
 
 	if !dryrun {
-		fmt.Println("Verify sda6 is actually gone...")
+		log.Print("Verify sda6 is actually gone...")
 		d1 = []byte("#!/bin/bash\necho -e " + `"p\nq\n"` + " | /sbin/fdisk /dev/sda\n")
 		if err = ioutil.WriteFile(tmpFile, d1, 0755); err != nil {
 			return err
@@ -989,7 +990,7 @@ func Wipe(dryrun bool) error {
 		cmd = exec.Command(tmpFile)
 		out, err = cmd.CombinedOutput()
 		if err != nil {
-			fmt.Printf("fdisk: %v, %v\n", out, err)
+			log.Print("fdisk: ", out, err)
 			return err
 		}
 		outs = strings.Split(string(out), "\n")
@@ -998,18 +999,18 @@ func Wipe(dryrun bool) error {
 				return fmt.Errorf("Error: /dev/sda6 not deleted, aborting wipe")
 			}
 		}
-		fmt.Println("Verified")
+		log.Print("Verified")
 	}
 
 	if !dryrun {
-		fmt.Println("Setting Install bit for coreboot...")
+		log.Print("Setting Install bit for coreboot...")
 		if err := setInstall(); err != nil {
 			return err
 		}
 	}
 
 	if dryrun {
-		fmt.Println("Wipe dryrun passed...")
+		log.Print("Wipe dryrun passed...")
 	}
 	return nil
 }
@@ -1060,9 +1061,9 @@ func fixNewroot() error { // FIXME Temporary remove by 9/30/2018
 }
 
 func reboot() error {
-	fmt.Print("\nWILL REBOOT NOW!!!\n")
+	log.Print("\nWILL REBOOT NOW!!!\n")
 	u, err := exec.Command("shutdown", "-r", "now").Output()
-	fmt.Println(u)
+	log.Print(u)
 	if err != nil {
 		return err
 	}
@@ -1181,7 +1182,7 @@ func fixSda1Swap() error {
 		}
 	}
 	if uuid1 == "" || uuid6 == "" {
-		fmt.Println("Error: no uuids")
+		log.Print("Error: no uuids")
 		return fmt.Errorf("ERROR: no UUID for swap in /etc/fstab.")
 	}
 	if uuid6 == uuid1 {
