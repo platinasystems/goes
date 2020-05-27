@@ -57,6 +57,10 @@ func (h *MsgHeader) Validate(buf []byte) error {
 		exact = SizeofMsgIfInfo
 	case MsgKindNeighUpdate:
 		exact = SizeofMsgNeighUpdate
+	case MsgKindNetNsAdd:
+		exact = SizeofMsgNetNs
+	case MsgKindNetNsDel:
+		exact = SizeofMsgNetNs
 	default:
 		return fmt.Errorf("msg kind %d unsupported", h.Kind)
 	}

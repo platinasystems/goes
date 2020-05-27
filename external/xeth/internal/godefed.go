@@ -125,6 +125,10 @@ type MsgNeighUpdate struct {
 	Lladdr		[6]uint8
 	Pad		[2]uint8
 }
+type MsgNetNs struct {
+	Header	MsgHeader
+	Net	uint64
+}
 type MsgSpeed struct {
 	Header	MsgHeader
 	Xid	uint32
@@ -157,6 +161,8 @@ const (
 	MsgKindFib6Entry			= 0x10
 	MsgKindNeighUpdate			= 0x11
 	MsgKindChangeUpperXid			= 0x12
+	MsgKindNetNsAdd				= 0x13
+	MsgKindNetNsDel				= 0x14
 )
 
 const (
@@ -177,6 +183,7 @@ const (
 	SizeofMsgFibEntry		= 0x28
 	SizeofMsgFib6Entry		= 0x50
 	SizeofMsgNeighUpdate		= 0x38
+	SizeofMsgNetNs			= 0x18
 	SizeofMsgSpeed			= 0x18
 	SizeofMsgStat			= 0x20
 )

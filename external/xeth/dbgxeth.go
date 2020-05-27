@@ -207,6 +207,14 @@ func (msg *Neighbor) Format(f fmt.State, c rune) {
 	fmt.Fprint(f, " ", msg.HardwareAddr)
 }
 
+func (msg NetNsAdd) Format(f fmt.State, c rune) {
+	fmt.Fprint(f, "netns add ", msg.NetNs)
+}
+
+func (msg NetNsDel) Format(f fmt.State, c rune) {
+	fmt.Fprint(f, "netns del ", msg.NetNs)
+}
+
 func (nh *NH) Format(f fmt.State, c rune) {
 	fmt.Fprint(f, "{")
 	fmt.Fprint(f, nh.IP)

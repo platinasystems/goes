@@ -77,6 +77,7 @@ const (
 	ClassAddress
 	ClassFib
 	ClassNeighbor
+	ClassNetNs
 )
 
 const (
@@ -110,8 +111,8 @@ type Task struct {
 	loch chan<- buffer // low priority, leaky-bucket tx channel
 	hich chan<- buffer // high priority, unbuffered, no-drop tx channel
 
-	rxErr error // error that stopped the rx service
-	txErr error // error that stopped the tx service
+	RxErr error // error that stopped the rx service
+	TxErr error // error that stopped the tx service
 
 	fd  int
 	fda syscall.SockaddrLinklayer
@@ -190,6 +191,8 @@ func Class(buf Buffer) int {
 		return ClassFib
 	case internal.MsgKindNeighUpdate:
 		return ClassNeighbor
+	case internal.MsgKindNetNsAdd, internal.MsgKindNetNsDel:
+		return ClassNetNs
 	default:
 		return ClassUnknown
 	}
@@ -199,7 +202,7 @@ func Class(buf Buffer) int {
 func Parse(buf Buffer) interface{} {
 	defer Parsed.Inc()
 	defer buf.pool()
-	switch kind(buf) {
+	switch k := kind(buf); k {
 	case internal.MsgKindBreak:
 		return Break{}
 	case internal.MsgKindChangeUpperXid:
@@ -272,6 +275,12 @@ func Parse(buf Buffer) interface{} {
 	case internal.MsgKindNeighUpdate:
 		msg := (*internal.MsgNeighUpdate)(buf.pointer())
 		return neighbor(msg)
+	case internal.MsgKindNetNsAdd:
+		msg := (*internal.MsgNetNs)(buf.pointer())
+		return NetNsAdd{NetNs(msg.Net)}
+	case internal.MsgKindNetNsDel:
+		msg := (*internal.MsgNetNs)(buf.pointer())
+		return NetNsDel{NetNs(msg.Net)}
 	}
 	return nil
 }
@@ -398,8 +407,8 @@ func (task *Task) goRx(rxch chan<- Buffer) {
 			return
 		default:
 		}
-		task.rxErr = task.sock.SetReadDeadline(time.Now().Add(rxto))
-		if task.rxErr != nil {
+		task.RxErr = task.sock.SetReadDeadline(time.Now().Add(rxto))
+		if task.RxErr != nil {
 			break
 		}
 		n, noob, flags, addr, err := task.sock.ReadMsgUnix(rxbuf, rxoob)
@@ -418,10 +427,10 @@ func (task *Task) goRx(rxch chan<- Buffer) {
 		} else if err != nil {
 			e, ok := err.(*os.SyscallError)
 			if !ok || e.Err.Error() != "EOF" {
-				task.rxErr = err
+				task.RxErr = err
 			}
 			break
-		} else if task.rxErr = h.Validate(rxbuf[:n]); task.rxErr != nil {
+		} else if task.RxErr = h.Validate(rxbuf[:n]); task.RxErr != nil {
 			break
 		} else {
 			rxto = minrxto
@@ -433,19 +442,19 @@ func (task *Task) goRx(rxch chan<- Buffer) {
 
 func (task *Task) goTx(loch, hich <-chan buffer) {
 	defer goes.WG.Done()
-	for task.txErr == nil {
+	for task.TxErr == nil {
 		select {
 		case <-goes.Stop:
 			return
 		case buf, ok := <-hich:
 			if ok {
-				task.txErr = task.tx(buf, 0)
+				task.TxErr = task.tx(buf, 0)
 			} else {
 				return
 			}
 		case buf, ok := <-loch:
 			if ok {
-				task.txErr = task.tx(buf, 10*time.Millisecond)
+				task.TxErr = task.tx(buf, 10*time.Millisecond)
 			} else {
 				return
 			}

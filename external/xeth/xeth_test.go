@@ -1,4 +1,4 @@
-// Copyright © 2018-2019 Platina Systems, Inc. All rights reserved.
+// Copyright © 2018-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -7,25 +7,32 @@ package xeth
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"testing"
+
+	"github.com/platinasystems/goes"
 )
 
 var Continue = flag.Bool("test.continue", false,
 	"continue after ifinfo and fib dumps unil SIGINT")
 
 func Test(t *testing.T) {
-	var wg sync.WaitGroup
-	defer wg.Wait()
-	stopch := make(chan struct{})
-	defer close(stopch)
+	goes.Stop = make(chan struct{})
+
+	defer goes.WG.Wait()
+	defer close(goes.Stop)
 
 	flag.Parse()
 
-	task, err := Start(&wg, stopch)
+	w := ioutil.Discard
+	if testing.Verbose() {
+		w = os.Stdout
+	}
+
+	task, err := Start()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,29 +45,31 @@ func Test(t *testing.T) {
 		// Load the attribute cache through Parse
 		Pool(Parse(buf))
 	}
+	if task.RxErr != nil {
+		t.Fatal(task.RxErr)
+	}
 
-	LinkRange(func(xid Xid, m *sync.Map) bool {
-		attrs := XethLinkAttrs{m}
-		fmt.Print(attrs.IfInfoName(), ", xid ")
+	LinkRange(func(xid Xid, l *Link) bool {
+		fmt.Fprint(w, l.IfInfoName(), ", xid ")
 		if xid < VlanNVid {
-			fmt.Print(uint32(xid))
+			fmt.Fprint(w, uint32(xid))
 		} else {
-			fmt.Print("(", uint32(xid/VlanNVid), ", ",
+			fmt.Fprint(w, "(", uint32(xid/VlanNVid), ", ",
 				uint32(xid&VlanVidMask), ")")
 		}
-		fmt.Print(", ifindex ", attrs.IfInfoIfIndex(),
-			", netns ", attrs.IfInfoNetNs(),
-			", kind ", attrs.IfInfoDevKind())
-		if ipnets := attrs.IPNets(); len(ipnets) > 0 {
-			fmt.Print(", ipnets ", ipnets)
+		fmt.Fprint(w, ", ifindex ", l.IfInfoIfIndex(),
+			", netns ", l.IfInfoNetNs(),
+			", kind ", l.IfInfoDevKind())
+		if ipnets := l.IPNets(); len(ipnets) > 0 {
+			fmt.Fprint(w, ", ipnets ", ipnets)
 		}
-		if uppers := attrs.Uppers(); len(uppers) > 0 {
-			fmt.Print(", uppers ", uppers)
+		if uppers := l.Uppers(); len(uppers) > 0 {
+			fmt.Fprint(w, ", uppers ", uppers)
 		}
-		if lowers := attrs.Lowers(); len(lowers) > 0 {
-			fmt.Print(", lowers ", lowers)
+		if lowers := l.Lowers(); len(lowers) > 0 {
+			fmt.Fprint(w, ", lowers ", lowers)
 		}
-		fmt.Println()
+		fmt.Fprintln(w)
 		return true
 	})
 
@@ -70,8 +79,11 @@ func Test(t *testing.T) {
 			break
 		}
 		msg := Parse(buf)
-		fmt.Println(msg)
+		fmt.Fprintln(w, msg)
 		Pool(msg)
+	}
+	if task.RxErr != nil {
+		t.Fatal(task.RxErr)
 	}
 
 	if *Continue {
@@ -81,16 +93,21 @@ func Test(t *testing.T) {
 			syscall.SIGINT,
 			syscall.SIGHUP,
 			syscall.SIGQUIT)
+		goes.WG.Add(1)
 		go func() {
-			wg.Add(1)
-			defer wg.Done()
+			defer goes.WG.Done()
+			fmt.Fprintln(w, "continue...")
 			for buf := range task.RxCh {
 				msg := Parse(buf)
-				fmt.Println(msg)
+				fmt.Fprintln(w, msg)
 				Pool(msg)
+			}
+			if task.RxErr != nil {
+				t.Error(task.RxErr)
 			}
 		}()
 		<-sigch
 		signal.Stop(sigch)
+		fmt.Fprintln(w, "stopped")
 	}
 }

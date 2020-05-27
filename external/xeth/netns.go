@@ -18,6 +18,14 @@ import (
 type NetNs uint64
 type NetNses []NetNs
 
+type NetNsAdd struct {
+	NetNs
+}
+
+type NetNsDel struct {
+	NetNs
+}
+
 const DefaultNetNs NetNs = 1
 
 type netnsAttrs struct {

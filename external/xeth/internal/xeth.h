@@ -78,6 +78,8 @@ enum xeth_msg_kind {
 	XETH_MSG_KIND_FIB6ENTRY,
 	XETH_MSG_KIND_NEIGH_UPDATE,
 	XETH_MSG_KIND_CHANGE_UPPER_XID,
+	XETH_MSG_KIND_NETNS_ADD,
+	XETH_MSG_KIND_NETNS_DEL,
 };
 
 enum xeth_msg_carrier_flag {
@@ -245,6 +247,11 @@ struct xeth_msg_neigh_update {
 	uint8_t dst[16];
 	uint8_t lladdr[XETH_ALEN];
 	uint8_t pad[8-XETH_ALEN];
+};
+
+struct xeth_msg_netns {
+	struct xeth_msg_header header;
+	uint64_t net;
 };
 
 struct xeth_msg_speed {

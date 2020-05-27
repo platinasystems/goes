@@ -25,6 +25,7 @@ type MsgIfa C.struct_xeth_msg_ifa
 type MsgIfa6 C.struct_xeth_msg_ifa6
 type MsgIfInfo C.struct_xeth_msg_ifinfo
 type MsgNeighUpdate C.struct_xeth_msg_neigh_update
+type MsgNetNs C.struct_xeth_msg_netns
 type MsgSpeed C.struct_xeth_msg_speed
 type MsgStat C.struct_xeth_msg_stat
 
@@ -48,6 +49,8 @@ const (
 	MsgKindFib6Entry                     = C.XETH_MSG_KIND_FIB6ENTRY
 	MsgKindNeighUpdate                   = C.XETH_MSG_KIND_NEIGH_UPDATE
 	MsgKindChangeUpperXid                = C.XETH_MSG_KIND_CHANGE_UPPER_XID
+	MsgKindNetNsAdd                      = C.XETH_MSG_KIND_NETNS_ADD
+	MsgKindNetNsDel                      = C.XETH_MSG_KIND_NETNS_DEL
 )
 
 const (
@@ -68,6 +71,7 @@ const (
 	SizeofMsgFibEntry         = C.sizeof_struct_xeth_msg_fibentry
 	SizeofMsgFib6Entry        = C.sizeof_struct_xeth_msg_fib6entry
 	SizeofMsgNeighUpdate      = C.sizeof_struct_xeth_msg_neigh_update
+	SizeofMsgNetNs            = C.sizeof_struct_xeth_msg_netns
 	SizeofMsgSpeed            = C.sizeof_struct_xeth_msg_speed
 	SizeofMsgStat             = C.sizeof_struct_xeth_msg_stat
 )
