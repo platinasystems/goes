@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/platinasystems/goes"
@@ -91,6 +92,10 @@ func (c *Command) Main(args ...string) (err error) {
 		for i := 0; i < cnt; i++ {
 			<-done
 		}
+
+		sort.Slice(c.mounts, func(i, j int) bool {
+			return c.mounts[i].mnt > c.mounts[j].mnt
+		})
 
 		for _, m := range c.mounts {
 			if m.hasGrub {
