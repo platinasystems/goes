@@ -65,12 +65,6 @@ func (c *Command) Main(args ...string) (err error) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
 
-	if kexec := bootc(); len(kexec) > 1 {
-		time.Sleep(5 * time.Second) // Allow user to type STOP in UI
-		err := c.g.Main(kexec...)
-		fmt.Println(err)
-	}
-
 	for {
 		dirs, err := ioutil.ReadDir(mp)
 		if err != nil {
