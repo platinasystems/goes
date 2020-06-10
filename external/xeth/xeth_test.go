@@ -20,6 +20,9 @@ var Continue = flag.Bool("test.continue", false,
 	"continue after ifinfo and fib dumps unil SIGINT")
 
 func Test(t *testing.T) {
+	if _, err := os.Stat("/sys/bus/pci/drivers/xeth"); err != nil {
+		t.Skip("no xeth driver")
+	}
 	goes.Stop = make(chan struct{})
 
 	defer goes.WG.Wait()
