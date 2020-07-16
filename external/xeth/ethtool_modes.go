@@ -11,17 +11,23 @@ type DevLinkModesAdvertising Xid
 type DevLinkModesLPAdvertising Xid
 
 func (xid Xid) RxSupported(modes uint64) DevLinkModesSupported {
-	LinkOf(xid).LinkModesSupported(EthtoolLinkModeBits(modes))
+	if l := LinkOf(xid); l != nil {
+		l.LinkModesSupported(EthtoolLinkModeBits(modes))
+	}
 	return DevLinkModesSupported(xid)
 }
 
 func (xid Xid) RxAdvertising(modes uint64) DevLinkModesAdvertising {
-	LinkOf(xid).LinkModesAdvertising(EthtoolLinkModeBits(modes))
+	if l := LinkOf(xid); l != nil {
+		l.LinkModesAdvertising(EthtoolLinkModeBits(modes))
+	}
 	return DevLinkModesAdvertising(xid)
 }
 
 func (xid Xid) RxLPAdvertising(modes uint64) DevLinkModesLPAdvertising {
-	LinkOf(xid).LinkModesLPAdvertising(EthtoolLinkModeBits(modes))
+	if l := LinkOf(xid); l != nil {
+		l.LinkModesLPAdvertising(EthtoolLinkModeBits(modes))
+	}
 	return DevLinkModesLPAdvertising(xid)
 }
 

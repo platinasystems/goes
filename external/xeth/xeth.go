@@ -4,7 +4,7 @@
 
 // This package provides a sideband control interface to an XETH driver.
 // Usage,
-//	task, err := xeth.Start()
+//	task, err := xeth.Start(dev)
 //	if err {
 //		panic(err)
 //	}
@@ -54,9 +54,13 @@
 package xeth
 
 import (
+	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 	"unsafe"
@@ -118,14 +122,39 @@ type Task struct {
 	fda syscall.SockaddrLinklayer
 }
 
-// Connect @xeth socket and run channel service routines.
-func Start() (task *Task, err error) {
-	xethif, err := net.InterfaceByName("xeth")
+// Write provision value to platform device sysfs file
+func Provision(dev, val string) error {
+	if len(val) == 0 {
+		// have to write something to get sysfs store handler to run
+		// which will then open the atsock
+		val = " "
+	}
+	sysfsdir := filepath.Join("/sys/bus/platform/devices", dev)
+	_, err := os.Stat(sysfsdir)
+	if err != nil {
+		return err
+	}
+	sysfsdir, err = filepath.EvalSymlinks(sysfsdir)
+	if err != nil {
+		return err
+	}
+	provision := filepath.Join(sysfsdir, "provision")
+	err = ioutil.WriteFile(provision, []byte(val), 0644)
+	if errors.Is(err, syscall.EBUSY) {
+		fmt.Fprintln(os.Stderr, "ignoring provision until xeth reload")
+		err = nil
+	}
+	return err
+}
+
+// Connect socket and run channel service routines.
+func Start(dev string) (task *Task, err error) {
+	muxif, err := net.InterfaceByName(dev)
 	if err != nil {
 		return
 	}
 
-	atxeth, err := net.ResolveUnixAddr(unixpacket, "@xeth")
+	atsockaddr, err := net.ResolveUnixAddr(unixpacket, "@"+dev)
 	if err != nil {
 		return
 	}
@@ -136,13 +165,24 @@ func Start() (task *Task, err error) {
 		return
 	}
 
-	atsock, err := net.DialUnix(unixpacket, nil, atxeth)
-	for err != nil {
-		if !isEAGAIN(err) {
-			return
+	atsock, err := func(a *net.UnixAddr) (*net.UnixConn, error) {
+		t := time.NewTicker(100 * time.Millisecond)
+		defer t.Stop()
+		for {
+			s, err := net.DialUnix(unixpacket, nil, atsockaddr)
+			if err == nil {
+				return s, nil
+			} else if !isEAGAIN(err) &&
+				!errors.Is(err, syscall.ECONNREFUSED) {
+				return nil, err
+			}
+			select {
+			case <-goes.Stop:
+				return nil, io.EOF
+			case <-t.C:
+			}
 		}
-		atsock, err = net.DialUnix(unixpacket, nil, atxeth)
-	}
+	}(atsockaddr)
 
 	loch := make(chan buffer, 4)
 	hich := make(chan buffer, 4)
@@ -156,7 +196,7 @@ func Start() (task *Task, err error) {
 		fd:   muxfd,
 		fda: syscall.SockaddrLinklayer{
 			Protocol: syscall.ETH_P_ARP,
-			Ifindex:  xethif.Index,
+			Ifindex:  muxif.Index,
 			Hatype:   syscall.ARPHRD_ETHER,
 		},
 	}
@@ -258,9 +298,9 @@ func Parse(buf Buffer) interface{} {
 		xid := Xid(msg.Xid)
 		switch msg.Reason {
 		case internal.IfInfoReasonNew:
-			return xid.RxIfInfo(msg)
+			return RxIfInfo(msg)
 		case internal.IfInfoReasonDump:
-			return xid.RxIfInfo(msg)
+			return RxIfInfo(msg)
 		case internal.IfInfoReasonDel:
 			return RxDelete(xid)
 		case internal.IfInfoReasonUp:

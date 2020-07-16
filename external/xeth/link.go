@@ -93,17 +93,6 @@ func expectLinkOf(xid Xid, requester string) (l *Link) {
 	return
 }
 
-// make the xid Link if it's not already available
-func mayMakeLinkOf(xid Xid) (l *Link) {
-	if l = LinkOf(xid); l == nil {
-		l = &Link{
-			xid: xid,
-		}
-		Links.Store(xid, l)
-	}
-	return
-}
-
 func LinkRange(f func(xid Xid, l *Link) bool) {
 	Links.Range(func(k, v interface{}) bool {
 		return f(k.(Xid), v.(*Link))

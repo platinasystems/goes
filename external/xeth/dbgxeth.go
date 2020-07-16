@@ -15,12 +15,9 @@ import (
 const Dbg = dbg.Func
 
 func (xid Xid) Format(f fmt.State, c rune) {
-	l := LinkOf(xid)
-	if l != nil {
+	if l := LinkOf(xid); l != nil {
 		fmt.Fprint(f, l.IfInfoName())
-		return
-	}
-	if xid > VlanNVid {
+	} else if xid > VlanNVid {
 		fmt.Fprintf(f, "(%d, %d)", xid&VlanVidMask, xid/VlanNVid)
 	} else {
 		fmt.Fprint(f, uint32(xid))
@@ -83,27 +80,45 @@ func (dev *DevEthtoolFlags) Format(f fmt.State, c rune) {
 
 func (dev DevEthtoolSettings) Format(f fmt.State, c rune) {
 	xid := Xid(dev)
-	l := LinkOf(xid)
 	fmt.Fprint(f, xid)
-	fmt.Fprint(f, " speed ", l.EthtoolSpeed(), " (mbps)")
-	fmt.Fprint(f, " autoneg ", l.EthtoolAutoNeg())
-	fmt.Fprint(f, " duplex ", l.EthtoolDuplex())
-	fmt.Fprint(f, " port ", l.EthtoolDevPort())
+	if l := LinkOf(xid); l != nil {
+		fmt.Fprint(f, " speed ", l.EthtoolSpeed(), " (mbps)")
+		fmt.Fprint(f, " autoneg ", l.EthtoolAutoNeg())
+		fmt.Fprint(f, " duplex ", l.EthtoolDuplex())
+		fmt.Fprint(f, " port ", l.EthtoolDevPort())
+	} else {
+		fmt.Fprint(f, " ethtool settings")
+	}
 }
 
 func (dev DevLinkModesSupported) Format(f fmt.State, c rune) {
 	xid := Xid(dev)
-	fmt.Fprint(f, xid, "<", LinkOf(xid).LinkModesSupported(), ">")
+	fmt.Fprint(f, xid)
+	if l := LinkOf(xid); l != nil {
+		fmt.Fprint(f, " <", l.LinkModesSupported(), ">")
+	} else {
+		fmt.Fprint(f, " <supported link modes>")
+	}
 }
 
 func (dev DevLinkModesAdvertising) Format(f fmt.State, c rune) {
 	xid := Xid(dev)
-	fmt.Fprint(f, xid, "<", LinkOf(xid).LinkModesAdvertising(), ">")
+	fmt.Fprint(f, xid)
+	if l := LinkOf(xid); l != nil {
+		fmt.Fprint(f, " <", l.LinkModesAdvertising(), ">")
+	} else {
+		fmt.Fprint(f, " <advertising link modes>")
+	}
 }
 
 func (dev DevLinkModesLPAdvertising) Format(f fmt.State, c rune) {
 	xid := Xid(dev)
-	fmt.Fprint(f, xid, "<", LinkOf(xid).LinkModesLPAdvertising(), ">")
+	fmt.Fprint(f, xid)
+	if l := LinkOf(xid); l != nil {
+		fmt.Fprint(f, " <", l.LinkModesLPAdvertising(), ">")
+	} else {
+		fmt.Fprint(f, " <link partner advertising link modes>")
+	}
 }
 
 func (bits EthtoolFlagBits) Format(f fmt.State, c rune) {

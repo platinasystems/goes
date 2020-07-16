@@ -8,21 +8,36 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"testing"
 
 	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/internal/assert"
 )
 
 var Continue = flag.Bool("test.continue", false,
 	"continue after ifinfo and fib dumps unil SIGINT")
 
 func Test(t *testing.T) {
-	if _, err := os.Stat("/sys/bus/pci/drivers/xeth"); err != nil {
-		t.Skip("no xeth driver")
+	var dev string
+	for _, dev = range []string{"platina-mk1", "xeth", ""} {
+		if len(dev) == 0 {
+			t.Skip("no xeth driver")
+		}
+		if _, err := net.InterfaceByName(dev); err == nil {
+			break
+		}
 	}
+	if err := Provision(dev, " "); err != nil && !os.IsNotExist(err) {
+		t.Fatal("provision:", err)
+	}
+	if err := assert.Root(); err != nil {
+		t.Skip(err)
+	}
+
 	goes.Stop = make(chan struct{})
 
 	defer goes.WG.Wait()
@@ -35,7 +50,7 @@ func Test(t *testing.T) {
 		w = os.Stdout
 	}
 
-	task, err := Start()
+	task, err := Start(dev)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +61,11 @@ func Test(t *testing.T) {
 			break
 		}
 		// Load the attribute cache through Parse
-		Pool(Parse(buf))
+		if msg := Parse(buf); msg != nil {
+			Pool(msg)
+		} else {
+			t.Fatal("Parsed buf is nil msg")
+		}
 	}
 	if task.RxErr != nil {
 		t.Fatal(task.RxErr)

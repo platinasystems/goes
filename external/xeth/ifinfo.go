@@ -19,9 +19,15 @@ type DevDump Xid
 type DevUnreg Xid
 type DevReg Xid
 
-func (xid Xid) RxIfInfo(msg *internal.MsgIfInfo) interface{} {
-	var note interface{} = DevDump(xid)
-	l := mayMakeLinkOf(xid)
+func RxIfInfo(msg *internal.MsgIfInfo) (note interface{}) {
+	xid := Xid(msg.Xid)
+	note = DevDump(xid)
+	l := LinkOf(xid)
+	if l == nil {
+		l = new(Link)
+		l.xid = xid
+		Links.Store(xid, l)
+	}
 	if len(l.IfInfoName()) == 0 {
 		note = DevNew(xid)
 		name := make([]byte, internal.SizeofIfName)
