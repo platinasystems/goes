@@ -1,4 +1,4 @@
-// Copyright © 2018 Platina Systems, Inc. All rights reserved.
+// Copyright © 2018-2020 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -29,7 +29,14 @@ import (
 )
 
 type Command struct {
-	g *goes.Goes
+	g     *goes.Goes
+	myIP  string
+	rtrIP string
+	dnsIP string
+	lt    uint32
+	ack   dhcp4.Packet
+	cl    *dhcp4client.Client
+	i     string
 }
 
 func (*Command) String() string { return "dhcpcd" }
@@ -53,52 +60,55 @@ type ifreq struct {
 	ifrNewname [IFNAMSIZ]byte
 }
 
-func (c *Command) parseACK(ack dhcp4.Packet) (myIP string, rtrIP string, dnsIP string, lt uint32, err error) {
-	myIP = ack.YIAddr().String()
+func (c *Command) parseACK(ack dhcp4.Packet) (err error) {
+	c.myIP = ack.YIAddr().String()
 	opt := ack.ParseOptions()
 	nm := opt[1]
 	fmt.Printf("Option[1] netmask: %v\n", nm)
 	if len(nm) == 4 {
-		myIP = myIP + "/" + strconv.Itoa(bits.LeadingZeros32(^binary.BigEndian.Uint32(nm)))
+		c.myIP = c.myIP + "/" + strconv.Itoa(bits.LeadingZeros32(^binary.BigEndian.Uint32(nm)))
 	}
-	fmt.Printf("Got address %s\n", myIP)
+	fmt.Printf("Got address %s\n", c.myIP)
 
 	rtr := opt[3]
+	c.rtrIP = ""
 	fmt.Printf("Option[3] router: %v\n", rtr)
 	if len(rtr) == 4 {
 		ip := net.IP(rtr)
 		if !ip.Equal(net.IPv4(0, 0, 0, 0)) {
-			rtrIP = ip.String()
+			c.rtrIP = ip.String()
 		}
 	}
 
 	ltOpt := opt[51]
 	fmt.Printf("Got lease %v\n", ltOpt)
-	lt = uint32(86400)
+	c.lt = uint32(86400)
 	if len(ltOpt) == 4 {
-		lt = binary.BigEndian.Uint32(ltOpt)
-		fmt.Printf("Lease time %d\n", lt)
+		c.lt = binary.BigEndian.Uint32(ltOpt)
+		fmt.Printf("Lease time %d\n", c.lt)
 	}
 	dns := opt[6]
 	fmt.Printf("Got DNS %v\n", dns)
+	c.dnsIP = ""
 	for i := 0; i < len(dns) && len(dns[i:]) >= 4; i += 4 {
-		dnsIP = dnsIP + "nameserver " + net.IP(dns[i:i+4]).String() + "\n"
+		c.dnsIP = c.dnsIP + "nameserver " + net.IP(dns[i:i+4]).String() + "\n"
 	}
-	fmt.Printf("DNS resolved to %v\n", dnsIP)
+	fmt.Printf("DNS resolved to %v\n", c.dnsIP)
 
 	return
 }
 
-func (c *Command) updateParm(dev string, myIP string, myLastIP string, rtrIP string, rtrLastIP string, dnsIP string, dnsLastIP string) (err error) {
+func (c *Command) updateParm(myIP string, myLastIP string, rtrIP string,
+	rtrLastIP string, dnsIP string, dnsLastIP string) (err error) {
 	if myIP != myLastIP {
 		if myIP != "" {
-			err = c.g.Main("ip", "address", "add", myIP, "dev", dev)
+			err = c.g.Main("ip", "address", "add", myIP, "dev", c.i)
 			if err != nil {
 				return err
 			}
 		}
 		if myLastIP != "" {
-			err = c.g.Main("ip", "address", "delete", myLastIP, "dev", dev)
+			err = c.g.Main("ip", "address", "delete", myLastIP, "dev", c.i)
 			if err != nil {
 				return err
 			}
@@ -131,16 +141,16 @@ func (c *Command) updateParm(dev string, myIP string, myLastIP string, rtrIP str
 
 func (c *Command) Main(args ...string) error {
 	parm, args := parms.New(args, "-i")
-	i := "eth0"
+	c.i = "eth0"
 	if parm.ByName["-i"] != "" {
-		i = parm.ByName["-i"]
+		c.i = parm.ByName["-i"]
 	}
-	if len(i) > (IFNAMSIZ)-1 {
+	if len(c.i) > (IFNAMSIZ)-1 {
 		return errors.New("Interface name too long")
 	}
 
 	var dev ifreq
-	copy(dev.ifrName[:], i)
+	copy(dev.ifrName[:], c.i)
 
 	s, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_DGRAM, 0)
 	if err != nil {
@@ -157,20 +167,20 @@ func (c *Command) Main(args ...string) error {
 
 	fmt.Printf("Got %s\n", mac)
 
-	err = c.g.Main("ip", "link", "change", i, "up")
+	err = c.g.Main("ip", "link", "change", c.i, "up")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = c.g.Main("ip", "link", "change", i, "down")
+		_ = c.g.Main("ip", "link", "change", c.i, "down")
 	}()
 
-	err = c.g.Main("ip", "route", "add", "255.255.255.255/32", "dev", i)
+	err = c.g.Main("ip", "route", "add", "255.255.255.255/32", "dev", c.i)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = c.g.Main("ip", "route", "delete", "255.255.255.255/32", "dev", i)
+		_ = c.g.Main("ip", "route", "delete", "255.255.255.255/32", "dev", c.i)
 	}()
 	sock, err := dhcp4client.NewInetSock(dhcp4client.SetLocalAddr(net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: 68}), dhcp4client.SetRemoteAddr(net.UDPAddr{IP: net.IPv4bcast, Port: 67}))
 	if err != nil {
@@ -178,11 +188,24 @@ func (c *Command) Main(args ...string) error {
 	}
 	defer sock.Close()
 
-	cl, err := dhcp4client.New(dhcp4client.HardwareAddr(mac), dhcp4client.Connection(sock))
+	c.cl, err = dhcp4client.New(dhcp4client.HardwareAddr(mac), dhcp4client.Connection(sock))
 	if err != nil {
 		return err
 	}
-	defer cl.Close()
+	defer c.cl.Close()
+
+	defer func() {
+		if c.ack != nil && c.myIP != "" {
+			err := c.cl.Release(c.ack)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error in release: %s\n", err)
+			}
+		}
+		c.updateParm("", c.myIP, "", c.rtrIP, "", c.dnsIP)
+		c.myIP = ""
+		c.rtrIP = ""
+		c.dnsIP = ""
+	}()
 
 	b := &backoff.Backoff{
 		Min:    1 * time.Second,
@@ -190,22 +213,29 @@ func (c *Command) Main(args ...string) error {
 		Factor: 2,
 		Jitter: false,
 	}
-	var myIP, rtrIP, dnsIP string
-	var lt uint32
-	var ack dhcp4.Packet
-	var success bool
 
 	for {
-		success, ack, err = cl.Request()
+		myLastIP := c.myIP
+		rtrLastIP := c.rtrIP
+		dnsLastIP := c.dnsIP
+		success := false
+		success, c.ack, err = c.cl.Request()
 		if err == nil {
 			if success {
-				myIP, rtrIP, dnsIP, lt, err = c.parseACK(ack)
+				err := c.parseACK(c.ack)
 				if err == nil {
-					err := c.updateParm(i, myIP, "", rtrIP, "", dnsIP, "")
-					if err == nil {
-						break
-					} else {
-						fmt.Fprintf(os.Stderr, "Error in updateParm: %s\n", err)
+					if c.myIP != "" {
+						err := c.updateParm(c.myIP, myLastIP, c.rtrIP, rtrLastIP,
+							c.dnsIP, dnsLastIP)
+						if err == nil {
+							exit, err := c.renew()
+							if exit {
+								return nil
+							}
+							fmt.Fprintf(os.Stderr, "Error in renew: %s\n", err)
+						} else {
+							fmt.Fprintf(os.Stderr, "Error in updateParm: %s\n", err)
+						}
 					}
 				} else {
 					fmt.Fprintf(os.Stderr, "Error in parseACK: %s\n", err)
@@ -230,13 +260,21 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 
-	defer func() {
-		c.updateParm(i, "", myIP, "", rtrIP, "", dnsIP)
-	}()
+	return nil
+}
 
-	for {
+func (c *Command) renew() (done bool, err error) {
+	b := &backoff.Backoff{
+		Min:    1 * time.Second,
+		Max:    60 * time.Second,
+		Factor: 2,
+		Jitter: false,
+	}
+	timeout := time.Now().Add(time.Duration(c.lt) * time.Second)
+	sleepTime := c.lt / 2
+	for time.Now().Before(timeout) {
 		if !func() bool {
-			t := time.NewTicker(time.Duration(lt) * time.Second)
+			t := time.NewTicker(time.Duration(sleepTime) * time.Second)
 			defer t.Stop()
 
 			select {
@@ -246,30 +284,41 @@ func (c *Command) Main(args ...string) error {
 				return true
 			}
 		}() {
-			return nil
+			return true, nil
 		}
-		myLastIP := myIP
-		rtrLastIP := rtrIP
-		dnsLastIP := dnsIP
+		sleepTime = sleepTime / 2
+		if sleepTime < 1 {
+			sleepTime = 1
+		}
+		myLastIP := c.myIP
+		rtrLastIP := c.rtrIP
+		dnsLastIP := c.dnsIP
 
 		for {
-			success, ack, err = cl.Renew(ack)
+			success := false
+			success, c.ack, err = c.cl.Renew(c.ack)
 			if err == nil {
 				if success {
-					myIP, rtrIP, dnsIP, lt, err = c.parseACK(ack)
+					err := c.parseACK(c.ack)
 					if err == nil {
-						err = c.updateParm(i, myIP, myLastIP, rtrIP, rtrLastIP, dnsIP, dnsLastIP)
+						if c.myIP == "" {
+							return false,
+								fmt.Errorf("Renew did not contain IP address")
+						}
+						err = c.updateParm(c.myIP, myLastIP, c.rtrIP, rtrLastIP, c.dnsIP, dnsLastIP)
 						if err == nil {
 							break
 						} else {
-							fmt.Fprintf(os.Stderr, "Error in updateParm: %s\n", err)
+							return false,
+								fmt.Errorf("Error in updateParm: %w", err)
 						}
 					} else {
-						fmt.Fprintf(os.Stderr, "Error in parseACK: %s\n", err)
+						return false,
+							fmt.Errorf("Error in parseACK: %w", err)
 					}
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "Error in Renew: %s\n", err)
+				return false, fmt.Errorf("Error in Renew: %w", err)
 			}
 			if !func() bool {
 				t := time.NewTicker(b.Duration())
@@ -282,10 +331,10 @@ func (c *Command) Main(args ...string) error {
 					return true
 				}
 			}() {
-				return nil
+				return true, nil
 			}
 		}
 	}
 
-	return nil
+	return false, fmt.Errorf("Lease expired without renew")
 }
