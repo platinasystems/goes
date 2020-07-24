@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/i2c"
 	"github.com/platinasystems/goes/external/log"
@@ -21,29 +22,21 @@ import (
 	"github.com/platinasystems/ioport"
 )
 
-type Command struct {
-	done chan struct{}
-}
+type Command struct{}
 
-func (*Command) String() string { return "i2cd" }
+func (Command) String() string { return "i2cd" }
 
-func (*Command) Usage() string { return "i2cd" }
+func (Command) Usage() string { return "i2cd" }
 
-func (*Command) Apropos() lang.Alt {
+func (Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: "i2c server daemon",
 	}
 }
 
-func (c *Command) Close() error {
-	close(c.done)
-	return nil
-}
+func (Command) Kind() cmd.Kind { return cmd.Daemon }
 
-func (*Command) Kind() cmd.Kind { return cmd.Daemon }
-
-func (c *Command) Main(...string) error {
-	c.done = make(chan struct{})
+func (c Command) Main(...string) error {
 	i2cReq := &I2cReq{c}
 	rpc.Register(i2cReq)
 	rpc.HandleHTTP()
@@ -56,7 +49,7 @@ func (c *Command) Main(...string) error {
 
 	for {
 		select {
-		case <-c.done:
+		case <-goes.Stop:
 			return nil
 		}
 	}
@@ -81,7 +74,7 @@ type R struct {
 }
 
 type I2cReq struct {
-	c *Command
+	c Command
 }
 
 var b = [i2c.BlockMax]byte{0}

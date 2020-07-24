@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/redis"
 	"github.com/platinasystems/goes/external/redis/publisher"
@@ -24,7 +25,6 @@ var readError int
 type Command struct {
 	VpageByKey map[string]uint8
 
-	stop chan struct{}
 	pub  *publisher.Publisher
 	last map[string]float64
 }
@@ -49,7 +49,6 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)
 
 	if c.pub, err = publisher.New(); err != nil {
@@ -63,18 +62,13 @@ func (c *Command) Main(...string) error {
 	t := time.NewTicker(10 * time.Second)
 	for {
 		select {
-		case <-c.stop:
+		case <-goes.Stop:
 			return nil
 		case <-t.C:
 			if err = c.update(); err != nil {
 			}
 		}
 	}
-	return nil
-}
-
-func (c *Command) Close() error {
-	close(c.stop)
 	return nil
 }
 

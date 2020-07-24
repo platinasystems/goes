@@ -29,8 +29,7 @@ import (
 )
 
 type Command struct {
-	g    *goes.Goes
-	done chan struct{}
+	g *goes.Goes
 }
 
 func (*Command) String() string { return "dhcpcd" }
@@ -41,11 +40,6 @@ func (*Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: "dhcp client daemon",
 	}
-}
-
-func (c *Command) Close() error {
-	close(c.done)
-	return nil
 }
 
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
@@ -163,8 +157,6 @@ func (c *Command) Main(args ...string) error {
 
 	fmt.Printf("Got %s\n", mac)
 
-	c.done = make(chan struct{})
-
 	err = c.g.Main("ip", "link", "change", i, "up")
 	if err != nil {
 		return err
@@ -228,7 +220,7 @@ func (c *Command) Main(args ...string) error {
 			defer t.Stop()
 
 			select {
-			case <-c.done:
+			case <-goes.Stop:
 				return false
 			case <-t.C:
 				return true
@@ -248,7 +240,7 @@ func (c *Command) Main(args ...string) error {
 			defer t.Stop()
 
 			select {
-			case <-c.done:
+			case <-goes.Stop:
 				return false
 			case <-t.C:
 				return true
@@ -284,7 +276,7 @@ func (c *Command) Main(args ...string) error {
 				defer t.Stop()
 
 				select {
-				case <-c.done:
+				case <-goes.Stop:
 					return false
 				case <-t.C:
 					return true

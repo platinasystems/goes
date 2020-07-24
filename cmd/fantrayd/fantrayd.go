@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/atsock"
 	"github.com/platinasystems/goes/external/log"
@@ -86,7 +87,6 @@ func (c *Command) Main(...string) error {
 	}
 
 	first = 1
-	c.stop = make(chan struct{})
 	c.last = make(map[string]float64)
 	c.lasts = make(map[string]string)
 	c.lastu = make(map[string]uint16)
@@ -116,7 +116,7 @@ func (c *Command) Main(...string) error {
 	t := time.NewTicker(5 * time.Second)
 	for {
 		select {
-		case <-c.stop:
+		case <-goes.Stop:
 			return nil
 		case <-t.C:
 			if holdoff > 0 {
@@ -129,11 +129,6 @@ func (c *Command) Main(...string) error {
 			}
 		}
 	}
-	return nil
-}
-
-func (c *Command) Close() error {
-	close(c.stop)
 	return nil
 }
 

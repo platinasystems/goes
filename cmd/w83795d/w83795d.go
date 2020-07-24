@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/atsock"
 	"github.com/platinasystems/goes/external/log"
@@ -67,7 +68,6 @@ type Info struct {
 	mutex sync.Mutex
 	rpc   *atsock.RpcServer
 	pub   *publisher.Publisher
-	stop  chan struct{}
 	last  map[string]uint16
 	lasts map[string]string
 }
@@ -104,7 +104,6 @@ func (c *Command) Main(...string) error {
 		return err
 	}
 
-	c.stop = make(chan struct{})
 	c.last = make(map[string]uint16)
 	c.lasts = make(map[string]string)
 
@@ -133,18 +132,13 @@ func (c *Command) Main(...string) error {
 	t := time.NewTicker(pollInterval * time.Second)
 	for {
 		select {
-		case <-c.stop:
+		case <-goes.Stop:
 			return nil
 		case <-t.C:
 			if err = c.update(); err != nil {
 			}
 		}
 	}
-	return nil
-}
-
-func (c *Command) Close() error {
-	close(c.stop)
 	return nil
 }
 

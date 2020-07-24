@@ -19,7 +19,6 @@ import (
 
 type Command struct {
 	g      *goes.Goes
-	done   chan struct{}
 	mounts []*bootMnt
 }
 
@@ -42,11 +41,6 @@ func (*Command) Apropos() lang.Alt {
 	}
 }
 
-func (c *Command) Close() error {
-	close(c.done)
-	return nil
-}
-
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
@@ -56,7 +50,6 @@ func (c *Command) Main(args ...string) (err error) {
 	if len(args) > 0 {
 		mp = args[0]
 	}
-	c.done = make(chan struct{})
 
 	done := make(chan *bootMnt, len(args))
 	if c.mounts == nil {
@@ -110,7 +103,7 @@ func (c *Command) Main(args ...string) (err error) {
 		}
 
 		select {
-		case <-c.done:
+		case <-goes.Stop:
 			return nil
 		case <-t.C:
 		}

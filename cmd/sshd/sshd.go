@@ -44,11 +44,6 @@ func (*Command) Apropos() lang.Alt {
 	}
 }
 
-func (c *Command) Close() error {
-	close(c.done)
-	return nil
-}
-
 func (c *Command) Goes(g *goes.Goes) { c.g = g }
 
 func (*Command) Kind() cmd.Kind { return cmd.Daemon }
@@ -77,7 +72,6 @@ func (c *Command) Main(args ...string) (err error) {
 	if err != nil {
 		return err
 	}
-	c.done = make(chan struct{})
 
 	srv := &ssh.Server{
 		Addr: ":22",
@@ -168,7 +162,7 @@ func (c *Command) Main(args ...string) (err error) {
 
 	for {
 		select {
-		case <-c.done:
+		case <-goes.Stop:
 			return nil
 		}
 	}

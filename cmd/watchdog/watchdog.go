@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/lang"
@@ -87,21 +88,26 @@ func (c *Command) Main(args ...string) error {
 	ticker := time.NewTicker(time.Duration(freq))
 	defer ticker.Stop()
 
-	for _ = range ticker.C {
-		if len(c.GpioPin) > 0 {
-			pin, found := gpio.FindPin(c.GpioPin)
-			t, err := pin.Value()
-			if found && err == nil {
-				pin.SetValue(!t)
+	for {
+		select {
+		case <-goes.Stop:
+			return nil
+		case <-ticker.C:
+			if len(c.GpioPin) > 0 {
+				pin, found := gpio.FindPin(c.GpioPin)
+				t, err := pin.Value()
+				if found && err == nil {
+					pin.SetValue(!t)
+				}
 			}
-		}
 
-		n, err := f.Write([]byte{0})
-		if err != nil {
-			return err
-		}
-		if n != 1 {
-			return io.ErrShortWrite
+			n, err := f.Write([]byte{0})
+			if err != nil {
+				return err
+			}
+			if n != 1 {
+				return io.ErrShortWrite
+			}
 		}
 	}
 	return nil
