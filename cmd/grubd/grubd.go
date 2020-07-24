@@ -72,7 +72,11 @@ func (c *Command) Main(args ...string) (err error) {
 					dir: sd,
 				}
 				c.mounts = append(c.mounts, m)
-				go c.tryScanFiles(m, done)
+				goes.WG.Add(1)
+				go func() {
+					defer goes.WG.Done()
+					c.tryScanFiles(m, done)
+				}()
 				cnt++
 			}
 		}

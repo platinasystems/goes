@@ -6,7 +6,6 @@
 package i2cd
 
 import (
-	"net"
 	"net/http"
 	"net/rpc"
 	"sync"
@@ -40,16 +39,19 @@ func (c Command) Main(...string) error {
 	i2cReq := &I2cReq{c}
 	rpc.Register(i2cReq)
 	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", ":1233")
-	if e != nil {
-		log.Print("listen error:", e)
+	srv := http.Server{
+		Addr: ":1233",
 	}
-	log.Print("listen OKAY")
-	go http.Serve(l, nil)
+	goes.WG.Add(1)
+	go func() {
+		defer goes.WG.Done()
+		srv.ListenAndServe()
+	}()
 
 	for {
 		select {
 		case <-goes.Stop:
+			srv.Close()
 			return nil
 		}
 	}

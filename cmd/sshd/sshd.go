@@ -94,12 +94,21 @@ func (c *Command) Main(args ...string) (err error) {
 			if err != nil {
 				panic(err)
 			}
+			goes.WG.Add(1)
 			go func() {
-				for win := range winCh {
-					setWinsize(f, win.Width, win.Height)
+				defer goes.WG.Done()
+				for {
+					select {
+					case <-goes.Stop:
+						return
+					case win := <-winCh:
+						setWinsize(f, win.Width, win.Height)
+					}
 				}
 			}()
+			goes.WG.Add(1)
 			go func() {
+				defer goes.WG.Done()
 				io.Copy(f, s) // stdin
 			}()
 			io.Copy(s, f) // stdout
@@ -156,13 +165,16 @@ func (c *Command) Main(args ...string) (err error) {
 		return err
 	}
 
+	goes.WG.Add(1)
 	go func() {
+		defer goes.WG.Done()
 		_ = srv.ListenAndServe()
 	}()
 
 	for {
 		select {
 		case <-goes.Stop:
+			_ = srv.Close()
 			return nil
 		}
 	}
