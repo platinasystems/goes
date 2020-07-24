@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	grs "github.com/platinasystems/go-redis-server"
 	"github.com/platinasystems/goes"
@@ -165,12 +166,22 @@ func (c *Command) Main(args ...string) error {
 	goes.WG.Add(1)
 	go func(redisd *Redisd, args ...string) {
 		defer goes.WG.Done()
-		for _, name := range args {
-			select {
-			case <-goes.Stop:
-				return
-			default:
+		for {
+			for _, name := range args {
 				redisd.listenOnInterface(name)
+			}
+			if !func() bool {
+				t := time.NewTicker(10 * time.Second)
+				defer t.Stop()
+
+				select {
+				case <-goes.Stop:
+					return false
+				case <-t.C:
+					return true
+				}
+			}() {
+				return
 			}
 		}
 	}(&c.redisd, args...)
