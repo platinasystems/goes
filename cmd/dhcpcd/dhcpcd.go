@@ -264,12 +264,6 @@ func (c *Command) Main(args ...string) error {
 }
 
 func (c *Command) renew() (done bool, err error) {
-	b := &backoff.Backoff{
-		Min:    1 * time.Second,
-		Max:    60 * time.Second,
-		Factor: 2,
-		Jitter: false,
-	}
 	timeout := time.Now().Add(time.Duration(c.lt) * time.Second)
 	sleepTime := c.lt / 2
 	for time.Now().Before(timeout) {
@@ -294,47 +288,33 @@ func (c *Command) renew() (done bool, err error) {
 		rtrLastIP := c.rtrIP
 		dnsLastIP := c.dnsIP
 
-		for {
-			success := false
-			success, c.ack, err = c.cl.Renew(c.ack)
-			if err == nil {
-				if success {
-					err := c.parseACK(c.ack)
+		success := false
+		success, c.ack, err = c.cl.Renew(c.ack)
+		if err == nil {
+			if success {
+				err := c.parseACK(c.ack)
+				if err == nil {
+					if c.myIP == "" {
+						return false,
+							fmt.Errorf("Renew did not contain IP address")
+					}
+					err = c.updateParm(c.myIP, myLastIP, c.rtrIP, rtrLastIP, c.dnsIP, dnsLastIP)
 					if err == nil {
-						if c.myIP == "" {
-							return false,
-								fmt.Errorf("Renew did not contain IP address")
-						}
-						err = c.updateParm(c.myIP, myLastIP, c.rtrIP, rtrLastIP, c.dnsIP, dnsLastIP)
-						if err == nil {
-							break
-						} else {
-							return false,
-								fmt.Errorf("Error in updateParm: %w", err)
-						}
+						timeout = time.Now().Add(time.Duration(c.lt) * time.Second)
+						sleepTime = c.lt / 2
+						continue
 					} else {
 						return false,
-							fmt.Errorf("Error in parseACK: %w", err)
+							fmt.Errorf("Error in updateParm: %w", err)
 					}
+				} else {
+					return false,
+						fmt.Errorf("Error in parseACK: %w", err)
 				}
-			} else {
-				return false, fmt.Errorf("Error in Renew: %w", err)
 			}
-			if !func() bool {
-				t := time.NewTicker(b.Duration())
-				defer t.Stop()
-
-				select {
-				case <-goes.Stop:
-					return false
-				case <-t.C:
-					return true
-				}
-			}() {
-				return true, nil
-			}
+		} else {
+			return false, fmt.Errorf("Error in Renew: %w", err)
 		}
 	}
-
 	return false, fmt.Errorf("Lease expired without renew")
 }
