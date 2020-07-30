@@ -17,6 +17,43 @@ import (
 
 const zero = uintptr(0)
 
+var virtualFilesystems = []struct {
+	dir    string
+	dev    string
+	fstype string
+	mode   os.FileMode
+}{
+	{"/dev", "devtmpfs", "devtmpfs", 0755},
+	{"/dev/pts", "devpts", "devpts", 0755},
+	{"/proc", "proc", "proc", 0555},
+	{"/sys", "sysfs", "sysfs", 0555},
+	{"/run", "tmpfs", "tmpfs", 0755},
+	{"/tmp", "tmpfs", "tmpfs", 01777},
+}
+
+var stdioLinks = []struct {
+	src, dst string
+}{
+	{"../proc/self/fd/0", "/dev/stdin"},
+	{"../proc/self/fd/1", "/dev/stdout"},
+	{"../proc/self/fd/2", "/dev/stderr"},
+}
+
+var targetDirs = []struct {
+	name string
+	mode os.FileMode
+}{
+	{"/root", 0700},
+	{"/tmp", 01777},
+	{"/var", 0755},
+}
+
+var targetLinks = []struct {
+	src, dst string
+}{
+	{"../run", "/var/run"},
+}
+
 type Command struct {
 	Hook   func() error
 	FsHook func() error
@@ -75,19 +112,7 @@ func (c *Command) Main(_ ...string) error {
 }
 
 func (*Command) mountVirtualFilesystems() {
-	for _, mnt := range []struct {
-		dir    string
-		dev    string
-		fstype string
-		mode   os.FileMode
-	}{
-		{"/dev", "devtmpfs", "devtmpfs", 0755},
-		{"/dev/pts", "devpts", "devpts", 0755},
-		{"/proc", "proc", "proc", 0555},
-		{"/sys", "sysfs", "sysfs", 0555},
-		{"/run", "tmpfs", "tmpfs", 0755},
-		{"/tmp", "tmpfs", "tmpfs", 01777},
-	} {
+	for _, mnt := range virtualFilesystems {
 		if _, err := os.Stat(mnt.dir); os.IsNotExist(err) {
 			err = os.Mkdir(mnt.dir, os.FileMode(mnt.mode))
 			if err != nil {
@@ -103,13 +128,7 @@ func (*Command) mountVirtualFilesystems() {
 }
 
 func (*Command) makeStdioLinks() {
-	for _, ln := range []struct {
-		src, dst string
-	}{
-		{"../proc/self/fd/0", "/dev/stdin"},
-		{"../proc/self/fd/1", "/dev/stdout"},
-		{"../proc/self/fd/2", "/dev/stderr"},
-	} {
+	for _, ln := range stdioLinks {
 		if _, err := os.Stat(ln.dst); os.IsNotExist(err) {
 			err = os.Symlink(ln.src, ln.dst)
 			if err != nil {
@@ -134,14 +153,7 @@ func (*Command) redirectStdioKmsg() {
 }
 
 func (*Command) makeTargetDirs() {
-	for _, dir := range []struct {
-		name string
-		mode os.FileMode
-	}{
-		{"/root", 0700},
-		{"/tmp", 01777},
-		{"/var", 0755},
-	} {
+	for _, dir := range targetDirs {
 		if _, err := os.Stat(dir.name); os.IsNotExist(err) {
 			err = os.Mkdir(dir.name, dir.mode)
 			if err != nil {
@@ -152,11 +164,7 @@ func (*Command) makeTargetDirs() {
 }
 
 func (*Command) makeTargetLinks() {
-	for _, ln := range []struct {
-		src, dst string
-	}{
-		{"../run", "/var/run"},
-	} {
+	for _, ln := range targetLinks {
 		if _, err := os.Stat(ln.dst); os.IsNotExist(err) {
 			err = os.Symlink(ln.src, ln.dst)
 			if err != nil {
