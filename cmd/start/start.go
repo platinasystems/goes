@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ramr/go-reaper"
 
@@ -159,6 +161,8 @@ func (c *Command) Main(args ...string) error {
 
 	go daemons.Wait()
 
+	allClosing := make(chan struct{}, 1)
+
 	for _, getty := range c.Gettys {
 		go func(getty TtyCon) {
 			for {
@@ -182,6 +186,19 @@ func (c *Command) Main(args ...string) error {
 				shell.Stdin = ttyFile
 				shell.Stdout = ttyFile
 				shell.Stderr = ttyFile
+				closing := make(chan struct{}, 1)
+				go func(shell *exec.Cmd, closing chan struct{}) {
+					select {
+					case <-closing:
+						break
+					case <-allClosing:
+						p := shell.Process
+						if p != nil {
+							p.Kill()
+						}
+						break
+					}
+				}(shell, closing)
 				err = shell.Run()
 				if err == nil {
 					fmt.Fprintf(os.Stderr,
@@ -194,10 +211,32 @@ func (c *Command) Main(args ...string) error {
 						prog.Base(), err)
 				}
 				_ = tty.Close()
+				close(closing)
+				select {
+				case <-allClosing:
+					return
+				default:
+				}
 			}
 		}(getty)
 	}
-	// A real init would listen for SIGTERM etc. Some day.
-	select {}
+
+	csig := make(chan os.Signal, 1)
+	signal.Notify(csig, syscall.SIGTERM)
+
+	for {
+		select {
+		case <-csig:
+			fmt.Fprintln(os.Stderr, "Got a signal")
+			err := c.g.Main("stop")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error in stop command: %s\n",
+					err)
+			}
+			close(allClosing)
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		}
+	}
 	return nil // not reached
 }
