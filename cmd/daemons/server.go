@@ -73,6 +73,7 @@ func (c *Server) Main(args ...string) error {
 			return nil
 		case <-sig:
 			c.Daemons.Stop([]int{}, &empty)
+			return nil
 		}
 	}
 }
