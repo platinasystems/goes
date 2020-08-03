@@ -108,7 +108,17 @@ func (c *Command) Main(_ ...string) error {
 		}
 	}
 	fmt.Printf("starting start\n")
-	return c.g.Main("start")
+	err := c.g.Main("start")
+	if err != nil {
+		fmt.Printf("Error from start: %s\n", err)
+	}
+	c.unmountVirtualFilesystems()
+	c.unmakeStdioLinks()
+	c.unmakeTargetLinks()
+	c.unmakeTargetDirs()
+	err = syscall.Exec("/init", os.Args, os.Environ())
+	fmt.Printf("syscall.Exec failed: %s\n", err)
+	return err
 }
 
 func (*Command) mountVirtualFilesystems() {
@@ -127,6 +137,17 @@ func (*Command) mountVirtualFilesystems() {
 	}
 }
 
+func (*Command) unmountVirtualFilesystems() {
+	for i := len(virtualFilesystems); i > 0; i-- {
+		mnt := virtualFilesystems[i-1]
+		fmt.Printf("Unmounting %s\n", mnt.dir)
+		err := syscall.Unmount(mnt.dir, syscall.MNT_DETACH)
+		if err != nil {
+			log.Print("err", "unmounting ", mnt.dir, ": ", err)
+		}
+	}
+}
+
 func (*Command) makeStdioLinks() {
 	for _, ln := range stdioLinks {
 		if _, err := os.Stat(ln.dst); os.IsNotExist(err) {
@@ -136,6 +157,12 @@ func (*Command) makeStdioLinks() {
 					":", err)
 			}
 		}
+	}
+}
+
+func (*Command) unmakeStdioLinks() {
+	for _, ln := range stdioLinks {
+		os.Remove(ln.dst)
 	}
 }
 
@@ -163,6 +190,12 @@ func (*Command) makeTargetDirs() {
 	}
 }
 
+func (*Command) unmakeTargetDirs() {
+	for _, dir := range targetDirs {
+		os.RemoveAll(dir.name)
+	}
+}
+
 func (*Command) makeTargetLinks() {
 	for _, ln := range targetLinks {
 		if _, err := os.Stat(ln.dst); os.IsNotExist(err) {
@@ -172,5 +205,11 @@ func (*Command) makeTargetLinks() {
 					ln.dst, ln.src, err))
 			}
 		}
+	}
+}
+
+func (*Command) unmakeTargetLinks() {
+	for _, ln := range targetLinks {
+		os.Remove(ln.dst)
 	}
 }
