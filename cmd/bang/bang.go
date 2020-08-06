@@ -120,14 +120,25 @@ func (Command) Main(args ...string) error {
 		args = args[:n-1]
 	}
 
-	filepath, u, err := url.FilePathFromUrl(args[0])
-	if err != nil {
-		return fmt.Errorf("Error from url.FilePathFromUrl(%s): %w",
-			args[0], err)
+	fp := args[0]
+	var u *neturl.URL
+	if parms.ByName["-chroot"] == "" {
+		var err error
+		fp, u, err = url.FilePathFromUrl(args[0])
+		if err != nil {
+			return fmt.Errorf("Error from url.FilePathFromUrl(%s): %w",
+				args[0], err)
+		}
+	} else {
+		p := filepath.Join(parms.ByName["-chroot"], args[0])
+		if _, err := os.Stat(p); err != nil {
+			return fmt.Errorf("Unable to stat %s: %w",
+				p, err)
+		}
 	}
 	execpath := args[0]
 	command := args[0]
-	if filepath == "" {
+	if fp == "" {
 		tmpDir = "/var/run/goes/bang-" + strconv.Itoa(os.Getppid())
 		err := os.MkdirAll(tmpDir, 0755)
 		if err != nil {
