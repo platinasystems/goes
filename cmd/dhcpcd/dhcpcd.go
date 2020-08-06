@@ -219,7 +219,18 @@ func (c *Command) Main(args ...string) error {
 		rtrLastIP := c.rtrIP
 		dnsLastIP := c.dnsIP
 		success := false
-		success, c.ack, err = c.cl.Request()
+		done := make(chan struct{}, 1)
+		goes.WG.Add(1)
+		go func() {
+			defer goes.WG.Done()
+			success, c.ack, err = c.cl.Request()
+			close(done)
+		}()
+		select {
+		case <-goes.Stop:
+			return nil
+		case <-done:
+		}
 		if err == nil {
 			if success {
 				err := c.parseACK(c.ack)
@@ -289,7 +300,18 @@ func (c *Command) renew() (done bool, err error) {
 		dnsLastIP := c.dnsIP
 
 		success := false
-		success, c.ack, err = c.cl.Renew(c.ack)
+		done := make(chan struct{}, 1)
+		goes.WG.Add(1)
+		go func() {
+			defer goes.WG.Done()
+			success, c.ack, err = c.cl.Request()
+			close(done)
+		}()
+		select {
+		case <-goes.Stop:
+			return true, nil
+		case <-done:
+		}
 		if err == nil {
 			if success {
 				err := c.parseACK(c.ack)
