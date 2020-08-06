@@ -90,6 +90,7 @@ func (c *Command) Main(args ...string) (err error) {
 
 		for _, m := range c.mounts {
 			if m.hasGrub {
+				done := make(chan struct{}, 1)
 				args := []string{"grub", "--daemon"}
 				args = append(args, m.mnt,
 					filepath.Join(m.dir, "grub/grub.cfg"))
@@ -99,10 +100,27 @@ func (c *Command) Main(args ...string) (err error) {
 				x.Stdout = os.Stdout
 				x.Stderr = os.Stderr
 				x.Dir = "/"
+				goes.WG.Add(1)
+				go func() {
+					defer goes.WG.Done()
+					for {
+						select {
+						case <-done:
+							return
+						case <-goes.Stop:
+							p := x.Process
+							if p != nil {
+								p.Kill()
+							}
+							return
+						}
+					}
+				}()
 				err := x.Run()
 				if err != nil {
 					fmt.Printf("grub returned %s\n", err)
 				}
+				close(done)
 			}
 		}
 
