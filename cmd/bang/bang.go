@@ -16,10 +16,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/flags"
 	"github.com/platinasystems/goes/cmd"
+	"github.com/platinasystems/goes/external/flags"
+	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/lang"
-	"github.com/platinasystems/parms"
 	"github.com/platinasystems/url"
 )
 
