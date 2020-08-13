@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/log"
 	"github.com/platinasystems/goes/internal/partitions"
@@ -21,7 +22,7 @@ import (
 
 var ErrUnknownPartition = errors.New("Unable to determine partition type")
 
-type Command chan struct{}
+type Command struct{}
 
 func (Command) String() string { return "mountd" }
 
@@ -31,11 +32,6 @@ func (Command) Apropos() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: "mount daemon",
 	}
-}
-
-func (c Command) Close() error {
-	close(c)
-	return nil
 }
 
 func (Command) Kind() cmd.Kind { return cmd.Daemon }
@@ -115,7 +111,7 @@ func (c Command) Main(args ...string) (err error) {
 	for {
 		c.mountall(mp)
 		select {
-		case <-c:
+		case <-goes.Stop:
 			return nil
 		case <-t.C:
 		}
