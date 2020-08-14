@@ -75,16 +75,12 @@ func (Restart) Apropos() lang.Alt {
 }
 
 func (Restart) Main(args ...string) error {
-	pids, err := pids(args)
-	if err != nil {
-		return err
-	}
 	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("Daemons.Restart", pids, &empty)
+	return cl.Call("Daemons.Restart", args, &empty)
 }
 
 func (Start) String() string { return "start" }
@@ -149,30 +145,10 @@ func (Stop) Apropos() lang.Alt {
 }
 
 func (Stop) Main(args ...string) error {
-	pids, err := pids(args)
-	if err != nil {
-		return err
-	}
 	cl, err := atsock.NewRpcClient(sockname())
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("Daemons.Stop", pids, &empty)
-}
-
-func pids(args []string) ([]int, error) {
-	if len(args) == 0 {
-		return []int{}, nil
-	}
-	pids := make([]int, len(args))
-	for i, arg := range args {
-		var pid int
-		_, err := fmt.Sscan(arg, &pid)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %v", arg, err)
-		}
-		pids[i] = pid
-	}
-	return pids, nil
+	return cl.Call("Daemons.Stop", args, &empty)
 }

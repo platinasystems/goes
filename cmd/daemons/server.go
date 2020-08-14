@@ -72,7 +72,7 @@ func (c *Server) Main(args ...string) error {
 			time.Sleep(100 * time.Millisecond)
 			return nil
 		case <-sig:
-			c.Daemons.Stop([]int{}, &empty)
+			c.Daemons.Stop([]string{}, &empty)
 			return nil
 		}
 	}

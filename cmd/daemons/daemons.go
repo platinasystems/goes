@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -134,8 +135,9 @@ func (d *Daemons) Start(args []string, reply *struct{}) error {
 	return nil
 }
 
-func (d *Daemons) Stop(pids []int, reply *struct{}) error {
-	if len(pids) == 0 {
+func (d *Daemons) Stop(pidlist []string, reply *struct{}) (err error) {
+	var pids []int
+	if len(pidlist) == 0 {
 		d.mutex.Lock()
 		if d.stopping {
 			d.mutex.Unlock()
@@ -150,14 +152,20 @@ func (d *Daemons) Stop(pids []int, reply *struct{}) error {
 			pids[len(pids)-i-1] = pid
 		}
 		d.mutex.Unlock()
+	} else {
+		pids, err = d.pidlistToPids(pidlist)
+		if err != nil {
+			return err
+		}
 	}
 	return d.stop(pids)
 }
 
-func (d *Daemons) Restart(pids []int, reply *struct{}) error {
+func (d *Daemons) Restart(pidlist []string, reply *struct{}) (err error) {
 	var pargs [][]string
+	var pids []int
 	d.mutex.Lock()
-	if len(pids) == 0 {
+	if len(pidlist) == 0 {
 		// stop all in reverse order
 		pids = make([]int, len(d.pids))
 		for i, pid := range d.pids {
@@ -171,6 +179,10 @@ func (d *Daemons) Restart(pids []int, reply *struct{}) error {
 			copy(pargs[i], p.Args)
 		}
 	} else {
+		pids, err = d.pidlistToPids(pidlist)
+		if err != nil {
+			return err
+		}
 		pargs = make([][]string, len(pids))
 		for i, pid := range pids {
 			p := d.cmdsByPid[pid]
@@ -187,6 +199,29 @@ func (d *Daemons) Restart(pids []int, reply *struct{}) error {
 		d.start(0, args...)
 	}
 	return nil
+}
+
+func (d *Daemons) pidlistToPids(pidlist []string) (pids []int, err error) {
+	for _, id := range pidlist {
+		pid, err := strconv.Atoi(id)
+		if err == nil {
+			pids = append(pids, pid)
+		} else {
+			found := false
+			for _, pid := range d.pids {
+				if p := d.cmd(pid); p != nil {
+					if p.Args[0] == id {
+						pids = append(pids, pid)
+						found = true
+					}
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("%s not found", id)
+			}
+		}
+	}
+	return pids, nil
 }
 
 func (d *Daemons) cmd(pid int) *exec.Cmd {
