@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/ramr/go-reaper"
 
@@ -166,6 +167,7 @@ func (c *Command) Main(args ...string) error {
 	for _, getty := range c.Gettys {
 		go func(getty TtyCon) {
 			for {
+				var termios syscall.Termios
 				tty, err := term.Open(getty.Tty,
 					term.Speed(getty.Baud))
 				if err != nil {
@@ -174,6 +176,25 @@ func (c *Command) Main(args ...string) error {
 						prog.Base(), getty.Tty, err)
 					return
 				}
+				_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
+					uintptr(tty.Fd()),
+					uintptr(syscall.TCGETS),
+					uintptr(unsafe.Pointer(&termios)))
+				if errno != 0 {
+					fmt.Fprintf(os.Stderr,
+						"TCGETS: %s: %v",
+						getty.Tty, errno)
+					return
+				}
+				termios.Iflag &^= syscall.BRKINT
+				termios.Iflag |= syscall.ICRNL | syscall.IXON
+				termios.Lflag |= syscall.ISIG | syscall.IEXTEN |
+					syscall.ICANON | syscall.ECHO
+				syscall.Syscall(syscall.SYS_IOCTL,
+					uintptr(tty.Fd()),
+					uintptr(syscall.TCSETS),
+					uintptr(unsafe.Pointer(&termios)))
+
 				ttyFile := os.NewFile(tty.Fd(), getty.Tty)
 				shell := exec.Command("/proc/self/exe")
 				shell.Args[0] = "cli"
@@ -210,6 +231,11 @@ func (c *Command) Main(args ...string) error {
 						"%s: error from cli: %s\n",
 						prog.Base(), err)
 				}
+				syscall.Syscall(syscall.SYS_IOCTL,
+					uintptr(tty.Fd()),
+					uintptr(syscall.TCSETS),
+					uintptr(unsafe.Pointer(&termios)))
+
 				_ = tty.Close()
 				close(closing)
 				select {
