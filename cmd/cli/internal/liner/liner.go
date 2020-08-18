@@ -129,6 +129,10 @@ func (l *Liner) Prompt(prompt string) (string, error) {
 
 		it := t
 		defer func() {
+			it.Iflag &^= syscall.BRKINT
+			it.Iflag |= syscall.ICRNL | syscall.IXON
+			it.Lflag |= syscall.ISIG | syscall.IEXTEN |
+				syscall.ICANON | syscall.ECHO
 			syscall.Syscall(syscall.SYS_IOCTL,
 				uintptr(syscall.Stdin),
 				uintptr(syscall.TCSETS),
