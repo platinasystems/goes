@@ -95,6 +95,17 @@ func (c *Command) Main(args ...string) error {
 	}
 	c.redisd.port = c.Port
 
+	// filter non-existent devs
+	for i := 0; i < len(c.Devs); {
+		if _, err := net.InterfaceByName(c.Devs[i]); err != nil {
+			copy(c.Devs[i:], c.Devs[i+1:])
+			n := len(c.Devs) - 1
+			c.Devs = c.Devs[:n]
+		} else {
+			i++
+		}
+	}
+
 	if len(args) == 0 {
 		if len(c.Devs) == 0 {
 			itfs, ierr := net.Interfaces()
