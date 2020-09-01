@@ -51,5 +51,4 @@ func (Command) Main(args ...string) error {
 			break
 		}
 	}
-	return err
 }

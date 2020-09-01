@@ -178,5 +178,4 @@ func (c *Command) Main(args ...string) (err error) {
 			return nil
 		}
 	}
-	return err
 }

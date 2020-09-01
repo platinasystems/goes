@@ -264,5 +264,4 @@ func (c *Command) Main(args ...string) error {
 			return nil
 		}
 	}
-	return nil // not reached
 }

@@ -112,7 +112,6 @@ func (c *Command) Main(args ...string) error {
 			break
 		}
 	}
-	return err
 }
 
 func (c *Command) Close() error {

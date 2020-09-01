@@ -173,5 +173,4 @@ func GetFamily(sr *nl.SockReceiver, name string) (uint16, error) {
 			}
 		}
 	}
-	return ercv(syscall.ENOTRECOVERABLE)
 }

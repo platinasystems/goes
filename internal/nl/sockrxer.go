@@ -84,7 +84,6 @@ func (sr *SockReceiver) UntilDone(req []byte, do func([]byte)) error {
 			do(b)
 		}
 	}
-	return nil
 }
 
 func DoNothing([]byte) {}

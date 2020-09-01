@@ -139,7 +139,6 @@ func (c *Command) Main(...string) error {
 			}
 		}
 	}
-	return nil
 }
 
 func (c *Command) update() error {
@@ -430,7 +429,6 @@ func (h *I2cDev) SetFanDuty(d uint8) error {
 		p, _ := redis.Hget(redis.DefaultHash, "fan_tray."+strconv.Itoa(int(j))+".status")
 		if p != "" && !strings.Contains(p, "ok") {
 			return nil
-			break
 		}
 	}
 

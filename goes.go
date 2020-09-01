@@ -10,7 +10,6 @@ package goes
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -705,7 +704,6 @@ func (g *Goes) ensureTerminated(ls shellutils.List) (*shellutils.List, error) {
 			ls.Cmds = append(ls.Cmds, cl)
 		}
 	}
-	return nil, errors.New("ensureTerminated: internal error")
 }
 
 type piperun struct {

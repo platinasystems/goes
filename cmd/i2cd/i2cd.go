@@ -55,7 +55,6 @@ func (c Command) Main(...string) error {
 			return nil
 		}
 	}
-	return nil
 }
 
 const MAXOPS = 30

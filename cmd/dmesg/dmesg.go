@@ -93,7 +93,7 @@ func (Command) Main(args ...string) error {
 	}
 
 	if len(args) > 0 {
-		fmt.Errorf("%v: unexpected", args)
+		_ = fmt.Errorf("%v: unexpected", args)
 	}
 
 	f, err := os.Open(parm.ByName["-F"])
@@ -130,7 +130,7 @@ func (Command) Main(args ...string) error {
 	if s := parm.ByName["-n"]; len(s) > 0 {
 		pri, found := log.PriorityByName[s]
 		if !found {
-			fmt.Errorf("%s: unknown", s)
+			_ = fmt.Errorf("%s: unknown", s)
 		}
 		_, err = syscall.Klogctl(SYSLOG_ACTION_CONSOLE_LEVEL,
 			buf[:pri])

@@ -110,5 +110,4 @@ func (c *Command) Main(args ...string) error {
 			}
 		}
 	}
-	return nil
 }

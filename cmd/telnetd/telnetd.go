@@ -17,9 +17,9 @@ import (
 
 	"github.com/kr/pty"
 	"github.com/platinasystems/goes/cmd"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/telnet/command"
 	"github.com/platinasystems/goes/internal/telnet/option"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -92,7 +92,6 @@ func (Command) Main(args ...string) error {
 			conn.Close()
 		}()
 	}
-	return nil
 }
 
 func optionNegotiation(conn net.Conn) error {

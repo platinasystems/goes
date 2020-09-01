@@ -134,9 +134,9 @@ func sourceMode(flag *flags.Flags, r *bufio.Reader, p string) error {
 		b, err := r.ReadByte()
 		if err != nil {
 			return err
-			if b != 0 {
-				return fmt.Errorf("Unexpected response %#x", b)
-			}
+		}
+		if b != 0 {
+			return fmt.Errorf("Unexpected response %#x", b)
 		}
 	}
 	fmt.Printf("C%#o %d %s\n", s.Mode()&os.ModePerm, s.Size(), s.Name())

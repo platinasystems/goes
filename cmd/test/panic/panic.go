@@ -42,7 +42,6 @@ func (cmd) Main(args ...string) error {
 		msg = strings.Join(args, " ")
 	}
 	panic(msg)
-	return nil
 }
 
 var (

@@ -45,5 +45,4 @@ func (Command) Main(args ...string) error {
 		msg = strings.Join(args, " ")
 	}
 	panic(msg)
-	return nil
 }

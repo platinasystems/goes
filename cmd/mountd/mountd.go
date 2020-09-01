@@ -160,5 +160,4 @@ func (c *Command) Main(args ...string) (err error) {
 		case <-t.C:
 		}
 	}
-	return nil
 }

@@ -278,7 +278,6 @@ func pollMountResults(c chan *MountResult) (i int) {
 			return i
 		}
 	}
-	return i
 }
 
 func flushMountResults(c chan *MountResult, complete, count int) {

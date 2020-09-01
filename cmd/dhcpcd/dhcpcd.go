@@ -270,8 +270,6 @@ func (c *Command) Main(args ...string) error {
 			return nil
 		}
 	}
-
-	return nil
 }
 
 func (c *Command) renew() (done bool, err error) {
