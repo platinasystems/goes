@@ -6,14 +6,14 @@ package group
 
 import "fmt"
 
-func ExampleAdm() {
+func ExampleParse_adm() {
 	group := Parse()
 	fmt.Println("adm.Gid:", group["adm"].Gid())
 	// Output:
 	// adm.Gid: 4
 }
 
-func ExampleFoobar() {
+func ExampleParse_foobar() {
 	group := Parse()
 	fmt.Println("foobar.Gid:", group["foobar"].Gid())
 	// Output:

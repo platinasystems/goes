@@ -17,7 +17,7 @@ type KexecSegment struct {
 }
 
 func (s KexecSegment) String() string {
-	return fmt.Sprintf("Buf@x Bufsize=%x Mem=%x Memsz=%x", s.Buf, s.Bufsz,
+	return fmt.Sprintf("Buf@%xx Bufsize=%x Mem=%x Memsz=%x", s.Buf, s.Bufsz,
 		s.Mem, s.Memsz)
 }
 

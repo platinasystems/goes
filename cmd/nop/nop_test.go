@@ -86,7 +86,7 @@ func TestDefaultCommand(t *testing.T) {
 	c.testLazyCmd(t)
 }
 
-func ExampleDefaultCommand() {
+func ExampleMain() {
 	c := Command{}
 	fmt.Println(c)
 	fmt.Println(c.Usage())
@@ -110,7 +110,7 @@ func TestXyzzyCommand(t *testing.T) {
 	c.testLazyCmd(t)
 }
 
-func ExampleXyzzyCommand() {
+func ExampleMain_xyzzy() {
 	c := Command{C: "xyzzy"}
 	fmt.Println(c)
 	fmt.Println(c.Usage())

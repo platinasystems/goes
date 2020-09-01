@@ -10,9 +10,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -99,15 +99,16 @@ func (Command) Main(args ...string) error {
 		if !found {
 			return fmt.Errorf("%s: %q not found", x.name, s)
 		}
-		info = append(info, nl.Attr{x.t, nl.Uint32Attr(idx)})
+		info = append(info, nl.Attr{Type: x.t,
+			Value: nl.Uint32Attr(idx)})
 	}
 	s = opt.Parms.ByName["subversion"]
 	if len(s) > 0 {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("subversion: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_HSR_MULTICAST_SPEC,
-			nl.Uint8Attr(u8)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_HSR_MULTICAST_SPEC,
+			Value: nl.Uint8Attr(u8)})
 	}
 	s = opt.Parms.ByName["version"]
 	if len(s) > 0 {
@@ -117,14 +118,16 @@ func (Command) Main(args ...string) error {
 		if u8 > 1 {
 			return fmt.Errorf("version: %q %v", s, syscall.ERANGE)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_HSR_VERSION,
-			nl.Uint8Attr(u8)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_HSR_VERSION,
+			Value: nl.Uint8Attr(u8)})
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("hsr")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("hsr")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA, Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

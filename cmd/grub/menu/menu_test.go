@@ -20,7 +20,7 @@ func TestMain(t *testing.T) {
 	testCmdWithArgs(s, t, InternalError)
 }
 
-func ExampleMenuentryCommand() {
+func ExampleMain() {
 	m, _ := New()
 	fmt.Println(m.String())
 	fmt.Println(m.Usage())
@@ -41,7 +41,7 @@ func ExampleMenuentryCommand() {
 	//	item is selected.
 }
 
-func ExampleSubmenuCommand() {
+func ExampleMain_submenuCommand() {
 	_, s := New()
 	fmt.Println(s.String())
 	fmt.Println(s.Usage())

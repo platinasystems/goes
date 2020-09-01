@@ -10,9 +10,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -109,8 +109,8 @@ func (Command) Main(args ...string) error {
 			if ip4 := net.ParseIP(s).To4(); ip4 == nil {
 				return fmt.Errorf("%s: %q invalid", x.name, s)
 			} else {
-				info = append(info, nl.Attr{x.t,
-					nl.BytesAttr(ip4)})
+				info = append(info, nl.Attr{Type: x.t,
+					Value: nl.BytesAttr(ip4)})
 			}
 		}
 	}
@@ -126,7 +126,8 @@ func (Command) Main(args ...string) error {
 			if _, err := fmt.Sscan(s, &u8); err != nil {
 				return fmt.Errorf("%s: %q %v", x.name, s, err)
 			}
-			info = append(info, nl.Attr{x.t, nl.Uint8Attr(u8)})
+			info = append(info, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(u8)})
 		}
 	}
 	if s := opt.Parms.ByName["dev"]; len(s) > 0 {
@@ -134,19 +135,19 @@ func (Command) Main(args ...string) error {
 		if !found {
 			return fmt.Errorf("dev: %q not found", s)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_LINK,
-			nl.Uint32Attr(dev)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_LINK,
+			Value: nl.Uint32Attr(dev)})
 	}
 	if opt.Flags.ByName["pmtudisc"] {
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_PMTUDISC,
-			nl.Uint8Attr(1)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_PMTUDISC,
+			Value: nl.Uint8Attr(1)})
 	} else if opt.Flags.ByName["no-pmtudisc"] {
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_PMTUDISC,
-			nl.Uint8Attr(0)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_PMTUDISC,
+			Value: nl.Uint8Attr(0)})
 	}
 	if opt.Flags.ByName["no-encap"] {
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
-			nl.Uint32Attr(rtnl.TUNNEL_ENCAP_NONE)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_ENCAP_TYPE,
+			Value: nl.Uint32Attr(rtnl.TUNNEL_ENCAP_NONE)})
 	} else {
 		if s := opt.Parms.ByName["encap"]; len(s) > 0 {
 			if encap, found := map[string]uint16{
@@ -157,8 +158,8 @@ func (Command) Main(args ...string) error {
 				return fmt.Errorf("encap: %q unknown", s)
 			} else {
 				info = append(info,
-					nl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
-						nl.Uint32Attr(encap)})
+					nl.Attr{Type: rtnl.IFLA_IPTUN_ENCAP_TYPE,
+						Value: nl.Uint32Attr(encap)})
 			}
 		}
 	}
@@ -177,20 +178,21 @@ func (Command) Main(args ...string) error {
 						x.name, s, err)
 				}
 			}
-			info = append(info, nl.Attr{rtnl.IFLA_IPTUN_ENCAP_TYPE,
-				nl.Be16Attr(u16)})
+			info = append(info, nl.Attr{
+				Type:  rtnl.IFLA_IPTUN_ENCAP_TYPE,
+				Value: nl.Be16Attr(u16)})
 		}
 	}
 	switch s := opt.Parms.ByName["mode"]; s {
 	case "", "any", "anyip4", "any/ip4":
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_PROTO,
-			nl.Uint8Attr(0)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_PROTO,
+			Value: nl.Uint8Attr(0)})
 	case "ipip", "ip4ip4", "ip4/ip4":
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_PROTO,
-			nl.Uint8Attr(rtnl.IPPROTO_IPIP)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_PROTO,
+			Value: nl.Uint8Attr(rtnl.IPPROTO_IPIP)})
 	case "mplsip", "mplsip4", "mpls/ip4":
-		info = append(info, nl.Attr{rtnl.IFLA_IPTUN_PROTO,
-			nl.Uint8Attr(rtnl.IPPROTO_MPLS)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_IPTUN_PROTO,
+			Value: nl.Uint8Attr(rtnl.IPPROTO_MPLS)})
 	default:
 		return fmt.Errorf("%q: unknown encap", s)
 	}
@@ -208,13 +210,15 @@ func (Command) Main(args ...string) error {
 		}
 	}
 
-	info = append(info, nl.Attr{rtnl.IFLA_GRE_ENCAP_FLAGS,
-		nl.Uint16Attr(encapflags)})
+	info = append(info, nl.Attr{Type: rtnl.IFLA_GRE_ENCAP_FLAGS,
+		Value: nl.Uint16Attr(encapflags)})
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("ipip")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("ipip")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA, Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

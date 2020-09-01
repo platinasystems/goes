@@ -10,9 +10,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -142,8 +142,9 @@ func (Command) Main(args ...string) error {
 	}
 
 	if opt.Flags.ByName["fdb-flush"] {
-		add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_BR_FDB_FLUSH,
-			nl.NilAttr{}})
+		add.Attrs = append(add.Attrs, nl.Attr{
+			Type:  rtnl.IFLA_BR_FDB_FLUSH,
+			Value: nl.NilAttr{}})
 	}
 	for _, x := range []struct {
 		name string
@@ -170,7 +171,8 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u64); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t, nl.Uint32Attr(u64)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.Uint32Attr(u64)})
 	}
 	for _, x := range []struct {
 		name string
@@ -196,7 +198,8 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t, nl.Uint32Attr(u32)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.Uint32Attr(u32)})
 	}
 	for _, x := range []struct {
 		name string
@@ -215,7 +218,8 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t, nl.Uint16Attr(u16)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.Uint16Attr(u16)})
 	}
 	for _, x := range []struct {
 		name string
@@ -242,7 +246,8 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v ", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t, nl.Uint16Attr(u8)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.Uint16Attr(u8)})
 	}
 	for _, x := range []struct {
 		name string
@@ -258,12 +263,13 @@ func (Command) Main(args ...string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t,
-			nl.BytesAttr(lladdr)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.BytesAttr(lladdr)})
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO,
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("bridge")}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+			Value: nl.KstringAttr("bridge")}})
 
 	req, err := add.Message()
 	if err == nil {

@@ -12,9 +12,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -224,8 +224,8 @@ func (Command) Main(args ...string) error {
 	} else if u32 >= 1<<24 {
 		return fmt.Errorf("vni: %q %v", s, syscall.ERANGE)
 	}
-	info = append(info, nl.Attr{rtnl.IFLA_VXLAN_ID,
-		nl.Uint32Attr(u32)})
+	info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_ID,
+		Value: nl.Uint32Attr(u32)})
 	for _, x := range []struct {
 		name string
 		p    *net.IP
@@ -247,29 +247,29 @@ func (Command) Main(args ...string) error {
 		if addr != nil {
 			if ip4 := addr.To4(); ip4 != nil {
 				info = append(info,
-					nl.Attr{rtnl.IFLA_VXLAN_GROUP,
-						nl.BytesAttr(ip4)})
+					nl.Attr{Type: rtnl.IFLA_VXLAN_GROUP,
+						Value: nl.BytesAttr(ip4)})
 			} else {
 				info = append(info,
-					nl.Attr{rtnl.IFLA_VXLAN_GROUP6,
-						nl.BytesAttr(addr.To16())})
+					nl.Attr{Type: rtnl.IFLA_VXLAN_GROUP6,
+						Value: nl.BytesAttr(addr.To16())})
 			}
 			break
 		}
 	}
 	if ip4 := laddr.To4(); ip4 != nil {
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_LOCAL,
-			nl.BytesAttr(ip4)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_LOCAL,
+			Value: nl.BytesAttr(ip4)})
 	} else {
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_LOCAL6,
-			nl.BytesAttr(laddr.To16())})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_LOCAL6,
+			Value: nl.BytesAttr(laddr.To16())})
 	}
 	if s = opt.Parms.ByName["dev"]; len(s) > 0 {
 		if dev, found := rtnl.If.IndexByName[s]; !found {
 			return fmt.Errorf("dev: %q not found", s)
 		} else {
-			info = append(info, nl.Attr{rtnl.IFLA_VXLAN_LINK,
-				nl.Uint32Attr(dev)})
+			info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_LINK,
+				Value: nl.Uint32Attr(dev)})
 		}
 	}
 	for _, x := range []struct {
@@ -286,15 +286,15 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		info = append(info, nl.Attr{x.t, nl.Uint8Attr(u8)})
+		info = append(info, nl.Attr{Type: x.t, Value: nl.Uint8Attr(u8)})
 	}
 	if s = opt.Parms.ByName["flowlabel"]; len(s) > 0 {
 		var u32 uint32
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("flowlabel: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_LABEL,
-			nl.Be32Attr(u32)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_LABEL,
+			Value: nl.Be32Attr(u32)})
 	}
 	for _, x := range []struct {
 		name string
@@ -311,14 +311,15 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u32); err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		info = append(info, nl.Attr{x.t, nl.Uint32Attr(u32)})
+		info = append(info, nl.Attr{Type: x.t,
+			Value: nl.Uint32Attr(u32)})
 	}
 	if s = opt.Parms.ByName["dstport"]; len(s) > 0 {
 		if _, err = fmt.Sscan(s, &u16); err != nil {
 			return fmt.Errorf("dstport: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_PORT,
-			nl.Be16Attr(u16)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_PORT,
+			Value: nl.Be16Attr(u16)})
 	}
 	if s = opt.Parms.ByName["srcport"]; len(s) > 0 {
 		var pr rtnl.IflaVxlanPortRange
@@ -332,8 +333,8 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s[colon+1:], &pr.High); err != nil {
 			return fmt.Errorf("srcport high: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_PORT_RANGE,
-			pr})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_PORT_RANGE,
+			Value: pr})
 	}
 	for _, x := range []struct {
 		name string
@@ -351,19 +352,21 @@ func (Command) Main(args ...string) error {
 		{"remcsumrx", rtnl.IFLA_VXLAN_REMCSUM_TX},
 	} {
 		if opt.Flags.ByName[x.name] {
-			info = append(info, nl.Attr{x.t, nl.Uint8Attr(1)})
+			info = append(info, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(1)})
 		} else if opt.Flags.ByName["no-"+x.name] {
-			info = append(info, nl.Attr{x.t, nl.Uint8Attr(0)})
+			info = append(info, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(0)})
 		}
 	}
 	if opt.Flags.ByName["external"] {
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
-			nl.Uint8Attr(1)})
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_LEARNING,
-			nl.Uint8Attr(0)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_COLLECT_METADATA,
+			Value: nl.Uint8Attr(1)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_LEARNING,
+			Value: nl.Uint8Attr(0)})
 	} else if opt.Flags.ByName["no-external"] {
-		info = append(info, nl.Attr{rtnl.IFLA_VXLAN_COLLECT_METADATA,
-			nl.Uint8Attr(0)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VXLAN_COLLECT_METADATA,
+			Value: nl.Uint8Attr(0)})
 	}
 	for _, x := range []struct {
 		name string
@@ -373,14 +376,17 @@ func (Command) Main(args ...string) error {
 		{"gpe", rtnl.IFLA_VXLAN_GPE},
 	} {
 		if opt.Flags.ByName[x.name] {
-			info = append(info, nl.Attr{x.t, nl.NilAttr{}})
+			info = append(info, nl.Attr{Type: x.t,
+				Value: nl.NilAttr{}})
 		}
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vxlan")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("vxlan")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA, Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

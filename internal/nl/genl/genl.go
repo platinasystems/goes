@@ -129,7 +129,7 @@ func GetFamily(sr *nl.SockReceiver, name string) (uint16, error) {
 		Seq:   seq,
 	}, Msg{
 		Cmd: CTRL_CMD_GETFAMILY,
-	}, nl.Attr{CTRL_ATTR_FAMILY_NAME, nl.KstringAttr(name)})
+	}, nl.Attr{Type: CTRL_ATTR_FAMILY_NAME, Value: nl.KstringAttr(name)})
 	if err != nil {
 		return 0, fmt.Errorf("GetFamily(%q).Request: %v", name, err)
 	}

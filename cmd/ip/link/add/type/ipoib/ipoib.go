@@ -9,9 +9,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -91,7 +91,8 @@ func (Command) Main(args ...string) error {
 			return fmt.Errorf("type ipoib %s: %q %v",
 				x.name, s, err)
 		}
-		info = append(info, nl.Attr{x.t, nl.Uint16Attr(u16)})
+		info = append(info, nl.Attr{Type: x.t,
+			Value: nl.Uint16Attr(u16)})
 	}
 	if s := opt.Parms.ByName["mode"]; len(s) > 0 {
 		if mode, found := map[string]uint16{
@@ -100,15 +101,17 @@ func (Command) Main(args ...string) error {
 		}[s]; !found {
 			return fmt.Errorf("type ipoib mode: %q invalid", s)
 		} else {
-			info = append(info, nl.Attr{rtnl.IFLA_IPOIB_MODE,
-				nl.Uint16Attr(mode)})
+			info = append(info, nl.Attr{Type: rtnl.IFLA_IPOIB_MODE,
+				Value: nl.Uint16Attr(mode)})
 		}
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("ipoib")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("ipoib")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA, Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

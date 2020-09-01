@@ -54,13 +54,14 @@ func FileLoad(k *os.File, i *os.File, cmdline string, flags uintptr) (err error)
 	if err == syscall.ENOSYS {
 		kdat, err := ioutil.ReadAll(k)
 		if err != nil {
-			return fmt.Errorf("Opening kernel %s: %w", k, err)
+			return fmt.Errorf("Opening kernel %s: %w", k.Name(), err)
 		}
 		idat := []byte{}
 		if i != nil {
 			idat, err = ioutil.ReadAll(i)
 			if err != nil {
-				return fmt.Errorf("Opening initramfs %s: %w", i, err)
+				return fmt.Errorf("Opening initramfs %s: %w",
+					i.Name(), err)
 			}
 		}
 		return LoadSlices(kdat, idat, cmdline, flags)

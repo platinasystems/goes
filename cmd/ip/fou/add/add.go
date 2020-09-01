@@ -8,11 +8,11 @@ import (
 	"fmt"
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/genl"
 	"github.com/platinasystems/goes/internal/nl/genl/fou"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -63,8 +63,8 @@ func (Command) Main(args ...string) error {
 		if _, err := fmt.Sscan(s, &port); err != nil {
 			return fmt.Errorf("port %q %v", s, err)
 		}
-		attrs = append(attrs, nl.Attr{fou.FOU_ATTR_PORT,
-			nl.Be16Attr(port)})
+		attrs = append(attrs, nl.Attr{Type: fou.FOU_ATTR_PORT,
+			Value: nl.Be16Attr(port)})
 	} else {
 		return fmt.Errorf("missing port")
 	}
@@ -73,11 +73,12 @@ func (Command) Main(args ...string) error {
 	if opt.Flags.ByName["gue"] {
 		t = fou.FOU_ENCAP_GUE
 	}
-	attrs = append(attrs, nl.Attr{fou.FOU_ATTR_TYPE, nl.Uint8Attr(t)})
+	attrs = append(attrs, nl.Attr{Type: fou.FOU_ATTR_TYPE,
+		Value: nl.Uint8Attr(t)})
 
 	if opt.Parms.ByName["-f"] == "inet6" {
-		attrs = append(attrs, nl.Attr{fou.FOU_ATTR_AF,
-			nl.Uint16Attr(rtnl.AF_INET6)})
+		attrs = append(attrs, nl.Attr{Type: fou.FOU_ATTR_AF,
+			Value: nl.Uint16Attr(rtnl.AF_INET6)})
 	}
 
 	if t == fou.FOU_ENCAP_DIRECT {
@@ -92,8 +93,8 @@ func (Command) Main(args ...string) error {
 		default:
 			return fmt.Errorf("iproto %q unknown", s)
 		}
-		attrs = append(attrs, nl.Attr{fou.FOU_ATTR_IPPROTO,
-			nl.Uint8Attr(ipproto)})
+		attrs = append(attrs, nl.Attr{Type: fou.FOU_ATTR_IPPROTO,
+			Value: nl.Uint8Attr(ipproto)})
 	}
 
 	sock, err := nl.NewSock(nl.NETLINK_GENERIC)

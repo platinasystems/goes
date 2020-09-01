@@ -27,7 +27,7 @@ func Nsid(sr *nl.SockReceiver, name string) (int32, error) {
 	}, NetnsMsg{
 		Family: AF_UNSPEC,
 	},
-		nl.Attr{NETNSA_FD, nl.Uint32Attr(f.Fd())},
+		nl.Attr{Type: NETNSA_FD, Value: nl.Uint32Attr(f.Fd())},
 	); err != nil {
 		return -1, err
 	} else if err = sr.UntilDone(req, func(b []byte) {

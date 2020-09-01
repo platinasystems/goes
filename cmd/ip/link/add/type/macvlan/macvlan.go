@@ -11,9 +11,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command string
@@ -127,41 +127,43 @@ func (c Command) Main(args ...string) error {
 	if !found {
 		return fmt.Errorf("mode: %q unknown", s)
 	}
-	info = append(info, nl.Attr{rtnl.IFLA_MACVLAN_MODE,
-		nl.Uint32Attr(mode)})
+	info = append(info, nl.Attr{Type: rtnl.IFLA_MACVLAN_MODE,
+		Value: nl.Uint32Attr(mode)})
 	switch mode {
 	case rtnl.MACVLAN_MODE_PASSTHRU:
 		if opt.Flags.ByName["no-promisc"] {
-			info = append(info, nl.Attr{rtnl.IFLA_MACVLAN_FLAGS,
-				nl.Uint16Attr(rtnl.MACVLAN_FLAG_NOPROMISC)})
+			info = append(info, nl.Attr{Type: rtnl.IFLA_MACVLAN_FLAGS,
+				Value: nl.Uint16Attr(rtnl.MACVLAN_FLAG_NOPROMISC)})
 		}
 	case rtnl.MACVLAN_MODE_SOURCE:
 		if !opt.Flags.ByName["macaddr"] {
 			// skip
 		} else if opt.Flags.ByName["flush"] {
 			info = append(info, nl.Attr{
-				rtnl.IFLA_MACVLAN_MACADDR_MODE,
-				nl.Uint32Attr(rtnl.MACVLAN_MACADDR_FLUSH)})
+				Type:  rtnl.IFLA_MACVLAN_MACADDR_MODE,
+				Value: nl.Uint32Attr(rtnl.MACVLAN_MACADDR_FLUSH)})
 		} else if s = opt.Parms.ByName["add"]; len(s) > 0 {
 			mac, err := net.ParseMAC(s)
 			if err != nil {
 				return fmt.Errorf("LLADDR: %q %v", s, err)
 			}
 			info = append(info, nl.Attr{
-				rtnl.IFLA_MACVLAN_MACADDR_MODE,
-				nl.Uint32Attr(rtnl.MACVLAN_MACADDR_ADD)})
-			info = append(info, nl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
-				nl.BytesAttr(mac)})
+				Type:  rtnl.IFLA_MACVLAN_MACADDR_MODE,
+				Value: nl.Uint32Attr(rtnl.MACVLAN_MACADDR_ADD)})
+			info = append(info, nl.Attr{
+				Type:  rtnl.IFLA_MACVLAN_MACADDR,
+				Value: nl.BytesAttr(mac)})
 		} else if s = opt.Parms.ByName["del"]; len(s) > 0 {
 			mac, err := net.ParseMAC(s)
 			if err != nil {
 				return fmt.Errorf("LLADDR: %q %v", s, err)
 			}
 			info = append(info, nl.Attr{
-				rtnl.IFLA_MACVLAN_MACADDR_MODE,
-				nl.Uint32Attr(rtnl.MACVLAN_MACADDR_DEL)})
-			info = append(info, nl.Attr{rtnl.IFLA_MACVLAN_MACADDR,
-				nl.BytesAttr(mac)})
+				Type:  rtnl.IFLA_MACVLAN_MACADDR_MODE,
+				Value: nl.Uint32Attr(rtnl.MACVLAN_MACADDR_DEL)})
+			info = append(info, nl.Attr{
+				Type:  rtnl.IFLA_MACVLAN_MACADDR,
+				Value: nl.BytesAttr(mac)})
 		} else if s = opt.Parms.ByName["set"]; len(s) > 0 {
 			var macs nl.Attrs
 			for _, smac := range strings.Split(s, ",") {
@@ -171,21 +173,25 @@ func (c Command) Main(args ...string) error {
 						smac, err)
 				}
 				macs = append(macs, nl.Attr{
-					rtnl.IFLA_MACVLAN_MACADDR,
-					nl.BytesAttr(mac)})
+					Type:  rtnl.IFLA_MACVLAN_MACADDR,
+					Value: nl.BytesAttr(mac)})
 			}
 			info = append(info, nl.Attr{
-				rtnl.IFLA_MACVLAN_MACADDR_MODE,
-				nl.Uint32Attr(rtnl.MACVLAN_MACADDR_SET)})
+				Type:  rtnl.IFLA_MACVLAN_MACADDR_MODE,
+				Value: nl.Uint32Attr(rtnl.MACVLAN_MACADDR_SET)})
 			info = append(info,
-				nl.Attr{rtnl.IFLA_MACVLAN_MACADDR_DATA, macs})
+				nl.Attr{Type: rtnl.IFLA_MACVLAN_MACADDR_DATA,
+					Value: macs})
 		}
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr(c)},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr(c)},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA,
+				Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

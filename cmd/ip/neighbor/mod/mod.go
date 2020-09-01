@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command string
@@ -53,7 +53,7 @@ func (c Command) Main(args ...string) error {
 		attrs nl.Attrs
 	}
 	addattr := func(t uint16, v io.Reader) {
-		nd.attrs = append(nd.attrs, nl.Attr{t, v})
+		nd.attrs = append(nd.attrs, nl.Attr{Type: t, Value: v})
 	}
 
 	nd.hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK
@@ -145,7 +145,8 @@ func (c Command) Main(args ...string) error {
 			rtnl.IfInfoMsg{
 				Family: rtnl.AF_UNSPEC,
 			},
-			nl.Attr{rtnl.IFLA_IFNAME, nl.KstringAttr(name)},
+			nl.Attr{Type: rtnl.IFLA_IFNAME,
+				Value: nl.KstringAttr(name)},
 		); err != nil {
 			return err
 		} else if err = sr.UntilDone(req, func(b []byte) {

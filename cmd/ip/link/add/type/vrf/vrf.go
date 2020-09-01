@@ -9,9 +9,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -92,14 +92,18 @@ func (Command) Main(args ...string) error {
 		}
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_IFNAME,
-		nl.KstringAttr(args[0])})
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vrf")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, nl.Attrs{
-			nl.Attr{rtnl.IFLA_VRF_TABLE, nl.Uint32Attr(tbl)}},
-		},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_IFNAME,
+		Value: nl.KstringAttr(args[0])})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("vrf")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA,
+				Value: nl.Attrs{
+					nl.Attr{Type: rtnl.IFLA_VRF_TABLE,
+						Value: nl.Uint32Attr(tbl)}},
+			},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

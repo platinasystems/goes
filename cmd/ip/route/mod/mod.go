@@ -251,7 +251,7 @@ func (Command) Complete(args ...string) (list []string) {
 }
 
 func (m *mod) append(t uint16, v io.Reader) {
-	m.attrs = append(m.attrs, nl.Attr{t, v})
+	m.attrs = append(m.attrs, nl.Attr{Type: t, Value: v})
 }
 
 func (m *mod) getifindices() error {
@@ -293,7 +293,7 @@ func (m *mod) parse() error {
 		mxattrs nl.Attrs
 	)
 	mxappend := func(t uint16, v io.Reader) {
-		mxattrs = append(mxattrs, nl.Attr{t, v})
+		mxattrs = append(mxattrs, nl.Attr{Type: t, Value: v})
 	}
 	familyopt := m.opt.Parms.ByName["-f"]
 	if len(familyopt) == 0 {
@@ -345,8 +345,8 @@ func (m *mod) parse() error {
 					m.append(rtnl.RTA_GATEWAY, v)
 				} else {
 					m.append(rtnl.RTA_VIA,
-						rtnl.RtVia{uint16(v.Family()),
-							v.Bytes()})
+						rtnl.RtVia{Family: uint16(v.Family()),
+							Address: v.Bytes()})
 				}
 			} else {
 				err = e
@@ -801,7 +801,7 @@ func (m *mod) parseNextHops() (rtnl.RtnhAttrsList, error) {
 		nh  rtnl.RtnhAttrs
 	)
 	nhappend := func(t uint16, v io.Reader) {
-		nh.Attrs = append(nh.Attrs, nl.Attr{t, v})
+		nh.Attrs = append(nh.Attrs, nl.Attr{Type: t, Value: v})
 	}
 	nhs := rtnl.RtnhAttrsList{nh}
 nhloop:
@@ -823,8 +823,8 @@ nhloop:
 					nhappend(rtnl.RTA_GATEWAY, v)
 				} else {
 					nhappend(rtnl.RTA_VIA,
-						rtnl.RtVia{uint16(v.Family()),
-							v.Bytes()})
+						rtnl.RtVia{Family: uint16(v.Family()),
+							Address: v.Bytes()})
 				}
 			} else {
 				err = e
@@ -878,7 +878,7 @@ func (m *mod) parseEncapMpls() (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	attrs := nl.Attrs{nl.Attr{rtnl.MPLS_IPTUNNEL_DST, addr}}
+	attrs := nl.Attrs{nl.Attr{Type: rtnl.MPLS_IPTUNNEL_DST, Value: addr}}
 	m.args = m.args[1:]
 	if len(m.args) == 0 {
 		return attrs, nil
@@ -894,8 +894,8 @@ func (m *mod) parseEncapMpls() (io.Reader, error) {
 	if _, err = fmt.Sscan(m.args[0], &ttl); err == nil {
 		return nil, fmt.Errorf("ttl: %v", err)
 	}
-	attrs = append(attrs, nl.Attr{rtnl.MPLS_IPTUNNEL_TTL,
-		nl.Uint8Attr(ttl)})
+	attrs = append(attrs, nl.Attr{Type: rtnl.MPLS_IPTUNNEL_TTL,
+		Value: nl.Uint8Attr(ttl)})
 	m.args = m.args[1:]
 	return attrs, nil
 }
@@ -904,7 +904,7 @@ func (m *mod) parseEncapMpls() (io.Reader, error) {
 func (m *mod) parseEncapIp() (io.Reader, error) {
 	var attrs nl.Attrs
 	appendAttr := func(t uint16, v io.Reader) {
-		attrs = append(attrs, nl.Attr{t, v})
+		attrs = append(attrs, nl.Attr{Type: t, Value: v})
 	}
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing id")
@@ -974,7 +974,7 @@ func (m *mod) parseEncapIp() (io.Reader, error) {
 func (m *mod) parseEncapIp6() (io.Reader, error) {
 	var attrs nl.Attrs
 	appendAttr := func(t uint16, v io.Reader) {
-		attrs = append(attrs, nl.Attr{t, v})
+		attrs = append(attrs, nl.Attr{Type: t, Value: v})
 	}
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing id")
@@ -1045,7 +1045,7 @@ func (m *mod) parseEncapIp6() (io.Reader, error) {
 func (m *mod) parseEncapIla() (io.Reader, error) {
 	var attrs nl.Attrs
 	appendAttr := func(t uint16, v io.Reader) {
-		attrs = append(attrs, nl.Attr{t, v})
+		attrs = append(attrs, nl.Attr{Type: t, Value: v})
 	}
 	if len(m.args) == 0 {
 		return nil, fmt.Errorf("missing LOCATOR")
@@ -1141,7 +1141,7 @@ func (m *mod) parseEncapSeg6() (io.Reader, error) {
 		tlv.HmacKeyId.Store(hmac)
 	}
 
-	return nl.Attr{rtnl.SEG6_IPTUNNEL_SRH, nl.BytesAttr(b)}, nil
+	return nl.Attr{Type: rtnl.SEG6_IPTUNNEL_SRH, Value: nl.BytesAttr(b)}, nil
 }
 
 // [ in PROG ] [ out PROG ] [ xmit PROG ] [ headroom SIZE ]

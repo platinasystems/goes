@@ -10,9 +10,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -157,8 +157,8 @@ func (Command) Main(args ...string) error {
 		}
 	}
 	if iflaVlanFlags.Mask != 0 {
-		info = append(info, nl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
-			iflaVlanFlags})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VLAN_PROTOCOL,
+			Value: iflaVlanFlags})
 	}
 	if s := opt.Parms.ByName["protocol"]; len(s) > 0 {
 		proto, found := map[string]uint16{
@@ -168,8 +168,8 @@ func (Command) Main(args ...string) error {
 		if !found {
 			return fmt.Errorf("protocol: %q not found", s)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_VLAN_PROTOCOL,
-			nl.Be16Attr(proto)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VLAN_PROTOCOL,
+			Value: nl.Be16Attr(proto)})
 	}
 	if s := opt.Parms.ByName["id"]; len(s) > 0 {
 		var id uint16
@@ -177,8 +177,8 @@ func (Command) Main(args ...string) error {
 			return fmt.Errorf("type vlan id: %q %v",
 				s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_VLAN_ID,
-			nl.Uint16Attr(id)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_VLAN_ID,
+			Value: nl.Uint16Attr(id)})
 	}
 	for _, x := range []struct {
 		name string
@@ -204,13 +204,15 @@ func (Command) Main(args ...string) error {
 			return fmt.Errorf("%s: TO: %q %v",
 				x.name, s[colon+1:], err)
 		}
-		info = append(info, nl.Attr{x.t, qos})
+		info = append(info, nl.Attr{Type: x.t, Value: qos})
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("vlan")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("vlan")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA, Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

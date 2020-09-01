@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 var (
@@ -144,7 +144,7 @@ func (Command) Main(args ...string) error {
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		nl.Attr{rtnl.IFLA_EXT_MASK, rtnl.RTEXT_FILTER_VF},
+		nl.Attr{Type: rtnl.IFLA_EXT_MASK, Value: rtnl.RTEXT_FILTER_VF},
 	); err != nil {
 		return err
 	} else if err = sr.UntilDone(req, func(b []byte) {

@@ -12,7 +12,7 @@ pipeline {
 	stage('Build') {
 	    steps {
 		echo "Building goes..."
-		sh 'set +x; for package in `find . -type d -print` ; do ls $package/*.go > /dev/null 2>&1 && { echo "Working on" $package ; { ls $package/*_test.go > /dev/null 2>&1 && { go test -v $package || exit; } } ; { go build  -v -buildmode=archive $package || exit; } } || echo "Skipping" $package;done'
+		sh 'set +x; go vet ./... && for package in `find . -type d -print` ; do ls $package/*.go > /dev/null 2>&1 && { echo "Working on" $package ; { ls $package/*_test.go > /dev/null 2>&1 && { go test -v $package || exit; } } ; { go build  -v -buildmode=archive $package || exit; } } || echo "Skipping" $package;done'
 	    }
 	}
     }

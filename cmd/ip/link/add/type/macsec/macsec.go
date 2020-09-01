@@ -9,9 +9,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -126,15 +126,15 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &port); err != nil {
 			return fmt.Errorf("port: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_MACSEC_PORT,
-			nl.Be16Attr(port)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_MACSEC_PORT,
+			Value: nl.Be16Attr(port)})
 	} else if s = opt.Parms.ByName["sci"]; len(s) > 0 {
 		var sci uint64
 		if _, err = fmt.Sscan(s, &sci); err != nil {
 			return fmt.Errorf("sci: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_MACSEC_SCI,
-			nl.Be64Attr(sci)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_MACSEC_SCI,
+			Value: nl.Be64Attr(sci)})
 	} else {
 		return fmt.Errorf("missing port or sci")
 	}
@@ -151,11 +151,11 @@ func (Command) Main(args ...string) error {
 		{"replay", rtnl.IFLA_MACSEC_REPLAY_PROTECT},
 	} {
 		if opt.Flags.ByName[x.name] {
-			info = append(info, nl.Attr{x.t,
-				nl.Uint8Attr(1)})
+			info = append(info, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(1)})
 		} else if opt.Flags.ByName["no-"+x.name] {
-			info = append(info, nl.Attr{x.t,
-				nl.Uint8Attr(0)})
+			info = append(info, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(0)})
 		}
 	}
 	if opt.Flags.ByName["replay"] {
@@ -167,16 +167,16 @@ func (Command) Main(args ...string) error {
 		if _, err := fmt.Sscan(s, &window); err != nil {
 			return fmt.Errorf("window: %q %v", s, err)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_MACSEC_WINDOW,
-			nl.Uint32Attr(window)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_MACSEC_WINDOW,
+			Value: nl.Uint32Attr(window)})
 	}
 	if s = opt.Parms.ByName["cipher"]; len(s) > 0 {
 		switch s {
 		case "default", "gcm-aes-128":
 			id := rtnl.MACSEC_DEFAULT_CIPHER_ID
 			info = append(info,
-				nl.Attr{rtnl.IFLA_MACSEC_CIPHER_SUITE,
-					nl.Uint64Attr(id)})
+				nl.Attr{Type: rtnl.IFLA_MACSEC_CIPHER_SUITE,
+					Value: nl.Uint64Attr(id)})
 		default:
 			return fmt.Errorf("cipher: %q unknown", s)
 		}
@@ -190,8 +190,8 @@ func (Command) Main(args ...string) error {
 		if !found {
 			return fmt.Errorf("validate: %q unkown", s)
 		}
-		info = append(info, nl.Attr{rtnl.IFLA_MACSEC_VALIDATION,
-			nl.Uint8Attr(validate)})
+		info = append(info, nl.Attr{Type: rtnl.IFLA_MACSEC_VALIDATION,
+			Value: nl.Uint8Attr(validate)})
 	}
 	for _, x := range []struct {
 		name string
@@ -208,13 +208,15 @@ func (Command) Main(args ...string) error {
 		if _, err = fmt.Sscan(s, &u8); err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		info = append(info, nl.Attr{x.t, nl.Uint8Attr(u8)})
+		info = append(info, nl.Attr{Type: x.t, Value: nl.Uint8Attr(u8)})
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO, nl.Attrs{
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("macsec")},
-		nl.Attr{rtnl.IFLA_INFO_DATA, info},
-	}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attrs{
+			nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+				Value: nl.KstringAttr("macsec")},
+			nl.Attr{Type: rtnl.IFLA_INFO_DATA, Value: info},
+		}})
 	req, err := add.Message()
 	if err == nil {
 		err = sr.UntilDone(req, nl.DoNothing)

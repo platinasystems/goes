@@ -23,7 +23,7 @@ func TestGrubCommand(t *testing.T) {
 	}
 }
 
-func ExampleParser() {
+func ExampleMain() {
 	c := &Command{g: Goes}
 	err := c.runScript("testdata/hello.grub")
 	if err != nil {

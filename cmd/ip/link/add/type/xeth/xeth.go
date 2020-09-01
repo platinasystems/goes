@@ -9,9 +9,9 @@ import (
 
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -60,8 +60,9 @@ func (Command) Main(args ...string) error {
 		return err
 	}
 
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINKINFO,
-		nl.Attr{rtnl.IFLA_INFO_KIND, nl.KstringAttr("xeth")}})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
+		Value: nl.Attr{Type: rtnl.IFLA_INFO_KIND,
+			Value: nl.KstringAttr("xeth")}})
 
 	req, err := add.Message()
 	if err == nil {

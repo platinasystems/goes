@@ -9,7 +9,7 @@ type Be32 [4]byte
 type Be64 [8]byte
 
 func (be *Be16) Load() uint16 {
-	v := uint16(be[0] << 8)
+	v := uint16(be[0]) << 8
 	v |= uint16(be[1])
 	return v
 }
@@ -20,9 +20,9 @@ func (be *Be16) Store(v uint16) {
 }
 
 func (be *Be32) Load() uint32 {
-	v := uint32(be[0] << 24)
-	v |= uint32(be[1] << 16)
-	v |= uint32(be[2] << 8)
+	v := uint32(be[0]) << 24
+	v |= uint32(be[1]) << 16
+	v |= uint32(be[2]) << 8
 	v |= uint32(be[3])
 	return v
 }
@@ -35,13 +35,13 @@ func (be *Be32) Store(v uint32) {
 }
 
 func (be *Be64) Load() uint64 {
-	v := uint64(be[0] << 56)
-	v |= uint64(be[1] << 48)
-	v |= uint64(be[2] << 40)
-	v |= uint64(be[3] << 32)
-	v |= uint64(be[4] << 24)
-	v |= uint64(be[5] << 16)
-	v |= uint64(be[6] << 8)
+	v := uint64(be[0]) << 56
+	v |= uint64(be[1]) << 48
+	v |= uint64(be[2]) << 40
+	v |= uint64(be[3]) << 32
+	v |= uint64(be[4]) << 24
+	v |= uint64(be[5]) << 16
+	v |= uint64(be[6]) << 8
 	v |= uint64(be[7])
 	return v
 }

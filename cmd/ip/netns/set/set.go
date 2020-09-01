@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/netns"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command struct{}
@@ -80,8 +80,8 @@ func (Command) Main(args ...string) error {
 		rtnl.NetnsMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		nl.Attr{rtnl.NETNSA_FD, nl.Uint32Attr(f.Fd())},
-		nl.Attr{rtnl.NETNSA_NSID, nl.Int32Attr(nsid)},
+		nl.Attr{Type: rtnl.NETNSA_FD, Value: nl.Uint32Attr(f.Fd())},
+		nl.Attr{Type: rtnl.NETNSA_NSID, Value: nl.Int32Attr(nsid)},
 	)
 	if err != nil {
 		return err

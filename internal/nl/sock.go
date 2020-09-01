@@ -296,7 +296,7 @@ func (sock *Sock) gogorx(bytech chan<- byte, rdy chan<- struct{}) {
 		FD_ZERO(&rfds)
 		FD_SET(&rfds, sock.fd)
 		FD_SET(&rfds, prfd)
-		tv := syscall.Timeval{10, 0}
+		tv := syscall.Timeval{Sec: 10, Usec: 0}
 		n, sock.Err = syscall.Select(prfd+1, &rfds, nil, nil, &tv)
 		if sock.Err != nil {
 			break

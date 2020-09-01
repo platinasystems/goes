@@ -224,9 +224,11 @@ func (m *mod) parse() error {
 		{"protodown", "no-protodown", rtnl.IFLA_PROTO_DOWN},
 	} {
 		if m.opt.Flags.ByName[x.set] {
-			m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint8Attr(1)})
+			m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(1)})
 		} else if m.opt.Flags.ByName[x.unset] {
-			m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint8Attr(0)})
+			m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+				Value: nl.Uint8Attr(0)})
 		}
 	}
 	for _, x := range []struct {
@@ -237,7 +239,8 @@ func (m *mod) parse() error {
 		{"no-vrf", rtnl.IFLA_MASTER},
 	} {
 		if m.opt.Flags.ByName[x.name] {
-			m.attrs = append(m.attrs, nl.Attr{x.t, nl.Int32Attr(0)})
+			m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+				Value: nl.Int32Attr(0)})
 		}
 	}
 	for _, x := range []struct {
@@ -295,7 +298,8 @@ func (m *mod) parse() error {
 		if len(s) == 0 {
 			continue
 		}
-		m.attrs = append(m.attrs, nl.Attr{x.t, nl.KstringAttr(s)})
+		m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+			Value: nl.KstringAttr(s)})
 	}
 	for _, x := range []struct {
 		name string
@@ -316,7 +320,8 @@ func (m *mod) parse() error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Uint32Attr(u32)})
+		m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+			Value: nl.Uint32Attr(u32)})
 	}
 	for _, x := range []struct {
 		name string
@@ -333,7 +338,8 @@ func (m *mod) parse() error {
 		if err != nil {
 			return fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		m.attrs = append(m.attrs, nl.Attr{x.t, nl.BytesAttr(mac)})
+		m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+			Value: nl.BytesAttr(mac)})
 	}
 	for _, x := range []struct {
 		name string
@@ -350,7 +356,8 @@ func (m *mod) parse() error {
 		if !found {
 			return fmt.Errorf("%s: %q not found", x.name, s)
 		}
-		m.attrs = append(m.attrs, nl.Attr{x.t, nl.Int32Attr(ifindex)})
+		m.attrs = append(m.attrs, nl.Attr{Type: x.t,
+			Value: nl.Int32Attr(ifindex)})
 	}
 	if s := m.opt.Parms.ByName["netns"]; len(s) > 0 {
 		var id int32
@@ -364,36 +371,37 @@ func (m *mod) parse() error {
 		} else {
 			t = rtnl.IFLA_NET_NS_PID
 		}
-		m.attrs = append(m.attrs, nl.Attr{t, nl.Int32Attr(id)})
+		m.attrs = append(m.attrs, nl.Attr{Type: t,
+			Value: nl.Int32Attr(id)})
 	}
 	if s := m.opt.Parms.ByName["mode"]; len(s) > 0 {
 		mode, found := rtnl.IfLinkModeByName[s]
 		if !found {
 			return fmt.Errorf("mode: %q unknown", s)
 		}
-		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_LINKMODE,
-			nl.Uint8Attr(mode)})
+		m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_LINKMODE,
+			Value: nl.Uint8Attr(mode)})
 	}
 	if s := m.opt.Parms.ByName["state"]; len(s) > 0 {
 		u8, found := rtnl.IfOperByName[s]
 		if !found {
 			return fmt.Errorf("state: %q unknown", s)
 		}
-		m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_OPERSTATE,
-			nl.Uint8Attr(u8)})
+		m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_OPERSTATE,
+			Value: nl.Uint8Attr(u8)})
 	}
 	if m.name == "add" {
 		switch len(m.args) {
 		case 0:
 		case 1:
-			m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_IFNAME,
-				nl.KstringAttr(m.args[0])})
+			m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_IFNAME,
+				Value: nl.KstringAttr(m.args[0])})
 		default:
 			return fmt.Errorf("%v: unexpected", m.args[1:])
 		}
 		if link != 0 {
-			m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_LINK,
-				nl.Int32Attr(link)})
+			m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_LINK,
+				Value: nl.Int32Attr(link)})
 		}
 		if len(m.indices) == 0 {
 			m.indices = []int32{0}
@@ -419,8 +427,8 @@ func (m *mod) parse() error {
 			m.indices = []int32{ifindex}
 		}
 		if gid != nogroup {
-			m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_GROUP,
-				nl.Uint32Attr(gid)})
+			m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_GROUP,
+				Value: nl.Uint32Attr(gid)})
 		}
 	default:
 		return fmt.Errorf("%v: unexpected", m.args[1:])
@@ -433,10 +441,10 @@ func (m *mod) parseAddrGenMode(s string) error {
 	if !found {
 		return fmt.Errorf("addrgenmode: %q unknown", s)
 	}
-	m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_AF_SPEC,
-		nl.Attr{uint16(rtnl.AF_INET6),
-			nl.Attr{rtnl.IFLA_INET6_ADDR_GEN_MODE,
-				nl.Uint8Attr(mode),
+	m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_AF_SPEC,
+		Value: nl.Attr{Type: uint16(rtnl.AF_INET6),
+			Value: nl.Attr{Type: rtnl.IFLA_INET6_ADDR_GEN_MODE,
+				Value: nl.Uint8Attr(mode),
 			},
 		},
 	},

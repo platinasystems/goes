@@ -113,7 +113,8 @@ func Assign(key, sockname, name string) error {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("Reg.Assign", args.Assign{key, sockname, name}, &empty)
+	return cl.Call("Reg.Assign", args.Assign{Key: key, AtSock: sockname,
+		Name: name}, &empty)
 }
 
 // Unassign an RPC handler for the given key.
@@ -123,7 +124,7 @@ func Unassign(key string) error {
 		return err
 	}
 	defer cl.Close()
-	return cl.Call("Reg.Unassign", args.Unassign{key}, &empty)
+	return cl.Call("Reg.Unassign", args.Unassign{Key: key}, &empty)
 }
 
 // Connect to the redis file socket.
@@ -353,7 +354,7 @@ func Subscribe(channel string) (psc redis.PubSubConn, err error) {
 	if err != nil {
 		return
 	}
-	psc = redis.PubSubConn{redis.NewConn(conn, 0, wrtimeout)}
+	psc = redis.PubSubConn{Conn: redis.NewConn(conn, 0, wrtimeout)}
 	err = psc.Subscribe(channel)
 	if err != nil {
 		psc.Close()

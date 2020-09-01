@@ -47,11 +47,11 @@ func (m *mod) parseVf(s string) error {
 		{"trust", "no-trust", rtnl.IFLA_VF_TRUST},
 	} {
 		if m.opt.Flags.ByName[x.on] {
-			attrs = append(attrs, nl.Attr{x.t,
-				rtnl.IflaVfFlag{Vf: vf, Setting: 1}})
+			attrs = append(attrs, nl.Attr{Type: x.t,
+				Value: rtnl.IflaVfFlag{Vf: vf, Setting: 1}})
 		} else if m.opt.Flags.ByName[x.off] {
-			attrs = append(attrs, nl.Attr{x.t,
-				rtnl.IflaVfFlag{Vf: vf, Setting: 0}})
+			attrs = append(attrs, nl.Attr{Type: x.t,
+				Value: rtnl.IflaVfFlag{Vf: vf, Setting: 0}})
 		}
 	}
 	if s := m.opt.Parms.ByName["mac"]; len(s) > 0 {
@@ -63,7 +63,8 @@ func (m *mod) parseVf(s string) error {
 		} else {
 			copy(v.Mac[:], mac)
 		}
-		attrs = append(attrs, nl.Attr{rtnl.IFLA_VF_MAC, &v})
+		attrs = append(attrs, nl.Attr{Type: rtnl.IFLA_VF_MAC,
+			Value: &v})
 	}
 	if s := m.opt.Parms.ByName["vlan"]; len(s) > 0 {
 		v := rtnl.IflaVfVlan{
@@ -78,7 +79,8 @@ func (m *mod) parseVf(s string) error {
 					vf, qos, err)
 			}
 		}
-		attrs = append(attrs, nl.Attr{rtnl.IFLA_VF_VLAN, v})
+		attrs = append(attrs, nl.Attr{Type: rtnl.IFLA_VF_VLAN,
+			Value: v})
 	}
 	if s := m.opt.Parms.ByName["rate"]; len(s) > 0 {
 		v := rtnl.IflaVfTxRate{
@@ -87,7 +89,8 @@ func (m *mod) parseVf(s string) error {
 		if _, err := fmt.Sscan(s, &v.Rate); err != nil {
 			return fmt.Errorf("vf: %d: rate: %q %v", vf, s, err)
 		}
-		attrs = append(attrs, nl.Attr{rtnl.IFLA_VF_TX_RATE, v})
+		attrs = append(attrs, nl.Attr{Type: rtnl.IFLA_VF_TX_RATE,
+			Value: v})
 	} else if s := m.opt.Parms.ByName["min-tx-rate"]; len(s) > 0 {
 		v := rtnl.IflaVfRate{
 			Vf: vf,
@@ -101,7 +104,8 @@ func (m *mod) parseVf(s string) error {
 			return fmt.Errorf("vf: %d: max-tx-rate: %q %v",
 				vf, s, err)
 		}
-		attrs = append(attrs, nl.Attr{rtnl.IFLA_VF_RATE, v})
+		attrs = append(attrs, nl.Attr{Type: rtnl.IFLA_VF_RATE,
+			Value: v})
 	}
 	if s := m.opt.Parms.ByName["link-state"]; len(s) > 0 {
 		ls, found := rtnl.IflaVfLinkStateByName[s]
@@ -109,8 +113,8 @@ func (m *mod) parseVf(s string) error {
 			return fmt.Errorf("vf: %d: link-state: %q unknown",
 				vf, s)
 		}
-		attrs = append(attrs, nl.Attr{rtnl.IFLA_VF_LINK_STATE,
-			rtnl.IflaVfLinkState{
+		attrs = append(attrs, nl.Attr{Type: rtnl.IFLA_VF_LINK_STATE,
+			Value: rtnl.IflaVfLinkState{
 				Vf:        vf,
 				LinkState: ls,
 			}})
@@ -130,10 +134,10 @@ func (m *mod) parseVf(s string) error {
 				return fmt.Errorf("vf: %d: %s: %q %v",
 					vf, x.name, s, err)
 			}
-			attrs = append(attrs, nl.Attr{x.t, v})
+			attrs = append(attrs, nl.Attr{Type: x.t, Value: v})
 		}
 	}
-	m.attrs = append(m.attrs, nl.Attr{rtnl.IFLA_VFINFO_LIST,
-		nl.Attr{rtnl.IFLA_VF_INFO, attrs}})
+	m.attrs = append(m.attrs, nl.Attr{Type: rtnl.IFLA_VFINFO_LIST,
+		Value: nl.Attr{Type: rtnl.IFLA_VF_INFO, Value: attrs}})
 	return nil
 }

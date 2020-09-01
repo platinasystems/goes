@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/cmd/ip/internal/options"
-	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/goes/internal/nl"
 	"github.com/platinasystems/goes/internal/nl/rtnl"
+	"github.com/platinasystems/goes/lang"
 )
 
 type Command string
@@ -59,7 +59,7 @@ func (c Command) Main(args ...string) error {
 		rsp   rtnl.Ifa
 	}
 	addattr := func(t uint16, v io.Reader) {
-		ifa.attrs = append(ifa.attrs, nl.Attr{t, v})
+		ifa.attrs = append(ifa.attrs, nl.Attr{Type: t, Value: v})
 	}
 
 	opt, args := options.New(args)
@@ -166,8 +166,8 @@ func (c Command) Main(args ...string) error {
 		}
 	}
 	if s := opt.Parms.ByName["label"]; len(s) > 0 {
-		ifa.attrs = append(ifa.attrs, nl.Attr{rtnl.IFA_LABEL,
-			nl.KstringAttr(s)})
+		ifa.attrs = append(ifa.attrs, nl.Attr{Type: rtnl.IFA_LABEL,
+			Value: nl.KstringAttr(s)})
 	}
 	if s := opt.Parms.ByName["scope"]; len(s) > 0 {
 		var found bool
@@ -194,8 +194,8 @@ func (c Command) Main(args ...string) error {
 		rtnl.IfInfoMsg{
 			Family: rtnl.AF_UNSPEC,
 		},
-		nl.Attr{rtnl.IFLA_IFNAME,
-			nl.KstringAttr(opt.Parms.ByName["dev"])},
+		nl.Attr{Type: rtnl.IFLA_IFNAME,
+			Value: nl.KstringAttr(opt.Parms.ByName["dev"])},
 	); err != nil {
 		return err
 	} else if err = sr.UntilDone(req, func(b []byte) {

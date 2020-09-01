@@ -33,8 +33,8 @@ func New(opt *options.Options, args []string) (*Add, error) {
 	add.Hdr.Flags = nl.NLM_F_REQUEST | nl.NLM_F_ACK | nl.NLM_F_CREATE |
 		nl.NLM_F_EXCL
 	add.Msg.Family = rtnl.AF_UNSPEC
-	add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_IFNAME,
-		nl.KstringAttr(ifname)})
+	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_IFNAME,
+		Value: nl.KstringAttr(ifname)})
 	for _, x := range []struct {
 		name string
 		t    uint16
@@ -50,7 +50,8 @@ func New(opt *options.Options, args []string) (*Add, error) {
 		if err != nil {
 			return add, fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t, nl.BytesAttr(mac)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.BytesAttr(mac)})
 	}
 	if s := opt.Parms.ByName["index"]; len(s) > 0 {
 		if _, err := fmt.Sscan(s, &add.Msg.Index); err != nil {
@@ -62,8 +63,8 @@ func New(opt *options.Options, args []string) (*Add, error) {
 		if !found {
 			return add, fmt.Errorf("link: %q not found", s)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{rtnl.IFLA_LINK,
-			nl.Int32Attr(link)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINK,
+			Value: nl.Int32Attr(link)})
 	}
 	for _, x := range []struct {
 		name string
@@ -83,7 +84,8 @@ func New(opt *options.Options, args []string) (*Add, error) {
 		if err != nil {
 			return add, fmt.Errorf("%s: %q %v", x.name, s, err)
 		}
-		add.Attrs = append(add.Attrs, nl.Attr{x.t, nl.Uint32Attr(u32)})
+		add.Attrs = append(add.Attrs, nl.Attr{Type: x.t,
+			Value: nl.Uint32Attr(u32)})
 	}
 	return add, nil
 }
