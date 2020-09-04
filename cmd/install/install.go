@@ -19,11 +19,15 @@ import (
 	"github.com/satori/uuid"
 )
 
+const defaultArchive = "https://platina.io/goes/rootfs.cpio.xz"
+
 type Command struct {
 	g *goes.Goes
 
 	AdminUser string
 	AdminPass string
+
+	Archive string
 
 	DebianDistro   string
 	DebianDownload string
@@ -103,7 +107,13 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	args = parm.Parse(args)
-	if len(args) != 1 {
+	c.Archive = defaultArchive
+
+	if len(args) >= 1 {
+		c.Archive = args[0]
+		args = args[1:]
+	}
+	if len(args) != 0 {
 		return fmt.Errorf("Unexpected: %v", args)
 	}
 
@@ -170,7 +180,7 @@ func (c *Command) Main(args ...string) error {
 		return fmt.Errorf("Unable to remount tmpfs shared: %w", err)
 	}
 
-	err = c.readArchive(args[0])
+	err = c.readArchive()
 	if err != nil {
 		return fmt.Errorf("Error reading archive: %w", err)
 	}

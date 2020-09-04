@@ -18,10 +18,10 @@ import (
 	//	"golang.org/x/sys/unix"
 )
 
-func (c *Command) readArchive(arname string) (err error) {
-	txz, err := url.Open(arname)
+func (c *Command) readArchive() (err error) {
+	txz, err := url.Open(c.Archive)
 	if err != nil {
-		return fmt.Errorf("Error opening %s: %w", arname, err)
+		return fmt.Errorf("Error opening %s: %w", c.Archive, err)
 	}
 	defer txz.Close()
 
