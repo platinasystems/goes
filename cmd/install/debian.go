@@ -6,12 +6,12 @@ package install
 
 var setupChroot = chroot{
 	setup: bootstrap.setup + `mkdir -p /debian
-mount /dev/sda2 /debian
+mount /dev/{{ .InstallDev }}2 /debian
 `,
 }
 
 var debianChroot = chroot{
-	setup: bootstrap.setup + `mount /dev/sda2 /debian
+	setup: bootstrap.setup + `mount /dev/{{ .InstallDev }}2 /debian
 chroot /debian /bin/sh << EOF
 set -x
 mount -t proc none proc
@@ -19,7 +19,7 @@ mount -t devtmpfs none dev
 mount -t devpts none /dev/pts
 mount -t sysfs none sys
 mkdir -p /debian
-mount /dev/sda2 /debian
+mount /dev/{{ .InstallDev }}2 /debian
 export PATH
 `,
 	teardown: "EOF",

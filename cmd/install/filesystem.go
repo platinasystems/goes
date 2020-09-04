@@ -9,12 +9,12 @@ import (
 )
 
 var formatNoSwap = `label: gpt
-device: /dev/sda
+device: /dev/{{ .InstallDev }}
 unit: sectors
 sector-size: 512
 
-/dev/sda1 : size=     1024000, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid={{ .UUIDEFI }}
-/dev/sda2 :                    type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/{{ .InstallDev }}1 : size=     1024000, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid={{ .UUIDEFI }}
+/dev/{{ .InstallDev }}2 :                    type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
 `
 var fstab = `PARTUUID={{ .UUIDEFI }}	/boot/efi	vfat	umask=0077	0	1
 UUID={{ .UUIDLinux }}	/	ext4	errors=remount-ro	0	1
@@ -32,9 +32,9 @@ func (c *Command) filesystemSetup() (err error) {
 	}
 
 	err = c.doCommandsInChroot(bootstrap, []string{
-		"sfdisk /dev/sda < sda.format",
-		"mkfs.vfat /dev/sda1",
-		"mkfs.ext4 -U {{ .UUIDLinux }} /dev/sda2 > /dev/null",
+		"sfdisk /dev/{{ .InstallDev }} < sda.format",
+		"mkfs.vfat /dev/{{ .InstallDev }}1",
+		"mkfs.ext4 -U {{ .UUIDLinux }} /dev/{{ .InstallDev }}2 > /dev/null",
 	})
 	if err != nil {
 		return fmt.Errorf("Error setting up filesystems: %w", err)

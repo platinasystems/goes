@@ -34,6 +34,8 @@ type Command struct {
 
 	GPGServer string
 
+	InstallDev string
+
 	MgmtEth string
 	MgmtIP  string
 	MgmtGW  string
@@ -88,6 +90,8 @@ func (c *Command) Main(args ...string) error {
 			"http://ftp.debian.org/debian"},
 
 		{"-gpg-server", &c.GPGServer, "pool.sks-keyservers.net"},
+
+		{"-install-dev", &c.InstallDev, "sda"},
 
 		{"-mgmt-eth", &c.MgmtEth, "enp5s0"},
 		{"-mgmt-ip", &c.MgmtIP, ""},
