@@ -201,7 +201,7 @@ func (c *Command) Main(args ...string) error {
 				shell.SysProcAttr = &syscall.SysProcAttr{
 					Setsid:  true,
 					Setctty: true,
-					Ctty:    int(tty.Fd()),
+					Ctty:    0,
 					Pgid:    0,
 				}
 				shell.Stdin = ttyFile
