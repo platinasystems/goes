@@ -49,8 +49,14 @@ func Path() string {
 }
 
 func DaemonEnv() []string {
-	return []string{
+	env := []string{
 		"PATH=" + Path(),
 		"TERM=linux",
 	}
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "GO") {
+			env = append(env, e)
+		}
+	}
+	return env
 }
