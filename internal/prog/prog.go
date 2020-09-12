@@ -47,3 +47,10 @@ func Path() string {
 	}
 	return path
 }
+
+func DaemonEnv() []string {
+	return []string{
+		"PATH=" + Path(),
+		"TERM=linux",
+	}
+}

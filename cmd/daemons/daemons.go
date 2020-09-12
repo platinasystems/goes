@@ -67,10 +67,8 @@ func (d *Daemons) start(restarts int, args ...string) {
 	p.Stdout = wout
 	p.Stderr = werr
 	p.Dir = "/"
-	p.Env = []string{
-		"PATH=" + prog.Path(),
-		"TERM=linux",
-	}
+	p.Env = prog.DaemonEnv()
+
 	if err = p.Start(); err != nil {
 		return
 	}

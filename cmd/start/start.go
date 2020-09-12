@@ -116,10 +116,7 @@ func (c *Command) Main(args ...string) error {
 	daemons.Stdout = nil
 	daemons.Stderr = nil
 	daemons.Dir = "/"
-	daemons.Env = []string{
-		"PATH=" + prog.Path(),
-		"TERM=linux",
-	}
+	daemons.Env = prog.DaemonEnv()
 	daemons.SysProcAttr = &syscall.SysProcAttr{
 		Setsid: true,
 		Pgid:   0,
