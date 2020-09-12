@@ -4,14 +4,14 @@ require (
 	github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e
 	github.com/cavaliercoder/grab v1.0.0
+	github.com/creack/pty v1.1.11
 	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
 	github.com/d2g/dhcp4client v0.0.0-20180622102533-b7a004ff1a09
 	github.com/djherbis/times v1.2.0 // indirect
 	github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568 // indirect
 	github.com/garyburd/redigo v1.6.0
-	github.com/gliderlabs/ssh v0.1.3
+	github.com/gliderlabs/ssh v0.3.0
 	github.com/jpillora/backoff v0.0.0-20180909062703-3050d21c67d7
-	github.com/kr/pty v1.1.3
 	github.com/mattn/go-isatty v0.0.4
 	github.com/platinasystems/fdt v1.0.1
 	github.com/platinasystems/go-redis-server v0.0.0-20181030193423-fcb8fa742b73
@@ -36,4 +36,4 @@ require (
 	gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 // indirect
 )
 
-go 1.13
+go 1.14

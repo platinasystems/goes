@@ -16,7 +16,7 @@ import (
 
 	"github.com/gliderlabs/ssh"
 
-	"github.com/kr/pty"
+	"github.com/creack/pty"
 
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"

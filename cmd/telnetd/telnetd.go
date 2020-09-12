@@ -15,7 +15,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kr/pty"
+	"github.com/creack/pty"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/internal/telnet/command"
 	"github.com/platinasystems/goes/internal/telnet/option"
