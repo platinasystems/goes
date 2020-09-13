@@ -25,6 +25,7 @@ import (
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/external/parms"
+	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/internal/shellutils"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/url"
@@ -434,7 +435,7 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 		fmt.Printf("F*$=%v %v\n", g.Status, args)
 	}
 	a := append(g.Path(), args...)
-	x := exec.Command("/proc/self/exe", a[1:]...)
+	x := exec.Command(prog.Name(), a[1:]...)
 	x.Args[0] = a[0]
 	return x
 }
