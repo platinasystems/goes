@@ -72,6 +72,10 @@ var (
 	}
 )
 
+type Syncer interface {
+	Sync() error
+}
+
 // Atomic change of the os.Stdout default.
 func Writer(w io.Writer) {
 	writer.Store(w)
@@ -143,9 +147,13 @@ func (style Style) log(format string, _ interface{}, args ...interface{}) error 
 	w, ok := writer.Load().(io.Writer)
 	if !ok || w == nil {
 		w = os.Stdout
-		defer os.Stdout.Sync()
 	}
-	w.Write(buf.Bytes())
+	_, err = w.Write(buf.Bytes())
+	if method, found := w.(Syncer); found {
+		if syncerr := method.Sync(); err == nil {
+			err = syncerr
+		}
+	}
 	return err
 }
 
