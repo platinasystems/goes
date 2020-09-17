@@ -11,7 +11,9 @@ import (
 	"github.com/platinasystems/goes/lang"
 )
 
-type Command struct{}
+type Command struct {
+	V string
+}
 
 func (Command) String() string { return "version" }
 func (Command) Usage() string  { return "[show ]version" }
@@ -22,7 +24,11 @@ func (Command) Apropos() lang.Alt {
 	}
 }
 
-func (Command) Main(...string) error {
-	fmt.Println(buildinfo.New().Version())
+func (c *Command) Main(...string) error {
+	ver := buildinfo.New().Version()
+	if c.V != "" && ver == "(devel)" {
+		ver = c.V
+	}
+	fmt.Println(ver)
 	return nil
 }
