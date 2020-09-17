@@ -110,8 +110,8 @@ func (c *Command) Main(args ...string) error {
 		}
 	}
 
-	daemons := exec.Command("/proc/self/exe", args...)
-	daemons.Args[0] = "goes-daemons"
+	args = append([]string{"goes-daemons"}, args...)
+	daemons := prog.Command(args...)
 	daemons.Stdin = nil
 	daemons.Stdout = nil
 	daemons.Stderr = nil

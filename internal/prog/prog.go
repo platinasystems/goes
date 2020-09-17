@@ -8,6 +8,7 @@ package prog
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -31,10 +32,17 @@ func Name() string {
 		var err error
 		name, err = os.Readlink("/proc/self/exe")
 		if err != nil {
-			name = os.Args[0]
+			name = a
 		}
 	}
 	return name
+}
+
+func Command(args ...string) (cmd *exec.Cmd) {
+	n := Name()
+	cmd = exec.Command(n, args[1:]...)
+	cmd.Args[0] = args[0]
+	return
 }
 
 func Path() string {

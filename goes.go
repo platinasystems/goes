@@ -435,8 +435,7 @@ func (g *Goes) Fork(args ...string) *exec.Cmd {
 		fmt.Printf("F*$=%v %v\n", g.Status, args)
 	}
 	a := append(g.Path(), args...)
-	x := exec.Command(prog.Name(), a[1:]...)
-	x.Args[0] = a[0]
+	x := prog.Command(a...)
 	return x
 }
 

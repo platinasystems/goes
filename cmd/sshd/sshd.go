@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"syscall"
 	"unsafe"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/log"
+	"github.com/platinasystems/goes/internal/prog"
 	"github.com/platinasystems/goes/lang"
 	"github.com/platinasystems/ssh_key_helper"
 
@@ -85,8 +85,7 @@ func (c *Command) Main(args ...string) (err error) {
 		if len(cmdline) == 0 {
 			cmdline = []string{"cli"}
 		}
-		cmd := exec.Command("/proc/self/exe", cmdline[1:]...)
-		cmd.Args[0] = cmdline[0]
+		cmd := prog.Command(cmdline...)
 		ptyReq, winCh, isPty := s.Pty()
 		if isPty {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
