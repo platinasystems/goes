@@ -1,0 +1,15 @@
+Source: goes-completion
+Section: net
+Priority: optional
+Maintainer: Tom Grennan <tgrennan@platinasystems.com>
+Build-Depends: debhelper (>=10), bash-completion
+Standards-Version: 3.9.8
+Homepage: https://platinasystems.com
+Vcs-Browser: https://github.com/platinasystems/goes
+Vcs-Git: https://github.com/platinasystems/goes.git
+
+Package: goes-completion
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: goes shell completion
+ Shell completion common to all GO-Embedded-Systems

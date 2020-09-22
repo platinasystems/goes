@@ -6,6 +6,9 @@
 *.zip
 *~
 *#*#
-/goes-*
 /*.patch
-platina-mk1.ko
+/goes-*
+/debian/debhelper-build-stamp
+/debian/files
+/debian/goes-completion.substvars
+/debian/goes-completion/
