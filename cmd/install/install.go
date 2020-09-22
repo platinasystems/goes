@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes"
+	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/external/parms"
 	"github.com/platinasystems/goes/lang"
 
@@ -105,6 +106,7 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	parm, args := parms.New(args)
+	flag, args := flags.New(args, "-shell")
 
 	for _, x := range parmTable {
 		parm.ByName[x.parm] = ""
@@ -200,6 +202,11 @@ func (c *Command) Main(args ...string) error {
 	}()
 
 	time.Sleep(time.Second) // give daemons time to exit
+
+	if flag.ByName["-shell"] {
+		return c.g.Main("!", "-cd", "/", "-chroot", c.Target, "-m",
+			"/bin/sh")
+	}
 
 	err = c.filesystemSetup()
 	if err != nil {
