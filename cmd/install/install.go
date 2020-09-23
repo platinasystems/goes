@@ -30,6 +30,8 @@ type Command struct {
 
 	Archive string
 
+	CdebootstrapOptions string
+
 	DebianDistro   string
 	DebianDownload string
 
@@ -106,7 +108,8 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	parm, args := parms.New(args)
-	flag, args := flags.New(args, "-shell")
+	flag, args := flags.New(args, "-shell", "-allow-unauthenticated",
+		"-debug")
 
 	for _, x := range parmTable {
 		parm.ByName[x.parm] = ""
@@ -208,6 +211,12 @@ func (c *Command) Main(args ...string) error {
 			"/bin/sh")
 	}
 
+	if flag.ByName["-allow-unauthenticated"] {
+		c.CdebootstrapOptions = "--allow-unauthenticated "
+	}
+	if flag.ByName["-debug"] {
+		c.CdebootstrapOptions += "--debug "
+	}
 	err = c.filesystemSetup()
 	if err != nil {
 		return err

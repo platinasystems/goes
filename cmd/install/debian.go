@@ -31,7 +31,7 @@ func (c *Command) debianInstall() (err error) {
 		cmds []string
 	}{
 		{setupChroot, []string{
-			"cdebootstrap --arch amd64 {{ .DebianDistro }} /debian {{ .DebianDownload }}",
+			"cdebootstrap --arch amd64 {{ .CdebootstrapOptions }}{{ .DebianDistro }} /debian {{ .DebianDownload }}",
 			"cp fstab /debian/etc/fstab",
 			"cp {{ .MgmtEth }} /debian/etc/network/interfaces.d",
 		},
