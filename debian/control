@@ -9,7 +9,7 @@ Vcs-Browser: https://github.com/platinasystems/goes
 Vcs-Git: https://github.com/platinasystems/goes.git
 
 Package: goes-completion
-Architecture: any
+Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: goes shell completion
  Shell completion common to all GO-Embedded-Systems
