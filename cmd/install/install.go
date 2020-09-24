@@ -32,8 +32,12 @@ type Command struct {
 
 	CdebootstrapOptions string
 
+	Components string
+
 	DebianDistro   string
 	DebianDownload string
+
+	DebootstrapProgram string
 
 	GPGServer string
 
@@ -88,9 +92,13 @@ func (c *Command) Main(args ...string) error {
 		{"-admin-user", &c.AdminUser, "platina"},
 		{"-admin-pass", &c.AdminPass, "plat1na"},
 
+		{"-components", &c.Components, ""},
+
 		{"-debian-distro", &c.DebianDistro, "debian/stretch"},
 		{"-debian-download", &c.DebianDownload,
 			"http://ftp.debian.org/debian"},
+
+		{"-debootstrap-program", &c.DebootstrapProgram, "cdebootstrap"},
 
 		{"-gpg-server", &c.GPGServer, "pool.sks-keyservers.net"},
 
@@ -216,6 +224,9 @@ func (c *Command) Main(args ...string) error {
 	}
 	if flag.ByName["-debug"] {
 		c.CdebootstrapOptions += "--debug "
+	}
+	if c.Components != "" {
+		c.CdebootstrapOptions += "--components " + c.Components + " "
 	}
 	err = c.filesystemSetup()
 	if err != nil {

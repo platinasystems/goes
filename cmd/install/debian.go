@@ -31,15 +31,16 @@ func (c *Command) debianInstall() (err error) {
 		cmds []string
 	}{
 		{setupChroot, []string{
-			"cdebootstrap --arch amd64 {{ .CdebootstrapOptions }}{{ .DebianDistro }} /debian {{ .DebianDownload }}",
+			"{{ .DebootstrapProgram }} --arch amd64 {{ .CdebootstrapOptions }}{{ .DebianDistro }} /debian {{ .DebianDownload }}",
 			"cp fstab /debian/etc/fstab",
+			"mkdir -p /debian/etc/network/interfaces.d",
 			"cp {{ .MgmtEth }} /debian/etc/network/interfaces.d",
 		},
 		},
 
 		{debianChroot, []string{
 			"apt-get update",
-			"apt-get -y install grub-efi-amd64 apt-transport-https dirmngr initramfs-tools openssh-server sudo ca-certificates",
+			"apt-get -y install grub-efi-amd64 apt-transport-https dirmngr initramfs-tools openssh-server sudo ca-certificates ifupdown",
 			`echo "deb {{ .PlatinaDownload }} {{ .PlatinaDistro }} main" >> /etc/apt/sources.list`,
 			"apt-key adv --keyserver {{ .GPGServer }} --recv-keys {{ .PlatinaGPG }}",
 			"apt-get update",
