@@ -31,6 +31,8 @@ func (c *Command) debianInstall() (err error) {
 		cmds []string
 	}{
 		{setupChroot, []string{
+			"mkdir -p /debian/etc",
+			"cp etc/resolv.conf /debian/etc",
 			"{{ .DebootstrapProgram }} --arch amd64 {{ .CdebootstrapOptions }}{{ .DebianDistro }} /debian {{ .DebianDownload }}",
 			"cp fstab /debian/etc/fstab",
 			"mkdir -p /debian/etc/network/interfaces.d",
@@ -40,7 +42,7 @@ func (c *Command) debianInstall() (err error) {
 
 		{debianChroot, []string{
 			"apt-get update",
-			"apt-get -y install grub-efi-amd64 apt-transport-https dirmngr initramfs-tools openssh-server sudo ca-certificates ifupdown",
+			"apt-get -y install grub-efi-amd64 apt-transport-https dirmngr initramfs-tools openssh-server sudo ca-certificates ifupdown resolvconf",
 			`echo "deb {{ .PlatinaDownload }} {{ .PlatinaDistro }} main" >> /etc/apt/sources.list`,
 			"apt-key adv --keyserver {{ .GPGServer }} --recv-keys {{ .PlatinaGPG }}",
 			"apt-get update",
@@ -49,6 +51,7 @@ func (c *Command) debianInstall() (err error) {
 			`adduser --gecos "System Administrator" --disabled-password {{ .AdminUser }}`,
 			"adduser {{ .AdminUser }} sudo",
 			"echo {{ .AdminUser }}:{{ .AdminPass }}|chpasswd",
+			"systemctl enable systemd-resolved",
 		},
 		},
 	} {
