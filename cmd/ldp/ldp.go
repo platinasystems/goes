@@ -229,9 +229,13 @@ func (Command) Main(args ...string) error {
 	go doSink(iodev)
 
 	t := time.Now()
+	frames := 0
+	bytes := 0
+
 	for i := 0; i < 10000000; i++ {
 		if time.Since(t) >= time.Minute {
-			fmt.Printf("Sent %d frames\n", i)
+			fmt.Printf("Sent %d frames %d bytes\n", frames,
+				bytes)
 			t = time.Now()
 		}
 		for k, pat := range pldp.PatternMap {
@@ -248,7 +252,9 @@ func (Command) Main(args ...string) error {
 					fmt.Printf("Expected written length %d got %d\n",
 						len(m), n)
 				}
+				bytes += n
 			}
+			frames++
 		}
 	}
 
