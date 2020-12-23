@@ -10,7 +10,10 @@ import (
 	"math/rand"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
+
+	"github.com/mattn/go-isatty"
 
 	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/external/parms"
@@ -157,7 +160,7 @@ func (Command) Main(args ...string) error {
 		}
 		defer dev.Close()
 
-		if !flag.ByName["-nolock"] {
+		if isatty.IsTerminal(dev.Fd()) && !flag.ByName["-nolock"] {
 			_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
 				uintptr(dev.Fd()),
 				uintptr(syscall.TIOCEXCL),
@@ -173,48 +176,50 @@ func (Command) Main(args ...string) error {
 
 		var savedDev syscall.Termios
 
-		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-			uintptr(dev.Fd()),
-			uintptr(syscall.TCGETS),
-			uintptr(unsafe.Pointer(&savedDev)))
-		if errno != 0 {
-			return fmt.Errorf("TCGETS: %s: %v", args[0], errno)
-		}
-		defer func() {
-			if !flag.ByName["-noinit"] && !flag.ByName["-noreset"] {
-				syscall.Syscall(syscall.SYS_IOCTL,
+		if isatty.IsTerminal(dev.Fd()) {
+			_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
+				uintptr(dev.Fd()),
+				uintptr(syscall.TCGETS),
+				uintptr(unsafe.Pointer(&savedDev)))
+			if errno != 0 {
+				return fmt.Errorf("TCGETS: %s: %v", args[0], errno)
+			}
+			defer func() {
+				if !flag.ByName["-noinit"] && !flag.ByName["-noreset"] {
+					syscall.Syscall(syscall.SYS_IOCTL,
+						uintptr(dev.Fd()),
+						uintptr(syscall.TCSETS),
+						uintptr(unsafe.Pointer(&savedDev)))
+				}
+			}()
+
+			if !flag.ByName["-noinit"] {
+				t := savedDev
+				t.Iflag &^= syscall.IGNBRK |
+					syscall.BRKINT |
+					syscall.PARMRK |
+					syscall.ISTRIP |
+					syscall.INLCR |
+					syscall.IGNCR |
+					syscall.ICRNL |
+					syscall.IXON
+				t.Oflag &^= syscall.OPOST
+				t.Lflag &^= syscall.ECHO |
+					syscall.ECHONL |
+					syscall.ICANON |
+					syscall.ISIG |
+					syscall.IEXTEN
+				t.Cflag = baud | parity | databits | stopbits |
+					syscall.HUPCL |
+					syscall.CREAD |
+					syscall.CLOCAL
+				_, _, errno = syscall.Syscall(syscall.SYS_IOCTL,
 					uintptr(dev.Fd()),
 					uintptr(syscall.TCSETS),
-					uintptr(unsafe.Pointer(&savedDev)))
-			}
-		}()
-
-		if !flag.ByName["-noinit"] {
-			t := savedDev
-			t.Iflag &^= syscall.IGNBRK |
-				syscall.BRKINT |
-				syscall.PARMRK |
-				syscall.ISTRIP |
-				syscall.INLCR |
-				syscall.IGNCR |
-				syscall.ICRNL |
-				syscall.IXON
-			t.Oflag &^= syscall.OPOST
-			t.Lflag &^= syscall.ECHO |
-				syscall.ECHONL |
-				syscall.ICANON |
-				syscall.ISIG |
-				syscall.IEXTEN
-			t.Cflag = baud | parity | databits | stopbits |
-				syscall.HUPCL |
-				syscall.CREAD |
-				syscall.CLOCAL
-			_, _, errno = syscall.Syscall(syscall.SYS_IOCTL,
-				uintptr(dev.Fd()),
-				uintptr(syscall.TCSETS),
-				uintptr(unsafe.Pointer(&t)))
-			if errno != 0 {
-				return fmt.Errorf("TCSETS: %v", errno)
+					uintptr(unsafe.Pointer(&t)))
+				if errno != 0 {
+					return fmt.Errorf("TCSETS: %v", errno)
+				}
 			}
 		}
 		iodev = dev
@@ -223,19 +228,26 @@ func (Command) Main(args ...string) error {
 	}
 	go doSink(iodev)
 
+	t := time.Now()
 	for i := 0; i < 10000000; i++ {
+		if time.Since(t) >= time.Minute {
+			fmt.Printf("Sent %d frames\n", i)
+			t = time.Now()
+		}
 		for k, pat := range pldp.PatternMap {
 			r1 := rand.Int31n(int32(10))
 			r2 := rand.Int31n(int32(len(pat.SequenceData)))
 			ml := int(r1*int32(len(pat.SequenceData)) + r2)
 			m := pat.NewMessage(k, ml)
 			n, err := iodev.Write(m)
-			if n != len(m) {
-				fmt.Printf("Expected written length %d got %d",
-					n, len(m))
-			}
 			if err != nil {
-				fmt.Printf("Unexpcted error %s", err)
+				fmt.Printf("Unexpected error %s writing pattern\n",
+					err)
+			} else {
+				if n != len(m) {
+					fmt.Printf("Expected written length %d got %d\n",
+						len(m), n)
+				}
 			}
 		}
 	}
@@ -247,6 +259,7 @@ func doSink(dev io.Reader) {
 	p := make([]byte, 1024)
 	sink := pldp.NewSink(false)
 	var goodFrames, framingErr, protocolErr, checksumErr, patternErr int64
+	t := time.Now()
 
 	for {
 		r, err := dev.Read(p)
@@ -266,8 +279,9 @@ func doSink(dev io.Reader) {
 			continue
 		}
 		if sink.GoodFrames != goodFrames {
-			if sink.GoodFrames%10000 == 0 {
+			if time.Since(t) >= time.Minute {
 				fmt.Printf("sink.GoodFrames: %d\n", sink.GoodFrames)
+				t = time.Now()
 			}
 			goodFrames = sink.GoodFrames
 		}
