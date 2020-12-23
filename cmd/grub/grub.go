@@ -277,9 +277,9 @@ func (c *Command) GetRoot() string {
 		if len(r) == 5 {
 			unit, err := strconv.Atoi(r[3])
 			if err == nil {
-				devSD = "/dev/sd" + string(97+unit) + r[4]
-				devHD = "/dev/hd" + string(97+unit) + r[4]
-				devVD = "/dev/vd" + string(97+unit) + r[4]
+				devSD = "/dev/sd" + string(rune(97+unit)) + r[4]
+				devHD = "/dev/hd" + string(rune(97+unit)) + r[4]
+				devVD = "/dev/vd" + string(rune(97+unit)) + r[4]
 			}
 		}
 	}
