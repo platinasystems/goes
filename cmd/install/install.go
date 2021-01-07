@@ -20,8 +20,6 @@ import (
 	"github.com/satori/uuid"
 )
 
-const defaultArchive = "https://platina.io/goes/rootfs.cpio.xz"
-
 type Command struct {
 	g *goes.Goes
 
@@ -34,10 +32,14 @@ type Command struct {
 
 	Components string
 
+	Daemons []string
+
 	DebianDistro   string
 	DebianDownload string
 
 	DebootstrapProgram string
+
+	DefaultArchive string
 
 	GPGServer string
 
@@ -124,7 +126,7 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	args = parm.Parse(args)
-	c.Archive = defaultArchive
+	c.Archive = c.DefaultArchive
 
 	if len(args) >= 1 {
 		c.Archive = args[0]
@@ -204,12 +206,14 @@ func (c *Command) Main(args ...string) error {
 
 	fmt.Printf("Target directory is %s\n", c.Target)
 
-	c.g.Main("daemons", "stop", "grubd")
-	c.g.Main("daemons", "stop", "mountd")
+	for _, daemon := range c.Daemons {
+		c.g.Main("daemons", "stop", daemon)
+	}
 
 	defer func() {
-		c.g.Main("daemons", "start", "mountd")
-		c.g.Main("daemons", "start", "grubd")
+		for _, daemon := range c.Daemons {
+			c.g.Main("daemons", "start", daemon)
+		}
 	}()
 
 	time.Sleep(time.Second) // give daemons time to exit
