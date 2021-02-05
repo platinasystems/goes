@@ -28,7 +28,7 @@ type Command struct {
 
 	Archive string
 
-	CdebootstrapOptions string
+	DebootstrapOptions string
 
 	Components string
 
@@ -102,14 +102,13 @@ OPTIONS
 
 	-components COMP	Components to install. Passed to debootstrap
 
-	-debian-distro DIST	Debian distro to install. Default is
-				debian/stretch
+	-debian-distro DIST	Debian distro to install. Default is stretch
 
 	-debian-download URL	Download URL. Default is
 				http://ftp.debian.org/debian
 
 	-debootstrap-program PRG Program to bootstrap Debian. Default is
-				cdebootstrap
+				debootstrap
 
 	-debug			Enable debugging. Passed to debootstrap
 
@@ -151,11 +150,11 @@ func (c *Command) Main(args ...string) error {
 
 		{"-components", &c.Components, ""},
 
-		{"-debian-distro", &c.DebianDistro, "debian/stretch"},
+		{"-debian-distro", &c.DebianDistro, "stretch"},
 		{"-debian-download", &c.DebianDownload,
 			"http://ftp.debian.org/debian"},
 
-		{"-debootstrap-program", &c.DebootstrapProgram, "cdebootstrap"},
+		{"-debootstrap-program", &c.DebootstrapProgram, "debootstrap"},
 
 		{"-gpg-server", &c.GPGServer, "pool.sks-keyservers.net"},
 
@@ -279,13 +278,13 @@ func (c *Command) Main(args ...string) error {
 	}
 
 	if flag.ByName["-allow-unauthenticated"] {
-		c.CdebootstrapOptions = "--allow-unauthenticated "
+		c.DebootstrapOptions = "--allow-unauthenticated "
 	}
 	if flag.ByName["-debug"] {
-		c.CdebootstrapOptions += "--debug "
+		c.DebootstrapOptions += "--debug "
 	}
 	if c.Components != "" {
-		c.CdebootstrapOptions += "--components " + c.Components + " "
+		c.DebootstrapOptions += "--components " + c.Components + " "
 	}
 	err = c.filesystemSetup()
 	if err != nil {

@@ -33,7 +33,7 @@ func (c *Command) debianInstall() (err error) {
 		{setupChroot, []string{
 			"mkdir -p /debian/etc",
 			"cp etc/resolv.conf /debian/etc",
-			"{{ .DebootstrapProgram }} --arch amd64 {{ .CdebootstrapOptions }}{{ .DebianDistro }} /debian {{ .DebianDownload }}",
+			"{{ .DebootstrapProgram }} --arch amd64 {{ .DebootstrapOptions }}{{ .DebianDistro }} /debian {{ .DebianDownload }}",
 			"cp fstab /debian/etc/fstab",
 			"mkdir -p /debian/etc/network/interfaces.d",
 			"cp {{ .MgmtEth }} /debian/etc/network/interfaces.d",
