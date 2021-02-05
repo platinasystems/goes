@@ -75,13 +75,68 @@ func (*Command) Apropos() lang.Alt {
 	}
 }
 
-func (*Command) Man() lang.Alt {
+func (c *Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
-	install
+	Install an operating system. The install command is used to
+	install a new operating system, wiping out anything that may
+	be presently installed.
 
-	Install an operating system.`,
+	In the simplest case, typing "install" with no arguments will
+	install the current Platina-verified Debian release.
+
+USAGE
+	install [options] [installer URL]
+
+	[options] are listed below. The installer URL is generally not
+	needed. It defaults to "` + c.DefaultArchive + `".
+
+OPTIONS
+	-admin-user USER	Sets the admin account. Default is platina
+
+	-admin-pass PASS	Sets the admin password. Default is plat1na
+
+	-allow-unauthenticated	Allow unauthenticated packages. Use with
+				caution. Passed to debootstrap.
+
+	-components COMP	Components to install. Passed to debootstrap
+
+	-debian-distro DIST	Debian distro to install. Default is
+				debian/stretch
+
+	-debian-download URL	Download URL. Default is
+				http://ftp.debian.org/debian
+
+	-debootstrap-program PRG Program to bootstrap Debian. Default is
+				cdebootstrap
+
+	-debug			Enable debugging. Passed to debootstrap
+
+	-gpg-server srv		GPG server to validate keys. Default is
+				pool.sks-keyservers.net
+
+	-install-dev DEV	Device to install upon. Default is sda
+
+	-mgmt-eth IF		Management ethernet. Default is enp5s0
+
+	-mgmt-ip IP		Management IP address. Default is the currently
+				configured management IP address
+
+	-mgmt-GW GW		Management gateway IP address. Default is
+				the currently configured default gateway.
+
+	-platina-distro DIST	Platina distribution. Default is stretch
+
+	-platina-download URL	Platina distribution download URL. Default
+				is https://platina.io/goes/debian
+
+	-platina-GPG key	Platina code signing key. Default is
+				5FC2206DDF5ACEEA
+
+	-platina-release NAME	Platina release. Default is platina-mk1-release
+
+	-shell			Do not install. Just run a shell`,
 	}
 }
 
