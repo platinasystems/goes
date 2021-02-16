@@ -9,6 +9,36 @@ const (
 )
 
 const (
+	EncapVlan	= 0x0
+	EncapVpls	= 0x1
+)
+
+const (
+	EncapVlanVidBit	= 0xc
+	EncapVplsVidBit	= 0x14
+)
+
+const (
+	EncapVlanVidMask	= 0xfff
+	EncapVplsVidMask	= 0xfffff
+)
+
+const (
+	LbIflaUnspec	= 0x0
+	LbIflaChannel	= 0x1
+)
+
+const (
+	PortIflaUnspec	= 0x0
+	PortIflaXid	= 0x1
+)
+
+const (
+	VlanIflaUnspec	= 0x0
+	VlanIflaVid	= 0x1
+)
+
+const (
 	DevKindUnspec	= 0x0
 	DevKindPort	= 0x1
 	DevKindVlan	= 0x2
@@ -215,4 +245,8 @@ const (
 	ETHTOOL_LINK_MODE_FEC_NONE_BIT			= 49
 	ETHTOOL_LINK_MODE_FEC_RS_BIT			= 50
 	ETHTOOL_LINK_MODE_FEC_BASER_BIT			= 51
+)
+
+const (
+	NetifHwL2fwOffload = 0x800000000000
 )

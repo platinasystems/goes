@@ -105,7 +105,7 @@ type MsgIfa6 struct {
 type MsgIfInfo struct {
 	Header		MsgHeader
 	Xid		uint32
-	Reserved	uint32
+	Kdata		uint32
 	Ifname		[16]uint8
 	Net		uint64
 	Ifindex		int32
@@ -113,6 +113,7 @@ type MsgIfInfo struct {
 	Addr		[6]uint8
 	Kind		uint8
 	Reason		uint8
+	Features	uint64
 }
 type MsgNeighUpdate struct {
 	Header		MsgHeader
@@ -177,7 +178,7 @@ const (
 	SizeofMsgEthtoolLinkModes	= 0x20
 	SizeofMsgIfa			= 0x20
 	SizeofMsgIfa6			= 0x30
-	SizeofMsgIfInfo			= 0x40
+	SizeofMsgIfInfo			= 0x48
 	SizeofNextHop			= 0x18
 	SizeofNextHop6			= 0x20
 	SizeofMsgFibEntry		= 0x28
@@ -246,9 +247,4 @@ const (
 const (
 	IFA_ADD	= NETDEV_UP
 	IFA_DEL	= NETDEV_DOWN
-)
-
-const (
-	VlanIflaUnspec	= 0x0
-	VlanIflaVid	= 0x1
 )

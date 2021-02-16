@@ -6,6 +6,7 @@ package internal
 #include <stdint.h>
 #include <linux/types.h>
 #include <errno.h>
+typedef int bool;
 #include "internal/xeth.h"
 */
 import "C"
@@ -134,9 +135,4 @@ const (
 const (
 	IFA_ADD = NETDEV_UP
 	IFA_DEL = NETDEV_DOWN
-)
-
-const (
-	VlanIflaUnspec = C.XETH_VLAN_IFLA_UNSPEC
-	VlanIflaVid    = C.XETH_VLAN_IFLA_VID
 )

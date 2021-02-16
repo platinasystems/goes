@@ -6,13 +6,46 @@ package xeth
 #include <stdint.h>
 #include <linux/types.h>
 #include <errno.h>
+typedef int bool;
+typedef uint64_t u64;
 #include "internal/xeth.h"
+#include "internal/netdev_features.h"
 */
 import "C"
 
 const (
 	VlanVidMask = C.XETH_VLAN_VID_MASK
 	VlanNVid    = C.XETH_VLAN_N_VID
+)
+
+const (
+	EncapVlan = C.XETH_ENCAP_VLAN
+	EncapVpls = C.XETH_ENCAP_VPLS
+)
+
+const (
+	EncapVlanVidBit = C.XETH_ENCAP_VLAN_VID_BIT
+	EncapVplsVidBit = C.XETH_ENCAP_VPLS_VID_BIT
+)
+
+const (
+	EncapVlanVidMask = C.XETH_ENCAP_VLAN_VID_MASK
+	EncapVplsVidMask = C.XETH_ENCAP_VPLS_VID_MASK
+)
+
+const (
+	LbIflaUnspec  = C.XETH_LB_IFLA_UNSPEC
+	LbIflaChannel = C.XETH_LB_IFLA_CHANNEL
+)
+
+const (
+	PortIflaUnspec = C.XETH_PORT_IFLA_UNSPEC
+	PortIflaXid    = C.XETH_PORT_IFLA_XID
+)
+
+const (
+	VlanIflaUnspec = C.XETH_VLAN_IFLA_UNSPEC
+	VlanIflaVid    = C.XETH_VLAN_IFLA_VID
 )
 
 const (
@@ -222,4 +255,8 @@ const (
 	ETHTOOL_LINK_MODE_FEC_NONE_BIT               = 49
 	ETHTOOL_LINK_MODE_FEC_RS_BIT                 = 50
 	ETHTOOL_LINK_MODE_FEC_BASER_BIT              = 51
+)
+
+const (
+	NetifHwL2fwOffload = C.NETIF_F_HW_L2FW_DOFFLOAD
 )

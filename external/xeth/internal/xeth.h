@@ -1,7 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /**
  * XETH side-band channel protocol.
  *
- * SPDX-License-Identifier: GPL-2.0
  * Copyright(c) 2018-2019 Platina Systems, Inc.
  *
  * Contact Information:
@@ -11,6 +11,8 @@
 
 #ifndef __XETH_UAPI_H
 #define __XETH_UAPI_H
+
+#include <linux/types.h>
 
 #ifdef IFNAMSIZE
 # define XETH_IFNAMSIZ IFNAMSIZ
@@ -44,10 +46,37 @@ enum {
 	XETH_SIZEOF_JUMBO_FRAME = 9728,
 };
 
+enum xeth_encap {
+	XETH_ENCAP_VLAN = 0,
+	XETH_ENCAP_VPLS,
+};
+
+enum xeth_encap_vid_bit {
+      XETH_ENCAP_VLAN_VID_BIT = 12,
+      XETH_ENCAP_VPLS_VID_BIT = 20,
+};
+
+enum xeth_encap_vid_mask {
+      XETH_ENCAP_VLAN_VID_MASK = (1 << XETH_ENCAP_VLAN_VID_BIT) - 1,
+      XETH_ENCAP_VPLS_VID_MASK = (1 << XETH_ENCAP_VPLS_VID_BIT) - 1,
+};
+
+enum xeth_port_ifla {
+	XETH_PORT_IFLA_UNSPEC,
+	XETH_PORT_IFLA_XID,
+	XETH_PORT_N_IFLA,
+};
+
 enum xeth_vlan_ifla {
 	XETH_VLAN_IFLA_UNSPEC,
 	XETH_VLAN_IFLA_VID,
 	XETH_VLAN_N_IFLA,
+};
+
+enum xeth_lb_ifla {
+	XETH_LB_IFLA_UNSPEC,
+	XETH_LB_IFLA_CHANNEL,
+	XETH_LB_N_IFLA,
 };
 
 enum xeth_dev_kind {
@@ -56,6 +85,7 @@ enum xeth_dev_kind {
 	XETH_DEV_KIND_VLAN,
 	XETH_DEV_KIND_BRIDGE,
 	XETH_DEV_KIND_LAG,
+	XETH_DEV_KIND_LB,
 };
 
 enum xeth_msg_kind {
@@ -82,6 +112,34 @@ enum xeth_msg_kind {
 	XETH_MSG_KIND_NETNS_DEL,
 };
 
+enum xeth_link_stat {
+	XETH_LINK_STAT_RX_PACKETS,
+	XETH_LINK_STAT_TX_PACKETS,
+	XETH_LINK_STAT_RX_BYTES,
+	XETH_LINK_STAT_TX_BYTES,
+	XETH_LINK_STAT_RX_ERRORS,
+	XETH_LINK_STAT_TX_ERRORS,
+	XETH_LINK_STAT_RX_DROPPED,
+	XETH_LINK_STAT_TX_DROPPED,
+	XETH_LINK_STAT_MULTICAST,
+	XETH_LINK_STAT_COLLISIONS,
+	XETH_LINK_STAT_RX_LENGTH_ERRORS,
+	XETH_LINK_STAT_RX_OVER_ERRORS,
+	XETH_LINK_STAT_RX_CRC_ERRORS,
+	XETH_LINK_STAT_RX_FRAME_ERRORS,
+	XETH_LINK_STAT_RX_FIFO_ERRORS,
+	XETH_LINK_STAT_RX_MISSED_ERRORS,
+	XETH_LINK_STAT_TX_ABORTED_ERRORS,
+	XETH_LINK_STAT_TX_CARRIER_ERRORS,
+	XETH_LINK_STAT_TX_FIFO_ERRORS,
+	XETH_LINK_STAT_TX_HEARTBEAT_ERRORS,
+	XETH_LINK_STAT_TX_WINDOW_ERRORS,
+	XETH_LINK_STAT_RX_COMPRESSED,
+	XETH_LINK_STAT_TX_COMPRESSED,
+	XETH_LINK_STAT_RX_NOHANDLER,
+	XETH_N_LINK_STAT,
+};
+
 enum xeth_msg_carrier_flag {
 	XETH_CARRIER_OFF,
 	XETH_CARRIER_ON,
@@ -95,6 +153,7 @@ enum xeth_msg_ifinfo_reason {
 	XETH_IFINFO_REASON_DUMP,
 	XETH_IFINFO_REASON_REG,
 	XETH_IFINFO_REASON_UNREG,
+	XETH_IFINFO_REASON_FEATURES,
 };
 
 struct xeth_msg_header {
@@ -108,6 +167,37 @@ struct xeth_msg_header {
 struct xeth_msg {
 	struct xeth_msg_header header;
 };
+
+static inline bool xeth_is_msg(void *data)
+{
+	struct xeth_msg *msg = data;
+
+	return	msg->header.z64 == 0 &&
+		msg->header.z32 == 0 &&
+		msg->header.z16 == 0;
+}
+
+static inline enum xeth_msg_kind xeth_msg_kind(void *data)
+{
+	struct xeth_msg *msg = data;
+	return msg->header.kind;
+}
+
+static inline bool xeth_msg_version_match(void *data)
+{
+	struct xeth_msg *msg = data;
+	return msg->header.version == XETH_MSG_VERSION;
+}
+
+static inline void xeth_msg_init(void *data, enum xeth_msg_kind kind)
+{
+	struct xeth_msg *msg = data;
+	msg->header.z64 = 0;
+	msg->header.z32 = 0;
+	msg->header.z16 = 0;
+	msg->header.version = XETH_MSG_VERSION;
+	msg->header.kind = kind;
+}
 
 struct xeth_msg_break {
 	struct xeth_msg_header header;
@@ -227,7 +317,11 @@ struct xeth_msg_ifa6 {
 struct xeth_msg_ifinfo {
 	struct xeth_msg_header header;
 	uint32_t xid;
-	uint32_t reserved;
+	/* @kdata: kind specific data
+	 * 	vlan: { XETH_ENCAP_VLAN or XETH_ENCAP_VPLS }
+	 * 	loopback: CHANNEL )
+	 */
+	uint32_t kdata;
 	uint8_t ifname[XETH_IFNAMSIZ];
 	uint64_t net;
 	int32_t ifindex;
@@ -235,6 +329,7 @@ struct xeth_msg_ifinfo {
 	uint8_t addr[XETH_ALEN];
 	uint8_t kind;
 	uint8_t reason;
+	uint64_t features;
 };
 
 struct xeth_msg_neigh_update {
