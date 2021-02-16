@@ -1,12 +1,10 @@
-// Copyright © 2015-2016 Platina Systems, Inc. All rights reserved.
+// Copyright © 2015-2021 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package xeth
+package xeth_bridge
 
 import (
-	"fmt"
-
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/options"
 	"github.com/platinasystems/goes/cmd/ip/link/add/internal/request"
 	"github.com/platinasystems/goes/internal/nl"
@@ -14,28 +12,27 @@ import (
 	"github.com/platinasystems/goes/lang"
 )
 
+const usage = "ip link add [[ name ] NAME ] link LINK type xeth-bridge"
+
 type Command struct{}
 
-func (Command) String() string { return "xeth" }
+func (Command) String() string { return "xeth-bridge" }
 
 func (Command) Usage() string {
-	return fmt.Sprint("ip link add type xeth [ OPTION ]...")
+	return usage
 }
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "add an ethernet multiplexor",
+		lang.EnUS: "add proxy bridge",
 	}
 }
 
 func (Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
-OPTIONS
-	[name] NAME
-
 SEE ALSO
-	ip link add type man xeth || ip link add type xeth -man
+	ip link add type man xeth-bridge || ip link add type xeth-bridge -man
 	ip link man add || ip link add -man
 	man ip || ip -man`,
 	}
@@ -62,7 +59,7 @@ func (Command) Main(args ...string) error {
 
 	add.Attrs = append(add.Attrs, nl.Attr{Type: rtnl.IFLA_LINKINFO,
 		Value: nl.Attr{Type: rtnl.IFLA_INFO_KIND,
-			Value: nl.KstringAttr("xeth")}})
+			Value: nl.KstringAttr("xeth-bridge")}})
 
 	req, err := add.Message()
 	if err == nil {

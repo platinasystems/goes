@@ -50,7 +50,7 @@ OPTIONS
 		initial transmit queue depth
 
 SEE ALSO
-	ip link add man type || ip link add type TYPE -man
+	ip link add man type || ip link add type -man
 	ip link add type man TYPE || ip link add type TYPE -man
 	man ip || ip -man`,
 	},

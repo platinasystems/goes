@@ -20,7 +20,8 @@ import (
 	"github.com/platinasystems/goes/cmd/ip/link/add/type/vlan"
 	"github.com/platinasystems/goes/cmd/ip/link/add/type/vrf"
 	"github.com/platinasystems/goes/cmd/ip/link/add/type/vxlan"
-	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth"
+	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_bridge"
+	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_lag"
 	"github.com/platinasystems/goes/lang"
 )
 
@@ -55,7 +56,8 @@ TYPES
 	vlan - 802.1q tagged virtual LAN interface
 	vrf - Virtual Routing and Forwarding device
 	vxlan - Virtual eXtended LAN
-	xeth - ethernet multiplexor
+	xeth_bridge - proxy ethernet bridge
+	xeth_lag - proxy ethernet link-aggregation-group
 
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
@@ -63,24 +65,25 @@ SEE ALSO
 	man ip || ip -man`,
 	},
 	ByName: map[string]cmd.Cmd{
-		"bridge":    bridge.Command{},
-		"dummy":     basic.Command("dummy"),
-		"geneve":    geneve.Command{},
-		"gre":       gre.Command("gre"),
-		"gretap":    gre.Command("gretap"),
-		"hsr":       hsr.Command{},
-		"ifb":       basic.Command("ifb"),
-		"ip6gre":    ip6gre.Command("ip6gre"),
-		"ip6gretap": ip6gre.Command("ip6gretap"),
-		"ipip":      ipip.Command{},
-		"ipoib":     ipoib.Command{},
-		"macsec":    macsec.Command{},
-		"macvlan":   macvlan.Command("macvlan"),
-		"macvtap":   macvlan.Command("macvtap"),
-		"vcan":      basic.Command("vcan"),
-		"vlan":      vlan.Command{},
-		"vrf":       vrf.Command{},
-		"vxlan":     vxlan.Command{},
-		"xeth":      xeth.Command{},
+		"bridge":      bridge.Command{},
+		"dummy":       basic.Command("dummy"),
+		"geneve":      geneve.Command{},
+		"gre":         gre.Command("gre"),
+		"gretap":      gre.Command("gretap"),
+		"hsr":         hsr.Command{},
+		"ifb":         basic.Command("ifb"),
+		"ip6gre":      ip6gre.Command("ip6gre"),
+		"ip6gretap":   ip6gre.Command("ip6gretap"),
+		"ipip":        ipip.Command{},
+		"ipoib":       ipoib.Command{},
+		"macsec":      macsec.Command{},
+		"macvlan":     macvlan.Command("macvlan"),
+		"macvtap":     macvlan.Command("macvtap"),
+		"vcan":        basic.Command("vcan"),
+		"vlan":        vlan.Command{},
+		"vrf":         vrf.Command{},
+		"vxlan":       vxlan.Command{},
+		"xeth-bridge": xeth_bridge.Command{},
+		"xeth-lag":    xeth_lag.Command{},
 	},
 }
