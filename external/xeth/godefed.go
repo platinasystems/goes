@@ -24,17 +24,9 @@ const (
 )
 
 const (
-	LbIflaUnspec	= 0x0
 	LbIflaChannel	= 0x1
-)
-
-const (
-	PortIflaUnspec	= 0x0
+	MuxIflaEncap	= 0x1
 	PortIflaXid	= 0x1
-)
-
-const (
-	VlanIflaUnspec	= 0x0
 	VlanIflaVid	= 0x1
 )
 

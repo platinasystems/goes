@@ -22,6 +22,9 @@ import (
 	"github.com/platinasystems/goes/cmd/ip/link/add/type/vxlan"
 	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_bridge"
 	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_lag"
+	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_lb"
+	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_port"
+	"github.com/platinasystems/goes/cmd/ip/link/add/type/xeth_vlan"
 	"github.com/platinasystems/goes/lang"
 )
 
@@ -58,6 +61,9 @@ TYPES
 	vxlan - Virtual eXtended LAN
 	xeth_bridge - proxy ethernet bridge
 	xeth_lag - proxy ethernet link-aggregation-group
+	xeth_lb - proxy loop-back
+	xeth_lag - proxy ethernet port
+	xeth_vlan - vlan of proxy port or lag
 
 SEE ALSO
 	ip link add type man TYPE || ip link add type TYPE -man
@@ -85,5 +91,8 @@ SEE ALSO
 		"vxlan":       vxlan.Command{},
 		"xeth-bridge": xeth_bridge.Command{},
 		"xeth-lag":    xeth_lag.Command{},
+		"xeth-lb":     xeth_lb.Command{},
+		"xeth-port":   xeth_port.Command{},
+		"xeth-vlan":   xeth_vlan.Command{},
 	},
 }

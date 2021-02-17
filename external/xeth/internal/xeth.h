@@ -63,20 +63,26 @@ enum xeth_encap_vid_mask {
 
 enum xeth_port_ifla {
 	XETH_PORT_IFLA_UNSPEC,
-	XETH_PORT_IFLA_XID,
+	XETH_PORT_IFLA_XID,	/* u32 */
 	XETH_PORT_N_IFLA,
 };
 
 enum xeth_vlan_ifla {
 	XETH_VLAN_IFLA_UNSPEC,
-	XETH_VLAN_IFLA_VID,
+	XETH_VLAN_IFLA_VID,	/* u16 */
 	XETH_VLAN_N_IFLA,
 };
 
 enum xeth_lb_ifla {
 	XETH_LB_IFLA_UNSPEC,
-	XETH_LB_IFLA_CHANNEL,
+	XETH_LB_IFLA_CHANNEL,	/* u8 */
 	XETH_LB_N_IFLA,
+};
+
+enum xeth_mux_ifla {
+	XETH_MUX_IFLA_UNSPEC,
+	XETH_MUX_IFLA_ENCAP,	/* u8 */
+	XETH_MUX_N_IFLA,
 };
 
 enum xeth_dev_kind {

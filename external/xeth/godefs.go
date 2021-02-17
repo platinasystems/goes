@@ -34,18 +34,10 @@ const (
 )
 
 const (
-	LbIflaUnspec  = C.XETH_LB_IFLA_UNSPEC
 	LbIflaChannel = C.XETH_LB_IFLA_CHANNEL
-)
-
-const (
-	PortIflaUnspec = C.XETH_PORT_IFLA_UNSPEC
-	PortIflaXid    = C.XETH_PORT_IFLA_XID
-)
-
-const (
-	VlanIflaUnspec = C.XETH_VLAN_IFLA_UNSPEC
-	VlanIflaVid    = C.XETH_VLAN_IFLA_VID
+	MuxIflaEncap  = C.XETH_MUX_IFLA_ENCAP
+	PortIflaXid   = C.XETH_PORT_IFLA_XID
+	VlanIflaVid   = C.XETH_VLAN_IFLA_VID
 )
 
 const (
