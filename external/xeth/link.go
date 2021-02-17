@@ -25,6 +25,7 @@ type Linker interface {
 	IfInfoName(set ...string) string
 	IfInfoIfIndex(set ...int32) int32
 	IfInfoNetNs(set ...NetNs) NetNs
+	IfInfoFeatures(set ...uint64) uint64
 	IfInfoFlags(set ...net.Flags) net.Flags
 	IfInfoDevKind(set ...DevKind) DevKind
 	IfInfoHardwareAddr(set ...net.HardwareAddr) net.HardwareAddr
@@ -35,6 +36,7 @@ type Linker interface {
 	IsLag() bool
 	IsPort() bool
 	IsVlan() bool
+	NetIfHwL2FwdOffload() bool
 	LinkModesSupported(set ...EthtoolLinkModeBits) EthtoolLinkModeBits
 	LinkModesAdvertising(set ...EthtoolLinkModeBits) EthtoolLinkModeBits
 	LinkModesLPAdvertising(set ...EthtoolLinkModeBits) EthtoolLinkModeBits
@@ -59,6 +61,7 @@ const (
 	LinkAttrIfInfoName
 	LinkAttrIfInfoIfIndex
 	LinkAttrIfInfoNetNs
+	LinkAttrIfInfoFeatures
 	LinkAttrIfInfoFlags
 	LinkAttrIfInfoDevKind
 	LinkAttrIfInfoHardwareAddr
@@ -216,6 +219,16 @@ func (l *Link) IfInfoNetNs(set ...NetNs) (netns NetNs) {
 	return
 }
 
+func (l *Link) IfInfoFeatures(set ...uint64) (features uint64) {
+	if len(set) > 0 {
+		features = set[0]
+		l.Store(LinkAttrIfInfoFeatures, features)
+	} else if v, ok := l.Load(LinkAttrIfInfoFeatures); ok {
+		features = v.(uint64)
+	}
+	return
+}
+
 func (l *Link) IfInfoFlags(set ...net.Flags) (flags net.Flags) {
 	if len(set) > 0 {
 		flags = set[0]
@@ -278,6 +291,10 @@ func (l *Link) IsPort() bool {
 
 func (l *Link) IsVlan() bool {
 	return l.IfInfoDevKind() == DevKindVlan
+}
+
+func (l *Link) NetIfHwL2FwdOffload() bool {
+	return (l.IfInfoFeatures() & NetIfHwL2FwdOffload) == NetIfHwL2FwdOffload
 }
 
 func (l *Link) LinkModesSupported(set ...EthtoolLinkModeBits) EthtoolLinkModeBits {

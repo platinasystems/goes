@@ -240,5 +240,5 @@ const (
 )
 
 const (
-	NetifHwL2fwOffload = 0x800000000000
+	NetIfHwL2FwdOffload = 0x800000000000
 )

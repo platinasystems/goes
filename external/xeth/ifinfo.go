@@ -18,6 +18,7 @@ type DevDown Xid
 type DevDump Xid
 type DevUnreg Xid
 type DevReg Xid
+type DevFeatures Xid
 
 func RxIfInfo(msg *internal.MsgIfInfo) (note interface{}) {
 	xid := Xid(msg.Xid)
@@ -48,6 +49,7 @@ func RxIfInfo(msg *internal.MsgIfInfo) (note interface{}) {
 	l.IfInfoIfIndex(msg.Ifindex)
 	l.IfInfoNetNs(NetNs(msg.Net))
 	l.IfInfoFlags(net.Flags(msg.Flags))
+	l.IfInfoFeatures(msg.Features)
 	return note
 }
 
@@ -90,4 +92,12 @@ func (xid Xid) RxUnreg(newIfindex int32) (unreg DevUnreg) {
 		l.IfInfoIfIndex(newIfindex)
 	}
 	return unreg
+}
+
+func (xid Xid) RxFeatures(features uint64) (note DevFeatures) {
+	note = DevFeatures(xid)
+	if l := expectLinkOf(xid, "RxFeatures"); l != nil {
+		l.IfInfoFeatures(features)
+	}
+	return note
 }

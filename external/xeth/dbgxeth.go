@@ -58,6 +58,10 @@ func (dev DevUnreg) Format(f fmt.State, c rune) {
 	fmt.Fprint(f, Xid(dev), " unreg")
 }
 
+func (dev DevFeatures) Format(f fmt.State, c rune) {
+	fmt.Fprint(f, Xid(dev), " features")
+}
+
 func (dev *DevAddIPNet) Format(f fmt.State, c rune) {
 	fmt.Fprint(f, dev.Xid, " add ", dev.IPNet)
 }

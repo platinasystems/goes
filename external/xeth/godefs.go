@@ -250,5 +250,5 @@ const (
 )
 
 const (
-	NetifHwL2fwOffload = C.NETIF_F_HW_L2FW_DOFFLOAD
+	NetIfHwL2FwdOffload = C.NETIF_F_HW_L2FW_DOFFLOAD
 )

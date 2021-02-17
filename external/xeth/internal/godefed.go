@@ -237,6 +237,7 @@ const (
 	IfInfoReasonDump	= 0x4
 	IfInfoReasonReg		= 0x5
 	IfInfoReasonUnreg	= 0x6
+	IfInfoReasonFeatures	= 0x7
 )
 
 const (

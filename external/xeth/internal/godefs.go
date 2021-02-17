@@ -118,13 +118,14 @@ const (
 )
 
 const (
-	IfInfoReasonNew   = C.XETH_IFINFO_REASON_NEW
-	IfInfoReasonDel   = C.XETH_IFINFO_REASON_DEL
-	IfInfoReasonUp    = C.XETH_IFINFO_REASON_UP
-	IfInfoReasonDown  = C.XETH_IFINFO_REASON_DOWN
-	IfInfoReasonDump  = C.XETH_IFINFO_REASON_DUMP
-	IfInfoReasonReg   = C.XETH_IFINFO_REASON_REG
-	IfInfoReasonUnreg = C.XETH_IFINFO_REASON_UNREG
+	IfInfoReasonNew      = C.XETH_IFINFO_REASON_NEW
+	IfInfoReasonDel      = C.XETH_IFINFO_REASON_DEL
+	IfInfoReasonUp       = C.XETH_IFINFO_REASON_UP
+	IfInfoReasonDown     = C.XETH_IFINFO_REASON_DOWN
+	IfInfoReasonDump     = C.XETH_IFINFO_REASON_DUMP
+	IfInfoReasonReg      = C.XETH_IFINFO_REASON_REG
+	IfInfoReasonUnreg    = C.XETH_IFINFO_REASON_UNREG
+	IfInfoReasonFeatures = C.XETH_IFINFO_REASON_FEATURES
 )
 
 const (
