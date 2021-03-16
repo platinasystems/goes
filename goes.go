@@ -348,7 +348,8 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 		if !g.isStdoutRedirected(stdout) { // fixme not a pipe
 			err := x.Wait()
 			g.Status = err
-			if err != nil {
+			if err != nil &&
+				err.Error() != "exit status 1" {
 				fmt.Fprintln(os.Stderr, err)
 			}
 		} else {
@@ -356,7 +357,8 @@ func (g *Goes) ProcessCommand(cl shellutils.Cmdline, closers *[]io.Closer) (func
 			go func(x *exec.Cmd) {
 				defer WG.Done()
 				err := x.Wait()
-				if err != nil {
+				if err != nil &&
+					err.Error() != "exit status 1" {
 					fmt.Fprintln(os.Stderr, err)
 				}
 				if x.Stdout != os.Stdout {
