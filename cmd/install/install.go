@@ -39,9 +39,12 @@ type Command struct {
 
 	DebootstrapProgram string
 
-	DefaultArchive string
+	DefaultArchive  string
+	DefaultHostname string
 
 	GPGServer string
+
+	Hostname string
 
 	InstallDev string
 
@@ -115,6 +118,9 @@ OPTIONS
 	-gpg-server srv		GPG server to validate keys. Default is
 				pool.sks-keyservers.net
 
+	-hostname name		Hostname to set. Default is ` +
+			c.DefaultHostname + `
+
 	-install-dev DEV	Device to install upon. Default is sda
 
 	-mgmt-eth IF		Management ethernet. Default is enp5s0
@@ -157,6 +163,8 @@ func (c *Command) Main(args ...string) error {
 		{"-debootstrap-program", &c.DebootstrapProgram, "debootstrap"},
 
 		{"-gpg-server", &c.GPGServer, "pool.sks-keyservers.net"},
+
+		{"-hostname", &c.Hostname, c.DefaultHostname},
 
 		{"-install-dev", &c.InstallDev, "sda"},
 

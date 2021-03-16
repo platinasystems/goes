@@ -51,6 +51,7 @@ func (c *Command) debianInstall() (err error) {
 			`adduser --gecos "System Administrator" --disabled-password {{ .AdminUser }}`,
 			"adduser {{ .AdminUser }} sudo",
 			"echo {{ .AdminUser }}:{{ .AdminPass }}|chpasswd",
+			"echo {{ .Hostname }}>/etc/hostname",
 			"systemctl enable systemd-resolved",
 		},
 		},
