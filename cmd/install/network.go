@@ -188,3 +188,28 @@ func defaultGatewayV6() (gwIP net.IP, iface string, err error) {
 	}
 	return nil, "", fmt.Errorf("Default IPv6 route not found")
 }
+
+func (c *Command) updateDNS() {
+	file, err := os.Open("/etc/resolv.conf")
+	if err != nil {
+		fmt.Printf("Unable to parse /etc/resolv.conf: %s\n", err)
+		return
+	}
+	defer file.Close()
+
+	ns := ""
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		l := scanner.Text()
+		f := strings.Fields(l)
+		if len(f) != 2 || f[0] != "nameserver" {
+			continue
+		}
+		if ns != "" {
+			ns = ns + " "
+		}
+		ns = ns + f[1]
+	}
+	c.DefaultDNS = ns
+}

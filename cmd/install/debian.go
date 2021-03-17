@@ -52,6 +52,7 @@ func (c *Command) debianInstall() (err error) {
 			"adduser {{ .AdminUser }} sudo",
 			"echo {{ .AdminUser }}:{{ .AdminPass }}|chpasswd",
 			"echo {{ .Hostname }}>/etc/hostname",
+			`{{if .DNSAddr }} sed -i -e "s/^#DNS=$/DNS={{ .DNSAddr }}/" /etc/systemd/resolved.conf{{end}}`,
 			"systemctl enable systemd-resolved",
 		},
 		},

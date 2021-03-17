@@ -40,8 +40,11 @@ type Command struct {
 	DebootstrapProgram string
 
 	DefaultArchive  string
+	DefaultDNS      string
 	DefaultHostname string
 	DefaultRelease  string
+
+	DNSAddr string
 
 	GPGServer string
 
@@ -80,6 +83,7 @@ func (*Command) Apropos() lang.Alt {
 }
 
 func (c *Command) Man() lang.Alt {
+	c.updateDNS()
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
@@ -116,6 +120,9 @@ OPTIONS
 
 	-debug			Enable debugging. Passed to debootstrap
 
+	-dnsaddr		Set default DNS addresses. Default is
+				` + c.DefaultDNS + `
+
 	-gpg-server srv		GPG server to validate keys. Default is
 				pool.sks-keyservers.net
 
@@ -148,6 +155,8 @@ OPTIONS
 }
 
 func (c *Command) Main(args ...string) error {
+	c.updateDNS()
+
 	parmTable := []struct {
 		parm   string
 		strPtr *string
@@ -163,6 +172,8 @@ func (c *Command) Main(args ...string) error {
 			"http://ftp.debian.org/debian"},
 
 		{"-debootstrap-program", &c.DebootstrapProgram, "debootstrap"},
+
+		{"-dnsaddr", &c.DNSAddr, c.DefaultDNS},
 
 		{"-gpg-server", &c.GPGServer, "pool.sks-keyservers.net"},
 
