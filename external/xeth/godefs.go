@@ -46,6 +46,7 @@ const (
 	DevKindVlan   = C.XETH_DEV_KIND_VLAN
 	DevKindBridge = C.XETH_DEV_KIND_BRIDGE
 	DevKindLag    = C.XETH_DEV_KIND_LAG
+	DevKindLB     = C.XETH_DEV_KIND_LB
 )
 
 const (

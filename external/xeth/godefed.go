@@ -36,6 +36,7 @@ const (
 	DevKindVlan	= 0x2
 	DevKindBridge	= 0x3
 	DevKindLag	= 0x4
+	DevKindLB	= 0x5
 )
 
 const (
