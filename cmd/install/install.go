@@ -41,6 +41,7 @@ type Command struct {
 
 	DefaultArchive  string
 	DefaultHostname string
+	DefaultRelease  string
 
 	GPGServer string
 
@@ -139,7 +140,8 @@ OPTIONS
 	-platina-GPG key	Platina code signing key. Default is
 				5FC2206DDF5ACEEA
 
-	-platina-release NAME	Platina release. Default is platina-mk1-release
+	-platina-release NAME	Platina release. Default is ` +
+			c.DefaultRelease + `
 
 	-shell			Do not install. Just run a shell`,
 	}
@@ -175,8 +177,8 @@ func (c *Command) Main(args ...string) error {
 		{"-platina-distro", &c.PlatinaDistro, "stretch"},
 		{"-platina-download", &c.PlatinaDownload,
 			"https://platina.io/goes/debian"},
-		{"-platina-gpg", &c.PlatinaGPG, "5FC2206DDF5ACEEA"},            // kph@platinasystems.com key
-		{"-platina-release", &c.PlatinaRelease, "platina-mk1-release"}, // Move to board definitions
+		{"-platina-gpg", &c.PlatinaGPG, "5FC2206DDF5ACEEA"}, // kph@platinasystems.com key
+		{"-platina-release", &c.PlatinaRelease, c.DefaultRelease},
 	}
 
 	parm, args := parms.New(args)
