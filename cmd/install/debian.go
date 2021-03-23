@@ -53,6 +53,7 @@ func (c *Command) debianInstall() (err error) {
 			"echo {{ .AdminUser }}:{{ .AdminPass }}|chpasswd",
 			"echo {{ .Hostname }}>/etc/hostname",
 			`{{if .DNSAddr }} sed -i -e "s/^#DNS=$/DNS={{ .DNSAddr }}/" /etc/systemd/resolved.conf{{end}}`,
+			`sed -i -e "s/^source-directory \/etc\/network\/interfaces.d$/source \/etc\/network\/interfaces.d/" /etc/network/interfaces`,
 			"systemctl enable systemd-resolved",
 		},
 		},
