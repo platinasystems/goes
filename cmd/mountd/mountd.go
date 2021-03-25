@@ -16,7 +16,7 @@ import (
 	"github.com/platinasystems/goes"
 	"github.com/platinasystems/goes/cmd"
 	"github.com/platinasystems/goes/external/log"
-	"github.com/platinasystems/goes/internal/partitions"
+	"github.com/platinasystems/goes/external/partitions"
 	"github.com/platinasystems/goes/lang"
 )
 

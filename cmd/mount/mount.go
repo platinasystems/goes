@@ -13,7 +13,7 @@ import (
 
 	"github.com/platinasystems/goes/external/flags"
 	"github.com/platinasystems/goes/external/parms"
-	"github.com/platinasystems/goes/internal/partitions"
+	"github.com/platinasystems/goes/external/partitions"
 	"github.com/platinasystems/goes/lang"
 )
 
