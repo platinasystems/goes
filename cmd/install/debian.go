@@ -16,6 +16,7 @@ chroot /debian /bin/sh << EOF
 set -x
 mount -t proc none proc
 mount -t devtmpfs none dev
+[ -L /dev/fd ] || ln -s /proc/self/fd /dev/fd
 mount -t devpts none /dev/pts
 mount -t sysfs none sys
 mkdir -p /debian
