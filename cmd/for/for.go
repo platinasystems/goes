@@ -19,12 +19,12 @@ type Command struct{}
 func (Command) String() string { return "for" }
 
 func (Command) Usage() string {
-	return "for VAR... in COMMAND ; do COMMAND $VAR; done"
+	return "for VAR in ARGS... ; do COMMAND $VAR; done"
 }
 
 func (Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "conditional command",
+		lang.EnUS: "loop over a set of arguments and run a command",
 	}
 }
 
@@ -32,7 +32,7 @@ func (Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
-	Iterate over a services of words for a set of commands.`,
+	Iterate over a series of words for a set of commands.`,
 	}
 }
 
