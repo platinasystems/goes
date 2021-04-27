@@ -160,6 +160,11 @@ func makeBlockFunc(g *goes.Goes, varName string,
 				if err != nil {
 					fmt.Fprintln(stderr, err)
 				}
+				if g.Status != nil {
+					if g.Status.Error() == "signal: interrupt" {
+						return g.Status
+					}
+				}
 			}
 		}
 		return nil
