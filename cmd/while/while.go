@@ -14,25 +14,32 @@ import (
 	"github.com/platinasystems/goes/lang"
 )
 
-type Command struct{}
-
-func (Command) String() string { return "while" }
-
-func (Command) Usage() string {
-	return "while COND ; do COMMAND ; done"
+type Command struct {
+	IsUntil bool
 }
 
-func (Command) Apropos() lang.Alt {
+func (c Command) String() string {
+	if c.IsUntil {
+		return "until"
+	}
+	return "while"
+}
+
+func (c Command) Usage() string {
+	return c.String() + " COND ; do COMMAND ; done"
+}
+
+func (c Command) Apropos() lang.Alt {
 	return lang.Alt{
-		lang.EnUS: "Loop while a condition is true",
+		lang.EnUS: "Loop " + c.String() + " a condition is true",
 	}
 }
 
-func (Command) Man() lang.Alt {
+func (c Command) Man() lang.Alt {
 	return lang.Alt{
 		lang.EnUS: `
 DESCRIPTION
-	Executes a set of commands while another returns success`,
+	Executes a set of commands ` + c.String() + ` another returns success`,
 	}
 }
 
@@ -86,7 +93,7 @@ func (c Command) Block(g *goes.Goes, ls shellutils.List) (*shellutils.List, func
 		}
 
 	}
-	blockfun, err := makeBlockFunc(g, whileList, doList)
+	blockfun, err := c.makeBlockFunc(g, whileList, doList)
 
 	return &ls, blockfun, err
 }
@@ -101,11 +108,11 @@ func runList(pipeline []func(stdin io.Reader, stdout io.Writer, stderr io.Writer
 	return nil
 }
 
-func makeBlockFunc(g *goes.Goes, whileList, doList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
+func (c Command) makeBlockFunc(g *goes.Goes, whileList, doList []func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error) (func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error, error) {
 	runfun := func(stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 		for {
 			err := runList(whileList, stdin, stdout, stderr)
-			if err == nil && g.Status == nil {
+			if (err == nil && g.Status == nil) != c.IsUntil {
 				err = runList(doList, stdin, stdout, stderr)
 				if err != nil {
 					fmt.Fprintln(stderr, err)
