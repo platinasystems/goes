@@ -1,4 +1,4 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2021 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -18,6 +18,7 @@ const (
 	TokenLiteral = iota
 	TokenEnvget
 	TokenEnvset
+	TokenGlob
 )
 
 // Token is a type and a string value. During parsing, we convert

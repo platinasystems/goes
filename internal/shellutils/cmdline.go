@@ -1,4 +1,4 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2021 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -6,6 +6,7 @@ package shellutils
 
 import (
 	"fmt"
+	"path/filepath"
 )
 
 // Cmdline is a slice of Words which may be variable setting, a command,
@@ -47,6 +48,24 @@ func (c *Cmdline) Slice(getenv func(string) string) (map[string]string, []string
 					envsetOffset = len(s)
 				}
 				s += t.V
+			case TokenGlob:
+				match, err := filepath.Glob(t.V)
+				if match == nil || err != nil {
+					s += t.V
+					continue
+				}
+				s += match[0]
+				if len(match) == 1 {
+					continue
+				}
+				Cmdline = append(Cmdline, s)
+				match = match[1:]
+				if len(match) > 1 {
+					Cmdline = append(Cmdline,
+						match[:len(match)-1]...)
+					match = match[len(match)-1:]
+				}
+				s = match[0]
 			default:
 				panic(fmt.Errorf("Unknown Token %v", t))
 			}

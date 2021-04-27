@@ -1,4 +1,4 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2021 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 package shellutils
@@ -209,6 +209,20 @@ processRune:
 			if err != nil {
 				return nil, err
 			}
+			continue
+		}
+		if r == '*' || r == '?' || r == '[' {
+			glob := string(r)
+			for len(s) > 0 {
+				r, wid := utf8.DecodeRuneInString(s)
+				if unicode.IsSpace(r) ||
+					strings.ContainsRune("|&;()<>", r) {
+					break
+				}
+				s = s[wid:]
+				glob = glob + string(r)
+			}
+			w.add(glob, TokenGlob)
 			continue
 		}
 		w.addLiteral(string(r))

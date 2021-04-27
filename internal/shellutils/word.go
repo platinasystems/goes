@@ -1,4 +1,4 @@
-// Copyright © 2017 Platina Systems, Inc. All rights reserved.
+// Copyright © 2017-2021 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,6 +7,7 @@ package shellutils
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -79,4 +80,38 @@ func (w *Word) String() string {
 		s += t.V
 	}
 	return s
+}
+
+// Expand converts a word into a slice of strings doing glob expansion
+func (w *Word) Expand() (str []string) {
+	s := ""
+	for _, t := range w.Tokens {
+		switch t.T {
+		case TokenLiteral, TokenEnvget, TokenEnvset:
+			s += t.V
+
+		case TokenGlob:
+			match, err := filepath.Glob(t.V)
+			if match == nil || err != nil {
+				s += t.V
+				continue
+			}
+			s += match[0]
+			if len(match) == 1 {
+				continue
+			}
+			str = append(str, s)
+			match = match[1:]
+			if len(match) > 1 {
+				str = append(str,
+					match[:len(match)-1]...)
+				match = match[len(match)-1:]
+			}
+			s = match[0]
+		default:
+			panic(fmt.Errorf("Unknown Token %v", t))
+		}
+	}
+	str = append(str, s)
+	return
 }
