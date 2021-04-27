@@ -117,6 +117,11 @@ func (c Command) makeBlockFunc(g *goes.Goes, whileList, doList []func(stdin io.R
 				if err != nil {
 					fmt.Fprintln(stderr, err)
 				}
+				if g.Status != nil {
+					if g.Status.Error() == "signal: interrupt" {
+						return g.Status
+					}
+				}
 			} else {
 				return err
 			}
