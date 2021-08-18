@@ -43,9 +43,9 @@ func (c *Command) debianInstall() (err error) {
 
 		{debianChroot, []string{
 			"apt-get update",
-			"apt-get -y install grub-efi-amd64 apt-transport-https dirmngr initramfs-tools openssh-server sudo ca-certificates ifupdown resolvconf",
-			`echo "deb {{ .PlatinaDownload }} {{ .PlatinaDistro }} main" >> /etc/apt/sources.list`,
-			"apt-key adv --keyserver {{ .GPGServer }} --recv-keys {{ .PlatinaGPG }}",
+			"apt-get -y install grub-efi-amd64 apt-transport-https dirmngr initramfs-tools openssh-server sudo ca-certificates ifupdown resolvconf wget",
+			"wget {{ .PlatinaDownload }}/platina-apt-source_{{ .PlatinaDistro }}.deb {{ .PlatinaDownload }}/platina-archive-keyring_{{ .PlatinaDistro }}.deb",
+			"dpkg -i platina-apt-source_{{ .PlatinaDistro }}.deb platina-archive-keyring_{{ .PlatinaDistro }}.deb",
 			"apt-get update",
 			"apt-get -y install {{ .PlatinaRelease }}",
 			"update-grub",

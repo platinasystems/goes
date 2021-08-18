@@ -46,8 +46,6 @@ type Command struct {
 
 	DNSAddr string
 
-	GPGServer string
-
 	Hostname string
 
 	InstallDev string
@@ -58,7 +56,6 @@ type Command struct {
 
 	PlatinaDistro   string
 	PlatinaDownload string
-	PlatinaGPG      string
 	PlatinaRelease  string
 
 	Target string
@@ -123,9 +120,6 @@ OPTIONS
 	-dnsaddr		Set default DNS addresses. Default is
 				` + c.DefaultDNS + `
 
-	-gpg-server srv		GPG server to validate keys. Default is
-				pool.sks-keyservers.net
-
 	-hostname name		Hostname to set. Default is ` +
 			c.DefaultHostname + `
 
@@ -143,9 +137,6 @@ OPTIONS
 
 	-platina-download URL	Platina distribution download URL. Default
 				is https://platina.io/goes/debian
-
-	-platina-GPG key	Platina code signing key. Default is
-				5FC2206DDF5ACEEA
 
 	-platina-release NAME	Platina release. Default is ` +
 			c.DefaultRelease + `
@@ -175,8 +166,6 @@ func (c *Command) Main(args ...string) error {
 
 		{"-dnsaddr", &c.DNSAddr, c.DefaultDNS},
 
-		{"-gpg-server", &c.GPGServer, "pool.sks-keyservers.net"},
-
 		{"-hostname", &c.Hostname, c.DefaultHostname},
 
 		{"-install-dev", &c.InstallDev, "sda"},
@@ -188,7 +177,6 @@ func (c *Command) Main(args ...string) error {
 		{"-platina-distro", &c.PlatinaDistro, "stretch"},
 		{"-platina-download", &c.PlatinaDownload,
 			"https://platina.io/goes/debian"},
-		{"-platina-gpg", &c.PlatinaGPG, "5FC2206DDF5ACEEA"}, // kph@platinasystems.com key
 		{"-platina-release", &c.PlatinaRelease, c.DefaultRelease},
 	}
 
