@@ -6,7 +6,10 @@
 *.zip
 *~
 *#*#
-goes-*
+/goes-*
+/v2/goes-*
+/tlsx
+/v2/tlsx
 /*.patch
 /debian/debhelper-build-stamp
 /debian/files
