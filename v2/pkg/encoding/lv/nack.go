@@ -4,18 +4,15 @@
 
 package lv
 
-const (
-	Ebit    = 15
-	Eflag   = 1 << Ebit
-	Efilter = Eflag - 1
+import "strings"
+
+var (
+	ErrTooLarge = Nack("encoded length is too large")
+	ErrTooSmall = Nack("receiving buf is too small")
 )
 
 type Nack string
 
-func (s Nack) Error() string { return string(s) }
+func NewNack(s string) Nack { return Nack(strings.Clone(s)) }
 
-func nack(b []byte) Nack {
-	c := make([]byte, len(b))
-	copy(c, b)
-	return Nack(c)
-}
+func (s Nack) Error() string { return string(s) }

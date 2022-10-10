@@ -9,38 +9,28 @@ import (
 	"io"
 )
 
-// This is a contextual reader that checks the embedded context Err() and
-// Done() before or after read.
-func With(ctx context.Context, r io.Reader) io.Reader {
-	return cr{ctx, r}
-}
-
-type cr struct {
-	c context.Context
+// This is a contextual reader that checks the embedded context Err() before or
+// after read.
+type ContextualReader struct {
+	context.Context
 	r io.Reader
 }
 
-func (cr cr) Read(buf []byte) (int, error) {
-	err := cr.c.Err()
+func With(ctx context.Context, r io.Reader) ContextualReader {
+	return ContextualReader{ctx, r}
+}
+
+func (cr ContextualReader) Read(buf []byte) (int, error) {
+	err := cr.Err()
 	if err != nil {
 		return 0, err
 	}
 	if cr.r == nil {
 		return 0, io.EOF
 	}
-	select {
-	case <-cr.c.Done():
-		return 0, context.Canceled
-	default:
-	}
 	n, err := cr.r.Read(buf)
 	if err == nil {
-		select {
-		case <-cr.c.Done():
-			err = context.Canceled
-		default:
-			err = cr.c.Err()
-		}
+		err = cr.Err()
 	}
 	return n, err
 }

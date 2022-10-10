@@ -13,28 +13,28 @@ import (
 const PendingRendezvous = 4
 
 type rendezvous struct {
-	provider *tls.Conn
-	consumer chan *tls.Conn
+	host  *tls.Conn
+	guest chan *tls.Conn
 }
 
 var rendezvousPool = &sync.Pool{
 	New: func() any {
 		return &rendezvous{
-			consumer: make(chan *tls.Conn),
+			guest: make(chan *tls.Conn),
 		}
 	},
 }
 
-var providers = struct {
+var hosts = struct {
 	mutex      sync.RWMutex
 	rendezvous map[string]chan *rendezvous
 }{
 	rendezvous: make(map[string]chan *rendezvous),
 }
 
-func newRendezvous(provider *tls.Conn) *rendezvous {
+func newRendezvous(host *tls.Conn) *rendezvous {
 	r := rendezvousPool.Get().(*rendezvous)
-	r.provider = provider
+	r.host = host
 	return r
 }
 
@@ -42,53 +42,53 @@ func (r *rendezvous) Free() {
 	rendezvousPool.Put(r)
 }
 
-func WaitForConsumer(ctx context.Context, c *tls.Conn, ski string) (
+func waitForGuest(ctx context.Context, c *tls.Conn, ski string) (
 	*tls.Conn, error,
 ) {
 	r := newRendezvous(c)
-	providers.mutex.RLock()
-	ch, ok := providers.rendezvous[ski]
-	providers.mutex.RUnlock()
+	hosts.mutex.RLock()
+	ch, ok := hosts.rendezvous[ski]
+	hosts.mutex.RUnlock()
 	if !ok {
-		providers.mutex.Lock()
-		if ch, ok = providers.rendezvous[ski]; !ok {
+		hosts.mutex.Lock()
+		if ch, ok = hosts.rendezvous[ski]; !ok {
 			ch = make(chan *rendezvous, PendingRendezvous)
-			providers.rendezvous[ski] = ch
+			hosts.rendezvous[ski] = ch
 		}
-		providers.mutex.Unlock()
+		hosts.mutex.Unlock()
 	}
 	ch <- r
 	select {
-	case consumer := <-r.consumer:
+	case guest := <-r.guest:
 		r.Free()
-		return consumer, nil
+		return guest, nil
 	case <-ctx.Done():
 		return nil, context.Canceled
 	}
 }
 
-func WaitForProvider(ctx context.Context, c *tls.Conn, ski string) (
+func waitForHost(ctx context.Context, c *tls.Conn, ski string) (
 	*tls.Conn, error,
 ) {
-	providers.mutex.RLock()
-	ch, ok := providers.rendezvous[ski]
-	providers.mutex.RUnlock()
+	hosts.mutex.RLock()
+	ch, ok := hosts.rendezvous[ski]
+	hosts.mutex.RUnlock()
 	if !ok {
-		providers.mutex.Lock()
-		if providers.rendezvous == nil {
-			providers.rendezvous = make(map[string]chan *rendezvous)
+		hosts.mutex.Lock()
+		if hosts.rendezvous == nil {
+			hosts.rendezvous = make(map[string]chan *rendezvous)
 		}
-		if ch, ok = providers.rendezvous[ski]; !ok {
+		if ch, ok = hosts.rendezvous[ski]; !ok {
 			ch = make(chan *rendezvous, PendingRendezvous)
-			providers.rendezvous[ski] = ch
+			hosts.rendezvous[ski] = ch
 		}
-		providers.mutex.Unlock()
+		hosts.mutex.Unlock()
 	}
 	select {
 	case r := <-ch:
-		provider := r.provider
-		r.consumer <- c
-		return provider, nil
+		host := r.host
+		r.guest <- c
+		return host, nil
 	case <-ctx.Done():
 		return nil, context.Canceled
 	}

@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
-	"github.com/platinasystems/goes/v2/pkg/goes/log"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
 )
@@ -24,6 +24,7 @@ import (
 var (
 	ErrIncomplete = errors.New("incomplete")
 	ErrNotFound   = errors.New("not found")
+	Fatal         = style.PlainStderr.Fatal
 )
 
 func HasHelp(args []string) bool {
@@ -48,7 +49,6 @@ func (m Map) Format(w fmt.State, verb rune) {
 
 func (m Map) Main() {
 	Root = m
-	log.Style()
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
 	defer stop()
@@ -75,8 +75,7 @@ func (m Map) Main() {
 	}
 	err = f(ctx, os.Stdin, os.Stdout, path, args...)
 	if err != nil && !errors.Is(err, flag.ErrHelp) {
-		log.Plain()
-		log.Fatal(err)
+		Fatal(err)
 	}
 }
 

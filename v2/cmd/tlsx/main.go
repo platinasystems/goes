@@ -52,8 +52,8 @@ import (
 )
 
 func main() {
-	state.DirFlag = flag.String("d", state.DirDefault.String(),
-		"State directory.")
+	flag.String("state", state.DirDefault.String(), "")
+	flag.Bool("verbose", false, "")
 	selection.Map{
 		"alias":       tlsx.Alias,
 		"authorize":   tlsx.AuthorizeOrRevoke,

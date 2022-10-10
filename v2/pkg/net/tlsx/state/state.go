@@ -5,6 +5,7 @@
 package state
 
 import (
+	"flag"
 	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/os/program"
@@ -13,7 +14,6 @@ import (
 )
 
 var (
-	DirFlag    *string
 	DirDefault = cache.New[string](func(p *string) error {
 		sh, err := xdg.StateHome.Value()
 		if err != nil {
@@ -26,9 +26,10 @@ var (
 		return err
 	})
 	Dir = cache.New[string](func(p *string) (err error) {
-		if DirFlag != nil && len(*DirFlag) > 0 {
-			*p = *DirFlag
-		} else {
+		if state := flag.Lookup("state"); state != nil {
+			*p = state.Value.String()
+		}
+		if len(*p) == 0 {
 			*p, err = DirDefault.Value()
 		}
 		return

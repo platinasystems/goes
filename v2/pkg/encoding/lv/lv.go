@@ -6,11 +6,9 @@
 // 2-byte, big-endian unsigned integer length that doesn't exceed Max bytes.
 package lv
 
-import "errors"
-
-const Max = 4096
-
-var (
-	ErrTooLarge = errors.New("encoded length is too large")
-	ErrTooSmall = errors.New("receiving buf is too small")
+const (
+	Ebit    = 15
+	Eflag   = 1 << Ebit
+	Efilter = Eflag - 1
+	Max     = 4096
 )

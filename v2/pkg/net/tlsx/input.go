@@ -15,6 +15,11 @@ type input struct {
 	e error
 }
 
+func newinput(r io.Reader) (io.Reader, func()) {
+	in := &input{r: r}
+	return in, in.flush
+}
+
 func (in *input) Read(b []byte) (int, error) {
 	var n int
 	if in.r == nil {

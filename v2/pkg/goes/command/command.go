@@ -13,8 +13,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"golang.org/x/term"
 )
 
 var (
@@ -76,6 +78,18 @@ func Func(
 	cmd.Stdin = r
 	cmd.Stdout = w
 	cmd.Stderr = stderr
+	if method, ok := r.(interface{ Fd() uintptr }); ok {
+		if fd := method.Fd(); term.IsTerminal(int(fd)) {
+			cmd.Stderr = w
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				Setsid:  true,
+				Setctty: true,
+				// FIXME may need to set ctty on tlsx-host
+				// w/ detached terminal
+				// Ctty:    int(fd),
+			}
+		}
+	}
 	err = cmd.Run()
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); ok && stderr.Len() > 0 {

@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/xdg"
+	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 )
 
 const Network = "tcp"

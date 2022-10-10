@@ -29,7 +29,7 @@ var SVC = "unspecified"
 
 // Notify exchange that this accepts consumer requests; then wait for exchange
 // rendezvous to service requests.
-func Accept(
+func Host(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	ex string,
@@ -68,6 +68,12 @@ func Accept(
 				return
 			}
 			continue
+		} else if true {
+			// skip following log(s) if true
+		} else if s := c.LocalAddr().String(); len(s) > 0 {
+			Log(s)
+		} else {
+			Log(c.RemoteAddr())
 		}
 
 		cl := tls.Client(c, cfg)
@@ -86,7 +92,6 @@ func Accept(
 			if ctx.Err() != nil {
 				return
 			}
-			Elog(err)
 			continue
 		}
 
@@ -97,12 +102,13 @@ func Accept(
 			path selection.Path,
 			args ...string,
 		) (err error) {
-			switch args[0] {
-			case "ring":
-				err = ring(ctx, cl, args[1:]...)
-				if err != nil {
-					err = fmt.Errorf("%s: %w", args[1],
-						err)
+			switch {
+			case len(args) != 2:
+				err = ErrNoSubjectKeyId
+			case args[0] == "ring":
+				cn := args[1]
+				if err = ring(ctx, cl, cn); err != nil {
+					err = fmt.Errorf("%s: %w", cn, err)
 				}
 			default:
 				err = fmt.Errorf("%q: %w", args[0],
@@ -110,14 +116,15 @@ func Accept(
 			}
 			return
 		})
+
 		if err != nil {
 			cl.Close()
 			if ctx.Err() != nil {
 				return
 			}
 			continue
-
 		}
+
 		wg.Add(1)
 		go func(cl *tls.Conn) {
 			defer wg.Done()
@@ -125,9 +132,14 @@ func Accept(
 			for {
 				err := service(ctx, cl, path, f)
 				if ctx.Err() != nil ||
+					errors.Is(err, ErrExit) ||
+					errors.Is(err, io.EOF) ||
 					errors.Is(err, net.ErrClosed) ||
-					errors.Is(err, io.EOF) {
-					return
+					errors.Is(err, ErrEmptyRequest) {
+					break
+				}
+				if err != nil {
+					Elog(err)
 				}
 			}
 		}(cl)
@@ -135,17 +147,12 @@ func Accept(
 }
 
 // Confim consumer authorization.
-func ring(ctx context.Context, pr *tls.Conn, args ...string) (err error) {
-	enc := lv.NewEncoder(write.With(ctx, pr))
-	svc := []byte(SVC)
-	if len(args) != 1 {
-		err = ErrNoSubjectKeyId
-	} else if ski := cert.SKI.String(); ski == args[0] {
-		_, err = enc.Write(svc)
-	} else if val, ok := authorized.Load(args[0]); ok && val {
-		_, err = enc.Write(svc)
-	} else {
-		err = authorized.ErrUnauthorized
+func ring(ctx context.Context, pr *tls.Conn, cn string) error {
+	if ski := cert.SKI.String(); ski != cn {
+		if val, ok := authorized.Load(cn); !ok || !val {
+			return authorized.ErrUnauthorized
+		}
 	}
-	return
+	_, err := lv.NewEncoder(write.With(ctx, pr)).Encode(SVC)
+	return err
 }

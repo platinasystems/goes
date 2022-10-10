@@ -32,9 +32,10 @@ func exApproveOrDeny(
 	path selection.Path,
 	args ...string,
 ) (err error) {
+	tlsx.SetVerbosity()
 	op := path[len(path)-1]
 	fs := flag.NewFlagSet(op, flag.ContinueOnError)
-	ex := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
+	xflag := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
 	fs.Usage = func() {
 		op_ := "Approve"
 		if op != "approve" {
@@ -56,7 +57,7 @@ func exApproveOrDeny(
 		fs.Usage()
 		return
 	}
-	cn, err := tlsx.DialAndHandshake(ctx, *ex)
+	cn, err := tlsx.DialAndHandshake(ctx, *xflag)
 	if err != nil {
 		return err
 	}
@@ -71,8 +72,9 @@ func exClients(
 	path selection.Path,
 	args ...string,
 ) (err error) {
+	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("certs", flag.ContinueOnError)
-	ex := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
+	xflag := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
 	fs.Usage = func() {
 		path.Usage(w, "[<options>]\n",
 			"List certificates of exchange clients\n",
@@ -89,7 +91,7 @@ func exClients(
 		fs.Usage()
 		return
 	}
-	cn, err := tlsx.DialAndHandshake(ctx, *ex)
+	cn, err := tlsx.DialAndHandshake(ctx, *xflag)
 	if err != nil {
 		fmt.Fprintln(w, "greet failed:", err)
 		return err
@@ -105,9 +107,10 @@ func exStart(
 	path selection.Path,
 	args ...string,
 ) error {
+	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("exchange", flag.ContinueOnError)
-	xp := fs.Uint("x", 0, "Exchange port. (default IPC)")
-	rp := fs.Uint("r", 0, "Registry port. (default IPC)")
+	rflag := fs.Uint("r", 0, "Registry port. (default IPC)")
+	xflag := fs.Uint("x", 0, "Exchange port. (default IPC)")
 	fs.Usage = func() {
 		path.Usage(w, "[<options>]\n",
 			"Start TLS exchange service.\n",
@@ -127,15 +130,15 @@ func exStart(
 		return err
 	}
 	var xln, rln net.Listener
-	if *xp == 0 {
+	if *xflag == 0 {
 		xln, err = tlsx.IPC.Listen()
 		if err == nil {
 			rln, err = tlsx.Reg.IPC.Listen()
 		}
 	} else {
-		xln, err = net.Listen("tcp", fmt.Sprint(":", *xp))
+		xln, err = net.Listen("tcp", fmt.Sprint(":", *xflag))
 		if err == nil {
-			rln, err = net.Listen("tcp", fmt.Sprint(":", *rp))
+			rln, err = net.Listen("tcp", fmt.Sprint(":", *rflag))
 		}
 	}
 	if err != nil {
@@ -145,7 +148,7 @@ func exStart(
 	wg.Add(1)
 	go tlsx.Exchange(ctx, &wg, xln)
 	wg.Add(1)
-	go tlsx.Registry(ctx, &wg, rln, *xp)
+	go tlsx.Registry(ctx, &wg, rln, *xflag)
 	wg.Wait()
 	return nil
 }

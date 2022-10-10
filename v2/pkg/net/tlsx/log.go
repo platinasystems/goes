@@ -4,11 +4,23 @@
 
 package tlsx
 
-import "log"
+import (
+	"flag"
+
+	"github.com/platinasystems/goes/v2/pkg/log/style"
+)
 
 var (
-	Log   = func(args ...any) {}
-	Logf  = func(format string, args ...any) {}
-	Elog  = log.Println
-	Elogf = log.Printf
+	Log   = style.Muteln
+	Logf  = style.Mutef
+	Elog  = style.ShortFileStderr.Println
+	Elogf = style.ShortFileStderr.Printf
 )
+
+func SetVerbosity() {
+	verbose := flag.Lookup("verbose")
+	if verbose != nil && verbose.Value.String() == "true" {
+		Log = style.ShortFileStdout.Println
+		Logf = style.ShortFileStdout.Printf
+	}
+}

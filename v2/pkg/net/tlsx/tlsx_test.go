@@ -100,52 +100,56 @@ func test(tb testing.TB, n uint) {
 	go Exchange(ctx, &wg, ln)
 
 	wg.Add(1)
-	go Accept(ctx, &wg, "", selection.Map{
+	go Host(ctx, &wg, "", selection.Map{
 		"cat":  cat.Func,
 		"echo": echo.Func,
 	}.Select)
 
-	cn, err := DialAndHandshake(ctx, "")
+	guest, err := DialAndHandshake(ctx, "")
 	if err != nil {
 		tb.Fatal(err)
 	}
-	defer cn.Close()
+	defer guest.Close()
 
 	got := new(strings.Builder)
 
-	err = Req(ctx, cn, nil, got, "connect", cert.SKI.String())
+	err = Req(ctx, guest, nil, got, "connect", cert.SKI.String())
 	if err != nil {
 		tb.Fatal(err)
 	}
 	if svc := got.String(); svc != SVC {
 		tb.Fatal(svc)
+	} else {
+		tb.Logf("%s: OK", svc)
 	}
 
 	if t, ok := tb.(*testing.T); ok {
 		t.Run("echo", func(t *testing.T) {
 			const want = "hello world\n"
 			got.Reset()
-			err := Req(ctx, cn, nil, got,
+			err := Req(ctx, guest, nil, got,
 				"echo", "hello", "world")
 			if err != nil {
 				t.Fatal(err)
 			}
 			if gots := got.String(); gots != want {
-				t.Errorf("%q", got)
-			} else if false {
+				t.Errorf("%q != %q", got, want)
+			} else if true {
 				t.Logf("%q", got)
 			}
 		})
 		t.Run("cat", func(t *testing.T) {
 			const want = "sample input"
+			r := strings.NewReader(want)
 			got.Reset()
-			err := Req(ctx, cn, strings.NewReader(want), got,
-				"cat", "-")
+			err := Req(ctx, guest, r, got, "cat")
 			if err != nil {
 				t.Fatal(err)
 			}
 			if gots := got.String(); gots != want {
-				t.Errorf("%q", got)
+				t.Errorf("%q != %q", got, want)
+			} else if true {
+				t.Logf("%q", got)
 			}
 		})
 	} else {
@@ -154,7 +158,7 @@ func test(tb testing.TB, n uint) {
 			want.Reset()
 			fmt.Fprintln(want, "hello", "world", i)
 			got.Reset()
-			err := Req(ctx, cn, nil, got,
+			err := Req(ctx, guest, nil, got,
 				"echo", "hello", "world", i)
 			if err != nil {
 				t.Fatal(err)

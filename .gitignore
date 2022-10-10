@@ -7,7 +7,9 @@
 *~
 *#*#
 /goes-*
+/*-example
 /v2/goes-*
+/v2/*-example
 /tlsx
 /v2/tlsx
 /*.patch

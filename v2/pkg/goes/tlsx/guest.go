@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/creack/pty"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
@@ -30,10 +31,12 @@ func Jump(
 	path selection.Path,
 	args ...string,
 ) error {
+	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("jump", flag.ContinueOnError)
-	ex := fs.String("x", certs.Exchanges.FirstDNS(),
+	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
+	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
+	xflag := fs.String("x", certs.Exchanges.FirstDNS(),
 		"Exchange <dns> or <subject-key-id>.")
-	in := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	fs.Usage = func() {
 		path.Usage(w, "[<options>] <host> [<request> [<args>]]\n",
 			"Run request on host connected through exchange.\n",
@@ -73,25 +76,41 @@ func Jump(
 	} else {
 		return fmt.Errorf("%s: %w", host, alias.ErrNotFound)
 	}
-	if len(*in) == 0 {
-		r = io.LimitReader(nil, 0)
-	} else if *in == "-" {
-		// Req with Stdin
-	} else if f, err := os.Open(*in); err == nil {
+	tlsc, err := tlsx.DialAndHandshake(ctx, *xflag)
+	if err != nil {
+		return err
+	}
+	defer tlsc.Close()
+	svc := new(strings.Builder)
+	if err = tlsx.Req(ctx, tlsc, nil, svc, "connect", ski); err != nil {
+		return err
+	}
+	var anyargs []any
+	if *tflag {
+		if ws, err := pty.GetsizeFull(os.Stdin); err == nil {
+			anyargs = append(anyargs,
+				"pty", ws.Rows, ws.Cols, ws.X, ws.Y)
+		} else {
+			return err
+		}
+	} else if len(*iflag) == 0 {
+		r = nil
+	} else if *iflag == "-" {
+	} else if f, err := os.Open(*iflag); err == nil {
 		defer f.Close()
 		r = f
 	} else {
 		return err
 	}
-	cn, err := tlsx.DialAndHandshake(ctx, *ex)
-	if err != nil {
-		return err
+	for _, arg := range args {
+		anyargs = append(anyargs, arg)
 	}
-	defer cn.Close()
-	svc := new(strings.Builder)
-	err = tlsx.Req(ctx, cn, nil, svc, "connect", ski)
-	if err != nil {
-		return err
+	if err = tlsx.Req(ctx, tlsc, r, w, anyargs...); err != nil {
+		if err.Error() == tlsx.ErrExit.Error() {
+			err = nil
+		} else {
+			err = fmt.Errorf("%s: %w", svc, err)
+		}
 	}
-	return tlsx.Req(ctx, cn, r, w, args)
+	return err
 }

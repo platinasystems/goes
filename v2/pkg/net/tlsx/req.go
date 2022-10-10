@@ -7,17 +7,17 @@ package tlsx
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
+	"github.com/platinasystems/goes/v2/pkg/context/rawtty"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
 
-const WithInput = "<<<<"
+const InputTag = "<<<<"
 
 // Send request through connection in context; then write the response to the
 // context output and return any error.
@@ -40,46 +40,52 @@ func Req(
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	ictx, cancel := context.WithCancel(context.Background())
+	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	enc := lv.NewEncoder(write.With(ctx, conn))
+	dec := lv.NewDecoder(poll.With(cctx, conn))
+	enc := lv.NewEncoder(write.With(cctx, conn))
 
-	err := req(enc, args...)
-	if err != nil {
+	if args[0] == "pty" {
+		tty, err := rawtty.With(cctx)
+		if err != nil {
+			return err
+		}
+		defer tty.Close()
+		r, w = tty, tty
+	}
+
+	if _, err := enc.Encode(args...); err != nil {
 		return err
 	}
 
-	if r == nil {
-		enc.Break()
-	} else {
-		enc.WriteString(WithInput)
-		ienc := lv.NewEncoder(write.With(ictx, conn))
+	if r != nil {
+		if _, err := enc.Encode(InputTag); err != nil {
+			return err
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ib := page.New()
-			defer page.Free(ib)
+			pg := page.New()
+			defer page.Free(pg)
 			for {
-				select {
-				case <-ictx.Done():
-					return
-				default:
-				}
-				n, err := r.Read(ib)
-				if n == 0 {
-					ienc.Break()
+				n, err := r.Read(pg)
+				if cctx.Err() != nil {
 					break
 				}
-				_, err = ienc.Write(ib[:n])
-				if err != nil {
+				if err != nil || n == 0 {
+					enc.Encode(nil)
+					break
+				}
+				if _, err = enc.Write(pg[:n]); err != nil {
 					break
 				}
 			}
 		}()
+	} else if _, err := enc.Encode(nil); err != nil {
+		return err
 	}
 
-	dec := lv.NewDecoder(poll.With(ctx, conn))
 	ob := page.New()
 	defer page.Free(ob)
 
@@ -93,36 +99,5 @@ func Req(
 		}
 	}
 
-	return nil
-}
-
-func ack(enc lv.Encode, args ...any) error {
-	return req(enc, append(args, nil))
-}
-
-// recurse or iterate if args contains []any or []string.
-func req(enc lv.Encode, args ...any) error {
-	for _, arg := range args {
-		switch t := arg.(type) {
-		case nil:
-			return enc.Break()
-		case []any:
-			if err := req(enc, t...); err != nil {
-				return err
-			}
-		case []string:
-			for _, s := range t {
-				_, err := enc.WriteString(s)
-				if err != nil {
-					return err
-				}
-			}
-		default:
-			_, err := fmt.Fprint(enc, arg)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }

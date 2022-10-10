@@ -22,11 +22,9 @@ import (
 )
 
 var Service = selection.Map{
-	"authorize": AuthorizeOrRevoke,
-	"cat":       cat.Func,
-	"command":   command.Func,
-	"echo":      echo.Func,
-	"revoke":    AuthorizeOrRevoke,
+	"cat":     cat.Func,
+	"command": command.Func,
+	"echo":    echo.Func,
 }
 
 func Host(
@@ -38,6 +36,7 @@ func Host(
 ) error {
 	const synopsis = `
 Service consumer requests through subscribed exchange(s).`
+	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("host", flag.ContinueOnError)
 	fs.Usage = func() {
 		path.Usage(w, synopsis)
@@ -56,10 +55,12 @@ Service consumer requests through subscribed exchange(s).`
 		fs.Usage()
 		return nil
 	}
+	Service["authorize"] = AuthorizeOrRevoke
+	Service["revoke"] = AuthorizeOrRevoke
 	var wg sync.WaitGroup
 	for _, ski := range certs.Exchanges.SKIs() {
 		wg.Add(1)
-		go tlsx.Accept(ctx, &wg, ski, Service.Select)
+		go tlsx.Host(ctx, &wg, ski, Service.Select)
 	}
 	wg.Wait()
 	return nil

@@ -11,10 +11,12 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
+	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/read"
+	"github.com/creack/pty"
+	"github.com/platinasystems/goes/v2/pkg/context/nbr"
+	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
@@ -23,6 +25,7 @@ import (
 
 var (
 	ErrEmptyRequest    = errors.New("empty request")
+	ErrExit            = errors.New("exit")
 	ServiceReadTimeout = 3 * time.Second
 )
 
@@ -39,57 +42,113 @@ func service(
 ) error {
 	var (
 		args []string
-		in   input
-		t0   time.Time
+		wg   sync.WaitGroup
 	)
-	dec := lv.NewDecoder(read.With(ctx, conn))
-	enc := lv.NewEncoder(write.With(ctx, conn))
+
+	defer wg.Wait()
+
+	cctx, cancel := context.WithCancel(ctx)
+	dec := lv.NewDecoder(poll.With(cctx, conn))
+	enc := lv.NewEncoder(write.With(cctx, conn))
+	r := io.LimitReader(nil, 0)
+	w := io.Writer(enc)
 	pg := page.New()
 	defer page.Free(pg)
 
+	var ispty bool
 	for i := 0; ; {
-		err := conn.SetReadDeadline(time.Now().Add(ServiceReadTimeout))
-		if err != nil {
-			return err
-		}
-		n, err := dec.Read(pg[i:])
-		if err != nil {
-			if errors.Is(err, os.ErrDeadlineExceeded) {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				default:
-				}
-				continue
+		if n, err := dec.Read(pg[i:]); err != nil {
+			return fmt.Errorf("decode: %w", err)
+		} else if n == 0 {
+			if len(args) == 0 {
+				return ErrEmptyRequest
 			}
-			return err
-		}
-		if err = conn.SetReadDeadline(t0); err != nil {
-			return err
-		}
-		if n == 0 {
 			break
-		} else if s := string(pg[i : i+n]); s == WithInput {
-			in.r = dec
+		} else if s := string(pg[i : i+n]); s == InputTag {
+			if len(args) == 0 {
+				return ErrEmptyRequest
+			}
+			if args[0] != "pty" {
+				ir, flush := newinput(dec)
+				r = ir
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					<-cctx.Done()
+					flush()
+				}()
+			} else if n := len(args); n < 6 {
+				return fmt.Errorf("missing %s", []string{
+					"pty",
+					"<rows>",
+					"<cols>",
+					"<x-pixels>",
+					"<y-pixels>",
+					"<req>",
+				}[n])
+			} else {
+				var ws pty.Winsize
+				ispty = true
+				args = args[1:]
+				for i, pu := range []*uint16{
+					&ws.Rows,
+					&ws.Cols,
+					&ws.X,
+					&ws.Y,
+				} {
+					_, err = fmt.Sscan(args[i], pu)
+					if err != nil {
+						return fmt.Errorf("%q: %w",
+							args[i], err)
+					}
+				}
+				args = args[4:]
+				ptmx, tty, err := pty.Open()
+				if err != nil {
+					return fmt.Errorf("pty: %w", err)
+				}
+				if err = pty.Setsize(tty, &ws); err != nil {
+					ptmx.Close()
+					return fmt.Errorf("resize: %w", err)
+				}
+				r, w = tty, tty
+				ir, flush := newinput(dec)
+				wg.Add(1)
+				go func() {
+					io.Copy(ptmx, ir)
+					ptmx.Close()
+					flush()
+					// Log("ptmx<-input done")
+					wg.Done()
+				}()
+				wg.Add(1)
+				go func() {
+					io.Copy(enc, nbr.With(cctx, ptmx))
+					// Log("conn<-ptmx done")
+					wg.Done()
+				}()
+			}
 			break
 		} else {
 			args = append(args, s)
 			i += n
 		}
 	}
-	err := ErrEmptyRequest
-	if len(args) > 0 {
-		err = f(ctx, &in, enc, path, args...)
-		in.flush()
-	}
+	err := f(cctx, r, w, path, args...)
 	switch {
-	case ctx.Err() != nil:
+	case errors.Is(err, context.Canceled):
 	case errors.Is(err, net.ErrClosed):
 	case errors.Is(err, io.EOF):
 	case err == nil:
-		err = enc.Break()
+		if ispty {
+			err = ErrExit
+		}
+		enc.Encode(err)
 	default:
-		enc.Nack(fmt.Errorf("%v: %w", path, err))
+		err = fmt.Errorf("service %v: %w", path, err)
+		enc.Encode(err)
 	}
+	cancel()
+	// defer Log(os.Getpid(), err, "\r")
 	return err
 }

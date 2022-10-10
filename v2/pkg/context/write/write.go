@@ -9,35 +9,25 @@ import (
 	"io"
 )
 
-// This a contextual writer that checks the embedded context Err() and
-// Done() before or after write.
-func With(ctx context.Context, w io.Writer) io.Writer {
-	return cw{ctx, w}
-}
-
-type cw struct {
-	c context.Context
+// This a contextual writer that checks the embedded context Err() before or
+// after write.
+type ContextualWriter struct {
+	context.Context
 	w io.Writer
 }
 
-func (cw cw) Write(data []byte) (int, error) {
-	err := cw.c.Err()
+func With(ctx context.Context, w io.Writer) ContextualWriter {
+	return ContextualWriter{ctx, w}
+}
+
+func (cw ContextualWriter) Write(data []byte) (int, error) {
+	err := cw.Err()
 	if err != nil {
 		return 0, err
 	}
-	select {
-	case <-cw.c.Done():
-		return 0, context.Canceled
-	default:
-	}
 	n, err := cw.w.Write(data)
 	if err == nil {
-		select {
-		case <-cw.c.Done():
-			err = context.Canceled
-		default:
-			err = cw.c.Err()
-		}
+		err = cw.Err()
 	}
 	return n, err
 }
