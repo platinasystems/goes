@@ -106,7 +106,7 @@ func LookRestrictedPath(name string) (string, error) {
 		}
 		return "", ErrNotFound
 	}
-	rpath, err := RestrictedPath.Value()
+	rpath, err := RestrictedPath.ValErr()
 	if err != nil {
 		return "", err
 	}

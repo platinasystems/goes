@@ -44,7 +44,7 @@ var PrivateKey = cache.New[string](func(p *string) (err error) {
 })
 
 func filename(base string) (string, error) {
-	fn, err := state.Dir.Value()
+	fn, err := state.Dir.ValErr()
 	if err == nil {
 		fn = filepath.Join(fn, base)
 	}

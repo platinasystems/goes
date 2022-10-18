@@ -21,7 +21,7 @@ var aliases = cache.New[map[string]string](func(
 	p *map[string]string,
 ) error {
 	*p = make(map[string]string)
-	fn, err := filename.Aliases.Value()
+	fn, err := filename.Aliases.ValErr()
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func Range(f func(aka, ski string) bool) {
 
 func Store(aka, ski string) error {
 	return aliases.Ref(func(p *map[string]string) error {
-		fn, err := filename.Aliases.Value()
+		fn, err := filename.Aliases.ValErr()
 		if err == nil {
 			(*p)[aka] = ski
 			data, err := json.Marshal(*p)

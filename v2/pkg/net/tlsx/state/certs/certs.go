@@ -175,7 +175,7 @@ func (certs Certs) FirstDNS() (s string) {
 }
 
 func (certs Certs) Pool() (pool *x509.CertPool, err error) {
-	c, err := certs.Cache.Value()
+	c, err := certs.Cache.ValErr()
 	if err == nil {
 		pool = c.Pool
 	}
@@ -213,7 +213,7 @@ func (certs Certs) TestLoad(peers ...*x509.Certificate) {
 		(*p).Headers = make([]Headers, len(peers))
 		(*p).Peers = make([]*x509.Certificate, len(peers))
 		(*p).Pool = x509.NewCertPool()
-		c, err := cert.Value()
+		c, err := cert.ValErr()
 		if err != nil {
 			panic(err)
 		}
@@ -227,11 +227,11 @@ func (certs Certs) TestLoad(peers ...*x509.Certificate) {
 }
 
 func (file File) Load(c *Cache) (err error) {
-	c.FileName, err = file.Name.Value()
+	c.FileName, err = file.Name.ValErr()
 	if err != nil {
 		return
 	}
-	tlsc, err := cert.Value()
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		return
 	}

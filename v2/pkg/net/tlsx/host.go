@@ -44,8 +44,8 @@ func Host(
 
 	path := selection.Path{host.Name.String()}
 
-	if SVC, err = program.MainReference.Value(); err != nil {
-		SVC = program.Base.String()
+	if SVC, err = program.MainReference.ValErr(); err != nil {
+		SVC = program.Base.Value()
 	}
 
 	for {

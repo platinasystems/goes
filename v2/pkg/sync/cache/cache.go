@@ -21,6 +21,12 @@ func New[T any](load func(*T) error) *Cache[T] {
 	return &Cache[T]{load: load}
 }
 
+// Returns load error.
+func (c *Cache[T]) Err() error {
+	_, err := c.ValErr()
+	return err
+}
+
 // Preemptive load.
 func (c *Cache[T]) Preload(f func(*T)) {
 	c.m.Lock()
@@ -55,16 +61,18 @@ func (c *Cache[T]) Ref(f func(*T) error) error {
 }
 
 func (c *Cache[T]) String() string {
-	v, err := c.Value()
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprint(v)
+	return fmt.Sprint(c.Value())
 }
 
-// If not yet loaded, do so before returning value.  If load failed, this will
-// continue to return its error until overwritten by Preload or Reload.
-func (c *Cache[T]) Value() (T, error) {
+// If not yet loaded, do so before returning value.  If load failed, the
+// returns its zero value and Err continues to return the failure until
+// overwritten by Preload or Reload.
+func (c *Cache[T]) Value() T {
+	v, _ := c.ValErr()
+	return v
+}
+
+func (c *Cache[T]) ValErr() (T, error) {
 	c.m.RLock()
 	if c.loaded {
 		defer c.m.RUnlock()

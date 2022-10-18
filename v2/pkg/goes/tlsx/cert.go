@@ -36,7 +36,7 @@ func CreateCert(
 ) error {
 	const year = 365 * 24 * time.Hour
 
-	hn, err := host.Name.Value()
+	hn, err := host.Name.ValErr()
 	if err != nil {
 		return err
 	}

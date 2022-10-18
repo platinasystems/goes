@@ -24,7 +24,7 @@ import (
 var (
 	ErrIncomplete = errors.New("incomplete")
 	ErrNotFound   = errors.New("not found")
-	Fatal         = style.PlainStderr.Fatal
+	Fatal         = style.Plain.Errata.Fatal
 )
 
 func HasHelp(args []string) bool {
@@ -48,6 +48,8 @@ func (m Map) Format(w fmt.State, verb rune) {
 }
 
 func (m Map) Main() {
+	r := io.Reader(os.Stdin)
+	w := io.Writer(os.Stdout)
 	Root = m
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
@@ -55,7 +57,7 @@ func (m Map) Main() {
 	path := Path{program.Base.String()}
 	flag.CommandLine.Init(path[0], flag.ContinueOnError)
 	flag.Usage = func() {
-		Root.Usage(os.Stdout, path, flag.CommandLine)
+		Root.Usage(w, path, flag.CommandLine)
 	}
 	timeout := flag.Duration("timeout", 0,
 		"Terminate command if incomplete by non-zero limit.")
@@ -73,18 +75,27 @@ func (m Map) Main() {
 	if !found {
 		f = Root.Select
 	}
-	err = f(ctx, os.Stdin, os.Stdout, path, args...)
+	isDaemon := len(args) > 0 && args[0] == "daemon"
+	if isDaemon {
+		style.System()
+		r = io.LimitReader(nil, 0)
+		w = style.Plain.Notice.Writer()
+		fmt.Fprintln(w, args, "start")
+	}
+	err = f(ctx, r, w, path, args...)
 	if err != nil && !errors.Is(err, flag.ErrHelp) {
 		Fatal(err)
+	} else if isDaemon {
+		fmt.Fprintln(w, args, "exit")
 	}
 }
 
 func (m Map) Keys() []string {
-	var i int
-	keys := make([]string, len(m))
+	keys := make([]string, 0, len(m))
 	for k := range m {
-		keys[i] = k
-		i += 1
+		if k != "daemon" {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	return keys

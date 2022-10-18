@@ -23,7 +23,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
 	defer stop()
-	tty, err := rawtty.With(ctx, os.Stdin, os.Stdout)
+	tty, err := rawtty.With(ctx)
 	if err != nil {
 		log.Print(err)
 		return

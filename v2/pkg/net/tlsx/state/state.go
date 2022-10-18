@@ -15,11 +15,11 @@ import (
 
 var (
 	DirDefault = cache.New[string](func(p *string) error {
-		sh, err := xdg.StateHome.Value()
+		sh, err := xdg.StateHome.ValErr()
 		if err != nil {
 			return err
 		}
-		base, err := program.Base.Value()
+		base, err := program.Base.ValErr()
 		if err == nil {
 			*p = filepath.Join(sh, base)
 		}
@@ -30,14 +30,14 @@ var (
 			*p = state.Value.String()
 		}
 		if len(*p) == 0 {
-			*p, err = DirDefault.Value()
+			*p, err = DirDefault.ValErr()
 		}
 		return
 	})
 )
 
 func MkDir() error {
-	dir, err := Dir.Value()
+	dir, err := Dir.ValErr()
 	if err == nil {
 		err = xdg.MkPath(dir)
 	}

@@ -21,7 +21,7 @@ import (
 var ErrUnavailable = errors.New("unavailable")
 
 var Base = cache.New[string](func(p *string) (err error) {
-	exe, err := Executable.Value()
+	exe, err := Executable.ValErr()
 	if err == nil {
 		*p = filepath.Base(exe)
 	}
@@ -29,7 +29,7 @@ var Base = cache.New[string](func(p *string) (err error) {
 })
 
 var BuildId = cache.New[string](func(p *string) (err error) {
-	exe, err := Executable.Value()
+	exe, err := Executable.ValErr()
 	if err == nil {
 		*p, err = buildid.ReadFile(exe)
 	}
@@ -57,7 +57,7 @@ var Executable = cache.New[string](func(p *string) (err error) {
 })
 
 var IsOpt = cache.New[bool](func(p *bool) (err error) {
-	exe, err := Executable.Value()
+	exe, err := Executable.ValErr()
 	if err == nil {
 		*p = strings.HasPrefix(exe, "/opt")
 	}
@@ -65,7 +65,7 @@ var IsOpt = cache.New[bool](func(p *bool) (err error) {
 })
 
 var IsUsrLocal = cache.New[bool](func(p *bool) (err error) {
-	exe, err := Executable.Value()
+	exe, err := Executable.ValErr()
 	if err == nil {
 		*p = strings.HasPrefix(exe, "/usr/local")
 	}
@@ -80,7 +80,7 @@ var IsSuperUser = cache.New[bool](func(p *bool) error {
 // Returns the main module reference in the form of PATH@SYMVER or empty
 // if the main module is unavailable, as with GO tests.
 var MainReference = cache.New[string](func(p *string) (err error) {
-	bi, err := BuildInfo.Value()
+	bi, err := BuildInfo.ValErr()
 	if err == nil {
 		m := &bi.Main
 		if m.Replace != nil {
@@ -97,7 +97,7 @@ var MainReference = cache.New[string](func(p *string) (err error) {
 
 // Returns the main module version.
 var MainVersion = cache.New[string](func(p *string) (err error) {
-	bi, err := BuildInfo.Value()
+	bi, err := BuildInfo.ValErr()
 	if err == nil {
 		m := &bi.Main
 		if m.Replace != nil {

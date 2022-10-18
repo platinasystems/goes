@@ -13,14 +13,14 @@ import (
 var (
 	Log   = style.Muteln
 	Logf  = style.Mutef
-	Elog  = style.ShortFileStderr.Println
-	Elogf = style.ShortFileStderr.Printf
+	Elog  = style.ShortFile.Errata.Println
+	Elogf = style.ShortFile.Errata.Printf
 )
 
 func SetVerbosity() {
 	verbose := flag.Lookup("verbose")
 	if verbose != nil && verbose.Value.String() == "true" {
-		Log = style.ShortFileStdout.Println
-		Logf = style.ShortFileStdout.Printf
+		Log = style.ShortFile.Notice.Println
+		Logf = style.ShortFile.Notice.Printf
 	}
 }

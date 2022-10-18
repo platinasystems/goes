@@ -93,7 +93,7 @@ func NewX509Certificate(k PrivateKey, temp *x509.Certificate) (
 	cert *x509.Certificate, block *pem.Block, err error,
 ) {
 	random := rand.Reader
-	hn, err := host.Name.Value()
+	hn, err := host.Name.ValErr()
 	if err != nil {
 		return
 	}

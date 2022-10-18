@@ -18,14 +18,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/alias"
 )
 
-var Exchange = selection.Map{
-	"approve": exApproveOrDeny,
-	"clients": exClients,
-	"deny":    exApproveOrDeny,
-	"start":   exStart,
-}
-
-func exApproveOrDeny(
+func ApproveOrDeny(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -65,7 +58,7 @@ func exApproveOrDeny(
 	return tlsx.Req(ctx, cn, nil, w, op, fs.Args())
 }
 
-func exClients(
+func Clients(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -100,7 +93,7 @@ func exClients(
 	return tlsx.Req(ctx, cn, nil, w, "clients")
 }
 
-func exStart(
+func Exchange(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -133,7 +126,7 @@ func exStart(
 	if *xflag == 0 {
 		xln, err = tlsx.IPC.Listen()
 		if err == nil {
-			rln, err = tlsx.Reg.IPC.Listen()
+			rln, err = tlsx.RegIPC.Listen()
 		}
 	} else {
 		xln, err = net.Listen("tcp", fmt.Sprint(":", *xflag))

@@ -18,10 +18,6 @@ Usage:
 		List certificates of exchange clients.
 	tlsx [-d DIR] exchange deny [<subject-key-id(s)>]
 		Deny client(s) subscription.
-	tlsx [-d DIR] exchange start [-r PORT] [-x PORT]
-		Start TLS exchange service.
-	tlsx [-d DIR] host
-		Service consumer requests through subscribed exchange(s).
 	tlsx [-d DIR] jump <host> [<request> [<args>]]
 		Run request on host connected through exchange.
 	tlsx [-d DIR] revoke [<subject-key-id(s)>]
@@ -38,6 +34,10 @@ Usage:
 		PATH@SYMVER
 	tlsx show version
 		SYMVER
+	tlsx [-d DIR] start exchange start [-r PORT] [-x PORT]
+		Start TLS exchange service.
+	tlsx [-d DIR] start host
+		Service consumer requests through subscribed exchange(s).
 	tlsx [-d DIR] subscribe
 		Register host or consumer with exchange.
 */
@@ -46,6 +46,7 @@ package main
 import (
 	"flag"
 
+	"github.com/platinasystems/goes/v2/pkg/goes/daemon"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
@@ -56,13 +57,19 @@ func main() {
 	flag.Bool("verbose", false, "")
 	selection.Map{
 		"alias":       tlsx.Alias,
+		"approve":     tlsx.ApproveOrDeny,
 		"authorize":   tlsx.AuthorizeOrRevoke,
+		"clients":     tlsx.Clients,
 		"create-cert": tlsx.CreateCert,
-		"exchange":    tlsx.Exchange.Select,
-		"host":        tlsx.Host,
-		"jump":        tlsx.Jump,
-		"revoke":      tlsx.AuthorizeOrRevoke,
-		"show":        tlsx.Show.Select,
-		"subscribe":   tlsx.Subscribe,
+		"daemon": selection.Map{
+			"exchange": tlsx.Exchange,
+			"host":     tlsx.Host,
+		}.Select,
+		"deny":      tlsx.ApproveOrDeny,
+		"jump":      tlsx.Jump,
+		"revoke":    tlsx.AuthorizeOrRevoke,
+		"show":      tlsx.Show.Select,
+		"start":     daemon.Start,
+		"subscribe": tlsx.Subscribe,
 	}.Main()
 }

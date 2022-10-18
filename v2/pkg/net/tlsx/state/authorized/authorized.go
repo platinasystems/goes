@@ -23,7 +23,7 @@ var authorized = cache.New[map[string]bool](func(
 	p *map[string]bool,
 ) error {
 	*p = make(map[string]bool)
-	fn, err := filename.Authorized.Value()
+	fn, err := filename.Authorized.ValErr()
 	if err != nil {
 		return err
 	}

@@ -14,10 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
-
-var IPC = ipc.Preface(program.Base.String())
 
 func DialAndHandshake(ctx context.Context, ex string) (
 	cl *tls.Conn, err error,
@@ -41,7 +38,7 @@ func DialAndHandshake(ctx context.Context, ex string) (
 
 func dialcfg(ex string) (nw, addr string, cfg *tls.Config, err error) {
 	var sn string
-	hn, err := host.Name.Value()
+	hn, err := host.Name.ValErr()
 	if err != nil {
 		return
 	}
@@ -65,7 +62,7 @@ func dialcfg(ex string) (nw, addr string, cfg *tls.Config, err error) {
 		err = fmt.Errorf("%s: %w", ex, ErrNameOrSKINotFound)
 		return
 	}
-	tlsc, err := cert.Value()
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		return
 	}

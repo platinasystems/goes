@@ -12,6 +12,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/goes/show"
+	"github.com/platinasystems/goes/v2/pkg/goes/xdg"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
@@ -24,6 +25,7 @@ var Show = selection.Map{
 	"clients":        showClients,
 	"exchanges":      showExchanges,
 	"main-reference": show.Func(program.MainReference),
+	"xdg":            xdg.Show,
 	"version":        show.Func(program.MainVersion),
 }
 
@@ -43,7 +45,7 @@ func showCert(
 		)
 		return nil
 	}
-	tlsc, err := cert.Value()
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		return err
 	}

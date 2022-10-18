@@ -18,7 +18,7 @@ import (
 var ErrNilLeaf = errors.New("nil leaf")
 
 var SKI = cache.New[string](func(p *string) error {
-	c, err := cert.Value()
+	c, err := cert.ValErr()
 	if err == nil {
 		if c.Leaf != nil {
 			*p = hex.EncodeToString(c.Leaf.SubjectKeyId)
@@ -32,11 +32,11 @@ var SKI = cache.New[string](func(p *string) error {
 var cert = cache.New[tls.Certificate](func(
 	p *tls.Certificate,
 ) error {
-	cfn, err := filename.Cert.Value()
+	cfn, err := filename.Cert.ValErr()
 	if err != nil {
 		return err
 	}
-	kfn, err := filename.PrivateKey.Value()
+	kfn, err := filename.PrivateKey.ValErr()
 	if err != nil {
 		return err
 	}
@@ -51,4 +51,4 @@ func Preload(c tls.Certificate, x *x509.Certificate) {
 	})
 }
 
-func Value() (tls.Certificate, error) { return cert.Value() }
+func ValErr() (tls.Certificate, error) { return cert.ValErr() }

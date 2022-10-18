@@ -30,7 +30,7 @@ var (
 // If SU, make an XDG path w/ 0755 permissions or 0700 otherwise.
 func MkPath(s string) error {
 	var perm os.FileMode = 0700
-	if t, _ := program.IsSuperUser.Value(); t {
+	if program.IsSuperUser.Value() {
 		perm = 0755
 	}
 	return os.MkdirAll(s, perm)
@@ -38,17 +38,21 @@ func MkPath(s string) error {
 
 // If SU, returns /var/cache or /var/run; otherwise, $XDG_CACHE_HOME,
 // UserCacheDir or TempDir.
-var CacheHome = cache.New[string](func(p *string) error {
-	if t, _ := program.IsSuperUser.Value(); t {
-		*p = rootCacheHome.String()
-	} else if *p = Getenv("XDG_CACHE_HOME"); len(*p) == 0 {
-		if d, err := UserCacheDir(); err == nil {
+var CacheHome = cache.New[string](func(p *string) (err error) {
+	if program.IsSuperUser.Value() {
+		if *p, err = rootCacheHome.ValErr(); err == nil {
+			return
+		}
+	}
+	if *p = Getenv("XDG_CACHE_HOME"); len(*p) == 0 {
+		if d, derr := UserCacheDir(); derr == nil {
 			*p = d
 		} else {
 			*p = os.TempDir()
 		}
 	}
-	return nil
+	err = nil
+	return
 })
 
 var ConfigDirs = cache.New[string](func(p *string) error {
@@ -60,8 +64,8 @@ var ConfigDirs = cache.New[string](func(p *string) error {
 
 // If SU, returns "/etc/opt" if opt program; or "/etc" otherwise.
 var ConfigHome = cache.New[string](func(p *string) error {
-	if t, _ := program.IsSuperUser.Value(); t {
-		if t, _ = program.IsOpt.Value(); t {
+	if program.IsSuperUser.Value() {
+		if program.IsOpt.Value() {
 			*p = "/etc/opt"
 		} else {
 			*p = "/etc"
@@ -86,10 +90,10 @@ var DataDirs = cache.New[string](func(p *string) error {
 // If SU, returns "/usr/local/share" if local program; "/opt/share" if opt
 // program; or "/usr/share" otherwise.
 var DataHome = cache.New[string](func(p *string) error {
-	if t, _ := program.IsSuperUser.Value(); t {
-		if t, _ = program.IsUsrLocal.Value(); t {
+	if program.IsSuperUser.Value() {
+		if program.IsUsrLocal.Value() {
 			*p = "/usr/local/share"
-		} else if t, _ = program.IsOpt.Value(); t {
+		} else if program.IsOpt.Value() {
 			*p = "/opt/share"
 		} else {
 			*p = "/usr/share"
@@ -104,28 +108,32 @@ var DataHome = cache.New[string](func(p *string) error {
 	return nil
 })
 
-// If SU, returns "/var/run" or "/tmp"; otherwise, $XDG_RUNTIME_DIR or
+// If SU, returns "/var/run", if available; otherwise, $XDG_RUNTIME_DIR or
 // UserCacheDir.
-var RunTimeDir = cache.New[string](func(p *string) error {
-	if t, _ := program.IsSuperUser.Value(); t {
-		*p = rootRunTimeDir.String()
-	} else if *p = Getenv("XDG_RUNTIME_DIR"); len(*p) == 0 {
-		if d, err := UserCacheDir(); err == nil {
+var RunTimeDir = cache.New[string](func(p *string) (err error) {
+	if program.IsSuperUser.Value() {
+		if *p, err = rootRunTimeDir.ValErr(); err == nil {
+			return
+		}
+	}
+	if *p = Getenv("XDG_RUNTIME_DIR"); len(*p) == 0 {
+		if d, derr := UserCacheDir(); derr == nil {
 			*p = d
 		} else {
 			*p = os.TempDir()
 		}
 	}
-	return nil
+	err = nil
+	return
 })
 
 // If SU, returns "/var/local" if local program; "/var/opt" if opt program;
 // or "/var/lib" otherwise.
 var StateHome = cache.New[string](func(p *string) error {
-	if t, _ := program.IsSuperUser.Value(); t {
-		if t, _ = program.IsUsrLocal.Value(); t {
+	if program.IsSuperUser.Value() {
+		if program.IsUsrLocal.Value() {
 			*p = "/var/local"
-		} else if t, _ = program.IsOpt.Value(); t {
+		} else if program.IsOpt.Value() {
 			*p = "/var/opt"
 		} else {
 			*p = "/var/lib"
@@ -140,25 +148,21 @@ var StateHome = cache.New[string](func(p *string) error {
 	return nil
 })
 
-var rootCacheHome = cache.New[string](func(p *string) error {
-	for _, d := range []string{"var/cache", "/var/run"} {
-		if _, err := os.Stat(d); err == nil {
+var rootCacheHome = cache.New[string](func(p *string) (err error) {
+	for _, d := range []string{"/var/cache", "/var/run", "/tmp"} {
+		if _, err = os.Stat(d); err == nil {
 			*p = d
 			break
 		}
 	}
-	if len(*p) == 0 {
-		*p = "/tmp"
-	}
-	return nil
+	return
 })
 
 var rootRunTimeDir = cache.New[string](func(p *string) error {
 	const var_run = "/var/run"
-	if _, err := os.Stat(var_run); err == nil {
+	_, err := os.Stat(var_run)
+	if err == nil {
 		*p = var_run
-	} else {
-		*p = "/tmp"
 	}
-	return nil
+	return err
 })

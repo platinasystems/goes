@@ -49,7 +49,7 @@ func Exchange(
 	ln net.Listener,
 ) {
 	defer wg.Done()
-	tlsc, err := cert.Value()
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +65,7 @@ func Exchange(
 	if err != nil {
 		panic(err)
 	}
-	hn, err := host.Name.Value()
+	hn, err := host.Name.ValErr()
 	if err != nil {
 		panic(err)
 	}

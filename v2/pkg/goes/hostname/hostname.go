@@ -48,7 +48,7 @@ func Func(
 	if args = fs.Args(); len(args) > 0 {
 		return host.Set(args[0])
 	}
-	hn, err := host.Name.Value()
+	hn, err := host.Name.ValErr()
 	if err != nil {
 		return err
 	}

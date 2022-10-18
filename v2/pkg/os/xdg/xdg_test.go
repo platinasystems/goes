@@ -18,7 +18,7 @@ type unit struct {
 
 func (ut unit) test(t *testing.T) {
 	t.Helper()
-	if got, err := ut.c.Value(); err != nil {
+	if got, err := ut.c.ValErr(); err != nil {
 		t.Error(err)
 	} else if got != ut.want {
 		if len(got) == 0 {

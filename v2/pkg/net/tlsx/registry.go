@@ -20,16 +20,12 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
 var Reg = struct {
-	IPC   ipc.Ipc
 	mutex sync.Mutex
 	l     []*x509.Certificate
-}{
-	IPC: ipc.Preface(fmt.Sprint(program.Base.String(), ".registry")),
-}
+}{}
 
 func Registry(
 	ctx context.Context,
@@ -39,7 +35,7 @@ func Registry(
 ) {
 	defer wg.Done()
 
-	tlsc, err := cert.Value()
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +83,7 @@ func Registry(
 
 func Subscribe(ctx context.Context, addr string) error {
 	var name string
-	tlsc, err := cert.Value()
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		return err
 	}
@@ -95,15 +91,15 @@ func Subscribe(ctx context.Context, addr string) error {
 	nw := "tcp"
 	if len(addr) == 0 {
 		nw = ipc.Network
-		addr, err = Reg.IPC.Address()
+		addr, err = RegIPC.Address()
 		if err == nil {
-			name, err = host.Name.Value()
+			name, err = host.Name.ValErr()
 		}
 	} else {
 		if i := strings.LastIndex(addr, ":"); i < 0 {
 			return fmt.Errorf("%q: expect [<dns>]:<port>", addr)
 		} else if i == 0 {
-			name, err = host.Name.Value()
+			name, err = host.Name.ValErr()
 		} else {
 			name = addr[:i]
 		}
