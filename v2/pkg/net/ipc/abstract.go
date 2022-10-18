@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build !ipc_loopback && !ipc_unix_file && (ipc_unix_abstract || linux)
+//go:build linux
 
 package ipc
 
@@ -11,27 +11,33 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 	"syscall"
 )
 
-// The prefix of a Unix abstract domain socket is "@".
-func Prefix() string { return "@" }
+type Abstract string
 
-func (ipc Ipc) Listen() (net.Listener, error) {
-	ln, err := net.Listen(Network, string(ipc))
+// The prefix of a Linux abstract domain socket is "@".
+func NewAbstract(s string) Ipc { return Ipc{Abstract(fmt.Sprint("@", s))} }
+
+func (abs Abstract) Address() (string, error) { return abs.String(), nil }
+
+func (abs Abstract) Listen() (net.Listener, error) {
+	ln, err := net.Listen(abs.Network(), abs.String())
 	if err != nil {
 		return nil, err
 	}
-	return abstract{ln}, nil
+	return AbstractListener{ln}, nil
 }
 
-type abstract struct {
+func (Abstract) Network() string { return "unix" }
+
+func (abs Abstract) String() string { return string(abs) }
+
+type AbstractListener struct {
 	net.Listener
 }
 
-func (ln abstract) Accept() (conn net.Conn, err error) {
+func (ln AbstractListener) Accept() (conn net.Conn, err error) {
 	var peer *syscall.Ucred
 	my := syscall.Ucred{
 		Uid: uint32(os.Geteuid()),

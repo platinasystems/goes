@@ -2,8 +2,6 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build windows || (unix && !linux)
-
 package ipc
 
-var New = NewFile
+var New = NewLoopback

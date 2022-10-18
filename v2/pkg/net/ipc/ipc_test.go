@@ -31,7 +31,7 @@ func TestIpc(t *testing.T) {
 	r := io.LimitReader(nil, 0)
 	got := new(strings.Builder)
 
-	ipc := Preface("goes_ipc_test")
+	ipc := New("goes_ipc_test")
 	path := selection.Path{ipc.String()}
 	selector := selection.Map{
 		"cat":  cat.Func,

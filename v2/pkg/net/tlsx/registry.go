@@ -16,7 +16,6 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
-	"github.com/platinasystems/goes/v2/pkg/net/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -90,7 +89,7 @@ func Subscribe(ctx context.Context, addr string) error {
 	var dl net.Dialer
 	nw := "tcp"
 	if len(addr) == 0 {
-		nw = ipc.Network
+		nw = RegIPC.Network()
 		addr, err = RegIPC.Address()
 		if err == nil {
 			name, err = host.Name.ValErr()

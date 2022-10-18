@@ -13,6 +13,6 @@ import (
 
 var (
 	base   = program.Base.String()
-	IPC    = ipc.Preface(base)
-	RegIPC = ipc.Preface(fmt.Sprint(base, ".registry"))
+	IPC    = ipc.New(base)
+	RegIPC = ipc.New(fmt.Sprint(base, ".registry"))
 )

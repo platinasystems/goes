@@ -16,14 +16,14 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 )
 
-// Socket or loopback address file name, usually:
-//
-//	Preface(program.BaseName.Value())
-type Ipc string
-
-func Preface(s string) Ipc {
-	return Ipc(fmt.Sprint(Prefix(), s))
+type Ipcer interface {
+	Address() (string, error)
+	Listen() (net.Listener, error)
+	Network() string
+	String() string
 }
+
+type Ipc struct{ Ipcer }
 
 func (ipc Ipc) Func(
 	ctx context.Context,
@@ -90,7 +90,13 @@ func (ipc Ipc) Dial(ctx context.Context) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return new(net.Dialer).DialContext(ctx, Network, address)
+	return new(net.Dialer).DialContext(ctx, ipc.Network(), address)
 }
 
-func (ipc Ipc) String() string { return string(ipc) }
+func (ipc Ipc) String() string {
+	address, err := ipc.Address()
+	if err != nil {
+		return fmt.Sprint(ipc.Network(), "://", err)
+	}
+	return fmt.Sprint(ipc.Network(), "://", address)
+}
