@@ -35,12 +35,16 @@ void asl_debug(const char* const s) {
 }
 */
 import "C"
-import "bytes"
+import (
+	"bytes"
+	"unsafe"
+)
 
 type ASL struct{ Level }
 
 func (asl ASL) Write(b []byte) (int, error) {
 	cs := C.CString(string(bytes.TrimSpace(b)))
+	defer C.free(unsafe.Pointer(cs))
 	switch asl.Level {
 	case Emergency:
 		fallthrough
