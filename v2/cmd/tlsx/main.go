@@ -49,12 +49,14 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/daemon"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
 )
 
 func main() {
-	flag.String("state", state.DirDefault.String(), "")
-	flag.Bool("verbose", false, "")
+	ipc.DirFlag = flag.String("ipc", ipc.DefaultDir(), "socket directory")
+	state.DirFlag = flag.String("state", state.DefaultDir(),
+		"certificate directory")
 	selection.Map{
 		"alias":       tlsx.Alias,
 		"approve":     tlsx.ApproveOrDeny,

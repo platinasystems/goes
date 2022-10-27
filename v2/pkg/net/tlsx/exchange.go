@@ -20,6 +20,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
@@ -85,15 +86,9 @@ func Exchange(
 
 			if err = tlsc.HandshakeContext(ctx); err != nil {
 				if suppress.Errors(err, Suppressed...) != nil {
-					Elog(err)
+					style.Error(err)
 				}
 				return
-			} else if true {
-				// skip following log(s) if true
-			} else if s := tlsc.RemoteAddr().String(); len(s) > 0 {
-				Log(s)
-			} else {
-				Log(tlsc.LocalAddr())
 			}
 			err = service(ctx, tlsc, path, func(
 				ctx context.Context,
@@ -118,7 +113,7 @@ func Exchange(
 				return ErrUnknownCommand
 			})
 			if suppress.Errors(err, Suppressed...) != nil {
-				Elog(err)
+				style.Error(err)
 			}
 		}(tlsc)
 	}
@@ -142,7 +137,6 @@ func exAccept(ctx context.Context, host *tls.Conn) error {
 		return fmt.Errorf("accept guest: %w", err)
 	}
 	io.Copy(host, guest)
-	// Log("host<-guest done")
 	return nil
 }
 
@@ -166,7 +160,6 @@ func exConnect(ctx context.Context, guest *tls.Conn, args []string) (
 		return fmt.Errorf("ring:%s: %w", ski, err)
 	}
 	io.Copy(guest, host)
-	// Log("guest<-host done")
 	return nil
 }
 

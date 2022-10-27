@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/alias"
 )
 
@@ -25,7 +26,6 @@ func ApproveOrDeny(
 	path selection.Path,
 	args ...string,
 ) (err error) {
-	tlsx.SetVerbosity()
 	op := path[len(path)-1]
 	fs := flag.NewFlagSet(op, flag.ContinueOnError)
 	xflag := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
@@ -65,7 +65,6 @@ func Clients(
 	path selection.Path,
 	args ...string,
 ) (err error) {
-	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("certs", flag.ContinueOnError)
 	xflag := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
 	fs.Usage = func() {
@@ -100,7 +99,6 @@ func Exchange(
 	path selection.Path,
 	args ...string,
 ) error {
-	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("exchange", flag.ContinueOnError)
 	rflag := fs.Uint("r", 0, "Registry port. (default IPC)")
 	xflag := fs.Uint("x", 0, "Exchange port. (default IPC)")
@@ -124,9 +122,9 @@ func Exchange(
 	}
 	var xln, rln net.Listener
 	if *xflag == 0 {
-		xln, err = tlsx.IPC.Listen()
+		xln, err = ipc.Exchange().Listen()
 		if err == nil {
-			rln, err = tlsx.RegIPC.Listen()
+			rln, err = ipc.Registry().Listen()
 		}
 	} else {
 		xln, err = net.Listen("tcp", fmt.Sprint(":", *xflag))

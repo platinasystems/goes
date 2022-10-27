@@ -64,14 +64,18 @@ func (c *Cache[T]) String() string {
 	return fmt.Sprint(c.Value())
 }
 
-// If not yet loaded, do so before returning value.  If load failed, the
-// returns its zero value and Err continues to return the failure until
-// overwritten by Preload or Reload.
+// Panic if ValErr returns error; otherwise, return its value.
 func (c *Cache[T]) Value() T {
-	v, _ := c.ValErr()
+	v, err := c.ValErr()
+	if err != nil {
+		panic(err)
+	}
 	return v
 }
 
+// If not yet loaded, do so before returning value.  If load failed,
+// return its zero value and Err continues to return the failure until
+// overwritten by Preload or Reload.
 func (c *Cache[T]) ValErr() (T, error) {
 	c.m.RLock()
 	if c.loaded {

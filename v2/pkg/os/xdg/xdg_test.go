@@ -8,19 +8,16 @@ import (
 	"testing"
 
 	"github.com/platinasystems/goes/v2/pkg/os/program"
-	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
 type unit struct {
-	c    *cache.Cache[string]
+	get  func() string
 	want string
 }
 
 func (ut unit) test(t *testing.T) {
 	t.Helper()
-	if got, err := ut.c.ValErr(); err != nil {
-		t.Error(err)
-	} else if got != ut.want {
+	if got := ut.get(); got != ut.want {
 		if len(got) == 0 {
 			got = "\"\""
 		}
@@ -39,7 +36,7 @@ func Test(t *testing.T) {
 		program.IsUsrLocal.Preload(func(p *bool) {
 			*p = true
 		})
-		rootCacheHome.Preload(func(p *string) {
+		Root.CacheHome.Preload(func(p *string) {
 			*p = "/var/cache"
 		})
 		t.Run("XDG_CACHE_HOME", unit{
@@ -51,7 +48,7 @@ func Test(t *testing.T) {
 		t.Run("XDG_DATA_HOME", unit{
 			DataHome, "/usr/local/share",
 		}.test)
-		rootRunTimeDir.Preload(func(p *string) {
+		Root.RunTimeDir.Preload(func(p *string) {
 			*p = "/var/run"
 		})
 		t.Run("XDG_RUNTIME_DIR", unit{
@@ -75,23 +72,23 @@ func Test(t *testing.T) {
 					"XDG_STATE_HOME":  "$HOME/.local/state",
 				}[name]
 			}
-			CacheHome.Reload()
+			xdg.CacheHome.Reload()
 			t.Run("XDG_CACHE_HOME", unit{
 				CacheHome, "$HOME/.cache",
 			}.test)
-			ConfigHome.Reload()
+			xdg.ConfigHome.Reload()
 			t.Run("XDG_CONFIG_HOME", unit{
 				ConfigHome, "$HOME/.config",
 			}.test)
-			DataHome.Reload()
+			xdg.DataHome.Reload()
 			t.Run("XDG_DATA_HOME", unit{
 				DataHome, "$HOME/.local/share",
 			}.test)
-			RunTimeDir.Reload()
+			xdg.RunTimeDir.Reload()
 			t.Run("XDG_RUNTIME_DIR", unit{
 				RunTimeDir, "/run/user/$ID",
 			}.test)
-			StateHome.Reload()
+			xdg.StateHome.Reload()
 			t.Run("XDG_STATE_HOME", unit{
 				StateHome, "$HOME/.local/state",
 			}.test)
@@ -107,23 +104,23 @@ func Test(t *testing.T) {
 			UserHomeDir = func() (string, error) {
 				return "$HOME", nil
 			}
-			CacheHome.Reload()
+			xdg.CacheHome.Reload()
 			t.Run("XDG_CACHE_HOME", unit{
 				CacheHome, "$HOME/.cache",
 			}.test)
-			ConfigHome.Reload()
+			xdg.ConfigHome.Reload()
 			t.Run("XDG_CONFIG_HOME", unit{
 				ConfigHome, "$HOME/.config",
 			}.test)
-			DataHome.Reload()
+			xdg.DataHome.Reload()
 			t.Run("XDG_DATA_HOME", unit{
 				DataHome, "$HOME/.local/share",
 			}.test)
-			RunTimeDir.Reload()
+			xdg.RunTimeDir.Reload()
 			t.Run("XDG_RUNTIME_DIR", unit{
 				RunTimeDir, "$HOME/.cache",
 			}.test)
-			StateHome.Reload()
+			xdg.StateHome.Reload()
 			t.Run("XDG_STATE_HOME", unit{
 				StateHome, "$HOME/.local/state",
 			}.test)

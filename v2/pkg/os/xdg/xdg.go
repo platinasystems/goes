@@ -36,125 +36,145 @@ func MkPath(s string) error {
 	return os.MkdirAll(s, perm)
 }
 
-// If available, returns $XDG_CACHE_HOME.  If SU, returns /var/cache or
-// /var/run; otherwise, if not SU, returns UserCacheDir or TempDir.
-var CacheHome = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_CACHE_HOME"); len(*p) > 0 {
-	} else if program.IsSuperUser.Value() {
-		*p = rootCacheHome.Value()
-	} else if d, derr := UserCacheDir(); derr == nil {
-		*p = d
-	} else {
-		*p = os.TempDir()
-	}
-	return nil
-})
-
-// If available, returns $XDG_CONFIG_DIRS; otherwise, returns /etc/xdg.
-var ConfigDirs = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_CONFIG_DIRS"); len(*p) == 0 {
-		*p = "/etc/xdg"
-	}
-	return nil
-})
-
-// If available, returns $XDG_CONFIG_HOME.  If SU, returns "/etc/opt" if opt
-// program; or "/etc"; otherwise, if not SU, returns UserConfigDir or TempDir.
-var ConfigHome = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_CONFIG_HOME"); len(*p) > 0 {
-	} else if program.IsSuperUser.Value() {
-		if program.IsOpt.Value() {
-			*p = "/etc/opt"
+var xdg = struct {
+	CacheHome,
+	ConfigDirs,
+	ConfigHome,
+	DataDirs,
+	DataHome,
+	RunTimeDir,
+	StateHome *cache.Cache[string]
+}{
+	CacheHome: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_CACHE_HOME"); len(*p) > 0 {
+		} else if program.Is.SuperUser() {
+			*p = Root.CacheHome.Value()
+		} else if d, derr := UserCacheDir(); derr == nil {
+			*p = d
 		} else {
-			*p = "/etc"
+			*p = os.TempDir()
 		}
-	} else if d, err := UserConfigDir(); err == nil {
-		*p = d
-	} else {
-		*p = os.TempDir()
-	}
-	return nil
-})
-
-var DataDirs = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_DATA_DIRS"); len(*p) == 0 {
-		*p = "/usr/local/share:/usr/share"
-	}
-	return nil
-})
-
-// If available, returns $XDG_DATA_HOME.  If SU, returns "/usr/local/share" if
-// local program; "/opt/share" if opt program; or "/usr/share"; otherwise, if
-// not SU, returns UserHomeDir or TempDir.
-var DataHome = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_DATA_HOME"); len(*p) > 0 {
-	} else if program.IsSuperUser.Value() {
-		if program.IsUsrLocal.Value() {
-			*p = "/usr/local/share"
-		} else if program.IsOpt.Value() {
-			*p = "/opt/share"
+		return nil
+	}),
+	ConfigDirs: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_CONFIG_DIRS"); len(*p) == 0 {
+			*p = "/etc/xdg"
+		}
+		return nil
+	}),
+	ConfigHome: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_CONFIG_HOME"); len(*p) > 0 {
+		} else if program.Is.SuperUser() {
+			if program.Is.Opt() {
+				*p = "/etc/opt"
+			} else {
+				*p = "/etc"
+			}
+		} else if d, err := UserConfigDir(); err == nil {
+			*p = d
 		} else {
-			*p = "/usr/share"
+			*p = os.TempDir()
 		}
-	} else if h, err := UserHomeDir(); err == nil {
-		*p = filepath.Join(h, ".local", "share")
-	} else {
-		*p = os.TempDir()
-	}
-	return nil
-})
-
-// If available, returns $XDG_RUNTIME_DIR; or if SU, "/var/run"; otherwise,
-// UserCacheDir or TempDir.
-var RunTimeDir = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_RUNTIME_DIR"); len(*p) > 0 {
-	} else if program.IsSuperUser.Value() {
-		*p = rootRunTimeDir.Value()
-	} else if d, err := UserCacheDir(); err == nil {
-		*p = d
-	} else {
-		*p = os.TempDir()
-	}
-	return nil
-})
-
-// If available, returns $XDG_STATE_HOME. If SU, returns "/var/local" if local
-// program; "/var/opt" if opt program; or "/var/lib" otherwise. if not SU and
-// no $XDG_STATE_HOME, returns UserHomeDir()/.local/state.
-var StateHome = cache.New[string](func(p *string) error {
-	if *p = Getenv("XDG_STATE_HOME"); len(*p) > 0 {
-	} else if program.IsSuperUser.Value() {
-		if program.IsUsrLocal.Value() {
-			*p = "/var/local"
-		} else if program.IsOpt.Value() {
-			*p = "/var/opt"
+		return nil
+	}),
+	DataDirs: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_DATA_DIRS"); len(*p) == 0 {
+			*p = "/usr/local/share:/usr/share"
+		}
+		return nil
+	}),
+	DataHome: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_DATA_HOME"); len(*p) > 0 {
+		} else if program.Is.SuperUser() {
+			if program.Is.UsrLocal() {
+				*p = "/usr/local/share"
+			} else if program.Is.Opt() {
+				*p = "/opt/share"
+			} else {
+				*p = "/usr/share"
+			}
+		} else if h, err := UserHomeDir(); err == nil {
+			*p = filepath.Join(h, ".local", "share")
 		} else {
-			*p = "/var/lib"
+			*p = os.TempDir()
 		}
-	} else if h, err := UserHomeDir(); err == nil {
-		*p = filepath.Join(h, ".local", "state")
-	} else {
-		*p = os.TempDir()
-	}
-	return nil
-})
-
-var rootCacheHome = cache.New[string](func(p *string) error {
-	for _, *p = range []string{"/var/cache", "/var/run"} {
-		if _, err := os.Stat(*p); err == nil {
-			return nil
+		return nil
+	}),
+	RunTimeDir: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_RUNTIME_DIR"); len(*p) > 0 {
+		} else if program.Is.SuperUser() {
+			*p = Root.RunTimeDir.Value()
+		} else if d, err := UserCacheDir(); err == nil {
+			*p = d
+		} else {
+			*p = os.TempDir()
 		}
-	}
-	*p = os.TempDir()
-	return nil
-})
+		return nil
+	}),
+	// If available, returns $XDG_STATE_HOME. If SU, returns "/var/local"
+	// if local program; "/var/opt" if opt program; or "/var/lib"
+	// otherwise. if not SU and no $XDG_STATE_HOME, returns
+	// UserHomeDir()/.local/state.
+	StateHome: cache.New[string](func(p *string) error {
+		if *p = Getenv("XDG_STATE_HOME"); len(*p) > 0 {
+		} else if program.Is.SuperUser() {
+			if program.Is.UsrLocal() {
+				*p = "/var/local"
+			} else if program.Is.Opt() {
+				*p = "/var/opt"
+			} else {
+				*p = "/var/lib"
+			}
+		} else if h, err := UserHomeDir(); err == nil {
+			*p = filepath.Join(h, ".local", "state")
+		} else {
+			*p = os.TempDir()
+		}
+		return nil
+	}),
+}
 
-var rootRunTimeDir = cache.New[string](func(p *string) error {
-	const var_run = "/var/run"
-	if _, err := os.Stat(var_run); err == nil {
-		*p = var_run
-	} else {
+var Root = struct {
+	CacheHome,
+	RunTimeDir *cache.Cache[string]
+}{
+	CacheHome: cache.New[string](func(p *string) error {
+		for _, *p = range []string{"/var/cache", "/var/run"} {
+			if _, err := os.Stat(*p); err == nil {
+				return nil
+			}
+		}
 		*p = os.TempDir()
-	}
-	return nil
-})
+		return nil
+	}),
+	RunTimeDir: cache.New[string](func(p *string) error {
+		const var_run = "/var/run"
+		if _, err := os.Stat(var_run); err == nil {
+			*p = var_run
+		} else {
+			*p = os.TempDir()
+		}
+		return nil
+	}),
+}
+
+var (
+	// If available, returns $XDG_CACHE_HOME.  If SU, returns /var/cache or
+	// /var/run; otherwise, if not SU, returns UserCacheDir or TempDir.
+	CacheHome = xdg.CacheHome.Value
+	// If available, returns $XDG_CONFIG_DIRS; otherwise, returns /etc/xdg.
+	ConfigDirs = xdg.ConfigDirs.Value
+	// If available, returns $XDG_CONFIG_HOME.  If SU, returns "/etc/opt"
+	// if opt program; or "/etc"; otherwise, if not SU, returns
+	// UserConfigDir or TempDir.
+	ConfigHome = xdg.ConfigHome.Value
+	DataDirs   = xdg.DataDirs.Value
+	// If available, returns $XDG_DATA_HOME.  If SU, returns
+	// "/usr/local/share" if local program; "/opt/share" if opt program; or
+	// "/usr/share"; otherwise, if not SU, returns UserHomeDir or TempDir.
+	DataHome = xdg.DataHome.Value
+	// If available, returns $XDG_RUNTIME_DIR; or if SU, "/var/run";
+	// otherwise, UserCacheDir or TempDir.
+	RunTimeDir = xdg.RunTimeDir.Value
+	StateHome  = xdg.StateHome.Value
+)

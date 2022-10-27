@@ -20,19 +20,13 @@ import (
 
 var ErrUnavailable = errors.New("unavailable")
 
-var Base = cache.New[string](func(p *string) (err error) {
-	exe, err := Executable.ValErr()
-	if err == nil {
-		*p = filepath.Base(exe)
-	}
-	return
-})
+var Base = cache.New[string](func(p *string) error {
+	*p = filepath.Base(Executable())
+	return nil
+}).Value
 
 var BuildId = cache.New[string](func(p *string) (err error) {
-	exe, err := Executable.ValErr()
-	if err == nil {
-		*p, err = buildid.ReadFile(exe)
-	}
+	*p, err = buildid.ReadFile(Executable())
 	return
 })
 
@@ -44,31 +38,23 @@ var BuildInfo = cache.New[*debug.BuildInfo](func(p **debug.BuildInfo) error {
 	return ErrUnavailable
 })
 
-var Executable = cache.New[string](func(p *string) (err error) {
-	*p, err = os.Executable()
-	if err != nil {
-		if *p = os.Args[0]; len(*p) > 0 {
-			err = nil
-		} else {
-			err = ErrUnavailable
-		}
+var Executable = cache.New[string](func(p *string) error {
+	if s, err := os.Executable(); err == nil {
+		*p = s
+	} else {
+		*p = os.Args[0]
 	}
-	return
-})
+	return nil
+}).Value
 
 var IsOpt = cache.New[bool](func(p *bool) (err error) {
-	exe, err := Executable.ValErr()
-	if err == nil {
-		*p = strings.HasPrefix(exe, "/opt")
-	}
+	*p = strings.HasPrefix(Executable(), filepath.FromSlash("/opt"))
 	return
 })
 
 var IsUsrLocal = cache.New[bool](func(p *bool) (err error) {
-	exe, err := Executable.ValErr()
-	if err == nil {
-		*p = strings.HasPrefix(exe, "/usr/local")
-	}
+	*p = strings.HasPrefix(Executable(),
+		filepath.FromSlash("/usr/local"))
 	return
 })
 
@@ -76,6 +62,14 @@ var IsSuperUser = cache.New[bool](func(p *bool) error {
 	*p = os.Geteuid() == 0
 	return nil
 })
+
+var Is = struct {
+	Opt, UsrLocal, SuperUser func() bool
+}{
+	Opt:       IsOpt.Value,
+	UsrLocal:  IsUsrLocal.Value,
+	SuperUser: IsSuperUser.Value,
+}
 
 // Returns the main module reference in the form of PATH@SYMVER or empty
 // if the main module is unavailable, as with GO tests.

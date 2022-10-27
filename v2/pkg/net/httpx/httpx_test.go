@@ -101,7 +101,7 @@ func test(tb testing.TB, n uint) {
 	ctx, cancel := context.WithCancel(sigctx)
 	defer cancel()
 
-	ln, err := ipc.New("goes_https_test").Listen()
+	ln, err := ipc.New().Listen()
 	if err != nil {
 		tb.Fatal(err)
 	}

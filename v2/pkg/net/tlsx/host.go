@@ -14,11 +14,13 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/authorized"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -45,7 +47,7 @@ func Host(
 	path := selection.Path{host.Name.String()}
 
 	if SVC, err = program.MainReference.ValErr(); err != nil {
-		SVC = program.Base.Value()
+		SVC = program.Base()
 	}
 
 	for {
@@ -56,7 +58,10 @@ func Host(
 				return
 			}
 			if !errors.Is(err, fs.ErrNotExist) {
-				Elog(err)
+				style.Error(err)
+			}
+			if errors.Is(err, syscall.ECONNREFUSED) {
+				return
 			}
 			t := time.NewTimer(3 * time.Second)
 			select {
@@ -68,12 +73,6 @@ func Host(
 				return
 			}
 			continue
-		} else if true {
-			// skip following log(s) if true
-		} else if s := c.LocalAddr().String(); len(s) > 0 {
-			Log(s)
-		} else {
-			Log(c.RemoteAddr())
 		}
 
 		cl := tls.Client(c, cfg)
@@ -81,7 +80,7 @@ func Host(
 		if err = cl.HandshakeContext(ctx); err != nil {
 			cl.Close()
 			if ctx.Err() == nil {
-				Elog(err)
+				style.Error(err)
 			}
 			return
 		}
@@ -139,7 +138,7 @@ func Host(
 					break
 				}
 				if err != nil {
-					Elog(err)
+					style.Error(err)
 				}
 			}
 		}(cl)

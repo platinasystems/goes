@@ -6,23 +6,19 @@ package cat
 
 import (
 	"context"
-	"io"
 	"strings"
 	"testing"
+
+	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 )
 
 func Test(t *testing.T) {
 	const want = "hello world\n"
 	ctx := context.Background()
 	got := new(strings.Builder)
-	rw := struct {
-		io.Reader
-		io.Writer
-	}{
-		strings.NewReader(want),
-		got,
-	}
-	if err := Func(ctx, rw, "cat", "-"); err != nil {
+	r := strings.NewReader(want)
+	cat := selection.Path{"cat"}
+	if err := Func(ctx, r, got, cat, "-"); err != nil {
 		t.Error(err)
 	} else if gots := got.String(); gots != want {
 		t.Errorf("%q != %q", gots, want)

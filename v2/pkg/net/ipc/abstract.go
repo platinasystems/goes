@@ -17,7 +17,9 @@ import (
 type Abstract string
 
 // The prefix of a Linux abstract domain socket is "@".
-func NewAbstract(s string) Ipc { return Ipc{Abstract(fmt.Sprint("@", s))} }
+func NewAbstract(suffix ...any) Ipc {
+	return Ipc{Abstract(join("@", suffix))}
+}
 
 func (abs Abstract) Address() (string, error) { return abs.String(), nil }
 

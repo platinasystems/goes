@@ -5,19 +5,16 @@
 package ipc
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
-
-	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 )
 
 type File string
 
-// The prefix of a Unix file socket is xdg.RunTimeDir+"/S."
-func NewFile(s string) Ipc {
-	fn := filepath.Join(xdg.RunTimeDir.String(), fmt.Sprint("S.", s))
+// A Unix file socket named Dir()+"/S."+suffix
+func NewFile(suffix ...any) Ipc {
+	fn := filepath.Join(Dir(), join("S.", suffix))
 	return Ipc{File(fn)}
 }
 
@@ -28,7 +25,7 @@ func (file File) Listen() (net.Listener, error) {
 	address := file.String()
 	ln, err := net.Listen(file.Network(), address)
 	if err == nil {
-		err = os.Chmod(address, 0770)
+		err = os.Chmod(address, 0700)
 	}
 	return ln, err
 }

@@ -38,14 +38,6 @@ func Start(
 	if len(args) == 0 {
 		return selection.ErrIncomplete
 	}
-	exe, err := program.Executable.ValErr()
-	if err != nil {
-		return err
-	}
-	rtd, err := xdg.RunTimeDir.ValErr()
-	if err != nil {
-		return err
-	}
 	u, err := user.Current()
 	if err != nil {
 		return err
@@ -57,7 +49,7 @@ func Start(
 	if _, err := fmt.Sscan(u.Gid, &cred.Gid); err != nil {
 		return fmt.Errorf("user:gid: %w", err)
 	}
-	cmd := exec.Command(exe)
+	cmd := exec.Command(program.Executable())
 	flag.VisitAll(func(f *flag.Flag) {
 		if s := f.Value.String(); s != f.DefValue {
 			cmd.Args = append(cmd.Args, fmt.Sprint(
@@ -74,6 +66,7 @@ func Start(
 		"LocalAppData",
 		"home",
 		"HOME",
+		"TMPDIR",
 		"USERPROFILE",
 		"XDG_CACHE_HOME",
 	} {
@@ -81,7 +74,7 @@ func Start(
 			cmd.Env = append(cmd.Env, fmt.Sprint(name, "=", val))
 		}
 	}
-	cmd.Dir = rtd
+	cmd.Dir = xdg.RunTimeDir()
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -90,7 +83,7 @@ func Start(
 		Setsid:     true,
 	}
 	if err = cmd.Start(); err == nil {
-		fmt.Fprint(w, program.Base, "_", args[0], "_pid=",
+		fmt.Fprint(w, program.Base(), "_", args[0], "_pid=",
 			cmd.Process.Pid, "\n")
 	}
 	return err

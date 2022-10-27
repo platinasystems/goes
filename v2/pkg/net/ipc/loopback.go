@@ -11,16 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 )
 
 type Loopback string
 
-// The prefix of a loopback address file is xdg.RunTimeDir()+"/A."
-func NewLoopback(s string) Ipc {
-	fn := filepath.Join(xdg.RunTimeDir.Value(), fmt.Sprint("A.", s))
-	return Ipc{Loopback(fn)}
+// A loopback address file named Dir()+"/A."+suffix
+func NewLoopback(suffix ...any) Ipc {
+	return Ipc{Loopback(filepath.Join(Dir(), join("A.", suffix)))}
 }
 
 // Returns alocated 127.0.0.1:PORT from Ipc file.

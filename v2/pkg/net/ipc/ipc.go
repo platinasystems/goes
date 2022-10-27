@@ -14,6 +14,7 @@ import (
 	"net/rpc"
 
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
 type Ipcer interface {
@@ -99,4 +100,8 @@ func (ipc Ipc) String() string {
 		return fmt.Sprint(ipc.Network(), "://", err)
 	}
 	return fmt.Sprint(ipc.Network(), "://", address)
+}
+
+func join(prefix string, args []any) string {
+	return fmt.Sprint(prefix, program.Base(), fmt.Sprint(args...))
 }

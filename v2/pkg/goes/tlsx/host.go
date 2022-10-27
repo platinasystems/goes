@@ -36,7 +36,6 @@ func Host(
 ) error {
 	const synopsis = `
 Service consumer requests through subscribed exchange(s).`
-	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("host", flag.ContinueOnError)
 	fs.Usage = func() {
 		path.Usage(w, synopsis)

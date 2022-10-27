@@ -31,7 +31,6 @@ func Jump(
 	path selection.Path,
 	args ...string,
 ) error {
-	tlsx.SetVerbosity()
 	fs := flag.NewFlagSet("jump", flag.ContinueOnError)
 	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")

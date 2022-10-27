@@ -15,7 +15,9 @@ import (
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -63,13 +65,13 @@ func Registry(
 					context.Canceled,
 					net.ErrClosed,
 				); err != nil {
-					Elog(err)
+					style.Error(err)
 				}
 				return
 			}
 			cs := sv.ConnectionState()
 			if len(cs.PeerCertificates) == 0 {
-				Elog(ErrNoPeer)
+				style.Error(ErrNoPeer)
 				return
 			}
 			binary.Write(sv, binary.BigEndian, uint16(xp))
@@ -89,9 +91,9 @@ func Subscribe(ctx context.Context, addr string) error {
 	var dl net.Dialer
 	nw := "tcp"
 	if len(addr) == 0 {
-		nw = RegIPC.Network()
-		addr, err = RegIPC.Address()
-		if err == nil {
+		na := ipc.Registry()
+		nw = na.Network()
+		if addr, err = na.Address(); err == nil {
 			name, err = host.Name.ValErr()
 		}
 	} else {

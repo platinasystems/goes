@@ -84,13 +84,12 @@ func Func(
 			cmd.SysProcAttr = &syscall.SysProcAttr{
 				Setsid:  true,
 				Setctty: true,
-				// FIXME may need to set ctty on tlsx-host
-				// w/ detached terminal
-				// Ctty:    int(fd),
 			}
 		}
 	}
-	err = cmd.Run()
+	if err = cmd.Start(); err == nil {
+		err = cmd.Wait()
+	}
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); ok && stderr.Len() > 0 {
 			err = errors.New(stderr.String())

@@ -24,7 +24,6 @@ import (
 var (
 	ErrIncomplete = errors.New("incomplete")
 	ErrNotFound   = errors.New("not found")
-	Fatal         = style.Plain.Errata.Fatal
 )
 
 func HasHelp(args []string) bool {
@@ -54,24 +53,27 @@ func (m Map) Main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
 	defer stop()
-	path := Path{program.Base.String()}
+	path := Path{program.Base()}
 	flag.CommandLine.Init(path[0], flag.ContinueOnError)
 	flag.Usage = func() {
 		Root.Usage(w, path, flag.CommandLine)
 	}
+	style.Quiet = flag.Bool("quiet", false, "suppress errata")
+	style.Verbose = flag.Bool("verbose", false, "print notices")
 	timeout := flag.Duration("timeout", 0,
 		"Terminate command if incomplete by non-zero limit.")
 	err := flag.CommandLine.Parse(os.Args[1:])
 	if err == flag.ErrHelp {
 		return
 	}
+	style.Verbosity()
 	if *timeout != 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *timeout)
 		defer cancel()
 	}
 	args := flag.Args()
-	f, found := Root[program.Executable.String()] // e.g. /init
+	f, found := Root[program.Executable()] // e.g. /init
 	if !found {
 		f = Root.Select
 	}
@@ -80,13 +82,13 @@ func (m Map) Main() {
 		style.System()
 		r = io.LimitReader(nil, 0)
 		w = style.Plain.Notice.Writer()
-		fmt.Fprintln(w, args, "start")
+		fmt.Fprintln(w, "start", args)
 	}
 	err = f(ctx, r, w, path, args...)
 	if err != nil && !errors.Is(err, flag.ErrHelp) {
-		Fatal(err)
+		style.Fatal(err)
 	} else if isDaemon {
-		fmt.Fprintln(w, args, "exit")
+		fmt.Fprintln(w, "exit", args)
 	}
 }
 

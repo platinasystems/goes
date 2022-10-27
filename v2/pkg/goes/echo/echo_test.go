@@ -9,22 +9,20 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 )
 
 func Test(t *testing.T) {
 	ctx := context.Background()
 	got := new(strings.Builder)
-	rw := struct {
-		io.Reader
-		io.Writer
-	}{
-		io.LimitReader(nil, 0),
-		got,
-	}
+	r := io.LimitReader(nil, 0)
+	echo := selection.Path{"echo"}
 	try := func(t *testing.T, want string, args ...string) {
 		t.Helper()
 		got.Reset()
-		if err := Func(ctx, rw, "echo", args...); err != nil {
+		err := Func(ctx, r, got, echo, args...)
+		if err != nil {
 			t.Error(err)
 		} else if gots := got.String(); gots != want {
 			t.Errorf("%q != %q", gots, want)

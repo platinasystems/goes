@@ -20,6 +20,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/cat"
 	"github.com/platinasystems/goes/v2/pkg/goes/echo"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/authorized"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
@@ -45,17 +47,14 @@ func test(tb testing.TB, n uint) {
 	defer wg.Wait()
 	var err error
 
-	Elog = tb.Error
-	Elogf = tb.Errorf
-	Log = tb.Log
-	Logf = tb.Logf
+	style.Test(tb)
 
 	sigctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	ctx, cancel := context.WithCancel(sigctx)
 	defer cancel()
 
-	ln, err := IPC.Listen()
+	ln, err := ipc.Exchange().Listen()
 	if err != nil {
 		tb.Fatal(err)
 	}

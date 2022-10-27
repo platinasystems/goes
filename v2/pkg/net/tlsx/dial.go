@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -43,9 +44,10 @@ func dialcfg(ex string) (nw, addr string, cfg *tls.Config, err error) {
 	}
 	nw = "tcp"
 	if len(ex) == 0 {
-		nw = IPC.Network()
 		sn = hn
-		if addr, err = IPC.Address(); err != nil {
+		na := ipc.Exchange()
+		nw = na.Network()
+		if addr, err = na.Address(); err != nil {
 			return
 		}
 	} else if dns, port := certs.Exchanges.NamePort(ex); len(dns) > 0 {
