@@ -22,6 +22,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/bridge"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -72,6 +73,9 @@ func Exchange(
 	}
 	path := selection.Path{hn}
 
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	br := bridge.New(cctx, wg)
 	for c := range accept.With(ctx, ln, make(chan net.Conn, 4)) {
 		wg.Add(1)
 		tlsc := tls.Server(c, &tls.Config{
@@ -97,18 +101,26 @@ func Exchange(
 				path selection.Path,
 				args ...string,
 			) error {
+				cs := tlsc.ConnectionState()
+				if len(cs.PeerCertificates) == 0 {
+					return ErrNoPeer
+				}
+				ski := hex.EncodeToString(cs.
+					PeerCertificates[0].SubjectKeyId)
 				switch args[0] {
 				case "accept":
-					return exAccept(ctx, tlsc)
+					return exAccept(ctx, tlsc, ski)
 				case "approve":
 					return exRegistry(ctx, tlsc, args)
 				case "clients":
 					return exClients(ctx, tlsc)
 				case "connect":
 					args = args[1:]
-					return exConnect(ctx, tlsc, args)
+					return exConnect(ctx, tlsc, ski, args)
 				case "deny":
 					return exRegistry(ctx, tlsc, args)
+				case "join":
+					return br.Join(ctx, tlsc)
 				}
 				return ErrUnknownCommand
 			})
@@ -121,17 +133,12 @@ func Exchange(
 
 // Ack provider accepting consumer requests then wait for ring with consumer
 // SubjectKeyID consumer before copying from consumer to the provider.
-func exAccept(ctx context.Context, host *tls.Conn) error {
-	cs := host.ConnectionState()
-	if len(cs.PeerCertificates) == 0 {
-		return fmt.Errorf("accept: %w", ErrNoPeer)
-	}
+func exAccept(ctx context.Context, host *tls.Conn, ski string) error {
 	enc := lv.NewEncoder(write.With(ctx, host))
 	_, err := enc.Encode("OK", nil)
 	if err != nil {
 		return fmt.Errorf("accept ack: %w", err)
 	}
-	ski := hex.EncodeToString(cs.PeerCertificates[0].SubjectKeyId)
 	guest, err := waitForGuest(ctx, host, ski)
 	if err != nil {
 		return fmt.Errorf("accept guest: %w", err)
@@ -141,14 +148,12 @@ func exAccept(ctx context.Context, host *tls.Conn) error {
 }
 
 // Ring provider with consumer SubjectKeyId then copy the provider to consumer.
-func exConnect(ctx context.Context, guest *tls.Conn, args []string) (
-	err error,
-) {
-	cs := guest.ConnectionState()
-	if len(cs.PeerCertificates) == 0 {
-		return ErrNoPeer
-	}
-	ski := hex.EncodeToString(cs.PeerCertificates[0].SubjectKeyId)
+func exConnect(
+	ctx context.Context,
+	guest *tls.Conn,
+	ski string,
+	args []string,
+) (err error) {
 	if len(args) == 0 {
 		return ErrNoSubjectKeyId
 	}
