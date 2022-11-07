@@ -6,8 +6,10 @@ package poll
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
+	"os"
 	"time"
 )
 
@@ -54,7 +56,7 @@ func (p Poll) Read(b []byte) (int, error) {
 			if !operr.Timeout() {
 				return n, operr
 			}
-		} else {
+		} else if !errors.Is(err, os.ErrDeadlineExceeded) {
 			return n, err
 		}
 		if dur < MaxInterval {
