@@ -7,24 +7,22 @@ package tlsx
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/address"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
-	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
 func DialAndHandshake(ctx context.Context, ex string) (
 	cl *tls.Conn, err error,
 ) {
-	nw, addr, cfg, err := dialcfg(ex)
+	addr, cfg, err := AddrCfg(ex)
 	if err != nil {
 		return
 	}
 	var dl net.Dialer
-	c, err := dl.DialContext(ctx, nw, addr)
+	c, err := dl.DialContext(ctx, addr.Network(), addr.String())
 	if err != nil {
 		return
 	}
@@ -36,45 +34,21 @@ func DialAndHandshake(ctx context.Context, ex string) (
 	return
 }
 
-func dialcfg(ex string) (nw, addr string, cfg *tls.Config, err error) {
-	var sn string
-	hn, err := host.Name.ValErr()
-	if err != nil {
+func AddrCfg(ex string) (addr net.Addr, cfg *tls.Config, err error) {
+	var ok bool
+	name, ski, exc := Lookup(ex)
+	if exc == nil {
+		err = certs.Unsubscribed(ex)
 		return
 	}
-	nw = "tcp"
-	if len(ex) == 0 {
-		sn = hn
-		na := ipc.Exchange()
-		nw = na.Network()
-		if addr, err = na.Address(); err != nil {
-			return
-		}
-	} else if dns, port := certs.Exchanges.NamePort(ex); len(dns) > 0 {
-		if sn = dns; len(port) == 0 {
-			err = fmt.Errorf("%s: port empty", dns)
-		} else if port == "0" {
-			nw, addr, cfg, err = dialcfg("")
-			return
-		} else {
-			addr = fmt.Sprint(dns, ":", port)
-		}
-	} else {
-		err = fmt.Errorf("%s: %w", ex, ErrNameOrSKINotFound)
-		return
-	}
-	tlsc, err := cert.ValErr()
-	if err != nil {
-		return
-	}
-	rootCAs, err := certs.Exchanges.Pool()
-	if err != nil {
+	if addr, ok = address.Load(ski); !ok {
+		err = address.Unaddressed(ski, name)
 		return
 	}
 	cfg = &tls.Config{
-		Certificates: []tls.Certificate{tlsc},
-		ServerName:   sn,
-		RootCAs:      rootCAs,
+		Certificates: []tls.Certificate{cert.Value()},
+		ServerName:   name,
+		RootCAs:      certs.Subscriptions.Pool(),
 	}
 	return
 }

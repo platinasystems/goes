@@ -8,7 +8,6 @@ package ipc
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"syscall"

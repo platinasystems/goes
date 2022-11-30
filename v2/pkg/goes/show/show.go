@@ -8,32 +8,40 @@ import (
 	"context"
 	"fmt"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"strings"
+	"text/template"
 )
 
-// This returns a selection.Func that prints it's receiver.
-func Func(v any) selection.Func {
-	return show{v}.funk
+// This returns a method that printlns its embedded value/Formatter/String.
+func New(v any) func(
+	context.Context,
+	io.Reader,
+	io.Writer,
+	[]string,
+	...string,
+) error {
+	return show{v}.show
 }
 
-type show struct {
-	v any
-}
+type show struct{ v any }
 
-func (sh show) funk(
+func (sh show) show(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	if path.HasComplete() {
+	switch path[1] {
+	case "complete":
 		return nil
-	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "\nPrint named value.")
-		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return template.Must(template.New("usage").Parse(`
+usage: {{.}}
+	Print named value.
+`[1:])).Execute(w, strings.Join(path, " "))
 	}
 	fmt.Fprintln(w, sh.v)
 	return ctx.Err()

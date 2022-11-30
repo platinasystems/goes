@@ -5,11 +5,10 @@
 package style
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
-
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
 const (
@@ -23,21 +22,16 @@ type Style struct {
 }
 
 var (
-	Base = program.Base()
-
-	notice = Base + ":"
-	errata = Base + ":error:"
-
 	Mute  = func(args ...any) {}
 	Mutef = func(format string, args ...any) {}
 
 	Plain = struct{ Errata, Notice Style }{
-		Style{Errata, log.New(os.Stderr, errata+" ", plain)},
-		Style{Notice, log.New(os.Stdout, notice+" ", plain)},
+		Style{Errata, log.New(os.Stderr, "", plain)},
+		Style{Notice, log.New(os.Stdout, "", plain)},
 	}
 	ShortFile = struct{ Errata, Notice Style }{
-		Style{Errata, log.New(os.Stderr, errata, shortfile)},
-		Style{Notice, log.New(os.Stdout, notice, shortfile)},
+		Style{Errata, log.New(os.Stderr, "", shortfile)},
+		Style{Notice, log.New(os.Stdout, "", shortfile)},
 	}
 
 	Error   = ShortFile.Errata.Print
@@ -50,7 +44,8 @@ var (
 	Printf  = Mutef
 	Println = Mute
 
-	Quiet, Verbose *bool
+	Quiet   = flag.Bool("quiet", false, "Suppress errata.")
+	Verbose = flag.Bool("verbose", false, "Print notices.")
 )
 
 // Log Plain and ShortFile messages to System logger instead of Std{out|err}.

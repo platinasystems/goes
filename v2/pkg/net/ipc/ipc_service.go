@@ -6,6 +6,7 @@ package ipc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -17,13 +18,16 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
+
+var ErrMissingInput = errors.New("missing input")
 
 // no handler timeout if 0
 func (ipc Ipc) Service(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	selector selection.Func,
+	m selection.Map,
 	timeout time.Duration,
 ) error {
 	if timeout == 0 {
@@ -43,11 +47,7 @@ func (ipc Ipc) Service(
 	}()
 
 	svr := rpc.NewServer()
-	svr.Register(&Service{
-		ln.Addr().String(),
-		selector,
-		timeout,
-	})
+	svr.Register(&Service{ln.Addr().String(), timeout, m})
 
 	wg.Add(1)
 	go func() {
@@ -75,9 +75,9 @@ func (ipc Ipc) Service(
 }
 
 type Service struct {
-	address  string
-	selector selection.Func
-	timeout  time.Duration
+	address string
+	timeout time.Duration
+	m       selection.Map
 }
 
 func (svc *Service) Select(args []string, result *string) error {
@@ -90,15 +90,27 @@ func (svc *Service) Select(args []string, result *string) error {
 	}
 	w := new(strings.Builder)
 	var r io.Reader = io.LimitReader(nil, 0)
-	if len(args) > 1 && args[0] == "-i" {
+	path := []string{program.Base()}
+	if len(args) == 0 {
+		return selection.ErrIncomplete
+	}
+	if args[0] == "complete" {
+		path = append(path, args[0])
+		if args = args[1:]; len(args) > 1 && args[0] == "help" {
+			args = args[1:]
+		}
+	} else if args[0] == "help" {
+		path = append(path, args[0])
+		args = args[1:]
+	} else if args[0] == "-i" {
 		if len(args) == 1 {
-			return fmt.Errorf("missing input")
+			return ErrMissingInput
 		}
 		r = strings.NewReader(args[1])
 		args = args[2:]
 	}
-	path := selection.Path{svc.address}
-	err := svc.selector(ctx, r, w, path, args...)
+	path = append(path, svc.address)
+	err := svc.m.Select(ctx, r, w, path, args...)
 	if err != nil {
 		fmt.Fprintln(w, err)
 	}

@@ -9,7 +9,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -28,15 +27,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
-var (
-	ErrNoSubjectKeyId    = errors.New("missing subject-key-id")
-	ErrNoPeer            = errors.New("no peer certificates")
-	ErrNameOrSKINotFound = errors.New("name or subject-key-id not found")
-	ErrSKINotFound       = errors.New("subject-key-id not found")
-	ErrUnknownCommand    = errors.New("unknown command")
-
-	ClientHeaders = make(map[string]string)
-)
+var SubscriberHeaders = make(map[string]string)
 
 var Suppressed = []error{
 	context.Canceled,
@@ -45,139 +36,129 @@ var Suppressed = []error{
 	syscall.EPIPE,
 }
 
+func Lookup(ex string) (name, ski string, c *x509.Certificate) {
+	c = cert.Value().Leaf
+	ski = cert.SKI()
+	if len(ex) == 0 || ex == ski {
+		name = c.DNSNames[0]
+		return
+	}
+	for _, s := range c.DNSNames {
+		if ex == s {
+			name = s
+			return
+		}
+	}
+	name = ""
+	ski = ""
+	c = nil
+	certs.Subscriptions.Range(func(entry certs.Entry) bool {
+		if ex == entry.SKI {
+			ski = ex
+			c = entry.Certificate
+			name = c.DNSNames[0]
+			return false
+		}
+		for _, s := range entry.Certificate.DNSNames {
+			if ex == s {
+				ski = entry.SKI
+				name = ex
+				c = entry.Certificate
+				return false
+			}
+		}
+		return true
+	})
+	return
+}
+
 func Exchange(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	ln net.Listener,
+	m selection.Map,
 ) {
 	defer wg.Done()
-	tlsc, err := cert.ValErr()
-	if err != nil {
-		panic(err)
-	}
-	tlscs := []tls.Certificate{tlsc}
-	if tlsc.Leaf == nil {
-		panic("nil leaf")
-	}
-	if len(tlsc.Leaf.DNSNames) == 0 {
-		panic("no DNS names")
-	}
-	sn := tlsc.Leaf.DNSNames[0]
-	clients, err := certs.Clients.Pool()
-	if err != nil {
-		panic(err)
-	}
-	hn, err := host.Name.ValErr()
-	if err != nil {
-		panic(err)
-	}
-	path := selection.Path{hn}
 
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	br := bridge.New(cctx, wg)
+
+	excert := cert.Value()
+
+	br := bridge.New(cctx, wg, excert.Leaf.DNSNames[0])
+
 	for c := range accept.With(ctx, ln, make(chan net.Conn, 4)) {
-		wg.Add(1)
-		tlsc := tls.Server(c, &tls.Config{
-			Certificates: tlscs,
-			ServerName:   sn,
+		sv := tls.Server(c, &tls.Config{
+			Certificates: []tls.Certificate{excert},
+			ServerName:   excert.Leaf.DNSNames[0],
 			ClientAuth:   tls.RequireAndVerifyClientCert,
-			ClientCAs:    clients,
+			ClientCAs:    certs.Subscribers.Pool(),
 		})
-		go func(tlsc *tls.Conn) {
-			wg.Done()
-			defer tlsc.Close()
-
-			if err = tlsc.HandshakeContext(ctx); err != nil {
-				if suppress.Errors(err, Suppressed...) != nil {
-					style.Error(err)
-				}
-				return
-			}
-			err = service(ctx, tlsc, path, func(
-				ctx context.Context,
-				r io.Reader,
-				w io.Writer,
-				path selection.Path,
-				args ...string,
-			) error {
-				cs := tlsc.ConnectionState()
-				if len(cs.PeerCertificates) == 0 {
-					return ErrNoPeer
-				}
-				ski := hex.EncodeToString(cs.
-					PeerCertificates[0].SubjectKeyId)
-				switch args[0] {
-				case "accept":
-					return exAccept(ctx, tlsc, ski)
-				case "approve":
-					return exRegistry(ctx, tlsc, args)
-				case "clients":
-					return exClients(ctx, tlsc)
-				case "connect":
-					args = args[1:]
-					return exConnect(ctx, tlsc, ski, args)
-				case "deny":
-					return exRegistry(ctx, tlsc, args)
-				case "join":
-					return br.Join(ctx, tlsc)
-				}
-				return ErrUnknownCommand
-			})
-			if suppress.Errors(err, Suppressed...) != nil {
-				style.Error(err)
-			}
-		}(tlsc)
+		wg.Add(1)
+		go exService(cctx, wg, sv, m, br)
 	}
 }
 
-// Ack provider accepting consumer requests then wait for ring with consumer
-// SubjectKeyID consumer before copying from consumer to the provider.
-func exAccept(ctx context.Context, host *tls.Conn, ski string) error {
-	enc := lv.NewEncoder(write.With(ctx, host))
-	_, err := enc.Encode("OK", nil)
-	if err != nil {
-		return fmt.Errorf("accept ack: %w", err)
-	}
-	guest, err := waitForGuest(ctx, host, ski)
-	if err != nil {
-		return fmt.Errorf("accept guest: %w", err)
-	}
-	io.Copy(host, guest)
-	return nil
-}
-
-// Ring provider with consumer SubjectKeyId then copy the provider to consumer.
-func exConnect(
+func exService(
 	ctx context.Context,
-	guest *tls.Conn,
-	ski string,
-	args []string,
-) (err error) {
-	if len(args) == 0 {
-		return ErrNoSubjectKeyId
-	}
-	host, err := waitForHost(ctx, guest, args[0])
-	if err != nil {
-		return fmt.Errorf("host: %w", err)
-	}
-	if _, err := lv.NewEncoder(host).Encode("ring", ski, nil); err != nil {
-		return fmt.Errorf("ring:%s: %w", ski, err)
-	}
-	io.Copy(guest, host)
-	return nil
-}
+	wg *sync.WaitGroup,
+	c *tls.Conn,
+	m selection.Map,
+	br *bridge.Bridge,
+) {
+	wg.Done()
+	defer c.Close()
 
-func exClients(ctx context.Context, c *tls.Conn) error {
-	enc := lv.NewEncoder(c)
-	certs.Clients.Range(func(
-		headers certs.Headers,
-		client *x509.Certificate,
-	) bool {
-		certs.Fsequent(enc, headers, client)
-		return true
+	err := c.HandshakeContext(ctx)
+	if err != nil {
+		if suppress.Errors(err, Suppressed...) != nil {
+			style.Error(err)
+		}
+		return
+	}
+	err = service(ctx, c, func(
+		ctx context.Context,
+		r io.Reader,
+		w io.Writer,
+		args ...string,
+	) error {
+		cs := c.ConnectionState()
+		if len(cs.PeerCertificates) == 0 {
+			return ErrNoPeer
+		}
+
+		path := []string{host.Name.Value()}
+
+		if len(args) == 0 {
+			return selection.ErrIncomplete
+		}
+		switch args[0] {
+		case "approve":
+			return exRegistry(ctx, c, args)
+		case "complete":
+			path = append(path, args[0])
+			args = args[1:]
+			if len(args) > 0 && args[0] == "help" {
+				args = args[1:]
+			}
+		case "deny":
+			return exRegistry(ctx, c, args)
+		case "help":
+			path = append(path, args[0])
+			args = args[1:]
+		case "join":
+			enc := lv.NewEncoder(write.With(ctx, c))
+			enc.Encode("OK", nil)
+			br.Join(ctx, c)
+			return net.ErrClosed
+		case "subscribers":
+			return exSubscribers(ctx, c)
+		}
+		return m.Select(ctx, r, w, append(path, "host"), args...)
 	})
-	return nil
+	if suppress.Errors(err, Suppressed...) != nil {
+		style.Error(err)
+	}
 }
 
 func exRegistry(ctx context.Context, c *tls.Conn, args []string) error {
@@ -200,13 +181,11 @@ skiloop:
 				continue
 			}
 			if approve {
-				if err := certs.Clients.Add(
-					ClientHeaders,
+				if err := certs.Subscribers.Add(
+					SubscriberHeaders,
 					cert,
 				); err != nil {
-					return fmt.
-						Errorf("registry approve: %w",
-							err)
+					return fmt.Errorf("approve: %w", err)
 				}
 			}
 			copy(Reg.l[i:], Reg.l[i+1:])
@@ -215,5 +194,14 @@ skiloop:
 		}
 		return fmt.Errorf("registry %s: %w", ski, ErrSKINotFound)
 	}
+	return nil
+}
+
+func exSubscribers(ctx context.Context, c *tls.Conn) error {
+	enc := lv.NewEncoder(c)
+	certs.Subscribers.Range(func(entry certs.Entry) bool {
+		fmt.Fprint(enc, entry)
+		return true
+	})
 	return nil
 }

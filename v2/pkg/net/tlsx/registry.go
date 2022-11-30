@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
@@ -17,22 +16,24 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
+	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
 
-var Reg = struct {
-	mutex sync.Mutex
-	l     []*x509.Certificate
-}{}
+var (
+	Reg = struct {
+		mutex sync.Mutex
+		l     []*x509.Certificate
+	}{}
+	SubscriptionHeaders = make(map[string]string)
+)
 
 func Registry(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	ln net.Listener,
-	xp uint,
 ) {
 	defer wg.Done()
 
@@ -74,7 +75,7 @@ func Registry(
 				style.Error(ErrNoPeer)
 				return
 			}
-			binary.Write(sv, binary.BigEndian, uint16(xp))
+			sv.Write([]byte("OK"))
 			Reg.mutex.Lock()
 			Reg.l = append(Reg.l, cs.PeerCertificates[0])
 			Reg.mutex.Unlock()
@@ -82,29 +83,33 @@ func Registry(
 	}
 }
 
-func Subscribe(ctx context.Context, addr string) error {
-	var name string
-	tlsc, err := cert.ValErr()
-	if err != nil {
-		return err
-	}
+func Subscribe(ctx context.Context, args []string) (err error) {
+	var name, addr string
 	var dl net.Dialer
 	nw := "tcp"
-	if len(addr) == 0 {
-		na := ipc.Registry()
-		nw = na.Network()
-		if addr, err = na.Address(); err == nil {
-			name, err = host.Name.ValErr()
-		}
-	} else {
-		if i := strings.LastIndex(addr, ":"); i < 0 {
-			return fmt.Errorf("%q: expect [<dns>]:<port>", addr)
-		} else if i == 0 {
-			name, err = host.Name.ValErr()
+	switch len(args) {
+	case 0:
+		return ErrMissingAddress
+	case 1:
+		if i := strings.LastIndex(args[0], ":"); i < 0 {
+			err = ErrNotNamePort
+			return
+		} else if i > 0 {
+			addr = args[0]
+			name = args[0][:i]
+		} else if name, err = host.Name.ValErr(); err != nil {
+			return
 		} else {
-			name = addr[:i]
+			addr = args[0]
 		}
+	case 2:
+		name = args[0]
+		addr = args[1]
+	default:
+		err = fmt.Errorf("%w: %v", ErrUnexpectedArgs, args[2:])
+		return
 	}
+	tlsc, err := cert.ValErr()
 	if err != nil {
 		return err
 	}
@@ -125,10 +130,17 @@ func Subscribe(ctx context.Context, addr string) error {
 	if len(cs.PeerCertificates) == 0 {
 		return ErrNoPeer
 	}
-	var port uint16
-	binary.Read(cl, binary.BigEndian, &port)
-	headers := map[string]string{
-		"port": fmt.Sprint(port),
+	pg := page.New()
+	defer page.Free(pg)
+	n, err := cl.Read(pg)
+	if err != nil {
+		return ErrNotOK
 	}
-	return certs.Exchanges.Add(headers, cs.PeerCertificates[0])
+	if string(pg[:n]) != "OK" {
+		return ErrNotOK
+	}
+	return certs.Subscriptions.Add(
+		SubscriptionHeaders,
+		cs.PeerCertificates[0],
+	)
 }

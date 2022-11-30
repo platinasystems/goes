@@ -13,7 +13,12 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 )
 
-//go:generate sh -c "go tool cgo -godefs -- godefs_darwin.go > godefed_darwin.go"
+//go:generate sh -c "go tool cgo -godefs -- if_utun_darwin.go > zif_utun_darwin.go"
+
+const (
+	HasPI  = true
+	CanTAP = false
+)
 
 var namsiz = uintptr(IFNAMSIZ)
 var namsizp = uintptr(unsafe.Pointer(&namsiz))

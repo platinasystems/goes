@@ -12,31 +12,28 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 )
 
+// fork self to run key'd daemon.
 func Start(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	if path.HasComplete() {
-		return nil
-	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "<daemon> [<args>]\n",
-			"Start named daemon.",
-		)
-		return nil
-	}
-	if len(args) == 0 {
-		return selection.ErrIncomplete
+	daemon := path[len(path)-1]
+	if strings.HasPrefix(daemon, "_") {
+		if path[1] == "complete" {
+			return nil
+		}
+		s := strings.TrimPrefix(daemon, "_")
+		return fmt.Errorf("%s %w", s, ErrUnavailable)
 	}
 	u, err := user.Current()
 	if err != nil {
@@ -56,7 +53,11 @@ func Start(
 				"-", f.Name, "=", s))
 		}
 	})
-	cmd.Args = append(cmd.Args, "daemon")
+	preempted := path[1] == "complete" || path[1] == "help"
+	if preempted {
+		cmd.Args = append(cmd.Args, path[1])
+	}
+	cmd.Args = append(cmd.Args, "daemon", daemon)
 	cmd.Args = append(cmd.Args, args...)
 	cmd.Env = []string{
 		Path(),
@@ -76,15 +77,21 @@ func Start(
 	}
 	cmd.Dir = xdg.RunTimeDir()
 	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: cred,
-		Setsid:     true,
-	}
-	if err = cmd.Start(); err == nil {
-		fmt.Fprint(w, program.Base(), "_", args[0], "_pid=",
-			cmd.Process.Pid, "\n")
+	if preempted {
+		cmd.Stdout = w
+		cmd.Stderr = w
+		err = cmd.Run()
+	} else {
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential: cred,
+			Setsid:     true,
+		}
+		if err = cmd.Start(); err == nil {
+			fmt.Fprint(w, program.Base(), ":daemon:", daemon,
+				":pid: ", cmd.Process.Pid, "\n")
+		}
 	}
 	return err
 }

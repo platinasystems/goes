@@ -17,6 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/cat"
 	"github.com/platinasystems/goes/v2/pkg/goes/echo"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
 func TestIpc(t *testing.T) {
@@ -31,19 +32,21 @@ func TestIpc(t *testing.T) {
 	r := io.LimitReader(nil, 0)
 	got := new(strings.Builder)
 
-	ipc := New("goes_ipc_test")
-	path := selection.Path{ipc.String()}
-	selector := selection.Map{
+	ipc := New()
+	m := selection.Map{
 		"cat":  cat.Func,
 		"echo": echo.Func,
-	}.Select
-	err := ipc.Service(ctx, &wg, selector, 30*time.Second)
+	}
+	err := ipc.Service(ctx, &wg, m, 30*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
+	prog := program.Base()
+	ipcs := ipc.String()
 	ut := func(
 		t *testing.T,
 		want string,
+		path []string,
 		args ...string,
 	) {
 		t.Helper()
@@ -58,14 +61,15 @@ func TestIpc(t *testing.T) {
 		}
 	}
 	t.Run("complete", func(t *testing.T) {
-		ut(t, "echo\n", "complete", "ec")
+		ut(t, "echo\n", []string{prog, "complete", ipcs}, "ec")
 	})
 	t.Run("echo", func(t *testing.T) {
-		ut(t, "hello world\n", "echo", "hello", "world")
+		ut(t, "hello world\n", []string{prog, ipcs},
+			"echo", "hello", "world")
 	})
 	t.Run("cat", func(t *testing.T) {
 		const want = "hello world\n"
 		r = strings.NewReader(want)
-		ut(t, want, "-i", "-", "cat", "-")
+		ut(t, want, []string{prog, ipcs}, "-i", "-", "cat", "-")
 	})
 }

@@ -14,7 +14,9 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
+	"text/template"
 
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
@@ -24,78 +26,40 @@ import (
 var (
 	ErrIncomplete = errors.New("incomplete")
 	ErrNotFound   = errors.New("not found")
+
+	Timeout = flags.CommandLine.Duration("timeout", 0,
+		"Terminate if incomplete by non-zero limit.")
 )
 
-func HasHelp(args []string) bool {
-	if len(args) > 0 && strings.HasPrefix(args[0], "-") {
-		a0 := strings.TrimLeft(args[0], "-")
-		return a0 == "h" || a0 == "help"
-	}
-	return false
+var Usage = `
+usage: {{.Prog}} [<options>] <command> [<args>]
+{{print .Flags}}
+{{print .Selection}}`
+
+type UsageData struct {
+	Prog string
+	flags.Flags
+	Selection Map
 }
 
-type Func = func(context.Context, io.Reader, io.Writer, Path, ...string) error
-
-type Map map[string]Func
-
-var Root Map
+type Map map[string]func(
+	context.Context,
+	io.Reader,
+	io.Writer,
+	[]string,
+	...string,
+) error
 
 func (m Map) Format(w fmt.State, verb rune) {
 	for _, k := range m.Keys() {
-		fmt.Fprint(w, "\n  ", k)
-	}
-}
-
-func (m Map) Main() {
-	r := io.Reader(os.Stdin)
-	w := io.Writer(os.Stdout)
-	Root = m
-	ctx, stop := signal.NotifyContext(context.Background(),
-		termination.Signals...)
-	defer stop()
-	path := Path{program.Base()}
-	flag.CommandLine.Init(path[0], flag.ContinueOnError)
-	flag.Usage = func() {
-		Root.Usage(w, path, flag.CommandLine)
-	}
-	style.Quiet = flag.Bool("quiet", false, "suppress errata")
-	style.Verbose = flag.Bool("verbose", false, "print notices")
-	timeout := flag.Duration("timeout", 0,
-		"Terminate command if incomplete by non-zero limit.")
-	err := flag.CommandLine.Parse(os.Args[1:])
-	if err == flag.ErrHelp {
-		return
-	}
-	style.Verbosity()
-	if *timeout != 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-	args := flag.Args()
-	f, found := Root[program.Executable()] // e.g. /init
-	if !found {
-		f = Root.Select
-	}
-	isDaemon := len(args) > 0 && args[0] == "daemon"
-	if isDaemon {
-		style.System()
-		r = io.LimitReader(nil, 0)
-		w = style.Plain.Notice.Writer()
-		fmt.Fprintln(w, "start", args)
-	}
-	err = f(ctx, r, w, path, args...)
-	if err != nil && !errors.Is(err, flag.ErrHelp) {
-		style.Fatal(err)
-	} else if isDaemon {
-		fmt.Fprintln(w, "exit", args)
+		fmt.Fprintln(w, " ", k)
 	}
 }
 
 func (m Map) Keys() []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
-		if k != "daemon" {
+		if k != "daemon" && !strings.HasPrefix(k, "_") {
 			keys = append(keys, k)
 		}
 	}
@@ -103,73 +67,136 @@ func (m Map) Keys() []string {
 	return keys
 }
 
+// The hooks are run after parse of command line flags.
+// Use these to extend the main Map per flag input.
+func (m Map) Main(hooks ...func(Map) error) {
+	r := io.Reader(os.Stdin)
+	w := io.Writer(os.Stdout)
+	path := []string{program.Base()}
+
+	usage := func() {
+		template.Must(template.New("usage").Parse(Usage[1:])).
+			Execute(w, UsageData{
+				path[0],
+				flags.CommandLine,
+				m,
+			})
+	}
+
+	if !flags.CommandLine.Parsed() {
+		err := flags.CommandLine.Parse(os.Args[1:])
+		if err == flags.ErrHelp {
+			usage()
+			return
+		} else if err != nil {
+			style.Fatal(Error{path, err})
+		}
+		style.Verbosity()
+		for _, hook := range hooks {
+			if err := hook(m); err != nil {
+				style.Fatal(Error{path, err})
+			}
+		}
+	}
+
+	args := flag.CommandLine.Args()
+	if len(args) == 0 {
+		style.Fatal(Error{path, ErrIncomplete})
+	}
+
+	switch args[0] {
+	case "complete":
+		path = append(path, args[0])
+		if args = args[1:]; len(args) == 0 {
+			complete.Last(w, args, m.Keys(),
+				flags.CommandLine.FlagSet)
+			return
+		} else if args[0] == "help" {
+			args = args[1:]
+		}
+	case "help":
+		path = append(path, args[0])
+		if args = args[1:]; len(args) == 0 {
+			usage()
+			return
+		}
+	case "daemon":
+		style.System()
+		r = io.LimitReader(nil, 0)
+		w = style.Plain.Notice.Writer()
+		fmt.Fprintln(w, "start", args)
+		defer func() { fmt.Fprintln(w, "exit", args) }()
+	}
+
+	exe := program.Executable()
+	f, found := m[exe]
+	if found { // is an executable link, e.g. /init
+		path[0] = exe
+	} else {
+		f = m.Select
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		termination.Signals...)
+	defer stop()
+
+	if *Timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *Timeout)
+		defer cancel()
+	}
+
+	if err := f(ctx, r, w, path, args...); err != nil {
+		if !errors.Is(err, flag.ErrHelp) {
+			style.Fatal(err)
+		}
+	}
+}
+
 func (m Map) Select(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path Path,
+	path []string,
 	args ...string,
-) error {
-	if len(args) > 0 && len(path) == 1 {
-		if args[0] == "complete" || args[0] == "help" {
-			path = append(path, args[0])
-			args = args[1:]
-		}
-	}
+) (err error) {
 	if len(args) == 0 {
-		if f, found := m[""]; found {
-			return f(ctx, r, w, path)
-		}
-		if path.HasComplete() {
+		switch path[1] {
+		case "complete":
 			complete.Last(w, args, m.Keys())
-			return nil
-		}
-		if path.HasHelp() {
-			m.Usage(w, path)
-			return nil
-		}
-		return ErrIncomplete
-	}
-	if f, found := m[args[0]]; found {
-		err := f(ctx, r, w, append(path, args[0]), args[1:]...)
-		if err != nil {
-			return fmt.Errorf("%s: %w", args[0], err)
-		}
-		return nil
-	}
-	if f, found := m[""]; found {
-		return f(ctx, r, w, path, args...)
-	}
-	if path.HasComplete() {
-		complete.Last(w, args, m.Keys())
-		return nil
-	}
-	if path.HasHelp() || HasHelp(args) {
-		m.Usage(w, path)
-		return nil
-	}
-	if f, found := m["command"]; found {
-		return f(ctx, r, w, append(path, "command"), args...)
-	}
-	return fmt.Errorf("%q: %w", args[0], ErrNotFound)
-}
+		case "help":
+			copy(path[1:], path[2:])
+			path = path[:len(path)-1]
+			err = template.Must(template.New("usage").Parse(`
+usage: {{.Command}} <command|object> [<args>]
 
-func (m Map) Usage(
-	w io.Writer,
-	path Path,
-	args ...any,
-) {
-	var usage string
-	if len(path) == 1 {
-		if _, ok := m[""]; ok {
-			usage = "[<options>] [<command> [<args>]]\n"
-		} else {
-			usage = "[<options>] <command> [<args>]\n"
+{{print .Selection}}`[1:])).Execute(w, struct {
+				Command   string
+				Selection Map
+			}{strings.Join(path, " "), m})
+			if err != nil {
+				err = Error{path, err}
+			}
+		default:
+			err = Error{path, ErrIncomplete}
 		}
-	} else if _, ok := m[""]; ok {
-		usage = "[<command> [<args>]]\n"
+	} else if f, found := m[args[0]]; found {
+		err = f(ctx, r, w, append(path, args[0]), args[1:]...)
+		if err != nil {
+			if _, wrapped := err.(Error); !wrapped {
+				err = Error{path, err}
+			}
+		}
+	} else if f, found := m["command"]; found {
+		err = f(ctx, r, w, append(path, "command"), args...)
+		if err != nil {
+			err = Error{append(path, args[0]), err}
+		}
+	} else if path[1] == "complete" && len(args) == 1 {
+		complete.Last(w, args, m.Keys())
+		return
 	} else {
-		usage = "<command> [<args>]\n"
+		err = Error{append(path, args[0]), ErrNotFound}
 	}
-	path.Usage(w, usage, args, m)
+	return
 }

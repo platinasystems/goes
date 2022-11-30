@@ -36,7 +36,7 @@ func MkPath(s string) error {
 	return os.MkdirAll(s, perm)
 }
 
-var xdg = struct {
+var Cache = struct {
 	CacheHome,
 	ConfigDirs,
 	ConfigHome,
@@ -161,20 +161,20 @@ var Root = struct {
 var (
 	// If available, returns $XDG_CACHE_HOME.  If SU, returns /var/cache or
 	// /var/run; otherwise, if not SU, returns UserCacheDir or TempDir.
-	CacheHome = xdg.CacheHome.Value
+	CacheHome = Cache.CacheHome.Value
 	// If available, returns $XDG_CONFIG_DIRS; otherwise, returns /etc/xdg.
-	ConfigDirs = xdg.ConfigDirs.Value
+	ConfigDirs = Cache.ConfigDirs.Value
 	// If available, returns $XDG_CONFIG_HOME.  If SU, returns "/etc/opt"
 	// if opt program; or "/etc"; otherwise, if not SU, returns
 	// UserConfigDir or TempDir.
-	ConfigHome = xdg.ConfigHome.Value
-	DataDirs   = xdg.DataDirs.Value
+	ConfigHome = Cache.ConfigHome.Value
+	DataDirs   = Cache.DataDirs.Value
 	// If available, returns $XDG_DATA_HOME.  If SU, returns
 	// "/usr/local/share" if local program; "/opt/share" if opt program; or
 	// "/usr/share"; otherwise, if not SU, returns UserHomeDir or TempDir.
-	DataHome = xdg.DataHome.Value
+	DataHome = Cache.DataHome.Value
 	// If available, returns $XDG_RUNTIME_DIR; or if SU, "/var/run";
 	// otherwise, UserCacheDir or TempDir.
-	RunTimeDir = xdg.RunTimeDir.Value
-	StateHome  = xdg.StateHome.Value
+	RunTimeDir = Cache.RunTimeDir.Value
+	StateHome  = Cache.StateHome.Value
 )

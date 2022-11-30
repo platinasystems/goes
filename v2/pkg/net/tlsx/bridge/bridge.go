@@ -7,22 +7,29 @@ package bridge
 import (
 	"context"
 	"crypto/tls"
-	"os"
+	"errors"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/net/frame"
+	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
 
+var ErrTooShort = errors.New("len(frame) < 14")
+
 type Bridge struct {
+	name  string
 	input chan *input
 	join  chan *tls.Conn
 	leave chan *tls.Conn
 }
 
-func New(ctx context.Context, wg *sync.WaitGroup) *Bridge {
+func New(ctx context.Context, wg *sync.WaitGroup, name string) *Bridge {
 	br := &Bridge{
+		name:  name,
 		input: make(chan *input, 16),
 		join:  make(chan *tls.Conn, 4),
 		leave: make(chan *tls.Conn, 4),
@@ -32,69 +39,44 @@ func New(ctx context.Context, wg *sync.WaitGroup) *Bridge {
 	return br
 }
 
-func (br *Bridge) Join(ctx context.Context, conn *tls.Conn) error {
-	br.join <- conn
-	defer func() { br.leave <- conn }()
+func (br *Bridge) Join(ctx context.Context, c *tls.Conn) {
+	br.join <- c
+	defer func() { br.leave <- c }()
 
-	dec := lv.NewDecoder(poll.With(ctx, conn))
+	sub := dns0(c)
+	dec := lv.NewDecoder(poll.With(ctx, c))
 	for {
-		in := pool.Get().(*input)
-		in.c = conn
-		n, err := dec.Read(in.b)
+		pg := page.New()
+		n, err := dec.Read(pg)
 		if err != nil {
-			in.free()
-			return err
+			page.Free(pg)
+			style.Error(err)
+			break
 		}
-		in.b = in.b[:n]
+		if n < 14 {
+			page.Free(pg)
+			style.Error(ErrTooShort)
+			break
+		}
+		in := newinput(c, pg[:n])
+		style.Println(br.name, "<-", sub, frame.Eth(in.pg))
 		br.input <- in
 	}
-	return nil
 }
 
 func (br *Bridge) forward(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var flood []*tls.Conn
-	learned := make(map[uint64]*tls.Conn)
-
-	learn := func(b []byte, c *tls.Conn) {
-		learned[ea64(b[6:])] = c
-	}
-	forward := func(ctx context.Context, c *tls.Conn, b []byte) error {
-		_, err := lv.NewEncoder(write.With(ctx, c)).Write(b)
-		return err
-	}
+	lookup := make(map[uint64]*tls.Conn)
 
 	for {
 		select {
 		case <-ctx.Done():
 			flood = flood[:0]
-			for k := range learned {
-				delete(learned, k)
+			for k := range lookup {
+				delete(lookup, k)
 			}
 			return
-		case in := <-br.input:
-			if len(in.b) < 14 {
-				in.free()
-				continue
-			}
-			if (in.b[6] & 1) == 0 {
-				learn(in.b, in.c)
-			}
-			if (in.b[0] & 1) == 0 {
-				da := ea64(in.b)
-				if c, ok := learned[da]; ok {
-					err := forward(ctx, c, in.b)
-					if err == nil {
-						in.free()
-						continue
-					}
-					delete(learned, da)
-				}
-			}
-			for _, c := range flood {
-				forward(ctx, c, in.b)
-			}
-			in.free()
 		case c := <-br.join:
 			flood = append(flood, c)
 		case c := <-br.leave:
@@ -104,40 +86,66 @@ func (br *Bridge) forward(ctx context.Context, wg *sync.WaitGroup) {
 					flood = flood[:len(flood)-1]
 				}
 			}
+			for k, v := range lookup {
+				if v == c {
+					delete(lookup, k)
+					break
+				}
+			}
+		case in := <-br.input:
+			eth := frame.Eth(in.pg)
+			if eth.ShouldLearn() {
+				lookup[eth.SA()] = in.c
+			}
+			da := eth.DA()
+			if c, ok := lookup[da]; ok {
+				br.send(ctx, c, in)
+			} else {
+				for _, c := range flood {
+					if c != in.c {
+						br.send(ctx, c, in)
+					}
+				}
+			}
+			in.free()
 		}
 	}
 }
 
-type input struct {
-	c *tls.Conn
-	b []byte
+func (br *Bridge) send(ctx context.Context, c *tls.Conn, in *input) {
+	_, err := lv.NewEncoder(write.With(ctx, c)).Write(in.pg)
+	if err != nil {
+		style.Errorln(br.name, "->", dns0(c), err)
+	} else {
+		style.Println(br.name, "->", dns0(c), frame.Eth(in.pg))
+	}
 }
 
-var (
-	size = os.Getpagesize()
-	pool = sync.Pool{
-		New: func() any {
-			return &input{
-				b: make([]byte, size, size),
-			}
-		},
-	}
-)
+type input struct {
+	c  *tls.Conn
+	pg []byte
+}
+
+var pool = sync.Pool{New: func() any { return new(input) }}
+
+func newinput(c *tls.Conn, pg []byte) *input {
+	in := pool.Get().(*input)
+	in.c = c
+	in.pg = pg
+	return in
+}
 
 func (in *input) free() {
-	if cap(in.b) == size {
-		in.c = nil
-		in.b = in.b[:size]
-		pool.Put(in)
-	}
+	page.Free(in.pg)
+	in.c = nil
+	in.pg = in.pg[:0]
+	pool.Put(in)
 }
 
-func ea64(b []byte) uint64 {
-	ea := uint64(b[0]) << 40
-	ea |= uint64(b[1]) << 32
-	ea |= uint64(b[2]) << 24
-	ea |= uint64(b[3]) << 16
-	ea |= uint64(b[4]) << 8
-	ea |= uint64(b[5])
-	return ea
+func dns0(c *tls.Conn) string {
+	if cs := c.ConnectionState(); len(cs.PeerCertificates) > 0 &&
+		len(cs.PeerCertificates[0].DNSNames) > 0 {
+		return cs.PeerCertificates[0].DNSNames[0]
+	}
+	return "anonymous"
 }

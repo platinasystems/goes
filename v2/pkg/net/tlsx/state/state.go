@@ -5,6 +5,7 @@
 package state
 
 import (
+	"flag"
 	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/os/program"
@@ -13,28 +14,19 @@ import (
 )
 
 var (
-	DirFlag *string
-	Dir     = cache.New[string](func(p *string) (err error) {
-		if DirFlag != nil {
-			*p = *DirFlag
-		} else {
-			*p = DefaultDir()
-		}
-		return
-	})
-	DefaultDir = cache.New[string](func(p *string) error {
-		*p = filepath.Join(
-			xdg.StateHome(),
-			program.Base(),
-		)
-		return nil
-	}).Value
+	Cache = struct {
+		Dir *cache.Cache[string]
+	}{
+		Dir: cache.New[string](func(p *string) error {
+			*p = *Flag
+			return nil
+		}),
+	}
+	Default = filepath.Join(xdg.StateHome(), program.Base())
+	Dir     = Cache.Dir.Value
+	Flag    = flag.String("state", Default, "certificate directory")
 )
 
 func MkDir() error {
-	dir, err := Dir.ValErr()
-	if err == nil {
-		err = xdg.MkPath(dir)
-	}
-	return err
+	return xdg.MkPath(Dir())
 }

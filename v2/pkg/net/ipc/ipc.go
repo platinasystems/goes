@@ -6,14 +6,15 @@ package ipc
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/rpc"
+	"strings"
+	"text/template"
 
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
@@ -30,25 +31,27 @@ func (ipc Ipc) Func(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	var res string
-	name := path[len(path)-1]
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs := flags.New()
 	in := fs.String("i", "", "Input FILE or '-' for STDIN.")
-	fs.Usage = func() {
-		path.Usage(w, "[-i <FILE|->] COMMAND [OPTION]... [ARG]...\n")
-	}
-	if path.HasComplete() {
-		args = append([]string{"complete"}, args...)
-		return nil
-	}
-	if path.HasHelp() {
-		args = append([]string{"help"}, args...)
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(`
+usage: {{.Command}} [<options>] <command> [<args>]
+Run command through IPC server.
+{{print .Flags}}`[1:])).Execute(w, struct {
+			Command string
+			Flags   flags.Flags
+		}{
+			strings.Join(path, " "),
+			fs,
+		})
 	}
 	err := fs.Parse(args)
-	if err != nil {
+	if err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
 		return err
 	}
 	args = fs.Args()
@@ -64,10 +67,14 @@ func (ipc Ipc) Func(
 		}
 		args = append([]string{"-i", string(b)}, args...)
 	}
+	if path[1] == "complete" || path[1] == "help" {
+		args = append([]string{path[1]}, args...)
+	}
 	conn, err := ipc.Dial(ctx)
 	if err != nil {
 		return err
 	}
+	var res string
 	c := rpc.NewClient(conn)
 	call := c.Go("Service.Select", args, &res, nil)
 	select {

@@ -6,44 +6,32 @@ package tlsx
 
 import (
 	"context"
-	"crypto/x509"
 	"fmt"
 	"io"
+	"strings"
+	"text/template"
 
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
-	"github.com/platinasystems/goes/v2/pkg/goes/show"
-	"github.com/platinasystems/goes/v2/pkg/goes/xdg"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
-var Show = selection.Map{
-	"build-id":       show.Func(program.BuildId),
-	"build-info":     show.Func(program.BuildInfo),
-	"cert":           showCert,
-	"clients":        showClients,
-	"exchanges":      showExchanges,
-	"main-reference": show.Func(program.MainReference),
-	"xdg":            xdg.Show,
-	"version":        show.Func(program.MainVersion),
-}
-
-func showCert(
+func ShowCert(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	if path.HasComplete() {
+	switch path[1] {
+	case "complete":
 		return nil
-	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "\n",
-			"Print local certificate.",
-		)
-		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return template.Must(template.New("usage").Parse(`
+usage: {{.}}
+Print local certificate.
+`[1:])).Execute(w, strings.Join(path, " "))
 	}
 	tlsc, err := cert.ValErr()
 	if err != nil {
@@ -58,54 +46,34 @@ func showCert(
 	if n := len(tlsc.SignedCertificateTimestamps); n > 0 {
 		fmt.Fprintln(w, "signed_certificate_timestamps:", n)
 	}
-	certs.Fsequent(w, certs.Headers{}, tlsc.Leaf)
+	fmt.Fprint(w, certs.NewEntry(tlsc.Leaf))
 	return nil
 }
 
-func showClients(
+func ShowSubs(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	if path.HasComplete() {
+	switch path[1] {
+	case "complete":
 		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return template.Must(template.New("usage").Parse(`
+usage: {{.}}
+List certificates.
+`[1:])).Execute(w, strings.Join(path, " "))
 	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "\nList client certificates of exchange.")
-		return nil
+	subs := certs.Subscribers
+	if path[len(path)-1] == "subscriptions" {
+		subs = certs.Subscriptions
 	}
-	certs.Clients.Range(func(
-		headers certs.Headers,
-		cl *x509.Certificate,
-	) bool {
-		certs.Fsequent(w, headers, cl)
-		return true
-	})
-	return nil
-}
-
-func showExchanges(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path selection.Path,
-	args ...string,
-) error {
-	if path.HasComplete() {
-		return nil
-	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "\nList exchange certificates of "+
-			"host or consumer.")
-		return nil
-	}
-	certs.Exchanges.Range(func(
-		headers certs.Headers,
-		ex *x509.Certificate,
-	) bool {
-		certs.Fsequent(w, headers, ex)
+	subs.Range(func(entry certs.Entry) bool {
+		fmt.Fprint(w, entry)
 		return true
 	})
 	return nil

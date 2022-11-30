@@ -7,32 +7,30 @@ package tlsx
 import (
 	"context"
 	"io"
+	"strings"
+	"text/template"
 
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 )
 
-// Subscribe provider or consumer to exchange.
 func Subscribe(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) (err error) {
-	if path.HasComplete() {
+	switch path[1] {
+	case "complete":
 		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return template.Must(template.New("usage").Parse(`
+usage:	{{print .}} <name>:<port>
+	{{print .}} <name> <address>:<port>
+Register with exchange.
+`[1:])).Execute(w, strings.Join(path, " "))
 	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "[[<dns>]:<port>]\n",
-			"Register host or consumer with exchange."+
-				"(default IPC)",
-		)
-		return nil
-	}
-	var reg string
-	if len(args) > 0 {
-		reg = args[0]
-	}
-	return tlsx.Subscribe(ctx, reg)
+	return tlsx.Subscribe(ctx, args)
 }

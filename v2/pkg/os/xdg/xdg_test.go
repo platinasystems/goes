@@ -72,23 +72,23 @@ func Test(t *testing.T) {
 					"XDG_STATE_HOME":  "$HOME/.local/state",
 				}[name]
 			}
-			xdg.CacheHome.Reload()
+			Cache.CacheHome.Reload()
 			t.Run("XDG_CACHE_HOME", unit{
 				CacheHome, "$HOME/.cache",
 			}.test)
-			xdg.ConfigHome.Reload()
+			Cache.ConfigHome.Reload()
 			t.Run("XDG_CONFIG_HOME", unit{
 				ConfigHome, "$HOME/.config",
 			}.test)
-			xdg.DataHome.Reload()
+			Cache.DataHome.Reload()
 			t.Run("XDG_DATA_HOME", unit{
 				DataHome, "$HOME/.local/share",
 			}.test)
-			xdg.RunTimeDir.Reload()
+			Cache.RunTimeDir.Reload()
 			t.Run("XDG_RUNTIME_DIR", unit{
 				RunTimeDir, "/run/user/$ID",
 			}.test)
-			xdg.StateHome.Reload()
+			Cache.StateHome.Reload()
 			t.Run("XDG_STATE_HOME", unit{
 				StateHome, "$HOME/.local/state",
 			}.test)
@@ -104,23 +104,23 @@ func Test(t *testing.T) {
 			UserHomeDir = func() (string, error) {
 				return "$HOME", nil
 			}
-			xdg.CacheHome.Reload()
+			Cache.CacheHome.Reload()
 			t.Run("XDG_CACHE_HOME", unit{
 				CacheHome, "$HOME/.cache",
 			}.test)
-			xdg.ConfigHome.Reload()
+			Cache.ConfigHome.Reload()
 			t.Run("XDG_CONFIG_HOME", unit{
 				ConfigHome, "$HOME/.config",
 			}.test)
-			xdg.DataHome.Reload()
+			Cache.DataHome.Reload()
 			t.Run("XDG_DATA_HOME", unit{
 				DataHome, "$HOME/.local/share",
 			}.test)
-			xdg.RunTimeDir.Reload()
+			Cache.RunTimeDir.Reload()
 			t.Run("XDG_RUNTIME_DIR", unit{
 				RunTimeDir, "$HOME/.cache",
 			}.test)
-			xdg.StateHome.Reload()
+			Cache.StateHome.Reload()
 			t.Run("XDG_STATE_HOME", unit{
 				StateHome, "$HOME/.local/state",
 			}.test)

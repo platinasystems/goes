@@ -6,6 +6,11 @@
 
 package host
 
-import "encoding/binary"
+import "github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 
-var ByteOrder binary.ByteOrder = binary.BigEndian
+type Uint8 = big.Uint8
+type Uint16 = big.Uint16
+type Uint32 = big.Uint32
+type Uint64 = big.Uint64
+type Float32 = big.Float32
+type Float64 = big.Float64

@@ -6,6 +6,11 @@
 
 package host
 
-import "encoding/binary"
+import "github.com/platinasystems/goes/v2/pkg/encoding/binary/little"
 
-var ByteOrder binary.ByteOrder = binary.LittleEndian
+type Uint8 = little.Uint8
+type Uint16 = little.Uint16
+type Uint32 = little.Uint32
+type Uint64 = little.Uint64
+type Float32 = little.Float32
+type Float64 = little.Float64

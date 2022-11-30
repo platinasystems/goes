@@ -13,40 +13,31 @@ import (
 
 type Type = *cache.Cache[string]
 
-var Aliases = cache.New[string](func(p *string) (err error) {
-	*p, err = filename("aliases.json")
-	return
-})
+var Addresses = cache.New[string](func(p *string) error {
+	*p = filename("addresses.json")
+	return nil
+}).Value
 
-var Authorized = cache.New[string](func(p *string) (err error) {
-	*p, err = filename("authorized.txt")
-	return
-})
+var Cert = cache.New[string](func(p *string) error {
+	*p = filename("cert.pem")
+	return nil
+}).Value
 
-var Cert = cache.New[string](func(p *string) (err error) {
-	*p, err = filename("cert.pem")
-	return
-})
+var Subscribers = cache.New[string](func(p *string) error {
+	*p = filename("subscribers.pem")
+	return nil
+}).Value
 
-var Clients = cache.New[string](func(p *string) (err error) {
-	*p, err = filename("clients.pem")
-	return
-})
+var Subscriptions = cache.New[string](func(p *string) error {
+	*p = filename("subscriptions.pem")
+	return nil
+}).Value
 
-var Exchanges = cache.New[string](func(p *string) (err error) {
-	*p, err = filename("exchanges.pem")
-	return
-})
+var PrivateKey = cache.New[string](func(p *string) error {
+	*p = filename("key.pem")
+	return nil
+}).Value
 
-var PrivateKey = cache.New[string](func(p *string) (err error) {
-	*p, err = filename("key.pem")
-	return
-})
-
-func filename(base string) (string, error) {
-	fn, err := state.Dir.ValErr()
-	if err == nil {
-		fn = filepath.Join(fn, base)
-	}
-	return fn, err
+func filename(base string) string {
+	return filepath.Join(state.Dir(), base)
 }

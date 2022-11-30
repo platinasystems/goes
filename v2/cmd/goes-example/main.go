@@ -19,9 +19,9 @@ func main() {
 		"command": command.Func,
 		"echo":    echo.Func,
 		"show": selection.Map{
-			"build-id":   show.Func(program.BuildId),
-			"build-info": show.Func(program.BuildInfo),
-			"version":    show.Func(program.MainVersion),
+			"build-id":   show.New(program.BuildId),
+			"build-info": show.New(program.BuildInfo),
+			"version":    show.New(program.MainVersion),
 		}.Select,
 	}.Main()
 }

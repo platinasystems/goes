@@ -9,19 +9,18 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
 	"os/user"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/filename"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -31,17 +30,12 @@ func CreateCert(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
 	const year = 365 * 24 * time.Hour
 
-	hn, err := host.Name.ValErr()
-	if err != nil {
-		return err
-	}
-
-	defname := hn
+	defname := host.Name.Value()
 	if cur, err := user.Current(); err == nil {
 		switch {
 		case len(cur.Name) > 0:
@@ -51,13 +45,12 @@ func CreateCert(
 		}
 	}
 
-	keyfn := filename.PrivateKey.String()
-	certfn := filename.Cert.String()
-	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+	fs := flags.New()
+
 	alg := keycert.PureEd25519
-	fs.Var(&alg, "alg", fmt.Sprint(keycert.Algs))
+	fs.Var(&alg, "alg", strings.Join(keycert.Algs, ", "))
 	sn := fs.Int64("serial-number", 1, "")
-	dnsnames := fs.String("dns", hn, "comma separated")
+	dnsnames := fs.String("dns", host.Name.Value(), "comma separated")
 	dur := fs.Duration("duration", 10*year, "note 8760 hours per year")
 
 	email := fs.String("email", "", "")
@@ -68,33 +61,43 @@ func CreateCert(
 	country := fs.String("country", "", "")
 	name := fs.String("name", defname, "")
 
-	fs.Usage = func() {
-		path.Usage(w, "[<options>]\n",
-			"Create key and certifcate for"+
-				" host, consumer, or exchange.\n",
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(`
+usage: {{.Command}} [<options>]
+Create key and certifcate for host or exchange.
+{{print .Flags}}
+`[1:])).Execute(w, struct {
+			Command string
+			Flags   flags.Flags
+		}{
+			strings.Join(path, " "),
 			fs,
-		)
+		})
 	}
 
-	if err := fs.Parse(args); err != nil {
+	switch path[1] {
+	case "complete":
+		complete.Last(w, args, fs.FlagSet)
+		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return usage()
+	}
+
+	if err := fs.Parse(args); err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
 		return err
 	}
-	if fs.NArg() > 0 {
-		return fmt.Errorf("unexpected: %v", fs.Args())
-	}
 
-	if path.HasComplete() {
-		complete.Last(w, args, fs, keycert.Algs)
-		return nil
-	}
-	if path.HasHelp() {
-		fs.Usage()
-		return nil
+	if args = fs.Args(); len(args) > 0 {
+		return fmt.Errorf("%w: %v", ErrUnexpectedArgs, args)
 	}
 
 	dnsa := strings.Split(*dnsnames, ",")
 	if len(dnsa) == 0 || len(dnsa[0]) == 0 {
-		return errors.New("no DNS names")
+		return ErrNoDNSNames
 	}
 
 	k, block, err := keycert.NewPrivateKey(alg.Value())
@@ -105,7 +108,7 @@ func CreateCert(
 		return err
 	}
 	pemdata := pem.EncodeToMemory(block)
-	err = ioutil.WriteFile(keyfn, pemdata, 0600)
+	err = ioutil.WriteFile(filename.PrivateKey(), pemdata, 0600)
 	if err != nil {
 		return err
 	}
@@ -114,7 +117,7 @@ func CreateCert(
 		emails = strings.Split(*email, ",")
 	}
 	if len(*name) == 0 {
-		return errors.New("no name")
+		return ErrNoName
 	}
 	now := time.Now()
 	expire := now.Add(*dur)
@@ -141,5 +144,5 @@ func CreateCert(
 		return err
 	}
 	pemdata = pem.EncodeToMemory(block)
-	return ioutil.WriteFile(certfn, pemdata, 0644)
+	return ioutil.WriteFile(filename.Cert(), pemdata, 0644)
 }

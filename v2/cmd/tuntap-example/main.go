@@ -13,6 +13,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
@@ -21,8 +22,8 @@ import (
 func main() {
 	var link tuntap.Link
 	flag.TextVar(&link, "link", link, "tap link address (default autogen)")
-	group := flag.Int("group", tuntap.Unset, "(default unset)")
-	owner := flag.Int("owner", tuntap.Unset, "(default unset)")
+	group := flag.Int("group", tuntap.Unset, "unset w/ -1")
+	owner := flag.Int("owner", tuntap.Unset, "unset w/ -1")
 	persist := flag.Bool("persist", false, "")
 	tap := flag.Bool("tap", false, "(default tun)")
 	unit := flag.Uint("unit", 0, "")
@@ -37,15 +38,9 @@ func main() {
 		Link:    link,
 	}
 
-	min := tuntap.MinPktLen
-	addrs := func(b []byte) (src, dst fmt.Stringer) {
-		return tuntap.TunAddrs(b)
-	}
+	min := tuntap.TunMin
 	if *tap {
-		min = tuntap.MinEthLen
-		addrs = func(b []byte) (src, dst fmt.Stringer) {
-			return tuntap.TapAddrs(b)
-		}
+		min = tuntap.TapMin
 	}
 
 	f, err := tuntap.New(cfg)
@@ -73,8 +68,12 @@ func main() {
 			style.Error("too short")
 			break
 		}
-		flags, proto := tuntap.Info(pg)
-		src, dst := addrs(pg)
-		fmt.Printf("%#04x %04x %v -> %v\n", flags, proto, src, dst)
+		if tuntap.HasPI {
+			fmt.Println(frame.TunPI(pg[:n]))
+		} else if *tap {
+			fmt.Println(frame.Eth(pg[:n]))
+		} else {
+			fmt.Println(frame.IP(pg[:n]))
+		}
 	}
 }

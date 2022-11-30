@@ -7,44 +7,54 @@ package echo
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
+	"strings"
+	"text/template"
 
 	"github.com/platinasystems/goes/v2/pkg/context/write"
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 )
 
 func Func(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	fs := flag.NewFlagSet("echo", flag.ContinueOnError)
-	esc := fs.Bool("e", false, "interpret escapes")
-	nonl := fs.Bool("n", false, "without trailing newline")
-	fs.Usage = func() {
-		path.Usage(w, "[<options>] [<strings>]\n",
-			"Print string(s) to standard output.\n",
+	fs := flags.New()
+	esc := fs.Bool("e", false, "Interpret escapes.")
+	nonl := fs.Bool("n", false, "Without trailing newline.")
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(`
+usage: {{.Command}} [<options>] [<strings>]
+Print string(s) to standard output.
+{{print .Flags}}`[1:])).Execute(w, struct {
+			Command string
+			Flags   flags.Flags
+		}{
+			strings.Join(path, " "),
 			fs,
-		)
+		})
+	}
+	switch path[1] {
+	case "complete":
+		complete.Last(w, args, fs.FlagSet)
+		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return usage()
 	}
 	err := fs.Parse(args)
-	if err != nil {
+	if err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
 		return err
 	}
 	args = fs.Args()
-	if path.HasComplete() {
-		complete.Last(w, args, fs)
-		return nil
-	}
-	if path.HasHelp() {
-		fs.Usage()
-		return nil
-	}
 	cw := write.With(ctx, w)
 	for i, arg := range args {
 		if i > 0 {

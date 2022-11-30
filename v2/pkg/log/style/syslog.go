@@ -22,7 +22,7 @@ var priorities = map[Level]syslog.Priority{
 // Log to syslog instead of Std{out|err}.
 func (style Style) System() {
 	pri := syslog.LOG_DAEMON | priorities[style.Level]
-	if sl, err := syslog.New(pri, Base); err == nil {
+	if sl, err := syslog.New(pri, ""); err == nil {
 		style.SetOutput(sl)
 		style.SetPrefix("")
 	}

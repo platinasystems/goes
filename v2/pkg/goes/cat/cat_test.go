@@ -8,8 +8,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 )
 
 func Test(t *testing.T) {
@@ -17,8 +15,8 @@ func Test(t *testing.T) {
 	ctx := context.Background()
 	got := new(strings.Builder)
 	r := strings.NewReader(want)
-	cat := selection.Path{"cat"}
-	if err := Func(ctx, r, got, cat, "-"); err != nil {
+	path := []string{"cat.test", "cat"}
+	if err := Func(ctx, r, got, path, "-"); err != nil {
 		t.Error(err)
 	} else if gots := got.String(); gots != want {
 		t.Errorf("%q != %q", gots, want)

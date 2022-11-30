@@ -2,76 +2,93 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-/*
-The tlsx provides these TLS network roles: host, consumer, and exchange.
-
-Usage:
-	tlsx [-d DIR] alias [<name> [<subject-key-id>]]
-		Add or print subject-key-id association.
-	tlsx [-d DIR] authorize [<subject-key-id(s)>]
-		Authorize host consumer.
-	tlsx [-d DIR] create-cert
-		Create key and certifcate for host, consumer, or exchange.
-	tlsx [-d DIR] exchange approve [<subject-key-id(s)>]
-		Approve client(s) subscription.
-	tlsx [-d DIR] exchange clients
-		List certificates of exchange clients.
-	tlsx [-d DIR] exchange deny [<subject-key-id(s)>]
-		Deny client(s) subscription.
-	tlsx [-d DIR] jump <host> [<request> [<args>]]
-		Run request on host connected through exchange.
-	tlsx [-d DIR] revoke [<subject-key-id(s)>]
-		Revoke consumer authorization.
-	tlsx show build-id
-	tlsx show build-info
-	tlsx [-d DIR] show cert
-		Print local certificate.
-	tlsx [-d DIR] show clients
-		List client certificates of exchange.
-	tlsx [-d DIR] show exchanges
-		List exchange certificates of host or consumer.
-	tlsx show main-reference
-		PATH@SYMVER
-	tlsx show version
-		SYMVER
-	tlsx [-d DIR] start exchange start [-r PORT] [-x PORT]
-		Start TLS exchange service.
-	tlsx [-d DIR] start host
-		Service consumer requests through subscribed exchange(s).
-	tlsx [-d DIR] subscribe
-		Register host or consumer with exchange.
-*/
+// This command provides a TLS network in which an exchange bridges connecting
+// hosts.
 package main
 
 import (
-	"flag"
-
 	"github.com/platinasystems/goes/v2/pkg/goes/daemon"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/goes/show"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx"
-	"github.com/platinasystems/goes/v2/pkg/net/ipc"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/tap"
+	"github.com/platinasystems/goes/v2/pkg/goes/xdg"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
+const Usage = `
+usage:	{{.Prog}} [<options>] address [<exchange> [<exchange-address>]]
+		Assign or print exchange address.
+	{{.Prog}} [<options>] create-cert
+		Create key and certifcate for host, consumer, or exchange.
+	{{.Prog}} [<options>] [exec] <exchange> approve [<guest(s)>]
+		Approve subscriptions.
+	{{.Prog}} [<options>] [exec] <exchange> subscribers
+		List certificates of exchange subscribers.
+	{{.Prog}} [<options>] [exec] <exchange> deny [<guest(s)>]
+		Deny client(s) subscription.
+	{{.Prog}} [<options>] [exec] <exchange> [<command> [<args>]]
+		Run request on host connected through exchange.
+	{{.Prog}} show build-id
+	{{.Prog}} show build-info
+	{{.Prog}} [<options>] show cert
+		Print local certificate.
+	{{.Prog}} [<options>] show subscribers
+		List certificates of exchanges.
+	{{.Prog}} [<options>] show subscriptions
+		List exchange certificates.
+	{{.Prog}} show main-reference
+		PATH@SYMVER
+	{{.Prog}} show version
+		SYMVER
+	{{.Prog}} [<options>] start exchange [-r <address>] [-x <address>]
+		Start TLS exchange service.
+	{{.Prog}} [<options>] start tap [-u <unit>] [<exchange>]
+		Start link tunnel.
+	{{.Prog}} [<options>] subscribe <registry-address>
+		Request exchange service.
+{{print .Flags}}
+  <address>
+	A network address and port, e.g.
+		:8003
+		[::1]:8003
+		unix://PATH
+		unix://@NAME
+  <exchange>, <guest>
+	The primary DNS name or subject-key-id of a certificate.
+`
+
 func main() {
-	ipc.DirFlag = flag.String("ipc", ipc.DefaultDir(), "socket directory")
-	state.DirFlag = flag.String("state", state.DefaultDir(),
-		"certificate directory")
+	selection.Usage = Usage
 	selection.Map{
-		"alias":       tlsx.Alias,
-		"approve":     tlsx.ApproveOrDeny,
-		"authorize":   tlsx.AuthorizeOrRevoke,
-		"clients":     tlsx.Clients,
+		"address":     tlsx.Address,
 		"create-cert": tlsx.CreateCert,
 		"daemon": selection.Map{
 			"exchange": tlsx.Exchange,
-			"host":     tlsx.Host,
+			tap.Key:    tap.Daemon,
 		}.Select,
-		"deny":      tlsx.ApproveOrDeny,
-		"jump":      tlsx.Jump,
-		"revoke":    tlsx.AuthorizeOrRevoke,
-		"show":      tlsx.Show.Select,
-		"start":     daemon.Start,
+		"exec": tlsx.Exec,
+		"show": selection.Map{
+			"build-id":       show.New(program.BuildId),
+			"build-info":     show.New(program.BuildInfo),
+			"cert":           tlsx.ShowCert,
+			"main-reference": show.New(program.MainReference),
+			"subscribers":    tlsx.ShowSubs,
+			"subscriptions":  tlsx.ShowSubs,
+			"state":          show.New(state.Cache.Dir),
+			"xdg":            xdg.Show,
+			"version":        show.New(program.MainVersion),
+		}.Select,
+		"start": selection.Map{
+			"exchange": daemon.Start,
+			tap.Key:    daemon.Start,
+		}.Select,
 		"subscribe": tlsx.Subscribe,
-	}.Main()
+	}.Main(func(m selection.Map) error {
+		for _, x := range tlsx.Exchanges() {
+			m[x] = tlsx.Exec
+		}
+		return nil
+	})
 }

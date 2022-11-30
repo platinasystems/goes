@@ -10,29 +10,30 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"text/template"
 
 	"github.com/platinasystems/goes/v2/pkg/context/read"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
-	"github.com/platinasystems/goes/v2/pkg/goes/complete"
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 )
 
 func Func(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	if path.HasComplete() {
-		complete.Last(w, args, "*")
+	switch path[1] {
+	case "complete":
 		return nil
-	}
-	if path.HasHelp() || selection.HasHelp(args) {
-		path.Usage(w, "[<files>|-]\n",
-			"Concatenate file(s) or standard in (-) to output.",
-		)
-		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return template.Must(template.New("usage").Parse(`
+usage: {{.}} [<file(s)>|-]
+Concatenate file(s) or standard in (-) to output.
+`[1:])).Execute(w, strings.Join(path, " "))
 	}
 	if len(args) == 0 {
 		args = append(args, "-")

@@ -21,29 +21,28 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/utmpx"
 )
 
-var (
-	ErrEmptyRequest    = errors.New("empty request")
-	ErrExit            = errors.New("exit")
-	ServiceReadTimeout = 3 * time.Second
-)
+var ServiceReadTimeout = 3 * time.Second
 
 // Service connection by parsing TLV request arguements and input upto the zero
 // length Break.  This calls f() with a reader that LV decodes any input; a
-// writer that LV encodes date to connection; and the decoded arguments.  If
+// writer with LV data encoding to connection; and the decoded arguments.  If
 // f() succeeds, this sends the zero length Break to the connection; otherwise,
 // this sends an encoded Nack.
 func service(
 	ctx context.Context,
 	conn *tls.Conn,
-	path selection.Path,
-	f selection.Func,
+	f func(
+		context.Context,
+		io.Reader,
+		io.Writer,
+		...string,
+	) error,
 ) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -96,7 +95,7 @@ func service(
 	if ispty {
 		err = ptycmd(cctx, wg, ra, dec, enc, args[1:])
 	} else {
-		err = f(cctx, r, w, path, args...)
+		err = f(cctx, r, w, args...)
 	}
 	switch {
 	case errors.Is(err, context.Canceled):
@@ -108,7 +107,6 @@ func service(
 		}
 		enc.Encode(err)
 	default:
-		err = fmt.Errorf("service %v: %w", path, err)
 		enc.Encode(err)
 	}
 	return err

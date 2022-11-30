@@ -21,6 +21,12 @@ func New[T any](load func(*T) error) *Cache[T] {
 	return &Cache[T]{load: load}
 }
 
+func (c *Cache[T]) Format(w fmt.State, verb rune) {
+	if v, err := c.ValErr(); err == nil {
+		fmt.Fprint(w, v)
+	}
+}
+
 // Returns load error.
 func (c *Cache[T]) Err() error {
 	_, err := c.ValErr()
@@ -58,10 +64,6 @@ func (c *Cache[T]) Ref(f func(*T) error) error {
 		return c.err
 	}
 	return f(&c.v)
-}
-
-func (c *Cache[T]) String() string {
-	return fmt.Sprint(c.Value())
 }
 
 // Panic if ValErr returns error; otherwise, return its value.

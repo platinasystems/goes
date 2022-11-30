@@ -6,140 +6,82 @@ package tlsx
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
+	"text/template"
 
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
+	"github.com/platinasystems/goes/v2/pkg/goes/cat"
+	"github.com/platinasystems/goes/v2/pkg/goes/command"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes/echo"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/ipc"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/alias"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/address"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 )
 
-func ApproveOrDeny(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path selection.Path,
-	args ...string,
-) (err error) {
-	op := path[len(path)-1]
-	fs := flag.NewFlagSet(op, flag.ContinueOnError)
-	xflag := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
-	fs.Usage = func() {
-		op_ := "Approve"
-		if op != "approve" {
-			op_ = "Deny"
-		}
-		path.Usage(w, "[<options>] [<subject-key-id(s)>]\n",
-			op_, " client(s) subscription.\n",
-			fs,
-		)
-	}
-	if err = fs.Parse(args); err != nil {
-		return
-	}
-	if path.HasComplete() {
-		complete.Last(w, args, alias.Keys())
-		return
-	}
-	if path.HasHelp() {
-		fs.Usage()
-		return
-	}
-	cn, err := tlsx.DialAndHandshake(ctx, *xflag)
-	if err != nil {
-		return err
-	}
-	defer cn.Close()
-	return tlsx.Req(ctx, cn, nil, w, op, fs.Args())
-}
-
-func Clients(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path selection.Path,
-	args ...string,
-) (err error) {
-	fs := flag.NewFlagSet("certs", flag.ContinueOnError)
-	xflag := fs.String("x", "", "Exchange <dns>:<port> (default IPC).")
-	fs.Usage = func() {
-		path.Usage(w, "[<options>]\n",
-			"List certificates of exchange clients\n",
-			fs,
-		)
-	}
-	if err = fs.Parse(args); err != nil {
-		return
-	}
-	if path.HasComplete() {
-		return
-	}
-	if path.HasHelp() {
-		fs.Usage()
-		return
-	}
-	cn, err := tlsx.DialAndHandshake(ctx, *xflag)
-	if err != nil {
-		fmt.Fprintln(w, "greet failed:", err)
-		return err
-	}
-	defer cn.Close()
-	return tlsx.Req(ctx, cn, nil, w, "clients")
+var Service = selection.Map{
+	"cat":     cat.Func,
+	"command": command.Func,
+	"echo":    echo.Func,
 }
 
 func Exchange(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	fs := flag.NewFlagSet("exchange", flag.ContinueOnError)
-	rflag := fs.Uint("r", 0, "Registry port. (default IPC)")
-	xflag := fs.Uint("x", 0, "Exchange port. (default IPC)")
-	fs.Usage = func() {
-		path.Usage(w, "[<options>]\n",
-			"Start TLS exchange service.\n",
+	fs := flags.New()
+	rflag := fs.String("r", ":8002", "Registry [<address>]:<port>.")
+	xflag := fs.String("x", ":8003", "Exchange [<address>]:<port>.")
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(`
+usage: {{.Command}} [<options>]
+Start TLS exchange service.
+{{print .Flags}}`[1:])).Execute(w, struct {
+			Command string
+			flags.Flags
+		}{
+			strings.Join(path, " "),
 			fs,
-		)
+		})
 	}
-	if path.HasComplete() {
-		complete.Last(w, args, fs)
+	switch path[1] {
+	case "complete":
+		complete.Last(w, args, fs.FlagSet)
 		return nil
-	}
-	if path.HasHelp() {
-		fs.Usage()
-		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return usage()
 	}
 	err := fs.Parse(args)
+	if err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
+		return err
+	}
+	args = fs.Args()
+	rln, err := net.Listen("tcp", *rflag)
 	if err != nil {
 		return err
 	}
-	var xln, rln net.Listener
-	if *xflag == 0 {
-		xln, err = ipc.Exchange().Listen()
-		if err == nil {
-			rln, err = ipc.Registry().Listen()
-		}
-	} else {
-		xln, err = net.Listen("tcp", fmt.Sprint(":", *xflag))
-		if err == nil {
-			rln, err = net.Listen("tcp", fmt.Sprint(":", *rflag))
-		}
-	}
+	xln, err := net.Listen("tcp", *xflag)
 	if err != nil {
+		rln.Close()
 		return err
 	}
+	address.Store(cert.SKI(), xln.Addr().String())
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go tlsx.Exchange(ctx, &wg, xln)
+	go tlsx.Registry(ctx, &wg, rln)
 	wg.Add(1)
-	go tlsx.Registry(ctx, &wg, rln, *xflag)
+	go tlsx.Exchange(ctx, &wg, xln, Service)
 	wg.Wait()
 	return nil
 }

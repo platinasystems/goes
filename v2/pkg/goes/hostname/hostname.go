@@ -6,13 +6,12 @@ package hostname
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 	"strings"
+	"text/template"
 
-	"github.com/platinasystems/goes/v2/pkg/goes/complete"
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
@@ -20,30 +19,38 @@ func Func(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
-	path selection.Path,
+	path []string,
 	args ...string,
 ) error {
-	fs := flag.NewFlagSet("hostname", flag.ContinueOnError)
+	fs := flags.New()
 	dFlag := fs.Bool("d", false, "only print domain")
 	fFlag := fs.Bool("f", true, "print fully qualified domain name (FQDN)")
 	sFlag := fs.Bool("s", false, "print name w/o domain")
-	fs.Usage = func() {
-		path.Usage(w, "[<options>] [<name>]\n",
-			"Set or print system host name.\n",
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(`
+usage: {{.Command}} [<options>] [<name>]\n",
+Set or print system host name.
+{{ print .Flags}}`[1:])).Execute(w, struct {
+			Command string
+			Flags   flags.Flags
+		}{
+			strings.Join(path, " "),
 			fs,
-		)
+		})
+	}
+	switch path[1] {
+	case "complete":
+		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = path[:len(path)-1]
+		return usage()
 	}
 	err := fs.Parse(args)
-	if err != nil {
+	if err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
 		return err
-	}
-	if path.HasComplete() {
-		complete.Last(w, args, fs)
-		return nil
-	}
-	if path.HasHelp() {
-		fs.Usage()
-		return nil
 	}
 	if args = fs.Args(); len(args) > 0 {
 		return host.Set(args[0])

@@ -5,19 +5,21 @@
 package ipc
 
 import (
+	"flag"
+
 	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
 var (
 	Dir = cache.New[string](func(p *string) error {
-		if DirFlag != nil {
+		if len(*DirFlag) > 0 {
 			*p = *DirFlag
 		} else {
-			*p = DefaultDir()
+			*p = xdg.RunTimeDir()
 		}
 		return nil
 	}).Value
-	DirFlag    *string
-	DefaultDir = xdg.RunTimeDir
+	DirFlag = flag.String("ipc", "", "socket directory"+
+		"(default "+xdg.RunTimeDir()+")")
 )
