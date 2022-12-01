@@ -65,7 +65,7 @@ func main() {
 		"address":     tlsx.Address,
 		"create-cert": tlsx.CreateCert,
 		"daemon": selection.Map{
-			"exchange": tlsx.Exchange,
+			"exchange": tlsx.Daemon,
 			tap.Key:    tap.Daemon,
 		}.Select,
 		"exec": tlsx.Exec,

@@ -13,23 +13,13 @@ import (
 	"text/template"
 
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
-	"github.com/platinasystems/goes/v2/pkg/goes/cat"
-	"github.com/platinasystems/goes/v2/pkg/goes/command"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
-	"github.com/platinasystems/goes/v2/pkg/goes/echo"
-	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/address"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 )
 
-var Service = selection.Map{
-	"cat":     cat.Func,
-	"command": command.Func,
-	"echo":    echo.Func,
-}
-
-func Exchange(
+func Daemon(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -37,7 +27,7 @@ func Exchange(
 	args ...string,
 ) error {
 	fs := flags.New()
-	rflag := fs.String("r", ":8002", "Registry [<address>]:<port>.")
+	rflag := fs.String("r", ":8004", "Registry [<address>]:<port>.")
 	xflag := fs.String("x", ":8003", "Exchange [<address>]:<port>.")
 	usage := func() error {
 		return template.Must(template.New("usage").Parse(`
