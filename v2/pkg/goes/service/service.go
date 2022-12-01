@@ -2,14 +2,14 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package ipc
+package service
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"net"
 	"net/rpc"
 	"os"
 	"os/signal"
@@ -23,55 +23,25 @@ import (
 
 var ErrMissingInput = errors.New("missing input")
 
-// no handler timeout if 0
-func (ipc Ipc) Service(
-	ctx context.Context,
+func With(
 	wg *sync.WaitGroup,
+	conch <-chan net.Conn,
+	address string,
+	timeout time.Duration, // no handler timeout if 0
 	m selection.Map,
-	timeout time.Duration,
-) error {
-	if timeout == 0 {
-		timeout = 30 * time.Second
-	}
-
-	ln, err := ipc.Listen()
-	if err != nil {
-		return err
-	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer ln.Close()
-		<-ctx.Done()
-	}()
-
+) {
+	defer wg.Done()
 	svr := rpc.NewServer()
-	svr.Register(&Service{ln.Addr().String(), timeout, m})
+	svr.Register(&Service{address, timeout, m})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			if c, err := ln.Accept(); err != nil {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					log.Println(err)
-				}
-			} else {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					defer c.Close()
-					svr.ServeConn(c)
-				}()
-			}
-		}
-	}()
-
-	return nil
+	for c := range conch {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer c.Close()
+			svr.ServeConn(c)
+		}()
+	}
 }
 
 type Service struct {

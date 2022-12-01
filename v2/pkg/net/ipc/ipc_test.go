@@ -7,6 +7,7 @@ package ipc
 import (
 	"context"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -17,10 +18,15 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/cat"
 	"github.com/platinasystems/goes/v2/pkg/goes/echo"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/goes/service"
+	"github.com/platinasystems/goes/v2/pkg/net/accept"
+	"github.com/platinasystems/goes/v2/pkg/net/foreclose"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
 func TestIpc(t *testing.T) {
+	const timeout = 30 * time.Second
+
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
@@ -33,14 +39,27 @@ func TestIpc(t *testing.T) {
 	got := new(strings.Builder)
 
 	ipc := New()
-	m := selection.Map{
-		"cat":  cat.Func,
-		"echo": echo.Func,
-	}
-	err := ipc.Service(ctx, &wg, m, 30*time.Second)
+	req := service.Request{ipc}
+	ln, err := ipc.Listen()
 	if err != nil {
 		t.Fatal(err)
 	}
+	lna := ln.Addr().String()
+
+	wg.Add(1)
+	go foreclose.With(ctx, &wg, ln)
+
+	conch := make(chan net.Conn, 4)
+
+	wg.Add(1)
+	go accept.With(&wg, ln, conch)
+
+	wg.Add(1)
+	go service.With(&wg, conch, lna, timeout, selection.Map{
+		"cat":  cat.Func,
+		"echo": echo.Func,
+	})
+
 	prog := program.Base()
 	ipcs := ipc.String()
 	ut := func(
@@ -51,7 +70,7 @@ func TestIpc(t *testing.T) {
 	) {
 		t.Helper()
 		got.Reset()
-		err := ipc.Func(ctx, r, got, path, args...)
+		err := req.Func(ctx, r, got, path, args...)
 		if err != nil {
 			t.Error(err)
 		} else if gots := got.String(); gots != want {

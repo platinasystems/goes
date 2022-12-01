@@ -22,15 +22,14 @@ func NewLoopback(suffix ...any) Ipc {
 
 // Returns alocated 127.0.0.1:PORT from Ipc file.
 func (lb Loopback) Address() (string, error) {
-	addrdata, err := ioutil.ReadFile(lb.String())
+	addrdata, err := ioutil.ReadFile(string(lb))
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(addrdata)), err
 }
 
-func (Loopback) Network() string   { return "tcp" }
-func (lb Loopback) String() string { return string(lb) }
+func (Loopback) Network() string { return "tcp" }
 
 // Listen on the the loopback interface (127.0.0.1) at the next available port
 // and record the allocated address in a file named by Ipc.

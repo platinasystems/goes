@@ -5,28 +5,20 @@
 package accept
 
 import (
-	"context"
 	"net"
+	"sync"
 )
 
-// This starts a pair of go-routines that forward accepted connections until
-// ctx.Done() whence they close both listener and forwarding channel. Usage,
-//
-//	for c := range accept.With(ctx, ln, make(chan net.Conn, depth) { ... }
-func With(
-	ctx context.Context,
-	ln net.Listener,
-	ch chan net.Conn,
-) <-chan net.Conn {
-	go func() {
-		<-ctx.Done()
-		ln.Close()
-	}()
-	go func() {
-		for c, err := ln.Accept(); err == nil; c, err = ln.Accept() {
+// This is run as go routine to continually feed accepted connections to
+// channel until the listner is closed.
+func With(wg *sync.WaitGroup, ln net.Listener, ch chan<- net.Conn) {
+	defer wg.Done()
+	defer close(ch)
+	for {
+		if c, err := ln.Accept(); err == nil {
 			ch <- c
+		} else {
+			break
 		}
-		close(ch)
-	}()
-	return ch
+	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
+	"github.com/platinasystems/goes/v2/pkg/net/foreclose"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
@@ -49,13 +50,22 @@ func Registry(
 		panic("no DNS names")
 	}
 	sn := tlsc.Leaf.DNSNames[0]
-	for c := range accept.With(ctx, ln, make(chan net.Conn, 4)) {
-		wg.Add(1)
+
+	wg.Add(1)
+	go foreclose.With(ctx, wg, ln)
+
+	conch := make(chan net.Conn, 4)
+
+	wg.Add(1)
+	go accept.With(wg, ln, conch)
+
+	for c := range conch {
 		sv := tls.Server(c, &tls.Config{
 			Certificates: tlscs,
 			ServerName:   sn,
 			ClientAuth:   tls.RequireAnyClientCert,
 		})
+		wg.Add(1)
 		go func(sv *tls.Conn) {
 			wg.Done()
 			defer sv.Close()

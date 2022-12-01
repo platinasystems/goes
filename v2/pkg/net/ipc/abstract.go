@@ -32,8 +32,6 @@ func (abs Abstract) Listen() (net.Listener, error) {
 
 func (Abstract) Network() string { return "unix" }
 
-func (abs Abstract) String() string { return string(abs) }
-
 type AbstractListener struct {
 	net.Listener
 }

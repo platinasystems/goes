@@ -21,6 +21,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
+	"github.com/platinasystems/goes/v2/pkg/net/foreclose"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/bridge"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
@@ -80,14 +81,22 @@ func Exchange(
 ) {
 	defer wg.Done()
 
+	excert := cert.Value()
+
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	excert := cert.Value()
+	wg.Add(1)
+	go foreclose.With(cctx, wg, ln)
+
+	conch := make(chan net.Conn, 4)
+
+	wg.Add(1)
+	go accept.With(wg, ln, conch)
 
 	br := bridge.New(cctx, wg, excert.Leaf.DNSNames[0])
 
-	for c := range accept.With(ctx, ln, make(chan net.Conn, 4)) {
+	for c := range conch {
 		sv := tls.Server(c, &tls.Config{
 			Certificates: []tls.Certificate{excert},
 			ServerName:   excert.Leaf.DNSNames[0],
