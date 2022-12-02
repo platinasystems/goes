@@ -48,7 +48,7 @@ func AddrCfg(ex string) (addr net.Addr, cfg *tls.Config, err error) {
 	cfg = &tls.Config{
 		Certificates: []tls.Certificate{cert.Value()},
 		ServerName:   name,
-		RootCAs:      certs.Subscriptions.Pool(),
+		RootCAs:      certs.RootCAs.Clone(),
 	}
 	return
 }

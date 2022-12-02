@@ -149,8 +149,8 @@ func Subscribe(ctx context.Context, args []string) (err error) {
 	if string(pg[:n]) != "OK" {
 		return ErrNotOK
 	}
-	return certs.Subscriptions.Add(
-		SubscriptionHeaders,
-		cs.PeerCertificates[0],
-	)
+	p0 := cs.PeerCertificates[0]
+	certs.RootCAs.Add(p0)
+	certs.ClientCAs.Add(p0)
+	return certs.Subscriptions.Add(SubscriptionHeaders, p0)
 }

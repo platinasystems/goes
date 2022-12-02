@@ -46,7 +46,7 @@ Print local certificate.
 	if n := len(tlsc.SignedCertificateTimestamps); n > 0 {
 		fmt.Fprintln(w, "signed_certificate_timestamps:", n)
 	}
-	fmt.Fprint(w, certs.NewEntry(tlsc.Leaf))
+	fmt.Fprint(w, certs.NewCert(tlsc.Leaf))
 	return nil
 }
 
@@ -72,9 +72,6 @@ List certificates.
 	if path[len(path)-1] == "subscriptions" {
 		subs = certs.Subscriptions
 	}
-	subs.Range(func(entry certs.Entry) bool {
-		fmt.Fprint(w, entry)
-		return true
-	})
+	fmt.Fprint(w, subs)
 	return nil
 }

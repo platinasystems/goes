@@ -17,9 +17,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
-type File struct {
-	Name func() string
-}
+type File struct{ Name func() string }
 
 var (
 	SubscribersFile   = File{filename.Subscribers}
@@ -32,14 +30,14 @@ func Unsubscribed(ex string) error {
 
 type Headers = map[string]string
 
-type Entry struct {
+type Cert struct {
 	Headers
 	*x509.Certificate
 	Name, SKI string
 }
 
-func NewEntry(c *x509.Certificate) Entry {
-	return Entry{
+func NewCert(c *x509.Certificate) Cert {
+	return Cert{
 		Headers:     make(Headers),
 		Certificate: c,
 		Name:        c.DNSNames[0],
@@ -47,126 +45,202 @@ func NewEntry(c *x509.Certificate) Entry {
 	}
 }
 
-type Cache struct {
-	FileName string
-	Entries  []Entry
-	Pool     *x509.CertPool
+type certs struct {
+	fn string
+	l  []Cert
 }
 
-type Certs struct {
-	Cache *cache.Cache[Cache]
+type Certs struct{ cache *cache.Cache[certs] }
+
+var Subscribers = Certs{cache.New[certs](SubscribersFile.Load)}
+var Subscriptions = Certs{cache.New[certs](SubscriptionsFile.Load)}
+
+type Pool struct{ cache *cache.Cache[*x509.CertPool] }
+
+// ClientCAs includes self plus all Subscribers and Subscriptions.
+var ClientCAs = Pool{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
+	*p = x509.NewCertPool()
+	if tlsc, err := cert.ValErr(); err != nil {
+		return err
+	} else {
+		(*p).AddCert(tlsc.Leaf)
+	}
+	Subscriptions.Range(func(c Cert) bool {
+		(*p).AddCert(c.Certificate)
+		return true
+	})
+	Subscribers.Range(func(c Cert) bool {
+		(*p).AddCert(c.Certificate)
+		return true
+	})
+	return nil
+})}
+
+// RootCAs includes self plus all Subscriptions.
+var RootCAs = Pool{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
+	*p = x509.NewCertPool()
+	if tlsc, err := cert.ValErr(); err != nil {
+		return err
+	} else {
+		(*p).AddCert(tlsc.Leaf)
+	}
+	Subscriptions.Range(func(c Cert) bool {
+		(*p).AddCert(c.Certificate)
+		return true
+	})
+	return nil
+})}
+
+func (pool Pool) Add(c *x509.Certificate) {
+	pool.cache.Ref(func(p **x509.CertPool) error {
+		(*p).AddCert(c)
+		return nil
+	})
 }
 
-var (
-	Subscribers   = Certs{cache.New[Cache](SubscribersFile.Load)}
-	Subscriptions = Certs{cache.New[Cache](SubscriptionsFile.Load)}
-)
+func (pool Pool) Clone() (cas *x509.CertPool) {
+	pool.cache.Ref(func(p **x509.CertPool) error {
+		cas = (*p).Clone()
+		return nil
+	})
+	return
+}
 
-// Format entry as yaml like sequence to writer.
-func (entry Entry) Format(w fmt.State, verb rune) {
-	fmt.Fprintln(w, "- name:", entry.Name)
-	fmt.Fprintln(w, "  subject_key_id:", entry.SKI)
-	fmt.Fprintln(w, "  serial_number:", entry.Certificate.SerialNumber)
-	fmt.Fprintln(w, "  not_before:", entry.Certificate.NotBefore)
-	fmt.Fprintln(w, "  not_after:", entry.Certificate.NotAfter)
-	fmt.Fprintln(w, "  subject:", entry.Certificate.Subject)
-	if len(entry.EmailAddresses) > 0 {
+// Format as yaml like sequence to writer.
+func (c Cert) Format(w fmt.State, verb rune) {
+	fmt.Fprintln(w, "- name:", c.Name)
+	fmt.Fprintln(w, "  subject_key_id:", c.SKI)
+	fmt.Fprintln(w, "  serial_number:", c.Certificate.SerialNumber)
+	fmt.Fprintln(w, "  not_before:", c.Certificate.NotBefore)
+	fmt.Fprintln(w, "  not_after:", c.Certificate.NotAfter)
+	fmt.Fprintln(w, "  subject:", c.Certificate.Subject)
+	if len(c.EmailAddresses) > 0 {
 		fmt.Fprintln(w, "email_addresses:")
-		for _, email := range entry.Certificate.EmailAddresses {
+		for _, email := range c.Certificate.EmailAddresses {
 			fmt.Fprintln(w, "    -", email)
 		}
 	}
-	if len(entry.Certificate.DNSNames) > 0 {
+	if len(c.Certificate.DNSNames) > 0 {
 		fmt.Fprintln(w, "  dns_names:")
-		for _, dns := range entry.Certificate.DNSNames {
+		for _, dns := range c.Certificate.DNSNames {
 			fmt.Fprintln(w, "    -", dns)
 		}
 	}
-	if len(entry.Certificate.IPAddresses) > 0 {
+	if len(c.Certificate.IPAddresses) > 0 {
 		fmt.Fprintln(w, "ip_addresses:")
-		for _, ip := range entry.Certificate.IPAddresses {
+		for _, ip := range c.Certificate.IPAddresses {
 			fmt.Fprintln(w, "    -", ip)
 		}
 	}
-	if len(entry.Certificate.URIs) > 0 {
+	if len(c.Certificate.URIs) > 0 {
 		fmt.Fprintln(w, "uris:")
-		for _, uri := range entry.Certificate.URIs {
+		for _, uri := range c.Certificate.URIs {
 			fmt.Fprintln(w, "    -", uri)
 		}
 	}
-	fmt.Fprintln(w, "  public_key_algorithm:", entry.Certificate.PublicKeyAlgorithm)
-	fmt.Fprintln(w, "  signature_algorithm:", entry.Certificate.SignatureAlgorithm)
+	fmt.Fprintln(w, "  public_key_algorithm:",
+		c.Certificate.PublicKeyAlgorithm)
+	fmt.Fprintln(w, "  signature_algorithm:",
+		c.Certificate.SignatureAlgorithm)
 	fmt.Fprintln(w, "  key_usage:")
-	if entry.Certificate.KeyUsage == 0 {
+	if c.Certificate.KeyUsage == 0 {
 		fmt.Fprintln(w, "    - none")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageDigitalSignature) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageDigitalSignature) != 0 {
 		fmt.Fprintln(w, "    -", "digital_signature")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageContentCommitment) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageContentCommitment) != 0 {
 		fmt.Fprintln(w, "    -", "content_commitment")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageKeyEncipherment) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageKeyEncipherment) != 0 {
 		fmt.Fprintln(w, "    -", "key_encipherment")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageDataEncipherment) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageDataEncipherment) != 0 {
 		fmt.Fprintln(w, "    -", "data_encipherment")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageKeyAgreement) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageKeyAgreement) != 0 {
 		fmt.Fprintln(w, "    -", "key_agreement")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageCertSign) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageCertSign) != 0 {
 		fmt.Fprintln(w, "    -", "cert_sign")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageCRLSign) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageCRLSign) != 0 {
 		fmt.Fprintln(w, "    -", "CRL_sign")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageEncipherOnly) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageEncipherOnly) != 0 {
 		fmt.Fprintln(w, "    -", "encipher_only")
 	}
-	if (entry.Certificate.KeyUsage & x509.KeyUsageDecipherOnly) != 0 {
+	if (c.Certificate.KeyUsage & x509.KeyUsageDecipherOnly) != 0 {
 		fmt.Fprintln(w, "    -", "decipher_only")
 	}
 	opts := x509.VerifyOptions{
 		Roots: x509.NewCertPool(),
 	}
-	opts.Roots.AddCert(entry.Certificate)
+	opts.Roots.AddCert(c.Certificate)
 	fmt.Fprint(w, "  signature: ")
-	if _, err := entry.Certificate.Verify(opts); err == nil {
+	if _, err := c.Certificate.Verify(opts); err == nil {
 		fmt.Fprintln(w, "ok")
 	} else {
 		fmt.Fprintln(w, err)
 	}
-	for k, v := range entry.Headers {
+	for k, v := range c.Headers {
 		fmt.Fprint(w, "  ", k, ": ", v, "\n")
 	}
-	fmt.Fprintln(w, "  version:", entry.Certificate.Version)
+	fmt.Fprintln(w, "  version:", c.Certificate.Version)
 }
 
-func (certs Certs) Add(h Headers, c *x509.Certificate) error {
-	return certs.Cache.Ref(func(p *Cache) error {
-		(*p).Entries = append((*p).Entries, Entry{
+func (cached Certs) Add(h Headers, c *x509.Certificate) error {
+	return cached.cache.Ref(func(p *certs) error {
+		(*p).l = append((*p).l, Cert{
 			Headers:     h,
 			Certificate: c,
 			Name:        c.DNSNames[0],
 			SKI:         hex.EncodeToString(c.SubjectKeyId),
 		})
-		(*p).Pool.AddCert(c)
-		if len(p.FileName) == 0 {
-			return nil
-		}
-		return keycert.AppendX509CertificatesFile(p.FileName, h, c)
+		return keycert.AppendX509CertificatesFile(p.fn, h, c)
 	})
 }
 
-func (certs Certs) Pool() *x509.CertPool {
-	return certs.Cache.Value().Pool
+func (cached Certs) Format(w fmt.State, verb rune) {
+	cached.Range(func(c Cert) bool {
+		fmt.Fprint(w, c)
+		return true
+	})
 }
 
-func (certs Certs) Range(f func(Entry) bool) {
-	certs.Cache.Ref(func(p *Cache) error {
-		for _, entry := range (*p).Entries {
-			if !f(entry) {
+func (cached Certs) Lookup(ex string) (name, ski string, x *x509.Certificate) {
+	cached.Range(func(c Cert) bool {
+		if ex == c.SKI {
+			ski = ex
+			x = c.Certificate
+			name = c.DNSNames[0]
+			return false
+		}
+		for _, s := range c.Certificate.DNSNames {
+			if ex == s {
+				ski = c.SKI
+				name = ex
+				x = c.Certificate
+				return false
+			}
+		}
+		return true
+	})
+	return
+}
+
+func (cached Certs) Names() (names []string) {
+	cached.Range(func(c Cert) bool {
+		names = append(names, c.Name)
+		return true
+	})
+	return
+}
+
+func (cached Certs) Range(f func(Cert) bool) {
+	cached.cache.Ref(func(p *certs) error {
+		for _, c := range (*p).l {
+			if !f(c) {
 				break
 			}
 		}
@@ -174,64 +248,32 @@ func (certs Certs) Range(f func(Entry) bool) {
 	})
 }
 
-func (certs Certs) Names() (names []string) {
-	certs.Range(func(entry Entry) bool {
-		names = append(names, entry.Name)
+func (cached Certs) SKIs() (skis []string) {
+	cached.Range(func(c Cert) bool {
+		skis = append(skis, c.SKI)
 		return true
 	})
 	return
 }
 
-func (certs Certs) SKIs() (skis []string) {
-	certs.Range(func(entry Entry) bool {
-		skis = append(skis, entry.SKI)
-		return true
-	})
-	return
-}
-
-// Preload test certificates instead of parsing file.
-func (certs Certs) TestLoad(cs ...*x509.Certificate) {
-	certs.Cache.Preload(func(p *Cache) {
-		(*p).Entries = make([]Entry, len(cs))
-		(*p).Pool = x509.NewCertPool()
-		c, err := cert.ValErr()
-		if err != nil {
-			panic(err)
-		}
-		(*p).Pool.AddCert(c.Leaf)
-		for i, c := range cs {
-			(*p).Entries[i].Headers = make(Headers)
-			(*p).Entries[i].Certificate = c
-			(*p).Entries[i].SKI = hex.EncodeToString(c.SubjectKeyId)
-			(*p).Pool.AddCert(c)
-		}
-	})
-}
-
-func (file File) Load(c *Cache) (err error) {
-	c.FileName = file.Name()
-	if tlsc, err := cert.ValErr(); err == nil {
-		c.Pool = x509.NewCertPool()
-		c.Pool.AddCert(tlsc.Leaf)
-	}
-	blocks, err := keycert.DecodeFile(c.FileName)
+func (file File) Load(c *certs) error {
+	c.fn = file.Name()
+	blocks, err := keycert.DecodeFile(c.fn)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			err = nil
 		}
-		return
+		return nil
 	}
-	c.Entries = make([]Entry, len(blocks))
+	c.l = make([]Cert, len(blocks))
 	cs, err := keycert.ParseX509Certificates(blocks)
 	if err == nil {
 		for i, block := range blocks {
-			c.Entries[i].Headers = block.Headers
-			c.Entries[i].Certificate = cs[i]
-			c.Entries[i].SKI =
-				hex.EncodeToString(cs[i].SubjectKeyId)
-			c.Pool.AddCert(cs[i])
+			c.l[i].Headers = block.Headers
+			c.l[i].Certificate = cs[i]
+			c.l[i].SKI = hex.
+				EncodeToString(cs[i].SubjectKeyId)
 		}
 	}
-	return
+	return err
 }

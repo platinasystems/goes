@@ -50,26 +50,7 @@ func Lookup(ex string) (name, ski string, c *x509.Certificate) {
 			return
 		}
 	}
-	name = ""
-	ski = ""
-	c = nil
-	certs.Subscriptions.Range(func(entry certs.Entry) bool {
-		if ex == entry.SKI {
-			ski = ex
-			c = entry.Certificate
-			name = c.DNSNames[0]
-			return false
-		}
-		for _, s := range entry.Certificate.DNSNames {
-			if ex == s {
-				ski = entry.SKI
-				name = ex
-				c = entry.Certificate
-				return false
-			}
-		}
-		return true
-	})
+	name, ski, c = certs.Subscriptions.Lookup(ex)
 	return
 }
 
@@ -101,7 +82,7 @@ func Exchange(
 			Certificates: []tls.Certificate{excert},
 			ServerName:   excert.Leaf.DNSNames[0],
 			ClientAuth:   tls.RequireAndVerifyClientCert,
-			ClientCAs:    certs.Subscribers.Pool(),
+			ClientCAs:    certs.ClientCAs.Clone(),
 		})
 		wg.Add(1)
 		go exService(cctx, wg, sv, m, br)
@@ -196,6 +177,7 @@ skiloop:
 				); err != nil {
 					return fmt.Errorf("approve: %w", err)
 				}
+				certs.ClientCAs.Add(cert)
 			}
 			copy(Reg.l[i:], Reg.l[i+1:])
 			Reg.l = Reg.l[:len(Reg.l)-1]
@@ -208,9 +190,6 @@ skiloop:
 
 func exSubscribers(ctx context.Context, c *tls.Conn) error {
 	enc := lv.NewEncoder(c)
-	certs.Subscribers.Range(func(entry certs.Entry) bool {
-		fmt.Fprint(enc, entry)
-		return true
-	})
+	fmt.Fprint(enc, certs.Subscribers)
 	return nil
 }
