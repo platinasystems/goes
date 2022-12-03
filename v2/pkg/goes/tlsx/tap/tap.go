@@ -18,6 +18,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
 const Key = "tap"
@@ -54,7 +55,9 @@ Exchange tunnel.
 		path = path[:len(path)-1]
 		return usage()
 	case "complete":
-		complete.Last(w, args, fs.FlagSet, tlsx.Exchanges())
+		complete.Last(w, args, fs.FlagSet,
+			certs.Self.DNSNames(),
+			certs.Subscriptions.Names())
 		return nil
 	}
 	if err := fs.Parse(args); err == flags.ErrHelp {

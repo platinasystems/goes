@@ -2,10 +2,11 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package tlsx
+package exec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,11 +17,10 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
-var Exchanges = tlsx.Exchanges
-
-func Exec(
+func Func(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -69,7 +69,9 @@ Remote execution.
 	switch path[1] {
 	case "complete":
 		if len(ex) == 0 {
-			complete.Last(w, args, fs.FlagSet, Exchanges())
+			complete.Last(w, args, fs.FlagSet,
+				certs.Self.DNSNames(),
+				certs.Subscriptions.Names())
 			return nil
 		}
 		args = append([]string{path[1]}, args...)
@@ -82,7 +84,7 @@ Remote execution.
 		args = append([]string{path[1]}, args...)
 	}
 	if len(ex) == 0 {
-		return ErrNoExchange
+		return errors.New("no <exchange>")
 	}
 
 	tlsc, err := tlsx.DialAndHandshake(ctx, ex)

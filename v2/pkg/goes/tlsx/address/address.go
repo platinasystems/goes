@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package tlsx
+package address
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
-func Address(
+func Func(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package tlsx
+package exchange
 
 import (
 	"context"
@@ -14,12 +14,15 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/address"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
-func Daemon(
+type Daemon selection.Map
+
+func (d Daemon) Start(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -71,7 +74,7 @@ Start TLS exchange service.
 	wg.Add(1)
 	go tlsx.Registry(ctx, &wg, rln)
 	wg.Add(1)
-	go tlsx.Exchange(ctx, &wg, xln, Service)
+	go tlsx.Exchange(ctx, &wg, xln, selection.Map(d))
 	wg.Wait()
 	return nil
 }

@@ -7,10 +7,17 @@
 package main
 
 import (
+	"github.com/platinasystems/goes/v2/pkg/goes/cat"
+	"github.com/platinasystems/goes/v2/pkg/goes/command"
 	"github.com/platinasystems/goes/v2/pkg/goes/daemon"
+	"github.com/platinasystems/goes/v2/pkg/goes/echo"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
 	"github.com/platinasystems/goes/v2/pkg/goes/show"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/address"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/cert"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/exchange"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/exec"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/subscribe"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/tap"
 	"github.com/platinasystems/goes/v2/pkg/goes/xdg"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
@@ -63,13 +70,20 @@ usage:	{{.Prog}} [<options>] address [<exchange> [<exchange-address>]]
 func main() {
 	selection.Usage = Usage
 	selection.Map{
-		"address":     tlsx.Address,
-		"create-cert": tlsx.CreateCert,
-		"daemon": selection.Map{
-			"exchange": tlsx.Daemon,
-			tap.Key:    tap.Daemon,
+		"address": address.Func,
+		"cert": selection.Map{
+			"create": cert.Create,
+			"show":   show.New(certs.Self),
 		}.Select,
-		"exec": tlsx.Exec,
+		"daemon": selection.Map{
+			"exchange": exchange.Daemon{
+				"cat":     cat.Func,
+				"command": command.Func,
+				"echo":    echo.Func,
+			}.Start,
+			tap.Key: tap.Daemon,
+		}.Select,
+		"exec": exec.Func,
 		"show": selection.Map{
 			"build-id":       show.New(program.BuildId),
 			"build-info":     show.New(program.BuildInfo),
@@ -85,10 +99,13 @@ func main() {
 			"exchange": daemon.Start,
 			tap.Key:    daemon.Start,
 		}.Select,
-		"subscribe": tlsx.Subscribe,
+		"subscribe": subscribe.Func,
 	}.Main(func(m selection.Map) error {
-		for _, x := range tlsx.Exchanges() {
-			m[x] = tlsx.Exec
+		for _, x := range certs.Self.DNSNames() {
+			m[x] = exec.Func
+		}
+		for _, x := range certs.Subscriptions.Names() {
+			m[x] = exec.Func
 		}
 		return nil
 	})

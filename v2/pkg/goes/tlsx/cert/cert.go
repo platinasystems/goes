@@ -2,13 +2,14 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package tlsx
+package cert
 
 import (
 	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,7 +27,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
-func CreateCert(
+func Create(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -92,12 +93,12 @@ Create key and certifcate for host or exchange.
 	}
 
 	if args = fs.Args(); len(args) > 0 {
-		return fmt.Errorf("%w: %v", ErrUnexpectedArgs, args)
+		return fmt.Errorf("unexpected: %v", args)
 	}
 
 	dnsa := strings.Split(*dnsnames, ",")
 	if len(dnsa) == 0 || len(dnsa[0]) == 0 {
-		return ErrNoDNSNames
+		return errors.New("no DNS names")
 	}
 
 	k, block, err := keycert.NewPrivateKey(alg.Value())
@@ -117,7 +118,7 @@ Create key and certifcate for host or exchange.
 		emails = strings.Split(*email, ",")
 	}
 	if len(*name) == 0 {
-		return ErrNoName
+		return errors.New("no name")
 	}
 	now := time.Now()
 	expire := now.Add(*dur)
