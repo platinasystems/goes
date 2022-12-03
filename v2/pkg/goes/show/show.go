@@ -10,9 +10,11 @@ import (
 	"io"
 	"strings"
 	"text/template"
+
+	"github.com/platinasystems/goes/v2/pkg/encoding/ensure"
 )
 
-// This returns a method that printlns its embedded value/Formatter/String.
+// This returns a method that prints its embedded value/Formatter/String.
 func New(v any) func(
 	context.Context,
 	io.Reader,
@@ -43,6 +45,9 @@ usage: {{.}}
 	Print named value.
 `[1:])).Execute(w, strings.Join(path, " "))
 	}
-	fmt.Fprintln(w, sh.v)
+
+	nw := ensure.Newline(w)
+	defer nw.Close()
+	fmt.Fprint(nw, sh.v)
 	return ctx.Err()
 }

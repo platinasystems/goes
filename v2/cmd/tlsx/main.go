@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/tap"
 	"github.com/platinasystems/goes/v2/pkg/goes/xdg"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
@@ -72,10 +73,10 @@ func main() {
 		"show": selection.Map{
 			"build-id":       show.New(program.BuildId),
 			"build-info":     show.New(program.BuildInfo),
-			"cert":           tlsx.ShowCert,
+			"cert":           show.New(certs.Self),
 			"main-reference": show.New(program.MainReference),
-			"subscribers":    tlsx.ShowSubs,
-			"subscriptions":  tlsx.ShowSubs,
+			"subscribers":    show.New(certs.Subscribers),
+			"subscriptions":  show.New(certs.Subscriptions),
 			"state":          show.New(state.Cache.Dir),
 			"xdg":            xdg.Show,
 			"version":        show.New(program.MainVersion),

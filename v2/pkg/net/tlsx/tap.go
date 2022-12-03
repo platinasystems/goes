@@ -23,7 +23,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
@@ -47,7 +47,7 @@ func Tap(ctx context.Context, ex string, unit uint) error {
 
 	host := cfg.Certificates[0].Leaf.DNSNames[0]
 
-	ha := net.HardwareAddr(cert.Value().Leaf.SubjectKeyId[:6])
+	ha := net.HardwareAddr(certs.Self.SKI()[:6])
 	ha[0] &^= 1
 
 	f, err := tuntap.New(&tuntap.Configuration{

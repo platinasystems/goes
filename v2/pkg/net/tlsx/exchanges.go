@@ -4,15 +4,10 @@
 
 package tlsx
 
-import (
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
-)
+import "github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 
 func Exchanges() (l []string) {
-	if c, err := cert.ValErr(); err == nil {
-		l = append(l, c.Leaf.DNSNames[0])
-	}
+	l = append(l, certs.Self.DNSNames()...)
 	l = append(l, certs.Subscriptions.Names()...)
 	return l
 }

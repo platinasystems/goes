@@ -17,7 +17,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
 	"github.com/platinasystems/goes/v2/pkg/net/foreclose"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
@@ -38,11 +37,7 @@ func Registry(
 ) {
 	defer wg.Done()
 
-	tlsc, err := cert.ValErr()
-	if err != nil {
-		panic(err)
-	}
-	tlscs := []tls.Certificate{tlsc}
+	tlsc := certs.Self.TLS()
 	if tlsc.Leaf == nil {
 		panic("nil leaf")
 	}
@@ -61,7 +56,7 @@ func Registry(
 
 	for c := range conch {
 		sv := tls.Server(c, &tls.Config{
-			Certificates: tlscs,
+			Certificates: []tls.Certificate{tlsc},
 			ServerName:   sn,
 			ClientAuth:   tls.RequireAnyClientCert,
 		})
@@ -119,17 +114,13 @@ func Subscribe(ctx context.Context, args []string) (err error) {
 		err = fmt.Errorf("%w: %v", ErrUnexpectedArgs, args[2:])
 		return
 	}
-	tlsc, err := cert.ValErr()
-	if err != nil {
-		return err
-	}
 	c, err := dl.DialContext(ctx, nw, addr)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 	cl := tls.Client(c, &tls.Config{
-		Certificates:       []tls.Certificate{tlsc},
+		Certificates:       []tls.Certificate{certs.Self.TLS()},
 		ServerName:         name,
 		InsecureSkipVerify: true,
 	})

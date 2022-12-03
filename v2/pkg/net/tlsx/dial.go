@@ -10,7 +10,6 @@ import (
 	"net"
 
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/address"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
@@ -46,7 +45,7 @@ func AddrCfg(ex string) (addr net.Addr, cfg *tls.Config, err error) {
 		return
 	}
 	cfg = &tls.Config{
-		Certificates: []tls.Certificate{cert.Value()},
+		Certificates: []tls.Certificate{certs.Self.TLS()},
 		ServerName:   name,
 		RootCAs:      certs.RootCAs.Clone(),
 	}

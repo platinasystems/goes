@@ -16,7 +16,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/address"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
 func Daemon(
@@ -66,7 +66,7 @@ Start TLS exchange service.
 		rln.Close()
 		return err
 	}
-	address.Store(cert.SKI(), xln.Addr().String())
+	address.Store(certs.Self.SKI(), xln.Addr().String())
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go tlsx.Registry(ctx, &wg, rln)

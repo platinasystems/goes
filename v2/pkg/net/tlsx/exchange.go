@@ -23,7 +23,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
 	"github.com/platinasystems/goes/v2/pkg/net/foreclose"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/bridge"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/cert"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
@@ -38,8 +37,8 @@ var Suppressed = []error{
 }
 
 func Lookup(ex string) (name, ski string, c *x509.Certificate) {
-	c = cert.Value().Leaf
-	ski = cert.SKI()
+	c = certs.Self.Leaf()
+	ski = certs.Self.SKI()
 	if len(ex) == 0 || ex == ski {
 		name = c.DNSNames[0]
 		return
@@ -62,7 +61,7 @@ func Exchange(
 ) {
 	defer wg.Done()
 
-	excert := cert.Value()
+	excert := certs.Self.TLS()
 
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
