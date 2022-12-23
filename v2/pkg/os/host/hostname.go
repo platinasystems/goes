@@ -10,19 +10,21 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
-var Name = cache.New[string](func(p *string) error {
+type CachedName struct{ *cache.Cache[string] }
+
+var Name = CachedName{cache.New[string](func(p *string) error {
 	s, err := os.Hostname()
 	if err == nil {
 		*p = s
 	}
 	return err
-})
+})}
 
-func Set(s string) error {
-	return Name.Ref(func(p *string) error {
-		err := sethostname([]byte(s))
+func (cn CachedName) UnmarshalText(text []byte) error {
+	return cn.Mutex(func(p *string) error {
+		err := sethostname(text)
 		if err == nil {
-			*p = s
+			*p = string(text)
 		}
 		return err
 	})

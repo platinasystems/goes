@@ -15,12 +15,12 @@ type CAs struct{ cache *cache.Cache[*x509.CertPool] }
 // ClientCAs includes self plus all Subscribers and Subscriptions.
 var ClientCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 	*p = x509.NewCertPool()
-	(*p).AddCert(Self.Leaf())
-	Subscriptions.Range(func(x X509) bool {
+	Self.Add(*p)
+	Subscriptions.Range(func(x *X509) bool {
 		(*p).AddCert(x.Certificate)
 		return true
 	})
-	Subscribers.Range(func(x X509) bool {
+	Subscribers.Range(func(x *X509) bool {
 		(*p).AddCert(x.Certificate)
 		return true
 	})
@@ -30,8 +30,8 @@ var ClientCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 // RootCAs includes self plus all Subscriptions.
 var RootCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 	*p = x509.NewCertPool()
-	(*p).AddCert(Self.Leaf())
-	Subscriptions.Range(func(x X509) bool {
+	Self.Add(*p)
+	Subscriptions.Range(func(x *X509) bool {
 		(*p).AddCert(x.Certificate)
 		return true
 	})
@@ -39,14 +39,14 @@ var RootCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 })}
 
 func (cached CAs) Add(c *x509.Certificate) {
-	cached.cache.Ref(func(p **x509.CertPool) error {
+	cached.cache.Mutex(func(p **x509.CertPool) error {
 		(*p).AddCert(c)
 		return nil
 	})
 }
 
 func (cached CAs) Clone() (cas *x509.CertPool) {
-	cached.cache.Ref(func(p **x509.CertPool) error {
+	cached.cache.Mutex(func(p **x509.CertPool) error {
 		cas = (*p).Clone()
 		return nil
 	})

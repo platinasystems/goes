@@ -192,7 +192,7 @@ usage: {{.Command}} <command|object> [<args>]
 		if err != nil {
 			err = Error{append(path, args[0]), err}
 		}
-	} else if path[1] == "complete" && len(args) == 1 {
+	} else if len(path) > 1 && path[1] == "complete" && len(args) == 1 {
 		complete.Last(w, args, m.Keys())
 		return
 	} else {

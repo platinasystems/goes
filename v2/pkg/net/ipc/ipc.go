@@ -11,25 +11,26 @@ import (
 )
 
 type Ipcer interface {
-	Address() (string, error)
+	Err() error
 	Listen() (net.Listener, error)
-	Network() string
+	net.Addr
 }
 
 type Ipc struct{ Ipcer }
 
-func (ipc Ipc) Dial(ctx context.Context) (net.Conn, error) {
-	address, err := ipc.Address()
-	if err != nil {
+func (ipc Ipc) Connect(ctx context.Context, _ string) (net.Conn, error) {
+	address := ipc.String()
+	if err := ipc.Err(); err != nil {
 		return nil, err
 	}
 	return new(net.Dialer).DialContext(ctx, ipc.Network(), address)
 }
 
-func (ipc Ipc) String() string {
-	address, err := ipc.Address()
-	if err != nil {
-		return fmt.Sprint(ipc.Network(), "://", err)
+func (ipc Ipc) Format(w fmt.State, verb rune) {
+	address := ipc.String()
+	if err := ipc.Err(); err != nil {
+		fmt.Fprint(w, ipc.Network(), "://", err)
+	} else {
+		fmt.Fprint(w, ipc.Network(), "://", address)
 	}
-	return fmt.Sprint(ipc.Network(), "://", address)
 }

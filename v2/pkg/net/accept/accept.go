@@ -9,9 +9,8 @@ import (
 	"sync"
 )
 
-// This is run as go routine to continually feed accepted connections to
-// channel until the listner is closed.
-func With(wg *sync.WaitGroup, ln net.Listener, ch chan<- net.Conn) {
+// Send accepted connections to channel until listner is closed.
+func Routine(wg *sync.WaitGroup, ch chan<- net.Conn, ln net.Listener) {
 	defer wg.Done()
 	defer close(ch)
 	for {

@@ -78,6 +78,9 @@ func Glob(pat, arg string) (c []string) {
 }
 
 func Flags(fs *flag.FlagSet, arg string) (c []string) {
+	if !strings.HasPrefix(arg, "-") {
+		return
+	}
 	arg = strings.TrimLeft(arg, "-")
 	fs.VisitAll(func(f *flag.Flag) {
 		if len(arg) == 0 || strings.HasPrefix(f.Name, arg) {

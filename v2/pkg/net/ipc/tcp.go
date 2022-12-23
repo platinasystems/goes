@@ -13,9 +13,9 @@ type Tcp string
 
 func NewTcp(ap string) Ipc { return Ipc{Tcp(ap)} }
 
-func (tcp Tcp) Address() (string, error) { return string(tcp), nil }
-
-func (Tcp) Network() string { return "tcp" }
+func (tcp Tcp) Err() error     { return nil }
+func (Tcp) Network() string    { return "tcp" }
+func (tcp Tcp) String() string { return string(tcp) }
 
 func (tcp Tcp) Listen() (net.Listener, error) {
 	return net.Listen("tcp", string(tcp))

@@ -10,8 +10,17 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/subscribe"
 )
+
+const Usage = `
+usage:	{{.}} <name>:<port>
+	{{.}} <name> <address>:<port>
+Register with exchange.
+`
+
+// PEM block headers to subscription certificates.
+var Headers = map[string]string{}
 
 func Func(
 	ctx context.Context,
@@ -26,11 +35,9 @@ func Func(
 	case "help":
 		copy(path[1:], path[2:])
 		path = path[:len(path)-1]
-		return template.Must(template.New("usage").Parse(`
-usage:	{{print .}} <name>:<port>
-	{{print .}} <name> <address>:<port>
-Register with exchange.
-`[1:])).Execute(w, strings.Join(path, " "))
+		return template.Must(template.New("usage").
+			Parse(Usage[1:])).
+			Execute(w, strings.Join(path, " "))
 	}
-	return tlsx.Subscribe(ctx, args)
+	return subscribe.Req(ctx, Headers, args)
 }

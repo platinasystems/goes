@@ -17,20 +17,6 @@ func Test(t *testing.T) {
 			t.Errorf("%q", v)
 		}
 	})
-	t.Run("build-id:", func(t *testing.T) {
-		if v, err := BuildId.ValErr(); err != nil {
-			t.Error(err)
-		} else if len(v) == 0 {
-			t.Error("empty")
-		}
-	})
-	t.Run("build-info:", func(t *testing.T) {
-		if v, err := BuildInfo.ValErr(); err != nil {
-			t.Error(err)
-		} else if v == nil {
-			t.Error("nil")
-		}
-	})
 	t.Run("is /opt:", func(t *testing.T) {
 		if Is.Opt() {
 			t.Error("unexpected")
@@ -46,14 +32,34 @@ func Test(t *testing.T) {
 			t.Error("unexpected")
 		}
 	})
-	t.Run("main reference:", func(t *testing.T) {
-		if v, err := MainReference.ValErr(); err != ErrUnavailable {
-			t.Error("test shouldn't have main reference:", v)
-		}
+	t.Run("build:", func(t *testing.T) {
+		t.Run("id:", func(t *testing.T) {
+			if v, err := Build.Id.ValErr(); err != nil {
+				t.Error(err)
+			} else if len(v) == 0 {
+				t.Error("empty")
+			}
+		})
+		t.Run("info:", func(t *testing.T) {
+			if v, err := Build.Info.ValErr(); err != nil {
+				t.Error(err)
+			} else if v == nil {
+				t.Error("nil")
+			}
+		})
 	})
-	t.Run("main version:", func(t *testing.T) {
-		if v, err := MainVersion.ValErr(); err != ErrUnavailable {
-			t.Error("test shouldn't have main version:", v)
-		}
+	t.Run("main:", func(t *testing.T) {
+		t.Run("reference:", func(t *testing.T) {
+			v, err := Main.Reference.ValErr()
+			if err != ErrUnavailable {
+				t.Error("test shouldn't have main reference:", v)
+			}
+		})
+		t.Run("version:", func(t *testing.T) {
+			v, err := Main.Version.ValErr()
+			if err != ErrUnavailable {
+				t.Error("test shouldn't have main version:", v)
+			}
+		})
 	})
 }

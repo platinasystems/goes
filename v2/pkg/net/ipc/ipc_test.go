@@ -39,7 +39,7 @@ func TestIpc(t *testing.T) {
 	got := new(strings.Builder)
 
 	ipc := New()
-	req := service.Request{ipc}
+	req := service.Request{ipc.Connect}
 	ln, err := ipc.Listen()
 	if err != nil {
 		t.Fatal(err)
@@ -47,18 +47,18 @@ func TestIpc(t *testing.T) {
 	lna := ln.Addr().String()
 
 	wg.Add(1)
-	go foreclose.With(ctx, &wg, ln)
+	go foreclose.Routine(ctx, &wg, ln)
 
 	conch := make(chan net.Conn, 4)
 
 	wg.Add(1)
-	go accept.With(&wg, ln, conch)
+	go accept.Routine(&wg, conch, ln)
 
 	wg.Add(1)
-	go service.With(&wg, conch, lna, timeout, selection.Map{
+	go service.Routine(ctx, &wg, conch, lna, timeout, selection.Map{
 		"cat":  cat.Func,
 		"echo": echo.Func,
-	})
+	}.Select)
 
 	prog := program.Base()
 	ipcs := ipc.String()
@@ -80,15 +80,15 @@ func TestIpc(t *testing.T) {
 		}
 	}
 	t.Run("complete", func(t *testing.T) {
-		ut(t, "echo\n", []string{prog, "complete", ipcs}, "ec")
+		ut(t, "echo\n", []string{prog, "complete", ipcs}, ".", "ec")
 	})
 	t.Run("echo", func(t *testing.T) {
 		ut(t, "hello world\n", []string{prog, ipcs},
-			"echo", "hello", "world")
+			".", "echo", "hello", "world")
 	})
 	t.Run("cat", func(t *testing.T) {
 		const want = "hello world\n"
 		r = strings.NewReader(want)
-		ut(t, want, []string{prog, ipcs}, "-i", "-", "cat", "-")
+		ut(t, want, []string{prog, ipcs}, "-i", "-", ".", "cat", "-")
 	})
 }

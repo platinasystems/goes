@@ -9,19 +9,21 @@ package main
 import (
 	"github.com/platinasystems/goes/v2/pkg/goes/cat"
 	"github.com/platinasystems/goes/v2/pkg/goes/command"
-	"github.com/platinasystems/goes/v2/pkg/goes/daemon"
 	"github.com/platinasystems/goes/v2/pkg/goes/echo"
 	"github.com/platinasystems/goes/v2/pkg/goes/selection"
+	"github.com/platinasystems/goes/v2/pkg/goes/service"
 	"github.com/platinasystems/goes/v2/pkg/goes/show"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/address"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/cert"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/exchange"
+	"github.com/platinasystems/goes/v2/pkg/goes/start"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/admin"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/create_cert"
+	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/daemon"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/exec"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/subscribe"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/tap"
 	"github.com/platinasystems/goes/v2/pkg/goes/xdg"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/dir"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
@@ -30,83 +32,82 @@ usage:	{{.Prog}} [<options>] address [<exchange> [<exchange-address>]]
 		Assign or print exchange address.
 	{{.Prog}} [<options>] create-cert
 		Create key and certifcate for host, consumer, or exchange.
-	{{.Prog}} [<options>] [exec] <exchange> approve [<guest(s)>]
-		Approve subscriptions.
-	{{.Prog}} [<options>] [exec] <exchange> subscribers
-		List certificates of exchange subscribers.
-	{{.Prog}} [<options>] [exec] <exchange> deny [<guest(s)>]
-		Deny client(s) subscription.
-	{{.Prog}} [<options>] [exec] <exchange> [<command> [<args>]]
-		Run request on host connected through exchange.
-	{{.Prog}} show build-id
-	{{.Prog}} show build-info
-	{{.Prog}} [<options>] show cert
-		Print local certificate.
-	{{.Prog}} [<options>] show subscribers
-		List certificates of exchanges.
-	{{.Prog}} [<options>] show subscriptions
-		List exchange certificates.
-	{{.Prog}} show main-reference
-		PATH@SYMVER
-	{{.Prog}} show version
-		SYMVER
-	{{.Prog}} [<options>] start exchange [-r <address>] [-x <address>]
-		Start TLS exchange service.
-	{{.Prog}} [<options>] start tap [-u <unit>] [<exchange>]
-		Start link tunnel.
+	{{.Prog}} [<options>] exec <exchange> <command> [<args>]
+		Run command on exchange.
+	{{.Prog}} json ...
+		JSON format object.
+	{{.Prog}} show ...
+		Text format object.
+	{{.Prog}} [<options>] rpc <host> <func> [<args>]
+		Blocking RPC to <host>.
+	{{.Prog}} [<options>] start <routines>
+		Ordered start of one or more daemon go-routines.
 	{{.Prog}} [<options>] subscribe <registry-address>
 		Request exchange service.
 {{print .Flags}}
-  <address>
-	A network address and port, e.g.
-		:8003
-		[::1]:8003
-		unix://PATH
-		unix://@NAME
+  <address>	A network address and port, e.g.
+	- :8003
+	- 127.0.0.1:8003
+	- [::1]:8003
+	- unix://PATH
+	- unix://@NAME
+
   <exchange>, <guest>
 	The primary DNS name or subject-key-id of a certificate.
+
+  <routine>	One or more, ordered daemon go-routines, e.g.
+	- exchange [bridge [leasing <network> <base>]]
+	- registry
+	- rpc
+	- tap [-unix <#>] [-prefix <prefix>] <exchange>
 `
 
 func main() {
 	selection.Usage = Usage
-	selection.Map{
-		"address": address.Func,
-		"cert": selection.Map{
-			"create": cert.Create,
-			"show":   show.New(certs.Self),
+	tenants := &daemon.Exchange.Bridge.Leasing
+	showprog := selection.Map{
+		"build": selection.Map{
+			"id":   show.Text{program.Build.Id}.Func,
+			"info": show.Text{program.Build.Info}.Func,
 		}.Select,
-		"daemon": selection.Map{
-			"exchange": exchange.Daemon{
-				"cat":     cat.Func,
-				"command": command.Func,
-				"echo":    echo.Func,
-			}.Start,
-			tap.Key: tap.Daemon,
+		"main": selection.Map{
+			"reference": show.Text{program.Main.Reference}.Func,
+			"version":   show.Text{program.Main.Version}.Func,
 		}.Select,
-		"exec": exec.Func,
+	}.Select
+	daemon.Exchange.Selector = selection.Map{
+		"approve": admin.Func,
+		"cat":     cat.Func,
+		"command": command.Func,
+		"deny":    admin.Func,
+		"echo":    echo.Func,
 		"show": selection.Map{
-			"build-id":       show.New(program.BuildId),
-			"build-info":     show.New(program.BuildInfo),
-			"cert":           show.New(certs.Self),
-			"main-reference": show.New(program.MainReference),
-			"subscribers":    show.New(certs.Subscribers),
-			"subscriptions":  show.New(certs.Subscriptions),
-			"state":          show.New(state.Cache.Dir),
-			"xdg":            xdg.Show,
-			"version":        show.New(program.MainVersion),
+			"json": selection.Map{
+				"tenants": show.JSON{tenants}.Func,
+			}.Select,
+			"program":     showprog,
+			"subscribers": show.Text{certs.Subscribers}.Func,
+			"tenant":      show.KeyText{tenants}.Func,
+			"tenants":     show.Text{tenants}.Func,
 		}.Select,
-		"start": selection.Map{
-			"exchange": daemon.Start,
-			tap.Key:    daemon.Start,
+	}
+	selection.Map{
+		"create-cert": create_cert.Func,
+		"daemon":      daemon.Func,
+		"exec":        exec.Func,
+		"rpc":         service.Request{tlsx.RPC}.Func,
+		"show": selection.Map{
+			"program":       showprog,
+			"cert":          show.Text{certs.Self}.Func,
+			"exchange-port": show.TextContext{port.Exchange}.Func,
+			"registry-port": show.TextContext{port.Registry}.Func,
+			"rpc-port":      show.TextContext{port.RPC}.Func,
+			"subscribers":   show.Text{certs.Subscribers}.Func,
+			"subscriptions": show.Text{certs.Subscriptions}.Func,
+			"state":         show.Text{dir.Cached.Name}.Func,
+			"xdg":           xdg.Show,
 		}.Select,
+		"start":     start.Func,
 		"subscribe": subscribe.Func,
-	}.Main(func(m selection.Map) error {
-		for _, x := range certs.Self.DNSNames() {
-			m[x] = exec.Func
-		}
-		for _, x := range certs.Subscriptions.Names() {
-			m[x] = exec.Func
-		}
-		return nil
-	})
+	}.Main()
 }

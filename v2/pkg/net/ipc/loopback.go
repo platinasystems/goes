@@ -13,29 +13,27 @@ import (
 	"strings"
 )
 
-type Loopback string
+type Loopback struct {
+	fn  string
+	err error
+}
 
 // A loopback address file named Dir()+"/A."+suffix
 func NewLoopback(suffix ...any) Ipc {
-	return Ipc{Loopback(filepath.Join(Dir(), join("A.", suffix)))}
+	return Ipc{&Loopback{
+		filepath.Join(Dir(), join("A.", suffix)),
+		nil,
+	}}
 }
 
-// Returns alocated 127.0.0.1:PORT from Ipc file.
-func (lb Loopback) Address() (string, error) {
-	addrdata, err := ioutil.ReadFile(string(lb))
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(addrdata)), err
-}
-
-func (Loopback) Network() string { return "tcp" }
+// Returns any error trying to read file containing allocated address:port
+func (lb *Loopback) Err() error { return lb.err }
 
 // Listen on the the loopback interface (127.0.0.1) at the next available port
 // and record the allocated address in a file named by Ipc.
-func (lb Loopback) Listen() (net.Listener, error) {
+func (lb *Loopback) Listen() (net.Listener, error) {
 	const create = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	f, err := os.OpenFile(string(lb), create, 0640)
+	f, err := os.OpenFile(lb.fn, create, 0640)
 	if err != nil {
 		return nil, err
 	}
@@ -48,13 +46,25 @@ func (lb Loopback) Listen() (net.Listener, error) {
 	return LoopbackListener{ln, lb}, err
 }
 
+func (*Loopback) Network() string { return "tcp" }
+
+// Returns allocated 127.0.0.1:PORT from Ipc file.
+func (lb *Loopback) String() string {
+	addrdata, err := ioutil.ReadFile(lb.fn)
+	if err != nil {
+		lb.err = err
+		return ""
+	}
+	return strings.TrimSpace(string(addrdata))
+}
+
 type LoopbackListener struct {
 	net.Listener
-	lb Loopback
+	lb *Loopback
 }
 
 func (l LoopbackListener) Close() error {
 	err := l.Listener.Close()
-	os.Remove(string(l.lb))
+	os.Remove(string(l.lb.fn))
 	return err
 }

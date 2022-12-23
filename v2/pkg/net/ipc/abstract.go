@@ -20,7 +20,9 @@ func NewAbstract(suffix ...any) Ipc {
 	return Ipc{Abstract(join("@", suffix))}
 }
 
-func (abs Abstract) Address() (string, error) { return abs.String(), nil }
+func (Abstract) Err() error         { return nil }
+func (Abstract) Network() string    { return "unix" }
+func (abs Abstract) String() string { return string(abs) }
 
 func (abs Abstract) Listen() (net.Listener, error) {
 	ln, err := net.Listen(abs.Network(), abs.String())
@@ -29,8 +31,6 @@ func (abs Abstract) Listen() (net.Listener, error) {
 	}
 	return AbstractListener{ln}, nil
 }
-
-func (Abstract) Network() string { return "unix" }
 
 type AbstractListener struct {
 	net.Listener

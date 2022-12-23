@@ -18,13 +18,17 @@ type X509 struct {
 	Name, SKI string
 }
 
-func NewX509(c *x509.Certificate) X509 {
-	return X509{
-		Headers:     make(Headers),
-		Certificate: c,
-		Name:        c.DNSNames[0],
-		SKI:         hex.EncodeToString(c.SubjectKeyId),
-	}
+func NewX509(h Headers, c *x509.Certificate) *X509 {
+	x := new(X509)
+	x.Set(h, c)
+	return x
+}
+
+func (x *X509) Set(h Headers, c *x509.Certificate) {
+	x.Headers = h
+	x.Certificate = c
+	x.Name = c.DNSNames[0]
+	x.SKI = hex.EncodeToString(c.SubjectKeyId)
 }
 
 // Format as yaml like sequence to writer.

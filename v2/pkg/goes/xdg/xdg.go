@@ -11,11 +11,11 @@ import (
 )
 
 var Show = selection.Map{
-	"cache-home":   show.New(xdg.Cache.CacheHome),
-	"config-dirs":  show.New(xdg.Cache.ConfigDirs),
-	"config-home":  show.New(xdg.Cache.ConfigHome),
-	"data-dirs":    show.New(xdg.Cache.DataDirs),
-	"data-home":    show.New(xdg.Cache.DataHome),
-	"run-time-dir": show.New(xdg.Cache.RunTimeDir),
-	"state-home":   show.New(xdg.Cache.StateHome),
+	"cache-home":   show.Text{xdg.Cache.CacheHome}.Func,
+	"config-dirs":  show.Text{xdg.Cache.ConfigDirs}.Func,
+	"config-home":  show.Text{xdg.Cache.ConfigHome}.Func,
+	"data-dirs":    show.Text{xdg.Cache.DataDirs}.Func,
+	"data-home":    show.Text{xdg.Cache.DataHome}.Func,
+	"run-time-dir": show.Text{xdg.Cache.RunTimeDir}.Func,
+	"state-home":   show.Text{xdg.Cache.StateHome}.Func,
 }.Select

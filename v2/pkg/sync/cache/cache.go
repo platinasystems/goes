@@ -5,59 +5,62 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
 
 type Cache[T any] struct {
-	m      sync.RWMutex
-	load   func(*T) error
-	loaded bool
-	err    error
-	v      T
+	m   sync.RWMutex
+	l   func(*T) error
+	lc  func(context.Context, *T) error
+	ok  bool
+	err error
+	v   T
 }
 
 func New[T any](load func(*T) error) *Cache[T] {
-	return &Cache[T]{load: load}
+	return &Cache[T]{l: load}
 }
 
-func (c *Cache[T]) Format(w fmt.State, verb rune) {
-	if v, err := c.ValErr(); err == nil {
-		fmt.Fprint(w, v)
+func NewContext[T any](load func(context.Context, *T) error) *Cache[T] {
+	return &Cache[T]{lc: load}
+}
+
+func (c *Cache[T]) Invalidate() {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.ok = false
+}
+
+func (c *Cache[T]) MarshalText() (text []byte, err error) {
+	v, err := c.ValErr()
+	if err == nil {
+		text = []byte(fmt.Sprint(v))
 	}
+	return
 }
 
-// Returns load error.
-func (c *Cache[T]) Err() error {
-	_, err := c.ValErr()
-	return err
-}
-
-// Preemptive load.
-func (c *Cache[T]) Preload(f func(*T)) {
-	c.m.Lock()
-	defer c.m.Unlock()
-	f(&c.v)
-	c.loaded = true
-	c.err = nil
-}
-
-func (c *Cache[T]) Reload() {
-	c.m.Lock()
-	defer c.m.Unlock()
-	c.loaded = true
-	c.err = c.load(&c.v)
+func (c *Cache[T]) MarshalTextContext(ctx context.Context) (
+	text []byte,
+	err error,
+) {
+	v, err := c.ValErrContext(ctx)
+	if err == nil {
+		text = []byte(fmt.Sprint(v))
+	}
+	return
 }
 
 // If not yet loaded, do so and return if error; otherwise, continue with call
-// to f() with read+write locked reference and return its results.
-func (c *Cache[T]) Ref(f func(*T) error) error {
+// to f() with locked reference and return f's results.
+func (c *Cache[T]) Mutex(f func(*T) error) error {
 	c.m.Lock()
 	defer c.m.Unlock()
-	if !c.loaded {
-		c.loaded = true
-		if c.load != nil {
-			c.err = c.load(&c.v)
+	if !c.ok {
+		c.ok = true
+		if c.l != nil {
+			c.err = c.l(&c.v)
 		}
 	}
 	if c.err != nil {
@@ -66,13 +69,30 @@ func (c *Cache[T]) Ref(f func(*T) error) error {
 	return f(&c.v)
 }
 
-// Panic if ValErr returns error; otherwise, return its value.
-func (c *Cache[T]) Value() T {
-	v, err := c.ValErr()
-	if err != nil {
-		panic(err)
+func (c *Cache[T]) MutexContext(
+	ctx context.Context,
+	f func(context.Context, *T) error) error {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if !c.ok {
+		c.ok = true
+		if c.lc != nil {
+			c.err = c.lc(ctx, &c.v)
+		}
 	}
-	return v
+	if c.err != nil {
+		return c.err
+	}
+	return f(ctx, &c.v)
+}
+
+// Preemptive load.
+func (c *Cache[T]) Preload(f func(*T)) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	f(&c.v)
+	c.ok = true
+	c.err = nil
 }
 
 // If not yet loaded, do so before returning value.  If load failed,
@@ -80,18 +100,52 @@ func (c *Cache[T]) Value() T {
 // overwritten by Preload or Reload.
 func (c *Cache[T]) ValErr() (T, error) {
 	c.m.RLock()
-	if c.loaded {
+	if c.ok {
 		defer c.m.RUnlock()
 	} else {
 		c.m.RUnlock()
 		c.m.Lock()
 		defer c.m.Unlock()
-		if !c.loaded {
-			c.loaded = true
-			if c.load != nil {
-				c.err = c.load(&c.v)
+		if !c.ok {
+			c.ok = true
+			if c.l != nil {
+				c.err = c.l(&c.v)
 			}
 		}
 	}
 	return c.v, c.err
+}
+
+func (c *Cache[T]) Value() T {
+	t, err := c.ValErr()
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func (c *Cache[T]) ValErrContext(ctx context.Context) (T, error) {
+	c.m.RLock()
+	if c.ok {
+		defer c.m.RUnlock()
+	} else {
+		c.m.RUnlock()
+		c.m.Lock()
+		defer c.m.Unlock()
+		if !c.ok {
+			c.ok = true
+			if c.lc != nil {
+				c.err = c.lc(ctx, &c.v)
+			}
+		}
+	}
+	return c.v, c.err
+}
+
+func (c *Cache[T]) ValueContext(ctx context.Context) T {
+	t, err := c.ValErrContext(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

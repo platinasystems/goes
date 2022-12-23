@@ -20,6 +20,11 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
+const Usage = `
+usage: {{.Command}} [<options>] <exchange> <command> [<args>]
+Remote execution.
+{{print .Flags}}`
+
 func Func(
 	ctx context.Context,
 	r io.Reader,
@@ -28,27 +33,17 @@ func Func(
 	args ...string,
 ) error {
 	fs := flags.New()
-	ex := path[len(path)-1]
 	usage := func() error {
-		text := map[bool]string{
-			true: `
-usage: {{.Command}} [<options>] <exchange> <command> [<args>]
-Remote execution.
-{{print .Flags}}`,
-			false: `
-usage: {{.Command}} [<options>] <command> [<args>]
-Remote execution.
-{{print .Flags}}`,
-		}[ex == "exec" || ex == ""]
-		return template.Must(template.New("usage").Parse(text[1:])).
-			Execute(w, struct {
-				Command string
-				Flags   flags.Flags
-			}{
-				strings.Join(path, " "),
-				fs,
-			})
+		return template.Must(template.New("usage").
+			Parse(Usage[1:])).Execute(w, struct {
+			Command string
+			Flags   flags.Flags
+		}{
+			strings.Join(path, " "),
+			fs,
+		})
 	}
+
 	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
 	err := fs.Parse(args)
@@ -57,41 +52,35 @@ Remote execution.
 	} else if err != nil {
 		return err
 	}
+
 	args = fs.Args()
-	if ex == "exec" {
-		if len(args) > 0 {
-			ex = args[0]
-			args = args[1:]
-		} else {
-			ex = ""
-		}
-	}
 	switch path[1] {
 	case "complete":
-		if len(ex) == 0 {
+		if len(args) <= 1 {
 			complete.Last(w, args, fs.FlagSet,
-				certs.Self.DNSNames(),
+				certs.Self.Name(),
 				certs.Subscriptions.Names())
 			return nil
 		}
 		args = append([]string{path[1]}, args...)
 	case "help":
-		if len(ex) == 0 {
+		if len(args) == 0 {
 			copy(path[1:], path[2:])
 			path = path[:len(path)-1]
 			return usage()
 		}
 		args = append([]string{path[1]}, args...)
 	}
-	if len(ex) == 0 {
+
+	if len(args) == 0 {
 		return errors.New("no <exchange>")
 	}
 
-	tlsc, err := tlsx.DialAndHandshake(ctx, ex)
-	if err != nil {
-		return err
+	ex := args[0]
+	if args = args[1:]; len(args) == 0 {
+		return errors.New("no <command>")
 	}
-	defer tlsc.Close()
+
 	var anyargs []any
 	if *tflag {
 		if ws, err := pty.GetsizeFull(os.Stdin); err == nil {
@@ -112,12 +101,14 @@ Remote execution.
 	for _, arg := range args {
 		anyargs = append(anyargs, arg)
 	}
-	if err = tlsx.Req(ctx, tlsc, r, w, anyargs...); err != nil {
-		if err.Error() == tlsx.ErrExit.Error() {
-			err = nil
-		} else {
-			err = fmt.Errorf("%s: %w", ex, err)
-		}
+
+	conn, err := tlsx.Exchange.Connect(ctx, ex)
+	if err != nil {
+		return err
+	}
+
+	if err = tlsx.Exec(ctx, conn, r, w, anyargs...); err != nil {
+		err = fmt.Errorf("%s: %w", ex, err)
 	}
 	return err
 }

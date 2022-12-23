@@ -11,7 +11,7 @@ import (
 )
 
 // Close listener when context is done.
-func With(ctx context.Context, wg *sync.WaitGroup, ln net.Listener) {
+func Routine(ctx context.Context, wg *sync.WaitGroup, ln net.Listener) {
 	defer wg.Done()
 	defer ln.Close()
 	<-ctx.Done()

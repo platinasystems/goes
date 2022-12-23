@@ -5,9 +5,9 @@
 package certs
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -23,7 +23,7 @@ var (
 
 type TLS struct {
 	tls.Certificate
-	Name, SKI string
+	X509
 }
 
 type CachedTLS struct{ *cache.Cache[TLS] }
@@ -37,54 +37,60 @@ var Self = CachedTLS{cache.New[TLS](func(p *TLS) (err error) {
 			err = ErrNilLeaf
 		} else if len(p.Certificate.Leaf.DNSNames) == 0 {
 			err = ErrNoDNSNames
+		} else {
+			p.X509.Set(Headers{}, p.Certificate.Leaf)
 		}
 	}
-	p.Name = p.Certificate.Leaf.DNSNames[0]
-	p.SKI = hex.EncodeToString(p.Certificate.Leaf.SubjectKeyId)
 	return
 })}
 
-func (t CachedTLS) Format(w fmt.State, verb rune) {
-	t.Ref(func(p *TLS) error {
+func (t CachedTLS) Add(cas *x509.CertPool) {
+	t.Mutex(func(p *TLS) error {
+		if c := p.X509.Certificate; c != nil {
+			cas.AddCert(c)
+		}
+		return nil
+	})
+}
+
+func (t CachedTLS) MarshalText() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	t.Mutex(func(p *TLS) error {
 		algs := p.Certificate.SupportedSignatureAlgorithms
 		if n := len(algs); n > 0 {
-			fmt.Fprintln(w, "supported_signature_algoritums:")
+			fmt.Fprintln(buf, "supported_signature_algoritums:")
 			for _, alg := range algs {
-				fmt.Fprintln(w, "  -", alg)
+				fmt.Fprintln(buf, "  -", alg)
 			}
 		}
 		ctss := p.Certificate.SignedCertificateTimestamps
 		if n := len(ctss); n > 0 {
-			fmt.Fprintln(w, "signed_certificate_timestamps:", n)
+			fmt.Fprintln(buf, "signed_certificate_timestamps:", n)
 		}
-		fmt.Fprint(w, X509{
-			Headers:     make(Headers),
-			Certificate: p.Certificate.Leaf,
-			Name:        p.Name,
-			SKI:         p.SKI,
-		})
+		fmt.Fprint(buf, p.X509)
 		return nil
 	})
+	return buf.Bytes(), nil
 }
 
-func (t CachedTLS) DNSNames() (l []string) {
-	t.Ref(func(p *TLS) error {
-		l = p.Certificate.Leaf.DNSNames
-		return nil
-	})
-	return
-}
-
-func (t CachedTLS) Leaf() (x *x509.Certificate) {
-	t.Ref(func(p *TLS) error {
-		x = p.Certificate.Leaf
-		return nil
+func (t CachedTLS) Match(nameOrSKI string) (match *X509, err error) {
+	if len(nameOrSKI) == 0 {
+		err = errors.New("empty name or SKI")
+		return
+	}
+	err = t.Mutex(func(p *TLS) error {
+		if nameOrSKI == p.X509.Name || nameOrSKI == p.X509.SKI {
+			match = &p.X509
+			return nil
+		}
+		return fmt.Errorf("%q: neither name nor SKI of %s",
+			nameOrSKI, filename.Cert())
 	})
 	return
 }
 
 func (t CachedTLS) Name() (s string) {
-	t.Ref(func(p *TLS) error {
+	t.Mutex(func(p *TLS) error {
 		s = p.Name
 		return nil
 	})
@@ -92,7 +98,7 @@ func (t CachedTLS) Name() (s string) {
 }
 
 func (t CachedTLS) SKI() (s string) {
-	t.Ref(func(p *TLS) error {
+	t.Mutex(func(p *TLS) error {
 		s = p.SKI
 		return nil
 	})
@@ -100,7 +106,7 @@ func (t CachedTLS) SKI() (s string) {
 }
 
 func (t CachedTLS) TLS() (c tls.Certificate) {
-	t.Ref(func(p *TLS) error {
+	t.Mutex(func(p *TLS) error {
 		c = p.Certificate
 		return nil
 	})

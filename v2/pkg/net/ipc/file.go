@@ -17,16 +17,16 @@ func NewFile(suffix ...any) Ipc {
 	return Ipc{File(filepath.Join(Dir(), join("S.", suffix)))}
 }
 
-func (file File) Address() (string, error) { return string(file), nil }
+func (File) Err() error       { return nil }
+func (File) Network() string  { return "unix" }
+func (f File) String() string { return string(f) }
 
 // Listen on the Unix file socket named by File.Address().
-func (file File) Listen() (net.Listener, error) {
-	address := string(file)
-	ln, err := net.Listen(file.Network(), address)
+func (f File) Listen() (net.Listener, error) {
+	address := string(f)
+	ln, err := net.Listen(f.Network(), address)
 	if err == nil {
 		err = os.Chmod(address, 0700)
 	}
 	return ln, err
 }
-
-func (File) Network() string { return "unix" }

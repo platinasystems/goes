@@ -25,19 +25,6 @@ var Base = cache.New[string](func(p *string) error {
 	return nil
 }).Value
 
-var BuildId = cache.New[string](func(p *string) (err error) {
-	*p, err = buildid.ReadFile(Executable())
-	return
-})
-
-var BuildInfo = cache.New[*debug.BuildInfo](func(p **debug.BuildInfo) error {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		*p = info
-		return nil
-	}
-	return ErrUnavailable
-})
-
 var Executable = cache.New[string](func(p *string) error {
 	if s, err := os.Executable(); err == nil {
 		*p = s
@@ -47,61 +34,82 @@ var Executable = cache.New[string](func(p *string) error {
 	return nil
 }).Value
 
-var IsOpt = cache.New[bool](func(p *bool) (err error) {
-	*p = strings.HasPrefix(Executable(), filepath.FromSlash("/opt"))
-	return
-})
-
-var IsUsrLocal = cache.New[bool](func(p *bool) (err error) {
-	*p = strings.HasPrefix(Executable(),
-		filepath.FromSlash("/usr/local"))
-	return
-})
-
-var IsSuperUser = cache.New[bool](func(p *bool) error {
-	*p = os.Geteuid() == 0
-	return nil
-})
+var Cache = struct{ Opt, UsrLocal, SuperUser *cache.Cache[bool] }{
+	Opt: cache.New[bool](func(p *bool) (err error) {
+		*p = strings.HasPrefix(Executable(), filepath.FromSlash("/opt"))
+		return
+	}),
+	UsrLocal: cache.New[bool](func(p *bool) (err error) {
+		*p = strings.HasPrefix(Executable(),
+			filepath.FromSlash("/usr/local"))
+		return
+	}),
+	SuperUser: cache.New[bool](func(p *bool) error {
+		*p = os.Geteuid() == 0
+		return nil
+	}),
+}
 
 var Is = struct {
 	Opt, UsrLocal, SuperUser func() bool
 }{
-	Opt:       IsOpt.Value,
-	UsrLocal:  IsUsrLocal.Value,
-	SuperUser: IsSuperUser.Value,
+	Opt:       Cache.Opt.Value,
+	UsrLocal:  Cache.UsrLocal.Value,
+	SuperUser: Cache.SuperUser.Value,
 }
 
-// Returns the main module reference in the form of PATH@SYMVER or empty
-// if the main module is unavailable, as with GO tests.
-var MainReference = cache.New[string](func(p *string) (err error) {
-	bi, err := BuildInfo.ValErr()
-	if err == nil {
-		m := &bi.Main
-		if m.Replace != nil {
-			m = m.Replace
+var Build = struct {
+	Id   *cache.Cache[string]
+	Info *cache.Cache[*debug.BuildInfo]
+}{
+	Id: cache.New[string](func(p *string) (err error) {
+		*p, err = buildid.ReadFile(Executable())
+		return
+	}),
+	Info: cache.New[*debug.BuildInfo](func(p **debug.BuildInfo) error {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			*p = info
+			return nil
 		}
-		if len(m.Path) > 0 && len(m.Version) > 0 {
-			*p = fmt.Sprint(m.Path, "@", m.Version)
-		} else {
-			err = ErrUnavailable
-		}
-	}
-	return
-})
+		return ErrUnavailable
+	}),
+}
 
-// Returns the main module version.
-var MainVersion = cache.New[string](func(p *string) (err error) {
-	bi, err := BuildInfo.ValErr()
-	if err == nil {
-		m := &bi.Main
-		if m.Replace != nil {
-			m = m.Replace
+var Main = struct {
+	// The main module reference in the form of PATH@SYMVER or empty if the
+	// main module is unavailable, as with GO tests.
+	Reference *cache.Cache[string]
+	// Returns the main module version.
+	Version *cache.Cache[string]
+}{
+	Reference: cache.New[string](func(p *string) (err error) {
+		bi, err := Build.Info.ValErr()
+		if err == nil {
+			m := &bi.Main
+			if m.Replace != nil {
+				m = m.Replace
+			}
+			if len(m.Path) > 0 && len(m.Version) > 0 {
+				*p = fmt.Sprint(m.Path, "@", m.Version)
+			} else {
+				err = ErrUnavailable
+			}
 		}
-		if len(m.Version) > 0 {
-			*p = m.Version
-		} else {
-			err = ErrUnavailable
+		return
+	}),
+	Version: cache.New[string](func(p *string) (err error) {
+		bi, err := Build.Info.ValErr()
+		if err == nil {
+			m := &bi.Main
+			if m.Replace != nil {
+				m = m.Replace
+			}
+			if len(m.Version) > 0 {
+				*p = m.Version
+			} else {
+				err = ErrUnavailable
+			}
 		}
-	}
-	return
-})
+		return
+	}),
+}
