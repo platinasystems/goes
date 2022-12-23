@@ -40,7 +40,7 @@ func Match(nameOrSKI string) (match *X509, err error) {
 		if err != nil {
 			match, err = Subscribers.Match(nameOrSKI)
 			if err != nil {
-				err = fmt.Errorf("cert:%s: %w", err)
+				err = fmt.Errorf("cert:%s: %w", nameOrSKI, err)
 			}
 		}
 	}

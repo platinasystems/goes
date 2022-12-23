@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
@@ -30,22 +31,19 @@ var (
 	ErrMissingInput  = errors.New("missing input")
 )
 
-var Select = func(
-	context.Context,
-	io.Reader,
-	io.Writer,
-	[]string,
-	...string,
-) error {
-	return ErrMisconfigured
-}
-
-func Routine(ctx context.Context, wg *sync.WaitGroup) {
+func Routine(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	selection map[string]any,
+) {
 	defer wg.Done()
 
-	addr := &net.TCPAddr{Port: port.RPC.ValueContext(ctx)}
+	addr := &net.TCPAddr{Port: port.RPC.Value()}
 	svr := rpc.NewServer()
-	svr.Register(&Service{30 * time.Second})
+	svr.Register(&Service{
+		30 * time.Second,
+		selection,
+	})
 
 	svch := make(chan *tls.Conn, 4)
 	wg.Add(1)
@@ -65,7 +63,8 @@ func Routine(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 type Service struct {
-	timeout time.Duration
+	timeout   time.Duration
+	selection map[string]any
 }
 
 func (svc *Service) Select(args []string, result *string) error {
@@ -97,7 +96,7 @@ func (svc *Service) Select(args []string, result *string) error {
 		r = strings.NewReader(args[1])
 		args = args[2:]
 	}
-	err := Select(ctx, r, w, path, args...)
+	err := goes.Select(ctx, r, w, path, svc.selection, args...)
 	if err != nil {
 		fmt.Fprintln(w, err)
 	}

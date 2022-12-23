@@ -47,7 +47,7 @@ func (c Connector) Connect(ctx context.Context, host string) (
 	}
 
 	tcpa := &net.TCPAddr{
-		Port: c.ValueContext(ctx),
+		Port: c.Value(),
 	}
 
 	var dl net.Dialer

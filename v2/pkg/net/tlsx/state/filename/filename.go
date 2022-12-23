@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -44,7 +44,7 @@ var Subscriptions = cache.New[string](func(p *string) error {
 }).Value
 
 func filename(base string) string {
-	return filepath.Join(dir.Name(), base)
+	return filepath.Join(dir.Name.Value(), base)
 }
 
 var ExchangeAddress = cache.New[string](func(p *string) error {

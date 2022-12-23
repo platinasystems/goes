@@ -61,7 +61,7 @@ func Routine(
 ) {
 	defer wg.Done()
 
-	addr := &net.TCPAddr{Port: port.Registry.ValueContext(ctx)}
+	addr := &net.TCPAddr{Port: port.Registry.Value()}
 	svch := make(chan *tls.Conn, 4)
 
 	wg.Add(1)

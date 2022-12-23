@@ -53,7 +53,7 @@ Set or print system host name.
 		return err
 	}
 	if args = fs.Args(); len(args) > 0 {
-		return host.Set(args[0])
+		return host.Name.UnmarshalText([]byte(args[0]))
 	}
 	hn, err := host.Name.ValErr()
 	if err != nil {

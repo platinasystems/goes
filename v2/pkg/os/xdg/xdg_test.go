@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -27,39 +27,39 @@ func (ut unit) test(t *testing.T) {
 
 func Test(t *testing.T) {
 	t.Run("root", func(t *testing.T) {
-		program.IsSuperUser.Preload(func(p *bool) {
+		program.Opt.Preload(func(p *bool) {
 			*p = true
 		})
-		program.IsOpt.Preload(func(p *bool) {
+		program.SuperUser.Preload(func(p *bool) {
 			*p = true
 		})
-		program.IsUsrLocal.Preload(func(p *bool) {
+		program.UsrLocal.Preload(func(p *bool) {
 			*p = true
 		})
-		Root.CacheHome.Preload(func(p *string) {
+		SU.CacheHome.Preload(func(p *string) {
 			*p = "/var/cache"
 		})
 		t.Run("XDG_CACHE_HOME", unit{
-			CacheHome, "/var/cache",
+			CacheHome.Value, "/var/cache",
 		}.test)
 		t.Run("XDG_CONFIG_HOME", unit{
-			ConfigHome, "/etc/opt",
+			ConfigHome.Value, "/etc/opt",
 		}.test)
 		t.Run("XDG_DATA_HOME", unit{
-			DataHome, "/usr/local/share",
+			DataHome.Value, "/usr/local/share",
 		}.test)
-		Root.RunTimeDir.Preload(func(p *string) {
+		SU.RunTimeDir.Preload(func(p *string) {
 			*p = "/var/run"
 		})
 		t.Run("XDG_RUNTIME_DIR", unit{
-			RunTimeDir, "/var/run",
+			RunTimeDir.Value, "/var/run",
 		}.test)
 		t.Run("XDG_STATE_HOME", unit{
-			StateHome, "/var/local",
+			StateHome.Value, "/var/local",
 		}.test)
 	})
 	t.Run("user", func(t *testing.T) {
-		program.IsSuperUser.Preload(func(p *bool) {
+		program.SuperUser.Preload(func(p *bool) {
 			*p = false
 		})
 		t.Run("env", func(t *testing.T) {
@@ -72,25 +72,25 @@ func Test(t *testing.T) {
 					"XDG_STATE_HOME":  "$HOME/.local/state",
 				}[name]
 			}
-			Cache.CacheHome.Reload()
+			CacheHome.Invalidate()
 			t.Run("XDG_CACHE_HOME", unit{
-				CacheHome, "$HOME/.cache",
+				CacheHome.Value, "$HOME/.cache",
 			}.test)
-			Cache.ConfigHome.Reload()
+			ConfigHome.Invalidate()
 			t.Run("XDG_CONFIG_HOME", unit{
-				ConfigHome, "$HOME/.config",
+				ConfigHome.Value, "$HOME/.config",
 			}.test)
-			Cache.DataHome.Reload()
+			DataHome.Invalidate()
 			t.Run("XDG_DATA_HOME", unit{
-				DataHome, "$HOME/.local/share",
+				DataHome.Value, "$HOME/.local/share",
 			}.test)
-			Cache.RunTimeDir.Reload()
+			RunTimeDir.Invalidate()
 			t.Run("XDG_RUNTIME_DIR", unit{
-				RunTimeDir, "/run/user/$ID",
+				RunTimeDir.Value, "/run/user/$ID",
 			}.test)
-			Cache.StateHome.Reload()
+			StateHome.Invalidate()
 			t.Run("XDG_STATE_HOME", unit{
-				StateHome, "$HOME/.local/state",
+				StateHome.Value, "$HOME/.local/state",
 			}.test)
 		})
 		t.Run("noenv", func(t *testing.T) {
@@ -104,25 +104,25 @@ func Test(t *testing.T) {
 			UserHomeDir = func() (string, error) {
 				return "$HOME", nil
 			}
-			Cache.CacheHome.Reload()
+			CacheHome.Invalidate()
 			t.Run("XDG_CACHE_HOME", unit{
-				CacheHome, "$HOME/.cache",
+				CacheHome.Value, "$HOME/.cache",
 			}.test)
-			Cache.ConfigHome.Reload()
+			ConfigHome.Invalidate()
 			t.Run("XDG_CONFIG_HOME", unit{
-				ConfigHome, "$HOME/.config",
+				ConfigHome.Value, "$HOME/.config",
 			}.test)
-			Cache.DataHome.Reload()
+			DataHome.Invalidate()
 			t.Run("XDG_DATA_HOME", unit{
-				DataHome, "$HOME/.local/share",
+				DataHome.Value, "$HOME/.local/share",
 			}.test)
-			Cache.RunTimeDir.Reload()
+			RunTimeDir.Invalidate()
 			t.Run("XDG_RUNTIME_DIR", unit{
-				RunTimeDir, "$HOME/.cache",
+				RunTimeDir.Value, "$HOME/.cache",
 			}.test)
-			Cache.StateHome.Reload()
+			StateHome.Invalidate()
 			t.Run("XDG_STATE_HOME", unit{
-				StateHome, "$HOME/.local/state",
+				StateHome.Value, "$HOME/.local/state",
 			}.test)
 		})
 	})

@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/exchange/bridge"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
@@ -31,24 +32,14 @@ var (
 	ErrEmptyRequest  = errors.New("empty request")
 )
 
-type Selector interface {
-	Select(
-		context.Context,
-		io.Reader,
-		io.Writer,
-		[]string,
-		...string,
-	) error
-}
-
 type T struct {
-	cfg    tls.Config
-	Bridge bridge.T
-	Selector
+	cfg       tls.Config
+	Bridge    bridge.T
+	Selection map[string]any
 }
 
 func (t *T) Configure(args []string) ([]string, error) {
-	if t.Selector == nil {
+	if t.Selection == nil {
 		return args, ErrMisconfigured
 	}
 	if len(args) > 0 && args[0] == "bridge" {
@@ -70,7 +61,7 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	addr := &net.TCPAddr{Port: port.Exchange.ValueContext(ctx)}
+	addr := &net.TCPAddr{Port: port.Exchange.Value()}
 
 	svch := make(chan *tls.Conn, 4)
 
@@ -171,7 +162,8 @@ serviceLoop0:
 		case "pty":
 			r = dec
 		}
-		err = t.Select(cctx, r, w, append(path, ra), args...)
+		err = goes.Select(cctx, r, w, append(path, ra), t.Selection,
+			args...)
 		cancel()
 		iowg.Wait()
 		switch {

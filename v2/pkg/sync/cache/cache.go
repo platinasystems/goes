@@ -1,20 +1,28 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package cache
 
 import (
-	"context"
+	"encoding"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 )
 
+var ErrReadOnly = errors.New("read only")
+
+type Mutexer[T any] interface {
+	Mutex(func(*T) error) error
+}
+
 type Cache[T any] struct {
 	m   sync.RWMutex
 	l   func(*T) error
-	lc  func(context.Context, *T) error
 	ok  bool
+	ro  bool
 	err error
 	v   T
 }
@@ -23,8 +31,11 @@ func New[T any](load func(*T) error) *Cache[T] {
 	return &Cache[T]{l: load}
 }
 
-func NewContext[T any](load func(context.Context, *T) error) *Cache[T] {
-	return &Cache[T]{lc: load}
+func NewReadOnly[T any](load func(*T) error) *Cache[T] {
+	return &Cache[T]{
+		l:  load,
+		ro: true,
+	}
 }
 
 func (c *Cache[T]) Invalidate() {
@@ -33,21 +44,22 @@ func (c *Cache[T]) Invalidate() {
 	c.ok = false
 }
 
-func (c *Cache[T]) MarshalText() (text []byte, err error) {
+func (c *Cache[T]) MarshalJSON() (text []byte, err error) {
 	v, err := c.ValErr()
 	if err == nil {
-		text = []byte(fmt.Sprint(v))
+		text, err = json.Marshal(v)
 	}
 	return
 }
 
-func (c *Cache[T]) MarshalTextContext(ctx context.Context) (
-	text []byte,
-	err error,
-) {
-	v, err := c.ValErrContext(ctx)
+func (c *Cache[T]) MarshalText() (text []byte, err error) {
+	v, err := c.ValErr()
 	if err == nil {
-		text = []byte(fmt.Sprint(v))
+		if method, ok := any(v).(encoding.TextMarshaler); ok {
+			text, err = method.MarshalText()
+		} else {
+			text = []byte(fmt.Sprint(v))
+		}
 	}
 	return
 }
@@ -69,23 +81,6 @@ func (c *Cache[T]) Mutex(f func(*T) error) error {
 	return f(&c.v)
 }
 
-func (c *Cache[T]) MutexContext(
-	ctx context.Context,
-	f func(context.Context, *T) error) error {
-	c.m.Lock()
-	defer c.m.Unlock()
-	if !c.ok {
-		c.ok = true
-		if c.lc != nil {
-			c.err = c.lc(ctx, &c.v)
-		}
-	}
-	if c.err != nil {
-		return c.err
-	}
-	return f(ctx, &c.v)
-}
-
 // Preemptive load.
 func (c *Cache[T]) Preload(f func(*T)) {
 	c.m.Lock()
@@ -93,6 +88,32 @@ func (c *Cache[T]) Preload(f func(*T)) {
 	f(&c.v)
 	c.ok = true
 	c.err = nil
+}
+
+func (c *Cache[T]) UnmarshalJSON(text []byte) (err error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.ro {
+		err = ErrReadOnly
+	} else if err = json.Unmarshal(text, &c.v); err == nil {
+		c.ok = true
+	}
+	return
+}
+
+func (c *Cache[T]) UnmarshalText(text []byte) (err error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.ro {
+		err = ErrReadOnly
+	} else if m, ok := any(&c.v).(encoding.TextUnmarshaler); ok {
+		if err = m.UnmarshalText(text); err == nil {
+			c.ok = true
+		}
+	} else if _, err = fmt.Sscan(string(text), &c.v); err == nil {
+		c.ok = true
+	}
+	return
 }
 
 // If not yet loaded, do so before returning value.  If load failed,
@@ -118,32 +139,6 @@ func (c *Cache[T]) ValErr() (T, error) {
 
 func (c *Cache[T]) Value() T {
 	t, err := c.ValErr()
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
-
-func (c *Cache[T]) ValErrContext(ctx context.Context) (T, error) {
-	c.m.RLock()
-	if c.ok {
-		defer c.m.RUnlock()
-	} else {
-		c.m.RUnlock()
-		c.m.Lock()
-		defer c.m.Unlock()
-		if !c.ok {
-			c.ok = true
-			if c.lc != nil {
-				c.err = c.lc(ctx, &c.v)
-			}
-		}
-	}
-	return c.v, c.err
-}
-
-func (c *Cache[T]) ValueContext(ctx context.Context) T {
-	t, err := c.ValErrContext(ctx)
 	if err != nil {
 		panic(err)
 	}

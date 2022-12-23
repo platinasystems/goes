@@ -99,7 +99,7 @@ func Func(
 		case "rpc":
 			args = args[1:]
 			wg.Add(1)
-			go service.Routine(ctx, &wg)
+			go service.Routine(ctx, &wg, Exchange.Selection)
 		case "tap":
 			args, err = Tap.Configure(ctx, args[1:])
 			if err != nil {

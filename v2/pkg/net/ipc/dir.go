@@ -16,10 +16,10 @@ var (
 		if len(*DirFlag) > 0 {
 			*p = *DirFlag
 		} else {
-			*p = xdg.RunTimeDir()
+			*p = xdg.RunTimeDir.Value()
 		}
 		return nil
 	}).Value
 	DirFlag = flag.String("ipc", "", "socket directory"+
-		"(default "+xdg.RunTimeDir()+")")
+		"(default $XDG_RUNTIME_DIR)")
 )

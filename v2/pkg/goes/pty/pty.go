@@ -99,7 +99,7 @@ run command in an allocated TTY.
 		Setctty: true,
 	}
 	if err = cmd.Start(); err == nil {
-		if program.IsSuperUser.Value() {
+		if program.Is.SuperUser() {
 			line := tty.Name()
 			ra := path[1]
 			pid := cmd.Process.Pid
