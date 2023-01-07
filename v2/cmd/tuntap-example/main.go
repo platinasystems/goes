@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -69,9 +69,9 @@ func main() {
 			break
 		}
 		if tuntap.HasPI {
-			fmt.Println(frame.TunPI(pg[:n]))
+			fmt.Println(frame.NewTunPIData(pg[:n]))
 		} else if *tap {
-			fmt.Println(frame.Eth(pg[:n]))
+			fmt.Println(frame.NewEthData(pg[:n]))
 		} else {
 			fmt.Println(frame.IP(pg[:n]))
 		}

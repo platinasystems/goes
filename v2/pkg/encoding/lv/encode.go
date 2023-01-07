@@ -1,13 +1,14 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package lv
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io"
+
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 )
 
 type Encoding struct{ w io.Writer }
@@ -63,7 +64,7 @@ func (enc Encoding) Encode(args ...any) (n int, err error) {
 
 // Write an encoded length followed by data to the encapsulated writer.
 func (enc Encoding) Write(data []byte) (t int, err error) {
-	var b [2]byte
+	var bign big.Uint16
 	n := len(data)
 	if n == 0 {
 		return
@@ -72,8 +73,8 @@ func (enc Encoding) Write(data []byte) (t int, err error) {
 		if n > Max {
 			n = Max
 		}
-		binary.BigEndian.PutUint16(b[:], uint16(n))
-		if _, err = enc.w.Write(b[:]); err != nil {
+		bign.Put(uint16(n))
+		if _, err = enc.w.Write(bign[:]); err != nil {
 			break
 		}
 		if _, err = enc.w.Write(data[:n]); err != nil {
@@ -88,14 +89,14 @@ func (enc Encoding) Write(data []byte) (t int, err error) {
 
 // A negative acknowledgment.
 func (enc Encoding) nack(err error) error {
-	var b [2]byte
+	var bign big.Uint16
 	data := []byte(err.Error())
 	n := len(data)
 	if n > Max {
 		return fmt.Errorf("nack length: %d: too large", n)
 	}
-	binary.BigEndian.PutUint16(b[:], uint16(n)|Eflag)
-	if _, err = enc.w.Write(b[:]); err == nil {
+	bign.Put(uint16(n) | Eflag)
+	if _, err = enc.w.Write(bign[:]); err == nil {
 		_, err = enc.w.Write(data)
 	}
 	return err

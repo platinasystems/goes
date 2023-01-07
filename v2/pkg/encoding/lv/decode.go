@@ -1,12 +1,13 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package lv
 
 import (
-	"encoding/binary"
 	"io"
+
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 )
 
 type Decoding struct{ r io.Reader }
@@ -24,7 +25,7 @@ func (dec Decoding) Read(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	u := binary.BigEndian.Uint16(b[:2])
+	u := (*big.Uint16)(b).Value()
 	e := u & Eflag
 	n = int(u & Efilter)
 	switch {

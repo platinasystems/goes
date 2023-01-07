@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -15,9 +15,9 @@ func (ip IP) Version() uint8 { return ip[0] >> 4 }
 func (ip IP) Format(w fmt.State, verb rune) {
 	switch ver := ip.Version(); ver {
 	case 4:
-		fmt.Fprint(w, IPv4(ip))
+		fmt.Fprint(w, NewIPv4Data(ip))
 	case 6:
-		fmt.Fprint(w, IPv6(ip))
+		fmt.Fprint(w, NewIPv6Data(ip))
 	default:
 		fmt.Fprintf(w, "ipv%d", ver)
 	}

@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -112,7 +112,7 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 			break
 		}
 		in := newinput(c, pg[:n])
-		style.Println(t.name, "<-", sub, frame.Eth(in.pg))
+		style.Println(t.name, "<-", sub, frame.NewEthData(in.pg))
 		t.inputch <- in
 	}
 }
@@ -146,7 +146,7 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 				}
 			}
 		case in := <-t.inputch:
-			eth := frame.Eth(in.pg)
+			eth := frame.NewEthData(in.pg)
 			if eth.ShouldLearn() {
 				lookup[eth.SA()] = in.c
 			}
@@ -170,7 +170,7 @@ func (t *T) send(ctx context.Context, c *tls.Conn, in *input) {
 	if err != nil {
 		style.Errorln(t.name, "->", dns0(c), err)
 	} else {
-		style.Println(t.name, "->", dns0(c), frame.Eth(in.pg))
+		style.Println(t.name, "->", dns0(c), frame.NewEthData(in.pg))
 	}
 }
 

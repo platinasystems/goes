@@ -1,19 +1,28 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package frame
 
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
+)
 
-type MPLS []byte
+type MPLSData struct {
+	*MPLS
+	Data []byte
+}
 
-func (MPLS) Format(w fmt.State, verb rune) {
+func NewMPLSData(data []byte) MPLSData {
+	mpls := (*MPLS)(unsafe.Pointer(&data[0]))
+	return MPLSData{mpls, data[unsafe.Sizeof(mpls):]}
+}
+
+func (mpls MPLSData) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "mpls ...")
 }
 
-type MMPLS []byte
-
-func (MMPLS) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "m-mpls ...")
+type MPLS struct {
+	// FIXME
 }

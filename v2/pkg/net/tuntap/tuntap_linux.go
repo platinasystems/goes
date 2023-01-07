@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -127,16 +127,16 @@ func setlink(ifname string, link Link) error {
 	return err
 }
 
-func (ifr *Ifreq) Flags() host.Uint16 {
-	return host.Uint16(ifr.Ifru[:2])
+func (ifr *Ifreq) Flags() *host.Uint16 {
+	return (*host.Uint16)(ifr.Ifru[:2])
 }
 
-func (ifr *Ifreq) Index() host.Uint32 {
-	return host.Uint32(ifr.Ifru[:4])
+func (ifr *Ifreq) Index() *host.Uint32 {
+	return (*host.Uint32)(ifr.Ifru[:4])
 }
 
-func (ifr *Ifreq) AF() big.Uint16 {
-	return big.Uint16(ifr.Ifru[:2])
+func (ifr *Ifreq) AF() *big.Uint16 {
+	return (*big.Uint16)(ifr.Ifru[:2])
 }
 
 func (ifr *Ifreq) HA() net.HardwareAddr {
