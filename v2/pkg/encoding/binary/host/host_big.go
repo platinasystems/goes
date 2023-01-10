@@ -16,8 +16,20 @@ const (
 type Uint16 = big.Uint16
 type Uint32 = big.Uint32
 type Uint64 = big.Uint64
+
+var (
+	NewUint16 = big.NewUint16
+	NewUint32 = big.NewUint32
+	NewUint64 = big.NewUint64
+)
+
 type Float32 = big.Float32
 type Float64 = big.Float64
+
+var (
+	NewFloat32 = little.NewFloat32
+	NewFloat64 = little.NewFloat64
+)
 
 func Net16(v uint16) uint16 { return v }
 func Net32(v uint32) uint32 { return v }

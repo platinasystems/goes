@@ -7,14 +7,12 @@ package host
 import (
 	"testing"
 
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endiantest"
 )
 
 func Test(t *testing.T) {
 	b := make([]byte, 8)
 	for _, v := range endiantest.Uints {
-		endiantest.Run[uint8](t, (*Uint8)(b), uint8(v))
 		endiantest.Run[uint16](t, (*Uint16)(b), uint16(v))
 		endiantest.Run[uint32](t, (*Uint32)(b), uint32(v))
 		endiantest.Run[uint64](t, (*Uint64)(b), uint64(v))
@@ -34,7 +32,7 @@ func Test(t *testing.T) {
 	})
 }
 
-func run[T endian.Numeric](t *testing.T, n, little T) {
+func run[T uint16 | uint32 | uint64](t *testing.T, n, little T) {
 	t.Helper()
 	x := n
 	if IsLittleEndian {

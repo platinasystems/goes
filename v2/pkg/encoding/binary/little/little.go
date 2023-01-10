@@ -15,6 +15,10 @@ type Uint16 [2]byte
 type Uint32 [4]byte
 type Uint64 [8]byte
 
+func NewUint16(b []byte) (*Uint16, []byte) { return (*Uint16)(b), b[2:] }
+func NewUint32(b []byte) (*Uint32, []byte) { return (*Uint32)(b), b[4:] }
+func NewUint64(b []byte) (*Uint64, []byte) { return (*Uint64)(b), b[8:] }
+
 func (le *Uint16) Put(v uint16) { Endian.PutUint16(le[:], v) }
 func (le *Uint32) Put(v uint32) { Endian.PutUint32(le[:], v) }
 func (le *Uint64) Put(v uint64) { Endian.PutUint64(le[:], v) }
@@ -25,6 +29,9 @@ func (le *Uint64) Value() uint64 { return Endian.Uint64(le[:]) }
 
 type Float32 Uint32
 type Float64 Uint64
+
+func NewFloat32(b []byte) (*Float32, []byte) { return (*Float32)(b), b[4:] }
+func NewFloat64(b []byte) (*Float64, []byte) { return (*Float64)(b), b[8:] }
 
 func (le *Float32) Put(v float32) { (*Uint32)(le).Put(math.Float32bits(v)) }
 func (le *Float64) Put(v float64) { (*Uint64)(le).Put(math.Float64bits(v)) }

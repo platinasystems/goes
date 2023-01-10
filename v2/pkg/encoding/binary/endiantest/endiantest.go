@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"math"
 	"testing"
-
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
 )
 
 var Uints = []uint64{
@@ -32,7 +30,16 @@ var Floats = []float64{
 	math.Ln10,
 }
 
-func Run[T endian.Numeric](t *testing.T, x endian.Number[T], want T) {
+type Numbers interface {
+	uint8 | uint16 | uint32 | uint64 | float32 | float64
+}
+
+type I[T Numbers] interface {
+	Put(T)
+	Value() T
+}
+
+func Run[T Numbers](t *testing.T, x I[T], want T) {
 	t.Helper()
 	t.Run(fmt.Sprintf("%T(%#x)", x, want), func(t *testing.T) {
 		t.Helper()
