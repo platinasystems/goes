@@ -6,78 +6,11 @@ package frame
 
 import (
 	"fmt"
-	"net"
 	"syscall"
-	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/host"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/universal"
 )
-
-type IPv4Data struct {
-	*IPv4
-	Data []byte
-}
-
-func NewIPv4Data(data []byte) IPv4Data {
-	ipv4 := (*IPv4)(unsafe.Pointer(&data[0]))
-	n := uint16(ipv4.VIHL().IHL()) * 4
-	if min := uint16(unsafe.Sizeof(ipv4)); n < min {
-		n = min
-	}
-	return IPv4Data{ipv4, data[n:]}
-}
-
-func (ipv4 IPv4Data) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "ipv4: ", ipv4.SA(), " -> ", ipv4.DA())
-	switch proto := ipv4.Protocol.Value(); proto {
-	case syscall.IPPROTO_ICMP:
-		fmt.Fprint(w, ProtoMark, NewICMPData(ipv4.Data))
-	case syscall.IPPROTO_TCP:
-		fmt.Fprint(w, ProtoMark, NewTCPData(ipv4.Data))
-	case syscall.IPPROTO_UDP:
-		fmt.Fprint(w, ProtoMark, NewUDPData(ipv4.Data))
-	default:
-		fmt.Fprintf(w, ", proto[%#x]", proto)
-	}
-}
-
-// https://en.wikipedia.org/wiki/IPv4
-type IPv4 struct {
-	vihl     host.Uint8
-	tos      host.Uint8
-	TL       big.Uint16
-	ID       big.Uint16
-	ffo      big.Uint16
-	TTL      host.Uint8
-	Protocol host.Uint8
-	Checksum big.Uint16
-	sa       [4]byte
-	da       [4]byte
-	Data     []byte
-}
-
-func (ipv4 *IPv4) VIHL() IPv4VIHL { return IPv4VIHL{&ipv4.vihl} }
-func (ipv4 *IPv4) TOS() IPv4TOS   { return IPv4TOS{&ipv4.tos} }
-func (ipv4 *IPv4) FFO() IPv4FFO   { return IPv4FFO{&ipv4.ffo} }
-func (ipv4 *IPv4) SA() net.IP     { return net.IP(ipv4.sa[:]) }
-func (ipv4 *IPv4) DA() net.IP     { return net.IP(ipv4.da[:]) }
-
-type IPv4VIHL struct{ *host.Uint8 }
-
-func (vihl IPv4VIHL) Version() uint8 { return vihl.Value() >> 4 }
-func (vihl IPv4VIHL) IHL() uint8     { return vihl.Value() & 0xf }
-
-func (vihl IPv4VIHL) Set(version, ihl uint8) {
-	vihl.Put((version << 4) | (ihl & 0xf))
-}
-
-type IPv4TOS struct{ *host.Uint8 }
-
-func (tos IPv4TOS) DHCP() uint8 { return tos.Value() >> 2 }
-func (tos IPv4TOS) ECN() uint8  { return tos.Value() & 0x3 }
-
-func (tos IPv4TOS) Set(dhcp, ecn uint8) { tos.Put((dhcp << 2) | (ecn & 0x3)) }
 
 const (
 	IPv4MFbit    = 13
@@ -85,14 +18,68 @@ const (
 	IPv4FlagMask = ((1 << IPv4MFbit) - 1)
 )
 
-type IPv4FFO struct{ *big.Uint16 } // Flags + Fragment Offset
+// https://en.wikipedia.org/wiki/IPv4
+type IPv4 struct {
+	VIHL     *universal.Uint8
+	TOS      *universal.Uint8
+	TL       *big.Uint16
+	ID       *big.Uint16
+	FFO      *big.Uint16
+	TTL      *universal.Uint8
+	Protocol *universal.Uint8
+	Checksum *big.Uint16
+	SA       *universal.IPv4
+	DA       *universal.IPv4
+	Options  []byte
+	Data     []byte
+}
 
-func (ffo IPv4FFO) DF() bool { return (ffo.Value()>>IPv4MFbit)&1 == 1 }
-func (ffo IPv4FFO) MF() bool { return (ffo.Value()>>IPv4DFbit)&1 == 1 }
+func NewIPv4(data []byte) *IPv4 {
+	ipv4 := new(IPv4)
+	ipv4.Write(data)
+	return ipv4
+}
 
-func (ffo IPv4FFO) FragOffset() uint16 { return ffo.Value() & IPv4FlagMask }
+func (ipv4 *IPv4) Format(w fmt.State, verb rune) {
+	fmt.Fprint(w, "ipv4: ", ipv4.DA.Value(), " <- ", ipv4.SA.Value())
+	switch proto := ipv4.Protocol.Value(); proto {
+	case syscall.IPPROTO_ICMP:
+		fmt.Fprint(w, ProtoMark, NewICMP(ipv4.Data))
+	case syscall.IPPROTO_TCP:
+		fmt.Fprint(w, ProtoMark, NewTCP(ipv4.Data))
+	case syscall.IPPROTO_UDP:
+		fmt.Fprint(w, ProtoMark, NewUDP(ipv4.Data))
+	default:
+		fmt.Fprintf(w, ", proto[%#x]", proto)
+	}
+}
 
-func (ffo IPv4FFO) Set(df, mf bool, fragoffset uint16) {
+func (ipv4 *IPv4) Version() uint8 { return ipv4.VIHL.Value() >> 4 }
+func (ipv4 *IPv4) IHL() uint8     { return ipv4.VIHL.Value() & 0xf }
+
+// Set VIHL field per length of Options.
+func (ipv4 *IPv4) SetVIHL() {
+	n := uint8(len(ipv4.Options))
+	if (n & 3) != 0 {
+		panic("len(Options) must be multiple of 4")
+	}
+	n /= 4
+	ipv4.VIHL.Put((4 << 4) | (n & 0xf))
+}
+
+func (ipv4 *IPv4) DHCP() uint8 { return ipv4.TOS.Value() >> 2 }
+func (ipv4 *IPv4) ECN() uint8  { return ipv4.TOS.Value() & 0x3 }
+
+func (ipv4 *IPv4) SetTOS(dhcp, ecn uint8) {
+	ipv4.TOS.Put((dhcp << 2) | (ecn & 0x3))
+}
+
+func (ipv4 *IPv4) DF() bool { return (ipv4.FFO.Value()>>IPv4MFbit)&1 == 1 }
+func (ipv4 *IPv4) MF() bool { return (ipv4.FFO.Value()>>IPv4DFbit)&1 == 1 }
+
+func (ipv4 *IPv4) FragOffset() uint16 { return ipv4.FFO.Value() & IPv4FlagMask }
+
+func (ipv4 *IPv4) SetFFO(df, mf bool, fragoffset uint16) {
 	u := fragoffset & IPv4FlagMask
 	if mf {
 		u |= 1 << 13
@@ -100,5 +87,24 @@ func (ffo IPv4FFO) Set(df, mf bool, fragoffset uint16) {
 	if df {
 		u |= 1 << 14
 	}
-	ffo.Put(u)
+	ipv4.FFO.Put(u)
+}
+
+func (ipv4 *IPv4) Write(data []byte) (int, error) {
+	ipv4.VIHL, ipv4.Data = universal.NewUint8(data)
+	ipv4.TOS, ipv4.Data = universal.NewUint8(ipv4.Data)
+	ipv4.TL, ipv4.Data = big.NewUint16(ipv4.Data)
+	ipv4.ID, ipv4.Data = big.NewUint16(ipv4.Data)
+	ipv4.FFO, ipv4.Data = big.NewUint16(ipv4.Data)
+	ipv4.TTL, ipv4.Data = universal.NewUint8(ipv4.Data)
+	ipv4.Protocol, ipv4.Data = universal.NewUint8(ipv4.Data)
+	ipv4.Checksum, ipv4.Data = big.NewUint16(ipv4.Data)
+	ipv4.SA, ipv4.Data = universal.NewIPv4(ipv4.Data)
+	ipv4.DA, ipv4.Data = universal.NewIPv4(ipv4.Data)
+	if ihl := ipv4.IHL(); ihl > 5 {
+		n := (ihl - 5) * 4
+		ipv4.Options = ipv4.Data[:n]
+		ipv4.Data = ipv4.Data[n:]
+	}
+	return len(data) - len(ipv4.Data), nil
 }

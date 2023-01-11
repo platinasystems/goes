@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package neutral
+package universal
 
 type Uint8 [1]byte
 

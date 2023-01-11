@@ -112,7 +112,7 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 			break
 		}
 		in := newinput(c, pg[:n])
-		style.Println(t.name, "<-", sub, frame.NewEthData(in.pg))
+		style.Println(t.name, "<-", sub, frame.NewEth(in.pg))
 		t.inputch <- in
 	}
 }
@@ -146,7 +146,7 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 				}
 			}
 		case in := <-t.inputch:
-			eth := frame.NewEthData(in.pg)
+			eth := frame.NewEth(in.pg)
 			if eth.ShouldLearn() {
 				lookup[eth.SA()] = in.c
 			}
@@ -170,7 +170,7 @@ func (t *T) send(ctx context.Context, c *tls.Conn, in *input) {
 	if err != nil {
 		style.Errorln(t.name, "->", dns0(c), err)
 	} else {
-		style.Println(t.name, "->", dns0(c), frame.NewEthData(in.pg))
+		style.Println(t.name, "->", dns0(c), frame.NewEth(in.pg))
 	}
 }
 

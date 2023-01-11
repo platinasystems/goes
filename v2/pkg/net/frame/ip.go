@@ -15,9 +15,9 @@ func (ip IP) Version() uint8 { return ip[0] >> 4 }
 func (ip IP) Format(w fmt.State, verb rune) {
 	switch ver := ip.Version(); ver {
 	case 4:
-		fmt.Fprint(w, NewIPv4Data(ip))
+		fmt.Fprint(w, NewIPv4(ip))
 	case 6:
-		fmt.Fprint(w, NewIPv6Data(ip))
+		fmt.Fprint(w, NewIPv6(ip))
 	default:
 		fmt.Fprintf(w, "ipv%d", ver)
 	}

@@ -69,9 +69,9 @@ func main() {
 			break
 		}
 		if tuntap.HasPI {
-			fmt.Println(frame.NewTunPIData(pg[:n]))
+			fmt.Println(frame.NewTunPI(pg[:n]))
 		} else if *tap {
-			fmt.Println(frame.NewEthData(pg[:n]))
+			fmt.Println(frame.NewEth(pg[:n]))
 		} else {
 			fmt.Println(frame.IP(pg[:n]))
 		}

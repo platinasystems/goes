@@ -6,23 +6,34 @@ package frame
 
 import (
 	"fmt"
-	"unsafe"
+
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 )
 
-type UDPData struct {
-	*UDP
+// https://en.wikipedia.org/wiki/User_Datagram_Protocol
+type UDP struct {
+	SP   *big.Uint16
+	DP   *big.Uint16
+	Len  *big.Uint16
+	Sum  *big.Uint16
 	Data []byte
 }
 
-func NewUDPData(data []byte) UDPData {
-	udp := (*UDP)(unsafe.Pointer(&data[0]))
-	return UDPData{udp, data[unsafe.Sizeof(udp):]}
+func NewUDP(data []byte) *UDP {
+	udp := new(UDP)
+	udp.Write(data)
+	return udp
 }
 
-func (udp UDPData) Format(w fmt.State, verb rune) {
-	fmt.Fprint(w, "udp ...")
+func (udp *UDP) Format(w fmt.State, verb rune) {
+	fmt.Fprint(w, "udp[", udp.Len.Value(), "]: ",
+		udp.DP.Value(), " <- ", udp.SP.Value())
 }
 
-type UDP struct {
-	// FIXME
+func (udp *UDP) Write(data []byte) (int, error) {
+	udp.SP, udp.Data = big.NewUint16(data)
+	udp.DP, udp.Data = big.NewUint16(udp.Data)
+	udp.Len, udp.Data = big.NewUint16(udp.Data)
+	udp.Sum, udp.Data = big.NewUint16(udp.Data)
+	return len(data) - len(udp.Data), nil
 }

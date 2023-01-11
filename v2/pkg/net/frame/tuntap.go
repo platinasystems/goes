@@ -7,25 +7,26 @@ package frame
 import (
 	"fmt"
 	"syscall"
-	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/host"
 )
 
-type TunPIData struct {
-	*TunPI
-	Data []byte
+type TunPI struct {
+	Flags *host.Uint16
+	Proto *big.Uint16
+	Data  []byte
 }
 
-func NewTunPIData(data []byte) TunPIData {
-	pi := (*TunPI)(unsafe.Pointer(&data[0]))
-	return TunPIData{pi, data[unsafe.Sizeof(*pi):]}
+func NewTunPI(data []byte) *TunPI {
+	pi := new(TunPI)
+	pi.Write(data)
+	return pi
 }
 
 // Returns AF_INET or AF_INET6 if the top 4 bits of the first data byte are 4
 // or 6 respectively; otherwise 0.
-func (pi *TunPIData) AF() (af uint16) {
+func (pi *TunPI) AF() (af uint16) {
 	switch pi.Data[0] >> 4 {
 	case 4:
 		af = syscall.AF_INET
@@ -35,19 +36,20 @@ func (pi *TunPIData) AF() (af uint16) {
 	return
 }
 
-func (pi TunPIData) Format(w fmt.State, verb rune) {
+func (pi *TunPI) Format(w fmt.State, verb rune) {
 	fmt.Fprintf(w, "tun: %#x", pi.Flags.Value())
 	switch proto := pi.Proto.Value(); proto {
 	case syscall.AF_INET:
-		fmt.Fprint(w, ProtoMark, NewIPv4Data(pi.Data))
+		fmt.Fprint(w, ProtoMark, NewIPv4(pi.Data))
 	case syscall.AF_INET6:
-		fmt.Fprint(w, ProtoMark, NewIPv6Data(pi.Data))
+		fmt.Fprint(w, ProtoMark, NewIPv6(pi.Data))
 	default:
 		fmt.Fprintf(w, ", proto[%#x]", proto)
 	}
 }
 
-type TunPI struct {
-	Flags host.Uint16
-	Proto big.Uint16
+func (pi *TunPI) Write(data []byte) (int, error) {
+	pi.Flags, pi.Data = host.NewUint16(data)
+	pi.Proto, pi.Data = big.NewUint16(pi.Data)
+	return len(data) - len(pi.Data), nil
 }

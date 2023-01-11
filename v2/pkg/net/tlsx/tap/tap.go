@@ -267,7 +267,7 @@ func (t *T) reader(
 			}
 			break
 		}
-		style.Println(host, "->", x, frame.NewEthData(pg[:n]))
+		style.Println(host, "->", x, frame.NewEth(pg[:n]))
 	}
 }
 
@@ -293,7 +293,7 @@ func (t *T) writer(
 			}
 			break
 		}
-		style.Println(host, "<-", x, frame.NewEthData(pg[:n]))
+		style.Println(host, "<-", x, frame.NewEth(pg[:n]))
 	}
 }
 
