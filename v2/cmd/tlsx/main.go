@@ -3,7 +3,15 @@
 // LICENSE file.
 
 // This command provides a TLS network in which an exchange bridges connecting
-// hosts.
+// hosts. e.g.
+//
+//	$ sudo ip netns exec x ./tlsx -state ~/t/x -verbose start exchange bridge leasing 10.200.1.0/30 10.200.1.2 &
+//	$ sudo ip netns exec h1 ./tlsx -state ~/t/h1 -verbose start tap -prefix 10.200.1.1/30 x &
+//	$ sudo ip netns exec h2 ./tlsx -state ~/t/h2 -verbose start tap x &
+//	$ sudo ip netns exec h2 ping -c 1 10.200.1.1
+//	...
+//	$ sudo ip netns exec h1 ping -c 1 10.200.1.2
+//	...
 package main
 
 import (
