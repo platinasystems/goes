@@ -27,7 +27,7 @@ func (q *IEEE8021Q) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ieee802_1Q:")
 	fmt.Fprintf(w, " pcp %#x", q.PCP())
 	fmt.Fprint(w, ", dei ", q.DEI())
-	fmt.Fprint(w, ", vid %#x", q.DEI())
+	fmt.Fprintf(w, ", vid %#x", q.VID())
 	switch t := q.TYPE.Value(); t {
 	case 0x0800:
 		fmt.Fprint(w, ProtoMark, NewIPv4(q.Data))
