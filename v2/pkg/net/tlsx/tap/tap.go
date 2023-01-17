@@ -26,6 +26,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
+	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
@@ -43,6 +44,7 @@ type T struct {
 	Exchange string
 	*os.File
 	Prefix netip.Prefix
+	ip     string
 }
 
 func (t *T) Configure(ctx context.Context, args []string) ([]string, error) {
@@ -60,7 +62,13 @@ func (t *T) Configure(ctx context.Context, args []string) ([]string, error) {
 	t.Exchange = args[0]
 	args = args[1:]
 
-	ha := net.HardwareAddr(certs.Self.SKI()[:6])
+	if t.ip, err = exec.LookPath("ip"); err != nil {
+		t.ip = ""
+		err = nil
+	}
+
+	ha := make(net.HardwareAddr, 6)
+	copy(ha, certs.Self.TLS().Leaf.SubjectKeyId)
 	ha[0] &^= 1
 
 	if !tuntap.CanTAP {
@@ -95,7 +103,7 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 	defer t.File.Close()
 	defer t.admin(ctx, Down)
 
-	hf := fmt.Sprint(certs.Self.Name(), ":", t.File.Name())
+	hf := fmt.Sprint(certs.Self.Name(), ":", t.Name())
 
 	err := t.admin(ctx, Up)
 	if err != nil {
@@ -167,30 +175,25 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// FIXME change to a GO implementation of iproute2/ifconfig
 func (t *T) admin(ctx context.Context, updown bool) error {
-	s := map[bool]string{
-		false: "down",
-		true:  "up",
-	}[updown]
-	out, err := exec.CommandContext(ctx, "ip", "link", "set", t.Name(),
-		s).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s; %w", out, err)
+	if updown {
+		return netif.Up(t.Name())
+	} else {
+		return netif.Down(t.Name())
 	}
-	return nil
 }
 
 func (t *T) setPrefix(ctx context.Context) error {
-	out, err := exec.CommandContext(ctx, "ip", "address", "add",
-		t.Prefix.String(), "dev", t.Name()).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s; %w", out, err)
-	}
-	return nil
+	bc := netip.IPv4Unspecified()
+	// or bc := netip.AddrFrom4([4]byte{255, 255, 255, 255})
+	return netif.Add(t.Name(), t.Prefix, bc)
 }
 
 func (t *T) State(ctx context.Context, updown bool) error {
+	// FIXME w/ netlink
+	if len(t.ip) == 0 {
+		return nil
+	}
 	s := map[bool]string{
 		false: "LOWERLAYERDOWN",
 		true:  "UP",

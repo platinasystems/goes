@@ -6,6 +6,7 @@
 *.zip
 *~
 *#*#
+_cgo_.o
 /goes-*
 /*-example
 /v2/goes-*
