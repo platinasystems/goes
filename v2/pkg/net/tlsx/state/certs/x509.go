@@ -1,13 +1,16 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package certs
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
+	"io"
 )
 
 type Headers = map[string]string
@@ -32,7 +35,7 @@ func (x *X509) Set(h Headers, c *x509.Certificate) {
 }
 
 // Format as yaml like sequence to writer.
-func (x X509) Format(w fmt.State, verb rune) {
+func (x *X509) Format(w fmt.State, verb rune) {
 	fmt.Fprintln(w, "- name:", x.Name)
 	fmt.Fprintln(w, "  subject_key_id:", x.SKI)
 	fmt.Fprintln(w, "  serial_number:", x.Certificate.SerialNumber)
@@ -40,7 +43,7 @@ func (x X509) Format(w fmt.State, verb rune) {
 	fmt.Fprintln(w, "  not_after:", x.Certificate.NotAfter)
 	fmt.Fprintln(w, "  subject:", x.Certificate.Subject)
 	if len(x.EmailAddresses) > 0 {
-		fmt.Fprintln(w, "email_addresses:")
+		fmt.Fprintln(w, "  email_addresses:")
 		for _, email := range x.Certificate.EmailAddresses {
 			fmt.Fprintln(w, "    -", email)
 		}
@@ -112,4 +115,24 @@ func (x X509) Format(w fmt.State, verb rune) {
 		fmt.Fprint(w, "  ", k, ": ", v, "\n")
 	}
 	fmt.Fprintln(w, "  version:", x.Certificate.Version)
+	if data, err := x.MarshalPEM(); err == nil {
+		fmt.Fprint(w, "  pem: |")
+		DataBlock(w, data, 4)
+	}
+}
+
+func (x *X509) MarshalPEM() (data []byte, err error) {
+	data = pem.EncodeToMemory(&pem.Block{
+		Type:    "CERTIFICATE",
+		Headers: x.Headers,
+		Bytes:   x.Certificate.Raw,
+	})
+	return
+}
+
+func DataBlock(w io.Writer, data []byte, i int) {
+	const nls = "\n                "
+	w.Write([]byte(nls[:1+i]))
+	buf := bytes.Replace(data, []byte(nls[:1]), []byte(nls[:1+i]), -1)
+	w.Write(buf[:len(buf)-i])
 }

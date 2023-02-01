@@ -12,8 +12,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
 var Suppressed = []error{
@@ -42,12 +42,11 @@ func Routine(
 			if !ok {
 				return
 			}
+			cfg.ClientCAs = certs.ClientCAs.Clone()
 			sv := tls.Server(c, cfg)
 			err := sv.HandshakeContext(ctx)
 			if err != nil {
-				if suppress.Errors(err, Suppressed...) != nil {
-					style.Error(err)
-				}
+				style.Error(err)
 				sv.Close()
 			} else {
 				cs := sv.ConnectionState()

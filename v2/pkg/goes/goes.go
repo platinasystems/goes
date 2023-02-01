@@ -16,6 +16,8 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
+	"sync"
+	"syscall"
 	"text/template"
 
 	"github.com/platinasystems/goes/v2/pkg/container/slice"
@@ -38,6 +40,9 @@ var (
 	Timeout = flags.CommandLine.Duration("timeout", 0,
 		"Terminate if incomplete by non-zero limit.")
 )
+
+// Reload is called on SIGHUP.
+var Reload = func() {}
 
 // Load Root before calling Main.
 var Root = map[string]any{}
@@ -76,9 +81,18 @@ usage: {{.Prog}} [<options>] <command> [<args>]
 // If not yet done, Parse command line flags, then set i/o and create context
 // before Select of Root map.
 func Main() {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
 	defer stop()
+
+	hupch := make(chan os.Signal, 4)
+	signal.Notify(hupch, os.Signal(syscall.SIGHUP))
+	defer signal.Stop(hupch)
+	wg.Add(1)
+	go reload(ctx, &wg, hupch)
 
 	r := io.Reader(os.Stdin)
 	w := io.Writer(os.Stdout)
@@ -139,12 +153,6 @@ func Main() {
 	case "help":
 		path = append(path, args[0])
 		args = args[1:]
-	case "daemon":
-		style.System()
-		r = io.LimitReader(nil, 0)
-		w = style.Plain.Notice.Writer()
-		fmt.Fprintln(w, "start", args)
-		defer func() { fmt.Fprintln(w, "exit", args) }()
 	}
 
 	err := do(v, ctx, r, w, path, Root, args...)
@@ -250,6 +258,15 @@ Unmarshal or scan object from text value.
 		...string,
 	) error:
 		return t(ctx, w, path, args...)
+	case func() ([]byte, error):
+		text, err := t()
+		if n := len(text); err == nil && n > 0 {
+			w.Write(text)
+			if text[n-1] != '\n' {
+				w.Write([]byte{'\n'})
+			}
+		}
+		return err
 	}
 	if len(args) == 0 {
 		var (
@@ -288,4 +305,19 @@ Unmarshal or scan object from text value.
 	}
 	_, err := fmt.Sscan(args[0], v)
 	return err
+}
+
+func reload(ctx context.Context, wg *sync.WaitGroup, hupch <-chan os.Signal) {
+	wg.Done()
+	for {
+		select {
+		case _, ok := <-hupch:
+			if !ok {
+				return
+			}
+			Reload()
+		case <-ctx.Done():
+			return
+		}
+	}
 }

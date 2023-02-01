@@ -34,12 +34,19 @@ var (
 		Style{Notice, log.New(os.Stdout, "", shortfile)},
 	}
 
+	// Errors may be muted with the quiet flag.
 	Error   = ShortFile.Errata.Print
 	Errorf  = ShortFile.Errata.Printf
 	Errorln = ShortFile.Errata.Println
+	// Fatal messages are never muted.
 	Fatal   = Plain.Errata.Fatal
 	Fatalf  = Plain.Errata.Fatalf
 	Fatalln = Plain.Errata.Fatalln
+	// Notes may be muted with the quiet flag.
+	Note   = ShortFile.Notice.Print
+	Notef  = ShortFile.Notice.Printf
+	Noteln = ShortFile.Notice.Println
+	// Prints may be unmuted with the verbose flag.
 	Print   = Mute
 	Printf  = Mutef
 	Println = Mute
@@ -61,6 +68,9 @@ func Verbosity() {
 		Error = Mute
 		Errorf = Mutef
 		Errorln = Mute
+		Note = Mute
+		Notef = Mutef
+		Noteln = Mute
 	}
 	if Verbose != nil && *Verbose {
 		Print = ShortFile.Notice.Print

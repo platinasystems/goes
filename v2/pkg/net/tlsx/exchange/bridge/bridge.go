@@ -9,8 +9,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
-	"flag"
 	"fmt"
+	"net/netip"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
@@ -38,25 +38,15 @@ type T struct {
 	leavech chan *tls.Conn
 }
 
-func (t *T) Configure(args []string) ([]string, error) {
-	if len(args) > 0 {
-		switch args[0] {
-		case "-h":
-			return args, flag.ErrHelp
-		case "leasing":
-			var err error
-			args, err = t.Leasing.Configure(args[1:])
-			if err != nil {
-				return args, err
-			}
-		}
+func (t *T) Configure(prefix netip.Prefix) {
+	if prefix.IsValid() {
+		t.Leasing.Configure(prefix)
 	}
 	t.name = certs.Self.Name()
 	t.inputch = make(chan *input, 16)
 	t.joinch = make(chan *tls.Conn, 4)
 	t.leavech = make(chan *tls.Conn, 4)
 	t.Enabled = true
-	return args, nil
 }
 
 func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
@@ -66,7 +56,6 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 	defer func() { t.leavech <- c }()
 
 	ra := remote.Addr(c)
-	sub := dns0(c)
 	dec := lv.NewDecoder(poll.With(ctx, c))
 	enc := lv.NewEncoder(write.With(ctx, c))
 
@@ -97,7 +86,6 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 		enc.Encode(err)
 		return
 	}
-	style.Println("OK")
 	for {
 		pg := page.New()
 		n, err := dec.Read(pg)
@@ -112,7 +100,7 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 			break
 		}
 		in := newinput(c, pg[:n])
-		style.Println(t.name, "<-", sub, frame.NewEth(in.pg))
+		style.Println(t.name, "<-", ra, frame.NewEth(in.pg))
 		t.inputch <- in
 	}
 }
@@ -166,11 +154,12 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (t *T) send(ctx context.Context, c *tls.Conn, in *input) {
+	ra := remote.Addr(c)
 	_, err := lv.NewEncoder(write.With(ctx, c)).Write(in.pg)
 	if err != nil {
-		style.Errorln(t.name, "->", dns0(c), err)
+		style.Errorln(t.name, "->", ra, err)
 	} else {
-		style.Println(t.name, "->", dns0(c), frame.NewEth(in.pg))
+		style.Println(t.name, "->", ra, frame.NewEth(in.pg))
 	}
 }
 

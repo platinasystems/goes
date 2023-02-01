@@ -5,8 +5,10 @@
 // This command provides a TLS network in which an exchange bridges connecting
 // hosts. e.g.
 //
-//	$ sudo ip netns exec x ./tlsx -state ~/t/x -verbose start exchange bridge leasing 10.200.1.0/30 10.200.1.2 &
-//	$ sudo ip netns exec h1 ./tlsx -state ~/t/h1 -verbose start tap -prefix 10.200.1.1/30 x &
+//	$ sudo ip netns exec x ./tlsx -state ~/t/x -verbose start \
+//		exchange bridge leasing 10.200.1.0/30 10.200.1.2 &
+//	$ sudo ip netns exec h1 ./tlsx -state ~/t/h1 -verbose start \
+//		tap -prefix 10.200.1.1/30 x &
 //	$ sudo ip netns exec h2 ./tlsx -state ~/t/h2 -verbose start tap x &
 //	$ sudo ip netns exec h2 ping -c 1 10.200.1.1
 //	...
@@ -35,32 +37,48 @@ import (
 )
 
 func main() {
+	var starter any = start.Func
+	if program.IsKoApp() {
+		starter = daemon.Func
+	}
 	daemon.Exchange.Selection = map[string]any{
-		"approve":     admin.Func,
-		"build":       program.Build,
-		"cat":         cat.Func,
-		"command":     command.Func,
-		"deny":        admin.Func,
-		"echo":        echo.Func,
-		"main":        program.Main,
-		"subscribers": certs.Subscribers,
-		"tenants":     &daemon.Exchange.Bridge.Leasing,
+		"approve": admin.Func,
+		"cat":     cat.Func,
+		"command": command.Func,
+		"deny":    admin.Func,
+		"echo":    echo.Func,
+		"show": map[string]any{
+			"build":       program.Build,
+			"main":        program.Main,
+			"subscribers": certs.Subscribers,
+			"tenants":     &daemon.Exchange.Bridge.Leasing,
+		},
 	}
 	goes.Root = map[string]any{
-		"build":         program.Build,
-		"cert":          certs.Self,
-		"create-cert":   create_cert.Func,
-		"daemon":        daemon.Func,
-		"exec":          exec.Func,
-		"main":          program.Main,
-		"port":          port.Map,
-		"rpc":           service.Request{tlsx.RPC}.Func,
-		"runtime-dir":   xdg.RunTimeDir,
-		"state-dir":     dir.Name,
-		"start":         start.Func,
-		"subscribe":     subscribe.Func,
-		"subscribers":   certs.Subscribers,
-		"subscriptions": certs.Subscriptions,
+		"approve":     exec.IPC,
+		"command":     command.Func,
+		"create-cert": create_cert.Func,
+		"daemon":      daemon.Func,
+		"deny":        exec.IPC,
+		"exec":        exec.Func,
+		"port":        port.Map,
+		"rpc":         service.Request{tlsx.RPC}.Func,
+		"runtime-dir": xdg.RunTimeDir,
+		"show": map[string]any{
+			"build": program.Build,
+			"cert": map[string]any{
+				"pem":  certs.Self.MarshalPEM,
+				"text": certs.Self.MarshalText,
+			},
+			"main":          program.Main,
+			"state-dir":     dir.Name,
+			"subscribers":   certs.Subscribers,
+			"subscriptions": certs.Subscriptions,
+			"tenants":       exec.IPC,
+		},
+		"start":     starter,
+		"subscribe": subscribe.Func,
 	}
+	goes.Reload = certs.Subscribers.Invalidate
 	goes.Main()
 }

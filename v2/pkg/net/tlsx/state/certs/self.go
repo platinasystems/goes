@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -53,9 +53,25 @@ func (t CachedTLS) Add(cas *x509.CertPool) {
 	})
 }
 
+func (t CachedTLS) Format(w fmt.State, verb rune) {
+	if buf, err := t.MarshalText(); err == nil {
+		w.Write(buf)
+	} else {
+		fmt.Fprint(w, err)
+	}
+}
+
+func (t CachedTLS) MarshalPEM() (data []byte, err error) {
+	t.Mutex(func(p *TLS) error {
+		data, err = p.MarshalPEM()
+		return err
+	})
+	return
+}
+
 func (t CachedTLS) MarshalText() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	t.Mutex(func(p *TLS) error {
+	err := t.Mutex(func(p *TLS) error {
 		algs := p.Certificate.SupportedSignatureAlgorithms
 		if n := len(algs); n > 0 {
 			fmt.Fprintln(buf, "supported_signature_algoritums:")
@@ -67,10 +83,10 @@ func (t CachedTLS) MarshalText() ([]byte, error) {
 		if n := len(ctss); n > 0 {
 			fmt.Fprintln(buf, "signed_certificate_timestamps:", n)
 		}
-		fmt.Fprint(buf, p.X509)
+		fmt.Fprint(buf, &p.X509)
 		return nil
 	})
-	return buf.Bytes(), nil
+	return buf.Bytes(), err
 }
 
 func (t CachedTLS) Match(nameOrSKI string) (match *X509, err error) {

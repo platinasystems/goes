@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -10,11 +10,14 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/netip"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
+	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
+	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/exchange/bridge"
@@ -30,6 +33,11 @@ import (
 var (
 	ErrMisconfigured = errors.New("misconfigured")
 	ErrEmptyRequest  = errors.New("empty request")
+	Suppressed       = []error{
+		context.Canceled,
+		net.ErrClosed,
+		io.EOF,
+	}
 )
 
 type T struct {
@@ -39,20 +47,24 @@ type T struct {
 }
 
 func (t *T) Configure(args []string) ([]string, error) {
+	var leasing netip.Prefix
+	fs := flags.New()
+	bflag := fs.Bool("b", false, "bridge")
+	fs.TextVar(&leasing, "l", leasing, "lease prefix [ip/bits]")
 	if t.Selection == nil {
 		return args, ErrMisconfigured
 	}
-	if len(args) > 0 && args[0] == "bridge" {
-		var err error
-		if args, err = t.Bridge.Configure(args[1:]); err != nil {
-			return args, err
-		}
+	err := fs.Parse(args)
+	if err != nil {
+		return nil, err
+	}
+	if *bflag {
+		t.Bridge.Configure(leasing)
 	}
 	t.cfg.Certificates = []tls.Certificate{certs.Self.TLS()}
 	t.cfg.ServerName = certs.Self.Name()
 	t.cfg.ClientAuth = tls.RequireAndVerifyClientCert
-	t.cfg.ClientCAs = certs.ClientCAs.Clone()
-	return args, nil
+	return fs.Args(), nil
 }
 
 func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
@@ -113,7 +125,9 @@ serviceLoop0:
 
 		for i := 0; ; {
 			if n, err = dec.Read(pg[i:]); err != nil {
-				style.Error(err)
+				if suppress.Errors(err, Suppressed...) != nil {
+					style.Error(err)
+				}
 				return
 			} else if n == 0 {
 				if len(args) == 0 {
@@ -142,7 +156,7 @@ serviceLoop0:
 			}
 		}
 
-		style.Plain.Notice.Println(ra, args)
+		style.Note(ra, args)
 
 		path := []string{host.Name.Value()}
 

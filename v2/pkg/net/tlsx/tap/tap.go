@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io/fs"
 	"net"
 	"net/netip"
@@ -38,37 +39,39 @@ const (
 	Up   = true
 )
 
-var ErrNoExchange = errors.New("missing <exchange>")
-
 type T struct {
 	Exchange string
 	*os.File
-	Prefix netip.Prefix
-	ip     string
+	Prefix   netip.Prefix
+	iproute2 string
 }
 
 func (t *T) Configure(ctx context.Context, args []string) ([]string, error) {
 	fs := flags.New()
-	fs.TextVar(&t.Prefix, "prefix", t.Prefix,
-		"ip/bits (default dynamic lease)")
-	unit := fs.Uint("unit", 0, "interface suffix")
+	fs.TextVar(&t.Prefix, "p", t.Prefix,
+		"prefix [ip/bits] (default dynamic lease)")
+	uflag := fs.Uint("u", 0, "interface unit suffix")
+	xflag := fs.String("x", certs.Self.Name(), "exchange")
 	err := fs.Parse(args)
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
-	if args = fs.Args(); len(args) == 0 {
-		return []string{}, ErrNoExchange
-	}
-	t.Exchange = args[0]
-	args = args[1:]
+	t.Exchange = *xflag
 
-	if t.ip, err = exec.LookPath("ip"); err != nil {
-		t.ip = ""
+	if t.iproute2, err = exec.LookPath("ip"); err != nil {
+		t.iproute2 = ""
 		err = nil
 	}
 
 	ha := make(net.HardwareAddr, 6)
-	copy(ha, certs.Self.TLS().Leaf.SubjectKeyId)
+	if t.Prefix.IsValid() {
+		h := fnv.New64()
+		h.Write(t.Prefix.Addr().AsSlice())
+		h.Write(certs.Self.TLS().Leaf.SubjectKeyId)
+		copy(ha, h.Sum(nil))
+	} else {
+		copy(ha, certs.Self.TLS().Leaf.SubjectKeyId)
+	}
 	ha[0] &^= 1
 
 	if !tuntap.CanTAP {
@@ -80,30 +83,28 @@ func (t *T) Configure(ctx context.Context, args []string) ([]string, error) {
 	}
 
 	if t.File, err = tuntap.New(&tuntap.Configuration{
-		Unit:  *unit,
+		Unit:  *uflag,
 		IsTap: true,
 		Link:  tuntap.Link{ha},
 	}); err != nil {
-		return args, err
+		return nil, fmt.Errorf("new: %w", err)
 	}
 
 	if t.Prefix.IsValid() {
 		if err = t.setPrefix(ctx); err != nil {
 			t.Close()
 			t.File = nil
-			return args, err
+			return nil, fmt.Errorf("prefix: %w", err)
 		}
 	}
 
-	return args, err
+	return fs.Args(), nil
 }
 
 func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer t.File.Close()
 	defer t.admin(ctx, Down)
-
-	hf := fmt.Sprint(certs.Self.Name(), ":", t.Name())
 
 	err := t.admin(ctx, Up)
 	if err != nil {
@@ -124,16 +125,16 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 			}
 			if !errors.Is(err, fs.ErrNotExist) {
 				style.Error(err)
-			}
-			if errors.Is(err, syscall.ECONNREFUSED) {
-				style.Error(err)
-				return
+				if errors.Is(err, syscall.ECONNREFUSED) {
+					return
+				}
 			}
 			t.sleep(ctx, 3*time.Second)
 			continue
 		}
 
-		name := dns0(conn)
+		la := conn.LocalAddr().String()
+		xname := dns0(conn)
 
 		got := new(strings.Builder)
 		args := []any{"join"}
@@ -167,8 +168,8 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 		}
 
 		rwg.Add(1)
-		go t.reader(cctx, &rwg, conn, hf, name)
-		t.writer(ctx, conn, hf, name)
+		go t.reader(cctx, &rwg, conn, la, xname)
+		t.writer(ctx, conn, la, xname)
 		cancel()
 		rwg.Wait()
 		conn.Close()
@@ -191,15 +192,15 @@ func (t *T) setPrefix(ctx context.Context) error {
 
 func (t *T) State(ctx context.Context, updown bool) error {
 	// FIXME w/ netlink
-	if len(t.ip) == 0 {
+	if true || len(t.iproute2) == 0 {
 		return nil
 	}
 	s := map[bool]string{
 		false: "LOWERLAYERDOWN",
 		true:  "UP",
 	}[updown]
-	out, err := exec.CommandContext(ctx, "ip", "link", "set", t.Name(),
-		"state", s).CombinedOutput()
+	out, err := exec.CommandContext(ctx, t.iproute2, "link", "set",
+		t.Name(), "state", s).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s; %w", out, err)
 	}

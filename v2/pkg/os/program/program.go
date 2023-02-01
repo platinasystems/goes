@@ -36,10 +36,28 @@ var Executable = cache.NewReadOnly[string](
 		return nil
 	}).Value
 
+var SlashExecutable = cache.NewReadOnly[string](
+	func(p *string) error {
+		*p = filepath.ToSlash(Executable())
+		return nil
+	}).Value
+
+var (
+	IsKoApp     = KoApp.Value
+	IsOpt       = Opt.Value
+	IsSuperUser = SuperUser.Value
+	IsUsrLocal  = UsrLocal.Value
+)
+
+var KoApp = cache.NewReadOnly[bool](
+	func(p *bool) (err error) {
+		*p = strings.HasPrefix(SlashExecutable(), "/ko-app")
+		return
+	})
+
 var Opt = cache.NewReadOnly[bool](
 	func(p *bool) (err error) {
-		*p = strings.HasPrefix(Executable(),
-			filepath.FromSlash("/opt"))
+		*p = strings.HasPrefix(SlashExecutable(), "/opt")
 		return
 	})
 
@@ -51,18 +69,9 @@ var SuperUser = cache.NewReadOnly[bool](
 
 var UsrLocal = cache.NewReadOnly[bool](
 	func(p *bool) (err error) {
-		*p = strings.HasPrefix(Executable(),
-			filepath.FromSlash("/usr/local"))
+		*p = strings.HasPrefix(SlashExecutable(), "/usr/local")
 		return
 	})
-
-var Is = struct {
-	Opt, SuperUser, UsrLocal func() bool
-}{
-	Opt:       Opt.Value,
-	SuperUser: SuperUser.Value,
-	UsrLocal:  UsrLocal.Value,
-}
 
 var BuildId = cache.NewReadOnly[string](
 	func(p *string) (err error) {

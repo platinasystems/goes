@@ -30,7 +30,7 @@ var (
 // If SU, make an XDG path w/ 0755 permissions or 0700 otherwise.
 func MkPath(s string) error {
 	var perm os.FileMode = 0700
-	if program.Is.SuperUser() {
+	if program.IsSuperUser() {
 		perm = 0755
 	}
 	return os.MkdirAll(s, perm)
@@ -41,7 +41,7 @@ func MkPath(s string) error {
 var CacheHome = cache.NewReadOnly[string](
 	func(p *string) error {
 		if *p = Getenv("XDG_CACHE_HOME"); len(*p) > 0 {
-		} else if program.Is.SuperUser() {
+		} else if program.IsSuperUser() {
 			*p = SU.CacheHome.Value()
 		} else if d, derr := UserCacheDir(); derr == nil {
 			*p = d
@@ -65,8 +65,8 @@ var ConfigDirs = cache.New[string](
 var ConfigHome = cache.New[string](
 	func(p *string) error {
 		if *p = Getenv("XDG_CONFIG_HOME"); len(*p) > 0 {
-		} else if program.Is.SuperUser() {
-			if program.Is.Opt() {
+		} else if program.IsSuperUser() {
+			if program.IsOpt() {
 				*p = "/etc/opt"
 			} else {
 				*p = "/etc"
@@ -95,10 +95,10 @@ var DataDirs = cache.New[string](
 var DataHome = cache.New[string](
 	func(p *string) error {
 		if *p = Getenv("XDG_DATA_HOME"); len(*p) > 0 {
-		} else if program.Is.SuperUser() {
-			if program.Is.UsrLocal() {
+		} else if program.IsSuperUser() {
+			if program.IsUsrLocal() {
 				*p = "/usr/local/share"
-			} else if program.Is.Opt() {
+			} else if program.IsOpt() {
 				*p = "/opt/share"
 			} else {
 				*p = "/usr/share"
@@ -116,7 +116,7 @@ var DataHome = cache.New[string](
 var RunTimeDir = cache.New[string](
 	func(p *string) error {
 		if *p = Getenv("XDG_RUNTIME_DIR"); len(*p) > 0 {
-		} else if program.Is.SuperUser() {
+		} else if program.IsSuperUser() {
 			*p = SU.RunTimeDir.Value()
 		} else if d, err := UserCacheDir(); err == nil {
 			*p = d
@@ -133,10 +133,10 @@ var RunTimeDir = cache.New[string](
 var StateHome = cache.New[string](
 	func(p *string) error {
 		if *p = Getenv("XDG_STATE_HOME"); len(*p) > 0 {
-		} else if program.Is.SuperUser() {
-			if program.Is.UsrLocal() {
+		} else if program.IsSuperUser() {
+			if program.IsUsrLocal() {
 				*p = "/var/local"
-			} else if program.Is.Opt() {
+			} else if program.IsOpt() {
 				*p = "/var/opt"
 			} else {
 				*p = "/var/lib"

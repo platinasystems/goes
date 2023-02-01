@@ -7,38 +7,41 @@ package daemon
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"os/exec"
 	"sync"
 	"text/template"
 
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
+	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/exchange"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/registry"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/service"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/tap"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
 const DaemonUsage = `
 usage: {{.}} start <routines> [<command> [<args>]]
 Ordered start of one or more of these daemon go-routines,
 
-  exchange [bridge [leasing <network> <base>]]
+  exchange [-b [-l <prefix>]]
   registry
   rpc
-  tap [-name <name>] [-prefix <prefix>] [-unix #] <exchange>
+  tap [-p <prefix>] [-u <unit>] [-x <exchange>]
 
 e.g. an exchange VPN,
 
-  {{.}} start registry exchange bridge leasing <network> <base>
+  {{.}} start registry exchange -b -l <prefix>
 
-a named service w/in the exchange,
+an exchange service,
 
-  {{.}} start tap -name <name> -prefix <prefix> <exchange> <command> [<args>]
+  {{.}} start tap -p <prefix> -x <exchange> <command> [<args>]
 
 an exchange node providing non-blocking (exchange) and blocking (rpc) service,
 
-  {{.}} start tap <exchange> exchange rpc
+  {{.}} start tap -x <exchange> exchange rpc
 `
 
 var (
@@ -48,7 +51,6 @@ var (
 
 func Func(
 	ctx context.Context,
-	r io.Reader,
 	w io.Writer,
 	path []string,
 	args ...string,
@@ -65,14 +67,14 @@ func Func(
 	switch path[1] {
 	case "complete":
 		complete.Last(w, args, []string{
-			"bridge",
 			"exchange",
-			"leasing",
 			"registry",
 			"rpc",
 			"tap",
-			"-unit",
-			"-prefix",
+			"-b", // bridge
+			"-l", // leasing
+			"-u", // unit
+			"-p", // prefix
 		})
 		return nil
 	case "help":
@@ -81,36 +83,49 @@ func Func(
 		return usage()
 	}
 
+	if !program.IsKoApp() {
+		style.System()
+	}
+
 	cctx, cancel := context.WithCancel(ctx)
 	for ctx.Err() == nil && len(args) > 0 {
 		switch args[0] {
 		case "exchange":
 			args, err = Exchange.Configure(args[1:])
 			if err != nil {
+				err = fmt.Errorf("exchange: %w", err)
 				cancel()
 			} else {
+				style.Note("go exchange...")
 				wg.Add(1)
 				go Exchange.Routine(cctx, &wg)
 			}
 		case "registry":
 			args = args[1:]
+			style.Note("go registry...")
 			wg.Add(1)
 			go registry.Routine(cctx, &wg)
 		case "rpc":
+			style.Note("rpc...")
 			args = args[1:]
 			wg.Add(1)
 			go service.Routine(ctx, &wg, Exchange.Selection)
 		case "tap":
 			args, err = Tap.Configure(ctx, args[1:])
 			if err != nil {
+				err = fmt.Errorf("tap: %w", err)
 				cancel()
 			} else {
+				style.Note("go tap...")
 				wg.Add(1)
 				go Tap.Routine(cctx, &wg)
 			}
 		default:
 			err = exec.CommandContext(cctx, args[0], args[1:]...).
 				Run()
+			if err != nil {
+				err = fmt.Errorf("%v %w", args, err)
+			}
 			cancel()
 		}
 	}

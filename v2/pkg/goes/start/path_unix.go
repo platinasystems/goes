@@ -27,6 +27,7 @@ var Path = func() string {
 		}
 	}
 	for _, s := range []string{
+		"/ko-app",
 		"/usr/local/bin",
 		"/usr/bin",
 		"/bin",

@@ -7,7 +7,6 @@ package admin
 import (
 	"context"
 	"crypto/x509"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"strings"
@@ -26,7 +25,6 @@ var Headers = make(map[string]string)
 
 func Func(
 	ctx context.Context,
-	r io.Reader,
 	w io.Writer,
 	path []string,
 	args ...string,
@@ -44,19 +42,19 @@ func Func(
 		path = path[:len(path)-1]
 		return usage()
 	}
-	if len(args) <= 1 {
-		registry.Range(func(c *x509.Certificate) bool {
-			fmt.Fprint(w, hex.EncodeToString(c.SubjectKeyId),
-				": ", c.DNSNames, "\n")
+	if len(args) == 0 {
+		registry.Range(func(c *x509.Certificate, ski string) bool {
+			fmt.Fprint(w, ski, ": ", c.DNSNames, "\n")
 			return true
 		})
 		return nil
 	}
 	approve := path[len(path)-1] == "approve"
-	for _, arg := range args[1:] {
-		c := registry.Extract(func(c *x509.Certificate) bool {
-			return hex.EncodeToString(c.SubjectKeyId) == arg
-		})
+	for _, arg := range args {
+		c := registry.Extract(
+			func(c *x509.Certificate, ski string) bool {
+				return ski == arg
+			})
 		if c == nil {
 			return fmt.Errorf("%s: not found", arg)
 		}

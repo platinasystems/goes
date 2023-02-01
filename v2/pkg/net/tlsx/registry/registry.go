@@ -8,48 +8,59 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"net"
 	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/container/slice"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
+type entry struct {
+	cert *x509.Certificate
+	ski  string
+}
+
+var cut = slice.Cut[entry]
+
 var reg = struct {
-	mutex sync.Mutex
-	certs []*x509.Certificate
+	mutex   sync.Mutex
+	entries []entry
 }{}
 
 func Append(c *x509.Certificate) {
 	reg.mutex.Lock()
 	defer reg.mutex.Unlock()
-	reg.certs = append(reg.certs, c)
+	reg.entries = append(reg.entries, entry{
+		c, hex.EncodeToString(c.SubjectKeyId),
+	})
 }
 
-// Extract calls f() with each registered certificate until f() returns true;
-// then deregisters and returns that certficate. This returns nil if f()
-// returned false with all certificates.
-func Extract(f func(*x509.Certificate) bool) (x *x509.Certificate) {
+// Extract calls f() with each registered certificate and it's hex encoded
+// subject-key-id (SKI) until f() returns true; then deregisters and returns
+// that certficate and SKI. This returns nil if f() returned false with all
+// certificates.
+func Extract(f func(*x509.Certificate, string) bool) *x509.Certificate {
 	reg.mutex.Lock()
 	defer reg.mutex.Unlock()
-	for i, c := range reg.certs {
-		if f(c) {
-			x = c
-			copy(reg.certs[i:], reg.certs[i+1:])
-			reg.certs = reg.certs[:len(reg.certs)-1]
-			break
+	for i, entry := range reg.entries {
+		if f(entry.cert, entry.ski) {
+			reg.entries = cut(reg.entries, uint(i), 1)
+			return entry.cert
 		}
 	}
-	return
+	return nil
 }
 
-// Range calls f() with each registered certificate until f() returns false.
-func Range(f func(*x509.Certificate) bool) {
+// Range calls f() with each registered certificate and SKI until f() returns
+// false.
+func Range(f func(*x509.Certificate, string) bool) {
 	reg.mutex.Lock()
 	defer reg.mutex.Unlock()
-	for _, c := range reg.certs {
-		if !f(c) {
+	for _, entry := range reg.entries {
+		if !f(entry.cert, entry.ski) {
 			break
 		}
 	}

@@ -26,7 +26,7 @@ var (
 		"/bin",
 	}
 	RestrictedPath = cache.New[[]string](func(p *[]string) (err error) {
-		if program.Is.SuperUser() {
+		if program.IsSuperUser() {
 			*p = RestrictedSuperUserPath
 		} else {
 			*p = RestrictedUserPath

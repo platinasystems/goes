@@ -7,9 +7,11 @@ package tlsx
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
+	"errors"
 	"net"
+	"syscall"
 
+	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
@@ -29,15 +31,13 @@ func (c Connector) Connect(ctx context.Context, host string) (
 	conn net.Conn,
 	err error,
 ) {
-	rootCAs := x509.NewCertPool()
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{
 			certs.Self.TLS(),
 		},
-		RootCAs: rootCAs,
+		RootCAs: certs.RootCAs.Clone(),
 	}
 	if match, merr := certs.Match(host); merr == nil {
-		rootCAs.AddCert(match.Certificate)
 		cfg.ServerName = match.Name
 	}
 
@@ -63,6 +63,9 @@ func (c Connector) Connect(ctx context.Context, host string) (
 			} else {
 				conn = cl
 			}
+			break
+		} else if errors.Is(err, syscall.ECONNREFUSED) {
+			style.Error(ipa.IP, err)
 			break
 		}
 	}

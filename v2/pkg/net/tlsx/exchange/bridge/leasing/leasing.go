@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"net/netip"
 	"sync"
@@ -22,41 +21,18 @@ var (
 type T struct {
 	Enabled bool
 	sync.RWMutex
-	network netip.Prefix
-	base,
-	next netip.Addr
+	prefix  netip.Prefix
+	next    netip.Addr
 	address map[string]netip.Addr
 	tenant  map[netip.Addr]string
 }
 
-func (t *T) Configure(args []string) ([]string, error) {
-	switch len(args) {
-	case 0:
-		return args, ErrNoNetwork
-	case 1:
-		return args, ErrNoBase
-	}
-	if args[0] == "-h" {
-		return args, flag.ErrHelp
-	}
-	var err error
-	t.network, err = netip.ParsePrefix(args[0])
-	if err != nil {
-		return args[1:], fmt.Errorf("<network>: %w", err)
-	}
-	t.base, err = netip.ParseAddr(args[1])
-	if err != nil {
-		return args[2:], fmt.Errorf("<base>: %w", err)
-	}
-	if !t.network.Contains(t.base) {
-		return args[2:], fmt.Errorf("%v doesn't contain %v",
-			t.network, t.base)
-	}
-	t.next = t.base
+func (t *T) Configure(prefix netip.Prefix) {
+	t.prefix = prefix
+	t.next = prefix.Addr().Next()
 	t.address = make(map[string]netip.Addr)
 	t.tenant = make(map[netip.Addr]string)
 	t.Enabled = true
-	return args[2:], nil
 }
 
 func (t *T) Lease(tenant string) netip.Prefix {
@@ -64,12 +40,20 @@ func (t *T) Lease(tenant string) netip.Prefix {
 	defer t.Unlock()
 	addr, ok := t.address[tenant]
 	if !ok {
-		addr = t.next
-		t.next = t.next.Next()
+		for {
+			addr = t.next
+			t.next = t.next.Next()
+			if _, occupied := t.tenant[addr]; !occupied {
+				break
+			}
+			if t.prefix.Contains(t.next) {
+				t.next = t.prefix.Addr().Next()
+			}
+		}
 		t.address[tenant] = addr
 		t.tenant[addr] = tenant
 	}
-	return netip.PrefixFrom(addr, t.network.Bits())
+	return netip.PrefixFrom(addr, t.prefix.Bits())
 }
 
 func (t *T) MarshalJSON() ([]byte, error) {
@@ -95,12 +79,9 @@ func (t *T) Occupy(tenant, arg string) error {
 	if err != nil {
 		return err
 	}
-	if !t.network.Contains(addr) {
+	if !t.prefix.Contains(addr) {
 		return fmt.Errorf("network %v doesn't contain %v",
-			t.network, addr)
-	}
-	if addr.Compare(t.base) >= 0 {
-		return fmt.Errorf("%v >= base @ %v", addr, t.base)
+			t.prefix, addr)
 	}
 	if occupant, occupied := t.tenant[addr]; occupied {
 		if occupant != tenant {

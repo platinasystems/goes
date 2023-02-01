@@ -10,7 +10,7 @@ func Cut[T any](l []T, i, n uint) []T {
 	return l[:uint(len(l))-n]
 }
 
-// Remove all matching elements from slice.
+// Return a new slice with all matching (v) values of list (l) removed.
 func Filter[T comparable](l []T, v T) []T {
 	for i, lv := range l {
 		if lv == v {

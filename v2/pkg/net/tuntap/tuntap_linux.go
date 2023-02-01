@@ -21,7 +21,7 @@ import (
 const (
 	HasPI  = false
 	CanTAP = true
-	TUNDEV = "/dev/net/tun"
+	DevTun = "/dev/net/tun"
 )
 
 func New(cfg *Configuration) (*os.File, error) {
@@ -39,8 +39,9 @@ func New(cfg *Configuration) (*os.File, error) {
 	}
 	copy(ifr.Ifrn[:], []byte(fmt.Sprintf("%s%d", prefix, cfg.Unit)))
 
-	fdi, err := syscall.Open(TUNDEV, os.O_RDWR, 0)
+	fdi, err := syscall.Open(DevTun, os.O_RDWR, 0)
 	if err != nil {
+		err = fmt.Errorf("%s: %w", DevTun, err)
 		return nil, err
 	}
 	fdp := uintptr(fdi)

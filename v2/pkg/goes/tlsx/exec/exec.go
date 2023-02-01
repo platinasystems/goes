@@ -14,11 +14,14 @@ import (
 	"text/template"
 
 	"github.com/creack/pty"
+	"github.com/platinasystems/goes/v2/pkg/container/slice"
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
+
+var cut = slice.Cut[string]
 
 const Usage = `
 usage: {{.Command}} [<options>] <exchange> <command> [<args>]
@@ -65,8 +68,7 @@ func Func(
 		args = append([]string{path[1]}, args...)
 	case "help":
 		if len(args) == 0 {
-			copy(path[1:], path[2:])
-			path = path[:len(path)-1]
+			path = cut(path, 1, 1)
 			return usage()
 		}
 		args = append([]string{path[1]}, args...)
@@ -111,4 +113,32 @@ func Func(
 		err = fmt.Errorf("%s: %w", ex, err)
 	}
 	return err
+}
+
+func IPC(
+	ctx context.Context,
+	r io.Reader,
+	w io.Writer,
+	path []string,
+	args ...string,
+) error {
+	const usage = `
+usage: {{.}} <command> [<args>]
+Daemon IPC.`
+	switch path[1] {
+	case "complete":
+		return nil
+	case "help":
+		return template.Must(template.New("usage").
+			Parse(usage[1:])).
+			Execute(w, strings.Join(
+				cut(path, 1, 1), " ",
+			))
+	}
+	last := len(path) - 1
+	cmd := path[last]
+	path[last] = "exec"
+	args = append([]string{certs.Self.Value().X509.Name, cmd},
+		args...)
+	return Func(ctx, r, w, path, args...)
 }
