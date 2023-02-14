@@ -7,8 +7,12 @@ package certs
 import (
 	"crypto/x509"
 
+	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
+
+// If Restricted is true, the Self certificate is the only permitted Client.
+var Restricted bool
 
 type CAs struct{ cache *cache.Cache[*x509.CertPool] }
 
@@ -16,11 +20,14 @@ type CAs struct{ cache *cache.Cache[*x509.CertPool] }
 var ClientCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 	*p = x509.NewCertPool()
 	Self.Add(*p)
-	Subscriptions.Range(func(x *X509) bool {
+	if Restricted {
+		return nil
+	}
+	Subscriptions.Range(func(x *keycert.X509) bool {
 		(*p).AddCert(x.Certificate)
 		return true
 	})
-	Subscribers.Range(func(x *X509) bool {
+	Subscribers.Range(func(x *keycert.X509) bool {
 		(*p).AddCert(x.Certificate)
 		return true
 	})
@@ -31,7 +38,7 @@ var ClientCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 var RootCAs = CAs{cache.New[*x509.CertPool](func(p **x509.CertPool) error {
 	*p = x509.NewCertPool()
 	Self.Add(*p)
-	Subscriptions.Range(func(x *X509) bool {
+	Subscriptions.Range(func(x *keycert.X509) bool {
 		(*p).AddCert(x.Certificate)
 		return true
 	})

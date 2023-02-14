@@ -16,36 +16,14 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
-var (
-	ErrNilLeaf    = errors.New("nil leaf")
-	ErrNoDNSNames = errors.New("no DNS names")
-)
+type TLS struct{ *cache.Cache[keycert.TLS] }
 
-type TLS struct {
-	tls.Certificate
-	X509
-}
-
-type CachedTLS struct{ *cache.Cache[TLS] }
-
-var Self = CachedTLS{cache.New[TLS](func(p *TLS) (err error) {
-	if p.Certificate, err = keycert.ReadTLSCertificate(
-		filename.Cert(),
-		filename.PrivateKey(),
-	); err == nil {
-		if p.Certificate.Leaf == nil {
-			err = ErrNilLeaf
-		} else if len(p.Certificate.Leaf.DNSNames) == 0 {
-			err = ErrNoDNSNames
-		} else {
-			p.X509.Set(Headers{}, p.Certificate.Leaf)
-		}
-	}
-	return
+var Self = TLS{cache.New[keycert.TLS](func(p *keycert.TLS) error {
+	return p.LoadX509KeyPair(filename.Cert(), filename.PrivateKey())
 })}
 
-func (t CachedTLS) Add(cas *x509.CertPool) {
-	t.Mutex(func(p *TLS) error {
+func (t TLS) Add(cas *x509.CertPool) {
+	t.Mutex(func(p *keycert.TLS) error {
 		if c := p.X509.Certificate; c != nil {
 			cas.AddCert(c)
 		}
@@ -53,7 +31,7 @@ func (t CachedTLS) Add(cas *x509.CertPool) {
 	})
 }
 
-func (t CachedTLS) Format(w fmt.State, verb rune) {
+func (t TLS) Format(w fmt.State, verb rune) {
 	if buf, err := t.MarshalText(); err == nil {
 		w.Write(buf)
 	} else {
@@ -61,17 +39,17 @@ func (t CachedTLS) Format(w fmt.State, verb rune) {
 	}
 }
 
-func (t CachedTLS) MarshalPEM() (data []byte, err error) {
-	t.Mutex(func(p *TLS) error {
+func (t TLS) MarshalPEM() (data []byte, err error) {
+	t.Mutex(func(p *keycert.TLS) error {
 		data, err = p.MarshalPEM()
 		return err
 	})
 	return
 }
 
-func (t CachedTLS) MarshalText() ([]byte, error) {
+func (t TLS) MarshalText() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := t.Mutex(func(p *TLS) error {
+	err := t.Mutex(func(p *keycert.TLS) error {
 		algs := p.Certificate.SupportedSignatureAlgorithms
 		if n := len(algs); n > 0 {
 			fmt.Fprintln(buf, "supported_signature_algoritums:")
@@ -89,13 +67,13 @@ func (t CachedTLS) MarshalText() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func (t CachedTLS) Match(nameOrSKI string) (match *X509, err error) {
+func (t TLS) Match(nameOrSKI string) (match *keycert.X509, err error) {
 	if len(nameOrSKI) == 0 {
 		err = errors.New("empty name or SKI")
 		return
 	}
-	err = t.Mutex(func(p *TLS) error {
-		if nameOrSKI == p.X509.Name || nameOrSKI == p.X509.SKI {
+	err = t.Mutex(func(p *keycert.TLS) error {
+		if nameOrSKI == p.X509.Name() || nameOrSKI == p.X509.SKI() {
 			match = &p.X509
 			return nil
 		}
@@ -105,24 +83,24 @@ func (t CachedTLS) Match(nameOrSKI string) (match *X509, err error) {
 	return
 }
 
-func (t CachedTLS) Name() (s string) {
-	t.Mutex(func(p *TLS) error {
-		s = p.Name
+func (t TLS) Name() (s string) {
+	t.Mutex(func(p *keycert.TLS) error {
+		s = p.Name()
 		return nil
 	})
 	return
 }
 
-func (t CachedTLS) SKI() (s string) {
-	t.Mutex(func(p *TLS) error {
-		s = p.SKI
+func (t TLS) SKI() (s string) {
+	t.Mutex(func(p *keycert.TLS) error {
+		s = p.SKI()
 		return nil
 	})
 	return
 }
 
-func (t CachedTLS) TLS() (c tls.Certificate) {
-	t.Mutex(func(p *TLS) error {
+func (t TLS) TLS() (c tls.Certificate) {
+	t.Mutex(func(p *keycert.TLS) error {
 		c = p.Certificate
 		return nil
 	})

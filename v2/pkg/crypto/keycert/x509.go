@@ -2,15 +2,22 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package certs
+package keycert
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
+	"os"
+	"time"
+
+	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
 type Headers = map[string]string
@@ -18,26 +25,27 @@ type Headers = map[string]string
 type X509 struct {
 	Headers
 	*x509.Certificate
-	Name, SKI string
 }
 
-func NewX509(h Headers, c *x509.Certificate) *X509 {
-	x := new(X509)
-	x.Set(h, c)
-	return x
-}
-
-func (x *X509) Set(h Headers, c *x509.Certificate) {
-	x.Headers = h
-	x.Certificate = c
-	x.Name = c.DNSNames[0]
-	x.SKI = hex.EncodeToString(c.SubjectKeyId)
+func (x *X509) AppendFile(name string) error {
+	f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if err = pem.Encode(f, &pem.Block{
+		Headers: x.Headers,
+		Bytes:   x.Certificate.Raw,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Format as yaml like sequence to writer.
 func (x *X509) Format(w fmt.State, verb rune) {
-	fmt.Fprintln(w, "- name:", x.Name)
-	fmt.Fprintln(w, "  subject_key_id:", x.SKI)
+	fmt.Fprintln(w, "- name:", x.Name())
+	fmt.Fprintln(w, "  subject_key_id:", x.SKI())
 	fmt.Fprintln(w, "  serial_number:", x.Certificate.SerialNumber)
 	fmt.Fprintln(w, "  not_before:", x.Certificate.NotBefore)
 	fmt.Fprintln(w, "  not_after:", x.Certificate.NotAfter)
@@ -130,9 +138,74 @@ func (x *X509) MarshalPEM() (data []byte, err error) {
 	return
 }
 
+func (x *X509) Name() (s string) {
+	if x.Certificate != nil && len(x.Certificate.DNSNames) > 0 {
+		s = x.Certificate.DNSNames[0]
+	}
+	return
+}
+
+func (x *X509) SKI() (s string) {
+	if x.Certificate != nil {
+		s = hex.EncodeToString(x.Certificate.SubjectKeyId)
+	}
+	return
+}
+
+func (x *X509) UnmarshalPEM(blk *pem.Block) error {
+	c, err := x509.ParseCertificate(blk.Bytes)
+	if err == nil {
+		x.Headers = blk.Headers
+		x.Certificate = c
+	}
+	return err
+}
+
 func DataBlock(w io.Writer, data []byte, i int) {
 	const nls = "\n                "
 	w.Write([]byte(nls[:1+i]))
 	buf := bytes.Replace(data, []byte(nls[:1]), []byte(nls[:1+i]), -1)
 	w.Write(buf[:len(buf)-i])
+}
+
+func NewX509Certificate(k PrivateKey, temp *x509.Certificate) (
+	cert *x509.Certificate, block *pem.Block, err error,
+) {
+	random := rand.Reader
+	hn, err := host.Name.ValErr()
+	if err != nil {
+		return
+	}
+	if temp.SerialNumber == nil {
+		max := big.NewInt(math.MaxInt64)
+		temp.SerialNumber, err = rand.Int(random, max)
+		if err != nil {
+			return
+		}
+	}
+	if len(temp.DNSNames) == 0 {
+		temp.DNSNames = []string{hn}
+	}
+	if len(temp.Subject.CommonName) == 0 {
+		temp.Subject.CommonName = temp.DNSNames[0]
+	}
+	if temp.NotBefore.IsZero() {
+		temp.NotBefore = time.Now()
+	}
+	if temp.NotAfter.IsZero() || temp.NotAfter.Before(temp.NotBefore) {
+		temp.NotAfter = temp.NotBefore.Add(10 * 365 * 24 * time.Hour)
+	}
+	der, err := x509.CreateCertificate(random, temp, temp, k.Public(), k)
+	if err != nil {
+		return
+	}
+	if cert, err = x509.ParseCertificate(der); err != nil {
+		return
+	}
+	block = &pem.Block{
+		Type:    "CERTIFICATE",
+		Headers: map[string]string{},
+		Bytes:   der,
+	}
+	return
 }

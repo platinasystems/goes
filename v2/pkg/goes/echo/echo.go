@@ -12,6 +12,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/platinasystems/goes/v2/pkg/container/slice"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
@@ -43,8 +44,7 @@ Print string(s) to standard output.
 		complete.Last(w, args, fs.FlagSet)
 		return nil
 	case "help":
-		copy(path[1:], path[2:])
-		path = path[:len(path)-1]
+		path = slice.Cut[string](path, 1, 1)
 		return usage()
 	}
 	err := fs.Parse(args)

@@ -21,57 +21,51 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/goes/cat"
 	"github.com/platinasystems/goes/v2/pkg/goes/command"
 	"github.com/platinasystems/goes/v2/pkg/goes/echo"
-	"github.com/platinasystems/goes/v2/pkg/goes/service"
 	"github.com/platinasystems/goes/v2/pkg/goes/start"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/admin"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/create_cert"
-	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/daemon"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/exec"
 	"github.com/platinasystems/goes/v2/pkg/goes/tlsx/subscribe"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/exchange"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/service"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/dir"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/tap"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 )
 
 func main() {
 	var starter any = start.Func
+	daemons := map[string]any{
+		"exchange": exchange.Daemon,
+		"tap":      tap.Daemon,
+	}
 	if program.IsKoApp() {
-		starter = daemon.Func
+		// start daemons directly instead of through detached child
+		starter = daemons
 	}
-	daemon.Exchange.Selection = map[string]any{
-		"approve": admin.Func,
-		"cat":     cat.Func,
-		"command": command.Func,
-		"deny":    admin.Func,
-		"echo":    echo.Func,
-		"show": map[string]any{
-			"build":       program.Build,
-			"main":        program.Main,
-			"subscribers": certs.Subscribers,
-			"tenants":     &daemon.Exchange.Bridge.Leasing,
-		},
-	}
+	service.Selection["cat"] = cat.Func
+	service.Selection["command"] = command.Func
+	service.Selection["echo"] = echo.Func
 	goes.Root = map[string]any{
 		"approve":     exec.IPC,
 		"command":     command.Func,
 		"create-cert": create_cert.Func,
-		"daemon":      daemon.Func,
+		"daemon":      daemons,
 		"deny":        exec.IPC,
 		"exec":        exec.Func,
-		"port":        port.Map,
-		"rpc":         service.Request{tlsx.RPC}.Func,
-		"runtime-dir": xdg.RunTimeDir,
 		"show": map[string]any{
 			"build": program.Build,
 			"cert": map[string]any{
 				"pem":  certs.Self.MarshalPEM,
 				"text": certs.Self.MarshalText,
 			},
+			"dir": map[string]any{
+				"runtime": xdg.RunTimeDir,
+				"state":   dir.Name,
+			},
 			"main":          program.Main,
-			"state-dir":     dir.Name,
+			"registry":      exec.IPC,
 			"subscribers":   certs.Subscribers,
 			"subscriptions": certs.Subscriptions,
 			"tenants":       exec.IPC,

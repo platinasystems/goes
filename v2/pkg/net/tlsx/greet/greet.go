@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,44 +7,58 @@ package greet
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
-	"sync"
+	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/net/accept"
-	"github.com/platinasystems/goes/v2/pkg/net/foreclose"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/handshake"
+	"github.com/platinasystems/goes/v2/pkg/context/poll"
+	"github.com/platinasystems/goes/v2/pkg/context/write"
+	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
+	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
 
-func Routine(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	svch chan<- *tls.Conn,
-	addr *net.TCPAddr,
-	cfg *tls.Config,
-) {
-	defer wg.Done()
-	defer close(svch)
+func Client(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
+	sv := tls.Server(conn, &tls.Config{
+		Certificates: []tls.Certificate{
+			certs.Self.TLS(),
+		},
+		ServerName: certs.Self.Name(),
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		ClientCAs:  certs.ClientCAs.Clone(),
+	})
+	return sv, sv.HandshakeContext(ctx)
+}
 
-	ln, err := net.Listen(addr.Network(), addr.String())
-	if err != nil {
-		style.Error(err)
-		return
+// Send hello to server then handshake and return TLS connection.
+func Server(ctx context.Context, name string, conn net.Conn) (
+	*tls.Conn, error,
+) {
+	ob := page.New()
+	defer page.Free(ob)
+
+	dec := lv.NewDecoder(poll.With(ctx, conn))
+	enc := lv.NewEncoder(write.With(ctx, conn))
+
+	enc.Encode("hello", nil)
+	if _, err := dec.Read(ob); err != nil {
+		return nil, err
 	}
 
-	conch := make(chan net.Conn, 4)
-
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	wg.Add(1)
-	go foreclose.Routine(cctx, wg, ln)
-
-	wg.Add(1)
-	go accept.Routine(wg, conch, ln)
-
-	wg.Add(1)
-	go handshake.Routine(cctx, wg, svch, conch, cfg)
-
-	<-ctx.Done()
+	cfg := &tls.Config{
+		Certificates: []tls.Certificate{
+			certs.Self.TLS(),
+		},
+		RootCAs: certs.RootCAs.Clone(),
+	}
+	if i := strings.IndexAny(name, "@:"); i > 0 {
+		name = name[:i]
+	}
+	if match, err := certs.Match(name); err == nil {
+		cfg.ServerName = match.Name()
+	} else {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	cl := tls.Client(conn, cfg)
+	return cl, cl.HandshakeContext(ctx)
 }

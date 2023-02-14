@@ -6,186 +6,81 @@ package exchange
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
-	"io"
-	"net"
+	"html/template"
 	"net/netip"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/context/poll"
-	"github.com/platinasystems/goes/v2/pkg/context/write"
-	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
-	"github.com/platinasystems/goes/v2/pkg/errors/suppress"
+	"github.com/platinasystems/goes/v2/pkg/container/slice"
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
-	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/exchange/bridge"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/input"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/remote"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/bridge"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/lease"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/service"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
-	"github.com/platinasystems/goes/v2/pkg/os/host"
-	"github.com/platinasystems/goes/v2/pkg/os/page"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
-var (
-	ErrMisconfigured = errors.New("misconfigured")
-	ErrEmptyRequest  = errors.New("empty request")
-	Suppressed       = []error{
-		context.Canceled,
-		net.ErrClosed,
-		io.EOF,
+const Usage = `
+usage: {{.}} exchange [-p <port>] <prefix>
+Start exchange at <port> (default 8003).
+`
+
+var ErrIncomplete = errors.New("incomplete")
+
+func Daemon(
+	ctx context.Context,
+	path []string,
+	args ...string,
+) error {
+	if !program.IsKoApp() {
+		style.System()
 	}
-)
 
-type T struct {
-	cfg       tls.Config
-	Bridge    bridge.T
-	Selection map[string]any
-}
-
-func (t *T) Configure(args []string) ([]string, error) {
-	var leasing netip.Prefix
 	fs := flags.New()
-	bflag := fs.Bool("b", false, "bridge")
-	fs.TextVar(&leasing, "l", leasing, "lease prefix [ip/bits]")
-	if t.Selection == nil {
-		return args, ErrMisconfigured
+	port := fs.Uint("p", 8003, "service port")
+	fs.BoolVar(&certs.Restricted, "r", false, "restrict clients to self")
+
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(Usage[1:])).
+			Execute(style.Plain.Notice.Writer(), path[0])
 	}
+
+	switch path[1] {
+	case "complete":
+		return nil
+	case "help":
+		copy(path[1:], path[2:])
+		path = slice.Cut[string](path, 1, 1)
+		return usage()
+	}
+
 	err := fs.Parse(args)
-	if err != nil {
-		return nil, err
+	if err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
+		return err
 	}
-	if *bflag {
-		t.Bridge.Configure(leasing)
+	args = fs.Args()
+
+	if len(args) == 0 {
+		return ErrIncomplete
 	}
-	t.cfg.Certificates = []tls.Certificate{certs.Self.TLS()}
-	t.cfg.ServerName = certs.Self.Name()
-	t.cfg.ClientAuth = tls.RequireAndVerifyClientCert
-	return fs.Args(), nil
-}
 
-func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+	if prefix, err := netip.ParsePrefix(args[0]); err != nil {
+		return err
+	} else {
+		lease.Enable(prefix)
+	}
 
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	addr := &net.TCPAddr{Port: port.Exchange.Value()}
-
-	svch := make(chan *tls.Conn, 4)
+	var wg sync.WaitGroup
+	defer wg.Wait()
 
 	wg.Add(1)
-	go greet.Routine(ctx, wg, svch, addr, &t.cfg)
+	go bridge.Routine(ctx, &wg)
 
-	if t.Bridge.Enabled {
-		wg.Add(1)
-		go t.Bridge.Routine(ctx, wg)
-	}
+	wg.Add(1)
+	go service.Routine(ctx, &wg, *port)
 
-	for sv := range svch {
-		wg.Add(1)
-		go t.service(cctx, wg, sv)
-	}
-}
-
-// Service connection by parsing TLV request arguements and input upto the zero
-// length Break.  This calls f() with a reader that LV decodes any input; a
-// writer with LV data encoding to connection; and the decoded arguments.  If
-// f() succeeds, this sends the zero length Break to the connection; otherwise,
-// this sends an encoded Nack.
-func (t *T) service(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	sv *tls.Conn,
-) {
-	wg.Done()
-	defer sv.Close()
-
-	ra := remote.Addr(sv)
-	dec := lv.NewDecoder(poll.With(ctx, sv))
-	enc := lv.NewEncoder(write.With(ctx, sv))
-	r := io.LimitReader(nil, 0)
-	w := io.Writer(enc)
-	pg := page.New()
-	defer page.Free(pg)
-
-serviceLoop0:
-	for {
-		var (
-			args []string
-			err  error
-			n    int
-			iowg sync.WaitGroup
-		)
-
-		cctx, cancel := context.WithCancel(ctx)
-
-		for i := 0; ; {
-			if n, err = dec.Read(pg[i:]); err != nil {
-				if suppress.Errors(err, Suppressed...) != nil {
-					style.Error(err)
-				}
-				return
-			} else if n == 0 {
-				if len(args) == 0 {
-					style.Error(ErrEmptyRequest)
-					return
-				}
-				break
-			} else if s := string(pg[i : i+n]); s != "<<<<" {
-				args = append(args, s)
-				i += n
-			} else if len(args) == 0 {
-				style.Error(ErrEmptyRequest)
-				return
-			} else if args[0] == "pty" {
-				break
-			} else {
-				ir, flush := input.New(dec)
-				r = ir
-				iowg.Add(1)
-				go func() {
-					defer iowg.Done()
-					<-cctx.Done()
-					flush()
-				}()
-				break
-			}
-		}
-
-		style.Note(ra, args)
-
-		path := []string{host.Name.Value()}
-
-		switch args[0] {
-		case "complete":
-			path = append(path, args[0])
-			args = args[1:]
-			if len(args) > 0 && args[0] == "help" {
-				args = args[1:]
-			}
-		case "help":
-			path = append(path, args[0])
-			args = args[1:]
-		case "join":
-			t.Bridge.Join(ctx, sv, args[1:])
-			continue serviceLoop0
-		case "pty":
-			r = dec
-		}
-		err = goes.Select(cctx, r, w, append(path, ra), t.Selection,
-			args...)
-		cancel()
-		iowg.Wait()
-		switch {
-		case errors.Is(err, context.Canceled):
-		case errors.Is(err, net.ErrClosed):
-		case errors.Is(err, io.EOF):
-		default:
-			enc.Encode(err)
-		}
-	}
+	return nil
 }

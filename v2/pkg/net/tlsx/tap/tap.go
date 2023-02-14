@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"html/template"
 	"io/fs"
 	"net"
 	"net/netip"
@@ -21,200 +22,248 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/container/slice"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/service"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
+	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
+
+const Usage = `
+usage: {{.}} tap [-p <port>] <name>[@<address>][:<port>] [-a <address>]...
+Open one or more taps to named exchanges.
+
+  -a <address>
+	Static tap interface address.
+  -p <port>
+	If non-zero, run command service at port after opening tap(s).
+`
 
 const (
-	Down = false
-	Up   = true
+	down = false
+	up   = true
 )
 
-type T struct {
-	Exchange string
-	*os.File
-	Prefix   netip.Prefix
-	iproute2 string
-}
+var (
+	ErrIncomplete = errors.New("incomplete")
+	ErrCantTap    = errors.New(runtime.GOOS + " can't TAP")
+	ErrHasPI      = errors.New(runtime.GOOS + " has unwanted packet info")
+	ErrTooShort   = errors.New("too short")
+)
 
-func (t *T) Configure(ctx context.Context, args []string) ([]string, error) {
+// Path to iproute2 command if available.
+var iproute2 string
+
+// The Tap interface address (aka. MAC) is a hash of the unit number (order of
+// creation) and the subject-key-id of the Self certificate.
+func Daemon(
+	ctx context.Context,
+	path []string,
+	args ...string,
+) error {
+	if !program.IsKoApp() {
+		style.System()
+	}
+
 	fs := flags.New()
-	fs.TextVar(&t.Prefix, "p", t.Prefix,
-		"prefix [ip/bits] (default dynamic lease)")
-	uflag := fs.Uint("u", 0, "interface unit suffix")
-	xflag := fs.String("x", certs.Self.Name(), "exchange")
+	port := fs.Uint("p", 0, "non-zero service port")
+
+	usage := func() error {
+		return template.Must(template.New("usage").Parse(Usage[1:])).
+			Execute(style.Plain.Notice.Writer(), path[0])
+	}
+
+	switch path[1] {
+	case "complete":
+		return nil
+	case "help":
+		path = slice.Cut[string](path, 1, 1)
+		return usage()
+	}
+
 	err := fs.Parse(args)
-	if err != nil {
-		return nil, err
+	if err == flags.ErrHelp {
+		return usage()
+	} else if err != nil {
+		return err
 	}
-	t.Exchange = *xflag
-
-	if t.iproute2, err = exec.LookPath("ip"); err != nil {
-		t.iproute2 = ""
-		err = nil
-	}
-
-	ha := make(net.HardwareAddr, 6)
-	if t.Prefix.IsValid() {
-		h := fnv.New64()
-		h.Write(t.Prefix.Addr().AsSlice())
-		h.Write(certs.Self.TLS().Leaf.SubjectKeyId)
-		copy(ha, h.Sum(nil))
-	} else {
-		copy(ha, certs.Self.TLS().Leaf.SubjectKeyId)
-	}
-	ha[0] &^= 1
+	args = fs.Args()
 
 	if !tuntap.CanTAP {
-		return args, fmt.Errorf("%s can't TAP", runtime.GOOS)
+		return ErrCantTap
 	}
 	if tuntap.HasPI {
-		return args, fmt.Errorf("%s's has unwanted packet info",
-			runtime.GOOS)
+		return ErrHasPI
+	}
+	if s, err := exec.LookPath("ip"); err == nil {
+		iproute2 = s
 	}
 
-	if t.File, err = tuntap.New(&tuntap.Configuration{
-		Unit:  *uflag,
-		IsTap: true,
-		Link:  tuntap.Link{ha},
-	}); err != nil {
-		return nil, fmt.Errorf("new: %w", err)
-	}
+	var wg sync.WaitGroup
+	defer wg.Wait()
 
-	if t.Prefix.IsValid() {
-		if err = t.setPrefix(ctx); err != nil {
-			t.Close()
-			t.File = nil
-			return nil, fmt.Errorf("prefix: %w", err)
+	ski := certs.Self.TLS().Leaf.SubjectKeyId
+	for i := 0; len(args) > 0; i++ {
+		ex := args[0]
+		ha := make(net.HardwareAddr, 6)
+		hash := fnv.New64()
+		hash.Write([]byte{byte(i << 1)}) // shift over muti-cast
+		hash.Write(ski)
+		copy(ha, hash.Sum(nil))
+		ha[0] &^= 1 // mask muti-cast
+		join := []any{"join", ""}
+		if len(args) > 1 && args[1] == "-a" {
+			if len(args) < 2 {
+				return egress.Marked(ErrIncomplete)
+			}
+			if ipa, err := netip.ParseAddr(args[2]); err != nil {
+				return egress.Marked(err)
+			} else {
+				join[1] = ipa.String()
+			}
+			args = args[3:]
+		} else {
+			args = args[1:]
+			join = join[:1]
 		}
+		f, err := tuntap.New(&tuntap.Configuration{
+			Unit:  uint(i),
+			IsTap: true,
+			Link:  tuntap.Link{ha},
+		})
+		if err != nil {
+			return egress.Marked(err)
+		}
+		wg.Add(1)
+		go routine(ctx, &wg, f, ex, join)
 	}
-
-	return fs.Args(), nil
+	if *port != 0 {
+		wg.Add(1)
+		go service.Routine(ctx, &wg, *port)
+	}
+	return nil
 }
 
-func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
+func routine(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	f *os.File,
+	ex string,
+	join []any,
+) {
 	defer wg.Done()
-	defer t.File.Close()
-	defer t.admin(ctx, Down)
+	defer f.Close()
+	defer style.ShortFile.Errata.Recovery()
 
-	err := t.admin(ctx, Up)
-	if err != nil {
-		style.Error(err)
-		return
+	ifname := f.Name()
+	if err := admin(ifname, up); err != nil {
+		panic(err)
 	}
 
 	for ctx.Err() == nil {
-		if err = t.State(ctx, Down); err != nil {
-			style.Error(err)
-			return
+		if err := setState(ctx, ifname, down); err != nil {
+			panic(err)
 		}
 
-		conn, err := tlsx.Exchange.Connect(ctx, t.Exchange)
+		conn, err := tlsx.Connect(ctx, ex)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
 			if !errors.Is(err, fs.ErrNotExist) {
-				style.Error(err)
 				if errors.Is(err, syscall.ECONNREFUSED) {
-					return
+					panic(err)
 				}
 			}
-			t.sleep(ctx, 3*time.Second)
+			fsleep(ctx, f, 3*time.Second)
 			continue
 		}
 
 		la := conn.LocalAddr().String()
 		xname := dns0(conn)
 
+		tlsc, err := greet.Server(ctx, ex, conn)
+		if err != nil {
+			panic(egress.Unmarked(err, conn.Close))
+		}
+
 		got := new(strings.Builder)
-		args := []any{"join"}
-		if t.Prefix.IsValid() {
-			args = append(args, t.Prefix.Addr())
+		if err = tlsx.Exec(ctx, tlsc, nil, got, join...); err != nil {
+			panic(egress.Unmarked(err, tlsc.Close))
 		}
-		if err = tlsx.Exec(ctx, conn, nil, got, args...); err != nil {
-			conn.Close()
-			style.Error(err)
-			return
+		prefix, err := netip.ParsePrefix(got.String())
+		if err != nil {
+			panic(egress.Unmarked(err, tlsc.Close))
 		}
-		if !t.Prefix.IsValid() {
-			t.Prefix, err = netip.ParsePrefix(got.String())
-			if err == nil {
-				err = t.setPrefix(ctx)
-			}
-			if err != nil {
-				conn.Close()
-				style.Error(err)
-				return
-			}
+		if err = setPrefix(ifname, prefix); err != nil {
+			panic(egress.Unmarked(err, tlsc.Close))
+		}
+		if err = setState(ctx, ifname, up); err != nil {
+			panic(egress.Unmarked(err, tlsc.Close))
 		}
 
 		cctx, cancel := context.WithCancel(ctx)
+
 		var rwg sync.WaitGroup
-
-		if err = t.State(ctx, Up); err != nil {
-			conn.Close()
-			style.Error(err)
-			return
-		}
-
 		rwg.Add(1)
-		go t.reader(cctx, &rwg, conn, la, xname)
-		t.writer(ctx, conn, la, xname)
+		go fread(cctx, &rwg, f, tlsc, la, xname)
+		fwrite(ctx, tlsc, f, la, xname)
 		cancel()
 		rwg.Wait()
-		conn.Close()
+		tlsc.Close()
 	}
 }
 
-func (t *T) admin(ctx context.Context, updown bool) error {
+func admin(ifname string, updown bool) error {
 	if updown {
-		return netif.Up(t.Name())
+		return netif.Up(ifname)
 	} else {
-		return netif.Down(t.Name())
+		return netif.Down(ifname)
 	}
 }
 
-func (t *T) setPrefix(ctx context.Context) error {
+func setPrefix(ifname string, prefix netip.Prefix) error {
 	bc := netip.IPv4Unspecified()
 	// or bc := netip.AddrFrom4([4]byte{255, 255, 255, 255})
-	return netif.Add(t.Name(), t.Prefix, bc)
+	return netif.Add(ifname, prefix, bc)
 }
 
-func (t *T) State(ctx context.Context, updown bool) error {
+func setState(ctx context.Context, ifname string, updown bool) error {
 	// FIXME w/ netlink
-	if true || len(t.iproute2) == 0 {
+	if true || len(iproute2) == 0 {
 		return nil
 	}
 	s := map[bool]string{
 		false: "LOWERLAYERDOWN",
 		true:  "UP",
 	}[updown]
-	out, err := exec.CommandContext(ctx, t.iproute2, "link", "set",
-		t.Name(), "state", s).CombinedOutput()
+	out, err := exec.CommandContext(ctx, iproute2, "link", "set",
+		ifname, "state", s).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s; %w", out, err)
 	}
 	return nil
 }
 
-func (t *T) sleep(ctx context.Context, dur time.Duration) {
+func fsleep(ctx context.Context, f *os.File, dur time.Duration) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	p := poll.With(cctx, t.File)
+	p := poll.With(cctx, f)
 
 	wg.Add(1)
 	go func() {
@@ -242,32 +291,34 @@ func (t *T) sleep(ctx context.Context, dur time.Duration) {
 	}
 }
 
-func (t *T) reader(
+func fread(
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	conn net.Conn,
+	f *os.File,
+	tlsc *tls.Conn,
 	host, x string,
 ) {
 	defer wg.Done()
+	defer style.ShortFile.Errata.Recovery()
 	pg := page.New()
 	defer page.Free(pg)
-	enc := lv.NewEncoder(write.With(ctx, conn))
-	p := poll.With(ctx, t.File)
+	enc := lv.NewEncoder(write.With(ctx, tlsc))
+	p := poll.With(ctx, f)
 	for {
 		n, err := p.Read(pg)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				style.Errorln(host, err)
+				panic(err)
 			}
 			break
 		}
 		if n < tuntap.TapMin {
-			style.Error(host, "too short")
+			panic(ErrTooShort)
 			break
 		}
 		if _, err = enc.Write(pg[:n]); err != nil {
 			if !errors.Is(err, context.Canceled) {
-				style.Errorln(host, "->", x, err)
+				panic(err)
 			}
 			break
 		}
@@ -275,25 +326,29 @@ func (t *T) reader(
 	}
 }
 
-func (t *T) writer(
+func fwrite(
 	ctx context.Context,
-	conn net.Conn,
+	tlsc *tls.Conn,
+	f *os.File,
 	host, x string,
 ) {
+	defer style.ShortFile.Errata.Recovery()
+
 	pg := page.New()
 	defer page.Free(pg)
-	dec := lv.NewDecoder(poll.With(ctx, conn))
+
+	dec := lv.NewDecoder(poll.With(ctx, tlsc))
 	for {
 		n, err := dec.Read(pg)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				style.Errorln(host, err)
+				panic(err)
 			}
 			break
 		}
-		if _, err = t.Write(pg[:n]); err != nil {
+		if _, err = f.Write(pg[:n]); err != nil {
 			if !errors.Is(err, context.Canceled) {
-				style.Errorln(host, err)
+				panic(err)
 			}
 			break
 		}

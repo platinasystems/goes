@@ -65,16 +65,16 @@ func Exec(
 			defer wg.Done()
 			pg := page.New()
 			defer page.Free(pg)
+			defer enc.Encode(nil)
 			for {
 				n, err := r.Read(pg)
-				if cctx.Err() != nil {
-					break
-				}
 				if err != nil || n == 0 {
-					enc.Encode(nil)
 					break
 				}
 				if _, err = enc.Write(pg[:n]); err != nil {
+					break
+				}
+				if cctx.Err() != nil {
 					break
 				}
 			}

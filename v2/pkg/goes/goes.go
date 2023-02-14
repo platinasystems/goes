@@ -258,6 +258,17 @@ Unmarshal or scan object from text value.
 		...string,
 	) error:
 		return t(ctx, w, path, args...)
+	case func(
+		context.Context,
+		[]string,
+		...string,
+	) error:
+		return t(ctx, path, args...)
+	case func(
+		context.Context,
+		...string,
+	) error:
+		return t(ctx, args...)
 	case func() ([]byte, error):
 		text, err := t()
 		if n := len(text); err == nil && n > 0 {

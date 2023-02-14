@@ -45,11 +45,11 @@ func New(cfg *Configuration) (*os.File, error) {
 		return nil, err
 	}
 	fdp := uintptr(fdi)
-	fdc := egress.New[*os.File](func() { syscall.Close(fdi) })
+	fdc := func() error { return syscall.Close(fdi) }
 
 	err = ioctl(fdp, syscall.TUNSETIFF, ifrp)
 	if err != nil {
-		return fdc(fmt.Errorf("set iff: %w", err))
+		return nil, egress.Marked(err, fdc)
 	}
 
 	bzero(ifr.Ifrn[:])
@@ -57,7 +57,7 @@ func New(cfg *Configuration) (*os.File, error) {
 
 	err = ioctl(fdp, syscall.TUNGETIFF, ifrp)
 	if err != nil {
-		return fdc(fmt.Errorf("get iff: %w", err))
+		return nil, egress.Marked(err, fdc)
 	}
 
 	ifname := gstring(ifr.Ifrn[:])
@@ -65,32 +65,32 @@ func New(cfg *Configuration) (*os.File, error) {
 	if cfg.Owner != Unset {
 		err = ioctl(fdp, syscall.TUNSETOWNER, uintptr(cfg.Owner))
 		if err != nil {
-			return fdc(fmt.Errorf("owner: %w", err))
+			return nil, egress.Marked(err, fdc)
 		}
 	}
 
 	if cfg.Group != Unset {
 		err = ioctl(fdp, syscall.TUNSETGROUP, uintptr(cfg.Group))
 		if err != nil {
-			return fdc(fmt.Errorf("group: %w", err))
+			return nil, egress.Marked(err, fdc)
 		}
 	}
 
 	if cfg.Persist {
 		err = ioctl(fdp, syscall.TUNSETPERSIST, uintptr(1))
 		if err != nil {
-			return fdc(fmt.Errorf("persist: %w", err))
+			return nil, egress.Marked(err, fdc)
 		}
 	}
 
 	if !cfg.Link.IsAutogen() {
 		if err = setlink(ifname, cfg.Link); err != nil {
-			return fdc(err)
+			return nil, egress.Marked(err, fdc)
 		}
 	}
 
 	if err = syscall.SetNonblock(fdi, true); err != nil {
-		return fdc(fmt.Errorf("non-block: %w", err))
+		return nil, egress.Marked(err, fdc)
 	}
 
 	return os.NewFile(fdp, ifname), nil

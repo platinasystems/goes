@@ -5,85 +5,109 @@
 package registry
 
 import (
+	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/hex"
-	"net"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"io"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/container/slice"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/port"
+	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
-type entry struct {
-	cert *x509.Certificate
-	ski  string
-}
+var (
+	ErrIncomplete = errors.New("incomplete")
+	ErrInvalid    = errors.New("invalid")
+	ErrNotFound   = errors.New("not found")
+)
 
-var cut = slice.Cut[entry]
+var cut = slice.Cut[*keycert.X509]
 
 var reg = struct {
-	mutex   sync.Mutex
-	entries []entry
+	mutex sync.Mutex
+	certs []*keycert.X509
 }{}
 
-func Append(c *x509.Certificate) {
+func Admin(ctx context.Context, path []string, args ...string) error {
+	if len(args) == 0 {
+		return egress.Marked(ErrIncomplete)
+	}
 	reg.mutex.Lock()
 	defer reg.mutex.Unlock()
-	reg.entries = append(reg.entries, entry{
-		c, hex.EncodeToString(c.SubjectKeyId),
-	})
+	approve := path[len(path)-1] == "approve"
+	for i, x := range reg.certs {
+		if x.Name() == args[0] || x.SKI() == args[0] {
+			reg.certs = cut(reg.certs, uint(i), 1)
+			if approve {
+				err := certs.Subscribers.Append(x)
+				if err != nil {
+					return egress.Marked(err)
+				}
+				certs.ClientCAs.Add(x.Certificate)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("%q: %w", args[0], ErrNotFound)
 }
 
-// Extract calls f() with each registered certificate and it's hex encoded
-// subject-key-id (SKI) until f() returns true; then deregisters and returns
-// that certficate and SKI. This returns nil if f() returned false with all
-// certificates.
-func Extract(f func(*x509.Certificate, string) bool) *x509.Certificate {
+func Show(
+	ctx context.Context,
+	w io.Writer,
+	path []string,
+	args ...string,
+) error {
 	reg.mutex.Lock()
 	defer reg.mutex.Unlock()
-	for i, entry := range reg.entries {
-		if f(entry.cert, entry.ski) {
-			reg.entries = cut(reg.entries, uint(i), 1)
-			return entry.cert
-		}
+	for _, x := range reg.certs {
+		fmt.Fprint(w, x.SKI(), ": ", x.Certificate.DNSNames, "\n")
 	}
 	return nil
 }
 
-// Range calls f() with each registered certificate and SKI until f() returns
-// false.
-func Range(f func(*x509.Certificate, string) bool) {
+// Register PEM decoded input.
+func Subscribe(
+	ctx context.Context,
+	r io.Reader,
+	w io.Writer,
+	path []string,
+	args ...string,
+) error {
+	var data []byte
+
+	if len(args) == 0 {
+		return egress.Marked(ErrIncomplete)
+	}
+	if args[0] == "-" {
+		var buf bytes.Buffer
+		if _, err := io.Copy(&buf, r); err != nil {
+			return egress.Marked(err)
+		}
+		data = buf.Bytes()
+	} else {
+		data = []byte(args[0])
+	}
+
+	blk, _ := pem.Decode(data)
+	if blk == nil {
+		return egress.Marked(ErrInvalid)
+	}
+	x := new(keycert.X509)
+	err := x.UnmarshalPEM(blk)
+	if err != nil {
+		return egress.Marked(err)
+	}
 	reg.mutex.Lock()
 	defer reg.mutex.Unlock()
-	for _, entry := range reg.entries {
-		if !f(entry.cert, entry.ski) {
-			break
-		}
+	reg.certs = append(reg.certs, x)
+	self, err := certs.Self.MarshalPEM()
+	if err != nil {
+		return egress.Marked(err)
 	}
-}
-
-func Routine(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-) {
-	defer wg.Done()
-
-	addr := &net.TCPAddr{Port: port.Registry.Value()}
-	svch := make(chan *tls.Conn, 4)
-
-	wg.Add(1)
-	go greet.Routine(ctx, wg, svch, addr, &tls.Config{
-		Certificates: []tls.Certificate{certs.Self.TLS()},
-		ServerName:   certs.Self.Name(),
-		ClientAuth:   tls.RequireAnyClientCert,
-	})
-	for sv := range svch {
-		sv.Write([]byte("OK"))
-		Append(sv.ConnectionState().PeerCertificates[0])
-		sv.Close()
-	}
+	_, err = w.Write(self)
+	return egress.Marked(err)
 }

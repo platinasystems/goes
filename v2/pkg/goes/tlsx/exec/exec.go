@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -18,15 +18,18 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/greet"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
-var cut = slice.Cut[string]
-
 const Usage = `
-usage: {{.Command}} [<options>] <exchange> <command> [<args>]
+usage: {{.Command}} [<options>] <name>[@<address>][:<port>] <command> [<args>]
 Remote execution.
 {{print .Flags}}`
+
+var ErrIncomplete = errors.New("incomplete")
+
+var cut = slice.Cut[string]
 
 func Func(
 	ctx context.Context,
@@ -36,6 +39,9 @@ func Func(
 	args ...string,
 ) error {
 	fs := flags.New()
+	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
+	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
+
 	usage := func() error {
 		return template.Must(template.New("usage").
 			Parse(Usage[1:])).Execute(w, struct {
@@ -47,8 +53,6 @@ func Func(
 		})
 	}
 
-	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
-	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
 	err := fs.Parse(args)
 	if err == flags.ErrHelp {
 		return usage()
@@ -75,12 +79,12 @@ func Func(
 	}
 
 	if len(args) == 0 {
-		return errors.New("no <exchange>")
+		return ErrIncomplete
 	}
 
 	ex := args[0]
 	if args = args[1:]; len(args) == 0 {
-		return errors.New("no <command>")
+		return ErrIncomplete
 	}
 
 	var anyargs []any
@@ -104,12 +108,17 @@ func Func(
 		anyargs = append(anyargs, arg)
 	}
 
-	conn, err := tlsx.Exchange.Connect(ctx, ex)
+	conn, err := tlsx.Connect(ctx, ex)
 	if err != nil {
 		return err
 	}
 
-	if err = tlsx.Exec(ctx, conn, r, w, anyargs...); err != nil {
+	tlsc, err := greet.Server(ctx, ex, conn)
+	if err != nil {
+		return err
+	}
+
+	if err = tlsx.Exec(ctx, tlsc, r, w, anyargs...); err != nil {
 		err = fmt.Errorf("%s: %w", ex, err)
 	}
 	return err
@@ -123,22 +132,23 @@ func IPC(
 	args ...string,
 ) error {
 	const usage = `
-usage: {{.}} <command> [<args>]
-Daemon IPC.`
+usage: {{.}} [-i <file>|-] [<args>]
+Daemon IPC.
+`
 	switch path[1] {
 	case "complete":
 		return nil
 	case "help":
 		return template.Must(template.New("usage").
 			Parse(usage[1:])).
-			Execute(w, strings.Join(
-				cut(path, 1, 1), " ",
-			))
+			Execute(w, strings.Join(cut(path, 1, 1), " "))
 	}
-	last := len(path) - 1
-	cmd := path[last]
-	path[last] = "exec"
-	args = append([]string{certs.Self.Value().X509.Name, cmd},
-		args...)
-	return Func(ctx, r, w, path, args...)
+	ipc := struct{ path, args []string }{
+		path: []string{path[0], "exec"},
+		args: make([]string, 0, len(path)+len(args)),
+	}
+	ipc.args = append(ipc.args, certs.Self.Name())
+	ipc.args = append(ipc.args, path[1:]...)
+	ipc.args = append(ipc.args, args...)
+	return Func(ctx, r, w, ipc.path, ipc.args...)
 }

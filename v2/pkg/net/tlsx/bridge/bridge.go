@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/netip"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
@@ -18,51 +17,42 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx/exchange/bridge/leasing"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/lease"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/remote"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
 
+type input struct {
+	c  *tls.Conn
+	pg []byte
+}
+
 var (
-	ErrTooShort    = errors.New("len(frame) < 14")
-	ErrUnavailable = errors.New("disabled bridge")
+	ErrTooShort    = errors.New("too short")
+	ErrUnavailable = errors.New("unavailable")
 )
 
-type T struct {
-	Enabled bool
-	Leasing leasing.T
+var (
 	name    string
-	inputch chan *input
-	joinch  chan *tls.Conn
-	leavech chan *tls.Conn
-}
+	inputch = make(chan *input, 16)
+	joinch  = make(chan *tls.Conn, 4)
+	leavech = make(chan *tls.Conn, 4)
+	pool    = sync.Pool{New: func() any { return new(input) }}
+)
 
-func (t *T) Configure(prefix netip.Prefix) {
-	if prefix.IsValid() {
-		t.Leasing.Configure(prefix)
-	}
-	t.name = certs.Self.Name()
-	t.inputch = make(chan *input, 16)
-	t.joinch = make(chan *tls.Conn, 4)
-	t.leavech = make(chan *tls.Conn, 4)
-	t.Enabled = true
-}
-
-func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
+func Join(ctx context.Context, c *tls.Conn, args []string) {
 	var tenant string
-
-	t.joinch <- c
-	defer func() { t.leavech <- c }()
 
 	ra := remote.Addr(c)
 	dec := lv.NewDecoder(poll.With(ctx, c))
 	enc := lv.NewEncoder(write.With(ctx, c))
 
-	if !t.Enabled {
+	if len(name) == 0 {
 		enc.Encode(ErrUnavailable)
 		return
 	}
+
 	if cs := c.ConnectionState(); len(cs.PeerCertificates) == 0 {
 		enc.Encode(fmt.Errorf("%v: no certficate", ra))
 		return
@@ -76,16 +66,16 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 			tenant += fmt.Sprint("@", ra)
 		}
 	}
-	if !t.Leasing.Enabled {
-		enc.Encode("OK", nil)
-	} else if len(args) == 0 {
-		enc.Encode(t.Leasing.Lease(tenant).String(), nil)
-	} else if err := t.Leasing.Occupy(tenant, args[0]); err == nil {
-		enc.Encode("OK", nil)
-	} else {
+	if p, err := lease.Contract(tenant, args...); err != nil {
 		enc.Encode(err)
 		return
+	} else {
+		enc.Encode(p.String(), nil)
 	}
+
+	joinch <- c
+	defer func() { leavech <- c }()
+
 	for {
 		pg := page.New()
 		n, err := dec.Read(pg)
@@ -100,15 +90,17 @@ func (t *T) Join(ctx context.Context, c *tls.Conn, args []string) {
 			break
 		}
 		in := newinput(c, pg[:n])
-		style.Println(t.name, "<-", ra, frame.NewEth(in.pg))
-		t.inputch <- in
+		style.Println(name, "<-", ra, frame.NewEth(in.pg))
+		inputch <- in
 	}
 }
 
-func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
+func Routine(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var flood []*tls.Conn
 	lookup := make(map[uint64]*tls.Conn)
+
+	name = certs.Self.Name()
 
 	for {
 		select {
@@ -118,9 +110,9 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 				delete(lookup, k)
 			}
 			return
-		case c := <-t.joinch:
+		case c := <-joinch:
 			flood = append(flood, c)
-		case c := <-t.leavech:
+		case c := <-leavech:
 			for i, v := range flood {
 				if v == c {
 					copy(flood[i:], flood[i+1:])
@@ -133,18 +125,18 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 					break
 				}
 			}
-		case in := <-t.inputch:
+		case in := <-inputch:
 			eth := frame.NewEth(in.pg)
 			if eth.ShouldLearn() {
 				lookup[eth.SA()] = in.c
 			}
 			da := eth.DA()
 			if c, ok := lookup[da]; ok {
-				t.send(ctx, c, in)
+				send(ctx, c, in)
 			} else {
 				for _, c := range flood {
 					if c != in.c {
-						t.send(ctx, c, in)
+						send(ctx, c, in)
 					}
 				}
 			}
@@ -153,22 +145,15 @@ func (t *T) Routine(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (t *T) send(ctx context.Context, c *tls.Conn, in *input) {
+func send(ctx context.Context, c *tls.Conn, in *input) {
 	ra := remote.Addr(c)
 	_, err := lv.NewEncoder(write.With(ctx, c)).Write(in.pg)
 	if err != nil {
-		style.Errorln(t.name, "->", ra, err)
+		style.Errorln(name, "->", ra, err)
 	} else {
-		style.Println(t.name, "->", ra, frame.NewEth(in.pg))
+		style.Println(name, "->", ra, frame.NewEth(in.pg))
 	}
 }
-
-type input struct {
-	c  *tls.Conn
-	pg []byte
-}
-
-var pool = sync.Pool{New: func() any { return new(input) }}
 
 func newinput(c *tls.Conn, pg []byte) *input {
 	in := pool.Get().(*input)

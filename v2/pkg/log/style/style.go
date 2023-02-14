@@ -55,6 +55,12 @@ var (
 	Verbose = flag.Bool("verbose", false, "Print notices.")
 )
 
+func (style Style) Recovery() {
+	if r := recover(); r != nil {
+		style.Output(3, fmt.Sprint(r))
+	}
+}
+
 // Log Plain and ShortFile messages to System logger instead of Std{out|err}.
 func System() {
 	Plain.Errata.System()

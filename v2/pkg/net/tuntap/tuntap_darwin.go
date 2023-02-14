@@ -43,13 +43,13 @@ func New(cfg *Configuration) (*os.File, error) {
 		return nil, fmt.Errorf("socket: %v", err)
 	}
 	fdp := uintptr(fdi)
-	fdc := egress.New[*os.File](func() { syscall.Close(fdi) })
+	fdc := func() error { return syscall.Close(fdi) }
 
 	ci := newCtlInfo()
 
 	err = ioctl(fdp, CTLIOCGINFO, uintptr(unsafe.Pointer(ci)))
 	if err != nil {
-		return fdc(fmt.Errorf("CTLIOCGINFO: %w", err))
+		return nil, egress.Marked(err, fdc)
 	}
 
 	sac := &SockaddrCtl{
@@ -62,7 +62,8 @@ func New(cfg *Configuration) (*os.File, error) {
 	_, _, errno := syscall.RawSyscall(syscall.SYS_CONNECT, fdp,
 		uintptr(unsafe.Pointer(sac)), SizeofSockaddrCtl)
 	if errno != 0 {
-		return fdc(os.NewSyscallError("connect", errno))
+		err = os.NewSyscallError("connect", errno)
+		return nil, egress.Marked(err, fdc)
 	}
 
 	name := make([]byte, IFNAMSIZ, IFNAMSIZ)
@@ -71,7 +72,8 @@ func New(cfg *Configuration) (*os.File, error) {
 		SYSPROTO_CONTROL, UTUN_OPT_IFNAME,
 		uintptr(unsafe.Pointer(&name[0])), namsizp, 0)
 	if errno != 0 {
-		return fdc(os.NewSyscallError("ifname", errno))
+		err = os.NewSyscallError("ifname", errno)
+		return nil, egress.Marked(err, fdc)
 	}
 
 	for i, b := range name {
@@ -82,7 +84,7 @@ func New(cfg *Configuration) (*os.File, error) {
 	}
 
 	if err = syscall.SetNonblock(fdi, true); err != nil {
-		return fdc(fmt.Errorf("non-block: %w", err))
+		return nil, egress.Marked(err, fdc)
 	}
 
 	return os.NewFile(fdp, string(name)), nil
