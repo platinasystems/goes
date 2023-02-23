@@ -23,9 +23,12 @@ import (
 )
 
 const Usage = `
-usage: {{.Command}} [<options>] <name>[@<address>][:<port>] <command> [<args>]
+usage: {{.Command}} [<options>] <exchange> <command> [<args>]
 Remote execution.
-{{print .Flags}}`
+{{print .Flags}}
+<exchange>
+	<name>[@<dns|ip4|\[ip6\]>][:<port>]
+`
 
 var ErrIncomplete = errors.New("incomplete")
 

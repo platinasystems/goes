@@ -51,13 +51,19 @@ func Server(ctx context.Context, name string, conn net.Conn) (
 		},
 		RootCAs: certs.RootCAs.Clone(),
 	}
-	if i := strings.IndexAny(name, "@:"); i > 0 {
-		name = name[:i]
-	}
-	if match, err := certs.Match(name); err == nil {
-		cfg.ServerName = match.Name()
+	if i := strings.Index(name, "@"); i == 0 {
+		cfg.ServerName = certs.Self.Name()
 	} else {
-		return nil, fmt.Errorf("%s: %w", name, err)
+		if i > 0 {
+			name = name[:i]
+		} else if i = strings.Index(name, ":"); i > 0 {
+			name = name[:i]
+		}
+		if match, err := certs.Match(name); err == nil {
+			cfg.ServerName = match.Name()
+		} else {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
 	}
 	cl := tls.Client(conn, cfg)
 	return cl, cl.HandshakeContext(ctx)

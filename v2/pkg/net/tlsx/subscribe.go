@@ -16,12 +16,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 )
 
-var (
-	ErrInvalid = errors.New("invalid server response")
-	Suppressed = []error{
-		context.Canceled,
-	}
-)
+var ErrInvalidResponse = errors.New("invalid server response")
+var Suppressed = []error{context.Canceled}
 
 func Subscribe(ctx context.Context, ex string) error {
 	data, err := certs.Self.MarshalPEM()
@@ -46,7 +42,7 @@ func Subscribe(ctx context.Context, ex string) error {
 	x := new(keycert.X509)
 	blk, _ := pem.Decode(w.Bytes())
 	if blk == nil {
-		return egress.Marked(ErrInvalid)
+		return egress.Marked(ErrInvalidResponse)
 	}
 	if err := x.UnmarshalPEM(blk); err != nil {
 		return egress.Marked(err)

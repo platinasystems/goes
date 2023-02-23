@@ -41,14 +41,12 @@ import (
 )
 
 const Usage = `
-usage: {{.}} tap [-p <port>] <name>[@<address>][:<port>] [-a <address>]...
-Open one or more taps to named exchanges.
+usage: {{.Command}} tap [<options>] <exchange>
+Open tap to named exchange or self @ given address.
 
-  -a <address>
-	Static tap interface address.
-  -p <port>
-	If non-zero, run command service at port after opening tap(s).
-`
+<exchange>
+	[<name]>[@<dns|ip4|\[ip6\]>][:<port>]
+{{print .Flags}}`
 
 const (
 	down = false
@@ -76,12 +74,24 @@ func Daemon(
 		style.System()
 	}
 
+	style.Note(args)
+	style.Print(args)
+	style.Error(args)
+
+	var addr net.IP
 	fs := flags.New()
 	port := fs.Uint("p", 0, "non-zero service port")
+	fs.TextVar(&addr, "a", addr, "static tap address")
 
 	usage := func() error {
 		return template.Must(template.New("usage").Parse(Usage[1:])).
-			Execute(style.Plain.Notice.Writer(), path[0])
+			Execute(style.Plain.Notice.Writer(), struct {
+				Command string
+				Flags   flags.Flags
+			}{
+				strings.Join(path, " "),
+				fs,
+			})
 	}
 
 	switch path[1] {
@@ -98,13 +108,16 @@ func Daemon(
 	} else if err != nil {
 		return err
 	}
-	args = fs.Args()
+	if args = fs.Args(); len(args) == 0 {
+		return egress.Marked(ErrIncomplete)
+	}
+	ex := args[0]
 
 	if !tuntap.CanTAP {
-		return ErrCantTap
+		return egress.Marked(ErrCantTap)
 	}
 	if tuntap.HasPI {
-		return ErrHasPI
+		return egress.Marked(ErrHasPI)
 	}
 	if s, err := exec.LookPath("ip"); err == nil {
 		iproute2 = s
@@ -114,40 +127,28 @@ func Daemon(
 	defer wg.Wait()
 
 	ski := certs.Self.TLS().Leaf.SubjectKeyId
-	for i := 0; len(args) > 0; i++ {
-		ex := args[0]
-		ha := make(net.HardwareAddr, 6)
-		hash := fnv.New64()
-		hash.Write([]byte{byte(i << 1)}) // shift over muti-cast
-		hash.Write(ski)
-		copy(ha, hash.Sum(nil))
-		ha[0] &^= 1 // mask muti-cast
-		join := []any{"join", ""}
-		if len(args) > 1 && args[1] == "-a" {
-			if len(args) < 2 {
-				return egress.Marked(ErrIncomplete)
-			}
-			if ipa, err := netip.ParseAddr(args[2]); err != nil {
-				return egress.Marked(err)
-			} else {
-				join[1] = ipa.String()
-			}
-			args = args[3:]
-		} else {
-			args = args[1:]
-			join = join[:1]
-		}
-		f, err := tuntap.New(&tuntap.Configuration{
-			Unit:  uint(i),
-			IsTap: true,
-			Link:  tuntap.Link{ha},
-		})
-		if err != nil {
-			return egress.Marked(err)
-		}
-		wg.Add(1)
-		go routine(ctx, &wg, f, ex, join)
+	ha := make(net.HardwareAddr, 6)
+	hash := fnv.New64()
+	hash.Write(ski)
+	copy(ha, hash.Sum(nil))
+	ha[0] &^= 1 // mask muti-cast
+	join := []any{"join", ""}
+	if addr.IsUnspecified() {
+		join = join[:1]
+	} else {
+		join[1] = addr.String()
 	}
+	f, err := tuntap.New(&tuntap.Configuration{
+		Unit:  0,
+		IsTap: true,
+		Link:  tuntap.Link{ha},
+	})
+	if err != nil {
+		return egress.Marked(err)
+	}
+	style.Noteln(ex, join)
+	wg.Add(1)
+	go routine(ctx, &wg, f, ex, join)
 	if *port != 0 {
 		wg.Add(1)
 		go service.Routine(ctx, &wg, *port)

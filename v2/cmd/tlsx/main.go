@@ -30,6 +30,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/certs"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/dir"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/tap"
+	"github.com/platinasystems/goes/v2/pkg/net/tlsx/wait"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 )
@@ -39,6 +40,7 @@ func main() {
 	daemons := map[string]any{
 		"exchange": exchange.Daemon,
 		"tap":      tap.Daemon,
+		"wait":     wait.Daemon,
 	}
 	if program.IsKoApp() {
 		// start daemons directly instead of through detached child
