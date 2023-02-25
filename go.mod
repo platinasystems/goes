@@ -31,8 +31,7 @@ require (
 	github.com/satori/uuid v1.2.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/ulikunitz/xz v0.5.8
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
+	golang.org/x/crypto v0.1.0
 	gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 // indirect
 )
 
