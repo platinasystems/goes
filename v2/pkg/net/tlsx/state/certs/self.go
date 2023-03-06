@@ -22,8 +22,8 @@ var Self = TLS{cache.New[keycert.TLS](func(p *keycert.TLS) error {
 	return p.LoadX509KeyPair(filename.Cert(), filename.PrivateKey())
 })}
 
-func (t TLS) Add(cas *x509.CertPool) {
-	t.Mutex(func(p *keycert.TLS) error {
+func (t TLS) Add(cas *x509.CertPool) error {
+	return t.Mutex(func(p *keycert.TLS) error {
 		if c := p.X509.Certificate; c != nil {
 			cas.AddCert(c)
 		}
@@ -83,24 +83,24 @@ func (t TLS) Match(nameOrSKI string) (match *keycert.X509, err error) {
 	return
 }
 
-func (t TLS) Name() (s string) {
-	t.Mutex(func(p *keycert.TLS) error {
+func (t TLS) Name() (s string, err error) {
+	err = t.Mutex(func(p *keycert.TLS) error {
 		s = p.Name()
 		return nil
 	})
 	return
 }
 
-func (t TLS) SKI() (s string) {
-	t.Mutex(func(p *keycert.TLS) error {
+func (t TLS) SKI() (s string, err error) {
+	err = t.Mutex(func(p *keycert.TLS) error {
 		s = p.SKI()
 		return nil
 	})
 	return
 }
 
-func (t TLS) TLS() (c tls.Certificate) {
-	t.Mutex(func(p *keycert.TLS) error {
+func (t TLS) TLS() (c tls.Certificate, err error) {
+	err = t.Mutex(func(p *keycert.TLS) error {
 		c = p.Certificate
 		return nil
 	})

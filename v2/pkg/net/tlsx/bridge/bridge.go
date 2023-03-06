@@ -15,6 +15,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/lease"
@@ -44,6 +45,11 @@ var (
 func Join(ctx context.Context, c *tls.Conn, args []string) {
 	var tenant string
 
+	self, err := certs.Self.SKI()
+	if err != nil {
+		panic(egress.Marked(err))
+	}
+
 	ra := remote.Addr(c)
 	dec := lv.NewDecoder(poll.With(ctx, c))
 	enc := lv.NewEncoder(write.With(ctx, c))
@@ -62,7 +68,7 @@ func Join(ctx context.Context, c *tls.Conn, args []string) {
 	} else {
 		tenant = cs.PeerCertificates[0].DNSNames[0]
 		ski := hex.EncodeToString(cs.PeerCertificates[0].SubjectKeyId)
-		if ski == certs.Self.SKI() {
+		if ski == self {
 			tenant += fmt.Sprint("@", ra)
 		}
 	}
@@ -100,7 +106,10 @@ func Routine(ctx context.Context, wg *sync.WaitGroup) {
 	var flood []*tls.Conn
 	lookup := make(map[uint64]*tls.Conn)
 
-	name = certs.Self.Name()
+	var err error
+	if name, err = certs.Self.Name(); err != nil {
+		panic(egress.Marked(err))
+	}
 
 	for {
 		select {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/platinasystems/goes/v2/pkg/container/slice"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
@@ -67,9 +68,10 @@ func Func(
 	switch path[1] {
 	case "complete":
 		if len(args) <= 1 {
-			complete.Last(w, args, fs.FlagSet,
-				certs.Self.Name(),
-				certs.Subscriptions.Names())
+			if name, err := certs.Self.Name(); err == nil {
+				complete.Last(w, args, fs.FlagSet, name,
+					certs.Subscriptions.Names())
+			}
 			return nil
 		}
 		args = append([]string{path[1]}, args...)
@@ -150,7 +152,11 @@ Daemon IPC.
 		path: []string{path[0], "exec"},
 		args: make([]string, 0, len(path)+len(args)),
 	}
-	ipc.args = append(ipc.args, certs.Self.Name())
+	name, err := certs.Self.Name()
+	if err != nil {
+		return egress.Marked(err)
+	}
+	ipc.args = append(ipc.args, name)
 	ipc.args = append(ipc.args, path[1:]...)
 	ipc.args = append(ipc.args, args...)
 	return Func(ctx, r, w, ipc.path, ipc.args...)

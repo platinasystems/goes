@@ -19,11 +19,19 @@ import (
 )
 
 func Client(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
+	self, err := certs.Self.TLS()
+	if err != nil {
+		return nil, err
+	}
+	name, err := certs.Self.Name()
+	if err != nil {
+		return nil, err
+	}
 	sv := tls.Server(conn, &tls.Config{
 		Certificates: []tls.Certificate{
-			certs.Self.TLS(),
+			self,
 		},
-		ServerName: certs.Self.Name(),
+		ServerName: name,
 		ClientAuth: tls.RequireAndVerifyClientCert,
 		ClientCAs:  certs.ClientCAs.Clone(),
 	})
@@ -34,6 +42,14 @@ func Client(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
 func Server(ctx context.Context, name string, conn net.Conn) (
 	*tls.Conn, error,
 ) {
+	self, err := certs.Self.TLS()
+	if err != nil {
+		return nil, err
+	}
+	if name, err = certs.Self.Name(); err != nil {
+		return nil, err
+	}
+
 	ob := page.New()
 	defer page.Free(ob)
 
@@ -46,13 +62,11 @@ func Server(ctx context.Context, name string, conn net.Conn) (
 	}
 
 	cfg := &tls.Config{
-		Certificates: []tls.Certificate{
-			certs.Self.TLS(),
-		},
-		RootCAs: certs.RootCAs.Clone(),
+		Certificates: []tls.Certificate{self},
+		RootCAs:      certs.RootCAs.Clone(),
 	}
 	if i := strings.Index(name, "@"); i == 0 {
-		cfg.ServerName = certs.Self.Name()
+		cfg.ServerName = name
 	} else {
 		if i > 0 {
 			name = name[:i]

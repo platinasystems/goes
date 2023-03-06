@@ -74,10 +74,6 @@ func Daemon(
 		style.System()
 	}
 
-	style.Note(args)
-	style.Print(args)
-	style.Error(args)
-
 	var addr net.IP
 	fs := flags.New()
 	port := fs.Uint("p", 0, "non-zero service port")
@@ -123,30 +119,41 @@ func Daemon(
 		iproute2 = s
 	}
 
-	var wg sync.WaitGroup
-	defer wg.Wait()
+	self, err := certs.Self.TLS()
+	if err != nil {
+		return egress.Marked(err)
+	}
 
-	ski := certs.Self.TLS().Leaf.SubjectKeyId
-	ha := make(net.HardwareAddr, 6)
 	hash := fnv.New64()
-	hash.Write(ski)
-	copy(ha, hash.Sum(nil))
-	ha[0] &^= 1 // mask muti-cast
+	hash.Write(self.Leaf.SubjectKeyId)
+
+	cfg := &tuntap.Configuration{
+		Unit:  0,
+		IsTap: true,
+		Link: tuntap.Link{
+			HardwareAddr: make(net.HardwareAddr, 6),
+		},
+	}
+
+	copy(cfg.Link.HardwareAddr, hash.Sum(nil))
+	cfg.Link.HardwareAddr[0] &^= 1 // mask muti-cast
+
 	join := []any{"join", ""}
 	if addr.IsUnspecified() {
 		join = join[:1]
 	} else {
 		join[1] = addr.String()
 	}
-	f, err := tuntap.New(&tuntap.Configuration{
-		Unit:  0,
-		IsTap: true,
-		Link:  tuntap.Link{ha},
-	})
+
+	f, err := tuntap.New(cfg)
 	if err != nil {
 		return egress.Marked(err)
 	}
 	style.Noteln(ex, join)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	wg.Add(1)
 	go routine(ctx, &wg, f, ex, join)
 	if *port != 0 {

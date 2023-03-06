@@ -6,7 +6,6 @@ package dir
 
 import (
 	"flag"
-	"os"
 	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/os/program"
@@ -14,15 +13,9 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
-const VarRunKO = "/var/run/ko"
-
 var (
 	Default = cache.New[string](func(p *string) error {
-		if _, err := os.Stat(VarRunKO); err == nil {
-			*p = VarRunKO
-		} else {
-			filepath.Join(xdg.StateHome.Value(), program.Base())
-		}
+		*p = filepath.Join(xdg.StateHome.Value(), program.Base())
 		return nil
 	})
 	Flag = flag.String("state", Default.Value(), "Certificate directory.")

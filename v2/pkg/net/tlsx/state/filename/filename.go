@@ -5,54 +5,36 @@
 package filename
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/dir"
 	"github.com/platinasystems/goes/v2/pkg/sync/cache"
 )
 
-type Type = *cache.Cache[string]
-
 var Cert = cache.New[string](func(p *string) error {
-	*p = filename("cert.pem")
-	return nil
-}).Value
-
-var Hosts = cache.New[string](func(p *string) error {
-	*p = filename("hosts.json")
+	*p = filename("TLSX_CERT_FILE", "cert.pem")
 	return nil
 }).Value
 
 var PrivateKey = cache.New[string](func(p *string) error {
-	*p = filename("key.pem")
-	return nil
-}).Value
-
-var Services = cache.New[string](func(p *string) error {
-	*p = filename("services.json")
+	*p = filename("TLSX_KEY_FILE", "key.pem")
 	return nil
 }).Value
 
 var Subscribers = cache.New[string](func(p *string) error {
-	*p = filename("subscribers.pem")
+	*p = filename("TLSX_SUBSCRIBERS_FILE", "subscribers.pem")
 	return nil
 }).Value
 
 var Subscriptions = cache.New[string](func(p *string) error {
-	*p = filename("subscriptions.pem")
+	*p = filename("TLSX_SUBSCRIPTIONS_FILE", "subscriptions.pem")
 	return nil
 }).Value
 
-func filename(base string) string {
-	return filepath.Join(dir.Name.Value(), base)
+func filename(env, base string) (fn string) {
+	if fn = os.Getenv(env); len(fn) == 0 {
+		fn = filepath.Join(dir.Name.Value(), base)
+	}
+	return
 }
-
-var ExchangeAddress = cache.New[string](func(p *string) error {
-	*p = filename("exchange_address.json")
-	return nil
-}).Value
-
-var RPCAddress = cache.New[string](func(p *string) error {
-	*p = filename("rpc_address.json")
-	return nil
-}).Value

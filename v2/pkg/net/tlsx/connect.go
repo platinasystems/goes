@@ -12,7 +12,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 )
 
 const Port = 8003
@@ -76,21 +76,18 @@ func Connect(ctx context.Context, host string) (net.Conn, error) {
 		}
 	}
 
-	style.Noteln("ips", ips)
 	var dl net.Dialer
 	for _, ip := range ips {
 		tcpa.IP = ip.IP
-		style.Noteln("connect", tcpa.IP, "...")
 		conn, err := dl.DialContext(ctx, tcpa.Network(), tcpa.String())
 		if err == nil {
-			style.Noteln("connected", tcpa.IP)
 			return conn, nil
 		} else if errors.Is(err, syscall.ECONNREFUSED) {
-			return nil, fmt.Errorf("%v: %w", ip.IP, err)
+			err = fmt.Errorf("%v: %w", ip.IP, err)
+			return nil, egress.Marked(err)
 		}
 	}
-	style.Error(host, ": ", ErrUnavailable)
-	return nil, fmt.Errorf("%s: %w", host, ErrUnavailable)
+	return nil, egress.Marked(fmt.Errorf("%s: %w", host, ErrUnavailable))
 }
 
 func parseIP(s string) (net.IP, error) {
