@@ -19,12 +19,7 @@ import (
 	"os"
 )
 
-const (
-	BlockTypeECDSA   = "ECDSA PRIVATE KEY"
-	BlockTypeED25519 = "ED25519 PRIVATE KEY"
-	BlockTypeRSA     = "RSA PRIVATE KEY"
-	KeyFileFlags     = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-)
+const KeyFileFlags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 
 type PrivateKey interface {
 	Public() crypto.PublicKey
@@ -42,29 +37,21 @@ func NewPrivateKey(alg x509.SignatureAlgorithm) (
 	k PrivateKey, block *pem.Block, err error,
 ) {
 	random := rand.Reader
-	kbt := "PRIVATE KEY"
 	switch alg {
 	case x509.PureEd25519:
 		_, k, err = ed25519.GenerateKey(random)
-		kbt = BlockTypeED25519
 	case x509.ECDSAWithSHA256:
 		k, err = ecdsa.GenerateKey(elliptic.P256(), random)
-		kbt = BlockTypeECDSA
 	case x509.ECDSAWithSHA384:
 		k, err = ecdsa.GenerateKey(elliptic.P384(), random)
-		kbt = BlockTypeECDSA
 	case x509.ECDSAWithSHA512:
 		k, err = ecdsa.GenerateKey(elliptic.P521(), random)
-		kbt = BlockTypeECDSA
 	case x509.SHA256WithRSA:
 		k, err = rsa.GenerateKey(random, 256)
-		kbt = BlockTypeRSA
 	case x509.SHA384WithRSA:
 		k, err = rsa.GenerateKey(random, 384)
-		kbt = BlockTypeRSA
 	case x509.SHA512WithRSA:
 		k, err = rsa.GenerateKey(random, 512)
-		kbt = BlockTypeRSA
 	default:
 		err = ErrUnsupportedSignatureAlgorithm
 	}
@@ -76,7 +63,7 @@ func NewPrivateKey(alg x509.SignatureAlgorithm) (
 		return
 	}
 	block = &pem.Block{
-		Type:    kbt,
+		Type:    "PRIVATE KEY",
 		Headers: map[string]string{},
 		Bytes:   pkcs,
 	}
