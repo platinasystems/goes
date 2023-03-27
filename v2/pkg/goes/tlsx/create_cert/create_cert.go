@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag/flags"
 	"github.com/platinasystems/goes/v2/pkg/goes/complete"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx/state/dir"
@@ -99,30 +100,36 @@ func Func(
 		return fmt.Errorf("unexpected: %v", args)
 	}
 
+	if len(*name) == 0 {
+		return errors.New("no name")
+	}
+
 	dnsa := strings.Split(*dnsnames, ",")
 	if len(dnsa) == 0 || len(dnsa[0]) == 0 {
 		return errors.New("no DNS names")
 	}
 
-	k, block, err := keycert.NewPrivateKey(alg.Value())
-	if err != nil {
-		return err
-	}
-	if err = dir.Mk(); err != nil {
-		return err
-	}
-	pemdata := pem.EncodeToMemory(block)
-	err = ioutil.WriteFile(filename.PrivateKey(), pemdata, 0600)
-	if err != nil {
-		return err
-	}
 	var emails []string
 	if len(*email) > 0 {
 		emails = strings.Split(*email, ",")
 	}
-	if len(*name) == 0 {
-		return errors.New("no name")
+
+	err := dir.Mk()
+	if egress.Marked(err); err != nil {
+		return err
 	}
+
+	k, block, err := keycert.NewPrivateKey(alg.Value())
+	if egress.Marked(err); err != nil {
+		return err
+	}
+
+	pemdata := pem.EncodeToMemory(block)
+	err = ioutil.WriteFile(filename.PrivateKey(), pemdata, 0600)
+	if egress.Marked(err); err != nil {
+		return err
+	}
+
 	now := time.Now()
 	expire := now.Add(*dur)
 	template := x509.Certificate{
@@ -144,7 +151,7 @@ func Func(
 		},
 	}
 	_, block, err = keycert.NewX509Certificate(k, &template)
-	if err != nil {
+	if egress.Marked(err); err != nil {
 		return err
 	}
 	pemdata = pem.EncodeToMemory(block)

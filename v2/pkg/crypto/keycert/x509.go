@@ -17,6 +17,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
@@ -173,13 +174,13 @@ func NewX509Certificate(k PrivateKey, temp *x509.Certificate) (
 ) {
 	random := rand.Reader
 	hn, err := host.Name.ValErr()
-	if err != nil {
+	if err = egress.Marked(err); err != nil {
 		return
 	}
 	if temp.SerialNumber == nil {
 		max := big.NewInt(math.MaxInt64)
 		temp.SerialNumber, err = rand.Int(random, max)
-		if err != nil {
+		if err = egress.Marked(err); err != nil {
 			return
 		}
 	}
@@ -196,10 +197,11 @@ func NewX509Certificate(k PrivateKey, temp *x509.Certificate) (
 		temp.NotAfter = temp.NotBefore.Add(10 * 365 * 24 * time.Hour)
 	}
 	der, err := x509.CreateCertificate(random, temp, temp, k.Public(), k)
-	if err != nil {
+	if err = egress.Marked(err); err != nil {
 		return
 	}
-	if cert, err = x509.ParseCertificate(der); err != nil {
+	cert, err = x509.ParseCertificate(der)
+	if err = egress.Marked(err); err != nil {
 		return
 	}
 	block = &pem.Block{
