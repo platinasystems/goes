@@ -46,12 +46,8 @@ func NewPrivateKey(alg x509.SignatureAlgorithm) (
 		k, err = ecdsa.GenerateKey(elliptic.P384(), random)
 	case x509.ECDSAWithSHA512:
 		k, err = ecdsa.GenerateKey(elliptic.P521(), random)
-	case x509.SHA256WithRSA:
-		k, err = rsa.GenerateKey(random, 256)
-	case x509.SHA384WithRSA:
-		k, err = rsa.GenerateKey(random, 384)
-	case x509.SHA512WithRSA:
-		k, err = rsa.GenerateKey(random, 512)
+	case x509.SHA256WithRSA, x509.SHA384WithRSA, x509.SHA512WithRSA:
+		k, err = rsa.GenerateKey(random, 4096)
 	default:
 		err = ErrUnsupportedSignatureAlgorithm
 	}
