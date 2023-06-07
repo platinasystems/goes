@@ -9,6 +9,7 @@ import (
 	"errors"
 	"html/template"
 	"net/netip"
+	"strings"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/container/slice"
@@ -22,7 +23,7 @@ import (
 )
 
 const Usage = `
-usage: {{.}} exchange [-p <port>] <prefix>
+usage: {{.}} [-p <port>] <prefix>
 Start exchange at <port> (default 8003).
 `
 
@@ -33,17 +34,14 @@ func Daemon(
 	path []string,
 	args ...string,
 ) error {
-	if !program.IsKoApp() {
-		style.System()
-	}
-
 	fs := flags.New()
 	port := fs.Uint("p", 8003, "service port")
 	fs.BoolVar(&certs.Restricted, "r", false, "restrict clients to self")
 
 	usage := func() error {
 		return template.Must(template.New("usage").Parse(Usage[1:])).
-			Execute(style.Plain.Notice.Writer(), path[0])
+			Execute(style.Plain.Notice.Writer(),
+				strings.Join(path, " "))
 	}
 
 	switch path[1] {
@@ -52,7 +50,12 @@ func Daemon(
 	case "help":
 		copy(path[1:], path[2:])
 		path = slice.Cut[string](path, 1, 1)
+		path[1] = "start" // replace "daemon"
 		return usage()
+	default:
+		if !program.IsKoApp() {
+			style.System()
+		}
 	}
 
 	err := fs.Parse(args)

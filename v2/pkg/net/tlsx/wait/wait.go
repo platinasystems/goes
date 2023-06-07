@@ -6,6 +6,7 @@ package wait
 
 import (
 	"context"
+	"strings"
 	"text/template"
 
 	"github.com/platinasystems/goes/v2/pkg/container/slice"
@@ -14,7 +15,7 @@ import (
 )
 
 const Usage = `
-usage: {{.}} wait
+usage: {{.}}
 Wait until kill signal to hold container namespace open.
 `
 
@@ -23,13 +24,10 @@ func Daemon(
 	path []string,
 	args ...string,
 ) error {
-	if !program.IsKoApp() {
-		style.System()
-	}
-
 	usage := func() error {
 		return template.Must(template.New("usage").Parse(Usage[1:])).
-			Execute(style.Plain.Notice.Writer(), path[0])
+			Execute(style.Plain.Notice.Writer(),
+				strings.Join(path, " "))
 	}
 
 	switch path[1] {
@@ -37,7 +35,12 @@ func Daemon(
 		return nil
 	case "help":
 		path = slice.Cut[string](path, 1, 1)
+		path[1] = "start" // replace "daemon"
 		return usage()
+	default:
+		if !program.IsKoApp() {
+			style.System()
+		}
 	}
 
 	<-ctx.Done()

@@ -41,11 +41,11 @@ import (
 )
 
 const Usage = `
-usage: {{.Command}} tap [<options>] <exchange>
+usage: {{.Command}} [<options>] <exchange>
 Open tap to named exchange or self @ given address.
 
 <exchange>
-	[<name]>[@<dns|ip4|\[ip6\]>][:<port>]
+	[<name>][@<dns|ip4|\[ip6\]>][:<port>]
 {{print .Flags}}`
 
 const (
@@ -70,10 +70,6 @@ func Daemon(
 	path []string,
 	args ...string,
 ) error {
-	if !program.IsKoApp() {
-		style.System()
-	}
-
 	var addr net.IP
 	fs := flags.New()
 	port := fs.Uint("p", 0, "non-zero service port")
@@ -95,7 +91,12 @@ func Daemon(
 		return nil
 	case "help":
 		path = slice.Cut[string](path, 1, 1)
+		path[1] = "start" // replace "daemon"
 		return usage()
+	default:
+		if !program.IsKoApp() {
+			style.System()
+		}
 	}
 
 	err := fs.Parse(args)
