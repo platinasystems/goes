@@ -6,6 +6,7 @@ package tap
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -63,8 +64,8 @@ var (
 // Path to iproute2 command if available.
 var iproute2 string
 
-// The Tap interface address (aka. MAC) is a hash of the unit number (order of
-// creation) and the subject-key-id of the Self certificate.
+// The default tap link address (aka. MAC) is a hash of the unit number and the
+// subject-key-id of the Self certificate.
 func Daemon(
 	ctx context.Context,
 	path []string,
@@ -72,8 +73,11 @@ func Daemon(
 ) error {
 	var addr net.IP
 	fs := flags.New()
+	fs.TextVar(&addr, "a", addr, "static network address")
 	port := fs.Uint("p", 0, "non-zero service port")
-	fs.TextVar(&addr, "a", addr, "static tap address")
+	randll := fs.Bool("r", false,
+		"use random link address instead of hashed cert SKI")
+	unit := fs.Uint("u", 0, "unit number")
 
 	usage := func() error {
 		return template.Must(template.New("usage").Parse(Usage[1:])).
@@ -125,19 +129,24 @@ func Daemon(
 		return egress.Marked(err)
 	}
 
-	hash := fnv.New64()
-	hash.Write(self.Leaf.SubjectKeyId)
-
 	cfg := &tuntap.Configuration{
-		Unit:  0,
+		Unit:  *unit,
 		IsTap: true,
 		Link: tuntap.Link{
 			HardwareAddr: make(net.HardwareAddr, 6),
 		},
 	}
 
-	copy(cfg.Link.HardwareAddr, hash.Sum(nil))
-	cfg.Link.HardwareAddr[0] &^= 1 // mask muti-cast
+	if *randll {
+		rand.Read([]byte(cfg.Link.HardwareAddr))
+	} else {
+		hash := fnv.New64()
+		hash.Write(self.Leaf.SubjectKeyId)
+		fmt.Fprint(hash, *unit)
+		copy(cfg.Link.HardwareAddr, hash.Sum(nil))
+	}
+
+	cfg.Link.HardwareAddr[0] &^= 1 // mask multi-cast
 
 	join := []any{"join", ""}
 	if addr.IsUnspecified() {
