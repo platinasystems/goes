@@ -39,15 +39,40 @@ func Client(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
 }
 
 // Send hello to server then handshake and return TLS connection.
-func Server(ctx context.Context, name string, conn net.Conn) (
-	*tls.Conn, error,
+//	host: [<name>][@<dns|ip4|[ipv6]>][:<port>]	(default self)
+func Server(ctx context.Context, host string, conn net.Conn) (
+	cl *tls.Conn, err error,
 ) {
+	var sname string
+	if len(host) == 0 {
+		if sname, err = certs.Self.Name(); err != nil {
+			return
+		}
+	} else {
+		at := strings.Index(host, "@")
+		colon := strings.LastIndex(host, ":")
+		if at < 0 {
+			if colon > 0 { // <name>:<port>
+				host = host[:colon]
+			}
+		} else if at > 0 { // <name>@...
+			host = host[:at]
+		} else if colon > 0 { // @<dns>:<port>
+			host = host[1:colon]
+		} else { // @<dns>
+			host = host[1:]
+		}
+		if match, merr := certs.Match(host); merr != nil {
+			err = fmt.Errorf("%s: %w", host, merr)
+			return
+		} else {
+			sname = match.Name()
+		}
+	}
+
 	self, err := certs.Self.TLS()
 	if err != nil {
-		return nil, err
-	}
-	if name, err = certs.Self.Name(); err != nil {
-		return nil, err
+		return
 	}
 
 	ob := page.New()
@@ -57,28 +82,13 @@ func Server(ctx context.Context, name string, conn net.Conn) (
 	enc := lv.NewEncoder(write.With(ctx, conn))
 
 	enc.Encode("hello", nil)
-	if _, err := dec.Read(ob); err != nil {
-		return nil, err
+	if _, err = dec.Read(ob); err == nil {
+		cl = tls.Client(conn, &tls.Config{
+			Certificates: []tls.Certificate{self},
+			RootCAs:      certs.RootCAs.Clone(),
+			ServerName:   sname,
+		})
+		err = cl.HandshakeContext(ctx)
 	}
-
-	cfg := &tls.Config{
-		Certificates: []tls.Certificate{self},
-		RootCAs:      certs.RootCAs.Clone(),
-	}
-	if i := strings.Index(name, "@"); i == 0 {
-		cfg.ServerName = name
-	} else {
-		if i > 0 {
-			name = name[:i]
-		} else if i = strings.Index(name, ":"); i > 0 {
-			name = name[:i]
-		}
-		if match, err := certs.Match(name); err == nil {
-			cfg.ServerName = match.Name()
-		} else {
-			return nil, fmt.Errorf("%s: %w", name, err)
-		}
-	}
-	cl := tls.Client(conn, cfg)
-	return cl, cl.HandshakeContext(ctx)
+	return
 }
