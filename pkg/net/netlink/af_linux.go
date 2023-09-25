@@ -1,0 +1,49 @@
+// Copyright © 2015-2023 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
+package netlink
+
+const (
+	AF_UNSPEC = iota
+	AF_UNIX
+	AF_INET
+	AF_AX25
+	AF_IPX
+	AF_APPLETALK
+	AF_NETROM
+	AF_BRIDGE
+	AF_ATMPVC
+	AF_X25
+	AF_INET6
+	AF_ROSE
+	AF_DECnet
+	AF_NETBEUI
+	AF_SECURITY
+	AF_KEY
+	AF_NETLINK
+	AF_PACKET
+	AF_ASH
+	AF_ECONET
+	AF_ATMSVC
+	AF_RDS
+	AF_SNA
+	AF_IRDA
+	AF_PPPOX
+	AF_WANPIPE
+	AF_LLC
+	AF_IB
+	AF_MPLS
+	AF_CAN
+	AF_TIPC
+	AF_BLUETOOTH
+	AF_IUCV
+	AF_RXRPC
+	AF_ISDN
+	AF_PHONET
+	AF_IEEE802154
+	AF_CAIF
+	AF_ALG
+	AF_NFC
+	AF_VSOCK
+)
