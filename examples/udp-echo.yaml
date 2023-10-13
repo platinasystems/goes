@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: udp-echo
+  labels:
+    name: udp-echo
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: udp-echo
+  namespace: udp-echo
+  labels:
+    app: udp-echo
+spec:
+  restartPolicy: Never
+  containers:
+  - name: udp-echo
+    imagePullPolicy: IfNotPresent
+    image: ko://github.com/platinasystems/goes/v2
+    args: ["start", "udp-echo"]
+    ports:
+    - containerPort: 7
+      protocol: UDP
+      name: echo

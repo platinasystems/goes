@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 )
 
 // If Restricted is true, the Self certificate is the only permitted Client.
@@ -26,11 +26,11 @@ var ClientCAs = sync.OnceValue(func() *CAs {
 	if Restricted {
 		return cas
 	}
-	Subscriptions().Range(func(x *keycert.X509) bool {
+	Subscriptions().Range(func(x *xcert.X509) bool {
 		cas.pool.AddCert(x.Certificate)
 		return true
 	})
-	Subscribers().Range(func(x *keycert.X509) bool {
+	Subscribers().Range(func(x *xcert.X509) bool {
 		cas.pool.AddCert(x.Certificate)
 		return true
 	})
@@ -41,7 +41,7 @@ var ClientCAs = sync.OnceValue(func() *CAs {
 var RootCAs = sync.OnceValue(func() *CAs {
 	cas := &CAs{pool: x509.NewCertPool()}
 	cas.pool.AddCert(Self().X509.Certificate)
-	Subscriptions().Range(func(x *keycert.X509) bool {
+	Subscriptions().Range(func(x *xcert.X509) bool {
 		cas.pool.AddCert(x.Certificate)
 		return true
 	})

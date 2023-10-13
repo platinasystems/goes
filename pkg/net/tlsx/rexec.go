@@ -36,7 +36,7 @@ Remote execution.
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
 	if complete.Parameter.Value(ctx) {
 		if len(args) <= 1 {
-			style.Completions(args, fs.FlagSet, Self().Name(),
+			style.Completions(args, fs.FlagSet, Self().DNS0(),
 				Subscriptions().Names())
 		}
 		return nil

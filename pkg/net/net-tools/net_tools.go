@@ -4,7 +4,14 @@
 
 package net_tools
 
+var Daemons = map[string]any{
+	"udp-echo": UDPEcho,
+	"www-echo": WWWEcho,
+}
+
 var Root = map[string]any{
 	"ifconfig": Ifconfig,
 	"netstat":  Netstat,
+	"udp-ping": UDPPing,
+	"www-ping": WWWPing,
 }

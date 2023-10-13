@@ -5,6 +5,7 @@
 package goes
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding"
@@ -16,7 +17,6 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
@@ -25,14 +25,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-var (
-	// Reload is called on SIGHUP.
-	Reload = func() {}
-	// Load Root before calling Main.
-	Root = map[string]any{}
-)
-
-var cancel context.CancelFunc
+// Load Root before calling Main.
+var Root = map[string]any{}
 
 // Walk embedded FS tree to add path references to map.
 func EmbedFS(m map[string]any, efs embed.FS, root string) {
@@ -47,23 +41,15 @@ func EmbedFS(m map[string]any, efs embed.FS, root string) {
 
 // Execute subsystem in an interruptible context with stdin and and stdout.
 func Exec(subsys any) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
 	defer stop()
 
-	r := io.Reader(os.Stdin)
-	w := io.Writer(os.Stdout)
-	path := []string{program.Base()}
-	args := os.Args[1:]
-
-	hupch := make(chan os.Signal, 4)
-	signal.Notify(hupch, os.Signal(syscall.SIGHUP))
-	defer signal.Stop(hupch)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go reload(ctx, &wg, hupch)
-
-	ctx, cancel = context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	Root["integral"] = Integral
 	Merge(Root, Integral)
@@ -77,6 +63,14 @@ func Exec(subsys any) {
 		if _, ok = show["completion"]; !ok {
 			show["completion"] = IntegralShowCompletion
 		}
+	}
+
+	r := io.Reader(os.Stdin)
+	w := io.Writer(os.Stdout)
+	path := []string{program.Base()}
+	args := os.Args[1:]
+	if len(args) > 0 && args[0] == "daemon" && !program.IsKoApp() {
+		style.System()
 	}
 
 	err := do(subsys, ctx, r, w, path, Root, args...)
@@ -168,6 +162,14 @@ Unmarshal or scan object from text value.
 		err = t(ctx, r, w, path, m, args...)
 	case func(
 		context.Context,
+		io.Writer,
+		[]string,
+		map[string]any,
+		...string,
+	) error:
+		err = t(ctx, w, path, m, args...)
+	case func(
+		context.Context,
 		io.Reader,
 		io.Writer,
 		[]string,
@@ -239,24 +241,11 @@ Unmarshal or scan object from text value.
 	return
 }
 
+var nl = []byte{'\n'}
+
 func fwriteln(w io.Writer, text []byte) {
 	w.Write(text)
-	if text[len(text)-1] != '\n' {
-		w.Write([]byte{'\n'})
-	}
-}
-
-func reload(ctx context.Context, wg *sync.WaitGroup, hupch <-chan os.Signal) {
-	wg.Done()
-	for {
-		select {
-		case _, ok := <-hupch:
-			if !ok {
-				return
-			}
-			Reload()
-		case <-ctx.Done():
-			return
-		}
+	if !bytes.HasSuffix(text, nl) {
+		w.Write(nl)
 	}
 }

@@ -23,7 +23,7 @@ func greetClient(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
 		Certificates: []tls.Certificate{
 			self.Certificate,
 		},
-		ServerName: self.Name(),
+		ServerName: self.DNS0(),
 		ClientAuth: tls.RequireAndVerifyClientCert,
 		ClientCAs:  ClientCAs().Clone(),
 	})
@@ -31,6 +31,7 @@ func greetClient(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
 }
 
 // Send "tls" command to server then handshake and return TLS connection.
+//
 //	host: [<name>][@<dns|ip4|[ipv6]>][:<port>]	(default self)
 func greetServer(ctx context.Context, host string, conn net.Conn) (
 	cl *tls.Conn, err error,
@@ -38,7 +39,7 @@ func greetServer(ctx context.Context, host string, conn net.Conn) (
 	var sname string
 	self := Self()
 	if len(host) == 0 {
-		sname = self.Name()
+		sname = self.DNS0()
 	} else {
 		at := strings.Index(host, "@")
 		colon := strings.LastIndex(host, ":")
@@ -53,11 +54,11 @@ func greetServer(ctx context.Context, host string, conn net.Conn) (
 		} else { // @<dns>
 			host = host[1:]
 		}
-		if match, merr := Match(host); merr != nil {
-			err = fmt.Errorf("%s: %w", host, merr)
+		if match := Match(host); match == nil {
+			err = fmt.Errorf("%s: %w", host, ErrNotFound)
 			return
 		} else {
-			sname = match.Name()
+			sname = match.DNS0()
 		}
 	}
 

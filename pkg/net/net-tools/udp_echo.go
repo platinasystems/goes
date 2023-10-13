@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package udpecho
+package net_tools
 
 import (
 	"context"
@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/context/help"
@@ -21,20 +23,66 @@ import (
 )
 
 const (
-	Packets = 1024
-	Window  = 4
+	UDPEchoPackets = 1024
+	UDPEchoPort    = 7
+	UDPEchoWindow  = 4
 )
 
-var ErrIncomplete = errors.New("incomplete")
+func UDPEcho(
+	ctx context.Context,
+	path []string,
+	args ...string,
+) error {
+	const usage = `{{$path := join .Path " "}}{{/*
+*/}}usage: {{$path}} [<address>:<port>]
+Echo UDP received packets (default <:{{.Port}}>)
+`
+	if complete.Parameter.Value(ctx) {
+		return nil
+	}
+	if help.Parameter.Value(ctx) {
+		if len(path) > 1 && path[1] == "daemon" {
+			path[1] = "start"
+		}
+		return style.Usage(usage, struct {
+			Path []string
+			Port int
+		}{path, UDPEchoPort})
+	}
 
-func Ping(
+	var udpa *net.UDPAddr
+	if len(args) == 0 {
+		udpa = &net.UDPAddr{Port: 7}
+	} else if ap, err := netip.ParseAddrPort(args[0]); err != nil {
+		return err
+	} else {
+		udpa = net.UDPAddrFromAddrPort(ap)
+	}
+
+	c, err := net.ListenUDP("udp", udpa)
+	if err != nil {
+		return err
+	}
+
+	style.Noteln("start", udpa, "service")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go udpEchoReply(ctx, &wg, c)
+	<-ctx.Done()
+	c.Close()
+	wg.Wait()
+	style.Noteln("stopped", udpa, "service")
+	return nil
+}
+
+func UDPPing(
 	ctx context.Context,
 	w io.Writer,
 	path []string,
 	args ...string,
 ) error {
 	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] <host> [<interface>]
+*/}}usage: {{$path}} [<options>] [<host>]
 Ping echo host with UDP sequenced packets.
 
 <host>
@@ -45,7 +93,7 @@ Ping echo host with UDP sequenced packets.
     <name>:<port>
     <name>
 
-The default <port> is {{.Port}}.
+The default <host> is 127.0.0.1:{{.Port}}.
 `
 	if complete.Parameter.Value(ctx) {
 		return nil
@@ -54,13 +102,13 @@ The default <port> is {{.Port}}.
 		return style.Usage(usage, struct {
 			Path []string
 			Port int
-		}{path, Port})
+		}{path, UDPEchoPort})
 	}
-	if len(args) == 0 {
-		return ErrIncomplete
+	addr := "127.0.0.1"
+	if len(args) > 0 {
+		addr = args[0]
 	}
-
-	aps, err := resolve.AddrPort(ctx, args[0], Port)
+	aps, err := resolve.AddrPort(ctx, addr, UDPEchoPort)
 	if err != nil {
 		return err
 	}
@@ -113,16 +161,16 @@ The default <port> is {{.Port}}.
 			if seq <= acked {
 				continue
 			} else if seq == acked+1 {
-				if acked = seq; acked == Packets {
+				if acked = seq; acked == UDPEchoPackets {
 					break
 				}
-				win = Window - (next - acked) + 1
+				win = UDPEchoWindow - (next - acked) + 1
 			} else {
 				retx += 1
 				next = acked + 1
 			}
 		}
-		for i := 0; i < win && next <= Packets; i++ {
+		for i := 0; i < win && next <= UDPEchoPackets; i++ {
 			binary.BigEndian.PutUint64(pg, uint64(next))
 			if _, err = c.Write(pg[:8]); err != nil {
 				return err
@@ -131,6 +179,28 @@ The default <port> is {{.Port}}.
 		}
 	}
 	fmt.Print(retx, " retransmits, ",
-		Packets/time.Now().Sub(start).Seconds(), "pps\n")
+		UDPEchoPackets/time.Now().Sub(start).Seconds(), "pps\n")
 	return ctx.Err()
+}
+
+func udpEchoReply(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	c *net.UDPConn,
+) {
+	defer wg.Done()
+	defer style.Recovery()
+	pg := make([]byte, 4<<10)
+	for {
+		n, from, err := c.ReadFromUDP(pg)
+		if err != nil {
+			if ctx.Err() != context.Canceled {
+				panic(err)
+			}
+			break
+		}
+		if _, err = c.WriteTo(pg[:n], from); err != nil {
+			panic(err)
+		}
+	}
 }

@@ -6,30 +6,34 @@ package main
 
 import (
 	"github.com/platinasystems/goes/v2/pkg/coreutils"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	net_tools "github.com/platinasystems/goes/v2/pkg/net/net-tools"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
-	"github.com/platinasystems/goes/v2/pkg/net/udpecho"
 )
 
+var daemons = map[string]any{
+	"tlsx": tlsx.Daemons,
+}
+
 var root = map[string]any{
-	"daemon": map[string]any{
-		"tlsx": tlsx.Daemons,
-		"udp": map[string]any{
-			"echo": udpecho.Reply,
-		},
+	"daemon": daemons,
+	"generate": map[string]any{
+		"certificate": xcert.Generate,
+		"key":         xkey.Generate,
 	},
 	"show": map[string]any{
-		"tlsx": tlsx.Show,
-	},
-	"udp": map[string]any{
-		"ping": udpecho.Ping,
+		"certificate": xcert.Show,
+		"key":         xkey.Show,
+		"tlsx":        tlsx.Show,
 	},
 }
 
 func main() {
 	goes.Merge(root, coreutils.Root)
 	goes.Merge(root, net_tools.Root)
+	goes.Merge(daemons, net_tools.Daemons)
 	goes.Root = root
 	goes.Main()
 }

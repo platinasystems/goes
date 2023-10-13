@@ -7,12 +7,11 @@ package tlsx
 import (
 	"bytes"
 	"context"
-	"encoding/pem"
 	"errors"
 	"io"
 
 	"github.com/platinasystems/goes/v2/pkg/context/help"
-	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
@@ -57,12 +56,8 @@ Register with exchange.
 		return egress.Marked(err)
 	}
 
-	x := new(keycert.X509)
-	blk, _ := pem.Decode(buf.Bytes())
-	if blk == nil {
-		return egress.Marked(ErrInvalid)
-	}
-	if err := x.UnmarshalPEM(blk); err != nil {
+	x := new(xcert.X509)
+	if err = x.UnmarshalText(buf.Bytes()); err != nil {
 		return egress.Marked(err)
 	}
 	Subscriptions().Append(x)

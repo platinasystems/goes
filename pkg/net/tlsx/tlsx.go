@@ -11,11 +11,10 @@ var Daemons = map[string]any{
 }
 
 var Root = map[string]any{
-	"approve":     IPC,
-	"create-cert": CreateCert,
-	"deny":        IPC,
-	"exec":        Rexec,
-	"subscribe":   Subscribe,
+	"approve":   IPC,
+	"deny":      IPC,
+	"exec":      Rexec,
+	"subscribe": Subscribe,
 }
 
 var Show = map[string]any{

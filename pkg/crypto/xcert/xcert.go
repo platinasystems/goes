@@ -2,24 +2,26 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package tlsx
+// Extended tls and x509 certificates.
+package xcert
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
 	"math/big"
+	"os"
 	"os/user"
 	"strings"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/context/help"
-	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
@@ -27,7 +29,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func CreateCert(
+func Generate(
 	ctx context.Context,
 	r io.Reader,
 	w io.Writer,
@@ -36,12 +38,14 @@ func CreateCert(
 ) error {
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>]
-Create key and certifcate for host or exchange.
+Generate PEM encoded x509 certifcate to stdout with stdin signature key.
 {{print .Flags}}`
 	const year = 365 * 24 * time.Hour
+	const longest = 10 * year
 
 	defname := host.Name()
-	if cur, err := user.Current(); err == nil {
+	cur, err := user.Current()
+	if err == nil {
 		switch {
 		case len(cur.Name) > 0:
 			defname = cur.Name
@@ -51,10 +55,8 @@ Create key and certifcate for host or exchange.
 	}
 
 	fs, h := flag.New()
-	alg := keycert.PureEd25519
-	fs.Var(&alg, "alg", strings.Join(keycert.Algs, ", "))
 	sn := fs.Int64("serial-number", 1, "")
-	dnsnames := fs.String("dns", host.Name(), "comma separated")
+	dnsnames := fs.String("dns", host.Name(), "comma separated list")
 	dur := fs.Duration("duration", 10*year, "note 8760 hours per year")
 	email := fs.String("email", "", "")
 	organization := fs.String("organization", "", "")
@@ -62,13 +64,13 @@ Create key and certifcate for host or exchange.
 	province := fs.String("province", "", "")
 	country := fs.String("country", "", "")
 	name := fs.String("name", defname, "")
+
 	if complete.Parameter.Value(ctx) {
-		style.Completions(args, fs.FlagSet)
+		style.Completions(args, fs.FlagSet, "*.pem")
 		return nil
 	}
-	err := fs.Parse(args)
-	if err != nil {
-		return err
+	if err = fs.Parse(args); err != nil {
+		return egress.Marked(err)
 	}
 	if help.Parameter.Value(ctx) || *h {
 		return style.Usage(usage, struct {
@@ -76,17 +78,19 @@ Create key and certifcate for host or exchange.
 			Flags fmt.Formatter
 		}{path, fs})
 	}
-	args = fs.Args()
-	if len(args) > 0 {
-		return fmt.Errorf("unexpected: %v", args)
+
+	var priv xkey.Private
+	if _, err = priv.ReadFrom(r); err != nil {
+		return egress.Marked(err)
 	}
+
 	if len(*name) == 0 {
-		return errors.New("no name")
+		return egress.Marked(ErrNoName)
 	}
 
 	dnsa := strings.Split(*dnsnames, ",")
 	if len(dnsa) == 0 || len(dnsa[0]) == 0 {
-		return errors.New("no DNS names")
+		return egress.Marked(ErrNoDNSNames)
 	}
 
 	var emails []string
@@ -94,27 +98,12 @@ Create key and certifcate for host or exchange.
 		emails = strings.Split(*email, ",")
 	}
 
-	if err = MkStateDir(); err != nil {
-		return egress.Marked(err)
-	}
-
-	k, block, err := keycert.NewPrivateKey(alg.Value())
-	if err != nil {
-		return egress.Marked(err)
-	}
-
-	pemdata := pem.EncodeToMemory(block)
-	err = ioutil.WriteFile(KeyFileName(), pemdata, 0600)
-	if err != nil {
-		return egress.Marked(err)
-	}
-
 	now := time.Now()
 	expire := now.Add(*dur)
 	template := x509.Certificate{
 		IsCA:               true,
 		SerialNumber:       big.NewInt(*sn),
-		SignatureAlgorithm: alg.Value(),
+		SignatureAlgorithm: priv.SignatureAlgorithm(),
 		DNSNames:           dnsa,
 		EmailAddresses:     emails,
 		NotBefore:          now,
@@ -129,10 +118,74 @@ Create key and certifcate for host or exchange.
 			CommonName:   *name,
 		},
 	}
-	_, block, err = keycert.NewX509Certificate(k, &template)
-	if egress.Marked(err); err != nil {
+	parent := &template
+
+	random := rand.Reader
+	if template.SerialNumber == nil {
+		max := big.NewInt(math.MaxInt64)
+		template.SerialNumber, err = rand.Int(random, max)
+		if err != nil {
+			return egress.Marked(err)
+		}
+	}
+	if len(template.DNSNames) == 0 {
+		template.DNSNames = []string{host.Name()}
+	}
+	if len(template.Subject.CommonName) == 0 {
+		template.Subject.CommonName = template.DNSNames[0]
+	}
+	if template.NotBefore.IsZero() {
+		template.NotBefore = time.Now()
+	}
+	if template.NotAfter.IsZero() ||
+		template.NotAfter.Before(template.NotBefore) {
+		template.NotAfter = template.NotBefore.Add(longest)
+	}
+	der, err := x509.CreateCertificate(random, &template, parent,
+		priv.Public(), priv.Private())
+	if err != nil {
+		return egress.Marked(err)
+	}
+	blk := &pem.Block{
+		Type:    "CERTIFICATE",
+		Headers: map[string]string{},
+		Bytes:   der,
+	}
+	return egress.Marked(pem.Encode(w, blk))
+}
+
+func Show(
+	ctx context.Context,
+	r io.Reader,
+	w io.Writer,
+	path []string,
+	args ...string,
+) error {
+	const usage = `{{/*
+*/}}usage: {{join . " "}} [<name>]
+Print decoded x509 PEM certifcate(s) from the named file or stdin.
+`
+	if complete.Parameter.Value(ctx) {
+		style.Completions(args, "*.pem")
+		return nil
+	}
+	if help.Parameter.Value(ctx) {
+		return style.Usage(usage, path)
+	}
+	if len(args) > 0 && args[0] != "-" {
+		if f, err := os.Open(args[0]); err != nil {
+			return err
+		} else {
+			defer f.Close()
+			r = f
+		}
+	}
+	var x X509
+	if _, err := x.ReadFrom(r); err != nil {
 		return err
 	}
-	pemdata = pem.EncodeToMemory(block)
-	return ioutil.WriteFile(CertFileName(), pemdata, 0644)
+	for p := &x; p != nil; p = p.Next {
+		fmt.Fprint(w, p)
+	}
+	return nil
 }

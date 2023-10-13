@@ -7,16 +7,26 @@ package tlsx
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 )
 
-var Self = sync.OnceValue(func() *keycert.TLS {
-	self := new(keycert.TLS)
-	err := self.LoadX509KeyPair(CertFileName(), KeyFileName())
+var Self = sync.OnceValue(func() *xcert.TLS {
+	self := new(xcert.TLS)
+	data, err := os.ReadFile(KeyFileName())
 	if err != nil {
-		panic(err)
+		return nil
+	}
+	if err = self.X509.UnmarshalText(data); err != nil {
+		return nil
+	}
+	if data, err = os.ReadFile(CertFileName()); err != nil {
+		return nil
+	}
+	if err = self.UnmarshalText(data); err != nil {
+		return nil
 	}
 	return self
 })

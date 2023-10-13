@@ -7,37 +7,40 @@ package tlsx
 import (
 	"bytes"
 	"context"
-	"encoding/pem"
 	"fmt"
 	"io"
-	"slices"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/keycert"
+	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 )
 
-var reg = struct {
-	mutex sync.Mutex
-	certs []*keycert.X509
-}{}
+var reg struct {
+	sync.RWMutex
+	x *xcert.X509
+}
 
 func regAdmin(ctx context.Context, path []string, args ...string) error {
 	if len(args) == 0 {
 		return egress.Marked(ErrIncomplete)
 	}
-	reg.mutex.Lock()
-	defer reg.mutex.Unlock()
 	approve := path[len(path)-1] == "approve"
-	for i, x := range reg.certs {
-		if x.Name() == args[0] || x.SKI() == args[0] {
-			reg.certs = slices.Delete(reg.certs, i, i+1)
+	reg.Lock()
+	defer reg.Unlock()
+	for cur, prev := reg.x, reg.x; cur != nil; cur = cur.Next {
+		if cur.IsMatch(args[0]) {
 			if approve {
-				Subscribers().Append(x)
-				ClientCAs().Add(x.Certificate)
+				Subscribers().Append(cur)
+				ClientCAs().Add(cur.Certificate)
+			}
+			if cur == prev {
+				reg.x = cur.Next
+			} else {
+				prev.Next = cur.Next
 			}
 			return nil
 		}
+		prev = cur
 	}
 	return fmt.Errorf("%q: %w", args[0], ErrNotFound)
 }
@@ -48,11 +51,12 @@ func regShow(
 	path []string,
 	args ...string,
 ) error {
-	reg.mutex.Lock()
-	defer reg.mutex.Unlock()
-	for _, x := range reg.certs {
+	reg.RLock()
+	defer reg.RUnlock()
+	reg.x.Range(func(x *xcert.X509) bool {
 		fmt.Fprint(w, x.SKI(), ": ", x.Certificate.DNSNames, "\n")
-	}
+		return true
+	})
 	return nil
 }
 
@@ -78,19 +82,19 @@ func regSubscribe(
 	} else {
 		data = []byte(args[0])
 	}
-
-	blk, _ := pem.Decode(data)
-	if blk == nil {
-		return egress.Marked(ErrInvalid)
-	}
-	x := new(keycert.X509)
-	err := x.UnmarshalPEM(blk)
+	x, err := xcert.NewX509(data)
 	if err != nil {
 		return egress.Marked(err)
 	}
-	reg.mutex.Lock()
-	defer reg.mutex.Unlock()
-	reg.certs = append(reg.certs, x)
+	func() {
+		reg.Lock()
+		defer reg.Unlock()
+		if reg.x == nil {
+			reg.x = x
+		} else {
+			reg.x.Append(x)
+		}
+	}()
 	self, err := Selfie.MarshalPEM()
 	if err != nil {
 		return egress.Marked(err)

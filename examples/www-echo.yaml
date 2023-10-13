@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: www-echo
+  labels:
+    name: www-echo
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: www-echo
+  namespace: www-echo
+  labels:
+    app: www-echo
+spec:
+  restartPolicy: Never
+  containers:
+  - name: www-echo
+    imagePullPolicy: IfNotPresent
+    image: ko://github.com/platinasystems/goes/v2
+    args: ["start", "www-echo"]
+    ports:
+    - containerPort: 8080
+      name: http

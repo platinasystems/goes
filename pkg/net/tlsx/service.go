@@ -50,10 +50,6 @@ func Routine(
 	defer style.Recovery(context.Canceled, net.ErrClosed, io.EOF)
 	var pcwg sync.WaitGroup
 
-	exchange.halt = make(chan string)
-	exchange.member = make(map[uint32]*Member)
-	exchange.reservation = make(map[Confirmation]*Member)
-
 	if pc != nil {
 		pcwg.Add(1)
 		go xpacket(ctx, &pcwg, pc)

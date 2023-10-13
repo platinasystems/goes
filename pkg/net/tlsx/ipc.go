@@ -33,7 +33,7 @@ Daemon IPC.
 		path: []string{path[0], "exec"},
 		args: make([]string, 0, len(path)+len(args)),
 	}
-	ipc.args = append(ipc.args, Self().Name())
+	ipc.args = append(ipc.args, Self().DNS0())
 	ipc.args = append(ipc.args, path[1:]...)
 	ipc.args = append(ipc.args, args...)
 	return Rexec(ctx, r, w, ipc.path, ipc.args...)

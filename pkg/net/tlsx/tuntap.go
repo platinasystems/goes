@@ -34,7 +34,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -83,9 +82,6 @@ Open tap to named exchange or self @ given address.
 	}
 	if args = fs.Args(); len(args) == 0 {
 		panic(ErrIncomplete)
-	}
-	if !program.IsKoApp() {
-		style.System()
 	}
 
 	ex := args[0]

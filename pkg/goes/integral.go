@@ -28,11 +28,9 @@ import (
 	"golang.org/x/term"
 )
 
-var Children chan *os.Process
-
 // These are merged into the Root of the command tree.
 var Integral = map[string]any{
-	"cancel":   IntegralCancel,
+	"append":   IntegralOutput,
 	"command":  IntegralCommand,
 	"complete": IntegralComplete,
 	"help":     IntegralHelp,
@@ -40,29 +38,8 @@ var Integral = map[string]any{
 	"output":   IntegralOutput,
 	"standby":  IntegralStandby,
 	"start":    IntegralStart,
+	"tee":      IntegralOutput,
 	"timeout":  IntegralTimeout,
-}
-
-func IntegralCancel(
-	ctx context.Context,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}}
-Stop child processes.
-`
-	if complete.Parameter.Value(ctx) {
-		return nil
-	}
-	if help.Parameter.Value(ctx) {
-		return style.Usage(usage, path)
-	}
-	cancel()
-	for proc := range Children {
-		proc.Wait()
-	}
-	return ctx.Err()
 }
 
 func IntegralCommand(
@@ -76,10 +53,10 @@ func IntegralCommand(
 */}}usage: {{$path}} [<options>] <command> [<args>]
 Run external command.
 {{print .Flags}}`
-	fs, h := flag.New()
-	p := fs.Bool("p", false, "Restricted path search.")
-	v := fs.Bool("v", false, "Report path found.")
-	vv := fs.Bool("V", false, "More verbose report.")
+	fs, hFlag := flag.New()
+	pFlag := fs.Bool("p", false, "Restricted path search.")
+	vFlag := fs.Bool("v", false, "Report path found.")
+	vvFlag := fs.Bool("V", false, "More verbose report.")
 	if complete.Parameter.Value(ctx) {
 		style.Completions(args, fs.FlagSet)
 		return nil
@@ -88,7 +65,7 @@ Run external command.
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Parameter.Value(ctx) || *hFlag {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags fmt.Formatter
@@ -100,18 +77,18 @@ Run external command.
 	}
 
 	lookpath := exec.LookPath
-	if *p {
+	if *pFlag {
 		lookpath = restricted.LookPath
 	}
 	full, err := lookpath(args[0])
 	if err != nil {
 		return err
 	}
-	if *v {
+	if *vFlag {
 		fmt.Fprintln(w, full)
 		return nil
 	}
-	if *vv {
+	if *vvFlag {
 		fmt.Fprintln(w, args[0], "is", full)
 		return nil
 	}
@@ -192,43 +169,38 @@ Command/Objects
 
 func IntegralInput(
 	ctx context.Context,
-	r io.Reader,
 	w io.Writer,
 	path []string,
 	m map[string]any,
 	args ...string,
 ) error {
 	const usage = `{{/*
-*/}}usage: {{join .Path " "}} <file> <command|object> [<args>]
+*/}}usage: {{join . " "}} <file> <command|object> [<args>]
 
-Command/Objects
-{{keys .Map}}`
+Perform command or set object with input from named file.
+`
 	if complete.Parameter.Value(ctx) {
 		if len(args) < 2 {
 			style.Completions(args, "*")
 			return nil
 		}
-		return do(Select, ctx, r, w, path, m, args[1:]...)
+		return do(Select, ctx, nil, w, path, m, args[1:]...)
 	}
 	if help.Parameter.Value(ctx) {
 		if len(args) < 2 {
-			return style.Usage(usage, struct {
-				Path []string
-				Map  map[string]any
-			}{path, m})
+			return style.Usage(usage, path)
 		}
-		return do(Select, ctx, r, w, path, m, args[1:]...)
+		return do(Select, ctx, nil, w, path, m, args[1:]...)
 	}
 	if len(args) < 2 {
 		return ErrIncomplete
 	}
-	if f, err := os.Open(args[0]); err != nil {
+	f, err := os.Open(args[0])
+	if err != nil {
 		return err
-	} else {
-		defer f.Close()
-		r = f
 	}
-	return do(Select, ctx, r, w, path, m, args[1:]...)
+	defer f.Close()
+	return do(Select, ctx, f, w, path, m, args[1:]...)
 }
 
 func IntegralOutput(
@@ -240,10 +212,15 @@ func IntegralOutput(
 	args ...string,
 ) error {
 	const usage = `{{/*
-*/}}usage: {{join .Path " "}} <file> <command|object> [<args>]
+*/}}usage: {{join .Path " "}} [-m <mode>] <file> <command|object> [<args>]
 
-Command/Objects
-{{keys .Map}}`
+Perform command or print object with output directed to named file.
+{{print .Flags}}`
+	cmd := path[len(path)-1]
+	fs, hFlag := flag.New()
+	aFlag := fs.Bool("a", cmd == "append", "Append output to named file.")
+	mFlag := fs.Uint("m", 0666, "File mode (default 0666).")
+	tFlag := fs.Bool("t", cmd == "tee", "Tee output to named file.")
 	if complete.Parameter.Value(ctx) {
 		if len(args) < 2 {
 			style.Completions(args, "*")
@@ -251,22 +228,37 @@ Command/Objects
 		}
 		return do(Select, ctx, r, w, path, m, args[1:]...)
 	}
-	if help.Parameter.Value(ctx) {
+	err := fs.Parse(args)
+	if err != nil {
+		return err
+	}
+	if help.Parameter.Value(ctx) || *hFlag {
 		if len(args) < 2 {
 			return style.Usage(usage, struct {
-				Path []string
-				Map  map[string]any
-			}{path, m})
+				Path  []string
+				Flags fmt.Formatter
+			}{path, fs})
 		}
 		return do(Select, ctx, r, w, path, m, args[1:]...)
 	}
 	if len(args) < 2 {
 		return ErrIncomplete
 	}
-	if f, err := os.Create(args[0]); err != nil {
-		return err
+	fflags := os.O_RDWR | os.O_CREATE
+	if *aFlag {
+		fflags |= os.O_APPEND
 	} else {
-		defer f.Close()
+		fflags |= os.O_TRUNC
+	}
+	fmode := os.FileMode(*mFlag)
+	f, err := os.OpenFile(args[0], fflags, fmode)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if *tFlag {
+		w = io.MultiWriter(w, f)
+	} else {
 		w = f
 	}
 	return do(Select, ctx, r, w, path, m, args[1:]...)
@@ -417,6 +409,10 @@ Daemons
 		}
 		return do(Select, ctx, r, w, path, daemons, args...)
 	}
+	if program.IsKoApp() {
+		dpath := []string{path[0], "daemon"}
+		return do(Select, ctx, r, w, dpath, daemons, args...)
+	}
 	u, err := user.Current()
 	if err != nil {
 		return err
@@ -471,9 +467,6 @@ Daemons
 	if err = cmd.Start(); err == nil {
 		fmt.Fprint(w, program.Base(), ":daemon:", args[0],
 			":pid: ", cmd.Process.Pid, "\n")
-		if Children != nil {
-			Children <- cmd.Process
-		}
 	}
 	return err
 }

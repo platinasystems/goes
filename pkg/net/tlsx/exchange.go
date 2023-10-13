@@ -21,7 +21,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -33,13 +32,17 @@ const (
 	ExchangeCounters
 )
 
-var exchange struct {
+var exchange = struct {
 	sync.RWMutex
 	member      map[uint32]*Member
 	pkt         net.PacketConn
 	reservation map[Confirmation]*Member
 	atomic      [ExchangeCounters]uint64
 	halt        chan string
+}{
+	halt:        make(chan string),
+	member:      make(map[uint32]*Member),
+	reservation: make(map[Confirmation]*Member),
 }
 
 func Exchange(
@@ -67,9 +70,6 @@ Start exchange at <address> (default :8003).
 	args = fs.Args()
 	if len(args) == 0 {
 		return ErrIncomplete
-	}
-	if !program.IsKoApp() {
-		style.System()
 	}
 
 	ln, err := net.Listen("tcp", *tcp)
@@ -160,9 +160,9 @@ Reserve exchange membership.
 		return ErrIncomplete
 	}
 
-	i, err := Subscribers().Index(args[0])
-	if err != nil {
-		return err
+	i := Subscribers().Index(args[0])
+	if i < 0 {
+		return ErrNotFound
 	}
 	req, err := io.ReadAll(r)
 	if err != nil {
@@ -194,16 +194,13 @@ Returns the PEM encoded data containing the public key and nonce of member.
 	if len(args) < 1 {
 		return ErrIncomplete
 	}
-
 	var id uint32
-
 	_, err := fmt.Sscan(args[0], &id)
 	if err != nil {
 		return err
 	}
-
-	if m, err := xwhois(id); err != nil {
-		return egress.Marked(err)
+	if m := xwhois(id); m == nil {
+		return egress.Marked(ErrNotFound)
 	} else if _, err = w.Write(m.PublicKeyData); err != nil {
 		return egress.Marked(err)
 	}
@@ -380,13 +377,10 @@ func xpacket(
 	}
 }
 
-func xwhois(id uint32) (*Member, error) {
+func xwhois(id uint32) *Member {
 	exchange.RLock()
 	defer exchange.RUnlock()
-	if m, ok := exchange.member[id]; ok {
-		return m, nil
-	}
-	return nil, fmt.Errorf("%d: %w", id, ErrNotFound)
+	return exchange.member[id]
 }
 
 type Member struct {
