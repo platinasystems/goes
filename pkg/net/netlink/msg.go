@@ -7,7 +7,6 @@
 package netlink
 
 import (
-	"strings"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/syscall/align"
@@ -93,12 +92,42 @@ var (
 	ExtractNlMsghdr  = Extract[NlMsghdr]
 	ExtractIfAddrmsg = Extract[IfAddrmsg]
 	ExtractIfInfomsg = Extract[IfInfomsg]
-	ExtractRtAttr    = Extract[RtAttr]
 )
+
+func ExtractError(data []byte) error {
+	msgerr, _ := Extract[NlMsgerr](data)
+	if msgerr.Error != 0 {
+		return Errno(-msgerr.Error)
+	}
+	return nil
+}
+
+func ExtractRtAttr(data []byte) (kind uint16, value, remainder []byte) {
+	if len(data) < SizeofRtAttr {
+		return
+	}
+	rta := Pointer[RtAttr](data)
+	n := int(rta.Len)
+	if n < SizeofRtAttr || n > len(data) {
+		return
+	}
+	kind = rta.Type
+	value = data[SizeofRtAttr:n]
+	if n = align.RTA.Roundup(n); n < len(data) {
+		remainder = data[n:]
+	}
+	return
+}
 
 // Return type at beginning of data.
 func Pointer[T AttrTypes | MsgTypes](data []byte) *T {
 	return (*T)(unsafe.Pointer(&data[0]))
+}
+
+func Clone(data []byte) []byte {
+	clone := make([]byte, len(data))
+	copy(clone, data)
+	return clone
 }
 
 // Clone data up to its first null (`\0`) if any.
@@ -109,5 +138,5 @@ func CloneString(data []byte) string {
 			break
 		}
 	}
-	return strings.Clone(string(data))
+	return string(Clone(data))
 }

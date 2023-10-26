@@ -9,6 +9,7 @@ package netif
 import (
 	"net"
 	"net/netip"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
@@ -86,7 +87,9 @@ func List() (nifs []*Netif, err error) {
 			nif.Extra["xmittiming"] = im.Data.Xmittiming
 		}
 		if im.Data.Lastchange.Sec != 0 {
-			nif.Extra["lastchange"] = im.Data.Lastchange
+			nif.Extra["lastchange"] = time.Unix(
+				int64(im.Data.Lastchange.Sec),
+				int64(im.Data.Lastchange.Usec)*1000)
 		}
 		if im.Data.Hwassist != 0 {
 			nif.Extra["hwassist"] = im.Data.Hwassist
@@ -130,21 +133,35 @@ func (nif *Netif) parseAddrs(addrs int32, body []byte) {
 			sa, _, _ := sysctl.ExtractSockaddrIn(body)
 			switch i {
 			case sysctl.RTAX_DST:
-				nif.Extra["peer"] = netip.AddrFrom4(sa.Addr)
+				nif.Extra["dst"] = netip.AddrFrom4(sa.Addr)
+			case sysctl.RTAX_GATEWAY:
+				nif.Extra["gw"] = netip.AddrFrom4(sa.Addr)
+			case sysctl.RTAX_GENMASK:
 			case sysctl.RTAX_NETMASK:
 				bits, _ = net.IPMask(sa.Addr[:]).Size()
+			case sysctl.RTAX_IFP:
 			case sysctl.RTAX_IFA:
 				addr = netip.AddrFrom4(sa.Addr)
+			case sysctl.RTAX_AUTHOR:
+			case sysctl.RTAX_BRD:
+				nif.Extra["brd"] = netip.AddrFrom4(sa.Addr)
 			}
 		case sysctl.AF_INET6:
 			sa, _, _ := sysctl.ExtractSockaddrIn6(body)
 			switch i {
 			case sysctl.RTAX_DST:
-				nif.Extra["peer"] = netip.AddrFrom16(sa.Addr)
+				nif.Extra["dst"] = netip.AddrFrom16(sa.Addr)
+			case sysctl.RTAX_GATEWAY:
+				nif.Extra["gw"] = netip.AddrFrom16(sa.Addr)
+			case sysctl.RTAX_GENMASK:
 			case sysctl.RTAX_NETMASK:
 				bits, _ = net.IPMask(sa.Addr[:]).Size()
+			case sysctl.RTAX_IFP:
 			case sysctl.RTAX_IFA:
 				addr = netip.AddrFrom16(sa.Addr)
+			case sysctl.RTAX_AUTHOR:
+			case sysctl.RTAX_BRD:
+				nif.Extra["brd"] = netip.AddrFrom16(sa.Addr)
 			}
 		}
 		body = body[align.Sysctl.Roundup(int(h.Len)):]

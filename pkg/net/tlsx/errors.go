@@ -6,6 +6,7 @@ package tlsx
 
 import (
 	"errors"
+	"io/fs"
 	"runtime"
 )
 
@@ -15,7 +16,7 @@ var (
 	ErrExists       = errors.New("exists")
 	ErrHasPI        = errors.New(runtime.GOOS + " has unwanted packet info")
 	ErrIncomplete   = errors.New("incomplete")
-	ErrInvalid      = errors.New("invalid")
+	ErrInvalid      = fs.ErrInvalid
 	ErrNotFound     = errors.New("not found")
 	ErrRange        = errors.New("out of range")
 	ErrOccupied     = errors.New("occupied")

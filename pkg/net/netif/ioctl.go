@@ -7,98 +7,59 @@
 package netif
 
 import (
-	"net"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
 const IFNAMSIZ = syscall.IFNAMSIZ
 
-type SockaddrIn = syscall.RawSockaddrInet4
+type SockaddrIn struct{ syscall.RawSockaddrInet4 }
 
-func SockaddrInInit(sain *SockaddrIn, addr []byte) {
+func (sain *SockaddrIn) Set(addr []byte) {
 	sain.Len = uint8(unsafe.Sizeof(*sain))
 	sain.Family = syscall.AF_INET
 	copy(sain.Addr[:], addr)
 }
 
-type SockaddrIn6 = syscall.RawSockaddrInet6
+type SockaddrIn6 struct{ syscall.RawSockaddrInet6 }
 
-func SockaddrIn6Init(sain6 *SockaddrIn6, addr []byte) {
+func (sain6 *SockaddrIn6) Set(addr []byte) {
 	sain6.Len = uint8(unsafe.Sizeof(*sain6))
 	sain6.Family = syscall.AF_INET6
 	copy(sain6.Addr[:], addr)
 }
 
-type InAliasreq struct {
-	Name      [IFNAMSIZ]byte
-	Addr      SockaddrIn
-	Broadaddr SockaddrIn
-	Mask      SockaddrIn
+type InAlias struct {
+	Addr SockaddrIn
+	Dest SockaddrIn
+	Mask SockaddrIn
 }
 
-func NewInAliasreq(
-	name string,
-	addr, dest net.IP,
-	mask net.IPMask,
-) *InAliasreq {
-	req := new(InAliasreq)
-	copy(req.Name[:], name)
-	if addr != nil {
-		SockaddrInInit(&req.Addr, addr)
-	}
-	if dest != nil {
-		SockaddrInInit(&req.Broadaddr, dest)
-	}
-	if mask != nil {
-		SockaddrInInit(&req.Mask, mask)
-	}
-	return req
+type In6Alias struct {
+	Addr     SockaddrIn6
+	Dest     SockaddrIn6
+	Mask     SockaddrIn6
+	Flags    int32
+	Lifetime In6AddrLifetime
+	Vhid     int32
 }
 
-type In6Aliasreq struct {
-	Name       [IFNAMSIZ]byte
-	Addr       SockaddrIn6
-	Broadaddr  SockaddrIn6
-	Prefixmask SockaddrIn6
-	Flags      int32
-	Lifetime   In6Addrlifetime
-}
-
-type In6Addrlifetime struct {
+type In6AddrLifetime struct {
 	Expire    TimeT
 	Preferred TimeT
 	Vltime    uint32
 	Pltime    uint32
 }
 
-func NewIn6Aliasreq(
-	name string,
-	addr, dest net.IP,
-	mask net.IPMask,
-) *In6Aliasreq {
-	req := new(In6Aliasreq)
-	copy(req.Name[:], name)
-	req.Lifetime.Vltime = ND6_INFINITE_LIFETIME
-	req.Lifetime.Pltime = ND6_INFINITE_LIFETIME
-	if addr != nil {
-		SockaddrIn6Init(&req.Addr, addr)
-	}
-	if dest != nil {
-		SockaddrIn6Init(&req.Broadaddr, dest)
-	}
-	if mask != nil {
-		SockaddrIn6Init(&req.Prefixmask, mask)
-	}
-	return req
-}
-
 type Nothing struct{}
 
 type IfreqValue interface {
-	~byte | ~uint16 | ~int32 | ~uint32 | Nothing |
-		IFCAPS | SockaddrIn | SockaddrIn6
+	Nothing | ~byte | ~uint16 | ~int32 | ~uint32 | IFCAPS |
+		InAlias | In6Alias |
+		SockaddrIn | SockaddrIn6
 }
 
 type Ifreq[V IfreqValue] struct {
@@ -112,10 +73,12 @@ func NewIfreq[V IfreqValue](name string) *Ifreq[V] {
 	return ifr
 }
 
-func IOCTL[FD ~int, R InAliasreq | In6Aliasreq |
-	Ifreq[Nothing] |
+func IOCTL[FD ~int, R Ifreq[Nothing] |
 	Ifreq[IFF] |
 	Ifreq[uint32] |
+	Ifreq[IFCAPS] |
+	Ifreq[InAlias] |
+	Ifreq[In6Alias] |
 	Ifreq[SockaddrIn] |
 	Ifreq[SockaddrIn6]](
 	fd FD, op uintptr, req *R,
@@ -129,4 +92,30 @@ func IOCTL[FD ~int, R InAliasreq | In6Aliasreq |
 		return os.NewSyscallError("ioctl", errno)
 	}
 	return nil
+}
+
+func InetIOCTL[R Ifreq[Nothing] |
+	Ifreq[IFF] |
+	Ifreq[uint32] |
+	Ifreq[InAlias] |
+	Ifreq[SockaddrIn]](
+	op uintptr, req *R,
+) error {
+	inet, err := af.OpenInet()
+	if err != nil {
+		return err
+	}
+	defer af.Close(inet)
+	return IOCTL(inet, op, req)
+}
+
+func Inet6IOCTL[R Ifreq[In6Alias] | Ifreq[SockaddrIn6]](
+	op uintptr, req *R,
+) error {
+	inet6, err := af.OpenInet6()
+	if err != nil {
+		return err
+	}
+	defer af.Close(inet6)
+	return IOCTL(inet6, op, req)
 }

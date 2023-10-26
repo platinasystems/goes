@@ -5,10 +5,11 @@
 package netif
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"net/netip"
-	"strings"
+	"sort"
 )
 
 type Parameter uint8
@@ -30,21 +31,33 @@ const (
 	StringParameter
 	LinkModeParameter
 	StateParameter
-	PrefixParameter
-	AddrParameter
 )
 
 type Netif struct {
 	net.Interface
 	Type fmt.Stringer
 	// IP & IPv6
-	Prefixes []netip.Prefix
+	Prefixes   []netip.Prefix
+	Multicasts []netip.Addr
 	// Extra attributes
 	Extra  map[string]any
 	Rx, Tx struct {
 		Packets, Bytes, Drops, Errors uint64
 	}
 	Collisions uint64
+}
+
+func ByName(name string) (*Netif, error) {
+	if nifs, err := List(); err != nil {
+		return nil, err
+	} else {
+		for _, nif := range nifs {
+			if nif.Name == name {
+				return nif, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("%s %w", name, ErrNotFound)
 }
 
 func (nif *Netif) Addrs() (addrs []net.Addr, err error) {
@@ -60,51 +73,63 @@ func (nif *Netif) Addrs() (addrs []net.Addr, err error) {
 }
 
 func (nif *Netif) MulticastAddrs() (addrs []net.Addr, err error) {
-	for _, prefix := range nif.Prefixes {
-		if addr := prefix.Addr(); addr.IsMulticast() {
-			addrs = append(addrs, &net.IPAddr{
-				IP:   net.IP(addr.AsSlice()),
-				Zone: addr.Zone(),
-			})
-		}
+	for _, addr := range nif.Multicasts {
+		addrs = append(addrs, &net.IPAddr{
+			IP:   net.IP(addr.AsSlice()),
+			Zone: addr.Zone(),
+		})
 	}
 	return
 }
 
 func (nif *Netif) Format(w fmt.State, verb rune) {
-	var n, t int
-	sb := new(strings.Builder)
-	n, _ = fmt.Fprintf(w, "%s[%d]:", nif.Name, nif.Index)
-	t += n
-	n, _ = fmt.Fprintf(w, " flags=%04x<%s>", uint(nif.Flags), nif.Flags)
-	t += n
-	n, _ = fmt.Fprintf(w, " mtu %d", nif.MTU)
-	t += n
-	for k, v := range nif.Extra {
-		sb.Reset()
-		fmt.Fprint(sb, k, " ", v)
-		if t+sb.Len() > 80 {
+	buf := new(bytes.Buffer)
+	t, _ := fmt.Fprintf(w, "%s[%d]:", nif.Name, nif.Index)
+	wrap := func() {
+		if t+buf.Len() > 80 {
 			fmt.Fprint(w, "\n\t")
 			t = 8
 		} else {
 			fmt.Fprint(w, " ")
 			t += 1
 		}
-		n, _ = fmt.Fprint(w, sb)
+		n, _ := w.Write(buf.Bytes())
 		t += n
 	}
-	fmt.Fprint(w, "\n\t", nif.Type)
+	bprintf := func(format string, args ...any) {
+		buf.Reset()
+		fmt.Fprintf(buf, format, args...)
+		wrap()
+	}
+	bprint := func(args ...any) {
+		buf.Reset()
+		fmt.Fprint(buf, args...)
+		wrap()
+	}
+	bprintf("flags=%04x<%s>", uint(nif.Flags), nif.Flags)
+	bprint("type ", nif.Type)
+	bprintf("mtu %d", nif.MTU)
 	if len(nif.HardwareAddr) == 6 && nif.HardwareAddr[0] != 0 {
-		fmt.Fprint(w, " ", nif.HardwareAddr)
+		bprint("mac ", nif.HardwareAddr)
+	}
+	keys := make([]string, 0, len(nif.Extra))
+	for k := range nif.Extra {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		bprint(k, " ", nif.Extra[k])
 	}
 	for _, prefix := range nif.Prefixes {
-		fmt.Fprint(w, "\n\tinet")
 		if prefix.Addr().Is6() {
-			fmt.Fprint(w, "6")
+			bprint("inet6 ", prefix)
+		} else {
+			bprint("inet ", prefix)
 		}
-		fmt.Fprint(w, " ", prefix)
 	}
-	fmt.Fprintln(w)
+	if t > 8 {
+		fmt.Fprintln(w)
+	}
 }
 
 func (nif *Netif) parseIFF(iff IFF) {

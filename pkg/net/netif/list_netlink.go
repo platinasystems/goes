@@ -11,8 +11,14 @@ import (
 	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
-	"github.com/platinasystems/goes/v2/pkg/syscall/align"
 )
+
+const (
+	IFA_UNSPEC  = netlink.IFA_UNSPEC
+	IFLA_UNSPEC = netlink.IFLA_UNSPEC
+)
+
+var rta = netlink.ExtractRtAttr
 
 func List() ([]*Netif, error) {
 	nl, err := netlink.Open()
@@ -23,64 +29,127 @@ func List() ([]*Netif, error) {
 	return list(nl)
 }
 
-func list(nl *netlink.Netlink) (nifs []*Netif, err error) {
-	h, req := netlink.ExpandNlMsghdr(nil)
-	h.Type = netlink.RTM_GETLINK
-	h.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
-	rtgen, req := netlink.ExpandRtGenmsg(req)
-	rtgen.Family = netlink.AF_UNSPEC
-	err = nl.Request(req, func(rsp []byte) error {
-		h := netlink.Pointer[netlink.NlMsghdr](rsp)
-		if h.Type == netlink.RTM_NEWLINK {
-			nif := new(Netif)
-			if err := nif.update(rsp); err != nil {
-				return err
-			}
-			nifs = append(nifs, nif)
-		}
-		return nil
-	})
-	if err != nil {
-		return
+func list(nl *netlink.Netlink) ([]*Netif, error) {
+	nifs, err := ifinfos(nl)
+	if err == nil {
+		err = ifaddrs(nl, nifs)
 	}
+	return nifs, err
+}
+
+func ifinfos(nl *netlink.Netlink) ([]*Netif, error) {
+	var nifs []*Netif
+	req, msg := netlink.ExpandNlMsghdr(nil)
+	req.Type = netlink.RTM_GETLINK
+	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
+	rtgen, msg := netlink.ExpandRtGenmsg(msg)
+	rtgen.Family = netlink.AF_UNSPEC
+	if err := nl.Request(msg); err != nil {
+		return nifs, err
+	}
+	for {
+		rsp, data, err := nl.Next()
+		if err != nil {
+			return nifs, err
+		} else if rsp.Seq != req.Seq {
+			continue
+		} else if rsp.Type == netlink.NLMSG_DONE {
+			break
+		} else if rsp.Type == netlink.NLMSG_ERROR {
+			return nifs, netlink.ExtractError(data)
+		} else if rsp.Type != netlink.RTM_NEWLINK {
+			continue
+		}
+		nif := new(Netif)
+		if err = nif.ifinfo(data); err != nil {
+			return nifs, err
+		}
+		nifs = append(nifs, nif)
+	}
+	return nifs, nil
+}
+
+func ifaddrs(nl *netlink.Netlink, nifs []*Netif) error {
 	byIndex := make(map[int]*Netif)
 	for _, nif := range nifs {
 		byIndex[nif.Index] = nif
 	}
-	h.Type = netlink.RTM_GETADDR
-	h.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
+	req, msg := netlink.ExpandNlMsghdr(nil)
+	req.Type = netlink.RTM_GETADDR
+	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
+	rtgen, msg := netlink.ExpandRtGenmsg(msg)
 	rtgen.Family = netlink.AF_UNSPEC
-	err = nl.Request(req, func(rsp []byte) error {
-		h, rsp := netlink.ExtractNlMsghdr(rsp)
-		if h.Type != netlink.RTM_NEWADDR {
-			return nil
+	if err := nl.Request(msg); err != nil {
+		return err
+	}
+	for {
+		rsp, data, err := nl.Next()
+		if err != nil {
+			return err
+		} else if rsp.Seq != req.Seq {
+			continue
+		} else if rsp.Type == netlink.NLMSG_DONE {
+			break
+		} else if rsp.Type == netlink.NLMSG_ERROR {
+			return netlink.ExtractError(data)
+		} else if rsp.Type != netlink.RTM_NEWADDR {
+			continue
 		}
-		ifaddr, rsp := netlink.ExtractIfAddrmsg(rsp)
-		rta, rsp := netlink.ExtractRtAttr(rsp)
-		_ = rta
-		if nif, ok := byIndex[int(ifaddr.Index)]; ok {
-			var ip netip.Addr
-			switch ifaddr.Family {
-			case netlink.AF_INET:
-				ip = netip.AddrFrom4([4]byte(rsp[:4]))
-			case netlink.AF_INET6:
-				ip = netip.AddrFrom16([16]byte(rsp[:16]))
+		ifaddr, data := netlink.ExtractIfAddrmsg(data)
+		nif, ok := byIndex[int(ifaddr.Index)]
+		if !ok {
+			continue
+		}
+		var addr, local netip.Addr
+		for t, v, m := rta(data); t != IFA_UNSPEC; t, v, m = rta(m) {
+			switch t {
+			case netlink.IFA_ADDRESS,
+				netlink.IFA_LOCAL,
+				netlink.IFA_BROADCAST,
+				netlink.IFA_ANYCAST,
+				netlink.IFA_MULTICAST:
+				switch ifaddr.Family {
+				case netlink.AF_INET:
+					v = v[:4]
+				case netlink.AF_INET6:
+					v = v[:16]
+				}
+				a, aok := netip.AddrFromSlice(v)
+				if !aok {
+					continue
+				}
+				switch t {
+				case netlink.IFA_ADDRESS:
+					addr = a
+				case netlink.IFA_LOCAL:
+					local = a
+				case netlink.IFA_BROADCAST:
+					nif.Extra["l3broadcast"] = a
+				case netlink.IFA_ANYCAST:
+					nif.Extra["anycast"] = a
+				case netlink.IFA_MULTICAST:
+					nif.Multicasts =
+						append(nif.Multicasts, a)
+				}
+			case netlink.IFA_LABEL:
+				nif.Extra["label"] = netlink.CloneString(v)
 			}
-			prefix := netip.PrefixFrom(ip, int(ifaddr.Prefixlen))
+		}
+		if addr.IsValid() {
+			if local.IsValid() && local.Compare(addr) != 0 {
+				nif.Extra["peer"] = addr
+				addr = local
+			}
+			prefix := netip.PrefixFrom(addr, int(ifaddr.Prefixlen))
 			nif.Prefixes = append(nif.Prefixes, prefix)
 		}
-		return nil
-	})
-	return
+	}
+	return nil
 }
 
-func (nif *Netif) update(data []byte) error {
+func (nif *Netif) ifinfo(data []byte) error {
 	var stats64 *netlink.RtnlLinkStats[uint64]
-	h, rsp := netlink.ExtractNlMsghdr(data)
-	if h.Type != netlink.RTM_NEWLINK {
-		return nil
-	}
-	ifinfo, rsp := netlink.ExtractIfInfomsg(rsp)
+	ifinfo, data := netlink.ExtractIfInfomsg(data)
 	if nif.Index != 0 && int(ifinfo.Index) != nif.Index {
 		return nil
 	}
@@ -92,91 +161,84 @@ func (nif *Netif) update(data []byte) error {
 	iff := IFF(ifinfo.Flags)
 	nif.Extra["iff"] = iff
 	nif.parseIFF(iff)
-	for len(rsp) > netlink.SizeofRtAttr {
-		rta := netlink.Pointer[netlink.RtAttr](rsp)
-		val := rsp[netlink.SizeofRtAttr:int(rta.Len)]
-		rsp = rsp[align.RTA.Roundup(int(rta.Len)):]
-		var t byte
-		for _, b := range val {
-			t |= b
+	for t, v, data := rta(data); t != IFLA_UNSPEC; t, v, data = rta(data) {
+		var isnt0 bool
+		for _, b := range v {
+			if b != 0 {
+				isnt0 = true
+			}
 		}
-		switch rta.Type {
+		switch t {
 		case netlink.IFLA_UNSPEC:
 		case netlink.IFLA_ADDRESS:
-			if t != 0 {
-				nif.HardwareAddr = make(net.HardwareAddr,
-					len(val))
-				copy(nif.HardwareAddr, val)
+			if isnt0 {
+				nif.HardwareAddr =
+					net.HardwareAddr(netlink.Clone(v))
 			}
 		case netlink.IFLA_BROADCAST:
-			if t != 0 {
-				ha := make(net.HardwareAddr, len(val))
-				copy(ha, val)
-				nif.Extra["broadcast"] = ha
+			if isnt0 {
+				nif.Extra["broadcast"] =
+					net.HardwareAddr(netlink.Clone(v))
 			}
 		case netlink.IFLA_IFNAME:
-			nif.Name = netlink.CloneString(val)
+			nif.Name = netlink.CloneString(v)
 		case netlink.IFLA_MTU:
-			nif.MTU = int(*(netlink.Pointer[uint32](val)))
+			nif.MTU = int(*(netlink.Pointer[uint32](v)))
 		case netlink.IFLA_LINK:
-			nif.Extra["link"] = *(netlink.Pointer[uint32](val))
+			nif.Extra["link"] = *(netlink.Pointer[uint32](v))
 		case netlink.IFLA_QDISC:
-			nif.Extra["qdisc"] = netlink.CloneString(val)
+			nif.Extra["qdisc"] = netlink.CloneString(v)
 		case netlink.IFLA_STATS:
 			if stats64 == nil {
-				delete(nif.Extra, "stats")
 				stats := netlink.Pointer[netlink.
-					RtnlLinkStats[uint32]](val)
-				nif.Extra["stats"] = *stats
-				nif.Rx.Packets = uint64(stats64.RxPackets)
-				nif.Rx.Bytes = uint64(stats64.RxBytes)
-				nif.Rx.Drops = uint64(stats64.RxDropped)
-				nif.Rx.Errors = uint64(stats64.RxErrors)
-				nif.Tx.Packets = uint64(stats64.TxPackets)
-				nif.Tx.Bytes = uint64(stats64.TxBytes)
-				nif.Tx.Drops = uint64(stats64.TxDropped)
-				nif.Tx.Errors = uint64(stats64.TxErrors)
-				nif.Collisions = uint64(stats64.Collisions)
+					RtnlLinkStats[uint32]](v)
+				nif.Rx.Packets = uint64(stats.RxPackets)
+				nif.Rx.Bytes = uint64(stats.RxBytes)
+				nif.Rx.Drops = uint64(stats.RxDropped)
+				nif.Rx.Errors = uint64(stats.RxErrors)
+				nif.Tx.Packets = uint64(stats.TxPackets)
+				nif.Tx.Bytes = uint64(stats.TxBytes)
+				nif.Tx.Drops = uint64(stats.TxDropped)
+				nif.Tx.Errors = uint64(stats.TxErrors)
+				nif.Collisions = uint64(stats.Collisions)
 			}
 		case netlink.IFLA_COST:
 		case netlink.IFLA_PRIORITY:
 		case netlink.IFLA_MASTER:
-			nif.Extra["master"] = *(netlink.Pointer[uint32](val))
+			nif.Extra["master"] = *(netlink.Pointer[uint32](v))
 		case netlink.IFLA_WIRELESS:
 		case netlink.IFLA_PROTINFO:
 		case netlink.IFLA_TXQLEN:
-			nif.Extra["qlen"] = *(netlink.Pointer[uint32](val))
+			nif.Extra["qlen"] = *(netlink.Pointer[uint32](v))
 		case netlink.IFLA_MAP:
-			if t != 0 {
+			if isnt0 {
 				nif.Extra["ifmap"] = *(netlink.
-					Pointer[netlink.RtnlLinkIfmap](val))
+					Pointer[netlink.RtnlLinkIfmap](v))
 			}
 		case netlink.IFLA_WEIGHT:
-			nif.Extra["weight"] = *(netlink.Pointer[uint32](val))
+			nif.Extra["weight"] = *(netlink.Pointer[uint32](v))
 		case netlink.IFLA_OPERSTATE:
 			delete(nif.Extra, "state")
-			if s, ok := netlink.IfOperName[val[0]]; ok {
+			if s, ok := netlink.IfOperName[v[0]]; ok {
 				nif.Extra["state"] = s
 			}
 		case netlink.IFLA_LINKMODE:
 			delete(nif.Extra, "mode")
-			if s, ok := netlink.IfLinkModeName[val[0]]; ok {
+			if s, ok := netlink.IfLinkModeName[v[0]]; ok {
 				nif.Extra["mode"] = s
 			}
 		case netlink.IFLA_LINKINFO:
 			// nested
 		case netlink.IFLA_NET_NS_PID:
-			nif.Extra["ns-pid"] = *(netlink.Pointer[int32](val))
+			nif.Extra["ns-pid"], _ = netlink.Extract[int32](v)
 		case netlink.IFLA_IFALIAS:
-			nif.Extra["alias"] = netlink.CloneString(val)
+			nif.Extra["alias"] = netlink.CloneString(v)
 		case netlink.IFLA_NUM_VF:
-			nif.Extra["num-vf"] = *(netlink.Pointer[int32](val))
+			nif.Extra["num-vf"], _ = netlink.Extract[int32](v)
 		case netlink.IFLA_VFINFO_LIST:
 		case netlink.IFLA_STATS64:
-			delete(nif.Extra, "stats")
 			stats64 = netlink.Pointer[netlink.
-				RtnlLinkStats[uint64]](val)
-			nif.Extra["stats"] = *stats64
+				RtnlLinkStats[uint64]](v)
 			nif.Rx.Packets = stats64.RxPackets
 			nif.Rx.Bytes = stats64.RxBytes
 			nif.Rx.Drops = stats64.RxDropped
@@ -191,18 +253,18 @@ func (nif *Netif) update(data []byte) error {
 		case netlink.IFLA_AF_SPEC:
 			// nested
 		case netlink.IFLA_GROUP:
-			nif.Extra["group"] = *(netlink.Pointer[int32](val))
+			nif.Extra["group"] = *(netlink.Pointer[int32](v))
 		case netlink.IFLA_NET_NS_FD:
-			nif.Extra["ns-pid"] = *(netlink.Pointer[int32](val))
+			nif.Extra["ns-pid"] = *(netlink.Pointer[int32](v))
 		case netlink.IFLA_EXT_MASK:
 		case netlink.IFLA_PROMISCUITY:
-			nif.Extra["promiscuity"] = *(netlink.Pointer[int32](val))
+			nif.Extra["promiscuity"] = *(netlink.Pointer[int32](v))
 		case netlink.IFLA_NUM_TX_QUEUES:
-			nif.Extra["tx-queues"] = *(netlink.Pointer[uint32](val))
+			nif.Extra["tx-queues"] = *(netlink.Pointer[uint32](v))
 		case netlink.IFLA_NUM_RX_QUEUES:
-			nif.Extra["rx-queues"] = *(netlink.Pointer[uint32](val))
+			nif.Extra["rx-queues"] = *(netlink.Pointer[uint32](v))
 		case netlink.IFLA_CARRIER:
-			if val[0] == 0 {
+			if v[0] == 0 {
 				nif.Extra["carrier"] = "down"
 			} else {
 				nif.Extra["carrier"] = "up"

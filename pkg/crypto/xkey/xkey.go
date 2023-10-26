@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -38,8 +39,8 @@ type Private struct {
 }
 
 var (
-	ErrInvalid     = errors.New("invalid")
-	ErrUnsupported = errors.New("unsupported")
+	ErrInvalid     = fs.ErrInvalid
+	ErrUnsupported = errors.ErrUnsupported
 )
 
 func Generate(

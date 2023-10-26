@@ -9,22 +9,12 @@ package netif
 import (
 	"fmt"
 	"net"
-	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 )
 
 const ConfigParameters = `
-Config Parameters
-  {add | alias} <prefix>
-	Add network <prefix> to interface.
-  {delete | -alias} <prefix>
-	Remove network <prefix> from interface.
-  {change | replace} <prefix>
-	Change or replace the current prefix with the preceding <prefix>.
-  peer <address>
-  	Set <address> of the interface's point-to-point peer. 
   up | down
 	Enable/Disable named interface.
   arp | -arp
@@ -63,13 +53,6 @@ var ConfigParameter = map[string]Parameter{
 	"lladdr":       HardwareAddrParameter,
 	"mode":         LinkModeParameter,
 	"state":        StateParameter,
-	"add":          PrefixParameter,
-	"alias":        PrefixParameter,
-	"del":          PrefixParameter,
-	"-alias":       PrefixParameter,
-	"change":       PrefixParameter,
-	"replace":      PrefixParameter,
-	"peer":         AddrParameter,
 }
 
 var ConfigFlag = map[string]IFF{
@@ -100,14 +83,9 @@ var ConfigAttr = map[string]uint16{
 	"lladdr":       netlink.IFLA_ADDRESS,
 	"mode":         netlink.IFLA_LINKMODE,
 	"state":        netlink.IFLA_OPERSTATE,
-	"add":          netlink.IFA_LOCAL,
-	"del":          netlink.IFA_LOCAL,
-	"change":       netlink.IFA_LOCAL,
-	"replace":      netlink.IFA_LOCAL,
-	"peer":         netlink.IFA_ADDRESS,
 }
 
-func (nif *Netif) Config(args ...string) error {
+func (nif *Netif) Config(args []string) error {
 	nl, err := netlink.Open()
 	if err != nil {
 		return err
@@ -118,30 +96,21 @@ func (nif *Netif) Config(args ...string) error {
 		return egress.Marked(err)
 	}
 
-	ifahdr, ifareq := netlink.Expand[netlink.NlMsghdr](nil)
-	ifahdr.Type = netlink.RTM_NEWADDR
-	ifahdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifa, ifareq := netlink.Expand[netlink.IfAddrmsg](ifareq)
-	ifa.Family = netlink.AF_UNSPEC
-	ifa.Index = uint32(nif.Index)
-	baseIfareqLen := len(ifareq)
-
-	iflhdr, iflreq := netlink.Expand[netlink.NlMsghdr](nil)
-	iflhdr.Type = netlink.RTM_NEWLINK
-	iflhdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, iflreq := netlink.Expand[netlink.IfInfomsg](iflreq)
+	req, msg := netlink.Expand[netlink.NlMsghdr](nil)
+	req.Type = netlink.RTM_NEWLINK
+	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
+	ifinfo, msg := netlink.Expand[netlink.IfInfomsg](msg)
 	ifinfo.Family = netlink.AF_UNSPEC
 	ifinfo.Index = int32(nif.Index)
 	ifinfo.Change = 0
 	ifinfo.Flags = uint32(nif.Flags)
-	baseIflreqLen := len(iflreq)
 
 	for len(args) > 0 {
 		change := uint32(ConfigFlag[args[0]])
 		ifla := ConfigAttr[args[0]]
 		switch parameter := ConfigParameter[args[0]]; parameter {
 		case UnknownParameter:
-			return fmt.Errorf("%q %w", args[0], ErrInvalid)
+			return egress.Markf("%q %w", args[0], ErrInvalid)
 		case TrueFlagParameter:
 			ifinfo.Change |= change
 			ifinfo.Flags |= change
@@ -151,132 +120,110 @@ func (nif *Netif) Config(args ...string) error {
 			ifinfo.Flags &^= change
 			args = args[1:]
 		case TrueAttrParameter:
-			iflreq = netlink.CatAttr(iflreq, ifla, uint8(1))
+			msg = netlink.CatAttr(msg, ifla, uint8(1))
 			args = args[1:]
 		case FalseAttrParameter:
-			iflreq = netlink.CatAttr(iflreq, ifla, uint8(0))
+			msg = netlink.CatAttr(msg, ifla, uint8(0))
 			args = args[1:]
 		case Uint32Parameter:
-			var v uint32
 			if len(args) < 2 {
-				return ErrIncomplete
-			} else if _, err = fmt.Sscan(args[1], &v); err != nil {
-				return fmt.Errorf("%q %w", args[1], err)
+				return egress.Markf("%q %w",
+					args[0], ErrIncomplete)
 			}
-			iflreq = netlink.CatAttr(iflreq, ifla, v)
+			var v uint32
+			_, err = fmt.Sscan(args[1], &v)
+			if err != nil {
+				return egress.Markf("%q %w", args[1], err)
+			}
+			msg = netlink.CatAttr(msg, ifla, v)
 			args = args[2:]
 		case Int32Parameter:
-			var v int32
 			if len(args) < 2 {
-				return ErrIncomplete
-			} else if _, err = fmt.Sscan(args[1], &v); err != nil {
-				return fmt.Errorf("%q %w", args[1], err)
+				return egress.Markf("%q %w",
+					args[0], ErrIncomplete)
 			}
-			iflreq = netlink.CatAttr(iflreq, ifla, v)
+			var v int32
+			_, err = fmt.Sscan(args[1], &v)
+			if err != nil {
+				return egress.Markf("%q %w", args[1], err)
+			}
+			msg = netlink.CatAttr(msg, ifla, v)
 			args = args[2:]
 		case HardwareAddrParameter:
-			var v net.HardwareAddr
 			if len(args) < 2 {
-				return ErrIncomplete
-			} else if v, err = net.ParseMAC(args[1]); err != nil {
-				return fmt.Errorf("%q %w", args[1], err)
+				return egress.Markf("%q %w",
+					args[0], ErrIncomplete)
 			}
-			iflreq = netlink.CatBytesAttr(iflreq, ifla, v)
+			v, err := net.ParseMAC(args[1])
+			if err != nil {
+				return egress.Markf("%q %w", args[1], err)
+			}
+			msg = netlink.CatBytesAttr(msg, ifla, v)
 			args = args[2:]
 		case StringParameter:
 			if len(args) < 2 {
-				return ErrIncomplete
+				return egress.Markf("%q %w",
+					args[0], ErrIncomplete)
 			}
-			iflreq = netlink.CatStringAttr(iflreq, ifla, args[1])
+			msg = netlink.CatStringAttr(msg, ifla, args[1])
 			args = args[2:]
 		case LinkModeParameter:
 			if len(args) < 2 {
-				return ErrIncomplete
+				return egress.Markf("%q %w",
+					args[0], ErrIncomplete)
 			}
 			mode, ok := netlink.IfLinkModeByName[args[1]]
 			if !ok {
-				return fmt.Errorf("%q %w", args[1], ErrInvalid)
+				return egress.Markf("%q %w",
+					args[1], ErrInvalid)
 			}
-			iflreq = netlink.CatAttr(iflreq, ifla, mode)
+			msg = netlink.CatAttr(msg, ifla, mode)
 			args = args[2:]
 		case StateParameter:
 			if len(args) < 2 {
-				return ErrIncomplete
+				return egress.Markf("%q %w",
+					args[0], ErrIncomplete)
 			}
 			op, ok := netlink.IfOperByName[args[1]]
 			if !ok {
-				return fmt.Errorf("%q %w", args[1], ErrInvalid)
+				return egress.Markf("%q %w",
+					args[1], ErrInvalid)
 			}
-			iflreq = netlink.CatAttr(iflreq, ifla, op)
-			args = args[2:]
-		case PrefixParameter:
-			if len(args) < 2 {
-				return ErrIncomplete
-			}
-			prefix, err := netip.ParsePrefix(args[1])
-			if err != nil {
-				return fmt.Errorf("%q %w", args[1], err)
-			}
-			if prefix.Addr().Is4() {
-				ifa.Family = netlink.AF_INET
-			} else if prefix.Addr().Is6() {
-				ifa.Family = netlink.AF_INET6
-			} else {
-				return fmt.Errorf("%q %w", args[0], ErrInvalid)
-			}
-			v := prefix.Addr().AsSlice()
-			ifareq = netlink.CatBytesAttr(ifareq, ifla, v)
-			ifa.Prefixlen = uint8(prefix.Bits())
-			switch args[0] {
-			case "add":
-				ifahdr.Type = netlink.RTM_NEWADDR
-				ifahdr.Flags |= netlink.NLM_F_CREATE
-				ifahdr.Flags |= netlink.NLM_F_EXCL
-			case "del":
-				ifahdr.Type = netlink.RTM_DELADDR
-			case "change":
-				ifahdr.Type = netlink.RTM_NEWADDR
-				ifahdr.Flags |= netlink.NLM_F_REPLACE
-			case "replace":
-				ifahdr.Type = netlink.RTM_NEWADDR
-				ifahdr.Flags |= netlink.NLM_F_CREATE
-				ifahdr.Flags |= netlink.NLM_F_EXCL
-			}
-			args = args[2:]
-		case AddrParameter:
-			if len(args) < 2 {
-				return ErrIncomplete
-			}
-			peer, err := netip.ParseAddr(args[1])
-			if err != nil {
-				return fmt.Errorf("%q %w", args[1], err)
-			}
-			v := peer.AsSlice()
-			ifareq = netlink.CatBytesAttr(ifareq, ifla, v)
+			msg = netlink.CatAttr(msg, ifla, op)
 			args = args[2:]
 		default:
 			return fmt.Errorf("%q %w", args[0], ErrInvalid)
 		}
 	}
-	if ifahdr.Type != 0 && len(ifareq) > baseIfareqLen {
-		if err = nl.Request(ifareq, nil); err != nil {
-			return egress.Marked(err)
-		}
+	if err = nl.Request(msg); err == nil {
+		err = nl.Wait(req.Seq)
 	}
-	if ifinfo.Change != 0 || len(iflreq) > baseIflreqLen {
-		if err = nl.Request(iflreq, nil); err != nil {
-			return egress.Marked(err)
-		}
-	}
-	return nil
+	return err
 }
 
 func (nif *Netif) refresh(nl *netlink.Netlink) error {
-	iflhdr, iflreq := netlink.ExpandNlMsghdr(nil)
-	iflhdr.Type = netlink.RTM_GETLINK
-	iflhdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, iflreq := netlink.ExpandIfInfomsg(iflreq)
+	req, msg := netlink.ExpandNlMsghdr(nil)
+	req.Type = netlink.RTM_GETLINK
+	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
+	ifinfo, msg := netlink.ExpandIfInfomsg(msg)
 	ifinfo.Family = netlink.AF_UNSPEC
 	ifinfo.Index = int32(nif.Index)
-	return nl.Request(iflreq, nif.update)
+	if err := nl.Request(msg); err != nil {
+		return err
+	}
+	for {
+		rsp, data, err := nl.Next()
+		if err != nil {
+			return err
+		} else if rsp.Seq != req.Seq {
+			continue
+		} else if rsp.Type == netlink.NLMSG_DONE {
+			return nil
+		} else if rsp.Type == netlink.NLMSG_ERROR {
+			return netlink.ExtractError(data)
+		} else if rsp.Type != netlink.RTM_NEWLINK {
+			continue
+		}
+		return nif.ifinfo(data)
+	}
 }

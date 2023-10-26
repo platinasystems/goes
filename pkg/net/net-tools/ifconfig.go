@@ -9,14 +9,20 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"regexp"
+	"slices"
+	"unicode"
 
 	"github.com/platinasystems/goes/v2/pkg/context/help"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
+
+var inets = []string{"inet", "inet6"}
 
 func Ifconfig(
 	ctx context.Context,
@@ -25,16 +31,16 @@ func Ifconfig(
 	args ...string,
 ) error {
 	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<modifier(s)>] [<filter>] [<parameter>]...
+*/}}usage: {{$path}} [<option>]... [<parameter>]...
 Configure and display network interface parameters.
 
   • {{$path}} [<modifier(s)>] [<filter>]
     Display parameters of matching interfaces.
-  • {{$path}} <name> <prefix> <dest> [[add | alias] | [del | -alias]]
-    Add (default) or delete <prefix> from named interface with optional
-    poinit-to-point <dest> address.
+  • {{$path}} <name> <prefix> [<destination>] [<command>] [<parameter>]...
+    Add or delete a network prefix.
+    A point-to-point interface also requires the remote destination.
   • {{$path}} <filter> [<parameter>]...
-    Configure parameters of matching interfaces. 
+    Configure link parameters of matching interfaces. 
   • {{$path}} <device|name> create [<parameter>]...
     Create the specified network pseudo-device with given name or auto-named
     with cloneable device prefix.
@@ -51,13 +57,12 @@ Filters
 Modifiers
 	{ -L, -m, -r, -v }
 
-Options{{print .Flags}}` +
+Options{{print .Flags}}
+Commands` + netif.AddressCommands + `
+Parameters` + netif.AddressParameters +
 		netif.ConfigParameters +
 		netif.CreateParameters
-	var (
-		pat *regexp.Regexp
-		sel []*netif.Netif
-	)
+	var pat *regexp.Regexp
 	fs, h := flag.New()
 	mFlag := fs.Bool("m", false, "Display all supported media.")
 	LFlag := fs.Bool("L", false, "Display IPv6 address lifetime as offset.")
@@ -69,9 +74,9 @@ Options{{print .Flags}}` +
 	vFlag := fs.Bool("v", false, "Verbose display.")
 	CFlag := fs.Bool("C", false, "List cloneable devices.")
 	rFlag := fs.Bool("r", false, "Display route references.")
-	FFlag := fs.String("F", "", "Address Family {inet, inet6, link}.")
 	XFlag := fs.String("X", "", "Pattern match interface name.")
-	_ = *mFlag || *LFlag || *aFlag || *vFlag || *rFlag
+	// FIXME add these display modifiers
+	_ = *mFlag || *LFlag || *vFlag || *rFlag
 	if complete.Parameter.Value(ctx) {
 		if len(args) < 2 {
 			ncloneable := len(netif.Cloneable)
@@ -95,26 +100,12 @@ Options{{print .Flags}}` +
 			Flags fmt.Formatter
 		}{path, fs})
 	}
-	args = fs.Args()
 	if len(*XFlag) > 0 {
 		if pat, err = regexp.Compile(*XFlag); err != nil {
 			return err
 		}
 	}
-	family := *FFlag
-	if len(args) > 0 &&
-		(args[0] == "inet" || args[0] == "inet6" || args[0] == "link") {
-		family = args[0]
-		args = args[1:]
-	}
-	if len(args) > 1 && args[1] == "create" {
-		nif, err := netif.Create(args[0], args[1:]...)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(w, nif.Name)
-		return nil
-	}
+	args = fs.Args()
 	nifs, err := netif.List()
 	if err != nil {
 		return err
@@ -123,7 +114,8 @@ Options{{print .Flags}}` +
 	for _, nif := range nifs {
 		named[nif.Name] = nif
 	}
-	if *CFlag {
+	switch {
+	case *CFlag:
 		var sep string
 		for _, dev := range netif.Cloneable {
 			fmt.Fprint(w, sep, dev)
@@ -133,15 +125,13 @@ Options{{print .Flags}}` +
 			fmt.Fprintln(w)
 		}
 		return nil
-	}
-	if *lFlag {
+	case *lFlag:
 		var sep string
 		for _, nif := range nifs {
 			isup := (nif.Flags & net.FlagUp) == net.FlagUp
 			if (*dFlag && !isup) || (*uFlag && isup) ||
 				(!*dFlag && !*uFlag) {
 				// FIXME family filter
-				_ = family
 				fmt.Fprint(w, sep, nif.Name)
 				sep = " "
 			}
@@ -150,120 +140,105 @@ Options{{print .Flags}}` +
 			fmt.Fprintln(w)
 		}
 		return nil
-	}
-	if len(args) == 0 {
-		if *dFlag {
+	case *aFlag || len(args) == 0:
+		switch {
+		case *dFlag:
 			for _, nif := range nifs {
-				if nif.Flags&net.FlagUp == 0 {
-					fmt.Fprint(w, nif)
+				if pat == nil || pat.MatchString(nif.Name) {
+					if nif.Flags&net.FlagUp == 0 {
+						fmt.Fprint(w, nif)
+					}
 				}
 			}
-		} else if *uFlag {
+		case *uFlag:
 			for _, nif := range nifs {
-				if nif.Flags&net.FlagUp == net.FlagUp {
-					fmt.Fprint(w, nif)
+				if pat == nil || pat.MatchString(nif.Name) {
+					if nif.Flags&net.FlagUp == net.FlagUp {
+						fmt.Fprint(w, nif)
+					}
 				}
 			}
-		} else if pat != nil {
+		case pat != nil:
 			for _, nif := range nifs {
 				if pat.MatchString(nif.Name) {
 					fmt.Fprint(w, nif)
 				}
 			}
-		} else {
+		default:
 			for _, nif := range nifs {
 				fmt.Fprint(w, nif)
 			}
 		}
 		return nil
-	}
-	if len(args) == 1 {
-		if nif, ok := named[args[0]]; !ok {
-			err = fmt.Errorf("%q not found", args[0])
-		} else {
-			fmt.Fprint(w, nif)
-		}
-		return err
-	}
-	if args[1] == "destroy" {
-		if nif, ok := named[args[0]]; !ok {
-			err = fmt.Errorf("%q not found", args[0])
-		} else {
-			err = nif.Destroy()
-		}
-		return err
-	}
-	if *dFlag {
-		for _, nif := range nifs {
-			if nif.Flags&net.FlagUp == 0 {
-				sel = append(sel, nif)
-			}
-		}
-	} else if *uFlag {
-		for _, nif := range nifs {
-			if nif.Flags&net.FlagUp == net.FlagUp {
-				sel = append(sel, nif)
-			}
-		}
-	} else if pat != nil {
+	case pat != nil:
 		for _, nif := range nifs {
 			if pat.MatchString(nif.Name) {
-				sel = append(sel, nif)
-			}
-		}
-	} else if nif, ok := named[args[0]]; ok {
-		sel = append(sel, nif)
-		// rearrange args
-		if _, _, terr := net.ParseCIDR(args[1]); terr == nil {
-			if len(args) > 2 {
-				if net.ParseIP(args[2]) != nil {
-					if len(args) > 3 &&
-						(args[3] == "add" ||
-							args[3] == "alias") {
-						// <prefix> <dest> {add | alias}
-						args = append([]string{
-							"add", args[1],
-							"dest", args[2],
-						}, args[4:]...)
-					} else {
-						// <prefix> <dest>
-						args = append([]string{
-							"add", args[1],
-							"dest", args[2],
-						}, args[3:]...)
-					}
-				} else if args[2] == "add" || args[2] == "alias" {
-					// <prefix> {add | alias}
-					args = append([]string{"add", args[1]},
-						args[3:]...)
-				} else {
-					// <prefix> [parameter]...
-					args = append([]string{"add", args[1]},
-						args[2:]...)
+				if err = nif.Config(args[1:]); err != nil {
+					return err
 				}
-			} else {
-				// <prefix>
-				args = []string{"add", args[1]}
-			}
-		} else if net.ParseIP(args[1]) != nil {
-			if len(args) > 2 {
-				if args[2] == "del" || args[2] == "-alias" {
-					// <address> {del || -alias}
-					args = []string{"del", args[1]}
-				} else {
-					return fmt.Errorf("%q invalid", args[2])
-				}
-			} else {
-				return fmt.Errorf("incomplete")
 			}
 		}
-	} else {
-		return fmt.Errorf("%q not found", args[0])
+		return nil
 	}
-	for _, nif := range sel {
-		if err = nif.Config(args...); err != nil {
-			return err
+	if len(args) > 1 && args[1] == "create" {
+		nif, err := netif.Create(args[0], args[2:]...)
+		if err == nil {
+			fmt.Fprintln(w, nif.Name)
+		}
+		return err
+	}
+	nif, exists := named[args[0]]
+	if !exists {
+		return fmt.Errorf("%s %w", args[0], ErrNotFound)
+	}
+	args = args[1:]
+	if len(args) == 0 {
+		fmt.Fprint(w, nif)
+		return nil
+	}
+	if args[0] == "destroy" {
+		return nif.Destroy()
+	}
+	if slices.Index(inets, args[0]) >= 0 ||
+		unicode.IsNumber([]rune(args[0])[0]) {
+		return ifconfigAddr(nif, args)
+	}
+	return nif.Config(args)
+}
+
+func ifconfigAddr(nif *netif.Netif, args []string) error {
+	if slices.Index(inets, args[0]) >= 0 {
+		args = args[1:]
+	}
+	prefix, err := netip.ParsePrefix(args[0])
+	if err != nil {
+		return egress.Markf("%s %w", args[0], err)
+	}
+	addr, bits := prefix.Addr(), prefix.Bits()
+	args = args[1:]
+	var dest netip.Addr
+	if (nif.Flags & net.FlagPointToPoint) != 0 {
+		if len(args) == 0 {
+			return egress.
+				Markf("%w, missing point-to-point destination",
+					ErrIncomplete)
+		}
+		if dest, err = netip.ParseAddr(args[0]); err != nil {
+			return egress.Markf("%v %w", args[0], err)
+		}
+		args = args[1:]
+	}
+	if len(args) > 0 {
+		switch args[0] {
+		case "add", "alias":
+			return nif.Add(addr, dest, bits, args[1:])
+		case "del", "delete", "-alias":
+			return nif.Del(addr, dest, bits, args[1:])
+		case "change":
+			return nif.Change(addr, dest, bits, args[1:])
+		case "replace":
+			return nif.Replace(addr, dest, bits, args[1:])
 		}
 	}
-	return nil
+	return nif.Add(addr, dest, bits, args)
 }

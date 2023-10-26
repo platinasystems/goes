@@ -24,7 +24,7 @@ const (
 	CanPersist     = false
 	CanChangeOwner = false
 	CanChangeGroup = false
-	DevTun         = "/dev/net/tun"
+	DevNetTun      = "/dev/net/tun"
 )
 
 func New(
@@ -33,7 +33,7 @@ func New(
 	persist bool,
 	owner, group int,
 	ha netif.HardwareAddr,
-) (t *os.File, err error) {
+) (*os.File, error) {
 	ifr := new(Ifreq)
 	ifrp := uintptr(unsafe.Pointer(ifr))
 
@@ -46,10 +46,25 @@ func New(
 	}
 	copy(ifr.Ifrn[:], []byte(fmt.Sprintf("%s%d", prefix, unit)))
 
-	fd, err := syscall.Open(DevTun, os.O_RDWR, 0)
+	if _, err := os.Stat(DevNetTun); err != nil {
+		const (
+			major = 10
+			minor = 200
+			dev   = (major << 8) | (minor & 0xff) |
+				((minor & 0xfff00) << 12)
+		)
+		if _, err = os.Stat("/dev/net"); err != nil {
+			return nil, egress.Marked(err)
+		}
+		err = syscall.Mknod(DevNetTun, syscall.S_IFCHR, dev)
+		if err != nil {
+			return nil, egress.Marked(err)
+		}
+	}
+
+	fd, err := syscall.Open(DevNetTun, os.O_RDWR, 0)
 	if err != nil {
-		err = fmt.Errorf("%s: %w", DevTun, err)
-		return
+		return nil, egress.Marked(err)
 	}
 	defer func() {
 		if err != nil {
@@ -59,14 +74,14 @@ func New(
 	defer egress.Recovery(&err)
 
 	if err = ioctl(uintptr(fd), syscall.TUNSETIFF, ifrp); err != nil {
-		panic(err)
+		return nil, egress.Marked(err)
 	}
 
 	bzero(ifr.Ifrn[:])
 	bzero(ifr.Ifru[:])
 
 	if err = ioctl(uintptr(fd), syscall.TUNGETIFF, ifrp); err != nil {
-		panic(err)
+		return nil, egress.Marked(err)
 	}
 
 	ifname := gstring(ifr.Ifrn[:])
@@ -74,36 +89,35 @@ func New(
 	if owner != Unset {
 		err = ioctl(uintptr(fd), syscall.TUNSETOWNER, uintptr(owner))
 		if err != nil {
-			panic(err)
+			return nil, egress.Marked(err)
 		}
 	}
 
 	if group != Unset {
 		err = ioctl(uintptr(fd), syscall.TUNSETGROUP, uintptr(group))
 		if err != nil {
-			panic(err)
+			return nil, egress.Marked(err)
 		}
 	}
 
 	if persist {
 		err = ioctl(uintptr(fd), syscall.TUNSETPERSIST, uintptr(1))
 		if err != nil {
-			panic(err)
+			return nil, egress.Marked(err)
 		}
 	}
 
 	if isTAP {
 		if err = setmac(ifname, ha); err != nil {
-			panic(err)
+			return nil, egress.Marked(err)
 		}
 	}
 
 	if err = syscall.SetNonblock(fd, true); err != nil {
-		panic(err)
+		return nil, egress.Marked(err)
 	}
 
-	t = os.NewFile(uintptr(fd), ifname)
-	return
+	return os.NewFile(uintptr(fd), ifname), nil
 }
 
 func setmac(ifname string, ha netif.HardwareAddr) error {

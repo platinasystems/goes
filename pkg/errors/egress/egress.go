@@ -14,6 +14,7 @@ import (
 var FileNameMutation = filepath.Base
 
 // Wrap a non-nil error with the caller's file name and line number, e.g.
+//
 //	if err != nil {
 //		return Marked(err)
 //	}
@@ -26,8 +27,20 @@ func Marked(err error) error {
 	return err
 }
 
+// Wrap fmt.Errorf with the caller's file name and line number, e.g.
+//
+//	return Markf(format, args...)
+func Markf(format string, args ...any) error {
+	err := fmt.Errorf(format, args...)
+	if _, f, l, ok := runtime.Caller(1); ok {
+		err = &mark{f, l, err}
+	}
+	return err
+}
+
 // Record a recovered panic as an error wrapped with the panic'd file name and
 // line number, e.g.
+//
 //	func() (err error) {
 //		...
 //		defer Recovery(&err)

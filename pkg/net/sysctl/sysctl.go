@@ -8,7 +8,6 @@
 package sysctl
 
 import (
-	"errors"
 	"os"
 	"syscall"
 	"unsafe"
@@ -36,21 +35,24 @@ type SockaddrTypes interface {
 	SockaddrSubHdr | SockaddrDatalink | SockaddrIn | SockaddrIn6
 }
 
-var Err3Strikes = errors.New("failed 3 times")
+var trysize = []uintptr{
+	4 << 10, // 4KB
+	64 << 10,
+	256 << 10,
+	1 << 20, // 1MB
+}
 
 func Get(mib ...int32) ([]byte, error) {
-	for try, b := 0, make([]byte, align.Page.Size()); try < 3; try++ {
-		n := uintptr(len(b))
-		err := sysctl(mib, &b[0], &n, nil, 0)
-		if err == nil {
+	for try := 0; try < len(trysize); try++ {
+		n := trysize[try]
+		b := make([]byte, n)
+		if err := sysctl(mib, &b[0], &n, nil, 0); err == nil {
 			return b[:n], nil
-		}
-		if err != syscall.ENOMEM {
+		} else if err != syscall.ENOMEM {
 			return nil, os.NewSyscallError("sysctl", err)
 		}
-		b = make([]byte, align.Page.Roundup(int(n)))
 	}
-	return nil, Err3Strikes
+	return nil, syscall.ENOMEM
 }
 
 // Return the beginning type along with any attached body and remainder.

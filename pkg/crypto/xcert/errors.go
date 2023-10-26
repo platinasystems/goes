@@ -4,10 +4,13 @@
 
 package xcert
 
-import "errors"
+import (
+	"errors"
+	"io/fs"
+)
 
 var (
-	ErrInvalid    = errors.New("invalid")
+	ErrInvalid    = fs.ErrInvalid
 	ErrNilLeaf    = errors.New("nil leaf")
 	ErrNoName     = errors.New("no name")
 	ErrNoDNSNames = errors.New("no DNS names")

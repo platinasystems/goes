@@ -14,10 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 )
 
-const CreateParameters = `
-Create Parameters
-  FIXME
-`
+const CreateParameters = ""
 
 var Cloneable = []string{
 	"bridge",

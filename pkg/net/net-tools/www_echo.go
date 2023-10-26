@@ -80,11 +80,8 @@ Ping echo host.
 
 <host>
     [<ip6>]:<port>
-    <ip6>
     <ip4>:<port>
-    <ip4>
     <name>:<port>
-    <name>
 
 The default is 127.0.0.1:{{.Port}}.
 `
@@ -99,11 +96,11 @@ The default is 127.0.0.1:{{.Port}}.
 	}
 	url := fmt.Sprint("http://127.0.0.1:", WWWEchoPort, "/hello")
 	if len(args) > 0 {
-		url = fmt.Sprint("http://", args[0], "hello")
+		url = fmt.Sprint("http://", args[0], "/hello")
 	}
 	resp, err := http.Get(url)
-	defer resp.Body.Close()
 	if err == nil {
+		defer resp.Body.Close()
 		nl := []byte{'\n'}
 		io.Copy(w, resp.Body)
 		w.Write(nl)

@@ -15,11 +15,14 @@ func (nif *Netif) Destroy() error {
 	}
 	defer nl.Close()
 
-	iflhdr, iflreq := netlink.ExpandNlMsghdr(nil)
-	iflhdr.Type = netlink.RTM_DELLINK
-	iflhdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, iflreq := netlink.ExpandIfInfomsg(iflreq)
+	req, msg := netlink.ExpandNlMsghdr(nil)
+	req.Type = netlink.RTM_DELLINK
+	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
+	ifinfo, msg := netlink.ExpandIfInfomsg(msg)
 	ifinfo.Family = netlink.AF_UNSPEC
 	ifinfo.Index = int32(nif.Index)
-	return nl.Request(iflreq, nil)
+	if err = nl.Request(msg); err == nil {
+		err = nl.Wait(req.Seq)
+	}
+	return err
 }

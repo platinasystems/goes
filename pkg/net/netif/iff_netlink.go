@@ -31,16 +31,19 @@ func Admin(ifname string, with, without IFF) error {
 	if nif == nil {
 		return egress.Marked(ErrNotFound)
 	}
-	iflhdr, iflreq := netlink.Expand[netlink.NlMsghdr](nil)
-	iflhdr.Type = netlink.RTM_NEWLINK
-	iflhdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, iflreq := netlink.Expand[netlink.IfInfomsg](iflreq)
+	req, msg := netlink.Expand[netlink.NlMsghdr](nil)
+	req.Type = netlink.RTM_NEWLINK
+	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
+	ifinfo, msg := netlink.Expand[netlink.IfInfomsg](msg)
 	ifinfo.Family = netlink.AF_UNSPEC
 	ifinfo.Index = int32(nif.Index)
 	ifinfo.Change = uint32(with | without)
 	ifinfo.Flags |= uint32(with)
 	ifinfo.Flags &^= uint32(without)
-	return egress.Marked(nl.Request(iflreq, nil))
+	if err = nl.Request(msg); err == nil {
+		err = nl.Wait(req.Seq)
+	}
+	return err
 }
 
 func Down(ifname string) error {

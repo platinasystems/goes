@@ -13,10 +13,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-const CreateParameters = `
-Create Parameters
-  FIXME
-`
+const CreateParameters = ""
 
 var Cloneable = []string{
 	"feth",

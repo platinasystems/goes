@@ -409,7 +409,7 @@ Daemons
 		}
 		return do(Select, ctx, r, w, path, daemons, args...)
 	}
-	if program.IsKoApp() {
+	if os.Getpid() == 1 {
 		dpath := []string{path[0], "daemon"}
 		return do(Select, ctx, r, w, dpath, daemons, args...)
 	}
@@ -424,12 +424,8 @@ Daemons
 	if _, err = fmt.Sscan(u.Gid, &cred.Gid); err != nil {
 		return fmt.Errorf("user:gid: %w", err)
 	}
-	cmd := exec.Command(program.Executable())
-	if help.Parameter.Value(ctx) {
-		cmd.Args = append(cmd.Args, "help")
-	}
-	cmd.Args = append(cmd.Args, "daemon")
-	cmd.Args = append(cmd.Args, args...)
+	args = append([]string{"daemon"}, args...)
+	cmd := exec.Command(program.Executable(), args...)
 	cmd.Env = []string{
 		Path(),
 	}

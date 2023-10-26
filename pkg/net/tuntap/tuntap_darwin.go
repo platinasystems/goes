@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 )
 
@@ -34,8 +33,7 @@ var (
 )
 
 var (
-	namsiz  = uintptr(IFNAMSIZ)
-	namsizp = uintptr(unsafe.Pointer(&namsiz))
+	namsiz = uintptr(IFNAMSIZ)
 )
 
 func New(
@@ -44,17 +42,15 @@ func New(
 	persist bool,
 	owner, group int,
 	ha netif.HardwareAddr,
-) (t *os.File, err error) {
+) (*os.File, error) {
 	if isTAP {
-		err = ErrCantTAP
+		return nil, ErrCantTAP
 	} else if persist {
-		err = ErrCantPersist
+		return nil, ErrCantPersist
 	} else if owner != Unset {
-		err = ErrCantChangeOwner
+		return nil, ErrCantChangeOwner
 	} else if group != Unset {
-		err = ErrCantChangeGroup
-	} else if err != nil {
-		return
+		return nil, ErrCantChangeGroup
 	}
 
 	fd, err := syscall.
@@ -67,13 +63,15 @@ func New(
 			syscall.Close(fd)
 		}
 	}()
-	defer egress.Recovery(&err)
 
-	ci := newCtlInfo()
-	cip := uintptr(unsafe.Pointer(ci))
+	ci := new(CtlInfo)
+	for i, b := range []byte(UTUN_CONTROL_NAME) {
+		ci.Name[i] = int8(b)
+	}
 
-	if err = ioctl(uintptr(fd), CTLIOCGINFO, cip); err != nil {
-		panic(err)
+	err = ioctl(uintptr(fd), CTLIOCGINFO, uintptr(unsafe.Pointer(ci)))
+	if err != nil {
+		return nil, err
 	}
 
 	sac := &SockaddrCtl{
@@ -83,20 +81,23 @@ func New(
 		Sc_id:      ci.Id,
 		Sc_unit:    uint32(unit) + 1,
 	}
-	sacp := uintptr(unsafe.Pointer(sac))
 	_, _, errno := syscall.RawSyscall(syscall.SYS_CONNECT, uintptr(fd),
-		sacp, SizeofSockaddrCtl)
+		uintptr(unsafe.Pointer(sac)), SizeofSockaddrCtl)
 	if errno != 0 {
-		panic(os.NewSyscallError("connect", errno))
+		err = fmt.Errorf("utun%d:%w", unit,
+			os.NewSyscallError("connect", errno))
+		return nil, err
 	}
 
 	name := make([]byte, IFNAMSIZ, IFNAMSIZ)
-	namep := uintptr(unsafe.Pointer(&name[0]))
-
 	_, _, errno = syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(fd),
-		SYSPROTO_CONTROL, UTUN_OPT_IFNAME, namep, namsizp, 0)
+		SYSPROTO_CONTROL, UTUN_OPT_IFNAME,
+		uintptr(unsafe.Pointer(&name[0])),
+		uintptr(unsafe.Pointer(&namsiz)),
+		0)
 	if errno != 0 {
-		panic(os.NewSyscallError("ifname", errno))
+		err = os.NewSyscallError("ifname", errno)
+		return nil, err
 	}
 
 	for i, b := range name {
@@ -107,17 +108,8 @@ func New(
 	}
 
 	if err = syscall.SetNonblock(fd, true); err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	t = os.NewFile(uintptr(fd), string(name))
-	return
-}
-
-func newCtlInfo() *CtlInfo {
-	ci := new(CtlInfo)
-	for i, b := range []byte(UTUN_CONTROL_NAME) {
-		ci.Name[i] = int8(b)
-	}
-	return ci
+	return os.NewFile(uintptr(fd), string(name)), nil
 }
