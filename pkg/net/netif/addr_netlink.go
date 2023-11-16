@@ -11,6 +11,9 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
 const AddressCommands = `
@@ -24,50 +27,71 @@ const AddressCommands = `
 
 const AddressParameters = ""
 
-func (nif *Netif) Add(addr, dest netip.Addr, bits int, args []string) (
-	err error,
-) {
-	args, err = nif.addr(netlink.RTM_NEWADDR,
-		netlink.NLM_F_CREATE|netlink.NLM_F_EXCL,
-		addr, dest, bits, args)
+func (nif *NetIf) Add(
+	prefix netip.Prefix,
+	dest netip.Addr,
+	args []string,
+) (err error) {
+	const (
+		cmd   = rtnetlink.RTM_NEWADDR
+		flags = netlink.NLM_F_CREATE | netlink.NLM_F_EXCL
+	)
+	args, err = nif.addr(cmd, flags, prefix, dest, args)
 	if err == nil && len(args) > 0 {
 		err = nif.Config(args)
 	}
 	return
 }
 
-func (nif *Netif) Change(addr, dest netip.Addr, bits int, args []string) (
-	err error,
-) {
-	args, err = nif.addr(netlink.RTM_NEWADDR, netlink.NLM_F_REPLACE,
-		addr, dest, bits, args)
+func (nif *NetIf) Change(
+	prefix netip.Prefix,
+	dest netip.Addr,
+	args []string,
+) (err error) {
+	const (
+		cmd   = rtnetlink.RTM_NEWADDR
+		flags = netlink.NLM_F_REPLACE
+	)
+	args, err = nif.addr(cmd, flags, prefix, dest, args)
 	if err == nil && len(args) > 0 {
 		err = nif.Config(args)
 	}
 	return
 }
 
-func (nif *Netif) Del(addr, dest netip.Addr, bits int, args []string) error {
-	_, err := nif.addr(netlink.RTM_DELADDR, 0, addr, dest, bits, args)
+func (nif *NetIf) Del(
+	prefix netip.Prefix,
+	dest netip.Addr,
+	args []string,
+) error {
+	const (
+		cmd   = rtnetlink.RTM_DELADDR
+		flags = 0
+	)
+	_, err := nif.addr(cmd, flags, prefix, dest, args)
 	return err
 }
 
-func (nif *Netif) Replace(addr, dest netip.Addr, bits int, args []string) (
-	err error,
-) {
-	args, err = nif.addr(netlink.RTM_NEWADDR,
-		netlink.NLM_F_CREATE|netlink.NLM_F_REPLACE,
-		addr, dest, bits, args)
+func (nif *NetIf) Replace(
+	prefix netip.Prefix,
+	dest netip.Addr,
+	args []string,
+) (err error) {
+	const (
+		cmd   = rtnetlink.RTM_NEWADDR
+		flags = netlink.NLM_F_CREATE | netlink.NLM_F_REPLACE
+	)
+	args, err = nif.addr(cmd, flags, prefix, dest, args)
 	if err == nil && len(args) > 0 {
 		err = nif.Config(args)
 	}
 	return
 }
 
-func (nif *Netif) addr(
+func (nif *NetIf) addr(
 	cmd, flags uint16,
-	addr, dest netip.Addr,
-	bits int,
+	prefix netip.Prefix,
+	dest netip.Addr,
 	args []string,
 ) ([]string, error) {
 	nl, err := netlink.Open()
@@ -76,49 +100,47 @@ func (nif *Netif) addr(
 	}
 	defer nl.Close()
 
-	req, msg := netlink.Expand[netlink.NlMsghdr](nil)
-	req.Type = cmd
-	req.Flags = flags | netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifa, msg := netlink.Expand[netlink.IfAddrmsg](msg)
+	addr, bits := prefix.Addr(), prefix.Bits()
+
+	hdr, req := netlink.ExpandMsgHdr(nil)
+	hdr.Type = cmd
+	hdr.Flags = flags | netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
+	ifa, req := netlink.ExpandIfAddrMsg(req)
 	ifa.Index = uint32(nif.Index)
-	ifa.Prefixlen = uint8(bits)
+	ifa.PrefixLen = uint8(bits)
 
 	if addr.Is4() {
-		ifa.Family = netlink.AF_INET
+		ifa.Family = af.INET
 	} else if addr.Is6() {
-		ifa.Family = netlink.AF_INET6
+		ifa.Family = af.INET6
 	} else {
-		return args, egress.Markf("%v %w", addr, ErrWrongFamily)
+		return args, egress.Markf("%v %w", prefix, ErrWrongFamily)
 	}
 
 	if dest.IsValid() {
-		if ifa.Family == netlink.AF_INET {
+		if ifa.Family == af.INET {
 			if dest.Is4() {
-				ifa.Prefixlen = 32
+				ifa.PrefixLen = 32
 			} else {
 				return args, egress.Markf("%v %w",
 					dest, ErrWrongFamily)
 			}
 		} else if dest.Is6() {
-			ifa.Prefixlen = 128
+			ifa.PrefixLen = 128
 		} else {
 			return args, egress.Markf("%v %w", dest, ErrWrongFamily)
 		}
-		msg = netlink.
-			CatBytesAttr(msg, netlink.IFA_ADDRESS, dest.AsSlice())
+		req = netlink.
+			CatBytesAttr(req, ifaddr.IFA_ADDRESS, dest.AsSlice())
 	}
 
-	msg = netlink.CatBytesAttr(msg, netlink.IFA_LOCAL, addr.AsSlice())
+	req = netlink.CatBytesAttr(req, ifaddr.IFA_LOCAL, addr.AsSlice())
 
-	if err := nl.Request(msg); err != nil {
+	if err = nl.Request(req); err != nil {
 		return args, egress.Marked(err)
 	}
-	if err = nl.Wait(req.Seq); err != nil {
+	if err = nl.Wait(hdr.SEQ); err != nil {
 		return args, egress.Marked(err)
-	}
-	if dest.IsValid() && (ifa.Family == netlink.AF_INET && bits < 32) ||
-		(ifa.Family == netlink.AF_INET6 && bits < 128) {
-		// FIXME add route
 	}
 	return args, nil
 }

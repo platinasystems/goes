@@ -12,6 +12,9 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
 const CreateParameters = ""
@@ -37,7 +40,7 @@ var Cloneable = []string{
 	"vxlan",
 }
 
-func Create(name string, args ...string) (*Netif, error) {
+func Create(name string, args ...string) (*NetIf, error) {
 	var kind string
 	for _, dev := range Cloneable {
 		if strings.HasPrefix(name, dev) {
@@ -52,38 +55,41 @@ func Create(name string, args ...string) (*Netif, error) {
 		return nil, fmt.Errorf("%q %w", name, ErrUnsupported)
 	}
 
+	_, existing, _, err := List()
+	if err != nil {
+		return nil, err
+	}
+
 	nl, err := netlink.Open()
 	if err != nil {
 		return nil, egress.Marked(err)
 	}
 	defer nl.Close()
 
-	nifs, err := list(nl)
-	if err != nil {
-		return nil, err
-	}
-	existing := make(map[int]*Netif)
-	for _, nif := range nifs {
-		existing[nif.Index] = nif
-	}
-
-	h, req := netlink.Expand[netlink.NlMsghdr](nil)
-	h.Type = netlink.RTM_NEWLINK
-	h.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK |
+	hdr, req := netlink.ExpandMsgHdr(nil)
+	hdr.Type = rtnetlink.RTM_NEWLINK
+	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK |
 		netlink.NLM_F_CREATE | netlink.NLM_F_EXCL
 
-	ifinfo, req := netlink.Expand[netlink.IfInfomsg](req)
-	ifinfo.Family = netlink.AF_UNSPEC
+	ifinfo, req := netlink.Expand[rtnetlink.IfInfoMsg](req)
+	ifinfo.Family = af.UNSPEC
 
-	req = netlink.CatStringAttr(req, netlink.IFLA_IFNAME, name)
+	req = netlink.CatStringAttr(req, iflink.IFLA_IFNAME, name)
 
 	i := len(req)
-	nested, req := netlink.Expand[netlink.RtAttr](req)
-	nested.Type = netlink.IFLA_LINKINFO
-	req = netlink.CatStringAttr(req, netlink.IFLA_INFO_KIND, kind)
+	nested, req := netlink.Expand[iflink.Attr](req)
+	nested.Type = iflink.IFLA_LINKINFO
+	req = netlink.CatStringAttr(req, iflink.IFLA_INFO_KIND, kind)
 	nested.Len = uint16(len(req) - i)
 
-	if nifs, err = list(nl); err != nil {
+	if err = nl.Request(req); err != nil {
+		return nil, egress.Marked(err)
+	}
+	if err = nl.Wait(hdr.SEQ); err != nil {
+		return nil, egress.Marked(err)
+	}
+	nifs, _, _, err := List()
+	if err != nil {
 		return nil, egress.Marked(err)
 	}
 	for _, nif := range nifs {

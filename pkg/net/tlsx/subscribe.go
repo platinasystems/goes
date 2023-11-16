@@ -29,7 +29,7 @@ Register with exchange.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) == 0 {

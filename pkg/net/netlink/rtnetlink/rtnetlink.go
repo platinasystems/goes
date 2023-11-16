@@ -1,0 +1,618 @@
+// SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+
+package rtnetlink
+
+const (
+	RTNL_FAMILY_IPMR  = 128
+	RTNL_FAMILY_IP6MR = 129
+	RTNL_FAMILY_MAX   = 129
+)
+
+const RTM_BASE = 16
+const (
+	RTM_NEWLINK = RTM_BASE + iota
+	RTM_DELLINK
+	RTM_GETLINK
+	RTM_SETLINK
+)
+const (
+	RTM_NEWADDR = 20 + iota
+	RTM_DELADDR
+	RTM_GETADDR
+	_
+)
+const (
+	RTM_NEWROUTE = 24 + iota
+	RTM_DELROUTE
+	RTM_GETROUTE
+	_
+)
+const (
+	RTM_NEWNEIGH = 28 + iota
+	RTM_DELNEIGH
+	RTM_GETNEIGH
+	_
+)
+const (
+	RTM_NEWRULE = 32 + iota
+	RTM_DELRULE
+	RTM_GETRULE
+	_
+)
+const (
+	RTM_NEWQDISC = 36 + iota
+	RTM_DELQDISC
+	RTM_GETQDISC
+	_
+)
+const (
+	RTM_NEWTCLASS = 40 + iota
+	RTM_DELTCLASS
+	RTM_GETTCLASS
+	_
+)
+const (
+	RTM_NEWTFILTER = 44 + iota
+	RTM_DELTFILTER
+	RTM_GETTFILTER
+	_
+)
+const (
+	RTM_NEWACTION = 48 + iota
+	RTM_DELACTION
+	RTM_GETACTION
+	_
+)
+const (
+	RTM_NEWPREFIX = 52 + iota
+	_
+	_
+	_
+	_
+	_
+)
+const (
+	RTM_GETMULTICAST = 58 + iota
+	_
+	_
+	_
+)
+const (
+	RTM_GETANYCAST = 62 + iota
+	_
+)
+const (
+	RTM_NEWNEIGHTBL = 64 + iota
+	_
+)
+const (
+	RTM_GETNEIGHTBL = 66 + iota
+	RTM_SETNEIGHTBL
+)
+const (
+	RTM_NEWNDUSEROPT = 68 + iota
+	_
+	_
+	_
+)
+const (
+	RTM_NEWADDRLABEL = 72 + iota
+	RTM_DELADDRLABEL
+	RTM_GETADDRLABEL
+	_
+	_
+	_
+	_
+)
+const (
+	RTM_GETDCB = 78 + iota
+	RTM_SETDCB
+)
+const (
+	RTM_NEWNETCONF = 80 + iota
+	RTM_DELNETCONF
+	RTM_GETNETCONF
+	_
+)
+const (
+	RTM_NEWMDB = 84 + iota
+	RTM_DELMDB
+	RTM_GETMDB
+	_
+)
+const (
+	RTM_NEWNSID = 88 + iota
+	RTM_DELNSID
+	RTM_GETNSID
+	_
+)
+const (
+	RTM_NEWSTATS = 92 + iota
+	_
+)
+const (
+	RTM_GETSTATS = 94 + iota
+	RTM_SETSTATS
+)
+const (
+	RTM_NEWCACHEREPORT = 96 + iota
+	_
+	_
+	_
+)
+const (
+	RTM_NEWCHAIN = 100 + iota
+	RTM_DELCHAIN
+	RTM_GETCHAIN
+	_
+)
+const (
+	RTM_NEWNEXTHOP = 104 + iota
+	RTM_DELNEXTHOP
+	RTM_GETNEXTHOP
+	_
+)
+const (
+	RTM_NEWLINKPROP = 108 + iota
+	RTM_DELLINKPROP
+	RTM_GETLINKPROP
+	_
+)
+const (
+	RTM_NEWVLAN = 112 + iota
+	RTM_DELVLAN
+	RTM_GETVLAN
+	_
+)
+const (
+	RTM_NEWNEXTHOPBUCKET = 116 + iota
+	RTM_DELNEXTHOPBUCKET
+	RTM_GETNEXTHOPBUCKET
+	_
+)
+const (
+	RTM_NEWTUNNEL = 120 + iota
+	RTM_DELTUNNEL
+	RTM_GETTUNNEL
+	RTM_CNT
+)
+const RTM_MAX = ((RTM_CNT + 3) &^ 3) - 1
+const RTM_NR_MSGTYPES = RTM_CNT - RTM_BASE
+const RTM_NR_FAMILIES = RTM_NR_MSGTYPES >> 2
+
+func RTM_FAM(cmd uint16) uint16 {
+	return (((cmd) - RTM_BASE) >> 2)
+}
+
+type RtMsg struct {
+	Family uint8
+	DstLen uint8
+	SrcLen uint8
+	TOS    uint8
+
+	Table    RtTable
+	Protocol uint8
+	Scope    RtScope
+	Type     uint8
+
+	Flags uint32
+}
+
+const (
+	RTN_UNSPEC = iota
+	RTN_UNICAST
+	RTN_LOCAL
+	RTN_BROADCAST
+	RTN_ANYCAST
+	RTN_MULTICAST
+	RTN_BLACKHOLE
+	RTN_UNREACHABLE
+	RTN_PROHIBIT
+	RTN_THROW
+	RTN_NAT
+	RTN_XRESOLVE
+	RTN_CNT
+)
+const RTN_MAX = RTN_CNT - 1
+
+const (
+	RTPROT_UNSPEC = iota
+	RTPROT_REDIRECT
+	RTPROT_KERNEL
+	RTPROT_BOOT
+	RTPROT_STATIC
+)
+const (
+	RTPROT_GATED = 8 + iota
+	RTPROT_RA
+	RTPROT_MRT
+	RTPROT_ZEBRA
+	RTPROT_BIRD
+	RTPROT_DNROUTED
+	RTPROT_XORP
+	RTPROT_NTK
+	RTPROT_DHCP
+	RTPROT_MROUTED
+	RTPROT_KEEPALIVED
+)
+const RTPROT_BABEL = 42
+const RTPROT_OPENR = 99
+const (
+	RTPROT_BGP = 186 + iota
+	RTPROT_ISIS
+	RTPROT_OSPF
+	RTPROT_RIP
+	_
+	_
+	RTPROT_EIGRP
+)
+
+type RtScope = uint8
+
+const (
+	RT_SCOPE_UNIVERSE RtScope = 0
+	RT_SCOPE_SITE     RtScope = 200
+	RT_SCOPE_LINK     RtScope = 253
+	RT_SCOPE_HOST     RtScope = 254
+	RT_SCOPE_NOWHERE  RtScope = 255
+)
+
+const (
+	RTM_F_NOTIFY         = 0x100
+	RTM_F_CLONED         = 0x200
+	RTM_F_EQUALIZE       = 0x400
+	RTM_F_PREFIX         = 0x800
+	RTM_F_LOOKUP_TABLE   = 0x1000
+	RTM_F_FIB_MATCH      = 0x2000
+	RTM_F_OFFLOAD        = 0x4000
+	RTM_F_TRAP           = 0x8000
+	RTM_F_OFFLOAD_FAILED = 0x20000000
+)
+
+type RtTable = uint8
+
+const (
+	RT_TABLE_UNSPEC  RtTable = 0
+	RT_TABLE_COMPAT  RtTable = 252
+	RT_TABLE_DEFAULT RtTable = 253
+	RT_TABLE_MAIN    RtTable = 254
+	RT_TABLE_LOCAL   RtTable = 255
+)
+
+type Rta = uint16
+
+const (
+	RTA_UNSPEC Rta = iota
+	RTA_DST
+	RTA_SRC
+	RTA_IIF
+	RTA_OIF
+	RTA_GATEWAY
+	RTA_PRIORITY
+	RTA_PREFSRC
+	RTA_METRICS
+	RTA_MULTIPATH
+	RTA_PROTOINFO
+	RTA_FLOW
+	RTA_CACHEINFO
+	RTA_SESSION
+	RTA_MP_ALGO
+	RTA_TABLE
+	RTA_MARK
+	RTA_MFC_STATS
+	RTA_VIA
+	RTA_NEWDST
+	RTA_PREF
+	RTA_ENCAP_TYPE
+	RTA_ENCAP
+	RTA_EXPIRES
+	RTA_PAD
+	RTA_UID
+	RTA_TTL_PROPAGATE
+	RTA_IP_PROTO
+	RTA_SPORT
+	RTA_DPORT
+	RTA_NH_ID
+	RTA_CNT
+)
+const RTA_MAX = RTA_CNT - 1
+
+type Attr struct {
+	Len  uint16
+	Type Rta
+}
+
+const SizeofRtAttr = 2 + 2
+
+const RTA_ALIGNTO = 4
+
+type RtNextHop struct {
+	Len     uint16
+	Flags   uint8
+	Hops    uint8
+	IfIndex int32
+}
+
+const (
+	RTNH_F_DEAD = 1 << iota
+	RTNH_F_PERVASIVE
+	RTNH_F_ONLINK
+	RTNH_F_OFFLOAD
+	RTNH_F_LINKDOWN
+	RTNH_F_UNRESOLVED
+	RTNH_F_TRAP
+)
+const RTNH_COMPARE_MASK = RTNH_F_DEAD |
+	RTNH_F_LINKDOWN |
+	RTNH_F_OFFLOAD |
+	RTNH_F_TRAP
+
+const RTNH_ALIGNTO = 4
+
+type RtVia struct {
+	Family uint16
+}
+
+type RtaCacheinfo struct {
+	ClntRef uint32
+	LastUse uint32
+	Expires uint32
+	Error   uint32
+	Used    uint32
+
+	ID    uint32
+	TS    uint32
+	Tsage uint32
+}
+
+const RTNETLINK_HAVE_PEERINFO = 1
+
+const (
+	RTAX_UNSPEC = iota
+	RTAX_LOCK
+	RTAX_MTU
+	RTAX_WINDOW
+	RTAX_RTT
+	RTAX_RTTVAR
+	RTAX_SSTHRESH
+	RTAX_CWND
+	RTAX_ADVMSS
+	RTAX_REORDERING
+	RTAX_HOPLIMIT
+	RTAX_INITCWND
+	RTAX_FEATURES
+	RTAX_RTO_MIN
+	RTAX_INITRWND
+	RTAX_QUICKACK
+	RTAX_CC_ALGO
+	RTAX_FASTOPEN_NO_COOKIE
+	RTAX_CNT
+)
+const RTAX_MAX = RTAX_CNT - 1
+
+const (
+	RTAX_FEATURE_ECN = 1 << iota
+	RTAX_FEATURE_SACK
+	RTAX_FEATURE_TIMESTAMP
+	RTAX_FEATURE_ALLFRAG
+)
+const RTAX_FEATURE_MASK = RTAX_FEATURE_ECN |
+	RTAX_FEATURE_SACK |
+	RTAX_FEATURE_TIMESTAMP |
+	RTAX_FEATURE_ALLFRAG
+
+type RtaSession struct {
+	Proto uint8
+	_     uint8
+	_     uint16
+	Union uint32
+}
+
+type RtaSessionPoirts struct {
+	Sport uint16
+	Dport uint16
+}
+
+type RtaSessionICMP struct {
+	Type  uint8
+	Code  uint8
+	Ident uint16
+}
+
+type RtaSessionSPI = uint32
+
+type RtaMfcStats struct {
+	packets   uint64
+	MfcsBytes uint64
+	WrongIf   uint64
+}
+
+type RtGenMsg struct {
+	Family uint8
+}
+
+type IfInfoMsg struct {
+	Family uint8
+	_      uint8
+	Type   uint16
+	Index  int32
+	Flags  uint32
+	Change uint32
+}
+
+type PrefixMsg struct {
+	Family  uint8
+	_       uint8
+	_       uint16
+	IfIndex int32
+	Type    uint8
+	Len     uint8
+	Flags   uint8
+	_       uint8
+}
+
+const (
+	PREFIX_UNSPEC = iota
+	PREFIX_ADDRESS
+	PREFIX_CACHEINFO
+	PREFIX_CNT
+)
+const PREFIX_MAX = PREFIX_CNT - 1
+
+type PrefixCacheinfo struct {
+	PreferredTime uint32
+	ValidTime     uint32
+}
+
+type TcMsg struct {
+	Family  uint8
+	_       uint8
+	_       uint16
+	IfIndex int32
+	Handle  uint32
+	Parent  uint32
+	Info    uint32
+}
+
+const (
+	TCA_UNSPEC = iota
+	TCA_KIND
+	TCA_OPTIONS
+	TCA_STATS
+	TCA_XSTATS
+	TCA_RATE
+	TCA_FCNT
+	TCA_STATS2
+	TCA_STAB
+	TCA_PAD
+	TCA_DUMP_INVISIBLE
+	TCA_CHAIN
+	TCA_HW_OFFLOAD
+	TCA_INGRESS_BLOCK
+	TCA_EGRESS_BLOCK
+	TCA_DUMP_FLAGS
+	TCA_EXT_WARN_MSG
+	TCA_CNT
+)
+const TCA_MAX = TCA_CNT - 1
+
+const (
+	TCA_DUMP_FLAGS_TERSE = 1 << iota
+)
+
+type NdUserOptMsg struct {
+	Family   uint8
+	_        uint8
+	OptsLen  uint16
+	IfIndex  int32
+	IcmpType uint8
+	IcmpCode uint8
+	_        uint16
+	_        uint32
+}
+
+const (
+	NDUSEROPT_UNSPEC = iota
+	NDUSEROPT_SRCADDR
+	NDUSEROPT_CNT
+)
+const NDUSEROPT_MAX = NDUSEROPT_CNT - 1
+
+const (
+	RTMGRP_LINK = 1 << iota
+	RTMGRP_NOTIFY
+	RTMGRP_NEIGH
+	RTMGRP_TC
+	RTMGRP_IPV4_IFADDR
+	RTMGRP_IPV4_MROUTE
+	RTMGRP_IPV4_ROUTE
+	RTMGRP_IPV4_RULE
+	RTMGRP_IPV6_IFADDR
+	RTMGRP_IPV6_MROUTE
+	RTMGRP_IPV6_ROUTE
+	RTMGRP_IPV6_IFINFO
+	RTMGRP_DECnet_IFADDR
+	_
+	RTMGRP_DECnet_ROUTE
+)
+const RTMGRP_IPV6_PREFIX = 0x20000
+
+type RtnlGroup = uint8
+
+const (
+	RTNLGRP_NONE RtnlGroup = iota
+	RTNLGRP_LINK
+	RTNLGRP_NOTIFY
+	RTNLGRP_NEIGH
+	RTNLGRP_TC
+	RTNLGRP_IPV4_IFADDR
+	RTNLGRP_IPV4_MROUTE
+	RTNLGRP_IPV4_ROUTE
+	RTNLGRP_IPV4_RULE
+	RTNLGRP_IPV6_IFADDR
+	RTNLGRP_IPV6_MROUTE
+	RTNLGRP_IPV6_ROUTE
+	RTNLGRP_IPV6_IFINFO
+	RTNLGRP_DECnet_IFADDR
+	RTNLGRP_NOP2
+	RTNLGRP_DECnet_ROUTE
+	RTNLGRP_DECnet_RULE
+	RTNLGRP_NOP4
+	RTNLGRP_IPV6_PREFIX
+	RTNLGRP_IPV6_RULE
+	RTNLGRP_ND_USEROPT
+	RTNLGRP_PHONET_IFADDR
+	RTNLGRP_PHONET_ROUTE
+	RTNLGRP_DCB
+	RTNLGRP_IPV4_NETCONF
+	RTNLGRP_IPV6_NETCONF
+	RTNLGRP_MDB
+	RTNLGRP_MPLS_ROUTE
+	RTNLGRP_NSID
+	RTNLGRP_MPLS_NETCONF
+	RTNLGRP_IPV4_MROUTE_R
+	RTNLGRP_IPV6_MROUTE_R
+	RTNLGRP_NEXTHOP
+	RTNLGRP_BRVLAN
+	RTNLGRP_MCTP_IFADDR
+	RTNLGRP_TUNNEL
+	RTNLGRP_STATS
+	RTNLGRP_CNT
+)
+const RTNLGRP_MAX = RTNLGRP_CNT - 1
+
+type TcaMsg struct {
+	Family uint8
+	_      uint8
+	_      uint16
+}
+
+const (
+	TCA_ROOT_UNSPEC = iota
+	TCA_ROOT_TAB
+	TCA_ROOT_FLAGS
+	TCA_ROOT_COUNT
+	TCA_ROOT_TIME_DELTA
+	TCA_ROOT_EXT_WARN_MSG
+	TCA_ROOT_CNT
+)
+const TCA_ACT_TAB = TCA_ROOT_TAB
+const TCAA_MAX = TCA_ROOT_TAB
+const TCA_ROOT_MAX = TCA_ROOT_CNT - 1
+
+const (
+	TCA_FLAG_LARGE_DUMP_ON = 1 << iota
+	TCA_ACT_FLAG_TERSE_DUMP
+)
+const TCA_ACT_FLAG_LARGE_DUMP_ON = TCA_FLAG_LARGE_DUMP_ON
+
+const (
+	RTEXT_FILTER_VF = 1 << iota
+	RTEXT_FILTER_BRVLAN
+	RTEXT_FILTER_BRVLAN_COMPRESSED
+	RTEXT_FILTER_SKIP_STATS
+	RTEXT_FILTER_MRP
+	RTEXT_FILTER_CFM_CONFIG
+	RTEXT_FILTER_CFM_STATUS
+	RTEXT_FILTER_MST
+)

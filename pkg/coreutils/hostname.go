@@ -27,8 +27,8 @@ func Hostname(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>] [<name>]
 Set or print system host name.
-{{ print .Flags}}`
-	fs, h := flag.New()
+{{SprintDefault .Flags}}`
+	fs := flag.New("hostname")
 	dFlag := fs.Bool("d", false, "only print domain")
 	fFlag := fs.Bool("f", true, "print fully qualified domain name (FQDN)")
 	sFlag := fs.Bool("s", false, "print name w/o domain")
@@ -39,10 +39,10 @@ Set or print system host name.
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()

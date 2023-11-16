@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/netip"
 	"sort"
+	"sync"
 )
 
 type Parameter uint8
@@ -33,7 +34,7 @@ const (
 	StateParameter
 )
 
-type Netif struct {
+type NetIf struct {
 	net.Interface
 	Type fmt.Stringer
 	// IP & IPv6
@@ -47,20 +48,7 @@ type Netif struct {
 	Collisions uint64
 }
 
-func ByName(name string) (*Netif, error) {
-	if nifs, err := List(); err != nil {
-		return nil, err
-	} else {
-		for _, nif := range nifs {
-			if nif.Name == name {
-				return nif, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("%s %w", name, ErrNotFound)
-}
-
-func (nif *Netif) Addrs() (addrs []net.Addr, err error) {
+func (nif *NetIf) Addrs() (addrs []net.Addr, err error) {
 	for _, prefix := range nif.Prefixes {
 		if addr := prefix.Addr(); !addr.IsMulticast() {
 			addrs = append(addrs, &net.IPAddr{
@@ -72,7 +60,7 @@ func (nif *Netif) Addrs() (addrs []net.Addr, err error) {
 	return
 }
 
-func (nif *Netif) MulticastAddrs() (addrs []net.Addr, err error) {
+func (nif *NetIf) MulticastAddrs() (addrs []net.Addr, err error) {
 	for _, addr := range nif.Multicasts {
 		addrs = append(addrs, &net.IPAddr{
 			IP:   net.IP(addr.AsSlice()),
@@ -82,7 +70,7 @@ func (nif *Netif) MulticastAddrs() (addrs []net.Addr, err error) {
 	return
 }
 
-func (nif *Netif) Format(w fmt.State, verb rune) {
+func (nif *NetIf) Format(w fmt.State, verb rune) {
 	buf := new(bytes.Buffer)
 	t, _ := fmt.Fprintf(w, "%s[%d]:", nif.Name, nif.Index)
 	wrap := func() {
@@ -132,35 +120,32 @@ func (nif *Netif) Format(w fmt.State, verb rune) {
 	}
 }
 
-func (nif *Netif) parseIFF(iff IFF) {
-	if iff.Has(IFF_UP) {
-		nif.Flags |= net.FlagUp
-	} else {
-		nif.Flags &^= net.FlagUp
-	}
-	if iff.Has(IFF_BROADCAST) {
-		nif.Flags |= net.FlagBroadcast
-	} else {
-		nif.Flags &^= net.FlagBroadcast
-	}
-	if iff.Has(IFF_LOOPBACK) {
-		nif.Flags |= net.FlagLoopback
-	} else {
-		nif.Flags &^= net.FlagLoopback
-	}
-	if iff.Has(IFF_POINTOPOINT) {
-		nif.Flags |= net.FlagPointToPoint
-	} else {
-		nif.Flags &^= net.FlagPointToPoint
-	}
-	if iff.Has(IFF_MULTICAST) {
-		nif.Flags |= net.FlagMulticast
-	} else {
-		nif.Flags &^= net.FlagMulticast
-	}
-	if iff.Has(IFF_RUNNING) {
-		nif.Flags |= net.FlagRunning
-	} else {
-		nif.Flags &^= net.FlagRunning
+var cache struct {
+	sync.Once
+	list    []*NetIf
+	byIndex map[int]*NetIf
+	byName  map[string]*NetIf
+}
+
+func validate() {
+	cache.list, cache.byIndex, cache.byName, _ = List()
+}
+
+func Indexed(i int) *NetIf {
+	cache.Do(validate)
+	return cache.byIndex[i]
+}
+
+func Named(s string) *NetIf {
+	cache.Do(validate)
+	return cache.byName[s]
+}
+
+func Range(f func(*NetIf) bool) {
+	cache.Do(validate)
+	for _, nif := range cache.list {
+		if !f(nif) {
+			break
+		}
 	}
 }

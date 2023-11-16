@@ -53,7 +53,7 @@ func Exchange(
 	const usage = `usage: {{join . " "}} [-r] [-a <address>]
 Start exchange at <address> (default :8003).
 `
-	fs, h := flag.New()
+	fs := flag.New("exchange")
 	tcp := fs.String("tcp", ":8003", "service address")
 	udp := fs.String("udp", ":8003", "packet service (disable if empty)")
 	fs.BoolVar(&Restricted, "r", false, "restrict clients to self")
@@ -64,7 +64,7 @@ Start exchange at <address> (default :8003).
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, path)
 	}
 	args = fs.Args()
@@ -109,7 +109,7 @@ Join exchange with reserve confirmation number.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) < 1 {
@@ -153,7 +153,7 @@ Reserve exchange membership.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) < 1 {
@@ -188,7 +188,7 @@ Returns the PEM encoded data containing the public key and nonce of member.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) < 1 {

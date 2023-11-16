@@ -8,11 +8,13 @@ package af
 
 import "syscall"
 
+const NETLINK = syscall.AF_NETLINK
+
 type Netlink int
 
 var OpenNetlink = Open[Netlink]
 
-func (Netlink) Family() int { return syscall.AF_NETLINK }
+func (Netlink) Family() int { return NETLINK }
 func (Netlink) Type() int   { return syscall.SOCK_RAW | syscall.SOCK_CLOEXEC }
 func (Netlink) Proto() int  { return syscall.NETLINK_ROUTE }
 

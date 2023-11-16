@@ -36,9 +36,10 @@ Configure and display network interface parameters.
 
   • {{$path}} [<modifier(s)>] [<filter>]
     Display parameters of matching interfaces.
-  • {{$path}} <name> <prefix> [<destination>] [<command>] [<parameter>]...
+  • {{$path}} <name> <prefix> [<command>] [<parameter>]...
     Add or delete a network prefix.
-    A point-to-point interface also requires the remote destination.
+  • {{$path}} <name> <address> <destination> [<command>] [<parameter>]...
+    Add or delete a point-to-point address.
   • {{$path}} <filter> [<parameter>]...
     Configure link parameters of matching interfaces. 
   • {{$path}} <device|name> create [<parameter>]...
@@ -57,13 +58,13 @@ Filters
 Modifiers
 	{ -L, -m, -r, -v }
 
-Options{{print .Flags}}
+Options{{SprintDefault .Flags}}
 Commands` + netif.AddressCommands + `
 Parameters` + netif.AddressParameters +
 		netif.ConfigParameters +
 		netif.CreateParameters
 	var pat *regexp.Regexp
-	fs, h := flag.New()
+	fs := flag.New("ifconfig")
 	mFlag := fs.Bool("m", false, "Display all supported media.")
 	LFlag := fs.Bool("L", false, "Display IPv6 address lifetime as offset.")
 	aFlag := fs.Bool("a", false,
@@ -80,7 +81,12 @@ Parameters` + netif.AddressParameters +
 	if complete.Parameter.Value(ctx) {
 		if len(args) < 2 {
 			ncloneable := len(netif.Cloneable)
-			nifs, _ := netif.List()
+			nifs, nifByIndex, nifByName, err := netif.List()
+			if err != nil {
+				return err
+			}
+			_ = nifByIndex
+			_ = nifByName
 			names := make([]string, ncloneable+len(nifs))
 			copy(names, netif.Cloneable)
 			for i, nif := range nifs {
@@ -94,10 +100,10 @@ Parameters` + netif.AddressParameters +
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	if len(*XFlag) > 0 {
@@ -106,14 +112,11 @@ Parameters` + netif.AddressParameters +
 		}
 	}
 	args = fs.Args()
-	nifs, err := netif.List()
+	nifs, nifByIndex, nifByName, err := netif.List()
 	if err != nil {
 		return err
 	}
-	named := make(map[string]*netif.Netif)
-	for _, nif := range nifs {
-		named[nif.Name] = nif
-	}
+	_ = nifByIndex
 	switch {
 	case *CFlag:
 		var sep string
@@ -187,8 +190,8 @@ Parameters` + netif.AddressParameters +
 		}
 		return err
 	}
-	nif, exists := named[args[0]]
-	if !exists {
+	nif, ok := nifByName[args[0]]
+	if !ok {
 		return fmt.Errorf("%s %w", args[0], ErrNotFound)
 	}
 	args = args[1:]
@@ -206,39 +209,54 @@ Parameters` + netif.AddressParameters +
 	return nif.Config(args)
 }
 
-func ifconfigAddr(nif *netif.Netif, args []string) error {
+func ifconfigAddr(nif *netif.NetIf, args []string) error {
+	var (
+		prefix netip.Prefix
+		dest   netip.Addr
+		err    error
+	)
 	if slices.Index(inets, args[0]) >= 0 {
 		args = args[1:]
 	}
-	prefix, err := netip.ParsePrefix(args[0])
-	if err != nil {
-		return egress.Markf("%s %w", args[0], err)
-	}
-	addr, bits := prefix.Addr(), prefix.Bits()
-	args = args[1:]
-	var dest netip.Addr
 	if (nif.Flags & net.FlagPointToPoint) != 0 {
 		if len(args) == 0 {
+			return egress.Markf("%w, no address", ErrIncomplete)
+		}
+		if addr, err := netip.ParseAddr(args[0]); err != nil {
+			return egress.Markf("%q %w", args[0], err)
+		} else if addr.Is4() {
+			prefix = netip.PrefixFrom(addr, 32)
+		} else if addr.Is6() {
+			prefix = netip.PrefixFrom(addr, 128)
+		} else {
+			return egress.Markf("%q %w", args[0], ErrInvalid)
+		}
+		if args = args[1:]; len(args) == 0 {
 			return egress.
-				Markf("%w, missing point-to-point destination",
-					ErrIncomplete)
+				Markf("%w, no destination", ErrIncomplete)
 		}
 		if dest, err = netip.ParseAddr(args[0]); err != nil {
-			return egress.Markf("%v %w", args[0], err)
+			return egress.Markf("%q %w", args[0], err)
 		}
+		args = args[1:]
+	} else if len(args) == 0 {
+		return egress.Markf("%w, no prefix", ErrIncomplete)
+	} else if prefix, err = netip.ParsePrefix(args[0]); err != nil {
+		return egress.Markf("%q %w", args[0], err)
+	} else {
 		args = args[1:]
 	}
 	if len(args) > 0 {
 		switch args[0] {
 		case "add", "alias":
-			return nif.Add(addr, dest, bits, args[1:])
+			return nif.Add(prefix, dest, args[1:])
 		case "del", "delete", "-alias":
-			return nif.Del(addr, dest, bits, args[1:])
+			return nif.Del(prefix, dest, args[1:])
 		case "change":
-			return nif.Change(addr, dest, bits, args[1:])
+			return nif.Change(prefix, dest, args[1:])
 		case "replace":
-			return nif.Replace(addr, dest, bits, args[1:])
+			return nif.Replace(prefix, dest, args[1:])
 		}
 	}
-	return nif.Add(addr, dest, bits, args)
+	return nif.Add(prefix, dest, args)
 }

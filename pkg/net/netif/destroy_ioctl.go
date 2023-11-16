@@ -9,15 +9,10 @@ package netif
 import (
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
 )
 
-func (nif *Netif) Destroy() error {
-	inet, err := af.Open[af.Inet]()
-	if err != nil {
-		return err
-	}
-	defer af.Close(inet)
-	req := NewIfreq[Nothing](nif.Name)
-	return IOCTL(inet, syscall.SIOCIFDESTROY, req)
+func (nif *NetIf) Destroy() error {
+	req := netioctl.NewIfReqNothing(nif.Name)
+	return netioctl.Inet(syscall.SIOCIFDESTROY, req)
 }

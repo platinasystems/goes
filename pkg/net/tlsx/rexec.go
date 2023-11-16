@@ -27,16 +27,16 @@ func Rexec(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>] <exchange> <command> [<args>]
 Remote execution.
-{{print .Flags}}
+{{SprintDefault .Flags}}
 <exchange>
 	<name>[@<dns|ip4|\[ip6\]>][:<port>]
 `
-	fs, h := flag.New()
+	fs := flag.New("rexec")
 	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
 	if complete.Parameter.Value(ctx) {
 		if len(args) <= 1 {
-			style.Completions(args, fs.FlagSet, Self().DNS0(),
+			style.Completions(args, fs, Self().DNS0(),
 				Subscriptions().Names())
 		}
 		return nil
@@ -45,10 +45,10 @@ Remote execution.
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()

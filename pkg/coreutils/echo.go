@@ -26,22 +26,22 @@ func Echo(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>] [<strings>]
 Print string(s) to standard output.
-{{print .Flags}}`
-	fs, h := flag.New()
+{{SprintDefault .Flags}}`
+	fs := flag.New("echo")
 	esc := fs.Bool("e", false, "Interpret escapes.")
 	nonl := fs.Bool("n", false, "Without trailing newline.")
 	if complete.Parameter.Value(ctx) {
-		style.Completions(args, fs.FlagSet)
+		style.Completions(args, fs)
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()

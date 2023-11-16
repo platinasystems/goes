@@ -39,7 +39,7 @@ func Generate(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>]
 Generate PEM encoded x509 certifcate to stdout with stdin signature key.
-{{print .Flags}}`
+{{SprintDefault .Flags}}`
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
 
@@ -54,7 +54,7 @@ Generate PEM encoded x509 certifcate to stdout with stdin signature key.
 		}
 	}
 
-	fs, h := flag.New()
+	fs := flag.New("generate")
 	sn := fs.Int64("serial-number", 1, "")
 	dnsnames := fs.String("dns", host.Name(), "comma separated list")
 	dur := fs.Duration("duration", 10*year, "note 8760 hours per year")
@@ -66,16 +66,16 @@ Generate PEM encoded x509 certifcate to stdout with stdin signature key.
 	name := fs.String("name", defname, "")
 
 	if complete.Parameter.Value(ctx) {
-		style.Completions(args, fs.FlagSet, "*.pem")
+		style.Completions(args, fs, "*.pem")
 		return nil
 	}
 	if err = fs.Parse(args); err != nil {
 		return egress.Marked(err)
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 
@@ -169,7 +169,7 @@ Print decoded x509 PEM certifcate(s) from the named file or stdin.
 		style.Completions(args, "*.pem")
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) > 0 && args[0] != "-" {

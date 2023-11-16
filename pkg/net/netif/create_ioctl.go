@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
 )
 
 const CreateParameters = ""
@@ -26,29 +26,26 @@ var Cloneable = []string{
 	"pktap",
 }
 
-func Create(name string, args ...string) (*Netif, error) {
-	nifs, err := List()
+func Create(name string, args ...string) (*NetIf, error) {
+	beforeNifs, beforeByIndex, beforeByName, err := List()
 	if err != nil {
 		return nil, egress.Marked(err)
 	}
-	existing := make(map[int]*Netif)
-	for _, nif := range nifs {
-		existing[nif.Index] = nif
-	}
-	inet, err := af.Open[af.Inet]()
+	_ = beforeNifs
+	_ = beforeByName
+	req := netioctl.NewIfReqNothing(name)
+	err = netioctl.Inet(syscall.SIOCIFCREATE2, req)
 	if err != nil {
 		return nil, egress.Marked(err)
 	}
-	defer af.Close(inet)
-	req := NewIfreq[Nothing](name)
-	if err = IOCTL(inet, syscall.SIOCIFCREATE2, req); err != nil {
+	afterNifs, afterByIndex, afterByName, err := List()
+	if err != nil {
 		return nil, egress.Marked(err)
 	}
-	if nifs, err = List(); err != nil {
-		return nil, egress.Marked(err)
-	}
-	for _, nif := range nifs {
-		if _, existed := existing[nif.Index]; !existed {
+	_ = afterByIndex
+	_ = afterByName
+	for _, nif := range afterNifs {
+		if _, existed := beforeByIndex[nif.Index]; !existed {
 			return nif, nil
 		}
 	}

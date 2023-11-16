@@ -9,11 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
+	"github.com/platinasystems/goes/v2/pkg/net/netrt"
+	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -37,23 +40,20 @@ Show network status.
   • {{$path}} -rs [-s]
   • {{$path}} -B [-I interface]
 
-Options{{print $.Flags}}`
-	fs, h := flag.New()
+Options{{SprintDefault .Flags}}`
+	fs := flag.New("netstat")
 	iFlag := fs.Bool("i", false, "Show interface info.")
-	sFlag := fs.Bool("s", false, "Show per-protocol stats.")
-	ssFlag := fs.Bool("ss", false, "Show per-protocol, non-zero stats.")
-	mFlag := fs.Bool("m", false, "Show memory stats.")
-	mmFlag := fs.Bool("mm", false, "Show detailed memory stats.")
 	rFlag := fs.Bool("r", false, "Show routing table.")
-	fFlag := fs.String("f", "", "Address Family {inet, inet6, link}.")
-	IFlag := fs.String("I", "", "Interface name.")
-	pFlag := fs.Int("p", 0, "Protocol number.")
-	wFlag := fs.Duration("w", 0, "Wait interval.")
-	_ = *sFlag || *ssFlag || *mFlag || *mmFlag || *rFlag
-	_ = fFlag
-	_ = IFlag
-	_ = *pFlag
-	_ = *wFlag
+	_ = fs.String("f", "", "Address Family: inet, inet6, link.")
+	_ = fs.Int("F", -1, "FIB number, -1 for current.")
+	_ = fs.String("I", "", "Interface name.")
+	_ = fs.Bool("m", false, "Show memory stats.")
+	_ = fs.Bool("mm", false, "Show detailed memory stats.")
+	_ = fs.Bool("n", false, "Show numeric address instead of lookup.")
+	_ = fs.Int("p", 0, "Protocol number.")
+	_ = fs.Bool("s", false, "Show per-protocol stats.")
+	_ = fs.Bool("ss", false, "Show per-protocol, non-zero stats.")
+	_ = fs.Duration("w", 0, "Wait interval.")
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
@@ -61,44 +61,54 @@ Options{{print $.Flags}}`
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()
 	switch {
 	case *iFlag:
-		nifs, err := netif.List()
-		if err != nil {
-			return err
+		return netstati(ctx, w, fs)
+	case *rFlag:
+		return netstatr(ctx, w, fs)
+	default:
+		return errors.New("FIXME")
+	}
+	return nil
+}
+
+func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
+	nifs, nifByIndex, nifByName, err := netif.List()
+	if err != nil {
+		return err
+	}
+	_ = nifByIndex
+	if ifname := flag.Eval[string](fs, "I"); len(ifname) > 0 {
+		if nif, ok := nifByName[ifname]; !ok {
+			return fmt.Errorf("%q %w", ifname, ErrNotFound)
+		} else {
+			nifs = []*netif.NetIf{nif}
 		}
-		if name := *IFlag; len(name) > 0 {
-			for _, nif := range nifs {
-				if nif.Name == name {
-					nifs[0] = nif
-					nifs = nifs[:1]
-					break
-				}
-			}
-			if len(nifs) > 1 {
-				return fmt.Errorf("%q not found", name)
-			}
-		}
-		fmt.Fprintf(w, "%-15s", "Name")
-		fmt.Fprintf(w, " %5s", "MTU")
-		fmt.Fprintf(w, " %11s", "Ipkts")
-		fmt.Fprintf(w, " %11s", "Ibytes")
-		fmt.Fprintf(w, " %11s", "Idrops")
-		fmt.Fprintf(w, " %11s", "Ierrs")
-		fmt.Fprintf(w, " %11s", "Opkts")
-		fmt.Fprintf(w, " %11s", "Obytes")
-		fmt.Fprintf(w, " %11s", "Odrops")
-		fmt.Fprintf(w, " %11s", "Oerrs")
-		fmt.Fprintf(w, " %11s", "Coll")
-		fmt.Fprintln(w)
-		for _, nif := range nifs {
+	}
+	fmt.Fprintf(w, "%-15s", "Name")
+	fmt.Fprintf(w, " %5s", "MTU")
+	fmt.Fprintf(w, " %11s", "Ipkts")
+	fmt.Fprintf(w, " %11s", "Ibytes")
+	fmt.Fprintf(w, " %11s", "Idrops")
+	fmt.Fprintf(w, " %11s", "Ierrs")
+	fmt.Fprintf(w, " %11s", "Opkts")
+	fmt.Fprintf(w, " %11s", "Obytes")
+	fmt.Fprintf(w, " %11s", "Odrops")
+	fmt.Fprintf(w, " %11s", "Oerrs")
+	fmt.Fprintf(w, " %11s", "Coll")
+	fmt.Fprintln(w)
+	for _, nif := range nifs {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 			fmt.Fprintf(w, "%-15s", nif.Name)
 			fmt.Fprintf(w, " %5d", nif.MTU)
 			fmt.Fprintf(w, " %11d", nif.Rx.Packets)
@@ -112,8 +122,126 @@ Options{{print $.Flags}}`
 			fmt.Fprintf(w, " %11d", nif.Collisions)
 			fmt.Fprintln(w)
 		}
+	}
+	return nil
+}
+
+func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
+	var family uint
+	switch s := flag.Eval[string](fs, "f"); s {
+	case "":
+		family = af.UNSPEC
+	case "inet":
+		family = af.INET
+	case "inet6":
+		family = af.INET6
 	default:
-		return errors.New("FIXME")
+		return fmt.Errorf("%q %w", s, ErrInvalid)
+	}
+	nifs, nifByIndex, nifByName, err := netif.List()
+	if err != nil {
+		return err
+	}
+	_ = nifs
+	_ = nifByName
+	nrts, err := netrt.NewList()
+	if err != nil {
+		return err
+	}
+	defer nrts.Close()
+	dstbuf := new(strings.Builder)
+	gwbuf := new(strings.Builder)
+	flagbuf := new(strings.Builder)
+	var dsts, gws, flags, ifnames []string
+	for {
+		nrt, err := nrts.Next()
+		if err != nil {
+			return err
+		} else if nrt == nil {
+			break
+		}
+		dstip := nrt.Dst()
+		gwip := nrt.GW()
+		line := nrt.Line()
+		if !dstip.IsValid() {
+			continue
+		}
+		if family == af.INET && dstip.Is6() {
+			continue
+		}
+		if family == af.INET6 && dstip.Is4() {
+			continue
+		}
+		dstbuf.Reset()
+		gwbuf.Reset()
+		flagbuf.Reset()
+		if dstip.IsUnspecified() {
+			fmt.Fprint(dstbuf, "default")
+		} else {
+			fmt.Fprint(dstbuf, dstip)
+		}
+		if dstip.Is6() && !gwip.IsValid() {
+			if line > 0 {
+				fmt.Fprint(dstbuf, "%", nifByIndex[line].Name)
+			}
+		}
+		if n := nrt.Bits(); n > 0 {
+			fmt.Fprint(dstbuf, "/", n)
+		}
+		if gwip.IsValid() {
+			fmt.Fprint(gwbuf, gwip)
+		} else if ha := nrt.HA(); len(ha) > 0 {
+			s := ha.String()
+			gwbuf.WriteString(strings.Replace(s, ":", ".", -1))
+		} else if nif, ok := nifByIndex[line]; ok {
+			gwbuf.WriteString(nif.Name)
+		} else {
+			fmt.Fprint(gwbuf, "line#", line)
+		}
+		for _, fc := range netrt.NetstatFlagCodes {
+			if nrt.Flags()&fc.Flag != 0 {
+				flagbuf.WriteRune(fc.Code)
+			}
+		}
+		dsts = append(dsts, dstbuf.String())
+		gws = append(gws, gwbuf.String())
+		flags = append(flags, flagbuf.String())
+		i := nrt.Index()
+		if nif, ok := nifByIndex[i]; ok {
+			ifnames = append(ifnames, nif.Name)
+		} else {
+			ifnames = append(ifnames, fmt.Sprint(i))
+		}
+	}
+	wdst := 16
+	for _, s := range dsts {
+		if n := len(s); n > wdst {
+			wdst = n
+		}
+	}
+	wgw := 16
+	for _, s := range gws {
+		if n := len(s); n > wgw {
+			wgw = n
+		}
+	}
+	wflags := 4
+	for _, s := range flags {
+		if n := len(s); n > wflags {
+			wflags = n
+		}
+	}
+	for i := range dsts {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			fmt.Fprintf(w, "%-*s %-*s %-*s %s\n",
+				wdst, dsts[i],
+				wgw, gws[i],
+				wflags, flags[i],
+				ifnames[i])
+		}
 	}
 	return nil
 }

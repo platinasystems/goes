@@ -12,6 +12,9 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
 const ConfigParameters = `
@@ -55,37 +58,37 @@ var ConfigParameter = map[string]Parameter{
 	"state":        StateParameter,
 }
 
-var ConfigFlag = map[string]IFF{
-	"up":     IFF_UP,
-	"-arp":   IFF_NOARP,
-	"no-arp": IFF_NOARP,
-	"down":   IFF_UP,
-	"arp":    IFF_NOARP,
+var ConfigFlag = map[string]iflink.NetDeviceFlag{
+	"up":     iflink.IFF_UP,
+	"-arp":   iflink.IFF_NOARP,
+	"no-arp": iflink.IFF_NOARP,
+	"down":   iflink.IFF_UP,
+	"arp":    iflink.IFF_NOARP,
 }
 
-var ConfigAttr = map[string]uint16{
-	"carrier":      netlink.IFLA_CARRIER,
-	"protodown":    netlink.IFLA_PROTO_DOWN,
-	"-protodown":   netlink.IFLA_PROTO_DOWN,
-	"no-protodown": netlink.IFLA_PROTO_DOWN,
-	"-carrier":     netlink.IFLA_CARRIER,
-	"no-carrier":   netlink.IFLA_CARRIER,
-	"protoup":      netlink.IFLA_PROTO_DOWN,
-	"link-netnsid": netlink.IFLA_LINK_NETNSID,
-	"mtu":          netlink.IFLA_MTU,
-	"numtxqueues":  netlink.IFLA_NUM_TX_QUEUES,
-	"numrxqueues":  netlink.IFLA_NUM_RX_QUEUES,
-	"txqueuelen":   netlink.IFLA_TXQLEN,
-	"master":       netlink.IFLA_MASTER,
-	"vrf":          netlink.IFLA_MASTER,
-	"address":      netlink.IFLA_ADDRESS,
-	"ether":        netlink.IFLA_ADDRESS,
-	"lladdr":       netlink.IFLA_ADDRESS,
-	"mode":         netlink.IFLA_LINKMODE,
-	"state":        netlink.IFLA_OPERSTATE,
+var ConfigAttr = map[string]iflink.Ifla{
+	"carrier":      iflink.IFLA_CARRIER,
+	"protodown":    iflink.IFLA_PROTO_DOWN,
+	"-protodown":   iflink.IFLA_PROTO_DOWN,
+	"no-protodown": iflink.IFLA_PROTO_DOWN,
+	"-carrier":     iflink.IFLA_CARRIER,
+	"no-carrier":   iflink.IFLA_CARRIER,
+	"protoup":      iflink.IFLA_PROTO_DOWN,
+	"link-netnsid": iflink.IFLA_LINK_NETNSID,
+	"mtu":          iflink.IFLA_MTU,
+	"numtxqueues":  iflink.IFLA_NUM_TX_QUEUES,
+	"numrxqueues":  iflink.IFLA_NUM_RX_QUEUES,
+	"txqueuelen":   iflink.IFLA_TXQLEN,
+	"master":       iflink.IFLA_MASTER,
+	"vrf":          iflink.IFLA_MASTER,
+	"address":      iflink.IFLA_ADDRESS,
+	"ether":        iflink.IFLA_ADDRESS,
+	"lladdr":       iflink.IFLA_ADDRESS,
+	"mode":         iflink.IFLA_LINKMODE,
+	"state":        iflink.IFLA_OPERSTATE,
 }
 
-func (nif *Netif) Config(args []string) error {
+func (nif *NetIf) Config(args []string) error {
 	nl, err := netlink.Open()
 	if err != nil {
 		return err
@@ -96,11 +99,11 @@ func (nif *Netif) Config(args []string) error {
 		return egress.Marked(err)
 	}
 
-	req, msg := netlink.Expand[netlink.NlMsghdr](nil)
-	req.Type = netlink.RTM_NEWLINK
+	req, msg := netlink.Expand[netlink.MsgHdr](nil)
+	req.Type = rtnetlink.RTM_NEWLINK
 	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, msg := netlink.Expand[netlink.IfInfomsg](msg)
-	ifinfo.Family = netlink.AF_UNSPEC
+	ifinfo, msg := netlink.Expand[rtnetlink.IfInfoMsg](msg)
+	ifinfo.Family = af.UNSPEC
 	ifinfo.Index = int32(nif.Index)
 	ifinfo.Change = 0
 	ifinfo.Flags = uint32(nif.Flags)
@@ -172,7 +175,7 @@ func (nif *Netif) Config(args []string) error {
 				return egress.Markf("%q %w",
 					args[0], ErrIncomplete)
 			}
-			mode, ok := netlink.IfLinkModeByName[args[1]]
+			mode, ok := iflink.ModeByName[args[1]]
 			if !ok {
 				return egress.Markf("%q %w",
 					args[1], ErrInvalid)
@@ -184,7 +187,7 @@ func (nif *Netif) Config(args []string) error {
 				return egress.Markf("%q %w",
 					args[0], ErrIncomplete)
 			}
-			op, ok := netlink.IfOperByName[args[1]]
+			op, ok := iflink.OperByName[args[1]]
 			if !ok {
 				return egress.Markf("%q %w",
 					args[1], ErrInvalid)
@@ -196,32 +199,34 @@ func (nif *Netif) Config(args []string) error {
 		}
 	}
 	if err = nl.Request(msg); err == nil {
-		err = nl.Wait(req.Seq)
+		err = nl.Wait(req.SEQ)
 	}
 	return err
 }
 
-func (nif *Netif) refresh(nl *netlink.Netlink) error {
-	req, msg := netlink.ExpandNlMsghdr(nil)
-	req.Type = netlink.RTM_GETLINK
-	req.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
-	ifinfo, msg := netlink.ExpandIfInfomsg(msg)
-	ifinfo.Family = netlink.AF_UNSPEC
+func (nif *NetIf) refresh(nl *netlink.NL) error {
+	hdr, req := netlink.ExpandMsgHdr(nil)
+	hdr.Type = rtnetlink.RTM_GETLINK
+	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
+	ifinfo, req := netlink.ExpandIfInfoMsg(req)
+	ifinfo.Family = af.UNSPEC
 	ifinfo.Index = int32(nif.Index)
-	if err := nl.Request(msg); err != nil {
+	if err := nl.Request(req); err != nil {
 		return err
 	}
+	seq := hdr.SEQ
 	for {
 		rsp, data, err := nl.Next()
 		if err != nil {
 			return err
-		} else if rsp.Seq != req.Seq {
+		} else if rsp.SEQ != seq {
 			continue
 		} else if rsp.Type == netlink.NLMSG_DONE {
 			return nil
 		} else if rsp.Type == netlink.NLMSG_ERROR {
-			return netlink.ExtractError(data)
-		} else if rsp.Type != netlink.RTM_NEWLINK {
+			e, _ := netlink.ExtractMsgErr(data)
+			return e.Err()
+		} else if rsp.Type != rtnetlink.RTM_NEWLINK {
 			continue
 		}
 		return nif.ifinfo(data)

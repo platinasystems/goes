@@ -58,10 +58,10 @@ Open tap to named exchange or self @ given address.
 
 <exchange>
 	[<name>][@<dns|ip4|\[ip6\]>][:<port>]
-{{print .Flags}}`
+{{SprintDefault .Flags}}`
 	defer egress.Recovery(&err)
 	var addr net.IP
-	fs, h := flag.New()
+	fs := flag.New("tuntap")
 	fs.TextVar(&addr, "a", addr, "static network address")
 	randll := fs.Bool("r", false,
 		"use random link address instead of hashed cert SKI")
@@ -73,10 +73,10 @@ Open tap to named exchange or self @ given address.
 	if err != nil {
 		return
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		err = style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 		return
 	}

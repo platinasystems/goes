@@ -40,7 +40,7 @@ Echo UDP received packets (default <:{{.Port}}>)
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
@@ -98,7 +98,7 @@ The default <host> is 127.0.0.1:{{.Port}}.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, struct {
 			Path []string
 			Port int

@@ -6,9 +6,7 @@
 
 package af
 
-import (
-	"syscall"
-)
+import "syscall"
 
 type AF interface {
 	~int
@@ -40,6 +38,14 @@ func Addr[FD ~int](fd FD) (syscall.Sockaddr, error) {
 
 func Close[FD ~int](fd FD) error {
 	return syscall.Close(int(fd))
+}
+
+func Read[FD ~int](fd FD, b []byte) (int, error) {
+	return syscall.Read(int(fd), b)
+}
+
+func Write[FD ~int](fd FD, b []byte) (int, error) {
+	return syscall.Write(int(fd), b)
 }
 
 func Recvfrom[FD ~int](fd FD, b []byte, flags int) (

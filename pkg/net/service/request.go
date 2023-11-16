@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/rpc"
 
+	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
@@ -36,8 +37,9 @@ func (req Request) Func(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>] <host> <command> [<args>]
 Run command on <host>.
-{{print .Flags}}`
-	fs, help := flag.New()
+{{SprintDefault .Flags}}`
+	cmd := path[len(path)-1]
+	fs := flag.New(cmd)
 	in := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	if complete.Parameter.Value(ctx) {
 		return nil
@@ -46,10 +48,10 @@ Run command on <host>.
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *help {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()

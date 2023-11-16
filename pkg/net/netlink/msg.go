@@ -2,69 +2,81 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build netlink || linux
-
 package netlink
 
 import (
+	"net/netip"
+	"syscall"
 	"unsafe"
 
-	"github.com/platinasystems/goes/v2/pkg/syscall/align"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
+	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-type AttrTypes interface {
-	~byte | ~int16 | ~uint16 | ~int32 | ~uint32 | ~int64 | ~uint64
+type Messages interface {
+	MsgHdr | MsgErr |
+		ifaddr.Msg |
+		rtnetlink.IfInfoMsg |
+		rtnetlink.RtGenMsg |
+		rtnetlink.RtMsg
 }
 
-type MsgTypes interface {
-	NlMsghdr | NlMsgerr | IfAddrmsg | IfInfomsg |
-		RtAttr | RtGenmsg | RtMsg | RtNexthop |
-		RtnlLinkStats[uint32] | RtnlLinkStats[uint64] |
-		RtnlLinkIfmap
+type Attributes interface {
+	~byte | ~int16 | ~uint16 | ~int32 | ~uint32 | ~int64 | ~uint64 |
+		Attr |
+		ifaddr.Attr |
+		iflink.Attr |
+		rtnetlink.Attr |
+		iflink.IfMap |
+		iflink.Stats[uint32] |
+		iflink.Stats[uint64] |
+		rtnetlink.RtNextHop
 }
 
 // Concatenate message with attribute header and type value padded to 4-byte
 // alignment.
-func CatAttr[T AttrTypes](msg []byte, ifla uint16, v T) []byte {
-	rta, msg := Expand[RtAttr](msg)
-	rta.Len = SizeofRtAttr + uint16(unsafe.Sizeof(v))
-	rta.Type = ifla
-	p, msg := Expand[T](msg)
+func CatAttr[T ~uint16, A Attributes](msg []byte, t T, v A) []byte {
+	attr, msg := Expand[Attr](msg)
+	attr.Len = uint16(unsafe.Sizeof(*attr) + unsafe.Sizeof(v))
+	attr.Type = uint16(t)
+	p, msg := Expand[A](msg)
 	*p = v
 	return msg
 }
 
 // Concatenate message with attribute header and given bytes padded to 4-byte
 // alignment.
-func CatBytesAttr(msg []byte, ifla uint16, b []byte) []byte {
-	rta, msg := Expand[RtAttr](msg)
-	rta.Len = SizeofRtAttr + uint16(len(b))
-	rta.Type = ifla
+func CatBytesAttr[T ~uint16](msg []byte, t T, b []byte) []byte {
+	attr, msg := Expand[Attr](msg)
+	attr.Len = uint16(unsafe.Sizeof(*attr)) + uint16(len(b))
+	attr.Type = uint16(t)
 	i := len(msg)
-	msg = msg[:len(msg)+align.RTA.Roundup(len(b))]
+	msg = msg[:len(msg)+NLA_ALIGN(len(b))]
 	copy(msg[i:], b)
 	return msg
 }
 
 // Concatenate message with attribute header and null terminate string padded
 // to 4-byte alignment.
-func CatStringAttr[S ~string](msg []byte, ifla uint16, s S) []byte {
-	rta, msg := Expand[RtAttr](msg)
-	rta.Len = SizeofRtAttr + uint16(len(s)) + 1
-	rta.Type = ifla
+func CatStringAttr[T ~uint16, S ~string](msg []byte, t T, s S) []byte {
+	attr, msg := Expand[Attr](msg)
+	attr.Len = uint16(unsafe.Sizeof(*attr)) + uint16(len(s)) + 1
+	attr.Type = uint16(t)
 	i := len(msg)
-	msg = msg[:len(msg)+align.RTA.Roundup(len(s)+1)]
+	msg = msg[:len(msg)+NLA_ALIGN(len(s)+1)]
 	copy(msg[i:], []byte(s))
 	msg[i+len(s)] = 0
 	return msg
 }
 
 // Expand data by type padded to 4-byte alignment.
-func Expand[T AttrTypes | MsgTypes](data []byte) (p *T, x []byte) {
+func Expand[T Attributes | Messages](data []byte) (p *T, x []byte) {
 	i := len(data)
-	size := align.RTA.Roundup(int(unsafe.Sizeof(*p)))
+	size := NLA_ALIGN(int(unsafe.Sizeof(*p)))
 	if i+size > cap(data) {
-		x = make([]byte, i+size, align.Page.Roundup(i+size))
+		x = make([]byte, i+size, PageAlign(i+size))
 		copy(x, data)
 	} else {
 		x = data[:i+size]
@@ -74,53 +86,61 @@ func Expand[T AttrTypes | MsgTypes](data []byte) (p *T, x []byte) {
 }
 
 var (
-	ExpandNlMsghdr  = Expand[NlMsghdr]
-	ExpandIfAddrmsg = Expand[IfAddrmsg]
-	ExpandIfInfomsg = Expand[IfInfomsg]
-	ExpandRtGenmsg  = Expand[RtGenmsg]
+	ExpandMsgHdr    = Expand[MsgHdr]
+	ExpandIfAddrMsg = Expand[ifaddr.Msg]
+	ExpandIfInfoMsg = Expand[rtnetlink.IfInfoMsg]
+	ExpandRtGenMsg  = Expand[rtnetlink.RtGenMsg]
 )
 
-// Return type at beginning of data along with the 4-byte aligned remainder.
-func Extract[T AttrTypes | MsgTypes](data []byte) (p *T, r []byte) {
-	p = Pointer[T](data)
-	size := align.RTA.Roundup(int(unsafe.Sizeof(*p)))
+// Return type at beginning of data along with the aligned remainder.
+func ExtractMsg[M Messages](data []byte) (p *M, r []byte) {
+	p = Pointer[M](data)
+	size := NLMSG_ALIGN(int(unsafe.Sizeof(*p)))
 	r = data[size:]
 	return
 }
 
 var (
-	ExtractNlMsghdr  = Extract[NlMsghdr]
-	ExtractIfAddrmsg = Extract[IfAddrmsg]
-	ExtractIfInfomsg = Extract[IfInfomsg]
+	ExtractMsgHdr    = ExtractMsg[MsgHdr]
+	ExtractMsgErr    = ExtractMsg[MsgErr]
+	ExtractIfAddrMsg = ExtractMsg[ifaddr.Msg]
+	ExtractIfInfoMsg = ExtractMsg[rtnetlink.IfInfoMsg]
+	ExtractRtMsg     = ExtractMsg[rtnetlink.RtMsg]
 )
 
-func ExtractError(data []byte) error {
-	msgerr, _ := Extract[NlMsgerr](data)
-	if msgerr.Error != 0 {
-		return Errno(-msgerr.Error)
+func (m *MsgErr) Err() error {
+	if m.Error != 0 {
+		return syscall.Errno(-m.Error)
 	}
 	return nil
 }
 
-func ExtractRtAttr(data []byte) (kind uint16, value, remainder []byte) {
-	if len(data) < SizeofRtAttr {
+func HasAttr(data []byte) bool {
+	return len(data) >= NLA_ALIGNTO
+}
+
+func ExtractAttr(data []byte) (t uint16, value, remainder []byte) {
+	attr := Pointer[Attr](data)
+	asz := int(unsafe.Sizeof(*attr))
+	if len(data) < asz {
 		return
 	}
-	rta := Pointer[RtAttr](data)
-	n := int(rta.Len)
-	if n < SizeofRtAttr || n > len(data) {
+	n := int(attr.Len)
+	if n < asz || n > len(data) {
 		return
 	}
-	kind = rta.Type
-	value = data[SizeofRtAttr:n]
-	if n = align.RTA.Roundup(n); n < len(data) {
+	t = attr.Type
+	value = data[asz:n]
+	if n = NLA_ALIGN(n); n < len(data) {
 		remainder = data[n:]
+	} else {
+		remainder = data[len(data):]
 	}
 	return
 }
 
 // Return type at beginning of data.
-func Pointer[T AttrTypes | MsgTypes](data []byte) *T {
+func Pointer[T Attributes | Messages](data []byte) *T {
 	return (*T)(unsafe.Pointer(&data[0]))
 }
 
@@ -139,4 +159,19 @@ func CloneString(data []byte) string {
 		}
 	}
 	return string(Clone(data))
+}
+
+func IP(family uint8, data []byte) (netip.Addr, bool) {
+	switch family {
+	case af.INET:
+		data = data[:4]
+	case af.INET6:
+		data = data[:16]
+	}
+	return netip.AddrFromSlice(data)
+}
+
+func Via(data []byte) (netip.Addr, bool) {
+	family := *(Pointer[uint16](data))
+	return IP(uint8(family), data[2:])
 }

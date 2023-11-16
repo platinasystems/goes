@@ -52,23 +52,23 @@ func IntegralCommand(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>] <command> [<args>]
 Run external command.
-{{print .Flags}}`
-	fs, hFlag := flag.New()
+{{SprintDefault .Flags}}`
+	fs := flag.New("command")
 	pFlag := fs.Bool("p", false, "Restricted path search.")
 	vFlag := fs.Bool("v", false, "Report path found.")
 	vvFlag := fs.Bool("V", false, "More verbose report.")
 	if complete.Parameter.Value(ctx) {
-		style.Completions(args, fs.FlagSet)
+		style.Completions(args, fs)
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *hFlag {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()
@@ -164,7 +164,7 @@ Command/Objects
 			Map  map[string]any
 		}{path, m})
 	}
-	return do(Select, help.Parameter.With(ctx, true), r, w, path, m, args...)
+	return do(Select, help.With(ctx), r, w, path, m, args...)
 }
 
 func IntegralInput(
@@ -186,7 +186,7 @@ Perform command or set object with input from named file.
 		}
 		return do(Select, ctx, nil, w, path, m, args[1:]...)
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		if len(args) < 2 {
 			return style.Usage(usage, path)
 		}
@@ -215,9 +215,9 @@ func IntegralOutput(
 */}}usage: {{join .Path " "}} [-m <mode>] <file> <command|object> [<args>]
 
 Perform command or print object with output directed to named file.
-{{print .Flags}}`
+{{SprintDefault .Flags}}`
 	cmd := path[len(path)-1]
-	fs, hFlag := flag.New()
+	fs := flag.New("output")
 	aFlag := fs.Bool("a", cmd == "append", "Append output to named file.")
 	mFlag := fs.Uint("m", 0666, "File mode (default 0666).")
 	tFlag := fs.Bool("t", cmd == "tee", "Tee output to named file.")
@@ -232,11 +232,11 @@ Perform command or print object with output directed to named file.
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *hFlag {
+	if help.Wanted(ctx, fs) {
 		if len(args) < 2 {
 			return style.Usage(usage, struct {
 				Path  []string
-				Flags fmt.Formatter
+				Flags *flag.FlagSet
 			}{path, fs})
 		}
 		return do(Select, ctx, r, w, path, m, args[1:]...)
@@ -305,7 +305,7 @@ Print shell completion script.
 		style.Completions(args, completionShellScript)
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) == 0 {
@@ -346,7 +346,7 @@ Print embedded file.
 		}
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	b, err := efs.ReadFile(path[len(path)-1])
@@ -369,7 +369,7 @@ Wait until interrupt or termination signal.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	<-ctx.Done()
@@ -400,7 +400,7 @@ Daemons
 		}
 		return do(Select, ctx, r, w, path, daemons, args...)
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		if len(args) == 0 {
 			return style.Usage(usage, struct {
 				Path []string
@@ -486,7 +486,7 @@ Command/Objects
 		}
 		return do(Select, ctx, r, w, path, m, args[1:]...)
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		if len(args) < 2 {
 			return style.Usage(usage, struct {
 				Path []string

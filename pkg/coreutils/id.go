@@ -26,8 +26,8 @@ func Id(
 	const usage = `{{$path := join .Path " "}}{{/*
 */}}usage: {{$path}} [<options>] [<user>]
 Print user identity.
-{{print .Flags}}`
-	fs, h := flag.New()
+{{SprintDefault .Flags}}`
+	fs := flag.New("id")
 	Aflag := fs.Bool("A", false, "Print user process audit.")
 	Gflag := fs.Bool("G", false, "Print group IDs.")
 	Mflag := fs.Bool("M", false, "Print process MAC label.")
@@ -40,17 +40,17 @@ Print user identity.
 	rflag := fs.Bool("r", false,
 		"Print real instead of effective group or user ID.")
 	if complete.Parameter.Value(ctx) {
-		style.Completions(args, fs.FlagSet)
+		style.Completions(args, fs)
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 	args = fs.Args()

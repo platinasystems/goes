@@ -26,7 +26,7 @@ Daemon IPC.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	ipc := struct{ path, args []string }{

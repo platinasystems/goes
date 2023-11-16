@@ -8,8 +8,11 @@ package netif
 
 import (
 	"fmt"
+	"net"
+	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
@@ -31,19 +34,24 @@ var ConfigParameter = map[string]Parameter{
 	"mtu":    Uint32Parameter,
 }
 
-var ConfigFlag = map[string]IFF{
-	"up":     IFF_UP,
-	"-arp":   IFF_NOARP,
-	"no-arp": IFF_NOARP,
-	"down":   IFF_UP,
-	"arp":    IFF_NOARP,
+var ConfigFlag = map[string]net.Flags{
+	"up":   net.FlagUp,
+	"down": net.FlagUp,
+}
+
+var ConfigIFF = map[string]netioctl.IFF{
+	"up":     netioctl.IFF_UP,
+	"-arp":   netioctl.IFF_NOARP,
+	"no-arp": netioctl.IFF_NOARP,
+	"down":   netioctl.IFF_UP,
+	"arp":    netioctl.IFF_NOARP,
 }
 
 var ConfigSIOC = map[string]uintptr{
-	"mtu": SIOCSIFMTU,
+	"mtu": syscall.SIOCSIFMTU,
 }
 
-func (nif *Netif) Config(args []string) error {
+func (nif *NetIf) Config(args []string) error {
 	inet, err := af.OpenInet()
 	if err != nil {
 		return egress.Marked(err)
@@ -54,35 +62,35 @@ func (nif *Netif) Config(args []string) error {
 		case UnknownParameter:
 			return egress.Markf("%q %w", args[0], ErrInvalid)
 		case TrueFlagParameter:
-			req := NewIfreq[IFF](nif.Name)
-			err = egress.Marked(IOCTL(inet, SIOCGIFFLAGS, req))
+			err = netioctl.Admin(nif.Name, ConfigIFF[args[0]], 0)
 			if err != nil {
 				return err
 			}
-			req.Value |= ConfigFlag[args[0]]
-			err = egress.Marked(IOCTL(inet, SIOCSIFFLAGS, req))
+			if flag, ok := ConfigFlag[args[0]]; ok {
+				nif.Flags |= flag
+			}
 			args = args[1:]
 		case FalseFlagParameter:
-			req := NewIfreq[IFF](nif.Name)
-			err = egress.Marked(IOCTL(inet, SIOCGIFFLAGS, req))
+			err = netioctl.Admin(nif.Name, 0, ConfigIFF[args[0]])
 			if err != nil {
 				return err
 			}
-			req.Value &^= ConfigFlag[args[0]]
-			err = egress.Marked(IOCTL(inet, SIOCSIFFLAGS, req))
+			if flag, ok := ConfigFlag[args[0]]; ok {
+				nif.Flags &^= flag
+			}
 			args = args[1:]
 		case Uint32Parameter:
 			if len(args) < 2 {
 				return egress.Markf("%q %w", args[0],
 					ErrIncomplete)
 			}
-			req := NewIfreq[uint32](nif.Name)
+			req := netioctl.NewIfReqUint32(nif.Name)
 			_, err = fmt.Sscan(args[1], &req.Value)
 			if err != nil {
 				return egress.Markf("%q %w", args[1], err)
 			}
-			err = egress.Marked(IOCTL(inet, ConfigSIOC[args[0]],
-				req))
+			sioc := ConfigSIOC[args[0]]
+			err = egress.Marked(netioctl.Inet(sioc, req))
 			args = args[2:]
 		default:
 			return egress.Markf("%q %w", args[0], ErrNotFound)

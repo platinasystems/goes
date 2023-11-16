@@ -11,9 +11,10 @@ var Daemons = map[string]any{
 }
 
 var Root = map[string]any{
+	"icmp-ping": ICMPPing,
 	"ifconfig":  Ifconfig,
 	"netstat":   Netstat,
-	"icmp-ping": ICMPPing,
+	"route":     Route,
 	"udp-ping":  UDPPing,
 	"www-ping":  WWWPing,
 }

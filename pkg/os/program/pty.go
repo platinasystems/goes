@@ -36,7 +36,7 @@ Run command in an allocated TTY.
 	if complete.Parameter.Value(ctx) {
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if n := len(args); n < 5 {

@@ -1,137 +1,238 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
-// Use of this source code is governed by the GPL-2 license described in the
-// LICENSE file.
-
-//go:build netlink || linux
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 
 package netlink
 
-import (
-	"sync/atomic"
-	"syscall"
-
-	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
-	"github.com/platinasystems/goes/v2/pkg/syscall/align"
+const (
+	NETLINK_ROUT = iota
+	NETLINK_UNUSED
+	NETLINK_USERSOCK
+	NETLINK_FIREWALL
+	NETLINK_SOCK_DIAG
+	NETLINK_NFLOG
+	NETLINK_XFRM
+	NETLINK_SELINUX
+	NETLINK_ISCSI
+	NETLINK_AUDIT
+	NETLINK_FIB_LOOKUP
+	NETLINK_CONNECTOR
+	NETLINK_NETFILTER
+	NETLINK_IP6_FW
+	NETLINK_DNRTMSG
+	NETLINK_KOBJECT_UEVENT
+	NETLINK_GENERIC
+	_
+	NETLINK_SCSITRANSPORT
+	NETLINK_ECRYPTFS
+	NETLINK_RDMA
+	NETLINK_CRYPTO
+	NETLINK_SMC
 )
 
-type Netlink struct {
-	sock af.Netlink
-	addr Sockaddr
-	seq  atomic.Uint32
-	pid  uint32
-	buf  []byte
-	rem  []byte
+const NETLINK_INET_DIAG = NETLINK_SOCK_DIAG
+
+const MAX_LINKS = 32
+
+type Sockaddr struct {
+	Family uint16
+	_      uint16
+	PID    uint32
+	Groups uint32
 }
 
-// Open netlink socket with paired (option, value)s.
-func Open(optval ...int) (nl *Netlink, err error) {
-	sock, err := af.Open[af.Netlink]()
-	if err = egress.Marked(err); err != nil {
-		return
-	}
-	defer func() {
-		if err != nil {
-			af.Close(sock)
-		}
-	}()
-	for ; len(optval) >= 2; optval = optval[2:] {
-		opt, val := optval[0], optval[1]
-		err = syscall.SetsockoptInt(int(sock), SOL_NETLINK, opt, val)
-		if err = egress.Marked(err); err != nil {
-			return
-		}
-
-	}
-	addr, err := sock.Bind()
-	if err = egress.Marked(err); err != nil {
-		return
-	}
-	lsa, err := af.Addr(sock)
-	if err = egress.Marked(err); err != nil {
-		return
-	}
-	if lsanl, ok := lsa.(*SockaddrNetlink); !ok {
-		err = egress.Marked(EINVAL)
-	} else {
-		nl = &Netlink{
-			sock: sock,
-			addr: addr,
-			pid:  lsanl.Pid,
-			buf:  make([]byte, align.Page.Size()),
-		}
-	}
-	return
+type MsgHdr struct {
+	Len   uint32
+	Type  uint16
+	Flags uint16
+	SEQ   uint32
+	PID   uint32
 }
 
-func (nl *Netlink) Close() error {
-	nl.buf = nl.buf[:0]
-	nl.rem = nl.rem[:0]
-	return af.Close(nl.sock)
+var msghdr MsgHdr
+
+const NLMSG_HDRLEN = 4 + 2 + 2 + 4 + 4
+const NLMSG_ALIGNTO = 4
+
+const (
+	NLM_F_REQUEST = 1 << iota
+	NLM_F_MULTI
+	NLM_F_ACK
+	NLM_F_ECHO
+	NLM_F_DUMP_INTR
+	NLM_F_DUMP_FILTERED
+)
+
+const (
+	NLM_F_ROOT = 0x100 << iota
+	NLM_F_MATCH
+	NLM_F_ATOMIC
+)
+
+const NLM_F_DUMP = NLM_F_ROOT | NLM_F_MATCH
+
+const (
+	NLM_F_REPLACE = 0x100 << iota
+	NLM_F_EXCL
+	NLM_F_CREATE
+	NLM_F_APPEND
+)
+
+const (
+	NLM_F_NONREC = 0x100 << iota
+	NLM_F_BULK
+)
+
+const (
+	NLM_F_CAPPED = 0x100 << iota
+	NLM_F_ACK_TLVS
+)
+
+const (
+	NLMSG_NOOP = 1 + iota
+	NLMSG_ERROR
+	NLMSG_DONE
+	NLMSG_OVERRUN
+)
+
+const NLMSG_MIN_TYPE = 0x10
+
+type MsgErr struct {
+	Error int32
+	MsgHdr
 }
 
-// This returns references to the next netlink message header and data that the
-// caller must release before subsequent Next calls.
-func (nl *Netlink) Next() (*NlMsghdr, []byte, error) {
-	if len(nl.rem) < NLMSG_HDRLEN {
-		for {
-			n, _, err := af.Recvfrom(nl.sock, nl.buf, MSG_PEEK)
-			if err != nil {
-				return nil, nil, egress.Marked(err)
-			}
-			if n < len(nl.buf) {
-				break
-			} else if n < cap(nl.buf) {
-				nl.buf = nl.buf[:cap(nl.buf)]
-			} else {
-				nl.buf = make([]byte, align.Page.Roundup(n))
-			}
-		}
-		if n, _, err := af.Recvfrom(nl.sock, nl.buf, 0); err != nil {
-			return nil, nil, egress.Marked(err)
-		} else if n < NLMSG_HDRLEN {
-			return nil, nil, egress.Marked(EINVAL)
-		} else {
-			nl.rem = nl.buf[:n]
-		}
-	}
-	hdr := Pointer[NlMsghdr](nl.rem)
-	n := int(hdr.Len)
-	al := align.NLMSG.Roundup(n)
-	if hdr.Len < NLMSG_HDRLEN {
-		return nil, nil, egress.Marked(EINVAL)
-	}
-	if al > len(nl.rem) {
-		return nil, nil, egress.Marked(EINVAL)
-	}
-	if hdr.Pid != nl.pid {
-		return nil, nil, egress.Marked(EINVAL)
-	}
-	data := nl.rem[NLMSG_HDRLEN:n]
-	nl.rem = nl.rem[al:]
-	return hdr, data, nil
+//go:generate stringer -output=zmsgerrattr_string.go -type=MsgErrAttr -trimprefix=NLMSGERR_ATTR_ .
+type MsgErrAttr uint8
+
+const (
+	NLMSGERR_ATTR_UNUSED = iota
+	NLMSGERR_ATTR_MSG
+	NLMSGERR_ATTR_OFFS
+	NLMSGERR_ATTR_COOKIE
+	NLMSGERR_ATTR_POLICY
+	NLMSGERR_ATTR_MISS_TYPE
+	NLMSGERR_ATTR_MISS_NEST
+	NLMSGERR_ATTR_CNT
+)
+const NLMSGERR_ATTR_MAX = NLMSGERR_ATTR_CNT - 1
+
+const (
+	NETLINK_ADD_MEMBERSHIP = 1 + iota
+	NETLINK_DROP_MEMBERSHIP
+	NETLINK_PKTINFO
+	NETLINK_BROADCAST_ERROR
+	NETLINK_NO_ENOBUFS
+	NETLINK_RX_RING
+	NETLINK_TX_RING
+	NETLINK_LISTEN_ALL_NSID
+	NETLINK_LIST_MEMBERSHIPS
+	NETLINK_CAP_ACK
+	NETLINK_EXT_ACK
+	NETLINK_GET_STRICT_CHK
+)
+
+type PktInfo struct {
+	group uint32
 }
 
-// Set message header's length and next sequence number before socket send.
-func (nl *Netlink) Request(msg []byte) error {
-	req := Pointer[NlMsghdr](msg)
-	req.Seq = nl.seq.Add(1)
-	req.Len = uint32(len(msg))
-	return af.Sendto(nl.sock, msg, 0, nl.addr)
+type MmapReq struct {
+	BlockSize uint32
+	BlockNr   uint32
+	FrameSize uint32
+	FrameNr   uint32
 }
 
-// Wait for DONE or ERROR response to the identified request.
-func (nl *Netlink) Wait(seq uint32) error {
-	for {
-		hdr, data, err := nl.Next()
-		if err != nil {
-			return err
-		} else if hdr.Seq != seq {
-			continue
-		} else if hdr.Type == NLMSG_DONE {
-			return nil
-		} else if hdr.Type == NLMSG_ERROR {
-			return ExtractError(data)
-		}
-	}
+type MmapHdr struct {
+	Status uint32
+	Len    uint32
+	Group  uint32
+	PID    uint32
+	UID    uint32
+	GID    uint32
 }
+
+const NL_MMAP_HDRLEN = 4 + 4 + 4 + 4 + 4 + 4
+
+type MmapStatus uint8
+
+const (
+	NL_MMAP_STATUS_UNUSED MmapStatus = iota
+	NL_MMAP_STATUS_RESERVED
+	NL_MMAP_STATUS_VALID
+	NL_MMAP_STATUS_COPY
+	NL_MMAP_STATUS_SKIP
+)
+
+const NL_MMAP_MSG_ALIGNMENT = NLMSG_ALIGNTO
+
+const NET_MAJOR = 36
+
+const (
+	NETLINK_UNCONNECTED = iota
+	NETLINK_CONNECTED
+)
+
+type Attr struct {
+	Len  uint16
+	Type uint16
+}
+
+const NLA_HDRLEN = 2 + 2
+const NLA_ALIGNTO = 4
+
+const NLA_F_NESTED = 1 << 15
+const NLA_F_NET_BYTEORDER = 1 << 14
+const NLA_TYPE_MASK = ^(NLA_F_NESTED | NLA_F_NET_BYTEORDER)
+
+type Bitfield32 struct {
+	Value    uint32
+	Selector uint32
+}
+
+//go:generate stringer -output=zattributetype_string.go -type=AttributeType -trimprefix=NL_ATTR_TYPE_ .
+type AttributeType uint16
+
+const (
+	NL_ATTR_TYPE_INVALID AttributeType = iota
+
+	NL_ATTR_TYPE_FLAG
+
+	NL_ATTR_TYPE_U8
+	NL_ATTR_TYPE_U16
+	NL_ATTR_TYPE_U32
+	NL_ATTR_TYPE_U64
+
+	NL_ATTR_TYPE_S8
+	NL_ATTR_TYPE_S16
+	NL_ATTR_TYPE_S32
+	NL_ATTR_TYPE_S64
+
+	NL_ATTR_TYPE_BINARY
+	NL_ATTR_TYPE_STRING
+	NL_ATTR_TYPE_NUL_STRING
+
+	NL_ATTR_TYPE_NESTED
+	NL_ATTR_TYPE_NESTED_ARRAY
+
+	NL_ATTR_TYPE_BITFIELD32
+)
+
+//go:generate stringer -output=zpolicytypeattr_string.go -type=PolicyTypeAttr -trimprefix=NL_POLICY_TYPE_ATTR_ .
+type PolicyTypeAttr uint16
+
+const (
+	NL_POLICY_TYPE_ATTR_UNSPEC PolicyTypeAttr = iota
+	NL_POLICY_TYPE_ATTR_TYPE
+	NL_POLICY_TYPE_ATTR_MIN_VALUE_S
+	NL_POLICY_TYPE_ATTR_MAX_VALUE_S
+	NL_POLICY_TYPE_ATTR_MIN_VALUE_U
+	NL_POLICY_TYPE_ATTR_MAX_VALUE_U
+	NL_POLICY_TYPE_ATTR_MIN_LENGTH
+	NL_POLICY_TYPE_ATTR_MAX_LENGTH
+	NL_POLICY_TYPE_ATTR_POLICY_IDX
+	NL_POLICY_TYPE_ATTR_POLICY_MAXTYPE
+	NL_POLICY_TYPE_ATTR_BITFIELD32_MASK
+	NL_POLICY_TYPE_ATTR_PAD
+	NL_POLICY_TYPE_ATTR_MASK
+	NL_POLICY_TYPE_ATTR_CNT
+)
+const NL_POLICY_TYPE_ATTR_MAX = NL_POLICY_TYPE_ATTR_CNT - 1

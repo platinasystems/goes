@@ -69,7 +69,7 @@ ed25519 algorithm.
 		}
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, struct {
 			Path, Algorithms []string
 		}{path, algs})
@@ -122,7 +122,7 @@ Print algorithm of the named private key file or stdin.
 		style.Completions(args, "*.pem")
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) > 0 && args[0] != "-" {

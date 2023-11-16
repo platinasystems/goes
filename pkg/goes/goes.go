@@ -103,7 +103,7 @@ func Select(
 	if len(args) == 0 {
 		if complete.Parameter.Value(ctx) {
 			style.Completions(args, m)
-		} else if help.Parameter.Value(ctx) {
+		} else if help.Wanted(ctx) {
 			path = append(path, "help")
 			return IntegralHelp(ctx, r, w, path, m)
 		} else {
@@ -202,7 +202,7 @@ Unmarshal or scan object from text value.
 	default:
 		// Show or set objects
 		nargs := len(args)
-		if help.Parameter.Value(ctx) {
+		if help.Wanted(ctx) {
 			if nargs == 0 || (nargs == 1 && args[0] == "-json") {
 				err = style.Usage(marshalUsage, path)
 			} else {

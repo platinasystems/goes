@@ -33,7 +33,7 @@ Concatenate file(s) or standard in (-) to output.
 		style.Completions(args, "*")
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	if len(args) == 0 {

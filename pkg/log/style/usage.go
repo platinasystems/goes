@@ -5,7 +5,9 @@
 package style
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"text/template"
@@ -14,14 +16,26 @@ import (
 var UsageTemplateFuncs = template.FuncMap{
 	"keys": MapKeys,
 	"join": strings.Join,
+
+	"SprintDefault": SprintDefault,
 }
 
+// Parse `text` as template then execute with `data` and `UsageTemplateFuncs`.
 func Usage(text string, data any) error {
 	t, err := template.New("usage").Funcs(UsageTemplateFuncs).Parse(text)
 	if err != nil {
 		return err
 	}
 	return t.Execute(Plain.Notice.Writer(), data)
+}
+
+func SprintDefault(fs *flag.FlagSet) string {
+	w := new(strings.Builder)
+	fmt.Fprintln(w)
+	fs.SetOutput(w)
+	fs.PrintDefaults()
+	fs.SetOutput(io.Discard)
+	return w.String()
 }
 
 func MapKeys(m map[string]any) string {

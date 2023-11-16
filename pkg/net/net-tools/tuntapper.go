@@ -28,8 +28,8 @@ func TunTapper(
 	const usage = `{{/*
 */}}usage: {{join .Path " "}} [<option>]... [<addr> <dest> [up]]
 Create a tun/tap device then log received packets/frames.
-{{print .Flags}}`
-	fs, h := flag.New()
+{{SprintDefault .Flags}}`
+	fs := flag.New("tuntapper")
 	unit := fs.Uint("u", 0, "Unit number suffix.")
 	ha := netif.NewHardwareAddr()
 	var isTap bool
@@ -53,7 +53,7 @@ Create a tun/tap device then log received packets/frames.
 		fs.IntVar(&group, "group", group, "unset w/ -1")
 	}
 	if complete.Parameter.Value(ctx) {
-		style.Completions(args, fs.FlagSet)
+		style.Completions(args, fs)
 		return nil
 	}
 	err := fs.Parse(args)
@@ -61,10 +61,10 @@ Create a tun/tap device then log received packets/frames.
 		return err
 	}
 	args = fs.Args()
-	if help.Parameter.Value(ctx) || *h {
+	if help.Wanted(ctx, fs) {
 		return style.Usage(usage, struct {
 			Path  []string
-			Flags fmt.Formatter
+			Flags *flag.FlagSet
 		}{path, fs})
 	}
 
@@ -75,9 +75,15 @@ Create a tun/tap device then log received packets/frames.
 	defer f.Close()
 
 	if len(args) > 1 {
-		nif, err := netif.ByName(f.Name())
+		nifs, nifByIndex, nifByName, err := netif.List()
 		if err != nil {
 			return err
+		}
+		_ = nifs
+		_ = nifByIndex
+		nif, ok := nifByName[f.Name()]
+		if !ok {
+			return fmt.Errorf("%q %w", f.Name(), ErrNotFound)
 		}
 		local, err := netip.ParseAddr(args[0])
 		if err != nil {
@@ -87,11 +93,13 @@ Create a tun/tap device then log received packets/frames.
 		if err != nil {
 			return fmt.Errorf("%q %w", args[1], err)
 		}
-		bits := 32
-		if local.Is6() {
-			bits = 128
+		var prefix netip.Prefix
+		if local.Is4() {
+			prefix = netip.PrefixFrom(local, 32)
+		} else {
+			prefix = netip.PrefixFrom(local, 128)
 		}
-		err = nif.Add(local, remote, bits, args[2:])
+		err = nif.Add(prefix, remote, args[2:])
 		if err != nil {
 			return err
 		}

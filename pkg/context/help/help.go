@@ -4,6 +4,31 @@
 
 package help
 
-import "github.com/platinasystems/goes/v2/pkg/context/parameter"
+import (
+	"context"
 
-var Parameter parameter.Key[bool]
+	"github.com/platinasystems/goes/v2/pkg/context/parameter"
+	"github.com/platinasystems/goes/v2/pkg/flag"
+)
+
+var help parameter.Key[bool]
+
+func Wanted(contextOrFlagSet ...any) bool {
+	for _, v := range contextOrFlagSet {
+		switch t := v.(type) {
+		case context.Context:
+			if help.Value(t) {
+				return true
+			}
+		case *flag.FlagSet:
+			if flag.Eval[bool](t, "help") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func With(ctx context.Context) context.Context {
+	return help.With(ctx, true)
+}

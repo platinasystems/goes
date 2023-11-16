@@ -8,10 +8,12 @@ package af
 
 import "syscall"
 
+const INET = syscall.AF_INET
+
 type Inet int
 
 var OpenInet = Open[Inet]
 
-func (Inet) Family() int { return syscall.AF_INET }
+func (Inet) Family() int { return INET }
 func (Inet) Type() int   { return syscall.SOCK_DGRAM }
 func (Inet) Proto() int  { return 0 }

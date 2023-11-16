@@ -2,36 +2,45 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-// This package provides a flag.FlagSet wrapper that doesn't output during
-// Parse and instead sets an associate `help` flag.  It also provides a
-// fmt.Formatter interface to PrintDefaults.
 package flag
 
 import (
 	"flag"
-	"fmt"
 	"io"
+	"reflect"
 )
 
 const helpmsg = "Print options."
 
 type Flag = flag.Flag
-type FlagSet struct{ *flag.FlagSet }
+type FlagSet = flag.FlagSet
 
-var CommandLine = FlagSet{flag.CommandLine}
+var CommandLine = flag.CommandLine
 
-func New() (fs FlagSet, help *bool) {
-	fs.FlagSet = flag.NewFlagSet("", 0)
+// Make a new flag.FlagSet that doesn't output during Parse and instead sets an
+// associate `help` flag.
+func New(name string) *FlagSet {
+	fs := flag.NewFlagSet(name, 0)
 	fs.SetOutput(io.Discard)
 	fs.Usage = func() {}
-	help = fs.Bool("help", false, helpmsg)
+	help := fs.Bool("help", false, helpmsg)
 	fs.BoolVar(help, "h", *help, helpmsg)
-	return
+	return fs
 }
 
-func (fs FlagSet) Format(w fmt.State, verb rune) {
-	fmt.Fprintln(w)
-	fs.SetOutput(w)
-	fs.PrintDefaults()
-	fs.SetOutput(io.Discard)
+// Return the elemental value of a flag or the generic's zero value if the flag
+// isn't w/in FlagSet or it's value can't be converted. Usage,
+//
+//	if Eval[bool](CommandLine, "verbose") { ... }
+func Eval[T any](fs *FlagSet, name string) (t T) {
+	if fs != nil {
+		if f := fs.Lookup(name); f != nil {
+			elem := reflect.ValueOf(f.Value).Elem()
+			ttype := reflect.TypeOf(t)
+			if elem.CanConvert(ttype) {
+				t = elem.Convert(ttype).Interface().(T)
+			}
+		}
+	}
+	return
 }

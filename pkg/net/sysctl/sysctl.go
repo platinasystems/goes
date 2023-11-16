@@ -11,28 +11,25 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
-
-	"github.com/platinasystems/goes/v2/pkg/syscall/align"
 )
 
-type MsgSubHdr struct {
-	Msglen  uint16
-	Version uint8
-	Type    uint8
+const MsgMin = 4
+
+func MsgLen(data []byte) int {
+	return int(*((*uint16)(unsafe.Pointer(&data[0]))))
 }
 
-type MsgTypes interface {
-	MsgSubHdr | IfMsghdr | IfaMsghdr | IfmaMsghdr | IfmaMsghdr2 | RtMsghdr
-}
+func MsgType(data []byte) uint8 { return data[3] }
 
-type SockaddrSubHdr struct {
-	Len    uint8
-	Family uint8
-	Index  uint16
-}
-
-type SockaddrTypes interface {
-	SockaddrSubHdr | SockaddrDatalink | SockaddrIn | SockaddrIn6
+func MsgOK(data []byte, types ...uint8) bool {
+	if data[2] == syscall.RTM_VERSION {
+		for _, t := range types {
+			if MsgType(data) == t {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 var trysize = []uintptr{
@@ -40,6 +37,7 @@ var trysize = []uintptr{
 	64 << 10,
 	256 << 10,
 	1 << 20, // 1MB
+	4 << 20,
 }
 
 func Get(mib ...int32) ([]byte, error) {
@@ -51,46 +49,7 @@ func Get(mib ...int32) ([]byte, error) {
 		} else if err != syscall.ENOMEM {
 			return nil, os.NewSyscallError("sysctl", err)
 		}
+		b = b[:0]
 	}
 	return nil, syscall.ENOMEM
-}
-
-// Return the beginning type along with any attached body and remainder.
-func Extract[T MsgTypes](data []byte) (p *T, body, rem []byte) {
-	h := Pointer[MsgSubHdr](data)
-	p = Pointer[T](data)
-	body = data[Sizeof(p):]
-	rem = data[align.Sysctl.Roundup(int(h.Msglen)):]
-	return
-}
-
-var (
-	ExtractIfMsghdr    = Extract[IfMsghdr]
-	ExtractIfaMsghdr   = Extract[IfaMsghdr]
-	ExtractIfmaMsghdr  = Extract[IfmaMsghdr]
-	ExtractIfmaMsghdr2 = Extract[IfmaMsghdr2]
-	ExtractRtMsghdr    = Extract[RtMsghdr]
-)
-
-func ExtractSockaddr[T SockaddrTypes](data []byte) (p *T, body, rem []byte) {
-	h := Pointer[SockaddrSubHdr](data)
-	p = Pointer[T](data)
-	body = data[Sizeof(p):]
-	rem = data[align.Sysctl.Roundup(int(h.Len)):]
-	return
-}
-
-var (
-	ExtractSockaddrDatalink = ExtractSockaddr[SockaddrDatalink]
-	ExtractSockaddrIn       = ExtractSockaddr[SockaddrIn]
-	ExtractSockaddrIn6      = ExtractSockaddr[SockaddrIn6]
-)
-
-// Return type at beginning of data.
-func Pointer[T MsgTypes | SockaddrTypes](data []byte) *T {
-	return (*T)(unsafe.Pointer(&data[0]))
-}
-
-func Sizeof[T MsgTypes | SockaddrTypes](p *T) int {
-	return int(unsafe.Sizeof(*p))
 }

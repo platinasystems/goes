@@ -34,7 +34,7 @@ Print or set environment variables.
 		style.Completions(args, "*")
 		return nil
 	}
-	if help.Parameter.Value(ctx) {
+	if help.Wanted(ctx) {
 		return style.Usage(usage, path)
 	}
 	environ := os.Environ()
