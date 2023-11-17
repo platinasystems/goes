@@ -80,18 +80,6 @@ Options{{SprintDefault .Flags}}`
 }
 
 func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
-	nifs, nifByIndex, nifByName, err := netif.List()
-	if err != nil {
-		return err
-	}
-	_ = nifByIndex
-	if ifname := flag.Eval[string](fs, "I"); len(ifname) > 0 {
-		if nif, ok := nifByName[ifname]; !ok {
-			return fmt.Errorf("%q %w", ifname, ErrNotFound)
-		} else {
-			nifs = []*netif.NetIf{nif}
-		}
-	}
 	fmt.Fprintf(w, "%-15s", "Name")
 	fmt.Fprintf(w, " %5s", "MTU")
 	fmt.Fprintf(w, " %11s", "Ipkts")
@@ -104,23 +92,34 @@ func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 	fmt.Fprintf(w, " %11s", "Oerrs")
 	fmt.Fprintf(w, " %11s", "Coll")
 	fmt.Fprintln(w)
-	for _, nif := range nifs {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			fmt.Fprintf(w, "%-15s", nif.Name)
-			fmt.Fprintf(w, " %5d", nif.MTU)
-			fmt.Fprintf(w, " %11d", nif.Rx.Packets)
-			fmt.Fprintf(w, " %11d", nif.Rx.Bytes)
-			fmt.Fprintf(w, " %11d", nif.Rx.Drops)
-			fmt.Fprintf(w, " %11d", nif.Rx.Errors)
-			fmt.Fprintf(w, " %11d", nif.Tx.Packets)
-			fmt.Fprintf(w, " %11d", nif.Tx.Bytes)
-			fmt.Fprintf(w, " %11d", nif.Tx.Drops)
-			fmt.Fprintf(w, " %11d", nif.Tx.Errors)
-			fmt.Fprintf(w, " %11d", nif.Collisions)
-			fmt.Fprintln(w)
+	show := func(nif *netif.NetIf) {
+		fmt.Fprintf(w, "%-15s", nif.Name)
+		fmt.Fprintf(w, " %5d", nif.MTU)
+		fmt.Fprintf(w, " %11d", nif.Rx.Packets)
+		fmt.Fprintf(w, " %11d", nif.Rx.Bytes)
+		fmt.Fprintf(w, " %11d", nif.Rx.Drops)
+		fmt.Fprintf(w, " %11d", nif.Rx.Errors)
+		fmt.Fprintf(w, " %11d", nif.Tx.Packets)
+		fmt.Fprintf(w, " %11d", nif.Tx.Bytes)
+		fmt.Fprintf(w, " %11d", nif.Tx.Drops)
+		fmt.Fprintf(w, " %11d", nif.Tx.Errors)
+		fmt.Fprintf(w, " %11d", nif.Collisions)
+		fmt.Fprintln(w)
+	}
+	if ifname := flag.Eval[string](fs, "I"); len(ifname) > 0 {
+		if nif := netif.Named(ifname); nif == nil {
+			return fmt.Errorf("%q %w", ifname, ErrNotFound)
+		} else {
+			show(nif)
+		}
+	} else {
+		for _, nif := range netif.Interfaces() {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+				show(nif)
+			}
 		}
 	}
 	return nil
@@ -138,12 +137,6 @@ func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 	default:
 		return fmt.Errorf("%q %w", s, ErrInvalid)
 	}
-	nifs, nifByIndex, nifByName, err := netif.List()
-	if err != nil {
-		return err
-	}
-	_ = nifs
-	_ = nifByName
 	nrts, err := netrt.NewList()
 	if err != nil {
 		return err
@@ -182,7 +175,11 @@ func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 		}
 		if dstip.Is6() && !gwip.IsValid() {
 			if line > 0 {
-				fmt.Fprint(dstbuf, "%", nifByIndex[line].Name)
+				if nif := netif.Indexed(line); nif != nil {
+					fmt.Fprint(dstbuf, "%", nif.Name)
+				} else {
+					fmt.Fprint(dstbuf, "%line#", line)
+				}
 			}
 		}
 		if n := nrt.Bits(); n > 0 {
@@ -193,7 +190,7 @@ func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 		} else if ha := nrt.HA(); len(ha) > 0 {
 			s := ha.String()
 			gwbuf.WriteString(strings.Replace(s, ":", ".", -1))
-		} else if nif, ok := nifByIndex[line]; ok {
+		} else if nif := netif.Indexed(line); nif != nil {
 			gwbuf.WriteString(nif.Name)
 		} else {
 			fmt.Fprint(gwbuf, "line#", line)
@@ -207,7 +204,7 @@ func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 		gws = append(gws, gwbuf.String())
 		flags = append(flags, flagbuf.String())
 		i := nrt.Index()
-		if nif, ok := nifByIndex[i]; ok {
+		if nif := netif.Indexed(i); nif != nil {
 			ifnames = append(ifnames, nif.Name)
 		} else {
 			ifnames = append(ifnames, fmt.Sprint(i))

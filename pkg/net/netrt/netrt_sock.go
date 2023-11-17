@@ -8,6 +8,7 @@ package netrt
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -97,7 +98,20 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	}
 	*/
 	if _, err = af.Write(sock, msg); err != nil {
-		return nil, egress.Markf("%w\n%#v", err, rtm)
+		switch {
+		case errors.Is(err, syscall.ESRCH):
+			return nil, ErrSRCH
+		case errors.Is(err, syscall.EBUSY):
+			return nil, ErrBUSY
+		case errors.Is(err, syscall.ENOBUFS):
+			return nil, ErrNOBUFS
+		case errors.Is(err, syscall.EADDRINUSE):
+			return nil, ErrADDRINUSE
+		case errors.Is(err, syscall.EEXIST):
+			return nil, ErrEXIST
+		default:
+			return nil, egress.Markf("%w\n%#v", err, rtm)
+		}
 	} else if cmd != syscall.RTM_GET {
 		return nil, nil
 	}

@@ -75,14 +75,8 @@ Create a tun/tap device then log received packets/frames.
 	defer f.Close()
 
 	if len(args) > 1 {
-		nifs, nifByIndex, nifByName, err := netif.List()
-		if err != nil {
-			return err
-		}
-		_ = nifs
-		_ = nifByIndex
-		nif, ok := nifByName[f.Name()]
-		if !ok {
+		nif := netif.Named(f.Name())
+		if nif == nil {
 			return fmt.Errorf("%q %w", f.Name(), ErrNotFound)
 		}
 		local, err := netip.ParseAddr(args[0])

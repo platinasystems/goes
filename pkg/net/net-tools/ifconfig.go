@@ -80,18 +80,13 @@ Parameters` + netif.AddressParameters +
 	_ = *mFlag || *LFlag || *vFlag || *rFlag
 	if complete.Parameter.Value(ctx) {
 		if len(args) < 2 {
-			ncloneable := len(netif.Cloneable)
-			nifs, nifByIndex, nifByName, err := netif.List()
-			if err != nil {
-				return err
-			}
-			_ = nifByIndex
-			_ = nifByName
-			names := make([]string, ncloneable+len(nifs))
-			copy(names, netif.Cloneable)
+			nifs := netif.Interfaces()
+			namecap := len(nifs) + len(netif.Cloneable)
+			names := make([]string, len(nifs), namecap)
 			for i, nif := range nifs {
-				names[ncloneable+i] = nif.Name
+				names[i] = nif.Name
 			}
+			names = append(names, netif.Cloneable...)
 			style.Completions(args, names)
 		}
 		return nil
@@ -112,11 +107,6 @@ Parameters` + netif.AddressParameters +
 		}
 	}
 	args = fs.Args()
-	nifs, nifByIndex, nifByName, err := netif.List()
-	if err != nil {
-		return err
-	}
-	_ = nifByIndex
 	switch {
 	case *CFlag:
 		var sep string
@@ -130,7 +120,7 @@ Parameters` + netif.AddressParameters +
 		return nil
 	case *lFlag:
 		var sep string
-		for _, nif := range nifs {
+		for _, nif := range netif.Interfaces() {
 			isup := (nif.Flags & net.FlagUp) == net.FlagUp
 			if (*dFlag && !isup) || (*uFlag && isup) ||
 				(!*dFlag && !*uFlag) {
@@ -146,7 +136,7 @@ Parameters` + netif.AddressParameters +
 	case *aFlag || len(args) == 0:
 		switch {
 		case *dFlag:
-			for _, nif := range nifs {
+			for _, nif := range netif.Interfaces() {
 				if pat == nil || pat.MatchString(nif.Name) {
 					if nif.Flags&net.FlagUp == 0 {
 						fmt.Fprint(w, nif)
@@ -154,7 +144,7 @@ Parameters` + netif.AddressParameters +
 				}
 			}
 		case *uFlag:
-			for _, nif := range nifs {
+			for _, nif := range netif.Interfaces() {
 				if pat == nil || pat.MatchString(nif.Name) {
 					if nif.Flags&net.FlagUp == net.FlagUp {
 						fmt.Fprint(w, nif)
@@ -162,26 +152,26 @@ Parameters` + netif.AddressParameters +
 				}
 			}
 		case pat != nil:
-			for _, nif := range nifs {
+			for _, nif := range netif.Interfaces() {
 				if pat.MatchString(nif.Name) {
 					fmt.Fprint(w, nif)
 				}
 			}
 		default:
-			for _, nif := range nifs {
+			for _, nif := range netif.Interfaces() {
 				fmt.Fprint(w, nif)
 			}
 		}
 		return nil
 	case pat != nil:
-		for _, nif := range nifs {
+		for _, nif := range netif.Interfaces() {
 			if pat.MatchString(nif.Name) {
 				if err = nif.Config(args[1:]); err != nil {
 					return err
 				}
 			}
 		}
-		return nil
+		return err
 	}
 	if len(args) > 1 && args[1] == "create" {
 		nif, err := netif.Create(args[0], args[2:]...)
@@ -190,8 +180,8 @@ Parameters` + netif.AddressParameters +
 		}
 		return err
 	}
-	nif, ok := nifByName[args[0]]
-	if !ok {
+	nif := netif.Named(args[0])
+	if nif == nil {
 		return fmt.Errorf("%s %w", args[0], ErrNotFound)
 	}
 	args = args[1:]

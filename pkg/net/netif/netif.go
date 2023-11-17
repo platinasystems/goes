@@ -121,29 +121,42 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 }
 
 var cache struct {
-	sync.Once
-	list    []*NetIf
-	byIndex map[int]*NetIf
-	byName  map[string]*NetIf
+	nifs    []*NetIf
+	indexed map[int]*NetIf
+	named   map[string]*NetIf
 }
 
-func validate() {
-	cache.list, cache.byIndex, cache.byName, _ = List()
-}
+var validate = sync.OnceFunc(func() {
+	var err error
+	cache.nifs, err = List()
+	if err != nil {
+		panic(err)
+	}
+	cache.indexed = make(map[int]*NetIf)
+	cache.named = make(map[string]*NetIf)
+	for _, nif := range cache.nifs {
+		cache.indexed[nif.Index] = nif
+		cache.named[nif.Name] = nif
+	}
+})
 
 func Indexed(i int) *NetIf {
-	cache.Do(validate)
-	return cache.byIndex[i]
+	validate()
+	return cache.indexed[i]
+}
+
+func Interfaces() []*NetIf {
+	validate()
+	return cache.nifs
 }
 
 func Named(s string) *NetIf {
-	cache.Do(validate)
-	return cache.byName[s]
+	validate()
+	return cache.named[s]
 }
 
 func Range(f func(*NetIf) bool) {
-	cache.Do(validate)
-	for _, nif := range cache.list {
+	for _, nif := range Interfaces() {
 		if !f(nif) {
 			break
 		}

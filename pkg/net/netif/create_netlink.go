@@ -55,9 +55,13 @@ func Create(name string, args ...string) (*NetIf, error) {
 		return nil, fmt.Errorf("%q %w", name, ErrUnsupported)
 	}
 
-	_, existing, _, err := List()
+	before := make(map[int]*NetIf)
+	nifs, err := List()
 	if err != nil {
 		return nil, err
+	}
+	for _, nif := range nifs {
+		before[nif.Index] = nif
 	}
 
 	nl, err := netlink.Open()
@@ -88,12 +92,11 @@ func Create(name string, args ...string) (*NetIf, error) {
 	if err = nl.Wait(hdr.SEQ); err != nil {
 		return nil, egress.Marked(err)
 	}
-	nifs, _, _, err := List()
-	if err != nil {
+	if nifs, err = List(); err != nil {
 		return nil, egress.Marked(err)
 	}
 	for _, nif := range nifs {
-		if _, existed := existing[nif.Index]; !existed {
+		if _, existed := before[nif.Index]; !existed {
 			return nif, nil
 		}
 	}

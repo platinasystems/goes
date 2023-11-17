@@ -18,23 +18,21 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func List() ([]*NetIf, map[int]*NetIf, map[string]*NetIf, error) {
+func List() ([]*NetIf, error) {
 	nl, err := netlink.Open()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	defer nl.Close()
 	nifs, err := ifinfos(nl)
-	nifByIndex := make(map[int]*NetIf)
-	nifByName := make(map[string]*NetIf)
+	indexed := make(map[int]*NetIf)
 	if err == nil {
 		for _, nif := range nifs {
-			nifByIndex[nif.Index] = nif
-			nifByName[nif.Name] = nif
+			indexed[nif.Index] = nif
 		}
-		err = ifaddrs(nl, nifByIndex)
+		err = ifaddrs(nl, indexed)
 	}
-	return nifs, nifByIndex, nifByName, err
+	return nifs, err
 }
 
 func ifinfos(nl *netlink.NL) ([]*NetIf, error) {
@@ -71,7 +69,7 @@ func ifinfos(nl *netlink.NL) ([]*NetIf, error) {
 	return nifs, nil
 }
 
-func ifaddrs(nl *netlink.NL, nifByIndex map[int]*NetIf) error {
+func ifaddrs(nl *netlink.NL, indexed map[int]*NetIf) error {
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETADDR
 	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
@@ -96,8 +94,8 @@ func ifaddrs(nl *netlink.NL, nifByIndex map[int]*NetIf) error {
 			continue
 		}
 		m, data := netlink.ExtractIfAddrMsg(data)
-		nif, ok := nifByIndex[int(m.Index)]
-		if !ok {
+		nif := indexed[int(m.Index)]
+		if nif == nil {
 			continue
 		}
 		var addr, local netip.Addr

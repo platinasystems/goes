@@ -45,7 +45,7 @@ func Sizeof[T Msgs](p *T) int {
 	return int(unsafe.Sizeof(*p))
 }
 
-func List() ([]*NetIf, map[int]*NetIf, map[string]*NetIf, error) {
+func List() (nifs []*NetIf, err error) {
 	rib, err := sysctl.Get(
 		syscall.CTL_NET,
 		af.ROUTE,
@@ -55,11 +55,9 @@ func List() ([]*NetIf, map[int]*NetIf, map[string]*NetIf, error) {
 		0,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nifs, err
 	}
-	var nifs []*NetIf
 	nifByIndex := make(map[int]*NetIf)
-	nifByName := make(map[string]*NetIf)
 	for data := rib; len(data) > sysctl.MsgMin; {
 		msglen := sysctl.MsgLen(data)
 		if len(data) < msglen {
@@ -73,9 +71,10 @@ func List() ([]*NetIf, map[int]*NetIf, map[string]*NetIf, error) {
 		data = datá
 		nif, ok := nifByIndex[int(im.Index)]
 		if !ok {
-			nif = new(NetIf)
+			nif = &NetIf{
+				Extra: make(map[string]any),
+			}
 			nif.Index = int(im.Index)
-			nif.Extra = make(map[string]any)
 			nifs = append(nifs, nif)
 			nifByIndex[nif.Index] = nif
 		}
@@ -144,7 +143,6 @@ func List() ([]*NetIf, map[int]*NetIf, map[string]*NetIf, error) {
 		}
 		dlhdr, body, _ := sockaddr.ExtractDlHdr(body)
 		nif.Name, nif.HardwareAddr, _ = dlhdr.NAS(body)
-		nifByName[nif.Name] = nif
 	}
 	for data := rib; len(data) > 0; {
 		msglen := sysctl.MsgLen(data)
@@ -195,5 +193,5 @@ func List() ([]*NetIf, map[int]*NetIf, map[string]*NetIf, error) {
 			nif.Prefixes = append(nif.Prefixes, prefix)
 		}
 	}
-	return nifs, nifByIndex, nifByName, nil
+	return nifs, nil
 }
