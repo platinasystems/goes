@@ -14,12 +14,10 @@ import (
 	"slices"
 	"unicode"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 var inets = []string{"inet", "inet6"}
@@ -78,7 +76,7 @@ Parameters` + netif.AddressParameters +
 	XFlag := fs.String("X", "", "Pattern match interface name.")
 	// FIXME add these display modifiers
 	_ = *mFlag || *LFlag || *vFlag || *rFlag
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) < 2 {
 			nifs := netif.Interfaces()
 			namecap := len(nifs) + len(netif.Cloneable)
@@ -95,7 +93,7 @@ Parameters` + netif.AddressParameters +
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

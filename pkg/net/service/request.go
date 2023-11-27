@@ -13,10 +13,8 @@ import (
 	"net"
 	"net/rpc"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 type Connecter interface {
@@ -41,14 +39,14 @@ Run command on <host>.
 	cmd := path[len(path)-1]
 	fs := flag.New(cmd)
 	in := fs.String("i", "", "Input FILE or '-' for STDIN.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

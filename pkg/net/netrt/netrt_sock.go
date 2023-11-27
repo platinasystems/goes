@@ -89,7 +89,7 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	}
 	defer af.Close(sock)
 	/* FIXME darwin doesn't have SO_SETFIB
-	if fib := flag.Eval[int](fs, "F"); fib >= 0 {
+	if fib := flag.Search[int]("F", fs); fib >= 0 {
 		if err = os.NewSyscallError("SO_SETFIB", syscall.
 			SetsockoptInt(int(sock), syscall.SOL_SOCKET,
 				syscall.SO_SETFIB, fib)); err != nil {
@@ -141,7 +141,7 @@ func appendDstGatewayNetmask(
 		mask  net.IPMask
 	)
 	bits := -1
-	s := flag.Eval[string](fs, "dst")
+	s := flag.Search[string]("dst", fs)
 	if len(s) == 0 {
 		if fs.NArg() == 0 {
 			return msg, ErrNoDst
@@ -155,7 +155,7 @@ func appendDstGatewayNetmask(
 		s = s[:slash]
 	}
 	if s == "default" {
-		if flag.Eval[bool](fs, "6") {
+		if flag.Search[bool]("6", fs) {
 			addr = netip.IPv6Unspecified()
 		} else {
 			addr = netip.IPv4Unspecified()
@@ -181,13 +181,13 @@ func appendDstGatewayNetmask(
 	msg = sockaddr.Append(msg, addr)
 	PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_DST
 
-	if s = flag.Eval[string](fs, "gateway"); len(s) == 0 {
+	if s = flag.Search[string]("gateway", fs); len(s) == 0 {
 		if fs.NArg() > 1 {
 			s = fs.Arg(1)
 		}
 	}
 	if len(s) > 0 {
-		if flag.Eval[bool](fs, "interface") {
+		if flag.Search[bool]("interface", fs) {
 			nif := netif.Named(s)
 			if nif == nil {
 				return msg, egress.Markf("%q not found", s)
@@ -218,12 +218,12 @@ func appendDstGatewayNetmask(
 
 	if len(mask) == 0 {
 		if addr.Is6() {
-			bits = flag.Eval[int](fs, "prefixlen")
+			bits = flag.Search[int]("prefixlen", fs)
 			if bits >= 0 {
 				mask = net.CIDRMask(int(bits), 128)
 			}
 		} else {
-			s = flag.Eval[string](fs, "mask")
+			s = flag.Search[string]("mask", fs)
 			if len(s) == 0 && fs.NArg() > 2 {
 				s = fs.Arg(2)
 			}
@@ -247,7 +247,7 @@ func appendDstGatewayNetmask(
 func appendGenmask(
 	ctx context.Context, fs *flag.FlagSet, msg []byte,
 ) ([]byte, error) {
-	s := flag.Eval[string](fs, "genmask")
+	s := flag.Search[string]("genmask", fs)
 	if len(s) == 0 {
 		return msg, nil
 	}
@@ -263,7 +263,7 @@ func appendGenmask(
 func appendIfp(
 	ctx context.Context, fs *flag.FlagSet, msg []byte,
 ) ([]byte, error) {
-	s := flag.Eval[string](fs, "ifp")
+	s := flag.Search[string]("ifp", fs)
 	if len(s) == 0 {
 		return msg, nil
 	}
@@ -284,7 +284,7 @@ func appendIfp(
 func appendIfa(
 	ctx context.Context, fs *flag.FlagSet, msg []byte,
 ) ([]byte, error) {
-	s := flag.Eval[string](fs, "ifa")
+	s := flag.Search[string]("ifa", fs)
 	if len(s) == 0 {
 		return msg, nil
 	}
@@ -294,7 +294,7 @@ func appendIfa(
 func appendAuthor(
 	ctx context.Context, fs *flag.FlagSet, msg []byte,
 ) ([]byte, error) {
-	s := flag.Eval[string](fs, "author")
+	s := flag.Search[string]("author", fs)
 	if len(s) == 0 {
 		return msg, nil
 	}

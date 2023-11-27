@@ -11,11 +11,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/context/read"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
+	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Cat(
@@ -29,11 +28,11 @@ func Cat(
 */}}usage: {{join . " "}} [<file(s)>|-]
 Concatenate file(s) or standard in (-) to output.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, "*")
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) == 0 {

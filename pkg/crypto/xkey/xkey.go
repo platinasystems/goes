@@ -22,10 +22,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 type Privateer interface {
@@ -63,13 +62,13 @@ ed25519 algorithm.
 		"x25519",
 		"rsa",
 	}
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) > 0 {
 			style.Completions(args, algs)
 		}
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, struct {
 			Path, Algorithms []string
 		}{path, algs})
@@ -118,11 +117,11 @@ func Show(
 */}}usage: {{join . " "}} [<name>]
 Print algorithm of the named private key file or stdin.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, "*.pem")
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) > 0 && args[0] != "-" {

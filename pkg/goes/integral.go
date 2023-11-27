@@ -19,12 +19,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/path/restricted"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 	"golang.org/x/term"
 )
 
@@ -57,7 +55,7 @@ Run external command.
 	pFlag := fs.Bool("p", false, "Restricted path search.")
 	vFlag := fs.Bool("v", false, "Report path found.")
 	vvFlag := fs.Bool("V", false, "More verbose report.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, fs)
 		return nil
 	}
@@ -65,7 +63,7 @@ Run external command.
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet
@@ -135,7 +133,7 @@ func IntegralComplete(
 	m map[string]any,
 	args ...string,
 ) error {
-	ctx = complete.Parameter.With(ctx, true)
+	flag.CommandLine.Lookup("complete").Value.Set("true")
 	path = path[:len(path)-1]
 	if len(args) == 0 {
 		style.Completions(args, m)
@@ -164,7 +162,8 @@ Command/Objects
 			Map  map[string]any
 		}{path, m})
 	}
-	return do(Select, help.With(ctx), r, w, path, m, args...)
+	flag.CommandLine.Lookup("help").Value.Set("true")
+	return do(Select, ctx, r, w, path, m, args...)
 }
 
 func IntegralInput(
@@ -179,14 +178,14 @@ func IntegralInput(
 
 Perform command or set object with input from named file.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) < 2 {
 			style.Completions(args, "*")
 			return nil
 		}
 		return do(Select, ctx, nil, w, path, m, args[1:]...)
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		if len(args) < 2 {
 			return style.Usage(usage, path)
 		}
@@ -221,7 +220,7 @@ Perform command or print object with output directed to named file.
 	aFlag := fs.Bool("a", cmd == "append", "Append output to named file.")
 	mFlag := fs.Uint("m", 0666, "File mode (default 0666).")
 	tFlag := fs.Bool("t", cmd == "tee", "Tee output to named file.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) < 2 {
 			style.Completions(args, "*")
 			return nil
@@ -232,7 +231,7 @@ Perform command or print object with output directed to named file.
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		if len(args) < 2 {
 			return style.Usage(usage, struct {
 				Path  []string
@@ -301,11 +300,11 @@ func IntegralShowCompletion(
 */}}usage: {{join . " "}} <shell>
 Print shell completion script.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, completionShellScript)
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) == 0 {
@@ -339,14 +338,14 @@ func IntegralShowFS(
 */}}usage: {{join . " "}}
 Print embedded file.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) == 0 {
 			// exact path match
 			style.Plain.Notice.Println(path[len(path)-1])
 		}
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	b, err := efs.ReadFile(path[len(path)-1])
@@ -366,10 +365,10 @@ func IntegralStandby(
 	const usage = `usage: {{join . " "}} [<pids>]
 Wait until interrupt or termination signal.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	<-ctx.Done()
@@ -393,14 +392,14 @@ Fork self to run <daemon> like this,
 Daemons
 {{keys .Map}}`
 	daemons := m["daemon"].(map[string]any)
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) == 0 {
 			style.Completions(args, daemons)
 			return nil
 		}
 		return do(Select, ctx, r, w, path, daemons, args...)
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		if len(args) == 0 {
 			return style.Usage(usage, struct {
 				Path []string
@@ -480,13 +479,13 @@ func IntegralTimeout(
 
 Command/Objects
 {{keys .Map}}`
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) < 2 {
 			return nil
 		}
 		return do(Select, ctx, r, w, path, m, args[1:]...)
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		if len(args) < 2 {
 			return style.Usage(usage, struct {
 				Path []string

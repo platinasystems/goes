@@ -11,10 +11,8 @@ import (
 	"os"
 	"os/user"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Id(
@@ -39,7 +37,7 @@ Print user identity.
 	nflag := fs.Bool("n", false, "Print user or group name instead of number.")
 	rflag := fs.Bool("r", false,
 		"Print real instead of effective group or user ID.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, fs)
 		return nil
 	}
@@ -47,7 +45,7 @@ Print user identity.
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 var Route = map[string]any{
@@ -47,7 +45,7 @@ func route(
 Options{{SprintDefault .Flags}}`
 	cmd := path[len(path)-1]
 	fs := netrt.FlagSet(cmd)
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, fs)
 		return nil
 	}
@@ -55,7 +53,7 @@ Options{{SprintDefault .Flags}}`
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path     []string
 			Synopsis string

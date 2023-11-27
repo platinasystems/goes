@@ -20,13 +20,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Generate(
@@ -65,14 +63,14 @@ Generate PEM encoded x509 certifcate to stdout with stdin signature key.
 	country := fs.String("country", "", "")
 	name := fs.String("name", defname, "")
 
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, fs, "*.pem")
 		return nil
 	}
 	if err = fs.Parse(args); err != nil {
 		return egress.Marked(err)
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet
@@ -165,11 +163,11 @@ func Show(
 */}}usage: {{join . " "}} [<name>]
 Print decoded x509 PEM certifcate(s) from the named file or stdin.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, "*.pem")
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) > 0 && args[0] != "-" {

@@ -12,11 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/platinasystems/goes/v2/pkg/context/parameter"
 )
-
-var Parameter parameter.Key[bool]
 
 type FlagSetter interface{ VisitAll(fn func(*flag.Flag)) }
 

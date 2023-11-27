@@ -18,15 +18,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
+	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-// Load Root before calling Main.
-var Root = map[string]any{}
+var (
+	Complete = flag.CommandLine.Bool("complete", false, "Finish last arg.")
+	Help     = flag.CommandLine.Bool("help", false, "Print options.")
+
+	// Load Root before calling Main.
+	Root = map[string]any{}
+)
 
 // Walk embedded FS tree to add path references to map.
 func EmbedFS(m map[string]any, efs embed.FS, root string) {
@@ -82,7 +86,11 @@ func Exec(subsys any) {
 	}
 }
 
-func Main() { Exec(Select) }
+func Main() {
+	flag.CommandLine.BoolVar(Help, "h", *Help,
+		flag.CommandLine.Lookup("help").Usage)
+	Exec(Select)
+}
 
 func Merge(to, from map[string]any) {
 	for k, v := range from {
@@ -101,9 +109,9 @@ func Select(
 	args ...string,
 ) (err error) {
 	if len(args) == 0 {
-		if complete.Parameter.Value(ctx) {
+		if *Complete {
 			style.Completions(args, m)
-		} else if help.Wanted(ctx) {
+		} else if *Help {
 			path = append(path, "help")
 			return IntegralHelp(ctx, r, w, path, m)
 		} else {
@@ -112,7 +120,7 @@ func Select(
 	} else if v, ok := m[args[0]]; ok {
 		path = append(path, args[0])
 		err = do(v, ctx, r, w, path, m, args[1:]...)
-	} else if len(args) == 1 && complete.Parameter.Value(ctx) {
+	} else if len(args) == 1 && *Complete {
 		style.Completions(args, m)
 	} else if len(path) == 1 {
 		err = IntegralCommand(ctx, r, w, path, args...)
@@ -202,7 +210,7 @@ Unmarshal or scan object from text value.
 	default:
 		// Show or set objects
 		nargs := len(args)
-		if help.Wanted(ctx) {
+		if *Help {
 			if nargs == 0 || (nargs == 1 && args[0] == "-json") {
 				err = style.Usage(marshalUsage, path)
 			} else {

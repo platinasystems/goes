@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
@@ -17,7 +16,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/sync/chunk"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func TunTapper(
@@ -52,7 +50,7 @@ Create a tun/tap device then log received packets/frames.
 	if tuntap.CanChangeGroup {
 		fs.IntVar(&group, "group", group, "unset w/ -1")
 	}
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, fs)
 		return nil
 	}
@@ -61,7 +59,7 @@ Create a tun/tap device then log received packets/frames.
 		return err
 	}
 	args = fs.Args()
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

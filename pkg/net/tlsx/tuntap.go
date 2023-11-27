@@ -24,7 +24,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
@@ -34,7 +33,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -66,14 +64,14 @@ Open tap to named exchange or self @ given address.
 	randll := fs.Bool("r", false,
 		"use random link address instead of hashed cert SKI")
 	unit := fs.Uint("u", 0, "unit number")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return
 	}
 	err = fs.Parse(args)
 	if err != nil {
 		return
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		err = style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

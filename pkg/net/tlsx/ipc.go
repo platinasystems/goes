@@ -8,9 +8,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
+	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func IPC(
@@ -23,10 +22,10 @@ func IPC(
 	const usage = `usage: {{join . " "}} [-i <file>|-] [<args>]
 Daemon IPC.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	ipc := struct{ path, args []string }{

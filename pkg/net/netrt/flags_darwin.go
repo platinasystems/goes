@@ -75,18 +75,18 @@ func setFlags(rtm *syscall.RtMsghdr, fs *flag.FlagSet, cmd uint8) {
 		{"proxy", syscall.RTF_PROXY},
 		{"xresolve", syscall.RTF_XRESOLVE},
 	} {
-		if flag.Eval[bool](fs, x.name) {
+		if flag.Search[bool](x.name, fs) {
 			rtm.Flags |= x.flag
 		}
 	}
-	if !flag.Eval[bool](fs, "interface") {
+	if !flag.Search[bool]("interface", fs) {
 		rtm.Flags |= syscall.RTF_GATEWAY
 	}
-	if mtu := flag.Eval[int](fs, "mtu"); mtu != 1500 {
+	if mtu := flag.Search[int]("mtu", fs); mtu != 1500 {
 		rtm.Rmx.Mtu = uint32(mtu)
 		rtm.Inits |= syscall.RTV_MTU
 	}
-	if secs := flag.Eval[int](fs, "expire"); secs != 0 {
+	if secs := flag.Search[int]("expire", fs); secs != 0 {
 		elapse := time.Second * time.Duration(secs)
 		expire := time.Now().Add(elapse).Unix()
 		rtm.Rmx.Expire = int32(expire)
@@ -104,7 +104,7 @@ func setFlags(rtm *syscall.RtMsghdr, fs *flag.FlagSet, cmd uint8) {
 		{"rtt", syscall.RTV_RTT, &rtm.Rmx.Rtt},
 		{"rttvar", syscall.RTV_RTTVAR, &rtm.Rmx.Rttvar},
 	} {
-		if v := flag.Eval[int](fs, x.name); v != 0 {
+		if v := flag.Search[int](x.name, fs); v != 0 {
 			*(x.rmx) = uint32(v)
 			rtm.Inits |= x.rtv
 		}

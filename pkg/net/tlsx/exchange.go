@@ -14,14 +14,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -57,14 +55,14 @@ Start exchange at <address> (default :8003).
 	tcp := fs.String("tcp", ":8003", "service address")
 	udp := fs.String("udp", ":8003", "packet service (disable if empty)")
 	fs.BoolVar(&Restricted, "r", false, "restrict clients to self")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, path)
 	}
 	args = fs.Args()
@@ -106,10 +104,10 @@ func Join(
 	const usage = `usage: {{join . " "}} <confirmation>
 Join exchange with reserve confirmation number.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) < 1 {
@@ -150,10 +148,10 @@ func Reserve(
 	const usage = `usage: {{join  . " "}} <name-or-subject-key-id>
 Reserve exchange membership.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) < 1 {
@@ -185,10 +183,10 @@ func WhoIs(
 	const usage = `usage: {{join . " "}} <id>
 Returns the PEM encoded data containing the public key and nonce of member.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, path)
 	}
 	if len(args) < 1 {

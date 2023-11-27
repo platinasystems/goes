@@ -10,11 +10,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Echo(
@@ -30,7 +28,7 @@ Print string(s) to standard output.
 	fs := flag.New("echo")
 	esc := fs.Bool("e", false, "Interpret escapes.")
 	nonl := fs.Bool("n", false, "Without trailing newline.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		style.Completions(args, fs)
 		return nil
 	}
@@ -38,7 +36,7 @@ Print string(s) to standard output.
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

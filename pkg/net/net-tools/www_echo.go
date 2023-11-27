@@ -13,9 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
+	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const WWWEchoPort = 8080
@@ -29,10 +28,10 @@ func WWWEcho(
 */}}usage: {{$path}} [<address>:<port>]
 Echo paths of http request (default listen at <:{{.Port}}>)
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
@@ -85,10 +84,10 @@ Ping echo host.
 
 The default is 127.0.0.1:{{.Port}}.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, struct {
 			Path []string
 			Port int

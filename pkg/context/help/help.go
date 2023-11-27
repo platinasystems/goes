@@ -21,7 +21,7 @@ func Wanted(contextOrFlagSet ...any) bool {
 				return true
 			}
 		case *flag.FlagSet:
-			if flag.Eval[bool](t, "help") {
+			if flag.Search[bool]("help", t) {
 				return true
 			}
 		}

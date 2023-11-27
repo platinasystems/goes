@@ -11,10 +11,8 @@ import (
 	"os"
 
 	"github.com/creack/pty"
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Rexec(
@@ -34,7 +32,7 @@ Remote execution.
 	fs := flag.New("rexec")
 	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		if len(args) <= 1 {
 			style.Completions(args, fs, Self().DNS0(),
 				Subscriptions().Names())
@@ -45,7 +43,7 @@ Remote execution.
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet

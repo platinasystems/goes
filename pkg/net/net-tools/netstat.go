@@ -11,13 +11,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Netstat(
@@ -54,14 +52,14 @@ Options{{SprintDefault .Flags}}`
 	_ = fs.Bool("s", false, "Show per-protocol stats.")
 	_ = fs.Bool("ss", false, "Show per-protocol, non-zero stats.")
 	_ = fs.Duration("w", 0, "Wait interval.")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet
@@ -106,7 +104,7 @@ func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 		fmt.Fprintf(w, " %11d", nif.Collisions)
 		fmt.Fprintln(w)
 	}
-	if ifname := flag.Eval[string](fs, "I"); len(ifname) > 0 {
+	if ifname := flag.Search[string]("I", fs); len(ifname) > 0 {
 		if nif := netif.Named(ifname); nif == nil {
 			return fmt.Errorf("%q %w", ifname, ErrNotFound)
 		} else {
@@ -127,7 +125,7 @@ func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 
 func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 	var family uint
-	switch s := flag.Eval[string](fs, "f"); s {
+	switch s := flag.Search[string]("f", fs); s {
 	case "":
 		family = af.UNSPEC
 	case "inet":

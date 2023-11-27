@@ -16,10 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
+	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/resolve"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -37,10 +36,10 @@ func UDPEcho(
 */}}usage: {{$path}} [<address>:<port>]
 Echo UDP received packets (default <:{{.Port}}>)
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
@@ -95,10 +94,10 @@ Ping echo host with UDP sequenced packets.
 
 The default <host> is 127.0.0.1:{{.Port}}.
 `
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
-	if help.Wanted(ctx) {
+	if flag.Search[bool]("help") {
 		return style.Usage(usage, struct {
 			Path []string
 			Port int

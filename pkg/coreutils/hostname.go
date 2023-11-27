@@ -10,11 +10,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/help"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 func Hostname(
@@ -32,14 +30,14 @@ Set or print system host name.
 	dFlag := fs.Bool("d", false, "only print domain")
 	fFlag := fs.Bool("f", true, "print fully qualified domain name (FQDN)")
 	sFlag := fs.Bool("s", false, "print name w/o domain")
-	if complete.Parameter.Value(ctx) {
+	if flag.Search[bool]("complete") {
 		return nil
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	if help.Wanted(ctx, fs) {
+	if flag.Search[bool]("help", fs) {
 		return style.Usage(usage, struct {
 			Path  []string
 			Flags *flag.FlagSet
