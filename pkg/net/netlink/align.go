@@ -9,6 +9,6 @@ import "github.com/platinasystems/goes/v2/pkg/syscall/align"
 var (
 	NLMSG_ALIGN = align.Align(NLMSG_ALIGNTO).Roundup
 	NLA_ALIGN   = align.Align(NLA_ALIGNTO).Roundup
-	PageAlign   = align.Page.Roundup
-	PageSize    = align.Page.Size
+	PageAlign   = Page.Align
+	PageSize    = Page.Size()
 )

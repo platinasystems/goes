@@ -22,8 +22,8 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
+	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
-	"github.com/platinasystems/goes/v2/pkg/syscall/align"
 )
 
 type appendAddrFunc func(context.Context, *flag.FlagSet, []byte) ([]byte, error)
@@ -62,7 +62,7 @@ func Monitor(ctx context.Context) (Streamer, error) {
 
 func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	var err error
-	msg := make([]byte, align.Page.Size())
+	msg := page.New()
 	rtm := Pointer[syscall.RtMsghdr](msg)
 	msg = msg[:Sizeof(rtm)]
 	rtm.Type = cmd

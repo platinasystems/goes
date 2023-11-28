@@ -4,10 +4,13 @@
 
 package sysctl
 
-import "github.com/platinasystems/goes/v2/pkg/syscall/align"
+import (
+	"github.com/platinasystems/goes/v2/pkg/os/page"
+	"github.com/platinasystems/goes/v2/pkg/syscall/align"
+)
 
 var (
 	Align     = align.Align(AlignTo).Roundup
-	PageAlign = align.Page.Roundup
-	PageSize  = align.Page.Size
+	PageAlign = page.Align
+	PageSize  = page.Size()
 )

@@ -8,12 +8,15 @@ import (
 	"os"
 
 	"github.com/platinasystems/goes/v2/pkg/sync/chunk"
+	"github.com/platinasystems/goes/v2/pkg/syscall/align"
 )
 
-var size = os.Getpagesize()
-
-var Free = chunk.Free
-var New = func() []byte { return chunk.New(size) }
+var (
+	size  = os.Getpagesize()
+	Align = align.Align(size).Roundup
+	Free  = chunk.Free
+	New   = func() []byte { return chunk.New(size) }
+)
 
 func Size() int { return size }
 
