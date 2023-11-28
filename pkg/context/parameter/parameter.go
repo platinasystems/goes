@@ -4,19 +4,27 @@
 
 package parameter
 
-import (
-	"context"
-)
-
-type Key[T any] struct{ _ T }
-
-// Prepend key'd value to context.
-func (k *Key[T]) With(ctx context.Context, v T) context.Context {
-	return context.WithValue(ctx, k, v)
+type Parameter[T any] struct {
+	Default T
 }
 
-// Return key'd value within context or its zero value if not present.
-func (k *Key[T]) Value(ctx context.Context) T {
-	v, _ := ctx.Value(k).(T)
-	return v
+// Prepend first optional parameter value to context.
+// If no values are given, use the paramenter default.
+func (p *Parameter[T]) With(ctx Context, opt ...T) Context {
+	v := p.Default
+	if len(opt) > 0 {
+		v = opt[0]
+	}
+	return WithValue(ctx, p, v)
+}
+
+// If present, return the context parameter value, otherwise, return
+// the parameter default.
+func (p *Parameter[T]) Within(ctx Context) T {
+	if t := ctx.Value(p); t != nil {
+		if v, ok := t.(T); ok {
+			return v
+		}
+	}
+	return p.Default
 }
