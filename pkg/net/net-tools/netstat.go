@@ -39,7 +39,7 @@ Show network status.
   • {{$path}} -B [-I interface]
 
 Options{{SprintDefault .Flags}}`
-	fs := flag.New("netstat")
+	fs := flag.NewSilentFlagSet("netstat")
 	iFlag := fs.Bool("i", false, "Show interface info.")
 	rFlag := fs.Bool("r", false, "Show routing table.")
 	_ = fs.String("f", "", "Address Family: inet, inet6, link.")

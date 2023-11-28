@@ -27,7 +27,7 @@ func TunTapper(
 */}}usage: {{join .Path " "}} [<option>]... [<addr> <dest> [up]]
 Create a tun/tap device then log received packets/frames.
 {{SprintDefault .Flags}}`
-	fs := flag.New("tuntapper")
+	fs := flag.NewSilentFlagSet("tuntapper")
 	unit := fs.Uint("u", 0, "Unit number suffix.")
 	ha := netif.NewHardwareAddr()
 	var isTap bool

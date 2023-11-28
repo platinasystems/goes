@@ -26,7 +26,7 @@ func Hostname(
 */}}usage: {{$path}} [<options>] [<name>]
 Set or print system host name.
 {{SprintDefault .Flags}}`
-	fs := flag.New("hostname")
+	fs := flag.NewSilentFlagSet("hostname")
 	dFlag := fs.Bool("d", false, "only print domain")
 	fFlag := fs.Bool("f", true, "print fully qualified domain name (FQDN)")
 	sFlag := fs.Bool("s", false, "print name w/o domain")

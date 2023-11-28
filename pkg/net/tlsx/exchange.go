@@ -51,7 +51,7 @@ func Exchange(
 	const usage = `usage: {{join . " "}} [-r] [-a <address>]
 Start exchange at <address> (default :8003).
 `
-	fs := flag.New("exchange")
+	fs := flag.NewSilentFlagSet("exchange")
 	tcp := fs.String("tcp", ":8003", "service address")
 	udp := fs.String("udp", ":8003", "packet service (disable if empty)")
 	fs.BoolVar(&Restricted, "r", false, "restrict clients to self")

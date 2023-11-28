@@ -62,7 +62,7 @@ Parameters` + netif.AddressParameters +
 		netif.ConfigParameters +
 		netif.CreateParameters
 	var pat *regexp.Regexp
-	fs := flag.New("ifconfig")
+	fs := flag.NewSilentFlagSet("ifconfig")
 	mFlag := fs.Bool("m", false, "Display all supported media.")
 	LFlag := fs.Bool("L", false, "Display IPv6 address lifetime as offset.")
 	aFlag := fs.Bool("a", false,

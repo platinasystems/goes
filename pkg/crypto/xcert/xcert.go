@@ -52,7 +52,7 @@ Generate PEM encoded x509 certifcate to stdout with stdin signature key.
 		}
 	}
 
-	fs := flag.New("generate")
+	fs := flag.NewSilentFlagSet("generate")
 	sn := fs.Int64("serial-number", 1, "")
 	dnsnames := fs.String("dns", host.Name(), "comma separated list")
 	dur := fs.Duration("duration", 10*year, "note 8760 hours per year")

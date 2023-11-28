@@ -25,7 +25,7 @@ func Echo(
 */}}usage: {{$path}} [<options>] [<strings>]
 Print string(s) to standard output.
 {{SprintDefault .Flags}}`
-	fs := flag.New("echo")
+	fs := flag.NewSilentFlagSet("echo")
 	esc := fs.Bool("e", false, "Interpret escapes.")
 	nonl := fs.Bool("n", false, "Without trailing newline.")
 	if flag.Search[bool]("complete") {

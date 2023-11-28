@@ -51,7 +51,7 @@ func IntegralCommand(
 */}}usage: {{$path}} [<options>] <command> [<args>]
 Run external command.
 {{SprintDefault .Flags}}`
-	fs := flag.New("command")
+	fs := flag.NewSilentFlagSet("command")
 	pFlag := fs.Bool("p", false, "Restricted path search.")
 	vFlag := fs.Bool("v", false, "Report path found.")
 	vvFlag := fs.Bool("V", false, "More verbose report.")
@@ -216,7 +216,7 @@ func IntegralOutput(
 Perform command or print object with output directed to named file.
 {{SprintDefault .Flags}}`
 	cmd := path[len(path)-1]
-	fs := flag.New("output")
+	fs := flag.NewSilentFlagSet("output")
 	aFlag := fs.Bool("a", cmd == "append", "Append output to named file.")
 	mFlag := fs.Uint("m", 0666, "File mode (default 0666).")
 	tFlag := fs.Bool("t", cmd == "tee", "Tee output to named file.")

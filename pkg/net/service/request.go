@@ -37,7 +37,7 @@ func (req Request) Func(
 Run command on <host>.
 {{SprintDefault .Flags}}`
 	cmd := path[len(path)-1]
-	fs := flag.New(cmd)
+	fs := flag.NewSilentFlagSet(cmd)
 	in := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	if flag.Search[bool]("complete") {
 		return nil

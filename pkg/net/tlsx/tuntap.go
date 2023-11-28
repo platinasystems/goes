@@ -59,7 +59,7 @@ Open tap to named exchange or self @ given address.
 {{SprintDefault .Flags}}`
 	defer egress.Recovery(&err)
 	var addr net.IP
-	fs := flag.New("tuntap")
+	fs := flag.NewSilentFlagSet("tuntap")
 	fs.TextVar(&addr, "a", addr, "static network address")
 	randll := fs.Bool("r", false,
 		"use random link address instead of hashed cert SKI")

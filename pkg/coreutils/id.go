@@ -25,7 +25,7 @@ func Id(
 */}}usage: {{$path}} [<options>] [<user>]
 Print user identity.
 {{SprintDefault .Flags}}`
-	fs := flag.New("id")
+	fs := flag.NewSilentFlagSet("id")
 	Aflag := fs.Bool("A", false, "Print user process audit.")
 	Gflag := fs.Bool("G", false, "Print group IDs.")
 	Mflag := fs.Bool("M", false, "Print process MAC label.")

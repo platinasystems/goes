@@ -29,7 +29,7 @@ Remote execution.
 <exchange>
 	<name>[@<dns|ip4|\[ip6\]>][:<port>]
 `
-	fs := flag.New("rexec")
+	fs := flag.NewSilentFlagSet("rexec")
 	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
 	if flag.Search[bool]("complete") {

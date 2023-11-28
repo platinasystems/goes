@@ -12,7 +12,7 @@ import (
 )
 
 func FlagSet(name string) *flag.FlagSet {
-	fs := flag.New(name)
+	fs := flag.NewSilentFlagSet(name)
 	afinet := fs.Bool("4", false, "Address hint.")
 	fs.BoolVar(afinet, "inet", false, "aka -4.")
 	afinet6 := fs.Bool("6", false, "Address hint.")
