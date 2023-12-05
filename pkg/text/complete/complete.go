@@ -16,35 +16,39 @@ import (
 
 type FlagSetter interface{ VisitAll(fn func(*flag.Flag)) }
 
-// Last the sorted matches of args[len(args)-1] completed by:
+// Print the sorted matches of args[len(args)-1] completed by:
 //
 //	FlagSetter
 //	string - glob files
 //	[]string - glossary
 //	map[string]any - matching keys
-func Last(args []string, completers ...any) (list []string) {
+func Last(args []string, completers ...any) error {
 	var last string
+	var matches []string
 	if len(args) > 0 {
 		last = args[len(args)-1]
 	}
 	for _, v := range completers {
 		switch t := v.(type) {
 		case FlagSetter:
-			list = append(list, Flags(t, last)...)
+			matches = append(matches, Flags(t, last)...)
 		case string:
-			list = append(list, Glob(t, last)...)
+			matches = append(matches, Glob(t, last)...)
 		case []string:
-			list = append(list, Glossary(t, last)...)
+			matches = append(matches, Glossary(t, last)...)
 		case map[string]string:
-			list = append(list, MapKeys(t, last)...)
+			matches = append(matches, MapKeys(t, last)...)
 		case map[string]any:
-			list = append(list, MapKeys(t, last)...)
+			matches = append(matches, MapKeys(t, last)...)
 		default:
-			fmt.Printf("can't match %T\n", t)
+			return fmt.Errorf("can't complete %T", t)
 		}
 	}
-	sort.Strings(list)
-	return
+	sort.Strings(matches)
+	for _, match := range matches {
+		fmt.Println(match)
+	}
+	return nil
 }
 
 func Flags(fs FlagSetter, arg string) (c []string) {

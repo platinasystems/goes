@@ -96,7 +96,7 @@ func (nif *NetIf) Config(args []string) error {
 	defer nl.Close()
 
 	if err = nif.refresh(nl); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 
 	req, msg := netlink.Expand[netlink.MsgHdr](nil)

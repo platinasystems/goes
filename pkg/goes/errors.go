@@ -11,6 +11,7 @@ import (
 
 var (
 	FIXME         = errors.New("FIXME")
+	ErrEmpty      = errors.New("empty selection")
 	ErrIncomplete = errors.New("incomplete")
 	ErrNoRoom     = errors.New("no room")
 	ErrNotFound   = errors.New("not found")
@@ -18,13 +19,18 @@ var (
 	ErrUnexpected = errors.New("unexpected")
 )
 
-type Error struct {
+type GoesError struct {
 	Path []string
 	Err  error
 }
 
-func (e Error) Error() string {
-	s := strings.Join(e.Path, "/") + ":"
+func IsGoesError(err error) bool {
+	_, ok := err.(GoesError)
+	return ok
+}
+
+func (e GoesError) Error() string {
+	s := strings.Join(e.Path, ":") + ":"
 	eee := e.Err.Error()
 	if strings.IndexRune(eee, ':') < 0 {
 		s += " "
@@ -33,4 +39,4 @@ func (e Error) Error() string {
 	return s
 }
 
-func (e Error) Unwrap() error { return e.Err }
+func (e GoesError) Unwrap() error { return e.Err }

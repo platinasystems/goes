@@ -11,12 +11,12 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 )
@@ -80,16 +80,16 @@ func JoinBridge(ctx context.Context, c *tls.Conn, args []string) {
 		n, err := dec.Read(pg)
 		if err != nil {
 			page.Free(pg)
-			style.Error(err)
+			log.Print(err)
 			break
 		}
 		if n < 14 {
 			page.Free(pg)
-			style.Error(ErrTooShort)
+			log.Print(ErrTooShort)
 			break
 		}
 		in := newBridgeInput(c, pg[:n])
-		style.Println(bridge.name, "<-", ra,
+		fmt..Fprintln(wctx.In(ctx), bridge.name, "<-", ra,
 			frame.Header[frame.ETH](in.pg))
 		bridge.inputch <- in
 	}
@@ -149,9 +149,9 @@ func bridgeSend(ctx context.Context, c *tls.Conn, in *bridgeInput) {
 	ra := remoteAddr(c)
 	_, err := lv.NewEncoder(write.With(ctx, c)).Write(in.pg)
 	if err != nil {
-		style.Errorln(bridge.name, "->", ra, err)
+		log.Println(bridge.name, "->", ra, err)
 	} else {
-		style.Println(bridge.name, "->", ra,
+		fmt.Fprintln(wctx.In(ctx), bridge.name, "->", ra,
 			frame.Header[frame.ETH](in.pg))
 	}
 }

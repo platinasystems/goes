@@ -12,7 +12,6 @@ import (
 	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
@@ -103,7 +102,7 @@ func (l *list) Next() (NetRt, error) {
 			case rtnetlink.RTA_PREFSRC:
 			case rtnetlink.RTA_METRICS:
 			case rtnetlink.RTA_MULTIPATH:
-				style.Note("MULTIPATH FIXME")
+				// FIXME
 			case rtnetlink.RTA_PROTOINFO:
 			case rtnetlink.RTA_FLOW:
 			case rtnetlink.RTA_CACHEINFO:

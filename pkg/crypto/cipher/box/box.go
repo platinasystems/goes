@@ -93,9 +93,9 @@ func (box Box) Close(c *Cipher) Box {
 	contents := box[BeginContent:]
 	if len(contents) > 0 {
 		if niv, err := rand.Read(box[BeginIV:EndIV]); err != nil {
-			panic(egress.Marked(err))
+			panic(egress.Mark(err))
 		} else if niv != IVSize {
-			panic(egress.Marked(ErrIncomplete))
+			panic(egress.Mark(ErrIncomplete))
 		}
 		nonce := NoncePlusIV(c.nonce.local, box[BeginIV:EndIV])
 		contents = c.gcm.Seal(contents[:0], nonce, contents, nil)
@@ -146,37 +146,37 @@ func (box Box) Receive(ctx context.Context, conn net.Conn, bxc *Cipher) (
 	if _, ok := conn.(net.PacketConn); ok {
 		n, err := ctxconn.Read(box)
 		if err != nil {
-			return box, egress.Marked(err)
+			return box, egress.Mark(err)
 		}
 		if n < BeginContent {
-			return box, egress.Marked(ErrUnderrun)
+			return box, egress.Mark(ErrUnderrun)
 		}
 		box = box[:n]
 		if box, err = box.Unseal(bxc); err != nil {
-			return box, egress.Marked(err)
+			return box, egress.Mark(err)
 		}
 	} else {
 		n, err := ctxconn.Read(box[:BeginContent])
 		if err != nil {
-			return box, egress.Marked(err)
+			return box, egress.Mark(err)
 		}
 		if n != BeginContent {
-			return box, egress.Marked(ErrUnderrun)
+			return box, egress.Mark(ErrUnderrun)
 		}
 		if box, err = box.Unseal(bxc); err != nil {
-			return box, egress.Marked(err)
+			return box, egress.Mark(err)
 		}
 		size := box.size()
 		if size > Size-BeginContent {
-			return box, egress.Marked(ErrOverrun)
+			return box, egress.Mark(ErrOverrun)
 		}
 		box = box[:BeginContent+size]
 		n, err = ctxconn.Read(box[BeginContent:])
 		if err != nil {
-			return box, egress.Marked(err)
+			return box, egress.Mark(err)
 		}
 		if n != int(size) {
-			return box, egress.Marked(ErrUnderrun)
+			return box, egress.Mark(ErrUnderrun)
 		}
 	}
 	return box, nil

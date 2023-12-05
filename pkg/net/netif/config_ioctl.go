@@ -54,7 +54,7 @@ var ConfigSIOC = map[string]uintptr{
 func (nif *NetIf) Config(args []string) error {
 	inet, err := af.OpenInet()
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	defer af.Close(inet)
 	for err == nil && len(args) > 0 {
@@ -90,7 +90,7 @@ func (nif *NetIf) Config(args []string) error {
 				return egress.Markf("%q %w", args[1], err)
 			}
 			sioc := ConfigSIOC[args[0]]
-			err = egress.Marked(netioctl.Inet(sioc, req))
+			err = egress.Mark(netioctl.Inet(sioc, req))
 			args = args[2:]
 		default:
 			return egress.Markf("%q %w", args[0], ErrNotFound)

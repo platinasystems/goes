@@ -104,11 +104,11 @@ func (nif *NetIf) Del(
 	if addr.Is4() {
 		req := netioctl.NewIfReqSockaddrIn(nif.Name)
 		req.Value.Write(prefix.Addr().AsSlice())
-		return egress.Marked(netioctl.Inet(syscall.SIOCDIFADDR, req))
+		return egress.Mark(netioctl.Inet(syscall.SIOCDIFADDR, req))
 	}
 	req := netioctl.NewIfReqSockaddrIn6(nif.Name)
 	req.Value.Write(addr.AsSlice())
-	return egress.Marked(netioctl.Inet6(netioctl.SIOCDIFADDR_IN6, req))
+	return egress.Mark(netioctl.Inet6(netioctl.SIOCDIFADDR_IN6, req))
 }
 
 func (nif *NetIf) Replace(

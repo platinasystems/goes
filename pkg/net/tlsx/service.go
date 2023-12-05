@@ -9,15 +9,19 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/selctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/io/flusher"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/accept"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
@@ -46,9 +50,9 @@ func Routine(
 	ln net.Listener,
 	pc net.PacketConn,
 ) {
-	defer wg.Done()
-	defer style.Recovery(context.Canceled, net.ErrClosed, io.EOF)
 	var pcwg sync.WaitGroup
+
+	defer wg.Done()
 
 	if pc != nil {
 		pcwg.Add(1)
@@ -84,7 +88,6 @@ func Routine(
 func service(ctx context.Context, wg *sync.WaitGroup, conn net.Conn) {
 	defer wg.Done()
 	defer conn.Close()
-	defer style.Recovery(context.Canceled)
 
 	ra := conn.RemoteAddr().String()
 	dec := lv.NewDecoder(poll.WithReader(ctx, conn))
@@ -102,28 +105,32 @@ serviceloop:
 			iowg sync.WaitGroup
 		)
 
-		r := io.LimitReader(nil, 0)
-		w := io.Writer(enc)
+		ctx = rctx.Parameter.With(ctx, io.LimitReader(nil, 0))
+		ctx = wctx.Parameter.With(ctx, io.Writer(enc))
 		cctx, cancel := context.WithCancel(ctx)
+		cctx = pathctx.Parameter.With(cctx, []string{host.Name()})
 
 		for i := 0; ; {
 			if n, err = dec.Read(pg[i:]); err != nil {
-				panic(err)
+				log.Print(err)
+				return
 			} else if n == 0 {
 				if len(args) == 0 {
-					panic(goes.ErrIncomplete)
+					log.Print(goes.ErrIncomplete)
+					return
 				}
 				break
 			} else if s := string(pg[i : i+n]); s != "<<<<" {
 				args = append(args, s)
 				i += n
 			} else if len(args) == 0 {
-				panic(goes.ErrIncomplete)
+				log.Print(goes.ErrIncomplete)
+				return
 			} else if args[0] == "pty" {
 				break
 			} else {
 				in, flush := flusher.New(dec)
-				r = in
+				cctx = rctx.Parameter.With(cctx, in)
 				iowg.Add(1)
 				go func() {
 					defer iowg.Done()
@@ -134,38 +141,34 @@ serviceloop:
 			}
 		}
 
-		// style.Note(ra, args)
-
-		path := []string{host.Name()}
-
 		if len(args) == 0 {
 			enc.Encode(ErrIncomplete)
 			continue serviceloop
 		}
 		if _, ok := conn.(*tls.Conn); ok {
 			if args[0] == "pty " {
-				r = dec
+				cctx = rctx.Parameter.With(cctx, dec)
 			}
-			err = goes.Select(cctx, r, w, append(path, ra),
-				Selection, args...)
+			cctx = pathctx.AppendIn(cctx, ra)
+			cctx = selctx.Parameter.With(cctx, Selection)
+			err = goes.Select(cctx, args...)
 		} else {
 			switch args[0] {
 			case "join":
-				path = append(path, args[0])
-				args = args[1:]
-				err = Join(cctx, w, conn, path, args...)
+				pathctx.AppendIn(cctx, args[0])
+				err = Join(cctx, conn, args[1:]...)
 				if err == nil {
 					return
 				}
 			case "subscribe":
-				path = append(path, args[0])
-				args = args[1:]
-				err = regSubscribe(ctx, r, w, path, args...)
+				pathctx.AppendIn(cctx, args[0])
+				err = regSubscribe(ctx, args[1:]...)
 			case "tls":
 				enc.Encode(nil)
 				sv, err := greetClient(ctx, conn)
 				if err != nil {
-					panic(err)
+					log.Print(err)
+					return
 				}
 				dec = lv.NewDecoder(poll.WithReader(ctx, sv))
 				enc = lv.NewEncoder(write.With(ctx, sv))

@@ -1,11 +1,10 @@
 // Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
-// Use of this source code is governed by the GPL-2 license described in the
-// LICENSE file.
+// Use of this source code is governed by the BSD-style license
+// described in the golang/LICENSE file.
 
 package egress
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -13,12 +12,17 @@ import (
 
 var FileNameMutation = filepath.Base
 
+func IsMarked(err error) bool {
+	_, ok := err.(*mark)
+	return ok
+}
+
 // Wrap a non-nil error with the caller's file name and line number, e.g.
 //
 //	if err != nil {
 //		return Marked(err)
 //	}
-func Marked(err error) error {
+func Mark(err error) error {
 	if err != nil {
 		if _, f, l, ok := runtime.Caller(1); ok {
 			err = &mark{f, l, err}
@@ -36,36 +40,6 @@ func Markf(format string, args ...any) error {
 		err = &mark{f, l, err}
 	}
 	return err
-}
-
-// Record a recovered panic as an error wrapped with the panic'd file name and
-// line number, e.g.
-//
-//	func() (err error) {
-//		...
-//		defer Recovery(&err)
-//		}
-//		...
-//		panic("oops")
-//	}
-func Recovery(p *error) {
-	r := recover()
-	if r == nil {
-		return
-	}
-	err, is_error := r.(error)
-	if !is_error {
-		err = errors.New(fmt.Sprint(r))
-	}
-	depth := 2
-	if _, is_runtime := err.(runtime.Error); is_runtime {
-		depth = 3
-	}
-	if _, f, l, ok := runtime.Caller(depth); ok {
-		*p = mark{f, l, err}
-	} else {
-		*p = err
-	}
 }
 
 type mark struct {

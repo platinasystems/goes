@@ -208,18 +208,18 @@ func (x *X509) SKIs() (skis []string) {
 
 func (x *X509) UnmarshalText(data []byte) error {
 	if x.Block, data = pem.Decode(data); x.Block == nil {
-		return egress.Marked(ErrInvalid)
+		return egress.Mark(ErrInvalid)
 	}
 	if x.Block.Type != "CERTIFICATE" {
 		x.Block = nil
 		if err := x.UnmarshalText(data); err != nil {
-			return egress.Marked(err)
+			return egress.Mark(err)
 		} else if x.Block == nil {
 			return nil
 		}
 	}
 	if err := x.UnmarshalDER(x.Block.Bytes); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	if len(data) > 0 {
 		if next, err := NewX509(data); err == nil {

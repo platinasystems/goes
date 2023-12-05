@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-package program
+package pty
 
 import (
 	"context"
@@ -15,28 +15,33 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/platinasystems/goes/v2/pkg/context/nbr"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/io/flusher"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/utmpx"
 )
 
-func PTY(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `usage: {{join . " "}} <rows> <cols> {{/*
-*/}}<x-pixels> <y-pixels> <command> [<args>]
-Run command in an allocated TTY.
-`
+const ExecUsageTemplate = `
+usage: {{.}} <rows> <cols> <x-pixels> <y-pixels> <command> [<args>]
+Run command in an allocated TTY.`
+
+func ExecUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Exec(ctx context.Context, args ...string) error {
+	path := pathctx.Parameter.In(ctx)
+	r := rctx.Parameter.In(ctx)
+	w := wctx.Parameter.In(ctx)
+
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(ExecUsageTemplate[1:], ExecUsageData(ctx))
 	}
 	if n := len(args); n < 5 {
 		return fmt.Errorf("missing %s", []string{

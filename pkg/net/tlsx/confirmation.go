@@ -17,10 +17,10 @@ func (p *Confirmation) ReadFrom(r io.Reader) (int64, error) {
 	var buf [8]byte
 	n, err := r.Read(buf[:])
 	if err != nil {
-		return int64(n), egress.Marked(err)
+		return int64(n), egress.Mark(err)
 	}
 	if n != len(buf[:]) {
-		return int64(n), egress.Marked(ErrUnderrun)
+		return int64(n), egress.Mark(ErrUnderrun)
 	}
 	err = p.UnmarshalBinary(buf[:])
 	return int64(n), err

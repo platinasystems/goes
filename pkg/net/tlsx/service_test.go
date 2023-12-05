@@ -19,15 +19,11 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
 )
 
 func Test(t *testing.T) {
-	style.Test(t)
-	defer style.Recovery(context.Canceled)
-
 	const (
 		duration = 30 * time.Second
 		period   = 3 * time.Second
@@ -72,7 +68,7 @@ func Test(t *testing.T) {
 		clients[i] = cl
 	}
 
-	style.Noteln("run for", duration, "...")
+	t.Log("run for", duration, "...")
 	rt := time.NewTimer(duration)
 
 	for i, cl := range clients {
@@ -91,7 +87,7 @@ func Test(t *testing.T) {
 			panic(err)
 		}
 		wg.Add(1)
-		go testrx(ctx, &wg, conn, cl)
+		go testrx(t, ctx, &wg, conn, cl)
 		wg.Add(1)
 		go cl.KeepAlive(ctx, &wg, conn, period)
 	}
@@ -107,6 +103,7 @@ func Test(t *testing.T) {
 }
 
 func testrx(
+	t *testing.T,
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn net.Conn,
@@ -129,22 +126,22 @@ func testrx(
 			if errors.Is(err, context.Canceled) {
 				break
 			} else {
-				style.Error(err)
+				t.Error(err)
 				break
 			}
 		}
 		from := bx.FromWhom()
 		if len(bx.Contents()) == 0 {
-			style.Notef("%d<-%d: keepalive", cl.ID, from)
+			t.Logf("%d<-%d: keepalive", cl.ID, from)
 			if remote, ok := cl.Remote(from); !ok {
 				m, err := exchange.whois(from)
 				if err != nil {
-					style.Error(err)
+					t.Error(err)
 					continue
 				}
 				remote, err = cl.AddRemote(from, m.PublicKey)
 				if err != nil {
-					style.Error(err)
+					t.Error(err)
 					continue
 				}
 			} else {
@@ -154,11 +151,11 @@ func testrx(
 				conn.Write(bx)
 			}
 		} else if remote, ok := cl.Remote(from); !ok {
-			style.Errorf("%d<-%d: indecipherable", cl.ID, from)
+			t.Errorf("%d<-%d: indecipherable", cl.ID, from)
 		} else if bx, err = bx.Open(remote); err != nil {
-			style.Errorf("%d<-%d: %v", cl.ID, from, err)
+			t.Errorf("%d<-%d: %v", cl.ID, from, err)
 		} else {
-			style.Notef("%d<-%d: %q", cl.ID, from, bx.Contents())
+			t.Logf("%d<-%d: %q", cl.ID, from, bx.Contents())
 		}
 	}
 }

@@ -10,69 +10,71 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"os"
 	"os/exec"
 	"os/user"
 	"runtime"
 	"strings"
 	"syscall"
-	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/selctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/path/restricted"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 	"golang.org/x/term"
 )
 
 // These are merged into the Root of the command tree.
 var Integral = map[string]any{
-	"append":   IntegralOutput,
 	"command":  IntegralCommand,
 	"complete": IntegralComplete,
 	"help":     IntegralHelp,
-	"input":    IntegralInput,
-	"output":   IntegralOutput,
 	"standby":  IntegralStandby,
 	"start":    IntegralStart,
-	"tee":      IntegralOutput,
-	"timeout":  IntegralTimeout,
 }
 
-func IntegralCommand(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] <command> [<args>]
-Run external command.
-{{SprintDefault .Flags}}`
+const IntegralCommandUsageTemplate = `
+usage: {{.Path}} [<options>] <command> [<args>]
+Run an external command.
+{{.Flag}}`
+
+func IntegralCommandUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
+
+func IntegralCommand(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("command")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	pFlag := fs.Bool("p", false, "Restricted path search.")
 	vFlag := fs.Bool("v", false, "Report path found.")
 	vvFlag := fs.Bool("V", false, "More verbose report.")
 	if flag.Search[bool]("complete") {
-		style.Completions(args, fs)
-		return nil
+		return complete.Last(args, fs)
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(IntegralCommandUsageTemplate[1:],
+			IntegralCommandUsageData(ctx))
 	}
 	args = fs.Args()
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
+	ctx = flagctx.Parameter.With(ctx, fs)
+	r := rctx.Parameter.In(ctx)
+	w := wctx.Parameter.In(ctx)
 
 	lookpath := exec.LookPath
 	if *pFlag {
@@ -125,187 +127,90 @@ Run external command.
 	return err
 }
 
-func IntegralComplete(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	m map[string]any,
-	args ...string,
-) error {
+func IntegralComplete(ctx context.Context, args ...string) error {
 	flag.CommandLine.Lookup("complete").Value.Set("true")
-	path = path[:len(path)-1]
 	if len(args) == 0 {
-		style.Completions(args, m)
-		return nil
+		return complete.Last(args, selctx.Parameter.In(ctx))
 	}
-	return Select(ctx, r, w, path, m, args...)
+	path := pathctx.Parameter.In(ctx)
+	ctx = pathctx.Parameter.With(ctx, path[:len(path)-1])
+	return Select(ctx, args...)
 }
 
-func IntegralHelp(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	m map[string]any,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join .Path " "}} <command|object> [<args>]
+const IntegralHelpUsageTemplate = `
+usage: {{.Path}} [option] <command|object> [<args>],
+Show command or object's help text.
 
+Options{{.Flag}}
 Command/Objects
-{{keys .Map}}`
-	path = path[:len(path)-1]
+{{.Commands}}`
+
+func IntegralHelpUsageData(ctx context.Context) any {
+	return struct{ Path, Flag, Commands string }{
+		Path:     pathctx.StringIn(ctx),
+		Flag:     flagctx.StringIn(ctx),
+		Commands: selctx.StringIn(ctx),
+	}
+}
+
+func IntegralHelp(ctx context.Context, args ...string) error {
 	if len(args) == 0 {
-		return style.Usage(usage, struct {
-			Path []string
-			Map  map[string]any
-		}{path, m})
+		return usage.Error(IntegralHelpUsageTemplate[1:],
+			IntegralHelpUsageData(ctx))
 	}
+	path := pathctx.Parameter.In(ctx)
+	ctx = pathctx.Parameter.With(ctx, path[:len(path)-1])
 	flag.CommandLine.Lookup("help").Value.Set("true")
-	return do(Select, ctx, r, w, path, m, args...)
-}
-
-func IntegralInput(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	m map[string]any,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}} <file> <command|object> [<args>]
-
-Perform command or set object with input from named file.
-`
-	if flag.Search[bool]("complete") {
-		if len(args) < 2 {
-			style.Completions(args, "*")
-			return nil
-		}
-		return do(Select, ctx, nil, w, path, m, args[1:]...)
-	}
-	if flag.Search[bool]("help") {
-		if len(args) < 2 {
-			return style.Usage(usage, path)
-		}
-		return do(Select, ctx, nil, w, path, m, args[1:]...)
-	}
-	if len(args) < 2 {
-		return ErrIncomplete
-	}
-	f, err := os.Open(args[0])
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return do(Select, ctx, f, w, path, m, args[1:]...)
-}
-
-func IntegralOutput(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	m map[string]any,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join .Path " "}} [-m <mode>] <file> <command|object> [<args>]
-
-Perform command or print object with output directed to named file.
-{{SprintDefault .Flags}}`
-	cmd := path[len(path)-1]
-	fs := flag.NewSilentFlagSet("output")
-	aFlag := fs.Bool("a", cmd == "append", "Append output to named file.")
-	mFlag := fs.Uint("m", 0666, "File mode (default 0666).")
-	tFlag := fs.Bool("t", cmd == "tee", "Tee output to named file.")
-	if flag.Search[bool]("complete") {
-		if len(args) < 2 {
-			style.Completions(args, "*")
-			return nil
-		}
-		return do(Select, ctx, r, w, path, m, args[1:]...)
-	}
-	err := fs.Parse(args)
-	if err != nil {
-		return err
-	}
-	if flag.Search[bool]("help", fs) {
-		if len(args) < 2 {
-			return style.Usage(usage, struct {
-				Path  []string
-				Flags *flag.FlagSet
-			}{path, fs})
-		}
-		return do(Select, ctx, r, w, path, m, args[1:]...)
-	}
-	if len(args) < 2 {
-		return ErrIncomplete
-	}
-	fflags := os.O_RDWR | os.O_CREATE
-	if *aFlag {
-		fflags |= os.O_APPEND
-	} else {
-		fflags |= os.O_TRUNC
-	}
-	fmode := os.FileMode(*mFlag)
-	f, err := os.OpenFile(args[0], fflags, fmode)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if *tFlag {
-		w = io.MultiWriter(w, f)
-	} else {
-		w = f
-	}
-	return do(Select, ctx, r, w, path, m, args[1:]...)
+	return do(ctx, Select, args...)
 }
 
 var completionShellScript = map[string]string{
-	"bash": `{{/*
-*/}}_{{.}} ()
+	"bash": `
+_{{.}} ()
 {
 	if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
-		COMPREPLY=($({{.}} complete ${COMP_WORDS[@]:1} ''))
+		COMPREPLY=($({{.}} -complete ${COMP_WORDS[@]:1} ''))
 	else
-		COMPREPLY=($({{.}} complete ${COMP_WORDS[@]:1}))
+		COMPREPLY=($({{.}} -complete ${COMP_WORDS[@]:1}))
 	fi
 	return 0
 }
 
 type -p {{.}} >/dev/null && complete -F _{{.}} -o filenames {{.}}
-`,
-	"zsh": `{{/*
-*/}}#compdef {{.}}
+`[1:],
+	"zsh": `
+#compdef {{.}}
 
 if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
-	COMPREPLY=( $({{.}} complete ${COMP_WORDS[@]:1} '') )
+	COMPREPLY=( $({{.}} -complete ${COMP_WORDS[@]:1} '') )
 else
-	COMPREPLY=( $({{.}} complete ${COMP_WORDS[@]:1}) )
+	COMPREPLY=( $({{.}} -complete ${COMP_WORDS[@]:1}) )
 fi
 
 return 0
-`,
+`[1:],
 }
 
-func IntegralShowCompletion(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}} <shell>
+const IntegralShowCompletionUsageTemplate = `
+usage: {{.}} <shell>
 Print shell completion script.
-`
+
+Shells
+  bash
+  zsh`
+
+func IntegralShowCompletionUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func IntegralShowCompletion(ctx context.Context, args ...string) error {
+	path := pathctx.Parameter.In(ctx)
 	if flag.Search[bool]("complete") {
-		style.Completions(args, completionShellScript)
-		return nil
+		return complete.Last(args, completionShellScript)
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(IntegralShowCompletionUsageTemplate[1:],
+			IntegralShowCompletionUsageData(ctx))
 	}
 	if len(args) == 0 {
 		return ErrIncomplete
@@ -319,7 +224,8 @@ Print shell completion script.
 		if err != nil {
 			return err
 		}
-		if err = t.Execute(w, path[0]); err != nil {
+		err = t.Execute(wctx.Parameter.In(ctx), path[0])
+		if err != nil {
 			return err
 		}
 	}
@@ -327,90 +233,88 @@ Print shell completion script.
 
 }
 
-func IntegralShowFS(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	efs embed.FS,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}}
-Print embedded file.
-`
+const IntegralShowFSUsageTemplate = `
+usage: {{.}}
+Print embedded file.`
+
+var IntegralShowFSUsageData = IntegralShowCompletionUsageData
+
+func IntegralShowFS(ctx context.Context, efs embed.FS, args ...string) error {
+	path := pathctx.Parameter.In(ctx)
 	if flag.Search[bool]("complete") {
 		if len(args) == 0 {
 			// exact path match
-			style.Plain.Notice.Println(path[len(path)-1])
+			fmt.Println(path[len(path)-1])
 		}
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(IntegralShowFSUsageTemplate[1:],
+			IntegralShowFSUsageData(ctx))
 	}
 	b, err := efs.ReadFile(path[len(path)-1])
 	if err == nil {
-		_, err = w.Write(b)
+		_, err = wctx.Parameter.In(ctx).Write(b)
 	}
 	return err
 }
 
+const IntegralStandbyUsageTemplate = `
+usage: {{.}} [<pids>]
+Wait until interrupt or termination signal.`
+
+var IntegralStandbyUsageData = IntegralShowCompletionUsageData
+
 // Use this to hold container until interrupt or termination signal.
-func IntegralStandby(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `usage: {{join . " "}} [<pids>]
-Wait until interrupt or termination signal.
-`
+func IntegralStandby(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(IntegralStandbyUsageTemplate[1:],
+			IntegralStandbyUsageData(ctx))
 	}
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func IntegralStart(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	m map[string]any,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} <daemon> [<options>]
+const IntegralStartUsageTemplate = `
+usage: {{.Path}} <daemon> [<options>]
 Fork self to run <daemon> like this,
 
-	{{$path}} daemon <daemon> [<options>]
+   {{.Prog}} daemon <daemon> [<options>]
 
 Daemons
-{{keys .Map}}`
-	daemons := m["daemon"].(map[string]any)
+{{.Daemons}}`
+
+func IntegralStartUsageData(ctx context.Context) any {
+	return struct{ Path, Prog, Daemons string }{
+		Path:    pathctx.StringIn(ctx),
+		Prog:    pathctx.Parameter.In(ctx)[0],
+		Daemons: selctx.StringIn(ctx),
+	}
+}
+
+func IntegralStart(ctx context.Context, args ...string) error {
+	daemons := selctx.Parameter.In(ctx)["daemon"].(map[string]any)
+	ctx = selctx.Parameter.With(ctx, daemons)
 	if flag.Search[bool]("complete") {
 		if len(args) == 0 {
-			style.Completions(args, daemons)
-			return nil
+			return complete.Last(args, daemons)
 		}
-		return do(Select, ctx, r, w, path, daemons, args...)
+		return do(ctx, Select, args...)
 	}
 	if flag.Search[bool]("help") {
 		if len(args) == 0 {
-			return style.Usage(usage, struct {
-				Path []string
-				Map  map[string]any
-			}{path, daemons})
+			return usage.Error(IntegralStartUsageTemplate[1:],
+				IntegralStartUsageData(ctx))
 		}
-		return do(Select, ctx, r, w, path, daemons, args...)
+		return do(ctx, Select, args...)
 	}
 	if os.Getpid() == 1 {
-		dpath := []string{path[0], "daemon"}
-		return do(Select, ctx, r, w, dpath, daemons, args...)
+		path := pathctx.Parameter.In(ctx)
+		ctx = pathctx.Parameter.With(ctx, append(path[:1], "daemon"))
+		return do(ctx, Select, args...)
 	}
 	u, err := user.Current()
 	if err != nil {
@@ -460,48 +364,10 @@ Daemons
 		Setsid:     true,
 	}
 	if err = cmd.Start(); err == nil {
-		fmt.Fprint(w, program.Base(), ":daemon:", args[0],
-			":pid: ", cmd.Process.Pid, "\n")
+		path := pathctx.Parameter.In(ctx)
+		w := wctx.Parameter.In(ctx)
+		pid := cmd.Process.Pid
+		fmt.Fprint(w, path[0], ":daemon:", args[0], ":pid: ", pid, "\n")
 	}
 	return err
-}
-
-func IntegralTimeout(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	m map[string]any,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join .Path " "}} <duration> <command|object> [<args>]
-
-Command/Objects
-{{keys .Map}}`
-	if flag.Search[bool]("complete") {
-		if len(args) < 2 {
-			return nil
-		}
-		return do(Select, ctx, r, w, path, m, args[1:]...)
-	}
-	if flag.Search[bool]("help") {
-		if len(args) < 2 {
-			return style.Usage(usage, struct {
-				Path []string
-				Map  map[string]any
-			}{path, m})
-		}
-		return do(Select, ctx, r, w, path, m, args[1:]...)
-	}
-	if len(args) < 2 {
-		return ErrIncomplete
-	}
-	dur, err := time.ParseDuration(args[0])
-	if err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(ctx, dur)
-	defer cancel()
-	return do(Select, ctx, r, w, path, m, args[1:]...)
 }

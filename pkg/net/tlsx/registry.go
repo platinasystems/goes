@@ -11,6 +11,9 @@ import (
 	"io"
 	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 )
@@ -20,10 +23,11 @@ var reg struct {
 	x *xcert.X509
 }
 
-func regAdmin(ctx context.Context, path []string, args ...string) error {
+func regAdmin(ctx context.Context, args ...string) error {
 	if len(args) == 0 {
-		return egress.Marked(ErrIncomplete)
+		return egress.Mark(ErrIncomplete)
 	}
+	path := pathctx.Parameter.In(ctx)
 	approve := path[len(path)-1] == "approve"
 	reg.Lock()
 	defer reg.Unlock()
@@ -45,14 +49,10 @@ func regAdmin(ctx context.Context, path []string, args ...string) error {
 	return fmt.Errorf("%q: %w", args[0], ErrNotFound)
 }
 
-func regShow(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
+func regShow(ctx context.Context, args ...string) error {
 	reg.RLock()
 	defer reg.RUnlock()
+	w := wctx.Parameter.In(ctx)
 	reg.x.Range(func(x *xcert.X509) bool {
 		fmt.Fprint(w, x.SKI(), ": ", x.Certificate.DNSNames, "\n")
 		return true
@@ -61,22 +61,17 @@ func regShow(
 }
 
 // Register PEM decoded input.
-func regSubscribe(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
+func regSubscribe(ctx context.Context, args ...string) error {
 	var data []byte
 
+	r := rctx.Parameter.In(ctx)
 	if len(args) == 0 {
-		return egress.Marked(ErrIncomplete)
+		return egress.Mark(ErrIncomplete)
 	}
 	if args[0] == "-" {
 		var buf bytes.Buffer
 		if _, err := io.Copy(&buf, r); err != nil {
-			return egress.Marked(err)
+			return egress.Mark(err)
 		}
 		data = buf.Bytes()
 	} else {
@@ -84,7 +79,7 @@ func regSubscribe(
 	}
 	x, err := xcert.NewX509(data)
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	func() {
 		reg.Lock()
@@ -97,8 +92,8 @@ func regSubscribe(
 	}()
 	self, err := Selfie.MarshalPEM()
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
-	_, err = w.Write(self)
-	return egress.Marked(err)
+	_, err = wctx.Parameter.In(ctx).Write(self)
+	return egress.Mark(err)
 }

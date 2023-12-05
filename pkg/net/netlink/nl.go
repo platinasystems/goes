@@ -14,6 +14,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
@@ -31,7 +32,7 @@ type NL struct {
 // Open netlink socket with paired (option, value)s.
 func Open(optval ...int) (nl *NL, err error) {
 	sock, err := af.Open[af.Netlink]()
-	if err = egress.Marked(err); err != nil {
+	if err = egress.Mark(err); err != nil {
 		return
 	}
 	defer func() {
@@ -42,27 +43,27 @@ func Open(optval ...int) (nl *NL, err error) {
 	for ; len(optval) >= 2; optval = optval[2:] {
 		opt, val := optval[0], optval[1]
 		err = syscall.SetsockoptInt(int(sock), SOL_NETLINK, opt, val)
-		if err = egress.Marked(err); err != nil {
+		if err = egress.Mark(err); err != nil {
 			return
 		}
 
 	}
 	addr, err := sock.Bind()
-	if err = egress.Marked(err); err != nil {
+	if err = egress.Mark(err); err != nil {
 		return
 	}
 	lsa, err := af.Addr(sock)
-	if err = egress.Marked(err); err != nil {
+	if err = egress.Mark(err); err != nil {
 		return
 	}
 	if lsanl, ok := lsa.(*syscall.SockaddrNetlink); !ok {
-		err = egress.Marked(ErrInvalid)
+		err = egress.Mark(ErrInvalid)
 	} else {
 		nl = &NL{
 			sock: sock,
 			addr: addr,
 			pid:  lsanl.Pid,
-			buf:  make([]byte, PageSize()),
+			buf:  page.New(),
 		}
 	}
 	return
@@ -124,20 +125,20 @@ func (nl *NL) Next() (*MsgHdr, []byte, error) {
 			n, _, err := af.
 				Recvfrom(nl.sock, nl.buf, syscall.MSG_PEEK)
 			if err != nil {
-				return nil, nil, egress.Marked(err)
+				return nil, nil, egress.Mark(err)
 			}
 			if n < len(nl.buf) {
 				break
 			} else if n < cap(nl.buf) {
 				nl.buf = nl.buf[:cap(nl.buf)]
 			} else {
-				nl.buf = make([]byte, PageAlign(n))
+				nl.buf = make([]byte, page.Align(n))
 			}
 		}
 		if n, _, err := af.Recvfrom(nl.sock, nl.buf, 0); err != nil {
-			return nil, nil, egress.Marked(err)
+			return nil, nil, egress.Mark(err)
 		} else if n < NLMSG_HDRLEN {
-			return nil, nil, egress.Marked(ErrInvalid)
+			return nil, nil, egress.Mark(ErrInvalid)
 		} else {
 			nl.rem = nl.buf[:n]
 		}
@@ -146,13 +147,13 @@ func (nl *NL) Next() (*MsgHdr, []byte, error) {
 	n := int(hdr.Len)
 	al := NLMSG_ALIGN(n)
 	if hdr.Len < NLMSG_HDRLEN {
-		return nil, nil, egress.Marked(ErrInvalid)
+		return nil, nil, egress.Mark(ErrInvalid)
 	}
 	if al > len(nl.rem) {
-		return nil, nil, egress.Marked(ErrInvalid)
+		return nil, nil, egress.Mark(ErrInvalid)
 	}
 	if hdr.PID != nl.pid {
-		return nil, nil, egress.Marked(ErrInvalid)
+		return nil, nil, egress.Mark(ErrInvalid)
 	}
 	data := nl.rem[NLMSG_HDRLEN:n]
 	nl.rem = nl.rem[al:]

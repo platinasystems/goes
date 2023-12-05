@@ -9,15 +9,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
+	"log"
 	"net"
 	"net/netip"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/resolve"
 )
 
@@ -27,15 +29,19 @@ const (
 	UDPEchoWindow  = 4
 )
 
-func UDPEcho(
-	ctx context.Context,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<address>:<port>]
-Echo UDP received packets (default <:{{.Port}}>)
-`
+const UDPEchoUsageTemplate = `
+usage: {{.Path}} [<address>:<port>]
+Echo UDP received packets (default <:{{.Port}}>)`
+
+func UDPEchoUsageData(ctx context.Context) any {
+	return struct {
+		Path string
+		Port int
+	}{pathctx.StringIn(ctx), UDPEchoPort}
+}
+
+func UDPEcho(ctx context.Context, args ...string) error {
+	path := pathctx.Parameter.In(ctx)
 	if flag.Search[bool]("complete") {
 		return nil
 	}
@@ -43,10 +49,8 @@ Echo UDP received packets (default <:{{.Port}}>)
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
-		return style.Usage(usage, struct {
-			Path []string
-			Port int
-		}{path, UDPEchoPort})
+		return usage.Error(UDPEchoUsageTemplate[1:],
+			UDPEchoUsageData(ctx))
 	}
 
 	var udpa *net.UDPAddr
@@ -63,25 +67,21 @@ Echo UDP received packets (default <:{{.Port}}>)
 		return err
 	}
 
-	style.Noteln("start", udpa, "service")
+	w := wctx.Parameter.In(ctx)
+
+	fmt.Fprintln(w, "start", udpa, "service")
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go udpEchoReply(ctx, &wg, c)
 	<-ctx.Done()
 	c.Close()
 	wg.Wait()
-	style.Noteln("stopped", udpa, "service")
+	fmt.Fprintln(w, "stopped", udpa, "service")
 	return nil
 }
 
-func UDPPing(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] [<host>]
+const UDPPingUsageTemplate = `
+usage: {{.Path}} [<options>] [<host>]
 Ping echo host with UDP sequenced packets.
 
 <host>
@@ -92,16 +92,17 @@ Ping echo host with UDP sequenced packets.
     <name>:<port>
     <name>
 
-The default <host> is 127.0.0.1:{{.Port}}.
-`
+The default <host> is 127.0.0.1:{{.Port}}. `
+
+var UDPPingUsageData = UDPEchoUsageData
+
+func UDPPing(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, struct {
-			Path []string
-			Port int
-		}{path, UDPEchoPort})
+		return usage.Error(UDPPingUsageTemplate[1:],
+			UDPPingUsageData(ctx))
 	}
 	addr := "127.0.0.1"
 	if len(args) > 0 {
@@ -188,18 +189,18 @@ func udpEchoReply(
 	c *net.UDPConn,
 ) {
 	defer wg.Done()
-	defer style.Recovery()
 	pg := make([]byte, 4<<10)
 	for {
 		n, from, err := c.ReadFromUDP(pg)
 		if err != nil {
 			if ctx.Err() != context.Canceled {
-				panic(err)
+				log.Print(err)
 			}
 			break
 		}
 		if _, err = c.WriteTo(pg[:n], from); err != nil {
-			panic(err)
+			log.Print(err)
+			break
 		}
 	}
 }

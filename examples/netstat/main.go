@@ -6,10 +6,12 @@
 package main
 
 import (
+	"os"
+
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	net_tools "github.com/platinasystems/goes/v2/pkg/net/net-tools"
 )
 
 func main() {
-	goes.Exec(net_tools.Netstat)
+	goes.Exec(net_tools.Netstat, os.Args[1:]...)
 }

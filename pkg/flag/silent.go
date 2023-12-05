@@ -16,6 +16,6 @@ func NewSilentFlagSet(name string) *FlagSet {
 	fs.SetOutput(io.Discard)
 	fs.Usage = func() {}
 	help := fs.Bool("help", false, "Print options.")
-	fs.BoolVar(help, "h", *help, fs.Lookup("help").Usage)
+	fs.BoolVar(help, "h", *help, "aka. -help.")
 	return fs
 }

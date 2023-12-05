@@ -8,6 +8,7 @@ package netrt
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/netip"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
@@ -77,7 +77,7 @@ func newNetRt(msg []byte) NetRt {
 			continue
 		}
 		if sal > len(body) {
-			style.Notef("addr[%d] too long, %d", i, sal)
+			log.Printf("addr[%d] too long, %d", i, sal)
 			break
 		}
 		switch family := sockaddr.Family(body); family {
@@ -102,7 +102,7 @@ func newNetRt(msg []byte) NetRt {
 				}
 			}
 		default:
-			style.Notef("addr[%d], family[%#x]", i, family)
+			log.Printf("addr[%d], family[%#x]", i, family)
 		}
 		body = body[sockaddr.Align(sal):]
 	}

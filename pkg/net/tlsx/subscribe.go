@@ -8,39 +8,40 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 )
 
-func Subscribe(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `usage: {{join . " "}} <name>[@<address>][:<port>]
-Register with exchange.
-`
+const SubscribeUsageTemplate = `
+usage: {{.}} <name>[@<address>][:<port>]
+Register with exchange.`
+
+func SubscribeUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Subscribe(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(SubscribeUsageTemplate[1:],
+			SubscribeUsageData(ctx))
 	}
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
 	data, err := Selfie.MarshalPEM()
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	conn, err := Connect(ctx, args[0])
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	defer conn.Close()
 
@@ -52,12 +53,12 @@ Register with exchange.
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 
 	x := new(xcert.X509)
 	if err = x.UnmarshalText(buf.Bytes()); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	Subscriptions().Append(x)
 	return nil

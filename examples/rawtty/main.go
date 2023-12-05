@@ -11,22 +11,24 @@ import (
 	"os/signal"
 
 	"github.com/platinasystems/goes/v2/pkg/context/rawtty"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
 )
 
 func main() {
-	defer style.Recovery(io.EOF)
 	ctx, stop := signal.NotifyContext(context.Background(),
 		termination.Signals...)
 	defer stop()
 	tty, err := rawtty.With(ctx)
 	if err != nil {
-		panic(err)
+		if err != io.EOF {
+			panic(err)
+		}
+		return
 	}
 	defer tty.Close()
 	fmt.Fprint(tty, "Echo input until \"\\r~.\"\n\r")
-	if _, err = io.Copy(tty, tty); err != nil {
+	_, err = io.Copy(tty, tty)
+	if err != nil && err != io.EOF {
 		panic(err)
 	}
 }

@@ -7,62 +7,69 @@ package net_tools
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/netip"
 	"regexp"
 	"slices"
 	"unicode"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 var inets = []string{"inet", "inet6"}
 
-func Ifconfig(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<option>]... [<parameter>]...
+const IfconfigUsageTemplate = `
+usage: {{.Path}} [<option>]... [<parameter>]...
 Configure and display network interface parameters.
 
-  • {{$path}} [<modifier(s)>] [<filter>]
+  • {{.Path}} [<modifier(s)>] [<filter>]
     Display parameters of matching interfaces.
-  • {{$path}} <name> <prefix> [<command>] [<parameter>]...
+  • {{.Path}} <name> <prefix> [<command>] [<parameter>]...
     Add or delete a network prefix.
-  • {{$path}} <name> <address> <destination> [<command>] [<parameter>]...
+  • {{.Path}} <name> <address> <destination> [<command>] [<parameter>]...
     Add or delete a point-to-point address.
-  • {{$path}} <filter> [<parameter>]...
+  • {{.Path}} <filter> [<parameter>]...
     Configure link parameters of matching interfaces. 
-  • {{$path}} <device|name> create [<parameter>]...
+  • {{.Path}} <device|name> create [<parameter>]...
     Create the specified network pseudo-device with given name or auto-named
     with cloneable device prefix.
-  • {{$path}} <name> destroy
+  • {{.Path}} <name> destroy
     Destroy the named pseudo-device.
-  • {{$path}} -C
+  • {{.Path}} -C
     List cloneable devices.
-  • {{$path}} -l <filter>
+  • {{.Path}} -l <filter>
     List matching interfaces.
 
 Filters
-	{ -a, -d, -u, -X <pattern, <family>, <name> }
+  { -a, -d, -u, -X <pattern, <family>, <name> }
 
 Modifiers
-	{ -L, -m, -r, -v }
+  { -L, -m, -r, -v }
 
-Options{{SprintDefault .Flags}}
+Options{{.Flag}}
 Commands` + netif.AddressCommands + `
 Parameters` + netif.AddressParameters +
-		netif.ConfigParameters +
-		netif.CreateParameters
+	netif.ConfigParameters +
+	netif.CreateParameters
+
+func IfconfigUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
+
+func Ifconfig(ctx context.Context, args ...string) error {
 	var pat *regexp.Regexp
 	fs := flag.NewSilentFlagSet("ifconfig")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	mFlag := fs.Bool("m", false, "Display all supported media.")
 	LFlag := fs.Bool("L", false, "Display IPv6 address lifetime as offset.")
 	aFlag := fs.Bool("a", false,
@@ -85,7 +92,7 @@ Parameters` + netif.AddressParameters +
 				names[i] = nif.Name
 			}
 			names = append(names, netif.Cloneable...)
-			style.Completions(args, names)
+			return complete.Last(args, names)
 		}
 		return nil
 	}
@@ -94,10 +101,8 @@ Parameters` + netif.AddressParameters +
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(IfconfigUsageTemplate[1:],
+			IfconfigUsageData(ctx))
 	}
 	if len(*XFlag) > 0 {
 		if pat, err = regexp.Compile(*XFlag); err != nil {
@@ -105,6 +110,7 @@ Parameters` + netif.AddressParameters +
 		}
 	}
 	args = fs.Args()
+	w := wctx.Parameter.In(ctx)
 	switch {
 	case *CFlag:
 		var sep string

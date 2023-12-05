@@ -8,42 +8,45 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func Echo(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] [<strings>]
+const EchoUsageTemplate = `
+usage: {{.Path}} [<options>] [<strings>]
 Print string(s) to standard output.
-{{SprintDefault .Flags}}`
+{{.Flag}}`
+
+func EchoUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
+
+func Echo(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("echo")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	esc := fs.Bool("e", false, "Interpret escapes.")
 	nonl := fs.Bool("n", false, "Without trailing newline.")
 	if flag.Search[bool]("complete") {
-		style.Completions(args, fs)
-		return nil
+		return complete.Last(args, fs)
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(EchoUsageTemplate[1:], EchoUsageData(ctx))
 	}
 	args = fs.Args()
-	cw := write.With(ctx, w)
+	cw := write.With(ctx, wctx.Parameter.In(ctx))
 	for i, arg := range args {
 		if i > 0 {
 			fmt.Fprint(cw, " ")

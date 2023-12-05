@@ -78,11 +78,10 @@ func Connect(ctx context.Context, host string) (net.Conn, error) {
 		if err == nil {
 			return conn, nil
 		} else if errors.Is(err, syscall.ECONNREFUSED) {
-			err = fmt.Errorf("%v: %w", ip.IP, err)
-			return nil, egress.Marked(err)
+			return nil, egress.Markf("%v: %w", ip.IP, err)
 		}
 	}
-	return nil, egress.Marked(fmt.Errorf("%s: %w", host, ErrUnavailable))
+	return nil, egress.Markf("%s: %w", host, ErrUnavailable)
 }
 
 func DNS0(conn net.Conn) string {

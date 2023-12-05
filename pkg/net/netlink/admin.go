@@ -16,13 +16,13 @@ import (
 func Admin(ifname string, with, without iflink.NetDeviceFlag) error {
 	nl, err := Open()
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	defer nl.Close()
 
 	ifindex, err := nl.IfIndex(ifname)
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	hdr, req := Expand[MsgHdr](nil)
 	hdr.Type = rtnetlink.RTM_NEWLINK

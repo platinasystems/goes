@@ -67,20 +67,20 @@ func NewCipher(opts ...any) (*Cipher, error) {
 	if c.priv == nil {
 		c.priv, err = ecdh.X25519().GenerateKey(rand.Reader)
 		if err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 	if c.nonce.local == nil {
 		c.nonce.local = NewNonce()
 		if n, err := rand.Read(c.nonce.local); err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		} else if n != NonceSize {
-			return nil, egress.Marked(ErrIncomplete)
+			return nil, egress.Mark(ErrIncomplete)
 		}
 	}
 	der, err := x509.MarshalPKIXPublicKey(c.priv.PublicKey())
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	c.PublicKey.Local = &pem.Block{
 		Type: "PUBLIC KEY",
@@ -92,7 +92,7 @@ func NewCipher(opts ...any) (*Cipher, error) {
 	c.nonce.remote = NewNonce()
 	if remote != nil {
 		if err := c.ECDH(remote); err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 	return c, nil
@@ -111,26 +111,26 @@ func (c *Cipher) Clone(remote *pem.Block) (*Cipher, error) {
 func (c *Cipher) ECDH(remote *pem.Block) error {
 	var err error
 	if s := remote.Headers["nonce"]; len(s) == 0 {
-		return egress.Marked(ErrIncomplete)
+		return egress.Mark(ErrIncomplete)
 	} else if c.nonce.remote, err = hex.DecodeString(s); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	} else if len(c.nonce.remote) != NonceSize {
-		return egress.Marked(ErrIncomplete)
+		return egress.Mark(ErrIncomplete)
 	}
 	rk, err := x509.ParsePKIXPublicKey(remote.Bytes)
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	shared, err := c.priv.ECDH(rk.(*ecdh.PublicKey))
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	cipherblock, err := aes.NewCipher(shared)
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	if c.gcm, err = cipher.NewGCM(cipherblock); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	if c.nonce.shared == nil || cap(c.nonce.shared) < NonceSize {
 		c.nonce.shared = NewNonce()

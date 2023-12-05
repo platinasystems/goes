@@ -38,7 +38,7 @@ func leaseContract(tenant string, args ...string) (netip.Prefix, error) {
 	lease.Lock()
 	defer lease.Unlock()
 	if !lease.prefix.IsValid() {
-		return lease.z, egress.Marked(ErrInvalid)
+		return lease.z, egress.Mark(ErrInvalid)
 	}
 	if len(args) == 0 {
 		if addr, ok := leaseAddressOf[tenant]; ok {
@@ -57,12 +57,12 @@ func leaseContract(tenant string, args ...string) (netip.Prefix, error) {
 					pass += 1
 				}
 			}
-			return lease.z, egress.Marked(ErrUnavailable)
+			return lease.z, egress.Mark(ErrUnavailable)
 		}
 	} else if addr, err := netip.ParseAddr(args[0]); err != nil {
-		return lease.z, egress.Marked(err)
+		return lease.z, egress.Mark(err)
 	} else if !lease.prefix.Contains(addr) {
-		return lease.z, egress.Marked(ErrInvalid)
+		return lease.z, egress.Mark(ErrInvalid)
 	} else if occupant, occupied := leaseTenantAt[addr]; !occupied {
 		leaseAddressOf[tenant] = addr
 		leaseTenantAt[addr] = tenant
@@ -70,7 +70,7 @@ func leaseContract(tenant string, args ...string) (netip.Prefix, error) {
 	} else if occupant == tenant {
 		return netip.PrefixFrom(addr, lease.bits), nil
 	} else {
-		return lease.z, egress.Marked(ErrOccupied)
+		return lease.z, egress.Mark(ErrOccupied)
 	}
 }
 

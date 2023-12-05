@@ -10,35 +10,45 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 )
 
 const WWWEchoPort = 8080
 
-func WWWEcho(
-	ctx context.Context,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<address>:<port>]
-Echo paths of http request (default listen at <:{{.Port}}>)
-`
+const WWWEchoUsageTemplate = `
+usage: {{.Path}} [<address>:<port>]
+Echo paths of http request.
+
+The default is <:{{.Port}}}>.`
+
+func WWWEchoUsageData(path []string) any {
+	return struct {
+		Path string
+		Port int
+	}{
+		Path: strings.Join(path, ""),
+		Port: WWWEchoPort,
+	}
+}
+
+func WWWEcho(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
+		path := pathctx.Parameter.In(ctx)
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
-		return style.Usage(usage, struct {
-			Path []string
-			Port int
-		}{path, WWWEchoPort})
+		return usage.Error(WWWEchoUsageTemplate[1:],
+			WWWEchoUsageData(path))
 	}
 
 	a := fmt.Sprint(":", WWWEchoPort)
@@ -56,43 +66,39 @@ Echo paths of http request (default listen at <:{{.Port}}>)
 	wg.Add(1)
 	go wwwEchoShutdown(cctx, &wg, srv)
 
-	style.Noteln("start", a, "service")
+	w := wctx.Parameter.In(ctx)
+	fmt.Fprintln(w, "start", a, "service")
 	err := srv.ListenAndServe()
 	cancel()
 	wg.Wait()
 	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
-	style.Noteln("stopped", a, "service")
+	fmt.Fprintln(w, "stopped", a, "service")
 	return err
 }
 
-func WWWPing(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<host>]
+const WWWPingUsageTemplate = `
+usage: {{.Path}} [<host>]
 Ping echo host.
 
 <host>
-    [<ip6>]:<port>
-    <ip4>:<port>
-    <name>:<port>
+  [<ip6>]:<port>
+  <ip4>:<port>
+  <name>:<port>
 
-The default is 127.0.0.1:{{.Port}}.
-`
+The default host is 127.0.0.1:{{.Port}}.`
+
+func WWWPing(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, struct {
-			Path []string
-			Port int
-		}{path, WWWEchoPort})
+		path := pathctx.Parameter.In(ctx)
+		return usage.Error(WWWPingUsageTemplate[1:],
+			WWWEchoUsageData(path))
 	}
+	w := wctx.Parameter.In(ctx)
 	url := fmt.Sprint("http://127.0.0.1:", WWWEchoPort, "/hello")
 	if len(args) > 0 {
 		url = fmt.Sprint("http://", args[0], "/hello")
@@ -114,11 +120,12 @@ func wwwEchoShutdown(
 ) {
 	const timeout = 10 * time.Second
 	defer wg.Done()
+	w := wctx.Parameter.In(ctx)
 	<-ctx.Done()
-	style.Note("done")
+	fmt.Fprintln(w, "done")
 	cctx, cancel := context.
 		WithTimeout(context.Background(), timeout)
 	defer cancel()
-	style.Note("shutdown...")
+	fmt.Fprintln(w, "shutdown...")
 	srv.Shutdown(cctx)
 }

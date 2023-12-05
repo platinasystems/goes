@@ -85,7 +85,7 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	rtm.Msglen = uint16(len(msg))
 	sock, err := af.OpenRoute()
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	defer af.Close(sock)
 	/* FIXME darwin doesn't have SO_SETFIB
@@ -118,7 +118,7 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	msg = msg[:cap(msg)]
 	n, err := af.Read(sock, msg)
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	return newNetRt(msg[:n]), nil
 }

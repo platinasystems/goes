@@ -6,11 +6,10 @@ package box
 
 import (
 	"context"
+	"log"
 	"net"
 	"sync"
 	"time"
-
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 )
 
 // Until cancelled, send periodic keep alives (empty boxes) to all members.
@@ -23,7 +22,6 @@ func KeepAlive(
 	period time.Duration,
 ) {
 	defer wg.Done()
-	defer style.Recovery(context.Canceled)
 
 	bx := New().Empty().ToAll().From(from).Close(bxc).Seal(bxc)
 	defer bx.Recycle()
@@ -33,7 +31,10 @@ func KeepAlive(
 
 	for {
 		if _, err := conn.Write(bx); err != nil {
-			panic(err)
+			if err != context.Canceled {
+				log.Print(err)
+			}
+			break
 		}
 		select {
 		case <-ctx.Done():

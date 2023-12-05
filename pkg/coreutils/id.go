@@ -7,25 +7,32 @@ package coreutils
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/user"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func Id(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] [<user>]
+const IdUsageTemplate = `
+usage: {{.Path}} [<options>] [<user>],
 Print user identity.
-{{SprintDefault .Flags}}`
+{{.Flag}}`
+
+func IdUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
+
+func Id(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("id")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	Aflag := fs.Bool("A", false, "Print user process audit.")
 	Gflag := fs.Bool("G", false, "Print group IDs.")
 	Mflag := fs.Bool("M", false, "Print process MAC label.")
@@ -38,20 +45,17 @@ Print user identity.
 	rflag := fs.Bool("r", false,
 		"Print real instead of effective group or user ID.")
 	if flag.Search[bool]("complete") {
-		style.Completions(args, fs)
-		return nil
+		return complete.Last(args, fs)
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(IdUsageTemplate[1:], IdUsageData(ctx))
 	}
 	args = fs.Args()
+	w := wctx.Parameter.In(ctx)
 	var u *user.User
 	if len(args) == 0 {
 		if u, err = user.Current(); err != nil {

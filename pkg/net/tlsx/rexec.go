@@ -7,34 +7,41 @@ package tlsx
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/creack/pty"
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func Rexec(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] <exchange> <command> [<args>]
+const RexecUsageTemplate = `
+usage: {{.Path}} [<options>] <exchange> <command> [<args>]
 Remote execution.
-{{SprintDefault .Flags}}
+
 <exchange>
 	<name>[@<dns|ip4|\[ip6\]>][:<port>]
-`
+{{.Flag}}`
+
+func RexecUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		pathctx.StringIn(ctx),
+		flagctx.StringIn(ctx),
+	}
+}
+
+func Rexec(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("rexec")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
 	if flag.Search[bool]("complete") {
 		if len(args) <= 1 {
-			style.Completions(args, fs, Self().DNS0(),
+			return complete.Last(args, fs, Self().DNS0(),
 				Subscriptions().Names())
 		}
 		return nil
@@ -44,10 +51,7 @@ Remote execution.
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(RexecUsageTemplate[1:], RexecUsageData(ctx))
 	}
 	args = fs.Args()
 	if len(args) == 0 {
@@ -58,6 +62,9 @@ Remote execution.
 	if args = args[1:]; len(args) == 0 {
 		return ErrIncomplete
 	}
+
+	r := rctx.Parameter.In(ctx)
+	w := wctx.Parameter.In(ctx)
 
 	var anyargs []any
 	if *tflag {

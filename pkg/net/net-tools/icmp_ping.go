@@ -7,18 +7,14 @@ package net_tools
 import (
 	"context"
 	"fmt"
-	"io"
 	"unicode"
 
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-func ICMPPing(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
+func ICMPPing(ctx context.Context, args ...string) error {
+	w := wctx.Parameter.In(ctx)
 	host := "127.0.0.1"
 	if len(args) > 0 {
 		host = args[0]

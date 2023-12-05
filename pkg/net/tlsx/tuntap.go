@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"log"
 	"math"
 	"math/big"
 	"net"
@@ -24,12 +25,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
-	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
@@ -41,45 +44,49 @@ const (
 )
 
 var MaxNonce = big.NewInt(math.MaxInt64)
+var EthHeader = frame.Header[frame.ETH]
+var PiHeader = frame.Header[frame.TunPI]
+var EthDump = func(...any) {}
 
 // Path to iproute2 command if available.
 var iproute2 string
 
-func TunTap(
-	ctx context.Context,
-	path []string,
-	args ...string,
-) (err error) {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] <exchange>
+const TunTapUsageTemplate = `
+usage: {{.Path}} [<options>] <exchange>
 Open tap to named exchange or self @ given address.
 
 <exchange>
 	[<name>][@<dns|ip4|\[ip6\]>][:<port>]
-{{SprintDefault .Flags}}`
-	defer egress.Recovery(&err)
+{{.Flag}}`
+
+func TunTapUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		pathctx.StringIn(ctx),
+		flagctx.StringIn(ctx),
+	}
+}
+
+func TunTap(ctx context.Context, args ...string) error {
 	var addr net.IP
 	fs := flag.NewSilentFlagSet("tuntap")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	fs.TextVar(&addr, "a", addr, "static network address")
 	randll := fs.Bool("r", false,
 		"use random link address instead of hashed cert SKI")
 	unit := fs.Uint("u", 0, "unit number")
 	if flag.Search[bool]("complete") {
-		return
+		return nil
 	}
-	err = fs.Parse(args)
+	err := fs.Parse(args)
 	if err != nil {
-		return
+		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		err = style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
-		return
+		return usage.Error(TunTapUsageTemplate[1:],
+			TunTapUsageData(ctx))
 	}
 	if args = fs.Args(); len(args) == 0 {
-		panic(ErrIncomplete)
+		return ErrIncomplete
 	}
 
 	ex := args[0]
@@ -91,7 +98,7 @@ Open tap to named exchange or self @ given address.
 	ha := netif.NewHardwareAddr()
 	if *randll {
 		if err = ha.Rand(); err != nil {
-			panic(err)
+			return err
 		}
 	} else {
 		hash := fnv.New64()
@@ -102,12 +109,13 @@ Open tap to named exchange or self @ given address.
 	}
 
 	network := 3
+	path := pathctx.Parameter.In(ctx)
 	if path[len(path)-1] == "tap" {
 		if !tuntap.CanTAP {
-			panic(ErrCantTap)
+			return ErrCantTap
 		}
 		if tuntap.HasPI {
-			panic(ErrHasPI)
+			return ErrHasPI
 		}
 		network = 2
 	}
@@ -119,27 +127,27 @@ Open tap to named exchange or self @ given address.
 	)
 	f, err := tuntap.New(*unit, network == 2, persist, owner, group, ha)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer f.Close()
 
 	ifname := f.Name()
-	if err := ttAdmin(ifname, ttUp); err != nil {
-		panic(err)
+	if err = ttAdmin(ifname, ttUp); err != nil {
+		return err
 	}
 
 	for ctx.Err() == nil {
-		if err := ttSetState(ctx, ifname, ttDown); err != nil {
-			panic(err)
+		if err = ttSetState(ctx, ifname, ttDown); err != nil {
+			return err
 		}
 
 		tkey, err := ecdh.X25519().GenerateKey(rand.Reader)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		tnonce, err := rand.Int(rand.Reader, MaxNonce)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		confirmation, gcm, snonce, err := ttReserve(ctx, ex, network,
@@ -156,7 +164,7 @@ Open tap to named exchange or self @ given address.
 			}
 			if !errors.Is(err, os.ErrNotExist) {
 				if errors.Is(err, syscall.ECONNREFUSED) {
-					panic(err)
+					return err
 				}
 			}
 			ttSleep(ctx, f, 3*time.Second)
@@ -169,28 +177,28 @@ Open tap to named exchange or self @ given address.
 		tlsc, err := greetServer(ctx, ex, conn)
 		if err != nil {
 			conn.Close()
-			panic(err)
+			return err
 		}
 
 		got := new(strings.Builder)
 		/*FIXME
 		if err = Exec(ctx, tlsc, nil, got, join...); err != nil {
 			tlsc.Close()
-			panic(err)
+			return err
 		}
 		*/
 		prefix, err := netip.ParsePrefix(got.String())
 		if err != nil {
 			tlsc.Close()
-			panic(err)
+			return err
 		}
 		if err = ttSetPrefix(ifname, prefix); err != nil {
 			tlsc.Close()
-			panic(err)
+			return err
 		}
 		if err = ttSetState(ctx, ifname, ttUp); err != nil {
 			tlsc.Close()
-			panic(err)
+			return err
 		}
 
 		cctx, cancel := context.WithCancel(ctx)
@@ -203,7 +211,7 @@ Open tap to named exchange or self @ given address.
 		rwg.Wait()
 		tlsc.Close()
 	}
-	return
+	return nil
 }
 
 func ttAdmin(ifname string, up bool) error {
@@ -298,32 +306,30 @@ func ttRead(
 	host, x string,
 ) {
 	defer wg.Done()
-	defer style.Recovery()
 	pg := page.New()
 	defer page.Free(pg)
 	enc := lv.NewEncoder(write.With(ctx, tlsc))
 	p := poll.WithReader(ctx, f)
+	pi := PiHeader(pg)
 	for {
 		n, err := p.Read(pg)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				panic(err)
+				log.Print(err)
 			}
 			break
 		}
-		/*FIXME
-		if n < tuntap.TapMin {
-			panic(ErrTooShort)
+		if n < frame.Sizeof(pi) {
+			log.Print(ErrTooShort)
 			break
 		}
-		*/
 		if _, err = enc.Write(pg[:n]); err != nil {
 			if !errors.Is(err, context.Canceled) {
-				panic(err)
+				log.Print(err)
 			}
 			break
 		}
-		// FIXME style.Println(host, "->", x, frame.NewEth(pg[:n]))
+		EthDump(host, "->", x, EthHeader(pg[:n]))
 	}
 }
 
@@ -333,8 +339,6 @@ func ttWrite(
 	f *os.File,
 	host, x string,
 ) {
-	defer style.Recovery()
-
 	pg := page.New()
 	defer page.Free(pg)
 
@@ -343,16 +347,16 @@ func ttWrite(
 		n, err := dec.Read(pg)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				panic(err)
+				log.Print(err)
 			}
 			break
 		}
 		if _, err = f.Write(pg[:n]); err != nil {
 			if !errors.Is(err, context.Canceled) {
-				panic(err)
+				log.Print(err)
 			}
 			break
 		}
-		// FIXME style.Println(host, "<-", x, frame.NewEth(pg[:n]))
+		EthDump(host, "<-", x, EthHeader(pg[:n]))
 	}
 }

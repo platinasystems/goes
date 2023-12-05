@@ -8,13 +8,13 @@ import (
 	"context"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 )
 
 type Client struct {
@@ -36,20 +36,20 @@ func NewClient() (cl *Client, err error) {
 func (cl *Client) Peer(pemdata []byte) error {
 	pb, _ := pem.Decode(pemdata)
 	if pb == nil {
-		return egress.Marked(ErrInvalid)
+		return egress.Mark(ErrInvalid)
 	}
 	if err := cl.Exchange.ECDH(pb); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	if s, ok := cl.Exchange.PublicKey.Remote.Headers["confirmation"]; !ok {
-		return egress.Marked(ErrUnconfirmed)
+		return egress.Mark(ErrUnconfirmed)
 	} else if _, err := fmt.Sscan(s, &cl.Confirmation); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	if s, ok := cl.Exchange.PublicKey.Remote.Headers["id"]; !ok {
-		return egress.Marked(ErrUnidentified)
+		return egress.Mark(ErrUnidentified)
 	} else if _, err := fmt.Sscan(s, &cl.ID); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	return nil
 }
@@ -85,7 +85,6 @@ func (cl *Client) KeepAlive(
 	period time.Duration,
 ) {
 	defer wg.Done()
-	defer style.Recovery(context.Canceled)
 
 	bx := box.New().Empty().ToAll().From(cl.ID).
 		Close(cl.Exchange).Seal(cl.Exchange)
@@ -96,11 +95,13 @@ func (cl *Client) KeepAlive(
 
 	for {
 		if _, err := conn.Write(bx); err != nil {
-			panic(err)
+			log.Print(err)
+			break
 		}
 		select {
 		case <-ctx.Done():
-			panic(ctx.Err())
+			log.Print(ctx.Err())
+			return
 		case <-t.C:
 		}
 	}

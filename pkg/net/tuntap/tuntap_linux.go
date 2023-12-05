@@ -54,17 +54,17 @@ func New(
 				((minor & 0xfff00) << 12)
 		)
 		if _, err = os.Stat("/dev/net"); err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 		err = syscall.Mknod(DevNetTun, syscall.S_IFCHR, dev)
 		if err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 
 	fd, err := syscall.Open(DevNetTun, os.O_RDWR, 0)
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	defer func() {
 		if err != nil {
@@ -74,14 +74,14 @@ func New(
 	defer egress.Recovery(&err)
 
 	if err = ioctl(uintptr(fd), syscall.TUNSETIFF, ifrp); err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 
 	bzero(ifr.Ifrn[:])
 	bzero(ifr.Ifru[:])
 
 	if err = ioctl(uintptr(fd), syscall.TUNGETIFF, ifrp); err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 
 	ifname := gstring(ifr.Ifrn[:])
@@ -89,32 +89,32 @@ func New(
 	if owner != Unset {
 		err = ioctl(uintptr(fd), syscall.TUNSETOWNER, uintptr(owner))
 		if err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 
 	if group != Unset {
 		err = ioctl(uintptr(fd), syscall.TUNSETGROUP, uintptr(group))
 		if err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 
 	if persist {
 		err = ioctl(uintptr(fd), syscall.TUNSETPERSIST, uintptr(1))
 		if err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 
 	if isTAP {
 		if err = setmac(ifname, ha); err != nil {
-			return nil, egress.Marked(err)
+			return nil, egress.Mark(err)
 		}
 	}
 
 	if err = syscall.SetNonblock(fd, true); err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 
 	return os.NewFile(uintptr(fd), ifname), nil

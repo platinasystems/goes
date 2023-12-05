@@ -10,7 +10,7 @@ var ProtoMark = "; " // or \n\t
 
 type Headers interface {
 	ARP | ETH | Hop6 | ICMP | ICMP6 | IEEE8021Q | IPv4 | IPv6 |
-		MPLS | BOS | TCP | UDP | TapPI | TunPI
+		MPLS | BOS | TCP | UDP | TapPI | TunPI | TunTapPI
 }
 
 // This returns an unsafe reference to header structures.

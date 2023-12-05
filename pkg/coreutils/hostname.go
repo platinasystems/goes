@@ -7,26 +7,31 @@ package coreutils
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 )
 
-func Hostname(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] [<name>]
+const HostnameUsageTemplate = `
+usage: {{.Path}} [<options>] [<name>]
 Set or print system host name.
-{{SprintDefault .Flags}}`
+{{.Flag}}`
+
+func HostnameUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
+
+func Hostname(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("hostname")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	dFlag := fs.Bool("d", false, "only print domain")
 	fFlag := fs.Bool("f", true, "print fully qualified domain name (FQDN)")
 	sFlag := fs.Bool("s", false, "print name w/o domain")
@@ -38,10 +43,8 @@ Set or print system host name.
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(HostnameUsageTemplate[1:],
+			HostnameUsageData(ctx))
 	}
 	args = fs.Args()
 	if len(args) > 0 {
@@ -58,6 +61,6 @@ Set or print system host name.
 			hn = hn[:dot]
 		}
 	}
-	fmt.Fprintln(w, hn)
+	fmt.Fprintln(wctx.Parameter.In(ctx), hn)
 	return ctx.Err()
 }

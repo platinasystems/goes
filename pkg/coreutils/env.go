@@ -8,35 +8,43 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/selctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func Env(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}} [<var>=<val>]... [<command> <args>]
+const EnvUsageTemplate = `
+usage: {{.Path}} [<var>=<val>]... [<command> <args>]
 Print or set environment variables.
-`
+
+Commands/Objects
+{{.Commands}}`
+
+func EnvUsageData(ctx context.Context) any {
+	return struct{ Path, Commands string }{
+		Path:     pathctx.StringIn(ctx),
+		Commands: selctx.StringIn(ctx),
+	}
+}
+
+func Env(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
-		style.Completions(args, "*")
-		return nil
+		return complete.Last(args, "*")
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(EnvUsageTemplate[1:], EnvUsageData(ctx))
 	}
 	environ := os.Environ()
+	w := wctx.Parameter.In(ctx)
 	if len(args) == 0 {
 		for _, env := range environ {
 			fmt.Fprintln(w, env)
@@ -69,7 +77,7 @@ Print or set environment variables.
 	stderr := new(strings.Builder)
 	cmd := exec.CommandContext(ctx, program.Executable(), args...)
 	cmd.Env = environ
-	cmd.Stdin = r
+	cmd.Stdin = rctx.Parameter.In(ctx)
 	cmd.Stdout = w
 	cmd.Stderr = stderr
 	err := cmd.Start()

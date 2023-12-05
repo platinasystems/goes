@@ -46,41 +46,41 @@ func (x *TLS) UnmarshalDER(der []byte) error {
 
 func (x *TLS) validate() error {
 	if x.Certificate.PrivateKey == nil {
-		return egress.Marked(ErrPrivateKey)
+		return egress.Mark(ErrPrivateKey)
 	}
 	if len(x.X509.Certificate.DNSNames) == 0 {
-		return egress.Marked(ErrNoDNSNames)
+		return egress.Mark(ErrNoDNSNames)
 	}
 	if x.X509.Block.Type != "CERTIFICATE" {
-		return egress.Marked(ErrInvalid)
+		return egress.Mark(ErrInvalid)
 	}
 	switch pub := x.X509.Certificate.PublicKey.(type) {
 	case *rsa.PublicKey:
 		priv, ok := x.Certificate.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
-			return egress.Marked(ErrKeyType)
+			return egress.Mark(ErrKeyType)
 		}
 		if pub.N.Cmp(priv.N) != 0 {
-			return egress.Marked(ErrKeyParm)
+			return egress.Mark(ErrKeyParm)
 		}
 	case *ecdsa.PublicKey:
 		priv, ok := x.Certificate.PrivateKey.(*ecdsa.PrivateKey)
 		if !ok {
-			return egress.Marked(ErrKeyType)
+			return egress.Mark(ErrKeyType)
 		}
 		if pub.X.Cmp(priv.X) != 0 || pub.Y.Cmp(priv.Y) != 0 {
-			return egress.Marked(ErrKeyParm)
+			return egress.Mark(ErrKeyParm)
 		}
 	case ed25519.PublicKey:
 		priv, ok := x.Certificate.PrivateKey.(ed25519.PrivateKey)
 		if !ok {
-			return egress.Marked(ErrKeyType)
+			return egress.Mark(ErrKeyType)
 		}
 		if !bytes.Equal(priv.Public().(ed25519.PublicKey), pub) {
-			return egress.Marked(ErrKeyParm)
+			return egress.Mark(ErrKeyParm)
 		}
 	default:
-		return egress.Marked(ErrInvalid)
+		return egress.Mark(ErrInvalid)
 	}
 	x.Certificate.Certificate =
 		append(x.Certificate.Certificate, x.X509.Block.Bytes)

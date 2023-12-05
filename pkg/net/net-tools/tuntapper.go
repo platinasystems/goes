@@ -9,31 +9,42 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/sync/chunk"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func TunTapper(
-	ctx context.Context,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join .Path " "}} [<option>]... [<addr> <dest> [up]]
+var HdrDump = func(...any) {}
+
+const TunTapperUsageTemplate = `
+usage: {{.Path}} [<option>]... [<addr> <dest> [up]]
 Create a tun/tap device then log received packets/frames.
-{{SprintDefault .Flags}}`
+{{.Flag}}`
+
+func TunTapperUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
+
+func TunTapper(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("tuntapper")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	unit := fs.Uint("u", 0, "Unit number suffix.")
 	ha := netif.NewHardwareAddr()
 	var isTap bool
 	if tuntap.CanTAP {
 		if err := ha.Rand(); err != nil {
-			panic(err)
+			return egress.Mark(err)
 		}
 		fs.BoolVar(&isTap, "tap", isTap, "(default tun)")
 		fs.TextVar(&ha, "link", ha, "override random link address")
@@ -51,39 +62,36 @@ Create a tun/tap device then log received packets/frames.
 		fs.IntVar(&group, "group", group, "unset w/ -1")
 	}
 	if flag.Search[bool]("complete") {
-		style.Completions(args, fs)
-		return nil
+		return complete.Last(args, fs)
 	}
 	err := fs.Parse(args)
 	if err != nil {
-		return err
+		return egress.Mark(err)
 	}
 	args = fs.Args()
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(TunTapperUsageTemplate[1:],
+			TunTapperUsageData(ctx))
 	}
 
 	f, err := tuntap.New(*unit, isTap, persist, owner, group, ha)
 	if err != nil {
-		return err
+		return egress.Mark(err)
 	}
 	defer f.Close()
 
 	if len(args) > 1 {
 		nif := netif.Named(f.Name())
 		if nif == nil {
-			return fmt.Errorf("%q %w", f.Name(), ErrNotFound)
+			return egress.Markf("%q %w", f.Name(), ErrNotFound)
 		}
 		local, err := netip.ParseAddr(args[0])
 		if err != nil {
-			return fmt.Errorf("%q %w", args[0], err)
+			return egress.Markf("%q %w", args[0], err)
 		}
 		remote, err := netip.ParseAddr(args[1])
 		if err != nil {
-			return fmt.Errorf("%q %w", args[1], err)
+			return egress.Markf("%q %w", args[1], err)
 		}
 		var prefix netip.Prefix
 		if local.Is4() {
@@ -93,7 +101,7 @@ Create a tun/tap device then log received packets/frames.
 		}
 		err = nif.Add(prefix, remote, args[2:])
 		if err != nil {
-			return err
+			return egress.Mark(err)
 		}
 	}
 
@@ -124,11 +132,11 @@ Create a tun/tap device then log received packets/frames.
 	p := poll.WithReader(ctx, f)
 	for {
 		if n, err := p.Read(buf); err != nil {
-			panic(err)
+			return egress.Mark(err)
 		} else if n < min {
-			panic(tuntap.ErrUnderrun)
+			return egress.Mark(tuntap.ErrUnderrun)
 		}
-		style.Noteln(hdr)
+		HdrDump(hdr)
 	}
 	return nil
 }

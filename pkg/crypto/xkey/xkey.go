@@ -22,9 +22,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 type Privateer interface {
@@ -42,37 +46,39 @@ var (
 	ErrUnsupported = errors.ErrUnsupported
 )
 
-func Generate(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join .Path " "}} [<algorithm>]
-Generate PEM encoded private signature key to stdout with given or default,
-ed25519 algorithm.
+const GenerateUsageTemplate = `
+usage: {{.}} [<algorithm>]
+Generate PEM encoded private signature key to stdout with given or
+default, ed25519 algorithm.
 
-{{range .Algorithms}}
-  {{.}}{{end}}
-`
-	algs := []string{
-		"ecdsa",
-		"ed25519",
-		"x25519",
-		"rsa",
-	}
+Algorithms
+  ecdsa
+  ed25519
+  x25519
+  rsa`
+
+func GenerateUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Generate(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		if len(args) > 0 {
-			style.Completions(args, algs)
+			return complete.Last(args, []string{
+				"ecdsa",
+				"ed25519",
+				"x25519",
+				"rsa",
+			})
+
 		}
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, struct {
-			Path, Algorithms []string
-		}{path, algs})
+		return usage.Error(GenerateUsageTemplate[1:],
+			GenerateUsageData(ctx))
 	}
+	w := wctx.Parameter.In(ctx)
 	alg := "ed25519"
 	if len(args) > 0 {
 		alg = args[0]
@@ -106,24 +112,22 @@ ed25519 algorithm.
 	return pem.Encode(w, blk)
 }
 
-func Show(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}} [<name>]
-Print algorithm of the named private key file or stdin.
-`
+const ShowUsageTemplate = `
+usage: {{.}} [<name>]
+Print algorithm of the named private key file or stdin.`
+
+func ShowUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Show(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
-		style.Completions(args, "*.pem")
-		return nil
+		return complete.Last(args, "*.pem")
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(ShowUsageTemplate[1:], ShowUsageData(ctx))
 	}
+	r := rctx.Parameter.In(ctx)
 	if len(args) > 0 && args[0] != "-" {
 		if f, err := os.Open(args[0]); err != nil {
 			return err
@@ -136,7 +140,7 @@ Print algorithm of the named private key file or stdin.
 	if _, err := priv.ReadFrom(r); err != nil {
 		return err
 	}
-	fmt.Fprintln(w, priv)
+	fmt.Fprintln(wctx.Parameter.In(ctx), priv)
 	return nil
 }
 
@@ -145,13 +149,13 @@ func (priv Private) Private() Privateer { return priv.Privateer }
 func (priv *Private) ReadFrom(r io.Reader) (int64, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return 0, egress.Marked(err)
+		return 0, egress.Mark(err)
 	}
 	n := int64(len(data))
 	for {
 		var rest []byte
 		if priv.Block, rest = pem.Decode(data); priv.Block == nil {
-			return n, egress.Marked(ErrInvalid)
+			return n, egress.Mark(ErrInvalid)
 		}
 		if strings.HasSuffix(priv.Block.Type, "PRIVATE KEY") {
 			break
@@ -160,7 +164,7 @@ func (priv *Private) ReadFrom(r io.Reader) (int64, error) {
 	}
 	v, err := x509.ParsePKCS8PrivateKey(priv.Block.Bytes)
 	if err != nil {
-		return n, egress.Marked(err)
+		return n, egress.Mark(err)
 	}
 	priv.Privateer = v.(Privateer)
 	return n, nil

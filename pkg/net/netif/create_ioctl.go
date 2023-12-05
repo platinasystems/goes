@@ -29,7 +29,7 @@ var Cloneable = []string{
 func Create(name string, args ...string) (*NetIf, error) {
 	nifs, err := List()
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	before := make(map[int]*NetIf)
 	for _, nif := range nifs {
@@ -38,16 +38,16 @@ func Create(name string, args ...string) (*NetIf, error) {
 	req := netioctl.NewIfReqNothing(name)
 	err = netioctl.Inet(syscall.SIOCIFCREATE2, req)
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	after, err := List()
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	for _, nif := range after {
 		if _, existed := before[nif.Index]; !existed {
 			return nif, nil
 		}
 	}
-	return nil, egress.Marked(ErrNotFound)
+	return nil, egress.Mark(ErrNotFound)
 }

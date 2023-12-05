@@ -8,38 +8,43 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func Netstat(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<option>]...
+const NetstatUsageTemplate = `
+usage: {{.Path}} [<option>]...
 Show network status.
+		
+  • {{.Path}} [-AaLlnW] [-f <family> | -p <protocol>]
+  • {{.Path}} [-gilns] [-v] [-f <family>] [-I <interface>]
+  • {{.Path}} -i | -I <interface> [-w <period>] [-c <queue>] [-abdgqRtS]\n",
+  • {{.Path}} -s [-s] [-f <family> | -p <protocol>] [-w <period>]
+  • {{.Path}} -i | -I <interface> -s [-f <family> | -p <protocol>]
+  • {{.Path}} -m [-m]
+  • {{.Path}} -r [-Aaln] [-f <family>]
+  • {{.Path}} -rs [-s]
+  • {{.Path}} -B [-I interface]
+{{.Flag}}`
 
-  • {{$path}} [-AaLlnW] [-f <family> | -p <protocol>]
-  • {{$path}} [-gilns] [-v] [-f <family>] [-I <interface>]
-  • {{$path}} -i | -I <interface> [-w <period>] [-c <queue>] [-abdgqRtS]
-  • {{$path}} -s [-s] [-f <family> | -p <protocol>] [-w <period>]
-  • {{$path}} -i | -I <interface> -s [-f <family> | -p <protocol>]
-  • {{$path}} -m [-m]
-  • {{$path}} -r [-Aaln] [-f <family>]
-  • {{$path}} -rs [-s]
-  • {{$path}} -B [-I interface]
+func NetstatUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		Path: pathctx.StringIn(ctx),
+		Flag: flagctx.StringIn(ctx),
+	}
+}
 
-Options{{SprintDefault .Flags}}`
+func Netstat(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("netstat")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	iFlag := fs.Bool("i", false, "Show interface info.")
 	rFlag := fs.Bool("r", false, "Show routing table.")
 	_ = fs.String("f", "", "Address Family: inet, inet6, link.")
@@ -52,6 +57,7 @@ Options{{SprintDefault .Flags}}`
 	_ = fs.Bool("s", false, "Show per-protocol stats.")
 	_ = fs.Bool("ss", false, "Show per-protocol, non-zero stats.")
 	_ = fs.Duration("w", 0, "Wait interval.")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	if flag.Search[bool]("complete") {
 		return nil
 	}
@@ -60,24 +66,24 @@ Options{{SprintDefault .Flags}}`
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(NetstatUsageTemplate[1:],
+			NetstatUsageData(ctx))
 	}
 	args = fs.Args()
 	switch {
 	case *iFlag:
-		return netstati(ctx, w, fs)
+		return netstati(ctx)
 	case *rFlag:
-		return netstatr(ctx, w, fs)
+		return netstatr(ctx)
 	default:
 		return errors.New("FIXME")
 	}
 	return nil
 }
 
-func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
+func netstati(ctx context.Context) error {
+	fs := flagctx.Parameter.In(ctx)
+	w := wctx.Parameter.In(ctx)
 	fmt.Fprintf(w, "%-15s", "Name")
 	fmt.Fprintf(w, " %5s", "MTU")
 	fmt.Fprintf(w, " %11s", "Ipkts")
@@ -123,8 +129,10 @@ func netstati(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
 	return nil
 }
 
-func netstatr(ctx context.Context, w io.Writer, fs *flag.FlagSet) error {
+func netstatr(ctx context.Context) error {
 	var family uint
+	fs := flagctx.Parameter.In(ctx)
+	w := wctx.Parameter.In(ctx)
 	switch s := flag.Search[string]("f", fs); s {
 	case "":
 		family = af.UNSPEC

@@ -11,35 +11,36 @@ import (
 	"io"
 	"os"
 
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
 	"github.com/platinasystems/goes/v2/pkg/context/read"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-func Cat(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join . " "}} [<file(s)>|-]
-Concatenate file(s) or standard in (-) to output.
-`
+const CatUsageTemplate = `
+usage: {{.}} [<file(s)>|-]
+Concatenate file(s) or standard in (-) to output.`
+
+func CatUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Cat(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
-		style.Completions(args, "*")
-		return nil
+		return complete.Last(args, "*")
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(CatUsageTemplate[1:], CatUsageData(ctx))
 	}
 	if len(args) == 0 {
 		args = append(args, "-")
 	}
-	cr := read.With(ctx, r)
-	cw := write.With(ctx, w)
+	cr := read.With(ctx, rctx.Parameter.In(ctx))
+	cw := write.With(ctx, wctx.Parameter.In(ctx))
 	for _, fn := range args {
 		if fn == "-" {
 			io.Copy(cw, cr)

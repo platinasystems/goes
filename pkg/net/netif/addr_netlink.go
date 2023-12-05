@@ -137,10 +137,10 @@ func (nif *NetIf) addr(
 	req = netlink.CatBytesAttr(req, ifaddr.IFA_LOCAL, addr.AsSlice())
 
 	if err = nl.Request(req); err != nil {
-		return args, egress.Marked(err)
+		return args, egress.Mark(err)
 	}
 	if err = nl.Wait(hdr.SEQ); err != nil {
-		return args, egress.Marked(err)
+		return args, egress.Mark(err)
 	}
 	return args, nil
 }

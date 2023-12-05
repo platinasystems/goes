@@ -7,11 +7,14 @@ package net_tools
 import (
 	"context"
 	"fmt"
-	"io"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 var Route = map[string]any{
@@ -32,33 +35,34 @@ var routeSynopsis = map[string]string{
 	"monitor": "Continuously report route changes.",
 }
 
-func route(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{/*
-*/}}usage: {{join .Path " "}} [<option>]... [<addr|prefix> [<gateway>] [<mask>]]
+const RouteUsageTemplate = `
+usage: {{.Path}} [<option>]... [<addr|prefix> [<gateway>] [<mask>]]
 {{.Synopsis}}
+{{.Flag}}`
 
-Options{{SprintDefault .Flags}}`
+func RouteUsageData(ctx context.Context, synopsis string) any {
+	return struct{ Path, Synopsis, Flag string }{
+		Path:     pathctx.StringIn(ctx),
+		Synopsis: synopsis,
+		Flag:     flagctx.StringIn(ctx),
+	}
+}
+
+func route(ctx context.Context, args ...string) error {
+	path := pathctx.Parameter.In(ctx)
 	cmd := path[len(path)-1]
-	fs := netrt.FlagSet(cmd)
+	fs := flag.NewSilentFlagSet(cmd)
+	ctx = flagctx.Parameter.With(ctx, fs)
 	if flag.Search[bool]("complete") {
-		style.Completions(args, fs)
-		return nil
+		return complete.Last(args, fs)
 	}
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path     []string
-			Synopsis string
-			Flags    *flag.FlagSet
-		}{path, routeSynopsis[cmd], fs})
+		return usage.Error(RouteUsageTemplate[1:],
+			RouteUsageData(ctx, routeSynopsis[cmd]))
 	}
 	args = fs.Args()
 
@@ -73,7 +77,7 @@ Options{{SprintDefault .Flags}}`
 		err = netrt.Flush(ctx, fs)
 	case "get", "show":
 		if nrt, gerr := netrt.Get(ctx, fs); gerr == nil {
-			fmt.Fprint(w, nrt)
+			fmt.Fprint(wctx.Parameter.In(ctx), nrt)
 		} else {
 			err = gerr
 		}

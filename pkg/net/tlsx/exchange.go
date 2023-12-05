@@ -10,16 +10,21 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"sync/atomic"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
+	"github.com/platinasystems/goes/v2/pkg/context/rctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 )
 
 const (
@@ -43,15 +48,21 @@ var exchange = struct {
 	reservation: make(map[Confirmation]*Member),
 }
 
-func Exchange(
-	ctx context.Context,
-	path []string,
-	args ...string,
-) error {
-	const usage = `usage: {{join . " "}} [-r] [-a <address>]
+const ExchangeUsageTemplate = `
+usage: {{.Path}} [-r] [-a <address>]
 Start exchange at <address> (default :8003).
-`
+{{.Flag}}`
+
+func ExchangeUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		pathctx.StringIn(ctx),
+		flagctx.StringIn(ctx),
+	}
+}
+
+func Exchange(ctx context.Context, args ...string) error {
 	fs := flag.NewSilentFlagSet("exchange")
+	ctx = flagctx.Parameter.With(ctx, fs)
 	tcp := fs.String("tcp", ":8003", "service address")
 	udp := fs.String("udp", ":8003", "packet service (disable if empty)")
 	fs.BoolVar(&Restricted, "r", false, "restrict clients to self")
@@ -63,7 +74,8 @@ Start exchange at <address> (default :8003).
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, path)
+		return usage.Error(ExchangeUsageTemplate[1:],
+			ExchangeUsageData(ctx))
 	}
 	args = fs.Args()
 	if len(args) == 0 {
@@ -94,30 +106,27 @@ Start exchange at <address> (default :8003).
 	return nil
 }
 
-func Join(
-	ctx context.Context,
-	w io.Writer,
-	conn net.Conn,
-	path []string,
-	args ...string,
-) (err error) {
-	const usage = `usage: {{join . " "}} <confirmation>
-Join exchange with reserve confirmation number.
-`
+const JoinUsageTemplate = `
+usage: {{.}} <confirmation>
+Join exchange with reserve confirmation number.`
+
+func JoinUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Join(ctx context.Context, conn net.Conn, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(JoinUsageTemplate[1:], JoinUsageData(ctx))
 	}
 	if len(args) < 1 {
 		return ErrIncomplete
 	}
 
-	defer style.Recovery(context.Canceled)
-
 	var cno Confirmation
-	_, err = fmt.Sscan(args[0], &cno)
+	_, err := fmt.Sscan(args[0], &cno)
 	if err != nil {
 		return err
 	}
@@ -128,7 +137,7 @@ Join exchange with reserve confirmation number.
 	}
 
 	// BREAK to ack join before starting PDU exchange protocol.
-	w.(lv.Encoding).Encode(nil)
+	wctx.Parameter.In(ctx).(lv.Encoding).Encode(nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -138,21 +147,21 @@ Join exchange with reserve confirmation number.
 	return nil
 }
 
-func Reserve(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `usage: {{join  . " "}} <name-or-subject-key-id>
-Reserve exchange membership.
-`
+const ReserveUsageTemplate = `
+usage: {{.}} <name-or-subject-key-id>
+Reserve exchange membership.`
+
+func ReserveUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func Reserve(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(ReserveUsageTemplate[1:],
+			ReserveUsageData(ctx))
 	}
 	if len(args) < 1 {
 		return ErrIncomplete
@@ -162,32 +171,33 @@ Reserve exchange membership.
 	if i < 0 {
 		return ErrNotFound
 	}
-	req, err := io.ReadAll(r)
+	req, err := io.ReadAll(rctx.Parameter.In(ctx))
 	if err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	rsp, err := xreserve(uint32(i), req)
 	if err != nil {
 		return err
 	}
-	_, err = w.Write(rsp)
-	return egress.Marked(err)
+	_, err = wctx.Parameter.In(ctx).Write(rsp)
+	return egress.Mark(err)
 }
 
-func WhoIs(
-	ctx context.Context,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `usage: {{join . " "}} <id>
-Returns the PEM encoded data containing the public key and nonce of member.
-`
+const WhoIsUsageTemplate = `
+usage: {{.}} <id>
+Returns the PEM encoded data containing the public key and nonce of member.`
+
+func WhoIsUsageData(ctx context.Context) any {
+	return pathctx.StringIn(ctx)
+}
+
+func WhoIs(ctx context.Context, args ...string) error {
 	if flag.Search[bool]("complete") {
 		return nil
 	}
 	if flag.Search[bool]("help") {
-		return style.Usage(usage, path)
+		return usage.Error(WhoIsUsageTemplate[1:],
+			WhoIsUsageData(ctx))
 	}
 	if len(args) < 1 {
 		return ErrIncomplete
@@ -197,10 +207,11 @@ Returns the PEM encoded data containing the public key and nonce of member.
 	if err != nil {
 		return err
 	}
+	w := wctx.Parameter.In(ctx)
 	if m := xwhois(id); m == nil {
-		return egress.Marked(ErrNotFound)
+		return egress.Mark(ErrNotFound)
 	} else if _, err = w.Write(m.PublicKeyData); err != nil {
-		return egress.Marked(err)
+		return egress.Mark(err)
 	}
 	return nil
 }
@@ -243,10 +254,10 @@ func xforward(bx box.Box) {
 		} else if m.conn != nil {
 			m.conn.Write(bx)
 		} else {
-			style.Errorf("%d: neither packet nor stream", to)
+			log.Printf("%d: neither packet nor stream", to)
 		}
 	} else {
-		style.Error(to, ": not found")
+		log.Print(to, ": not found")
 		xinc(ExchangeDrops)
 	}
 }
@@ -259,7 +270,7 @@ func xjoin(conn net.Conn, cno Confirmation) (
 	m, ok := exchange.reservation[cno]
 	if !ok {
 		err := fmt.Errorf("%d: %w", cno, ErrNotFound)
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	delete(exchange.reservation, cno)
 	m.conn = conn
@@ -273,15 +284,15 @@ func xreserve(id uint32, pubkeydata []byte) ([]byte, error) {
 	var cno Confirmation
 	_, err := cno.ReadFrom(rand.Reader)
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	pubkey, _ := pem.Decode(pubkeydata)
 	if pubkey == nil {
-		return nil, egress.Marked(ErrInvalid)
+		return nil, egress.Mark(ErrInvalid)
 	}
 	bxc, err := box.NewCipher(pubkey)
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	bxc.PublicKey.Local.Headers["confirmation"] = cno.String()
 	bxc.PublicKey.Local.Headers["id"] = fmt.Sprintf("%d", id)
@@ -298,7 +309,7 @@ func xreserve(id uint32, pubkeydata []byte) ([]byte, error) {
 		defer exchange.Unlock()
 		if old, exists := exchange.member[id]; exists {
 			if old.conn != nil {
-				return egress.Marked(ErrExists)
+				return egress.Mark(ErrExists)
 			} else if old.addr != nil {
 				exchange.halt <- old.addr.String()
 			}
@@ -317,7 +328,6 @@ func xpacket(
 	pkt net.PacketConn,
 ) {
 	defer wg.Done()
-	defer style.Recovery(context.Canceled)
 
 	exchange.pkt = pkt
 	pktctx := poll.WithReadFromer(ctx, exchange.pkt)
@@ -325,7 +335,8 @@ func xpacket(
 	for bx := box.New(); true; bx = bx.Expand() {
 		n, addr, err := pktctx.ReadFrom(bx)
 		if err != nil {
-			panic(err)
+			log.Print(err)
+			break
 		}
 		select {
 		case s := <-exchange.halt:
@@ -338,7 +349,7 @@ func xpacket(
 		if n == 8 {
 			var cno Confirmation
 			if err = cno.UnmarshalBinary(bx); err != nil {
-				style.Error(err)
+				log.Print(err)
 				continue
 			}
 			func() {
@@ -351,22 +362,22 @@ func xpacket(
 					exchange.member[m.id] = m
 					mat[addr.String()] = m
 				} else {
-					style.Error("unmatched: ", cno)
+					log.Print("unmatched: ", cno)
 				}
 			}()
 		} else if n < box.BeginContent {
-			style.Error("incomplete")
+			log.Print("incomplete")
 			xinc(ExchangeIncompletes)
 		} else if m, ok := mat[addr.String()]; !ok {
-			style.Error("unknown")
+			log.Print("unknown")
 			xinc(ExchangeUnknowns)
 		} else if bx, err = bx.Unseal(m.cipher); err != nil {
-			style.Error("invalid")
+			log.Print("invalid")
 			xinc(ExchangeInvalids)
 		} else {
 			if bx.IsToAll() {
 				if bx, err = bx.Open(m.cipher); err != nil {
-					style.Error(err)
+					log.Print(err)
 					continue
 				}
 			}
@@ -395,7 +406,6 @@ type Member struct {
 
 func (m *Member) service(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
-	defer style.Recovery(context.Canceled, io.EOF)
 	defer m.resign()
 
 	bx := box.New()
@@ -403,11 +413,13 @@ func (m *Member) service(ctx context.Context, wg *sync.WaitGroup) {
 	var err error
 	for {
 		if bx, err = bx.Receive(ctx, m.conn, m.cipher); err != nil {
-			panic(err)
+			log.Print(err)
+			break
 		}
 		if bx.IsToAll() {
 			if bx, err = bx.Open(m.cipher); err != nil {
-				panic(err)
+				log.Print(err)
+				break
 			}
 		}
 		xforward(bx)

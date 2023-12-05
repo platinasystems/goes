@@ -8,13 +8,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/rpc"
 
+	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
+	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/flag"
-	"github.com/platinasystems/goes/v2/pkg/log/style"
 )
 
 type Connecter interface {
@@ -25,19 +27,22 @@ type Request struct {
 	Connecter
 }
 
-func (req Request) Func(
-	ctx context.Context,
-	r io.Reader,
-	w io.Writer,
-	path []string,
-	args ...string,
-) error {
-	const usage = `{{$path := join .Path " "}}{{/*
-*/}}usage: {{$path}} [<options>] <host> <command> [<args>]
+const RequestUsageTemplate = `
+usage: {{.Path}} [<options>] <host> <command> [<args>]
 Run command on <host>.
-{{SprintDefault .Flags}}`
+{{.Flag}}`
+
+func RequestUsageData(ctx context.Context) any {
+	return struct{ Path, Flag string }{
+		pathctx.StringIn(ctx),
+		flagctx.StringIn(ctx),
+	}
+}
+
+func (req Request) Func(ctx context.Context, args ...string) error {
 	cmd := path[len(path)-1]
 	fs := flag.NewSilentFlagSet(cmd)
+	ctx = flagctx.Parameter.With(ctx, fs)
 	in := fs.String("i", "", "Input FILE or '-' for STDIN.")
 	if flag.Search[bool]("complete") {
 		return nil
@@ -47,10 +52,8 @@ Run command on <host>.
 		return err
 	}
 	if flag.Search[bool]("help", fs) {
-		return style.Usage(usage, struct {
-			Path  []string
-			Flags *flag.FlagSet
-		}{path, fs})
+		return usage.Error(RequestUsageTemplate[1:],
+			RequestUsageData(ctx))
 	}
 	args = fs.Args()
 	if len(args) == 0 {
@@ -92,7 +95,7 @@ Run command on <host>.
 	}
 
 	if len(res) > 0 {
-		fmt.Fprint(w, res)
+		fmt.Fprint(wctx.Parameter.In(ctx), res)
 	}
 	return err
 }

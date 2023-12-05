@@ -12,6 +12,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
+	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
@@ -76,7 +77,7 @@ func Expand[T Attributes | Messages](data []byte) (p *T, x []byte) {
 	i := len(data)
 	size := NLA_ALIGN(int(unsafe.Sizeof(*p)))
 	if i+size > cap(data) {
-		x = make([]byte, i+size, PageAlign(i+size))
+		x = make([]byte, i+size, page.Align(i+size))
 		copy(x, data)
 	} else {
 		x = data[:i+size]

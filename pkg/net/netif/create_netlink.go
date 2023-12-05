@@ -66,7 +66,7 @@ func Create(name string, args ...string) (*NetIf, error) {
 
 	nl, err := netlink.Open()
 	if err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	defer nl.Close()
 
@@ -87,18 +87,18 @@ func Create(name string, args ...string) (*NetIf, error) {
 	nested.Len = uint16(len(req) - i)
 
 	if err = nl.Request(req); err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	if err = nl.Wait(hdr.SEQ); err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	if nifs, err = List(); err != nil {
-		return nil, egress.Marked(err)
+		return nil, egress.Mark(err)
 	}
 	for _, nif := range nifs {
 		if _, existed := before[nif.Index]; !existed {
 			return nif, nil
 		}
 	}
-	return nil, egress.Marked(ErrNotFound)
+	return nil, egress.Mark(ErrNotFound)
 }
