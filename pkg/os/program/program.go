@@ -46,7 +46,7 @@ var IsUsrLocal = sync.OnceValue(func() bool {
 var BuildId = sync.OnceValue(func() string {
 	s, err := buildid.ReadFile(Executable())
 	if err != nil {
-		panic(err)
+		s = err.Error()
 	}
 	return s
 })
