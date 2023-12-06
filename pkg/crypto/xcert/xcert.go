@@ -19,14 +19,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
@@ -38,8 +34,8 @@ Generate PEM encoded x509 certifcate to stdout with stdin signature key.
 
 func GenerateUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
@@ -58,31 +54,31 @@ func Generate(ctx context.Context, args ...string) error {
 		}
 	}
 
-	fs := flag.NewSilentFlagSet("generate")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	sn := fs.Int64("serial-number", 1, "")
-	dnsnames := fs.String("dns", host.Name(), "comma separated list")
-	dur := fs.Duration("duration", 10*year, "note 8760 hours per year")
-	email := fs.String("email", "", "")
-	organization := fs.String("organization", "", "")
-	locality := fs.String("locality", "", "")
-	province := fs.String("province", "", "")
-	country := fs.String("country", "", "")
-	name := fs.String("name", defname, "")
+	flags := usage.NewFlags("generate")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	sn := flags.Int64("serial-number", 1, "")
+	dnsnames := flags.String("dns", host.Name(), "comma separated list")
+	dur := flags.Duration("duration", 10*year, "note 8760 hours per year")
+	email := flags.String("email", "", "")
+	organization := flags.String("organization", "", "")
+	locality := flags.String("locality", "", "")
+	province := flags.String("province", "", "")
+	country := flags.String("country", "", "")
+	name := flags.String("name", defname, "")
 
-	if flag.Search[bool]("complete") {
-		return complete.Last(args, fs, "*.pem")
+	if *complete.Help {
+		return complete.Last(args, flags, "*.pem")
 	}
-	if err = fs.Parse(args); err != nil {
+	if err = flags.Parse(args); err != nil {
 		return egress.Mark(err)
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(GenerateUsageTemplate[1:],
 			GenerateUsageData(ctx))
 
 	}
 
-	r := rctx.Parameter.In(ctx)
+	r := ctxparm.Reader.In(ctx)
 
 	var priv xkey.Private
 	if _, err = priv.ReadFrom(r); err != nil {
@@ -156,7 +152,7 @@ func Generate(ctx context.Context, args ...string) error {
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	return egress.Mark(pem.Encode(wctx.Parameter.In(ctx), blk))
+	return egress.Mark(pem.Encode(ctxparm.Writer.In(ctx), blk))
 }
 
 const ShowUsageTemplate = `
@@ -164,18 +160,18 @@ usage: {{.}} [<name>]
 Print decoded x509 PEM certifcate(s) from the named file or stdin.`
 
 func ShowUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Show(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return complete.Last(args, "*.pem")
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(ShowUsageTemplate[1:], ShowUsageData(ctx))
 	}
-	r := rctx.Parameter.In(ctx)
-	w := wctx.Parameter.In(ctx)
+	r := ctxparm.Reader.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	if len(args) > 0 && args[0] != "-" {
 		if f, err := os.Open(args[0]); err != nil {
 			return err

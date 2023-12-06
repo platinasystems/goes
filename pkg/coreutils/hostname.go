@@ -9,12 +9,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const HostnameUsageTemplate = `
@@ -24,29 +22,29 @@ Set or print system host name.
 
 func HostnameUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func Hostname(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("hostname")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	dFlag := fs.Bool("d", false, "only print domain")
-	fFlag := fs.Bool("f", true, "print fully qualified domain name (FQDN)")
-	sFlag := fs.Bool("s", false, "print name w/o domain")
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	err := fs.Parse(args)
+	flags := usage.NewFlags("hostname")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	dFlag := flags.Bool("d", false, "only print domain")
+	fFlag := flags.Bool("f", true, "print fully qualified domain name (FQDN)")
+	sFlag := flags.Bool("s", false, "print name w/o domain")
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(HostnameUsageTemplate[1:],
 			HostnameUsageData(ctx))
 	}
-	args = fs.Args()
+	args = flags.Args()
 	if len(args) > 0 {
 		return host.Rename(args[0])
 	}
@@ -61,6 +59,6 @@ func Hostname(ctx context.Context, args ...string) error {
 			hn = hn[:dot]
 		}
 	}
-	fmt.Fprintln(wctx.Parameter.In(ctx), hn)
+	fmt.Fprintln(ctxparm.Writer.In(ctx), hn)
 	return ctx.Err()
 }

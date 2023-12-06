@@ -9,12 +9,10 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -25,37 +23,37 @@ Print user identity.
 
 func IdUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func Id(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("id")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	Aflag := fs.Bool("A", false, "Print user process audit.")
-	Gflag := fs.Bool("G", false, "Print group IDs.")
-	Mflag := fs.Bool("M", false, "Print process MAC label.")
-	Pflag := fs.Bool("P", false, "Print password file entry.")
-	cflag := fs.Bool("c", false, "Print login class.")
-	gflag := fs.Bool("g", false, "Print effective group ID.")
-	pflag := fs.Bool("p", false, "Print human readable output.")
-	uflag := fs.Bool("u", false, "Print effective user ID.")
-	nflag := fs.Bool("n", false, "Print user or group name instead of number.")
-	rflag := fs.Bool("r", false,
-		"Print real instead of effective group or user ID.")
-	if flag.Search[bool]("complete") {
-		return complete.Last(args, fs)
+	if *complete.Help {
+		return nil
 	}
-	err := fs.Parse(args)
+	flags := usage.NewFlags("id")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	Aflag := flags.Bool("A", false, "Print user process audit.")
+	Gflag := flags.Bool("G", false, "Print group IDs.")
+	Mflag := flags.Bool("M", false, "Print process MAC label.")
+	Pflag := flags.Bool("P", false, "Print password file entry.")
+	cflag := flags.Bool("c", false, "Print login class.")
+	gflag := flags.Bool("g", false, "Print effective group ID.")
+	pflag := flags.Bool("p", false, "Print human readable output.")
+	uflag := flags.Bool("u", false, "Print effective user ID.")
+	nflag := flags.Bool("n", false, "Print user or group name instead of number.")
+	rflag := flags.Bool("r", false,
+		"Print real instead of effective group or user ID.")
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(IdUsageTemplate[1:], IdUsageData(ctx))
 	}
-	args = fs.Args()
-	w := wctx.Parameter.In(ctx)
+	args = flags.Args()
+	w := ctxparm.Writer.In(ctx)
 	var u *user.User
 	if len(args) == 0 {
 		if u, err = user.Current(); err != nil {

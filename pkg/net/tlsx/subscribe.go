@@ -8,12 +8,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const SubscribeUsageTemplate = `
@@ -21,14 +22,14 @@ usage: {{.}} <name>[@<address>][:<port>]
 Register with exchange.`
 
 func SubscribeUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Subscribe(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(SubscribeUsageTemplate[1:],
 			SubscribeUsageData(ctx))
 	}

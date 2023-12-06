@@ -8,13 +8,12 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
@@ -31,45 +30,45 @@ Create a tun/tap device then log received packets/frames.
 
 func TunTapperUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func TunTapper(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("tuntapper")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	unit := fs.Uint("u", 0, "Unit number suffix.")
+	flags := usage.NewFlags("tuntapper")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	unit := flags.Uint("u", 0, "Unit number suffix.")
 	ha := netif.NewHardwareAddr()
 	var isTap bool
 	if tuntap.CanTAP {
 		if err := ha.Rand(); err != nil {
 			return egress.Mark(err)
 		}
-		fs.BoolVar(&isTap, "tap", isTap, "(default tun)")
-		fs.TextVar(&ha, "link", ha, "override random link address")
+		flags.BoolVar(&isTap, "tap", isTap, "(default tun)")
+		flags.TextVar(&ha, "link", ha, "override random link address")
 	}
 	var persist bool
 	if tuntap.CanPersist {
-		fs.BoolVar(&persist, "persist", persist, "")
+		flags.BoolVar(&persist, "persist", persist, "")
 	}
 	owner := tuntap.Unset
 	if tuntap.CanChangeOwner {
-		fs.IntVar(&owner, "owner", owner, "unset w/ -1")
+		flags.IntVar(&owner, "owner", owner, "unset w/ -1")
 	}
 	group := tuntap.Unset
 	if tuntap.CanChangeGroup {
-		fs.IntVar(&group, "group", group, "unset w/ -1")
+		flags.IntVar(&group, "group", group, "unset w/ -1")
 	}
-	if flag.Search[bool]("complete") {
-		return complete.Last(args, fs)
+	if *complete.Help {
+		return complete.Last(args, flags)
 	}
-	err := fs.Parse(args)
+	err := flags.Parse(args)
 	if err != nil {
 		return egress.Mark(err)
 	}
-	args = fs.Args()
-	if flag.Search[bool]("help", fs) {
+	args = flags.Args()
+	if *usage.Help {
 		return usage.Error(TunTapperUsageTemplate[1:],
 			TunTapperUsageData(ctx))
 	}

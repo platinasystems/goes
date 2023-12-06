@@ -14,6 +14,8 @@ import (
 	"strings"
 )
 
+var Help = flag.Bool("complete", false, "Finish last arg.")
+
 type FlagSetter interface{ VisitAll(fn func(*flag.Flag)) }
 
 // Print the sorted matches of args[len(args)-1] completed by:

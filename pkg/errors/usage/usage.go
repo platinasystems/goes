@@ -5,16 +5,18 @@
 package usage
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"strings"
 	"text/template"
 )
 
-type usageError string
+// Set Help flag instead of PrintDefaults output during flag.Parse
+var Help = flag.Bool("help", false, "Print usage.")
 
-func InError(err error) bool {
-	_, ok := err.(usageError)
-	return ok
+func init() {
+	flag.BoolVar(Help, "h", *Help, "aka. -help.")
 }
 
 // If args[0] is a string containing "{{", it is parsed as a text/Template that
@@ -42,5 +44,24 @@ func Error(args ...any) error {
 	}
 	return usageError(sb.String())
 }
+
+// Returns true if err is a usage error.
+func In(err error) bool {
+	_, ok := err.(usageError)
+	return ok
+}
+
+// Make a flag.FlagSet that doesn't output during Parse but instead sets a
+// the above Help flag.
+func NewFlags(name string) *flag.FlagSet {
+	flags := flag.NewFlagSet(name, 0)
+	flags.SetOutput(io.Discard)
+	flags.Usage = func() {}
+	flags.BoolVar(Help, "help", *Help, "Print usage.")
+	flags.BoolVar(Help, "h", *Help, "aka. -help.")
+	return flags
+}
+
+type usageError string
 
 func (e usageError) Error() string { return string(e) }

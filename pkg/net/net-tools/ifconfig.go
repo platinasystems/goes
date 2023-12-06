@@ -11,14 +11,12 @@ import (
 	"net/netip"
 	"regexp"
 	"slices"
+	"strings"
 	"unicode"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
@@ -61,29 +59,30 @@ Parameters` + netif.AddressParameters +
 
 func IfconfigUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func Ifconfig(ctx context.Context, args ...string) error {
 	var pat *regexp.Regexp
-	fs := flag.NewSilentFlagSet("ifconfig")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	mFlag := fs.Bool("m", false, "Display all supported media.")
-	LFlag := fs.Bool("L", false, "Display IPv6 address lifetime as offset.")
-	aFlag := fs.Bool("a", false,
+	flags := usage.NewFlags("ifconfig")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	mFlag := flags.Bool("m", false, "Display all supported media.")
+	LFlag := flags.Bool("L", false,
+		"Display IPv6 address lifetime as offset.")
+	aFlag := flags.Bool("a", false,
 		"Display all interfaces (implied unless -d, -u, -X).")
-	dFlag := fs.Bool("d", false, "Only display down interfaces.")
-	uFlag := fs.Bool("u", false, "Only display up interfaces.")
-	lFlag := fs.Bool("l", false, "List available interfaces.")
-	vFlag := fs.Bool("v", false, "Verbose display.")
-	CFlag := fs.Bool("C", false, "List cloneable devices.")
-	rFlag := fs.Bool("r", false, "Display route references.")
-	XFlag := fs.String("X", "", "Pattern match interface name.")
+	dFlag := flags.Bool("d", false, "Only display down interfaces.")
+	uFlag := flags.Bool("u", false, "Only display up interfaces.")
+	lFlag := flags.Bool("l", false, "List available interfaces.")
+	vFlag := flags.Bool("v", false, "Verbose display.")
+	CFlag := flags.Bool("C", false, "List cloneable devices.")
+	rFlag := flags.Bool("r", false, "Display route references.")
+	XFlag := flags.String("X", "", "Pattern match interface name.")
 	// FIXME add these display modifiers
 	_ = *mFlag || *LFlag || *vFlag || *rFlag
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		if len(args) < 2 {
 			nifs := netif.Interfaces()
 			namecap := len(nifs) + len(netif.Cloneable)
@@ -96,11 +95,11 @@ func Ifconfig(ctx context.Context, args ...string) error {
 		}
 		return nil
 	}
-	err := fs.Parse(args)
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(IfconfigUsageTemplate[1:],
 			IfconfigUsageData(ctx))
 	}
@@ -109,8 +108,8 @@ func Ifconfig(ctx context.Context, args ...string) error {
 			return err
 		}
 	}
-	args = fs.Args()
-	w := wctx.Parameter.In(ctx)
+	args = flags.Args()
+	w := ctxparm.Writer.In(ctx)
 	switch {
 	case *CFlag:
 		var sep string

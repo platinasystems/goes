@@ -14,10 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const WWWEchoPort = 8080
@@ -39,11 +38,11 @@ func WWWEchoUsageData(path []string) any {
 }
 
 func WWWEcho(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
-		path := pathctx.Parameter.In(ctx)
+	if *usage.Help {
+		path := ctxparm.Strings.In(ctx)
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
@@ -66,7 +65,7 @@ func WWWEcho(ctx context.Context, args ...string) error {
 	wg.Add(1)
 	go wwwEchoShutdown(cctx, &wg, srv)
 
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	fmt.Fprintln(w, "start", a, "service")
 	err := srv.ListenAndServe()
 	cancel()
@@ -90,15 +89,15 @@ Ping echo host.
 The default host is 127.0.0.1:{{.Port}}.`
 
 func WWWPing(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
-		path := pathctx.Parameter.In(ctx)
+	if *usage.Help {
+		path := ctxparm.Strings.In(ctx)
 		return usage.Error(WWWPingUsageTemplate[1:],
 			WWWEchoUsageData(path))
 	}
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	url := fmt.Sprint("http://127.0.0.1:", WWWEchoPort, "/hello")
 	if len(args) > 0 {
 		url = fmt.Sprint("http://", args[0], "/hello")
@@ -120,7 +119,7 @@ func wwwEchoShutdown(
 ) {
 	const timeout = 10 * time.Second
 	defer wg.Done()
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	<-ctx.Done()
 	fmt.Fprintln(w, "done")
 	cctx, cancel := context.

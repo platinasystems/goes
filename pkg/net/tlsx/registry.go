@@ -11,9 +11,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 )
@@ -27,7 +25,7 @@ func regAdmin(ctx context.Context, args ...string) error {
 	if len(args) == 0 {
 		return egress.Mark(ErrIncomplete)
 	}
-	path := pathctx.Parameter.In(ctx)
+	path := ctxparm.Strings.In(ctx)
 	approve := path[len(path)-1] == "approve"
 	reg.Lock()
 	defer reg.Unlock()
@@ -52,7 +50,7 @@ func regAdmin(ctx context.Context, args ...string) error {
 func regShow(ctx context.Context, args ...string) error {
 	reg.RLock()
 	defer reg.RUnlock()
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	reg.x.Range(func(x *xcert.X509) bool {
 		fmt.Fprint(w, x.SKI(), ": ", x.Certificate.DNSNames, "\n")
 		return true
@@ -64,7 +62,7 @@ func regShow(ctx context.Context, args ...string) error {
 func regSubscribe(ctx context.Context, args ...string) error {
 	var data []byte
 
-	r := rctx.Parameter.In(ctx)
+	r := ctxparm.Reader.In(ctx)
 	if len(args) == 0 {
 		return egress.Mark(ErrIncomplete)
 	}
@@ -94,6 +92,6 @@ func regSubscribe(ctx context.Context, args ...string) error {
 	if err != nil {
 		return egress.Mark(err)
 	}
-	_, err = wctx.Parameter.In(ctx).Write(self)
+	_, err = ctxparm.Writer.In(ctx).Write(self)
 	return egress.Mark(err)
 }

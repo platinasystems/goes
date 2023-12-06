@@ -17,13 +17,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/selctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/path/restricted"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
@@ -46,35 +41,35 @@ Run an external command.
 
 func IntegralCommandUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func IntegralCommand(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("command")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	pFlag := fs.Bool("p", false, "Restricted path search.")
-	vFlag := fs.Bool("v", false, "Report path found.")
-	vvFlag := fs.Bool("V", false, "More verbose report.")
-	if flag.Search[bool]("complete") {
-		return complete.Last(args, fs)
+	flags := usage.NewFlags("command")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	pFlag := flags.Bool("p", false, "Restricted path search.")
+	vFlag := flags.Bool("v", false, "Report path found.")
+	vvFlag := flags.Bool("V", false, "More verbose report.")
+	if *complete.Help {
+		return complete.Last(args, flags)
 	}
-	err := fs.Parse(args)
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(IntegralCommandUsageTemplate[1:],
 			IntegralCommandUsageData(ctx))
 	}
-	args = fs.Args()
+	args = flags.Args()
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
-	ctx = flagctx.Parameter.With(ctx, fs)
-	r := rctx.Parameter.In(ctx)
-	w := wctx.Parameter.In(ctx)
+	ctx = ctxparm.Flags.With(ctx, flags)
+	r := ctxparm.Reader.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 
 	lookpath := exec.LookPath
 	if *pFlag {
@@ -128,12 +123,12 @@ func IntegralCommand(ctx context.Context, args ...string) error {
 }
 
 func IntegralComplete(ctx context.Context, args ...string) error {
-	flag.CommandLine.Lookup("complete").Value.Set("true")
 	if len(args) == 0 {
-		return complete.Last(args, selctx.Parameter.In(ctx))
+		return complete.Last(args, ctxparm.MapKeysIn(ctx))
 	}
-	path := pathctx.Parameter.In(ctx)
-	ctx = pathctx.Parameter.With(ctx, path[:len(path)-1])
+	path := ctxparm.Strings.In(ctx)
+	ctx = ctxparm.Strings.With(ctx, path[:len(path)-1])
+	*complete.Help = true
 	return Select(ctx, args...)
 }
 
@@ -147,9 +142,9 @@ Command/Objects
 
 func IntegralHelpUsageData(ctx context.Context) any {
 	return struct{ Path, Flag, Commands string }{
-		Path:     pathctx.StringIn(ctx),
-		Flag:     flagctx.StringIn(ctx),
-		Commands: selctx.StringIn(ctx),
+		Path:     strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag:     ctxparm.SprintFlagsIn(ctx),
+		Commands: ctxparm.MapKeysIn(ctx),
 	}
 }
 
@@ -158,9 +153,9 @@ func IntegralHelp(ctx context.Context, args ...string) error {
 		return usage.Error(IntegralHelpUsageTemplate[1:],
 			IntegralHelpUsageData(ctx))
 	}
-	path := pathctx.Parameter.In(ctx)
-	ctx = pathctx.Parameter.With(ctx, path[:len(path)-1])
-	flag.CommandLine.Lookup("help").Value.Set("true")
+	path := ctxparm.Strings.In(ctx)
+	ctx = ctxparm.Strings.With(ctx, path[:len(path)-1])
+	*usage.Help = true
 	return do(ctx, Select, args...)
 }
 
@@ -200,15 +195,15 @@ Shells
   zsh`
 
 func IntegralShowCompletionUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return ctxparm.Strings.In(ctx)
 }
 
 func IntegralShowCompletion(ctx context.Context, args ...string) error {
-	path := pathctx.Parameter.In(ctx)
-	if flag.Search[bool]("complete") {
+	path := ctxparm.Strings.In(ctx)
+	if *complete.Help {
 		return complete.Last(args, completionShellScript)
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(IntegralShowCompletionUsageTemplate[1:],
 			IntegralShowCompletionUsageData(ctx))
 	}
@@ -224,7 +219,7 @@ func IntegralShowCompletion(ctx context.Context, args ...string) error {
 		if err != nil {
 			return err
 		}
-		err = t.Execute(wctx.Parameter.In(ctx), path[0])
+		err = t.Execute(ctxparm.Writer.In(ctx), path[0])
 		if err != nil {
 			return err
 		}
@@ -240,21 +235,21 @@ Print embedded file.`
 var IntegralShowFSUsageData = IntegralShowCompletionUsageData
 
 func IntegralShowFS(ctx context.Context, efs embed.FS, args ...string) error {
-	path := pathctx.Parameter.In(ctx)
-	if flag.Search[bool]("complete") {
+	path := ctxparm.Strings.In(ctx)
+	if *complete.Help {
 		if len(args) == 0 {
 			// exact path match
 			fmt.Println(path[len(path)-1])
 		}
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(IntegralShowFSUsageTemplate[1:],
 			IntegralShowFSUsageData(ctx))
 	}
 	b, err := efs.ReadFile(path[len(path)-1])
 	if err == nil {
-		_, err = wctx.Parameter.In(ctx).Write(b)
+		_, err = ctxparm.Writer.In(ctx).Write(b)
 	}
 	return err
 }
@@ -267,10 +262,10 @@ var IntegralStandbyUsageData = IntegralShowCompletionUsageData
 
 // Use this to hold container until interrupt or termination signal.
 func IntegralStandby(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(IntegralStandbyUsageTemplate[1:],
 			IntegralStandbyUsageData(ctx))
 	}
@@ -289,22 +284,22 @@ Daemons
 
 func IntegralStartUsageData(ctx context.Context) any {
 	return struct{ Path, Prog, Daemons string }{
-		Path:    pathctx.StringIn(ctx),
-		Prog:    pathctx.Parameter.In(ctx)[0],
-		Daemons: selctx.StringIn(ctx),
+		Path:    strings.Join(ctxparm.Strings.In(ctx), " "),
+		Prog:    program.Base(),
+		Daemons: ctxparm.MapKeysIn(ctx),
 	}
 }
 
 func IntegralStart(ctx context.Context, args ...string) error {
-	daemons := selctx.Parameter.In(ctx)["daemon"].(map[string]any)
-	ctx = selctx.Parameter.With(ctx, daemons)
-	if flag.Search[bool]("complete") {
+	daemons := ctxparm.Map.In(ctx)["daemon"].(map[string]any)
+	ctx = ctxparm.Map.With(ctx, daemons)
+	if *complete.Help {
 		if len(args) == 0 {
 			return complete.Last(args, daemons)
 		}
 		return do(ctx, Select, args...)
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		if len(args) == 0 {
 			return usage.Error(IntegralStartUsageTemplate[1:],
 				IntegralStartUsageData(ctx))
@@ -312,8 +307,8 @@ func IntegralStart(ctx context.Context, args ...string) error {
 		return do(ctx, Select, args...)
 	}
 	if os.Getpid() == 1 {
-		path := pathctx.Parameter.In(ctx)
-		ctx = pathctx.Parameter.With(ctx, append(path[:1], "daemon"))
+		path := ctxparm.Strings.In(ctx)
+		ctx = ctxparm.Strings.With(ctx, append(path[:1], "daemon"))
 		return do(ctx, Select, args...)
 	}
 	u, err := user.Current()
@@ -364,8 +359,8 @@ func IntegralStart(ctx context.Context, args ...string) error {
 		Setsid:     true,
 	}
 	if err = cmd.Start(); err == nil {
-		path := pathctx.Parameter.In(ctx)
-		w := wctx.Parameter.In(ctx)
+		path := ctxparm.Strings.In(ctx)
+		w := ctxparm.Writer.In(ctx)
 		pid := cmd.Process.Pid
 		fmt.Fprint(w, path[0], ":daemon:", args[0], ":pid: ", pid, "\n")
 	}

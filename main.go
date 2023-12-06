@@ -7,7 +7,7 @@ package main
 import (
 	_ "embed"
 
-	"github.com/platinasystems/goes/v2/pkg/context/selctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/coreutils"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
@@ -45,6 +45,6 @@ func main() {
 	goes.Merge(root, coreutils.Root)
 	goes.Merge(root, net_tools.Root)
 	goes.Merge(daemons, net_tools.Daemons)
-	selctx.Parameter.Default = root
+	ctxparm.Map.Default = root
 	goes.Main()
 }

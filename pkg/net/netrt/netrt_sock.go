@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"unicode"
 
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
@@ -26,33 +26,33 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-type appendAddrFunc func(context.Context, *flag.FlagSet, []byte) ([]byte, error)
+type appendAddrFunc func(context.Context, []byte) ([]byte, error)
 
 var seq atomic.Int32
 
-func Add(ctx context.Context, fs *flag.FlagSet) error {
-	_, err := rtreq(ctx, fs, syscall.RTM_ADD)
+func Add(ctx context.Context) error {
+	_, err := rtreq(ctx, syscall.RTM_ADD)
 	return err
 }
 
-func Change(ctx context.Context, fs *flag.FlagSet) error {
-	_, err := rtreq(ctx, fs, syscall.RTM_CHANGE)
+func Change(ctx context.Context) error {
+	_, err := rtreq(ctx, syscall.RTM_CHANGE)
 	return err
 }
 
-func Delete(ctx context.Context, fs *flag.FlagSet) error {
-	_, err := rtreq(ctx, fs, syscall.RTM_DELETE)
+func Delete(ctx context.Context) error {
+	_, err := rtreq(ctx, syscall.RTM_DELETE)
 	return err
 }
 
-func Flush(ctx context.Context, fs *flag.FlagSet) error {
+func Flush(ctx context.Context) error {
 	return FIXME
 }
 
-func Get(ctx context.Context, fs *flag.FlagSet) (
+func Get(ctx context.Context) (
 	NetRt, error,
 ) {
-	nrt, err := rtreq(ctx, fs, syscall.RTM_GET)
+	nrt, err := rtreq(ctx, syscall.RTM_GET)
 	return nrt, err
 }
 
@@ -60,7 +60,7 @@ func Monitor(ctx context.Context) (Streamer, error) {
 	return nil, FIXME
 }
 
-func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
+func rtreq(ctx context.Context, cmd uint8) (NetRt, error) {
 	var err error
 	msg := page.New()
 	rtm := Pointer[syscall.RtMsghdr](msg)
@@ -68,7 +68,7 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	rtm.Type = cmd
 	rtm.Version = syscall.RTM_VERSION
 	rtm.Seq = seq.Add(1)
-	setFlags(rtm, fs, cmd)
+	setRtmFlags(ctx, cmd, rtm)
 	for _, f := range []appendAddrFunc{
 		appendDstGatewayNetmask,
 		appendGenmask,
@@ -77,7 +77,7 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 		appendAuthor,
 		appendBrd,
 	} {
-		if msg, err = f(ctx, fs, msg); err != nil {
+		if msg, err = f(ctx, msg); err != nil {
 			return nil, err
 		}
 	}
@@ -89,7 +89,7 @@ func rtreq(ctx context.Context, fs *flag.FlagSet, cmd uint8) (NetRt, error) {
 	}
 	defer af.Close(sock)
 	/* FIXME darwin doesn't have SO_SETFIB
-	if fib := flag.Search[int]("F", fs); fib >= 0 {
+	if fib := ctxparm.SearchFlagsIn[int](ctx, "F"); fib >= 0 {
 		if err = os.NewSyscallError("SO_SETFIB", syscall.
 			SetsockoptInt(int(sock), syscall.SOL_SOCKET,
 				syscall.SO_SETFIB, fib)); err != nil {
@@ -130,9 +130,7 @@ func rtrmx[T int32 | uint32](rmx *T, inits *uint32, v uint, rtv uint32) {
 	}
 }
 
-func appendDstGatewayNetmask(
-	ctx context.Context, fs *flag.FlagSet, msg []byte,
-) ([]byte, error) {
+func appendDstGatewayNetmask(ctx context.Context, msg []byte) ([]byte, error) {
 	var (
 		err   error
 		ok    bool
@@ -141,12 +139,13 @@ func appendDstGatewayNetmask(
 		mask  net.IPMask
 	)
 	bits := -1
-	s := flag.Search[string]("dst", fs)
+	args := ctxparm.Flags.In(ctx).Args()
+	s := ctxparm.SearchFlagsIn[string](ctx, "dst")
 	if len(s) == 0 {
-		if fs.NArg() == 0 {
+		if len(args) == 0 {
 			return msg, ErrNoDst
 		}
-		s = fs.Arg(0)
+		s = args[0]
 	}
 	if slash := strings.Index(s, "/"); slash > 0 {
 		if _, err = fmt.Sscan(s[slash+1:], &bits); err != nil {
@@ -155,7 +154,7 @@ func appendDstGatewayNetmask(
 		s = s[:slash]
 	}
 	if s == "default" {
-		if flag.Search[bool]("6", fs) {
+		if ctxparm.SearchFlagsIn[bool](ctx, "6") {
 			addr = netip.IPv6Unspecified()
 		} else {
 			addr = netip.IPv4Unspecified()
@@ -181,13 +180,13 @@ func appendDstGatewayNetmask(
 	msg = sockaddr.Append(msg, addr)
 	PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_DST
 
-	if s = flag.Search[string]("gateway", fs); len(s) == 0 {
-		if fs.NArg() > 1 {
-			s = fs.Arg(1)
+	if s = ctxparm.SearchFlagsIn[string](ctx, "gateway"); len(s) == 0 {
+		if len(args) > 1 {
+			s = args[1]
 		}
 	}
 	if len(s) > 0 {
-		if flag.Search[bool]("interface", fs) {
+		if ctxparm.SearchFlagsIn[bool](ctx, "interface") {
 			nif := netif.Named(s)
 			if nif == nil {
 				return msg, egress.Markf("%q not found", s)
@@ -218,14 +217,14 @@ func appendDstGatewayNetmask(
 
 	if len(mask) == 0 {
 		if addr.Is6() {
-			bits = flag.Search[int]("prefixlen", fs)
+			bits = ctxparm.SearchFlagsIn[int](ctx, "prefixlen")
 			if bits >= 0 {
 				mask = net.CIDRMask(int(bits), 128)
 			}
 		} else {
-			s = flag.Search[string]("mask", fs)
-			if len(s) == 0 && fs.NArg() > 2 {
-				s = fs.Arg(2)
+			s = ctxparm.SearchFlagsIn[string](ctx, "mask")
+			if len(s) == 0 && len(args) > 2 {
+				s = args[2]
 			}
 			if len(s) > 0 {
 				if addr, err = netip.ParseAddr(s); err != nil {
@@ -244,10 +243,8 @@ func appendDstGatewayNetmask(
 	return msg, nil
 }
 
-func appendGenmask(
-	ctx context.Context, fs *flag.FlagSet, msg []byte,
-) ([]byte, error) {
-	s := flag.Search[string]("genmask", fs)
+func appendGenmask(ctx context.Context, msg []byte) ([]byte, error) {
+	s := ctxparm.SearchFlagsIn[string](ctx, "genmask")
 	if len(s) == 0 {
 		return msg, nil
 	}
@@ -260,10 +257,8 @@ func appendGenmask(
 	return msg, nil
 }
 
-func appendIfp(
-	ctx context.Context, fs *flag.FlagSet, msg []byte,
-) ([]byte, error) {
-	s := flag.Search[string]("ifp", fs)
+func appendIfp(ctx context.Context, msg []byte) ([]byte, error) {
+	s := ctxparm.SearchFlagsIn[string](ctx, "ifp")
 	if len(s) == 0 {
 		return msg, nil
 	}
@@ -281,30 +276,26 @@ func appendIfp(
 	return msg, nil
 }
 
-func appendIfa(
-	ctx context.Context, fs *flag.FlagSet, msg []byte,
-) ([]byte, error) {
-	s := flag.Search[string]("ifa", fs)
+func appendIfa(ctx context.Context, msg []byte) ([]byte, error) {
+	s := ctxparm.SearchFlagsIn[string](ctx, "ifa")
 	if len(s) == 0 {
 		return msg, nil
 	}
+	// FIXME
 	return msg, nil
 }
 
-func appendAuthor(
-	ctx context.Context, fs *flag.FlagSet, msg []byte,
-) ([]byte, error) {
-	s := flag.Search[string]("author", fs)
+func appendAuthor(ctx context.Context, msg []byte) ([]byte, error) {
+	s := ctxparm.SearchFlagsIn[string](ctx, "author")
 	if len(s) == 0 {
 		return msg, nil
 	}
+	// FIXME
 	// redirect ?
 	return msg, nil
 }
 
-func appendBrd(
-	ctx context.Context, fs *flag.FlagSet, msg []byte,
-) ([]byte, error) {
+func appendBrd(ctx context.Context, msg []byte) ([]byte, error) {
 	// broadcast || point-to-point peer
 	return msg, nil
 }

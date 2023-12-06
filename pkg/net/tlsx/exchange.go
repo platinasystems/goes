@@ -12,19 +12,17 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -55,29 +53,29 @@ Start exchange at <address> (default :8003).
 
 func ExchangeUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		pathctx.StringIn(ctx),
-		flagctx.StringIn(ctx),
+		strings.Join(ctxparm.Strings.In(ctx), " "),
+		ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func Exchange(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("exchange")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	tcp := fs.String("tcp", ":8003", "service address")
-	udp := fs.String("udp", ":8003", "packet service (disable if empty)")
-	fs.BoolVar(&Restricted, "r", false, "restrict clients to self")
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	err := fs.Parse(args)
+	flags := usage.NewFlags("exchange")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	tcp := flags.String("tcp", ":8003", "service address")
+	udp := flags.String("udp", ":8003", "packet service (disable if empty)")
+	flags.BoolVar(&Restricted, "r", false, "restrict clients to self")
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(ExchangeUsageTemplate[1:],
 			ExchangeUsageData(ctx))
 	}
-	args = fs.Args()
+	args = flags.Args()
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
@@ -111,14 +109,14 @@ usage: {{.}} <confirmation>
 Join exchange with reserve confirmation number.`
 
 func JoinUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Join(ctx context.Context, conn net.Conn, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(JoinUsageTemplate[1:], JoinUsageData(ctx))
 	}
 	if len(args) < 1 {
@@ -137,7 +135,7 @@ func Join(ctx context.Context, conn net.Conn, args ...string) error {
 	}
 
 	// BREAK to ack join before starting PDU exchange protocol.
-	wctx.Parameter.In(ctx).(lv.Encoding).Encode(nil)
+	ctxparm.Writer.In(ctx).(lv.Encoding).Encode(nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -152,14 +150,14 @@ usage: {{.}} <name-or-subject-key-id>
 Reserve exchange membership.`
 
 func ReserveUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Reserve(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(ReserveUsageTemplate[1:],
 			ReserveUsageData(ctx))
 	}
@@ -171,7 +169,7 @@ func Reserve(ctx context.Context, args ...string) error {
 	if i < 0 {
 		return ErrNotFound
 	}
-	req, err := io.ReadAll(rctx.Parameter.In(ctx))
+	req, err := io.ReadAll(ctxparm.Reader.In(ctx))
 	if err != nil {
 		return egress.Mark(err)
 	}
@@ -179,7 +177,7 @@ func Reserve(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	_, err = wctx.Parameter.In(ctx).Write(rsp)
+	_, err = ctxparm.Writer.In(ctx).Write(rsp)
 	return egress.Mark(err)
 }
 
@@ -188,14 +186,14 @@ usage: {{.}} <id>
 Returns the PEM encoded data containing the public key and nonce of member.`
 
 func WhoIsUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func WhoIs(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(WhoIsUsageTemplate[1:],
 			WhoIsUsageData(ctx))
 	}
@@ -207,7 +205,7 @@ func WhoIs(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	if m := xwhois(id); m == nil {
 		return egress.Mark(ErrNotFound)
 	} else if _, err = w.Write(m.PublicKeyData); err != nil {

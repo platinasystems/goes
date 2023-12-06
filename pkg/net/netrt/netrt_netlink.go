@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
@@ -132,23 +131,23 @@ func (l *list) Next() (NetRt, error) {
 	return nil, nil
 }
 
-func Add(ctx context.Context, fs *flag.FlagSet) error {
+func Add(ctx context.Context) error {
 	return FIXME
 }
 
-func Change(ctx context.Context, fs *flag.FlagSet) error {
+func Change(ctx context.Context) error {
 	return FIXME
 }
 
-func Delete(ctx context.Context, fs *flag.FlagSet) error {
+func Delete(ctx context.Context) error {
 	return FIXME
 }
 
-func Flush(ctx context.Context, fs *flag.FlagSet) error {
+func Flush(ctx context.Context) error {
 	return FIXME
 }
 
-func Get(ctx context.Context, fs *flag.FlagSet) (NetRt, error) {
+func Get(ctx context.Context) (NetRt, error) {
 	return nil, FIXME
 }
 

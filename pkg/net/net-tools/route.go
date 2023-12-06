@@ -7,12 +7,10 @@ package net_tools
 import (
 	"context"
 	"fmt"
+	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
@@ -42,42 +40,51 @@ usage: {{.Path}} [<option>]... [<addr|prefix> [<gateway>] [<mask>]]
 
 func RouteUsageData(ctx context.Context, synopsis string) any {
 	return struct{ Path, Synopsis, Flag string }{
-		Path:     pathctx.StringIn(ctx),
+		Path:     strings.Join(ctxparm.Strings.In(ctx), " "),
 		Synopsis: synopsis,
-		Flag:     flagctx.StringIn(ctx),
+		Flag:     ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func route(ctx context.Context, args ...string) error {
-	path := pathctx.Parameter.In(ctx)
+	path := ctxparm.Strings.In(ctx)
 	cmd := path[len(path)-1]
-	fs := flag.NewSilentFlagSet(cmd)
-	ctx = flagctx.Parameter.With(ctx, fs)
-	if flag.Search[bool]("complete") {
-		return complete.Last(args, fs)
+	flags := usage.NewFlags(cmd)
+	ctx = ctxparm.Flags.With(ctx, flags)
+	afinet := flags.Bool("4", false, "Address hint.")
+	flags.BoolVar(afinet, "inet", false, "aka -4.")
+	afinet6 := flags.Bool("6", false, "Address hint.")
+	flags.BoolVar(afinet6, "inet6", false, "aka -6.")
+	iface := flags.Bool("interface", false, "Instead of next-hop.")
+	flags.BoolVar(iface, "iface", false, "aka. -interface")
+	flags.String("dst", "", "Instead 1st position arg.")
+	flags.String("gateway", "", "Instead 2nd position arg.")
+	flags.String("mask", "", "Instead 3rd position arg or 1st /<suffix>.")
+	flags.Int("prefixlen", -1, "Instead of 1st arg /<suffix>.")
+	routeFlagsGOOS(flags)
+	if *complete.Help {
+		return complete.Last(args, flags)
 	}
-	err := fs.Parse(args)
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(RouteUsageTemplate[1:],
 			RouteUsageData(ctx, routeSynopsis[cmd]))
 	}
-	args = fs.Args()
-
 	switch cmd {
 	case "add":
-		err = netrt.Add(ctx, fs)
+		err = netrt.Add(ctx)
 	case "change":
-		err = netrt.Change(ctx, fs)
+		err = netrt.Change(ctx)
 	case "delete":
-		err = netrt.Delete(ctx, fs)
+		err = netrt.Delete(ctx)
 	case "flush":
-		err = netrt.Flush(ctx, fs)
+		err = netrt.Flush(ctx)
 	case "get", "show":
-		if nrt, gerr := netrt.Get(ctx, fs); gerr == nil {
-			fmt.Fprint(wctx.Parameter.In(ctx), nrt)
+		if nrt, gerr := netrt.Get(ctx); gerr == nil {
+			fmt.Fprint(ctxparm.Writer.In(ctx), nrt)
 		} else {
 			err = gerr
 		}

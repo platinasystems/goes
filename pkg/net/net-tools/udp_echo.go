@@ -13,14 +13,14 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/resolve"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -37,15 +37,18 @@ func UDPEchoUsageData(ctx context.Context) any {
 	return struct {
 		Path string
 		Port int
-	}{pathctx.StringIn(ctx), UDPEchoPort}
+	}{
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Port: UDPEchoPort,
+	}
 }
 
 func UDPEcho(ctx context.Context, args ...string) error {
-	path := pathctx.Parameter.In(ctx)
-	if flag.Search[bool]("complete") {
+	path := ctxparm.Strings.In(ctx)
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		if len(path) > 1 && path[1] == "daemon" {
 			path[1] = "start"
 		}
@@ -67,7 +70,7 @@ func UDPEcho(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 
 	fmt.Fprintln(w, "start", udpa, "service")
 	var wg sync.WaitGroup
@@ -97,10 +100,10 @@ The default <host> is 127.0.0.1:{{.Port}}. `
 var UDPPingUsageData = UDPEchoUsageData
 
 func UDPPing(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(UDPPingUsageTemplate[1:],
 			UDPPingUsageData(ctx))
 	}

@@ -13,11 +13,8 @@ import (
 	"net"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/selctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -105,10 +102,10 @@ serviceloop:
 			iowg sync.WaitGroup
 		)
 
-		ctx = rctx.Parameter.With(ctx, io.LimitReader(nil, 0))
-		ctx = wctx.Parameter.With(ctx, io.Writer(enc))
+		ctx = ctxparm.Reader.With(ctx, io.LimitReader(nil, 0))
+		ctx = ctxparm.Writer.With(ctx, io.Writer(enc))
 		cctx, cancel := context.WithCancel(ctx)
-		cctx = pathctx.Parameter.With(cctx, []string{host.Name()})
+		cctx = ctxparm.Strings.With(cctx, []string{host.Name()})
 
 		for i := 0; ; {
 			if n, err = dec.Read(pg[i:]); err != nil {
@@ -130,7 +127,7 @@ serviceloop:
 				break
 			} else {
 				in, flush := flusher.New(dec)
-				cctx = rctx.Parameter.With(cctx, in)
+				cctx = ctxparm.Reader.With(cctx, in)
 				iowg.Add(1)
 				go func() {
 					defer iowg.Done()
@@ -147,21 +144,21 @@ serviceloop:
 		}
 		if _, ok := conn.(*tls.Conn); ok {
 			if args[0] == "pty " {
-				cctx = rctx.Parameter.With(cctx, dec)
+				cctx = ctxparm.Reader.With(cctx, dec)
 			}
-			cctx = pathctx.AppendIn(cctx, ra)
-			cctx = selctx.Parameter.With(cctx, Selection)
+			cctx = ctxparm.AppendStringsIn(cctx, ra)
+			cctx = ctxparm.Map.With(cctx, Selection)
 			err = goes.Select(cctx, args...)
 		} else {
 			switch args[0] {
 			case "join":
-				pathctx.AppendIn(cctx, args[0])
+				ctxparm.AppendStringsIn(cctx, args[0])
 				err = Join(cctx, conn, args[1:]...)
 				if err == nil {
 					return
 				}
 			case "subscribe":
-				pathctx.AppendIn(cctx, args[0])
+				ctxparm.AppendStringsIn(cctx, args[0])
 				err = regSubscribe(ctx, args[1:]...)
 			case "tls":
 				enc.Encode(nil)

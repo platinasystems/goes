@@ -12,12 +12,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/selctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
@@ -31,20 +27,20 @@ Commands/Objects
 
 func EnvUsageData(ctx context.Context) any {
 	return struct{ Path, Commands string }{
-		Path:     pathctx.StringIn(ctx),
-		Commands: selctx.StringIn(ctx),
+		Path:     strings.Join(ctxparm.Strings.In(ctx), " "),
+		Commands: ctxparm.MapKeysIn(ctx),
 	}
 }
 
 func Env(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
-		return complete.Last(args, "*")
+	if *complete.Help {
+		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(EnvUsageTemplate[1:], EnvUsageData(ctx))
 	}
 	environ := os.Environ()
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	if len(args) == 0 {
 		for _, env := range environ {
 			fmt.Fprintln(w, env)
@@ -77,7 +73,7 @@ func Env(ctx context.Context, args ...string) error {
 	stderr := new(strings.Builder)
 	cmd := exec.CommandContext(ctx, program.Executable(), args...)
 	cmd.Env = environ
-	cmd.Stdin = rctx.Parameter.In(ctx)
+	cmd.Stdin = ctxparm.Reader.In(ctx)
 	cmd.Stdout = w
 	cmd.Stderr = stderr
 	err := cmd.Start()

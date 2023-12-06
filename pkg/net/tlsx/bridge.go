@@ -14,6 +14,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
@@ -89,7 +90,7 @@ func JoinBridge(ctx context.Context, c *tls.Conn, args []string) {
 			break
 		}
 		in := newBridgeInput(c, pg[:n])
-		fmt..Fprintln(wctx.In(ctx), bridge.name, "<-", ra,
+		fmt.Fprintln(ctxparm.Writer.In(ctx), bridge.name, "<-", ra,
 			frame.Header[frame.ETH](in.pg))
 		bridge.inputch <- in
 	}
@@ -151,7 +152,7 @@ func bridgeSend(ctx context.Context, c *tls.Conn, in *bridgeInput) {
 	if err != nil {
 		log.Println(bridge.name, "->", ra, err)
 	} else {
-		fmt.Fprintln(wctx.In(ctx), bridge.name, "->", ra,
+		fmt.Fprintln(ctxparm.Writer.In(ctx), bridge.name, "->", ra,
 			frame.Header[frame.ETH](in.pg))
 	}
 }

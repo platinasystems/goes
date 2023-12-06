@@ -10,14 +10,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const NetstatUsageTemplate = `
@@ -37,39 +35,38 @@ Show network status.
 
 func NetstatUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		Path: pathctx.StringIn(ctx),
-		Flag: flagctx.StringIn(ctx),
+		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
+		Flag: ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func Netstat(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("netstat")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	iFlag := fs.Bool("i", false, "Show interface info.")
-	rFlag := fs.Bool("r", false, "Show routing table.")
-	_ = fs.String("f", "", "Address Family: inet, inet6, link.")
-	_ = fs.Int("F", -1, "FIB number, -1 for current.")
-	_ = fs.String("I", "", "Interface name.")
-	_ = fs.Bool("m", false, "Show memory stats.")
-	_ = fs.Bool("mm", false, "Show detailed memory stats.")
-	_ = fs.Bool("n", false, "Show numeric address instead of lookup.")
-	_ = fs.Int("p", 0, "Protocol number.")
-	_ = fs.Bool("s", false, "Show per-protocol stats.")
-	_ = fs.Bool("ss", false, "Show per-protocol, non-zero stats.")
-	_ = fs.Duration("w", 0, "Wait interval.")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	err := fs.Parse(args)
+	flags := usage.NewFlags("netstat")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	iFlag := flags.Bool("i", false, "Show interface info.")
+	rFlag := flags.Bool("r", false, "Show routing table.")
+	_ = flags.String("f", "", "Address Family: inet, inet6, link.")
+	_ = flags.Int("F", -1, "FIB number, -1 for current.")
+	_ = flags.String("I", "", "Interface name.")
+	_ = flags.Bool("m", false, "Show memory stats.")
+	_ = flags.Bool("mm", false, "Show detailed memory stats.")
+	_ = flags.Bool("n", false, "Show numeric address instead of lookup.")
+	_ = flags.Int("p", 0, "Protocol number.")
+	_ = flags.Bool("s", false, "Show per-protocol stats.")
+	_ = flags.Bool("ss", false, "Show per-protocol, non-zero stats.")
+	_ = flags.Duration("w", 0, "Wait interval.")
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(NetstatUsageTemplate[1:],
 			NetstatUsageData(ctx))
 	}
-	args = fs.Args()
+	args = flags.Args()
 	switch {
 	case *iFlag:
 		return netstati(ctx)
@@ -82,8 +79,7 @@ func Netstat(ctx context.Context, args ...string) error {
 }
 
 func netstati(ctx context.Context) error {
-	fs := flagctx.Parameter.In(ctx)
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	fmt.Fprintf(w, "%-15s", "Name")
 	fmt.Fprintf(w, " %5s", "MTU")
 	fmt.Fprintf(w, " %11s", "Ipkts")
@@ -110,7 +106,7 @@ func netstati(ctx context.Context) error {
 		fmt.Fprintf(w, " %11d", nif.Collisions)
 		fmt.Fprintln(w)
 	}
-	if ifname := flag.Search[string]("I", fs); len(ifname) > 0 {
+	if ifname := ctxparm.SearchFlagsIn[string](ctx, "I"); len(ifname) > 0 {
 		if nif := netif.Named(ifname); nif == nil {
 			return fmt.Errorf("%q %w", ifname, ErrNotFound)
 		} else {
@@ -131,9 +127,8 @@ func netstati(ctx context.Context) error {
 
 func netstatr(ctx context.Context) error {
 	var family uint
-	fs := flagctx.Parameter.In(ctx)
-	w := wctx.Parameter.In(ctx)
-	switch s := flag.Search[string]("f", fs); s {
+	w := ctxparm.Writer.In(ctx)
+	switch s := ctxparm.SearchFlagsIn[string](ctx, "f"); s {
 	case "":
 		family = af.UNSPEC
 	case "inet":

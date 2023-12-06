@@ -10,18 +10,17 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/creack/pty"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/nbr"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/io/flusher"
 	"github.com/platinasystems/goes/v2/pkg/os/utmpx"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const ExecUsageTemplate = `
@@ -29,18 +28,18 @@ usage: {{.}} <rows> <cols> <x-pixels> <y-pixels> <command> [<args>]
 Run command in an allocated TTY.`
 
 func ExecUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Exec(ctx context.Context, args ...string) error {
-	path := pathctx.Parameter.In(ctx)
-	r := rctx.Parameter.In(ctx)
-	w := wctx.Parameter.In(ctx)
+	path := ctxparm.Strings.In(ctx)
+	r := ctxparm.Reader.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(ExecUsageTemplate[1:], ExecUsageData(ctx))
 	}
 	if n := len(args); n < 5 {

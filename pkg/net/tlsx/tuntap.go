@@ -25,17 +25,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -61,31 +60,31 @@ Open tap to named exchange or self @ given address.
 
 func TunTapUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		pathctx.StringIn(ctx),
-		flagctx.StringIn(ctx),
+		strings.Join(ctxparm.Strings.In(ctx), " "),
+		ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func TunTap(ctx context.Context, args ...string) error {
 	var addr net.IP
-	fs := flag.NewSilentFlagSet("tuntap")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	fs.TextVar(&addr, "a", addr, "static network address")
-	randll := fs.Bool("r", false,
-		"use random link address instead of hashed cert SKI")
-	unit := fs.Uint("u", 0, "unit number")
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	err := fs.Parse(args)
+	flags := usage.NewFlags("tuntap")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	flags.TextVar(&addr, "a", addr, "static network address")
+	randll := flags.Bool("r", false,
+		"use random link address instead of hashed cert SKI")
+	unit := flags.Uint("u", 0, "unit number")
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(TunTapUsageTemplate[1:],
 			TunTapUsageData(ctx))
 	}
-	if args = fs.Args(); len(args) == 0 {
+	if args = flags.Args(); len(args) == 0 {
 		return ErrIncomplete
 	}
 
@@ -109,7 +108,7 @@ func TunTap(ctx context.Context, args ...string) error {
 	}
 
 	network := 3
-	path := pathctx.Parameter.In(ctx)
+	path := ctxparm.Strings.In(ctx)
 	if path[len(path)-1] == "tap" {
 		if !tuntap.CanTAP {
 			return ErrCantTap

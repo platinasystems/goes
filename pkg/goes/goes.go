@@ -20,10 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/selctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/log/oslog"
@@ -32,7 +29,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-var Append, Complete, Help, Json, Tee bool
+var Append, Json, Tee bool
 var Input, Output string
 var Mode uint = 0666
 var Timeout time.Duration
@@ -42,12 +39,15 @@ func Exec(subsys any, args ...string) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		termination.Signals...)
+	ctx := context.Background()
+
+	ctx, stop := signal.NotifyContext(ctx, termination.Signals...)
 	defer stop()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	ctx = ctxparm.AppendStringsIn(ctx, program.Base())
 
 	if len(Input) > 0 {
 		f, err := os.Open(Input)
@@ -56,7 +56,7 @@ func Exec(subsys any, args ...string) {
 			return
 		}
 		defer f.Close()
-		ctx = rctx.Parameter.With(ctx, f)
+		ctx = ctxparm.Reader.With(ctx, f)
 	}
 	if len(Output) > 0 {
 		fflags := os.O_RDWR | os.O_CREATE
@@ -73,17 +73,17 @@ func Exec(subsys any, args ...string) {
 		}
 		defer f.Close()
 		if Tee {
-			mw := io.MultiWriter(wctx.Parameter.In(ctx), f)
-			ctx = wctx.Parameter.With(ctx, mw)
+			mw := io.MultiWriter(ctxparm.Writer.In(ctx), f)
+			ctx = ctxparm.Writer.With(ctx, mw)
 		} else {
-			ctx = wctx.Parameter.With(ctx, f)
+			ctx = ctxparm.Writer.With(ctx, f)
 		}
 	}
 	if Timeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, Timeout)
 		defer cancel()
 	}
-	if show, ok := selctx.Parameter.Default["show"].(map[string]any); ok {
+	if show, ok := ctxparm.Map.Default["show"].(map[string]any); ok {
 		if _, ok = show["build"]; !ok {
 			show["build"] = program.Build
 		}
@@ -101,7 +101,7 @@ func Exec(subsys any, args ...string) {
 		}
 		if wc, err := oslog.OpenNotice(); err == nil {
 			defer wc.Close()
-			wctx.Parameter.Default = wc
+			ctxparm.Writer.Default = wc
 		}
 	}
 
@@ -109,12 +109,12 @@ func Exec(subsys any, args ...string) {
 	if err != nil {
 		if !IsGoesError(err) &&
 			!egress.IsMarked(err) &&
-			!usage.InError(err) {
+			!usage.In(err) {
 
-			err = GoesError{pathctx.Parameter.In(ctx), err}
+			err = GoesError{ctxparm.Strings.In(ctx), err}
 		}
 		Fprint1ln(log.Writer(), err)
-		if !usage.InError(err) {
+		if !usage.In(err) {
 			os.Exit(1)
 		}
 	}
@@ -123,25 +123,22 @@ func Exec(subsys any, args ...string) {
 func Main() {
 	log.SetFlags(log.Lshortfile)
 	flag.BoolVar(&Append, "append", false, "Append to -output file.")
-	flag.BoolVar(&Append, "a", false, "aka. -append.")
-	flag.BoolVar(&Complete, "complete", false, "Finish last arg.")
-	flag.BoolVar(&Help, "help", false, "Print options.")
-	flag.BoolVar(&Help, "h", false, "aka. -help.")
-	flag.BoolVar(&Json, "json", false,
+	flag.BoolVar(&Append, "a", Append, "aka. -append.")
+	flag.BoolVar(&Json, "json", Json,
 		"Marshal/Unmarshal object with JSON format text.")
 	flag.BoolVar(&Tee, "tee", false, "Tee to -output file and stdout.")
-	flag.BoolVar(&Tee, "t", false, "aka. -tee.")
-	flag.StringVar(&Input, "input", "",
+	flag.BoolVar(&Tee, "t", Tee, "aka. -tee.")
+	flag.StringVar(&Input, "input", Input,
 		"Read from named file instead of stdin.")
-	flag.StringVar(&Input, "i", "", "aka -i.")
-	flag.StringVar(&Output, "output", "",
+	flag.StringVar(&Input, "i", Input, "aka -i.")
+	flag.StringVar(&Output, "output", Output,
 		"Write to named file instead of stdout.")
-	flag.StringVar(&Output, "o", "", "aka. -o")
-	flag.UintVar(&Mode, "mode", 0666, "File mode (default 0666).")
-	flag.DurationVar(&Timeout, "timeout", 0, "Elapse time limit.")
+	flag.StringVar(&Output, "o", Output, "aka. -o")
+	flag.UintVar(&Mode, "mode", Mode, "File mode (default 0666).")
+	flag.DurationVar(&Timeout, "timeout", Timeout, "Elapse time limit.")
 	flag.Parse()
-	selctx.Parameter.Default["integral"] = Integral
-	Merge(selctx.Parameter.Default, Integral)
+	ctxparm.Map.Default["integral"] = Integral
+	Merge(ctxparm.Map.Default, Integral)
 	Exec(Select, flag.Args()...)
 }
 
@@ -154,34 +151,34 @@ func Merge(to, from map[string]any) {
 }
 
 func Select(ctx context.Context, args ...string) (err error) {
-	sel := selctx.Parameter.In(ctx)
+	sel := ctxparm.Map.In(ctx)
 	if len(sel) == 0 {
 		err = ErrEmpty
 	} else if len(args) == 0 {
-		if Complete {
+		if *complete.Help {
 			err = complete.Last(args, sel)
-		} else if Help {
+		} else if *usage.Help {
 			err = IntegralHelp(ctx)
 		} else {
 			err = ErrIncomplete
 		}
 	} else if v, ok := sel[args[0]]; ok {
-		ctx = pathctx.AppendIn(ctx, args[0])
+		ctx = ctxparm.AppendStringsIn(ctx, args[0])
 		err = do(ctx, v, args[1:]...)
-	} else if len(args) == 1 && Complete {
+	} else if len(args) == 1 && *complete.Help {
 		err = complete.Last(args, sel)
-	} else if len(pathctx.Parameter.In(ctx)) == 1 {
+	} else if len(ctxparm.Strings.In(ctx)) == 1 {
 		err = IntegralCommand(ctx, args...)
 	} else {
-		ctx = pathctx.AppendIn(ctx, args[0])
+		ctx = ctxparm.AppendStringsIn(ctx, args[0])
 		err = ErrNotFound
 	}
 	if err != nil &&
 		!IsGoesError(err) &&
 		!egress.IsMarked(err) &&
-		!usage.InError(err) {
+		!usage.In(err) {
 
-		err = GoesError{pathctx.Parameter.In(ctx), err}
+		err = GoesError{ctxparm.Strings.In(ctx), err}
 	}
 	return
 }
@@ -191,7 +188,7 @@ usage: {{.}} [-json]
 Format named object.`
 
 func MarshalTextUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 const UnmarshalTextUsageTemplate = `
@@ -203,7 +200,7 @@ var UnmarshalTextUsageData = MarshalTextUsageData
 func do(ctx context.Context, subsys any, args ...string) error {
 	var text []byte
 	var err error
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	switch t := subsys.(type) {
 	case []byte:
 		if !Json {
@@ -220,7 +217,7 @@ func do(ctx context.Context, subsys any, args ...string) error {
 		}
 		return err
 	case map[string]any:
-		return Select(selctx.Parameter.With(ctx, t), args...)
+		return Select(ctxparm.Map.With(ctx, t), args...)
 	case embed.FS:
 		return IntegralShowFS(ctx, t, args...)
 	case func(context.Context, ...string) error:
@@ -257,7 +254,7 @@ func do(ctx context.Context, subsys any, args ...string) error {
 	}
 	// Show or set objects
 	nargs := len(args)
-	if Help {
+	if *usage.Help {
 		if nargs == 0 {
 			err = usage.Error(MarshalTextUsageTemplate[1:],
 				MarshalTextUsageData(ctx))

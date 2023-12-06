@@ -6,10 +6,11 @@ package tlsx
 
 import (
 	"context"
+	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
+	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const IPCUsageTemplate = `
@@ -17,17 +18,17 @@ usage: {{.}} [-i <file>|-] [<args>]
 Daemon IPC.`
 
 func IPCUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func IPC(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return nil
 	}
-	path := pathctx.Parameter.In(ctx)
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(IPCUsageTemplate[1:], IPCUsageData(ctx))
 	}
+	path := ctxparm.Strings.In(ctx)
 	ipc := struct{ path, args []string }{
 		path: append(path[:1], "exec"),
 		args: make([]string, 0, len(path)+len(args)),

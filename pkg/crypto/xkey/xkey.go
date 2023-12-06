@@ -22,12 +22,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -58,11 +55,11 @@ Algorithms
   rsa`
 
 func GenerateUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Generate(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		if len(args) > 0 {
 			return complete.Last(args, []string{
 				"ecdsa",
@@ -74,11 +71,11 @@ func Generate(ctx context.Context, args ...string) error {
 		}
 		return nil
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(GenerateUsageTemplate[1:],
 			GenerateUsageData(ctx))
 	}
-	w := wctx.Parameter.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 	alg := "ed25519"
 	if len(args) > 0 {
 		alg = args[0]
@@ -117,17 +114,17 @@ usage: {{.}} [<name>]
 Print algorithm of the named private key file or stdin.`
 
 func ShowUsageData(ctx context.Context) any {
-	return pathctx.StringIn(ctx)
+	return strings.Join(ctxparm.Strings.In(ctx), " ")
 }
 
 func Show(ctx context.Context, args ...string) error {
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		return complete.Last(args, "*.pem")
 	}
-	if flag.Search[bool]("help") {
+	if *usage.Help {
 		return usage.Error(ShowUsageTemplate[1:], ShowUsageData(ctx))
 	}
-	r := rctx.Parameter.In(ctx)
+	r := ctxparm.Reader.In(ctx)
 	if len(args) > 0 && args[0] != "-" {
 		if f, err := os.Open(args[0]); err != nil {
 			return err
@@ -140,7 +137,7 @@ func Show(ctx context.Context, args ...string) error {
 	if _, err := priv.ReadFrom(r); err != nil {
 		return err
 	}
-	fmt.Fprintln(wctx.Parameter.In(ctx), priv)
+	fmt.Fprintln(ctxparm.Writer.In(ctx), priv)
 	return nil
 }
 

@@ -8,14 +8,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/creack/pty"
-	"github.com/platinasystems/goes/v2/pkg/context/flagctx"
-	"github.com/platinasystems/goes/v2/pkg/context/pathctx"
-	"github.com/platinasystems/goes/v2/pkg/context/rctx"
-	"github.com/platinasystems/goes/v2/pkg/context/wctx"
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/flag"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -29,31 +26,31 @@ Remote execution.
 
 func RexecUsageData(ctx context.Context) any {
 	return struct{ Path, Flag string }{
-		pathctx.StringIn(ctx),
-		flagctx.StringIn(ctx),
+		strings.Join(ctxparm.Strings.In(ctx), " "),
+		ctxparm.SprintFlagsIn(ctx),
 	}
 }
 
 func Rexec(ctx context.Context, args ...string) error {
-	fs := flag.NewSilentFlagSet("rexec")
-	ctx = flagctx.Parameter.With(ctx, fs)
-	iflag := fs.String("i", "", "Input FILE or '-' for STDIN.")
-	tflag := fs.Bool("t", false, "Allocate a pseudo-TTY.")
-	if flag.Search[bool]("complete") {
+	if *complete.Help {
 		if len(args) <= 1 {
-			return complete.Last(args, fs, Self().DNS0(),
+			return complete.Last(args, Self().DNS0(),
 				Subscriptions().Names())
 		}
 		return nil
 	}
-	err := fs.Parse(args)
+	flags := usage.NewFlags("rexec")
+	ctx = ctxparm.Flags.With(ctx, flags)
+	iflag := flags.String("i", "", "Input FILE or '-' for STDIN.")
+	tflag := flags.Bool("t", false, "Allocate a pseudo-TTY.")
+	err := flags.Parse(args)
 	if err != nil {
 		return err
 	}
-	if flag.Search[bool]("help", fs) {
+	if *usage.Help {
 		return usage.Error(RexecUsageTemplate[1:], RexecUsageData(ctx))
 	}
-	args = fs.Args()
+	args = flags.Args()
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
@@ -63,8 +60,8 @@ func Rexec(ctx context.Context, args ...string) error {
 		return ErrIncomplete
 	}
 
-	r := rctx.Parameter.In(ctx)
-	w := wctx.Parameter.In(ctx)
+	r := ctxparm.Reader.In(ctx)
+	w := ctxparm.Writer.In(ctx)
 
 	var anyargs []any
 	if *tflag {
