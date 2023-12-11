@@ -7,10 +7,12 @@ package net_tools
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
@@ -51,9 +53,9 @@ func route(ctx context.Context, args ...string) error {
 	cmd := path[len(path)-1]
 	flags := usage.NewFlags(cmd)
 	ctx = ctxparm.Flags.With(ctx, flags)
-	afinet := flags.Bool("4", false, "Address hint.")
+	afinet := flags.Bool("4", false, "Address filter.")
 	flags.BoolVar(afinet, "inet", false, "aka -4.")
-	afinet6 := flags.Bool("6", false, "Address hint.")
+	afinet6 := flags.Bool("6", false, "Address filter.")
 	flags.BoolVar(afinet6, "inet6", false, "aka -6.")
 	iface := flags.Bool("interface", false, "Instead of next-hop.")
 	flags.BoolVar(iface, "iface", false, "aka. -interface")
@@ -83,11 +85,11 @@ func route(ctx context.Context, args ...string) error {
 	case "flush":
 		err = netrt.Flush(ctx)
 	case "get", "show":
-		if nrt, gerr := netrt.Get(ctx); gerr == nil {
-			fmt.Fprint(ctxparm.Writer.In(ctx), nrt)
-		} else {
-			err = gerr
+		nrt, err := netrt.Get(ctx)
+		if err != nil {
+			return err
 		}
+		fPrintNetRt(ctxparm.Writer.In(ctx), nrt)
 	case "monitor":
 		if nrts, monerr := netrt.Monitor(ctx); monerr == nil {
 			_ = nrts //FIXME
@@ -96,4 +98,29 @@ func route(ctx context.Context, args ...string) error {
 		}
 	}
 	return err
+}
+
+func fPrintNetRt(w io.Writer, nrt netrt.NetRt) {
+	dstip := nrt.Dst()
+	gwip := nrt.GW()
+	line := nrt.Line()
+	if !dstip.IsValid() {
+		return
+	}
+	fmt.Fprint(w, dstip)
+	if n := nrt.Bits(); n > 0 {
+		fmt.Fprint(w, "/", n)
+	}
+	fmt.Fprint(w, "->")
+	if gwip.IsValid() {
+		fmt.Fprint(w, gwip)
+	} else if ha := nrt.HA(); len(ha) > 0 {
+		s := strings.Replace(ha.String(), ":", ".", -1)
+		fmt.Fprint(w, s)
+	} else if nif := netif.Indexed(line); nif != nil {
+		fmt.Fprint(w, nif.Name)
+	} else {
+		fmt.Fprint(w, "line#", line)
+	}
+	fmt.Fprintln(w)
 }

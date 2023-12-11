@@ -14,7 +14,6 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -28,7 +27,7 @@ Show network status.
   • {{.Path}} -s [-s] [-f <family> | -p <protocol>] [-w <period>]
   • {{.Path}} -i | -I <interface> -s [-f <family> | -p <protocol>]
   • {{.Path}} -m [-m]
-  • {{.Path}} -r [-Aaln] [-f <family>]
+  • {{.Path}} -r [-Aaln] [-4|-6]
   • {{.Path}} -rs [-s]
   • {{.Path}} -B [-I interface]
 {{.Flag}}`
@@ -48,6 +47,10 @@ func Netstat(ctx context.Context, args ...string) error {
 	ctx = ctxparm.Flags.With(ctx, flags)
 	iFlag := flags.Bool("i", false, "Show interface info.")
 	rFlag := flags.Bool("r", false, "Show routing table.")
+	afinet := flags.Bool("4", false, "Address filter.")
+	flags.BoolVar(afinet, "inet", false, "aka -4.")
+	afinet6 := flags.Bool("6", false, "Address filter.")
+	flags.BoolVar(afinet6, "inet6", false, "aka -6.")
 	_ = flags.String("f", "", "Address Family: inet, inet6, link.")
 	_ = flags.Int("F", -1, "FIB number, -1 for current.")
 	_ = flags.String("I", "", "Interface name.")
@@ -126,29 +129,18 @@ func netstati(ctx context.Context) error {
 }
 
 func netstatr(ctx context.Context) error {
-	var family uint
 	w := ctxparm.Writer.In(ctx)
-	switch s := ctxparm.SearchFlagsIn[string](ctx, "f"); s {
-	case "":
-		family = af.UNSPEC
-	case "inet":
-		family = af.INET
-	case "inet6":
-		family = af.INET6
-	default:
-		return fmt.Errorf("%q %w", s, ErrInvalid)
-	}
-	nrts, err := netrt.NewList()
+	streamer, err := netrt.NewList(ctx)
 	if err != nil {
 		return err
 	}
-	defer nrts.Close()
+	defer streamer.Close()
 	dstbuf := new(strings.Builder)
 	gwbuf := new(strings.Builder)
 	flagbuf := new(strings.Builder)
 	var dsts, gws, flags, ifnames []string
 	for {
-		nrt, err := nrts.Next()
+		nrt, err := streamer.Next()
 		if err != nil {
 			return err
 		} else if nrt == nil {
@@ -158,12 +150,6 @@ func netstatr(ctx context.Context) error {
 		gwip := nrt.GW()
 		line := nrt.Line()
 		if !dstip.IsValid() {
-			continue
-		}
-		if family == af.INET && dstip.Is6() {
-			continue
-		}
-		if family == af.INET6 && dstip.Is4() {
 			continue
 		}
 		dstbuf.Reset()

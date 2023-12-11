@@ -91,6 +91,7 @@ var (
 	ExpandIfAddrMsg = Expand[ifaddr.Msg]
 	ExpandIfInfoMsg = Expand[rtnetlink.IfInfoMsg]
 	ExpandRtGenMsg  = Expand[rtnetlink.RtGenMsg]
+	ExpandRtMsg     = Expand[rtnetlink.RtMsg]
 )
 
 // Return type at beginning of data along with the aligned remainder.

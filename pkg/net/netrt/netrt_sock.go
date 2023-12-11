@@ -15,7 +15,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
-	"unicode"
 
 	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
@@ -49,9 +48,7 @@ func Flush(ctx context.Context) error {
 	return FIXME
 }
 
-func Get(ctx context.Context) (
-	NetRt, error,
-) {
+func Get(ctx context.Context) (NetRt, error) {
 	nrt, err := rtreq(ctx, syscall.RTM_GET)
 	return nrt, err
 }
@@ -298,9 +295,4 @@ func appendAuthor(ctx context.Context, msg []byte) ([]byte, error) {
 func appendBrd(ctx context.Context, msg []byte) ([]byte, error) {
 	// broadcast || point-to-point peer
 	return msg, nil
-}
-
-func isnumeric(s string) bool {
-	r := []rune(s)[0]
-	return unicode.IsNumber(r) || r == ':'
 }

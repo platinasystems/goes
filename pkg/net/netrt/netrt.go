@@ -7,6 +7,7 @@ package netrt
 import (
 	"net"
 	"net/netip"
+	"unicode"
 )
 
 type NetRt interface {
@@ -49,4 +50,9 @@ func FirstNonZero[T comparable](args ...T) T {
 		}
 	}
 	return zero
+}
+
+func isnumeric(s string) bool {
+	r := []rune(s)[0]
+	return unicode.IsNumber(r) || r == ':'
 }

@@ -7,20 +7,30 @@
 package netrt
 
 import (
+	"context"
 	"syscall"
 
+	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
 type list struct{ data []byte }
 
-func NewList() (Streamer, error) {
+func NewList(ctx context.Context) (Streamer, error) {
+	var family int32
+	if ctxparm.SearchFlagsIn[bool](ctx, "4") {
+		family = af.INET
+	} else if ctxparm.SearchFlagsIn[bool](ctx, "6") {
+		family = af.INET6
+	} else {
+		family = af.UNSPEC
+	}
 	data, err := sysctl.Get(
 		syscall.CTL_NET,
 		af.ROUTE,
 		0,
-		af.UNSPEC,
+		family,
 		syscall.NET_RT_DUMP,
 		0,
 		// FIXME fib?
