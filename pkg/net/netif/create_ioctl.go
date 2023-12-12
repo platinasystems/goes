@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
@@ -26,8 +27,8 @@ var Cloneable = []string{
 	"pktap",
 }
 
-func Create(name string, args ...string) (*NetIf, error) {
-	nifs, err := List()
+func Create(ctx context.Context, name string, args ...string) (*NetIf, error) {
+	nifs, err := List(ctx)
 	if err != nil {
 		return nil, egress.Mark(err)
 	}
@@ -40,7 +41,7 @@ func Create(name string, args ...string) (*NetIf, error) {
 	if err != nil {
 		return nil, egress.Mark(err)
 	}
-	after, err := List()
+	after, err := List(ctx)
 	if err != nil {
 		return nil, egress.Mark(err)
 	}

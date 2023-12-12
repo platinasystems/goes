@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/netip"
@@ -26,24 +27,26 @@ const AddressCommands = `
 const AddressParameters = ""
 
 func (nif *NetIf) Add(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
 ) (err error) {
 	if addr := prefix.Addr(); addr.Is4() {
-		args, err = nif.add4(prefix, dest, args)
+		args, err = nif.add4(ctx, prefix, dest, args)
 	} else if addr.Is6() {
-		args, err = nif.add6(prefix, dest, args)
+		args, err = nif.add6(ctx, prefix, dest, args)
 	} else {
 		err = fmt.Errorf("%v %w", prefix, ErrWrongFamily)
 	}
 	if err == nil && len(args) > 0 {
-		err = nif.Config(args)
+		err = nif.Config(ctx, args)
 	}
 	return
 }
 
 func (nif *NetIf) add4(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -65,6 +68,7 @@ func (nif *NetIf) add4(
 }
 
 func (nif *NetIf) add6(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -88,6 +92,7 @@ func (nif *NetIf) add6(
 }
 
 func (nif *NetIf) Change(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -96,6 +101,7 @@ func (nif *NetIf) Change(
 }
 
 func (nif *NetIf) Del(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -112,6 +118,7 @@ func (nif *NetIf) Del(
 }
 
 func (nif *NetIf) Replace(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,

@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
@@ -28,6 +29,7 @@ const AddressCommands = `
 const AddressParameters = ""
 
 func (nif *NetIf) Add(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -36,14 +38,15 @@ func (nif *NetIf) Add(
 		cmd   = rtnetlink.RTM_NEWADDR
 		flags = netlink.NLM_F_CREATE | netlink.NLM_F_EXCL
 	)
-	args, err = nif.addr(cmd, flags, prefix, dest, args)
+	args, err = nif.addr(ctx, cmd, flags, prefix, dest, args)
 	if err == nil && len(args) > 0 {
-		err = nif.Config(args)
+		err = nif.Config(ctx, args)
 	}
 	return
 }
 
 func (nif *NetIf) Change(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -52,14 +55,15 @@ func (nif *NetIf) Change(
 		cmd   = rtnetlink.RTM_NEWADDR
 		flags = netlink.NLM_F_REPLACE
 	)
-	args, err = nif.addr(cmd, flags, prefix, dest, args)
+	args, err = nif.addr(ctx, cmd, flags, prefix, dest, args)
 	if err == nil && len(args) > 0 {
-		err = nif.Config(args)
+		err = nif.Config(ctx, args)
 	}
 	return
 }
 
 func (nif *NetIf) Del(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -68,11 +72,12 @@ func (nif *NetIf) Del(
 		cmd   = rtnetlink.RTM_DELADDR
 		flags = 0
 	)
-	_, err := nif.addr(cmd, flags, prefix, dest, args)
+	_, err := nif.addr(ctx, cmd, flags, prefix, dest, args)
 	return err
 }
 
 func (nif *NetIf) Replace(
+	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
 	args []string,
@@ -81,14 +86,15 @@ func (nif *NetIf) Replace(
 		cmd   = rtnetlink.RTM_NEWADDR
 		flags = netlink.NLM_F_CREATE | netlink.NLM_F_REPLACE
 	)
-	args, err = nif.addr(cmd, flags, prefix, dest, args)
+	args, err = nif.addr(ctx, cmd, flags, prefix, dest, args)
 	if err == nil && len(args) > 0 {
-		err = nif.Config(args)
+		err = nif.Config(ctx, args)
 	}
 	return
 }
 
 func (nif *NetIf) addr(
+	ctx context.Context,
 	cmd, flags uint16,
 	prefix netip.Prefix,
 	dest netip.Addr,
@@ -139,7 +145,7 @@ func (nif *NetIf) addr(
 	if err = nl.Request(req); err != nil {
 		return args, egress.Mark(err)
 	}
-	if err = nl.Wait(hdr.SEQ); err != nil {
+	if err = nl.Wait(ctx, hdr.SEQ); err != nil {
 		return args, egress.Mark(err)
 	}
 	return args, nil

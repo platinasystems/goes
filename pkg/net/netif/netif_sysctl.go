@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"net"
 	"net/netip"
 	"syscall"
@@ -45,7 +46,7 @@ func Sizeof[T Msgs](p *T) int {
 	return int(unsafe.Sizeof(*p))
 }
 
-func List() (nifs []*NetIf, err error) {
+func List(ctx context.Context) (nifs []*NetIf, err error) {
 	rib, err := sysctl.Get(
 		syscall.CTL_NET,
 		af.ROUTE,

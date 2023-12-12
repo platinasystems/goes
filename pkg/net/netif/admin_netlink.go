@@ -7,14 +7,16 @@
 package netif
 
 import (
+	"context"
+
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 )
 
-func Down(ifname string) error {
-	return netlink.Admin(ifname, 0, iflink.IFF_UP)
+func Down(ctx context.Context, ifname string) error {
+	return netlink.Admin(ctx, ifname, 0, iflink.IFF_UP)
 }
 
-func Up(ifname string) error {
-	return netlink.Admin(ifname, iflink.IFF_UP, 0)
+func Up(ctx context.Context, ifname string) error {
+	return netlink.Admin(ctx, ifname, iflink.IFF_UP, 0)
 }

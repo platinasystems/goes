@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"syscall"
@@ -51,7 +52,7 @@ var ConfigSIOC = map[string]uintptr{
 	"mtu": syscall.SIOCSIFMTU,
 }
 
-func (nif *NetIf) Config(args []string) error {
+func (nif *NetIf) Config(ctx context.Context, args []string) error {
 	inet, err := af.OpenInet()
 	if err != nil {
 		return egress.Mark(err)

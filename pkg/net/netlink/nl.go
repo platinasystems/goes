@@ -7,6 +7,7 @@
 package netlink
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -75,7 +76,7 @@ func (nl *NL) Close() error {
 	return af.Close(nl.sock)
 }
 
-func (nl *NL) IfIndex(ifname string) (int32, error) {
+func (nl *NL) IfIndex(ctx context.Context, ifname string) (int32, error) {
 	hdr, req := ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETLINK
 	hdr.Flags = NLM_F_REQUEST | NLM_F_DUMP
@@ -86,7 +87,7 @@ func (nl *NL) IfIndex(ifname string) (int32, error) {
 	}
 	seq := hdr.SEQ
 	for {
-		rsp, data, err := nl.Next()
+		rsp, data, err := nl.Next(ctx)
 		if err != nil {
 			return -1, err
 		} else if rsp.SEQ != seq {
@@ -119,7 +120,7 @@ func (nl *NL) IfIndex(ifname string) (int32, error) {
 
 // This returns references to the next netlink message header and data that the
 // caller must release before subsequent Next calls.
-func (nl *NL) Next() (*MsgHdr, []byte, error) {
+func (nl *NL) Next(ctx context.Context) (*MsgHdr, []byte, error) {
 	if len(nl.rem) < NLMSG_HDRLEN {
 		for {
 			n, _, err := af.
@@ -169,9 +170,9 @@ func (nl *NL) Request(msg []byte) error {
 }
 
 // Wait for DONE or ERROR response to the identified request.
-func (nl *NL) Wait(seq uint32) error {
+func (nl *NL) Wait(ctx context.Context, seq uint32) error {
 	for {
-		hdr, data, err := nl.Next()
+		hdr, data, err := nl.Next(ctx)
 		if err != nil {
 			return err
 		} else if hdr.SEQ != seq {

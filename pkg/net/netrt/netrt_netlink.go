@@ -71,9 +71,9 @@ func (strm *stream) Close() error {
 	return strm.nl.Close()
 }
 
-func (strm *stream) Next() (NetRt, error) {
+func (strm *stream) Next(ctx context.Context) (NetRt, error) {
 	for {
-		rsp, data, err := strm.nl.Next()
+		rsp, data, err := strm.nl.Next(ctx)
 		if err != nil {
 			return nil, err
 		} else if rsp.SEQ != strm.seq {
@@ -183,7 +183,7 @@ func Get(ctx context.Context) (NetRt, error) {
 	}
 	strm := &stream{nl, hdr.SEQ}
 	defer strm.Close()
-	return strm.Next()
+	return strm.Next(ctx)
 }
 
 func Monitor(ctx context.Context) (Streamer, error) {

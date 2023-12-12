@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -88,14 +89,14 @@ var ConfigAttr = map[string]iflink.Ifla{
 	"state":        iflink.IFLA_OPERSTATE,
 }
 
-func (nif *NetIf) Config(args []string) error {
+func (nif *NetIf) Config(ctx context.Context, args []string) error {
 	nl, err := netlink.Open()
 	if err != nil {
 		return err
 	}
 	defer nl.Close()
 
-	if err = nif.refresh(nl); err != nil {
+	if err = nif.refresh(ctx, nl); err != nil {
 		return egress.Mark(err)
 	}
 
@@ -199,12 +200,12 @@ func (nif *NetIf) Config(args []string) error {
 		}
 	}
 	if err = nl.Request(msg); err == nil {
-		err = nl.Wait(req.SEQ)
+		err = nl.Wait(ctx, req.SEQ)
 	}
 	return err
 }
 
-func (nif *NetIf) refresh(nl *netlink.NL) error {
+func (nif *NetIf) refresh(ctx context.Context, nl *netlink.NL) error {
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETLINK
 	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_ACK
@@ -216,7 +217,7 @@ func (nif *NetIf) refresh(nl *netlink.NL) error {
 	}
 	seq := hdr.SEQ
 	for {
-		rsp, data, err := nl.Next()
+		rsp, data, err := nl.Next(ctx)
 		if err != nil {
 			return err
 		} else if rsp.SEQ != seq {

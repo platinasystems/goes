@@ -6,12 +6,17 @@
 
 package netif
 
-import "github.com/platinasystems/goes/v2/pkg/net/netioctl"
+import (
+	"context"
 
-func Down(ifname string) error {
+	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
+)
+
+func Down(ctx context.Context, ifname string) error {
 	return netioctl.Admin(ifname, 0, netioctl.IFF_UP)
 }
 
-func Up(ifname string) error {
-	return netioctl.Admin(ifname, netioctl.IFF_UP|netioctl.IFF_RUNNING, 0)
+func Up(ctx context.Context, ifname string) error {
+	const iff = netioctl.IFF_UP | netioctl.IFF_RUNNING
+	return netioctl.Admin(ifname, iff, 0)
 }

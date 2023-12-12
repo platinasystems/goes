@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -40,7 +41,7 @@ var Cloneable = []string{
 	"vxlan",
 }
 
-func Create(name string, args ...string) (*NetIf, error) {
+func Create(ctx context.Context, name string, args ...string) (*NetIf, error) {
 	var kind string
 	for _, dev := range Cloneable {
 		if strings.HasPrefix(name, dev) {
@@ -56,7 +57,7 @@ func Create(name string, args ...string) (*NetIf, error) {
 	}
 
 	before := make(map[int]*NetIf)
-	nifs, err := List()
+	nifs, err := List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +90,10 @@ func Create(name string, args ...string) (*NetIf, error) {
 	if err = nl.Request(req); err != nil {
 		return nil, egress.Mark(err)
 	}
-	if err = nl.Wait(hdr.SEQ); err != nil {
+	if err = nl.Wait(ctx, hdr.SEQ); err != nil {
 		return nil, egress.Mark(err)
 	}
-	if nifs, err = List(); err != nil {
+	if nifs, err = List(ctx); err != nil {
 		return nil, egress.Mark(err)
 	}
 	for _, nif := range nifs {

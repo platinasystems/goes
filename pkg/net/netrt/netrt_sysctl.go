@@ -46,7 +46,7 @@ func (l *list) Close() error {
 	return nil
 }
 
-func (l *list) Next() (NetRt, error) {
+func (l *list) Next(ctx context.Context) (NetRt, error) {
 	for len(l.data) > sysctl.MsgMin {
 		rtm := PointerRtMsghdr(l.data)
 		if len(l.data) < Sizeof(rtm) {

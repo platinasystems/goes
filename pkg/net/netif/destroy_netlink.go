@@ -7,12 +7,14 @@
 package netif
 
 import (
+	"context"
+
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func (nif *NetIf) Destroy() error {
+func (nif *NetIf) Destroy(ctx context.Context) error {
 	nl, err := netlink.Open()
 	if err != nil {
 		return err
@@ -26,7 +28,7 @@ func (nif *NetIf) Destroy() error {
 	ifinfo.Family = af.UNSPEC
 	ifinfo.Index = int32(nif.Index)
 	if err = nl.Request(msg); err == nil {
-		err = nl.Wait(req.SEQ)
+		err = nl.Wait(ctx, req.SEQ)
 	}
 	return err
 }

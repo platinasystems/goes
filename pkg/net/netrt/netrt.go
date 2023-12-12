@@ -5,6 +5,7 @@
 package netrt
 
 import (
+	"context"
 	"net"
 	"net/netip"
 	"unicode"
@@ -22,7 +23,7 @@ type NetRt interface {
 }
 
 type Streamer interface {
-	Next() (NetRt, error)
+	Next(context.Context) (NetRt, error)
 	Close() error
 }
 

@@ -7,20 +7,26 @@
 package netlink
 
 import (
+	"context"
+
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func Admin(ifname string, with, without iflink.NetDeviceFlag) error {
+func Admin(
+	ctx context.Context,
+	ifname string, with,
+	without iflink.NetDeviceFlag,
+) error {
 	nl, err := Open()
 	if err != nil {
 		return egress.Mark(err)
 	}
 	defer nl.Close()
 
-	ifindex, err := nl.IfIndex(ifname)
+	ifindex, err := nl.IfIndex(ctx, ifname)
 	if err != nil {
 		return egress.Mark(err)
 	}
@@ -34,7 +40,7 @@ func Admin(ifname string, with, without iflink.NetDeviceFlag) error {
 	ifinfo.Flags |= uint32(with)
 	ifinfo.Flags &^= uint32(without)
 	if err = nl.Request(req); err == nil {
-		err = nl.Wait(hdr.SEQ)
+		err = nl.Wait(ctx, hdr.SEQ)
 	}
 	return err
 }

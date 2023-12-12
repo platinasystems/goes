@@ -131,7 +131,7 @@ func TunTap(ctx context.Context, args ...string) error {
 	defer f.Close()
 
 	ifname := f.Name()
-	if err = ttAdmin(ifname, ttUp); err != nil {
+	if err = ttAdmin(ctx, ifname, ttUp); err != nil {
 		return err
 	}
 
@@ -213,11 +213,11 @@ func TunTap(ctx context.Context, args ...string) error {
 	return nil
 }
 
-func ttAdmin(ifname string, up bool) error {
+func ttAdmin(ctx context.Context, ifname string, up bool) error {
 	if up {
-		return netif.Up(ifname)
+		return netif.Up(ctx, ifname)
 	} else {
-		return netif.Down(ifname)
+		return netif.Down(ctx, ifname)
 	}
 }
 

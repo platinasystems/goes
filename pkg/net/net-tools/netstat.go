@@ -140,7 +140,7 @@ func netstatr(ctx context.Context) error {
 	flagbuf := new(strings.Builder)
 	var dsts, gws, flags, ifnames []string
 	for {
-		nrt, err := streamer.Next()
+		nrt, err := streamer.Next(ctx)
 		if err != nil {
 			return err
 		} else if nrt == nil {

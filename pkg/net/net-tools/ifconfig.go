@@ -169,7 +169,7 @@ func Ifconfig(ctx context.Context, args ...string) error {
 	case pat != nil:
 		for _, nif := range netif.Interfaces() {
 			if pat.MatchString(nif.Name) {
-				if err = nif.Config(args[1:]); err != nil {
+				if err = nif.Config(ctx, args[1:]); err != nil {
 					return err
 				}
 			}
@@ -177,7 +177,7 @@ func Ifconfig(ctx context.Context, args ...string) error {
 		return err
 	}
 	if len(args) > 1 && args[1] == "create" {
-		nif, err := netif.Create(args[0], args[2:]...)
+		nif, err := netif.Create(ctx, args[0], args[2:]...)
 		if err == nil {
 			fmt.Fprintln(w, nif.Name)
 		}
@@ -193,16 +193,16 @@ func Ifconfig(ctx context.Context, args ...string) error {
 		return nil
 	}
 	if args[0] == "destroy" {
-		return nif.Destroy()
+		return nif.Destroy(ctx)
 	}
 	if slices.Index(inets, args[0]) >= 0 ||
 		unicode.IsNumber([]rune(args[0])[0]) {
-		return ifconfigAddr(nif, args)
+		return ifconfigAddr(ctx, nif, args)
 	}
-	return nif.Config(args)
+	return nif.Config(ctx, args)
 }
 
-func ifconfigAddr(nif *netif.NetIf, args []string) error {
+func ifconfigAddr(ctx context.Context, nif *netif.NetIf, args []string) error {
 	var (
 		prefix netip.Prefix
 		dest   netip.Addr
@@ -242,14 +242,14 @@ func ifconfigAddr(nif *netif.NetIf, args []string) error {
 	if len(args) > 0 {
 		switch args[0] {
 		case "add", "alias":
-			return nif.Add(prefix, dest, args[1:])
+			return nif.Add(ctx, prefix, dest, args[1:])
 		case "del", "delete", "-alias":
-			return nif.Del(prefix, dest, args[1:])
+			return nif.Del(ctx, prefix, dest, args[1:])
 		case "change":
-			return nif.Change(prefix, dest, args[1:])
+			return nif.Change(ctx, prefix, dest, args[1:])
 		case "replace":
-			return nif.Replace(prefix, dest, args[1:])
+			return nif.Replace(ctx, prefix, dest, args[1:])
 		}
 	}
-	return nif.Add(prefix, dest, args)
+	return nif.Add(ctx, prefix, dest, args)
 }

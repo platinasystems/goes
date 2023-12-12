@@ -6,11 +6,15 @@ package netif
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"net/netip"
+	"os/signal"
 	"sort"
 	"sync"
+
+	"github.com/platinasystems/goes/v2/pkg/os/termination"
 )
 
 type Parameter uint8
@@ -128,7 +132,13 @@ var cache struct {
 
 var validate = sync.OnceFunc(func() {
 	var err error
-	cache.nifs, err = List()
+
+	ctx := context.Background()
+
+	ctx, stop := signal.NotifyContext(ctx, termination.Signals...)
+	defer stop()
+
+	cache.nifs, err = List(ctx)
 	if err != nil {
 		panic(err)
 	}

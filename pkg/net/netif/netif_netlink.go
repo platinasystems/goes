@@ -7,6 +7,7 @@
 package netif
 
 import (
+	"context"
 	"net"
 	"net/netip"
 
@@ -18,24 +19,24 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func List() ([]*NetIf, error) {
+func List(ctx context.Context) ([]*NetIf, error) {
 	nl, err := netlink.Open()
 	if err != nil {
 		return nil, err
 	}
 	defer nl.Close()
-	nifs, err := ifinfos(nl)
+	nifs, err := ifinfos(ctx, nl)
 	indexed := make(map[int]*NetIf)
 	if err == nil {
 		for _, nif := range nifs {
 			indexed[nif.Index] = nif
 		}
-		err = ifaddrs(nl, indexed)
+		err = ifaddrs(ctx, nl, indexed)
 	}
 	return nifs, err
 }
 
-func ifinfos(nl *netlink.NL) ([]*NetIf, error) {
+func ifinfos(ctx context.Context, nl *netlink.NL) ([]*NetIf, error) {
 	var nifs []*NetIf
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETLINK
@@ -47,7 +48,7 @@ func ifinfos(nl *netlink.NL) ([]*NetIf, error) {
 	}
 	seq := hdr.SEQ
 	for {
-		rsp, data, err := nl.Next()
+		rsp, data, err := nl.Next(ctx)
 		if err != nil {
 			return nifs, err
 		} else if rsp.SEQ != seq {
@@ -69,7 +70,11 @@ func ifinfos(nl *netlink.NL) ([]*NetIf, error) {
 	return nifs, nil
 }
 
-func ifaddrs(nl *netlink.NL, indexed map[int]*NetIf) error {
+func ifaddrs(
+	ctx context.Context,
+	nl *netlink.NL,
+	indexed map[int]*NetIf,
+) error {
 	hdr, req := netlink.ExpandMsgHdr(nil)
 	hdr.Type = rtnetlink.RTM_GETADDR
 	hdr.Flags = netlink.NLM_F_REQUEST | netlink.NLM_F_DUMP
@@ -80,7 +85,7 @@ func ifaddrs(nl *netlink.NL, indexed map[int]*NetIf) error {
 	}
 	seq := hdr.SEQ
 	for {
-		rsp, data, err := nl.Next()
+		rsp, data, err := nl.Next(ctx)
 		if err != nil {
 			return err
 		} else if rsp.SEQ != seq {
