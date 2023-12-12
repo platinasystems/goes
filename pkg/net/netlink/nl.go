@@ -8,6 +8,7 @@ package netlink
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"syscall"
@@ -17,6 +18,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"github.com/platinasystems/goes/v2/pkg/syscall/fdset"
 )
 
 const SOL_NETLINK = 270
@@ -118,13 +120,43 @@ func (nl *NL) IfIndex(ctx context.Context, ifname string) (int32, error) {
 	return -1, fmt.Errorf("%q %w", ifname, ErrNotFound)
 }
 
+func IsDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
 // This returns references to the next netlink message header and data that the
 // caller must release before subsequent Next calls.
 func (nl *NL) Next(ctx context.Context) (*MsgHdr, []byte, error) {
+	const peek = syscall.MSG_PEEK | syscall.MSG_TRUNC | syscall.MSG_DONTWAIT
+	const donotwait = syscall.MSG_DONTWAIT
+	fd := int(nl.sock)
 	if len(nl.rem) < NLMSG_HDRLEN {
+		if IsDone(ctx) {
+			return nil, nil, ctx.Err()
+		}
 		for {
-			n, _, err := af.
-				Recvfrom(nl.sock, nl.buf, syscall.MSG_PEEK)
+			var sel fdset.Selection
+			sel.Read.Set(fd)
+			err := sel.Select()
+			if IsDone(ctx) {
+				return nil, nil, ctx.Err()
+			}
+			if err != nil {
+				if errors.Is(err, syscall.EAGAIN) {
+					continue
+				}
+				return nil, nil, egress.Mark(err)
+			}
+			if !sel.Read.IsSet(fd) {
+				continue
+			}
+			// peek to see if we need to expand buffer
+			n, _, err := af.Recvfrom(nl.sock, nl.buf, peek)
 			if err != nil {
 				return nil, nil, egress.Mark(err)
 			}
@@ -136,7 +168,8 @@ func (nl *NL) Next(ctx context.Context) (*MsgHdr, []byte, error) {
 				nl.buf = make([]byte, page.Align(n))
 			}
 		}
-		if n, _, err := af.Recvfrom(nl.sock, nl.buf, 0); err != nil {
+		n, _, err := af.Recvfrom(nl.sock, nl.buf, donotwait)
+		if err != nil {
 			return nil, nil, egress.Mark(err)
 		} else if n < NLMSG_HDRLEN {
 			return nil, nil, egress.Mark(ErrInvalid)
