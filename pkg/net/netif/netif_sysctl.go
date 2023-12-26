@@ -1,8 +1,8 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build !netlink && !linux
+//go:build darwin || freebsd || netbsd || openbsd
 
 package netif
 
@@ -11,10 +11,8 @@ import (
 	"net"
 	"net/netip"
 	"syscall"
-	"time"
 	"unsafe"
 
-	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
@@ -23,12 +21,6 @@ import (
 type IfMsgHdr = syscall.IfMsghdr
 type IfData = syscall.IfData
 type IfaMsgHdr = syscall.IfaMsghdr
-type IfmaMsgHdr = syscall.IfmaMsghdr
-type IfmaMsgHdr2 = syscall.IfmaMsghdr2
-
-type Msgs interface {
-	IfMsgHdr | IfaMsgHdr | IfmaMsgHdr | IfmaMsgHdr2
-}
 
 func Extract[T Msgs](data []byte) (p *T, body, rem []byte) {
 	l := sysctl.MsgLen(data)
@@ -97,7 +89,7 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 		if (im.Flags & int32(syscall.IFF_RUNNING)) != 0 {
 			nif.Flags |= net.FlagRunning
 		}
-		nif.Type = netioctl.IFT(im.Data.Type)
+		nif.Type = int(im.Data.Type)
 		nif.MTU = int(im.Data.Mtu)
 		nif.Rx.Packets = uint64(im.Data.Ipackets)
 		nif.Rx.Bytes = uint64(im.Data.Ibytes)
@@ -107,41 +99,7 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 		nif.Tx.Errors = uint64(im.Data.Oerrors)
 		nif.Collisions = uint64(im.Data.Collisions)
 		nif.Rx.Drops = uint64(im.Data.Iqdrops)
-		if im.Data.Recvquota != 0 {
-			nif.Extra["recvquota"] = im.Data.Recvquota
-		}
-		if im.Data.Xmitquota != 0 {
-			nif.Extra["xmitquota"] = im.Data.Xmitquota
-		}
-		if im.Data.Metric != 0 {
-			nif.Extra["metric"] = im.Data.Metric
-		}
-		if im.Data.Baudrate != 0 {
-			nif.Extra["baudrate"] = im.Data.Baudrate
-		}
-		if im.Data.Imcasts != 0 {
-			nif.Extra["imcasts"] = im.Data.Imcasts
-		}
-		if im.Data.Omcasts != 0 {
-			nif.Extra["omcasts"] = im.Data.Omcasts
-		}
-		if im.Data.Noproto != 0 {
-			nif.Extra["noproto"] = im.Data.Noproto
-		}
-		if im.Data.Recvtiming != 0 {
-			nif.Extra["recvtiming"] = im.Data.Recvtiming
-		}
-		if im.Data.Xmittiming != 0 {
-			nif.Extra["xmittiming"] = im.Data.Xmittiming
-		}
-		if im.Data.Lastchange.Sec != 0 {
-			nif.Extra["lastchange"] = time.Unix(
-				int64(im.Data.Lastchange.Sec),
-				int64(im.Data.Lastchange.Usec)*1000)
-		}
-		if im.Data.Hwassist != 0 {
-			nif.Extra["hwassist"] = im.Data.Hwassist
-		}
+		nif.ExtraIfData(&im.Data)
 		dlhdr, body, _ := sockaddr.ExtractDlHdr(body)
 		nif.Name, nif.HardwareAddr, _ = dlhdr.NAS(body)
 	}

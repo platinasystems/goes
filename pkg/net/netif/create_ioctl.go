@@ -8,7 +8,6 @@ package netif
 
 import (
 	"context"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
@@ -37,7 +36,7 @@ func Create(ctx context.Context, name string, args ...string) (*NetIf, error) {
 		before[nif.Index] = nif
 	}
 	req := netioctl.NewIfReqNothing(name)
-	err = netioctl.Inet(syscall.SIOCIFCREATE2, req)
+	err = netioctl.Inet(SIOCIFCREATE, req)
 	if err != nil {
 		return nil, egress.Mark(err)
 	}

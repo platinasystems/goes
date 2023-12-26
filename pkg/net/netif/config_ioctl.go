@@ -40,12 +40,12 @@ var ConfigFlag = map[string]net.Flags{
 	"down": net.FlagUp,
 }
 
-var ConfigIFF = map[string]netioctl.IFF{
-	"up":     netioctl.IFF_UP,
-	"-arp":   netioctl.IFF_NOARP,
-	"no-arp": netioctl.IFF_NOARP,
-	"down":   netioctl.IFF_UP,
-	"arp":    netioctl.IFF_NOARP,
+var ConfigIFF = map[string]int{
+	"up":     syscall.IFF_UP,
+	"-arp":   syscall.IFF_NOARP,
+	"no-arp": syscall.IFF_NOARP,
+	"down":   syscall.IFF_UP,
+	"arp":    syscall.IFF_NOARP,
 }
 
 var ConfigSIOC = map[string]uintptr{

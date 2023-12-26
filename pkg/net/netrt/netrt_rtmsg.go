@@ -23,7 +23,9 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func Extract[T syscall.RtMsghdr](data []byte) (t *T, body, rem []byte) {
+type RtMsghdr = syscall.RtMsghdr
+
+func Extract[T RtMsghdr](data []byte) (t *T, body, rem []byte) {
 	l := sysctl.MsgLen(data)
 	t = Pointer[T](data)
 	body = data[Sizeof(t):]
@@ -31,19 +33,19 @@ func Extract[T syscall.RtMsghdr](data []byte) (t *T, body, rem []byte) {
 	return
 }
 
-var ExtractRtMsghdr = Extract[syscall.RtMsghdr]
+var ExtractRtMsghdr = Extract[RtMsghdr]
 
-func Pointer[T ~uint16 | syscall.RtMsghdr](data []byte) *T {
+func Pointer[T ~uint16 | RtMsghdr](data []byte) *T {
 	return (*T)(unsafe.Pointer(&data[0]))
 }
 
-var PointerRtMsghdr = Pointer[syscall.RtMsghdr]
+var PointerRtMsghdr = Pointer[RtMsghdr]
 
-func Sizeof[T syscall.RtMsghdr](p *T) int {
+func Sizeof[T RtMsghdr](p *T) int {
 	return int(unsafe.Sizeof(*p))
 }
 
-var SizeofRtMsghdr = Sizeof[syscall.RtMsghdr]
+var SizeofRtMsghdr = Sizeof[RtMsghdr]
 
 type link struct {
 	line uint16

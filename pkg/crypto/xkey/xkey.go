@@ -22,9 +22,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
@@ -43,8 +42,8 @@ var (
 	ErrUnsupported = errors.ErrUnsupported
 )
 
-const GenerateUsageTemplate = `
-usage: {{.}} [<algorithm>]
+const GenerateUsage = `
+usage: {{branch .}} [<algorithm>]
 Generate PEM encoded private signature key to stdout with given or
 default, ed25519 algorithm.
 
@@ -54,12 +53,8 @@ Algorithms
   x25519
   rsa`
 
-func GenerateUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Generate(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Generate(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		if len(args) > 0 {
 			return complete.Last(args, []string{
 				"ecdsa",
@@ -71,11 +66,10 @@ func Generate(ctx context.Context, args ...string) error {
 		}
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(GenerateUsageTemplate[1:],
-			GenerateUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, GenerateUsage)
 	}
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	alg := "ed25519"
 	if len(args) > 0 {
 		alg = args[0]
@@ -109,22 +103,18 @@ func Generate(ctx context.Context, args ...string) error {
 	return pem.Encode(w, blk)
 }
 
-const ShowUsageTemplate = `
-usage: {{.}} [<name>]
+const ShowUsage = `
+usage: {{branch .}} [<name>]
 Print algorithm of the named private key file or stdin.`
 
-func ShowUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Show(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Show(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return complete.Last(args, "*.pem")
 	}
-	if *usage.Help {
-		return usage.Error(ShowUsageTemplate[1:], ShowUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, ShowUsage)
 	}
-	r := ctxparm.Reader.In(ctx)
+	r := goes.ContextStdin(ctx)
 	if len(args) > 0 && args[0] != "-" {
 		if f, err := os.Open(args[0]); err != nil {
 			return err
@@ -137,7 +127,8 @@ func Show(ctx context.Context, args ...string) error {
 	if _, err := priv.ReadFrom(r); err != nil {
 		return err
 	}
-	fmt.Fprintln(ctxparm.Writer.In(ctx), priv)
+	w := goes.ContextStdout(ctx)
+	fmt.Fprintln(w, priv)
 	return nil
 }
 

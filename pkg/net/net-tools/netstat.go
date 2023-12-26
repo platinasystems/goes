@@ -7,44 +7,36 @@ package net_tools
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const NetstatUsageTemplate = `
-usage: {{.Path}} [<option>]...
+const NetstatUsage = `
+usage: {{branch .}} [<option>]...
 Show network status.
 		
-  • {{.Path}} [-AaLlnW] [-f <family> | -p <protocol>]
-  • {{.Path}} [-gilns] [-v] [-f <family>] [-I <interface>]
-  • {{.Path}} -i | -I <interface> [-w <period>] [-c <queue>] [-abdgqRtS]\n",
-  • {{.Path}} -s [-s] [-f <family> | -p <protocol>] [-w <period>]
-  • {{.Path}} -i | -I <interface> -s [-f <family> | -p <protocol>]
-  • {{.Path}} -m [-m]
-  • {{.Path}} -r [-Aaln] [-4|-6]
-  • {{.Path}} -rs [-s]
-  • {{.Path}} -B [-I interface]
-{{.Flag}}`
+  • {{branch .}} [-AaLlnW] [-f <family> | -p <protocol>]
+  • {{branch .}} [-gilns] [-v] [-f <family>] [-I <interface>]
+  • {{branch .}} -i | -I <interface> [-w <period>] [-c <queue>] [-abdgqRtS]
+  • {{branch .}} -s [-s] [-f <family> | -p <protocol>] [-w <period>]
+  • {{branch .}} -i | -I <interface> -s [-f <family> | -p <protocol>]
+  • {{branch .}} -m [-m]
+  • {{branch .}} -r [-Aaln] [-4|-6]
+  • {{branch .}} -rs [-s]
+  • {{branch .}} -B [-I interface]
+{{flags .}}`
 
-func NetstatUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Netstat(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Netstat(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	flags := usage.NewFlags("netstat")
-	ctx = ctxparm.Flags.With(ctx, flags)
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
 	iFlag := flags.Bool("i", false, "Show interface info.")
 	rFlag := flags.Bool("r", false, "Show routing table.")
 	afinet := flags.Bool("4", false, "Address filter.")
@@ -61,13 +53,12 @@ func Netstat(ctx context.Context, args ...string) error {
 	_ = flags.Bool("s", false, "Show per-protocol stats.")
 	_ = flags.Bool("ss", false, "Show per-protocol, non-zero stats.")
 	_ = flags.Duration("w", 0, "Wait interval.")
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(NetstatUsageTemplate[1:],
-			NetstatUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, NetstatUsage)
 	}
 	args = flags.Args()
 	switch {
@@ -82,7 +73,7 @@ func Netstat(ctx context.Context, args ...string) error {
 }
 
 func netstati(ctx context.Context) error {
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	fmt.Fprintf(w, "%-15s", "Name")
 	fmt.Fprintf(w, " %5s", "MTU")
 	fmt.Fprintf(w, " %11s", "Ipkts")
@@ -109,7 +100,8 @@ func netstati(ctx context.Context) error {
 		fmt.Fprintf(w, " %11d", nif.Collisions)
 		fmt.Fprintln(w)
 	}
-	if ifname := ctxparm.SearchFlagsIn[string](ctx, "I"); len(ifname) > 0 {
+	ifname := goes.SearchContextFlags[string](ctx, "I")
+	if len(ifname) > 0 {
 		if nif := netif.Named(ifname); nif == nil {
 			return fmt.Errorf("%q %w", ifname, ErrNotFound)
 		} else {
@@ -129,7 +121,7 @@ func netstati(ctx context.Context) error {
 }
 
 func netstatr(ctx context.Context) error {
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	streamer, err := netrt.NewList(ctx)
 	if err != nil {
 		return err
@@ -182,9 +174,10 @@ func netstatr(ctx context.Context) error {
 		} else {
 			fmt.Fprint(gwbuf, "line#", line)
 		}
-		for _, fc := range netrt.NetstatFlagCodes {
-			if nrt.Flags()&fc.Flag != 0 {
-				flagbuf.WriteRune(fc.Code)
+		rtf := nrt.Flags()
+		for i, c := range RtfMark {
+			if (rtf & (1 << i)) != 0 {
+				flagbuf.WriteRune(c)
 			}
 		}
 		dsts = append(dsts, dstbuf.String())

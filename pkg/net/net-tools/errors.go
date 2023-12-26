@@ -10,9 +10,13 @@ import (
 )
 
 var (
+	ErrNoDst       = errors.New("missing <destination>")
+	ErrNoGW        = errors.New("missing <gateway>")
+	ErrNoMask      = errors.New("missing <mask> or prefixlen")
 	ErrIncomplete  = errors.New("incomplete")
 	ErrInvalid     = fs.ErrInvalid
 	ErrNotFound    = errors.New("not found")
 	ErrUnsupported = errors.ErrUnsupported
 	ErrWrongFamily = errors.New("wrong family")
+	FIXME          = errors.New("FIXME")
 )

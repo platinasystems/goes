@@ -11,9 +11,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
 var reg struct {
@@ -21,12 +21,12 @@ var reg struct {
 	x *xcert.X509
 }
 
-func regAdmin(ctx context.Context, args ...string) error {
+func regAdmin(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return egress.Mark(ErrIncomplete)
 	}
-	path := ctxparm.Strings.In(ctx)
-	approve := path[len(path)-1] == "approve"
+	branch := goes.ContextBranch(ctx)
+	approve := branch[len(branch)-1] == "approve"
 	reg.Lock()
 	defer reg.Unlock()
 	for cur, prev := reg.x, reg.x; cur != nil; cur = cur.Next {
@@ -47,10 +47,10 @@ func regAdmin(ctx context.Context, args ...string) error {
 	return fmt.Errorf("%q: %w", args[0], ErrNotFound)
 }
 
-func regShow(ctx context.Context, args ...string) error {
+func regShow(ctx context.Context, args []string) error {
 	reg.RLock()
 	defer reg.RUnlock()
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	reg.x.Range(func(x *xcert.X509) bool {
 		fmt.Fprint(w, x.SKI(), ": ", x.Certificate.DNSNames, "\n")
 		return true
@@ -59,10 +59,10 @@ func regShow(ctx context.Context, args ...string) error {
 }
 
 // Register PEM decoded input.
-func regSubscribe(ctx context.Context, args ...string) error {
+func regSubscribe(ctx context.Context, args []string) error {
 	var data []byte
 
-	r := ctxparm.Reader.In(ctx)
+	r := goes.ContextStdin(ctx)
 	if len(args) == 0 {
 		return egress.Mark(ErrIncomplete)
 	}
@@ -92,6 +92,6 @@ func regSubscribe(ctx context.Context, args ...string) error {
 	if err != nil {
 		return egress.Mark(err)
 	}
-	_, err = ctxparm.Writer.In(ctx).Write(self)
+	_, err = goes.ContextStdout(ctx).Write(self)
 	return egress.Mark(err)
 }

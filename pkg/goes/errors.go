@@ -4,13 +4,11 @@
 
 package goes
 
-import (
-	"errors"
-	"strings"
-)
+import "errors"
 
 var (
 	FIXME         = errors.New("FIXME")
+	ErrDisabled   = errors.New("disabled")
 	ErrEmpty      = errors.New("empty selection")
 	ErrIncomplete = errors.New("incomplete")
 	ErrNoRoom     = errors.New("no room")
@@ -18,25 +16,3 @@ var (
 	ErrRange      = errors.New("out of range")
 	ErrUnexpected = errors.New("unexpected")
 )
-
-type GoesError struct {
-	Path []string
-	Err  error
-}
-
-func IsGoesError(err error) bool {
-	_, ok := err.(GoesError)
-	return ok
-}
-
-func (e GoesError) Error() string {
-	s := strings.Join(e.Path, ":") + ":"
-	eee := e.Err.Error()
-	if strings.IndexRune(eee, ':') < 0 {
-		s += " "
-	}
-	s += eee
-	return s
-}
-
-func (e GoesError) Unwrap() error { return e.Err }

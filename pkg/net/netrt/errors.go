@@ -7,7 +7,6 @@ package netrt
 import "errors"
 
 var (
-	ErrNoDst     = errors.New("missing destination <addr|prefix>")
 	ErrSRCH      = errors.New("not in table")
 	ErrBUSY      = errors.New("entry in use")
 	ErrNOBUFS    = errors.New("not enough memory")

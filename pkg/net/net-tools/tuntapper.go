@@ -6,14 +6,13 @@ package net_tools
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/netip"
-	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
@@ -23,21 +22,14 @@ import (
 
 var HdrDump = func(...any) {}
 
-const TunTapperUsageTemplate = `
-usage: {{.Path}} [<option>]... [<addr> <dest> [up]]
+const TunTapperUsage = `
+usage: {{branch .}} [<option>]... [<addr> <dest> [up]]
 Create a tun/tap device then log received packets/frames.
-{{.Flag}}`
+{{flags .}}`
 
-func TunTapperUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func TunTapper(ctx context.Context, args ...string) error {
-	flags := usage.NewFlags("tuntapper")
-	ctx = ctxparm.Flags.With(ctx, flags)
+func TunTapper(ctx context.Context, args []string) error {
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
 	unit := flags.Uint("u", 0, "Unit number suffix.")
 	ha := netif.NewHardwareAddr()
 	var isTap bool
@@ -60,18 +52,17 @@ func TunTapper(ctx context.Context, args ...string) error {
 	if tuntap.CanChangeGroup {
 		flags.IntVar(&group, "group", group, "unset w/ -1")
 	}
-	if *complete.Help {
+	if goes.ContextComplete(ctx) {
 		return complete.Last(args, flags)
 	}
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
-		return egress.Mark(err)
+		return err
+	}
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, TunTapperUsage)
 	}
 	args = flags.Args()
-	if *usage.Help {
-		return usage.Error(TunTapperUsageTemplate[1:],
-			TunTapperUsageData(ctx))
-	}
 
 	f, err := tuntap.New(*unit, isTap, persist, owner, group, ha)
 	if err != nil {

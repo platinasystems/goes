@@ -6,35 +6,30 @@ package tlsx
 
 import (
 	"context"
-	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
-const IPCUsageTemplate = `
-usage: {{.}} [-i <file>|-] [<args>]
+const IPCUsage = `
+usage: {{branch .}} [-i <file>|-] [<args>]
 Daemon IPC.`
 
-func IPCUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func IPC(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func IPC(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(IPCUsageTemplate[1:], IPCUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, IPCUsage)
 	}
-	path := ctxparm.Strings.In(ctx)
-	ipc := struct{ path, args []string }{
-		path: append(path[:1], "exec"),
-		args: make([]string, 0, len(path)+len(args)),
+	self := Self()
+	if self == nil {
+		return ErrNotFound
 	}
-	ipc.args = append(ipc.args, Self().DNS0())
-	ipc.args = append(ipc.args, path[1:]...)
-	ipc.args = append(ipc.args, args...)
-	return Rexec(ctx, ipc.args...)
+	branch := goes.ContextBranch(ctx)
+	ctx = goes.BranchContext(ctx, append(branch[:1], "ipc"))
+	ipc := make([]string, 0, len(branch)+len(args))
+	ipc = append(ipc, self.DNS0())
+	ipc = append(ipc, branch[1:]...)
+	ipc = append(ipc, args...)
+	return Rexec(ctx, ipc)
 }

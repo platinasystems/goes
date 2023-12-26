@@ -1,0 +1,2 @@
+exceeded-transmit-hop-limit
+exceeded-fragment-reassembly

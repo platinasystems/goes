@@ -12,6 +12,7 @@ import (
 	"net"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
@@ -59,7 +60,7 @@ var ConfigParameter = map[string]Parameter{
 	"state":        StateParameter,
 }
 
-var ConfigFlag = map[string]iflink.NetDeviceFlag{
+var ConfigFlag = map[string]uint{
 	"up":     iflink.IFF_UP,
 	"-arp":   iflink.IFF_NOARP,
 	"no-arp": iflink.IFF_NOARP,
@@ -67,7 +68,7 @@ var ConfigFlag = map[string]iflink.NetDeviceFlag{
 	"arp":    iflink.IFF_NOARP,
 }
 
-var ConfigAttr = map[string]iflink.Ifla{
+var ConfigAttr = map[string]uint{
 	"carrier":      iflink.IFLA_CARRIER,
 	"protodown":    iflink.IFLA_PROTO_DOWN,
 	"-protodown":   iflink.IFLA_PROTO_DOWN,
@@ -110,18 +111,18 @@ func (nif *NetIf) Config(ctx context.Context, args []string) error {
 	ifinfo.Flags = uint32(nif.Flags)
 
 	for len(args) > 0 {
-		change := uint32(ConfigFlag[args[0]])
+		change := ConfigFlag[args[0]]
 		ifla := ConfigAttr[args[0]]
 		switch parameter := ConfigParameter[args[0]]; parameter {
 		case UnknownParameter:
 			return egress.Markf("%q %w", args[0], ErrInvalid)
 		case TrueFlagParameter:
-			ifinfo.Change |= change
-			ifinfo.Flags |= change
+			integer.Set(&ifinfo.Change, change)
+			integer.Set(&ifinfo.Flags, change)
 			args = args[1:]
 		case FalseFlagParameter:
-			ifinfo.Change |= change
-			ifinfo.Flags &^= change
+			integer.Set(&ifinfo.Change, change)
+			integer.Reset(&ifinfo.Flags, change)
 			args = args[1:]
 		case TrueAttrParameter:
 			msg = netlink.CatAttr(msg, ifla, uint8(1))
@@ -176,8 +177,8 @@ func (nif *NetIf) Config(ctx context.Context, args []string) error {
 				return egress.Markf("%q %w",
 					args[0], ErrIncomplete)
 			}
-			mode, ok := iflink.ModeByName[args[1]]
-			if !ok {
+			mode := iflink.IfLinkModeByName(args[1])
+			if mode == iflink.INVALID_IF_LINK_MODE {
 				return egress.Markf("%q %w",
 					args[1], ErrInvalid)
 			}
@@ -188,8 +189,8 @@ func (nif *NetIf) Config(ctx context.Context, args []string) error {
 				return egress.Markf("%q %w",
 					args[0], ErrIncomplete)
 			}
-			op, ok := iflink.OperByName[args[1]]
-			if !ok {
+			op := iflink.IfOperByName(args[1])
+			if op == iflink.INVALID_IF_OPER {
 				return egress.Markf("%q %w",
 					args[1], ErrInvalid)
 			}

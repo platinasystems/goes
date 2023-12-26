@@ -9,18 +9,10 @@ package netrt
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net"
-	"net/netip"
-	"strings"
 	"sync/atomic"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/net/netif"
-	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
-	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
@@ -29,71 +21,43 @@ type appendAddrFunc func(context.Context, []byte) ([]byte, error)
 
 var seq atomic.Int32
 
-func Add(ctx context.Context) error {
-	_, err := rtreq(ctx, syscall.RTM_ADD)
-	return err
-}
-
-func Change(ctx context.Context) error {
-	_, err := rtreq(ctx, syscall.RTM_CHANGE)
-	return err
-}
-
-func Delete(ctx context.Context) error {
-	_, err := rtreq(ctx, syscall.RTM_DELETE)
-	return err
-}
-
 func Flush(ctx context.Context) error {
 	return FIXME
-}
-
-func Get(ctx context.Context) (NetRt, error) {
-	nrt, err := rtreq(ctx, syscall.RTM_GET)
-	return nrt, err
 }
 
 func Monitor(ctx context.Context) (Streamer, error) {
 	return nil, FIXME
 }
 
-func rtreq(ctx context.Context, cmd uint8) (NetRt, error) {
-	var err error
+func NewRtMsg() []byte {
 	msg := page.New()
-	rtm := Pointer[syscall.RtMsghdr](msg)
+	rtm := PointerRtMsghdr(msg)
 	msg = msg[:Sizeof(rtm)]
-	rtm.Type = cmd
+	// rtm.Type = rtmt
 	rtm.Version = syscall.RTM_VERSION
 	rtm.Seq = seq.Add(1)
-	setRtmFlags(ctx, cmd, rtm)
-	for _, f := range []appendAddrFunc{
-		appendDstGatewayNetmask,
-		appendGenmask,
-		appendIfp,
-		appendIfa,
-		appendAuthor,
-		appendBrd,
-	} {
-		if msg, err = f(ctx, msg); err != nil {
-			return nil, err
-		}
-	}
-	rtm = PointerRtMsghdr(msg)
+	return msg
+}
+
+func Request(msg []byte, fib int) (NetRt, error) {
+	rtm := PointerRtMsghdr(msg)
 	rtm.Msglen = uint16(len(msg))
 	sock, err := af.OpenRoute()
 	if err != nil {
 		return nil, egress.Mark(err)
 	}
 	defer af.Close(sock)
-	/* FIXME darwin doesn't have SO_SETFIB
-	if fib := ctxparm.SearchFlagsIn[int](ctx, "F"); fib >= 0 {
-		if err = os.NewSyscallError("SO_SETFIB", syscall.
-			SetsockoptInt(int(sock), syscall.SOL_SOCKET,
-				syscall.SO_SETFIB, fib)); err != nil {
+	if fib >= 0 {
+		err = FIXME
+		// FIXME darwin doesn't have SO_SETFIB so contrain like this
+		// err = sock.SetFib(fib)
+		// err = os.NewSyscallError("SO_SETFIB", syscall.
+		// 	SetsockoptInt(int(sock), syscall.SOL_SOCKET,
+		// 		syscall.SO_SETFIB, fib))
+		if err != nil {
 			return nil, err
 		}
 	}
-	*/
 	if _, err = af.Write(sock, msg); err != nil {
 		switch {
 		case errors.Is(err, syscall.ESRCH):
@@ -109,7 +73,7 @@ func rtreq(ctx context.Context, cmd uint8) (NetRt, error) {
 		default:
 			return nil, egress.Markf("%w\n%#v", err, rtm)
 		}
-	} else if cmd != syscall.RTM_GET {
+	} else if rtm.Type != syscall.RTM_GET {
 		return nil, nil
 	}
 	msg = msg[:cap(msg)]
@@ -120,179 +84,11 @@ func rtreq(ctx context.Context, cmd uint8) (NetRt, error) {
 	return newNetRt(msg[:n]), nil
 }
 
+/*FIXME
 func rtrmx[T int32 | uint32](rmx *T, inits *uint32, v uint, rtv uint32) {
 	if v > 0 {
 		*(rmx) = T(v)
 		*(inits) |= rtv
 	}
 }
-
-func appendDstGatewayNetmask(ctx context.Context, msg []byte) ([]byte, error) {
-	var (
-		err   error
-		ok    bool
-		addrs []net.IPAddr
-		addr  netip.Addr
-		mask  net.IPMask
-	)
-	bits := -1
-	args := ctxparm.Flags.In(ctx).Args()
-	s := ctxparm.SearchFlagsIn[string](ctx, "dst")
-	if len(s) == 0 {
-		if len(args) == 0 {
-			return msg, ErrNoDst
-		}
-		s = args[0]
-	}
-	if slash := strings.Index(s, "/"); slash > 0 {
-		if _, err = fmt.Sscan(s[slash+1:], &bits); err != nil {
-			return msg, egress.Markf("%q %w", s[slash+1:], err)
-		}
-		s = s[:slash]
-	}
-	if s == "default" {
-		if ctxparm.SearchFlagsIn[bool](ctx, "6") {
-			addr = netip.IPv6Unspecified()
-		} else {
-			addr = netip.IPv4Unspecified()
-		}
-	} else if s == "::" {
-		addr = netip.IPv6Unspecified()
-	} else if isnumeric(s) {
-		if addr, err = netip.ParseAddr(s); err != nil {
-			return msg, egress.Markf("%q %w", s, err)
-		}
-	} else if addrs, err = net.DefaultResolver.
-		LookupIPAddr(ctx, s); err != nil {
-		return msg, egress.Markf("%q %w", s, err)
-	} else if addr, ok = netip.AddrFromSlice(addrs[0].IP); !ok {
-		return msg, egress.Markf("%v invalid", addrs[0].IP)
-	}
-	if bits < 0 {
-	} else if addr.Is6() {
-		mask = net.CIDRMask(bits, 128)
-	} else {
-		mask = net.CIDRMask(bits, 32)
-	}
-	msg = sockaddr.Append(msg, addr)
-	PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_DST
-
-	if s = ctxparm.SearchFlagsIn[string](ctx, "gateway"); len(s) == 0 {
-		if len(args) > 1 {
-			s = args[1]
-		}
-	}
-	if len(s) > 0 {
-		if ctxparm.SearchFlagsIn[bool](ctx, "interface") {
-			nif := netif.Named(s)
-			if nif == nil {
-				return msg, egress.Markf("%q not found", s)
-			}
-			msg = sockaddr.AppendDl(msg,
-				uint16(nif.Index),
-				uint8(nif.Type.(netioctl.IFT)),
-				nif.Name,
-				nif.HardwareAddr,
-				[]byte{})
-			PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_GATEWAY
-		} else if isnumeric(s) {
-			if addr, err = netip.ParseAddr(s); err != nil {
-				return msg, egress.Markf("%q %w", s, err)
-			}
-			msg = sockaddr.Append(msg, addr)
-			PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_GATEWAY
-		} else if addrs, err := net.DefaultResolver.
-			LookupIPAddr(ctx, s); err != nil {
-			return msg, egress.Markf("%q %w", s, err)
-		} else if addr, ok = netip.AddrFromSlice(addrs[0].IP); !ok {
-			return msg, egress.Markf("%v invalid", addrs[0].IP)
-		} else {
-			msg = sockaddr.Append(msg, addr)
-			PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_GATEWAY
-		}
-	}
-
-	if len(mask) == 0 {
-		if addr.Is6() {
-			bits = ctxparm.SearchFlagsIn[int](ctx, "prefixlen")
-			if bits >= 0 {
-				mask = net.CIDRMask(int(bits), 128)
-			}
-		} else {
-			s = ctxparm.SearchFlagsIn[string](ctx, "mask")
-			if len(s) == 0 && len(args) > 2 {
-				s = args[2]
-			}
-			if len(s) > 0 {
-				if addr, err = netip.ParseAddr(s); err != nil {
-					return msg, egress.Markf("%q %w", s, err)
-				}
-				mask = net.IPMask(addr.AsSlice())
-			}
-		}
-	}
-	if len(mask) > 0 {
-		if addr, ok = netip.AddrFromSlice(mask); ok {
-			msg = sockaddr.Append(msg, addr)
-			PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_NETMASK
-		}
-	}
-	return msg, nil
-}
-
-func appendGenmask(ctx context.Context, msg []byte) ([]byte, error) {
-	s := ctxparm.SearchFlagsIn[string](ctx, "genmask")
-	if len(s) == 0 {
-		return msg, nil
-	}
-	addr, err := netip.ParseAddr(s)
-	if err != nil {
-		return msg, egress.Markf("%q %w", s, err)
-	}
-	msg = sockaddr.Append(msg, addr)
-	PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_GENMASK
-	return msg, nil
-}
-
-func appendIfp(ctx context.Context, msg []byte) ([]byte, error) {
-	s := ctxparm.SearchFlagsIn[string](ctx, "ifp")
-	if len(s) == 0 {
-		return msg, nil
-	}
-	nif := netif.Named(s)
-	if nif == nil {
-		return msg, egress.Markf("%q not found", s)
-	}
-	msg = sockaddr.AppendDl(msg,
-		uint16(nif.Index),
-		uint8(nif.Type.(netioctl.IFT)),
-		nif.Name,
-		nif.HardwareAddr,
-		[]byte{})
-	PointerRtMsghdr(msg).Addrs |= 1 << syscall.RTAX_IFP
-	return msg, nil
-}
-
-func appendIfa(ctx context.Context, msg []byte) ([]byte, error) {
-	s := ctxparm.SearchFlagsIn[string](ctx, "ifa")
-	if len(s) == 0 {
-		return msg, nil
-	}
-	// FIXME
-	return msg, nil
-}
-
-func appendAuthor(ctx context.Context, msg []byte) ([]byte, error) {
-	s := ctxparm.SearchFlagsIn[string](ctx, "author")
-	if len(s) == 0 {
-		return msg, nil
-	}
-	// FIXME
-	// redirect ?
-	return msg, nil
-}
-
-func appendBrd(ctx context.Context, msg []byte) ([]byte, error) {
-	// broadcast || point-to-point peer
-	return msg, nil
-}
+*/

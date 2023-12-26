@@ -10,7 +10,7 @@ import (
 	"context"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
@@ -19,9 +19,9 @@ type list struct{ data []byte }
 
 func NewList(ctx context.Context) (Streamer, error) {
 	var family int32
-	if ctxparm.SearchFlagsIn[bool](ctx, "4") {
+	if goes.SearchContextFlags[bool](ctx, "4") {
 		family = af.INET
-	} else if ctxparm.SearchFlagsIn[bool](ctx, "6") {
+	} else if goes.SearchContextFlags[bool](ctx, "6") {
 		family = af.INET6
 	} else {
 		family = af.UNSPEC

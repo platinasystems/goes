@@ -6,34 +6,25 @@ package coreutils
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/user"
-	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
-const IdUsageTemplate = `
-usage: {{.Path}} [<options>] [<user>],
+const IdUsage = `
+usage: {{branch .}} [<options>] [<user>],
 Print user identity.
-{{.Flag}}`
+{{flags .}}`
 
-func IdUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Id(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Id(ctx context.Context, args []string) error {
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	flags := usage.NewFlags("id")
-	ctx = ctxparm.Flags.With(ctx, flags)
 	Aflag := flags.Bool("A", false, "Print user process audit.")
 	Gflag := flags.Bool("G", false, "Print group IDs.")
 	Mflag := flags.Bool("M", false, "Print process MAC label.")
@@ -42,18 +33,19 @@ func Id(ctx context.Context, args ...string) error {
 	gflag := flags.Bool("g", false, "Print effective group ID.")
 	pflag := flags.Bool("p", false, "Print human readable output.")
 	uflag := flags.Bool("u", false, "Print effective user ID.")
-	nflag := flags.Bool("n", false, "Print user or group name instead of number.")
+	nflag := flags.Bool("n", false,
+		"Print user or group name instead of number.")
 	rflag := flags.Bool("r", false,
 		"Print real instead of effective group or user ID.")
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(IdUsageTemplate[1:], IdUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, IdUsage)
 	}
 	args = flags.Args()
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	var u *user.User
 	if len(args) == 0 {
 		if u, err = user.Current(); err != nil {

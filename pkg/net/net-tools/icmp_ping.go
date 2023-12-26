@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"unicode"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-func ICMPPing(ctx context.Context, args ...string) error {
-	w := ctxparm.Writer.In(ctx)
+func ICMPPing(ctx context.Context, args []string) error {
+	w := goes.ContextStdout(ctx)
 	host := "127.0.0.1"
 	if len(args) > 0 {
 		host = args[0]

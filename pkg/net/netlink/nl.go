@@ -106,12 +106,12 @@ func (nl *NL) IfIndex(ctx context.Context, ifname string) (int32, error) {
 		ifindex := int32(-1)
 		for HasAttr(data) {
 			t, v, datá := ExtractAttr(data)
-			data = datá
-			if iflink.Ifla(t) == iflink.IFLA_IFNAME {
+			if t == iflink.IFLA_IFNAME {
 				if CloneString(v) == ifname {
 					ifindex = ifinfo.Index
 				}
 			}
+			data = datá
 		}
 		if ifindex > 0 {
 			return ifindex, nil

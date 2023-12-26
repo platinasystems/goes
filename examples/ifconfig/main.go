@@ -6,6 +6,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
@@ -13,5 +14,5 @@ import (
 )
 
 func main() {
-	goes.Exec(net_tools.Ifconfig, os.Args[1:]...)
+	goes.Exec(context.Background(), net_tools.Ifconfig, os.Args[1:])
 }

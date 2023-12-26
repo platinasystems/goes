@@ -10,44 +10,28 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
 const WWWEchoPort = 8080
 
-const WWWEchoUsageTemplate = `
-usage: {{.Path}} [<address>:<port>]
-Echo paths of http request.
-
-The default is <:{{.Port}}}>.`
-
-func WWWEchoUsageData(path []string) any {
-	return struct {
-		Path string
-		Port int
-	}{
-		Path: strings.Join(path, ""),
-		Port: WWWEchoPort,
-	}
-}
-
-func WWWEcho(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func WWWEcho(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		path := ctxparm.Strings.In(ctx)
-		if len(path) > 1 && path[1] == "daemon" {
-			path[1] = "start"
+	if goes.ContextHelp(ctx) {
+		branch := goes.ContextBranch(ctx)
+		if len(branch) > 1 && branch[1] == "daemon" {
+			branch[1] = "start"
 		}
-		return usage.Error(WWWEchoUsageTemplate[1:],
-			WWWEchoUsageData(path))
+		return goes.Usage(ctx, `
+usage: {{branch .}} [<address>:<port>]
+Echo paths of http request.
+
+The default is <:8080>.`)
 	}
 
 	a := fmt.Sprint(":", WWWEchoPort)
@@ -65,7 +49,7 @@ func WWWEcho(ctx context.Context, args ...string) error {
 	wg.Add(1)
 	go wwwEchoShutdown(cctx, &wg, srv)
 
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	fmt.Fprintln(w, "start", a, "service")
 	err := srv.ListenAndServe()
 	cancel()
@@ -77,8 +61,13 @@ func WWWEcho(ctx context.Context, args ...string) error {
 	return err
 }
 
-const WWWPingUsageTemplate = `
-usage: {{.Path}} [<host>]
+func WWWPing(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
+		return nil
+	}
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, `
+usage: {{branch .}} [<host>]
 Ping echo host.
 
 <host>
@@ -86,18 +75,9 @@ Ping echo host.
   <ip4>:<port>
   <name>:<port>
 
-The default host is 127.0.0.1:{{.Port}}.`
-
-func WWWPing(ctx context.Context, args ...string) error {
-	if *complete.Help {
-		return nil
+The default host is 127.0.0.1:8080.`)
 	}
-	if *usage.Help {
-		path := ctxparm.Strings.In(ctx)
-		return usage.Error(WWWPingUsageTemplate[1:],
-			WWWEchoUsageData(path))
-	}
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	url := fmt.Sprint("http://127.0.0.1:", WWWEchoPort, "/hello")
 	if len(args) > 0 {
 		url = fmt.Sprint("http://", args[0], "/hello")
@@ -119,7 +99,7 @@ func wwwEchoShutdown(
 ) {
 	const timeout = 10 * time.Second
 	defer wg.Done()
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	<-ctx.Done()
 	fmt.Fprintln(w, "done")
 	cctx, cancel := context.

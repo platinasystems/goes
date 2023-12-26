@@ -8,21 +8,19 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
-	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
 const (
@@ -46,34 +44,26 @@ var exchange = struct {
 	reservation: make(map[Confirmation]*Member),
 }
 
-const ExchangeUsageTemplate = `
-usage: {{.Path}} [-r] [-a <address>]
+const ExchangeUsage = `
+usage: {{branch .}} [-r] [-a <address>]
 Start exchange at <address> (default :8003).
-{{.Flag}}`
+{{flags .}}`
 
-func ExchangeUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		strings.Join(ctxparm.Strings.In(ctx), " "),
-		ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Exchange(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Exchange(ctx context.Context, args []string) error {
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	flags := usage.NewFlags("exchange")
-	ctx = ctxparm.Flags.With(ctx, flags)
 	tcp := flags.String("tcp", ":8003", "service address")
 	udp := flags.String("udp", ":8003", "packet service (disable if empty)")
 	flags.BoolVar(&Restricted, "r", false, "restrict clients to self")
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(ExchangeUsageTemplate[1:],
-			ExchangeUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, ExchangeUsage)
 	}
 	args = flags.Args()
 	if len(args) == 0 {
@@ -104,20 +94,21 @@ func Exchange(ctx context.Context, args ...string) error {
 	return nil
 }
 
-const JoinUsageTemplate = `
-usage: {{.}} <confirmation>
+const JoinUsage = `
+usage: {{branch .}} <confirmation>
 Join exchange with reserve confirmation number.`
 
-func JoinUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Join(ctx context.Context, conn net.Conn, args ...string) error {
-	if *complete.Help {
+func Join(
+	ctx context.Context,
+	conn net.Conn,
+	enc lv.Encoding,
+	args []string,
+) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(JoinUsageTemplate[1:], JoinUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, JoinUsage)
 	}
 	if len(args) < 1 {
 		return ErrIncomplete
@@ -135,7 +126,7 @@ func Join(ctx context.Context, conn net.Conn, args ...string) error {
 	}
 
 	// BREAK to ack join before starting PDU exchange protocol.
-	ctxparm.Writer.In(ctx).(lv.Encoding).Encode(nil)
+	enc.Encode(nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -145,21 +136,16 @@ func Join(ctx context.Context, conn net.Conn, args ...string) error {
 	return nil
 }
 
-const ReserveUsageTemplate = `
-usage: {{.}} <name-or-subject-key-id>
+const ReserveUsage = `
+usage: {{branch .}} <name-or-subject-key-id>
 Reserve exchange membership.`
 
-func ReserveUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Reserve(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Reserve(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(ReserveUsageTemplate[1:],
-			ReserveUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, ReserveUsage)
 	}
 	if len(args) < 1 {
 		return ErrIncomplete
@@ -169,7 +155,7 @@ func Reserve(ctx context.Context, args ...string) error {
 	if i < 0 {
 		return ErrNotFound
 	}
-	req, err := io.ReadAll(ctxparm.Reader.In(ctx))
+	req, err := io.ReadAll(goes.ContextStdin(ctx))
 	if err != nil {
 		return egress.Mark(err)
 	}
@@ -177,25 +163,20 @@ func Reserve(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	_, err = ctxparm.Writer.In(ctx).Write(rsp)
+	_, err = goes.ContextStdout(ctx).Write(rsp)
 	return egress.Mark(err)
 }
 
-const WhoIsUsageTemplate = `
-usage: {{.}} <id>
+const WhoIsUsage = `
+usage: {{branch .}} <id>
 Returns the PEM encoded data containing the public key and nonce of member.`
 
-func WhoIsUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func WhoIs(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func WhoIs(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(WhoIsUsageTemplate[1:],
-			WhoIsUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, WhoIsUsage)
 	}
 	if len(args) < 1 {
 		return ErrIncomplete
@@ -205,7 +186,7 @@ func WhoIs(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	if m := xwhois(id); m == nil {
 		return egress.Mark(ErrNotFound)
 	} else if _, err = w.Write(m.PublicKeyData); err != nil {

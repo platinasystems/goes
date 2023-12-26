@@ -6,8 +6,8 @@ package main
 
 import (
 	_ "embed"
+	"maps"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/coreutils"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
@@ -22,29 +22,23 @@ var license []byte
 //go:embed PATENTS
 var patents []byte
 
-var daemons = map[string]any{
-	"tlsx": tlsx.Daemons,
-}
-
-var root = map[string]any{
-	"daemon": daemons,
-	"generate": map[string]any{
-		"certificate": xcert.Generate,
-		"key":         xkey.Generate,
-	},
-	"show": map[string]any{
+func main() {
+	maps.Copy(goes.Root, coreutils.Root)
+	maps.Copy(goes.Root, net_tools.Root)
+	maps.Copy(goes.Root, map[string]any{
+		"generate": map[string]any{
+			"certificate": xcert.Generate,
+			"key":         xkey.Generate,
+		},
+	})
+	maps.Copy(goes.Daemons, net_tools.Daemons)
+	maps.Copy(goes.Daemons, tlsx.Daemons)
+	maps.Copy(goes.Show, map[string]any{
 		"certificate": xcert.Show,
 		"key":         xkey.Show,
-		"tlsx":        tlsx.Show,
 		"license":     license,
 		"patents":     patents,
-	},
-}
-
-func main() {
-	goes.Merge(root, coreutils.Root)
-	goes.Merge(root, net_tools.Root)
-	goes.Merge(daemons, net_tools.Daemons)
-	ctxparm.Map.Default = root
+		"tlsx":        tlsx.Show,
+	})
 	goes.Main()
 }

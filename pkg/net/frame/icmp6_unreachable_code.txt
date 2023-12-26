@@ -1,0 +1,8 @@
+noroute-to-destination
+communication-administratively-prohibited
+beyond-scopeof-source-address
+address-unreachable
+port-unreachable
+source-address-failed-ingress-or-egress-policy
+reject-route-to-destination
+error-in-source-routing-header

@@ -8,7 +8,6 @@ import (
 	"context"
 	"net"
 	"net/netip"
-	"unicode"
 )
 
 type NetRt interface {
@@ -25,11 +24,6 @@ type NetRt interface {
 type Streamer interface {
 	Next(context.Context) (NetRt, error)
 	Close() error
-}
-
-type NetstatFlagCode struct {
-	Flag uint
-	Code rune
 }
 
 func FirstNonNil(args ...any) any {
@@ -51,9 +45,4 @@ func FirstNonZero[T comparable](args ...T) T {
 		}
 	}
 	return zero
-}
-
-func isnumeric(s string) bool {
-	r := []rune(s)[0]
-	return unicode.IsNumber(r) || r == ':'
 }

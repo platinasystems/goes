@@ -5,6 +5,7 @@
 package tlsx
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
@@ -12,8 +13,14 @@ import (
 
 var Subscribers = sync.
 	OnceValue(xcert.NameX509File(SubscribersFileName).Load)
+var SubscribersNames = sync.OnceValue(func() string {
+	return strings.Join(Subscribers().Names(), "\n")
+})
 var Subscriptions = sync.
 	OnceValue(xcert.NameX509File(SubscriptionsFileName).Load)
+var SubscriptionsNames = sync.OnceValue(func() string {
+	return strings.Join(Subscriptions().Names(), "\n")
+})
 
 func Match(nameOrSKI string) (x *xcert.X509) {
 	if self := Self(); self.IsMatch(nameOrSKI) {

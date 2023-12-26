@@ -11,9 +11,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
@@ -77,6 +77,22 @@ func Routine(
 	}
 }
 
+func pipeIn(ctx context.Context, wg *sync.WaitGroup, r io.Reader) (
+	context.Context, error,
+) {
+	rPipe, wPipe, err := os.Pipe()
+	if err != nil {
+		return ctx, err
+	}
+	ctx = goes.StdinContext(ctx, rPipe)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(wPipe, r)
+	}()
+	return ctx, nil
+}
+
 // Service connections by parsing TLV request arguements and input upto the
 // zero length Break; then calls the selected function with a reader that LV
 // decodes any input; a writer with LV data encoding to connection; and the
@@ -89,6 +105,17 @@ func service(ctx context.Context, wg *sync.WaitGroup, conn net.Conn) {
 	ra := conn.RemoteAddr().String()
 	dec := lv.NewDecoder(poll.WithReader(ctx, conn))
 	enc := lv.NewEncoder(write.With(ctx, conn))
+	rEncPipe, wEncPipe, err := os.Pipe()
+	if err != nil {
+		enc.Encode(err)
+		return
+	}
+	defer wEncPipe.Close()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(enc, rEncPipe)
+	}()
 
 	pg := page.New()
 	defer page.Free(pg)
@@ -102,10 +129,10 @@ serviceloop:
 			iowg sync.WaitGroup
 		)
 
-		ctx = ctxparm.Reader.With(ctx, io.LimitReader(nil, 0))
-		ctx = ctxparm.Writer.With(ctx, io.Writer(enc))
+		ctx = goes.StdinContext(ctx, nil)
+		ctx = goes.StdoutContext(ctx, wEncPipe)
 		cctx, cancel := context.WithCancel(ctx)
-		cctx = ctxparm.Strings.With(cctx, []string{host.Name()})
+		cctx = goes.BranchContext(cctx, []string{host.Name()})
 
 		for i := 0; ; {
 			if n, err = dec.Read(pg[i:]); err != nil {
@@ -127,7 +154,11 @@ serviceloop:
 				break
 			} else {
 				in, flush := flusher.New(dec)
-				cctx = ctxparm.Reader.With(cctx, in)
+				cctx, err = pipeIn(cctx, &iowg, in)
+				if err != nil {
+					enc.Encode(err)
+					return
+				}
 				iowg.Add(1)
 				go func() {
 					defer iowg.Done()
@@ -144,22 +175,26 @@ serviceloop:
 		}
 		if _, ok := conn.(*tls.Conn); ok {
 			if args[0] == "pty " {
-				cctx = ctxparm.Reader.With(cctx, dec)
+				cctx, err = pipeIn(cctx, &iowg, dec)
+				if err != nil {
+					enc.Encode(ErrIncomplete)
+					continue serviceloop
+				}
 			}
-			cctx = ctxparm.AppendStringsIn(cctx, ra)
-			cctx = ctxparm.Map.With(cctx, Selection)
-			err = goes.Select(cctx, args...)
+			cctx = goes.BranchContext(cctx, []string{ra})
+			cctx = goes.RootContext(cctx, Selection)
+			err = goes.Select(cctx, args)
 		} else {
 			switch args[0] {
 			case "join":
-				ctxparm.AppendStringsIn(cctx, args[0])
-				err = Join(cctx, conn, args[1:]...)
+				cctx = goes.AppendBranchContext(cctx, args[0])
+				err = Join(cctx, conn, enc, args[1:])
 				if err == nil {
 					return
 				}
 			case "subscribe":
-				ctxparm.AppendStringsIn(cctx, args[0])
-				err = regSubscribe(ctx, args[1:]...)
+				cctx = goes.AppendBranchContext(cctx, args[0])
+				err = regSubscribe(cctx, args[1:])
 			case "tls":
 				enc.Encode(nil)
 				sv, err := greetClient(ctx, conn)

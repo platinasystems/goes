@@ -36,12 +36,19 @@ type selfie struct{}
 var Selfie selfie
 
 func (selfie) MarshalPEM() ([]byte, error) {
-	return Self().MarshalPEM()
+	self := Self()
+	if self == nil {
+		return nil, ErrNotFound
+	}
+	return self.MarshalPEM()
 }
 
 func (selfie) MarshalText() ([]byte, error) {
-	buf := new(bytes.Buffer)
 	self := Self()
+	if self == nil {
+		return nil, ErrNotFound
+	}
+	buf := new(bytes.Buffer)
 	algs := self.Certificate.SupportedSignatureAlgorithms
 	if n := len(algs); n > 0 {
 		fmt.Fprintln(buf, "supported_signature_algoritums:")

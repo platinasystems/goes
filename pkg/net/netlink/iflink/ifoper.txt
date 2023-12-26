@@ -1,0 +1,7 @@
+unknown
+notpresent
+down
+lowerlayerdown
+testing
+dormant
+up

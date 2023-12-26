@@ -2,7 +2,7 @@
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
-//go:build darwin || (aix && ppc) || (freebsd && 386) || (linux && (386 || arm || mips || mipsle || ppc))
+//go:build darwin || (aix && ppc) || ((freebsd || netbsd || openbsd) && 386) || (linux && (386 || arm || mips || mipsle || ppc))
 
 package netioctl
 

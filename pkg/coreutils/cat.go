@@ -10,35 +10,29 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/read"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const CatUsageTemplate = `
-usage: {{.}} [<file(s)>|-]
+const CatUsage = `
+usage: {{branch .}} [<file(s)>|-]
 Concatenate file(s) or standard in (-) to output.`
 
-func CatUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Cat(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Cat(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return complete.Last(args, "*")
 	}
-	if *usage.Help {
-		return usage.Error(CatUsageTemplate[1:], CatUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, CatUsage)
 	}
 	if len(args) == 0 {
 		args = append(args, "-")
 	}
-	cr := read.With(ctx, ctxparm.Reader.In(ctx))
-	cw := write.With(ctx, ctxparm.Writer.In(ctx))
+	cr := read.With(ctx, goes.ContextStdin(ctx))
+	cw := write.With(ctx, goes.ContextStdout(ctx))
 	for _, fn := range args {
 		if fn == "-" {
 			io.Copy(cw, cr)

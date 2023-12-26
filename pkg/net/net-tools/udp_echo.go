@@ -13,14 +13,11 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/resolve"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -29,31 +26,34 @@ const (
 	UDPEchoWindow  = 4
 )
 
-const UDPEchoUsageTemplate = `
-usage: {{.Path}} [<address>:<port>]
-Echo UDP received packets (default <:{{.Port}}>)`
+const UDPEchoUsage = `
+usage: {{branch .}} [<address>:<port>]
+Echo UDP received packets (default <:7>)`
 
-func UDPEchoUsageData(ctx context.Context) any {
-	return struct {
-		Path string
-		Port int
-	}{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Port: UDPEchoPort,
-	}
-}
+const UDPPingUsage = `
+usage: {{branch .}} [<options>] [<host>]
+Ping echo host with UDP sequenced packets.
 
-func UDPEcho(ctx context.Context, args ...string) error {
-	path := ctxparm.Strings.In(ctx)
-	if *complete.Help {
+<host>
+    [<ip6>]:<port>
+    <ip6>
+    <ip4>:<port>
+    <ip4>
+    <name>:<port>
+    <name>
+
+The default <host> is 127.0.0.1:7. `
+
+func UDPEcho(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		if len(path) > 1 && path[1] == "daemon" {
-			path[1] = "start"
+	if goes.ContextHelp(ctx) {
+		branch := goes.ContextBranch(ctx)
+		if len(branch) > 1 && branch[1] == "daemon" {
+			branch[1] = "start"
 		}
-		return usage.Error(UDPEchoUsageTemplate[1:],
-			UDPEchoUsageData(ctx))
+		return goes.Usage(ctx, UDPEchoUsage)
 	}
 
 	var udpa *net.UDPAddr
@@ -70,7 +70,7 @@ func UDPEcho(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 
 	fmt.Fprintln(w, "start", udpa, "service")
 	var wg sync.WaitGroup
@@ -83,29 +83,12 @@ func UDPEcho(ctx context.Context, args ...string) error {
 	return nil
 }
 
-const UDPPingUsageTemplate = `
-usage: {{.Path}} [<options>] [<host>]
-Ping echo host with UDP sequenced packets.
-
-<host>
-    [<ip6>]:<port>
-    <ip6>
-    <ip4>:<port>
-    <ip4>
-    <name>:<port>
-    <name>
-
-The default <host> is 127.0.0.1:{{.Port}}. `
-
-var UDPPingUsageData = UDPEchoUsageData
-
-func UDPPing(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func UDPPing(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(UDPPingUsageTemplate[1:],
-			UDPPingUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, UDPPingUsage)
 	}
 	addr := "127.0.0.1"
 	if len(args) > 0 {

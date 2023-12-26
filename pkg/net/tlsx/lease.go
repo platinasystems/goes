@@ -34,7 +34,7 @@ func leaseEnable(p netip.Prefix) {
 	lease.bits = p.Bits()
 }
 
-func leaseContract(tenant string, args ...string) (netip.Prefix, error) {
+func leaseContract(tenant string, args []string) (netip.Prefix, error) {
 	lease.Lock()
 	defer lease.Unlock()
 	if !lease.prefix.IsValid() {

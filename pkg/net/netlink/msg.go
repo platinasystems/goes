@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
@@ -25,7 +26,8 @@ type Messages interface {
 }
 
 type Attributes interface {
-	~byte | ~int16 | ~uint16 | ~int32 | ~uint32 | ~int64 | ~uint64 |
+	~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~int8 | ~int16 | ~int32 | ~int64 |
 		Attr |
 		ifaddr.Attr |
 		iflink.Attr |
@@ -36,12 +38,17 @@ type Attributes interface {
 		rtnetlink.RtNextHop
 }
 
+type AttrType interface {
+	integer.Int | integer.Uint
+}
+
 // Concatenate message with attribute header and type value padded to 4-byte
 // alignment.
-func CatAttr[T ~uint16, A Attributes](msg []byte, t T, v A) []byte {
+func CatAttr[T AttrType, A Attributes](msg []byte, t T, v A) []byte {
 	attr, msg := Expand[Attr](msg)
-	attr.Len = uint16(unsafe.Sizeof(*attr) + unsafe.Sizeof(v))
-	attr.Type = uint16(t)
+	integer.Assign(&attr.Len, unsafe.Sizeof(*attr))
+	integer.Add(&attr.Len, unsafe.Sizeof(v))
+	integer.Assign(&attr.Type, t)
 	p, msg := Expand[A](msg)
 	*p = v
 	return msg
@@ -49,40 +56,49 @@ func CatAttr[T ~uint16, A Attributes](msg []byte, t T, v A) []byte {
 
 // Concatenate message with attribute header and given bytes padded to 4-byte
 // alignment.
-func CatBytesAttr[T ~uint16](msg []byte, t T, b []byte) []byte {
+func CatBytesAttr[T AttrType](msg []byte, t T, b []byte) []byte {
 	attr, msg := Expand[Attr](msg)
-	attr.Len = uint16(unsafe.Sizeof(*attr)) + uint16(len(b))
-	attr.Type = uint16(t)
+	integer.Assign(&attr.Len, unsafe.Sizeof(*attr))
+	integer.Add(&attr.Len, len(b))
+	integer.Assign(&attr.Type, t)
 	i := len(msg)
-	msg = msg[:len(msg)+NLA_ALIGN(len(b))]
+	msg = grow(msg, len(b))
 	copy(msg[i:], b)
 	return msg
 }
 
 // Concatenate message with attribute header and null terminate string padded
 // to 4-byte alignment.
-func CatStringAttr[T ~uint16, S ~string](msg []byte, t T, s S) []byte {
+func CatStringAttr[T AttrType, S ~string](msg []byte, t T, s S) []byte {
 	attr, msg := Expand[Attr](msg)
-	attr.Len = uint16(unsafe.Sizeof(*attr)) + uint16(len(s)) + 1
-	attr.Type = uint16(t)
+	integer.Assign(&attr.Len, unsafe.Sizeof(*attr))
+	integer.Add(&attr.Len, len(s)+1)
+	integer.Assign(&attr.Type, t)
 	i := len(msg)
-	msg = msg[:len(msg)+NLA_ALIGN(len(s)+1)]
-	copy(msg[i:], []byte(s))
-	msg[i+len(s)] = 0
+	b := []byte(s)
+	msg = grow(msg, len(b)+1)
+	copy(msg[i:], b)
+	msg[i+len(b)] = 0
 	return msg
 }
 
 // Expand data by type padded to 4-byte alignment.
 func Expand[T Attributes | Messages](data []byte) (p *T, x []byte) {
 	i := len(data)
-	size := NLA_ALIGN(int(unsafe.Sizeof(*p)))
-	if i+size > cap(data) {
-		x = make([]byte, i+size, page.Align(i+size))
+	x = grow(data, int(unsafe.Sizeof(*p)))
+	p = Pointer[T](x[i:])
+	return
+}
+
+func grow(data []byte, n int) (x []byte) {
+	i := len(data)
+	n = i + NLA_ALIGN(n)
+	if n > cap(data) {
+		x = make([]byte, n, page.Align(n))
 		copy(x, data)
 	} else {
-		x = data[:i+size]
+		x = data[:n]
 	}
-	p = Pointer[T](x[i:])
 	return
 }
 
@@ -145,6 +161,8 @@ func ExtractAttr(data []byte) (t uint16, value, remainder []byte) {
 func Pointer[T Attributes | Messages](data []byte) *T {
 	return (*T)(unsafe.Pointer(&data[0]))
 }
+
+var PointerMsgHdr = Pointer[MsgHdr]
 
 func Clone(data []byte) []byte {
 	clone := make([]byte, len(data))

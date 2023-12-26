@@ -1,0 +1,16 @@
+network-unreachable
+host-unreachable
+protocol-unreachable
+port-unreachable
+fragmentation-required
+source-route-failed
+network-unknown
+hostun-known
+source-host-isolated
+network-administratively-prohibited
+host-administratively-prohibited
+tps-network-unreachable
+tps-host-unreachable
+communication-administratively-prohibited
+host-precedence-violation
+precedence-cutoff

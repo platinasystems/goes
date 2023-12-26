@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"math"
 	"math/big"
@@ -19,29 +20,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/crypto/xkey"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const GenerateUsageTemplate = `
-usage: {{.Path}} [<options>],
+const GenerateUsage = `
+usage: {{branch .}} [<options>],
 Generate PEM encoded x509 certifcate to stdout with stdin signature key.
-{{.Flag}}`
+{{flags .}}`
 
-func GenerateUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Generate(ctx context.Context, args ...string) error {
+func Generate(ctx context.Context, args []string) error {
 	const year = 365 * 24 * time.Hour
 	const longest = 10 * year
+
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
 
 	defname := host.Name()
 	cur, err := user.Current()
@@ -53,9 +49,6 @@ func Generate(ctx context.Context, args ...string) error {
 			defname = cur.Username
 		}
 	}
-
-	flags := usage.NewFlags("generate")
-	ctx = ctxparm.Flags.With(ctx, flags)
 	sn := flags.Int64("serial-number", 1, "")
 	dnsnames := flags.String("dns", host.Name(), "comma separated list")
 	dur := flags.Duration("duration", 10*year, "note 8760 hours per year")
@@ -66,19 +59,19 @@ func Generate(ctx context.Context, args ...string) error {
 	country := flags.String("country", "", "")
 	name := flags.String("name", defname, "")
 
-	if *complete.Help {
+	if goes.ContextComplete(ctx) {
 		return complete.Last(args, flags, "*.pem")
 	}
-	if err = flags.Parse(args); err != nil {
-		return egress.Mark(err)
+	ctx, err = goes.ParseFlagsContext(ctx, args)
+	if err != nil {
+		return err
 	}
-	if *usage.Help {
-		return usage.Error(GenerateUsageTemplate[1:],
-			GenerateUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, GenerateUsage)
 
 	}
 
-	r := ctxparm.Reader.In(ctx)
+	r := goes.ContextStdin(ctx)
 
 	var priv xkey.Private
 	if _, err = priv.ReadFrom(r); err != nil {
@@ -152,26 +145,22 @@ func Generate(ctx context.Context, args ...string) error {
 		Headers: map[string]string{},
 		Bytes:   der,
 	}
-	return egress.Mark(pem.Encode(ctxparm.Writer.In(ctx), blk))
+	return egress.Mark(pem.Encode(goes.ContextStdout(ctx), blk))
 }
 
-const ShowUsageTemplate = `
-usage: {{.}} [<name>]
+const ShowUsage = `
+usage: {{branch .}} [<name>]
 Print decoded x509 PEM certifcate(s) from the named file or stdin.`
 
-func ShowUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Show(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Show(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return complete.Last(args, "*.pem")
 	}
-	if *usage.Help {
-		return usage.Error(ShowUsageTemplate[1:], ShowUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, ShowUsage)
 	}
-	r := ctxparm.Reader.In(ctx)
-	w := ctxparm.Writer.In(ctx)
+	r := goes.ContextStdin(ctx)
+	w := goes.ContextStdout(ctx)
 	if len(args) > 0 && args[0] != "-" {
 		if f, err := os.Open(args[0]); err != nil {
 			return err

@@ -1,0 +1,41 @@
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
+package net_tools
+
+const RtfMark = "" +
+	"U" + // 0x00000001 RTF_UP
+	"G" + // 0x00000002 RTF_GATEWAY
+	"H" + // 0x00000004 RTF_HOST
+	"r" + // 0x00000008 RTF_REINSTATE
+	"D" + // 0x00000010 RTF_DYNAMIC
+	"M" + // 0x00000020 RTF_MODIFIED
+	"s" + // 0x00000040 RTF_MSS
+	"T" + // 0x00000040 RTF_MTU
+	"W" + // 0x00000080 RTF_WINDOW
+	"i" + // 0x00000100 RTF_IRTT
+	"R" + // 0x00000200 RTF_REJECT
+	"S" + // 0x00000400 RTF_STATIC
+	"X" + // 0x00000800 RTF_XRESOLVE
+	"n" + // 0x00001000 RTF_NOFORWARD
+	"T" + // 0x00002000 RTF_THROW
+	"t" + // 0x00004000 RTF_NOPMTUDISC
+	"_" + // 0x00008000 RTF_0x8000
+	"d" + // 0x00010000 RTF_DEFAULT
+	"a" + // 0x00020000 RTF_ALLONLINK
+	"k" + // 0x00040000 RTF_ADDRCONF
+	"_" + // 0x00080000 RTF_0x80000
+	"r" + // 0x00100000 RTF_LINKRT
+	"h" + // 0x00200000 RTF_NONEXTHOP
+	"_" + // 0x00400000 RTF_0x400000
+	"_" + // 0x00800000 RTF_0x800000
+	"c" + // 0x01000000 RTF_CACHE
+	"F" + // 0x02000000 RTF_FLOW
+	"P" + // 0x04000000 RTF_POLICY
+	"N" + // 0x08000000 RTF_NAT
+	"B" + // 0x10000000 RTF_BROADCAST
+	"M" + // 0x20000000 RTF_MULTICAST
+	"I" + // 0x40000000 RTF_INTERFACE
+	"l" + // 0x80000000 RTF_LOCAL
+	""

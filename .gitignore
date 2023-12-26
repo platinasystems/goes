@@ -15,8 +15,9 @@ _cgo_.o
 /netstat
 /pty
 /rawtty
-/tuntap
+/textembedder
 /tlsx
+/tuntap
 /debian/debhelper-build-stamp
 /debian/files
 /debian/goes-completion.substvars

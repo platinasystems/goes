@@ -7,15 +7,13 @@ package service
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/rpc"
-	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
 type Connecter interface {
@@ -26,33 +24,26 @@ type Request struct {
 	Connecter
 }
 
-const RequestUsageTemplate = `
-usage: {{.Path}} [<options>] <host> <command> [<args>]
+const RequestUsage = `
+usage: {{branch .}} [<options>] <host> <command> [<args>]
 Run command on <host>.
-{{.Flag}}`
+{{flags .}}`
 
-func RequestUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		strings.Join(ctxparm.Strings.In(ctx), " "),
-		ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func (req Request) Func(ctx context.Context, args ...string) error {
-	path := ctxparm.Strings.In(ctx)
-	cmd := path[len(path)-1]
-	if *complete.Help {
+func (req Request) Func(ctx context.Context, args []string) error {
+	var flag flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
+	branch := goes.ContextBranch(ctx)
+	cmd := branch[len(branch)-1]
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	ctx, flags := ctxparm.NewFlagsIn(ctx, cmd)
 	in := flags.String("i", "", "Input FILE or '-' for STDIN.")
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(RequestUsageTemplate[1:],
-			RequestUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, RequestUsage)
 	}
 	args = flags.Args()
 	if len(args) == 0 {
@@ -94,7 +85,7 @@ func (req Request) Func(ctx context.Context, args ...string) error {
 	}
 
 	if len(res) > 0 {
-		fmt.Fprint(ctxparm.Writer.In(ctx), res)
+		fmt.Fprint(goes.ContextStdout(ctx), res)
 	}
 	return err
 }

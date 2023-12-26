@@ -42,10 +42,8 @@ type HwStats64 struct {
 	Multicast uint64
 }
 
-type Ifla uint16
-
 const (
-	IFLA_UNSPEC Ifla = iota
+	IFLA_UNSPEC = iota
 	IFLA_ADDRESS
 	IFLA_BROADCAST
 	IFLA_IFNAME
@@ -116,7 +114,7 @@ const (
 const IFLA_MAX = IFLA_CNT - 1
 
 const (
-	IFLA_PROTO_DOWN_REASON_UNSPEC Ifla = iota
+	IFLA_PROTO_DOWN_REASON_UNSPEC = iota
 	IFLA_PROTO_DOWN_REASON_MASK
 	IFLA_PROTO_DOWN_REASON_VALUE
 	IFLA_PROTO_DOWN_REASON_CNT
@@ -124,14 +122,14 @@ const (
 const IFLA_PROTO_DOWN_REASON_MAX = IFLA_PROTO_DOWN_REASON_CNT - 1
 
 const (
-	IFLA_INET_UNSPEC Ifla = iota
+	IFLA_INET_UNSPEC = iota
 	IFLA_INET_CONF
 	IFLA_INET_CNT
 )
 const IFLA_INET_MAX = IFLA_INET_CNT - 1
 
 const (
-	IFLA_INET6_UNSPEC Ifla = iota
+	IFLA_INET6_UNSPEC = iota
 	IFLA_INET6_FLAGS
 	IFLA_INET6_CONF
 	IFLA_INET6_STATS
@@ -147,13 +145,11 @@ const IFLA_INET6_MAX = IFLA_INET6_CNT - 1
 
 type Attr struct {
 	Len  uint16
-	Type Ifla
+	Type uint16
 }
 
-type In6AddrGenMode uint8
-
 const (
-	IN6_ADDR_GEN_MODE_EUI64 In6AddrGenMode = iota
+	IN6_ADDR_GEN_MODE_EUI64 = iota
 	IN6_ADDR_GEN_MODE_NONE
 	IN6_ADDR_GEN_MODE_STABLE_PRIVACY
 	IN6_ADDR_GEN_MODE_RANDOM
@@ -223,7 +219,7 @@ const (
 )
 
 const (
-	IFLA_BRPORT_UNSPEC Ifla = iota
+	IFLA_BRPORT_UNSPEC = iota
 	IFLA_BRPORT_STATE
 	IFLA_BRPORT_PRIORITY
 	IFLA_BRPORT_COST
@@ -280,7 +276,7 @@ type IflaCacheInfo struct {
 }
 
 const (
-	IFLA_INFO_UNSPEC Ifla = iota
+	IFLA_INFO_UNSPEC = iota
 	IFLA_INFO_KIND
 	IFLA_INFO_DATA
 	IFLA_INFO_XSTATS
@@ -333,20 +329,16 @@ const (
 )
 const IFLA_MACVLAN_MAX = IFLA_MACVLAN_CNT - 1
 
-type MacVlanMode = uint8
-
 const (
-	MACVLAN_MODE_PRIVATE  MacVlanMode = 1
-	MACVLAN_MODE_VEPA     MacVlanMode = 2
-	MACVLAN_MODE_BRIDGE   MacVlanMode = 4
-	MACVLAN_MODE_PASSTHRU MacVlanMode = 8
-	MACVLAN_MODE_SOURCE   MacVlanMode = 16
+	MACVLAN_MODE_PRIVATE  = 1
+	MACVLAN_MODE_VEPA     = 2
+	MACVLAN_MODE_BRIDGE   = 4
+	MACVLAN_MODE_PASSTHRU = 8
+	MACVLAN_MODE_SOURCE   = 16
 )
 
-type MacVlanMacAddrMode = uint8
-
 const (
-	MACVLAN_MACADDR_ADD MacVlanMacAddrMode = iota
+	MACVLAN_MACADDR_ADD = iota
 	MACVLAN_MACADDR_DEL
 	MACVLAN_MACADDR_FLUSH
 	MACVLAN_MACADDR_SET
@@ -401,20 +393,16 @@ const (
 )
 const IFLA_XFRM_MAX = IFLA_XFRM_CNT - 1
 
-type MacSecValidate uint8
-
 const (
-	MACSEC_VALIDATE_DISABLED MacSecValidate = iota
+	MACSEC_VALIDATE_DISABLED = iota
 	MACSEC_VALIDATE_CHECK
 	MACSEC_VALIDATE_STRICT
 	MACSEC_VALIDATE_END
 )
 const MACSEC_VALIDATE_MAX = MACSEC_VALIDATE_END - 1
 
-type MacSecOffload uint8
-
 const (
-	MACSEC_OFFLOAD_OFF MacSecOffload = iota
+	MACSEC_OFFLOAD_OFF = iota
 	MACSEC_OFFLOAD_PHY
 	MACSEC_OFFLOAD_MAC
 	MACSEC_OFFLOAD_END
@@ -429,10 +417,8 @@ const (
 )
 const IFLA_IPVLAN_MAX = IFLA_IPVLAN_CNT - 1
 
-type IpVlanMode = uint8
-
 const (
-	IPVLAN_MODE_L2 IpVlanMode = 0
+	IPVLAN_MODE_L2 = iota
 	IPVLAN_MODE_L3
 	IPVLAN_MODE_L3S
 	IPVLAN_MODE_MAX
@@ -528,10 +514,8 @@ type IflaVxlanPortRange struct {
 	High big.Uint16
 }
 
-type IflaVxlanDF = uint8
-
 const (
-	VXLAN_DF_UNSET IflaVxlanDF = iota
+	VXLAN_DF_UNSET = iota
 	VXLAN_DF_SET
 	VXLAN_DF_INHERIT
 	VXLAN_DF_END
@@ -585,10 +569,8 @@ const (
 )
 const IFLA_PPP_MAX = IFLA_PPP_CNT - 1
 
-type IflaGTPRole = uint8
-
 const (
-	GTP_ROLE_GGSN IflaGTPRole = iota
+	GTP_ROLE_GGSN = iota
 	GTP_ROLE_SGSN
 )
 

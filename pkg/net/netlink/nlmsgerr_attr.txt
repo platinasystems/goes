@@ -1,0 +1,8 @@
+unused
+msg
+offs
+cookie
+policy
+miss_type
+miss_nest
+cnt

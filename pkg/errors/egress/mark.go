@@ -31,6 +31,16 @@ func Mark(err error) error {
 	return err
 }
 
+// Skip 2 calls back.
+func MarkCaller(err error) error {
+	if err != nil {
+		if _, f, l, ok := runtime.Caller(2); ok {
+			err = &mark{f, l, err}
+		}
+	}
+	return err
+}
+
 // Wrap fmt.Errorf with the caller's file name and line number, e.g.
 //
 //	return Markf(format, args...)
@@ -40,6 +50,10 @@ func Markf(format string, args ...any) error {
 		err = &mark{f, l, err}
 	}
 	return err
+}
+
+func MarkResult[T any](v T, err error) (T, error) {
+	return v, MarkCaller(err)
 }
 
 type mark struct {

@@ -10,15 +10,16 @@ import (
 	"context"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
-	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
+	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func Admin(
+func Admin[With, Without integer.Int | integer.Uint](
 	ctx context.Context,
-	ifname string, with,
-	without iflink.NetDeviceFlag,
+	ifname string,
+	with With,
+	without Without,
 ) error {
 	nl, err := Open()
 	if err != nil {
@@ -36,9 +37,10 @@ func Admin(
 	ifinfo, req := Expand[rtnetlink.IfInfoMsg](req)
 	ifinfo.Family = af.UNSPEC
 	ifinfo.Index = ifindex
-	ifinfo.Change = uint32(with | without)
-	ifinfo.Flags |= uint32(with)
-	ifinfo.Flags &^= uint32(without)
+	integer.Set(&ifinfo.Change, with)
+	integer.Set(&ifinfo.Change, without)
+	integer.Set(&ifinfo.Flags, with)
+	integer.Reset(&ifinfo.Flags, without)
 	if err = nl.Request(req); err == nil {
 		err = nl.Wait(ctx, hdr.SEQ)
 	}

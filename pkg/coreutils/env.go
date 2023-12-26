@@ -12,35 +12,26 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const EnvUsageTemplate = `
-usage: {{.Path}} [<var>=<val>]... [<command> <args>]
+const EnvUsage = `
+usage: {{branch .}} [<var>=<val>]... [<command> <args>]
 Print or set environment variables.
 
 Commands/Objects
-{{.Commands}}`
+{{root .}}`
 
-func EnvUsageData(ctx context.Context) any {
-	return struct{ Path, Commands string }{
-		Path:     strings.Join(ctxparm.Strings.In(ctx), " "),
-		Commands: ctxparm.MapKeysIn(ctx),
-	}
-}
-
-func Env(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Env(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(EnvUsageTemplate[1:], EnvUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, EnvUsage)
 	}
 	environ := os.Environ()
-	w := ctxparm.Writer.In(ctx)
+	w := goes.ContextStdout(ctx)
 	if len(args) == 0 {
 		for _, env := range environ {
 			fmt.Fprintln(w, env)
@@ -73,7 +64,7 @@ func Env(ctx context.Context, args ...string) error {
 	stderr := new(strings.Builder)
 	cmd := exec.CommandContext(ctx, program.Executable(), args...)
 	cmd.Env = environ
-	cmd.Stdin = ctxparm.Reader.In(ctx)
+	cmd.Stdin = goes.ContextStdin(ctx)
 	cmd.Stdout = w
 	cmd.Stderr = stderr
 	err := cmd.Start()

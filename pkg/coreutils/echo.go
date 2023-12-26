@@ -7,47 +7,37 @@ package coreutils
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/context/write"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
-const EchoUsageTemplate = `
-usage: {{.Path}} [<options>] [<strings>]
+const EchoUsage = `
+usage: {{branch .}} [<options>] [<strings>]
 Print string(s) to standard output.
-{{.Flag}}`
+{{flags .}}`
 
-func EchoUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Echo(ctx context.Context, args ...string) error {
-	if *complete.Help {
-		return nil
-	}
-	flags := usage.NewFlags("echo")
-	ctx = ctxparm.Flags.With(ctx, flags)
+func Echo(ctx context.Context, args []string) error {
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
 	esc := flags.Bool("e", false, "Interpret escapes.")
 	nonl := flags.Bool("n", false, "Without trailing newline.")
-	err := flags.Parse(args)
+	if goes.ContextComplete(ctx) {
+		return nil
+	}
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(EchoUsageTemplate[1:], EchoUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, EchoUsage)
 	}
 	args = flags.Args()
-	cw := write.With(ctx, ctxparm.Writer.In(ctx))
+	w := goes.ContextStdout(ctx)
 	for i, arg := range args {
 		if i > 0 {
-			fmt.Fprint(cw, " ")
+			fmt.Fprint(w, " ")
 		}
 		if *esc {
 			text := []byte(fmt.Sprintf(`"%s"`, arg))
@@ -56,10 +46,10 @@ func Echo(ctx context.Context, args ...string) error {
 				return err
 			}
 		}
-		fmt.Fprint(cw, arg)
+		fmt.Fprint(w, arg)
 	}
 	if !*nonl {
-		fmt.Fprintln(cw)
+		fmt.Fprintln(w)
 	}
 	return ctx.Err()
 }

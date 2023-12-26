@@ -6,43 +6,35 @@ package coreutils
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"strings"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/os/host"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const HostnameUsageTemplate = `
-usage: {{.Path}} [<options>] [<name>]
+const HostnameUsage = `
+usage: {{branch .}} [<options>] [<name>]
 Set or print system host name.
-{{.Flag}}`
+{{flags .}}`
 
-func HostnameUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Hostname(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Hostname(ctx context.Context, args []string) error {
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	flags := usage.NewFlags("hostname")
-	ctx = ctxparm.Flags.With(ctx, flags)
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
 	dFlag := flags.Bool("d", false, "only print domain")
-	fFlag := flags.Bool("f", true, "print fully qualified domain name (FQDN)")
+	fFlag := flags.Bool("f", true,
+		"print fully qualified domain name (FQDN)")
 	sFlag := flags.Bool("s", false, "print name w/o domain")
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(HostnameUsageTemplate[1:],
-			HostnameUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, HostnameUsage)
 	}
 	args = flags.Args()
 	if len(args) > 0 {
@@ -59,6 +51,6 @@ func Hostname(ctx context.Context, args ...string) error {
 			hn = hn[:dot]
 		}
 	}
-	fmt.Fprintln(ctxparm.Writer.In(ctx), hn)
+	fmt.Fprintln(goes.ContextStdout(ctx), hn)
 	return ctx.Err()
 }

@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,11 +7,6 @@
 package netioctl
 
 //go:generate sh -c "go tool cgo -godefs -- sioc6.go > zsioc6_${GOOS}.go"
-//go:generate stringer -output=zifcap_string_${GOOS}.go -type=IFCAP -trimprefix=IFCAP_ .
-//go:generate sh -c "go doc syscall.IFF_UP | sed -n -f iff.sed | gofmt > ziff_${GOOS}.go"
-//go:generate stringer -output=ziff_string_${GOOS}.go -type=IFF -trimprefix=IFF_ .
-//go:generate sh -c "go doc syscall.IFT_OTHER | sed -n -f ift.sed | gofmt > zift_${GOOS}.go"
-//go:generate stringer -output=zift_string_${GOOS}.go -type=IFT -trimprefix=IFT_ .
 
 import (
 	"os"
@@ -23,6 +18,8 @@ import (
 )
 
 const IFNAMSIZ = syscall.IFNAMSIZ
+
+type IFCAPs struct{ Req, Cur uint32 }
 
 type InAlias struct {
 	Addr sockaddr.In
@@ -51,7 +48,7 @@ type Nothing struct{}
 type IfReqValue interface {
 	~byte | ~uint16 | ~int32 | ~uint32 |
 		Nothing |
-		IfCaps |
+		IFCAPs |
 		InAlias | In6Alias |
 		sockaddr.In | sockaddr.In6
 }
@@ -72,8 +69,8 @@ var (
 	NewIfReqUint16      = NewIfReq[uint16]
 	NewIfReqUint32      = NewIfReq[uint32]
 	NewIfReqInt32       = NewIfReq[int32]
+	NewIfReqIfCaps      = NewIfReq[IFCAPs]
 	NewIfReqNothing     = NewIfReq[Nothing]
-	NewIfReqIfCaps      = NewIfReq[IfCaps]
 	NewIfReqInAlias     = NewIfReq[InAlias]
 	NewIfReqIn6Alias    = NewIfReq[In6Alias]
 	NewIfReqSockaddrIn  = NewIfReq[sockaddr.In]
@@ -109,7 +106,7 @@ func Inet6[R IfReq[In6Alias] | IfReq[sockaddr.In6]](
 func ioctl[FD ~int, R IfReq[Nothing] |
 	IfReq[uint16] |
 	IfReq[uint32] |
-	IfReq[IfCaps] |
+	IfReq[IFCAPs] |
 	IfReq[InAlias] |
 	IfReq[In6Alias] |
 	IfReq[sockaddr.In] |

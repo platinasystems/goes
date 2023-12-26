@@ -11,9 +11,9 @@ import (
 	"net"
 	"net/netip"
 
+	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
-	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifarp"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
@@ -149,33 +149,33 @@ func ifaddrs(
 }
 
 func (nif *NetIf) ifinfo(data []byte) error {
-	var stats64 *iflink.Stats[uint64]
+	var s64 *iflink.Stats[uint64]
 	m, data := netlink.ExtractIfInfoMsg(data)
 	if nif.Index != 0 && int(m.Index) != nif.Index {
 		return nil
 	}
-	nif.Index = int(m.Index)
-	nif.Type = ifarp.ARPHRD(m.Type)
+	integer.Assign(&nif.Index, m.Index)
+	integer.Assign(&nif.Type, m.Type)
 	if nif.Extra == nil {
 		nif.Extra = make(map[string]any)
 	}
-	if (m.Flags & uint32(iflink.IFF_UP)) != 0 {
-		nif.Flags |= net.FlagUp
+	if integer.Has(m.Flags, iflink.IFF_UP) {
+		integer.Set(&nif.Flags, net.FlagUp)
 	}
-	if (m.Flags & uint32(iflink.IFF_BROADCAST)) != 0 {
-		nif.Flags |= net.FlagBroadcast
+	if integer.Has(m.Flags, iflink.IFF_BROADCAST) {
+		integer.Set(&nif.Flags, net.FlagBroadcast)
 	}
-	if (m.Flags & uint32(iflink.IFF_LOOPBACK)) != 0 {
-		nif.Flags |= net.FlagLoopback
+	if integer.Has(m.Flags, iflink.IFF_LOOPBACK) {
+		integer.Set(&nif.Flags, net.FlagLoopback)
 	}
-	if (m.Flags & uint32(iflink.IFF_POINTOPOINT)) != 0 {
-		nif.Flags |= net.FlagPointToPoint
+	if integer.Has(m.Flags, iflink.IFF_POINTOPOINT) {
+		integer.Set(&nif.Flags, net.FlagPointToPoint)
 	}
-	if (m.Flags & uint32(iflink.IFF_MULTICAST)) != 0 {
-		nif.Flags |= net.FlagMulticast
+	if integer.Has(m.Flags, iflink.IFF_MULTICAST) {
+		integer.Set(&nif.Flags, net.FlagMulticast)
 	}
-	if (m.Flags & uint32(iflink.IFF_RUNNING)) != 0 {
-		nif.Flags |= net.FlagRunning
+	if integer.Has(m.Flags, iflink.IFF_RUNNING) {
+		integer.Set(&nif.Flags, net.FlagRunning)
 	}
 	for netlink.HasAttr(data) {
 		t, v, datá := netlink.ExtractAttr(data)
@@ -186,7 +186,7 @@ func (nif *NetIf) ifinfo(data []byte) error {
 				isnt0 = true
 			}
 		}
-		switch iflink.Ifla(t) {
+		switch t {
 		case iflink.IFLA_UNSPEC:
 		case iflink.IFLA_ADDRESS:
 			if isnt0 {
@@ -207,17 +207,17 @@ func (nif *NetIf) ifinfo(data []byte) error {
 		case iflink.IFLA_QDISC:
 			nif.Extra["qdisc"] = netlink.CloneString(v)
 		case iflink.IFLA_STATS:
-			if stats64 == nil {
+			if s64 == nil {
 				s32 := netlink.Pointer[iflink.Stats[uint32]](v)
-				nif.Rx.Packets = uint64(s32.RxPackets)
-				nif.Rx.Bytes = uint64(s32.RxBytes)
-				nif.Rx.Drops = uint64(s32.RxDropped)
-				nif.Rx.Errors = uint64(s32.RxErrors)
-				nif.Tx.Packets = uint64(s32.TxPackets)
-				nif.Tx.Bytes = uint64(s32.TxBytes)
-				nif.Tx.Drops = uint64(s32.TxDropped)
-				nif.Tx.Errors = uint64(s32.TxErrors)
-				nif.Collisions = uint64(s32.Collisions)
+				integer.Assign(&nif.Rx.Packets, s32.RxPackets)
+				integer.Assign(&nif.Rx.Bytes, s32.RxBytes)
+				integer.Assign(&nif.Rx.Drops, s32.RxDropped)
+				integer.Assign(&nif.Rx.Errors, s32.RxErrors)
+				integer.Assign(&nif.Tx.Packets, s32.TxPackets)
+				integer.Assign(&nif.Tx.Bytes, s32.TxBytes)
+				integer.Assign(&nif.Tx.Drops, s32.TxDropped)
+				integer.Assign(&nif.Tx.Errors, s32.TxErrors)
+				integer.Assign(&nif.Collisions, s32.Collisions)
 			}
 		case iflink.IFLA_COST:
 		case iflink.IFLA_PRIORITY:
@@ -236,10 +236,10 @@ func (nif *NetIf) ifinfo(data []byte) error {
 			nif.Extra["weight"] = *(netlink.Pointer[uint32](v))
 		case iflink.IFLA_OPERSTATE:
 			delete(nif.Extra, "state")
-			nif.Extra["state"] = iflink.IfOper(v[0]).String()
+			nif.Extra["state"] = iflink.IfOperName(v[0])
 		case iflink.IFLA_LINKMODE:
 			delete(nif.Extra, "mode")
-			nif.Extra["mode"] = iflink.IfLinkMode(v[0]).String()
+			nif.Extra["mode"] = iflink.IfLinkModeName(v[0])
 		case iflink.IFLA_LINKINFO:
 			// nested
 		case iflink.IFLA_NET_NS_PID:
@@ -250,16 +250,16 @@ func (nif *NetIf) ifinfo(data []byte) error {
 			nif.Extra["num-vf"] = *(netlink.Pointer[int32](v))
 		case iflink.IFLA_VFINFO_LIST:
 		case iflink.IFLA_STATS64:
-			stats64 = netlink.Pointer[iflink.Stats[uint64]](v)
-			nif.Rx.Packets = stats64.RxPackets
-			nif.Rx.Bytes = stats64.RxBytes
-			nif.Rx.Drops = stats64.RxDropped
-			nif.Rx.Errors = stats64.RxErrors
-			nif.Tx.Packets = stats64.TxPackets
-			nif.Tx.Bytes = stats64.TxBytes
-			nif.Tx.Drops = stats64.TxDropped
-			nif.Tx.Errors = stats64.TxErrors
-			nif.Collisions = stats64.Collisions
+			s64 = netlink.Pointer[iflink.Stats[uint64]](v)
+			integer.Assign(&nif.Rx.Packets, s64.RxPackets)
+			integer.Assign(&nif.Rx.Bytes, s64.RxBytes)
+			integer.Assign(&nif.Rx.Drops, s64.RxDropped)
+			integer.Assign(&nif.Rx.Errors, s64.RxErrors)
+			integer.Assign(&nif.Tx.Packets, s64.TxPackets)
+			integer.Assign(&nif.Tx.Bytes, s64.TxBytes)
+			integer.Assign(&nif.Tx.Drops, s64.TxDropped)
+			integer.Assign(&nif.Tx.Errors, s64.TxErrors)
+			integer.Assign(&nif.Collisions, s64.Collisions)
 		case iflink.IFLA_VF_PORTS:
 		case iflink.IFLA_PORT_SELF:
 		case iflink.IFLA_AF_SPEC:

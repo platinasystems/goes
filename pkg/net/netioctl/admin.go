@@ -10,7 +10,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
-func Admin(ifname string, with, without IFF) error {
+func Admin[T ~int | ~uint](ifname string, with, without T) error {
 	inet, err := af.Open[af.Inet]()
 	if err != nil {
 		return err

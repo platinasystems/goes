@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"errors"
+	"flag"
 	"fmt"
 	"hash/fnv"
 	"log"
@@ -25,16 +26,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
 	"github.com/platinasystems/goes/v2/pkg/context/write"
 	"github.com/platinasystems/goes/v2/pkg/encoding/lv"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
-	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
 const (
@@ -50,39 +49,31 @@ var EthDump = func(...any) {}
 // Path to iproute2 command if available.
 var iproute2 string
 
-const TunTapUsageTemplate = `
-usage: {{.Path}} [<options>] <exchange>
+const TunTapUsage = `
+usage: {{branch .}} [<options>] <exchange>
 Open tap to named exchange or self @ given address.
 
 <exchange>
 	[<name>][@<dns|ip4|\[ip6\]>][:<port>]
-{{.Flag}}`
+{{flags .}}`
 
-func TunTapUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		strings.Join(ctxparm.Strings.In(ctx), " "),
-		ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func TunTap(ctx context.Context, args ...string) error {
+func TunTap(ctx context.Context, args []string) error {
 	var addr net.IP
-	if *complete.Help {
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
+	if goes.ContextComplete(ctx) {
 		return nil
 	}
-	flags := usage.NewFlags("tuntap")
-	ctx = ctxparm.Flags.With(ctx, flags)
 	flags.TextVar(&addr, "a", addr, "static network address")
 	randll := flags.Bool("r", false,
 		"use random link address instead of hashed cert SKI")
 	unit := flags.Uint("u", 0, "unit number")
 	err := flags.Parse(args)
+	if errors.Is(err, flag.ErrHelp) || goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, TunTapUsage)
+	}
 	if err != nil {
 		return err
-	}
-	if *usage.Help {
-		return usage.Error(TunTapUsageTemplate[1:],
-			TunTapUsageData(ctx))
 	}
 	if args = flags.Args(); len(args) == 0 {
 		return ErrIncomplete
@@ -108,8 +99,8 @@ func TunTap(ctx context.Context, args ...string) error {
 	}
 
 	network := 3
-	path := ctxparm.Strings.In(ctx)
-	if path[len(path)-1] == "tap" {
+	branch := goes.ContextBranch(ctx)
+	if branch[len(branch)-1] == "tap" {
 		if !tuntap.CanTAP {
 			return ErrCantTap
 		}

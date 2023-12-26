@@ -14,6 +14,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/platinasystems/goes/v2/pkg/net/ift"
 	"github.com/platinasystems/goes/v2/pkg/os/termination"
 )
 
@@ -40,7 +41,7 @@ const (
 
 type NetIf struct {
 	net.Interface
-	Type fmt.Stringer
+	Type int
 	// IP & IPv6
 	Prefixes   []netip.Prefix
 	Multicasts []netip.Addr
@@ -99,7 +100,7 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 		wrap()
 	}
 	bprintf("flags=%04x<%s>", uint(nif.Flags), nif.Flags)
-	bprint("type ", nif.Type)
+	bprint("type ", ift.Name(nif.Type))
 	bprintf("mtu %d", nif.MTU)
 	if len(nif.HardwareAddr) == 6 && nif.HardwareAddr[0] != 0 {
 		bprint("mac ", nif.HardwareAddr)

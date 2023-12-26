@@ -14,10 +14,10 @@ func TestEcho(t *testing.T) {
 	ctx := context.Background()
 	got := new(strings.Builder)
 	path := []string{"echo.test", "echo"}
-	try := func(t *testing.T, want string, args ...string) {
+	try := func(t *testing.T, want string, args []string) {
 		t.Helper()
 		got.Reset()
-		err := Echo(ctx, got, path, args...)
+		err := Echo(ctx, got, path, args)
 		if err != nil {
 			t.Error(err)
 		} else if gots := got.String(); gots != want {

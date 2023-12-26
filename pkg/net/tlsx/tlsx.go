@@ -24,7 +24,7 @@ var Show = map[string]any{
 	},
 	"filenames":     Filenames,
 	"registry":      IPC,
-	"subscribers":   Subscribers,
-	"subscriptions": Subscriptions,
+	"subscribers":   SubscribersNames,
+	"subscriptions": SubscriptionsNames,
 	"tenants":       IPC,
 }

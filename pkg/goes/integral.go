@@ -6,10 +6,9 @@ package goes
 
 import (
 	"context"
-	"embed"
 	"errors"
+	"flag"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 	"os/user"
@@ -17,59 +16,80 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
 	"github.com/platinasystems/goes/v2/pkg/path/restricted"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 	"golang.org/x/term"
 )
 
-// These are merged into the Root of the command tree.
-var Integral = map[string]any{
-	"command":  IntegralCommand,
-	"complete": IntegralComplete,
-	"help":     IntegralHelp,
-	"standby":  IntegralStandby,
-	"start":    IntegralStart,
+const (
+	BashCompletion = `
+_{{$arg0 := branch . 0 1}}{{$arg0}}()
+{
+	if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
+		COMPREPLY=($({{$arg0}} -complete ${COMP_WORDS[@]:1} ''))
+	else
+		COMPREPLY=($({{$arg0}} -complete ${COMP_WORDS[@]:1}))
+	fi
+	return 0
 }
 
-const IntegralCommandUsageTemplate = `
-usage: {{.Path}} [<options>] <command> [<args>]
-Run an external command.
-{{.Flag}}`
+type -p {{$arg0}} >/dev/null &&
+	complete -F _{{$arg0}} -o filenames {{$arg0}}`
+	ZshCompletion = `
+#compdef {{$arg0 := branch . 0 1}}{{$arg0}}
 
-func IntegralCommandUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		Path: strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag: ctxparm.SprintFlagsIn(ctx),
-	}
+if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
+	COMPREPLY=( $({{$arg0}} -complete ${COMP_WORDS[@]:1} '') )
+else
+	COMPREPLY=( $({{$arg0}} -complete ${COMP_WORDS[@]:1}) )
+fi
+
+return 0`
+)
+
+var Completion = map[string]any{
+	"bash": BashCompletion,
+	"zsh":  ZshCompletion,
 }
 
-func IntegralCommand(ctx context.Context, args ...string) error {
-	flags := usage.NewFlags("command")
-	ctx = ctxparm.Flags.With(ctx, flags)
+var Daemons = map[string]any{
+	"standby": Standby,
+}
+
+var Show = map[string]any{
+	"build":      program.Build,
+	"main":       program.Main,
+	"completion": Completion,
+}
+
+func ExternalCommand(ctx context.Context, args []string) error {
+	var flags flag.FlagSet
+	ctx = FlagsContext(ctx, &flags)
 	pFlag := flags.Bool("p", false, "Restricted path search.")
 	vFlag := flags.Bool("v", false, "Report path found.")
 	vvFlag := flags.Bool("V", false, "More verbose report.")
-	if *complete.Help {
+	if ContextComplete(ctx) {
 		return complete.Last(args, flags)
 	}
-	err := flags.Parse(args)
+	ctx, err := ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(IntegralCommandUsageTemplate[1:],
-			IntegralCommandUsageData(ctx))
+	if ContextHelp(ctx) {
+		return Usage(ctx, `
+usage: {{branch .}} [<options>] <command> [<args>]
+Run an external command.
+{{flags .}}`)
 	}
 	args = flags.Args()
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
-	ctx = ctxparm.Flags.With(ctx, flags)
-	r := ctxparm.Reader.In(ctx)
-	w := ctxparm.Writer.In(ctx)
+
+	r := ContextStdin(ctx)
+	w := ContextStdout(ctx)
 
 	lookpath := exec.LookPath
 	if *pFlag {
@@ -92,22 +112,20 @@ func IntegralCommand(ctx context.Context, args ...string) error {
 	cmd.Stdin = r
 	cmd.Stdout = w
 	cmd.Stderr = stderr
-	if method, ok := r.(interface{ Fd() uintptr }); ok {
-		if fd := int(method.Fd()); term.IsTerminal(fd) {
-			cmd.Stderr = w
-			switch runtime.GOOS {
-			case "linux":
-				cmd.SysProcAttr = &syscall.SysProcAttr{
-					Setsid:  true,
-					Setctty: true,
-				}
-			case "darwin":
-				cmd.SysProcAttr = &syscall.SysProcAttr{
-					Setsid: true,
-					// FIXME can't Setctty on darwin
-					// Setctty: true,
-					// Ctty:    0,
-				}
+	if fd := int(r.Fd()); term.IsTerminal(fd) {
+		cmd.Stderr = w
+		switch runtime.GOOS {
+		case "linux":
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				Setsid:  true,
+				Setctty: true,
+			}
+		case "darwin":
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				Setsid: true,
+				// FIXME can't Setctty on darwin
+				// Setctty: true,
+				// Ctty:    0,
 			}
 		}
 	}
@@ -122,194 +140,78 @@ func IntegralCommand(ctx context.Context, args ...string) error {
 	return err
 }
 
-func IntegralComplete(ctx context.Context, args ...string) error {
+func Complete(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return complete.Last(args, ctxparm.MapKeysIn(ctx))
+		return complete.Last(args, ContextRoot(ctx))
 	}
-	path := ctxparm.Strings.In(ctx)
-	ctx = ctxparm.Strings.With(ctx, path[:len(path)-1])
-	*complete.Help = true
-	return Select(ctx, args...)
+	branch := ContextBranch(ctx)
+	ctx = BranchContext(ctx, branch[:len(branch)-1])
+	ctx = CompleteContext(ctx, true)
+	return do(ctx, Select, args)
 }
 
-const IntegralHelpUsageTemplate = `
-usage: {{.Path}} [option] <command|object> [<args>],
-Show command or object's help text.
+func Help(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return Usage(ctx, `
+usage: {{branch . 0 1}} [option] {{branch . 1}} <command|object> [<args>]
+{{synopsis .}}
 
-Options{{.Flag}}
+Options{{flags .}}
 Command/Objects
-{{.Commands}}`
-
-func IntegralHelpUsageData(ctx context.Context) any {
-	return struct{ Path, Flag, Commands string }{
-		Path:     strings.Join(ctxparm.Strings.In(ctx), " "),
-		Flag:     ctxparm.SprintFlagsIn(ctx),
-		Commands: ctxparm.MapKeysIn(ctx),
+{{root . "daemon"}}`)
 	}
+	branch := ContextBranch(ctx)
+	ctx = BranchContext(ctx, branch[:len(branch)-1])
+	ctx = HelpContext(ctx, true)
+	return do(ctx, Select, args)
 }
-
-func IntegralHelp(ctx context.Context, args ...string) error {
-	if len(args) == 0 {
-		return usage.Error(IntegralHelpUsageTemplate[1:],
-			IntegralHelpUsageData(ctx))
-	}
-	path := ctxparm.Strings.In(ctx)
-	ctx = ctxparm.Strings.With(ctx, path[:len(path)-1])
-	*usage.Help = true
-	return do(ctx, Select, args...)
-}
-
-var completionShellScript = map[string]string{
-	"bash": `
-_{{.}} ()
-{
-	if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
-		COMPREPLY=($({{.}} -complete ${COMP_WORDS[@]:1} ''))
-	else
-		COMPREPLY=($({{.}} -complete ${COMP_WORDS[@]:1}))
-	fi
-	return 0
-}
-
-type -p {{.}} >/dev/null && complete -F _{{.}} -o filenames {{.}}
-`[1:],
-	"zsh": `
-#compdef {{.}}
-
-if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
-	COMPREPLY=( $({{.}} -complete ${COMP_WORDS[@]:1} '') )
-else
-	COMPREPLY=( $({{.}} -complete ${COMP_WORDS[@]:1}) )
-fi
-
-return 0
-`[1:],
-}
-
-const IntegralShowCompletionUsageTemplate = `
-usage: {{.}} <shell>
-Print shell completion script.
-
-Shells
-  bash
-  zsh`
-
-func IntegralShowCompletionUsageData(ctx context.Context) any {
-	return ctxparm.Strings.In(ctx)
-}
-
-func IntegralShowCompletion(ctx context.Context, args ...string) error {
-	path := ctxparm.Strings.In(ctx)
-	if *complete.Help {
-		return complete.Last(args, completionShellScript)
-	}
-	if *usage.Help {
-		return usage.Error(IntegralShowCompletionUsageTemplate[1:],
-			IntegralShowCompletionUsageData(ctx))
-	}
-	if len(args) == 0 {
-		return ErrIncomplete
-	}
-	for _, shell := range args {
-		script, ok := completionShellScript[shell]
-		if !ok {
-			return fmt.Errorf("%s: %w", shell, ErrNotFound)
-		}
-		t, err := template.New(shell).Parse(script)
-		if err != nil {
-			return err
-		}
-		err = t.Execute(ctxparm.Writer.In(ctx), path[0])
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-
-}
-
-const IntegralShowFSUsageTemplate = `
-usage: {{.}}
-Print embedded file.`
-
-var IntegralShowFSUsageData = IntegralShowCompletionUsageData
-
-func IntegralShowFS(ctx context.Context, efs embed.FS, args ...string) error {
-	path := ctxparm.Strings.In(ctx)
-	if *complete.Help {
-		if len(args) == 0 {
-			// exact path match
-			fmt.Println(path[len(path)-1])
-		}
-		return nil
-	}
-	if *usage.Help {
-		return usage.Error(IntegralShowFSUsageTemplate[1:],
-			IntegralShowFSUsageData(ctx))
-	}
-	b, err := efs.ReadFile(path[len(path)-1])
-	if err == nil {
-		_, err = ctxparm.Writer.In(ctx).Write(b)
-	}
-	return err
-}
-
-const IntegralStandbyUsageTemplate = `
-usage: {{.}} [<pids>]
-Wait until interrupt or termination signal.`
-
-var IntegralStandbyUsageData = IntegralShowCompletionUsageData
 
 // Use this to hold container until interrupt or termination signal.
-func IntegralStandby(ctx context.Context, args ...string) error {
-	if *complete.Help {
+func Standby(ctx context.Context, args []string) error {
+	if ContextComplete(ctx) {
 		return nil
 	}
-	if *usage.Help {
-		return usage.Error(IntegralStandbyUsageTemplate[1:],
-			IntegralStandbyUsageData(ctx))
+	if ContextHelp(ctx) {
+		return Usage(ctx, `
+usage: {{branch .}} [<pids>]
+Wait until interrupt or termination signal.`)
 	}
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-const IntegralStartUsageTemplate = `
-usage: {{.Path}} <daemon> [<options>]
-Fork self to run <daemon> like this,
-
-   {{.Prog}} daemon <daemon> [<options>]
-
-Daemons
-{{.Daemons}}`
-
-func IntegralStartUsageData(ctx context.Context) any {
-	return struct{ Path, Prog, Daemons string }{
-		Path:    strings.Join(ctxparm.Strings.In(ctx), " "),
-		Prog:    program.Base(),
-		Daemons: ctxparm.MapKeysIn(ctx),
+func Start(ctx context.Context, args []string) error {
+	vdaemon, ok := ContextRoot(ctx)["daemon"]
+	if !ok {
+		return egress.Mark(FIXME)
 	}
-}
-
-func IntegralStart(ctx context.Context, args ...string) error {
-	daemons := ctxparm.Map.In(ctx)["daemon"].(map[string]any)
-	ctx = ctxparm.Map.With(ctx, daemons)
-	if *complete.Help {
+	daemons, ok := vdaemon.(map[string]any)
+	if !ok {
+		return egress.Mark(FIXME)
+	}
+	ctx = RootContext(ctx, daemons)
+	if ContextComplete(ctx) {
 		if len(args) == 0 {
 			return complete.Last(args, daemons)
 		}
-		return do(ctx, Select, args...)
+		return do(ctx, Select, args)
 	}
-	if *usage.Help {
+	if ContextHelp(ctx) {
 		if len(args) == 0 {
-			return usage.Error(IntegralStartUsageTemplate[1:],
-				IntegralStartUsageData(ctx))
+			return Usage(ctx, `
+usage: {{branch .}} <daemon> [<options>]
+Fork self to run <daemon> like this,
+
+   {{branch . 0 1}} daemon <daemon> [<options>]
+
+Daemons
+{{root .}}`)
 		}
-		return do(ctx, Select, args...)
+		return do(ctx, Select, args)
 	}
 	if os.Getpid() == 1 {
-		path := ctxparm.Strings.In(ctx)
-		ctx = ctxparm.Strings.With(ctx, append(path[:1], "daemon"))
-		return do(ctx, Select, args...)
+		ctx = AppendBranchContext(ctx, "daemon")
+		return do(ctx, Select, args)
 	}
 	u, err := user.Current()
 	if err != nil {
@@ -359,10 +261,11 @@ func IntegralStart(ctx context.Context, args ...string) error {
 		Setsid:     true,
 	}
 	if err = cmd.Start(); err == nil {
-		path := ctxparm.Strings.In(ctx)
-		w := ctxparm.Writer.In(ctx)
-		pid := cmd.Process.Pid
-		fmt.Fprint(w, path[0], ":daemon:", args[0], ":pid: ", pid, "\n")
+		w := ContextStdout(ctx)
+		branch := ContextBranch(ctx)
+		fmt.Fprint(w, branch[0], ":daemon:", args[0],
+			":pid: ", cmd.Process.Pid,
+			"\n")
 	}
 	return err
 }

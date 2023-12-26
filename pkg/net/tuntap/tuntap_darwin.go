@@ -1,14 +1,12 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package tuntap
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -25,16 +23,7 @@ const (
 	CanChangeGroup = false
 )
 
-var (
-	ErrCantTAP         = errors.New(runtime.GOOS + " can't TAP")
-	ErrCantPersist     = errors.New(runtime.GOOS + " can't persist")
-	ErrCantChangeOwner = errors.New(runtime.GOOS + " can't change owner")
-	ErrCantChangeGroup = errors.New(runtime.GOOS + " can't change group")
-)
-
-var (
-	namsiz = uintptr(IFNAMSIZ)
-)
+var namsiz = uintptr(IFNAMSIZ)
 
 func New(
 	unit uint,

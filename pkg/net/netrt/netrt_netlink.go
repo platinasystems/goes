@@ -11,8 +11,8 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/syscall/af"
@@ -45,9 +45,9 @@ type stream struct {
 
 func NewList(ctx context.Context) (Streamer, error) {
 	var family uint8
-	if ctxparm.SearchFlagsIn[bool](ctx, "4") {
+	if goes.SearchContextFlags[bool](ctx, "4") {
 		family = af.INET
-	} else if ctxparm.SearchFlagsIn[bool](ctx, "6") {
+	} else if goes.SearchContextFlags[bool](ctx, "6") {
 		family = af.INET6
 	} else {
 		family = af.UNSPEC
@@ -141,88 +141,23 @@ func (strm *stream) Next(ctx context.Context) (NetRt, error) {
 	return nil, nil
 }
 
-func Add(ctx context.Context) error {
-	return FIXME
-}
-
-func Change(ctx context.Context) error {
-	return FIXME
-}
-
-func Delete(ctx context.Context) error {
-	return FIXME
-}
-
-func Flush(ctx context.Context) error {
-	return FIXME
-}
-
-func Get(ctx context.Context) (NetRt, error) {
-	dst, err := parseDstFlag(ctx)
+func OneReq(ctx context.Context, req []byte) (NetRt, error) {
+	nl, err := egress.MarkResult(netlink.Open())
 	if err != nil {
 		return nil, err
 	}
-	hdr, req := netlink.ExpandMsgHdr(nil)
-	hdr.Type = rtnetlink.RTM_GETROUTE
-	hdr.Flags = netlink.NLM_F_REQUEST
-	rtm, req := netlink.ExpandRtMsg(req)
-	if dst.Is6() {
-		rtm.Family = af.INET6
-		rtm.DstLen = 128
-	} else {
-		rtm.Family = af.INET
-		rtm.DstLen = 32
-	}
-	req = netlink.CatBytesAttr(req, rtnetlink.RTA_DST, dst.AsSlice())
-	nl, err := netlink.Open()
+	defer nl.Close()
+	seq, err := egress.MarkResult(Req(nl, req))
 	if err != nil {
 		return nil, err
 	}
-	if err = nl.Request(req); err != nil {
-		return nil, err
-	}
-	strm := &stream{nl, hdr.SEQ}
-	defer strm.Close()
-	return strm.Next(ctx)
+	strm := stream{nl, seq}
+	return egress.MarkResult(strm.Next(ctx))
 }
 
-func Monitor(ctx context.Context) (Streamer, error) {
-	return nil, FIXME
-}
-
-func parseDstFlag(ctx context.Context) (dst netip.Addr, err error) {
-	args := ctxparm.Flags.In(ctx).Args()
-	s := ctxparm.SearchFlagsIn[string](ctx, "dst")
-	if len(s) == 0 {
-		if len(args) == 0 {
-			err = ErrNoDst
-			return
-		}
-		s = args[0]
-	}
-	if s == "default" {
-		if ctxparm.SearchFlagsIn[bool](ctx, "6") {
-			dst = netip.IPv6Unspecified()
-		} else {
-			dst = netip.IPv4Unspecified()
-		}
-		return
-	} else if s == "::" {
-		dst = netip.IPv6Unspecified()
-		return
-	} else if isnumeric(s) {
-		dst, err = netip.ParseAddr(s)
-		return
-	}
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, s)
-	if err != nil {
-		err = egress.Markf("%q %w", s, err)
-		return
-	}
-	var ok bool
-	dst, ok = netip.AddrFromSlice(addrs[0].IP)
-	if !ok {
-		err = egress.Markf("%v invalid", addrs[0].IP)
-	}
-	return
+// If successful, this returns the request sequence number.
+func Req(nl *netlink.NL, req []byte) (uint32, error) {
+	hdr := netlink.Pointer[netlink.MsgHdr](req)
+	err := nl.Request(req)
+	return hdr.SEQ, err
 }

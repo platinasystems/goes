@@ -10,37 +10,32 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/creack/pty"
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
 	"github.com/platinasystems/goes/v2/pkg/context/nbr"
 	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/io/flusher"
 	"github.com/platinasystems/goes/v2/pkg/os/utmpx"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const ExecUsageTemplate = `
-usage: {{.}} <rows> <cols> <x-pixels> <y-pixels> <command> [<args>]
+const ExecUsage = `
+usage: {{branch .}} <rows> <cols> <x-pixels> <y-pixels> <command> [<args>]
 Run command in an allocated TTY.`
 
-func ExecUsageData(ctx context.Context) any {
-	return strings.Join(ctxparm.Strings.In(ctx), " ")
-}
-
-func Exec(ctx context.Context, args ...string) error {
-	path := ctxparm.Strings.In(ctx)
-	r := ctxparm.Reader.In(ctx)
-	w := ctxparm.Writer.In(ctx)
+func Exec(ctx context.Context, args []string) error {
+	branch := goes.ContextBranch(ctx)
+	r := goes.ContextStdin(ctx)
+	w := goes.ContextStdout(ctx)
 
 	if *complete.Help {
 		return nil
 	}
 	if *usage.Help {
-		return usage.Error(ExecUsageTemplate[1:], ExecUsageData(ctx))
+		return goes.Usage(ctx, ExecUsage)
 	}
 	if n := len(args); n < 5 {
 		return fmt.Errorf("missing %s", []string{

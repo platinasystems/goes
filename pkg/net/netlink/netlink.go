@@ -100,9 +100,6 @@ type MsgErr struct {
 	MsgHdr
 }
 
-//go:generate stringer -output=zmsgerrattr_string.go -type=MsgErrAttr -trimprefix=NLMSGERR_ATTR_ .
-type MsgErrAttr uint8
-
 const (
 	NLMSGERR_ATTR_UNUSED = iota
 	NLMSGERR_ATTR_MSG
@@ -188,39 +185,27 @@ type Bitfield32 struct {
 	Selector uint32
 }
 
-//go:generate stringer -output=zattributetype_string.go -type=AttributeType -trimprefix=NL_ATTR_TYPE_ .
-type AttributeType uint16
-
 const (
-	NL_ATTR_TYPE_INVALID AttributeType = iota
-
+	NL_ATTR_TYPE_INVALID = iota
 	NL_ATTR_TYPE_FLAG
-
 	NL_ATTR_TYPE_U8
 	NL_ATTR_TYPE_U16
 	NL_ATTR_TYPE_U32
 	NL_ATTR_TYPE_U64
-
 	NL_ATTR_TYPE_S8
 	NL_ATTR_TYPE_S16
 	NL_ATTR_TYPE_S32
 	NL_ATTR_TYPE_S64
-
 	NL_ATTR_TYPE_BINARY
 	NL_ATTR_TYPE_STRING
 	NL_ATTR_TYPE_NUL_STRING
-
 	NL_ATTR_TYPE_NESTED
 	NL_ATTR_TYPE_NESTED_ARRAY
-
 	NL_ATTR_TYPE_BITFIELD32
 )
 
-//go:generate stringer -output=zpolicytypeattr_string.go -type=PolicyTypeAttr -trimprefix=NL_POLICY_TYPE_ATTR_ .
-type PolicyTypeAttr uint16
-
 const (
-	NL_POLICY_TYPE_ATTR_UNSPEC PolicyTypeAttr = iota
+	NL_POLICY_TYPE_ATTR_UNSPEC = iota
 	NL_POLICY_TYPE_ATTR_TYPE
 	NL_POLICY_TYPE_ATTR_MIN_VALUE_S
 	NL_POLICY_TYPE_ATTR_MAX_VALUE_S

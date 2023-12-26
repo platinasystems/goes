@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -13,29 +13,31 @@ import (
 
 // https://en.wikipedia.org/wiki/Internet_Control_Message_Protocol
 type ICMP struct {
-	Type ICMPType
+	Type uint8
 	Code uint8
 	Sum  big.Uint16
 }
 
 func (icmp *ICMP) Format(w fmt.State, verb rune) {
-	var code any
-	fmt.Fprint(w, "icmp: ")
+	typename := ICMPTypeName(icmp.Type)
+	if len(typename) == 0 {
+		typename = "unknown"
+	}
+	fmt.Fprint(w, "icmp: ", typename, ", ")
 	switch icmp.Type {
 	case ICMPTypeDestinationUnreachable:
-		code = ICMPUnreachableCode(icmp.Code)
+		fmt.Fprint(w, ICMPUnreachableCodeName(icmp.Code))
 	case ICMPTypeRedirectMessage:
-		code = ICMPRedirectCode(icmp.Code)
+		fmt.Fprint(w, ICMPRedirectCodeName(icmp.Code))
 	case ICMPTypeTimeExceeded:
-		code = ICMPTimeExceededCode(icmp.Code)
+		fmt.Fprint(w, ICMPTimeExceededCodeName(icmp.Code))
 	case ICMPTypeInvalidParamter:
-		code = ICMPInvalidParameterCode(icmp.Code)
+		fmt.Fprint(w, ICMPInvalidParameterCodeName(icmp.Code))
 	case ICMPTypeExtendedEchoReply:
-		code = ICMPExtendedEchoReplyCode(icmp.Code)
+		fmt.Fprint(w, ICMPExtendedEchoReplyCodeName(icmp.Code))
 	default:
-		code = icmp.Code
+		fmt.Fprint(w, icmp.Code)
 	}
-	fmt.Fprint(w, icmp.Type, ", ", code)
 }
 
 func (icmp *ICMP) IP() net.IP {
@@ -43,11 +45,8 @@ func (icmp *ICMP) IP() net.IP {
 	return net.IP(ip[:])
 }
 
-type ICMPType uint8
-
-//go:generate stringer -output=zicmp_type_string.go -type=ICMPType -trimprefix=ICMPType .
 const (
-	ICMPTypeEchoReply ICMPType = iota
+	ICMPTypeEchoReply = iota
 	_
 	_
 	ICMPTypeDestinationUnreachable
@@ -68,15 +67,14 @@ const (
 	ICMPTypeAddressMaskReeply
 )
 
-const ICMPTypeTraceRoute = ICMPType(30)
-const ICMPTypeExtendedEchoRequest = ICMPType(42)
-const ICMPTypeExtendedEchoReply = ICMPType(42)
-
-type ICMPUnreachableCode uint8
-
-//go:generate stringer -output=zicmp_unreachable_string.go -type=ICMPUnreachableCode -trimprefix=ICMPUnreachableCode .
 const (
-	ICMPUnreachableCodeNetworkUnreachable ICMPUnreachableCode = iota
+	ICMPTypeTraceRoute          = 30
+	ICMPTypeExtendedEchoRequest = 42
+	ICMPTypeExtendedEchoReply   = 42
+)
+
+const (
+	ICMPUnreachableCodeNetworkUnreachable = iota
 	ICMPUnreachableCodeHostUnreachable
 	ICMPUnreachableCodeProtocolUnreachable
 	ICMPUnreachableCodePortUnreachable
@@ -94,38 +92,26 @@ const (
 	ICMPUnreachableCodePrecedenceCutoff
 )
 
-type ICMPRedirectCode uint8
-
-//go:generate stringer -output=zicmp_redirect_string.go -type=ICMPRedirectCode -trimprefix=ICMPRedirectCode .
 const (
-	ICMPRedirectCodeNetwork ICMPRedirectCode = iota
+	ICMPRedirectCodeNetwork = iota
 	ICMPRedirectCodeHost
 	ICMPRedirectCodeTOSNetwork
 	ICMPRedirectCodeTOSHost
 )
 
-type ICMPTimeExceededCode uint8
-
-//go:generate stringer -output=zicmp_time_exceeded_string.go -type=ICMPTimeExceededCode -trimprefix=ICMPTimeExceededCode .
 const (
-	ICMPTimeExceededCodeTTL ICMPTimeExceededCode = iota
+	ICMPTimeExceededCodeTTL = iota
 	ICMPTimeExceededCodeFragmentReassembly
 )
 
-type ICMPInvalidParameterCode uint8
-
-//go:generate stringer -output=zicmp_invalid_parameter_string.go -type=ICMPInvalidParameterCode -trimprefix=ICMPInvalidParameterCode .
 const (
-	ICMPInvalidParameterCodePointer ICMPInvalidParameterCode = iota
+	ICMPInvalidParameterCodePointer = iota
 	ICMPInvalidParameterCodeMissingOption
 	ICMPInvalidParameterCodeLength
 )
 
-type ICMPExtendedEchoReplyCode uint8
-
-//go:generate stringer -output=zicmp_extended_echo_reply_string.go -type=ICMPExtendedEchoReplyCode -trimprefix=ICMPExtendedEchoReplyCode .
 const (
-	ICMPExtendedEchoReplyCodeNoError ICMPExtendedEchoReplyCode = iota
+	ICMPExtendedEchoReplyCodeNoError = iota
 	ICMPExtendedEchoReplyCodeMalformedQuery
 	ICMPExtendedEchoReplyCodeNoSuchInterface
 	ICMPExtendedEchoReplyCodeNoSuchTableEntry

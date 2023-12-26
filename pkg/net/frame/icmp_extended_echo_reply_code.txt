@@ -1,0 +1,5 @@
+no-error
+malformed-query
+no-such-interface
+no-such-table-entry
+ambiguous-interface

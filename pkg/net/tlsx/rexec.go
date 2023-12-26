@@ -6,49 +6,42 @@ package tlsx
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/creack/pty"
-	"github.com/platinasystems/goes/v2/pkg/context/ctxparm"
-	"github.com/platinasystems/goes/v2/pkg/errors/usage"
+	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 )
 
-const RexecUsageTemplate = `
-usage: {{.Path}} [<options>] <exchange> <command> [<args>]
+const RexecUsage = `
+usage: {{branch .}} [<options>] <exchange> <command> [<args>]
 Remote execution.
 
 <exchange>
 	<name>[@<dns|ip4|\[ip6\]>][:<port>]
-{{.Flag}}`
+{{flags .}}`
 
-func RexecUsageData(ctx context.Context) any {
-	return struct{ Path, Flag string }{
-		strings.Join(ctxparm.Strings.In(ctx), " "),
-		ctxparm.SprintFlagsIn(ctx),
-	}
-}
-
-func Rexec(ctx context.Context, args ...string) error {
-	if *complete.Help {
-		if len(args) <= 1 {
-			return complete.Last(args, Self().DNS0(),
+func Rexec(ctx context.Context, args []string) error {
+	var flags flag.FlagSet
+	ctx = goes.FlagsContext(ctx, &flags)
+	self := Self()
+	if goes.ContextComplete(ctx) {
+		if len(args) <= 1 && self != nil {
+			return complete.Last(args, self.DNS0(),
 				Subscriptions().Names())
 		}
 		return nil
 	}
-	flags := usage.NewFlags("rexec")
-	ctx = ctxparm.Flags.With(ctx, flags)
 	iflag := flags.String("i", "", "Input FILE or '-' for STDIN.")
 	tflag := flags.Bool("t", false, "Allocate a pseudo-TTY.")
-	err := flags.Parse(args)
+	ctx, err := goes.ParseFlagsContext(ctx, args)
 	if err != nil {
 		return err
 	}
-	if *usage.Help {
-		return usage.Error(RexecUsageTemplate[1:], RexecUsageData(ctx))
+	if goes.ContextHelp(ctx) {
+		return goes.Usage(ctx, RexecUsage)
 	}
 	args = flags.Args()
 	if len(args) == 0 {
@@ -60,8 +53,8 @@ func Rexec(ctx context.Context, args ...string) error {
 		return ErrIncomplete
 	}
 
-	r := ctxparm.Reader.In(ctx)
-	w := ctxparm.Writer.In(ctx)
+	r := goes.ContextStdin(ctx)
+	w := goes.ContextStdout(ctx)
 
 	var anyargs []any
 	if *tflag {
