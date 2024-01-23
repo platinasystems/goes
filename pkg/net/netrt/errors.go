@@ -7,10 +7,11 @@ package netrt
 import "errors"
 
 var (
-	ErrSRCH      = errors.New("not in table")
-	ErrBUSY      = errors.New("entry in use")
-	ErrNOBUFS    = errors.New("not enough memory")
-	ErrADDRINUSE = errors.New("gateway uses the same route")
-	ErrEXIST     = errors.New("route already in table")
-	FIXME        = errors.New("FIXME")
+	ErrSRCH        = errors.New("not in table")
+	ErrBUSY        = errors.New("entry in use")
+	ErrNOBUFS      = errors.New("not enough memory")
+	ErrADDRINUSE   = errors.New("gateway uses the same route")
+	ErrEXIST       = errors.New("route already in table")
+	ErrUnsupported = errors.New("unsupported")
+	FIXME          = errors.New("FIXME")
 )

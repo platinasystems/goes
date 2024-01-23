@@ -11,12 +11,12 @@ import (
 	"log"
 	"net"
 	"net/netip"
-	"strings"
 	"text/tabwriter"
 	"time"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/net/af"
+	"github.com/platinasystems/goes/v2/pkg/net/iff"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
@@ -176,8 +176,8 @@ func (nrt *netrt) Format(w fmt.State, verb rune) {
 			fmt.Fprintf(w, "%11s: %s\n", s, rtname(v))
 		}
 	}
-	fmt.Fprintf(w, "%11s: %s\n", "interface", ifname(nrt.Index()))
-	fmt.Fprintf(w, "%11s: <%s>\n", "flags", ifflags(nrt.flags))
+	fmt.Fprintf(w, "%11s: %s\n", "interface", netif.Name(nrt.Index()))
+	fmt.Fprintf(w, "%11s: <%s>\n", "flags", iff.Names(nrt.flags))
 	tw := tabwriter.NewWriter(w, 9, 0, 1, ' ', tabwriter.AlignRight)
 	defer tw.Flush()
 	fmt.Fprint(tw, "recvpipe", "\t")
@@ -221,60 +221,10 @@ func rtname(v any) string {
 		return t.String()
 	case *link:
 		if len(t.ha) == 0 {
-			return ifname(int(t.line))
+			return netif.Name(int(t.line))
 		}
-		return fmt.Sprintf("%s[%v]", ifname(int(t.line)), t.ha)
+		return fmt.Sprintf("%s[%v]", netif.Name(int(t.line)), t.ha)
 	default:
 		return fmt.Sprintf("%#v", v)
 	}
-}
-
-func ifname(index int) string {
-	if nif := netif.Indexed(index); nif != nil {
-		return nif.Name
-	}
-	return fmt.Sprintf("%d", index)
-}
-
-func ifflags(rtf int32) string {
-	var sb strings.Builder
-	for i, s := range []string{
-		"up",        //	RTF_UP		0x1
-		"gateway",   //	RTF_GATEWAY	0x2
-		"host",      //	RTF_HOST	0x4
-		"reject",    //	RTF_REJECT	0x8
-		"dynamic",   //	RTF_DYNAMIC	0x10
-		"modified",  //	RTF_MODIFIED	0x20
-		"done",      //	RTF_DONE	0x40
-		"delclone",  //	RTF_DELCLONE	0x80
-		"cloning",   //	RTF_CLONING	0x100
-		"xresolve",  //	RTF_XRESOLVE	0x200
-		"llinfo",    //	RTF_LLINFO	0x400
-		"static",    //	RTF_STATIC	0x800
-		"blackhole", //	RTF_BLACKHOLE	0x1000
-		"",          //			0x2000
-		"proto2",    //	RTF_PROTO2	0x4000
-		"proto1",    //	RTF_PROTO1	0x8000
-		"prcloning", //	RTF_PRCLONING	0x10000
-		"wascloned", //	RTF_WASCLONED	0x20000
-		"proto3",    //	RTF_PROTO3	0x40000
-		"",          //			0x80000
-		"pinned",    //	RTF_PINNED	0x100000
-		"local",     //	RTF_LOCAL	0x200000
-		"broadcast", //	RTF_BROADCAST	0x400000
-		"multicast", //	RTF_MULTICAST	0x800000
-		"ifscope",   //	RTF_IFSCOPE	0x1000000
-		"condemned", //	RTF_CONDEMNED	0x2000000
-		"ifref",     //	RTF_IFREF	0x4000000
-		"proxy",     //	RTF_PROXY	0x8000000
-		"router",    //	RTF_ROUTER	0x10000000
-	} {
-		if rtf&(1<<i) != 0 {
-			if sb.Len() > 0 {
-				sb.WriteRune(',')
-			}
-			sb.WriteString(s)
-		}
-	}
-	return sb.String()
 }

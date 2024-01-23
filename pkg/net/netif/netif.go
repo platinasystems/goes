@@ -125,45 +125,23 @@ func (nif *NetIf) Format(w fmt.State, verb rune) {
 	}
 }
 
-var cache struct {
-	nifs    []*NetIf
-	indexed map[int]*NetIf
-	named   map[string]*NetIf
-}
-
-var validate = sync.OnceFunc(func() {
-	var err error
-
-	ctx := context.Background()
-
-	ctx, stop := signal.NotifyContext(ctx, termination.Signals...)
-	defer stop()
-
-	cache.nifs, err = List(ctx)
-	if err != nil {
-		panic(err)
-	}
-	cache.indexed = make(map[int]*NetIf)
-	cache.named = make(map[string]*NetIf)
-	for _, nif := range cache.nifs {
-		cache.indexed[nif.Index] = nif
-		cache.named[nif.Name] = nif
-	}
-})
-
 func Indexed(i int) *NetIf {
-	validate()
-	return cache.indexed[i]
+	return cache().byIndex[i]
 }
 
 func Interfaces() []*NetIf {
-	validate()
-	return cache.nifs
+	return cache().list
+}
+
+func Name(i int) string {
+	if nif := Indexed(i); nif != nil {
+		return nif.Name
+	}
+	return fmt.Sprintf("%d", i)
 }
 
 func Named(s string) *NetIf {
-	validate()
-	return cache.named[s]
+	return cache().byName[s]
 }
 
 func Range(f func(*NetIf) bool) {
@@ -173,3 +151,28 @@ func Range(f func(*NetIf) bool) {
 		}
 	}
 }
+
+var cache = sync.OnceValue(func() (nifs struct {
+	list    []*NetIf
+	byIndex map[int]*NetIf
+	byName  map[string]*NetIf
+}) {
+
+	var err error
+
+	ctx := context.Background()
+
+	ctx, stop := signal.NotifyContext(ctx, termination.Signals...)
+	defer stop()
+
+	if nifs.list, err = List(ctx); err != nil {
+		panic(err)
+	}
+	nifs.byIndex = make(map[int]*NetIf)
+	nifs.byName = make(map[string]*NetIf)
+	for _, nif := range nifs.list {
+		nifs.byIndex[nif.Index] = nif
+		nifs.byName[nif.Name] = nif
+	}
+	return nifs
+})
