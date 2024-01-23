@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
+	"golang.org/x/sys/unix"
 )
 
 const ND6_INFINITE_LIFETIME = 0xffffffff
@@ -64,7 +64,7 @@ func (nif *NetIf) add4(
 		req.Value.Dest.Write(dest.AsSlice())
 	}
 	req.Value.Mask.Write(net.CIDRMask(prefix.Bits(), bits))
-	return args, netioctl.Inet(syscall.SIOCAIFADDR, req)
+	return args, netioctl.Inet(unix.SIOCAIFADDR, req)
 }
 
 func (nif *NetIf) add6(
@@ -110,7 +110,7 @@ func (nif *NetIf) Del(
 	if addr.Is4() {
 		req := netioctl.NewIfReqSockaddrIn(nif.Name)
 		req.Value.Write(prefix.Addr().AsSlice())
-		return egress.Mark(netioctl.Inet(syscall.SIOCDIFADDR, req))
+		return egress.Mark(netioctl.Inet(unix.SIOCDIFADDR, req))
 	}
 	req := netioctl.NewIfReqSockaddrIn6(nif.Name)
 	req.Value.Write(addr.AsSlice())

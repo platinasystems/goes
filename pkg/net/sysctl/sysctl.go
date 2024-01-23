@@ -9,8 +9,9 @@ package sysctl
 
 import (
 	"os"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const MsgMin = 4
@@ -22,7 +23,7 @@ func MsgLen(data []byte) int {
 func MsgType(data []byte) uint8 { return data[3] }
 
 func MsgOK(data []byte, types ...uint8) bool {
-	if data[2] == syscall.RTM_VERSION {
+	if data[2] == unix.RTM_VERSION {
 		for _, t := range types {
 			if MsgType(data) == t {
 				return true
@@ -46,10 +47,10 @@ func Get(mib ...int32) ([]byte, error) {
 		b := make([]byte, n)
 		if err := sysctl(mib, &b[0], &n, nil, 0); err == nil {
 			return b[:n], nil
-		} else if err != syscall.ENOMEM {
+		} else if err != unix.ENOMEM {
 			return nil, os.NewSyscallError("sysctl", err)
 		}
 		b = b[:0]
 	}
-	return nil, syscall.ENOMEM
+	return nil, unix.ENOMEM
 }

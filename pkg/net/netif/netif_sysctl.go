@@ -10,17 +10,17 @@ import (
 	"context"
 	"net"
 	"net/netip"
-	"syscall"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
-type IfMsgHdr = syscall.IfMsghdr
-type IfData = syscall.IfData
-type IfaMsgHdr = syscall.IfaMsghdr
+type IfMsgHdr = unix.IfMsghdr
+type IfData = unix.IfData
+type IfaMsgHdr = unix.IfaMsghdr
 
 func Extract[T Msgs](data []byte) (p *T, body, rem []byte) {
 	l := sysctl.MsgLen(data)
@@ -40,11 +40,11 @@ func Sizeof[T Msgs](p *T) int {
 
 func List(ctx context.Context) (nifs []*NetIf, err error) {
 	rib, err := sysctl.Get(
-		syscall.CTL_NET,
+		unix.CTL_NET,
 		af.ROUTE,
 		0,
 		af.UNSPEC,
-		syscall.NET_RT_IFLIST,
+		unix.NET_RT_IFLIST,
 		0,
 	)
 	if err != nil {
@@ -56,7 +56,7 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 		if len(data) < msglen {
 			break
 		}
-		if !sysctl.MsgOK(data, syscall.RTM_IFINFO) {
+		if !sysctl.MsgOK(data, unix.RTM_IFINFO) {
 			data = data[msglen:]
 			continue
 		}
@@ -71,22 +71,22 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 			nifs = append(nifs, nif)
 			nifByIndex[nif.Index] = nif
 		}
-		if (im.Flags & int32(syscall.IFF_UP)) != 0 {
+		if (im.Flags & int32(unix.IFF_UP)) != 0 {
 			nif.Flags |= net.FlagUp
 		}
-		if (im.Flags & int32(syscall.IFF_BROADCAST)) != 0 {
+		if (im.Flags & int32(unix.IFF_BROADCAST)) != 0 {
 			nif.Flags |= net.FlagBroadcast
 		}
-		if (im.Flags & int32(syscall.IFF_LOOPBACK)) != 0 {
+		if (im.Flags & int32(unix.IFF_LOOPBACK)) != 0 {
 			nif.Flags |= net.FlagLoopback
 		}
-		if (im.Flags & int32(syscall.IFF_POINTOPOINT)) != 0 {
+		if (im.Flags & int32(unix.IFF_POINTOPOINT)) != 0 {
 			nif.Flags |= net.FlagPointToPoint
 		}
-		if (im.Flags & int32(syscall.IFF_MULTICAST)) != 0 {
+		if (im.Flags & int32(unix.IFF_MULTICAST)) != 0 {
 			nif.Flags |= net.FlagMulticast
 		}
-		if (im.Flags & int32(syscall.IFF_RUNNING)) != 0 {
+		if (im.Flags & int32(unix.IFF_RUNNING)) != 0 {
 			nif.Flags |= net.FlagRunning
 		}
 		nif.Type = int(im.Data.Type)
@@ -108,7 +108,7 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 		if len(data) < msglen {
 			break
 		}
-		if !sysctl.MsgOK(data, syscall.RTM_NEWADDR) {
+		if !sysctl.MsgOK(data, unix.RTM_NEWADDR) {
 			data = data[msglen:]
 			continue
 		}
@@ -123,7 +123,7 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 			bits int
 		)
 		const min = sockaddr.Min
-		for i := 0; i < syscall.RTAX_MAX && len(body) > min; i++ {
+		for i := 0; i < unix.RTAX_MAX && len(body) > min; i++ {
 			if (int(ifa.Addrs) & (1 << i)) == 0 {
 				continue
 			}
@@ -132,17 +132,17 @@ func List(ctx context.Context) (nifs []*NetIf, err error) {
 				break
 			}
 			switch i {
-			case syscall.RTAX_DST:
+			case unix.RTAX_DST:
 				nif.Extra["dst"] = sockaddr.IP(body)
-			case syscall.RTAX_GATEWAY:
+			case unix.RTAX_GATEWAY:
 				nif.Extra["gw"] = sockaddr.IP(body)
-			case syscall.RTAX_NETMASK:
+			case unix.RTAX_NETMASK:
 				ip := sockaddr.IP(body)
 				bits, _ = net.IPMask(ip.AsSlice()).Size()
-			case syscall.RTAX_IFA:
+			case unix.RTAX_IFA:
 				addr = sockaddr.IP(body)
-			case syscall.RTAX_AUTHOR:
-			case syscall.RTAX_BRD:
+			case unix.RTAX_AUTHOR:
+			case unix.RTAX_BRD:
 				nif.Extra["brd"] = sockaddr.IP(body)
 			}
 			body = body[sysctl.Align(sal):]

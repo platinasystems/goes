@@ -5,7 +5,7 @@ go 1.21.1
 require (
 	github.com/creack/pty v1.1.18
 	github.com/prometheus-community/pro-bing v0.3.0
-	golang.org/x/sys v0.10.0
+	golang.org/x/sys v0.16.0
 	golang.org/x/term v0.10.0
 	golang/buildid v1.19.1+incompatible
 )

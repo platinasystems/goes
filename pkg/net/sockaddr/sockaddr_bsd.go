@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -9,12 +9,12 @@ package sockaddr
 import (
 	"net"
 	"net/netip"
-	"syscall"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/align"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
-	"github.com/platinasystems/goes/v2/pkg/syscall/align"
+	"golang.org/x/sys/unix"
 )
 
 const Min = 2
@@ -22,7 +22,7 @@ const Min = 2
 func Len(data []byte) int     { return int(data[0]) }
 func Family(data []byte) uint { return uint(data[1]) }
 
-type In struct{ syscall.RawSockaddrInet4 }
+type In struct{ unix.RawSockaddrInet4 }
 
 func (sa *In) Write(addr []byte) (int, error) {
 	sa.Len = uint8(Sizeof(sa))
@@ -30,7 +30,7 @@ func (sa *In) Write(addr []byte) (int, error) {
 	return copy(sa.Addr[:], addr), nil
 }
 
-type In6 struct{ syscall.RawSockaddrInet6 }
+type In6 struct{ unix.RawSockaddrInet6 }
 
 func (sa *In6) Write(addr []byte) (int, error) {
 	sa.Len = uint8(Sizeof(sa))
@@ -62,7 +62,7 @@ func IP(data []byte) (ip netip.Addr) {
 	return
 }
 
-// Replaced syscall.RawSockaddrDatalink b/c it's
+// Replaced RawSockaddrDatalink b/c it's
 //
 //	Data   [12]int8
 //

@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -8,11 +8,11 @@ package netrt
 
 import (
 	"context"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
 type list struct{ data []byte }
@@ -27,11 +27,11 @@ func NewList(ctx context.Context) (Streamer, error) {
 		family = af.UNSPEC
 	}
 	data, err := sysctl.Get(
-		syscall.CTL_NET,
+		unix.CTL_NET,
 		af.ROUTE,
 		0,
 		family,
-		syscall.NET_RT_DUMP,
+		unix.NET_RT_DUMP,
 		0,
 		// FIXME fib?
 	)
@@ -55,14 +55,14 @@ func (l *list) Next(ctx context.Context) (NetRt, error) {
 		n := sysctl.Align(int(rtm.Msglen))
 		msg := l.data[:n]
 		l.data = l.data[n:]
-		if rtm.Version != syscall.RTM_VERSION {
+		if rtm.Version != unix.RTM_VERSION {
 			continue
 		}
-		if rtm.Type != syscall.RTM_GET {
+		if rtm.Type != unix.RTM_GET {
 			continue
 		}
 		// macOS seems to filter routes with both of these flags
-		const gh = syscall.RTF_GATEWAY | syscall.RTF_HOST
+		const gh = unix.RTF_GATEWAY | unix.RTF_HOST
 		if (rtm.Flags & gh) == gh {
 			continue
 		}

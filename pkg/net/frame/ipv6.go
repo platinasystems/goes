@@ -6,7 +6,6 @@ package frame
 
 import (
 	"fmt"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/omni"
@@ -27,11 +26,11 @@ func (ipv6 *IPv6) Format(w fmt.State, verb rune) {
 	switch nh := ipv6.NextHeader.Value(); nh {
 	case 0:
 		fmt.Fprint(w, ProtoMark, (*Hop6)(Data(ipv6)))
-	case syscall.IPPROTO_ICMPV6:
+	case IPPROTO_ICMPV6:
 		fmt.Fprint(w, ProtoMark, (*ICMP6)(Data(ipv6)))
-	case syscall.IPPROTO_TCP:
+	case IPPROTO_TCP:
 		fmt.Fprint(w, ProtoMark, (*TCP)(Data(ipv6)))
-	case syscall.IPPROTO_UDP:
+	case IPPROTO_UDP:
 		fmt.Fprint(w, ProtoMark, (*UDP)(Data(ipv6)))
 	default:
 		fmt.Fprintf(w, ", next[%#x]", nh)

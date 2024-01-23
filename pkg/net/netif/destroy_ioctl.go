@@ -8,12 +8,12 @@ package netif
 
 import (
 	"context"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
+	"golang.org/x/sys/unix"
 )
 
 func (nif *NetIf) Destroy(ctx context.Context) error {
 	req := netioctl.NewIfReqNothing(nif.Name)
-	return netioctl.Inet(syscall.SIOCIFDESTROY, req)
+	return netioctl.Inet(unix.SIOCIFDESTROY, req)
 }

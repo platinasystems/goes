@@ -6,7 +6,6 @@ package frame
 
 import (
 	"fmt"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/omni"
@@ -35,11 +34,11 @@ type IPv4 struct {
 func (ipv4 *IPv4) Format(w fmt.State, verb rune) {
 	fmt.Fprint(w, "ipv4: ", ipv4.DA.Value(), " <- ", ipv4.SA.Value())
 	switch proto := ipv4.Protocol.Value(); proto {
-	case syscall.IPPROTO_ICMP:
+	case IPPROTO_ICMP:
 		fmt.Fprint(w, ProtoMark, (*ICMP)(Data(ipv4)))
-	case syscall.IPPROTO_TCP:
+	case IPPROTO_TCP:
 		fmt.Fprint(w, ProtoMark, (*TCP)(Data(ipv4)))
-	case syscall.IPPROTO_UDP:
+	case IPPROTO_UDP:
 		fmt.Fprint(w, ProtoMark, (*UDP)(Data(ipv4)))
 	default:
 		fmt.Fprintf(w, ", proto[%#x]", proto)

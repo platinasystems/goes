@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -10,11 +10,11 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
 type appendAddrFunc func(context.Context, []byte) ([]byte, error)
@@ -34,7 +34,7 @@ func NewRtMsg() []byte {
 	rtm := PointerRtMsghdr(msg)
 	msg = msg[:Sizeof(rtm)]
 	// rtm.Type = rtmt
-	rtm.Version = syscall.RTM_VERSION
+	rtm.Version = unix.RTM_VERSION
 	rtm.Seq = seq.Add(1)
 	return msg
 }
@@ -51,29 +51,29 @@ func Request(msg []byte, fib int) (NetRt, error) {
 		err = FIXME
 		// FIXME darwin doesn't have SO_SETFIB so contrain like this
 		// err = sock.SetFib(fib)
-		// err = os.NewSyscallError("SO_SETFIB", syscall.
-		// 	SetsockoptInt(int(sock), syscall.SOL_SOCKET,
-		// 		syscall.SO_SETFIB, fib))
+		// err = os.NewSyscallError("SO_SETFIB",
+		// 	 unix.SetsockoptInt(int(sock), unix.SOL_SOCKET,
+		// 		unix.SO_SETFIB, fib))
 		if err != nil {
 			return nil, err
 		}
 	}
 	if _, err = af.Write(sock, msg); err != nil {
 		switch {
-		case errors.Is(err, syscall.ESRCH):
+		case errors.Is(err, unix.ESRCH):
 			return nil, ErrSRCH
-		case errors.Is(err, syscall.EBUSY):
+		case errors.Is(err, unix.EBUSY):
 			return nil, ErrBUSY
-		case errors.Is(err, syscall.ENOBUFS):
+		case errors.Is(err, unix.ENOBUFS):
 			return nil, ErrNOBUFS
-		case errors.Is(err, syscall.EADDRINUSE):
+		case errors.Is(err, unix.EADDRINUSE):
 			return nil, ErrADDRINUSE
-		case errors.Is(err, syscall.EEXIST):
+		case errors.Is(err, unix.EEXIST):
 			return nil, ErrEXIST
 		default:
 			return nil, egress.Markf("%w\n%#v", err, rtm)
 		}
-	} else if rtm.Type != syscall.RTM_GET {
+	} else if rtm.Type != unix.RTM_GET {
 		return nil, nil
 	}
 	msg = msg[:cap(msg)]

@@ -10,14 +10,14 @@ package netioctl
 
 import (
 	"os"
-	"syscall"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
-const IFNAMSIZ = syscall.IFNAMSIZ
+const IFNAMSIZ = unix.IFNAMSIZ
 
 type IFCAPs struct{ Req, Cur uint32 }
 
@@ -114,9 +114,9 @@ func ioctl[FD ~int, R IfReq[Nothing] |
 	fd FD, op uintptr, req *R,
 ) error {
 	if op == 0 {
-		return syscall.EOPNOTSUPP
+		return unix.EOPNOTSUPP
 	}
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), op,
+	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), op,
 		uintptr(unsafe.Pointer(req)))
 	if errno != 0 {
 		return os.NewSyscallError("ioctl", errno)

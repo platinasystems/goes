@@ -5,19 +5,20 @@
 package netif
 
 import (
-	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
-const SIOCIFCREATE = syscall.SIOCIFCREATE2
+const SIOCIFCREATE = unix.SIOCIFCREATE2
 
-type IfmaMsgHdr = syscall.IfmaMsghdr
+type IfmaMsgHdr = unix.IfmaMsghdr
 
 type Msgs interface {
 	IfMsgHdr | IfaMsgHdr | IfmaMsgHdr
 }
 
-func (nif *NetIf) ExtraIfData(ifdata *syscall.IfData) {
+func (nif *NetIf) ExtraIfData(ifdata *unix.IfData) {
 	if ifdata.Metric != 0 {
 		nif.Extra["metric"] = ifdata.Metric
 	}

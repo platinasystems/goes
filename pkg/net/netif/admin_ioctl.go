@@ -8,16 +8,16 @@ package netif
 
 import (
 	"context"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
+	"golang.org/x/sys/unix"
 )
 
 func Down(ctx context.Context, ifname string) error {
-	return netioctl.Admin(ifname, 0, syscall.IFF_UP)
+	return netioctl.Admin(ifname, 0, unix.IFF_UP)
 }
 
 func Up(ctx context.Context, ifname string) error {
-	const iff = syscall.IFF_UP | syscall.IFF_RUNNING
+	const iff = unix.IFF_UP | unix.IFF_RUNNING
 	return netioctl.Admin(ifname, iff, 0)
 }

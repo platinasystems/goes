@@ -1,4 +1,4 @@
-// Copyright © 2022 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -7,7 +7,6 @@ package ensure
 import (
 	"bytes"
 	"io"
-	"syscall"
 )
 
 // Newline returns a wrapper that, if necessary, writes a trailing newline
@@ -31,7 +30,7 @@ func (p *nw) Write(b []byte) (int, error) {
 
 func (p *nw) Close() error {
 	if p == nil || p.w == nil {
-		return syscall.EINVAL
+		return EINVAL
 	}
 	if !bytes.HasSuffix(p.b.Bytes(), nl) {
 		p.w.Write(nl)

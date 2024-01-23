@@ -6,7 +6,6 @@ package frame
 
 import (
 	"fmt"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/omni"
 )
@@ -34,11 +33,11 @@ func (hop *Hop6) Format(w fmt.State, verb rune) {
 		if t != 59 {
 			fmt.Fprint(w, ProtoMark, (*Hop6)(Data(hop)))
 		}
-	} else if t == syscall.IPPROTO_ICMPV6 {
+	} else if t == IPPROTO_ICMPV6 {
 		fmt.Fprint(w, (*ICMP6)(Data(hop)))
-	} else if t == syscall.IPPROTO_TCP {
+	} else if t == IPPROTO_TCP {
 		fmt.Fprint(w, (*TCP)(Data(hop)))
-	} else if t == syscall.IPPROTO_UDP {
+	} else if t == IPPROTO_UDP {
 		fmt.Fprint(w, (*UDP)(Data(hop)))
 	} else {
 		fmt.Fprintf(w, "proto %#x", t)

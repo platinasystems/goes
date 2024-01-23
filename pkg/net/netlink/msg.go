@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -6,15 +6,15 @@ package netlink
 
 import (
 	"net/netip"
-	"syscall"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/integer"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
 type Messages interface {
@@ -128,7 +128,7 @@ var (
 
 func (m *MsgErr) Err() error {
 	if m.Error != 0 {
-		return syscall.Errno(-m.Error)
+		return unix.Errno(-m.Error)
 	}
 	return nil
 }

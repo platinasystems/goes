@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,21 +11,21 @@ import (
 	"errors"
 	"fmt"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/fdsel"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/iflink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
 	"github.com/platinasystems/goes/v2/pkg/os/page"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
-	"github.com/platinasystems/goes/v2/pkg/syscall/fdset"
+	"golang.org/x/sys/unix"
 )
 
 const SOL_NETLINK = 270
 
 type NL struct {
 	sock af.Netlink
-	addr syscall.Sockaddr
+	addr unix.Sockaddr
 	seq  atomic.Uint32
 	pid  uint32
 	buf  []byte
@@ -45,7 +45,7 @@ func Open(optval ...int) (nl *NL, err error) {
 	}()
 	for ; len(optval) >= 2; optval = optval[2:] {
 		opt, val := optval[0], optval[1]
-		err = syscall.SetsockoptInt(int(sock), SOL_NETLINK, opt, val)
+		err = unix.SetsockoptInt(int(sock), SOL_NETLINK, opt, val)
 		if err = egress.Mark(err); err != nil {
 			return
 		}
@@ -59,7 +59,7 @@ func Open(optval ...int) (nl *NL, err error) {
 	if err = egress.Mark(err); err != nil {
 		return
 	}
-	if lsanl, ok := lsa.(*syscall.SockaddrNetlink); !ok {
+	if lsanl, ok := lsa.(*unix.SockaddrNetlink); !ok {
 		err = egress.Mark(ErrInvalid)
 	} else {
 		nl = &NL{
@@ -132,22 +132,22 @@ func IsDone(ctx context.Context) bool {
 // This returns references to the next netlink message header and data that the
 // caller must release before subsequent Next calls.
 func (nl *NL) Next(ctx context.Context) (*MsgHdr, []byte, error) {
-	const peek = syscall.MSG_PEEK | syscall.MSG_TRUNC | syscall.MSG_DONTWAIT
-	const donotwait = syscall.MSG_DONTWAIT
+	const peek = unix.MSG_PEEK | unix.MSG_TRUNC | unix.MSG_DONTWAIT
+	const donotwait = unix.MSG_DONTWAIT
 	fd := int(nl.sock)
 	if len(nl.rem) < NLMSG_HDRLEN {
 		if IsDone(ctx) {
 			return nil, nil, ctx.Err()
 		}
 		for {
-			var sel fdset.Selection
+			var sel fdsel.Selection
 			sel.Read.Set(fd)
 			err := sel.Select()
 			if IsDone(ctx) {
 				return nil, nil, ctx.Err()
 			}
 			if err != nil {
-				if errors.Is(err, syscall.EAGAIN) {
+				if errors.Is(err, unix.EAGAIN) {
 					continue
 				}
 				return nil, nil, egress.Mark(err)

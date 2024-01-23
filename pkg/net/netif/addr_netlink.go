@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,10 +11,10 @@ import (
 	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/ifaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/netlink/rtnetlink"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
 )
 
 const AddressCommands = `

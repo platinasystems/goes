@@ -12,13 +12,13 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/flag/flagset"
 	"github.com/platinasystems/goes/v2/pkg/integer"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/netrt"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
+	"golang.org/x/sys/unix"
 )
 
 var routeModBranch = map[string]any{
@@ -53,13 +53,33 @@ Lookup and display the route for a destination.
 {{dstopts}}`,
 }
 
+type routeGatewayFlag struct {
+	rtf  uint
+	name string
+	val  bool
+	dsc  string
+}
+
+type routeGatewayMetric struct {
+	name string
+	val  uint
+	dsc  string
+}
+
 func routeGatewayOptions() *flag.FlagSet {
 	opts := new(flag.FlagSet)
 	opts.String("genmask", "", "FIXME")
 	opts.String("ifa", "", "A MAC address of a point-to-point peer?")
 	opts.String("ifp", "", "A point-to-point peer interface and MAC?")
-	netrt.AddFlags(opts)
-	netrt.AddMetricFlags(opts)
+	iface := opts.Bool("interface", false,
+		"<gateway> is a point-to-point interface name")
+	opts.BoolVar(iface, "iface", *iface, "aka -interface")
+	for _, o := range routeGatewayFlags {
+		opts.Bool(o.name, o.val, o.dsc)
+	}
+	for _, o := range routeGatewayMetrics {
+		opts.Uint(o.name, o.val, o.dsc)
+	}
 	return opts
 }
 
@@ -80,33 +100,39 @@ func routeModReq(
 		}
 		switch cmd {
 		case "add":
-			rtm.Type = syscall.RTM_ADD
+			rtm.Type = unix.RTM_ADD
 		case "change":
-			rtm.Type = syscall.RTM_CHANGE
+			rtm.Type = unix.RTM_CHANGE
 		}
-		integer.Set(&rtm.Flags, netrt.RTF_UP)
+		integer.Set(&rtm.Flags, unix.RTF_UP)
 		if dst.Bits() == dst.Addr().BitLen() {
-			integer.Set(&rtm.Flags, netrt.RTF_HOST)
+			integer.Set(&rtm.Flags, unix.RTF_HOST)
 		}
-		netrt.SetFlags(rtm, opts)
-		netrt.SetMetrics(rtm, opts)
+		for _, o := range routeGatewayFlags {
+			if flagset.Search[bool](opts, o.name) {
+				integer.Set(&rtm.Flags, o.rtf)
+			} else {
+				integer.Reset(&rtm.Flags, o.rtf)
+			}
+		}
+		routeSetMetrics(rtm, opts)
 	case "del":
-		rtm.Type = syscall.RTM_DELETE
-		integer.Set(&rtm.Flags, netrt.RTF_PINNED)
+		rtm.Type = unix.RTM_DELETE
+		routeSetDelFlag(rtm)
 	case "get":
-		rtm.Type = syscall.RTM_GET
+		rtm.Type = unix.RTM_GET
 	default:
 		return nil, fmt.Errorf("%q %w", cmd, ErrUnsupported)
 	}
 	msg = sockaddr.Append(msg, dst.Addr())
 	rtm = netrt.PointerRtMsghdr(msg)
-	integer.Set(&rtm.Addrs, 1<<syscall.RTAX_DST)
+	integer.Set(&rtm.Addrs, 1<<unix.RTAX_DST)
 	switch t := gw.(type) {
 	case netip.Addr:
 		msg = sockaddr.Append(msg, t)
 		rtm = netrt.PointerRtMsghdr(msg)
-		integer.Set(&rtm.Addrs, 1<<syscall.RTAX_GATEWAY)
-		integer.Set(&rtm.Flags, netrt.RTF_GATEWAY)
+		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
+		integer.Set(&rtm.Flags, unix.RTF_GATEWAY)
 	case []net.IPAddr:
 		ipa := routeSelectGateway(t, dst.Addr().Is6())
 		gwaddr, ok := netip.AddrFromSlice(ipa.IP)
@@ -116,8 +142,8 @@ func routeModReq(
 		}
 		msg = sockaddr.Append(msg, gwaddr)
 		rtm = netrt.PointerRtMsghdr(msg)
-		integer.Set(&rtm.Addrs, 1<<syscall.RTAX_GATEWAY)
-		integer.Set(&rtm.Flags, netrt.RTF_GATEWAY)
+		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
+		integer.Set(&rtm.Flags, unix.RTF_GATEWAY)
 	case *netif.NetIf:
 		msg = sockaddr.AppendDl(msg,
 			uint16(t.Index),
@@ -126,7 +152,7 @@ func routeModReq(
 			t.HardwareAddr,
 			[]byte{})
 		rtm = netrt.PointerRtMsghdr(msg)
-		integer.Set(&rtm.Addrs, 1<<syscall.RTAX_GATEWAY)
+		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 	default:
 		return nil, fmt.Errorf("<gateway>: %w", ErrInvalid)
 	}
@@ -139,7 +165,7 @@ func routeModReq(
 		}
 		msg = sockaddr.Append(msg, maskaddr)
 		rtm = netrt.PointerRtMsghdr(msg)
-		integer.Set(&rtm.Addrs, 1<<syscall.RTAX_NETMASK)
+		integer.Set(&rtm.Addrs, 1<<unix.RTAX_NETMASK)
 	}
 	if s := flagset.Search[string](opts, "genmask"); len(s) > 0 {
 		// FIXME e.g. 255.255.255.255 ?

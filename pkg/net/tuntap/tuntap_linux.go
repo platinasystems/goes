@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"syscall"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
+	"golang.org/x/sys/unix"
 )
 
 //go:generate sh -c "go tool cgo -godefs -- if_tun_linux.go > zif_tun_linux.go"
@@ -56,52 +56,52 @@ func New(
 		if _, err = os.Stat("/dev/net"); err != nil {
 			return nil, egress.Mark(err)
 		}
-		err = syscall.Mknod(DevNetTun, syscall.S_IFCHR, dev)
+		err = unix.Mknod(DevNetTun, unix.S_IFCHR, dev)
 		if err != nil {
 			return nil, egress.Mark(err)
 		}
 	}
 
-	fd, err := syscall.Open(DevNetTun, os.O_RDWR, 0)
+	fd, err := unix.Open(DevNetTun, os.O_RDWR, 0)
 	if err != nil {
 		return nil, egress.Mark(err)
 	}
 	defer func() {
 		if err != nil {
-			syscall.Close(fd)
+			unix.Close(fd)
 		}
 	}()
 	defer egress.Recovery(&err)
 
-	if err = ioctl(uintptr(fd), syscall.TUNSETIFF, ifrp); err != nil {
+	if err = ioctl(uintptr(fd), unix.TUNSETIFF, ifrp); err != nil {
 		return nil, egress.Mark(err)
 	}
 
 	bzero(ifr.Ifrn[:])
 	bzero(ifr.Ifru[:])
 
-	if err = ioctl(uintptr(fd), syscall.TUNGETIFF, ifrp); err != nil {
+	if err = ioctl(uintptr(fd), unix.TUNGETIFF, ifrp); err != nil {
 		return nil, egress.Mark(err)
 	}
 
 	ifname := gstring(ifr.Ifrn[:])
 
 	if owner != Unset {
-		err = ioctl(uintptr(fd), syscall.TUNSETOWNER, uintptr(owner))
+		err = ioctl(uintptr(fd), unix.TUNSETOWNER, uintptr(owner))
 		if err != nil {
 			return nil, egress.Mark(err)
 		}
 	}
 
 	if group != Unset {
-		err = ioctl(uintptr(fd), syscall.TUNSETGROUP, uintptr(group))
+		err = ioctl(uintptr(fd), unix.TUNSETGROUP, uintptr(group))
 		if err != nil {
 			return nil, egress.Mark(err)
 		}
 	}
 
 	if persist {
-		err = ioctl(uintptr(fd), syscall.TUNSETPERSIST, uintptr(1))
+		err = ioctl(uintptr(fd), unix.TUNSETPERSIST, uintptr(1))
 		if err != nil {
 			return nil, egress.Mark(err)
 		}
@@ -113,7 +113,7 @@ func New(
 		}
 	}
 
-	if err = syscall.SetNonblock(fd, true); err != nil {
+	if err = unix.SetNonblock(fd, true); err != nil {
 		return nil, egress.Mark(err)
 	}
 
@@ -122,21 +122,21 @@ func New(
 
 func setmac(ifname string, ha netif.HardwareAddr) error {
 	//FIXME w/ netlink
-	socki, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
+	socki, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
 	if err != nil {
 		return fmt.Errorf("socket: %w", err)
 	}
 	sockp := uintptr(socki)
-	defer syscall.Close(socki)
+	defer unix.Close(socki)
 
 	ifr := new(Ifreq)
 	copy(ifr.Ifrn[:], []byte(ifname))
-	err = ioctl(sockp, syscall.SIOCGIFINDEX, uintptr(unsafe.Pointer(ifr)))
+	err = ioctl(sockp, unix.SIOCGIFINDEX, uintptr(unsafe.Pointer(ifr)))
 	if err != nil {
 		return fmt.Errorf("get ifindex: %w", err)
 	}
 	_ = ifr.Index()
-	err = ioctl(sockp, syscall.SIOCGIFHWADDR, uintptr(unsafe.Pointer(ifr)))
+	err = ioctl(sockp, unix.SIOCGIFHWADDR, uintptr(unsafe.Pointer(ifr)))
 	if err != nil {
 		return fmt.Errorf("get hwaddr: %w", err)
 	}
@@ -144,7 +144,7 @@ func setmac(ifname string, ha netif.HardwareAddr) error {
 	old := netif.NewHardwareAddr()
 	copy(old, ifr.HA())
 	copy(ifr.HA(), ha)
-	err = ioctl(sockp, syscall.SIOCSIFHWADDR, uintptr(unsafe.Pointer(ifr)))
+	err = ioctl(sockp, unix.SIOCSIFHWADDR, uintptr(unsafe.Pointer(ifr)))
 	if err != nil {
 		err = fmt.Errorf("hwaddr(%v->%v): %w", old, ha, err)
 	}

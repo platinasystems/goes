@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -10,11 +10,11 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/netioctl"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
 const ConfigParameters = `
@@ -41,15 +41,15 @@ var ConfigFlag = map[string]net.Flags{
 }
 
 var ConfigIFF = map[string]int{
-	"up":     syscall.IFF_UP,
-	"-arp":   syscall.IFF_NOARP,
-	"no-arp": syscall.IFF_NOARP,
-	"down":   syscall.IFF_UP,
-	"arp":    syscall.IFF_NOARP,
+	"up":     unix.IFF_UP,
+	"-arp":   unix.IFF_NOARP,
+	"no-arp": unix.IFF_NOARP,
+	"down":   unix.IFF_UP,
+	"arp":    unix.IFF_NOARP,
 }
 
 var ConfigSIOC = map[string]uintptr{
-	"mtu": syscall.SIOCSIFMTU,
+	"mtu": unix.SIOCSIFMTU,
 }
 
 func (nif *NetIf) Config(ctx context.Context, args []string) error {

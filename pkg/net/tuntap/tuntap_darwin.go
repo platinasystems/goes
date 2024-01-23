@@ -5,12 +5,12 @@
 package tuntap
 
 import (
-	"fmt"
 	"os"
-	"syscall"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
+	"golang.org/x/sys/unix"
 )
 
 //go:generate sh -c "go tool cgo -godefs -- if_utun_darwin.go > zif_utun_darwin.go"
@@ -42,14 +42,13 @@ func New(
 		return nil, ErrCantChangeGroup
 	}
 
-	fd, err := syscall.
-		Socket(PF_SYSTEM, syscall.SOCK_DGRAM, SYSPROTO_CONTROL)
+	fd, err := unix.Socket(PF_SYSTEM, unix.SOCK_DGRAM, SYSPROTO_CONTROL)
 	if err != nil {
-		return nil, fmt.Errorf("socket: %v", err)
+		return nil, egress.Mark(err)
 	}
 	defer func() {
 		if err != nil {
-			syscall.Close(fd)
+			unix.Close(fd)
 		}
 	}()
 
@@ -70,16 +69,14 @@ func New(
 		Sc_id:      ci.Id,
 		Sc_unit:    uint32(unit) + 1,
 	}
-	_, _, errno := syscall.RawSyscall(syscall.SYS_CONNECT, uintptr(fd),
+	_, _, errno := unix.RawSyscall(unix.SYS_CONNECT, uintptr(fd),
 		uintptr(unsafe.Pointer(sac)), SizeofSockaddrCtl)
 	if errno != 0 {
-		err = fmt.Errorf("utun%d:%w", unit,
-			os.NewSyscallError("connect", errno))
-		return nil, err
+		return nil, egress.Mark(err)
 	}
 
 	name := make([]byte, IFNAMSIZ, IFNAMSIZ)
-	_, _, errno = syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(fd),
+	_, _, errno = unix.Syscall6(unix.SYS_GETSOCKOPT, uintptr(fd),
 		SYSPROTO_CONTROL, UTUN_OPT_IFNAME,
 		uintptr(unsafe.Pointer(&name[0])),
 		uintptr(unsafe.Pointer(&namsiz)),
@@ -96,7 +93,7 @@ func New(
 		}
 	}
 
-	if err = syscall.SetNonblock(fd, true); err != nil {
+	if err = unix.SetNonblock(fd, true); err != nil {
 		return nil, err
 	}
 

@@ -6,10 +6,10 @@ package frame
 
 import (
 	"fmt"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/native"
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 )
 
 type TunTapPI struct {
@@ -30,15 +30,15 @@ func (pi *TapPI) Format(w fmt.State, verb rune) {
 
 // Returns AF_INET or AF_INET6 if the top 4 bits of the first data byte are 4
 // or 6 respectively; otherwise 0.
-func (pi *TunPI) AF() (af uint16) {
+func (pi *TunPI) AF() uint16 {
 	verlen := *(*uint8)(Data(pi))
 	switch verlen >> 4 {
 	case 4:
-		af = syscall.AF_INET
+		return af.INET
 	case 6:
-		af = syscall.AF_INET6
+		return af.INET6
 	}
-	return
+	return 0
 }
 
 func (pi *TunPI) Format(w fmt.State, verb rune) {
@@ -47,9 +47,9 @@ func (pi *TunPI) Format(w fmt.State, verb rune) {
 		fmt.Fprintf(w, ": %#x", flags)
 	}
 	switch proto := pi.Proto.Value(); proto {
-	case syscall.AF_INET:
+	case af.INET:
 		fmt.Fprint(w, ProtoMark, (*IPv4)(Data(pi)))
-	case syscall.AF_INET6:
+	case af.INET6:
 		fmt.Fprint(w, ProtoMark, (*IPv6)(Data(pi)))
 	default:
 		fmt.Fprintf(w, ", proto[%#x]", proto)

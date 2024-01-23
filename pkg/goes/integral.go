@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -11,10 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
-	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
@@ -62,6 +59,46 @@ var Show = map[string]any{
 	"build":      program.Build,
 	"main":       program.Main,
 	"completion": Completion,
+}
+
+func Complete(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return complete.Last(args, ContextRoot(ctx))
+	}
+	branch := ContextBranch(ctx)
+	ctx = BranchContext(ctx, branch[:len(branch)-1])
+	ctx = CompleteContext(ctx, true)
+	return do(ctx, Select, args)
+}
+
+func Help(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return Usage(ctx, `
+usage: {{branch . 0 1}} [option] {{branch . 1}} <command|object> [<args>]
+{{synopsis .}}
+
+Options{{flags .}}
+Command/Objects
+{{root . "daemon"}}`)
+	}
+	branch := ContextBranch(ctx)
+	ctx = BranchContext(ctx, branch[:len(branch)-1])
+	ctx = HelpContext(ctx, true)
+	return do(ctx, Select, args)
+}
+
+// Use this to hold container until interrupt or termination signal.
+func Standby(ctx context.Context, args []string) error {
+	if ContextComplete(ctx) {
+		return nil
+	}
+	if ContextHelp(ctx) {
+		return Usage(ctx, `
+usage: {{branch .}} [<pids>]
+Wait until interrupt or termination signal.`)
+	}
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func ExternalCommand(ctx context.Context, args []string) error {
@@ -114,20 +151,7 @@ Run an external command.
 	cmd.Stderr = stderr
 	if fd := int(r.Fd()); term.IsTerminal(fd) {
 		cmd.Stderr = w
-		switch runtime.GOOS {
-		case "linux":
-			cmd.SysProcAttr = &syscall.SysProcAttr{
-				Setsid:  true,
-				Setctty: true,
-			}
-		case "darwin":
-			cmd.SysProcAttr = &syscall.SysProcAttr{
-				Setsid: true,
-				// FIXME can't Setctty on darwin
-				// Setctty: true,
-				// Ctty:    0,
-			}
-		}
+		cmd.SysProcAttr, err = InteractiveSysProcAttr()
 	}
 	if err = cmd.Start(); err == nil {
 		err = cmd.Wait()
@@ -138,46 +162,6 @@ Run an external command.
 		}
 	}
 	return err
-}
-
-func Complete(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return complete.Last(args, ContextRoot(ctx))
-	}
-	branch := ContextBranch(ctx)
-	ctx = BranchContext(ctx, branch[:len(branch)-1])
-	ctx = CompleteContext(ctx, true)
-	return do(ctx, Select, args)
-}
-
-func Help(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return Usage(ctx, `
-usage: {{branch . 0 1}} [option] {{branch . 1}} <command|object> [<args>]
-{{synopsis .}}
-
-Options{{flags .}}
-Command/Objects
-{{root . "daemon"}}`)
-	}
-	branch := ContextBranch(ctx)
-	ctx = BranchContext(ctx, branch[:len(branch)-1])
-	ctx = HelpContext(ctx, true)
-	return do(ctx, Select, args)
-}
-
-// Use this to hold container until interrupt or termination signal.
-func Standby(ctx context.Context, args []string) error {
-	if ContextComplete(ctx) {
-		return nil
-	}
-	if ContextHelp(ctx) {
-		return Usage(ctx, `
-usage: {{branch .}} [<pids>]
-Wait until interrupt or termination signal.`)
-	}
-	<-ctx.Done()
-	return ctx.Err()
 }
 
 func Start(ctx context.Context, args []string) error {
@@ -213,17 +197,6 @@ Daemons
 		ctx = AppendBranchContext(ctx, "daemon")
 		return do(ctx, Select, args)
 	}
-	u, err := user.Current()
-	if err != nil {
-		return err
-	}
-	cred := &syscall.Credential{NoSetGroups: true}
-	if _, err = fmt.Sscan(u.Uid, &cred.Uid); err != nil {
-		return fmt.Errorf("user:uid: %w", err)
-	}
-	if _, err = fmt.Sscan(u.Gid, &cred.Gid); err != nil {
-		return fmt.Errorf("user:gid: %w", err)
-	}
 	args = append([]string{"daemon"}, args...)
 	cmd := exec.Command(program.Executable(), args...)
 	cmd.Env = []string{
@@ -244,7 +217,7 @@ Daemons
 	}
 	if os.Geteuid() == 0 {
 		cmd.Dir = "/var/run"
-	} else if d, err := os.UserCacheDir(); err == nil {
+	} else if d, undetermined := os.UserCacheDir(); undetermined == nil {
 		cmd.Dir = d
 	}
 	if len(cmd.Dir) == 0 || func(s string) error {
@@ -256,16 +229,17 @@ Daemons
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Credential: cred,
-		Setsid:     true,
-	}
-	if err = cmd.Start(); err == nil {
-		w := ContextStdout(ctx)
-		branch := ContextBranch(ctx)
-		fmt.Fprint(w, branch[0], ":daemon:", args[0],
-			":pid: ", cmd.Process.Pid,
-			"\n")
+	var err error
+	cmd.SysProcAttr, err = DaemonSysProcAttr()
+	if err == nil {
+		err = cmd.Start()
+		if err == nil {
+			w := ContextStdout(ctx)
+			branch := ContextBranch(ctx)
+			fmt.Fprint(w, branch[0], ":daemon:", args[0],
+				":pid: ", cmd.Process.Pid,
+				"\n")
+		}
 	}
 	return err
 }

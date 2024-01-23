@@ -4,8 +4,8 @@
 
 package host
 
-import "syscall"
+import "golang.org/x/sys/unix"
 
 func rename(text string) error {
-	return syscall.Sethostname([]byte(text))
+	return unix.Sethostname([]byte(text))
 }

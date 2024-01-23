@@ -6,11 +6,11 @@
 
 package ifcap
 
-import "syscall"
+import "golang.org/x/sys/unix"
 
 const (
-	SIOCGIFCAP = syscall.SIOCGIFCAP
-	SIOCSIFCAP = syscall.SIOCSIFCAP
+	SIOCGIFCAP = unix.SIOCGIFCAP
+	SIOCSIFCAP = unix.SIOCSIFCAP
 )
 
 var Strings = []string{

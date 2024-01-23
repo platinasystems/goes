@@ -1,4 +1,4 @@
-// Copyright © 2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -12,18 +12,18 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"syscall"
 	"text/tabwriter"
 	"time"
 	"unsafe"
 
+	"github.com/platinasystems/goes/v2/pkg/net/af"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/sockaddr"
 	"github.com/platinasystems/goes/v2/pkg/net/sysctl"
-	"github.com/platinasystems/goes/v2/pkg/syscall/af"
+	"golang.org/x/sys/unix"
 )
 
-type RtMsghdr = syscall.RtMsghdr
+type RtMsghdr = unix.RtMsghdr
 
 func Extract[T RtMsghdr](data []byte) (t *T, body, rem []byte) {
 	l := sysctl.MsgLen(data)
@@ -56,8 +56,8 @@ type netrt struct {
 	index uint16
 	_     uint16
 	flags int32
-	rmx   syscall.RtMetrics
-	addrs [syscall.RTAX_MAX]any
+	rmx   unix.RtMetrics
+	addrs [unix.RTAX_MAX]any
 }
 
 func newNetRt(msg []byte) NetRt {
@@ -92,7 +92,7 @@ func newNetRt(msg []byte) NetRt {
 			_, address, _ := dl.NAS(dlbody)
 			nrt.addrs[i] = &link{dl.Index, address}
 		case 0xff:
-			if v := nrt.addrs[syscall.RTAX_DST]; v != nil {
+			if v := nrt.addrs[unix.RTAX_DST]; v != nil {
 				if addr, ok := v.(netip.Addr); ok {
 					if addr.Is4() {
 						nrt.addrs[i] = sockaddr.
@@ -122,39 +122,39 @@ func vip(v any) netip.Addr {
 }
 
 func (nrt *netrt) Dst() netip.Addr {
-	return vip(nrt.addrs[syscall.RTAX_DST])
+	return vip(nrt.addrs[unix.RTAX_DST])
 }
 
 func (nrt *netrt) GW() netip.Addr {
-	return vip(nrt.addrs[syscall.RTAX_GATEWAY])
+	return vip(nrt.addrs[unix.RTAX_GATEWAY])
 }
 
 func (nrt *netrt) Netmask() netip.Addr {
-	v := FirstNonNil(nrt.addrs[syscall.RTAX_NETMASK],
-		nrt.addrs[syscall.RTAX_GENMASK])
+	v := FirstNonNil(nrt.addrs[unix.RTAX_NETMASK],
+		nrt.addrs[unix.RTAX_GENMASK])
 	return vip(v)
 }
 
 func (nrt *netrt) IFA() netip.Addr {
-	return vip(nrt.addrs[syscall.RTAX_IFA])
+	return vip(nrt.addrs[unix.RTAX_IFA])
 }
 
 func (nrt *netrt) Line() int {
-	if lnk, ok := nrt.addrs[syscall.RTAX_GATEWAY].(*link); ok {
+	if lnk, ok := nrt.addrs[unix.RTAX_GATEWAY].(*link); ok {
 		return int(lnk.line)
 	}
 	return -1
 }
 
 func (nrt *netrt) HA() net.HardwareAddr {
-	if lnk, ok := nrt.addrs[syscall.RTAX_GATEWAY].(*link); ok {
+	if lnk, ok := nrt.addrs[unix.RTAX_GATEWAY].(*link); ok {
 		return lnk.ha
 	}
 	return net.HardwareAddr{}
 }
 
 func (nrt *netrt) Bits() int {
-	if nm := vip(nrt.addrs[syscall.RTAX_NETMASK]); nm.IsValid() {
+	if nm := vip(nrt.addrs[unix.RTAX_NETMASK]); nm.IsValid() {
 		ones, _ := net.IPMask(nm.AsSlice()).Size()
 		return ones
 	}
