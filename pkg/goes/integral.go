@@ -15,6 +15,7 @@ import (
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
+	"github.com/platinasystems/goes/v2/pkg/os/xdg"
 	"github.com/platinasystems/goes/v2/pkg/path/restricted"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 	"golang.org/x/term"
@@ -57,8 +58,10 @@ var Daemons = map[string]any{
 
 var Show = map[string]any{
 	"build":      program.Build,
-	"main":       program.Main,
 	"completion": Completion,
+	"main":       program.Main,
+	"options":    Options,
+	"xdg":        xdg.Dirs,
 }
 
 func Complete(ctx context.Context, args []string) error {
@@ -74,17 +77,39 @@ func Complete(ctx context.Context, args []string) error {
 func Help(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return Usage(ctx, `
-usage: {{branch . 0 1}} [option] {{branch . 1}} <command|object> [<args>]
-{{synopsis .}}
+{{$cmd := branch . 0 1 -}}
+{{$branch := branch . 1 -}}
+{{if eq $branch "help"}}
+{{- $branch = ""}}
+{{- end -}}
+{{if $branch}}
+{{- $branch = print $branch " "}}
+{{- end -}}
+{{$trunk := branch . 1 2 -}}
+{{$args := "<command> [<args>]" -}}
+{{$syn := "Run command" -}}
+{{$heading := "Commands" -}}
+{{if eq $trunk "show"}}
+{{- $args = "<object>"}}
+{{- $syn = "Show object"}}
+{{- $heading = "Objects"}}
+{{- end -}}
+usage: {{$cmd}} [option] {{$branch}}{{$args}}
+{{$syn}}.
 
-Options{{flags .}}
-Command/Objects
+{{$heading}}
 {{root . "daemon"}}`)
 	}
 	branch := ContextBranch(ctx)
 	ctx = BranchContext(ctx, branch[:len(branch)-1])
 	ctx = HelpContext(ctx, true)
 	return do(ctx, Select, args)
+}
+
+func Options(ctx context.Context, args []string) error {
+	flag.CommandLine.SetOutput(ContextStdout(ctx))
+	flag.PrintDefaults()
+	return nil
 }
 
 // Use this to hold container until interrupt or termination signal.

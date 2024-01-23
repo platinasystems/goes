@@ -31,7 +31,9 @@ func SprintContextBranch(ctx context.Context, begend ...int) string {
 	branch := ContextBranch(ctx)
 	beg, end := 0, len(branch)
 	if len(begend) > 0 {
-		if i := begend[0]; i >= 0 && i < end {
+		if i := begend[0]; i > end {
+			beg = end
+		} else if i >= 0 {
 			beg = i
 		}
 		if len(begend) > 1 {

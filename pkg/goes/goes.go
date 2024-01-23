@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/log/oslog"
@@ -26,6 +27,20 @@ import (
 )
 
 const nl = "\n"
+
+var Flag = struct {
+	Append, Tee   *bool
+	Input, Output *string
+	Mode          *uint
+	Timeout       *time.Duration
+}{
+	Append:  flag.Bool("a", false, "Append to -o <file>."),
+	Tee:     flag.Bool("t", false, "Tee to -o <file> and stdout."),
+	Input:   flag.String("i", "", "Read from named file."),
+	Output:  flag.String("o", "", "Write to named file."),
+	Mode:    flag.Uint("m", 0, "Output file mode (default 0666)."),
+	Timeout: flag.Duration("T", 0, "Elapse time limit."),
+}
 
 // Execute subsystem with an interruptible context.
 func Exec(ctx context.Context, subsys any, args []string) {
@@ -59,14 +74,6 @@ func Exec(ctx context.Context, subsys any, args []string) {
 func Main() {
 	log.SetFlags(log.Lshortfile)
 
-	appendFlag := flag.Bool("a", false, "Append to -o <file>.")
-	flag.BoolVar(&completeParameter, "complete", false, "Finish last arg.")
-	teeFlag := flag.Bool("t", false, "Tee to -o <file> and stdout.")
-	inputFlag := flag.String("i", "", "Read from named file.")
-	outputFlag := flag.String("o", "", "Write to named file.")
-	modeFlag := flag.Uint("m", 0, "Output file mode (default 0666).")
-	timeoutFlag := flag.Duration("T", 0, "Elapse time limit.")
-
 	ctx, err := ParseFlagsContext(context.Background(), os.Args[1:])
 	if err != nil {
 		fmt.Fprint(os.Stderr, ContextBranch(ctx)[0], ": ",
@@ -75,13 +82,13 @@ func Main() {
 	}
 	args := ContextFlags(ctx).Args()
 
-	if timeoutFlag.Nanoseconds() > 0 {
+	if Flag.Timeout.Nanoseconds() > 0 {
 		var timeout context.CancelFunc
-		ctx, timeout = context.WithTimeout(ctx, *timeoutFlag)
+		ctx, timeout = context.WithTimeout(ctx, *Flag.Timeout)
 		defer timeout()
 	}
-	if len(*inputFlag) > 0 {
-		f, err := os.Open(*inputFlag)
+	if len(*Flag.Input) > 0 {
+		f, err := os.Open(*Flag.Input)
 		if err != nil {
 			log.Print(err)
 			return
@@ -89,24 +96,24 @@ func Main() {
 		defer f.Close()
 		defer override.Value(&os.Stdin, f)()
 	}
-	if len(*outputFlag) > 0 {
+	if len(*Flag.Output) > 0 {
 		fflags := os.O_RDWR | os.O_CREATE
-		if *appendFlag {
+		if *Flag.Append {
 			fflags |= os.O_APPEND
 		} else {
 			fflags |= os.O_TRUNC
 		}
-		fmode := os.FileMode(0666)
-		if *modeFlag != 0 {
-			fmode = os.FileMode(*modeFlag)
+		mode := os.FileMode(0666)
+		if *Flag.Mode != 0 {
+			mode = os.FileMode(*Flag.Mode)
 		}
-		f, err := os.OpenFile(*outputFlag, fflags, fmode)
+		f, err := os.OpenFile(*Flag.Output, fflags, mode)
 		if err != nil {
 			log.Print(err)
 			return
 		}
 		defer f.Close()
-		if *teeFlag {
+		if *Flag.Tee {
 			pr, pw, err := os.Pipe()
 			if err != nil {
 				log.Print(err)
@@ -133,7 +140,7 @@ func Main() {
 		defer wErrPipe.Close()
 		defer override.Value(&os.Stderr, wErrPipe)()
 		go io.Copy(errLog, rErrPipe)
-		if len(*outputFlag) == 0 {
+		if len(*Flag.Output) == 0 {
 			outLog, err := oslog.OpenNotice()
 			if err != nil {
 				log.Fatal(err)
@@ -159,10 +166,8 @@ func Select(ctx context.Context, args []string) (err error) {
 	} else if len(args) == 0 {
 		if ContextComplete(ctx) {
 			err = complete.Last(args, root)
-		} else if ContextHelp(ctx) {
-			err = Help(ctx, args)
 		} else {
-			err = ErrIncomplete
+			err = Help(ctx, args)
 		}
 	} else if v, ok := root[args[0]]; ok {
 		ctx = AppendBranchContext(ctx, args[0])
