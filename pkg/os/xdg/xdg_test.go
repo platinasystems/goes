@@ -1,14 +1,10 @@
-// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
 package xdg
 
-import (
-	"testing"
-
-	"github.com/platinasystems/goes/v2/pkg/os/program"
-)
+import "testing"
 
 type unit struct {
 	get  func() string
@@ -21,30 +17,30 @@ func (ut unit) test(t *testing.T) {
 		if len(got) == 0 {
 			got = "\"\""
 		}
-		t.Error(got)
+		t.Error(got, "!=", ut.want)
 	}
 }
 
 func Test(t *testing.T) {
-	CacheHome = cacheHome
-	ConfigHome = configHome
-	DataHome = dataHome
-	RunTimeDir = runTimeDir
-	StateHome = stateHome
+	CacheHome = getCacheHome
+	ConfigHome = getConfigHome
+	DataHome = getDataHome
+	RunTimeDir = getRuntimeDir
+	StateHome = getStateHome
 	t.Run("root", func(t *testing.T) {
-		program.IsOpt = func() bool {
+		IsOpt = func() bool {
 			return true
 		}
-		program.IsUsrLocal = func() bool {
+		IsUsrLocal = func() bool {
 			return true
 		}
 		IsSuperUser = func() bool {
 			return true
 		}
-		SU.CacheHome = func() string {
+		SuperUser.CacheHome = func() string {
 			return "/var/cache"
 		}
-		SU.RunTimeDir = func() string {
+		SuperUser.RunTimeDir = func() string {
 			return "/var/run"
 		}
 		t.Run("XDG_CACHE_HOME", unit{

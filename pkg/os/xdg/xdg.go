@@ -9,27 +9,130 @@
 package xdg
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
-
-	"github.com/platinasystems/goes/v2/pkg/os/program"
 )
 
-var (
-	// test overwrides
-	Getenv = os.Getenv
+// test overrides
+var Getenv = os.Getenv
+var UserCacheDir = os.UserCacheDir
+var UserConfigDir = os.UserConfigDir
+var UserHomeDir = os.UserHomeDir
 
-	UserCacheDir = os.UserCacheDir
+// flag overrides
+var Flag = struct {
+	XdgCacheHome,
+	XdgConfigDirs,
+	XdgConfigHome,
+	XdgDataDirs,
+	XdgDataHome,
+	XdgRuntimeDir,
+	XdgStateHome *string
+}{
+	XdgCacheHome: flag.String("xdg-cache-home", "",
+		"Default $XDG_CACHE_HOME or ~/.local/cache."),
+	XdgConfigDirs: flag.String("xdg-config-dirs", "",
+		"Default $XDG_CONFIG_DIRS or ~/.config:/etc/xdg."),
+	XdgConfigHome: flag.String("xdg-config-home", "",
+		"Default $XDG_CONFIG_HOME or ~/.config."),
+	XdgDataDirs: flag.String("xdg-data-dirs", "",
+		"Default $XDG_DATA_DIRS or "+
+			"~/.local/share:/usr/local/share:/usr/share."),
+	XdgDataHome: flag.String("xdg-data-home", "",
+		"Default $XDG_DATA_HOME or ~/.local/share."),
+	XdgRuntimeDir: flag.String("xdg-runtime-dir", "",
+		"Default $XDG_RUNTIME_DIR or ~/.local/cache."),
+	XdgStateHome: flag.String("xdg-state-home", "",
+		"Default $XDG_STATE_HOME or ~/.local/state."),
+}
 
-	UserConfigDir = os.UserConfigDir
+var SlashOpt = filepath.FromSlash("/opt")
 
-	UserHomeDir = os.UserHomeDir
-)
+var IsOpt = sync.OnceValue(func() bool {
+	return strings.HasPrefix(os.Args[0], SlashOpt)
+})
+
+var UsrLocal = filepath.FromSlash("/usr/local")
+
+var IsUsrLocal = sync.OnceValue(func() bool {
+	return strings.HasPrefix(os.Args[0], UsrLocal)
+})
 
 var IsSuperUser = sync.OnceValue(func() bool {
 	return os.Geteuid() == 0
 })
+
+var SuperUser = struct {
+	CacheHome, RunTimeDir func() string
+}{
+	CacheHome: sync.OnceValue(func() string {
+		for _, s := range []string{
+			filepath.FromSlash("/var/cache"),
+			filepath.FromSlash("/var/run"),
+		} {
+			if _, err := os.Stat(s); err == nil {
+				return s
+			}
+		}
+		return os.TempDir()
+	}),
+	RunTimeDir: sync.OnceValue(func() string {
+		var_run := filepath.FromSlash("/var/run")
+		if _, err := os.Stat(var_run); err == nil {
+			return var_run
+		}
+		return os.TempDir()
+	}),
+}
+
+// If available, returns the -xdg-cache-home command line flag or
+// $XDG_CACHE_HOME environment variable; or if super user, /var/cache or
+// /var/run; otherwise, if not super user, ~/.local/cache or /tmp).
+var CacheHome = sync.OnceValue(getCacheHome)
+
+// If available, returns the -xdg-config-dirs command line flag or
+// $XDG_CONFIG_DIRS environment variable; otherwise, ~/.config:/etc/xdg.
+var ConfigDirs = sync.OnceValue(getConfigDirs)
+
+// If available, returns the -xdg-config-home command line flag or
+// $XDG_CONFIG_HOME environment variable; or if super user, /etc/opt if opt
+// program; or /etc; otherwise, if not super user, returns ~/.config or
+// /tmp.
+var ConfigHome = sync.OnceValue(getConfigHome)
+
+// If available, returns the -xdg-data-dirs command line flag or $XDG_DATA_DIRS
+// environment variable; otherwise,
+// ~/.local/share:/usr/local/share:/usr/share.
+var DataDirs = sync.OnceValue(getDataDirs)
+
+// If available, returns the -xdg-data-home command line flag or $XDG_DATA_HOME
+// environment variable; or if super user, /usr/local/share if local program;
+// /opt/share if opt program; or /usr/share; otherwise, if not super user,
+// ~/.local/share or /tmp.
+var DataHome = sync.OnceValue(getDataHome)
+
+// If available, returns the -xdg-runtime-dir command line flag or
+// $XDG_RUNTIME_DIR environment variable; or if superuser, "/var/run";
+// otherwise, ~/.local/cache or /tmp.
+var RunTimeDir = sync.OnceValue(getRuntimeDir)
+
+// If available, returns the -xdg-state-home command line flag or
+// $XDG_STATE_HOME environment variable; or is superuser, /var/local if local
+// program; /var/opt if opt program; or /var/lib; otherwise. if not superuser,
+// ~/.local/state.
+var StateHome = sync.OnceValue(getStateHome)
+
+var Dirs = map[string]any{
+	"cache":   CacheHome,
+	"config":  ConfigHome,
+	"data":    DataHome,
+	"runtime": RunTimeDir,
+	"state":   StateHome,
+}
 
 // If SU, make an XDG path w/ 0755 permissions or 0700 otherwise.
 func MkPath(s string) error {
@@ -40,15 +143,13 @@ func MkPath(s string) error {
 	return os.MkdirAll(s, perm)
 }
 
-// If available, returns $XDG_CACHE_HOME.  If SU, returns /var/cache or
-// /var/run; otherwise, if not SU, returns UserCacheDir or TempDir.
-var CacheHome = sync.OnceValue(cacheHome)
-
-func cacheHome() string {
-	if s := Getenv("XDG_CACHE_HOME"); len(s) > 0 {
+func getCacheHome() string {
+	if s := *Flag.XdgCacheHome; len(s) > 0 {
+		return s
+	} else if s = Getenv("XDG_CACHE_HOME"); len(s) > 0 {
 		return s
 	} else if IsSuperUser() {
-		return SU.CacheHome()
+		return SuperUser.CacheHome()
 	} else if d, err := UserCacheDir(); err == nil {
 		return d
 	} else {
@@ -57,134 +158,94 @@ func cacheHome() string {
 	return ""
 }
 
-// If available, returns $XDG_CONFIG_DIRS; otherwise, returns /etc/xdg.
-var ConfigDirs = sync.OnceValue(configDirs)
-
-func configDirs() string {
-	if s := Getenv("XDG_CONFIG_DIRS"); len(s) == 0 {
+func getConfigDirs() string {
+	sysconfigdirs := filepath.FromSlash("/etc/xdg")
+	if s := *Flag.XdgConfigDirs; len(s) > 0 {
 		return s
+	} else if s = Getenv("XDG_CONFIG_DIRS"); len(s) == 0 {
+		return s
+	} else if s, err := UserConfigDir(); err == nil {
+		return fmt.Sprint(s, os.PathListSeparator, sysconfigdirs)
 	}
-	return "/etc/xdg"
+	return sysconfigdirs
 }
 
-// If available, returns $XDG_CONFIG_HOME.  If SU, returns /etc/opt if opt
-// program; or /etc; otherwise, if not SU, returns UserConfigDir or TempDir.
-var ConfigHome = sync.OnceValue(configHome)
-
-func configHome() string {
-	if s := Getenv("XDG_CONFIG_HOME"); len(s) > 0 {
+func getConfigHome() string {
+	if s := *Flag.XdgConfigHome; len(s) > 0 {
+		return s
+	} else if s = Getenv("XDG_CONFIG_HOME"); len(s) > 0 {
 		return s
 	} else if IsSuperUser() {
-		if program.IsOpt() {
-			return "/etc/opt"
+		if IsOpt() {
+			return filepath.FromSlash("/etc/opt")
 		} else {
-			return "/etc"
+			return filepath.FromSlash("/etc")
 		}
-	} else if d, err := UserConfigDir(); err == nil {
-		return d
+	} else if s, err := UserConfigDir(); err == nil {
+		return s
 	}
 	return os.TempDir()
 }
 
-// If available, returns $XDG_DATA_DIRS; otherwise,
-// /usr/local/share:/usr/share.
-var DataDirs = sync.OnceValue(dataDirs)
-
-func dataDirs() string {
-	if s := Getenv("XDG_DATA_DIRS"); len(s) > 0 {
+func getDataDirs() string {
+	sysdatadirs := fmt.Sprint(filepath.FromSlash("/usr/local/share"),
+		os.PathListSeparator, filepath.FromSlash("/usr/share"))
+	if s := *Flag.XdgDataDirs; len(s) > 0 {
 		return s
+	} else if s = Getenv("XDG_DATA_DIRS"); len(s) > 0 {
+		return s
+	} else if s, err := os.UserHomeDir(); err == nil {
+		return fmt.Sprint(filepath.Join(s, ".local", "share"),
+			os.PathListSeparator, sysdatadirs)
 	}
-	return "/usr/local/share:/usr/share"
+	return sysdatadirs
 }
 
-// If available, returns $XDG_DATA_HOME.  If SU, returns /usr/local/share if
-// local program; /opt/share if opt program; or /usr/share; otherwise, if not
-// SU, returns UserHomeDir or TempDir.
-var DataHome = sync.OnceValue(dataHome)
-
-func dataHome() string {
-	if s := Getenv("XDG_DATA_HOME"); len(s) > 0 {
+func getDataHome() string {
+	if s := *Flag.XdgDataHome; len(s) > 0 {
+		return s
+	} else if s = Getenv("XDG_DATA_HOME"); len(s) > 0 {
 		return s
 	} else if IsSuperUser() {
-		if program.IsUsrLocal() {
+		if IsUsrLocal() {
 			return "/usr/local/share"
-		} else if program.IsOpt() {
+		} else if IsOpt() {
 			return "/opt/share"
 		}
 		return "/usr/share"
-	} else if h, err := UserHomeDir(); err == nil {
-		return filepath.Join(h, ".local", "share")
+	} else if s, err := UserHomeDir(); err == nil {
+		return filepath.Join(s, ".local", "share")
 	}
 	return os.TempDir()
 }
 
-// If available, returns $XDG_RUNTIME_DIR; or if SU, "/var/run"; otherwise,
-// UserCacheDir or TempDir.
-var RunTimeDir = sync.OnceValue(runTimeDir)
-
-func runTimeDir() string {
-	if s := Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
+func getRuntimeDir() string {
+	if s := *Flag.XdgRuntimeDir; len(s) > 0 {
+		return s
+	} else if s = Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
 		return s
 	} else if IsSuperUser() {
-		return SU.RunTimeDir()
-	} else if d, err := UserCacheDir(); err == nil {
-		return d
+		return SuperUser.RunTimeDir()
+	} else if s, err := UserCacheDir(); err == nil {
+		return s
 	}
 	return os.TempDir()
 }
 
-// If available, returns $XDG_STATE_HOME. If SU, returns "/var/local"
-// if local program; "/var/opt" if opt program; or "/var/lib"
-// otherwise. if not SU and no $XDG_STATE_HOME, returns
-// UserHomeDir()/.local/state.
-var StateHome = sync.OnceValue(stateHome)
-
-func stateHome() string {
-	if s := Getenv("XDG_STATE_HOME"); len(s) > 0 {
+func getStateHome() string {
+	if s := *Flag.XdgStateHome; len(s) > 0 {
+		return s
+	} else if s = Getenv("XDG_STATE_HOME"); len(s) > 0 {
 		return s
 	} else if IsSuperUser() {
-		if program.IsUsrLocal() {
-			return "/var/local"
-		} else if program.IsOpt() {
-			return "/var/opt"
+		if IsUsrLocal() {
+			return filepath.FromSlash("/var/local")
+		} else if IsOpt() {
+			return filepath.FromSlash("/var/opt")
 		}
-		return "/var/lib"
+		return filepath.FromSlash("/var/lib")
 	} else if h, err := UserHomeDir(); err == nil {
 		return filepath.Join(h, ".local", "state")
 	}
 	return os.TempDir()
-}
-
-var SU = struct {
-	CacheHome, RunTimeDir func() string
-}{
-	CacheHome:  sync.OnceValue(suCacheHome),
-	RunTimeDir: sync.OnceValue(suRunTimeDir),
-}
-
-func suCacheHome() string {
-	for _, s := range []string{"/var/cache", "/var/run"} {
-		if _, err := os.Stat(s); err == nil {
-			return s
-		}
-	}
-	return os.TempDir()
-}
-
-func suRunTimeDir() string {
-	const var_run = "/var/run"
-	if _, err := os.Stat(var_run); err == nil {
-		return var_run
-	}
-	return os.TempDir()
-}
-
-var Dirs = map[string]any{
-	"cache-home":   CacheHome,
-	"config-dirs":  ConfigDirs,
-	"config-home":  ConfigHome,
-	"data-dirs":    DataDirs,
-	"data-home":    DataHome,
-	"run-time-dir": RunTimeDir,
-	"state-home":   StateHome,
 }
