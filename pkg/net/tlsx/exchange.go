@@ -150,8 +150,11 @@ func Reserve(ctx context.Context, args []string) error {
 	if len(args) < 1 {
 		return ErrIncomplete
 	}
-
-	i := Subscribers().Index(args[0])
+	err := InitSubscribers()
+	if err != nil {
+		return err
+	}
+	i := Subscribers.Index(args[0])
 	if i < 0 {
 		return ErrNotFound
 	}

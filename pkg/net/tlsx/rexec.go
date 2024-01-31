@@ -26,11 +26,13 @@ Remote execution.
 func Rexec(ctx context.Context, args []string) error {
 	var flags flag.FlagSet
 	ctx = goes.FlagsContext(ctx, &flags)
-	self := Self()
+	if err := InitRootCAs(); err != nil {
+		return err
+	}
 	if goes.ContextComplete(ctx) {
-		if len(args) <= 1 && self != nil {
-			return complete.Last(args, self.DNS0(),
-				Subscriptions().Names())
+		if len(args) <= 1 {
+			return complete.Last(args, Self.DNS0(),
+				Subscriptions.Names())
 		}
 		return nil
 	}

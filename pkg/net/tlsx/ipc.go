@@ -21,14 +21,13 @@ func IPC(ctx context.Context, args []string) error {
 	if goes.ContextHelp(ctx) {
 		return goes.Usage(ctx, IPCUsage)
 	}
-	self := Self()
-	if self == nil {
+	if err := InitSelf(); err != nil {
 		return ErrNotFound
 	}
 	branch := goes.ContextBranch(ctx)
 	ctx = goes.BranchContext(ctx, append(branch[:1], "ipc"))
 	ipc := make([]string, 0, len(branch)+len(args))
-	ipc = append(ipc, self.DNS0())
+	ipc = append(ipc, Self.DNS0())
 	ipc = append(ipc, branch[1:]...)
 	ipc = append(ipc, args...)
 	return Rexec(ctx, ipc)

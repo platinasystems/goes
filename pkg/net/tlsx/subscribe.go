@@ -9,28 +9,29 @@ import (
 	"context"
 	"errors"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 )
-
-const SubscribeUsage = `
-usage: {{branch .}} <name>[@<address>][:<port>]
-Register with exchange.`
 
 func Subscribe(ctx context.Context, args []string) error {
 	if goes.ContextComplete(ctx) {
 		return nil
 	}
 	if goes.ContextHelp(ctx) {
-		return goes.Usage(ctx, SubscribeUsage)
+		return goes.Usage(ctx, `
+usage: {{branch .}} <name>[@<address>][:<port>]
+Register with exchange.`)
 	}
 	if len(args) == 0 {
 		return ErrIncomplete
 	}
-	data, err := Selfie.MarshalPEM()
+	err := InitSelf()
 	if err != nil {
-		return egress.Mark(err)
+		return err
+	}
+	data, err := Self.MarshalPEM()
+	if err != nil {
+		return err
 	}
 	conn, err := Connect(ctx, args[0])
 	if err != nil {
@@ -49,10 +50,10 @@ func Subscribe(ctx context.Context, args []string) error {
 		return egress.Mark(err)
 	}
 
-	x := new(xcert.X509)
+	x := new(X509)
 	if err = x.UnmarshalText(buf.Bytes()); err != nil {
 		return egress.Mark(err)
 	}
-	Subscriptions().Append(x)
+	Subscriptions.Append(x)
 	return nil
 }

@@ -18,14 +18,15 @@ import (
 )
 
 func greetClient(ctx context.Context, conn net.Conn) (*tls.Conn, error) {
-	self := Self()
+	err := InitClientCAs()
+	if err != nil {
+		return nil, err
+	}
 	sv := tls.Server(conn, &tls.Config{
-		Certificates: []tls.Certificate{
-			self.Certificate,
-		},
-		ServerName: self.DNS0(),
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		ClientCAs:  ClientCAs().Clone(),
+		Certificates: []tls.Certificate{Self.Certificate},
+		ServerName:   Self.DNS0(),
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    ClientCAs.Clone(),
 	})
 	return sv, sv.HandshakeContext(ctx)
 }
@@ -37,9 +38,11 @@ func greetServer(ctx context.Context, host string, conn net.Conn) (
 	cl *tls.Conn, err error,
 ) {
 	var sname string
-	self := Self()
+	if err = InitRootCAs(); err != nil {
+		return
+	}
 	if len(host) == 0 {
-		sname = self.DNS0()
+		sname = Self.DNS0()
 	} else {
 		at := strings.Index(host, "@")
 		colon := strings.LastIndex(host, ":")
@@ -71,8 +74,8 @@ func greetServer(ctx context.Context, host string, conn net.Conn) (
 	enc.Encode("tls", nil)
 	if _, err = dec.Read(ob); err == nil {
 		cl = tls.Client(conn, &tls.Config{
-			Certificates: []tls.Certificate{self.Certificate},
-			RootCAs:      RootCAs().Clone(),
+			Certificates: []tls.Certificate{Self.Certificate},
+			RootCAs:      RootCAs.Clone(),
 			ServerName:   sname,
 		})
 		err = cl.HandshakeContext(ctx)

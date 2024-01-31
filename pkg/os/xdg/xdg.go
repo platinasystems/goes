@@ -30,7 +30,7 @@ var Flag = struct {
 	XdgConfigHome,
 	XdgDataDirs,
 	XdgDataHome,
-	XdgRuntimeDir,
+	XdgRunTimeDir,
 	XdgStateHome *string
 }{
 	XdgCacheHome: flag.String("xdg-cache-home", "",
@@ -44,7 +44,7 @@ var Flag = struct {
 			"~/.local/share:/usr/local/share:/usr/share."),
 	XdgDataHome: flag.String("xdg-data-home", "",
 		"Default $XDG_DATA_HOME or ~/.local/share."),
-	XdgRuntimeDir: flag.String("xdg-runtime-dir", "",
+	XdgRunTimeDir: flag.String("xdg-runtime-dir", "",
 		"Default $XDG_RUNTIME_DIR or ~/.local/cache."),
 	XdgStateHome: flag.String("xdg-state-home", "",
 		"Default $XDG_STATE_HOME or ~/.local/state."),
@@ -118,7 +118,7 @@ var DataHome = sync.OnceValue(getDataHome)
 // If available, returns the -xdg-runtime-dir command line flag or
 // $XDG_RUNTIME_DIR environment variable; or if superuser, "/var/run";
 // otherwise, ~/.local/cache or /tmp.
-var RunTimeDir = sync.OnceValue(getRuntimeDir)
+var RunTimeDir = sync.OnceValue(getRunTimeDir)
 
 // If available, returns the -xdg-state-home command line flag or
 // $XDG_STATE_HOME environment variable; or is superuser, /var/local if local
@@ -132,15 +132,6 @@ var Dirs = map[string]any{
 	"data":    DataHome,
 	"runtime": RunTimeDir,
 	"state":   StateHome,
-}
-
-// If SU, make an XDG path w/ 0755 permissions or 0700 otherwise.
-func MkPath(s string) error {
-	var perm os.FileMode = 0700
-	if IsSuperUser() {
-		perm = 0755
-	}
-	return os.MkdirAll(s, perm)
 }
 
 func getCacheHome() string {
@@ -219,8 +210,8 @@ func getDataHome() string {
 	return os.TempDir()
 }
 
-func getRuntimeDir() string {
-	if s := *Flag.XdgRuntimeDir; len(s) > 0 {
+func getRunTimeDir() string {
+	if s := *Flag.XdgRunTimeDir; len(s) > 0 {
 		return s
 	} else if s = Getenv("XDG_RUNTIME_DIR"); len(s) > 0 {
 		return s

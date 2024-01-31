@@ -92,7 +92,7 @@ func TunTap(ctx context.Context, args []string) error {
 		}
 	} else {
 		hash := fnv.New64()
-		hash.Write(Self().Certificate.Leaf.SubjectKeyId)
+		hash.Write(Self.Certificate.Leaf.SubjectKeyId)
 		fmt.Fprint(hash, *unit)
 		copy(ha, hash.Sum(nil))
 		ha.Unicast()

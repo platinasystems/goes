@@ -11,19 +11,21 @@ import (
 	"io"
 	"sync"
 
-	"github.com/platinasystems/goes/v2/pkg/crypto/xcert"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 )
 
 var reg struct {
 	sync.RWMutex
-	x *xcert.X509
+	x *X509
 }
 
 func regAdmin(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return egress.Mark(ErrIncomplete)
+	}
+	if err := InitClientCAs(); err != nil {
+		return err
 	}
 	branch := goes.ContextBranch(ctx)
 	approve := branch[len(branch)-1] == "approve"
@@ -32,8 +34,8 @@ func regAdmin(ctx context.Context, args []string) error {
 	for cur, prev := reg.x, reg.x; cur != nil; cur = cur.Next {
 		if cur.IsMatch(args[0]) {
 			if approve {
-				Subscribers().Append(cur)
-				ClientCAs().Add(cur.Certificate)
+				Subscribers.Append(cur)
+				ClientCAs.Add(cur.Certificate)
 			}
 			if cur == prev {
 				reg.x = cur.Next
@@ -51,7 +53,7 @@ func regShow(ctx context.Context, args []string) error {
 	reg.RLock()
 	defer reg.RUnlock()
 	w := goes.ContextStdout(ctx)
-	reg.x.Range(func(x *xcert.X509) bool {
+	reg.x.Range(func(x *X509) bool {
 		fmt.Fprint(w, x.SKI(), ": ", x.Certificate.DNSNames, "\n")
 		return true
 	})
@@ -75,7 +77,11 @@ func regSubscribe(ctx context.Context, args []string) error {
 	} else {
 		data = []byte(args[0])
 	}
-	x, err := xcert.NewX509(data)
+	err := InitSelf()
+	if err != nil {
+		return err
+	}
+	x, err := NewX509(data)
 	if err != nil {
 		return egress.Mark(err)
 	}
@@ -88,10 +94,10 @@ func regSubscribe(ctx context.Context, args []string) error {
 			reg.x.Append(x)
 		}
 	}()
-	self, err := Selfie.MarshalPEM()
+	selfpem, err := Self.MarshalPEM()
 	if err != nil {
-		return egress.Mark(err)
+		return err
 	}
-	_, err = goes.ContextStdout(ctx).Write(self)
+	_, err = goes.ContextStdout(ctx).Write(selfpem)
 	return egress.Mark(err)
 }
