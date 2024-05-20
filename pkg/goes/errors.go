@@ -7,12 +7,13 @@ package goes
 import "errors"
 
 var (
-	FIXME         = errors.New("FIXME")
-	ErrDisabled   = errors.New("disabled")
-	ErrEmpty      = errors.New("empty selection")
-	ErrIncomplete = errors.New("incomplete")
-	ErrNoRoom     = errors.New("no room")
-	ErrNotFound   = errors.New("not found")
-	ErrRange      = errors.New("out of range")
-	ErrUnexpected = errors.New("unexpected")
+	FIXME          = errors.New("FIXME")
+	ErrDisabled    = errors.New("disabled")
+	ErrEmpty       = errors.New("empty selection")
+	ErrIncomplete  = errors.New("incomplete")
+	ErrNoRoom      = errors.New("no room")
+	ErrNotFound    = errors.New("not found")
+	ErrRange       = errors.New("out of range")
+	ErrUnavailable = errors.New("unavailable")
+	ErrUnexpected  = errors.New("unexpected")
 )

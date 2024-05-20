@@ -58,6 +58,7 @@ var IntegralCommands = map[string]any{
 	"log":      IntegralLog,
 	"input":    IntegralInput,
 	"output":   IntegralOutput,
+	"pty":      IntegralPTY,
 	"start":    IntegralStart,
 }
 

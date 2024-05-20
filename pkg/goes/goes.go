@@ -1,4 +1,4 @@
-// Copyright © 2022-2023 Platina Systems, Inc. All rights reserved.
+// Copyright © 2022-2024 Platina Systems, Inc. All rights reserved.
 // Use of this source code is governed by the GPL-2 license described in the
 // LICENSE file.
 
@@ -21,6 +21,8 @@ import (
 
 func Do(ctx context.Context, subsys any, args []string) error {
 	switch t := subsys.(type) {
+	case error:
+		return t
 	case map[string]any:
 		return Select(RootContext(ctx, t), args)
 	case func(context.Context, []string) error:
