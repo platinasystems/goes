@@ -1,6 +1,6 @@
 module github.com/platinasystems/goes/v2
 
-go 1.21.1
+go 1.22.0
 
 require (
 	github.com/creack/pty v1.1.18
