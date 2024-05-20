@@ -1,0 +1,80 @@
+// Copyright © 2023-2024 Platina Systems, Inc. All rights reserved.
+// Use of this source code is governed by the GPL-2 license described in the
+// LICENSE file.
+
+package x509keys
+
+import (
+	"encoding/pem"
+	"io"
+	"os"
+	"sync"
+
+	"github.com/platinasystems/goes/v2/pkg/crypto/pem/pemblocks"
+)
+
+type File struct {
+	Path   string
+	mutex  sync.RWMutex
+	blocks []*pem.Block
+	keys   []Privater
+}
+
+func NewFile(path string) (f *File, err error) {
+	f = &File{Path: path}
+	r, err := os.Open(path)
+	if err == nil {
+		defer r.Close()
+		_, err = f.ReadFrom(r)
+	}
+	return
+}
+
+func (f *File) ReadFrom(r io.Reader) (int64, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return 0, err
+	}
+	f.blocks, _ = pemblocks.Decode(data)
+	f.keys, err = Parse(f.blocks...)
+	return int64(len(data)), err
+}
+
+func (f *File) Add(block *pem.Block, key Privater) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	for i, k := range f.keys {
+		if k == nil {
+			f.blocks[i] = block
+			f.keys[i] = key
+			return pemblocks.Create(f.Path, 0600, f.blocks...)
+		}
+	}
+	f.blocks = append(f.blocks, block)
+	f.keys = append(f.keys, key)
+	return pemblocks.Append(f.Path, 0600, block)
+}
+
+// Thie returns <nil> if there are no keys.
+func (f *File) First() Privater {
+	f.mutex.RLock()
+	defer f.mutex.RUnlock()
+	for _, key := range f.keys {
+		if key != nil {
+			return key
+		}
+	}
+	return nil
+}
+
+func (f *File) Show(w io.Writer) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	if t, err := Template(); err != nil {
+		return err
+	} else {
+		return t.Execute(w, f.keys)
+	}
+}

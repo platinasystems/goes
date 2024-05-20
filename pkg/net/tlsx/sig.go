@@ -11,7 +11,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -34,7 +34,7 @@ var Signature struct {
 }
 
 var InitSignature = sync.OnceValue(func() error {
-	data, err := ioutil.ReadFile(*OptionalSignatureFileName)
+	data, err := os.ReadFile(*OptionalSignatureFileName)
 	if err != nil || len(data) == 0 {
 		return err
 	}

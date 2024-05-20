@@ -14,12 +14,16 @@ import (
 )
 
 var Root = map[string]any{
-	"command":  ExternalCommand,
-	"complete": InitEnabledRootFunc,
-	"daemon":   Daemons,
-	"help":     InitEnabledRootFunc,
-	"show":     Show,
-	"start":    InitEnabledRootFunc,
+	"daemon": make(map[string]any),
+	"show":   make(map[string]any),
+}
+
+func RootDaemons() map[string]any {
+	return Root["daemon"].(map[string]any)
+}
+
+func RootShows() map[string]any {
+	return Root["show"].(map[string]any)
 }
 
 func ContextRoot(ctx context.Context) map[string]any {
@@ -28,11 +32,6 @@ func ContextRoot(ctx context.Context) map[string]any {
 
 func RootContext(ctx context.Context, root map[string]any) context.Context {
 	return parameter.Context(ctx, &Root, root)
-}
-
-// The InitEnabled functions work around initialization cycle loop detection.
-func InitEnabledRootFunc(context.Context, []string) error {
-	return ErrDisabled
 }
 
 func SprintContextRootKeys(ctx context.Context, filter ...string) string {
@@ -55,10 +54,4 @@ func SprintContextRootKeys(ctx context.Context, filter ...string) string {
 		}
 	}
 	return sb.String()
-}
-
-func init() {
-	Root["complete"] = Complete
-	Root["help"] = Help
-	Root["start"] = Start
 }

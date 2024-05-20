@@ -72,6 +72,7 @@ func New(
 	_, _, errno := unix.RawSyscall(unix.SYS_CONNECT, uintptr(fd),
 		uintptr(unsafe.Pointer(sac)), SizeofSockaddrCtl)
 	if errno != 0 {
+		err = os.NewSyscallError("sysctl", errno)
 		return nil, egress.Mark(err)
 	}
 

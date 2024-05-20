@@ -30,12 +30,12 @@ func (nif *NetIf) Add(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) (err error) {
 	if addr := prefix.Addr(); addr.Is4() {
-		args, err = nif.add4(ctx, prefix, dest, args)
+		args, err = nif.add4(ctx, prefix, dest, args...)
 	} else if addr.Is6() {
-		args, err = nif.add6(ctx, prefix, dest, args)
+		args, err = nif.add6(ctx, prefix, dest, args...)
 	} else {
 		err = fmt.Errorf("%v %w", prefix, ErrWrongFamily)
 	}
@@ -49,7 +49,7 @@ func (nif *NetIf) add4(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) ([]string, error) {
 	bits := prefix.Bits()
 	req := netioctl.NewIfReqInAlias(nif.Name)
@@ -71,7 +71,7 @@ func (nif *NetIf) add6(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) ([]string, error) {
 	bits := prefix.Bits()
 	req := netioctl.NewIfReqIn6Alias(nif.Name)
@@ -95,7 +95,7 @@ func (nif *NetIf) Change(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) error {
 	return ErrUnsupported
 }
@@ -104,7 +104,7 @@ func (nif *NetIf) Del(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) error {
 	addr := prefix.Addr()
 	if addr.Is4() {
@@ -121,7 +121,7 @@ func (nif *NetIf) Replace(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) error {
 	return ErrUnsupported
 }

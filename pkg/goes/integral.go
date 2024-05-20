@@ -9,124 +9,76 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
+	"github.com/platinasystems/goes/v2/pkg/log/oslog"
 	"github.com/platinasystems/goes/v2/pkg/os/program"
-	"github.com/platinasystems/goes/v2/pkg/os/xdg"
+	"github.com/platinasystems/goes/v2/pkg/override"
 	"github.com/platinasystems/goes/v2/pkg/path/restricted"
 	"github.com/platinasystems/goes/v2/pkg/text/complete"
 	"golang.org/x/term"
 )
 
 const (
-	BashCompletion = `
+	IntegralBashCompletion = `
 _{{$arg0 := branch . 0 1}}{{$arg0}}()
 {
 	if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
-		COMPREPLY=($({{$arg0}} -complete ${COMP_WORDS[@]:1} ''))
+		COMPREPLY=( $({{$arg0}} complete ${COMP_WORDS[@]:1} '') )
 	else
-		COMPREPLY=($({{$arg0}} -complete ${COMP_WORDS[@]:1}))
+		COMPREPLY=( $({{$arg0}} complete ${COMP_WORDS[@]:1}) )
 	fi
 	return 0
 }
 
 type -p {{$arg0}} >/dev/null &&
 	complete -F _{{$arg0}} -o filenames {{$arg0}}`
-	ZshCompletion = `
+	IntegralZshCompletion = `
 #compdef {{$arg0 := branch . 0 1}}{{$arg0}}
 
 if [ -z ${COMP_WORDS[COMP_CWORD]} ] ; then
-	COMPREPLY=( $({{$arg0}} -complete ${COMP_WORDS[@]:1} '') )
+	COMPREPLY=( $({{$arg0}} complete ${COMP_WORDS[@]:1} '') )
 else
-	COMPREPLY=( $({{$arg0}} -complete ${COMP_WORDS[@]:1}) )
+	COMPREPLY=( $({{$arg0}} complete ${COMP_WORDS[@]:1}) )
 fi
 
 return 0`
 )
 
-var Completion = map[string]any{
-	"bash": BashCompletion,
-	"zsh":  ZshCompletion,
+var IntegralCommands = map[string]any{
+	"command":  IntegralCommand,
+	"complete": IntegralComplete,
+	"cutoff":   IntegralCutoff,
+	"help":     IntegralHelp,
+	"log":      IntegralLog,
+	"input":    IntegralInput,
+	"output":   IntegralOutput,
+	"start":    IntegralStart,
 }
 
-var Daemons = map[string]any{
-	"standby": Standby,
+var IntegralDaemons = map[string]any{
+	"standby": IntegralStandby,
 }
 
-var Show = map[string]any{
-	"build":      program.Build,
-	"completion": Completion,
-	"main":       program.Main,
-	"options":    Options,
-	"xdg":        xdg.Dirs,
+var IntegralShow = map[string]any{
+	"build": program.Build,
+	"completion": map[string]any{
+		"bash": IntegralBashCompletion,
+		"zsh":  IntegralZshCompletion,
+	},
+	"main": program.Main,
 }
 
-func Complete(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return complete.Last(args, ContextRoot(ctx))
-	}
-	branch := ContextBranch(ctx)
-	ctx = BranchContext(ctx, branch[:len(branch)-1])
-	ctx = CompleteContext(ctx, true)
-	return do(ctx, Select, args)
-}
-
-func Help(ctx context.Context, args []string) error {
-	if len(args) == 0 {
-		return Usage(ctx, `
-{{$cmd := branch . 0 1 -}}
-{{$branch := branch . 1 -}}
-{{if eq $branch "help"}}
-{{- $branch = ""}}
-{{- end -}}
-{{if $branch}}
-{{- $branch = print $branch " "}}
-{{- end -}}
-{{$trunk := branch . 1 2 -}}
-{{$args := "<command> [<args>]" -}}
-{{$syn := "Run command" -}}
-{{$heading := "Commands" -}}
-{{if eq $trunk "show"}}
-{{- $args = "<object>"}}
-{{- $syn = "Show object"}}
-{{- $heading = "Objects"}}
-{{- end -}}
-usage: {{$cmd}} [option] {{$branch}}{{$args}}
-{{$syn}}.
-
-{{$heading}}
-{{root . "daemon"}}`)
-	}
-	branch := ContextBranch(ctx)
-	ctx = BranchContext(ctx, branch[:len(branch)-1])
-	ctx = HelpContext(ctx, true)
-	return do(ctx, Select, args)
-}
-
-func Options(ctx context.Context, args []string) error {
-	flag.CommandLine.SetOutput(ContextStdout(ctx))
-	flag.PrintDefaults()
-	return nil
-}
-
-// Use this to hold container until interrupt or termination signal.
-func Standby(ctx context.Context, args []string) error {
-	if ContextComplete(ctx) {
-		return nil
-	}
-	if ContextHelp(ctx) {
-		return Usage(ctx, `
-usage: {{branch .}} [<pids>]
-Wait until interrupt or termination signal.`)
-	}
-	<-ctx.Done()
-	return ctx.Err()
-}
-
-func ExternalCommand(ctx context.Context, args []string) error {
+func IntegralCommand(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} [<options>] <command> [<args>]
+Run an external command.
+{{flags .}}`
 	var flags flag.FlagSet
 	ctx = FlagsContext(ctx, &flags)
 	pFlag := flags.Bool("p", false, "Restricted path search.")
@@ -140,10 +92,7 @@ func ExternalCommand(ctx context.Context, args []string) error {
 		return err
 	}
 	if ContextHelp(ctx) {
-		return Usage(ctx, `
-usage: {{branch .}} [<options>] <command> [<args>]
-Run an external command.
-{{flags .}}`)
+		return Usage(ctx, usage)
 	}
 	args = flags.Args()
 	if len(args) == 0 {
@@ -189,7 +138,131 @@ Run an external command.
 	return err
 }
 
-func Start(ctx context.Context, args []string) error {
+func IntegralComplete(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return complete.Last(args, ContextRoot(ctx))
+	}
+	branch := ContextBranch(ctx)
+	ctx = BranchContext(ctx, branch[:len(branch)-1])
+	ctx = CompleteContext(ctx, true)
+	return Do(ctx, Select, args)
+}
+
+func IntegralCutoff(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} <duarion> <command> [<options>]
+Run <command> until max <duration>.`
+	if ContextComplete(ctx) {
+		return Do(ctx, Select, args)
+	}
+	if ContextHelp(ctx) {
+		if len(args) == 0 {
+			return Usage(ctx, usage)
+		}
+		return Do(ctx, Select, args)
+	}
+	if len(args) < 2 {
+		return ErrIncomplete
+	}
+	timeout, err := time.ParseDuration(args[0])
+	if err != nil {
+		return err
+	}
+	toctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return Do(toctx, Select, args[1:])
+}
+
+func IntegralHelp(ctx context.Context, args []string) error {
+	const usage = `
+{{$cmd := branch . 0 1 -}}
+{{$branch := branch . 1 -}}
+{{if eq $branch "help"}}
+{{- $branch = ""}}
+{{- end -}}
+{{if $branch}}
+{{- $branch = print $branch " "}}
+{{- end -}}
+{{$trunk := branch . 1 2 -}}
+{{$args := "<command> [<args>]" -}}
+{{$syn := "Run command" -}}
+{{$heading := "Commands" -}}
+{{if eq $trunk "show"}}
+{{- $args = "<object>"}}
+{{- $syn = "Show object"}}
+{{- $heading = "Objects"}}
+{{- end -}}
+usage: {{$cmd}} [option] {{$branch}}{{$args}}
+{{$syn}}.
+{{if eq $branch ""}}
+Options{{flags .}}
+{{- end}}
+{{$heading}}
+{{root . "daemon"}}`
+	if len(args) == 0 {
+		return Usage(ctx, usage)
+	}
+	branch := ContextBranch(ctx)
+	ctx = BranchContext(ctx, branch[:len(branch)-1])
+	ctx = HelpContext(ctx, true)
+	return Do(ctx, Select, args)
+}
+
+func IntegralInput(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} <file> <command> [<options>]
+Run <command> with <file> input.`
+	if ContextComplete(ctx) {
+		return Do(ctx, Select, args)
+	}
+	if ContextHelp(ctx) {
+		if len(args) == 0 {
+			return Usage(ctx, usage)
+		}
+		return Do(ctx, Select, args)
+	}
+	if len(args) < 2 {
+		return ErrIncomplete
+	}
+
+	r, err := os.Open(args[0])
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	defer override.Value(&os.Stdin, r)()
+	return Do(StdinContext(ctx, r), Select, args[1:])
+}
+
+func IntegralKoAppLog(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} <command> [<options>]
+Stubb ko-app logging; instead, everything is printed to stdout or stderr.`
+	if ContextComplete(ctx) {
+		if len(args) == 0 {
+			return complete.Last(args, Root)
+		}
+		return Do(ctx, Select, args)
+	}
+	if ContextHelp(ctx) {
+		if len(args) == 0 {
+			return Usage(ctx, usage)
+		}
+		return Do(ctx, Select, args)
+	}
+	if len(args) == 0 {
+		return ErrIncomplete
+	}
+	return Do(ctx, Select, args)
+}
+
+func IntegralKoAppStart(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} <daemon> [<options>]
+Run ko-app <daemon>.
+
+Daemons
+{{root .}}`
 	vdaemon, ok := ContextRoot(ctx)["daemon"]
 	if !ok {
 		return egress.Mark(FIXME)
@@ -203,28 +276,202 @@ func Start(ctx context.Context, args []string) error {
 		if len(args) == 0 {
 			return complete.Last(args, daemons)
 		}
-		return do(ctx, Select, args)
+		return Do(ctx, Select, args)
 	}
 	if ContextHelp(ctx) {
 		if len(args) == 0 {
-			return Usage(ctx, `
+			return Usage(ctx, usage)
+		}
+		return Do(ctx, Select, args)
+	}
+	if len(args) == 0 {
+		return ErrIncomplete
+	}
+	return Do(ctx, Select, args)
+}
+
+func IntegralLog(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} <command> [<options>]
+Print <command> output and errors to syslog.`
+	if program.IsKoApp() {
+		return IntegralKoAppLog(ctx, args)
+	}
+	if ContextComplete(ctx) {
+		return Do(ctx, Select, args)
+	}
+	if ContextHelp(ctx) {
+		if len(args) == 0 {
+			return Usage(ctx, usage)
+		}
+		return Do(ctx, Select, args)
+	}
+	if len(args) == 0 {
+		return ErrIncomplete
+	}
+
+	outLog, err := oslog.OpenNotice()
+	if err != nil {
+		return err
+	}
+	defer outLog.Close()
+	rOutPipe, wOutPipe, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	defer wOutPipe.Close()
+	go io.Copy(outLog, rOutPipe)
+
+	errLog, err := oslog.OpenError()
+	if err != nil {
+		return err
+	}
+	defer errLog.Close()
+	rErrPipe, wErrPipe, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	defer wErrPipe.Close()
+	go io.Copy(errLog, rErrPipe)
+
+	ctx = StdoutContext(ctx, wOutPipe)
+	ctx = StderrContext(ctx, wErrPipe)
+
+	return Do(ctx, Select, args)
+}
+
+func IntegralOutput(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} [<modifiers>] <file> <command> [<options>]
+Run <command> with output to <file>.
+
+Modifiers{{flags .}}`
+	flags := flag.NewFlagSet("", 0)
+	aFlag := flags.Bool("a", false, "Append <file> instead of truncate.")
+	tFlag := flags.Bool("t", false, "Tee to <file> and stdout.")
+	mFlag := flags.Uint("m", 0, "Output file mode (default 0666).")
+	fctx := FlagsContext(ctx, flags)
+
+	ctx, err := ParseFlagsContext(fctx, args)
+	if err != nil {
+		return err
+	}
+	if ContextComplete(fctx) {
+		return Do(ctx, Select, args)
+	}
+	if ContextHelp(fctx) {
+		if len(args) == 0 {
+			return Usage(fctx, usage)
+		}
+		return Do(ctx, Select, args)
+	}
+	if args = flags.Args(); len(args) < 2 {
+		return ErrIncomplete
+	}
+	oflags := os.O_RDWR | os.O_CREATE
+	if *aFlag {
+		oflags |= os.O_APPEND
+	} else {
+		oflags |= os.O_TRUNC
+	}
+	mode := os.FileMode(0666)
+	if *mFlag != 0 {
+		mode = os.FileMode(*mFlag)
+	}
+	f, err := os.OpenFile(args[0], oflags, mode)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if *tFlag {
+		pr, pw, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		defer pw.Close()
+		defer override.Value(&os.Stdout, pw)()
+		go io.Copy(io.MultiWriter(os.Stdout, f), pr)
+		ctx = StdoutContext(ctx, pw)
+	} else {
+		defer override.Value(&os.Stdout, f)()
+		ctx = StdoutContext(ctx, f)
+	}
+	return Do(ctx, Select, args[1:])
+}
+
+// Use this to hold container until interrupt or termination signal.
+func IntegralStandby(ctx context.Context, args []string) error {
+	const usage = `
+usage: {{branch .}} [<pids>]
+Wait until interrupt or termination signal.`
+	if ContextComplete(ctx) {
+		return nil
+	}
+	if ContextHelp(ctx) {
+		return Usage(ctx, usage)
+	}
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func IntegralStart(ctx context.Context, args []string) error {
+	const usage = `
 usage: {{branch .}} <daemon> [<options>]
 Fork self to run <daemon> like this,
 
-   {{branch . 0 1}} daemon <daemon> [<options>]
+   {{branch . 0 1}} oslog daemon <daemon> [<options>]
 
 Daemons
-{{root .}}`)
+{{root .}}`
+	if program.IsKoApp() {
+		return IntegralKoAppStart(ctx, args)
+	}
+	vdaemon, ok := ContextRoot(ctx)["daemon"]
+	if !ok {
+		return egress.Mark(FIXME)
+	}
+	daemons, ok := vdaemon.(map[string]any)
+	if !ok {
+		return egress.Mark(FIXME)
+	}
+	ctx = RootContext(ctx, daemons)
+	if ContextComplete(ctx) {
+		if len(args) == 0 {
+			return complete.Last(args, daemons)
 		}
-		return do(ctx, Select, args)
+		return Do(ctx, Select, args)
 	}
-	if os.Getpid() == 1 {
-		ctx = AppendBranchContext(ctx, "daemon")
-		return do(ctx, Select, args)
+	if ContextHelp(ctx) {
+		if len(args) == 0 {
+			return Usage(ctx, usage)
+		}
+		return Do(ctx, Select, args)
 	}
-	args = append([]string{"daemon"}, args...)
-	cmd := exec.Command(program.Executable(), args...)
-	cmd.Env = []string{
+	if len(args) == 0 {
+		return ErrIncomplete
+	}
+	cmd := exec.Command(program.Executable(),
+		append([]string{"oslog", "daemon"}, args...)...)
+	cmd.Env = DaemonEnv()
+	cmd.Dir = program.RunTimeDir()
+	_, err := os.Stat(cmd.Dir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		cmd.Dir = os.TempDir()
+	}
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if cmd.SysProcAttr, err = DaemonSysProcAttr(); err == nil {
+		err = cmd.Start()
+	}
+	return err
+}
+
+func DaemonEnv() []string {
+	env := []string{
 		Path(),
 	}
 	for _, name := range []string{
@@ -235,36 +482,16 @@ Daemons
 		"TMPDIR",
 		"USERPROFILE",
 		"XDG_CACHE_HOME",
+		"XDG_CONFIG_DIRS",
+		"XDG_CONFIG_HOME",
+		"XDG_DATA_DIRS",
+		"XDG_DATA_HOME",
+		"XDG_RUNTIME_DIR",
+		"XDG_STATE_HOME",
 	} {
 		if val, ok := os.LookupEnv(name); ok {
-			cmd.Env = append(cmd.Env, fmt.Sprint(name, "=", val))
+			env = append(env, fmt.Sprint(name, "=", val))
 		}
 	}
-	if os.Geteuid() == 0 {
-		cmd.Dir = "/var/run"
-	} else if d, undetermined := os.UserCacheDir(); undetermined == nil {
-		cmd.Dir = d
-	}
-	if len(cmd.Dir) == 0 || func(s string) error {
-		_, err := os.Stat(s)
-		return err
-	}(cmd.Dir) != nil {
-		cmd.Dir = os.TempDir()
-	}
-	cmd.Stdin = nil
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	var err error
-	cmd.SysProcAttr, err = DaemonSysProcAttr()
-	if err == nil {
-		err = cmd.Start()
-		if err == nil {
-			w := ContextStdout(ctx)
-			branch := ContextBranch(ctx)
-			fmt.Fprint(w, branch[0], ":daemon:", args[0],
-				":pid: ", cmd.Process.Pid,
-				"\n")
-		}
-	}
-	return err
+	return env
 }

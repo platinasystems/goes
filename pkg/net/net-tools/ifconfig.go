@@ -233,14 +233,14 @@ func ifconfigAddr(ctx context.Context, nif *netif.NetIf, args []string) error {
 	if len(args) > 0 {
 		switch args[0] {
 		case "add", "alias":
-			return nif.Add(ctx, prefix, dest, args[1:])
+			return nif.Add(ctx, prefix, dest, args[1:]...)
 		case "del", "delete", "-alias":
-			return nif.Del(ctx, prefix, dest, args[1:])
+			return nif.Del(ctx, prefix, dest, args[1:]...)
 		case "change":
-			return nif.Change(ctx, prefix, dest, args[1:])
+			return nif.Change(ctx, prefix, dest, args[1:]...)
 		case "replace":
-			return nif.Replace(ctx, prefix, dest, args[1:])
+			return nif.Replace(ctx, prefix, dest, args[1:]...)
 		}
 	}
-	return nif.Add(ctx, prefix, dest, args)
+	return nif.Add(ctx, prefix, dest, args...)
 }

@@ -8,46 +8,41 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 var FileNameMutation = filepath.Base
 
 func IsMarked(err error) bool {
-	_, ok := err.(*mark)
+	_, ok := err.(*MarkError)
 	return ok
 }
 
-// Wrap a non-nil error with the caller's file name and line number, e.g.
-//
-//	if err != nil {
-//		return Marked(err)
-//	}
-func Mark(err error) error {
+// Wrap a non-nil error with the caller's file name and line number and args.
+func Mark(err error, args ...any) error {
 	if err != nil {
 		if _, f, l, ok := runtime.Caller(1); ok {
-			err = &mark{f, l, err}
+			err = &MarkError{f, l, err, args}
 		}
 	}
 	return err
 }
 
 // Skip 2 calls back.
-func MarkCaller(err error) error {
+func MarkCaller(err error, args ...any) error {
 	if err != nil {
 		if _, f, l, ok := runtime.Caller(2); ok {
-			err = &mark{f, l, err}
+			err = &MarkError{f, l, err, args}
 		}
 	}
 	return err
 }
 
-// Wrap fmt.Errorf with the caller's file name and line number, e.g.
-//
-//	return Markf(format, args...)
+// Wrap fmt.Errorf with the caller's file name and line number.
 func Markf(format string, args ...any) error {
 	err := fmt.Errorf(format, args...)
 	if _, f, l, ok := runtime.Caller(1); ok {
-		err = &mark{f, l, err}
+		err = &MarkError{f, l, err, nil}
 	}
 	return err
 }
@@ -56,20 +51,38 @@ func MarkResult[T any](v T, err error) (T, error) {
 	return v, MarkCaller(err)
 }
 
-type mark struct {
+type MarkError struct {
 	file string
 	line int
 	err  error
+	args []any
 }
 
-func (m mark) Error() string {
-	sep := ": "
-	if _, ok := m.err.(*mark); ok {
-		sep = "/"
+func (m *MarkError) Error() string {
+	if m == nil {
+		return ""
 	}
-	return fmt.Sprint(FileNameMutation(m.file), ":", m.line, sep, m.err)
+	var sb strings.Builder
+	fmt.Fprint(&sb, FileNameMutation(m.file), ":", m.line)
+	if IsMarked(m.err) {
+		fmt.Fprint(&sb, "/ ")
+	} else {
+		fmt.Fprint(&sb, ": ")
+	}
+	fmt.Fprint(&sb, m.err)
+	if len(m.args) > 0 {
+		fmt.Fprint(&sb, " [")
+		for i, arg := range m.args {
+			if i > 0 {
+				fmt.Fprint(&sb, " ")
+			}
+			fmt.Fprint(&sb, arg)
+		}
+		fmt.Fprint(&sb, "]")
+	}
+	return sb.String()
 }
 
-func (m mark) Unwrap() error {
+func (m *MarkError) Unwrap() error {
 	return m.err
 }

@@ -15,6 +15,7 @@ import (
 )
 
 func ContextPrintln(ctx context.Context, s string) error {
+	const nl = "\n"
 	s = strings.TrimRight(s, nl)
 	if len(s) == 0 {
 		return nil

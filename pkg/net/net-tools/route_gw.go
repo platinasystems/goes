@@ -40,17 +40,3 @@ func routeGateway(
 	}
 	return ipas, nil
 }
-
-func routeSelectGateway(ipas []net.IPAddr, prefer6 bool) net.IPAddr {
-	ipa := ipas[0]
-	l := net.IPv4len
-	if prefer6 {
-		l = net.IPv6len
-	}
-	for _, entry := range ipas {
-		if len(entry.IP) == l {
-			ipa = entry
-		}
-	}
-	return ipa
-}

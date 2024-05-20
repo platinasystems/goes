@@ -15,6 +15,7 @@ _cgo_.o
 /netstat
 /pty
 /rawtty
+/route
 /textembedder
 /tlsx
 /tuntap

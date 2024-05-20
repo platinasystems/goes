@@ -11,7 +11,7 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/coreutils"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	net_tools "github.com/platinasystems/goes/v2/pkg/net/net-tools"
-	"github.com/platinasystems/goes/v2/pkg/net/tlsx"
+	"github.com/platinasystems/goes/v2/pkg/net/vpn"
 )
 
 //go:embed LICENSE
@@ -21,13 +21,15 @@ var license []byte
 var patents []byte
 
 func main() {
+	maps.Copy(goes.RootShows(), map[string]any{
+		"license": license,
+		"patents": patents,
+	})
 	maps.Copy(goes.Root, coreutils.Root)
 	maps.Copy(goes.Root, net_tools.Root)
-	goes.Root["tlsx"] = tlsx.Command
-	goes.Show["license"] = license
-	goes.Show["patents"] = patents
-	goes.Show["tlsx"] = tlsx.Show
-	maps.Copy(goes.Daemons, net_tools.Daemons)
-	goes.Daemons["tlsx"] = tlsx.Daemon
+	maps.Copy(goes.RootDaemons(), net_tools.Daemons)
+	goes.Root["vpn"] = vpn.Commands
+	goes.RootDaemons()["vpn"] = vpn.Daemons
+	goes.RootShows()["vpn"] = vpn.Shows
 	goes.Main()
 }

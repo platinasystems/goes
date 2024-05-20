@@ -141,9 +141,7 @@ func routeModCmd(ctx context.Context, args []string) error {
 	} else if err != nil {
 		return err
 	}
-
-	args = dstopts.Args()
-	if len(args) > 0 {
+	if len(args) == 0 {
 		return ErrNoDst
 	}
 	dstarg := args[0]

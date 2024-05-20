@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-func Search[T comparable](flags *flag.FlagSet, name string) T {
+func Search[T any](flags *flag.FlagSet, name string) T {
 	var zero T
 	f := flags.Lookup(name)
 	if f == nil {

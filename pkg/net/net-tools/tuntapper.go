@@ -89,7 +89,7 @@ func TunTapper(ctx context.Context, args []string) error {
 		} else {
 			prefix = netip.PrefixFrom(local, 128)
 		}
-		err = nif.Add(ctx, prefix, remote, args[2:])
+		err = nif.Add(ctx, prefix, remote, args[2:]...)
 		if err != nil {
 			return egress.Mark(err)
 		}

@@ -6,7 +6,6 @@ package ipc
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -50,7 +49,7 @@ func (*Loopback) Network() string { return "tcp" }
 
 // Returns allocated 127.0.0.1:PORT from Ipc file.
 func (lb *Loopback) String() string {
-	addrdata, err := ioutil.ReadFile(lb.fn)
+	addrdata, err := os.ReadFile(lb.fn)
 	if err != nil {
 		lb.err = err
 		return ""

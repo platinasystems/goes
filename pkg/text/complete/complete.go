@@ -7,7 +7,6 @@ package complete
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -64,32 +63,50 @@ func Flags(fs FlagSetter, arg string) (c []string) {
 	return
 }
 
-// Files matching last arg + pattern.
+// Pattern matching files.
 func Glob(pat, arg string) (c []string) {
-	ps := string(os.PathSeparator)
-	c, _ = filepath.Glob(fmt.Sprint(arg, pat))
-	for i, fn := range c {
-		if fi, err := os.Stat(fn); err == nil {
-			if fi.IsDir() {
-				c[i] += ps
+	const ps = string(os.PathSeparator)
+	const tildedir = "~" + ps
+	var dn, bn string
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	athome := strings.HasPrefix(arg, tildedir)
+	if athome {
+		// FIXME this isn't working for zsh
+		if arg == tildedir {
+			arg = home
+		} else {
+			arg = strings.Replace(arg, "~", home, 1)
+		}
+	}
+
+	if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
+		dn, bn = arg, "."
+	} else {
+		dn, bn = filepath.Dir(arg), filepath.Base(arg)
+	}
+
+	dir, err := os.ReadDir(dn)
+	if err != nil {
+		return
+	}
+	for _, de := range dir {
+		if bn == "." || strings.HasPrefix(de.Name(), bn) {
+			match, err := filepath.Match(pat, de.Name())
+			if de.IsDir() || (err == nil && match) {
+				c = append(c, filepath.Join(dn, de.Name()))
 			}
 		}
 	}
-	if len(c) == 1 && strings.HasSuffix(c[0], ps) {
-		if fis, err := ioutil.ReadDir(c[0]); err == nil {
-			for _, fi := range fis {
-				name := filepath.Join(c[0], fi.Name())
-				realname, err := filepath.EvalSymlinks(name)
-				if err == nil {
-					realfi, err := os.Stat(realname)
-					if err == nil {
-						fi = realfi
-					}
-				}
-				if fi.IsDir() {
-					name += ps
-				}
-				c = append(c, name)
+	if athome {
+		for i, s := range c {
+			if strings.HasPrefix(s, home) {
+				c[i] = strings.Replace(s, home, "~", 1)
+			} else if strings.HasPrefix(s, "."+ps) {
+				c[i] = s[2:]
 			}
 		}
 	}

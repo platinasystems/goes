@@ -15,10 +15,8 @@ import (
 	"strings"
 )
 
-func PrintOrReadBytes(
-	ctx context.Context,
-	b []byte,
-	args []string,
+func ImplicitPrintOrReadBytes(
+	ctx context.Context, b []byte, args []string,
 ) (err error) {
 	if ContextComplete(ctx) {
 		return nil
@@ -36,10 +34,8 @@ Print or overwrite object with stdin.`)
 	return
 }
 
-func PrintBytesResult(
-	ctx context.Context,
-	funk func() ([]byte, error),
-	args []string,
+func ImplicitPrintBytesResult(
+	ctx context.Context, funk func() ([]byte, error), args []string,
 ) error {
 	if ContextComplete(ctx) {
 		return nil
@@ -56,7 +52,9 @@ Print result.`)
 	return err
 }
 
-func PrintEmbedFS(ctx context.Context, efs embed.FS, args []string) error {
+func ImplicitPrintEmbedFS(
+	ctx context.Context, efs embed.FS, args []string,
+) error {
 	if ContextComplete(ctx) {
 		return nil
 	}
@@ -72,15 +70,13 @@ Print embedded file.`)
 	return err
 }
 
-type jsoner interface {
+type JSONer interface {
 	json.Marshaler
 	json.Unmarshaler
 }
 
-func PrintOrUnmarshalJSON(
-	ctx context.Context,
-	v jsoner,
-	args []string,
+func ImplicitPrintOrUnmarshalJSON(
+	ctx context.Context, v JSONer, args []string,
 ) (err error) {
 	var data []byte
 	if ContextComplete(ctx) {
@@ -105,10 +101,8 @@ JSON marshal object to stdout, or with "-" option, unmarshal from stdin.`)
 	return
 }
 
-func PrintOrScanObject(
-	ctx context.Context,
-	obj any,
-	args []string,
+func ImplicitPrintOrScanObject(
+	ctx context.Context, obj any, args []string,
 ) (err error) {
 	if ContextComplete(ctx) {
 		return nil
@@ -128,7 +122,9 @@ Print or scan object from stdin.`)
 	return
 }
 
-func PrintString(ctx context.Context, s string, args []string) error {
+func ImplicitPrintString(
+	ctx context.Context, s string, args []string,
+) error {
 	if ContextComplete(ctx) {
 		return nil
 	}
@@ -146,10 +142,8 @@ Print object.`)
 	return ContextPrintln(ctx, s)
 }
 
-func PrintStringer(
-	ctx context.Context,
-	obj fmt.Stringer,
-	args []string,
+func ImplicitPrintStringer(
+	ctx context.Context, obj fmt.Stringer, args []string,
 ) error {
 	if ContextComplete(ctx) {
 		return nil
@@ -162,10 +156,8 @@ Print object.`)
 	return ContextPrintln(ctx, obj.String())
 }
 
-func PrintStringResult(
-	ctx context.Context,
-	funk func() string,
-	args []string,
+func ImplicitPrintStringResult(
+	ctx context.Context, funk func() string, args []string,
 ) error {
 	if ContextComplete(ctx) {
 		return nil
@@ -178,16 +170,15 @@ Print result.`)
 	return ContextPrintln(ctx, funk())
 }
 
-type texter interface {
+type Texter interface {
 	encoding.TextMarshaler
 	encoding.TextUnmarshaler
 }
 
-func PrintOrUnmarshalText(
-	ctx context.Context,
-	v texter,
-	args []string,
+func ImplicitPrintOrUnmarshalText(
+	ctx context.Context, v Texter, args []string,
 ) (err error) {
+	const nl = "\n"
 	var data []byte
 	if ContextComplete(ctx) {
 		return nil

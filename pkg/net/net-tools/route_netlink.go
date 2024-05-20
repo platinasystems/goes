@@ -82,6 +82,44 @@ Destination Options{{dstopts}},
 Gateway Options{{gwopts}}`,
 }
 
+var routeProtocol = map[string]uint8{
+	"redirect": rtnetlink.RTPROT_REDIRECT,
+	"kernel":   rtnetlink.RTPROT_KERNEL,
+	"boot":     rtnetlink.RTPROT_BOOT,
+	"static":   rtnetlink.RTPROT_STATIC,
+}
+
+var routeScope = map[string]rtnetlink.RtScope{
+	"global":   rtnetlink.RT_SCOPE_UNIVERSE,
+	"universe": rtnetlink.RT_SCOPE_UNIVERSE,
+	"nowhere":  rtnetlink.RT_SCOPE_NOWHERE,
+	"host":     rtnetlink.RT_SCOPE_HOST,
+	"link":     rtnetlink.RT_SCOPE_LINK,
+	"site":     rtnetlink.RT_SCOPE_SITE,
+}
+
+var routeTable = map[string]rtnetlink.RtTable{
+	"compat":  rtnetlink.RT_TABLE_COMPAT,
+	"default": rtnetlink.RT_TABLE_DEFAULT,
+	"main":    rtnetlink.RT_TABLE_MAIN,
+	"local":   rtnetlink.RT_TABLE_LOCAL,
+}
+
+var routeTo = map[string]uint8{
+	"unicast":     rtnetlink.RTN_UNICAST,
+	"local":       rtnetlink.RTN_LOCAL,
+	"broadcast":   rtnetlink.RTN_BROADCAST,
+	"anycast":     rtnetlink.RTN_ANYCAST,
+	"multicast":   rtnetlink.RTN_MULTICAST,
+	"blackhole":   rtnetlink.RTN_BLACKHOLE,
+	"unreachable": rtnetlink.RTN_UNREACHABLE,
+	"prohibit":    rtnetlink.RTN_PROHIBIT,
+	"throw":       rtnetlink.RTN_THROW,
+	"nat":         rtnetlink.RTN_NAT,
+	"xresolve":    rtnetlink.RTN_XRESOLVE,
+	"cnt":         rtnetlink.RTN_CNT,
+}
+
 func routeGatewayOptions() *flag.FlagSet {
 	opts := new(flag.FlagSet)
 	opts.Int("expire", 0, "Seconds from now.")
@@ -183,18 +221,19 @@ func routeModReq(
 		}
 		switch t := gw.(type) {
 		case netip.Addr:
-			gwattr := routeGatewayAttr(dst.Addr(), t)
+			gwattr := netrt.GatewayAttr(dst.Addr(), t)
 			req = netlink.CatBytesAttr(req, gwattr, t.AsSlice())
 		case []net.IPAddr:
-			ipa := routeSelectGateway(t, dst.Addr().Is6())
+			ipa := netrt.SelectGateway(t, dst.Addr().Is6())
 			gwaddr, ok := netip.AddrFromSlice(ipa.IP)
 			if !ok {
 				return nil, fmt.
 					Errorf("%w resolved address (%v)",
 						ErrInvalid, ipa)
 			}
-			gwattr := routeGatewayAttr(dst.Addr(), gwaddr)
-			req = netlink.CatBytesAttr(req, gwattr, gwaddr.AsSlice())
+			gwattr := netrt.GatewayAttr(dst.Addr(), gwaddr)
+			gwip := gwaddr.AsSlice()
+			req = netlink.CatBytesAttr(req, gwattr, gwip)
 		case *netif.NetIf:
 			gwi := uint32(t.Index)
 			req = netlink.CatAttr(req, rtnetlink.RTA_IIF, gwi)
@@ -231,53 +270,4 @@ func routeModReq(
 	}
 	netlink.PointerMsgHdr(req).Len = uint32(len(req))
 	return netrt.OneReq(ctx, req)
-}
-
-var routeProtocol = map[string]uint8{
-	"redirect": rtnetlink.RTPROT_REDIRECT,
-	"kernel":   rtnetlink.RTPROT_KERNEL,
-	"boot":     rtnetlink.RTPROT_BOOT,
-	"static":   rtnetlink.RTPROT_STATIC,
-}
-
-var routeScope = map[string]rtnetlink.RtScope{
-	"global":   rtnetlink.RT_SCOPE_UNIVERSE,
-	"universe": rtnetlink.RT_SCOPE_UNIVERSE,
-	"nowhere":  rtnetlink.RT_SCOPE_NOWHERE,
-	"host":     rtnetlink.RT_SCOPE_HOST,
-	"link":     rtnetlink.RT_SCOPE_LINK,
-	"site":     rtnetlink.RT_SCOPE_SITE,
-}
-
-var routeTable = map[string]rtnetlink.RtTable{
-	"compat":  rtnetlink.RT_TABLE_COMPAT,
-	"default": rtnetlink.RT_TABLE_DEFAULT,
-	"main":    rtnetlink.RT_TABLE_MAIN,
-	"local":   rtnetlink.RT_TABLE_LOCAL,
-}
-
-var routeTo = map[string]uint8{
-	"unicast":     rtnetlink.RTN_UNICAST,
-	"local":       rtnetlink.RTN_LOCAL,
-	"broadcast":   rtnetlink.RTN_BROADCAST,
-	"anycast":     rtnetlink.RTN_ANYCAST,
-	"multicast":   rtnetlink.RTN_MULTICAST,
-	"blackhole":   rtnetlink.RTN_BLACKHOLE,
-	"unreachable": rtnetlink.RTN_UNREACHABLE,
-	"prohibit":    rtnetlink.RTN_PROHIBIT,
-	"throw":       rtnetlink.RTN_THROW,
-	"nat":         rtnetlink.RTN_NAT,
-	"xresolve":    rtnetlink.RTN_XRESOLVE,
-	"cnt":         rtnetlink.RTN_CNT,
-}
-
-func routeGatewayAttr(dst, gw netip.Addr) uint16 {
-	if dst.Is4() {
-		if gw.Is6() {
-			return rtnetlink.RTA_VIA
-		}
-	} else if gw.Is4() {
-		return rtnetlink.RTA_VIA
-	}
-	return rtnetlink.RTA_GATEWAY
 }

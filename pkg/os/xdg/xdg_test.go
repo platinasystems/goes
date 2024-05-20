@@ -22,16 +22,16 @@ func (ut unit) test(t *testing.T) {
 }
 
 func Test(t *testing.T) {
-	CacheHome = getCacheHome
-	ConfigHome = getConfigHome
-	DataHome = getDataHome
-	RunTimeDir = getRuntimeDir
-	StateHome = getStateHome
+	CacheHome = DefaultCacheHome
+	ConfigHome = DefaultConfigHome
+	DataHome = DefaultDataHome
+	RunTimeDir = DefaultRunTimeDir
+	StateHome = DefaultStateHome
 	t.Run("root", func(t *testing.T) {
-		IsOpt = func() bool {
+		ProgramInOpt = func() bool {
 			return true
 		}
-		IsUsrLocal = func() bool {
+		ProgramInUsrLocal = func() bool {
 			return true
 		}
 		IsSuperUser = func() bool {

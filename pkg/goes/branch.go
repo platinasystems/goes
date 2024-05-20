@@ -45,21 +45,24 @@ func SprintContextBranch(ctx context.Context, begend ...int) string {
 	return strings.Join(branch[beg:end], " ")
 }
 
-func WrapBranch(ctx context.Context, err error) error {
-	return branchError{ContextBranch(ctx), err}
+func Mark(ctx context.Context, err error) error {
+	if err != nil {
+		err = MarkError{ContextBranch(ctx), err}
+	}
+	return err
 }
 
-type branchError struct {
+type MarkError struct {
 	branch []string
 	err    error
 }
 
-func IsWrappedBranch(err error) bool {
-	_, ok := err.(branchError)
+func IsMarked(err error) bool {
+	_, ok := err.(MarkError)
 	return ok
 }
 
-func (e branchError) Error() string {
+func (e MarkError) Error() string {
 	var sb strings.Builder
 	for _, s := range e.branch {
 		fmt.Fprint(&sb, s, ":")
@@ -74,4 +77,4 @@ func (e branchError) Error() string {
 	return sb.String()
 }
 
-func (e branchError) Unwrap() error { return e.err }
+func (m MarkError) Unwrap() error { return m.err }

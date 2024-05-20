@@ -34,7 +34,11 @@ func Recovery(p *error, suppressed ...error) {
 		depth = 3
 	}
 	if _, f, l, ok := runtime.Caller(depth); ok {
-		*p = mark{f, l, err}
+		*p = &MarkError{
+			file: f,
+			line: l,
+			err:  err,
+		}
 	} else {
 		*p = err
 	}

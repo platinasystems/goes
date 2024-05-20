@@ -161,3 +161,15 @@ func Req(nl *netlink.NL, req []byte) (uint32, error) {
 	err := nl.Request(req)
 	return hdr.SEQ, err
 }
+
+func GatewayAttr(dst, gw netip.Addr) (attr uint16) {
+	attr = rtnetlink.RTA_GATEWAY
+	if dst.Is4() {
+		if gw.Is6() {
+			attr = rtnetlink.RTA_VIA
+		}
+	} else if gw.Is4() {
+		attr = rtnetlink.RTA_VIA
+	}
+	return
+}

@@ -12,6 +12,11 @@ import (
 	"github.com/platinasystems/goes/v2/pkg/net/af"
 )
 
+const (
+	PI_P_IP   = 0x800
+	PI_P_IPV6 = 0x86dd
+)
+
 type TunTapPI struct {
 	Flags native.Uint16
 	Proto big.Uint16
@@ -47,9 +52,9 @@ func (pi *TunPI) Format(w fmt.State, verb rune) {
 		fmt.Fprintf(w, ": %#x", flags)
 	}
 	switch proto := pi.Proto.Value(); proto {
-	case af.INET:
+	case PI_P_IP:
 		fmt.Fprint(w, ProtoMark, (*IPv4)(Data(pi)))
-	case af.INET6:
+	case PI_P_IPV6:
 		fmt.Fprint(w, ProtoMark, (*IPv6)(Data(pi)))
 	default:
 		fmt.Fprintf(w, ", proto[%#x]", proto)

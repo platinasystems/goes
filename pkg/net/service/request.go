@@ -9,9 +9,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/rpc"
+	"os"
 
 	"github.com/platinasystems/goes/v2/pkg/goes"
 )
@@ -56,9 +57,9 @@ func (req Request) Func(ctx context.Context, args []string) error {
 	if len(*in) > 0 {
 		var b []byte
 		if *in == "-" {
-			b, err = ioutil.ReadAll(r)
+			b, err = io.ReadAll(r)
 		} else {
-			b, err = ioutil.ReadFile(*in)
+			b, err = os.ReadFile(*in)
 		}
 		if err != nil {
 			return err

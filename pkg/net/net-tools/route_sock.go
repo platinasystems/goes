@@ -134,7 +134,7 @@ func routeModReq(
 		integer.Set(&rtm.Addrs, 1<<unix.RTAX_GATEWAY)
 		integer.Set(&rtm.Flags, unix.RTF_GATEWAY)
 	case []net.IPAddr:
-		ipa := routeSelectGateway(t, dst.Addr().Is6())
+		ipa := netrt.SelectGateway(t, dst.Addr().Is6())
 		gwaddr, ok := netip.AddrFromSlice(ipa.IP)
 		if !ok {
 			return nil, fmt.Errorf("%w resolved address (%v)",

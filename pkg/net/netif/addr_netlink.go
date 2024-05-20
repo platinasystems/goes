@@ -32,7 +32,7 @@ func (nif *NetIf) Add(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) (err error) {
 	const (
 		cmd   = rtnetlink.RTM_NEWADDR
@@ -49,7 +49,7 @@ func (nif *NetIf) Change(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) (err error) {
 	const (
 		cmd   = rtnetlink.RTM_NEWADDR
@@ -66,7 +66,7 @@ func (nif *NetIf) Del(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) error {
 	const (
 		cmd   = rtnetlink.RTM_DELADDR
@@ -80,7 +80,7 @@ func (nif *NetIf) Replace(
 	ctx context.Context,
 	prefix netip.Prefix,
 	dest netip.Addr,
-	args []string,
+	args ...string,
 ) (err error) {
 	const (
 		cmd   = rtnetlink.RTM_NEWADDR
