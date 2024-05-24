@@ -10,18 +10,13 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"strings"
 	"sync"
+	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
-)
-
-const (
-	exHello          = "hello"
-	exWhoisAddressed = "whois addressed"
-	exWhoisLabelled  = "whois labelled"
 )
 
 type exchange struct {
@@ -158,57 +153,74 @@ func (ex *exchange) rx(ctx context.Context, c *crate) {
 	from := c.box.FromWhom()
 	ifrom := from.Index()
 	gcm := ex.gcm[ifrom]
-	s := string(c.box.Contents())
-	switch {
-	case strings.HasPrefix(s, exHello):
-		verbose.Println(ifrom, c.ap, strings.TrimSpace(s))
+	pi := NewTunPI(c.box.Contents())
+	switch pi.Proto {
+	case TUNPI_P_VPN_HELLO:
+		switch pi.Flags {
+		case VPN_HELLO_F_UNIX_MICRO:
+			then, _ := endian.PullBigInteger[int64](pi.Data)
+			now := time.Now().UnixMicro()
+			if now > then {
+				d := time.Microsecond * time.Duration(now-then)
+				verbose.Println(ifrom, c.ap, "hello", d)
+			} else {
+				verbose.Println(ifrom, c.ap,
+					"hello from the future")
+			}
+		default:
+			verbose.Println(ifrom, c.ap, "unknown", pi.Flags)
+		}
 		inventory.Put(c)
 		return
-	case strings.HasPrefix(s, exWhoisAddressed):
-		s = strings.TrimPrefix(s, exWhoisAddressed)
-		s = strings.TrimSpace(s)
-		addr, err := egress.MarkResult(netip.ParseAddr(s))
-		if err != nil {
-			fmt.Fprintln(verbose, err)
+	case TUNPI_P_VPN_WHOIS:
+		switch pi.Flags {
+		case VPN_WHOIS_F_ADDRESSED:
+			if len(pi.Data) < 16 {
+				verbose.Print(ErrInvalid)
+				inventory.Put(c)
+				return
+			}
+			addr := netip.AddrFrom16([16]byte(pi.Data)).Unmap()
+			blk = ex.pem.addressed[addr]
+			if blk == nil {
+				ex.wg.Add(1)
+				go ex.whoisAddressedRoutine(ctx, addr)
+				inventory.Put(c)
+				return
+			}
+		case VPN_WHOIS_F_LABELLED:
+			lbl, _ := endian.PullBigInteger[label.Label](pi.Data)
+			if blk = ex.pem.labelled[lbl.Index()]; blk == nil {
+				ex.wg.Add(1)
+				go ex.whoisLabelledRoutine(ctx, lbl)
+				inventory.Put(c)
+				return
+			}
+		case VPN_WHOIS_F_SERVICE:
+			verbose.Print(FIXME)
 			inventory.Put(c)
 			return
-		} else if blk = ex.pem.addressed[addr]; blk == nil {
-			ex.wg.Add(1)
-			go ex.whoisAddressedRoutine(ctx, addr)
-			inventory.Put(c)
-			return
-		}
-	case strings.HasPrefix(s, exWhoisLabelled):
-		var lbl label.Label
-		s = strings.TrimPrefix(s, exWhoisLabelled)
-		s = strings.TrimSpace(s)
-		_, err := egress.MarkResult(fmt.Sscan(s, &lbl))
-		if err != nil {
-			fmt.Fprintln(verbose, err)
-			inventory.Put(c)
-			return
-		} else if blk = ex.pem.labelled[lbl.Index()]; blk == nil {
-			ex.wg.Add(1)
-			go ex.whoisLabelledRoutine(ctx, lbl)
+		default:
+			verbose.Println(ifrom, c.ap, "unknown", pi.Flags)
 			inventory.Put(c)
 			return
 		}
 	default:
-		verbose.Println(ifrom, c.ap, "unknown", s)
+		verbose.Println(ifrom, c.ap, "unknown", pi.Proto)
 		inventory.Put(c)
 		return
 	}
 	c.box = c.box.From(ex.label)
 	c.box = c.box.To(from)
 	c.box = c.box.Empty()
-	if err := egress.Mark(pem.Encode(c, blk)); err != nil {
-		fmt.Fprint(errata, err)
-		inventory.Put(c)
-	} else {
-		c.box = c.box.CloseWith(gcm)
-		c.box.SealWith(gcm)
-		c.Put(ex.ch.pkt.tx)
-	}
+	c.box = TunPI{
+		Flags: VPN_WHOIS_F_RESPONSE,
+		Proto: TUNPI_P_VPN_WHOIS,
+		Data:  pem.EncodeToMemory(blk),
+	}.Append(c.box)
+	c.box = c.box.CloseWith(gcm)
+	c.box.SealWith(gcm)
+	c.Put(ex.ch.pkt.tx)
 }
 
 func (ex *exchange) whoisAddressedRoutine(

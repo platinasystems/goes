@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
@@ -250,32 +251,34 @@ guestLoop:
 				inventory.Put(c)
 				continue guestLoop
 			}
-			if from == ex {
-				data := c.box.Contents()
-				blk, _ := pem.Decode(data)
-				if blk == nil {
+			pi := NewTunPI(c.box.Contents())
+			switch pi.Proto {
+			case TUNPI_P_VPN_HELLO:
+				verbose.Print(FIXME)
+				// re-checkin if registry era mismatch
+				// else re-query exchange from registry
+				// if that era is mismatched
+			case TUNPI_P_VPN_WHOIS:
+				if pi.Flags != VPN_WHOIS_F_RESPONSE {
+					errata.Printf("unknown %#x", pi.Flags)
+				} else if blk, _ := pem.
+					Decode(pi.Data); blk == nil {
 					errata.Print(ErrNotPEM)
-					inventory.Put(c)
-					continue guestLoop
-				}
-				if err = g.peer(blk); err != nil {
+				} else if err = g.peer(blk); err != nil {
 					fmt.Fprint(verbose, err)
 				}
 				inventory.Put(c)
-				continue guestLoop
-			}
-			pi := frame.Header[frame.TunPI](c.box.Contents())
-			pip := pi.Proto.Value()
-			if pip == frame.PI_P_IP || pip == frame.PI_P_IPV6 {
+			case TUNPI_P_IP, TUNPI_P_IPV6:
 				g.ch.tun.write <- c
-			} else {
-				verbose.Printf("unknown proto %#x", pip)
+			default:
+				verbose.Printf("unknown %#x", pi.Proto)
 				inventory.Put(c)
 			}
 		}
 	}
 }
 
+/*FIXME
 func (*guest) getLnIP(want4 bool) (net.IP, error) {
 	ifas, err := net.InterfaceAddrs()
 	if err != nil {
@@ -296,13 +299,18 @@ func (*guest) getLnIP(want4 bool) (net.IP, error) {
 	}
 	return nil, ErrNoServiceIP
 }
+*/
 
 func (g *guest) hello(to label.Label, now time.Time) {
 	ifrom := g.label.Index()
 	ito := to.Index()
 	c := newCrate()
 	c.box = c.box.Empty()
-	fmt.Fprintln(c, exHello, now.UTC())
+	c.box = TunPI{
+		Flags: VPN_HELLO_F_UNIX_MICRO,
+		Proto: TUNPI_P_VPN_HELLO,
+		Data:  endian.NewBigInteger(now.UnixMicro()),
+	}.Append(c.box)
 	c.box = c.box.From(g.label)
 	c.box = c.box.To(to)
 	via, ok := g.via[ito]
@@ -355,6 +363,7 @@ func (g *guest) tunReadRoutine(ctx context.Context) {
 			return
 		}
 		c.box = c.box.Shrink(n)
+		// FIXME rewrite frame package to use binary/endian
 		verbose.Print(frame.Header[frame.TunPI](c.box.Contents()))
 		g.ch.tun.read <- c
 	}
@@ -384,16 +393,25 @@ func (g *guest) tunWriteRoutine(ctx context.Context) {
 }
 
 func (g *guest) whoisAddressed(addr netip.Addr) {
+	a16 := addr.As16()
 	c := newCrate()
 	c.box = c.box.Empty()
-	fmt.Fprintln(c, "whois addressed", addr)
+	c.box = TunPI{
+		Flags: VPN_WHOIS_F_ADDRESSED,
+		Proto: TUNPI_P_VPN_WHOIS,
+		Data:  a16[:],
+	}.Append(c.box)
 	g.whois(c)
 }
 
 func (g *guest) whoisLabelled(lbl label.Label) {
 	c := newCrate()
 	c.box = c.box.Empty()
-	fmt.Fprintln(c, "whois labelled", lbl)
+	c.box = TunPI{
+		Flags: VPN_WHOIS_F_LABELLED,
+		Proto: TUNPI_P_VPN_WHOIS,
+		Data:  endian.NewBigInteger(lbl),
+	}.Append(c.box)
 	g.whois(c)
 }
 
