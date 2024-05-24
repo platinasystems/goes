@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 )
@@ -158,7 +158,7 @@ func (ex *exchange) rx(ctx context.Context, c *crate) {
 	case TUNPI_P_VPN_HELLO:
 		switch pi.Flags {
 		case VPN_HELLO_F_UNIX_MICRO:
-			then, _ := endian.PullBigInteger[int64](pi.Data)
+			then, _ := binint.PullBig[int64](pi.Data)
 			now := time.Now().UnixMicro()
 			if now > then {
 				d := time.Microsecond * time.Duration(now-then)
@@ -189,7 +189,7 @@ func (ex *exchange) rx(ctx context.Context, c *crate) {
 				return
 			}
 		case VPN_WHOIS_F_LABELLED:
-			lbl, _ := endian.PullBigInteger[label.Label](pi.Data)
+			lbl, _ := binint.PullBig[label.Label](pi.Data)
 			if blk = ex.pem.labelled[lbl.Index()]; blk == nil {
 				ex.wg.Add(1)
 				go ex.whoisLabelledRoutine(ctx, lbl)

@@ -4,7 +4,7 @@
 
 package vpn
 
-import "github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
+import "github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 
 const (
 	TUNPI_P_IP   = 0x800
@@ -34,14 +34,14 @@ type TunPI struct {
 }
 
 func NewTunPI(data []byte) *TunPI {
-	flags, data := endian.PullBigInteger[uint16](data)
-	proto, data := endian.PullBigInteger[uint16](data)
+	flags, data := binint.PullBig[uint16](data)
+	proto, data := binint.PullBig[uint16](data)
 	return &TunPI{flags, proto, data}
 }
 
 func (pi TunPI) Append(data []byte) []byte {
-	data = endian.AppendBigInteger(data, pi.Flags)
-	data = endian.AppendBigInteger(data, pi.Proto)
+	data = binint.AppendBig(data, pi.Flags)
+	data = binint.AppendBig(data, pi.Proto)
 	if pi.Data != nil && len(pi.Data) > 0 {
 		data = append(data, pi.Data...)
 	}

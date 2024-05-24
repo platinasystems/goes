@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/endian"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 	"github.com/platinasystems/goes/v2/pkg/net/frame"
@@ -309,7 +309,7 @@ func (g *guest) hello(to label.Label, now time.Time) {
 	c.box = TunPI{
 		Flags: VPN_HELLO_F_UNIX_MICRO,
 		Proto: TUNPI_P_VPN_HELLO,
-		Data:  endian.NewBigInteger(now.UnixMicro()),
+		Data:  binint.NewBig(now.UnixMicro()),
 	}.Append(c.box)
 	c.box = c.box.From(g.label)
 	c.box = c.box.To(to)
@@ -410,7 +410,7 @@ func (g *guest) whoisLabelled(lbl label.Label) {
 	c.box = TunPI{
 		Flags: VPN_WHOIS_F_LABELLED,
 		Proto: TUNPI_P_VPN_WHOIS,
-		Data:  endian.NewBigInteger(lbl),
+		Data:  binint.NewBig(lbl),
 	}.Append(c.box)
 	g.whois(c)
 }
