@@ -15,6 +15,10 @@ func Test(t *testing.T) {
 	for name, endian := range binint.Endians {
 		t.Run(name, func(t *testing.T) {
 			t.Helper()
+
+			var b [8]byte
+			var got float64
+
 			for _, want := range []float64{
 				math.E,
 				math.Pi,
@@ -26,8 +30,8 @@ func Test(t *testing.T) {
 				math.Ln2,
 				math.Ln10,
 			} {
-				data := New(endian, want)
-				got, _ := Pull[float64](endian, data)
+				Append(endian, b[:0], want)
+				Pull(endian, b[:], &got)
 				if got != want {
 					t.Error(got, "!=", want)
 				}

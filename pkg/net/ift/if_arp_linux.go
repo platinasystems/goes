@@ -2,8 +2,6 @@
 
 package ift
 
-import "github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
-
 const (
 	ARPHRD_NETROM   = 0
 	ARPHRD_ETHER    = 1
@@ -109,11 +107,3 @@ const (
 	ATF_NETMASK     = 0x20
 	ATF_DONTPUB     = 0x40
 )
-
-type ArpHdr struct {
-	HRD big.Uint16
-	PRO big.Uint16
-	HLN uint8
-	PLN uint8
-	OP  big.Uint16
-}

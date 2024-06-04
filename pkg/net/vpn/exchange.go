@@ -11,10 +11,9 @@ import (
 	"net"
 	"net/netip"
 	"sync"
-	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
 )
@@ -150,37 +149,33 @@ pktRxLoop:
 
 func (ex *exchange) rx(ctx context.Context, c *crate) {
 	var blk *pem.Block
+	var pi binph.TunPI
 	from := c.box.FromWhom()
 	ifrom := from.Index()
 	gcm := ex.gcm[ifrom]
-	pi := NewTunPI(c.box.Contents())
-	switch pi.Proto {
-	case TUNPI_P_VPN_HELLO:
-		switch pi.Flags {
-		case VPN_HELLO_F_UNIX_MICRO:
-			then, _ := binint.PullBig[int64](pi.Data)
-			now := time.Now().UnixMicro()
-			if now > then {
-				d := time.Microsecond * time.Duration(now-then)
-				verbose.Println(ifrom, c.ap, "hello", d)
-			} else {
-				verbose.Println(ifrom, c.ap,
-					"hello from the future")
-			}
-		default:
-			verbose.Println(ifrom, c.ap, "unknown", pi.Flags)
+	contents := c.box.Contents()
+	payload := pi.PullFrom(contents)
+	switch {
+	case len(payload) == len(contents):
+		verbose.Println(ifrom, c.ap, ErrUnderrun)
+		inventory.Put(c)
+		return
+	case pi.Proto == VPN_P_HELLO:
+		if span := VpnHelloTimeSpan(payload); span == 0 {
+			verbose.Println(ifrom, c.ap, "hello", ErrUnderrun)
+		} else {
+			verbose.Println(ifrom, c.ap, "hello", span)
 		}
 		inventory.Put(c)
 		return
-	case TUNPI_P_VPN_WHOIS:
-		switch pi.Flags {
-		case VPN_WHOIS_F_ADDRESSED:
-			if len(pi.Data) < 16 {
-				verbose.Print(ErrInvalid)
-				inventory.Put(c)
-				return
-			}
-			addr := netip.AddrFrom16([16]byte(pi.Data)).Unmap()
+	case pi.Proto == VPN_P_WHOIS_ADDRESSED:
+		if addr := VpnWhoisAddress(payload); !addr.IsValid() {
+			verbose.Println(ifrom, c.ap, "whois-addressed",
+				ErrUnderrun)
+			inventory.Put(c)
+			return
+		} else {
+			verbose.Println(ifrom, c.ap, "whois-addressed", addr)
 			blk = ex.pem.addressed[addr]
 			if blk == nil {
 				ex.wg.Add(1)
@@ -188,23 +183,32 @@ func (ex *exchange) rx(ctx context.Context, c *crate) {
 				inventory.Put(c)
 				return
 			}
-		case VPN_WHOIS_F_LABELLED:
-			lbl, _ := binint.PullBig[label.Label](pi.Data)
-			if blk = ex.pem.labelled[lbl.Index()]; blk == nil {
+		}
+	case pi.Proto == VPN_P_WHOIS_LABELLED:
+		if lbl, ok := VpnWhoisLabel(payload); !ok {
+			verbose.Println(ifrom, c.ap, "whois-labelled",
+				ErrUnderrun)
+			inventory.Put(c)
+			return
+		} else {
+			verbose.Println(ifrom, c.ap, "whois-labelled", lbl)
+			blk = ex.pem.labelled[lbl.Index()]
+			if blk == nil {
 				ex.wg.Add(1)
 				go ex.whoisLabelledRoutine(ctx, lbl)
 				inventory.Put(c)
 				return
 			}
-		case VPN_WHOIS_F_SERVICE:
-			verbose.Print(FIXME)
-			inventory.Put(c)
-			return
-		default:
-			verbose.Println(ifrom, c.ap, "unknown", pi.Flags)
-			inventory.Put(c)
-			return
 		}
+	case pi.Proto == VPN_P_WHOIS_SERVICE:
+		if ap := VpnWhoisService(payload); !ap.Addr().IsValid() {
+			verbose.Println(ifrom, c.ap, "whois-service",
+				ErrUnderrun)
+		} else {
+			verbose.Println(ifrom, c.ap, "whois-service", ap)
+		}
+		inventory.Put(c)
+		return
 	default:
 		verbose.Println(ifrom, c.ap, "unknown", pi.Proto)
 		inventory.Put(c)
@@ -213,11 +217,10 @@ func (ex *exchange) rx(ctx context.Context, c *crate) {
 	c.box = c.box.From(ex.label)
 	c.box = c.box.To(from)
 	c.box = c.box.Empty()
-	c.box = TunPI{
-		Flags: VPN_WHOIS_F_RESPONSE,
-		Proto: TUNPI_P_VPN_WHOIS,
-		Data:  pem.EncodeToMemory(blk),
-	}.Append(c.box)
+	c.box = binph.TunPI{
+		Proto: VPN_P_PUBLIC_KEY,
+	}.AppendTo(c.box)
+	c.box = AppendVpnPublicKey(c.box, blk)
 	c.box = c.box.CloseWith(gcm)
 	c.box.SealWith(gcm)
 	c.Put(ex.ch.pkt.tx)

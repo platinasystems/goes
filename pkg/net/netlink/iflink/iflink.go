@@ -2,7 +2,7 @@
 
 package iflink
 
-import "github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
+import "github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 
 type Stats[T uint32 | uint64] struct {
 	RxPackets,
@@ -510,8 +510,21 @@ const (
 const IFLA_VXLAN_MAX = IFLA_VXLAN_CNT - 1
 
 type IflaVxlanPortRange struct {
-	Low  big.Uint16
-	High big.Uint16
+	Low  uint16
+	High uint16
+}
+
+func NewIflaVxlanPortRange(data []byte) (*IflaVxlanPortRange, []byte) {
+	p := new(IflaVxlanPortRange)
+	data = binint.PullBig(data, &p.Low)
+	data = binint.PullBig(data, &p.High)
+	return p, data
+}
+
+func (v IflaVxlanPortRange) Append(data []byte) []byte {
+	data = binint.AppendBig(data, v.Low)
+	data = binint.AppendBig(data, v.High)
+	return data
 }
 
 const (
@@ -702,7 +715,24 @@ type IflaVfVlanInfo struct {
 	Vf        uint32
 	Vlan      uint32
 	Qos       uint32
-	VlanProto big.Uint16
+	VlanProto uint16
+}
+
+func NewIflaVfVlanInfo(data []byte) (*IflaVfVlanInfo, []byte) {
+	p := new(IflaVfVlanInfo)
+	data = binint.PullNative(data, &p.Vf)
+	data = binint.PullNative(data, &p.Vlan)
+	data = binint.PullNative(data, &p.Qos)
+	data = binint.PullBig(data, &p.VlanProto)
+	return p, data
+}
+
+func (v IflaVfVlanInfo) Append(data []byte) []byte {
+	data = binint.AppendNative(data, v.Vf)
+	data = binint.AppendNative(data, v.Vlan)
+	data = binint.AppendNative(data, v.Qos)
+	data = binint.AppendBig(data, v.VlanProto)
+	return data
 }
 
 type IflaVfTxRate struct {

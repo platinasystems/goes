@@ -5,9 +5,8 @@
 package lv
 
 import (
+	"encoding/binary"
 	"io"
-
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
 )
 
 type Decoding struct{ r io.Reader }
@@ -25,7 +24,7 @@ func (dec Decoding) Read(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	u := (*big.Uint16)(b).Value()
+	u := binary.BigEndian.Uint16(b)
 	e := u & Eflag
 	n = int(u & Efilter)
 	switch {

@@ -16,12 +16,13 @@ import (
 	"time"
 
 	"github.com/platinasystems/goes/v2/pkg/crypto/cipher/box/label"
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binpdu"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binph"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
+	"golang.org/x/exp/maps"
 )
 
 type guest struct {
@@ -127,6 +128,8 @@ Start VPN tunnel.
 	g.ch.pkt.tx = make(chan *crate, 4)
 	g.ch.tun.read = make(chan *crate, 4)
 	g.ch.tun.write = make(chan *crate, 4)
+
+	maps.Copy(binpdu.TunPIprotos, TunPIprotos)
 
 	g.wg.Add(1)
 	go pktRxRoutine(ctx, &g.wg, udp, g.ch.pkt.rx)
@@ -251,24 +254,27 @@ guestLoop:
 				inventory.Put(c)
 				continue guestLoop
 			}
-			pi := NewTunPI(c.box.Contents())
-			switch pi.Proto {
-			case TUNPI_P_VPN_HELLO:
+			contents := c.box.Contents()
+			var pi binph.TunPI
+			payload := pi.PullFrom(contents)
+			switch {
+			case len(payload) == len(contents):
+				verbose.Print(ErrUnderrun)
+				inventory.Put(c)
+			case pi.Proto == VPN_P_HELLO:
 				verbose.Print(FIXME)
 				// re-checkin if registry era mismatch
 				// else re-query exchange from registry
 				// if that era is mismatched
-			case TUNPI_P_VPN_WHOIS:
-				if pi.Flags != VPN_WHOIS_F_RESPONSE {
-					errata.Printf("unknown %#x", pi.Flags)
-				} else if blk, _ := pem.
-					Decode(pi.Data); blk == nil {
+			case pi.Proto == VPN_P_PUBLIC_KEY:
+				if blk, _ := pem.Decode(payload); blk == nil {
 					errata.Print(ErrNotPEM)
 				} else if err = g.peer(blk); err != nil {
 					fmt.Fprint(verbose, err)
 				}
 				inventory.Put(c)
-			case TUNPI_P_IP, TUNPI_P_IPV6:
+			case pi.Proto == binpdu.ETH_P_IP ||
+				pi.Proto == binpdu.ETH_P_IPV6:
 				g.ch.tun.write <- c
 			default:
 				verbose.Printf("unknown %#x", pi.Proto)
@@ -306,11 +312,10 @@ func (g *guest) hello(to label.Label, now time.Time) {
 	ito := to.Index()
 	c := newCrate()
 	c.box = c.box.Empty()
-	c.box = TunPI{
-		Flags: VPN_HELLO_F_UNIX_MICRO,
-		Proto: TUNPI_P_VPN_HELLO,
-		Data:  binint.NewBig(now.UnixMicro()),
-	}.Append(c.box)
+	c.box = binph.TunPI{
+		Proto: VPN_P_HELLO,
+	}.AppendTo(c.box)
+	c.box = AppendVpnHelloUnixMicro(c.box, now.UnixMicro())
 	c.box = c.box.From(g.label)
 	c.box = c.box.To(to)
 	via, ok := g.via[ito]
@@ -337,15 +342,26 @@ func (g *guest) hello(to label.Label, now time.Time) {
 	g.ch.pkt.tx <- c
 }
 
+var zaddr netip.Addr
+
 func (*guest) toWhom(contents []byte) netip.Addr {
-	pi := frame.Header[frame.TunPI](contents)
-	switch pi.Proto.Value() {
-	case frame.PI_P_IP:
-		return netip.AddrFrom4((*frame.IPv4)(frame.Data(pi)).DA)
-	case frame.PI_P_IPV6:
-		return netip.AddrFrom16((*frame.IPv6)(frame.Data(pi)).DA)
+	var pi binph.TunPI
+	payload := pi.PullFrom(contents)
+	switch {
+	case len(payload) == len(contents):
+		return zaddr
+	case pi.Proto == binpdu.ETH_P_IP:
+		var ip binph.IP
+		if pl := ip.PullFrom(payload); len(pl) < len(contents) {
+			return netip.AddrFrom4([4]byte(ip.DA))
+		}
+	case pi.Proto == binpdu.ETH_P_IPV6:
+		var ip6 binph.IP6
+		if pl := ip6.PullFrom(payload); len(pl) < len(contents) {
+			return netip.AddrFrom16([16]byte(ip6.DA))
+		}
 	}
-	return netip.Addr{}
+	return zaddr
 }
 
 func (g *guest) tunReadRoutine(ctx context.Context) {
@@ -363,8 +379,7 @@ func (g *guest) tunReadRoutine(ctx context.Context) {
 			return
 		}
 		c.box = c.box.Shrink(n)
-		// FIXME rewrite frame package to use binary/endian
-		verbose.Print(frame.Header[frame.TunPI](c.box.Contents()))
+		verbose.Print(binpdu.TunPI(c.box.Contents()))
 		g.ch.tun.read <- c
 	}
 }
@@ -385,7 +400,7 @@ func (g *guest) tunWriteRoutine(ctx context.Context) {
 			} else if _, err := g.tunnel.Write(data); err != nil {
 				verbose.Print(err)
 			} else {
-				verbose.Print(frame.Header[frame.TunPI](data))
+				verbose.Print(binpdu.TunPI(data))
 			}
 			inventory.Put(c)
 		}
@@ -393,25 +408,22 @@ func (g *guest) tunWriteRoutine(ctx context.Context) {
 }
 
 func (g *guest) whoisAddressed(addr netip.Addr) {
-	a16 := addr.As16()
 	c := newCrate()
 	c.box = c.box.Empty()
-	c.box = TunPI{
-		Flags: VPN_WHOIS_F_ADDRESSED,
-		Proto: TUNPI_P_VPN_WHOIS,
-		Data:  a16[:],
-	}.Append(c.box)
+	c.box = binph.TunPI{
+		Proto: VPN_P_WHOIS_ADDRESSED,
+	}.AppendTo(c.box)
+	c.box = AppendVpnWhoisAddress(c.box, addr)
 	g.whois(c)
 }
 
 func (g *guest) whoisLabelled(lbl label.Label) {
 	c := newCrate()
 	c.box = c.box.Empty()
-	c.box = TunPI{
-		Flags: VPN_WHOIS_F_LABELLED,
-		Proto: TUNPI_P_VPN_WHOIS,
-		Data:  binint.NewBig(lbl),
-	}.Append(c.box)
+	c.box = binph.TunPI{
+		Proto: VPN_P_WHOIS_LABELLED,
+	}.AppendTo(c.box)
+	c.box = AppendVpnWhoisLabel(c.box, lbl)
 	g.whois(c)
 }
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/platinasystems/goes/v2/pkg/encoding/binary/big"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 )
 
 type Encoding struct{ w io.Writer }
@@ -16,12 +16,12 @@ type Encoding struct{ w io.Writer }
 func NewEncoder(w io.Writer) Encoding { return Encoding{w} }
 
 // Args:
-//  - Recurse []any
-//  - Iterate []string
-//  - Break nil
-//  - Nack error
-//  - Write []byte, string
-//  - Format anything else
+//   - Recurse []any
+//   - Iterate []string
+//   - Break nil
+//   - Nack error
+//   - Write []byte, string
+//   - Format anything else
 func (enc Encoding) Encode(args ...any) (n int, err error) {
 	var brk [2]byte
 	for _, arg := range args {
@@ -64,7 +64,6 @@ func (enc Encoding) Encode(args ...any) (n int, err error) {
 
 // Write an encoded length followed by data to the encapsulated writer.
 func (enc Encoding) Write(data []byte) (t int, err error) {
-	var bign big.Uint16
 	n := len(data)
 	if n == 0 {
 		return
@@ -73,8 +72,7 @@ func (enc Encoding) Write(data []byte) (t int, err error) {
 		if n > Max {
 			n = Max
 		}
-		bign.Put(uint16(n))
-		if _, err = enc.w.Write(bign[:]); err != nil {
+		if _, err = enc.w.Write(binint.NewBig(uint16(n))); err != nil {
 			break
 		}
 		if _, err = enc.w.Write(data[:n]); err != nil {
@@ -89,14 +87,12 @@ func (enc Encoding) Write(data []byte) (t int, err error) {
 
 // A negative acknowledgment.
 func (enc Encoding) nack(err error) error {
-	var bign big.Uint16
 	data := []byte(err.Error())
 	n := len(data)
 	if n > Max {
 		return fmt.Errorf("nack length: %d: too large", n)
 	}
-	bign.Put(uint16(n) | Eflag)
-	if _, err = enc.w.Write(bign[:]); err == nil {
+	if _, err = enc.w.Write(binint.NewBig(uint16(n) | Eflag)); err == nil {
 		_, err = enc.w.Write(data)
 	}
 	return err

@@ -11,9 +11,9 @@ import (
 	"net/netip"
 
 	"github.com/platinasystems/goes/v2/pkg/context/poll"
+	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binpdu"
 	"github.com/platinasystems/goes/v2/pkg/errors/egress"
 	"github.com/platinasystems/goes/v2/pkg/goes"
-	"github.com/platinasystems/goes/v2/pkg/net/frame"
 	"github.com/platinasystems/goes/v2/pkg/net/netif"
 	"github.com/platinasystems/goes/v2/pkg/net/tuntap"
 	"github.com/platinasystems/goes/v2/pkg/sync/chunk"
@@ -103,20 +103,20 @@ func TunTapper(ctx context.Context, args []string) error {
 		min int
 	)
 
+	const (
+		sizeof_pi  = 4
+		sizeof_ip  = 20
+		sizeof_eth = 14
+	)
 	if !isTap {
-		pi := frame.Header[frame.TunPI](buf)
-		hdr = pi
-		ip := (*frame.IPv4)(frame.Data(pi))
-		min = frame.Sizeof(pi) + frame.Sizeof(ip)
+		hdr = binpdu.TunPI(buf)
+		min = sizeof_pi + sizeof_ip
 	} else if tuntap.HasPI {
-		pi := frame.Header[frame.TapPI](buf)
-		hdr = pi
-		eth := (*frame.ETH)(frame.Data(pi))
-		min = frame.Sizeof(pi) + frame.Sizeof(eth)
+		hdr = binpdu.TunPI(buf)
+		min = sizeof_pi + sizeof_eth
 	} else {
-		eth := frame.Header[frame.ETH](buf)
-		hdr = eth
-		min = frame.Sizeof(eth)
+		hdr = binpdu.Eth(buf)
+		min = sizeof_eth
 	}
 
 	p := poll.WithReader(ctx, f)

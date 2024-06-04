@@ -5,86 +5,59 @@
 package binfloat
 
 import (
+	"encoding/binary"
 	"math"
 	"unsafe"
 
 	"github.com/platinasystems/goes/v2/pkg/encoding/binary/binint"
 )
 
-type Endian = binint.Endian
+type Floater interface{ ~float32 | ~float64 }
 
-type Float interface {
-	~float32 | ~float64
-}
-
-var Big = binint.Big
-var Little = binint.Little
-var Native = binint.Native
-
-func Append[F Float](endian Endian, data []byte, f F) []byte {
-	switch unsafe.Sizeof(f) {
+func Append[F Floater](apo binary.AppendByteOrder, data []byte, v F) []byte {
+	switch unsafe.Sizeof(v) {
 	case 4:
-		data = binint.Append(endian, data, math.Float32bits(float32(f)))
+		data = binint.Append(apo, data, math.Float32bits(float32(v)))
 	case 8:
-		data = binint.Append(endian, data, math.Float64bits(float64(f)))
+		data = binint.Append(apo, data, math.Float64bits(float64(v)))
 	}
 	return data
 }
 
-func AppendBig[F Float](data []byte, f F) []byte {
-	return Append(Big, data, f)
+func AppendBig[F Floater](data []byte, v F) []byte {
+	return Append(binary.BigEndian, data, v)
 }
 
-func AppendLittle[F Float](data []byte, f F) []byte {
-	return Append(Little, data, f)
+func AppendLittle[F Floater](data []byte, v F) []byte {
+	return Append(binary.LittleEndian, data, v)
 }
 
-func AppendNative[F Float](data []byte, f F) []byte {
-	return Append(Native, data, f)
+func AppendNative[F Floater](data []byte, v F) []byte {
+	return Append(binary.NativeEndian, data, v)
 }
 
-func New[F Float](endian Endian, f F) (data []byte) {
-	switch unsafe.Sizeof(f) {
+func Pull[F Floater](bo binary.ByteOrder, data []byte, p *F) []byte {
+	switch unsafe.Sizeof(*p) {
 	case 4:
-		data = binint.New(endian, math.Float32bits(float32(f)))
+		var u uint32
+		data = binint.Pull(bo, data, &u)
+		*p = F(math.Float32frombits(u))
 	case 8:
-		data = binint.New(endian, math.Float64bits(float64(f)))
+		var u uint64
+		data = binint.Pull(bo, data, &u)
+		*p = F(math.Float64frombits(u))
 	}
-	return
+	return data
 }
 
-func NewBig[F Float](f F) []byte {
-	return New(Big, f)
+func PullBig[F Floater](data []byte, p *F) []byte {
+	return Pull[F](binary.BigEndian, data, p)
 }
 
-func NewLittle[F Float](f F) []byte {
-	return New(Little, f)
+func PullLittle[F Floater](data []byte, p *F) []byte {
+	return Pull[F](binary.LittleEndian, data, p)
 }
 
-func NewNative[F Float](f F) []byte {
-	return New(Native, f)
-}
-
-func Pull[F Float](endian Endian, data []byte) (f F, rem []byte) {
-	switch unsafe.Sizeof(f) {
-	case 4:
-		f = F(math.Float32frombits(endian.Uint32(data)))
-		rem = data[4:]
-	case 8:
-		f = F(math.Float64frombits(endian.Uint64(data)))
-		rem = data[8:]
-	}
-	return
-}
-
-func PullBig[F Float](data []byte) (f F, rem []byte) {
-	return Pull[F](Big, data)
-}
-
-func PullLittle[F Float](data []byte) (f F, rem []byte) {
-	return Pull[F](Little, data)
-}
-
-func PullNative[F Float](data []byte) (f F, rem []byte) {
-	return Pull[F](Native, data)
+func PullNative[F Floater](data []byte, p *F) []byte {
+	return Pull[F](binary.NativeEndian, data, p)
 }
